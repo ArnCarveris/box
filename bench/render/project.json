@@ -113,7 +113,9 @@
                 "benchcases": [
                     "none",
                     "one",
-                    "sixteen"
+                    "sixteen",
+                    "lights_off",
+                    "lights"
                 ]
             },
             {

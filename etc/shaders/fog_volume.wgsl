@@ -14,18 +14,35 @@
 // geometry. A pixel whose ray misses the box, or meets geometry before it, is discarded.
 //
 // The segment is marched in steps scaled by its share of the diagonal of the box, at least 4,
-// from an offset of one interleaved gradient noise step of the pixel, which does not change with
-// the frame. The density is the density of the volume times a smoothstep from 0 at the faces of
-// the box to 1 at edge_fade inside. Each step integrates the in scattered light of the step
+// or 8 with noise, from an offset of one interleaved gradient noise step of the pixel, which does
+// not change with the frame. The density is the density of the volume times a smoothstep from 0
+// at the faces of the box to 1 at edge_fade inside.
+//
+// With a noise_strength above 0 the density is also scaled by the tileable 3D noise texture
+// (group 1), sampled twice at the world position moved back by the wind times the time of the
+// frame and divided by noise_scale: a coarse sample and a detail sample at 3.1 times the
+// frequency. The noise is in world space, not in the frame of the box, so a volume that moves
+// or turns does not drag its billows along, and volumes that overlap share them. A volume
+// without noise takes no samples. Each step integrates the in scattered light of the step
 // analytically over its extinction (Frostbite, Hillaire 2015) and the march stops once the
 // transmittance falls under TRANSMITTANCE_MIN.
 //
 // The light scattered at a point is the mean ambient of the view over up and down (ambient.wgsl,
 // the environment or the hemisphere, not the probe volume) times ambient_inscatter, plus the
 // first directional light over pi through its cascades (shadow_point) and light cookie, times
-// the Henyey-Greenstein phase of the volume times 4 pi, as in fog.wgsl, and sun_inscatter. The
-// other lights are not marched. A view that applies the aerial perspective attenuates the
-// scattered light by the transmittance of the atmosphere at the middle of the segment.
+// the Henyey-Greenstein phase of the volume times 4 pi, as in fog.wgsl, and sun_inscatter, plus
+// the point and spot lights of the clusters of the view (light_at). The other directional lights
+// are not marched. A view that applies the aerial perspective attenuates the scattered light by
+// the transmittance of the atmosphere at the middle of the segment.
+//
+// The point and spot lights are marched when light_inscatter is above 0 and the view has any. To
+// bound their cost the march is split into FOG_LIGHT_SEGMENTS segments of its steps; the first
+// step of a segment with density looks up the cluster of the middle of the segment and keeps its
+// first FOG_LIGHT_SEGMENTS lights for the steps of the segment, so a ray makes at most that many
+// cluster lookups and a dense cluster may lose lights. A light adds its color times attenuation
+// (attenuation.wgsl) over pi, the phase and light_inscatter, through one depth comparison of its
+// shadow tile when it has one (punctual_shadow_point). A volume or a view without them takes
+// none of this path.
 //
 // The output is the scattered light in rgb and the transmittance of the background in a, blended
 // as color = src + dst * src.a with the alpha of the target kept. The fragment discards and
@@ -33,6 +50,8 @@
 // level or gradient sample.
 #include "include/lights.wgsl"
 #include "include/shadow.wgsl"
+#include "include/point_shadow.wgsl"
+#include "include/attenuation.wgsl"
 #include "include/cookie.wgsl"
 #include "include/ambient.wgsl"
 #include "include/aerial.wgsl"
@@ -44,6 +63,13 @@ const TRANSMITTANCE_MIN: f32 = 0.001;
 
 // Steps of a march at least.
 const STEPS_MIN: i32 = 4;
+
+// Steps of a march at least when the volume has noise.
+const STEPS_MIN_NOISE: i32 = 8;
+
+// Cluster lookups of a march at most, and the lights of each it keeps at most,
+// BOX_FOG_VOLUME_LIGHT_STEPS.
+const FOG_LIGHT_SEGMENTS: i32 = 8;
 
 struct FogVolume {
     center: vec3f,
@@ -57,18 +83,29 @@ struct FogVolume {
     sun_inscatter: f32,
     ambient_inscatter: f32,
     steps: i32,
+    wind: vec3f,
+    noise_strength: f32,
+    noise_scale: f32,
+    light_inscatter: f32,
+    pad0: f32,
+    pad1: f32,
 };
 
 struct FogDraw {
     inv_view_proj: mat4x4f,
+    // World time of the frame in seconds
+    time: f32,
 };
 
 @group(0) @binding(0) var<uniform> view: View;
 @group(0) @binding(1) var<storage, read> lights: array<Light>;
+@group(0) @binding(2) var<storage, read> clusters: array<u32>;
 
 @group(1) @binding(0) var<storage, read> volumes: array<FogVolume>;
 @group(1) @binding(1) var<uniform> draw: FogDraw;
 @group(1) @binding(2) var depth_texture: texture_depth_2d;
+@group(1) @binding(3) var noise: texture_3d<f32>;
+@group(1) @binding(4) var noise_sampler: sampler;
 
 struct VertexOut {
     @builtin(position) clip: vec4f,
@@ -135,6 +172,62 @@ fn edge(fog: FogVolume, q: vec3f) -> f32 {
     return smoothstep(0.0, fog.edge_fade, d);
 }
 
+// Density of a volume at a point, q in its local frame and p in the world.
+fn density(fog: FogVolume, q: vec3f, p: vec3f) -> f32 {
+    var value = fog.density * edge(fog, q);
+    if (value > 0.0 && fog.noise_strength > 0.0) {
+        let uvw = (p - fog.wind * draw.time) / fog.noise_scale;
+        let n = textureSampleLevel(noise, noise_sampler, uvw, 0.0).r;
+        let detail = textureSampleLevel(noise, noise_sampler, uvw * 3.1 + vec3f(0.37), 0.0).r;
+        let v = n * 0.75 + detail * 0.25;
+        value *= mix(1.0, saturate(v * 2.0), fog.noise_strength);
+    }
+
+    return value;
+}
+
+// Point and spot lights of the segment of the march the fragment is in, indices into lights.
+var<private> segment_lights: array<u32, FOG_LIGHT_SEGMENTS>;
+var<private> segment_count: u32;
+
+// Keep the first FOG_LIGHT_SEGMENTS point and spot lights of the cluster of a position for the
+// steps of a segment.
+fn segment_lookup(p: vec3f) {
+    let cluster = cluster_index(view, cluster_view_position(view, p));
+    let first = 1u + 2u * cluster_count(view) + clusters[1u + 2u * cluster];
+    let count = min(cluster_lights(clusters[2u + 2u * cluster]), u32(FOG_LIGHT_SEGMENTS));
+    for (var i = 0u; i < count; i++) {
+        segment_lights[i] = clusters[first + i];
+    }
+    segment_count = count;
+}
+
+// Light the point and spot lights of the segment scatter at a position toward the eye along a
+// ray direction: color times attenuation over pi, the phase of the volume and light_inscatter,
+// through one comparison of the shadow tile of a light that has one.
+fn light_at(fog: FogVolume, p: vec3f, dir: vec3f) -> vec3f {
+    var sum = vec3f(0.0);
+    for (var i = 0u; i < segment_count; i++) {
+        let light = lights[segment_lights[i]];
+        let delta = light.position - p;
+        let dist = length(delta);
+        let l = delta / max(dist, 1e-4);
+        let a = attenuation(light, l, dist);
+        if (a <= 0.0) {
+            continue;
+        }
+
+        var visible = 1.0;
+        if (light.shadow < view.spot_config.x) {
+            visible = punctual_shadow_point(light, p);
+        }
+
+        sum += light.color * (a / PI * phase(dot(dir, l), fog.asymmetry) * visible);
+    }
+
+    return sum * fog.light_inscatter;
+}
+
 @fragment
 fn fs(in: VertexOut) -> @location(0) vec4f {
     let fog = volumes[in.instance];
@@ -171,8 +264,9 @@ fn fs(in: VertexOut) -> @location(0) vec4f {
 
     let span = t_far - t_near;
     let diagonal = max(2.0 * length(fog.extent), 1e-5);
-    let budget = max(fog.steps, STEPS_MIN);
-    let steps = clamp(i32(ceil(f32(budget) * span / diagonal)), STEPS_MIN, budget);
+    let steps_min = select(STEPS_MIN, STEPS_MIN_NOISE, fog.noise_strength > 0.0);
+    let budget = max(fog.steps, steps_min);
+    let steps = clamp(i32(ceil(f32(budget) * span / diagonal)), steps_min, budget);
     let ds = span / f32(steps);
     let jitter = gradient_noise(floor(in.clip.xy));
 
@@ -187,23 +281,39 @@ fn fs(in: VertexOut) -> @location(0) vec4f {
             fog.sun_inscatter;
     }
 
+    let local = fog.light_inscatter > 0.0 && view.lights.y > view.lights.x;
+    let segments = min(steps, FOG_LIGHT_SEGMENTS);
+    var segment = -1;
+    segment_count = 0u;
+
     var transmittance = 1.0;
     var inscatter = vec3f(0.0);
     for (var i = 0; i < steps; i++) {
         let t = t_near + (f32(i) + jitter) * ds;
-        let density = fog.density * edge(fog, o + d * t);
-        if (density <= 0.0) {
+        let p = origin + dir * t;
+        let sigma = density(fog, o + d * t, p);
+        if (sigma <= 0.0) {
             continue;
         }
 
-        let p = origin + dir * t;
         var light = ambient_light;
         if (sun) {
             light += sun_light * shadow_point(p) * light_cookie(p, l, up);
         }
 
-        let extinction = density;
-        let scatter = density * (1.0 - fog.absorption);
+        if (local) {
+            let k = i * segments / steps;
+            if (k != segment) {
+                segment = k;
+                let middle = t_near + (f32(k) + 0.5) * span / f32(segments);
+                segment_lookup(origin + dir * middle);
+            }
+
+            light += light_at(fog, p, dir);
+        }
+
+        let extinction = sigma;
+        let scatter = sigma * (1.0 - fog.absorption);
         let step_t = exp(-extinction * ds);
         let s = fog.color * scatter * light;
         let sint = (s - s * step_t) / max(extinction, 1e-5);
