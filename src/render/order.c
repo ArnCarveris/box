@@ -404,9 +404,12 @@ static void box_draws_rank_write(
     }
 }
 
-/** Make the runs: the shape slot and then the glyph slots of every entity in order. Rank the
- * shape and the glyphs of every entity in the order of its tree (box_draws_rank_next), the
- * floating elements of a tree after the rest of it, and write the ranks that changed.
+/** Make the runs: the shadow slot, the shape slot and then the glyph slots of every entity in
+ * order.
+ *
+ * Rank the shadow, the shape and the glyphs of every entity in the order of its tree
+ * (box_draws_rank_next), the floating elements of a tree after the rest of it, and write the
+ * ranks that changed.
  *
  * @param world The world
  * @param d The state
@@ -426,6 +429,13 @@ static void box_draws_order_runs(
         }
 
         ecs_map_val_t *tree = ecs_map_ensure(&d->tree_ranks, order[i].tree);
+        BoxShadowSlot *bs = ecs_get_mut(world, e, BoxShadowSlot);
+        if (bs && bs->batch >= 0) {
+            bs->rank = box_draws_rank_next(tree, bs->rank);
+            box_draws_run_add(d, bs->batch, bs->slot);
+            box_draws_rank_write(box_draws_batch(d, bs->batch), bs->slot, bs->rank);
+        }
+
         DrawSlot *s = ecs_get_mut(world, e, DrawSlot);
         if (s && s->batch >= 0 &&
             box_draws_batch(d, s->batch)->key.pipeline == BOX_RENDER_SHADER_SHAPE2D)

@@ -623,7 +623,15 @@
                     "culled_by_view",
                     "created_in_post_update",
                     "created_in_pre_store",
-                    "created_in_on_store"
+                    "created_in_on_store",
+                    "box_shadow_darkens_and_falls_off",
+                    "box_shadow_offset_spread_edges",
+                    "box_shadow_under_element",
+                    "box_shadow_sibling_order",
+                    "box_shadow_clipped",
+                    "box_shadow_past_view_edge",
+                    "box_shadow_needs_rect_or_circle",
+                    "box_shadow_slots_freed"
                 ]
             },
             {

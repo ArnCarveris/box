@@ -323,6 +323,39 @@
                 ]
             },
             {
+                "id": "Curve",
+                "setup": true,
+                "testcases": [
+                    "linear",
+                    "catmull_rom",
+                    "bezier",
+                    "no_keys",
+                    "one_key",
+                    "uneven_linear",
+                    "uneven_catmull_rom",
+                    "catmull_rom_slope_continuous",
+                    "bezier_authored_slopes",
+                    "bezier_time_linear",
+                    "cubic3",
+                    "area_linear",
+                    "area_catmull_rom",
+                    "area_bezier",
+                    "bake",
+                    "solve_css",
+                    "solve_degenerate",
+                    "validate_valid",
+                    "validate_kind",
+                    "validate_time_order",
+                    "validate_time_equal",
+                    "validate_time_not_finite",
+                    "validate_value_not_finite",
+                    "validate_slope_not_finite",
+                    "script_positional",
+                    "script_named",
+                    "copy_delete_no_leak"
+                ]
+            },
+            {
                 "id": "SetAt",
                 "testcases": [
                     "runs_at_frame",

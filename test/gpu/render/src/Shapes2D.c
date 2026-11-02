@@ -1510,3 +1510,445 @@ void Shapes2D_created_in_on_store(void) {
     ecs_os_free(path);
     ecs_fini(world);
 }
+
+/** Make a world with an ortho camera of one unit per pixel, a white background and a 64x64
+ * capture.
+ *
+ * @param file The name of the capture
+ * @param culling Whether the view culls
+ * @return The world
+ */
+static ecs_world_t* Shapes2D_shadow_world(
+    const char *file,
+    bool culling)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    if (culling) {
+        ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+    }
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set_name(world, view, "shadow_view");
+    ecs_set(world, view, View, {.camera = camera,
+        .culling = {.enabled = culling, .occlusion = culling, .min_dimension_px = 1},
+        .clear = {.enabled = true, .color = {255, 255, 255, 255}}});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 64,
+        .write_to_file = ECS_CONST_CAST(char*, file), .resolution_scale = 1});
+
+    return world;
+}
+
+/** Render a frame of a world made by Shapes2D_shadow_world and read its capture.
+ *
+ * @param world The world
+ * @param file The name of the capture
+ * @return The pixels, freed with stbi_image_free
+ */
+static unsigned char* Shapes2D_shadow_capture(
+    ecs_world_t *world,
+    const char *file)
+{
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, file);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 64);
+    test_int(h, 64);
+    ecs_os_free(path);
+
+    return px;
+}
+
+/** Get a pixel of a 64x64 capture.
+ *
+ * @param px The pixels
+ * @param x The column
+ * @param y The row, 0 at the top
+ * @return The RGBA of the pixel
+ */
+static const unsigned char* Shapes2D_at(
+    const unsigned char *px,
+    int32_t x,
+    int32_t y)
+{
+    return &px[(y * 64 + x) * 4];
+}
+
+/** Add a white rect with a shadow.
+ *
+ * @param world The world
+ * @param parent The parent, 0 for none
+ * @param x Its x position
+ * @param y Its y position
+ * @param size Its width and height
+ * @param shadow Its shadow
+ * @return The rect
+ */
+static ecs_entity_t Shapes2D_shadowed(
+    ecs_world_t *world,
+    ecs_entity_t parent,
+    float x,
+    float y,
+    float size,
+    BoxShadow shadow)
+{
+    ecs_entity_t e = parent ? ecs_new_w_pair(world, EcsChildOf, parent) : ecs_new(world);
+    ecs_set(world, e, Position, {x, y, 0});
+    ecs_set(world, e, Rect, {size, size});
+    ecs_set(world, e, Rgb, {255, 255, 255});
+    ecs_set_ptr(world, e, BoxShadow, &shadow);
+
+    return e;
+}
+
+/** Count the instances the last frame of a null backend drew.
+ *
+ * @param null The null backend
+ * @return The sum of the instances of its draws
+ */
+static int32_t Shapes2D_drawn(
+    const box_render_null_t *null)
+{
+    int32_t i, result = 0;
+    for (i = 0; i < ecs_vec_count(&null->last.batches); i ++) {
+        result += (int32_t)ecs_vec_get_t(
+            &null->last.batches, box_render_batch_t, i)->instance_count;
+    }
+
+    return result;
+}
+
+void Shapes2D_box_shadow_darkens_and_falls_off(void) {
+    // ui/box_shadow
+    ecs_world_t *world = Shapes2D_shadow_world("shadow_falloff.png", false);
+    Shapes2D_shadowed(world, 0, 0, 0, 20,
+        (BoxShadow){.blur = 8, .color = {0, 0, 0, 255}});
+    unsigned char *px = Shapes2D_shadow_capture(world, "shadow_falloff.png");
+    const unsigned char *c = Shapes2D_at(px, 32, 32);
+    test_assert(c[0] > 245 && c[1] > 245 && c[2] > 245);
+    c = Shapes2D_at(px, 41, 32);
+    test_assert(c[0] > 245);
+    int32_t near_ = Shapes2D_at(px, 42, 32)[0];
+    int32_t mid = Shapes2D_at(px, 45, 32)[0];
+    int32_t far_ = Shapes2D_at(px, 48, 32)[0];
+    test_assert(near_ < 220);
+    test_assert(near_ < mid);
+    test_assert(mid < far_);
+    test_assert(Shapes2D_at(px, 59, 32)[0] > 250);
+    test_assert(Shapes2D_at(px, 32, 59)[0] > 250);
+    test_assert(Shapes2D_at(px, 21, 32)[0] < 220);
+    test_assert(Shapes2D_at(px, 32, 21)[0] < 220);
+    test_assert(Shapes2D_at(px, 32, 42)[0] < 220);
+    test_assert(abs((int)Shapes2D_at(px, 21, 32)[0] - near_) <= 3);
+    stbi_image_free(px);
+
+    ecs_fini(world);
+}
+
+void Shapes2D_box_shadow_offset_spread_edges(void) {
+    // ui/box_shadow
+    ecs_world_t *world = Shapes2D_shadow_world("shadow_edges.png", false);
+    ecs_entity_t e = Shapes2D_shadowed(world, 0, 0, 0, 20, (BoxShadow){
+        .offset_x = 6, .offset_y = -6, .spread = 2, .color = {0, 0, 0, 255}});
+    unsigned char *px = Shapes2D_shadow_capture(world, "shadow_edges.png");
+    test_assert(Shapes2D_at(px, 32, 32)[0] > 245);
+    test_assert(Shapes2D_at(px, 48, 45)[0] < 10);
+    test_assert(Shapes2D_at(px, 51, 45)[0] > 250);
+    test_assert(Shapes2D_at(px, 49, 45)[0] < Shapes2D_at(px, 50, 45)[0]);
+    test_assert(Shapes2D_at(px, 45, 48)[0] < 10);
+    test_assert(Shapes2D_at(px, 45, 51)[0] > 250);
+    test_assert(Shapes2D_at(px, 27, 45)[0] < 10);
+    test_assert(Shapes2D_at(px, 24, 45)[0] > 250);
+    test_assert(Shapes2D_at(px, 45, 16)[0] > 250);
+    test_assert(Shapes2D_at(px, 45, 27)[0] < 10);
+    stbi_image_free(px);
+
+    ecs_set(world, e, BoxShadow, {.spread = 6, .color = {0, 0, 0, 255}});
+    px = Shapes2D_shadow_capture(world, "shadow_edges.png");
+    test_assert(Shapes2D_at(px, 46, 17)[0] < 10);
+    test_assert(Shapes2D_at(px, 17, 46)[0] < 10);
+    test_assert(Shapes2D_at(px, 49, 32)[0] > 250);
+    stbi_image_free(px);
+
+    ecs_set(world, e, Border, {.radius = 8});
+    px = Shapes2D_shadow_capture(world, "shadow_edges.png");
+    test_assert(Shapes2D_at(px, 47, 16)[0] > 245);
+    test_assert(Shapes2D_at(px, 16, 47)[0] > 245);
+    test_assert(Shapes2D_at(px, 42, 21)[0] < 40);
+    test_assert(Shapes2D_at(px, 46, 31)[0] < 10);
+    stbi_image_free(px);
+
+    ecs_set(world, e, BoxShadow, {.spread = -4, .color = {0, 0, 0, 255}});
+    ecs_set(world, e, Rgb, {255, 0, 0});
+    px = Shapes2D_shadow_capture(world, "shadow_edges.png");
+    const unsigned char *c = Shapes2D_at(px, 32, 32);
+    test_assert(c[0] > 245 && c[1] < 10);
+    test_assert(Shapes2D_at(px, 43, 32)[1] > 250);
+    stbi_image_free(px);
+
+    ecs_set(world, e, BoxShadow, {.spread = -10, .color = {0, 0, 0, 255}});
+    ecs_set(world, e, Opacity, {0.5f});
+    px = Shapes2D_shadow_capture(world, "shadow_edges.png");
+    c = Shapes2D_at(px, 32, 32);
+    test_assert(c[0] > 245 && c[1] > 170 && c[1] < 205);
+    stbi_image_free(px);
+
+    ecs_fini(world);
+}
+
+void Shapes2D_box_shadow_under_element(void) {
+    // ui/box_shadow
+    ecs_world_t *world = Shapes2D_shadow_world("shadow_under.png", false);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Rect, {21, 21});
+    ecs_set(world, e, Rgb, {255, 0, 0});
+    ecs_set(world, e, BoxShadow, {.blur = 4, .color = {0, 0, 0, 255}});
+    unsigned char *px = Shapes2D_shadow_capture(world, "shadow_under.png");
+    const unsigned char *c = Shapes2D_at(px, 41, 32);
+    test_assert(c[0] > 245 && c[1] < 10 && c[2] < 10);
+    c = Shapes2D_at(px, 32, 32);
+    test_assert(c[0] > 245 && c[1] < 10 && c[2] < 10);
+    c = Shapes2D_at(px, 42, 32);
+    test_assert(c[0] > 210 && c[1] > 90 && c[1] < 180);
+    test_assert(Shapes2D_at(px, 43, 32)[1] < 230);
+    test_assert(Shapes2D_at(px, 43, 32)[1] > Shapes2D_at(px, 42, 32)[1]);
+    stbi_image_free(px);
+
+    ecs_set(world, e, BoxShadow, {.color = {0, 0, 0, 255}});
+    ecs_set(world, e, BlendMode, {Additive});
+    px = Shapes2D_shadow_capture(world, "shadow_under.png");
+    c = Shapes2D_at(px, 32, 32);
+    test_assert(c[0] > 245 && c[1] < 10 && c[2] < 10);
+    c = Shapes2D_at(px, 39, 25);
+    test_assert(c[0] > 245 && c[1] < 10 && c[2] < 10);
+    c = Shapes2D_at(px, 52, 32);
+    test_assert(c[0] > 250 && c[1] > 250 && c[2] > 250);
+    stbi_image_free(px);
+
+    ecs_fini(world);
+}
+
+void Shapes2D_box_shadow_sibling_order(void) {
+    // ui/box_shadow
+    ecs_world_t *world = Shapes2D_shadow_world("shadow_siblings.png", false);
+    ecs_entity_t panel = ecs_new(world);
+    ecs_set(world, panel, Position, {0, 0, 0});
+    ecs_entity_t early = ecs_new_w_pair(world, EcsChildOf, panel);
+    ecs_set(world, early, Position, {-12, 0, 0});
+    ecs_set(world, early, Rect, {16, 40});
+    ecs_set(world, early, Rgb, {0, 255, 0});
+    Shapes2D_shadowed(world, panel, 0, 0, 12,
+        (BoxShadow){.spread = 10, .color = {0, 0, 0, 255}});
+    ecs_entity_t late = ecs_new_w_pair(world, EcsChildOf, panel);
+    ecs_set(world, late, Position, {12, 0, 0});
+    ecs_set(world, late, Rect, {16, 40});
+    ecs_set(world, late, Rgb, {255, 0, 0});
+    unsigned char *px = Shapes2D_shadow_capture(world, "shadow_siblings.png");
+    const unsigned char *c = Shapes2D_at(px, 17, 32);
+    test_assert(c[1] < 10);
+    c = Shapes2D_at(px, 17, 13);
+    test_assert(c[0] < 10 && c[1] > 245);
+    c = Shapes2D_at(px, 46, 32);
+    test_assert(c[0] > 245 && c[1] < 10 && c[2] < 10);
+    c = Shapes2D_at(px, 32, 32);
+    test_assert(c[0] > 245 && c[1] > 245 && c[2] > 245);
+    stbi_image_free(px);
+
+    ecs_fini(world);
+}
+
+void Shapes2D_box_shadow_clipped(void) {
+    // ui/box_shadow
+    ecs_world_t *world = Shapes2D_shadow_world("shadow_clip.png", false);
+    ecs_entity_t clip = ecs_new(world);
+    ecs_set(world, clip, Position, {0, 0, 0});
+    ecs_set(world, clip, Rect, {20, 20});
+    ecs_set(world, clip, Rgb, {255, 255, 255});
+    ecs_add_id(world, clip, ClipChildren);
+    Shapes2D_shadowed(world, clip, 0, 0, 10,
+        (BoxShadow){.spread = 10, .color = {0, 0, 0, 255}});
+    unsigned char *px = Shapes2D_shadow_capture(world, "shadow_clip.png");
+    test_assert(Shapes2D_at(px, 32, 32)[0] > 245);
+    test_assert(Shapes2D_at(px, 40, 32)[0] < 10);
+    test_assert(Shapes2D_at(px, 32, 23)[0] < 10);
+    test_assert(Shapes2D_at(px, 44, 32)[0] > 250);
+    test_assert(Shapes2D_at(px, 32, 44)[0] > 250);
+    test_assert(Shapes2D_at(px, 19, 19)[0] > 250);
+    stbi_image_free(px);
+
+    ecs_fini(world);
+}
+
+void Shapes2D_box_shadow_past_view_edge(void) {
+    // ui/box_shadow
+    ecs_world_t *world = Shapes2D_shadow_world("shadow_edge.png", true);
+    Shapes2D_shadowed(world, 0, 40, 0, 10,
+        (BoxShadow){.offset_x = -20, .blur = 4, .color = {0, 0, 0, 255}});
+    Shapes2D_shadowed(world, 0, -36, 0, 20,
+        (BoxShadow){.blur = 16, .color = {0, 0, 0, 255}});
+    unsigned char *px = Shapes2D_shadow_capture(world, "shadow_edge.png");
+    ecs_entity_t view = ecs_lookup(world, "shadow_view");
+    box_render_cull_stats_t stats;
+    test_bool(box_render_gpu_cull_stats(world, view, &stats), true);
+    test_int(stats.tested, 4);
+    test_int(stats.visible, 3);
+    test_assert(Shapes2D_at(px, 52, 32)[0] < 40);
+    test_assert(Shapes2D_at(px, 62, 32)[0] > 250);
+    test_assert(Shapes2D_at(px, 0, 32)[0] > 245);
+    test_assert(Shapes2D_at(px, 8, 32)[0] < 220);
+    test_assert(Shapes2D_at(px, 8, 32)[0] < Shapes2D_at(px, 14, 32)[0]);
+    stbi_image_free(px);
+
+    ecs_fini(world);
+}
+
+void Shapes2D_box_shadow_needs_rect_or_circle(void) {
+    // ui/box_shadow
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    ecs_entity_t line = ecs_new(world);
+    ecs_set(world, line, Position, {0, 0, -10});
+    ecs_set(world, line, Line, {.x1 = 0, .y1 = 0, .x2 = 1, .y2 = 1, .width = 1});
+    ecs_entity_t label = ecs_new(world);
+    ecs_set(world, label, Position, {0, 0, -10});
+    ecs_set(world, label, Text, {.value = "HI", .size = 1,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_entity_t bare = ecs_new(world);
+    ecs_set(world, bare, Position, {0, 0, -10});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    int32_t plain = Shapes2D_drawn(null);
+    test_assert(plain >= 3);
+
+    ecs_set(world, line, BoxShadow, {.blur = 2, .spread = 1});
+    ecs_set(world, label, BoxShadow, {.blur = 2, .spread = 1});
+    ecs_set(world, bare, BoxShadow, {.blur = 2, .spread = 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(Shapes2D_drawn(null), plain);
+
+    ecs_set(world, line, Circle, {1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(Shapes2D_drawn(null), plain + 1);
+
+    ecs_remove(world, line, Circle);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(Shapes2D_drawn(null), plain);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Shapes2D_box_shadow_slots_freed(void) {
+    // ui/box_shadow
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    ecs_entity_t a = ecs_new(world);
+    ecs_set(world, a, Position, {0, 0, -10});
+    ecs_set(world, a, Rect, {1, 1});
+    ecs_entity_t b = ecs_new(world);
+    ecs_set(world, b, Position, {2, 0, -10});
+    ecs_set(world, b, Circle, {1});
+    ecs_set(world, b, Opacity, {0.5f});
+    ecs_entity_t c = ecs_new(world);
+    ecs_set(world, c, Position, {4, 0, -10});
+    ecs_set(world, c, Rect, {1, 2});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    box_render_draws_stats_t stats;
+    box_render_draws_stats(world, &stats);
+    test_int(stats.instances, 3);
+    test_int(stats.batches, 2);
+
+    ecs_set(world, a, BoxShadow, {.blur = 1});
+    ecs_set(world, b, BoxShadow, {.blur = 1});
+    ecs_set(world, c, BoxShadow, {.blur = 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    box_render_draws_stats(world, &stats);
+    test_int(stats.instances, 6);
+    test_int(stats.batches, 2);
+    test_int(Shapes2D_drawn(null), 6);
+
+    ecs_set(world, a, BoxShadow, {.blur = 2, .spread = 1});
+    ecs_set(world, c, BoxShadow, {.spread = -1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    box_render_draws_stats(world, &stats);
+    test_int(stats.instances, 5);
+
+    ecs_set(world, c, BoxShadow, {.spread = 1});
+    ecs_remove(world, a, BoxShadow);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    box_render_draws_stats(world, &stats);
+    test_int(stats.instances, 5);
+
+    ecs_set(world, a, BoxShadow, {.blur = 3});
+    ecs_set(world, b, BlendMode, {Additive});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    box_render_draws_stats(world, &stats);
+    test_int(stats.instances, 6);
+    test_int(stats.batches, 3);
+
+    ecs_set(world, b, Border, {.width = 0.1f});
+    ecs_set(world, c, Rect, {3, 2});
+    ecs_remove(world, a, Rect);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    box_render_draws_stats(world, &stats);
+    test_int(stats.instances, 4);
+    test_int(Shapes2D_drawn(null), 4);
+
+    ecs_set(world, a, Rect, {1, 1});
+    ecs_delete(world, b);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    box_render_draws_stats(world, &stats);
+    test_int(stats.instances, 4);
+
+    ecs_delete(world, a);
+    ecs_remove(world, c, BoxShadow);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    box_render_draws_stats(world, &stats);
+    test_int(stats.instances, 1);
+    test_int(stats.batches, 1);
+    test_int(Shapes2D_drawn(null), 1);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

@@ -274,6 +274,39 @@ void Layout_fit_rect(void) {
     ecs_fini(world);
 }
 
+void Layout_fit_ignores_box_shadow(void) {
+    // ui/box_shadow
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t p = ecs_new(world);
+    ecs_set(world, p, Layout, { .direction = DirectionRow });
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, a, Rect, {40, 30});
+    ecs_set(world, a, BoxShadow, {
+        .offset_x = 12, .offset_y = -8, .blur = 16, .spread = 6, .color = {0, 0, 0, 255} });
+    ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, b, Circle, {7});
+    ecs_set(world, b, BoxShadow, { .blur = 30, .spread = 20 });
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, a, LayoutBounds)->width, 40);
+    test_flt(ecs_get(world, a, LayoutBounds)->height, 30);
+    test_flt(ecs_get(world, b, LayoutBounds)->width, 14);
+    test_flt(ecs_get(world, b, LayoutBounds)->height, 14);
+    test_flt(ecs_get(world, p, LayoutBounds)->width, 54);
+    test_flt(ecs_get(world, p, LayoutBounds)->height, 30);
+
+    ecs_set(world, a, BoxShadow, { .blur = 40, .spread = 30 });
+    ecs_remove(world, b, BoxShadow);
+    ecs_progress(world, 0);
+    test_flt(ecs_get(world, a, LayoutBounds)->width, 40);
+    test_flt(ecs_get(world, p, LayoutBounds)->width, 54);
+    test_flt(ecs_get(world, p, LayoutBounds)->height, 30);
+
+    ecs_fini(world);
+}
+
 void Layout_fit_circle(void) {
     // ui/layout
     ecs_world_t *world = ecs_init();

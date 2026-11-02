@@ -472,6 +472,24 @@ ECS_STRUCT(Border, {
     rgba color;   /**< Color of the border, default opaque black */
 });
 
+/** Soft shadow drawn behind the Rect or Circle of the entity, like a CSS box-shadow.
+ *
+ * Lengths are in the units of the shape. The shadow box is the shape moved by the offset and
+ * grown by the spread on each side with its corner radius; a negative spread shrinks it, down to
+ * nothing. As in CSS the edge is a Gaussian of a standard deviation of half the blur.
+ *
+ * The alpha is that of the color times the opacity of the entity. It follows the outline of a Rect
+ * or Circle, not the alpha of an Image, and draws nothing on a Line or Text. Picking and layout
+ * ignore it.
+ */
+ECS_STRUCT(BoxShadow, {
+    float offset_x; /**< Horizontal offset of the shadow */
+    float offset_y; /**< Vertical offset of the shadow */
+    float blur;     /**< Blur radius, twice the standard deviation of the edge, 0 for sharp */
+    float spread;   /**< Growth of the shadow box on each side, negative to shrink it */
+    rgba color;     /**< Color of the shadow, display encoded, default opaque black */
+});
+
 /** Area of a texture shown on the Rect or Circle of the entity.
  *
  * The area is u0, v0 to u1, v1 in texture coordinates, with v 0 at the top of the image; a

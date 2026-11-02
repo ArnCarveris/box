@@ -8,6 +8,7 @@
 
 /* This generated file contains includes for project dependencies */
 #include "box/bake_config.h"
+#include "box/curve.h"
 #include "box/transform.h"
 #include "box/geometry.h"
 #include "box/camera.h"

@@ -312,8 +312,8 @@ static void BoxDrawsOnOrdered(
     d->order_dirty = true;
 }
 
-/** Free the slots of entities that lose their shape, and the slot of the material table a mesh
- * shape owns.
+/** Free the slots of entities that lose their shape, the slot of their shadow, and the slot of
+ * the material table a mesh shape owns.
  *
  * @param it The iterator of the observer
  */
@@ -335,6 +335,7 @@ static void BoxDrawsOnRemove(
         }
 
         box_draws_material_release(it->world, d, it->entities[i]);
+        box_draws_box_shadow_remove(it->world, d, it->entities[i]);
     }
 
 done:
@@ -751,7 +752,8 @@ void box_draws_shape_material(
     }
 }
 
-/** Bring a changed entity into the batches of its shape and text and write their instances.
+/** Bring a changed entity into the batches of its shape, shadow and text and write their
+ * instances.
  *
  * @param world The world
  * @param d The state
@@ -771,6 +773,10 @@ static void box_draws_update(
     kinds = s->changed;
     s->changed = 0;
     box_draws_update_shape(world, d, e, s, kinds);
+    if (ecs_has(world, e, BoxShadowSlot)) {
+        box_draws_box_shadow_update(world, d, e, s);
+    }
+
     if (ecs_has(world, e, TextSlots)) {
         box_draws_text_update(world, d, e, kinds);
     }
@@ -948,6 +954,7 @@ static void box_draws_observers(
     box_draws_observer(world, d, "DrawsOnTextSpans", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(TextSpans) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShading);
+    box_draws_box_shadow_observers(world, d);
     box_draws_material_observers(world, d);
     d->refs ++;
     box_transform_on_dynamic(world, BoxDrawsOnChange, d, box_draws_free);
@@ -1137,6 +1144,7 @@ void box_render_draws_init(
     d->refs = 1;
     box_draws_queries(world, d);
     box_draws_text_init(world, d);
+    box_draws_box_shadow_init(world);
     box_draws_observers(world, d);
     box_draws_transform_observers(world, d);
 
