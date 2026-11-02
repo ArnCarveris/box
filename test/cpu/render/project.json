@@ -49,7 +49,9 @@
                     "clear_coat_defaults",
                     "clear_coat_pack",
                     "specular_anisotropy_defaults",
-                    "specular_anisotropy_pack"
+                    "specular_anisotropy_pack",
+                    "sheen_defaults",
+                    "sheen_pack"
                 ]
             },
             {
@@ -289,7 +291,11 @@
                     "runs_grow_by_half",
                     "page_grows_by_half",
                     "page_growth_stops_at_page_slots",
-                    "top_run_grows_in_place"
+                    "top_run_grows_in_place",
+                    "new_batch_gets_exact_run",
+                    "new_small_batch_gets_min_run",
+                    "exact_run_grows_moved",
+                    "spawn_grows_pages_without_moves"
                 ]
             },
             {
@@ -316,6 +322,8 @@
                     "clear_coat_dynamic_material_repacks",
                     "specular_anisotropy_brings_material_id",
                     "specular_anisotropy_prefab_change_reaches_slot",
+                    "sheen_brings_material_id",
+                    "sheen_prefab_change_reaches_slot",
                     "equal_materials_share_slot",
                     "changed_material_takes_other_slot",
                     "alone_changed_material_keeps_slot",

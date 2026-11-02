@@ -897,6 +897,26 @@ static uint32_t box_draws_anisotropy_pack(
     return result;
 }
 
+/** Pack a Sheen into the sheen word of a material record: the display encoded color and the
+ * roughness clamped to 0..1 as a unorm8.
+ *
+ * @param sheen The component, NULL for none
+ * @return r | g << 8 | b << 16 | roughness << 24, 0 without one or with a black color
+ */
+static uint32_t box_draws_sheen_pack(
+    const Sheen *sheen)
+{
+    uint32_t result = 0u;
+    if (sheen && (sheen->color.r || sheen->color.g || sheen->color.b)) {
+        float roughness = isfinite(sheen->roughness) ? sheen->roughness : 0.0f;
+        uint32_t r = (uint32_t)(glm_clamp(roughness, 0.0f, 1.0f) * 255.0f + 0.5f);
+        result = (uint32_t)sheen->color.r | ((uint32_t)sheen->color.g << 8) |
+            ((uint32_t)sheen->color.b << 16) | (r << 24);
+    }
+
+    return result;
+}
+
 void box_draws_material_pack(
     box_render_material_t *out,
     const box_draw_material_t *material)
@@ -933,8 +953,8 @@ void box_draws_material_pack(
     out->clear_coat = coat && box_draws_unorm16(coat->strength)
         ? box_draws_unorm16(coat->strength) | (box_draws_unorm16(coat->roughness) << 16) : 0u;
     out->anisotropy = box_draws_anisotropy_pack(material->anisotropy);
-    out->reserved[0] = 0;
-    out->reserved[1] = 0;
+    out->sheen = box_draws_sheen_pack(material->sheen);
+    out->reserved = 0;
 }
 
 void box_draws_mesh_shading(
@@ -1127,13 +1147,13 @@ void box_draws_reset_backend(
     box_draws_materials_reset(d);
 }
 
-/** Give a batch a run of slots that holds all its instances. A batch that outgrew its run
- * extends it in place when it ends at the top of its page, so nothing is copied and no hole is
- * left, and otherwise moves to a new run; its old run is freed.
+/** Give a batch a run that holds all its instances. A new batch gets its count rounded up to
+ * BOX_DRAWS_GROW_ALIGN slots, at least BOX_DRAWS_MIN_CAPACITY; one that outgrew its run takes
+ * the growth step at or above its count (box_draws_grow), so headroom only comes with growth.
  *
- * A moved batch remembers the old run and the instances the GPU holds in it, which the send
- * copies into the new run (box_draws_send_batch); its changed slots stay queued and are written
- * over the copy. A batch the GPU holds no instances of uploads every instance.
+ * A run at the top of its page extends in place; otherwise the batch moves and its run is freed,
+ * and the send copies the instances the GPU holds into the new run and writes the queued changes
+ * over them (box_draws_send_batch). A batch the GPU holds none of uploads every instance.
  *
  * @param p The packet
  * @param d The state
@@ -1153,7 +1173,11 @@ static void box_draws_reserve(
         goto done;
     }
 
-    capacity = box_draws_grow(0, count);
+    if (b->page < 0) {
+        capacity = box_draws_grow(count, count);
+    } else {
+        capacity = box_draws_grow(0, count);
+    }
 
     if (capacity > limit && count <= limit) {
         capacity = limit;
