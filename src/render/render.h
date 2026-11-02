@@ -776,7 +776,7 @@ void box_render_bake_init(
 /** A probe of the volume of a scene */
 typedef struct box_render_probe_t {
     vec3 position;          /**< World position of the probe */
-    bool valid;             /**< The probe is outside static geometry, so views sample it */
+    bool valid;             /**< A static surface can use the probe, so views sample it */
 } box_render_probe_t;
 
 /** Find the probe of the volume of a scene nearest to a position.

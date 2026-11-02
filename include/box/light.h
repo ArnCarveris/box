@@ -168,9 +168,9 @@ ECS_STRUCT(ShadowAtlas, {
 /** Baked indirect lighting of a scene, placed on a Scene root or as a singleton for the default
  * scene. Adding it adds LightBakeStatus.
  *
- * A bake is bounces + 1 passes: the first captures direct light and emission, each later one
- * adds a bounce. A change rebakes the probes it can reach, which keep their values meanwhile
- * (static shapes, lights). Dynamic shapes rebake none.
+ * A bake is bounces + 1 passes: direct light and emission, then a pass per bounce. A change of
+ * static shapes or lights rebakes the probes it can reach; dynamic shapes rebake none. Probes
+ * no static surface blends are not baked: a dynamic shape in open air shows the ambient.
  *
  * Values apply as specified: bounces 0 bakes direct emission and light only, budget_ms 0 bakes
  * nothing, a capture_size outside 1 to 256 or bounces outside 0 to 16 bakes nothing and sets

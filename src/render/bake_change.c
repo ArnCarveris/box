@@ -113,7 +113,7 @@ done:
     return;
 }
 
-/** Check again whether the probes of a volume inside a box lie inside static geometry.
+/** Check again whether the probes of a volume inside a box are usable.
  *
  * A probe that became invalid is hidden from the views at once. One that became valid is
  * shown when the bake that captures it is shown, so the views never see its old values.
@@ -146,7 +146,7 @@ static void box_bake_revalidate(
                 uint32_t bit = 1u << (probe & 31);
                 vec3 pos;
                 box_bake_probe_position(v, probe, pos);
-                bool now = !box_bake_occupied(world, b, cache, v->scene, pos);
+                bool now = box_bake_usable(world, b, cache, v, pos);
                 if (now == ((valid[probe >> 5] & bit) != 0)) {
                     continue;
                 }
@@ -378,7 +378,7 @@ static void box_bake_on_moved(
 }
 
 /** Queue the probes a changed region of a scene can reach: its bounds padded by the probe
- * spacing once per pass, after checking again which probes in it lie inside geometry.
+ * spacing once per pass, after checking again which probes within reach of it are usable.
  *
  * @param world The world
  * @param b The state
@@ -400,8 +400,11 @@ static void box_bake_region(
     }
 
     int32_t bounces = v->bounces >= 0 && v->bounces <= BOX_BAKE_BOUNCES_MAX ? v->bounces : 0;
-    float pad = v->grid.spacing * (float)(1 + bounces);
-    box_bake_revalidate(world, b, v, min, max);
+    float reach = box_bake_reach(v);
+    float pad = glm_max(v->grid.spacing * (float)(1 + bounces), reach);
+    glm_vec3_subs(ECS_CONST_CAST(float*, min), reach, lo);
+    glm_vec3_adds(ECS_CONST_CAST(float*, max), reach, hi);
+    box_bake_revalidate(world, b, v, lo, hi);
     glm_vec3_subs(ECS_CONST_CAST(float*, min), pad, lo);
     glm_vec3_adds(ECS_CONST_CAST(float*, max), pad, hi);
     box_bake_mark_box(v, lo, hi, false);

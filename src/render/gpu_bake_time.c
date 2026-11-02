@@ -162,6 +162,40 @@ static double box_gpu_bake_period(
 #endif
 }
 
+/** Record that the queue finished the commands of the timestamps of a readback.
+ *
+ * @param status Outcome of the request
+ * @param message Error text
+ * @param userdata1 The box_gpu_bake_readback_t
+ * @param userdata2 Unused
+ */
+static void box_gpu_bake_on_written(
+    WGPUQueueWorkDoneStatus status,
+    WGPUStringView message,
+    void *userdata1,
+    void *userdata2)
+{
+    box_gpu_bake_readback_t *r = userdata1;
+    (void)message;
+    (void)userdata2;
+    if (status == WGPUQueueWorkDoneStatus_Success) {
+        r->finished = true;
+    }
+}
+
+void box_gpu_bake_readback_written(
+    box_gpu_t *gpu,
+    box_gpu_bake_readback_t *r)
+{
+    r->state = BOX_GPU_BAKE_WRITTEN;
+    r->finished = false;
+    wgpuQueueOnSubmittedWorkDone(gpu->queue, (WGPUQueueWorkDoneCallbackInfo){
+        .mode = WGPUCallbackMode_AllowSpontaneous,
+        .callback = box_gpu_bake_on_written,
+        .userdata1 = r
+    });
+}
+
 /** Map the timestamp copies that were submitted and publish the ones that arrived.
  *
  * @param gpu The backend
@@ -174,7 +208,9 @@ void box_gpu_bake_readback_poll(
     int32_t i;
 #ifndef __EMSCRIPTEN__
     for (i = 0; i < BOX_GPU_BAKE_READBACKS; i ++) {
-        if (b->readbacks[i].state == BOX_GPU_BAKE_MAPPING || b->done[i].probes) {
+        if (b->readbacks[i].state == BOX_GPU_BAKE_MAPPING || b->done[i].probes ||
+            b->readbacks[i].state == BOX_GPU_BAKE_WRITTEN)
+        {
             wgpuDevicePoll(gpu->device, false, NULL);
             break;
         }
@@ -243,12 +279,11 @@ int32_t box_gpu_bake_readback(
     return result;
 }
 
-/** Resolve the timestamps of the readbacks whose captures were submitted before the last
- * packet and copy them into their readbacks; the ones recorded earlier in this packet are
- * resolved by the next one.
+/** Resolve the timestamps of the readbacks whose captures the queue finished and copy them into
+ * their readbacks.
  *
- * Metal writes the timestamps of a pass when the pass completed, which a resolve in the same
- * or the next command buffer does not wait for, so the resolve waits for one more packet.
+ * Metal writes the timestamps of a pass when the pass completed, which a resolve does not wait
+ * for, and a frame does not wait for the queue, so the captures may be many packets behind.
  *
  * @param gpu The backend
  * @param b The capture state
@@ -263,7 +298,7 @@ void box_gpu_bake_resolve(
     for (r = 0; r < BOX_GPU_BAKE_READBACKS; r ++) {
         box_gpu_bake_readback_t *rb = &b->readbacks[r];
         uint64_t offset = (uint64_t)r * 2 * BOX_GPU_BAKE_RESOLVE_ALIGN;
-        if (rb->state != BOX_GPU_BAKE_WRITTEN) {
+        if (rb->state != BOX_GPU_BAKE_WRITTEN || !rb->finished) {
             continue;
         }
 
@@ -285,7 +320,7 @@ void box_gpu_bake_resolve(
 
     for (r = 0; r < BOX_GPU_BAKE_READBACKS; r ++) {
         if (b->readbacks[r].state == BOX_GPU_BAKE_RECORDED) {
-            b->readbacks[r].state = BOX_GPU_BAKE_WRITTEN;
+            box_gpu_bake_readback_written(gpu, &b->readbacks[r]);
         }
     }
 

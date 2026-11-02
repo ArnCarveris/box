@@ -2,9 +2,9 @@
  * @file render/bake.c
  * @brief Irradiance probe volume of every scene with LightBake and the captures that bake it.
  *
- * The grid covers the static bounds the spatial index holds, padded and spaced as LightBake
- * says; probes inside a static shape are invalid. Probes start as the SH of the sky: the
- * hemisphere ambient, or LightBake.environment, whose new versions are ambient changes.
+ * The grid covers the static bounds of the spatial index, padded and spaced as LightBake says;
+ * probes inside a static shape or in open air, which no static surface blends, are invalid.
+ * Probes start as the SH of the sky: the hemisphere ambient, or LightBake.environment.
  *
  * Captures of the nearest unbaked probes go into each packet as budget_ms allows for bounces
  * + 1 passes, each shading with the previous one; views keep the last complete pass. A change
@@ -342,7 +342,36 @@ bool box_bake_occupied(
     return result;
 }
 
-/** Mark the probes of a volume that lie inside static geometry as invalid.
+float box_bake_reach(
+    const box_bake_volume_t *v)
+{
+    float beyond = v->bounds_padding < 0 ? -v->bounds_padding : 0.0f;
+
+    return (v->grid.spacing + beyond) * (1.0f + (float)BOX_BAKE_EPSILON);
+}
+
+bool box_bake_usable(
+    const ecs_world_t *world,
+    box_render_bake_t *b,
+    const box_mesh_cache_t *cache,
+    const box_bake_volume_t *v,
+    const vec3 pos)
+{
+    float reach = box_bake_reach(v);
+    ecs_entity_t scene = v->scene;
+    bool result = false;
+    vec3 lo, hi;
+    glm_vec3_subs(ECS_CONST_CAST(float*, pos), reach, lo);
+    glm_vec3_adds(ECS_CONST_CAST(float*, pos), reach, hi);
+    ecs_vec_clear(&b->hits);
+    if (box_spatial_overlap_box(world, scene, lo, hi, &b->hits)) {
+        result = !box_bake_occupied(world, b, cache, scene, pos);
+    }
+
+    return result;
+}
+
+/** Mark the probes of a volume that no static surface can use as invalid.
  *
  * @param world The world
  * @param b The state, owns the scratch of the overlap queries
@@ -363,7 +392,7 @@ static void box_bake_validate(
     for (i = 0; i < v->probes; i ++) {
         vec3 pos;
         box_bake_probe_position(v, (uint32_t)i, pos);
-        if (!box_bake_occupied(world, b, cache, v->scene, pos)) {
+        if (box_bake_usable(world, b, cache, v, pos)) {
             valid[i >> 5] |= 1u << (i & 31);
             v->valid_count ++;
         }
@@ -481,7 +510,7 @@ static void box_bake_queue(
     v->resort = true;
 }
 
-/** Check whether a probe of a volume is outside static geometry.
+/** Check whether a probe of a volume is one a static surface can use.
  *
  * @param v The volume
  * @param probe Index of the probe
@@ -1133,19 +1162,27 @@ static void box_bake_pick(
 
 /** Get the probes a scene captures in a frame of its budget.
  *
+ * The share of a probe the budget leaves carries over to the next frame. A frame costs a fixed
+ * part besides its probes, which the time per probe holds: rounding down would keep a frame at
+ * the count that measured it, while the carry lets the count settle where it fills the budget.
+ *
  * @param b The state
  * @param v The volume
  * @return Probes of the budget at the GPU time per probe, at least one
  */
 static int32_t box_bake_budget(
     const box_render_bake_t *b,
-    const box_bake_volume_t *v)
+    box_bake_volume_t *v)
 {
-    float probes = floorf(v->budget_ms / b->probe_ms);
+    float probes = v->credit + v->budget_ms / b->probe_ms;
     int32_t result = BOX_BAKE_FRAME_MAX;
     if (probes < (float)BOX_BAKE_FRAME_MAX) {
         result = probes < 1.0f ? 1 : (int32_t)probes;
     }
+
+    v->credit = probes > (float)result && result < BOX_BAKE_FRAME_MAX
+        ? probes - (float)result
+        : 0.0f;
 
     return result;
 }

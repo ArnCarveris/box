@@ -598,3 +598,151 @@ void ProbeCapture_scene_grows_past_chunk_of_atlas(void) {
 
     ecs_fini(world);
 }
+
+void ProbeCapture_large_far_instance_of_small_block_captured(void) {
+    // baked_lighting/probe_capture
+    unsigned char *images[2] = {NULL, NULL};
+    int w[2] = {0, 0}, h[2] = {0, 0}, n = 0, i;
+    int64_t sum[2] = {0, 0};
+    for (i = 0; i < 2; i ++) {
+        ecs_world_t *world = ecs_init();
+        ECS_IMPORT(world, Box);
+        App *app = ecs_singleton_get_mut(world, App);
+        app->headless = true;
+        ecs_singleton_modified(world, App);
+
+        ecs_entity_t scene = ecs_new(world);
+        ecs_add(world, scene, Scene);
+        ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
+            .capture_size = 16, .budget_ms = 2, .bounces = 0});
+        ecs_set(world, scene, AmbientLight, {.intensity = 0});
+        ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
+        ecs_set(world, dark, DirectionalLight, {.intensity = 0});
+        ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
+        ecs_set(world, camera, Position, {0, 6, 0});
+        ecs_set(world, camera, Rotation, {-1.5707963f, 0, 0});
+        ecs_set(world, camera, Camera, {.fov = 30, .near_ = 0.1f});
+        ecs_entity_t view = ecs_new(world);
+        ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true,
+            .lighting.baked = true});
+        ecs_entity_t floor = ecs_new_w_pair(world, EcsChildOf, scene);
+        ecs_set(world, floor, Position, {0, 0, 0});
+        ecs_set(world, floor, Rotation, {-1.5707963f, 0, 0});
+        ecs_set(world, floor, Quad, {8, 8});
+        int32_t t;
+        for (t = 0; t < 300; t ++) {
+            ecs_entity_t tiny = ecs_new_w_pair(world, EcsChildOf, scene);
+            ecs_set(world, tiny, Position, {60.0f + (float)t * 0.1f, 1, 0});
+            ecs_set(world, tiny, Box, {0.02f, 0.02f, 0.02f});
+            ecs_set(world, tiny, Emissive, {.strength = 20, .color = {255, 255, 255}});
+            if (i && t == 150) {
+                ecs_entity_t other = ecs_new_w_pair(world, EcsChildOf, scene);
+                ecs_set(world, other, Position, {50, 15, 25});
+                ecs_set(world, other, Box, {30, 30, 30});
+                ecs_set(world, other, Emissive, {.strength = 20, .color = {255, 255, 255}});
+            }
+        }
+
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Surface, {.width = 64, .height = 48, .write_to_file = "block.png",
+            .resolution_scale = 1});
+        char *path = flecs_asprintf("%s/block.png",
+            ecs_singleton_get(world, AppStatus)->tmp_dir);
+
+        int32_t frames = 0;
+        while (!ecs_get(world, scene, LightBakeStatus)->converged && frames < 5000) {
+            ecs_progress(world, 0);
+            box_render_sync(world);
+            frames ++;
+        }
+
+        test_bool(ecs_get(world, scene, LightBakeStatus)->converged, true);
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        images[i] = stbi_load(path, &w[i], &h[i], &n, 4);
+        test_assert(images[i] != NULL);
+        for (t = 0; t < w[i] * h[i] * 4; t ++) {
+            sum[i] += images[i][t];
+        }
+
+        stbi_image_free(images[i]);
+        ecs_os_free(path);
+        ecs_fini(world);
+    }
+
+    test_assert(sum[1] > sum[0] + w[0] * h[0] * 4);
+}
+
+void ProbeCapture_small_near_instance_of_far_block_captured(void) {
+    // baked_lighting/probe_capture
+    unsigned char *images[2] = {NULL, NULL};
+    int w[2] = {0, 0}, h[2] = {0, 0}, n = 0, i;
+    int64_t sum[2] = {0, 0};
+    for (i = 0; i < 2; i ++) {
+        ecs_world_t *world = ecs_init();
+        ECS_IMPORT(world, Box);
+        App *app = ecs_singleton_get_mut(world, App);
+        app->headless = true;
+        ecs_singleton_modified(world, App);
+
+        ecs_entity_t scene = ecs_new(world);
+        ecs_add(world, scene, Scene);
+        ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
+            .capture_size = 16, .budget_ms = 2, .bounces = 0});
+        ecs_set(world, scene, AmbientLight, {.intensity = 0});
+        ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
+        ecs_set(world, dark, DirectionalLight, {.intensity = 0});
+        ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
+        ecs_set(world, camera, Position, {0, 6, 0});
+        ecs_set(world, camera, Rotation, {-1.5707963f, 0, 0});
+        ecs_set(world, camera, Camera, {.fov = 30, .near_ = 0.1f});
+        ecs_entity_t view = ecs_new(world);
+        ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true,
+            .lighting.baked = true});
+        ecs_entity_t floor = ecs_new_w_pair(world, EcsChildOf, scene);
+        ecs_set(world, floor, Position, {0, 0, 0});
+        ecs_set(world, floor, Rotation, {-1.5707963f, 0, 0});
+        ecs_set(world, floor, Quad, {8, 8});
+        int32_t t;
+        for (t = 0; t < 300; t ++) {
+            ecs_entity_t tiny = ecs_new_w_pair(world, EcsChildOf, scene);
+            ecs_set(world, tiny, Position, {30.0f + (float)t * 0.1f, 1, 0});
+            ecs_set(world, tiny, Box, {0.02f, 0.02f, 0.02f});
+            ecs_set(world, tiny, Emissive, {.strength = 20, .color = {255, 255, 255}});
+            if (i && t == 150) {
+                ecs_entity_t other = ecs_new_w_pair(world, EcsChildOf, scene);
+                ecs_set(world, other, Position, {2, 1, 2});
+                ecs_set(world, other, Box, {0.5f, 0.5f, 0.5f});
+                ecs_set(world, other, Emissive, {.strength = 400, .color = {255, 255, 255}});
+            }
+        }
+
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Surface, {.width = 64, .height = 48, .write_to_file = "block.png",
+            .resolution_scale = 1});
+        char *path = flecs_asprintf("%s/block.png",
+            ecs_singleton_get(world, AppStatus)->tmp_dir);
+
+        int32_t frames = 0;
+        while (!ecs_get(world, scene, LightBakeStatus)->converged && frames < 5000) {
+            ecs_progress(world, 0);
+            box_render_sync(world);
+            frames ++;
+        }
+
+        test_bool(ecs_get(world, scene, LightBakeStatus)->converged, true);
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        images[i] = stbi_load(path, &w[i], &h[i], &n, 4);
+        test_assert(images[i] != NULL);
+        for (t = 0; t < w[i] * h[i] * 4; t ++) {
+            sum[i] += images[i][t];
+        }
+
+        stbi_image_free(images[i]);
+        ecs_os_free(path);
+        ecs_fini(world);
+    }
+
+    test_assert(sum[1] > sum[0] + w[0] * h[0] * 4);
+}

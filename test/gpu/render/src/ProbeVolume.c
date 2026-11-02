@@ -399,3 +399,77 @@ void ProbeVolume_ambient_probes_match_hemisphere(void) {
     stbi_image_free(images[0]);
     stbi_image_free(images[1]);
 }
+
+void ProbeVolume_open_air_probes_invalid(void) {
+    // baked_lighting/probe_volume
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t scene = ecs_new(world);
+    ecs_add(world, scene, Scene);
+    ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 0});
+    ecs_entity_t floor = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, floor, Position, {0, 0, 0});
+    ecs_set(world, floor, Box, {20, 1, 20});
+    ecs_entity_t pillar = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, pillar, Position, {9, 20, 9});
+    ecs_set(world, pillar, Box, {1, 40, 1});
+    ecs_progress(world, 0);
+
+    box_render_probe_t probe;
+    test_assert(box_render_bake_probe(world, scene, (vec3){-9, 1, -9}, &probe));
+    test_flt(probe.position[1], 1);
+    test_bool(probe.valid, true);
+
+    test_assert(box_render_bake_probe(world, scene, (vec3){-9, 3, -9}, &probe));
+    test_flt(probe.position[1], 3);
+    test_bool(probe.valid, false);
+
+    test_assert(box_render_bake_probe(world, scene, (vec3){-9, 21, -9}, &probe));
+    test_flt(probe.position[1], 21);
+    test_bool(probe.valid, false);
+
+    test_assert(box_render_bake_probe(world, scene, (vec3){7, 21, 9}, &probe));
+    test_flt(probe.position[0], 7);
+    test_bool(probe.valid, true);
+
+    ecs_fini(world);
+}
+
+void ProbeVolume_probes_around_shape_follow_it(void) {
+    // baked_lighting/probe_volume
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t scene = ecs_new(world);
+    ecs_add(world, scene, Scene);
+    ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 0});
+    ecs_entity_t floor = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, floor, Position, {0, 0, 0});
+    ecs_set(world, floor, Box, {20, 1, 20});
+    ecs_entity_t pillar = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, pillar, Position, {9, 20, 9});
+    ecs_set(world, pillar, Box, {1, 40, 1});
+    ecs_progress(world, 0);
+
+    box_render_probe_t probe;
+    vec3 open = {-9, 21, -9};
+    test_assert(box_render_bake_probe(world, scene, open, &probe));
+    test_bool(probe.valid, false);
+
+    ecs_entity_t added = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, added, Position, {-9, 23, -9});
+    ecs_set(world, added, Box, {1, 1, 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_assert(box_render_bake_probe(world, scene, open, &probe));
+    test_bool(probe.valid, true);
+
+    ecs_delete(world, added);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_assert(box_render_bake_probe(world, scene, open, &probe));
+    test_bool(probe.valid, false);
+
+    ecs_fini(world);
+}

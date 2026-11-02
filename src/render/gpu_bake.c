@@ -261,6 +261,8 @@ static void box_gpu_bake_state_free(
     ecs_vec_fini_t(NULL, &b->run_data, uint8_t);
     ecs_vec_fini_t(NULL, &b->cull_runs, box_gpu_bake_run_t);
     ecs_vec_fini_t(NULL, &b->block_data, box_gpu_bake_block_t);
+    ecs_vec_fini_t(NULL, &b->bounds_jobs, box_gpu_bake_job_t);
+    ecs_vec_fini_t(NULL, &b->bounds_lists, uint32_t);
     ecs_vec_fini_t(NULL, &b->list_data, uint32_t);
     wgpuPipelineLayoutRelease(b->cull_pipeline_layout);
     wgpuBindGroupLayoutRelease(b->cull_layout);
@@ -417,6 +419,8 @@ static box_gpu_bake_t* box_gpu_bake_state_new(
     ecs_vec_init_t(NULL, &b->run_data, uint8_t, 0);
     ecs_vec_init_t(NULL, &b->cull_runs, box_gpu_bake_run_t, 0);
     ecs_vec_init_t(NULL, &b->block_data, box_gpu_bake_block_t, 0);
+    ecs_vec_init_t(NULL, &b->bounds_jobs, box_gpu_bake_job_t, 0);
+    ecs_vec_init_t(NULL, &b->bounds_lists, uint32_t, 0);
     ecs_vec_init_t(NULL, &b->list_data, uint32_t, 0);
     box_gpu_bake_queries_init(gpu, b);
 
@@ -690,6 +694,8 @@ static void box_gpu_bake_draws(
         b->bounds_group = NULL;
     }
 
+    b->bounds_stale = grown;
+
     if (!b->cull_group) {
         WGPUBindGroupEntry entries[7] = {
             { .binding = 0, .buffer = b->params, .size = sizeof(box_gpu_bake_params_t) },
@@ -727,7 +733,7 @@ static void box_gpu_bake_draws(
  * @param b The capture state
  * @param encoder The encoder of the chunk
  * @param count Probes of the chunk
- * @param first Whether the chunk is the first of its batch, which takes the bounds of the blocks
+ * @param first Whether the chunk is the first of its batch, which takes stale bounds of the blocks
  * @param writes Timestamp the pass writes, NULL for none
  * @return Whether the pass was recorded
  */
@@ -745,7 +751,8 @@ static bool box_gpu_bake_cull(
     }
 
     WGPUComputePassEncoder pass = box_gpu_compute_begin(encoder, writes);
-    if (first) {
+    if (first && b->bounds_stale) {
+        b->bounds_stale = false;
         wgpuComputePassEncoderSetPipeline(pass, b->bounds);
         for (r = 0; r < ecs_vec_count(&b->cull_runs); r ++) {
             const box_gpu_bake_run_t *run = ecs_vec_get_t(&b->cull_runs, box_gpu_bake_run_t, r);
@@ -1642,6 +1649,105 @@ static void box_gpu_bake_pass_reflect(
     box_gpu_bake_sun(out, batch->bounds_min, batch->bounds_max);
 }
 
+/** Check whether two vectors hold the same bytes.
+ *
+ * @param a The first vector
+ * @param b The second vector
+ * @param size Size of an element
+ * @return Whether they hold the same elements
+ */
+static bool box_gpu_bake_vec_equal(
+    const ecs_vec_t *a,
+    const ecs_vec_t *b,
+    ecs_size_t size)
+{
+    int32_t count = ecs_vec_count(a);
+
+    return count == ecs_vec_count(b) && (!count ||
+        !ecs_os_memcmp(ecs_vec_first(a), ecs_vec_first(b), count * size));
+}
+
+/** Decide whether the bounds of the blocks must be taken for the captures of a batch: static
+ * instances keep their bounds for as long as a bake of a volume runs, since any change of them
+ * starts a new bake. Reflections have no bake to compare and take them again.
+ *
+ * @param b The capture state, with the batches of the captures listed
+ * @param pass The captures
+ */
+static void box_gpu_bake_bounds_check(
+    box_gpu_bake_t *b,
+    const box_gpu_bake_pass_t *pass)
+{
+    const box_render_bake_batch_t *batch = pass->bake;
+    bool same = batch && b->bounds_volume == batch->volume &&
+        b->bounds_generation == batch->generation &&
+        box_gpu_bake_vec_equal(&b->bounds_jobs, &b->job_data, ECS_SIZEOF(box_gpu_bake_job_t)) &&
+        box_gpu_bake_vec_equal(&b->bounds_lists, &b->list_data, ECS_SIZEOF(uint32_t));
+    b->bounds_stale |= !same;
+    if (b->bounds_stale) {
+        int32_t jobs = ecs_vec_count(&b->job_data), lists = ecs_vec_count(&b->list_data);
+        b->bounds_volume = batch ? batch->volume : 0;
+        b->bounds_generation = batch ? batch->generation : 0;
+        ecs_vec_set_count_t(NULL, &b->bounds_jobs, box_gpu_bake_job_t, jobs);
+        ecs_vec_set_count_t(NULL, &b->bounds_lists, uint32_t, lists);
+        if (jobs) {
+            ecs_os_memcpy_n(ecs_vec_first(&b->bounds_jobs), ecs_vec_first(&b->job_data),
+                box_gpu_bake_job_t, jobs);
+        }
+
+        if (lists) {
+            ecs_os_memcpy_n(ecs_vec_first(&b->bounds_lists), ecs_vec_first(&b->list_data),
+                uint32_t, lists);
+        }
+    }
+}
+
+/** Get the capture shadow map a batch can sample without rendering it: one rendered for the same
+ * bake with the same cascade, since a change of the static casters or of the sun starts a new
+ * bake or moves the cascade.
+ *
+ * @param b The capture state
+ * @param pass The captures
+ * @return The shadow map, NULL when the batch renders it
+ */
+static WGPUTextureView box_gpu_bake_shadow_kept(
+    const box_gpu_bake_t *b,
+    const box_gpu_bake_pass_t *pass)
+{
+    const box_render_bake_batch_t *batch = pass->bake;
+    bool kept = batch && pass->sun && b->kept_shadow && b->kept_volume == batch->volume &&
+        b->kept_generation == batch->generation &&
+        !ecs_os_memcmp(b->kept_matrix, pass->cascade.matrix, ECS_SIZEOF(mat4));
+
+    return kept ? b->kept_shadow : NULL;
+}
+
+/** Remember the shadow map a batch rendered for the next batches of its bake; the shadow map of
+ * another kind of captures takes its place in the texture, so none is kept then.
+ *
+ * @param gpu The backend
+ * @param b The capture state
+ * @param pass The captures
+ * @param before The shadow map the batch started with
+ * @param shadow The shadow map the batch sampled
+ */
+static void box_gpu_bake_shadow_keep(
+    const box_gpu_t *gpu,
+    box_gpu_bake_t *b,
+    const box_gpu_bake_pass_t *pass,
+    WGPUTextureView before,
+    WGPUTextureView shadow)
+{
+    if (shadow && shadow != before) {
+        b->kept_shadow = pass->bake && shadow != gpu->shadow_empty_view ? shadow : NULL;
+        if (b->kept_shadow) {
+            b->kept_volume = pass->bake->volume;
+            b->kept_generation = pass->bake->generation;
+            ecs_os_memcpy(b->kept_matrix, pass->cascade.matrix, ECS_SIZEOF(mat4));
+        }
+    }
+}
+
 /** Capture the probes of a batch, chunk by chunk.
  *
  * @param gpu The backend
@@ -1659,7 +1765,7 @@ static void box_gpu_bake_batch(
     box_gpu_bake_timer_t *timer,
     bool last)
 {
-    WGPUTextureView shadow = NULL;
+    WGPUTextureView kept = box_gpu_bake_shadow_kept(b, pass), shadow = kept;
     int32_t first, chunk = box_gpu_bake_chunk(packet, pass->scene, pass->size, pass->count);
     if (pass->cube) {
         int32_t layers = gpu->stats.texture_layers > 0
@@ -1670,11 +1776,14 @@ static void box_gpu_bake_batch(
 
     box_gpu_bake_atlas(gpu, &b->sets[pass->kind], pass->size, chunk);
     box_gpu_bake_draws(gpu, b, packet, pass->scene, chunk);
+    box_gpu_bake_bounds_check(b, pass);
     for (first = 0; first < pass->count; first += chunk) {
         int32_t count = pass->count - first < chunk ? pass->count - first : chunk;
         box_gpu_bake_chunk_capture(gpu, b, packet, pass, first, count, &shadow, timer,
             last && first + count >= pass->count);
     }
+
+    box_gpu_bake_shadow_keep(gpu, b, pass, kept, shadow);
 }
 
 void box_gpu_bake_fini(
@@ -1770,6 +1879,7 @@ static void box_gpu_bake_run(
     }
 
     box_gpu_bake_t *b = box_gpu_bake_state(gpu);
+    b->in_flight = 0;
     timer.readback = box_gpu_bake_readback(b);
     for (i = 0; i <= last; i ++) {
         if (!box_gpu_bake_batch_valid(packet, kind, i)) {
@@ -1791,7 +1901,7 @@ static void box_gpu_bake_run(
     if (timer.ended) {
         b->readbacks[timer.readback].probes = probes;
         b->readbacks[timer.readback].kind = kind;
-        b->readbacks[timer.readback].state = BOX_GPU_BAKE_WRITTEN;
+        box_gpu_bake_readback_written(gpu, &b->readbacks[timer.readback]);
     } else if (!b->queries) {
         box_gpu_bake_done_measure(gpu, b, kind, start, probes);
     }

@@ -132,7 +132,7 @@ typedef struct box_bake_volume_t {
     uint32_t filled_env;    /**< env_handle the probes were filled with, or rebaked for */
     int32_t filled_content; /**< env_content the probes were filled with, or rebaked for */
     float ambient[BOX_RENDER_SH_COEFFICIENTS][4]; /**< Irradiance of the views of this frame */
-    ecs_vec_t valid;        /**< uint32_t, one bit per probe outside static geometry */
+    ecs_vec_t valid;        /**< uint32_t, one bit per probe a static surface can use */
     ecs_vec_t queue;        /**< uint32_t, probes waiting for capture, the nearest last */
     ecs_vec_t flight;       /**< box_bake_flight_t, probes in packets not reported captured */
     ecs_vec_t done;         /**< uint8_t, passes the backend reported for every probe */
@@ -144,13 +144,14 @@ typedef struct box_bake_volume_t {
     vec3 max;               /**< Maximum corner of the static bounds of the grid */
     int32_t capture_size;   /**< LightBake.capture_size of this frame */
     float budget_ms;        /**< LightBake.budget_ms of this frame */
+    float credit;           /**< Share of a probe the budget of the last frame left */
     int32_t bounces;        /**< LightBake.bounces of this frame */
     uint32_t generation;    /**< Number of the bake, so captures of an earlier one are ignored */
     int32_t passes;         /**< Passes of the bake, one more than its bounces */
     int32_t submitted;      /**< Passes whose every probe went into a packet */
     int32_t completed;      /**< Passes the backend reported for every valid probe */
     int32_t count;          /**< Probes every pass of the bake captures */
-    int32_t valid_count;    /**< Probes outside static geometry */
+    int32_t valid_count;    /**< Probes a static surface can use */
     int32_t reported[BOX_BAKE_PASSES_MAX]; /**< Probes the backend reported per pass */
     int32_t first;          /**< Probe buffer the first pass writes, later passes alternate */
     int32_t display;        /**< Probe buffer the views sample */
@@ -211,7 +212,7 @@ box_bake_volume_t* box_bake_find(
     const box_render_bake_t *b,
     ecs_entity_t scene);
 
-/** Check whether a probe of a volume is outside static geometry.
+/** Check whether a probe of a volume is one a static surface can use.
  *
  * @param v The volume
  * @param probe Index of the probe
@@ -246,6 +247,33 @@ bool box_bake_occupied(
     box_render_bake_t *b,
     const box_mesh_cache_t *cache,
     ecs_entity_t scene,
+    const vec3 pos);
+
+/** Get how far on any axis a point of a static surface can be from a probe it blends: a spacing
+ * inside the grid, where it blends the corners of its cell, and as far past it as negative
+ * padding moves the border probes off the bounds, where it clamps to them.
+ *
+ * @param v The volume
+ * @return The distance in world units
+ */
+float box_bake_reach(
+    const box_bake_volume_t *v);
+
+/** Check whether a static surface can use a probe: it is outside static geometry and a static
+ * shape lies within the reach of it on every axis.
+ *
+ * @param world The world
+ * @param b The state, owns the scratch of the overlap queries
+ * @param cache The mesh cache
+ * @param v The volume
+ * @param pos The position of the probe
+ * @return Whether the probe is usable
+ */
+bool box_bake_usable(
+    const ecs_world_t *world,
+    box_render_bake_t *b,
+    const box_mesh_cache_t *cache,
+    const box_bake_volume_t *v,
     const vec3 pos);
 
 /** Queue a probe of a volume for the next bake when it is valid and not queued yet.

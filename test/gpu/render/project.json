@@ -349,6 +349,8 @@
                 "id": "ProbeCapture",
                 "testcases": [
                     "converges_in_bounded_frames",
+                    "large_far_instance_of_small_block_captured",
+                    "small_near_instance_of_far_block_captured",
                     "zero_budget_never_converges",
                     "dynamic_shape_lit_not_captured",
                     "no_bake_removes_contribution",
@@ -374,6 +376,7 @@
                     "deleting_uncaptured_shapes_rebakes_nothing",
                     "parent_opacity_and_prefab_textures_rebake",
                     "newly_valid_probe_hidden_until_baked",
+                    "moved_caster_matches_fresh_bake",
                     "full_rebakes_keep_values",
                     "tint_rebakes_nothing",
                     "bake_ignores_tint",
@@ -418,7 +421,9 @@
                     "valid_inside_torus_hole",
                     "grid_follows_static_bounds",
                     "unbaked_view_renders_identically",
-                    "ambient_probes_match_hemisphere"
+                    "ambient_probes_match_hemisphere",
+                    "open_air_probes_invalid",
+                    "probes_around_shape_follow_it"
                 ]
             },
             {

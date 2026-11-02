@@ -44,7 +44,8 @@ typedef enum box_gpu_bake_readback_state_t {
     BOX_GPU_BAKE_FREE,              /**< Unused */
     BOX_GPU_BAKE_RECORDED,          /**< The timestamps are recorded before the captures of the
                                      *   packet, which turn them written */
-    BOX_GPU_BAKE_WRITTEN,           /**< The timestamps are submitted, resolved a packet later */
+    BOX_GPU_BAKE_WRITTEN,           /**< The timestamps are submitted, resolved once the queue
+                                     *   finished them */
     BOX_GPU_BAKE_COPIED,            /**< The copy is submitted, mapped at the next capture */
     BOX_GPU_BAKE_MAPPING,           /**< Waiting for the map */
     BOX_GPU_BAKE_MAPPED,            /**< Mapped, the timestamps can be read */
@@ -55,6 +56,7 @@ typedef enum box_gpu_bake_readback_state_t {
 typedef struct box_gpu_bake_readback_t {
     WGPUBuffer buffer;              /**< Mappable copy of the resolved timestamps */
     int32_t state;                  /**< box_gpu_bake_readback_state_t */
+    bool finished;                  /**< The queue finished the commands of the timestamps */
     int32_t probes;                 /**< Probes the measured captures held, or environments
                                      *   processed */
     int32_t kind;                   /**< box_gpu_bake_kind_t of the captures */
@@ -223,6 +225,15 @@ struct box_gpu_bake_t {
     uint64_t lists_size;            /**< Bytes of lists */
     WGPUBindGroup cull_group;       /**< Binds the buffers of the cull, NULL when they changed */
     WGPUBindGroup bounds_group;     /**< Binds the buffers of the block bounds, as cull_group */
+    bool bounds_stale;              /**< The next chunk takes the bounds of the blocks */
+    uint32_t bounds_volume;         /**< Volume whose bake the bounds were taken for, 0 for none */
+    uint32_t bounds_generation;     /**< Generation of that bake */
+    ecs_vec_t bounds_jobs;          /**< box_gpu_bake_job_t the bounds were taken for */
+    ecs_vec_t bounds_lists;         /**< uint32_t, the listed slots the bounds were taken for */
+    WGPUTextureView kept_shadow;    /**< Capture shadow map kept for a bake, NULL for none */
+    uint32_t kept_volume;           /**< Volume of the bake the shadow map was rendered for */
+    uint32_t kept_generation;       /**< Generation of that bake */
+    mat4 kept_matrix;               /**< Matrix of the cascade of the shadow map */
     ecs_vec_t draws;                /**< box_gpu_bake_draw_t of the bake batch */
     ecs_vec_t job_data;             /**< box_gpu_bake_job_t of the bake batch */
     ecs_vec_t run_data;             /**< Bytes of the uniforms of the runs of the bake batch */
@@ -246,7 +257,8 @@ struct box_gpu_bake_t {
                                                           *   yet taken, under the gpu lock */
     ecs_vec_t captured[BOX_GPU_BAKE_KINDS]; /**< box_render_bake_result_t of each kind not taken,
                                              *   under the gpu lock */
-    int32_t in_flight;              /**< Chunks submitted since the queue was last waited for */
+    int32_t in_flight;              /**< Chunks of the packet submitted since the queue was last
+                                     *   waited for: a frame of few chunks does not wait */
 };
 
 /** Create the timestamp queries and their readbacks when the device has the feature.
@@ -300,8 +312,17 @@ const WGPUPassTimestampWrites* box_gpu_bake_writes(
 int32_t box_gpu_bake_readback(
     box_gpu_bake_t *b);
 
-/** Resolve the timestamps of the readbacks whose captures were submitted before the last
- * packet and copy them into their readbacks.
+/** Mark the timestamps of a readback as submitted and ask when the queue finishes them.
+ *
+ * @param gpu The backend
+ * @param r The readback
+ */
+void box_gpu_bake_readback_written(
+    box_gpu_t *gpu,
+    box_gpu_bake_readback_t *r);
+
+/** Resolve the timestamps of the readbacks whose captures the queue finished and copy them into
+ * their readbacks.
  *
  * @param gpu The backend
  * @param b The capture state

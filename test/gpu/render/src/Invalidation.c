@@ -1223,3 +1223,89 @@ void Invalidation_same_transform_rebakes_nothing(void) {
 
     ecs_fini(world);
 }
+
+void Invalidation_moved_caster_matches_fresh_bake(void) {
+    // baked_lighting/invalidation
+    unsigned char *images[2] = {NULL, NULL};
+    int w[2] = {0, 0}, h[2] = {0, 0}, n = 0, i, largest = 0;
+    for (i = 0; i < 2; i ++) {
+        ecs_world_t *world = ecs_init();
+        ECS_IMPORT(world, Box);
+        App *app = ecs_singleton_get_mut(world, App);
+        app->headless = true;
+        ecs_singleton_modified(world, App);
+
+        ecs_entity_t scene = ecs_new(world);
+        ecs_add(world, scene, Scene);
+        ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
+            .capture_size = 16, .budget_ms = 2, .bounces = 1});
+        ecs_set(world, scene, AmbientLight, {.intensity = 0});
+        ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
+        ecs_set(world, camera, Position, {4, 1.5f, 0});
+        ecs_set(world, camera, Rotation, {0, 1.5707963f, 0});
+        ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+        ecs_entity_t view = ecs_new(world);
+        ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true,
+            .lighting.baked = true, .shadows.enabled = true});
+        ecs_entity_t sun = ecs_new_w_pair(world, EcsChildOf, scene);
+        ecs_set(world, sun, Rotation, {1.5707963f, 0, 0});
+        ecs_set(world, sun, DirectionalLight, {.intensity = 12});
+        ecs_entity_t floor = ecs_new_w_pair(world, EcsChildOf, scene);
+        ecs_set(world, floor, Position, {0, -0.1f, 0});
+        ecs_set(world, floor, Box, {10, 0.2f, 10});
+        ecs_set(world, floor, Rgb, {255, 255, 255});
+        ecs_entity_t wall = ecs_new_w_pair(world, EcsChildOf, scene);
+        ecs_set(world, wall, Position, {-5, 2, 0});
+        ecs_set(world, wall, Box, {0.2f, 4, 10});
+        ecs_set(world, wall, Rgb, {255, 255, 255});
+        ecs_entity_t caster = ecs_new_w_pair(world, EcsChildOf, scene);
+        ecs_set(world, caster, Position, {i ? -2.5f : 2.5f, 3, 0});
+        ecs_set(world, caster, Box, {5, 0.2f, 10});
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Surface, {.width = 64, .height = 48, .write_to_file = "caster.png",
+            .resolution_scale = 1});
+        char *path = flecs_asprintf("%s/caster.png",
+            ecs_singleton_get(world, AppStatus)->tmp_dir);
+
+        int32_t frames = 0;
+        while (!ecs_get(world, scene, LightBakeStatus)->converged && frames < 5000) {
+            ecs_progress(world, 0);
+            box_render_sync(world);
+            frames ++;
+        }
+
+        test_bool(ecs_get(world, scene, LightBakeStatus)->converged, true);
+        if (i) {
+            ecs_set(world, caster, Position, {2.5f, 3, 0});
+            ecs_progress(world, 0);
+            box_render_sync(world);
+            test_bool(ecs_get(world, scene, LightBakeStatus)->converged, false);
+            frames = 0;
+            while (!ecs_get(world, scene, LightBakeStatus)->converged && frames < 5000) {
+                ecs_progress(world, 0);
+                box_render_sync(world);
+                frames ++;
+            }
+
+            test_bool(ecs_get(world, scene, LightBakeStatus)->converged, true);
+        }
+
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        images[i] = stbi_load(path, &w[i], &h[i], &n, 4);
+        test_assert(images[i] != NULL);
+        ecs_os_free(path);
+        ecs_fini(world);
+    }
+
+    test_int(w[0], w[1]);
+    test_int(h[0], h[1]);
+    for (i = 0; i < w[0] * h[0] * 4; i ++) {
+        int d = abs((int)images[0][i] - (int)images[1][i]);
+        largest = d > largest ? d : largest;
+    }
+
+    test_assert(largest <= 2);
+    stbi_image_free(images[0]);
+    stbi_image_free(images[1]);
+}
