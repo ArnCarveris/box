@@ -1,6 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect x="6" y="18" width="24" height="14" rx="2" fill="#bdb4a9"/>
-  <rect x="34" y="18" width="24" height="14" rx="2" fill="#afa699"/>
-  <rect x="6" y="36" width="24" height="14" rx="2" fill="#afa699"/>
-  <rect x="34" y="36" width="24" height="14" rx="2" fill="#bdb4a9"/>
+  <defs>
+    <filter id="contour" filterUnits="userSpaceOnUse" x="-4" y="-4" width="72" height="72" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="0.5"/><feComponentTransfer result="edge"><feFuncA type="linear" slope="7" intercept="-0.15"/></feComponentTransfer><feGaussianBlur in="edge" stdDeviation="1"/><feOffset dx="0.5" dy="1.5"/><feComponentTransfer result="shadow"><feFuncA type="linear" slope="0.55"/></feComponentTransfer><feFlood flood-color="#090b0d"/><feComposite in2="edge" operator="in" result="line"/><feMerge><feMergeNode in="shadow"/><feMergeNode in="line"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="rockTop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d3cbbd"/><stop offset="1" stop-color="#a79e8e"/></linearGradient>
+    <linearGradient id="rockLit" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b0a797"/><stop offset="1" stop-color="#837a6b"/></linearGradient>
+    <linearGradient id="rockMid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8f8676"/><stop offset="1" stop-color="#5f574b"/></linearGradient>
+    <linearGradient id="rockDark" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6b6357"/><stop offset="1" stop-color="#39332b"/></linearGradient>
+  </defs>
+  <g filter="url(#contour)">
+    <polygon points="4,37 11,31 37,31 30,37" fill="url(#rockTop)"/>
+    <polygon points="30,37 37,31 37,47 30,53" fill="url(#rockDark)"/>
+    <rect x="4" y="37" width="26" height="16" fill="url(#rockLit)"/>
+    <path d="M4.6 37.4 L29.7 37.4" fill="none" stroke="#dadada" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+    <path d="M30 37 L37 31" fill="none" stroke="#dadada" stroke-width="0.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.3"/>
+    <rect x="4" y="51.6" width="26" height="1.4" fill="#000000" opacity="0.28"/>
+    <polygon points="31,37 38,31 59,31 52,37" fill="url(#rockTop)"/>
+    <polygon points="52,37 59,31 59,47 52,53" fill="url(#rockDark)"/>
+    <rect x="31" y="37" width="21" height="16" fill="url(#rockMid)"/>
+    <path d="M31.6 37.4 L51.7 37.4" fill="none" stroke="#dadada" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+    <path d="M52 37 L59 31" fill="none" stroke="#dadada" stroke-width="0.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.3"/>
+    <rect x="31" y="51.6" width="21" height="1.4" fill="#000000" opacity="0.28"/>
+    <polygon points="13,19 22,12 52,12 43,19" fill="url(#rockTop)"/>
+    <polygon points="43,19 52,12 52,27 43,34" fill="url(#rockDark)"/>
+    <rect x="13" y="19" width="30" height="15" fill="url(#rockLit)"/>
+    <path d="M13.6 19.4 L42.7 19.4" fill="none" stroke="#dadada" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+    <path d="M43 19 L52 12" fill="none" stroke="#dadada" stroke-width="0.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.3"/>
+    <rect x="13" y="32.6" width="30" height="1.4" fill="#000000" opacity="0.28"/>
+    <path d="M18 26 L22 24.5 L26 28" fill="none" stroke="#120e08" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
+    <path d="M9 45 L13 43.5" fill="none" stroke="#120e08" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
+    <path d="M38 46 L42 44 L45 47" fill="none" stroke="#120e08" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
+  </g>
 </svg>

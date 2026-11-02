@@ -1,8 +1,39 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect x="6" y="46" width="52" height="10" rx="3" fill="#6b7282"/>
-  <rect x="10" y="26" width="8" height="20" rx="3" fill="#ff87c4"/>
-  <rect x="46" y="26" width="8" height="20" rx="3" fill="#ff87c4"/>
-  <rect x="22" y="24" width="20" height="22" rx="4" fill="#c2cbda"/>
-  <circle cx="32" cy="34" r="6" fill="#ff87c4"/>
-  <rect x="29" y="6" width="6" height="18" rx="2" fill="#97a0b2"/>
+  <defs>
+    <filter id="contour" filterUnits="userSpaceOnUse" x="-4" y="-4" width="72" height="72" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="0.5"/><feComponentTransfer result="edge"><feFuncA type="linear" slope="7" intercept="-0.15"/></feComponentTransfer><feGaussianBlur in="edge" stdDeviation="1"/><feOffset dx="0.5" dy="1.5"/><feComponentTransfer result="shadow"><feFuncA type="linear" slope="0.55"/></feComponentTransfer><feFlood flood-color="#090b0d"/><feComposite in2="edge" operator="in" result="line"/><feMerge><feMergeNode in="shadow"/><feMergeNode in="line"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <pattern id="hazard" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)"><rect width="6" height="6" fill="#d9a23a"/><rect width="3" height="6" fill="#15181b"/></pattern>
+    <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c6cfd3"/><stop offset="0.45" stop-color="#8f9ca2"/><stop offset="1" stop-color="#4a565c"/></linearGradient>
+    <linearGradient id="steelCyl" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#465057"/><stop offset="0.28" stop-color="#ccd5d9"/><stop offset="0.6" stop-color="#87949a"/><stop offset="1" stop-color="#283035"/></linearGradient>
+    <linearGradient id="gun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#79868c"/><stop offset="0.5" stop-color="#3f4a50"/><stop offset="1" stop-color="#1e2529"/></linearGradient>
+    <linearGradient id="gunCyl" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#232a2e"/><stop offset="0.3" stop-color="#808d93"/><stop offset="0.65" stop-color="#414c52"/><stop offset="1" stop-color="#14191c"/></linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e0b955"/><stop offset="0.5" stop-color="#d4912c"/><stop offset="1" stop-color="#83501a"/></linearGradient>
+    <linearGradient id="laser" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e0a0c8"/><stop offset="0.5" stop-color="#c9568f"/><stop offset="1" stop-color="#6e2350"/></linearGradient>
+    <linearGradient id="laserCyl" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#5e1e45"/><stop offset="0.3" stop-color="#e0a0c8"/><stop offset="0.65" stop-color="#b84a84"/><stop offset="1" stop-color="#4a1636"/></linearGradient>
+    <radialGradient id="laserLens" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#e0c0d8"/><stop offset="0.45" stop-color="#d65f9e"/><stop offset="1" stop-color="#5e1b43"/></radialGradient>
+  </defs>
+  <g filter="url(#contour)">
+    <rect x="5" y="48" width="54" height="10" rx="2" fill="url(#gun)"/>
+    <rect x="7" y="48.5" width="50" height="0.9" rx="0.4" fill="#dadada" opacity="0.3"/>
+    <rect x="7" y="56.5" width="50" height="1" rx="0.4" fill="#000000" opacity="0.3"/>
+    <rect x="7" y="53.5" width="50" height="3" rx="0.6" fill="url(#hazard)"/>
+    <rect x="13" y="40" width="38" height="9" rx="3" fill="url(#amber)"/>
+    <rect x="16" y="40.5" width="32" height="0.9" rx="0.4" fill="#dadada" opacity="0.4"/>
+    <rect x="16" y="47.5" width="32" height="1" rx="0.4" fill="#000000" opacity="0.35"/>
+    <rect x="9" y="18" width="11" height="24" rx="2.5" fill="url(#laserCyl)"/>
+    <rect x="44" y="18" width="11" height="24" rx="2.5" fill="url(#laserCyl)"/>
+    <rect x="8" y="15" width="13" height="5" rx="1.2" fill="url(#gunCyl)"/>
+    <rect x="43" y="15" width="13" height="5" rx="1.2" fill="url(#gunCyl)"/>
+    <rect x="8" y="38" width="13" height="5" rx="1.2" fill="url(#gunCyl)"/>
+    <rect x="43" y="38" width="13" height="5" rx="1.2" fill="url(#gunCyl)"/>
+    <path d="M9 26 L20 26 M9 32 L20 32 M44 26 L55 26 M44 32 L55 32" fill="none" stroke="#2b0d20" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round" opacity="0.65"/>
+    <rect x="27.5" y="3" width="9" height="20" rx="1.2" fill="url(#steelCyl)"/>
+    <rect x="26" y="3" width="12" height="4" rx="1" fill="url(#gunCyl)"/>
+    <rect x="29" y="1" width="6" height="3" rx="0.8" fill="url(#laser)"/>
+    <rect x="21" y="19" width="22" height="23" rx="3" fill="url(#steel)"/>
+    <rect x="24" y="19.5" width="16" height="0.9" rx="0.4" fill="#dadada" opacity="0.4"/>
+    <rect x="24" y="40.5" width="16" height="1" rx="0.4" fill="#000000" opacity="0.35"/>
+    <circle cx="32" cy="30.5" r="7.300000000000001" fill="#101417"/>
+    <circle cx="32" cy="30.5" r="6.2" fill="url(#laserLens)"/>
+    <circle cx="30.016" cy="28.268" r="1.612" fill="#dadada" opacity="0.65"/>
+  </g>
 </svg>

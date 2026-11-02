@@ -1,7 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect x="10" y="16" width="44" height="34" rx="4" fill="#97a0b2"/>
-  <rect x="10" y="26" width="44" height="6" fill="#c2cbda"/>
-  <rect x="18" y="34" width="12" height="10" rx="2" fill="#83fff3"/>
-  <rect x="34" y="34" width="12" height="10" rx="2" fill="#83fff3"/>
-  <rect x="6" y="50" width="52" height="6" rx="2" fill="#6b7282"/>
+  <defs>
+    <filter id="contour" filterUnits="userSpaceOnUse" x="-4" y="-4" width="72" height="72" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="0.5"/><feComponentTransfer result="edge"><feFuncA type="linear" slope="7" intercept="-0.15"/></feComponentTransfer><feGaussianBlur in="edge" stdDeviation="1"/><feOffset dx="0.5" dy="1.5"/><feComponentTransfer result="shadow"><feFuncA type="linear" slope="0.55"/></feComponentTransfer><feFlood flood-color="#090b0d"/><feComposite in2="edge" operator="in" result="line"/><feMerge><feMergeNode in="shadow"/><feMergeNode in="line"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <pattern id="hazard" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)"><rect width="6" height="6" fill="#d9a23a"/><rect width="3" height="6" fill="#15181b"/></pattern>
+    <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c6cfd3"/><stop offset="0.45" stop-color="#8f9ca2"/><stop offset="1" stop-color="#4a565c"/></linearGradient>
+    <linearGradient id="gun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#79868c"/><stop offset="0.5" stop-color="#3f4a50"/><stop offset="1" stop-color="#1e2529"/></linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fe0d4"/><stop offset="0.55" stop-color="#2fa899"/><stop offset="1" stop-color="#0d5a55"/></linearGradient>
+  </defs>
+  <g filter="url(#contour)">
+    <polygon points="6,22 16,13 58,13 48,22" fill="url(#steel)"/>
+    <polygon points="48,22 58,13 58,44 48,54" fill="url(#gun)"/>
+    <rect x="6" y="22" width="42" height="32" rx="1" fill="url(#steel)"/>
+    <rect x="7" y="22.5" width="40" height="0.9" rx="0.4" fill="#dadada" opacity="0.4"/>
+    <rect x="7" y="52.5" width="40" height="1" rx="0.4" fill="#000000" opacity="0.35"/>
+    <rect x="6" y="42" width="42" height="6" fill="url(#hazard)"/>
+    <path d="M6 42 L48 42 M6 48 L48 48" fill="none" stroke="#14191c" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
+    <path d="M15 23 L15 41 M27 23 L27 41 M39 23 L39 41" fill="none" stroke="#20272b" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" opacity="0.65"/>
+    <path d="M16 23.5 L16 41 M28 23.5 L28 41 M40 23.5 L40 41" fill="none" stroke="#dadada" stroke-width="0.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.35"/>
+    <rect x="18.5" y="27" width="5.5" height="8" rx="1" fill="#0d1113"/>
+    <rect x="19.2" y="27.7" width="4.1" height="6.6" rx="0.6" fill="url(#glass)"/>
+    <rect x="30.5" y="27" width="5.5" height="8" rx="1" fill="#0d1113"/>
+    <rect x="31.2" y="27.7" width="4.1" height="6.6" rx="0.6" fill="url(#glass)"/>
+    <path d="M51 22 L51 49 M55 19 L55 45" fill="none" stroke="#0d1113" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
+    <rect x="3" y="53" width="48" height="6" rx="1.5" fill="url(#gun)"/>
+    <polygon points="51,53 60,44 60,50 51,59" fill="#20272b"/>
+    <rect x="4.5" y="53.4" width="45" height="0.8" rx="0.4" fill="#dadada" opacity="0.3"/>
+  </g>
 </svg>

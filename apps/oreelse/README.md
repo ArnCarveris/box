@@ -1162,7 +1162,7 @@ its tile in the grid.
 | `etc/ui/fonts/` | The fonts of the UI with their licenses |
 | `etc/ui/art/` | The textures of the UI, which `tools/ui_art.py` writes (numpy and Pillow) |
 | `etc/ui/signs/` | The original's sign art of the title screen (SVG), unchanged |
-| `etc/icons/` | The original's icons (SVG), unchanged |
+| `etc/icons/` | The icons (SVG), redrawn from the original's with shared materials: light from the top left, gradients and bevels, a dark contour and a soft shadow. No color channel goes above byte 226, the start of the HUD's `Bloom`, so the icons do not glow |
 | `etc/ui/hazard_strip.svg` | The original's hazard strip of the panels, unchanged |
 | `src/flow.c` | States, clock, blink, toast, seeds, `oreelse.cancel()`, `oreelse.restart()` |
 | `src/map.c` | The tile grid, the deposits' registration and the hover tile |

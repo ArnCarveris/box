@@ -1,17 +1,39 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect x="4" y="44" width="56" height="12" rx="3" fill="#686f7f"/>
-  <rect x="8" y="40" width="48" height="6" fill="#949daf"/>
-  <rect x="4" y="52" width="56" height="4" fill="#ffca68"/>
-  <circle cx="18" cy="43" r="7" fill="#7f8799"/>
-  <circle cx="46" cy="43" r="7" fill="#7f8799"/>
-  <rect x="14" y="42" width="8" height="2" fill="#d5deee"/>
-  <rect x="42" y="42" width="8" height="2" fill="#d5deee"/>
-  <rect x="24" y="18" width="16" height="8" rx="2" fill="#bfc8d7"/>
-  <rect x="27" y="14" width="10" height="4" fill="#ffca68"/>
-  <rect x="30" y="26" width="4" height="5" fill="#949daf"/>
-  <rect x="10" y="10" width="20" height="2.5" rx="1" fill="#686f7f"/>
-  <rect x="34" y="10" width="20" height="2.5" rx="1" fill="#686f7f"/>
-  <rect x="18" y="11" width="3" height="8" fill="#949daf"/>
-  <rect x="43" y="11" width="3" height="8" fill="#949daf"/>
-  <circle cx="32" cy="22" r="2.5" fill="#7dfff2"/>
+  <defs>
+    <filter id="contour" filterUnits="userSpaceOnUse" x="-4" y="-4" width="72" height="72" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="0.5"/><feComponentTransfer result="edge"><feFuncA type="linear" slope="7" intercept="-0.15"/></feComponentTransfer><feGaussianBlur in="edge" stdDeviation="1"/><feOffset dx="0.5" dy="1.5"/><feComponentTransfer result="shadow"><feFuncA type="linear" slope="0.55"/></feComponentTransfer><feFlood flood-color="#090b0d"/><feComposite in2="edge" operator="in" result="line"/><feMerge><feMergeNode in="shadow"/><feMergeNode in="line"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <pattern id="hazard" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)"><rect width="6" height="6" fill="#d9a23a"/><rect width="3" height="6" fill="#15181b"/></pattern>
+    <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c6cfd3"/><stop offset="0.45" stop-color="#8f9ca2"/><stop offset="1" stop-color="#4a565c"/></linearGradient>
+    <linearGradient id="gun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#79868c"/><stop offset="0.5" stop-color="#3f4a50"/><stop offset="1" stop-color="#1e2529"/></linearGradient>
+    <linearGradient id="gunCyl" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#232a2e"/><stop offset="0.3" stop-color="#808d93"/><stop offset="0.65" stop-color="#414c52"/><stop offset="1" stop-color="#14191c"/></linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e0b955"/><stop offset="0.5" stop-color="#d4912c"/><stop offset="1" stop-color="#83501a"/></linearGradient>
+    <radialGradient id="lens" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#b4e0da"/><stop offset="0.45" stop-color="#4fcdbb"/><stop offset="1" stop-color="#0c5f5a"/></radialGradient>
+  </defs>
+  <g filter="url(#contour)">
+    <rect x="2" y="42" width="60" height="16" rx="3" fill="url(#gun)"/>
+    <rect x="5" y="42.5" width="54" height="0.9" rx="0.4" fill="#dadada" opacity="0.4"/>
+    <rect x="5" y="56.5" width="54" height="1" rx="0.4" fill="#000000" opacity="0.4"/>
+    <rect x="4" y="51" width="56" height="5" rx="0.8" fill="url(#hazard)"/>
+    <ellipse cx="32" cy="46.5" rx="22" ry="3.6" fill="#101417"/>
+    <ellipse cx="32" cy="46.2" rx="19" ry="2.6" fill="url(#steel)"/>
+    <ellipse cx="32" cy="46.2" rx="9" ry="1.3" fill="#101417"/>
+    <ellipse cx="32" cy="42" rx="11" ry="1.8" fill="#000000" opacity="0.45"/>
+    <circle cx="7" cy="46.5" r="1.4" fill="url(#lens)"/>
+    <circle cx="57" cy="46.5" r="1.4" fill="url(#lens)"/>
+    <rect x="6" y="13" width="52" height="3" rx="1" fill="url(#gun)"/>
+    <rect x="15" y="15" width="3.4" height="8" fill="url(#gunCyl)"/>
+    <rect x="45.6" y="15" width="3.4" height="8" fill="url(#gunCyl)"/>
+    <ellipse cx="16.7" cy="11.5" rx="12" ry="2.2" fill="url(#steel)"/>
+    <ellipse cx="47.3" cy="11.5" rx="12" ry="2.2" fill="url(#steel)"/>
+    <circle cx="16.7" cy="11.5" r="1.6" fill="#101417"/>
+    <circle cx="47.3" cy="11.5" r="1.6" fill="#101417"/>
+    <rect x="25" y="13" width="14" height="4" rx="1.2" fill="url(#amber)"/>
+    <rect x="20" y="17" width="24" height="13" rx="3.5" fill="url(#steel)"/>
+    <rect x="23.5" y="17.5" width="17.0" height="0.9" rx="0.4" fill="#dadada" opacity="0.45"/>
+    <rect x="23.5" y="28.5" width="17.0" height="1" rx="0.4" fill="#000000" opacity="0.35"/>
+    <rect x="27" y="29" width="2.4" height="6" rx="0.6" fill="url(#gun)"/>
+    <rect x="34.6" y="29" width="2.4" height="6" rx="0.6" fill="url(#gun)"/>
+    <circle cx="32" cy="23.5" r="4.2" fill="#101417"/>
+    <circle cx="32" cy="23.5" r="3.1" fill="url(#lens)"/>
+    <circle cx="31.008" cy="22.384" r="0.806" fill="#dadada" opacity="0.65"/>
+  </g>
 </svg>

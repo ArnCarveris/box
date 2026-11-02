@@ -1,5 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <path d="M6 44 C16 20 26 20 32 32 C38 44 48 44 58 20" fill="none" stroke="#f89857" stroke-width="7" stroke-linecap="round"/>
-  <rect x="4" y="42" width="10" height="8" rx="2" fill="#969fb1"/>
-  <rect x="52" y="16" width="10" height="8" rx="2" fill="#969fb1"/>
+  <defs>
+    <filter id="contour" filterUnits="userSpaceOnUse" x="-4" y="-4" width="72" height="72" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="0.5"/><feComponentTransfer result="edge"><feFuncA type="linear" slope="7" intercept="-0.15"/></feComponentTransfer><feGaussianBlur in="edge" stdDeviation="1"/><feOffset dx="0.5" dy="1.5"/><feComponentTransfer result="shadow"><feFuncA type="linear" slope="0.55"/></feComponentTransfer><feFlood flood-color="#090b0d"/><feComposite in2="edge" operator="in" result="line"/><feMerge><feMergeNode in="shadow"/><feMergeNode in="line"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c6cfd3"/><stop offset="0.45" stop-color="#8f9ca2"/><stop offset="1" stop-color="#4a565c"/></linearGradient>
+    <linearGradient id="gun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#79868c"/><stop offset="0.5" stop-color="#3f4a50"/><stop offset="1" stop-color="#1e2529"/></linearGradient>
+    <linearGradient id="copperV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e0a06a"/><stop offset="0.45" stop-color="#b9642f"/><stop offset="1" stop-color="#5c2c11"/></linearGradient>
+  </defs>
+  <g filter="url(#contour)">
+    <path d="M46 50 C54 58 58 54 60 46" fill="none" stroke="#2a140a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="1"/>
+    <path d="M46 50 C54 58 58 54 60 46" fill="none" stroke="#c97c41" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="1"/>
+    <path d="M47 49.5 C54 56 57 53 59 46" fill="none" stroke="#e0ab78" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+    <ellipse cx="14" cy="32" rx="6" ry="23" fill="url(#gun)"/>
+    <rect x="14" y="14" width="34" height="36" fill="url(#copperV)"/>
+    <path d="M19 14 L21 50" fill="none" stroke="#34180a" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+    <path d="M23 14 L25 50" fill="none" stroke="#34180a" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+    <path d="M27 14 L29 50" fill="none" stroke="#34180a" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+    <path d="M31 14 L33 50" fill="none" stroke="#34180a" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+    <path d="M35 14 L37 50" fill="none" stroke="#34180a" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+    <path d="M39 14 L41 50" fill="none" stroke="#34180a" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+    <path d="M43 14 L45 50" fill="none" stroke="#34180a" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+    <path d="M19.8 18 L20.1 25" fill="none" stroke="#e0c0a0" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+    <path d="M23.8 18 L24.1 25" fill="none" stroke="#e0c0a0" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+    <path d="M27.8 18 L28.1 25" fill="none" stroke="#e0c0a0" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+    <path d="M31.8 18 L32.1 25" fill="none" stroke="#e0c0a0" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+    <path d="M35.8 18 L36.1 25" fill="none" stroke="#e0c0a0" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+    <path d="M39.8 18 L40.1 25" fill="none" stroke="#e0c0a0" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+    <path d="M43.8 18 L44.1 25" fill="none" stroke="#e0c0a0" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+    <rect x="14" y="46" width="34" height="4" fill="#000000" opacity="0.3"/>
+    <rect x="14" y="14" width="3.5" height="36" fill="#000000" opacity="0.35"/>
+    <ellipse cx="48" cy="32" rx="7" ry="24" fill="url(#steel)"/>
+    <ellipse cx="48" cy="32" rx="4.8" ry="20.5" fill="url(#gun)"/>
+    <ellipse cx="48.6" cy="32" rx="2" ry="6.5" fill="#101417"/>
+    <path d="M43.3 15 C42 22 41.5 28 41.5 32" fill="none" stroke="#dadada" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
+  </g>
 </svg>
