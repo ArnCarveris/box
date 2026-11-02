@@ -898,7 +898,6 @@ fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
     return lit;
 }
 
-<<<<<<< HEAD
 // Light passed through the surface toward the eye by the back lobe of a diffuse transmission, of
 // one light arriving from direction l with a radiance at the far side: a Lambert lobe on the
 // inverted normal, without a Fresnel term or a specular lobe. The sheen scales it by its
@@ -916,22 +915,6 @@ fn brdf_back(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> vec3f {
     return back;
 }
 
-// Distance below which a point or spot light stops getting brighter, so a surface at the light
-// stays finite.
-const LIGHT_MIN_DISTANCE: f32 = 0.01;
-
-// Radiance of a point or spot light at a position: inverse square falloff, smoothly windowed
-// to zero at the range as in Frostbite's smoothDistanceAtt, times the smooth cone of a spot.
-fn attenuation(light: Light, l: vec3f, dist: f32) -> f32 {
-    let ratio = dist / max(light.range, 1e-4);
-    let window = clamp(1.0 - ratio * ratio * ratio * ratio, 0.0, 1.0);
-    let cone = clamp(dot(-l, light.direction) * light.spot_scale + light.spot_offset, 0.0, 1.0);
-    let near_ = max(dist, LIGHT_MIN_DISTANCE);
-    return window * window / (near_ * near_) * cone * cone;
-}
-
-=======
->>>>>>> 29d75bad63d10ef24f243d2c23715db80adf1f85
 // Light inputs. Every direct light the forward pass uses comes from here: the directional
 // lights of the scene, the first one through its shadow map and light cookie, then the point
 // and spot lights of the cluster of the fragment, a spot or point light with a tile of the
