@@ -4,6 +4,7 @@ include leaf
 include tree
 include fern
 include vine
+include detail
 include bridge
 include roof
 include tower
@@ -15,9 +16,9 @@ include courtyard
 include slab
 include conservatory
 include skyscraper
-include streetlight
 include terrain
 include districts
+include life
 using flecs.script
 using box.transform
 using box.geometry
@@ -36,22 +37,24 @@ assets {
     prop floor_variation: i32 = 2
     prop center_floors: i32 = 8
     prop skyscraper_floors: i32 = 7
-    prop trees_per_block: i32 = 7
+    prop trees_per_block: i32 = 5
     const width = columns * spacing + 32
     const depth = rows * spacing + 20
     const extent = math.sqrt(width * width + depth * depth)
-    CanopyTerrain(width: width, depth: depth) {}
+    const plaza_radius = 11
+    const civic_z = (rows - 2 - (rows - 1) / 2.0) * spacing + spacing / 2
+    CanopyTerrain terrain(width: width, depth: depth, seed: seed)
     CanopyDistricts(rows: rows, columns: columns, spacing: spacing, seed: seed,
-      base_floors: base_floors, floor_variation: floor_variation, center_floors: center_floors, skyscraper_floors: skyscraper_floors, trees_per_block: trees_per_block) {}
+      base_floors: base_floors, floor_variation: floor_variation, center_floors: center_floors, skyscraper_floors: skyscraper_floors, trees_per_block: trees_per_block, plaza_radius: plaza_radius) {}
     civic_island {
-      Position: {0, 0.4, depth * 0.34}
-      platform : CanopyIvory { Position: {0, 1.8, 0}; Cylinder: {radius: 7, length: 3.6, segments: 48} }
-      CanopyConservatory() { Position: {0, 3.6, 0} }
-      CanopyBridge(length: spacing + 8, width: 3) { Position: {0, 4.2, 0} }
+      Position: {0, 0.2, civic_z}
+      CanopyCivicPlaza(radius: plaza_radius, height: 4.52) {}
     }
+    CanopyCivicSquare(spacing: spacing, radius: plaza_radius) { Position: {0, 0, civic_z} }
+    CanopyLife(width: width, depth: depth, seed: seed) {}
     camera {
-      Position: {-extent * 0.69, extent * 0.59, extent * 0.87}
-      Rotation: {-0.48, -0.67, 0}
+      Position: {-extent * 0.63, extent * 0.37, extent * 0.76}
+      Rotation: {-0.285, -0.69, 0}
       Camera: {fov: 43, near_: 0.5, far_: extent * 5}
       CameraController: {speed: 30}
     }

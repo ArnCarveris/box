@@ -1,8 +1,8 @@
 # Canopy City
 
-A procedural jungle utopia on a finite earthen diorama: 90 buildings mixing terraced residential towers, cylindrical garden towers, stepped residences, slender solar-canopy spires, staggered pod residences, courtyard residences, staggered slabs and varied skyscrapers, timber facade fins and soffits, planted balconies, hanging vines, rooftop gardens and solar panels, connected elevated walks, a central water garden and a ribbed botanical conservatory. Layered trees and understory ferns weave through the districts.
+A procedural jungle utopia on a finite earthen diorama: buildings mixing terraced residential towers, cylindrical garden towers, stepped residences, slender solar-canopy spires, staggered pod residences, courtyard residences, staggered slabs and varied skyscrapers, timber facade fins and soffits, planted balconies, hanging vines, rooftop gardens and solar panels, connected elevated walks, a central water garden and a ribbed botanical conservatory. Layered trees and understory ferns weave through the districts.
 
-The primitive survey in [INVENTORY.md](INVENTORY.md) was written before the scene design. All assets are native Flecs geometry in separate files; no external textures or models are required.
+The primitive survey in [INVENTORY.md](INVENTORY.md) was written before the scene design.
 
 ## Run
 
@@ -23,7 +23,7 @@ Set properties on the `assets.JungleCity` instance in `../jungle_city.flecs`, fo
 assets.JungleCity city(rows: 9, columns: 10, seed: 17) { camera {} }
 ```
 
-The reusable template is in [city.flecs](city.flecs). Include `jungle_city/city` to use it in another scene. Each instance has independent dimensions, seed and vegetation settings; there are no global configuration constants. The plinth, water, forest perimeter, bridge network, camera distance and far plane follow the dimensions. The camera child is declared in the instance body so the view can reference it before template expansion. The ambient sky, light bake and view remain in the entry scene. Streetlamps belong to each city instance; the city contains no text signs.
+The reusable template is in [city.flecs](city.flecs). Include `jungle_city/city` to use it in another scene. Each instance has independent dimensions, seed and vegetation settings; there are no global configuration constants. The plinth, water, forest perimeter, bridge network, camera distance and far plane follow the dimensions. The camera child is declared in the instance body so the view can reference it before template expansion. Streetlamps belong to each city instance; the city contains no text signs.
 
 For a wider city:
 
@@ -42,19 +42,19 @@ assets.JungleCity city(rows: 4, columns: 8, spacing: 18, seed: 42,
 | floor_variation | 2 | At least 1; random additional floors from zero up to this value minus one |
 | center_floors | 8 | Additional floors at the center, tapering smoothly to zero at the perimeter; keep base + variation + center at most 13 |
 | skyscraper_floors | 7 | Base height bonus for the landmark tier, with additional offsets per design; zero disables this tier |
-| trees_per_block | 7 | Nonnegative integer; reduce for more open districts or faster loading |
+| trees_per_block | 5 | Nonnegative integer; reduce for more open districts or faster loading |
 
-Default footprint: 202 by 173 world units, approximately three times the original 122 × 95 area, with exactly three times as many buildings (90 versus 30). Width is columns × spacing + 32; depth is rows × spacing + 20. Even layouts have columns × rows towers; odd layouts have (columns − 1) × rows towers. For example, 8 columns, 4 rows and spacing 18 produces a 176 × 92 diorama with 32 towers. Larger counts increase geometry and startup cost; no runtime LOD is implemented.
+Default footprint: 202 by 173 world units. Width is columns × spacing + 32; depth is rows × spacing + 20. For example, 8 columns, 4 rows and spacing 18 produces a 176 × 92 diorama. Larger counts increase geometry and startup cost; no runtime LOD is implemented.
 
 ## Asset files
 
-`materials.flecs` contains shared material prefabs; `leaf.flecs` defines a folded leaf mesh shared by trees. `tree`, `branch`, `fern`, `vine`, `tower`, `rotunda`, `cascade`, `spire`, `pods`, `courtyard`, `slab`, `skyscraper`, `roof`, `streetlight`, `bridge`, `conservatory` and `terrain` each define one reusable asset template. `districts.flecs` arranges those assets. The city template loads dependencies in order and provides a camera; the entry scene defines lighting and effects. Asset templates expect those shared dependencies to be loaded first.
+`materials.flecs` contains shared material prefabs. `tree`, `branch`, `fern`, `vine`, `tower`, `rotunda`, `cascade`, `spire`, `pods`, `courtyard`, `slab`, `skyscraper`, `roof`, `bridge`, `conservatory` and `terrain` define reusable asset templates. `districts.flecs` arranges those assets. The city template loads dependencies in order and provides a camera; the entry scene defines lighting and effects. Asset templates expect those shared dependencies to be loaded first.
 
-Opaque teal glazing keeps the dense city in the opaque render pass. A subdued ambient sky and emissive surfaces feed a whole-city indirect light bake with one bounce, six-unit probe spacing and 32-pixel captures. The interactive bake uses an eight-millisecond frame budget and caches completed results. GTAO, subtle height fog, restrained bloom, tonemapping and SMAA finish the image. The first bake takes longer than a cached load; headless rendering completes the bake before producing the image.
+The interactive bake uses an eight-millisecond frame budget and caches completed results. GTAO, subtle height fog, restrained bloom, tonemapping and SMAA finish the image. The first bake takes longer than a cached load; headless rendering completes the bake before producing the image.
 
 ## Building variation
 
-Each lot seeds Box's `math.Rng` using the city seed and both coordinates. Separate draws select seven neighborhood building families, floor count, width, depth, five wall colors, three timber colors, facade spacing and six roof treatments. Weighted family arrays selected with a Flecs `match` expression favor towers and spires in the center and terraced or pod residences outside. Courtyard residences frame planted atriums; staggered slabs add wide, offset silhouettes. The innermost lots (centrality above 0.9) form a curated landmark group. The default six lots each get a different design, with height settings ranging from 14 to 28 floors rather than a uniform tower tier. The city seed rotates the landmark arrangement; lot randomness continues to vary materials and proportions. Designs include unequal skybridge towers, a broad stepped garden pyramid, cantilevered vertical neighborhoods, a tall botanical needle with solar petals, an open atrium crowned by a conservatory, and a spiraling garden tower. Deep planted decks, rooftop trees, hanging vines, projecting supports and distinct crowns make the massing readable from the city camera. Each keeps the common pedestrian entrance. A smooth product of the normalized X/Z falloffs adds up to eight floors near the center, while the perimeter stays at two or three floors. Vegetation has its own stream, so changing tree density does not reshuffle buildings. Lot random streams stay fixed at existing grid coordinates when resizing; the height gradient and family weights adapt to the new center. Window illumination uses an independent seeded stream in each building. Neighborhood building selection uses weighted random draws; the six landmark types are distributed across central lots to avoid duplicates in the default layout.
+Each lot seeds Box's `math.Rng` using the city seed and both coordinates. Separate draws select seven neighborhood building families, floor count, width, depth, five wall colors, three timber colors, facade spacing and six roof treatments. Weighted family arrays selected with a Flecs `match` expression favor towers and spires in the center and terraced or pod residences outside. Courtyard residences frame planted atriums; staggered slabs add wide, offset silhouettes. The innermost lots (centrality above 0.9) form a curated landmark group. The default six lots each get a different design, with height settings ranging from 14 to 28 floors rather than a uniform tower tier. The city seed rotates the landmark arrangement; lot randomness continues to vary materials and proportions. Designs include unequal skybridge towers, a broad stepped garden pyramid, cantilevered vertical neighborhoods, a tall botanical needle with solar petals, an open atrium crowned by a conservatory, and a spiraling garden tower. Deep planted decks, rooftop trees, hanging vines, projecting supports and distinct crowns make the massing readable from the city camera. Each keeps the common pedestrian entrance. A smooth product of the normalized X/Z falloffs adds up to eight floors near the center, while the perimeter stays at two or three floors. Vegetation has its own stream, so changing tree density does not reshuffle buildings. Lot random streams stay fixed at existing grid coordinates when resizing; the height gradient and family weights adapt to the new center. Neighborhood building selection uses weighted random draws; the six landmark types are distributed across central lots to avoid duplicates in the default layout.
 
 
 The `CanopySkyscraper.floorplan` values select these landmark designs. Heights below are the default template settings; open decks, crowns and the observatory mast add to their silhouettes.
@@ -72,9 +72,7 @@ Terrace towers have balcony bands, rotundas have circular floor plates, cascade 
 
 ## Vegetation and city lighting
 
-Trees use tapered trunks, buttress roots, visible branches, twigs and individual folded leaf meshes. Randomized broadleaf crowns and arching palm fronds replace solid foliage spheres. Tree height, species, branch direction and leaf dimensions vary independently.
-
-Warm emissive window panels appear in a seeded subset of rooms, with solar-topped emissive streetlamps and subdued jade bridge edges. Rooftop pools and pavilions add occasional warm accents. These surfaces illuminate their surroundings through the light bake; there are no point lights or directional lights in either entry scene. Ambient sky illumination keeps unlit foliage readable.
+Tree height, species, branch direction and leaf dimensions vary independently.
 
 To inspect the city lighting at dusk, run the alternate entry scene (it includes the same city and overrides only presentation settings):
 

@@ -1,17 +1,7 @@
 include jungle_city
 using flecs.script
-using box.light
-using box.view
 
-jungle_city {
-  AmbientLight: {sky: {179, 214, 208}, ground: {92, 119, 76}, intensity: 0.12}
-}
-main_view {
-  View: {
-    camera: jungle_city.city.camera,
-    clear: {enabled: true, color: {35, 55, 69, 255}},
-    lighting: {enabled: true, baked: true},
-    shadows: {enabled: true, resolution: 4096, max_distance: 1000},
-    effects: [{effect: canopy_ao}, {effect: canopy_mist}, {effect: canopy_bloom}, {effect: canopy_tonemap}, {effect: canopy_aa}]
-  }
+async {
+  hud_hour = 17.45
+  hud_fog = 0.0035
 }

@@ -7,8 +7,6 @@ using box.material
 template CanopyVine {
   prop length: f32 = 3
   prop phase: f32 = 0
-  { (IsA, CanopyJade); Position: {0, -length / 2, 0}; Cylinder: {radius: 0.035, length: length, segments: 5} }
-  for i in 0..7 {
-    { (IsA, CanopyLeaf); Position: {math.sin(i * 2.4 + phase) * 0.19, -i * length / 7, 0.08}; Rotation: {0, i * 2.4, 0.4}; Scale: {0.28, 0.42, 0.15}; IcoSphere: {radius: 1, segments: 0} }
-  }
+  { (IsA, CanopyVineCard); Position: {0, -length / 2, 0.04}; Rotation: {0, math.sin(phase) * 0.4, 0}; Quad: {0.32 + length * 0.1, length} }
+  { (IsA, CanopyVineCard); Rgb: {96, 138, 62}; Position: {0, -length * 0.42, 0.06}; Rotation: {0, 1.2 + math.cos(phase) * 0.5, 0}; Quad: {0.3 + length * 0.08, length * 0.84} }
 }
