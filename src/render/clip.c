@@ -16,7 +16,8 @@
 #define BOX_DRAWS_CLIP_WALK (256)
 
 /** Get the next ancestor whose ClipChildren can clip an entity: its parent, none above a
- * floating element (LayoutFloat), which its ancestors do not clip.
+ * floating element (LayoutFloat), which its ancestors do not clip. A clipped overlay (a
+ * LayoutFloat with clip) stays clipped by its ancestors, so the walk goes on to its parent.
  *
  * @param world The world
  * @param e The entity
@@ -27,8 +28,11 @@ static ecs_entity_t box_draws_clip_up(
     ecs_entity_t e)
 {
     ecs_entity_t result = 0;
-    if (e && !ecs_has(world, e, LayoutFloat)) {
-        result = ecs_get_parent(world, e);
+    if (e) {
+        const LayoutFloat *fl = ecs_get(world, e, LayoutFloat);
+        if (!fl || fl->clip) {
+            result = ecs_get_parent(world, e);
+        }
     }
 
     return result;

@@ -9,7 +9,8 @@
     },
     "lang.c": {
         "include": [
-            "../../../src/render"
+            "../../../src/render",
+            "../../../src/picking"
         ]
     },
     "test": {

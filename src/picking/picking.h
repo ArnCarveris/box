@@ -263,7 +263,8 @@ bool box_pick_cursor_ray(
 /** Check whether one element is drawn after another in the hierarchy order of 2D drawing.
  *
  * Floating elements and their descendants draw after the others. Parents draw before their
- * children, siblings by Position z, then OrderedChildren order or id.
+ * children, siblings by Position z, then clipped overlays (LayoutFloat.clip) after the others,
+ * then OrderedChildren order or id.
  *
  * @param world The world
  * @param a The first element

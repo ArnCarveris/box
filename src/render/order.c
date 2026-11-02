@@ -4,11 +4,11 @@
  *
  * The entities with 2D slots are sorted by the sibling keys (Position z, then rank) of their
  * ancestors and themselves, floating elements (LayoutFloat) and their descendants after the
- * rest; their slots are drawn per view as runs of consecutive slots.
+ * rest, a clipped overlay (LayoutFloat.clip) after its siblings of the same z.
  *
- * The shapes and glyphs of a tree, the descendants of a topmost entity below the scene roots,
- * are ranked in that order, so the 2D shader lifts the depth of every one over the coplanar
- * elements of its tree drawn before it.
+ * Their slots are drawn per view as runs of consecutive slots. The shapes and glyphs of a tree,
+ * the descendants of a topmost entity below the scene roots, are ranked in that order, so the 2D
+ * shader lifts the depth of every one over the coplanar elements of its tree drawn before it.
  */
 
 #include "draw.h"
@@ -19,6 +19,12 @@
 
 /** Ranks a shape or glyphs may keep above twice the count of the ranks before it in its tree */
 #define BOX_DRAWS_RANK_SLACK (16)
+
+/** Bit of the sibling rank in a path key that puts a clipped overlay after its siblings */
+#define BOX_DRAWS_RANK_OVERLAY (0x80000000u)
+
+/** Bits of the sibling rank in a path key below BOX_DRAWS_RANK_OVERLAY */
+#define BOX_DRAWS_RANK_MASK (0x7fffffffu)
 
 void box_draws_order_init(
     box_render_draws_t *d)
@@ -34,6 +40,7 @@ void box_draws_order_init(
     ecs_map_init(&d->parents, NULL);
     ecs_map_init(&d->order_z, NULL);
     ecs_map_init(&d->tree_ranks, NULL);
+    ecs_map_init(&d->overlays, NULL);
 }
 
 void box_draws_order_fini(
@@ -50,6 +57,7 @@ void box_draws_order_fini(
     ecs_map_fini(&d->parents);
     ecs_map_fini(&d->order_z);
     ecs_map_fini(&d->tree_ranks);
+    ecs_map_fini(&d->overlays);
 }
 
 void box_draws_order_slot(
@@ -185,8 +193,24 @@ static uint32_t box_draws_z(
     return bits & 0x80000000u ? ~bits : bits | 0x80000000u;
 }
 
+/** Check whether an entity is a clipped overlay (LayoutFloat with clip).
+ *
+ * @param world The world
+ * @param e The entity
+ * @return Whether it is one
+ */
+static bool box_draws_overlay(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    const LayoutFloat *fl = ecs_get(world, e, LayoutFloat);
+
+    return fl && fl->clip;
+}
+
 /** Make the path of an entity once per order: the path of its parent followed by its own key,
- * which holds the z key in its high and the rank among the siblings in its low bits.
+ * which holds the z key in its high and the rank among the siblings in its low bits. The top
+ * bit of the rank is set for a clipped overlay, which sorts after its siblings of the same z.
  *
  * @param world The world
  * @param d The state
@@ -214,7 +238,12 @@ static uint64_t box_draws_path(
     }
 
     uint32_t z = box_draws_z(world, e);
-    uint64_t key = ((uint64_t)z << 32) | box_draws_rank(world, d, parent, e);
+    uint32_t rank = box_draws_rank(world, d, parent, e) & BOX_DRAWS_RANK_MASK;
+    if (box_draws_overlay(world, e)) {
+        rank |= BOX_DRAWS_RANK_OVERLAY;
+    }
+
+    uint64_t key = ((uint64_t)z << 32) | rank;
     *ecs_map_ensure(&d->order_z, e) = z;
     first = ecs_vec_count(&d->order_keys);
     ecs_vec_grow_t(NULL, &d->order_keys, uint64_t, depth + 1);
@@ -241,7 +270,8 @@ void box_draws_order_position(
     }
 }
 
-/** Check whether an entity or one of its ancestors floats (LayoutFloat), and find its tree.
+/** Check whether an entity or one of its ancestors floats (LayoutFloat without clip), and find
+ * its tree.
  *
  * @param world The world
  * @param e The entity
@@ -257,7 +287,8 @@ static bool box_draws_floating(
     bool result = false;
     *tree = e;
     for (; e; e = ecs_get_parent(world, e)) {
-        result |= ecs_has(world, e, LayoutFloat);
+        const LayoutFloat *fl = ecs_get(world, e, LayoutFloat);
+        result |= fl && !fl->clip;
         if (!ecs_has(world, e, Scene)) {
             *tree = e;
         }
