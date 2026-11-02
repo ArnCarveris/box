@@ -96,9 +96,8 @@ float box_render_clip_area(
     float half[2]);
 
 /** Check whether a world position is inside the clip areas of the ClipChildren ancestors of an
- * entity, in the local XY plane of each, as the 2D shader clips it. A clip with an empty area
- * contains no position. The ancestors of a floating element (LayoutFloat) do not clip it, unless
- * it is a clipped overlay (LayoutFloat.clip).
+ * entity, in the local XY plane of each, as the 2D shader clips it; an empty area contains none.
+ * The ancestors of a floating element (LayoutFloat without clip) do not clip it.
  *
  * @param world The world
  * @param e The entity, whose own ClipChildren does not clip it
