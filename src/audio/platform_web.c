@@ -170,7 +170,7 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
     }
 
     var audio = { ctx: ctx, node: null, pending: [], requests: {}, sounds: {}, id: 0,
-        failed: 0, coreSize: size, events: [], onevents: null };
+        failed: 0, coreSize: size, events: [], queue: [], onevents: null };
     audio.post = function(m, transfer) {
         if (audio.node) {
             audio.node.port.postMessage(m, transfer || []);
@@ -234,6 +234,11 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
             Array.prototype.push.apply(audio.events, m.events);
             if (audio.events.length > 4096) {
                 audio.events.splice(0, audio.events.length - 4096);
+            }
+            // The queue the transport of the main module takes from (transport.c)
+            Array.prototype.push.apply(audio.queue, m.events);
+            if (audio.queue.length > 4096) {
+                audio.queue.splice(0, audio.queue.length - 4096);
             }
             if (audio.onevents) {
                 audio.onevents(m.events);
