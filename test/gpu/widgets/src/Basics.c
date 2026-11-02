@@ -7,6 +7,7 @@
 
 #include "gallery.h"
 #include <bake_test.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -864,6 +865,87 @@ void Basics_set_mut_no_change(void) {
 
     test_int(gallery_changes(world, s), 0);
     gallery_expect(world, s, "get gallery Gallery.mut.last", "\"none\"");
+
+    ecs_fini(world);
+}
+
+void Basics_disabled_no_feedback(void) {
+    // widgets/basics
+    ecs_entity_t s = 0;
+    ecs_world_t *world = gallery_load(&s);
+    float fy, fx = basics_slider_at(world, BASICS ".sliders.muted", 0.1f, &fy);
+    const struct {
+        const char *path, *tmpl, *hover, *down;
+        float fx, fy;
+    } widgets[] = {
+        { "buttons.off", "Button", "hover", "down", 0, 0 },
+        { "toggles.locked", "Checkbox", "hover", "down", -0.8f, 0 },
+        { "toggles.airplane", "Switch", "hover", "down", -0.6f, 0 },
+        { "radios.size.huge", "RadioButton", "hover", "down", 0, 0 },
+        { "radios.quality.low", "RadioButton", "hover", "down", 0, 0 },
+        { "sliders.muted", "Slider", "hover", "down", fx, fy },
+        { "steppers.fixed", "Stepper", "part", "pressed", BASICS_PLUS, 0 }
+    };
+    int32_t i;
+
+    /* The pointer over a disabled widget and a press on it show neither the hover nor the
+     * pressed look */
+    for (i = 0; i < 7; i ++) {
+        char *path = flecs_asprintf(BASICS ".%s", widgets[i].path);
+        bool part = !strcmp(widgets[i].hover, "part");
+        gallery_hover(world, s, path, widgets[i].fx, widgets[i].fy, PAGE);
+        basics_expect_mut(world, s, widgets[i].path, widgets[i].tmpl, widgets[i].hover,
+            part ? "0" : "false");
+        ecs_os_free(gallery_run(world, s, "mouse_button left true"));
+        gallery_settle(world, s);
+        basics_expect_mut(world, s, widgets[i].path, widgets[i].tmpl, widgets[i].down,
+            part ? "0" : "false");
+        ecs_os_free(gallery_run(world, s, "mouse_button left false"));
+        gallery_settle(world, s);
+        ecs_os_free(path);
+    }
+
+    /* The checked switch keeps its color, without the tint of a hovered filled control */
+    gallery_hover(world, s, BASICS ".toggles.airplane", -0.6f, 0, PAGE);
+    test_assert(!ecs_has(world, ecs_lookup(world, BASICS ".toggles.airplane.track"), Tint));
+    gallery_hover(world, s, BASICS ".buttons.off", 0, 0, PAGE);
+    test_assert(!ecs_has(world, ecs_lookup(world, BASICS ".buttons.off"), Tint));
+    ecs_os_free(gallery_run(world, s, "mouse_button left true"));
+    gallery_settle(world, s);
+    test_assert(!ecs_has(world, ecs_lookup(world, BASICS ".buttons.off"), Tint));
+    ecs_os_free(gallery_run(world, s, "mouse_button left false"));
+    gallery_settle(world, s);
+    test_int(gallery_changes(world, s), 0);
+
+    ecs_fini(world);
+}
+
+void Basics_stepper_inside_border(void) {
+    // widgets/basics
+    ecs_entity_t s = 0;
+    ecs_world_t *world = gallery_load(&s);
+    float stepper[4], minus[4], plus[4];
+
+    /* The buttons of a stepper sit inside its border instead of covering it */
+    gallery_rect(world, BASICS ".steppers.count", stepper);
+    gallery_rect(world, BASICS ".steppers.count.minus", minus);
+    gallery_rect(world, BASICS ".steppers.count.plus", plus);
+    test_assert(fabsf(minus[0] - (stepper[0] + 1)) < 0.01f);
+    test_assert(fabsf(minus[1] - (stepper[1] + 1)) < 0.01f);
+    test_assert(fabsf(minus[3] - (stepper[3] - 1)) < 0.01f);
+    test_assert(fabsf(plus[2] - (stepper[2] - 1)) < 0.01f);
+
+    /* They keep the width of their hit area, which ends button points from the edge */
+    test_assert(fabsf(minus[2] - (stepper[0] + 28)) < 0.01f);
+    test_assert(fabsf(plus[0] - (stepper[2] - 28)) < 0.01f);
+    gallery_expect(world, s, "get " BASICS ".steppers.count.minus box.geometry.Border.radius",
+        "3");
+
+    /* With the focus ring they move inside it */
+    basics_tab_to(world, s, BASICS ".steppers.count");
+    gallery_settle(world, s);
+    gallery_rect(world, BASICS ".steppers.count.minus", minus);
+    test_assert(fabsf(minus[0] - (stepper[0] + 2)) < 0.01f);
 
     ecs_fini(world);
 }

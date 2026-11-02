@@ -107,31 +107,33 @@ static void widgets_frames(
     }
 }
 
-/** Set a floating point member of the mut of a template instance.
+/** Set a member of the mut of a template instance with the set command, which assigns it as a
+ * script does; a mut has an on_replace hook, so it cannot be ensured.
  *
  * @param world The world
- * @param e The instance
+ * @param path Path of the instance
  * @param mut Path of the mut, such as box.widgets.ScrollView.mut
  * @param member Name of the member
  * @param value The value
  */
 static void widgets_set_mut(
     ecs_world_t *world,
-    ecs_entity_t e,
+    const char *path,
     const char *mut,
     const char *member,
     double value)
 {
-    ecs_entity_t type = ecs_lookup(world, mut);
-    test_assert(type != 0);
-    const EcsComponent *c = ecs_get(world, type, EcsComponent);
-    test_assert(c != NULL);
-    void *ptr = ecs_ensure_id(world, e, type, (size_t)c->size);
-    ecs_meta_cursor_t cur = ecs_meta_cursor(world, type, ptr);
-    test_int(ecs_meta_push(&cur), 0);
-    test_int(ecs_meta_member(&cur, member), 0);
-    test_int(ecs_meta_set_float(&cur, value), 0);
-    ecs_modified_id(world, e, type);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    char *line = flecs_asprintf("set %s %s {%s: %g}", path, mut, member, value);
+    bool error = true;
+    char *out = box_command_run(world, s, line, &error);
+    if (error) {
+        printf("command '%s' failed: %s\n", line, out);
+    }
+
+    test_bool(error, false);
+    ecs_os_free(out);
+    ecs_os_free(line);
 }
 
 /** Get the offset of an entity from another one, from their world transforms.
@@ -154,12 +156,15 @@ static void widgets_offset(
     out[1] = a->m[3][1] - b->m[3][1];
 }
 
-/** A scroll view of 200 by 100 points with six blocks of 40 points in a column, which do not fit */
+/** A scroll view of 200 by 100 points with six blocks of 40 points in a column, which do not fit,
+ * placed so it has a world transform */
 #define WIDGETS_TALL_VIEW \
     "using box.widgets\n" \
     "using box.layout\n" \
     "using box.geometry\n" \
+    "using box.transform\n" \
     "ScrollView view(width: 200, height: 100) {\n" \
+    "  Position: {0, 0, 0}\n" \
     "  b0 { LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n" \
     "  b1 { LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n" \
     "  b2 { LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n" \
@@ -489,20 +494,28 @@ void Widgets_scroll_bar_in_view(void) {
     test_assert(k != NULL);
     test_flt(thumb[1] + k->height / 2, 50 - 1 - 2);
 
-    /* Scrolled, the bar stays where it is and the thumb moves down */
-    widgets_set_mut(world, view, "box.widgets.ScrollView.mut", "y", 40);
-    widgets_frames(world);
-    c = ecs_get(world, view, LayoutContent);
-    test_flt(c->y, 40);
+    /* Scrolled, the bar stays where it is and the thumb moves down, in the frame that moves the
+     * content: the bar never jumps with the content for a frame */
+    float block[2], shifted[2];
+    widgets_offset(world, ecs_lookup(world, "view.b0"), view, block);
+    widgets_set_mut(world, "view", "box.widgets.ScrollView.mut", "y", 40);
+    ecs_progress(world, 0);
+    widgets_offset(world, ecs_lookup(world, "view.b0"), view, shifted);
+    test_flt(shifted[1], block[1] + 40);
     widgets_offset(world, bar, view, at);
     test_flt(at[0], 100 - 1 - 5);
     test_flt(at[1], 0);
     float moved[2];
     widgets_offset(world, knob, view, moved);
     test_assert(moved[1] < thumb[1] - 1);
+    widgets_frames(world);
+    c = ecs_get(world, view, LayoutContent);
+    test_flt(c->y, 40);
+    widgets_offset(world, bar, view, at);
+    test_flt(at[1], 0);
 
     /* At the end the thumb ends at the end of the track */
-    widgets_set_mut(world, view, "box.widgets.ScrollView.mut", "y", 1000);
+    widgets_set_mut(world, "view", "box.widgets.ScrollView.mut", "y", 1000);
     widgets_frames(world);
     widgets_offset(world, bar, view, at);
     test_flt(at[1], 0);
@@ -573,13 +586,13 @@ void Widgets_scroll_thumb_hover_look(void) {
     test_bool(ecs_has(world, knob, Tint), false);
 
     /* Over the thumb it lightens toward the text color */
-    widgets_set_mut(world, view, "box.widgets.ScrollView.mut", "over", 1);
+    widgets_set_mut(world, "view", "box.widgets.ScrollView.mut", "over", 1);
     widgets_frames(world);
     knob = ecs_lookup(world, "view.scrollbars.vscroll.knob");
     test_bool(ecs_has(world, knob, Tint), true);
 
     /* Dragged it takes the text color */
-    widgets_set_mut(world, view, "box.widgets.ScrollView.mut", "drag", 1);
+    widgets_set_mut(world, "view", "box.widgets.ScrollView.mut", "drag", 1);
     widgets_frames(world);
     knob = ecs_lookup(world, "view.scrollbars.vscroll.knob");
     test_bool(ecs_has(world, knob, Tint), false);
@@ -594,7 +607,9 @@ void Widgets_panel_title_in_column(void) {
     ecs_world_t *world = widgets_scene(
         "using box.widgets\n"
         "using box.layout\n"
+        "using box.transform\n"
         "Panel panel(title: \"Title\", width: 300) {\n"
+        "  Position: {0, 0, 0}\n"
         "  b0 { LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n"
         "}\n");
     widgets_frames(world);
@@ -620,5 +635,46 @@ void Widgets_panel_title_in_column(void) {
     test_flt(at[0] - hb->width / 2, -150 + 12);
     test_flt(at[1] + hb->height / 2, pb->height / 2 - 12);
 
+    ecs_fini(world);
+}
+
+void Widgets_list_keeps_width(void) {
+    // ui/widgets
+    ecs_world_t *world = widgets_scene(
+        "using box.widgets\n"
+        "using box.layout\n"
+        "using box.transform\n"
+        "column {\n"
+        "  Position: {0, 0, 0}\n"
+        "  Layout: {direction: Column}\n"
+        "  LayoutItem: {width: {mode: Fixed, value: 300}}\n"
+        "  ListView list(items: [\"a\", \"b\", \"c\", \"d\", \"e\", \"f\", \"g\", \"h\"], height: 100)\n"
+        "}\n");
+    widgets_frames(world);
+
+    /* The list scrolls and shows its bar, which the layout does not measure into the content:
+     * the list keeps the width of its column, frame after frame */
+    ecs_entity_t list = ecs_lookup(world, "column.list");
+    test_assert(list != 0);
+    test_assert(ecs_get(world, list, LayoutContent)->max_y > 0);
+    test_flt(ecs_get(world, list, LayoutBounds)->width, 300);
+    test_flt(ecs_get(world, ecs_lookup(world, "column"), LayoutBounds)->width, 300);
+    widgets_frames(world);
+    widgets_frames(world);
+    test_flt(ecs_get(world, list, LayoutBounds)->width, 300);
+    test_flt(ecs_get(world, list, LayoutContent)->max_x, 0);
+    ecs_entity_t bar = ecs_lookup(world, "column.list.scrollbars.vscroll");
+    test_assert(bar != 0);
+
+    /* The bar sits one point inside the right edge, the rows left of it */
+    float at[2];
+    widgets_offset(world, bar, list, at);
+    test_flt(at[0], 150 - 1 - 5);
+    test_flt(ecs_get(world, ecs_lookup(world, "column.list.rows"), LayoutBounds)->width,
+        300 - 1 - 1 - 10);
+
+    char *logs = widgets_warnings(world);
+    test_str(logs, "");
+    ecs_os_free(logs);
     ecs_fini(world);
 }

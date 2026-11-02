@@ -302,8 +302,10 @@ template HeadlessScrollView {
 // The look of a scroll bar, centered on its Position: an opaque track length points long and
 // size points thick, its corners rounded by radius, with a thumb of length thumb at offset at from
 // the start of the track (its top or its left end). The thumb lightens toward the text color
-// while the pointer is over it (hover) and takes that color while it is dragged (active). The
-// pointer shows a hand over the bar.
+// while the pointer is over it (hover) and takes that color while it is dragged (active). ring is
+// the part of the focus ring of the view the bar lies over, in points from its outer side (the
+// right or the bottom): that strip takes the focus color, so the ring keeps its width along the
+// bar. The pointer shows a hand over the bar.
 template ScrollBar {
   prop vertical: bool = true
   prop length: f32 = 0
@@ -313,6 +315,7 @@ template ScrollBar {
   prop radius: f32 = 0
   prop active: bool = false
   prop hover: bool = false
+  prop ring: f32 = 0
 
   const t = box.ui.theme[UiTheme]
   const inset = 2
@@ -329,6 +332,19 @@ template ScrollBar {
   Rgb: t.surface
   Border: {radius: radius}
   Cursor: {CursorPointer}
+
+  if ring > 0 {
+    ring_edge {
+      if vertical {
+        Position: {w / 2 - ring / 2, 0, 0}
+        Rect: {ring, h}
+      } else {
+        Position: {0, ring / 2 - h / 2, 0}
+        Rect: {w, ring}
+      }
+      Rgb: t.focus
+    }
+  }
 
   knob {
     if vertical {
@@ -409,6 +425,10 @@ template ScrollView : HeadlessScrollView {
     const vthumb = scroll_thumb(vtrack, b.height, c.height)
     const hthumb = scroll_thumb(htrack, b.width, c.width)
     const radius = max(t.radius - edge, 0)
+    const ring_under = match ring {
+      true: max(t.focus_width - edge, 0)
+      _: 0
+    }
 
     scrollbars {
       LayoutItem: {width: {mode: Fixed, value: 0}, height: {mode: Fixed, value: 0}}
@@ -418,7 +438,7 @@ template ScrollView : HeadlessScrollView {
       if vbar {
         ScrollBar vscroll(
           vertical: true, length: b.height - edge * 2, thumb: vthumb, size: bar,
-          radius: radius, active: drag == 1, hover: over == 1,
+          radius: radius, active: drag == 1, hover: over == 1, ring: ring_under,
           at: scroll_thumb_at(vtrack, vthumb, c.y, c.max_y)) {
           Position: {b.width / 2 - edge - bar / 2 - sx, -sy, 0}
         }
@@ -427,7 +447,7 @@ template ScrollView : HeadlessScrollView {
       if hbar {
         ScrollBar hscroll(
           vertical: false, length: b.width - edge * 2, thumb: hthumb, size: bar,
-          radius: radius, active: drag == 2, hover: over == 2,
+          radius: radius, active: drag == 2, hover: over == 2, ring: ring_under,
           at: scroll_thumb_at(htrack, hthumb, c.x, c.max_x)) {
           Position: {-sx, edge + bar / 2 - b.height / 2 - sy, 0}
         }
@@ -441,7 +461,7 @@ template ScrollView : HeadlessScrollView {
 // on a row selects it; Up and Down select the next and the previous row, PageUp and PageDown move
 // a page, Home and End select the first and the last row, and the scroll offset follows so the
 // selected row stays in view. Each change of the selection reports a change. hover is the row
-// under the pointer, -1 for none. The rows start inset points below the top of the content. The
+// under the pointer, -1 for none and while disabled. The rows start inset points below the top of the content. The
 // pointer shows a hand over the list, a crossed circle while it is disabled.
 template HeadlessListView : HeadlessScrollView {
   prop items = ["Item"]
@@ -478,7 +498,7 @@ template HeadlessListView : HeadlessScrollView {
       const along = b.height / 2 - e.local_y + content.y - inset
       const i = floor(along / max(row, 1))
       const over_bar = content.max_y > 0 && e.local_x >= b.width / 2 - edge - bar
-      const h = match !over_bar && along >= 0 && i < count {
+      const h = match !disabled && !over_bar && along >= 0 && i < count {
         true: i
         _: -1
       }
@@ -629,13 +649,19 @@ template ListView : HeadlessListView {
     }
   }
 
-  // edge points inside the right, top and bottom edges, clear of the border
+  // The bar sits edge points inside the right, top and bottom edges, clear of the border. It is
+  // in scrollbars, which has no LayoutItem, so it does not scroll, and no size or Layout, so the
+  // layout does not measure the bar into the content: a child without a LayoutItem needs twice
+  // its distance from the center, which would widen the list by the padding of the rows.
   if vbar {
-    ScrollBar vscroll(
-      vertical: true, length: vtrack, thumb: vthumb, size: bar,
-      radius: max(t.radius - edge, 0), active: drag == 1, hover: over == 1,
-      at: scroll_thumb_at(vtrack, vthumb, c.y, c.max_y)) {
-      Position: {b.width / 2 - edge - bar / 2, 0, 0}
+    scrollbars {
+      ScrollBar vscroll(
+        vertical: true, length: vtrack, thumb: vthumb, size: bar,
+        radius: max(t.radius - edge, 0), active: drag == 1, hover: over == 1,
+        ring: match ring { true: max(t.focus_width - edge, 0); _: 0 },
+        at: scroll_thumb_at(vtrack, vthumb, c.y, c.max_y)) {
+        Position: {b.width / 2 - edge - bar / 2, 0, 0}
+      }
     }
   }
 
