@@ -850,7 +850,10 @@ typedef struct box_render_material_t {
                              *   BOX_MATERIAL_ATTENUATION_DISTANCE without one */
     uint32_t clear_coat;    /**< ClearCoat strength | roughness << 16, two unorm16 clamped to
                              *   0..1, 0 without one or with a strength of 0 */
-    uint32_t reserved[3];   /**< 0, pads the record to the 16 byte alignment of Material */
+    uint32_t anisotropy;    /**< SpecularAnisotropy strength | rotation << 16, two unorm16, the
+                             *   strength clamped to 0..1 and the rotation wrapped to 0..2 pi
+                             *   over 2 pi, 0 without one or with a strength of 0 */
+    uint32_t reserved[2];   /**< 0, pads the record to the 16 byte alignment of Material */
 } box_render_material_t;
 
 /** Shading of a mesh instance, the shading stream of a mesh instance page, MeshShading of

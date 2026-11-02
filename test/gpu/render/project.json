@@ -232,6 +232,20 @@
                 ]
             },
             {
+                "id": "SpecularAnisotropy",
+                "testcases": [
+                    "strength_zero_unchanged",
+                    "stretches_highlight",
+                    "rotation_turns_highlight",
+                    "indirect_stretches_reflection",
+                    "degenerate_uvs_isotropic",
+                    "ignored_by_unlit",
+                    "ignored_by_2d",
+                    "prefab",
+                    "change_and_remove"
+                ]
+            },
+            {
                 "id": "Tint",
                 "testcases": [
                     "mix_by_strength",

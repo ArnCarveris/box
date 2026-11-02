@@ -25,9 +25,9 @@ extern "C" {
 /** Slot of the material table a shape renders with, set by the engine and read only for
  * applications, inherited by instances.
  *
- * Rgb, PbrMaterial, ClearCoat, Emissive, Transmission, TextureTransform and AlphaCutoff bring
- * it along. A prefab that owns one gets a slot its instances share, a 3D shape that owns one a
- * slot of its own, composed of what it owns and what it still inherits.
+ * Rgb, PbrMaterial, ClearCoat, SpecularAnisotropy, Emissive, Transmission, TextureTransform
+ * and AlphaCutoff bring it along. A prefab that owns one gets a slot its instances share, a 3D
+ * shape that owns one a slot of its own, composed of what it owns and what it still inherits.
  *
  * Slot 0 is the default material, of a shape without any material component. An owned id that
  * was never handed a slot (a light, a 2D shape, a text) is UINT32_MAX.
@@ -134,6 +134,33 @@ ECS_STRUCT(PbrMaterial, {
 ECS_STRUCT(ClearCoat, {
     float strength;  /**< 0 no coat to 1 full coat */
     float roughness; /**< Roughness of the coat, 0 mirror to 1 fully diffuse */
+});
+
+/** Strength of a constructed SpecularAnisotropy: a fully stretched highlight */
+#define BOX_MATERIAL_ANISOTROPY_STRENGTH (1.0f)
+
+/** Rotation of a constructed SpecularAnisotropy: along the +U direction of the texture */
+#define BOX_MATERIAL_ANISOTROPY_ROTATION (0.0f)
+
+/** Highlight of a 3D mesh stretched along a direction in its surface (brushed metal, hair, satin),
+ * glTF's KHR_materials_anisotropy, default strength 1 and rotation 0, inherited like Rgb; a field
+ * a scene does not set keeps its default. Strength clamps to 0..1, rotation wraps to 0..2 pi.
+ * Only 3D meshes have it, 2D shapes and text ignore it.
+ *
+ * The base lobe only, not the clear coat: direct light uses an anisotropic GGX distribution and
+ * Smith visibility with the roughness along the direction mixed from the roughness of the surface
+ * toward 1 by strength squared; indirect light reflects about a normal bent toward the direction,
+ * as the glTF sample viewer does. An unlit view ignores it.
+ *
+ * Vertices have no tangents: the direction is the +U direction of the screen space cotangent frame
+ * of the UVs, turned by rotation around the normal. It is constant per triangle and follows the UV
+ * mapping, so a shape needs a continuous UV mapping for a continuous highlight; a triangle whose
+ * UVs are degenerate (constant) shades isotropic.
+ */
+ECS_STRUCT(SpecularAnisotropy, {
+    float strength; /**< 0 isotropic to 1 fully stretched */
+    float rotation; /**< Radians counter clockwise from the +U direction of the texture, around
+                     *   the normal */
 });
 
 /** Emitted light, inherited by instances, like Rgb. Tints do not apply to it. */

@@ -56,6 +56,11 @@ void box_draws_transition_target(
         out->clear_coat = *material->clear_coat;
     }
 
+    if (material->anisotropy) {
+        out->anisotropic = true;
+        out->anisotropy = *material->anisotropy;
+    }
+
     if (material->opacity) {
         out->present |= 1u << BOX_RENDER_TRANSITION_OPACITY;
         out->opacity = *material->opacity;
@@ -112,6 +117,7 @@ void box_draws_transition_encode(
             &material->transmission),
         .clear_coat = box_draws_transition_part(material, BOX_RENDER_TRANSITION_CLEAR_COAT,
             &material->clear_coat),
+        .anisotropy = material->anisotropic ? &material->anisotropy : NULL,
         .tint = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TINT,
             &material->tint),
         .inherited = material->tinted ? &material->inherited : NULL,

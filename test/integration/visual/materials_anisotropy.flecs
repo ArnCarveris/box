@@ -1,0 +1,204 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+// Specular anisotropy (SpecularAnisotropy) on brushed light gray metal of roughness 0.3, lit by a
+// sun from above and behind the camera and by the environment sky.hdr. The first row
+// of spheres and the second of cylinders have a strength of 0, 0.25, 0.5, 0.75 and 1 from left
+// to right at rotation 0: the round highlight of the sun stretches into an arc around the axis,
+// along the U direction of their UVs, and the reflection of the horizon smears along it. The
+// third row of spheres and the fourth of cylinders have a strength of 0.8 and a rotation of 0,
+// pi / 8, pi / 4, 3 pi / 8 and pi / 2: the arc turns from around the axis to along it, a vertical
+// streak at pi / 2.
+anisotropy {
+  Scene: {}
+  AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
+
+  sky {
+    Environment: {resolution: 128}
+    EnvironmentImage: {path: "test/assets/environments/sky.hdr"}
+  }
+
+  sun {
+    Rotation: {0.6, 2.5, 0}
+    DirectionalLight: {intensity: 3}
+  }
+
+  camera {
+    Position: {0, 1.9, 6.2}
+    Rotation: {-0.06, 0, 0}
+    Camera: {fov: 50}
+  }
+
+  strength_sphere_0 {
+    Position: {-2.4, 3.5, 0}
+    Sphere: {segments: 64, smooth: true, radius: 0.42}
+    Rgb: {205, 205, 210}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
+    SpecularAnisotropy: {strength: 0, rotation: 0}
+  }
+
+  strength_sphere_1 {
+    Position: {-1.2, 3.5, 0}
+    Sphere: {segments: 64, smooth: true, radius: 0.42}
+    Rgb: {205, 205, 210}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
+    SpecularAnisotropy: {strength: 0.25, rotation: 0}
+  }
+
+  strength_sphere_2 {
+    Position: {0, 3.5, 0}
+    Sphere: {segments: 64, smooth: true, radius: 0.42}
+    Rgb: {205, 205, 210}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
+    SpecularAnisotropy: {strength: 0.5, rotation: 0}
+  }
+
+  strength_sphere_3 {
+    Position: {1.2, 3.5, 0}
+    Sphere: {segments: 64, smooth: true, radius: 0.42}
+    Rgb: {205, 205, 210}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
+    SpecularAnisotropy: {strength: 0.75, rotation: 0}
+  }
+
+  strength_sphere_4 {
+    Position: {2.4, 3.5, 0}
+    Sphere: {segments: 64, smooth: true, radius: 0.42}
+    Rgb: {205, 205, 210}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
+    SpecularAnisotropy: {strength: 1, rotation: 0}
+  }
+
+  strength_cylinder_0 {
+    Position: {-2.4, 2.45, 0}
+    Cylinder: {segments: 64, smooth: true, length: 0.8, radius: 0.38}
+    Rgb: {205, 205, 210}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
+    SpecularAnisotropy: {strength: 0, rotation: 0}
+  }
+
+  strength_cylinder_1 {
+    Position: {-1.2, 2.45, 0}
+    Cylinder: {segments: 64, smooth: true, length: 0.8, radius: 0.38}
+    Rgb: {205, 205, 210}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
+    SpecularAnisotropy: {strength: 0.25, rotation: 0}
+  }
+
+  strength_cylinder_2 {
+    Position: {0, 2.45, 0}
+    Cylinder: {segments: 64, smooth: true, length: 0.8, radius: 0.38}
+    Rgb: {205, 205, 210}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
+    SpecularAnisotropy: {strength: 0.5, rotation: 0}
+  }
+
+  strength_cylinder_3 {
+    Position: {1.2, 2.45, 0}
+    Cylinder: {segments: 64, smooth: true, length: 0.8, radius: 0.38}
+    Rgb: {205, 205, 210}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
+    SpecularAnisotropy: {strength: 0.75, rotation: 0}
+  }
+
+  strength_cylinder_4 {
+    Position: {2.4, 2.45, 0}
+    Cylinder: {segments: 64, smooth: true, length: 0.8, radius: 0.38}
+    Rgb: {205, 205, 210}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
+    SpecularAnisotropy: {strength: 1, rotation: 0}
+  }
+
+  rotation_sphere_0 {
+    Position: {-2.4, 1.4, 0}
+    Sphere: {segments: 64, smooth: true, radius: 0.42}
+    Rgb: {205, 205, 210}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
+    SpecularAnisotropy: {strength: 0.8, rotation: 0}
+  }
+
+  rotation_sphere_1 {
+    Position: {-1.2, 1.4, 0}
+    Sphere: {segments: 64, smooth: true, radius: 0.42}
+    Rgb: {205, 205, 210}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
+    SpecularAnisotropy: {strength: 0.8, rotation: 0.3927}
+  }
+
+  rotation_sphere_2 {
+    Position: {0, 1.4, 0}
+    Sphere: {segments: 64, smooth: true, radius: 0.42}
+    Rgb: {205, 205, 210}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
+    SpecularAnisotropy: {strength: 0.8, rotation: 0.7854}
+  }
+
+  rotation_sphere_3 {
+    Position: {1.2, 1.4, 0}
+    Sphere: {segments: 64, smooth: true, radius: 0.42}
+    Rgb: {205, 205, 210}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
+    SpecularAnisotropy: {strength: 0.8, rotation: 1.1781}
+  }
+
+  rotation_sphere_4 {
+    Position: {2.4, 1.4, 0}
+    Sphere: {segments: 64, smooth: true, radius: 0.42}
+    Rgb: {205, 205, 210}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
+    SpecularAnisotropy: {strength: 0.8, rotation: 1.5708}
+  }
+
+  rotation_cylinder_0 {
+    Position: {-2.4, 0.35, 0}
+    Cylinder: {segments: 64, smooth: true, length: 0.8, radius: 0.38}
+    Rgb: {205, 205, 210}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
+    SpecularAnisotropy: {strength: 0.8, rotation: 0}
+  }
+
+  rotation_cylinder_1 {
+    Position: {-1.2, 0.35, 0}
+    Cylinder: {segments: 64, smooth: true, length: 0.8, radius: 0.38}
+    Rgb: {205, 205, 210}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
+    SpecularAnisotropy: {strength: 0.8, rotation: 0.3927}
+  }
+
+  rotation_cylinder_2 {
+    Position: {0, 0.35, 0}
+    Cylinder: {segments: 64, smooth: true, length: 0.8, radius: 0.38}
+    Rgb: {205, 205, 210}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
+    SpecularAnisotropy: {strength: 0.8, rotation: 0.7854}
+  }
+
+  rotation_cylinder_3 {
+    Position: {1.2, 0.35, 0}
+    Cylinder: {segments: 64, smooth: true, length: 0.8, radius: 0.38}
+    Rgb: {205, 205, 210}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
+    SpecularAnisotropy: {strength: 0.8, rotation: 1.1781}
+  }
+
+  rotation_cylinder_4 {
+    Position: {2.4, 0.35, 0}
+    Cylinder: {segments: 64, smooth: true, length: 0.8, radius: 0.38}
+    Rgb: {205, 205, 210}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
+    SpecularAnisotropy: {strength: 0.8, rotation: 1.5708}
+  }
+}
+
+anisotropy_view {
+  View: {
+    camera: anisotropy.camera,
+    clear: {enabled: true, color: {0, 0, 0, 255}},
+    lighting: {enabled: true, reflections: true,
+      environment: {source: anisotropy.sky, intensity: 1, yaw: 0, background: true}}
+  }
+}
