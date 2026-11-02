@@ -1545,3 +1545,70 @@ void MaterialIds_specular_anisotropy_prefab_change_reaches_slot(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+void MaterialIds_sheen_brings_material_id(void) {
+    // materials/material_ids
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t velvet = ecs_new(world);
+    ecs_set(world, velvet, Box, {1, 1, 1});
+    ecs_set(world, velvet, Sheen, {.color = {255, 0, 128}, .roughness = 1});
+    ecs_entity_t plain = ecs_new(world);
+    ecs_set(world, plain, Position, {2, 0, 0});
+    ecs_set(world, plain, Box, {1, 1, 1});
+    frame(world);
+
+    test_bool(ecs_owns(world, velvet, MaterialId), true);
+    uint32_t id = id_of(world, velvet);
+    test_assert(id != 0 && id != UINT32_MAX);
+    test_uint(shading_of(world, velvet)->material, id);
+    test_uint(record_of(world, id)->sheen, 255u | (128u << 16) | (255u << 24));
+    test_uint(shading_of(world, plain)->material, 0);
+    test_uint(record_of(world, 0)->sheen, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MaterialIds_sheen_prefab_change_reaches_slot(void) {
+    // materials/material_ids
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t prefab = prefab_new(world);
+    ecs_set(world, prefab, Sheen, {.color = {255, 255, 255}, .roughness = 1});
+    ecs_entity_t a = instance_new(world, prefab, 0);
+    ecs_entity_t b = instance_new(world, prefab, 1);
+    ecs_set(world, b, Rgb, {0, 255, 0});
+    ecs_entity_t c = instance_new(world, prefab, 2);
+    ecs_set(world, c, Sheen, {.color = {255, 0, 0}, .roughness = 0});
+    frame(world);
+    frame(world);
+    uint32_t shared = id_of(world, prefab);
+    uint32_t own = id_of(world, b);
+    uint32_t red = id_of(world, c);
+    test_uint(shading_of(world, a)->material, shared);
+    test_assert(own != shared);
+    test_assert(red != shared && red != own);
+    test_uint(record_of(world, shared)->sheen, 0xFFFFFFFFu);
+    test_uint(record_of(world, own)->sheen, 0xFFFFFFFFu);
+    test_uint(record_of(world, red)->sheen, 0xFFu);
+    test_uint(record_of(world, 0)->sheen, 0);
+
+    ecs_set(world, prefab, Sheen, {.color = {0, 0, 255}, .roughness = 0});
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.material_bytes, 2 * MATERIAL);
+    test_int(stats.upload_bytes, 0);
+    test_uint(record_of(world, shared)->sheen, 0xFFu << 16);
+    test_uint(record_of(world, own)->sheen, 0xFFu << 16);
+    test_uint(record_of(world, own)->color, color_word(0, 255, 0));
+    test_uint(record_of(world, red)->sheen, 0xFFu);
+
+    ecs_remove(world, prefab, Sheen);
+    frame(world);
+    test_uint(record_of(world, shared)->sheen, 0);
+    test_uint(record_of(world, own)->sheen, 0);
+    test_uint(record_of(world, red)->sheen, 0xFFu);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

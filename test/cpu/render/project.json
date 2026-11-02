@@ -49,7 +49,9 @@
                     "clear_coat_defaults",
                     "clear_coat_pack",
                     "specular_anisotropy_defaults",
-                    "specular_anisotropy_pack"
+                    "specular_anisotropy_pack",
+                    "sheen_defaults",
+                    "sheen_pack"
                 ]
             },
             {
@@ -315,6 +317,8 @@
                     "clear_coat_dynamic_material_repacks",
                     "specular_anisotropy_brings_material_id",
                     "specular_anisotropy_prefab_change_reaches_slot",
+                    "sheen_brings_material_id",
+                    "sheen_prefab_change_reaches_slot",
                     "equal_materials_share_slot",
                     "changed_material_takes_other_slot",
                     "alone_changed_material_keeps_slot",
