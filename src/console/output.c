@@ -1446,7 +1446,8 @@ static void box_console_fmt_value(
 /**
  * Run the commands of a line one at a time, recording the session scope
  * each command ran in. A line with a single command runs as a whole. Like
- * ecs_shell_run, this stops at the first command that reports an error.
+ * ecs_shell_run, this stops at the first command that reports an error (a
+ * failing command always reports one).
  *
  * @param world The world
  * @param con The console
@@ -1462,18 +1463,18 @@ static ecs_shell_result_t box_console_out_run_line(
     const char *line,
     ecs_vec_t *scopes)
 {
-    int32_t start, end, next_start, next_end, at = 0;
-    bool multi = box_console_syntax_split(line, 0, &start, &end) &&
-        box_console_syntax_split(line, end, &next_start, &next_end);
-    ecs_shell_result_t r;
-    if (!multi) {
-        r = ecs_shell_run(world, session, line);
-    } else {
-        ecs_vec_init_t(NULL, &r.results, ecs_value_t, 0);
-        ecs_vec_init_t(NULL, &r.errors, char*, 0);
+    int32_t start, end, at = 0;
+    if (!box_console_syntax_split(line, 0, &start, &end) ||
+        !box_console_syntax_split(line, end, &start, &end))
+    {
+        return ecs_shell_run(world, session, line);
     }
 
-    while (multi && box_console_syntax_split(line, at, &start, &end)) {
+    ecs_shell_result_t r;
+    ecs_vec_init_t(NULL, &r.results, ecs_value_t, 0);
+    ecs_vec_init_t(NULL, &r.errors, char*, 0);
+
+    while (box_console_syntax_split(line, at, &start, &end)) {
         ecs_entity_t scope = box_console_session_scope(world, con);
         char *text = flecs_asprintf("%.*s", end - start, &line[start]);
         ecs_shell_result_t cmd = ecs_shell_run(world, session, text);
