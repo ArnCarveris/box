@@ -96,10 +96,11 @@ post_d {
   Rgb: {40, 40, 44}
 }
 
-// The pole in the cone of lamp_b, whose shadow cuts a wedge out of its cone
+// The pole in the cone of lamp_b, toward the camera from the light, so its shadow cuts a wedge
+// out of the cone along the view
 pole {
-  Position: {-3.4, 1.6, -9}
-  Box: {0.25, 3.2, 0.25}
+  Position: {-4, 2, -8.4}
+  Box: {0.25, 4, 0.25}
   Rgb: {90, 90, 96}
 }
 
@@ -111,11 +112,11 @@ street_fog {
 // A blue point light in a fog volume of its own across the road
 glow {
   Position: {5, 1.5, -10}
-  PointLight: {intensity: 3 * flecs.script.math.PI, range: 3}
+  PointLight: {intensity: 3 * flecs.script.math.PI, range: 2.5}
   Rgb: {80, 150, 255}
 }
 
 glow_fog {
   Position: {5, 1.5, -10}
-  FogVolume: {extent: {2, 1.5, 2}, density: 0.6, asymmetry: 0, edge_fade: 0.4, steps: 48}
+  FogVolume: {extent: {3, 2.5, 3}, density: 0.6, asymmetry: 0, edge_fade: 0.5, steps: 48}
 }
