@@ -64,14 +64,12 @@ const TRANSMITTANCE_MIN: f32 = 0.001;
 // Steps of a march at least.
 const STEPS_MIN: i32 = 4;
 
-<<<<<<< HEAD
 // Steps of a march at least when the volume has noise.
 const STEPS_MIN_NOISE: i32 = 8;
-=======
+
 // Cluster lookups of a march at most, and the lights of each it keeps at most,
 // BOX_FOG_VOLUME_LIGHT_STEPS.
 const FOG_LIGHT_SEGMENTS: i32 = 8;
->>>>>>> 7cb8fe4b3712af4523b83ff0cb71936a3b6f4c99
 
 struct FogVolume {
     center: vec3f,
@@ -85,16 +83,12 @@ struct FogVolume {
     sun_inscatter: f32,
     ambient_inscatter: f32,
     steps: i32,
-<<<<<<< HEAD
     wind: vec3f,
     noise_strength: f32,
     noise_scale: f32,
-=======
     light_inscatter: f32,
     pad0: f32,
     pad1: f32,
-    pad2: f32,
->>>>>>> 7cb8fe4b3712af4523b83ff0cb71936a3b6f4c99
 };
 
 struct FogDraw {
@@ -178,7 +172,6 @@ fn edge(fog: FogVolume, q: vec3f) -> f32 {
     return smoothstep(0.0, fog.edge_fade, d);
 }
 
-<<<<<<< HEAD
 // Density of a volume at a point, q in its local frame and p in the world.
 fn density(fog: FogVolume, q: vec3f, p: vec3f) -> f32 {
     var value = fog.density * edge(fog, q);
@@ -191,7 +184,8 @@ fn density(fog: FogVolume, q: vec3f, p: vec3f) -> f32 {
     }
 
     return value;
-=======
+}
+
 // Point and spot lights of the segment of the march the fragment is in, indices into lights.
 var<private> segment_lights: array<u32, FOG_LIGHT_SEGMENTS>;
 var<private> segment_count: u32;
@@ -232,7 +226,6 @@ fn light_at(fog: FogVolume, p: vec3f, dir: vec3f) -> vec3f {
     }
 
     return sum * fog.light_inscatter;
->>>>>>> 7cb8fe4b3712af4523b83ff0cb71936a3b6f4c99
 }
 
 @fragment
@@ -308,10 +301,6 @@ fn fs(in: VertexOut) -> @location(0) vec4f {
             light += sun_light * shadow_point(p) * light_cookie(p, l, up);
         }
 
-<<<<<<< HEAD
-        let extinction = sigma;
-        let scatter = sigma * (1.0 - fog.absorption);
-=======
         if (local) {
             let k = i * segments / steps;
             if (k != segment) {
@@ -323,9 +312,8 @@ fn fs(in: VertexOut) -> @location(0) vec4f {
             light += light_at(fog, p, dir);
         }
 
-        let extinction = density;
-        let scatter = density * (1.0 - fog.absorption);
->>>>>>> 7cb8fe4b3712af4523b83ff0cb71936a3b6f4c99
+        let extinction = sigma;
+        let scatter = sigma * (1.0 - fog.absorption);
         let step_t = exp(-extinction * ds);
         let s = fog.color * scatter * light;
         let sint = (s - s * step_t) / max(extinction, 1e-5);

@@ -59,13 +59,10 @@
                 "testcases": [
                     "defaults",
                     "partial_script_keeps_others",
-<<<<<<< HEAD
                     "partial_noise_keeps_others",
                     "noise_record",
                     "noise_texture",
-=======
                     "light_inscatter_script_keeps_others",
->>>>>>> 7cb8fe4b3712af4523b83ff0cb71936a3b6f4c99
                     "rotated_record",
                     "clamped_values",
                     "back_to_front",
