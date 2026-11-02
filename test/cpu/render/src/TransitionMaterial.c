@@ -1468,10 +1468,11 @@ static void tr_test_material_idle(
         test_assert(!ecs_has_id(world, e, TransitionMaterial));
     }
 
-    uint32_t slot = ecs_get(world, plain, MaterialId)->value;
     int32_t batch = ecs_get(world, plain, DrawSlot)->batch;
     ecs_set_id(world, plain, mc->component, (size_t)mc->size, mc->to);
     tr_frame(world);
+    uint32_t slot = ecs_get(world, plain, MaterialId)->value;
+    test_assert(slot != ecs_get(world, e, MaterialId)->value);
     test_int(ecs_vec_count(&null->last.transitions), 0);
     test_int(box_render_transitions_material_visited(s), 0);
     test_assert(!ecs_has_id(world, plain, TransitionMaterial));
@@ -1484,7 +1485,8 @@ static void tr_test_material_idle(
 }
 
 /** Check that the final record of a transition equals the record of a shape that had the target
- * set directly, without a transition.
+ * set directly, without a transition: once it ends the shape shares the slot of that shape, in
+ * the same batch.
  *
  * @param c The component
  */
@@ -1496,7 +1498,8 @@ static void tr_test_material_final(
     tr_material_case_t case_ = tr_case(c), *mc = &case_;
     ecs_entity_t e = tr_shape(world, 0, 0);
     ecs_entity_t direct = tr_shape(world, 0, 2);
-    box_render_material_t rendered, still;
+    box_render_material_t packed, still;
+    box_draw_material_t m;
     int32_t i;
     ecs_set_id(world, e, mc->component, (size_t)mc->size, mc->from);
     box_transition_set(world, e, mc->component, &(TransitionSpec){ .duration = 1.0f });
@@ -1515,11 +1518,15 @@ static void tr_test_material_final(
         test_assert(!ecs_has_id(world, e, TransitionMaterial));
     }
 
-    test_assert(tr_material_rendered(world, null, slot, &rendered));
+    const DrawSlot *ds = ecs_get(world, e, DrawSlot);
+    test_uint(ecs_get(world, e, MaterialId)->value, slot_d);
+    test_uint(box_draws_slot_mesh_shading(tr_batch(world, e), ds->slot)->material, slot_d);
+    box_draws_material_of(world, e, &m);
+    box_draws_material_pack(&packed, &m);
     still = *ecs_vec_get_t(&box_draws_state(world)->materials.records, box_render_material_t,
         (int32_t)slot_d);
-    test_assert(!ecs_os_memcmp_t(&rendered, &still, box_render_material_t));
-    test_int(ecs_get(world, e, DrawSlot)->batch, ecs_get(world, direct, DrawSlot)->batch);
+    test_assert(!ecs_os_memcmp_t(&packed, &still, box_render_material_t));
+    test_int(ds->batch, ecs_get(world, direct, DrawSlot)->batch);
     tr_fini(world, null);
 }
 
