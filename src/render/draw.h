@@ -207,8 +207,11 @@ typedef struct box_draw_material_t {
     const SpecularAnisotropy *anisotropy; /**< Stretched highlight of a 3D shape, ignored by 2D
                                  *   shapes */
     const Sheen *sheen;         /**< Grazing rim of a 3D shape, ignored by 2D shapes */
+<<<<<<< HEAD
     const DiffuseTransmission *diffuse_transmission; /**< Back lit glow of a 3D shape, ignored
                                  *   by 2D shapes */
+=======
+>>>>>>> fc65258d1671295d619796a3272b6dad04878636
     const Tint *tint;           /**< Tint of the shape itself, applied after the inherited */
     const box_draw_tint_t *inherited; /**< Composed tints of the ancestors, NULL for none */
     const Shape2D *shape2d;     /**< Resolved 2D shape, NULL for a 3D shape */
@@ -250,9 +253,12 @@ typedef struct box_draw_transition_material_t {
     bool anisotropic;       /**< The material has a SpecularAnisotropy */
     Sheen sheen;            /**< Sheen, kept as is: it does not transition */
     bool sheened;           /**< The material has a Sheen */
+<<<<<<< HEAD
     DiffuseTransmission diffuse_transmission; /**< DiffuseTransmission, kept as is: it does not
                              *   transition */
     bool diffuse_transmissive; /**< The material has a DiffuseTransmission */
+=======
+>>>>>>> fc65258d1671295d619796a3272b6dad04878636
     Opacity opacity;        /**< Opacity of the shape itself */
     Tint tint;              /**< Tint of the shape itself */
     box_draw_tint_t inherited; /**< Tints of the ancestors, when tinted */
@@ -746,10 +752,16 @@ void box_draws_color_unpack(
  *
  * The record holds the display encoded base color (the default color without Rgb), metallic,
  * roughness, emission, texture transform and AlphaCutoff (0 without one) clamped as the shading
+<<<<<<< HEAD
  * was, the Transmission (factor 0 without one) and the lobes of the other material components.
  *
  * ClearCoat, SpecularAnisotropy and Sheen are 0 without one or at 0, a Sheen at a black color,
  * DiffuseTransmission 0 without one.
+=======
+ * was, the Transmission (factor 0 without one), and the ClearCoat, SpecularAnisotropy and Sheen.
+ *
+ * ClearCoat, SpecularAnisotropy and Sheen are 0 without one or at 0, a Sheen at a black color.
+>>>>>>> fc65258d1671295d619796a3272b6dad04878636
  * Opacity, tints and the 2D shape are not.
  *
  * @param out The record

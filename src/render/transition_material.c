@@ -66,11 +66,14 @@ void box_draws_transition_target(
         out->sheen = *material->sheen;
     }
 
+<<<<<<< HEAD
     if (material->diffuse_transmission) {
         out->diffuse_transmissive = true;
         out->diffuse_transmission = *material->diffuse_transmission;
     }
 
+=======
+>>>>>>> fc65258d1671295d619796a3272b6dad04878636
     if (material->opacity) {
         out->present |= 1u << BOX_RENDER_TRANSITION_OPACITY;
         out->opacity = *material->opacity;
@@ -129,8 +132,11 @@ void box_draws_transition_encode(
             &material->clear_coat),
         .anisotropy = material->anisotropic ? &material->anisotropy : NULL,
         .sheen = material->sheened ? &material->sheen : NULL,
+<<<<<<< HEAD
         .diffuse_transmission = material->diffuse_transmissive
             ? &material->diffuse_transmission : NULL,
+=======
+>>>>>>> fc65258d1671295d619796a3272b6dad04878636
         .tint = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TINT,
             &material->tint),
         .inherited = material->tinted ? &material->inherited : NULL,

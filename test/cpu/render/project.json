@@ -51,9 +51,13 @@
                     "specular_anisotropy_defaults",
                     "specular_anisotropy_pack",
                     "sheen_defaults",
+<<<<<<< HEAD
                     "sheen_pack",
                     "diffuse_transmission_defaults",
                     "diffuse_transmission_pack"
+=======
+                    "sheen_pack"
+>>>>>>> fc65258d1671295d619796a3272b6dad04878636
                 ]
             },
             {
@@ -329,8 +333,11 @@
                     "specular_anisotropy_prefab_change_reaches_slot",
                     "sheen_brings_material_id",
                     "sheen_prefab_change_reaches_slot",
+<<<<<<< HEAD
                     "diffuse_transmission_brings_material_id",
                     "diffuse_transmission_prefab_change_reaches_slot",
+=======
+>>>>>>> fc65258d1671295d619796a3272b6dad04878636
                     "equal_materials_share_slot",
                     "changed_material_takes_other_slot",
                     "alone_changed_material_keeps_slot",

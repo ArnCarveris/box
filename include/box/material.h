@@ -1,7 +1,11 @@
 /**
  * @file box/material.h
  * @brief Material components: color, opacity, tint, PBR parameters, clear coat, anisotropy, sheen,
+<<<<<<< HEAD
  * diffuse transmission, emission and transmission.
+=======
+ * emission and transmission.
+>>>>>>> fc65258d1671295d619796a3272b6dad04878636
  *
  * The box.material module resolves tints through the hierarchy and registers
  * the material layers a scene applies on top of the sampled surface.
@@ -25,9 +29,15 @@ extern "C" {
 /** Slot of the material table a shape renders with, set by the engine and read only for
  * applications, inherited by instances.
  *
+<<<<<<< HEAD
  * Rgb, PbrMaterial, ClearCoat, SpecularAnisotropy, Sheen, DiffuseTransmission, Emissive,
  * Transmission, TextureTransform and AlphaCutoff bring it along. A prefab that owns one gets a
  * slot its instances share, a 3D shape that owns one a slot of what it owns and still inherits.
+=======
+ * Rgb, PbrMaterial, ClearCoat, SpecularAnisotropy, Sheen, Emissive, Transmission, TextureTransform
+ * and AlphaCutoff bring it along. A prefab that owns one gets a slot its instances share, a 3D
+ * shape that owns one a slot of its own, composed of what it owns and what it still inherits.
+>>>>>>> fc65258d1671295d619796a3272b6dad04878636
  *
  * Slot 0 is the default material, of a shape without any material component. An owned id that
  * was never handed a slot (a light, a 2D shape, a text) is UINT32_MAX.
@@ -176,6 +186,7 @@ ECS_STRUCT(Sheen, {
     float roughness; /**< 0 tight rim to 1 broad, clamped to 0..1 */
 });
 
+<<<<<<< HEAD
 /** Factor of a constructed DiffuseTransmission: half of the diffuse light passes through */
 #define BOX_MATERIAL_DIFFUSE_TRANSMISSION_FACTOR (0.5f)
 
@@ -195,6 +206,8 @@ ECS_STRUCT(DiffuseTransmission, {
                       *   0 for a thin sheet */
 });
 
+=======
+>>>>>>> fc65258d1671295d619796a3272b6dad04878636
 /** Emitted light, inherited by instances, like Rgb. Tints do not apply to it. */
 ECS_STRUCT(Emissive, {
     float strength; /**< Emission intensity */

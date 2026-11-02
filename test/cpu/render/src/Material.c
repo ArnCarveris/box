@@ -713,11 +713,15 @@ void Material_clear_coat_pack(void) {
     test_uint(record.clear_coat, 0);
     test_uint(record.anisotropy, 0);
     test_uint(record.sheen, 0);
+<<<<<<< HEAD
     test_uint(record.reserved[0], 0);
     test_uint(record.reserved[1], 0);
     test_uint(record.reserved[2], 0);
     test_uint(record.diffuse_transmission, 0);
     test_flt(record.thickness, 0);
+=======
+    test_uint(record.reserved, 0);
+>>>>>>> fc65258d1671295d619796a3272b6dad04878636
     plain = record;
 
     ClearCoat full = { .strength = 1, .roughness = 0 };
@@ -923,6 +927,7 @@ void Material_sheen_pack(void) {
     ecs_os_memset_t(&record, 0x55, box_render_material_t);
     box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
     test_uint(record.sheen, 0);
+<<<<<<< HEAD
     test_uint(record.reserved[0], 0);
     test_uint(record.reserved[1], 0);
     test_uint(record.reserved[2], 0);
@@ -930,6 +935,11 @@ void Material_sheen_pack(void) {
     test_flt(record.thickness, 0);
     plain = record;
     test_int(ECS_SIZEOF(box_render_material_t), 96);
+=======
+    test_uint(record.reserved, 0);
+    plain = record;
+    test_int(ECS_SIZEOF(box_render_material_t), 80);
+>>>>>>> fc65258d1671295d619796a3272b6dad04878636
 
     Sheen white = { .color = {255, 255, 255}, .roughness = 1 };
     box_draws_material_pack(&record, &(box_draw_material_t){ .sheen = &white, .fade = 1 });
@@ -978,6 +988,7 @@ void Material_sheen_pack(void) {
         .sheen = &mixed, .pbr = &pbr, .fade = 1 });
     test_assert(!ecs_os_memcmp_t(&a, &b, box_render_shading_t));
 }
+<<<<<<< HEAD
 
 void Material_diffuse_transmission_defaults(void) {
     // materials/pbr
@@ -1110,3 +1121,5 @@ void Material_diffuse_transmission_pack(void) {
         .diffuse_transmission = &mixed, .pbr = &pbr, .fade = 1 });
     test_assert(!ecs_os_memcmp_t(&a, &b, box_render_shading_t));
 }
+=======
+>>>>>>> fc65258d1671295d619796a3272b6dad04878636
