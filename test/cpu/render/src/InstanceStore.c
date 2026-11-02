@@ -1369,9 +1369,9 @@ void InstanceStore_grow_steps(void) {
     test_uint(box_draws_grow(1001, 1001), 1004);
     test_uint(box_draws_grow(110000, 110000), 110000);
 
-    /* A run grows by half from its slots */
-    test_uint(box_draws_grow(1000, 1001), 1500);
-    test_uint(box_draws_grow(20, 21), 32);
+    /* A run that outgrows its slots takes the step at or above its count */
+    test_uint(box_draws_grow(0, 1001), 1460);
+    test_uint(box_draws_grow(0, 21), 24);
 
     /* The steps stay within a factor of 1.5 of the count, past the minimum */
     for (i = (int32_t)MIN_RUN + 1; i < 100000; i += 7) {
@@ -1414,18 +1414,18 @@ void InstanceStore_runs_grow_by_half(void) {
     test_int(stats.kept_pages, 0);
     test_int(buffer_ops(null, BOX_RENDER_CREATE, PAGE(0)), 0);
 
-    /* The 21st moves the batch to a run grown by half from its 20 slots, 32 at slot 36; the page
-     * grows from 36 slots by half to 56, then to the 68 slots its top reaches */
+    /* The 21st moves the batch to the growth step of 24 slots at slot 36; the page grows from
+     * 36 slots by half to 56, then to the 60 slots its top reaches */
     shape_new(world, 3, 20, false);
     stats = frame(world);
     test_uint(batch_of(null, 21)->first_instance, 36);
     test_int(stats.copies, STREAMS);
     test_int(stats.kept_pages, STREAMS);
-    test_int(stats.page_slots, 68);
+    test_int(stats.page_slots, 60);
     for (s = 0; s < STREAMS; s ++) {
         const box_render_buffer_desc_t *desc = created(null, PAGE(0) + (uint32_t)s);
         test_assert(desc != NULL);
-        test_uint(desc->size, (uint64_t)68 * stride_of(s));
+        test_uint(desc->size, (uint64_t)60 * stride_of(s));
         test_uint(desc->size % BOX_RENDER_COPY_ALIGN, 0);
         test_assert(desc->usage & BOX_RENDER_BUFFER_KEEP);
     }
@@ -1610,12 +1610,12 @@ void InstanceStore_new_batch_gets_exact_run(void) {
         test_uint(desc->size % BOX_RENDER_COPY_ALIGN, 0);
     }
 
-    /* One more instance grows the run by half to the next step, 1,500 slots; the run ends at
-     * the top of the page, so it extends in place without a copy */
+    /* One more instance grows the run to the next growth step, 1,460 slots; the run ends at the
+     * top of the page, so it extends in place without a copy. The page buffers grow by half */
     shape_new(world, 3, 0, false);
     stats = frame(world);
     test_uint(batch_of(null, 1001)->first_instance, 0);
-    test_uint(batch_get(world, first)->capacity, 1500);
+    test_uint(batch_get(world, first)->capacity, 1460);
     test_int(stats.copies, 0);
     test_int(ecs_vec_count(&null->last.copies), 0);
     test_int(stats.kept_pages, STREAMS);
@@ -1678,22 +1678,63 @@ void InstanceStore_exact_run_grows_moved(void) {
     test_uint(batch_of(null, 1)->first_instance, 1000);
     test_int(stats.page_slots, 1000 + MIN_RUN);
 
-    /* One more instance moves the first batch to a run of the next step, 1,500 slots, above the
-     * second; the GPU copies its 1,000 instances into the new run */
+    /* One more instance moves the first batch to a run of the next growth step, 1,460 slots,
+     * above the second; the GPU copies its 1,000 instances into the new run */
     shape_new(world, 3, 0, false);
     stats = frame(world);
-    test_uint(batch_get(world, first)->capacity, 1500);
+    test_uint(batch_get(world, first)->capacity, 1460);
     test_uint(batch_of(null, 1001)->first_instance, 1000 + MIN_RUN);
     test_uint(batch_of(null, 1)->first_instance, 1000);
     test_int(stats.copies, STREAMS);
     test_int(stats.kept_pages, STREAMS);
-    test_int(stats.page_slots, 1000 + MIN_RUN + 1500);
+    test_int(stats.copy_bytes, 1000 * (int64_t)INSTANCE);
+    test_int(stats.page_slots, 1000 + MIN_RUN + 1460);
     for (s = 0; s < STREAMS; s ++) {
         const box_render_buffer_desc_t *desc = created(null, PAGE(0) + (uint32_t)s);
         test_assert(desc != NULL);
-        test_uint(desc->size, (uint64_t)(1000 + MIN_RUN + 1500) * stride_of(s));
+        test_uint(desc->size, (uint64_t)(1000 + MIN_RUN + 1460) * stride_of(s));
         test_uint(desc->size % BOX_RENDER_COPY_ALIGN, 0);
     }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** The spawn scene of docs/gpu-instance-memory.md: 1,000 boxes added in each of 64 frames. */
+void InstanceStore_spawn_grows_pages_without_moves(void) {
+    // gpu_instance_data/instance_run_exact
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t first = 0;
+    int32_t f, i, moves = 0, growths = 0;
+    box_render_draws_stats_t stats = {0};
+    for (f = 0; f < 64; f ++) {
+        for (i = 0; i < 1000; i ++) {
+            ecs_entity_t e = box_new(world, (float)i);
+            if (!first) {
+                first = e;
+            }
+        }
+
+        stats = frame(world);
+        moves += stats.copies / STREAMS;
+        growths += stats.kept_pages / STREAMS;
+
+        /* The first frame takes a run of its 1,000 instances; every later one grows the run in
+         * place to the growth step at or above its count */
+        if (!f) {
+            test_uint(batch_get(world, first)->capacity, 1000);
+        } else {
+            test_uint(batch_get(world, first)->capacity,
+                box_draws_grow(0, (uint32_t)(f + 1) * 1000));
+        }
+    }
+
+    /* The run never moves and the page buffers grow 10 times, as with a first run of the growth
+     * step, up to the 84,312 slots of the last step */
+    test_int(moves, 0);
+    test_int(growths, 10);
+    test_int(stats.page_slots, 84312);
 
     ecs_fini(world);
     box_render_null_free(null);

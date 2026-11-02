@@ -1127,17 +1127,13 @@ void box_draws_reset_backend(
     box_draws_materials_reset(d);
 }
 
-/** Give a batch a run of slots that holds all its instances. A new batch gets a run of its
- * count, rounded up to BOX_DRAWS_GROW_ALIGN slots and at least BOX_DRAWS_MIN_CAPACITY, so a
- * batch created with all its instances in one frame holds no slots it never uses. A batch that
- * outgrew its run grows to the next growth step from its run (box_draws_grow), so headroom is
- * only added once a batch grows. It extends its run in place when it ends at the top of its
- * page, so nothing is copied and no hole is left, and otherwise moves to a new run; its old run
- * is freed.
+/** Give a batch a run that holds all its instances. A new batch gets its count rounded up to
+ * BOX_DRAWS_GROW_ALIGN slots, at least BOX_DRAWS_MIN_CAPACITY; one that outgrew its run takes
+ * the growth step at or above its count (box_draws_grow), so headroom only comes with growth.
  *
- * A moved batch remembers the old run and the instances the GPU holds in it, which the send
- * copies into the new run (box_draws_send_batch); its changed slots stay queued and are written
- * over the copy. A batch the GPU holds no instances of uploads every instance.
+ * A run at the top of its page extends in place; otherwise the batch moves and its run is freed,
+ * and the send copies the instances the GPU holds into the new run and writes the queued changes
+ * over them (box_draws_send_batch). A batch the GPU holds none of uploads every instance.
  *
  * @param p The packet
  * @param d The state
@@ -1158,10 +1154,9 @@ static void box_draws_reserve(
     }
 
     if (b->page < 0) {
-        /* From its own count, box_draws_grow rounds the count up without a step */
         capacity = box_draws_grow(count, count);
     } else {
-        capacity = box_draws_grow(b->capacity, count);
+        capacity = box_draws_grow(0, count);
     }
 
     if (capacity > limit && count <= limit) {

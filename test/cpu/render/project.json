@@ -275,7 +275,8 @@
                     "top_run_grows_in_place",
                     "new_batch_gets_exact_run",
                     "new_small_batch_gets_min_run",
-                    "exact_run_grows_moved"
+                    "exact_run_grows_moved",
+                    "spawn_grows_pages_without_moves"
                 ]
             },
             {

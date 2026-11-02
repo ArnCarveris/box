@@ -454,22 +454,25 @@ moving: nothing is copied and no hole is left. Without that, the extra moves of 
 steps left more holes: the spawn scene ended at 146,412 slots instead of 131,072, with 10 moves
 instead of 6.
 
-Measured with the backend that drops packets, before and after (slots, then page bytes):
+Measured with the backend that drops packets, before and after (slots, then page bytes). The
+last column is the follow-up InstanceRunExact below, measured with a release run of
+`bench/render` (the spawn scene in `InstanceStore.spawn_grows_pages_without_moves`):
 
-| Case | Before | After | 4,096 slot pages |
-| --- | --- | --- | --- |
-| Extract (110,000 instances) | 262,144, 16.8 MB | 137,568, 8.8 MB | 139,264, 8.9 MB |
-| Text.layout_10k (110,000 glyphs) | 131,072, 14.7 MB | 126,468, 14.2 MB | 126,976, 14.2 MB |
-| Shapes2D.dynamic_material | 262,144, 29.4 MB | 137,568, 15.4 MB | 139,264, 15.6 MB |
-| Shapes2D.changed_1pct | 131,072, 14.7 MB | 126,468, 14.2 MB | 126,976, 14.2 MB |
-| Shapes2D.ui_tree_idle | 16,384, 1.8 MB | 11,100, 1.2 MB | 12,288, 1.4 MB |
-| Shapes2D.clipped_1000_moving_clips | 1,024, 115 KB | 1,460, 164 KB | 4,096, 459 KB |
-| Parametric.extract_spaceship_size (8,792 instances) | 32,768, 8.4 MB | 13,880, 1.9 MB | 16,384, 2.6 MB |
-| Spawn, 64 × 1,000 boxes | 131,072, 8.4 MB | 84,312, 5.4 MB | 86,016, 5.5 MB |
+| Case | Before | After | 4,096 slot pages | Exact first run |
+| --- | --- | --- | --- | --- |
+| Extract (110,000 instances) | 262,144, 16.8 MB | 137,568, 8.8 MB | 139,264, 8.9 MB | 110,000, 7.0 MB |
+| Text.layout_10k (110,000 glyphs) | 131,072, 14.7 MB | 126,468, 14.2 MB | 126,976, 14.2 MB | 110,000, 12.3 MB |
+| Shapes2D.dynamic_material | 262,144, 29.4 MB | 137,568, 15.4 MB | 139,264, 15.6 MB | 110,000, 12.3 MB |
+| Shapes2D.changed_1pct | 131,072, 14.7 MB | 126,468, 14.2 MB | 126,976, 14.2 MB | 100,000, 11.2 MB |
+| Shapes2D.ui_tree_idle | 16,384, 1.8 MB | 11,100, 1.2 MB | 12,288, 1.4 MB | 10,100, 1.1 MB |
+| Shapes2D.clipped_1000_moving_clips | 1,024, 115 KB | 1,460, 164 KB | 4,096, 459 KB | 1,004, 112 KB |
+| Parametric.extract_spaceship_size (8,792 instances) | 32,768, 8.4 MB | 13,880, 1.9 MB | 16,384, 2.6 MB | 10,960, 1.7 MB |
+| Spawn, 64 × 1,000 boxes | 131,072, 8.4 MB | 84,312, 5.4 MB | 86,016, 5.5 MB | 84,312, 5.4 MB |
 
-Text and Shapes2D.changed_1pct hold one batch of 110,000, whose run step is 126,468. The 1,000
-shapes of clipped_1000_moving_clips fall just past the step of 972, so their run of 1,460 is
-larger than the power of two; the factor of 1.5 bounds a run to 1.5 times its count instead of 2.
+Text and Shapes2D.changed_1pct hold one batch of 110,000 and 100,000, whose run step is
+126,468. The 1,000 shapes of clipped_1000_moving_clips fall just past the step of 972, so their
+run of 1,460 is larger than the power of two; the factor of 1.5 bounds a run to 1.5 times its
+count instead of 2.
 
 The spawn scene moved its run 6 times before (12 copies of 4.0 MB) and grew its page 6 times
 (8.2 MB kept); after, nothing moves and the page grows 10 times (10.6 MB kept), so the GPU moves
@@ -485,28 +488,26 @@ copies grow with the square of its slots; with 1.5 the copied bytes stay below t
 
 Follow-up (InstanceRunExact): a new batch gets a run of its count rounded up to 4 slots
 (`BOX_DRAWS_GROW_ALIGN`), at least `BOX_DRAWS_MIN_CAPACITY`, instead of the growth step at or
-above its count (`box_draws_reserve`). Growth headroom is only added once a batch outgrows its
-run: it then grows by half from its run (`box_draws_grow(capacity, count)`), so a run of 1,000
-grows to 1,500, extended in place at the top of its page or moved with a GPU copy. A batch that
-starts at 16 slots or less starts on the growth steps, so its growth is unchanged. A batch that
-gains one instance right after it is created with more than 16 moves or extends once more than
-before; a move copies its instances once on the GPU (InstancePageCopy).
+above its count (`box_draws_reserve`). A batch created with all its instances in one frame holds
+no headroom it never uses: Extract, Text, dynamic_material and changed_1pct hold just their
+instance counts, and clipped_1000_moving_clips drops below the power of two again. Every run is
+a multiple of 4 slots, so the 4 byte and copy alignment of WebGPU holds.
 
-Derived from the code, to be replaced by the measured values (slots, then page bytes):
+Growth headroom is only added once a batch outgrows its run: it then takes the growth step at
+or above its count, as before (`box_draws_grow(0, count)`), extended in place at the top of its
+page or moved with a GPU copy (InstancePageCopy). From its second run a batch so takes the same
+runs as before. The spawn scene still moves nothing and grows its page 10 times, to the same
+84,312 slots; Extract's setup still neither moves nor grows. Growing from the exact run by half
+instead (1,000 to 1,500, 2,252, ...) also kept 0 moves and 10 growths, but ended the spawn scene
+at 86,672 slots, off the steps.
 
-| Case | Growth step first run | Exact first run |
-| --- | --- | --- |
-| Extract (110,000 instances) | 137,568, 8.8 MB | 110,000, 7.0 MB (derived) |
-| Text.layout_10k (110,000 glyphs) | 126,468, 14.2 MB | 110,000, 12.3 MB (derived) |
-| Shapes2D.dynamic_material | 137,568, 15.4 MB | to measure |
-| Shapes2D.changed_1pct | 126,468, 14.2 MB | 110,000, 12.3 MB (derived) |
-| Shapes2D.ui_tree_idle | 11,100, 1.2 MB | to measure |
-| Shapes2D.clipped_1000_moving_clips | 1,460, 164 KB | 1,000, 112 KB (derived) |
-| Parametric.extract_spaceship_size (8,792 instances) | 13,880, 1.9 MB | to measure |
-| Spawn, 64 × 1,000 boxes | 84,312, 5.4 MB | to measure |
-
-Moves and page growths of the spawn scene and of Extract's setup, before and after, are still to
-be measured; the spawn scene had 0 moves and 10 page growths with the growth step first run.
+The cost is one move for a batch that, right after it was created with more than 16 instances,
+gains instances its old growth step would have held: 1,000 shapes and one more move to a run of
+1,460, or extend it in place at the top of the page. The move copies the 1,000 instances once on
+the GPU (64 bytes each for a mesh, 112 for a 2D shape: 64 or 112 KB) instead of uploading them, and leaves a
+hole of 1,000 slots that later runs reuse. A batch that starts at 16 instances or less starts on
+the growth steps and grows exactly as before. A run just below a step gains little headroom on
+its first growth (968 grows to 972), so it can move once more before it reaches the step above.
 
 ### O3. Full re-uploads when a run moves or a page grows
 
