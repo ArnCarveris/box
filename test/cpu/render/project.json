@@ -57,6 +57,7 @@
                 "testcases": [
                     "defaults",
                     "partial_script_keeps_others",
+                    "light_inscatter_script_keeps_others",
                     "rotated_record",
                     "clamped_values",
                     "back_to_front",

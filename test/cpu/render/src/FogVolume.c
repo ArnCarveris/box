@@ -174,12 +174,14 @@ void FogVolume_defaults(void) {
     test_flt(f->edge_fade, 1);
     test_flt(f->sun_inscatter, 1);
     test_flt(f->ambient_inscatter, 1);
+    test_flt(f->light_inscatter, 1);
     test_int(f->steps, 24);
 
     ecs_entity_t added = ecs_new(world);
     ecs_add(world, added, FogVolume);
     f = ecs_get(world, added, FogVolume);
     test_flt(f->density, 0.1f);
+    test_flt(f->light_inscatter, 1);
     test_int(f->steps, 24);
 
     ecs_entity_t view = ecs_new(world);
@@ -210,6 +212,29 @@ void FogVolume_partial_script_keeps_others(void) {
     test_flt(f->edge_fade, 1);
     test_flt(f->sun_inscatter, 1);
     test_flt(f->ambient_inscatter, 1);
+    test_flt(f->light_inscatter, 1);
+    test_int(f->steps, 24);
+
+    ecs_fini(world);
+}
+
+void FogVolume_light_inscatter_script_keeps_others(void) {
+    // fog_volume/component
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script_run(world, "fog",
+        "using box.light\n"
+        "fog { FogVolume: {light_inscatter: 0} }\n", NULL) == 0);
+    const FogVolume *f = ecs_get(world, ecs_lookup(world, "fog"), FogVolume);
+    test_flt(f->light_inscatter, 0);
+    test_flt(f->extent[0], 5);
+    test_flt(f->density, 0.1f);
+    test_int(f->color.r, 255);
+    test_flt(f->asymmetry, 0.3f);
+    test_flt(f->edge_fade, 1);
+    test_flt(f->sun_inscatter, 1);
+    test_flt(f->ambient_inscatter, 1);
     test_int(f->steps, 24);
 
     ecs_fini(world);
@@ -228,6 +253,7 @@ void FogVolume_rotated_record(void) {
     f->extent[1] = 2;
     f->extent[2] = 3;
     f->color = (rgb){255, 0, 128};
+    f->light_inscatter = 2.5f;
     ecs_modified(world, e, FogVolume);
     frame(world);
 
@@ -263,6 +289,7 @@ void FogVolume_rotated_record(void) {
     test_assert(fabsf(r->color[2] - 0.2158605f) < 1e-4f);
     test_flt(r->density, 0.1f);
     test_flt(r->asymmetry, 0.3f);
+    test_flt(r->light_inscatter, 2.5f);
     test_int(r->steps, 24);
 
     ecs_fini(world);
@@ -277,10 +304,12 @@ void FogVolume_clamped_values(void) {
     ecs_entity_t high = volume_new(world, 0, 0, 0, -20);
     ecs_set(world, low, FogVolume, {
         .extent = {-1, 2, 2}, .density = -1, .absorption = -0.5f, .asymmetry = -5,
-        .edge_fade = -1, .sun_inscatter = -1, .ambient_inscatter = -2, .steps = 1});
+        .edge_fade = -1, .sun_inscatter = -1, .ambient_inscatter = -2, .light_inscatter = -3,
+        .steps = 1});
     ecs_set(world, high, FogVolume, {
         .extent = {2, 2, 2}, .density = 3, .absorption = 2, .asymmetry = 5,
-        .edge_fade = 4, .sun_inscatter = 2, .ambient_inscatter = 3, .steps = 1000});
+        .edge_fade = 4, .sun_inscatter = 2, .ambient_inscatter = 3, .light_inscatter = 4,
+        .steps = 1000});
     frame(world);
 
     const box_render_view_t *v = packet_view(null, view);
@@ -295,6 +324,7 @@ void FogVolume_clamped_values(void) {
     test_flt(near_->edge_fade, 0);
     test_flt(near_->sun_inscatter, 0);
     test_flt(near_->ambient_inscatter, 0);
+    test_flt(near_->light_inscatter, 0);
     test_int(near_->steps, 4);
 
     test_flt(far_->center[2], -20);
@@ -304,6 +334,7 @@ void FogVolume_clamped_values(void) {
     test_flt(far_->edge_fade, 4);
     test_flt(far_->sun_inscatter, 2);
     test_flt(far_->ambient_inscatter, 3);
+    test_flt(far_->light_inscatter, 4);
     test_int(far_->steps, 128);
 
     ecs_fini(world);

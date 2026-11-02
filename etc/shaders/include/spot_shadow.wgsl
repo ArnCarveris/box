@@ -80,3 +80,32 @@ fn spot_shadow(light: Light, world: vec3f, normal: vec3f) -> f32 {
 
     return sum;
 }
+
+// Fraction of a spot light with a tile that reaches a position in a medium, without a normal:
+// one depth comparison of the tile, no tent filter, for the many lookups of a raymarch.
+fn spot_shadow_point(light: Light, world: vec3f) -> f32 {
+    let tile = shadow_tiles[light.shadow];
+    let along = dot(world - light.position, light.direction);
+    let near_ = tile.params.x;
+    let far_ = tile.params.y;
+    if (along <= 0.0 || along >= far_) {
+        return 1.0;
+    }
+
+    let p = tile.matrix * vec4f(world, 1.0);
+    if (p.w <= 0.0) {
+        return 1.0;
+    }
+
+    let uv = p.xy / p.w * vec2f(0.5, -0.5) + vec2f(0.5);
+    if (any(uv < vec2f(0.0)) || any(uv > vec2f(1.0))) {
+        return 1.0;
+    }
+
+    let depth = clamp(along - view.spot_bias.x * along * tile.params.z, near_, far_);
+    let reference = near_ * (far_ - depth) / (depth * (far_ - near_));
+    let size = tile.rect.w;
+    let tap = clamp(tile.rect.xy + uv * tile.rect.z, tile.rect.xy + vec2f(0.5 * size),
+        tile.rect.xy + vec2f(tile.rect.z - 0.5 * size));
+    return textureSampleCompareLevel(shadow_atlas, shadow_sampler, tap, reference);
+}
