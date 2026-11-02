@@ -8,8 +8,8 @@
  * marches the boxes back to front before the particles. Without volumes nothing is recorded.
  *
  * Group 1 holds the records of the view, the inverse view projection of the target, the depth and
- * the noise texture; the uniforms and records of every draw of a packet follow each
- * other in one buffer, which grows when a draw does not fit.
+ * the noise texture; the uniforms and records of every draw of a packet follow each other in one
+ * buffer, which grows when a draw does not fit.
  */
 
 #include "gpu.h"

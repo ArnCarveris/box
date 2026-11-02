@@ -22,11 +22,12 @@
 // (group 1), sampled twice at the world position moved back by the offset of the volume and
 // divided by noise_scale: a coarse sample and a detail sample at 3.1 times the frequency. The
 // offset is the wind times the world time, computed on the CPU in double precision and wrapped to
-// 10 noise_scale, over which both samples repeat, so the drift stays smooth after hours. The noise is in world space, not in the frame of the box, so a volume that moves
-// or turns does not drag its billows along, and volumes that overlap share them. A volume
-// without noise takes no samples. Each step integrates the in scattered light of the step
-// analytically over its extinction (Frostbite, Hillaire 2015) and the march stops once the
-// transmittance falls under TRANSMITTANCE_MIN.
+// 10 noise_scale, over which both samples repeat, so the drift stays smooth after hours. The
+// noise is in world space, not in the frame of the box, so a volume that moves or turns does not
+// drag its billows along, and volumes that overlap share them. A volume without noise takes no
+// samples. Each step integrates the in scattered light of the step analytically over its
+// extinction (Frostbite, Hillaire 2015) and the march stops once the transmittance falls under
+// TRANSMITTANCE_MIN.
 //
 // The light scattered at a point is the mean ambient of the view over up and down (ambient.wgsl,
 // the environment or the hemisphere, not the probe volume) times ambient_inscatter, plus the
