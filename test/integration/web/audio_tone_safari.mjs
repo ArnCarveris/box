@@ -17,8 +17,8 @@ AudioWorklet, while a scene renders.
 bake3's bake.json sets output_dir; "$(tools/integration.py local-env --env <env>)" prints the
 local env folder either way. safaridriver comes from --safaridriver or $SAFARIDRIVER,
 /usr/bin/safaridriver by default, and runs on a free localhost port. Safari needs remote
-automation, enabled once with "sudo safaridriver --enable" and the Develop menu option "Allow
-Remote Automation", and a logged-in GUI session; the check stops with exit status 2 and says so
+automation, enabled once with "sudo safaridriver --enable" and "Allow remote automation" in the
+Developer section of Safari Settings, and a logged-in GUI session; the check stops with exit status 2 and says so
 when either is missing. It prints the Safari and macOS versions and stops when Safari has no
 WebGPU, which the page needs.
 
@@ -254,8 +254,8 @@ async function main() {
         throw new Error(`Safari refused the automation session: ${err.message}\n` +
           'Remote automation is off. Run once on this host, as an admin:\n' +
           '  sudo safaridriver --enable\n' +
-          'and turn on "Allow Remote Automation" in the Develop menu of Safari (Settings > ' +
-          'Advanced > "Show features for web developers" shows the menu).');
+          'and turn on "Allow remote automation" in Safari Settings > Developer (Settings > ' +
+          'Advanced > "Show features for web developers" shows that section).');
       }
       if (err.name === 'TimeoutError' || /timeout|abort/i.test(text)) {
         throw new Error('Safari did not open a session in time. Safari WebDriver needs a ' +
@@ -293,10 +293,9 @@ async function main() {
     const expect = (ok, what) => { if (!ok) failures.push(what); };
     const isolation = await evaluate('({ isolated: self.crossOriginIsolated, ' +
       'sab: typeof SharedArrayBuffer, failed: Module.boxAudio.failed, ' +
-      'core: Module.boxAudio.coreSize, source: Module.boxAudio.source })');
+      'core: Module.boxAudio.coreSize })');
     console.log(`crossOriginIsolated: ${isolation.isolated}, SharedArrayBuffer: ` +
-      `${isolation.sab}, core wasm: ${isolation.core} bytes, worklet from a ` +
-      `${isolation.source} URL`);
+      `${isolation.sab}, core wasm: ${isolation.core} bytes`);
     expect(!isolation.isolated, 'the page is cross origin isolated');
     expect(!isolation.failed, `the audio failed (${isolation.failed})`);
 

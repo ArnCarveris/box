@@ -72,8 +72,8 @@ node test/integration/web/audio_tone.mjs \
 `safaridriver` over the W3C WebDriver HTTP API (plain `node`, no npm dependency). It starts
 `safaridriver -p <free port>`, opens a session, prints the Safari and macOS versions and stops
 with exit status 2 when Safari has no WebGPU, when remote automation is off (run
-`sudo safaridriver --enable` once as an admin and turn on "Allow Remote Automation" in the
-Develop menu) or when no GUI session is logged in. Safari WebDriver has no log endpoint, so the
+`sudo safaridriver --enable` once as an admin and turn on "Allow remote automation" in the
+Developer section of Safari Settings) or when no GUI session is logged in. Safari WebDriver has no log endpoint, so the
 server injects a script at the top of the `<head>` of `boxrun.html`, before the page runs, which
 records the console (`log`, `info`, `warn`, `error`), uncaught errors and rejections, and counts
 the frames; the check reads that log from the page. It expects the context suspended and no

@@ -133,13 +133,12 @@ node test/integration/web/audio_tone_safari.mjs "$BIN"
 ```
 
 Safari automation has to be enabled once on the host, by an admin, with
-`sudo safaridriver --enable` and the Develop menu option "Allow Remote Automation", and needs a
-logged-in GUI session. Where it cannot run, check Safari by hand: open the same address in
-Safari on macOS, click the canvas, and expect the tone, the frequency change from the console
-and no `box.audio` warning in the console.
+`sudo safaridriver --enable` and "Allow remote automation" in the Developer section of Safari
+Settings (Advanced > "Show features for web developers" shows it), and needs a logged-in GUI
+session; without it the check stops with exit status 2 and says so. Where it cannot run, check
+Safari by hand: open the same address in Safari on macOS, click the canvas, and expect the tone,
+the frequency change from the console and no `box.audio` warning in the console.
 
-When Safari rejects the Blob URL of the worklet script, `platform_web.c` loads the same script
-from a data URL (`Module.boxAudio.source` is then `data`) before it reports the worklet as not
-loaded. `Module.boxAudio.gestures` counts the key and mouse button events that reached the audio
-and `Module.boxAudio.resumes` the calls of `ctx.resume()` they made, which tells an input that
-never arrives from a resume the browser refuses.
+`Module.boxAudio.gestures` counts the key and mouse button events that reached the audio and
+`Module.boxAudio.resumes` the calls of `ctx.resume()` they made, which tells an input that never
+arrives from a resume the browser refuses.
