@@ -118,3 +118,19 @@ test/integration/web/quarantine.sh
 
 When Chrome still hangs at the start ("chrome did not start", while `Google Chrome --version`
 does not return either), look for another launch check holding it the same way.
+
+`audio_module.mjs` checks the `box.audio` module in headless Chrome with
+`test/integration/web/audio_module.flecs`, a scene that only uses the module and script: a
+looping 440 Hz tone at a peak of 0.25 on a bus, and a click that `box.audio.play` plays at load.
+It reads `AudioStatus` and runs commands through the shell of the page
+(`Module.cwrap('box_command_web_run', 'string', ['string'])`). It expects
+`AudioWaitingForGesture` before a trusted click and the click dropped, the tone at its level
+after it, half the level after `set music box.audio.AudioBus {volume: 0.5}`, a suspended context
+(`AudioSuspended`) while the page is hidden and a resumed one when it shows again, a one second
+`audio capture 1` in `/tmp` of the page's file system with the tone, and the loop still playing
+after a 500 ms stall of the main thread:
+
+```sh
+node test/integration/web/audio_module.mjs \
+    "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
+```

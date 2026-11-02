@@ -1,0 +1,30 @@
+// A small mixer for the Script suite of test/cpu/audio: a looping hum on a bus that feeds a
+// music bus, and a click played once on the master with box.audio.play.
+//
+// The hum is a value of 0.5 through sfx at 0.5 into music at 0.5, so 0.125 reaches the
+// master. The click is 0.4 for 0.2 seconds (3 frames at 10 Hz, the last one fading out), so
+// during its first 0.2 seconds the master reads 0.525, and 0.125 once it ended.
+using box.audio
+
+hum {
+  AudioPcm: {samples: [0.5, 0.5, 0.5, 0.5]}
+}
+
+click {
+  AudioPcm: {samples: [0.4, 0.4, 0.4], sample_rate: 10}
+}
+
+music {
+  AudioBus: {volume: 0.5}
+}
+
+sfx {
+  AudioBus: {output: music, volume: 0.5}
+}
+
+hum_source {
+  AudioSource: {sound: hum, loop: true}
+  AudioOutput: {bus: sfx}
+}
+
+const played: bool = box.audio.play(click, 1.0)

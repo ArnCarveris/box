@@ -41,6 +41,7 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
     var worklet = function() {
         var EVENTS = 64;
         var SOUND_FREE = 3;
+        var STATUS_QUANTA = 32;
         class BoxAudioProcessor extends AudioWorkletProcessor {
             constructor(options) {
                 super();
@@ -55,6 +56,8 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                 this.sounds = new Map();
                 this.quanta = 0;
                 this.batches = 0;
+                this.capture = null;
+                this.voices = -1;
                 this.views();
                 var self = this;
                 this.port.onmessage = function(e) { self.command(e.data); };
@@ -104,6 +107,9 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                         core.box_audio_core_wasm_free(at);
                     }
                     this.port.postMessage({ type: 'sound', id: m.id, ok: ok });
+                } else if (m.type === 'capture') {
+                    this.capture = { data: new Float32Array(m.frames * 2), frames: m.frames,
+                        at: 0 };
                 } else if (m.type === 'stats') {
                     this.port.postMessage({ type: 'stats', id: m.id, quanta: this.quanta,
                         frame: currentFrame, time: currentTime, sampleRate: sampleRate,
@@ -132,6 +138,34 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                 this.port.postMessage({ type: 'events', events: list });
             }
 
+            // Interleaves the frames of a quantum into the capture that records, if any
+            record(n) {
+                var c = this.capture;
+                if (!c) {
+                    return;
+                }
+                var count = Math.min(n, c.frames - c.at);
+                for (var i = 0; i < count; i++) {
+                    c.data[(c.at + i) * 2] = this.left[i];
+                    c.data[(c.at + i) * 2 + 1] = this.right[i];
+                }
+                c.at += count;
+                if (c.at >= c.frames) {
+                    this.capture = null;
+                    this.port.postMessage({ type: 'capture', data: c.data.buffer },
+                        [c.data.buffer]);
+                }
+            }
+
+            // The voices go to the main module every few quanta, when they changed
+            status() {
+                var voices = this.core.box_audio_core_wasm_voices();
+                if (voices !== this.voices) {
+                    this.voices = voices;
+                    this.port.postMessage({ type: 'status', voices: voices });
+                }
+            }
+
             process(inputs, outputs) {
                 var out = outputs[0];
                 var frames = out.length ? out[0].length : 0;
@@ -139,6 +173,7 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                 for (var at = 0; at < frames; at += this.quantum) {
                     var n = Math.min(this.quantum, frames - at);
                     this.core.box_audio_core_wasm_render(n);
+                    this.record(n);
                     out[0].set(n === this.quantum ? this.left : this.left.subarray(0, n), at);
                     if (out.length > 1) {
                         out[1].set(n === this.quantum ? this.right : this.right.subarray(0, n),
@@ -147,6 +182,9 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                 }
                 this.receive();
                 this.quanta++;
+                if (this.quanta % STATUS_QUANTA === 0) {
+                    this.status();
+                }
                 return true;
             }
         }
@@ -171,7 +209,8 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
 
     var audio = { ctx: ctx, node: null, pending: [], requests: {}, sounds: {}, id: 0,
         failed: 0, coreSize: size, events: [], queue: [], onevents: null, gestures: 0,
-        resumes: 0 };
+        resumes: 0, voices: 0, gain: null, hidden: false, wasRunning: false, suspends: 0,
+        visibilityResumes: 0, capturing: false, captured: null };
     audio.post = function(m, transfer) {
         if (audio.node) {
             audio.node.port.postMessage(m, transfer || []);
@@ -231,6 +270,10 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
             resolve = audio.sounds[m.id];
             delete audio.sounds[m.id];
             m = m.ok;
+        } else if (m.type === 'status') {
+            audio.voices = m.voices;
+        } else if (m.type === 'capture') {
+            audio.captured = new Float32Array(m.data);
         } else if (m.type === 'events') {
             Array.prototype.push.apply(audio.events, m.events);
             if (audio.events.length > 4096) {
@@ -250,6 +293,48 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
         }
     };
 
+    // A hidden page gets no animation frames, so no commands would end its loops: fade out
+    // and suspend, and resume where the page was running when it shows again
+    var FADE = 0.05;
+    var ramp = function(to) {
+        if (!audio.gain) {
+            return;
+        }
+        var g = audio.gain.gain, t = ctx.currentTime;
+        g.cancelScheduledValues(t);
+        g.setValueAtTime(g.value, t);
+        g.linearRampToValueAtTime(to, t + FADE);
+    };
+    audio.visibility = function(hidden) {
+        if (audio.failed || hidden === audio.hidden) {
+            return;
+        }
+        audio.hidden = hidden;
+        clearTimeout(audio.suspendTimer);
+        if (hidden) {
+            audio.wasRunning = ctx.state === 'running';
+            if (!audio.wasRunning) {
+                return;
+            }
+            ramp(0);
+            audio.suspendTimer = setTimeout(function() {
+                if (audio.hidden && !audio.failed) {
+                    audio.suspends++;
+                    ctx.suspend().catch(function() { });
+                }
+            }, FADE * 1000 + 20);
+        } else if (audio.wasRunning) {
+            audio.wasRunning = false;
+            audio.visibilityResumes++;
+            ctx.resume().then(function() { ramp(1); }).catch(function() { });
+        }
+    };
+    if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', function() {
+            audio.visibility(document.visibilityState === 'hidden');
+        });
+    }
+
     var bytes = HEAPU8.slice(core, core + size).buffer;
     var url = URL.createObjectURL(new Blob(['(' + worklet.toString() + ')();'],
         { type: 'application/javascript' }));
@@ -264,7 +349,11 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
         });
         node.onprocessorerror = function() { fail(4); };
         node.port.onmessage = function(e) { receive(e.data); };
-        node.connect(ctx.destination);
+        var gain = ctx.createGain();
+        gain.gain.value = audio.hidden ? 0 : 1;
+        gain.connect(ctx.destination);
+        node.connect(gain);
+        audio.gain = gain;
         audio.node = node;
         var pending = audio.pending || [];
         audio.pending = null;

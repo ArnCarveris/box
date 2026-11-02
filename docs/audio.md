@@ -3,9 +3,9 @@
 Box renders its sound in the audio core, `src/audio/core`: plain C without flecs, box or
 platform code. The core is a mixer of voices and buses that renders blocks of float samples
 into a left and a right channel. It is driven by a byte stream of commands and reports back
-with events. Rendering does not allocate, lock, log or wait. Later tasks add the native output
-and the `box.audio` module; this page describes the core, the native output and the web, the
-platform where audio is the hardest to get right.
+with events. Rendering does not allocate, lock, log or wait. This page describes the
+[`box.audio` module](#the-boxaudio-module) that apps use, the core, the native output and the
+web, the platform where audio is the hardest to get right.
 
 On macOS and Linux the core plays on a miniaudio device, see [Native output](#native-output).
 
@@ -109,6 +109,9 @@ bool sound(t, id, data, frames, channels, rate);   // hand over a sound, copied
 int32_t read_events(t, events, max);               // the events of the core, oldest first
 box_audio_state_t state(t);                        // what the output does
 void update(t, delta);                             // once per frame
+void stats(t, stats);                              // voices and load of the core
+bool capture(t, frames);                           // record the next frames the core renders
+float* capture_take(t, &frames);                   // a finished capture, NULL while it records
 ```
 
 | Transport | Where the core runs |
@@ -118,15 +121,25 @@ void update(t, delta);                             // once per frame
 | null | on the main thread, which renders the frames of each frame's delta |
 
 The state is `OFF` (no output), `NO_DEVICE` (the null transport renders), `STARTING` (the web
-waits for the worklet or a gesture), `RUNNING` (a device plays) or `LOST` (the device
-disappeared and the main thread renders until it reopens). Every transport frees the frames of
+loads the worklet), `WAITING` (the page waits for a gesture), `RUNNING` (a device plays),
+`LOST` (the device disappeared and the main thread renders until it reopens), `FAILED` (the page
+could not start its audio) or `SUSPENDED` (the page is hidden).
+
+**Captures** tap the core where it renders, so they work with every transport: the null
+transport copies the frames it renders on the main thread; the native transport hands the audio
+thread a buffer through the command ring, which the audio thread fills after each block and
+reports full with an atomic flag, so the main thread takes it back without a lock; the worklet
+records its quanta and posts the frames back over the port. The load is the time a render takes
+over the time it renders, smoothed; the native audio thread and the null transport measure it,
+the worklet does not (it has no clock finer than a millisecond) and reports 0. Every transport frees the frames of
 a sound itself after `SOUND_FREE`; the main thread keeps the last 4096 events until
 `read_events`.
 
 **Where the output opens.** A world that imports box opens nothing: thousands of tests import
 it and must not touch audio hardware. `box_app_run` opens the output of its world
-(`src/audio/output.c`), as the singleton `box.app.AudioOutput`, which the system
-`AudioOutputUpdate` updates in `OnStore` with the delta of the frame:
+(`src/audio/output.c`), as the singleton `box.app.AudioTransport`, which the system
+`AudioTransportUpdate` updates in `OnStore` with the delta of the frame. Every open gets a new
+serial, which tells `box.audio` to send its sounds and state again:
 
 - a real app opens the default device, and the null transport when there is none;
 - `--headless` opens no device and runs the null transport;
@@ -303,7 +316,15 @@ bake3 --target em --local-env=<name> apps/boxrun
 Browsers only start audio after a user gesture. The context is created suspended when the
 canvas gets its input backend, and the key and mouse button handlers of the canvas
 (`box_web_callbacks` in `src/input/platform_web.c`) resume it on the first key or button event.
-Until then the app runs normally, silently, and logs nothing.
+Until then the app runs normally, silently, and logs nothing; `AudioStatus.state` is
+`AudioWaitingForGesture`, and `box.audio` drops the plays that do not loop (see
+[Before the gesture](#before-the-gesture)).
+
+**A hidden page** gets no animation frames, so no commands arrive and looping sounds would never
+end. On `visibilitychange` to hidden the page ramps a gain node after the worklet to 0 over
+50 ms and then suspends the context (`AudioSuspended`); when it shows again it resumes the
+context, if it was running, and ramps the gain back to 1. `Module.boxAudio.suspends` and
+`visibilityResumes` count both. Native apps keep playing when they lose the focus.
 
 A failure to create audio, a browser without Web Audio or without `AudioWorklet`, a worklet that
 does not load or a core that does not start in it, logs one warning
@@ -311,8 +332,8 @@ does not load or a core that does not start in it, logs one warning
 
 ## Playing a sound by hand
 
-Until the `box.audio` module exists, nothing in box sends commands. To hear the core, build the
-page, serve its folder and open it with a scene that renders, then click the canvas:
+Apps play through the `box.audio` module. To hear the core alone, build the page, serve its
+folder and open it with a scene that renders, then click the canvas:
 
 ```sh
 bake3 --target em --local-env=audio apps/boxrun
@@ -356,3 +377,91 @@ expect the tone and no `box.audio` warning in the console.
 `Module.boxAudio.gestures` counts the key and mouse button events that reached the audio and
 `Module.boxAudio.resumes` the calls of `ctx.resume()` they made, which tells an input that never
 arrives from a resume the browser refuses.
+
+## The box.audio module
+
+`include/box/audio.h`, in `src/audio/audio.c` and `src/audio/sync.c`, makes audio data driven:
+components that a script, the REST API or the `set` command write, sent to the core once per
+frame, the same on every platform.
+
+| Component | What it is |
+|-----------|------------|
+| `AudioPcm` | The samples of a sound (`samples`, `channels`, `sample_rate`, 0 for the output rate); `box_audio_sound_from_pcm` sets it from C. Later tasks add other sound kinds |
+| `AudioBus` | A mixer bus: `output` (0 for the master), `volume` (1), `pan`, `mute`, `send` and `send_level` |
+| `AudioOutput` | The bus a source, or a sound by default, plays on |
+| `AudioSource` | A sound that plays while the entity exists: `sound`, `volume` (1), `pitch` (1), `loop`, `playing` (true) |
+| `AudioSettings` | Singleton: `master_volume` (1) and `mute` |
+| `AudioStatus` | Singleton, read only: `state`, `sample_rate`, `voices`, `voices_stolen`, `load`, `buses` |
+
+Constructors give the defaults in parentheses, so `AudioSource: {sound: click}` in a script plays
+at unity volume and pitch. From C, `ecs_set` writes every member; use `ecs_ensure` to keep the
+defaults.
+
+```
+music { AudioBus: {volume: 0.5} }
+sfx { AudioBus: {output: music} }
+hum { AudioSource: {sound: hum_pcm, loop: true}  AudioOutput: {bus: sfx} }
+const played: bool = box.audio.play(click, 0.8)
+```
+
+`box_audio_play(world, sound, volume)`, in scripts `box.audio.play(sound, volume)`, plays a
+sound once on the bus of its `AudioOutput`, without an entity per play; there is no control of a
+voice after it started. `box_audio_capture(world, seconds, path)`, in scripts
+`box.audio.capture(seconds, path)`, records the master output to a WAV file.
+
+**One batch per frame.** The system `AudioSync` runs in `PreStore`, after the transforms and
+before the output renders in `OnStore`. It remembers what it sent and writes a command only for
+what differs, all into one batch, and sends nothing in a frame without changes. Its order:
+the events of the output (ended voices, steals, freed sounds), the buses, the order, the master
+settings, new sounds, the sources, then the plays, the stops of deleted sources and the releases
+of sounds. A world without audio components pays the empty queries.
+
+**Buses** get an index of the core, up to 31 besides the master; more log one error and are
+silent. The order is compiled whenever a bus appears, disappears or changes its output or send:
+a depth first walk computes the longest path of each bus to the master and finds cycles; the
+deepest buses come first, the master last. A cycle through outputs and sends logs one error that
+names the buses on it and keeps the last valid order, which the core keeps playing. A deleted
+bus, or an output or send that names no bus, routes to the master: its sources and one shots are
+moved to the master and the index is reused a frame later. A Disabled bus is muted.
+
+**Sources** start a voice when `playing` is true and their sound is known, and stop it when
+`playing` goes false, the sound or `loop` changes or the entity is deleted, which fades it out
+over the ramp of the core. A sound that does not loop sets `playing` to false when it ends. A
+Disabled source keeps its voice at volume 0. Prefabs do not play; their instances get their own
+copy of `AudioSource` and play on their own, as `ParticleEmitter` instances do.
+
+**Sounds** are sent to the output once, with an id of the core; a change of `AudioPcm` releases
+the old id and sends the new samples, and a deleted sound is released, freed by the side that
+owns the frames once no voice plays it.
+
+### Before the gesture
+
+A scene plays the same on native, on the web and headless. On the web, plays requested while the
+page waits for a gesture are dropped unless they loop: a `box.audio.play` and the start of a
+source that does not loop are skipped (the source's `playing` goes false), while a looping source
+starts and is heard from the gesture on. So a page does not burst out with every click sound of
+its first seconds at the first key press. Native and headless runs have no gesture and drop
+nothing.
+
+### The audio command and captures
+
+The shell command `audio` (`src/command/cmd_audio.c`) prints the state, the rate, the voices, the
+steals and the load, then the master and the buses in processing order. `audio volume <v>` and
+`audio mute [on|off]` write `AudioSettings`. `audio capture <seconds>` records the master output
+to a 16 bit stereo WAV resource of the session, fetched like a `capture` PNG with
+`GET /shell/session/<id>/resource/<name>`, empty until the file is written in one rename. In the
+browser it writes `/tmp/audio_capture_<n>.wav` in the file system of the page and returns the
+path; the page runs commands with `Module.cwrap('box_command_web_run', 'string', ['string'])`.
+Headless with a fixed `--delta-time`, two runs write identical captures, which is how agents and
+tests inspect audio and how a render can be listened to. `box.perf` reports the largest load of
+a run as `PerfStatus.audio_load` and `audio_load` in its report.
+
+The tests are `Module`, `Source`, `Script` and `Capture` in `test/cpu/audio`, through the null
+transport; `test/integration/e2e/audio.py` drives the command on a headless app, and
+`test/integration/web/audio_module.mjs` checks the gesture, the levels, a hidden page, a capture
+and a stall in Chrome with `test/integration/web/audio_module.flecs`:
+
+```sh
+node test/integration/web/audio_module.mjs \
+    "$(tools/integration.py local-env --env audio)/wasm32-Emscripten/debug/bin"
+```

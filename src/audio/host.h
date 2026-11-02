@@ -18,6 +18,44 @@ typedef struct box_audio_host_t {
     int64_t rendered;                    /**< Frames the main thread rendered for the deltas */
 } box_audio_host_t;
 
+/** A capture of the frames a core renders, written on the thread that renders */
+typedef struct box_audio_capture_t {
+    float *data;     /**< Interleaved stereo frames, NULL when no capture records */
+    int32_t frames;  /**< Frames to record */
+    int32_t at;      /**< Frames recorded */
+} box_audio_capture_t;
+
+/** Weight of a new measurement in the smoothed load */
+#define BOX_AUDIO_LOAD_SMOOTHING (0.1f)
+
+/** Copy rendered frames into a capture, as far as it has room. Does not allocate.
+ *
+ * @param capture The capture
+ * @param left Left channel
+ * @param right Right channel
+ * @param frames Number of frames
+ * @return Whether the capture is complete
+ */
+bool box_audio_capture_write(
+    box_audio_capture_t *capture,
+    const float *left,
+    const float *right,
+    int32_t frames);
+
+/** Smooth the load of a render: the seconds it took over the seconds it rendered.
+ *
+ * @param load The smoothed load so far
+ * @param seconds Seconds the render took
+ * @param frames Frames it rendered
+ * @param sample_rate Frames per second
+ * @return The new smoothed load
+ */
+float box_audio_load_update(
+    float load,
+    double seconds,
+    int32_t frames,
+    float sample_rate);
+
 /** Allocate the event queue of a host.
  *
  * @param host The host, zeroed

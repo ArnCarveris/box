@@ -6,6 +6,62 @@
 #include "command.h"
 #include <string.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+
+/** The world of the page, the last one that imported box.command */
+static ecs_world_t *box_command_web_world;
+
+/** The session of box_command_web_run */
+static ecs_entity_t box_command_web_session;
+
+/** The output of the last box_command_web_run */
+static char *box_command_web_output;
+
+/** Run a command line in a session of the world of the page, the counterpart of the shell
+ * endpoints of the REST API, which the browser does not have. The page calls it with
+ * Module.cwrap('box_command_web_run', 'string', ['string']).
+ *
+ * @param line The command line
+ * @return The output as box_command_run formats it, valid until the next call
+ */
+EMSCRIPTEN_KEEPALIVE const char* box_command_web_run(
+    const char *line)
+{
+    ecs_world_t *world = box_command_web_world;
+    ecs_os_free(box_command_web_output);
+    box_command_web_output = NULL;
+    if (!world) {
+        goto done;
+    }
+
+    if (!box_command_web_session || !ecs_is_alive(world, box_command_web_session)) {
+        box_command_web_session = ecs_shell_session_init(world,
+            &(ecs_shell_session_desc_t){0});
+    }
+
+    box_command_web_output = box_command_run(world, box_command_web_session, line, NULL);
+done:
+    return box_command_web_output ? box_command_web_output : "";
+}
+
+/** Forget the world of the page when it is deleted.
+ *
+ * @param world The world
+ * @param ctx Unused
+ */
+static void box_command_web_fini(
+    ecs_world_t *world,
+    void *ctx)
+{
+    (void)ctx;
+    if (box_command_web_world == world) {
+        box_command_web_world = NULL;
+        box_command_web_session = 0;
+    }
+}
+#endif
+
 ecs_entity_t box_command_register(
     ecs_world_t *world,
     const char *brief,
@@ -218,6 +274,12 @@ void BoxCommandImport(
     box_cmd_input_init(world);
     box_cmd_render_init(world);
     box_cmd_fit_init(world);
+    box_cmd_audio_init(world);
     box_cmd_frames_init(world);
     box_cmd_edit_init(world);
+#ifdef __EMSCRIPTEN__
+    box_command_web_world = world;
+    box_command_web_session = 0;
+    ecs_atfini(world, box_command_web_fini, NULL);
+#endif
 }

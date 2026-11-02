@@ -133,6 +133,46 @@ done:
     return (int32_t)result;
 }
 
+bool box_audio_capture_write(
+    box_audio_capture_t *capture,
+    const float *left,
+    const float *right,
+    int32_t frames)
+{
+    int32_t i, count;
+    bool result = false;
+    if (!capture->data) {
+        goto done;
+    }
+
+    count = capture->frames - capture->at;
+    count = frames < count ? frames : count;
+    for (i = 0; i < count; i ++) {
+        capture->data[(capture->at + i) * 2] = left[i];
+        capture->data[(capture->at + i) * 2 + 1] = right[i];
+    }
+
+    capture->at += count;
+    result = capture->at >= capture->frames;
+done:
+    return result;
+}
+
+float box_audio_load_update(
+    float load,
+    double seconds,
+    int32_t frames,
+    float sample_rate)
+{
+    float result = load;
+    if (frames > 0 && sample_rate > 0 && seconds >= 0) {
+        float now = (float)(seconds * (double)sample_rate / (double)frames);
+        result = load + (now - load) * BOX_AUDIO_LOAD_SMOOTHING;
+    }
+
+    return result;
+}
+
 void box_audio_transport_free(
     box_audio_transport_t *t)
 {
@@ -150,6 +190,9 @@ typedef struct box_audio_null_t {
     box_audio_core_t *core;       /**< The core */
     box_audio_output_t output;    /**< Receives the rendered frames */
     void *ctx;                    /**< Context of output */
+    box_audio_capture_t capture;  /**< The capture that records, if any */
+    bool captured;                /**< The capture is complete */
+    float load;                   /**< Smoothed load of the renders */
     float left[BOX_AUDIO_TRANSPORT_FRAMES];   /**< Rendered left channel */
     float right[BOX_AUDIO_TRANSPORT_FRAMES];  /**< Rendered right channel */
 } box_audio_null_t;
@@ -249,7 +292,9 @@ static void box_audio_null_update(
     box_audio_null_t *n = (box_audio_null_t*)t;
     box_audio_event_t events[64];
     int32_t frames = box_audio_host_frames(&n->host, delta, t->sample_rate);
-    int32_t count, i;
+    int32_t total = frames, count, i;
+    ecs_time_t start;
+    ecs_time_measure(&start);
     while (frames > 0) {
         int32_t block = frames < BOX_AUDIO_TRANSPORT_FRAMES ? frames : BOX_AUDIO_TRANSPORT_FRAMES;
         box_audio_core_render(n->core, n->left, n->right, block);
@@ -257,8 +302,14 @@ static void box_audio_null_update(
             n->output(n->left, n->right, block, n->ctx);
         }
 
+        if (box_audio_capture_write(&n->capture, n->left, n->right, block)) {
+            n->captured = true;
+        }
+
         frames -= block;
     }
+
+    n->load = box_audio_load_update(n->load, ecs_time_measure(&start), total, t->sample_rate);
 
     do {
         count = box_audio_core_read_events(n->core, events, 64);
@@ -266,6 +317,67 @@ static void box_audio_null_update(
             box_audio_host_event(&n->host, &events[i]);
         }
     } while (count == 64);
+}
+
+/** Report the voices of the core and the load of the renders.
+ *
+ * @param t The transport
+ * @param stats Receives the stats
+ */
+static void box_audio_null_stats(
+    box_audio_transport_t *t,
+    box_audio_transport_stats_t *stats)
+{
+    box_audio_null_t *n = (box_audio_null_t*)t;
+    stats->voices = box_audio_core_voice_count(n->core);
+    stats->load = n->load;
+}
+
+/** Start to record the frames of the next renders.
+ *
+ * @param t The transport
+ * @param frames Frames to record
+ * @return Whether the capture started
+ */
+static bool box_audio_null_capture(
+    box_audio_transport_t *t,
+    int32_t frames)
+{
+    box_audio_null_t *n = (box_audio_null_t*)t;
+    bool result = false;
+    if (n->capture.data || frames <= 0) {
+        goto done;
+    }
+
+    n->capture.data = ecs_os_malloc_n(float, frames * 2);
+    n->capture.frames = frames;
+    n->capture.at = 0;
+    n->captured = false;
+    result = n->capture.data != NULL;
+done:
+    return result;
+}
+
+/** Take the frames of a complete capture.
+ *
+ * @param t The transport
+ * @param frames Receives the number of frames
+ * @return The frames, owned by the caller, NULL while the capture records
+ */
+static float* box_audio_null_capture_take(
+    box_audio_transport_t *t,
+    int32_t *frames)
+{
+    box_audio_null_t *n = (box_audio_null_t*)t;
+    float *result = NULL;
+    if (n->captured) {
+        result = n->capture.data;
+        *frames = n->capture.frames;
+        n->capture = (box_audio_capture_t){0};
+        n->captured = false;
+    }
+
+    return result;
 }
 
 /** Free the core, then the sounds.
@@ -276,6 +388,7 @@ static void box_audio_null_free(
     box_audio_transport_t *t)
 {
     box_audio_null_t *n = (box_audio_null_t*)t;
+    ecs_os_free(n->capture.data);
     box_audio_core_free(n->core);
     box_audio_host_fini(&n->host);
     ecs_os_free(n);
@@ -309,7 +422,10 @@ box_audio_transport_t* box_audio_transport_null_new(
         .read_events = box_audio_null_read_events,
         .state = box_audio_null_state,
         .update = box_audio_null_update,
-        .free = box_audio_null_free
+        .free = box_audio_null_free,
+        .stats = box_audio_null_stats,
+        .capture = box_audio_null_capture,
+        .capture_take = box_audio_null_capture_take
     };
     result = &n->base;
 done:
@@ -328,10 +444,71 @@ done:
  */
 EM_JS(int, box_audio_web_state, (void), {
     var audio = Module.boxAudio;
-    if (!audio || audio.failed) {
-        return audio ? 1 : 2;
+    if (!audio) {
+        return 2;
     }
-    return audio.node && audio.ctx.state === 'running' ? 3 : 2;
+    if (audio.failed) {
+        return 5;
+    }
+    if (audio.hidden && audio.wasRunning) {
+        return 7;
+    }
+    if (audio.ctx.state !== 'running') {
+        return 6;
+    }
+    return audio.node ? 3 : 2;
+});
+
+/** Read the sample rate of the AudioContext of the page.
+ *
+ * @return Frames per second, 0 when the page has no audio
+ */
+EM_JS(float, box_audio_web_rate, (void), {
+    var audio = Module.boxAudio;
+    return audio && !audio.failed ? audio.ctx.sampleRate : 0;
+});
+
+/** Read the voices the worklet reported last.
+ *
+ * @return Number of voices
+ */
+EM_JS(int, box_audio_web_voices, (void), {
+    var audio = Module.boxAudio;
+    return audio && audio.voices ? audio.voices : 0;
+});
+
+/** Ask the worklet to record the frames of its next quanta.
+ *
+ * @param frames Frames to record
+ * @return Whether the request was posted
+ */
+EM_JS(int, box_audio_web_capture_start, (int frames), {
+    var audio = Module.boxAudio;
+    if (!audio || audio.failed || audio.capturing) {
+        return 0;
+    }
+    audio.capturing = true;
+    audio.captured = null;
+    audio.post({ type: 'capture', frames: frames });
+    return 1;
+});
+
+/** Copy a capture the worklet completed into the heap of the main module.
+ *
+ * @param dst Receives frames * 2 floats
+ * @param frames Frames of the capture
+ * @return Whether a complete capture was copied
+ */
+EM_JS(int, box_audio_web_capture_take, (float *dst, int frames), {
+    var audio = Module.boxAudio;
+    var data = audio && audio.captured;
+    if (!data || data.length !== frames * 2) {
+        return 0;
+    }
+    HEAPF32.set(data, dst >> 2);
+    audio.captured = null;
+    audio.capturing = false;
+    return 1;
 });
 
 /** Take the events the worklet reported since the last call.
@@ -442,6 +619,12 @@ static void box_audio_webt_update(
     (void)delta;
 }
 
+/** The web transport: the worklet renders, the main module waits for its captures */
+typedef struct box_audio_webt_t {
+    box_audio_transport_t base;  /**< The interface, first */
+    int32_t capture;             /**< Frames of the capture that records, 0 for none */
+} box_audio_webt_t;
+
 /** Free the transport; the audio of the page stays.
  *
  * @param t The transport
@@ -452,19 +635,87 @@ static void box_audio_webt_free(
     ecs_os_free(t);
 }
 
+/** Report the voices the worklet reported last; the worklet does not measure its load.
+ *
+ * @param t The transport
+ * @param stats Receives the stats
+ */
+static void box_audio_webt_stats(
+    box_audio_transport_t *t,
+    box_audio_transport_stats_t *stats)
+{
+    t->sample_rate = box_audio_web_rate();
+    stats->voices = box_audio_web_voices();
+    stats->load = 0;
+}
+
+/** Ask the worklet to record its next frames.
+ *
+ * @param t The transport
+ * @param frames Frames to record
+ * @return Whether the request was posted
+ */
+static bool box_audio_webt_capture(
+    box_audio_transport_t *t,
+    int32_t frames)
+{
+    box_audio_webt_t *w = (box_audio_webt_t*)t;
+    bool result = false;
+    if (!w->capture && frames > 0 && box_audio_web_capture_start(frames)) {
+        w->capture = frames;
+        result = true;
+    }
+
+    return result;
+}
+
+/** Take a capture the worklet completed.
+ *
+ * @param t The transport
+ * @param frames Receives the number of frames
+ * @return The frames, owned by the caller, NULL while the capture records
+ */
+static float* box_audio_webt_capture_take(
+    box_audio_transport_t *t,
+    int32_t *frames)
+{
+    box_audio_webt_t *w = (box_audio_webt_t*)t;
+    float *result = NULL;
+    if (!w->capture) {
+        goto done;
+    }
+
+    result = ecs_os_malloc_n(float, w->capture * 2);
+    if (result && box_audio_web_capture_take(result, w->capture)) {
+        *frames = w->capture;
+        w->capture = 0;
+    } else {
+        ecs_os_free(result);
+        result = NULL;
+    }
+
+done:
+    return result;
+}
+
 box_audio_transport_t* box_audio_transport_web_new(void)
 {
-    box_audio_transport_t *result = ecs_os_calloc_t(box_audio_transport_t);
-    if (result) {
-        *result = (box_audio_transport_t){
+    box_audio_webt_t *w = ecs_os_calloc_t(box_audio_webt_t);
+    box_audio_transport_t *result = NULL;
+    if (w) {
+        w->base = (box_audio_transport_t){
             .kind = BOX_AUDIO_TRANSPORT_WEB,
             .commands = box_audio_webt_commands,
             .sound = box_audio_webt_sound,
             .read_events = box_audio_webt_read_events,
             .state = box_audio_webt_state,
             .update = box_audio_webt_update,
-            .free = box_audio_webt_free
+            .free = box_audio_webt_free,
+            .stats = box_audio_webt_stats,
+            .capture = box_audio_webt_capture,
+            .capture_take = box_audio_webt_capture_take
         };
+        result = &w->base;
     }
 
     return result;
