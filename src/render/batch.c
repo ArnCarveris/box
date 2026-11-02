@@ -15,6 +15,7 @@
  */
 
 #include "draw.h"
+#include <math.h>
 
 /** Color of a shape without Rgb, display encoded */
 static const uint8_t box_draws_default_color[3] = { 204, 204, 204 };
@@ -869,6 +870,31 @@ void box_draws_material(
     box_draws_color_pack(out->color, linear);
 }
 
+/** Pack a SpecularAnisotropy into the anisotropy word of a material record: the strength clamped
+ * to 0..1 and the rotation wrapped to 0..2 pi over 2 pi, as two unorm16.
+ *
+ * @param anisotropy The component, NULL for none
+ * @return strength | rotation << 16, 0 without one or with a strength of 0
+ */
+static uint32_t box_draws_anisotropy_pack(
+    const SpecularAnisotropy *anisotropy)
+{
+    uint32_t result = 0u;
+    if (anisotropy && box_draws_unorm16(anisotropy->strength)) {
+        float turn = 2.0f * GLM_PIf;
+        float rotation = anisotropy->rotation;
+        rotation = isfinite(rotation) ? fmodf(rotation, turn) : 0.0f;
+        if (rotation < 0.0f) {
+            rotation += turn;
+        }
+
+        result = box_draws_unorm16(anisotropy->strength) |
+            (box_draws_unorm16(rotation / turn) << 16);
+    }
+
+    return result;
+}
+
 void box_draws_material_pack(
     box_render_material_t *out,
     const box_draw_material_t *material)
@@ -904,9 +930,9 @@ void box_draws_material_pack(
         ? transmission->attenuation_distance : BOX_MATERIAL_ATTENUATION_DISTANCE;
     out->clear_coat = coat && box_draws_unorm16(coat->strength)
         ? box_draws_unorm16(coat->strength) | (box_draws_unorm16(coat->roughness) << 16) : 0u;
+    out->anisotropy = box_draws_anisotropy_pack(material->anisotropy);
     out->reserved[0] = 0;
     out->reserved[1] = 0;
-    out->reserved[2] = 0;
 }
 
 void box_draws_mesh_shading(
