@@ -260,6 +260,45 @@ ECS_STRUCT(ReflectionProbe, {
     vec3 offset;          /**< Capture point relative to the entity, default {0, 0, 0} */
 });
 
+/** A box of fog in the scene the entity is in, placed by the world transform of the entity
+ * (position and rotation, scale is ignored) as a ReflectionProbe is: centered on the entity and
+ * oriented by its rotation.
+ *
+ * Every lit view of the scene with LightSettings.fog_volumes raymarches the part of the box in
+ * front of its depth in its forward pass, after the opaque meshes and the sky and before the
+ * particles, the 2D shapes and the blended draws: glass shows it through its opaque snapshot,
+ * but blended shapes and particles in or behind a volume are not fogged. Volumes outside the
+ * frustum of a view are left out, the others blend back to front by the distance of their
+ * centers, at most BOX_RENDER_FOG_VOLUMES_MAX (32) per view, the nearest kept. Probe and
+ * reflection captures and bakes do not see them.
+ *
+ * The fog is lit by the ambient light of the view, the environment of the view or the
+ * hemisphere of the scene (not the probe volume), and by the first directional light through
+ * its cascades and LightCookie, with a Henyey-Greenstein phase. Further directional lights and
+ * the point and spot lights are not marched. A view that renders the Atmosphere of its scene
+ * attenuates the light the volume scatters by the aerial perspective.
+ *
+ * The draw adds the light the fog scatters to the color and multiplies it by the transmittance
+ * of the fog; the alpha of the target is left as it is, so a view without clear keeps its alpha.
+ */
+ECS_STRUCT(FogVolume, {
+    vec3 extent;             /**< Half size of the box, default {5, 5, 5} */
+    float density;           /**< Extinction per world unit, default 0.1 */
+    rgb color;               /**< Color of the scattered light, display encoded, default
+                              *   white */
+    float absorption;        /**< Share of the extinction that is absorbed, 0 to 1, default 0 */
+    float asymmetry;         /**< Henyey-Greenstein g, -0.9 to 0.9, default 0.3: positive
+                              *   scatters forward, so the fog is brighter looking toward the
+                              *   sun */
+    float edge_fade;         /**< Distance inside the box over which density fades to 0 at its
+                              *   faces with a smoothstep, default 1, 0 for hard faces */
+    float sun_inscatter;     /**< Scale of the sun, default 1 */
+    float ambient_inscatter; /**< Scale of the ambient light, default 1 */
+    int32_t steps;           /**< March steps across a volume, default 24, clamped to 4..128;
+                              *   a ray that crosses part of the box takes its share of them,
+                              *   at least 4 */
+});
+
 /** How the mip levels of an environment cubemap are prefiltered from its first level */
 ECS_ENUM(EnvironmentFilter, {
     EnvironmentFilterGgx = 0, /**< GGX radiance of a rougher surface at each higher level */

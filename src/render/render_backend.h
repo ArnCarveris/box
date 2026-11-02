@@ -42,6 +42,8 @@ typedef struct box_render_gpu_stats_t {
                                  *   that draw opaque meshes: one per frame, two for a view
                                  *   that culls by occlusion */
     int32_t prepass_draws;      /**< Draw calls recorded in the depth prepasses */
+    int32_t fog_volumes;        /**< Fog volumes drawn, one per volume of a view in each frame
+                                 *   it renders; their draw calls count among draws */
     int32_t transmission_snapshots; /**< Opaque snapshots recorded for transmission, one per
                                  *   frame of each view that draws a Transmission shape */
     int32_t transmission_textures; /**< Snapshot textures created for transmission, one per
@@ -56,8 +58,9 @@ typedef struct box_render_gpu_stats_t {
                                  *   batches draws in it (only blended or transmissive draws).
                                  *
                                  *   Plus the passes a view continues in after a split: one
-                                 *   after its opaque snapshot of transmission, one for soft
-                                 *   particles and one more when draws follow those.
+                                 *   after its opaque snapshot of transmission, one that reads
+                                 *   the depth for its fog volumes and soft particles together
+                                 *   and one more when draws follow those.
                                  *
                                  *   Not the depth prepasses, the snapshot downsample passes,
                                  *   nor the shadow, cull, atmosphere, particle simulation or

@@ -446,7 +446,7 @@ static void box_shader_changed(
  * it converts environment images or draws environment backgrounds and the packet carries an
  * image or a view with a background, or it simulates or draws particles
  * and the packet has a particle pool, or it blurs the opaque snapshot and a batch is
- * transmissive
+ * transmissive, or it raymarches fog volumes and a view of the packet draws one
  */
 static bool box_shader_used(
     const box_render_packet_t *p,
@@ -474,6 +474,10 @@ static bool box_shader_used(
     }
 
     if (box_render_particles_use(p, handle)) {
+        result = true;
+    }
+
+    if (handle == BOX_RENDER_SHADER_FOG_VOLUME && ecs_vec_count(&p->fog_volumes)) {
         result = true;
     }
 
@@ -798,4 +802,6 @@ void BoxShaderImport(
         "etc/shaders/particle_draw.wgsl", BOX_RENDER_SHADER_PARTICLE_DRAW, true);
     box_shader_builtin(world, state, builtin, "transmission", "etc/shaders/transmission.wgsl",
         BOX_RENDER_SHADER_TRANSMISSION, true);
+    box_shader_builtin(world, state, builtin, "fog_volume", "etc/shaders/fog_volume.wgsl",
+        BOX_RENDER_SHADER_FOG_VOLUME, true);
 }

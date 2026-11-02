@@ -1,0 +1,110 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+// Light shafts: a low sun shines through three window holes in the left wall of a room with a
+// ceiling and a back wall, whose open front faces the camera. A FogVolume fills the room, so the
+// light of each window draws a shaft through the fog and onto the floor, and the pillars and
+// strips of the wall cast the dark gaps between the shafts. The forward phase of the fog makes
+// the shafts brighter toward the windows the camera looks at; the ambient keeps the fog in the
+// shadows faintly visible.
+
+camera {
+  Position: {5, 3, 13}
+  Rotation: {-0.12, 0.42, 0}
+  Camera: {fov: 55}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {16, 18, 24, 255}}, shadows: {enabled: true}}
+}
+
+$ {
+  AmbientLight: {sky: {40, 44, 54}, ground: {24, 22, 20}}
+}
+
+sun {
+  Rotation: {0.3, 1.5708, 0}
+  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+  Rgb: {255, 226, 180}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {17, 0.2, 13}
+  Rgb: {150, 140, 128}
+}
+
+ceiling {
+  Position: {0, 6.15, 0}
+  Box: {17, 0.3, 13}
+  Rgb: {120, 116, 110}
+}
+
+back_wall {
+  Position: {0, 3, -6.35}
+  Box: {17, 6.6, 0.3}
+  Rgb: {170, 160, 150}
+}
+
+right_wall {
+  Position: {8.35, 3, 0}
+  Box: {0.3, 6.6, 13}
+  Rgb: {170, 160, 150}
+}
+
+// The left wall, in pieces around three windows from y 2 to 4.5, 1.5 wide at z -3, 0 and 3
+window_wall {
+  Position: {-8.35, 0, 0}
+
+  bottom {
+    Position: {0, 1, 0}
+    Box: {0.3, 2, 13}
+    Rgb: {170, 160, 150}
+  }
+
+  top {
+    Position: {0, 5.25, 0}
+    Box: {0.3, 1.5, 13}
+    Rgb: {170, 160, 150}
+  }
+
+  pillar_back {
+    Position: {0, 3.25, -5.125}
+    Box: {0.3, 2.5, 2.75}
+    Rgb: {170, 160, 150}
+  }
+
+  pillar_mid_back {
+    Position: {0, 3.25, -1.5}
+    Box: {0.3, 2.5, 1.5}
+    Rgb: {170, 160, 150}
+  }
+
+  pillar_mid_front {
+    Position: {0, 3.25, 1.5}
+    Box: {0.3, 2.5, 1.5}
+    Rgb: {170, 160, 150}
+  }
+
+  pillar_front {
+    Position: {0, 3.25, 5.125}
+    Box: {0.3, 2.5, 2.75}
+    Rgb: {170, 160, 150}
+  }
+}
+
+crate {
+  Position: {2, 0.75, -2}
+  Rotation: {0, 0.4, 0}
+  Box: {1.5, 1.5, 1.5}
+  Rgb: {160, 110, 70}
+}
+
+fog {
+  Position: {0, 3, 0}
+  FogVolume: {extent: {8.2, 3, 6.2}, density: 0.12, color: {235, 238, 245}, asymmetry: 0.5, edge_fade: 0.3, steps: 48}
+}

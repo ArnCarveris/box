@@ -43,6 +43,8 @@
 #include "include/spot_shadow.wgsl"
 #include "include/point_shadow.wgsl"
 #include "include/cookie.wgsl"
+#include "include/ambient.wgsl"
+#include "include/aerial.wgsl"
 
 // BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
 override blend_mode: u32 = 0u;
@@ -75,17 +77,11 @@ const MIN_ROUGHNESS: f32 = 0.045;
 @group(0) @binding(7) var reflection_sampler: sampler;
 @group(0) @binding(8) var<storage, read> reflection_sh: array<vec4f>;
 
-// Aerial perspective volume of the view (atmosphere.wgsl): x and y the uv of the screen, z the
-// distance from the camera, rgb the in scattered light and a the transmittance up to it.
-@group(0) @binding(9) var aerial_volume: texture_3d<f32>;
-@group(0) @binding(10) var aerial_sampler: sampler;
-
 // Environment of the view (LightSettings.environment): a cubemap whose mip k of N is
 // prefiltered for the perceptual roughness k / (N - 1), as a reflection probe slot, and its L2
-// SH irradiance. Views without one bind the black reflection slot and a zero SH, and their
-// view.environment.w is 0.
+// SH irradiance (ambient.wgsl). Views without one bind the black reflection slot and a zero SH,
+// and their view.environment.w is 0.
 @group(0) @binding(12) var environment_cube: texture_cube<f32>;
-@group(0) @binding(13) var<uniform> environment_sh: array<vec4f, 9>;
 
 // Ambient occlusion of the view (Gtao) at the render size, read at the pixel of a fragment; a
 // view without Gtao, and the probe and reflection captures, bind a 1x1 white image.
@@ -327,39 +323,6 @@ struct DepthCutoutOut {
     if (alpha < f.cutoff) {
         discard;
     }
-}
-
-// Irradiance in a direction from the L2 SH irradiance coefficients E_lm of a probe
-// (Ramamoorthi and Hanrahan, Sloan's real basis), before the division by pi and the clamp.
-fn sh_irradiance(e0: vec3f, e1: vec3f, e2: vec3f, e3: vec3f, e4: vec3f, e5: vec3f,
-    e6: vec3f, e7: vec3f, e8: vec3f, d: vec3f) -> vec3f
-{
-    let band0 = e0 * 0.2820947918;
-    let band1 = (e1 * d.y + e2 * d.z + e3 * d.x) * 0.4886025119;
-    let band2 = (e4 * (d.x * d.y) + e5 * (d.y * d.z) + e7 * (d.x * d.z)) * 1.0925484306
-        + e6 * (0.3153915653 * (3.0 * d.z * d.z - 1.0))
-        + e8 * (0.5462742153 * (d.x * d.x - d.y * d.y));
-    return band0 + band1 + band2;
-}
-
-// Irradiance over pi in a world direction from the SH of the environment of the view, turned by
-// its yaw, times its intensity.
-fn environment_irradiance(dir: vec3f) -> vec3f {
-    let d = environment_direction(view, dir);
-    let e = sh_irradiance(environment_sh[0].rgb, environment_sh[1].rgb, environment_sh[2].rgb,
-        environment_sh[3].rgb, environment_sh[4].rgb, environment_sh[5].rgb,
-        environment_sh[6].rgb, environment_sh[7].rgb, environment_sh[8].rgb, d);
-    return max(e / PI, vec3f(0.0)) * view.environment.x;
-}
-
-// Ambient light of the scene in a direction: the SH of the environment of a view lit by one,
-// else the hemisphere ambient.
-fn ambient(dir: vec3f) -> vec3f {
-    if (view.environment.w > 0.0) {
-        return environment_irradiance(dir);
-    }
-
-    return mix(view.ambient_ground.rgb, view.ambient_sky.rgb, dir.y * 0.5 + 0.5);
 }
 
 // Indirect light of a fragment, irradiance over pi: in the direction of its normal for the
@@ -914,16 +877,6 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
 fn shade(s: Surface, v: vec3f, world: vec3f) -> vec3f {
     let lit = shade_split(s, v, world);
     return lit.diffuse + lit.specular;
-}
-
-// In scattered light (rgb) and transmittance (a) of the atmosphere between a fragment and the
-// camera, from one trilinear tap of the aerial perspective volume.
-fn aerial_sample(pos: vec4f, world: vec3f) -> vec4f {
-    let uv = pos.xy * view.viewport.zw;
-    let km = length(world - view.camera.xyz) * view.aerial.x;
-    let slices = view.aerial.z;
-    let w = (km * view.aerial.y * (slices - 1.0) + 0.5) / slices;
-    return textureSampleLevel(aerial_volume, aerial_sampler, vec3f(uv, w), 0.0);
 }
 
 // Color of a fragment seen through the atmosphere between it and the camera, shaped for the

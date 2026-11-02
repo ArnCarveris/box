@@ -49,6 +49,7 @@ ECS_STRUCT(LightSettings, {
     bool atmosphere;        /**< Render the Atmosphere of the scene: the sky behind the
                              *   geometry and the aerial perspective of the 3D meshes, View
                              *   ctor sets true */
+    bool fog_volumes;       /**< Render the FogVolumes of the scene, View ctor sets true */
     EnvironmentSettings environment; /**< Environment the view is lit with, used only when
                                       *   the view is lit */
     ecs_entity_t scene;     /**< Scene whose lights and shadows light the view, 0 for its own */
@@ -153,8 +154,8 @@ int box_view_compare(
 
 /** Register the box.view module.
  *
- * View gets a constructor that enables lighting, baked lighting, reflections and the
- * atmosphere, sets the environment intensity to 1 and the ShadowSettings defaults with shadows
+ * View gets a constructor that enables lighting, baked lighting, reflections, the
+ * atmosphere and the fog volumes, sets the environment intensity to 1 and the ShadowSettings defaults with shadows
  * disabled and enables culling with occlusion and a smallest size of one pixel.
  *
  * A C literal View starts from zero instead: unlit, drawing every instance.

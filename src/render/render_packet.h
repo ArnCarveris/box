@@ -66,6 +66,12 @@
 /** Shader handle of the engine shader that blurs the opaque snapshot of transmission */
 #define BOX_RENDER_SHADER_TRANSMISSION (50)
 
+/** Shader handle of the engine shader that raymarches the fog volumes of a view */
+#define BOX_RENDER_SHADER_FOG_VOLUME (51)
+
+/** Fog volumes a view draws at most, the nearest ones */
+#define BOX_RENDER_FOG_VOLUMES_MAX (32)
+
 /** Cascades of the shadow map of a view at most */
 #define BOX_RENDER_SHADOW_CASCADES (4)
 
@@ -453,6 +459,25 @@ typedef struct box_render_view_env_t {
     bool background;        /**< Draw the environment in place of the clear color */
 } box_render_view_env_t;
 
+/** A FogVolume a view raymarches, resolved; the layout of FogVolume in fog_volume.wgsl.
+ *
+ * The box is centered on center and spans extent along each of its axes, the world rotation of
+ * the entity; the values are clamped to their ranges.
+ */
+typedef struct box_render_fog_volume_t {
+    float center[3];        /**< World position of the entity */
+    float density;          /**< FogVolume.density, at least 0 */
+    float axes[3][4];       /**< World direction of the local X, Y and Z of the box, w unused */
+    float extent[3];        /**< FogVolume.extent, each at least 0 */
+    float absorption;       /**< FogVolume.absorption, 0 to 1 */
+    float color[3];         /**< Linear FogVolume.color */
+    float asymmetry;        /**< FogVolume.asymmetry, -0.9 to 0.9 */
+    float edge_fade;        /**< FogVolume.edge_fade, at least 0 */
+    float sun_inscatter;    /**< FogVolume.sun_inscatter, at least 0 */
+    float ambient_inscatter; /**< FogVolume.ambient_inscatter, at least 0 */
+    int32_t steps;          /**< FogVolume.steps, 4 to 128 */
+} box_render_fog_volume_t;
+
 /** The culling of a view, resolved from its CullSettings */
 typedef struct box_render_view_cull_t {
     bool enabled;           /**< Instances outside the frustum or too small are not drawn */
@@ -504,6 +529,9 @@ typedef struct box_render_view_t {
                                  *   atmosphere pass */
     box_render_view_atmos_t atmos; /**< Inputs of its sky view and aerial perspective */
     box_render_view_env_t environment; /**< Environment the view is lit with */
+    int32_t fog_first;          /**< Index of the first fog volume of the view in the packet */
+    int32_t fog_count;          /**< Fog volumes the view draws, back to front, filled by the
+                                 *   light extract for a lit view with LightSettings.fog_volumes */
 } box_render_view_t;
 
 /** Kind of an effect pass of a view */
@@ -1120,6 +1148,7 @@ typedef struct box_render_packet_t {
     ecs_vec_t particles;    /**< box_render_particle_pool_t, simulated after the scatters */
     ecs_vec_t shadow_atlases; /**< box_render_shadow_atlas_t, the atlases with tiles */
     ecs_vec_t shadow_tiles; /**< box_render_shadow_tile_t of those atlases */
+    ecs_vec_t fog_volumes;  /**< box_render_fog_volume_t, the fog volumes of the views */
     ecs_vec_t transitions;  /**< box_render_transition_record_t in the order they were made,
                              *   empty in a world without Transition */
     ecs_vec_t data;         /**< Bytes the resources and uploads point into */
