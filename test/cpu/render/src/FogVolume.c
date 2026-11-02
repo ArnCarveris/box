@@ -318,12 +318,13 @@ void FogVolume_noise_record(void) {
     ecs_fini(world);
 }
 
-/** The noise texture is the same on every call, fills 0 to 255 and tiles: the step across an
- * edge is no larger than the steps inside. */
+/** The noise texture is the same on every call, fills 0 to 255 around a median of 128 and tiles:
+ * the step across an edge is no larger than the steps inside. */
 void FogVolume_noise_texture(void) {
     // fog_volume/noise
     const int32_t n = BOX_RENDER_FOG_NOISE_SIZE;
-    int32_t count = n * n * n, i, x, y, z, lo = 255, hi = 0, wrap = 0, inner = 0;
+    int32_t count = n * n * n, i, x, y, z, lo = 255, hi = 0, wrap = 0, inner = 0, below = 0;
+    ecs_os_set_api_defaults();
     uint8_t *a = ecs_os_malloc(count), *b = ecs_os_malloc(count);
     box_render_fog_noise(a);
     box_render_fog_noise(b);
@@ -333,11 +334,13 @@ void FogVolume_noise_texture(void) {
         lo = a[i] < lo ? a[i] : lo;
         hi = a[i] > hi ? a[i] : hi;
         sum += a[i];
+        below += a[i] < 128;
     }
 
     test_int(lo, 0);
     test_int(hi, 255);
-    test_assert(sum / count > 64 && sum / count < 192);
+    test_assert(sum / count > 96 && sum / count < 160);
+    test_assert(below > count * 0.45 && below < count * 0.55);
 
     for (z = 0; z < n; z ++) {
         for (y = 0; y < n; y ++) {
