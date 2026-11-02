@@ -472,7 +472,12 @@
                     "find_match_escaped",
                     "tree_many_children",
                     "error_no_blank_line",
-                    "script_block_comment"
+                    "script_block_comment",
+                    "multi_cd_ls",
+                    "multi_ls_cd",
+                    "multi_cd_find",
+                    "multi_cd_grep",
+                    "multi_script_diff"
                 ]
             },
             {
