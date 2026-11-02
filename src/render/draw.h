@@ -743,8 +743,8 @@ void box_draws_color_unpack(
  * roughness, emission, texture transform and AlphaCutoff (0 without one) clamped as the shading
  * was, the Transmission (factor 0 without one), and the ClearCoat, SpecularAnisotropy and Sheen.
  *
- * ClearCoat, SpecularAnisotropy and Sheen are 0 without one or at 0 (a black Sheen). Opacity, tints and the 2D shape
- * are not.
+ * ClearCoat, SpecularAnisotropy and Sheen are 0 without one or at 0, a Sheen at a black color.
+ * Opacity, tints and the 2D shape are not.
  *
  * @param out The record
  * @param material Material components of the owner
