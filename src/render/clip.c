@@ -73,8 +73,6 @@ float box_render_clip_area(
     float result = 0;
     box_draws_clip_bounds(world, e, half);
     if (b) {
-        /* The border lies inside the edge, as the 2D shader draws it: the inner edge is the
-         * outer one moved in by the width, its radius the clamped outer radius less the width */
         float width = b->width > 0 ? b->width : 0;
         result = glm_clamp(b->radius, 0.0f, glm_min(half[0], half[1]));
         half[0] = glm_max(half[0] - width, 0.0f);
