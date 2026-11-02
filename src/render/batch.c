@@ -36,7 +36,7 @@ static const uint8_t box_draws_image_color[3] = { 255, 255, 255 };
 _Static_assert(sizeof(box_render_transform_t) == 48, "InstanceTransform of instance.wgsl");
 _Static_assert(sizeof(box_render_shading_t) == 64, "Shape2DShading of shape2d.wgsl");
 _Static_assert(sizeof(box_render_mesh_shading_t) == 16, "MeshShading of instance.wgsl");
-_Static_assert(sizeof(box_render_material_t) == 80, "Material of material.wgsl");
+_Static_assert(sizeof(box_render_material_t) == 96, "Material of material.wgsl");
 
 /** Bytes of the header of a scatter segment */
 #define BOX_DRAWS_HEADER ((uint32_t)(BOX_RENDER_SCATTER_HEADER * sizeof(uint32_t)))
@@ -917,6 +917,26 @@ static uint32_t box_draws_sheen_pack(
     return result;
 }
 
+/** Pack a DiffuseTransmission into the diffuse_transmission word of a material record: the
+ * display encoded color and the factor clamped to 0..1 as a unorm8.
+ *
+ * @param diffuse The component, NULL for none
+ * @return r | g << 8 | b << 16 | factor << 24, 0 without one
+ */
+static uint32_t box_draws_diffuse_transmission_pack(
+    const DiffuseTransmission *diffuse)
+{
+    uint32_t result = 0u;
+    if (diffuse) {
+        float factor = isfinite(diffuse->factor) ? diffuse->factor : 0.0f;
+        uint32_t f = (uint32_t)(glm_clamp(factor, 0.0f, 1.0f) * 255.0f + 0.5f);
+        result = (uint32_t)diffuse->color.r | ((uint32_t)diffuse->color.g << 8) |
+            ((uint32_t)diffuse->color.b << 16) | (f << 24);
+    }
+
+    return result;
+}
+
 void box_draws_material_pack(
     box_render_material_t *out,
     const box_draw_material_t *material)
@@ -954,7 +974,15 @@ void box_draws_material_pack(
         ? box_draws_unorm16(coat->strength) | (box_draws_unorm16(coat->roughness) << 16) : 0u;
     out->anisotropy = box_draws_anisotropy_pack(material->anisotropy);
     out->sheen = box_draws_sheen_pack(material->sheen);
-    out->reserved = 0;
+    out->diffuse_transmission = box_draws_diffuse_transmission_pack(
+        material->diffuse_transmission);
+    out->thickness = material->diffuse_transmission &&
+        isfinite(material->diffuse_transmission->thickness) &&
+        material->diffuse_transmission->thickness > 0.0f
+        ? material->diffuse_transmission->thickness : 0.0f;
+    out->reserved[0] = 0;
+    out->reserved[1] = 0;
+    out->reserved[2] = 0;
 }
 
 void box_draws_mesh_shading(
