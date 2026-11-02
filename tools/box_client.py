@@ -111,7 +111,8 @@ def split_members(path):
 
 
 MEMBER = re.compile(r"(\w+)|\[(\d+)\]")
-UNRESOLVED = re.compile(r"unresolved identifier|parameter 'component'|is not a component")
+UNRESOLVED = re.compile(r"unresolved identifier|parameter 'component'|is not a component|"
+                        r"unknown member|cannot resolve member")
 GET_MEMBER = re.compile(r"^get\s+(\S+)\s+([A-Za-z_][\w.\[\]]*)\s*$")
 SET_MEMBER = re.compile(r"^set\s+(\S+)\s+([A-Za-z_][\w.]*)\s+(.+)$", re.S)
 
@@ -283,8 +284,9 @@ class App:
         """Run line with the component of each split of a member path in turn, the shortest
         first, until one runs and has the members: the component, its members and the result,
         or the member of the result when member is given. Only a component that does not
-        resolve or lacks the members moves on to the next split; any other failure, or the
-        failure of the first split when no split works, is raised."""
+        resolve or lacks the members (also a set whose value names a member the component does
+        not have, such as the mut of a template) moves on to the next split; any other failure,
+        or the failure of the first split when no split works, is raised."""
         first = None
         for component, members in splits:
             try:

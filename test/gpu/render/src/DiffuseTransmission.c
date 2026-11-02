@@ -16,6 +16,7 @@
 #include <math.h>
 #include <string.h>
 #include "render.h"
+#include "draw.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
@@ -1491,5 +1492,157 @@ void DiffuseTransmission_blur_no_snapshot_no_copy(void) {
     test_int(after.transmission_textures, 0);
     test_int(after.errors, before.errors);
     test_assert(after.passes > before.passes);
+    ecs_fini(world);
+}
+
+/** Seconds every frame of the transition case advances the world: its transition takes a
+ * second, so the frames after a change render at progress 0, 1/4, 1/2, 3/4 and 1 */
+#define DT_DELTA (0.25f)
+
+/** Render a frame of the transition case, that advances the world by DT_DELTA, into a PNG and
+ * load it. The surface persists between the frames, so only the file name changes.
+ *
+ * @param world The world
+ * @param name File name of the capture
+ * @return The pixels, RGBA, freed with stbi_image_free
+ */
+static unsigned char* dt_step(
+    ecs_world_t *world,
+    const char *name)
+{
+    ecs_entity_t e = ecs_lookup(world, "capture");
+    if (!e) {
+        e = ecs_entity(world, { .name = "capture" });
+    }
+
+    ecs_set(world, e, Surface, {.width = DT_W, .height = DT_W,
+        .write_to_file = ECS_CONST_CAST(char*, name), .resolution_scale = 1});
+    ecs_progress(world, DT_DELTA);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, name);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    ecs_os_free(path);
+    test_assert(px != NULL);
+    test_int(w, DT_W);
+    test_int(h, DT_W);
+
+    return px;
+}
+
+/** Render frames of the transition case and keep the last one.
+ *
+ * @param world The world
+ * @param prefix Prefix of the file names, followed by the index of the frame
+ * @param first Index of the first frame
+ * @param count Frames to render, at least 1
+ * @return The pixels of the last frame
+ */
+static unsigned char* dt_steps(
+    ecs_world_t *world,
+    const char *prefix,
+    int first,
+    int count)
+{
+    unsigned char *px = NULL;
+    int i;
+    for (i = 0; i < count; i ++) {
+        char *name = flecs_asprintf("%s_%d.png", prefix, first + i);
+        if (px) {
+            stbi_image_free(px);
+        }
+
+        px = dt_step(world, name);
+        ecs_os_free(name);
+    }
+
+    return px;
+}
+
+/** Check that two captures of the transition case differ by at most a tolerance per channel,
+ * and free them.
+ *
+ * @param a The first capture
+ * @param b The second capture
+ * @param tolerance Largest channel difference
+ */
+static void dt_expect_close(
+    unsigned char *a,
+    unsigned char *b,
+    int tolerance)
+{
+    int i, worst = 0;
+    for (i = 0; i < DT_W * DT_W * 4; i ++) {
+        int d = abs((int)a[i] - (int)b[i]);
+        worst = d > worst ? d : worst;
+    }
+
+    test_assert(worst <= tolerance);
+    stbi_image_free(a);
+    stbi_image_free(b);
+}
+
+/** Check that the shape of the transition case kept its batch and slot.
+ *
+ * @param world The world
+ * @param e The shape
+ * @param batch The batch it had before the change
+ * @param slot The slot it had before the change
+ */
+static void dt_same_batch(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    int32_t batch,
+    int32_t slot)
+{
+    const DrawSlot *ds = ecs_get(world, e, DrawSlot);
+    test_assert(ds != NULL);
+    test_int(ds->batch, batch);
+    test_int(ds->slot, slot);
+    test_assert(!ecs_has_id(world, e, TransitionMaterial));
+}
+
+/** The gray quad lit from behind transmits from none (factor 0) to all of its diffuse light
+ * (factor 1) over a second: at half the duration its center shows half of the transmitted light.
+ *
+ * At the end the pixels are those of a quad that has the factor of 1 from the start. Its batch
+ * and slot do not change.
+ */
+void DiffuseTransmission_transition_mid(void) {
+    // materials/pbr
+    DiffuseTransmission none = {.factor = 0, .color = {255, 255, 255}};
+    DiffuseTransmission full = {.factor = 1, .color = {255, 255, 255}};
+
+    ecs_world_t *still = dt_world(true, false);
+    ecs_singleton_set(still, RenderSettings, {.in_flight = 2, .main_thread = true});
+    dt_sun(still, true, GLM_PIf);
+    dt_quad(still, 0, 2, DT_GRAY, &full);
+    unsigned char *target = dt_steps(still, "dt_transition_still", 0, 7);
+    ecs_fini(still);
+
+    ecs_world_t *world = dt_world(true, false);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+    dt_sun(world, true, GLM_PIf);
+    ecs_entity_t e = dt_quad(world, 0, 2, DT_GRAY, &none);
+    box_transition_set(world, e, ecs_id(DiffuseTransmission),
+        &(TransitionSpec){ .duration = 1.0f });
+    unsigned char *px = dt_steps(world, "dt_transition", 0, 2);
+    dt_expect_center(px, 0, 1);
+    stbi_image_free(px);
+    int32_t batch = ecs_get(world, e, DrawSlot)->batch;
+    int32_t slot = ecs_get(world, e, DrawSlot)->slot;
+
+    ecs_set_ptr(world, e, DiffuseTransmission, &full);
+    px = dt_steps(world, "dt_transition", 2, 3);
+    test_flt(ecs_get(world, e, DiffuseTransmission)->factor, 1);
+    dt_same_batch(world, e, batch, slot);
+    dt_expect_center(px, dt_encode(dt_linear(DT_GRAY) * 128.0f / 255.0f), 3);
+    stbi_image_free(px);
+
+    px = dt_steps(world, "dt_transition", 5, 2);
+    dt_same_batch(world, e, batch, slot);
+    dt_expect_center(px, dt_encode(dt_linear(DT_GRAY)), 3);
+    dt_expect_close(px, target, 1);
     ecs_fini(world);
 }

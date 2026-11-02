@@ -15,6 +15,7 @@
 #include <math.h>
 #include <string.h>
 #include "render.h"
+#include "draw.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
@@ -637,4 +638,158 @@ void SpecularAnisotropy_change_and_remove(void) {
     ecs_os_free(path);
     ecs_fini(world);
     stbi_image_free(before);
+}
+
+/** Seconds every frame of the transition case advances the world: its transition takes a
+ * second, so the frames after a change render at progress 0, 1/4, 1/2, 3/4 and 1 */
+#define ANISO_DELTA (0.25f)
+
+/** Render a frame of the transition case, that advances the world by ANISO_DELTA, into a PNG and
+ * load it. The surface persists between the frames, so only the file name changes.
+ *
+ * @param world The world
+ * @param name File name of the capture
+ * @return The pixels, RGBA, freed with stbi_image_free
+ */
+static unsigned char* aniso_step(
+    ecs_world_t *world,
+    const char *name)
+{
+    ecs_entity_t e = ecs_lookup(world, "capture");
+    if (!e) {
+        e = ecs_entity(world, { .name = "capture" });
+    }
+
+    ecs_set(world, e, Surface, {.width = ANISO_W, .height = ANISO_H,
+        .write_to_file = ECS_CONST_CAST(char*, name), .resolution_scale = 1});
+    ecs_progress(world, ANISO_DELTA);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, name);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    ecs_os_free(path);
+    test_assert(px != NULL);
+    test_int(w, ANISO_W);
+    test_int(h, ANISO_H);
+
+    return px;
+}
+
+/** Render frames of the transition case and keep the last one.
+ *
+ * @param world The world
+ * @param prefix Prefix of the file names, followed by the index of the frame
+ * @param first Index of the first frame
+ * @param count Frames to render, at least 1
+ * @return The pixels of the last frame
+ */
+static unsigned char* aniso_steps(
+    ecs_world_t *world,
+    const char *prefix,
+    int first,
+    int count)
+{
+    unsigned char *px = NULL;
+    int i;
+    for (i = 0; i < count; i ++) {
+        char *name = flecs_asprintf("%s_%d.png", prefix, first + i);
+        if (px) {
+            stbi_image_free(px);
+        }
+
+        px = aniso_step(world, name);
+        ecs_os_free(name);
+    }
+
+    return px;
+}
+
+/** Check that two captures of the transition case differ by at most a tolerance per channel,
+ * and free them.
+ *
+ * @param a The first capture
+ * @param b The second capture
+ * @param tolerance Largest channel difference
+ */
+static void aniso_expect_close(
+    unsigned char *a,
+    unsigned char *b,
+    int tolerance)
+{
+    int i, worst = 0;
+    for (i = 0; i < ANISO_W * ANISO_H * 4; i ++) {
+        int d = abs((int)a[i] - (int)b[i]);
+        worst = d > worst ? d : worst;
+    }
+
+    test_assert(worst <= tolerance);
+    stbi_image_free(a);
+    stbi_image_free(b);
+}
+
+/** Check that the shape of the transition case kept its batch and slot.
+ *
+ * @param world The world
+ * @param e The shape
+ * @param batch The batch it had before the change
+ * @param slot The slot it had before the change
+ */
+static void aniso_same_batch(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    int32_t batch,
+    int32_t slot)
+{
+    const DrawSlot *ds = ecs_get(world, e, DrawSlot);
+    test_assert(ds != NULL);
+    test_int(ds->batch, batch);
+    test_int(ds->slot, slot);
+    test_assert(!ecs_has_id(world, e, TransitionMaterial));
+}
+
+/** The highlight of the smooth metal quad turns from along x (rotation 0) to along y (pi / 2)
+ * over a second: at half the duration it lies along the diagonal of a rotation of pi / 4.
+ *
+ * At the end the pixels are those of a quad that has the target from the start. Its batch and
+ * slot do not change.
+ */
+void SpecularAnisotropy_transition_mid(void) {
+    // materials/pbr
+    SpecularAnisotropy along = {.strength = 0.6f, .rotation = 0};
+    SpecularAnisotropy across = {.strength = 0.6f, .rotation = GLM_PI_2f};
+
+    ecs_world_t *still = aniso_world(true);
+    ecs_singleton_set(still, RenderSettings, {.in_flight = 2, .main_thread = true});
+    aniso_quad(still, 0, &across);
+    aniso_light(still, 0, 10);
+    unsigned char *target = aniso_steps(still, "aniso_transition_still", 0, 7);
+    ecs_fini(still);
+
+    ecs_world_t *world = aniso_world(true);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+    ecs_entity_t e = aniso_quad(world, 0, &along);
+    aniso_light(world, 0, 10);
+    box_transition_set(world, e, ecs_id(SpecularAnisotropy),
+        &(TransitionSpec){ .duration = 1.0f });
+    unsigned char *px = aniso_steps(world, "aniso_transition", 0, 2);
+    int ax = 0, ay = 0;
+    aniso_extent(px, 0, ANISO_W, &ax, &ay);
+    test_assert(ax * 2 >= ay * 3);
+    stbi_image_free(px);
+    int32_t batch = ecs_get(world, e, DrawSlot)->batch;
+    int32_t slot = ecs_get(world, e, DrawSlot)->slot;
+
+    ecs_set_ptr(world, e, SpecularAnisotropy, &across);
+    px = aniso_steps(world, "aniso_transition", 2, 3);
+    test_flt(ecs_get(world, e, SpecularAnisotropy)->rotation, GLM_PI_2f);
+    aniso_same_batch(world, e, batch, slot);
+    test_assert(aniso_sum(px, 76, 36) > aniso_sum(px, 76, 60) * 2);
+    test_assert(aniso_sum(px, 52, 60) > aniso_sum(px, 52, 36) * 2);
+    stbi_image_free(px);
+
+    px = aniso_steps(world, "aniso_transition", 5, 2);
+    aniso_same_batch(world, e, batch, slot);
+    aniso_expect_close(px, target, 1);
+    ecs_fini(world);
 }

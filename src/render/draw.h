@@ -246,13 +246,9 @@ typedef struct box_draw_transition_material_t {
     TextureTransform uv;    /**< TextureTransform */
     Transmission transmission; /**< Transmission */
     ClearCoat clear_coat;   /**< ClearCoat */
-    SpecularAnisotropy anisotropy; /**< SpecularAnisotropy, kept as is: it does not transition */
-    bool anisotropic;       /**< The material has a SpecularAnisotropy */
-    Sheen sheen;            /**< Sheen, kept as is: it does not transition */
-    bool sheened;           /**< The material has a Sheen */
-    DiffuseTransmission diffuse_transmission; /**< DiffuseTransmission, kept as is: it does not
-                             *   transition */
-    bool diffuse_transmissive; /**< The material has a DiffuseTransmission */
+    SpecularAnisotropy anisotropy; /**< SpecularAnisotropy */
+    Sheen sheen;            /**< Sheen */
+    DiffuseTransmission diffuse_transmission; /**< DiffuseTransmission */
     Opacity opacity;        /**< Opacity of the shape itself */
     Tint tint;              /**< Tint of the shape itself */
     box_draw_tint_t inherited; /**< Tints of the ancestors, when tinted */
