@@ -107,6 +107,27 @@ static void box_clear_coat_ctor(
     }
 }
 
+/** Construct SpecularAnisotropy values: a fully stretched highlight along +U.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_specular_anisotropy_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    SpecularAnisotropy *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (SpecularAnisotropy){
+            .strength = BOX_MATERIAL_ANISOTROPY_STRENGTH,
+            .rotation = BOX_MATERIAL_ANISOTROPY_ROTATION };
+    }
+}
+
 /** Construct Transmission values of a surface without volume: no transmission, the index of
  * refraction of glass and no absorption.
  *
@@ -163,6 +184,7 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, Tint);
     ECS_META_COMPONENT(world, PbrMaterial);
     ECS_META_COMPONENT(world, ClearCoat);
+    ECS_META_COMPONENT(world, SpecularAnisotropy);
     ECS_META_COMPONENT(world, Emissive);
     ECS_META_COMPONENT(world, Transmission);
     ECS_META_COMPONENT(world, BlendMode);
@@ -174,18 +196,19 @@ void BoxMaterialImport(
     ecs_set_hooks(world, AlphaCutoff, { .ctor = box_alpha_cutoff_ctor });
     ecs_set_hooks(world, PbrMaterial, { .ctor = box_pbr_material_ctor });
     ecs_set_hooks(world, ClearCoat, { .ctor = box_clear_coat_ctor });
+    ecs_set_hooks(world, SpecularAnisotropy, { .ctor = box_specular_anisotropy_ctor });
     ecs_set_hooks(world, TextureTransform, { .ctor = box_texture_transform_ctor });
     ecs_set_hooks(world, Transmission, { .ctor = box_transmission_ctor });
     ecs_set_hooks(world, MaterialId, { .ctor = box_material_id_ctor });
     ecs_add_pair(world, ecs_id(MaterialId), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(PbrTextures), EcsOnInstantiate, EcsInherit);
 
-    ecs_entity_t materials[7] = {
+    ecs_entity_t materials[8] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
-        ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat)
+        ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy)
     };
     int32_t i;
-    for (i = 0; i < 7; i ++) {
+    for (i = 0; i < 8; i ++) {
         ecs_add_pair(world, materials[i], EcsOnInstantiate, EcsInherit);
         ecs_add_pair(world, materials[i], EcsWith, ecs_id(MaterialId));
     }

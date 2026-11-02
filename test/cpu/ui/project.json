@@ -30,6 +30,7 @@
                     "fit_content",
                     "fit_rect",
                     "fit_circle",
+                    "fit_ignores_box_shadow",
                     "fit_text",
                     "fit_without_item",
                     "fixed_size",

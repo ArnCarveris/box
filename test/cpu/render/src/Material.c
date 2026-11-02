@@ -711,9 +711,9 @@ void Material_clear_coat_pack(void) {
     ecs_os_memset_t(&record, 0x55, box_render_material_t);
     box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
     test_uint(record.clear_coat, 0);
+    test_uint(record.anisotropy, 0);
     test_uint(record.reserved[0], 0);
     test_uint(record.reserved[1], 0);
-    test_uint(record.reserved[2], 0);
     plain = record;
 
     ClearCoat full = { .strength = 1, .roughness = 0 };
@@ -755,5 +755,111 @@ void Material_clear_coat_pack(void) {
     box_draws_material(&a, &(box_draw_material_t){ .pbr = &pbr, .fade = 1 });
     box_draws_material(&b, &(box_draw_material_t){
         .clear_coat = &half, .pbr = &pbr, .fade = 1 });
+    test_assert(!ecs_os_memcmp_t(&a, &b, box_render_shading_t));
+}
+
+void Material_specular_anisotropy_defaults(void) {
+    // materials/pbr
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script_run(world, "anisotropy",
+        "using box.material\n"
+        "turned { SpecularAnisotropy: {rotation: 0.5} }\n"
+        "half { SpecularAnisotropy: {strength: 0.5} }\n", NULL) == 0);
+
+    ecs_entity_t added = ecs_new(world);
+    ecs_add(world, added, SpecularAnisotropy);
+    const SpecularAnisotropy *a = ecs_get(world, added, SpecularAnisotropy);
+    test_assert(a != NULL);
+    test_flt(a->strength, BOX_MATERIAL_ANISOTROPY_STRENGTH);
+    test_flt(a->rotation, BOX_MATERIAL_ANISOTROPY_ROTATION);
+    test_flt(a->strength, 1);
+    test_flt(a->rotation, 0);
+    test_bool(ecs_owns(world, added, MaterialId), true);
+
+    a = ecs_get(world, ecs_lookup(world, "turned"), SpecularAnisotropy);
+    test_assert(a != NULL);
+    test_flt(a->strength, 1);
+    test_flt(a->rotation, 0.5f);
+    test_bool(ecs_owns(world, ecs_lookup(world, "turned"), MaterialId), true);
+
+    a = ecs_get(world, ecs_lookup(world, "half"), SpecularAnisotropy);
+    test_assert(a != NULL);
+    test_flt(a->strength, 0.5f);
+    test_flt(a->rotation, 0);
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, SpecularAnisotropy, {.strength = 0.25f, .rotation = 0.75f});
+    ecs_entity_t instance = ecs_new_w_pair(world, EcsIsA, prefab);
+    test_bool(ecs_owns(world, instance, SpecularAnisotropy), false);
+    test_flt(ecs_get(world, instance, SpecularAnisotropy)->strength, 0.25f);
+    test_flt(ecs_get(world, instance, SpecularAnisotropy)->rotation, 0.75f);
+
+    ecs_fini(world);
+}
+
+/** The record holds the anisotropy as two unorm16, the strength clamped to 0..1 and the rotation
+ * wrapped to 0..2 pi over 2 pi, 0 without one or with a strength of 0, and a transition of
+ * another component encodes the record again with it. */
+void Material_specular_anisotropy_pack(void) {
+    // materials/pbr
+    box_render_material_t record, plain;
+    ecs_os_memset_t(&record, 0x55, box_render_material_t);
+    box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
+    test_uint(record.anisotropy, 0);
+    plain = record;
+    test_int(ECS_SIZEOF(box_render_material_t), 80);
+
+    SpecularAnisotropy full = { .strength = 1, .rotation = 0 };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .anisotropy = &full, .fade = 1 });
+    test_uint(record.anisotropy, 0xFFFFu);
+
+    SpecularAnisotropy half = { .strength = 0.5f, .rotation = GLM_PIf };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .anisotropy = &half, .fade = 1 });
+    test_uint(record.anisotropy & 0xFFFFu, 32768u);
+    test_uint(record.anisotropy >> 16, 32768u);
+
+    SpecularAnisotropy negative = { .strength = 2, .rotation = -GLM_PI_2f };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .anisotropy = &negative, .fade = 1 });
+    test_uint(record.anisotropy & 0xFFFFu, 0xFFFFu);
+    test_uint(record.anisotropy >> 16, 49151u);
+
+    SpecularAnisotropy wrapped = { .strength = 1, .rotation = 5.0f * GLM_PI_2f };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .anisotropy = &wrapped, .fade = 1 });
+    test_uint(record.anisotropy >> 16, 16384u);
+
+    SpecularAnisotropy turn = { .strength = 1, .rotation = 2.0f * GLM_PIf };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .anisotropy = &turn, .fade = 1 });
+    test_uint(record.anisotropy, 0xFFFFu);
+
+    SpecularAnisotropy low = { .strength = -1, .rotation = 1 };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .anisotropy = &low, .fade = 1 });
+    test_uint(record.anisotropy, 0);
+
+    SpecularAnisotropy bare = { .strength = 0, .rotation = 1 };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .anisotropy = &bare, .fade = 1 });
+    test_uint(record.anisotropy, 0);
+
+    box_draws_material_pack(&record, &(box_draw_material_t){ .anisotropy = &half, .fade = 1 });
+    record.anisotropy = 0;
+    test_assert(!ecs_os_memcmp_t(&record, &plain, box_render_material_t));
+
+    PbrMaterial pbr = { .metallic = 0.25f, .roughness = 0.125f };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .anisotropy = &half, .pbr = &pbr, .fade = 1 });
+    box_draw_transition_material_t target;
+    box_render_material_t encoded;
+    box_draws_transition_target(&target, &(box_draw_material_t){
+        .anisotropy = &half, .pbr = &pbr, .fade = 1 }, BOX_DRAW_TRANSITION_TABLE);
+    box_draws_transition_encode(&target, &encoded);
+    test_assert(!ecs_os_memcmp_t(&encoded, &record, box_render_material_t));
+
+    box_render_shading_t a, b;
+    box_draws_material(&a, &(box_draw_material_t){ .pbr = &pbr, .fade = 1 });
+    box_draws_material(&b, &(box_draw_material_t){
+        .anisotropy = &half, .pbr = &pbr, .fade = 1 });
     test_assert(!ecs_os_memcmp_t(&a, &b, box_render_shading_t));
 }
