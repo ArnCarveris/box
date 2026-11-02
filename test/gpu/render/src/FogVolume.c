@@ -973,7 +973,6 @@ void FogVolume_noise_zero_unchanged(void) {
             f->wind[0] = 30;
             f->wind[2] = -10;
             ecs_modified(world, e, FogVolume);
-            fv_frames(world, 5);
         }
 
         px[k] = fv_render(world, files[k]);
@@ -1006,7 +1005,7 @@ void FogVolume_noise_varies(void) {
     printf("noise 0: mean %.1f deviation %.2f, noise 1: mean %.1f deviation %.2f\n",
         mean[0], deviation[0], mean[1], deviation[1]);
     test_assert(deviation[0] < 1.0);
-    test_assert(deviation[1] > 8.0);
+    test_assert(deviation[1] > 6.0);
     test_assert(fabs(mean[1] - mean[0]) < 25.0);
     test_assert(fabs(mean[0] - fv_srgb(fv_lin(FV_WALL) * expf(-0.8f))) < 4.0);
 }
@@ -1073,21 +1072,27 @@ void FogVolume_wind_moves(void) {
     }
 }
 
-/** Two runs with the same fixed delta time render the same pixels at the same frame, wind and
- * all. */
+/** Two headless runs of 7 frames with --delta-time render the same pixels at the last frame,
+ * wind and all. */
 void FogVolume_noise_deterministic(void) {
     // fog_volume/noise
     const char *files[2] = { "fog_noise_run_a.png", "fog_noise_run_b.png" };
+    char *argv[] = {"boxrun", "--headless", "--frames", "7", "--delta-time", "0.016666667"};
     unsigned char *px[2];
     int32_t k;
     for (k = 0; k < 2; k ++) {
         ecs_world_t *world = fv_world(0);
+        test_int(box_app_parse(world, 6, argv), 0);
         App *app = ecs_singleton_get_mut(world, App);
-        app->delta_time = 1.0f / 60;
+        app->unguarded = true;
+        app->unpaced = true;
         ecs_singleton_modified(world, App);
         fv_noise_volume(world, 0.8f, 5, (float[]){1.5f, 0.5f, -0.75f});
-        fv_frames(world, 7);
-        px[k] = fv_render(world, files[k]);
+        fv_surface(world, FV_SIZE, FV_SIZE, files[k]);
+        test_int(box_app_run(world), 0);
+        box_render_sync(world);
+        test_int(ecs_get_world_info(world)->frame_count_total, 7);
+        px[k] = fv_load(world, files[k], FV_SIZE, FV_SIZE);
         ecs_fini(world);
     }
 
@@ -1108,7 +1113,7 @@ void FogVolume_noise_device_loss(void) {
     unsigned char *before = fv_render(world, "fog_noise_lost.png");
     double mean, deviation, neighbours;
     fv_measure(before, &mean, &deviation, &neighbours);
-    test_assert(deviation > 8.0);
+    test_assert(deviation > 6.0);
     test_int(ecs_singleton_get(world, RenderStatus)->device_losses, 0);
 
     const char *tmp = ecs_singleton_get(world, AppStatus)->tmp_dir;

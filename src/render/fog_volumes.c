@@ -55,6 +55,9 @@ static float box_fog_linear(
 /** Octaves of the fog volume noise */
 #define BOX_FOG_NOISE_OCTAVES (4)
 
+/** Bins of the histogram the fog volume noise finds its percentiles in */
+#define BOX_FOG_NOISE_BINS (4096)
+
 /** Hash an integer to a well mixed one (the finalizer of MurmurHash3).
  *
  * @param x The integer
@@ -132,10 +135,12 @@ void box_render_fog_noise(
     uint8_t *out)
 {
     const int32_t n = BOX_RENDER_FOG_NOISE_SIZE;
-    int32_t count = n * n * n, o, x, y, z, i;
+    int32_t count = n * n * n, o, x, y, z, i, k;
     float *values = ecs_os_calloc_n(float, count);
     float *lattice = ecs_os_malloc_n(float, 16 * 16 * 16);
-    float amplitude = 1.0f, lo, hi, scale;
+    int32_t *histogram = ecs_os_calloc_n(int32_t, BOX_FOG_NOISE_BINS), total;
+    const double share[3] = { 0.01, 0.5, 0.99 };
+    float amplitude = 1.0f, lo, hi, scale, at[3];
     int32_t cx[BOX_RENDER_FOG_NOISE_SIZE], nx[BOX_RENDER_FOG_NOISE_SIZE];
     int32_t cy[BOX_RENDER_FOG_NOISE_SIZE], ny[BOX_RENDER_FOG_NOISE_SIZE];
     int32_t cz[BOX_RENDER_FOG_NOISE_SIZE], nz[BOX_RENDER_FOG_NOISE_SIZE];
@@ -189,11 +194,27 @@ void box_render_fog_noise(
         hi = glm_max(hi, values[i]);
     }
 
-    scale = hi > lo ? 255.0f / (hi - lo) : 0.0f;
+    scale = hi > lo ? (float)BOX_FOG_NOISE_BINS / (hi - lo) : 0.0f;
     for (i = 0; i < count; i ++) {
-        out[i] = (uint8_t)glm_clamp(roundf((values[i] - lo) * scale), 0.0f, 255.0f);
+        int32_t bin = (int32_t)((values[i] - lo) * scale);
+        histogram[bin < BOX_FOG_NOISE_BINS ? bin : BOX_FOG_NOISE_BINS - 1] ++;
     }
 
+    for (i = 0, total = 0, k = 0; k < 3; i ++) {
+        total += histogram[i];
+        while (k < 3 && total >= (int32_t)((double)count * share[k])) {
+            at[k ++] = lo + ((float)i + 0.5f) / (float)BOX_FOG_NOISE_BINS * (hi - lo);
+        }
+    }
+
+    for (i = 0; i < count; i ++) {
+        float v = values[i] <= at[1]
+            ? 0.5f - 0.5f * (at[1] - values[i]) / glm_max(at[1] - at[0], 1e-6f)
+            : 0.5f + 0.5f * (values[i] - at[1]) / glm_max(at[2] - at[1], 1e-6f);
+        out[i] = (uint8_t)roundf(255.0f * glm_clamp(v, 0.0f, 1.0f));
+    }
+
+    ecs_os_free(histogram);
     ecs_os_free(lattice);
     ecs_os_free(values);
 }
