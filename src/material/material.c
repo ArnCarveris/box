@@ -149,6 +149,29 @@ static void box_sheen_ctor(
     }
 }
 
+/** Construct DiffuseTransmission values: half of the diffuse light passes through, untinted,
+ * a thin sheet.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_diffuse_transmission_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    DiffuseTransmission *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (DiffuseTransmission){
+            .factor = BOX_MATERIAL_DIFFUSE_TRANSMISSION_FACTOR,
+            .color = { 255, 255, 255 },
+            .thickness = 0.0f };
+    }
+}
+
 /** Construct Transmission values of a surface without volume: no transmission, the index of
  * refraction of glass and no absorption.
  *
@@ -207,6 +230,7 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, ClearCoat);
     ECS_META_COMPONENT(world, SpecularAnisotropy);
     ECS_META_COMPONENT(world, Sheen);
+    ECS_META_COMPONENT(world, DiffuseTransmission);
     ECS_META_COMPONENT(world, Emissive);
     ECS_META_COMPONENT(world, Transmission);
     ECS_META_COMPONENT(world, BlendMode);
@@ -220,19 +244,20 @@ void BoxMaterialImport(
     ecs_set_hooks(world, ClearCoat, { .ctor = box_clear_coat_ctor });
     ecs_set_hooks(world, SpecularAnisotropy, { .ctor = box_specular_anisotropy_ctor });
     ecs_set_hooks(world, Sheen, { .ctor = box_sheen_ctor });
+    ecs_set_hooks(world, DiffuseTransmission, { .ctor = box_diffuse_transmission_ctor });
     ecs_set_hooks(world, TextureTransform, { .ctor = box_texture_transform_ctor });
     ecs_set_hooks(world, Transmission, { .ctor = box_transmission_ctor });
     ecs_set_hooks(world, MaterialId, { .ctor = box_material_id_ctor });
     ecs_add_pair(world, ecs_id(MaterialId), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(PbrTextures), EcsOnInstantiate, EcsInherit);
 
-    ecs_entity_t materials[9] = {
+    ecs_entity_t materials[10] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
         ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy),
-        ecs_id(Sheen)
+        ecs_id(Sheen), ecs_id(DiffuseTransmission)
     };
     int32_t i;
-    for (i = 0; i < 9; i ++) {
+    for (i = 0; i < 10; i ++) {
         ecs_add_pair(world, materials[i], EcsOnInstantiate, EcsInherit);
         ecs_add_pair(world, materials[i], EcsWith, ecs_id(MaterialId));
     }

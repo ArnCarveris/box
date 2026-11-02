@@ -1612,3 +1612,78 @@ void MaterialIds_sheen_prefab_change_reaches_slot(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+void MaterialIds_diffuse_transmission_brings_material_id(void) {
+    // materials/material_ids
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t leaf = ecs_new(world);
+    ecs_set(world, leaf, Box, {1, 1, 1});
+    ecs_set(world, leaf, DiffuseTransmission, {
+        .factor = 1, .color = {255, 0, 128}, .thickness = 0.5f});
+    ecs_entity_t plain = ecs_new(world);
+    ecs_set(world, plain, Position, {2, 0, 0});
+    ecs_set(world, plain, Box, {1, 1, 1});
+    frame(world);
+
+    test_bool(ecs_owns(world, leaf, MaterialId), true);
+    uint32_t id = id_of(world, leaf);
+    test_assert(id != 0 && id != UINT32_MAX);
+    test_uint(shading_of(world, leaf)->material, id);
+    test_uint(record_of(world, id)->diffuse_transmission,
+        255u | (128u << 16) | (255u << 24));
+    test_flt(record_of(world, id)->thickness, 0.5f);
+    test_uint(shading_of(world, plain)->material, 0);
+    test_uint(record_of(world, 0)->diffuse_transmission, 0);
+    test_flt(record_of(world, 0)->thickness, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MaterialIds_diffuse_transmission_prefab_change_reaches_slot(void) {
+    // materials/material_ids
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t prefab = prefab_new(world);
+    ecs_set(world, prefab, DiffuseTransmission, {.factor = 1, .color = {255, 255, 255}});
+    ecs_entity_t a = instance_new(world, prefab, 0);
+    ecs_entity_t b = instance_new(world, prefab, 1);
+    ecs_set(world, b, Rgb, {0, 255, 0});
+    ecs_entity_t c = instance_new(world, prefab, 2);
+    ecs_set(world, c, DiffuseTransmission, {.factor = 0, .color = {255, 0, 0}});
+    frame(world);
+    frame(world);
+    uint32_t shared = id_of(world, prefab);
+    uint32_t own = id_of(world, b);
+    uint32_t red = id_of(world, c);
+    test_bool(ecs_owns(world, a, DiffuseTransmission), false);
+    test_uint(shading_of(world, a)->material, shared);
+    test_assert(own != shared);
+    test_assert(red != shared && red != own);
+    test_uint(record_of(world, shared)->diffuse_transmission, 0xFFFFFFFFu);
+    test_uint(record_of(world, own)->diffuse_transmission, 0xFFFFFFFFu);
+    test_uint(record_of(world, red)->diffuse_transmission, 0xFFu);
+    test_uint(record_of(world, 0)->diffuse_transmission, 0);
+
+    ecs_set(world, prefab, DiffuseTransmission, {
+        .factor = 0, .color = {0, 0, 255}, .thickness = 1});
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.material_bytes, 2 * MATERIAL);
+    test_int(stats.upload_bytes, 0);
+    test_uint(record_of(world, shared)->diffuse_transmission, 0xFFu << 16);
+    test_uint(record_of(world, own)->diffuse_transmission, 0xFFu << 16);
+    test_flt(record_of(world, own)->thickness, 1);
+    test_uint(record_of(world, own)->color, color_word(0, 255, 0));
+    test_uint(record_of(world, red)->diffuse_transmission, 0xFFu);
+    test_uint(shading_of(world, a)->material, shared);
+
+    ecs_remove(world, prefab, DiffuseTransmission);
+    frame(world);
+    test_uint(record_of(world, shared)->diffuse_transmission, 0);
+    test_uint(record_of(world, own)->diffuse_transmission, 0);
+    test_uint(record_of(world, red)->diffuse_transmission, 0xFFu);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

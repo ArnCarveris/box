@@ -69,6 +69,7 @@ template HeadlessRadioButton : parent RadioGroup {
     Cursor: {CursorNotAllowed}
   }
 
+  // A disabled button ignores the pointer, so it never shows as hovered or pressed
   async {
     if !off && first == 0 {
       first = this
@@ -76,7 +77,7 @@ template HeadlessRadioButton : parent RadioGroup {
 
     while true {
       await on.enter(this)
-      hover = true
+      hover = !off
       await on.leave(this)
       hover = false
     }
@@ -85,7 +86,7 @@ template HeadlessRadioButton : parent RadioGroup {
   async {
     while true {
       await on.press(this)
-      down = true
+      down = !off
       await on.release(this)
       down = false
     }

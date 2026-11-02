@@ -91,7 +91,7 @@ template HeadlessTabHeader {
 }
 
 // The header of a tab: the label, raised on the surface of the page and underlined with the
-// accent while selected
+// accent while selected. Its corners follow the inside of the border of the tab view.
 template TabHeader : HeadlessTabHeader {
   const t = box.ui.theme[UiTheme]
   const focus = FocusStatus[FocusStatus]
@@ -114,11 +114,11 @@ template TabHeader : HeadlessTabHeader {
 
   if ring {
     Border: {
-      width: t.focus_width, radius: t.radius,
+      width: t.focus_width, radius: t.radius - 1,
       color: {t.focus.r, t.focus.g, t.focus.b, 255}
     }
   } else {
-    Border: {width: 0, radius: t.radius}
+    Border: {width: 0, radius: t.radius - 1}
   }
 
   above {
@@ -173,18 +173,20 @@ template TabView {
   const none: entity = 0
   const t = box.ui.theme[UiTheme]
   const bar_h = t.control_height + 4
+  const edge = 1
 
-  Layout: {direction: Column}
+  // The bar and the page sit inside the border, edge points wide
+  Layout: {direction: Column, padding: {edge, edge, edge, edge}}
   LayoutItem: {}
   if width > 0 {
     LayoutItem = {width: {mode: Fixed, value: width}}
   }
   if height > 0 {
-    LayoutItem = {height: {mode: Fixed, value: bar_h + height}}
+    LayoutItem = {height: {mode: Fixed, value: bar_h + height + edge * 2}}
   }
   Rect: {1, 1}
   Rgb: t.surface_alt
-  Border: {width: 1, radius: t.radius, color: {t.border.r, t.border.g, t.border.b, 255}}
+  Border: {width: edge, radius: t.radius, color: {t.border.r, t.border.g, t.border.b, 255}}
 
   bar {
     Layout: {direction: Row, spacing: 2}
@@ -297,7 +299,8 @@ template HeadlessTab : parent TabView {
   }
 }
 
-// A tab: a page on the surface that lays its children out in a column
+// A tab: a page on the surface that lays its children out in a column, its corners following
+// the inside of the border of the tab view
 template Tab : HeadlessTab {
   const t = box.ui.theme[UiTheme]
   const pad = t.padding * 1.5
@@ -305,5 +308,5 @@ template Tab : HeadlessTab {
   Layout: {direction: Column, padding: {pad, pad, pad, pad}, spacing: t.spacing}
   Rect: {1, 1}
   Rgb: t.surface
-  Border: {radius: t.radius}
+  Border: {radius: t.radius - 1}
 }

@@ -30,7 +30,7 @@ static const char *box_audio_web_reasons[] = {
 /** Create the AudioContext, suspended until a gesture, and load the worklet from a Blob URL.
  *
  * The worklet compiles the bytes of the core synchronously in the constructor of its processor
- * and calls render once per quantum. Commands sent before the node exists wait in the page.
+ * and calls render once per quantum. Messages sent before the node exists wait in the page.
  *
  * @param core Bytes of the wasm of the core
  * @param size Size of the wasm in bytes
@@ -39,41 +39,103 @@ static const char *box_audio_web_reasons[] = {
  */
 EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quantum), {
     var worklet = function() {
+        var EVENTS = 64;
+        var SOUND_FREE = 3;
         class BoxAudioProcessor extends AudioWorkletProcessor {
             constructor(options) {
                 super();
                 var o = options.processorOptions;
                 var core = new WebAssembly.Instance(new WebAssembly.Module(o.core), {}).exports;
-                core.box_audio_core_wasm_init(o.sampleRate);
+                if (!core.box_audio_core_wasm_init(o.sampleRate)) {
+                    throw new Error('the audio core did not start');
+                }
                 this.core = core;
                 this.quantum = o.quantum;
-                this.left = new Float32Array(core.memory.buffer,
-                    core.box_audio_core_wasm_left(), o.quantum);
-                this.right = new Float32Array(core.memory.buffer,
-                    core.box_audio_core_wasm_right(), o.quantum);
+                this.buffer = null;
+                this.sounds = new Map();
                 this.quanta = 0;
-                this.frequency = 0;
-                this.level = 0;
+                this.batches = 0;
+                this.views();
                 var self = this;
                 this.port.onmessage = function(e) { self.command(e.data); };
             }
 
+            // The memory of the core grows when it allocates, which detaches the views
+            views() {
+                var buffer = this.core.memory.buffer;
+                if (buffer !== this.buffer) {
+                    this.buffer = buffer;
+                    this.left = new Float32Array(buffer, this.core.box_audio_core_wasm_left(),
+                        this.quantum);
+                    this.right = new Float32Array(buffer, this.core.box_audio_core_wasm_right(),
+                        this.quantum);
+                    this.events = new Int32Array(buffer, this.core.box_audio_core_wasm_events(),
+                        EVENTS * 3);
+                }
+            }
+
+            copy(bytes) {
+                var at = this.core.box_audio_core_wasm_alloc(bytes.length);
+                if (at) {
+                    this.views();
+                    new Uint8Array(this.buffer, at, bytes.length).set(bytes);
+                }
+                return at;
+            }
+
             command(m) {
-                if (m.type === 'tone') {
-                    this.frequency = m.frequency;
-                    this.level = m.level;
-                    this.core.box_audio_core_wasm_set_frequency(m.frequency);
-                    this.core.box_audio_core_wasm_set_level(m.level);
+                var core = this.core, at, bytes, ok;
+                if (m.type === 'commands') {
+                    bytes = new Uint8Array(m.data);
+                    at = this.copy(bytes);
+                    if (at) {
+                        core.box_audio_core_wasm_apply(at, bytes.length);
+                        core.box_audio_core_wasm_free(at);
+                        this.batches++;
+                    }
+                } else if (m.type === 'sound') {
+                    bytes = new Uint8Array(m.data);
+                    at = this.sounds.has(m.id) ? 0 : this.copy(bytes);
+                    ok = !!at && !!core.box_audio_core_wasm_sound(m.id, at, m.frames, m.channels,
+                        m.sampleRate);
+                    if (ok) {
+                        this.sounds.set(m.id, at);
+                    } else if (at) {
+                        core.box_audio_core_wasm_free(at);
+                    }
+                    this.port.postMessage({ type: 'sound', id: m.id, ok: ok });
                 } else if (m.type === 'stats') {
                     this.port.postMessage({ type: 'stats', id: m.id, quanta: this.quanta,
                         frame: currentFrame, time: currentTime, sampleRate: sampleRate,
-                        frequency: this.frequency, level: this.level });
+                        voices: core.box_audio_core_wasm_voices(), batches: this.batches,
+                        sounds: this.sounds.size, memory: this.buffer.byteLength });
                 }
+            }
+
+            // Sounds the core no longer uses are freed here, on the side that owns them
+            receive() {
+                var n = this.core.box_audio_core_wasm_read_events();
+                if (!n) {
+                    return;
+                }
+                this.views();
+                var list = [];
+                for (var i = 0; i < n; i++) {
+                    var e = { type: this.events[i * 3], id: this.events[i * 3 + 1] >>> 0,
+                        value: this.events[i * 3 + 2] };
+                    if (e.type === SOUND_FREE && this.sounds.has(e.id)) {
+                        this.core.box_audio_core_wasm_free(this.sounds.get(e.id));
+                        this.sounds.delete(e.id);
+                    }
+                    list.push(e);
+                }
+                this.port.postMessage({ type: 'events', events: list });
             }
 
             process(inputs, outputs) {
                 var out = outputs[0];
                 var frames = out.length ? out[0].length : 0;
+                this.views();
                 for (var at = 0; at < frames; at += this.quantum) {
                     var n = Math.min(this.quantum, frames - at);
                     this.core.box_audio_core_wasm_render(n);
@@ -83,6 +145,7 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                             at);
                     }
                 }
+                this.receive();
                 this.quanta++;
                 return true;
             }
@@ -106,13 +169,13 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
         return 2;
     }
 
-    var audio = { ctx: ctx, node: null, pending: [], requests: {}, id: 0, failed: 0,
-        coreSize: size };
-    audio.post = function(m) {
+    var audio = { ctx: ctx, node: null, pending: [], requests: {}, sounds: {}, id: 0,
+        failed: 0, coreSize: size, events: [], onevents: null };
+    audio.post = function(m, transfer) {
         if (audio.node) {
-            audio.node.port.postMessage(m);
+            audio.node.port.postMessage(m, transfer || []);
         } else if (audio.pending) {
-            audio.pending.push(m);
+            audio.pending.push([m, transfer || []]);
         }
     };
     audio.stats = function() {
@@ -120,6 +183,24 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
             var id = ++audio.id;
             audio.requests[id] = resolve;
             audio.post({ type: 'stats', id: id });
+        });
+    };
+    // A batch of commands of the core, an ArrayBuffer that is transferred or a typed array
+    // that is copied
+    audio.commands = function(bytes) {
+        var data = bytes instanceof ArrayBuffer ? bytes :
+            bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+        audio.post({ type: 'commands', data: data }, [data]);
+    };
+    // A sound of interleaved float frames, copied; the promise resolves with whether the core
+    // took it
+    audio.sound = function(id, samples, channels, rate) {
+        var data = Float32Array.from(samples).buffer;
+        return new Promise(function(resolve) {
+            audio.sounds[id] = resolve;
+            audio.post({ type: 'sound', id: id, channels: channels,
+                frames: Math.floor(data.byteLength / 4 / channels),
+                sampleRate: rate || ctx.sampleRate, data: data }, [data]);
         });
     };
     var fail = function(code) {
@@ -140,6 +221,28 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
             console.warn('box.audio: the audio failed (' + code + '), the app runs without sound');
         }
     };
+    var receive = function(m) {
+        var resolve;
+        if (m.type === 'stats') {
+            resolve = audio.requests[m.id];
+            delete audio.requests[m.id];
+        } else if (m.type === 'sound') {
+            resolve = audio.sounds[m.id];
+            delete audio.sounds[m.id];
+            m = m.ok;
+        } else if (m.type === 'events') {
+            Array.prototype.push.apply(audio.events, m.events);
+            if (audio.events.length > 4096) {
+                audio.events.splice(0, audio.events.length - 4096);
+            }
+            if (audio.onevents) {
+                audio.onevents(m.events);
+            }
+        }
+        if (resolve) {
+            resolve(m);
+        }
+    };
 
     var bytes = HEAPU8.slice(core, core + size).buffer;
     var url = URL.createObjectURL(new Blob(['(' + worklet.toString() + ')();'],
@@ -154,18 +257,12 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
             processorOptions: { core: bytes, sampleRate: ctx.sampleRate, quantum: quantum }
         });
         node.onprocessorerror = function() { fail(4); };
-        node.port.onmessage = function(e) {
-            var resolve = audio.requests[e.data.id];
-            if (resolve) {
-                delete audio.requests[e.data.id];
-                resolve(e.data);
-            }
-        };
+        node.port.onmessage = function(e) { receive(e.data); };
         node.connect(ctx.destination);
         audio.node = node;
         var pending = audio.pending || [];
         audio.pending = null;
-        pending.forEach(function(m) { node.port.postMessage(m); });
+        pending.forEach(function(p) { node.port.postMessage(p[0], p[1]); });
     }).catch(function() {
         URL.revokeObjectURL(url);
         fail(3);
@@ -184,28 +281,33 @@ EM_JS(void, box_audio_web_resume, (void), {
     }
 });
 
-/** Post the tone command to the core, or keep it in the page until the node exists.
+/** Post a copy of a command batch to the worklet.
  *
- * @param frequency Frequency in Hz
- * @param level Peak level, 0..1
+ * @param commands The bytes
+ * @param size Number of bytes
  */
-EM_JS(void, box_audio_web_post_tone, (float frequency, float level), {
+EM_JS(void, box_audio_web_post_commands, (const void *commands, int size), {
     var audio = Module.boxAudio;
     if (audio && !audio.failed) {
-        audio.post({ type: 'tone', frequency: frequency, level: level });
+        audio.commands(HEAPU8.slice(commands, commands + size).buffer);
     }
 });
 
-/** Read the temporary ?tone=<hz> parameter of the address of the page.
+/** Post a copy of a sound to the worklet.
  *
- * @return The frequency in Hz, 0 without a valid parameter
+ * @param id Id of the sound
+ * @param data Frames, interleaved when stereo
+ * @param count Number of floats, frames times channels
+ * @param channels 1 or 2
+ * @param rate Frames per second of the sound
  */
-EM_JS(double, box_audio_web_query_tone, (void), {
-    if (typeof location === 'undefined' || typeof URLSearchParams === 'undefined') {
-        return 0;
+EM_JS(void, box_audio_web_post_sound, (unsigned id, const float *data, int count, int channels,
+    float rate), {
+    var audio = Module.boxAudio;
+    if (audio && !audio.failed) {
+        audio.sound(id >>> 0, new Float32Array(HEAPU8.slice(data, data + count * 4).buffer),
+            channels, rate);
     }
-    var hz = parseFloat(new URLSearchParams(location.search).get('tone'));
-    return isFinite(hz) && hz > 0 ? hz : 0;
 });
 
 /** Log the one warning of a failed audio, which the page reports when the worklet or the core
@@ -222,17 +324,30 @@ EMSCRIPTEN_KEEPALIVE void box_audio_web_failed(
     ecs_warn("box.audio: %s, the app runs without sound", text);
 }
 
-EMSCRIPTEN_KEEPALIVE void box_audio_web_tone(
-    float frequency,
-    float level)
+EMSCRIPTEN_KEEPALIVE void box_audio_web_apply(
+    const void *commands,
+    int32_t size)
 {
-    box_audio_web_post_tone(frequency, level);
+    if (box_audio_web_started && commands && size > 0) {
+        box_audio_web_post_commands(commands, size);
+    }
+}
+
+EMSCRIPTEN_KEEPALIVE void box_audio_web_sound(
+    uint32_t id,
+    const float *data,
+    int32_t frames,
+    int32_t channels,
+    float sample_rate)
+{
+    if (box_audio_web_started && data && frames > 0 && (channels == 1 || channels == 2)) {
+        box_audio_web_post_sound(id, data, frames * channels, channels, sample_rate);
+    }
 }
 
 void box_audio_web_start(void)
 {
     int reason;
-    double tone;
     if (box_audio_web_started) {
         goto done;
     }
@@ -242,12 +357,6 @@ void box_audio_web_start(void)
         BOX_AUDIO_CORE_QUANTUM);
     if (reason) {
         box_audio_web_failed(reason);
-        goto done;
-    }
-
-    tone = box_audio_web_query_tone();
-    if (tone > 0) {
-        box_audio_web_tone((float)tone, BOX_AUDIO_WEB_TONE_LEVEL);
     }
 
 done:
@@ -271,12 +380,26 @@ void box_audio_web_gesture(void)
 {
 }
 
-void box_audio_web_tone(
-    float frequency,
-    float level)
+void box_audio_web_apply(
+    const void *commands,
+    int32_t size)
 {
-    (void)frequency;
-    (void)level;
+    (void)commands;
+    (void)size;
+}
+
+void box_audio_web_sound(
+    uint32_t id,
+    const float *data,
+    int32_t frames,
+    int32_t channels,
+    float sample_rate)
+{
+    (void)id;
+    (void)data;
+    (void)frames;
+    (void)channels;
+    (void)sample_rate;
 }
 
 #endif

@@ -46,16 +46,21 @@ template HeadlessStepper {
     }
   }
 
+  // A disabled stepper ignores the pointer, so its buttons never show as hovered or pressed
   async {
     while true {
       const e = await on.move(this)
       const w = this[LayoutBounds].width
-      part = match e.local_x < button - w / 2 {
+      const at = match e.local_x < button - w / 2 {
         true: -1
         _: match e.local_x > w / 2 - button {
           true: 1
           _: 0
         }
+      }
+      part = match disabled {
+        true: 0
+        _: at
       }
     }
   }
@@ -71,12 +76,16 @@ template HeadlessStepper {
     while true {
       const e = await on.press(this)
       const w = this[LayoutBounds].width
-      pressed = match e.local_x < button - w / 2 {
+      const at = match e.local_x < button - w / 2 {
         true: -1
         _: match e.local_x > w / 2 - button {
           true: 1
           _: 0
         }
+      }
+      pressed = match disabled {
+        true: 0
+        _: at
       }
       await on.release(this)
       pressed = 0
@@ -148,7 +157,8 @@ template HeadlessStepper {
 }
 
 // A stepper: a minus button, the value with decimals digits after the point and a plus button
-// in one bordered control. A width fixes it, 0 makes it 112 points.
+// in one bordered control. The buttons sit inside the border, which is edge points wide. A width
+// fixes it, 0 makes it 112 points.
 template Stepper : HeadlessStepper {
   prop decimals: i32 = 0
   prop button: f32 = 28
@@ -159,8 +169,12 @@ template Stepper : HeadlessStepper {
     0.0: 112
     _: width
   }
+  const edge = match ring {
+    true: t.focus_width
+    _: 1
+  }
 
-  Layout: {direction: Row, v: Middle}
+  Layout: {direction: Row, v: Middle, padding: {edge, edge, edge, edge}}
   LayoutItem: {
     width: {mode: Fixed, value: w},
     height: {mode: Fixed, value: t.control_height}
@@ -179,9 +193,9 @@ template Stepper : HeadlessStepper {
 
   minus {
     Layout: {direction: Row, h: Center, v: Middle}
-    LayoutItem: {width: {mode: Fixed, value: button}, height: {mode: Grow}}
+    LayoutItem: {width: {mode: Fixed, value: button - edge}, height: {mode: Grow}}
     Rect: {1, 1}
-    Border: {radius: t.radius}
+    Border: {radius: t.radius - edge}
 
     if pressed == -1 {
       Rgb: t.pressed
@@ -213,9 +227,9 @@ template Stepper : HeadlessStepper {
 
   plus {
     Layout: {direction: Row, h: Center, v: Middle}
-    LayoutItem: {width: {mode: Fixed, value: button}, height: {mode: Grow}}
+    LayoutItem: {width: {mode: Fixed, value: button - edge}, height: {mode: Grow}}
     Rect: {1, 1}
-    Border: {radius: t.radius}
+    Border: {radius: t.radius - edge}
 
     if pressed == 1 {
       Rgb: t.pressed

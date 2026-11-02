@@ -73,6 +73,106 @@ static bool widgets_has_member(
     return result;
 }
 
+/** Load the widget library and a scene that uses it into a new world.
+ *
+ * @param code The scene, which can use box.widgets
+ * @return The world
+ */
+static ecs_world_t* widgets_scene(
+    const char *code)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    char *widgets = box_app_locate("test/assets/ui/widgets.flecs");
+    test_assert(ecs_script(world, {
+        .entity = ecs_entity(world, { .name = "box.ui.widgets" }),
+        .filename = widgets
+    }) != 0);
+    ecs_os_free(widgets);
+    test_assert(ecs_script(world, { .code = code }) != 0);
+
+    return world;
+}
+
+/** Run frames, so the templates, the layout and the transforms settle.
+ *
+ * @param world The world
+ */
+static void widgets_frames(
+    ecs_world_t *world)
+{
+    int32_t i;
+    for (i = 0; i < 6; i ++) {
+        ecs_progress(world, 0);
+    }
+}
+
+/** Set a member of the mut of a template instance with the set command, which assigns it as a
+ * script does; a mut has an on_replace hook, so it cannot be ensured.
+ *
+ * @param world The world
+ * @param path Path of the instance
+ * @param mut Path of the mut, such as box.widgets.ScrollView.mut
+ * @param member Name of the member
+ * @param value The value
+ */
+static void widgets_set_mut(
+    ecs_world_t *world,
+    const char *path,
+    const char *mut,
+    const char *member,
+    double value)
+{
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    char *line = flecs_asprintf("set %s %s {%s: %g}", path, mut, member, value);
+    bool error = true;
+    char *out = box_command_run(world, s, line, &error);
+    if (error) {
+        printf("command '%s' failed: %s\n", line, out);
+    }
+
+    test_bool(error, false);
+    ecs_os_free(out);
+    ecs_os_free(line);
+}
+
+/** Get the offset of an entity from another one, from their world transforms.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param from The other entity
+ * @param out Receives the offset on x and y
+ */
+static void widgets_offset(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_entity_t from,
+    float out[2])
+{
+    const WorldTransform *a = ecs_get(world, e, WorldTransform);
+    const WorldTransform *b = ecs_get(world, from, WorldTransform);
+    test_assert(a != NULL && b != NULL);
+    out[0] = a->m[3][0] - b->m[3][0];
+    out[1] = a->m[3][1] - b->m[3][1];
+}
+
+/** A scroll view of 200 by 100 points with six blocks of 40 points in a column, which do not fit,
+ * placed so it has a world transform */
+#define WIDGETS_TALL_VIEW \
+    "using box.widgets\n" \
+    "using box.layout\n" \
+    "using box.geometry\n" \
+    "using box.transform\n" \
+    "ScrollView view(width: 200, height: 100) {\n" \
+    "  Position: {0, 0, 0}\n" \
+    "  b0 { LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n" \
+    "  b1 { LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n" \
+    "  b2 { LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n" \
+    "  b3 { LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n" \
+    "  b4 { LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n" \
+    "  b5 { LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n" \
+    "}\n"
+
 void Widgets_library_loads(void) {
     // ui/widgets
     ecs_world_t *world = ecs_init();
@@ -341,5 +441,240 @@ void Widgets_sibling(void) {
     test_assert(ecs_get_target(world, ecs_lookup(world, "r7"), EcsIsA, 0) == a);
     test_assert(ecs_get_target(world, ecs_lookup(world, "r8"), EcsIsA, 0) == a);
 
+    ecs_fini(world);
+}
+
+
+void Widgets_scroll_bar_in_view(void) {
+    // ui/widgets
+    ecs_world_t *world = widgets_scene(WIDGETS_TALL_VIEW);
+    widgets_frames(world);
+
+    ecs_entity_t view = ecs_lookup(world, "view");
+    ecs_entity_t bars = ecs_lookup(world, "view.scrollbars");
+    ecs_entity_t bar = ecs_lookup(world, "view.scrollbars.vscroll");
+    ecs_entity_t knob = ecs_lookup(world, "view.scrollbars.vscroll.knob");
+    test_assert(view != 0 && bars != 0 && bar != 0 && knob != 0);
+    test_assert(ecs_lookup(world, "view.scrollbars.hscroll") == 0);
+    const LayoutContent *c = ecs_get(world, view, LayoutContent);
+    test_assert(c != NULL);
+    test_assert(c->max_y > 0);
+
+    /* The bars do not float, so the clips of the view and its ancestors clip them; they are the
+     * last child of the column, drawn and picked over the content */
+    test_bool(ecs_has(world, bars, LayoutFloat), false);
+    test_bool(ecs_has(world, bar, LayoutFloat), false);
+    ecs_entities_t children = ecs_get_ordered_children(world, view);
+    test_assert(children.count == 7);
+    test_assert(children.ids[6] == bars);
+
+    /* The track runs one point inside the right, top and bottom edges, 10 points thick, opaque
+     * on a color of its own */
+    float at[2];
+    widgets_offset(world, bar, view, at);
+    test_flt(at[0], 100 - 1 - 5);
+    test_flt(at[1], 0);
+    const Rect *r = ecs_get(world, bar, Rect);
+    test_assert(r != NULL);
+    test_flt(r->width, 10);
+    test_flt(r->height, 98);
+    const UiTheme *t = ecs_get(world, ecs_lookup(world, "box.ui.theme"), UiTheme);
+    const Rgb *track = ecs_get(world, bar, Rgb);
+    const Rgb *surface = ecs_get(world, view, Rgb);
+    test_assert(track != NULL && surface != NULL);
+    test_int(track->r, t->surface.r);
+    test_assert(track->r != surface->r || track->g != surface->g || track->b != surface->b);
+    const Opacity *o = ecs_get(world, bar, Opacity);
+    test_assert(o == NULL || o->value == 1);
+
+    /* The thumb starts at the top of the track */
+    float thumb[2];
+    widgets_offset(world, knob, view, thumb);
+    const Rect *k = ecs_get(world, knob, Rect);
+    test_assert(k != NULL);
+    test_flt(thumb[1] + k->height / 2, 50 - 1 - 2);
+
+    /* Scrolled, the bar stays where it is and the thumb moves down, in the frame that moves the
+     * content: the bar never jumps with the content for a frame */
+    float block[2], shifted[2];
+    widgets_offset(world, ecs_lookup(world, "view.b0"), view, block);
+    widgets_set_mut(world, "view", "box.widgets.ScrollView.mut", "y", 40);
+    ecs_progress(world, 0);
+    widgets_offset(world, ecs_lookup(world, "view.b0"), view, shifted);
+    test_flt(shifted[1], block[1] + 40);
+    widgets_offset(world, bar, view, at);
+    test_flt(at[0], 100 - 1 - 5);
+    test_flt(at[1], 0);
+    float moved[2];
+    widgets_offset(world, knob, view, moved);
+    test_assert(moved[1] < thumb[1] - 1);
+    widgets_frames(world);
+    c = ecs_get(world, view, LayoutContent);
+    test_flt(c->y, 40);
+    widgets_offset(world, bar, view, at);
+    test_flt(at[1], 0);
+
+    /* At the end the thumb ends at the end of the track */
+    widgets_set_mut(world, "view", "box.widgets.ScrollView.mut", "y", 1000);
+    widgets_frames(world);
+    widgets_offset(world, bar, view, at);
+    test_flt(at[1], 0);
+    widgets_offset(world, knob, view, moved);
+    k = ecs_get(world, knob, Rect);
+    test_flt(moved[1] - k->height / 2, -50 + 1 + 2);
+
+    char *logs = widgets_warnings(world);
+    test_str(logs, "");
+    ecs_os_free(logs);
+    ecs_fini(world);
+}
+
+void Widgets_scroll_gutter(void) {
+    // ui/widgets
+    ecs_world_t *world = widgets_scene(
+        "using box.widgets\n"
+        "using box.layout\n"
+        "ScrollView view(width: 200, height: 100, horizontal: true) {\n"
+        "  b0 { LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n"
+        "}\n");
+    widgets_frames(world);
+
+    /* Everything fits: no bars and no room for them */
+    ecs_entity_t view = ecs_lookup(world, "view");
+    test_assert(ecs_lookup(world, "view.scrollbars") == 0);
+    const Layout *l = ecs_get(world, view, Layout);
+    test_assert(l != NULL);
+    test_flt(l->padding.right, 8);
+    test_flt(l->padding.bottom, 8);
+    test_flt(l->padding.left, 8);
+    test_flt(l->padding.top, 8);
+    const LayoutContent *c = ecs_get(world, view, LayoutContent);
+    test_flt(c->height, 40 + 16);
+
+    char *logs = widgets_warnings(world);
+    test_str(logs, "");
+    ecs_os_free(logs);
+    ecs_fini(world);
+}
+
+void Widgets_scroll_gutter_with_bar(void) {
+    // ui/widgets
+    ecs_world_t *world = widgets_scene(WIDGETS_TALL_VIEW);
+    widgets_frames(world);
+
+    /* The vertical bar shows: room on the right, the bottom keeps the padding below the last
+     * block, the spacing before the bars included */
+    ecs_entity_t view = ecs_lookup(world, "view");
+    const Layout *l = ecs_get(world, view, Layout);
+    test_assert(l != NULL);
+    test_flt(l->padding.right, 18);
+    test_flt(l->padding.bottom + l->spacing, 8);
+    const LayoutContent *c = ecs_get(world, view, LayoutContent);
+    test_flt(c->height, 6 * 40 + 5 * 8 + 16);
+    test_flt(c->max_y, c->height - 100);
+
+    ecs_fini(world);
+}
+
+void Widgets_scroll_thumb_hover_look(void) {
+    // ui/widgets
+    ecs_world_t *world = widgets_scene(WIDGETS_TALL_VIEW);
+    widgets_frames(world);
+    ecs_entity_t view = ecs_lookup(world, "view");
+    ecs_entity_t knob = ecs_lookup(world, "view.scrollbars.vscroll.knob");
+    test_assert(knob != 0);
+    test_bool(ecs_has(world, knob, Tint), false);
+
+    /* Over the thumb it lightens toward the text color */
+    widgets_set_mut(world, "view", "box.widgets.ScrollView.mut", "over", 1);
+    widgets_frames(world);
+    knob = ecs_lookup(world, "view.scrollbars.vscroll.knob");
+    test_bool(ecs_has(world, knob, Tint), true);
+
+    /* Dragged it takes the text color */
+    widgets_set_mut(world, "view", "box.widgets.ScrollView.mut", "drag", 1);
+    widgets_frames(world);
+    knob = ecs_lookup(world, "view.scrollbars.vscroll.knob");
+    test_bool(ecs_has(world, knob, Tint), false);
+    const UiTheme *t = ecs_get(world, ecs_lookup(world, "box.ui.theme"), UiTheme);
+    test_int(ecs_get(world, knob, Rgb)->r, t->text.r);
+
+    ecs_fini(world);
+}
+
+void Widgets_panel_title_in_column(void) {
+    // ui/widgets
+    ecs_world_t *world = widgets_scene(
+        "using box.widgets\n"
+        "using box.layout\n"
+        "using box.transform\n"
+        "Panel panel(title: \"Title\", width: 300) {\n"
+        "  Position: {0, 0, 0}\n"
+        "  b0 { LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n"
+        "}\n");
+    widgets_frames(world);
+
+    /* The title is the first child of the column, not a float that leaves the clips around the
+     * panel; the block follows it after the spacing */
+    ecs_entity_t panel = ecs_lookup(world, "panel");
+    ecs_entity_t heading = ecs_lookup(world, "panel.heading");
+    ecs_entity_t block = ecs_lookup(world, "panel.b0");
+    test_assert(panel != 0 && heading != 0 && block != 0);
+    test_bool(ecs_has(world, heading, LayoutFloat), false);
+    ecs_entities_t children = ecs_get_ordered_children(world, panel);
+    test_assert(children.count == 2);
+    test_assert(children.ids[0] == heading);
+
+    const LayoutBounds *pb = ecs_get(world, panel, LayoutBounds);
+    const LayoutBounds *hb = ecs_get(world, heading, LayoutBounds);
+    test_assert(pb != NULL && hb != NULL);
+    test_flt(hb->height, 18 * 1.25f);
+    test_flt(pb->height, 12 + 18 * 1.25f + 8 + 40 + 12);
+    float at[2];
+    widgets_offset(world, heading, panel, at);
+    test_flt(at[0] - hb->width / 2, -150 + 12);
+    test_flt(at[1] + hb->height / 2, pb->height / 2 - 12);
+
+    ecs_fini(world);
+}
+
+void Widgets_list_keeps_width(void) {
+    // ui/widgets
+    ecs_world_t *world = widgets_scene(
+        "using box.widgets\n"
+        "using box.layout\n"
+        "using box.transform\n"
+        "column {\n"
+        "  Position: {0, 0, 0}\n"
+        "  Layout: {direction: Column}\n"
+        "  LayoutItem: {width: {mode: Fixed, value: 300}}\n"
+        "  ListView list(items: [\"a\", \"b\", \"c\", \"d\", \"e\", \"f\", \"g\", \"h\"], height: 100)\n"
+        "}\n");
+    widgets_frames(world);
+
+    /* The list scrolls and shows its bar, which the layout does not measure into the content:
+     * the list keeps the width of its column, frame after frame */
+    ecs_entity_t list = ecs_lookup(world, "column.list");
+    test_assert(list != 0);
+    test_assert(ecs_get(world, list, LayoutContent)->max_y > 0);
+    test_flt(ecs_get(world, list, LayoutBounds)->width, 300);
+    test_flt(ecs_get(world, ecs_lookup(world, "column"), LayoutBounds)->width, 300);
+    widgets_frames(world);
+    widgets_frames(world);
+    test_flt(ecs_get(world, list, LayoutBounds)->width, 300);
+    test_flt(ecs_get(world, list, LayoutContent)->max_x, 0);
+    ecs_entity_t bar = ecs_lookup(world, "column.list.scrollbars.vscroll");
+    test_assert(bar != 0);
+
+    /* The bar sits one point inside the right edge, the rows left of it */
+    float at[2];
+    widgets_offset(world, bar, list, at);
+    test_flt(at[0], 150 - 1 - 5);
+    test_flt(ecs_get(world, ecs_lookup(world, "column.list.rows"), LayoutBounds)->width,
+        300 - 1 - 1 - 10);
+
+    char *logs = widgets_warnings(world);
+    test_str(logs, "");
+    ecs_os_free(logs);
     ecs_fini(world);
 }

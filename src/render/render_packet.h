@@ -896,7 +896,11 @@ typedef struct box_render_material_t {
     uint32_t sheen;         /**< Sheen r | g << 8 | b << 16 | roughness << 24, the color display
                              *   encoded and the roughness a unorm8 clamped to 0..1, 0 without
                              *   one or with a black color */
-    uint32_t reserved;      /**< 0, pads the record to the 16 byte alignment of Material */
+    uint32_t diffuse_transmission; /**< DiffuseTransmission r | g << 8 | b << 16 | factor << 24,
+                             *   the color display encoded and the factor a unorm8 clamped to
+                             *   0..1, 0 without one */
+    float thickness;        /**< DiffuseTransmission.thickness, 0 without one */
+    uint32_t reserved[3];   /**< 0, pads the record to the 16 byte alignment of Material */
 } box_render_material_t;
 
 /** Shading of a mesh instance, the shading stream of a mesh instance page, MeshShading of

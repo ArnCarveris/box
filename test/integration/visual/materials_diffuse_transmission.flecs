@@ -1,0 +1,174 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+// Diffuse transmission (DiffuseTransmission) of thin surfaces lit from behind by a low sun that
+// shines toward the camera, with the shadows of the view on. Top left, leaf quads (leaf.png,
+// alpha tested, BackFacePlain) hang in front of the sun and glow a yellow green through their
+// faces; the rightmost leaf has no diffuse transmission and stays a dark silhouette. In the
+// middle a red curtain with an orange glow has a dark box behind it, between it and the sun,
+// whose shadow is a dark shape on the glow. On the right a lampshade (a Lathe, BackFacePlain)
+// around a point light glows warm on its outside. In front, a row of white panels has a
+// factor of 0, 0.25, 0.5, 0.75 and 1 from left to right: the glow through them grows.
+backlit {
+  Scene: {}
+  AmbientLight: {sky: {90, 100, 130}, ground: {50, 45, 40}, intensity: 0.4}
+
+  camera {
+    Position: {0, 1.8, 7}
+    Rotation: {-0.08, 0, 0}
+    Camera: {fov: 55}
+  }
+
+  sun {
+    Rotation: {0.22, 0, 0}
+    DirectionalLight: {intensity: 4}
+  }
+
+  leaf_tex {
+    TexturePath: {path: "test/integration/visual/assets/leaf.png"}
+  }
+
+  floor {
+    Position: {0, -0.1, 0}
+    Box: {16, 0.2, 12}
+    Rgb: {90, 88, 84}
+    PbrMaterial: {roughness: 0.9}
+  }
+
+  leaf_0 {
+    Position: {-4.2, 3.0, 0}
+    Rotation: {0, 0, 0.2}
+    Quad: {1.2, 1.2}
+    Rgb: {200, 230, 170}
+    PbrTextures: {albedo: leaf_tex}
+    BackFaceMode: {BackFacePlain}
+    AlphaCutoff: {value: 0.5}
+    DiffuseTransmission: {factor: 0.6, color: {230, 255, 120}}
+  }
+
+  leaf_1 {
+    Position: {-3.3, 3.3, -0.2}
+    Rotation: {0, 0.2, -0.3}
+    Quad: {1.2, 1.2}
+    Rgb: {200, 230, 170}
+    PbrTextures: {albedo: leaf_tex}
+    BackFaceMode: {BackFacePlain}
+    AlphaCutoff: {value: 0.5}
+    DiffuseTransmission: {factor: 0.6, color: {230, 255, 120}}
+  }
+
+  leaf_2 {
+    Position: {-3.8, 2.2, 0.2}
+    Rotation: {0, -0.2, 0.5}
+    Quad: {1.2, 1.2}
+    Rgb: {200, 230, 170}
+    PbrTextures: {albedo: leaf_tex}
+    BackFaceMode: {BackFacePlain}
+    AlphaCutoff: {value: 0.5}
+    DiffuseTransmission: {factor: 0.8, color: {230, 255, 120}, thickness: 0.01}
+  }
+
+  leaf_plain {
+    Position: {-2.4, 2.6, 0}
+    Rotation: {0, 0, -0.4}
+    Quad: {1.2, 1.2}
+    Rgb: {200, 230, 170}
+    PbrTextures: {albedo: leaf_tex}
+    BackFaceMode: {BackFacePlain}
+    AlphaCutoff: {value: 0.5}
+  }
+
+  curtain {
+    Position: {0, 2.9, -1}
+    Quad: {2.6, 2.0}
+    Rgb: {210, 70, 60}
+    PbrMaterial: {roughness: 0.9}
+    BackFaceMode: {BackFacePlain}
+    DiffuseTransmission: {factor: 0.8, color: {255, 170, 120}}
+  }
+
+  caster {
+    Position: {0.4, 3.35, -2.2}
+    Box: {0.7, 0.7, 0.2}
+    Rgb: {30, 30, 30}
+  }
+
+  lamp_stand {
+    Position: {3.4, 0.45, 0}
+    Cylinder: {segments: 16, smooth: true, length: 0.9, radius: 0.05}
+    Rgb: {60, 55, 50}
+  }
+
+  lamp_profile {
+    Path2D: {
+      start: {0.6, 0},
+      segments: [
+        {kind: Line, end: {0.5, 0.35}},
+        {kind: Line, end: {0.38, 0.7}}
+      ]
+    }
+  }
+
+  lampshade {
+    Position: {3.4, 0.9, 0}
+    Lathe: {profile: lamp_profile, segments: 48, rings: 8}
+    Rgb: {245, 235, 215}
+    PbrMaterial: {roughness: 0.9}
+    BackFaceMode: {BackFacePlain}
+    DiffuseTransmission: {factor: 0.7, color: {255, 210, 150}}
+  }
+
+  bulb {
+    Position: {3.4, 1.2, 0}
+    PointLight: {intensity: 2, range: 6, shadows: true}
+  }
+
+  panel_0 {
+    Position: {-2, 0.6, 2}
+    Quad: {0.7, 0.9}
+    Rgb: {235, 235, 225}
+    PbrMaterial: {roughness: 0.8}
+    DiffuseTransmission: {factor: 0}
+  }
+
+  panel_1 {
+    Position: {-1, 0.6, 2}
+    Quad: {0.7, 0.9}
+    Rgb: {235, 235, 225}
+    PbrMaterial: {roughness: 0.8}
+    DiffuseTransmission: {factor: 0.25}
+  }
+
+  panel_2 {
+    Position: {0, 0.6, 2}
+    Quad: {0.7, 0.9}
+    Rgb: {235, 235, 225}
+    PbrMaterial: {roughness: 0.8}
+    DiffuseTransmission: {factor: 0.5}
+  }
+
+  panel_3 {
+    Position: {1, 0.6, 2}
+    Quad: {0.7, 0.9}
+    Rgb: {235, 235, 225}
+    PbrMaterial: {roughness: 0.8}
+    DiffuseTransmission: {factor: 0.75}
+  }
+
+  panel_4 {
+    Position: {2, 0.6, 2}
+    Quad: {0.7, 0.9}
+    Rgb: {235, 235, 225}
+    PbrMaterial: {roughness: 0.8}
+    DiffuseTransmission: {factor: 1}
+  }
+}
+
+backlit_view {
+  View: {camera: backlit.camera, clear: {enabled: true, color: {40, 50, 70, 255}}, shadows: {enabled: true}}
+}
