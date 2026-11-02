@@ -317,6 +317,9 @@
                     "supported",
                     "transmission_map",
                     "clear_coat_map",
+                    "specular_anisotropy_map",
+                    "sheen_map",
+                    "diffuse_transmission_map",
                     "ease_end_points",
                     "ease_monotonic",
                     "ease_midpoints"

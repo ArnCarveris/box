@@ -1050,6 +1050,9 @@ typedef enum box_render_transition_component_t {
     BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM, /**< TextureTransform */
     BOX_RENDER_TRANSITION_TRANSMISSION,     /**< Transmission */
     BOX_RENDER_TRANSITION_CLEAR_COAT,       /**< ClearCoat */
+    BOX_RENDER_TRANSITION_ANISOTROPY,       /**< SpecularAnisotropy */
+    BOX_RENDER_TRANSITION_SHEEN,            /**< Sheen */
+    BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION, /**< DiffuseTransmission */
     BOX_RENDER_TRANSITION_COMPONENTS        /**< Number of transitionable components */
 } box_render_transition_component_t;
 

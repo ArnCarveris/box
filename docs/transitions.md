@@ -6,8 +6,8 @@ in the rendered pixels.
 
 The feature is complete: transitions of `Position`, `Rotation` and `Scale` render for the entity and
 its descendants (see [Transform transitions](#transform-transitions)), transitions of `Rgb`,
-`AlphaCutoff`, `PbrMaterial`, `Emissive`, `TextureTransform`, `Transmission` and `ClearCoat` for
-mesh shapes, 2D shapes and texts (see [Material transitions](#material-transitions)), and
+`AlphaCutoff`, `PbrMaterial`, `Emissive`, `TextureTransform`, `Transmission`, `ClearCoat`,
+`SpecularAnisotropy`, `Sheen` and `DiffuseTransmission` for mesh shapes, 2D shapes and texts (see [Material transitions](#material-transitions)), and
 transitions of `Tint` and `Opacity` composed down the hierarchy (see [Tint and opacity
 transitions](#tint-and-opacity-transitions)). It works on the render thread, in main thread mode
 (the browser) and with the null backend. What it does not do is listed in
@@ -118,8 +118,8 @@ storage is a flecs map (`ecs_map_t`) keyed by the component entity whose values 
 - There is no API, component, stat or query that returns the in-progress value. It exists only
   on the render thread. Only rendered pixels show it.
 - Transitionable: `Position`, `Rotation`, `Scale`, `Rgb`, `Opacity`, `AlphaCutoff`, `Tint`,
-  `PbrMaterial`, `Emissive`, `TextureTransform`, `Transmission` and `ClearCoat`
-  (`box_transition_supported()`). Others are rejected: `PbrTextures` holds handles that are part of
+  `PbrMaterial`, `Emissive`, `TextureTransform`, `Transmission`, `ClearCoat`,
+  `SpecularAnisotropy`, `Sheen` and `DiffuseTransmission` (`box_transition_supported()`). Others are rejected: `PbrTextures` holds handles that are part of
   the batch key, `WorldTransform` and `MaterialId` are computed by the engine, and enums and tags
   have nothing to interpolate.
 - A key that is not transitionable, or an entry with a negative `duration` or `delay`, logs an
@@ -407,7 +407,8 @@ Implemented in `src/render/transitions.c` (game thread), `src/render/transition.
 thread) and the encoding in `src/render/batch.c` and `src/render/materials.c`.
 
 - A node runs a *material transition* in a frame when `Rgb`, `AlphaCutoff`, `PbrMaterial`,
-  `Emissive`, `TextureTransform`, `Transmission` or `ClearCoat` is active at the packet time
+  `Emissive`, `TextureTransform`, `Transmission`, `ClearCoat`, `SpecularAnisotropy`, `Sheen` or
+  `DiffuseTransmission` is active at the packet time
   (`box_render_transitions_active`).
 - The value of a component that a record reads comes from the entity that owns it: the entity
   itself or the `IsA` base that has it (`ecs_get_target_for_id(world, e, EcsIsA, id)`). The
@@ -474,6 +475,21 @@ thread) and the encoding in `src/render/batch.c` and `src/render/materials.c`.
   the word of no coat (0). Adding or removing `ClearCoat` is a structural change and does not
   animate. Its value is 8 bytes and 2 fields, within `BOX_RENDER_TRANSITION_VALUE` and
   `BOX_RENDER_TRANSITION_FIELDS`.
+- `SpecularAnisotropy`, `Sheen` and `DiffuseTransmission` patch the material table only, like
+  `ClearCoat`: 2D shapes and texts ignore them, and none of them has a batch key bit, so a shape
+  keeps its batch while any of them moves. The slot is packed again from the rendered values
+  with the functions of `box_draws_material_pack`:
+  - `SpecularAnisotropy.strength` and `rotation` interpolate linearly. The rotation takes no
+    shortest path and does not wrap while it moves: from 0 to 4 pi it turns twice. It wraps to
+    0..2 pi only when packed into the `anisotropy` word (two unorm16), and a strength of 0 packs
+    the word of no anisotropy (0). 8 bytes and 2 fields.
+  - `Sheen.color` interpolates per channel like `Rgb` and `roughness` linearly, packed into the
+    `sheen` word; a color through black packs the word of no sheen (0). 8 bytes and 4 fields.
+  - `DiffuseTransmission.factor`, `thickness` and `blur` interpolate linearly and `color` per
+    channel like `Rgb`, packed into the `diffuse_transmission`, `thickness` and `diffuse_blur`
+    words. 16 bytes and 6 fields.
+  All three are within `BOX_RENDER_TRANSITION_VALUE` and `BOX_RENDER_TRANSITION_FIELDS`. Adding
+  or removing one is a structural change and does not animate.
 - While recording shadow regions, a slot whose `AlphaCutoff` or `TextureTransform` runs (and
   the frame after) goes to `shadow_materials`, so alpha tested casters render their tiles again.
 - Anything that reads `Rgb` into a material or shading record transitions: mesh shapes, 2D

@@ -153,6 +153,10 @@ ECS_STRUCT(ClearCoat, {
  * Vertices have no tangents: the direction is +U of the screen space cotangent frame of the UVs,
  * turned by rotation, constant per triangle, so a continuous highlight needs a continuous UV
  * mapping. A triangle with degenerate (constant) UVs shades isotropic.
+ *
+ * Transitionable (Transition): strength and rotation interpolate linearly by the timing function,
+ * through a strength of 0 too; the rotation takes no shortest path and wraps only when rendered.
+ * Adding or removing SpecularAnisotropy does not animate.
  */
 ECS_STRUCT(SpecularAnisotropy, {
     float strength; /**< 0 isotropic to 1 fully stretched, clamped to 0..1 */
@@ -170,6 +174,9 @@ ECS_STRUCT(SpecularAnisotropy, {
  * As three.js: direct light adds a Charlie lobe with the Neubelt visibility, indirect light the
  * diffuse light by a fit of the sheen albedo, and the base keeps 1 - 0.157 * max(color), with no
  * lookup table. It lies under the clear coat; emission is not scaled, an unlit view ignores it.
+ *
+ * Transitionable (Transition): color interpolates per channel like Rgb and roughness linearly by
+ * the timing function, through a black color too; adding or removing Sheen does not animate.
  */
 ECS_STRUCT(Sheen, {
     Rgb color;       /**< Color of the sheen, display encoded, black for none */
@@ -195,6 +202,10 @@ ECS_STRUCT(Sheen, {
  * depth, takes the softest mip. A shape with DiffuseTransmission and no Transmission is opaque
  * and ignores the blur. Blended and transmissive shapes are not in the snapshot, so they are
  * neither seen nor blurred through it.
+ *
+ * Transitionable (Transition): factor, thickness and blur interpolate linearly by the timing
+ * function and color per channel like Rgb, through a factor of 0 too; adding or removing
+ * DiffuseTransmission does not animate.
  */
 ECS_STRUCT(DiffuseTransmission, {
     float factor;    /**< 0 all diffuse light is reflected to 1 all of it passes through,

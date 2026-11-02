@@ -16,6 +16,7 @@
 #include <math.h>
 #include <string.h>
 #include "render.h"
+#include "draw.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
@@ -671,4 +672,157 @@ void Sheen_change_and_remove(void) {
     ecs_os_free(path);
     ecs_fini(world);
     stbi_image_free(before);
+}
+
+/** Seconds every frame of the transition case advances the world: its transition takes a
+ * second, so the frames after a change render at progress 0, 1/4, 1/2, 3/4 and 1 */
+#define SHEEN_DELTA (0.25f)
+
+/** Render a frame of the transition case, that advances the world by SHEEN_DELTA, into a PNG and
+ * load it. The surface persists between the frames, so only the file name changes.
+ *
+ * @param world The world
+ * @param name File name of the capture
+ * @return The pixels, RGBA, freed with stbi_image_free
+ */
+static unsigned char* sheen_step(
+    ecs_world_t *world,
+    const char *name)
+{
+    ecs_entity_t e = ecs_lookup(world, "capture");
+    if (!e) {
+        e = ecs_entity(world, { .name = "capture" });
+    }
+
+    ecs_set(world, e, Surface, {.width = SHEEN_W, .height = SHEEN_W,
+        .write_to_file = ECS_CONST_CAST(char*, name), .resolution_scale = 1});
+    ecs_progress(world, SHEEN_DELTA);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, name);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    ecs_os_free(path);
+    test_assert(px != NULL);
+    test_int(w, SHEEN_W);
+    test_int(h, SHEEN_W);
+
+    return px;
+}
+
+/** Render frames of the transition case and keep the last one.
+ *
+ * @param world The world
+ * @param prefix Prefix of the file names, followed by the index of the frame
+ * @param first Index of the first frame
+ * @param count Frames to render, at least 1
+ * @return The pixels of the last frame
+ */
+static unsigned char* sheen_steps(
+    ecs_world_t *world,
+    const char *prefix,
+    int first,
+    int count)
+{
+    unsigned char *px = NULL;
+    int i;
+    for (i = 0; i < count; i ++) {
+        char *name = flecs_asprintf("%s_%d.png", prefix, first + i);
+        if (px) {
+            stbi_image_free(px);
+        }
+
+        px = sheen_step(world, name);
+        ecs_os_free(name);
+    }
+
+    return px;
+}
+
+/** Check that two captures of the transition case differ by at most a tolerance per channel,
+ * and free them.
+ *
+ * @param a The first capture
+ * @param b The second capture
+ * @param tolerance Largest channel difference
+ */
+static void sheen_expect_close(
+    unsigned char *a,
+    unsigned char *b,
+    int tolerance)
+{
+    int i, worst = 0;
+    for (i = 0; i < SHEEN_W * SHEEN_W * 4; i ++) {
+        int d = abs((int)a[i] - (int)b[i]);
+        worst = d > worst ? d : worst;
+    }
+
+    test_assert(worst <= tolerance);
+    stbi_image_free(a);
+    stbi_image_free(b);
+}
+
+/** Check that the shape of the transition case kept its batch and slot.
+ *
+ * @param world The world
+ * @param e The shape
+ * @param batch The batch it had before the change
+ * @param slot The slot it had before the change
+ */
+static void sheen_same_batch(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    int32_t batch,
+    int32_t slot)
+{
+    const DrawSlot *ds = ecs_get(world, e, DrawSlot);
+    test_assert(ds != NULL);
+    test_int(ds->batch, batch);
+    test_int(ds->slot, slot);
+    test_assert(!ecs_has_id(world, e, TransitionMaterial));
+}
+
+/** The sheen of the dark sphere goes from black (none) to white over a second: at half the
+ * duration its rim is brighter than at the start and darker than at the end.
+ *
+ * At the end the pixels are those of a sphere that has the white sheen from the start. Its batch
+ * and slot do not change.
+ */
+void Sheen_transition_mid(void) {
+    // materials/pbr
+    Sheen black = {.color = {0, 0, 0}, .roughness = 0.5f};
+    Sheen white = {.color = {255, 255, 255}, .roughness = 0.5f};
+
+    ecs_world_t *still = sheen_world(true, 3);
+    ecs_singleton_set(still, RenderSettings, {.in_flight = 2, .main_thread = true});
+    sheen_sphere(still, 0, &white);
+    unsigned char *target = sheen_steps(still, "sheen_transition_still", 0, 7);
+    sheen_ring_t end = sheen_rim(target);
+    ecs_fini(still);
+
+    ecs_world_t *world = sheen_world(true, 3);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+    ecs_entity_t e = sheen_sphere(world, 0, &black);
+    box_transition_set(world, e, ecs_id(Sheen), &(TransitionSpec){ .duration = 1.0f });
+    unsigned char *px = sheen_steps(world, "sheen_transition", 0, 2);
+    sheen_ring_t start = sheen_rim(px);
+    stbi_image_free(px);
+    test_assert(end.sum > start.sum * 2.0f + 0.1f);
+    int32_t batch = ecs_get(world, e, DrawSlot)->batch;
+    int32_t slot = ecs_get(world, e, DrawSlot)->slot;
+
+    ecs_set_ptr(world, e, Sheen, &white);
+    px = sheen_steps(world, "sheen_transition", 2, 3);
+    test_int(ecs_get(world, e, Sheen)->color.r, 255);
+    sheen_same_batch(world, e, batch, slot);
+    sheen_ring_t mid = sheen_rim(px);
+    float span = end.sum - start.sum;
+    test_assert(mid.sum > start.sum + span * 0.05f);
+    test_assert(mid.sum < end.sum - span * 0.25f);
+    stbi_image_free(px);
+
+    px = sheen_steps(world, "sheen_transition", 5, 2);
+    sheen_same_batch(world, e, batch, slot);
+    sheen_expect_close(px, target, 1);
+    ecs_fini(world);
 }
