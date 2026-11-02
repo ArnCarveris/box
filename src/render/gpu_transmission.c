@@ -8,7 +8,7 @@
  *
  * A target has one snapshot per color format of its views, at its render size. Until the
  * downsample shader compiles only mip 0 is copied and bound, so a rough shape samples the
- * sharp image. Views without transmissive draws bind a white image.
+ * sharp image. Views without transmissive draws bind a white image and a depth placeholder.
  */
 
 #include "gpu.h"
@@ -28,6 +28,9 @@ struct box_gpu_snapshot_t {
     uint32_t height;                /**< Height of mip 0, the render height of the target */
     uint32_t mip_count;             /**< Mip levels */
     WGPUTextureFormat format;       /**< Format of the color attachment it copies */
+    WGPUTexture depth;              /**< Copy of the depth of the target, which a blur reads
+                                     *   as the forward pass cannot bind its own depth */
+    WGPUTextureView depth_view;     /**< View of the depth copy */
     WGPURenderPipeline pipeline;    /**< Downsample pipeline of its format in this frame, NULL
                                      *   until the shader exists, which leaves the mips above 0
                                      *   unwritten and unsampled */
@@ -42,6 +45,8 @@ struct box_gpu_transmission_t {
     int32_t revision;               /**< Revision of the shader of the pipelines */
     WGPUTexture white;              /**< 1x1 white image of the views without a snapshot */
     WGPUTextureView white_view;     /**< View of the white image */
+    WGPUTexture no_depth;           /**< 1x1 depth placeholder of the views without a snapshot */
+    WGPUTextureView no_depth_view;  /**< View of the depth placeholder */
     bool uncopyable;                /**< A color target that cannot be copied was reported */
 };
 
@@ -93,6 +98,15 @@ void box_gpu_transmission_init(
     WGPUTexelCopyBufferLayout layout = { .bytesPerRow = sizeof(white), .rowsPerImage = 1 };
     WGPUExtent3D extent = { 1, 1, 1 };
     wgpuQueueWriteTexture(gpu->queue, &dst, white, sizeof(white), &layout, &extent);
+    tr->no_depth = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
+        .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_RenderAttachment,
+        .dimension = WGPUTextureDimension_2D,
+        .size = { 1, 1, 1 },
+        .format = BOX_GPU_DEPTH_FORMAT,
+        .mipLevelCount = 1,
+        .sampleCount = 1
+    });
+    tr->no_depth_view = wgpuTextureCreateView(tr->no_depth, NULL);
     ecs_map_init(&tr->pipelines, NULL);
     gpu->transmission = tr;
 }
@@ -130,6 +144,8 @@ void box_gpu_transmission_fini(
     wgpuSamplerRelease(tr->sampler);
     wgpuTextureViewRelease(tr->white_view);
     wgpuTextureRelease(tr->white);
+    wgpuTextureViewRelease(tr->no_depth_view);
+    wgpuTextureRelease(tr->no_depth);
     ecs_os_free(tr);
     gpu->transmission = NULL;
 done:
@@ -189,7 +205,7 @@ done:
     return result;
 }
 
-/** Create a snapshot and the bind groups of its downsample passes.
+/** Create a snapshot, its depth copy and the bind groups of its downsample passes.
  *
  * Its mips are the full chain of its size minus one, at least one.
  *
@@ -231,6 +247,15 @@ static box_gpu_snapshot_t* box_gpu_snapshot_new(
         .sampleCount = 1
     });
     result->view = wgpuTextureCreateView(result->texture, NULL);
+    result->depth = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
+        .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst,
+        .dimension = WGPUTextureDimension_2D,
+        .size = { width, height, 1 },
+        .format = BOX_GPU_DEPTH_FORMAT,
+        .mipLevelCount = 1,
+        .sampleCount = 1
+    });
+    result->depth_view = wgpuTextureCreateView(result->depth, NULL);
     box_gpu_count(gpu, BOX_GPU_STAT_TRANSMISSION_TEXTURE);
     for (i = 0; i < result->mip_count; i ++) {
         result->mips[i] = wgpuTextureCreateView(result->texture, &(WGPUTextureViewDescriptor){
@@ -281,6 +306,8 @@ static void box_gpu_snapshot_free(
 
     wgpuTextureViewRelease(s->view);
     wgpuTextureRelease(s->texture);
+    wgpuTextureViewRelease(s->depth_view);
+    wgpuTextureRelease(s->depth);
     ecs_os_free(s);
 done:
     return;
@@ -372,17 +399,29 @@ WGPUTextureView box_gpu_transmission_view(
     return result;
 }
 
+WGPUTextureView box_gpu_transmission_depth_view(
+    box_gpu_t *gpu,
+    const box_gpu_snapshot_t *s)
+{
+    return s ? s->depth_view : gpu->transmission->no_depth_view;
+}
+
 void box_gpu_transmission_record(
     box_gpu_t *gpu,
     box_gpu_snapshot_t *s,
     WGPUCommandEncoder encoder,
-    WGPUTexture source)
+    WGPUTexture source,
+    WGPUTexture depth)
 {
     WGPURenderPipeline pipeline = s->pipeline;
     uint32_t i;
     wgpuCommandEncoderCopyTextureToTexture(encoder,
         &(WGPUTexelCopyTextureInfo){ .texture = source, .aspect = WGPUTextureAspect_All },
         &(WGPUTexelCopyTextureInfo){ .texture = s->texture, .aspect = WGPUTextureAspect_All },
+        &(WGPUExtent3D){ s->width, s->height, 1 });
+    wgpuCommandEncoderCopyTextureToTexture(encoder,
+        &(WGPUTexelCopyTextureInfo){ .texture = depth, .aspect = WGPUTextureAspect_All },
+        &(WGPUTexelCopyTextureInfo){ .texture = s->depth, .aspect = WGPUTextureAspect_All },
         &(WGPUExtent3D){ s->width, s->height, 1 });
     for (i = 1; pipeline && i < s->mip_count; i ++) {
         WGPURenderPassColorAttachment attachment = {

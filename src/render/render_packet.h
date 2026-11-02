@@ -900,7 +900,9 @@ typedef struct box_render_material_t {
                              *   the color display encoded and the factor a unorm8 clamped to
                              *   0..1, 0 without one */
     float thickness;        /**< DiffuseTransmission.thickness, 0 without one */
-    uint32_t reserved[3];   /**< 0, pads the record to the 16 byte alignment of Material */
+    float diffuse_blur;     /**< DiffuseTransmission.blur, 0 without one or with a negative or
+                             *   non finite blur */
+    uint32_t reserved[2];   /**< 0, pads the record to the 16 byte alignment of Material */
 } box_render_material_t;
 
 /** Shading of a mesh instance, the shading stream of a mesh instance page, MeshShading of

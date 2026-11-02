@@ -865,3 +865,631 @@ void DiffuseTransmission_change_and_remove(void) {
     ecs_fini(world);
     stbi_image_free(before);
 }
+
+/* DiffuseTransmission.blur: what a Transmission pane shows of the opaque snapshot blurs by the
+ * distance behind it. These cases run in a lit view without lights and with a black ambient,
+ * from a camera at the origin looking down -Z (fov 60) into a 256x128 capture, as the
+ * Transmission suite does: emissive walls of black albedo behind a smooth white pane of
+ * transmission factor 1, ior 1 and thickness 0 whose front face is at z -2.99, so a pixel
+ * through it is the snapshot at that pixel, sampled at the mip of its blur. */
+
+/** Width of the captures of the blur cases */
+#define DB_W (256)
+
+/** Height of the captures of the blur cases */
+#define DB_H (128)
+
+/** Tangent of half the vertical field of view of the blur cases, 60 degrees */
+#define DB_TAN (0.57735f)
+
+/** Create a headless world that renders on the main thread, with no light but a point light of
+ * intensity 0 out of reach (which replaces the default sun) and a black ambient.
+ *
+ * @return The world
+ */
+static ecs_world_t* db_world(void)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+    ecs_singleton_set(world, AmbientLight, {.intensity = 0});
+    ecs_entity_t light = ecs_new(world);
+    ecs_set(world, light, Position, {1000, 1000, 1000});
+    ecs_set(world, light, PointLight, {.intensity = 0, .range = 0.1f});
+
+    return world;
+}
+
+/** Add a camera looking down -Z and a lit view of it that clears to a color.
+ *
+ * @param world The world
+ * @param parent Parent of the camera, 0 for none
+ * @param z Z of the camera
+ * @param ortho Whether the camera is orthographic, 4 units high
+ * @param clear Display encoded clear color, the sky of the view
+ * @return The view
+ */
+static ecs_entity_t db_view(
+    ecs_world_t *world,
+    ecs_entity_t parent,
+    float z,
+    bool ortho,
+    const uint8_t clear[3])
+{
+    ecs_entity_t camera = parent ? ecs_new_w_pair(world, EcsChildOf, parent) : ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, z});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f, .far_ = 1000,
+        .ortho = ortho, .ortho_height = 4});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera,
+        .clear = {.enabled = true, .color = {clear[0], clear[1], clear[2], 255}},
+        .lighting = {.enabled = true}});
+
+    return view;
+}
+
+/** Add an emissive box of black albedo.
+ *
+ * @param world The world
+ * @param parent Parent of the box, 0 for none
+ * @param x X of its center
+ * @param z Z of its center
+ * @param w Width
+ * @param h Height
+ * @param d Depth
+ * @param red Whether it emits red, else blue
+ * @return The box
+ */
+static ecs_entity_t db_wall(
+    ecs_world_t *world,
+    ecs_entity_t parent,
+    float x,
+    float z,
+    float w,
+    float h,
+    float d,
+    bool red)
+{
+    ecs_entity_t e = parent ? ecs_new_w_pair(world, EcsChildOf, parent) : ecs_new(world);
+    ecs_set(world, e, Position, {x, 0, z});
+    ecs_set(world, e, Box, {w, h, d});
+    ecs_set(world, e, Rgb, {0, 0, 0});
+    ecs_set(world, e, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, e, Emissive, {.strength = 1,
+        .color = {red ? 255 : 0, 0, red ? 0 : 255}});
+
+    return e;
+}
+
+/** Add a red wall left of x and a blue one right of it, their front faces a distance behind
+ * the pane.
+ *
+ * @param world The world
+ * @param parent Parent of the walls, 0 for none
+ * @param x X of the edge between them
+ * @param behind Distance of their front faces behind the front face of the pane
+ * @param left Width of the red wall
+ * @param right Width of the blue wall
+ */
+static void db_edge_walls(
+    ecs_world_t *world,
+    ecs_entity_t parent,
+    float x,
+    float behind,
+    float left,
+    float right)
+{
+    float z = -2.99f - behind - 0.05f;
+    db_wall(world, parent, x - left * 0.5f, z, left, 40, 0.1f, true);
+    db_wall(world, parent, x + right * 0.5f, z, right, 40, 0.1f, false);
+}
+
+/** Add a smooth white pane of transmission factor 1, ior 1 and thickness 0, 0.02 thick with
+ * its front face at z -2.99.
+ *
+ * @param world The world
+ * @param parent Parent of the pane, 0 for none
+ * @param x X of its center
+ * @param w Width
+ * @param roughness Roughness of the pane
+ * @param dt The DiffuseTransmission of the pane, NULL for none
+ * @return The pane
+ */
+static ecs_entity_t db_pane(
+    ecs_world_t *world,
+    ecs_entity_t parent,
+    float x,
+    float w,
+    float roughness,
+    const DiffuseTransmission *dt)
+{
+    ecs_entity_t e = parent ? ecs_new_w_pair(world, EcsChildOf, parent) : ecs_new(world);
+    ecs_set(world, e, Position, {x, 0, -3});
+    ecs_set(world, e, Box, {w, 4, 0.02f});
+    ecs_set(world, e, Rgb, {255, 255, 255});
+    ecs_set(world, e, PbrMaterial, {.metallic = 0, .roughness = roughness});
+    ecs_set(world, e, Transmission, {.transmission_factor = 1, .ior = 1,
+        .thickness_factor = 0, .attenuation_distance = 1e10f,
+        .attenuation_color = {255, 255, 255}});
+    if (dt) {
+        ecs_set_ptr(world, e, DiffuseTransmission, dt);
+    }
+
+    return e;
+}
+
+/** A DiffuseTransmission that adds no lobe, with a blur.
+ *
+ * @param blur The blur
+ * @return The component
+ */
+static DiffuseTransmission db_blur(
+    float blur)
+{
+    return (DiffuseTransmission){ .factor = 0, .color = {255, 255, 255}, .blur = blur };
+}
+
+/** Run frames and read the counters of the GPU backend after them.
+ *
+ * @param world The world
+ * @param count Frames to run
+ * @return The counters
+ */
+static box_render_gpu_stats_t db_frames(
+    ecs_world_t *world,
+    int32_t count)
+{
+    box_render_gpu_stats_t stats;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        ecs_progress(world, 1.0f / 60);
+        box_render_sync(world);
+    }
+
+    test_bool(box_render_gpu_stats(world, &stats) || !count, true);
+
+    return stats;
+}
+
+/** Load a capture of the temporary directory.
+ *
+ * @param world The world
+ * @param file Name of the PNG
+ * @param width Expected width
+ * @param height Expected height
+ * @return The pixels, RGBA, freed with stbi_image_free
+ */
+static unsigned char* db_load(
+    ecs_world_t *world,
+    const char *file,
+    int32_t width,
+    int32_t height)
+{
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, file);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, width);
+    test_int(h, height);
+    ecs_os_free(path);
+
+    return px;
+}
+
+/** Add a surface, render three frames into a capture without validation errors and load it.
+ *
+ * @param world The world
+ * @param file Name of the PNG
+ * @return The pixels, RGBA, freed with stbi_image_free
+ */
+static unsigned char* db_render(
+    ecs_world_t *world,
+    const char *file)
+{
+    box_render_gpu_stats_t before = db_frames(world, 0), after;
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = DB_W, .height = DB_H,
+        .write_to_file = ECS_CONST_CAST(char*, file), .resolution_scale = 1});
+    after = db_frames(world, 3);
+    test_int(after.errors, before.errors);
+
+    return db_load(world, file, DB_W, DB_H);
+}
+
+/** Blue share of a pixel, blue over red plus blue in linear light, -1 for a dark pixel.
+ *
+ * @param px The pixels
+ * @param width Width of the capture
+ * @param x Column
+ * @param y Row
+ * @return The share
+ */
+static float db_share(
+    const unsigned char *px,
+    int32_t width,
+    int32_t x,
+    int32_t y)
+{
+    const unsigned char *p = &px[(y * width + x) * 4];
+    float r = dt_linear(p[0]), b = dt_linear(p[2]);
+
+    return r + b > 0.01f ? b / (r + b) : -1.0f;
+}
+
+/** Width in pixels of the red to blue edge of a row: the columns of a range whose blue share
+ * lies between 0.1 and 0.9.
+ *
+ * @param px The pixels
+ * @param width Width of the capture
+ * @param y Row
+ * @param x0 First column of the range
+ * @param x1 Column past the range
+ * @return The width
+ */
+static int32_t db_edge(
+    const unsigned char *px,
+    int32_t width,
+    int32_t y,
+    int32_t x0,
+    int32_t x1)
+{
+    int32_t x, result = 0;
+    for (x = x0; x < x1; x ++) {
+        float s = db_share(px, width, x, y);
+        if (s > 0.1f && s < 0.9f) {
+            result ++;
+        }
+    }
+
+    return result;
+}
+
+/** Largest step of the blue share between two neighbor columns of a range of a row, skipping
+ * dark pixels.
+ *
+ * @param px The pixels
+ * @param width Width of the capture
+ * @param y Row
+ * @param x0 First column of the range
+ * @param x1 Column past the range
+ * @return The step
+ */
+static float db_sharpness(
+    const unsigned char *px,
+    int32_t width,
+    int32_t y,
+    int32_t x0,
+    int32_t x1)
+{
+    float result = 0, last = -1.0f;
+    int32_t x;
+    for (x = x0; x < x1; x ++) {
+        float s = db_share(px, width, x, y);
+        if (s >= 0.0f && last >= 0.0f && fabsf(s - last) > result) {
+            result = fabsf(s - last);
+        }
+
+        last = s;
+    }
+
+    return result;
+}
+
+/** Render a red to blue edge at the center of the capture a distance behind a pane.
+ *
+ * @param file Name of the PNG
+ * @param behind Distance of the walls behind the pane
+ * @param ortho Whether the camera is orthographic
+ * @param camera_z Z of the camera
+ * @param dt The DiffuseTransmission of the pane, NULL for none
+ * @return The width of the edge in pixels
+ */
+static int32_t db_edge_behind(
+    const char *file,
+    float behind,
+    bool ortho,
+    float camera_z,
+    const DiffuseTransmission *dt)
+{
+    const uint8_t black[3] = { 0, 0, 0 };
+    ecs_world_t *world = db_world();
+    db_view(world, 0, camera_z, ortho, black);
+    db_edge_walls(world, 0, 0, behind, 40, 40);
+    db_pane(world, 0, 0, 6, 0, dt);
+    unsigned char *px = db_render(world, file);
+    int32_t result = db_edge(px, DB_W, DB_H / 2, DB_W / 4, DB_W * 3 / 4);
+    stbi_image_free(px);
+    ecs_fini(world);
+
+    return result;
+}
+
+void DiffuseTransmission_blur_zero_unchanged(void) {
+    // materials/transmission
+    const uint8_t black[3] = { 0, 0, 0 };
+    DiffuseTransmission none = db_blur(0);
+    unsigned char *images[2];
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        ecs_world_t *world = db_world();
+        db_view(world, 0, 0, false, black);
+        db_edge_walls(world, 0, 0, 2, 40, 40);
+        db_pane(world, 0, 0, 6, 0.3f, i ? &none : NULL);
+        images[i] = db_render(world, i ? "db_zero_blur.png" : "db_zero_plain.png");
+        ecs_fini(world);
+    }
+
+    test_int(memcmp(images[0], images[1], DB_W * DB_H * 4), 0);
+    stbi_image_free(images[0]);
+    stbi_image_free(images[1]);
+}
+
+/** A quad with only DiffuseTransmission draws in the opaque pass, which has no snapshot: its
+ * blur changes nothing. */
+void DiffuseTransmission_blur_ignored_without_transmission(void) {
+    // materials/transmission
+    DiffuseTransmission sharp = {.factor = 1, .color = {255, 255, 255}, .blur = 0};
+    DiffuseTransmission blurred = {.factor = 1, .color = {255, 255, 255}, .blur = 2};
+    unsigned char *a = dt_backlit(&sharp, true, "db_ignored_0.png");
+    unsigned char *b = dt_backlit(&blurred, true, "db_ignored_2.png");
+    test_assert(dt_center(a).sum > 0.1f);
+    dt_expect_same(a, b);
+}
+
+/** A blur of 0.25 at 4 units behind the pane is about 16 pixels of mip 0, at 0.1 behind under
+ * one: the far edge is wide, the near one stays as sharp as without the blur. */
+void DiffuseTransmission_blur_grows_with_distance(void) {
+    // materials/transmission
+    DiffuseTransmission dt = db_blur(0.25f);
+    int32_t plain = db_edge_behind("db_grows_plain.png", 0.1f, false, 0, NULL);
+    int32_t near_ = db_edge_behind("db_grows_near.png", 0.1f, false, 0, &dt);
+    int32_t far_ = db_edge_behind("db_grows_far.png", 4, false, 0, &dt);
+    printf("edge width: plain %d, 0.1 behind %d, 4 behind %d\n", plain, near_, far_);
+    test_assert(plain <= 3);
+    test_assert(near_ <= plain + 1);
+    test_assert(far_ >= near_ + 6);
+    test_assert(far_ >= 8);
+}
+
+/** Column of a world point in a capture of the camera at the origin.
+ *
+ * @param x X of the point
+ * @param z Z of the point, negative
+ * @return The column
+ */
+static int32_t db_column(
+    float x,
+    float z)
+{
+    float aspect = (float)DB_W / (float)DB_H;
+
+    return (int32_t)((0.5f + x / -z / (DB_TAN * aspect) * 0.5f) * (float)DB_W);
+}
+
+/** A panel of red and blue stripes half a unit wide touches the back of the pane at its left
+ * end and turns 0.6 radians away from it, with a blur of 0.15: the stripes are sharp at the
+ * contact (about a pixel of blur) and washed out at the far end, where they are more than 3
+ * units behind (about 8 pixels, wider than a stripe there). */
+void DiffuseTransmission_blur_contact_sharp(void) {
+    // materials/transmission
+    const uint8_t black[3] = { 0, 0, 0 };
+    const float angle = 0.6f, x0 = -1.5f, z0 = -3.03f;
+    DiffuseTransmission dt = db_blur(0.15f);
+    ecs_world_t *world = db_world();
+    db_view(world, 0, 0, false, black);
+    ecs_entity_t panel = ecs_new(world);
+    ecs_set(world, panel, Position, {x0, 0, z0});
+    ecs_set(world, panel, Rotation, {0, angle, 0});
+    int32_t i;
+    for (i = 0; i < 12; i ++) {
+        db_wall(world, panel, ((float)i + 0.5f) * 0.5f, 0, 0.5f, 3, 0.02f, (i & 1) == 0);
+    }
+
+    db_pane(world, 0, 0, 7, 0, &dt);
+    unsigned char *px = db_render(world, "db_contact.png");
+
+    float c = cosf(angle), s = sinf(angle);
+    int32_t near0 = db_column(x0 + 0.25f * c, z0 - 0.25f * s);
+    int32_t near1 = db_column(x0 + 2.0f * c, z0 - 2.0f * s);
+    int32_t far0 = db_column(x0 + 4.0f * c, z0 - 4.0f * s);
+    int32_t far1 = db_column(x0 + 5.75f * c, z0 - 5.75f * s);
+    float near_ = db_sharpness(px, DB_W, DB_H / 2, near0, near1);
+    float far_ = db_sharpness(px, DB_W, DB_H / 2, far0, far1);
+    printf("contact: columns %d..%d step %f, far end: columns %d..%d step %f\n",
+        near0, near1, near_, far0, far1, far_);
+    test_assert(near1 > near0 + 8 && far1 > far0 + 8);
+    test_assert(near_ > 0.25f);
+    test_assert(far_ < near_ * 0.5f);
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+/** Render a pane over a red wall that covers the left of the capture up to column 183 and
+ * the sky (a blue clear color) right of it.
+ *
+ * @param file Name of the PNG
+ * @param roughness Roughness of the pane
+ * @param dt The DiffuseTransmission of the pane, NULL for none
+ * @return The pixels
+ */
+static unsigned char* db_sky(
+    const char *file,
+    float roughness,
+    const DiffuseTransmission *dt)
+{
+    const uint8_t sky[3] = { 0, 0, 120 };
+    ecs_world_t *world = db_world();
+    db_view(world, 0, 0, false, sky);
+    db_wall(world, 0, -7.5f, -10, 25, 40, 0.1f, true);
+    db_pane(world, 0, 0, 6, roughness, dt);
+    unsigned char *px = db_render(world, file);
+    ecs_fini(world);
+
+    return px;
+}
+
+/** Through the blurred pane the sky (depth 0) shows the top mip, a mix of the wall and the sky,
+ * as a pane of roughness 1 does, while the wall far left keeps its color; no pixel is NaN, which
+ * the capture would show as black. */
+void DiffuseTransmission_blur_sky_max(void) {
+    // materials/transmission
+    DiffuseTransmission dt = db_blur(0.05f);
+    unsigned char *sharp = db_sky("db_sky_sharp.png", 0, NULL);
+    unsigned char *blurred = db_sky("db_sky_blur.png", 0, &dt);
+    unsigned char *rough = db_sky("db_sky_rough.png", 1, NULL);
+    const unsigned char *s = &sharp[((DB_H / 2) * DB_W + 220) * 4];
+    const unsigned char *b = &blurred[((DB_H / 2) * DB_W + 220) * 4];
+    const unsigned char *r = &rough[((DB_H / 2) * DB_W + 220) * 4];
+    const unsigned char *wall = &blurred[((DB_H / 2) * DB_W + 30) * 4];
+    const unsigned char *wall_sharp = &sharp[((DB_H / 2) * DB_W + 30) * 4];
+    int32_t x, y, c, dark = 0;
+    printf("sky: sharp %d %d %d, blur %d %d %d, rough %d %d %d\n", s[0], s[1], s[2],
+        b[0], b[1], b[2], r[0], r[1], r[2]);
+    test_assert(s[0] <= 2);
+    test_assert(b[0] > 10);
+    for (c = 0; c < 3; c ++) {
+        test_assert(abs((int32_t)b[c] - (int32_t)r[c]) <= 4);
+        test_assert(abs((int32_t)wall[c] - (int32_t)wall_sharp[c]) <= 3);
+    }
+
+    for (y = 0; y < DB_H; y ++) {
+        for (x = 0; x < DB_W; x ++) {
+            const unsigned char *p = &blurred[(y * DB_W + x) * 4];
+            dark += p[0] + p[1] + p[2] == 0;
+        }
+    }
+
+    test_int(dark, 0);
+    stbi_image_free(sharp);
+    stbi_image_free(blurred);
+    stbi_image_free(rough);
+}
+
+/** Walls 2 behind the pane are 5 from a camera at the origin and 10 from one 5 units back: the
+ * edge is about half as many pixels there, the same width in world units at the walls. */
+void DiffuseTransmission_blur_perspective(void) {
+    // materials/transmission
+    DiffuseTransmission dt = db_blur(0.18f);
+    int32_t close = db_edge_behind("db_persp_close.png", 2, false, 0, &dt);
+    int32_t back = db_edge_behind("db_persp_back.png", 2, false, 5, &dt);
+    float unit = 2.0f * DB_TAN / (float)DB_H;
+    float world_close = (float)close * 5.0f * unit, world_back = (float)back * 10.0f * unit;
+    printf("edge: %d pixels at 5 (%f units), %d pixels at 10 (%f units)\n", close,
+        world_close, back, world_back);
+    test_assert(close >= 6);
+    test_assert((float)close > (float)back * 1.4f);
+    test_assert(fabsf(world_close - world_back) <
+        0.35f * (world_close > world_back ? world_close : world_back));
+}
+
+/** An orthographic view 4 units high: 0.25 * 4 is a radius of 1 unit, 32 pixels, and 0.25 *
+ * 0.1 under one pixel. */
+void DiffuseTransmission_blur_orthographic(void) {
+    // materials/transmission
+    DiffuseTransmission dt = db_blur(0.25f);
+    int32_t near_ = db_edge_behind("db_ortho_near.png", 0.1f, true, 0, &dt);
+    int32_t far_ = db_edge_behind("db_ortho_far.png", 4, true, 0, &dt);
+    printf("orthographic edge: 0.1 behind %d, 4 behind %d\n", near_, far_);
+    test_assert(near_ <= 3);
+    test_assert(far_ >= near_ + 8);
+}
+
+/** A resize recreates the snapshot with its depth copy at the new size, which the blur reads
+ * without validation errors. */
+void DiffuseTransmission_blur_resize(void) {
+    // materials/transmission
+    const uint8_t black[3] = { 0, 0, 0 };
+    DiffuseTransmission dt = db_blur(0.25f);
+    ecs_world_t *world = db_world();
+    db_view(world, 0, 0, false, black);
+    db_edge_walls(world, 0, 0, 4, 40, 40);
+    db_pane(world, 0, 0, 6, 0, &dt);
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = DB_W, .height = DB_H,
+        .write_to_file = "db_resize_a.png", .resolution_scale = 1});
+    box_render_gpu_stats_t before = db_frames(world, 3);
+    unsigned char *px = db_load(world, "db_resize_a.png", DB_W, DB_H);
+    int32_t a = db_edge(px, DB_W, DB_H / 2, DB_W / 4, DB_W * 3 / 4);
+    stbi_image_free(px);
+
+    ecs_set(world, s, Surface, {.width = 192, .height = 96,
+        .write_to_file = "db_resize_b.png", .resolution_scale = 1});
+    box_render_gpu_stats_t after = db_frames(world, 3);
+    px = db_load(world, "db_resize_b.png", 192, 96);
+    int32_t b = db_edge(px, 192, 48, 48, 144);
+    stbi_image_free(px);
+    printf("resize: edge %d at %dx%d, %d at 192x96\n", a, DB_W, DB_H, b);
+    test_int(after.errors, before.errors);
+    test_int(after.transmission_snapshots - before.transmission_snapshots, 3);
+    test_assert(after.transmission_textures > before.transmission_textures);
+    test_assert(a >= 8);
+    test_assert(b >= 6);
+    test_assert(b < a);
+
+    ecs_fini(world);
+}
+
+/** The first view has a pane over the left half with an edge 0.1 behind it, the second (of
+ * another scene, drawn over the first without clearing) one over the right half with an edge 4
+ * behind it. Each copies its own depth: the left edge stays sharp and the right one blurs, which
+ * it would not if it read the depth of the first view. */
+void DiffuseTransmission_blur_two_views(void) {
+    // materials/transmission
+    const uint8_t black[3] = { 0, 0, 0 };
+    DiffuseTransmission dt = db_blur(0.25f);
+    ecs_world_t *world = db_world();
+    db_view(world, 0, 0, false, black);
+    db_edge_walls(world, 0, -1.5f, 0.1f, 20, 20);
+    db_pane(world, 0, -1.8f, 3.4f, 0, &dt);
+
+    ecs_entity_t scene = ecs_new(world);
+    ecs_set(world, scene, Scene, {0});
+    ecs_entity_t second = db_view(world, scene, 0, false, black);
+    ecs_set(world, second, View, {.camera = ecs_get(world, second, View)->camera,
+        .clear = {.enabled = false}, .lighting = {.enabled = true}, .order = 1});
+    db_edge_walls(world, scene, 3, 4, 2.5f, 5);
+    db_pane(world, scene, 1.8f, 3.4f, 0, &dt);
+
+    box_render_gpu_stats_t before = db_frames(world, 0);
+    unsigned char *px = db_render(world, "db_two_views.png");
+    box_render_gpu_stats_t after = db_frames(world, 1);
+    int32_t left_edge = db_column(-1.5f, -3.09f), right_edge = db_column(3, -6.99f);
+    int32_t left = db_edge(px, DB_W, DB_H / 2, left_edge - 30, left_edge + 30);
+    int32_t right = db_edge(px, DB_W, DB_H / 2, right_edge - 30, right_edge + 30);
+    printf("two views: left edge at %d width %d, right edge at %d width %d\n", left_edge,
+        left, right_edge, right);
+    test_assert(left <= 3);
+    test_assert(right >= left + 6);
+    test_int(after.errors, before.errors);
+    before = after;
+    after = db_frames(world, 1);
+    test_int(after.transmission_snapshots - before.transmission_snapshots, 2);
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+/** A view whose only DiffuseTransmission with a blur has no Transmission draws no transmissive
+ * batch: it records no snapshot and no depth copy, and creates no snapshot texture. */
+void DiffuseTransmission_blur_no_snapshot_no_copy(void) {
+    // materials/transmission
+    const uint8_t black[3] = { 0, 0, 0 };
+    DiffuseTransmission dt = db_blur(0.5f);
+    dt.factor = 0.5f;
+    ecs_world_t *world = db_world();
+    db_view(world, 0, 0, false, black);
+    db_edge_walls(world, 0, 0, 2, 40, 40);
+    ecs_entity_t quad = db_pane(world, 0, 0, 6, 0, &dt);
+    ecs_remove(world, quad, Transmission);
+    unsigned char *px = db_render(world, "db_no_snapshot.png");
+    stbi_image_free(px);
+    box_render_gpu_stats_t before = db_frames(world, 0);
+    box_render_gpu_stats_t after = db_frames(world, 3);
+    test_int(after.transmission_snapshots, 0);
+    test_int(after.transmission_textures, 0);
+    test_int(after.errors, before.errors);
+    test_assert(after.passes > before.passes);
+    ecs_fini(world);
+}

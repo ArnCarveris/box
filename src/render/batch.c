@@ -980,9 +980,12 @@ void box_draws_material_pack(
         isfinite(material->diffuse_transmission->thickness) &&
         material->diffuse_transmission->thickness > 0.0f
         ? material->diffuse_transmission->thickness : 0.0f;
+    out->diffuse_blur = material->diffuse_transmission &&
+        isfinite(material->diffuse_transmission->blur) &&
+        material->diffuse_transmission->blur > 0.0f
+        ? material->diffuse_transmission->blur : 0.0f;
     out->reserved[0] = 0;
     out->reserved[1] = 0;
-    out->reserved[2] = 0;
 }
 
 void box_draws_mesh_shading(

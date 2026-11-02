@@ -265,7 +265,17 @@
                     "ignored_by_unlit",
                     "ignored_by_2d",
                     "prefab",
-                    "change_and_remove"
+                    "change_and_remove",
+                    "blur_zero_unchanged",
+                    "blur_ignored_without_transmission",
+                    "blur_grows_with_distance",
+                    "blur_contact_sharp",
+                    "blur_sky_max",
+                    "blur_perspective",
+                    "blur_orthographic",
+                    "blur_resize",
+                    "blur_two_views",
+                    "blur_no_snapshot_no_copy"
                 ]
             },
             {
