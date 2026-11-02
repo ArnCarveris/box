@@ -1095,3 +1095,136 @@ void ConsoleOutput_script_block_comment(void) {
 
     ecs_fini(world);
 }
+
+/** Callback of the test command minus: returns a string that starts with a '-'.
+ *
+ * @param ctx Call context
+ * @param argc Number of arguments
+ * @param argv The arguments
+ * @param result Receives the string
+ */
+static void output_minus_cmd(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    (void)ctx; (void)argc; (void)argv;
+    *(char**)result->ptr = ecs_os_strdup("-not a diff\n+nor this");
+}
+
+void ConsoleOutput_multi_cd_ls(void) {
+    // console/output
+    ecs_world_t *world = output_world();
+    ecs_entity(world, { .name = "alps.alpha" });
+    ecs_entity(world, { .name = "alps.beta" });
+    output_run(world, "cd alps; ls; cd ..");
+
+    // The ls rows are relative to alps, the scope the ls ran in
+    const ConsoleOutput *o = output_colors(world);
+    test_assert(output_find(world, "alps.alpha", true) == 0);
+    test_assert(output_find(world, "alps.beta", true) == 0);
+    ecs_entity_t alpha = output_find(world, "alpha", true);
+    output_check(world, alpha, 0, 5, &o->entity);
+    ecs_entity_t beta = output_find(world, "beta", true);
+    output_check(world, beta, 0, 4, &o->entity);
+
+    ecs_fini(world);
+}
+
+void ConsoleOutput_multi_ls_cd(void) {
+    // console/output
+    ecs_world_t *world = output_world();
+    ecs_entity(world, { .name = "alps.alpha" });
+    ecs_entity(world, { .name = "alps.beta" });
+    output_run(world, "ls alps; cd alps");
+
+    // The ls rows are relative to the root, as when ls alps runs alone
+    const ConsoleOutput *o = output_colors(world);
+    test_assert(output_find(world, "alpha", true) == 0);
+    ecs_entity_t alpha = output_find(world, "alps.alpha", true);
+    output_check(world, alpha, 0, 5, &o->dim);
+    output_check(world, alpha, 5, 10, &o->entity);
+    ecs_entity_t beta = output_find(world, "alps.beta", true);
+    output_check(world, beta, 0, 5, &o->dim);
+    output_check(world, beta, 5, 9, &o->entity);
+
+    ecs_fini(world);
+}
+
+void ConsoleOutput_multi_cd_find(void) {
+    // console/output
+    ecs_world_t *world = output_world();
+    ecs_entity(world, { .name = "alps.alpha" });
+    ecs_entity(world, { .name = "alps.beta" });
+    output_run(world, "cd alps; find alp; cd ..");
+
+    // The find result is relative to alps, its name match is on the shown text
+    const ConsoleOutput *o = output_colors(world);
+    test_assert(output_find(world, "alps.alpha", true) == 0);
+    ecs_entity_t alpha = output_find(world, "alpha", true);
+    output_check(world, alpha, 0, 3, &o->match);
+    output_check(world, alpha, 3, 5, &o->entity);
+
+    ecs_fini(world);
+}
+
+void ConsoleOutput_multi_cd_grep(void) {
+    // console/output
+    ecs_world_t *world = output_world();
+    ecs_entity(world, { .name = "alps.alpha" });
+    output_run(world, "cd alps; grep alp; cd ..");
+
+    // The grep name match is relative to alps and marked on the shown text
+    const ConsoleOutput *o = output_colors(world);
+    test_assert(output_find(world, "alps.alpha", true) == 0);
+    ecs_entity_t alpha = output_find(world, "alpha", true);
+    output_check(world, alpha, 0, 3, &o->match);
+    output_check(world, alpha, 3, 5, &o->entity);
+
+    ecs_fini(world);
+}
+
+void ConsoleOutput_multi_script_diff(void) {
+    // console/output
+    ecs_world_t *world = output_world();
+    ecs_entity_t s = ecs_script(world, {
+        .entity = ecs_entity(world, { .name = "level" }),
+        .code = "e {}\n"
+    });
+    test_assert(s != 0);
+    test_assert(ecs_script_update(world, s, 0, "e {}\ng {}\n") == 0);
+    output_command(world, "minus", output_minus_cmd, true);
+    output_run(world, "script_diff level; minus");
+
+    // The script_diff result is colored as a diff
+    const ConsoleOutput *o = output_colors(world);
+    ecs_entity_t added = output_find(world, "+g {}", true);
+    output_check(world, added, 0, -1, &o->added);
+
+    // The string of the next command is not a diff
+    ecs_entity_t minus = output_find(world, "-not a diff", true);
+    test_assert(minus != 0);
+    test_assert(!ecs_has(world, minus, TextSpans));
+    ecs_entity_t plus = output_find(world, "+nor this", true);
+    test_assert(plus != 0);
+    test_assert(!ecs_has(world, plus, TextSpans));
+
+    ecs_fini(world);
+}
+
+void ConsoleOutput_multi_error_stops(void) {
+    // console/output
+    ecs_world_t *world = output_world();
+    ecs_entity(world, { .name = "alps.alpha" });
+    output_run(world, "ls alps; rm nothing; cd alps");
+
+    // Only the error is shown and the commands after it do not run
+    test_assert(output_find(world, "error: ", false) != 0);
+    test_assert(output_find(world, "alps.alpha", true) == 0);
+    output_run(world, "ls");
+    test_assert(output_find(world, "alps", true) != 0);
+    test_assert(output_find(world, "alpha", true) == 0);
+
+    ecs_fini(world);
+}
