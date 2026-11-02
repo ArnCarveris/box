@@ -18,7 +18,6 @@
 /** A FogVolume of this frame */
 typedef struct box_fog_volume_t {
     ecs_entity_t scene;     /**< Scene root of the volume, 0 for the default scene */
-    float radius;           /**< Radius of the sphere around its box */
     box_render_fog_volume_t record; /**< Its record */
 } box_fog_volume_t;
 
@@ -114,7 +113,6 @@ static void box_fog_collect(
             box_fog_volume_t *f = ecs_vec_append_t(NULL, &l->fog_volumes, box_fog_volume_t);
             f->scene = box_render_scene_field(&it, 2, i);
             box_fog_record(&fogs[i], transforms ? &transforms[i] : NULL, &f->record);
-            f->radius = glm_vec3_norm(f->record.extent);
         }
     }
 }
@@ -158,6 +156,60 @@ static bool box_fog_listed(
     return result;
 }
 
+/** Check whether a sphere or a box may be in the frustum of a view: whether it is on the inner
+ * side of every plane, by the radius of the sphere or the extent of the box along the normal.
+ *
+ * @param v The view
+ * @param center Center of the shape
+ * @param radius Radius of the sphere, used without axes
+ * @param axes Unit axes of the box, NULL for a sphere
+ * @param extent Half size of the box along its axes
+ * @return Whether the shape may be in the frustum
+ */
+static bool box_view_sees(
+    const box_render_view_t *v,
+    const float *center,
+    float radius,
+    const vec4 *axes,
+    const float *extent)
+{
+    const Camera *c = &v->camera_data;
+    bool sides = !c->ortho || c->ortho_scale <= 0, result = true;
+    float aspect = c->aspect_ratio > 0 ? c->aspect_ratio : BOX_RENDER_SEES_ASPECT;
+    mat4 proj, m;
+    int32_t i, j, k;
+    box_camera_projection(c, aspect, 1.0f, proj);
+    glm_mat4_mul(proj, ECS_CONST_CAST(vec4*, v->view_matrix), m);
+    for (i = sides ? 0 : 4; i < 6 && result; i ++) {
+        vec4 plane;
+        for (j = 0; j < 4; j ++) {
+            if (i < 4) {
+                plane[j] = m[j][3] + ((i & 1) ? -1.0f : 1.0f) * m[j][i / 2];
+            } else {
+                plane[j] = i == 4 ? m[j][3] - m[j][2] : m[j][2];
+            }
+        }
+
+        float len = sqrtf(plane[0] * plane[0] + plane[1] * plane[1] + plane[2] * plane[2]);
+        if (len > 1e-12f) {
+            float d = (plane[0] * center[0] + plane[1] * center[1] + plane[2] * center[2] +
+                plane[3]) / len;
+            float r = radius;
+            if (axes) {
+                r = 0;
+                for (k = 0; k < 3; k ++) {
+                    r += extent[k] * fabsf(plane[0] * axes[k][0] + plane[1] * axes[k][1] +
+                        plane[2] * axes[k][2]) / len;
+                }
+            }
+
+            result = d >= -r;
+        }
+    }
+
+    return result;
+}
+
 void box_render_fog_views(
     ecs_world_t *world,
     box_render_fog_t *l,
@@ -187,7 +239,9 @@ void box_render_fog_views(
         ecs_vec_clear(&l->fog_order);
         for (j = 0; j < fog_count; j ++) {
             const box_fog_volume_t *f = &fogs[j];
-            if (f->scene != v->scene || !box_render_view_sees(v, f->record.center, f->radius)) {
+            if (f->scene != v->scene || !box_view_sees(v, f->record.center, 0,
+                ECS_CONST_CAST(vec4*, f->record.axes), f->record.extent))
+            {
                 continue;
             }
 
@@ -276,31 +330,5 @@ bool box_render_view_sees(
     const float *center,
     float radius)
 {
-    const Camera *c = &v->camera_data;
-    bool sides = !c->ortho || c->ortho_scale <= 0, result = true;
-    float aspect = c->aspect_ratio > 0 ? c->aspect_ratio : BOX_RENDER_SEES_ASPECT;
-    mat4 proj, m;
-    int32_t i, j;
-    box_camera_projection(c, aspect, 1.0f, proj);
-    glm_mat4_mul(proj, ECS_CONST_CAST(vec4*, v->view_matrix), m);
-    for (i = sides ? 0 : 4; i < 6 && result; i ++) {
-        vec4 plane;
-        for (j = 0; j < 4; j ++) {
-            if (i < 4) {
-                plane[j] = m[j][3] + ((i & 1) ? -1.0f : 1.0f) * m[j][i / 2];
-            } else {
-                plane[j] = i == 4 ? m[j][3] - m[j][2] : m[j][2];
-            }
-        }
-
-        float len = sqrtf(plane[0] * plane[0] + plane[1] * plane[1] + plane[2] * plane[2]);
-        if (len > 1e-12f) {
-            float d = (plane[0] * center[0] + plane[1] * center[1] + plane[2] * center[2] +
-                plane[3]) / len;
-            result = d >= -radius;
-        }
-    }
-
-    return result;
+    return box_view_sees(v, center, radius, NULL, NULL);
 }
-

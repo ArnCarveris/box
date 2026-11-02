@@ -57,10 +57,9 @@ typedef struct box_render_gpu_stats_t {
                                  *   the mesh shader is not compiled yet or none of its culled
                                  *   batches draws in it (only blended or transmissive draws).
                                  *
-                                 *   Plus the passes a view continues in after a split: one
-                                 *   after its opaque snapshot of transmission, one that reads
-                                 *   the depth for its fog volumes and soft particles together
-                                 *   and one more when draws follow those.
+                                 *   Plus a split after its opaque snapshot of transmission,
+                                 *   one that reads the depth for its fog volumes and soft
+                                 *   particles and one more when draws follow those.
                                  *
                                  *   Not the depth prepasses, the snapshot downsample passes,
                                  *   nor the shadow, cull, atmosphere, particle simulation or

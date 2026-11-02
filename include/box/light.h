@@ -260,26 +260,17 @@ ECS_STRUCT(ReflectionProbe, {
     vec3 offset;          /**< Capture point relative to the entity, default {0, 0, 0} */
 });
 
-/** A box of fog in the scene the entity is in, placed by the world transform of the entity
- * (position and rotation, scale is ignored) as a ReflectionProbe is: centered on the entity and
- * oriented by its rotation.
+/** A box of fog the lit views of its scene with LightSettings.fog_volumes raymarch, placed by the
+ * position and rotation of the entity as a ReflectionProbe is (scale ignored). Probe and
+ * reflection captures and bakes do not see it.
  *
- * Every lit view of the scene with LightSettings.fog_volumes raymarches the part of the box in
- * front of its depth in its forward pass, after the opaque meshes and the sky and before the
- * particles, the 2D shapes and the blended draws: glass shows it through its opaque snapshot,
- * but blended shapes and particles in or behind a volume are not fogged. Volumes outside the
- * frustum of a view are left out, the others blend back to front by the distance of their
- * centers, at most BOX_RENDER_FOG_VOLUMES_MAX (32) per view, the nearest kept. Probe and
- * reflection captures and bakes do not see them.
+ * It draws in the forward pass after the opaque meshes and the sky, back to front, at most 32 in
+ * the frustum per view, the nearest kept. Glass shows it through its snapshot; blended shapes and
+ * particles in or behind it are not fogged, and a view without clear keeps its alpha.
  *
- * The fog is lit by the ambient light of the view, the environment of the view or the
- * hemisphere of the scene (not the probe volume), and by the first directional light through
- * its cascades and LightCookie, with a Henyey-Greenstein phase. Further directional lights and
- * the point and spot lights are not marched. A view that renders the Atmosphere of its scene
- * attenuates the light the volume scatters by the aerial perspective.
- *
- * The draw adds the light the fog scatters to the color and multiplies it by the transmittance
- * of the fog; the alpha of the target is left as it is, so a view without clear keeps its alpha.
+ * It is lit by the ambient of the view (environment or hemisphere, not the probe volume) and the
+ * first directional light through its cascades and LightCookie, dimmed by the aerial perspective
+ * of the view; further directional, point and spot lights are not marched.
  */
 ECS_STRUCT(FogVolume, {
     vec3 extent;             /**< Half size of the box, default {5, 5, 5} */

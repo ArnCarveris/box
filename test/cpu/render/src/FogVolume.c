@@ -381,6 +381,7 @@ void FogVolume_frustum_culled(void) {
     volume_new(world, 0, 0, -500, -10);
     ecs_entity_t inside = volume_new(world, 0, 0, 0, 12);
     ecs_set(world, inside, FogVolume, {.extent = {5, 5, 5}, .density = 0.1f, .steps = 24});
+    volume_new(world, 0, 0, 0, 16);
     frame(world);
 
     const box_render_view_t *v = packet_view(null, view);

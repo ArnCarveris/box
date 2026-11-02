@@ -5,9 +5,8 @@
  * phase, the order of overlapping volumes, glass, orthographic cameras, resizes, several views
  * and the captures, which do not see them; checked on PNG captures.
  *
- * Most cases run in a lit view without directional light (a point light of intensity 0 out of
- * reach replaces the default sun) from a camera at the origin looking down -Z with a 60 degree
- * field of view, over walls of black albedo that show their emission. Volumes have hard edges
+ * Most cases run in a lit view without a sun, from a camera at the origin looking down -Z with a
+ * 60 degree field of view, over black walls that show their emission. Volumes have hard edges
  * and white color unless a case sets them.
  */
 
@@ -432,7 +431,8 @@ void FogVolume_camera_inside(void) {
     ecs_fini(world);
 }
 
-/** A volume behind the camera, whose bounding sphere reaches into the frustum, draws nothing. */
+/** A volume behind the camera, whose bounding sphere reaches into the frustum but whose box does
+ * not, is culled and draws nothing. */
 void FogVolume_not_behind_camera(void) {
     // fog_volume/draw
     ecs_world_t *world = fv_world(0);
@@ -446,7 +446,7 @@ void FogVolume_not_behind_camera(void) {
     stbi_image_free(px);
     box_render_gpu_stats_t before = fv_frames(world, 0);
     box_render_gpu_stats_t after = fv_frames(world, 1);
-    test_int(after.fog_volumes - before.fog_volumes, 1);
+    test_int(after.fog_volumes - before.fog_volumes, 0);
 
     ecs_fini(world);
 }

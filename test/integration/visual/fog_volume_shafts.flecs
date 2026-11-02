@@ -6,15 +6,15 @@ using box.view
 using box.light
 
 // Light shafts: a low sun shines through three window holes in the left wall of a room with a
-// ceiling and a back wall, whose open front faces the camera. A FogVolume fills the room, so the
-// light of each window draws a shaft through the fog and onto the floor, and the pillars and
-// strips of the wall cast the dark gaps between the shafts. The forward phase of the fog makes
-// the shafts brighter toward the windows the camera looks at; the ambient keeps the fog in the
-// shadows faintly visible.
+// ceiling and a back wall. A FogVolume fills the room, so the light of each window draws a shaft
+// through the fog and onto the floor, and the pillars of the wall cast the dark gaps between the
+// shafts. The camera stands inside the fog by the right wall and looks back at the windows, so
+// the forward phase of the fog makes the shafts brighter toward them; the ambient keeps the fog
+// in the shadows faintly visible, and a crate stands in the fog in front of the right shaft.
 
 camera {
-  Position: {5, 3, 13}
-  Rotation: {-0.12, 0.42, 0}
+  Position: {7.6, 1.6, 0}
+  Rotation: {0.15, 1.5708, 0}
   Camera: {fov: 55}
 }
 
