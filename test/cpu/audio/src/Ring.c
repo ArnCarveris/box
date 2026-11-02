@@ -5,9 +5,16 @@
  */
 
 #include "util.h"
+#include <flecs.h>
 #include <ring.h>
 #include <pthread.h>
 #include <sched.h>
+
+/* The cases without a world call no flecs function that would set up the OS API they allocate
+ * and log with. */
+void Ring_setup(void) {
+    ecs_os_set_api_defaults();
+}
 
 void Ring_order(void) {
     // audio/native
@@ -105,8 +112,10 @@ void Ring_two_parts(void) {
 
     test_bool(box_audio_ring_write(&ring, payload, 12, payload, 12), true);
     test_bool(box_audio_ring_write(&ring, payload, 12, payload, 12), true);
-    test_bool(box_audio_ring_write(&ring, &header, 4, payload, 12), false);
+    test_bool(box_audio_ring_write(&ring, &header, 4, out, 16), false);
     test_int(box_audio_ring_used(&ring), 48);
+    test_bool(box_audio_ring_write(&ring, &header, 4, payload, 12), true);
+    test_int(box_audio_ring_room(&ring), 0);
     box_audio_ring_fini(&ring);
 }
 

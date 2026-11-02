@@ -5,6 +5,7 @@
  */
 
 #include "util.h"
+#include <flecs.h>
 #include <transport.h>
 
 /** Frames of a capture */
@@ -50,6 +51,12 @@ static box_audio_transport_t* transport_null(
     test_int(t->state(t), BOX_AUDIO_STATE_NO_DEVICE);
 
     return t;
+}
+
+/* The cases without a world call no flecs function that would set up the OS API they allocate
+ * and log with. */
+void Transport_setup(void) {
+    ecs_os_set_api_defaults();
 }
 
 void Transport_null_frames(void) {
@@ -222,9 +229,9 @@ void Transport_command_before_render(void) {
     box_audio_writer_init(&writer, bytes, sizeof(bytes));
     box_audio_write_play(&writer, 1, 1, 0, 1, 0, 1, 0);
     test_bool(t->commands(t, writer.data, writer.size), true);
-    t->update(t, 0.01f);
+    t->update(t, 0.0125f);
 
-    test_int(capture.frames, 480);
+    test_int(capture.frames, 600);
     test_assert(transport_l[0] < 0.01f);
     test_assert(transport_l[AUDIO_RAMP + 10] > 0.49f);
     box_audio_transport_free(t);

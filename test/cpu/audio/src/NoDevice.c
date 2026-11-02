@@ -54,6 +54,12 @@ static void no_device_capture_stop(
     ecs_log_enable_colors(c.colors);
 }
 
+/* The cases without a world call no flecs function that would set up the OS API they allocate
+ * and log with. */
+void NoDevice_setup(void) {
+    ecs_os_set_api_defaults();
+}
+
 void NoDevice_test_world(void) {
     // audio/native
     ecs_world_t *world = ecs_init();
