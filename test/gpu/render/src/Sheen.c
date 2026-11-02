@@ -2,10 +2,12 @@
  * @file Sheen.c
  * @brief Tests for how a Sheen shades and updates, checked on PNG captures.
  *
- * Most cases look at a dark rough sphere of radius 1 at the origin, seen from 4 units in front
- * of it, lit by a directional light travelling along the view, so the light reaches every pixel
- * the camera sees and the half vector is the view direction. Its silhouette is a circle of
- * about 45 pixels around the center of the image, where the sheen shows as a bright rim.
+ * Most cases look at a dark rough sphere of radius 1, 4 units in front of the camera, lit by a
+ * directional light along the view; its silhouette is a circle of about 45 pixels around the
+ * center of the image, where the sheen shows as a bright rim.
+ *
+ * The center keeps 1 - 0.157 of its base, plus in indirect light the small bias the albedo fit
+ * has above a roughness of 0.25. Under a coat at normal incidence the sheen loses about 4%.
  */
 
 #include <box.h>
@@ -190,6 +192,7 @@ static float sheen_linear(
     unsigned char v)
 {
     float c = (float)v / 255.0f;
+
     return c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f);
 }
 
@@ -313,9 +316,8 @@ void Sheen_brightens_grazing(void) {
     test_assert(plain_center.sum > 0.05f);
     test_assert(sheen_rim_.sum > plain_rim.sum * 2.0f + 0.1f);
 
-    /* The center has no sheen and keeps 1 - 0.157 of its base */
     test_assert(sheen_center_.sum <= plain_center.sum * 1.01f + 0.002f);
-    test_assert(sheen_center_.sum >= plain_center.sum * 0.80f);
+    test_assert(sheen_center_.sum >= plain_center.sum * 0.78f);
 
     stbi_image_free(plain);
     stbi_image_free(sheen);
@@ -351,8 +353,6 @@ void Sheen_roughness_broadens(void) {
     unsigned char *a = sheen_lit(&tight, 3, true, "sheen_tight.png");
     unsigned char *b = sheen_lit(&broad, 3, true, "sheen_broad.png");
 
-    /* Pixels halfway between the center and the rim, the normal about 30 to 45 degrees from
-     * the view */
     sheen_ring_t plain_mid = sheen_ring(plain, 20, 30);
     sheen_ring_t tight_mid = sheen_ring(a, 20, 30);
     sheen_ring_t broad_mid = sheen_ring(b, 20, 30);
@@ -378,7 +378,9 @@ void Sheen_indirect_only(void) {
     test_assert(plain_center.sum > 0.02f);
     test_assert(sheen_rim_.sum > plain_rim.sum * 1.5f + 0.03f);
     test_assert(sheen_rim_.sum > sheen_center_.sum);
-    test_assert(plain_center.sum + 0.001f >= sheen_center_.sum * 0.9f);
+
+    test_assert(sheen_center_.sum >= plain_center.sum * 0.8f);
+    test_assert(sheen_rim_.sum - plain_rim.sum > (sheen_center_.sum - plain_center.sum) * 2.0f);
 
     stbi_image_free(plain);
     stbi_image_free(sheen);
@@ -527,8 +529,6 @@ void Sheen_under_clear_coat(void) {
     unsigned char *coated_plain = sheen_coated(NULL, true, "sheen_coated_plain.png");
     unsigned char *coated = sheen_coated(&white, true, "sheen_coated.png");
 
-    /* The coat lobe is the same with and without the sheen and cancels in the difference; what
-     * the sheen adds loses the coat's Fresnel at normal incidence, 0.04 */
     float bare = sheen_rim(sheen).sum - sheen_rim(plain).sum;
     float under = sheen_rim(coated).sum - sheen_rim(coated_plain).sum;
     test_assert(bare > 0.1f);

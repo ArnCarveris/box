@@ -25,8 +25,8 @@ extern "C" {
 /** Slot of the material table a shape renders with, set by the engine and read only for
  * applications, inherited by instances.
  *
- * Rgb, PbrMaterial, ClearCoat, SpecularAnisotropy, Sheen, Emissive, Transmission,
- * TextureTransform and AlphaCutoff bring it along. A prefab that owns one gets a slot its instances share, a 3D
+ * Rgb, PbrMaterial, ClearCoat, SpecularAnisotropy, Sheen, Emissive, Transmission, TextureTransform
+ * and AlphaCutoff bring it along. A prefab that owns one gets a slot its instances share, a 3D
  * shape that owns one a slot of its own, composed of what it owns and what it still inherits.
  *
  * Slot 0 is the default material, of a shape without any material component. An owned id that
@@ -165,15 +165,11 @@ ECS_STRUCT(SpecularAnisotropy, {
 
 /** Soft bright rim at grazing angles of a 3D mesh (velvet, cloth, dust), glTF's
  * KHR_materials_sheen, default a white color and roughness 0.5, inherited like Rgb; a field a
- * scene does not set keeps its default. A black color means no sheen. Only 3D meshes have it,
- * 2D shapes and text ignore it.
+ * scene does not set keeps its default. Only 3D meshes have it, 2D shapes and text ignore it.
  *
- * The model three.js uses: direct light adds a Charlie lobe with the Neubelt visibility times
- * color, its roughness squared clamped to 0.07..1 before; indirect light adds the indirect
- * diffuse light times color times an analytic fit of the sheen albedo and the occlusion. The base
- * lobes lose energy by a constant 1 - 0.157 * max(color), with no lookup table. The sheen lies
- * under the clear coat, which attenuates it with the rest of the base. Emission is not scaled; an
- * unlit view ignores it.
+ * As three.js: direct light adds a Charlie lobe with the Neubelt visibility, indirect light the
+ * diffuse light by a fit of the sheen albedo, and the base keeps 1 - 0.157 * max(color), with no
+ * lookup table. It lies under the clear coat; emission is not scaled, an unlit view ignores it.
  */
 ECS_STRUCT(Sheen, {
     Rgb color;       /**< Color of the sheen, display encoded, black for none */
