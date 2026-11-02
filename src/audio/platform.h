@@ -6,13 +6,11 @@
 #ifndef BOX_AUDIO_PLATFORM_H
 #define BOX_AUDIO_PLATFORM_H
 
-/** Default peak level of the tone of the ?tone= query parameter */
-#define BOX_AUDIO_WEB_TONE_LEVEL 0.25f
+#include <stdint.h>
 
 /** Create the AudioContext of the page and load the worklet of the core, once per page.
  *
- * The context stays suspended until box_audio_web_gesture. With ?tone=<hz> in the address of
- * the page the core plays a tone of that frequency once it runs. Nothing on native builds.
+ * The context stays suspended until box_audio_web_gesture. Nothing on native builds.
  */
 void box_audio_web_start(void);
 
@@ -21,13 +19,30 @@ void box_audio_web_start(void);
  */
 void box_audio_web_gesture(void);
 
-/** Send the tone command to the core: its frequency and peak level. Nothing on native builds.
+/** Send a batch of commands of the core (core/core.h) to the worklet, which applies it
+ * between two quanta. The bytes are copied. Nothing on native builds.
  *
- * @param frequency Frequency in Hz
- * @param level Peak level, 0..1
+ * @param commands The bytes
+ * @param size Number of bytes
  */
-void box_audio_web_tone(
-    float frequency,
-    float level);
+void box_audio_web_apply(
+    const void *commands,
+    int32_t size);
+
+/** Send a sound to the worklet, which copies it into the heap of its core and frees it there
+ * once a release made it unused. The frames are copied. Nothing on native builds.
+ *
+ * @param id Id of the sound
+ * @param data Frames, interleaved when stereo
+ * @param frames Number of frames
+ * @param channels 1 or 2
+ * @param sample_rate Frames per second of the sound
+ */
+void box_audio_web_sound(
+    uint32_t id,
+    const float *data,
+    int32_t frames,
+    int32_t channels,
+    float sample_rate);
 
 #endif

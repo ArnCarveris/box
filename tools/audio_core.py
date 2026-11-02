@@ -23,20 +23,26 @@ import tempfile
 
 EXPORTS = [
     "box_audio_core_wasm_init",
+    "box_audio_core_wasm_alloc",
+    "box_audio_core_wasm_free",
+    "box_audio_core_wasm_sound",
+    "box_audio_core_wasm_apply",
     "box_audio_core_wasm_render",
+    "box_audio_core_wasm_read_events",
+    "box_audio_core_wasm_events",
+    "box_audio_core_wasm_voices",
     "box_audio_core_wasm_left",
     "box_audio_core_wasm_right",
-    "box_audio_core_wasm_set_frequency",
-    "box_audio_core_wasm_set_level",
 ]
 
 # clang, not emcc: emcc links start code and libc of its cache into a standalone wasm, which the
-# core does not need, so the build needs no cache and the module stays about 1 KB.
+# core does not need, so the build needs no cache and the module stays a few KB. The memory starts
+# at 1 MB and grows up to 256 MB as the worklet copies sounds into the heap of the core.
 FLAGS = [
     "--target=wasm32-unknown-unknown", "-O2", "-msimd128", "-std=c11", "-ffreestanding",
     "-nostdlib", "-Wall", "-Werror", "-DBOX_AUDIO_CORE_WASM",
     "-Wl,--no-entry", "-Wl,-z,stack-size=65536", "-Wl,--initial-memory=1048576",
-    "-Wl,--max-memory=1048576", "-Wl,--strip-all",
+    "-Wl,--max-memory=268435456", "-Wl,--strip-all",
 ] + ["-Wl,--export=" + name for name in EXPORTS]
 
 
