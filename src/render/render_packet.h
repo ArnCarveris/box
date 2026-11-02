@@ -476,15 +476,11 @@ typedef struct box_render_fog_volume_t {
     float sun_inscatter;    /**< FogVolume.sun_inscatter, at least 0 */
     float ambient_inscatter; /**< FogVolume.ambient_inscatter, at least 0 */
     int32_t steps;          /**< FogVolume.steps, 4 to 128 */
-<<<<<<< HEAD
     float wind[3];          /**< FogVolume.wind */
     float noise_strength;   /**< FogVolume.noise_strength, 0 to 1 */
     float noise_scale;      /**< FogVolume.noise_scale, at least BOX_RENDER_FOG_NOISE_SCALE_MIN */
-    float _pad[3];          /**< Padding to the 16 byte alignment of the WGSL struct */
-=======
     float light_inscatter;  /**< FogVolume.light_inscatter, at least 0 */
-    float pad[3];           /**< Pads the record to the 16 byte stride of its WGSL array */
->>>>>>> 7cb8fe4b3712af4523b83ff0cb71936a3b6f4c99
+    float pad[2];           /**< Pads the record to the 16 byte stride of its WGSL array */
 } box_render_fog_volume_t;
 
 /** Smallest FogVolume.noise_scale a record keeps */

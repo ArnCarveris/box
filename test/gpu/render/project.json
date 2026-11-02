@@ -985,14 +985,12 @@
                     "two_views",
                     "view_disables",
                     "not_in_captures",
-<<<<<<< HEAD
                     "noise_zero_unchanged",
                     "noise_varies",
                     "noise_scale",
                     "wind_moves",
                     "noise_deterministic",
-                    "noise_device_loss"
-=======
+                    "noise_device_loss",
                     "lights_zero_unchanged",
                     "point_light_glow",
                     "spot_light_cone",
@@ -1000,7 +998,6 @@
                     "point_shadow_in_fog",
                     "light_outside_clusters",
                     "no_new_splits"
->>>>>>> 7cb8fe4b3712af4523b83ff0cb71936a3b6f4c99
                 ]
             }
         ]

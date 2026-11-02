@@ -862,7 +862,6 @@ void FogVolume_not_in_captures(void) {
     test_assert(fabsf(sh_fogged - sh_clear) <= 0.02f * fabsf(sh_clear) + 1e-4f);
 }
 
-<<<<<<< HEAD
 /** Add an absorbing volume with noise in front of the wall of an orthographic view: 2 units
  * deep across the whole view, 4 pixels a unit.
  *
@@ -886,7 +885,11 @@ static ecs_entity_t fv_noise_volume(
     f->noise_strength = strength;
     f->noise_scale = scale;
     glm_vec3_copy(ECS_CONST_CAST(float*, wind), f->wind);
-=======
+    ecs_modified(world, e, FogVolume);
+
+    return e;
+}
+
 /** Add a white volume that scatters all it extinguishes, with hard edges, an isotropic phase
  * and 128 steps.
  *
@@ -909,13 +912,11 @@ static ecs_entity_t fv_lit_volume(
     f->asymmetry = 0;
     f->steps = 128;
     f->light_inscatter = light_inscatter;
->>>>>>> 7cb8fe4b3712af4523b83ff0cb71936a3b6f4c99
     ecs_modified(world, e, FogVolume);
 
     return e;
 }
 
-<<<<<<< HEAD
 /** Measure the green of the pixels of a square capture inside a margin of 4 pixels.
  *
  * @param px The pixels
@@ -1164,7 +1165,7 @@ void FogVolume_noise_device_loss(void) {
     ecs_os_free(path);
     ecs_fini(world);
 }
-=======
+
 /** Add a point light.
  *
  * @param world The world
@@ -1487,4 +1488,3 @@ void FogVolume_no_new_splits(void) {
     test_int(with[0], without[0]);
     test_int(with[1], without[1]);
 }
->>>>>>> 7cb8fe4b3712af4523b83ff0cb71936a3b6f4c99
