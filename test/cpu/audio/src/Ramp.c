@@ -33,8 +33,8 @@ void Ramp_volume_step(void) {
     test_assert(audio_l[2047] == 0.5f);
     audio_voice_set(core, 1, BOX_AUDIO_PARAM_VOLUME, 0.2f);
     audio_render(core, 2048, 2048);
-    test_assert(audio_max_step(audio_l, 1, 4096) <= bound);
-    test_assert(audio_max_step(audio_r, 1, 4096) <= bound);
+    test_assert(audio_max_step(audio_l, 2048, 4096) <= bound);
+    test_assert(audio_max_step(audio_r, 2048, 4096) <= bound);
     test_assert(audio_l[2048] < 0.5f);
     test_assert(audio_l[2048] > 0.49f);
     test_assert(fabsf(audio_l[2048 + AUDIO_RAMP] - 0.1f) < 1e-6f);

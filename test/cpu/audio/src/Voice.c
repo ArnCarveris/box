@@ -84,7 +84,11 @@ void Voice_release_after_end(void) {
     test_assert(audio_l[511] == 0.5f);
     test_int(audio_events(core, BOX_AUDIO_EVENT_SOUND_FREE, NULL), 0);
     audio_render(core, 512, 1024);
-    test_int(audio_events(core, BOX_AUDIO_EVENT_SOUND_FREE, &e), 1);
+    test_int(box_audio_core_read_events(core, &e, 1), 1);
+    test_int(e.type, BOX_AUDIO_EVENT_VOICE_END);
+    test_uint(e.id, 1);
+    test_int(box_audio_core_read_events(core, &e, 1), 1);
+    test_int(e.type, BOX_AUDIO_EVENT_SOUND_FREE);
     test_uint(e.id, 3);
     audio_play(core, 2, 3, 0, 1, 0, 1, 0);
     test_int(box_audio_core_voice_count(core), 0);

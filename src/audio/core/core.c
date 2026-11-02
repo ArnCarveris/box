@@ -256,7 +256,8 @@ static float box_audio_voice_level(
     return v->left.target > v->right.target ? v->left.target : v->right.target;
 }
 
-/** End a voice: free its slot, give back its source and report it.
+/** End a voice: report it, then free its slot and give back its source, so the end comes
+ * before the SOUND_FREE it can cause.
  *
  * @param core The core
  * @param v The voice
@@ -269,9 +270,9 @@ static void box_audio_voice_end(
         core->playing --;
     }
 
+    box_audio_core_event(core, BOX_AUDIO_EVENT_VOICE_END, v->handle, 0);
     box_audio_source_end(core, &v->source);
     v->state = BOX_AUDIO_VOICE_FREE;
-    box_audio_core_event(core, BOX_AUDIO_EVENT_VOICE_END, v->handle, 0);
 }
 
 /** Fade a voice out over a number of frames, after which it ends.

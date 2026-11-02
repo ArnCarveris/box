@@ -82,9 +82,10 @@ is immediate. The pan is equal power with unity at the center: the gains are
 `sqrt(2) cos(a)` and `sqrt(2) sin(a)` for `a` from 0 to pi/2, so a centered mono voice plays
 its samples as they are.
 
-**The limiter** on the master keeps the peak at `BOX_AUDIO_LIMITER_THRESHOLD` (0.95): its gain
-drops at once to the threshold over the peak and rises back linearly over 100 ms. A signal
-under the threshold passes unchanged, and a final clamp keeps the output within -1..1.
+**The limiter** on the master keeps the peak at `BOX_AUDIO_LIMITER_THRESHOLD` (0.95): its gain,
+one for both channels so the image does not shift, drops at once to the threshold over the peak
+and rises back linearly over 100 ms. A signal under the threshold passes unchanged, and a final
+clamp keeps the output within -1..1.
 
 **Bad input.** Every sample a source reads and every sample a bus outputs that is NaN,
 infinite, larger than 1e30 or smaller than 1e-30 becomes 0, so neither a NaN nor a denormal

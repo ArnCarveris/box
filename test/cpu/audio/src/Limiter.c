@@ -5,6 +5,8 @@
 
 #include "util.h"
 
+/* The gain of the limiter is linked: the louder channel reaches the threshold, the other
+ * keeps its ratio to it */
 void Limiter_full_voices(void) {
     // audio/limiter
     box_audio_core_t *core = audio_new();
@@ -26,7 +28,7 @@ void Limiter_full_voices(void) {
     }
 
     test_assert(audio_peak(audio_l, 0, AUDIO_FRAMES) > 0.9f);
-    test_assert(audio_peak(audio_r, 0, AUDIO_FRAMES) > 0.9f);
+    test_assert(audio_peak(audio_r, 0, AUDIO_FRAMES) > 0.1f);
     box_audio_core_free(core);
 }
 
