@@ -1127,9 +1127,13 @@ void box_draws_reset_backend(
     box_draws_materials_reset(d);
 }
 
-/** Give a batch a run of slots that holds all its instances. A batch that outgrew its run
- * extends it in place when it ends at the top of its page, so nothing is copied and no hole is
- * left, and otherwise moves to a new run; its old run is freed.
+/** Give a batch a run of slots that holds all its instances. A new batch gets a run of its
+ * count, rounded up to BOX_DRAWS_GROW_ALIGN slots and at least BOX_DRAWS_MIN_CAPACITY, so a
+ * batch created with all its instances in one frame holds no slots it never uses. A batch that
+ * outgrew its run grows to the next growth step from its run (box_draws_grow), so headroom is
+ * only added once a batch grows. It extends its run in place when it ends at the top of its
+ * page, so nothing is copied and no hole is left, and otherwise moves to a new run; its old run
+ * is freed.
  *
  * A moved batch remembers the old run and the instances the GPU holds in it, which the send
  * copies into the new run (box_draws_send_batch); its changed slots stay queued and are written
@@ -1153,7 +1157,12 @@ static void box_draws_reserve(
         goto done;
     }
 
-    capacity = box_draws_grow(0, count);
+    if (b->page < 0) {
+        /* From its own count, box_draws_grow rounds the count up without a step */
+        capacity = box_draws_grow(count, count);
+    } else {
+        capacity = box_draws_grow(b->capacity, count);
+    }
 
     if (capacity > limit && count <= limit) {
         capacity = limit;

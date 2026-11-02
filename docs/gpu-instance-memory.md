@@ -483,6 +483,31 @@ once, so the steps save no growth either (7 against 10 in the spawn scene, 11.0 
 kept). A page whose top grows in small steps would be created again every 4,096 slots, so its
 copies grow with the square of its slots; with 1.5 the copied bytes stay below twice its size.
 
+Follow-up (InstanceRunExact): a new batch gets a run of its count rounded up to 4 slots
+(`BOX_DRAWS_GROW_ALIGN`), at least `BOX_DRAWS_MIN_CAPACITY`, instead of the growth step at or
+above its count (`box_draws_reserve`). Growth headroom is only added once a batch outgrows its
+run: it then grows by half from its run (`box_draws_grow(capacity, count)`), so a run of 1,000
+grows to 1,500, extended in place at the top of its page or moved with a GPU copy. A batch that
+starts at 16 slots or less starts on the growth steps, so its growth is unchanged. A batch that
+gains one instance right after it is created with more than 16 moves or extends once more than
+before; a move copies its instances once on the GPU (InstancePageCopy).
+
+Derived from the code, to be replaced by the measured values (slots, then page bytes):
+
+| Case | Growth step first run | Exact first run |
+| --- | --- | --- |
+| Extract (110,000 instances) | 137,568, 8.8 MB | 110,000, 7.0 MB (derived) |
+| Text.layout_10k (110,000 glyphs) | 126,468, 14.2 MB | 110,000, 12.3 MB (derived) |
+| Shapes2D.dynamic_material | 137,568, 15.4 MB | to measure |
+| Shapes2D.changed_1pct | 126,468, 14.2 MB | 110,000, 12.3 MB (derived) |
+| Shapes2D.ui_tree_idle | 11,100, 1.2 MB | to measure |
+| Shapes2D.clipped_1000_moving_clips | 1,460, 164 KB | 1,000, 112 KB (derived) |
+| Parametric.extract_spaceship_size (8,792 instances) | 13,880, 1.9 MB | to measure |
+| Spawn, 64 × 1,000 boxes | 84,312, 5.4 MB | to measure |
+
+Moves and page growths of the spawn scene and of Extract's setup, before and after, are still to
+be measured; the spawn scene had 0 moves and 10 page growths with the growth step first run.
+
 ### O3. Full re-uploads when a run moves or a page grows
 
 When a page buffer is created again, `box_draws_pages` marks every batch of the page `full`, and
