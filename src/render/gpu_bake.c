@@ -16,8 +16,9 @@
 
 #ifdef BOX_RENDER_WGPU
 
-/** Visible slots the probes of a chunk may use at most */
-#define BOX_GPU_BAKE_VISIBLE (1 << 22)
+/** Visible slots the probes of a chunk may use at most, which fill the 128 MiB storage binding
+ * of WebGPU */
+#define BOX_GPU_BAKE_VISIBLE (1 << 25)
 
 /** Texels of the face atlas at most */
 #define BOX_GPU_BAKE_TEXELS (1 << 22)
@@ -31,8 +32,14 @@
 /** Near plane of the faces in world units */
 #define BOX_GPU_BAKE_NEAR (0.01f)
 
-/** Bytes between the cull uniforms of two batches, the dynamic offset alignment of webgpu */
-#define BOX_GPU_BAKE_JOB_STRIDE (256)
+/** Bytes between the cull uniforms of two pages, the dynamic offset alignment of webgpu */
+#define BOX_GPU_BAKE_RUN_STRIDE (256)
+
+/** Instances of a block of the cull, CULL_GROUP of etc/shaders/bake_sh.wgsl */
+#define BOX_GPU_BAKE_BLOCK (256)
+
+/** Bytes of the bounds of a block, CullBounds of etc/shaders/bake_sh.wgsl */
+#define BOX_GPU_BAKE_BOUNDS_SIZE (32)
 
 /** Words of the indexed indirect draw arguments of one draw */
 #define BOX_GPU_BAKE_ARGS (5)
@@ -228,22 +235,37 @@ static void box_gpu_bake_state_free(
         wgpuComputePipelineRelease(b->cull);
     }
 
+    if (b->bounds) {
+        wgpuComputePipelineRelease(b->bounds);
+    }
+
     if (b->cull_group) {
         wgpuBindGroupRelease(b->cull_group);
     }
 
-    WGPUBuffer buffers[4] = { b->jobs, b->slots, b->args, b->lists };
-    for (i = 0; i < 4; i ++) {
+    if (b->bounds_group) {
+        wgpuBindGroupRelease(b->bounds_group);
+    }
+
+    WGPUBuffer buffers[7] = {
+        b->jobs, b->runs, b->blocks, b->block_bounds, b->slots, b->args, b->lists
+    };
+    for (i = 0; i < 7; i ++) {
         if (buffers[i]) {
             wgpuBufferRelease(buffers[i]);
         }
     }
 
     ecs_vec_fini_t(NULL, &b->draws, box_gpu_bake_draw_t);
-    ecs_vec_fini_t(NULL, &b->job_data, uint8_t);
+    ecs_vec_fini_t(NULL, &b->job_data, box_gpu_bake_job_t);
+    ecs_vec_fini_t(NULL, &b->run_data, uint8_t);
+    ecs_vec_fini_t(NULL, &b->cull_runs, box_gpu_bake_run_t);
+    ecs_vec_fini_t(NULL, &b->block_data, box_gpu_bake_block_t);
     ecs_vec_fini_t(NULL, &b->list_data, uint32_t);
     wgpuPipelineLayoutRelease(b->cull_pipeline_layout);
     wgpuBindGroupLayoutRelease(b->cull_layout);
+    wgpuPipelineLayoutRelease(b->bounds_pipeline_layout);
+    wgpuBindGroupLayoutRelease(b->bounds_layout);
     wgpuBufferRelease(b->uniforms);
     wgpuBufferRelease(b->params);
     wgpuBufferRelease(b->clusters);
@@ -309,7 +331,7 @@ static box_gpu_bake_t* box_gpu_bake_state_new(
             .bindGroupLayoutCount = 1,
             .bindGroupLayouts = &b->layout
         });
-    WGPUBindGroupLayoutEntry cull[5] = {
+    WGPUBindGroupLayoutEntry cull[7] = {
         entries[0],
         {
             .binding = 5,
@@ -317,7 +339,7 @@ static box_gpu_bake_t* box_gpu_bake_state_new(
             .buffer = {
                 .type = WGPUBufferBindingType_Uniform,
                 .hasDynamicOffset = true,
-                .minBindingSize = sizeof(box_gpu_bake_job_t)
+                .minBindingSize = sizeof(box_gpu_bake_run_uniforms_t)
             }
         },
         {
@@ -334,15 +356,48 @@ static box_gpu_bake_t* box_gpu_bake_state_new(
             .binding = 8,
             .visibility = WGPUShaderStage_Compute,
             .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+        },
+        {
+            .binding = 18,
+            .visibility = WGPUShaderStage_Compute,
+            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+        },
+        {
+            .binding = 21,
+            .visibility = WGPUShaderStage_Compute,
+            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
         }
     };
     b->cull_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 5, .entries = cull });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 7, .entries = cull });
+    WGPUBindGroupLayoutEntry bounds[5] = {
+        cull[1],
+        cull[4],
+        cull[5],
+        {
+            .binding = 19,
+            .visibility = WGPUShaderStage_Compute,
+            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+        },
+        {
+            .binding = 20,
+            .visibility = WGPUShaderStage_Compute,
+            .buffer = { .type = WGPUBufferBindingType_Storage }
+        }
+    };
+    b->bounds_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 5, .entries = bounds });
     WGPUBindGroupLayout cull_groups[2] = { b->cull_layout, gpu->transform_layout };
     b->cull_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){
             .bindGroupLayoutCount = 2,
             .bindGroupLayouts = cull_groups
+        });
+    WGPUBindGroupLayout bounds_groups[2] = { b->bounds_layout, gpu->transform_layout };
+    b->bounds_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
+        &(WGPUPipelineLayoutDescriptor){
+            .bindGroupLayoutCount = 2,
+            .bindGroupLayouts = bounds_groups
         });
     b->uniforms = box_gpu_bake_buffer(gpu,
         (uint64_t)6 * BOX_GPU_BAKE_CHUNK * BOX_GPU_VIEW_STRIDE, WGPUBufferUsage_Uniform);
@@ -358,7 +413,10 @@ static box_gpu_bake_t* box_gpu_bake_state_new(
     }
 
     ecs_vec_init_t(NULL, &b->draws, box_gpu_bake_draw_t, 0);
-    ecs_vec_init_t(NULL, &b->job_data, uint8_t, 0);
+    ecs_vec_init_t(NULL, &b->job_data, box_gpu_bake_job_t, 0);
+    ecs_vec_init_t(NULL, &b->run_data, uint8_t, 0);
+    ecs_vec_init_t(NULL, &b->cull_runs, box_gpu_bake_run_t, 0);
+    ecs_vec_init_t(NULL, &b->block_data, box_gpu_bake_block_t, 0);
     ecs_vec_init_t(NULL, &b->list_data, uint32_t, 0);
     box_gpu_bake_queries_init(gpu, b);
 
@@ -413,6 +471,7 @@ static WGPUComputePipeline box_gpu_bake_pipeline(
 
     box_gpu_bake_compute(gpu, &b->project, b->pipeline_layout, s->module, "project");
     box_gpu_bake_compute(gpu, &b->cull, b->cull_pipeline_layout, s->module, "cull");
+    box_gpu_bake_compute(gpu, &b->bounds, b->bounds_pipeline_layout, s->module, "cull_bounds");
     box_gpu_reflect_pipelines(gpu, s->module);
     b->revision = s->revision;
 done:
@@ -454,6 +513,97 @@ static bool box_gpu_bake_reserve(
     result = true;
 done:
     return result;
+}
+
+/** Write the cull job of every batch, the batches of an instance page next to each other, and the
+ * runs the cull dispatches them with.
+ *
+ * @param gpu The backend
+ * @param b The capture state, with the batches listed
+ * @param packet The packet
+ */
+static void box_gpu_bake_jobs(
+    box_gpu_t *gpu,
+    box_gpu_bake_t *b,
+    const box_render_packet_t *packet)
+{
+    int32_t d, r, draws = ecs_vec_count(&b->draws);
+    uint32_t written = 0;
+    ecs_vec_set_count_t(NULL, &b->job_data, box_gpu_bake_job_t, draws);
+    ecs_vec_clear(&b->cull_runs);
+    ecs_vec_clear(&b->block_data);
+    for (d = 0; d < draws; d ++) {
+        WGPUBindGroup page = ecs_vec_get_t(&b->draws, box_gpu_bake_draw_t, d)->page;
+        for (r = 0; r < ecs_vec_count(&b->cull_runs); r ++) {
+            if (ecs_vec_get_t(&b->cull_runs, box_gpu_bake_run_t, r)->page == page) {
+                break;
+            }
+        }
+
+        if (r == ecs_vec_count(&b->cull_runs)) {
+            *ecs_vec_append_t(NULL, &b->cull_runs, box_gpu_bake_run_t) =
+                (box_gpu_bake_run_t){ .page = page };
+        }
+
+        ecs_vec_get_t(&b->cull_runs, box_gpu_bake_run_t, r)->count ++;
+    }
+
+    int32_t runs = ecs_vec_count(&b->cull_runs);
+    ecs_vec_set_count_t(NULL, &b->run_data, uint8_t, runs * BOX_GPU_BAKE_RUN_STRIDE);
+    for (r = 0; r < runs; r ++) {
+        box_gpu_bake_run_t *run = ecs_vec_get_t(&b->cull_runs, box_gpu_bake_run_t, r);
+        box_gpu_bake_run_uniforms_t *u = (box_gpu_bake_run_uniforms_t*)ecs_vec_get_t(
+            &b->run_data, uint8_t, r * BOX_GPU_BAKE_RUN_STRIDE);
+        ecs_os_memset_t(u, 0, box_gpu_bake_run_uniforms_t);
+        u->first = written;
+        u->first_block = (uint32_t)ecs_vec_count(&b->block_data);
+        run->first = written;
+        run->first_block = u->first_block;
+        for (d = 0; d < draws; d ++) {
+            const box_gpu_bake_draw_t *draw = ecs_vec_get_t(&b->draws, box_gpu_bake_draw_t, d);
+            if (draw->page != run->page) {
+                continue;
+            }
+
+            const box_render_batch_t *rb = ecs_vec_get_t(
+                &packet->batches, box_render_batch_t, draw->batch);
+            box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, rb->mesh);
+            box_gpu_bake_job_t *job = ecs_vec_get_t(&b->job_data, box_gpu_bake_job_t,
+                (int32_t)written);
+            ecs_os_memset_t(job, 0, box_gpu_bake_job_t);
+            job->first = rb->first_instance;
+            job->count = draw->count;
+            job->draw = (uint32_t)d;
+            job->index_count = m->index_count;
+            job->region = draw->region;
+            job->draws = (uint32_t)draws;
+            job->stride = b->stride;
+            job->blocks = (uint32_t)ecs_vec_count(&b->block_data);
+            glm_vec3_copy(m->center, job->center);
+            glm_vec3_copy(m->extent, job->extent);
+            if (rb->listed) {
+                job->first = (uint32_t)ecs_vec_count(&b->list_data);
+                job->list = 1;
+                ecs_os_memcpy_n(
+                    ecs_vec_grow_t(NULL, &b->list_data, uint32_t, (int32_t)draw->count),
+                    box_render_packet_data(packet, rb->slots), uint32_t, (int32_t)draw->count);
+            }
+
+            uint32_t start;
+            for (start = 0; start < draw->count; start += BOX_GPU_BAKE_BLOCK) {
+                uint32_t left = draw->count - start;
+                *ecs_vec_append_t(NULL, &b->block_data, box_gpu_bake_block_t) =
+                    (box_gpu_bake_block_t){
+                        .job = written,
+                        .start = start,
+                        .count = left < BOX_GPU_BAKE_BLOCK ? left : BOX_GPU_BAKE_BLOCK
+                    };
+                run->blocks ++;
+            }
+
+            written ++;
+        }
+    }
 }
 
 /** List the batches the faces of the captures of a scene draw, write the cull uniforms of each
@@ -498,36 +648,19 @@ static void box_gpu_bake_draws(
     }
 
     int32_t draws = ecs_vec_count(&b->draws);
-    ecs_vec_set_count_t(NULL, &b->job_data, uint8_t, draws * BOX_GPU_BAKE_JOB_STRIDE);
-    for (d = 0; d < draws; d ++) {
-        const box_gpu_bake_draw_t *draw = ecs_vec_get_t(&b->draws, box_gpu_bake_draw_t, d);
-        const box_render_batch_t *rb = ecs_vec_get_t(
-            &packet->batches, box_render_batch_t, draw->batch);
-        box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, rb->mesh);
-        box_gpu_bake_job_t *job = (box_gpu_bake_job_t*)ecs_vec_get_t(
-            &b->job_data, uint8_t, d * BOX_GPU_BAKE_JOB_STRIDE);
-        ecs_os_memset_t(job, 0, box_gpu_bake_job_t);
-        job->first = rb->first_instance;
-        job->count = draw->count;
-        job->draw = (uint32_t)d;
-        job->index_count = m->index_count;
-        job->region = draw->region;
-        job->draws = (uint32_t)draws;
-        job->stride = b->stride;
-        glm_vec3_copy(m->center, job->center);
-        glm_vec3_copy(m->extent, job->extent);
-        if (rb->listed) {
-            job->first = (uint32_t)ecs_vec_count(&b->list_data);
-            job->list = 1;
-            ecs_os_memcpy_n(ecs_vec_grow_t(NULL, &b->list_data, uint32_t, (int32_t)draw->count),
-                box_render_packet_data(packet, rb->slots), uint32_t, (int32_t)draw->count);
-        }
-    }
-
+    box_gpu_bake_jobs(gpu, b, packet);
+    int32_t runs = ecs_vec_count(&b->cull_runs);
+    int32_t blocks = ecs_vec_count(&b->block_data);
     uint64_t faces = (uint64_t)chunk * 6;
     int32_t lists = ecs_vec_count(&b->list_data);
     grown |= box_gpu_bake_reserve(gpu, &b->jobs, &b->jobs_size,
-        (uint64_t)glm_max(draws, 1) * BOX_GPU_BAKE_JOB_STRIDE, WGPUBufferUsage_Uniform);
+        (uint64_t)glm_max(draws, 1) * sizeof(box_gpu_bake_job_t), WGPUBufferUsage_Storage);
+    grown |= box_gpu_bake_reserve(gpu, &b->runs, &b->runs_size,
+        (uint64_t)glm_max(runs, 1) * BOX_GPU_BAKE_RUN_STRIDE, WGPUBufferUsage_Uniform);
+    grown |= box_gpu_bake_reserve(gpu, &b->blocks, &b->blocks_size,
+        (uint64_t)glm_max(blocks, 1) * sizeof(box_gpu_bake_block_t), WGPUBufferUsage_Storage);
+    grown |= box_gpu_bake_reserve(gpu, &b->block_bounds, &b->block_bounds_size,
+        (uint64_t)glm_max(blocks, 1) * BOX_GPU_BAKE_BOUNDS_SIZE, WGPUBufferUsage_Storage);
     grown |= box_gpu_bake_reserve(gpu, &b->slots, &b->slots_size,
         faces * glm_max(b->stride, 1) * sizeof(uint32_t),
         WGPUBufferUsage_Storage | WGPUBufferUsage_Vertex);
@@ -538,7 +671,11 @@ static void box_gpu_bake_draws(
         (uint64_t)glm_max(lists, 1) * sizeof(uint32_t), WGPUBufferUsage_Storage);
     if (draws) {
         wgpuQueueWriteBuffer(gpu->queue, b->jobs, 0, ecs_vec_first(&b->job_data),
-            (size_t)draws * BOX_GPU_BAKE_JOB_STRIDE);
+            (size_t)draws * sizeof(box_gpu_bake_job_t));
+        wgpuQueueWriteBuffer(gpu->queue, b->runs, 0, ecs_vec_first(&b->run_data),
+            (size_t)runs * BOX_GPU_BAKE_RUN_STRIDE);
+        wgpuQueueWriteBuffer(gpu->queue, b->blocks, 0, ecs_vec_first(&b->block_data),
+            (size_t)blocks * sizeof(box_gpu_bake_block_t));
     }
 
     if (lists) {
@@ -548,31 +685,49 @@ static void box_gpu_bake_draws(
 
     if (grown && b->cull_group) {
         wgpuBindGroupRelease(b->cull_group);
+        wgpuBindGroupRelease(b->bounds_group);
         b->cull_group = NULL;
+        b->bounds_group = NULL;
     }
 
     if (!b->cull_group) {
-        WGPUBindGroupEntry entries[5] = {
+        WGPUBindGroupEntry entries[7] = {
             { .binding = 0, .buffer = b->params, .size = sizeof(box_gpu_bake_params_t) },
-            { .binding = 5, .buffer = b->jobs, .size = sizeof(box_gpu_bake_job_t) },
+            { .binding = 5, .buffer = b->runs, .size = sizeof(box_gpu_bake_run_uniforms_t) },
             { .binding = 6, .buffer = b->slots, .size = b->slots_size },
             { .binding = 7, .buffer = b->args, .size = b->args_size },
-            { .binding = 8, .buffer = b->lists, .size = b->lists_size }
+            { .binding = 8, .buffer = b->lists, .size = b->lists_size },
+            { .binding = 18, .buffer = b->jobs, .size = b->jobs_size },
+            { .binding = 21, .buffer = b->block_bounds, .size = b->block_bounds_size }
         };
         b->cull_group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
             .layout = b->cull_layout,
-            .entryCount = 5,
+            .entryCount = 7,
             .entries = entries
+        });
+        WGPUBindGroupEntry bounds[5] = {
+            entries[1],
+            entries[4],
+            entries[5],
+            { .binding = 19, .buffer = b->blocks, .size = b->blocks_size },
+            { .binding = 20, .buffer = b->block_bounds, .size = b->block_bounds_size }
+        };
+        b->bounds_group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+            .layout = b->bounds_layout,
+            .entryCount = 5,
+            .entries = bounds
         });
     }
 }
 
-/** Record the cull of the faces of a chunk: a dispatch per batch, a workgroup per probe.
+/** Record the cull of the faces of a chunk: a dispatch per instance page, a workgroup per probe
+ * and batch of the page.
  *
  * @param gpu The backend
  * @param b The capture state
  * @param encoder The encoder of the chunk
  * @param count Probes of the chunk
+ * @param first Whether the chunk is the first of its batch, which takes the bounds of the blocks
  * @param writes Timestamp the pass writes, NULL for none
  * @return Whether the pass was recorded
  */
@@ -581,27 +736,34 @@ static bool box_gpu_bake_cull(
     box_gpu_bake_t *b,
     WGPUCommandEncoder encoder,
     int32_t count,
+    bool first,
     const WGPUPassTimestampWrites *writes)
 {
-    int32_t d, draws = ecs_vec_count(&b->draws);
+    int32_t r, draws = ecs_vec_count(&b->draws);
     if (!draws) {
         goto done;
     }
 
     WGPUComputePassEncoder pass = box_gpu_compute_begin(encoder, writes);
-    WGPUBindGroup page = NULL;
-    wgpuComputePassEncoderSetPipeline(pass, b->cull);
-    for (d = 0; d < draws; d ++) {
-        const box_gpu_bake_draw_t *draw = ecs_vec_get_t(&b->draws, box_gpu_bake_draw_t, d);
-        uint32_t offset = (uint32_t)(d * BOX_GPU_BAKE_JOB_STRIDE);
-        wgpuComputePassEncoderSetBindGroup(pass, 0, b->cull_group, 1, &offset);
-        if (draw->page != page) {
-            wgpuComputePassEncoderSetBindGroup(pass, 1, draw->page, 0, NULL);
-            box_gpu_count(gpu, BOX_GPU_STAT_INSTANCE_BIND);
-            page = draw->page;
+    if (first) {
+        wgpuComputePassEncoderSetPipeline(pass, b->bounds);
+        for (r = 0; r < ecs_vec_count(&b->cull_runs); r ++) {
+            const box_gpu_bake_run_t *run = ecs_vec_get_t(&b->cull_runs, box_gpu_bake_run_t, r);
+            uint32_t offset = (uint32_t)(r * BOX_GPU_BAKE_RUN_STRIDE);
+            wgpuComputePassEncoderSetBindGroup(pass, 0, b->bounds_group, 1, &offset);
+            wgpuComputePassEncoderSetBindGroup(pass, 1, run->page, 0, NULL);
+            wgpuComputePassEncoderDispatchWorkgroups(pass, run->blocks, 1, 1);
         }
+    }
 
-        wgpuComputePassEncoderDispatchWorkgroups(pass, (uint32_t)count, 1, 1);
+    wgpuComputePassEncoderSetPipeline(pass, b->cull);
+    for (r = 0; r < ecs_vec_count(&b->cull_runs); r ++) {
+        const box_gpu_bake_run_t *run = ecs_vec_get_t(&b->cull_runs, box_gpu_bake_run_t, r);
+        uint32_t offset = (uint32_t)(r * BOX_GPU_BAKE_RUN_STRIDE);
+        wgpuComputePassEncoderSetBindGroup(pass, 0, b->cull_group, 1, &offset);
+        wgpuComputePassEncoderSetBindGroup(pass, 1, run->page, 0, NULL);
+        box_gpu_count(gpu, BOX_GPU_STAT_INSTANCE_BIND);
+        wgpuComputePassEncoderDispatchWorkgroups(pass, (uint32_t)count, run->count, 1);
     }
 
     wgpuComputePassEncoderEnd(pass);
@@ -1211,20 +1373,27 @@ done:
     return result;
 }
 
-/** Get the probes of a chunk: as many as the atlas, slots and visible buffer allow.
+/** Get the probes of a chunk: as many as the batch holds, rounded up to a power of two so the
+ * buffers settle while the count varies, and the atlas, slots and visible buffer allow.
  *
  * @param packet The packet
  * @param scene Scene of the captures
  * @param size Face edge of the captures in texels
+ * @param count Probes of the batch
  * @return Probes per chunk, at least 1
  */
 static int32_t box_gpu_bake_chunk(
     const box_render_packet_t *packet,
     ecs_entity_t scene,
-    int32_t size)
+    int32_t size,
+    int32_t count)
 {
     int64_t instances = 0, texels = (int64_t)size * size * 6;
-    int32_t i, result = BOX_GPU_BAKE_CHUNK;
+    int32_t i, result = 1;
+    while (result < count && result < BOX_GPU_BAKE_CHUNK) {
+        result *= 2;
+    }
+
     for (i = 0; i < ecs_vec_count(&packet->batches); i ++) {
         const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
         if (b->scene == scene && b->bake && b->view == -1) {
@@ -1322,7 +1491,7 @@ static void box_gpu_bake_chunk_capture(
             offsetof(box_gpu_bake_params_t, environment), BOX_GPU_PROBE_SIZE);
     }
 
-    if (box_gpu_bake_cull(gpu, b, encoder, count,
+    if (box_gpu_bake_cull(gpu, b, encoder, count, probes == pass->probes,
         timed && !timer->begun
             ? box_gpu_bake_writes(b, timer->readback, true, false, &begin)
             : NULL))
@@ -1491,7 +1660,7 @@ static void box_gpu_bake_batch(
     bool last)
 {
     WGPUTextureView shadow = NULL;
-    int32_t first, chunk = box_gpu_bake_chunk(packet, pass->scene, pass->size);
+    int32_t first, chunk = box_gpu_bake_chunk(packet, pass->scene, pass->size, pass->count);
     if (pass->cube) {
         int32_t layers = gpu->stats.texture_layers > 0
             ? gpu->stats.texture_layers

@@ -21,7 +21,11 @@
 // each probe of the chunk draws: those whose sphere spans the smallest size at their depth in
 // the face their center is in, and whose box reaches into the 90 degree frustum of the face.
 // The slots of a face keep slot order, compacted by a workgroup prefix sum, so depth ties
-// resolve the same way in every bake.
+// resolve the same way in every bake. One dispatch covers the batches of an instance page, a
+// workgroup per probe and batch: a dispatch costs the GPU far more than its workgroups do.
+// The cull_bounds entry point first takes the bounds of every block of CULL_GROUP instances of
+// a batch; a block whose bounds fail the smallest size at the probe skips its instances, which
+// would all fail the same test, so the lists are the same with or without the bounds.
 //
 // The reflect_store entry point writes the faces of the reflection probes of a chunk into mip 0
 // of their cubemap slot instead (params.probes holds the slots), mirrored to the WebGPU cubemap
@@ -79,7 +83,34 @@ struct Light {
     spot_offset: f32,
 };
 
-// The instances of one batch the cull tests, at a dynamic offset per batch.
+// The batches of an instance page the cull tests, at a dynamic offset per page.
+struct CullRun {
+    // Job of the first batch
+    first: u32,
+    // Block of the first batch
+    first_block: u32,
+    pad0: u32,
+    pad1: u32,
+};
+
+// CULL_GROUP instances of a batch at most, whose bounds cull_bounds takes.
+struct CullBlock {
+    job: u32,
+    // First instance of the block in the batch
+    start: u32,
+    count: u32,
+    pad0: u32,
+};
+
+// Bounds of the instances of a block.
+struct CullBounds {
+    // xyz: lowest center, w: largest radius
+    low: vec4f,
+    // xyz: highest center
+    high: vec4f,
+};
+
+// The instances of one batch the cull tests.
 struct CullJob {
     // First slot of the run of the batch in its instance page, or first entry of lists when
     // list is 1
@@ -98,8 +129,9 @@ struct CullJob {
     draws: u32,
     // Slots of a face, those of every batch
     stride: u32,
+    // Block of the first instances of the batch
+    blocks: u32,
     pad0: u32,
-    pad1: u32,
 };
 
 @group(0) @binding(0) var<uniform> params: Params;
@@ -107,7 +139,7 @@ struct CullJob {
 @group(0) @binding(2) var<storage, read_write> volume: array<vec4f>;
 @group(0) @binding(3) var depths: texture_depth_2d;
 @group(0) @binding(4) var<storage, read> lights: array<Light>;
-@group(0) @binding(5) var<uniform> job: CullJob;
+@group(0) @binding(5) var<uniform> run: CullRun;
 @group(0) @binding(6) var<storage, read_write> slots: array<u32>;
 @group(0) @binding(7) var<storage, read_write> args: array<u32>;
 @group(0) @binding(8) var<storage, read> lists: array<u32>;
@@ -120,6 +152,10 @@ struct CullJob {
 @group(0) @binding(15) var source_sampler: sampler;
 @group(0) @binding(16) var prefiltered: texture_storage_2d_array<rgba16float, write>;
 @group(0) @binding(17) var environment_cube: texture_cube<f32>;
+@group(0) @binding(18) var<storage, read> jobs: array<CullJob>;
+@group(0) @binding(19) var<storage, read> blocks: array<CullBlock>;
+@group(0) @binding(20) var<storage, read_write> bounds_out: array<CullBounds>;
+@group(0) @binding(21) var<storage, read> bounds: array<CullBounds>;
 @group(1) @binding(0) var<storage, read> transforms: array<InstanceTransform>;
 @group(1) @binding(1) var<storage, read> surface_assets: array<vec4f>;
 
@@ -351,17 +387,64 @@ fn project(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_index)
     }
 }
 
-// Faces of a probe that draw an instance, one bit per face in the order of face_axes. Face f
-// sees along axis a = f / 2 where the depth along a is at least the distance along the other
-// two axes; the box reaches into it when it does so for each of them on its nearest corner.
-fn cull_faces(slot: u32, eye: vec3f) -> u32 {
+// World box around an instance of a batch.
+struct CullBox {
+    center: vec3f,
+    extent: vec3f,
+};
+
+fn cull_box(job: CullJob, slot: u32) -> CullBox {
     let m = instance_model(transforms[slot]);
     let c0 = m[0].xyz;
     let c1 = m[1].xyz;
     let c2 = m[2].xyz;
-    let center = c0 * job.center.x + c1 * job.center.y + c2 * job.center.z + m[3].xyz;
-    let e = abs(c0) * job.extent.x + abs(c1) * job.extent.y + abs(c2) * job.extent.z;
-    let q = center - eye;
+    return CullBox(
+        c0 * job.center.x + c1 * job.center.y + c2 * job.center.z + m[3].xyz,
+        abs(c0) * job.extent.x + abs(c1) * job.extent.y + abs(c2) * job.extent.z);
+}
+
+// Slot of an instance of a batch.
+fn cull_slot(job: CullJob, i: u32) -> u32 {
+    if (job.list != 0u) {
+        return lists[job.first + i];
+    }
+
+    return job.first + i;
+}
+
+// One invocation per block: the block is small, and the invocations share nothing.
+@compute @workgroup_size(1)
+fn cull_bounds(@builtin(global_invocation_id) id: vec3u) {
+    let index = run.first_block + id.x;
+    let block = blocks[index];
+    let job = jobs[block.job];
+    var low = vec3f(1e30);
+    var high = vec3f(-1e30);
+    var radius = 0.0;
+    for (var i = 0u; i < block.count; i++) {
+        let box = cull_box(job, cull_slot(job, block.start + i));
+        low = min(low, box.center);
+        high = max(high, box.center);
+        radius = max(radius, length(box.extent));
+    }
+
+    bounds_out[index] = CullBounds(vec4f(low, radius), vec4f(high, 0.0));
+}
+
+// Whether every instance of a block fails the smallest size at a probe: none is around the
+// probe, and the largest is too small at the depth of the nearest center.
+fn cull_block_small(b: CullBounds, eye: vec3f) -> bool {
+    let a = max(max(b.low.xyz - eye, eye - b.high.xyz), vec3f(0.0));
+    let w = max(a.x, max(a.y, a.z));
+    return w > b.low.w && 2.0 * b.low.w * params.near.y < params.near.z * w;
+}
+
+// Faces of a probe that draw an instance, one bit per face in the order of face_axes. Face f
+// sees along axis a = f / 2 where the depth along a is at least the distance along the other
+// two axes; the box reaches into it when it does so for each of them on its nearest corner.
+fn cull_faces(box: CullBox, eye: vec3f) -> u32 {
+    let e = box.extent;
+    let q = box.center - eye;
     let a = abs(q);
     let radius = length(e);
     let w = max(a.x, max(a.y, a.z));
@@ -391,19 +474,23 @@ fn face_count(v: vec2u, f: u32) -> u32 {
 @compute @workgroup_size(256)
 fn cull(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_index) lane: u32) {
     let probe = group.x;
+    let job = jobs[run.first + group.y];
     let eye = params.positions[probe].xyz;
     var running = array<u32, 6>(0u, 0u, 0u, 0u, 0u, 0u);
+    var block = job.blocks;
     for (var start = 0u; start < job.count; start += CULL_GROUP) {
+        let small = cull_block_small(bounds[block], eye);
+        block += 1u;
+        if (small) {
+            continue;
+        }
+
         let i = start + lane;
         var slot = 0u;
         var mask = 0u;
         if (i < job.count) {
-            slot = job.first + i;
-            if (job.list != 0u) {
-                slot = lists[job.first + i];
-            }
-
-            mask = cull_faces(slot, eye);
+            slot = cull_slot(job, i);
+            mask = cull_faces(cull_box(job, slot), eye);
         }
 
         let own = vec2u(

@@ -104,8 +104,33 @@ typedef struct box_gpu_bake_job_t {
     uint32_t region;                /**< First entry of the batch in the slots of a face */
     uint32_t draws;                 /**< Batches of the chunk */
     uint32_t stride;                /**< Slots of a face, those of every batch */
-    uint32_t pad[2];                /**< Pads the job to the size of CullJob */
+    uint32_t blocks;                /**< Block of the first instances of the batch */
+    uint32_t pad;                   /**< Pads the job to the size of CullJob */
 } box_gpu_bake_job_t;
+
+/** The batches of an instance page the cull of a chunk tests in one dispatch */
+typedef struct box_gpu_bake_run_t {
+    WGPUBindGroup page;             /**< Instance page the cull reads */
+    uint32_t first;                 /**< Job of the first batch */
+    uint32_t count;                 /**< Batches of the page */
+    uint32_t first_block;           /**< Block of the first batch */
+    uint32_t blocks;                /**< Blocks of the batches of the page */
+} box_gpu_bake_run_t;
+
+/** Instances of a batch whose bounds the cull tests together, as CullBlock of bake_sh.wgsl */
+typedef struct box_gpu_bake_block_t {
+    uint32_t job;                   /**< Job of the batch */
+    uint32_t start;                 /**< First instance of the block in the batch */
+    uint32_t count;                 /**< Instances of the block */
+    uint32_t pad;                   /**< Pads the block to the size of CullBlock */
+} box_gpu_bake_block_t;
+
+/** Uniforms of the cull of one instance page of a chunk, as CullRun of bake_sh.wgsl */
+typedef struct box_gpu_bake_run_uniforms_t {
+    uint32_t first;                 /**< Job of the first batch */
+    uint32_t first_block;           /**< Block of the first batch */
+    uint32_t pad[2];                /**< Pads the run to the size of CullRun */
+} box_gpu_bake_run_uniforms_t;
 
 /** A batch the faces of the captures draw, with what its draws bind */
 typedef struct box_gpu_bake_draw_t {
@@ -178,9 +203,18 @@ struct box_gpu_bake_t {
     WGPUBindGroupLayout cull_layout; /**< Bind group layout of the cull */
     WGPUPipelineLayout cull_pipeline_layout; /**< Pipeline layout of the cull */
     WGPUComputePipeline cull;       /**< Cull pipeline, NULL until the shader exists */
+    WGPUBindGroupLayout bounds_layout; /**< Bind group layout of the block bounds */
+    WGPUPipelineLayout bounds_pipeline_layout; /**< Pipeline layout of the block bounds */
+    WGPUComputePipeline bounds;     /**< Block bounds pipeline, NULL until the shader exists */
     int32_t revision;               /**< Revision of the shader the pipelines were made with */
-    WGPUBuffer jobs;                /**< box_gpu_bake_job_t of the batches, a stride apart */
+    WGPUBuffer jobs;                /**< box_gpu_bake_job_t of the batches, page by page */
     uint64_t jobs_size;             /**< Bytes of jobs */
+    WGPUBuffer runs;                /**< box_gpu_bake_run_uniforms_t of the pages, a stride apart */
+    uint64_t runs_size;             /**< Bytes of runs */
+    WGPUBuffer blocks;              /**< box_gpu_bake_block_t of the batches, in job order */
+    uint64_t blocks_size;           /**< Bytes of blocks */
+    WGPUBuffer block_bounds;        /**< Bounds of each block, which the first chunk takes */
+    uint64_t block_bounds_size;     /**< Bytes of block_bounds */
     WGPUBuffer slots;               /**< Visible slots of every face, batch by batch */
     uint64_t slots_size;            /**< Bytes of slots */
     WGPUBuffer args;                /**< Indirect draw arguments of every face and batch */
@@ -188,8 +222,12 @@ struct box_gpu_bake_t {
     WGPUBuffer lists;               /**< Slots of the listed batches */
     uint64_t lists_size;            /**< Bytes of lists */
     WGPUBindGroup cull_group;       /**< Binds the buffers of the cull, NULL when they changed */
+    WGPUBindGroup bounds_group;     /**< Binds the buffers of the block bounds, as cull_group */
     ecs_vec_t draws;                /**< box_gpu_bake_draw_t of the bake batch */
-    ecs_vec_t job_data;             /**< Bytes of the jobs of the bake batch */
+    ecs_vec_t job_data;             /**< box_gpu_bake_job_t of the bake batch */
+    ecs_vec_t run_data;             /**< Bytes of the uniforms of the runs of the bake batch */
+    ecs_vec_t cull_runs;            /**< box_gpu_bake_run_t of the bake batch */
+    ecs_vec_t block_data;           /**< box_gpu_bake_block_t of the bake batch */
     ecs_vec_t list_data;            /**< uint32_t, the slots of its listed batches */
     uint32_t stride;                /**< Slots of a face, those of every batch */
     int32_t chunk;
