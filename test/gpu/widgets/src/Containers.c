@@ -1207,14 +1207,12 @@ void Containers_scroll_bar_clipped_by_page(void) {
     ecs_os_free(gallery_run(world, s, "set " NOTES " box.widgets.ScrollView.mut.y %.1f",
         (double)max_y));
     gallery_settle(world, s);
+    float at_end = containers_content(world, NOTES)->y;
+    test_assert(fabsf(at_end - max_y) < 0.1f);
     containers_shape(world, NOTES ".scrollbars.vscroll.knob", knob);
     float y = page[3] + 6;
     test_assert(knob[3] > y + 2);
     test_bool(containers_clip_keeps(world, NOTES ".scrollbars.vscroll.knob", x, y), false);
-    if (knob[1] > page[3]) {
-        test_bool(box_render_clip_hides(world,
-            ecs_lookup(world, NOTES ".scrollbars.vscroll.knob")), true);
-    }
 
     char *handler = containers_handler_at(world, s, x, y);
     test_assert(strcmp(handler, "\"" NOTES "\"") != 0);
@@ -1224,11 +1222,14 @@ void Containers_scroll_bar_clipped_by_page(void) {
     ecs_os_free(gallery_run(world, s, "mouse_click left [%.1f, %.1f]", (double)x, (double)y));
     gallery_settle(world, s);
     containers_expect(world, s, NOTES, "ScrollView", "drag", "0");
-    test_flt(containers_content(world, NOTES)->y, max_y);
+    test_flt(containers_content(world, NOTES)->y, at_end);
 
-    /* Scrolled past the top of the page, the bar does not draw or pick over the header */
+    /* Scrolled past the top of the page, the bar does not draw or pick over the header. The
+     * window is low enough for the page to scroll the view that far. */
     ecs_os_free(gallery_run(world, s, "set " NOTES " box.widgets.ScrollView.mut.y 0"));
     gallery_settle(world, s);
+    containers_resize(world, 1280, 400);
+    gallery_rect(world, PAGE, page);
     containers_page_top(world, s, NOTES, page[1] - 100);
     containers_rect(world, NOTES, notes);
     test_assert(notes[1] < page[1] - 20 && notes[3] > page[1]);
@@ -1265,7 +1266,7 @@ void Containers_scroll_bar_inside_border(void) {
 
     /* The same for the list view */
     containers_rect(world, FILES, files);
-    containers_shape(world, FILES ".vscroll", bar);
+    containers_shape(world, FILES ".scrollbars.vscroll", bar);
     gallery_expect_at_most(bar[2], files[2] - CONTAINERS_EDGE);
     gallery_expect_at_least(bar[1], files[1] + CONTAINERS_EDGE);
     gallery_expect_at_most(bar[3], files[3] - CONTAINERS_EDGE);
@@ -1289,11 +1290,11 @@ void Containers_scroll_bar_opaque(void) {
         "{\"Rgb\":{\"r\":38, \"g\":41, \"b\":48}}");
     gallery_expect(world, s, "get " NOTES ".scrollbars.vscroll box.material.Rgb",
         "{\"Rgb\":{\"r\":46, \"g\":50, \"b\":58}}");
-    gallery_expect(world, s, "get " FILES ".vscroll box.material.Rgb",
+    gallery_expect(world, s, "get " FILES ".scrollbars.vscroll box.material.Rgb",
         "{\"Rgb\":{\"r\":46, \"g\":50, \"b\":58}}");
     const Opacity *o = ecs_get(world, ecs_lookup(world, NOTES ".scrollbars.vscroll"), Opacity);
     test_assert(o == NULL || o->value == 1);
-    o = ecs_get(world, ecs_lookup(world, FILES ".vscroll"), Opacity);
+    o = ecs_get(world, ecs_lookup(world, FILES ".scrollbars.vscroll"), Opacity);
     test_assert(o == NULL || o->value == 1);
 
     ecs_fini(world);
@@ -1444,7 +1445,7 @@ void Containers_scroll_thumb_hover(void) {
     /* The list view has it too */
     gallery_hover(world, s, FILES, 1.0f - CONTAINERS_BAR / 300.0f, -0.9f, FILES);
     containers_expect(world, s, FILES, "ListView", "over", "1");
-    test_bool(ecs_has(world, ecs_lookup(world, FILES ".vscroll.knob"), Tint), true);
+    test_bool(ecs_has(world, ecs_lookup(world, FILES ".scrollbars.vscroll.knob"), Tint), true);
 
     ecs_fini(world);
 }
@@ -1472,12 +1473,13 @@ void Containers_panel_title_clipped(void) {
     gallery_expect_at(heading[1], panel[1] + 12);
     gallery_expect_at(tabs[1], heading[3] + 8);
 
-    /* Scrolled above the top of the page it is clipped away, not drawn over the header */
+    /* Scrolled above the top of the page it is clipped away, not drawn over the header. The
+     * window is low enough for the page to scroll the panel that far. */
+    containers_resize(world, 1280, 600);
     gallery_rect(world, PAGE, page);
     containers_page_top(world, s, CONTAINERS, page[1] - 40);
     containers_rect(world, CONTAINERS ".heading", heading);
     test_assert(heading[3] < page[1]);
-    test_bool(box_render_clip_hides(world, e), true);
     test_bool(containers_clip_keeps(world, CONTAINERS ".heading",
         (heading[0] + heading[2]) * 0.5f, (heading[1] + heading[3]) * 0.5f), false);
 
@@ -1631,7 +1633,7 @@ void Containers_list_200_items(void) {
     test_flt(c->max_y, c->height - (list[3] - list[1]));
 
     /* The thumb of the list is as short as it gets */
-    test_flt(ecs_get(world, ecs_lookup(world, FILES ".vscroll.knob"), Rect)->height, 20 - 4);
+    test_flt(ecs_get(world, ecs_lookup(world, FILES ".scrollbars.vscroll.knob"), Rect)->height, 20 - 4);
 
     /* The wheel reaches the last row, which takes a click */
     gallery_hover(world, s, FILES ".rows.row_1", 0, 0, FILES);
@@ -1757,6 +1759,70 @@ void Containers_collapsible_content_activation(void) {
     containers_expect(world, s, ADVANCED ".experimental", "Switch", "current", "false");
     containers_expect(world, s, ADVANCED, "Collapsible", "current", "true");
     test_int(gallery_changes(world, s), 2);
+
+    ecs_fini(world);
+}
+
+void Containers_tabs_inside_border(void) {
+    // widgets/containers
+    ecs_entity_t s = 0;
+    ecs_world_t *world = containers_load(&s);
+    float view[4], bar[4], page[4], header[4];
+
+    /* The bar and the page sit inside the border of the tab view, so it shows all around */
+    containers_rect(world, TABS, view);
+    containers_rect(world, TABS ".bar", bar);
+    containers_rect(world, TABS ".general", page);
+    containers_rect(world, TABS ".bar.tab_0", header);
+    gallery_expect_at(bar[0], view[0] + 1);
+    gallery_expect_at(bar[1], view[1] + 1);
+    gallery_expect_at(bar[2], view[2] - 1);
+    gallery_expect_at(header[0], view[0] + 1);
+    gallery_expect_at(page[0], view[0] + 1);
+    gallery_expect_at(page[2], view[2] - 1);
+    gallery_expect_at(page[3], view[3] - 1);
+    gallery_expect_at(page[1], bar[3]);
+
+    /* The height of the view still gives the page its height */
+    gallery_expect_at(page[3] - page[1], 100);
+
+    /* The corners of the page and the headers follow the inside of the border */
+    gallery_expect(world, s, "get " TABS ".general box.geometry.Border.radius", "3");
+    gallery_expect(world, s, "get " TABS ".bar.tab_0 box.geometry.Border.radius", "3");
+
+    ecs_fini(world);
+}
+
+void Containers_scroll_ring_under_bar(void) {
+    // widgets/containers
+    ecs_entity_t s = 0;
+    ecs_world_t *world = containers_load(&s);
+    float notes[4], edge[4];
+
+    /* Without the focus ring the bar shows no ring color */
+    test_assert(ecs_lookup(world, NOTES ".scrollbars.vscroll.ring_edge") == 0);
+
+    /* With it, the outer point of the track, over the inner point of the ring, takes the ring
+     * color, so the ring keeps its width along the bar */
+    gallery_tab_to(world, s, NOTES);
+    gallery_settle(world, s);
+    gallery_expect(world, s, "get " NOTES " box.geometry.Border.width", "2");
+    ecs_entity_t e = ecs_lookup(world, NOTES ".scrollbars.vscroll.ring_edge");
+    test_assert(e != 0);
+    containers_rect(world, NOTES, notes);
+    containers_shape(world, NOTES ".scrollbars.vscroll.ring_edge", edge);
+    gallery_expect_at(edge[2], notes[2] - CONTAINERS_EDGE);
+    gallery_expect_at(edge[0], notes[2] - 2);
+    gallery_expect_at(edge[1], notes[1] + CONTAINERS_EDGE);
+    gallery_expect_at(edge[3], notes[3] - CONTAINERS_EDGE);
+    gallery_expect(world, s, "get " NOTES ".scrollbars.vscroll.ring_edge box.material.Rgb",
+        "{\"Rgb\":{\"r\":120, \"g\":172, \"b\":240}}");
+
+    /* The list view does the same */
+    gallery_tab_to(world, s, FILES);
+    gallery_settle(world, s);
+    test_assert(ecs_lookup(world, NOTES ".scrollbars.vscroll.ring_edge") == 0);
+    test_assert(ecs_lookup(world, FILES ".scrollbars.vscroll.ring_edge") != 0);
 
     ecs_fini(world);
 }

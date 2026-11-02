@@ -61,10 +61,11 @@ template HeadlessSlider {
     }
   }
 
+  // A disabled slider ignores the pointer, so it never shows as hovered or held
   async {
     while true {
       await on.enter(this)
-      hover = true
+      hover = !disabled
       await on.leave(this)
       hover = false
     }
@@ -74,8 +75,8 @@ template HeadlessSlider {
     while true {
       const e = await on.press(this)
       const b = this[LayoutBounds]
-      down = e.local_y < thumb - b.height / 2
-      if down && !disabled {
+      down = !disabled && e.local_y < thumb - b.height / 2
+      if down {
         const ratio = clamp((e.local_x + b.width / 2 - thumb / 2) / (b.width - thumb + 0.001), 0, 1)
         const v = slider_snap(min + ratio * range, min, max, step)
         if v != current {

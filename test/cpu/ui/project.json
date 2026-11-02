@@ -353,7 +353,8 @@
                     "scroll_gutter",
                     "scroll_gutter_with_bar",
                     "scroll_thumb_hover_look",
-                    "panel_title_in_column"
+                    "panel_title_in_column",
+                    "list_keeps_width"
                 ]
             },
             {

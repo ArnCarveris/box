@@ -33,10 +33,11 @@ template HeadlessButton {
     Cursor: {CursorNotAllowed}
   }
 
+  // A disabled button ignores the pointer, so it never shows as hovered or pressed
   async {
     while true {
       await on.enter(this)
-      hover = true
+      hover = !disabled
       await on.leave(this)
       hover = false
     }
@@ -45,7 +46,7 @@ template HeadlessButton {
   async {
     while true {
       await on.press(this)
-      down = true
+      down = !disabled
       await on.release(this)
       down = false
     }

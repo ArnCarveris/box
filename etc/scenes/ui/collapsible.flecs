@@ -56,10 +56,11 @@ template HeadlessCollapsible {
     }
   }
 
+  // A disabled section ignores the pointer, so it never shows as hovered or pressed
   async {
     while true {
       await on.enter(head)
-      hover = true
+      hover = !disabled
     }
   }
 
@@ -73,7 +74,7 @@ template HeadlessCollapsible {
   async {
     while true {
       await on.press(head)
-      down = true
+      down = !disabled
     }
   }
 
