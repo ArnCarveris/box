@@ -171,7 +171,7 @@ static void OreWorkerPlace(
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         if (!ecs_owns(it->world, it->entities[i], OreCrafter)) {
-            ecs_set(it->world, it->entities[i], OreCrafter, {
+            ecs_set(it->stage, it->entities[i], OreCrafter, {
                 .speed = self ? worker[i].speed : worker->speed
             });
         }
