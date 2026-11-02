@@ -815,7 +815,6 @@ void box_draws_materials_observers(
     ecs_world_t *world,
     box_render_draws_t *d)
 {
-<<<<<<< HEAD
     ecs_entity_t components[10] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
         ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy),
@@ -825,17 +824,6 @@ void box_draws_materials_observers(
         "DrawsOnColor", "DrawsOnPbrMaterial", "DrawsOnEmissive", "DrawsOnTextureTransform",
         "DrawsOnAlphaCutoff", "DrawsOnTransmission", "DrawsOnClearCoat",
         "DrawsOnSpecularAnisotropy", "DrawsOnSheen", "DrawsOnDiffuseTransmission"
-=======
-    ecs_entity_t components[9] = {
-        ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
-        ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy),
-        ecs_id(Sheen)
-    };
-    const char *names[9] = {
-        "DrawsOnColor", "DrawsOnPbrMaterial", "DrawsOnEmissive", "DrawsOnTextureTransform",
-        "DrawsOnAlphaCutoff", "DrawsOnTransmission", "DrawsOnClearCoat",
-        "DrawsOnSpecularAnisotropy", "DrawsOnSheen"
->>>>>>> fc65258d1671295d619796a3272b6dad04878636
     };
     int32_t i;
     box_draws_observer(world, d, "MaterialsOnPrefab", (ecs_observer_desc_t){
@@ -860,11 +848,7 @@ void box_draws_materials_observers(
         .query.flags = EcsQueryMatchPrefab,
         .events = { EcsOnAdd, EcsOnRemove } }, BoxMaterialsOnIsA);
 
-<<<<<<< HEAD
     for (i = 0; i < 10; i ++) {
-=======
-    for (i = 0; i < 9; i ++) {
->>>>>>> fc65258d1671295d619796a3272b6dad04878636
         bool keyed = components[i] == ecs_id(AlphaCutoff) ||
             components[i] == ecs_id(Transmission);
         box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
@@ -895,10 +879,7 @@ void box_draws_material_of(
         out->clear_coat = ecs_get(world, owner, ClearCoat);
         out->anisotropy = ecs_get(world, owner, SpecularAnisotropy);
         out->sheen = ecs_get(world, owner, Sheen);
-<<<<<<< HEAD
         out->diffuse_transmission = ecs_get(world, owner, DiffuseTransmission);
-=======
->>>>>>> fc65258d1671295d619796a3272b6dad04878636
     }
 }
 

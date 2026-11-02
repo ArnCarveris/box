@@ -917,7 +917,6 @@ static uint32_t box_draws_sheen_pack(
     return result;
 }
 
-<<<<<<< HEAD
 /** Pack a DiffuseTransmission into the diffuse_transmission word of a material record: the
  * display encoded color and the factor clamped to 0..1 as a unorm8.
  *
@@ -938,8 +937,6 @@ static uint32_t box_draws_diffuse_transmission_pack(
     return result;
 }
 
-=======
->>>>>>> fc65258d1671295d619796a3272b6dad04878636
 void box_draws_material_pack(
     box_render_material_t *out,
     const box_draw_material_t *material)
@@ -977,7 +974,6 @@ void box_draws_material_pack(
         ? box_draws_unorm16(coat->strength) | (box_draws_unorm16(coat->roughness) << 16) : 0u;
     out->anisotropy = box_draws_anisotropy_pack(material->anisotropy);
     out->sheen = box_draws_sheen_pack(material->sheen);
-<<<<<<< HEAD
     out->diffuse_transmission = box_draws_diffuse_transmission_pack(
         material->diffuse_transmission);
     out->thickness = material->diffuse_transmission &&
@@ -987,9 +983,6 @@ void box_draws_material_pack(
     out->reserved[0] = 0;
     out->reserved[1] = 0;
     out->reserved[2] = 0;
-=======
-    out->reserved = 0;
->>>>>>> fc65258d1671295d619796a3272b6dad04878636
 }
 
 void box_draws_mesh_shading(

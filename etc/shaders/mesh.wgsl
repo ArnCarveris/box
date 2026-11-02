@@ -46,7 +46,6 @@
 // indirect diffuse light times an analytic fit of its albedo in indirect light, and a constant
 // energy compensation of the base lobes, 1 - 0.157 times the largest channel of its color. It
 // lies under the clear coat. Without it (a black color) a fragment skips all of it.
-<<<<<<< HEAD
 // A material with diffuse transmission (DiffuseTransmission, KHR_materials_diffuse_transmission)
 // adds a second Lambert lobe on the inverted normal, of its linear color times the diffuse color
 // times its factor, and keeps 1 - factor of its front diffuse lobe. Direct light reaches it
@@ -55,8 +54,6 @@
 // the far side reaches it without ambient occlusion. The clear coat and the sheen attenuate it as
 // they do the front diffuse lobe. It stays in the opaque pass. Without it (factor 0) a fragment
 // skips all of it, and every texture it reads is read without implicit derivatives.
-=======
->>>>>>> fc65258d1671295d619796a3272b6dad04878636
 #include "include/instance.wgsl"
 #include "include/material.wgsl"
 #include "include/lights.wgsl"
@@ -190,11 +187,8 @@ struct VertexOut {
     @location(11) @interpolate(flat) anisotropy: vec2f,
     // Sheen of the material: linear color and roughness, a black color without one
     @location(12) @interpolate(flat) sheen: vec4f,
-<<<<<<< HEAD
     // DiffuseTransmission of the material: linear color and factor, 0 factor without one
     @location(13) @interpolate(flat) diffuse_transmission: vec4f,
-=======
->>>>>>> fc65258d1671295d619796a3272b6dad04878636
     // Transmission of the material: factor, index of refraction, thickness and attenuation
     // distance, its linear attenuation color and the scale of the instance along its axes
     @location(7) @interpolate(flat) transmission: vec4f,
@@ -315,12 +309,9 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material) -> Vert
     o.anisotropy = unpack2x16unorm(material.anisotropy);
     let sheen = unpack4x8unorm(material.sheen);
     o.sheen = vec4f(material_linear(sheen.rgb), sheen.a);
-<<<<<<< HEAD
     let diffuse_transmission = unpack4x8unorm(material.diffuse_transmission);
     o.diffuse_transmission = vec4f(material_linear(diffuse_transmission.rgb),
         diffuse_transmission.a);
-=======
->>>>>>> fc65258d1671295d619796a3272b6dad04878636
     o.uv = s.uv;
     o.transmission = vec4f(material.transmission_factor, material.ior,
         material.thickness_factor, material.attenuation_distance);
@@ -646,14 +637,10 @@ fn reflections(world: vec3f, spec: vec3f, roughness: f32, cluster: u32, fallback
 // along tangent, perpendicular to normal, with bitangent = cross(normal, tangent); it is 0
 // without one and where the UVs give no direction. sheen is the linear color of the sheen,
 // black without one, and sheen_roughness its roughness clamped to 0.07..1, material constants
-<<<<<<< HEAD
 // that apply on both faces. back_factor is the factor of the diffuse transmission, 0 without
 // one, back_color the light its back lobe passes through, its linear color times the diffuse
 // color times the factor, and thickness the distance behind the surface of its shadow lookup;
 // they apply on front faces and plain back faces.
-=======
-// that apply on both faces.
->>>>>>> fc65258d1671295d619796a3272b6dad04878636
 struct Surface {
     albedo: vec3f,
     alpha: f32,
@@ -670,12 +657,9 @@ struct Surface {
     bitangent: vec3f,
     sheen: vec3f,
     sheen_roughness: f32,
-<<<<<<< HEAD
     back_color: vec3f,
     back_factor: f32,
     thickness: f32,
-=======
->>>>>>> fc65258d1671295d619796a3272b6dad04878636
 };
 
 // Tangent frame from the screen derivatives of the position and the UVs (cotangent frame), its
@@ -862,12 +846,8 @@ struct Lit {
 // coat reflects the GGX lobe of its normal and roughness times its Fresnel Fc, and the base below
 // it 1 - Fc of what it reflects without one. An anisotropic base stretches its lobe along the
 // tangent, its roughness there mixed toward 1 by the square of the strength. A sheen adds its
-<<<<<<< HEAD
 // Charlie lobe on the mapped normal and scales the base by its compensation, below the coat. A
 // diffuse transmission keeps 1 - its factor of the diffuse color.
-=======
-// Charlie lobe on the mapped normal and scales the base by its compensation, below the coat.
->>>>>>> fc65258d1671295d619796a3272b6dad04878636
 fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
     let n = s.normal;
     let a = s.roughness * s.roughness;
@@ -918,7 +898,6 @@ fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
     return lit;
 }
 
-<<<<<<< HEAD
 // Light passed through the surface toward the eye by the back lobe of a diffuse transmission, of
 // one light arriving from direction l with a radiance at the far side: a Lambert lobe on the
 // inverted normal, without a Fresnel term or a specular lobe. The sheen scales it by its
@@ -936,8 +915,6 @@ fn brdf_back(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> vec3f {
     return back;
 }
 
-=======
->>>>>>> fc65258d1671295d619796a3272b6dad04878636
 // Light inputs. Every direct light the forward pass uses comes from here: the directional
 // lights of the scene, the first one through its shadow map and light cookie, then the point
 // and spot lights of the cluster of the fragment, a spot or point light with a tile of the
@@ -1106,16 +1083,6 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
         indirect_specular = indirect_specular * comp + indirect_sheen;
         indirect_diffuse *= comp;
         indirect_back *= comp;
-    }
-
-    // A sheen reflects the indirect diffuse light by the fit of its albedo, and the base keeps
-    // its compensation of what it reflects without one; the coat below covers both.
-    if (any(s.sheen > vec3f(0.0))) {
-        let comp = sheen_compensation(s.sheen);
-        let indirect_sheen = e.diffuse * s.sheen * sheen_albedo(ndv, s.sheen_roughness) *
-            s.occlusion;
-        indirect_specular = indirect_specular * comp + indirect_sheen;
-        indirect_diffuse *= comp;
     }
 
     // The clear coat reflects the light along the reflection about its own normal at its own

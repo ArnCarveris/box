@@ -1612,7 +1612,6 @@ void MaterialIds_sheen_prefab_change_reaches_slot(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
-<<<<<<< HEAD
 
 void MaterialIds_diffuse_transmission_brings_material_id(void) {
     // materials/material_ids
@@ -1688,5 +1687,3 @@ void MaterialIds_diffuse_transmission_prefab_change_reaches_slot(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
-=======
->>>>>>> fc65258d1671295d619796a3272b6dad04878636

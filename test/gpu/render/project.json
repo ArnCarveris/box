@@ -249,7 +249,6 @@
                 ]
             },
             {
-<<<<<<< HEAD
                 "id": "DiffuseTransmission",
                 "testcases": [
                     "factor_zero_unchanged",
@@ -270,8 +269,6 @@
                 ]
             },
             {
-=======
->>>>>>> fc65258d1671295d619796a3272b6dad04878636
                 "id": "SpecularAnisotropy",
                 "testcases": [
                     "strength_zero_unchanged",
