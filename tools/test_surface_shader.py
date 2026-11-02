@@ -50,9 +50,11 @@ class SurfaceShaderTests(unittest.TestCase):
         self.assertNotIn("(d,", self.generated)
 
     def test_no_c_left(self):
-        for text in ("/**", "box_sv", "box_sweep_sample", "box_surface", "float ", "int ",
-                     "bool ", "found", "0f", "sqrtf", "fminf", "fmaxf", "(float)", "(int)"):
+        for text in ("/**", "box_sv", "box_sweep_sample", "box_surface", "found", "sqrtf",
+                     "fminf", "fmaxf", "(float)", "(int)"):
             self.assertNotIn(text, self.generated)
+        for pattern in (r"\bfloat\b", r"\bint\b", r"\bbool \w+ =", r"(?<![\w.])\d+(\.\d*)?f\b"):
+            self.assertNotRegex(self.generated, pattern)
 
     def test_curve(self):
         self.assertIn('#include "curve.wgsl"', self.generated)
