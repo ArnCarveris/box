@@ -1,66 +1,121 @@
-// The inventory screen (E), the original's inventory.flecs: the 15 stock slots of the inventory,
-// the construct section with its Buildings and Rocket tabs of slot buttons, the info panel of
-// the item under the pointer and the Inventory (E) button, which the HUD shows. It reads
-// OreInventoryScreen (the tab), OreInventory, OrePlacement (the selection), OreNeeds and the
-// OreCanOrder of the items, the HUD the game state, OreInventoryScreen (open) and OreItemInfo
-// (the item of the info panel); it formats every text from them. Its elements tell the game
-// what the pointer is over (oreelse.inventory_hover()) and call oreelse functions on a click.
-//
-// The slots, the tabs and the buttons restyle box.widgets.HeadlessButton, which follows the
-// pointer and the activations: the look is an expression of its hover and of props for the
-// state. A change of a prop starts the async blocks of an instance again, so each of them awaits
-// one event: the leave of the pointer clears hover even when the block of the base that awaits
-// it was started again while the pointer was over the element.
-//
-// The numbers are the original's pixels, as in hud.flecs: an element of a panel sits at
-// LayoutItem {h: Left, v: Top, x, y: -y}, y down from the top left corner; the anchors of the
-// screen, the info panel and the button flip the original's y, which points down. The original
-// lays a line of text out as high as its size, box as high as the line of its font: the titles
-// and the hint in the columns of the sections take the height of their size, so what follows
-// them sits where the original puts it.
-//
-// A template that inherits one of another script captures every constant of this script, and
-// a template takes at most 64 reactive inputs: only the numbers several templates share are
-// constants of the script, the others are constants of their template.
-
 using flecs.script
 using flecs.script.math
 using box.types
 using box.layout
+using box.transform
 using box.geometry
 using box.material
 using box.text
 using box.picking
+using box.transition
 using oreelse
 
-// A slot of the stock or of the construct section, 72x72 with corners of 3, its item's icon
-// 44x44 at (14, 8)
 const slotSize: f32 = 72
 const slotRadius: f32 = 3
 const slotIcon: f32 = 44
-const slotIconX: f32 = 14
-const slotIconY: f32 = 8
-
-// The face of a filled slot and of a slot button that can order, lighter while hovered, and
-// its border
-const slotFace: Rgb = {46, 50, 58}
-const slotHover: Rgb = {66, 72, 82}
-const slotEdge: Rgb = {88, 94, 106}
-
-// The padding of a section and the size of its title
 const sectionPad: f32 = 14
-const titleSize: f32 = 20
-
-// The info panel and the size of its texts
+const titleSize: f32 = 19
 const infoWidth: f32 = 560
 const infoHeight: f32 = 154
-const infoText: f32 = 15
+const infoText: f32 = 14
 
-// A stock slot, slot index of the inventory at (index % 5, floor(index / 5)) times the pitch
-// of 80 of its grid. Empty: a dark socket with an inner outline of 32x32 at (20, 20). Filled:
-// the face, lighter while hovered, the item's icon and its count at y 49, right aligned in 63.
-// The selected building: an amber face and a 2 pixel amber border, no hover change. A click on
-// a building picks it (oreelse.inventory_pick()).
+template OreSlotFace {
+  prop filled: bool = true
+  prop can: bool = true
+  prop selected: bool = false
+  prop hover: bool = false
+  prop down: bool = false
+  prop tex: entity = 0
+  prop tone: Rgb = {240, 176, 58}
+
+  const motion = OreUiMotion[OreUiMotion].scale
+  const lit = hover && can && filled
+  const lift: f32 = match down && lit { true: 0.94; _: match lit { true: 1.12; _: 1 } }
+  const iconAlpha: f32 = match can { true: 1; _: 0.45 }
+  const haloAlpha: f32 = match selected { true: 0.5; _: match lit { true: 0.34; _: 0.1 } }
+
+  const liveFace: Rgb = match lit {
+    true: {60, 64, 70}
+    false: {38, 41, 46}
+  }
+
+  const faceFilled: Rgb = match selected {
+    true: {84, 62, 22}
+    false: liveFace
+  }
+
+  const face: Rgb = match filled && can {
+    true: faceFilled
+    false: {16, 17, 20}
+  }
+
+  const edgeLive: rgba = match lit {
+    true: {240, 176, 58, 255}
+    false: {80, 84, 90, 255}
+  }
+
+  const edgeFilled: rgba = match selected {
+    true: {240, 176, 58, 255}
+    false: edgeLive
+  }
+
+  const edge: rgba = match filled {
+    true: edgeFilled
+    false: {40, 43, 48, 255}
+  }
+
+  Layout: {}
+  LayoutItem: {
+    h: Left, v: Top,
+    width: {mode: Fixed, value: slotSize}, height: {mode: Fixed, value: slotSize}
+  }
+  box.spatial.SpatialIgnore
+
+  plate {
+    Position: {0, 0, 0}
+    Layout: {}
+    LayoutItem: {
+      h: Left, v: Top,
+      width: {mode: Fixed, value: slotSize}, height: {mode: Fixed, value: slotSize}
+    }
+    Rect: {1, 1}
+    Image: {texture: ui_art.plate}
+    Rgb: face
+    Border: {width: match selected { true: 2; _: 1 }, radius: slotRadius, color: edge}
+    Transition: [Rgb: {duration: 0.12 * motion}]
+  }
+
+  if filled {
+    OreHalo aura(size: slotSize * 1.3, color: tone, alpha: haloAlpha, z: 1) {
+      Transition: [Opacity: {duration: 0.16 * motion}]
+    }
+
+    art {
+      Position: {0, 6, 2}
+      Scale: {lift, lift, 1}
+      Rect: {slotIcon, slotIcon}
+      Image: {texture: tex}
+      Opacity: {iconAlpha}
+      Transition: [Scale: {duration: 0.12 * motion, timing_function: EaseOut}]
+      box.spatial.SpatialIgnore
+    }
+  } else {
+    socket_a {
+      Position: {0, 0, 1}
+      Line: {-7, 0, 7, 0, width: 1}
+      Rgb: {44, 47, 52}
+      box.spatial.SpatialIgnore
+    }
+
+    socket_b {
+      Position: {0, 0, 1}
+      Line: {0, -7, 0, 7, width: 1}
+      Rgb: {44, 47, 52}
+      box.spatial.SpatialIgnore
+    }
+  }
+}
+
 template StockSlot : box.widgets.HeadlessButton {
   prop index: i32 = 0
   prop item: entity = 0
@@ -68,42 +123,8 @@ template StockSlot : box.widgets.HeadlessButton {
   prop active: bool = false
 
   const pitch: f32 = 80
-  const socketAt: f32 = 20
-  const socketSize: f32 = 32
-  const countY: f32 = 49
-  const countWidth: f32 = 63
-  const countSize: f32 = 15
-  const selectedFace: Rgb = {78, 62, 26}
-  const emptyFace: Rgb = {15, 16, 20}
-  const emptyEdge: Rgb = {44, 48, 56}
-  const countInk: Rgb = {224, 229, 237}
-
   const none: entity = 0
   const filled = item != none
-  const faceIdle: Rgb = match hover {
-    true: slotHover
-    false: slotFace
-  }
-  const faceFilled: Rgb = match active {
-    true: selectedFace
-    false: faceIdle
-  }
-  const face: Rgb = match filled {
-    true: faceFilled
-    false: emptyFace
-  }
-  const edgeFilled: Rgb = match active {
-    true: palette.amber
-    false: slotEdge
-  }
-  const edge: Rgb = match filled {
-    true: edgeFilled
-    false: emptyEdge
-  }
-  const edgeWidth: f32 = match active {
-    true: 2
-    false: 1
-  }
 
   Layout: {}
   LayoutItem: {
@@ -111,35 +132,21 @@ template StockSlot : box.widgets.HeadlessButton {
     width: {mode: Fixed, value: slotSize}, height: {mode: Fixed, value: slotSize}
   }
   Rect: {1, 1}
-  Rgb: face
-  Border: {width: edgeWidth, radius: slotRadius, color: {edge.r, edge.g, edge.b, 255}}
+  Rgb: {0, 0, 0}
+  BlendMode: Additive
 
-  // The socket is only an outline: its fill is the face of the empty slot it sits on
-  if !filled {
-    socket {
-      LayoutItem: {
-        h: Left, v: Top, x: socketAt, y: -socketAt,
-        width: {mode: Fixed, value: socketSize}, height: {mode: Fixed, value: socketSize}
-      }
-      Rect: {1, 1}
-      Rgb: emptyFace
-      Border: {width: 1, radius: 2, color: {emptyEdge.r, emptyEdge.g, emptyEdge.b, 255}}
+  if filled {
+    OreSlotFace face(
+      selected: active, hover: hover, down: down, tex: item[OreIcon].texture,
+      tone: match active { true: palette.amber; _: palette.text })
+
+    OreText count_label(
+      text: "{count}", size: 15, font: ui_fonts.mono, color: palette.text,
+      width: slotSize - 7, align: Right, y: 51) {
+      Position: {0, 0, 3}
     }
   } else {
-    icon {
-      LayoutItem: {
-        h: Left, v: Top, x: slotIconX, y: -slotIconY,
-        width: {mode: Fixed, value: slotIcon}, height: {mode: Fixed, value: slotIcon}
-      }
-      Rect: {1, 1}
-      Image: {texture: item[OreIcon].texture, u0: 0, v0: 0, u1: 1, v1: 1}
-    }
-
-    count_label {
-      LayoutItem: {h: Left, v: Top, x: 0, y: -countY, width: {mode: Fixed, value: countWidth}}
-      Text: {value: "{count}", size: countSize, width: countWidth, align: Right}
-      Rgb: countInk
-    }
+    OreSlotFace face(filled: false)
   }
 
   async {
@@ -167,60 +174,24 @@ template StockSlot : box.widgets.HeadlessButton {
   }
 }
 
-// A slot button of the construct section: the item's icon and, on the rocket page, its key at
-// (8, 4). When the item can be ordered (can, its OreCanOrder) the face lightens while hovered
-// and the icon is opaque; when it cannot the button is dim, the icon at alpha 150 and the face
-// does not change. A click orders one, cfg.craftBatch with Shift held at the click
-// (oreelse.inventory_order()); the screen stays open.
 template SlotButton : box.widgets.HeadlessButton {
   prop item: entity = 0
   prop key: string = ""
   prop can: bool = true
 
-  const keySize: f32 = 13
-  const keyInk: Rgb = {132, 139, 152}
-  const dimFace: Rgb = {30, 33, 39}
-  const dimEdge: Rgb = {52, 56, 64}
-  const dimAlpha: f32 = 150
-
-  const faceLit: Rgb = match hover {
-    true: slotHover
-    false: slotFace
-  }
-  const face: Rgb = match can {
-    true: faceLit
-    false: dimFace
-  }
-  const edge: Rgb = match can {
-    true: slotEdge
-    false: dimEdge
-  }
-  const iconAlpha: f32 = match can {
-    true: 255
-    false: dimAlpha
-  }
+  const none: entity = 0
 
   Layout: {}
   LayoutItem: {width: {mode: Fixed, value: slotSize}, height: {mode: Fixed, value: slotSize}}
   Rect: {1, 1}
-  Rgb: face
-  Border: {width: 1, radius: slotRadius, color: {edge.r, edge.g, edge.b, 255}}
+  Rgb: {0, 0, 0}
+  BlendMode: Additive
 
-  icon {
-    LayoutItem: {
-      h: Left, v: Top, x: slotIconX, y: -slotIconY,
-      width: {mode: Fixed, value: slotIcon}, height: {mode: Fixed, value: slotIcon}
-    }
-    Rect: {1, 1}
-    Image: {texture: item[OreIcon].texture, u0: 0, v0: 0, u1: 1, v1: 1}
-    Opacity: {iconAlpha / 255.0}
-  }
+  OreSlotFace face(can: can, hover: hover, down: down, tex: item[OreIcon].texture)
 
   if key != "" {
-    key_label {
-      LayoutItem: {h: Left, v: Top, x: 8, y: -4}
-      Text: {value: key, size: keySize}
-      Rgb: keyInk
+    OreKeyCap key_label(key: key, width: 16, height: 16, size: 10, x: 4, y: 4) {
+      Position: {0, 0, 3}
     }
   }
 
@@ -249,65 +220,33 @@ template SlotButton : box.widgets.HeadlessButton {
   }
 }
 
-// A tab button of the construct section, 148x30, tab its index, the label at y 7. Inactive: a
-// dark face, lighter while hovered, and the label in the soft color. Active: an amber face and
-// border, a light label and an amber underline of 132x2 at (8, 27), no hover change. A click
-// selects the tab (oreelse.inventory_tab()).
+const tabWidth: f32 = 148
+const tabHeight: f32 = 30
+
 template TabButton : box.widgets.HeadlessButton {
   prop tab: i32 = 0
   prop active: bool = false
 
-  const tabWidth: f32 = 148
-  const tabHeight: f32 = 30
-  const labelY: f32 = 7
-  const labelSize: f32 = 15
-  const underlineX: f32 = 8
-  const underlineY: f32 = 27
-  const idleFace: Rgb = {32, 35, 41}
-  const hoverFace: Rgb = {50, 55, 63}
-  const activeFace: Rgb = {60, 52, 28}
-  const idleEdge: Rgb = {52, 56, 64}
-  const activeInk: Rgb = {246, 220, 168}
+  const motion = OreUiMotion[OreUiMotion].scale
 
-  const faceIdle: Rgb = match hover {
-    true: hoverFace
-    false: idleFace
-  }
   const face: Rgb = match active {
-    true: activeFace
-    false: faceIdle
-  }
-  const edge: Rgb = match active {
-    true: palette.amber
-    false: idleEdge
-  }
-  const ink: Rgb = match active {
-    true: activeInk
-    false: palette.soft
+    true: {60, 48, 22}
+    false: match hover { true: {50, 54, 60}; _: {30, 32, 37} }
   }
 
-  Layout: {}
+  const ink: Rgb = match active {
+    true: palette.amberPale
+    false: match hover { true: palette.text; _: palette.soft }
+  }
+
+  Layout: {direction: Row, h: Center, v: Middle}
   LayoutItem: {width: {mode: Fixed, value: tabWidth}, height: {mode: Fixed, value: tabHeight}}
   Rect: {1, 1}
   Rgb: face
-  Border: {width: 1, radius: slotRadius, color: {edge.r, edge.g, edge.b, 255}}
+  Border: {width: 1, radius: slotRadius, color: {62, 66, 72, 255}}
+  Transition: [Rgb: {duration: 0.16 * motion}]
 
-  caption {
-    LayoutItem: {h: Left, v: Top, x: 0, y: -labelY, width: {mode: Fixed, value: tabWidth}}
-    Text: {value: label, size: labelSize, width: tabWidth, align: Center}
-    Rgb: ink
-  }
-
-  if active {
-    underline {
-      LayoutItem: {
-        h: Left, v: Top, x: underlineX, y: -underlineY,
-        width: {mode: Fixed, value: tabWidth - 2 * underlineX}, height: {mode: Fixed, value: 2}
-      }
-      Rect: {1, 1}
-      Rgb: palette.amber
-    }
-  }
+  OreText caption(text: label, size: 14, font: ui_fonts.label, color: ink)
 
   async {
     while true {
@@ -326,54 +265,98 @@ template TabButton : box.widgets.HeadlessButton {
   }
 }
 
-// The Inventory (E) button at the bottom center, 196x38: its ActionTrigger taps the Inventory
-// action, which E raises too. The face (with its alpha) lightens while hovered; it is a plate
-// below the caption, so the alpha leaves the caption opaque. InputBlocker keeps its clicks from
-// the world.
-template InventoryButton : box.widgets.HeadlessButton {
+template TabMarker {
+  prop tab: i32 = 0
+
+  const motion = OreUiMotion[OreUiMotion].scale
+
+  LayoutFloat: {h: Left, v: Bottom, anchor_h: Left, anchor_v: Bottom, x: tab * (tabWidth + 8)}
+  LayoutItem: {width: {mode: Fixed, value: tabWidth}, height: {mode: Fixed, value: 3}}
+  Transition: [Position: {duration: 0.26 * motion, timing_function: EaseInOut}]
+  box.spatial.SpatialIgnore
+
+  OreHalo beam(size: tabWidth, height: 18, color: palette.amber, alpha: 0.45, z: 0)
+
+  rule {
+    Position: {0, 0, 1}
+    Rect: {tabWidth - 12, 2}
+    Rgb: palette.amber
+    Emissive: {strength: 0.6, color: palette.amberGlow}
+  }
+}
+
+template InventoryButtonFace {
+  prop label: string = ""
+  prop hover: bool = false
+  prop down: bool = false
+
   const buttonWidth: f32 = 196
   const buttonHeight: f32 = 38
-  const captionSize: f32 = 17
+  const motion = OreUiMotion[OreUiMotion].scale
+  const lift: f32 = match down { true: 0.97; _: 1 }
+  const halo: f32 = match hover { true: 0.4; _: 0.12 }
 
   const face: Rgb = match hover {
-    true: slotHover
-    false: slotFace
-  }
-  const alpha: f32 = match hover {
-    true: 240
-    false: 236
+    true: {66, 58, 38}
+    false: {34, 37, 42}
   }
 
-  InputBlocker
+  const ink: Rgb = match hover {
+    true: palette.amberPale
+    false: palette.text
+  }
+
   Layout: {}
   LayoutItem: {
-    h: Center, v: Bottom, y: 22,
+    h: Left, v: Top,
     width: {mode: Fixed, value: buttonWidth}, height: {mode: Fixed, value: buttonHeight}
+  }
+  Scale: {lift, lift, 1}
+  Transition: [Scale: {duration: 0.08 * motion}]
+  box.spatial.SpatialIgnore
+
+  OreHalo aura(size: buttonWidth + 60, height: buttonHeight + 50, color: palette.amber, alpha: halo, z: -1) {
+    Transition: [Opacity: {duration: 0.16 * motion}]
   }
 
   plate {
+    Position: {0, 0, 0}
     LayoutItem: {
       h: Left, v: Top,
       width: {mode: Fixed, value: buttonWidth}, height: {mode: Fixed, value: buttonHeight}
     }
     Rect: {1, 1}
+    Image: {texture: ui_art.plate}
     Rgb: face
-    Opacity: {alpha / 255.0}
-    Border: {width: 1, radius: slotRadius, color: {slotEdge.r, slotEdge.g, slotEdge.b, 255}}
+    Border: {width: 1, radius: slotRadius, color: {98, 102, 106, 255}}
+    Transition: [Rgb: {duration: 0.12 * motion}]
   }
 
-  caption {
-    Layout: {direction: Row, h: Center, v: Middle}
+  row {
+    Position: {0, 0, 1}
+    Layout: {direction: Row, spacing: 10, h: Center, v: Middle}
     LayoutItem: {
       h: Left, v: Top,
       width: {mode: Fixed, value: buttonWidth}, height: {mode: Fixed, value: buttonHeight}
     }
 
-    line {
-      Text: {value: label, size: captionSize}
-      Rgb: palette.text
-    }
+    OreKeyCap key(key: "E", width: 18, height: 18)
+    OreText word(text: label, size: 15, font: ui_fonts.stencil, color: ink)
   }
+}
+
+template InventoryButton : box.widgets.HeadlessButton {
+  InputBlocker
+  Layout: {}
+  LayoutItem: {
+    h: Center, v: Bottom, y: 22,
+    width: {mode: Fixed, value: 196}, height: {mode: Fixed, value: 38}
+  }
+  Rect: {1, 1}
+  Rgb: {0, 0, 0}
+  BlendMode: Additive
+
+  InventoryButtonFace face(label: label, hover: hover, down: down)
 
   async {
     while true {
@@ -383,57 +366,36 @@ template InventoryButton : box.widgets.HeadlessButton {
   }
 }
 
-// The content of the inventory section: the title, the hint and a grid of 392x232 with the 15
-// stock slots of the inventory in its slot order, the building selected for placement in amber
 template StockBody {
   const gridWidth: f32 = 392
   const gridHeight: f32 = 232
-  const hintSize: f32 = 14
 
   const none: entity = 0
   const stock = OreInventory[OreInventory]
   const selected = OrePlacement[OrePlacement].selected
 
   Layout: {
-    direction: Column, spacing: 12, padding: {sectionPad, sectionPad, sectionPad, sectionPad}
+    direction: Column, spacing: 8, padding: {sectionPad, sectionPad, sectionPad, sectionPad}
   }
   LayoutItem: {h: Left, v: Top}
 
-  title {
-    LayoutItem: {height: {mode: Fixed, value: titleSize}}
-    Text: {value: "INVENTORY", size: titleSize}
-    Rgb: palette.text
-  }
+  OreText title(text: "INVENTORY", size: titleSize, font: ui_fonts.stencil, color: palette.amber, glow: 0.35, glowColor: palette.amberGlow)
+  OreText hint(text: "Click a building to place it - 15 slots", size: 13, color: palette.soft)
 
-  stock_body {
-    Layout: {direction: Column, spacing: 8}
-
-    hint {
-      LayoutItem: {height: {mode: Fixed, value: hintSize}}
-      Text: {value: "Click a building to place it - 15 slots", size: hintSize}
-      Rgb: palette.soft
+  grid {
+    Layout: {}
+    LayoutItem: {
+      width: {mode: Fixed, value: gridWidth}, height: {mode: Fixed, value: gridHeight}
     }
 
-    grid {
-      Layout: {}
-      LayoutItem: {
-        width: {mode: Fixed, value: gridWidth}, height: {mode: Fixed, value: gridHeight}
-      }
-
-      for i in 0..15 {
-        "slot_{i}" {
-          StockSlot: {
-            index: i, item: stock.slots[i].item, count: stock.slots[i].amount,
-            active: stock.slots[i].item != none && stock.slots[i].item == selected
-          }
-        }
-      }
+    for i in 0..15 {
+      StockSlot "slot_{i}"(
+        index: i, item: stock.slots[i].item, count: stock.slots[i].amount,
+        active: stock.slots[i].item != none && stock.slots[i].item == selected)
     }
   }
 }
 
-// The Buildings tab: three rows of three slot buttons. The observers of a script do not see the
-// changes of the item prefabs: every can reads the flips of OreCanOrder too, so it follows them
 template BuildingsPage {
   const flips = OreCanOrderFlips[OreCanOrderFlips].count
 
@@ -441,55 +403,26 @@ template BuildingsPage {
 
   row_base {
     Layout: {direction: Row, spacing: 8}
-
-    wall {
-      SlotButton: {item: Wall, can: flips >= 0 && Wall[OreCanOrder].value}
-    }
-
-    drill {
-      SlotButton: {item: Drill, can: flips >= 0 && Drill[OreCanOrder].value}
-    }
-
-    solar_panel {
-      SlotButton: {item: SolarPanel, can: flips >= 0 && SolarPanel[OreCanOrder].value}
-    }
+    SlotButton wall(item: Wall, can: flips >= 0 && Wall[OreCanOrder].value)
+    SlotButton drill(item: Drill, can: flips >= 0 && Drill[OreCanOrder].value)
+    SlotButton solar_panel(item: SolarPanel, can: flips >= 0 && SolarPanel[OreCanOrder].value)
   }
 
   row_turrets {
     Layout: {direction: Row, spacing: 8}
-
-    gun_turret {
-      SlotButton: {item: GunTurret, can: flips >= 0 && GunTurret[OreCanOrder].value}
-    }
-
-    laser_turret {
-      SlotButton: {item: LaserTurret, can: flips >= 0 && LaserTurret[OreCanOrder].value}
-    }
-
-    missile_turret {
-      SlotButton: {item: MissileTurret, can: flips >= 0 && MissileTurret[OreCanOrder].value}
-    }
+    SlotButton gun_turret(item: GunTurret, can: flips >= 0 && GunTurret[OreCanOrder].value)
+    SlotButton laser_turret(item: LaserTurret, can: flips >= 0 && LaserTurret[OreCanOrder].value)
+    SlotButton missile_turret(item: MissileTurret, can: flips >= 0 && MissileTurret[OreCanOrder].value)
   }
 
   row_late {
     Layout: {direction: Row, spacing: 8}
-
-    factory {
-      SlotButton: {item: Factory, can: flips >= 0 && Factory[OreCanOrder].value}
-    }
-
-    rocket_pad {
-      SlotButton: {item: RocketPad, can: flips >= 0 && RocketPad[OreCanOrder].value}
-    }
-
-    drone_pad {
-      SlotButton: {item: DronePad, can: flips >= 0 && DronePad[OreCanOrder].value}
-    }
+    SlotButton factory(item: Factory, can: flips >= 0 && Factory[OreCanOrder].value)
+    SlotButton rocket_pad(item: RocketPad, can: flips >= 0 && RocketPad[OreCanOrder].value)
+    SlotButton drone_pad(item: DronePad, can: flips >= 0 && DronePad[OreCanOrder].value)
   }
 }
 
-// The Rocket tab: one row of the four rocket parts with their craft keys, the cans following
-// the flips of OreCanOrder like those of the Buildings tab
 template RocketPage {
   const flips = OreCanOrderFlips[OreCanOrderFlips].count
 
@@ -497,39 +430,13 @@ template RocketPage {
 
   row_rocket {
     Layout: {direction: Row, spacing: 8}
-
-    engine {
-      SlotButton: {
-        item: items.RocketEngine, key: "F",
-        can: flips >= 0 && items.RocketEngine[OreCanOrder].value
-      }
-    }
-
-    fuel {
-      SlotButton: {
-        item: items.RocketFuelStorage, key: "G",
-        can: flips >= 0 && items.RocketFuelStorage[OreCanOrder].value
-      }
-    }
-
-    cargo_bay {
-      SlotButton: {
-        item: items.RocketCargoBay, key: "H",
-        can: flips >= 0 && items.RocketCargoBay[OreCanOrder].value
-      }
-    }
-
-    life_support {
-      SlotButton: {
-        item: items.RocketLifeSupport, key: "J",
-        can: flips >= 0 && items.RocketLifeSupport[OreCanOrder].value
-      }
-    }
+    SlotButton engine(item: items.RocketEngine, key: "F", can: flips >= 0 && items.RocketEngine[OreCanOrder].value)
+    SlotButton fuel(item: items.RocketFuelStorage, key: "G", can: flips >= 0 && items.RocketFuelStorage[OreCanOrder].value)
+    SlotButton cargo_bay(item: items.RocketCargoBay, key: "H", can: flips >= 0 && items.RocketCargoBay[OreCanOrder].value)
+    SlotButton life_support(item: items.RocketLifeSupport, key: "J", can: flips >= 0 && items.RocketLifeSupport[OreCanOrder].value)
   }
 }
 
-// The content of the construct section: the title, the tab buttons and a page area of 312x232
-// with the page of the active tab
 template ConstructBody {
   prop tab: i32 = 0
 
@@ -537,26 +444,18 @@ template ConstructBody {
   const pageHeight: f32 = 232
 
   Layout: {
-    direction: Column, spacing: 12, padding: {sectionPad, sectionPad, sectionPad, sectionPad}
+    direction: Column, spacing: 8, padding: {sectionPad, sectionPad, sectionPad, sectionPad}
   }
   LayoutItem: {h: Left, v: Top}
 
-  title {
-    LayoutItem: {height: {mode: Fixed, value: titleSize}}
-    Text: {value: "CONSTRUCT", size: titleSize}
-    Rgb: palette.text
-  }
+  OreText title(text: "CONSTRUCT", size: titleSize, font: ui_fonts.stencil, color: palette.amber, glow: 0.35, glowColor: palette.amberGlow)
 
   tabs {
     Layout: {direction: Row, spacing: 8}
 
-    buildings_tab {
-      TabButton: {label: "Buildings", tab: 0, active: tab == 0}
-    }
-
-    rocket_tab {
-      TabButton: {label: "Rocket", tab: 1, active: tab == 1}
-    }
+    TabButton buildings_tab(label: "Buildings", tab: 0, active: tab == 0)
+    TabButton rocket_tab(label: "Rocket", tab: 1, active: tab == 1)
+    TabMarker marker(tab: tab)
   }
 
   pages {
@@ -566,28 +465,19 @@ template ConstructBody {
     }
 
     if tab == 0 {
-      buildings_page {
-        BuildingsPage: {}
-      }
+      BuildingsPage buildings_page()
     } else {
-      rocket_page {
-        RocketPage: {}
-      }
+      RocketPage rocket_page()
     }
   }
 }
 
-// The info panel of item, 560x154 below the screen: its icon 56x56, name, a note on how it is
-// made (or that it is ready to place, place) with its power, its detail and, for an item with a
-// recipe other than a building in a stock slot, its needs of raw ore once OreNeeds has them
 template ItemInfoPanel {
   prop item: entity = 0
   prop place: bool = false
 
-  const infoCap: f32 = 7
   const iconSize: f32 = 56
-  const nameSize: f32 = 22
-  const needIcon: f32 = 26
+  const needIcon: f32 = 24
 
   const needs = OreNeeds[OreNeeds]
   const recipe = item?[OreRecipe]
@@ -610,7 +500,6 @@ template ItemInfoPanel {
     false: 0
   }
 
-  // The power suffix: what a consumer draws, what a producer makes, else nothing
   const genText: string = match gen > 0 {
     true: " - +{gen:.0} W"
     false: ""
@@ -638,73 +527,33 @@ template ItemInfoPanel {
     width: {mode: Fixed, value: infoWidth}, height: {mode: Fixed, value: infoHeight}
   }
 
-  // The chrome below the content
-  panel {
-    Panel: {width: infoWidth, height: infoHeight, capH: infoCap}
-    LayoutItem: {h: Left, v: Top}
-  }
+  Panel panel(width: infoWidth, height: infoHeight, capH: 6, aura: 0.14) {
+    OreHalo icon_glow(size: iconSize * 2, color: palette.amber, alpha: 0.2, x: -infoWidth / 2 + 42, y: infoHeight / 2 - 50, z: 0)
+    OreGlyph icon(tex: item[OreIcon].texture, size: iconSize, x: 14, y: 22)
+    OreText item_name(text: item[OreItem].name, size: 21, font: ui_fonts.stencil, color: palette.text, x: 82, y: 17)
+    OreText note(text: noteText, size: infoText, font: ui_fonts.label, color: palette.amber, x: 82, y: 49)
+    OreText detail(text: item[OreItem].detail, size: infoText, color: palette.soft, x: 82, y: 71)
 
-  icon {
-    LayoutItem: {
-      h: Left, v: Top, x: 14, y: -22,
-      width: {mode: Fixed, value: iconSize}, height: {mode: Fixed, value: iconSize}
-    }
-    Rect: {1, 1}
-    Image: {texture: item[OreIcon].texture, u0: 0, v0: 0, u1: 1, v1: 1}
-  }
+    if recipe && !place && needs.item == item && needs.count > 0 {
+      OreText needs_label(text: "NEEDS", size: 12, font: ui_fonts.stencil, color: palette.amber, x: 14, y: 114)
 
-  item_name {
-    LayoutItem: {h: Left, v: Top, x: 82, y: -22}
-    Text: {value: item[OreItem].name, size: nameSize}
-    Rgb: palette.text
-  }
+      needs_list {
+        Layout: {direction: Row, spacing: 18}
+        LayoutItem: {h: Left, v: Top, x: 82, y: -106}
 
-  note {
-    LayoutItem: {h: Left, v: Top, x: 82, y: -54}
-    Text: {value: noteText, size: infoText}
-    Rgb: palette.amber
-  }
+        for i in 0..needs.count {
+          "need_{i}" {
+            const need = needs.ores[i]
+            const ore = need.item
+            const short = need.have < need.need
 
-  detail {
-    LayoutItem: {h: Left, v: Top, x: 82, y: -76}
-    Text: {value: item[OreItem].detail, size: infoText}
-    Rgb: palette.soft
-  }
+            Layout: {direction: Row, spacing: 6, v: Middle}
 
-  if recipe && !place && needs.item == item && needs.count > 0 {
-    needs_label {
-      LayoutItem: {h: Left, v: Top, x: 14, y: -112}
-      Text: {value: "NEEDS", size: infoText}
-      Rgb: palette.amber
-    }
-
-    // A row per ore, Iron, Copper, Stone, Luminite: its icon and have/need, red while short
-    needs_list {
-      Layout: {direction: Row, spacing: 18}
-      LayoutItem: {h: Left, v: Top, x: 82, y: -108}
-
-      for i in 0..needs.count {
-        "need_{i}" {
-          const need = needs.ores[i]
-          const ore = need.item
-          const short = need.have < need.need
-
-          Layout: {direction: Row, spacing: 6, v: Middle}
-
-          icon {
-            LayoutItem: {
-              width: {mode: Fixed, value: needIcon}, height: {mode: Fixed, value: needIcon}
-            }
-            Rect: {1, 1}
-            Image: {texture: ore[OreIcon].texture, u0: 0, v0: 0, u1: 1, v1: 1}
-          }
-
-          amount {
-            Text: {value: "{need.have}/{need.need}", size: infoText}
-            Rgb: match short {
-              true: palette.red
-              false: palette.text
-            }
+            OreGlyph icon(tex: ore[OreIcon].texture, size: needIcon)
+            OreText amount(
+              text: "{need.have}/{need.need}", size: 15, font: ui_fonts.mono,
+              color: match short { true: palette.red; _: palette.text },
+              glow: match short { true: 0.4; _: 0 })
           }
         }
       }
@@ -712,21 +561,15 @@ template ItemInfoPanel {
   }
 }
 
-// The inventory screen, 802x368 at the center of the parent (the screen of the HUD), with the
-// inventory section (420x334) at (14, 20) and the construct section (340x334) at (448, 20) on
-// the tab of OreInventoryScreen. The HUD shows it while the screen is open and the game plays;
-// wider than a small window, it hangs over its edges like the original's.
 template InventoryScreen {
   const screenWidth: f32 = 802
   const screenHeight: f32 = 368
-  const screenCap: f32 = 8
   const sectionTop: f32 = 20
   const sectionHeight: f32 = 334
   const stockWidth: f32 = 420
   const constructWidth: f32 = 340
-  const screenFill: rgba = {17, 18, 22, 244}
-  const sectionFill: rgba = {26, 28, 33, 236}
-  const sectionEdge: rgba = {58, 63, 73, 255}
+  const sectionFill: rgba = {34, 37, 42, 255}
+  const sectionEdge: rgba = {62, 66, 72, 255}
 
   const tab = OreInventoryScreen[OreInventoryScreen].tab
 
@@ -736,32 +579,19 @@ template InventoryScreen {
     width: {mode: Fixed, value: screenWidth}, height: {mode: Fixed, value: screenHeight}
   }
 
-  // The chrome below the sections
-  panel {
-    Panel: {width: screenWidth, height: screenHeight, capH: screenCap, fill: screenFill}
-    LayoutItem: {h: Left, v: Top}
-  }
-
-  stock_section {
-    Panel: {
-      width: stockWidth, height: sectionHeight, cap: false, fill: sectionFill, edge: sectionEdge
+  Panel panel(
+    width: screenWidth, height: screenHeight, capH: 8,
+    fill: {18, 20, 23, 250}, aura: 0.14) {
+    Panel stock_section(
+      width: stockWidth, height: sectionHeight, cap: false, fill: sectionFill, edge: sectionEdge,
+      aura: 0, brackets: false, x: sectionPad, y: -sectionTop) {
+      StockBody body()
     }
-    LayoutItem: {h: Left, v: Top, x: sectionPad, y: -sectionTop}
 
-    body {
-      StockBody: {}
-    }
-  }
-
-  construct_section {
-    Panel: {
-      width: constructWidth, height: sectionHeight, cap: false,
-      fill: sectionFill, edge: sectionEdge
-    }
-    LayoutItem: {h: Left, v: Top, x: sectionPad + stockWidth + sectionPad, y: -sectionTop}
-
-    body {
-      ConstructBody: {tab: tab}
+    Panel construct_section(
+      width: constructWidth, height: sectionHeight, cap: false, fill: sectionFill, edge: sectionEdge,
+      aura: 0, brackets: false, x: sectionPad + stockWidth + sectionPad, y: -sectionTop) {
+      ConstructBody body(tab: tab)
     }
   }
 }

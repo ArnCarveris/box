@@ -5,7 +5,7 @@
 // and `Copper plate (4x)`. The second, two electronics, is stalled: a worker holds a finished
 // unit that does not fit the full inventory (15 kinds, Electronics not among them) and its pool
 // has nothing to craft the rest from, so its header `Electronics (2x) - inventory full` has a
-// full dark red fill and a red label, and its indented `Wire (1x)` a red label. The power panel
+// full dark red fill and a pale label, and its indented `Wire (1x)` a red label. The power panel
 // shows at the bottom left at the start levels 2, 2, 2.
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse

@@ -1,7 +1,3 @@
-// The columns of the power allocator, the original's PowerSegment and power_panel: a column per
-// category of OrePowerAlloc with four bars, its icon and its caption. The HUD (ui/hud.flecs)
-// places the three columns in the power panel at the bottom left.
-
 using flecs.script
 using box.layout
 using box.geometry
@@ -9,23 +5,16 @@ using box.material
 using box.texture
 using box.text
 using box.picking
+using box.transition
 using oreelse
 
-// The bars: width, height, x in the column and the y of the top bar (level 4), one level lower
-// every powerBarPitch
-const powerBarWidth: f32 = 52
+const powerBarWidth: f32 = 54
 const powerBarHeight: f32 = 11
-const powerBarX: f32 = 11
-const powerBarTop: f32 = 38
-const powerBarPitch: f32 = 16
-
-// Width of a column
+const powerBarX: f32 = 10
+const powerBarTop: f32 = 40
+const powerBarPitch: f32 = 15
 const powerColumnWidth: f32 = 74
 
-// A bar of a column, the bar of level in the column of the category kind (an OrePowerKind as an
-// i32), at y from the top of the column. It is lit when level is at most the level of the
-// category; the lit bars of a column share the color of its level, orange at 1, green at 2 and
-// cyan above, lighter while hovered. A click sets the level (oreelse.power_set).
 template PowerBar {
   prop kind: i32 = 0
   prop level: i32 = 1
@@ -33,6 +22,7 @@ template PowerBar {
 
   mut hover = false
 
+  const motion = OreUiMotion[OreUiMotion].scale
   const alloc = OrePowerAlloc[OrePowerAlloc]
   const tone: i32 = match kind {
     0: alloc.level[0]
@@ -57,8 +47,8 @@ template PowerBar {
   }
 
   const offColor: Rgb = match hover {
-    true: {34, 37, 44}
-    false: palette.well
+    true: {44, 48, 54}
+    false: {14, 15, 18}
   }
 
   const litColor: Rgb = match tone {
@@ -72,18 +62,23 @@ template PowerBar {
     false: offColor
   }
 
+  const barGlow: f32 = match lit {
+    true: 0.18
+    false: 0
+  }
+
   Interactive
+  Cursor: {CursorPointer}
   LayoutItem: {
     h: Left, v: Top, x: powerBarX, y: -y,
     width: {mode: Fixed, value: powerBarWidth}, height: {mode: Fixed, value: powerBarHeight}
   }
   Rect: {1, 1}
   Rgb: barColor
-  Border: {width: 1, radius: 2, color: {52, 56, 64, 255}}
+  Emissive: {strength: barGlow, color: litColor}
+  Border: {width: 1, radius: 2, color: {52, 56, 62, 255}}
+  Transition: [Rgb: {duration: 0.14 * motion}, Emissive: {duration: 0.14 * motion}]
 
-  // Entering and leaving in loops of their own: a change of the props or of the state read
-  // evaluates the template again and restarts its async blocks, and a single loop restarted
-  // while hovered would wait for an enter and miss the leave
   async {
     while true {
       await on.enter(this)
@@ -106,51 +101,56 @@ template PowerBar {
   }
 }
 
-// A column of the power panel for the category kind: the bars of levels 4, 3, 2 and 1 from the
-// top at y 38, 54, 70 and 86, the icon of 26x26 at (24, 104) and the caption at y 136, centered
-// in the column's 74 pixels. An instance places it at its x in the panel.
 template PowerColumn {
   prop kind: i32 = 0
   prop icon: entity = 0
   prop caption: string = ""
+  prop x: f32 = 0
 
   Layout: {}
-
-  bar_4 {
-    PowerBar: {kind: kind, level: 4, y: powerBarTop}
+  LayoutItem: {
+    h: Left, v: Top, x: x,
+    width: {mode: Fixed, value: powerColumnWidth}, height: {mode: Fixed, value: 150}
   }
 
-  bar_3 {
-    PowerBar: {kind: kind, level: 3, y: powerBarTop + powerBarPitch}
+  PowerBar bar_4(kind: kind, level: 4, y: powerBarTop)
+  PowerBar bar_3(kind: kind, level: 3, y: powerBarTop + powerBarPitch)
+  PowerBar bar_2(kind: kind, level: 2, y: powerBarTop + powerBarPitch * 2)
+  PowerBar bar_1(kind: kind, level: 1, y: powerBarTop + powerBarPitch * 3)
+
+  OreGlyph symbol(tex: icon, size: 24, x: 25, y: 104)
+
+  OreText caption_label(
+    text: caption, size: 9, font: ui_fonts.label, color: palette.soft,
+    width: powerColumnWidth, align: Center, y: 132)
+}
+
+template PowerFree {
+  const alloc = OrePowerAlloc[OrePowerAlloc]
+  const freeBars = cfg.powerBars - alloc.level[0] - alloc.level[1] - alloc.level[2]
+
+  Layout: {direction: Row, spacing: 3, v: Middle}
+  LayoutItem: {h: Right, v: Top, x: -12, y: -12}
+
+  OreText word(text: "FREE {freeBars}", size: 11, font: ui_fonts.mono, color: palette.amber)
+
+  gap {
+    LayoutItem: {width: {mode: Fixed, value: 4}}
   }
 
-  bar_2 {
-    PowerBar: {kind: kind, level: 2, y: powerBarTop + powerBarPitch * 2}
-  }
-
-  bar_1 {
-    PowerBar: {kind: kind, level: 1, y: powerBarTop + powerBarPitch * 3}
-  }
-
-  symbol {
-    LayoutItem: {
-      h: Left, v: Top, x: 24, y: -104,
-      width: {mode: Fixed, value: 26}, height: {mode: Fixed, value: 26}
-    }
-    Rect: {1, 1}
-    Image: {texture: icon, u0: 0, v0: 0, u1: 1, v1: 1}
-  }
-
-  // Centered by the layout rather than wrapped at the column's width, so a caption wider than
-  // the column (CONSTRUCTION) stays on one line, centered on it
-  caption_label {
-    Layout: {}
-    LayoutItem: {h: Left, v: Top, y: -136, width: {mode: Fixed, value: powerColumnWidth}}
-
-    line {
-      LayoutItem: {h: Center, v: Top}
-      Text: {value: caption, size: 10, wrap: Newlines}
-      Rgb: palette.soft
+  for i in 0..cfg.powerBars {
+    "pip_{i}" {
+      const on = i < freeBars
+      LayoutItem: {width: {mode: Fixed, value: 5}, height: {mode: Fixed, value: 10}}
+      Rect: {1, 1}
+      if on {
+        Rgb: palette.amber
+        Emissive: {strength: 0.5, color: palette.amberGlow}
+      } else {
+        Rgb: {38, 41, 46}
+        Emissive: {strength: 0, color: palette.amberGlow}
+      }
+      box.spatial.SpatialIgnore
     }
   }
 }

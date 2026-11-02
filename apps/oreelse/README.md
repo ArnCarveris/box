@@ -120,18 +120,13 @@ The clock counts the seconds of play; the end screen shows it as the survival ti
 
 ### The screens
 
-The title screen shows three signs, MINE, DEFEND and ESCAPE, what the game is about, the list of
-the controls and `PRESS ANY KEY TO START`. The pause screen shows `PAUSED`, the quality button
-(see Render quality), the same list of the controls and `Press ESC to resume`; the quality button
-is the only control that works while paused. The end screen shows `YOU ESCAPED` when the game is
-won and `THE SWARM GOT YOU` when it is lost, the Luminite shipped, the critters killed, the time
-survived (the clock as minutes and seconds, `12:05`) with the last wave, and
-`Press R to land again`:
-
-```
-25 Luminite shipped
-37 critters killed - survived 12:05 to wave 9
-```
+The title screen shows the logo, three signs, MINE, DEFEND and ESCAPE, what the game is about, the
+list of the controls and `PRESS ANY KEY TO START`. The pause screen shows `PAUSED`, the quality
+button (see Render quality), the same list of the controls and `Press ESC to resume`; the quality
+button is the only control that works while paused. The end screen shows `YOU ESCAPED` when the
+game is won and `THE SWARM GOT YOU` when it is lost, tiles with the Luminite shipped, the critters
+killed, the time survived (the clock as minutes and seconds, `12:05`) and the last wave, and
+`PRESS R TO LAND AGAIN`.
 
 The wheel zooms over every screen.
 
@@ -700,8 +695,9 @@ holds three gauges, left to right:
 
 - **Luminite**: `held / shipped`, the Luminite in the inventory and the Luminite shipped to
   orbit.
-- **Waves**: the critter and a bar of the time to the next wave, filling up as it nears: purple,
-  orange once it is three quarters there, and full, blinking red, while a wave spawns.
+- **Waves**: the critter, `NEXT WAVE n` or `WAVE n ATTACKING` and a bar of the time to the next
+  wave, filling up as it nears: purple, orange once it is three quarters there, and full, blinking
+  red, while a wave spawns.
 - **Power**: `production / demand W` (rounded down) and a bar of the ratio of the two, green, red
   in a blackout.
 
@@ -711,7 +707,7 @@ building while one is under way, and with a rocket pad the status of its rocket:
 once it is launched, `Rocket ready to launch (P)` (blinking green) when it is valid, else what
 it needs: `Install a cargo bay (U) or life support (I)`, `Needs 4 engines, 2 installed (T)` or
 `Needs 1 fuel tanks, 0 installed (Y)`. Below 30% health `! SUIT BREACH !` blinks red at the top
-of the screen.
+of the screen and the edges of the screen pulse red with it.
 
 A building or the astronaut that is damaged (above 0 and below its full HP) shows a health bar
 over it: a dark bar 4 px tall, 6 px above the top of its model as the camera sees it and as wide
@@ -738,8 +734,8 @@ Three more panels show while playing, and hide while paused:
   inventory; an order whose units are all delivered shows `Rocket engine - wrapping up` (or
   `- inventory full`) until its leftovers are in the inventory. A click on a header row cancels
   one unit of the order; the indented rows do nothing.
-- **The power allocator**, at the bottom left: `FREE n`, the bars not assigned out of 6, and a
-  column of four bars for Mining, Weapons and Construction. The bars up to a category's level are
+- **The power allocator**, at the bottom left: `FREE n` with a pip per bar not assigned out of
+  6, and a column of four bars for Mining, Weapons and Construction. The bars up to a category's level are
   lit, orange at level 1, green at 2 and cyan at 3 and 4. A click on a bar sets the level (see
   Power).
 - **The rocket assembly**, at the right under the status bar while there is a rocket pad: a row
@@ -821,7 +817,17 @@ The port follows these; new code keeps to them.
 - **UI** is a screen space UI scene like bunnyhopper's HUD, reactive to the game's
   singletons, using box's layout, text, image and widget features. Clicks are `on.click`
   handlers (or `ActionTrigger`) that call `oreelse` functions. Panels have `InputBlocker` so a
-  click on them does not reach the world; labels without a panel are not hit-testable.
+  click on them does not reach the world; labels without a panel are not hit-testable. A layout
+  without a shape takes part in picking too and a hit nothing handles goes to the world view, not
+  to the UI below it, so a full screen wrapper is `SpatialIgnore` or sized to its content.
+- **The look of the UI** is a salvaged field terminal: stencil headings (Saira Stencil One), labels
+  and text in Chakra Petch, readouts in Share Tech Mono (`etc/ui/fonts`, SIL Open Font License),
+  brushed plates, hazard tape and amber and Luminite light. The parts are in `etc/ui/kit.flecs`.
+  The HUD lays out on a virtual screen of at least 1280x720, which `OreScreenCamera` scales to the
+  window, so wider windows give it more room and larger windows show it larger. Its view has its
+  own `Bloom`, off at the Low tier, so only `Emissive` and bright colors of the UI glow, not the
+  world under it. `OreUiMotion.scale` multiplies the durations and delays of its transitions; the
+  visual scenes set it to 0 (`test/visual/setup/seed.flecs`), so they capture the settled UI.
 - **Determinism**: `OreSeed {seed, run}` holds the session seed (`--seed N` or the time) and
   the runs since the start. `ore_seed_get(world, stream)` derives the seed of a stream of the
   current run: stream 0 seeds the C generator (`OreRandom`, drawn with `ore_random01`), and
@@ -853,8 +859,8 @@ The port follows these; new code keeps to them.
   original's prefab and part names (`Ore`, `Astronaut`, `JetPlume`, `GroundSurface`, ...), and
   never as placeholder geometry. Animation runs in C systems that only run while `Playing`;
   visuals read the game's state instead of keeping their own copy.
-- **Colors** of the world are the original's linear light, in the port's bytes; the UI keeps the
-  original's bytes (see Colors below).
+- **Colors** of the world are the original's linear light, in the port's bytes; the UI uses plain
+  sRGB bytes (see Colors below).
 - **README**: this file describes the game like a player's manual (controls, rules); a change
   to the mechanics updates it.
 
@@ -880,21 +886,18 @@ keeps the original's bytes:
 - **World color textures** load with `TexturePath.linear` (`include/box/texture.h`), which
   encodes their pixels to sRGB on load, so the color layers read the stored values as linear
   light as the original does; the SVGs stay unchanged. The normal and ORM maps load as they are.
-- **The UI** keeps the original's bytes, decoded as sRGB: everything under `etc/ui` (the
-  palette, panels, texts, borders, the HUD, the inventory, the power, queue and rocket panels,
-  the screens) and the health bars, whose fill blends `cfg.hpBarFull`, `hpBarMid` and `hpBarLow`
-  as the original's `oreBarLerp` and shows the blend as it is, over `cfg.hpBarBack` with a
-  `cfg.hpBarEdge`. Its images (the icons of `etc/icons` in `etc/ui/icons.flecs`, the hazard strip
-  of the panels, the signs of the title screen) load without `TexturePath.linear`. The original
-  draws its UI as it is over the finished frame, after the lighting, so its UI bytes are shown
-  as sRGB: encoding them like the world's showed the UI lighter and less saturated than the
-  original, flat and washed out.
+- **The UI** uses plain sRGB bytes: everything under `etc/ui` (the palette, panels, texts,
+  borders, the HUD, the inventory, the power, queue and rocket panels, the screens) and the health
+  bars, whose fill blends `cfg.hpBarFull`, `hpBarMid` and `hpBarLow` as the original's `oreBarLerp`
+  and shows the blend as it is, over `cfg.hpBarBack` with a `cfg.hpBarEdge`. Its images (the icons
+  of `etc/icons` in `etc/ui/icons.flecs`, the hazard strip of the panels, the signs of the title
+  screen and `etc/ui/art`) load without `TexturePath.linear`. It draws over the finished frame,
+  after the lighting and the tonemap of the world.
 
 The conversion stays in the app: box, its visual baselines and the other apps keep decoding
 color bytes as sRGB (bunnyhopper kept its original's bytes). The colors stay plain bytes in
 the same places, and the C code, which takes every color from the scripts, did not change.
-The scenarios compare world colors with `box_client.srgb()` of the original's bytes and UI
-colors with the original's bytes.
+The scenarios compare world colors with `box_client.srgb()` of the original's bytes.
 
 ## From flecs-engine to box
 
@@ -1150,14 +1153,17 @@ its tile in the grid.
 | `etc/assets/` | The original's textures (SVG), unchanged, and `terrain_dirt_orm.svg`; the color textures load with `linear: true`. `textures/cloud_noise.png`, a copy of the engine's CookieNoise, is the cookie of the cloud shadows |
 | `etc/ui/palette.flecs` | The colors of the UI, `palette.*` |
 | `etc/ui/icons.flecs` | The icon textures, `icons.*`, which the items name with `OreIcon` |
-| `etc/ui/panel.flecs` | The `Panel` template, the chrome of every panel: the plate, its edge, the hazard strip and the `InputBlocker` |
+| `etc/ui/kit.flecs` | The shared parts of the UI: the virtual screen (`OreScreenCamera`, `OreScreenRoot`), `OreOneShot`, `OreText`, `OreGlyph`, `OreHalo`, `OreBar`, `OreKeyCap`, `OreRule`, `OreHazardRule`, `OreVeil` and the textures of `etc/ui/art` |
+| `etc/ui/panel.flecs` | The `Panel` template, the chrome of every panel: its shadow and rim light, the plate, its edge, the hazard strip, its heading and the `InputBlocker` |
 | `etc/ui/health_bar.flecs` | The `HealthBar` template, the health bar of a damaged building or astronaut, anchored to the projection of its model box (`OreModelBox`) |
-| `etc/ui/hud.flecs` | The `OreHud` template, which shows the screens in their states: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert, the rocket status line, the order queue, power allocator and rocket assembly panels, drawn and hit in that order (z 0, 1 and 2), the Inventory (E) button and the inventory screen with its info panel over them (z 3 and 4) |
+| `etc/ui/hud.flecs` | The `OreHud` template, which shows the screens in their states: the status bar (`OreLuminiteGauge`, `OreWaveGauge`, `OrePowerGauge`), the toast, the mine bar, the suit breach alert, the rocket status line, the panels of play, the inventory and the screens of the game flow, and the view of the HUD with its bloom |
 | `etc/ui/inventory.flecs` | The inventory screen (`InventoryScreen`: `StockBody` with its `StockSlot`s, `ConstructBody` with its `TabButton`s and the `BuildingsPage` and `RocketPage` of `SlotButton`s; the slots and buttons are restyled `box.widgets.HeadlessButton`s), its info panel (`ItemInfoPanel`) and the Inventory (E) button (`InventoryButton`), which the HUD shows |
-| `etc/ui/queue.flecs` | The `QueueRow` template, a row of the order queue |
-| `etc/ui/power.flecs` | The `PowerBar` and `PowerColumn` templates of the power allocator |
-| `etc/ui/rocket_panel.flecs` | The `RocketSection`, `RocketStep` and `RocketLaunch` templates of the rocket assembly |
+| `etc/ui/queue.flecs` | The `QueueRow` template, a row of the order queue, and `OreQueueRows` |
+| `etc/ui/power.flecs` | The `PowerBar`, `PowerColumn` and `PowerFree` templates of the power allocator |
+| `etc/ui/rocket_panel.flecs` | The `RocketSection`, `RocketStep`, `RocketLaunch` and `OreRocketBody` templates of the rocket assembly |
 | `etc/ui/screens.flecs` | The screens of the game flow: `OreTitleScreen` (with its signs, `OreSign`), `OrePauseScreen` (with `OreQualityButton` and its `OreQualityValue`), `OreEndScreen`, and `OreControls`, the list of the controls the title and pause screens share (`OreControl` rows) |
+| `etc/ui/fonts/` | The fonts of the UI with their licenses |
+| `etc/ui/art/` | The textures of the UI, which `tools/ui_art.py` writes (numpy and Pillow) |
 | `etc/ui/signs/` | The original's sign art of the title screen (SVG), unchanged |
 | `etc/icons/` | The original's icons (SVG), unchanged |
 | `etc/ui/hazard_strip.svg` | The original's hazard strip of the panels, unchanged |

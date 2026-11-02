@@ -1,7 +1,7 @@
 // The end screen of a won run over the seeded map with the status bar of the HUD at the top
-// right: a panel of 640x218 above the middle of the window with YOU ESCAPED, 25 Luminite
-// shipped in teal, 37 critters killed - survived 12:05 to wave 9 and Press R to land again in
-// the soft color.
+// right, under slowly turning teal rays: YOU ESCAPED in glowing teal over a hazard rule, the tiles
+// 25 LUMINITE SHIPPED, 37 CRITTERS KILLED, 12:05 TIME SURVIVED and 9 LAST WAVE, and PRESS R TO LAND
+// AGAIN in amber.
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
 

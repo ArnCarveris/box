@@ -1,8 +1,8 @@
-// The title screen over the seeded map at the start: a panel of 900x640 in the middle of the
-// window, its hazard strip on top; three signs, MINE in orange, DEFEND in red and ESCAPE in teal,
-// each edged in its color with its warning sign art over its label; the two lines of what the game
-// is about, the list of the eight controls (the keys right aligned, the actions in the soft
-// color) and PRESS ANY KEY TO START at the bottom. No status bar.
+// The title screen over the seeded map at the start, dimmed by a veil: the ORE ELSE logo in glowing
+// amber over a hazard rule, the line about the crash, three sign cards, MINE in orange, DEFEND in
+// red and ESCAPE in teal, each edged and lit in its color with its warning sign art over its label;
+// the two lines of what the game is about, the eight controls in two columns with their key caps
+// and PRESS ANY KEY TO START at the bottom. No status bar.
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
 

@@ -1,241 +1,196 @@
-// The screens of the game flow, the original's splash screens: the title screen, the pause
-// screen with the quality button and the end screen of a won or lost run, and the list of the
-// controls the title and pause screens share (the original copied it into both). OreHud shows
-// each in its game state, over the rest of the HUD.
-//
-// The numbers are the original's pixels, positions from the top left corner of the panel with
-// y down (an element sits at LayoutItem {h: Left, v: Top, x, y: -y}); the original's anchor
-// offsets are y down too, so a panel the original lifts by 40 has y: 40 here. A centered line
-// is a Text as wide as its panel with align Center.
-//
-// The screens show outside play only, where the world takes no clicks, so their panels do not
-// block the pointer: the wheel zooms over them, as over the original's screens.
-
 using flecs.script
 using flecs.script.math
+using box.app
 using box.types
 using box.layout
+using box.transform
 using box.geometry
 using box.material
 using box.texture
 using box.text
 using box.input
 using box.picking
+using box.movement
+using box.transition
 using oreelse
 
-// The art of the signs of the title screen, the original's (etc/ui/signs, unchanged),
-// rasterized at 512x512 as the original's
 ui_signs {
-  mine {
-    TexturePath: {path: "apps/oreelse/etc/ui/signs/mine.svg", width: 512, height: 512}
-  }
-
-  defend {
-    TexturePath: {path: "apps/oreelse/etc/ui/signs/defend.svg", width: 512, height: 512}
-  }
-
-  escape {
-    TexturePath: {path: "apps/oreelse/etc/ui/signs/escape.svg", width: 512, height: 512}
-  }
+  mine { TexturePath: {path: "apps/oreelse/etc/ui/signs/mine.svg", width: 512, height: 512} }
+  defend { TexturePath: {path: "apps/oreelse/etc/ui/signs/defend.svg", width: 512, height: 512} }
+  escape { TexturePath: {path: "apps/oreelse/etc/ui/signs/escape.svg", width: 512, height: 512} }
 }
 
-// The plate of the three screens and the height of their hazard strip
-const screenFill: rgba = {15, 16, 19, 252}
-const screenCap: f32 = 7
+const keyWidth: f32 = 92
+const actionWidth: f32 = 306
+const signWidth: f32 = 244
+const signHeight: f32 = 196
+const signArt: f32 = 122
 
-// The text sizes of the screens: the headings, the lines and the small lines
-const screenHeading: f32 = 28
-const screenLine: f32 = 17
-const screenSmall: f32 = 15
-
-// The controls list: a key label right aligned in keyWidth, controlGap, the action in
-// actionWidth, the rows controlSpacing apart
-const keyWidth: f32 = 150
-const actionWidth: f32 = 428
-const controlGap: f32 = 16
-const controlSpacing: f32 = 7
-
-// The title screen and its signs
-const titleWidth: f32 = 900
-const titleHeight: f32 = 640
-const signWidth: f32 = 260
-const signHeight: f32 = 240
-const signGap: f32 = 24
-const signFill: rgba = {24, 26, 31, 255}
-const signArtWidth: f32 = 170
-const signArtHeight: f32 = 150
-const signArtX: f32 = 45
-const signArtY: f32 = 22
-const signLabelY: f32 = 184
-const signLabelSize: f32 = 36
-
-// The square art shows whole in the 170x150 box of the original's contain fit: 150x150 in its
-// middle
-const signArtSide: f32 = min(signArtWidth, signArtHeight)
-
-// The pause screen and its quality button
-const pauseWidth: f32 = 640
-const pauseHeight: f32 = 388
-const qualityWidth: f32 = 138
-const qualityHeight: f32 = 26
-const qualityPad: f32 = 11
-const qualitySize: f32 = 12
-
-// The texts of the button, the original's (height - size) / 2 - 1 from its top
-const qualityTextY: f32 = (qualityHeight - qualitySize) / 2 - 1
-
-// The end screen
-const endWidth: f32 = 640
-const endHeight: f32 = 218
-
-// A row of the controls list: the key, right aligned in the text color, and its action in the
-// soft color
 template OreControl {
   prop key: string = ""
   prop action: string = ""
 
-  Layout: {direction: Row, spacing: controlGap}
+  Layout: {direction: Row, spacing: 12, v: Middle}
 
-  key_label {
-    LayoutItem: {width: {mode: Fixed, value: keyWidth}}
-    Text: {value: key, size: screenSmall, width: keyWidth, align: Right}
-    Rgb: palette.text
-  }
-
-  action_label {
-    LayoutItem: {width: {mode: Fixed, value: actionWidth}}
-    Text: {value: action, size: screenSmall, width: actionWidth}
-    Rgb: palette.soft
-  }
+  OreKeyCap cap(key: key, width: keyWidth, height: 20, size: 12)
+  OreText action_label(text: action, size: 14, color: palette.soft, width: actionWidth)
 }
 
-// The controls of the game, the list the title and the pause screens show
 template OreControls {
-  Layout: {direction: Column, spacing: controlSpacing}
+  Layout: {direction: Row, spacing: 24}
 
-  walk {
-    OreControl: {key: "W A S D", action: "Walk"}
+  left {
+    Layout: {direction: Column, spacing: 6}
+    OreControl walk(key: "W A S D", action: "Walk")
+    OreControl run(key: "Shift", action: "Walk faster")
+    OreControl zoom(key: "Mouse wheel", action: "Zoom in/out")
+    OreControl place(key: "Left click", action: "Place selected building")
   }
 
-  run {
-    OreControl: {key: "Shift", action: "Walk faster"}
-  }
-
-  zoom {
-    OreControl: {key: "Mouse wheel", action: "Zoom in/out"}
-  }
-
-  place {
-    OreControl: {key: "Left click", action: "Place selected building"}
-  }
-
-  demolish {
-    OreControl: {key: "Right click", action: "Demolish/mine object under mouse cursor"}
-  }
-
-  inventory {
-    OreControl: {key: "E", action: "Open / close the inventory"}
-  }
-
-  pick {
-    OreControl: {key: "Q", action: "Select the building under the cursor / deselect"}
-  }
-
-  cancel {
-    OreControl: {key: "ESC", action: "Cancel / Pause"}
+  right {
+    Layout: {direction: Column, spacing: 6}
+    OreControl demolish(key: "Right click", action: "Demolish/mine object under mouse cursor")
+    OreControl inventory(key: "E", action: "Open / close the inventory")
+    OreControl pick(key: "Q", action: "Select the building under the cursor / deselect")
+    OreControl cancel(key: "ESC", action: "Cancel / Pause")
   }
 }
 
-// A sign of the title screen: a panel edged in its color with its art and its label
-template OreSign {
+template OrePulseText {
+  prop text: string = ""
+  prop size: f32 = 16
+  prop color: Rgb = {232, 230, 222}
+  prop font: entity = ui_fonts.stencil
+
+  const motion = OreUiMotion[OreUiMotion].scale
+  const beat: i32 = floor(AppStatus[AppStatus].elapsed * 1.25)
+  const bright = motion == 0 || beat % 2 == 0
+
+  Text: {value: text, size: size, font: font}
+  Rgb: color
+  if bright {
+    Opacity: {1}
+  } else {
+    Opacity: {0.35}
+  }
+  Transition: [Opacity: {duration: 0.7 * motion, timing_function: EaseInOut}]
+  box.spatial.SpatialIgnore
+}
+
+template OreLogoGlyph : OreOneShot {
+  prop letter: string = ""
+  prop index: i32 = 0
+
+  const motion = OreUiMotion[OreUiMotion].scale
+  const shown = fired || motion == 0
+  const delay: f32 = (0.1 + index * 0.075) * motion
+  const k: f32 = match shown { true: 1; _: 1.3 }
+  const a: f32 = match shown { true: 1; _: 0 }
+  const e: f32 = match shown { true: 0.3; _: 3.5 }
+
+  Scale: {k, k, 1}
+  Opacity: {a}
+  Text: {value: letter, size: 104, font: ui_fonts.stencil}
+  Rgb: palette.amber
+  Emissive: {strength: e, color: palette.amberGlow}
+  Transition: [
+    Scale: {duration: 0.7 * motion, delay: delay, timing_function: EaseOut},
+    Opacity: {duration: 0.45 * motion, delay: delay, timing_function: EaseOut},
+    Emissive: {duration: 1.4 * motion, delay: delay, timing_function: EaseOut}
+  ]
+  box.spatial.SpatialIgnore
+}
+
+template OreLogo {
+  Layout: {}
+  LayoutItem: {width: {mode: Fixed, value: 860}, height: {mode: Fixed, value: 108}}
+
+  OreHalo glow(size: 860, height: 280, color: {255, 130, 30}, alpha: 0.22, z: -1)
+
+  letters {
+    Position: {0, 0, 1}
+    Layout: {direction: Row, v: Middle, h: Center}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+
+    OreLogoGlyph g0(letter: "O", index: 0)
+    OreLogoGlyph g1(letter: "R", index: 1)
+    OreLogoGlyph g2(letter: "E", index: 2)
+    gap {
+      LayoutItem: {width: {mode: Fixed, value: 36}}
+    }
+    OreLogoGlyph g3(letter: "E", index: 3)
+    OreLogoGlyph g4(letter: "L", index: 4)
+    OreLogoGlyph g5(letter: "S", index: 5)
+    OreLogoGlyph g6(letter: "E", index: 6)
+  }
+}
+
+template OreSign : OreOneShot {
   prop label: string = ""
-  prop color: Rgb = {226, 231, 238}
+  prop color: Rgb = {232, 230, 222}
   prop art: entity = 0
+  prop index: i32 = 0
 
-  Panel: {
-    width: signWidth, height: signHeight, capH: screenCap, fill: signFill,
-    edge: {color.r, color.g, color.b, 255}, block: false
-  }
+  const motion = OreUiMotion[OreUiMotion].scale
+  const shown = fired || motion == 0
+  const delay: f32 = (0.55 + index * 0.13) * motion
+  const a: f32 = match shown { true: 1; _: 0 }
 
-  art_image {
-    LayoutItem: {
-      h: Left, v: Top, x: signArtX + (signArtWidth - signArtSide) / 2,
-      y: -(signArtY + (signArtHeight - signArtSide) / 2),
-      width: {mode: Fixed, value: signArtSide}, height: {mode: Fixed, value: signArtSide}
-    }
-    Rect: {1, 1}
-    Rgb: {255, 255, 255}
-    Image: {texture: art, u0: 0, v0: 0, u1: 1, v1: 1}
-  }
+  Layout: {}
+  LayoutItem: {width: {mode: Fixed, value: signWidth}, height: {mode: Fixed, value: signHeight}}
+  Opacity: {a}
+  Transition: [Opacity: {duration: 0.4 * motion, delay: delay}]
 
-  label_text {
-    LayoutItem: {
-      h: Left, v: Top, y: -signLabelY, width: {mode: Fixed, value: signWidth}
-    }
-    Text: {value: label, size: signLabelSize, width: signWidth, align: Center}
-    Rgb: color
+  Panel card(
+    width: signWidth, height: signHeight, capH: 6, block: false, glow: color, aura: 0.3,
+    edge: {color.r, color.g, color.b, 255}, fill: {26, 28, 32, 255}) {
+    OreHalo art_glow(size: signArt * 1.9, color: color, alpha: 0.32, y: 26, z: 0)
+    OreGlyph art_image(tex: art, size: signArt, h: Center, y: 14)
+    OreText label_text(
+      text: label, size: 32, font: ui_fonts.stencil, color: color, glow: 0.12,
+      width: signWidth, align: Center, y: 146)
   }
 }
 
-// The title screen: the three signs, what the game is about, the controls and how to start.
-// Any key or mouse button starts the game (OreTitleStart)
 template OreTitleScreen {
-  LayoutItem: {h: Center, v: Middle}
-  Panel: {
-    width: titleWidth, height: titleHeight, capH: screenCap, fill: screenFill, block: false
-  }
+  const veilEdge: f32 = 0.95
 
-  signs {
-    LayoutItem: {h: Left, v: Top, x: 36, y: -44}
-    Layout: {direction: Row, spacing: signGap}
+  Layout: {}
+  LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
 
-    mine {
-      OreSign: {label: "MINE", color: palette.ore, art: ui_signs.mine}
+  OreVeil veil(dim: 0.52, edge: veilEdge)
+
+  column {
+    Position: {0, 0, 2}
+    Layout: {direction: Column, h: Center, v: Middle, spacing: 14}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+
+    OreLogo logo()
+    OreHazardRule rule(width: 620, height: 6)
+    OreText tagline(
+      text: "You crash-landed on a hostile planet.", size: 18, font: ui_fonts.label,
+      color: palette.text)
+
+    signs {
+      Layout: {direction: Row, spacing: 22}
+      OreSign mine(label: "MINE", color: palette.ore, art: ui_signs.mine, index: 0)
+      OreSign defend(label: "DEFEND", color: palette.red, art: ui_signs.defend, index: 1)
+      OreSign escape(label: "ESCAPE", color: palette.luminite, art: ui_signs.escape, index: 2)
     }
 
-    defend {
-      OreSign: {label: "DEFEND", color: palette.red, art: ui_signs.defend}
-    }
+    OreText goal(
+      text: "Collect luminite, ship it off planet with rockets, defend the base against attacks,\nescape before the waves get too strong.",
+      size: 15, color: palette.text, width: 760, align: Center)
 
-    escape {
-      OreSign: {label: "ESCAPE", color: palette.luminite, art: ui_signs.escape}
-    }
-  }
+    OreControls controls()
 
-  goal_a {
-    LayoutItem: {h: Left, v: Top, y: -312, width: {mode: Fixed, value: titleWidth}}
-    Text: {
-      value: "Collect luminite, ship it off planet with rockets, defend the base against attacks,",
-      size: screenLine, width: titleWidth, align: Center
-    }
-    Rgb: palette.text
-  }
-
-  goal_b {
-    LayoutItem: {h: Left, v: Top, y: -336, width: {mode: Fixed, value: titleWidth}}
-    Text: {
-      value: "escape before the waves get too strong.",
-      size: screenLine, width: titleWidth, align: Center
-    }
-    Rgb: palette.text
-  }
-
-  controls {
-    LayoutItem: {h: Left, v: Top, x: 153, y: -390}
-    OreControls: {}
-  }
-
-  start {
-    LayoutItem: {h: Left, v: Top, y: -600, width: {mode: Fixed, value: titleWidth}}
-    Text: {value: "PRESS ANY KEY TO START", size: screenLine, width: titleWidth, align: Center}
-    Rgb: palette.soft
+    OrePulseText start(text: "PRESS ANY KEY TO START", size: 18, color: palette.amber)
   }
 }
 
-// The render quality tier on the quality button, right aligned in the button less its padding,
-// amber. A template of its own: a click changes OreQuality, and only this label evaluates again
 template OreQualityValue {
   const tier = OreQuality[OreQuality].tier
+  const level: i32 = match tier { Low: 1; Medium: 2; _: 3 }
   const mediumText: string = match tier == Medium {
     true: "MEDIUM"
     false: "HIGH"
@@ -245,49 +200,54 @@ template OreQualityValue {
     false: mediumText
   }
 
-  LayoutItem: {
-    h: Left, v: Top, y: -qualityTextY, width: {mode: Fixed, value: qualityWidth - qualityPad}
+  Layout: {direction: Row, spacing: 3, v: Middle}
+
+  for i in 0..3 {
+    "led_{i}" {
+      const on = i < level
+      LayoutItem: {width: {mode: Fixed, value: 6}, height: {mode: Fixed, value: 12}}
+      Rect: {1, 1}
+      if on {
+        Rgb: palette.amber
+        Emissive: {strength: 0.5, color: palette.amberGlow}
+      } else {
+        Rgb: {38, 41, 46}
+        Emissive: {strength: 0, color: palette.amberGlow}
+      }
+      box.spatial.SpatialIgnore
+    }
   }
-  Text: {value: tierText, size: qualitySize, width: qualityWidth - qualityPad, align: Right}
-  Rgb: palette.amber
+
+  gap {
+    LayoutItem: {width: {mode: Fixed, value: 4}}
+  }
+
+  OreText tier_name(text: tierText, size: 13, font: ui_fonts.mono, color: palette.amber, width: 48)
 }
 
-// The quality button of the pause screen: QUALITY and the render quality tier. A click raises
-// the Quality action, which cycles the tier High, Medium, Low and back to High
-// (oreelse.cycleQuality()). The face is a child of its own, so its opacity leaves the texts
-// opaque; it lightens while the cursor is over the button.
 template OreQualityButton {
   mut hover = false
 
-  Layout: {}
+  const motion = OreUiMotion[OreUiMotion].scale
+  const buttonWidth: f32 = 212
+  const buttonHeight: f32 = 30
+
   ActionTrigger: {action: actions.Quality}
   Cursor: {CursorPointer}
-
-  face {
-    LayoutItem: {
-      h: Left, v: Top,
-      width: {mode: Fixed, value: qualityWidth}, height: {mode: Fixed, value: qualityHeight}
-    }
-    Rect: {1, 1}
-    if hover {
-      Rgb: {38, 42, 49}
-      Opacity: {240 / 255.0}
-    } else {
-      Rgb: {21, 23, 27}
-      Opacity: {236 / 255.0}
-    }
-    Border: {width: 1, radius: 3, color: {74, 80, 90, 255}}
+  Layout: {direction: Row, spacing: 12, h: Center, v: Middle}
+  LayoutItem: {width: {mode: Fixed, value: buttonWidth}, height: {mode: Fixed, value: buttonHeight}}
+  Rect: {1, 1}
+  if hover {
+    Rgb: {66, 58, 38}
+    Border: {width: 1, radius: 3, color: {240, 176, 58, 255}}
+  } else {
+    Rgb: {30, 32, 37}
+    Border: {width: 1, radius: 3, color: {78, 82, 88, 255}}
   }
+  Transition: [Rgb: {duration: 0.12 * motion}]
 
-  caption {
-    LayoutItem: {h: Left, v: Top, x: qualityPad, y: -qualityTextY}
-    Text: {value: "QUALITY", size: qualitySize}
-    Rgb: palette.soft
-  }
-
-  value {
-    OreQualityValue: {}
-  }
+  OreText caption(text: "QUALITY", size: 12, font: ui_fonts.label, color: palette.soft)
+  OreQualityValue value()
 
   async {
     while true {
@@ -299,38 +259,71 @@ template OreQualityButton {
   }
 }
 
-// The pause screen: the quality button, the controls and how to resume
 template OrePauseScreen {
-  LayoutItem: {h: Center, v: Middle, y: 40}
-  Panel: {
-    width: pauseWidth, height: pauseHeight, capH: screenCap, fill: screenFill, block: false
-  }
+  const panelWidth: f32 = 880
+  const panelHeight: f32 = 320
 
-  heading {
-    LayoutItem: {h: Left, v: Top, y: -48, width: {mode: Fixed, value: pauseWidth}}
-    Text: {value: "PAUSED", size: screenHeading, width: pauseWidth, align: Center}
-    Rgb: palette.text
-  }
+  Layout: {}
+  LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
 
-  quality {
-    LayoutItem: {h: Left, v: Top, x: 251, y: -96}
-    OreQualityButton: {}
-  }
+  OreVeil veil(dim: 0.3, edge: 0.8)
 
-  controls {
-    LayoutItem: {h: Left, v: Top, x: 23, y: -142}
-    OreControls: {}
-  }
+  Panel panel(
+    width: panelWidth, height: panelHeight, capH: 8, block: false, h: Center, v: Middle, y: 40,
+    aura: 0.14) {
+    Position: {0, 0, 2}
+    column {
+      Layout: {direction: Column, h: Center, v: Middle, spacing: 16}
+      LayoutItem: {
+        h: Left, v: Top,
+        width: {mode: Fixed, value: panelWidth}, height: {mode: Fixed, value: panelHeight}
+      }
 
-  resume {
-    LayoutItem: {h: Left, v: Top, y: -346, width: {mode: Fixed, value: pauseWidth}}
-    Text: {value: "Press ESC to resume", size: screenSmall, width: pauseWidth, align: Center}
-    Rgb: palette.soft
+      OreText heading(text: "PAUSED", size: 44, font: ui_fonts.stencil, color: palette.amber, glow: 0.35, glowColor: palette.amberGlow)
+      OreQualityButton quality()
+      OreControls controls()
+      OreText resume(text: "Press ESC to resume", size: 14, font: ui_fonts.label, color: palette.soft)
+    }
   }
 }
 
-// The end screen of a run, won or lost: the Luminite shipped, the critters killed, the time
-// survived (the clock as m:ss) and the last wave. R lands again (oreelse.restart())
+template OreStatTile {
+  prop value: string = ""
+  prop caption: string = ""
+  prop color: Rgb = {232, 230, 222}
+
+  const tileWidth: f32 = 176
+  const tileHeight: f32 = 88
+
+  Layout: {direction: Column, h: Center, v: Middle, spacing: 2}
+  LayoutItem: {width: {mode: Fixed, value: tileWidth}, height: {mode: Fixed, value: tileHeight}}
+  Rect: {1, 1}
+  Rgb: palette.well
+  Border: {width: 1, radius: 3, color: {color.r / 2, color.g / 2, color.b / 2, 255}}
+  box.spatial.SpatialIgnore
+
+  OreText amount(text: value, size: 34, font: ui_fonts.mono, color: color, glow: 0.5)
+  OreText name(text: caption, size: 11, font: ui_fonts.label, color: palette.soft)
+}
+
+template OreEndRays : OreOneShot {
+  prop color: Rgb = {255, 255, 255}
+
+  const motion = OreUiMotion[OreUiMotion].scale
+  const shown = fired || motion == 0
+  const a: f32 = match shown { true: 0.075; _: 0 }
+
+  Position: {0, 62, 1}
+  Rect: {1300, 1300}
+  Image: {texture: ui_art.rays}
+  Rgb: color
+  Opacity: {a}
+  BlendMode: Additive
+  AngularVelocity: {0, 0, 0.07}
+  Transition: [Opacity: {duration: 1.4 * motion}]
+  box.spatial.SpatialIgnore
+}
+
 template OreEndScreen {
   const won = OreGameState?[(OreGameState, Won)]
   const shipped = OreRocketState[OreRocketState].shipped
@@ -346,35 +339,40 @@ template OreEndScreen {
     false: "THE SWARM GOT YOU"
   }
 
-  LayoutItem: {h: Center, v: Middle, y: 60}
-  Panel: {
-    width: endWidth, height: endHeight, capH: screenCap, fill: screenFill, block: false
+  const tone: Rgb = match won {
+    true: palette.luminite
+    false: palette.red
   }
 
-  heading {
-    LayoutItem: {h: Left, v: Top, y: -44, width: {mode: Fixed, value: endWidth}}
-    Text: {value: headingText, size: screenHeading, width: endWidth, align: Center}
-    Rgb: palette.text
+  const veilTone: Rgb = match won {
+    true: {0, 0, 0}
+    false: {60, 4, 2}
   }
 
-  score {
-    LayoutItem: {h: Left, v: Top, y: -100, width: {mode: Fixed, value: endWidth}}
-    Text: {value: "{shipped} Luminite shipped", size: screenLine, width: endWidth, align: Center}
-    Rgb: palette.luminite
+  Layout: {}
+  LayoutItem: {width: {mode: Grow, content_min: false}, height: {mode: Grow, content_min: false}}
+
+  OreVeil veil(dim: 0.5, edge: 0.95, color: veilTone)
+  if won {
+    OreEndRays rays(color: tone)
   }
 
-  stats {
-    LayoutItem: {h: Left, v: Top, y: -128, width: {mode: Fixed, value: endWidth}}
-    Text: {
-      value: "{kills} critters killed - survived {minutes:.0}:{seconds:02} to wave {wave}",
-      size: screenLine, width: endWidth, align: Center
+  column {
+    Position: {0, 0, 2}
+    Layout: {direction: Column, h: Center, v: Middle, spacing: 18}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+
+    OreText heading(text: headingText, size: 72, font: ui_fonts.stencil, color: tone, glow: 0.5)
+    OreHazardRule rule(width: 620, height: 6)
+
+    tiles {
+      Layout: {direction: Row, spacing: 12}
+      OreStatTile luminite(value: "{shipped}", caption: "LUMINITE SHIPPED", color: palette.luminite)
+      OreStatTile critters(value: "{kills}", caption: "CRITTERS KILLED", color: palette.red)
+      OreStatTile clock(value: "{minutes:.0}:{seconds:02}", caption: "TIME SURVIVED", color: palette.text)
+      OreStatTile last_wave(value: "{wave}", caption: "LAST WAVE", color: palette.amber)
     }
-    Rgb: palette.text
-  }
 
-  again {
-    LayoutItem: {h: Left, v: Top, y: -166, width: {mode: Fixed, value: endWidth}}
-    Text: {value: "Press R to land again", size: screenSmall, width: endWidth, align: Center}
-    Rgb: palette.soft
+    OrePulseText again(text: "PRESS R TO LAND AGAIN", size: 18, color: palette.amber)
   }
 }

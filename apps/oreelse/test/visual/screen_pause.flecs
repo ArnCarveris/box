@@ -1,7 +1,7 @@
-// The pause screen over the seeded map with the status bar of the HUD at the top right: a panel
-// of 640x388 a little above the middle of the window with PAUSED, the quality button with the
-// cursor over it (the lighter face {38, 42, 49}) showing QUALITY and HIGH in amber, the list of
-// the eight controls and Press ESC to resume at the bottom.
+// The pause screen over the seeded map with the status bar of the HUD at the top right, dimmed by
+// a veil: a panel of 880x320 a little above the middle of the window with PAUSED, the quality
+// button with the cursor over it (an amber edge) showing QUALITY, three lit LEDs and HIGH in amber,
+// the eight controls in two columns and Press ESC to resume at the bottom.
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
 
@@ -10,10 +10,10 @@ using box.camera
 using box.surface
 using oreelse
 
-// The cursor over the middle of the quality button. The button's center is 125 logical pixels
+// The cursor over the middle of the quality button. The button's center is 72 logical pixels
 // above the middle of the 1280x720 window, which the HUD camera at ortho_scale 0.5 shows at
-// half size: 62.5 points above the middle of the window
-const hover = box.command.commands.mouse_move("[640, 298]", false)
+// half size: 36 points above the middle of the window
+const hover = box.command.commands.mouse_move("[640, 324]", false)
 
 // The capture is 640x360: the HUD lays out for a 1280x720 window and its camera shows it at
 // half size, so the capture holds the whole screen as a 1280x720 window shows it

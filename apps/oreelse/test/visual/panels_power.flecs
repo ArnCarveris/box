@@ -3,17 +3,15 @@
 // Mining has its bottom bar lit orange, Weapons its two bottom bars green and Construction all
 // four cyan; the cursor rests on the third bar of Construction, which is a lighter cyan. Under
 // the bars the drill, the gun turret and the factory and the captions MINING, WEAPONS and
-// CONSTRUCTION. The window is the size of the capture, so the cursor's point is the point of
-// the layout: the bar spans x 207..259 and y 238..249 of the window. In a window this small the
-// Inventory (E) button at the bottom center (x 222..418, y 300..338) covers the right end of
-// the panel, the CONSTRUCTION caption; in the 1280x720 window of the game they are apart
+// CONSTRUCTION. The HUD lays out on a virtual screen of 1280x720, which this window shows at half
+// size: the bar spans x 103..130 and y 302..308 of the window.
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
 
 using box.surface
 using oreelse
 
-const hover = box.command.commands.mouse_move("[233, 243]", false)
+const hover = box.command.commands.mouse_move("[116, 305]", false)
 
 window {
   Surface: {width: 640, height: 360}

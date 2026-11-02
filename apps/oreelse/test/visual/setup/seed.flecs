@@ -5,4 +5,5 @@ using oreelse
 
 $ {
   OreSeed: {seed: 7, run: 0}
+  OreUiMotion: {scale: 0}
 }

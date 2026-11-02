@@ -1,9 +1,9 @@
 // The rocket assembly panel at the right, while playing (the panels hide while paused), of a
 // crewed rocket ready to launch: life support, a cargo bay, 8 engines and 2 fuel tanks, with 20
 // Luminite loaded and 30 held. Every part section is complete or has a part (green edges and
-// counts): LIFE SUPPORT 1 / 1, CARGO BAYS 1 / 4, FUEL TANKS 2 / 2, ENGINES 8 / 8 with eight
+// counts): LIFE SUPPORT 1/1, CARGO BAYS 1/4, FUEL TANKS 2/2, ENGINES 8/8 with eight
 // narrower pips; the plus steps are dim (nothing more fits or none is held) and the minus steps
-// lit. The Luminite section 20 / 25 in green with its bar 0.8 teal. The LAUNCH button is lit,
+// lit. The Luminite section 20/25 in green with its bar 0.8 teal. The LAUNCH button is lit,
 // warm with an amber edge, with the note CREW + 25 LUMINITE ABOARD (20 loaded and 5 that a load
 // adds).
 include apps/oreelse/test/visual/setup/seed

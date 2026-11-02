@@ -4,7 +4,7 @@
 // iron (7), an empty slot, drills (2) and wire (4), then the empty sockets of the other seven
 // slots. The construct section: the Buildings tab active (amber, underlined), the Rocket tab
 // dark; of the nine slot buttons only the drill can be ordered (6 of the iron plates), the other
-// eight are dim with their icons at alpha 150. The info panel below the screen shows the solar
+// eight are dark with their icons dimmed. The info panel below the screen shows the solar
 // panel of its slot button, as if hovered: its icon and name, "Craft 2.0s - +20 W" in amber,
 // "Generates power." and NEEDS Iron 8/8 in the text color and Copper 6/12 in red (the 3 copper
 // plates count as 6 copper of the 12 it takes). The Inventory (E) button at the bottom center.

@@ -57,6 +57,7 @@ include deposits
 include run
 include launch
 include stresstest
+include ui/kit
 include ui/panel
 include ui/queue
 include ui/power
@@ -262,5 +263,5 @@ $ {
 
 // The HUD (ui/hud.flecs), created after the world view so it draws over it
 hud {
-  OreHud: {surface: window}
+  OreHud: {}
 }

@@ -1,9 +1,9 @@
 // The rocket assembly panel at the right, while playing (the panels hide while paused), of a
-// rocket with a cargo bay, 2 engines and a fuel tank. LIFE SUPPORT 0 / 1, one empty pip, its
-// plus step dim (none in the inventory); CARGO BAYS 1 / 4 with a green edge and one of four
-// pips filled, both steps lit; FUEL TANKS 1 / 1 complete (green), its plus step dim; ENGINES
-// 2 / 4 blocked: a red edge, a red count and two empty pips with red edges, both steps lit (two
-// engines in the inventory). The Luminite section 0 / 25 with an empty bar, loadable (40 held).
+// rocket with a cargo bay, 2 engines and a fuel tank. LIFE SUPPORT 0/1, one empty pip, its
+// plus step dim (none in the inventory); CARGO BAYS 1/4 with a green edge and one of four
+// pips filled, both steps lit; FUEL TANKS 1/1 complete (green), its plus step dim; ENGINES
+// 2/4 blocked: a red edge, a red count and two empty pips with red edges, both steps lit (two
+// engines in the inventory). The Luminite section 0/25 with an empty bar, loadable (40 held).
 // The LAUNCH button is dim with the note NEEDS 2 MORE ENGINES.
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
