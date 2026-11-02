@@ -35,122 +35,6 @@ static ECS_COMPONENT_DECLARE(TransitionPendingFlush);
 /** Stages with an id from this on are not tracked, the remove misses their pending maps */
 #define BOX_TRANSITION_PENDING_STAGES (64)
 
-/** Iterations of Newton's method before falling back to bisection */
-#define BOX_TRANSITION_NEWTON_STEPS (8)
-
-/** Iterations of bisection, enough for float precision */
-#define BOX_TRANSITION_BISECT_STEPS (32)
-
-/** Accepted error of the solved x of a curve */
-#define BOX_TRANSITION_EPSILON (1e-6f)
-
-/** One coordinate of a cubic Bezier from (0, 0) to (1, 1).
- *
- * @param p1 Coordinate of the first control point
- * @param p2 Coordinate of the second control point
- * @param s Curve parameter, 0..1
- * @return The coordinate at s
- */
-static float box_transition_bezier(
-    float p1,
-    float p2,
-    float s)
-{
-    float u = 1.0f - s;
-
-    return 3.0f * u * u * s * p1 + 3.0f * u * s * s * p2 + s * s * s;
-}
-
-/** Derivative of one coordinate of a cubic Bezier from (0, 0) to (1, 1).
- *
- * @param p1 Coordinate of the first control point
- * @param p2 Coordinate of the second control point
- * @param s Curve parameter, 0..1
- * @return The derivative at s
- */
-static float box_transition_bezier_slope(
-    float p1,
-    float p2,
-    float s)
-{
-    float u = 1.0f - s;
-
-    return 3.0f * u * u * p1 + 6.0f * u * s * (p2 - p1) + 3.0f * s * s * (1.0f - p2);
-}
-
-/** Curve parameter where the x of a cubic Bezier equals t, with Newton's method, falling back
- * to bisection when Newton leaves the curve or stalls.
- *
- * @param x1 X of the first control point, 0..1
- * @param x2 X of the second control point, 0..1
- * @param t The x to solve for, 0..1
- * @return The curve parameter
- */
-static float box_transition_solve(
-    float x1,
-    float x2,
-    float t)
-{
-    float s = t;
-    bool solved = false;
-    int32_t i;
-    for (i = 0; i < BOX_TRANSITION_NEWTON_STEPS && !solved; i ++) {
-        float err = box_transition_bezier(x1, x2, s) - t;
-        float slope = box_transition_bezier_slope(x1, x2, s);
-        if (fabsf(err) < BOX_TRANSITION_EPSILON) {
-            solved = true;
-        } else if (fabsf(slope) < BOX_TRANSITION_EPSILON) {
-            break;
-        } else {
-            s -= err / slope;
-        }
-
-        if (s < 0.0f || s > 1.0f) {
-            break;
-        }
-    }
-
-    if (!solved) {
-        float lo = 0.0f, hi = 1.0f;
-        s = t;
-        for (i = 0; i < BOX_TRANSITION_BISECT_STEPS; i ++) {
-            float x = box_transition_bezier(x1, x2, s);
-            if (fabsf(x - t) < BOX_TRANSITION_EPSILON) {
-                break;
-            }
-
-            if (x < t) {
-                lo = s;
-            } else {
-                hi = s;
-            }
-
-            s = 0.5f * (lo + hi);
-        }
-    }
-
-    return s;
-}
-
-/** Y of a cubic Bezier where its x equals t.
- *
- * @param x1 X of the first control point, 0..1
- * @param y1 Y of the first control point
- * @param x2 X of the second control point, 0..1
- * @param y2 Y of the second control point
- * @param t The x to solve for, 0..1
- * @return The y of the curve at t
- */
-static float box_transition_cubic(
-    float x1,
-    float y1,
-    float x2,
-    float y2,
-    float t)
-{
-    return box_transition_bezier(y1, y2, box_transition_solve(x1, x2, t));
-}
-
 float box_transition_ease(
     TimingFunction fn,
     float t)
@@ -161,11 +45,11 @@ float box_transition_ease(
     } else if (t >= 1.0f) {
         result = 1.0f;
     } else if (fn == EaseIn) {
-        result = box_transition_cubic(0.42f, 0.0f, 1.0f, 1.0f, t);
+        result = box_curve_ease(0.42f, 0.0f, 1.0f, 1.0f, t);
     } else if (fn == EaseOut) {
-        result = box_transition_cubic(0.0f, 0.0f, 0.58f, 1.0f, t);
+        result = box_curve_ease(0.0f, 0.0f, 0.58f, 1.0f, t);
     } else if (fn == EaseInOut) {
-        result = box_transition_cubic(0.42f, 0.0f, 0.58f, 1.0f, t);
+        result = box_curve_ease(0.42f, 0.0f, 0.58f, 1.0f, t);
     }
 
     return result;
