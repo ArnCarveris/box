@@ -95,6 +95,9 @@ typedef struct box_gpu_atmos_t box_gpu_atmos_t;
 /** Pipelines and frame buffers of the particle passes */
 typedef struct box_gpu_particles_t box_gpu_particles_t;
 
+/** Pipelines and the buffer of the draws of the fog volumes */
+typedef struct box_gpu_fog_volumes_t box_gpu_fog_volumes_t;
+
 /** A capture on its way from the GPU to its PNG file */
 typedef struct box_gpu_capture_t box_gpu_capture_t;
 
@@ -823,6 +826,7 @@ typedef struct box_gpu_t {
     struct box_gpu_env_image_t *environment_image; /**< Conversion of environment images,
                                                     *   created by the first image */
     box_gpu_particles_t *particles; /**< Particle passes */
+    box_gpu_fog_volumes_t *fog_volumes; /**< Fog volume draws */
     struct box_gpu_env_process_t *environment_process; /**< Processing of the environments,
                                                         *   created on first use */
     struct box_gpu_env_background_t *environment_background; /**< Background draw of the
@@ -867,7 +871,8 @@ typedef enum box_gpu_stat_t {
     BOX_GPU_STAT_SHADOW_PASS,       /**< A shadow atlas render pass was recorded */
     BOX_GPU_STAT_SHADOW_DRAW,       /**< A draw call was recorded in a cascade or a tile */
     BOX_GPU_STAT_COPY_DIRECT,       /**< A copy went from its source to its destination */
-    BOX_GPU_STAT_COPY_STAGED        /**< A copy went through the staging buffer */
+    BOX_GPU_STAT_COPY_STAGED,       /**< A copy went through the staging buffer */
+    BOX_GPU_STAT_FOG_VOLUME         /**< A fog volume was drawn */
 } box_gpu_stat_t;
 
 #ifdef __EMSCRIPTEN__

@@ -3,7 +3,8 @@
  * @brief The browser backend: canvas and window events push device events to the world.
  *
  * Keys, buttons, the wheel and focus come from the canvas, cursor moves and button releases
- * from the page so a drag continues outside it. The cursor is reported in surface points.
+ * from the page so a drag continues outside it. The cursor is reported in surface points. Key
+ * and button events are the user gestures that start the audio of the page.
  *
  * The page pastes with its own shortcuts; the paste events of the canvas are collected in the
  * page and pushed by the poll. The clipboard is written with navigator.clipboard.writeText and
@@ -12,6 +13,7 @@
 
 #include "input.h"
 #include "platform.h"
+#include "../audio/platform.h"
 
 #ifdef __EMSCRIPTEN__
 
@@ -176,7 +178,7 @@ EM_JS(bool, box_web_has_focus, (void), {
     return document.hasFocus();
 });
 
-/** Push a key event and its text.
+/** Push a key event and its text, and resume the audio: the event is a user gesture.
  *
  * @param type Keydown or keyup
  * @param event The keyboard event
@@ -190,6 +192,7 @@ static bool box_web_key(
 {
     box_web_t *web = ctx;
     bool result;
+    box_audio_web_gesture();
     box_web_begin(web);
     result = box_input_dom_on_key(web->world, event->code, event->key,
         type == EMSCRIPTEN_EVENT_KEYDOWN, event->repeat, event->ctrlKey || event->metaKey);
@@ -239,7 +242,7 @@ static bool box_web_move(
     return false;
 }
 
-/** Push a mouse button event at the cursor position.
+/** Push a mouse button event at the cursor position, and resume the audio, a user gesture.
  *
  * @param type Mousedown or mouseup
  * @param event The mouse event
@@ -253,6 +256,7 @@ static bool box_web_button(
 {
     box_web_t *web = ctx;
     Key key = box_input_dom_button(event->button);
+    box_audio_web_gesture();
     if (key) {
         box_web_push_move(web, event);
         box_input_platform_push(web->world, &(InputEvent){
@@ -579,6 +583,7 @@ void box_input_web_attach(
     web->world = world;
     web->surface = surface;
     box_web_callbacks(web);
+    box_audio_web_start();
     box_input_platform_set(world, &(box_input_platform_t){
         .poll = box_web_poll,
         .free = box_web_free,

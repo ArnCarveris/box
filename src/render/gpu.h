@@ -1196,6 +1196,60 @@ bool box_gpu_particles_draw(
     const box_render_view_t *v,
     WGPUTextureView depth);
 
+/** Create the layouts of the fog volume draws, after the view layout.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_fog_volumes_init(
+    box_gpu_t *gpu);
+
+/** Release the pipelines, layouts and buffer of the fog volume draws.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_fog_volumes_fini(
+    box_gpu_t *gpu);
+
+/** Start the fog volume draws of a packet, which fill the buffer of the draws from its start.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_fog_volumes_begin(
+    box_gpu_t *gpu);
+
+/** Check whether a view draws fog volumes: it has records and the shader is compiled, so its
+ * forward pass splits around them.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @return Whether the view draws its fog volumes in this frame
+ */
+bool box_gpu_fog_volumes_ready(
+    box_gpu_t *gpu,
+    const box_render_view_t *v);
+
+/** Record the fog volumes of a view, one instanced draw back to front. Replaces the pipeline
+ * and the bind group at 1.
+ *
+ * @param gpu The backend
+ * @param pass The render pass of the view, which reads its depth, with the bind group of the
+ * view at 0
+ * @param t The target, whose size the projection follows
+ * @param format The format of the color target
+ * @param packet The packet, which holds the records
+ * @param v The view
+ * @param depth The depth of the view, read only in the pass
+ * @return Whether the volumes were drawn
+ */
+bool box_gpu_fog_volumes_draw(
+    box_gpu_t *gpu,
+    WGPURenderPassEncoder pass,
+    const box_gpu_target_t *t,
+    WGPUTextureFormat format,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    WGPUTextureView depth);
+
 /** Create the layouts, sampler and placeholders of the effect passes.
  *
  * @param gpu The backend

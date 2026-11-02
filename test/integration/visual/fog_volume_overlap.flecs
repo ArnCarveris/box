@@ -1,0 +1,73 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+// Colored fog volumes crossing each other with objects inside them: a red box of fog along X, a
+// blue one along Z and a green one turned 45 degrees about Y stand on a floor, lit by a sun with
+// shadows and a soft ambient. The volumes blend back to front where they overlap, fade over half
+// a unit at their faces, and fog the parts of the sphere, the pillar and the block inside them
+// by the fog in front of each pixel only; the shadows of the objects darken the fog behind them.
+
+camera {
+  Position: {0, 5.5, 11}
+  Rotation: {-0.42, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {20, 22, 28, 255}}, shadows: {enabled: true}}
+}
+
+$ {
+  AmbientLight: {sky: {90, 96, 110}, ground: {40, 36, 32}}
+}
+
+sun {
+  Rotation: {0.9, 0.5, 0}
+  DirectionalLight: {intensity: 1.2 * flecs.script.math.PI}
+  Rgb: {255, 244, 228}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {16, 0.2, 12}
+  Rgb: {180, 180, 185}
+}
+
+ball {
+  Position: {-2.5, 1, 0}
+  Sphere: {segments: 32, smooth: true, radius: 1}
+  Rgb: {230, 230, 230}
+}
+
+pillar {
+  Position: {0, 1.5, -2}
+  Box: {0.8, 3, 0.8}
+  Rgb: {210, 200, 120}
+}
+
+block {
+  Position: {2.5, 0.6, 1}
+  Rotation: {0, 0.6, 0}
+  Box: {1.2, 1.2, 1.2}
+  Rgb: {120, 160, 220}
+}
+
+red_fog {
+  Position: {0, 1.25, 0}
+  FogVolume: {extent: {5, 1.25, 1.2}, density: 0.6, color: {255, 70, 60}, edge_fade: 0.5}
+}
+
+blue_fog {
+  Position: {0, 1.5, -1}
+  FogVolume: {extent: {1.2, 1.5, 4}, density: 0.6, color: {60, 110, 255}, edge_fade: 0.5}
+}
+
+green_fog {
+  Position: {2.5, 1, 1}
+  Rotation: {0, 0.785, 0}
+  FogVolume: {extent: {1.5, 1, 1.5}, density: 0.8, color: {80, 230, 110}, asymmetry: 0, edge_fade: 0.5}
+}

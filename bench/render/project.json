@@ -2,7 +2,7 @@
     "id": "bench_render",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the packet data, the extract of the instanced batches and lights, the shadow pass, the frustum and occlusion cull passes, the effect passes, the baked lighting, prefab instantiation, the atmosphere extract, the particle passes, the transitions and a scene with parametric surfaces of box.render",
+        "description": "Benchmarks for the packet data, the extract of the instanced batches and lights, the shadow pass, the frustum and occlusion cull passes, the effect passes, the fog volumes, the baked lighting, prefab instantiation, the atmosphere extract, the particle passes, the transitions and a scene with parametric surfaces of box.render",
         "public": false,
         "use": [
             "box"
@@ -106,6 +106,14 @@
                     "occluded_city_100k_frustum_only",
                     "many_batches_shadows",
                     "town"
+                ]
+            },
+            {
+                "id": "FogVolume",
+                "benchcases": [
+                    "none",
+                    "one",
+                    "sixteen"
                 ]
             },
             {
