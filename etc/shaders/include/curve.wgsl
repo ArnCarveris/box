@@ -1,4 +1,4 @@
-// Cubic Bezier evaluators of curves, de Casteljau like surface_cubic. The C twins are
+// Cubic Bezier evaluators of curves, with de Casteljau's algorithm. The C twins are
 // box_curve_cubic and box_curve_cubic3 in src/curve/curve.c; a change to one is a change to both.
 // Includes resolve from the folder of the including file first, so a file in this folder
 // includes it as "curve.wgsl" and a shader in etc/shaders as "include/curve.wgsl".

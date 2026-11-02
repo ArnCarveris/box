@@ -1,0 +1,493 @@
+/**
+ * @file FogVolume.c
+ * @brief Tests for the FogVolume component and the fog volume records the light extract gives
+ * the views: defaults, resolved records, order, the limit, culling and the views without any.
+ *
+ * The camera of the views stands at (0, 0, 10) and looks along -Z with a 60 degree field of
+ * view; the worlds render into a null backend.
+ */
+
+#include <box.h>
+#include <bake_test.h>
+#include <math.h>
+#include "render.h"
+
+/** Warnings logged while the counting log hook is set */
+static int32_t fog_warnings;
+
+/** Log hook that counts the warnings.
+ *
+ * @param level Level of the message
+ * @param file File that logged it
+ * @param line Line that logged it
+ * @param msg The message
+ */
+static void fog_count_warnings(
+    int32_t level,
+    const char *file,
+    int32_t line,
+    const char *msg)
+{
+    (void)file;
+    (void)line;
+    (void)msg;
+    if (level == -2) {
+        fog_warnings ++;
+    }
+}
+
+/** Create a world that renders into a null backend.
+ *
+ * @param null Receives the backend
+ * @return The world
+ */
+static ecs_world_t* world_new(
+    box_render_null_t **null)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(*null);
+    box_render_set_backend(world, &backend);
+
+    return world;
+}
+
+/** Create a view with the defaults of the View constructor and its camera.
+ *
+ * @param world The world
+ * @param parent Parent of the camera, its scene, 0 for the default scene
+ * @return The view
+ */
+static ecs_entity_t view_new(
+    ecs_world_t *world,
+    ecs_entity_t parent)
+{
+    ecs_entity_t camera = parent ? ecs_new_w_pair(world, EcsChildOf, parent) : ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_add(world, view, View);
+    View *v = ecs_get_mut(world, view, View);
+    v->camera = camera;
+    ecs_modified(world, view, View);
+
+    return view;
+}
+
+/** Create a fog volume with the defaults at a position.
+ *
+ * @param world The world
+ * @param parent Parent of the volume, 0 for none
+ * @param x World x
+ * @param y World y
+ * @param z World z
+ * @return The volume
+ */
+static ecs_entity_t volume_new(
+    ecs_world_t *world,
+    ecs_entity_t parent,
+    float x,
+    float y,
+    float z)
+{
+    ecs_entity_t e = parent ? ecs_new_w_pair(world, EcsChildOf, parent) : ecs_new(world);
+    ecs_set(world, e, Position, {x, y, z});
+    ecs_add(world, e, FogVolume);
+
+    return e;
+}
+
+/** Run a frame and wait until the backend rendered it.
+ *
+ * @param world The world
+ */
+static void frame(
+    ecs_world_t *world)
+{
+    ecs_progress(world, 0);
+    box_render_sync(world);
+}
+
+/** Find the view of the last packet that renders a view entity.
+ *
+ * @param null The backend
+ * @param view The view entity
+ * @return The view of the packet
+ */
+static const box_render_view_t* packet_view(
+    box_render_null_t *null,
+    ecs_entity_t view)
+{
+    const box_render_view_t *result = NULL;
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&null->last.views); i ++) {
+        const box_render_view_t *v = ecs_vec_get_t(&null->last.views, box_render_view_t, i);
+        if (v->view == view) {
+            result = v;
+        }
+    }
+
+    test_assert(result != NULL);
+
+    return result;
+}
+
+/** Get a fog volume record of a view of the last packet.
+ *
+ * @param null The backend
+ * @param v The view of the packet
+ * @param index Index of the record among those of the view
+ * @return The record
+ */
+static const box_render_fog_volume_t* record_of(
+    box_render_null_t *null,
+    const box_render_view_t *v,
+    int32_t index)
+{
+    test_assert(index < v->fog_count);
+    test_assert(v->fog_first + index < ecs_vec_count(&null->last.fog_volumes));
+
+    return ecs_vec_get_t(&null->last.fog_volumes, box_render_fog_volume_t,
+        v->fog_first + index);
+}
+
+void FogVolume_defaults(void) {
+    // fog_volume/component
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script_run(world, "fog",
+        "using box.light\n"
+        "fog { FogVolume: {} }\n", NULL) == 0);
+    const FogVolume *f = ecs_get(world, ecs_lookup(world, "fog"), FogVolume);
+    test_assert(f != NULL);
+    test_flt(f->extent[0], 5);
+    test_flt(f->extent[1], 5);
+    test_flt(f->extent[2], 5);
+    test_flt(f->density, 0.1f);
+    test_int(f->color.r, 255);
+    test_int(f->color.g, 255);
+    test_int(f->color.b, 255);
+    test_flt(f->absorption, 0);
+    test_flt(f->asymmetry, 0.3f);
+    test_flt(f->edge_fade, 1);
+    test_flt(f->sun_inscatter, 1);
+    test_flt(f->ambient_inscatter, 1);
+    test_int(f->steps, 24);
+
+    ecs_entity_t added = ecs_new(world);
+    ecs_add(world, added, FogVolume);
+    f = ecs_get(world, added, FogVolume);
+    test_flt(f->density, 0.1f);
+    test_int(f->steps, 24);
+
+    ecs_entity_t view = ecs_new(world);
+    ecs_add(world, view, View);
+    test_bool(ecs_get(world, view, View)->lighting.fog_volumes, true);
+    ecs_entity_t literal = ecs_new(world);
+    ecs_set(world, literal, View, {.lighting.enabled = true});
+    test_bool(ecs_get(world, literal, View)->lighting.fog_volumes, false);
+
+    ecs_fini(world);
+}
+
+void FogVolume_partial_script_keeps_others(void) {
+    // fog_volume/component
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script_run(world, "fog",
+        "using box.light\n"
+        "fog { FogVolume: {density: 0.5, color: {255, 0, 0}} }\n", NULL) == 0);
+    const FogVolume *f = ecs_get(world, ecs_lookup(world, "fog"), FogVolume);
+    test_flt(f->density, 0.5f);
+    test_int(f->color.r, 255);
+    test_int(f->color.g, 0);
+    test_int(f->color.b, 0);
+    test_flt(f->extent[0], 5);
+    test_flt(f->asymmetry, 0.3f);
+    test_flt(f->edge_fade, 1);
+    test_flt(f->sun_inscatter, 1);
+    test_flt(f->ambient_inscatter, 1);
+    test_int(f->steps, 24);
+
+    ecs_fini(world);
+}
+
+void FogVolume_rotated_record(void) {
+    // fog_volume/extract
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t view = view_new(world, 0);
+    ecs_entity_t e = volume_new(world, 0, 1, 2, -3);
+    ecs_set(world, e, Rotation, {0, (float)GLM_PI_4, 0});
+    ecs_set(world, e, Scale, {2, 3, 4});
+    FogVolume *f = ecs_get_mut(world, e, FogVolume);
+    f->extent[0] = 1;
+    f->extent[1] = 2;
+    f->extent[2] = 3;
+    f->color = (rgb){255, 0, 128};
+    ecs_modified(world, e, FogVolume);
+    frame(world);
+
+    const box_render_view_t *v = packet_view(null, view);
+    test_int(v->fog_count, 1);
+    const box_render_fog_volume_t *r = record_of(null, v, 0);
+    test_flt(r->center[0], 1);
+    test_flt(r->center[1], 2);
+    test_flt(r->center[2], -3);
+    test_flt(r->extent[0], 1);
+    test_flt(r->extent[1], 2);
+    test_flt(r->extent[2], 3);
+
+    const WorldTransform *wt = ecs_get(world, e, WorldTransform);
+    int32_t k, c;
+    for (k = 0; k < 3; k ++) {
+        vec3 axis;
+        glm_vec3_normalize_to(ECS_CONST_CAST(float*, wt->m[k]), axis);
+        for (c = 0; c < 3; c ++) {
+            test_assert(fabsf(r->axes[k][c] - axis[c]) < 1e-5f);
+        }
+
+        test_assert(fabsf(glm_vec3_norm(ECS_CONST_CAST(float*, r->axes[k])) - 1.0f) < 1e-5f);
+    }
+
+    test_assert(fabsf(r->axes[1][1] - 1.0f) < 1e-5f);
+    test_assert(fabsf(fabsf(r->axes[0][0]) - sqrtf(0.5f)) < 1e-5f);
+    test_assert(fabsf(fabsf(r->axes[0][2]) - sqrtf(0.5f)) < 1e-5f);
+    test_assert(fabsf(glm_vec3_dot(ECS_CONST_CAST(float*, r->axes[0]),
+        ECS_CONST_CAST(float*, r->axes[2]))) < 1e-5f);
+    test_flt(r->color[0], 1);
+    test_flt(r->color[1], 0);
+    test_assert(fabsf(r->color[2] - 0.2158605f) < 1e-4f);
+    test_flt(r->density, 0.1f);
+    test_flt(r->asymmetry, 0.3f);
+    test_int(r->steps, 24);
+
+    ecs_fini(world);
+}
+
+void FogVolume_clamped_values(void) {
+    // fog_volume/extract
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t view = view_new(world, 0);
+    ecs_entity_t low = volume_new(world, 0, 0, 0, -5);
+    ecs_entity_t high = volume_new(world, 0, 0, 0, -20);
+    ecs_set(world, low, FogVolume, {
+        .extent = {-1, 2, 2}, .density = -1, .absorption = -0.5f, .asymmetry = -5,
+        .edge_fade = -1, .sun_inscatter = -1, .ambient_inscatter = -2, .steps = 1});
+    ecs_set(world, high, FogVolume, {
+        .extent = {2, 2, 2}, .density = 3, .absorption = 2, .asymmetry = 5,
+        .edge_fade = 4, .sun_inscatter = 2, .ambient_inscatter = 3, .steps = 1000});
+    frame(world);
+
+    const box_render_view_t *v = packet_view(null, view);
+    test_int(v->fog_count, 2);
+    const box_render_fog_volume_t *far_ = record_of(null, v, 0);
+    const box_render_fog_volume_t *near_ = record_of(null, v, 1);
+    test_flt(near_->center[2], -5);
+    test_flt(near_->extent[0], 0);
+    test_flt(near_->density, 0);
+    test_flt(near_->absorption, 0);
+    test_flt(near_->asymmetry, -0.9f);
+    test_flt(near_->edge_fade, 0);
+    test_flt(near_->sun_inscatter, 0);
+    test_flt(near_->ambient_inscatter, 0);
+    test_int(near_->steps, 4);
+
+    test_flt(far_->center[2], -20);
+    test_flt(far_->density, 3);
+    test_flt(far_->absorption, 1);
+    test_flt(far_->asymmetry, 0.9f);
+    test_flt(far_->edge_fade, 4);
+    test_flt(far_->sun_inscatter, 2);
+    test_flt(far_->ambient_inscatter, 3);
+    test_int(far_->steps, 128);
+
+    ecs_fini(world);
+}
+
+void FogVolume_back_to_front(void) {
+    // fog_volume/order
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t view = view_new(world, 0);
+    volume_new(world, 0, 0, 0, -10);
+    volume_new(world, 0, 1, 0, -40);
+    volume_new(world, 0, -1, 0, 0);
+    volume_new(world, 0, 0, 1, -25);
+    frame(world);
+
+    const box_render_view_t *v = packet_view(null, view);
+    test_int(v->fog_count, 4);
+    test_flt(record_of(null, v, 0)->center[2], -40);
+    test_flt(record_of(null, v, 1)->center[2], -25);
+    test_flt(record_of(null, v, 2)->center[2], -10);
+    test_flt(record_of(null, v, 3)->center[2], 0);
+
+    box_render_lights_stats_t stats;
+    box_render_lights_stats(world, &stats);
+    test_int(stats.fog_volumes, 4);
+    test_int(stats.fog_dropped, 0);
+
+    ecs_fini(world);
+}
+
+void FogVolume_limit_keeps_nearest(void) {
+    // fog_volume/order
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t view = view_new(world, 0);
+    int32_t i, count = BOX_RENDER_FOG_VOLUMES_MAX + 8;
+    for (i = 0; i < count; i ++) {
+        ecs_entity_t e = volume_new(world, 0, 0, 0, -1.0f - 2.0f * (float)i);
+        ecs_set(world, e, FogVolume, {.extent = {0.5f, 0.5f, 0.5f}, .density = 0.1f,
+            .steps = 24});
+    }
+
+    ecs_os_api_log_t log = ecs_os_api.log_;
+    fog_warnings = 0;
+    ecs_os_api.log_ = fog_count_warnings;
+    frame(world);
+    frame(world);
+    frame(world);
+    ecs_os_api.log_ = log;
+    test_int(fog_warnings, 1);
+
+    const box_render_view_t *v = packet_view(null, view);
+    test_int(v->fog_count, BOX_RENDER_FOG_VOLUMES_MAX);
+    test_flt(record_of(null, v, 0)->center[2],
+        -1.0f - 2.0f * (float)(BOX_RENDER_FOG_VOLUMES_MAX - 1));
+    test_flt(record_of(null, v, BOX_RENDER_FOG_VOLUMES_MAX - 1)->center[2], -1);
+
+    box_render_lights_stats_t stats;
+    box_render_lights_stats(world, &stats);
+    test_int(stats.fog_volumes, BOX_RENDER_FOG_VOLUMES_MAX);
+    test_int(stats.fog_dropped, 8);
+
+    ecs_fini(world);
+}
+
+void FogVolume_frustum_culled(void) {
+    // fog_volume/cull
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t view = view_new(world, 0);
+    volume_new(world, 0, 0, 0, -10);
+    volume_new(world, 0, 0, 0, 40);
+    volume_new(world, 0, 500, 0, -10);
+    volume_new(world, 0, 0, -500, -10);
+    ecs_entity_t inside = volume_new(world, 0, 0, 0, 12);
+    ecs_set(world, inside, FogVolume, {.extent = {5, 5, 5}, .density = 0.1f, .steps = 24});
+    volume_new(world, 0, 0, 0, 16);
+    frame(world);
+
+    const box_render_view_t *v = packet_view(null, view);
+    test_int(v->fog_count, 2);
+    test_flt(record_of(null, v, 0)->center[2], -10);
+    test_flt(record_of(null, v, 1)->center[2], 12);
+
+    ecs_fini(world);
+}
+
+void FogVolume_unlit_view_none(void) {
+    // fog_volume/views
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t view = view_new(world, 0);
+    View *v = ecs_get_mut(world, view, View);
+    v->lighting.enabled = false;
+    ecs_modified(world, view, View);
+    volume_new(world, 0, 0, 0, -10);
+    frame(world);
+
+    test_int(packet_view(null, view)->fog_count, 0);
+    test_int(ecs_vec_count(&null->last.fog_volumes), 0);
+
+    ecs_fini(world);
+}
+
+void FogVolume_view_disabled_none(void) {
+    // fog_volume/views
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t view = view_new(world, 0);
+    ecs_entity_t other = view_new(world, 0);
+    View *v = ecs_get_mut(world, view, View);
+    v->lighting.fog_volumes = false;
+    ecs_modified(world, view, View);
+    volume_new(world, 0, 0, 0, -10);
+    frame(world);
+
+    test_int(packet_view(null, view)->fog_count, 0);
+    test_int(packet_view(null, other)->fog_count, 1);
+    test_int(ecs_vec_count(&null->last.fog_volumes), 1);
+
+    ecs_fini(world);
+}
+
+void FogVolume_other_scene_none(void) {
+    // fog_volume/views
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t scene = ecs_new(world);
+    ecs_add(world, scene, Scene);
+    ecs_entity_t view = view_new(world, 0);
+    ecs_entity_t scene_view = view_new(world, scene);
+    volume_new(world, scene, 0, 0, -10);
+    frame(world);
+
+    test_int(packet_view(null, view)->fog_count, 0);
+    const box_render_view_t *v = packet_view(null, scene_view);
+    test_int(v->fog_count, 1);
+    test_flt(record_of(null, v, 0)->center[2], -10);
+
+    volume_new(world, 0, 0, 1, -20);
+    frame(world);
+    v = packet_view(null, view);
+    test_int(v->fog_count, 1);
+    test_flt(record_of(null, v, 0)->center[2], -20);
+    v = packet_view(null, scene_view);
+    test_int(v->fog_count, 1);
+    test_flt(record_of(null, v, 0)->center[2], -10);
+
+    ecs_fini(world);
+}
+
+void FogVolume_moved_and_removed(void) {
+    // fog_volume/extract
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t view = view_new(world, 0);
+    ecs_entity_t e = volume_new(world, 0, 0, 0, -10);
+    frame(world);
+    test_flt(record_of(null, packet_view(null, view), 0)->center[2], -10);
+
+    ecs_set(world, e, Position, {2, 0, -15});
+    frame(world);
+    const box_render_fog_volume_t *r = record_of(null, packet_view(null, view), 0);
+    test_flt(r->center[0], 2);
+    test_flt(r->center[2], -15);
+
+    FogVolume *f = ecs_get_mut(world, e, FogVolume);
+    f->density = 0.25f;
+    ecs_modified(world, e, FogVolume);
+    frame(world);
+    test_flt(record_of(null, packet_view(null, view), 0)->density, 0.25f);
+
+    ecs_remove(world, e, FogVolume);
+    frame(world);
+    test_int(packet_view(null, view)->fog_count, 0);
+    test_int(ecs_vec_count(&null->last.fog_volumes), 0);
+
+    ecs_add(world, e, FogVolume);
+    frame(world);
+    test_int(packet_view(null, view)->fog_count, 1);
+    ecs_delete(world, e);
+    frame(world);
+    test_int(packet_view(null, view)->fog_count, 0);
+
+    ecs_fini(world);
+}

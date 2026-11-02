@@ -53,6 +53,22 @@
                 ]
             },
             {
+                "id": "FogVolume",
+                "testcases": [
+                    "defaults",
+                    "partial_script_keeps_others",
+                    "rotated_record",
+                    "clamped_values",
+                    "back_to_front",
+                    "limit_keeps_nearest",
+                    "frustum_culled",
+                    "unlit_view_none",
+                    "view_disabled_none",
+                    "other_scene_none",
+                    "moved_and_removed"
+                ]
+            },
+            {
                 "id": "ReflectionBake",
                 "testcases": [
                     "script_defaults",

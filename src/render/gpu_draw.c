@@ -238,6 +238,7 @@ void box_gpu_draw_init(
     box_gpu_transmission_init(gpu);
     box_gpu_atmosphere_init(gpu);
     box_gpu_particles_init(gpu);
+    box_gpu_fog_volumes_init(gpu);
 }
 
 /** Release the buffers of a mesh and the mesh.
@@ -585,6 +586,7 @@ void box_gpu_draw_fini(
     box_gpu_transmission_fini(gpu);
     box_gpu_atmosphere_fini(gpu);
     box_gpu_particles_fini(gpu);
+    box_gpu_fog_volumes_fini(gpu);
     if (gpu->view_buffer) {
         wgpuBufferRelease(gpu->view_buffer);
         gpu->view_buffer = NULL;
@@ -1445,6 +1447,8 @@ typedef struct box_gpu_view_pass_t {
     WGPUStoreOp depth_store;        /**< Store op of the depth of the passes after the split */
     bool soft;                      /**< The particles draw in a pass of their own that reads
                                      *   the depth instead of writing it */
+    bool fog;                       /**< The fog volumes draw in a pass of their own that reads
+                                     *   the depth instead of writing it */
     box_gpu_snapshot_t *snapshot;   /**< Snapshot the image is copied into before the first
                                      *   blended draw, NULL without transmissive draws or once
                                      *   copied */
@@ -1493,15 +1497,17 @@ static WGPURenderPassEncoder box_gpu_view_pass_continue(
     return wgpuCommandEncoderBeginRenderPass(vp->encoder, &desc);
 }
 
-/** Record the particles of the scene of a view, then bind the groups of the forward pass again,
- * which the particle pipeline does not share.
+/** Record the fog volumes of a view, then the particles of its scene, then bind the groups of
+ * the forward pass again, which their pipelines do not share.
  *
- * A view with a soft pool ends its pass, draws the particles in a pass that samples the depth it
- * reads and, unless they are the last draws of the view, continues in a new pass.
+ * A view with fog volumes or a soft pool ends its pass, draws both in a pass that samples the
+ * depth it reads and, unless they are the last draws of the view, continues in a new pass.
  *
  * @param gpu The backend
+ * @param t The target
  * @param vp The pass of the view, its pass replaced by a split
  * @param format The format of the color target
+ * @param packet The packet
  * @param v The view
  * @param group The bind group of the view
  * @param offset Offset of the uniforms of the view in the view buffer
@@ -1510,15 +1516,17 @@ static WGPURenderPassEncoder box_gpu_view_pass_continue(
  */
 static bool box_gpu_draw_particles(
     box_gpu_t *gpu,
+    const box_gpu_target_t *t,
     box_gpu_view_pass_t *vp,
     WGPUTextureFormat format,
+    const box_render_packet_t *packet,
     const box_render_view_t *v,
     WGPUBindGroup group,
     uint32_t offset,
     bool last)
 {
     bool result = true, rebind = true;
-    if (!vp->soft) {
+    if (!vp->soft && !vp->fog) {
         result = box_gpu_particles_draw(gpu, vp->pass, format, v, NULL);
         rebind = result;
     } else {
@@ -1526,6 +1534,10 @@ static bool box_gpu_draw_particles(
         wgpuRenderPassEncoderRelease(vp->pass);
         vp->pass = box_gpu_view_pass_continue(gpu, vp, true);
         wgpuRenderPassEncoderSetBindGroup(vp->pass, 0, group, 1, &offset);
+        if (vp->fog) {
+            box_gpu_fog_volumes_draw(gpu, vp->pass, t, format, packet, v, vp->depth);
+        }
+
         box_gpu_particles_draw(gpu, vp->pass, format, v, vp->depth);
         rebind = !last;
         if (!last) {
@@ -1571,16 +1583,17 @@ static void box_gpu_draw_snapshot(
 
 /** Record the indirect draws of the batches a view renders in a pass, in packet order.
  *
- * The sky of a view that renders its atmosphere, then the particles of its scene, draw after
- * the opaque 3D meshes and before the 2D shapes and the blended draws, in the phases that draw
- * those.
+ * The sky of a view that renders its atmosphere, then its fog volumes, then the particles of
+ * its scene, draw after the opaque 3D meshes and before the 2D shapes and the blended draws, in
+ * the phases that draw those.
  *
  * After a depth prepass the opaque meshes draw with the Equal pipelines, both the early and the
  * late arguments of a view that culls by occlusion, so they draw what the prepasses drew.
  *
  * @param gpu The backend
  * @param t The target
- * @param vp The render pass of the view, which the particles may split, and its opaque snapshot,
+ * @param vp The render pass of the view, which the fog volumes and particles may split, and its
+ * opaque snapshot,
  * which splits it right before its first blended draw (box_gpu_draw_snapshot)
  * @param format The format of the color target
  * @param packet The packet
@@ -1628,7 +1641,7 @@ static void box_gpu_draw_batches(
 
         if (!particles && !mesh) {
             particles = true;
-            if (box_gpu_draw_particles(gpu, vp, format, v, group, offset, false)) {
+            if (box_gpu_draw_particles(gpu, t, vp, format, packet, v, group, offset, false)) {
                 bound = NULL;
                 material = NULL;
                 instances = NULL;
@@ -1677,14 +1690,14 @@ static void box_gpu_draw_batches(
     }
 
     if (!particles) {
-        box_gpu_draw_particles(gpu, vp, format, v, group, offset, true);
+        box_gpu_draw_particles(gpu, t, vp, format, packet, v, group, offset, true);
     }
 }
 
 /** Record a render pass of a view and its draws of one phase.
  *
- * Counts the pass among the forward passes, and each pass the opaque snapshot and soft
- * particles split it into (box_gpu_view_pass_continue).
+ * Counts the pass among the forward passes, and each pass the opaque snapshot, the fog volumes
+ * and soft particles split it into (box_gpu_view_pass_continue).
  *
  * @param gpu The backend
  * @param t The target
@@ -1733,19 +1746,21 @@ static void box_gpu_draw_pass(
         attachment.clearValue = (WGPUColor){0};
     }
 
+    bool fog = phase != 1 && box_gpu_fog_volumes_ready(gpu, v);
     box_gpu_view_pass_t vp = {
         .encoder = encoder,
         .color = hdr ? hdr : color,
         .depth = t->depth_view,
-        .depth_store = phase == 1 || hdr ? WGPUStoreOp_Store : WGPUStoreOp_Discard,
+        .depth_store = phase == 1 || hdr || fog ? WGPUStoreOp_Store : WGPUStoreOp_Discard,
         .soft = phase != 1 && box_gpu_particles_soft(gpu, v),
+        .fog = fog,
         .snapshot = phase != 1 ? snapshot : NULL,
         .source = source
     };
     WGPURenderPassDepthStencilAttachment depth = {
         .view = t->depth_view,
         .depthLoadOp = phase < 2 ? WGPULoadOp_Clear : WGPULoadOp_Load,
-        .depthStoreOp = vp.soft || vp.snapshot ? WGPUStoreOp_Store : vp.depth_store,
+        .depthStoreOp = vp.soft || vp.snapshot || vp.fog ? WGPUStoreOp_Store : vp.depth_store,
         .depthClearValue = 0.0f
     };
     WGPURenderPassDescriptor desc = {
