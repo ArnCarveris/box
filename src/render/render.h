@@ -203,12 +203,67 @@ typedef struct box_render_lights_stats_t {
     int64_t upload_bytes;       /**< Bytes the last extract uploaded into light buffers */
     int32_t shadow_tiles;       /**< Shadow atlas tiles of every scene */
     int32_t shadow_dropped;     /**< Shadow casting lights a view sees that got no tile */
+    int32_t fog_volumes;        /**< Fog volume records of every view */
+    int32_t fog_dropped;        /**< Fog volumes views saw beyond BOX_RENDER_FOG_VOLUMES_MAX */
 } box_render_lights_stats_t;
+
+/** Fog volumes the light extract gives the views, see box_render_fog_views */
+typedef struct box_render_fog_t box_render_fog_t;
+
+/** Create the state of the fog volumes of the views and its query.
+ *
+ * @param world The world
+ * @return The state
+ */
+box_render_fog_t* box_render_fog_new(
+    ecs_world_t *world);
+
+/** Free the state of the fog volumes of the views.
+ *
+ * @param fog The state, NULL for none
+ */
+void box_render_fog_free(
+    box_render_fog_t *fog);
+
+/** Give every lit view with LightSettings.fog_volumes the FogVolumes of the scene of its camera
+ * that may be in its frustum, back to front by the distance of their centers from the camera.
+ *
+ * A view that sees more than BOX_RENDER_FOG_VOLUMES_MAX keeps the nearest and is warned about
+ * once when it goes over. Views without a view entity, unlit views and cameras without a depth
+ * range get none; the records go into the packet after those of the views before.
+ *
+ * @param world The world
+ * @param fog The state
+ * @param p The packet, whose views are lit
+ * @param stats Counters of the light extract, which count the records and dropped volumes
+ */
+void box_render_fog_views(
+    ecs_world_t *world,
+    box_render_fog_t *fog,
+    box_render_packet_t *p,
+    box_render_lights_stats_t *stats);
+
+/** Check whether a sphere may reach into the frustum of a view.
+ *
+ * A camera that follows the aspect of its surface is tested with a wide aspect of 4, an
+ * orthographic one sized by its surface only by its depth range, so a sphere the view may see
+ * is never left out.
+ *
+ * @param v The view
+ * @param center World center of the sphere
+ * @param radius Radius of the sphere
+ * @return Whether the sphere is not entirely outside a plane of the frustum
+ */
+bool box_render_view_sees(
+    const box_render_view_t *v,
+    const float *center,
+    float radius);
 
 /** Register the system that sends the lights of every scene and the lights of every view.
  *
  * Lights are collected per scene into a light buffer that is uploaded when it changed; every
- * view of the packet gets the buffer and the ambient light of the scene of its camera.
+ * view of the packet gets the buffer and the ambient light of the scene of its camera, and a
+ * lit view with LightSettings.fog_volumes the FogVolumes of that scene in its frustum.
  *
  * @param world The world
  */

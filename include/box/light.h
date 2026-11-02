@@ -260,6 +260,36 @@ ECS_STRUCT(ReflectionProbe, {
     vec3 offset;          /**< Capture point relative to the entity, default {0, 0, 0} */
 });
 
+/** A box of fog the lit views of its scene with LightSettings.fog_volumes raymarch, placed by the
+ * position and rotation of the entity as a ReflectionProbe is (scale ignored). Probe and
+ * reflection captures and bakes do not see it.
+ *
+ * It draws in the forward pass after the opaque meshes and the sky, back to front, at most 32 in
+ * the frustum per view, the nearest kept. Glass shows it through its snapshot; blended shapes and
+ * particles in or behind it are not fogged, and a view without clear keeps its alpha.
+ *
+ * It is lit by the ambient of the view (environment or hemisphere, not the probe volume) and the
+ * first directional light through its cascades and LightCookie, dimmed by the aerial perspective
+ * of the view; further directional, point and spot lights are not marched.
+ */
+ECS_STRUCT(FogVolume, {
+    vec3 extent;             /**< Half size of the box, default {5, 5, 5} */
+    float density;           /**< Extinction per world unit, default 0.1 */
+    rgb color;               /**< Color of the scattered light, display encoded, default
+                              *   white */
+    float absorption;        /**< Share of the extinction that is absorbed, 0 to 1, default 0 */
+    float asymmetry;         /**< Henyey-Greenstein g, -0.9 to 0.9, default 0.3: positive
+                              *   scatters forward, so the fog is brighter looking toward the
+                              *   sun */
+    float edge_fade;         /**< Distance inside the box over which density fades to 0 at its
+                              *   faces with a smoothstep, default 1, 0 for hard faces */
+    float sun_inscatter;     /**< Scale of the sun, default 1 */
+    float ambient_inscatter; /**< Scale of the ambient light, default 1 */
+    int32_t steps;           /**< March steps across a volume, default 24, clamped to 4..128;
+                              *   a ray that crosses part of the box takes its share of them,
+                              *   at least 4 */
+});
+
 /** How the mip levels of an environment cubemap are prefiltered from its first level */
 ECS_ENUM(EnvironmentFilter, {
     EnvironmentFilterGgx = 0, /**< GGX radiance of a rougher surface at each higher level */
