@@ -67,6 +67,8 @@ struct View {
     cookie_y: vec4f,
     // x: 1 when the view applies the cookie, y: its projection, 0 plane and 1 light
     cookie_config: vec4u,
+    // Inverse of view_proj, clip space of the target to world
+    inv_view_proj: mat4x4f,
 };
 
 // shadow is the index of the tile record of a spot or point light in the shadow atlas of the

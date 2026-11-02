@@ -247,7 +247,8 @@ void box_render_fog_noise(
  *
  * A view that sees more than BOX_RENDER_FOG_VOLUMES_MAX keeps the nearest and is warned about
  * once when it goes over. Views without a view entity, unlit views and cameras without a depth
- * range get none; the records go into the packet after those of the views before.
+ * range get none; the records go into the packet after those of the views before. The noise
+ * offsets of the records are those at the time of the packet.
  *
  * @param world The world
  * @param fog The state
@@ -259,6 +260,19 @@ void box_render_fog_views(
     box_render_fog_t *fog,
     box_render_packet_t *p,
     box_render_lights_stats_t *stats);
+
+/** Get the offset the wind of a FogVolume moves its noise by at a time: its wind times the time
+ * on each axis, computed in double precision and wrapped to [0, BOX_RENDER_FOG_NOISE_PERIOD
+ * times its noise_scale), the distance over which both noise samples of the shader repeat.
+ *
+ * @param fog The FogVolume
+ * @param time Seconds the world has advanced in total
+ * @param out Receives the three components in world units
+ */
+void box_render_fog_offset(
+    const FogVolume *fog,
+    double time,
+    float *out);
 
 /** Check whether a sphere may reach into the frustum of a view.
  *

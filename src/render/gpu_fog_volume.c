@@ -7,9 +7,9 @@
  * continues in a pass that reads its depth, where one instanced draw of 36 vertices per volume
  * marches the boxes back to front before the particles. Without volumes nothing is recorded.
  *
- * Group 1 holds the records of the view, the inverse view projection and time of the packet, the
- * depth and the noise texture; the uniforms and records of every draw of a packet follow each
- * other in one buffer, which grows when a draw does not fit.
+ * Group 1 holds the records of the view, the inverse view projection of the target, the depth and
+ * the noise texture; the uniforms and records of every draw of a packet follow each other in one
+ * buffer, which grows when a draw does not fit.
  */
 
 #include "gpu.h"
@@ -21,7 +21,7 @@
 #define BOX_GPU_FOG_UNIFORM_STRIDE (256u)
 
 /** Bytes of the uniform of a draw, FogDraw in fog_volume.wgsl */
-#define BOX_GPU_FOG_UNIFORM_SIZE (80u)
+#define BOX_GPU_FOG_UNIFORM_SIZE (64u)
 
 /** Smallest buffer of the draws of a packet in bytes */
 #define BOX_GPU_FOG_BUFFER_MIN (16384u)
@@ -33,9 +33,6 @@
 /** Uniform of a draw, matching FogDraw in fog_volume.wgsl */
 typedef struct box_gpu_fog_uniforms_t {
     mat4 inv_view_proj;             /**< Clip space of the target to world */
-    float time;                     /**< World time of the packet in seconds, the noise moves
-                                     *   by the wind times it */
-    float _pad[3];                  /**< Padding to the size of FogDraw */
 } box_gpu_fog_uniforms_t;
 
 struct box_gpu_fog_volumes_t {
@@ -424,7 +421,6 @@ bool box_gpu_fog_volumes_draw(
         (float)t->desc.point_width, (float)t->desc.point_height, proj);
     glm_mat4_mul(proj, ECS_CONST_CAST(vec4*, v->view_matrix), view_proj);
     glm_mat4_inv(view_proj, u.inv_view_proj);
-    u.time = (float)packet->time;
     wgpuQueueWriteBuffer(gpu->queue, f->buffer, offset, &u, sizeof(u));
     wgpuQueueWriteBuffer(gpu->queue, f->buffer, offset + BOX_GPU_FOG_UNIFORM_STRIDE,
         fogs, (size_t)records);

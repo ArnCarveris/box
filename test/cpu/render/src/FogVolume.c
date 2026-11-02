@@ -320,16 +320,22 @@ void FogVolume_noise_record(void) {
     test_flt(r_plain->center[2], -5);
     test_flt(r_plain->noise_strength, 0);
     test_flt(r_plain->noise_scale, 4);
-    test_flt(r_plain->wind[0], 0);
-    test_flt(r_plain->wind[1], 0);
-    test_flt(r_plain->wind[2], 0);
+    test_flt(r_plain->offset[0], 0);
+    test_flt(r_plain->offset[1], 0);
+    test_flt(r_plain->offset[2], 0);
 
     test_flt(r_noisy->center[2], -20);
     test_flt(r_noisy->noise_strength, 0.5f);
     test_flt(r_noisy->noise_scale, 7);
-    test_flt(r_noisy->wind[0], 1);
-    test_flt(r_noisy->wind[1], -2);
-    test_flt(r_noisy->wind[2], 3);
+    float expected[3];
+    box_render_fog_offset(&(FogVolume){.noise_scale = 7, .wind = {1, -2, 3}},
+        null->last.time, expected);
+    int32_t k;
+    for (k = 0; k < 3; k ++) {
+        test_assert(fabsf(r_noisy->offset[k] - expected[k]) < 1e-4f);
+        test_assert(r_noisy->offset[k] >= 0 && r_noisy->offset[k] < 70);
+    }
+
     test_flt(r_noisy->density, 0.1f);
     test_int(r_noisy->steps, 24);
 
@@ -670,6 +676,107 @@ void FogVolume_moved_and_removed(void) {
     ecs_delete(world, e);
     frame(world);
     test_int(packet_view(null, view)->fog_count, 0);
+
+    ecs_fini(world);
+}
+
+/** The noise offset of a FogVolume at a large time equals the offset at that time modulo the
+ * period of each axis, 10 noise_scale over the speed of the wind along it. */
+void FogVolume_offset_wraps(void) {
+    // fog_volume/noise
+    const FogVolume fog = {.noise_scale = 3, .wind = {2.5f, -0.75f, 7}};
+    const double times[3] = { 1e6, 86400.0 * 3 + 0.123, 123456.789 };
+    int32_t i, k;
+    for (i = 0; i < 3; i ++) {
+        float big[3];
+        box_render_fog_offset(&fog, times[i], big);
+        for (k = 0; k < 3; k ++) {
+            double period = 30.0 / fabs((double)fog.wind[k]);
+            float small[3];
+            box_render_fog_offset(&fog, fmod(times[i], period), small);
+            float d = fabsf(big[k] - small[k]);
+            // Both may sit at either end of [0, 30), which is the same noise
+            d = d > 15.0f ? 30.0f - d : d;
+            test_assert(d < 1e-3f);
+            test_assert(big[k] >= 0 && big[k] < 30);
+        }
+    }
+
+    float at[3], at_next[3];
+    box_render_fog_offset(&fog, 1e6, at);
+    box_render_fog_offset(&fog, 1e6 + 1.0 / 60, at_next);
+    test_assert(fabsf(at_next[0] - at[0] - 2.5f / 60) < 1e-4f);
+}
+
+/** A negative wind gives an offset in [0, 10 noise_scale) at every time, also at negative
+ * products near the end of the period. */
+void FogVolume_offset_negative_wind(void) {
+    // fog_volume/noise
+    const FogVolume fog = {.noise_scale = 0.5f, .wind = {-1.3f, -4, -1e-7f}};
+    const double times[6] = { 0.001, 1, 3.7, 3600, 1e6, 1e9 };
+    int32_t i, k;
+    for (i = 0; i < 6; i ++) {
+        float out[3];
+        box_render_fog_offset(&fog, times[i], out);
+        for (k = 0; k < 3; k ++) {
+            test_assert(out[k] >= 0 && out[k] < 5);
+        }
+    }
+
+    float out[3];
+    box_render_fog_offset(&fog, 1, out);
+    test_assert(fabsf(out[0] - 3.7f) < 1e-4f);
+    test_assert(fabsf(out[1] - 1.0f) < 1e-4f);
+}
+
+/** A volume without wind has a noise offset of 0 at every time, also through the extract. */
+void FogVolume_offset_zero_wind(void) {
+    // fog_volume/noise
+    const FogVolume fog = {.noise_scale = 4};
+    const double times[4] = { 0, 1, 1e6, 1e9 };
+    int32_t i, k;
+    for (i = 0; i < 4; i ++) {
+        float out[3] = {1, 1, 1};
+        box_render_fog_offset(&fog, times[i], out);
+        for (k = 0; k < 3; k ++) {
+            test_flt(out[k], 0);
+        }
+    }
+}
+
+/** The extract writes the offset at the time of the packet into the record. */
+void FogVolume_offset_record(void) {
+    // fog_volume/noise
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t view = view_new(world, 0);
+    ecs_entity_t e = volume_new(world, 0, 0, 0, -5);
+    FogVolume *f = ecs_get_mut(world, e, FogVolume);
+    f->noise_strength = 1;
+    f->noise_scale = 2;
+    f->wind[0] = 0.3f;
+    f->wind[1] = -5;
+    f->wind[2] = 0;
+    ecs_modified(world, e, FogVolume);
+    FogVolume fog = *f;
+    ecs_progress(world, 1000);
+    box_render_sync(world);
+    ecs_progress(world, 1000);
+    box_render_sync(world);
+
+    const box_render_view_t *v = packet_view(null, view);
+    test_int(v->fog_count, 1);
+    const box_render_fog_volume_t *r = record_of(null, v, 0);
+    test_assert(null->last.time > 0);
+    float expected[3];
+    box_render_fog_offset(&fog, null->last.time, expected);
+    int32_t k;
+    for (k = 0; k < 3; k ++) {
+        test_assert(fabsf(r->offset[k] - expected[k]) < 1e-4f);
+        test_assert(r->offset[k] >= 0 && r->offset[k] < 20);
+    }
+
+    test_flt(r->offset[2], 0);
 
     ecs_fini(world);
 }

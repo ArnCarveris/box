@@ -41,7 +41,9 @@ struct Material {
     diffuse_transmission: u32,
     // DiffuseTransmission.thickness, world units behind the surface of its shadow lookup
     thickness: f32,
-    reserved0: u32,
+    // DiffuseTransmission.blur, world units of blur radius per world unit behind the surface of
+    // a Transmission shape, 0 without one
+    diffuse_blur: f32,
     reserved1: u32,
     reserved2: u32,
 };
