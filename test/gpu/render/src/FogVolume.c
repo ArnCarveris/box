@@ -860,3 +860,353 @@ void FogVolume_not_in_captures(void) {
     test_assert(fabsf(fogged - clear) <= 0.02f * clear);
     test_assert(fabsf(sh_fogged - sh_clear) <= 0.02f * fabsf(sh_clear) + 1e-4f);
 }
+
+/** Add a white volume that scatters all it extinguishes, with hard edges, an isotropic phase
+ * and 128 steps.
+ *
+ * @param world The world
+ * @param pos Center
+ * @param extent Half size
+ * @param density Extinction per unit
+ * @param light_inscatter Scale of the point and spot lights
+ * @return The volume
+ */
+static ecs_entity_t fv_lit_volume(
+    ecs_world_t *world,
+    const float pos[3],
+    const float extent[3],
+    float density,
+    float light_inscatter)
+{
+    ecs_entity_t e = fv_volume(world, pos, extent, density, 0);
+    FogVolume *f = ecs_get_mut(world, e, FogVolume);
+    f->asymmetry = 0;
+    f->steps = 128;
+    f->light_inscatter = light_inscatter;
+    ecs_modified(world, e, FogVolume);
+
+    return e;
+}
+
+/** Add a point light.
+ *
+ * @param world The world
+ * @param pos Position
+ * @param intensity Intensity
+ * @param range Range
+ * @param shadows Whether it casts shadows
+ * @return The light
+ */
+static ecs_entity_t fv_point(
+    ecs_world_t *world,
+    const float pos[3],
+    float intensity,
+    float range,
+    bool shadows)
+{
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {pos[0], pos[1], pos[2]});
+    ecs_set(world, e, PointLight, {.intensity = intensity, .range = range,
+        .shadows = shadows, .shadow_resolution = 512});
+
+    return e;
+}
+
+/** Add a spot light shining straight down with an inner angle 5 degrees under its outer one.
+ *
+ * @param world The world
+ * @param pos Position
+ * @param intensity Intensity
+ * @param range Range
+ * @param outer Outer half angle in degrees
+ * @param shadows Whether it casts shadows
+ * @return The light
+ */
+static ecs_entity_t fv_spot(
+    ecs_world_t *world,
+    const float pos[3],
+    float intensity,
+    float range,
+    float outer,
+    bool shadows)
+{
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {pos[0], pos[1], pos[2]});
+    ecs_set(world, e, Rotation, {(float)GLM_PI_2, 0, 0});
+    ecs_set(world, e, SpotLight, {.intensity = intensity, .range = range,
+        .inner_angle = outer - 5, .outer_angle = outer, .shadows = shadows,
+        .shadow_resolution = 512});
+
+    return e;
+}
+
+/** Turn on the shadows of a view.
+ *
+ * @param world The world
+ * @param view The view
+ */
+static void fv_view_shadows(
+    ecs_world_t *world,
+    ecs_entity_t view)
+{
+    View *v = ecs_get_mut(world, view, View);
+    v->shadows = fv_shadows;
+    ecs_modified(world, view, View);
+}
+
+/** Render a volume lit by the ambient with light_inscatter 0, with or without a bright point
+ * light inside.
+ *
+ * @param light Whether the point light is there
+ * @param file Name of the PNG
+ * @return The pixels, RGBA, freed with stbi_image_free
+ */
+static unsigned char* fv_lights_zero(
+    bool light,
+    const char *file)
+{
+    ecs_world_t *world = fv_world(0.2f);
+    fv_view(world, fv_camera(world, 0, 0), true);
+    fv_wall(world, 0, -20, 40, FV_WALL);
+    fv_lit_volume(world, (float[]){0, 0, -10}, (float[]){6, 6, 4}, 0.3f, 0);
+    if (light) {
+        fv_point(world, (float[]){0, 0, -10}, 10 * GLM_PIf, 5, false);
+    }
+
+    unsigned char *px = fv_render(world, file);
+    ecs_fini(world);
+
+    return px;
+}
+
+/** With light_inscatter 0 a point light inside the volume changes none of its pixels. */
+void FogVolume_lights_zero_unchanged(void) {
+    // fog_volume/lights
+    unsigned char *without = fv_lights_zero(false, "fog_lights_zero_none.png");
+    unsigned char *with = fv_lights_zero(true, "fog_lights_zero.png");
+    test_assert(fv_px(without, 32, 32)[1] > 10);
+    test_assert(!memcmp(without, with, FV_SIZE * FV_SIZE * 4));
+    stbi_image_free(without);
+    stbi_image_free(with);
+}
+
+/** A point light in the middle of a thin dense slab glows around it, less with the distance,
+ * and not past its range. At z -10 a world unit is about 5.5 pixels. */
+void FogVolume_point_light_glow(void) {
+    // fog_volume/lights
+    ecs_world_t *world = fv_world(0);
+    fv_view(world, fv_camera(world, 0, 0), true);
+    fv_lit_volume(world, (float[]){0, 0, -10}, (float[]){6, 6, 1}, 0.5f, 1);
+    fv_point(world, (float[]){0, 0, -10}, 0.5f * GLM_PIf, 4, false);
+    unsigned char *px = fv_render(world, "fog_point_glow.png");
+    int32_t x, last = fv_px(px, 33, 32)[1];
+    for (x = 34; x < 62; x ++) {
+        int32_t value = fv_px(px, x, 32)[1];
+        test_assert(value <= last + 3);
+        last = value;
+    }
+
+    int32_t near_ = fv_px(px, 40, 32)[1], mid = fv_px(px, 49, 32)[1];
+    test_assert(near_ > 80);
+    test_assert(near_ > mid + 20);
+    test_assert(mid > 10);
+    test_assert(fv_px(px, 60, 32)[1] <= 2);
+    test_assert(fv_px(px, 32, 60)[1] <= 2);
+    test_assert(fv_px(px, 4, 4)[1] <= 2);
+    stbi_image_free(px);
+
+    ecs_fini(world);
+}
+
+/** Render a slab of fog under a spot light shining down, from the side, with or without a
+ * caster under the light; the light and its tile cast shadows when shadows is set.
+ *
+ * @param shadows Whether the view and the light render shadows
+ * @param caster Whether a thin bar 1.5 under the light crosses the cone
+ * @param file Name of the PNG
+ * @return The pixels, RGBA, freed with stbi_image_free
+ */
+static unsigned char* fv_spot_render(
+    bool shadows,
+    bool caster,
+    const char *file)
+{
+    ecs_world_t *world = fv_world(0);
+    ecs_entity_t view = fv_view(world, fv_camera(world, 0, 0), true);
+    if (shadows) {
+        fv_view_shadows(world, view);
+    }
+
+    fv_lit_volume(world, (float[]){0, 0, -10}, (float[]){6, 5, 1}, 0.5f, 1);
+    fv_spot(world, (float[]){0, 4, -10}, 3 * GLM_PIf, 10, shadows ? 30 : 20, shadows);
+    if (caster) {
+        ecs_entity_t bar = ecs_new(world);
+        ecs_set(world, bar, Position, {0, 2.5f, -10});
+        ecs_set(world, bar, Box, {0.5f, 0.2f, 4});
+    }
+
+    unsigned char *px = fv_render(world, file);
+    ecs_fini(world);
+
+    return px;
+}
+
+/** A spot light shining down through the fog shows its cone from the side: lit under the light,
+ * dark beside the cone and above the light. At z -10 a world unit is about 5.5 pixels, the cone
+ * is 1.5 wide each way at y 0. */
+void FogVolume_spot_light_cone(void) {
+    // fog_volume/lights
+    unsigned char *px = fv_spot_render(false, false, "fog_spot_cone.png");
+    int32_t center = fv_px(px, 32, 32)[1];
+    test_assert(center > 60);
+    test_assert(fv_px(px, 32, 22)[1] > 60);
+    test_assert(fv_px(px, 49, 32)[1] <= 2);
+    test_assert(fv_px(px, 15, 32)[1] <= 2);
+    test_assert(fv_px(px, 32, 4)[1] <= 2);
+    test_assert(fv_px(px, 52, 50)[1] <= 2);
+    stbi_image_free(px);
+}
+
+/** A bar inside the cone of a shadowed spot light leaves a dark wedge in the fog under it, while
+ * the fog of the cone beside the wedge stays as lit. */
+void FogVolume_spot_shadow_in_fog(void) {
+    // fog_volume/lights
+    unsigned char *open = fv_spot_render(true, false, "fog_spot_shadow_open.png");
+    unsigned char *shaded = fv_spot_render(true, true, "fog_spot_shadow.png");
+    int32_t open_center = fv_px(open, 32, 32)[1], shaded_center = fv_px(shaded, 32, 32)[1];
+    int32_t open_side = fv_px(open, 40, 32)[1], shaded_side = fv_px(shaded, 40, 32)[1];
+    test_assert(open_center > 60);
+    test_assert(shaded_center * 2 < open_center);
+    test_assert(open_side > 40);
+    test_assert(abs(shaded_side - open_side) <= 8);
+    test_assert(shaded_center * 2 < shaded_side);
+    stbi_image_free(open);
+    stbi_image_free(shaded);
+}
+
+/** Render a slab of fog around a shadowed point light, with or without a bar 1.5 under it.
+ *
+ * @param caster Whether the bar is there
+ * @param file Name of the PNG
+ * @return The pixels, RGBA, freed with stbi_image_free
+ */
+static unsigned char* fv_point_shadow_render(
+    bool caster,
+    const char *file)
+{
+    ecs_world_t *world = fv_world(0);
+    ecs_entity_t view = fv_view(world, fv_camera(world, 0, 0), true);
+    fv_view_shadows(world, view);
+    fv_lit_volume(world, (float[]){0, 0, -10}, (float[]){6, 5, 1}, 0.5f, 1);
+    fv_point(world, (float[]){0, 3, -10}, 2 * GLM_PIf, 6, true);
+    if (caster) {
+        ecs_entity_t bar = ecs_new(world);
+        ecs_set(world, bar, Position, {0, 1.5f, -10});
+        ecs_set(world, bar, Box, {0.5f, 0.2f, 4});
+    }
+
+    unsigned char *px = fv_render(world, file);
+    ecs_fini(world);
+
+    return px;
+}
+
+/** A bar under a shadowed point light leaves a dark wedge in the fog under it, while the fog
+ * beside the wedge stays as lit. */
+void FogVolume_point_shadow_in_fog(void) {
+    // fog_volume/lights
+    unsigned char *open = fv_point_shadow_render(false, "fog_point_shadow_open.png");
+    unsigned char *shaded = fv_point_shadow_render(true, "fog_point_shadow.png");
+    int32_t open_center = fv_px(open, 32, 32)[1], shaded_center = fv_px(shaded, 32, 32)[1];
+    int32_t open_side = fv_px(open, 41, 32)[1], shaded_side = fv_px(shaded, 41, 32)[1];
+    test_assert(open_center > 60);
+    test_assert(shaded_center * 2 < open_center);
+    test_assert(open_side > 40);
+    test_assert(abs(shaded_side - open_side) <= 8);
+    test_assert(shaded_center * 2 < shaded_side);
+    stbi_image_free(open);
+    stbi_image_free(shaded);
+}
+
+/** Render a volume in front of the camera, with or without a point light behind the camera
+ * whose range reaches into the volume.
+ *
+ * @param light Whether the light is there
+ * @param file Name of the PNG
+ * @return The green of the center pixel
+ */
+static int32_t fv_behind_render(
+    bool light,
+    const char *file)
+{
+    ecs_world_t *world = fv_world(0);
+    fv_view(world, fv_camera(world, 0, 0), true);
+    fv_lit_volume(world, (float[]){0, 0, -3}, (float[]){6, 6, 2}, 0.5f, 1);
+    if (light) {
+        fv_point(world, (float[]){0, 0, 3}, 4 * GLM_PIf, 8, false);
+    }
+
+    unsigned char *px = fv_render(world, file);
+    int32_t result = fv_px(px, 32, 32)[1];
+    stbi_image_free(px);
+    ecs_fini(world);
+
+    return result;
+}
+
+/** A point light behind the camera, outside the frustum the clusters cover, lights the near part
+ * of a volume its range reaches. */
+void FogVolume_light_outside_clusters(void) {
+    // fog_volume/lights
+    int32_t dark = fv_behind_render(false, "fog_behind_light_none.png");
+    int32_t lit = fv_behind_render(true, "fog_behind_light.png");
+    test_assert(dark <= 2);
+    test_assert(lit > dark + 30);
+}
+
+/** Count the forward passes and fog volume draws of two frames of a volume with or without 16
+ * point and spot lights in it.
+ *
+ * @param lights Whether the lights are there
+ * @param out Receives the forward passes and the fog volumes
+ */
+static void fv_splits(
+    bool lights,
+    int32_t out[2])
+{
+    ecs_world_t *world = fv_world(0.2f);
+    ecs_entity_t view = fv_view(world, fv_camera(world, 0, 0), true);
+    fv_view_shadows(world, view);
+    fv_wall(world, 0, -20, 40, FV_WALL);
+    fv_lit_volume(world, (float[]){0, 0, -10}, (float[]){8, 6, 4}, 0.2f, 1);
+    int32_t i;
+    for (i = 0; lights && i < 16; i ++) {
+        float pos[3] = {(float)(i % 4) * 4 - 6, (float)(i / 4) * 2 - 3, -10};
+        if (i % 2) {
+            fv_spot(world, pos, GLM_PIf, 5, 30, i % 4 == 1);
+        } else {
+            fv_point(world, pos, GLM_PIf, 4, i % 8 == 0);
+        }
+    }
+
+    unsigned char *px = fv_render(world, lights ? "fog_splits_lights.png" : "fog_splits.png");
+    stbi_image_free(px);
+    box_render_gpu_stats_t before = fv_frames(world, 0);
+    box_render_gpu_stats_t after = fv_frames(world, 2);
+    out[0] = after.forward_passes - before.forward_passes;
+    out[1] = after.fog_volumes - before.fog_volumes;
+    test_int(after.errors, before.errors);
+    ecs_fini(world);
+}
+
+/** Lights in a volume add no forward pass and no fog volume draw. */
+void FogVolume_no_new_splits(void) {
+    // fog_volume/lights
+    int32_t without[2], with[2];
+    fv_splits(false, without);
+    fv_splits(true, with);
+    test_int(without[0], 4);
+    test_int(without[1], 2);
+    test_int(with[0], without[0]);
+    test_int(with[1], without[1]);
+}

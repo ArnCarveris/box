@@ -967,7 +967,14 @@
                     "resize",
                     "two_views",
                     "view_disables",
-                    "not_in_captures"
+                    "not_in_captures",
+                    "lights_zero_unchanged",
+                    "point_light_glow",
+                    "spot_light_cone",
+                    "spot_shadow_in_fog",
+                    "point_shadow_in_fog",
+                    "light_outside_clusters",
+                    "no_new_splits"
                 ]
             }
         ]

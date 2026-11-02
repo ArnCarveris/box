@@ -476,6 +476,8 @@ typedef struct box_render_fog_volume_t {
     float sun_inscatter;    /**< FogVolume.sun_inscatter, at least 0 */
     float ambient_inscatter; /**< FogVolume.ambient_inscatter, at least 0 */
     int32_t steps;          /**< FogVolume.steps, 4 to 128 */
+    float light_inscatter;  /**< FogVolume.light_inscatter, at least 0 */
+    float pad[3];           /**< Pads the record to the 16 byte stride of its WGSL array */
 } box_render_fog_volume_t;
 
 /** The culling of a view, resolved from its CullSettings */

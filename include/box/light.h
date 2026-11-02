@@ -25,6 +25,10 @@
 extern "C" {
 #endif
 
+/** Cluster lookups of the point and spot lights a FogVolume ray makes at most, and the lights
+ * of each lookup it marches at most; FOG_LIGHT_SEGMENTS in etc/shaders/fog_volume.wgsl */
+#define BOX_FOG_VOLUME_LIGHT_STEPS (8)
+
 /** How a light takes part in the LightBake of its scene, as Unity's light modes.
  *
  * Mixed is the zero value and means what it says: the light lights directly in realtime and
@@ -268,9 +272,14 @@ ECS_STRUCT(ReflectionProbe, {
  * the frustum per view, the nearest kept. Glass shows it through its snapshot; blended shapes and
  * particles in or behind it are not fogged, and a view without clear keeps its alpha.
  *
- * It is lit by the ambient of the view (environment or hemisphere, not the probe volume) and the
- * first directional light through its cascades and LightCookie, dimmed by the aerial perspective
- * of the view; further directional, point and spot lights are not marched.
+ * It is lit by the ambient of the view (environment or hemisphere, not the probe volume), the
+ * first directional light through its cascades and LightCookie, and the point and spot lights of
+ * the clusters of the view through their shadow tiles, dimmed by the aerial perspective of the
+ * view; further directional lights are not marched. To bound the cost, a ray looks up its
+ * clusters at most BOX_FOG_VOLUME_LIGHT_STEPS times: the march is split into that many
+ * segments, each lit by the first BOX_FOG_VOLUME_LIGHT_STEPS lights of the cluster at its middle,
+ * so a dense cluster or a segment that crosses several clusters may lose lights. Their shadows
+ * are one depth comparison per step, without the filter of the meshes.
  */
 ECS_STRUCT(FogVolume, {
     vec3 extent;             /**< Half size of the box, default {5, 5, 5} */
@@ -285,6 +294,8 @@ ECS_STRUCT(FogVolume, {
                               *   faces with a smoothstep, default 1, 0 for hard faces */
     float sun_inscatter;     /**< Scale of the sun, default 1 */
     float ambient_inscatter; /**< Scale of the ambient light, default 1 */
+    float light_inscatter;   /**< Scale of the point and spot lights, default 1, 0 skips their
+                              *   lookup */
     int32_t steps;           /**< March steps across a volume, default 24, clamped to 4..128;
                               *   a ray that crosses part of the box takes its share of them,
                               *   at least 4 */
