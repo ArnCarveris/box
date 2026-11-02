@@ -477,7 +477,8 @@
                     "multi_ls_cd",
                     "multi_cd_find",
                     "multi_cd_grep",
-                    "multi_script_diff"
+                    "multi_script_diff",
+                    "multi_error_stops"
                 ]
             },
             {

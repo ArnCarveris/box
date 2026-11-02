@@ -1212,3 +1212,19 @@ void ConsoleOutput_multi_script_diff(void) {
 
     ecs_fini(world);
 }
+
+void ConsoleOutput_multi_error_stops(void) {
+    // console/output
+    ecs_world_t *world = output_world();
+    ecs_entity(world, { .name = "alps.alpha" });
+    output_run(world, "ls alps; rm nothing; cd alps");
+
+    // Only the error is shown and the commands after it do not run
+    test_assert(output_find(world, "error: ", false) != 0);
+    test_assert(output_find(world, "alps.alpha", true) == 0);
+    output_run(world, "ls");
+    test_assert(output_find(world, "alps", true) != 0);
+    test_assert(output_find(world, "alpha", true) == 0);
+
+    ecs_fini(world);
+}
