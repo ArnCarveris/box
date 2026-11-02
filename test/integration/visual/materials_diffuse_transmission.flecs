@@ -84,8 +84,8 @@ backlit {
   }
 
   curtain {
-    Position: {0, 2.4, -1}
-    Quad: {2.6, 2.4}
+    Position: {0, 2.9, -1}
+    Quad: {2.6, 2.0}
     Rgb: {210, 70, 60}
     PbrMaterial: {roughness: 0.9}
     BackFaceMode: {BackFacePlain}
@@ -93,7 +93,7 @@ backlit {
   }
 
   caster {
-    Position: {0.4, 2.85, -2.2}
+    Position: {0.4, 3.35, -2.2}
     Box: {0.7, 0.7, 0.2}
     Rgb: {30, 30, 30}
   }

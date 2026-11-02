@@ -576,28 +576,52 @@ void DiffuseTransmission_shadow_on_back(void) {
     stbi_image_free(shadowed);
 }
 
-void DiffuseTransmission_sheet_no_self_shadow(void) {
-    // materials/pbr
-    DiffuseTransmission full = {.factor = 1, .color = {255, 255, 255}, .thickness = 0};
-    float expect = dt_linear(DT_GRAY);
-    ecs_world_t *world = dt_world(true, true);
-    dt_sun(world, true, GLM_PIf);
-    dt_quad(world, 0, 2, DT_GRAY, &full);
-    unsigned char *px = dt_render(world, "dt_sheet.png");
+/** Render the gray quad with a full thin diffuse transmission lit from behind by a directional
+ * light turned by an angle around y, with or without the shadows of the view.
+ *
+ * @param angle Angle of the light from the axis of the quad in radians
+ * @param shadows Whether the view renders shadows
+ * @param name File name of the capture
+ * @return The pixels
+ */
+static unsigned char* dt_sheet(
+    float angle,
+    bool shadows,
+    const char *name)
+{
+    ecs_world_t *world = dt_world(true, shadows);
+    ecs_entity_t sun = dt_sun(world, true, GLM_PIf);
+    ecs_set(world, sun, Rotation, {0, angle, 0});
+    dt_quad(world, 0, 2, DT_GRAY, &(DiffuseTransmission){
+        .factor = 1, .color = {255, 255, 255}, .thickness = 0});
+    unsigned char *px = dt_render(world, name);
     ecs_fini(world);
 
-    unsigned char *unshadowed = dt_backlit(&full, true, "dt_sheet_unshadowed.png");
-    int points[5][2] = {{64, 64}, {64 + 30, 64}, {64 - 30, 64}, {64, 64 + 30}, {64, 64 - 30}};
-    int i;
-    for (i = 0; i < 5; i ++) {
-        dt_mean_t m = dt_mean(px, points[i][0], points[i][1], 2);
-        test_assert(m.c[0] > expect * 0.9f);
-        test_assert(fabsf(m.sum - dt_mean(unshadowed, points[i][0], points[i][1], 2).sum) <
-            m.sum * 0.05f);
-    }
+    return px;
+}
 
-    stbi_image_free(px);
-    stbi_image_free(unshadowed);
+void DiffuseTransmission_sheet_no_self_shadow(void) {
+    // materials/pbr
+    float angles[2] = {0, 1.1f};
+    const char *names[2][2] = {
+        {"dt_sheet.png", "dt_sheet_unshadowed.png"},
+        {"dt_sheet_oblique.png", "dt_sheet_oblique_unshadowed.png"}};
+    int points[5][2] = {{64, 64}, {64 + 30, 64}, {64 - 30, 64}, {64, 64 + 30}, {64, 64 - 30}};
+    int a, i;
+    for (a = 0; a < 2; a ++) {
+        float expect = dt_linear(DT_GRAY) * cosf(angles[a]);
+        unsigned char *px = dt_sheet(angles[a], true, names[a][0]);
+        unsigned char *unshadowed = dt_sheet(angles[a], false, names[a][1]);
+        for (i = 0; i < 5; i ++) {
+            dt_mean_t m = dt_mean(px, points[i][0], points[i][1], 2);
+            test_assert(m.c[0] > expect * 0.9f);
+            test_assert(fabsf(m.sum - dt_mean(unshadowed, points[i][0], points[i][1], 2).sum) <
+                m.sum * 0.05f);
+        }
+
+        stbi_image_free(px);
+        stbi_image_free(unshadowed);
+    }
 }
 
 /** Render a shadow casting sphere of radius 1 with a full diffuse transmission lit from behind by
