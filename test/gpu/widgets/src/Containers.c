@@ -6,6 +6,7 @@
 
 #include "gallery.h"
 #include "render.h"
+#include "picking.h"
 #include <bake_test.h>
 #include <math.h>
 #include <stdlib.h>
@@ -1192,7 +1193,10 @@ void Containers_scroll_bar_clipped_by_page(void) {
     containers_rect(world, NOTES, notes);
     test_assert(notes[1] < page[3] && notes[3] > page[3] + 20);
     test_assert(ecs_lookup(world, NOTES ".scrollbars") != 0);
-    test_bool(ecs_has(world, ecs_lookup(world, NOTES ".scrollbars"), LayoutFloat), false);
+    const LayoutFloat *overlay = ecs_get(
+        world, ecs_lookup(world, NOTES ".scrollbars"), LayoutFloat);
+    test_assert(overlay != NULL);
+    test_bool(overlay->clip, true);
     test_bool(ecs_has(world, ecs_lookup(world, NOTES ".scrollbars.vscroll"), LayoutFloat), false);
 
     /* The track is drawn inside the page and clipped below it */
@@ -1306,8 +1310,8 @@ void Containers_scroll_bar_follows_scroll(void) {
     ecs_world_t *world = containers_load(&s);
     float before[4], after[4], knob_before[4], knob_after[4], notes[4];
 
-    /* The bars sit in the last child of the column, which the content offset moves; the bar
-     * stays where it is and only its thumb moves */
+    /* The bars sit in a clipped overlay, which the content offset does not move; the bar stays
+     * where it is and only its thumb moves */
     containers_rect(world, NOTES, notes);
     containers_shape(world, NOTES ".scrollbars.vscroll", before);
     containers_shape(world, NOTES ".scrollbars.vscroll.knob", knob_before);
@@ -1329,10 +1333,21 @@ void Containers_scroll_bar_follows_scroll(void) {
     gallery_expect_at(after[1], before[1]);
     gallery_expect_at(knob_after[3], notes[3] - CONTAINERS_EDGE - 2);
 
-    /* The scroll bars stay last among the children, over the content */
+    /* The scroll bars are a clipped overlay of the view, drawn over the content */
+    ecs_entity_t bars = ecs_lookup(world, NOTES ".scrollbars");
+    test_assert(bars != 0);
+    test_assert(ecs_get_parent(world, bars) == ecs_lookup(world, NOTES));
+    const LayoutFloat *overlay = ecs_get(world, bars, LayoutFloat);
+    test_assert(overlay != NULL);
+    test_bool(overlay->clip, true);
     ecs_entities_t children = ecs_get_ordered_children(world, ecs_lookup(world, NOTES));
     test_assert(children.count > 1);
-    test_assert(children.ids[children.count - 1] == ecs_lookup(world, NOTES ".scrollbars"));
+    int32_t i;
+    for (i = 0; i < children.count; i ++) {
+        if (children.ids[i] != bars) {
+            test_bool(box_pick_drawn_after(world, bars, children.ids[i]), true);
+        }
+    }
 
     ecs_fini(world);
 }
@@ -1390,7 +1405,7 @@ void Containers_scroll_gutter(void) {
     test_assert(ecs_lookup(world, PAGE ".scrollbars.hscroll") == 0);
     const Layout *l = ecs_get(world, ecs_lookup(world, PAGE), Layout);
     test_flt(l->padding.right, 8 + CONTAINERS_BAR);
-    test_flt(l->padding.bottom + l->spacing, 8);
+    test_flt(l->padding.bottom, 8);
 
     /* Where everything fits there are no bars and no gutter */
     containers_resize(world, 2400, 1800);
@@ -1407,7 +1422,7 @@ void Containers_scroll_gutter(void) {
     test_assert(ecs_lookup(world, PAGE ".scrollbars.hscroll") != 0);
     l = ecs_get(world, ecs_lookup(world, PAGE), Layout);
     test_flt(l->padding.right, 8 + CONTAINERS_BAR);
-    test_flt(l->padding.bottom + l->spacing, 8 + CONTAINERS_BAR);
+    test_flt(l->padding.bottom, 8 + CONTAINERS_BAR);
     gallery_expect(world, s, "logs warning 100", "");
 
     ecs_fini(world);

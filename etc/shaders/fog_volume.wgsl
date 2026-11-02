@@ -19,13 +19,15 @@
 // at the faces of the box to 1 at edge_fade inside.
 //
 // With a noise_strength above 0 the density is also scaled by the tileable 3D noise texture
-// (group 1), sampled twice at the world position moved back by the wind times the time of the
-// frame and divided by noise_scale: a coarse sample and a detail sample at 3.1 times the
-// frequency. The noise is in world space, not in the frame of the box, so a volume that moves
-// or turns does not drag its billows along, and volumes that overlap share them. A volume
-// without noise takes no samples. Each step integrates the in scattered light of the step
-// analytically over its extinction (Frostbite, Hillaire 2015) and the march stops once the
-// transmittance falls under TRANSMITTANCE_MIN.
+// (group 1), sampled twice at the world position moved back by the offset of the volume and
+// divided by noise_scale: a coarse sample and a detail sample at 3.1 times the frequency. The
+// offset is the wind times the world time, computed on the CPU in double precision and wrapped to
+// 10 noise_scale, over which both samples repeat, so the drift stays smooth after hours. The
+// noise is in world space, not in the frame of the box, so a volume that moves or turns does not
+// drag its billows along, and volumes that overlap share them. A volume without noise takes no
+// samples. Each step integrates the in scattered light of the step analytically over its
+// extinction (Frostbite, Hillaire 2015) and the march stops once the transmittance falls under
+// TRANSMITTANCE_MIN.
 //
 // The light scattered at a point is the mean ambient of the view over up and down (ambient.wgsl,
 // the environment or the hemisphere, not the probe volume) times ambient_inscatter, plus the
@@ -83,7 +85,8 @@ struct FogVolume {
     sun_inscatter: f32,
     ambient_inscatter: f32,
     steps: i32,
-    wind: vec3f,
+    // World offset of the noise, the wind times the world time wrapped to 10 noise_scale
+    offset: vec3f,
     noise_strength: f32,
     noise_scale: f32,
     light_inscatter: f32,
@@ -93,8 +96,6 @@ struct FogVolume {
 
 struct FogDraw {
     inv_view_proj: mat4x4f,
-    // World time of the frame in seconds
-    time: f32,
 };
 
 @group(0) @binding(0) var<uniform> view: View;
@@ -176,7 +177,7 @@ fn edge(fog: FogVolume, q: vec3f) -> f32 {
 fn density(fog: FogVolume, q: vec3f, p: vec3f) -> f32 {
     var value = fog.density * edge(fog, q);
     if (value > 0.0 && fog.noise_strength > 0.0) {
-        let uvw = (p - fog.wind * draw.time) / fog.noise_scale;
+        let uvw = (p - fog.offset) / fog.noise_scale;
         let n = textureSampleLevel(noise, noise_sampler, uvw, 0.0).r;
         let detail = textureSampleLevel(noise, noise_sampler, uvw * 3.1 + vec3f(0.37), 0.0).r;
         let v = n * 0.75 + detail * 0.25;

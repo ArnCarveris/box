@@ -17,8 +17,8 @@
 /** Largest number of worker threads the pool starts */
 #define BOX_JOBS_MAX_WORKERS (16)
 
-/** Cores kept free for the main thread and the render thread */
-#define BOX_JOBS_RESERVED_CORES (2)
+/** Cores kept free for the main thread, the render thread and the audio thread of the device */
+#define BOX_JOBS_RESERVED_CORES (3)
 
 /** Work of a job, run on a worker thread; it may not touch the world.
  *

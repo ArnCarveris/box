@@ -9,7 +9,8 @@
     },
     "lang.c": {
         "include": [
-            "../../../src/audio/core"
+            "../../../src/audio/core",
+            "../../../src/audio"
         ]
     },
     "test": {
@@ -100,6 +101,42 @@
                 "testcases": [
                     "render",
                     "events_and_release"
+                ]
+            },
+            {
+                "id": "Ring",
+                "setup": true,
+                "testcases": [
+                    "order",
+                    "full_refuses",
+                    "wrap_around",
+                    "two_parts",
+                    "stress"
+                ]
+            },
+            {
+                "id": "Transport",
+                "setup": true,
+                "testcases": [
+                    "null_frames",
+                    "null_frames_44100",
+                    "null_zero_delta",
+                    "null_bit_identical",
+                    "null_sound_free",
+                    "null_sound_in_use",
+                    "command_before_render"
+                ]
+            },
+            {
+                "id": "NoDevice",
+                "setup": true,
+                "testcases": [
+                    "test_world",
+                    "headless",
+                    "no_audio",
+                    "app_no_audio",
+                    "failed_open",
+                    "native_unavailable"
                 ]
             }
         ]

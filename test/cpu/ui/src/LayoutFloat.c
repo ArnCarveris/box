@@ -6,6 +6,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include <math.h>
+#include "render.h"
 
 /** Create the root of the tests: a 400 by 400 column.
  *
@@ -714,6 +715,241 @@ void LayoutFloat_script(void) {
     test_flt(ecs_get(world, root, LayoutBounds)->height, 400);
     test_flt(ecs_get(world, list, Position)->x, -10);
     test_flt(ecs_get(world, list, Position)->y, 35);
+
+    ecs_fini(world);
+}
+
+/** The reproduction of a float in a clip: a 100 by 100 ClipChildren column at the origin with
+ * an 80 by 300 column below its top left corner, which spans -50..30 on x and -250..50 on y. Its
+ * child overlay, 10 by 50 against its bottom right corner, lies below the bottom of outer. The
+ * argument is appended to the LayoutFloat of overlay. */
+#define FLOAT_CLIP_REPRO(fl) \
+    "using box.layout\n" \
+    "using box.geometry\n" \
+    "using box.transform\n" \
+    "outer {\n" \
+    "  Position: {0, 0, 0}\n" \
+    "  Layout: {direction: Column}\n" \
+    "  LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n" \
+    "  ClipChildren\n" \
+    "  inner {\n" \
+    "    Layout: {direction: Column}\n" \
+    "    LayoutItem: {width: {mode: Fixed, value: 80}, height: {mode: Fixed, value: 300}}\n" \
+    "    overlay {\n" \
+    "      LayoutFloat: {h: Right, v: Bottom, anchor_h: Right, anchor_v: Bottom" fl "}\n" \
+    "      LayoutItem: {width: {mode: Fixed, value: 10}, height: {mode: Fixed, value: 50}}\n" \
+    "      Rect: {1, 1}\n" \
+    "    }\n" \
+    "  }\n" \
+    "}\n"
+
+/** Nested clips: outer as in FLOAT_CLIP_REPRO, inner a ClipChildren column of the same place
+ * with a content child that fills it. Its first child overlay, 20 points wide, takes the height
+ * of inner and sits 5 points right of its right edge: it spans 15..35 on x, the part right of
+ * 30 outside inner, and -250..50 on y, the part below -50 outside outer. The argument is appended
+ * to the LayoutFloat of overlay. */
+#define FLOAT_CLIP_NESTED(fl) \
+    "using box.layout\n" \
+    "using box.geometry\n" \
+    "using box.transform\n" \
+    "outer {\n" \
+    "  Position: {0, 0, 0}\n" \
+    "  Layout: {direction: Column}\n" \
+    "  LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n" \
+    "  ClipChildren\n" \
+    "  inner {\n" \
+    "    Layout: {direction: Column}\n" \
+    "    LayoutItem: {width: {mode: Fixed, value: 80}, height: {mode: Fixed, value: 300}}\n" \
+    "    ClipChildren\n" \
+    "    overlay {\n" \
+    "      LayoutFloat: {h: Right, v: Middle, anchor_h: Right, anchor_v: Middle, x: 5" fl "}\n" \
+    "      LayoutItem: {width: {mode: Fixed, value: 20}, height: {mode: Grow}}\n" \
+    "      Rect: {1, 1}\n" \
+    "    }\n" \
+    "    content {\n" \
+    "      LayoutItem: {width: {mode: Fixed, value: 80}, height: {mode: Fixed, value: 300}}\n" \
+    "      Rect: {1, 1}\n" \
+    "    }\n" \
+    "  }\n" \
+    "}\n"
+
+/** Run a script in a new world and run frames, so the layout and the transforms settle.
+ *
+ * @param code The script
+ * @return The world
+ */
+static ecs_world_t* float_clip_world(
+    const char *code)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    test_assert(ecs_script_run(world, "clip", code, NULL) == 0);
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    return world;
+}
+
+/** Check whether the clips around an element keep a world point on its plane.
+ *
+ * @param world The world
+ * @param path Path of the element
+ * @param x World x of the point
+ * @param y World y of the point
+ * @return Whether no ClipChildren ancestor clips the point away
+ */
+static bool float_clip_keeps(
+    ecs_world_t *world,
+    const char *path,
+    float x,
+    float y)
+{
+    ecs_entity_t e = ecs_lookup(world, path);
+    test_assert(e != 0);
+    float point[3] = { x, y, 0 };
+
+    return box_render_clip_contains(world, e, point);
+}
+
+/** Get the world position of the center of an element.
+ *
+ * @param world The world
+ * @param path Path of the element
+ * @param out Receives the position
+ */
+static void float_clip_center(
+    ecs_world_t *world,
+    const char *path,
+    float out[3])
+{
+    const WorldTransform *t = ecs_get(world, ecs_lookup(world, path), WorldTransform);
+    test_assert(t != NULL);
+    out[0] = t->m[3][0];
+    out[1] = t->m[3][1];
+    out[2] = t->m[3][2];
+}
+
+void LayoutFloat_clip_overlay_clipped(void) {
+    ecs_world_t *world = float_clip_world(FLOAT_CLIP_REPRO(", clip: true"));
+    ecs_entity_t overlay = ecs_lookup(world, "outer.inner.overlay");
+    test_assert(overlay != 0);
+    test_bool(ecs_get(world, overlay, LayoutFloat)->clip, true);
+
+    /* Placed as a float, against the bottom right corner of inner, below the bottom of outer */
+    float center[3];
+    float_clip_center(world, "outer.inner.overlay", center);
+    test_flt(center[0], 25);
+    test_flt(center[1], -225);
+
+    /* The clip of outer, an ancestor of its parent, clips it away */
+    test_bool(box_render_clip_contains(world, overlay, center), false);
+    test_bool(box_render_clip_hides(world, overlay), true);
+
+    ecs_fini(world);
+}
+
+void LayoutFloat_float_escapes_clips(void) {
+    ecs_world_t *world = float_clip_world(FLOAT_CLIP_REPRO(""));
+    ecs_entity_t overlay = ecs_lookup(world, "outer.inner.overlay");
+    test_assert(overlay != 0);
+    test_bool(ecs_get(world, overlay, LayoutFloat)->clip, false);
+
+    /* A float without clip, such as a dropdown list, leaves the clips of its ancestors */
+    float center[3];
+    float_clip_center(world, "outer.inner.overlay", center);
+    test_flt(center[1], -225);
+    test_bool(box_render_clip_contains(world, overlay, center), true);
+    test_bool(box_render_clip_hides(world, overlay), false);
+
+    ecs_fini(world);
+}
+
+void LayoutFloat_clip_overlay_nested_clips(void) {
+    ecs_world_t *world = float_clip_world(FLOAT_CLIP_NESTED(", clip: true"));
+    ecs_entity_t overlay = ecs_lookup(world, "outer.inner.overlay");
+    ecs_entity_t content = ecs_lookup(world, "outer.inner.content");
+    test_assert(overlay != 0 && content != 0);
+
+    /* Out of the flow: the first child, it does not move the content, and it takes the height
+     * of its anchor */
+    test_flt(ecs_get(world, overlay, Position)->x, 35);
+    test_flt(ecs_get(world, overlay, Position)->y, 0);
+    test_flt(ecs_get(world, overlay, LayoutBounds)->height, 300);
+    test_flt(ecs_get(world, content, Position)->x, 0);
+    test_flt(ecs_get(world, content, Position)->y, 0);
+
+    /* Inside both clips it is kept, outside either one it is not */
+    test_bool(float_clip_keeps(world, "outer.inner.overlay", 20, 0), true);
+    test_bool(float_clip_keeps(world, "outer.inner.overlay", 32, 0), false);
+    test_bool(float_clip_keeps(world, "outer.inner.overlay", 20, -80), false);
+    test_bool(float_clip_keeps(world, "outer.inner.overlay", 32, -80), false);
+    test_bool(box_render_clip_hides(world, overlay), false);
+
+    /* Its descendants are clipped the same way */
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, overlay);
+    ecs_set(world, child, Position, {0, 0, 0});
+    ecs_set(world, child, Rect, {4, 4});
+    ecs_progress(world, 0);
+    float point[3] = { 32, 0, 0 };
+    test_bool(box_render_clip_contains(world, child, point), false);
+    point[0] = 20;
+    test_bool(box_render_clip_contains(world, child, point), true);
+
+    /* The flag set at runtime takes effect: without it the float leaves both clips */
+    ecs_set(world, overlay, LayoutFloat, {
+        .h = AlignRight, .v = VAlignMiddle, .anchor_h = AlignRight, .anchor_v = VAlignMiddle,
+        .x = 5 });
+    ecs_progress(world, 0);
+    test_bool(float_clip_keeps(world, "outer.inner.overlay", 32, -80), true);
+    test_bool(box_render_clip_contains(world, child, (float[3]){ 32, 0, 0 }), true);
+
+    ecs_fini(world);
+}
+
+void LayoutFloat_float_escapes_nested_clips(void) {
+    ecs_world_t *world = float_clip_world(FLOAT_CLIP_NESTED(""));
+    test_bool(float_clip_keeps(world, "outer.inner.overlay", 20, 0), true);
+    test_bool(float_clip_keeps(world, "outer.inner.overlay", 32, 0), true);
+    test_bool(float_clip_keeps(world, "outer.inner.overlay", 20, -80), true);
+    test_bool(float_clip_keeps(world, "outer.inner.overlay", 32, -80), true);
+
+    ecs_fini(world);
+}
+
+void LayoutFloat_clip_overlay_inside_float(void) {
+    /* A clipped overlay in a dropdown list is clipped by the list, not by the clips the list
+     * leaves */
+    ecs_world_t *world = float_clip_world(
+        "using box.layout\n"
+        "using box.geometry\n"
+        "using box.transform\n"
+        "outer {\n"
+        "  Position: {0, 0, 0}\n"
+        "  Layout: {direction: Column}\n"
+        "  LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n"
+        "  ClipChildren\n"
+        "  list {\n"
+        "    LayoutFloat: {h: Left, v: Top, anchor_h: Left, anchor_v: Bottom}\n"
+        "    Layout: {direction: Column}\n"
+        "    LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 200}}\n"
+        "    ClipChildren\n"
+        "    bar {\n"
+        "      LayoutFloat: {h: Right, v: Top, anchor_h: Right, anchor_v: Top, x: 5, clip: true}\n"
+        "      LayoutItem: {width: {mode: Fixed, value: 20}, height: {mode: Fixed, value: 50}}\n"
+        "      Rect: {1, 1}\n"
+        "    }\n"
+        "  }\n"
+        "}\n");
+
+    /* The list spans -50..50 on x and -250..-50 on y, below outer; bar spans 35..55 on x */
+    float center[3];
+    float_clip_center(world, "outer.list", center);
+    test_flt(center[0], 0);
+    test_flt(center[1], -150);
+    test_bool(float_clip_keeps(world, "outer.list.bar", 40, -60), true);
+    test_bool(float_clip_keeps(world, "outer.list.bar", 52, -60), false);
 
     ecs_fini(world);
 }

@@ -695,7 +695,7 @@ static bool box_pick_ordered_after(
     return result;
 }
 
-/** Check whether an element or one of its ancestors floats (LayoutFloat).
+/** Check whether an element or one of its ancestors floats (LayoutFloat without clip).
  *
  * @param world The world
  * @param path The element and its ancestors, root first
@@ -710,10 +710,27 @@ static bool box_pick_floating(
     bool result = false;
     int32_t i;
     for (i = 0; i < count && !result; i ++) {
-        result = ecs_has(world, path[i], LayoutFloat);
+        const LayoutFloat *fl = ecs_get(world, path[i], LayoutFloat);
+        result = fl && !fl->clip;
     }
 
     return result;
+}
+
+/** Check whether an element is a clipped overlay (LayoutFloat with clip), which draws after its
+ * siblings of the same z.
+ *
+ * @param world The world
+ * @param e The element
+ * @return Whether it is one
+ */
+static bool box_pick_overlay(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    const LayoutFloat *fl = ecs_get(world, e, LayoutFloat);
+
+    return fl && fl->clip;
 }
 
 bool box_pick_drawn_after(
@@ -736,9 +753,12 @@ bool box_pick_drawn_after(
         result = na > nb;
     } else {
         float za = box_pick_z(world, pa[i]), zb = box_pick_z(world, pb[i]);
+        bool oa = box_pick_overlay(world, pa[i]), ob = box_pick_overlay(world, pb[i]);
         ecs_entity_t parent = i ? pa[i - 1] : 0;
         if (za != zb) {
             result = za > zb;
+        } else if (oa != ob) {
+            result = oa;
         } else if (parent && ecs_has_id(world, parent, EcsOrderedChildren)) {
             result = box_pick_ordered_after(world, parent, pa[i], pb[i]);
         } else {

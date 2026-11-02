@@ -43,6 +43,22 @@ void Args_headless(void) {
     ecs_fini(world);
 }
 
+void Args_no_audio(void) {
+    // engine_core/app
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_bool(ecs_singleton_get(world, App)->no_audio, false);
+    char *argv[] = {"boxrun", "--no-audio"};
+    test_int(box_app_parse(world, 2, argv), 0);
+
+    const App *app = ecs_singleton_get(world, App);
+    test_bool(app->no_audio, true);
+    test_bool(app->headless, false);
+
+    ecs_fini(world);
+}
+
 void Args_frames(void) {
     // engine_core/app
     ecs_world_t *world = ecs_init();

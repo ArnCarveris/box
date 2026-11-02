@@ -370,12 +370,10 @@ template ScrollBar {
 // inside the right and bottom edges while the content does not fit; the padding leaves room for a
 // bar while it shows. width and height fix the view, 0 grows it to the space its parent gives.
 //
-// The bars are in scrollbars, a child of no size, so they are clipped by the view and the clips
-// around it and draw and pick over the content. A column places every child but a LayoutFloat,
-// and a float leaves the clips of its ancestors (box_draws_clip_up in src/render/clip.c), so
-// scrollbars is the last child of the column: created when a bar first shows, after the layout
-// ordered the children. Its bars move back by its place in the column, the end of the content
-// shifted by the scroll offset, and the bottom padding leaves out the spacing before it.
+// The bars are in scrollbars, a clipped overlay (LayoutFloat with clip) of no size on the center
+// of the view: the column leaves it out of its flow and the scroll offset does not move it, yet
+// the view and the clips around it clip it, and it draws and picks over the content wherever it
+// is among the children, so content added after the bars show stays under them.
 template ScrollView : HeadlessScrollView {
   prop bar: f32 = 10
   prop edge: f32 = 1
@@ -389,7 +387,7 @@ template ScrollView : HeadlessScrollView {
   const hbar = horizontal && c.max_x > 0
   const bars = vbar || hbar
   const pad_right = pad + match vbar { true: bar; _: 0 }
-  const pad_bottom = pad + match hbar { true: bar; _: 0 } - match bars { true: t.spacing; _: 0 }
+  const pad_bottom = pad + match hbar { true: bar; _: 0 }
 
   Layout: {direction: Column, spacing: t.spacing, padding: {pad, pad_bottom, pad, pad_right}}
   LayoutItem: {}
@@ -416,10 +414,6 @@ template ScrollView : HeadlessScrollView {
   }
 
   if bars {
-    // The place of scrollbars in the view, where the column puts it: the left of the content
-    // box and the end of the content, both shifted by the scroll offset
-    const sx = pad - b.width / 2 - c.x
-    const sy = b.height / 2 - c.height + pad_bottom + c.y
     const vtrack = scroll_track(b.height, edge, match hbar { true: bar; _: 0 })
     const htrack = scroll_track(b.width, edge, match vbar { true: bar; _: 0 })
     const vthumb = scroll_thumb(vtrack, b.height, c.height)
@@ -431,8 +425,8 @@ template ScrollView : HeadlessScrollView {
     }
 
     scrollbars {
+      LayoutFloat: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, clip: true}
       LayoutItem: {width: {mode: Fixed, value: 0}, height: {mode: Fixed, value: 0}}
-      Position: {sx, sy, 0}
 
       // Both tracks run the whole length of their edge and cover the corner between them
       if vbar {
@@ -440,7 +434,7 @@ template ScrollView : HeadlessScrollView {
           vertical: true, length: b.height - edge * 2, thumb: vthumb, size: bar,
           radius: radius, active: drag == 1, hover: over == 1, ring: ring_under,
           at: scroll_thumb_at(vtrack, vthumb, c.y, c.max_y)) {
-          Position: {b.width / 2 - edge - bar / 2 - sx, -sy, 0}
+          Position: {b.width / 2 - edge - bar / 2, 0, 0}
         }
       }
 
@@ -449,7 +443,7 @@ template ScrollView : HeadlessScrollView {
           vertical: false, length: b.width - edge * 2, thumb: hthumb, size: bar,
           radius: radius, active: drag == 2, hover: over == 2, ring: ring_under,
           at: scroll_thumb_at(htrack, hthumb, c.x, c.max_x)) {
-          Position: {-sx, edge + bar / 2 - b.height / 2 - sy, 0}
+          Position: {0, edge + bar / 2 - b.height / 2, 0}
         }
       }
     }
