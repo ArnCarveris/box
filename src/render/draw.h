@@ -180,6 +180,20 @@ typedef struct TextSlots {
 /** Component id of TextSlots */
 extern ECS_COMPONENT_DECLARE(TextSlots);
 
+/** Batch, slot and rank of the shadow of a 2D shape with a BoxShadow, added with every BoxShadow.
+ *
+ * The shadow is a second instance of the entity drawn just before its shape, in the batch of the
+ * shape with the AlphaBlend blend mode and no textures. */
+typedef struct BoxShadowSlot {
+    int32_t batch;  /**< Index of the batch, -1 when no shadow is drawn */
+    int32_t slot;   /**< Slot of the shadow in the batch */
+    uint32_t rank;  /**< Rank of the shadow in the draw order of the tree of the entity, below
+                     *   the shape of its entity */
+} BoxShadowSlot;
+
+/** Component id of BoxShadowSlot */
+extern ECS_COMPONENT_DECLARE(BoxShadowSlot);
+
 /** The material components of a shape, NULL for the ones it does not have */
 typedef struct box_draw_material_t {
     const Rgb *color;           /**< Base color, display encoded */
@@ -190,6 +204,8 @@ typedef struct box_draw_material_t {
     const TextureTransform *uv; /**< Scale and offset of the texture coordinates */
     const Transmission *transmission; /**< Light passing through a 3D shape */
     const ClearCoat *clear_coat; /**< Dielectric layer over a 3D shape, ignored by 2D shapes */
+    const SpecularAnisotropy *anisotropy; /**< Stretched highlight of a 3D shape, ignored by 2D
+                                 *   shapes */
     const Tint *tint;           /**< Tint of the shape itself, applied after the inherited */
     const box_draw_tint_t *inherited; /**< Composed tints of the ancestors, NULL for none */
     const Shape2D *shape2d;     /**< Resolved 2D shape, NULL for a 3D shape */
@@ -227,6 +243,8 @@ typedef struct box_draw_transition_material_t {
     TextureTransform uv;    /**< TextureTransform */
     Transmission transmission; /**< Transmission */
     ClearCoat clear_coat;   /**< ClearCoat */
+    SpecularAnisotropy anisotropy; /**< SpecularAnisotropy, kept as is: it does not transition */
+    bool anisotropic;       /**< The material has a SpecularAnisotropy */
     Opacity opacity;        /**< Opacity of the shape itself */
     Tint tint;              /**< Tint of the shape itself */
     box_draw_tint_t inherited; /**< Tints of the ancestors, when tinted */
@@ -720,9 +738,10 @@ void box_draws_color_unpack(
  *
  * The record holds the display encoded base color (the default color without Rgb), metallic,
  * roughness, emission, texture transform and AlphaCutoff (0 without one) clamped as the shading
- * was, the Transmission (factor 0 without one) and the ClearCoat (0 without one or at 0).
+ * was, the Transmission (factor 0 without one), and the ClearCoat and SpecularAnisotropy.
  *
- * Opacity, tints and the 2D shape are not.
+ * ClearCoat and SpecularAnisotropy are 0 without one or at 0. Opacity, tints and the 2D shape
+ * are not.
  *
  * @param out The record
  * @param material Material components of the owner
@@ -1448,6 +1467,66 @@ void box_draws_text_remove(
 void box_draws_text_dynamic(
     ecs_world_t *world,
     box_render_draws_t *d);
+
+/** Register the shadows of the 2D shapes: the BoxShadowSlot of every BoxShadow.
+ *
+ * @param world The world
+ */
+void box_draws_box_shadow_init(
+    ecs_world_t *world);
+
+/** Register the observers of the shadows: a set BoxShadow writes the shadow again, a removed one
+ * frees its slot, also on a deleted or disabled entity.
+ *
+ * @param world The world
+ * @param d The state
+ */
+void box_draws_box_shadow_observers(
+    ecs_world_t *world,
+    box_render_draws_t *d);
+
+/** Bring the shadow of a changed entity into the batch of its shape and write its instance, or
+ * free its slot when it draws no shadow: without a BoxShadow, without a drawn Rect or Circle, or
+ * with an empty shadow box.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ * @param s The DrawSlot of the entity, its shape already updated
+ */
+void box_draws_box_shadow_update(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e,
+    const DrawSlot *s);
+
+/** Free the shadow slot of an entity.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ */
+void box_draws_box_shadow_remove(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e);
+
+/** Point the BoxShadowSlot of an entity at the slot its shadow moves to, when the shadow is the
+ * instance that moves.
+ *
+ * @param world The world
+ * @param moved The entity of the instance that moves
+ * @param batch Index of the batch
+ * @param from The slot the instance was in
+ * @param to The slot the instance moves to
+ * @return Whether the instance is the shadow of the entity
+ */
+bool box_draws_box_shadow_moved(
+    ecs_world_t *world,
+    ecs_entity_t moved,
+    int32_t batch,
+    int32_t from,
+    int32_t to);
 
 /** Initialize the clip areas of the 2D draws.
  *

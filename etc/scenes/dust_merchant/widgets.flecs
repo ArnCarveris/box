@@ -296,8 +296,10 @@ template Breaker {
     stem {
       Position: {0, 0, match out { true: 7; _: 1.4 }}
       Transition: [Position: {duration: 0.07, timing_function: EaseOut}]
-      band { Position: {0, 0, 2.2}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 6, length: 4.4, segments: 14, smooth: true}; Rgb: {214, 210, 196}; PbrMaterial: {metallic: 0, roughness: 0.5} }
-      cap : Bakelite { Position: {0, 0, 7}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 7.4, length: 5, segments: 14, smooth: true} }
+      if out {
+        band { Position: {0, 0, 2.6}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 9.4, length: 2.4, segments: 16, smooth: true}; Rgb: {226, 222, 206}; PbrMaterial: {metallic: 0, roughness: 0.5} }
+      }
+      cap : Bakelite { Position: {0, 0, 7}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 7.4, length: 5, segments: 14, smooth: true}; Rgb: {16, 14, 12} }
       if flag {
         tie { Position: {0, 0, 3}; Rotation: {PI / 2, 0, 0}; Torus: {radius: 7, tube: 0.9, segments: 16, rings: 6}; Rgb: {168, 28, 20}; PbrMaterial: {metallic: 0, roughness: 0.5} }
       }
@@ -583,30 +585,45 @@ template CapButton {
       }
       Transition: [Emissive: {duration: 0.14, timing_function: EaseOut}]
     }
-    words {
-      Position: {0, match sub == "" { true: 0; _: 7 }, 4.3}
-      Text: {value: legend, size: size, font: font_stencil, align: Center}
-      if lit {
-        Rgb: {3, 2, 1}
-      } else if bus {
-        Rgb: {hue.r * 0.8, hue.g * 0.8, hue.b * 0.8}
-      } else {
-        Rgb: {hue.r * 0.14, hue.g * 0.14, hue.b * 0.14}
-      }
-      SpatialIgnore
-    }
-    if sub != "" {
-      minor {
-        Position: {0, -11, 4.3}
-        Text: {value: sub, size: size * 0.72, font: font_stencil, align: Center}
-        if lit {
-          Rgb: {3, 2, 1}
-        } else if bus {
-          Rgb: {hue.r * 0.56, hue.g * 0.56, hue.b * 0.56}
-        } else {
-          Rgb: {hue.r * 0.1, hue.g * 0.1, hue.b * 0.1}
-        }
+    if lit {
+      words_lit {
+        Position: {0, match sub == "" { true: 0; _: 7 }, 4.3}
+        Text: {value: legend, size: size, font: font_stencil, align: Center}
+        Rgb: {1, 1, 1}
         SpatialIgnore
+      }
+      if sub != "" {
+        minor_lit {
+          Position: {0, -11, 4.3}
+          Text: {value: sub, size: size * 0.72, font: font_stencil, align: Center}
+          Rgb: {1, 1, 1}
+          SpatialIgnore
+        }
+      }
+    } else {
+      words {
+        Position: {0, match sub == "" { true: 0; _: 7 }, 4.3}
+        Text: {value: legend, size: size, font: font_stencil, align: Center}
+        if bus {
+          Rgb: {hue.r * 0.8, hue.g * 0.8, hue.b * 0.8}
+        } else {
+          Rgb: {hue.r * 0.14, hue.g * 0.14, hue.b * 0.14}
+        }
+        Transition: [Rgb: {duration: 0.5}]
+        SpatialIgnore
+      }
+      if sub != "" {
+        minor {
+          Position: {0, -11, 4.3}
+          Text: {value: sub, size: size * 0.72, font: font_stencil, align: Center}
+          if bus {
+            Rgb: {hue.r * 0.56, hue.g * 0.56, hue.b * 0.56}
+          } else {
+            Rgb: {hue.r * 0.1, hue.g * 0.1, hue.b * 0.1}
+          }
+          Transition: [Rgb: {duration: 0.5}]
+          SpatialIgnore
+        }
       }
     }
   }
@@ -960,32 +977,57 @@ template Annunciator {
     Transition: [Emissive: {duration: 0.09, timing_function: EaseOut}]
     SpatialIgnore
   }
-  words {
-    Position: {0, match sub == "" { true: 0; _: size * 0.5 }, 2.9}
-    Text: {value: legend, size: size, font: font_stencil, align: Center}
-    if shown {
-      Rgb: {2, 1, 1}
-    } else if bus {
-      Rgb: {hue.r * 0.62, hue.g * 0.62, hue.b * 0.62}
-    } else {
-      Rgb: {hue.r * 0.1, hue.g * 0.1, hue.b * 0.1}
-    }
-    Transition: [Rgb: {duration: 0.05}]
-    SpatialIgnore
-  }
-  if sub != "" {
-    minor {
-      Position: {0, 0 - size * 0.56, 2.9}
-      Text: {value: sub, size: size * 0.86, font: font_stencil, align: Center}
-      if shown {
-        Rgb: {2, 1, 1}
-      } else if bus {
-        Rgb: {hue.r * 0.46, hue.g * 0.46, hue.b * 0.46}
-      } else {
-        Rgb: {hue.r * 0.08, hue.g * 0.08, hue.b * 0.08}
-      }
-      Transition: [Rgb: {duration: 0.05}]
+  if shown {
+    words_lit {
+      Position: {-0.2, match sub == "" { true: 0; _: size * 0.5 }, 2.9}
+      Text: {value: legend, size: size, font: font_stencil, align: Center}
+      Rgb: {1, 1, 1}
       SpatialIgnore
+    }
+    words_lit_b {
+      Position: {0.2, match sub == "" { true: 0; _: size * 0.5 }, 2.92}
+      Text: {value: legend, size: size, font: font_stencil, align: Center}
+      Rgb: {1, 1, 1}
+      SpatialIgnore
+    }
+    if sub != "" {
+      minor_lit {
+        Position: {-0.18, 0 - size * 0.56, 2.9}
+        Text: {value: sub, size: size * 0.86, font: font_stencil, align: Center}
+        Rgb: {1, 1, 1}
+        SpatialIgnore
+      }
+      minor_lit_b {
+        Position: {0.18, 0 - size * 0.56, 2.92}
+        Text: {value: sub, size: size * 0.86, font: font_stencil, align: Center}
+        Rgb: {1, 1, 1}
+        SpatialIgnore
+      }
+    }
+  } else {
+    words {
+      Position: {0, match sub == "" { true: 0; _: size * 0.5 }, 2.9}
+      Text: {value: legend, size: size, font: font_stencil, align: Center}
+      if bus {
+        Rgb: {hue.r * 0.62, hue.g * 0.62, hue.b * 0.62}
+      } else {
+        Rgb: {hue.r * 0.1, hue.g * 0.1, hue.b * 0.1}
+      }
+      Transition: [Rgb: {duration: 0.5}]
+      SpatialIgnore
+    }
+    if sub != "" {
+      minor {
+        Position: {0, 0 - size * 0.56, 2.9}
+        Text: {value: sub, size: size * 0.86, font: font_stencil, align: Center}
+        if bus {
+          Rgb: {hue.r * 0.46, hue.g * 0.46, hue.b * 0.46}
+        } else {
+          Rgb: {hue.r * 0.08, hue.g * 0.08, hue.b * 0.08}
+        }
+        Transition: [Rgb: {duration: 0.5}]
+        SpatialIgnore
+      }
     }
   }
 }

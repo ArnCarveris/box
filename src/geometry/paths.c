@@ -56,7 +56,7 @@ static void box_path_segment(const float *start, const float *end,
         b[i] = kind == PathLine ? start[i] + (end[i] - start[i]) / 3 : control1[i];
         c[i] = kind == PathLine ? start[i] + (end[i] - start[i]) * (2.0f / 3) : control2[i];
     }
-    box_path_cubic_evaluate(a, b, c, d, t, point);
+    box_curve_cubic3(a, b, c, d, t, point);
     for (int i = 0; i < dimensions; i ++) {
         out[i] = point[i];
     }

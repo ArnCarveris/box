@@ -36,6 +36,11 @@
 // geometric normal and of its own roughness: a GGX lobe in direct light and a second specular
 // lookup in indirect light, which take what they reflect from the base. Without a coat (strength
 // 0) a fragment skips both.
+// An anisotropic material (SpecularAnisotropy, KHR_materials_anisotropy) stretches the base lobe
+// along a tangent of the cotangent frame of its UVs turned by its rotation: an anisotropic GGX
+// distribution and Smith visibility in direct light and a reflection about a bent normal in
+// indirect light. The clear coat stays isotropic. Without it (strength 0), and on a triangle whose
+// UVs are degenerate, a fragment skips both.
 #include "include/instance.wgsl"
 #include "include/material.wgsl"
 #include "include/lights.wgsl"
@@ -162,6 +167,8 @@ struct VertexOut {
     @location(6) @interpolate(flat) cutoff: f32,
     // ClearCoat of the material: strength and roughness, 0 strength without one
     @location(10) @interpolate(flat) clear_coat: vec2f,
+    // SpecularAnisotropy of the material: strength and rotation over 2 pi, 0 strength without one
+    @location(11) @interpolate(flat) anisotropy: vec2f,
     // Transmission of the material: factor, index of refraction, thickness and attenuation
     // distance, its linear attenuation color and the scale of the instance along its axes
     @location(7) @interpolate(flat) transmission: vec4f,
@@ -279,6 +286,7 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material) -> Vert
     o.material = s.material;
     o.cutoff = material.cutoff;
     o.clear_coat = unpack2x16unorm(material.clear_coat);
+    o.anisotropy = unpack2x16unorm(material.anisotropy);
     o.uv = s.uv;
     o.transmission = vec4f(material.transmission_factor, material.ior,
         material.thickness_factor, material.attenuation_distance);
@@ -599,7 +607,10 @@ fn reflections(world: vec3f, spec: vec3f, roughness: f32, cluster: u32, fallback
 // sides. The occlusion scales the indirect light only. geometric is the interpolated vertex
 // normal before the normal map, negated on back faces as normal is, which the shadow lookup
 // is offset along. coat and coat_roughness are the strength and roughness of the clear coat,
-// material constants that apply on both faces; the coat lies on geometric.
+// material constants that apply on both faces; the coat lies on geometric. anisotropy is the
+// strength of the anisotropy of the base, a material constant that applies on both faces too,
+// along tangent, perpendicular to normal, with bitangent = cross(normal, tangent); it is 0
+// without one and where the UVs give no direction.
 struct Surface {
     albedo: vec3f,
     alpha: f32,
@@ -611,12 +622,23 @@ struct Surface {
     geometric: vec3f,
     coat: f32,
     coat_roughness: f32,
+    anisotropy: f32,
+    tangent: vec3f,
+    bitangent: vec3f,
 };
 
-// Tangent frame from the screen derivatives of the position and the UVs (cotangent frame),
-// applied to a tangent space normal whose y points up the image, toward smaller v. The
-// framebuffer y of dpdy points down, which negates both derivative axes of the frame.
-fn perturb(n: vec3f, p: vec3f, uv: vec2f, m: vec3f) -> vec3f {
+// Tangent frame from the screen derivatives of the position and the UVs (cotangent frame), its
+// tangent and bitangent scaled by the same factor, the longer of the two of unit length. The
+// framebuffer y of dpdy points down, which negates both derivative axes of the frame. degenerate
+// is set where the UV derivatives give no frame. It reads dpdx and dpdy, so it is called in
+// uniform control flow.
+struct Frame {
+    tangent: vec3f,
+    bitangent: vec3f,
+    degenerate: bool,
+};
+
+fn cotangent_frame(n: vec3f, p: vec3f, uv: vec2f) -> Frame {
     let dp1 = dpdx(p);
     let dp2 = dpdy(p);
     let duv1 = dpdx(uv);
@@ -627,8 +649,14 @@ fn perturb(n: vec3f, p: vec3f, uv: vec2f, m: vec3f) -> vec3f {
     let b = dp2perp * duv1.y + dp1perp * duv2.y;
     let len2 = max(dot(t, t), dot(b, b));
     let scale = inverseSqrt(max(len2, 1e-20));
-    let tangent = mat3x3f(-t * scale, b * scale, n);
-    return select(normalize(tangent * m), n, len2 < 1e-20);
+    return Frame(-t * scale, b * scale, len2 < 1e-20);
+}
+
+// A tangent space normal whose y points up the image, toward smaller v, in the cotangent frame
+// of the normal n.
+fn perturb(n: vec3f, frame: Frame, m: vec3f) -> vec3f {
+    let tangent = mat3x3f(frame.tangent, frame.bitangent, n);
+    return select(normalize(tangent * m), n, frame.degenerate);
 }
 
 fn surface(f: VertexOut, front: bool) -> Surface {
@@ -637,7 +665,8 @@ fn surface(f: VertexOut, front: bool) -> Surface {
     let orm = textureSample(orm_map, material_sampler, f.uv).rgb;
     let tangent_normal = textureSample(normal_map, material_sampler, f.uv).xyz * 2.0 - 1.0;
     let geometric = normalize(f.normal);
-    let mapped = perturb(geometric, f.world, f.uv, tangent_normal);
+    let frame = cotangent_frame(geometric, f.world, f.uv);
+    let mapped = perturb(geometric, frame, tangent_normal);
     var s: Surface;
     s.albedo = f.color.rgb;
     s.alpha = f.color.a;
@@ -661,6 +690,23 @@ fn surface(f: VertexOut, front: bool) -> Surface {
     } else if (alpha_cutout) {
         s.alpha *= albedo.a;
     }
+
+    // The direction of the anisotropy: the tangent of the frame turned by the rotation around
+    // the normal, made perpendicular to the shading normal.
+    s.anisotropy = 0.0;
+    s.tangent = vec3f(0.0);
+    s.bitangent = vec3f(0.0);
+    if (f.anisotropy.x > 0.0 && !frame.degenerate) {
+        let rotation = f.anisotropy.y * (2.0 * PI);
+        let dir = frame.tangent * cos(rotation) + frame.bitangent * sin(rotation);
+        let along = dir - s.normal * dot(dir, s.normal);
+        let len2 = dot(along, along);
+        if (len2 > 1e-12) {
+            s.anisotropy = clamp(f.anisotropy.x, 0.0, 1.0);
+            s.tangent = along * inverseSqrt(len2);
+            s.bitangent = cross(s.normal, s.tangent);
+        }
+    }
     return s;
 }
 
@@ -675,6 +721,24 @@ fn visibility_smith(ndv: f32, ndl: f32, a: f32) -> f32 {
     let gv = ndl * sqrt((ndv - a2 * ndv) * ndv + a2);
     let gl = ndv * sqrt((ndl - a2 * ndl) * ndl + a2);
     return 0.5 / max(gv + gl, 1e-7);
+}
+
+// Anisotropic GGX distribution (KHR_materials_anisotropy) with the roughness at along the
+// tangent and ab along the bitangent.
+fn distribution_ggx_anisotropic(at: f32, ab: f32, ndh: f32, tdh: f32, bdh: f32) -> f32 {
+    let a2 = at * ab;
+    let f = vec3f(ab * tdh, at * bdh, a2 * ndh);
+    let w2 = a2 / dot(f, f);
+    return a2 * w2 * w2 / PI;
+}
+
+// Anisotropic height correlated Smith visibility (KHR_materials_anisotropy).
+fn visibility_smith_anisotropic(at: f32, ab: f32, ndl: f32, ndv: f32,
+    bdv: f32, tdv: f32, tdl: f32, bdl: f32) -> f32
+{
+    let gv = ndl * length(vec3f(at * tdv, ab * bdv, ndv));
+    let gl = ndv * length(vec3f(at * tdl, ab * bdl, ndl));
+    return saturate(0.5 / max(gv + gl, 1e-7));
 }
 
 fn fresnel_schlick(cos_theta: f32, f0: vec3f) -> vec3f {
@@ -701,7 +765,8 @@ struct Lit {
 
 // Light reflected toward the eye by one light arriving from direction l with a radiance. A clear
 // coat reflects the GGX lobe of its normal and roughness times its Fresnel Fc, and the base below
-// it 1 - Fc of what it reflects without one.
+// it 1 - Fc of what it reflects without one. An anisotropic base stretches its lobe along the
+// tangent, its roughness there mixed toward 1 by the square of the strength.
 fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
     let n = s.normal;
     let a = s.roughness * s.roughness;
@@ -713,7 +778,16 @@ fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
     let ndh = max(dot(n, h), 0.0);
     let ldh = max(dot(l, h), 0.0);
     let f = fresnel_schlick(ldh, f0);
-    let specular = distribution_ggx(ndh, a) * visibility_smith(ndv, ndl, a) * f;
+    var specular = distribution_ggx(ndh, a) * visibility_smith(ndv, ndl, a) * f;
+    if (s.anisotropy > 0.0) {
+        let ab = max(a, 0.001);
+        let at = mix(ab, 1.0, s.anisotropy * s.anisotropy);
+        let t = s.tangent;
+        let b = s.bitangent;
+        specular = distribution_ggx_anisotropic(at, ab, ndh, dot(t, h), dot(b, h)) *
+            visibility_smith_anisotropic(at, ab, ndl, ndv, dot(b, v), dot(t, v), dot(t, l),
+                dot(b, l)) * f;
+    }
     let diffuse = (vec3f(1.0) - f) * diffuse_color / PI;
     var lit = Lit(diffuse * radiance * ndl, specular * radiance * ndl);
     if (s.coat > 0.0) {
@@ -834,7 +908,20 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
     let diffuse_color = s.albedo * (1.0 - s.metallic);
     let ndv = max(dot(n, v), 1e-4);
     let ab = env_brdf(s.roughness, ndv);
-    let r = reflect(-v, n);
+    var r = reflect(-v, n);
+
+    // An anisotropic base reflects about a normal bent toward the direction of the anisotropy,
+    // as the glTF sample viewer does.
+    if (s.anisotropy > 0.0) {
+        let along = cross(cross(s.bitangent, v), s.bitangent);
+        let len2 = dot(along, along);
+        let x = 1.0 - s.anisotropy * (1.0 - s.roughness);
+        let k = x * x * x * x;
+        if (len2 > 1e-12) {
+            let bent = normalize(mix(along * inverseSqrt(len2), n, k));
+            r = reflect(-v, bent);
+        }
+    }
     let spec = mix(r, n, a);
     var cluster = 0u;
     if (view.lights.y > view.lights.x || view.grid.w > 0u) {

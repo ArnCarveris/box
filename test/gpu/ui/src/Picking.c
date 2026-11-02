@@ -976,6 +976,71 @@ void Picking_layout_bounds(void) {
     ecs_fini(world);
 }
 
+void Picking_box_shadow_not_picked(void) {
+    // ui/box_shadow
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script(world, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.camera\n"
+        "using box.view\n"
+        "using box.picking\n"
+        "template Probe {\n"
+        "  mut clicks: i32 = 0\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.click(this)\n"
+        "      clicks = clicks + 1\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "hud {\n"
+        "  Scene: {}\n"
+        "  camera {\n"
+        "    Position: {0, 0, 100}\n"
+        "    Camera: {ortho: true, ortho_scale: 1}\n"
+        "  }\n"
+        "  button {\n"
+        "    Position: {0, 0, 0}\n"
+        "    Rect: {40, 20}\n"
+        "    BoxShadow: {offset_x: 30, offset_y: -30, blur: 20, spread: 10, "
+            "color: {0, 0, 0, 255}}\n"
+        "    Interactive\n"
+        "    Probe: {}\n"
+        "  }\n"
+        "}\n"
+        "hud_view {\n"
+        "  View: {camera: hud.camera}\n"
+        "}\n" }) != 0);
+
+    typedef struct { int32_t clicks; } Mut;
+    ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
+    ecs_entity_t button = ecs_lookup(world, "hud.button");
+    test_assert(mut != 0);
+    ecs_progress(world, 0);
+
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_click left [670, 390]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(((const Mut*)ecs_get_id(world, button, mut))->clicks, 0);
+
+    ecs_os_free(box_command_run(world, s, "mouse_click left [665, 375]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(((const Mut*)ecs_get_id(world, button, mut))->clicks, 0);
+
+    ecs_os_free(box_command_run(world, s, "mouse_click left [650, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(((const Mut*)ecs_get_id(world, button, mut))->clicks, 1);
+
+    ecs_fini(world);
+}
+
 void Picking_unhandled_goes_to_screen(void) {
     // ui/picking
     ecs_world_t *world = ecs_init();

@@ -123,6 +123,7 @@
                     "press_drag_release",
                     "scroll",
                     "layout_bounds",
+                    "box_shadow_not_picked",
                     "unhandled_goes_to_screen",
                     "capture_drag_leaves_element",
                     "capture_drag_across_second_view",

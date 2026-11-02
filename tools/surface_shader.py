@@ -3,7 +3,7 @@ import re
 
 root = Path(__file__).resolve().parent.parent
 source = (root / 'src/geometry/surface_math.c').read_text()
-source = source[source.index('static box_sv sv('):source.index('void box_path_cubic_evaluate(')]
+source = source[source.index('static box_sv sv('):source.index('void box_surface_sample(')]
 source = re.sub(r'static (box_sv|float) (\w+)\((.*?)\)\s*\{',
     lambda m: 'fn ' + m[2] + '(' + ', '.join(
         part.strip().split()[-1].lstrip('*') + ': ' + ('SurfaceData' if '*' in part else
@@ -22,5 +22,5 @@ source = re.sub(r'\b(sqrtf|fminf|fmaxf|fabsf|floorf|cosf|sinf)\b',
     lambda m: {'sqrtf':'sqrt', 'fminf':'min', 'fmaxf':'max', 'fabsf':'abs',
         'floorf':'floor', 'cosf':'cos', 'sinf':'sin'}[m[0]], source)
 source = source.replace('i ++', 'i ++')
-output = '#pragma once\n\nstruct SurfaceData {\n    p: array<vec4f, 24>,\n};\n\n' + source
+output = '#pragma once\n\n#include "curve.wgsl"\n\nstruct SurfaceData {\n    p: array<vec4f, 24>,\n};\n\n' + source
 (root / 'etc/shaders/include/surface.wgsl').write_text(output)

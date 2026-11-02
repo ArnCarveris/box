@@ -251,6 +251,25 @@ static void box_border_ctor(
     }
 }
 
+/** Construct BoxShadow values with an opaque black shadow.
+ *
+ * @param ptr The values
+ * @param count Number of values
+ * @param ti The type info
+ */
+static void box_box_shadow_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    BoxShadow *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (BoxShadow){ .color = { 0, 0, 0, 255 } };
+    }
+}
+
 /** Construct Line values one unit wide.
  *
  * @param ptr The values
@@ -300,6 +319,7 @@ void box_geometry_shapes2d_init(
     ECS_COMPONENT_DEFINE(world, Shape2D);
     ecs_set_hooks(world, Shape2D, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Border, { .ctor = box_border_ctor });
+    ecs_set_hooks(world, BoxShadow, { .ctor = box_box_shadow_ctor });
     ecs_set_hooks(world, Line, { .ctor = box_line_ctor });
     ecs_set_hooks(world, Image, { .ctor = box_image_ctor });
     box_shape_t *quad = box_mesh_cache_add_shape(box_mesh_cache_of(world),

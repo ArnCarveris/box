@@ -1478,3 +1478,70 @@ void MaterialIds_shared_cutoff_change_records_shadow(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+void MaterialIds_specular_anisotropy_brings_material_id(void) {
+    // materials/material_ids
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t brushed = ecs_new(world);
+    ecs_set(world, brushed, Box, {1, 1, 1});
+    ecs_set(world, brushed, SpecularAnisotropy, {.strength = 0.5f, .rotation = GLM_PIf});
+    ecs_entity_t plain = ecs_new(world);
+    ecs_set(world, plain, Position, {2, 0, 0});
+    ecs_set(world, plain, Box, {1, 1, 1});
+    frame(world);
+
+    test_bool(ecs_owns(world, brushed, MaterialId), true);
+    uint32_t id = id_of(world, brushed);
+    test_assert(id != 0 && id != UINT32_MAX);
+    test_uint(shading_of(world, brushed)->material, id);
+    test_uint(record_of(world, id)->anisotropy, 32768u | (32768u << 16));
+    test_uint(shading_of(world, plain)->material, 0);
+    test_uint(record_of(world, 0)->anisotropy, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MaterialIds_specular_anisotropy_prefab_change_reaches_slot(void) {
+    // materials/material_ids
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t prefab = prefab_new(world);
+    ecs_set(world, prefab, SpecularAnisotropy, {.strength = 1, .rotation = GLM_PIf});
+    ecs_entity_t a = instance_new(world, prefab, 0);
+    ecs_entity_t b = instance_new(world, prefab, 1);
+    ecs_set(world, b, Rgb, {0, 255, 0});
+    ecs_entity_t c = instance_new(world, prefab, 2);
+    ecs_set(world, c, SpecularAnisotropy, {.strength = 0.5f, .rotation = 0});
+    frame(world);
+    frame(world);
+    uint32_t shared = id_of(world, prefab);
+    uint32_t own = id_of(world, b);
+    uint32_t turned = id_of(world, c);
+    test_uint(shading_of(world, a)->material, shared);
+    test_assert(own != shared);
+    test_assert(turned != shared && turned != own);
+    test_uint(record_of(world, shared)->anisotropy, 0xFFFFu | (32768u << 16));
+    test_uint(record_of(world, own)->anisotropy, 0xFFFFu | (32768u << 16));
+    test_uint(record_of(world, turned)->anisotropy, 32768u);
+    test_uint(record_of(world, 0)->anisotropy, 0);
+
+    ecs_set(world, prefab, SpecularAnisotropy, {.strength = 0.25f, .rotation = GLM_PI_2f});
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.material_bytes, 2 * MATERIAL);
+    test_int(stats.upload_bytes, 0);
+    test_uint(record_of(world, shared)->anisotropy, 16384u | (16384u << 16));
+    test_uint(record_of(world, own)->anisotropy, 16384u | (16384u << 16));
+    test_uint(record_of(world, own)->color, color_word(0, 255, 0));
+    test_uint(record_of(world, turned)->anisotropy, 32768u);
+
+    ecs_remove(world, prefab, SpecularAnisotropy);
+    frame(world);
+    test_uint(record_of(world, shared)->anisotropy, 0);
+    test_uint(record_of(world, own)->anisotropy, 0);
+    test_uint(record_of(world, turned)->anisotropy, 32768u);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
