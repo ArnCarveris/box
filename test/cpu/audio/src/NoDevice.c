@@ -113,6 +113,25 @@ void NoDevice_no_audio(void) {
     ecs_fini(world);
 }
 
+/* A run that is not headless, as the frame loop tests of core start one, opens no device with
+ * no_audio. */
+void NoDevice_app_no_audio(void) {
+    // audio/native
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, App, { .frames = 3, .delta_time = 0.02f, .no_audio = true });
+
+    no_device_capture_t c = no_device_capture_start();
+    test_int(box_app_run(world), 0);
+    no_device_capture_stop(c);
+
+    test_assert(box_audio_output_transport(world) == NULL);
+    test_int(box_audio_output_state(world), BOX_AUDIO_STATE_OFF);
+    test_int(no_device_errors, 0);
+    test_int(no_device_warnings, 0);
+    ecs_fini(world);
+}
+
 void NoDevice_failed_open(void) {
     // audio/native
     ecs_world_t *world = ecs_init();

@@ -134,6 +134,7 @@
                     "test_world",
                     "headless",
                     "no_audio",
+                    "app_no_audio",
                     "failed_open",
                     "native_unavailable"
                 ]
