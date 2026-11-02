@@ -476,7 +476,14 @@ typedef struct box_render_fog_volume_t {
     float sun_inscatter;    /**< FogVolume.sun_inscatter, at least 0 */
     float ambient_inscatter; /**< FogVolume.ambient_inscatter, at least 0 */
     int32_t steps;          /**< FogVolume.steps, 4 to 128 */
+    float wind[3];          /**< FogVolume.wind */
+    float noise_strength;   /**< FogVolume.noise_strength, 0 to 1 */
+    float noise_scale;      /**< FogVolume.noise_scale, at least BOX_RENDER_FOG_NOISE_SCALE_MIN */
+    float _pad[3];          /**< Padding to the 16 byte alignment of the WGSL struct */
 } box_render_fog_volume_t;
+
+/** Smallest FogVolume.noise_scale a record keeps */
+#define BOX_RENDER_FOG_NOISE_SCALE_MIN (0.01f)
 
 /** The culling of a view, resolved from its CullSettings */
 typedef struct box_render_view_cull_t {

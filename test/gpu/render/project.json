@@ -967,7 +967,13 @@
                     "resize",
                     "two_views",
                     "view_disables",
-                    "not_in_captures"
+                    "not_in_captures",
+                    "noise_zero_unchanged",
+                    "noise_varies",
+                    "noise_scale",
+                    "wind_moves",
+                    "noise_deterministic",
+                    "noise_device_loss"
                 ]
             }
         ]

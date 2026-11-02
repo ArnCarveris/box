@@ -49,6 +49,155 @@ static float box_fog_linear(
     return c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f);
 }
 
+/** Seed of the fog volume noise */
+#define BOX_FOG_NOISE_SEED (0x9E3779B9u)
+
+/** Octaves of the fog volume noise */
+#define BOX_FOG_NOISE_OCTAVES (4)
+
+/** Hash an integer to a well mixed one (the finalizer of MurmurHash3).
+ *
+ * @param x The integer
+ * @return The hash
+ */
+static uint32_t box_fog_hash(
+    uint32_t x)
+{
+    x ^= x >> 16;
+    x *= 0x85EBCA6Bu;
+    x ^= x >> 13;
+    x *= 0xC2B2AE35u;
+    x ^= x >> 16;
+
+    return x;
+}
+
+/** Get a random value in [0, 1) of a seed and three integers.
+ *
+ * @param seed The seed
+ * @param i First integer
+ * @param j Second integer
+ * @param k Third integer
+ * @return The value
+ */
+static float box_fog_random(
+    uint32_t seed,
+    uint32_t i,
+    uint32_t j,
+    uint32_t k)
+{
+    uint32_t h = box_fog_hash(seed ^ box_fog_hash(i ^ box_fog_hash(j ^ box_fog_hash(k))));
+
+    return (float)(h >> 8) / 16777216.0f;
+}
+
+/** Quintic smoothstep of a fraction, with zero first and second derivatives at 0 and 1.
+ *
+ * @param t The fraction
+ * @return The smoothed fraction
+ */
+static float box_fog_fade(
+    float t)
+{
+    return t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f);
+}
+
+/** Lattice cell and fraction of the texels along an axis for one octave.
+ *
+ * @param period Lattice cells across the texture
+ * @param offset Offset of the lattice in cells
+ * @param cell Receives the cell of each texel, 0 to period - 1
+ * @param next Receives the cell after it, wrapped
+ * @param frac Receives the smoothed fraction of each texel in its cell
+ */
+static void box_fog_noise_axis(
+    int32_t period,
+    float offset,
+    int32_t *cell,
+    int32_t *next,
+    float *frac)
+{
+    int32_t i;
+    for (i = 0; i < BOX_RENDER_FOG_NOISE_SIZE; i ++) {
+        float p = ((float)i + 0.5f) * (float)period / (float)BOX_RENDER_FOG_NOISE_SIZE + offset;
+        float c = floorf(p);
+        int32_t ci = ((int32_t)c % period + period) % period;
+        cell[i] = ci;
+        next[i] = (ci + 1) % period;
+        frac[i] = box_fog_fade(p - c);
+    }
+}
+
+void box_render_fog_noise(
+    uint8_t *out)
+{
+    const int32_t n = BOX_RENDER_FOG_NOISE_SIZE;
+    int32_t count = n * n * n, o, x, y, z, i;
+    float *values = ecs_os_calloc_n(float, count);
+    float *lattice = ecs_os_malloc_n(float, 16 * 16 * 16);
+    float amplitude = 1.0f, lo, hi, scale;
+    int32_t cx[BOX_RENDER_FOG_NOISE_SIZE], nx[BOX_RENDER_FOG_NOISE_SIZE];
+    int32_t cy[BOX_RENDER_FOG_NOISE_SIZE], ny[BOX_RENDER_FOG_NOISE_SIZE];
+    int32_t cz[BOX_RENDER_FOG_NOISE_SIZE], nz[BOX_RENDER_FOG_NOISE_SIZE];
+    float fx[BOX_RENDER_FOG_NOISE_SIZE], fy[BOX_RENDER_FOG_NOISE_SIZE];
+    float fz[BOX_RENDER_FOG_NOISE_SIZE];
+    for (o = 0; o < BOX_FOG_NOISE_OCTAVES; o ++) {
+        int32_t period = 2 << o;
+        uint32_t seed = box_fog_hash(BOX_FOG_NOISE_SEED + (uint32_t)o);
+        for (z = 0; z < period; z ++) {
+            for (y = 0; y < period; y ++) {
+                for (x = 0; x < period; x ++) {
+                    lattice[(z * period + y) * period + x] = box_fog_random(
+                        seed, (uint32_t)x, (uint32_t)y, (uint32_t)z);
+                }
+            }
+        }
+
+        box_fog_noise_axis(period, box_fog_random(seed, 1u << 20, 0, 0) * (float)period,
+            cx, nx, fx);
+        box_fog_noise_axis(period, box_fog_random(seed, 0, 1u << 20, 0) * (float)period,
+            cy, ny, fy);
+        box_fog_noise_axis(period, box_fog_random(seed, 0, 0, 1u << 20) * (float)period,
+            cz, nz, fz);
+        for (z = 0; z < n; z ++) {
+            const float *z0 = &lattice[cz[z] * period * period];
+            const float *z1 = &lattice[nz[z] * period * period];
+            for (y = 0; y < n; y ++) {
+                const float *r00 = &z0[cy[y] * period], *r01 = &z0[ny[y] * period];
+                const float *r10 = &z1[cy[y] * period], *r11 = &z1[ny[y] * period];
+                float *row = &values[(z * n + y) * n];
+                for (x = 0; x < n; x ++) {
+                    int32_t a = cx[x], b = nx[x];
+                    float u = fx[x];
+                    float v00 = r00[a] + u * (r00[b] - r00[a]);
+                    float v01 = r01[a] + u * (r01[b] - r01[a]);
+                    float v10 = r10[a] + u * (r10[b] - r10[a]);
+                    float v11 = r11[a] + u * (r11[b] - r11[a]);
+                    float v0 = v00 + fy[y] * (v01 - v00);
+                    float v1 = v10 + fy[y] * (v11 - v10);
+                    row[x] += amplitude * (v0 + fz[z] * (v1 - v0));
+                }
+            }
+        }
+
+        amplitude *= 0.5f;
+    }
+
+    lo = hi = values[0];
+    for (i = 1; i < count; i ++) {
+        lo = glm_min(lo, values[i]);
+        hi = glm_max(hi, values[i]);
+    }
+
+    scale = hi > lo ? 255.0f / (hi - lo) : 0.0f;
+    for (i = 0; i < count; i ++) {
+        out[i] = (uint8_t)glm_clamp(roundf((values[i] - lo) * scale), 0.0f, 255.0f);
+    }
+
+    ecs_os_free(lattice);
+    ecs_os_free(values);
+}
+
 /** Write the record of a FogVolume: its box placed by the rotation and position of the world
  * transform, scale ignored, and its values clamped to their ranges.
  *
@@ -89,6 +238,9 @@ static void box_fog_record(
     out->sun_inscatter = glm_max(fog->sun_inscatter, 0.0f);
     out->ambient_inscatter = glm_max(fog->ambient_inscatter, 0.0f);
     out->steps = fog->steps < 4 ? 4 : fog->steps > 128 ? 128 : fog->steps;
+    out->noise_strength = glm_clamp(fog->noise_strength, 0.0f, 1.0f);
+    out->noise_scale = glm_max(fog->noise_scale, BOX_RENDER_FOG_NOISE_SCALE_MIN);
+    glm_vec3_copy(ECS_CONST_CAST(float*, fog->wind), out->wind);
     out->color[0] = box_fog_linear(fog->color.r);
     out->color[1] = box_fog_linear(fog->color.g);
     out->color[2] = box_fog_linear(fog->color.b);
