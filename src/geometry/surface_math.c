@@ -299,10 +299,10 @@ static box_sv surface_frame(
     box_sv tangent)
 {
     int steps = (int)sf(d, 8, 1);
-    float parameter = t * steps;
+    float parameter = t * (float)steps;
     int index = (int)fminf(floorf(parameter), (float)(steps - 1));
     int offset = (int)sf(d, 8, 0) + index;
-    box_sv axis = sv_mix(sp(d, offset), sp(d, offset + 1), parameter - index);
+    box_sv axis = sv_mix(sp(d, offset), sp(d, offset + 1), parameter - (float)index);
 
     return sv_unit(sv_sub(axis, sv_mul(tangent, sv_dot(axis, tangent))));
 }
