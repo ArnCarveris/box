@@ -154,7 +154,8 @@
                     "far_plane_raised",
                     "far_plane_raised_ortho",
                     "far_plane_kept",
-                    "aspect_of_view_surface"
+                    "aspect_of_view_surface",
+                    "aspect_of_claimed_view_surface"
                 ]
             }
         ]
