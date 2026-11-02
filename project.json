@@ -105,6 +105,11 @@
     },
     "${os Darwin}": {
         "bundle": {
+            "miniaudio": {
+                "repository": "https://github.com/mackron/miniaudio.git",
+                "tag": "0.11.26",
+                "header-only": true
+            },
             "glfw": {
                 "repository": "https://github.com/glfw/glfw.git",
                 "tag": "3.4",
@@ -161,6 +166,11 @@
     },
     "${os Linux}": {
         "bundle": {
+            "miniaudio": {
+                "repository": "https://github.com/mackron/miniaudio.git",
+                "tag": "0.11.26",
+                "header-only": true
+            },
             "wgpu_native": {
                 "repository": "https://github.com/gfx-rs/wgpu-native.git",
                 "tag": "v29.0.1.1",

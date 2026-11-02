@@ -891,6 +891,7 @@ static void box_gpu_bake_face(
     box_camera_projection(&rv->camera_data, edge, edge, proj);
     ecs_os_memset_t(u, 0, box_gpu_view_uniforms_t);
     glm_mat4_mul(proj, rv->view_matrix, u->view_proj);
+    glm_mat4_inv(u->view_proj, u->inv_view_proj);
     glm_vec3_copy(eye, u->camera);
     u->camera[3] = 1;
     u->reflection[1] = 1;
@@ -1089,7 +1090,7 @@ static void box_gpu_bake_bundles(
 
     box_gpu_bake_hold(s, true);
     s->faces_group = box_gpu_light_group_with(gpu, NULL, rv, b->uniforms, b->clusters, shadow,
-        NULL, NULL);
+        NULL, NULL, NULL);
     s->bundles = ecs_os_calloc_n(WGPURenderBundle, count);
     s->bundle_count = count;
     for (i = 0; i < count; i ++) {

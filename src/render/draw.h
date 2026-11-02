@@ -751,7 +751,7 @@ void box_draws_color_unpack(
  * was, the Transmission (factor 0 without one) and the lobes of the other material components.
  *
  * ClearCoat, SpecularAnisotropy and Sheen are 0 without one or at 0, a Sheen at a black color,
- * DiffuseTransmission 0 without one.
+ * DiffuseTransmission 0 without one, its blur 0 when negative or not finite.
  * Opacity, tints and the 2D shape are not.
  *
  * @param out The record

@@ -65,6 +65,7 @@ ECS_STRUCT(App, {
     bool design;        /**< Render the gallery of design cameras, set by --design */
     char *camera;       /**< Name of the Camera the surface shows, set by --camera, NULL for none */
     char *out;          /**< Image file the surface is written to, set by --out, NULL for none */
+    bool no_audio;      /**< Open no audio output, set by --no-audio */
 });
 
 /** State of the process the engine writes, read only for applications */

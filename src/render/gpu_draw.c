@@ -54,7 +54,7 @@ static WGPUBuffer box_gpu_buffer_new(
 void box_gpu_draw_init(
     box_gpu_t *gpu)
 {
-    WGPUBindGroupLayoutEntry entries[20] = {
+    WGPUBindGroupLayoutEntry entries[21] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
@@ -188,9 +188,17 @@ void box_gpu_draw_init(
                 .sampleType = WGPUTextureSampleType_Float,
                 .viewDimension = WGPUTextureViewDimension_2D
             }
+        },
+        {
+            .binding = 20,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Depth,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
         }
     };
-    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 20, .entries = entries };
+    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 21, .entries = entries };
     box_gpu_cull_init(gpu);
     box_gpu_volume_init(gpu);
     box_gpu_reflect_init(gpu);
@@ -1383,6 +1391,7 @@ static int32_t box_gpu_view_write(
         box_camera_projection(&v->camera_data,
             (float)t->desc.point_width, (float)t->desc.point_height, proj);
         glm_mat4_mul(proj, ECS_CONST_CAST(vec4*, v->view_matrix), u->view_proj);
+        glm_mat4_inv(u->view_proj, u->inv_view_proj);
         glm_vec3_copy(ECS_CONST_CAST(float*, v->camera_transform[3]), u->camera);
         u->camera[3] = 1;
         u->viewport[0] = (float)t->desc.render_width;
@@ -1456,6 +1465,8 @@ typedef struct box_gpu_view_pass_t {
                                      *   copied */
     WGPUTexture source;             /**< Texture of the color attachment, which the snapshot
                                      *   copies */
+    WGPUTexture depth_texture;      /**< Texture of the depth attachment, which the snapshot
+                                     *   copies next to its color */
 } box_gpu_view_pass_t;
 
 /** Begin a pass of a view that continues the image and depth of the pass before it, counted
@@ -1557,9 +1568,9 @@ static bool box_gpu_draw_particles(
     return result;
 }
 
-/** End the pass of a view before its first blended draw, copy its image into the opaque
- * snapshot and blur its pyramid (box_gpu_transmission_record), then continue in a new pass with
- * the groups of the forward pass bound again.
+/** End the pass of a view before its first blended draw, copy its image and depth into the
+ * opaque snapshot and blur its pyramid (box_gpu_transmission_record), then continue in a new
+ * pass with the groups of the forward pass bound again.
  *
  * @param gpu The backend
  * @param vp The pass of the view, its pass replaced
@@ -1576,7 +1587,8 @@ static void box_gpu_draw_snapshot(
 {
     wgpuRenderPassEncoderEnd(vp->pass);
     wgpuRenderPassEncoderRelease(vp->pass);
-    box_gpu_transmission_record(gpu, vp->snapshot, vp->encoder, vp->source);
+    box_gpu_transmission_record(gpu, vp->snapshot, vp->encoder, vp->source,
+        vp->depth_texture);
     vp->snapshot = NULL;
     vp->pass = box_gpu_view_pass_continue(gpu, vp, false);
     wgpuRenderPassEncoderSetBindGroup(vp->pass, 0, group, 1, &offset);
@@ -1757,7 +1769,8 @@ static void box_gpu_draw_pass(
         .soft = phase != 1 && box_gpu_particles_soft(gpu, v),
         .fog = fog,
         .snapshot = phase != 1 ? snapshot : NULL,
-        .source = source
+        .source = source,
+        .depth_texture = t->depth
     };
     WGPURenderPassDepthStencilAttachment depth = {
         .view = t->depth_view,
@@ -1930,8 +1943,7 @@ void box_gpu_draw_views(
         WGPUTextureView ao = prepasses ? box_gpu_gtao_begin(gpu, t, packet, v) : NULL;
         box_gpu_snapshot_t *snapshot = box_gpu_transmission_begin(gpu, t, packet, slot, source,
             hdr ? BOX_GPU_HDR_FORMAT : t->format);
-        WGPUBindGroup group = box_gpu_light_group(gpu, t, v, slot, ao,
-            box_gpu_transmission_view(gpu, snapshot));
+        WGPUBindGroup group = box_gpu_light_group(gpu, t, v, slot, ao, snapshot);
         if (prepasses) {
             box_gpu_draw_prepass(gpu, t, encoder, packet, v, group, slot, false);
             if (occludes) {

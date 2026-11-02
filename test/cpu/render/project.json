@@ -53,7 +53,9 @@
                     "sheen_defaults",
                     "sheen_pack",
                     "diffuse_transmission_defaults",
-                    "diffuse_transmission_pack"
+                    "diffuse_transmission_pack",
+                    "diffuse_transmission_blur_defaults",
+                    "diffuse_transmission_blur_pack"
                 ]
             },
             {
@@ -73,7 +75,11 @@
                     "unlit_view_none",
                     "view_disabled_none",
                     "other_scene_none",
-                    "moved_and_removed"
+                    "moved_and_removed",
+                    "offset_wraps",
+                    "offset_negative_wind",
+                    "offset_zero_wind",
+                    "offset_record"
                 ]
             },
             {

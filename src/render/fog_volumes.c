@@ -5,6 +5,9 @@
  * The volumes are collected once per frame; a view with LightSettings.fog_volumes gets those of
  * the scene of its camera that may be in its frustum, back to front by the distance of their
  * centers from the camera, at most BOX_RENDER_FOG_VOLUMES_MAX of the nearest.
+ *
+ * The offset the wind moves the noise by is computed from the time of the packet in double
+ * precision and wrapped to the period of the noise, so drifting fog stays smooth after hours.
  */
 
 #include "render.h"
@@ -219,16 +222,36 @@ void box_render_fog_noise(
     ecs_os_free(values);
 }
 
+void box_render_fog_offset(
+    const FogVolume *fog,
+    double time,
+    float *out)
+{
+    double period = BOX_RENDER_FOG_NOISE_PERIOD *
+        (double)glm_max(fog->noise_scale, BOX_RENDER_FOG_NOISE_SCALE_MIN);
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        double v = fmod((double)fog->wind[i] * time, period);
+        out[i] = (float)(v < 0 ? v + period : v);
+        if (out[i] >= (float)period) {
+            out[i] = 0.0f;
+        }
+    }
+}
+
 /** Write the record of a FogVolume: its box placed by the rotation and position of the world
- * transform, scale ignored, and its values clamped to their ranges.
+ * transform, scale ignored, its values clamped to their ranges and the offset of its noise at a
+ * time.
  *
  * @param fog The FogVolume
  * @param transform World transform of the entity, NULL for the origin
+ * @param time Seconds the world has advanced in total, the time of the packet
  * @param out Receives the record
  */
 static void box_fog_record(
     const FogVolume *fog,
     const WorldTransform *transform,
+    double time,
     box_render_fog_volume_t *out)
 {
     int32_t k;
@@ -262,7 +285,7 @@ static void box_fog_record(
     out->steps = fog->steps < 4 ? 4 : fog->steps > 128 ? 128 : fog->steps;
     out->noise_strength = glm_clamp(fog->noise_strength, 0.0f, 1.0f);
     out->noise_scale = glm_max(fog->noise_scale, BOX_RENDER_FOG_NOISE_SCALE_MIN);
-    glm_vec3_copy(ECS_CONST_CAST(float*, fog->wind), out->wind);
+    box_render_fog_offset(fog, time, out->offset);
     out->color[0] = box_fog_linear(fog->color.r);
     out->color[1] = box_fog_linear(fog->color.g);
     out->color[2] = box_fog_linear(fog->color.b);
@@ -272,10 +295,12 @@ static void box_fog_record(
  *
  * @param world The world
  * @param l The fog state
+ * @param time Seconds the world has advanced in total, the time of the packet
  */
 static void box_fog_collect(
     ecs_world_t *world,
-    box_render_fog_t *l)
+    box_render_fog_t *l,
+    double time)
 {
     ecs_vec_clear(&l->fog_volumes);
     ecs_iter_t it = ecs_query_iter(world, l->query);
@@ -286,7 +311,8 @@ static void box_fog_collect(
         for (i = 0; i < it.count; i ++) {
             box_fog_volume_t *f = ecs_vec_append_t(NULL, &l->fog_volumes, box_fog_volume_t);
             f->scene = box_render_scene_field(&it, 2, i);
-            box_fog_record(&fogs[i], transforms ? &transforms[i] : NULL, &f->record);
+            box_fog_record(&fogs[i], transforms ? &transforms[i] : NULL, time,
+                &f->record);
         }
     }
 }
@@ -393,7 +419,7 @@ void box_render_fog_views(
     const box_fog_volume_t *fogs = NULL;
     int32_t i, j, count = ecs_vec_count(&p->views), fog_count = 0;
     ecs_vec_clear(&l->fog_over_next);
-    box_fog_collect(world, l);
+    box_fog_collect(world, l, p->time);
     fogs = ecs_vec_first_t(&l->fog_volumes, box_fog_volume_t);
     fog_count = ecs_vec_count(&l->fog_volumes);
     for (i = 0; i < count; i ++) {

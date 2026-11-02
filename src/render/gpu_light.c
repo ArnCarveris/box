@@ -744,7 +744,8 @@ WGPUBindGroup box_gpu_light_group_with(
     WGPUBuffer clusters,
     WGPUTextureView shadow,
     WGPUTextureView ao,
-    WGPUTextureView snapshot)
+    WGPUTextureView snapshot,
+    WGPUTextureView snapshot_depth)
 {
     uint64_t size = 0;
     WGPUBuffer lights = box_gpu_light_binding(gpu, v, &size);
@@ -755,7 +756,7 @@ WGPUBindGroup box_gpu_light_group_with(
         &gpu->buffers, box_gpu_buffer_t, BOX_RENDER_BUFFER_CLIPS);
     WGPUBuffer tiles = NULL;
     const box_gpu_atlas_t *atlas = t ? box_gpu_atlas_of(gpu, v, &tiles) : NULL;
-    WGPUBindGroupEntry entries[20] = {
+    WGPUBindGroupEntry entries[21] = {
         { .binding = 0, .buffer = uniforms, .size = sizeof(box_gpu_view_uniforms_t) },
         { .binding = 1, .buffer = lights, .size = size },
         { .binding = 2, .buffer = clusters, .size = wgpuBufferGetSize(clusters) },
@@ -792,13 +793,18 @@ WGPUBindGroup box_gpu_light_group_with(
         [19] = {
             .binding = 19,
             .textureView = snapshot ? snapshot : box_gpu_transmission_view(gpu, NULL)
+        },
+        [20] = {
+            .binding = 20,
+            .textureView = snapshot_depth
+                ? snapshot_depth : box_gpu_transmission_depth_view(gpu, NULL)
         }
     };
     box_gpu_atmosphere_bindings(gpu, t, v, &entries[9]);
     box_gpu_environment_bindings(gpu, t ? v : NULL, &entries[12]);
     WGPUBindGroupDescriptor desc = {
         .layout = gpu->view_layout,
-        .entryCount = 20,
+        .entryCount = 21,
         .entries = entries
     };
 
@@ -811,10 +817,12 @@ WGPUBindGroup box_gpu_light_group(
     const box_render_view_t *v,
     int32_t slot,
     WGPUTextureView ao,
-    WGPUTextureView snapshot)
+    const box_gpu_snapshot_t *snapshot)
 {
     return box_gpu_light_group_with(gpu, t, v, gpu->view_buffer,
-        box_gpu_cluster_buffer(gpu, t, v), box_gpu_shadow_binding(gpu, v), ao, snapshot);
+        box_gpu_cluster_buffer(gpu, t, v), box_gpu_shadow_binding(gpu, v), ao,
+        box_gpu_transmission_view(gpu, snapshot),
+        box_gpu_transmission_depth_view(gpu, snapshot));
 }
 
 void box_gpu_light_purge(

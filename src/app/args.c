@@ -186,6 +186,8 @@ int box_app_parse(
             app->headless = true;
         } else if (!strcmp(arg, "--design")) {
             app->design = true;
+        } else if (!strcmp(arg, "--no-audio")) {
+            app->no_audio = true;
         } else if (arg[1] == '-' && box_app_has_value(&arg[2])) {
             result = box_app_option(app, &arg[2], i + 1 < argc ? argv[i + 1] : NULL);
             i ++;

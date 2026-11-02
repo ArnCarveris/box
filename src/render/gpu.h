@@ -498,6 +498,10 @@ WGPURenderPipeline box_gpu_forward_pipeline(
 
 /** Create the layouts the forward pass shares.
  *
+ * Group 0 binds 9 sampled textures to the fragment stage, the depth copy of the opaque snapshot
+ * (binding 20) the last: with the 4 material maps the mesh pipelines sample 13 of the 16 a
+ * device has at least, the particle and fog volume pipelines fewer.
+ *
  * @param gpu The backend
  */
 void box_gpu_draw_init(
@@ -739,6 +743,8 @@ void box_gpu_cookie_uniforms(
  * @param ao Ambient occlusion image of the view (box_gpu_gtao_begin), NULL for the white image
  * @param snapshot Opaque snapshot of the view (box_gpu_transmission_view), NULL for the white
  * image, as the probe and reflection captures bind
+ * @param snapshot_depth Depth copy of the opaque snapshot (box_gpu_transmission_depth_view),
+ * NULL for the 1x1 depth placeholder, as the probe and reflection captures bind
  * @return The bind group, released by the caller
  */
 WGPUBindGroup box_gpu_light_group_with(
@@ -749,19 +755,20 @@ WGPUBindGroup box_gpu_light_group_with(
     WGPUBuffer clusters,
     WGPUTextureView shadow,
     WGPUTextureView ao,
-    WGPUTextureView snapshot);
+    WGPUTextureView snapshot,
+    WGPUTextureView snapshot_depth);
 
 /** Create the bind group of the forward pass of a view: its uniforms, lights, clusters, shadow
  * map, aerial perspective volume, environment, ambient occlusion, shadow atlas, tile records,
- * light cookie and opaque snapshot.
+ * light cookie and opaque snapshot with its depth copy.
  *
  * @param gpu The backend
  * @param t The target
  * @param v The view
  * @param slot Slot of the view in the view buffer
  * @param ao Ambient occlusion image of the view (box_gpu_gtao_begin), NULL for the white image
- * @param snapshot Opaque snapshot of the view (box_gpu_transmission_view), NULL for the white
- * image
+ * @param snapshot Opaque snapshot of the view (box_gpu_transmission_begin), NULL for the white
+ * image and the depth placeholder
  * @return The bind group, released by the caller
  */
 WGPUBindGroup box_gpu_light_group(
@@ -770,7 +777,7 @@ WGPUBindGroup box_gpu_light_group(
     const box_render_view_t *v,
     int32_t slot,
     WGPUTextureView ao,
-    WGPUTextureView snapshot);
+    const box_gpu_snapshot_t *snapshot);
 
 /** Create the layouts, sampler and empty shadow map of the shadow pass.
  *
@@ -1430,8 +1437,20 @@ WGPUTextureView box_gpu_transmission_view(
     box_gpu_t *gpu,
     const box_gpu_snapshot_t *s);
 
+/** Get the depth copy of a snapshot which group 0 of the forward pass binds
+ * (opaque_snapshot_depth of mesh.wgsl).
+ *
+ * @param gpu The backend
+ * @param s The snapshot, NULL for the 1x1 depth placeholder
+ * @return The view
+ */
+WGPUTextureView box_gpu_transmission_depth_view(
+    box_gpu_t *gpu,
+    const box_gpu_snapshot_t *s);
+
 /** Copy the color attachment of a view into mip 0 of its snapshot and blur every mip above
- * from the one below (a Jimenez 13 tap downsample). Called between two render passes.
+ * from the one below (a Jimenez 13 tap downsample), and copy its depth attachment into the
+ * depth copy of the snapshot. Called between two render passes.
  *
  * Until the downsample pipeline exists only mip 0 is written, which is all the view of the
  * snapshot shows then (box_gpu_transmission_view).
@@ -1440,12 +1459,14 @@ WGPUTextureView box_gpu_transmission_view(
  * @param s The snapshot
  * @param encoder The encoder of the frame
  * @param source Texture of the color attachment, at least as large as the snapshot
+ * @param depth Texture of the depth attachment (CopySrc), the size of the snapshot
  */
 void box_gpu_transmission_record(
     box_gpu_t *gpu,
     box_gpu_snapshot_t *s,
     WGPUCommandEncoder encoder,
-    WGPUTexture source);
+    WGPUTexture source,
+    WGPUTexture depth);
 
 /** Release the snapshots of a target, of every format.
  *

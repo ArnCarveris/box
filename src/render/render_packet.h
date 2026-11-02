@@ -476,12 +476,18 @@ typedef struct box_render_fog_volume_t {
     float sun_inscatter;    /**< FogVolume.sun_inscatter, at least 0 */
     float ambient_inscatter; /**< FogVolume.ambient_inscatter, at least 0 */
     int32_t steps;          /**< FogVolume.steps, 4 to 128 */
-    float wind[3];          /**< FogVolume.wind */
+    float offset[3];        /**< World offset the noise moves by: FogVolume.wind times the world
+                             *   time, in double precision and wrapped to [0, 10 noise_scale),
+                             *   the period of the noise, see box_render_fog_offset */
     float noise_strength;   /**< FogVolume.noise_strength, 0 to 1 */
     float noise_scale;      /**< FogVolume.noise_scale, at least BOX_RENDER_FOG_NOISE_SCALE_MIN */
     float light_inscatter;  /**< FogVolume.light_inscatter, at least 0 */
     float pad[2];           /**< Pads the record to the 16 byte stride of its WGSL array */
 } box_render_fog_volume_t;
+
+/** Noise scales over which the noise of a fog volume repeats: the coarse sample repeats every
+ * scale and the detail sample, at 3.1 times it, every 10 */
+#define BOX_RENDER_FOG_NOISE_PERIOD (10.0)
 
 /** Smallest FogVolume.noise_scale a record keeps */
 #define BOX_RENDER_FOG_NOISE_SCALE_MIN (0.01f)
@@ -900,7 +906,9 @@ typedef struct box_render_material_t {
                              *   the color display encoded and the factor a unorm8 clamped to
                              *   0..1, 0 without one */
     float thickness;        /**< DiffuseTransmission.thickness, 0 without one */
-    uint32_t reserved[3];   /**< 0, pads the record to the 16 byte alignment of Material */
+    float diffuse_blur;     /**< DiffuseTransmission.blur, 0 without one or with a negative or
+                             *   non finite blur */
+    uint32_t reserved[2];   /**< 0, pads the record to the 16 byte alignment of Material */
 } box_render_material_t;
 
 /** Shading of a mesh instance, the shading stream of a mesh instance page, MeshShading of

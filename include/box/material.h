@@ -180,12 +180,21 @@ ECS_STRUCT(Sheen, {
 #define BOX_MATERIAL_DIFFUSE_TRANSMISSION_FACTOR (0.5f)
 
 /** Diffuse light passing through a thin 3D surface (leaf, paper, lampshade), glTF's
- * KHR_materials_diffuse_transmission, default factor 0.5, white and thickness 0, inherited like
- * Rgb; a field a scene does not set keeps its default. 2D shapes and text ignore it.
+ * KHR_materials_diffuse_transmission, default factor 0.5, white, thickness 0 and blur 0,
+ * inherited like Rgb; a field a scene does not set keeps its default. 2D shapes and text ignore
+ * it.
  *
  * A Lambert lobe on the inverted normal of base color * color * factor, the front keeping 1 -
  * factor, none on metals. It stays in the opaque pass (depth, shadows, no snapshot), its shadow
  * is not tinted, and a single sided quad needs BackFacePlain to be seen from behind.
+ *
+ * The blur applies only to a shape that also has Transmission (frosted glass, a shower door):
+ * what it shows of the opaque snapshot is blurred by the distance between its surface and what
+ * is behind it, read from a depth copy of the snapshot, on top of the blur of its roughness. An
+ * object touching the surface stays sharp and one further behind gets softer; the sky, with no
+ * depth, takes the softest mip. A shape with DiffuseTransmission and no Transmission is opaque
+ * and ignores the blur. Blended and transmissive shapes are not in the snapshot, so they are
+ * neither seen nor blurred through it.
  */
 ECS_STRUCT(DiffuseTransmission, {
     float factor;    /**< 0 all diffuse light is reflected to 1 all of it passes through,
@@ -193,6 +202,9 @@ ECS_STRUCT(DiffuseTransmission, {
     Rgb color;       /**< Tint of the light that passes through, display encoded */
     float thickness; /**< World units a ray travels through the surface for its shadow lookup,
                       *   0 for a thin sheet */
+    float blur;      /**< World units of blur radius per world unit of distance behind the
+                      *   surface (the tangent of the cone light spreads into) of a shape with
+                      *   Transmission, 0 for none */
 });
 
 /** Emitted light, inherited by instances, like Rgb. Tints do not apply to it. */

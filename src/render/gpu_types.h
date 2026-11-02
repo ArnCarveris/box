@@ -47,7 +47,7 @@
 #define BOX_GPU_DEPTH_FORMAT (WGPUTextureFormat_Depth32Float)
 
 /** Bytes between the uniforms of two views, a multiple of the dynamic offset alignment */
-#define BOX_GPU_VIEW_STRIDE (768)
+#define BOX_GPU_VIEW_STRIDE (1024)
 
 /** Bytes between the matrices of two cascades, the dynamic offset alignment of webgpu */
 #define BOX_GPU_CASCADE_STRIDE (256)
@@ -580,7 +580,13 @@ typedef struct box_gpu_view_uniforms_t {
     vec4 cookie_y;                  /**< Local Y axis of the light, w unused */
     uint32_t cookie_config[4];      /**< 1 when the view applies the cookie and 0 when not,
                                      *   its LightCookieProjection, two unused */
+    mat4 inv_view_proj;             /**< Inverse of view_proj, clip space of the target to
+                                     *   world, which the blur of a DiffuseTransmission reads
+                                     *   the depth of the opaque snapshot with */
 } box_gpu_view_uniforms_t;
+
+_Static_assert(sizeof(box_gpu_view_uniforms_t) <= BOX_GPU_VIEW_STRIDE,
+    "the uniforms of a view fit in its stride");
 
 /** The shadow atlas of a scene: the depth texture its spot and point light tiles render into */
 typedef struct box_gpu_atlas_t {

@@ -715,7 +715,7 @@ void Material_clear_coat_pack(void) {
     test_uint(record.sheen, 0);
     test_uint(record.reserved[0], 0);
     test_uint(record.reserved[1], 0);
-    test_uint(record.reserved[2], 0);
+    test_flt(record.diffuse_blur, 0);
     test_uint(record.diffuse_transmission, 0);
     test_flt(record.thickness, 0);
     plain = record;
@@ -925,7 +925,7 @@ void Material_sheen_pack(void) {
     test_uint(record.sheen, 0);
     test_uint(record.reserved[0], 0);
     test_uint(record.reserved[1], 0);
-    test_uint(record.reserved[2], 0);
+    test_flt(record.diffuse_blur, 0);
     test_uint(record.diffuse_transmission, 0);
     test_flt(record.thickness, 0);
     plain = record;
@@ -1053,7 +1053,7 @@ void Material_diffuse_transmission_pack(void) {
     test_flt(record.thickness, 0);
     test_uint(record.reserved[0], 0);
     test_uint(record.reserved[1], 0);
-    test_uint(record.reserved[2], 0);
+    test_flt(record.diffuse_blur, 0);
     plain = record;
 
     DiffuseTransmission white = { .factor = 1, .color = {255, 255, 255} };
@@ -1109,4 +1109,110 @@ void Material_diffuse_transmission_pack(void) {
     box_draws_material(&b, &(box_draw_material_t){
         .diffuse_transmission = &mixed, .pbr = &pbr, .fade = 1 });
     test_assert(!ecs_os_memcmp_t(&a, &b, box_render_shading_t));
+}
+
+/** DiffuseTransmission.blur is 0 by default, a script sets it and a partial value keeps the
+ * other fields at their defaults; one that sets only another field keeps the blur at 0. */
+void Material_diffuse_transmission_blur_defaults(void) {
+    // materials/pbr
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script_run(world, "diffuse_transmission_blur",
+        "using box.material\n"
+        "frosted { DiffuseTransmission: {blur: 0.25} }\n"
+        "leaf { DiffuseTransmission: {factor: 0.75} }\n", NULL) == 0);
+
+    ecs_entity_t added = ecs_new(world);
+    ecs_add(world, added, DiffuseTransmission);
+    const DiffuseTransmission *d = ecs_get(world, added, DiffuseTransmission);
+    test_assert(d != NULL);
+    test_flt(d->blur, 0);
+
+    d = ecs_get(world, ecs_lookup(world, "frosted"), DiffuseTransmission);
+    test_assert(d != NULL);
+    test_flt(d->blur, 0.25f);
+    test_flt(d->factor, BOX_MATERIAL_DIFFUSE_TRANSMISSION_FACTOR);
+    test_uint(d->color.r, 255);
+    test_uint(d->color.g, 255);
+    test_uint(d->color.b, 255);
+    test_flt(d->thickness, 0);
+
+    d = ecs_get(world, ecs_lookup(world, "leaf"), DiffuseTransmission);
+    test_assert(d != NULL);
+    test_flt(d->factor, 0.75f);
+    test_flt(d->blur, 0);
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, DiffuseTransmission, {
+        .factor = 0.25f, .color = {10, 20, 30}, .blur = 0.5f});
+    ecs_entity_t instance = ecs_new_w_pair(world, EcsIsA, prefab);
+    test_flt(ecs_get(world, instance, DiffuseTransmission)->blur, 0.5f);
+
+    ecs_fini(world);
+}
+
+/** The record holds DiffuseTransmission.blur in the word after the thickness, 0 without one
+ * and for a negative or non finite blur, in a record of 96 bytes, and a transition of another
+ * component encodes the record again with it. */
+void Material_diffuse_transmission_blur_pack(void) {
+    // materials/pbr
+    box_render_material_t record, plain;
+    test_int(ECS_SIZEOF(box_render_material_t), 96);
+    test_int(offsetof(box_render_material_t, diffuse_blur), 84);
+    ecs_os_memset_t(&record, 0x55, box_render_material_t);
+    box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
+    test_flt(record.diffuse_blur, 0);
+    test_uint(record.reserved[0], 0);
+    test_uint(record.reserved[1], 0);
+    plain = record;
+
+    DiffuseTransmission frosted = {
+        .factor = 0.5f, .color = {255, 255, 255}, .thickness = 0.25f, .blur = 0.125f };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .diffuse_transmission = &frosted, .fade = 1 });
+    test_flt(record.diffuse_blur, 0.125f);
+    test_flt(record.thickness, 0.25f);
+    test_uint(record.diffuse_transmission >> 24, 128u);
+    test_uint(record.reserved[0], 0);
+    test_uint(record.reserved[1], 0);
+
+    DiffuseTransmission plain_blur = { .factor = 0.5f, .color = {255, 255, 255} };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .diffuse_transmission = &plain_blur, .fade = 1 });
+    test_flt(record.diffuse_blur, 0);
+
+    DiffuseTransmission negative = { .factor = 0.5f, .color = {255, 255, 255}, .blur = -1 };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .diffuse_transmission = &negative, .fade = 1 });
+    test_flt(record.diffuse_blur, 0);
+
+    DiffuseTransmission nan = { .factor = 0.5f, .color = {255, 255, 255}, .blur = NAN };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .diffuse_transmission = &nan, .fade = 1 });
+    test_flt(record.diffuse_blur, 0);
+
+    DiffuseTransmission inf = { .factor = 0.5f, .color = {255, 255, 255}, .blur = INFINITY };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .diffuse_transmission = &inf, .fade = 1 });
+    test_flt(record.diffuse_blur, 0);
+
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .diffuse_transmission = &frosted, .fade = 1 });
+    record.diffuse_transmission = 0;
+    record.thickness = 0;
+    record.diffuse_blur = 0;
+    test_assert(!ecs_os_memcmp_t(&record, &plain, box_render_material_t));
+
+    PbrMaterial pbr = { .metallic = 0.25f, .roughness = 0.125f };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .diffuse_transmission = &frosted, .pbr = &pbr, .fade = 1 });
+    box_draw_transition_material_t target;
+    box_render_material_t encoded;
+    box_draws_transition_target(&target, &(box_draw_material_t){
+        .diffuse_transmission = &frosted, .pbr = &pbr, .fade = 1 },
+        BOX_DRAW_TRANSITION_TABLE);
+    box_draws_transition_encode(&target, &encoded);
+    test_assert(!ecs_os_memcmp_t(&encoded, &record, box_render_material_t));
+    test_flt(encoded.diffuse_blur, 0.125f);
 }
