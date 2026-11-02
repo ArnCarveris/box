@@ -57,6 +57,7 @@ template HullDecal {
   prop rough: f32 = 0.3
   prop tex: entity = tex_crack
   prop solid: bool = false
+  prop glint: f32 = 0
 
   const p = hull_pt(s, t)
   const n = hull_in(s, t)
@@ -72,6 +73,7 @@ template HullDecal {
   }
   PbrMaterial: {metallic: 0, roughness: rough}
   PbrTextures: {albedo: tex}
+  Emissive: {strength: glint, color: tint}
   NoShadow
   SpatialIgnore
 }
@@ -385,7 +387,7 @@ template MapLamp {
   beam_light {
     Position: {at.x, at.y, at.z}
     Rotation: {pitch_of(at, aim), yaw_of(at, aim), 0}
-    SpotLight: {intensity: match lit { true: 0.34; _: 0 }, range: 1.6, inner_angle: 26, outer_angle: 54}
+    SpotLight: {intensity: match lit { true: 1.0; _: 0 }, range: 1.6, inner_angle: 26, outer_angle: 54}
     Rgb: {255, 206, 140}
   }
 }
@@ -407,9 +409,9 @@ template DustFall {
 }
 
 template PaneDamage {
-  HullDecal crack(s: 0.235, t: -0.6, lift: 0.006, w: 0.42, h: 0.42, roll: 0.5, tint: {236, 240, 240}, tex: tex_crack)
-  HullDecal tape_a(s: 0.205, t: -0.56, lift: 0.009, w: 0.15, h: 0.03, roll: 0.72, tint: {150, 144, 120}, rough: 0.8, tex: tex_tape)
-  HullDecal tape_b(s: 0.205, t: -0.56, lift: 0.011, w: 0.14, h: 0.03, roll: -0.66, tint: {150, 144, 120}, rough: 0.8, tex: tex_tape)
+  HullDecal crack(s: 0.235, t: -0.6, lift: 0.006, w: 0.46, h: 0.46, roll: 0.5, tint: {236, 240, 240}, tex: tex_crack, glint: 0.32)
+  HullDecal tape_a(s: 0.228, t: -0.585, lift: 0.009, w: 0.13, h: 0.026, roll: 0.72, tint: {214, 206, 170}, rough: 0.8, tex: tex_tape)
+  HullDecal tape_b(s: 0.228, t: -0.585, lift: 0.011, w: 0.12, h: 0.026, roll: -0.66, tint: {214, 206, 170}, rough: 0.8, tex: tex_tape)
   wash {
     const p = hull_pt(0.26, 0.42)
     const n = hull_in(0.26, 0.42)
