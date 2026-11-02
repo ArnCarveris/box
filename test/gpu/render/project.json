@@ -423,7 +423,8 @@
                     "unbaked_view_renders_identically",
                     "ambient_probes_match_hemisphere",
                     "open_air_probes_invalid",
-                    "probes_around_shape_follow_it"
+                    "probes_around_shape_follow_it",
+                    "probes_around_moved_shape_follow_it"
                 ]
             },
             {

@@ -116,7 +116,8 @@ done:
 /** Check again whether the probes of a volume inside a box are usable.
  *
  * A probe that became invalid is hidden from the views at once. One that became valid is
- * shown when the bake that captures it is shown, so the views never see its old values.
+ * shown when the bake that captures it is shown, so the views never see its old values. A probe
+ * is checked once per frame, however many changed shapes reach it.
  *
  * @param world The world
  * @param b The state
@@ -134,6 +135,7 @@ static void box_bake_revalidate(
     const box_mesh_cache_t *cache = box_mesh_cache_of(world);
     uint32_t *valid = ecs_vec_first(&v->valid);
     uint32_t *shown = ecs_vec_first(&v->shown);
+    uint32_t *checked = ecs_vec_first(&v->checked);
     int32_t lo[3], hi[3], x, y, z;
     if (!box_bake_cells(v, min, max, lo, hi)) {
         goto done;
@@ -145,6 +147,11 @@ static void box_bake_revalidate(
                 uint32_t probe = (uint32_t)(x + (y + z * v->grid.size[1]) * v->grid.size[0]);
                 uint32_t bit = 1u << (probe & 31);
                 vec3 pos;
+                if (checked[probe >> 5] & bit) {
+                    continue;
+                }
+
+                checked[probe >> 5] |= bit;
                 box_bake_probe_position(v, probe, pos);
                 bool now = box_bake_usable(world, b, cache, v, pos);
                 if (now == ((valid[probe >> 5] & bit) != 0)) {
@@ -234,15 +241,18 @@ static bool box_bake_recording(
  * @param b The state
  * @param e The shape
  * @param removed Whether the shape is being removed, so the index may have lost it already
+ * @param geometry Whether the change can move, add or remove surfaces
  */
 static void box_bake_record(
     const ecs_world_t *world,
     box_render_bake_t *b,
     ecs_entity_t e,
-    bool removed)
+    bool removed,
+    bool geometry)
 {
     box_bake_change_t *c = ecs_vec_append_t(NULL, &b->changes, box_bake_change_t);
     c->entity = e;
+    c->geometry = geometry;
     c->old = box_spatial_bounds(world, e, &c->scene, c->min, c->max);
     if (!c->old && removed && ecs_has(world, e, WorldTransform) &&
         box_bake_shape_bounds(world, e, c->min, c->max))
@@ -303,7 +313,8 @@ static void BakeOnChange(
         if (ecs_has(it->world, e, ShapeMesh) &&
             box_bake_captured_but(it->world, it->table, e, flag ? id : 0))
         {
-            box_bake_record(it->world, b, e, it->event == EcsOnRemove);
+            box_bake_record(it->world, b, e, it->event == EcsOnRemove,
+                flag || deleted || id == ecs_id(ShapeMesh));
         }
     }
 
@@ -325,7 +336,7 @@ static void box_bake_record_tree(
     if (ecs_has(world, e, ShapeMesh) &&
         box_bake_captured_but(world, ecs_get_table(world, e), e, 0))
     {
-        box_bake_record(world, b, e, false);
+        box_bake_record(world, b, e, false, false);
     }
 
     ecs_iter_t it = ecs_children(world, e);
@@ -372,26 +383,29 @@ static void box_bake_on_moved(
     int32_t i;
     for (i = 0; box_bake_recording(b) && i < count; i ++) {
         if (ecs_has(world, entities[i], ShapeMesh) && !ecs_has_id(world, entities[i], NoBake)) {
-            box_bake_record(world, ctx, entities[i], false);
+            box_bake_record(world, ctx, entities[i], false, true);
         }
     }
 }
 
 /** Queue the probes a changed region of a scene can reach: its bounds padded by the probe
- * spacing once per pass, after checking again which probes within reach of it are usable.
+ * spacing once per pass. When its surfaces changed, not only their look, it first checks again
+ * which probes within reach of it are usable.
  *
  * @param world The world
  * @param b The state
  * @param scene The scene of the region
  * @param min Minimum corner of the region
  * @param max Maximum corner of the region
+ * @param geometry Whether surfaces of the region moved, came or went
  */
 static void box_bake_region(
     const ecs_world_t *world,
     box_render_bake_t *b,
     ecs_entity_t scene,
     const vec3 min,
-    const vec3 max)
+    const vec3 max,
+    bool geometry)
 {
     box_bake_volume_t *v = box_bake_find(b, scene);
     vec3 lo, hi;
@@ -404,7 +418,10 @@ static void box_bake_region(
     float pad = glm_max(v->grid.spacing * (float)(1 + bounces), reach);
     glm_vec3_subs(ECS_CONST_CAST(float*, min), reach, lo);
     glm_vec3_adds(ECS_CONST_CAST(float*, max), reach, hi);
-    box_bake_revalidate(world, b, v, lo, hi);
+    if (geometry) {
+        box_bake_revalidate(world, b, v, lo, hi);
+    }
+
     glm_vec3_subs(ECS_CONST_CAST(float*, min), pad, lo);
     glm_vec3_adds(ECS_CONST_CAST(float*, max), pad, hi);
     box_bake_mark_box(v, lo, hi, false);
@@ -418,15 +435,18 @@ done:
  * @param scene The scene of the region
  * @param min Minimum corner of the region
  * @param max Maximum corner of the region
+ * @param geometry Whether surfaces of the region moved, came or went
  */
 static void box_bake_add_region(
     box_render_bake_t *b,
     ecs_entity_t scene,
     const vec3 min,
-    const vec3 max)
+    const vec3 max,
+    bool geometry)
 {
     box_bake_region_t *r = ecs_vec_append_t(NULL, &b->regions, box_bake_region_t);
     r->scene = scene;
+    r->geometry = geometry;
     glm_vec3_copy(ECS_CONST_CAST(float*, min), r->min);
     glm_vec3_copy(ECS_CONST_CAST(float*, max), r->max);
 }
@@ -442,7 +462,7 @@ void box_bake_changes(
         ecs_entity_t e = c->entity, scene = 0;
         vec3 min, max;
         if (c->old) {
-            box_bake_add_region(b, c->scene, c->min, c->max);
+            box_bake_add_region(b, c->scene, c->min, c->max, c->geometry);
         }
 
         if (ecs_is_alive(world, e) && !ecs_has_id(world, e, NoBake) &&
@@ -451,14 +471,23 @@ void box_bake_changes(
             !box_transform_dynamic(world, ecs_get_table(world, e)) &&
             box_spatial_bounds(world, e, &scene, min, max))
         {
-            box_bake_add_region(b, scene, min, max);
+            box_bake_add_region(b, scene, min, max, c->geometry);
         }
     }
 
     ecs_vec_clear(&b->changes);
+    for (i = 0; ecs_vec_count(&b->regions) && i < ecs_vec_count(&b->volumes); i ++) {
+        box_bake_volume_t *v = ecs_vec_get_t(&b->volumes, box_bake_volume_t, i);
+        int32_t words = ecs_vec_count(&v->valid);
+        ecs_vec_set_count_t(NULL, &v->checked, uint32_t, words);
+        if (words) {
+            ecs_os_memset_n(ecs_vec_first(&v->checked), 0, uint32_t, words);
+        }
+    }
+
     for (i = 0; ecs_vec_count(&b->volumes) && i < ecs_vec_count(&b->regions); i ++) {
         const box_bake_region_t *r = ecs_vec_get_t(&b->regions, box_bake_region_t, i);
-        box_bake_region(world, b, r->scene, r->min, r->max);
+        box_bake_region(world, b, r->scene, r->min, r->max, r->geometry);
     }
 }
 

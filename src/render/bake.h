@@ -28,6 +28,7 @@ typedef struct box_bake_change_t {
     ecs_entity_t entity;    /**< The shape */
     ecs_entity_t scene;     /**< Scene of the old bounds */
     bool old;               /**< The shape had bounds in a scene before the change */
+    bool geometry;          /**< The change can move, add or remove surfaces, not only their look */
     vec3 min;               /**< Minimum corner of the old bounds */
     vec3 max;               /**< Maximum corner of the old bounds */
 } box_bake_change_t;
@@ -35,6 +36,7 @@ typedef struct box_bake_change_t {
 /** A region of a scene a static shape covered before or after a change */
 typedef struct box_bake_region_t {
     ecs_entity_t scene;     /**< Scene of the region */
+    bool geometry;          /**< Surfaces of the region moved, came or went */
     vec3 min;               /**< Minimum corner of the region */
     vec3 max;               /**< Maximum corner of the region */
 } box_bake_region_t;
@@ -133,6 +135,7 @@ typedef struct box_bake_volume_t {
     int32_t filled_content; /**< env_content the probes were filled with, or rebaked for */
     float ambient[BOX_RENDER_SH_COEFFICIENTS][4]; /**< Irradiance of the views of this frame */
     ecs_vec_t valid;        /**< uint32_t, one bit per probe a static surface can use */
+    ecs_vec_t checked;      /**< uint32_t, one bit per probe checked again in this frame */
     ecs_vec_t queue;        /**< uint32_t, probes waiting for capture, the nearest last */
     ecs_vec_t flight;       /**< box_bake_flight_t, probes in packets not reported captured */
     ecs_vec_t done;         /**< uint8_t, passes the backend reported for every probe */

@@ -80,6 +80,7 @@ static box_bake_volume_t* box_bake_ensure(
         ecs_os_memset_t(result, 0, box_bake_volume_t);
         result->scene = scene;
         ecs_vec_init_t(NULL, &result->valid, uint32_t, 0);
+        ecs_vec_init_t(NULL, &result->checked, uint32_t, 0);
         ecs_vec_init_t(NULL, &result->queue, uint32_t, 0);
         ecs_vec_init_t(NULL, &result->flight, box_bake_flight_t, 0);
         ecs_vec_init_t(NULL, &result->done, uint8_t, 0);
@@ -998,6 +999,7 @@ static void box_bake_volume_fini(
     box_bake_volume_t *v)
 {
     ecs_vec_fini_t(NULL, &v->valid, uint32_t);
+    ecs_vec_fini_t(NULL, &v->checked, uint32_t);
     ecs_vec_fini_t(NULL, &v->queue, uint32_t);
     ecs_vec_fini_t(NULL, &v->flight, box_bake_flight_t);
     ecs_vec_fini_t(NULL, &v->done, uint8_t);
