@@ -141,6 +141,14 @@ ECS_STRUCT(LayoutContent, {
  * It draws and picks above every non floating element of its scene, floats among each other in
  * hierarchy order, and ClipChildren ancestors of its parent do not clip it or its descendants.
  * It follows its anchor when the anchor moves, scrolls or resizes, in the same frame.
+ *
+ * With clip the element is a clipped overlay instead, such as the scroll bars of a scroll view:
+ * placed the same way, out of the flow and not shifted by a LayoutScroll of its parent, but the
+ * ClipChildren ancestors of its parent clip it and its descendants as any other child, in the
+ * 2D shader and in picking. It does not count as floating: it draws and picks in the hierarchy
+ * order of its parent, after its siblings of the same Position z and their descendants, as if
+ * it were the last child, whatever its place among the children. A clipped overlay inside a
+ * regular float draws with that float, above the non floating elements, and is clipped up to it.
  */
 ECS_STRUCT(LayoutFloat, {
     ecs_entity_t anchor; /**< Element the float is placed against, 0 for its parent; found
@@ -155,6 +163,9 @@ ECS_STRUCT(LayoutFloat, {
     bool flip;           /**< Keep the float inside its layout root (or LayoutFill surface): on y
                           *   it flips to the anchor's other side when that fits better, y offset
                           *   mirrored; on x it is shifted to stay inside */
+    bool clip;           /**< A clipped overlay: the ClipChildren ancestors of its parent
+                          *   still clip it, and it draws in the order of its parent, after its
+                          *   siblings */
 });
 
 /** Makes an element take the size of a surface in points, the root of a layout that fills the

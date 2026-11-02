@@ -1442,6 +1442,9 @@ void Transition_supported(void) {
     test_assert(box_transition_supported(world, ecs_id(TextureTransform)));
     test_assert(box_transition_supported(world, ecs_id(Transmission)));
     test_assert(box_transition_supported(world, ecs_id(ClearCoat)));
+    test_assert(box_transition_supported(world, ecs_id(SpecularAnisotropy)));
+    test_assert(box_transition_supported(world, ecs_id(Sheen)));
+    test_assert(box_transition_supported(world, ecs_id(DiffuseTransmission)));
 
     test_assert(!box_transition_supported(world, ecs_id(PbrTextures)));
     test_assert(!box_transition_supported(world, ecs_id(WorldTransform)));
@@ -1524,6 +1527,83 @@ void Transition_clear_coat_map(void) {
     test_int(ecs_map_count(ecs_get(world, e, Transition)), 1);
 
     ecs_fini(world);
+}
+
+/** Run a script that gives an entity a material lobe and a transition of it, and check the
+ * transition is stored, valid and can be replaced from C.
+ *
+ * @param name Name of the script
+ * @param code The script, of an entity e
+ * @param path Path of the component
+ */
+static void transition_lobe_map(
+    const char *name,
+    const char *code,
+    const char *path)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    transition_capture_begin();
+    int result = ecs_script_run(world, name, code, NULL);
+    char *errors = transition_capture_end();
+    test_int(result, 0);
+    test_assert(errors == NULL);
+
+    ecs_entity_t e = ecs_lookup(world, "e");
+    ecs_entity_t id = ecs_lookup(world, path);
+    test_assert(e != 0);
+    test_assert(id != 0);
+    test_int(ecs_map_count(ecs_get(world, e, Transition)), 1);
+    const TransitionSpec *t = box_transition_get(world, e, id);
+    test_assert(t != NULL);
+    test_flt(t->duration, 0.5f);
+    test_int(t->timing_function, EaseInOut);
+    test_assert(box_transition_supported(world, id));
+    test_assert(box_transition_valid(world, id, t));
+    test_assert(!box_transition_valid(world, id, &(TransitionSpec){ .duration = -1.0f }));
+
+    transition_capture_begin();
+    box_transition_set(world, e, id, &(TransitionSpec){ .duration = 2.0f });
+    errors = transition_capture_end();
+    test_assert(errors == NULL);
+    test_flt(box_transition_get(world, e, id)->duration, 2.0f);
+    test_int(ecs_map_count(ecs_get(world, e, Transition)), 1);
+
+    ecs_fini(world);
+}
+
+void Transition_specular_anisotropy_map(void) {
+    // engine_core/transition
+    transition_lobe_map("specular_anisotropy",
+        "using box.material\n"
+        "using box.transition\n"
+        "e {\n"
+        "  SpecularAnisotropy: {strength: 1, rotation: 0.5}\n"
+        "  Transition: [SpecularAnisotropy: {duration: 0.5, timing_function: EaseInOut}]\n"
+        "}\n", "box.material.SpecularAnisotropy");
+}
+
+void Transition_sheen_map(void) {
+    // engine_core/transition
+    transition_lobe_map("sheen",
+        "using box.material\n"
+        "using box.transition\n"
+        "e {\n"
+        "  Sheen: {color: {255, 255, 255}, roughness: 0.25}\n"
+        "  Transition: [Sheen: {duration: 0.5, timing_function: EaseInOut}]\n"
+        "}\n", "box.material.Sheen");
+}
+
+void Transition_diffuse_transmission_map(void) {
+    // engine_core/transition
+    transition_lobe_map("diffuse_transmission",
+        "using box.material\n"
+        "using box.transition\n"
+        "e {\n"
+        "  DiffuseTransmission: {factor: 0.5, color: {255, 255, 255}}\n"
+        "  Transition: [DiffuseTransmission: {duration: 0.5, timing_function: EaseInOut}]\n"
+        "}\n", "box.material.DiffuseTransmission");
 }
 
 void Transition_ease_end_points(void) {

@@ -41,6 +41,9 @@ static void tr_material_set(
     case BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM: m->uv = value; break;
     case BOX_RENDER_TRANSITION_TRANSMISSION: m->transmission = value; break;
     case BOX_RENDER_TRANSITION_CLEAR_COAT: m->clear_coat = value; break;
+    case BOX_RENDER_TRANSITION_ANISOTROPY: m->anisotropy = value; break;
+    case BOX_RENDER_TRANSITION_SHEEN: m->sheen = value; break;
+    case BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION: m->diffuse_transmission = value; break;
     default: test_assert(false); break;
     }
 }
@@ -179,6 +182,24 @@ static const Transmission tr_transmission_to = {
 static const ClearCoat tr_coat_from = { .strength = 0.25f, .roughness = 0 };
 static const ClearCoat tr_coat_to = { .strength = 1, .roughness = 1 };
 
+/** The SpecularAnisotropy case: the rotation turns twice, 0 to 4 pi, which a shortest path or a
+ * wrap of the moving value would not, so the packed rotation is pi, 2 pi and 3 pi in between */
+static const SpecularAnisotropy tr_aniso_from = { .strength = 0.25f, .rotation = 0 };
+static const SpecularAnisotropy tr_aniso_to = { .strength = 1, .rotation = 4.0f * GLM_PIf };
+
+/** The Sheen case: every color channel steps by an integer each quarter */
+static const Sheen tr_sheen_from = { .color = {40, 20, 8}, .roughness = 0 };
+static const Sheen tr_sheen_to = { .color = {200, 100, 40}, .roughness = 1 };
+
+/** The DiffuseTransmission case: every float and color channel steps by an exact amount each
+ * quarter */
+static const DiffuseTransmission tr_diffuse_from = {
+    .factor = 0, .color = {0, 0, 0}, .thickness = 0, .blur = 0
+};
+static const DiffuseTransmission tr_diffuse_to = {
+    .factor = 1, .color = {200, 100, 40}, .thickness = 2, .blur = 0.5f
+};
+
 /** Get the case of a component, once the world registered the components.
  *
  * @param c The component
@@ -230,6 +251,24 @@ static tr_material_case_t tr_case(
         result.size = ECS_SIZEOF(ClearCoat);
         result.from = &tr_coat_from;
         result.to = &tr_coat_to;
+        break;
+    case BOX_RENDER_TRANSITION_ANISOTROPY:
+        result.component = ecs_id(SpecularAnisotropy);
+        result.size = ECS_SIZEOF(SpecularAnisotropy);
+        result.from = &tr_aniso_from;
+        result.to = &tr_aniso_to;
+        break;
+    case BOX_RENDER_TRANSITION_SHEEN:
+        result.component = ecs_id(Sheen);
+        result.size = ECS_SIZEOF(Sheen);
+        result.from = &tr_sheen_from;
+        result.to = &tr_sheen_to;
+        break;
+    case BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION:
+        result.component = ecs_id(DiffuseTransmission);
+        result.size = ECS_SIZEOF(DiffuseTransmission);
+        result.from = &tr_diffuse_from;
+        result.to = &tr_diffuse_to;
         break;
     default:
         test_assert(false);
@@ -1316,4 +1355,379 @@ void TransitionMaterial_transitions_get_no_lookup(void) {
     test_assert(q != ecs_id(RenderTransitionState));
     test_assert(ecs_query_get(world, q) != NULL);
     tr_fini(world, null);
+}
+
+/** Run a material transition of a prefab with mesh instances and one instance that owns its
+ * own value: the slot of the prefab is patched at every quarter with the mixed value, the slot
+ * of the owner keeps its own, and no instance changes its batch or slot.
+ *
+ * @param c The component
+ * @param own The value of the instance that owns one
+ */
+static void tr_test_prefab_material(
+    box_render_transition_component_t c,
+    const void *own)
+{
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    box_render_transitions_t *s = box_render_transitions_get(world);
+    tr_material_case_t case_ = tr_case(c), *mc = &case_;
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_entity_t instances[8];
+    box_render_material_t rendered, expected;
+    box_draw_material_t m;
+    float mid[BOX_RENDER_TRANSITION_VALUE / 4];
+    int32_t i;
+    ecs_set(world, prefab, Box, {1, 1, 1});
+    ecs_set_id(world, prefab, mc->component, (size_t)mc->size, mc->from);
+    box_transition_set(world, prefab, mc->component, &(TransitionSpec){ .duration = 1.0f });
+    for (i = 0; i < 8; i ++) {
+        instances[i] = ecs_new_w_pair(world, EcsIsA, prefab);
+        ecs_set(world, instances[i], Position, {(float)i, 0, 0});
+    }
+
+    ecs_entity_t over = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_set(world, over, Position, {0, 2, 0});
+    ecs_set_id(world, over, mc->component, (size_t)mc->size, own);
+    tr_frame(world);
+    tr_frame(world);
+    uint32_t slot_p = ecs_get(world, prefab, MaterialId)->value;
+    uint32_t slot_o = ecs_get(world, over, MaterialId)->value;
+    test_assert(ecs_owns(world, over, MaterialId));
+    test_assert(slot_o != slot_p);
+    int32_t batch = ecs_get(world, instances[0], DrawSlot)->batch;
+    int32_t batch_o = ecs_get(world, over, DrawSlot)->batch;
+    box_render_material_t own_record;
+    box_draws_material_of(world, over, &m);
+    box_draws_material_pack(&own_record, &m);
+
+    ecs_set_id(world, prefab, mc->component, (size_t)mc->size, mc->to);
+    for (i = 0; i < 4; i ++) {
+        int32_t j;
+        tr_frame(world);
+        test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 1);
+        test_int(box_render_transitions_material_visited(s), 2);
+        tr_material_mix(mc, (float)i / 4.0f, mid);
+        box_draws_material_of(world, prefab, &m);
+        tr_material_set(&m, mc->c, mid);
+        box_draws_material_pack(&expected, &m);
+        test_assert(tr_material_rendered(world, null, slot_p, &rendered));
+        test_assert(!ecs_os_memcmp_t(&rendered, &expected, box_render_material_t));
+        if (tr_material_rendered(world, null, slot_o, &rendered)) {
+            test_assert(!ecs_os_memcmp_t(&rendered, &own_record, box_render_material_t));
+        }
+
+        test_int(ecs_get(world, over, DrawSlot)->batch, batch_o);
+        for (j = 0; j < 8; j ++) {
+            const DrawSlot *ds = ecs_get(world, instances[j], DrawSlot);
+            test_assert(!ecs_has_id(world, instances[j], TransitionMaterial));
+            test_assert(!ecs_os_memcmp(ecs_get_id(world, instances[j], mc->component), mc->to,
+                mc->size));
+            test_int(ds->batch, batch);
+            test_uint(box_draws_slot_mesh_shading(tr_batch(world, instances[j]),
+                ds->slot)->material, slot_p);
+        }
+    }
+
+    tr_frame(world);
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
+    box_draws_material_of(world, prefab, &m);
+    box_draws_material_pack(&expected, &m);
+    test_assert(tr_material_rendered(world, null, slot_p, &rendered));
+    test_assert(!ecs_os_memcmp_t(&rendered, &expected, box_render_material_t));
+    tr_fini(world, null);
+}
+
+/** Check that a mesh shape with a material component and a Transition of it pays nothing
+ * while the component does not change, and that a shape without a Transition pays nothing when
+ * it changes: no transition records, no TransitionMaterial and the slot is packed directly.
+ *
+ * @param c The component
+ */
+static void tr_test_material_idle(
+    box_render_transition_component_t c)
+{
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    box_render_transitions_t *s = box_render_transitions_get(world);
+    tr_material_case_t case_ = tr_case(c), *mc = &case_;
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    ecs_entity_t plain = tr_shape(world, 0, 2);
+    box_render_material_t rendered, expected;
+    box_draw_material_t m;
+    int32_t i;
+    ecs_set_id(world, e, mc->component, (size_t)mc->size, mc->from);
+    box_transition_set(world, e, mc->component, &(TransitionSpec){ .duration = 1.0f });
+    ecs_set_id(world, plain, mc->component, (size_t)mc->size, mc->from);
+    tr_frame(world);
+    tr_frame(world);
+    for (i = 0; i < 3; i ++) {
+        tr_frame(world);
+        test_int(ecs_vec_count(&null->last.transitions), 0);
+        test_int(box_render_transitions_material_visited(s), 0);
+        test_assert(!ecs_has_id(world, e, TransitionMaterial));
+    }
+
+    int32_t batch = ecs_get(world, plain, DrawSlot)->batch;
+    ecs_set_id(world, plain, mc->component, (size_t)mc->size, mc->to);
+    tr_frame(world);
+    uint32_t slot = ecs_get(world, plain, MaterialId)->value;
+    test_assert(slot != ecs_get(world, e, MaterialId)->value);
+    test_int(ecs_vec_count(&null->last.transitions), 0);
+    test_int(box_render_transitions_material_visited(s), 0);
+    test_assert(!ecs_has_id(world, plain, TransitionMaterial));
+    test_int(ecs_get(world, plain, DrawSlot)->batch, batch);
+    box_draws_material_of(world, plain, &m);
+    box_draws_material_pack(&expected, &m);
+    test_assert(tr_material_rendered(world, null, slot, &rendered));
+    test_assert(!ecs_os_memcmp_t(&rendered, &expected, box_render_material_t));
+    tr_fini(world, null);
+}
+
+/** Check that the final record of a transition equals the record of a shape that had the target
+ * set directly, without a transition: once it ends the shape shares the slot of that shape, in
+ * the same batch.
+ *
+ * @param c The component
+ */
+static void tr_test_material_final(
+    box_render_transition_component_t c)
+{
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    tr_material_case_t case_ = tr_case(c), *mc = &case_;
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    ecs_entity_t direct = tr_shape(world, 0, 2);
+    box_render_material_t packed, still;
+    box_draw_material_t m;
+    int32_t i;
+    ecs_set_id(world, e, mc->component, (size_t)mc->size, mc->from);
+    box_transition_set(world, e, mc->component, &(TransitionSpec){ .duration = 1.0f });
+    ecs_set_id(world, direct, mc->component, (size_t)mc->size, mc->to);
+    tr_frame(world);
+    tr_frame(world);
+    uint32_t slot = ecs_get(world, e, MaterialId)->value;
+    uint32_t slot_d = ecs_get(world, direct, MaterialId)->value;
+    int32_t batch = ecs_get(world, e, DrawSlot)->batch;
+    test_assert(slot != slot_d);
+
+    ecs_set_id(world, e, mc->component, (size_t)mc->size, mc->to);
+    for (i = 0; i < 5; i ++) {
+        tr_frame(world);
+        test_int(ecs_get(world, e, DrawSlot)->batch, batch);
+        test_assert(!ecs_has_id(world, e, TransitionMaterial));
+    }
+
+    const DrawSlot *ds = ecs_get(world, e, DrawSlot);
+    test_uint(ecs_get(world, e, MaterialId)->value, slot_d);
+    test_uint(box_draws_slot_mesh_shading(tr_batch(world, e), ds->slot)->material, slot_d);
+    box_draws_material_of(world, e, &m);
+    box_draws_material_pack(&packed, &m);
+    still = *ecs_vec_get_t(&box_draws_state(world)->materials.records, box_render_material_t,
+        (int32_t)slot_d);
+    test_assert(!ecs_os_memcmp_t(&packed, &still, box_render_material_t));
+    test_int(ds->batch, ecs_get(world, direct, DrawSlot)->batch);
+    tr_fini(world, null);
+}
+
+/** Get the packed anisotropy word of a SpecularAnisotropy, the rotation wrapped to 0..2 pi.
+ *
+ * @param a The anisotropy
+ * @return The word
+ */
+static uint32_t tr_aniso_word(
+    const SpecularAnisotropy *a)
+{
+    float turn = 2.0f * GLM_PIf;
+    float rotation = fmodf(a->rotation, turn);
+    if (rotation < 0.0f) {
+        rotation += turn;
+    }
+
+    return tr_unorm16(a->strength) | (tr_unorm16(rotation / turn) << 16);
+}
+
+/* The rotation renders 0, pi, 2 pi and 3 pi in the frames after the change: packed as none, half
+ * a turn, none and half a turn, which neither a shortest path nor a wrap of the moving value
+ * gives. */
+void TransitionMaterial_specular_anisotropy_mesh(void) {
+    // engine_core/transition
+    tr_test_mesh_material(BOX_RENDER_TRANSITION_ANISOTROPY);
+
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    box_render_material_t rendered;
+    int32_t i;
+    ecs_set_ptr(world, e, SpecularAnisotropy, &tr_aniso_from);
+    box_transition_set(world, e, ecs_id(SpecularAnisotropy),
+        &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+    tr_frame(world);
+    uint32_t slot = ecs_get(world, e, MaterialId)->value;
+    test_assert(slot != 0 && slot != UINT32_MAX);
+
+    ecs_set_ptr(world, e, SpecularAnisotropy, &tr_aniso_to);
+    for (i = 0; i < 4; i ++) {
+        SpecularAnisotropy expected = {
+            .strength = 0.25f + 0.75f * 0.25f * (float)i,
+            .rotation = GLM_PIf * (float)i
+        };
+        uint32_t half;
+        tr_frame(world);
+        test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 1);
+        test_assert(tr_material_rendered(world, null, slot, &rendered));
+        test_uint(rendered.anisotropy & 0xFFFFu, tr_unorm16(expected.strength));
+        half = rendered.anisotropy >> 16;
+        if (i == 1 || i == 3) {
+            test_assert(half >= 32766u && half <= 32769u);
+        } else {
+            test_assert(half <= 1u || half >= 65534u);
+        }
+    }
+
+    tr_frame(world);
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
+    test_assert(tr_material_rendered(world, null, slot, &rendered));
+    test_uint(rendered.anisotropy, tr_aniso_word(&tr_aniso_to));
+    tr_fini(world, null);
+}
+
+void TransitionMaterial_specular_anisotropy_prefab(void) {
+    // engine_core/transition
+    tr_test_prefab_material(BOX_RENDER_TRANSITION_ANISOTROPY,
+        &(SpecularAnisotropy){ .strength = 0.5f, .rotation = 1.0f });
+}
+
+void TransitionMaterial_specular_anisotropy_final(void) {
+    // engine_core/transition
+    tr_test_material_final(BOX_RENDER_TRANSITION_ANISOTROPY);
+}
+
+void TransitionMaterial_specular_anisotropy_idle(void) {
+    // engine_core/transition
+    tr_test_material_idle(BOX_RENDER_TRANSITION_ANISOTROPY);
+}
+
+void TransitionMaterial_specular_anisotropy_2d(void) {
+    // engine_core/transition
+    tr_test_shape_material(BOX_RENDER_TRANSITION_ANISOTROPY, false);
+}
+
+void TransitionMaterial_sheen_mesh(void) {
+    // engine_core/transition
+    tr_test_mesh_material(BOX_RENDER_TRANSITION_SHEEN);
+
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    box_render_material_t rendered;
+    int32_t i;
+    ecs_set_ptr(world, e, Sheen, &tr_sheen_from);
+    box_transition_set(world, e, ecs_id(Sheen), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+    tr_frame(world);
+    uint32_t slot = ecs_get(world, e, MaterialId)->value;
+    test_assert(slot != 0 && slot != UINT32_MAX);
+
+    ecs_set_ptr(world, e, Sheen, &tr_sheen_to);
+    for (i = 0; i < 4; i ++) {
+        uint32_t k = (uint32_t)i;
+        uint32_t r = (uint32_t)(0.25f * (float)i * 255.0f + 0.5f);
+        tr_frame(world);
+        test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 1);
+        test_assert(tr_material_rendered(world, null, slot, &rendered));
+        test_uint(rendered.sheen & 0xFFFFFFu,
+            tr_color_word(40 + 40 * k, 20 + 20 * k, 8 + 8 * k));
+        test_uint(rendered.sheen >> 24, r);
+    }
+
+    tr_frame(world);
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
+    test_assert(tr_material_rendered(world, null, slot, &rendered));
+    test_uint(rendered.sheen, tr_color_word(200, 100, 40) | (255u << 24));
+    tr_fini(world, null);
+}
+
+void TransitionMaterial_sheen_prefab(void) {
+    // engine_core/transition
+    tr_test_prefab_material(BOX_RENDER_TRANSITION_SHEEN,
+        &(Sheen){ .color = {10, 200, 30}, .roughness = 0.25f });
+}
+
+void TransitionMaterial_sheen_final(void) {
+    // engine_core/transition
+    tr_test_material_final(BOX_RENDER_TRANSITION_SHEEN);
+}
+
+void TransitionMaterial_sheen_idle(void) {
+    // engine_core/transition
+    tr_test_material_idle(BOX_RENDER_TRANSITION_SHEEN);
+}
+
+void TransitionMaterial_sheen_2d(void) {
+    // engine_core/transition
+    tr_test_shape_material(BOX_RENDER_TRANSITION_SHEEN, false);
+}
+
+void TransitionMaterial_diffuse_transmission_mesh(void) {
+    // engine_core/transition
+    tr_test_mesh_material(BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION);
+
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    box_render_material_t rendered;
+    int32_t i;
+    ecs_set_ptr(world, e, DiffuseTransmission, &tr_diffuse_from);
+    box_transition_set(world, e, ecs_id(DiffuseTransmission),
+        &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+    tr_frame(world);
+    uint32_t slot = ecs_get(world, e, MaterialId)->value;
+    test_assert(slot != 0 && slot != UINT32_MAX);
+
+    ecs_set_ptr(world, e, DiffuseTransmission, &tr_diffuse_to);
+    for (i = 0; i < 4; i ++) {
+        uint32_t k = (uint32_t)i;
+        float t = 0.25f * (float)i;
+        uint32_t f = (uint32_t)(t * 255.0f + 0.5f);
+        tr_frame(world);
+        test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 1);
+        test_assert(tr_material_rendered(world, null, slot, &rendered));
+        test_uint(rendered.diffuse_transmission & 0xFFFFFFu,
+            tr_color_word(50 * k, 25 * k, 10 * k));
+        test_uint(rendered.diffuse_transmission >> 24, f);
+        test_flt(rendered.thickness, 2.0f * t);
+        test_flt(rendered.diffuse_blur, 0.5f * t);
+    }
+
+    tr_frame(world);
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
+    test_assert(tr_material_rendered(world, null, slot, &rendered));
+    test_uint(rendered.diffuse_transmission, tr_color_word(200, 100, 40) | (255u << 24));
+    test_flt(rendered.thickness, 2.0f);
+    test_flt(rendered.diffuse_blur, 0.5f);
+    tr_fini(world, null);
+}
+
+void TransitionMaterial_diffuse_transmission_prefab(void) {
+    // engine_core/transition
+    tr_test_prefab_material(BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION,
+        &(DiffuseTransmission){ .factor = 0.75f, .color = {10, 200, 30}, .thickness = 1 });
+}
+
+void TransitionMaterial_diffuse_transmission_final(void) {
+    // engine_core/transition
+    tr_test_material_final(BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION);
+}
+
+void TransitionMaterial_diffuse_transmission_idle(void) {
+    // engine_core/transition
+    tr_test_material_idle(BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION);
+}
+
+void TransitionMaterial_diffuse_transmission_2d(void) {
+    // engine_core/transition
+    tr_test_shape_material(BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION, false);
 }

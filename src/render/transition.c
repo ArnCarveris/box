@@ -33,6 +33,11 @@ _Static_assert(sizeof(TextureTransform) <= BOX_RENDER_TRANSITION_VALUE,
     "TextureTransform fits a value");
 _Static_assert(sizeof(Transmission) <= BOX_RENDER_TRANSITION_VALUE, "Transmission fits a value");
 _Static_assert(sizeof(ClearCoat) <= BOX_RENDER_TRANSITION_VALUE, "ClearCoat fits a value");
+_Static_assert(sizeof(SpecularAnisotropy) <= BOX_RENDER_TRANSITION_VALUE,
+    "SpecularAnisotropy fits a value");
+_Static_assert(sizeof(Sheen) <= BOX_RENDER_TRANSITION_VALUE, "Sheen fits a value");
+_Static_assert(sizeof(DiffuseTransmission) <= BOX_RENDER_TRANSITION_VALUE,
+    "DiffuseTransmission fits a value");
 _Static_assert(BOX_RENDER_TRANSITION_VALUE % sizeof(float) == 0, "A value holds floats");
 _Static_assert(BOX_RENDER_TRANSITION_COMPONENTS <= 16,
     "box_draw_transition_material_t.present holds a bit per component");
@@ -89,7 +94,22 @@ static const box_render_transition_layout_t box_transition_layouts[
         BOX_TRANSITION_U8(Transmission, attenuation_color.b) } },
     [BOX_RENDER_TRANSITION_CLEAR_COAT] = { ECS_SIZEOF(ClearCoat), 2, {
         BOX_TRANSITION_FLOAT(ClearCoat, strength),
-        BOX_TRANSITION_FLOAT(ClearCoat, roughness) } }
+        BOX_TRANSITION_FLOAT(ClearCoat, roughness) } },
+    [BOX_RENDER_TRANSITION_ANISOTROPY] = { ECS_SIZEOF(SpecularAnisotropy), 2, {
+        BOX_TRANSITION_FLOAT(SpecularAnisotropy, strength),
+        BOX_TRANSITION_FLOAT(SpecularAnisotropy, rotation) } },
+    [BOX_RENDER_TRANSITION_SHEEN] = { ECS_SIZEOF(Sheen), 4, {
+        BOX_TRANSITION_U8(Sheen, color.r),
+        BOX_TRANSITION_U8(Sheen, color.g),
+        BOX_TRANSITION_U8(Sheen, color.b),
+        BOX_TRANSITION_FLOAT(Sheen, roughness) } },
+    [BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION] = { ECS_SIZEOF(DiffuseTransmission), 6, {
+        BOX_TRANSITION_FLOAT(DiffuseTransmission, factor),
+        BOX_TRANSITION_U8(DiffuseTransmission, color.r),
+        BOX_TRANSITION_U8(DiffuseTransmission, color.g),
+        BOX_TRANSITION_U8(DiffuseTransmission, color.b),
+        BOX_TRANSITION_FLOAT(DiffuseTransmission, thickness),
+        BOX_TRANSITION_FLOAT(DiffuseTransmission, blur) } }
 };
 
 const box_render_transition_layout_t* box_render_transition_layout(
@@ -691,6 +711,11 @@ static void* box_transition_material_value(
     case BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM: result = &material->uv; break;
     case BOX_RENDER_TRANSITION_TRANSMISSION: result = &material->transmission; break;
     case BOX_RENDER_TRANSITION_CLEAR_COAT: result = &material->clear_coat; break;
+    case BOX_RENDER_TRANSITION_ANISOTROPY: result = &material->anisotropy; break;
+    case BOX_RENDER_TRANSITION_SHEEN: result = &material->sheen; break;
+    case BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION:
+        result = &material->diffuse_transmission;
+        break;
     case BOX_RENDER_TRANSITION_OPACITY: result = &material->opacity; break;
     case BOX_RENDER_TRANSITION_TINT: result = &material->tint; break;
     case BOX_RENDER_TRANSITION_POSITION:

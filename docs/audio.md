@@ -4,10 +4,10 @@ Box renders its sound in the audio core, `src/audio/core`: plain C without flecs
 platform code. The core is a mixer of voices and buses that renders blocks of float samples
 into a left and a right channel. It is driven by a byte stream of commands and reports back
 with events. Rendering does not allocate, lock, log or wait. Later tasks add the native output
-and the `box.audio` module; this page describes the core and the web, the platform where audio
-is the hardest to get right.
+and the `box.audio` module; this page describes the core, the native output and the web, the
+platform where audio is the hardest to get right.
 
-Native builds compile the core into box and do nothing else with it yet.
+On macOS and Linux the core plays on a miniaudio device, see [Native output](#native-output).
 
 ## The core
 
@@ -98,6 +98,103 @@ whether the frames are rendered one at a time or in one large block.
 The tests are `test/cpu/audio`, which render offline; `bench/audio` mixes 64 voices through 8
 buses and reports the time per frame.
 
+## Transports
+
+The main thread reaches the core through a transport, one small interface in
+`src/audio/transport.h` that every output implements:
+
+```c
+bool commands(t, data, size);                      // send a command batch, copied
+bool sound(t, id, data, frames, channels, rate);   // hand over a sound, copied
+int32_t read_events(t, events, max);               // the events of the core, oldest first
+box_audio_state_t state(t);                        // what the output does
+void update(t, delta);                             // once per frame
+```
+
+| Transport | Where the core runs |
+|-----------|---------------------|
+| native | on the audio thread of a miniaudio device, macOS and Linux |
+| web | in the AudioWorklet of the page, over its `MessagePort` |
+| null | on the main thread, which renders the frames of each frame's delta |
+
+The state is `OFF` (no output), `NO_DEVICE` (the null transport renders), `STARTING` (the web
+waits for the worklet or a gesture), `RUNNING` (a device plays) or `LOST` (the device
+disappeared and the main thread renders until it reopens). Every transport frees the frames of
+a sound itself after `SOUND_FREE`; the main thread keeps the last 4096 events until
+`read_events`.
+
+**Where the output opens.** A world that imports box opens nothing: thousands of tests import
+it and must not touch audio hardware. `box_app_run` opens the output of its world
+(`src/audio/output.c`), as the singleton `box.app.AudioOutput`, which the system
+`AudioOutputUpdate` updates in `OnStore` with the delta of the frame:
+
+- a real app opens the default device, and the null transport when there is none;
+- `--headless` opens no device and runs the null transport;
+- `--no-audio` opens nothing, and the state is `OFF`.
+
+**No device is not an error.** The pm containers and CI have no audio device. A failed open
+logs one warning, `box.audio: no audio device (...), the app runs without sound`, never an
+error, because the e2e runs fail on a logged error, and the app goes on with the null
+transport and the state `NO_DEVICE`.
+
+**The null transport** renders `floor(time x rate)` frames in total, where time is the sum of
+the frame deltas, at most one second per frame. With a fixed `--delta-time` every run renders
+the same frames at the same block boundaries, so the audio is bit identical in every run, which
+the capture of the audio module depends on. Commands apply at once and take effect at the
+start of the next render.
+
+## Native output
+
+`src/audio/native.c` is the only file that includes miniaudio, bundled header only in
+`project.json` (tag `0.11.26`) for macOS and Linux. It uses the device API alone, built with
+`MA_NO_ENGINE`, `MA_NO_NODE_GRAPH`, `MA_NO_RESOURCE_MANAGER`, `MA_NO_DECODING`,
+`MA_NO_ENCODING`, `MA_NO_GENERATION` and `MA_NO_NULL` (so a machine without audio fails the
+open instead of playing into the silent null backend of miniaudio). Mixing, panning and
+resampling are the core's. The device is opened for 32 bit float stereo at the native rate of
+the device, which becomes the rate of the core, with `noFixedSizedCallback`, so the callback
+renders any frame count the device asks for, in blocks of 512 frames.
+
+**Two rings.** The main thread and the device callback share two single producer single
+consumer rings of bytes (`src/audio/ring.c`) with C11 atomics: commands and sounds to the audio
+thread (64 KB), events back (4096 events). Each side owns one index, loads the other with
+acquire and stores its own with release; a write is all or nothing. `src/render/ring.c` is not
+a model for them: it takes a lock.
+
+- A command batch is split at command boundaries into messages of at most 4 KB. A sound is a
+  message with a pointer to frames the main thread copied and owns.
+- The messages first go to a queue of the main thread, which writes as many as fit into the
+  ring. A full ring keeps the rest on the main thread for the next frame; neither side blocks.
+- The callback takes every message the ring holds, applies it, renders, and moves the events
+  of the core into the event ring as far as it has room; the rest wait in the core. A sound the
+  core refuses comes back as an internal event, so the main thread frees it. A sound waits in
+  the ring while the event ring has no room for that refusal.
+- The callback never allocates, locks, logs or waits.
+
+**Thread priority.** The audio thread gets a real time priority through miniaudio
+(`ma_context_config.threadPriority`) and nowhere else. It counts against
+`BOX_JOBS_RESERVED_CORES`, which keeps 3 cores free: the main thread, the render thread and the
+audio thread; the job pool takes the rest.
+
+**A device that disappears**, such as unplugged headphones, does not stop the app. miniaudio
+follows a change of the default device itself where the backend supports it (reported as
+`rerouted`). A stop the main thread did not ask for marks the device lost: the next frame
+closes it, which joins its thread, logs one warning, and the main thread takes over the rings
+and renders the deltas like the null transport, so voices end and sounds are freed. Every 2
+seconds it tries to reopen the default device at the rate of the core; miniaudio converts when
+the new device has another rate.
+
+**Linking.** Runtime linking stays on: miniaudio loads the libraries of its backends
+(PulseAudio, ALSA, JACK on Linux; CoreAudio on macOS) at run time, so there are no new link
+flags. A notarized macOS build, whose hardened runtime may refuse to load them, builds
+`native.c` with `-DMA_NO_RUNTIME_LINKING` and links `-framework CoreFoundation -framework
+CoreAudio -framework AudioToolbox`, or keeps runtime linking and signs with the entitlements
+the miniaudio documentation lists for macOS.
+
+The web does not compile the device part: the bundle is not fetched for Emscripten and
+`native.c` compiles to a stub there.
+
+The tests are `Ring`, `Transport` and `NoDevice` in `test/cpu/audio`, which need no device.
+
 ## Two threads on the web
 
 The web build has no threads: there is no render thread and jobs run inline, so the main thread
@@ -122,6 +219,9 @@ The two talk only over the `MessagePort` of the `AudioWorkletNode`, with plain o
   had any. On `SOUND_FREE` the worklet has already freed the frames in its heap.
 - `{ type: 'stats', id }` asks the worklet for its quantum count, clock, voices, sounds and
   memory, which the browser check uses.
+
+The web transport of `transport.c` sends with these functions and reads the events from
+`Module.boxAudio.queue`, which keeps up to 4096 events until the main module takes them.
 
 In the page, `Module.boxAudio.commands(bytes)` sends a batch, `Module.boxAudio.sound(id,
 samples, channels, rate)` a sound (a promise of whether the core took it),

@@ -1,7 +1,8 @@
 /**
  * @file ScrollFloat.c
  * @brief A scroll view shows and picks only the rows in view; a floating element draws and picks
- * above the other elements and outside the clip of its ancestors.
+ * above the other elements and outside the clip of its ancestors, a clipped overlay above its
+ * siblings and inside that clip.
  */
 
 #include <box.h>
@@ -457,5 +458,100 @@ void ScrollFloat_float_takes_click_over_sibling(void) {
     test_int(sf_clicks(world, list), 2);
     test_int(sf_clicks(world, sibling), 1);
 
+    ecs_fini(world);
+}
+
+/** Add a 20x10 row of a color to a view.
+ *
+ * @param world The world
+ * @param view The view
+ * @param r Red
+ * @param g Green
+ * @param b Blue
+ */
+static void sf_row(
+    ecs_world_t *world,
+    ecs_entity_t view,
+    uint8_t r,
+    uint8_t g,
+    uint8_t b)
+{
+    ecs_entity_t row = ecs_new_w_pair(world, EcsChildOf, view);
+    ecs_set(world, row, Rect, {20, 10});
+    ecs_set(world, row, Rgb, {r, g, b});
+}
+
+void ScrollFloat_clip_overlay_draws_over_content_inside_clip(void) {
+    ecs_world_t *world = sf_world("overlay.png");
+
+    /* A 20x20 scroll view at the origin, x and y -10..10, with a 6x40 green clipped overlay
+     * along its right edge, x 4..10 and y -20..20, as its first child and a red row after it */
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, Position, {0, 0, 0});
+    ecs_set(world, view, Rect, {20, 20});
+    ecs_set(world, view, Rgb, {0, 0, 0});
+    ecs_set(world, view, Layout, { .direction = DirectionColumn });
+    ecs_set(world, view, LayoutItem, {
+        .width = { SizeModeFixed, 20 }, .height = { SizeModeFixed, 20 } });
+    ecs_set(world, view, LayoutScroll, { .vertical = true });
+    ecs_add_id(world, view, ClipChildren);
+    ecs_entity_t overlay = ecs_new_w_pair(world, EcsChildOf, view);
+    ecs_set(world, overlay, Rect, {6, 40});
+    ecs_set(world, overlay, Rgb, {0, 255, 0});
+    ecs_set(world, overlay, LayoutFloat, { .h = AlignRight, .v = VAlignMiddle,
+        .anchor_h = AlignRight, .anchor_v = VAlignMiddle, .clip = true });
+    sf_row(world, view, 255, 0, 0);
+    unsigned char *px = sf_render(world, "overlay.png", 2);
+
+    test_flt(ecs_get(world, overlay, Position)->x, 7);
+    test_flt(ecs_get(world, overlay, Position)->y, 0);
+
+    /* Over the row after it, and the row where it does not reach */
+    test_assert(sf_is(sf_at(px, 39, 27), 1));
+    test_assert(sf_is(sf_at(px, 25, 27), 0));
+    test_assert(sf_is(sf_at(px, 39, 37), 1));
+    test_assert(sf_black(sf_at(px, 25, 37)));
+
+    /* Clipped by the view above and below it */
+    test_assert(sf_black(sf_at(px, 39, 18)));
+    test_assert(sf_black(sf_at(px, 39, 46)));
+    stbi_image_free(px);
+
+    /* Blue rows added at runtime, scrolled into view, stay under it and do not move it */
+    sf_row(world, view, 0, 0, 255);
+    sf_row(world, view, 0, 0, 255);
+    ecs_set(world, view, LayoutScroll, { .y = 10, .vertical = true });
+    px = sf_render(world, "overlay.png", 2);
+    test_flt(ecs_get(world, view, LayoutContent)->y, 10);
+    test_flt(ecs_get(world, overlay, Position)->x, 7);
+    test_flt(ecs_get(world, overlay, Position)->y, 0);
+    test_assert(sf_is(sf_at(px, 39, 27), 1));
+    test_assert(sf_is(sf_at(px, 39, 37), 1));
+    test_assert(sf_is(sf_at(px, 25, 27), 2));
+    test_assert(sf_is(sf_at(px, 25, 37), 2));
+    test_assert(sf_black(sf_at(px, 39, 18)));
+    test_assert(sf_black(sf_at(px, 39, 46)));
+    stbi_image_free(px);
+
+    /* Without clip it is a regular float and leaves the view */
+    ecs_set(world, overlay, LayoutFloat, { .h = AlignRight, .v = VAlignMiddle,
+        .anchor_h = AlignRight, .anchor_v = VAlignMiddle });
+    px = sf_render(world, "overlay.png", 2);
+    test_assert(sf_is(sf_at(px, 39, 18), 1));
+    test_assert(sf_is(sf_at(px, 39, 46), 1));
+    test_assert(sf_is(sf_at(px, 39, 27), 1));
+    test_assert(sf_is(sf_at(px, 25, 27), 2));
+    stbi_image_free(px);
+
+    /* With clip again the view clips it again */
+    ecs_set(world, overlay, LayoutFloat, { .h = AlignRight, .v = VAlignMiddle,
+        .anchor_h = AlignRight, .anchor_v = VAlignMiddle, .clip = true });
+    px = sf_render(world, "overlay.png", 2);
+    test_assert(sf_black(sf_at(px, 39, 18)));
+    test_assert(sf_black(sf_at(px, 39, 46)));
+    test_assert(sf_is(sf_at(px, 39, 27), 1));
+    test_assert(sf_is(sf_at(px, 25, 27), 2));
+
+    stbi_image_free(px);
     ecs_fini(world);
 }

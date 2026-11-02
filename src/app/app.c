@@ -8,6 +8,7 @@
 #include "watch.h"
 #include "../render/render.h"
 #include "../transform/transform_version.h"
+#include "../audio/output.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -880,6 +881,8 @@ done:
  * script also when it fails to parse or evaluate; both leave EcsScript without a script and
  * set its error, which tell whether the scene loaded.
  *
+ * The audio output opens here and nowhere else, so a world that imports box opens no device.
+ *
  * @param world The world
  * @return 0 when the world may run, nonzero when it may not
  */
@@ -932,6 +935,11 @@ static int box_app_start(
     }
 
     box_app_target_fps(world, app);
+
+    box_audio_output_open(world, &(box_audio_output_desc_t){
+        .headless = app->headless,
+        .disabled = app->no_audio
+    });
     result = 0;
 done:
     return result;
@@ -1008,6 +1016,8 @@ void BoxAppImport(
     });
     ecs_add_pair(world, ecs_id(SetAt), EcsWith, EcsDisabled);
     ecs_add_pair(world, ecs_id(SetAt), EcsWith, ecs_id(SetAtWritten));
+
+    box_audio_output_init(world);
 
     ecs_singleton_set(world, AppStatus, {0});
     ecs_singleton_set(world, FrameTiming, {0});

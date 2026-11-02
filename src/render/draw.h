@@ -246,13 +246,9 @@ typedef struct box_draw_transition_material_t {
     TextureTransform uv;    /**< TextureTransform */
     Transmission transmission; /**< Transmission */
     ClearCoat clear_coat;   /**< ClearCoat */
-    SpecularAnisotropy anisotropy; /**< SpecularAnisotropy, kept as is: it does not transition */
-    bool anisotropic;       /**< The material has a SpecularAnisotropy */
-    Sheen sheen;            /**< Sheen, kept as is: it does not transition */
-    bool sheened;           /**< The material has a Sheen */
-    DiffuseTransmission diffuse_transmission; /**< DiffuseTransmission, kept as is: it does not
-                             *   transition */
-    bool diffuse_transmissive; /**< The material has a DiffuseTransmission */
+    SpecularAnisotropy anisotropy; /**< SpecularAnisotropy */
+    Sheen sheen;            /**< Sheen */
+    DiffuseTransmission diffuse_transmission; /**< DiffuseTransmission */
     Opacity opacity;        /**< Opacity of the shape itself */
     Tint tint;              /**< Tint of the shape itself */
     box_draw_tint_t inherited; /**< Tints of the ancestors, when tinted */
@@ -461,6 +457,8 @@ typedef struct box_render_draws_t {
     ecs_map_t order_z;          /**< Entity of a path to the z key it was ordered by */
     ecs_map_t tree_ranks;       /**< Tree of the order to its next rank and its count of ranks,
                                  *   while the runs are made */
+    ecs_map_t overlays;         /**< Clipped overlays (LayoutFloat.clip) to 1, so a set
+                                 *   LayoutFloat changes the order only when its clip changed */
     const void *backend;        /**< Context of the backend the GPU state was sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
@@ -1557,7 +1555,8 @@ void box_draws_clips_fini(
     box_render_draws_t *d);
 
 /** Get the clip index of the nearest ClipChildren ancestor of an entity, giving the ancestor
- * an index when it has none. The walk stops at a floating element (LayoutFloat).
+ * an index when it has none. The walk stops at a floating element (LayoutFloat) that is not a
+ * clipped overlay (LayoutFloat.clip).
  *
  * @param world The world
  * @param d The state

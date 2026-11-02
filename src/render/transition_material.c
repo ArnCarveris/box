@@ -57,17 +57,17 @@ void box_draws_transition_target(
     }
 
     if (material->anisotropy) {
-        out->anisotropic = true;
+        out->present |= 1u << BOX_RENDER_TRANSITION_ANISOTROPY;
         out->anisotropy = *material->anisotropy;
     }
 
     if (material->sheen) {
-        out->sheened = true;
+        out->present |= 1u << BOX_RENDER_TRANSITION_SHEEN;
         out->sheen = *material->sheen;
     }
 
     if (material->diffuse_transmission) {
-        out->diffuse_transmissive = true;
+        out->present |= 1u << BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION;
         out->diffuse_transmission = *material->diffuse_transmission;
     }
 
@@ -127,10 +127,12 @@ void box_draws_transition_encode(
             &material->transmission),
         .clear_coat = box_draws_transition_part(material, BOX_RENDER_TRANSITION_CLEAR_COAT,
             &material->clear_coat),
-        .anisotropy = material->anisotropic ? &material->anisotropy : NULL,
-        .sheen = material->sheened ? &material->sheen : NULL,
-        .diffuse_transmission = material->diffuse_transmissive
-            ? &material->diffuse_transmission : NULL,
+        .anisotropy = box_draws_transition_part(material, BOX_RENDER_TRANSITION_ANISOTROPY,
+            &material->anisotropy),
+        .sheen = box_draws_transition_part(material, BOX_RENDER_TRANSITION_SHEEN,
+            &material->sheen),
+        .diffuse_transmission = box_draws_transition_part(material,
+            BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION, &material->diffuse_transmission),
         .tint = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TINT,
             &material->tint),
         .inherited = material->tinted ? &material->inherited : NULL,

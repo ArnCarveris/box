@@ -219,3 +219,116 @@ void PickOrder_many_views_keep_top_created_last(void) {
     // ui/picking
     order_many(true);
 }
+
+/** A screen UI scene with nested clips at the center of the surface: outer, a 100 by 100
+ * ClipChildren column, and inner, an 80 by 300 ClipChildren column below its top left corner
+ * filled by content. Its first child overlay, 20 points wide and as high as inner, sits 5 points
+ * right of its right edge: in world space it spans 15..35 on x, the part right of 30 outside
+ * inner, and -250..50 on y, the part below -50 outside outer. The argument is appended to the
+ * LayoutFloat of overlay. */
+#define ORDER_CLIPS(fl) \
+    "using box.layout\n" \
+    "hud {\n" \
+    "  Scene: {}\n" \
+    "  camera {\n" \
+    "    Position: {0, 0, 100}\n" \
+    "    Camera: {ortho: true, ortho_scale: 1}\n" \
+    "  }\n" \
+    "  outer {\n" \
+    "    Position: {0, 0, 0}\n" \
+    "    Layout: {direction: Column}\n" \
+    "    LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n" \
+    "    Rect: {1, 1}\n" \
+    "    Interactive\n" \
+    "    ClipChildren\n" \
+    "    inner {\n" \
+    "      Layout: {direction: Column}\n" \
+    "      LayoutItem: {width: {mode: Fixed, value: 80}, height: {mode: Fixed, value: 300}}\n" \
+    "      ClipChildren\n" \
+    "      overlay {\n" \
+    "        LayoutFloat: {h: Right, v: Middle, anchor_h: Right, anchor_v: Middle, x: 5" fl "}\n" \
+    "        LayoutItem: {width: {mode: Fixed, value: 20}, height: {mode: Grow}}\n" \
+    "        Rect: {1, 1}\n" \
+    "        Interactive\n" \
+    "      }\n" \
+    "      content {\n" \
+    "        LayoutItem: {width: {mode: Fixed, value: 80}, height: {mode: Fixed, value: 300}}\n" \
+    "        Rect: {1, 1}\n" \
+    "        Interactive\n" \
+    "      }\n" \
+    "    }\n" \
+    "  }\n" \
+    "}\n" \
+    "hud_view { View: {camera: hud.camera} }\n"
+
+/** Move the pointer to a world position of the screen UI scene, run a frame and get the hit.
+ *
+ * @param world The world
+ * @param x World x, 0 at the center of the surface
+ * @param y World y, up
+ * @return The nearest entity the pointer hit, 0 for none
+ */
+static ecs_entity_t order_hit_at(
+    ecs_world_t *world,
+    float x,
+    float y)
+{
+    box_input_mouse_move(world, 640 + x, 360 - y, false);
+    ecs_progress(world, 0);
+
+    return ecs_singleton_get(world, PickStatus)->hit;
+}
+
+void PickOrder_clip_overlay_over_siblings(void) {
+    // ui/picking
+    ecs_world_t *world = order_world(ORDER_CLIPS(", clip: true"));
+    ecs_entity_t overlay = order_e(world, "hud.outer.inner.overlay");
+    ecs_entity_t content = order_e(world, "hud.outer.inner.content");
+
+    /* The first child, it still draws and picks over the content, which it does not float
+     * above the rest of the scene for */
+    ecs_entities_t children = ecs_get_ordered_children(world, order_e(world, "hud.outer.inner"));
+    test_int(children.count, 2);
+    test_uint(children.ids[0], overlay);
+    test_bool(box_pick_drawn_after(world, overlay, content), true);
+    test_bool(box_pick_drawn_after(world, content, overlay), false);
+    test_bool(box_pick_drawn_after(world, overlay, order_e(world, "hud.outer")), true);
+    test_uint(order_hit_at(world, 20, 0), overlay);
+    test_uint(order_hit_at(world, -20, 0), content);
+
+    /* A sibling of a higher z still draws over it */
+    ecs_set(world, content, Position, {0, 0, 1});
+    ecs_progress(world, 0);
+    test_bool(box_pick_drawn_after(world, content, overlay), true);
+
+    ecs_fini(world);
+}
+
+void PickOrder_clip_overlay_not_picked_outside_clips(void) {
+    // ui/picking
+    ecs_world_t *world = order_world(ORDER_CLIPS(", clip: true"));
+    ecs_entity_t overlay = order_e(world, "hud.outer.inner.overlay");
+
+    /* Inside both clips it is picked; right of inner the pointer goes to outer under it, below
+     * outer to nothing */
+    test_uint(order_hit_at(world, 20, 0), overlay);
+    test_uint(order_hit_at(world, 32, 0), order_e(world, "hud.outer"));
+    test_uint(order_hit_at(world, 20, -80), 0);
+    test_uint(order_hit_at(world, 32, -80), 0);
+
+    ecs_fini(world);
+}
+
+void PickOrder_float_picked_outside_clips(void) {
+    // ui/picking
+    ecs_world_t *world = order_world(ORDER_CLIPS(""));
+    ecs_entity_t overlay = order_e(world, "hud.outer.inner.overlay");
+
+    /* A float without clip leaves the clips and draws over every non floating element */
+    test_uint(order_hit_at(world, 20, 0), overlay);
+    test_uint(order_hit_at(world, 32, 0), overlay);
+    test_uint(order_hit_at(world, 20, -80), overlay);
+    test_uint(order_hit_at(world, 32, -80), overlay);
+
+    ecs_fini(world);
+}

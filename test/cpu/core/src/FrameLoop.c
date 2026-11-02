@@ -100,7 +100,7 @@ void FrameLoop_delta_time_default(void) {
 void FrameLoop_fixed_delta_time(void) {
     // engine/builtin_frame_pacing
     ecs_world_t *world = loop_world(0.003);
-    ecs_singleton_set(world, App, { .frames = 4, .delta_time = 0.025f });
+    ecs_singleton_set(world, App, { .frames = 4, .delta_time = 0.025f, .no_audio = true });
 
     test_int(box_app_run(world), 0);
     test_int(loop_frames, 4);
@@ -117,7 +117,7 @@ void FrameLoop_fixed_delta_time(void) {
 void FrameLoop_measured_delta_time(void) {
     // engine/builtin_frame_pacing
     ecs_world_t *world = loop_world(0.010);
-    ecs_singleton_set(world, App, { .frames = 6 });
+    ecs_singleton_set(world, App, { .frames = 6, .no_audio = true });
 
     test_int(box_app_run(world), 0);
     test_int(loop_frames, 6);
@@ -133,7 +133,7 @@ void FrameLoop_delta_time_change_applies_next_frame(void) {
     ecs_world_t *world = loop_world(0.010);
     loop_change_at = 2;
     loop_change_delta = 0.05f;
-    ecs_singleton_set(world, App, { .frames = 6 });
+    ecs_singleton_set(world, App, { .frames = 6, .no_audio = true });
 
     test_int(box_app_run(world), 0);
     test_int(loop_frames, 6);
@@ -154,7 +154,7 @@ void FrameLoop_fps_sets_target_fps(void) {
     ecs_singleton_set(world, App, { .fps = 0 });
     test_flt(ecs_get_world_info(world)->target_fps, 0);
 
-    ecs_singleton_set(world, App, { .frames = 5, .fps = 40 });
+    ecs_singleton_set(world, App, { .frames = 5, .fps = 40, .no_audio = true });
     test_int(box_app_run(world), 0);
     test_flt(ecs_get_world_info(world)->target_fps, 40);
     for (int i = 1; i < 5; i ++) {
@@ -169,7 +169,7 @@ void FrameLoop_fps_change_while_running(void) {
     ecs_world_t *world = loop_world(0.002);
     loop_change_at = 2;
     loop_change_fps = 20;
-    ecs_singleton_set(world, App, { .frames = 7, .fps = 50 });
+    ecs_singleton_set(world, App, { .frames = 7, .fps = 50, .no_audio = true });
 
     test_int(box_app_run(world), 0);
     test_flt(ecs_get_world_info(world)->target_fps, 20);
