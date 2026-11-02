@@ -22,7 +22,7 @@ main_view {
 }
 
 sun {
-  Rotation: {-0.7, 0.5, 0}
+  Rotation: {0.8, 2.6, 0}
   DirectionalLight: {intensity: 1.5 * flecs.script.math.PI}
   Rgb: {255, 255, 255}
 }
@@ -71,7 +71,7 @@ far_1 : Stripes { Position: {1.6, 0, -5.2} }
 
 // The same row beside the pane, seen directly
 direct_0 : Stripes { Position: {3.6, 0, -0.2} }
-direct_1 : Stripes { Position: {4.8, 0, -5.2} }
+direct_1 : Stripes { Position: {7.6, 0, -5.2} }
 
 frosted_pane {
   Position: {-0.6, 2.4, 0}

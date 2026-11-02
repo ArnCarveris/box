@@ -1159,16 +1159,6 @@ fn output(color: vec3f, alpha: f32) -> vec4f {
     }
 }
 
-// Color of a transmissive fragment (Transmission), as flecs-engine shades it: the opaque
-// snapshot seen where the ray refracted by the index of refraction leaves a volume of the
-// thickness of the material times the scale of the instance, at a mip that follows the
-// roughness, reduced by the Fresnel reflection of the index (Schlick), absorbed toward the
-// attenuation color over the attenuation distance (Beer-Lambert) and tinted by the albedo. The
-// transmission factor replaces the diffuse light by it; the specular light and the emission are
-// added on top. The atmosphere between the fragment and the camera attenuates its own light
-// and the transmitted light and adds its in scattered light by what is not transmitted. A
-// factor of 0 is the lit surface. It writes no depth, so it takes no ambient occlusion of the
-// view, which belongs to what is behind it.
 // Mip of the opaque snapshot a Transmission shape with a DiffuseTransmission.blur samples: the
 // blur radius grows by blur world units per world unit between the surface and the opaque
 // image behind it, read from the depth copy of the snapshot, and is measured in pixels of mip 0
@@ -1203,6 +1193,16 @@ fn transmission_blur_lod(world: vec3f, screen_uv: vec2f, blur: f32, rough_lod: f
     return clamp(max(rough_lod, blur_lod), 0.0, max_mip);
 }
 
+// Color of a transmissive fragment (Transmission), as flecs-engine shades it: the opaque
+// snapshot seen where the ray refracted by the index of refraction leaves a volume of the
+// thickness of the material times the scale of the instance, at a mip that follows the
+// roughness, reduced by the Fresnel reflection of the index (Schlick), absorbed toward the
+// attenuation color over the attenuation distance (Beer-Lambert) and tinted by the albedo. The
+// transmission factor replaces the diffuse light by it; the specular light and the emission are
+// added on top. The atmosphere between the fragment and the camera attenuates its own light
+// and the transmitted light and adds its in scattered light by what is not transmitted. A
+// factor of 0 is the lit surface. It writes no depth, so it takes no ambient occlusion of the
+// view, which belongs to what is behind it.
 fn transmission(f: VertexOut, s: Surface) -> vec4f {
     var ap = vec4f(0.0, 0.0, 0.0, 1.0);
     if (view.aerial.w > 0.0) {
