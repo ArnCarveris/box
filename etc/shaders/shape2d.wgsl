@@ -17,6 +17,14 @@
 // are read by the slot the cull pass wrote, from the transform and shading streams of the
 // instance page of the batch (group 2).
 //
+// The shadow of a Rect or Circle with a BoxShadow is a rectangle instance with a negative border
+// width: shape.y is the negated standard deviation of its edge and shape.x the corner radius of
+// the shadow box, the quad minus a margin of 3 standard deviations on each side, both in units of
+// half the smaller side of the quad; shape.zw are 0. Its coverage is the Gaussian falloff of the
+// distance to the shadow box (an erf of the distance, the approximation of a blurred rounded box
+// with one sample), softened by the footprint of the pixel so a shadow without blur keeps an
+// anti-aliased edge. Every other instance pays one comparison for it.
+//
 // ids.x of the shading is the clip index of the instance, 0 when no ClipChildren ancestor clips
 // it. A clip maps the world position of a fragment into the local plane of its
 // element, where the coverage of its rounded area multiplies the alpha, anti-aliased over the
@@ -188,6 +196,24 @@ fn rounded_box(p: vec2f, extent: vec2f, radius: f32) -> f32 {
     return length(max(q, vec2f(0.0))) + min(max(q.x, q.y), 0.0) - r;
 }
 
+// Error function, the approximation of Abramowitz and Stegun 7.1.27 (error below 5e-4).
+fn erf_approx(x: f32) -> f32 {
+    let a = abs(x);
+    let t = 1.0 + (0.278393 + (0.230389 + (0.000972 + 0.078108 * a) * a) * a) * a;
+    let t2 = t * t;
+    return sign(x) * (1.0 - 1.0 / (t2 * t2));
+}
+
+// Coverage of a shadow: the Gaussian falloff of the signed distance to the shadow box, the quad
+// of the given half extents minus 3 standard deviations on each side. The standard deviation is
+// widened by the footprint of the pixel, so the edge of a shadow without blur is anti-aliased.
+fn shadow_coverage(p: vec2f, extent: vec2f, radius: f32, sigma: f32, px: f32) -> f32 {
+    let box_extent = max(extent - vec2f(3.0 * sigma), vec2f(0.0));
+    let d = rounded_box(p, box_extent, radius);
+    let s = sqrt(sigma * sigma + 0.16 * px * px);
+    return 0.5 - 0.5 * erf_approx(d / (s * 1.41421356));
+}
+
 // Part of a pixel covered by the inside of an edge at a distance, the pixel being px wide.
 fn coverage(d: f32, px: f32) -> f32 {
     return clamp(0.5 - d / max(px, 1e-6), 0.0, 1.0);
@@ -286,10 +312,16 @@ fn ranked_depth(depth: f32, rank: u32) -> f32 {
     let shape_cover = coverage(d, px);
     let fill = select(1.0, coverage(inner, inner_px), f.params.y > 0.0);
     let shape_color = mix(f.border.rgb, f.color.rgb * texel.rgb, fill);
-    let color = select(shape_color, f.color.rgb, glyph) + f.emissive;
+    var color = select(shape_color, f.color.rgb, glyph) + f.emissive;
     let shape_alpha = shape_cover * thin * f.color.a * mix(f.border.a, texel.a, fill);
     var alpha = select(shape_alpha, glyph_cover * f.color.a, glyph);
     var cover = select(shape_cover, glyph_cover, glyph);
+    if (f.params.y < 0.0) {
+        cover = shadow_coverage(f.local, f.extent, f.params.x, -f.params.y, px);
+        color = f.color.rgb;
+        alpha = cover * f.color.a;
+    }
+
     if (f.clip != 0u) {
         let clipped = clip_coverage(f.clip, f.world, world_dx, world_dy);
         alpha *= clipped;

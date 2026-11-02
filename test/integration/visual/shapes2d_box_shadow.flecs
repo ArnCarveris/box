@@ -1,0 +1,146 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+
+// Soft shadows (BoxShadow) of cards with different offsets, blurs, spreads, radii and colors, over a
+// light and a dark panel in a screen space UI (top) and on a turned world space panel (bottom).
+
+world_camera {
+  Position: {0, 0, 4}
+  Camera: {fov: 55}
+}
+
+world_view {
+  View: {camera: world_camera, clear: {enabled: true, color: {120, 150, 190, 255}}}
+}
+
+template Cards {
+  prop r: u8 = 0
+  prop g: u8 = 0
+  prop b: u8 = 0
+  prop a: u8 = 90
+  prop strong: u8 = 140
+  prop fill_r: u8 = 255
+  prop fill_g: u8 = 255
+  prop fill_b: u8 = 255
+
+  soft {
+    Position: {-90, 30, 1}
+    Rect: {60, 36}
+    Rgb: {fill_r, fill_g, fill_b}
+    Border: {radius: 8}
+    BoxShadow: {offset_y: -4, blur: 12, color: {r, g, b, a}}
+  }
+
+  hard {
+    Position: {0, 30, 1}
+    Rect: {60, 36}
+    Rgb: {fill_r, fill_g, fill_b}
+    BoxShadow: {offset_x: 6, offset_y: -6, color: {r, g, b, strong}}
+  }
+
+  pill {
+    Position: {90, 30, 1}
+    Rect: {64, 30}
+    Rgb: {fill_r, fill_g, fill_b}
+    Border: {radius: 100}
+    BoxShadow: {blur: 24, spread: 4, color: {40, 90, 220, 150}}
+  }
+
+  disc {
+    Position: {-90, -30, 1}
+    Circle: {18}
+    Rgb: {fill_r, fill_g, fill_b}
+    BoxShadow: {offset_y: -3, blur: 8, color: {r, g, b, a}}
+  }
+
+  lifted {
+    Position: {0, -30, 1}
+    Rect: {60, 36}
+    Rgb: {fill_r, fill_g, fill_b}
+    Border: {radius: 6}
+    BoxShadow: {offset_y: -10, blur: 10, spread: -6, color: {r, g, b, strong}}
+  }
+
+  glow {
+    Position: {90, -30, 1}
+    Rect: {60, 36}
+    Rgb: {fill_r, fill_g, fill_b}
+    Opacity: {0.7}
+    Border: {width: 2, radius: 10, color: {230, 80, 70, 255}}
+    BoxShadow: {blur: 4, spread: 3, color: {230, 80, 70, 255}}
+  }
+}
+
+board {
+  Position: {0, -0.55, 0}
+  Rotation: {-0.35, 0.35, 0}
+  Scale: {0.006, 0.006, 0.006}
+  Rect: {580, 150}
+  Rgb: {40, 44, 56}
+  Border: {radius: 16}
+  BoxShadow: {offset_y: -12, blur: 30, color: {0, 0, 0, 160}}
+
+  light {
+    Position: {-145, 0, 1}
+    Rect: {280, 130}
+    Rgb: {236, 238, 242}
+    Border: {radius: 10}
+
+    cards {
+      Position: {0, 0, 1}
+      Cards: {}
+    }
+  }
+
+  dark {
+    Position: {145, 0, 1}
+    Rect: {280, 130}
+    Rgb: {24, 26, 34}
+    Border: {radius: 10}
+
+    cards {
+      Position: {0, 0, 1}
+      Cards: {a: 200, strong: 230, fill_r: 70, fill_g: 76, fill_b: 96}
+    }
+  }
+}
+
+hud {
+  Scene: {}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+
+  light {
+    Position: {-150, 85, 0}
+    Rect: {290, 150}
+    Rgb: {236, 238, 242}
+    Border: {radius: 12}
+
+    cards {
+      Position: {0, 0, 1}
+      Cards: {}
+    }
+  }
+
+  dark {
+    Position: {150, 85, 0}
+    Rect: {290, 150}
+    Rgb: {24, 26, 34}
+    Border: {radius: 12}
+
+    cards {
+      Position: {0, 0, 1}
+      Cards: {a: 200, strong: 230, fill_r: 70, fill_g: 76, fill_b: 96}
+    }
+  }
+}
+
+hud_view {
+  View: {camera: hud.camera, lighting: {enabled: false}}
+}

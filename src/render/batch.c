@@ -702,7 +702,9 @@ void box_draws_slot_remove(
 
     if (slot != last) {
         ecs_entity_t moved = *ecs_vec_get_t(&b->entities, ecs_entity_t, last);
-        DrawSlot *s = b->key.atlas ? NULL : ecs_get_mut(world, moved, DrawSlot);
+        bool shadow = flat && !b->key.atlas &&
+            box_draws_box_shadow_moved(world, moved, index, last, slot);
+        DrawSlot *s = b->key.atlas || shadow ? NULL : ecs_get_mut(world, moved, DrawSlot);
         if (b->key.atlas) {
             box_draws_glyph_moved(world, b, moved, last, slot);
         }
