@@ -49,6 +49,7 @@ fn sf(i: i32, j: i32) -> f32 {
     if (i >= 24) {
         return surface_assets[i - 24][j];
     }
+
     return surface_data.p[i][j];
 }
 
@@ -61,6 +62,7 @@ fn surface_path(first: i32, count: i32, t: f32) -> vec3f {
     var index = i32(min(floor(parameter), f32(count - 1)));
     var local = parameter - f32(index);
     var base = first + index * 4;
+
     return curve_cubic3(sp(base), sp(base + 1), sp(base + 2), sp(base + 3), local);
 }
 
@@ -77,6 +79,7 @@ fn surface_direction(t: f32) -> vec3f {
     var a = sv_sub(sp(base + 1), sp(base));
     var b = sv_sub(sp(base + 2), sp(base + 1));
     var c = sv_sub(sp(base + 3), sp(base + 2));
+
     return sv_unit(sv_mix(sv_mix(a, b, local), sv_mix(b, c, local), local));
 }
 
@@ -90,11 +93,12 @@ fn surface_axis(tangent: vec3f) -> vec3f {
 }
 
 fn surface_frame(t: f32, tangent: vec3f) -> vec3f {
-    let steps = i32(sf(8, 1));
-    let parameter = t * f32(steps);
-    let index = i32(min(floor(parameter), f32(steps - 1)));
-    let offset = i32(sf(8, 0)) + index;
-    let axis = sv_mix(sp(offset), sp(offset + 1), parameter - f32(index));
+    var steps = i32(sf(8, 1));
+    var parameter = t * f32(steps);
+    var index = i32(min(floor(parameter), f32(steps - 1)));
+    var offset = i32(sf(8, 0)) + index;
+    var axis = sv_mix(sp(offset), sp(offset + 1), parameter - f32(index));
+
     return sv_unit(sv_sub(axis, sv_mul(tangent, sv_dot(axis, tangent))));
 }
 
@@ -106,12 +110,15 @@ fn surface_boundary(u: f32, inner: i32) -> vec3f {
         first = count;
         count = i32(sf(5, 1)) - count;
     }
+
     var t = u * f32(count);
     if (sf(0, 0) == 1.0 && sf(4, 3) == 0.0) {
         t = u * f32(count - 1);
     }
+
     var i = i32(min(floor(t), f32(count - 1)));
     var next = i32(sf(offset + first + i, 3));
+
     return sv_mix(sp(offset + first + i), sp(offset + next), t - f32(i));
 }
 
@@ -122,72 +129,75 @@ struct SurfaceSweepSample {
 };
 
 fn surface_sweep_sample(region: i32, u: f32, v: f32) -> SurfaceSweepSample {
-    var count: i32 = i32(sf(4, 1));
-    var parameter: f32 = v * f32(count);
-    var index: i32 = i32(min(floor(parameter), f32(count - 1)));
-    var local: f32 = parameter - f32(index);
-    var base: i32 = i32(sf(4, 0)) + index * 4;
-    var p0: vec3f = sp(base);
-    var p1: vec3f = sp(base + 1);
-    var p2: vec3f = sp(base + 2);
-    var p3: vec3f = sp(base + 3);
-    var a: vec3f = sv_sub(p1, p0);
-    var b: vec3f = sv_sub(p2, p1);
-    var c: vec3f = sv_sub(p3, p2);
-    var direction: vec3f = sv_mix(sv_mix(a, b, local), sv_mix(b, c, local), local);
-    var acceleration: vec3f = sv_mul(sv_mix(sv_sub(b, a), sv_sub(c, b), local), 2.0 * f32(count));
-    var speed: f32 = sqrt(sv_dot(direction, direction));
-    var tangent: vec3f = sv_unit(direction);
-    var tangent_delta: vec3f = sv(0.0, 0.0, 0.0);
+    var count = i32(sf(4, 1));
+    var parameter = v * f32(count);
+    var index = i32(min(floor(parameter), f32(count - 1)));
+    var local = parameter - f32(index);
+    var base = i32(sf(4, 0)) + index * 4;
+    var p0 = sp(base);
+    var p1 = sp(base + 1);
+    var p2 = sp(base + 2);
+    var p3 = sp(base + 3);
+    var a = sv_sub(p1, p0);
+    var b = sv_sub(p2, p1);
+    var c = sv_sub(p3, p2);
+    var direction = sv_mix(sv_mix(a, b, local), sv_mix(b, c, local), local);
+    var acceleration = sv_mul(sv_mix(sv_sub(b, a), sv_sub(c, b), local), 2.0 * f32(count));
+    var speed = sqrt(sv_dot(direction, direction));
+    var tangent = sv_unit(direction);
+    var tangent_delta = sv(0.0, 0.0, 0.0);
     if (speed >= 0.000000000001) {
         tangent_delta = sv_mul(sv_sub(acceleration,
             sv_mul(tangent, sv_dot(acceleration, tangent))), 1.0 / speed);
     }
-    var steps: i32 = i32(sf(8, 1));
-    var frame_parameter: f32 = v * f32(steps);
-    var frame_index: i32 = i32(min(floor(frame_parameter), f32(steps - 1)));
-    var offset: i32 = i32(sf(8, 0)) + frame_index;
-    var first: vec3f = sp(offset);
-    var last: vec3f = sp(offset + 1);
-    var reference: vec3f = sv_mix(first, last, frame_parameter - f32(frame_index));
-    var reference_delta: vec3f = sv_mul(sv_sub(last, first), f32(steps));
-    var projection: f32 = sv_dot(reference, tangent);
-    var projected: vec3f = sv_sub(reference, sv_mul(tangent, projection));
-    var axis: vec3f = sv_unit(projected);
-    var projected_delta: vec3f = sv_sub(sv_sub(reference_delta, sv_mul(tangent_delta, projection)),
+
+    var steps = i32(sf(8, 1));
+    var frame_parameter = v * f32(steps);
+    var frame_index = i32(min(floor(frame_parameter), f32(steps - 1)));
+    var offset = i32(sf(8, 0)) + frame_index;
+    var first = sp(offset);
+    var last = sp(offset + 1);
+    var reference = sv_mix(first, last, frame_parameter - f32(frame_index));
+    var reference_delta = sv_mul(sv_sub(last, first), f32(steps));
+    var projection = sv_dot(reference, tangent);
+    var projected = sv_sub(reference, sv_mul(tangent, projection));
+    var axis = sv_unit(projected);
+    var projected_delta = sv_sub(sv_sub(reference_delta, sv_mul(tangent_delta, projection)),
         sv_mul(tangent, sv_dot(reference_delta, tangent) + sv_dot(reference, tangent_delta)));
-    var axis_delta: vec3f = sv_mul(sv_sub(projected_delta,
+    var axis_delta = sv_mul(sv_sub(projected_delta,
         sv_mul(axis, sv_dot(projected_delta, axis))),
         1.0 / max(sqrt(sv_dot(projected, projected)), 0.000000000001));
-    var binormal: vec3f = sv_cross(axis, tangent);
-    var binormal_delta: vec3f = sv_add(sv_cross(axis_delta, tangent), sv_cross(axis, tangent_delta));
-    var point: vec3f = surface_boundary(u, region);
-    var profile_delta: vec3f = sv_sub(surface_boundary(min(u + 0.0001, 1.0), region),
+    var binormal = sv_cross(axis, tangent);
+    var binormal_delta = sv_add(sv_cross(axis_delta, tangent), sv_cross(axis, tangent_delta));
+    var point = surface_boundary(u, region);
+    var profile_delta = sv_sub(surface_boundary(min(u + 0.0001, 1.0), region),
         surface_boundary(max(u - 0.0001, 0.0), region));
-    var taper_delta: f32 = sf(1, 1) - 1.0;
-    var taper: f32 = 1.0 + taper_delta * v;
-    var roll_delta: f32 = sf(1, 2);
-    var roll: f32 = roll_delta * v;
-    var cr: f32 = cos(roll);
-    var sr: f32 = sin(roll);
-    var x: f32 = point.x * sf(2, 0) * cr - point.y * sf(2, 1) * sr;
-    var z: f32 = point.x * sf(2, 0) * sr + point.y * sf(2, 1) * cr;
-    var dx: f32 = profile_delta.x * sf(2, 0) * cr - profile_delta.y * sf(2, 1) * sr;
-    var dz: f32 = profile_delta.x * sf(2, 0) * sr + profile_delta.y * sf(2, 1) * cr;
-    var du: vec3f = sv_mul(sv_add(sv_mul(axis, dx), sv_mul(binormal, dz)), taper);
-    var dv: vec3f = sv_add(sv_mul(direction, 3.0 * f32(count)),
+    var taper_delta = sf(1, 1) - 1.0;
+    var taper = 1.0 + taper_delta * v;
+    var roll_delta = sf(1, 2);
+    var roll = roll_delta * v;
+    var cr = cos(roll);
+    var sr = sin(roll);
+    var x = point.x * sf(2, 0) * cr - point.y * sf(2, 1) * sr;
+    var z = point.x * sf(2, 0) * sr + point.y * sf(2, 1) * cr;
+    var dx = profile_delta.x * sf(2, 0) * cr - profile_delta.y * sf(2, 1) * sr;
+    var dz = profile_delta.x * sf(2, 0) * sr + profile_delta.y * sf(2, 1) * cr;
+    var du = sv_mul(sv_add(sv_mul(axis, dx), sv_mul(binormal, dz)), taper);
+    var dv = sv_add(sv_mul(direction, 3.0 * f32(count)),
         sv_add(sv_mul(axis_delta, x * taper), sv_mul(binormal_delta, z * taper)));
     dv = sv_add(dv, sv_add(sv_mul(axis, taper_delta * x - roll_delta * taper * z),
         sv_mul(binormal, taper_delta * z + roll_delta * taper * x)));
-    var normal: vec3f = sv_cross(dv, du);
+    var normal = sv_cross(dv, du);
     if (sv_dot(normal, sv_cross(tangent, du)) < 0.0) {
         normal = sv_mul(normal, -1.0);
     }
+
     var result: SurfaceSweepSample;
     result.position = sv_add(curve_cubic3(p0, p1, p2, p3, local),
         sv_mul(sv_add(sv_mul(axis, x), sv_mul(binormal, z)), taper));
     result.normal = normal;
     result.tangent = du;
+
     return result;
 }
 
@@ -200,6 +210,7 @@ fn surface_sweep_point(point: vec3f, v: f32) -> vec3f {
     var z = a * sin(roll) + b * cos(roll);
     var tangent = surface_direction(v);
     var axis = surface_frame(v, tangent);
+
     return sv_add(surface_curve(v), sv_add(sv_mul(axis, x), sv_mul(sv_cross(axis, tangent), z)));
 }
 
@@ -209,6 +220,7 @@ fn surface_loft_point(point: i32, v: f32) -> vec3f {
     var offset = i32(sf(4, 0));
     var t = v * f32(count - 1);
     var section = i32(min(floor(t), f32(count - 2)));
+
     return sv_mix(sp(offset + section * points + point),
         sp(offset + (section + 1) * points + point), t - f32(section));
 }
@@ -241,6 +253,7 @@ fn surface_outer(u: f32, v: f32, inner: i32) -> vec3f {
     if (kind == 1) {
         return surface_sweep_point(surface_boundary(u, inner), v);
     }
+
     if (kind == 2) {
         var count = i32(sf(5, 2));
         var first = 0;
@@ -248,12 +261,15 @@ fn surface_outer(u: f32, v: f32, inner: i32) -> vec3f {
             first = count;
             count = i32(sf(5, 1)) - count;
         }
+
         var t = u * f32(count);
         var i = i32(min(floor(t), f32(count - 1)));
         var profile_offset = i32(sf(5, 0));
         var next = i32(sf(profile_offset + first + i, 3));
-        return sv_mix(surface_loft_point(first + i, v), surface_loft_point(next, v), t - f32(i));
+        return sv_mix(surface_loft_point(first + i, v), surface_loft_point(next, v),
+            t - f32(i));
     }
+
     if (kind == 3) {
         var first = i32(sf(4, 0));
         var count = i32(sf(4, 1));
@@ -261,6 +277,7 @@ fn surface_outer(u: f32, v: f32, inner: i32) -> vec3f {
             first = i32(sf(4, 2));
             count = i32(sf(4, 3));
         }
+
         var point = surface_path(first, count, v);
         return sv(point.x * cos(u * 6.28318530718), point.y,
             point.x * sin(u * 6.28318530718));
@@ -274,14 +291,12 @@ fn surface_outer(u: f32, v: f32, inner: i32) -> vec3f {
             var normal = sv_unit(sv(cos(a) * cos(b) / max(radius.x, 0.000001),
                 sin(b) / max(radius.y, 0.000001),
                 sin(a) * cos(b) / max(radius.z, 0.000001)));
-
             return sv_sub(sv(radius.x * cos(a) * cos(b), radius.y * sin(b),
                 radius.z * sin(a) * cos(b)), sv_mul(normal, thickness));
         }
 
         var tube = sf(3, 1) - thickness;
         var radial = sf(3, 0) + tube * cos(b);
-
         return sv(radial * cos(a), tube * sin(b), radial * sin(a));
     }
 
@@ -309,7 +324,6 @@ fn surface_outer(u: f32, v: f32, inner: i32) -> vec3f {
         var inset = sf(1, 2) * height + max(bevel - edge, 0.0);
         var point = sv_mix(surface_prism_corner(i, inset),
             surface_prism_corner(next, inset), t - f32(i));
-
         return sv(point.x + sf(2, 0) * height, (height - 0.5) * sf(1, 1),
             point.z + sf(2, 1) * height);
     }
@@ -328,6 +342,7 @@ fn surface_cap(u: f32, v: f32, side: f32) -> vec3f {
     if (sf(0, 0) == 1.0) {
         return surface_sweep_point(sv(x, y, 0.0), side);
     }
+
     var offset = i32(sf(7, 0));
     var count = i32(sf(7, 1));
     var profile = i32(sf(5, 0));
@@ -343,9 +358,11 @@ fn surface_cap(u: f32, v: f32, side: f32) -> vec3f {
         var wc = ((b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x)) / area;
         if (wb >= -0.00001 && wc >= -0.00001 && wb + wc <= 1.00001) {
             return sv_add(sv_mul(surface_loft_point(ia, side), 1.0 - wb - wc),
-                sv_add(sv_mul(surface_loft_point(ib, side), wb), sv_mul(surface_loft_point(ic, side), wc)));
+                sv_add(sv_mul(surface_loft_point(ib, side), wb),
+                    sv_mul(surface_loft_point(ic, side), wc)));
         }
     }
+
     return surface_loft_point(0, side);
 }
 
@@ -353,6 +370,7 @@ fn surface_position(region: i32, u: f32, v: f32) -> vec3f {
     if ((sf(0, 0) == 1.0 || sf(0, 0) == 2.0) && (region == 2 || region == 3)) {
         return surface_cap(u, v, f32(region - 2));
     }
+
     if (region == 8 || region == 9) {
         var side = f32(region - 8);
         var point = i32(floor(u + 0.5));
@@ -360,8 +378,10 @@ fn surface_position(region: i32, u: f32, v: f32) -> vec3f {
             var profile_offset = i32(sf(5, 0));
             return surface_sweep_point(sp(profile_offset + point), side);
         }
+
         return surface_loft_point(point, side);
     }
+
     if (sf(0, 0) == 7.0 && region >= 2) {
         var y = -0.5;
         if (region == 3) {
@@ -415,12 +435,14 @@ fn surface_normal(region: i32, u: f32, v: f32) -> vec3f {
     if ((sf(0, 0) == 1.0 || sf(0, 0) == 2.0) && (region == 2 || region == 3)) {
         cap_region = region + 6;
     }
+
     if (cap_region == 8 || cap_region == 9) {
         var side = f32(cap_region - 8);
         var normal = sv(0.0, 1.0, 0.0);
         if (sf(0, 0) == 1.0) {
             normal = surface_direction(side);
         }
+
         if (sf(0, 0) == 2.0) {
             var triangle = i32(sf(7, 0));
             var ia = i32(sf(triangle, 0));
@@ -431,11 +453,14 @@ fn surface_normal(region: i32, u: f32, v: f32) -> vec3f {
             var c = surface_loft_point(ic, side);
             normal = sv_unit(sv_cross(sv_sub(c, a), sv_sub(b, a)));
         }
+
         if (cap_region == 8) {
             normal = sv_mul(normal, -1.0);
         }
+
         return normal;
     }
+
     if (sf(0, 0) == 7.0 && region >= 2) {
         if (region == 2) {
             return sv(0.0, -1.0, 0.0);
@@ -445,19 +470,21 @@ fn surface_normal(region: i32, u: f32, v: f32) -> vec3f {
     }
 
     if (sf(0, 0) == 1.0 && region < 2) {
-        let sample = surface_sweep_sample(region, u, v);
+        var sample = surface_sweep_sample(region, u, v);
         if (sv_dot(sample.normal, sample.normal) >= 0.000000000001) {
             return sv_unit(sample.normal);
         }
     }
 
+    var flip = (region == 1 && sf(0, 0) == 3.0) || region == 3 || region == 4 ||
+        region == 7;
     var delta = 0.0001;
     var du = sv_sub(surface_position(region, min(u + delta, 1.0), v),
         surface_position(region, max(u - delta, 0.0), v));
     var dv = sv_sub(surface_position(region, u, min(v + delta, 1.0)),
         surface_position(region, u, max(v - delta, 0.0)));
     var normal = sv_cross(dv, du);
-    if ((region == 1 && sf(0, 0) == 3.0) || region == 3 || region == 4 || region == 7) {
+    if (flip) {
         normal = sv_mul(normal, -1.0);
     }
 
@@ -468,7 +495,7 @@ fn surface_normal(region: i32, u: f32, v: f32) -> vec3f {
         dv = sv_sub(surface_position(region, u, fallback + delta),
             surface_position(region, u, fallback - delta));
         normal = sv_cross(dv, du);
-        if ((region == 1 && sf(0, 0) == 3.0) || region == 3 || region == 4 || region == 7) {
+        if (flip) {
             normal = sv_mul(normal, -1.0);
         }
     }
@@ -479,6 +506,6 @@ fn surface_normal(region: i32, u: f32, v: f32) -> vec3f {
             normal = sv_mul(normal, -1.0);
         }
     }
+
     return sv_unit(normal);
 }
-

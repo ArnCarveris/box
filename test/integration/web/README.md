@@ -48,23 +48,54 @@ node test/integration/web/transmission.mjs \
     "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
 ```
 
-`audio_tone.mjs` checks the audio of the browser build (`docs/audio.md`): the audio core runs
-from its own wasm in an AudioWorklet, without shared memory, and starts on a user gesture. It
-serves the page without COOP/COEP headers, so `crossOriginIsolated` is false, and opens
-`test/integration/web/audio_tone.flecs`, a turning box, with `?tone=440`, the temporary trigger
-of the tone. Chrome runs without an autoplay flag, so no audio starts without a gesture. Once
+`audio_core.mjs` checks the audio of the browser build (`docs/audio.md`): the mixer of the
+audio core runs from its own wasm in an AudioWorklet, without shared memory, starts on a user
+gesture and is driven by command batches over the port. It serves the page without COOP/COEP
+headers, so `crossOriginIsolated` is false, and opens `test/integration/web/audio_core.flecs`,
+a turning box. Chrome runs without an autoplay flag, so no audio starts without a gesture. Once
 the scene draws, the check expects the audio context suspended before a gesture, frames drawn
 for a second and no error in the log. A trusted click of the DevTools protocol
-(`Input.dispatchMouseEvent`) on the canvas has to start it; an `AnalyserNode` on the
-worklet node then has to measure 440 Hz at a peak of 0.25. A 500 ms busy loop on the main thread
-has to leave the clock and the quantum count of the worklet advancing by its length, with the
-tone intact afterwards, and `Module._box_audio_web_tone(660, 0.25)`, a command sent from C, has
-to change the frequency to 660 Hz. The frames keep advancing and the log has no error, no
-`box.audio` warning and no invalid WebGPU object. It prints its measurements and the size of the
-core:
+(`Input.dispatchMouseEvent`) on the canvas has to start it. The check then sends a sound of a
+440 Hz sine at 0.25 (`Module.boxAudio.sound`) and a batch with a looped play command
+(`Module.boxAudio.commands`, encoded with a `DataView` as in `src/audio/core/core.h`); an
+`AnalyserNode` on the worklet node has to measure 440 Hz at a peak of 0.25 without a step
+larger than the sine's. A volume command of 0.5 has to reach the output, the window of the
+analyser holding the old peak at its start and 0.125 at its end, without a click. A 500 ms
+busy loop on the main thread has to leave the clock and the quantum count of the worklet
+advancing by its length with the voice playing and intact afterwards. A batch with an order
+that has a cycle, a stop and a release has to come back as an `ORDER_REFUSED`, a `VOICE_END`
+and a `SOUND_FREE` event, with the worklet holding no voice and no sound and the output silent.
+The frames keep advancing and the log has no error, no `box.audio` warning and no invalid
+WebGPU object. It prints its measurements, the events and the sizes of the core:
 
 ```sh
-node test/integration/web/audio_tone.mjs \
+node test/integration/web/audio_core.mjs \
+    "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
+```
+
+`audio_core_safari.mjs` runs the same audio check in real Safari on macOS, driven by
+`safaridriver` over the W3C WebDriver HTTP API (plain `node`, no npm dependency). It starts
+`safaridriver -p <free port>`, opens a session, prints the Safari and macOS versions and stops
+with exit status 2 when Safari has no WebGPU, when remote automation is off (run
+`sudo safaridriver --enable` once as an admin and turn on "Allow remote automation" in the
+Developer section of Safari Settings) or when no GUI session is logged in. Safari WebDriver has
+no log endpoint, so the server injects a script at the top of the `<head>` of `boxrun.html`,
+before the page runs, which records the console (`log`, `info`, `warn`, `error`), uncaught
+errors and rejections, and counts the frames; the check reads that log from the page. It opens
+`test/integration/web/audio_core.flecs`, expects the context suspended and no failure before a
+gesture while the scene renders, then clicks the canvas with WebDriver Actions
+(`POST /session/{id}/actions`, pointer down and up). If Safari does not take the click as a
+gesture it tries a key press, and it prints `Module.boxAudio.gestures` and
+`Module.boxAudio.resumes`, which tell an input that never reaches the page from a `resume()`
+Safari refuses. Once running, it sends the sound of a 440 Hz sine at 0.25 and a looped play
+command as `audio_core.mjs` does; the voice has to measure 440 Hz at a peak of 0.25, then 660 Hz
+after a pitch command of 1.5, `Module._box_audio_web_apply` and `_box_audio_web_sound` have to be
+exported, the frames keep advancing and the log has no error and no `box.audio` warning. It
+leaves out the volume ramp, the main thread stall and the events of `audio_core.mjs`.
+`--safaridriver` or `$SAFARIDRIVER` selects the driver, `/usr/bin/safaridriver` by default:
+
+```sh
+node test/integration/web/audio_core_safari.mjs \
     "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
 ```
 
