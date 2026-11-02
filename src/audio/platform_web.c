@@ -27,7 +27,8 @@ static const char *box_audio_web_reasons[] = {
     "the audio core did not start in the worklet"
 };
 
-/** Create the AudioContext, suspended until a gesture, and load the worklet from a Blob URL.
+/** Create the AudioContext, suspended until a gesture, and load the worklet from a Blob URL,
+ * or from a data URL of the same script when the browser rejects the Blob URL.
  *
  * The worklet compiles the bytes of the core synchronously in the constructor of its processor
  * and calls render once per quantum. Commands sent before the node exists wait in the page.
@@ -107,7 +108,7 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
     }
 
     var audio = { ctx: ctx, node: null, pending: [], requests: {}, id: 0, failed: 0,
-        coreSize: size };
+        coreSize: size, gestures: 0, resumes: 0, source: 'blob' };
     audio.post = function(m) {
         if (audio.node) {
             audio.node.port.postMessage(m);
@@ -142,11 +143,19 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
     };
 
     var bytes = HEAPU8.slice(core, core + size).buffer;
-    var url = URL.createObjectURL(new Blob(['(' + worklet.toString() + ')();'],
-        { type: 'application/javascript' }));
+    var script = '(' + worklet.toString() + ')();';
+    var url = URL.createObjectURL(new Blob([script], { type: 'application/javascript' }));
     Module.boxAudio = audio;
-    ctx.audioWorklet.addModule(url).then(function() {
+    ctx.audioWorklet.addModule(url).catch(function() {
         URL.revokeObjectURL(url);
+        url = null;
+        audio.source = 'data';
+        return ctx.audioWorklet.addModule('data:application/javascript;charset=utf-8,' +
+            encodeURIComponent(script));
+    }).then(function() {
+        if (url) {
+            URL.revokeObjectURL(url);
+        }
         var node = new AudioWorkletNode(ctx, 'box-audio-core', {
             numberOfInputs: 0,
             numberOfOutputs: 1,
@@ -167,7 +176,9 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
         audio.pending = null;
         pending.forEach(function(m) { node.port.postMessage(m); });
     }).catch(function() {
-        URL.revokeObjectURL(url);
+        if (url) {
+            URL.revokeObjectURL(url);
+        }
         fail(3);
     });
 
@@ -175,11 +186,17 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
 });
 
 /** Resume the AudioContext when it is suspended. The promise of resume is not waited on; the
- * browser refuses it outside a gesture, which is not an error.
+ * browser refuses it outside a gesture, which is not an error. Module.boxAudio counts the
+ * gestures that reach it and the calls of resume, which tells an input that never arrives from
+ * a resume the browser refuses.
  */
 EM_JS(void, box_audio_web_resume, (void), {
     var audio = Module.boxAudio;
+    if (audio) {
+        audio.gestures++;
+    }
     if (audio && !audio.failed && audio.ctx.state === 'suspended') {
+        audio.resumes++;
         audio.ctx.resume().catch(function() { });
     }
 });

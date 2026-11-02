@@ -68,6 +68,29 @@ node test/integration/web/audio_tone.mjs \
     "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
 ```
 
+`audio_tone_safari.mjs` runs the same audio check in real Safari on macOS, driven by
+`safaridriver` over the W3C WebDriver HTTP API (plain `node`, no npm dependency). It starts
+`safaridriver -p <free port>`, opens a session, prints the Safari and macOS versions and stops
+with exit status 2 when Safari has no WebGPU, when remote automation is off (run
+`sudo safaridriver --enable` once as an admin and turn on "Allow Remote Automation" in the
+Develop menu) or when no GUI session is logged in. Safari WebDriver has no log endpoint, so the
+server injects a script at the top of the `<head>` of `boxrun.html`, before the page runs, which
+records the console (`log`, `info`, `warn`, `error`), uncaught errors and rejections, and counts
+the frames; the check reads that log from the page. It expects the context suspended and no
+failure before a gesture while the scene renders, then clicks the canvas with WebDriver Actions
+(`POST /session/{id}/actions`, pointer down and up). If Safari does not take the click as a
+gesture it tries a key press, and it prints `Module.boxAudio.gestures` and
+`Module.boxAudio.resumes`, which tell an input that never reaches the page from a `resume()`
+Safari refuses. Once running, the tone has to measure 440 Hz at a peak of 0.25, then 660 Hz after
+`Module._box_audio_web_tone(660, 0.25)`, the frames keep advancing and the log has no error and
+no `box.audio` warning. It leaves out the main thread stall of `audio_tone.mjs`. `--safaridriver`
+or `$SAFARIDRIVER` selects the driver, `/usr/bin/safaridriver` by default:
+
+```sh
+node test/integration/web/audio_tone_safari.mjs \
+    "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
+```
+
 Before starting Chrome on macOS, the scripts check the `.app` bundle that contains the Chrome
 executable (after resolving symlinks) for the `com.apple.quarantine` attribute
 (`xattr -p com.apple.quarantine <app>`).

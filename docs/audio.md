@@ -124,9 +124,22 @@ Then open
 `Module._box_audio_web_tone(660, 0.25)` changes the tone, and `Module.boxAudio.ctx.state` shows
 the state of the context.
 
-This is also the check for Safari, which the automated check cannot run: open the same address
-in Safari on macOS, click the canvas, and expect the tone, the frequency change from the console
+The automated check of Chrome is `test/integration/web/audio_tone.mjs`, and of Safari
+`test/integration/web/audio_tone_safari.mjs`, which drives real Safari through `safaridriver`
+on macOS (see `test/integration/web/README.md`):
+
+```sh
+node test/integration/web/audio_tone_safari.mjs "$BIN"
+```
+
+Safari automation has to be enabled once on the host, by an admin, with
+`sudo safaridriver --enable` and the Develop menu option "Allow Remote Automation", and needs a
+logged-in GUI session. Where it cannot run, check Safari by hand: open the same address in
+Safari on macOS, click the canvas, and expect the tone, the frequency change from the console
 and no `box.audio` warning in the console.
 
-The automated check of Chrome is `test/integration/web/audio_tone.mjs`, see
-`test/integration/web/README.md`.
+When Safari rejects the Blob URL of the worklet script, `platform_web.c` loads the same script
+from a data URL (`Module.boxAudio.source` is then `data`) before it reports the worklet as not
+loaded. `Module.boxAudio.gestures` counts the key and mouse button events that reached the audio
+and `Module.boxAudio.resumes` the calls of `ctx.resume()` they made, which tells an input that
+never arrives from a resume the browser refuses.
