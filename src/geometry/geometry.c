@@ -409,6 +409,7 @@ void BoxGeometryImport(
     ECS_META_COMPONENT(world, Circle);
     ECS_META_COMPONENT(world, Line);
     ECS_META_COMPONENT(world, Border);
+    ECS_META_COMPONENT(world, BoxShadow);
     ECS_META_COMPONENT(world, Image);
 
     ECS_COMPONENT_DEFINE(world, ShapeMesh);
