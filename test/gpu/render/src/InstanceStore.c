@@ -362,7 +362,7 @@ void InstanceStore_run_moved_to_other_page_copies_directly(void) {
     // gpu_instance_data/copy_staging_release
     ecs_world_t *world = world_new();
     ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
-    box_render_draws_page(world, 128);
+    box_render_draws_page(world, 64);
     ecs_entity_t a[2], b[3];
     int32_t i;
     for (i = 0; i < 2; i ++) {
@@ -375,20 +375,32 @@ void InstanceStore_run_moved_to_other_page_copies_directly(void) {
 
     box_render_gpu_stats_t before = frames(world, 3);
     box_render_draws_t *d = box_draws_state(world);
-    test_int(box_draws_batch(d, ecs_get(world, a[0], DrawSlot)->batch)->page, 0);
-    test_int(box_draws_batch(d, ecs_get(world, b[0], DrawSlot)->batch)->page, 0);
+    box_draw_batch_t *ba = box_draws_batch(d, ecs_get(world, a[0], DrawSlot)->batch);
+    box_draw_batch_t *bb = box_draws_batch(d, ecs_get(world, b[0], DrawSlot)->batch);
+    test_int(ba->page, 0);
+    test_int(bb->page, 0);
     test_int(before.copy_staging, 0);
     batch_matches_in(world, a[0], 0);
     batch_matches_in(world, b[0], 0);
 
-    /* The first batch outgrows its run of 64 slots and the page holds at most 128 slots, so it
-     * moves to a new page: the copies go from the buffers of the first page straight into the
-     * buffers of the second */
-    for (i = 0; i < 64; i ++) {
+    /* The first batch outgrows its run: the run it grows to neither extends in place, as the
+     * second batch is above it, nor fits past the second batch in a page of 64 slots, so it
+     * moves to a new page. The layout depends on the run policy, checked here so a change of it
+     * fails on the layout rather than on the copies */
+    test_assert(ba->first + ba->capacity <= bb->first);
+    test_assert(box_draws_grow(0, 40) <= 64);
+    test_assert(bb->first + bb->capacity + box_draws_grow(0, 40) > 64);
+    for (i = 0; i < 38; i ++) {
         ngon_new(world, 3, (float)(i % 16) - 8, (float)(i / 16) - 8);
     }
 
+    /* The copies go from the buffers of the first page straight into the buffers of the
+     * second */
     box_render_gpu_stats_t after = frames(world, 1);
+    ba = box_draws_batch(d, ecs_get(world, a[0], DrawSlot)->batch);
+    bb = box_draws_batch(d, ecs_get(world, b[0], DrawSlot)->batch);
+    test_int(ba->page, 1);
+    test_int(bb->page, 0);
     box_render_draws_stats_t stats;
     box_render_draws_stats(world, &stats);
     test_int(stats.copies, BOX_RENDER_INSTANCE_STREAMS_PLAIN);
@@ -563,24 +575,43 @@ void InstanceStore_staging_released_after_frames_without_copies(void) {
     // gpu_instance_data/copy_staging_release
     ecs_world_t *world = world_new();
     ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
-    ecs_entity_t a[4];
+    ecs_entity_t a[4], b[4];
     int32_t i, burst;
     for (i = 0; i < 4; i ++) {
         a[i] = ngon_new(world, 3, (float)i - 10, 0);
-        ngon_new(world, 4, (float)i - 10, 4);
+        b[i] = ngon_new(world, 4, (float)i - 10, 4);
     }
 
     box_render_gpu_stats_t before = frames(world, 3);
+    box_render_draws_t *d = box_draws_state(world);
     test_int(before.copy_staging, 0);
 
-    /* A burst of moves within the first page, which grows: each frame the first batch outgrows
-     * its run and moves past the second one in the same buffer, through the staging buffer */
+    /* A burst of moves within the first page, which grows: each frame one of the two batches
+     * outgrows its run while the other is above it, so it cannot extend in place and moves past
+     * the other in the same buffer, through the staging buffer. The batches take turns, so the
+     * last packet of the burst stages as well */
+    box_render_gpu_stats_t prev = before;
     for (burst = 0; burst < 3; burst ++) {
+        ecs_entity_t grown = burst % 2 ? b[0] : a[0];
+        ecs_entity_t other = burst % 2 ? a[0] : b[0];
+        box_draw_batch_t *bg = box_draws_batch(d, ecs_get(world, grown, DrawSlot)->batch);
+        box_draw_batch_t *bo = box_draws_batch(d, ecs_get(world, other, DrawSlot)->batch);
+        uint32_t first = bg->first;
+        test_int(bg->page, 0);
+        test_int(bo->page, 0);
+        test_assert(bg->first + bg->capacity <= bo->first);
         for (i = 0; i < 64 << burst; i ++) {
-            ngon_new(world, 3, (float)(i % 16) - 8, (float)((i / 16) % 16) - 8);
+            ngon_new(world, burst % 2 ? 4 : 3, (float)(i % 16) - 8,
+                (float)((i / 16) % 16) - 8);
         }
 
-        frames(world, 1);
+        box_render_gpu_stats_t cur = frames(world, 1);
+        bg = box_draws_batch(d, ecs_get(world, grown, DrawSlot)->batch);
+        test_int(bg->page, 0);
+        test_assert(bg->first != first);
+        test_int(cur.copies_staged - prev.copies_staged, BOX_RENDER_INSTANCE_STREAMS_PLAIN);
+        test_int(cur.errors, 0);
+        prev = cur;
     }
 
     box_render_gpu_stats_t after = frames(world, 0);
@@ -589,6 +620,7 @@ void InstanceStore_staging_released_after_frames_without_copies(void) {
     test_assert(after.copy_staging > 0);
     test_assert(after.copy_staging_peak >= after.copy_staging);
     batch_matches(world, a[0]);
+    batch_matches(world, b[0]);
 
     /* Kept while fewer packets than the limit had no staged copies */
     before = after;
@@ -605,6 +637,7 @@ void InstanceStore_staging_released_after_frames_without_copies(void) {
     test_int(after.copy_staging, 0);
     test_int(after.errors, 0);
     batch_matches(world, a[0]);
+    batch_matches(world, b[0]);
     ecs_fini(world);
 }
 

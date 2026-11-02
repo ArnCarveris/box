@@ -337,6 +337,9 @@ static void box_gpu_target_scene(
 
 /** Make the textures of a target match its description.
  *
+ * Its depth can be copied: a view with transmissive draws copies it next to its opaque
+ * snapshot (box_gpu_transmission_record).
+ *
  * @param gpu The backend
  * @param t The target
  */
@@ -381,7 +384,8 @@ static void box_gpu_target_configure(
     }
 
     t->depth = box_gpu_texture(gpu, d->render_width, d->render_height, BOX_GPU_DEPTH_FORMAT,
-        WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding);
+        WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding |
+        WGPUTextureUsage_CopySrc);
     t->depth_view = wgpuTextureCreateView(t->depth, NULL);
 
     box_gpu_count(gpu, BOX_GPU_STAT_CONFIGURED);

@@ -150,7 +150,7 @@ static void box_sheen_ctor(
 }
 
 /** Construct DiffuseTransmission values: half of the diffuse light passes through, untinted,
- * a thin sheet.
+ * a thin sheet, no distance aware blur.
  *
  * @param ptr The components
  * @param count Number of components
@@ -168,7 +168,8 @@ static void box_diffuse_transmission_ctor(
         values[i] = (DiffuseTransmission){
             .factor = BOX_MATERIAL_DIFFUSE_TRANSMISSION_FACTOR,
             .color = { 255, 255, 255 },
-            .thickness = 0.0f };
+            .thickness = 0.0f,
+            .blur = 0.0f };
     }
 }
 

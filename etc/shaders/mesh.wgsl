@@ -111,6 +111,11 @@ const MIN_ROUGHNESS: f32 = 0.045;
 // transmissive draws, and the captures, bind a 1x1 white image.
 @group(0) @binding(19) var opaque_snapshot: texture_2d<f32>;
 
+// Depth of the target copied with the opaque snapshot (gpu_transmission.c), reversed Z with 0 for
+// the sky, which the blur of a DiffuseTransmission reads with textureLoad. A view without
+// transmissive draws, and the captures, bind a 1x1 placeholder.
+@group(0) @binding(20) var opaque_snapshot_depth: texture_depth_2d;
+
 @group(2) @binding(0) var<storage, read> transforms: array<InstanceTransform>;
 @group(2) @binding(1) var<storage, read> surface_assets: array<vec4f>;
 @group(2) @binding(2) var<storage, read> shadings: array<MeshShading>;
@@ -178,8 +183,8 @@ struct VertexOut {
     @location(3) emissive: vec3f,
     @location(4) material: vec2f,
     @location(5) uv: vec2f,
-    // Flat scalars of the material: the AlphaCutoff in x and the thickness of the
-    // DiffuseTransmission in y; z and w are 0
+    // Flat scalars of the material: the AlphaCutoff in x, the thickness of the
+    // DiffuseTransmission in y and its blur in z; w is 0
     @location(6) @interpolate(flat) scalars: vec4f,
     // ClearCoat of the material: strength and roughness, 0 strength without one
     @location(10) @interpolate(flat) clear_coat: vec2f,
@@ -304,7 +309,7 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material) -> Vert
     o.color = s.color;
     o.emissive = material.emissive;
     o.material = s.material;
-    o.scalars = vec4f(material.cutoff, material.thickness, 0.0, 0.0);
+    o.scalars = vec4f(material.cutoff, material.thickness, material.diffuse_blur, 0.0);
     o.clear_coat = unpack2x16unorm(material.clear_coat);
     o.anisotropy = unpack2x16unorm(material.anisotropy);
     let sheen = unpack4x8unorm(material.sheen);
@@ -1154,6 +1159,40 @@ fn output(color: vec3f, alpha: f32) -> vec4f {
     }
 }
 
+// Mip of the opaque snapshot a Transmission shape with a DiffuseTransmission.blur samples: the
+// blur radius grows by blur world units per world unit between the surface and the opaque
+// image behind it, read from the depth copy of the snapshot, and is measured in pixels of mip 0
+// at the distance of what is blurred (in a perspective view) or at the scale of an orthographic
+// one. Contact is sharp, the sky (depth 0) takes the top mip, and the roughness blur stays the
+// least it samples.
+fn transmission_blur_lod(world: vec3f, screen_uv: vec2f, blur: f32, rough_lod: f32,
+    max_mip: f32) -> f32
+{
+    let size = vec2i(textureDimensions(opaque_snapshot_depth));
+    let depth = textureLoad(opaque_snapshot_depth, min(vec2i(screen_uv * vec2f(size)), size - 1),
+        0);
+    var blur_lod = max_mip;
+    if (depth > 0.0) {
+        let h = view.inv_view_proj * vec4f(screen_uv.x * 2.0 - 1.0, 1.0 - screen_uv.y * 2.0,
+            depth, 1.0);
+        let behind = max(length(h.xyz / h.w - world), 0.0);
+
+        // The blur radius in world units, seen at the distance of what is blurred, in pixels of
+        // mip 0. view.cluster.y is the inverse of the projection scale of y: the tangent of
+        // half the vertical field of view, or the half height of an orthographic view, where
+        // the distance does not matter.
+        let radius = behind * blur;
+        var eye = 1.0;
+        if (view.lights.w == 0u) {
+            eye = max(length(world - view.camera.xyz) + behind, 1e-4);
+        }
+        let pixels = radius / eye / view.cluster.y * view.viewport.y * 0.5;
+        blur_lod = log2(max(pixels, 1.0));
+    }
+
+    return clamp(max(rough_lod, blur_lod), 0.0, max_mip);
+}
+
 // Color of a transmissive fragment (Transmission), as flecs-engine shades it: the opaque
 // snapshot seen where the ray refracted by the index of refraction leaves a volume of the
 // thickness of the material times the scale of the instance, at a mip that follows the
@@ -1199,7 +1238,11 @@ fn transmission(f: VertexOut, s: Surface) -> vec4f {
 
     // Sample opaque scene at refracted UV with roughness-dependent LOD
     let max_mip = max(f32(textureNumLevels(opaque_snapshot)) - 1.0, 0.0);
-    let bg_lod = s.roughness * max_mip;
+    var bg_lod = s.roughness * max_mip;
+    let diffuse_blur = f.scalars.z;
+    if (diffuse_blur > 0.0) {
+        bg_lod = transmission_blur_lod(f.world, screen_uv, diffuse_blur, bg_lod, max_mip);
+    }
     let background = textureSampleLevel(opaque_snapshot, reflection_sampler, screen_uv,
         bg_lod).rgb;
 

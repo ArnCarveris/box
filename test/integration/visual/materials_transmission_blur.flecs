@@ -1,0 +1,83 @@
+// Distance aware blur of a frosted pane (Transmission with a DiffuseTransmission.blur): a smooth
+// pane stands in front of a row of striped columns, from left to right touching its back and
+// 0.4, 1.2, 2.5 and 5 units behind it, under a sun. Through the pane the column that touches it
+// is crisp and each one further back is softer; above the columns the pane shows the sky, which
+// takes the softest mip. Right of the pane the same row is seen directly, sharp.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.atmosphere
+
+camera {
+  Position: {0, 1.6, 6.5}
+  Rotation: {-0.05, 0, 0}
+  Camera: {fov: 55, far_: 0}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}}
+}
+
+sun {
+  Rotation: {0.8, 2.6, 0}
+  DirectionalLight: {intensity: 1.5 * flecs.script.math.PI}
+  Rgb: {255, 255, 255}
+}
+
+$ {
+  Atmosphere: {units_per_km: 1000, sun: sun}
+}
+
+ground {
+  Position: {0, -0.1, -2}
+  Box: {30, 0.2, 20}
+  Rgb: {120, 118, 112}
+  PbrMaterial: {roughness: 0.9}
+}
+
+// A column of four stripes, dark and light, whose edges show how much it is blurred
+prefab Stripes {
+  s0 {
+    Position: {0, 0.2, 0}
+    Box: {0.8, 0.4, 0.3}
+    Rgb: {230, 70, 50}
+  }
+  s1 {
+    Position: {0, 0.6, 0}
+    Box: {0.8, 0.4, 0.3}
+    Rgb: {30, 30, 36}
+  }
+  s2 {
+    Position: {0, 1.0, 0}
+    Box: {0.8, 0.4, 0.3}
+    Rgb: {240, 220, 90}
+  }
+  s3 {
+    Position: {0, 1.4, 0}
+    Box: {0.8, 0.4, 0.3}
+    Rgb: {30, 30, 36}
+  }
+}
+
+// The back face of the pane is at z -0.05: the first column touches it
+touching : Stripes { Position: {-3.2, 0, -0.2} }
+near_0 : Stripes { Position: {-2.0, 0, -0.6} }
+near_1 : Stripes { Position: {-0.8, 0, -1.4} }
+far_0 : Stripes { Position: {0.4, 0, -2.7} }
+far_1 : Stripes { Position: {1.6, 0, -5.2} }
+
+// The same row beside the pane, seen directly
+direct_0 : Stripes { Position: {3.6, 0, -0.2} }
+direct_1 : Stripes { Position: {7.6, 0, -5.2} }
+
+frosted_pane {
+  Position: {-0.6, 2.4, 0}
+  Box: {6.6, 4.8, 0.1}
+  Rgb: {245, 248, 255}
+  PbrMaterial: {roughness: 0.04}
+  Transmission: {transmission_factor: 1, ior: 1.2, thickness_factor: 0.05}
+  DiffuseTransmission: {factor: 0, blur: 0.12}
+}
