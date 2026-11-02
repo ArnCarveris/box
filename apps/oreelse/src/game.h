@@ -103,6 +103,13 @@ ECS_STRUCT(OreBlink, {
     bool lamp; /**< On for the first half of every 1 / cfg.lampRate seconds */
 });
 
+/** How fast the animations of the UI run, a singleton the UI scripts read: 1 in play, 0 shows
+ * every element in its final state at once.
+ */
+ECS_STRUCT(OreUiMotion, {
+    float scale; /**< Multiplier of the durations and delays of the UI's transitions */
+});
+
 /** The one line message at the bottom of the screen, shown with ore_toast. Modified when a
  * message starts and when it ends, not while it counts.
  */

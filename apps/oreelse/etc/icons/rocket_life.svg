@@ -1,6 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <circle cx="32" cy="30" r="20" fill="#c2cbda"/>
-  <path d="M14 38 A20 20 0 0 1 50 38 Z" fill="#83fff3"/>
-  <rect x="20" y="50" width="24" height="8" rx="3" fill="#6b7282"/>
-  <rect x="28" y="6" width="8" height="8" rx="2" fill="#ffcc6e"/>
+  <defs>
+    <filter id="contour" filterUnits="userSpaceOnUse" x="-4" y="-4" width="72" height="72" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="0.5"/><feComponentTransfer result="edge"><feFuncA type="linear" slope="7" intercept="-0.15"/></feComponentTransfer><feGaussianBlur in="edge" stdDeviation="1"/><feOffset dx="0.5" dy="1.5"/><feComponentTransfer result="shadow"><feFuncA type="linear" slope="0.55"/></feComponentTransfer><feFlood flood-color="#090b0d"/><feComposite in2="edge" operator="in" result="line"/><feMerge><feMergeNode in="shadow"/><feMergeNode in="line"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="gun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#79868c"/><stop offset="0.5" stop-color="#3f4a50"/><stop offset="1" stop-color="#1e2529"/></linearGradient>
+    <linearGradient id="gunCyl" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#232a2e"/><stop offset="0.3" stop-color="#808d93"/><stop offset="0.65" stop-color="#414c52"/><stop offset="1" stop-color="#14191c"/></linearGradient>
+    <linearGradient id="amberCyl" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7c4c15"/><stop offset="0.3" stop-color="#e0b955"/><stop offset="0.65" stop-color="#c98426"/><stop offset="1" stop-color="#5f390f"/></linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fe0d4"/><stop offset="0.55" stop-color="#2fa899"/><stop offset="1" stop-color="#0d5a55"/></linearGradient>
+    <radialGradient id="sphere" cx="0.36" cy="0.28" r="0.85"><stop offset="0" stop-color="#d3dbde"/><stop offset="0.45" stop-color="#8f9ca2"/><stop offset="1" stop-color="#2a3237"/></radialGradient>
+  </defs>
+  <g filter="url(#contour)">
+    <rect x="27" y="3" width="10" height="7" rx="1.5" fill="url(#amberCyl)"/>
+    <rect x="24" y="8" width="16" height="3.5" rx="1" fill="url(#gunCyl)"/>
+    <rect x="18" y="49" width="28" height="10" rx="2" fill="url(#gunCyl)"/>
+    <rect x="13" y="54" width="38" height="5" rx="1.5" fill="url(#gun)"/>
+    <rect x="14.5" y="54.4" width="35" height="0.8" rx="0.4" fill="#dadada" opacity="0.3"/>
+    <circle cx="32" cy="30" r="21" fill="url(#sphere)"/>
+    <path d="M15 36 A18 18 0 0 1 49 36 Q32 41 15 36 Z" fill="#0c1012"/>
+    <path d="M16.8 35 A16.5 16.5 0 0 1 47.2 35 Q32 39 16.8 35 Z" fill="url(#glass)"/>
+    <path d="M20 30 A13 13 0 0 1 32 20 Q24 23 22 32 Z" fill="#dadada" opacity="0.55"/>
+    <path d="M15 37 Q32 42.5 49 37" fill="none" stroke="#14191c" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
+    <path d="M16 45 Q32 50 48 45" fill="none" stroke="#14191c" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+    <circle cx="24" cy="44" r="1.1" fill="#272e33"/>
+    <circle cx="23.75" cy="43.7" r="0.55" fill="#b4bec3" opacity="0.8"/>
+    <circle cx="32" cy="45" r="1.1" fill="#272e33"/>
+    <circle cx="31.75" cy="44.7" r="0.55" fill="#b4bec3" opacity="0.8"/>
+    <circle cx="40" cy="44" r="1.1" fill="#272e33"/>
+    <circle cx="39.75" cy="43.7" r="0.55" fill="#b4bec3" opacity="0.8"/>
+  </g>
 </svg>

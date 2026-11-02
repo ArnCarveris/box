@@ -30,6 +30,7 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OreRandom);
     ECS_META_COMPONENT(world, OreClock);
     ECS_META_COMPONENT(world, OreBlink);
+    ECS_META_COMPONENT(world, OreUiMotion);
     ECS_META_COMPONENT(world, OreToast);
     ECS_META_COMPONENT(world, OreZoom);
     ECS_META_COMPONENT(world, OreView);
@@ -146,6 +147,8 @@ void OreelseImport(
     ore_flow_import(world);
     ore_map_import(world);
     ore_player_import(world);
+    ecs_singleton_set(world, OreUiMotion, { .scale = 1 });
+
     ore_inventory_import(world);
     ore_inventory_screen_import(world);
     ore_mining_import(world);

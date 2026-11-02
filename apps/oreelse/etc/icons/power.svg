@@ -1,5 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <path d="M36 4 L14 36 L28 36 L24 60 L50 26 L34 26 Z" fill="#e3a739"/>
-  <path d="M36 4 L14 36 L28 36 L30 26 L34 26 Z" fill="#ffc966"/>
-  <path d="M34 26 L50 26 L24 60 L30 34 Z" fill="#ffe39b"/>
+  <defs>
+    <filter id="contour" filterUnits="userSpaceOnUse" x="-4" y="-4" width="72" height="72" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="0.5"/><feComponentTransfer result="edge"><feFuncA type="linear" slope="7" intercept="-0.15"/></feComponentTransfer><feGaussianBlur in="edge" stdDeviation="1"/><feOffset dx="0.5" dy="1.5"/><feComponentTransfer result="shadow"><feFuncA type="linear" slope="0.55"/></feComponentTransfer><feFlood flood-color="#090b0d"/><feComposite in2="edge" operator="in" result="line"/><feMerge><feMergeNode in="shadow"/><feMergeNode in="line"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="boltA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e0c468"/><stop offset="1" stop-color="#d4912c"/></linearGradient>
+    <linearGradient id="boltB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d99f35"/><stop offset="1" stop-color="#7d4b15"/></linearGradient>
+  </defs>
+  <g filter="url(#contour)">
+    <polygon points="37,3 12,37 27,37 22,61 52,25 35,25" fill="url(#boltB)"/>
+    <polygon points="37,3 12,37 18,37 31.5,22 35,25" fill="url(#boltA)"/>
+    <polygon points="18,37 27,37 22,61 31,37" fill="#8c561a"/>
+    <polygon points="35,25 52,25 44,34.5 31,34" fill="url(#boltA)"/>
+    <path d="M36.5 5 L14.5 35.5" fill="none" stroke="#e0d68c" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+    <path d="M36.5 26 L49 26" fill="none" stroke="#e0d68c" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+    <path d="M27 37.5 L23.3 56" fill="none" stroke="#e0c468" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
+  </g>
 </svg>

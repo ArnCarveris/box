@@ -1,94 +1,139 @@
-// The chrome of every panel of the UI, the original's Panel: a dark plate with a thin edge and
-// a hazard strip across its top. The content of a panel are its children, placed from its top
-// left corner (h: Left, v: Top, y down as negative offsets) below the strip.
-
 using flecs.script.math
 using box.types
 using box.transform
 using box.layout
 using box.geometry
 using box.material
+using box.text
 using box.texture
+using box.transition
 using box.picking
+using oreelse
 
-// The hazard strip of the cap, rasterized at 2048x12
-ui_textures {
-  hazard_strip {
-    TexturePath: {path: "apps/oreelse/etc/ui/hazard_strip.svg", width: 2048, height: 12}
-  }
-}
-
-// Corner radius of a panel
 const panelRadius: f32 = 3
-
-// The draw order of the plate and the strip among the children of a panel: below the content.
-// Siblings draw in the order of their Position z, then of their ids, and an instance inside a
-// template creates its content before the plate
-const plateZ: f32 = -2
-const stripZ: f32 = -1
-
-// Size the hazard strip is rasterized at
 const stripWidth: f32 = 2048
 const stripHeight: f32 = 12
 
-// A panel of width by height: the plate in the fill color, its corners rounded by 3, with a 1
-// pixel border in the edge color. With cap a strip of width by capH runs across its top, the
-// hazard strip tinted white with cover fit: scaled to the larger of the two ratios, so it takes
-// the strip's height and is cropped to its horizontal center, framed by a 1 pixel edge border.
-//
-// box rounds all four corners of a Rect alike, so the strip is square and the panel clips its
-// children to its own rounded rect (ClipChildren), which rounds the strip's top corners like the
-// panel's. The plate's opacity, the alpha of the fill, also applies to its border; the content
-// stays opaque. With block, InputBlocker keeps clicks, the right button and the wheel over the
-// panel from the world. The children of the template size the panel (the layout fits it to the
-// plate), so an instance only anchors it with a LayoutItem.
-template Panel {
+template Panel : OreOneShot {
   prop width: f32 = 252
   prop height: f32 = 100
+  prop title: string = ""
   prop cap: bool = true
   prop capH: f32 = 7
-  prop fill: rgba = {21, 23, 27, 236}
-  prop edge: rgba = {74, 80, 90, 255}
+  prop fill: rgba = {24, 26, 30, 244}
+  prop edge: rgba = {78, 82, 88, 255}
+  prop glow: Rgb = {240, 176, 58}
+  prop aura: f32 = 0.1
   prop block: bool = true
+  prop brackets: bool = true
+  prop h: Align = Left
+  prop v: VAlign = Top
+  prop x: f32 = 0
+  prop y: f32 = 0
+  prop delay: f32 = 0
 
+  const motion = OreUiMotion[OreUiMotion].scale
+  const shown = fired || motion == 0
   const scale = max(width / stripWidth, capH / stripHeight)
   const spanU = width / (stripWidth * scale)
   const spanV = capH / (stripHeight * scale)
+  const bx = width / 2 - 10
+  const by = height / 2 - 10
+  const top: f32 = match cap { true: capH; _: 0 }
 
   Layout: {}
-  Border: {radius: panelRadius}
-  ClipChildren
+  LayoutItem: {
+    h: h, v: v, x: x, y: y,
+    width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}
+  }
+  Opacity: {match shown { true: 1; _: 0 }}
+  Transition: [Opacity: {duration: 0.28 * motion, delay: delay * motion}]
 
   if block {
     InputBlocker
   }
 
-  plate {
-    Position: {0, 0, plateZ}
+  shadow {
+    Position: {0, -4, -6}
+    Rect: {width * 1.1 + 56, height * 1.1 + 56}
+    Image: {texture: ui_art.halo}
+    Rgb: {0, 0, 0}
+    Opacity: {0.7}
+    box.spatial.SpatialIgnore
+  }
+
+  OreHalo rim(size: width + 44, height: height + 44, color: glow, alpha: aura, z: -5)
+
+  chrome {
+    Position: {0, 0, -4}
+    Layout: {}
     LayoutItem: {
       h: Left, v: Top,
       width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}
     }
-    Rect: {1, 1}
-    Rgb: {fill.r, fill.g, fill.b}
-    Opacity: {fill.a / 255.0}
-    Border: {width: 1, radius: panelRadius, color: edge}
-  }
+    Border: {radius: panelRadius}
+    ClipChildren
 
-  if cap {
-    strip {
-      Position: {0, 0, stripZ}
+    plate {
+      Position: {0, 0, 0}
       LayoutItem: {
         h: Left, v: Top,
-        width: {mode: Fixed, value: width}, height: {mode: Fixed, value: capH}
+        width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}
       }
       Rect: {1, 1}
-      Rgb: {255, 255, 255}
-      Image: {
-        texture: ui_textures.hazard_strip,
-        u0: 0.5 - spanU / 2, v0: 0.5 - spanV / 2, u1: 0.5 + spanU / 2, v1: 0.5 + spanV / 2
-      }
-      Border: {width: 1, radius: 0, color: edge}
+      Image: {texture: ui_art.plate}
+      Rgb: {fill.r, fill.g, fill.b}
+      Opacity: {fill.a / 255.0}
+      Border: {width: 1, radius: panelRadius, color: edge}
     }
+
+    if cap {
+      strip {
+        Position: {0, 0, 1}
+        LayoutItem: {
+          h: Left, v: Top,
+          width: {mode: Fixed, value: width}, height: {mode: Fixed, value: capH}
+        }
+        Rect: {1, 1}
+        Rgb: {255, 255, 255}
+        Image: {
+          texture: ui_art.hazard,
+          u0: 0.5 - spanU / 2, v0: 0.5 - spanV / 2, u1: 0.5 + spanU / 2, v1: 0.5 + spanV / 2
+        }
+        box.spatial.SpatialIgnore
+      }
+    }
+
+    OreRule sheen(width: width - 2, x: 1, y: top + 1, color: {96, 100, 106}) {
+      Position: {0, 0, 2}
+      Opacity: {0.5}
+    }
+  }
+
+  if brackets {
+    bracket_bl {
+      Position: {-bx, -by, -3}
+      Rotation: {0, 0, PI / 2}
+      Rect: {12, 12}
+      Image: {texture: ui_art.bracket}
+      Rgb: {edge.r, edge.g, edge.b}
+      box.spatial.SpatialIgnore
+    }
+
+    bracket_br {
+      Position: {bx, -by, -3}
+      Rotation: {0, 0, PI}
+      Rect: {12, 12}
+      Image: {texture: ui_art.bracket}
+      Rgb: {edge.r, edge.g, edge.b}
+      box.spatial.SpatialIgnore
+    }
+  }
+
+  if title != "" {
+    OreText heading(
+      text: title, size: 15, font: ui_fonts.stencil, color: palette.amber, glow: 0.35,
+      glowColor: palette.amberGlow, x: 12, y: top + 5)
+    OreRule heading_rule(width: width - 24, x: 12, y: top + 26)
   }
 }

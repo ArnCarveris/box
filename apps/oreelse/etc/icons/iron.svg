@@ -1,8 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <path d="M12 46 L6 28 L20 14 L40 12 L54 24 L50 48 Z" fill="#96a8c3"/>
-  <path d="M20 14 L40 12 L36 30 L16 32 Z" fill="#acbed9"/>
-  <path d="M36 30 L54 24 L50 48 L32 46 Z" fill="#8594af"/>
-  <circle cx="24" cy="40" r="3.4" fill="#c6d6ea"/>
-  <circle cx="42" cy="36" r="2.6" fill="#c6d6ea"/>
-  <circle cx="30" cy="22" r="2.2" fill="#c6d6ea"/>
+  <defs>
+    <filter id="contour" filterUnits="userSpaceOnUse" x="-4" y="-4" width="72" height="72" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="0.5"/><feComponentTransfer result="edge"><feFuncA type="linear" slope="7" intercept="-0.15"/></feComponentTransfer><feGaussianBlur in="edge" stdDeviation="1"/><feOffset dx="0.5" dy="1.5"/><feComponentTransfer result="shadow"><feFuncA type="linear" slope="0.55"/></feComponentTransfer><feFlood flood-color="#090b0d"/><feComposite in2="edge" operator="in" result="line"/><feMerge><feMergeNode in="shadow"/><feMergeNode in="line"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="ironTop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b9cbdc"/><stop offset="1" stop-color="#8ca4c0"/></linearGradient>
+    <linearGradient id="ironLit" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a4bad3"/><stop offset="1" stop-color="#6a819f"/></linearGradient>
+    <linearGradient id="ironMid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7a90ad"/><stop offset="1" stop-color="#4a5c78"/></linearGradient>
+    <linearGradient id="ironDark" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a6d89"/><stop offset="1" stop-color="#28364c"/></linearGradient>
+  </defs>
+  <g filter="url(#contour)">
+    <polygon points="19,13 41,11 37,28 17,30" fill="url(#ironTop)"/>
+    <polygon points="41,11 57,25 37,28" fill="url(#ironLit)"/>
+    <polygon points="5,29 19,13 17,30" fill="url(#ironLit)"/>
+    <polygon points="5,29 17,30 30,42 28,54 10,47" fill="url(#ironMid)"/>
+    <polygon points="17,30 37,28 30,42" fill="url(#ironLit)"/>
+    <polygon points="37,28 57,25 52,50 28,54 30,42" fill="url(#ironDark)"/>
+    <path d="M19 13 L17 30 L37 28 L41 11" fill="none" stroke="#d8dee2" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
+    <path d="M17 30 L30 42 L37 28 L57 25" fill="none" stroke="#d8dee2" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round" opacity="0.3"/>
+    <path d="M30 42 L28 54" fill="none" stroke="#0c1118" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
+    <path d="M24 24 L29 19 L34 20" fill="none" stroke="#3a4a62" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
+    <path d="M24 23.3 L29 18.3 L34 19.3" fill="none" stroke="#dde3e6" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+    <path d="M41 41 L46 35 L50 36" fill="none" stroke="#141c2a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
+    <path d="M41 40.3 L46 34.3 L50 35.3" fill="none" stroke="#a9bdd2" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+    <path d="M14 40 L18 37 L22 41" fill="none" stroke="#1d2738" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+    <path d="M14 39.4 L18 36.4 L22 40.4" fill="none" stroke="#a9bdd2" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+  </g>
 </svg>

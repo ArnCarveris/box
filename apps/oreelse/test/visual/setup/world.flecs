@@ -1,9 +1,0 @@
-// No HUD, for the scenes of the world that stay on the title screen so nothing moves: the view
-// of the HUD is disabled, so neither the title screen nor the rest of the HUD draws over the
-// world. Included after the game.
-
-hud {
-  view {
-    Disabled
-  }
-}

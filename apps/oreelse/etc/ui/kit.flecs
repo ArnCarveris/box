@@ -1,0 +1,276 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.layout
+using box.geometry
+using box.material
+using box.text
+using box.texture
+using box.transition
+using box.surface
+using box.camera
+using oreelse
+
+window {}
+
+ui_art {
+  halo { TexturePath: {path: "apps/oreelse/etc/ui/art/halo.png"} }
+  vignette { TexturePath: {path: "apps/oreelse/etc/ui/art/vignette.png"} }
+  plate { TexturePath: {path: "apps/oreelse/etc/ui/art/plate.png"} }
+  bracket { TexturePath: {path: "apps/oreelse/etc/ui/art/bracket.svg", width: 64} }
+  rays { TexturePath: {path: "apps/oreelse/etc/ui/art/rays.svg", width: 1024} }
+  hazard { TexturePath: {path: "apps/oreelse/etc/ui/hazard_strip.svg", width: 2048, height: 12} }
+}
+
+ui_tick_a {}
+ui_tick_b {}
+
+async {
+  while true {
+    await on.change(ui_tick_b)
+    await ui.changed(ui_tick_a)
+  }
+}
+
+async {
+  while true {
+    await ui.changed(ui_tick_b)
+    await on.change(ui_tick_a)
+  }
+}
+
+fn ore_screen_scale(w: f32, h: f32) -> f32 {
+  min(h / 720.0, w / 1280.0)
+}
+
+template OreScreenCamera {
+  prop scale: f32 = 1
+
+  Position: {0, 0, 100}
+  Camera: {ortho: true, ortho_scale: scale}
+}
+
+template OreScreenRoot {
+  prop width: f32 = 1280
+  prop height: f32 = 720
+
+  LayoutItem: {width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}}
+}
+
+template OreOneShot {
+  mut fired = false
+
+  async {
+    await on.change(ui_tick_a)
+    await on.change(ui_tick_a)
+    fired = true
+  }
+}
+
+template OreText {
+  prop text: string = ""
+  prop size: f32 = 14
+  prop color: Rgb = {232, 230, 222}
+  prop font: entity = ui_fonts.body
+  prop width: f32 = 0
+  prop align: Align = Left
+  prop glow: f32 = 0
+  prop glowColor: Rgb = {0, 0, 0}
+  prop x: f32 = 0
+  prop y: f32 = 0
+  prop h: Align = Left
+  prop v: VAlign = Top
+
+  if width > 0 {
+    LayoutItem: {h: h, v: v, x: x, y: -y, width: {mode: Fixed, value: width}}
+    Text: {value: text, size: size, font: font, width: width, align: align}
+  } else {
+    LayoutItem: {h: h, v: v, x: x, y: -y}
+    Text: {value: text, size: size, font: font, wrap: Newlines}
+  }
+  Rgb: color
+  if glow > 0 {
+    Emissive: {
+      strength: glow,
+      color: match glowColor.r + glowColor.g + glowColor.b > 0 { true: glowColor; _: color }
+    }
+  }
+  box.spatial.SpatialIgnore
+}
+
+template OreGlyph {
+  prop tex: entity = 0
+  prop size: f32 = 22
+  prop alpha: f32 = 1
+  prop x: f32 = 0
+  prop y: f32 = 0
+  prop h: Align = Left
+  prop v: VAlign = Top
+
+  LayoutItem: {
+    h: h, v: v, x: x, y: -y,
+    width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}
+  }
+  Rect: {1, 1}
+  Image: {texture: tex}
+  Opacity: {alpha}
+  box.spatial.SpatialIgnore
+}
+
+template OreHalo {
+  prop size: f32 = 64
+  prop height: f32 = 0
+  prop color: Rgb = {255, 255, 255}
+  prop alpha: f32 = 1
+  prop x: f32 = 0
+  prop y: f32 = 0
+  prop z: f32 = -1
+
+  Position: {x, y, z}
+  Rect: {size, match height > 0 { true: height; _: size }}
+  Image: {texture: ui_art.halo}
+  Rgb: color
+  Opacity: {alpha}
+  BlendMode: Additive
+  box.spatial.SpatialIgnore
+}
+
+template OreBar {
+  prop width: f32 = 100
+  prop height: f32 = 10
+  prop frac: f32 = 0
+  prop color: Rgb = {240, 176, 58}
+  prop glow: f32 = 0.2
+  prop notches: i32 = 0
+  prop seconds: f32 = 0.2
+  prop x: f32 = 0
+  prop y: f32 = 0
+  prop h: Align = Left
+  prop v: VAlign = Top
+
+  const motion = OreUiMotion[OreUiMotion].scale
+  const f = clamp(frac, 0, 1)
+  const inner = width - 2
+
+  Layout: {}
+  LayoutItem: {
+    h: h, v: v, x: x, y: -y,
+    width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}
+  }
+  box.spatial.SpatialIgnore
+
+  well {
+    Position: {0, 0, 0}
+    Rect: {width, height}
+    Rgb: palette.well
+    Border: {width: 1, radius: 2, color: {palette.divider.r, palette.divider.g, palette.divider.b, 255}}
+  }
+
+  fill {
+    Position: {(f - 1) * inner / 2, 0, 1}
+    Scale: {max(f, 0.001), 1, 1}
+    Rect: {inner, height - 2}
+    Rgb: color
+    Emissive: {strength: glow, color: color}
+    Transition: [
+      Position: {duration: seconds * motion, timing_function: EaseOut},
+      Scale: {duration: seconds * motion, timing_function: EaseOut},
+      Rgb: {duration: 0.2 * motion},
+      Emissive: {duration: 0.2 * motion}
+    ]
+  }
+
+  for i in 1..notches {
+    "notch_{i}" {
+      Position: {width * (i / (notches * 1.0) - 0.5), 0, 2}
+      Rect: {1, height}
+      Rgb: palette.well
+    }
+  }
+}
+
+template OreKeyCap {
+  prop key: string = ""
+  prop width: f32 = 22
+  prop height: f32 = 18
+  prop size: f32 = 11
+  prop color: Rgb = {232, 230, 222}
+  prop edge: Rgb = {98, 102, 106}
+  prop x: f32 = 0
+  prop y: f32 = 0
+  prop h: Align = Left
+  prop v: VAlign = Top
+
+  Layout: {direction: Row, h: Center, v: Middle}
+  LayoutItem: {
+    h: h, v: v, x: x, y: -y,
+    width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}
+  }
+  Rect: {1, 1}
+  Rgb: palette.well
+  Border: {width: 1, radius: 2, color: {edge.r, edge.g, edge.b, 255}}
+  box.spatial.SpatialIgnore
+
+  OreText cap(text: key, size: size, font: ui_fonts.mono, color: color)
+}
+
+template OreRule {
+  prop width: f32 = 100
+  prop color: Rgb = {62, 66, 72}
+  prop x: f32 = 0
+  prop y: f32 = 0
+
+  LayoutItem: {
+    h: Left, v: Top, x: x, y: -y,
+    width: {mode: Fixed, value: width}, height: {mode: Fixed, value: 1}
+  }
+  Rect: {1, 1}
+  Rgb: color
+  box.spatial.SpatialIgnore
+}
+
+template OreHazardRule {
+  prop width: f32 = 400
+  prop height: f32 = 6
+  prop alpha: f32 = 1
+
+  const scale = max(width / 2048.0, height / 12.0)
+  const spanU = width / (2048.0 * scale)
+  const spanV = height / (12.0 * scale)
+
+  LayoutItem: {width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}}
+  Rect: {1, 1}
+  Rgb: {255, 255, 255}
+  Opacity: {alpha}
+  Image: {
+    texture: ui_art.hazard,
+    u0: 0.5 - spanU / 2, v0: 0.5 - spanV / 2, u1: 0.5 + spanU / 2, v1: 0.5 + spanV / 2
+  }
+  box.spatial.SpatialIgnore
+}
+
+template OreVeil {
+  prop dim: f32 = 0.35
+  prop edge: f32 = 0.85
+  prop color: Rgb = {0, 0, 0}
+
+  Layout: {}
+  LayoutItem: {width: {mode: Grow, content_min: false}, height: {mode: Grow, content_min: false}}
+  box.spatial.SpatialIgnore
+
+  flat {
+    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Rect: {1, 1}
+    Rgb: {0, 0, 0}
+    Opacity: {dim}
+  }
+
+  shade {
+    Position: {0, 0, 1}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Rect: {1, 1}
+    Image: {texture: ui_art.vignette}
+    Rgb: color
+    Opacity: {edge}
+  }
+}

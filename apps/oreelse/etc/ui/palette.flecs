@@ -1,23 +1,32 @@
-// The colors of the UI, the original's palette, as palette.<name>: the text, the muted text,
-// the accents, the wells of the bars and the dividers.
-
 using box.material
+using box.text
 
 palette {
-  // Text and muted text
-  export const text: Rgb = {226, 231, 238}
-  export const soft: Rgb = {146, 154, 166}
+  export const text: Rgb = {222, 220, 212}
+  export const soft: Rgb = {156, 158, 156}
+  export const faint: Rgb = {98, 102, 106}
 
-  // Accents: amber, red (warnings, a short supply), green (fine, in supply)
   export const amber: Rgb = {240, 176, 58}
-  export const red: Rgb = {228, 96, 84}
+  export const amberPale: Rgb = {255, 226, 164}
+  export const amberGlow: Rgb = {255, 118, 12}
+  export const red: Rgb = {236, 84, 70}
   export const green: Rgb = {124, 226, 148}
+  export const cyan: Rgb = {92, 236, 222}
+  export const violet: Rgb = {150, 130, 196}
 
-  // Luminite and the other ores
   export const luminite: Rgb = {96, 240, 218}
   export const ore: Rgb = {236, 176, 104}
 
-  // The empty part of a bar and the lines between the groups of a panel
-  export const well: Rgb = {13, 14, 17}
-  export const divider: Rgb = {62, 68, 78}
+  export const steel: Rgb = {24, 26, 30}
+  export const steelHigh: Rgb = {44, 48, 54}
+  export const steelHover: Rgb = {66, 71, 78}
+  export const well: Rgb = {9, 10, 12}
+  export const divider: Rgb = {62, 66, 72}
+}
+
+ui_fonts {
+  stencil { Font: {path: "apps/oreelse/etc/ui/fonts/SairaStencilOne-Regular.ttf"} }
+  label { Font: {path: "apps/oreelse/etc/ui/fonts/ChakraPetch-SemiBold.ttf"} }
+  body { Font: {path: "apps/oreelse/etc/ui/fonts/ChakraPetch-Medium.ttf"} }
+  mono { Font: {path: "apps/oreelse/etc/ui/fonts/ShareTechMono-Regular.ttf"} }
 }

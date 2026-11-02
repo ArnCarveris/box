@@ -1,11 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect x="28" y="34" width="8" height="20" fill="#9aa3b5"/>
-  <rect x="18" y="50" width="28" height="8" rx="2" fill="#6f7585"/>
-  <g transform="skewX(-12)">
-    <rect x="12" y="8" width="48" height="26" rx="3" fill="#8d98b1"/>
-    <rect x="16" y="12" width="19" height="8" fill="#6fa7ff"/>
-    <rect x="37" y="12" width="19" height="8" fill="#6fa7ff"/>
-    <rect x="16" y="22" width="19" height="8" fill="#5594ff"/>
-    <rect x="37" y="22" width="19" height="8" fill="#5594ff"/>
+  <defs>
+    <filter id="contour" filterUnits="userSpaceOnUse" x="-4" y="-4" width="72" height="72" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="0.5"/><feComponentTransfer result="edge"><feFuncA type="linear" slope="7" intercept="-0.15"/></feComponentTransfer><feGaussianBlur in="edge" stdDeviation="1"/><feOffset dx="0.5" dy="1.5"/><feComponentTransfer result="shadow"><feFuncA type="linear" slope="0.55"/></feComponentTransfer><feFlood flood-color="#090b0d"/><feComposite in2="edge" operator="in" result="line"/><feMerge><feMergeNode in="shadow"/><feMergeNode in="line"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <pattern id="hazard" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)"><rect width="6" height="6" fill="#d9a23a"/><rect width="3" height="6" fill="#15181b"/></pattern>
+    <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c6cfd3"/><stop offset="0.45" stop-color="#8f9ca2"/><stop offset="1" stop-color="#4a565c"/></linearGradient>
+    <linearGradient id="gun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#79868c"/><stop offset="0.5" stop-color="#3f4a50"/><stop offset="1" stop-color="#1e2529"/></linearGradient>
+    <linearGradient id="gunCyl" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#232a2e"/><stop offset="0.3" stop-color="#808d93"/><stop offset="0.65" stop-color="#414c52"/><stop offset="1" stop-color="#14191c"/></linearGradient>
+    <linearGradient id="cell" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f8fe0"/><stop offset="0.55" stop-color="#2a5fb8"/><stop offset="1" stop-color="#14306e"/></linearGradient>
+  </defs>
+  <g filter="url(#contour)">
+    <rect x="28" y="35" width="8" height="17" fill="url(#gunCyl)"/>
+    <rect x="17" y="49" width="30" height="9" rx="2" fill="url(#gun)"/>
+    <rect x="19" y="49.5" width="26" height="0.9" rx="0.4" fill="#dadada" opacity="0.3"/>
+    <rect x="20" y="53" width="24" height="2.6" rx="0.5" fill="url(#hazard)"/>
+    <polygon points="3,36 14.5,6 60.5,6 50,36" fill="url(#steel)"/>
+    <polygon points="3,36 50,36 50,38 3,38" fill="#20272b"/>
+    <path d="M15.3 6.6 L60 6.6" fill="none" stroke="#dadada" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+    <polygon points="15.5,9.1 29.0,9.1 23.9,20.4 10.5,20.4" fill="url(#cell)"/>
+    <polygon points="30.5,9.1 44.0,9.1 38.7,20.4 25.4,20.4" fill="url(#cell)"/>
+    <polygon points="45.5,9.1 59.0,9.1 53.6,20.4 40.2,20.4" fill="url(#cell)"/>
+    <polygon points="10.0,21.6 23.3,21.6 18.2,32.9 5.0,32.9" fill="url(#cell)"/>
+    <polygon points="24.8,21.6 38.1,21.6 32.9,32.9 19.7,32.9" fill="url(#cell)"/>
+    <polygon points="39.6,21.6 53.0,21.6 47.6,32.9 34.4,32.9" fill="url(#cell)"/>
+    <polygon points="30,9 39,9 27,33 18,33" fill="#a8c8e0" opacity="0.3"/>
+    <polygon points="42,9 45,9 33,33 30,33" fill="#a8c8e0" opacity="0.2"/>
   </g>
 </svg>

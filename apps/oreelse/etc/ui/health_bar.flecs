@@ -1,12 +1,3 @@
-// The health bar of a damaged building or astronaut, the original's health_bars.c as screen
-// space UI. The game (src/health_bars.c) creates an instance under the scene of the bars when a
-// building or the astronaut gets damaged, sets frac when its health changes and deletes it when
-// it is back to full health, destroyed or dead.
-//
-// box.projection anchors the bar to the projection of the building's model box through the
-// world view every frame: as wide as the box looks on screen, cfg.hpBarMargin above its top
-// edge and cfg.hpBarHeight tall, hidden when narrower than cfg.hpBarMinWidth or off screen.
-
 using flecs.script.math
 using box.types
 using box.transform
@@ -16,9 +7,6 @@ using box.layout
 using box.projection
 using oreelse
 
-// The bar of a building or the astronaut: the dark plate, the fill inset 1 pixel and
-// (width - 2) * frac wide in the color of the blend, and the 1 pixel edge over both. building
-// is the building or the astronaut, w, d and h its model box (OreModelBox), view the world view
 template HealthBar {
   prop building: entity = 0
   prop view: entity = 0
@@ -30,9 +18,6 @@ template HealthBar {
   const back = cfg.hpBarBack
   const edge = cfg.hpBarEdge
 
-  // Amber to green at half health and above, red to amber below: the original's oreBarLerp,
-  // a + (b - a) * t in f32 per channel, truncated, of the original's bytes, which the UI keeps
-  // (README.md, Colors)
   const upper: bool = frac >= 0.5
   const from: Rgb = match upper {
     true: cfg.hpBarMid
@@ -57,8 +42,6 @@ template HealthBar {
   const b: f32 = fb + (tb - fb) * t
   const color: Rgb = {floor(r), floor(g), floor(b)}
 
-  // Elements are centered on their Position: the bar's bottom edge sits hpBarMargin above the
-  // top of the box
   ProjectedAnchor: {target: building, view: view}
   ProjectedBox: {
     min: {-w / 2, 0, -d / 2}, max: {w / 2, h, d / 2},
@@ -73,6 +56,7 @@ template HealthBar {
     Rect: {1, 1}
     Rgb: {back.r, back.g, back.b}
     Opacity: {back.a / 255.0}
+    Border: {width: 1, radius: 1, color: edge}
   }
 
   track {
@@ -88,55 +72,6 @@ template HealthBar {
 
     rest {
       LayoutItem: {width: {mode: Grow, value: 1 - frac}, height: {mode: Grow}}
-    }
-  }
-
-  // The edge as four 1 pixel strips, the sides between the top and the bottom so no pixel is
-  // blended twice
-  border {
-    Position: {0, 0, 2}
-    Layout: {}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
-
-    top {
-      LayoutItem: {
-        h: Left, v: Top, width: {mode: Grow}, height: {mode: Fixed, value: 1}
-      }
-      Rect: {1, 1}
-      Rgb: {edge.r, edge.g, edge.b}
-      Opacity: {edge.a / 255.0}
-    }
-
-    bottom {
-      LayoutItem: {
-        h: Left, v: Bottom, width: {mode: Grow}, height: {mode: Fixed, value: 1}
-      }
-      Rect: {1, 1}
-      Rgb: {edge.r, edge.g, edge.b}
-      Opacity: {edge.a / 255.0}
-    }
-
-    sides {
-      Layout: {padding: {1, 1, 0, 0}}
-      LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
-
-      left {
-        LayoutItem: {
-          h: Left, v: Top, width: {mode: Fixed, value: 1}, height: {mode: Grow}
-        }
-        Rect: {1, 1}
-        Rgb: {edge.r, edge.g, edge.b}
-        Opacity: {edge.a / 255.0}
-      }
-
-      right {
-        LayoutItem: {
-          h: Right, v: Top, width: {mode: Fixed, value: 1}, height: {mode: Grow}
-        }
-        Rect: {1, 1}
-        Rgb: {edge.r, edge.g, edge.b}
-        Opacity: {edge.a / 255.0}
-      }
     }
   }
 }

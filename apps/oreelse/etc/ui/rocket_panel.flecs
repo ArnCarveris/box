@@ -1,50 +1,29 @@
-// The parts of the rocket assembly panel, the original's RocketSection, RocketStep and
-// RocketButton: a section per part of the rocket with the strip of its pips, the Luminite load
-// section in bar mode, the plus and minus steps of the parts and the LAUNCH button. The HUD
-// (ui/hud.flecs) places them in the panel and passes them the rocket state (OreRocketState),
-// which decides every look: the UI computes nothing about the rocket of its own.
-
 using flecs.script
 using flecs.script.math
 using box.types
 using box.layout
+using box.transform
 using box.geometry
 using box.material
 using box.texture
 using box.text
 using box.picking
+using box.transition
 using oreelse
 
-// The strip of a section: its inset, the height of a pip or of the bar, the widest pip and the
-// gap between two pips
 const stripPad: f32 = 8
-const pipHeight: f32 = 10
-const pipMax: f32 = 22
+const pipHeight: f32 = 9
+const pipMax: f32 = 24
 const pipGap: f32 = 3
+const dimFace: Rgb = {26, 28, 33}
+const dimEdge: rgba = {52, 56, 62, 255}
 
-// The face of a step or of the launch button that cannot act
-const dimFace: Rgb = {30, 33, 39}
-const dimEdge: rgba = {52, 56, 64, 255}
-
-// The muted text of the key labels
-const keyColor: Rgb = {132, 139, 152}
-
-// A section of width by height at (x, y) of the panel: count of need of a part, with its icon of
-// 22x22 at (8, 5), its label at (36, 7) and `count / need` right aligned at y 5. It is ok with
-// count == need > 0 when exact, else with count above 0: a green edge, a green count and a
-// bright label; blocked, a red edge, a red count and a bright label. Under them, 16 pixels above
-// the bottom, the strip: max(need, count) pips, the first count of them filled amber; in bar
-// mode a well with a teal fill of fill of its width instead.
-//
-// The section in bar mode is the Luminite load section, which reacts to the pointer: lighter
-// while hovered with afford (loading would move Luminite now), darker without, and a click loads
-// (oreelse.rocket_load).
 template RocketSection {
   prop label: string = ""
   prop icon: entity = 0
   prop x: f32 = 12
   prop y: f32 = 0
-  prop width: f32 = 156
+  prop width: f32 = 172
   prop height: f32 = 46
   prop count: i32 = 0
   prop need: i32 = 0
@@ -56,42 +35,43 @@ template RocketSection {
 
   mut hover = false
 
+  const motion = OreUiMotion[OreUiMotion].scale
   const ok: bool = match exact {
     true: need > 0 && count == need
     false: count > 0
   }
 
   const span: f32 = width - stripPad * 2
-  const stripY: f32 = height - 16
+  const stripY: f32 = height - 15
 
   const hoverFace: Rgb = match hover {
-    true: {46, 50, 58}
-    false: {34, 37, 44}
+    true: {52, 56, 63}
+    false: {34, 37, 42}
   }
 
   const loadFace: Rgb = match afford {
     true: hoverFace
-    false: {26, 28, 34}
+    false: {24, 26, 30}
   }
 
   const face: Rgb = match bar {
     true: loadFace
-    false: {34, 37, 44}
+    false: {30, 32, 37}
   }
 
   const okEdge: rgba = match ok {
-    true: {96, 168, 116, 255}
-    false: {66, 72, 82, 255}
+    true: {96, 180, 122, 255}
+    false: {62, 66, 72, 255}
   }
 
   const edge: rgba = match blocked {
-    true: {150, 66, 60, 255}
+    true: {190, 70, 60, 255}
     false: okEdge
   }
 
   const labelColor: Rgb = match ok || blocked {
-    true: {186, 194, 206}
-    false: {112, 118, 130}
+    true: palette.text
+    false: palette.soft
   }
 
   const okCount: Rgb = match ok {
@@ -104,9 +84,14 @@ template RocketSection {
     false: okCount
   }
 
+  const countGlow: f32 = match ok || blocked {
+    true: 0.45
+    false: 0
+  }
+
   const emptyEdge: rgba = match blocked {
     true: {188, 78, 70, 255}
-    false: {74, 80, 92, 255}
+    false: {62, 66, 72, 255}
   }
 
   Layout: {}
@@ -116,61 +101,30 @@ template RocketSection {
   }
   Rect: {1, 1}
   Rgb: face
-  Border: {width: 1, radius: 3, color: edge}
+  Border: {width: 1, radius: 2, color: edge}
+  Transition: [Rgb: {duration: 0.12 * motion}]
 
   if bar {
     Interactive
+    Cursor: {CursorPointer}
   }
 
   if icon != 0 {
-    symbol {
-      LayoutItem: {
-        h: Left, v: Top, x: stripPad, y: -5,
-        width: {mode: Fixed, value: 22}, height: {mode: Fixed, value: 22}
-      }
-      Rect: {1, 1}
-      Image: {texture: icon, u0: 0, v0: 0, u1: 1, v1: 1}
-    }
+    OreGlyph symbol(tex: icon, size: 20, x: 7, y: 4)
   }
 
-  name_label {
-    LayoutItem: {h: Left, v: Top, x: 36, y: -7}
-    Text: {value: label, size: 13, wrap: Newlines}
-    Rgb: labelColor
-  }
+  OreText name_label(text: label, size: 11, font: ui_fonts.label, color: labelColor, x: 32, y: 7)
 
-  count_label {
-    LayoutItem: {h: Left, v: Top, y: -5, width: {mode: Fixed, value: width - stripPad}}
-    Text: {value: "{count} / {need}", size: 15, width: width - stripPad, align: Right}
-    Rgb: countColor
-  }
+  OreText count_label(
+    text: "{count}/{need}", size: 15, font: ui_fonts.mono, color: countColor, glow: countGlow,
+    width: width - stripPad, align: Right, y: 5)
 
   if bar {
-    well {
-      LayoutItem: {
-        h: Left, v: Top, x: stripPad, y: -stripY,
-        width: {mode: Fixed, value: span}, height: {mode: Fixed, value: pipHeight}
-      }
-      Rect: {1, 1}
-      Rgb: palette.well
-      Border: {width: 1, radius: 2, color: {74, 80, 92, 255}}
-    }
-
-    if fill > 0 {
-      bar_fill {
-        LayoutItem: {
-          h: Left, v: Top, x: stripPad, y: -stripY,
-          width: {mode: Fixed, value: span * clamp(fill, 0, 1)},
-          height: {mode: Fixed, value: pipHeight}
-        }
-        Rect: {1, 1}
-        Rgb: palette.luminite
-        Border: {radius: 2}
-      }
-    }
+    OreBar load_bar(
+      width: span, height: pipHeight, frac: fill, color: palette.luminite, glow: 0.3,
+      notches: 10, seconds: 0.35, x: stripPad, y: stripY)
   }
 
-  // The pips: as many as the larger of need and count, at most 22 wide, 3 apart
   const pips: i32 = match need > count {
     true: need
     false: count
@@ -183,31 +137,26 @@ template RocketSection {
     for i in 0..pips {
       const filled = i < count
 
-      const pipFace: Rgb = match filled {
-        true: palette.amber
-        false: palette.well
-      }
-
-      const pipEdge: rgba = match filled {
-        true: {252, 214, 140, 255}
-        false: emptyEdge
-      }
-
       "pip_{i}" {
         LayoutItem: {
           h: Left, v: Top, x: stripPad + i * (pipWidth + pipGap), y: -stripY,
           width: {mode: Fixed, value: pipWidth}, height: {mode: Fixed, value: pipHeight}
         }
         Rect: {1, 1}
-        Rgb: pipFace
-        Border: {width: 1, radius: 2, color: pipEdge}
+        if filled {
+          Rgb: palette.amber
+          Emissive: {strength: 0.5, color: palette.amberGlow}
+          Border: {width: 1, radius: 1, color: {252, 214, 140, 255}}
+        } else {
+          Rgb: palette.well
+          Emissive: {strength: 0, color: palette.amberGlow}
+          Border: {width: 1, radius: 1, color: emptyEdge}
+        }
+        box.spatial.SpatialIgnore
       }
     }
   }
 
-  // Entering and leaving in loops of their own: a change of the props or of the state read
-  // evaluates the template again and restarts its async blocks, and a single loop restarted
-  // while hovered would wait for an enter and miss the leave
   async {
     while true {
       await on.enter(this)
@@ -232,10 +181,6 @@ template RocketSection {
   }
 }
 
-// A step of 40x30 at (x, y) of the panel that installs (plus) or uninstalls one of a part of the
-// rocket (item) with a click (oreelse.rocket_install, oreelse.rocket_uninstall): its sign
-// centered, a plus step with its key label at (4, 1). Enabled, it has a face that lights up
-// while hovered; disabled, a dim one.
 template RocketStep {
   prop item: entity = 0
   prop plus: bool = true
@@ -245,15 +190,17 @@ template RocketStep {
   prop y: f32 = 0
 
   mut hover = false
+  mut down = false
 
+  const motion = OreUiMotion[OreUiMotion].scale
   const sign: string = match plus {
     true: "+"
     false: "-"
   }
 
-  const liveFace: Rgb = match hover {
-    true: {66, 72, 82}
-    false: {46, 50, 58}
+  const liveFace: Rgb = match down {
+    true: {30, 32, 36}
+    false: match hover { true: {76, 70, 52}; _: {50, 54, 60} }
   }
 
   const face: Rgb = match enabled {
@@ -261,48 +208,46 @@ template RocketStep {
     false: dimFace
   }
 
+  const liveEdge: rgba = match hover {
+    true: {240, 176, 58, 255}
+    false: {98, 102, 106, 255}
+  }
+
   const edge: rgba = match enabled {
-    true: {88, 94, 106, 255}
+    true: liveEdge
     false: dimEdge
   }
 
   const signColor: Rgb = match enabled {
     true: palette.text
-    false: {90, 96, 108}
+    false: {78, 82, 88}
   }
 
   const keyTone: Rgb = match enabled {
-    true: keyColor
-    false: {74, 79, 90}
+    true: palette.soft
+    false: {68, 72, 78}
   }
 
   Interactive
+  if enabled {
+    Cursor: {CursorPointer}
+  }
   Layout: {}
   LayoutItem: {
     h: Left, v: Top, x: x, y: -y,
-    width: {mode: Fixed, value: 40}, height: {mode: Fixed, value: 30}
+    width: {mode: Fixed, value: 38}, height: {mode: Fixed, value: 30}
   }
   Rect: {1, 1}
   Rgb: face
-  Border: {width: 1, radius: 3, color: edge}
+  Border: {width: 1, radius: 2, color: edge}
+  Transition: [Rgb: {duration: 0.1 * motion}]
 
-  sign_label {
-    LayoutItem: {h: Center, v: Middle}
-    Text: {value: sign, size: 19}
-    Rgb: signColor
-  }
+  OreText sign_label(text: sign, size: 20, font: ui_fonts.label, color: signColor, h: Center, v: Middle)
 
   if plus {
-    key_label {
-      LayoutItem: {h: Left, v: Top, x: 4, y: -1}
-      Text: {value: key, size: 11}
-      Rgb: keyTone
-    }
+    OreText key_label(text: key, size: 10, font: ui_fonts.mono, color: keyTone, x: 4, y: 1)
   }
 
-  // Entering and leaving in loops of their own: a change of the props or of the state read
-  // evaluates the template again and restarts its async blocks, and a single loop restarted
-  // while hovered would wait for an enter and miss the leave
   async {
     while true {
       await on.enter(this)
@@ -319,6 +264,15 @@ template RocketStep {
 
   async {
     while true {
+      await on.press(this)
+      down = true
+      await on.release(this)
+      down = false
+    }
+  }
+
+  async {
+    while true {
       await on.click(this)
       if plus {
         await oreelse.rocket_install(item)
@@ -329,64 +283,144 @@ template RocketStep {
   }
 }
 
-// The LAUNCH button of width by height at (x, y) of the panel: `LAUNCH` centered at y 8, the key
-// label P at (6, 3) and the note centered at y 30. Enabled (the rocket can launch) its face is
-// warm with a 2 pixel amber edge, else dim. A click launches (oreelse.rocket_launch).
-template RocketLaunch {
-  prop x: f32 = 0
-  prop y: f32 = 0
-  prop width: f32 = 248
-  prop height: f32 = 48
+template RocketLaunchFace {
+  prop width: f32 = 260
+  prop height: f32 = 52
   prop enabled: bool = false
   prop note: string = ""
+  prop hover: bool = false
+  prop down: bool = false
+
+  const motion = OreUiMotion[OreUiMotion].scale
+  const slow = OreBlink[OreBlink].slow
+  const pulse: f32 = match enabled && (slow || hover) { true: 0.55; _: 0.22 }
+
+  const liveFace: Rgb = match down {
+    true: {60, 44, 16}
+    false: match hover { true: {112, 82, 28}; _: {84, 62, 22} }
+  }
 
   const face: Rgb = match enabled {
-    true: {78, 62, 26}
+    true: liveFace
     false: dimFace
   }
 
-  const amberEdge: rgba = {palette.amber.r, palette.amber.g, palette.amber.b, 255}
-  const edge: rgba = match enabled {
-    true: amberEdge
-    false: dimEdge
-  }
-
-  const edgeWidth: f32 = match enabled {
-    true: 2
-    false: 1
-  }
-
   const nameColor: Rgb = match enabled {
-    true: {246, 220, 168}
-    false: {110, 116, 128}
+    true: palette.amberPale
+    false: palette.faint
   }
+
+  const nameGlow: f32 = match enabled {
+    true: 0.5
+    false: 0
+  }
+
+  Layout: {}
+  LayoutItem: {
+    h: Left, v: Top,
+    width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}
+  }
+  box.spatial.SpatialIgnore
+
+  if enabled {
+    OreHalo aura(size: width * 1.3, height: height * 2.6, color: palette.amber, alpha: pulse, z: -1) {
+      Transition: [Opacity: {duration: 0.4 * motion}]
+    }
+  }
+
+  plate {
+    Position: {0, 0, 0}
+    Layout: {}
+    LayoutItem: {
+      h: Left, v: Top,
+      width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}
+    }
+    Rect: {1, 1}
+    Rgb: face
+    Transition: [Rgb: {duration: 0.12 * motion}]
+    if enabled {
+      Border: {width: 2, radius: 3, color: {240, 176, 58, 255}}
+    } else {
+      Border: {width: 1, radius: 3, color: dimEdge}
+    }
+    ClipChildren
+
+    if enabled {
+      tape_top {
+        LayoutItem: {h: Left, v: Top}
+        OreHazardRule: {width: width, height: 4}
+      }
+
+      tape_bottom {
+        LayoutItem: {h: Left, v: Bottom}
+        OreHazardRule: {width: width, height: 4}
+      }
+    }
+  }
+
+  OreText name_label(
+    text: "LAUNCH", size: 21, font: ui_fonts.stencil, color: nameColor, glow: nameGlow,
+    glowColor: palette.amberGlow, h: Center, y: 6) {
+    Position: {0, 0, 1}
+  }
+
+  OreKeyCap key_label(key: "P", width: 16, height: 16, size: 10, x: 8, y: 8) {
+    Position: {0, 0, 1}
+  }
+
+  OreText note_label(text: note, size: 10, font: ui_fonts.label, color: palette.soft, h: Center, y: 33) {
+    Position: {0, 0, 1}
+  }
+}
+
+template RocketLaunch {
+  prop x: f32 = 0
+  prop y: f32 = 0
+  prop width: f32 = 260
+  prop height: f32 = 52
+  prop enabled: bool = false
+  prop note: string = ""
+
+  mut hover = false
+  mut down = false
 
   Interactive
+  if enabled {
+    Cursor: {CursorPointer}
+  }
   Layout: {}
   LayoutItem: {
     h: Left, v: Top, x: x, y: -y,
     width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}
   }
   Rect: {1, 1}
-  Rgb: face
-  Border: {width: edgeWidth, radius: 3, color: edge}
+  Rgb: {0, 0, 0}
+  BlendMode: Additive
 
-  name_label {
-    LayoutItem: {h: Center, v: Top, y: -8}
-    Text: {value: "LAUNCH", size: 19}
-    Rgb: nameColor
+  RocketLaunchFace face(
+    width: width, height: height, enabled: enabled, note: note, hover: hover, down: down)
+
+  async {
+    while true {
+      await on.enter(this)
+      hover = true
+    }
   }
 
-  key_label {
-    LayoutItem: {h: Left, v: Top, x: 6, y: -3}
-    Text: {value: "P", size: 11}
-    Rgb: keyColor
+  async {
+    while true {
+      await on.leave(this)
+      hover = false
+    }
   }
 
-  note_label {
-    LayoutItem: {h: Center, v: Top, y: -30}
-    Text: {value: note, size: 12}
-    Rgb: palette.soft
+  async {
+    while true {
+      await on.press(this)
+      down = true
+      await on.release(this)
+      down = false
+    }
   }
 
   async {
@@ -395,4 +429,117 @@ template RocketLaunch {
       await oreelse.rocket_launch()
     }
   }
+}
+
+template OreRocketBody {
+  const sectionY: f32 = 42
+  const sectionPitch: f32 = 50
+  const stepY: f32 = 8
+  const minusX: f32 = 192
+  const plusX: f32 = 234
+
+  const rocketState = OreRocketState[OreRocketState]
+  const held = rocketState.held
+  const flying = rocketState.phase != Idle
+  const units = rocketState.units
+  const engines = rocketState.engines
+  const fuel = rocketState.fuel
+  const lifeSupport = rocketState.life_support
+  const cargo = rocketState.cargo
+  const loaded = rocketState.loaded
+  const capacity = rocketState.capacity
+  const install = rocketState.install
+  const uninstall = rocketState.uninstall
+  const canLoad = rocketState.load
+  const canLaunch = rocketState.launch
+  const engineNeed = units * cfg.enginesPerUnit
+
+  const loadedAmount: f32 = loaded
+  const loadFill: f32 = match capacity > 0 {
+    true: loadedAmount / capacity
+    false: 0
+  }
+
+  const room = capacity - loaded
+  const fits: i32 = match held < room {
+    true: held
+    false: room
+  }
+  const pending: i32 = match room > 0 {
+    true: fits
+    false: 0
+  }
+  const aboard = loaded + pending
+  const missingEngines = engineNeed - engines
+  const missingFuel = units - fuel
+  const aboardNote: string = match lifeSupport > 0 {
+    true: "CREW + {aboard} LUMINITE ABOARD"
+    false: "{aboard} LUMINITE ABOARD"
+  }
+  const fuelNote: string = match fuel != units {
+    true: "NEEDS {missingFuel} MORE FUEL TANKS"
+    false: aboardNote
+  }
+  const engineNote: string = match engines != engineNeed {
+    true: "NEEDS {missingEngines} MORE ENGINES"
+    false: fuelNote
+  }
+  const unitNote: string = match units == 0 {
+    true: "FIT A CARGO BAY OR LIFE SUPPORT"
+    false: engineNote
+  }
+  const launchNote: string = match flying {
+    true: "LIFTOFF"
+    false: unitNote
+  }
+
+  Layout: {}
+  LayoutItem: {h: Left, v: Top, width: {mode: Fixed, value: 284}, height: {mode: Fixed, value: 366}}
+
+  RocketSection life_section(
+    label: "LIFE SUPPORT", icon: icons.rocket_life, y: sectionY,
+    count: lifeSupport, need: cfg.maxLifeSupport)
+  RocketStep life_minus(
+    item: items.RocketLifeSupport, plus: false, enabled: uninstall.life_support,
+    x: minusX, y: sectionY + stepY)
+  RocketStep life_plus(
+    item: items.RocketLifeSupport, key: "I", enabled: install.life_support,
+    x: plusX, y: sectionY + stepY)
+
+  RocketSection cargo_section(
+    label: "CARGO BAYS", icon: icons.rocket_cargo, y: sectionY + sectionPitch,
+    count: cargo, need: cfg.maxCargoBays)
+  RocketStep cargo_minus(
+    item: items.RocketCargoBay, plus: false, enabled: uninstall.cargo,
+    x: minusX, y: sectionY + sectionPitch + stepY)
+  RocketStep cargo_plus(
+    item: items.RocketCargoBay, key: "U", enabled: install.cargo,
+    x: plusX, y: sectionY + sectionPitch + stepY)
+
+  RocketSection fuel_section(
+    label: "FUEL TANKS", icon: icons.rocket_fuel, y: sectionY + sectionPitch * 2,
+    count: fuel, need: units, exact: true, blocked: units > 0 && fuel != units)
+  RocketStep fuel_minus(
+    item: items.RocketFuelStorage, plus: false, enabled: uninstall.fuel,
+    x: minusX, y: sectionY + sectionPitch * 2 + stepY)
+  RocketStep fuel_plus(
+    item: items.RocketFuelStorage, key: "Y", enabled: install.fuel,
+    x: plusX, y: sectionY + sectionPitch * 2 + stepY)
+
+  RocketSection engine_section(
+    label: "ENGINES", icon: icons.rocket_engine, y: sectionY + sectionPitch * 3,
+    count: engines, need: engineNeed, exact: true,
+    blocked: units > 0 && engines != engineNeed)
+  RocketStep engine_minus(
+    item: items.RocketEngine, plus: false, enabled: uninstall.engine,
+    x: minusX, y: sectionY + sectionPitch * 3 + stepY)
+  RocketStep engine_plus(
+    item: items.RocketEngine, key: "T", enabled: install.engine,
+    x: plusX, y: sectionY + sectionPitch * 3 + stepY)
+
+  RocketSection load_section(
+    label: "LUMINITE", icon: icons.luminite, y: 244, width: 260, height: 44,
+    count: loaded, need: capacity, bar: true, afford: canLoad, fill: loadFill)
+
+  RocketLaunch launch_button(x: 12, y: 300, enabled: canLaunch, note: launchNote)
 }

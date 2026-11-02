@@ -1,236 +1,111 @@
-// The HUD: a screen space UI scene drawn over the world, the original's hud.flecs. It reads the
-// game state, the singletons of the run (OreBlink, OreToast, OrePowerState, OreWaveState,
-// OreRocketState, OreCraftBook, OrePowerAlloc) and the health and mining of the astronaut, so
-// flecs evaluates the parts that depend on them again when they change; nothing in it is set
-// from C. Its root fills the window, so the elements stay at their edges when the window is
-// resized.
-//
-// The numbers are the original's pixels, positions from the top left corner of the parent with
-// y down: an element of a panel sits at LayoutItem {h: Left, v: Top, x, y: -y}. The labels are
-// centered vertically on their icons by the layout. The status bar, the order queue, the power
-// allocator, the rocket assembly and the screens of the game flow (ui/screens.flecs) are panels,
-// whose clicks call the oreelse functions: the other lines are plain labels, which the pointer
-// passes through. The inventory screen and its info panel come from the InventoryScreen and
-// ItemInfoPanel templates, the Inventory (E) button from InventoryButton (ui/inventory.flecs).
-
 using flecs.script.math
 using box.transform
 using box.geometry
 using box.material
 using box.camera
 using box.view
+using box.effects
 using box.layout
 using box.text
+using box.surface
+using box.transition
 using oreelse
 
-// Size of the text of the toast, the alert and the rocket status line
-const lineSize: f32 = 17
+template OreLineTag {
+  prop text: string = ""
+  prop color: Rgb = {232, 230, 222}
+  prop y: f32 = 0
 
-// The status bar: its size, the height of its strip and where its gauges sit
-const statusWidth: f32 = 506
-const statusHeight: f32 = 46
-const statusCap: f32 = 7
-const gaugeY: f32 = 8
-
-// The gauges: the icon, the label and the bar, from the origin of the gauge
-const gaugeIcon: f32 = 22
-const gaugeIconY: f32 = 8
-const gaugeLabelX: f32 = 28
-const gaugeLabelSize: f32 = 15
-const gaugeBarY: f32 = 13
-const gaugeBarHeight: f32 = 12
-const gaugeRadius: f32 = 2
-
-// The mine progress bar
-const mineWidth: f32 = 224
-const mineHeight: f32 = 14
-
-// The panels of play: the power panel, the width of the queue and the rocket panel with where
-// its sections and their steps sit
-const powerWidth: f32 = 264
-const powerHeight: f32 = 158
-const queueWidth: f32 = 252
-const rocketWidth: f32 = 272
-const rocketHeight: f32 = 366
-const sectionY: f32 = 44
-const sectionPitch: f32 = 50
-const stepY: f32 = 8
-const minusX: f32 = 176
-const plusX: f32 = 220
-
-// A gauge of the status bar: the icon of 22x22 at (0, 8), with a readout a label in the
-// gauge's color at x 28 (centered on the icon) and with a bar above 0 a well of bar x 12 at
-// (barX, 13) and over it a fill of 3 + (bar - 3) * frac, both rounded by 2.
-template StatusGauge {
-  prop icon: entity = 0
-  prop readout: string = ""
-  prop bar: f32 = 0
-  prop barX: f32 = 28
-  prop frac: f32 = 0
-  prop color: Rgb = {124, 226, 148}
-
-  Layout: {}
-
-  symbol {
-    LayoutItem: {
-      h: Left, v: Top, x: 0, y: -gaugeIconY,
-      width: {mode: Fixed, value: gaugeIcon}, height: {mode: Fixed, value: gaugeIcon}
-    }
-    Rect: {1, 1}
-    Image: {texture: icon, u0: 0, v0: 0, u1: 1, v1: 1}
-  }
-
-  if readout != "" {
-    label {
-      Layout: {direction: Row, v: Middle}
-      LayoutItem: {
-        h: Left, v: Top, x: gaugeLabelX, y: -gaugeIconY,
-        height: {mode: Fixed, value: gaugeIcon}
-      }
-
-      line {
-        Text: {value: readout, size: gaugeLabelSize}
-        Rgb: color
-      }
-    }
-  }
-
-  if bar > 0 {
-    well {
-      LayoutItem: {
-        h: Left, v: Top, x: barX, y: -gaugeBarY,
-        width: {mode: Fixed, value: bar}, height: {mode: Fixed, value: gaugeBarHeight}
-      }
-      Rect: {1, 1}
-      Rgb: palette.well
-      Border: {radius: gaugeRadius}
-    }
-
-    fill {
-      LayoutItem: {
-        h: Left, v: Top, x: barX, y: -gaugeBarY,
-        width: {mode: Fixed, value: 3 + (bar - 3) * clamp(frac, 0, 1)},
-        height: {mode: Fixed, value: gaugeBarHeight}
-      }
-      Rect: {1, 1}
-      Rgb: color
-      Border: {radius: gaugeRadius}
-    }
-  }
-}
-
-// A divider of the status bar, 1x16 at (x, 19)
-template StatusDivider {
-  prop x: f32 = 0
-
-  LayoutItem: {
-    h: Left, v: Top, x: x, y: -19,
-    width: {mode: Fixed, value: 1}, height: {mode: Fixed, value: 16}
-  }
+  Layout: {direction: Row, spacing: 9, v: Middle, padding: {4, 4, 9, 13}}
+  LayoutItem: {h: Center, v: Bottom, y: y}
   Rect: {1, 1}
-  Rgb: palette.divider
+  Rgb: {13, 14, 17}
+  Border: {width: 1, radius: 2, color: {color.r / 2, color.g / 2, color.b / 2, 255}}
+
+  tick {
+    LayoutItem: {width: {mode: Fixed, value: 3}, height: {mode: Fixed, value: 15}}
+    Rect: {1, 1}
+    Rgb: color
+    Emissive: {strength: 0.4, color: color}
+    box.spatial.SpatialIgnore
+  }
+
+  OreText line(text: text, size: 15, font: ui_fonts.label, color: color, glow: 0.12)
 }
 
-// The HUD of the game. The scene instantiates it after its world view, so the HUD view draws
-// after it, with the window the HUD fills.
-template OreHud {
-  prop surface: entity = 0
-
-  // The game state. The status bar shows outside the title screen, the rest of the HUD while
-  // playing and paused, each screen of the game flow in its states
-  const title = OreGameState?[(OreGameState, Title)]
-  const playing = OreGameState?[(OreGameState, Playing)]
-  const paused = OreGameState?[(OreGameState, Paused)]
-  const live = playing || paused
-  const won = OreGameState?[(OreGameState, Won)]
-  const lost = OreGameState?[(OreGameState, Lost)]
-  const ended = won || lost
-
-  // The inventory screen shows while it is open and the game plays, the info panel with it
-  // while OreItemInfo names an item
-  const none: entity = 0
-  const inventoryOpen = playing && OreInventoryScreen[OreInventoryScreen].open
-  const itemInfo = OreItemInfo[OreItemInfo]
-
-  // Each value on its own, so a change of one only sets what depends on it (OreWaveState
-  // changes every frame of play)
-  const blinkState = OreBlink[OreBlink]
-  const fast = blinkState.fast
-  const slow = blinkState.slow
-
+template OreToastLine {
   const toastState = OreToast[OreToast]
   const toastText = toastState.text
-  const toastWarn = toastState.warn
 
-  const powerState = OrePowerState[OrePowerState]
-  const production = floor(powerState.production)
-  const demand = floor(powerState.demand)
-  const powerRatio = powerState.ratio
-  const blackout = powerState.blackout
+  const toastColor: Rgb = match toastState.warn {
+    true: palette.red
+    false: palette.luminite
+  }
 
-  const waveState = OreWaveState[OreWaveState]
-  const waveFrac = waveState.frac
-  const spawning = waveState.left > 0
+  Layout: {}
+  LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+  box.spatial.SpatialIgnore
 
+  if toastText != "" {
+    OreLineTag toast(text: toastText, color: toastColor, y: 150)
+  }
+}
+
+template OreMineBar {
+  const mineProgress: f32 = astronaut[OreMining].progress
+
+  Layout: {}
+  LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+  box.spatial.SpatialIgnore
+
+  if mineProgress > 0 {
+    OreBar mine_bar(
+      width: 224, height: 12, frac: mineProgress, color: palette.ore, glow: 0.3, notches: 8,
+      seconds: 0, h: Center, v: Bottom, y: -102)
+  }
+}
+
+template OreBreachAlert {
+  const fast = OreBlink[OreBlink].fast
+  const health = astronaut[OreHealth]
+  const hpFrac: f32 = health.value / health.max
+
+  Layout: {}
+  LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+  box.spatial.SpatialIgnore
+
+  if hpFrac < 0.3 {
+    OreVeil danger(dim: 0, edge: match fast { true: 0.55; _: 0.2 }, color: {210, 24, 16})
+
+    alert {
+      Position: {0, 0, 1}
+      Layout: {direction: Row, spacing: 8, v: Middle, padding: {4, 4, 9, 11}}
+      LayoutItem: {h: Center, v: Top, y: -18}
+      Rect: {1, 1}
+      if fast {
+        Rgb: {78, 16, 12}
+      } else {
+        Rgb: {34, 10, 8}
+      }
+      Border: {width: 1, radius: 2, color: {236, 84, 70, 255}}
+
+      OreGlyph heart(tex: icons.heart, size: 18)
+      OreText word(text: "! SUIT BREACH !", size: 15, font: ui_fonts.stencil, color: palette.red, glow: 0.45)
+    }
+  }
+}
+
+template OreRocketLine {
+  const slow = OreBlink[OreBlink].slow
   const rocketState = OreRocketState[OreRocketState]
-  const held = rocketState.held
-  const shipped = rocketState.shipped
   const hasPad = rocketState.pad != 0
   const flying = rocketState.phase != Idle
   const valid = rocketState.valid
   const units = rocketState.units
   const engines = rocketState.engines
   const fuel = rocketState.fuel
-
-  // The astronaut by name: an entity in a variable is watched from the instance on, and
-  // restart() creates the astronaut again
-  const health = astronaut[OreHealth]
-  const hpFrac: f32 = health.value / health.max
-  const mineProgress: f32 = astronaut[OreMining].progress
-
-  const waveFlash: Rgb = match fast {
-    true: {248, 96, 84}
-    false: {132, 48, 44}
-  }
-
-  const waveSoon: Rgb = match waveFrac > 0.75 {
-    true: {240, 152, 72}
-    false: {138, 122, 174}
-  }
-
-  const waveColor: Rgb = match spawning {
-    true: waveFlash
-    false: waveSoon
-  }
-
-  const powerColor: Rgb = match blackout {
-    true: {228, 96, 84}
-    false: {124, 226, 148}
-  }
-
-  const toastColor: Rgb = match toastWarn {
-    true: palette.red
-    false: palette.luminite
-  }
-
-  const alertColor: Rgb = match fast {
-    true: {255, 96, 84}
-    false: {124, 44, 40}
-  }
-
-  const readyColor: Rgb = match slow {
-    true: {124, 226, 148}
-    false: {68, 148, 96}
-  }
-
-  const rocketColor: Rgb = match valid {
-    true: readyColor
-    false: {248, 196, 112}
-  }
-
-  // The rocket status line, the first that applies of launching, ready, no units, the engines
-  // and the fuel tanks
   const engineNeed = units * cfg.enginesPerUnit
+
   const fuelText = "Needs {units} fuel tanks, {fuel} installed (Y)"
   const engineText: string = match engines != engineNeed {
     true: "Needs {engineNeed} engines, {engines} installed (T)"
@@ -249,411 +124,252 @@ template OreHud {
     false: readyText
   }
 
-  // The order book and the power allocation, for the queue and the power panel
-  const book = OreCraftBook[OreCraftBook]
-  const rowCount = book.row_count
-
-  const alloc = OrePowerAlloc[OrePowerAlloc]
-  const freeBars = cfg.powerBars - alloc.level[0] - alloc.level[1] - alloc.level[2]
-
-  // The rocket assembly panel: the parts, the load and what can be done, from the rocket state
-  const lifeSupport = rocketState.life_support
-  const cargo = rocketState.cargo
-  const loaded = rocketState.loaded
-  const capacity = rocketState.capacity
-  const install = rocketState.install
-  const uninstall = rocketState.uninstall
-  const canLoad = rocketState.load
-  const canLaunch = rocketState.launch
-
-  const loadedAmount: f32 = loaded
-  const loadFill: f32 = match capacity > 0 {
-    true: loadedAmount / capacity
-    false: 0
+  const readyColor: Rgb = match slow {
+    true: {124, 226, 148}
+    false: {68, 148, 96}
   }
 
-  // The note of the LAUNCH button, the first that applies of the flight, no units, the engines
-  // and the fuel tanks, else the Luminite aboard: what is loaded plus what a load adds now
-  const room = capacity - loaded
-  const fits: i32 = match held < room {
-    true: held
-    false: room
-  }
-  const pending: i32 = match room > 0 {
-    true: fits
-    false: 0
-  }
-  const aboard = loaded + pending
-  const missingEngines = engineNeed - engines
-  const missingFuel = units - fuel
-  const aboardNote: string = match lifeSupport > 0 {
-    true: "CREW + {aboard} LUMINITE ABOARD"
-    false: "{aboard} LUMINITE ABOARD"
-  }
-  const fuelNote: string = match fuel != units {
-    true: "NEEDS {missingFuel} MORE FUEL TANKS"
-    false: aboardNote
-  }
-  const engineNote: string = match engines != engineNeed {
-    true: "NEEDS {missingEngines} MORE ENGINES"
-    false: fuelNote
-  }
-  const unitNote: string = match units == 0 {
-    true: "FIT A CARGO BAY OR LIFE SUPPORT"
-    false: engineNote
-  }
-  const launchNote: string = match flying {
-    true: "LIFTOFF"
-    false: unitNote
+  const rocketColor: Rgb = match valid {
+    true: readyColor
+    false: {248, 196, 112}
   }
 
-  // Screen space UI: an orthographic camera at ortho_scale 1, so one logical pixel is one point
+  Layout: {}
+  LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+  box.spatial.SpatialIgnore
+
+  if hasPad {
+    OreLineTag rocket_line(text: rocketText, color: rocketColor, y: 66)
+  }
+}
+
+template OreLuminiteGauge {
+  const rocketState = OreRocketState[OreRocketState]
+  const held = rocketState.held
+  const shipped = rocketState.shipped
+
+  Layout: {}
+  LayoutItem: {h: Left, v: Top, x: 12, y: -11, width: {mode: Fixed, value: 130}, height: {mode: Fixed, value: 38}}
+
+  OreGlyph symbol(tex: icons.luminite, size: 30, y: 4)
+
+  numbers {
+    Layout: {direction: Row, spacing: 5, v: Bottom}
+    LayoutItem: {h: Left, v: Top, x: 37}
+    OreText held_label(text: "{held}", size: 22, font: ui_fonts.mono, color: palette.luminite, glow: 0.15)
+    OreText shipped_label(text: "/ {shipped}", size: 14, font: ui_fonts.mono, color: palette.soft)
+  }
+
+  OreText caption(text: "HELD / SHIPPED", size: 9, font: ui_fonts.label, color: palette.soft, x: 37, y: 26)
+}
+
+template OreWaveGauge {
+  const fast = OreBlink[OreBlink].fast
+  const waveState = OreWaveState[OreWaveState]
+  const waveFrac = waveState.frac
+  const spawning = waveState.left > 0
+  const wave = waveState.wave
+
+  const waveFlash: Rgb = match fast {
+    true: {248, 96, 84}
+    false: {132, 48, 44}
+  }
+
+  const waveSoon: Rgb = match waveFrac > 0.75 {
+    true: {240, 152, 72}
+    false: palette.violet
+  }
+
+  const waveColor: Rgb = match spawning {
+    true: waveFlash
+    false: waveSoon
+  }
+
+  const waveText: string = match spawning {
+    true: "WAVE {wave} ATTACKING"
+    false: "NEXT WAVE {wave + 1}"
+  }
+
+  Layout: {}
+  LayoutItem: {h: Left, v: Top, x: 158, y: -11, width: {mode: Fixed, value: 170}, height: {mode: Fixed, value: 38}}
+
+  OreGlyph symbol(tex: icons.critter, size: 28, y: 4)
+  OreText caption(text: waveText, size: 11, font: ui_fonts.label, color: waveColor, x: 36, y: 3)
+  OreBar bar(width: 132, height: 11, frac: waveFrac, color: waveColor, glow: 0.6, notches: 10, seconds: 0.1, x: 36, y: 22)
+}
+
+template OrePowerGauge {
+  const powerState = OrePowerState[OrePowerState]
+  const production = floor(powerState.production)
+  const demand = floor(powerState.demand)
+  const blackout = powerState.blackout
+
+  const powerColor: Rgb = match blackout {
+    true: palette.red
+    false: palette.green
+  }
+
+  Layout: {}
+  LayoutItem: {h: Left, v: Top, x: 344, y: -11, width: {mode: Fixed, value: 176}, height: {mode: Fixed, value: 38}}
+
+  OreGlyph symbol(tex: icons.power, size: 26, y: 5)
+  OreText readout(text: "{production:.0} / {demand:.0} W", size: 14, font: ui_fonts.mono, color: powerColor, glow: 0.3, x: 34, y: 1)
+  OreBar bar(width: 138, height: 11, frac: powerState.ratio, color: powerColor, glow: 0.6, notches: 8, seconds: 0.35, x: 34, y: 22)
+}
+
+template OreStatusDivider {
+  prop x: f32 = 0
+
+  LayoutItem: {
+    h: Left, v: Top, x: x, y: -14,
+    width: {mode: Fixed, value: 1}, height: {mode: Fixed, value: 32}
+  }
+  Rect: {1, 1}
+  Rgb: palette.divider
+  box.spatial.SpatialIgnore
+}
+
+template OreHudBloom {
+  Bloom: {intensity: 0.6, threshold: 0.85, threshold_softness: 0.08}
+}
+
+hud_bloom { OreHudBloom }
+
+template OreHud {
+  const title = OreGameState?[(OreGameState, Title)]
+  const playing = OreGameState?[(OreGameState, Playing)]
+  const paused = OreGameState?[(OreGameState, Paused)]
+  const live = playing || paused
+  const won = OreGameState?[(OreGameState, Won)]
+  const lost = OreGameState?[(OreGameState, Lost)]
+  const ended = won || lost
+
+  const none: entity = 0
+  const inventoryOpen = playing && OreInventoryScreen[OreInventoryScreen].open
+  const itemInfo = OreItemInfo[OreItemInfo]
+  const hasPad = OreRocketState[OreRocketState].pad != 0
+  const rowCount = OreCraftBook[OreCraftBook].row_count
+  const lowTier = OreQuality[OreQuality].tier == Low
+
+  const hasStatus = window?[SurfaceStatus]
+  const isWindow: bool = match hasStatus {
+    true: window[SurfaceStatus].window
+    false: false
+  }
+  const pointWidth: f32 = match isWindow {
+    true: window[SurfaceStatus].point_width
+    false: window[Surface].width
+  }
+  const pointHeight: f32 = match isWindow {
+    true: window[SurfaceStatus].point_height
+    false: window[Surface].height
+  }
+  const screenScale = ore_screen_scale(pointWidth, pointHeight)
+
   ui {
     Scene: {}
 
-    camera {
-      Position: {0, 0, 100}
-      Camera: {ortho: true, ortho_scale: 1}
-    }
+    OreScreenCamera camera(scale: screenScale)
 
     screen {
-      LayoutFill: {surface: surface}
+      OreScreenRoot: {width: pointWidth / screenScale, height: pointHeight / screenScale}
       Layout: {}
 
-      // The status bar at the top right: Luminite held and shipped, the next wave and the power.
-      // The astronaut's health shows in its bar over it (ui/health_bar.flecs)
+      if live {
+        OreBreachAlert breach() {
+          Position: {0, 0, -1}
+        }
+      }
+
       if !title {
-        status {
-          Panel: {width: statusWidth, height: statusHeight, capH: statusCap}
-          LayoutItem: {h: Right, v: Top, x: -18, y: -16}
-
-          luminite {
-            LayoutItem: {h: Left, v: Top, x: 12, y: -gaugeY}
-            StatusGauge: {
-              icon: icons.luminite, readout: "{held} / {shipped}", color: palette.luminite
-            }
-          }
-
-          divider_a {
-            StatusDivider: {x: 144}
-          }
-
-          wave {
-            LayoutItem: {h: Left, v: Top, x: 156, y: -gaugeY}
-            StatusGauge: {icon: icons.critter, bar: 92, frac: waveFrac, color: waveColor}
-          }
-
-          divider_b {
-            StatusDivider: {x: 286}
-          }
-
-          power {
-            LayoutItem: {h: Left, v: Top, x: 298, y: -gaugeY}
-            StatusGauge: {
-              icon: icons.power, readout: "{production:.0} / {demand:.0} W",
-              bar: 72, barX: 124, frac: powerRatio, color: powerColor
-            }
-          }
+        Panel status(
+          width: 532, height: 56, capH: 6, h: Right, v: Top, x: -18, y: -16,
+          aura: 0.12) {
+          OreLuminiteGauge luminite()
+          OreStatusDivider divider_a(x: 150)
+          OreWaveGauge wave()
+          OreStatusDivider divider_b(x: 336)
+          OrePowerGauge power()
         }
       }
 
-      // The message of the toast, red for a warning
-      if live && toastText != "" {
-        toast {
-          LayoutItem: {
-            h: Center, v: Bottom, y: 150, width: {mode: Fixed, value: 640}
-          }
-          Text: {value: toastText, size: lineSize, width: 640, align: Center}
-          Rgb: toastColor
-        }
+      if live {
+        OreToastLine toast_line()
+        OreMineBar mine_line()
+        OreRocketLine rocket_status()
       }
 
-      // The progress of the swing at a deposit or a building
-      if live && mineProgress > 0 {
-        mine_bar {
-          Layout: {}
-          LayoutItem: {
-            h: Center, v: Bottom, y: 102,
-            width: {mode: Fixed, value: mineWidth}, height: {mode: Fixed, value: mineHeight}
-          }
-          Rect: {1, 1}
-          Rgb: palette.well
-          Border: {
-            width: 1, radius: 2,
-            color: {palette.divider.r, palette.divider.g, palette.divider.b, 255}
-          }
-
-          fill {
-            LayoutItem: {
-              h: Left, v: Top,
-              width: {mode: Fixed, value: 3 + (mineWidth - 3) * clamp(mineProgress, 0, 1)},
-              height: {mode: Fixed, value: mineHeight}
-            }
-            Rect: {1, 1}
-            Rgb: palette.ore
-            Border: {radius: 2}
-          }
-        }
-      }
-
-      // The suit breach alert below 30% health, blinking fast
-      if live && hpFrac < 0.3 {
-        alert {
-          LayoutItem: {h: Center, v: Top, y: -24, width: {mode: Fixed, value: 252}}
-          Text: {value: "! SUIT BREACH !", size: lineSize, width: 252, align: Center}
-          Rgb: alertColor
-        }
-      }
-
-      // What the rocket on the pad needs, or that it is ready (blinking slowly) or launching
-      if live && hasPad {
-        rocket_line {
-          LayoutItem: {h: Center, v: Bottom, y: 78, width: {mode: Fixed, value: 780}}
-          Text: {value: rocketText, size: lineSize, width: 780, align: Center}
-          Rgb: rocketColor
-        }
-      }
-
-      // The panels of play, hidden while paused. The power panel draws at z 0, the queue at 1
-      // and the rocket panel at 2: a tall queue grows up into the rocket panel, which draws and
-      // takes the pointer on top where they overlap
-
-      // The power allocator at the bottom left: the free bars and a column of four bars per
-      // category
       if playing {
-        power_panel {
-          Panel: {width: powerWidth, height: powerHeight, capH: 7}
-          LayoutItem: {h: Left, v: Bottom, x: 18, y: 18}
-
-          title {
-            LayoutItem: {h: Left, v: Top, x: 12, y: -12}
-            Text: {value: "POWER", size: 13}
-            Rgb: palette.amber
-          }
-
-          free {
-            LayoutItem: {h: Left, v: Top, x: 12, y: -12, width: {mode: Fixed, value: 240}}
-            Text: {value: "FREE {freeBars}", size: 13, width: 240, align: Right}
-            Rgb: palette.amber
-          }
-
-          mining {
-            LayoutItem: {h: Left, v: Top, x: 12}
-            PowerColumn: {kind: 0, icon: icons.drill, caption: "MINING"}
-          }
-
-          weapons {
-            LayoutItem: {h: Left, v: Top, x: 95}
-            PowerColumn: {kind: 1, icon: icons.gun_turret, caption: "WEAPONS"}
-          }
-
-          construction {
-            LayoutItem: {h: Left, v: Top, x: 178}
-            PowerColumn: {kind: 2, icon: icons.factory, caption: "CONSTRUCTION"}
-          }
+        Panel power_panel(
+          width: 264, height: 152, capH: 6, title: "POWER", h: Left, v: Bottom, x: 18, y: 18,
+          delay: 0.05) {
+          PowerFree free()
+          PowerColumn mining(kind: 0, icon: icons.drill, caption: "MINING", x: 12)
+          PowerColumn weapons(kind: 1, icon: icons.gun_turret, caption: "WEAPONS", x: 95)
+          PowerColumn construction(kind: 2, icon: icons.factory, caption: "CONSTRUCTION", x: 178)
         }
       }
 
-      // The order queue at the bottom right, growing upward with its rows: per order a header
-      // row, then a row per crafted part. A row is named by its order and item, so it keeps its
-      // entity as the book changes
       if playing && rowCount > 0 {
-        queue_panel {
+        Panel queue_panel(
+          width: 252, height: 42 + rowCount * 28, capH: 6, title: "ORDER QUEUE", h: Right, v: Bottom,
+          x: -18, y: 40) {
           Position: {0, 0, 1}
-          Panel: {width: queueWidth, height: 14 + rowCount * 28, capH: 6}
-          LayoutItem: {h: Right, v: Bottom, x: -18, y: 40}
-
-          for i in 0..rowCount {
-            const r = book.rows[i]
-            const thing: entity = r.item
-            const itemName = thing[OreItem].name
-            const countText = "{itemName} ({r.count}x)"
-            const fullText: string = match r.full {
-              true: " - inventory full"
-              false: ""
-            }
-            const doneText: string = match r.full {
-              true: "{itemName} - inventory full"
-              false: "{itemName} - wrapping up"
-            }
-            const rowText: string = match r.sub || r.count > 0 {
-              true: "{countText}{fullText}"
-              false: doneText
-            }
-
-            "row_{r.order}_{thing.name()}" {
-              QueueRow: {
-                row: i, order: r.order, icon: thing[OreIcon].texture, label: rowText,
-                sub: r.sub, count: r.count, active: r.active, progress: r.progress,
-                stalled: r.stalled
-              }
-            }
-          }
+          OreQueueRows rows()
         }
       }
 
-      // The rocket assembly at the right, under the status bar: a section and a minus and a
-      // plus step per part, the Luminite load section and the LAUNCH button
       if playing && hasPad {
-        rocket_panel {
+        Panel rocket_panel(
+          width: 284, height: 366, capH: 6, title: "ROCKET ASSEMBLY", h: Right, v: Top,
+          x: -18, y: -80, delay: 0.1) {
           Position: {0, 0, 2}
-          Panel: {width: rocketWidth, height: rocketHeight, capH: 7}
-          LayoutItem: {h: Right, v: Top, x: -18, y: -74}
-
-          title {
-            LayoutItem: {h: Left, v: Top, x: 12, y: -14}
-            Text: {value: "ROCKET ASSEMBLY", size: 15}
-            Rgb: palette.amber
-          }
-
-          life_section {
-            RocketSection: {
-              label: "LIFE SUPPORT", icon: icons.rocket_life, y: sectionY,
-              count: lifeSupport, need: cfg.maxLifeSupport
-            }
-          }
-
-          life_minus {
-            RocketStep: {
-              item: items.RocketLifeSupport, plus: false, enabled: uninstall.life_support,
-              x: minusX, y: sectionY + stepY
-            }
-          }
-
-          life_plus {
-            RocketStep: {
-              item: items.RocketLifeSupport, key: "I", enabled: install.life_support,
-              x: plusX, y: sectionY + stepY
-            }
-          }
-
-          cargo_section {
-            RocketSection: {
-              label: "CARGO BAYS", icon: icons.rocket_cargo, y: sectionY + sectionPitch,
-              count: cargo, need: cfg.maxCargoBays
-            }
-          }
-
-          cargo_minus {
-            RocketStep: {
-              item: items.RocketCargoBay, plus: false, enabled: uninstall.cargo,
-              x: minusX, y: sectionY + sectionPitch + stepY
-            }
-          }
-
-          cargo_plus {
-            RocketStep: {
-              item: items.RocketCargoBay, key: "U", enabled: install.cargo,
-              x: plusX, y: sectionY + sectionPitch + stepY
-            }
-          }
-
-          fuel_section {
-            RocketSection: {
-              label: "FUEL TANKS", icon: icons.rocket_fuel, y: sectionY + sectionPitch * 2,
-              count: fuel, need: units, exact: true, blocked: units > 0 && fuel != units
-            }
-          }
-
-          fuel_minus {
-            RocketStep: {
-              item: items.RocketFuelStorage, plus: false, enabled: uninstall.fuel,
-              x: minusX, y: sectionY + sectionPitch * 2 + stepY
-            }
-          }
-
-          fuel_plus {
-            RocketStep: {
-              item: items.RocketFuelStorage, key: "Y", enabled: install.fuel,
-              x: plusX, y: sectionY + sectionPitch * 2 + stepY
-            }
-          }
-
-          engine_section {
-            RocketSection: {
-              label: "ENGINES", icon: icons.rocket_engine, y: sectionY + sectionPitch * 3,
-              count: engines, need: engineNeed, exact: true,
-              blocked: units > 0 && engines != engineNeed
-            }
-          }
-
-          engine_minus {
-            RocketStep: {
-              item: items.RocketEngine, plus: false, enabled: uninstall.engine,
-              x: minusX, y: sectionY + sectionPitch * 3 + stepY
-            }
-          }
-
-          engine_plus {
-            RocketStep: {
-              item: items.RocketEngine, key: "T", enabled: install.engine,
-              x: plusX, y: sectionY + sectionPitch * 3 + stepY
-            }
-          }
-
-          load_section {
-            RocketSection: {
-              label: "LUMINITE", icon: icons.luminite, y: 254, width: 248, height: 40,
-              count: loaded, need: capacity, bar: true, afford: canLoad, fill: loadFill
-            }
-          }
-
-          launch_button {
-            RocketLaunch: {
-              x: 12, y: 306, width: 248, height: 48, enabled: canLaunch, note: launchNote
-            }
-          }
+          OreRocketBody body()
         }
       }
 
-      // The Inventory (E) button at the bottom center while playing, and the inventory screen
-      // with its info panel over the rest of the HUD (ui/inventory.flecs), above the panels of
-      // play at z 3 and 4
       if playing {
-        inventory_button {
-          InventoryButton: {label: "Inventory (E)", action: actions.Inventory}
-        }
+        InventoryButton inventory_button(label: "INVENTORY", action: actions.Inventory)
       }
 
       if inventoryOpen {
-        inventory {
+        InventoryScreen inventory() {
           Position: {0, 0, 3}
-          InventoryScreen: {}
         }
 
-        // While the pointer is over a stock slot holding an item or a slot button
         if itemInfo.item != none {
-          info_panel {
+          ItemInfoPanel info_panel(item: itemInfo.item, place: itemInfo.place) {
             Position: {0, 0, 4}
-            ItemInfoPanel: {item: itemInfo.item, place: itemInfo.place}
           }
         }
       }
 
-      // The screens of the game flow (ui/screens.flecs), over the rest of the HUD: the title
-      // screen, the pause screen and the end screen of a won or lost run
       if title {
-        title_screen {
-          OreTitleScreen: {}
+        OreTitleScreen title_screen() {
+          Position: {0, 0, 5}
         }
       }
 
       if paused {
-        pause_screen {
-          OrePauseScreen: {}
+        OrePauseScreen pause_screen() {
+          Position: {0, 0, 5}
         }
       }
 
       if ended {
-        end_screen {
-          OreEndScreen: {}
+        OreEndScreen end_screen() {
+          Position: {0, 0, 5}
         }
       }
     }
   }
 
-  // The view of the HUD, after the world view: no clear, no lighting and no culling
   view {
-    View: {camera: ui.camera, lighting: {enabled: false}, culling: {enabled: false}}
+    View: {
+      camera: ui.camera,
+      lighting: {enabled: false},
+      culling: {enabled: false},
+      effects: [{enabled: !lowTier, effect: hud_bloom}]
+    }
   }
 }

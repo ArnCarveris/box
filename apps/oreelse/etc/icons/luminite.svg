@@ -1,7 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <path d="M20 52 L14 30 L26 8 L36 30 L30 52 Z" fill="#49ebd1"/>
-  <path d="M26 8 L36 30 L30 52 L28 30 Z" fill="#73ffe9"/>
-  <path d="M38 52 L34 36 L44 20 L52 36 L48 52 Z" fill="#49d6c2"/>
-  <path d="M44 20 L52 36 L48 52 L45 36 Z" fill="#5cffe7"/>
-  <path d="M26 8 L28 30 L21 30 Z" fill="#b6fff2"/>
+  <defs>
+    <filter id="contour" filterUnits="userSpaceOnUse" x="-4" y="-4" width="72" height="72" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="0.5"/><feComponentTransfer result="edge"><feFuncA type="linear" slope="7" intercept="-0.15"/></feComponentTransfer><feGaussianBlur in="edge" stdDeviation="1"/><feOffset dx="0.5" dy="1.5"/><feComponentTransfer result="shadow"><feFuncA type="linear" slope="0.55"/></feComponentTransfer><feFlood flood-color="#090b0d"/><feComposite in2="edge" operator="in" result="line"/><feMerge><feMergeNode in="shadow"/><feMergeNode in="line"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="gun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#79868c"/><stop offset="0.5" stop-color="#3f4a50"/><stop offset="1" stop-color="#1e2529"/></linearGradient>
+    <linearGradient id="lumA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a8e0d8"/><stop offset="1" stop-color="#49c6b4"/></linearGradient>
+    <linearGradient id="lumB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#55cfbd"/><stop offset="1" stop-color="#178a7e"/></linearGradient>
+    <linearGradient id="lumC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#21998c"/><stop offset="1" stop-color="#0b4f4b"/></linearGradient>
+  </defs>
+  <g filter="url(#contour)">
+    <polygon points="7,59 11,50 23,46 45,46 54,50 58,59" fill="url(#gun)"/>
+    <path d="M11 50 L23 46 L45 46 L54 50" fill="none" stroke="#b4bec3" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
+    <polygon points="9,50 7,31 12,22 18,31 19,50" fill="url(#lumB)"/>
+    <polygon points="12,22 18,31 19,50 13,50" fill="url(#lumC)"/>
+    <polygon points="7,31 12,22 12.5,31" fill="url(#lumA)"/>
+    <polygon points="41,52 42,27 50,17 57,28 54,52" fill="url(#lumB)"/>
+    <polygon points="50,17 57,28 54,52 49,52" fill="url(#lumC)"/>
+    <polygon points="42,27 50,17 49,28" fill="url(#lumA)"/>
+    <polygon points="18,53 16,23 29,4 42,23 40,53" fill="url(#lumB)"/>
+    <polygon points="29,4 16,23 25,27 26,53 18,53" fill="url(#lumA)"/>
+    <polygon points="29,4 42,23 40,53 33,53 33,27" fill="url(#lumC)"/>
+    <polygon points="29,4 25,27 33,27" fill="#a8e0d8"/>
+    <path d="M29 4 L25 27 L26 53" fill="none" stroke="#c8e0dc" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+    <path d="M25 27 L33 27" fill="none" stroke="#c8e0dc" stroke-width="0.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
+    <path d="M20 26 L20.5 44" fill="none" stroke="#d8e4e2" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
+    <polygon points="9,50.5 19,50.5 19,52 9,52" fill="#000000" opacity="0.35"/>
+    <polygon points="18,53 40,53 40,54.5 18,54.5" fill="#000000" opacity="0.35"/>
+    <polygon points="41,52 54,52 54,53.5 41,53.5" fill="#000000" opacity="0.35"/>
+  </g>
 </svg>

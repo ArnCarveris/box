@@ -1,8 +1,37 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect x="6" y="46" width="52" height="10" rx="3" fill="#6b7282"/>
-  <rect x="16" y="38" width="32" height="10" rx="4" fill="#ffcc6e"/>
-  <rect x="20" y="20" width="24" height="20" rx="4" fill="#c2cbda"/>
-  <rect x="24" y="6" width="6" height="16" rx="2" fill="#818a9c"/>
-  <rect x="34" y="6" width="6" height="16" rx="2" fill="#818a9c"/>
-  <rect x="28" y="26" width="8" height="6" rx="2" fill="#83fff3"/>
+  <defs>
+    <filter id="contour" filterUnits="userSpaceOnUse" x="-4" y="-4" width="72" height="72" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="0.5"/><feComponentTransfer result="edge"><feFuncA type="linear" slope="7" intercept="-0.15"/></feComponentTransfer><feGaussianBlur in="edge" stdDeviation="1"/><feOffset dx="0.5" dy="1.5"/><feComponentTransfer result="shadow"><feFuncA type="linear" slope="0.55"/></feComponentTransfer><feFlood flood-color="#090b0d"/><feComposite in2="edge" operator="in" result="line"/><feMerge><feMergeNode in="shadow"/><feMergeNode in="line"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <pattern id="hazard" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)"><rect width="6" height="6" fill="#d9a23a"/><rect width="3" height="6" fill="#15181b"/></pattern>
+    <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c6cfd3"/><stop offset="0.45" stop-color="#8f9ca2"/><stop offset="1" stop-color="#4a565c"/></linearGradient>
+    <linearGradient id="steelCyl" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#465057"/><stop offset="0.28" stop-color="#ccd5d9"/><stop offset="0.6" stop-color="#87949a"/><stop offset="1" stop-color="#283035"/></linearGradient>
+    <linearGradient id="gun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#79868c"/><stop offset="0.5" stop-color="#3f4a50"/><stop offset="1" stop-color="#1e2529"/></linearGradient>
+    <linearGradient id="gunCyl" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#232a2e"/><stop offset="0.3" stop-color="#808d93"/><stop offset="0.65" stop-color="#414c52"/><stop offset="1" stop-color="#14191c"/></linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e0b955"/><stop offset="0.5" stop-color="#d4912c"/><stop offset="1" stop-color="#83501a"/></linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fe0d4"/><stop offset="0.55" stop-color="#2fa899"/><stop offset="1" stop-color="#0d5a55"/></linearGradient>
+  </defs>
+  <g filter="url(#contour)">
+    <rect x="5" y="48" width="54" height="10" rx="2" fill="url(#gun)"/>
+    <rect x="7" y="48.5" width="50" height="0.9" rx="0.4" fill="#dadada" opacity="0.3"/>
+    <rect x="7" y="56.5" width="50" height="1" rx="0.4" fill="#000000" opacity="0.3"/>
+    <rect x="7" y="53.5" width="50" height="3" rx="0.6" fill="url(#hazard)"/>
+    <rect x="13" y="40" width="38" height="9" rx="3" fill="url(#amber)"/>
+    <rect x="16" y="40.5" width="32" height="0.9" rx="0.4" fill="#dadada" opacity="0.4"/>
+    <rect x="16" y="47.5" width="32" height="1" rx="0.4" fill="#000000" opacity="0.35"/>
+    <rect x="22" y="4" width="7" height="22" rx="1.5" fill="url(#gunCyl)"/>
+    <rect x="35" y="4" width="7" height="22" rx="1.5" fill="url(#gunCyl)"/>
+    <rect x="21" y="3" width="9" height="4" rx="1" fill="url(#steelCyl)"/>
+    <rect x="34" y="3" width="9" height="4" rx="1" fill="url(#steelCyl)"/>
+    <rect x="23.5" y="3.5" width="4" height="1.4" rx="0.5" fill="#0a0d0f"/>
+    <rect x="36.5" y="3.5" width="4" height="1.4" rx="0.5" fill="#0a0d0f"/>
+    <path d="M16 42 L16 28 Q16 19 26 19 L38 19 Q48 19 48 28 L48 42 Z" fill="url(#steel)"/>
+    <path d="M18.5 30 Q18.5 21.5 26 21.5 L38 21.5" fill="none" stroke="#dadada" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
+    <rect x="16" y="38" width="32" height="4" fill="#000000" opacity="0.3"/>
+    <rect x="23" y="26" width="18" height="8.5" rx="2" fill="#0d1113"/>
+    <rect x="24.3" y="27.2" width="15.4" height="6" rx="1.2" fill="url(#glass)"/>
+    <polygon points="25,27.8 32,27.8 28,32.6 25,32.6" fill="#dadada" opacity="0.35"/>
+    <circle cx="19.5" cy="37" r="1.1" fill="#272e33"/>
+    <circle cx="19.25" cy="36.7" r="0.55" fill="#b4bec3" opacity="0.8"/>
+    <circle cx="44.5" cy="37" r="1.1" fill="#272e33"/>
+    <circle cx="44.25" cy="36.7" r="0.55" fill="#b4bec3" opacity="0.8"/>
+  </g>
 </svg>

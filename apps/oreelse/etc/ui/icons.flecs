@@ -1,7 +1,7 @@
-// The icons of the UI, the original's (etc/icons, unchanged), each rasterized from its SVG at
-// 128x128. The items (resources.flecs and the buildings) name theirs with OreIcon, so the UI
-// reads the icon from the item; heart, critter and power are the gauges of the status bar. An
-// Image shows an icon whole on a square Rect, so it is drawn with contain fit.
+// The icons of the UI (etc/icons), each rasterized from its SVG at 128x128. The items
+// (resources.flecs and the buildings) name theirs with OreIcon, so the UI reads the icon from the
+// item; heart, critter and power are the gauges of the status bar. An Image shows an icon whole on
+// a square Rect, so it is drawn with contain fit.
 
 using box.texture
 
