@@ -48,6 +48,26 @@ node test/integration/web/transmission.mjs \
     "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
 ```
 
+`audio_tone.mjs` checks the audio of the browser build (`docs/audio.md`): the audio core runs
+from its own wasm in an AudioWorklet, without shared memory, and starts on a user gesture. It
+serves the page without COOP/COEP headers, so `crossOriginIsolated` is false, and opens
+`test/integration/web/audio_tone.flecs`, a turning box, with `?tone=440`, the temporary trigger
+of the tone. Chrome runs without an autoplay flag, so no audio starts without a gesture. Once
+the scene draws, the check expects the audio context suspended before a gesture, frames drawn
+for a second and no error in the log. A trusted click of the DevTools protocol
+(`Input.dispatchMouseEvent`) on the canvas has to start it; an `AnalyserNode` on the
+worklet node then has to measure 440 Hz at a peak of 0.25. A 500 ms busy loop on the main thread
+has to leave the clock and the quantum count of the worklet advancing by its length, with the
+tone intact afterwards, and `Module._box_audio_web_tone(660, 0.25)`, a command sent from C, has
+to change the frequency to 660 Hz. The frames keep advancing and the log has no error, no
+`box.audio` warning and no invalid WebGPU object. It prints its measurements and the size of the
+core:
+
+```sh
+node test/integration/web/audio_tone.mjs \
+    "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
+```
+
 Before starting Chrome on macOS, the scripts check the `.app` bundle that contains the Chrome
 executable (after resolving symlinks) for the `com.apple.quarantine` attribute
 (`xattr -p com.apple.quarantine <app>`).

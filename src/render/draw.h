@@ -1148,6 +1148,11 @@ void box_draws_store_free(
  * BOX_DRAWS_MIN_CAPACITY, each step adds half and rounds up to BOX_DRAWS_GROW_ALIGN slots. From
  * the minimum the steps are 16, 24, 36, 56, 84, 128, 192, 288, ...
  *
+ * A batch that outgrows its run grows to the step at or above its count, from 0, so a run of
+ * 1,000 slots grows to 1,460. A new batch has no growth headroom: from its own count the result
+ * is the count rounded up to BOX_DRAWS_GROW_ALIGN slots, at least BOX_DRAWS_MIN_CAPACITY
+ * (box_draws_reserve).
+ *
  * @param capacity Slots to grow from, 0 for the minimum
  * @param count Slots the result holds at least
  * @return Slots of the step

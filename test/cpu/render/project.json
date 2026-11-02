@@ -290,7 +290,11 @@
                     "runs_grow_by_half",
                     "page_grows_by_half",
                     "page_growth_stops_at_page_slots",
-                    "top_run_grows_in_place"
+                    "top_run_grows_in_place",
+                    "new_batch_gets_exact_run",
+                    "new_small_batch_gets_min_run",
+                    "exact_run_grows_moved",
+                    "spawn_grows_pages_without_moves"
                 ]
             },
             {
