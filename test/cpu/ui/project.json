@@ -203,7 +203,8 @@
                     "many_views_keep_top_created_last",
                     "clip_overlay_over_siblings",
                     "clip_overlay_not_picked_outside_clips",
-                    "float_picked_outside_clips"
+                    "float_picked_outside_clips",
+                    "float_hidden_while_anchor_clipped"
                 ]
             },
             {
@@ -280,7 +281,11 @@
                     "float_escapes_clips",
                     "clip_overlay_nested_clips",
                     "float_escapes_nested_clips",
-                    "clip_overlay_inside_float"
+                    "clip_overlay_inside_float",
+                    "hide_clipped_anchor_scrolled_out",
+                    "no_hide_without_flag",
+                    "hide_clipped_clip_overlay_ignored",
+                    "hide_clipped_not_drawn"
                 ]
             },
             {

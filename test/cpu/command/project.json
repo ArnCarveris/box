@@ -42,7 +42,8 @@
                     "rest_endpoint",
                     "quit",
                     "console_session",
-                    "resource_file"
+                    "resource_file",
+                    "audio_command"
                 ]
             },
             {

@@ -22,6 +22,7 @@
 #include "box/layout.h"
 #include "box/text.h"
 #include "box/app.h"
+#include "box/audio.h"
 #include "box/render.h"
 #include "box/shader.h"
 #include "box/command.h"

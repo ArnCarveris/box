@@ -125,11 +125,12 @@ static void box_perf_report_stats(
         "  \"fast\": %d,\n  \"target_ms\": %.4f,\n  \"tolerance\": %.2f,\n"
         "  \"min_ms\": %.4f,\n  \"mean_ms\": %.4f,\n  \"p50_ms\": %.4f,\n"
         "  \"p99_ms\": %.4f,\n  \"max_ms\": %.4f,\n  \"fps\": %.2f,\n"
-        "  \"slept_ms\": %.3f,\n  \"stalls\": %d,\n  \"shapes\": %d,\n",
+        "  \"slept_ms\": %.3f,\n  \"stalls\": %d,\n  \"shapes\": %d,\n"
+        "  \"audio_load\": %.4f,\n",
         status->passed ? "true" : "false", status->frame, status->errors, status->slow,
         status->fast, status->target_ms, BOX_PERF_TOLERANCE, status->min_ms, status->mean_ms,
         status->p50_ms, status->p99_ms, status->max_ms, fps, status->slept_ms, status->stalls,
-        status->shapes);
+        status->shapes, (double)status->audio_load);
     ecs_strbuf_append(buf,
         "  \"delta_errors\": %d,\n  \"delta_tolerance_ms\": %.3f,\n  \"delta_max_ms\": %.4f,\n"
         "  \"present_mean_ms\": %.4f,\n"

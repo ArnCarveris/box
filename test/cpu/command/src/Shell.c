@@ -358,6 +358,7 @@ void Shell_help_lists_box_commands(void) {
     test_bool(error, false);
     test_assert(strstr(out, "key_press <key> [dur]  Tap a key, held for dur frames") != NULL);
     test_assert(strstr(out, "capture [camera]  Write a PNG") != NULL);
+    test_assert(strstr(out, "audio [action] [value]  Print the audio status") != NULL);
     test_assert(strstr(out, "\nls [scope]  ") != NULL);
     ecs_os_free(out);
 
@@ -508,5 +509,45 @@ void Shell_resource_file(void) {
     ecs_os_free(file);
     ecs_os_free(r.name);
     ecs_os_free(r.content_type);
+    ecs_fini(world);
+}
+
+void Shell_audio_command(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_entity_t bus = ecs_entity(world, { .name = "music" });
+    ecs_ensure(world, bus, AudioBus)->volume = 0.5f;
+    ecs_modified(world, bus, AudioBus);
+    ecs_progress(world, 0.016f);
+
+    bool error = true;
+    char *out = box_command_run(world, s, "audio", &error);
+    test_bool(error, false);
+    test_assert(strncmp(out, "off, 0 Hz, 0 voices", 19) == 0);
+    test_assert(strstr(out, "\nmaster: volume 1.00") != NULL);
+    test_assert(strstr(out, "music: volume 0.50 pan 0.00 -> master") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio volume 0.25", &error);
+    test_bool(error, false);
+    test_str(out, "master volume 0.25");
+    ecs_os_free(out);
+    test_flt(ecs_singleton_get(world, AudioSettings)->master_volume, 0.25f);
+
+    out = box_command_run(world, s, "audio mute on", &error);
+    test_str(out, "mute on");
+    ecs_os_free(out);
+    test_bool(ecs_singleton_get(world, AudioSettings)->mute, true);
+    out = box_command_run(world, s, "audio mute", &error);
+    test_str(out, "mute off");
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio volume loud", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    out = box_command_run(world, s, "audio sing", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
     ecs_fini(world);
 }

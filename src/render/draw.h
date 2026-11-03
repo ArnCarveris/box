@@ -358,6 +358,10 @@ typedef struct box_draw_batch_t {
  */
 typedef struct box_draw_clips_t {
     ecs_map_t index;        /**< Element to its clip index */
+    ecs_map_t floats;       /**< Float that hides while its anchor is clipped out
+                             *   (LayoutFloat.hide_clipped) to its clip index, whose area is
+                             *   empty while it hides and unbounded else; freed in a send once
+                             *   the float is gone or no longer hides */
     ecs_vec_t entities;     /**< ecs_entity_t per clip index, 0 for a free index */
     ecs_vec_t records;      /**< box_render_clip_t per clip index, as the backend has them */
     ecs_vec_t free;         /**< int32_t, clip indices to reuse */
@@ -457,8 +461,10 @@ typedef struct box_render_draws_t {
     ecs_map_t order_z;          /**< Entity of a path to the z key it was ordered by */
     ecs_map_t tree_ranks;       /**< Tree of the order to its next rank and its count of ranks,
                                  *   while the runs are made */
-    ecs_map_t overlays;         /**< Clipped overlays (LayoutFloat.clip) to 1, so a set
-                                 *   LayoutFloat changes the order only when its clip changed */
+    ecs_map_t overlays;         /**< Clipped overlays (LayoutFloat.clip) to 1 and floats with
+                                 *   hide_clipped to 2, so a set LayoutFloat changes the order
+                                 *   only when its clip changed, and the clip indices of the
+                                 *   subtree only when either changed */
     const void *backend;        /**< Context of the backend the GPU state was sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
@@ -1556,7 +1562,8 @@ void box_draws_clips_fini(
 
 /** Get the clip index of the nearest ClipChildren ancestor of an entity, giving the ancestor
  * an index when it has none. The walk stops at a floating element (LayoutFloat) that is not a
- * clipped overlay (LayoutFloat.clip).
+ * clipped overlay (LayoutFloat.clip); when that float has hide_clipped, the entity takes the
+ * clip index of the float, which hides it while the anchor of the float is clipped out.
  *
  * @param world The world
  * @param d The state

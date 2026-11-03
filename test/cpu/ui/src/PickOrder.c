@@ -332,3 +332,82 @@ void PickOrder_float_picked_outside_clips(void) {
 
     ecs_fini(world);
 }
+
+/** A screen UI scene with a scroll view at the center of the surface: scroll, a 100 by 100
+ * ClipChildren column with a LayoutScroll, holds anchor, 100 by 40 at its top, and 300 points of
+ * filler. The child list of anchor, 80 by 50 with hide_clipped, hangs below it: before a scroll
+ * it is centered on -10, -15 in world space, past the bottom of anchor over the filler. */
+#define ORDER_HIDE \
+    "using box.layout\n" \
+    "hud {\n" \
+    "  Scene: {}\n" \
+    "  camera {\n" \
+    "    Position: {0, 0, 100}\n" \
+    "    Camera: {ortho: true, ortho_scale: 1}\n" \
+    "  }\n" \
+    "  scroll {\n" \
+    "    Position: {0, 0, 0}\n" \
+    "    Layout: {direction: Column}\n" \
+    "    LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n" \
+    "    LayoutScroll: {vertical: true}\n" \
+    "    Rect: {1, 1}\n" \
+    "    ClipChildren\n" \
+    "    anchor {\n" \
+    "      Layout: {}\n" \
+    "      LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 40}}\n" \
+    "      Rect: {1, 1}\n" \
+    "      Interactive\n" \
+    "      list {\n" \
+    "        LayoutFloat: {anchor_v: Bottom, v: Top, hide_clipped: true}\n" \
+    "        Rect: {80, 50}\n" \
+    "        Interactive\n" \
+    "      }\n" \
+    "    }\n" \
+    "    filler {\n" \
+    "      LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 300}}\n" \
+    "      Rect: {1, 1}\n" \
+    "      Interactive\n" \
+    "    }\n" \
+    "  }\n" \
+    "}\n" \
+    "hud_view { View: {camera: hud.camera} }\n"
+
+/** Set the vertical scroll offset of the scroll view of ORDER_HIDE and run a frame.
+ *
+ * @param world The world
+ * @param y The offset
+ */
+static void order_scroll(
+    ecs_world_t *world,
+    float y)
+{
+    ecs_set(world, order_e(world, "hud.scroll"), LayoutScroll, { .y = y, .vertical = true });
+    ecs_progress(world, 0);
+}
+
+void PickOrder_float_hidden_while_anchor_clipped(void) {
+    // ui/picking
+    ecs_world_t *world = order_world(ORDER_HIDE);
+    ecs_entity_t list = order_e(world, "hud.scroll.anchor.list");
+    ecs_entity_t filler = order_e(world, "hud.scroll.filler");
+
+    /* The anchor is in view: the list picks over the filler */
+    test_uint(order_hit_at(world, -10, -15), list);
+    test_uint(order_hit_at(world, -10, -35), list);
+
+    /* Scrolled out, the list follows its anchor above the scroll view and is not picked there,
+     * and the filler under its old place gets the pointer */
+    order_scroll(world, 200);
+    test_uint(order_hit_at(world, -10, 185), 0);
+    test_uint(order_hit_at(world, -10, -15), filler);
+
+    /* Partly in view, the anchor keeps the list picked */
+    order_scroll(world, 30);
+    test_uint(order_hit_at(world, -10, 15), list);
+
+    /* Scrolled back in, it is picked again */
+    order_scroll(world, 0);
+    test_uint(order_hit_at(world, -10, -15), list);
+
+    ecs_fini(world);
+}
