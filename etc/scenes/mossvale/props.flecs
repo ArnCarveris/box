@@ -1,0 +1,521 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.transition
+using box.light
+using box.geometry
+using box.material
+using box.particle
+
+template Tree {
+  prop seed: f32 = 0
+  prop kind: i32 = 0
+  prop s: f32 = 1
+
+  const sz = s * (0.85 + fract(seed * 13.7) * 0.4)
+
+  tree {
+    Rotation: {0, seed * 6.283, 0}
+    Scale: {sz, sz, sz}
+    if kind == 1 {
+      trunk : MvBark { Position: {0, 0.8, 0}; Frustum: {length: 1.6, radius_bottom: 0.32, radius_top: 0.2, segments: 7} }
+      low : MvLeafPine { Position: {0, 2.4, 0}; Cone: {length: 2.6, radius: 1.9, segments: 9} }
+      mid : MvLeafPine { Position: {0, 3.7, 0}; Cone: {length: 2.2, radius: 1.45, segments: 9} }
+      tip : MvLeafPine { Position: {0, 4.8, 0}; Cone: {length: 1.8, radius: 0.95, segments: 9} }
+    } else if kind == 2 {
+      trunk : MvBirchBark { Position: {0, 1.6, 0}; Frustum: {length: 3.2, radius_bottom: 0.2, radius_top: 0.12, segments: 7} }
+      crown : MvLeafLight { Position: {0, 3.6, 0}; Scale: {1, 1.35, 1}; IcoSphere: {radius: 1.3, segments: 1} }
+      crown_b : MvLeafLight { Position: {0.5, 3.0, 0.3}; IcoSphere: {radius: 0.8, segments: 1} }
+    } else {
+      trunk : MvBark { Position: {0, 1.1, 0}; Frustum: {length: 2.2, radius_bottom: 0.38, radius_top: 0.24, segments: 7} }
+      root_a : MvBark { Position: {0.3, 0.12, 0}; Rotation: {0, 0, -1.0}; Cone: {length: 0.6, radius: 0.15, segments: 5} }
+      root_b : MvBark { Position: {-0.2, 0.12, 0.22}; Rotation: {0.9, 0, 0.6}; Cone: {length: 0.55, radius: 0.13, segments: 5} }
+      if kind == 3 {
+        crown : MvLeafAutumn { Position: {0, 3.1, 0}; IcoSphere: {radius: 1.7, segments: 1} }
+        crown_b : MvLeafRed { Position: {0.8, 3.8, 0.2}; IcoSphere: {radius: 1.1, segments: 1} }
+        crown_c : MvLeafAutumn { Position: {-0.8, 3.5, -0.4}; IcoSphere: {radius: 1.1, segments: 1} }
+      } else {
+        crown : MvLeaf { Position: {0, 3.1, 0}; IcoSphere: {radius: 1.7, segments: 1} }
+        crown_b : MvLeafLight { Position: {0.8, 3.8, 0.2}; IcoSphere: {radius: 1.1, segments: 1} }
+        crown_c : MvLeafDark { Position: {-0.8, 3.5, -0.4}; IcoSphere: {radius: 1.1, segments: 1} }
+      }
+    }
+  }
+}
+
+template Bush {
+  prop seed: f32 = 0
+  prop s: f32 = 1
+  a : MvLeafDark { Position: {0, 0.45 * s, 0}; Scale: {1.2 * s, 0.8 * s, 1 * s}; IcoSphere: {radius: 0.7, segments: 1} }
+  b : MvLeaf { Position: {0.45 * s, 0.35 * s, 0.2 * s}; Scale: {s, s, s}; IcoSphere: {radius: 0.5, segments: 1} }
+  if fract(seed * 7.1) > 0.6 {
+    berries {
+      for i in 0..4 {
+        const a = seed * 20 + i * 1.7
+        "b_{i}" { Position: {sin(a) * 0.6 * s, 0.6 * s, cos(a) * 0.5 * s}; Sphere: {radius: 0.08, segments: 6}; Rgb: {200, 50, 70}; PbrMaterial: {roughness: 0.5} }
+      }
+    }
+  }
+}
+
+template Rock {
+  prop seed: f32 = 0
+  prop s: f32 = 1
+  r : MvRock { Position: {0, 0.3 * s, 0}; Rotation: {seed, seed * 5, seed * 2}; Scale: {1.3 * s, 0.8 * s, 1.0 * s}; IcoSphere: {radius: 0.8, segments: 0} }
+  if fract(seed * 3.3) > 0.5 {
+    r2 : MvDarkStone { Position: {0.7 * s, 0.15 * s, 0.4 * s}; Rotation: {seed * 2, seed, 0}; Scale: {s, s, s}; IcoSphere: {radius: 0.4, segments: 0} }
+  }
+}
+
+template Flowers {
+  prop seed: f32 = 0
+  const pick = floor(fract(seed * 11.1) * 4)
+  for f in 0..6 {
+    const a = seed * 50 + f * 1.26
+    const r = 0.15 + fract(a * 3.3) * 0.5
+    "stem_{f}" : MvLeaf { Position: {sin(a) * r, 0.15, cos(a) * r}; Box: {0.04, 0.3, 0.04} }
+    if pick == 0 {
+      "head_{f}" : MvPetalPink { Position: {sin(a) * r, 0.32, cos(a) * r}; Sphere: {radius: 0.09, segments: 6} }
+    } else if pick == 1 {
+      "head_{f}" : MvPetalYellow { Position: {sin(a) * r, 0.32, cos(a) * r}; Sphere: {radius: 0.09, segments: 6} }
+    } else if pick == 2 {
+      "head_{f}" : MvPetalWhite { Position: {sin(a) * r, 0.32, cos(a) * r}; Sphere: {radius: 0.09, segments: 6} }
+    } else {
+      "head_{f}" : MvPetalBlue { Position: {sin(a) * r, 0.32, cos(a) * r}; Sphere: {radius: 0.09, segments: 6} }
+    }
+  }
+}
+
+template Tuft {
+  prop seed: f32 = 0
+  for b in 0..4 {
+    const a = seed * 30 + b * 1.6
+    "blade_{b}" : MvGrassDark {
+      Position: {sin(a) * 0.12, 0.18, cos(a) * 0.12}
+      Rotation: {sin(a) * 0.4, a, cos(a) * 0.4}
+      Cone: {length: 0.36 + fract(a) * 0.2, radius: 0.07, segments: 3}
+    }
+  }
+}
+
+template Reeds {
+  prop seed: f32 = 0
+  for b in 0..6 {
+    const a = seed * 30 + b * 1.1
+    const r = 0.1 + fract(a * 2.1) * 0.5
+    "reed_{b}" : MvCrop { Position: {sin(a) * r, 0.6, cos(a) * r}; Rotation: {sin(a) * 0.15, 0, cos(a) * 0.15}; Cylinder: {length: 1.2 + fract(a) * 0.5, radius: 0.03, segments: 4} }
+    if b % 2 == 0 {
+      "cat_{b}" : MvBark { Position: {sin(a) * r, 1.25 + fract(a) * 0.25, cos(a) * r}; Capsule: {length: 0.18, radius: 0.05, segments: 6} }
+    }
+  }
+}
+
+template Barrel {
+  body : MvWood { Position: {0, 0.45, 0}; Cylinder: {length: 0.9, radius: 0.36, segments: 12} }
+  hoop_a : MvIron { Position: {0, 0.18, 0}; Cylinder: {length: 0.06, radius: 0.375, segments: 12} }
+  hoop_b : MvIron { Position: {0, 0.72, 0}; Cylinder: {length: 0.06, radius: 0.375, segments: 12} }
+  lid : MvOldWood { Position: {0, 0.905, 0}; Cylinder: {length: 0.02, radius: 0.33, segments: 12} }
+}
+
+template Crate {
+  prop s: f32 = 0.7
+  box_ : MvOldWood { Position: {0, s / 2, 0}; Box: {s, s, s} }
+  band_a : MvTimber { Position: {0, s / 2, 0}; Box: {s + 0.02, 0.08, s + 0.02} }
+  band_b : MvTimber { Position: {0, s / 2, 0}; Box: {0.08, s + 0.02, s + 0.02} }
+}
+
+template HayBale {
+  bale : MvHay { Position: {0, 0.5, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {length: 1.2, radius: 0.5, segments: 12} }
+}
+
+template Woodpile {
+  for r in 0..3 {
+    for c in 0..(4 - r) {
+      "log_{r}_{c}" : MvBark {
+        Position: {(c - (3 - r) / 2.0) * 0.32, 0.15 + r * 0.27, 0}
+        Rotation: {HALF_PI, 0, 0}
+        Cylinder: {length: 1.4, radius: 0.15, segments: 7}
+      }
+    }
+  }
+}
+
+template FencePost {
+  post : MvOldWood { Position: {0, 0.5, 0}; Box: {0.14, 1.0, 0.14} }
+}
+
+template Fence {
+  prop len: f32 = 4
+  const n = max(1, floor(len / 2))
+  for i in 0..(n + 1) {
+    "post_{i}" : MvOldWood { Position: {-len / 2 + i * len / n, 0.5, 0}; Box: {0.14, 1.0, 0.14} }
+  }
+  rail_a : MvOldWood { Position: {0, 0.7, 0}; Box: {len, 0.08, 0.06} }
+  rail_b : MvOldWood { Position: {0, 0.35, 0}; Box: {len, 0.08, 0.06} }
+}
+
+template WindowPane {
+  prop w: f32 = 0.9
+  prop h: f32 = 0.9
+  prop lit: bool = false
+  prop box_: bool = false
+  prop seed: f32 = 0
+  frame_ : MvTimber { Position: {0, 0, -0.02}; Box: {w + 0.24, h + 0.24, 0.1} }
+  if lit {
+    glass : MvWindowLit { Position: {0, 0, 0.02}; Box: {w, h, 0.06} }
+  } else {
+    glass { Position: {0, 0, 0.02}; Box: {w, h, 0.06}; Rgb: {58, 72, 92}; PbrMaterial: {roughness: 0.12, metallic: 0.2} }
+  }
+  bar_h : MvTimber { Position: {0, 0, 0.06}; Box: {w, 0.07, 0.05} }
+  bar_v : MvTimber { Position: {0, 0, 0.06}; Box: {0.07, h, 0.05} }
+  sill : MvTimber { Position: {0, -h / 2 - 0.12, 0.1}; Box: {w + 0.4, 0.1, 0.24} }
+  if box_ {
+    planter : MvWood { Position: {0, -h / 2 - 0.32, 0.22}; Box: {w + 0.2, 0.3, 0.3} }
+    for f in 0..4 {
+      const fx = (f - 1.5) * (w + 0.1) / 4
+      if fract(seed * 7.3 + f * 0.37) > 0.5 {
+        "bloom_{f}" : MvPetalPink { Position: {fx, -h / 2 - 0.08, 0.24}; Sphere: {radius: 0.11, segments: 6} }
+      } else {
+        "bloom_{f}" : MvPetalYellow { Position: {fx, -h / 2 - 0.08, 0.24}; Sphere: {radius: 0.11, segments: 6} }
+      }
+      "leaf_{f}" : MvLeaf { Position: {fx + 0.08, -h / 2 - 0.14, 0.26}; Sphere: {radius: 0.09, segments: 6} }
+    }
+  }
+}
+
+template House {
+  prop x: f32 = 0
+  prop z: f32 = 0
+  prop w: f32 = 7
+  prop d: f32 = 5.5
+  prop h: f32 = 3.2
+  prop face: i32 = 0
+  prop wall: i32 = 0
+  prop roof: i32 = 0
+  prop chimney: bool = true
+  prop floors: i32 = 1
+
+  mut fade = false
+
+  const hw = match face % 2 { 0: w / 2; _: d / 2 }
+  const hd = match face % 2 { 0: d / 2; _: w / 2 }
+  const rh = d * 0.42
+  const wh = h * floors
+  const top = 0.3 + wh
+  const run = d / 2 + 0.55
+  const slope = atan(rh / run)
+  const slab = sqrt(run * run + rh * rh)
+  const night = hour > 17.4 || hour < 6
+  const seed = fract(x * 0.137 + z * 0.291)
+  const wo = match fade { true: 0.3; _: 1 }
+  const ro = match fade { true: 0.12; _: 1 }
+  const wc: Rgb = match wall { 0: {240, 230, 206}; 1: {236, 214, 176}; 2: {232, 196, 186}; 3: {170, 164, 152}; _: {214, 224, 232} }
+  const rc: Rgb = match roof { 0: {206, 168, 100}; 1: {170, 72, 54}; 2: {72, 94, 136}; 3: {80, 116, 76}; 4: {100, 72, 128}; _: {96, 100, 112} }
+  const rd: Rgb = {rc.r * 0.72, rc.g * 0.72, rc.b * 0.72}
+
+  Position: {x, 0, z}
+
+  frame {
+    Rotation: {0, face * HALF_PI, 0}
+    plinth : MvDarkStone { Position: {0, 0.15, 0}; Box: {w + 0.3, 0.3, d + 0.3} }
+    walls { Position: {0, 0.3 + wh / 2, 0}; Box: {w, wh, d}; Rgb: wc; PbrMaterial: {roughness: 0.95}; Opacity: {wo}; Transition: [Opacity: {duration: 0.3}] }
+    for c in 0..4 {
+      const cx = match c % 2 { 0: -w / 2; _: w / 2 }
+      const cz = match c < 2 { true: -d / 2; _: d / 2 }
+      "post_{c}" : MvTimber { Position: {cx, 0.3 + wh / 2, cz}; Box: {0.26, wh, 0.26}; Opacity: {wo} }
+    }
+    plate : MvTimber { Position: {0, top, 0}; Box: {w + 0.12, 0.22, d + 0.12}; Opacity: {wo} }
+    if wall != 3 {
+      beam_f : MvTimber { Position: {0, 0.3 + h * 0.18, d / 2 + 0.03}; Box: {w, 0.16, 0.06} }
+      stud_a : MvTimber { Position: {-w * 0.15, 0.3 + h / 2, d / 2 + 0.03}; Box: {0.16, h, 0.06} }
+      stud_b : MvTimber { Position: {w * 0.15, 0.3 + h / 2, d / 2 + 0.03}; Box: {0.16, h, 0.06} }
+      brace_a : MvTimber { Position: {-w * 0.43, 0.3 + h * 0.6, d / 2 + 0.03}; Rotation: {0, 0, 0.7}; Box: {0.14, h * 0.75, 0.06} }
+      brace_b : MvTimber { Position: {w * 0.43, 0.3 + h * 0.6, d / 2 + 0.03}; Rotation: {0, 0, -0.7}; Box: {0.14, h * 0.75, 0.06} }
+      beam_b : MvTimber { Position: {0, 0.3 + h * 0.18, -d / 2 - 0.03}; Box: {w, 0.16, 0.06}; Opacity: {wo} }
+    }
+    if floors > 1 {
+      mid : MvTimber { Position: {0, 0.3 + h, 0}; Box: {w + 0.1, 0.18, d + 0.1}; Opacity: {wo} }
+      WindowPane up_a(w: 0.8, h: 0.9, lit: night, box_: true, seed: seed) { Position: {-w * 0.3, 0.3 + h * 1.5, d / 2 + 0.05} }
+      WindowPane up_b(w: 0.8, h: 0.9, lit: night, box_: true, seed: seed + 0.3) { Position: {w * 0.3, 0.3 + h * 1.5, d / 2 + 0.05} }
+    }
+    roof_a { Position: {0, top + rh / 2, run / 2}; Rotation: {slope, 0, 0}; Box: {w + 0.9, 0.2, slab + 0.1}; Rgb: rc; PbrMaterial: {roughness: 0.85}; Opacity: {ro}; Transition: [Opacity: {duration: 0.3}] }
+    roof_b { Position: {0, top + rh / 2, 0 - run / 2}; Rotation: {0 - slope, 0, 0}; Box: {w + 0.9, 0.2, slab + 0.1}; Rgb: rc; PbrMaterial: {roughness: 0.85}; Opacity: {ro}; Transition: [Opacity: {duration: 0.3}] }
+    for k in 0..3 {
+      const t = (k + 1) / 4.0
+      "shingle_a_{k}" { Position: {0, top + rh * (1 - t) + 0.12, run * t}; Rotation: {slope, 0, 0}; Box: {w + 0.92, 0.06, 0.12}; Rgb: rd; PbrMaterial: {roughness: 0.9}; Opacity: {ro} }
+      "shingle_b_{k}" { Position: {0, top + rh * (1 - t) + 0.12, 0 - run * t}; Rotation: {0 - slope, 0, 0}; Box: {w + 0.92, 0.06, 0.12}; Rgb: rd; PbrMaterial: {roughness: 0.9}; Opacity: {ro} }
+    }
+    ridge { Position: {0, top + rh + 0.06, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {length: w + 1.0, radius: 0.16, segments: 8}; Rgb: rd; PbrMaterial: {roughness: 0.85}; Opacity: {ro} }
+    gable_a { Position: {w / 2 - 0.05, top + rh / 2, 0}; Rotation: {0, HALF_PI, 0}; TrianglePrism: {d, rh, 0.12}; Rgb: wc; PbrMaterial: {roughness: 0.95}; Opacity: {ro} }
+    gable_b { Position: {0 - w / 2 + 0.05, top + rh / 2, 0}; Rotation: {0, HALF_PI, 0}; TrianglePrism: {d, rh, 0.12}; Rgb: wc; PbrMaterial: {roughness: 0.95}; Opacity: {ro} }
+    door_frame : MvTimber { Position: {0, 1.45, d / 2 + 0.05}; Box: {1.6, 2.45, 0.08} }
+    door : MvWood { Position: {0, 1.35, d / 2 + 0.09}; Box: {1.2, 2.2, 0.08} }
+    door_band_a : MvIron { Position: {0, 0.85, d / 2 + 0.14}; Box: {1.1, 0.07, 0.03} }
+    door_band_b : MvIron { Position: {0, 1.95, d / 2 + 0.14}; Box: {1.1, 0.07, 0.03} }
+    knob : MvBrass { Position: {0.4, 1.35, d / 2 + 0.16}; Sphere: {radius: 0.07, segments: 6} }
+    step : MvStone { Position: {0, 0.12, d / 2 + 0.55}; Box: {2.0, 0.24, 0.8} }
+    WindowPane win_a(lit: night, box_: true, seed: seed) { Position: {-w * 0.31, 1.75, d / 2 + 0.05} }
+    WindowPane win_b(lit: night, box_: true, seed: seed + 0.5) { Position: {w * 0.31, 1.75, d / 2 + 0.05} }
+    WindowPane win_c(lit: night) { Position: {0, 1.75, -d / 2 - 0.05}; Rotation: {0, PI, 0} }
+    WindowPane win_d(lit: night) { Position: {w / 2 + 0.05, 1.75, 0}; Rotation: {0, HALF_PI, 0} }
+    WindowPane win_e(lit: night) { Position: {-w / 2 - 0.05, 1.75, 0}; Rotation: {0, 0 - HALF_PI, 0} }
+    if night {
+      porch_light { Position: {0, 2.9, d / 2 + 0.8}; PointLight: {intensity: 2.5, range: 7}; Rgb: {255, 190, 120} }
+    }
+    if chimney {
+      chimney_ : MvDarkStone { Position: {w * 0.3, top + rh * 0.75, -d * 0.18}; Box: {0.8, rh * 1.5 + 0.6, 0.8}; Opacity: {ro} }
+      chimney_cap : MvStone { Position: {w * 0.3, top + rh * 1.5 + 0.35, -d * 0.18}; Box: {1.0, 0.18, 1.0}; Opacity: {ro} }
+      smoke {
+        Position: {w * 0.3, top + rh * 1.5 + 0.6, -d * 0.18}
+        ParticleEmitter: {
+          max: 24, rate: 3,
+          shape: EmitterSphere, radius: 0.1,
+          direction: {0, 1, 0}, spread: 12, speed: {0.6, 1.0},
+          lifetime: {2.5, 4}, size: {0.5, 0.8}, opacity: {0.2, 0.35},
+          acceleration: {0.2, 0.1, 0.05},
+          color: {210, 206, 200}, color_variance: {10, 10, 10},
+          seed: x * 31 + z * 7
+        }
+        ParticleCurves: {size: {keys: [{0, 0.6}, {0.5, 1.6}, {1, 3}]}, opacity: {keys: [{0, 0}, {0.3, 1}, {1, 0}]}}
+      }
+    }
+  }
+
+  async {
+    block_rect(x - hw - 0.15, z - hd - 0.15, x + hw + 0.15, z + hd + 0.15)
+    while true {
+      await delay(0.15)
+      const behind = px > x - hw - 1.2 && px < x + hw + 1.2 && pz < z + hd && pz > z - hd - 3 - wh * 0.5
+      if behind != fade {
+        fade = behind
+      }
+    }
+  }
+}
+
+template Well {
+  prop x: f32 = 0
+  prop z: f32 = 0
+  Position: {x, 0, z}
+  ring : MvStone { Position: {0, 0.5, 0}; Tube: {length: 1.0, radius: 1.1, thickness: 0.3, segments: 16} }
+  water : MvDeepWater { Position: {0, 0.6, 0}; Cylinder: {length: 0.05, radius: 0.85, segments: 16} }
+  post_a : MvTimber { Position: {-0.95, 1.5, 0}; Box: {0.2, 2.0, 0.2} }
+  post_b : MvTimber { Position: {0.95, 1.5, 0}; Box: {0.2, 2.0, 0.2} }
+  axle : MvTimber { Position: {0, 2.0, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {length: 2.0, radius: 0.08, segments: 6} }
+  roof_ : MvRoofRed { Position: {0, 2.8, 0}; TrianglePrism: {2.8, 0.9, 1.8} }
+  bucket : MvWood { Position: {0.2, 1.3, 0}; Frustum: {length: 0.4, radius_bottom: 0.18, radius_top: 0.24, segments: 8} }
+  async { block_disc(x, z, 1.3) }
+}
+
+template Bench {
+  seat : MvWood { Position: {0, 0.5, 0}; Box: {2.0, 0.12, 0.6} }
+  back : MvWood { Position: {0, 0.9, -0.28}; Box: {2.0, 0.6, 0.08} }
+  leg_a : MvTimber { Position: {-0.8, 0.25, 0}; Box: {0.12, 0.5, 0.5} }
+  leg_b : MvTimber { Position: {0.8, 0.25, 0}; Box: {0.12, 0.5, 0.5} }
+}
+
+template Stall {
+  prop x: f32 = 0
+  prop z: f32 = 0
+  prop cloth: i32 = 0
+  prop rot: f32 = 0
+  Position: {x, 0, z}
+  Rotation: {0, rot, 0}
+  counter : MvWood { Position: {0, 0.5, 0}; Box: {2.8, 1.0, 1.2} }
+  for p in 0..4 {
+    const sx = match p % 2 { 0: -1.35; _: 1.35 }
+    const sz = match p < 2 { true: -0.55; _: 0.55 }
+    "pole_{p}" : MvTimber { Position: {sx, 1.25, sz}; Box: {0.1, 2.5, 0.1} }
+  }
+  if cloth == 0 {
+    awning : MvClothRed { Position: {0, 2.6, 0.1}; Rotation: {0.25, 0, 0}; Box: {3.1, 0.06, 1.7} }
+  } else if cloth == 1 {
+    awning : MvClothBlue { Position: {0, 2.6, 0.1}; Rotation: {0.25, 0, 0}; Box: {3.1, 0.06, 1.7} }
+  } else {
+    awning : MvClothYellow { Position: {0, 2.6, 0.1}; Rotation: {0.25, 0, 0}; Box: {3.1, 0.06, 1.7} }
+  }
+  goods_a : MvPumpkin { Position: {-0.8, 1.15, 0.1}; Scale: {1, 0.8, 1}; Sphere: {radius: 0.2, segments: 8} }
+  goods_b : MvCabbage { Position: {-0.3, 1.12, 0.2}; IcoSphere: {radius: 0.17, segments: 1} }
+  goods_c : MvWheat { Position: {0.4, 1.1, 0.1}; Box: {0.6, 0.2, 0.4} }
+  goods_d { Position: {0.9, 1.12, 0.2}; Sphere: {radius: 0.15, segments: 8}; Rgb: {200, 50, 50}; PbrMaterial: {roughness: 0.4} }
+  async { block_rect(x - 1.6, z - 0.8, x + 1.6, z + 0.8) }
+}
+
+template Signpost {
+  post : MvTimber { Position: {0, 1.1, 0}; Box: {0.16, 2.2, 0.16} }
+  board_a : MvWood { Position: {0.5, 1.8, 0}; Rotation: {0, 0, 0.05}; Box: {1.2, 0.3, 0.06} }
+  board_b : MvWood { Position: {-0.4, 1.35, 0}; Rotation: {0, 0, -0.05}; Box: {1.0, 0.3, 0.06} }
+}
+
+template Cart {
+  bed : MvOldWood { Position: {0, 0.9, 0}; Box: {2.4, 0.2, 1.4} }
+  side_a : MvOldWood { Position: {0, 1.2, 0.68}; Box: {2.4, 0.4, 0.08} }
+  side_b : MvOldWood { Position: {0, 1.2, -0.68}; Box: {2.4, 0.4, 0.08} }
+  wheel_a : MvTimber { Position: {0.3, 0.55, 0.8}; Rotation: {HALF_PI, 0, 0}; Cylinder: {length: 0.12, radius: 0.55, segments: 12} }
+  wheel_b : MvTimber { Position: {0.3, 0.55, -0.8}; Rotation: {HALF_PI, 0, 0}; Cylinder: {length: 0.12, radius: 0.55, segments: 12} }
+  shaft : MvTimber { Position: {-1.8, 0.75, 0}; Rotation: {0, 0, 0.15}; Box: {1.6, 0.1, 0.9} }
+  load : MvHay { Position: {0.1, 1.35, 0}; Scale: {1.6, 0.5, 0.9}; IcoSphere: {radius: 0.8, segments: 1} }
+}
+
+template Boat {
+  hull : MvWood { Position: {0, 0.25, 0}; Scale: {1, 0.45, 2.4}; Sphere: {radius: 0.8, segments: 12} }
+  inner : MvOldWood { Position: {0, 0.42, 0}; Scale: {0.85, 0.1, 2.1}; Sphere: {radius: 0.8, segments: 12} }
+  seat : MvTimber { Position: {0, 0.45, 0}; Box: {1.3, 0.08, 0.3} }
+  oar : MvTimber { Position: {0.6, 0.5, 0.3}; Rotation: {0, 0.3, 1.3}; Box: {0.06, 2.0, 0.12} }
+}
+
+template Lantern {
+  prop on: bool = false
+  pole : MvIron { Position: {0, 1.3, 0}; Cylinder: {length: 2.6, radius: 0.07, segments: 6} }
+  arm : MvIron { Position: {0.25, 2.55, 0}; Box: {0.6, 0.06, 0.06} }
+  cage : MvIron { Position: {0.5, 2.25, 0}; Box: {0.34, 0.06, 0.34} }
+  if on {
+    glass : MvGlow { Position: {0.5, 2.05, 0}; Box: {0.26, 0.36, 0.26} }
+  } else {
+    glass : MvUnlit { Position: {0.5, 2.05, 0}; Box: {0.26, 0.36, 0.26} }
+  }
+  cap : MvIron { Position: {0.5, 1.84, 0}; Box: {0.34, 0.06, 0.34} }
+}
+
+template Windmill {
+  prop spin: bool = false
+  mut turn: f32 = 0
+  base : MvStone { Position: {0, 0.5, 0}; Cylinder: {length: 1.0, radius: 3.0, segments: 14} }
+  body : MvPlaster { Position: {0, 4.5, 0}; Frustum: {length: 7.0, radius_bottom: 2.6, radius_top: 1.8, segments: 14} }
+  band : MvTimber { Position: {0, 8.0, 0}; Cylinder: {length: 0.3, radius: 1.95, segments: 14} }
+  cap : MvThatch { Position: {0, 9.3, 0}; Cone: {length: 2.4, radius: 2.2, segments: 14} }
+  door : MvWood { Position: {0, 1.6, 2.5}; Rotation: {-0.1, 0, 0}; Box: {1.1, 2.0, 0.1} }
+  win : MvWindowLit { Position: {0, 5.5, 2.25}; Rotation: {-0.1, 0, 0}; Box: {0.6, 0.7, 0.08} }
+  sails {
+    Position: {0, 8.4, 2.2}
+    Rotation: {0, 0, turn}
+    Transition: [Rotation: {duration: 1.0}]
+    hub : MvTimber { Rotation: {HALF_PI, 0, 0}; Cylinder: {length: 1.0, radius: 0.4, segments: 8} }
+    for b in 0..4 {
+      "blade_{b}" {
+        Rotation: {0, 0, b * HALF_PI}
+        spar : MvTimber { Position: {0, 3.4, 0.2}; Box: {0.2, 6.8, 0.15} }
+        cloth : MvCloth { Position: {0.65, 4.0, 0.24}; Box: {1.05, 5.2, 0.04} }
+      }
+    }
+  }
+  async {
+    while true {
+      await delay(1.0)
+      if spin {
+        turn += 1.2
+      }
+    }
+  }
+}
+
+template Pen {
+  prop w: f32 = 10
+  prop d: f32 = 8
+  Fence north(len: w) { Position: {0, 0, -d / 2} }
+  Fence south_a(len: w / 2 - 1.2) { Position: {-w / 4 - 0.6, 0, d / 2} }
+  Fence south_b(len: w / 2 - 1.2) { Position: {w / 4 + 0.6, 0, d / 2} }
+  Fence west(len: d) { Position: {-w / 2, 0, 0}; Rotation: {0, HALF_PI, 0} }
+  Fence east(len: d) { Position: {w / 2, 0, 0}; Rotation: {0, HALF_PI, 0} }
+}
+
+template Tower {
+  prop x: f32 = 0
+  prop z: f32 = 0
+  Position: {x, 0, z}
+  base : MvStone { Position: {0, 4, 0}; Frustum: {length: 8, radius_bottom: 2.2, radius_top: 1.7, segments: 12} }
+  top : MvStone { Position: {0, 8.4, 0}; Cylinder: {length: 0.8, radius: 2.1, segments: 12} }
+  roof_ : MvRoofPurple { Position: {0, 10.4, 0}; Cone: {length: 3.4, radius: 2.4, segments: 12} }
+  star : MvGold { Position: {0, 12.4, 0}; IcoSphere: {radius: 0.3, segments: 1} }
+  door : MvWood { Position: {0, 1.2, 2.1}; Box: {1.0, 2.2, 0.2} }
+  win_a : MvWindowLit { Position: {0, 5, 1.95}; Box: {0.5, 0.9, 0.1} }
+  win_b : MvWindowLit { Position: {1.9, 6.5, 0}; Box: {0.1, 0.9, 0.5} }
+  async { block_disc(x, z, 2.3) }
+}
+
+template MineMouth {
+  prop x: f32 = 0
+  prop z: f32 = 0
+  Position: {x, 0, z}
+  cliff : MvCliff { Position: {0, 3, -3}; Scale: {9, 4, 3.5}; IcoSphere: {radius: 1, segments: 1} }
+  cliff_b : MvCliff { Position: {-6, 2, -1}; Scale: {4, 3, 3}; IcoSphere: {radius: 1, segments: 1} }
+  cliff_c : MvCliff { Position: {6.5, 2.4, -1.5}; Scale: {4, 3.2, 3}; IcoSphere: {radius: 1, segments: 1} }
+  hole : MvDark { Position: {0, 1.5, 0.3}; Box: {3.2, 3.0, 0.4} }
+  beam_l : MvTimber { Position: {-1.8, 1.6, 0.6}; Box: {0.35, 3.2, 0.35} }
+  beam_r : MvTimber { Position: {1.8, 1.6, 0.6}; Box: {0.35, 3.2, 0.35} }
+  beam_t : MvTimber { Position: {0, 3.3, 0.6}; Box: {4.2, 0.4, 0.4} }
+  rail_a : MvIron { Position: {-0.5, 0.05, 3}; Box: {0.08, 0.1, 6} }
+  rail_b : MvIron { Position: {0.5, 0.05, 3}; Box: {0.08, 0.1, 6} }
+  cart : MvIron { Position: {0, 0.6, 4}; Box: {1.4, 0.8, 1.8} }
+  ore : MvDarkStone { Position: {0, 1.1, 4}; Scale: {1, 0.4, 1.2}; IcoSphere: {radius: 0.6, segments: 1} }
+  async {
+    block_rect(x - 10, z - 7, x + 10, z + 0.2)
+    block_rect(x - 1, z + 3, x + 1, z + 5)
+  }
+}
+
+template Dock {
+  prop x: f32 = 0
+  prop z: f32 = 0
+  prop len: f32 = 8
+  Position: {x, 0, z}
+  deck : MvWood { Position: {-len / 2, 0.3, 0}; Box: {len, 0.2, 2.4} }
+  for i in 0..4 {
+    "pile_a_{i}" : MvTimber { Position: {-i * len / 3, 0.1, 1.1}; Cylinder: {length: 1.2, radius: 0.16, segments: 6} }
+    "pile_b_{i}" : MvTimber { Position: {-i * len / 3, 0.1, -1.1}; Cylinder: {length: 1.2, radius: 0.16, segments: 6} }
+  }
+  async { unblock_rect(x - len, z - 1.2, x + 0.5, z + 1.2) }
+}
+
+template Scarecrow {
+  pole : MvTimber { Position: {0, 1.2, 0}; Box: {0.12, 2.4, 0.12} }
+  arms : MvTimber { Position: {0, 1.7, 0}; Box: {1.8, 0.1, 0.1} }
+  coat : MvClothBlue { Position: {0, 1.5, 0}; Box: {0.7, 0.9, 0.35} }
+  head : MvHay { Position: {0, 2.25, 0}; Sphere: {radius: 0.28, segments: 8} }
+  hat : MvTimber { Position: {0, 2.55, 0}; Cone: {length: 0.4, radius: 0.4, segments: 10} }
+}
+
+template Campfire {
+  prop on: bool = false
+  mut fl = false
+  for i in 0..6 {
+    const a = i * 1.047
+    "stone_{i}" : MvDarkStone { Position: {sin(a) * 0.7, 0.12, cos(a) * 0.7}; IcoSphere: {radius: 0.22, segments: 0} }
+  }
+  log_a : MvBark { Position: {0, 0.2, 0}; Rotation: {0.3, 0.5, HALF_PI}; Cylinder: {length: 1.1, radius: 0.1, segments: 6} }
+  log_b : MvBark { Position: {0, 0.2, 0}; Rotation: {0.3, -0.7, HALF_PI}; Cylinder: {length: 1.1, radius: 0.1, segments: 6} }
+  if on {
+    flame : MvFlame { Position: {0, 0.55, 0}; Scale: {1, match fl { true: 1.2; _: 0.85 }, 1}; Transition: [Scale: {duration: 0.14}]; Cone: {length: 0.8, radius: 0.32, segments: 8} }
+    light { Position: {0, 1.2, 0}; PointLight: {intensity: 6, range: 10}; Rgb: {255, 160, 80} }
+    sparks {
+      Position: {0, 0.6, 0}
+      ParticleEmitter: {
+        max: 40, rate: 14, shape: EmitterSphere, radius: 0.2,
+        direction: {0, 1, 0}, spread: 18, speed: {0.8, 1.8},
+        lifetime: {0.5, 1.1}, size: {0.06, 0.14}, opacity: {0.8, 1},
+        color: {255, 170, 70}, color_variance: {0, 40, 30}, seed: 5
+      }
+      ParticleAppearance: {blend: ParticleAdditive}
+    }
+  } else {
+    ash : MvAsh { Position: {0, 0.08, 0}; Cylinder: {length: 0.06, radius: 0.5, segments: 10} }
+  }
+  async {
+    while true {
+      await delay(0.15)
+      if on {
+        fl = !fl
+      }
+    }
+  }
+}
+
+template Mushroom {
+  prop s: f32 = 1
+  stem : MvPetalWhite { Position: {0, 0.15 * s, 0}; Cylinder: {length: 0.3 * s, radius: 0.06 * s, segments: 6} }
+  cap : MvMushroom { Position: {0, 0.3 * s, 0}; HemiSphere: {radius: 0.2 * s, segments: 8} }
+}
+
+template Grave {
+  stone : MvStone { Position: {0, 0.5, 0}; Box: {0.6, 1.0, 0.2} }
+}

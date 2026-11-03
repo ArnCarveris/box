@@ -1,0 +1,83 @@
+using flecs.script
+using box.material
+using box.text
+
+mv_font_display { Font: {path: "etc/scenes/mossvale/fonts/Cinzel.ttf"} }
+mv_font_body { Font: {path: "etc/scenes/mossvale/fonts/Spectral-Regular.ttf"} }
+
+prefab MvGrass { Rgb: {108, 156, 72}; PbrMaterial: {roughness: 1} }
+prefab MvGrassDark { Rgb: {78, 122, 58}; PbrMaterial: {roughness: 1} }
+prefab MvMeadow { Rgb: {122, 166, 80}; PbrMaterial: {roughness: 1} }
+prefab MvForestFloor { Rgb: {74, 98, 52}; PbrMaterial: {roughness: 1} }
+prefab MvHillGrass { Rgb: {140, 150, 86}; PbrMaterial: {roughness: 1} }
+prefab MvDirt { Rgb: {176, 142, 98}; PbrMaterial: {roughness: 1} }
+prefab MvPath { Rgb: {196, 168, 122}; PbrMaterial: {roughness: 1} }
+prefab MvCobble { Rgb: {176, 168, 154}; PbrMaterial: {roughness: 0.9} }
+prefab MvSoil { Rgb: {112, 80, 54}; PbrMaterial: {roughness: 1} }
+prefab MvSoilDry { Rgb: {160, 128, 90}; PbrMaterial: {roughness: 1} }
+prefab MvSand { Rgb: {222, 204, 156}; PbrMaterial: {roughness: 1} }
+prefab MvWater { Rgb: {52, 112, 140}; PbrMaterial: {roughness: 0.05}; ClearCoat: {strength: 1, roughness: 0.02} }
+prefab MvDeepWater { Rgb: {34, 82, 112}; PbrMaterial: {roughness: 0.05}; ClearCoat: {strength: 1, roughness: 0.02} }
+prefab MvIce { Rgb: {210, 236, 250}; PbrMaterial: {roughness: 0.15}; ClearCoat: {strength: 1, roughness: 0.05} }
+
+prefab MvStone { Rgb: {168, 162, 150}; PbrMaterial: {roughness: 0.9} }
+prefab MvDarkStone { Rgb: {112, 108, 102}; PbrMaterial: {roughness: 0.95} }
+prefab MvRock { Rgb: {150, 144, 132}; PbrMaterial: {roughness: 0.95} }
+prefab MvCliff { Rgb: {138, 124, 106}; PbrMaterial: {roughness: 0.95} }
+prefab MvPlaster { Rgb: {240, 230, 206}; PbrMaterial: {roughness: 0.95} }
+prefab MvPlasterWarm { Rgb: {236, 214, 176}; PbrMaterial: {roughness: 0.95} }
+prefab MvPlasterRose { Rgb: {232, 196, 186}; PbrMaterial: {roughness: 0.95} }
+prefab MvTimber { Rgb: {96, 66, 44}; PbrMaterial: {roughness: 0.85} }
+prefab MvWood { Rgb: {164, 118, 76}; PbrMaterial: {roughness: 0.8} }
+prefab MvOldWood { Rgb: {132, 108, 84}; PbrMaterial: {roughness: 0.9} }
+prefab MvBark { Rgb: {104, 78, 56}; PbrMaterial: {roughness: 1} }
+prefab MvBirchBark { Rgb: {226, 222, 210}; PbrMaterial: {roughness: 0.9} }
+prefab MvThatch { Rgb: {214, 176, 108}; PbrMaterial: {roughness: 1} }
+prefab MvRoofRed { Rgb: {176, 76, 56}; PbrMaterial: {roughness: 0.7} }
+prefab MvRoofBlue { Rgb: {76, 98, 140}; PbrMaterial: {roughness: 0.6} }
+prefab MvRoofGreen { Rgb: {84, 120, 80}; PbrMaterial: {roughness: 0.7} }
+prefab MvRoofPurple { Rgb: {104, 76, 132}; PbrMaterial: {roughness: 0.6} }
+prefab MvIron { Rgb: {58, 56, 56}; PbrMaterial: {metallic: 0.85, roughness: 0.45} }
+prefab MvGold { Rgb: {232, 184, 72}; PbrMaterial: {metallic: 1, roughness: 0.3} }
+prefab MvBrass { Rgb: {200, 160, 90}; PbrMaterial: {metallic: 0.9, roughness: 0.35} }
+prefab MvDark { Rgb: {32, 28, 26}; PbrMaterial: {roughness: 0.9} }
+prefab MvGlass { Rgb: {70, 56, 40}; PbrMaterial: {roughness: 0.3} }
+prefab MvWindowLit { Rgb: {80, 60, 30}; PbrMaterial: {roughness: 0.5}; Emissive: {strength: 1.5, color: {255, 180, 90}} }
+prefab MvCloth { Rgb: {226, 216, 192}; PbrMaterial: {roughness: 0.95} }
+prefab MvClothRed { Rgb: {176, 52, 48}; PbrMaterial: {roughness: 0.9} }
+prefab MvClothBlue { Rgb: {62, 90, 160}; PbrMaterial: {roughness: 0.9} }
+prefab MvClothYellow { Rgb: {230, 190, 70}; PbrMaterial: {roughness: 0.9} }
+prefab MvClothGreen { Rgb: {84, 140, 80}; PbrMaterial: {roughness: 0.9} }
+
+prefab MvLeaf { Rgb: {86, 140, 58}; PbrMaterial: {roughness: 1} }
+prefab MvLeafLight { Rgb: {124, 170, 70}; PbrMaterial: {roughness: 1} }
+prefab MvLeafDark { Rgb: {48, 96, 56}; PbrMaterial: {roughness: 1} }
+prefab MvLeafPine { Rgb: {44, 86, 60}; PbrMaterial: {roughness: 1} }
+prefab MvLeafAutumn { Rgb: {214, 150, 58}; PbrMaterial: {roughness: 1} }
+prefab MvLeafRed { Rgb: {190, 88, 52}; PbrMaterial: {roughness: 1} }
+prefab MvBurnt { Rgb: {44, 38, 34}; PbrMaterial: {roughness: 1} }
+prefab MvAsh { Rgb: {110, 104, 98}; PbrMaterial: {roughness: 1} }
+prefab MvWeed { Rgb: {104, 96, 48}; PbrMaterial: {roughness: 1} }
+prefab MvThorn { Rgb: {70, 60, 40}; PbrMaterial: {roughness: 1} }
+prefab MvWheat { Rgb: {226, 190, 100}; PbrMaterial: {roughness: 1} }
+prefab MvCrop { Rgb: {118, 170, 64}; PbrMaterial: {roughness: 1} }
+prefab MvCropDry { Rgb: {170, 150, 90}; PbrMaterial: {roughness: 1} }
+prefab MvPumpkin { Rgb: {226, 122, 36}; PbrMaterial: {roughness: 0.6} }
+prefab MvCabbage { Rgb: {130, 176, 92}; PbrMaterial: {roughness: 0.8} }
+prefab MvHay { Rgb: {222, 186, 104}; PbrMaterial: {roughness: 1} }
+prefab MvWool { Rgb: {240, 236, 226}; PbrMaterial: {roughness: 1} }
+prefab MvMushroom { Rgb: {200, 60, 50}; PbrMaterial: {roughness: 0.7} }
+prefab MvPetalPink { Rgb: {236, 130, 170}; PbrMaterial: {roughness: 0.8} }
+prefab MvPetalYellow { Rgb: {248, 214, 80}; PbrMaterial: {roughness: 0.8} }
+prefab MvPetalWhite { Rgb: {250, 246, 236}; PbrMaterial: {roughness: 0.8} }
+prefab MvPetalBlue { Rgb: {130, 150, 236}; PbrMaterial: {roughness: 0.8} }
+prefab MvLily { Rgb: {64, 128, 60}; PbrMaterial: {roughness: 0.6} }
+
+prefab MvSkin { Rgb: {232, 186, 150}; PbrMaterial: {roughness: 0.75} }
+prefab MvSkinTan { Rgb: {196, 144, 104}; PbrMaterial: {roughness: 0.75} }
+prefab MvSkinDark { Rgb: {140, 98, 70}; PbrMaterial: {roughness: 0.75} }
+
+prefab MvFlame { Rgb: {255, 190, 90}; Emissive: {strength: 6, color: {255, 140, 40}}; NoShadow }
+prefab MvGlow { Rgb: {255, 230, 160}; Emissive: {strength: 4, color: {255, 210, 130}}; NoShadow }
+prefab MvSpirit { Rgb: {170, 220, 255}; Emissive: {strength: 5, color: {140, 210, 255}}; NoShadow }
+prefab MvUnlit { Rgb: {60, 56, 50}; PbrMaterial: {roughness: 0.6} }

@@ -1,0 +1,451 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.camera
+using box.view
+using box.geometry
+using box.material
+using box.layout
+using box.text
+using box.input
+using box.picking
+using box.transition
+
+window {}
+
+export const C_TEXT: Rgb = {246, 238, 220}
+export const C_MUTED: Rgb = {196, 182, 158}
+export const C_GOLD: Rgb = {246, 206, 110}
+export const C_INK: Rgb = {48, 34, 24}
+export const C_PANEL: Rgb = {34, 27, 48}
+export const C_PANEL_HI: Rgb = {58, 46, 82}
+
+template Label {
+  prop text: string = ""
+  prop size: f32 = 15
+  prop color: Rgb = C_TEXT
+  prop display: bool = false
+  prop width: f32 = 0
+  prop align: Align = Left
+  Text: {value: text, size: size, width: width, align: align, font: match display { true: mv_font_display; _: mv_font_body }}
+  Rgb: color
+}
+
+template Panel {
+  prop pad: f32 = 12
+  prop w: f32 = 0
+  prop row: bool = false
+  prop alpha: f32 = 0.88
+  Layout: {direction: match row { true: Row; _: Column }, padding: {pad, pad, pad + 4, pad + 4}, spacing: 6, v: Middle}
+  if w > 0 {
+    LayoutItem: {width: {mode: Fixed, value: w}}
+  }
+  Rect: {1, 1}
+  Rgb: C_PANEL
+  Opacity: {alpha}
+  Border: {width: 2, radius: 8, color: {196, 160, 92, 255}}
+  BoxShadow: {offset_y: -4, blur: 16, spread: 1, color: {0, 0, 0, 120}}
+  InputBlocker
+}
+
+template SpellIcon {
+  prop s: i32 = 1
+  prop lit: bool = true
+  const c: Rgb = match lit { true: {spell_r(s), spell_g(s), spell_b(s)}; _: {90, 84, 100} }
+  LayoutItem: {width: {mode: Fixed, value: 40}, height: {mode: Fixed, value: 40}}
+  if s == 1 {
+    star { Position: {0, 0, 0.1}; Star: {points: 5, inner: 0.45, radius: 17}; Rgb: c }
+    core { Position: {0, 0, 0.2}; Circle: {5}; Rgb: {255, 240, 200} }
+  } else if s == 2 {
+    drop { Position: {0, -4, 0.1}; Circle: {11}; Rgb: c }
+    tip { Position: {0, 9, 0.1}; Triangle: {15, 14}; Rgb: c }
+    shine { Position: {-4, -1, 0.2}; Circle: {3}; Rgb: {230, 245, 255} }
+  } else if s == 3 {
+    w1 { Position: {-3, 9, 0.1}; Rect: {28, 5}; Rgb: c; Border: {radius: 2.5} }
+    w2 { Position: {3, 0, 0.1}; Rect: {32, 5}; Rgb: c; Border: {radius: 2.5} }
+    w3 { Position: {-5, -9, 0.1}; Rect: {22, 5}; Rgb: c; Border: {radius: 2.5} }
+  } else if s == 4 {
+    for p in 0..5 {
+      const a = p * 1.2566
+      "petal_{p}" { Position: {sin(a) * 9, cos(a) * 9, 0.1}; Circle: {7.5}; Rgb: c }
+    }
+    heart { Position: {0, 0, 0.2}; Circle: {6}; Rgb: {255, 220, 90} }
+  } else if s == 5 {
+    for p in 0..3 {
+      "arm_{p}" { Position: {0, 0, 0.1}; Rotation: {0, 0, p * 1.0472}; Rect: {34, 4}; Rgb: c; Border: {radius: 2} }
+    }
+    hub { Position: {0, 0, 0.2}; Circle: {5}; Rgb: {240, 250, 255} }
+  } else {
+    head { Position: {0, 7, 0.1}; Triangle: {26, 14}; Rgb: c }
+    stem { Position: {0, -6, 0.1}; Rect: {9, 16}; Rgb: c }
+    base { Position: {0, -15, 0.1}; Rect: {24, 3}; Rgb: c; Border: {radius: 1.5} }
+  }
+}
+
+template SpellSlot {
+  prop s: i32 = 1
+  mut over = false
+  const have = known[s]
+  const active = spell == s && have
+  Layout: {direction: Column, h: Center, v: Middle, spacing: 2, padding: {6, 4, 4, 4}}
+  LayoutItem: {width: {mode: Fixed, value: 76}, height: {mode: Fixed, value: 84}}
+  Rect: {1, 1}
+  if active {
+    Rgb: C_PANEL_HI
+    Border: {width: 3, radius: 8, color: {250, 214, 120, 255}}
+    BoxShadow: {blur: 14, spread: 2, color: {255, 200, 90, 150}}
+  } else if over && have {
+    Rgb: {44, 36, 60}
+    Border: {width: 2, radius: 8, color: {170, 140, 90, 255}}
+  } else {
+    Rgb: {26, 20, 36}
+    Border: {width: 2, radius: 8, color: {90, 78, 70, 255}}
+  }
+  Interactive
+  Cursor: {CursorPointer}
+  SpellIcon icon(s: s, lit: have)
+  Label name(text: match have { true: spell_name(s); _: "?" }, size: 12, color: match active { true: C_GOLD; _: C_MUTED }, display: true)
+  key {
+    LayoutFloat: {h: Center, v: Middle, anchor_h: Left, anchor_v: Top, x: 12, y: -12}
+    LayoutItem: {width: {mode: Fixed, value: 20}, height: {mode: Fixed, value: 20}}
+    Circle: {10}
+    Rgb: match active { true: {214, 166, 70}; _: {70, 62, 80} }
+    label { Position: {0, 0.5, 0.1}; Text: {value: "{s}", size: 11, font: mv_font_display}; Rgb: match active { true: C_INK; _: C_TEXT } }
+  }
+  async {
+    while true {
+      await on.click(this)
+      emit PickSpell(s: s)
+    }
+  }
+  async {
+    while true {
+      await on.enter(this)
+      over = true
+      await on.leave(this)
+      over = false
+    }
+  }
+}
+
+template SpellBar {
+  const ratio = clamp(mana / mana_max, 0, 1)
+  Layout: {direction: Column, h: Center, spacing: 8}
+  mana_row {
+    Layout: {direction: Row, v: Middle, spacing: 10, padding: {5, 5, 12, 12}}
+    Rect: {1, 1}
+    Rgb: C_PANEL
+    Opacity: {0.8}
+    Border: {width: 1.5, radius: 10, color: {150, 120, 80, 255}}
+    InputBlocker
+    Label mana_label(text: "Mana", size: 13, color: C_MUTED, display: true)
+    bar {
+      Layout: {direction: Row, padding: {3, 3, 3, 3}}
+      LayoutItem: {width: {mode: Fixed, value: 420}, height: {mode: Fixed, value: 16}}
+      Rect: {1, 1}
+      Rgb: {20, 16, 28}
+      Border: {width: 2, radius: 6, color: {120, 100, 80, 255}}
+      fill {
+        LayoutItem: {width: {mode: Fixed, value: max(414 * ratio, 4)}, height: {mode: Fixed, value: 10}}
+        Rect: {1, 1}
+        Rgb: {110, 150, 255}
+        Border: {radius: 4}
+      }
+    }
+    Label mana_value(text: "{mana:.0} / {mana_max:.0}", size: 13, color: C_MUTED)
+  }
+  Panel slots(row: true, pad: 8) {
+    for s in 1..7 {
+      SpellSlot "slot_{s}"(s: s)
+    }
+  }
+}
+
+fn npc_initial(n: i32) -> string {
+  match n { 0: "B"; 1: "P"; 2: "M"; 3: "D"; 4: "R"; 5: "T"; 6: "O"; 7: "M"; 8: "G"; 9: "F"; 10: "L"; 11: "G"; 12: "A"; _: "?" }
+}
+
+export const MAP_K: f32 = 1.08
+
+template Portrait {
+  prop id: i32 = 0
+  const c: Rgb = match id {
+    0: {70, 104, 70}
+    1: {176, 60, 52}
+    2: {96, 140, 84}
+    3: {96, 70, 52}
+    4: {196, 96, 120}
+    5: {70, 110, 190}
+    6: {120, 92, 60}
+    7: {120, 80, 140}
+    8: {170, 50, 46}
+    9: {130, 128, 120}
+    10: {220, 186, 60}
+    11: {70, 66, 70}
+    _: {80, 120, 180}
+  }
+  LayoutItem: {width: {mode: Fixed, value: 72}, height: {mode: Fixed, value: 72}}
+  ring { Position: {0, 0, 0.05}; Circle: {36}; Rgb: {214, 170, 90} }
+  disc { Position: {0, 0, 0.1}; Circle: {32}; Rgb: c }
+  face { Position: {0, 4, 0.15}; Circle: {15}; Rgb: {232, 190, 156} }
+  body { Position: {0, -22, 0.15}; Circle: {18}; Rgb: {c.r * 0.7, c.g * 0.7, c.b * 0.7} }
+  letter { Position: {20, -22, 0.3}; Circle: {11}; Rgb: C_PANEL }
+  glyph { Position: {20, -21.5, 0.35}; Text: {value: npc_initial(id), size: 13, font: mv_font_display}; Rgb: C_GOLD }
+}
+
+template MapMarker {
+  prop mx: f32 = 0
+  prop mz: f32 = 0
+  prop kind: i32 = 1
+  Position: {mx * MAP_K, 0 - mz * MAP_K, 0.5}
+  if kind == 2 {
+    outer { Position: {0, 0, 0}; Circle: {5.5}; Rgb: {30, 40, 70} }
+    inner { Position: {0, 0, 0.05}; Circle: {4}; Rgb: {130, 205, 255} }
+  } else {
+    outer { Position: {0, 0, 0}; Circle: {5.5}; Rgb: {60, 40, 10} }
+    inner { Position: {0, 0, 0.05}; Circle: {4}; Rgb: {255, 210, 90} }
+  }
+}
+
+template MiniMap {
+  InputBlocker
+  LayoutItem: {width: {mode: Fixed, value: 232}, height: {mode: Fixed, value: 232}}
+  Rect: {1, 1}
+  Rgb: C_PANEL
+  Opacity: {0.9}
+  Border: {width: 2, radius: 10, color: {196, 160, 92, 255}}
+  BoxShadow: {offset_y: -4, blur: 16, spread: 1, color: {0, 0, 0, 120}}
+  land { Position: {0, 0, 0.05}; Rect: {200 * MAP_K, 200 * MAP_K}; Rgb: {106, 150, 74}; Border: {radius: 6} }
+  forest { Position: {0, 65 * MAP_K, 0.1}; Rect: {200 * MAP_K, 70 * MAP_K}; Rgb: {58, 96, 56} }
+  hills { Position: {0, -65 * MAP_K, 0.1}; Rect: {200 * MAP_K, 70 * MAP_K}; Rgb: {150, 150, 96} }
+  farm { Position: {64 * MAP_K, 0, 0.12}; Rect: {62 * MAP_K, 58 * MAP_K}; Rgb: {150, 170, 84} }
+  for i in 0..21 {
+    const zz = -100 + i * 10
+    "river_{i}" { Position: {river_x(zz) * MAP_K, 0 - zz * MAP_K, 0.2}; Rect: {6 * MAP_K, 10.6 * MAP_K}; Rgb: {70, 130, 180} }
+  }
+  lake { Position: {LAKE_X * MAP_K, 0 - LAKE_Z * MAP_K, 0.2}; Circle: {LAKE_R * MAP_K}; Rgb: {70, 130, 180} }
+  isle { Position: {ISLE_X * MAP_K, 0 - ISLE_Z * MAP_K, 0.25}; Circle: {ISLE_R * MAP_K}; Rgb: {106, 150, 74} }
+  for i in 0..18 {
+    const zz = -84 + i * 10
+    "ns_{i}" { Position: {road_x(zz) * MAP_K, 0 - zz * MAP_K, 0.3}; Rect: {3, 10.8 * MAP_K}; Rgb: {214, 186, 130} }
+  }
+  for i in 0..16 {
+    const xx = -58 + i * 9.6
+    "ew_{i}" { Position: {xx * MAP_K, 0 - road_z(xx) * MAP_K, 0.3}; Rect: {10.4 * MAP_K, 3}; Rgb: {214, 186, 130} }
+  }
+  square { Position: {0, 0, 0.35}; Circle: {11 * MAP_K}; Rgb: {196, 186, 166} }
+  north { Position: {0, 104, 0.6}; Text: {value: "N", size: 12, font: mv_font_display}; Rgb: C_GOLD }
+  for n in 0..13 {
+    if npc_mark[n] > 0 {
+      MapMarker "mark_{n}"(mx: npc_x[n], mz: npc_z[n], kind: npc_mark[n])
+    }
+  }
+  if obj_on {
+    objective { Position: {obj_x * MAP_K, 0 - obj_z * MAP_K, 0.7}; Star: {points: 5, inner: 0.45, radius: 8}; Rgb: {255, 236, 160} }
+  }
+  player {
+    Position: {px * MAP_K, 0 - pz * MAP_K, 0.8}
+    Rotation: {0, 0, pyaw + PI}
+    shadow { Position: {0, 0, -0.05}; Triangle: {12, 14}; Rgb: {30, 20, 40} }
+    arrow { Position: {0, 0, 0.05}; Triangle: {9, 11}; Rgb: {250, 250, 255} }
+  }
+}
+
+template Tracker {
+  Layout: {direction: Column, spacing: 6, h: Right}
+  if track_n > 0 {
+    Panel box_(w: 360, pad: 12) {
+      Label head(text: "Tasks", size: 16, color: C_GOLD, display: true)
+      for i in 0..4 {
+        if i < track_n {
+          "entry_{i}" {
+            Layout: {direction: Column, spacing: 1}
+            Label title(text: track_t[i], size: 15, color: C_TEXT, display: true, width: 328)
+            Label sub(text: track_s[i], size: 13, color: C_MUTED, width: 328)
+          }
+        }
+      }
+    }
+  }
+}
+
+template Badge {
+  InputBlocker
+  Layout: {direction: Column, padding: {12, 12, 18, 18}, spacing: 3}
+  Rect: {1, 1}
+  Rgb: C_PANEL
+  Opacity: {0.88}
+  Border: {width: 2, radius: 8, color: {196, 160, 92, 255}}
+  BoxShadow: {offset_y: -4, blur: 16, spread: 1, color: {0, 0, 0, 120}}
+  Label name(text: "Wren", size: 22, color: C_GOLD, display: true)
+  Label rank(text: rank_name(done_count), size: 14, color: C_TEXT, display: true)
+  Label stats(text: "Tasks {done_count} of 25    Wisps {motes} of 20", size: 13, color: C_MUTED)
+}
+
+template Prompt {
+  const show = near_npc >= 0 && talk_npc < 0 && game_state == 1
+  Layout: {direction: Row, h: Center}
+  LayoutItem: {height: {mode: Fixed, value: 36}}
+  if show {
+    pill {
+      Layout: {direction: Row, v: Middle, spacing: 8, padding: {6, 6, 10, 14}}
+      Rect: {1, 1}
+      Rgb: C_PANEL
+      Opacity: {0.9}
+      Border: {width: 2, radius: 14, color: {196, 160, 92, 255}}
+      key {
+        LayoutItem: {width: {mode: Fixed, value: 22}, height: {mode: Fixed, value: 22}}
+        Circle: {11}
+        Rgb: {214, 166, 70}
+        label { Position: {0, 0.5, 0.1}; Text: {value: "E", size: 12, font: mv_font_display}; Rgb: C_INK }
+      }
+      Label text(text: "Talk to {npc_name(near_npc)}", size: 15, color: C_TEXT)
+    }
+  }
+}
+
+template Dialog {
+  const show = talk_npc >= 0
+  Layout: {direction: Row, h: Center}
+  if show {
+    Panel box_(w: 860, pad: 16, row: true) {
+      Portrait face(id: talk_npc)
+      body {
+        Layout: {direction: Column, spacing: 8}
+        Label who(text: npc_name(talk_npc), size: 21, color: C_GOLD, display: true)
+        Label say_(text: line(talk_topic * 10 + talk_line), size: 19, color: C_TEXT, width: 720)
+        more {
+          Layout: {direction: Row, h: Right}
+          LayoutItem: {width: {mode: Fixed, value: 720}}
+          Label hint(text: match line(talk_topic * 10 + talk_line + 1) != "" { true: "E  continue"; _: "E  close" }, size: 13, color: C_MUTED, display: true)
+        }
+      }
+    }
+  }
+}
+
+template ToastLine {
+  Layout: {direction: Row, h: Center}
+  if toast != "" && game_state == 1 {
+    box_ {
+      Layout: {direction: Row, h: Center, v: Middle, padding: {10, 10, 22, 22}}
+      Rect: {1, 1}
+      Rgb: {244, 232, 204}
+      Opacity: {0.95}
+      Border: {width: 2, radius: 6, color: {150, 110, 60, 255}}
+      BoxShadow: {offset_y: -3, blur: 12, color: {0, 0, 0, 110}}
+      Label text(text: toast, size: 16, color: C_INK, width: 640, align: Center)
+    }
+  }
+}
+
+template Banner {
+  Layout: {direction: Column, h: Center, spacing: 4}
+  if banner != "" && game_state == 1 {
+    Label title(text: banner, size: 40, color: C_GOLD, display: true, align: Center)
+    Label sub(text: banner_sub, size: 18, color: C_TEXT, width: 700, align: Center)
+  }
+}
+
+template TitleCard {
+  mut glow = false
+  Layout: {direction: Column, h: Center, v: Middle, spacing: 10, padding: {40, 40, 60, 60}}
+  Rect: {1, 1}
+  Rgb: {16, 12, 26}
+  Opacity: {0.62}
+  Label title(text: "MOSSVALE", size: 96, color: C_GOLD, display: true)
+  Label sub(text: "The Hedge Mage", size: 30, color: C_TEXT, display: true)
+  gap { LayoutItem: {height: {mode: Fixed, value: 18}} }
+  Label story(text: "Old Thistlewood, the village mage, has passed on, leaving his cottage and his staff to you, his apprentice Wren. The folk of Mossvale have chores aplenty, and magic makes light work.", size: 18, color: C_MUTED, width: 640, align: Center)
+  gap_b { LayoutItem: {height: {mode: Fixed, value: 18}} }
+  Label keys_a(text: "WASD  walk        Shift  hurry        E  talk", size: 16, color: C_TEXT, display: true)
+  Label keys_b(text: "1 to 6  choose a spell        Space  cast at the nearest target        Click  cast at the cursor", size: 16, color: C_TEXT, display: true)
+  gap_c { LayoutItem: {height: {mode: Fixed, value: 24}} }
+  go {
+    Layout: {direction: Row}
+    Opacity: {match glow { true: 1; _: 0.35 }}
+    Transition: [Opacity: {duration: 0.9, timing_function: EaseInOut}]
+    Text: {value: "Press Enter to begin", size: 24, font: mv_font_display}
+    Rgb: C_GOLD
+  }
+  async {
+    while true {
+      glow = !glow
+      await delay(0.9)
+    }
+  }
+}
+
+template EndCard {
+  const mins = floor((finished_at - started_at) / 60)
+  Layout: {direction: Column, h: Center, v: Middle, spacing: 10, padding: {40, 40, 60, 60}}
+  Rect: {1, 1}
+  Rgb: {12, 10, 22}
+  Opacity: {0.7}
+  Label title(text: "The Festival of Lights", size: 64, color: C_GOLD, display: true)
+  Label sub(text: "Mossvale has its mage again.", size: 26, color: C_TEXT, display: true)
+  gap { LayoutItem: {height: {mode: Fixed, value: 18}} }
+  Label stats(text: "Tasks completed: {done_count}        Wisps gathered: {motes} of 20        Time: {mins:.0} minutes", size: 18, color: C_MUTED)
+  Label rank(text: "Wren, {rank_name(done_count)}", size: 22, color: C_TEXT, display: true)
+  gap_b { LayoutItem: {height: {mode: Fixed, value: 24}} }
+  Label thanks(text: "Thank you for playing!", size: 24, color: C_GOLD, display: true)
+  Label more(text: "Press Enter to keep wandering the festival", size: 16, color: C_MUTED, display: true)
+}
+
+hud {
+  Scene: {}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+
+  screen {
+    LayoutFill: {surface: window}
+    Layout: {direction: Column, padding: {18, 18, 18, 18}, spacing: 10}
+
+    if game_state == 1 {
+      top {
+        Layout: {direction: Row, spacing: 12}
+        LayoutItem: {width: {mode: Grow}}
+        Badge badge()
+        middle {
+          Layout: {direction: Column, h: Center, spacing: 10, padding: {6, 0, 0, 0}}
+          LayoutItem: {width: {mode: Grow}}
+          Banner banner_()
+          ToastLine toast_()
+        }
+        Tracker tracker()
+      }
+      spacer { LayoutItem: {height: {mode: Grow}} }
+      bottom {
+        Layout: {direction: Column, h: Center, spacing: 10}
+        LayoutItem: {width: {mode: Grow}}
+        Dialog dialog()
+        Prompt prompt()
+        SpellBar spells()
+        MiniMap minimap {
+          LayoutFloat: {h: Right, v: Bottom, anchor_h: Right, anchor_v: Bottom, x: 0, y: 0}
+        }
+      }
+    }
+  }
+
+  if game_state == 0 {
+    TitleCard title {
+      LayoutFill: {surface: window}
+      Position: {0, 0, 5}
+    }
+  }
+
+  if game_state == 2 && clock > ending_t + 12 {
+    EndCard ending {
+      LayoutFill: {surface: window}
+      Position: {0, 0, 5}
+    }
+  }
+}
+
+hud_view {
+  View: {camera: hud.camera, order: 1, lighting: {enabled: false}, culling: {enabled: false}}
+}
