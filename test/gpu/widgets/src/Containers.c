@@ -774,13 +774,19 @@ void Containers_dropdown_list_hides_scrolled_out(void) {
     ecs_world_t *world = containers_load(&s);
     float page[4], button[4], option[4];
 
+    /* With notes scrolled to its end and a window this low, the page can scroll the button
+     * above its top. Opened near the top of the page, the list is drawn and picked */
+    containers_resize(world, 1280, 360);
+    ecs_os_free(gallery_run(world, s, "set " NOTES " box.widgets.ScrollView.mut.y %.1f",
+        (double)containers_content(world, NOTES)->max_y));
+    gallery_settle(world, s);
+    gallery_rect(world, PAGE, page);
+    containers_page_top(world, s, FORMAT, page[1] + 20);
     gallery_click(world, s, FORMAT, 0, 0, FORMAT);
     containers_expect(world, s, FORMAT, "Dropdown", "open", "true");
     ecs_entity_t list = ecs_lookup(world, FORMAT ".list");
     test_assert(list != 0);
     test_bool(ecs_get(world, list, LayoutFloat)->hide_clipped, true);
-
-    /* Open with the button in view, the list is drawn and picked */
     test_bool(box_render_float_hidden(world, list), false);
     test_assert(containers_list_clip(world, FORMAT ".list")->area[0] > 0);
     containers_rect(world, FORMAT ".list.option_1", option);
@@ -790,12 +796,10 @@ void Containers_dropdown_list_hides_scrolled_out(void) {
     test_str(handler, "\"" FORMAT "\"");
     ecs_os_free(handler);
 
-    /* The page scrolls the button above its top, which a window this low lets it do: the list
-     * stays open but is neither drawn nor picked */
-    containers_resize(world, 1280, 600);
-    gallery_rect(world, PAGE, page);
+    /* The page scrolls the button above its top: the list stays open, floating over the page,
+     * but is neither drawn nor picked */
     containers_rect(world, FORMAT, button);
-    containers_page_top(world, s, FORMAT, page[1] - (button[3] - button[1]) - 20);
+    containers_page_top(world, s, FORMAT, page[1] - (button[3] - button[1]) - 10);
     containers_rect(world, FORMAT, button);
     test_assert(button[3] < page[1]);
     containers_expect(world, s, FORMAT, "Dropdown", "open", "true");
@@ -805,12 +809,11 @@ void Containers_dropdown_list_hides_scrolled_out(void) {
     containers_rect(world, FORMAT ".list.option_1", option);
     x = (option[0] + option[2]) * 0.5f;
     y = (option[1] + option[3]) * 0.5f;
+    test_assert(y > page[1] && y < page[3]);
     test_bool(containers_clip_keeps(world, FORMAT ".list.option_1", x, y), false);
-    if (y > 0) {
-        handler = containers_handler_at(world, s, x, y);
-        test_assert(strcmp(handler, "\"" FORMAT "\"") != 0);
-        ecs_os_free(handler);
-    }
+    handler = containers_handler_at(world, s, x, y);
+    test_assert(strcmp(handler, "\"" FORMAT "\"") != 0);
+    ecs_os_free(handler);
 
     /* Scrolled back into view, the list shows and takes the pointer again */
     containers_page_top(world, s, FORMAT, page[1] + 20);
