@@ -102,6 +102,9 @@
 /** Highest frequency of an oscillator in Hz, the top of the audible range */
 #define BOX_AUDIO_SYNTH_FREQUENCY_MAX 20000.0f
 
+/** Largest amount of the filter envelope in octaves, up or down */
+#define BOX_AUDIO_SYNTH_OCTAVES_MAX 10.0f
+
 /** Commands of the byte stream. Each starts with a box_audio_cmd_header_t */
 typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_PLAY = 1,          /**< box_audio_cmd_play_t */
@@ -250,6 +253,12 @@ typedef enum box_audio_synth_filter_t {
     BOX_AUDIO_SYNTH_BANDPASS = 3      /**< Bandpass, unity at the cutoff */
 } box_audio_synth_filter_t;
 
+/** Slopes of the filter of a synth patch */
+typedef enum box_audio_synth_slope_t {
+    BOX_AUDIO_SYNTH_SLOPE_12 = 0,  /**< 12 dB per octave, one stage */
+    BOX_AUDIO_SYNTH_SLOPE_24 = 1   /**< 24 dB per octave, two cascaded stages */
+} box_audio_synth_slope_t;
+
 /** An envelope of a synth patch: a linear attack to 1, a decay to the sustain level, a hold
  * there and a release to 0 */
 typedef struct box_audio_synth_envelope_t {
@@ -282,9 +291,12 @@ typedef struct box_audio_synth_patch_t {
     box_audio_synth_envelope_t envelope;  /**< Envelope of the layers without their own */
     uint32_t filter;                      /**< A box_audio_synth_filter_t */
     float cutoff;                         /**< Hz */
-    float cutoff_end;                     /**< Hz the cutoff sweeps to, 0 for no sweep */
-    float cutoff_sweep;                   /**< Seconds of the sweep */
     float resonance;                      /**< 0..1, 1 rings the longest */
+    uint32_t slope;                       /**< A box_audio_synth_slope_t */
+    float filter_amount;                  /**< Octaves the filter envelope moves the cutoff at
+                                           * its level 1, negative closes it; 0 for none */
+    box_audio_synth_envelope_t filter_envelope; /**< Envelope of the cutoff, which does not
+                                           * keep the voice playing */
     box_audio_synth_layer_t layer[BOX_AUDIO_SYNTH_LAYERS]; /**< The oscillators */
 } box_audio_synth_patch_t;
 

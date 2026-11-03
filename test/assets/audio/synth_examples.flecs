@@ -1,4 +1,4 @@
-// The three synth sounds of docs/audio.md, kept the same: the Synth suite of test/cpu/audio
+// The four synth sounds of docs/audio.md, kept the same: the Synth suite of test/cpu/audio
 // checks that they parse, compile without errors, play and end.
 using box.audio
 
@@ -26,10 +26,21 @@ prefab UiBlip {
   }
 }
 
-// A whoosh: noise through a resonant bandpass that sweeps up and fades
+// A whoosh: noise through a resonant bandpass that a filter envelope opens as it fades in
 prefab Whoosh {
   SynthSound: {seed: 7, level_variance: 0.1}
   SynthEnvelope: {attack: 0.15, decay: 0.25, sustain: 0.3, hold: 0.1, release: 0.3}
-  SynthFilter: {kind: SynthBandPass, cutoff: 300, cutoff_end: 4000, sweep: 0.5, resonance: 0.6}
+  SynthFilter: {kind: SynthBandPass, cutoff: 300, resonance: 0.6}
+  SynthFilterEnvelope: {attack: 0.5, sustain: 1, hold: 0.31, amount: 3.737}
   SynthOscillator: {wave: SynthNoise, level: 0.8}
+}
+
+// A pluck: a saw through a 24 dB lowpass that its filter envelope opens 4 octaves on the attack
+// and closes with the note
+prefab Pluck {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.002, decay: 0.4, sustain: 0.3, hold: 0.1, release: 0.2}
+  SynthFilter: {kind: SynthLowPass, cutoff: 300, resonance: 0.3, slope: SynthSlope24}
+  SynthFilterEnvelope: {attack: 0.002, decay: 0.25, sustain: 0.2, hold: 0.25, release: 0.2, amount: 4}
+  SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.5}
 }

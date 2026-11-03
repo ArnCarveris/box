@@ -1,14 +1,15 @@
 /**
  * @file audio/core/synth.c
  * @brief The synth source: band limited oscillators and seeded noise, each with a linear
- * envelope, mixed into a state variable filter and an amp, rendered per frame from a copy of
- * the patch.
+ * envelope, mixed into a state variable filter of one or two stages, whose cutoff an envelope
+ * may move, and an amp, rendered per frame from a copy of the patch.
  *
  * Every voice holds its own copy of the patch, so a play allocates nothing and a new patch for
  * the same sound reaches the next play while the voices that play keep theirs.
  *
  * Like the rest of the core it uses no libm: the sine is box_audio_core_sin and the exponential
- * sweeps use the series of box_audio_synth_log2 and box_audio_synth_exp2.
+ * sweeps and the filter envelope use the series of box_audio_synth_log2 and
+ * box_audio_synth_exp2.
  */
 
 #include "internal.h"
@@ -22,7 +23,14 @@
 /** Damping of the filter at resonance 1, a Q of 100 that rings without blowing up */
 #define BOX_AUDIO_SYNTH_DAMPING_MIN 0.02
 
-/** Frames between two updates of the coefficients of a filter whose cutoff sweeps */
+/** Damping of the first stage of the 24 dB filter, 2 cos(pi / 8): with the second stage at
+ * resonance 0 the two make a fourth order Butterworth response */
+#define BOX_AUDIO_SYNTH_BUTTERWORTH_1 1.84775906502257351225
+
+/** Damping of the second, resonant stage of the 24 dB filter at resonance 0, 2 cos(3 pi / 8) */
+#define BOX_AUDIO_SYNTH_BUTTERWORTH_2 0.76536686473017954346
+
+/** Frames between two updates of the coefficients of a filter whose cutoff an envelope moves */
 #define BOX_AUDIO_SYNTH_CONTROL 8
 
 /** Largest share of the sample rate an oscillator plays at, under Nyquist with room for the
@@ -114,9 +122,14 @@ static void box_audio_synth_patch_clamp(
 
     p->cutoff = box_audio_synth_clamp(p->cutoff, BOX_AUDIO_SYNTH_CUTOFF_MIN,
         BOX_AUDIO_SYNTH_HZ_MAX);
-    p->cutoff_end = box_audio_synth_end_clamp(p->cutoff_end, BOX_AUDIO_SYNTH_CUTOFF_MIN);
-    p->cutoff_sweep = box_audio_synth_clamp(p->cutoff_sweep, 0, BOX_AUDIO_SYNTH_LENGTH_MAX);
     p->resonance = box_audio_synth_clamp(p->resonance, 0, 1);
+    if (p->slope > BOX_AUDIO_SYNTH_SLOPE_24) {
+        p->slope = BOX_AUDIO_SYNTH_SLOPE_12;
+    }
+
+    p->filter_amount = p->filter_amount == p->filter_amount ? box_audio_synth_clamp(
+        p->filter_amount, -BOX_AUDIO_SYNTH_OCTAVES_MAX, BOX_AUDIO_SYNTH_OCTAVES_MAX) : 0.0f;
+    box_audio_synth_envelope_clamp(&p->filter_envelope);
     for (i = 0; i < BOX_AUDIO_SYNTH_LAYERS; i ++) {
         box_audio_synth_layer_t *l = &p->layer[i];
         if (l->wave > BOX_AUDIO_SYNTH_NOISE) {
@@ -382,8 +395,9 @@ static inline float box_audio_synth_env_next(
     return e->value;
 }
 
-/** Set the coefficients of the filter from its cutoff: g = tan(pi cutoff / rate) of the
- * trapezoidal state variable filter, which stays stable at any cutoff and while it moves.
+/** Set the coefficients of the stages of the filter from its cutoff: g = tan(pi cutoff / rate)
+ * of the trapezoidal state variable filter, which stays stable at any cutoff and while it
+ * moves. Each stage is stable on its own, so their cascade is too.
  *
  * @param src The source
  * @param rate Frames per second
@@ -394,13 +408,35 @@ static void box_audio_synth_coefs(
 {
     double turns = src->cutoff / (2.0 * (double)rate);
     float g = box_audio_core_sin(turns) / box_audio_core_sin(turns + 0.25);
-    src->a1 = 1.0f / (1.0f + g * (g + src->k));
-    src->a2 = g * src->a1;
-    src->a3 = g * src->a2;
+    int32_t s;
+    for (s = 0; s < src->stages; s ++) {
+        box_audio_synth_svf_t *f = &src->svf[s];
+        f->a1 = 1.0f / (1.0f + g * (g + f->k));
+        f->a2 = g * f->a1;
+        f->a3 = g * f->a2;
+    }
 }
 
-/** Start a pass of the envelopes, the oscillators and the cutoff sweep, at the start of a play
- * and at each restart of a loop. The state of the filter goes on.
+/** Move the cutoff by the level of the filter envelope, exponentially in frequency: the cutoff
+ * of the patch times 2 to the amount times the level, clamped to the range of a cutoff.
+ *
+ * @param src The source
+ * @param level Level of the filter envelope, 0..1
+ * @param rate Frames per second
+ */
+static void box_audio_synth_cutoff(
+    box_audio_synth_source_t *src,
+    float level,
+    float rate)
+{
+    double cut = src->cutoff_base * box_audio_synth_exp2((double)src->amount * (double)level);
+    cut = cut < src->cutoff_top ? cut : src->cutoff_top;
+    src->cutoff = cut > BOX_AUDIO_SYNTH_CUTOFF_MIN ? cut : BOX_AUDIO_SYNTH_CUTOFF_MIN;
+    box_audio_synth_coefs(src, rate);
+}
+
+/** Start a pass of the envelopes, the oscillators and the filter envelope, at the start of a
+ * play and at each restart of a loop. The state of the filter goes on.
  *
  * @param core The core
  * @param src The source
@@ -457,16 +493,11 @@ static void box_audio_synth_pass(
     top = BOX_AUDIO_SYNTH_CUTOFF_NYQUIST * (double)rate;
     cut = (double)p->cutoff < top ? (double)p->cutoff : top;
     src->cutoff = cut;
-    src->cutoff_end = cut;
-    src->cutoff_ratio = 1;
-    src->cutoff_sweep = 0;
+    src->cutoff_base = (double)p->cutoff;
+    src->cutoff_top = top;
     src->control = BOX_AUDIO_SYNTH_CONTROL;
-    n = box_audio_synth_frames(p->cutoff_sweep, rate);
-    if (p->cutoff_end > 0 && n > 0) {
-        hi = (double)p->cutoff_end < top ? (double)p->cutoff_end : top;
-        src->cutoff_end = hi;
-        src->cutoff_ratio = box_audio_synth_ratio(cut, hi, n);
-        src->cutoff_sweep = n;
+    if (src->amount != 0) {
+        box_audio_synth_env_init(&src->fenv, &p->filter_envelope, rate);
     }
 
     box_audio_synth_coefs(src, rate);
@@ -530,10 +561,21 @@ void box_audio_source_synth(
     src->pitch = pitch * src->variance;
     src->loop = loop;
     src->filter = (int32_t)src->patch.filter;
-    src->k = (float)(BOX_AUDIO_SYNTH_SQRT2 -
-        (BOX_AUDIO_SYNTH_SQRT2 - BOX_AUDIO_SYNTH_DAMPING_MIN) * (double)src->patch.resonance);
-    src->ic1 = 0;
-    src->ic2 = 0;
+    src->amount = src->filter ? src->patch.filter_amount : 0.0f;
+    src->svf[0] = (box_audio_synth_svf_t){0};
+    src->svf[1] = (box_audio_synth_svf_t){ .k = (float)BOX_AUDIO_SYNTH_BUTTERWORTH_1 };
+    if (src->patch.slope == BOX_AUDIO_SYNTH_SLOPE_24) {
+        src->stages = 2;
+        src->svf[0].k = (float)(BOX_AUDIO_SYNTH_BUTTERWORTH_2 -
+            (BOX_AUDIO_SYNTH_BUTTERWORTH_2 - BOX_AUDIO_SYNTH_DAMPING_MIN) *
+            (double)src->patch.resonance);
+    } else {
+        src->stages = 1;
+        src->svf[0].k = (float)(BOX_AUDIO_SYNTH_SQRT2 -
+            (BOX_AUDIO_SYNTH_SQRT2 - BOX_AUDIO_SYNTH_DAMPING_MIN) *
+            (double)src->patch.resonance);
+    }
+
     box_audio_synth_pass(core, src);
 }
 
@@ -663,6 +705,35 @@ static inline float box_audio_synth_osc_next(
     return x;
 }
 
+/** Filter a frame through a stage of the filter.
+ *
+ * @param f The stage
+ * @param filter A box_audio_synth_filter_t, not BOX_AUDIO_SYNTH_FILTER_NONE
+ * @param x The input
+ * @return The output
+ */
+static inline float box_audio_synth_svf_next(
+    box_audio_synth_svf_t *f,
+    int32_t filter,
+    float x)
+{
+    float v1, v2, v3, y;
+    v3 = x - f->ic2;
+    v1 = f->a1 * f->ic1 + f->a2 * v3;
+    v2 = f->ic2 + f->a2 * f->ic1 + f->a3 * v3;
+    f->ic1 = box_audio_clean(2 * v1 - f->ic1);
+    f->ic2 = box_audio_clean(2 * v2 - f->ic2);
+    if (filter == BOX_AUDIO_SYNTH_LOWPASS) {
+        y = v2;
+    } else if (filter == BOX_AUDIO_SYNTH_HIGHPASS) {
+        y = x - f->k * v1 - v2;
+    } else {
+        y = f->k * v1;
+    }
+
+    return y;
+}
+
 int32_t box_audio_synth_render(
     box_audio_core_t *core,
     box_audio_synth_source_t *src,
@@ -688,29 +759,20 @@ int32_t box_audio_synth_render(
         }
 
         if (src->filter) {
-            float v1, v2, v3;
-            if (src->cutoff_sweep > 0) {
-                src->cutoff_sweep --;
-                src->cutoff = src->cutoff_sweep ? src->cutoff * src->cutoff_ratio :
-                    src->cutoff_end;
-                if (-- src->control <= 0 || !src->cutoff_sweep) {
+            if (src->amount != 0 && src->fenv.segment < BOX_AUDIO_SYNTH_DONE) {
+                float level = box_audio_synth_env_next(&src->fenv);
+                if (-- src->control <= 0 || src->fenv.segment >= BOX_AUDIO_SYNTH_DONE) {
                     src->control = BOX_AUDIO_SYNTH_CONTROL;
-                    box_audio_synth_coefs(src, rate);
+                    box_audio_synth_cutoff(src, level, rate);
                 }
             }
 
-            v3 = mix - src->ic2;
-            v1 = src->a1 * src->ic1 + src->a2 * v3;
-            v2 = src->ic2 + src->a2 * src->ic1 + src->a3 * v3;
-            src->ic1 = box_audio_clean(2 * v1 - src->ic1);
-            src->ic2 = box_audio_clean(2 * v2 - src->ic2);
-            if (src->filter == BOX_AUDIO_SYNTH_LOWPASS) {
-                y = v2;
-            } else if (src->filter == BOX_AUDIO_SYNTH_HIGHPASS) {
-                y = mix - src->k * v1 - v2;
-            } else {
-                y = src->k * v1;
+            y = mix;
+            if (src->stages > 1) {
+                y = box_audio_synth_svf_next(&src->svf[1], src->filter, y);
             }
+
+            y = box_audio_synth_svf_next(&src->svf[0], src->filter, y);
         } else {
             y = mix;
         }

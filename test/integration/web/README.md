@@ -238,7 +238,7 @@ node test/integration/web/audio_reverb.mjs \
 trusted click it records `audio capture 2` while a `script_write` plays the prefab `Beep` (a
 660 Hz sine at 0.5 with an envelope of 0.36 s) with `box.audio.play`, and measures its
 frequency, its level and its length at the rate of the context. It then starts 64 looping voices
-of `Hum` (a saw, a square and noise into a filter sweep) and prints the load of the worklet over
+of `Hum` (a saw, a square and noise into a filter envelope) and prints the load of the worklet over
 2000 quanta, which has to stay under real time:
 
 ```sh

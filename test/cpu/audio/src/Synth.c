@@ -577,44 +577,192 @@ void Synth_filter_bandpass(void) {
     test_assert(below < 0.5);
 }
 
-/** Render a quiet saw and noise through a filter at full resonance whose cutoff sweeps fast,
- * and check that it stays stable: a filter that blew up would reach the limiter.
+/** Render a quiet saw and noise through a filter at full resonance whose cutoff a fast filter
+ * envelope moves, and check that it stays stable: a filter that blew up would reach the limiter.
  *
  * @param kind A box_audio_synth_filter_t
- * @param from Cutoff at the start in Hz
- * @param to Cutoff at the end in Hz
+ * @param slope A box_audio_synth_slope_t
+ * @param cutoff Cutoff of the patch in Hz
+ * @param amount Octaves of the filter envelope
  */
-static void synth_check_sweep(
+static void synth_check_envelope(
     uint32_t kind,
-    float from,
-    float to)
+    uint32_t slope,
+    float cutoff,
+    float amount)
 {
     box_audio_core_t *core = synth_core(AUDIO_RATE);
     box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SAW, 110, 0.002f, 0.5f);
     p.layers = 2;
     p.layer[1] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_NOISE, .level = 0.002f };
     p.filter = kind;
-    p.cutoff = from;
-    p.cutoff_end = to;
-    p.cutoff_sweep = 0.05f;
+    p.slope = slope;
+    p.cutoff = cutoff;
     p.resonance = 1;
+    p.filter_amount = amount;
+    p.filter_envelope = (box_audio_synth_envelope_t){
+        .attack = 0.002f, .decay = 0.01f, .sustain = 0.5f, .hold = 0.02f, .release = 0.005f };
     synth_define(core, 1, &p);
-    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_play(core, 1, 1, 0, 1, 0, 1, BOX_AUDIO_PLAY_LOOP);
     audio_render(core, 0, AUDIO_FRAMES);
     test_assert(synth_finite(audio_l, 0, AUDIO_FRAMES));
     test_assert(audio_peak(audio_l, 0, AUDIO_FRAMES) < 0.5f);
-    test_int(box_audio_core_voice_count(core), 0);
     box_audio_core_free(core);
 }
 
-void Synth_filter_sweep_stable(void) {
+/** Every kind at both slopes, with a filter envelope that opens past Nyquist, one that closes
+ * from it and a cutoff at and above Nyquist; the loop restarts the envelope every 0.5 s. */
+void Synth_filter_envelope_stable(void) {
     // audio/synth
-    uint32_t kind;
-    for (kind = BOX_AUDIO_SYNTH_LOWPASS; kind <= BOX_AUDIO_SYNTH_BANDPASS; kind ++) {
-        synth_check_sweep(kind, 20, 30000);
-        synth_check_sweep(kind, 24000, 20);
-        synth_check_sweep(kind, AUDIO_RATE / 2, AUDIO_RATE);
+    uint32_t kind, slope;
+    for (slope = BOX_AUDIO_SYNTH_SLOPE_12; slope <= BOX_AUDIO_SYNTH_SLOPE_24; slope ++) {
+        for (kind = BOX_AUDIO_SYNTH_LOWPASS; kind <= BOX_AUDIO_SYNTH_BANDPASS; kind ++) {
+            synth_check_envelope(kind, slope, 20, 10);
+            synth_check_envelope(kind, slope, 24000, -10);
+            synth_check_envelope(kind, slope, AUDIO_RATE / 2, 3);
+            synth_check_envelope(kind, slope, AUDIO_RATE, -1);
+        }
     }
+}
+
+/** Energy of the first difference of a range, which grows with the energy at high frequencies.
+ *
+ * @param x Samples
+ * @param from First frame, above 0
+ * @param to End frame
+ * @return The mean square of the difference
+ */
+static double synth_bright(
+    const float *x,
+    int32_t from,
+    int32_t to)
+{
+    double sum = 0, d;
+    int32_t i;
+    for (i = from; i < to; i ++) {
+        d = (double)x[i] - x[i - 1];
+        sum += d * d;
+    }
+
+    return sum / (to - from);
+}
+
+/** Render a steady saw of 110 Hz through a lowpass with a filter envelope.
+ *
+ * @param cutoff Cutoff of the patch in Hz
+ * @param amount Octaves of the filter envelope
+ * @param env The filter envelope
+ */
+static void synth_render_envelope(
+    float cutoff,
+    float amount,
+    box_audio_synth_envelope_t env)
+{
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SAW, 110, 0.25f, 0.6f);
+    p.envelope.attack = 0.001f;
+    p.filter = BOX_AUDIO_SYNTH_LOWPASS;
+    p.cutoff = cutoff;
+    p.filter_amount = amount;
+    p.filter_envelope = env;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES / 2);
+    test_assert(synth_finite(audio_l, 0, AUDIO_FRAMES / 2));
+    box_audio_core_free(core);
+}
+
+/** A saw through a lowpass at 200 Hz whose envelope opens it 4 octaves: attack 0 to 4800,
+ * decay to 9600, hold at half (800 Hz) to 14400, release to 19200, then back at 200 Hz. */
+void Synth_filter_envelope_follows(void) {
+    // audio/synth
+    double start, peak, sustain, release, end;
+    synth_render_envelope(200, 4, (box_audio_synth_envelope_t){
+        .attack = 0.1f, .decay = 0.1f, .sustain = 0.5f, .hold = 0.1f, .release = 0.1f });
+    start = synth_bright(audio_l, 600, 1800);
+    peak = synth_bright(audio_l, 3600, 4800);
+    sustain = synth_bright(audio_l, 10800, 13200);
+    release = synth_bright(audio_l, 16800, 18000);
+    end = synth_bright(audio_l, 20400, 22800);
+    printf("filter envelope: start %.3g, peak %.3g, sustain %.3g, release %.3g, end %.3g\n",
+        start, peak, sustain, release, end);
+    test_assert(peak > 4 * start);
+    test_assert(peak > 2 * sustain);
+    test_assert(sustain > 2 * end);
+    test_assert(release < sustain);
+    test_assert(release > end);
+    test_assert(end < 2 * start);
+}
+
+/** A lowpass at 4 kHz that an amount of -4 octaves closes to 250 Hz on its sustain, and that is
+ * open again once its envelope ended. */
+void Synth_filter_envelope_negative(void) {
+    // audio/synth
+    box_audio_synth_envelope_t env = {
+        .attack = 0.02f, .sustain = 1, .hold = 0.2f, .release = 0.02f };
+    double open_sustain, open_end, closed_sustain, closed_end;
+    synth_render_envelope(4000, 0, env);
+    open_sustain = synth_bright(audio_l, 4800, 9600);
+    open_end = synth_bright(audio_l, 16800, 21600);
+    synth_render_envelope(4000, -4, env);
+    closed_sustain = synth_bright(audio_l, 4800, 9600);
+    closed_end = synth_bright(audio_l, 16800, 21600);
+    printf("negative amount: %.3g open, %.3g closed, %.3g and %.3g after\n",
+        open_sustain, closed_sustain, open_end, closed_end);
+    test_assert(closed_sustain < open_sustain / 10);
+    test_assert(closed_end > open_end * 0.8 && closed_end < open_end * 1.25);
+}
+
+/** Gain of the filter of a patch for a sine, at a slope.
+ *
+ * @param kind A box_audio_synth_filter_t
+ * @param slope A box_audio_synth_slope_t
+ * @param cutoff Hz
+ * @param frequency Hz of the sine, a whole number of periods in 9600 frames
+ * @return Amplitude out over amplitude in
+ */
+static double synth_slope_gain(
+    uint32_t kind,
+    uint32_t slope,
+    float cutoff,
+    float frequency)
+{
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SINE, frequency, 0.25f, 1.0f);
+    double result;
+    p.filter = kind;
+    p.slope = slope;
+    p.cutoff = cutoff;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 19200);
+    result = synth_amplitude(audio_l, 9600, 19200) / 0.25;
+    box_audio_core_free(core);
+
+    return result;
+}
+
+/** The 24 dB filter attenuates an octave past its cutoff about twice as much in dB as the 12 dB
+ * one, and passes its passband as the 12 dB one does. */
+void Synth_filter_slope_24(void) {
+    // audio/synth
+    double low12 = 20 * log10(synth_slope_gain(BOX_AUDIO_SYNTH_LOWPASS,
+        BOX_AUDIO_SYNTH_SLOPE_12, 1000, 2000));
+    double low24 = 20 * log10(synth_slope_gain(BOX_AUDIO_SYNTH_LOWPASS,
+        BOX_AUDIO_SYNTH_SLOPE_24, 1000, 2000));
+    double high12 = 20 * log10(synth_slope_gain(BOX_AUDIO_SYNTH_HIGHPASS,
+        BOX_AUDIO_SYNTH_SLOPE_12, 1000, 500));
+    double high24 = 20 * log10(synth_slope_gain(BOX_AUDIO_SYNTH_HIGHPASS,
+        BOX_AUDIO_SYNTH_SLOPE_24, 1000, 500));
+    double pass = synth_slope_gain(BOX_AUDIO_SYNTH_LOWPASS, BOX_AUDIO_SYNTH_SLOPE_24, 1000, 250);
+    double cut = synth_slope_gain(BOX_AUDIO_SYNTH_LOWPASS, BOX_AUDIO_SYNTH_SLOPE_24, 1000, 1000);
+    printf("an octave past 1 kHz: lowpass %.2f dB at 12, %.2f dB at 24; highpass %.2f dB at 12, "
+        "%.2f dB at 24; 24 dB lowpass %.2f dB at 250 Hz, %.2f dB at 1 kHz\n",
+        low12, low24, high12, high24, 20 * log10(pass), 20 * log10(cut));
+    test_assert(low24 / low12 > 1.7 && low24 / low12 < 2.3);
+    test_assert(high24 / high12 > 1.7 && high24 / high12 < 2.3);
+    test_assert(pass > 0.95 && pass < 1.05);
+    test_assert(fabs(cut - 0.7071) < 0.05);
 }
 
 void Synth_filter_extreme(void) {
@@ -632,9 +780,10 @@ void Synth_filter_extreme(void) {
         p.envelope = (box_audio_synth_envelope_t){ v, v, v, v, v };
         p.filter = 1 + (uint32_t)i % 3;
         p.cutoff = v;
-        p.cutoff_end = v;
-        p.cutoff_sweep = v;
         p.resonance = v;
+        p.slope = (uint32_t)i % 3;
+        p.filter_amount = v;
+        p.filter_envelope = (box_audio_synth_envelope_t){ v, v, v, v, v };
         for (k = 0; k < BOX_AUDIO_SYNTH_LAYERS; k ++) {
             p.layer[k] = (box_audio_synth_layer_t){
                 .wave = (uint32_t)(k + i), .has_envelope = (uint32_t)k % 2,
@@ -919,19 +1068,19 @@ void Synth_script_loop_source(void) {
 }
 
 /** The examples of docs/audio.md compile without errors, play and end: the click within 3
- * frames of AUDIO_DT, the blip within 12 and the whoosh within 70. */
+ * frames of AUDIO_DT, the blip within 12, the whoosh within 70 and the pluck within 48. */
 void Synth_docs_examples(void) {
     // audio/synth
     ecs_world_t *world = audio_world();
     char *code = synth_read("test/assets/audio/synth_examples.flecs");
-    const char *names[] = { "UiClick", "UiBlip", "Whoosh" };
-    const int32_t frames[] = { 3, 12, 70 };
+    const char *names[] = { "UiClick", "UiBlip", "Whoosh", "Pluck" };
+    const int32_t frames[] = { 3, 12, 70, 48 };
     int32_t i, start;
     audio_log_start();
     test_assert(ecs_script_run(world, "examples", code, NULL) == 0);
     ecs_os_free(code);
     audio_run(world, 1);
-    for (i = 0; i < 3; i ++) {
+    for (i = 0; i < 4; i ++) {
         ecs_entity_t sound = ecs_lookup(world, names[i]);
         test_assert(sound != 0);
         test_assert(ecs_get(world, sound, AudioSynth)->compiled);
@@ -946,6 +1095,56 @@ void Synth_docs_examples(void) {
 
     audio_log_stop();
     test_int(audio_log_errors, 0);
+    ecs_fini(world);
+}
+
+/** The filter envelope and the slope of a script reach the patch, and a change or a removal of
+ * the SynthFilterEnvelope compiles the sound again. */
+void Synth_script_filter_envelope(void) {
+    // audio/synth
+    ecs_world_t *world = audio_world();
+    char *code = synth_read("test/assets/audio/synth_examples.flecs");
+    ecs_entity_t pluck, whoosh;
+    const AudioSynth *synth;
+    test_assert(ecs_script_run(world, "examples", code, NULL) == 0);
+    ecs_os_free(code);
+    pluck = ecs_lookup(world, "Pluck");
+    whoosh = ecs_lookup(world, "Whoosh");
+    test_assert(pluck != 0);
+    test_assert(whoosh != 0);
+    test_int(ecs_get(world, pluck, SynthFilter)->slope, SynthSlope24);
+    test_flt(ecs_get(world, pluck, SynthFilterEnvelope)->amount, 4);
+    test_flt(ecs_get(world, pluck, SynthFilterEnvelope)->decay, 0.25f);
+    test_int(ecs_get(world, whoosh, SynthFilter)->slope, SynthSlope12);
+
+    audio_run(world, 1);
+    synth = ecs_get(world, pluck, AudioSynth);
+    test_assert(synth->compiled);
+    test_int(synth->patch.filter, BOX_AUDIO_SYNTH_LOWPASS);
+    test_int(synth->patch.slope, BOX_AUDIO_SYNTH_SLOPE_24);
+    test_flt(synth->patch.cutoff, 300);
+    test_flt(synth->patch.filter_amount, 4);
+    test_flt(synth->patch.filter_envelope.attack, 0.002f);
+    test_flt(synth->patch.filter_envelope.decay, 0.25f);
+    test_flt(synth->patch.filter_envelope.sustain, 0.2f);
+    test_flt(synth->patch.filter_envelope.hold, 0.25f);
+    test_flt(synth->patch.filter_envelope.release, 0.2f);
+    synth = ecs_get(world, whoosh, AudioSynth);
+    test_int(synth->patch.slope, BOX_AUDIO_SYNTH_SLOPE_12);
+    test_flt(synth->patch.filter_amount, 3.737f);
+    test_flt(synth->patch.filter_envelope.attack, 0.5f);
+
+    ecs_set(world, pluck, SynthFilterEnvelope, { .decay = 0.1f, .amount = -2 });
+    audio_run(world, 1);
+    synth = ecs_get(world, pluck, AudioSynth);
+    test_assert(synth->compiled);
+    test_flt(synth->patch.filter_amount, -2);
+    test_flt(synth->patch.filter_envelope.decay, 0.1f);
+    ecs_remove(world, pluck, SynthFilterEnvelope);
+    audio_run(world, 1);
+    synth = ecs_get(world, pluck, AudioSynth);
+    test_flt(synth->patch.filter_amount, 0);
+    test_flt(synth->patch.filter_envelope.decay, 0);
     ecs_fini(world);
 }
 

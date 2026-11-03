@@ -17,7 +17,8 @@ prefab SfxBuild {
   AudioOutput: {bus: sfx}
   SynthSound: {seed: 3, pitch_variance: 0.12, level_variance: 0.1}
   SynthEnvelope: {attack: 0.002, decay: 0.28}
-  SynthFilter: {kind: SynthLowPass, cutoff: 2400, cutoff_end: 300, sweep: 0.2, resonance: 0.1}
+  SynthFilter: {kind: SynthLowPass, cutoff: 300, resonance: 0.1}
+  SynthFilterEnvelope: {decay: 0.2, amount: 3}
   thud { SynthOscillator: {wave: SynthSine, frequency: 140, frequency_end: 55, sweep: 0.18, level: 0.9} }
   grit {
     SynthOscillator: {wave: SynthNoise, level: 0.5}
@@ -30,7 +31,8 @@ prefab SfxRaze {
   AudioOutput: {bus: sfx}
   SynthSound: {seed: 9, pitch_variance: 0.1}
   SynthEnvelope: {attack: 0.01, decay: 0.2, sustain: 0.5, hold: 0.15, release: 0.45}
-  SynthFilter: {kind: SynthLowPass, cutoff: 1400, cutoff_end: 200, sweep: 0.7, resonance: 0.2}
+  SynthFilter: {kind: SynthLowPass, cutoff: 200, resonance: 0.2}
+  SynthFilterEnvelope: {decay: 0.7, amount: 2.807}
   rubble { SynthOscillator: {wave: SynthNoise, level: 0.8} }
   boom { SynthOscillator: {wave: SynthSine, frequency: 90, frequency_end: 40, sweep: 0.5, level: 0.6} }
 }
@@ -40,7 +42,8 @@ prefab SfxPlant {
   AudioOutput: {bus: sfx}
   SynthSound: {seed: 5, pitch_variance: 0.15}
   SynthEnvelope: {attack: 0.01, decay: 0.18}
-  SynthFilter: {kind: SynthBandPass, cutoff: 2600, cutoff_end: 1200, sweep: 0.15, resonance: 0.4}
+  SynthFilter: {kind: SynthBandPass, cutoff: 1200, resonance: 0.4}
+  SynthFilterEnvelope: {decay: 0.15, amount: 1.115}
   SynthOscillator: {wave: SynthNoise, level: 0.7}
 }
 
@@ -49,7 +52,8 @@ prefab SfxSplash {
   AudioOutput: {bus: sfx}
   SynthSound: {seed: 11, pitch_variance: 0.1}
   SynthEnvelope: {attack: 0.005, decay: 0.4}
-  SynthFilter: {kind: SynthBandPass, cutoff: 600, cutoff_end: 3000, sweep: 0.25, resonance: 0.55}
+  SynthFilter: {kind: SynthBandPass, cutoff: 600, resonance: 0.55}
+  SynthFilterEnvelope: {attack: 0.25, sustain: 1, hold: 0.16, amount: 2.322}
   water { SynthOscillator: {wave: SynthNoise, level: 0.8} }
   bloop { SynthOscillator: {wave: SynthSine, frequency: 300, frequency_end: 700, sweep: 0.12, level: 0.3} }
 }
@@ -112,7 +116,8 @@ prefab SfxPop {
   AudioOutput: {bus: sfx}
   SynthSound: {seed: 21, pitch_variance: 0.3, level_variance: 0.2}
   SynthEnvelope: {attack: 0.001, decay: 0.35}
-  SynthFilter: {kind: SynthLowPass, cutoff: 3000, cutoff_end: 400, sweep: 0.3}
+  SynthFilter: {kind: SynthLowPass, cutoff: 400}
+  SynthFilterEnvelope: {decay: 0.3, amount: 2.907}
   SynthOscillator: {wave: SynthNoise, level: 0.6}
 }
 

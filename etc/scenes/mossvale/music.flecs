@@ -21,7 +21,8 @@ template Harp {
   AudioOutput: {bus: mv_music}
   SynthSound: {level_variance: 0.1}
   SynthEnvelope: {attack: 0.003, decay: 1.4}
-  SynthFilter: {kind: SynthLowPass, cutoff: 3400, cutoff_end: 900, sweep: 0.8, resonance: 0.1}
+  SynthFilter: {kind: SynthLowPass, cutoff: 900, resonance: 0.1}
+  SynthFilterEnvelope: {decay: 0.8, amount: 1.918}
   pluck { SynthOscillator: {wave: SynthTriangle, frequency: f, level: 0.32} }
   body { SynthOscillator: {wave: SynthSine, frequency: f, level: 0.3} }
   ring { SynthOscillator: {wave: SynthSine, frequency: f * 2, level: 0.08}; SynthEnvelope: {attack: 0.002, decay: 0.5} }
@@ -34,7 +35,8 @@ template Strings {
   AudioOutput: {bus: mv_music}
   SynthSound: {seed: 5}
   SynthEnvelope: {attack: 0.9, decay: 0.6, sustain: 0.7, hold: 1.2, release: 1.4}
-  SynthFilter: {kind: SynthLowPass, cutoff: 900, cutoff_end: 1400, sweep: 1.8, resonance: 0.12}
+  SynthFilter: {kind: SynthLowPass, cutoff: 900, resonance: 0.12}
+  SynthFilterEnvelope: {attack: 1.8, sustain: 1, hold: 2.3, amount: 0.637}
   low { SynthOscillator: {wave: SynthSaw, frequency: a, level: 0.09} }
   mid { SynthOscillator: {wave: SynthSaw, frequency: b * 1.003, level: 0.08} }
   high { SynthOscillator: {wave: SynthTriangle, frequency: c, level: 0.14} }
@@ -46,7 +48,8 @@ template Bass {
   AudioOutput: {bus: mv_music}
   SynthSound: {level_variance: 0.05}
   SynthEnvelope: {attack: 0.01, decay: 0.9}
-  SynthFilter: {kind: SynthLowPass, cutoff: 500, cutoff_end: 200, sweep: 0.5, resonance: 0.2}
+  SynthFilter: {kind: SynthLowPass, cutoff: 200, resonance: 0.2}
+  SynthFilterEnvelope: {decay: 0.5, amount: 1.322}
   body { SynthOscillator: {wave: SynthTriangle, frequency: f, level: 0.45} }
   sub { SynthOscillator: {wave: SynthSine, frequency: f, level: 0.4} }
 }

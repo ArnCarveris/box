@@ -41,7 +41,7 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 | `AudioPcm` | A sound from samples, from script or C |
 | `SoundFile` | A short sound from a WAV or FLAC file, decoded into memory, see [Sound files](#sound-files) |
 | `SoundStatus` | Read only: whether a `SoundFile` loads, is ready or failed |
-| `SynthSound` | A sound made by the synth from layers of `SynthOscillator`, `SynthEnvelope` and `SynthFilter`, see [Synth sounds](#synth-sounds) |
+| `SynthSound` | A sound made by the synth from layers of `SynthOscillator`, `SynthEnvelope`, `SynthFilter` and `SynthFilterEnvelope`, see [Synth sounds](#synth-sounds) |
 | `AudioSource` | A sound that plays while its entity exists, once or in a loop, with a volume and a pitch |
 | `AudioSpatial` | Places a source in the world: `min_distance`, `max_distance`, `rolloff`, see [Spatial audio](#spatial-audio) |
 | `AudioListener` | The entity that hears the spatial sources, the camera without one |
@@ -477,30 +477,45 @@ with `SOUND_FREE`. The core clamps every value of a patch, a NaN to the low end.
   uses reached silence; a looping voice starts a new pass instead, with the state of its
   filter. Synth voices start at their gain, without the ramp of the core, since the envelope
   starts at 0: an attack of 1 ms takes 1 ms.
-- **The filter** is the trapezoidal state variable filter (Simper): lowpass and highpass at 12
-  dB per octave and a bandpass with unity gain at the cutoff. Resonance 0 is a Butterworth
-  response (Q 0.707), 1 a Q of 50. Its coefficients come from `tan(pi cutoff / rate)` with the
-  cutoff clamped to 0.49 of the rate, so it stays stable at every cutoff and resonance, a cutoff
-  at Nyquist and a fast sweep included; a sweep updates them every 8 frames. Its state is
-  flushed like a bus sample.
+- **The filter** is the trapezoidal state variable filter (Simper): lowpass, highpass and a
+  bandpass with unity gain at the cutoff. At a slope of 12 dB per octave it is one stage:
+  resonance 0 is a Butterworth response (Q 0.707), 1 a Q of 50. At 24 dB per octave it is two
+  cascaded stages of the same kind and cutoff: the first at a fixed Q of 0.54, the second
+  resonant from Q 1.31 at resonance 0, so that resonance 0 is a fourth order Butterworth
+  response (-3 dB at the cutoff, -24 dB an octave past it), to a Q of 50 at 1. Its
+  coefficients come from
+  `tan(pi cutoff / rate)` with the cutoff clamped to 10 Hz..0.49 of the rate, and every stage
+  is stable on its own for any coefficient, so the cascade stays stable at every cutoff and
+  resonance, a cutoff at and above Nyquist and a fast envelope included. Its state is flushed
+  like a bus sample.
+- **The filter envelope** has the segments of the other envelopes and an amount in octaves,
+  -10..10. The cutoff is `cutoff * 2^(amount * level)`: exponential in frequency, so a linear
+  segment of the envelope moves the cutoff by the same musical interval per second. It updates
+  the coefficients every 8 frames while it runs and once at its end; it does not keep the voice
+  playing, and a looping voice restarts it with its pass. A patch with an amount of 0 runs no
+  envelope and computes no coefficients per frame, and a 12 dB filter runs one stage, so a
+  patch that uses neither costs what it did before.
 - **Cost.** Render work only: per frame of a voice an envelope step per envelope, an oscillator
-  per layer and the filter. `bench/audio` has a `Synth` suite of 64 voices in ns per sample.
+  per layer and the filter, one stage or two. `bench/audio` has a `Synth` suite of 64 voices in
+  ns per sample, with a filter envelope and with a 24 dB filter.
 
-The core needs no libm: the exponential sweeps use series for `log2` and `exp2` in `synth.c`.
+The core needs no libm: the exponential sweeps and the filter envelope use series for `log2` and
+`exp2` in `synth.c`.
 
 ### Synth sounds
 
 A sound effect is a prefab in script, with no file. `SynthSound` marks the root; the layers are
 the root and its children that have a `SynthOscillator`, as particle effect layers are. The
-`SynthEnvelope` and the `SynthFilter` of the root apply to the mix of the layers; a layer may
-have its own `SynthEnvelope`, and one without uses the root's.
+`SynthEnvelope`, the `SynthFilter` and the `SynthFilterEnvelope` of the root apply to the mix of
+the layers; a layer may have its own `SynthEnvelope`, and one without uses the root's.
 
 | Component | What it is |
 |-----------|------------|
 | `SynthSound` | The root: `seed`, `pitch_variance` and `level_variance` (random shares per play, 0) |
 | `SynthOscillator` | A layer: `wave` (`SynthSine`, `SynthSaw`, `SynthSquare`, `SynthTriangle`, `SynthNoise`), `frequency` (440), `frequency_end` (0, no sweep), `sweep` (s), `level` (1) |
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `release`, `hold`: seconds and a sustain level, all 0 by default |
-| `SynthFilter` | `kind` (`SynthLowPass`, `SynthHighPass`, `SynthBandPass`), `cutoff` (1000), `cutoff_end`, `sweep`, `resonance` |
+| `SynthFilter` | `kind` (`SynthLowPass`, `SynthHighPass`, `SynthBandPass`), `cutoff` (1000), `resonance` (0), `slope` (`SynthSlope12`, `SynthSlope24`) |
+| `SynthFilterEnvelope` | The envelope of the cutoff: `attack`, `decay`, `sustain`, `release`, `hold` as in `SynthEnvelope`, and `amount`, the octaves the cutoff moves at level 1 (0, negative closes the filter); nothing without a `SynthFilter` |
 
 The module (`src/audio/synth_sound.c`) compiles a sound once, and again when a component of it
 or of a layer changes, into a patch that the sync system sends with a `SYNTH` command before the
@@ -511,9 +526,12 @@ with `loop: true` starts it over at the end of its envelopes. A play allocates n
 - A layer without any envelope (no `SynthEnvelope` on it or on the root) would never end: it
   logs one error and the sound plays for `BOX_AUDIO_SYNTH_ENDLESS` (10) seconds.
 - An envelope that is not a time of 0 to 60 seconds logs one error and is cut.
+- The filter envelope has its own times: it does not follow the `SynthEnvelope`, so a cutoff
+  that closes with the note takes the same attack, decay, hold and release. One that should stay
+  open while the sound plays takes a sustain of 1 and a hold that lasts the sound.
 - Deleting the sound releases it and fades its one shots, as for `AudioPcm`.
 
-Three examples:
+Four examples:
 
 ```
 using box.audio
@@ -542,20 +560,38 @@ prefab UiBlip {
   }
 }
 
-// A whoosh: noise through a resonant bandpass that sweeps up and fades
+// A whoosh: noise through a resonant bandpass that a filter envelope opens as it fades in
 prefab Whoosh {
   SynthSound: {seed: 7, level_variance: 0.1}
   SynthEnvelope: {attack: 0.15, decay: 0.25, sustain: 0.3, hold: 0.1, release: 0.3}
-  SynthFilter: {kind: SynthBandPass, cutoff: 300, cutoff_end: 4000, sweep: 0.5, resonance: 0.6}
+  SynthFilter: {kind: SynthBandPass, cutoff: 300, resonance: 0.6}
+  SynthFilterEnvelope: {attack: 0.5, sustain: 1, hold: 0.31, amount: 3.737}
   SynthOscillator: {wave: SynthNoise, level: 0.8}
+}
+
+// A pluck: a saw through a 24 dB lowpass that its filter envelope opens 4 octaves on the attack
+// and closes with the note
+prefab Pluck {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.002, decay: 0.4, sustain: 0.3, hold: 0.1, release: 0.2}
+  SynthFilter: {kind: SynthLowPass, cutoff: 300, resonance: 0.3, slope: SynthSlope24}
+  SynthFilterEnvelope: {attack: 0.002, decay: 0.25, sustain: 0.2, hold: 0.25, release: 0.2, amount: 4}
+  SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.5}
 }
 ```
 
+The whoosh opens from 300 Hz to `300 * 2^3.737`, 4 kHz, over half a second and stays there. A
+sweep from one cutoff to another over a time is an attack of that time with a sustain of 1 when
+it rises, and a decay of that time from the higher cutoff to the lower one, the `cutoff`, when
+it falls: `SynthFilter: {cutoff: 300}` with `SynthFilterEnvelope: {decay: 0.2, amount: 3}`
+falls from 2400 Hz to 300 Hz in 0.2 s.
+
 The tests are the `Synth` suite of `test/cpu/audio`, on offline renders: frequencies of every
 wave at 44.1 and 48 kHz, sweeps, aliasing of a 5 kHz saw, square and triangle, flat and seeded noise, the
-times and edges of envelopes, the end of a voice, the filter one octave past its cutoff and
-under sweeps at full resonance and extreme values, layers, scripts from
-`test/assets/audio/synth.flecs`, the three examples above from
+times and edges of envelopes, the end of a voice, the filter one octave past its cutoff at both
+slopes, the cutoff following a filter envelope up and down, stability under fast filter
+envelopes at full resonance and at Nyquist for both slopes and extreme values, layers, scripts
+from `test/assets/audio/synth.flecs`, the four examples above from
 `test/assets/audio/synth_examples.flecs` and errors; `NoAlloc` renders 64 synth voices. The browser
 check is `test/integration/web/audio_synth.mjs`.
 

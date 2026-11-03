@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const USAGE = `Checks the synth of box.audio in headless Chrome with
 test/integration/web/audio_synth.flecs: Beep is a 660 Hz sine of 0.36 s, Hum three layers into a
-filter sweep.
+filter envelope.
 
   node test/integration/web/audio_synth.mjs [--chrome <path>] <bin dir>
 
