@@ -29,6 +29,8 @@ export const RESEARCH_MAX: i32 = 4
 export const FOOD_CAP: f64 = 250
 export const STARVE_SECONDS: i32 = 6
 export const FARM_SIZE: i32 = 4
+export const RAID_SECONDS: i32 = 35
+export const RAID_GRACE: i32 = 60
 
 event Build(i: i32)
 event Upgrade(i: i32)
@@ -59,8 +61,9 @@ fn kind_name(k: i32) -> string {
 
 fn piece_name(k: i32, lvl: i32) -> string {
   match k {
-    1: match lvl { 1: "Curtain Wall"; 2: "High Wall"; _: "Great Wall" }
+    1: match lvl { 1: "Palisade"; 2: "Curtain Wall"; _: "Great Wall" }
     2: match lvl { 1: "Watchtower"; 2: "Tower"; _: "Great Tower" }
+    3: match lvl { 1: "Timber Gate"; _: "Gatehouse" }
     4: match lvl { 1: "Tower Keep"; 2: "Stone Keep"; 3: "Great Keep"; _: "Royal Palace" }
     5: match lvl { 1: "Cottage"; 2: "House"; _: "Manor" }
     _: kind_name(k)
@@ -69,14 +72,14 @@ fn piece_name(k: i32, lvl: i32) -> string {
 
 fn kind_blurb(k: i32) -> string {
   match k {
-    1: "Curtain wall. Walls, towers and gatehouses that close a ring turn the ground inside into a courtyard."
+    1: "A wooden palisade, rebuilt in stone once your keep allows. Walls, towers and gatehouses that close a ring turn the ground inside into a courtyard."
     2: "Round tower. Joins the walls next to it. Select it to raise it, as high as your keep allows."
-    3: "A gatehouse with a portcullis. Turns to follow the wall it sits in, and closes the ring like a wall does."
-    4: "The lord's keep, one per realm. Collects taxes and caps the level of every other piece. Eats 4 food, twice as much with every level."
-    5: "A cottage for 4 folk. Eats 1 food. Safe inside the walls it gathers protection and grows into a house, then a manor."
+    3: "A timber gate, rebuilt in stone once your keep allows. Turns to follow the wall it sits in, and closes the ring like a wall does."
+    4: "The lord's keep, one per realm. Collects taxes and caps the level of every other piece; the walls and gates rise with it. Eats 4 food, twice as much with every level."
+    5: "A cottage for 4 folk. Eats 1 food. Outside the walls bandits raid it for gold; safe inside them it grows into a house, then a manor."
     6: "A fenced farm of 4 by 4 cells with a farmhouse. Grows 10 food a second; the blacksmith can research better farming."
     7: "The blacksmith, one per realm. Select it to research farming tools, so your fields feed more folk."
-    8: "A stone quarry. Cuts 2 stone a second."
+    8: "A stone quarry, dug into a stone deposit where grey rock breaks through the grass. Cuts 2 stone a second."
     9: "A moat of still water."
     10: "An oak or a pine. Cheap, and pleasant to look at."
     11: "A cobbled path."
@@ -89,6 +92,7 @@ fn max_level(k: i32) -> i32 {
   match k {
     1: 3
     2: 3
+    3: 2
     4: 4
     5: 3
     _: 1
@@ -97,9 +101,9 @@ fn max_level(k: i32) -> i32 {
 
 fn cost_gold(k: i32, lvl: i32) -> i32 {
   match k {
-    1: match lvl { 1: 0; 2: 10; _: 25 }
+    1: match lvl { 1: 3; 2: 10; _: 25 }
     2: 10 + (lvl - 1) * 20
-    3: 25
+    3: match lvl { 1: 20; _: 25 }
     4: match lvl { 1: 80; 2: 160; 3: 300; _: 500 }
     5: match lvl { 1: 25; 2: 50; _: 110 }
     6: 40
@@ -114,9 +118,9 @@ fn cost_gold(k: i32, lvl: i32) -> i32 {
 
 fn cost_stone(k: i32, lvl: i32) -> i32 {
   match k {
-    1: match lvl { 1: 10; 2: 25; _: 45 }
+    1: match lvl { 1: 0; 2: 25; _: 45 }
     2: 30 + (lvl - 1) * 20
-    3: 40
+    3: match lvl { 1: 0; _: 40 }
     4: match lvl { 1: 120; 2: 200; 3: 320; _: 480 }
     5: match lvl { 1: 5; 2: 25; _: 60 }
     7: 40
@@ -135,6 +139,21 @@ fn cost_text(k: i32, lvl: i32) -> string {
       _: match s > 0 {
         true: "{s} stone"
         _: "refund"
+      }
+    }
+  }
+}
+
+fn cost_words(k: i32, lvl: i32) -> string {
+  const g = cost_gold(k, lvl)
+  const s = cost_stone(k, lvl)
+  match g > 0 && s > 0 {
+    true: "{g} gold and {s} stone"
+    _: match g > 0 {
+      true: "{g} gold"
+      _: match s > 0 {
+        true: "{s} stone"
+        _: "free"
       }
     }
   }
@@ -166,6 +185,43 @@ fn drag_tool(t: i32) -> bool {
 
 fn barrier(k: i32) -> bool {
   k == 1 || k == 2 || k == 3
+}
+
+fn wooden(k: i32, lvl: i32) -> bool {
+  (k == 1 || k == 3) && lvl == 1
+}
+
+fn turns(k: i32) -> bool {
+  k == 2 || k == 4 || k == 5 || k == 6 || k == 7 || k == 8
+}
+
+fn faces_path(r: i32, kn: i32, ke: i32, ks: i32, kw: i32) -> bool {
+  match r {
+    0: ks == 11
+    1: ke == 11
+    2: kn == 11
+    _: kw == 11
+  }
+}
+
+fn house_face(r: i32, kn: i32, ke: i32, ks: i32, kw: i32) -> i32 {
+  match faces_path(r, kn, ke, ks, kw) {
+    true: r
+    _: match ks == 11 {
+      true: 0
+      _: match ke == 11 {
+        true: 1
+        _: match kn == 11 {
+          true: 2
+          _: match kw == 11 { true: 3; _: r }
+        }
+      }
+    }
+  }
+}
+
+fn build_face(t: i32, r: i32, kn: i32, ke: i32, ks: i32, kw: i32) -> i32 {
+  match t == 5 { true: house_face(r, kn, ke, ks, kw); _: r }
 }
 
 fn wall_height(k: i32, lvl: i32) -> f32 {
@@ -260,6 +316,10 @@ fn upgrade_lock(k: i32, lvl: i32, keep_lvl: i32, folk: i32, pts: f64, ruined: bo
   }
 }
 
+fn raid_loot(lvl: i32) -> f64 {
+  15 + lvl * 10
+}
+
 fn research_name(r: i32) -> string {
   match r {
     0: "Iron Ploughshares"
@@ -296,7 +356,7 @@ fn prestige_of(k: i32, lvl: i32, safe: bool) -> f64 {
   match k {
     1: lvl
     2: lvl * 4
-    3: 6
+    3: 3 + lvl * 3
     4: match safe { true: lvl * 40; _: lvl * 20 }
     5: match lvl { 1: match safe { true: 3; _: 2 }; 2: 6; _: 12 }
     6: 3
@@ -380,10 +440,13 @@ export mut points: f64[784] = {}
 export mut ready: bool[784] = {}
 export mut farm_origin: i32[784] = {}
 export mut fits4: bool[784] = {}
+export mut deposit: bool[784] = {}
+export mut facing: i32[784] = {}
 
 export mut tool: i32 = 0
 export mut hover_tool: i32 = 0
 export mut hover_cell: i32 = -1
+export mut build_rot: i32 = 0
 export mut selected: i32 = -1
 export mut rising: i32 = -1
 export mut rising_age: i32 = 0
@@ -420,3 +483,6 @@ export mut research_left: f64 = 0
 export mut clock: f64 = 0
 export mut toast: string = ""
 export mut toast_until: f64 = 0
+
+export mut raid_timer: i32 = 0
+export mut raids: i32 = 0

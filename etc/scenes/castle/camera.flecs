@@ -1,7 +1,7 @@
 // The camera orbits a point on the plot: WASD or the arrow keys move the point, Q and E turn
 // around it, the right mouse button drags the view around, the wheel or + and - zoom. The number
-// keys and P pick a tool, X the demolish tool, U upgrades the selected piece, Escape puts the tool
-// down and clears the selection.
+// keys and P pick a tool, X the demolish tool, R turns the piece before it is placed, U upgrades the
+// selected piece, Escape puts the tool down and clears the selection.
 
 using flecs.script
 using flecs.script.math
@@ -54,6 +54,7 @@ castle_actions {
   ToolKey Tool12(t: 12, key: X)
   PutDown { Action: {description: "Put the tool down and clear the selection"}; Binding: {key: Escape} }
   UpgradeKey { Action: {description: "Upgrade the selected piece"}; Binding: {key: U} }
+  RotateKey { Action: {description: "Turn the piece before placing it"}; Binding: {key: R} }
 }
 
 // Where the view eases to; the keys, the mouse and scripts move these
@@ -91,6 +92,13 @@ async {
         emit Upgrade(i: selected)
       }
     }
+  }
+}
+
+async {
+  while true {
+    await on.pressed(castle_actions.RotateKey)
+    build_rot = (build_rot + 1) % 4
   }
 }
 
