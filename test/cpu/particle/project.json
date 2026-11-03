@@ -260,6 +260,7 @@
                     "block_sprite",
                     "block_additive_unsorted",
                     "sorted_only_with_color_curve",
+                    "sorted_with_color_variance",
                     "sort_count_power_of_two",
                     "billboard_corners_sent",
                     "billboard_without_mesh_is_circle"

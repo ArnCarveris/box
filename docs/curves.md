@@ -687,7 +687,7 @@ Where it goes:
   A `ParticleMotion` reads its rows in the integrate pass, the others in the draw.
 - **A keyed `color` sorts.** Alpha blended particles without `ParticleAppearance` are drawn
   unsorted; a color curve makes them sort back to front every frame, which costs more than all
-  the curve reads together. With `ParticleAppearance` alpha particles always sort, and additive
+  the curve reads together. A nonzero `color_variance` on `ParticleEmitter` sorts them too. With `ParticleAppearance` alpha particles always sort, and additive
   ones never do.
 - **Baking is on change only.** A curve is baked when its component changes, and a key list the
   table has seen is not sampled again. Rows are shared by content, so instances of an effect
@@ -758,7 +758,8 @@ written down so that this guide and the code agree.
   `max_keys`.
 - **A color curve sorts alpha particles.** Alpha blended particles without `ParticleAppearance`
   are drawn unsorted, since particles of one color blend the same in any order; a keyed color
-  curve makes them sort back to front (`box_particles_block_look`, `src/render/particles.c`).
+  curve or a nonzero `color_variance` on `ParticleEmitter`, which gives each particle its own
+  color, makes them sort back to front (`box_particles_block_look`, `src/render/particles.c`).
 - **The emitter clock** (`ParticleTimeline`, `src/particle/timeline.c`):
   - `period` is in seconds of `ParticlePlayback.time`, and curve times run from 0 to 1 over it.
     A period of 0, no keys or a bad curve is 1.
