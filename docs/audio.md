@@ -532,7 +532,6 @@ copy of `AudioSource` and play on their own, as `ParticleEmitter` instances do.
 the old id and sends the new samples, and a deleted sound is released, freed by the side that
 owns the frames once no voice plays it.
 
-<<<<<<< HEAD
 ### Spatial audio
 
 `src/audio/spatial.c` places sounds in the world with a simple model: a sound gets quieter with
@@ -607,7 +606,7 @@ listener, a moving listener and 10 moving sources, against the same world withou
 
 **Disabled** works as for other sources: a Disabled spatial source keeps its voice at volume 0,
 or none when it is out of range.
-=======
+
 ### Sound files
 
 ```
@@ -668,7 +667,6 @@ embeds `etc`); a test file through `?preload=`.
 
 The tests are `Sample` in `test/cpu/audio`, with files in `test/assets/audio` that
 `make_sounds.py` next to them writes, and the browser check `audio_sample.mjs`.
->>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
 
 ### Before the gesture
 

@@ -203,9 +203,7 @@
                     "mixer_levels",
                     "level_change",
                     "play_function",
-<<<<<<< HEAD
-                    "spatial_scene"
-=======
+                    "spatial_scene",
                     "reverb_hall"
                 ]
             },
@@ -225,7 +223,6 @@
                     "second_reverb_errors",
                     "delete_fades",
                     "no_alloc"
->>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
                 ]
             },
             {

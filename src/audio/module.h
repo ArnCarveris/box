@@ -159,14 +159,11 @@ typedef struct box_audio_module_stats_t {
     int64_t orders;         /**< ORDER commands written */
     int64_t cycles;         /**< Compiles that found a cycle */
     int64_t dropped;        /**< Plays dropped before a gesture */
-<<<<<<< HEAD
     int64_t spatial_updates; /**< Spatial sources and plays whose gain was computed */
     int64_t out_of_range;   /**< Spatial plays that did not start beyond max_distance */
-=======
     int64_t reverbs;        /**< REVERB commands written */
     int64_t not_ready;      /**< Plays dropped while their sound file loaded */
     int64_t decodes;        /**< Decodes of sound files submitted */
->>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
 } box_audio_module_stats_t;
 
 /** A capture that waits for its frames */
@@ -203,15 +200,12 @@ typedef struct box_audio_module_t {
     ecs_vec_t plays;              /**< box_audio_play_t */
     ecs_vec_t stops;              /**< uint32_t voice handles of deleted sources */
     ecs_vec_t releases;           /**< uint32_t sound ids */
-<<<<<<< HEAD
     ecs_vec_t moved;              /**< ecs_entity_t spatial sources whose static transform moved */
-=======
     ecs_vec_t fades;              /**< uint32_t ids of deleted sounds whose one shots fade */
     ecs_vec_t samples;            /**< box_audio_sample_t*, the decoded sound files */
     uint64_t next_sample;         /**< Key of the next sample */
     box_audio_sample_sync_t *sample_sync; /**< Decodes in flight */
     ecs_query_t *sample_users;    /**< AudioSample, to update the status of its entities */
->>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
     AudioSettings settings;       /**< Settings sent */
     bool settings_sent;           /**< settings holds what the output has */
     int64_t voices_stolen;        /**< Steals the core reported */
@@ -263,7 +257,6 @@ int32_t box_audio_module_bus_index(
     const ecs_world_t *world,
     ecs_entity_t bus);
 
-<<<<<<< HEAD
 /** Find the listener of the frame: the first AudioListener, else the camera of the first
  * enabled View that has one.
  *
@@ -275,7 +268,7 @@ void box_audio_listener_find(
     ecs_world_t *world,
     box_audio_module_t *state,
     box_audio_listener_t *listener);
-=======
+
 /** Get the slot of the reverb of an entity in the core.
  *
  * @param world The world
@@ -285,7 +278,6 @@ void box_audio_listener_find(
 int32_t box_audio_module_reverb_slot(
     const ecs_world_t *world,
     ecs_entity_t e);
->>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
 
 /** Register the sync system and the observers of the module.
  *

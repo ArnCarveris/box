@@ -61,41 +61,44 @@ static void box_audio_source_ctor(
     }
 }
 
-<<<<<<< HEAD
 /** Construct AudioSpatial values: full volume within 1, silent from 50, rolloff 1.
-=======
-/** Construct Reverb values: a decay of 1.5 seconds, half damped, 20 ms of predelay, a middle
- * size, fully wet.
->>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
  *
  * @param ptr The components
  * @param count Number of components
  * @param ti Type info
  */
-<<<<<<< HEAD
 static void box_audio_spatial_ctor(
-=======
-static void box_audio_reverb_ctor(
->>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
     void *ptr,
     int32_t count,
     const ecs_type_info_t *ti)
 {
-<<<<<<< HEAD
     AudioSpatial *values = ptr;
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
         values[i] = (AudioSpatial){
             .min_distance = 1.0f, .max_distance = 50.0f, .rolloff = 1.0f };
-=======
+    }
+}
+
+/** Construct Reverb values: a decay of 1.5 seconds, half damped, 20 ms of predelay, a middle
+ * size, fully wet.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_reverb_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
     Reverb *values = ptr;
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
         values[i] = (Reverb){
             .decay = 1.5f, .damping = 0.5f, .predelay = 0.02f, .size = 0.5f, .mix = 1.0f };
->>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
     }
 }
 
@@ -508,11 +511,8 @@ static void box_audio_module_free(
     ecs_vec_fini_t(NULL, &state->plays, box_audio_play_t);
     ecs_vec_fini_t(NULL, &state->stops, uint32_t);
     ecs_vec_fini_t(NULL, &state->releases, uint32_t);
-<<<<<<< HEAD
     ecs_vec_fini_t(NULL, &state->moved, ecs_entity_t);
-=======
     box_audio_sample_fini(state);
->>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
     ecs_os_free(state->capture.path);
     ecs_os_free(state);
 }
@@ -564,12 +564,9 @@ void BoxAudioImport(
 {
     ECS_MODULE(world, BoxAudio);
     ECS_IMPORT(world, BoxTypes);
-<<<<<<< HEAD
     ECS_IMPORT(world, BoxTransform);
     ECS_IMPORT(world, BoxView);
-=======
     ECS_IMPORT(world, BoxJobs);
->>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
 
     ECS_META_COMPONENT(world, AudioState);
     ECS_META_COMPONENT(world, AudioBus);
@@ -584,14 +581,11 @@ void BoxAudioImport(
     box_owned_hooks(world, SoundStatus, BOX_OWNED_STR(SoundStatus, error));
     ECS_META_COMPONENT(world, AudioSource);
     ecs_set_hooks(world, AudioSource, { .ctor = box_audio_source_ctor });
-<<<<<<< HEAD
     ECS_TAG_DEFINE(world, AudioListener);
     ECS_META_COMPONENT(world, AudioSpatial);
     ecs_set_hooks(world, AudioSpatial, { .ctor = box_audio_spatial_ctor });
-=======
     ECS_META_COMPONENT(world, Reverb);
     ecs_set_hooks(world, Reverb, { .ctor = box_audio_reverb_ctor });
->>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
     ECS_META_COMPONENT(world, AudioSettings);
     ecs_set_hooks(world, AudioSettings, { .ctor = box_audio_settings_ctor });
     ECS_META_COMPONENT(world, AudioStatus);

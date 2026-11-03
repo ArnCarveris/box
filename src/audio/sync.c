@@ -675,31 +675,10 @@ static void box_audio_sounds(
                 continue;
             }
 
-<<<<<<< HEAD
-            s[i].id = 0;
-            for (id = 1; id < BOX_AUDIO_SOUND_MAX && state->sound_used[id]; id ++) { }
-            if (id == BOX_AUDIO_SOUND_MAX) {
-                if (!state->sound_overflow) {
-                    ecs_err("box.audio: more than %d sounds", BOX_AUDIO_SOUND_MAX - 1);
-                    state->sound_overflow = true;
-                }
-
-                continue;
-            }
-
-            if (t->sound(t, id, ecs_vec_first_t(&pcm[i].samples, float), frames, channels,
-                pcm[i].sample_rate))
-            {
-                state->sound_used[id] = 1;
-                s[i].id = id;
-                s[i].serial = state->serial;
-                state->spatial_dirty = true;
-            }
-=======
             s[i].id = box_audio_sound_send(state, t, ecs_vec_first_t(&pcm[i].samples, float),
                 frames, channels, pcm[i].sample_rate);
             s[i].serial = state->serial;
->>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
+            state->spatial_dirty |= s[i].id != 0;
         }
     }
 
@@ -712,6 +691,7 @@ static void box_audio_sounds(
         sample->id = box_audio_sound_send(state, t, sample->data, sample->frames,
             sample->channels, sample->sample_rate);
         sample->serial = state->serial;
+        state->spatial_dirty |= sample->id != 0;
     }
 }
 
@@ -799,10 +779,13 @@ static float box_audio_resume_position(
     ecs_entity_t sound,
     const AudioVoice *v)
 {
-    const AudioPcm *pcm = ecs_get(world, sound, AudioPcm);
+    const box_audio_sample_t *sample = box_audio_sample_of(world, sound);
+    const AudioPcm *pcm = sample ? NULL : ecs_get(world, sound, AudioPcm);
     int32_t channels = pcm && pcm->channels ? pcm->channels : 1;
-    double frames = pcm ? (double)(ecs_vec_count(&pcm->samples) / channels) : 0;
-    double rate = pcm && pcm->sample_rate > 0 ? pcm->sample_rate : state->rate;
+    double frames = sample ? (double)sample->frames :
+        pcm ? (double)(ecs_vec_count(&pcm->samples) / channels) : 0;
+    double rate = sample && sample->sample_rate > 0 ? sample->sample_rate :
+        pcm && pcm->sample_rate > 0 ? pcm->sample_rate : state->rate;
     double result = (state->time - v->origin) * box_audio_pitch_of(v->pitch) * rate;
     if (frames > 0 && result > 0) {
         result = fmod(result, frames);
@@ -1161,9 +1144,9 @@ static void box_audio_queued(
 
         box_audio_oneshot_t *shot = ecs_vec_append_t(NULL, &state->oneshots,
             box_audio_oneshot_t);
-<<<<<<< HEAD
         *shot = (box_audio_oneshot_t){
             .handle = box_audio_new_voice(state),
+            .sound = sound,
             .bus = box_audio_sound_bus(world, state, plays[i].sound),
             .spatial = plays[i].spatial,
             .position = { plays[i].position[0], plays[i].position[1], plays[i].position[2] },
@@ -1174,11 +1157,6 @@ static void box_audio_queued(
             .sent_pan = pan
         };
 
-=======
-        shot->handle = box_audio_new_voice(state);
-        shot->sound = sound;
-        shot->bus = box_audio_sound_bus(world, state, plays[i].sound);
->>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
         if (box_audio_reserve(state)) {
             box_audio_write_play(&state->writer, shot->handle, sound, shot->bus,
                 shot->sent_volume, pan, 1.0f, 0);

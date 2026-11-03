@@ -136,7 +136,6 @@ node test/integration/web/audio_module.mjs \
     "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
 ```
 
-<<<<<<< HEAD
 `audio_spatial.mjs` checks spatial audio in headless Chrome with
 `test/integration/web/audio_spatial.flecs`: a looping 440 Hz tone on an `AudioSpatial` source
 heard from an `AudioListener` at the origin. After a trusted click it moves the source with
@@ -147,7 +146,9 @@ right, the same power at every place (equal power) and no voice beyond `max_dist
 
 ```sh
 node test/integration/web/audio_spatial.mjs \
-=======
+    "$(tools/integration.py local-env --env audio)/wasm32-Emscripten/debug/bin"
+```
+
 `audio_reverb.mjs` checks the reverb with `test/integration/web/audio_reverb.flecs`, a bus
 `world` that sends to the bus `hall` with `Reverb: {decay: 2.4}`. After a trusted click it
 records `audio capture 4` while `box.audio.play` sends a click to the reverb, and measures the
@@ -171,6 +172,5 @@ expects the worklet to drop the voice and free the sound:
 
 ```sh
 node test/integration/web/audio_sample.mjs \
->>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
     "$(tools/integration.py local-env --env audio)/wasm32-Emscripten/debug/bin"
 ```

@@ -87,7 +87,6 @@ void Script_play_function(void) {
     ecs_fini(world);
 }
 
-<<<<<<< HEAD
 void Script_spatial_scene(void) {
     // audio/script
     ecs_world_t *world = audio_world();
@@ -105,7 +104,9 @@ void Script_spatial_scene(void) {
     test_assert(fabsf(audio_level(AUDIO_FRAME / 2)) < 1e-4f);
     test_assert(fabsf(audio_level_right(AUDIO_FRAME / 2) - 0.7071f) < 1e-3f);
     test_int(ecs_singleton_get(world, AudioStatus)->voices, 1);
-=======
+    ecs_fini(world);
+}
+
 void Script_reverb_hall(void) {
     // audio/script
     ecs_world_t *world = audio_world();
@@ -142,6 +143,5 @@ void Script_reverb_hall(void) {
     test_assert(ecs_lookup(world, "hall") == 0);
     audio_run(world, 10);
     test_flt(audio_peak(audio_tap_l, audio_tap_count - AUDIO_FRAME * 2, audio_tap_count), 0);
->>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
     ecs_fini(world);
 }
