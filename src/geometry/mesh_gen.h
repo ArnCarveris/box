@@ -186,6 +186,29 @@ void box_mesh_gen_rounded_box(
     float radius,
     int32_t segments);
 
+/** Number of edges of a box */
+#define BOX_BEVEL_EDGES (12)
+
+/** Box with a radius per edge centered on the origin, blending the corners between the edges.
+ *
+ * The radii are in the order of the members of Bevel: top_front, top_back, top_left, top_right,
+ * bottom_front, bottom_back, bottom_left, bottom_right, front_left, front_right, back_left and
+ * back_right.
+ *
+ * Radii that do not fit are scaled down together: along each axis, the corners at the two ends
+ * of an edge take the largest radius of their edges across that axis, and leave a sliver flat.
+ *
+ * @param mesh The mesh
+ * @param size Size along X, Y and Z
+ * @param radii Radius per edge, 0 for a sharp edge
+ * @param segments Steps per rounded edge, rounded up to even
+ */
+void box_mesh_gen_bevel(
+    box_mesh_t *mesh,
+    const vec3 size,
+    const float *radii,
+    int32_t segments);
+
 /** Convert an authored mesh, deriving face normals when it has none.
  *
  * @param mesh The mesh

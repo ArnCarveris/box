@@ -28,6 +28,11 @@ bake3 run test/cpu/core --local-env -- -j 8
 python3 tools/integration.py visual
 ```
 
+## Docs
+
+- [Audio](docs/audio.md): the guide to sound in box, from a first sound to the web rules,
+  captures and the reference of the audio core.
+
 ## Commands
 
 A running app takes shell commands on its REST port (`--port`, `PUT /shell/session`), in the

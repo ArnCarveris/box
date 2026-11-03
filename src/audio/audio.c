@@ -315,6 +315,20 @@ done:
     return result;
 }
 
+/** Whether an entity is a sound that box_audio_play and box_audio_play_at can play.
+ *
+ * @param world The world
+ * @param sound The entity
+ * @return Whether it is alive and has AudioPcm, SoundFile or SynthSound
+ */
+static bool box_audio_is_sound(
+    ecs_world_t *world,
+    ecs_entity_t sound)
+{
+    return sound && ecs_is_alive(world, sound) && (ecs_has(world, sound, AudioPcm) ||
+        ecs_has(world, sound, SoundFile) || ecs_has(world, sound, SynthSound));
+}
+
 bool box_audio_play(
     ecs_world_t *world,
     ecs_entity_t sound,
@@ -322,10 +336,7 @@ bool box_audio_play(
 {
     box_audio_module_t *state = box_audio_module_get(world);
     bool result = false;
-    if (!state || !sound || !ecs_is_alive(world, sound) ||
-        (!ecs_has(world, sound, AudioPcm) && !ecs_has(world, sound, SoundFile) &&
-        !ecs_has(world, sound, SynthSound)))
-    {
+    if (!state || !box_audio_is_sound(world, sound)) {
         goto done;
     }
 
@@ -344,9 +355,7 @@ bool box_audio_play_at(
 {
     box_audio_module_t *state = box_audio_module_get(world);
     bool result = false;
-    if (!state || !sound || !position || !ecs_is_alive(world, sound) ||
-        !ecs_has(world, sound, AudioPcm))
-    {
+    if (!state || !position || !box_audio_is_sound(world, sound)) {
         goto done;
     }
 

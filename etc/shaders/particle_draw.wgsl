@@ -3,7 +3,7 @@
 // particle faces the camera, its size wide and turned by its rotation; a free slot collapses
 // outside the clip volume. Size, rotation, spin and opacity are drawn from the seed and the spawn
 // index, each from its own stream, then the curves of the emitter scale them by the age over the
-// life (particle.wgsl).
+// life (particle.wgsl), read from their rows of the curve table unless they are constant.
 //
 // A circle is shaded smoothstep(1, 0, d^2) over its quad, a sprite shows a frame of its sheet and
 // a billboard is the mesh of the corner buffer turned to face the camera. A soft particle fades
@@ -30,6 +30,7 @@ const PI: f32 = 3.141592653589793;
 @group(1) @binding(3) var<storage, read> corners: array<Corner>;
 @group(1) @binding(4) var sprite_texture: texture_2d<f32>;
 @group(1) @binding(5) var sprite_sampler: sampler;
+@group(1) @binding(6) var<storage, read> curves: array<f32>;
 
 @group(2) @binding(0) var depth_texture: texture_depth_2d;
 
@@ -80,11 +81,11 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
     let life = f32(life_us) * 1e-6;
     let t = particle_norm_age(age, life);
     let size = particle_draw(seed, p.index, STREAM_SIZE, emitter.speed_size.zw) *
-        particle_curve(emitter.curve_size, t);
+        particle_curve(emitter.curve_rows.x, emitter.curve_values.x, t);
     let rotation = particle_draw(seed, p.index, STREAM_ROTATION, emitter.rotation_spin.xy);
     let spin = particle_draw(seed, p.index, STREAM_SPIN, emitter.rotation_spin.zw);
-    let angle = radians(particle_rotation(rotation, spin, emitter.curve_rotation,
-        emitter.curve_spin, age, life));
+    let angle = radians(particle_rotation(rotation, spin, emitter.curve_rows.z,
+        emitter.curve_values.z, emitter.curve_rows.w, emitter.curve_values.w, age, life));
     let c = cos(angle);
     let s = sin(angle);
     let right = vec3f(view.view[0].x, view.view[1].x, view.view[2].x);
@@ -128,9 +129,9 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
     out.world = world;
     out.depth = -(view.view * vec4f(world, 1.0)).z;
     out.opacity = particle_draw(seed, p.index, STREAM_OPACITY, emitter.opacity_radial.xy) *
-        particle_curve(emitter.curve_opacity, t);
+        particle_curve(emitter.curve_rows.y, emitter.curve_values.y, t);
     out.color = particle_color(seed, p.index, emitter.color.rgb, emitter.variance.rgb) *
-        particle_gradient(emitter.gradient, t);
+        particle_gradient(emitter.gradient_row, emitter.gradient, t);
     if (emitter.params.y > 0.0) {
         out.proj = view_projection_depth();
     }

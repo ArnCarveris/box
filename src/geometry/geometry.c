@@ -93,6 +93,62 @@ static void box_shape_mesh_move(
     }
 }
 
+/** Resolve one shape value to a mesh and an instance scale, taking a reference to the mesh.
+ *
+ * @param world The world
+ * @param shape The shape
+ * @param value The shape value
+ * @param resolved The resolved value
+ */
+static void box_shape_resolve_value(
+    const ecs_world_t *world,
+    const box_shape_t *shape,
+    const void *value,
+    ShapeMesh *resolved)
+{
+    *resolved = (ShapeMesh){0};
+    resolved->mesh = box_mesh_cache_acquire(shape->cache, shape, value);
+    glm_vec3_one(resolved->scale);
+    if (shape->desc.surface_world) {
+        shape->desc.surface_world(world, value, &resolved->surface,
+            resolved->min, resolved->max);
+    }
+
+    if (shape->desc.surface) {
+        shape->desc.surface(value, &resolved->surface, resolved->min, resolved->max);
+        box_shape_key_t key = {0};
+        if (shape->desc.key_world) {
+            shape->desc.key_world(world, value, &key);
+        } else {
+            shape->desc.key(value, &key);
+        }
+
+        resolved->surface.p[3][3] = (float)key.i[2];
+    }
+
+    if (resolved->surface.assets) {
+        ecs_os_free(resolved->surface.assets);
+        const box_mesh_t *mesh = box_mesh_cache_get(shape->cache, resolved->mesh);
+        resolved->surface.assets = mesh->surface_assets;
+        resolved->surface.asset_count = mesh->surface_asset_count;
+    }
+
+    if (shape->desc.surface_world) {
+        const box_mesh_t *mesh = box_mesh_cache_get(shape->cache, resolved->mesh);
+        if (!mesh || !mesh->vertex_count || !mesh->index_count) {
+            box_shape_mesh_release(shape->cache, resolved);
+            *resolved = (ShapeMesh){0};
+            glm_vec3_one(resolved->scale);
+        }
+    }
+
+    if (shape->desc.scale) {
+        shape->desc.scale(value, resolved->scale);
+    }
+
+    resolved->render_mesh = box_mesh_cache_resolve(shape->cache, resolved);
+}
+
 /** Resolve the shape values of an event to meshes, taking a reference to each.
  *
  * Entities that inherit the shape take the mesh their source resolved. The source's own OnSet
@@ -122,57 +178,62 @@ static void box_shape_resolve(
             resolved[i] = *shared;
         } else {
             const void *value = ECS_ELEM(values, shape->size, self ? i : 0);
-            resolved[i] = (ShapeMesh){0};
-            resolved[i].mesh = box_mesh_cache_acquire(shape->cache, shape, value);
-            glm_vec3_one(resolved[i].scale);
-            if (shape->desc.surface_world) {
-                shape->desc.surface_world(it->world, value, &resolved[i].surface,
-                    resolved[i].min, resolved[i].max);
-            }
-
-            if (shape->desc.surface) {
-                shape->desc.surface(value, &resolved[i].surface,
-                    resolved[i].min, resolved[i].max);
-                box_shape_key_t key = {0};
-                if (shape->desc.key_world) {
-                    shape->desc.key_world(it->world, value, &key);
-                } else {
-                    shape->desc.key(value, &key);
-                }
-
-                resolved[i].surface.p[3][3] = (float)key.i[2];
-            }
-
-            if (resolved[i].surface.assets) {
-                ecs_os_free(resolved[i].surface.assets);
-                const box_mesh_t *mesh = box_mesh_cache_get(shape->cache, resolved[i].mesh);
-                resolved[i].surface.assets = mesh->surface_assets;
-                resolved[i].surface.asset_count = mesh->surface_asset_count;
-            }
-
-            if (shape->desc.surface_world) {
-                const box_mesh_t *mesh = box_mesh_cache_get(shape->cache, resolved[i].mesh);
-                if (!mesh || !mesh->vertex_count || !mesh->index_count) {
-                    box_shape_mesh_release(shape->cache, &resolved[i]);
-                    resolved[i] = (ShapeMesh){0};
-                    glm_vec3_one(resolved[i].scale);
-                }
-            }
-
-            if (shape->desc.scale) {
-                shape->desc.scale(value, resolved[i].scale);
-            }
-
-            resolved[i].render_mesh = box_mesh_cache_resolve(shape->cache, &resolved[i]);
+            box_shape_resolve_value(it->world, shape, value, &resolved[i]);
         }
     }
 }
 
-/** Resolve set shape values to a cached mesh and an instance scale.
+/** Write a resolved shape to the ShapeMesh of an entity, which takes over its reference.
  *
  * ShapeMesh comes with the shape through the With trait, so the value is written in place
  * without moving the entity, which also holds while the entity is being instantiated. An
  * inherited value that resolves to the ShapeMesh the instance already has is left alone.
+ *
+ * @param world The world
+ * @param stage The stage for structural changes
+ * @param shape The shape
+ * @param e The entity
+ * @param resolved The resolved value
+ * @param inherited True when the shape value is inherited from a base
+ */
+static void box_shape_write(
+    ecs_world_t *world,
+    ecs_world_t *stage,
+    const box_shape_t *shape,
+    ecs_entity_t e,
+    ShapeMesh *resolved,
+    bool inherited)
+{
+    box_surface_materials_apply(world, e, resolved);
+    ShapeMesh *dst = ecs_get_mut(world, e, ShapeMesh);
+    bool same = dst && inherited && dst->mesh == resolved->mesh &&
+        glm_vec3_eqv(dst->scale, resolved->scale) &&
+        !ecs_os_memcmp_t(&dst->surface, &resolved->surface, box_surface_data_t);
+    if (same) {
+        box_shape_mesh_release(shape->cache, resolved);
+    } else if (dst) {
+        box_shape_mesh_release(shape->cache, dst);
+        *dst = *resolved;
+        ecs_modified(stage, e, ShapeMesh);
+    } else {
+        ecs_set_ptr(stage, e, ShapeMesh, resolved);
+        box_shape_mesh_release(shape->cache, resolved);
+    }
+}
+
+void box_shape_apply(
+    ecs_world_t *world,
+    ecs_world_t *stage,
+    const box_shape_t *shape,
+    ecs_entity_t e,
+    const void *value)
+{
+    ShapeMesh resolved;
+    box_shape_resolve_value(world, shape, value, &resolved);
+    box_shape_write(world, stage, shape, e, &resolved, false);
+}
+
+/** Resolve set shape values to a cached mesh and an instance scale.
  *
  * @param it The iterator
  */
@@ -186,21 +247,7 @@ static void box_shape_on_set(
     ecs_entity_t *entities = ecs_os_memdup_n(it->entities, ecs_entity_t, count);
     box_shape_resolve(it, shape, resolved);
     for (int32_t i = 0; i < count; i ++) {
-        box_surface_materials_apply(it->world, entities[i], &resolved[i]);
-        ShapeMesh *dst = ecs_get_mut(it->world, entities[i], ShapeMesh);
-        bool same = dst && !self && dst->mesh == resolved[i].mesh &&
-            glm_vec3_eqv(dst->scale, resolved[i].scale) &&
-            !ecs_os_memcmp_t(&dst->surface, &resolved[i].surface, box_surface_data_t);
-        if (same) {
-            box_shape_mesh_release(shape->cache, &resolved[i]);
-        } else if (dst) {
-            box_shape_mesh_release(shape->cache, dst);
-            *dst = resolved[i];
-            ecs_modified(it->stage, entities[i], ShapeMesh);
-        } else {
-            ecs_set_ptr(it->stage, entities[i], ShapeMesh, &resolved[i]);
-            box_shape_mesh_release(shape->cache, &resolved[i]);
-        }
+        box_shape_write(it->world, it->stage, shape, entities[i], &resolved[i], !self);
     }
 
     ecs_os_free(resolved);
@@ -338,13 +385,18 @@ int box_shape_register(
     shape->size = ti->size;
     shape->world = world;
     ecs_add_pair(world, desc->component, EcsWith, ecs_id(ShapeMesh));
-    ecs_observer(world, {
+    ecs_observer_desc_t on_set = {
         .query.terms = {{ .id = desc->component }},
         .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
         .events = { EcsOnSet },
         .callback = box_shape_on_set,
         .ctx = shape
-    });
+    };
+    if (desc->exclude) {
+        on_set.query.terms[1] = (ecs_term_t){ .id = desc->exclude, .oper = EcsNot };
+    }
+
+    ecs_observer_init(world, &on_set);
     ecs_observer(world, {
         .query.terms = {{ .id = desc->component }},
         .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
@@ -355,6 +407,106 @@ int box_shape_register(
     result = 0;
 done:
     return result;
+}
+
+/** Resolve an entity with a Box and a Bevel: the bevel mesh, or the plain Box mesh when the
+ * Bevel rounds no edge so that the entity shares the batches of plain boxes.
+ *
+ * @param world The world
+ * @param stage The stage for structural changes
+ * @param bevel The cached shape of the Bevel
+ * @param e The entity
+ * @param value The Box and the Bevel of the entity
+ */
+static void box_bevel_resolve(
+    ecs_world_t *world,
+    ecs_world_t *stage,
+    const box_shape_t *bevel,
+    ecs_entity_t e,
+    const box_bevel_value_t *value)
+{
+    if (box_bevel_flat(&value->bevel)) {
+        const box_shape_t *box = box_mesh_cache_shape(bevel->cache, ecs_id(Box));
+        box_shape_apply(world, stage, box, e, &value->box);
+    } else {
+        box_shape_apply(world, stage, bevel, e, value);
+    }
+}
+
+/** Resolve the entities with a Box and a Bevel whose Box or Bevel was set.
+ *
+ * The observer of Box skips entities with a Bevel, so this one owns their ShapeMesh.
+ *
+ * @param it The iterator
+ */
+static void box_bevel_on_set(
+    ecs_iter_t *it)
+{
+    const box_shape_t *bevel = it->ctx;
+    const Box *boxes = ecs_field(it, Box, 0);
+    const Bevel *bevels = ecs_field(it, Bevel, 1);
+    bool box_self = ecs_field_is_self(it, 0);
+    bool bevel_self = ecs_field_is_self(it, 1);
+    int32_t count = it->count;
+    box_bevel_value_t *values = ecs_os_malloc_n(box_bevel_value_t, count);
+    ecs_entity_t *entities = ecs_os_memdup_n(it->entities, ecs_entity_t, count);
+    for (int32_t i = 0; i < count; i ++) {
+        values[i].box = boxes[box_self ? i : 0];
+        values[i].bevel = bevels[bevel_self ? i : 0];
+    }
+
+    for (int32_t i = 0; i < count; i ++) {
+        box_bevel_resolve(it->world, it->stage, bevel, entities[i], &values[i]);
+    }
+
+    ecs_os_free(values);
+    ecs_os_free(entities);
+}
+
+/** Resolve an entity that loses its Bevel and keeps its Box, its own or inherited, back to the
+ * plain Box.
+ *
+ * An entity that is deleted resolves nothing, and one that also loses its Box drops its
+ * ShapeMesh in the remove observer of the Box.
+ *
+ * @param it The iterator
+ */
+static void box_bevel_on_remove(
+    ecs_iter_t *it)
+{
+    const box_shape_t *bevel = it->ctx;
+    const box_shape_t *box = box_mesh_cache_shape(bevel->cache, ecs_id(Box));
+    bool live = it->other_table && ecs_table_get_type(it->other_table)->count &&
+        ecs_search_relation(it->world, it->other_table, 0, ecs_id(Box), EcsIsA,
+            EcsSelf | EcsUp, NULL, NULL, NULL) != -1;
+    for (int32_t i = 0; live && i < it->count; i ++) {
+        ecs_entity_t e = it->entities[i];
+        const Box *value = ecs_get(it->world, e, Box);
+        if (value) {
+            Box copy = *value;
+            box_shape_apply(it->world, it->stage, box, e, &copy);
+        }
+    }
+}
+
+void box_geometry_bevel_init(
+    ecs_world_t *world,
+    box_shape_t *bevel)
+{
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(Box) }, { .id = ecs_id(Bevel) }},
+        .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
+        .events = { EcsOnSet },
+        .callback = box_bevel_on_set,
+        .ctx = bevel
+    });
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(Bevel) }},
+        .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
+        .events = { EcsOnRemove },
+        .callback = box_bevel_on_remove,
+        .ctx = bevel
+    });
 }
 
 void BoxGeometryImport(
@@ -388,6 +540,7 @@ void BoxGeometryImport(
     ECS_META_COMPONENT(world, Tube);
     ECS_META_COMPONENT(world, Frustum);
     ECS_META_COMPONENT(world, RoundedBox);
+    ECS_META_COMPONENT(world, Bevel);
     ECS_META_COMPONENT(world, Star);
     ECS_META_COMPONENT(world, SurfaceRegion);
     ECS_COMPONENT_DEFINE(world, PathSegmentKind);

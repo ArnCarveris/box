@@ -36,6 +36,14 @@
 /** Log2 of BOX_RENDER_PARTICLE_SORT_MIN, the keys a workgroup sorts */
 #define BOX_GPU_PARTICLE_SORT_GROUP_LOG (9u)
 
+/** Storage buffers the vertex stage of the draw reads: particles, keys, corners and the curve
+ * table; the view group adds none to the vertex stage */
+#define BOX_GPU_PARTICLE_VERTEX_STORAGE (4u)
+
+/** Storage buffers of the integrate and spawn passes: particles, spawn slots, mesh table,
+ * arguments and the curve table */
+#define BOX_GPU_PARTICLE_SIM_STORAGE (5u)
+
 /** Draw pipelines, one per color format and ParticleBlend */
 #define BOX_GPU_PARTICLE_DRAWS (BOX_GPU_BLIT_FORMATS * 2)
 
@@ -43,7 +51,8 @@
 typedef struct box_gpu_particle_draw_t {
     ecs_entity_t scene;             /**< Scene root of the pool */
     uint32_t block;                 /**< Index of its block and its draw arguments */
-    WGPUBindGroup group;            /**< Binds its block, particles, keys, mesh and sprite */
+    WGPUBindGroup group;            /**< Binds its block, particles, keys, mesh, sprite and the
+                                     *   curve table */
     WGPUBuffer page;                /**< Particle page of the pool */
     uint32_t offset;                /**< Byte offset of the pool in the page */
     uint64_t size;                  /**< Bytes of the pool */
@@ -251,7 +260,7 @@ static void box_gpu_particle_draw_init(
     box_gpu_t *gpu,
     box_gpu_particles_t *s)
 {
-    WGPUBindGroupLayoutEntry draw[6] = {
+    WGPUBindGroupLayoutEntry draw[7] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
@@ -288,6 +297,11 @@ static void box_gpu_particle_draw_init(
             .binding = 5,
             .visibility = WGPUShaderStage_Fragment,
             .sampler = { .type = WGPUSamplerBindingType_Filtering }
+        },
+        {
+            .binding = 6,
+            .visibility = WGPUShaderStage_Vertex,
+            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
         }
     };
     WGPUBindGroupLayoutEntry depth = {
@@ -299,7 +313,7 @@ static void box_gpu_particle_draw_init(
         }
     };
     s->draw_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 6, .entries = draw });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 7, .entries = draw });
     s->depth_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 1, .entries = &depth });
     WGPUBindGroupLayout groups[3] = { gpu->view_layout, s->draw_layout, s->depth_layout };
@@ -330,7 +344,8 @@ void box_gpu_particles_init(
     box_gpu_t *gpu)
 {
     box_gpu_particles_t *s = ecs_os_calloc_t(box_gpu_particles_t);
-    WGPUBindGroupLayoutEntry sim[5] = {
+    WGPULimits limits = WGPU_LIMITS_INIT;
+    WGPUBindGroupLayoutEntry sim[6] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Compute,
@@ -359,10 +374,24 @@ void box_gpu_particles_init(
             .binding = 4,
             .visibility = WGPUShaderStage_Compute,
             .buffer = { .type = WGPUBufferBindingType_Storage }
+        },
+        {
+            .binding = 8,
+            .visibility = WGPUShaderStage_Compute,
+            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
         }
     };
+    if (wgpuDeviceGetLimits(gpu->device, &limits) == WGPUStatus_Success &&
+        limits.maxStorageBuffersPerShaderStage != WGPU_LIMIT_U32_UNDEFINED &&
+        (limits.maxStorageBuffersPerShaderStage < BOX_GPU_PARTICLE_VERTEX_STORAGE ||
+            limits.maxStorageBuffersPerShaderStage < BOX_GPU_PARTICLE_SIM_STORAGE))
+    {
+        ecs_warn("particles need %u storage buffers per shader stage, the device has %u",
+            BOX_GPU_PARTICLE_SIM_STORAGE, limits.maxStorageBuffersPerShaderStage);
+    }
+
     s->sim_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 5, .entries = sim });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 6, .entries = sim });
     s->sim_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){
             .bindGroupLayoutCount = 1,
@@ -720,6 +749,23 @@ static void box_gpu_particle_upload(
         (size_t)slot_bytes);
 }
 
+/** Get the curve table a pool reads, NULL when it reads none or the table does not exist.
+ *
+ * The table is created again when it grows, so the groups that bind it are made per packet.
+ *
+ * @param gpu The backend
+ * @param pool The pool
+ * @return The buffer
+ */
+static const box_gpu_buffer_t* box_gpu_particle_curves(
+    box_gpu_t *gpu,
+    const box_render_particle_pool_t *pool)
+{
+    return pool->curves
+        ? ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, pool->curves)
+        : NULL;
+}
+
 /** Keep the draw of a pool for the views of its scene, with the bind group of its block, its
  * particles, its sort keys, its billboard corners and its sprite.
  *
@@ -740,8 +786,9 @@ static void box_gpu_particle_keep(
     box_gpu_buffer_t *mesh = b->look == ParticleBillboard
         ? ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, pool->mesh)
         : NULL;
+    const box_gpu_buffer_t *curves = box_gpu_particle_curves(gpu, pool);
     uint64_t size = (uint64_t)pool->capacity * BOX_RENDER_PARTICLE_SIZE;
-    WGPUBindGroupEntry draw[6] = {
+    WGPUBindGroupEntry draw[7] = {
         {
             .binding = 0, .buffer = s->blocks, .offset = 0,
             .size = sizeof(box_render_particle_block_t)
@@ -759,7 +806,11 @@ static void box_gpu_particle_keep(
             .binding = 4,
             .textureView = box_gpu_texture_color(gpu, b->look == ParticleSprite ? pool->texture : 0)
         },
-        { .binding = 5, .sampler = box_gpu_texture_sampler(gpu, WrapClamp, 1) }
+        { .binding = 5, .sampler = box_gpu_texture_sampler(gpu, WrapClamp, 1) },
+        {
+            .binding = 6, .buffer = curves ? curves->buffer : s->no_table, .offset = 0,
+            .size = curves ? curves->size : 32
+        }
     };
     box_gpu_particle_draw_t *d = ecs_vec_append_t(
         NULL, &s->draws_of_packet, box_gpu_particle_draw_t);
@@ -776,7 +827,7 @@ static void box_gpu_particle_keep(
     d->origin[2] = b->model[3][2];
     d->group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = s->draw_layout,
-        .entryCount = 6,
+        .entryCount = 7,
         .entries = draw
     });
 }
@@ -799,6 +850,7 @@ static void box_gpu_particle_dispatch(
     box_gpu_buffer_t *table = pool->table
         ? ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, pool->table)
         : NULL;
+    const box_gpu_buffer_t *curves = box_gpu_particle_curves(gpu, pool);
     uint64_t size = (uint64_t)pool->capacity * BOX_RENDER_PARTICLE_SIZE;
     uint32_t offset = index * BOX_GPU_PARTICLE_STRIDE;
     if (!page || pool->offset + size > page->size || pool->block.used > pool->capacity) {
@@ -808,7 +860,7 @@ static void box_gpu_particle_dispatch(
         goto done;
     }
 
-    WGPUBindGroupEntry entries[5] = {
+    WGPUBindGroupEntry entries[6] = {
         {
             .binding = 0, .buffer = s->blocks, .offset = 0,
             .size = sizeof(box_render_particle_block_t)
@@ -819,11 +871,15 @@ static void box_gpu_particle_dispatch(
             .binding = 3, .buffer = table ? table->buffer : s->no_table, .offset = 0,
             .size = table ? table->size : 32
         },
-        { .binding = 4, .buffer = s->args, .offset = 0, .size = s->args_size }
+        { .binding = 4, .buffer = s->args, .offset = 0, .size = s->args_size },
+        {
+            .binding = 8, .buffer = curves ? curves->buffer : s->no_table, .offset = 0,
+            .size = curves ? curves->size : 32
+        }
     };
     WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = s->sim_layout,
-        .entryCount = 5,
+        .entryCount = 6,
         .entries = entries
     });
     wgpuComputePassEncoderSetBindGroup(pass, 0, group, 1, &offset);

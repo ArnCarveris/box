@@ -1,6 +1,7 @@
 include dust_merchant/assets
 include dust_merchant/materials
 include dust_merchant/state
+include dust_merchant/audio
 include dust_merchant/kit
 include dust_merchant/widgets
 include dust_merchant/crt

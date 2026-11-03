@@ -10,6 +10,7 @@
 
 #include "draw.h"
 #include <stddef.h>
+#include <math.h>
 
 /** A float field of a component */
 #define BOX_TRANSITION_FLOAT(T, m) \
@@ -173,12 +174,12 @@ void box_render_transition_mix(
 {
     const box_render_transition_layout_t *layout = box_render_transition_layout(component);
     int32_t i;
-    if (!(t > 0.0f)) {
+    if (t == 0.0f || isnan(t)) {
         ecs_os_memcpy(out, from, BOX_RENDER_TRANSITION_VALUE);
         goto done;
     }
 
-    if (t >= 1.0f) {
+    if (t == 1.0f) {
         ecs_os_memcpy(out, to, BOX_RENDER_TRANSITION_VALUE);
         goto done;
     }
@@ -198,6 +199,33 @@ void box_render_transition_mix(
             v = v < 0.0f ? 0.0f : (v > 255.0f ? 255.0f : v);
             *(uint8_t*)ECS_OFFSET(out, field->offset) = (uint8_t)(v + 0.5f);
         }
+    }
+done:
+    return;
+}
+
+void box_render_transition_widen(
+    box_render_transition_component_t component,
+    const TransitionSpec *spec,
+    float *lo,
+    float *hi)
+{
+    float over;
+    int32_t i;
+    if (component > BOX_RENDER_TRANSITION_SCALE || spec->timing_function != CubicBezier) {
+        goto done;
+    }
+
+    over = glm_max(glm_max(spec->bezier.y1, spec->bezier.y2) - 1.0f,
+        -glm_min(spec->bezier.y1, spec->bezier.y2));
+    if (!(over > 0.0f)) {
+        goto done;
+    }
+
+    for (i = 0; i < 3; i ++) {
+        float width = (hi[i] - lo[i]) * over;
+        lo[i] -= width;
+        hi[i] += width;
     }
 done:
     return;
@@ -299,8 +327,10 @@ static void box_transition_value_at(
         ecs_os_memcpy(out, v->current, BOX_RENDER_TRANSITION_VALUE);
     } else {
         float progress = box_render_transition_progress(v->start, v->delay, v->duration, time);
-        box_render_transition_mix(component, v->from, v->target,
-            box_transition_ease(v->timing_function, progress), out);
+        float eased = v->timing_function == CubicBezier
+            ? box_transition_ease_bezier(CubicBezier, &v->bezier, progress)
+            : box_transition_ease(v->timing_function, progress);
+        box_render_transition_mix(component, v->from, v->target, eased, out);
     }
 }
 
@@ -362,6 +392,7 @@ static void box_transition_start(
     v->delay = r->delay;
     v->duration = r->duration;
     v->timing_function = r->timing_function;
+    v->bezier = r->bezier;
     if (!v->active) {
         v->active = true;
         node->running ++;

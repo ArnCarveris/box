@@ -348,6 +348,7 @@ async {
     await on.pressed(actions.step)
     if stage == STAGE_COLD && !sw[SW_MAIN] {
       sw[SW_MAIN] = true
+      const snap = box.audio.play(SfxToggle, 0.8)
       emit Flipped(sig: SW_MAIN)
     } else if stage == STAGE_BUS {
       igniting = true
