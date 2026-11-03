@@ -10,10 +10,11 @@
 #include <bake_bench.h>
 #include "render.h"
 
-/** Report the stream upload counters and the allocated page buffers of the last extract.
+/** Report the material records, the stream upload counters and the allocated page buffers of the
+ * last extract.
  *
- * Adds the transform_bytes, shading_bytes, surface_bytes, page_slots, page_transform_bytes,
- * page_shading_bytes, page_surface_bytes and page_bytes counters.
+ * Adds the materials, transform_bytes, shading_bytes, surface_bytes, page_slots,
+ * page_transform_bytes, page_shading_bytes, page_surface_bytes and page_bytes counters.
  *
  * @param b The bench
  * @param stats Counters of the last extract
