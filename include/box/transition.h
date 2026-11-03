@@ -56,18 +56,13 @@ ECS_STRUCT(TransitionSpec, {
     TransitionBezier bezier;        /**< Handles of CubicBezier, ignored by the others */
 });
 
-/** Map from a component id to the TransitionSpec of its changes, inherited by instances; an
- * instance that sets its own replaces the whole map. In script: Transition: [Position: {...}].
- * A key that is not transitionable, a negative duration or delay, or a CubicBezier with an x
- * handle outside 0..1 or a handle that is not finite logs an error and is ignored.
+/** Map from a component id to the TransitionSpec of its changes, inherited by instances that
+ * do not set their own. In script: Transition: [Position: {...}]. An invalid entry
+ * (box_transition_valid) logs an error and is ignored. Only a new value animates.
  *
- * Transitionable keys: Position, Rotation, Scale, Rgb, Opacity, AlphaCutoff, Tint, PbrMaterial,
- * Emissive, TextureTransform, Transmission, ClearCoat, SpecularAnisotropy, Sheen and
- * DiffuseTransmission (box_transition_supported). Only a new value of a kept component animates.
- *
- * The storage is a flecs map (ecs_map_t) keyed by the component entity, whose values are
- * allocated TransitionSpecs: read one with ecs_map_get_deref(map, TransitionSpec, component),
- * write one from C with box_transition_set() and remove one with box_transition_remove().
+ * A flecs map (ecs_map_t) keyed by the component entity, whose values are allocated
+ * TransitionSpecs: read one with ecs_map_get_deref(map, TransitionSpec, component), write one
+ * with box_transition_set() and remove one with box_transition_remove().
  */
 typedef ecs_map_t Transition;
 

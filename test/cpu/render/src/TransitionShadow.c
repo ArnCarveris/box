@@ -626,3 +626,38 @@ void TransitionShadow_bounds_corners(void) {
 
     tr_fini(world, null);
 }
+
+/* A box 1 wide moves from x = 0 to 4 along a CubicBezier whose y handles overshoot to 1.8: the
+ * rendered pose passes the target, and the regions of each frame still hold it, within the
+ * range widened by 0.8 of its width on each side */
+void TransitionShadow_bezier_overshoot(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    box_render_shadow_region_t bounds;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_vec_t *regions = tr_regions(world);
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    box_transition_set(world, e, ecs_id(Position), &(TransitionSpec){
+        .duration = 1.0f, .timing_function = CubicBezier,
+        .bezier = {0.3f, 1.8f, 0.7f, 1.8f} });
+    tr_frame(world);
+
+    ecs_set(world, e, Position, {4, 0, 0});
+    float max_x = 0.0f;
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        ecs_vec_clear(regions);
+        tr_frame(world);
+        tr_rendered_bounds(world, null, e, &bounds);
+        tr_test_regions(regions, &bounds, -3.8f, 7.8f);
+        max_x = glm_max(max_x, bounds.max[0]);
+    }
+
+    test_assert(max_x > 5.0f);
+    for (i = 0; i < 3; i ++) {
+        tr_frame(world);
+    }
+
+    tr_test_static(world, null, e);
+    tr_fini(world, null);
+}

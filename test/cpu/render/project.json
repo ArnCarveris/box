@@ -513,7 +513,8 @@
                     "mixed_children",
                     "surface_instance",
                     "range_mul_single",
-                    "bounds_corners"
+                    "bounds_corners",
+                    "bezier_overshoot"
                 ]
             },
             {
