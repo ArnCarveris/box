@@ -323,6 +323,7 @@ static void box_texture_fail(
 {
     box_texture_t *tex = box_texture_entry(t, e);
     tex->generation ++;
+    tex->waiting = false;
     ecs_err("%s", error);
     box_texture_status(world, e, TextureFailed, box_texture_revision(world, e), error);
 }
@@ -345,6 +346,7 @@ static void box_texture_submit(
     job->sync = t->sync;
     job->entity = e;
     job->generation = ++ tex->generation;
+    tex->waiting = false;
     t->sync->refs ++;
     ecs_os_mutex_lock(t->sync->lock);
     t->sync->working ++;
@@ -406,27 +408,39 @@ static void box_texture_request(
 
 /** Submit a generation of the TextureGen of an entity, with the layers of its source.
  *
+ * A source that exists but has no TextureGen yet, such as one declared later in a script, makes
+ * the texture wait in TextureLoading when wait is set; one that is deleted, loses its
+ * TextureGen or has no layers fails it.
+ *
  * @param world The world or a stage
  * @param t The registry
  * @param e The texture entity
  * @param gen Its TextureGen
+ * @param wait Wait for a source without a TextureGen instead of failing
  */
 static void box_texture_request_gen(
     ecs_world_t *world,
     box_textures_t *t,
     ecs_entity_t e,
-    const TextureGen *gen)
+    const TextureGen *gen,
+    bool wait)
 {
     const TextureGen *field = gen;
     if (gen->source) {
-        field = ecs_is_alive(world, gen->source)
-            ? ecs_get(world, gen->source, TextureGen)
-            : NULL;
+        bool exists = ecs_is_alive(world, gen->source);
+        bool removed = exists && gen->source == t->removed;
+        field = exists && !removed ? ecs_get(world, gen->source, TextureGen) : NULL;
+        if (!field && exists && !removed && wait) {
+            box_texture_t *tex = box_texture_entry(t, e);
+            tex->generation ++;
+            tex->waiting = true;
+            box_texture_status(world, e, TextureLoading, box_texture_revision(world, e), NULL);
+            goto done;
+        }
+
         if (!field || !ecs_vec_count(&field->layers)) {
             char *name = ecs_get_path(world, e);
-            char *source = ecs_is_alive(world, gen->source)
-                ? ecs_get_path(world, gen->source)
-                : NULL;
+            char *source = exists ? ecs_get_path(world, gen->source) : NULL;
             char *error = flecs_asprintf("texture '%s': source '%s' has no TextureGen with "
                 "layers", name, source ? source : "(deleted)");
             box_texture_fail(world, t, e, error);
@@ -497,7 +511,7 @@ static void box_texture_load(
     } else if (path) {
         box_texture_request(world, t, e, path);
     } else if (gen) {
-        box_texture_request_gen(world, t, e, gen);
+        box_texture_request_gen(world, t, e, gen, true);
     }
 }
 
@@ -617,7 +631,8 @@ done:
 }
 
 /** Forget the textures whose TexturePath or TextureGen is removed and release their backend
- * image; one that keeps the other loads from it instead, keeping its entry and image.
+ * image; one that keeps the other loads from it instead, keeping its entry and image. The
+ * textures derived from a removed TextureGen, also on deletion of its entity, fail.
  *
  * @param it The iterator of the observer
  */
@@ -639,7 +654,7 @@ static void BoxTextureOnRemove(
         box_texture_t *tex = ecs_map_get_deref(&t->textures, box_texture_t, e);
         box_file_watch_clear(it->world, t->watch, e);
         if (keep && is_path) {
-            box_texture_request_gen(it->stage, t, e, ecs_get(it->world, e, TextureGen));
+            box_texture_request_gen(it->stage, t, e, ecs_get(it->world, e, TextureGen), true);
             continue;
         } else if (keep) {
             box_texture_request(it->stage, t, e, ecs_get(it->world, e, TexturePath));
@@ -660,6 +675,14 @@ static void BoxTextureOnRemove(
             ecs_remove(it->stage, e, Texture);
             ecs_remove(it->stage, e, TextureStatus);
         }
+    }
+
+    /* After the loop, so derived textures deleted with their source in this batch are
+     * already forgotten */
+    for (i = 0; !is_path && i < it->count; i ++) {
+        t->removed = it->entities[i];
+        box_texture_regenerate_derived(it->stage, t, it->entities[i]);
+        t->removed = 0;
     }
 
 done:
@@ -721,8 +744,41 @@ static void box_textures_warn_timeout(
     ecs_os_free(list);
 }
 
-/** Load the textures again when the texture quality of the surfaces changed and, in a
- * headless run, wait for the decodes in flight so a frame always sees the same images, and
+/** Fail the textures that still wait for their source to get a TextureGen.
+ *
+ * @param world The world
+ * @param t The registry
+ */
+static void box_textures_fail_waiting(
+    ecs_world_t *world,
+    box_textures_t *t)
+{
+    ecs_vec_t waiting;
+    ecs_vec_init_t(NULL, &waiting, ecs_entity_t, 0);
+    ecs_map_iter_t it = ecs_map_iter(&t->textures);
+    while (ecs_map_next(&it)) {
+        box_texture_t *tex = ecs_map_ptr(&it);
+        if (tex->waiting) {
+            tex->waiting = false;
+            *ecs_vec_append_t(NULL, &waiting, ecs_entity_t) = tex->entity;
+        }
+    }
+
+    int32_t i, count = ecs_vec_count(&waiting);
+    ecs_entity_t *entities = ecs_vec_first_t(&waiting, ecs_entity_t);
+    for (i = 0; i < count; i ++) {
+        ecs_entity_t e = entities[i];
+        const TextureGen *gen = ecs_is_alive(world, e) ? ecs_get(world, e, TextureGen) : NULL;
+        if (gen && !ecs_has(world, e, TexturePath)) {
+            box_texture_request_gen(world, t, e, gen, false);
+        }
+    }
+
+    ecs_vec_fini_t(NULL, &waiting, ecs_entity_t);
+}
+
+/** Fail the textures whose source got no TextureGen since the last frame, load the textures
+ * again when the texture quality of the surfaces changed and, in a headless run, wait for the decodes in flight so a frame always sees the same images, and
  * warn when the wait gives up.
  *
  * @param it The iterator of the system
@@ -737,6 +793,7 @@ static void BoxTextureFrame(
         goto done;
     }
 
+    box_textures_fail_waiting(it->world, t);
     int32_t quality = box_textures_quality(it->world, t);
     if (t->quality && quality != t->quality) {
         t->quality = quality;

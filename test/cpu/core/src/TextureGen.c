@@ -599,6 +599,75 @@ void TextureGen_source_missing(void) {
     ecs_fini(world);
 }
 
+void TextureGen_source_declared_after(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    const char *code =
+        "using box.texture\n"
+        "ashlar { TextureGen: {source: ashlar_height, output: GenNormal} }\n"
+        "ashlar_height { TextureGen: {width: 16, height: 16, seed: 3,\n"
+        "  layers: [{kind: GenNoise, frequency: 4, octaves: 2, amount: 1}]} }\n";
+    test_assert(ecs_script_run(world, "ashlar", code, NULL) == 0);
+    ecs_entity_t tex = ecs_lookup(world, "ashlar");
+    test_assert(tex != 0);
+    const TextureStatus *status = wait_texture(world, tex);
+    test_int(status->state, TextureReady);
+    test_assert(status->error == NULL);
+    test_int(ecs_get(world, tex, Texture)->width, 16);
+
+    ecs_fini(world);
+}
+
+void TextureGen_source_gen_removed(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    const char *code =
+        "using box.texture\n"
+        "field { TextureGen: {width: 16, height: 16, seed: 1,\n"
+        "  layers: [{kind: GenNoise, frequency: 4, octaves: 2, amount: 1}]} }\n"
+        "field_n { TextureGen: {source: field, output: GenNormal} }\n";
+    test_assert(ecs_script_run(world, "gen", code, NULL) == 0);
+    ecs_entity_t field = ecs_lookup(world, "field");
+    ecs_entity_t normal = ecs_lookup(world, "field_n");
+    test_int(wait_texture(world, normal)->state, TextureReady);
+
+    ecs_log_set_level(-4);
+    ecs_remove(world, field, TextureGen);
+    const TextureStatus *status = wait_texture(world, normal);
+    test_int(status->state, TextureFailed);
+    test_assert(status->error != NULL);
+    test_assert(strstr(status->error, "field_n") != NULL);
+    test_assert(strstr(status->error, "'field'") != NULL);
+    test_assert(strstr(status->error, "TextureGen") != NULL);
+
+    ecs_fini(world);
+}
+
+void TextureGen_source_deleted(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    const char *code =
+        "using box.texture\n"
+        "field { TextureGen: {width: 16, height: 16, seed: 1,\n"
+        "  layers: [{kind: GenNoise, frequency: 4, octaves: 2, amount: 1}]} }\n"
+        "field_a { TextureGen: {source: field, output: GenAlbedo} }\n";
+    test_assert(ecs_script_run(world, "gen", code, NULL) == 0);
+    ecs_entity_t field = ecs_lookup(world, "field");
+    ecs_entity_t albedo = ecs_lookup(world, "field_a");
+    test_int(wait_texture(world, albedo)->state, TextureReady);
+
+    ecs_log_set_level(-4);
+    ecs_delete(world, field);
+    test_assert(!ecs_is_alive(world, field));
+    const TextureStatus *status = wait_texture(world, albedo);
+    test_int(status->state, TextureFailed);
+    test_assert(status->error != NULL);
+    test_assert(strstr(status->error, "field_a") != NULL);
+    test_assert(strstr(status->error, "'field'") != NULL);
+
+    ecs_fini(world);
+}
+
 void TextureGen_with_path_error(void) {
     // materials/textures
     ecs_world_t *world = world_new();
