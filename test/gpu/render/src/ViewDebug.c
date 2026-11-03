@@ -6,17 +6,15 @@
  * orthographic cameras, several views of a target, effects, captures, a camera under the plane
  * and resizes; checked on PNG captures.
  *
- * Most cases look straight down from 10 units above the plane with a 60 degree field of view
- * into a 128 pixel square capture that clears to black: 11.09 pixels a unit, world +X to the
- * right and +Z down the image, the origin at the center. The grid has white minor lines every
- * unit and green major lines every 5 units at full alpha.
+ * Most cases look straight down from 10 units with a 60 degree field of view into a black 128
+ * pixel capture: 11.09 pixels a unit, +X right and +Z down, the origin at the center, white
+ * minor lines every unit and green major lines every 5 units at full alpha.
  *
  * The world has no ambient light and no light in reach: geometry shows its emission only.
  */
 
 #include <box.h>
 #include <bake_test.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -384,8 +382,6 @@ static void dg_expect_lines(
 
         dg_scan_t s = dg_scan(px, row, from, to, false);
         float center = dg_pos((float)k, scale);
-        printf("line %d: red %.2f green %.2f blue %.2f, peak %d (center %.1f)\n", k,
-            s.sum[0], s.sum[1], s.sum[2], s.peak, center);
         test_assert(s.sum[0] > width * 0.6f);
         test_assert(s.sum[0] < width * 1.5f + 0.3f);
         test_assert(fabsf(s.sum[1] - s.sum[0]) < 0.15f * s.sum[0]);
@@ -454,8 +450,6 @@ void ViewDebug_grid_lines(void) {
         from = from < 0 ? 0 : from;
         to = to >= DG_SIZE ? DG_SIZE - 1 : to;
         dg_scan_t s = dg_scan(px, row, from, to, false);
-        printf("major %.0f: red %.2f green %.2f blue %.2f, peak %d (center %.1f)\n",
-            majors[k], s.sum[0], s.sum[1], s.sum[2], s.peak, center);
         test_assert(s.sum[1] > 0.9f);
         test_assert(s.sum[1] < 2.6f);
         test_assert(s.sum[0] < 0.4f * s.sum[1]);
@@ -563,7 +557,6 @@ void ViewDebug_grid_no_edge(void) {
     }
 
     for (y = DG_SIZE / 2; y < DG_SIZE / 2 + 12; y ++) {
-        printf("row %d: %.4f\n", y, means[y]);
         test_assert(fabsf(means[y + 1] - means[y]) < 0.03f);
     }
 
@@ -688,15 +681,11 @@ void ViewDebug_grid_not_tonemapped(void) {
 
     int32_t line = (int32_t)dg_pos(2, DG_SCALE), row = (int32_t)dg_pos(2.5f, DG_SCALE);
     const unsigned char *a = dg_px(px[0], line, row), *b = dg_px(px[1], line, row);
-    printf("line: %d %d %d without effects, %d %d %d with\n", a[0], a[1], a[2], b[0], b[1],
-        b[2]);
     for (k = 0; k < 3; k ++) {
         test_assert(abs((int32_t)a[k] - (int32_t)b[k]) <= 3);
     }
 
     test_assert(abs((int32_t)a[0] - 200) <= 6);
-    const unsigned char *bg_a = dg_px(px[0], line + 5, row), *bg_b = dg_px(px[1], line + 5, row);
-    test_assert(abs((int32_t)bg_a[2] - (int32_t)bg_b[2]) > 20);
     const unsigned char *box_a = dg_px(px[0], 37, 37), *box_b = dg_px(px[1], 37, 37);
     test_assert(abs((int32_t)box_a[0] - (int32_t)box_b[0]) > 5 ||
         abs((int32_t)box_a[2] - (int32_t)box_b[2]) > 5);

@@ -139,9 +139,8 @@ ECS_STRUCT(ViewEffect, {
 /** What a frame draws: a camera, the target it draws into and its settings.
  *
  * Views render in ascending order and are picked and get input in descending order, so a view
- * of a higher order draws over and is hit first. Ties keep entity id (creation) order.
- *
- * A changed order takes effect in the next frame.
+ * of a higher order draws over and is hit first. Ties keep entity id (creation) order. A
+ * changed order takes effect in the next frame.
  *
  * The debug settings draw over the image after the effects of the view, in colors that are not
  * tone mapped; a view of a higher order draws over them.
@@ -187,11 +186,10 @@ int box_view_compare(
  *
  * View gets a constructor that enables lighting, baked lighting, reflections, the atmosphere
  * and the fog volumes, sets the environment intensity to 1 and the ShadowSettings defaults with
- * shadows disabled, enables culling with occlusion and a smallest size of one pixel and sets the
- * GridSettings defaults with the grid disabled.
+ * shadows disabled, enables culling with occlusion and a smallest size of one pixel.
  *
- * A C literal View starts from zero instead: unlit, drawing every instance, without debug
- * drawing.
+ * It sets the GridSettings defaults with the grid disabled. A C literal View starts from zero
+ * instead: unlit, drawing every instance, without debug drawing.
  *
  * @param world The world
  */
