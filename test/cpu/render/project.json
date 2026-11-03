@@ -65,6 +65,7 @@
                     "texture_blend_batches",
                     "texture_blend_prefab",
                     "texture_blend_layer_changes",
+                    "texture_blend_layer_deleted",
                     "texture_blend_plain_fallback"
                 ]
             },

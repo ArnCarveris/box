@@ -22,8 +22,8 @@
 /** RGB PNG of 16 by 16 pixels of (128, 0, 0) */
 #define MASK_RED_PNG "test/assets/textures/mask_red.png"
 
-/** Create a headless world with a camera, a view whose pixels 16 and 48 of row 16 see x of -3.46 and 3.46 and a
- * surface of 64 by 32 pixels.
+/** Create a headless world with a camera, a view whose pixels 16 and 48 of row 16 see x of
+ * -3.46 and 3.46 and a surface of 64 by 32 pixels.
  *
  * @param file File the surface writes
  * @return The world

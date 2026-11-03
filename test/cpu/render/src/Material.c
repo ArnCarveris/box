@@ -1944,6 +1944,47 @@ void Material_texture_blend_layer_changes(void) {
     box_render_null_free(null);
 }
 
+/** A deleted layer entity, whose id the TextureBlend still holds, contributes the defaults like
+ * a layer without PbrTextures, and the shape keeps blending. */
+void Material_texture_blend_layer_deleted(void) {
+    // materials/texture_blend
+    box_render_null_t *null;
+    ecs_world_t *world = blend_world(&null);
+    ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
+    ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
+    ecs_entity_t grass = ecs_new(world);
+    ecs_set(world, grass, PbrTextures, {.albedo = a, .normal = g});
+    ecs_set(world, grass, TextureTransform, {.scale_x = 4, .scale_y = 4});
+    ecs_entity_t rock = ecs_new(world);
+    ecs_set(world, rock, PbrTextures, {.albedo = g});
+    ecs_entity_t e = cutout_shape(world, 9);
+    ecs_set(world, e, TextureBlend, {.layers = {grass, rock}});
+    ecs_entity_t textures[2] = { a, g };
+    blend_wait(world, textures, 2);
+
+    const box_render_batch_t *found[2];
+    test_int(blend_batches(null, cutout_mesh(world, e), found, 2), 1);
+    const box_render_texture_blend_t *r = blend_record(null, found[0]);
+    test_uint(r->layers[0][BOX_RENDER_BLEND_ALBEDO], blend_handle(world, a));
+    test_flt(r->transforms[0][0], 4);
+
+    ecs_delete(world, grass);
+    mapping_frame(world);
+    test_int(blend_batches(null, cutout_mesh(world, e), found, 2), 1);
+    test_bool(found[0]->texture_blend, true);
+    r = blend_record(null, found[0]);
+    test_uint(r->count, 2);
+    test_uint(r->layers[0][BOX_RENDER_BLEND_ALBEDO], 0);
+    test_uint(r->layers[0][BOX_RENDER_BLEND_ORM], 0);
+    test_uint(r->layers[0][BOX_RENDER_BLEND_NORMAL], 0);
+    test_flt(r->transforms[0][0], 1);
+    test_flt(r->transforms[0][1], 1);
+    test_uint(r->layers[1][BOX_RENDER_BLEND_ALBEDO], blend_handle(world, g));
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
 /** A shape with a TextureBlend draws as a plain shape with its own PbrTextures when it is alpha
  * tested, blended or has a triplanar TextureMapping, and blends again without them. */
 void Material_texture_blend_plain_fallback(void) {

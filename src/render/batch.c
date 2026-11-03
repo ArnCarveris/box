@@ -1483,9 +1483,12 @@ void box_draws_batch_blend(
     if (blend) {
         r->mask = box_draws_texture_handle(d, blend->mask);
         for (k = 0; k < BOX_RENDER_BLEND_LAYERS; k ++) {
+            /* TextureBlend stores plain ids: a deleted layer counts as one without
+             * PbrTextures */
             ecs_entity_t layer = blend->layers[k];
-            const PbrTextures *textures = layer ? ecs_get(d->world, layer, PbrTextures) : NULL;
-            const TextureTransform *uv = layer
+            bool alive = layer && ecs_is_alive(d->world, layer);
+            const PbrTextures *textures = alive ? ecs_get(d->world, layer, PbrTextures) : NULL;
+            const TextureTransform *uv = alive
                 ? ecs_get(d->world, layer, TextureTransform) : NULL;
             if (!layer) {
                 continue;

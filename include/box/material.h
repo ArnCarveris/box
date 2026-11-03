@@ -383,8 +383,10 @@ ECS_STRUCT(PbrTextures, {
  * Each layer entity samples the albedo, ORM and normal textures of its own PbrTextures (its
  * emissive is ignored), with its own TextureTransform on top of the texture coordinates of the
  * shape, so a layer with a scale of 20 tiles 20 times across a mask that covers the mesh once.
- * A layer that is 0, has no PbrTextures or whose texture is not loaded yet contributes white
- * albedo and ORM and a flat normal. A TextureGen texture works as a mask or a layer.
+ * A layer that is 0, deleted, has no PbrTextures or whose texture is not loaded yet contributes
+ * white albedo and ORM and a flat normal, except that the layers after the last one that is not
+ * 0 are unused: their mask channels are ignored, so an RGB mask weighs a 3 layer blend. A
+ * TextureGen texture works as a mask or a layer.
  *
  * While a shape draws with a TextureBlend the albedo, ORM and normal of its own PbrTextures are
  * ignored; its PbrTextures.emissive, Rgb, PbrMaterial, Tint and Emissive apply to the blended
