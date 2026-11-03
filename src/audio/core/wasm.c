@@ -20,7 +20,7 @@
 /** Bytes of a page of wasm memory */
 #define BOX_AUDIO_WASM_PAGE 65536
 
-/** Events the worklet reads per call */
+/** Events the worklet reads per call; it calls again until the core has none left */
 #define BOX_AUDIO_WASM_EVENTS 64
 
 /** Start of the heap, placed by the linker after the data and the stack */
@@ -296,6 +296,15 @@ int32_t box_audio_core_wasm_read_events(void)
 box_audio_event_t* box_audio_core_wasm_events(void)
 {
     return box_audio_core_wasm_ev;
+}
+
+/** Get the number of events the core lost since the last LOST event was read.
+ *
+ * @return Number of events
+ */
+int32_t box_audio_core_wasm_events_lost(void)
+{
+    return box_audio_core_wasm ? box_audio_core_events_lost(box_audio_core_wasm) : 0;
 }
 
 /** Get the number of voices that play.

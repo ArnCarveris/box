@@ -108,28 +108,30 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                     this.port.postMessage({ type: 'stats', id: m.id, quanta: this.quanta,
                         frame: currentFrame, time: currentTime, sampleRate: sampleRate,
                         voices: core.box_audio_core_wasm_voices(), batches: this.batches,
-                        sounds: this.sounds.size, memory: this.buffer.byteLength });
+                        sounds: this.sounds.size, memory: this.buffer.byteLength,
+                        lost: core.box_audio_core_wasm_events_lost() });
                 }
             }
 
-            // Sounds the core no longer uses are freed here, on the side that owns them
+            // Sounds the core no longer uses are freed here, on the side that owns them. Reads
+            // until the core has no events left, so no backlog builds up across quanta
             receive() {
-                var n = this.core.box_audio_core_wasm_read_events();
-                if (!n) {
-                    return;
-                }
-                this.views();
-                var list = [];
-                for (var i = 0; i < n; i++) {
-                    var e = { type: this.events[i * 3], id: this.events[i * 3 + 1] >>> 0,
-                        value: this.events[i * 3 + 2] };
-                    if (e.type === SOUND_FREE && this.sounds.has(e.id)) {
-                        this.core.box_audio_core_wasm_free(this.sounds.get(e.id));
-                        this.sounds.delete(e.id);
+                var list = [], n;
+                while ((n = this.core.box_audio_core_wasm_read_events()) > 0) {
+                    this.views();
+                    for (var i = 0; i < n; i++) {
+                        var e = { type: this.events[i * 3], id: this.events[i * 3 + 1] >>> 0,
+                            value: this.events[i * 3 + 2] };
+                        if (e.type === SOUND_FREE && this.sounds.has(e.id)) {
+                            this.core.box_audio_core_wasm_free(this.sounds.get(e.id));
+                            this.sounds.delete(e.id);
+                        }
+                        list.push(e);
                     }
-                    list.push(e);
                 }
-                this.port.postMessage({ type: 'events', events: list });
+                if (list.length) {
+                    this.port.postMessage({ type: 'events', events: list });
+                }
             }
 
             process(inputs, outputs) {

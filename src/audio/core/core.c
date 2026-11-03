@@ -196,21 +196,70 @@ static float box_audio_clamp(
     return v;
 }
 
+/** Push an event into the next slot of the ring, which has room.
+ *
+ * @param core The core
+ * @param type A box_audio_event_type_t
+ * @param id Id of the event
+ * @param value Value of the event
+ * @return Slot of the event
+ */
+static int32_t box_audio_core_push(
+    box_audio_core_t *core,
+    int32_t type,
+    uint32_t id,
+    int32_t value)
+{
+    int32_t at = (core->event_head + core->event_count) % BOX_AUDIO_EVENT_MAX;
+    box_audio_event_t *e = &core->events[at];
+    e->type = type;
+    e->id = id;
+    e->value = value;
+    core->event_count ++;
+
+    return at;
+}
+
 void box_audio_core_event(
     box_audio_core_t *core,
     int32_t type,
     uint32_t id,
     int32_t value)
 {
-    if (core->event_count >= BOX_AUDIO_EVENT_MAX) {
-        core->events_lost ++;
+    if (core->event_count < BOX_AUDIO_EVENT_MAX - 1) {
+        box_audio_core_push(core, type, id, value);
+    } else if (type == BOX_AUDIO_EVENT_SOUND_FREE && id < BOX_AUDIO_SOUND_MAX) {
+        if (core->sounds[id].state != BOX_AUDIO_SOUND_PENDING) {
+            core->sounds[id].state = BOX_AUDIO_SOUND_PENDING;
+            core->free_pending ++;
+        }
     } else {
-        box_audio_event_t *e = &core->events[
-            (core->event_head + core->event_count) % BOX_AUDIO_EVENT_MAX];
-        e->type = type;
-        e->id = id;
-        e->value = value;
-        core->event_count ++;
+        core->events_lost ++;
+        if (core->event_lost_at >= 0) {
+            core->events[core->event_lost_at].value = core->events_lost;
+        } else {
+            core->event_lost_at = box_audio_core_push(core, BOX_AUDIO_EVENT_LOST, 0,
+                core->events_lost);
+        }
+    }
+}
+
+/** Push the SOUND_FREE events that waited for room, as many as the ring takes.
+ *
+ * @param core The core
+ */
+static void box_audio_core_flush_free(
+    box_audio_core_t *core)
+{
+    uint32_t i;
+    for (i = 0; i < BOX_AUDIO_SOUND_MAX && core->free_pending > 0 &&
+        core->event_count < BOX_AUDIO_EVENT_MAX - 1; i ++)
+    {
+        if (core->sounds[i].state == BOX_AUDIO_SOUND_PENDING) {
+            core->sounds[i].state = BOX_AUDIO_SOUND_FREE;
+            core->free_pending --;
+            box_audio_core_push(core, BOX_AUDIO_EVENT_SOUND_FREE, i, 0);
+        }
     }
 }
 
@@ -704,6 +753,7 @@ box_audio_core_t* box_audio_core_new(
     core->order[0].send = BOX_AUDIO_BUS_NONE;
     core->order_count = 1;
     core->bus_active[0] = true;
+    core->event_lost_at = -1;
 
 done:
     return core;
@@ -765,14 +815,37 @@ int32_t box_audio_core_read_events(
     int32_t max)
 {
     int32_t count = 0;
-    while (core && events && count < max && core->event_count > 0) {
+    while (core && events && count < max) {
+        if (core->event_count == 0) {
+            box_audio_core_flush_free(core);
+        }
+
+        if (core->event_count == 0) {
+            break;
+        }
+
         events[count] = core->events[core->event_head];
+        if (core->event_head == core->event_lost_at) {
+            core->event_lost_at = -1;
+            core->events_lost = 0;
+        }
+
         core->event_head = (core->event_head + 1) % BOX_AUDIO_EVENT_MAX;
         core->event_count --;
         count ++;
     }
 
+    if (core) {
+        box_audio_core_flush_free(core);
+    }
+
     return count;
+}
+
+int32_t box_audio_core_events_lost(
+    const box_audio_core_t *core)
+{
+    return core->events_lost;
 }
 
 /** Render a block of a voice into its bus, and end it when its source ends or its fade does.
