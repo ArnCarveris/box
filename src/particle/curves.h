@@ -1,7 +1,8 @@
 /**
  * @file particle/curves.h
- * @brief Checks of the keyed curves of ParticleCurves and ParticleLight, shared by the validate
- * hooks, which log the problem, and the extract, which draws a bad curve as its default.
+ * @brief Checks of the keyed curves of ParticleCurves, ParticleLight and ParticleTimeline,
+ * shared by the validate hooks, which log the problem, and the extract, which draws a bad curve
+ * as its default.
  */
 
 #ifndef BOX_PARTICLE_CURVES_H
@@ -63,8 +64,13 @@ bool box_particle_light_curve_valid(
 bool box_particle_gradient_valid(
     const ParticleGradient *gradient);
 
+<<<<<<< HEAD
 /** Install the validate hooks of ParticleCurves, ParticleMotion and ParticleLight, which log the
  * first problem of every bad curve with the entity, the component and the field.
+=======
+/** Install the validate hooks of ParticleCurves, ParticleLight and ParticleTimeline, which log
+ * the first problem of every bad curve with the entity, the component and the field.
+>>>>>>> 3a518e63fed6c81879fc7d4cc46f55995ab6d204
  *
  * @param world The world
  */

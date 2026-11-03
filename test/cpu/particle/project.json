@@ -307,6 +307,25 @@
                 ]
             },
             {
+                "id": "Timeline",
+                "testcases": [
+                    "c_defaults",
+                    "script_values",
+                    "area_at_frame_rates",
+                    "loop_across_wrap",
+                    "once_holds_last_key",
+                    "zero_rate_spawns_nothing",
+                    "negative_keys",
+                    "paused_holds",
+                    "stopped_and_reset",
+                    "bursts_unchanged",
+                    "speed_scales_new_particles",
+                    "without_timeline_unchanged",
+                    "bad_curve_is_one",
+                    "copies_own_keys"
+                ]
+            },
+            {
                 "id": "Flash",
                 "testcases": [
                     "c_defaults",

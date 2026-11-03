@@ -1,7 +1,12 @@
 /**
  * @file particle/curves.c
+<<<<<<< HEAD
  * @brief Checks of the keyed curves of ParticleCurves, ParticleMotion and ParticleLight and their
  * validate hooks.
+=======
+ * @brief Checks of the keyed curves of ParticleCurves, ParticleLight and ParticleTimeline and
+ * their validate hooks.
+>>>>>>> 3a518e63fed6c81879fc7d4cc46f55995ab6d204
  */
 
 #include "curves.h"
@@ -251,10 +256,32 @@ static bool box_particle_light_validate(
     return true;
 }
 
+/** Validate hook for ParticleTimeline.
+ *
+ * @param world The world
+ * @param entity The entity being validated
+ * @param ptr Pointer to the component value
+ * @return Always true; problems are only logged
+ */
+static bool box_particle_timeline_validate(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    void *ptr)
+{
+    const ParticleTimeline *timeline = ptr;
+    box_particle_curves_report(world, entity, "ParticleTimeline", "rate",
+        box_particle_curve_check(&timeline->rate));
+    box_particle_curves_report(world, entity, "ParticleTimeline", "speed",
+        box_particle_curve_check(&timeline->speed));
+
+    return true;
+}
+
 void box_particle_curves_import(
     ecs_world_t *world)
 {
     ecs_set_hooks(world, ParticleCurves, { .on_validate = box_particle_curves_validate });
     ecs_set_hooks(world, ParticleMotion, { .on_validate = box_particle_motion_validate });
     ecs_set_hooks(world, ParticleLight, { .on_validate = box_particle_light_validate });
+    ecs_set_hooks(world, ParticleTimeline, { .on_validate = box_particle_timeline_validate });
 }
