@@ -1,7 +1,7 @@
 /**
  * @file audio/core/synth.c
- * @brief The synth source: band limited oscillators and seeded noise, each with a linear
- * envelope, mixed into a state variable filter and an amp, rendered per frame from a copy of
+ * @brief The synth source: band limited oscillators and seeded noise, each with a linear or
+ * curved envelope, mixed into a state variable filter and an amp, rendered per frame from a copy of
  * the patch.
  *
  * Every voice holds its own copy of the patch, so a play allocates nothing and a new patch for
@@ -65,7 +65,25 @@ static float box_audio_synth_clamp(
     return v;
 }
 
-/** Clamp the times and the level of an envelope.
+/** Clamp a curve of an envelope; NaN and curves too small to bend a segment are linear.
+ *
+ * @param v The curve
+ * @return The curve, 0 for linear
+ */
+static float box_audio_synth_curve_clamp(
+    float v)
+{
+    float a = v < 0 ? -v : v;
+    if (!(a >= BOX_AUDIO_SYNTH_CURVE_MIN)) {
+        v = 0;
+    } else if (a > BOX_AUDIO_SYNTH_CURVE_MAX) {
+        v = v < 0 ? -BOX_AUDIO_SYNTH_CURVE_MAX : BOX_AUDIO_SYNTH_CURVE_MAX;
+    }
+
+    return v;
+}
+
+/** Clamp the times, the level and the curves of an envelope.
  *
  * @param e The envelope
  */
@@ -77,6 +95,8 @@ static void box_audio_synth_envelope_clamp(
     e->sustain = box_audio_synth_clamp(e->sustain, 0, 1);
     e->release = box_audio_synth_clamp(e->release, 0, BOX_AUDIO_SYNTH_LENGTH_MAX);
     e->hold = box_audio_synth_clamp(e->hold, 0, BOX_AUDIO_SYNTH_LENGTH_MAX);
+    e->curve = box_audio_synth_curve_clamp(e->curve);
+    e->attack_curve = box_audio_synth_curve_clamp(e->attack_curve);
 }
 
 /** Clamp a frequency a sweep ends at; NaN and values that are not positive mean no sweep.
@@ -320,6 +340,11 @@ static void box_audio_synth_env_init(
         e->frames[i] = n[i];
     }
 
+    e->curve[BOX_AUDIO_SYNTH_ATTACK] = d->attack_curve;
+    e->curve[BOX_AUDIO_SYNTH_DECAY] = d->curve;
+    e->curve[BOX_AUDIO_SYNTH_HOLD] = 0;
+    e->curve[BOX_AUDIO_SYNTH_RELEASE] = d->curve;
+    e->curved = false;
     e->sustain = d->sustain;
     e->segment = -1;
     e->left = 0;
@@ -331,6 +356,11 @@ static void box_audio_synth_env_init(
 /** Enter a segment of an envelope; one without frames takes its level at once, which the
  * edge of BOX_AUDIO_SYNTH_EDGE keeps to segments that do not change it.
  *
+ * A linear segment adds a step per frame. A curved one of curve c over n frames follows
+ * v(k) = a + (v0 - a) r^k with r = exp(-c / n), whose asymptote a lies past the target so
+ * that v(n) is the target: one multiply and one add per frame, exp only here, and the last
+ * frame takes the target, so the segment ends on time.
+ *
  * @param e The envelope
  * @param segment A box_audio_synth_segment_t
  */
@@ -339,8 +369,10 @@ static void box_audio_synth_env_enter(
     int32_t segment)
 {
     int32_t n;
+    double c;
     e->segment = segment;
     if (segment >= BOX_AUDIO_SYNTH_DONE) {
+        e->curved = false;
         e->value = 0;
         e->target = 0;
         e->left = 0;
@@ -350,12 +382,23 @@ static void box_audio_synth_env_enter(
     e->target = segment == BOX_AUDIO_SYNTH_ATTACK ? 1.0f :
         (segment == BOX_AUDIO_SYNTH_RELEASE ? 0.0f : e->sustain);
     n = e->frames[segment];
+    e->curved = false;
     if (n <= 0) {
         e->value = e->target;
         e->left = 0;
     } else {
         e->left = n;
         e->step = (e->target - e->value) / (float)n;
+        c = e->curve[segment];
+        if (c != 0 && e->target != e->value) {
+            double r = box_audio_synth_exp2(-c / ((double)n * BOX_AUDIO_SYNTH_LN2));
+            double end = box_audio_synth_exp2(-c / BOX_AUDIO_SYNTH_LN2);
+            double a = ((double)e->target - (double)e->value * end) / (1 - end);
+            e->curved = true;
+            e->level = e->value;
+            e->mul = r;
+            e->add = a * (1 - r);
+        }
     }
 
 done:
@@ -376,7 +419,14 @@ static inline float box_audio_synth_env_next(
 
     if (e->left > 0) {
         e->left --;
-        e->value = e->left ? e->value + e->step : e->target;
+        if (!e->left) {
+            e->value = e->target;
+        } else if (e->curved) {
+            e->level = e->level * e->mul + e->add;
+            e->value = (float)e->level;
+        } else {
+            e->value = e->value + e->step;
+        }
     }
 
     return e->value;

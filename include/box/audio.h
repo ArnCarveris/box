@@ -197,8 +197,13 @@ ECS_STRUCT(SynthOscillator, {
     float level;           /**< Linear gain, default 1 */
 });
 
-/** An envelope: linear from 0 to 1 over attack, to sustain over decay, hold seconds there,
- * then to 0 over release.
+/** An envelope: from 0 to 1 over attack, to sustain over decay, hold seconds there, then to
+ * 0 over release.
+ *
+ * Each segment is linear by default. A positive curve bends it toward an exponential shape,
+ * fast at first and slow toward its target, as analog envelopes do, and still reaches the
+ * target at the end of its time; a negative one bends it the other way. Plucks use a curve of
+ * 4 to 6, pads 2 to 3.
  *
  * On the root it applies to every layer without its own, on a layer to that layer. A sound
  * ends once every envelope reached silence, so a one shot without a release still ends. A
@@ -211,6 +216,9 @@ ECS_STRUCT(SynthEnvelope, {
     float sustain;         /**< Level after the decay, 0..1, default 0 */
     float release;         /**< Seconds from the sustain level to 0 */
     float hold;            /**< Seconds at the sustain level before the release */
+    float curve;           /**< Curve of the decay and the release, 0 linear (default),
+                            *   -16..16 */
+    float attack_curve;    /**< Curve of the attack, 0 linear (default), -16..16 */
 });
 
 /** The filter of a synth sound, on its root: a state variable filter on the mix of the layers,

@@ -223,7 +223,7 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   EQ, compressor or delay on a bus.
 - **Voices**: 64, with the quietest stolen; no priorities. A one shot cannot be controlled after
   it started.
-- **Synth**: up to 4 oscillators and one filter per sound, linear envelopes, no LFO and no node
+- **Synth**: up to 4 oscillators and one filter per sound, linear or curved envelopes, no LFO and no node
   graph. A looping synth sound starts a new pass of its envelopes and oscillators at the end of
   the last, at most every 60 seconds; a drone keeps that gap short with edges of a few ms, as
   the dust merchant's engine does with 2 ms.
@@ -469,8 +469,19 @@ with `SOUND_FREE`. The core clamps every value of a patch, a NaN to the low end.
 - **Noise** is xorshift32, seeded per play from the seed of the patch and the count of its
   plays, so a fixed run gives bit identical output and every play differs. The same generator
   picks the pitch and level variances of the play.
-- **Envelopes** are linear and sample accurate: attack from 0 to 1, decay to the sustain level,
-  hold, release to 0. An attack, and a decay or a release that changes the level, takes at
+- **Envelopes** are sample accurate: attack from 0 to 1, decay to the sustain level, hold,
+  release to 0. Each segment is linear, or curved with `curve` (decay and release) and
+  `attack_curve`: a segment of curve c over n frames follows `v(k) = a + (v0 - a) r^k` with
+  `r = exp(-c / n)` and an asymptote `a` past the target, chosen so that `v(n)` is the target.
+  A positive curve is fast at first and slow toward the target, as an analog envelope; a
+  negative one is slow at first. Unlike an analog envelope the segment ends on time: the last
+  frame takes the target exactly, so a curved release still ends the voice at the end of its
+  release. The level at the middle of a segment is `1 / (1 + exp(-c / 2))` of the way, 0.5
+  for a linear one and 0.88 for a curve of 4. `exp` runs once per segment, in the series of
+  `synth.c`; per frame a curved segment costs one multiply and one add in double, a linear one
+  its step as before. Curves are clamped to plus or minus `BOX_AUDIO_SYNTH_CURVE_MAX` (16),
+  and one under `BOX_AUDIO_SYNTH_CURVE_MIN` (0.001) is linear, so a patch with curves of 0
+  renders bit identical to the linear envelopes. An attack, and a decay or a release that changes the level, takes at
   least `BOX_AUDIO_SYNTH_EDGE` (0.5 ms), so neither end clicks; with a sustain of 0 the envelope
   ends after its decay. A pass of an envelope is at most `BOX_AUDIO_SYNTH_LENGTH_MAX` (60 s); a
   longer one loses its hold first. A voice ends, and frees its slot, once every envelope it
@@ -483,7 +494,8 @@ with `SOUND_FREE`. The core clamps every value of a patch, a NaN to the low end.
   cutoff clamped to 0.49 of the rate, so it stays stable at every cutoff and resonance, a cutoff
   at Nyquist and a fast sweep included; a sweep updates them every 8 frames. Its state is
   flushed like a bus sample.
-- **Cost.** Render work only: per frame of a voice an envelope step per envelope, an oscillator
+- **Cost.** Render work only: per frame of a voice an envelope step per envelope (a multiply
+  and an add when curved), an oscillator
   per layer and the filter. `bench/audio` has a `Synth` suite of 64 voices in ns per sample.
 
 The core needs no libm: the exponential sweeps use series for `log2` and `exp2` in `synth.c`.
@@ -499,7 +511,7 @@ have its own `SynthEnvelope`, and one without uses the root's.
 |-----------|------------|
 | `SynthSound` | The root: `seed`, `pitch_variance` and `level_variance` (random shares per play, 0) |
 | `SynthOscillator` | A layer: `wave` (`SynthSine`, `SynthSaw`, `SynthSquare`, `SynthTriangle`, `SynthNoise`), `frequency` (440), `frequency_end` (0, no sweep), `sweep` (s), `level` (1) |
-| `SynthEnvelope` | `attack`, `decay`, `sustain`, `release`, `hold`: seconds and a sustain level, all 0 by default |
+| `SynthEnvelope` | `attack`, `decay`, `sustain`, `release`, `hold`: seconds and a sustain level, all 0 by default; `curve` (decay and release) and `attack_curve`: 0 linear (default), positive fast at first, -16..16 |
 | `SynthFilter` | `kind` (`SynthLowPass`, `SynthHighPass`, `SynthBandPass`), `cutoff` (1000), `cutoff_end`, `sweep`, `resonance` |
 
 The module (`src/audio/synth_sound.c`) compiles a sound once, and again when a component of it
@@ -513,7 +525,13 @@ with `loop: true` starts it over at the end of its envelopes. A play allocates n
 - An envelope that is not a time of 0 to 60 seconds logs one error and is cut.
 - Deleting the sound releases it and fades its one shots, as for `AudioPcm`.
 
-Three examples:
+Which curves to use: plucks, the harp, mallets and drums want a `curve` of 4 to 6 so they fall
+off fast at first and ring out softly; pads, strings and winds want 2 to 3 on the decay and the
+release, and an `attack_curve` of 1 to 2 for a swell that settles. A sound that keeps its
+linear envelope (curves of 0) renders exactly as before. A curve makes a segment quieter
+sooner, so a pluck usually wants a longer decay than its linear version.
+
+Four examples:
 
 ```
 using box.audio
@@ -549,13 +567,25 @@ prefab Whoosh {
   SynthFilter: {kind: SynthBandPass, cutoff: 300, cutoff_end: 4000, sweep: 0.5, resonance: 0.6}
   SynthOscillator: {wave: SynthNoise, level: 0.8}
 }
+
+// A pluck: a curved decay that falls fast and rings out, no sustain
+prefab Pluck {
+  AudioOutput: {bus: ui}
+  SynthSound: {level_variance: 0.1}
+  SynthEnvelope: {attack: 0.002, decay: 0.6, curve: 5}
+  SynthFilter: {kind: SynthLowPass, cutoff: 4000, cutoff_end: 1200, sweep: 0.3, resonance: 0.1}
+  string { SynthOscillator: {wave: SynthTriangle, frequency: 330, level: 0.4} }
+  body { SynthOscillator: {wave: SynthSine, frequency: 330, level: 0.3} }
+}
 ```
 
 The tests are the `Synth` suite of `test/cpu/audio`, on offline renders: frequencies of every
 wave at 44.1 and 48 kHz, sweeps, aliasing of a 5 kHz saw, square and triangle, flat and seeded noise, the
-times and edges of envelopes, the end of a voice, the filter one octave past its cutoff and
+times and edges of envelopes, curved envelopes (a linear one bit identical to the linear
+recurrence, a curved decay at its midpoint and on its sustain, a curved release that ends the
+voice on time), the end of a voice, the filter one octave past its cutoff and
 under sweeps at full resonance and extreme values, layers, scripts from
-`test/assets/audio/synth.flecs`, the three examples above from
+`test/assets/audio/synth.flecs`, the four examples above from
 `test/assets/audio/synth_examples.flecs` and errors; `NoAlloc` renders 64 synth voices. The browser
 check is `test/integration/web/audio_synth.mjs`.
 

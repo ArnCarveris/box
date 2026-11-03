@@ -171,6 +171,11 @@ typedef struct box_audio_synth_env_t {
     float step;           /**< Change per frame */
     float sustain;        /**< Sustain level */
     int32_t frames[4];    /**< Frames of the attack, the decay, the hold and the release */
+    float curve[4];       /**< Curves of the attack, the decay, the hold (0) and the release */
+    bool curved;          /**< The segment follows level, not step */
+    double level;         /**< Current level of a curved segment */
+    double mul;           /**< Factor per frame of a curved segment */
+    double add;           /**< Term per frame of a curved segment */
 } box_audio_synth_env_t;
 
 /** An oscillator of a synth voice */

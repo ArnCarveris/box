@@ -1,4 +1,4 @@
-// The three synth sounds of docs/audio.md, kept the same: the Synth suite of test/cpu/audio
+// The four synth sounds of docs/audio.md, kept the same: the Synth suite of test/cpu/audio
 // checks that they parse, compile without errors, play and end.
 using box.audio
 
@@ -32,4 +32,14 @@ prefab Whoosh {
   SynthEnvelope: {attack: 0.15, decay: 0.25, sustain: 0.3, hold: 0.1, release: 0.3}
   SynthFilter: {kind: SynthBandPass, cutoff: 300, cutoff_end: 4000, sweep: 0.5, resonance: 0.6}
   SynthOscillator: {wave: SynthNoise, level: 0.8}
+}
+
+// A pluck: a curved decay that falls fast and rings out, no sustain
+prefab Pluck {
+  AudioOutput: {bus: ui}
+  SynthSound: {level_variance: 0.1}
+  SynthEnvelope: {attack: 0.002, decay: 0.6, curve: 5}
+  SynthFilter: {kind: SynthLowPass, cutoff: 4000, cutoff_end: 1200, sweep: 0.3, resonance: 0.1}
+  string { SynthOscillator: {wave: SynthTriangle, frequency: 330, level: 0.4} }
+  body { SynthOscillator: {wave: SynthSine, frequency: 330, level: 0.3} }
 }
