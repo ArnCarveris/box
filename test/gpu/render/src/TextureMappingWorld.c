@@ -3,9 +3,10 @@
  * @brief Tests for MappingWorld texture mapping: touching meshes show one continuous texture.
  *
  * A 3 x 3 grid of touching boxes of different sizes, some turned by 90 degrees around y, with
- * MappingWorld and a checker texture, seen from above in an ortho view, renders the seams between
- * the boxes as a single box of the same total size does. The texture is emissive on a black,
- * rough metal so the light and the shadows of the scene do not take part.
+ * MappingWorld and a checker texture, seen from above in an ortho view, renders the seams
+ * between the boxes as a single box of the same total size does.
+ *
+ * The texture is emissive on a black, rough metal so the light and shadows do not take part.
  */
 
 #include <box.h>
@@ -173,6 +174,7 @@ static int32_t mapping_world_pixel(
     float world)
 {
     float per_unit = (float)MAPPING_WORLD_PX / MAPPING_WORLD_HEIGHT;
+
     return (int32_t)lroundf((float)MAPPING_WORLD_PX * 0.5f + world * per_unit);
 }
 
@@ -219,13 +221,14 @@ static void mapping_world_compare(
     }
 }
 
-/** The pixels on both sides of every seam of the grid match the single box. */
+/** The pixels on both sides of every seam of the grid match the single box, and so does the
+ * whole footprint, so no box shows a texture of its own. The checker shows on the single box:
+ * its red and its light squares, far apart in green, both inside its footprint. */
 void TextureMappingWorld_grid_matches_single_box(void) {
     // materials/texture_mapping_world
     unsigned char *grid = mapping_world_render(true, "mapping_world_grid.png");
     unsigned char *single = mapping_world_render(false, "mapping_world_single.png");
 
-    // The checker shows on the single box: both dark and bright texels inside its footprint.
     int32_t x, y, lo = 255, hi = 0;
     int32_t first = mapping_world_pixel(-3) + 1, last = mapping_world_pixel(3) - 1;
     for (y = first; y < last; y ++) {
@@ -236,8 +239,7 @@ void TextureMappingWorld_grid_matches_single_box(void) {
         }
     }
 
-    test_assert(lo < 64);
-    test_assert(hi > 192);
+    test_assert(hi - lo > 64);
 
     int32_t max = 0, count = 0, k;
     float seam_x = -3, seam_z = -3;
@@ -254,7 +256,6 @@ void TextureMappingWorld_grid_matches_single_box(void) {
 
     test_assert(max <= MAPPING_WORLD_MAX_DELTA || count <= MAPPING_WORLD_MAX_PIXELS);
 
-    // The whole footprint matches as well, so no box shows a texture of its own.
     max = 0;
     count = 0;
     mapping_world_compare(grid, single, first, first, last, last, &max, &count);

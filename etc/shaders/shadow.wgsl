@@ -7,7 +7,7 @@
 // the cutoff of its material, and discard where the alpha times the albedo alpha of the batch
 // (group 2) is below the cutoff, as the forward pass does. A MappingObject or MappingWorld
 // material projects the UV in the fragment stage, as mesh.wgsl does (mapping_uv), and with a
-// blend above 0 blends the alpha of its three axis projections (triplanar_alpha).
+// blend above 0 blends the alpha of its three axis projections (mapping_alpha).
 //
 // Spot light tiles of the shadow atlas draw with vs and vs_cutout too. A point light tile is
 // drawn once per octant of its octahedron with vs_point and vs_point_cutout, the octant in the
@@ -209,45 +209,13 @@ fn cutout_attributes(v: CutoutIn, o: ptr<function, CutoutOut>) {
     return o;
 }
 
-// Albedo alpha of a triplanar fragment (blend above 0), as triplanar_alpha of mesh.wgsl: the
-// alpha of each projection with a weight, sampled with the gradients of its projection,
-// blended; hard is the alpha of the hard projection, which a fragment with one projection keeps.
-fn triplanar_alpha(object: vec4f, normal: vec3f, offset: vec2f, blend: f32, dx: vec4f,
-    dy: vec4f, hard: f32) -> f32 {
-    let w = mapping_weights(normal, blend);
-    if (max(w.x, max(w.y, w.z)) >= 0.999) {
-        return hard;
-    }
-    let s = mapping_signs(normal);
-    var planes = mapping_planes(object, s);
-    var gx = mapping_planes(dx, s);
-    var gy = mapping_planes(dy, s);
-    var alpha = 0.0;
-    for (var k = 0u; k < 3u; k++) {
-        if (w[k] > 0.0) {
-            alpha += w[k] * textureSampleGrad(albedo_map, material_sampler, planes[k] + offset,
-                gx[k], gy[k]).a;
-        }
-    }
-    return alpha;
-}
-
 // Discard where the alpha times the albedo alpha of the batch is below the cutoff: at the
 // interpolated UV, or projected for a MappingObject or MappingWorld material (mapped not 0),
-// blended over the three axes with a blend (mapped above 1).
+// blended over the three axes with a blend (mapped above 1), as mapping_alpha makes it.
 fn cutout_test(uv: vec2f, alpha: f32, cutoff: f32, mapped: f32, object: vec4f,
     object_normal: vec3f) {
-    var at = uv;
-    if (mapped != 0.0) {
-        at = mapping_uv(object, object_normal, uv);
-    }
-    var albedo = textureSample(albedo_map, material_sampler, at).a;
-    let dx = dpdx(object);
-    let dy = dpdy(object);
-    if (mapped > 1.0) {
-        albedo = triplanar_alpha(object, object_normal, uv, mapped - 1.0, dx, dy, albedo);
-    }
-    if (alpha * albedo < cutoff) {
+    if (alpha * mapping_alpha(albedo_map, material_sampler, uv, mapped, object, object_normal) <
+        cutoff) {
         discard;
     }
 }

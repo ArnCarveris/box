@@ -185,6 +185,39 @@ fn mapping_bitangent(axis: u32) -> vec3f {
     return select(vec3f(0.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), axis == 1u);
 }
 
+// Albedo alpha of an alpha tested fragment from albedo (its albedo layer), at the interpolated
+// UV, or for a MappingObject or MappingWorld material (mapped not 0) projected with mapping_uv,
+// uv its offset. With a blend (mapped above 1) it blends the alpha of each projection with a
+// weight, sampled with the gradients of its projection from the screen derivatives of object,
+// once for a fragment whose normal is along an axis. mapped is flat, the same for every
+// fragment of a primitive and so of a quad, so the derivatives of either branch hold.
+@diagnostic(off, derivative_uniformity)
+fn mapping_alpha(albedo: texture_2d<f32>, smp: sampler, uv: vec2f, mapped: f32, object: vec4f,
+    normal: vec3f) -> f32 {
+    var alpha = 0.0;
+    if (mapped > 1.0) {
+        let dx = dpdx(object);
+        let dy = dpdy(object);
+        let w = mapping_weights(normal, mapped - 1.0);
+        let s = mapping_signs(normal);
+        var planes = mapping_planes(object, s);
+        var gx = mapping_planes(dx, s);
+        var gy = mapping_planes(dy, s);
+        for (var k = 0u; k < 3u; k++) {
+            if (w[k] > 0.0) {
+                alpha += w[k] * textureSampleGrad(albedo, smp, planes[k] + uv, gx[k], gy[k]).a;
+            }
+        }
+    } else {
+        var at = uv;
+        if (mapped != 0.0) {
+            at = mapping_uv(object, normal, uv);
+        }
+        alpha = textureSample(albedo, smp, at).a;
+    }
+    return alpha;
+}
+
 // Display encoded color to linear light.
 fn material_linear(c: vec3f) -> vec3f {
     return select(pow((c + vec3f(0.055)) / 1.055, vec3f(2.4)), c / 12.92, c <= vec3f(0.04045));

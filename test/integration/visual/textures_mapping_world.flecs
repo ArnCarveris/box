@@ -67,15 +67,17 @@ floor {
 board {
   Position: {-3.6, 0, 0}
 
-  for i in 0..36 {
-    {
-      Position: {(i % 6) * 1.2 - 3, -0.25, floor(i / 6) * 1.2 - 3}
-      Rotation: {0, (i % 2) * 0.5 * flecs.script.math.PI, 0}
-      Box: {1.2, 0.5, 1.2}
-      Rgb: {255, 255, 255}
-      PbrMaterial: {roughness: 0.9}
-      PbrTextures: {albedo: grass, normal: bumps}
-      TextureMapping: {mode: MappingWorld, size: 1.7}
+  for row in 0..6 {
+    for col in 0..6 {
+      {
+        Position: {col * 1.2 - 3, -0.25, row * 1.2 - 3}
+        Rotation: {0, ((row + col) % 2) * 0.5 * flecs.script.math.PI, 0}
+        Box: {1.2, 0.5, 1.2}
+        Rgb: {255, 255, 255}
+        PbrMaterial: {roughness: 0.9}
+        PbrTextures: {albedo: grass, normal: bumps}
+        TextureMapping: {mode: MappingWorld, size: 1.7}
+      }
     }
   }
 }

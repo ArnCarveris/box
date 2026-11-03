@@ -12,10 +12,11 @@
 // a triangle; its tangent frame follows from the derivatives of the projected UV. A MappingWorld
 // material projects the world position on the dominant axis of the world normal the same way.
 // With a TextureMapping.blend above 0 the three axis projections blend (triplanar): each layer
-// is sampled once per projection with a weight, with explicit gradients, the dominant one
-// reusing the sample of the hard projection where its derivatives hold; the normal map of each
-// projection turns to the world with the axes of that projection (turned by the rotation of the
-// instance for MappingObject) and the world normals blend.
+// is sampled once per projection with a weight, with the gradients of that projection, so a
+// face along an axis samples once; the normal map of each projection turns to the world with
+// the axes of that projection (turned by the rotation of the instance for MappingObject) and
+// the world normals blend. The blend is flat, so the fragments of a quad all take the triplanar
+// path or all the hard one, and only the triplanar one takes the derivatives of the position.
 // The ORM layer holds the glTF occlusion (red, of the indirect light only), roughness (green)
 // and metallic (blue) multipliers.
 // The cull pass writes the slots of the visible instances, which step per instance; the
@@ -353,44 +354,10 @@ struct DepthCutoutOut {
         s.object_normal);
 }
 
-// Albedo alpha of a triplanar fragment (blend above 0): the alpha of each projection with a
-// weight, sampled with the gradients of its projection, blended; hard is the alpha of the hard
-// projection, which a fragment with one projection keeps. The gradients dx, dy are the screen
-// derivatives of object.
-fn triplanar_alpha(object: vec4f, normal: vec3f, offset: vec2f, blend: f32, dx: vec4f,
-    dy: vec4f, hard: f32) -> f32 {
-    let w = mapping_weights(normal, blend);
-    if (max(w.x, max(w.y, w.z)) >= 0.999) {
-        return hard;
-    }
-    let s = mapping_signs(normal);
-    var planes = mapping_planes(object, s);
-    var gx = mapping_planes(dx, s);
-    var gy = mapping_planes(dy, s);
-    var alpha = 0.0;
-    for (var k = 0u; k < 3u; k++) {
-        if (w[k] > 0.0) {
-            alpha += w[k] * textureSampleGrad(albedo_map, material_sampler, planes[k] + offset,
-                gx[k], gy[k]).a;
-        }
-    }
-    return alpha;
-}
-
 @fragment fn fs_depth_cutout(f: DepthCutoutOut) {
-    var uv = f.uv;
-    if (f.mapped != 0.0) {
-        uv = mapping_uv(f.object, f.object_normal, f.uv);
-    }
-    var albedo = textureSample(albedo_map, material_sampler, uv).a;
-    let dx = dpdx(f.object);
-    let dy = dpdy(f.object);
-    if (f.mapped > 1.0) {
-        albedo = triplanar_alpha(f.object, f.object_normal, f.uv, f.mapped - 1.0, dx, dy,
-            albedo);
-    }
-    let alpha = f.alpha * albedo;
-    if (alpha < f.cutoff) {
+    let albedo = mapping_alpha(albedo_map, material_sampler, f.uv, f.mapped, f.object,
+        f.object_normal);
+    if (f.alpha * albedo < f.cutoff) {
         discard;
     }
 }
@@ -702,14 +669,15 @@ struct Surface {
 // Tangent frame from the screen derivatives of the position and the UVs (cotangent frame), its
 // tangent and bitangent scaled by the same factor, the longer of the two of unit length. The
 // framebuffer y of dpdy points down, which negates both derivative axes of the frame. degenerate
-// is set where the UV derivatives give no frame. It reads dpdx and dpdy, so it is called in
-// uniform control flow.
+// is set where the UV derivatives give no frame. It reads dpdx and dpdy, so it is called where
+// every fragment of a quad takes the same path (hard_layers).
 struct Frame {
     tangent: vec3f,
     bitangent: vec3f,
     degenerate: bool,
 };
 
+@diagnostic(off, derivative_uniformity)
 fn cotangent_frame(n: vec3f, p: vec3f, uv: vec2f) -> Frame {
     let dp1 = dpdx(p);
     let dp2 = dpdy(p);
@@ -731,19 +699,8 @@ fn perturb(n: vec3f, frame: Frame, m: vec3f) -> vec3f {
     return select(normalize(tangent * m), n, frame.degenerate);
 }
 
-// Texture coordinates of a fragment: the interpolated UV, or the projection of a MappingObject
-// or MappingWorld material on its dominant axis.
-fn fragment_uv(f: VertexOut) -> vec2f {
-    var uv = f.uv.xy;
-    if (f.scalars.w != 0.0) {
-        uv = mapping_uv(f.object, f.object_normal, f.uv.xy);
-    }
-    return uv;
-}
-
-// The texture layers of a fragment: albedo, emissive and ORM, the tangent space normal of the
-// normal map (y up the image) in normal, or once blended the world normal, and the tangent
-// frame of the normal map.
+// The texture layers of a fragment: albedo, emissive and ORM, the world normal the normal map
+// makes of the geometric normal, and the tangent frame of the normal map.
 struct Layers {
     albedo: vec4f,
     emissive: vec3f,
@@ -752,22 +709,46 @@ struct Layers {
     frame: Frame,
 };
 
+// The layers of a fragment without a triplanar blend, at the interpolated UV or the projection
+// of a MappingObject or MappingWorld material on its dominant axis, with the cotangent frame of
+// that UV. surface calls it for the fragments without a blend (f.scalars.w at most 1, flat),
+// which are all those of a primitive and so of a quad, so the implicit derivatives of its
+// samples and frame hold.
+@diagnostic(off, derivative_uniformity)
+fn hard_layers(f: VertexOut, geometric: vec3f) -> Layers {
+    var uv = f.uv.xy;
+    if (f.scalars.w != 0.0) {
+        uv = mapping_uv(f.object, f.object_normal, f.uv.xy);
+    }
+    var o: Layers;
+    o.albedo = textureSample(albedo_map, material_sampler, uv);
+    o.emissive = textureSample(emissive_map, material_sampler, uv).rgb;
+    o.orm = textureSample(orm_map, material_sampler, uv).rgb;
+    let m = textureSample(normal_map, material_sampler, uv).xyz * 2.0 - 1.0;
+    o.frame = cotangent_frame(geometric, f.world, uv);
+    o.normal = perturb(geometric, o.frame, m);
+    return o;
+}
+
 // Direction of v perpendicular to the normal n, of unit length; zero along n.
 fn tangent_along(v: vec3f, n: vec3f) -> vec3f {
     let p = v - n * dot(n, v);
     return p * inverseSqrt(max(dot(p, p), 1e-12));
 }
 
-// The layers of a triplanar fragment (blend above 0) from those of its hard projection: each
-// projection with a weight samples every layer with the gradients of its projection (dx, dy the
-// screen derivatives of f.object), except the dominant one, which keeps the hard samples where
-// the screen derivatives of the hard UV (uv_dx, uv_dy) match its gradients, so the quad does not
-// straddle a change of axis. The tangent normal of each projection turns to the world with the
-// tangent and bitangent of its axes (mapping_tangent, turned by f.rotation), made perpendicular
-// to the geometric normal, and the world normals blend; the frame is that of the dominant
-// projection.
-fn triplanar(f: VertexOut, geometric: vec3f, hard: Layers, uv_dx: vec2f, uv_dy: vec2f,
-    dx: vec4f, dy: vec4f) -> Layers {
+// The layers of a triplanar fragment (blend above 0): each projection with a weight samples
+// every layer once, with the gradients of its projection from the screen derivatives of
+// f.object, so a quad that straddles a change of the dominant axis keeps its mip level; a
+// fragment whose normal is along an axis samples once. The tangent normal of each projection
+// turns to the world with the tangent and bitangent of its axes (mapping_tangent, turned by
+// f.rotation), made perpendicular to the geometric normal, and the world normals blend; the
+// frame is that of the dominant projection. surface calls it for the fragments whose blend
+// (f.scalars.w, flat) is above 0, which are all those of a primitive and so of a quad, so the
+// derivatives taken here hold.
+@diagnostic(off, derivative_uniformity)
+fn triplanar(f: VertexOut, geometric: vec3f) -> Layers {
+    let dx = dpdx(f.object);
+    let dy = dpdy(f.object);
     let n = f.object_normal;
     let w = mapping_weights(n, f.scalars.w - 1.0);
     let s = mapping_signs(n);
@@ -775,36 +756,26 @@ fn triplanar(f: VertexOut, geometric: vec3f, hard: Layers, uv_dx: vec2f, uv_dy: 
     var planes = mapping_planes(f.object, s);
     var gx = mapping_planes(dx, s);
     var gy = mapping_planes(dy, s);
-    let reuse = length(uv_dx - gx[dominant]) <= 0.25 * length(gx[dominant]) &&
-        length(uv_dy - gy[dominant]) <= 0.25 * length(gy[dominant]);
     var o: Layers;
     o.albedo = vec4f(0.0);
     o.emissive = vec3f(0.0);
     o.orm = vec3f(0.0);
-    o.frame = hard.frame;
     var normal = vec3f(0.0);
     for (var k = 0u; k < 3u; k++) {
         if (w[k] == 0.0) {
             continue;
         }
-        var layer = hard;
-        if (k != dominant || !reuse) {
-            let uv = planes[k] + f.uv.xy;
-            layer.albedo = textureSampleGrad(albedo_map, material_sampler, uv, gx[k], gy[k]);
-            layer.emissive = textureSampleGrad(emissive_map, material_sampler, uv, gx[k],
-                gy[k]).rgb;
-            layer.orm = textureSampleGrad(orm_map, material_sampler, uv, gx[k], gy[k]).rgb;
-            layer.normal = textureSampleGrad(normal_map, material_sampler, uv, gx[k],
-                gy[k]).xyz * 2.0 - 1.0;
-        }
-        o.albedo += w[k] * layer.albedo;
-        o.emissive += w[k] * layer.emissive;
-        o.orm += w[k] * layer.orm;
+        let uv = planes[k] + f.uv.xy;
+        o.albedo += w[k] * textureSampleGrad(albedo_map, material_sampler, uv, gx[k], gy[k]);
+        o.emissive += w[k] * textureSampleGrad(emissive_map, material_sampler, uv, gx[k],
+            gy[k]).rgb;
+        o.orm += w[k] * textureSampleGrad(orm_map, material_sampler, uv, gx[k], gy[k]).rgb;
+        let m = textureSampleGrad(normal_map, material_sampler, uv, gx[k], gy[k]).xyz * 2.0 -
+            1.0;
         let tangent = tangent_along(mapping_rotate(f.rotation, mapping_tangent(k, s)), geometric);
         let bitangent = tangent_along(mapping_rotate(f.rotation, mapping_bitangent(k)),
             geometric);
-        normal += w[k] * (tangent * layer.normal.x + bitangent * layer.normal.y +
-            geometric * layer.normal.z);
+        normal += w[k] * (tangent * m.x + bitangent * m.y + geometric * m.z);
         if (k == dominant) {
             o.frame = Frame(tangent, bitangent, false);
         }
@@ -814,26 +785,14 @@ fn triplanar(f: VertexOut, geometric: vec3f, hard: Layers, uv_dx: vec2f, uv_dy: 
 }
 
 fn surface(f: VertexOut, front: bool) -> Surface {
-    let uv = fragment_uv(f);
-    var layers: Layers;
-    layers.albedo = textureSample(albedo_map, material_sampler, uv);
-    layers.emissive = textureSample(emissive_map, material_sampler, uv).rgb;
-    layers.orm = textureSample(orm_map, material_sampler, uv).rgb;
-    layers.normal = textureSample(normal_map, material_sampler, uv).xyz * 2.0 - 1.0;
     let geometric = normalize(f.normal);
-    layers.frame = cotangent_frame(geometric, f.world, uv);
-    // The derivatives a triplanar fragment samples with, in uniform control flow.
-    let uv_dx = dpdx(uv);
-    let uv_dy = dpdy(uv);
-    let object_dx = dpdx(f.object);
-    let object_dy = dpdy(f.object);
-    var mapped: vec3f;
+    var layers: Layers;
     if (f.scalars.w > 1.0) {
-        layers = triplanar(f, geometric, layers, uv_dx, uv_dy, object_dx, object_dy);
-        mapped = layers.normal;
+        layers = triplanar(f, geometric);
     } else {
-        mapped = perturb(geometric, layers.frame, layers.normal);
+        layers = hard_layers(f, geometric);
     }
+    let mapped = layers.normal;
     let albedo = layers.albedo;
     let emissive = layers.emissive;
     let orm = layers.orm;
