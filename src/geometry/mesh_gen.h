@@ -193,7 +193,10 @@ void box_mesh_gen_rounded_box(
  *
  * The radii are in the order of the members of Bevel: top_front, top_back, top_left, top_right,
  * bottom_front, bottom_back, bottom_left, bottom_right, front_left, front_right, back_left and
- * back_right. Radii that do not fit are scaled down together.
+ * back_right.
+ *
+ * Radii that do not fit are scaled down together: along each axis, the corners at the two ends
+ * of an edge take the largest radius of their edges across that axis, and leave a sliver flat.
  *
  * @param mesh The mesh
  * @param size Size along X, Y and Z

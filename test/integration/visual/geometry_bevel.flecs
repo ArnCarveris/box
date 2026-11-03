@@ -82,3 +82,12 @@ mixed {
   Bevel: {top_front: 0.35, top_left: 0.35, front_right: 0.35, back_left: 0.2}
   Rgb: {240, 200, 60}
 }
+
+// A thin plate with rounded corners: the vertical edges keep their radius on a low box
+plate {
+  Position: {0, 0.05, 1.7}
+  Rotation: {0, 0.15, 0}
+  Box: {2.6, 0.1, 0.9}
+  Bevel: {front_left: 0.35, front_right: 0.35, back_left: 0.35, back_right: 0.35}
+  Rgb: {170, 130, 230}
+}

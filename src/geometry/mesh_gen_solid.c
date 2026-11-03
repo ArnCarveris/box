@@ -213,9 +213,9 @@ void box_mesh_gen_rounded_box(
 /** Largest number of steps per rounded edge of a bevel */
 #define BOX_BEVEL_MAX_STEPS (128)
 
-/** Share of the side between two corners that the bevels of those corners may take, which keeps
- * every flat face and edge strip from collapsing to nothing */
-#define BOX_BEVEL_FIT (0.999f)
+/** Share of the largest side that stays flat between two corners whose bevels would otherwise
+ * take up the whole side between them. A flat part never collapses, also on a thin side. */
+#define BOX_BEVEL_GAP (0.0005f)
 
 /** Distance below which two vertices of a bevel are the same point */
 #define BOX_BEVEL_EPSILON (1e-6f)
@@ -270,18 +270,22 @@ static float box_bevel_edge(
     return radii[box_bevel_edge_member[axis][(corner >> lo) & 1][(corner >> hi) & 1]];
 }
 
-/** Get the largest radius of the three edges of a corner.
+/** Get how far the rounding of a corner reaches along an axis: the largest radius of the two
+ * edges of the corner that are perpendicular to the axis. The edge along the axis takes up
+ * length on the other two axes only.
  *
  * @param radii Radius per Bevel member
  * @param corner Index of the corner
- * @return The radius
+ * @param axis The axis
+ * @return The reach
  */
-static float box_bevel_corner_max(
+static float box_bevel_corner_reach(
     const float *radii,
-    int32_t corner)
+    int32_t corner,
+    int32_t axis)
 {
-    return glm_max(glm_max(box_bevel_edge(radii, 0, corner), box_bevel_edge(radii, 1, corner)),
-        box_bevel_edge(radii, 2, corner));
+    return glm_max(box_bevel_edge(radii, (axis + 1) % 3, corner),
+        box_bevel_edge(radii, (axis + 2) % 3, corner));
 }
 
 /** Get a point of the rounded part of a corner.
@@ -666,14 +670,16 @@ void box_mesh_gen_bevel(
         r[e] = glm_max(radii[e], 0.0f);
     }
 
+    float gap = BOX_BEVEL_GAP * glm_max(glm_max(size[0], size[1]), size[2]);
     for (int32_t axis = 0; axis < 3; axis ++) {
         for (int32_t c0 = 0; c0 < 8; c0 ++) {
             if (c0 & (1 << axis)) {
                 continue;
             }
 
-            float sum = box_bevel_corner_max(r, c0) + box_bevel_corner_max(r, c0 | (1 << axis));
-            float limit = BOX_BEVEL_FIT * size[axis];
+            float sum = box_bevel_corner_reach(r, c0, axis) +
+                box_bevel_corner_reach(r, c0 | (1 << axis), axis);
+            float limit = glm_max(size[axis] - gap, 0.0f);
             if (sum > limit) {
                 fit = glm_min(fit, limit / sum);
             }

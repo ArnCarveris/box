@@ -1313,12 +1313,13 @@ void Watertight_bevel(void) {
     ecs_entity_t e = ecs_new(world);
     char label[160];
     int32_t failures = 0;
-    ecs_set(world, e, Box, { 1, 0.8f, 1.2f });
 
+    static const float patterns[2][3] = { { 1, 0.8f, 1.2f }, { 2, 0.1f, 1 } };
     int32_t segments[2] = { 4, 6 };
-    for (int32_t s = 0; s < 2; s ++) {
+    for (int32_t s = 0; s < 3; s ++) {
+        ecs_set(world, e, Box, { patterns[s / 2][0], patterns[s / 2][1], patterns[s / 2][2] });
         for (int32_t pattern = 0; pattern < 4096; pattern ++) {
-            Bevel bevel = { .segments = segments[s] };
+            Bevel bevel = { .segments = segments[s % 2] };
             float radii[12];
             for (int32_t edge = 0; edge < 12; edge ++) {
                 radii[edge] = (pattern >> edge) & 1 ? 0.15f : 0.0f;
@@ -1326,16 +1327,18 @@ void Watertight_bevel(void) {
 
             watertight_bevel_edges(&bevel, radii);
             ecs_set_ptr(world, e, Bevel, &bevel);
-            snprintf(label, sizeof(label), "bevel pattern %03x segments %d",
-                pattern, segments[s]);
+            snprintf(label, sizeof(label), "bevel pattern %03x segments %d size %d",
+                pattern, segments[s % 2], s / 2);
             failures += !watertight_check(world, e, label);
         }
     }
 
     static const float choices[5] = { 0.0f, 0.05f, 0.1f, 0.2f, 0.3f };
-    static const float sizes[3][3] = { { 1, 0.8f, 1.2f }, { 2, 1, 1.5f }, { 1.4f, 2, 0.9f } };
+    static const float sizes[5][3] = {
+        { 1, 0.8f, 1.2f }, { 2, 1, 1.5f }, { 1.4f, 2, 0.9f }, { 2, 0.1f, 1 }, { 0.15f, 1.5f, 1 }
+    };
     uint32_t seed = 12345;
-    for (int32_t z = 0; z < 3; z ++) {
+    for (int32_t z = 0; z < 5; z ++) {
         ecs_set(world, e, Box, { sizes[z][0], sizes[z][1], sizes[z][2] });
         for (int32_t round = 0; round < 400; round ++) {
             Bevel bevel = { .segments = 2 + 2 * (round % 3) };

@@ -453,7 +453,8 @@ static void box_bevel_on_set(
     ecs_os_free(entities);
 }
 
-/** Resolve an entity that loses its Bevel and keeps its Box back to the plain Box.
+/** Resolve an entity that loses its Bevel and keeps its Box, its own or inherited, back to the
+ * plain Box.
  *
  * An entity that is deleted resolves nothing, and one that also loses its Box drops its
  * ShapeMesh in the remove observer of the Box.
@@ -466,7 +467,8 @@ static void box_bevel_on_remove(
     const box_shape_t *bevel = it->ctx;
     const box_shape_t *box = box_mesh_cache_shape(bevel->cache, ecs_id(Box));
     bool live = it->other_table && ecs_table_get_type(it->other_table)->count &&
-        ecs_table_has_id(it->world, it->other_table, ecs_id(Box));
+        ecs_search_relation(it->world, it->other_table, 0, ecs_id(Box), EcsIsA,
+            EcsSelf | EcsUp, NULL, NULL, NULL) != -1;
     for (int32_t i = 0; live && i < it->count; i ++) {
         ecs_entity_t e = it->entities[i];
         const Box *value = ecs_get(it->world, e, Box);

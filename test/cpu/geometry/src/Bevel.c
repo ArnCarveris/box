@@ -338,6 +338,25 @@ void Bevel_scaled_radii(void) {
     ecs_fini(world);
 }
 
+void Bevel_thin_box(void) {
+    ecs_world_t *world = bevel_world();
+    Box box = { 2, 0.1f, 1 };
+    float sharp = 1.0f + 0.5f, rounded = sharp - 0.3f * (2.0f - sqrtf(2.0f));
+    ecs_entity_t all = bevel_entity(world, box, (Bevel){ .front_left = 0.3f,
+        .front_right = 0.3f, .back_left = 0.3f, .back_right = 0.3f, .segments = 4 });
+    ecs_entity_t one = bevel_entity(world, box, (Bevel){ .front_right = 0.3f, .segments = 4 });
+    for (int32_t edge = 8; edge < 12; edge ++) {
+        test_assert(fabsf(bevel_reach(world, all, edge) - rounded) < 1e-3f);
+        test_assert(fabsf(bevel_reach(world, one, edge) - (edge == 9 ? rounded : sharp)) < 1e-3f);
+    }
+
+    ecs_entity_t across = bevel_entity(world, box, (Bevel){ .top_front = 0.3f, .segments = 4 });
+    float fitted = 0.1f - 0.0005f * 2.0f;
+    float limit = 0.05f + 0.5f - fitted * (2.0f - sqrtf(2.0f));
+    test_assert(fabsf(bevel_reach(world, across, 0) - limit) < 1e-3f);
+    ecs_fini(world);
+}
+
 void Bevel_radius_overrides(void) {
     ecs_world_t *world = bevel_world();
     ecs_entity_t bevel = bevel_entity(world, (Box){ 2, 1, 1.5f },

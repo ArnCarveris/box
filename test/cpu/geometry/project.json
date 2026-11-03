@@ -241,6 +241,7 @@
                     "uvs",
                     "edge_names",
                     "scaled_radii",
+                    "thin_box",
                     "radius_overrides",
                     "equal_edges",
                     "cache_shared",
