@@ -314,7 +314,9 @@ bake3 --target em --local-env=<name> apps/boxrun
 ## Starting and failing
 
 Browsers only start audio after a user gesture. The context is created suspended when the
-canvas gets its input backend, and the key and mouse button handlers of the canvas
+app opens its audio output, before the first frame, so that the sounds and the commands of that
+frame reach the worklet (they wait in the page while it loads). The key and mouse button
+handlers of the canvas
 (`box_web_callbacks` in `src/input/platform_web.c`) resume it on the first key or button event.
 Until then the app runs normally, silently, and logs nothing; `AudioStatus.state` is
 `AudioWaitingForGesture`, and `box.audio` drops the plays that do not loop (see

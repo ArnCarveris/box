@@ -148,7 +148,8 @@ box_audio_transport_t* box_audio_transport_null_new(
 box_audio_transport_t* box_audio_transport_native_new(
     const box_audio_native_desc_t *desc);
 
-/** Create the transport of the AudioWorklet of the page, which box_audio_web_start creates.
+/** Create the transport of the AudioWorklet of the page. Starts the audio of the page
+ * (box_audio_web_start) when it did not yet, so that what the first frame sends arrives.
  *
  * @return The transport, NULL on native builds
  */

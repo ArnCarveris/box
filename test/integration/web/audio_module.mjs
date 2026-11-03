@@ -15,7 +15,8 @@ the bus music and a click that box.audio.play plays at load.
 <bin dir> holds boxrun.html, .js and .wasm (see audio_core.mjs). Without an autoplay flag the
 check expects AudioStatus.state AudioWaitingForGesture before a gesture, then starts the audio
 with a trusted click: the tone has to reach the worklet at 440 Hz and a peak of 0.25 with one
-voice, the click dropped. A set of AudioBus.volume to 0.5 has to halve the level. A hidden page
+voice, the click dropped. A script that sets AudioBus.volume to 0.5 (script_write) has to halve
+the level. A hidden page
 has to fade out and suspend the context (AudioSuspended) and a visible one resume it. A capture
 of one second (audio capture 1) has to land as a WAV in the file system of the page with the
 tone, and a 500 ms busy loop on the main thread has to leave the loop playing. The commands run
@@ -246,7 +247,15 @@ async function main() {
 
     const failures = [];
     const expect = (ok, what) => { if (!ok) failures.push(what); };
-    const status = async (member) => (await evaluate(shell(`get $ box.audio.AudioStatus.${member}`)));
+    // The shell gets whole components, the member is taken here: a JSON string as get prints it
+    const audioStatus = async (member) => {
+      const out = await evaluate(shell('get $ box.audio.AudioStatus'));
+      try {
+        return JSON.stringify(JSON.parse(out).AudioStatus[member]);
+      } catch {
+        return out;
+      }
+    };
 
     if (!(await waitFor('window.boxFrames >= 30', 20000))) {
       throw new Error('the scene did not start rendering');
@@ -254,7 +263,7 @@ async function main() {
 
     // Before a gesture: AudioStatus waits for it, and the play of the click is dropped
     await sleep(500);
-    const waiting = await status('state');
+    const waiting = await audioStatus('state');
     console.log(`before the gesture: AudioStatus.state ${waiting}, context ` +
       `${await evaluate('Module.boxAudio.ctx.state')}`);
     expect(waiting === '"AudioWaitingForGesture"', 'AudioStatus does not wait for a gesture');
@@ -266,8 +275,11 @@ async function main() {
     }
     const running = await waitFor('Module.boxAudio.ctx.state === "running"', 5000);
     expect(running, 'the gesture did not start the audio');
-    await waitFor(`${shell('get $ box.audio.AudioStatus.state')} === '"AudioRunning"'`, 3000);
-    const state = await status('state');
+    const runningBy = Date.now() + 3000;
+    while (Date.now() < runningBy && await audioStatus('state') !== '"AudioRunning"') {
+      await sleep(100);
+    }
+    const state = await audioStatus('state');
     const stats = await evaluate('Module.boxAudio.stats()');
     console.log(`after the gesture: AudioStatus.state ${state}, worklet voices ${stats.voices}`);
     expect(state === '"AudioRunning"', 'AudioStatus is not AudioRunning after the gesture');
@@ -282,17 +294,20 @@ async function main() {
     expect(Math.abs(tone.peak - LEVEL) < 0.02, `the peak of the tone is not ${LEVEL}`);
     expect(Math.abs(tone.mean) < 0.02, 'the output has an offset, the click played');
 
-    // A change of the bus halves the level
-    const set = await evaluate(shell(`set music box.audio.AudioBus {volume: ${VOLUME}}`));
+    // A script that changes the volume of the bus halves the level
+    const code = `using box.audio\nmusic {\n  AudioBus: {volume: ${VOLUME}}\n}\n`;
+    const written = await evaluate(shell(`script_write mixer ${JSON.stringify(code)}`));
     await sleep(1000);
     const half = await evaluate(MEASURE);
-    console.log(`after AudioBus.volume ${VOLUME} (${set}): peak ${half.tail.toFixed(4)}`);
+    const bus = await evaluate(shell('get music box.audio.AudioBus'));
+    console.log(`after a script sets AudioBus.volume ${VOLUME} (${written}, ${bus}): peak ` +
+      `${half.tail.toFixed(4)}`);
     expect(Math.abs(half.tail - LEVEL * VOLUME) < 0.01, 'the volume of the bus did not apply');
 
     // A hidden page fades out and suspends, a visible one resumes
     await evaluate(visibility('hidden'));
     const suspended = await waitFor('Module.boxAudio.ctx.state === "suspended"', 3000);
-    const hiddenState = await status('state');
+    const hiddenState = await audioStatus('state');
     console.log(`hidden: context ${await evaluate('Module.boxAudio.ctx.state')}, ` +
       `AudioStatus.state ${hiddenState}, suspends ${await evaluate('Module.boxAudio.suspends')}`);
     expect(suspended, 'the hidden page did not suspend its audio');

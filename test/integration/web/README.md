@@ -125,10 +125,11 @@ looping 440 Hz tone at a peak of 0.25 on a bus, and a click that `box.audio.play
 It reads `AudioStatus` and runs commands through the shell of the page
 (`Module.cwrap('box_command_web_run', 'string', ['string'])`). It expects
 `AudioWaitingForGesture` before a trusted click and the click dropped, the tone at its level
-after it, half the level after `set music box.audio.AudioBus {volume: 0.5}`, a suspended context
-(`AudioSuspended`) while the page is hidden and a resumed one when it shows again, a one second
-`audio capture 1` in `/tmp` of the page's file system with the tone, and the loop still playing
-after a 500 ms stall of the main thread:
+after it, half the level after a script that the shell writes (`script_write`) sets
+`AudioBus: {volume: 0.5}` on the bus, a suspended context (`AudioSuspended`) while the page is
+hidden and a resumed one when it shows again, a one second `audio capture 1` in `/tmp` of the
+page's file system with the tone, and the loop still playing after a 500 ms stall of the main
+thread:
 
 ```sh
 node test/integration/web/audio_module.mjs \

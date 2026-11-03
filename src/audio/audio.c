@@ -76,6 +76,24 @@ static void box_audio_settings_ctor(
     }
 }
 
+/** Copy what box.audio sent for an entity: a copy starts with nothing sent. A prefab
+ * instance or a clone gets a sound, a bus or a voice of its own this way.
+ *
+ * @param dst The copies
+ * @param src The originals
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_track_copy(
+    void *dst,
+    const void *src,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)src;
+    ecs_os_memset(dst, 0, ti->size * count);
+}
+
 box_audio_module_t* box_audio_module_get(
     const ecs_world_t *world)
 {
@@ -427,9 +445,9 @@ void BoxAudioImport(
     ECS_COMPONENT_DEFINE(world, AudioSoundId);
     ECS_COMPONENT_DEFINE(world, AudioBusState);
     ECS_COMPONENT_DEFINE(world, AudioVoice);
-    ecs_add_pair(world, ecs_id(AudioSoundId), EcsOnInstantiate, EcsDontInherit);
-    ecs_add_pair(world, ecs_id(AudioBusState), EcsOnInstantiate, EcsDontInherit);
-    ecs_add_pair(world, ecs_id(AudioVoice), EcsOnInstantiate, EcsDontInherit);
+    ecs_set_hooks(world, AudioSoundId, { .copy = box_audio_track_copy });
+    ecs_set_hooks(world, AudioBusState, { .copy = box_audio_track_copy });
+    ecs_set_hooks(world, AudioVoice, { .copy = box_audio_track_copy });
     ecs_add_pair(world, ecs_id(AudioPcm), EcsWith, ecs_id(AudioSoundId));
     ecs_add_pair(world, ecs_id(AudioBus), EcsWith, ecs_id(AudioBusState));
     ecs_add_pair(world, ecs_id(AudioSource), EcsWith, ecs_id(AudioVoice));

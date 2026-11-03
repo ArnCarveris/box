@@ -702,6 +702,7 @@ box_audio_transport_t* box_audio_transport_web_new(void)
 {
     box_audio_webt_t *w = ecs_os_calloc_t(box_audio_webt_t);
     box_audio_transport_t *result = NULL;
+    box_audio_web_start();
     if (w) {
         w->base = (box_audio_transport_t){
             .kind = BOX_AUDIO_TRANSPORT_WEB,
