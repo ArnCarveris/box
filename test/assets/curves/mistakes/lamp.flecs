@@ -1,0 +1,10 @@
+// max_keys on a light, which has no random draw to blend two curves by
+using box.curve
+using box.light
+using box.particle
+
+lamp {
+  PointLight: {}
+  ParticleEmitter: {rate: 10}
+  ParticleLight: {period: 1, curve: {keys: [{0, 1}, {1, 0}], max_keys: [{0, 2}, {1, 0}]}}
+}

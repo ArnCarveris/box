@@ -58,6 +58,9 @@ panel {
 }
 ```
 
+For keyed curves of particles, lights, emission and animation tracks, and a recipe of a UI ease,
+see [Curves](curves.md).
+
 `box_transition_ease_bezier(fn, &bezier, t)` evaluates it, solving x for the curve parameter
 (`box_curve_ease`), and gives `box_transition_ease(fn, t)` for the presets. Handles equal to a
 preset, `{0.42, 0, 0.58, 1}` for `EaseInOut`, give the values of the preset.

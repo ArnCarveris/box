@@ -5,6 +5,9 @@
  * Particles never reach the ECS: an emitter sends a block of parameters in the render packet
  * and the renderer keeps the particles in pools it owns, so a fixed timestep gives the same
  * particles run after run.
+ *
+ * docs/curves.md is the guide to the curves of ParticleCurves, ParticleMotion, ParticleLight and
+ * ParticleTimeline, with recipes for common effects.
  */
 
 #ifndef BOX_PARTICLE_H
@@ -227,17 +230,18 @@ ECS_STRUCT(ParticleLight, {
  * its spawns, kept in their velocity. Paused holds, stopped emits nothing, bursts are not scaled.
  *
  * Size, lifetime, rotation and opacity have no curve here: every frame computes them from the
- * current ranges, so a curve would change live particles too. No keys, a bad curve, which its
- * validate hook logs, or period 0 is 1; the CPU evaluates them, without rows on the GPU.
+ * current ranges, so a curve would change live particles too. No keys, a bad curve, also one
+ * with max_keys as the clock has no random draw, or period 0 is 1, evaluated on the CPU.
  */
 ECS_STRUCT(ParticleTimeline, {
     float period;           /**< Seconds of the playback clock the curves span, default 0 for
                              *   no curves */
     bool loop;              /**< Repeat the curves every period, default false for once and
                              *   then the last key */
-    ParticleCurve rate;     /**< Multiplier of ParticleEmitter.rate, default 1 */
+    ParticleCurve rate;     /**< Multiplier of ParticleEmitter.rate, default 1, without
+                             *   max_keys */
     ParticleCurve speed;    /**< Multiplier of the start speed of the particles spawned now,
-                             *   default 1 */
+                             *   default 1, without max_keys */
 });
 
 /** A flash of the PointLight next to it in an effect template each time box_particle_burst_at

@@ -32,6 +32,8 @@ python3 tools/integration.py visual
 
 - [Audio](docs/audio.md): the guide to sound in box, from a first sound to the web rules,
   captures and the reference of the audio core.
+- [Curves](docs/curves.md): the guide to authoring curves for particles, lights, emission,
+  animation, paths and eases, with recipes, the errors and the cost.
 
 ## Commands
 

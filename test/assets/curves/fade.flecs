@@ -1,0 +1,14 @@
+// Fade in and out: each particle appears over the first fifth of its life, stays and fades out
+// over the last half, so the stream has no hard edge where particles are born or die.
+using box.curve
+using box.particle
+
+fade {
+  ParticleEmitter: {
+    rate: 30, spread: 20, speed: {0.5, 1}, lifetime: {2, 2.5}, size: {0.2, 0.2}, seed: 1
+  }
+  ParticleForces: {gravity: {0, 0, 0}}
+  ParticleCurves: {
+    opacity: {keys: [{0, 0}, {0.2, 1}, {0.5, 1}, {1, 0}]}
+  }
+}

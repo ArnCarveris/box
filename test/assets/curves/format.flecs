@@ -1,0 +1,12 @@
+// The format: a curve per field, linear by default, Catmull-Rom or Bezier per curve.
+using box.curve
+using box.particle
+
+smoke {
+  ParticleEmitter: {rate: 20, lifetime: {2, 3}, size: {0.5, 0.5}, seed: 1}
+  ParticleCurves: {
+    opacity: {keys: [{0, 0}, {0.1, 1}, {1, 0}]}
+    size: {kind: CurveCatmullRom, keys: [{0, 0.3}, {0.4, 1.8}, {1, 2.2}]}
+    spin: {kind: CurveBezier, keys: [{time: 0, value: 1, out: -2}, {time: 1, value: 0, in: 0}]}
+  }
+}

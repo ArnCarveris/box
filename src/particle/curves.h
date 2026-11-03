@@ -30,6 +30,15 @@ char* box_particle_curve_check(
 char* box_particle_light_curve_check(
     const ParticleCurve *curve);
 
+/** Check a curve of a ParticleTimeline: a valid ParticleCurve without max_keys, as the playback
+ * clock has no random draw to blend two curves by.
+ *
+ * @param curve The curve
+ * @return NULL when it is valid, else the first problem, to free with ecs_os_free
+ */
+char* box_particle_timeline_curve_check(
+    const ParticleCurve *curve);
+
 /** Check a ParticleGradient: the kind is in range and the times of its keys and of its
  * max_keys are finite, increase strictly and are from 0 to 1.
  *
@@ -54,6 +63,14 @@ bool box_particle_curve_valid(
  * @return Whether box_particle_light_curve_check finds no problem
  */
 bool box_particle_light_curve_valid(
+    const ParticleCurve *curve);
+
+/** Check whether a curve of a ParticleTimeline is valid, without a message.
+ *
+ * @param curve The curve
+ * @return Whether box_particle_timeline_curve_check finds no problem
+ */
+bool box_particle_timeline_curve_valid(
     const ParticleCurve *curve);
 
 /** Check whether a ParticleGradient is valid, without a message.

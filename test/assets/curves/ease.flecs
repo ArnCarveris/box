@@ -1,0 +1,17 @@
+// A custom ease for UI: a panel that springs to a new scale with a small overshoot, a CSS "back"
+// ease, and fades with a fast start and a long soft landing.
+using box.transform
+using box.geometry
+using box.material
+using box.transition
+
+panel {
+  Scale: {1, 1, 1}
+  Rect: {240, 120}
+  Rgb: {40, 44, 56}
+  Opacity: {1}
+  Transition: [
+    Scale: {duration: 0.25, timing_function: CubicBezier, bezier: {0.34, 1.56, 0.64, 1}},
+    Opacity: {duration: 0.3, timing_function: CubicBezier, bezier: {0.2, 0, 0, 1}}
+  ]
+}

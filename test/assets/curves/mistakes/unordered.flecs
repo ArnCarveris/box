@@ -1,0 +1,8 @@
+// Times that go back
+using box.curve
+using box.particle
+
+unordered {
+  ParticleEmitter: {rate: 10}
+  ParticleCurves: {opacity: {keys: [{0, 0}, {0.6, 1}, {0.5, 1}, {1, 0}]}}
+}

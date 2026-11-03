@@ -1,0 +1,17 @@
+// Spark that shrinks quickly: bright additive streaks that lose half their size in the first
+// fifth of their life, (1 - t)^3, and then glow out as small points while they fall.
+using box.curve
+using box.particle
+
+spark {
+  ParticleEmitter: {
+    max: 400, rate: 120, spread: 35, speed: {4, 7}, lifetime: {0.4, 0.8},
+    size: {0.06, 0.1}, color: {255, 200, 120}, seed: 3
+  }
+  ParticleForces: {drag: 1.5}
+  ParticleAppearance: {blend: ParticleAdditive, stretch: 0.03}
+  ParticleCurves: {
+    size: {kind: CurveBezier, keys: [{time: 0, value: 1, out: -3}, {time: 1, value: 0, in: 0}]}
+    opacity: {keys: [{0, 1}, {0.7, 1}, {1, 0}]}
+  }
+}

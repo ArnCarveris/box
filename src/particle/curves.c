@@ -60,18 +60,38 @@ char* box_particle_curve_check(
     return result;
 }
 
-char* box_particle_light_curve_check(
-    const ParticleCurve *curve)
+/** Check a ParticleCurve of an owner without a random draw: a valid ParticleCurve without
+ * max_keys.
+ *
+ * @param curve The curve
+ * @param owner What has no random draw, for the problem
+ * @return NULL when it is valid, else the first problem
+ */
+static char* box_particle_single_curve_check(
+    const ParticleCurve *curve,
+    const char *owner)
 {
     char *result = NULL;
     if (ecs_vec_count(&curve->max_keys)) {
         result = flecs_asprintf(
-            "max_keys is not allowed, a light has no random draw to blend two curves by");
+            "max_keys is not allowed, %s has no random draw to blend two curves by", owner);
     } else {
         result = box_particle_curve_check(curve);
     }
 
     return result;
+}
+
+char* box_particle_light_curve_check(
+    const ParticleCurve *curve)
+{
+    return box_particle_single_curve_check(curve, "a light");
+}
+
+char* box_particle_timeline_curve_check(
+    const ParticleCurve *curve)
+{
+    return box_particle_single_curve_check(curve, "the playback clock");
 }
 
 /** Check one list of keys of a ParticleGradient: the times are finite, increase strictly and
@@ -135,6 +155,16 @@ bool box_particle_light_curve_valid(
     const ParticleCurve *curve)
 {
     char *problem = box_particle_light_curve_check(curve);
+    bool result = problem == NULL;
+    ecs_os_free(problem);
+
+    return result;
+}
+
+bool box_particle_timeline_curve_valid(
+    const ParticleCurve *curve)
+{
+    char *problem = box_particle_timeline_curve_check(curve);
     bool result = problem == NULL;
     ecs_os_free(problem);
 
@@ -265,9 +295,9 @@ static bool box_particle_timeline_validate(
 {
     const ParticleTimeline *timeline = ptr;
     box_particle_curves_report(world, entity, "ParticleTimeline", "rate",
-        box_particle_curve_check(&timeline->rate));
+        box_particle_timeline_curve_check(&timeline->rate));
     box_particle_curves_report(world, entity, "ParticleTimeline", "speed",
-        box_particle_curve_check(&timeline->speed));
+        box_particle_timeline_curve_check(&timeline->speed));
 
     return true;
 }

@@ -331,6 +331,7 @@
                     "speed_scales_new_particles",
                     "without_timeline_unchanged",
                     "bad_curve_is_one",
+                    "max_keys_is_one",
                     "copies_own_keys"
                 ]
             },
@@ -415,6 +416,25 @@
                     "remove_frees_at_once",
                     "page_reused_after_free",
                     "light_goes_out"
+                ]
+            },
+            {
+                "id": "CurveRecipes",
+                "testcases": [
+                    "format",
+                    "fade",
+                    "puff",
+                    "spark",
+                    "flame",
+                    "burst",
+                    "pulse",
+                    "flicker",
+                    "random_size",
+                    "path",
+                    "ease",
+                    "mistakes",
+                    "first_mistake_only",
+                    "guide_quotes_recipes"
                 ]
             }
         ]

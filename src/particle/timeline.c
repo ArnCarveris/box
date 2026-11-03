@@ -10,7 +10,7 @@
 #include <math.h>
 
 /** Evaluate a curve of a ParticleTimeline with the curve module, exactly at its time; a curve
- * without keys or a bad one, which its validate hook logged, is 1.
+ * without keys or a bad one, also one with max_keys, which its validate hook logged, is 1.
  *
  * @param curve The curve, its times from 0 to 1 of the period
  * @param t The time over the period, 0 to 1
@@ -22,7 +22,7 @@ static float box_particle_timeline_curve(
 {
     Curve view = { .kind = curve->kind, .keys = curve->keys };
     float result = 1.0f;
-    if (ecs_vec_count(&curve->keys) && box_particle_curve_valid(curve)) {
+    if (ecs_vec_count(&curve->keys) && box_particle_timeline_curve_valid(curve)) {
         result = box_curve_value(&view, t, 1.0f);
         result = isfinite(result) ? result : 1.0f;
     }
@@ -159,7 +159,7 @@ double box_particle_timeline_seconds(
     double result = delta, seconds;
     Curve view;
     if (!period || !ecs_vec_count(&timeline->rate.keys) ||
-        !box_particle_curve_valid(&timeline->rate))
+        !box_particle_timeline_curve_valid(&timeline->rate))
     {
         goto done;
     }

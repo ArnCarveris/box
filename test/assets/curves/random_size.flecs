@@ -1,0 +1,18 @@
+// Random size curves: every particle follows its own curve between two, so some shrink steadily
+// while others swell to twice their size halfway and then collapse.
+using box.curve
+using box.particle
+
+bubbles {
+  ParticleEmitter: {
+    rate: 40, spread: 30, speed: {0.5, 1}, lifetime: {2, 2}, size: {0.2, 0.2}, seed: 8
+  }
+  ParticleForces: {gravity: {0, 0.2, 0}}
+  ParticleCurves: {
+    size: {
+      kind: CurveCatmullRom
+      keys: [{0, 1}, {1, 0.4}]
+      max_keys: [{0, 1}, {0.5, 2}, {1, 0.2}]
+    }
+  }
+}

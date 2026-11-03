@@ -750,6 +750,44 @@ void Timeline_bad_curve_is_one(void) {
     box_render_null_free(null);
 }
 
+void Timeline_max_keys_is_one(void) {
+    // particle/timeline
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t plain = emitter_new(world, 25);
+    ecs_entity_t e = emitter_new(world, 25);
+    ecs_set_name(world, e, "pulse");
+
+    timeline_errors[0] = '\0';
+    timeline_level = ecs_log_set_level(-1);
+    timeline_colors = ecs_log_enable_colors(false);
+    timeline_log = ecs_os_api.log_;
+    ecs_os_api.log_ = timeline_capture;
+    ecs_set(world, e, ParticleTimeline, {
+        .period = 1,
+        .rate = { CurveLinear, BOX_CURVE_KEYS({0, 0}, {1, 2}), BOX_CURVE_KEYS({0, 1}, {1, 1}) },
+        .speed = { CurveLinear, BOX_CURVE_KEYS({0, 2}, {1, 2}), BOX_CURVE_KEYS({0, 3}, {1, 3}) }
+    });
+    ecs_os_api.log_ = timeline_log;
+    ecs_log_enable_colors(timeline_colors);
+    ecs_log_set_level(timeline_level);
+
+    test_assert(strstr(timeline_errors, "invalid ParticleTimeline on pulse: rate max_keys is not "
+        "allowed, the playback clock has no random draw to blend two curves by") != NULL);
+    test_assert(strstr(timeline_errors, "invalid ParticleTimeline on pulse: speed max_keys is "
+        "not allowed") != NULL);
+
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        frame(world, DELTA);
+        test_int(spawned_of(null, e), spawned_of(null, plain));
+        test_flt(pool_of(null, e)->block.speed[0], pool_of(null, plain)->block.speed[0]);
+    }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
 void Timeline_copies_own_keys(void) {
     // particle/timeline
     ecs_world_t *world = ecs_init();

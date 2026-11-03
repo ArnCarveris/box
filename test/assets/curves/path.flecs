@@ -1,0 +1,57 @@
+// Catmull-Rom paths for geometry: a vase lathed from a profile that starts with a line, so its
+// foot is flat, and runs through four anchors with a smooth belly and lip; and a tube swept
+// along a smooth route with a round section from four anchors of a closed path.
+using box.transform
+using box.geometry
+using box.material
+
+vase_outer {
+  Path2D: {
+    start: {0, 0},
+    segments: [
+      {kind: Line, end: {0.4, 0}},
+      {kind: CatmullRom, end: {0.75, 0.6}},
+      {kind: CatmullRom, end: {0.35, 1.4}},
+      {kind: CatmullRom, end: {0.3, 1.8}},
+      {kind: CatmullRom, end: {0.5, 2.1}}
+    ],
+    closed: false
+  }
+}
+
+vase {
+  Position: {2, 0, 0}
+  Lathe: {profile: vase_outer, cap_start: true, cap_end: true}
+  Rgb: {70, 165, 205}
+}
+
+tube_profile {
+  Path2D: {
+    start: {0.25, 0},
+    segments: [
+      {kind: CatmullRom, end: {0, 0.25}},
+      {kind: CatmullRom, end: {-0.25, 0}},
+      {kind: CatmullRom, end: {0, -0.25}}
+    ],
+    closed: true
+  }
+}
+
+tube_section { Profile2D: {outer: tube_profile} }
+
+tube_route {
+  Path3D: {
+    start: {-1.5, 0.3, 0},
+    segments: [
+      {kind: CatmullRom, end: {-0.5, 2, 0.5}},
+      {kind: CatmullRom, end: {0.5, 0.6, -0.5}},
+      {kind: CatmullRom, end: {1.5, 2.2, 0}}
+    ]
+  }
+}
+
+tube {
+  Position: {-2, 0, 0}
+  Sweep: {path: tube_route, profile: tube_section, scale: {1, 1}, rings: 96}
+  Rgb: {230, 155, 65}
+}

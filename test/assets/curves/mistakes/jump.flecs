@@ -1,0 +1,8 @@
+// Two keys at the same time, here in max_keys: a jump needs two times, however close
+using box.curve
+using box.particle
+
+jump {
+  ParticleEmitter: {rate: 10}
+  ParticleCurves: {spin: {keys: [{0, 1}, {1, 0}], max_keys: [{0, 2}, {0, 1}, {1, 0}]}}
+}
