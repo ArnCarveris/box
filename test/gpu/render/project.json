@@ -355,6 +355,12 @@
                 ]
             },
             {
+                "id": "TextureMappingWorld",
+                "testcases": [
+                    "grid_matches_single_box"
+                ]
+            },
+            {
                 "id": "TextureLinear",
                 "testcases": [
                     "emissive_layer"

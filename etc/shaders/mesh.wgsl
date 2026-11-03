@@ -9,7 +9,13 @@
 // A MappingObject material (TextureMapping) projects its texture coordinates in the fragment
 // stage from the object position times the instance scale, on the plane of the dominant axis of
 // the interpolated object normal (mapping_uv of material.wgsl), so the axis never blends inside
-// a triangle; its tangent frame follows from the derivatives of the projected UV.
+// a triangle; its tangent frame follows from the derivatives of the projected UV. A MappingWorld
+// material projects the world position on the dominant axis of the world normal the same way.
+// With a TextureMapping.blend above 0 the three axis projections blend (triplanar): each layer
+// is sampled once per projection with a weight, with explicit gradients, the dominant one
+// reusing the sample of the hard projection where its derivatives hold; the normal map of each
+// projection turns to the world with the axes of that projection (turned by the rotation of the
+// instance for MappingObject) and the world normals blend.
 // The ORM layer holds the glTF occlusion (red, of the indirect light only), roughness (green)
 // and metallic (blue) multipliers.
 // The cull pass writes the slots of the visible instances, which step per instance; the
@@ -158,18 +164,22 @@ struct VertexOut {
     @location(1) normal: vec3f,
     @location(2) color: vec4f,
     @location(3) emissive: vec3f,
-    @location(4) material: vec2f,
-    // The UV of the mesh after the TextureTransform; for a MappingObject material what
-    // mapping_uv adds after the projection (mapping_offset)
-    @location(5) uv: vec2f,
+    // A MappingObject material with a blend: the rotation of the instance as a quaternion,
+    // which turns the axes of the projections to the world; the identity for MappingWorld
+    @location(4) @interpolate(flat) rotation: vec4f,
+    // The UV of the mesh after the TextureTransform in xy, for a mapped material what mapping_uv
+    // adds after the projection (mapping_offset); metallic and roughness in zw
+    @location(5) uv: vec4f,
     // Flat scalars of the material: the AlphaCutoff in x, the thickness of the
-    // DiffuseTransmission in y and its blur in z; w is 1 for a MappingObject material, else 0
+    // DiffuseTransmission in y and its blur in z; w is 1 plus the TextureMapping.blend for a
+    // MappingObject or MappingWorld material, else 0
     @location(6) @interpolate(flat) scalars: vec4f,
     // ClearCoat of the material in xy: strength and roughness, 0 strength without one;
     // SpecularAnisotropy in zw: strength and rotation over 2 pi, 0 strength without one
     @location(10) @interpolate(flat) layers: vec4f,
     // A MappingObject material: the object position as mapping_object makes it and the object
-    // normal; zero for the UVs of the mesh. The fragment stage reads at most 16 inter-stage
+    // normal; a MappingWorld material the world position and normal; zero for the UVs of the
+    // mesh. The fragment stage reads at most 16 inter-stage
     // variables, front_facing included, so the layers share a location to leave room for them.
     @location(11) object: vec4f,
     @location(14) object_normal: vec3f,
@@ -186,35 +196,48 @@ struct VertexOut {
 
 // Color, metallic and roughness, and UV of a vertex from the shading of its instance and its
 // material, with the tint and material of its region on a parametric surface. Reads the
-// surface_data place set. A MappingObject material on a plain mesh sets mapped, uv to the
-// offset of its projection and object and object_normal to what mapping_uv projects in the
-// fragment stage; a parametric surface keeps its own UVs.
+// surface_data place set. A MappingObject or MappingWorld material on a plain mesh sets mapped
+// to 1 plus its blend, uv to the offset of its projection and object and object_normal to what
+// mapping_uv projects in the fragment stage, and rotation to what turns the axes of its
+// projections to the world; a parametric surface keeps its own UVs.
 struct VertexShading {
     color: vec4f,
     material: vec2f,
     uv: vec2f,
-    mapped: bool,
+    mapped: f32,
     object: vec4f,
     object_normal: vec3f,
+    rotation: vec4f,
 };
 
-// scale: the lengths of the model matrix columns of the instance.
-fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, scale: vec3f)
-    -> VertexShading {
+// p: the placed vertex; scale: the lengths of the model matrix columns of the instance; normal:
+// the world normal of the vertex.
+fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Placed, scale: vec3f,
+    normal: vec3f) -> VertexShading {
     var o: VertexShading;
     let tint = select(mesh_shading_tint(shading), vec4f(0.0, 0.0, 0.0, 1.0),
         view.reflection.y != 0u);
     o.color = vec4f(material_color(material, tint), shading.alpha);
     o.material = vec2f(material.metallic, material.roughness);
     o.uv = v.uv * material.uv.xy + material.uv.zw;
-    o.mapped = false;
+    o.mapped = 0.0;
     o.object = vec4f(0.0);
     o.object_normal = vec3f(0.0);
+    o.rotation = vec4f(0.0, 0.0, 0.0, 1.0);
     if (material_mapped(material) && surface_data.p[0].x == 0.0) {
-        o.mapped = true;
+        let blend = material_blend(material);
+        o.mapped = 1.0 + blend;
         o.uv = mapping_offset(material);
-        o.object = mapping_object(material, v.position, scale);
-        o.object_normal = v.normal;
+        if (material_world(material)) {
+            o.object = mapping_object(material, p.world.xyz, vec3f(1.0));
+            o.object_normal = normal;
+        } else {
+            o.object = mapping_object(material, v.position, scale);
+            o.object_normal = v.normal;
+            if (blend > 0.0) {
+                o.rotation = mapping_rotation(p.model[0].xyz, p.model[1].xyz, p.model[2].xyz);
+            }
+        }
     }
     if (surface_data.p[0].x != 0.0) {
         var region = i32(v.position.z);
@@ -258,16 +281,16 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, scale: 
     let cofactor = mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1));
     let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
     let model_scale = vec3f(length(c0), length(c1), length(c2));
-    let s = vertex_shading(v, shading, material, model_scale);
+    let normal = cofactor * p.normal * flip;
+    let s = vertex_shading(v, shading, material, p, model_scale, normal);
     var o: VertexOut;
     o.pos = p.pos;
     o.world = p.world.xyz;
-    o.normal = cofactor * p.normal * flip;
+    o.normal = normal;
     o.color = s.color;
     o.emissive = material.emissive;
-    o.material = s.material;
-    o.scalars = vec4f(material.cutoff, material.thickness, material.diffuse_blur,
-        select(0.0, 1.0, s.mapped));
+    o.rotation = s.rotation;
+    o.scalars = vec4f(material.cutoff, material.thickness, material.diffuse_blur, s.mapped);
     o.layers = vec4f(unpack2x16unorm(material.clear_coat), unpack2x16unorm(material.anisotropy));
     o.object = s.object;
     o.object_normal = s.object_normal;
@@ -276,7 +299,7 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, scale: 
     let diffuse_transmission = unpack4x8unorm(material.diffuse_transmission);
     o.diffuse_transmission = vec4f(material_linear(diffuse_transmission.rgb),
         diffuse_transmission.a);
-    o.uv = s.uv;
+    o.uv = vec4f(s.uv, s.material);
     o.transmission = vec4f(material.transmission_factor, material.ior,
         material.thickness_factor, material.attenuation_distance);
     o.attenuation = material_linear(unpack4x8unorm(material.attenuation_color).rgb);
@@ -305,7 +328,8 @@ struct DepthCutoutOut {
     @location(0) uv: vec2f,
     @location(1) alpha: f32,
     @location(2) @interpolate(flat) cutoff: f32,
-    // A MappingObject material: 1 in mapped, and what mapping_uv projects, as VertexOut has them
+    // A MappingObject or MappingWorld material: 1 plus its blend in mapped, and what mapping_uv
+    // projects, as VertexOut has them
     @location(3) @interpolate(flat) mapped: f32,
     @location(4) object: vec4f,
     @location(5) object_normal: vec3f,
@@ -315,10 +339,42 @@ struct DepthCutoutOut {
     let shading = shadings[v.slot];
     let material = material_fetch(shading.material);
     let p = place(v);
-    let scale = vec3f(length(p.model[0].xyz), length(p.model[1].xyz), length(p.model[2].xyz));
-    let s = vertex_shading(v, shading, material, scale);
-    return DepthCutoutOut(p.pos, s.uv, s.color.a, material.cutoff, select(0.0, 1.0, s.mapped),
-        s.object, s.object_normal);
+    let c0 = p.model[0].xyz;
+    let c1 = p.model[1].xyz;
+    let c2 = p.model[2].xyz;
+    let scale = vec3f(length(c0), length(c1), length(c2));
+    var normal = vec3f(0.0);
+    if (material_world(material)) {
+        let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
+        normal = mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1)) * p.normal * flip;
+    }
+    let s = vertex_shading(v, shading, material, p, scale, normal);
+    return DepthCutoutOut(p.pos, s.uv, s.color.a, material.cutoff, s.mapped, s.object,
+        s.object_normal);
+}
+
+// Albedo alpha of a triplanar fragment (blend above 0): the alpha of each projection with a
+// weight, sampled with the gradients of its projection, blended; hard is the alpha of the hard
+// projection, which a fragment with one projection keeps. The gradients dx, dy are the screen
+// derivatives of object.
+fn triplanar_alpha(object: vec4f, normal: vec3f, offset: vec2f, blend: f32, dx: vec4f,
+    dy: vec4f, hard: f32) -> f32 {
+    let w = mapping_weights(normal, blend);
+    if (max(w.x, max(w.y, w.z)) >= 0.999) {
+        return hard;
+    }
+    let s = mapping_signs(normal);
+    var planes = mapping_planes(object, s);
+    var gx = mapping_planes(dx, s);
+    var gy = mapping_planes(dy, s);
+    var alpha = 0.0;
+    for (var k = 0u; k < 3u; k++) {
+        if (w[k] > 0.0) {
+            alpha += w[k] * textureSampleGrad(albedo_map, material_sampler, planes[k] + offset,
+                gx[k], gy[k]).a;
+        }
+    }
+    return alpha;
 }
 
 @fragment fn fs_depth_cutout(f: DepthCutoutOut) {
@@ -326,7 +382,14 @@ struct DepthCutoutOut {
     if (f.mapped != 0.0) {
         uv = mapping_uv(f.object, f.object_normal, f.uv);
     }
-    let alpha = f.alpha * textureSample(albedo_map, material_sampler, uv).a;
+    var albedo = textureSample(albedo_map, material_sampler, uv).a;
+    let dx = dpdx(f.object);
+    let dy = dpdy(f.object);
+    if (f.mapped > 1.0) {
+        albedo = triplanar_alpha(f.object, f.object_normal, f.uv, f.mapped - 1.0, dx, dy,
+            albedo);
+    }
+    let alpha = f.alpha * albedo;
     if (alpha < f.cutoff) {
         discard;
     }
@@ -669,29 +732,117 @@ fn perturb(n: vec3f, frame: Frame, m: vec3f) -> vec3f {
 }
 
 // Texture coordinates of a fragment: the interpolated UV, or the projection of a MappingObject
-// material.
+// or MappingWorld material on its dominant axis.
 fn fragment_uv(f: VertexOut) -> vec2f {
-    var uv = f.uv;
+    var uv = f.uv.xy;
     if (f.scalars.w != 0.0) {
-        uv = mapping_uv(f.object, f.object_normal, f.uv);
+        uv = mapping_uv(f.object, f.object_normal, f.uv.xy);
     }
     return uv;
 }
 
+// The texture layers of a fragment: albedo, emissive and ORM, the tangent space normal of the
+// normal map (y up the image) in normal, or once blended the world normal, and the tangent
+// frame of the normal map.
+struct Layers {
+    albedo: vec4f,
+    emissive: vec3f,
+    orm: vec3f,
+    normal: vec3f,
+    frame: Frame,
+};
+
+// Direction of v perpendicular to the normal n, of unit length; zero along n.
+fn tangent_along(v: vec3f, n: vec3f) -> vec3f {
+    let p = v - n * dot(n, v);
+    return p * inverseSqrt(max(dot(p, p), 1e-12));
+}
+
+// The layers of a triplanar fragment (blend above 0) from those of its hard projection: each
+// projection with a weight samples every layer with the gradients of its projection (dx, dy the
+// screen derivatives of f.object), except the dominant one, which keeps the hard samples where
+// the screen derivatives of the hard UV (uv_dx, uv_dy) match its gradients, so the quad does not
+// straddle a change of axis. The tangent normal of each projection turns to the world with the
+// tangent and bitangent of its axes (mapping_tangent, turned by f.rotation), made perpendicular
+// to the geometric normal, and the world normals blend; the frame is that of the dominant
+// projection.
+fn triplanar(f: VertexOut, geometric: vec3f, hard: Layers, uv_dx: vec2f, uv_dy: vec2f,
+    dx: vec4f, dy: vec4f) -> Layers {
+    let n = f.object_normal;
+    let w = mapping_weights(n, f.scalars.w - 1.0);
+    let s = mapping_signs(n);
+    let dominant = mapping_axis(n);
+    var planes = mapping_planes(f.object, s);
+    var gx = mapping_planes(dx, s);
+    var gy = mapping_planes(dy, s);
+    let reuse = length(uv_dx - gx[dominant]) <= 0.25 * length(gx[dominant]) &&
+        length(uv_dy - gy[dominant]) <= 0.25 * length(gy[dominant]);
+    var o: Layers;
+    o.albedo = vec4f(0.0);
+    o.emissive = vec3f(0.0);
+    o.orm = vec3f(0.0);
+    o.frame = hard.frame;
+    var normal = vec3f(0.0);
+    for (var k = 0u; k < 3u; k++) {
+        if (w[k] == 0.0) {
+            continue;
+        }
+        var layer = hard;
+        if (k != dominant || !reuse) {
+            let uv = planes[k] + f.uv.xy;
+            layer.albedo = textureSampleGrad(albedo_map, material_sampler, uv, gx[k], gy[k]);
+            layer.emissive = textureSampleGrad(emissive_map, material_sampler, uv, gx[k],
+                gy[k]).rgb;
+            layer.orm = textureSampleGrad(orm_map, material_sampler, uv, gx[k], gy[k]).rgb;
+            layer.normal = textureSampleGrad(normal_map, material_sampler, uv, gx[k],
+                gy[k]).xyz * 2.0 - 1.0;
+        }
+        o.albedo += w[k] * layer.albedo;
+        o.emissive += w[k] * layer.emissive;
+        o.orm += w[k] * layer.orm;
+        let tangent = tangent_along(mapping_rotate(f.rotation, mapping_tangent(k, s)), geometric);
+        let bitangent = tangent_along(mapping_rotate(f.rotation, mapping_bitangent(k)),
+            geometric);
+        normal += w[k] * (tangent * layer.normal.x + bitangent * layer.normal.y +
+            geometric * layer.normal.z);
+        if (k == dominant) {
+            o.frame = Frame(tangent, bitangent, false);
+        }
+    }
+    o.normal = select(geometric, normalize(normal), dot(normal, normal) > 1e-12);
+    return o;
+}
+
 fn surface(f: VertexOut, front: bool) -> Surface {
     let uv = fragment_uv(f);
-    let albedo = textureSample(albedo_map, material_sampler, uv);
-    let emissive = textureSample(emissive_map, material_sampler, uv).rgb;
-    let orm = textureSample(orm_map, material_sampler, uv).rgb;
-    let tangent_normal = textureSample(normal_map, material_sampler, uv).xyz * 2.0 - 1.0;
+    var layers: Layers;
+    layers.albedo = textureSample(albedo_map, material_sampler, uv);
+    layers.emissive = textureSample(emissive_map, material_sampler, uv).rgb;
+    layers.orm = textureSample(orm_map, material_sampler, uv).rgb;
+    layers.normal = textureSample(normal_map, material_sampler, uv).xyz * 2.0 - 1.0;
     let geometric = normalize(f.normal);
-    let frame = cotangent_frame(geometric, f.world, uv);
-    let mapped = perturb(geometric, frame, tangent_normal);
+    layers.frame = cotangent_frame(geometric, f.world, uv);
+    // The derivatives a triplanar fragment samples with, in uniform control flow.
+    let uv_dx = dpdx(uv);
+    let uv_dy = dpdy(uv);
+    let object_dx = dpdx(f.object);
+    let object_dy = dpdy(f.object);
+    var mapped: vec3f;
+    if (f.scalars.w > 1.0) {
+        layers = triplanar(f, geometric, layers, uv_dx, uv_dy, object_dx, object_dy);
+        mapped = layers.normal;
+    } else {
+        mapped = perturb(geometric, layers.frame, layers.normal);
+    }
+    let albedo = layers.albedo;
+    let emissive = layers.emissive;
+    let orm = layers.orm;
+    let frame = layers.frame;
     var s: Surface;
     s.albedo = f.color.rgb;
     s.alpha = f.color.a;
-    s.metallic = clamp(f.material.x, 0.0, 1.0);
-    s.roughness = clamp(f.material.y, MIN_ROUGHNESS, 1.0);
+    s.metallic = clamp(f.uv.z, 0.0, 1.0);
+    s.roughness = clamp(f.uv.w, MIN_ROUGHNESS, 1.0);
     s.occlusion = 1.0;
     s.emissive = f.emissive;
     s.normal = -geometric;
@@ -703,8 +854,8 @@ fn surface(f: VertexOut, front: bool) -> Surface {
     if (front) {
         s.albedo *= albedo.rgb;
         s.alpha *= albedo.a;
-        s.metallic = clamp(f.material.x * orm.b, 0.0, 1.0);
-        s.roughness = clamp(f.material.y * orm.g, MIN_ROUGHNESS, 1.0);
+        s.metallic = clamp(f.uv.z * orm.b, 0.0, 1.0);
+        s.roughness = clamp(f.uv.w * orm.g, MIN_ROUGHNESS, 1.0);
         s.occlusion = orm.r;
         s.emissive *= emissive;
         s.normal = mapped;

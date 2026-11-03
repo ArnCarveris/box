@@ -5,8 +5,9 @@
 // Alpha tested casters (AlphaCutoff) draw with vs_cutout and fs_cutout, which also bind the
 // shading stream and the material table, read the alpha of the instance and the UV transform and
 // the cutoff of its material, and discard where the alpha times the albedo alpha of the batch
-// (group 2) is below the cutoff, as the forward pass does. A MappingObject material projects
-// the UV in the fragment stage, as mesh.wgsl does (mapping_uv).
+// (group 2) is below the cutoff, as the forward pass does. A MappingObject or MappingWorld
+// material projects the UV in the fragment stage, as mesh.wgsl does (mapping_uv), and with a
+// blend above 0 blends the alpha of its three axis projections (triplanar_alpha).
 //
 // Spot light tiles of the shadow atlas draw with vs and vs_cutout too. A point light tile is
 // drawn once per octant of its octahedron with vs_point and vs_point_cutout, the octant in the
@@ -60,8 +61,9 @@ struct CutoutIn {
     @location(3) slot: u32,
 };
 
-// The UV of an alpha tested vertex, or for a MappingObject material (mapped 1) the offset of its
-// projection, with the object position and normal mapping_uv projects, as mesh.wgsl has them.
+// The UV of an alpha tested vertex, or for a MappingObject or MappingWorld material (mapped 1
+// plus its blend) the offset of its projection, with the object (or world) position and normal
+// mapping_uv projects, as mesh.wgsl has them.
 struct CutoutOut {
     @builtin(position) pos: vec4f,
     @location(0) uv: vec2f,
@@ -166,8 +168,8 @@ fn octant_distances(world: vec3f) -> vec3f {
 
 // The alpha tested attributes of a vertex: the UV as vs of mesh.wgsl transforms it (the side
 // region of a kind 7 surface, whose UVs start two tiles over, moves back), or the projection of
-// a MappingObject material on a plain mesh, the alpha of the instance and the cutoff of its
-// material. Reads surface_data, so the position comes first.
+// a MappingObject or MappingWorld material on a plain mesh, the alpha of the instance and the
+// cutoff of its material. Reads surface_data, so the position comes first.
 fn cutout_attributes(v: CutoutIn, o: ptr<function, CutoutOut>) {
     let shading = shadings[v.slot];
     let material = material_fetch(shading.material);
@@ -180,11 +182,21 @@ fn cutout_attributes(v: CutoutIn, o: ptr<function, CutoutOut>) {
     (*o).object_normal = vec3f(0.0);
     if (material_mapped(material) && surface_data.p[0].x == 0.0) {
         let model = instance_model(transforms[v.slot]);
-        let scale = vec3f(length(model[0].xyz), length(model[1].xyz), length(model[2].xyz));
-        (*o).mapped = 1.0;
+        let c0 = model[0].xyz;
+        let c1 = model[1].xyz;
+        let c2 = model[2].xyz;
+        let scale = vec3f(length(c0), length(c1), length(c2));
+        (*o).mapped = 1.0 + material_blend(material);
         (*o).uv = mapping_offset(material);
         (*o).object = mapping_object(material, v.position, scale);
         (*o).object_normal = v.normal;
+        if (material_world(material)) {
+            let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
+            (*o).object = mapping_object(material, (model * vec4f(v.position, 1.0)).xyz,
+                vec3f(1.0));
+            (*o).object_normal = mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1)) *
+                v.normal * flip;
+        }
     }
     (*o).alpha = shading.alpha;
     (*o).cutoff = material.cutoff;
@@ -197,24 +209,51 @@ fn cutout_attributes(v: CutoutIn, o: ptr<function, CutoutOut>) {
     return o;
 }
 
-// Discard where the alpha times the albedo alpha of the batch is below the cutoff.
-fn cutout_test(uv: vec2f, alpha: f32, cutoff: f32) {
-    if (alpha * textureSample(albedo_map, material_sampler, uv).a < cutoff) {
+// Albedo alpha of a triplanar fragment (blend above 0), as triplanar_alpha of mesh.wgsl: the
+// alpha of each projection with a weight, sampled with the gradients of its projection,
+// blended; hard is the alpha of the hard projection, which a fragment with one projection keeps.
+fn triplanar_alpha(object: vec4f, normal: vec3f, offset: vec2f, blend: f32, dx: vec4f,
+    dy: vec4f, hard: f32) -> f32 {
+    let w = mapping_weights(normal, blend);
+    if (max(w.x, max(w.y, w.z)) >= 0.999) {
+        return hard;
+    }
+    let s = mapping_signs(normal);
+    var planes = mapping_planes(object, s);
+    var gx = mapping_planes(dx, s);
+    var gy = mapping_planes(dy, s);
+    var alpha = 0.0;
+    for (var k = 0u; k < 3u; k++) {
+        if (w[k] > 0.0) {
+            alpha += w[k] * textureSampleGrad(albedo_map, material_sampler, planes[k] + offset,
+                gx[k], gy[k]).a;
+        }
+    }
+    return alpha;
+}
+
+// Discard where the alpha times the albedo alpha of the batch is below the cutoff: at the
+// interpolated UV, or projected for a MappingObject or MappingWorld material (mapped not 0),
+// blended over the three axes with a blend (mapped above 1).
+fn cutout_test(uv: vec2f, alpha: f32, cutoff: f32, mapped: f32, object: vec4f,
+    object_normal: vec3f) {
+    var at = uv;
+    if (mapped != 0.0) {
+        at = mapping_uv(object, object_normal, uv);
+    }
+    var albedo = textureSample(albedo_map, material_sampler, at).a;
+    let dx = dpdx(object);
+    let dy = dpdy(object);
+    if (mapped > 1.0) {
+        albedo = triplanar_alpha(object, object_normal, uv, mapped - 1.0, dx, dy, albedo);
+    }
+    if (alpha * albedo < cutoff) {
         discard;
     }
 }
 
-// The UV of an alpha tested fragment: interpolated, or projected for a MappingObject material.
-fn cutout_uv(uv: vec2f, mapped: f32, object: vec4f, object_normal: vec3f) -> vec2f {
-    var result = uv;
-    if (mapped != 0.0) {
-        result = mapping_uv(object, object_normal, uv);
-    }
-    return result;
-}
-
 @fragment fn fs_cutout(f: CutoutOut) {
-    cutout_test(cutout_uv(f.uv, f.mapped, f.object, f.object_normal), f.alpha, f.cutoff);
+    cutout_test(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
 }
 
 @vertex fn vs_point(v: VertexIn) -> PointOut {
@@ -254,7 +293,7 @@ fn cutout_uv(uv: vec2f, mapped: f32, object: vec4f, object_normal: vec3f) -> vec
 #ifdef BOX_SHADOW_CLIP_DISTANCES
 // The clip distances already kept the fragment to its octant.
 @fragment fn fs_point_cutout(f: CutoutOut) {
-    cutout_test(cutout_uv(f.uv, f.mapped, f.object, f.object_normal), f.alpha, f.cutoff);
+    cutout_test(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
 }
 #else
 // Discard a fragment outside the octant of its draw, which core WebGPU cannot clip.
@@ -269,7 +308,7 @@ fn octant_discard(clip: vec3f) {
 }
 
 @fragment fn fs_point_cutout(f: PointCutoutOut) {
-    cutout_test(cutout_uv(f.uv, f.mapped, f.object, f.object_normal), f.alpha, f.cutoff);
+    cutout_test(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
     octant_discard(f.clip);
 }
 #endif
