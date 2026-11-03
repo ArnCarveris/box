@@ -1,81 +1,24 @@
 /**
  * @file fps/fps.c
- * @brief Registers the box.fps module: the FpsPanel singleton and the system that opens, closes
- * and updates the fps panel, a chart of the frame samples in a scene and view of its own.
+ * @brief Registers the box.fps module: the FpsPanel singleton, the FpsSummary of the last second
+ * of frame samples and the system that opens and closes the fps panel, a scene and view of its
+ * own whose panel is an instance of the template of etc/fps/fps.flecs.
  *
- * The chart holds one bar of one point per frame sample at its right, the reference lines over
- * them and their labels in the gutter at its left. Its vertical axis is linear in fps, from
- * BOX_FPS_CHART_FPS at the bottom to 0 fps at the top.
- *
- * The bars are children of an element without a Layout, so changing them each frame lays
- * nothing out; the panel is laid out only when it opens or the surface changes.
+ * The script draws everything the panel shows. C creates the scene, camera and view, places the
+ * panel at the top right of the surface, loads the script and loads it again when it changes,
+ * writes FpsSummary and exports the colors and limits of the bars to the script.
  */
 
 #define BOX_FPS_IMPL
 #include <box.h>
-#include <math.h>
-#include <stdio.h>
-#include <string.h>
+#include "../app/watch.h"
+#include "../render/preprocess.h"
 
 /** Surface size in points the panel is placed in while the world has no Surface */
 #define BOX_FPS_DEFAULT_WIDTH (1280.0f)
 
 /** Surface height in points while the world has no Surface */
 #define BOX_FPS_DEFAULT_HEIGHT (720.0f)
-
-/** Points between the edges of the panel and its content */
-#define BOX_FPS_PADDING (8.0f)
-
-/** Height of the label of a reference line in points */
-#define BOX_FPS_MARK_H (16.0f)
-
-/** Width of the chart in points */
-#define BOX_FPS_CHART_W (BOX_FPS_WIDTH - 2 * BOX_FPS_PADDING)
-
-/** Height of the chart in points */
-#define BOX_FPS_CHART_H (BOX_FPS_HEIGHT - 2 * BOX_FPS_PADDING)
-
-/** Width of a bar in points. Whole points put the edges of the bars between pixels, so
- * neighboring bars meet without a seam of blended edges. */
-#define BOX_FPS_BAR_W (1.0f)
-
-/** Width of the plot, the bars, at the right of the chart in points */
-#define BOX_FPS_PLOT_W (BOX_FPS_BARS * BOX_FPS_BAR_W)
-
-/** Width of the gutter left of the plot that labels the reference lines in points */
-#define BOX_FPS_GUTTER (BOX_FPS_CHART_W - BOX_FPS_PLOT_W)
-
-/** Samples the strip of bars scrolls before its offsets start over, so they stay small */
-#define BOX_FPS_REBASE (BOX_FPS_BARS * 64)
-
-/** Steps per point the height of a bar is rounded to, so jitter below it sets nothing */
-#define BOX_FPS_STEPS (4.0f)
-
-/** Frame time of 60 fps in milliseconds */
-#define BOX_FPS_60_MS (1000.0 / 60.0)
-
-/** Frame time of 30 fps in milliseconds */
-#define BOX_FPS_30_MS (1000.0 / 30.0)
-
-/** Reference lines of the chart: 60, 30 and 0 fps */
-#define BOX_FPS_REFS (3)
-
-/** Rate of a frame, the color of its bar */
-typedef enum box_fps_rate_t {
-    BoxFpsFast = 0,     /**< 60 fps or faster, green */
-    BoxFpsSlow = 1,     /**< Under 60 fps, down to 30 fps, yellow */
-    BoxFpsCritical = 2  /**< Under 30 fps, red */
-} box_fps_rate_t;
-
-/** Colors and sizes of the panel taken from UiTheme */
-typedef struct box_fps_look_t {
-    Rgb surface;        /**< Background of the panel */
-    Rgb surface_alt;    /**< Background of the chart */
-    Rgb border;         /**< Edge of the panel */
-    Rgb text_muted;     /**< The reference lines and their labels */
-    float font_size;    /**< Em size of the labels of the reference lines */
-    float radius;       /**< Corner radius of the panel */
-} box_fps_look_t;
 
 /** State of the fps panel of a world, owned by the module */
 typedef struct box_fps_t {
@@ -84,20 +27,12 @@ typedef struct box_fps_t {
     ecs_entity_t root;          /**< Scene root of the content */
     ecs_entity_t camera;        /**< Orthographic camera at one point per unit */
     ecs_entity_t screen;        /**< Layout root that fills the surface */
-    ecs_entity_t panel;         /**< The panel, at the top right of the screen */
-    ecs_entity_t chart;         /**< Background of the chart, parent of the bars */
-    ecs_entity_t lines[BOX_FPS_REFS]; /**< Reference lines at 60, 30 and 0 fps */
-    ecs_entity_t marks[BOX_FPS_REFS]; /**< Labels of the reference lines in the gutter */
-    ecs_entity_t strip;         /**< Parent of the bars, scrolls one bar left per sample */
-    ecs_entity_t bars[BOX_FPS_BARS]; /**< Bar of each slot of the ring of FrameSamples */
-    float heights[BOX_FPS_BARS];     /**< Height each bar was set to */
-    float xs[BOX_FPS_BARS];          /**< x in the strip each bar was set to */
-    int32_t laps[BOX_FPS_BARS];      /**< Samples written to each slot since the rebase */
-    uint8_t rates[BOX_FPS_BARS];     /**< box_fps_rate_t each bar was colored with */
-    int32_t next;               /**< FrameSamples.next of the last update, -1 for none */
-    int32_t total;              /**< Samples written since the rebase */
-    float strip_x;              /**< x the strip was set to */
-    box_fps_look_t look;        /**< Look the content was colored with */
+    ecs_entity_t panel;         /**< The panel, instance of the script template */
+    ecs_entity_t script;        /**< Managed script of etc/fps/fps.flecs, 0 before it loads */
+    char *path;                 /**< Path the script was found at, NULL before it loads */
+    int32_t watch;              /**< Id of the file watch kind of the script, 0 without box.app */
+    bool reload;                /**< The script changed on disk since the last update */
+    bool missing;               /**< The script was not found since the panel opened */
     bool shown;                 /**< The content is shown */
     bool relayout;              /**< The surface changed since the screen was sized */
     ecs_entity_t surface;       /**< Surface the screen fills, 0 while the world has none */
@@ -106,92 +41,186 @@ typedef struct box_fps_t {
     ecs_query_t *surfaces;      /**< Entities with a Surface */
 } box_fps_t;
 
-/** Get the rate of a frame from its wall time.
- *
- * @param interval_ms The wall time in milliseconds
- * @return The rate
- */
-static box_fps_rate_t box_fps_rate(
-    double interval_ms)
+void box_fps_summarize(
+    const FrameSamples *samples,
+    FpsSummary *out)
 {
-    box_fps_rate_t result = BoxFpsCritical;
-    if (interval_ms <= BOX_FPS_60_MS + BOX_FPS_TOLERANCE_MS) {
-        result = BoxFpsFast;
-    } else if (interval_ms <= BOX_FPS_30_MS) {
-        result = BoxFpsSlow;
+    double sum = 0, worst = 0;
+    int32_t age, frames = 0;
+    for (age = 0; samples && age < BOX_FRAME_WINDOW && sum < BOX_FPS_SUMMARY_MS; age ++) {
+        double ms = box_frame_sample(samples, age);
+        if (ms <= 0) {
+            break;
+        }
+
+        sum += ms;
+        worst = ms > worst ? ms : worst;
+        frames ++;
     }
 
-    return result;
+    out->frames = frames;
+    out->mean_ms = frames ? sum / (double)frames : 0;
+    out->worst_ms = worst;
+    out->fps = sum > 0 ? 1000.0 * (double)frames / sum : 0;
 }
 
-/** Get the color of a rate.
- *
- * @param rate The rate
- * @return The color of its bars
- */
-static rgb box_fps_rate_color(
-    box_fps_rate_t rate)
-{
-    rgb result = BOX_FPS_RED;
-    if (rate == BoxFpsFast) {
-        result = BOX_FPS_GREEN;
-    } else if (rate == BoxFpsSlow) {
-        result = BOX_FPS_YELLOW;
-    }
-
-    return result;
-}
-
-rgb box_fps_bar_color(
-    double interval_ms)
-{
-    return box_fps_rate_color(box_fps_rate(interval_ms));
-}
-
-float box_fps_bar_height(
-    double interval_ms,
-    float chart_height)
-{
-    float result = 0;
-    if (interval_ms > 0 && chart_height > 0) {
-        double fps = 1000.0 / interval_ms;
-        float least = chart_height < 1 ? chart_height : 1;
-        result = (float)(1.0 - fps / BOX_FPS_CHART_FPS) * chart_height;
-        result = result > least ? result : least;
-    }
-
-    return result;
-}
-
-/** Get the look of the panel from the UI theme, or a dark look without one.
+/** Write the summary of the frame samples to FpsSummary when it differs from it.
  *
  * @param world The world
- * @param look Receives the look
  */
-static void box_fps_theme(
-    const ecs_world_t *world,
-    box_fps_look_t *look)
+static void box_fps_summary_sync(
+    ecs_world_t *world)
 {
-    ecs_entity_t e = ecs_lookup(world, "box.ui.theme");
-    const UiTheme *t = e ? ecs_get(world, e, UiTheme) : NULL;
-    ecs_os_memset_t(look, 0, box_fps_look_t);
-    if (t) {
-        look->surface = t->surface;
-        look->surface_alt = t->surface_alt;
-        look->border = t->border;
-        look->text_muted = t->text_muted;
-        look->font_size = t->small_font_size > 0 ? t->small_font_size : t->font_size;
-        look->radius = t->radius;
-    } else {
-        look->surface = (Rgb){ 32, 35, 41 };
-        look->surface_alt = (Rgb){ 22, 24, 29 };
-        look->border = (Rgb){ 60, 64, 72 };
-        look->text_muted = (Rgb){ 120, 125, 135 };
-        look->font_size = 12;
-        look->radius = 4;
+    FpsSummary sum;
+    const FpsSummary *cur = ecs_singleton_get(world, FpsSummary);
+    box_fps_summarize(ecs_singleton_get(world, FrameSamples), &sum);
+    if (!cur || cur->frames != sum.frames || cur->mean_ms != sum.mean_ms ||
+        cur->worst_ms != sum.worst_ms || cur->fps != sum.fps)
+    {
+        ecs_singleton_set_ptr(world, FpsSummary, &sum);
+    }
+}
+
+/** FrameSamples was set or notified: summarize them again while the panel is open.
+ *
+ * @param it Iterator of the observer
+ */
+static void box_fps_samples_on_set(
+    ecs_iter_t *it)
+{
+    box_fps_t *fps = it->ctx;
+    if (fps->shown) {
+        box_fps_summary_sync(it->world);
+    }
+}
+
+/** The script of the panel changed on disk: load it again in the next update.
+ *
+ * @param world The world
+ * @param ctx The panel state
+ * @param owner The script entity
+ */
+static void box_fps_script_changed(
+    ecs_world_t *world,
+    void *ctx,
+    ecs_entity_t owner)
+{
+    box_fps_t *fps = ctx;
+    (void)world;
+    if (owner == fps->script) {
+        fps->reload = true;
+    }
+}
+
+/** Load the script of the panel as a managed script in the root scope and watch its file.
+ *
+ * A missing file leaves the panel empty; it is looked for again the next time the panel opens.
+ *
+ * @param world The world
+ * @param fps The panel state
+ */
+static void box_fps_script_load(
+    ecs_world_t *world,
+    box_fps_t *fps)
+{
+    char *path = box_shader_locate_cwd(BOX_FPS_SCRIPT_PATH);
+    box_file_stamp_t stamp;
+    ecs_entity_t scope, script;
+    const EcsScript *loaded;
+    if (!path) {
+        ecs_warn("box.fps: %s not found, the fps panel is empty", BOX_FPS_SCRIPT_PATH);
+        fps->missing = true;
+        goto done;
     }
 
-    look->font_size = look->font_size > 0 ? look->font_size : 12;
+    box_file_stamp(path, &stamp);
+    scope = ecs_set_scope(world, 0);
+    script = ecs_script(world, {
+        .entity = ecs_entity(world, { .name = BOX_FPS_SCRIPT }),
+        .filename = path
+    });
+    ecs_set_scope(world, scope);
+
+    loaded = script ? ecs_get(world, script, EcsScript) : NULL;
+    if (!loaded || !loaded->script || loaded->error) {
+        ecs_err("box.fps: failed to load %s", path);
+    }
+
+    fps->script = script;
+    fps->missing = false;
+    ecs_os_free(fps->path);
+    fps->path = path;
+    path = NULL;
+    if (fps->watch && script) {
+        box_file_watch_add(world, fps->watch, script, fps->path, &stamp);
+    }
+
+done:
+    ecs_os_free(path);
+}
+
+/** Load the script of the panel again from its file after it changed on disk.
+ *
+ * A script that fails keeps the entities of the last load that succeeded where flecs does.
+ *
+ * @param world The world
+ * @param fps The panel state
+ */
+static void box_fps_script_reload(
+    ecs_world_t *world,
+    box_fps_t *fps)
+{
+    box_file_stamp_t stamp;
+    ecs_entity_t scope;
+    box_file_stamp(fps->path, &stamp);
+    if (stamp.sec < 0) {
+        goto done;
+    }
+
+    scope = ecs_set_scope(world, 0);
+    if (ecs_script_reload(world, fps->script, NULL)) {
+        ecs_err("box.fps: failed to reload %s", fps->path);
+    }
+
+    ecs_set_scope(world, scope);
+    if (fps->watch) {
+        box_file_watch_add(world, fps->watch, fps->script, fps->path, &stamp);
+    }
+
+done:
+    return;
+}
+
+/** Load the script when it did not load yet, and load it again when it changed.
+ *
+ * A file that was not found is not looked for again until the panel opens again.
+ *
+ * @param world The world
+ * @param fps The panel state
+ */
+static void box_fps_script_sync(
+    ecs_world_t *world,
+    box_fps_t *fps)
+{
+    if (!fps->script && fps->missing) {
+        goto done;
+    }
+
+    if (!fps->script || !ecs_is_alive(world, fps->script)) {
+        if (fps->script && fps->watch) {
+            box_file_watch_clear(world, fps->watch, fps->script);
+        }
+
+        fps->script = 0;
+        fps->reload = false;
+        box_fps_script_load(world, fps);
+    } else if (fps->reload) {
+        fps->reload = false;
+        box_fps_script_reload(world, fps);
+    }
+
+done:
+    return;
 }
 
 /** Get the root entity of the content and the view, creating it when needed.
@@ -231,93 +260,9 @@ static ecs_entity_t box_fps_element(
     return result;
 }
 
-/** Get the x of the center of the bar of a slot in the strip. A write moves the bar of the
- * slot one plot width to the right, past the newest bar.
+/** Create the scene, camera, screen and panel of the content. The script fills the panel.
  *
- * @param fps The panel state
- * @param slot The slot of the ring of FrameSamples
- * @return The x in points
- */
-static float box_fps_bar_x(
-    const box_fps_t *fps,
-    int32_t slot)
-{
-    return ((float)(fps->laps[slot] * BOX_FPS_BARS + slot) + 0.5f) * BOX_FPS_BAR_W;
-}
-
-/** Get the x of the strip in the chart, whose origin is its center: one bar further left for
- * every sample written, so the newest bar is against the right edge of the chart.
- *
- * @param fps The panel state
- * @return The x in points
- */
-static float box_fps_strip_x(
-    const box_fps_t *fps)
-{
-    return BOX_FPS_CHART_W * 0.5f - (float)(fps->total + BOX_FPS_BARS) * BOX_FPS_BAR_W;
-}
-
-/** Create the strip of bars, empty, the reference lines over them and their labels in the
- * gutter. A reference line is centered in a row of points, so its 1 point covers whole pixels.
- *
- * The line at 0 fps is the top row of the chart and its label is inset below the top edge, so
- * both stay inside the chart.
- *
- * @param world The world
- * @param fps The panel state
- */
-static void box_fps_chart_build(
-    ecs_world_t *world,
-    box_fps_t *fps)
-{
-    float bottom = -BOX_FPS_CHART_H * 0.5f;
-    float top = BOX_FPS_CHART_H * 0.5f;
-    float left = BOX_FPS_CHART_W * 0.5f - BOX_FPS_PLOT_W;
-    double refs[BOX_FPS_REFS] = { BOX_FPS_60_MS, BOX_FPS_30_MS, HUGE_VAL };
-    const char *names[BOX_FPS_REFS] = { "line_60", "line_30", "line_0" };
-    const char *marks[BOX_FPS_REFS] = { "mark_60", "mark_30", "mark_0" };
-    const char *texts[BOX_FPS_REFS] = { "60 fps", "30 fps", "0 fps" };
-    rgb green = BOX_FPS_GREEN;
-    char name[32];
-    int32_t i;
-    fps->strip = ecs_entity(world, { .name = "bars", .parent = fps->chart });
-    fps->strip_x = 0;
-    ecs_set(world, fps->strip, Position, { fps->strip_x, bottom, 0 });
-    for (i = 0; i < BOX_FPS_BARS; i ++) {
-        ecs_os_snprintf(name, sizeof(name), "bar_%d", i);
-        fps->bars[i] = ecs_entity(world, { .name = name, .parent = fps->strip });
-        ecs_set(world, fps->bars[i], Position, { 0, 0, 0 });
-        ecs_set(world, fps->bars[i], Rect, { BOX_FPS_BAR_W, 0 });
-        ecs_set(world, fps->bars[i], Rgb, { green.r, green.g, green.b });
-        fps->heights[i] = 0;
-        fps->xs[i] = 0;
-        fps->rates[i] = BoxFpsFast;
-    }
-
-    fps->next = -1;
-
-    for (i = 0; i < BOX_FPS_REFS; i ++) {
-        float h = box_fps_bar_height(refs[i], BOX_FPS_CHART_H);
-        float y, mark_y;
-        h = h < BOX_FPS_CHART_H - 1 ? h : BOX_FPS_CHART_H - 1;
-        y = floorf(bottom + h) + 0.5f;
-        mark_y = y < top - BOX_FPS_MARK_H * 0.5f ? y : top - BOX_FPS_MARK_H * 0.5f;
-        fps->lines[i] = ecs_entity(world, { .name = names[i], .parent = fps->chart });
-        ecs_set(world, fps->lines[i], Position, { 0, y, 0 });
-        ecs_set(world, fps->lines[i], Line, { left, 0, BOX_FPS_CHART_W * 0.5f, 0, 1 });
-        fps->marks[i] = ecs_entity(world, { .name = marks[i], .parent = fps->chart });
-        ecs_set(world, fps->marks[i], Position, {
-            -BOX_FPS_CHART_W * 0.5f + BOX_FPS_GUTTER * 0.5f, mark_y, 0 });
-        ecs_add(world, fps->marks[i], Text);
-        ecs_get_mut(world, fps->marks[i], Text)->value = ecs_os_strdup(texts[i]);
-        ecs_modified(world, fps->marks[i], Text);
-    }
-}
-
-/** Create the scene, camera, screen, panel and chart of the content.
- *
- * The bars are children of elements without a Layout, out of the layout tree,
- * and the scene has SpatialIgnore: moving bars cost no spatial update and picks pass through.
+ * The scene has SpatialIgnore: the bars cost no spatial update and picks pass through.
  *
  * @param world The world
  * @param fps The panel state
@@ -326,7 +271,6 @@ static void box_fps_build(
     ecs_world_t *world,
     box_fps_t *fps)
 {
-    float pad = BOX_FPS_PADDING;
     fps->root = ecs_entity(world, { .name = "ui", .parent = box_fps_scope(world, fps) });
     ecs_set(world, fps->root, Scene, {0});
     ecs_add(world, fps->root, SpatialIgnore);
@@ -345,162 +289,23 @@ static void box_fps_build(
         .v = VAlignTop
     });
     fps->panel = box_fps_element(world, fps->screen, "panel");
-    ecs_set(world, fps->panel, Layout, {
-        .direction = DirectionColumn,
-        .padding = { pad, pad, pad, pad },
-        .h = AlignLeft,
-        .v = VAlignTop
-    });
-    ecs_set(world, fps->panel, LayoutItem, {
-        .width = { .mode = SizeModeFixed, .value = BOX_FPS_WIDTH },
-        .height = { .mode = SizeModeFixed, .value = BOX_FPS_HEIGHT }
-    });
-    ecs_set(world, fps->panel, Rect, { BOX_FPS_WIDTH, BOX_FPS_HEIGHT });
-
-    fps->chart = box_fps_element(world, fps->panel, "chart");
-    ecs_set(world, fps->chart, LayoutItem, {
-        .width = { .mode = SizeModeFixed, .value = BOX_FPS_CHART_W },
-        .height = { .mode = SizeModeFixed, .value = BOX_FPS_CHART_H }
-    });
-    ecs_set(world, fps->chart, Rect, { BOX_FPS_CHART_W, BOX_FPS_CHART_H });
-    box_fps_chart_build(world, fps);
-    ecs_os_memset_t(&fps->look, 0, box_fps_look_t);
 }
 
-/** Set the size of a text of the panel when it differs.
+/** Make the panel an instance of the template of the script, which the script defines.
  *
- * @param world The world
- * @param e The entity with the Text
- * @param size The em size
- */
-static void box_fps_text_size(
-    ecs_world_t *world,
-    ecs_entity_t e,
-    float size)
-{
-    Text *t = ecs_get_mut(world, e, Text);
-    if (t && (t->size != size || t->line_height != BOX_FPS_MARK_H)) {
-        t->size = size;
-        t->line_height = BOX_FPS_MARK_H;
-        ecs_modified(world, e, Text);
-    }
-}
-
-/** Color the panel, the chart, the reference lines and their labels from the UI theme when
- * it changed since they were colored.
+ * A template that loaded again with a new entity is not on the panel anymore, so it is added
+ * again; one that was redefined in place updates the panel itself.
  *
  * @param world The world
  * @param fps The panel state
  */
-static void box_fps_theme_sync(
+static void box_fps_template(
     ecs_world_t *world,
     box_fps_t *fps)
 {
-    box_fps_look_t look;
-    int32_t i;
-    box_fps_theme(world, &look);
-    if (!memcmp(&look, &fps->look, sizeof(look))) {
-        goto done;
-    }
-
-    fps->look = look;
-    ecs_set(world, fps->panel, Rgb, { look.surface.r, look.surface.g, look.surface.b });
-    ecs_set(world, fps->panel, Border, {
-        .width = 1,
-        .radius = look.radius,
-        .color = { look.border.r, look.border.g, look.border.b, 255 }
-    });
-    ecs_set(world, fps->chart, Rgb, {
-        look.surface_alt.r, look.surface_alt.g, look.surface_alt.b });
-    for (i = 0; i < BOX_FPS_REFS; i ++) {
-        ecs_set(world, fps->lines[i], Rgb, {
-            look.text_muted.r, look.text_muted.g, look.text_muted.b });
-        ecs_set(world, fps->marks[i], Rgb, {
-            look.text_muted.r, look.text_muted.g, look.text_muted.b });
-        box_fps_text_size(world, fps->marks[i], look.font_size);
-    }
-
-done:
-    return;
-}
-
-/** Follow the ring of the samples: count the slots written since the last update, or start
- * the offsets over on the first update and after BOX_FPS_REBASE samples.
- *
- * @param fps The panel state
- * @param next FrameSamples.next, in 0..BOX_FPS_BARS - 1
- */
-static void box_fps_advance(
-    box_fps_t *fps,
-    int32_t next)
-{
-    int32_t i, count;
-    if (fps->next < 0 || fps->total >= BOX_FPS_REBASE) {
-        fps->total = next;
-        for (i = 0; i < BOX_FPS_BARS; i ++) {
-            fps->laps[i] = i < next;
-        }
-    } else {
-        count = (next - fps->next + BOX_FPS_BARS) % BOX_FPS_BARS;
-        for (i = 0; i < count; i ++) {
-            fps->laps[(fps->next + i) % BOX_FPS_BARS] ++;
-        }
-
-        fps->total += count;
-    }
-
-    fps->next = next;
-}
-
-/** Set the strip and the bars from the samples, the newest on the right.
- *
- * The bar of a slot draws the sample of that slot of the ring. A new sample scrolls the strip
- * one bar left and moves only the bar of its slot, to the right end, so a frame sets the strip
- * and the few bars whose slot was written, rounded height or rate changed.
- *
- * @param world The world
- * @param fps The panel state
- * @param samples The frame samples, NULL for none
- */
-static void box_fps_bars_sync(
-    ecs_world_t *world,
-    box_fps_t *fps,
-    const FrameSamples *samples)
-{
-    int32_t next = samples ? samples->next % BOX_FPS_BARS : 0;
-    float x;
-    int32_t i;
-    next = next < 0 ? next + BOX_FPS_BARS : next;
-    box_fps_advance(fps, next);
-    x = box_fps_strip_x(fps);
-    if (x != fps->strip_x) {
-        fps->strip_x = x;
-        ecs_set(world, fps->strip, Position, { x, -BOX_FPS_CHART_H * 0.5f, 0 });
-    }
-
-    for (i = 0; i < BOX_FPS_BARS; i ++) {
-        int32_t age = (next - 1 - i + 2 * BOX_FPS_BARS) % BOX_FPS_BARS;
-        double ms = samples ? box_frame_sample(samples, age) : 0;
-        float h = roundf(box_fps_bar_height(ms, BOX_FPS_CHART_H) * BOX_FPS_STEPS) /
-            BOX_FPS_STEPS;
-        box_fps_rate_t rate = box_fps_rate(ms);
-        bool resized = h != fps->heights[i];
-        x = box_fps_bar_x(fps, i);
-        if (resized) {
-            fps->heights[i] = h;
-            ecs_set(world, fps->bars[i], Rect, { BOX_FPS_BAR_W, h });
-        }
-
-        if (resized || x != fps->xs[i]) {
-            fps->xs[i] = x;
-            ecs_set(world, fps->bars[i], Position, { x, h * 0.5f, 0 });
-        }
-
-        if ((uint8_t)rate != fps->rates[i]) {
-            rgb c = box_fps_rate_color(rate);
-            fps->rates[i] = (uint8_t)rate;
-            ecs_set(world, fps->bars[i], Rgb, { c.r, c.g, c.b });
-        }
+    ecs_entity_t tmpl = ecs_lookup(world, BOX_FPS_TEMPLATE);
+    if (tmpl && ecs_has(world, tmpl, EcsComponent) && !ecs_has_id(world, fps->panel, tmpl)) {
+        ecs_add_id(world, fps->panel, tmpl);
     }
 }
 
@@ -561,8 +366,8 @@ static void box_fps_layout(
     fps->relayout = false;
 }
 
-/** Show the panel: build its content and create its view, a view without clear, lighting,
- * culling or effects at BOX_VIEW_ORDER_FPS.
+/** Show the panel: load its script, build its content and create its view, a view without
+ * clear, lighting, culling or effects at BOX_VIEW_ORDER_FPS.
  *
  * @param world The world
  * @param fps The panel state
@@ -571,6 +376,8 @@ static void box_fps_show(
     ecs_world_t *world,
     box_fps_t *fps)
 {
+    fps->missing = false;
+    box_fps_script_sync(world, fps);
     box_fps_build(world, fps);
     fps->view = ecs_entity(world, { .name = "view", .parent = box_fps_scope(world, fps) });
     ecs_set(world, fps->view, View, {
@@ -580,9 +387,11 @@ static void box_fps_show(
     fps->shown = true;
     fps->relayout = true;
     fps->surface = 0;
+    box_fps_summary_sync(world);
 }
 
-/** Hide the panel: delete its view and its content, so a closed panel costs nothing.
+/** Hide the panel: delete its view and its content, so a closed panel costs nothing. The
+ * script stays loaded.
  *
  * @param world The world
  * @param fps The panel state
@@ -601,10 +410,11 @@ static void box_fps_hide(
 
     fps->view = 0;
     fps->root = 0;
+    fps->panel = 0;
     fps->shown = false;
 }
 
-/** Open, close and update the panel from the FpsPanel singleton and the frame samples.
+/** Open and close the panel from the FpsPanel singleton, keep its script loaded and place it.
  *
  * @param it Iterator of the system, which has no terms
  */
@@ -614,7 +424,6 @@ static void BoxFpsUpdate(
     ecs_world_t *world = it->world;
     box_fps_t *fps = it->ctx;
     const FpsPanel *panel = ecs_singleton_get(world, FpsPanel);
-    const FrameSamples *samples;
     bool open = panel && panel->open;
     if (!open && fps->shown) {
         box_fps_hide(world, fps);
@@ -625,7 +434,7 @@ static void BoxFpsUpdate(
     }
 
     if (fps->shown && (!ecs_is_alive(world, fps->view) || !ecs_is_alive(world, fps->root) ||
-        !ecs_is_alive(world, fps->chart)))
+        !ecs_is_alive(world, fps->panel)))
     {
         box_fps_hide(world, fps);
     }
@@ -634,14 +443,13 @@ static void BoxFpsUpdate(
         box_fps_show(world, fps);
     }
 
+    box_fps_script_sync(world, fps);
+    box_fps_template(world, fps);
     box_fps_measure(world, fps);
     if (fps->relayout) {
         box_fps_layout(world, fps);
     }
 
-    samples = ecs_singleton_get(world, FrameSamples);
-    box_fps_theme_sync(world, fps);
-    box_fps_bars_sync(world, fps, samples);
 done:
     return;
 }
@@ -655,8 +463,53 @@ static void box_fps_free(
     ecs_world_t *world,
     void *ctx)
 {
+    box_fps_t *fps = ctx;
     (void)world;
-    ecs_os_free(ctx);
+    ecs_os_free(fps->path);
+    ecs_os_free(fps);
+}
+
+/** Export a color to the script as a constant of the module.
+ *
+ * @param world The world
+ * @param module The box.fps module
+ * @param name Name of the constant
+ * @param color The color
+ */
+static void box_fps_export_color(
+    ecs_world_t *world,
+    ecs_entity_t module,
+    const char *name,
+    rgb color)
+{
+    Rgb value = { color.r, color.g, color.b };
+    ecs_const_var(world, {
+        .name = name,
+        .parent = module,
+        .type = ecs_id(Rgb),
+        .value = &value
+    });
+}
+
+/** Export a number of milliseconds to the script as a constant of the module.
+ *
+ * @param world The world
+ * @param module The box.fps module
+ * @param name Name of the constant
+ * @param ms The milliseconds
+ */
+static void box_fps_export_ms(
+    ecs_world_t *world,
+    ecs_entity_t module,
+    const char *name,
+    double ms)
+{
+    ecs_const_var(world, {
+        .name = name,
+        .parent = module,
+        .type = ecs_id(ecs_f64_t),
+        .value = &ms
+    });
 }
 
 void BoxFpsImport(
@@ -677,16 +530,39 @@ void BoxFpsImport(
     ECS_IMPORT(world, BoxSpatial);
 
     ECS_META_COMPONENT(world, FpsPanel);
+    ECS_META_COMPONENT(world, FpsSummary);
     ecs_set_hooks(world, FpsPanel, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, FpsSummary, { .ctor = flecs_default_ctor });
+
+    ecs_entity_t module = ecs_id(BoxFps);
+    box_fps_export_color(world, module, "green", BOX_FPS_GREEN);
+    box_fps_export_color(world, module, "yellow", BOX_FPS_YELLOW);
+    box_fps_export_color(world, module, "red", BOX_FPS_RED);
+    box_fps_export_ms(world, module, "fast_ms", BOX_FPS_FAST_MS);
+    box_fps_export_ms(world, module, "slow_ms", BOX_FPS_SLOW_MS);
 
     box_fps_t *fps = ecs_os_calloc_t(box_fps_t);
     ecs_atfini(world, box_fps_free, fps);
     ecs_singleton_add(world, FpsPanel);
+    ecs_singleton_set(world, FpsSummary, {0});
+    fps->watch = box_file_watch_kind(world, "fps script", box_fps_script_changed, fps);
 
     fps->surfaces = ecs_query(world, {
         .entity = ecs_entity(world, { .name = "FpsSurfaces" }),
         .terms = {{ .id = ecs_id(Surface), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "FpsSamplesOnSet" }),
+        .query.terms = {{
+            .id = ecs_id(FrameSamples),
+            .src.id = ecs_id(FrameSamples),
+            .inout = EcsInOutNone
+        }},
+        .events = { EcsOnSet },
+        .callback = box_fps_samples_on_set,
+        .ctx = fps
     });
 
     ecs_system(world, {

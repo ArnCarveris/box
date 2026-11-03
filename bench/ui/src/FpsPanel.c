@@ -2,10 +2,9 @@
  * @file FpsPanel.c
  * @brief Benchmarks for the cost of the fps panel in a frame.
  *
- * Every case runs a headless frame of an empty world with a full window of frame samples that
- * the engine does not add to (hold). The difference between the cases is the cost of the panel:
- * closed, open with a new sample every frame so the strip scrolls and one bar is rewritten, and
- * open with fixed samples.
+ * Every case runs a headless frame of an empty world with a full window of held frame samples.
+ * The cases differ by the cost of the panel: closed, open with a new sample every frame, which
+ * moves every bar one slot left and changes the summary, and open with fixed samples.
  */
 
 #include <box.h>
@@ -39,9 +38,8 @@ static ecs_world_t* bench_fps_world(
     return world;
 }
 
-/** Run frames that each add a sample, so the strip of an open panel scrolls one slot and only
- * the bar of the new sample is rewritten. The sample is notified with ecs_singleton_modified, as
- * the engine does.
+/** Run frames that each add a sample, so the bars of an open panel each show the sample of the
+ * bar right of them. The sample is notified with ecs_singleton_modified, as the engine does.
  *
  * @param b The bench
  * @param open Whether the panel is open

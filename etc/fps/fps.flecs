@@ -1,0 +1,148 @@
+// The fps panel of box, the script module box.fps. box.fps loads it when the panel first opens
+// and loads it again when the file changes on disk.
+//
+// C creates the scene of the panel (fps.ui), its camera and view, and the panel
+// (fps.ui.screen.panel), which it places at the top right of the surface and makes an instance
+// of FpsWidget. Everything the panel shows is defined here, in the colors of the theme.
+//
+// The panel is a heading over a chart of the last 120 frame times and a summary of the last
+// second. The chart reads FrameSamples, the summary FpsSummary, which box.fps writes from them.
+// box.fps exports the colors of the bars (green, yellow, red) and the longest frame time of a
+// green and a yellow bar (fast_ms, slow_ms) from include/box/fps.h.
+//
+// The bars and the reference lines are children of the chart, which has no Layout: a new sample
+// sets the bars whose height or color changed and lays nothing out. Heights are rounded to a
+// quarter point, so jitter below it sets nothing either.
+
+module box.fps
+
+using flecs.script.math
+using box.app
+using box.ui
+using box.layout
+using box.geometry
+using box.material
+using box.text
+
+// The fps panel: the heading, the chart and the summary
+template FpsWidget {
+  prop title: string = "Frame rate"
+
+  const t = box.ui.theme[UiTheme]
+
+  // Bars of the chart, their width and the width of their slots, BOX_FPS_BARS,
+  // BOX_FPS_BAR_WIDTH and BOX_FPS_BAR_SLOT
+  const bars: i32 = 120
+  const bar_w: f32 = 3
+  const slot: f32 = 4
+  const chart_w: f32 = bars * slot
+
+  // Height of the chart and the frame time at its top, BOX_FPS_CHART_HEIGHT and
+  // BOX_FPS_CHART_MS
+  const chart_h: f32 = 60
+  const top_ms: f64 = 50
+
+  // Size of the ring of FrameSamples, BOX_FRAME_WINDOW
+  const window: i32 = 240
+
+  const green: Rgb = box.fps.green
+  const yellow: Rgb = box.fps.yellow
+  const red: Rgb = box.fps.red
+  const fast: f64 = box.fps.fast_ms
+  const slow: f64 = box.fps.slow_ms
+
+  // Rows of the heading and the summary, whole points so the chart stays on the pixel grid
+  const heading_h: f32 = ceil(t.font_size * 1.4)
+  const summary_h: f32 = ceil(t.small_font_size * 1.4)
+
+  Layout: {
+    direction: Column,
+    padding: {t.padding, t.padding, t.padding, t.padding},
+    spacing: t.spacing / 2
+  }
+  Rect: {1, 1}
+  Rgb: t.surface
+  Border: {width: 1, radius: t.radius, color: {t.border.r, t.border.g, t.border.b, 255}}
+
+  heading {
+    LayoutItem: {width: {mode: Fixed, value: chart_w}, height: {mode: Fixed, value: heading_h}}
+    Text: {value: title, size: t.font_size, line_height: heading_h}
+    Rgb: t.text
+  }
+
+  // Bar i draws the sample of age bars - 1 - i, the newest on the right. Its bottom is the
+  // bottom of the chart, its edges on whole points: 1 point of gap, then bar_w of bar.
+  chart {
+    LayoutItem: {width: {mode: Fixed, value: chart_w}, height: {mode: Fixed, value: chart_h}}
+
+    const s = FrameSamples[FrameSamples]
+    for i in 0..bars {
+      const age: i32 = bars - 1 - i
+      const ms: f64 = match age < s.count {
+        true: s.interval[(s.next - 1 - age + 2 * window) % window]
+        _: 0
+      }
+      const h: f32 = match ms > 0 {
+        true: max(bar_w, round(min(ms / top_ms, 1) * chart_h * 4) / 4)
+        _: 0
+      }
+      const level: i32 = match ms > slow {
+        true: 2
+        _: match ms > fast { true: 1; _: 0 }
+      }
+
+      "bar_{i}" {
+        Position: {-chart_w / 2 + i * slot + slot - bar_w / 2, -chart_h / 2 + h / 2, 0}
+        Rect: {bar_w, h}
+        Rgb: match level { 0: green; 1: yellow; _: red }
+      }
+    }
+
+    // The reference lines at 60 and 30 fps, centered in a row of points
+    line_60 {
+      Position: {0, floor(-chart_h / 2 + 1000.0 / 60 / top_ms * chart_h) + 0.5, 0}
+      Line: {-chart_w / 2, 0, chart_w / 2, 0, 1}
+      Rgb: t.text_muted
+      Opacity: {0.5}
+    }
+
+    line_30 {
+      Position: {0, floor(-chart_h / 2 + 1000.0 / 30 / top_ms * chart_h) + 0.5, 0}
+      Line: {-chart_w / 2, 0, chart_w / 2, 0, 1}
+      Rgb: t.text_muted
+      Opacity: {0.5}
+    }
+  }
+
+  // The mean and worst frame time on the left, the fps on the right in the color of the mean
+  summary {
+    const sum = FpsSummary[FpsSummary]
+    const level: i32 = match sum.mean_ms > slow {
+      true: 2
+      _: match sum.mean_ms > fast { true: 1; _: 0 }
+    }
+
+    Layout: {direction: Row}
+    LayoutItem: {width: {mode: Fixed, value: chart_w}, height: {mode: Fixed, value: summary_h}}
+
+    times {
+      LayoutItem: {width: {mode: Grow}}
+      Text: {
+        value: "mean {sum.mean_ms:.1} ms, worst {sum.worst_ms:.1} ms",
+        size: t.small_font_size,
+        line_height: summary_h
+      }
+      Rgb: t.text_muted
+    }
+
+    rate {
+      Text: {
+        value: "{sum.fps:.0} fps",
+        size: t.small_font_size,
+        line_height: summary_h,
+        align: Right
+      }
+      Rgb: match level { 0: green; 1: yellow; _: red }
+    }
+  }
+}
