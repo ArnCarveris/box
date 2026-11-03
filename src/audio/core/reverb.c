@@ -15,9 +15,10 @@ static const float box_audio_reverb_base[BOX_AUDIO_REVERB_LINES] = {
 };
 
 /** Signs of the input into each line, a vector that is no row of the matrix, so the first
- * reflection already spreads over every line */
+ * reflection already spreads over every line. Of the 128 sign vectors this one gives one of
+ * the weakest echoes at the length of a line in both outputs, at every size. */
 static const float box_audio_reverb_in[BOX_AUDIO_REVERB_LINES] = {
-    1, 1, 1, -1, 1, -1, -1, 1
+    1, -1, 1, 1, 1, -1, 1, 1
 };
 
 /** Signs of the lines in the left output, orthogonal to the right one */
@@ -234,6 +235,7 @@ static void box_audio_reverb_clear(
 
     rv->pre_pos = 0;
     rv->quiet = 0;
+    rv->still = 0;
 }
 
 /** Apply the target: the bus, the lengths of the lines for the size, the predelay and the
@@ -280,6 +282,7 @@ static void box_audio_reverb_apply(
 
     rv->damp = rv->damp_target;
     rv->idle = true;
+    box_audio_ramp_set(&rv->feed, 1);
 }
 
 /** Fade the wet signal out to apply the target once it is silent, or at once when the
@@ -467,20 +470,22 @@ static void box_audio_reverb_smooth(
  * @param r Right samples
  * @param frames Frames of the block
  * @param add Whether the input is silent and the wet signal adds to the samples
- * @return The largest sum of the magnitudes of the lines in the block
+ * @return Frames at the end of the block in which the lines summed under
+ * BOX_AUDIO_REVERB_SILENCE
  */
-static float box_audio_reverb_block(
+static int32_t box_audio_reverb_block(
     box_audio_reverb_t *rv,
     float *l,
     float *r,
     int32_t frames,
     bool add)
 {
-    float v[BOX_AUDIO_REVERB_LINES], o[BOX_AUDIO_REVERB_LINES], a, b, peak = 0;
+    float v[BOX_AUDIO_REVERB_LINES], o[BOX_AUDIO_REVERB_LINES], a, b;
     float damp = rv->damp;
-    int32_t i, k, h, j;
+    int32_t i, k, h, j, still = 0;
     for (i = 0; i < frames; i ++) {
-        float x = add ? 0.0f : (l[i] + r[i]) * 0.5f, wl = 0, wr = 0, sum = 0, wet, dry;
+        float x = add ? 0.0f : (l[i] + r[i]) * 0.5f * box_audio_ramp_next(&rv->feed);
+        float wl = 0, wr = 0, sum = 0, wet, dry;
         if (rv->pre_length) {
             float p = rv->pre[rv->pre_pos];
             rv->pre[rv->pre_pos] = x;
@@ -515,7 +520,7 @@ static float box_audio_reverb_block(
             rv->pos[k] = rv->pos[k] + 1 < rv->length[k] ? rv->pos[k] + 1 : 0;
         }
 
-        peak = sum > peak ? sum : peak;
+        still = sum < BOX_AUDIO_REVERB_SILENCE ? still + 1 : 0;
         wet = box_audio_ramp_next(&rv->mix);
         dry = 1 - wet;
         wet *= box_audio_ramp_next(&rv->fade) * BOX_AUDIO_REVERB_NORM;
@@ -528,7 +533,7 @@ static float box_audio_reverb_block(
         }
     }
 
-    return peak;
+    return still;
 }
 
 /** Run a reverb over a block, or skip it when it is silent and nothing comes in.
@@ -549,7 +554,7 @@ static void box_audio_reverb_render(
     bool add)
 {
     bool silent = add || box_audio_reverb_silent(l, r, frames);
-    float peak;
+    int32_t still, longest = rv->length[BOX_AUDIO_REVERB_LINES - 1];
     if (rv->idle && silent) {
         if (rv->swap || !rv->attached || add) {
             box_audio_reverb_apply(core, rv);
@@ -562,14 +567,18 @@ static void box_audio_reverb_render(
 
     rv->idle = false;
     box_audio_reverb_smooth(core, rv);
-    peak = box_audio_reverb_block(rv, l, r, frames, add);
+    still = box_audio_reverb_block(rv, l, r, frames, add);
     rv->quiet = !silent ? 0 : (rv->quiet < (1 << 30) ? rv->quiet + frames : rv->quiet);
+    rv->still = still < frames ? still : (rv->still < (1 << 30) ? rv->still + frames : rv->still);
     if (rv->swap && rv->fade.left == 0 && rv->fade.value == 0) {
         box_audio_reverb_apply(core, rv);
         box_audio_ramp_to(&rv->fade, rv->attached ? 1.0f : 0.0f,
             (int32_t)(BOX_AUDIO_REVERB_FADE * 0.5f * core->sample_rate));
+        box_audio_ramp_set(&rv->feed, 0);
+        box_audio_ramp_to(&rv->feed, 1,
+            (int32_t)(BOX_AUDIO_REVERB_FADE * 0.5f * core->sample_rate));
         rv->idle = false;
-    } else if (silent && rv->quiet > rv->pre_length && peak < BOX_AUDIO_REVERB_SILENCE) {
+    } else if (silent && rv->quiet >= rv->pre_length + longest && rv->still >= longest) {
         box_audio_reverb_clear(rv);
         rv->idle = true;
         if (add) {

@@ -105,8 +105,11 @@ typedef struct box_audio_reverb_t {
     int32_t pre_length;       /**< Delay of the predelay line in frames, 0 for none */
     int32_t pre_pos;          /**< Position of the predelay line */
     int32_t quiet;            /**< Frames of silent input in a row */
+    int32_t still;            /**< Frames in a row in which the lines summed under silence */
     box_audio_ramp_t mix;     /**< Wet level */
     box_audio_ramp_t fade;    /**< Fade of the wet signal around a swap */
+    box_audio_ramp_t feed;    /**< Fade in of the input after a swap, so it enters the clear
+                               * lines without a step */
 } box_audio_reverb_t;
 
 /** Kinds of sources a voice plays */

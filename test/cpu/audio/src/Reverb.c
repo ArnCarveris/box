@@ -369,7 +369,7 @@ void Reverb_density(void) {
     // audio/reverb
     rv_t rv;
     int32_t from = AUDIO_RATE / 5, to = AUDIO_RATE * 3 / 5, win = AUDIO_RATE / 500, i, k;
-    int32_t gaps = 0, windows = 0, lag;
+    int32_t gaps = 0, windows = 0, lag, worst_lag = 0;
     double worst = 0;
     rv_open(&rv, AUDIO_RATE, rv_params(2, 0.3f, 0.01f, 0.5f, 1), false);
     audio_play(rv.core, 1, 1, 1, 1, 0, 1, 0);
@@ -389,13 +389,16 @@ void Reverb_density(void) {
             yy += (double)rv_l[k + lag] * rv_l[k + lag];
         }
 
-        worst = fabs(xy) / sqrt(xx * yy) > worst ? fabs(xy) / sqrt(xx * yy) : worst;
+        if (fabs(xy) / sqrt(xx * yy) > worst) {
+            worst = fabs(xy) / sqrt(xx * yy);
+            worst_lag = lag;
+        }
     }
 
-    printf("density: %d of %d windows of 2 ms are gaps, largest echo correlation %.4f\n",
-        gaps, windows, worst);
+    printf("density: %d of %d windows of 2 ms are gaps, largest echo correlation %.4f at %d "
+        "frames\n", gaps, windows, worst, worst_lag);
     test_int(gaps, 0);
-    test_assert(worst < 0.5);
+    test_assert(worst < 0.3);
     rv_close(&rv);
 }
 

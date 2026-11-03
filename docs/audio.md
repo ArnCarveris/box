@@ -132,10 +132,12 @@ sources reach it through the send of their bus.
 - **Changes.** Decay and damping move to a new value over about 50 ms, a block at a time, and
   mix ramps over 20 ms. A change of size or predelay would change the lengths of the lines,
   which clicks: the wet signal fades out over 50 ms, the lines are cleared and take their new
-  lengths, and it fades back in over 50 ms (`BOX_AUDIO_REVERB_FADE`, 100 ms in all). A change of
-  the bus does the same.
+  lengths, and it fades back in over 50 ms (`BOX_AUDIO_REVERB_FADE`, 100 ms in all), while the
+  input fades into the clear lines over the same 50 ms, so a steady sound does not enter them
+  with a step. A change of the bus does the same.
 - **Silence costs nothing.** The tail rings out after its sources stop. Once the input has been
-  silent for longer than the predelay and the lines have decayed under -140 dB, the reverb
+  silent for longer than the predelay plus the longest line, and every line has read out under
+  -140 dB for a whole length of the longest line, so nothing louder is left in them, the reverb
   clears its lines and stops; while it is stopped and no signal comes in, a block costs a scan
   of the input for a sample over 1e-9. `box_audio_core_reverb_running` tells whether it runs.
 - **Taking it off.** A `REVERB` with bus `BOX_AUDIO_BUS_NONE` takes the reverb off its bus at
@@ -496,11 +498,12 @@ moved to the master and the index is reused a frame later. A Disabled bus is mut
 unloading the scene deletes it, which fades its tail out:
 
 ```
-hall { AudioBus: {output: master}, Reverb: {decay: 2.4, damping: 0.4, predelay: 0.02} }
+hall { AudioBus: {output: master}; Reverb: {decay: 2.4, damping: 0.4, predelay: 0.02} }
 world { AudioBus: {output: master, send: hall, send_level: 0.3} }
 ```
 
-`master` is `box.audio.master`, an entity without components that names the master. A reverb
+Components on one line are separated by `;` (or a newline): flecs script does not take a comma
+there. `master` is `box.audio.master`, an entity without components that names the master. A reverb
 gets a slot of the core and the module asks the transport for its memory before the first
 `REVERB` command; it sends the parameters again when they change. One reverb runs at once: a
 second one logs one error that names its entity (`box.audio: more than 1 reverb, '...' stays
@@ -529,7 +532,8 @@ nothing.
 ### The audio command and captures
 
 The shell command `audio` (`src/command/cmd_audio.c`) prints the state, the rate, the voices, the
-steals and the load, then the master and the buses in processing order. `audio volume <v>` and
+steals and the load, then the master and the buses in processing order, with the values of the
+reverb of a bus and `(dry, every slot taken)` for a reverb that has no slot. `audio volume <v>` and
 `audio mute [on|off]` write `AudioSettings`. `audio capture <seconds>` records the master output
 to a 16 bit stereo WAV resource of the session, fetched like a `capture` PNG with
 `GET /shell/session/<id>/resource/<name>`, empty until the file is written in one rename. In the
