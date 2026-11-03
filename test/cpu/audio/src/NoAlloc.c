@@ -108,7 +108,8 @@ void NoAlloc_synth_voices(void) {
     p.seed = 5;
     p.pitch_variance = 0.1f;
     p.envelope = (box_audio_synth_envelope_t){
-        .attack = 0.01f, .decay = 0.05f, .sustain = 0.5f, .hold = 0.1f, .release = 0.05f };
+        .attack = 0.01f, .decay = 0.05f, .sustain = 0.5f, .hold = 0.1f, .release = 0.05f,
+        .curve = 4, .attack_curve = 1 };
     p.filter = BOX_AUDIO_SYNTH_LOWPASS;
     p.cutoff = 300;
     p.cutoff_end = 8000;
