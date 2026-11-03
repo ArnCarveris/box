@@ -1257,7 +1257,7 @@ typedef enum box_gpu_depth_mode_t {
 
 /** Pack the state a forward or depth prepass pipeline is created for into its cache key.
  *
- * @param shader Shader handle, below 2^31
+ * @param shader Shader handle, below 2^30
  * @param format Format of the color target, below 2^24, Undefined for a depth prepass
  * @param blend BlendMode, below 16
  * @param back_face BackFaceMode, of which the pipeline only tells BackFaceCull from the rest

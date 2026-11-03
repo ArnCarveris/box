@@ -375,6 +375,16 @@
                 ]
             },
             {
+                "id": "TextureBlend",
+                "testcases": [
+                    "layer_zero_alone",
+                    "single_channel_mask",
+                    "rgba_mask",
+                    "arrays_shared_released",
+                    "layer_change_rebuilds"
+                ]
+            },
+            {
                 "id": "Light",
                 "testcases": [
                     "point_light_reaches_its_range",
