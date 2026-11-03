@@ -325,6 +325,154 @@ void Curve_catmull_rom_slope_continuous(void) {
     curve_free(&curve);
 }
 
+/** Uneven looping keys from 0 to 1 that end on their start value */
+static const CurveKey curve_loop_keys[] = {
+    { 0.0f, 0.4f }, { 0.15f, 1.2f }, { 0.45f, 0.7f }, { 0.8f, 1.1f }, { 1.0f, 0.4f }
+};
+
+void Curve_loop_catmull_rom_wrap(void) {
+    // curve/loop
+    Curve curve = curve_make(CurveCatmullRom, curve_loop_keys, 5);
+    const CurveKey *keys = curve_loop_keys;
+    float expected = (keys[1].value - keys[3].value) / (keys[1].time - (keys[3].time - 1.0f));
+    float c1, c2, n1, n2;
+    box_curve_loop_span_controls(&curve, 1.0f, 0, &c1, &c2);
+    box_curve_loop_span_controls(&curve, 1.0f, 3, &n1, &n2);
+    float into_first = 3.0f * (c1 - keys[0].value) / keys[1].time;
+    float out_of_last = 3.0f * (keys[4].value - n2) / (keys[4].time - keys[3].time);
+    test_assert(fabsf(into_first - expected) < 1e-4f);
+    test_assert(fabsf(out_of_last - expected) < 1e-4f);
+
+    float e = 1e-3f, v0 = box_curve_loop_value(&curve, 1.0f, 0.0f, 0.0f);
+    float v1 = box_curve_loop_value(&curve, 1.0f, 1.0f, 0.0f);
+    test_flt(v0, v1);
+    test_assert(fabsf(box_curve_loop_value(&curve, 1.0f, 1.0f - e, 0.0f) -
+        box_curve_loop_value(&curve, 1.0f, e, 0.0f)) < 1e-3f);
+    float before = (3.0f * v1 - 4.0f * box_curve_loop_value(&curve, 1.0f, 1.0f - e, 0.0f) +
+        box_curve_loop_value(&curve, 1.0f, 1.0f - 2.0f * e, 0.0f)) / (2.0f * e);
+    float after = (4.0f * box_curve_loop_value(&curve, 1.0f, e, 0.0f) - 3.0f * v0 -
+        box_curve_loop_value(&curve, 1.0f, 2.0f * e, 0.0f)) / (2.0f * e);
+    test_assert(fabsf(before - expected) < 1e-2f);
+    test_assert(fabsf(after - expected) < 1e-2f);
+
+    /* Without a period the ends mirror themselves and the slopes differ at the wrap */
+    float plain_before = (3.0f * v1 - 4.0f * box_curve_value(&curve, 1.0f - e, 0.0f) +
+        box_curve_value(&curve, 1.0f - 2.0f * e, 0.0f)) / (2.0f * e);
+    float plain_after = (4.0f * box_curve_value(&curve, e, 0.0f) - 3.0f * v0 -
+        box_curve_value(&curve, 2.0f * e, 0.0f)) / (2.0f * e);
+    test_assert(fabsf(plain_before - plain_after) > 1.0f);
+
+    /* The inner keys keep their slopes, the keys their values */
+    int32_t k;
+    for (k = 1; k < 3; k ++) {
+        box_curve_span_controls(&curve, k, &c1, &c2);
+        box_curve_loop_span_controls(&curve, 1.0f, k, &n1, &n2);
+        test_flt(c1, n1);
+        test_flt(c2, n2);
+    }
+
+    for (k = 0; k < 5; k ++) {
+        test_flt(box_curve_loop_value(&curve, 1.0f, keys[k].time, 0.0f), keys[k].value);
+    }
+
+    curve_free(&curve);
+}
+
+void Curve_loop_two_keys(void) {
+    // curve/loop
+    CurveKey keys[] = {{ 0.0f, 1.0f }, { 1.0f, 3.0f }};
+    Curve curve = curve_make(CurveCatmullRom, keys, 2);
+    float c1, c2;
+    box_curve_loop_span_controls(&curve, 1.0f, 0, &c1, &c2);
+    test_assert(fabsf(c1 - (1.0f + 1.0f / 3.0f)) < 1e-5f);
+    test_assert(fabsf(c2 - (3.0f - 1.0f / 3.0f)) < 1e-5f);
+    curve_free(&curve);
+}
+
+void Curve_loop_area(void) {
+    // curve/loop
+    Curve curve = curve_make(CurveCatmullRom, curve_loop_keys, 5);
+    static const float ranges[][2] = {
+        { 0.0f, 1.0f }, { 0.13f, 0.77f }, { 0.9f, 1.0f }, { 0.0f, 0.1f }, { 0.9f, 0.2f }
+    };
+    int32_t i, j;
+    for (i = 0; i < (int32_t)(sizeof(ranges) / sizeof(ranges[0])); i ++) {
+        const int32_t steps = 4000;
+        float from = ranges[i][0], to = ranges[i][1];
+        double h = ((double)to - from) / steps, sum = 0.0;
+        for (j = 0; j <= steps; j ++) {
+            double w = (j == 0 || j == steps) ? 1.0 : (j % 2 ? 4.0 : 2.0);
+            sum += w * box_curve_loop_value(&curve, 1.0f, (float)(from + h * j), 0.0f);
+        }
+
+        float area = box_curve_loop_area(&curve, 1.0f, from, to, 0.0f);
+        test_assert(fabs(area - sum * h / 3.0) < 1e-4);
+    }
+
+    test_assert(fabsf(box_curve_loop_area(&curve, 1.0f, 0.0f, 1.0f, 0.0f) -
+        box_curve_area(&curve, 0.0f, 1.0f, 0.0f)) > 1e-3f);
+    curve_free(&curve);
+}
+
+/** Check that a curve looping over a period evaluates as without one: values and areas.
+ *
+ * @param curve The curve
+ * @param period The period
+ */
+static void curve_check_loop_same(
+    const Curve *curve,
+    float period)
+{
+    int32_t i;
+    for (i = -10; i <= 110; i ++) {
+        float t = (float)i / 100.0f;
+        test_flt(box_curve_loop_value(curve, period, t, 0.0f), box_curve_value(curve, t, 0.0f));
+    }
+
+    test_flt(box_curve_loop_area(curve, period, -0.2f, 1.3f, 0.0f),
+        box_curve_area(curve, -0.2f, 1.3f, 0.0f));
+    int32_t span;
+    for (span = 0; span < ecs_vec_count(&curve->keys) - 1; span ++) {
+        float c1, c2, n1, n2;
+        box_curve_span_controls(curve, span, &c1, &c2);
+        box_curve_loop_span_controls(curve, period, span, &n1, &n2);
+        test_flt(c1, n1);
+        test_flt(c2, n2);
+    }
+}
+
+void Curve_loop_other_kinds_unchanged(void) {
+    // curve/loop
+    CurveKey keys[] = {
+        { .time = 0.0f, .value = 0.4f, .out = 2.0f },
+        { .time = 0.15f, .value = 1.2f, .in = -1.0f, .out = 0.5f },
+        { .time = 0.45f, .value = 0.7f, .in = 0.0f, .out = 3.0f },
+        { .time = 1.0f, .value = 0.4f, .in = -4.0f }
+    };
+    Curve linear = curve_make(CurveLinear, keys, 4);
+    Curve bezier = curve_make(CurveBezier, keys, 4);
+    curve_check_loop_same(&linear, 1.0f);
+    curve_check_loop_same(&bezier, 1.0f);
+    curve_free(&linear);
+    curve_free(&bezier);
+}
+
+void Curve_loop_partial_keys_unchanged(void) {
+    // curve/loop
+    CurveKey late[] = {{ 0.1f, 0.4f }, { 0.5f, 1.2f }, { 1.0f, 0.4f }};
+    CurveKey early[] = {{ 0.0f, 0.4f }, { 0.5f, 1.2f }, { 0.9f, 0.4f }};
+    Curve a = curve_make(CurveCatmullRom, late, 3);
+    Curve b = curve_make(CurveCatmullRom, early, 3);
+    Curve c = curve_make(CurveCatmullRom, curve_loop_keys, 5);
+    curve_check_loop_same(&a, 1.0f);
+    curve_check_loop_same(&b, 1.0f);
+    curve_check_loop_same(&c, 0.0f);
+    curve_check_loop_same(&c, 2.0f);
+    curve_free(&a);
+    curve_free(&b);
+    curve_free(&c);
+}
+
 void Curve_bezier_authored_slopes(void) {
     // curve/math
     CurveKey keys[] = {

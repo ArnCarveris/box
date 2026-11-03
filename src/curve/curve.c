@@ -59,25 +59,50 @@ void box_curve_cubic3(
     }
 }
 
+/** Whether a Catmull-Rom curve evaluated over a period takes its end neighbours across the wrap:
+ * the period is above 0, the first key is at 0 and the last at the period.
+ *
+ * @param keys The keys
+ * @param count Number of keys, at least 2
+ * @param period The period, 0 for none
+ * @return Whether the keys are a cycle
+ */
+static bool box_curve_cyclic(
+    const CurveKey *keys,
+    int32_t count,
+    float period)
+{
+    return period > 0.0f && keys[0].time == 0.0f && keys[count - 1].time == period;
+}
+
 /** Slope of a Catmull-Rom curve at a key, in value per unit of time.
  *
  * A missing neighbour of the first or last key has the value of the key and lies one span away
  * on the other side, so evenly spaced keys get the uniform controls p1 + (p2 - p0) / 6.
  *
+ * When the keys are a cycle, see box_curve_cyclic, the neighbour before the first key is the
+ * second to last key one period earlier and the one after the last key the second key one later.
+ *
  * @param keys The keys
  * @param count Number of keys, at least 2
  * @param k Index of the key
+ * @param period The period, 0 for none
  * @return The slope
  */
 static float box_curve_catmull_rom_slope(
     const CurveKey *keys,
     int32_t count,
-    int32_t k)
+    int32_t k,
+    float period)
 {
+    bool cyclic = box_curve_cyclic(keys, count, period);
     float t0, v0, t1, v1;
     if (k > 0) {
         t0 = keys[k - 1].time;
         v0 = keys[k - 1].value;
+    } else if (cyclic) {
+        t0 = keys[count - 2].time - period;
+        v0 = keys[count - 2].value;
     } else {
         t0 = 2.0f * keys[0].time - keys[1].time;
         v0 = keys[0].value;
@@ -86,6 +111,9 @@ static float box_curve_catmull_rom_slope(
     if (k < count - 1) {
         t1 = keys[k + 1].time;
         v1 = keys[k + 1].value;
+    } else if (cyclic) {
+        t1 = keys[1].time + period;
+        v1 = keys[1].value;
     } else {
         t1 = 2.0f * keys[k].time - keys[k - 1].time;
         v1 = keys[k].value;
@@ -100,6 +128,16 @@ void box_curve_span_controls(
     float *control1,
     float *control2)
 {
+    box_curve_loop_span_controls(curve, 0.0f, span, control1, control2);
+}
+
+void box_curve_loop_span_controls(
+    const Curve *curve,
+    float period,
+    int32_t span,
+    float *control1,
+    float *control2)
+{
     const CurveKey *keys = ecs_vec_first_t(&curve->keys, CurveKey);
     int32_t count = ecs_vec_count(&curve->keys);
     ecs_assert(span >= 0 && span < count - 1, ECS_INVALID_PARAMETER, NULL);
@@ -107,8 +145,8 @@ void box_curve_span_controls(
     float third = (b->time - a->time) / 3.0f;
 
     if (curve->kind == CurveCatmullRom) {
-        *control1 = a->value + box_curve_catmull_rom_slope(keys, count, span) * third;
-        *control2 = b->value - box_curve_catmull_rom_slope(keys, count, span + 1) * third;
+        *control1 = a->value + box_curve_catmull_rom_slope(keys, count, span, period) * third;
+        *control2 = b->value - box_curve_catmull_rom_slope(keys, count, span + 1, period) * third;
     } else if (curve->kind == CurveBezier) {
         *control1 = a->value + a->out * third;
         *control2 = b->value - b->in * third;
@@ -149,6 +187,15 @@ float box_curve_value(
     float time,
     float fallback)
 {
+    return box_curve_loop_value(curve, 0.0f, time, fallback);
+}
+
+float box_curve_loop_value(
+    const Curve *curve,
+    float period,
+    float time,
+    float fallback)
+{
     const CurveKey *keys = ecs_vec_first_t(&curve->keys, CurveKey);
     int32_t count = ecs_vec_count(&curve->keys);
     float result = fallback;
@@ -169,7 +216,7 @@ float box_curve_value(
     int32_t span = box_curve_find_span(keys, count, time);
     const CurveKey *a = &keys[span], *b = &keys[span + 1];
     float c1, c2;
-    box_curve_span_controls(curve, span, &c1, &c2);
+    box_curve_loop_span_controls(curve, period, span, &c1, &c2);
     result = box_curve_cubic(a->value, c1, c2, b->value, (time - a->time) / (b->time - a->time));
 done:
     return result;
@@ -179,18 +226,20 @@ done:
  * cubic, a + b s + c s^2 + d s^3, integrated in closed form.
  *
  * @param curve The curve
+ * @param period The period, 0 for none
  * @param span Index of the first key of the span
  * @param s The curve parameter in [0, 1]
  * @return The area from the time of the first key to the time at s
  */
 static double box_curve_span_area(
     const Curve *curve,
+    float period,
     int32_t span,
     double s)
 {
     const CurveKey *keys = ecs_vec_first_t(&curve->keys, CurveKey);
     float c1, c2;
-    box_curve_span_controls(curve, span, &c1, &c2);
+    box_curve_loop_span_controls(curve, period, span, &c1, &c2);
     double p0 = keys[span].value, p1 = c1, p2 = c2, p3 = keys[span + 1].value;
     double h = (double)keys[span + 1].time - (double)keys[span].time;
     double a = p0;
@@ -204,11 +253,13 @@ static double box_curve_span_area(
 /** Area under a curve with at least one key from its first key to a time, negative before it.
  *
  * @param curve The curve
+ * @param period The period, 0 for none
  * @param time The time
  * @return The area
  */
 static double box_curve_area_to(
     const Curve *curve,
+    float period,
     float time)
 {
     const CurveKey *keys = ecs_vec_first_t(&curve->keys, CurveKey);
@@ -223,14 +274,14 @@ static double box_curve_area_to(
     int32_t end = time >= last ? count - 1 : box_curve_find_span(keys, count, time);
     int32_t i;
     for (i = 0; i < end; i ++) {
-        result += box_curve_span_area(curve, i, 1.0);
+        result += box_curve_span_area(curve, period, i, 1.0);
     }
 
     if (time >= last) {
         result += keys[count - 1].value * ((double)time - last);
     } else {
         const CurveKey *a = &keys[end], *b = &keys[end + 1];
-        result += box_curve_span_area(curve, end,
+        result += box_curve_span_area(curve, period, end,
             ((double)time - a->time) / ((double)b->time - a->time));
     }
 
@@ -244,11 +295,22 @@ float box_curve_area(
     float to,
     float fallback)
 {
+    return box_curve_loop_area(curve, 0.0f, from, to, fallback);
+}
+
+float box_curve_loop_area(
+    const Curve *curve,
+    float period,
+    float from,
+    float to,
+    float fallback)
+{
     float result;
     if (!ecs_vec_count(&curve->keys)) {
         result = fallback * (to - from);
     } else {
-        result = (float)(box_curve_area_to(curve, to) - box_curve_area_to(curve, from));
+        result = (float)(box_curve_area_to(curve, period, to) -
+            box_curve_area_to(curve, period, from));
     }
 
     return result;

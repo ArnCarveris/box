@@ -312,6 +312,8 @@
                     "goes_out_with_entity",
                     "curve_kinds_once",
                     "curve_kinds_loop",
+                    "curve_catmull_rom_loop_wrap",
+                    "curve_catmull_rom_once_unchanged",
                     "bad_curve_is_one"
                 ]
             },
@@ -332,7 +334,11 @@
                     "without_timeline_unchanged",
                     "bad_curve_is_one",
                     "max_keys_is_one",
-                    "copies_own_keys"
+                    "copies_own_keys",
+                    "catmull_rom_loop_wrap",
+                    "catmull_rom_loop_count",
+                    "catmull_rom_once_unchanged",
+                    "loop_linear_bezier_unchanged"
                 ]
             },
             {

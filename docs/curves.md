@@ -107,8 +107,9 @@ parameter, so they differ only in the two control values of each span:
 - **`CurveCatmullRom`**: a smooth curve through every key without slopes to write. The slope at
   a key is `(v[k + 1] - v[k - 1]) / (t[k + 1] - t[k - 1])`, using the real time spacing so uneven
   keys work. At the first and last key the missing neighbour has the value of the key and lies one
-  span further, so the end slope is half that of the end span. Use it for organic shapes: growth,
-  flicker, a smooth path through points.
+  span further, so the end slope is half that of the end span; a looping light or timeline curve
+  takes its end neighbours across the wrap instead (see [Flicker on a light](#flicker-on-a-light)). Use it for
+  organic shapes: growth, flicker, a smooth path through points.
 - **`CurveBezier`**: you write the slopes. The controls of a span from key a to key b are
   `a.value + a.out * dt / 3` and `b.value - b.in * dt / 3`, a third of the span `dt` along. Use it
   for eases and for shapes the others cannot make, such as a fast start that settles.
@@ -355,17 +356,26 @@ campfire {
 A looping curve should end at the value it starts with, or the light jumps at every wrap. Uneven
 key times keep the flicker from looking regular. The `Rgb` of the entity colors the light.
 
-A looping `CurveCatmullRom` also turns a corner at the wrap: its end slopes come from its end
-spans, not from the other end, so the slope out of the last key is not the slope into the first.
-That is lost in a flicker but shows in a slow pulse. For a smooth loop use `CurveBezier` and give
-the first key an `out` equal to the `in` of the last, 0 for a pulse that rests at its ends:
+A looping `CurveCatmullRom` joins smoothly at the wrap. When `ParticleLight.loop` or
+`ParticleTimeline.loop` is on, its keys form a cycle: the neighbour before the first key is the
+second to last key one period earlier, and the neighbour after the last key is the second key one
+period later. The slope out of the last key is then the slope into the first, so plain keys give a
+smooth pulse without slopes to work out:
 
 ```flecs
-curve: {kind: CurveBezier, keys: [
-  {time: 0, value: 0.4, out: 0}, {time: 0.5, value: 1.3, in: 0, out: 0},
-  {time: 1, value: 0.4, in: 0}
-]}
+curve: {kind: CurveCatmullRom, keys: [{0, 0.4}, {0.3, 1.3}, {0.6, 0.8}, {1, 0.4}]}
 ```
+
+This holds only when the first key is at 0 and the last at 1. Keys that start after 0 or end
+before 1 hold their end values across the wrap, and their end slopes keep the mirrored neighbour
+of a curve that does not loop. A cycle cannot make a loop whose last value differs from its first
+continuous: it still jumps, so end on the starting value. `CurveLinear` and `CurveBezier` are the
+same with or without `loop`; for a Bezier loop give the first key an `out` equal to the `in` of the
+last. Curves of `ParticleCurves`, animation tracks and all other fields have no loop and keep the
+end neighbours of [Choosing a kind](#choosing-a-kind). This refines the end rule of the Curves epic
+design ("at the first and last key the neighbour is the key itself") for the looping clock curves
+of `ParticleLight` and `ParticleTimeline` only (`box_curve_loop_span_controls`,
+`include/box/curve.h`).
 
 ### Random size curves
 
@@ -763,7 +773,8 @@ written down so that this guide and the code agree.
   - `period` is in seconds of `ParticlePlayback.time`, and curve times run from 0 to 1 over it.
     A period of 0, no keys or a bad curve is 1.
   - `loop` repeats the curves every period; without it the curves hold their last key after the
-    period.
+    period. A looping Catmull-Rom curve from 0 to 1 takes its end neighbours across the wrap, so
+    it joins smoothly.
   - A frame spawns `rate` times the area of the rate curve above 0 over its part of the clock,
     across the wrap of a loop too, so the count does not depend on the frame rate. A negative
     rate value counts as 0.

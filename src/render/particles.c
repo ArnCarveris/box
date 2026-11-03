@@ -1182,18 +1182,23 @@ static uint32_t box_particles_texture(
  * evaluated here on the CPU, not from the curve table; a curve without keys or a bad one, also
  * one with max_keys, which its validate hook logged, is 1.
  *
+ * With loop the curve loops over a period of 1, so a Catmull-Rom curve from 0 to 1 takes its
+ * end neighbours across the wrap.
+ *
  * @param curve The curve, its times from 0 to 1 of the period
+ * @param loop Whether the curve repeats every period
  * @param t The time over the period, 0 to 1
  * @return The value
  */
 static float box_particles_light_curve(
     const ParticleCurve *curve,
+    bool loop,
     float t)
 {
     Curve view = { .kind = curve->kind, .keys = curve->keys };
     float result = 1.0f;
     if (ecs_vec_count(&curve->keys) && box_particle_light_curve_valid(curve)) {
-        result = box_curve_value(&view, t, 1.0f);
+        result = box_curve_loop_value(&view, loop ? 1.0f : 0.0f, t, 1.0f);
         result = isfinite(result) ? result : 1.0f;
     }
 
@@ -1224,7 +1229,7 @@ static float box_particles_light_value(
             t = time >= period ? 1.0f : (float)((double)time / (double)period);
         }
 
-        result *= box_particles_light_curve(&light->curve, t);
+        result *= box_particles_light_curve(&light->curve, light->loop, t);
     }
 
     if (stopped) {

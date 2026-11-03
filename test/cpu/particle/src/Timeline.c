@@ -14,6 +14,7 @@
 #include <string.h>
 #include "render.h"
 #include "simulate.h"
+#include "timeline.h"
 
 /** Frame delta of most tests, a fixed clock of a whole number of microseconds */
 #define DELTA (0.1f)
@@ -808,4 +809,137 @@ void Timeline_copies_own_keys(void) {
     ecs_delete(world, a);
     ecs_delete(world, base);
     ecs_fini(world);
+}
+
+/** Uneven Catmull-Rom keys from 0 to 1 that end on their start value */
+#define WRAP_KEYS BOX_CURVE_KEYS( \
+    {0, 0.4f}, {0.15f, 1.2f}, {0.45f, 0.7f}, {0.8f, 1.1f}, {1, 0.4f})
+
+/** Get the rate the clock emits at a time: the seconds of a short frame around it per second.
+ *
+ * @param timeline The timeline
+ * @param time Microseconds of the playback clock, at least 500
+ * @return The rate multiplier
+ */
+static double rate_at(
+    const ParticleTimeline *timeline,
+    uint64_t time)
+{
+    return box_particle_timeline_seconds(timeline, time - 500, time + 500, 0.001) / 0.001;
+}
+
+void Timeline_catmull_rom_loop_wrap(void) {
+    // particle/timeline
+    ParticleTimeline timeline = {
+        .period = 1, .loop = true,
+        .rate = { CurveCatmullRom, WRAP_KEYS },
+        .speed = { CurveCatmullRom, WRAP_KEYS }
+    };
+    Curve view = { .kind = CurveCatmullRom, .keys = timeline.rate.keys };
+    const CurveKey *keys = ecs_vec_first_t(&timeline.rate.keys, CurveKey);
+    float slope = (keys[1].value - keys[3].value) / (keys[1].time - keys[3].time + 1.0f);
+    float h = 0.01f, speed[5];
+    double rate[5];
+    int32_t i;
+    for (i = 0; i < 5; i ++) {
+        uint64_t time = 980000 + (uint64_t)i * 10000;
+        float t = (float)((double)(time % 1000000) / 1e6);
+        speed[i] = box_particle_timeline_speed(&timeline, time);
+        rate[i] = rate_at(&timeline, time);
+        test_assert(fabsf(speed[i] - box_curve_loop_value(&view, 1.0f, t, 1.0f)) < 1e-5f);
+        if (i != 2) {
+            test_assert(fabs(rate[i] - box_curve_loop_value(&view, 1.0f, t, 1.0f)) < 1e-3);
+        }
+    }
+
+    /* The value and the slopes meet at the wrap, for the speed and for the rate */
+    test_assert(fabsf(speed[2] - keys[0].value) < 1e-5f);
+    test_assert(fabs(rate[2] - keys[0].value) < 1e-3);
+    test_assert(fabsf(speed[1] - speed[3]) < 0.01f);
+    float before = (3.0f * speed[2] - 4.0f * speed[1] + speed[0]) / (2.0f * h);
+    float after = (4.0f * speed[3] - 3.0f * speed[2] - speed[4]) / (2.0f * h);
+    test_assert(fabsf(before - slope) < 0.05f);
+    test_assert(fabsf(after - slope) < 0.05f);
+    double rate_before = (3.0 * rate[2] - 4.0 * rate[1] + rate[0]) / (2.0 * h);
+    double rate_after = (4.0 * rate[3] - 3.0 * rate[2] - rate[4]) / (2.0 * h);
+    test_assert(fabs(rate_before - slope) < 0.1);
+    test_assert(fabs(rate_after - slope) < 0.1);
+}
+
+void Timeline_catmull_rom_loop_count(void) {
+    // particle/timeline
+    ParticleTimeline timeline = {
+        .period = 1, .loop = true, .rate = { CurveCatmullRom, WRAP_KEYS }
+    };
+    Curve view = { .kind = CurveCatmullRom, .keys = timeline.rate.keys };
+    double across = box_particle_timeline_seconds(&timeline, 900000, 1100000, 0.2);
+    double expected = (double)box_curve_loop_area(&view, 1.0f, 0.9f, 1.0f, 1.0f) +
+        (double)box_curve_loop_area(&view, 1.0f, 0.0f, 0.1f, 1.0f);
+    test_assert(fabs(across - expected) < 1e-5);
+    test_assert(fabs(across -
+        box_particle_timeline_seconds(&timeline, 900000, 1000000, 0.1) -
+        box_particle_timeline_seconds(&timeline, 1000000, 1100000, 0.1)) < 1e-6);
+
+    double full = (double)box_curve_loop_area(&view, 1.0f, 0.0f, 1.0f, 1.0f);
+    double plain = (double)box_curve_area(&view, 0.0f, 1.0f, 1.0f);
+    test_assert(fabs(box_particle_timeline_seconds(&timeline, 0, 3000000, 3.0) - 3.0 * full) <
+        1e-5);
+
+    /* An emitter of 1000 a second over three periods of half a second */
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    timeline.period = 0.5f;
+    ecs_entity_t e = timeline_new(world, 1000, timeline);
+    int32_t count = spawn_frames(world, null, e, DELTA, 15);
+    near_count(count, 1000.0 * 0.5 * 3.0 * full);
+    test_assert(fabs((double)count - 1000.0 * 0.5 * 3.0 * plain) > 2.0);
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Timeline_catmull_rom_once_unchanged(void) {
+    // particle/timeline
+    ParticleTimeline timeline = {
+        .period = 1, .rate = { CurveCatmullRom, WRAP_KEYS },
+        .speed = { CurveCatmullRom, WRAP_KEYS }
+    };
+    Curve view = { .kind = CurveCatmullRom, .keys = timeline.rate.keys };
+    test_assert(fabs(box_particle_timeline_seconds(&timeline, 200000, 700000, 0.5) -
+        (double)box_curve_area(&view, 0.2f, 0.7f, 1.0f)) < 1e-5);
+    test_assert(fabs(box_particle_timeline_seconds(&timeline, 900000, 1100000, 0.2) -
+        (double)box_curve_area(&view, 0.9f, 1.0f, 1.0f) - 0.1 * 0.4) < 1e-5);
+    int32_t i;
+    for (i = 0; i <= 10; i ++) {
+        float t = (float)i / 10.0f;
+        test_assert(fabsf(box_particle_timeline_speed(&timeline, (uint64_t)i * 100000) -
+            box_curve_value(&view, t, 1.0f)) < 1e-5f);
+    }
+}
+
+void Timeline_loop_linear_bezier_unchanged(void) {
+    // particle/timeline
+    ParticleCurve curves[2] = {
+        { CurveLinear, WRAP_KEYS },
+        { CurveBezier, BOX_CURVE_KEYS(
+            { .time = 0, .value = 0.4f, .out = 2 },
+            { .time = 0.15f, .value = 1.2f, .in = -1, .out = 0.5f },
+            { .time = 0.45f, .value = 0.7f, .in = 0, .out = 3 },
+            { .time = 1, .value = 0.4f, .in = -4 }) }
+    };
+    int32_t c, i;
+    for (c = 0; c < 2; c ++) {
+        ParticleTimeline timeline = {
+            .period = 1, .loop = true, .rate = curves[c], .speed = curves[c]
+        };
+        Curve view = { .kind = curves[c].kind, .keys = curves[c].keys };
+        double expected = (double)box_curve_area(&view, 0.9f, 1.0f, 1.0f) +
+            (double)box_curve_area(&view, 0.0f, 0.1f, 1.0f);
+        test_assert(fabs(box_particle_timeline_seconds(&timeline, 900000, 1100000, 0.2) -
+            expected) < 1e-5);
+        for (i = 0; i < 20; i ++) {
+            float t = (float)(i % 10) / 10.0f + 0.05f;
+            test_assert(fabsf(box_particle_timeline_speed(&timeline,
+                (uint64_t)i * 100000 + 50000) - box_curve_value(&view, t, 1.0f)) < 1e-5f);
+        }
+    }
 }
