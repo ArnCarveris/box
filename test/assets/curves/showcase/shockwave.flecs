@@ -1,0 +1,120 @@
+// A shockwave burst every 2.5 s: a flash of light and a hot core that swells and fades at once,
+// a bright ring that races out along the ground and stops, a ring of dust behind it that
+// slows to a halt and lifts as it settles, and debris that flies up, falls, bounces on the
+// ground and stops turning as it comes to rest.
+
+using box.curve
+using box.light
+using box.material
+using box.transform
+using box.geometry
+using box.particle
+
+// The chunk the debris draws as billboards, scaled by their size. A billboard draws the mesh
+// of a drawn entity, so it is one out of view.
+shockwave_chunk {
+  Position: {0, -1000, 0}
+  Box: {1, 0.7, 0.5}
+}
+
+shockwave {
+  // The flash: the light jumps to its intensity with each burst and falls off like
+  // (1 - t)^3 within 0.375 s, the steepest slope that does not dip below 0, 3 times the
+  // straight-line slope of the span. The period matches the burst so they stay in step.
+  core {
+    Position: {0, 0.4, 0}
+    Rgb: {255, 200, 140}
+    PointLight: {intensity: 10, range: 8}
+    ParticleLight: {
+      intensity: 10, period: 2.5, loop: true
+      curve: {kind: CurveBezier, keys: [
+        {time: 0, value: 1, out: -20}, {time: 0.15, value: 0, in: 0}, {time: 1, value: 0}
+      ]}
+    }
+    ParticleEmitter: {
+      max: 100, rate: 0, shape: EmitterSphere, radius: 0.1, spread: 180,
+      speed: {0.5, 1.5}, lifetime: {0.3, 0.45}, size: {0.8, 1.2},
+      color: {255, 220, 160}, seed: 21
+    }
+    ParticleBurst: {count: 40, at: 2.5, repeat: -1}
+    ParticleForces: {gravity: {0, 0, 0}}
+    ParticleAppearance: {blend: ParticleAdditive}
+    ParticleCurves: {
+      size: {kind: CurveBezier, keys: [
+        {time: 0, value: 0.3, out: 3.6}, {time: 1, value: 1.5, in: 0}
+      ]}
+      opacity: {kind: CurveBezier, keys: [
+        {time: 0, value: 1, out: -3}, {time: 1, value: 0, in: 0}
+      ]}
+    }
+  }
+
+  // The front: thin bright particles spawned at rest on a small disc, pushed out along the
+  // ground by the radial speed and stopped by the speed curve, (1 - t)^3, after a quarter of
+  // the distance they would have gone at their start speed.
+  front {
+    Position: {0, 0.05, 0}
+    ParticleEmitter: {
+      max: 600, rate: 0, shape: EmitterDisc, radius: 0.3, direction: {0, 0, 0},
+      radial: {16, 16}, lifetime: {0.55, 0.6}, size: {0.2, 0.25},
+      color: {200, 220, 255}, seed: 22
+    }
+    ParticleBurst: {count: 300, at: 2.5, repeat: -1}
+    ParticleForces: {gravity: {0, 0, 0}}
+    ParticleAppearance: {blend: ParticleAdditive, stretch: 0.02}
+    ParticleMotion: {
+      speed: {kind: CurveBezier, keys: [
+        {time: 0, value: 1, out: -3}, {time: 1, value: 0, in: 0}
+      ]}
+    }
+    ParticleCurves: {
+      opacity: {kind: CurveBezier, keys: [
+        {time: 0, value: 1, out: 0}, {time: 1, value: 0, in: 0}
+      ]}
+      size: {keys: [{0, 0.6}, {0.3, 1}, {1, 1.4}]}
+    }
+  }
+
+  // The dust ring: slower than the front and longer lived, it swells as it slows and lifts
+  // a little once it has stopped.
+  dust {
+    Position: {0, 0.1, 0}
+    ParticleEmitter: {
+      max: 600, rate: 0, shape: EmitterDisc, radius: 0.3, direction: {0, 0, 0},
+      radial: {4, 5}, lifetime: {1.4, 1.8}, size: {0.35, 0.5},
+      opacity: {0.5, 0.7}, color: {170, 150, 125}, color_variance: {15, 15, 15}, seed: 23
+    }
+    ParticleBurst: {count: 240, at: 2.5, repeat: -1}
+    ParticleForces: {gravity: {0, 0, 0}, turbulence: 0.5}
+    ParticleMotion: {
+      speed: {kind: CurveBezier, keys: [
+        {time: 0, value: 1, out: -3}, {time: 1, value: 0, in: 0}
+      ]}
+      velocity_y: {keys: [{0, 0}, {0.4, 0.1}, {1, 0.4}]}
+    }
+    ParticleCurves: {
+      size: {kind: CurveCatmullRom, keys: [{0, 0.4}, {0.3, 1.5}, {1, 2.5}]}
+      opacity: {keys: [{0, 0}, {0.05, 1}, {0.4, 0.6}, {1, 0}]}
+    }
+  }
+
+  // Debris: chunks thrown up in a cone that fall under gravity, bounce on the ground plane
+  // and slide to a stop. They spin fast at first and stop turning by 80% of their life, when
+  // they lie still, and vanish over the last 15%.
+  debris {
+    Position: {0, 0.2, 0}
+    ParticleEmitter: {
+      max: 200, rate: 0, shape: EmitterSphere, radius: 0.2, spread: 40,
+      speed: {4, 7}, lifetime: {2, 2.4}, size: {0.1, 0.2},
+      rotation: {0, 360}, spin: {-720, 720},
+      color: {110, 85, 65}, color_variance: {30, 25, 20}, seed: 24
+    }
+    ParticleBurst: {count: 50, at: 2.5, repeat: -1}
+    ParticleCollision: {height: 0, bounce: 0.45, friction: 0.35}
+    ParticleAppearance: {shape: ParticleBillboard, mesh: shockwave_chunk, lit: 0.8}
+    ParticleCurves: {
+      spin: {keys: [{0, 1}, {0.4, 0.6}, {0.8, 0}]}
+      opacity: {keys: [{0, 1}, {0.85, 1}, {1, 0}]}
+    }
+  }
+}

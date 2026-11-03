@@ -8,7 +8,8 @@ Usage:
 
 visual renders every <dir>/<scene>.flecs (test/integration/visual by default) headless with
 boxrun, a static camera and a fixed delta (--delta-time 1/60), and compares the last frame with
-<dir>/baseline/<scene>.png. A scene fails when the difference is strong and widespread: the
+<dir>/baseline/<scene>.png. A scene runs 3 frames before the capture, or the n of a line
+"// frames: n" in it, such as an effect that needs seconds to build up; --frames overrides both. A scene fails when the difference is strong and widespread: the
 largest channel delta is above 24 and more than 200 pixels have a channel off by more than 16,
 so GPU speckle and faint drift pass. A missing baseline fails too. A scene that has to change
 after its first frame, such as one frozen in the middle of a transition, does so with the
@@ -112,6 +113,7 @@ MAX_DELTA = 24
 PIXEL_DELTA = 16
 MAX_PIXELS = 200
 RENDER_TIMEOUT = 120
+DEFAULT_FRAMES = 3
 DELTA_TIME = "0.016666667"
 GUARD_WAIT = 10
 GUARD_PAUSE = 2
@@ -546,10 +548,20 @@ def prepare_app(args):
                       "size": os.path.getsize(binary)}
 
 
+def scene_frames(source, args):
+    """Frames to run before the capture: --frames when given, else the "// frames: n" line of
+    the scene, else DEFAULT_FRAMES."""
+    if args.frames is not None:
+        return args.frames
+    line = re.search(r"^//\s*frames:\s*(\d+)\s*$", source, re.MULTILINE)
+    return int(line.group(1)) if line else DEFAULT_FRAMES
+
+
 def render_scene(scene, png, args):
     width, height = (int(v) for v in args.size.lower().split("x"))
     with open(scene) as f:
         source = f.read()
+    frames = scene_frames(source, args)
     harness = os.path.join(os.path.dirname(png), scene_name(scene) + ".run.flecs")
     # Include paths cannot leave the folder of the script: link etc, apps and test/assets so a
     # scene can include etc/..., a scene of a game apps/<game>/etc/<game> and the test scripts
@@ -566,12 +578,13 @@ def render_scene(scene, png, args):
     with open(harness, "w") as f:
         f.write("%s\n\nvisual_capture {\n  box.surface.Surface: {width: %d, height: %d, "
                 "write_to_file: \"%s\"}\n}\n" % (source.rstrip(), width, height, png))
-    cmd = [args.binary, "--headless", "--frames", str(args.frames), "--delta-time", DELTA_TIME,
+    cmd = [args.binary, "--headless", "--frames", str(frames), "--delta-time", DELTA_TIME,
            "--timeout", str(RENDER_TIMEOUT), "--port", "0", harness]
     code, log, run = run_guarded(cmd, args, png, RENDER_TIMEOUT * 2,
                                  lambda log: "cpu oversubscribed" in log)
     with open(os.path.join(os.path.dirname(png), scene_name(scene) + ".log"), "w") as f:
         f.write(log)
+    run["frames"] = frames
     return code == 0 and os.path.isfile(png), log, run
 
 
@@ -589,7 +602,7 @@ def run_scene(scene, baseline_dir, out, update, args):
     rendered, log, run = render_scene(scene, png, args)
     result = {"scene": name, "path": display(scene), "status": "fail",
               "image": rendered, "baseline": False, "diff": False,
-              "frames": args.frames, "load_before": load_before, "load_after": load_average()}
+              "load_before": load_before, "load_after": load_average()}
     result.update(run)
     if not rendered:
         result["detail"] = "render failed, see %s.log" % name
@@ -1197,7 +1210,8 @@ def main():
     visual.add_argument("--env", help="bake3 local environment, the default one when absent")
     visual.add_argument("--cfg", help="bake3 build mode, the bake3 default when absent")
     visual.add_argument("--out", help="folder of the renders and the report")
-    visual.add_argument("--frames", type=int, default=3, help="frames to run before the capture")
+    visual.add_argument("--frames", type=int, help="frames to run before the capture, for every "
+                        "scene; without it a scene's \"// frames: n\" line, else %d" % DEFAULT_FRAMES)
     visual.add_argument("--size", default="640x360", help="surface size in pixels")
     visual.add_argument("--update-baseline", action="append", metavar="SCENE",
                         help="store the render of this scene as its baseline")

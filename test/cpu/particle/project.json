@@ -432,6 +432,10 @@
                     "random_size",
                     "path",
                     "ease",
+                    "showcase_campfire",
+                    "showcase_shockwave",
+                    "showcase_orb",
+                    "showcase_chimney",
                     "mistakes",
                     "first_mistake_only",
                     "guide_quotes_recipes"

@@ -1,0 +1,70 @@
+// The four effects of test/assets/curves/showcase, authored from docs/curves.md alone, 2.8 s
+// in: from the left a chimney puffing in rhythm with its smoke blown to the right, a campfire
+// with rising embers and a flickering light, a magic orb with motes on helices and a pulsing
+// light, and a shockwave 0.3 s after its second burst, its ring racing out and its debris in
+// the air. Each effect is included at the origin and moved by its root.
+// frames: 168
+
+include test/assets/curves/showcase/chimney
+include test/assets/curves/showcase/campfire
+include test/assets/curves/showcase/orb
+include test/assets/curves/showcase/shockwave
+
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+
+bloom {
+  Bloom: {intensity: 0.4, threshold: 1, threshold_softness: 0.5}
+}
+
+tonemap {
+  Tonemap: {}
+}
+
+camera {
+  Position: {0, 2.6, 11}
+  Rotation: {-0.14, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {14, 16, 26, 255}},
+    effects: [{effect: bloom}, {effect: tonemap}]}
+}
+
+$ {
+  AmbientLight: {sky: {50, 56, 74}, ground: {30, 28, 26}, intensity: 0.6}
+}
+
+moon {
+  Rotation: {0.7, 2.4, 0}
+  DirectionalLight: {intensity: 0.6 * flecs.script.math.PI}
+  Rgb: {170, 185, 230}
+}
+
+ground {
+  Position: {0, -0.1, 0}
+  Box: {24, 0.2, 10}
+  Rgb: {70, 66, 60}
+}
+
+chimney {
+  Position: {-6.2, 0, -1}
+}
+
+campfire {
+  Position: {-2.6, 0, 0.5}
+}
+
+orb {
+  Position: {1, 0, 0}
+}
+
+shockwave {
+  Position: {5, 0, 0}
+}

@@ -1,0 +1,52 @@
+// A chimney that puffs in the rhythm of a steam engine, a strong chuff and a weak one every
+// 1.4 s: each puff leaves fast, is caught by the wind as the drag comes on, and grows from
+// dark soot to pale grey haze as it drifts away.
+
+using box.curve
+using box.material
+using box.transform
+using box.geometry
+using box.particle
+
+chimney {
+  stack {
+    Position: {0, 1, 0}
+    Box: {0.5, 2, 0.5}
+    Rgb: {140, 62, 45}
+  }
+
+  cap {
+    Position: {0, 2.06, 0}
+    Box: {0.62, 0.12, 0.62}
+    Rgb: {90, 85, 80}
+  }
+
+  // The rate curve is the rhythm: two sharp linear rises, a strong puff at the start of the
+  // period and a weaker one at 0.5, and silence between them. The speed curve gives the
+  // particles of the start of a puff more speed than its tail, so a puff stays one lump. The
+  // drag curve lets a puff shoot up for the first fifth of its life before the wind takes it.
+  smoke {
+    Position: {0, 2.15, 0}
+    ParticleEmitter: {
+      max: 600, rate: 160, shape: EmitterDisc, radius: 0.12, spread: 12,
+      speed: {1.6, 2}, lifetime: {3, 4}, size: {0.3, 0.4},
+      rotation: {0, 360}, opacity: {0.7, 0.85}, seed: 41
+    }
+    ParticleForces: {gravity: {0, 0.25, 0}, wind: {1.2, 0, 0.1}, drag: 0.9, turbulence: 0.6}
+    ParticleTimeline: {
+      period: 1.4, loop: true
+      rate: {keys: [
+        {0, 0}, {0.03, 1}, {0.15, 0.8}, {0.25, 0}, {0.5, 0}, {0.53, 0.7}, {0.63, 0}, {1, 0}
+      ]}
+      speed: {keys: [{0, 1.4}, {0.25, 0.7}, {0.5, 1.2}, {0.63, 0.7}, {1, 1.4}]}
+    }
+    ParticleMotion: {
+      drag: {keys: [{0, 0.2}, {0.2, 1.5}, {1, 1}]}
+    }
+    ParticleCurves: {
+      color: {keys: [{0, {90, 88, 85}}, {0.3, {150, 148, 145}}, {1, {205, 205, 210}}]}
+      size: {kind: CurveCatmullRom, keys: [{0, 0.5}, {0.2, 1.3}, {1, 3.5}]}
+      opacity: {keys: [{0, 0}, {0.06, 1}, {0.4, 0.7}, {1, 0}]}
+    }
+  }
+}

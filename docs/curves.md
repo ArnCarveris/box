@@ -7,7 +7,8 @@ that takes a curve, how each kind behaves, recipes, how to check the result, wha
 supported and what it costs.
 
 The recipes are files in `test/assets/curves/`, loaded by the `CurveRecipes` suite of
-`test/cpu/particle`, which fails when one of them logs a warning or an error. Copy them.
+`test/cpu/particle`, which fails when one of them logs a warning or an error. Copy them. Whole
+effects built from them are in [Showcase](#showcase).
 
 ## The format
 
@@ -354,6 +355,18 @@ campfire {
 A looping curve should end at the value it starts with, or the light jumps at every wrap. Uneven
 key times keep the flicker from looking regular. The `Rgb` of the entity colors the light.
 
+A looping `CurveCatmullRom` also turns a corner at the wrap: its end slopes come from its end
+spans, not from the other end, so the slope out of the last key is not the slope into the first.
+That is lost in a flicker but shows in a slow pulse. For a smooth loop use `CurveBezier` and give
+the first key an `out` equal to the `in` of the last, 0 for a pulse that rests at its ends:
+
+```flecs
+curve: {kind: CurveBezier, keys: [
+  {time: 0, value: 0.4, out: 0}, {time: 0.5, value: 1.3, in: 0, out: 0},
+  {time: 1, value: 0.4, in: 0}
+]}
+```
+
 ### Random size curves
 
 Every particle follows its own curve between two, so some shrink steadily while others swell to
@@ -482,6 +495,41 @@ panel {
 target before it settles. Only a new value animates, so the panel moves when a script, the
 shell or C sets its `Scale` or `Opacity` later. `docs/transitions.md` has the details.
 
+## Showcase
+
+Four whole effects in `test/assets/curves/showcase/`, each built of several emitters under one
+root entity, and shown together by `test/integration/visual/curves_showcase.flecs`:
+
+| File | Effect | What the curves do that constants cannot |
+|------|--------|------------------------------------------|
+| `campfire.flecs` | Flame, smoke, embers, light | Embers pop out and slow down (`ParticleMotion.speed`), keep rising (`velocity_y`), wander and twinkle each their own way (`max_keys` mirrored or out of phase); the light flickers |
+| `shockwave.flecs` | Flash, ring front, dust ring, debris | Rings that race out and stop dead (`speed`, `(1 - t)^3`), a light flash in step with the burst, debris that stops turning as it settles (`spin`) |
+| `orb.flecs` | Glowing ball, halo, motes | Motes on helices from Bezier velocity curves, a radius of their own from `max_keys`; the light and the halo emission pulse together |
+| `chimney.flecs` | Stack and puffing smoke | Two puffs a period of different strength (`ParticleTimeline.rate`), faster starts (`speed`), smoke that shoots up before the wind takes it (`ParticleMotion.drag`) |
+
+What they needed beyond the recipes:
+
+- **A spin you can see.** `rotation` and `spin` turn a particle around the view axis, which a
+  `ParticleCircle`, the default shape, does not show. Draw the particles as a
+  `ParticleSprite` with a texture, or as a `ParticleBillboard` of the mesh of another entity:
+  `ParticleAppearance: {shape: ParticleBillboard, mesh: chunk, lit: 0.8}`. The mesh entity is
+  drawn itself, so put it out of view, `chunk { Position: {0, -1000, 0}, Box: {1, 0.7, 0.5} }`.
+- **Shapes in space from velocity curves.** A velocity curve is in world units per second, but
+  its time is the life, so the same keys trace a different path for every lifetime. Give a
+  particle that must trace a shape a fixed `lifetime: {L, L}`. A circle of radius `r` turned
+  `N` times over the life is `cos` on one axis and `sin` on the other with an amplitude
+  `A = 2 pi N r / L`: keys at every quarter turn, `CurveBezier`, slope 0 at the peaks and
+  `+-2 pi N A` at the zero crossings (`orb.flecs`). `max_keys` with another amplitude gives each
+  particle its own radius, as the three velocity axes share one draw.
+- **A light in step with a burst.** A `ParticleBurst` with `at: 2.5, repeat: -1` goes off at
+  2.5, 5, 7.5 s, and a `ParticleLight` with `period: 2.5, loop: true` starts its curve at 0, 2.5,
+  5 s, so a flash at the start of the curve meets every burst. The light also flashes once at
+  0 s, before the first burst.
+- **Moving an included effect.** `include` makes the entities of the file where it puts them.
+  Open the root again after the include to place it, `campfire { Position: {-2.6, 0, 0.5} }`;
+  its emitters, lights and meshes are its children and move with it. Shared helpers such as
+  a billboard mesh stay at the root of the file, with a name that does not collide.
+
 ## Checking the result
 
 ### Errors
@@ -547,7 +595,9 @@ reports a failure for the missing baseline; the image is there all the same. `in
 file from the repository root without `.flecs`, as the harness links `etc`, `apps` and
 `test/assets` next to the scene it renders; an effect of your own can also be written into the
 scene itself. Render again with other `--frames` to see other times, for example 6, 30 and 90
-for the start, the middle and a steady state, and look at the PNGs. A run of the app,
+for the start, the middle and a steady state, and look at the PNGs. A scene of
+`test/integration/visual` runs 3 frames unless it has a line `// frames: n`, as
+`curves_showcase.flecs` does to show its effects seconds in; `--frames` overrides both. A run of the app,
 `bake3 run apps/boxrun --local-env -- /tmp/fx/puff.flecs`, plays it live, and its `capture`
 shell command writes a PNG of a frame (README).
 

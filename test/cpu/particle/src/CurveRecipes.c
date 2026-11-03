@@ -14,8 +14,8 @@
 /** Frame delta of the tests */
 #define DELTA (0.1f)
 
-/** Frames a recipe runs, two seconds so a burst at 1.5 s goes off */
-#define FRAMES (20)
+/** Frames a recipe runs, three seconds so the bursts at 1.5 s and 2.5 s go off */
+#define FRAMES (30)
 
 /** Warnings and errors logged while capturing */
 static char recipe_log[4096];
@@ -217,6 +217,31 @@ void CurveRecipes_path(void) {
 void CurveRecipes_ease(void) {
     // particle/curve_docs
     recipe_check("ease.flecs", "panel", "box.transition.Transition", false);
+}
+
+void CurveRecipes_showcase_campfire(void) {
+    // particle/curve_docs
+    recipe_check("showcase/campfire.flecs", "campfire.flame", "box.particle.ParticleLight", true);
+    recipe_check("showcase/campfire.flecs", "campfire.embers", "box.particle.ParticleMotion", true);
+}
+
+void CurveRecipes_showcase_shockwave(void) {
+    // particle/curve_docs
+    recipe_check("showcase/shockwave.flecs", "shockwave.core", "box.particle.ParticleLight", true);
+    recipe_check("showcase/shockwave.flecs", "shockwave.dust", "box.particle.ParticleMotion", true);
+    recipe_check("showcase/shockwave.flecs", "shockwave.debris", "box.particle.ParticleCollision",
+        true);
+}
+
+void CurveRecipes_showcase_orb(void) {
+    // particle/curve_docs
+    recipe_check("showcase/orb.flecs", "orb.halo", "box.particle.ParticleTimeline", true);
+    recipe_check("showcase/orb.flecs", "orb.motes", "box.particle.ParticleMotion", true);
+}
+
+void CurveRecipes_showcase_chimney(void) {
+    // particle/curve_docs
+    recipe_check("showcase/chimney.flecs", "chimney.smoke", "box.particle.ParticleTimeline", true);
 }
 
 /** Check that a mistake of test/assets/curves/mistakes loads and logs an error.
