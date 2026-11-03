@@ -36,29 +36,87 @@ typedef struct box_particle_rows_entry_t {
     uint32_t row;           /**< First row */
     uint32_t rows;          /**< Rows it takes */
     int32_t refs;           /**< Pools that use it, 0 for rows that are handed out again */
+    bool listed;            /**< It is in the unused list of its rows */
+    uint32_t generation;    /**< Times its rows were written, so a remembered use can tell
+                             *   that they still hold what it baked */
+    uint64_t hash;          /**< Hash of its kind and content, its key in by_hash */
 } box_particle_rows_entry_t;
+
+/** The rows a ParticleCurves took when it was sampled, remembered by the hash of its keys */
+typedef struct box_particle_rows_known_t {
+    box_particle_rows_use_t use; /**< The use as it was baked, its entries not counted */
+    uint32_t generations[BOX_PARTICLE_ROWS_ENTRIES]; /**< Generations of its entries */
+} box_particle_rows_known_t;
+
+/** The rows a ParticleMotion took when it was sampled, remembered by the hash of its keys */
+typedef struct box_particle_rows_known_motion_t {
+    box_particle_rows_motion_t use; /**< The use as it was baked, its entries not counted */
+    uint32_t generations[4]; /**< Generations of its entries */
+} box_particle_rows_known_motion_t;
 
 void box_particle_rows_init(
     box_particle_rows_t *t)
 {
+    int32_t i;
     ecs_os_memset_t(t, 0, box_particle_rows_t);
     ecs_vec_init_t(NULL, &t->entries, box_particle_rows_entry_t, 0);
+    ecs_map_init(&t->by_hash, NULL);
+    for (i = 0; i <= BOX_PARTICLE_GRADIENT_ROWS; i ++) {
+        ecs_vec_init_t(NULL, &t->unused[i], int32_t, 0);
+    }
+
     ecs_vec_init_t(NULL, &t->data, float, 0);
+    ecs_vec_init_t(NULL, &t->known, box_particle_rows_known_t, 0);
+    ecs_vec_init_t(NULL, &t->known_motion, box_particle_rows_known_motion_t, 0);
+    ecs_map_init(&t->known_by_hash, NULL);
+    ecs_map_init(&t->known_motion_by_hash, NULL);
     t->dirty_first = UINT32_MAX;
 }
 
 void box_particle_rows_fini(
     box_particle_rows_t *t)
 {
+    int32_t i;
     ecs_vec_fini_t(NULL, &t->entries, box_particle_rows_entry_t);
+    ecs_map_fini(&t->by_hash);
+    for (i = 0; i <= BOX_PARTICLE_GRADIENT_ROWS; i ++) {
+        ecs_vec_fini_t(NULL, &t->unused[i], int32_t);
+    }
+
     ecs_vec_fini_t(NULL, &t->data, float);
+    ecs_vec_fini_t(NULL, &t->known, box_particle_rows_known_t);
+    ecs_vec_fini_t(NULL, &t->known_motion, box_particle_rows_known_motion_t);
+    ecs_map_fini(&t->known_by_hash);
+    ecs_map_fini(&t->known_motion_by_hash);
+}
+
+/** Forget the rows of the curves sampled before, of both kinds.
+ *
+ * @param t The table
+ */
+static void box_particle_rows_forget(
+    box_particle_rows_t *t)
+{
+    ecs_vec_clear(&t->known);
+    ecs_vec_clear(&t->known_motion);
+    ecs_map_clear(&t->known_by_hash);
+    ecs_map_clear(&t->known_motion_by_hash);
 }
 
 void box_particle_rows_reset(
     box_particle_rows_t *t)
 {
+    int32_t i;
     ecs_vec_clear(&t->entries);
+    ecs_map_clear(&t->by_hash);
+    for (i = 0; i <= BOX_PARTICLE_GRADIENT_ROWS; i ++) {
+        ecs_vec_clear(&t->unused[i]);
+    }
+
     ecs_vec_clear(&t->data);
+    box_particle_rows_forget(t);
+    t->last = NULL;
+    t->last_motion = NULL;
     t->capacity = 0;
     t->dirty_first = UINT32_MAX;
     t->dirty_end = 0;
@@ -84,6 +142,50 @@ static uint32_t box_particle_rows_of(
     return result;
 }
 
+/** Mix a word into a hash.
+ *
+ * @param hash The hash so far
+ * @param word The word
+ * @return The hash
+ */
+static uint64_t box_particle_rows_mix(
+    uint64_t hash,
+    uint64_t word)
+{
+    hash = (hash ^ word) * 0x9E3779B97F4A7C15ull;
+
+    return hash ^ (hash >> 29);
+}
+
+/** Add bytes to a hash, eight at a time: the curves of every emitter are hashed every frame.
+ *
+ * @param hash The hash so far
+ * @param data The bytes
+ * @param size Number of bytes
+ * @return The hash
+ */
+static uint64_t box_particle_rows_hash_bytes(
+    uint64_t hash,
+    const void *data,
+    size_t size)
+{
+    const uint8_t *bytes = data;
+    uint64_t word;
+    size_t i;
+    for (i = 0; i + sizeof(word) <= size; i += sizeof(word)) {
+        ecs_os_memcpy(&word, bytes + i, ECS_SIZEOF(word));
+        hash = box_particle_rows_mix(hash, word);
+    }
+
+    if (i < size) {
+        word = 0;
+        ecs_os_memcpy(&word, bytes + i, (ecs_size_t)(size - i));
+        hash = box_particle_rows_mix(hash, word);
+    }
+
+    return hash;
+}
+
 /** Write the content of an entry to its rows and mark them for the send.
  *
  * @param t The table
@@ -92,13 +194,14 @@ static uint32_t box_particle_rows_of(
  */
 static void box_particle_rows_write(
     box_particle_rows_t *t,
-    const box_particle_rows_entry_t *entry,
+    box_particle_rows_entry_t *entry,
     const float *samples)
 {
     float *out = ecs_vec_get_t(&t->data, float,
         (int32_t)(entry->row * BOX_PARTICLE_CURVE_SAMPLES));
     ecs_os_memcpy(out, samples,
         (ecs_size_t)(entry->rows * BOX_PARTICLE_CURVE_SAMPLES * sizeof(float)));
+    entry->generation ++;
     if (entry->row < t->dirty_first) {
         t->dirty_first = entry->row;
     }
@@ -110,9 +213,35 @@ static void box_particle_rows_write(
     t->bakes ++;
 }
 
-/** Get the rows of a baked curve: those of an entry of the same kind and content, else rows
- * nothing uses or new rows, written. The old rows of a pool are released after its new ones are
- * acquired, so its unchanged curves keep theirs.
+/** Take an entry that no pool uses with a number of rows, from the unused list of its rows.
+ *
+ * @param t The table
+ * @param rows Rows of the entry
+ * @return Index of the entry, -1 for none
+ */
+static int32_t box_particle_rows_unused(
+    box_particle_rows_t *t,
+    uint32_t rows)
+{
+    ecs_vec_t *list = &t->unused[rows];
+    int32_t result = -1;
+    while (result < 0 && ecs_vec_count(list)) {
+        int32_t i = *ecs_vec_last_t(list, int32_t);
+        box_particle_rows_entry_t *entry = ecs_vec_get_t(
+            &t->entries, box_particle_rows_entry_t, i);
+        ecs_vec_remove_last(list);
+        entry->listed = false;
+        if (!entry->refs) {
+            result = i;
+        }
+    }
+
+    return result;
+}
+
+/** Get the rows of a baked curve: those of an entry of the same kind and content, found by
+ * their hash, else the rows of an entry nothing uses or new rows, written. The old rows of a
+ * pool are released after its new ones are acquired, so its unchanged curves keep theirs.
  *
  * @param t The table
  * @param kind What the rows hold
@@ -126,32 +255,32 @@ static int32_t box_particle_rows_acquire(
 {
     uint32_t rows = box_particle_rows_of(kind);
     size_t bytes = rows * BOX_PARTICLE_CURVE_SAMPLES * sizeof(float);
-    int32_t i, count = ecs_vec_count(&t->entries), result = -1, unused = -1;
+    uint64_t hash = box_particle_rows_mix(
+        box_particle_rows_hash_bytes(14695981039346656037ull, samples, bytes), (uint64_t)kind);
+    ecs_map_val_t *found = ecs_map_get(&t->by_hash, hash);
     box_particle_rows_entry_t *entry;
-    for (i = 0; i < count; i ++) {
-        entry = ecs_vec_get_t(&t->entries, box_particle_rows_entry_t, i);
+    int32_t result = -1;
+    if (found) {
+        entry = ecs_vec_get_t(&t->entries, box_particle_rows_entry_t, (int32_t)*found);
         if (entry->kind == kind && !memcmp(ecs_vec_get_t(&t->data, float,
             (int32_t)(entry->row * BOX_PARTICLE_CURVE_SAMPLES)), samples, bytes))
         {
-            result = i;
-            break;
-        }
-
-        if (unused < 0 && !entry->refs && entry->rows == rows) {
-            unused = i;
+            result = (int32_t)*found;
+            goto done;
         }
     }
 
+    result = box_particle_rows_unused(t, rows);
     if (result >= 0) {
-        goto done;
-    }
-
-    if (unused >= 0) {
-        result = unused;
         entry = ecs_vec_get_t(&t->entries, box_particle_rows_entry_t, result);
+        found = ecs_map_get(&t->by_hash, entry->hash);
+        if (found && *found == (ecs_map_val_t)result) {
+            ecs_map_remove(&t->by_hash, entry->hash);
+        }
     } else {
-        result = count;
+        result = ecs_vec_count(&t->entries);
         entry = ecs_vec_append_t(NULL, &t->entries, box_particle_rows_entry_t);
+        ecs_os_memset_t(entry, 0, box_particle_rows_entry_t);
         entry->row = (uint32_t)ecs_vec_count(&t->data) / BOX_PARTICLE_CURVE_SAMPLES;
         entry->rows = rows;
         ecs_vec_grow_t(NULL, &t->data, float, (int32_t)(rows * BOX_PARTICLE_CURVE_SAMPLES));
@@ -159,6 +288,8 @@ static int32_t box_particle_rows_acquire(
 
     entry->kind = kind;
     entry->refs = 0;
+    entry->hash = hash;
+    ecs_map_ensure(&t->by_hash, hash)[0] = (ecs_map_val_t)result;
     box_particle_rows_write(t, entry, samples);
 done:
     ecs_vec_get_t(&t->entries, box_particle_rows_entry_t, result)->refs ++;
@@ -180,7 +311,13 @@ static void box_particle_rows_unref(
     int32_t i;
     for (i = 0; i < count; i ++) {
         if (entries[i] > 0 && entries[i] <= ecs_vec_count(&t->entries)) {
-            ecs_vec_get_t(&t->entries, box_particle_rows_entry_t, entries[i] - 1)->refs --;
+            box_particle_rows_entry_t *entry = ecs_vec_get_t(
+                &t->entries, box_particle_rows_entry_t, entries[i] - 1);
+            entry->refs --;
+            if (!entry->refs && !entry->listed) {
+                entry->listed = true;
+                *ecs_vec_append_t(NULL, &t->unused[entry->rows], int32_t) = entries[i] - 1;
+            }
         }
 
         entries[i] = 0;
@@ -472,27 +609,6 @@ done:
     return;
 }
 
-/** Add bytes to an FNV-1a hash.
- *
- * @param hash The hash so far
- * @param data The bytes
- * @param size Number of bytes
- * @return The hash
- */
-static uint64_t box_particle_rows_hash_bytes(
-    uint64_t hash,
-    const void *data,
-    size_t size)
-{
-    const uint8_t *bytes = data;
-    size_t i;
-    for (i = 0; i < size; i ++) {
-        hash = (hash ^ bytes[i]) * 1099511628211ull;
-    }
-
-    return hash;
-}
-
 /** Add the count and the keys of a list of CurveKey to a hash.
  *
  * @param hash The hash so far
@@ -504,7 +620,7 @@ static uint64_t box_particle_rows_hash_keys(
     const ecs_vec_t *keys)
 {
     int32_t count = ecs_vec_count(keys);
-    hash = box_particle_rows_hash_bytes(hash, &count, sizeof(count));
+    hash = box_particle_rows_mix(hash, (uint64_t)(uint32_t)count);
     if (count) {
         hash = box_particle_rows_hash_bytes(hash, ecs_vec_first(keys),
             (size_t)count * sizeof(CurveKey));
@@ -525,11 +641,12 @@ static uint64_t box_particle_rows_hash_colors(
 {
     const ParticleGradientKey *k = ecs_vec_first_t(keys, ParticleGradientKey);
     int32_t i, count = ecs_vec_count(keys);
-    hash = box_particle_rows_hash_bytes(hash, &count, sizeof(count));
+    hash = box_particle_rows_mix(hash, (uint64_t)(uint32_t)count);
     for (i = 0; i < count; i ++) {
-        uint8_t color[3] = { k[i].color.r, k[i].color.g, k[i].color.b };
-        hash = box_particle_rows_hash_bytes(hash, &k[i].time, sizeof(float));
-        hash = box_particle_rows_hash_bytes(hash, color, sizeof(color));
+        uint32_t time;
+        ecs_os_memcpy(&time, &k[i].time, ECS_SIZEOF(time));
+        hash = box_particle_rows_mix(hash, (uint64_t)time | ((uint64_t)k[i].color.r << 32) |
+            ((uint64_t)k[i].color.g << 40) | ((uint64_t)k[i].color.b << 48));
     }
 
     return hash;
@@ -550,16 +667,160 @@ static uint64_t box_particle_rows_hash(
     uint64_t hash = 14695981039346656037ull;
     int32_t i;
     for (i = 0; i < 4; i ++) {
-        hash = box_particle_rows_hash_bytes(hash, &scalars[i]->kind, sizeof(CurveKind));
+        hash = box_particle_rows_mix(hash, (uint64_t)scalars[i]->kind);
         hash = box_particle_rows_hash_keys(hash, &scalars[i]->keys);
         hash = box_particle_rows_hash_keys(hash, &scalars[i]->max_keys);
     }
 
-    hash = box_particle_rows_hash_bytes(hash, &curves->color.kind, sizeof(CurveKind));
+    hash = box_particle_rows_mix(hash, (uint64_t)curves->color.kind);
     hash = box_particle_rows_hash_colors(hash, &curves->color.keys);
     hash = box_particle_rows_hash_colors(hash, &curves->color.max_keys);
 
     return hash;
+}
+
+/** Check whether the entries a use took when it was remembered still hold what it baked.
+ *
+ * @param t The table
+ * @param entries Index plus 1 of its entries, 0 for none
+ * @param generations Generations of its entries when it was remembered
+ * @param count Number of entries
+ * @return Whether every entry is as it was
+ */
+static bool box_particle_rows_current(
+    const box_particle_rows_t *t,
+    const int32_t *entries,
+    const uint32_t *generations,
+    int32_t count)
+{
+    bool result = true;
+    int32_t i;
+    for (i = 0; i < count && result; i ++) {
+        if (entries[i] > 0) {
+            result = entries[i] <= ecs_vec_count(&t->entries) && ecs_vec_get_t(&t->entries,
+                box_particle_rows_entry_t, entries[i] - 1)->generation == generations[i];
+        }
+    }
+
+    return result;
+}
+
+/** Count the uses of entries.
+ *
+ * @param t The table
+ * @param entries Index plus 1 of the entries, 0 for none
+ * @param count Number of entries
+ */
+static void box_particle_rows_ref(
+    box_particle_rows_t *t,
+    const int32_t *entries,
+    int32_t count)
+{
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        if (entries[i] > 0) {
+            ecs_vec_get_t(&t->entries, box_particle_rows_entry_t, entries[i] - 1)->refs ++;
+        }
+    }
+}
+
+/** Record the generations of the entries of a use.
+ *
+ * @param t The table
+ * @param entries Index plus 1 of the entries, 0 for none
+ * @param count Number of entries
+ * @param out Receives the generations
+ */
+static void box_particle_rows_generations(
+    const box_particle_rows_t *t,
+    const int32_t *entries,
+    int32_t count,
+    uint32_t *out)
+{
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        out[i] = entries[i] > 0
+            ? ecs_vec_get_t(&t->entries, box_particle_rows_entry_t, entries[i] - 1)->generation
+            : 0;
+    }
+}
+
+/** Get the hash of ParticleCurves, computed once per frame for the curves at one address, which
+ * the instances of a template share.
+ *
+ * @param t The table
+ * @param curves The curves
+ * @return The hash
+ */
+static uint64_t box_particle_rows_curves_hash(
+    box_particle_rows_t *t,
+    const ParticleCurves *curves)
+{
+    if (curves != t->last) {
+        t->last = curves;
+        t->last_hash = box_particle_rows_hash(curves);
+    }
+
+    return t->last_hash;
+}
+
+/** Give a use the rows that curves with the same hash took when they were sampled, while those
+ * rows still hold what was baked.
+ *
+ * @param t The table
+ * @param use The use, its old entries saved by the caller
+ * @param hash Hash of the curves
+ * @return Whether the use took them
+ */
+static bool box_particle_rows_recall(
+    box_particle_rows_t *t,
+    box_particle_rows_use_t *use,
+    uint64_t hash)
+{
+    ecs_map_val_t *index = ecs_map_get(&t->known_by_hash, hash);
+    bool result = false;
+    if (index) {
+        const box_particle_rows_known_t *known = ecs_vec_get_t(
+            &t->known, box_particle_rows_known_t, (int32_t)*index);
+        if (box_particle_rows_current(t, known->use.entries, known->generations,
+            BOX_PARTICLE_ROWS_ENTRIES))
+        {
+            *use = known->use;
+            box_particle_rows_ref(t, use->entries, BOX_PARTICLE_ROWS_ENTRIES);
+            result = true;
+        }
+    }
+
+    return result;
+}
+
+/** Remember the rows of sampled curves by their hash, forgetting all of them when the table
+ * knows BOX_PARTICLE_ROWS_KNOWN.
+ *
+ * @param t The table
+ * @param use The use, baked
+ */
+static void box_particle_rows_remember(
+    box_particle_rows_t *t,
+    const box_particle_rows_use_t *use)
+{
+    ecs_map_val_t *index = ecs_map_get(&t->known_by_hash, use->hash);
+    box_particle_rows_known_t *known;
+    if (!index && ecs_vec_count(&t->known) >= BOX_PARTICLE_ROWS_KNOWN) {
+        ecs_vec_clear(&t->known);
+        ecs_map_clear(&t->known_by_hash);
+    }
+
+    if (index) {
+        known = ecs_vec_get_t(&t->known, box_particle_rows_known_t, (int32_t)*index);
+    } else {
+        ecs_map_insert(&t->known_by_hash, use->hash, (ecs_map_val_t)ecs_vec_count(&t->known));
+        known = ecs_vec_append_t(NULL, &t->known, box_particle_rows_known_t);
+    }
+
+    known->use = *use;
+    box_particle_rows_generations(t, use->entries, BOX_PARTICLE_ROWS_ENTRIES,
+        known->generations);
 }
 
 void box_particle_rows_update(
@@ -568,13 +829,18 @@ void box_particle_rows_update(
     const ParticleCurves *curves)
 {
     static const float defaults[4] = {1.0f, 1.0f, 0.0f, 1.0f};
-    uint64_t hash = curves ? box_particle_rows_hash(curves) : 0;
+    uint64_t hash = curves ? box_particle_rows_curves_hash(t, curves) : 0;
     int32_t i, old[BOX_PARTICLE_ROWS_ENTRIES];
     if (use->baked && use->had == (curves != NULL) && (!curves || hash == use->hash)) {
         goto done;
     }
 
     ecs_os_memcpy(old, use->entries, ECS_SIZEOF(old));
+    if (curves && box_particle_rows_recall(t, use, hash)) {
+        box_particle_rows_unref(t, old, BOX_PARTICLE_ROWS_ENTRIES);
+        goto done;
+    }
+
     ecs_os_memset(use->entries, 0, ECS_SIZEOF(use->entries));
     for (i = 0; i < 4; i ++) {
         use->rows[i] = BOX_PARTICLE_CURVE_CONSTANT;
@@ -591,12 +857,17 @@ void box_particle_rows_update(
         box_particle_rows_scalar(t, use, 2, &curves->rotation);
         box_particle_rows_scalar(t, use, 3, &curves->spin);
         box_particle_rows_gradient(t, use, &curves->color);
+        t->samplings ++;
     }
 
-    box_particle_rows_unref(t, old, BOX_PARTICLE_ROWS_ENTRIES);
     use->hash = hash;
     use->had = curves != NULL;
     use->baked = true;
+    if (curves) {
+        box_particle_rows_remember(t, use);
+    }
+
+    box_particle_rows_unref(t, old, BOX_PARTICLE_ROWS_ENTRIES);
 done:
     return;
 }
@@ -634,7 +905,7 @@ static uint64_t box_particle_rows_motion_hash(
     int32_t i;
     box_particle_rows_motion_curves(motion, curves);
     for (i = 0; i < 8; i ++) {
-        hash = box_particle_rows_hash_bytes(hash, &curves[i]->kind, sizeof(CurveKind));
+        hash = box_particle_rows_mix(hash, (uint64_t)curves[i]->kind);
         hash = box_particle_rows_hash_keys(hash, &curves[i]->keys);
         hash = box_particle_rows_hash_keys(hash, &curves[i]->max_keys);
     }
@@ -727,6 +998,82 @@ done:
     return;
 }
 
+/** Get the hash of a ParticleMotion, computed once per frame for the motion at one address, as
+ * box_particle_rows_curves_hash.
+ *
+ * @param t The table
+ * @param motion The motion
+ * @return The hash
+ */
+static uint64_t box_particle_rows_motion_hash_of(
+    box_particle_rows_t *t,
+    const ParticleMotion *motion)
+{
+    if (motion != t->last_motion) {
+        t->last_motion = motion;
+        t->last_motion_hash = box_particle_rows_motion_hash(motion);
+    }
+
+    return t->last_motion_hash;
+}
+
+/** Give a use the rows that a ParticleMotion with the same hash took when it was sampled, as
+ * box_particle_rows_recall.
+ *
+ * @param t The table
+ * @param use The use, its old entries saved by the caller
+ * @param hash Hash of the motion
+ * @return Whether the use took them
+ */
+static bool box_particle_rows_motion_recall(
+    box_particle_rows_t *t,
+    box_particle_rows_motion_t *use,
+    uint64_t hash)
+{
+    ecs_map_val_t *index = ecs_map_get(&t->known_motion_by_hash, hash);
+    bool result = false;
+    if (index) {
+        const box_particle_rows_known_motion_t *known = ecs_vec_get_t(
+            &t->known_motion, box_particle_rows_known_motion_t, (int32_t)*index);
+        if (box_particle_rows_current(t, known->use.entries, known->generations, 4)) {
+            *use = known->use;
+            box_particle_rows_ref(t, use->entries, 4);
+            result = true;
+        }
+    }
+
+    return result;
+}
+
+/** Remember the rows of a sampled ParticleMotion by its hash, as box_particle_rows_remember.
+ *
+ * @param t The table
+ * @param use The use, baked
+ */
+static void box_particle_rows_motion_remember(
+    box_particle_rows_t *t,
+    const box_particle_rows_motion_t *use)
+{
+    ecs_map_val_t *index = ecs_map_get(&t->known_motion_by_hash, use->hash);
+    box_particle_rows_known_motion_t *known;
+    if (!index && ecs_vec_count(&t->known_motion) >= BOX_PARTICLE_ROWS_KNOWN) {
+        ecs_vec_clear(&t->known_motion);
+        ecs_map_clear(&t->known_motion_by_hash);
+    }
+
+    if (index) {
+        known = ecs_vec_get_t(&t->known_motion, box_particle_rows_known_motion_t,
+            (int32_t)*index);
+    } else {
+        ecs_map_insert(&t->known_motion_by_hash, use->hash,
+            (ecs_map_val_t)ecs_vec_count(&t->known_motion));
+        known = ecs_vec_append_t(NULL, &t->known_motion, box_particle_rows_known_motion_t);
+    }
+
+    known->use = *use;
+    box_particle_rows_generations(t, use->entries, 4, known->generations);
+}
+
 void box_particle_rows_motion_update(
     box_particle_rows_t *t,
     box_particle_rows_motion_t *use,
@@ -735,13 +1082,18 @@ void box_particle_rows_motion_update(
     static const float defaults[8] = {0, 0, 0, 1, 0, 0, 0, 1};
     const ParticleCurve *curves[8];
     box_particle_motion_rows_t *rows = &use->rows;
-    uint64_t hash = motion ? box_particle_rows_motion_hash(motion) : 0;
+    uint64_t hash = motion ? box_particle_rows_motion_hash_of(t, motion) : 0;
     int32_t c, old[4];
     if (use->baked && use->had == (motion != NULL) && (!motion || hash == use->hash)) {
         goto done;
     }
 
     ecs_os_memcpy(old, use->entries, ECS_SIZEOF(old));
+    if (motion && box_particle_rows_motion_recall(t, use, hash)) {
+        box_particle_rows_unref(t, old, 4);
+        goto done;
+    }
+
     ecs_os_memset(use->entries, 0, ECS_SIZEOF(use->entries));
     rows->velocity_row = rows->velocity_max_row = BOX_PARTICLE_CURVE_CONSTANT;
     rows->force_row = rows->force_max_row = BOX_PARTICLE_CURVE_CONSTANT;
@@ -756,16 +1108,21 @@ void box_particle_rows_motion_update(
             &rows->velocity_max_row, rows->velocity);
         box_particle_rows_vector(t, curves + 4, defaults + 4, &use->entries[2],
             &rows->force_row, &rows->force_max_row, rows->force);
+        t->samplings ++;
     }
 
     use->active = rows->velocity_row != BOX_PARTICLE_CURVE_CONSTANT ||
         rows->force_row != BOX_PARTICLE_CURVE_CONSTANT ||
         memcmp(rows->velocity, defaults, sizeof(rows->velocity)) ||
         memcmp(rows->force, defaults + 4, sizeof(rows->force));
-    box_particle_rows_unref(t, old, 4);
     use->hash = hash;
     use->had = motion != NULL;
     use->baked = true;
+    if (motion) {
+        box_particle_rows_motion_remember(t, use);
+    }
+
+    box_particle_rows_unref(t, old, 4);
 done:
     return;
 }
@@ -835,6 +1192,8 @@ void box_particle_rows_send(
 
     t->dirty_first = UINT32_MAX;
     t->dirty_end = 0;
+    t->last = NULL;
+    t->last_motion = NULL;
 }
 
 void box_particle_rows_stats(
@@ -855,6 +1214,7 @@ void box_particle_rows_stats(
     out->rows = ecs_vec_count(&t->data) / BOX_PARTICLE_CURVE_SAMPLES;
     out->capacity = (int32_t)t->capacity;
     out->bakes = t->bakes;
+    out->samplings = t->samplings;
 }
 
 const float* box_particle_rows_data(

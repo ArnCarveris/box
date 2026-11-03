@@ -559,3 +559,275 @@ void CurveTable_kinds_bake_rows(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+/** Create an emitter with keyed ParticleMotion and no ParticleCurves.
+ *
+ * @param world The world
+ * @param end The end key of the velocity_y curve
+ * @return The emitter
+ */
+static ecs_entity_t moving_new(
+    ecs_world_t *world,
+    float end)
+{
+    ecs_entity_t e = emitter_new(world);
+    ecs_set(world, e, ParticleMotion, {
+        .velocity_y = { .keys = BOX_CURVE_KEYS({0, 0}, {0.5f, 1}, {1, end}) }
+    });
+
+    return e;
+}
+
+void CurveTable_seen_curves_not_sampled(void) {
+    // particle/curve_cost
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t a = sized_new(world, 4);
+    frame(world);
+    test_int(stats_of(world).samplings, 1);
+    test_int(stats_of(world).bakes, 1);
+
+    ecs_entity_t b = sized_new(world, 4);
+    frame(world);
+    box_render_particle_curve_stats_t st = stats_of(world);
+    test_int(st.samplings, 1);
+    test_int(st.bakes, 1);
+    test_int(st.entries, 1);
+    test_int(st.used, 1);
+    const box_render_particle_pool_t *pa = pool_of(null, a);
+    const box_render_particle_pool_t *pb = pool_of(null, b);
+    test_assert(pa != NULL && pb != NULL);
+    test_uint(pa->block.curve_rows[0], pb->block.curve_rows[0]);
+    test_flt(size_at(world, pb, 1), 4);
+    test_uint(pb->curves, BOX_RENDER_BUFFER_PARTICLE_CURVES);
+
+    frame(world);
+    test_int(stats_of(world).samplings, 1);
+
+    ecs_delete(world, a);
+    frame(world);
+    test_int(stats_of(world).used, 1);
+    ecs_delete(world, b);
+    frame(world);
+    test_int(stats_of(world).used, 0);
+
+    ecs_entity_t c = sized_new(world, 4);
+    frame(world);
+    st = stats_of(world);
+    test_int(st.samplings, 1);
+    test_int(st.bakes, 1);
+    test_int(st.used, 1);
+    const box_render_particle_pool_t *pc = pool_of(null, c);
+    test_assert(pc != NULL);
+    test_flt(size_at(world, pc, 1), 4);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void CurveTable_rewritten_rows_sampled_again(void) {
+    // particle/curve_cost
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t a = sized_new(world, 4);
+    frame(world);
+    ecs_delete(world, a);
+    frame(world);
+    test_int(stats_of(world).used, 0);
+
+    ecs_entity_t c = sized_new(world, 5);
+    frame(world);
+    box_render_particle_curve_stats_t st = stats_of(world);
+    test_int(st.rows, 1);
+    test_int(st.bakes, 2);
+
+    ecs_entity_t d = sized_new(world, 4);
+    frame(world);
+    st = stats_of(world);
+    test_int(st.samplings, 3);
+    test_int(st.bakes, 3);
+    test_int(st.used, 2);
+    const box_render_particle_pool_t *pc = pool_of(null, c);
+    const box_render_particle_pool_t *pd = pool_of(null, d);
+    test_assert(pc != NULL && pd != NULL);
+    test_assert(pc->block.curve_rows[0] != pd->block.curve_rows[0]);
+    test_flt(size_at(world, pc, 1), 5);
+    test_flt(size_at(world, pd, 1), 4);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void CurveTable_change_back_takes_known_rows(void) {
+    // particle/curve_cost
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t e = sized_new(world, 4);
+    ecs_entity_t keep = sized_new(world, 4);
+    frame(world);
+    test_int(stats_of(world).samplings, 1);
+
+    ParticleCurves *c = ecs_get_mut(world, e, ParticleCurves);
+    ecs_vec_get_t(&c->size.keys, CurveKey, 3)->value = 6;
+    ecs_modified(world, e, ParticleCurves);
+    frame(world);
+    test_int(stats_of(world).samplings, 2);
+    test_int(stats_of(world).bakes, 2);
+    const box_render_particle_pool_t *pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_flt(size_at(world, pool, 1), 6);
+
+    c = ecs_get_mut(world, e, ParticleCurves);
+    ecs_vec_get_t(&c->size.keys, CurveKey, 3)->value = 4;
+    ecs_modified(world, e, ParticleCurves);
+    frame(world);
+    box_render_particle_curve_stats_t st = stats_of(world);
+    test_int(st.samplings, 2);
+    test_int(st.bakes, 2);
+    test_int(st.used, 1);
+    pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_flt(size_at(world, pool, 1), 4);
+    test_uint(pool->block.curve_rows[0], pool_of(null, keep)->block.curve_rows[0]);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void CurveTable_in_place_write_rebakes(void) {
+    // particle/curve_cost
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t e = sized_new(world, 4);
+    frame(world);
+    test_int(stats_of(world).bakes, 1);
+
+    ParticleCurves *c = ecs_get_mut(world, e, ParticleCurves);
+    ecs_vec_get_t(&c->size.keys, CurveKey, 3)->value = 9;
+    frame(world);
+    test_int(stats_of(world).bakes, 2);
+    const box_render_particle_pool_t *pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_flt(size_at(world, pool, 1), 9);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void CurveTable_seen_motion_not_sampled(void) {
+    // particle/curve_cost
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t a = moving_new(world, 3);
+    frame(world);
+    test_int(stats_of(world).samplings, 1);
+    int64_t bakes = stats_of(world).bakes;
+    test_assert(bakes > 0);
+
+    ecs_entity_t b = moving_new(world, 3);
+    frame(world);
+    box_render_particle_curve_stats_t st = stats_of(world);
+    test_int(st.samplings, 1);
+    test_int(st.bakes, bakes);
+    const box_render_particle_pool_t *pa = pool_of(null, a);
+    const box_render_particle_pool_t *pb = pool_of(null, b);
+    test_assert(pa != NULL && pb != NULL);
+    test_assert(pa->block.motion_rows[0] != BOX_PARTICLE_CURVE_CONSTANT);
+    test_uint(pa->block.motion_rows[0], pb->block.motion_rows[0]);
+    test_uint(pb->curves, BOX_RENDER_BUFFER_PARTICLE_CURVES);
+
+    ecs_entity_t c = moving_new(world, 5);
+    frame(world);
+    test_int(stats_of(world).samplings, 2);
+    const box_render_particle_pool_t *pc = pool_of(null, c);
+    test_assert(pc != NULL);
+    test_assert(pc->block.motion_rows[0] != pa->block.motion_rows[0]);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void CurveTable_motion_from_prefab(void) {
+    // particle/curve_cost
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t base = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, base, ParticleMotion, {
+        .velocity_y = { .keys = BOX_CURVE_KEYS({0, 0}, {0.5f, 1}, {1, 3}) }
+    });
+    ecs_entity_t a = emitter_new(world);
+    ecs_add_pair(world, a, EcsIsA, base);
+    ecs_entity_t b = emitter_new(world);
+    ecs_add_pair(world, b, EcsIsA, base);
+    ecs_entity_t plain = emitter_new(world);
+    frame(world);
+
+    test_int(stats_of(world).samplings, 1);
+    const box_render_particle_pool_t *pa = pool_of(null, a);
+    const box_render_particle_pool_t *pb = pool_of(null, b);
+    const box_render_particle_pool_t *pp = pool_of(null, plain);
+    test_assert(pa != NULL && pb != NULL && pp != NULL);
+    test_assert(pa->block.motion_rows[0] != BOX_PARTICLE_CURVE_CONSTANT);
+    test_uint(pa->block.motion_rows[0], pb->block.motion_rows[0]);
+    test_uint(pp->block.motion_rows[0], BOX_PARTICLE_CURVE_CONSTANT);
+    test_uint(pp->curves, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Write the last key of the size curve of an emitter.
+ *
+ * @param world The world
+ * @param e The emitter
+ * @param end The value
+ */
+static void sized_set(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    float end)
+{
+    ParticleCurves *c = ecs_get_mut(world, e, ParticleCurves);
+    ecs_vec_get_t(&c->size.keys, CurveKey, 3)->value = end;
+    ecs_modified(world, e, ParticleCurves);
+}
+
+void CurveTable_change_reuses_freed_rows(void) {
+    // particle/curve_cost
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t a = sized_new(world, 4);
+    ecs_entity_t b = sized_new(world, 5);
+    frame(world);
+    test_int(stats_of(world).rows, 2);
+
+    sized_set(world, a, 6);
+    frame(world);
+    box_render_particle_curve_stats_t st = stats_of(world);
+    test_int(st.rows, 3);
+    test_int(st.used, 2);
+
+    sized_set(world, b, 7);
+    frame(world);
+    st = stats_of(world);
+    test_int(st.rows, 3);
+    test_int(st.used, 2);
+    test_int(st.bakes, 4);
+    const box_render_particle_pool_t *pa = pool_of(null, a);
+    const box_render_particle_pool_t *pb = pool_of(null, b);
+    test_assert(pa != NULL && pb != NULL);
+    test_flt(size_at(world, pa, 1), 6);
+    test_flt(size_at(world, pb, 1), 7);
+
+    ecs_entity_t c = sized_new(world, 6);
+    frame(world);
+    st = stats_of(world);
+    test_int(st.rows, 3);
+    test_int(st.bakes, 4);
+    const box_render_particle_pool_t *pc = pool_of(null, c);
+    test_assert(pc != NULL);
+    test_uint(pc->block.curve_rows[0], pool_of(null, a)->block.curve_rows[0]);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

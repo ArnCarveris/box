@@ -194,6 +194,9 @@ typedef struct box_render_particle_curve_stats_t {
     int32_t capacity;       /**< Rows the buffer holds */
     int32_t entries;        /**< Distinct curves in use */
     int64_t bakes;          /**< Curves baked into rows since the table was made */
+    int64_t samplings;      /**< ParticleCurves and ParticleMotion sampled to find their rows
+                             *   since the table was made; a pool whose curves the table saw
+                             *   before samples nothing */
 } box_render_particle_curve_stats_t;
 
 /** Get the counts of the curve table.

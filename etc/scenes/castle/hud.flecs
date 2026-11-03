@@ -1,6 +1,7 @@
-// The HUD, a screen space scene drawn over the world: the name and rank of the realm at the top
-// left, the treasury at the top right, messages in the middle and the toolbar at the bottom. The
-// icons of the tools are drawn with rects, circles and lines.
+// The HUD, a screen space scene drawn over the world: the crest, name and rank of the realm at
+// the top left, the treasury at the top right, messages in the middle and the toolbar at the
+// bottom. Panels are oak boards bound with iron brackets, hints and messages are parchment, and
+// the icons are drawings in castle/ui (castle/textures/generate.py writes the wood and parchment).
 
 using flecs.script
 using flecs.script.math
@@ -11,25 +12,52 @@ using box.geometry
 using box.material
 using box.layout
 using box.text
+using box.texture
 using box.input
 using box.picking
 
 window {}
 
-export const C_TEXT: Rgb = {240, 228, 204}
-export const C_MUTED: Rgb = {186, 166, 134}
-export const C_GOLD: Rgb = {238, 196, 100}
-export const C_RED: Rgb = {236, 112, 96}
-export const C_PANEL: Rgb = {44, 34, 26}
+export const C_TEXT: Rgb = {246, 232, 204}
+export const C_MUTED: Rgb = {208, 184, 146}
+export const C_GOLD: Rgb = {246, 204, 106}
+export const C_RED: Rgb = {240, 118, 96}
+export const C_INK: Rgb = {58, 36, 20}
+export const C_INK_SOFT: Rgb = {110, 78, 50}
+export const C_SHADE: Rgb = {26, 16, 10}
 
-template Card {
-  prop pad: f32 = 12
-  Layout: {direction: Column, padding: {pad, pad, pad + 4, pad + 4}, spacing: 6, v: Middle}
-  Rect: {1, 1}
-  Rgb: C_PANEL
-  Border: {width: 1.5, radius: 8, color: {176, 138, 72, 255}}
-  BoxShadow: {offset_y: -3, blur: 16, color: {0, 0, 0, 110}}
-  InputBlocker
+castle_ui_wood { TexturePath: {path: "etc/scenes/castle/ui/wood.jpg"} }
+castle_ui_parchment { TexturePath: {path: "etc/scenes/castle/ui/parchment.jpg"} }
+castle_ui_corner { TexturePath: {path: "etc/scenes/castle/ui/corner.svg", width: 128} }
+castle_ui_crest { TexturePath: {path: "etc/scenes/castle/ui/crest.svg", width: 192} }
+castle_ui_seal { TexturePath: {path: "etc/scenes/castle/ui/seal.svg", width: 128} }
+castle_icon_wall { TexturePath: {path: "etc/scenes/castle/ui/icons/wall.svg", width: 128} }
+castle_icon_tower { TexturePath: {path: "etc/scenes/castle/ui/icons/tower.svg", width: 128} }
+castle_icon_gate { TexturePath: {path: "etc/scenes/castle/ui/icons/gate.svg", width: 128} }
+castle_icon_keep { TexturePath: {path: "etc/scenes/castle/ui/icons/keep.svg", width: 128} }
+castle_icon_cottage { TexturePath: {path: "etc/scenes/castle/ui/icons/cottage.svg", width: 128} }
+castle_icon_quarry { TexturePath: {path: "etc/scenes/castle/ui/icons/quarry.svg", width: 128} }
+castle_icon_moat { TexturePath: {path: "etc/scenes/castle/ui/icons/moat.svg", width: 128} }
+castle_icon_tree { TexturePath: {path: "etc/scenes/castle/ui/icons/tree.svg", width: 128} }
+castle_icon_path { TexturePath: {path: "etc/scenes/castle/ui/icons/path.svg", width: 128} }
+castle_icon_demolish { TexturePath: {path: "etc/scenes/castle/ui/icons/demolish.svg", width: 128} }
+castle_icon_coin { TexturePath: {path: "etc/scenes/castle/ui/icons/coin.svg", width: 96} }
+castle_icon_stone { TexturePath: {path: "etc/scenes/castle/ui/icons/stone.svg", width: 96} }
+castle_icon_court { TexturePath: {path: "etc/scenes/castle/ui/icons/court.svg", width: 96} }
+
+fn tool_icon(t: i32) -> entity {
+  match t {
+    1: castle_icon_wall
+    2: castle_icon_tower
+    3: castle_icon_gate
+    4: castle_icon_keep
+    5: castle_icon_cottage
+    6: castle_icon_quarry
+    7: castle_icon_moat
+    8: castle_icon_tree
+    9: castle_icon_path
+    _: castle_icon_demolish
+  }
 }
 
 template Caption {
@@ -42,132 +70,101 @@ template Caption {
   Rgb: color
 }
 
-template IconRect {
-  prop x: f32 = 0
-  prop y: f32 = 0
-  prop w: f32 = 10
-  prop h: f32 = 10
-  prop z: f32 = 0
-  prop angle: f32 = 0
-  prop radius: f32 = 0
-  prop color: Rgb = {255, 255, 255}
+template Engraved {
+  prop text: string = ""
+  prop size: f32 = 18
+  prop color: Rgb = C_GOLD
+  prop display: bool = true
+  prop depth: f32 = 1.5
 
-  Position: {x, y, z}
-  Rotation: {0, 0, angle}
-  Rect: {w, h}
-  Border: {radius: radius}
-  Rgb: color
-}
+  Text: {value: text, size: size, font: match display { true: castle_font_display; _: castle_font_body }}
+  Rgb: C_SHADE
+  Opacity: {0.9}
 
-template IconDot {
-  prop x: f32 = 0
-  prop y: f32 = 0
-  prop z: f32 = 0
-  prop r: f32 = 4
-  prop color: Rgb = {255, 255, 255}
-
-  Position: {x, y, z}
-  Circle: {r}
-  Rgb: color
-}
-
-template IconLine {
-  prop x1: f32 = 0
-  prop y1: f32 = 0
-  prop x2: f32 = 10
-  prop y2: f32 = 0
-  prop w: f32 = 1.5
-  prop z: f32 = 0
-  prop color: Rgb = {255, 255, 255}
-
-  Position: {0, 0, z}
-  Line: {x1, y1, x2, y2, w}
-  Rgb: color
-}
-
-template ToolIcon {
-  prop t: i32 = 1
-
-  const i_stone: Rgb = {206, 194, 170}
-  const i_dark: Rgb = {116, 104, 92}
-  const i_slate: Rgb = {96, 120, 168}
-  const i_red: Rgb = {196, 52, 52}
-  const i_wood: Rgb = {156, 108, 66}
-  const i_leaf: Rgb = {104, 162, 74}
-  const i_water: Rgb = {74, 150, 200}
-  const i_tan: Rgb = {196, 164, 116}
-
-  Layout: {}
-  LayoutItem: {width: {mode: Fixed, value: 40}, height: {mode: Fixed, value: 36}}
-
-  if t == K_WALL {
-    IconRect body(y: -6, w: 34, h: 16, color: i_stone)
-    IconRect m1(x: -13.5, y: 5, w: 7, h: 6, color: i_stone)
-    IconRect m2(x: -4.5, y: 5, w: 7, h: 6, color: i_stone)
-    IconRect m3(x: 4.5, y: 5, w: 7, h: 6, color: i_stone)
-    IconRect m4(x: 13.5, y: 5, w: 7, h: 6, color: i_stone)
-    IconLine j1(x1: -17, y1: -6, x2: 17, y2: -6, w: 1, z: 0.1, color: i_dark)
-    IconLine j2(x1: -4, y1: -6, x2: -4, y2: 2, w: 1, z: 0.1, color: i_dark)
-    IconLine j3(x1: 7, y1: -14, x2: 7, y2: -6, w: 1, z: 0.1, color: i_dark)
-  } else if t == K_TOWER {
-    IconRect roof(y: 4, w: 14, h: 14, angle: 0.7854, color: i_slate)
-    IconRect body(y: -7, w: 14, h: 20, z: 0.1, color: i_stone)
-    IconRect slit(y: -6, w: 2.5, h: 7, z: 0.2, color: i_dark)
-    IconLine pole(x1: 0, y1: 13, x2: 0, y2: 18, w: 1.2, color: i_dark)
-    IconRect flag(x: 3, y: 16, w: 6, h: 3.5, color: i_red)
-  } else if t == K_GATE {
-    IconRect left(x: -11, y: -3, w: 11, h: 28, color: i_stone)
-    IconRect right(x: 11, y: -3, w: 11, h: 28, color: i_stone)
-    IconRect lintel(y: 5, w: 12, h: 12, color: i_stone)
-    IconRect gap(y: -10, w: 12, h: 14, z: 0.1, color: i_dark)
-    IconDot arch(y: -3, r: 6, z: 0.1, color: i_dark)
-    IconLine b1(x1: -3, y1: -17, x2: -3, y2: 1, w: 1, z: 0.2, color: i_stone)
-    IconLine b2(x1: 0, y1: -17, x2: 0, y2: 3, w: 1, z: 0.2, color: i_stone)
-    IconLine b3(x1: 3, y1: -17, x2: 3, y2: 1, w: 1, z: 0.2, color: i_stone)
-    IconRect banner(y: 8, w: 6, h: 6, z: 0.2, color: i_red)
-  } else if t == K_KEEP {
-    IconRect body(y: -5, w: 22, h: 24, color: i_stone)
-    IconRect tl(x: -12, y: -3, w: 6, h: 28, z: 0.1, color: i_stone)
-    IconRect tr(x: 12, y: -3, w: 6, h: 28, z: 0.1, color: i_stone)
-    IconRect rl(x: -12, y: 12, w: 6, h: 6, angle: 0.7854, color: i_slate)
-    IconRect rr(x: 12, y: 12, w: 6, h: 6, angle: 0.7854, color: i_slate)
-    IconRect w1(x: -4, y: -2, w: 3, h: 5, z: 0.2, color: i_dark)
-    IconRect w2(x: 4, y: -2, w: 3, h: 5, z: 0.2, color: i_dark)
-    IconRect door(y: -13, w: 6, h: 8, z: 0.2, color: i_wood)
-    IconLine pole(x1: 0, y1: 7, x2: 0, y2: 18, w: 1.2, color: i_dark)
-    IconRect flag(x: 4, y: 15.5, w: 8, h: 5, color: {52, 84, 168})
-  } else if t == K_HOUSE {
-    IconRect roof(y: 0, w: 22, h: 22, angle: 0.7854, color: {200, 160, 96})
-    IconRect walls(y: -9, w: 24, h: 14, z: 0.1, color: {236, 224, 196})
-    IconRect door(y: -12, w: 5, h: 8, z: 0.2, color: i_wood)
-    IconRect win(x: 7, y: -8, w: 4, h: 4, z: 0.2, color: {240, 170, 80})
-    IconRect beam(y: -2.5, w: 24, h: 1.5, z: 0.2, color: {90, 62, 40})
-  } else if t == K_QUARRY {
-    IconDot r1(x: -7, y: -6, r: 9, color: {150, 146, 138})
-    IconDot r2(x: 7, y: -9, r: 6, color: i_dark)
-    IconRect b1(x: 9, y: 5, w: 9, h: 8, color: i_stone)
-    IconRect b2(x: -2, y: 8, w: 9, h: 8, angle: 0.2, color: i_stone)
-    IconLine pick(x1: -16, y1: 14, x2: -4, y2: 2, w: 2, z: 0.2, color: i_wood)
-  } else if t == K_MOAT {
-    IconRect pool(y: -2, w: 36, h: 24, radius: 5, color: i_water)
-    IconLine wa(x1: -12, y1: 2, x2: -2, y2: 2, w: 1.5, z: 0.1, color: {170, 214, 236})
-    IconLine wb(x1: 2, y1: -6, x2: 12, y2: -6, w: 1.5, z: 0.1, color: {170, 214, 236})
-  } else if t == K_TREE {
-    IconRect trunk(y: -11, w: 4, h: 12, color: i_wood)
-    IconDot crown(y: 3, r: 11, z: 0.1, color: i_leaf)
-    IconDot crown_b(x: 6, y: 7, r: 6, z: 0.2, color: {128, 186, 92})
-  } else if t == K_PATH {
-    IconRect way(y: -2, w: 34, h: 18, radius: 4, color: i_tan)
-    IconDot c1(x: -10, y: -4, r: 3.5, z: 0.1, color: {150, 140, 126})
-    IconDot c2(x: -1, y: 1, r: 3, z: 0.1, color: {150, 140, 126})
-    IconDot c3(x: 8, y: -5, r: 3.5, z: 0.1, color: {150, 140, 126})
-    IconDot c4(x: 11, y: 3, r: 2.5, z: 0.1, color: {150, 140, 126})
-  } else if t == T_DEMOLISH {
-    IconLine handle(x1: -12, y1: -14, x2: 6, y2: 6, w: 3.5, color: i_wood)
-    IconRect head(x: 7, y: 7, w: 18, h: 8, angle: 0.7854, z: 0.1, color: {150, 150, 156})
-    IconRect rubble_a(x: -12, y: 10, w: 6, h: 5, angle: 0.3, color: i_stone)
-    IconRect rubble_b(x: 14, y: -12, w: 5, h: 4, angle: -0.4, color: i_stone)
+  face {
+    Position: {0 - depth * 0.6, depth, 0.02}
+    Text: {value: text, size: size, font: match display { true: castle_font_display; _: castle_font_body }}
+    Rgb: color
   }
+}
+
+template Picture {
+  prop tex: entity = 0
+  prop w: f32 = 32
+  prop h: f32 = 32
+  prop tint: Rgb = {255, 255, 255}
+
+  LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
+  Rect: {1, 1}
+  Image: {texture: tex}
+  Rgb: tint
+}
+
+template IronCorner {
+  prop h: Align = Left
+  prop v: VAlign = Top
+  prop turn: f32 = 0
+  prop size: f32 = 40
+  prop dx: f32 = -5
+  prop dy: f32 = 5
+
+  LayoutFloat: {h: h, v: v, anchor_h: h, anchor_v: v, x: dx, y: dy}
+  LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
+  Rotation: {0, 0, turn}
+  Rect: {1, 1}
+  Image: {texture: castle_ui_corner}
+}
+
+template Rivet {
+  prop r: f32 = 3.5
+
+  LayoutItem: {width: {mode: Fixed, value: r * 2}, height: {mode: Fixed, value: r * 2}}
+  Circle: {r}
+  Rgb: {112, 106, 98}
+  Border: {width: 1.2, color: {24, 20, 18, 255}}
+
+  glint { Position: {-r * 0.3, r * 0.3, 0.05}; Circle: {r * 0.35}; Rgb: {214, 206, 192} }
+}
+
+template IronStrap {
+  prop w: f32 = 300
+  prop top: bool = true
+
+  LayoutFloat: {h: Center, v: match top { true: Top; _: Bottom }, anchor_h: Center, anchor_v: match top { true: Top; _: Bottom }, y: match top { true: -7; _: 7 }}
+  LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: 10}}
+  Layout: {direction: Row, h: Center, v: Middle, spacing: 0}
+  Rect: {1, 1}
+  Rgb: {70, 66, 62}
+  Border: {width: 1.5, radius: 2, color: {22, 19, 17, 255}}
+
+  sheen { Position: {0, 2, 0.04}; Rect: {w - 6, 1.2}; Rgb: {150, 144, 136}; Opacity: {0.6} }
+  Rivet ra(r: 2.6) { LayoutFloat: {h: Left, v: Middle, anchor_h: Left, anchor_v: Middle, x: 10} }
+  Rivet rb(r: 2.6) { LayoutFloat: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, x: 0 - w * 0.25} }
+  Rivet rc(r: 2.6) { LayoutFloat: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, x: w * 0.25} }
+  Rivet rd(r: 2.6) { LayoutFloat: {h: Right, v: Middle, anchor_h: Right, anchor_v: Middle, x: -10} }
+}
+
+template WoodPanel {
+  prop w: f32 = 300
+  prop h: f32 = 120
+  prop pad: f32 = 16
+  prop u: f32 = 0
+  prop v: f32 = 0
+  prop row: bool = false
+
+  Layout: {direction: match row { true: Row; _: Column }, padding: {pad, pad, pad + 4, pad + 4}, spacing: 6, h: match row { true: Center; _: Left }, v: Middle}
+  LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
+  Rect: {1, 1}
+  Image: {texture: castle_ui_wood, u0: u, v0: v, u1: u + w / 2048, v1: v + h / 512}
+  Rgb: {214, 196, 180}
+  Border: {width: 3, radius: 6, color: {30, 22, 16, 255}}
+  BoxShadow: {offset_y: -5, blur: 18, spread: 1, color: {0, 0, 0, 140}}
+  InputBlocker
+
+  IronCorner tl(h: Left, v: Top)
+  IronCorner tr(h: Right, v: Top, turn: 0 - HALF_PI, dx: 5)
+  IronCorner bl(h: Left, v: Bottom, turn: HALF_PI, dy: -5)
+  IronCorner br(h: Right, v: Bottom, turn: PI, dx: 5, dy: -5)
 }
 
 template ToolButton {
@@ -179,33 +176,48 @@ template ToolButton {
   const active = tool == t
   const afford = gold >= cost_gold(t, 1) && stone >= cost_stone(t, 1)
 
-  Layout: {direction: Column, h: Center, v: Middle, spacing: 2, padding: {8, 6, 4, 4}}
-  LayoutItem: {width: {mode: Fixed, value: 78}, height: {mode: Fixed, value: 90}}
+  Layout: {direction: Column, h: Center, v: Middle, spacing: 1, padding: {6, 6, 4, 4}}
+  LayoutItem: {width: {mode: Fixed, value: 82}, height: {mode: Fixed, value: 100}}
   Rect: {1, 1}
+  Image: {texture: castle_ui_parchment, u0: 0.1 + t * 0.06, v0: 0.2, u1: 0.18 + t * 0.06, v1: 0.6}
   if active {
-    Rgb: {124, 90, 44}
-    Border: {width: 2, radius: 6, color: {246, 206, 112, 255}}
+    Rgb: {196, 138, 70}
+    Border: {width: 3, radius: 5, color: {250, 206, 102, 255}}
+    BoxShadow: {blur: 14, spread: 2, color: {255, 190, 70, 170}}
   } else if over {
-    Rgb: {78, 60, 44}
-    Border: {width: 1, radius: 6, color: {176, 138, 72, 255}}
+    Rgb: {118, 86, 60}
+    Border: {width: 2.5, radius: 5, color: {176, 132, 70, 255}}
+    BoxShadow: {offset_y: -2, blur: 6, color: {0, 0, 0, 120}}
   } else {
-    Rgb: {58, 45, 34}
-    Border: {width: 1, radius: 6, color: {104, 82, 56, 255}}
+    Rgb: {74, 54, 38}
+    Border: {width: 2.5, radius: 5, color: {26, 20, 16, 255}}
+    BoxShadow: {offset_y: -2, blur: 6, color: {0, 0, 0, 120}}
   }
   Interactive
   Cursor: {CursorPointer}
 
-  ToolIcon icon(t: t)
-  Caption name(text: kind_name(t), size: 13)
-  if afford {
-    Caption cost(text: cost_text(t, 1), size: 11, color: C_MUTED)
-  } else {
-    Caption cost(text: cost_text(t, 1), size: 11, color: C_RED)
+  Picture icon(tex: tool_icon(t), w: 50, h: 50, tint: match afford || active { true: {255, 255, 255}; _: {150, 140, 130} })
+  name {
+    Text: {value: kind_name(t), size: 12, font: castle_font_display}
+    Rgb: match active { true: {255, 246, 222}; _: C_TEXT }
   }
+  cost {
+    Text: {value: cost_text(t, 1), size: 11, font: castle_font_body}
+    Rgb: match afford { true: match active { true: {255, 230, 170}; _: C_MUTED }; _: C_RED }
+  }
+
   hotkey {
-    LayoutFloat: {h: Left, v: Top, anchor_h: Left, anchor_v: Top, x: 6, y: -4}
-    Text: {value: key, size: 10, font: castle_font_display}
-    Rgb: C_MUTED
+    LayoutFloat: {h: Center, v: Middle, anchor_h: Left, anchor_v: Top, x: 13, y: -13}
+    LayoutItem: {width: {mode: Fixed, value: 18}, height: {mode: Fixed, value: 18}}
+    Layout: {}
+    Circle: {9}
+    Rgb: match active { true: {196, 146, 56}; _: {84, 78, 72} }
+    Border: {width: 1.5, color: {20, 17, 15, 255}}
+    label {
+      Position: {0, 0.5, 0.1}
+      Text: {value: key, size: 10, font: castle_font_display}
+      Rgb: match active { true: C_INK; _: C_TEXT }
+    }
   }
 
   async {
@@ -231,41 +243,54 @@ template ToolButton {
 
 template ProgressBar {
   prop ratio: f32 = 0
-  prop width: f32 = 230
+  prop width: f32 = 206
 
-  Layout: {direction: Row}
-  LayoutItem: {width: {mode: Fixed, value: width}, height: {mode: Fixed, value: 8}}
+  Layout: {direction: Row, padding: {3, 3, 3, 3}}
+  LayoutItem: {width: {mode: Fixed, value: width}, height: {mode: Fixed, value: 16}}
   Rect: {1, 1}
-  Rgb: {26, 20, 16}
-  Border: {radius: 4}
+  Rgb: {24, 17, 12}
+  Border: {width: 2, radius: 4, color: {84, 78, 72, 255}}
 
   fill {
-    LayoutItem: {width: {mode: Fixed, value: max(width * clamp(ratio, 0, 1), 8)}, height: {mode: Fixed, value: 8}}
+    Layout: {}
+    LayoutItem: {width: {mode: Fixed, value: max((width - 6) * clamp(ratio, 0, 1), 6)}, height: {mode: Fixed, value: 10}}
     Rect: {1, 1}
-    Rgb: C_GOLD
-    Border: {radius: 4}
+    Rgb: {222, 166, 62}
+    Border: {radius: 2, width: 1, color: {120, 74, 20, 255}}
+    gloss {
+      Position: {0, 2.5, 0.05}
+      Rect: {max((width - 6) * clamp(ratio, 0, 1), 6) - 4, 2}
+      Rgb: {255, 232, 160}
+      Opacity: {0.7}
+    }
   }
+  Rivet left_(r: 3.2) { LayoutFloat: {h: Center, v: Middle, anchor_h: Left, anchor_v: Middle} }
+  Rivet right_(r: 3.2) { LayoutFloat: {h: Center, v: Middle, anchor_h: Right, anchor_v: Middle} }
 }
 
 template NewRealmButton {
   mut over = false
   mut armed = false
 
-  Layout: {direction: Row, h: Center, v: Middle, padding: {4, 4, 10, 10}}
+  Layout: {direction: Row, h: Center, v: Middle, padding: {4, 4, 12, 12}}
   LayoutItem: {height: {mode: Fixed, value: 24}}
   Rect: {1, 1}
   if armed {
-    Rgb: {150, 52, 40}
+    Rgb: {150, 44, 34}
   } else if over {
-    Rgb: {82, 64, 46}
+    Rgb: {96, 68, 44}
   } else {
-    Rgb: {60, 46, 35}
+    Rgb: {62, 44, 30}
   }
-  Border: {width: 1, radius: 4, color: {120, 94, 62, 255}}
+  Border: {width: 2, radius: 3, color: {28, 22, 18, 255}}
+  BoxShadow: {offset_y: -1.5, blur: 3, color: {0, 0, 0, 110}}
   Interactive
   Cursor: {CursorPointer}
 
-  Caption label(text: match armed { true: "Click again to raze everything"; _: "New realm" }, size: 12)
+  label {
+    Text: {value: match armed { true: "Click again to raze everything"; _: "New realm" }, size: 11, font: castle_font_display}
+    Rgb: C_TEXT
+  }
 
   async {
     while true {
@@ -291,72 +316,89 @@ template NewRealmButton {
   }
 }
 
-template RealmCard : Card {
+template RealmCard {
   const top_rank = rank >= RANKS - 1
   const lo = rank_need(rank)
   const hi = rank_need(rank + 1)
   const ratio = match top_rank { true: 1; _: (prestige - lo) / (hi - lo) }
 
-  Caption title(text: "CASTLEWRIGHT", size: 24, color: C_GOLD, display: true)
-  rank_row {
-    Layout: {direction: Row, spacing: 8, v: Middle}
-    Caption label(text: "Rank", size: 13, color: C_MUTED)
-    Caption value(text: rank_name(rank), size: 17, color: match crowned { true: C_GOLD; _: C_TEXT }, display: true)
+  Layout: {direction: Column}
+
+  WoodPanel panel(w: 346, h: 156, pad: 16, u: 0.05, v: 0.02) {
+    row {
+      Layout: {direction: Row, spacing: 14, v: Middle}
+      Picture crest(tex: castle_ui_crest, w: 72, h: 84)
+      info {
+        Layout: {direction: Column, spacing: 5}
+        Engraved title(text: "CASTLEWRIGHT", size: 25, color: C_GOLD, depth: 2)
+        rank_row {
+          Layout: {direction: Row, spacing: 8, v: Middle}
+          Caption label(text: "Rank", size: 13, color: C_MUTED)
+          value {
+            Text: {value: rank_name(rank), size: 17, font: castle_font_display}
+            Rgb: match crowned { true: C_GOLD; _: C_TEXT }
+          }
+        }
+        ProgressBar bar(ratio: ratio)
+        Caption detail(
+          text: match top_rank {
+            true: "Prestige {prestige:.0}. The realm is complete."
+            _: "Prestige {prestige:.0} of {hi:.0} for {rank_name(rank + 1)}"
+          },
+          size: 12, color: C_MUTED)
+      }
+    }
+    footer {
+      Layout: {direction: Row, h: Right}
+      LayoutItem: {width: {mode: Grow}}
+      NewRealmButton new_realm()
+    }
   }
-  ProgressBar bar(ratio: ratio)
-  Caption detail(
-    text: match top_rank {
-      true: "Prestige {prestige:.0}. The realm is complete."
-      _: "Prestige {prestige:.0} of {hi:.0} for {rank_name(rank + 1)}"
-    },
-    size: 12, color: C_MUTED)
-  NewRealmButton new_realm()
-}
-
-template CoinIcon {
-  Layout: {}
-  LayoutItem: {width: {mode: Fixed, value: 22}, height: {mode: Fixed, value: 22}}
-  IconDot outer(r: 10, color: {196, 148, 56})
-  IconDot inner(r: 7.5, z: 0.1, color: {244, 204, 104})
-  IconRect mark(w: 3, h: 9, z: 0.2, color: {196, 148, 56})
-}
-
-template StoneIcon {
-  Layout: {}
-  LayoutItem: {width: {mode: Fixed, value: 22}, height: {mode: Fixed, value: 22}}
-  IconRect a(x: -3, y: -4, w: 13, h: 9, radius: 2, color: {170, 162, 150})
-  IconRect b(x: 4, y: -4, w: 10, h: 9, radius: 2, z: 0.1, color: {140, 132, 122})
-  IconRect c(x: 0, y: 5, w: 12, h: 8, radius: 2, z: 0.2, color: {204, 196, 182})
-}
-
-template CourtIcon {
-  Layout: {}
-  LayoutItem: {width: {mode: Fixed, value: 22}, height: {mode: Fixed, value: 22}}
-  IconRect ring(w: 20, h: 20, radius: 3, color: {206, 194, 170})
-  IconRect yard(w: 13, h: 13, radius: 1, z: 0.1, color: {176, 156, 118})
 }
 
 template Stat {
+  prop icon: entity = 0
   prop value: string = ""
   prop rate: string = ""
 
-  Layout: {direction: Column, spacing: 0}
-  Caption amount(text: value, size: 19, color: C_TEXT, display: true)
-  Caption per(text: rate, size: 11, color: C_MUTED)
+  Layout: {direction: Row, spacing: 8, v: Middle, padding: {4, 4, 6, 10}}
+  LayoutItem: {width: {mode: Fixed, value: 136}, height: {mode: Fixed, value: 50}}
+  Rect: {1, 1}
+  Rgb: {40, 28, 19}
+  Opacity: {0.85}
+  Border: {width: 2, radius: 4, color: {22, 16, 12, 255}}
+
+  Picture pic(tex: icon, w: 36, h: 36)
+  text {
+    Layout: {direction: Column, spacing: 0}
+    Engraved amount(text: value, size: 20, color: C_TEXT, depth: 1.2)
+    Caption per(text: rate, size: 11, color: C_MUTED)
+  }
 }
 
-template TreasuryCard : Card {
-  row {
-    Layout: {direction: Row, spacing: 10, v: Middle}
-    CoinIcon coin()
-    Stat gold_stat(value: "{gold:.0}", rate: "+{gold_rate:.0} a second")
-    gap_a { LayoutItem: {width: {mode: Fixed, value: 8}} }
-    StoneIcon stone_icon()
-    Stat stone_stat(value: "{stone:.0}", rate: "+{stone_rate:.0} a second")
-    gap_b { LayoutItem: {width: {mode: Fixed, value: 8}} }
-    CourtIcon court()
-    Stat court_stat(value: "{courtyard}", rate: "courtyard cells")
+template TreasuryCard {
+  Layout: {direction: Column}
+
+  WoodPanel panel(w: 472, h: 86, pad: 14, u: 0.4, v: 0.3) {
+    row {
+      Layout: {direction: Row, spacing: 10, v: Middle}
+      Stat gold_stat(icon: castle_icon_coin, value: "{gold:.0}", rate: "+{gold_rate:.0} per second")
+      Stat stone_stat(icon: castle_icon_stone, value: "{stone:.0}", rate: "+{stone_rate:.0} per second")
+      Stat court_stat(icon: castle_icon_court, value: "{courtyard}", rate: "courtyard cells")
+    }
   }
+}
+
+template ScrollRod {
+  prop h: Align = Left
+
+  LayoutFloat: {h: Center, v: Middle, anchor_h: h, anchor_v: Middle}
+  LayoutItem: {width: {mode: Fixed, value: 14}, height: {mode: Grow, max: 80}}
+  Layout: {}
+  Rect: {1, 1}
+  Image: {texture: castle_ui_wood, u0: 0.3, v0: 0.1, u1: 0.31, v1: 0.2}
+  Rgb: {170, 120, 80}
+  Border: {width: 1.5, radius: 6, color: {40, 26, 16, 255}}
 }
 
 template HintLine {
@@ -381,29 +423,46 @@ template HintLine {
     }
   }
 
-  Layout: {direction: Row, h: Center, v: Middle, padding: {6, 6, 14, 14}}
-  LayoutItem: {width: {max: 760}}
+  Layout: {direction: Row, h: Center, v: Middle, padding: {7, 7, 26, 26}}
+  LayoutItem: {width: {mode: Fixed, value: 900}}
   Rect: {1, 1}
-  Rgb: {30, 23, 18}
-  Opacity: {0.85}
-  Border: {radius: 12}
-  Caption line(text: text, size: 13, color: C_TEXT)
+  Image: {texture: castle_ui_parchment, u0: 0.04, v0: 0.12, u1: 0.96, v1: 0.88}
+  Border: {width: 1.5, radius: 3, color: {96, 62, 32, 255}}
+  BoxShadow: {offset_y: -3, blur: 10, color: {0, 0, 0, 110}}
+
+  ScrollRod rod_l(h: Left)
+  ScrollRod rod_r(h: Right)
+  line {
+    Text: {value: text, size: 14, width: 840, align: Center, font: castle_font_body}
+    Rgb: C_INK
+  }
 }
 
-template Toolbar : Card {
-  row {
-    Layout: {direction: Row, spacing: 6}
-    ToolButton b1(t: K_WALL, key: "1")
-    ToolButton b2(t: K_TOWER, key: "2")
-    ToolButton b3(t: K_GATE, key: "3")
-    ToolButton b4(t: K_KEEP, key: "4")
-    ToolButton b5(t: K_HOUSE, key: "5")
-    ToolButton b6(t: K_QUARRY, key: "6")
-    ToolButton b7(t: K_MOAT, key: "7")
-    ToolButton b8(t: K_TREE, key: "8")
-    ToolButton b9(t: K_PATH, key: "9")
-    sep { LayoutItem: {width: {mode: Fixed, value: 1}, height: {mode: Fixed, value: 70}}; Rect: {1, 1}; Rgb: {110, 88, 60} }
-    ToolButton b10(t: T_DEMOLISH, key: "X")
+template Toolbar {
+  Layout: {direction: Column}
+
+  WoodPanel panel(w: 980, h: 146, pad: 14, u: 0.08, v: 0.55, row: true) {
+    IronStrap strap_top(w: 880, top: true)
+    IronStrap strap_bottom(w: 880, top: false)
+    row {
+      Layout: {direction: Row, spacing: 8, v: Middle}
+      ToolButton b1(t: K_WALL, key: "1")
+      ToolButton b2(t: K_TOWER, key: "2")
+      ToolButton b3(t: K_GATE, key: "3")
+      ToolButton b4(t: K_KEEP, key: "4")
+      ToolButton b5(t: K_HOUSE, key: "5")
+      ToolButton b6(t: K_QUARRY, key: "6")
+      ToolButton b7(t: K_MOAT, key: "7")
+      ToolButton b8(t: K_TREE, key: "8")
+      ToolButton b9(t: K_PATH, key: "9")
+      sep {
+        LayoutItem: {width: {mode: Fixed, value: 6}, height: {mode: Fixed, value: 92}}
+        Rect: {1, 1}
+        Rgb: {62, 58, 54}
+        Border: {width: 1.5, radius: 2, color: {20, 17, 15, 255}}
+      }
+      ToolButton b10(t: T_DEMOLISH, key: "X")
+    }
   }
 }
 
@@ -412,13 +471,23 @@ template ToastBanner {
 
   if toast != "" {
     banner {
-      Layout: {direction: Row, h: Center, v: Middle, padding: {10, 10, 20, 20}}
+      Layout: {direction: Row, h: Center, v: Middle, padding: {14, 14, 64, 30}}
+      LayoutItem: {width: {mode: Fixed, value: 680}}
       Rect: {1, 1}
-      Rgb: {44, 34, 26}
-      Opacity: {0.94}
-      Border: {width: 1.5, radius: 10, color: {222, 182, 96, 255}}
-      BoxShadow: {offset_y: -3, blur: 18, color: {0, 0, 0, 120}}
-      Caption line(text: toast, size: 16, color: C_TEXT)
+      Image: {texture: castle_ui_parchment, u0: 0.0, v0: 0.0, u1: 1, v1: 1}
+      Border: {width: 2, radius: 4, color: {110, 70, 36, 255}}
+      BoxShadow: {offset_y: -4, blur: 18, color: {0, 0, 0, 130}}
+
+      seal {
+        LayoutFloat: {h: Center, v: Middle, anchor_h: Left, anchor_v: Middle, x: 30}
+        LayoutItem: {width: {mode: Fixed, value: 52}, height: {mode: Fixed, value: 52}}
+        Rect: {1, 1}
+        Image: {texture: castle_ui_seal}
+      }
+      line {
+        Text: {value: toast, size: 17, width: 580, align: Center, font: castle_font_body}
+        Rgb: C_INK
+      }
     }
   }
 }
@@ -433,7 +502,7 @@ hud {
 
   screen {
     LayoutFill: {surface: window}
-    Layout: {direction: Column, padding: {18, 18, 18, 18}, spacing: 10}
+    Layout: {direction: Column, padding: {18, 18, 18, 18}, spacing: 12}
 
     top {
       Layout: {direction: Row, spacing: 12}
@@ -450,7 +519,7 @@ hud {
     }
 
     bottom {
-      Layout: {direction: Column, h: Center, spacing: 8}
+      Layout: {direction: Column, h: Center, spacing: 14}
       LayoutItem: {width: {mode: Grow}}
       HintLine hint()
       Toolbar toolbar()

@@ -24,14 +24,40 @@
 /** Entries a pool may use: those of its curves, then those of their max curves */
 #define BOX_PARTICLE_ROWS_ENTRIES (2 * BOX_PARTICLE_ROWS_CURVES)
 
-/** The curve table: the entries that hand out rows and the rows as they were sent */
+/** Distinct curves a table remembers the rows of, by kind, before it forgets them all */
+#define BOX_PARTICLE_ROWS_KNOWN (1024)
+
+/** The curve table: the entries that hand out rows and the rows as they were sent.
+ *
+ * The table remembers the rows of the ParticleCurves and ParticleMotion it sampled by the hash
+ * of their keys, so a pool whose curves were seen before, such as a new instance of an effect,
+ * takes their rows without sampling them.
+ *
+ * Within a frame it remembers the hash of the last ParticleCurves and ParticleMotion by address,
+ * so the instances that share the curves of their template hash them once.
+ */
 typedef struct box_particle_rows_t {
     ecs_vec_t entries;      /**< box_particle_rows_entry_t of particle_rows.c */
+    ecs_map_t by_hash;      /**< Hash of the kind and content of an entry to its index, so a
+                             *   bake finds equal rows without visiting every entry */
+    ecs_vec_t unused[BOX_PARTICLE_GRADIENT_ROWS + 1]; /**< int32_t, by rows taken: entries no
+                             *   pool used when they were added, handed out again from the
+                             *   last; an entry used since is skipped */
     ecs_vec_t data;         /**< float, BOX_PARTICLE_CURVE_SAMPLES per row handed out */
+    ecs_vec_t known;        /**< box_particle_rows_known_t of particle_rows.c */
+    ecs_vec_t known_motion; /**< box_particle_rows_known_motion_t of particle_rows.c */
+    ecs_map_t known_by_hash; /**< Hash of ParticleCurves to index of known */
+    ecs_map_t known_motion_by_hash; /**< Hash of ParticleMotion to index of known_motion */
+    const ParticleCurves *last; /**< ParticleCurves hashed last in this frame, NULL for none */
+    uint64_t last_hash;     /**< Its hash */
+    const ParticleMotion *last_motion; /**< ParticleMotion hashed last in this frame */
+    uint64_t last_motion_hash; /**< Its hash */
     uint32_t capacity;      /**< Rows of the buffer on the backend, 0 before it exists */
     uint32_t dirty_first;   /**< First row baked since the last send, UINT32_MAX for none */
     uint32_t dirty_end;     /**< Row after the last row baked since the last send */
     int64_t bakes;          /**< Curves baked since the table was made */
+    int64_t samplings;      /**< ParticleCurves and ParticleMotion sampled to find their rows
+                             *   since the table was made, also those whose rows existed */
 } box_particle_rows_t;
 
 /** The rows the curves of one pool use and what its block reads */
@@ -149,7 +175,8 @@ bool box_particle_rows_used(
     const box_particle_rows_use_t *use);
 
 /** Send the rows baked since the last send, creating the buffer again with every row when it
- * has to grow; the backend binds the new buffer with the groups of the packet.
+ * has to grow; the backend binds the new buffer with the groups of the packet. Ends the frame of
+ * the table, after which the curves are hashed again.
  *
  * @param t The table
  * @param p The packet

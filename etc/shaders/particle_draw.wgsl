@@ -84,13 +84,14 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
     let t = particle_norm_age(age, life);
     let size = particle_scaled(particle_draw(seed, p.index, STREAM_SIZE, emitter.speed_size.zw),
         emitter.curve_rows.x, emitter.curve_max.x, emitter.curve_values.x, t,
-        particle_blend(seed, p.index, CURVE_SIZE));
+        particle_curve_blend(seed, p.index, CURVE_SIZE, emitter.curve_max.x));
     let rotation = particle_draw(seed, p.index, STREAM_ROTATION, emitter.rotation_spin.xy);
     let spin = particle_draw(seed, p.index, STREAM_SPIN, emitter.rotation_spin.zw);
     let angle = radians(particle_rotation(rotation, spin, emitter.curve_rows.z,
-        emitter.curve_max.z, emitter.curve_values.z, particle_blend(seed, p.index, CURVE_ROTATION),
+        emitter.curve_max.z, emitter.curve_values.z,
+        particle_curve_blend(seed, p.index, CURVE_ROTATION, emitter.curve_max.z),
         emitter.curve_rows.w, emitter.curve_max.w, emitter.curve_values.w,
-        particle_blend(seed, p.index, CURVE_SPIN), age, life));
+        particle_curve_blend(seed, p.index, CURVE_SPIN, emitter.curve_max.w), age, life));
     let c = cos(angle);
     let s = sin(angle);
     let right = vec3f(view.view[0].x, view.view[1].x, view.view[2].x);
@@ -142,11 +143,11 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
     out.opacity = particle_scaled(
         particle_draw(seed, p.index, STREAM_OPACITY, emitter.opacity_radial.xy),
         emitter.curve_rows.y, emitter.curve_max.y, emitter.curve_values.y, t,
-        particle_blend(seed, p.index, CURVE_OPACITY));
+        particle_curve_blend(seed, p.index, CURVE_OPACITY, emitter.curve_max.y));
     out.color = particle_tinted(
         particle_color(seed, p.index, emitter.color.rgb, emitter.variance.rgb),
         emitter.gradient_row, emitter.gradient_max.x, emitter.gradient, t,
-        particle_blend(seed, p.index, CURVE_COLOR));
+        particle_curve_blend(seed, p.index, CURVE_COLOR, emitter.gradient_max.x));
     if (emitter.params.y > 0.0) {
         out.proj = view_projection_depth();
     }
