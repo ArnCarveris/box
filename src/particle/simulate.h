@@ -77,6 +77,27 @@
 /** Gradient of the color */
 #define BOX_PARTICLE_CURVE_COLOR (4u)
 
+/** First of the four hash streams of the blend of a particle between a curve of ParticleMotion
+ * and its max_keys, one per quantity in the order of BOX_PARTICLE_MOTION_VELOCITY to _DRAG: the
+ * three axes of the velocity share one, as do those of the force */
+#define BOX_PARTICLE_STREAM_MOTION (25u)
+
+/** Blend of the velocity curves, the offset of its stream from BOX_PARTICLE_STREAM_MOTION */
+#define BOX_PARTICLE_MOTION_VELOCITY (0u)
+
+/** Blend of the speed curve */
+#define BOX_PARTICLE_MOTION_SPEED (1u)
+
+/** Blend of the force curves */
+#define BOX_PARTICLE_MOTION_FORCE (2u)
+
+/** Blend of the drag curve */
+#define BOX_PARTICLE_MOTION_DRAG (3u)
+
+/** Rows of the curve table a vector curve of ParticleMotion takes, four floats per sample: the
+ * velocity x, y and z and the speed, or the force x, y and z and the drag */
+#define BOX_PARTICLE_VECTOR_ROWS (4)
+
 /** Ground collision mode of an emitter without a ground plane */
 #define BOX_PARTICLE_GROUND_NONE (0u)
 
@@ -151,6 +172,29 @@ typedef struct box_particle_ground_t {
     float bounce;           /**< Share of the speed into the plane a hit keeps, 0 to 1 */
     float friction;         /**< Share of the speed along the plane a hit loses, 0 to 1 */
 } box_particle_ground_t;
+
+/** The rows of the curves of a ParticleMotion, as MotionRows in particle.wgsl. The velocity and
+ * the speed are one vector curve of four floats per sample, the force and the drag another, so
+ * the block of an emitter names two rows and their max rows */
+typedef struct box_particle_motion_rows_t {
+    uint32_t velocity_row;  /**< First of the BOX_PARTICLE_VECTOR_ROWS rows of the velocity and
+                             *   the speed, BOX_PARTICLE_CURVE_CONSTANT while all four are
+                             *   constant */
+    uint32_t velocity_max_row; /**< First row of their max curves, BOX_PARTICLE_CURVE_CONSTANT
+                             *   when they have none */
+    uint32_t force_row;     /**< First row of the force and the drag, as velocity_row */
+    uint32_t force_max_row; /**< First row of their max curves, as velocity_max_row */
+    float velocity[4];      /**< Velocity xyz and speed w while constant */
+    float force[4];         /**< Force xyz and drag w while constant */
+} box_particle_motion_rows_t;
+
+/** The curves of ParticleMotion of a particle at its age, as Motion in particle.wgsl */
+typedef struct box_particle_motion_t {
+    float velocity[3];      /**< World velocity added to the movement only */
+    float speed;            /**< Multiplier of the stored velocity in the movement */
+    float force[3];         /**< World acceleration added to the acceleration */
+    float drag;             /**< Multiplier of the drag rate */
+} box_particle_motion_t;
 
 /** What a particle draws from its streams, as the spawn and the draw shaders draw it */
 typedef struct box_particle_sample_t {
@@ -500,28 +544,39 @@ static inline void box_particle_wander(
     out[2] = 0.5f * turbulence * (sinf(q[0]) + sinf(1.618f * q[1]));
 }
 
-/** Advance a particle by a frame: v += (acceleration + wander(p)) * delta, then the exact drag
- * v = wind + (v - wind) * exp(-drag * delta), then p += (v + drift) * delta. The drift moves
- * the particle without entering its velocity.
+/** Advance a particle by a frame: v += (acceleration + wander(p) + force) * delta, then the
+ * exact drag v = wind + (v - wind) * exp(-drag * motion drag * delta), then
+ * p += (speed * v + velocity + drift) * delta, with the curves of ParticleMotion.
+ *
+ * The drift and the velocity curve move the particle without entering its velocity.
+ *
+ * Without motion the curves are 0 and 1, which leave every value as without them, bit for bit.
  *
  * @param position World position, advanced in place
  * @param velocity World velocity, advanced in place
  * @param forces The forces of the frame
+ * @param motion The curves of ParticleMotion at the age of the particle after the frame,
+ *               box_particle_motion, NULL for none
  * @param delta Seconds of the frame
  */
 static inline void box_particle_integrate(
     float *position,
     float *velocity,
     const box_particle_forces_t *forces,
+    const box_particle_motion_t *motion,
     float delta)
 {
-    float wander[3], keep = expf(-forces->drag * delta);
+    static const box_particle_motion_t none = {
+        .velocity = {0, 0, 0}, .speed = 1.0f, .force = {0, 0, 0}, .drag = 1.0f
+    };
+    const box_particle_motion_t *m = motion ? motion : &none;
+    float wander[3], keep = expf(-forces->drag * fmaxf(m->drag, 0.0f) * delta);
     int32_t i;
     box_particle_wander(position, forces->phase, forces->scale, forces->turbulence, wander);
     for (i = 0; i < 3; i ++) {
-        velocity[i] += (forces->acceleration[i] + wander[i]) * delta;
+        velocity[i] += (forces->acceleration[i] + wander[i] + m->force[i]) * delta;
         velocity[i] = forces->wind[i] + (velocity[i] - forces->wind[i]) * keep;
-        position[i] += (velocity[i] + forces->drift[i]) * delta;
+        position[i] += (velocity[i] * m->speed + m->velocity[i] + forces->drift[i]) * delta;
     }
 }
 
@@ -813,6 +868,180 @@ static inline float box_particle_curve_area_range(
     }
 
     return result;
+}
+
+/** Get the normalized age of a particle from its lifetime and the microseconds it has left, as
+ * the draw computes it, integers until the division.
+ *
+ * @param life_us Lifetime of the particle in microseconds, box_particle_life
+ * @param remaining Microseconds it has left
+ * @return The age over the life, 0 to 1
+ */
+static inline float box_particle_life_age(
+    uint32_t life_us,
+    uint32_t remaining)
+{
+    float age = (float)(life_us - remaining) * 1e-6f;
+
+    return box_particle_norm_age(age, (float)life_us * 1e-6f);
+}
+
+/** Get the blend of a particle between the curves of a quantity of ParticleMotion and their max
+ * curves, the same for its whole life.
+ *
+ * @param seed The seed of the emitter
+ * @param index The spawn index of the particle
+ * @param which BOX_PARTICLE_MOTION_VELOCITY to BOX_PARTICLE_MOTION_DRAG
+ * @return The blend, 0 to 1
+ */
+static inline float box_particle_motion_blend(
+    uint32_t seed,
+    uint32_t index,
+    uint32_t which)
+{
+    return box_particle_unit(box_particle_hash(seed, index, BOX_PARTICLE_STREAM_MOTION + which));
+}
+
+/** Evaluate a vector curve at a normalized age from its rows in the curve table, four floats per
+ * sample, linear between two samples; a constant vector reads no row.
+ *
+ * @param table The curve table, BOX_PARTICLE_CURVE_SAMPLES floats per row
+ * @param row First row of the vector, BOX_PARTICLE_CURVE_CONSTANT for a constant
+ * @param value The four values of a constant vector
+ * @param t The normalized age, clamped to 0 to 1
+ * @param out Receives the four values
+ */
+static inline void box_particle_vector(
+    const float *table,
+    uint32_t row,
+    const float *value,
+    float t,
+    float *out)
+{
+    float f;
+    int32_t c;
+    if (row == BOX_PARTICLE_CURVE_CONSTANT) {
+        for (c = 0; c < 4; c ++) {
+            out[c] = value[c];
+        }
+    } else {
+        int32_t k = box_particle_curve_sample(t, &f);
+        const float *v = table + (size_t)row * BOX_PARTICLE_CURVE_SAMPLES + k * 4;
+        for (c = 0; c < 4; c ++) {
+            out[c] = v[c] + (v[c + 4] - v[c]) * f;
+        }
+    }
+}
+
+/** Evaluate the vector curve of a particle at a normalized age: the vector, or with a max vector
+ * each of its four values blended toward that of the max by its own blend of the particle.
+ *
+ * @param table The curve table
+ * @param row First row of the vector, BOX_PARTICLE_CURVE_CONSTANT for a constant
+ * @param max_row First row of the max vector, BOX_PARTICLE_CURVE_CONSTANT for none
+ * @param value The four values of a constant vector
+ * @param t The normalized age, clamped to 0 to 1
+ * @param u The four blends of the particle
+ * @param out Receives the four values
+ */
+static inline void box_particle_vector_range(
+    const float *table,
+    uint32_t row,
+    uint32_t max_row,
+    const float *value,
+    float t,
+    const float *u,
+    float *out)
+{
+    float max[4];
+    int32_t c;
+    box_particle_vector(table, row, value, t, out);
+    if (max_row != BOX_PARTICLE_CURVE_CONSTANT) {
+        box_particle_vector(table, max_row, value, t, max);
+        for (c = 0; c < 4; c ++) {
+            out[c] = out[c] + (max[c] - out[c]) * u[c];
+        }
+    }
+}
+
+/** Evaluate the velocity and speed curves of ParticleMotion of a particle at a normalized age,
+ * the three axes of the velocity blended by one draw and the speed by another.
+ *
+ * @param table The curve table
+ * @param rows The rows of the curves
+ * @param seed The seed of the emitter
+ * @param index The spawn index of the particle
+ * @param t The normalized age
+ * @param out Receives the velocity and the speed, its force and drag untouched
+ */
+static inline void box_particle_motion_velocity(
+    const float *table,
+    const box_particle_motion_rows_t *rows,
+    uint32_t seed,
+    uint32_t index,
+    float t,
+    box_particle_motion_t *out)
+{
+    float uv = box_particle_motion_blend(seed, index, BOX_PARTICLE_MOTION_VELOCITY);
+    float u[4] = {uv, uv, uv, box_particle_motion_blend(seed, index, BOX_PARTICLE_MOTION_SPEED)};
+    float v[4];
+    int32_t c;
+    box_particle_vector_range(table, rows->velocity_row, rows->velocity_max_row, rows->velocity,
+        t, u, v);
+    for (c = 0; c < 3; c ++) {
+        out->velocity[c] = v[c];
+    }
+
+    out->speed = v[3];
+}
+
+/** Evaluate the curves of ParticleMotion of a particle at a normalized age, each blended toward
+ * its max curve by the draw of its quantity.
+ *
+ * @param table The curve table
+ * @param rows The rows of the curves
+ * @param seed The seed of the emitter
+ * @param index The spawn index of the particle
+ * @param t The normalized age, box_particle_life_age
+ * @param out Receives the curves
+ */
+static inline void box_particle_motion(
+    const float *table,
+    const box_particle_motion_rows_t *rows,
+    uint32_t seed,
+    uint32_t index,
+    float t,
+    box_particle_motion_t *out)
+{
+    float uf = box_particle_motion_blend(seed, index, BOX_PARTICLE_MOTION_FORCE);
+    float u[4] = {uf, uf, uf, box_particle_motion_blend(seed, index, BOX_PARTICLE_MOTION_DRAG)};
+    float f[4];
+    int32_t c;
+    box_particle_motion_velocity(table, rows, seed, index, t, out);
+    box_particle_vector_range(table, rows->force_row, rows->force_max_row, rows->force, t, u, f);
+    for (c = 0; c < 3; c ++) {
+        out->force[c] = f[c];
+    }
+
+    out->drag = f[3];
+}
+
+/** Get the velocity a particle moves with but for the drift, which a stretched sprite stretches
+ * along: speed times its stored velocity plus the velocity curve.
+ *
+ * @param velocity The stored velocity
+ * @param motion The velocity and speed of its ParticleMotion, NULL for none
+ * @param out Receives the velocity, may alias velocity
+ */
+static inline void box_particle_moving(
+    const float *velocity,
+    const box_particle_motion_t *motion,
+    float *out)
+{
+    int32_t c;
+    for (c = 0; c < 3; c ++) {
+        out[c] = motion ? velocity[c] * motion->speed + motion->velocity[c] : velocity[c];
+    }
 }
 
 /** Get the degrees a particle has turned by its spin, the area under its spin curve up to its

@@ -690,6 +690,15 @@ static void box_bake_views(
 
         if (rv->lights.enabled && (view ? view->lighting.baked : true)) {
             rv->volume = v->handle;
+            if (rv->debug.light_probes && v->probes > BOX_RENDER_DEBUG_PROBES_MAX &&
+                !v->debug_warned)
+            {
+                char *path = ecs_get_path(world, rv->view);
+                ecs_warn("view '%s' shows %d of the %d light probes of its volume "
+                    "(BOX_GPU_DEBUG_PROBES_MAX)", path, BOX_RENDER_DEBUG_PROBES_MAX, v->probes);
+                ecs_os_free(path);
+                v->debug_warned = true;
+            }
         }
     }
 }

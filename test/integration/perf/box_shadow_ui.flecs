@@ -1,0 +1,102 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.perf
+
+// A dashboard of 37 shadowed panels lying on the ground: a header, a sidebar with 8 items, 12 cards
+// with a button each and a dialog with 2 buttons over them, every one with a BoxShadow of a real
+// UI (small blurs on the items and buttons, 24 on the cards, 64 on the dialog). The shadows of
+// the opaque panels are in the shadow batch (fs_shadow), so each one breaks a run.
+camera {
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {24, 28, 38, 255}}}
+}
+
+ui {
+  Position: {0, 0.01, 0}
+  Rotation: {-1.5708, 0, 0}
+  Scale: {0.01, 0.01, 0.01}
+
+  screen {
+    Position: {0, 0, 0}
+    Rect: {1280, 720}
+    Rgb: {236, 238, 242}
+
+    header {
+      Position: {0, 330, 1}
+      Rect: {1280, 60}
+      Rgb: {255, 255, 255}
+      BoxShadow: {offset_y: -2, blur: 8, color: {0, 0, 0, 60}}
+    }
+
+    sidebar {
+      Position: {-560, -30, 1}
+      Rect: {160, 660}
+      Rgb: {250, 251, 253}
+      BoxShadow: {offset_x: 2, blur: 12, color: {0, 0, 0, 50}}
+
+      for i in 0..8 {
+        "item_{i}" {
+          Position: {0, 280 - i * 48, 1}
+          Rect: {136, 36}
+          Rgb: {226, 232, 244}
+          Border: {radius: 6}
+          BoxShadow: {offset_y: -1, blur: 3, color: {0, 0, 0, 40}}
+        }
+      }
+    }
+
+    for x in 0..4 {
+      for y in 0..3 {
+        "card_{x}_{y}" {
+          Position: {x * 270 - 325, 175 - y * 205, 1}
+          Rect: {240, 180}
+          Rgb: {255, 255, 255}
+          Border: {radius: 12}
+          BoxShadow: {offset_y: -6, blur: 24, color: {0, 0, 0, 70}}
+
+          button {
+            Position: {60, -60, 1}
+            Rect: {80, 28}
+            Rgb: {40, 90, 220}
+            Border: {radius: 14}
+            BoxShadow: {offset_y: -2, blur: 6, spread: 1, color: {40, 90, 220, 120}}
+          }
+        }
+      }
+    }
+
+    dialog {
+      Position: {80, 0, 2}
+      Rect: {420, 260}
+      Rgb: {255, 255, 255}
+      Border: {radius: 16}
+      BoxShadow: {offset_y: -20, blur: 64, spread: 4, color: {0, 0, 0, 140}}
+
+      ok {
+        Position: {130, -95, 1}
+        Rect: {100, 34}
+        Rgb: {40, 90, 220}
+        Border: {radius: 8}
+        BoxShadow: {offset_y: -2, blur: 6, color: {40, 90, 220, 120}}
+      }
+
+      cancel {
+        Position: {15, -95, 1}
+        Rect: {100, 34}
+        Rgb: {236, 238, 242}
+        Border: {radius: 8}
+        BoxShadow: {offset_y: -2, blur: 6, color: {0, 0, 0, 60}}
+      }
+    }
+  }
+}
+
+$ {
+  PerfRun: {fps: 120, frames: 600, warmup: 120, period: 5, elevation: 60, camera: camera}
+}

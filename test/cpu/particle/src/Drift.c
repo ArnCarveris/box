@@ -225,7 +225,7 @@ static void replay_step(
 
         p->remaining = box_particle_age(p->remaining, b->delta_us);
         if (p->remaining) {
-            box_particle_integrate(p->position, p->velocity, &f, delta);
+            box_particle_integrate(p->position, p->velocity, &f, NULL, delta);
             r->moved[i] += delta;
             if (!box_particle_collide(p->position, p->velocity, &g)) {
                 p->remaining = 0;

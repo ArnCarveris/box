@@ -626,7 +626,8 @@ The shadow of a 2D shape (`BoxShadow`, `src/render/box_shadow.c`) is a second sl
 the way they reach the glyph slots of a text (`TextSlots`).
 
 - **Batch key.** The shadow slot copies the key of the batch of its shape with the `AlphaBlend`
-  blend mode and no textures (`box_draws_box_shadow_update`), which the rekey of a tag reruns: it
+  blend mode, no textures and `box_shadow`, so it draws with its own `fs_shadow` pipeline
+  (`box_draws_box_shadow_update`, which the rekey of a tag reruns): it
   is `dynamic_transform` and `dynamic_material` whenever its shape is, and already blended while
   an `Opacity` transition keeps its shape blended (`TransitionOpacity`).
 - **Transforms.** `box_transition_send_slots` sends a `SLOT` record for the shadow slot of every

@@ -523,7 +523,8 @@ void box_gpu_forward_reset(
 
 /** Create a forward pipeline from a mesh or 2D shape module inside an error scope, to find out
  * whether the module fits the pipeline layout before it replaces the module that renders. A
- * mesh module also creates the depth prepass pipelines, so it needs their entry points.
+ * mesh module also creates the depth prepass pipelines and a 2D shape module the shadow pipeline
+ * (fs_shadow), so they need their entry points.
  *
  * wgpu-native reports the scope at once; the browser reports it later, so there the check
  * passes and an invalid pipeline shows as a device error.
@@ -1257,6 +1258,9 @@ bool box_gpu_fog_volumes_draw(
     const box_render_view_t *v,
     WGPUTextureView depth);
 
+/** Probes of a kind (light or reflection) the debug pass of a view draws at most */
+#define BOX_GPU_DEBUG_PROBES_MAX ((uint32_t)BOX_RENDER_DEBUG_PROBES_MAX)
+
 /** Create the layouts of the debug passes, after the view layout.
  *
  * @param gpu The backend
@@ -1295,10 +1299,15 @@ void box_gpu_debug_mesh_free(
     box_gpu_mesh_t *m);
 
 /** Record the debug pass of a view after its effects: a render pass that loads the color of the
+<<<<<<< HEAD
  * target and reads the depth of the view, drawing the enabled debug items (the grid, then the
  * wireframe of the mesh draws of its cull view). A view without any records nothing.
  *
  * A debug item whose shader is not compiled yet draws nothing.
+=======
+ * target and reads the depth of the view, drawing the grid, then the probes and their boxes.
+ * A view without any, without probes to show or with shaders not compiled records nothing.
+>>>>>>> 89c3e831373618cfe934e5517cac76518eb68583
  *
  * @param gpu The backend
  * @param t The target, whose depth the pass reads and whose format it draws in

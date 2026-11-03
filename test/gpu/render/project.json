@@ -685,6 +685,7 @@
                     "box_shadow_past_view_edge",
                     "box_shadow_needs_rect_or_circle",
                     "box_shadow_slots_freed",
+                    "box_shadow_own_batch",
                     "box_shadow_follows_transform",
                     "box_shadow_follows_dynamic_transform",
                     "box_shadow_follows_size",
@@ -953,7 +954,9 @@
                     "lingering_renders_after_delete",
                     "drift_moves_particles",
                     "radial_ring_in_plane",
-                    "radial_burst_scaled"
+                    "radial_burst_scaled",
+                    "motion_velocity_curve_moves",
+                    "motion_force_curve_moves"
                 ]
             },
             {
@@ -1090,6 +1093,7 @@
                     "grid_not_in_captures",
                     "grid_camera_below",
                     "grid_resize",
+<<<<<<< HEAD
                     "wire_off_unchanged",
                     "wire_overlay_quad",
                     "wire_overlay_hidden",
@@ -1103,6 +1107,22 @@
                     "wire_per_view",
                     "wire_mesh_replaced",
                     "wire_with_grid"
+=======
+                    "probes_off_unchanged",
+                    "light_probes_at_grid",
+                    "light_probes_colors",
+                    "light_probes_hidden_by_geometry",
+                    "light_probes_invalid_marked",
+                    "light_probes_no_volume",
+                    "reflection_probes_mirror",
+                    "reflection_probes_not_ready",
+                    "reflection_boxes",
+                    "reflection_scene_probe_left_out",
+                    "probe_size",
+                    "probes_per_view",
+                    "probes_with_effects",
+                    "probes_not_in_captures"
+>>>>>>> 89c3e831373618cfe934e5517cac76518eb68583
                 ]
             }
         ]

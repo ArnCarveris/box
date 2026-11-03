@@ -870,15 +870,19 @@ def perf_script(scene, report, args):
     extra = ""
     if args.stall:
         extra += ", stall: %g" % args.stall
-    fps = re.search(r"PerfRun:\s*\{[^}]*\bfps:\s*(\d+)", source)
+    run = re.search(r"PerfRun:\s*\{([^}]*)\}", source)
+    members = run.group(1).strip() if run else ""
+    fps = re.search(r"\bfps:\s*(\d+)", members)
     if args.seconds and fps:
+        members = re.sub(r",?\s*\bframes:\s*\d+", "", members).strip(", ")
         extra += ", frames: %d" % round(int(fps.group(1)) * args.seconds)
     surface = ""
     if not re.search(r"\bSurface:", source):
         surface = "perf_surface {\n  box.surface.Surface: {width: %d, height: %d}\n}\n\n" % (
             width, height)
-    return "%s\n\n%s$ {\n  box.perf.PerfRun: {quit: true, report: \"%s\"%s}\n}\n" % (
-        source.rstrip(), surface, report, extra)
+    # Setting PerfRun again replaces the value of the scene, so the run repeats its members
+    return "%s\n\n%s$ {\n  box.perf.PerfRun: {%s%squit: true, report: \"%s\"%s}\n}\n" % (
+        source.rstrip(), surface, members, ", " if members else "", report, extra)
 
 
 def perf_command(harness, args):
