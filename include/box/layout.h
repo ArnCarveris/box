@@ -81,21 +81,13 @@ ECS_STRUCT(Sizing, {
     bool content_min; /**< A Grow size keeps the content minimum, true in a new LayoutItem */
 });
 
-/** Sizing and placement of an element inside the layout of its parent.
+/** Sizing and placement of an element in the layout of its parent. Without a Layout on the parent
+ * the element is a root, sized with its children but never placed: it keeps its own Position, the
+ * origin of its parent without one, and ignores x, y, h and v.
  *
- * The parent must have a Layout to place the element. An element whose parent has no Layout
- * is the root of a layout tree of its own: it is sized, its children with it, but never placed.
- * A root keeps its own Position, the origin of its parent without one, and ignores x, y, h and
- * v.
- *
- * A top-level element, or one under a parent outside any UI layout such as a scene entity, is a
- * root this way on purpose.
- *
- * When the parent is part of a UI layout (it has a LayoutItem, LayoutBounds or LayoutFill, or
- * its own parent has a Layout) a missing Layout is likely a mistake: the layout warns once,
- * naming the element and its parent, when it lays the trees out.
- *
- * It warns again when the mistake is fixed and made again. Prefabs never warn.
+ * A top-level root, or one under a scene entity, is intended. When the parent is in a UI layout
+ * (LayoutItem, LayoutBounds, LayoutFill or a parent with a Layout) the layout warns once per
+ * mistake as it lays the trees out, naming the element and its parent. Prefabs never warn.
  */
 ECS_STRUCT(LayoutItem, {
     Sizing width;  /**< Sizing on the x axis */
@@ -149,10 +141,8 @@ ECS_STRUCT(LayoutContent, {
  * menus and tooltips. The parent must have a Layout and leaves the element out of its fit size
  * and flow.
  *
- * A LayoutFloat on the root of a layout tree, an element without a parent or whose parent has
- * no Layout, does nothing: the root is sized from its LayoutItem and keeps its own Position
- * (see LayoutItem). The layout warns once that the float is ignored, naming the element and its
- * parent, and again when the mistake is fixed and made again.
+ * A LayoutFloat on a root (see LayoutItem), without a parent or whose parent has no Layout, is
+ * ignored: the root keeps its own Position. The layout warns once per mistake, naming it.
  *
  * Its h/v point sits on the anchor_h/anchor_v point of the anchor plus the x/y offset (y up, as
  * LayoutItem.y); a dropdown list has h: Left, v: Top, anchor_h: Left, anchor_v: Bottom. It sizes

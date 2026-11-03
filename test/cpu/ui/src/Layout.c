@@ -2033,6 +2033,16 @@ void Layout_no_warn_valid(void) {
     ecs_set(world, glint, Position, {2, 3, 0});
     ecs_set(world, glint, Rect, {4, 4});
 
+    ecs_entity_t late = ecs_new_w_pair(world, EcsChildOf, root);
+    ecs_set(world, late, Rect, {1, 1});
+    ecs_set(world, late, LayoutItem, {
+        .width = { SizeModeFixed, 40 }, .height = { SizeModeFixed, 40 } });
+    ecs_entity_t lc = ecs_new_w_pair(world, EcsChildOf, late);
+    ecs_set(world, lc, Rect, {4, 4});
+    ecs_set(world, lc, LayoutItem, {
+        .width = { SizeModeFixed, 4 }, .height = { SizeModeFixed, 4 } });
+    ecs_set(world, late, Layout, { .direction = DirectionRow });
+
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_set(world, prefab, Rect, {1, 1});
     ecs_set(world, prefab, LayoutItem, {
