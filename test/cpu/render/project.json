@@ -612,6 +612,17 @@
                     "tint_stays_in_bake",
                     "opacity_stays_out_of_bake"
                 ]
+            },
+            {
+                "id": "ShapeTransform",
+                "testcases": [
+                    "box_child_follows_parent",
+                    "box_child_follows_moved_parent",
+                    "box_child_follows_dynamic_parent",
+                    "rect_child_follows_parent",
+                    "point_light_child_follows_parent",
+                    "template_box_child_follows_parent"
+                ]
             }
         ]
     }
