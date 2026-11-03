@@ -192,9 +192,11 @@ ECS_STRUCT(LayoutFill, {
 /** Clips the Rect, Circle, Line, Border, Image and Text of the descendants of an element to its
  * area, like CSS overflow: hidden; the element itself is not clipped.
  *
- * The area is its LayoutBounds, else its Rect, centered in its local XY plane and rounded by its
- * Border.radius. Nested clips intersect, anti-aliased per pixel in screen, world and texture UI;
- * picking misses outside the area. 3D shapes below the element are not clipped.
+ * The area is its LayoutBounds, else its Rect, centered in its local XY plane, inside its Border:
+ * shrunk by Border.width on each side and rounded by Border.radius less the width, both at least
+ * 0, so content that scrolls under the edge does not cover the border or a focus ring. Nested
+ * clips intersect, anti-aliased per pixel in screen, world and texture UI; picking misses
+ * outside the area. 3D shapes below the element are not clipped.
  *
  * An empty area (zero width or height) hides everything below it, and Tab skips the Focusable
  * entities it clips away entirely, unless the element has a LayoutScroll.

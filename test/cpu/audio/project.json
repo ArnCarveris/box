@@ -86,7 +86,9 @@
                     "odd_frames",
                     "one_frame_at_a_time",
                     "unknown_commands",
-                    "events_overflow"
+                    "events_overflow",
+                    "release_after_burst",
+                    "release_playing_after_burst"
                 ]
             },
             {
@@ -124,6 +126,7 @@
                     "null_bit_identical",
                     "null_sound_free",
                     "null_sound_in_use",
+                    "null_sound_free_after_burst",
                     "command_before_render"
                 ]
             },
@@ -137,6 +140,58 @@
                     "app_no_audio",
                     "failed_open",
                     "native_unavailable"
+                ]
+            },
+            {
+                "id": "Module",
+                "testcases": [
+                    "defaults_c",
+                    "defaults_script",
+                    "partial_keeps_defaults",
+                    "order_tree",
+                    "order_chain_send",
+                    "cycle_keeps_order",
+                    "deleted_bus_reroutes",
+                    "bus_volume_pan_mute",
+                    "master_settings",
+                    "no_commands_unchanged",
+                    "one_batch_per_frame",
+                    "import_opens_no_device",
+                    "new_output_resends"
+                ]
+            },
+            {
+                "id": "Source",
+                "testcases": [
+                    "play_stop",
+                    "end_clears_playing",
+                    "loop",
+                    "pitch",
+                    "volume",
+                    "disabled_source",
+                    "disabled_bus",
+                    "change_bus",
+                    "prefab_instances",
+                    "deleted_fades",
+                    "play_oneshot",
+                    "pcm_change",
+                    "drop_before_gesture"
+                ]
+            },
+            {
+                "id": "Script",
+                "testcases": [
+                    "mixer_levels",
+                    "level_change",
+                    "play_function"
+                ]
+            },
+            {
+                "id": "Capture",
+                "testcases": [
+                    "valid_wav",
+                    "two_runs_identical",
+                    "no_output"
                 ]
             }
         ]

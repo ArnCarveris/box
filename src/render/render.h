@@ -82,12 +82,13 @@ void box_render_draws_stats(
     const ecs_world_t *world,
     box_render_draws_stats_t *stats);
 
-/** Get the clip area of a ClipChildren element: its LayoutBounds, else its Rect, with the
- * corners rounded by its Border.radius.
+/** Get the clip area of a ClipChildren element: its LayoutBounds, else its Rect, shrunk by its
+ * Border.width on each side and with the corners rounded by its Border.radius less the width,
+ * the inner edge of the border as the 2D shader draws it.
  *
  * @param world The world
  * @param e The element
- * @param half Receives half its width and half its height, 0 when it has neither
+ * @param half Receives half the width and half the height of the area, 0 when it has neither
  * @return The corner radius, clamped to half the smaller side
  */
 float box_render_clip_area(

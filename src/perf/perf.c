@@ -635,8 +635,14 @@ static void box_perf_measure(
     double now)
 {
     ecs_entity_t camera = box_perf_camera(world, run);
+    const AudioStatus *audio = ecs_id(AudioStatus) ?
+        ecs_singleton_get(world, AudioStatus) : NULL;
     box_perf_count(perf, status, now - perf->mark);
     box_perf_sample_cull(world, perf, status, camera);
+    if (audio && audio->load > status->audio_load) {
+        status->audio_load = audio->load;
+    }
+
     box_perf_travel(world, perf, status, camera);
 }
 

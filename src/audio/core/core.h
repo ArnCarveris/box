@@ -38,7 +38,9 @@
 /** Sounds a core knows at once; a sound id is below this */
 #define BOX_AUDIO_SOUND_MAX 1024
 
-/** Events a core holds until read_events; newer events are lost when it is full */
+/** Events a core holds until read_events. The last slot is kept for BOX_AUDIO_EVENT_LOST:
+ * newer events are lost when the others are full, and that event counts them.
+ * BOX_AUDIO_EVENT_SOUND_FREE is never lost; it waits in the core until there is room */
 #define BOX_AUDIO_EVENT_MAX 256
 
 /** Largest volume of a voice or a bus */
@@ -143,7 +145,10 @@ typedef enum box_audio_event_type_t {
                                          * the steals so far */
     BOX_AUDIO_EVENT_SOUND_FREE = 3,     /**< No voice uses a released sound, id is the sound */
     BOX_AUDIO_EVENT_ORDER_REFUSED = 4,  /**< An invalid order was ignored, value its count */
-    BOX_AUDIO_EVENT_IGNORED = 5         /**< A command was ignored, id is its type */
+    BOX_AUDIO_EVENT_IGNORED = 5,        /**< A command was ignored, id is its type */
+    BOX_AUDIO_EVENT_LOST = 6            /**< The ring was full, value is the events lost since
+                                         * the last LOST event was read; the last event of
+                                         * the ring when it is full */
 } box_audio_event_type_t;
 
 /** An event of the core */
@@ -244,6 +249,9 @@ void box_audio_core_render(
 
 /** Take the events of the core, oldest first.
  *
+ * A BOX_AUDIO_EVENT_SOUND_FREE that found the ring full is reported once there is room again,
+ * in this call or a later one. Does not allocate.
+ *
  * @param core The core
  * @param events Receives the events
  * @param max Room in events
@@ -253,6 +261,14 @@ int32_t box_audio_core_read_events(
     box_audio_core_t *core,
     box_audio_event_t *events,
     int32_t max);
+
+/** Get the number of events lost since the last BOX_AUDIO_EVENT_LOST was read.
+ *
+ * @param core The core
+ * @return Number of events, 0 when none were lost
+ */
+int32_t box_audio_core_events_lost(
+    const box_audio_core_t *core);
 
 /** Get the number of voices that play, without the ones that fade out.
  *

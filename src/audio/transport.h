@@ -40,9 +40,18 @@ typedef enum box_audio_state_t {
     BOX_AUDIO_STATE_STARTING = 2,   /**< The output is not playing yet: on the web the worklet
                                      * loads or the page waits for a gesture */
     BOX_AUDIO_STATE_RUNNING = 3,    /**< A device plays */
-    BOX_AUDIO_STATE_LOST = 4        /**< The device disappeared; the main thread renders until
+    BOX_AUDIO_STATE_LOST = 4,       /**< The device disappeared; the main thread renders until
                                      * the default device reopens */
+    BOX_AUDIO_STATE_FAILED = 5,     /**< The page could not start its audio */
+    BOX_AUDIO_STATE_WAITING = 6,    /**< The page waits for a gesture to start its audio */
+    BOX_AUDIO_STATE_SUSPENDED = 7   /**< The page is hidden, its audio faded out and suspended */
 } box_audio_state_t;
+
+/** What the core of a transport does, measured where it renders */
+typedef struct box_audio_transport_stats_t {
+    int32_t voices;  /**< Voices that play, without the ones that fade out */
+    float load;      /**< Share of real time the render takes, smoothed, 0 when not measured */
+} box_audio_transport_stats_t;
 
 /** Kind of a transport */
 typedef enum box_audio_transport_kind_t {
@@ -87,6 +96,17 @@ struct box_audio_transport_t {
 
     /** Close the output and free the transport */
     void (*free)(box_audio_transport_t *t);
+
+    /** Report the voices and the load of the core */
+    void (*stats)(box_audio_transport_t *t, box_audio_transport_stats_t *stats);
+
+    /** Start to record the next frames the core renders, into a buffer the transport owns.
+     * @return Whether the capture started; false while another one records */
+    bool (*capture)(box_audio_transport_t *t, int32_t frames);
+
+    /** Take a finished capture: interleaved stereo frames, which the caller frees with
+     * ecs_os_free. @return The frames, NULL while the capture records or when none runs */
+    float* (*capture_take)(box_audio_transport_t *t, int32_t *frames);
 };
 
 /** Called by the null transport with every block it renders */
@@ -128,7 +148,8 @@ box_audio_transport_t* box_audio_transport_null_new(
 box_audio_transport_t* box_audio_transport_native_new(
     const box_audio_native_desc_t *desc);
 
-/** Create the transport of the AudioWorklet of the page, which box_audio_web_start creates.
+/** Create the transport of the AudioWorklet of the page. Starts the audio of the page
+ * (box_audio_web_start) when it did not yet, so that what the first frame sends arrives.
  *
  * @return The transport, NULL on native builds
  */

@@ -99,6 +99,7 @@
                     "scroll_gutter",
                     "scroll_thumb_hover",
                     "scroll_ring_under_bar",
+                    "scroll_content_inside_border",
                     "panel_title_clipped",
                     "list_click_selects",
                     "list_keys",

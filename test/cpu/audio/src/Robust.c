@@ -258,19 +258,148 @@ void Robust_unknown_commands(void) {
     box_audio_core_free(core);
 }
 
+/* A LOST event in the last slot counts the events dropped, a second overflow counts from 0 again
+ * and without an overflow there is no LOST event. */
 void Robust_events_overflow(void) {
     // audio/robust
     box_audio_core_t *core = audio_new();
-    box_audio_event_t events[BOX_AUDIO_EVENT_MAX];
+    box_audio_event_t events[BOX_AUDIO_EVENT_MAX + 1];
     int32_t i;
     for (i = 0; i < BOX_AUDIO_EVENT_MAX * 2; i ++) {
         audio_play(core, 1, 999, 0, 1, 0, 1, 0);
     }
 
-    test_int(box_audio_core_read_events(core, events, BOX_AUDIO_EVENT_MAX),
+    test_int(box_audio_core_events_lost(core), BOX_AUDIO_EVENT_MAX + 1);
+    test_int(box_audio_core_read_events(core, events, BOX_AUDIO_EVENT_MAX + 1),
         BOX_AUDIO_EVENT_MAX);
+    for (i = 0; i < BOX_AUDIO_EVENT_MAX - 1; i ++) {
+        test_int(events[i].type, BOX_AUDIO_EVENT_IGNORED);
+    }
+
+    test_int(events[BOX_AUDIO_EVENT_MAX - 1].type, BOX_AUDIO_EVENT_LOST);
+    test_int(events[BOX_AUDIO_EVENT_MAX - 1].value, BOX_AUDIO_EVENT_MAX + 1);
+    test_int(box_audio_core_events_lost(core), 0);
+    test_int(box_audio_core_read_events(core, events, BOX_AUDIO_EVENT_MAX), 0);
+
+    for (i = 0; i < BOX_AUDIO_EVENT_MAX + 10; i ++) {
+        audio_play(core, 1, 999, 0, 1, 0, 1, 0);
+    }
+
+    test_int(box_audio_core_read_events(core, events, BOX_AUDIO_EVENT_MAX + 1),
+        BOX_AUDIO_EVENT_MAX);
+    test_int(events[BOX_AUDIO_EVENT_MAX - 1].type, BOX_AUDIO_EVENT_LOST);
+    test_int(events[BOX_AUDIO_EVENT_MAX - 1].value, 11);
+    test_int(box_audio_core_events_lost(core), 0);
+
+    for (i = 0; i < BOX_AUDIO_EVENT_MAX - 1; i ++) {
+        audio_play(core, 1, 999, 0, 1, 0, 1, 0);
+    }
+
+    test_int(audio_events(core, BOX_AUDIO_EVENT_LOST, NULL), 0);
     test_int(box_audio_core_read_events(core, events, BOX_AUDIO_EVENT_MAX), 0);
     audio_render(core, 0, 256);
     test_flt(audio_peak(audio_l, 0, 256), 0);
+    box_audio_core_free(core);
+}
+
+/** Bytes of a batch of 300 plays and a release */
+#define ROBUST_BURST_BYTES 32768
+
+/** Plays of a burst, at the voice cap each steals a voice and most end one */
+#define ROBUST_BURST 300
+
+static uint8_t robust_burst[ROBUST_BURST_BYTES];
+
+/** Read every event of the core in reads of at most 64, and look for a SOUND_FREE.
+ *
+ * @param core The core
+ * @param sound Sound whose SOUND_FREE is looked for
+ * @param lost Receives the sum of the values of the LOST events
+ * @return Number of SOUND_FREE events of the sound
+ */
+static int32_t robust_drain(
+    box_audio_core_t *core,
+    uint32_t sound,
+    int32_t *lost)
+{
+    box_audio_event_t events[64];
+    int32_t count, i, freed = 0, total = 0;
+    *lost = 0;
+    do {
+        count = box_audio_core_read_events(core, events, 64);
+        for (i = 0; i < count; i ++) {
+            if (events[i].type == BOX_AUDIO_EVENT_SOUND_FREE && events[i].id == sound) {
+                freed ++;
+            } else if (events[i].type == BOX_AUDIO_EVENT_LOST) {
+                *lost += events[i].value;
+            }
+        }
+
+        total += count;
+        test_assert(total <= BOX_AUDIO_EVENT_MAX * 4);
+    } while (count);
+
+    return freed;
+}
+
+/* Steals and ends of the plays fill the ring before the release of the unused sound, whose id
+ * stays taken until the transport learns it is free. */
+void Robust_release_after_burst(void) {
+    // audio/robust
+    box_audio_core_t *core = audio_new();
+    box_audio_writer_t w;
+    int32_t i, lost;
+    audio_fill(audio_sound_a, AUDIO_FRAMES, 0.01f);
+    audio_fill(audio_sound_b, 100, 0.5f);
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_FRAMES, 1, AUDIO_RATE));
+    test_assert(box_audio_core_sound(core, 2, audio_sound_b, 100, 1, AUDIO_RATE));
+
+    box_audio_writer_init(&w, robust_burst, sizeof(robust_burst));
+    for (i = 0; i < ROBUST_BURST; i ++) {
+        test_assert(box_audio_write_play(&w, (uint32_t)i, 1, 0, 0.5f, 0, 1, 0));
+    }
+
+    test_assert(box_audio_write_release(&w, 2));
+    box_audio_core_apply(core, w.data, w.size);
+    test_assert(box_audio_core_events_lost(core) > 0);
+
+    test_assert(!box_audio_core_sound(core, 2, audio_sound_b, 100, 1, AUDIO_RATE));
+    test_int(robust_drain(core, 2, &lost), 1);
+    test_assert(lost > 0);
+    test_int(box_audio_core_events_lost(core), 0);
+    test_assert(box_audio_core_sound(core, 2, audio_sound_b, 100, 1, AUDIO_RATE));
+    test_int(box_audio_core_voice_count(core), BOX_AUDIO_VOICE_MAX);
+    box_audio_core_free(core);
+}
+
+/* The voice of sound 2 is the loudest, so the cap steals the plays of the burst instead. It ends
+ * in the render while the ring is full, so its SOUND_FREE comes from the end of the source. */
+void Robust_release_playing_after_burst(void) {
+    // audio/robust
+    box_audio_core_t *core = audio_new();
+    box_audio_writer_t w;
+    int32_t i, lost;
+    audio_fill(audio_sound_a, AUDIO_FRAMES, 0.01f);
+    audio_fill(audio_sound_b, 100, 0.5f);
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_FRAMES, 1, AUDIO_RATE));
+    test_assert(box_audio_core_sound(core, 2, audio_sound_b, 100, 1, AUDIO_RATE));
+
+    box_audio_writer_init(&w, robust_burst, sizeof(robust_burst));
+    test_assert(box_audio_write_play(&w, 10000, 2, 0, 1, 0, 1, 0));
+    test_assert(box_audio_write_release(&w, 2));
+    for (i = 0; i < ROBUST_BURST; i ++) {
+        test_assert(box_audio_write_play(&w, (uint32_t)i, 1, 0, 0.5f, 0, 1, 0));
+    }
+
+    box_audio_core_apply(core, w.data, w.size);
+    test_assert(box_audio_core_events_lost(core) > 0);
+    test_assert(!box_audio_core_sound(core, 2, audio_sound_b, 100, 1, AUDIO_RATE));
+
+    audio_render(core, 0, 256);
+    test_assert(!box_audio_core_sound(core, 2, audio_sound_b, 100, 1, AUDIO_RATE));
+    test_int(robust_drain(core, 2, &lost), 1);
+    test_assert(lost > 0);
+    test_int(box_audio_core_events_lost(core), 0);
+    test_assert(box_audio_core_sound(core, 2, audio_sound_b, 100, 1, AUDIO_RATE));
     box_audio_core_free(core);
 }

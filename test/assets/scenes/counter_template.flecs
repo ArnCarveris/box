@@ -1,0 +1,11 @@
+// Scene of the box_client tests of tools/test_box_client.py: a template with a prop and a mut on
+// separate lines, so that a member path into its mut (Counter.mut.count) can be got and set.
+
+template Counter {
+  prop step: i32 = 1
+  mut count: i32 = 0
+}
+
+counter {
+  Counter: {}
+}

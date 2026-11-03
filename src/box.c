@@ -42,6 +42,7 @@ void BoxImport(
     ECS_IMPORT(world, BoxInput);
     ECS_IMPORT(world, BoxControllers);
     ECS_IMPORT(world, BoxApp);
+    ECS_IMPORT(world, BoxAudio);
     ECS_IMPORT(world, BoxJobs);
     ECS_IMPORT(world, BoxTexture);
     ECS_IMPORT(world, BoxText);
