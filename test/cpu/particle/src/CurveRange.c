@@ -355,6 +355,20 @@ void CurveRange_streams_new(void) {
     test_int(same, 0);
 }
 
+void CurveRange_blend_only_with_max(void) {
+    // particle/curve_cost
+    uint32_t curve, i;
+    for (curve = BOX_PARTICLE_CURVE_SIZE; curve <= BOX_PARTICLE_CURVE_COLOR; curve ++) {
+        for (i = 0; i < 16; i ++) {
+            test_flt(box_particle_curve_blend(SEED, i, curve, BOX_PARTICLE_CURVE_CONSTANT), 0);
+            test_flt(box_particle_curve_blend(SEED, i, curve, 0),
+                box_particle_blend(SEED, i, curve));
+            test_flt(box_particle_curve_blend(SEED, i, curve, 7),
+                box_particle_blend(SEED, i, curve));
+        }
+    }
+}
+
 void CurveRange_spin_area_blended(void) {
     // particle/curve_range
     ParticleCurve lo = { CurveLinear, BOX_CURVE_KEYS({0, 1}, {1, 0}) };

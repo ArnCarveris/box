@@ -1234,6 +1234,7 @@ static void box_particles_light_write(
  * @param playback Its playback control, NULL to play; receives the clock and a cleared reset
  * @param curves Its ParticleCurves, NULL for none
  * @param timeline Its ParticleTimeline, NULL for none
+ * @param motion Its ParticleMotion, NULL for none
  * @param look Its ParticleAppearance, NULL for none
  * @param effect The ParticleEffect of the instance it plays in, NULL for none
  * @param lights The lights its ParticleLight drives
@@ -1250,6 +1251,7 @@ static void box_particles_emitter(
     ParticlePlayback *playback,
     const ParticleCurves *curves,
     const ParticleTimeline *timeline,
+    const ParticleMotion *motion,
     const ParticleAppearance *look,
     const ParticleEffect *effect,
     const box_particles_light_t *lights,
@@ -1385,8 +1387,7 @@ static void box_particles_emitter(
 
     box_particles_block_forces(pool, emitter->acceleration, &forces, moves, &entry->block);
     box_particle_rows_update(&s->curves, &pool->curves, curves);
-    box_particle_rows_motion_update(&s->curves, &pool->motion,
-        ecs_get(world, e, ParticleMotion));
+    box_particle_rows_motion_update(&s->curves, &pool->motion, motion);
     box_particles_block_look(curves, look, pool, &entry->block);
     entry->curves = box_particle_rows_used(&pool->curves) ||
         box_particle_rows_motion_used(&pool->motion)
@@ -1575,11 +1576,13 @@ static void BoxRenderExtractParticles(
         PointLight *points = ecs_field(&qit, PointLight, 7);
         SpotLight *spots = ecs_field(&qit, SpotLight, 8);
         const ParticleTimeline *timelines = ecs_field(&qit, ParticleTimeline, 9);
+        const ParticleMotion *motions = ecs_field(&qit, ParticleMotion, 10);
         bool lights_shared = lights && !ecs_field_is_self(&qit, 6);
         bool shared = ecs_field_is_set(&qit, 1) && !ecs_field_is_self(&qit, 1);
         bool curves_shared = curves && !ecs_field_is_self(&qit, 4);
         bool looks_shared = looks && !ecs_field_is_self(&qit, 5);
         bool timelines_shared = timelines && !ecs_field_is_self(&qit, 9);
+        bool motions_shared = motions && !ecs_field_is_self(&qit, 10);
         ecs_entity_t effect_src = 0;
         bool effect_self = box_particles_effect_of(world, qit.table, 0, &effect_src);
         bool effect_rows = !effect_self && ecs_table_has_id(world, qit.table, ecs_id(EcsParent));
@@ -1603,6 +1606,7 @@ static void BoxRenderExtractParticles(
                 box_render_scene_field(&qit, 2, i), playbacks ? &playbacks[i] : NULL,
                 curves ? &curves[curves_shared ? 0 : i] : NULL,
                 timelines ? &timelines[timelines_shared ? 0 : i] : NULL,
+                motions ? &motions[motions_shared ? 0 : i] : NULL,
                 looks ? &looks[looks_shared ? 0 : i] : NULL,
                 effect_self ? ecs_get(world, qit.entities[i], ParticleEffect) : shared_effect,
                 &light, &stats);
@@ -1757,7 +1761,8 @@ void box_render_particles_import(
                     .inout = EcsInOut,
                     .oper = EcsOptional
                 },
-                { .id = ecs_id(ParticleTimeline), .inout = EcsIn, .oper = EcsOptional }
+                { .id = ecs_id(ParticleTimeline), .inout = EcsIn, .oper = EcsOptional },
+                { .id = ecs_id(ParticleMotion), .inout = EcsIn, .oper = EcsOptional }
             },
             .cache_kind = EcsQueryCacheAuto
         });

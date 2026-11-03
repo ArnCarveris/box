@@ -202,7 +202,19 @@
                     "simulate_1m_forces",
                     "draw_1m",
                     "smoke_fill",
-                    "effect_plays_1k"
+                    "effect_plays_1k",
+                    "simulate_1m_motion",
+                    "draw_1m_constant_curves",
+                    "draw_1m_curves",
+                    "draw_1m_curves_max",
+                    "draw_1m_curves_motion",
+                    "draw_1m_curves_max_motion",
+                    "extract_4k_no_curves",
+                    "extract_4k_constant_curves",
+                    "extract_4k_curves",
+                    "extract_4k_curves_max",
+                    "extract_4k_curves_change_one",
+                    "effect_plays_1k_curves"
                 ]
             }
         ]

@@ -218,6 +218,16 @@ fn particle_blend(seed: u32, index: u32, curve: u32) -> f32 {
     return particle_unit(particle_hash(seed, index, STREAM_CURVE + curve));
 }
 
+// The blend of a particle for a curve whose max curve is at max_row: 0 for a curve without a max
+// curve, which does not blend, so that an emitter without max curves hashes nothing for them.
+fn particle_curve_blend(seed: u32, index: u32, curve: u32, max_row: u32) -> f32 {
+    if (max_row == CURVE_CONSTANT) {
+        return 0.0;
+    }
+
+    return particle_blend(seed, index, curve);
+}
+
 // A display encoded color decoded to linear.
 fn particle_decode(c: vec3f) -> vec3f {
     return select(pow((c + 0.055) / 1.055, vec3f(2.4)), c / 12.92, c <= vec3f(0.04045));

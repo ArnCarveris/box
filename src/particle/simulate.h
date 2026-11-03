@@ -299,6 +299,29 @@ static inline float box_particle_blend(
     return box_particle_unit(box_particle_hash(seed, index, BOX_PARTICLE_STREAM_CURVE + curve));
 }
 
+/** Get the blend of a particle for a curve with a max curve: 0 for a curve without one, which
+ * does not blend, so that an emitter without max curves hashes nothing for them.
+ *
+ * @param seed The seed of the emitter
+ * @param index The spawn index of the particle
+ * @param curve The curve, BOX_PARTICLE_CURVE_SIZE to BOX_PARTICLE_CURVE_COLOR
+ * @param max_row Row of its max curve, BOX_PARTICLE_CURVE_CONSTANT for none
+ * @return The blend, 0 to 1
+ */
+static inline float box_particle_curve_blend(
+    uint32_t seed,
+    uint32_t index,
+    uint32_t curve,
+    uint32_t max_row)
+{
+    float result = 0.0f;
+    if (max_row != BOX_PARTICLE_CURVE_CONSTANT) {
+        result = box_particle_blend(seed, index, curve);
+    }
+
+    return result;
+}
+
 /** Decode a display encoded channel to linear.
  *
  * @param c The channel, 0 to 1
