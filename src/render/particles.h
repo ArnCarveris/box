@@ -21,6 +21,13 @@
 /** First buffer handle of the corner buffers of the ParticleBillboard meshes */
 #define BOX_RENDER_BUFFER_PARTICLE_MESH_FIRST (0x5C000000u)
 
+/** Buffer handle of the curve table: the baked rows of the curves of every emitter, of
+ * BOX_PARTICLE_CURVE_SAMPLES floats each */
+#define BOX_RENDER_BUFFER_PARTICLE_CURVES (0x5FFFFFFFu)
+
+/** Rows of the curve table when it is first created, doubled when it grows */
+#define BOX_RENDER_PARTICLE_CURVE_ROWS (32u)
+
 /** Fewest keys a sort of a pool sorts, the keys one workgroup sorts in shared memory */
 #define BOX_RENDER_PARTICLE_SORT_MIN (512u)
 
@@ -90,11 +97,13 @@ typedef struct box_render_particle_block_t {
     float softness;         /**< World units a particle fades over in front of the geometry */
     float stretch;          /**< Length added along the screen velocity per unit of speed */
     float lit;              /**< Fraction of the color the lights shade */
-    float curve_size[4];    /**< Keys of the size multiplier */
-    float curve_opacity[4]; /**< Keys of the opacity multiplier */
-    float curve_rotation[4]; /**< Keys of the turns added to the rotation */
-    float curve_spin[4];    /**< Keys of the spin multiplier */
-    float gradient[4][4];   /**< Linear colors of the color multiplier, w unused */
+    uint32_t curve_rows[4]; /**< Rows in the curve table of the size, opacity, rotation turns
+                             *   and spin curves, BOX_PARTICLE_CURVE_CONSTANT for a constant
+                             *   one; the area of the spin is in the row after its own */
+    float curve_values[4];  /**< Values of those curves while constant */
+    float gradient[3];      /**< Linear color of a constant color multiplier */
+    uint32_t gradient_row;  /**< First of the BOX_PARTICLE_GRADIENT_ROWS rows of the color
+                             *   multiplier, BOX_PARTICLE_CURVE_CONSTANT for a constant one */
     uint32_t corners;       /**< Vertices drawn per particle: 6 for a quad, else the corners of
                              *   the billboard mesh */
     uint32_t sorted;        /**< 1 when the pool is drawn back to front through its sort keys */
@@ -116,6 +125,7 @@ typedef struct box_render_particle_pool_t {
     uint32_t slots;         /**< Data offset of the block.count uint32_t spawn slots */
     uint32_t texture;       /**< Texture handle of a sprite, 0 for white */
     uint32_t mesh;          /**< Buffer handle of the corners of a billboard, 0 for none */
+    uint32_t curves;        /**< Buffer handle of the curve table, 0 before it exists */
     box_render_particle_block_t block; /**< Parameters of the frame */
 } box_render_particle_pool_t;
 
@@ -162,6 +172,34 @@ box_render_particles_t* box_render_particles_get(
 int32_t box_render_particles_live(
     const box_render_particles_t *s,
     ecs_entity_t emitter);
+
+/** Counts of the curve table of the particle extract */
+typedef struct box_render_particle_curve_stats_t {
+    int32_t rows;           /**< Rows of the table that were ever handed out */
+    int32_t used;           /**< Rows that curves of an emitter use */
+    int32_t capacity;       /**< Rows the buffer holds */
+    int32_t entries;        /**< Distinct curves in use */
+    int64_t bakes;          /**< Curves baked into rows since the table was made */
+} box_render_particle_curve_stats_t;
+
+/** Get the counts of the curve table.
+ *
+ * @param s The state of the extract, NULL for none
+ * @param out Receives the counts, zeroed for no state
+ */
+void box_render_particles_curve_stats(
+    const box_render_particles_t *s,
+    box_render_particle_curve_stats_t *out);
+
+/** Get the rows of the curve table as the extract last sent them.
+ *
+ * @param s The state of the extract, NULL for none
+ * @param rows Receives the rows that were handed out, NULL to ignore
+ * @return The rows, BOX_PARTICLE_CURVE_SAMPLES floats each, NULL without rows
+ */
+const float* box_render_particles_curve_table(
+    const box_render_particles_t *s,
+    int32_t *rows);
 
 /** Check whether a packet runs a particle shader.
  *

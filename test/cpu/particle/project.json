@@ -154,8 +154,22 @@
                     "spin_area_ramp",
                     "spin_area_not_spin_times_age",
                     "rotation_adds_turns",
+                    "row_holds_keys",
+                    "area_row_accumulates",
                     "c_defaults",
                     "script_defaults"
+                ]
+            },
+            {
+                "id": "CurveTable",
+                "testcases": [
+                    "block_reads_rows",
+                    "row_holds_keys",
+                    "equal_curves_share_rows",
+                    "change_rebakes",
+                    "no_curves_no_rows",
+                    "delete_frees_rows",
+                    "growth_creates_table_again"
                 ]
             },
             {
