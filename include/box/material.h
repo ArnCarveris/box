@@ -395,9 +395,19 @@ ECS_STRUCT(PbrTextures, {
  * result. Changing the mask, a layer, the PbrTextures or TextureTransform of a layer, or a
  * reload of one of their images updates the shapes.
  *
- * Only opaque 3D shapes blend: a shape with AlphaCutoff, a BlendMode other than Opaque, an
- * Opacity under 1, Transmission, or a MappingObject or MappingWorld TextureMapping with a blend
- * above 0 (triplanar) draws as if it had no TextureBlend, and 2D shapes ignore it.
+ * The alpha of a blended shape is the weighted alpha of the albedos of its layers: AlphaCutoff
+ * tests it in the forward pass, the depth prepass and the shadow pass, so a blended fence casts
+ * the shadow of its holes, and a BlendMode, an Opacity under 1 and Transmission draw with it. A
+ * MappingObject or MappingWorld TextureMapping with a blend above 0 (triplanar) samples the mask
+ * and each layer with a weight once per projection with a weight: a face along an axis whose
+ * mask weighs one layer samples each map once, a corner where three projections and four layers
+ * meet twelve times. BackFacePlain back faces sample no layer, but the albedo of an alpha tested
+ * shape. 2D shapes ignore a TextureBlend.
+ *
+ * Picking onto the texture of a blended shape (a mask, a layer albedo or the PbrTextures.emissive
+ * that a Surface renders) reports the texture coordinates of the shape, those the mask is
+ * sampled with, not those of a layer with its TextureTransform; it does not tell which layer
+ * weighs most at the hit, as the mask is not read back from the GPU.
  */
 ECS_STRUCT(TextureBlend, {
     ecs_entity_t mask;      /**< Texture entity whose red, green, blue and alpha weigh layers

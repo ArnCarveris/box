@@ -7,7 +7,11 @@
 // the cutoff of its material, and discard where the alpha times the albedo alpha of the batch
 // (group 2) is below the cutoff, as the forward pass does. A MappingObject or MappingWorld
 // material projects the UV in the fragment stage, as mesh.wgsl does (mapping_uv), and with a
-// blend above 0 blends the alpha of its three axis projections (mapping_alpha).
+// blend above 0 blends the alpha of its three axis projections (mapping_alpha). Alpha tested
+// casters with a TextureBlend draw with fs_cutout_blend and fs_point_cutout_blend, which bind the
+// blend group of their batch in group 2 instead and discard where the alpha times the weighted
+// alpha of the layer albedos is below the cutoff (blend_alpha), so they cast the shadow they
+// show.
 //
 // Spot light tiles of the shadow atlas draw with vs and vs_cutout too. A point light tile is
 // drawn once per octant of its octahedron with vs_point and vs_point_cutout, the octant in the
@@ -25,6 +29,7 @@ enable clip_distances;
 
 #include "include/instance.wgsl"
 #include "include/material.wgsl"
+#include "include/blend.wgsl"
 
 // Uniforms of a cascade, a spot light tile or an octant of a point light tile.
 struct Cascade {
@@ -48,6 +53,13 @@ const OCTANT_AXIS: f32 = 0.57735026919;
 
 @group(2) @binding(0) var albedo_map: texture_2d<f32>;
 @group(2) @binding(4) var material_sampler: sampler;
+
+// The blend group of an alpha tested caster with a TextureBlend (fs_cutout_blend and
+// fs_point_cutout_blend only): the albedo of each layer as a slice of an array, the mask and the
+// uniforms, at the bindings mesh.wgsl has them.
+@group(2) @binding(5) var blend_albedo: texture_2d_array<f32>;
+@group(2) @binding(8) var blend_mask: texture_2d<f32>;
+@group(2) @binding(9) var<uniform> blending: BlendUniforms;
 
 struct VertexIn {
     @location(0) position: vec3f,
@@ -230,6 +242,21 @@ fn cutout_test(uv: vec2f, alpha: f32, cutoff: f32, mapped: f32, object: vec4f,
     cutout_test(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
 }
 
+// Discard as cutout_test does, with the weighted alpha of the layers of a TextureBlend in place
+// of the albedo alpha of the batch.
+fn cutout_test_blend(uv: vec2f, alpha: f32, cutoff: f32, mapped: f32, object: vec4f,
+    object_normal: vec3f) {
+    if (alpha * blend_alpha(blend_albedo, blend_mask, material_sampler, blending, uv, mapped,
+        object, object_normal) < cutoff)
+    {
+        discard;
+    }
+}
+
+@fragment fn fs_cutout_blend(f: CutoutOut) {
+    cutout_test_blend(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
+}
+
 @vertex fn vs_point(v: VertexIn) -> PointOut {
     let world = caster_world(v.slot, v.position);
     let d = octant_distances(world);
@@ -269,6 +296,10 @@ fn cutout_test(uv: vec2f, alpha: f32, cutoff: f32, mapped: f32, object: vec4f,
 @fragment fn fs_point_cutout(f: CutoutOut) {
     cutout_test(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
 }
+
+@fragment fn fs_point_cutout_blend(f: CutoutOut) {
+    cutout_test_blend(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
+}
 #else
 // Discard a fragment outside the octant of its draw, which core WebGPU cannot clip.
 fn octant_discard(clip: vec3f) {
@@ -283,6 +314,11 @@ fn octant_discard(clip: vec3f) {
 
 @fragment fn fs_point_cutout(f: PointCutoutOut) {
     cutout_test(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
+    octant_discard(f.clip);
+}
+
+@fragment fn fs_point_cutout_blend(f: PointCutoutOut) {
+    cutout_test_blend(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
     octant_discard(f.clip);
 }
 #endif

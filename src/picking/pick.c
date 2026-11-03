@@ -1043,11 +1043,48 @@ static void box_pick_mapping_uv(
     uv[1] += 0.5f;
 }
 
+/** Find the surface that renders a texture a shape with a TextureBlend shows: its mask, the
+ * albedo of a layer or the emissive of its own PbrTextures, not its own albedo, which the blend
+ * replaces.
+ *
+ * @param world The world
+ * @param st The module state
+ * @param blend The TextureBlend of the shape
+ * @param pt The PbrTextures of the shape, NULL for none
+ * @param out Receives the surface
+ * @return Whether a texture of the blend is the texture of a surface
+ */
+static bool box_pick_blend_surface(
+    const ecs_world_t *world,
+    box_pick_state_t *st,
+    const TextureBlend *blend,
+    const PbrTextures *pt,
+    box_pick_surface_t *out)
+{
+    bool result = box_pick_texture_surface(world, st, blend->mask, out);
+    int32_t k;
+    for (k = 0; !result && k < 4; k ++) {
+        ecs_entity_t layer = blend->layers[k];
+        const PbrTextures *textures = layer && ecs_is_alive(world, layer)
+            ? ecs_get(world, layer, PbrTextures) : NULL;
+        result = textures && box_pick_texture_surface(world, st, textures->albedo, out);
+    }
+
+    if (!result && pt) {
+        result = box_pick_texture_surface(world, st, pt->emissive, out);
+    }
+
+    return result;
+}
+
 /** Map a hit on an entity that shows the texture of a surface to a cursor on that surface.
  *
  * An Image maps the area of the element to its texture area, through the nine parts of its
  * ImageSlice as the renderer draws it, PbrTextures map the UV of the mesh, or the projection of
  * a MappingObject or MappingWorld TextureMapping, through TextureTransform and TextureWrap.
+ *
+ * A TextureBlend maps them the same way when a surface renders its mask, a layer albedo or its
+ * emissive (box_pick_blend_surface): the coordinates of the mask, without a layer transform.
  *
  * @param world The world
  * @param st The module state
@@ -1067,6 +1104,7 @@ static bool box_pick_texture(
 {
     const Image *img = ecs_get(world, e, Image);
     const PbrTextures *pt = img ? NULL : ecs_get(world, e, PbrTextures);
+    const TextureBlend *blend = img ? NULL : ecs_get(world, e, TextureBlend);
     vec2 uv = {0}, size, local;
     bool circle = false, result = false;
     float t = 0;
@@ -1093,8 +1131,9 @@ static bool box_pick_texture(
                     glm_clamp(v, 0.0f, 1.0f) * size[1], uv);
             }
         }
-    } else if (pt && (box_pick_texture_surface(world, st, pt->albedo, out) ||
-        box_pick_texture_surface(world, st, pt->emissive, out)))
+    } else if (blend ? box_pick_blend_surface(world, st, blend, pt, out)
+        : pt && (box_pick_texture_surface(world, st, pt->albedo, out) ||
+            box_pick_texture_surface(world, st, pt->emissive, out)))
     {
         const TextureTransform *tt = ecs_get(world, e, TextureTransform);
         const TextureWrap *wrap = ecs_get(world, e, TextureWrap);

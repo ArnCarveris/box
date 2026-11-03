@@ -166,7 +166,7 @@ typedef struct box_draw_key_t {
                              *   fs_shadow entry point of the 2D shape shader */
     bool slice;             /**< Rects with an ImageSlice, drawn with the fs_slice entry point
                              *   of the 2D shape shader */
-    bool texture_blend;     /**< Opaque 3D shapes with a TextureBlend, drawn with the
+    bool texture_blend;     /**< 3D shapes with a TextureBlend, drawn with the
                              *   texture_blend variant of the mesh pipeline: textures[0] is the
                              *   entity that owns the TextureBlend, textures[2] and textures[3]
                              *   are 0, so the key does not grow */
@@ -1551,12 +1551,12 @@ void box_draws_batch_blend(
     box_render_batch_t *out);
 
 /** Get the entity whose TextureBlend a 3D shape draws with: the owner of the TextureBlend it
- * has or inherits, 0 when it has none or draws as if it had none (alpha tested, blended,
- * transmissive or with a triplanar TextureMapping).
+ * has or inherits, 0 when it has none or is no mesh shape of the mesh shader. Alpha tested,
+ * blended, transmissive and triplanar shapes blend as opaque ones do.
  *
  * @param world The world
  * @param e The shape
- * @param key Its key, with blend, cutout and transmissive resolved
+ * @param key Its key, with its pipeline resolved
  * @return The owner, 0 for none
  */
 ecs_entity_t box_draws_blend_owner(

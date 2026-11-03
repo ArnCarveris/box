@@ -1,0 +1,88 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+// TextureBlend on alpha tested and blended shapes. On the left a blended fence panel (AlphaCutoff)
+// whose mask (blend_mask.png, red top left, green top right) shows the lattice of fence.png on
+// its left and bottom and the leaf of leaf.png in its top right quadrant: the cutout follows the
+// weighted alpha of the two layers, and the sun from behind casts a shadow toward the camera with
+// the same holes, the lattice and the leaf. On the right a blended quad with BlendMode AlphaBlend
+// and the same mask over a checkered floor: where the leaf and the lattice are transparent the
+// floor shows through, where they are opaque they cover it.
+
+camera {
+  Position: {0, 2.6, 7.5}
+  Rotation: {-0.25, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {120, 160, 210, 255}}, shadows: {enabled: true}}
+}
+
+$ {
+  AmbientLight: {sky: {150, 170, 200}, ground: {70, 64, 56}, intensity: 0.5}
+}
+
+sun {
+  Rotation: {0.7, -0.3, 0}
+  DirectionalLight: {intensity: 1.5 * flecs.script.math.PI}
+  Rgb: {255, 245, 230}
+}
+
+mask {
+  TexturePath: {path: "test/integration/visual/assets/blend_mask.png"}
+}
+
+fence_tex {
+  TexturePath: {path: "test/integration/visual/assets/fence.png"}
+}
+
+leaf_tex {
+  TexturePath: {path: "test/integration/visual/assets/leaf.png"}
+}
+
+checker {
+  TexturePath: {path: "test/integration/visual/assets/checker.png"}
+}
+
+fence_layer {
+  PbrTextures: {albedo: fence_tex}
+  TextureTransform: {scale_x: 2, scale_y: 2}
+}
+
+leaf_layer {
+  PbrTextures: {albedo: leaf_tex}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {16, 0.2, 10}
+  Rgb: {200, 204, 190}
+  PbrTextures: {albedo: checker}
+  TextureTransform: {scale_x: 8, scale_y: 5}
+}
+
+fence {
+  Position: {-1.8, 1.2, -0.8}
+  Rotation: {0, 0.2, 0}
+  Box: {2.4, 2.4, 0.06}
+  Rgb: {235, 215, 190}
+  PbrMaterial: {roughness: 0.7}
+  TextureBlend: {mask: mask, layers: [fence_layer, leaf_layer]}
+  AlphaCutoff: {value: 0.5}
+}
+
+decal {
+  Position: {1.9, 0.02, 0.6}
+  Rotation: {-0.5 * flecs.script.math.PI, 0, 0}
+  Quad: {2.4, 2.4}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.6}
+  TextureBlend: {mask: mask, layers: [fence_layer, leaf_layer]}
+  BlendMode: {AlphaBlend}
+}

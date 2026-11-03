@@ -149,12 +149,18 @@ static char* bench_texture_noise(
  * PbrTextures or with a TextureBlend of four layers of PbrTextures under a noise mask, so most
  * fragments weigh several layers. Every frame waits for the GPU, so a case measures a frame.
  *
+ * With triplanar the sphere has a MappingObject TextureMapping with a blend of 1, so most
+ * fragments weigh the three projections; blended as well, that is the worst case of a
+ * TextureBlend, the mask and up to four layers sampled once per projection.
+ *
  * @param b The benchmark
  * @param blended Whether the sphere blends four layers
+ * @param triplanar Whether the sphere blends three projections
  */
 static void bench_texture_frame(
     bench_t *b,
-    bool blended)
+    bool blended,
+    bool triplanar)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -185,6 +191,10 @@ static void bench_texture_frame(
     ecs_set(world, e, Rgb, {220, 200, 180});
     ecs_set(world, e, PbrTextures, {.albedo = tex, .orm = tex, .normal = tex, .emissive = tex});
     ecs_set(world, e, Emissive, {.strength = 0.1f, .color = {255, 255, 255}});
+    if (triplanar) {
+        ecs_set(world, e, TextureMapping, {.mode = MappingObject, .size = 1.5f, .blend = 1});
+    }
+
     if (blended) {
         TextureBlend blend = { .mask = mask };
         int32_t i;
@@ -237,12 +247,26 @@ void Texture_single_frame(
     bench_t *b)
 {
     // materials/texture_blend
-    bench_texture_frame(b, false);
+    bench_texture_frame(b, false, false);
 }
 
 void Texture_blend_four_frame(
     bench_t *b)
 {
     // materials/texture_blend
-    bench_texture_frame(b, true);
+    bench_texture_frame(b, true, false);
+}
+
+void Texture_single_triplanar_frame(
+    bench_t *b)
+{
+    // materials/texture_blend
+    bench_texture_frame(b, false, true);
+}
+
+void Texture_blend_four_triplanar_frame(
+    bench_t *b)
+{
+    // materials/texture_blend
+    bench_texture_frame(b, true, true);
 }

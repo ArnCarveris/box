@@ -243,6 +243,16 @@ void box_gpu_shadow_fini(
         gpu->shadow_point_cutout = NULL;
     }
 
+    if (gpu->shadow_cutout_blend) {
+        wgpuRenderPipelineRelease(gpu->shadow_cutout_blend);
+        gpu->shadow_cutout_blend = NULL;
+    }
+
+    if (gpu->shadow_point_cutout_blend) {
+        wgpuRenderPipelineRelease(gpu->shadow_point_cutout_blend);
+        gpu->shadow_point_cutout_blend = NULL;
+    }
+
     gpu->shadow_point_shader = 0;
 
     if (gpu->shadow_buffer) {
@@ -273,6 +283,11 @@ void box_gpu_shadow_fini(
     if (gpu->shadow_cutout_layout) {
         wgpuPipelineLayoutRelease(gpu->shadow_cutout_layout);
         gpu->shadow_cutout_layout = NULL;
+    }
+
+    if (gpu->shadow_blend_layout) {
+        wgpuPipelineLayoutRelease(gpu->shadow_blend_layout);
+        gpu->shadow_blend_layout = NULL;
     }
 
     if (gpu->shadow_clear_layout) {
@@ -403,13 +418,16 @@ done:
  * also reads the normal and UV of the vertices, and its fragment stage discards below the cutoff.
  *
  * The point light pipelines project into an octant of the tile; without clip distances the
- * plain one has a fragment stage that discards outside the octant.
+ * plain one has a fragment stage that discards outside the octant. An alpha tested pipeline of
+ * a TextureBlend binds the blend group in group 2 (shadow_blend_layout, made on first use).
  *
  * @param gpu The backend
  * @param module The shadow shader module
  * @param cutout Whether to create the alpha tested pipeline
  * @param point Whether to create a pipeline of the octants of the point light tiles
  * @param discard Whether that pipeline discards outside the octant instead of clipping
+ * @param texture_blend Whether the alpha tested pipeline blends the layers of a TextureBlend;
+ * ignored without cutout
  * @return The pipeline
  */
 static WGPURenderPipeline box_gpu_shadow_create(
@@ -417,7 +435,8 @@ static WGPURenderPipeline box_gpu_shadow_create(
     WGPUShaderModule module,
     bool cutout,
     bool point,
-    bool discard)
+    bool discard,
+    bool texture_blend)
 {
     const char *vs = point
         ? (cutout ? "vs_point_cutout" : "vs_point")
@@ -425,6 +444,24 @@ static WGPURenderPipeline box_gpu_shadow_create(
     const char *fs = point
         ? (cutout ? "fs_point_cutout" : (discard ? "fs_point" : NULL))
         : (cutout ? "fs_cutout" : NULL);
+    WGPUPipelineLayout layout = cutout ? gpu->shadow_cutout_layout : gpu->shadow_pipeline_layout;
+    texture_blend = texture_blend && cutout;
+    if (texture_blend) {
+        WGPUBindGroupLayout groups[3] = {
+            gpu->shadow_layout, gpu->instance_layout, gpu->blend_layout
+        };
+        if (!gpu->shadow_blend_layout) {
+            gpu->shadow_blend_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
+                &(WGPUPipelineLayoutDescriptor){
+                    .bindGroupLayoutCount = 3,
+                    .bindGroupLayouts = groups
+                });
+        }
+
+        fs = point ? "fs_point_cutout_blend" : "fs_cutout_blend";
+        layout = gpu->shadow_blend_layout;
+    }
+
     WGPUVertexAttribute vertex_attrs[3] = {
         { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
         { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
@@ -459,7 +496,7 @@ static WGPURenderPipeline box_gpu_shadow_create(
         .entryPoint = { .data = fs, .length = WGPU_STRLEN }
     };
     WGPURenderPipelineDescriptor desc = {
-        .layout = cutout ? gpu->shadow_cutout_layout : gpu->shadow_pipeline_layout,
+        .layout = layout,
         .vertex = {
             .module = module,
             .entryPoint = { .data = vs, .length = WGPU_STRLEN },
@@ -546,8 +583,13 @@ static WGPURenderPipeline box_gpu_shadow_pipeline(
         wgpuRenderPipelineRelease(gpu->shadow_clear);
     }
 
-    gpu->shadow = box_gpu_shadow_create(gpu, s->module, false, false, false);
-    gpu->shadow_cutout = box_gpu_shadow_create(gpu, s->module, true, false, false);
+    if (gpu->shadow_cutout_blend) {
+        wgpuRenderPipelineRelease(gpu->shadow_cutout_blend);
+        gpu->shadow_cutout_blend = NULL;
+    }
+
+    gpu->shadow = box_gpu_shadow_create(gpu, s->module, false, false, false, false);
+    gpu->shadow_cutout = box_gpu_shadow_create(gpu, s->module, true, false, false, false);
     gpu->shadow_clear = box_gpu_shadow_clear_create(gpu, s->module);
     gpu->shadow_revision = s->revision;
 done:
@@ -597,9 +639,14 @@ static WGPURenderPipeline box_gpu_shadow_point_pipeline(
         wgpuRenderPipelineRelease(gpu->shadow_point_cutout);
     }
 
+    if (gpu->shadow_point_cutout_blend) {
+        wgpuRenderPipelineRelease(gpu->shadow_point_cutout_blend);
+        gpu->shadow_point_cutout_blend = NULL;
+    }
+
     bool discard = handle == BOX_RENDER_SHADER_SHADOW;
-    gpu->shadow_point = box_gpu_shadow_create(gpu, s->module, false, true, discard);
-    gpu->shadow_point_cutout = box_gpu_shadow_create(gpu, s->module, true, true, discard);
+    gpu->shadow_point = box_gpu_shadow_create(gpu, s->module, false, true, discard, false);
+    gpu->shadow_point_cutout = box_gpu_shadow_create(gpu, s->module, true, true, discard, false);
     gpu->shadow_point_shader = handle;
     gpu->shadow_point_revision = s->revision;
 done:
@@ -657,10 +704,39 @@ done:
     return;
 }
 
+/** Get the alpha tested shadow pipeline of the casters with a TextureBlend, created on first
+ * use from the shader the other pipelines of the cascades, or of the point light tiles, were
+ * made with, and released with them.
+ *
+ * @param gpu The backend
+ * @param point Whether to get the pipeline of the octants of the point light tiles
+ * @return The pipeline, NULL without a shader module
+ */
+static WGPURenderPipeline box_gpu_shadow_blend_pipeline(
+    box_gpu_t *gpu,
+    bool point)
+{
+    WGPURenderPipeline *slot = point ? &gpu->shadow_point_cutout_blend : &gpu->shadow_cutout_blend;
+    uint32_t handle = point && gpu->shadow_point_shader
+        ? gpu->shadow_point_shader : BOX_RENDER_SHADER_SHADOW;
+    box_gpu_shader_t *s = ecs_map_get_deref(&gpu->shaders, box_gpu_shader_t, handle);
+    if (*slot || !s || !s->module) {
+        goto done;
+    }
+
+    *slot = box_gpu_shadow_create(gpu, s->module, true, point,
+        handle == BOX_RENDER_SHADER_SHADOW, true);
+done:
+    return *slot;
+}
+
 /** Record the indirect draws of the shadow casters the cull pass kept in a cascade or a tile.
  *
  * Plain casters draw with the plain pipeline; alpha tested ones with the alpha tested pipeline
  * and the material group of their batch, whose albedo texture they sample.
+ *
+ * Alpha tested casters with a TextureBlend draw with box_gpu_shadow_blend_pipeline and the
+ * blend group of their batch, whose layers they blend.
  *
  * @param gpu The backend
  * @param pass The shadow pass of the cascade or the atlas
@@ -668,6 +744,7 @@ done:
  * @param cv The cull view of the cascade or the tile
  * @param plain Pipeline of the plain casters
  * @param alpha Pipeline of the alpha tested casters, NULL to draw them with the plain one
+ * @param point Whether the pass draws the octants of a point light tile
  * @param counted Whether the draws count in the shadow draws of the stats, false for the
  * probe captures
  */
@@ -678,6 +755,7 @@ static void box_gpu_shadow_draw(
     const box_gpu_cull_view_t *cv,
     WGPURenderPipeline plain,
     WGPURenderPipeline alpha,
+    bool point,
     bool counted)
 {
     WGPURenderPipeline bound = NULL;
@@ -690,6 +768,12 @@ static void box_gpu_shadow_draw(
             &packet->batches, box_render_batch_t, d->batch);
         bool cutout = b->cutout && alpha;
         WGPURenderPipeline pipeline = cutout ? alpha : plain;
+        if (cutout && box_gpu_texture_blends(b)) {
+            pipeline = box_gpu_shadow_blend_pipeline(gpu, point);
+            cutout = pipeline != NULL;
+            pipeline = cutout ? pipeline : plain;
+        }
+
         if (pipeline != bound) {
             wgpuRenderPassEncoderSetPipeline(pass, pipeline);
             bound = pipeline;
@@ -750,7 +834,8 @@ void box_gpu_shadow_render(
         WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
         wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
         if (cv) {
-            box_gpu_shadow_draw(gpu, pass, packet, cv, gpu->shadow, gpu->shadow_cutout, true);
+            box_gpu_shadow_draw(gpu, pass, packet, cv, gpu->shadow, gpu->shadow_cutout, false,
+                true);
         }
 
         wgpuRenderPassEncoderEnd(pass);
@@ -892,7 +977,8 @@ WGPUTextureView box_gpu_shadow_capture(
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, gpu->capture_shadow_group, 1, &offset);
     if (cv) {
-        box_gpu_shadow_draw(gpu, pass, packet, cv, gpu->shadow, gpu->shadow_cutout, false);
+        box_gpu_shadow_draw(gpu, pass, packet, cv, gpu->shadow, gpu->shadow_cutout, false,
+            false);
     }
 
     wgpuRenderPassEncoderEnd(pass);
@@ -1223,10 +1309,10 @@ static void box_gpu_atlas_pass(
             wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
             if (cv && octahedral) {
                 box_gpu_shadow_draw(gpu, pass, packet, cv, point, gpu->shadow_point_cutout,
-                    true);
+                    true, true);
             } else if (cv) {
                 box_gpu_shadow_draw(gpu, pass, packet, cv, gpu->shadow, gpu->shadow_cutout,
-                    true);
+                    false, true);
             }
         }
 
