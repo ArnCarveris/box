@@ -1069,6 +1069,9 @@ static void box_draws_observers(
     box_draws_observer(world, d, "DrawsOnTransitionOpacity", (ecs_observer_desc_t){
         .query.terms = {{ .id = TransitionOpacity }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
+    box_draws_observer(world, d, "DrawsOnTransitionBoxShadow", (ecs_observer_desc_t){
+        .query.terms = {{ .id = TransitionBoxShadow }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
     box_draws_observer(world, d, "DrawsOnLightBake", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(LightBake) }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnLightBake);

@@ -236,6 +236,13 @@
 /** Map of a layer of a TextureBlend: tangent space normal, stored */
 #define BOX_RENDER_BLEND_NORMAL (2)
 
+/** Map of a layer of a TextureBlend: height in red, stored, sampled only with a contrast above 0,
+ * after the maps every blend samples */
+#define BOX_RENDER_BLEND_HEIGHT (3)
+
+/** Textures of each layer of a TextureBlend in its record: the maps and the height */
+#define BOX_RENDER_BLEND_SOURCES (BOX_RENDER_BLEND_MAPS + 1)
+
 /** Anisotropic samples of the texture samplers when no surface sets them */
 #define BOX_RENDER_ANISOTROPY_DEFAULT (4)
 
@@ -575,8 +582,9 @@ typedef struct box_render_view_t {
     int32_t fog_first;          /**< Index of the first fog volume of the view in the packet */
     int32_t fog_count;          /**< Fog volumes the view draws, back to front, filled by the
                                  *   light extract for a lit view with LightSettings.fog_volumes */
-    ViewDebug debug;            /**< View.debug, all zero for the captures, which draw no debug
-                                 *   pass */
+    ViewDebug debug;            /**< View.debug, copied by a capture of the camera of a view;
+                                 *   all zero for the other captures (probes, reflections,
+                                 *   bakes, no view), which draw no debug pass */
 } box_render_view_t;
 
 /** Kind of an effect pass of a view */
@@ -1070,16 +1078,19 @@ typedef struct box_render_target_t {
  *
  * The backend blits the textures of each map into a texture array with a slice per layer, shared
  * by every batch with the same sources, and binds it with the mask, the emissive layer of the
- * batch (textures[1]) and the transforms in the texture_blend variant of the mesh pipeline. */
+ * batch (textures[1]) and the transforms in the texture_blend variant of the mesh pipeline. The
+ * heights make a fourth array only with a contrast above 0. */
 typedef struct box_render_texture_blend_t {
     uint32_t mask;      /**< Texture handle of the mask, 0 while it is not loaded */
-    uint32_t layers[BOX_RENDER_BLEND_LAYERS][BOX_RENDER_BLEND_MAPS]; /**< Texture handles of the
-                         *   albedo, ORM and normal of each layer, 0 for the default */
+    uint32_t layers[BOX_RENDER_BLEND_LAYERS][BOX_RENDER_BLEND_SOURCES]; /**< Texture handles
+                         *   of the albedo, ORM, normal and height of each layer, 0 for the
+                         *   default; the heights are 0 with a contrast of 0 */
     float transforms[BOX_RENDER_BLEND_LAYERS][4]; /**< TextureTransform of each layer: u scale,
                          *   v scale, u offset, v offset */
     uint32_t count;     /**< Layers up to the last one with an entity, at least 1: the slices of
                          *   the arrays */
     uint32_t quality;   /**< Largest dimension of a slice, the texture quality of the surfaces */
+    float contrast;     /**< TextureBlend.contrast, 0 for the linear blend without heights */
 } box_render_texture_blend_t;
 
 /** Instanced draw of one mesh with one pipeline, drawn by the views of its scene.
@@ -1146,16 +1157,17 @@ typedef enum box_render_transition_component_t {
     BOX_RENDER_TRANSITION_ANISOTROPY,       /**< SpecularAnisotropy */
     BOX_RENDER_TRANSITION_SHEEN,            /**< Sheen */
     BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION, /**< DiffuseTransmission */
+    BOX_RENDER_TRANSITION_BOX_SHADOW,       /**< BoxShadow */
     BOX_RENDER_TRANSITION_COMPONENTS        /**< Number of transitionable components */
 } box_render_transition_component_t;
 
-/** Bytes of the largest transitionable component (Transmission), the size of a value in a
- * record, a multiple of 4 so a value holds floats */
+/** Bytes of the largest transitionable components (Transmission, BoxShadow), the size of a
+ * value in a record, a multiple of 4 so a value holds floats */
 #define BOX_RENDER_TRANSITION_VALUE (20)
 
-/** Fields of the transitionable component with the most fields: Transmission, four floats and
- * the three bytes of its attenuation color */
-#define BOX_RENDER_TRANSITION_FIELDS (7)
+/** Fields of the transitionable component with the most fields: BoxShadow, four floats and
+ * the four bytes of its color */
+#define BOX_RENDER_TRANSITION_FIELDS (8)
 
 /** What a transition record does */
 typedef enum box_render_transition_op_t {
@@ -1173,9 +1185,12 @@ typedef enum box_render_transition_op_t {
     BOX_RENDER_TRANSITION_SHADING,      /**< A box_render_shading_t of a 2D shape or a glyph, or
                                          *   a box_render_mesh_shading_t of a mesh shape, in the
                                          *   packet data, written again the same way */
-    BOX_RENDER_TRANSITION_FADE          /**< The rendered tints and opacity of a node with an
+    BOX_RENDER_TRANSITION_FADE,         /**< The rendered tints and opacity of a node with an
                                          *   active Tint or Opacity transition, for this packet,
                                          *   composed from its parent node */
+    BOX_RENDER_TRANSITION_SHADOW_BOX    /**< The transform and the box_render_shading_t of the
+                                         *   shadow of a 2D shape, resolved again from the
+                                         *   box_draw_transition_box_shadow_t and its node */
 } box_render_transition_op_t;
 
 /** What a fade record points at in the packet data: the composed Tint and Opacity of the
@@ -1216,20 +1231,21 @@ typedef struct box_render_transition_pose_t {
  * the value without a transition; any other start transitions from the value the node renders
  * at the start time to the target. The records of a packet apply in the order they were made.
  *
- * Pose and slot records come every frame a node moves, parent nodes first, then the slots;
- * fade records every frame a Tint or Opacity runs, parent nodes first; then material and
- * shading records every frame they run, one per record.
+ * Pose and slot records come every frame a node moves, parent nodes first; fade records every
+ * frame a Tint or Opacity runs, parent nodes first; material, shading and box shadow records
+ * every frame they run, one per record, box shadows after the poses they read.
  */
 typedef struct box_render_transition_record_t {
     box_render_transition_op_t op;  /**< What the record does */
     uint32_t node;                  /**< Node id, from 1 */
-    uint32_t parent;                /**< Parent node of a pose or a fade, 0 for none */
+    uint32_t parent;                /**< Parent node of a pose or a fade, or the node that
+                                     *   moves the shape of a box shadow, 0 for none */
     uint32_t data;                  /**< Packet data offset of the pose of a pose, the rel
                                      *   matrix of a slot, the box_render_transition_fade_t of a
-                                     *   fade or the box_draw_transition_material_t of the rest */
+                                     *   fade, else the box_draw_transition_*_t of its op */
     uint32_t offset;                /**< Packet data offset of the box_render_transform_t a
                                      *   slot patches, or of the record a material or shading
-                                     *   record patches */
+                                     *   record patches, the shading of a box shadow */
     box_render_transition_component_t component; /**< Component of a start */
     TimingFunction timing_function; /**< Curve of a start */
     TransitionBezier bezier;        /**< Handles of a CubicBezier start, zero for the others */

@@ -147,7 +147,10 @@ static char* bench_texture_noise(
 
 /** Render frames of a lit sphere that fills a 3840x2160 surface, either with one set of
  * PbrTextures or with a TextureBlend of four layers of PbrTextures under a noise mask, so most
- * fragments weigh several layers. Every frame waits for the GPU, so a case measures a frame.
+ * fragments weigh several layers.
+ *
+ * Every frame waits for the GPU, so a case measures a frame. With a contrast above 0 the layers
+ * have the noise as their heights.
  *
  * With triplanar the sphere has a MappingObject TextureMapping with a blend of 1, so most
  * fragments weigh the three projections; blended as well, that is the worst case of a
@@ -155,12 +158,20 @@ static char* bench_texture_noise(
  *
  * @param b The benchmark
  * @param blended Whether the sphere blends four layers
+<<<<<<< HEAD
  * @param triplanar Whether the sphere blends three projections
+=======
+ * @param contrast TextureBlend.contrast of the blended sphere, 0 for the linear blend
+>>>>>>> dcd428d2f59705127d318ab404c7f52eaee7d2e8
  */
 static void bench_texture_frame(
     bench_t *b,
     bool blended,
+<<<<<<< HEAD
     bool triplanar)
+=======
+    float contrast)
+>>>>>>> dcd428d2f59705127d318ab404c7f52eaee7d2e8
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -196,7 +207,7 @@ static void bench_texture_frame(
     }
 
     if (blended) {
-        TextureBlend blend = { .mask = mask };
+        TextureBlend blend = { .mask = mask, .contrast = contrast };
         int32_t i;
         for (i = 0; i < 4; i ++) {
             blend.layers[i] = ecs_new(world);
@@ -204,6 +215,7 @@ static void bench_texture_frame(
                 .normal = tex});
             ecs_set(world, blend.layers[i], TextureTransform, {.scale_x = (float)(i + 1),
                 .scale_y = (float)(i + 1), .offset_x = 0.25f * (float)i});
+            blend.heights[i] = contrast > 0.0f ? tex : 0;
         }
 
         ecs_set_ptr(world, e, TextureBlend, &blend);
@@ -247,13 +259,18 @@ void Texture_single_frame(
     bench_t *b)
 {
     // materials/texture_blend
+<<<<<<< HEAD
     bench_texture_frame(b, false, false);
+=======
+    bench_texture_frame(b, false, 0.0f);
+>>>>>>> dcd428d2f59705127d318ab404c7f52eaee7d2e8
 }
 
 void Texture_blend_four_frame(
     bench_t *b)
 {
     // materials/texture_blend
+<<<<<<< HEAD
     bench_texture_frame(b, true, false);
 }
 
@@ -269,4 +286,14 @@ void Texture_blend_four_triplanar_frame(
 {
     // materials/texture_blend
     bench_texture_frame(b, true, true);
+=======
+    bench_texture_frame(b, true, 0.0f);
+}
+
+void Texture_blend_four_height_frame(
+    bench_t *b)
+{
+    // materials/texture_blend
+    bench_texture_frame(b, true, 16.0f);
+>>>>>>> dcd428d2f59705127d318ab404c7f52eaee7d2e8
 }

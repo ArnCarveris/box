@@ -240,8 +240,8 @@ typedef enum box_draw_transition_kind_t {
     BOX_DRAW_TRANSITION_MESH,       /**< The box_render_mesh_shading_t of a mesh shape: its tint
                                      *   and alpha */
     BOX_DRAW_TRANSITION_BOX_SHADOW  /**< The box_render_shading_t of the shadow of a 2D shape:
-                                     *   its color and cover alpha (material.w), which follow
-                                     *   the Tint and Opacity of the shape */
+                                     *   its color and cover alpha (material.w), or all of it
+                                     *   and its transform for a box shadow record */
 } box_draw_transition_kind_t;
 
 /** The target material of a record a material transition patches, as the game thread encoded
@@ -287,6 +287,26 @@ typedef struct box_draw_transition_material_t {
     float shadow_cover;     /**< The alpha the shape of a shadow record covers it with at an
                              *   opacity of 1, 0 for a blend mode that covers nothing */
 } box_draw_transition_material_t;
+
+/** What a box shadow record points at in the packet data: the target of the shadow of a 2D
+ * shape whose BoxShadow transitions, which the resolver resolves again with the BoxShadow its
+ * node renders (box_draws_box_shadow_patch).
+ *
+ * The shadow box shapes both the instance matrix and most words of the shading, so the record
+ * writes the whole transform and shading of the shadow slot. */
+typedef struct box_draw_transition_box_shadow_t {
+    box_draw_transition_material_t material; /**< Kind BOX_DRAW_TRANSITION_BOX_SHADOW: the
+                             *   tints, opacity and fade of the shape with their nodes, the cover
+                             *   alpha of the shape and in shape2d the resolved Rect */
+    BoxShadow shadow;       /**< Target BoxShadow */
+    float mesh_scale[2];    /**< ShapeMesh.scale of the shape, x and y, when meshed */
+    bool meshed;            /**< The shape has a ShapeMesh */
+    float world[4][4];      /**< Column major: target world matrix of the shape */
+    float rel[4][4];        /**< Column major: the target chain from the node that moves the
+                             *   shape (the parent of the record) down to the shape, read when
+                             *   that node has a pose in the packet */
+    uint32_t transform;     /**< Packet data offset of the box_render_transform_t of the shadow */
+} box_draw_transition_box_shadow_t;
 
 /** A matrix known to lie, element by element, between two matrices: the world matrices a node
  * of a transform transition can render with in a frame */
@@ -861,6 +881,23 @@ void box_draws_transition_fade_own(
     ecs_entity_t e,
     box_draw_tint_t *tint,
     float *alpha);
+
+/** Write the transform and the shading of a shadow from a box shadow record with the encoding
+ * of the game thread (box_draws_box_shadow_patch), from the material of the record with the
+ * rendered Tint, Opacity and fade. Pure: the resolver calls it on the render thread.
+ *
+ * @param record The record, its material holding the rendered values
+ * @param shadow The BoxShadow its node renders
+ * @param world World matrix the shape renders at
+ * @param transform The box_render_transform_t of the shadow in the packet data, unaligned
+ * @param shading The box_render_shading_t of the shadow in the packet data, unaligned
+ */
+void box_draws_transition_box_shadow(
+    const box_draw_transition_box_shadow_t *record,
+    const BoxShadow *shadow,
+    mat4 world,
+    void *transform,
+    void *shading);
 
 /** Send the fade record of a node of a Tint or Opacity transition: the composed Tint and
  * Opacity from its parent node, or of every ancestor without a parent node, and its target.
@@ -1536,8 +1573,10 @@ void box_draws_batch_textures(
     box_render_batch_t *out);
 
 /** Write the TextureBlend of a texture_blend batch into the packet data of its draw, as it is
- * now: the texture handles of the mask and the layers and the TextureTransform of each layer,
- * so a change of a layer reaches the draw without a change of the key.
+ * now: the texture handles of the mask, the layers and the heights, the TextureTransform of each
+ * layer and the contrast, so a change of a layer reaches the draw without a change of the key.
+ * Without a contrast the heights stay 0, so they neither split the bind groups nor make an
+ * array.
  *
  * @param p The packet
  * @param d The state
@@ -1710,6 +1749,69 @@ bool box_draws_box_shadow_target(
     const DrawSlot *s,
     const box_draw_material_t *material,
     box_draw_transition_material_t *out);
+
+/** Get the target of the box shadow record of an entity whose BoxShadow transitions: the
+ * target material of box_draws_box_shadow_target with the resolved Rect in shape2d, the
+ * BoxShadow, the mesh scale and the world matrix of its shape.
+ *
+ * No node is set, rel is the identity and transform 0.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ * @param s The DrawSlot of the entity
+ * @param material Material components of the shape (box_draws_shape_material)
+ * @param out Receives the target
+ * @return Whether the entity has a shadow slot
+ */
+bool box_draws_box_shadow_transition(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e,
+    const DrawSlot *s,
+    const box_draw_material_t *material,
+    box_draw_transition_box_shadow_t *out);
+
+/** Write the transform and the shading of a shadow from the target of a box shadow record and
+ * a BoxShadow, as box_draws_box_shadow_update writes them. Pure: the resolver calls it on the
+ * render thread.
+ *
+ * A shadow box without an area writes an instance that draws nothing. The clip and rank of the
+ * shading are kept.
+ *
+ * @param material The material components, with the rendered Tint, Opacity and fade
+ * @param record The target of the record
+ * @param shadow The BoxShadow to draw, the value its node renders
+ * @param world World matrix of the shape, the one it renders at
+ * @param transform The box_render_transform_t of the shadow in the packet data, unaligned
+ * @param shading The box_render_shading_t of the shadow in the packet data, unaligned
+ */
+void box_draws_box_shadow_patch(
+    const box_draw_material_t *material,
+    const box_draw_transition_box_shadow_t *record,
+    const BoxShadow *shadow,
+    mat4 world,
+    void *transform,
+    void *shading);
+
+/** Get an instance matrix of the shadow of an entity, relative to the world transform of its
+ * shape, whose quad holds every shadow a BoxShadow transition renders between per field bounds.
+ *
+ * It has the widest blur and spread, grown by half the range of the offset around its middle.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param lo Per field minimum of offset_x, offset_y, blur and spread
+ * @param hi Per field maximum of them
+ * @param out Receives the matrix
+ * @return Whether that shadow box has an area
+ */
+bool box_draws_box_shadow_bound(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const float *lo,
+    const float *hi,
+    mat4 out);
 
 /** Encode the color and the cover alpha of the shading of a shadow from a shadow record, as
  * box_draws_box_shadow_update writes them. Pure: the resolver calls it on the render thread.

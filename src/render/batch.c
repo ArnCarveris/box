@@ -1509,7 +1509,10 @@ void box_draws_batch_blend(
     }
 
     if (blend) {
+        float contrast = isfinite(blend->contrast) && blend->contrast > 0.0f
+            ? blend->contrast : 0.0f;
         r->mask = box_draws_texture_handle(d, blend->mask);
+        r->contrast = contrast;
         for (k = 0; k < BOX_RENDER_BLEND_LAYERS; k ++) {
             /* TextureBlend stores plain ids: a deleted layer counts as one without
              * PbrTextures */
@@ -1523,6 +1526,11 @@ void box_draws_batch_blend(
             }
 
             r->count = (uint32_t)k + 1;
+            if (contrast > 0.0f) {
+                r->layers[k][BOX_RENDER_BLEND_HEIGHT] = box_draws_texture_handle(d,
+                    blend->heights[k]);
+            }
+
             if (textures) {
                 r->layers[k][BOX_RENDER_BLEND_ALBEDO] = box_draws_texture_handle(d,
                     textures->albedo);

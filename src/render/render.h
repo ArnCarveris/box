@@ -1580,13 +1580,15 @@ void box_render_transition_mix(
     float t,
     void *out);
 
-/** Widen the per field range of the targets of a transform component by what a CubicBezier
- * can overshoot: from + (to - from) * e, with e in the hull of 0, y1, y2 and 1, lies at most
- * max(y1, y2) - 1 or -min(y1, y2) range widths beyond it. The presets do not overshoot.
+/** Widen the per field range of the targets of a transform component or a BoxShadow by what a
+ * CubicBezier can overshoot: from + (to - from) * e, with e in the hull of 0, y1, y2 and 1, lies
+ * at most max(y1, y2) - 1 or -min(y1, y2) range widths beyond it. The presets do not overshoot.
  *
- * @param component The component, nothing for one other than Position, Rotation or Scale
+ * @param component The component, nothing for one other than Position, Rotation, Scale or
+ * BoxShadow
  * @param spec The transition of the start
- * @param lo The per field minimum, widened
+ * @param lo The per field minimum, widened: three floats, four (offset_x, offset_y, blur and
+ * spread) for a BoxShadow
  * @param hi The per field maximum, widened
  */
 void box_render_transition_widen(
@@ -1715,6 +1717,13 @@ extern ECS_TAG_DECLARE(TransitionMaterial);
  * blended batch and cast no shadow while the transition runs; the transition extract adds and
  * removes it, which rekeys them to the batch of their target at the end. */
 extern ECS_TAG_DECLARE(TransitionOpacity);
+
+/** Private tag of the drawn entities whose BoxShadow has an active transition in this frame.
+ *
+ * It keys the slot of their shadow as dynamic_transform and dynamic_material, and keeps it while
+ * the target shadow box has no area; the transition extract adds and removes it, which rekeys
+ * the shadow to its static batch at the end. The slot of the shape keeps its key. */
+extern ECS_TAG_DECLARE(TransitionBoxShadow);
 
 /** Singleton that holds the state of the transition extract, set by
  * box_render_transitions_init, so box_render_transitions_get reads it without a lookup */

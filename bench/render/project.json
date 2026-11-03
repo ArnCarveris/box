@@ -64,8 +64,12 @@
                     "textured_batches",
                     "single_frame",
                     "blend_four_frame",
+<<<<<<< HEAD
                     "single_triplanar_frame",
                     "blend_four_triplanar_frame"
+=======
+                    "blend_four_height_frame"
+>>>>>>> dcd428d2f59705127d318ab404c7f52eaee7d2e8
                 ]
             },
             {

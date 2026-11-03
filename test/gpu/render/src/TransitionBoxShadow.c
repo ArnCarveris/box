@@ -3,6 +3,8 @@
  * @brief Tests that the shadow of a 2D shape (BoxShadow) follows the transform, opacity and
  * tint transitions of its shape and of the ancestors of its shape with the GPU backend: it
  * renders where and as strong as the shape renders, not at the target the game thread sees.
+ * And that a transition of BoxShadow itself blends its offset, blur, spread and color, alone
+ * and with a transition of the Opacity or Position of its shape.
  *
  * The world advances a quarter second per frame and the transitions take one second, Linear.
  * Each case compares the frame halfway through with a scene set up in that state without a
@@ -12,6 +14,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include "render.h"
 
@@ -570,6 +573,287 @@ void TransitionBoxShadow_shadow_removed_mid_transition(void) {
     test_assert(tbs_diff(mid, at_mid) <= TBS_TOLERANCE);
     test_int(tbs_diff(end, at_end), 0);
     stbi_image_free(mid);
+    stbi_image_free(end);
+    stbi_image_free(at_mid);
+    stbi_image_free(at_end);
+}
+
+/** Render a scene of one rect without a transition with a shadow of its own, at an opacity.
+ *
+ * @param file Image file in the temporary folder
+ * @param pose Pose of the rect
+ * @param opacity Opacity of the rect, negative for none
+ * @param shadow The shadow, NULL for none
+ * @return The pixels, freed with stbi_image_free
+ */
+static unsigned char* tbs_reference_shadow(
+    const char *file,
+    tbs_pose_t pose,
+    float opacity,
+    const BoxShadow *shadow)
+{
+    ecs_world_t *world = tbs_world();
+    ecs_entity_t e = tbs_rect(world, 0, pose, false);
+    if (shadow) {
+        ecs_set_ptr(world, e, BoxShadow, shadow);
+    }
+
+    if (opacity >= 0) {
+        ecs_set(world, e, Opacity, {opacity});
+    }
+
+    unsigned char *result = tbs_capture_n(world, file, 2);
+    tbs_fini(world);
+
+    return result;
+}
+
+/** Change the BoxShadow of a rect at the center with a transition of it, and of its Opacity and
+ * Position when given, and check that the frame halfway through matches a scene set up at the
+ * halfway values, and the frame after the end one set up at the targets.
+ *
+ * @param name Base name of the image files
+ * @param from The shadow at the start
+ * @param to The shadow it changes to
+ * @param mid The shadow halfway, rounded as the resolver rounds the channels
+ * @param opacity The Opacity it fades from 1 to, negative for no Opacity transition
+ * @param moves Whether it also moves from (-10, 4) to (10, -4)
+ * @param differ Least difference of a channel between the halfway frame and the target
+ */
+static void tbs_shadow_case(
+    const char *name,
+    const BoxShadow *from,
+    const BoxShadow *to,
+    const BoxShadow *mid,
+    float opacity,
+    bool moves,
+    int32_t differ)
+{
+    tbs_pose_t center = {0, 0, 1.0f, 0.0f};
+    tbs_pose_t start = moves ? (tbs_pose_t){-10, 4, 1.0f, 0.0f} : center;
+    tbs_pose_t end_pose = moves ? (tbs_pose_t){10, -4, 1.0f, 0.0f} : center;
+    float mid_opacity = opacity >= 0 ? (1.0f + opacity) * 0.5f : -1.0f;
+    char file[64], ref[64];
+    snprintf(file, sizeof(file), "tbs_%s.png", name);
+    snprintf(ref, sizeof(ref), "tbs_%s_ref.png", name);
+    ecs_world_t *world = tbs_world();
+    ecs_entity_t e = tbs_rect(world, 0, start, false);
+    ecs_set_ptr(world, e, BoxShadow, from);
+    tbs_transition(world, e, ecs_id(BoxShadow));
+    if (opacity >= 0) {
+        ecs_set(world, e, Opacity, {1.0f});
+        tbs_transition(world, e, ecs_id(Opacity));
+    }
+
+    if (moves) {
+        tbs_transition(world, e, ecs_id(Position));
+    }
+
+    stbi_image_free(tbs_capture(world, file));
+    ecs_set_ptr(world, e, BoxShadow, to);
+    if (opacity >= 0) {
+        ecs_set(world, e, Opacity, {opacity});
+    }
+
+    if (moves) {
+        tbs_pose(world, e, end_pose);
+    }
+
+    unsigned char *moving = tbs_capture_n(world, file, TBS_MID);
+    test_assert(ecs_has_id(world, e, TransitionBoxShadow));
+    test_assert(!ecs_os_memcmp_t(ecs_get(world, e, BoxShadow), to, BoxShadow));
+    unsigned char *end = tbs_capture_n(world, file, TBS_END - TBS_MID);
+    test_assert(!ecs_has_id(world, e, TransitionBoxShadow));
+    tbs_fini(world);
+
+    unsigned char *at_mid = tbs_reference_shadow(ref, center, mid_opacity, mid);
+    unsigned char *at_end = tbs_reference_shadow(ref, end_pose, opacity, to);
+    test_assert(tbs_diff(moving, at_end) > differ);
+    test_assert(tbs_diff(moving, at_mid) <= TBS_TOLERANCE);
+    test_int(tbs_diff(end, at_end), 0);
+    stbi_image_free(moving);
+    stbi_image_free(end);
+    stbi_image_free(at_mid);
+    stbi_image_free(at_end);
+}
+
+/** The shadow a card rests with: close under it and sharp */
+static const BoxShadow tbs_rest = {
+    .offset_x = 2, .offset_y = -2, .blur = 2, .color = {0, 0, 0, 200}};
+
+/** The shadow a card is lifted with: farther, softer and grown */
+static const BoxShadow tbs_lifted = {
+    .offset_x = 8, .offset_y = -8, .blur = 10, .spread = 2, .color = {0, 0, 0, 200}};
+
+/** Halfway between them */
+static const BoxShadow tbs_halfway = {
+    .offset_x = 5, .offset_y = -5, .blur = 6, .spread = 1, .color = {0, 0, 0, 200}};
+
+/** A shadowed rect is lifted: its shadow moves away and blurs. Halfway through it is the shadow
+ * of a rect set up at the halfway offset, blur and spread, and at the end that of the target.
+ */
+void TransitionBoxShadow_box_shadow_offset_blur(void) {
+    // ui/box_shadow
+    tbs_shadow_case("lift", &tbs_rest, &tbs_lifted, &tbs_halfway, -1, false, 20);
+}
+
+/** The shadow of a rect turns from a strong black to a weaker blue: halfway through its color
+ * and alpha are those of a scene set up at the halfway channels, mixed in display encoding as
+ * Rgb is.
+ */
+void TransitionBoxShadow_box_shadow_color(void) {
+    // ui/box_shadow
+    BoxShadow from = tbs_shadow, to = tbs_shadow, mid = tbs_shadow;
+    to.color = (rgba){0, 0, 255, 100};
+    mid.color = (rgba){0, 0, 128, 150};
+    tbs_shadow_case("color", &from, &to, &mid, -1, false, 10);
+}
+
+/** A shadowed rect is lifted while it fades from opacity 1 to 0.5: halfway through its shadow
+ * has the halfway box and fades with the opacity the rect renders at, 0.75.
+ */
+void TransitionBoxShadow_box_shadow_with_opacity(void) {
+    // ui/box_shadow
+    tbs_shadow_case("lift_fade", &tbs_rest, &tbs_lifted, &tbs_halfway, 0.5f, false, 20);
+}
+
+/** A shadowed rect is lifted while it moves: halfway through its shadow has the halfway box at
+ * the halfway position, and the frame after the end is a scene set up at the targets.
+ */
+void TransitionBoxShadow_box_shadow_with_position(void) {
+    // ui/box_shadow
+    tbs_shadow_case("lift_move", &tbs_rest, &tbs_lifted, &tbs_halfway, -1, true, 40);
+}
+
+/** The lift of a shadowed rect is interrupted halfway by a change back to its rest shadow.
+ *
+ * The shadow turns back from where it renders when the change is seen, three quarters of the
+ * way, without a jump, and the frame after the end matches a scene at the rest shadow.
+ */
+void TransitionBoxShadow_box_shadow_end_matches_target(void) {
+    // ui/box_shadow
+    tbs_pose_t center = {0, 0, 1.0f, 0.0f};
+    BoxShadow three_quarters = {
+        .offset_x = 6.5f, .offset_y = -6.5f, .blur = 8, .spread = 1.5f, .color = {0, 0, 0, 200}};
+    ecs_world_t *world = tbs_world();
+    ecs_entity_t e = tbs_rect(world, 0, center, false);
+    ecs_set_ptr(world, e, BoxShadow, &tbs_rest);
+    tbs_transition(world, e, ecs_id(BoxShadow));
+    stbi_image_free(tbs_capture(world, "tbs_back.png"));
+    ecs_set_ptr(world, e, BoxShadow, &tbs_lifted);
+    unsigned char *halfway = tbs_capture_n(world, "tbs_back.png", TBS_MID);
+    ecs_set_ptr(world, e, BoxShadow, &tbs_rest);
+    unsigned char *turned = tbs_capture(world, "tbs_back.png");
+    unsigned char *end = tbs_capture_n(world, "tbs_back.png", TBS_END);
+    test_assert(!ecs_has_id(world, e, TransitionBoxShadow));
+    tbs_fini(world);
+
+    unsigned char *at_rest = tbs_reference_shadow("tbs_back_ref.png", center, -1, &tbs_rest);
+    unsigned char *at_turn = tbs_reference_shadow("tbs_back_ref.png", center, -1,
+        &three_quarters);
+    test_assert(tbs_diff(halfway, at_rest) > 20);
+    test_assert(tbs_diff(turned, at_turn) <= TBS_TOLERANCE);
+    test_assert(tbs_diff(turned, at_rest) > 20);
+    test_int(tbs_diff(end, at_rest), 0);
+    stbi_image_free(halfway);
+    stbi_image_free(turned);
+    stbi_image_free(end);
+    stbi_image_free(at_rest);
+    stbi_image_free(at_turn);
+}
+
+/** A shadow whose spread starts below the half size of its rect, so it has no area, grows into
+ * one, and later shrinks back to none: halfway through each it is the shadow of a rect set up at
+ * the halfway spread, and after the shrink the rect draws without a shadow.
+ */
+void TransitionBoxShadow_box_shadow_no_area(void) {
+    // ui/box_shadow
+    tbs_pose_t center = {0, 0, 1.0f, 0.0f};
+    BoxShadow none = tbs_shadow, some = tbs_shadow, half = tbs_shadow;
+    none.spread = -12;
+    some.spread = 4;
+    half.spread = -4;
+    ecs_world_t *world = tbs_world();
+    ecs_entity_t e = tbs_rect(world, 0, center, false);
+    ecs_set_ptr(world, e, BoxShadow, &none);
+    tbs_transition(world, e, ecs_id(BoxShadow));
+    unsigned char *before = tbs_capture(world, "tbs_area.png");
+    ecs_set_ptr(world, e, BoxShadow, &some);
+    unsigned char *first = tbs_capture(world, "tbs_area.png");
+    unsigned char *grow = tbs_capture_n(world, "tbs_area.png", TBS_MID - 1);
+    unsigned char *grown = tbs_capture_n(world, "tbs_area.png", TBS_END - TBS_MID);
+    ecs_set_ptr(world, e, BoxShadow, &none);
+    unsigned char *shrink = tbs_capture_n(world, "tbs_area.png", TBS_MID);
+    unsigned char *gone = tbs_capture_n(world, "tbs_area.png", TBS_END - TBS_MID);
+    test_assert(!ecs_has_id(world, e, TransitionBoxShadow));
+    tbs_fini(world);
+
+    unsigned char *plain = tbs_reference_shadow("tbs_area_ref.png", center, -1, NULL);
+    unsigned char *at_half = tbs_reference_shadow("tbs_area_ref.png", center, -1, &half);
+    unsigned char *at_some = tbs_reference_shadow("tbs_area_ref.png", center, -1, &some);
+    test_int(tbs_diff(before, plain), 0);
+    test_assert(tbs_diff(first, plain) <= TBS_TOLERANCE);
+    test_assert(tbs_diff(grow, at_half) <= TBS_TOLERANCE);
+    test_int(tbs_diff(grown, at_some), 0);
+    test_assert(tbs_diff(shrink, at_half) <= TBS_TOLERANCE);
+    test_int(tbs_diff(gone, plain), 0);
+    stbi_image_free(before);
+    stbi_image_free(first);
+    stbi_image_free(grow);
+    stbi_image_free(grown);
+    stbi_image_free(shrink);
+    stbi_image_free(gone);
+    stbi_image_free(plain);
+    stbi_image_free(at_half);
+    stbi_image_free(at_some);
+}
+
+/** Two rects lift their shadows, the shadow of the first in the slot before that of the second.
+ *
+ * The first loses its BoxShadow halfway: its slot is freed and the shadow of the second may move
+ * into it. No record patches the freed slot, so the second shadow renders its own halfway value
+ * with its own rect, and the first rect draws without a shadow.
+ */
+void TransitionBoxShadow_box_shadow_removed(void) {
+    // ui/box_shadow
+    BoxShadow from = tbs_rest, to = tbs_rest, mid = tbs_rest;
+    tbs_pose_t a = {0, 14, 1.0f, 0.0f}, b = {0, -14, 1.0f, 0.0f};
+    to.offset_x = 4;
+    to.offset_y = -4;
+    to.blur = 4;
+    mid.offset_x = 3;
+    mid.offset_y = -3;
+    mid.blur = 3;
+    ecs_world_t *world = tbs_world();
+    ecs_entity_t ea = tbs_rect(world, 0, a, false);
+    ecs_entity_t eb = tbs_rect(world, 0, b, false);
+    ecs_set_ptr(world, ea, BoxShadow, &from);
+    ecs_set_ptr(world, eb, BoxShadow, &from);
+    tbs_transition(world, ea, ecs_id(BoxShadow));
+    tbs_transition(world, eb, ecs_id(BoxShadow));
+    stbi_image_free(tbs_capture(world, "tbs_lift_removed.png"));
+    ecs_set_ptr(world, ea, BoxShadow, &to);
+    ecs_set_ptr(world, eb, BoxShadow, &to);
+    stbi_image_free(tbs_capture_n(world, "tbs_lift_removed.png", TBS_MID - 1));
+    ecs_remove(world, ea, BoxShadow);
+    unsigned char *halfway = tbs_capture(world, "tbs_lift_removed.png");
+    test_assert(!ecs_has_id(world, ea, TransitionBoxShadow));
+    test_assert(ecs_has_id(world, eb, TransitionBoxShadow));
+    unsigned char *end = tbs_capture_n(world, "tbs_lift_removed.png", TBS_END - TBS_MID);
+    tbs_fini(world);
+
+    ecs_world_t *ref = tbs_world();
+    tbs_rect(ref, 0, a, false);
+    ecs_entity_t rb = tbs_rect(ref, 0, b, false);
+    ecs_set_ptr(ref, rb, BoxShadow, &mid);
+    unsigned char *at_mid = tbs_capture_n(ref, "tbs_lift_removed_ref.png", 2);
+    ecs_set_ptr(ref, rb, BoxShadow, &to);
+    unsigned char *at_end = tbs_capture_n(ref, "tbs_lift_removed_ref.png", 2);
+    tbs_fini(ref);
+
+    test_assert(tbs_diff(halfway, at_mid) <= TBS_TOLERANCE);
+    test_int(tbs_diff(end, at_end), 0);
+    stbi_image_free(halfway);
     stbi_image_free(end);
     stbi_image_free(at_mid);
     stbi_image_free(at_end);

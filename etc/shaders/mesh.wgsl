@@ -70,6 +70,7 @@
 // albedo, ORM and normal are slices of three texture arrays, each at the coordinates of the
 // shape times the TextureTransform of its layer. Only the layers with a weight are sampled, with
 // explicit gradients scaled from those of the shape, so a fragment with one weight samples each
+<<<<<<< HEAD
 // map once; the decoded normals blend and renormalize before they perturb the normal. With a
 // triplanar TextureMapping each projection with a weight samples the mask and each layer with a
 // weight once, with the gradients of the projection, so a flat face with one visible layer
@@ -81,6 +82,15 @@
 // after the layers are those of fs, and fs itself binds and samples nothing of the blend: an
 // override cannot hide the bindings of a branch from the static use of an entry point, so the
 // variant is an entry point of its own.
+=======
+// map once; the decoded normals blend and renormalize before they perturb the normal. The
+// emissive layer, the material constants and everything after the layers are those of fs, and
+// fs itself binds and samples nothing of the blend: an override cannot hide the bindings of a
+// branch from the static use of an entry point, so the variant is an entry point of its own.
+// With a contrast above 0 the weights of the layers are first shaped by their heights, a fourth
+// array (blend_heights), so the higher layer wins near a border; with a contrast of 0 the blend
+// is linear and samples no heights.
+>>>>>>> dcd428d2f59705127d318ab404c7f52eaee7d2e8
 #include "include/instance.wgsl"
 #include "include/material.wgsl"
 #include "include/blend.wgsl"
@@ -117,14 +127,45 @@ const MIN_ROUGHNESS: f32 = 0.045;
 @group(1) @binding(3) var normal_map: texture_2d<f32>;
 @group(1) @binding(4) var material_sampler: sampler;
 
+<<<<<<< HEAD
 // Group 1 of fs_blend and fs_depth_cutout_blend besides emissive_map and material_sampler: the
 // albedo (decoded from sRGB), ORM and normal of each layer as a slice of an array, the mask as
 // stored and the uniforms (BlendUniforms of blend.wgsl).
+=======
+// The layers of a TextureBlend (fs_blend only): the TextureTransform of each layer (scale in
+// xy, offset in zw), the slices of the arrays, the BLEND_MASKED, BLEND_SINGLE and BLEND_HEIGHT
+// flags and the contrast of the height based transitions, 0 for the linear blend.
+struct BlendUniforms {
+    transforms: array<vec4f, 4>,
+    count: u32,
+    flags: u32,
+    contrast: f32,
+};
+
+// The mask is loaded; without it layer 0 shows alone.
+const BLEND_MASKED: u32 = 1u;
+
+// The mask has a single channel r, which weighs layers 0 and 1 by 1 - r and r.
+const BLEND_SINGLE: u32 = 2u;
+
+// Layer 0 has a height image, shifted left by k for layer k; a layer without one is flat at 0.5.
+const BLEND_HEIGHT: u32 = 4u;
+
+// Share of the shaped weights below which a layer of a blend with a contrast is dropped, under a
+// step of an 8 bit channel, so the fragments past a border sample the maps of one layer only.
+const BLEND_HEIGHT_DROP: f32 = 1.0 / 256.0;
+
+// Group 1 of fs_blend besides emissive_map and material_sampler: the albedo (decoded from sRGB),
+// ORM and normal of each layer as a slice of an array, the mask as stored, the uniforms and the
+// height of each layer in the red of a slice, as stored (a one slice placeholder with a contrast
+// of 0).
+>>>>>>> dcd428d2f59705127d318ab404c7f52eaee7d2e8
 @group(1) @binding(5) var blend_albedo: texture_2d_array<f32>;
 @group(1) @binding(6) var blend_orm: texture_2d_array<f32>;
 @group(1) @binding(7) var blend_normal: texture_2d_array<f32>;
 @group(1) @binding(8) var blend_mask: texture_2d<f32>;
 @group(1) @binding(9) var<uniform> blending: BlendUniforms;
+@group(1) @binding(10) var blend_heights: texture_2d_array<f32>;
 
 // Reflection probes of the scene in blend order (box_render_reflection_probe_t), the cubemap
 // array with a slot per probe, mip k of N prefiltered for the perceptual roughness k / (N - 1)
@@ -837,8 +878,70 @@ struct BlendSample {
     normal: vec3f,
 };
 
+<<<<<<< HEAD
 fn blend_sample(uv: vec2f, gx: vec2f, gy: vec2f, w: vec4f, maps: bool) -> BlendSample {
     var o: BlendSample;
+=======
+// Weights of the layers of a TextureBlend shaped by their heights: each layer with a weight w
+// takes its height h (0.5 without a height image) at its coordinates, and its weight is
+// multiplied by exp(contrast * (h + w - m)), m the largest h + w, then normalized. Near a border
+// the higher layer wins, with a transition about 1 / contrast wide; a layer the mask weighs
+// alone keeps its weight of 1. Only the layers with a weight sample their height, and a layer
+// whose shaped weight is under BLEND_HEIGHT_DROP of the sum is dropped, so it samples no maps.
+fn blend_height_weights(w: vec4f, uv: vec2f, gx: vec2f, gy: vec2f) -> vec4f {
+    var s = vec4f(0.0);
+    var m = -1e30;
+    for (var k = 0u; k < 4u; k++) {
+        if (w[k] <= 0.0) {
+            continue;
+        }
+        var h = 0.5;
+        if ((blending.flags & (BLEND_HEIGHT << k)) != 0u) {
+            let t = blending.transforms[k];
+            h = textureSampleGrad(blend_heights, material_sampler, uv * t.xy + t.zw, k,
+                gx * t.xy, gy * t.xy).r;
+        }
+        s[k] = h + w[k];
+        m = max(m, s[k]);
+    }
+    var o = vec4f(0.0);
+    for (var k = 0u; k < 4u; k++) {
+        if (w[k] > 0.0) {
+            o[k] = w[k] * exp(blending.contrast * (s[k] - m));
+        }
+    }
+    let sum = o.x + o.y + o.z + o.w;
+    if (!(sum > 1e-12)) {
+        return w;
+    }
+    o = select(vec4f(0.0), o, o > vec4f(sum * BLEND_HEIGHT_DROP));
+    return o / (o.x + o.y + o.z + o.w);
+}
+
+// The layers of a fragment of a TextureBlend: the mask and the emissive layer at the texture
+// coordinates of the shape (the UV, or the projection of a MappingObject or MappingWorld material
+// without a blend on its dominant axis), and the albedo, ORM and normal of each layer with a
+// weight at those coordinates times its TextureTransform. The derivatives of the coordinates
+// are taken before the layers branch on their weights, and each layer samples with them scaled
+// by its transform; the tangent space normals of the layers blend and renormalize, with the
+// cotangent frame of the coordinates of the shape. surface_blend calls it for every fragment,
+// and f.scalars.w is flat, so the implicit derivatives hold.
+@diagnostic(off, derivative_uniformity)
+fn blend_layers(f: VertexOut, geometric: vec3f) -> Layers {
+    var uv = f.uv.xy;
+    if (f.scalars.w != 0.0) {
+        uv = mapping_uv(f.object, f.object_normal, f.uv.xy);
+    }
+    let gx = dpdx(uv);
+    let gy = dpdy(uv);
+    var o: Layers;
+    o.emissive = textureSample(emissive_map, material_sampler, uv).rgb;
+    o.frame = cotangent_frame(geometric, f.world, uv);
+    var w = blend_weights(textureSample(blend_mask, material_sampler, uv));
+    if (blending.contrast > 0.0) {
+        w = blend_height_weights(w, uv, gx, gy);
+    }
+>>>>>>> dcd428d2f59705127d318ab404c7f52eaee7d2e8
     o.albedo = vec4f(0.0);
     o.orm = vec3f(0.0);
     var m = vec3f(0.0);

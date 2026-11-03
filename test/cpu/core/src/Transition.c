@@ -1445,6 +1445,7 @@ void Transition_supported(void) {
     test_assert(box_transition_supported(world, ecs_id(SpecularAnisotropy)));
     test_assert(box_transition_supported(world, ecs_id(Sheen)));
     test_assert(box_transition_supported(world, ecs_id(DiffuseTransmission)));
+    test_assert(box_transition_supported(world, ecs_id(BoxShadow)));
 
     test_assert(!box_transition_supported(world, ecs_id(PbrTextures)));
     test_assert(!box_transition_supported(world, ecs_id(WorldTransform)));
