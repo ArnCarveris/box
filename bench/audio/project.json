@@ -2,7 +2,7 @@
     "id": "bench_audio",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the audio core: voices mixed through buses, in ns per frame",
+        "description": "Benchmarks for the audio core: voices mixed through buses, in ns per frame, and the spatial sources of box.audio, in ns per source",
         "public": false,
         "use": [
             "box"
@@ -10,7 +10,8 @@
     },
     "lang.c": {
         "include": [
-            "../../src/audio/core"
+            "../../src/audio/core",
+            "../../src/audio"
         ]
     },
     "bench": {
@@ -21,6 +22,15 @@
                     "voices_64_buses_8",
                     "silent_64_buses_8",
                     "idle"
+                ]
+            },
+            {
+                "id": "Spatial",
+                "benchcases": [
+                    "sources_1000_still",
+                    "sources_1000_listener_moves",
+                    "sources_1000_ten_move",
+                    "sources_0"
                 ]
             }
         ]

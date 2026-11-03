@@ -494,6 +494,8 @@ static void box_audio_cmd_voice_set(
         box_audio_source_pitch(&v->source, v->pitch);
     } else if (cmd->param == BOX_AUDIO_PARAM_BUS && value >= 0 && value < BOX_AUDIO_BUS_MAX) {
         v->bus = (uint32_t)value;
+    } else if (cmd->param == BOX_AUDIO_PARAM_POSITION) {
+        box_audio_source_seek(core, &v->source, value);
     } else {
         box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_VOICE_SET, 0);
     }

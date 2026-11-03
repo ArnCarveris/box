@@ -11,6 +11,7 @@ float audio_tap_r[AUDIO_TAP_MAX];
 int32_t audio_tap_count;
 int32_t audio_log_errors;
 char audio_log_last[1024];
+int32_t audio_log_warnings;
 
 static int32_t audio_log_level;
 static bool audio_log_colors;
@@ -132,6 +133,19 @@ float audio_level(
     return (float)(sum / frames);
 }
 
+float audio_level_right(
+    int32_t frames)
+{
+    double sum = 0;
+    int32_t i, from = audio_tap_count - frames;
+    test_assert(from >= 0);
+    for (i = from; i < audio_tap_count; i ++) {
+        sum += audio_tap_r[i];
+    }
+
+    return (float)(sum / frames);
+}
+
 int32_t audio_position(
     ecs_world_t *world,
     ecs_entity_t bus)
@@ -159,11 +173,14 @@ static void audio_log(
     if (level <= -3) {
         audio_log_errors ++;
         snprintf(audio_log_last, sizeof(audio_log_last), "%s", msg ? msg : "");
+    } else if (level == -2) {
+        audio_log_warnings ++;
     }
 }
 
 void audio_log_start(void) {
     audio_log_errors = 0;
+    audio_log_warnings = 0;
     audio_log_last[0] = '\0';
     audio_log_level = ecs_log_set_level(-1);
     audio_log_colors = ecs_log_enable_colors(false);

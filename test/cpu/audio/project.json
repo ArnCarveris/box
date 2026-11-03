@@ -183,7 +183,8 @@
                 "testcases": [
                     "mixer_levels",
                     "level_change",
-                    "play_function"
+                    "play_function",
+                    "spatial_scene"
                 ]
             },
             {
@@ -192,6 +193,26 @@
                     "valid_wav",
                     "two_runs_identical",
                     "no_output"
+                ]
+            },
+            {
+                "id": "Spatial",
+                "testcases": [
+                    "distance_curve",
+                    "silent_at_max",
+                    "pan_left_right_center",
+                    "follows_parent",
+                    "follows_listener",
+                    "listener_default_view",
+                    "listener_explicit",
+                    "listener_two_warns",
+                    "no_listener",
+                    "at_listener",
+                    "play_at",
+                    "out_of_range_loop",
+                    "teleport_no_click",
+                    "disabled_silent",
+                    "core_position"
                 ]
             }
         ]

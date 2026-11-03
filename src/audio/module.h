@@ -40,8 +40,12 @@ typedef struct AudioVoice {
     uint32_t sound;         /**< Sound id the voice plays */
     bool loop;              /**< Whether the voice loops */
     float volume;           /**< Volume sent, 0 for a Disabled source */
+    float pan;              /**< Pan sent */
     float pitch;            /**< Pitch sent */
     uint8_t bus;            /**< Bus index sent */
+    bool parked;            /**< A looping spatial source out of range: no voice, its time
+                             *   runs on from origin */
+    double origin;          /**< Module time at which the sound was at its start, at pitch */
 } AudioVoice;
 
 extern ECS_COMPONENT_DECLARE(AudioSoundId);
@@ -52,13 +56,33 @@ extern ECS_COMPONENT_DECLARE(AudioVoice);
 typedef struct box_audio_oneshot_t {
     uint32_t handle;        /**< Voice handle */
     uint8_t bus;            /**< Bus index */
+    bool spatial;           /**< A play of box_audio_play_at */
+    float position[3];      /**< World position of a spatial play */
+    AudioSpatial distances; /**< Distances of a spatial play */
+    float volume;           /**< Volume of the play, before the distance */
+    float sent_volume;      /**< Volume sent */
+    float sent_pan;         /**< Pan sent */
 } box_audio_oneshot_t;
 
 /** A play of box_audio_play, sent with the next batch */
 typedef struct box_audio_play_t {
     ecs_entity_t sound;     /**< The sound */
     float volume;           /**< The volume */
+    bool spatial;           /**< A play of box_audio_play_at */
+    float position[3];      /**< World position of a spatial play */
 } box_audio_play_t;
+
+/** Where a spatial source is heard from the listener */
+typedef struct box_audio_place_t {
+    float gain;             /**< Gain of the distance, 0 out of range */
+    float pan;              /**< Pan, -1 left to 1 right */
+} box_audio_place_t;
+
+/** The listener the spatial sources are heard from */
+typedef struct box_audio_listener_t {
+    ecs_entity_t entity;    /**< Entity that listens, 0 for none */
+    mat4 m;                 /**< Its world transform, identity without a listener */
+} box_audio_listener_t;
 
 /** Counters of the module, for the tests */
 typedef struct box_audio_module_stats_t {
@@ -68,6 +92,8 @@ typedef struct box_audio_module_stats_t {
     int64_t orders;         /**< ORDER commands written */
     int64_t cycles;         /**< Compiles that found a cycle */
     int64_t dropped;        /**< Plays dropped before a gesture */
+    int64_t spatial_updates; /**< Spatial sources and plays whose gain was computed */
+    int64_t out_of_range;   /**< Spatial plays that did not start beyond max_distance */
 } box_audio_module_stats_t;
 
 /** A capture that waits for its frames */
@@ -80,7 +106,10 @@ typedef struct box_audio_capture_job_t {
 /** The state of the module in a world */
 typedef struct box_audio_module_t {
     ecs_query_t *buses;           /**< AudioBus, disabled ones included */
-    ecs_query_t *sources;         /**< AudioSource, disabled ones included */
+    ecs_query_t *sources;         /**< AudioSource without AudioSpatial, disabled ones included */
+    ecs_query_t *spatial;         /**< AudioSource with AudioSpatial, change detected */
+    ecs_query_t *listeners;       /**< AudioListener with WorldTransform */
+    ecs_query_t *views;           /**< Enabled views, for a camera that listens */
     ecs_query_t *sounds;          /**< AudioPcm */
     uint32_t serial;              /**< Serial of the output the state was sent to */
     box_audio_writer_t writer;    /**< The batch of the frame, grown as needed */
@@ -98,10 +127,17 @@ typedef struct box_audio_module_t {
     ecs_vec_t plays;              /**< box_audio_play_t */
     ecs_vec_t stops;              /**< uint32_t voice handles of deleted sources */
     ecs_vec_t releases;           /**< uint32_t sound ids */
+    ecs_vec_t moved;              /**< ecs_entity_t spatial sources whose static transform moved */
     AudioSettings settings;       /**< Settings sent */
     bool settings_sent;           /**< settings holds what the output has */
     int64_t voices_stolen;        /**< Steals the core reported */
     box_audio_capture_job_t capture; /**< The capture that waits */
+    box_audio_listener_t listener;   /**< The listener of the last frame */
+    bool listener_warned;         /**< The warning of several listeners was logged */
+    bool spatial_dirty;           /**< Update every spatial source, not only changed ones */
+    bool waiting;                 /**< The page waited for a gesture in the last frame */
+    double time;                  /**< Seconds of output since the module started */
+    float rate;                   /**< Frames per second of the output */
     box_audio_module_stats_t stats;  /**< Counters */
 } box_audio_module_t;
 
@@ -142,6 +178,18 @@ int32_t box_audio_module_order(
 int32_t box_audio_module_bus_index(
     const ecs_world_t *world,
     ecs_entity_t bus);
+
+/** Find the listener of the frame: the first AudioListener, else the camera of the first
+ * enabled View that has one.
+ *
+ * @param world The world
+ * @param state The state
+ * @param listener Receives the listener
+ */
+void box_audio_listener_find(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    box_audio_listener_t *listener);
 
 /** Register the sync system and the observers of the module.
  *
