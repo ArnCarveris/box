@@ -14,9 +14,14 @@
 #include <math.h>
 
 /* A fused multiply add rounds once where two operations round twice, which would change the
- * bytes between platforms that contract and those that do not. */
+ * bytes between platforms that contract and those that do not. GCC ignores the standard pragma
+ * and contracts by default unless a strict ISO C mode is selected, so it is told directly. */
 #if defined(__clang__)
 #pragma STDC FP_CONTRACT OFF
+#elif defined(__GNUC__)
+#pragma GCC optimize("fp-contract=off")
+#elif defined(_MSC_VER)
+#pragma fp_contract(off)
 #endif
 
 /** Width a normal map strength refers to, in pixels */
