@@ -28,7 +28,13 @@
 extern "C" {
 #endif
 
-/** Position relative to the parent */
+/** Position relative to the parent.
+ *
+ * Every component that draws or has a place in the world comes with a Position (a With
+ * relationship): the shapes through ShapeMesh, Text, PointLight, SpotLight, FogVolume,
+ * ReflectionProbe and ParticleEmitter. A child with only one of them has the identity local
+ * transform and follows its parent instead of sitting at the world origin.
+ */
 ECS_STRUCT(Position, {
     float x; /**< X coordinate */
     float y; /**< Y coordinate */

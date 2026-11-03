@@ -389,6 +389,12 @@ void BoxLightImport(
     box_owned_hooks(world, EnvironmentImage, BOX_OWNED_STR(EnvironmentImage, path));
     ecs_add_pair(world, ecs_id(EnvironmentImage), EcsWith, ecs_id(Environment));
 
+    ECS_IMPORT(world, BoxTransform);
+    ecs_add_pair(world, ecs_id(PointLight), EcsWith, ecs_id(Position));
+    ecs_add_pair(world, ecs_id(SpotLight), EcsWith, ecs_id(Position));
+    ecs_add_pair(world, ecs_id(FogVolume), EcsWith, ecs_id(Position));
+    ecs_add_pair(world, ecs_id(ReflectionProbe), EcsWith, ecs_id(Position));
+
     ecs_observer(world, {
         .query.terms = {{ .id = ecs_id(LightBake) }},
         .events = { EcsOnAdd },

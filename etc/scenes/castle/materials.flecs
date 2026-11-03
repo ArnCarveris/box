@@ -1,7 +1,8 @@
 // Materials of the castle: weathered stone, slate, thatch, timber and turf, each a tint over a
 // tiling texture from castle/textures (generate.py writes them), with a little clear coat on the
 // water, the slate and the gilded finials. Pieces scale the textures with TextureTransform so a
-// block of stone is about the same size on every wall.
+// block of stone is about the same size on every wall; the ground (turf, moat water, meadow and
+// fields) sizes them in world units with TextureMapping instead.
 
 using flecs.script
 using box.material

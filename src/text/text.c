@@ -620,6 +620,7 @@ void BoxTextImport(
     ecs_world_t *world)
 {
     ECS_MODULE(world, BoxText);
+    ECS_IMPORT(world, BoxTransform);
     ECS_IMPORT(world, BoxLayout);
     ECS_IMPORT(world, BoxApp);
     ECS_IMPORT(world, BoxJobs);
@@ -653,6 +654,7 @@ void BoxTextImport(
     });
     ecs_add_pair(world, ecs_id(Text), EcsWith, ecs_id(TextGlyphs));
     ecs_add_pair(world, ecs_id(Text), EcsWith, ecs_id(TextBounds));
+    ecs_add_pair(world, ecs_id(Text), EcsWith, ecs_id(Position));
 
     box_text_systems_init(world);
     box_text_state_init(world);
