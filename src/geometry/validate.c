@@ -369,6 +369,41 @@ static bool box_validate_prism_hook(
     return true;
 }
 
+/** Validate hook for Bevel that reports radii that are negative or not finite.
+ *
+ * A Bevel without a Box is not reported: a script can set the Bevel before the Box.
+ *
+ * @param world The world
+ * @param entity The entity being validated
+ * @param ptr Pointer to the component value
+ * @return Always true; problems are only logged
+ */
+static bool box_validate_bevel_hook(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    void *ptr)
+{
+    const Bevel *bevel = ptr;
+    const float radii[] = {
+        bevel->radius,
+        bevel->top_front, bevel->top_back, bevel->top_left, bevel->top_right,
+        bevel->bottom_front, bevel->bottom_back, bevel->bottom_left, bevel->bottom_right,
+        bevel->front_left, bevel->front_right, bevel->back_left, bevel->back_right
+    };
+    const char *reason = NULL;
+    for (size_t i = 0; !reason && i < sizeof(radii) / sizeof(radii[0]); i ++) {
+        if (!isfinite(radii[i])) {
+            reason = "radii must be finite";
+        } else if (radii[i] < 0.0f) {
+            reason = "radii must not be negative";
+        }
+    }
+
+    box_validate_report(world, entity, "Bevel", reason);
+
+    return true;
+}
+
 /** Validate hook for ShapeMesh that reports empty or invalid meshes.
  *
  * @param world The world
@@ -457,5 +492,6 @@ void box_geometry_validation_init(
     ecs_set_hooks(world, Lathe, {.on_validate = box_validate_lathe_hook});
     ecs_set_hooks(world, ProfileExtrusion, {.on_validate = box_validate_extrusion_hook});
     ecs_set_hooks(world, BeveledPrism, {.on_validate = box_validate_prism_hook});
+    ecs_set_hooks(world, Bevel, {.on_validate = box_validate_bevel_hook});
     ecs_set_hooks(world, ShapeMesh, {.on_validate = box_validate_mesh_hook});
 }

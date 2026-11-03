@@ -20,10 +20,22 @@
 // The shadow of a Rect or Circle with a BoxShadow is a rectangle instance with a negative border
 // width: shape.y is the negated standard deviation of its edge and shape.x the corner radius of
 // the shadow box, the quad minus a margin of 3 standard deviations on each side, both in units of
-// half the smaller side of the quad; shape.zw are 0. Its coverage is the Gaussian falloff of the
-// distance to the shadow box (an erf of the distance, the approximation of a blurred rounded box
-// with one sample), softened by the footprint of the pixel so a shadow without blur keeps an
-// anti-aliased edge. Every other instance pays one comparison for it.
+// half the smaller side of the quad. Its coverage is the Gaussian falloff of the distance to the
+// shadow box (an erf of the distance, the approximation of a blurred rounded box with one sample),
+// softened by the footprint of the pixel so a shadow without blur keeps an anti-aliased edge.
+//
+// As in CSS a shadow is not drawn under its element, so it does not show through a translucent
+// one. uv.xy is the center of the rounded box of the element relative to the shadow, uv.zw its half
+// extents, shape.z its corner radius (f32 bits), all in the units of the shadow, and shape.w (f32
+// bits) the alpha the element covers what is under it with at its edge, 0 when its blend mode does
+// not cover (Additive and the like). Where the element covers a part c of the pixel with an alpha
+// a, the shadow is weighted by (1 - c) / (1 - a c): the element drawn over it then leaves the
+// shadow exactly on the part of the pixel outside the element, so no light or dark seam shows
+// along its edge, and an opaque element looks as without the cutout. The distance to the element
+// is taken in uniform control flow, a rounded box per fragment of every instance, for the
+// derivatives that anti-alias it the same way the element is. Wide, faint shadows band on 8-bit
+// sRGB targets, so the alpha of a shadow is dithered by about a step of the target with
+// interleaved gradient noise of the pixel position, stable from frame to frame (shadow_dither).
 //
 // ids.x of the shading is the clip index of the instance, 0 when no ClipChildren ancestor clips
 // it. A clip maps the world position of a fragment into the local plane of its
@@ -162,6 +174,9 @@ fn pixels_per_unit(mvp: mat4x4f, clip: vec4f, dir: vec2f) -> f32 {
         to_model = 0.5 / extent;
         o.params = vec2f(bitcast<f32>(inst.shape.x), bitcast<f32>(inst.shape.y));
         o.border = vec4f(unpack2x16float(inst.shape.z), unpack2x16float(inst.shape.w));
+        if (o.params.y < 0.0) {
+            o.border = vec4f(bitcast<f32>(inst.shape.z), bitcast<f32>(inst.shape.w), 0.0, 0.0);
+        }
     }
 
     let dir_x = axis * to_model;
@@ -218,6 +233,38 @@ fn shadow_coverage(p: vec2f, extent: vec2f, radius: f32, sigma: f32, px: f32) ->
 // Part of a pixel covered by the inside of an edge at a distance, the pixel being px wide.
 fn coverage(d: f32, px: f32) -> f32 {
     return clamp(0.5 - d / max(px, 1e-6), 0.0, 1.0);
+}
+
+// Weight of a shadow under a pixel its element covers a part cover of with an alpha: the shadow
+// left on the part outside the element once the element is drawn over it, 0 where the element
+// covers the whole pixel.
+fn cutout(cover: f32, alpha: f32) -> f32 {
+    let rest = 1.0 - alpha * cover;
+    return select(0.0, clamp((1.0 - cover) / max(rest, 1e-6), 0.0, 1.0), rest > 1e-5);
+}
+
+// Linear light one step of an 8-bit sRGB target spans at a linear value, from the slope of the
+// sRGB curve (constant on its linear segment below 0.0031308).
+fn srgb_step(l: f32) -> f32 {
+    return 2.4 / (1.055 * 255.0) * pow(max(l, 0.0031308), 1.0 - 1.0 / 2.4);
+}
+
+// Dithered alpha of a shadow of a linear color at a pixel: interleaved gradient noise (Jimenez
+// 2014) of the pixel position, the same every frame, of about one step of an 8-bit sRGB target
+// from end to end. The step it changes the target by depends on what is under the shadow, which
+// the shader does not know, so the amplitude is the smaller of the one for black under it (its
+// brightest channel lightening it) and for white under it (its darkest channel darkening it),
+// which keeps the noise within a step over any background. It is bounded by the distance of the
+// alpha to 0 and 1, so it never clamps: the average stays the alpha and the faint tail of a shadow
+// is not speckled out to the edge of its quad.
+fn shadow_dither(alpha: f32, color: vec3f, pos: vec2f) -> f32 {
+    let bright = max(max(color.r, color.g), color.b);
+    let dark = 1.0 - min(min(color.r, color.g), color.b);
+    let over_black = srgb_step(alpha * bright) / max(bright, 1e-6);
+    let over_white = srgb_step(1.0 - alpha * dark) / max(dark, 1e-6);
+    let amplitude = min(min(over_black, over_white), 2.0 * min(alpha, 1.0 - alpha));
+    let n = fract(52.9829189 * fract(dot(floor(pos), vec2f(0.06711056, 0.00583715))));
+    return alpha + (n - 0.5) * amplitude;
 }
 
 fn median(v: vec3f) -> f32 {
@@ -305,6 +352,9 @@ fn ranked_depth(depth: f32, rank: u32) -> f32 {
     let inner_extent = max(extent - vec2f(f.params.y), vec2f(0.0));
     let inner = rounded_box(f.local, inner_extent, f.params.x - f.params.y);
     let px = length(vec2f(dpdx(d), dpdy(d)));
+    let cut = rounded_box(f.local - f.uv_transform.xy, max(f.uv_transform.zw, footprint * 0.5),
+        f.border.x);
+    let cut_px = length(vec2f(dpdx(cut), dpdy(cut)));
     let inner_px = length(vec2f(dpdx(inner), dpdy(inner)));
     let uv = clamp(f.uv, vec2f(0.0), vec2f(1.0)) * f.uv_transform.xy + f.uv_transform.zw;
     let texel = textureSample(albedo_map, material_sampler, uv);
@@ -320,8 +370,10 @@ fn ranked_depth(depth: f32, rank: u32) -> f32 {
     if (f.params.y < 0.0) {
         cover = shadow_coverage(f.local, f.extent, f.params.x, -f.params.y,
             max(footprint.x, footprint.y));
+        cover *= cutout(coverage(cut, cut_px), f.border.y);
         color = f.color.rgb;
         alpha = cover * f.color.a;
+        alpha = shadow_dither(alpha, color, f.pos.xy);
     }
 
     if (f.clip != 0u) {

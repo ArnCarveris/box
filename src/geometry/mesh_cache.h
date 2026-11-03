@@ -36,6 +36,12 @@ typedef struct ShapeMesh {
 /** Component id of ShapeMesh */
 extern ECS_COMPONENT_DECLARE(ShapeMesh);
 
+/** Value of the Bevel shape: the Box and the Bevel of an entity */
+typedef struct box_bevel_value_t {
+    Box box;      /**< Size of the box */
+    Bevel bevel;  /**< Edge radii */
+} box_bevel_value_t;
+
 void box_geometry_validation_init(ecs_world_t *world);
 
 /** Create an empty mesh cache.
@@ -148,6 +154,49 @@ int32_t box_mesh_cache_count(
 box_shape_t* box_mesh_cache_add_shape(
     box_mesh_cache_t *cache,
     const box_shape_desc_t *desc);
+
+/** Find a registered shape.
+ *
+ * @param cache The cache
+ * @param component The shape component
+ * @return The shape, NULL when the component is not registered
+ */
+box_shape_t* box_mesh_cache_shape(
+    const box_mesh_cache_t *cache,
+    ecs_entity_t component);
+
+/** Resolve a shape value to a mesh and an instance scale and write it to the ShapeMesh of an
+ * entity, releasing the mesh it had.
+ *
+ * @param world The world
+ * @param stage The stage for structural changes
+ * @param shape The shape
+ * @param e The entity
+ * @param value The shape value
+ */
+void box_shape_apply(
+    ecs_world_t *world,
+    ecs_world_t *stage,
+    const box_shape_t *shape,
+    ecs_entity_t e,
+    const void *value);
+
+/** Check whether a Bevel rounds no edge, so that its Box resolves as a plain Box.
+ *
+ * @param bevel The bevel
+ * @return True when every radius that applies is 0, negative or not finite
+ */
+bool box_bevel_flat(
+    const Bevel *bevel);
+
+/** Create the observers that resolve entities with a Box and a Bevel.
+ *
+ * @param world The world
+ * @param bevel The cached shape of the Bevel, whose value is a box_bevel_value_t
+ */
+void box_geometry_bevel_init(
+    ecs_world_t *world,
+    box_shape_t *bevel);
 
 /** Free the arrays of a mesh.
  *
