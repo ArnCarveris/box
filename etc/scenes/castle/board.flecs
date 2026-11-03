@@ -40,29 +40,31 @@ template TileCursor {
 
   const t = tool
   const builds = t >= K_WALL && t <= K_PATH
-  const upgrade = builds && k == t && lvl < max_level(t)
   const place = builds && k == K_EMPTY
-  const nl = match upgrade { true: lvl + 1; _: 1 }
-  const afford = gold >= cost_gold(t, nl) && stone >= cost_stone(t, nl)
-  const keep_ok = t != K_KEEP || upgrade || keep_cell < 0
-  const ok = (place || upgrade) && afford && keep_ok
+  const afford = gold >= cost_gold(t, 1) && stone >= cost_stone(t, 1)
+  const unique_ok = (t != K_KEEP || keep_cell < 0) && (t != K_SMITH || smith_cell < 0)
+  const big = t == K_FARM && place
+  const ok = place && afford && unique_ok && (t != K_FARM || fits4[idx])
   const razes = t == T_DEMOLISH && k != K_EMPTY
+  const picks = t != T_DEMOLISH && k != K_EMPTY
   const y = match k == K_MOAT { true: -0.28; _: 0.05 }
 
   const color: Rgb = match ok {
     true: {120, 235, 110}
     _: match razes {
       true: {255, 128, 48}
-      _: match t == 0 { true: {255, 236, 190}; _: {235, 64, 52} }
+      _: match t == 0 || picks { true: {255, 236, 190}; _: {235, 64, 52} }
     }
   }
 
-  CursorEdge edge_n(len: 2, color: color) { Position: {0, y, -0.955} }
-  CursorEdge edge_s(len: 2, color: color) { Position: {0, y, 0.955} }
-  CursorEdge edge_e(len: 2, color: color) { Position: {0.955, y, 0}; Rotation: {0, HALF_PI, 0} }
-  CursorEdge edge_w(len: 2, color: color) { Position: {-0.955, y, 0}; Rotation: {0, HALF_PI, 0} }
+  const span = match big { true: 8; _: 2 }
+  const mid = match big { true: 1; _: 0 }
+  CursorEdge edge_n(len: span, color: color) { Position: {mid, y, mid - span / 2 + 0.045} }
+  CursorEdge edge_s(len: span, color: color) { Position: {mid, y, mid + span / 2 - 0.045} }
+  CursorEdge edge_e(len: span, color: color) { Position: {mid + span / 2 - 0.045, y, mid}; Rotation: {0, HALF_PI, 0} }
+  CursorEdge edge_w(len: span, color: color) { Position: {mid - span / 2 + 0.045, y, mid}; Rotation: {0, HALF_PI, 0} }
 
-  if place || upgrade {
+  if place {
     ghost {
       Opacity: {match ok { true: 0.5; _: 0.3 }}
       SpatialIgnore
@@ -71,8 +73,10 @@ template TileCursor {
       } else if t == K_PATH {
         dirt : CastleDirt { Position: {0, 0.01, 0}; Box: {1.9, 0.02, 1.9} }
         PathPiece path(seed: seed)
+      } else if t == K_FARM {
+        FarmPiece farm(seed: hash(idx - GRID - 1), research: research) { Position: {1, 0, 1} }
       } else {
-        PieceView view(k: t, lvl: nl, seed: seed, n: n, e: e, s: s, w: w, hn: hn, he: he, hs: hs, hw: hw)
+        PieceView view(k: t, lvl: 1, seed: seed, n: n, e: e, s: s, w: w, hn: hn, he: he, hs: hs, hw: hw)
       }
     }
   }
@@ -96,6 +100,12 @@ template Tile {
   const lvl = level[idx]
   const col = idx % GRID
   const safe = inside[idx]
+  const ruined = abandoned[idx]
+  const marked = ready[idx]
+  const picked = selected == idx
+  const anchor = k == K_FARM && farm_origin[idx] == idx
+  const crops = match anchor { true: research; _: 0 }
+  const forging = k == K_SMITH && researching
   const seed = hash(idx)
 
   const kn = match idx >= GRID { true: kind[idx - GRID]; _: 0 }
@@ -148,6 +158,9 @@ template Tile {
       if k == K_PATH {
         Rgb: {176 + shade, 148 + shade, 108 + shade}
         PbrTextures: {albedo: castle_tex_earth, normal: castle_tex_earth_n}
+      } else if k == K_FARM {
+        Rgb: {150 + shade, 116 + shade, 80 + shade}
+        PbrTextures: {albedo: castle_tex_earth, normal: castle_tex_earth_n}
       } else if k == K_QUARRY {
         Rgb: {170 + shade, 160 + shade, 144 + shade}
         PbrTextures: {albedo: castle_tex_earth, normal: castle_tex_earth_n}
@@ -171,7 +184,32 @@ template Tile {
   piece {
     Transition: [Position: {duration: match sunk { true: 0; _: 0.7 }, timing_function: EaseOut}]
     Position: {0, match sunk { true: -5; _: 0 }, 0}
-    PieceView view(k: k, lvl: lvl, seed: seed, n: n, e: e, s: s, w: w, hn: hn, he: he, hs: hs, hw: hw)
+    if anchor {
+      FarmPiece farm(seed: seed, research: crops) { Position: {3, 0, 3} }
+    } else {
+      PieceView view(k: k, lvl: lvl, seed: seed, ruined: ruined, working: forging, n: n, e: e, s: s, w: w, hn: hn, he: he, hs: hs, hw: hw)
+    }
+  }
+
+  if marked {
+    marker_ {
+      Position: {0, match lvl { 1: 2.5; _: 3.3 }, 0}
+      Scale: {1.8, 1.8, 1.8}
+      UpgradeMarker marker
+    }
+  }
+
+  if picked {
+    select_frame {
+      const glow: Rgb = {255, 206, 90}
+      const fy = match k == K_MOAT { true: -0.27; _: 0.07 }
+      const span = match k == K_FARM { true: 8.08; _: 2.08 }
+      const mid = match k == K_FARM { true: 3; _: 0 }
+      CursorEdge edge_n(len: span, color: glow, glow: 3) { Position: {mid, fy, mid - span / 2 + 0.04} }
+      CursorEdge edge_s(len: span, color: glow, glow: 3) { Position: {mid, fy, mid + span / 2 - 0.04} }
+      CursorEdge edge_e(len: span, color: glow, glow: 3) { Position: {mid + span / 2 - 0.04, fy, mid}; Rotation: {0, HALF_PI, 0} }
+      CursorEdge edge_w(len: span, color: glow, glow: 3) { Position: {mid - span / 2 + 0.04, fy, mid}; Rotation: {0, HALF_PI, 0} }
+    }
   }
 
   if hover {
@@ -202,11 +240,11 @@ template Tile {
 }
 
 fn road_x(z: f64) -> f64 {
-  sin((z - 15) * 0.04) * 7
+  sin((z - 29) * 0.04) * 7
 }
 
 fn river_z(x: f64) -> f64 {
-  54 + sin(x * 0.035) * 7 + sin(x * 0.011) * 4
+  70 + sin(x * 0.035) * 7 + sin(x * 0.011) * 4
 }
 
 template WildTree {
@@ -324,7 +362,7 @@ template Field {
 }
 
 template Landscape {
-  meadow : CastleMeadow { Position: {0, -1.6, 0}; Box: {400, 1.2, 400}; TextureTransform: {scale_x: 100, scale_y: 100} }
+  meadow : CastleMeadow { Position: {0, -1.6, 0}; Box: {500, 1.2, 500}; TextureTransform: {scale_x: 125, scale_y: 125} }
 
   rim : CastleSoil { Position: {0, -1.05, 0}; Box: {GRID * PITCH + 1.2, 0.1, GRID * PITCH + 1.2} }
   edge_n : CastleDarkStone { Position: {0, -0.5, -GRID * PITCH / 2 - 0.3}; Box: {GRID * PITCH + 1.2, 1.0, 0.6}; TextureTransform: {scale_x: 20, scale_y: 0.7} }
@@ -344,13 +382,12 @@ template Landscape {
     }
   }
 
-  for i in 0..60 {
-    const a = i * 0.1047
-    const side = floor(i / 15)
-    const t = (i % 15) / 14.0 - 0.5
+  for i in 0..120 {
+    const side = floor(i / 30)
+    const t = (i % 30) / 29.0 - 0.5
     const half = GRID * PITCH / 2 + 0.9
-    const bx = match side { 0: t * 30; 1: half; 2: t * 30; _: 0 - half }
-    const bz = match side { 0: 0 - half; 1: t * 30; 2: half; _: t * 30 }
+    const bx = match side { 0: t * 58; 1: half; 2: t * 58; _: 0 - half }
+    const bz = match side { 0: 0 - half; 1: t * 58; 2: half; _: t * 58 }
     if hash(i + 2000) < 0.55 && !(side == 2 && abs(bx) < 2.5) {
       "bush_{i}" : CastleLeafDark {
         Position: {bx, -0.9, bz}
@@ -361,7 +398,7 @@ template Landscape {
   }
 
   for i in 0..26 {
-    const z0 = 15.6 + i * 8
+    const z0 = HALF + 1.6 + i * 8
     const z1 = z0 + 8
     const x0 = road_x(z0)
     const x1 = road_x(z1)
@@ -374,7 +411,7 @@ template Landscape {
     }
     for f in 0..2 {
       const sx = match f { 0: -1.8; _: 1.8 }
-      if hash(i * 2 + f + 40) > 0.35 && (z0 > 62 || z0 < 44) {
+      if hash(i * 2 + f + 40) > 0.35 && (z0 > 78 || z0 < 60) {
         "fence_{i}_{f}" {
           Position: {(x0 + x1) / 2 + sx, -1, (z0 + z1) / 2}
           Rotation: {0, atan2(x1 - x0, 8), 0}
@@ -411,7 +448,7 @@ template Landscape {
     }
   }
 
-  const bz = river_z(road_x(54))
+  const bz = river_z(road_x(70))
   const bx = road_x(bz)
   bridge {
     Position: {bx, -1, bz}
@@ -431,17 +468,17 @@ template Landscape {
     }
   }
 
-  for gx in 0..13 {
-    for gz in 0..13 {
-      const i = gx * 13 + gz
-      const cx = (gx - 6) * 16 + (hash(i + 4000) - 0.5) * 2
-      const cz = (gz - 6) * 16 + (hash(i + 4100) - 0.5) * 2
-      const plot = abs(cx) < 27 && abs(cz) < 27
-      const road = cz > 6 && abs(cx - road_x(cz)) < 11
+  for gx in 0..15 {
+    for gz in 0..15 {
+      const i = gx * 15 + gz
+      const cx = (gx - 7) * 16 + (hash(i + 4000) - 0.5) * 2
+      const cz = (gz - 7) * 16 + (hash(i + 4100) - 0.5) * 2
+      const plot = abs(cx) < HALF + 13 && abs(cz) < HALF + 13
+      const road = cz > 20 && abs(cx - road_x(cz)) < 11
       const river = abs(cz - river_z(cx)) < 12
-      const forest = cz < -40
-      const hamlet = cz > 14 && cz < 48 && abs(cx - road_x(cz)) < 22
-      const mill = abs(cx - 46) < 14 && abs(cz + 22) < 14
+      const forest = cz < -56
+      const hamlet = cz > HALF && cz < HALF + 34 && abs(cx - road_x(cz)) < 22
+      const mill = abs(cx - 62) < 14 && abs(cz + 38) < 14
       if !plot && !road && !river && !forest && !hamlet && !mill && hash(i + 4200) > 0.12 {
         Field "field_{i}"(t: floor(hash(i + 4300) * 5), seed: hash(i + 4400), size: 13.5 + hash(i + 4500)) {
           Position: {cx, 0, cz}
@@ -465,7 +502,7 @@ template Landscape {
 
   for i in 0..240 {
     const tx = -150 + hash(i * 3 + 5001) * 300
-    const tz = -42 - hash(i * 7 + 5002) * 100 - hash(i + 5003) * 6
+    const tz = -58 - hash(i * 7 + 5002) * 100 - hash(i + 5003) * 6
     "forest_{i}" {
       Position: {tx, -1, tz}
       Scale: {1.7 + hash(i + 5004) * 0.8, 1.7 + hash(i + 5004) * 0.8, 1.7 + hash(i + 5004) * 0.8}
@@ -475,11 +512,11 @@ template Landscape {
 
   for i in 0..90 {
     const a = hash(i * 7 + 3) * 6.283
-    const r = 19 + hash(i * 5 + 11) * 46
+    const r = HALF + 5 + hash(i * 5 + 11) * 46
     const tx = sin(a) * r
     const tz = cos(a) * r
-    const clear = abs(tx) > 17 || abs(tz) > 17
-    const off_road = tz < 12 || abs(tx - road_x(tz)) > 4
+    const clear = abs(tx) > HALF + 3 || abs(tz) > HALF + 3
+    const off_road = tz < HALF - 2 || abs(tx - road_x(tz)) > 4
     const off_river = abs(tz - river_z(tx)) > 5
     if clear && off_road && off_river && hash(i + 6000) < 0.5 {
       "tree_{i}" {
@@ -491,44 +528,44 @@ template Landscape {
   }
 
   for h in 0..8 {
-    const hz = 21 + h * 3.6
+    const hz = HALF + 7 + h * 3.6
     const side = match h % 2 { 0: -1; _: 1 }
     "cottage_{h}" {
       Position: {road_x(hz) + side * 4.4, -1, hz}
       Rotation: {0, match side { -1: HALF_PI; _: 0 - HALF_PI }, 0}
       Scale: {1.5, 1.5, 1.5}
-      HousePiece house(seed: hash(h + 7000) * 0.5)
+      HousePiece house(level_: match h % 3 { 1: 2; _: 1 }, seed: hash(h + 7000) * 0.5)
     }
   }
   well_ {
-    Position: {road_x(32) + 4.4, -1, 32}
+    Position: {road_x(HALF + 18) + 4.4, -1, HALF + 18}
     Scale: {1.5, 1.5, 1.5}
     CourtProps props(seed: 0)
   }
   stall_ {
-    Position: {road_x(42) - 4.2, -1, 42}
+    Position: {road_x(HALF + 28) - 4.2, -1, HALF + 28}
     Rotation: {0, HALF_PI, 0}
     Scale: {1.5, 1.5, 1.5}
     CourtProps props(seed: 0.15)
   }
   fire_ {
-    Position: {road_x(46) + 5, -1, 46}
+    Position: {road_x(HALF + 32) + 5, -1, HALF + 32}
     Scale: {1.5, 1.5, 1.5}
     CourtProps props(seed: 0.03)
   }
 
-  Windmill mill { Position: {46, -1, -22}; Rotation: {0, -0.9, 0} }
+  Windmill mill { Position: {62, -1, -38}; Rotation: {0, -0.9, 0} }
 
-  Walker walker_0(x0: road_x(18), z0: 18, x1: road_x(26), z1: 26, period: 9, seed: 0.11)
-  Walker walker_1(x0: road_x(30) + 0.6, z0: 30, x1: road_x(40) + 0.6, z1: 40, period: 11, seed: 0.37)
-  Walker walker_2(x0: road_x(44) - 0.6, z0: 44, x1: road_x(36) - 0.6, z1: 36, period: 8, seed: 0.58)
-  Walker walker_3(x0: road_x(62), z0: 62, x1: road_x(74), z1: 74, period: 13, seed: 0.83)
-  Walker walker_4(x0: road_x(20) - 0.5, z0: 20, x1: road_x(16) - 0.5, z1: 16, period: 5, seed: 0.24)
-  Walker walker_5(x0: 30, z0: -4, x1: 40, z1: -16, period: 14, seed: 0.66)
+  Walker walker_0(x0: road_x(32), z0: 32, x1: road_x(40), z1: 40, period: 9, seed: 0.11)
+  Walker walker_1(x0: road_x(44) + 0.6, z0: 44, x1: road_x(54) + 0.6, z1: 54, period: 11, seed: 0.37)
+  Walker walker_2(x0: road_x(58) - 0.6, z0: 58, x1: road_x(50) - 0.6, z1: 50, period: 8, seed: 0.58)
+  Walker walker_3(x0: road_x(78), z0: 78, x1: road_x(90), z1: 90, period: 13, seed: 0.83)
+  Walker walker_4(x0: road_x(34) - 0.5, z0: 34, x1: road_x(30) - 0.5, z1: 30, period: 5, seed: 0.24)
+  Walker walker_5(x0: 44, z0: -18, x1: 54, z1: -30, period: 14, seed: 0.66)
 
   for i in 0..16 {
     const a = i * 0.39 + hash(i + 300) * 0.3
-    const r = 140 + hash(i + 400) * 50
+    const r = 170 + hash(i + 400) * 50
     "hill_{i}" : CastleFarHill {
       Position: {sin(a) * r, -18, cos(a) * r}
       Scale: {34 + hash(i + 500) * 30, 14 + hash(i + 600) * 18, 30 + hash(i + 700) * 20}
@@ -538,10 +575,10 @@ template Landscape {
 
   for i in 0..10 {
     const a = hash(i + 900) * 6.283
-    const r = 22 + hash(i + 950) * 30
+    const r = HALF + 8 + hash(i + 950) * 30
     const bxr = sin(a) * r
     const bzr = cos(a) * r
-    if abs(bzr - river_z(bxr)) > 5 && (bzr < 12 || abs(bxr - road_x(bzr)) > 4) {
+    if abs(bzr - river_z(bxr)) > 5 && (bzr < HALF - 2 || abs(bxr - road_x(bzr)) > 4) {
       "boulder_{i}" : CastleRock {
         Position: {bxr, -1, bzr}
         Rotation: {hash(i + 990), hash(i + 991) * 6, 0}
