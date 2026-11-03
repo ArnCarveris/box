@@ -1,6 +1,7 @@
 /**
  * @file audio/core/source.c
- * @brief Sources of voices. A sample buffer for now; new kinds add a case to each function.
+ * @brief Sources of voices: a sample buffer, or a synth patch (synth.c). A new kind adds a case
+ * to each function.
  */
 
 #include "internal.h"
@@ -28,6 +29,8 @@ void box_audio_source_pitch(
 {
     if (source->kind == BOX_AUDIO_SOURCE_SAMPLE) {
         source->data.sample.step = source->data.sample.rate * (double)pitch;
+    } else if (source->kind == BOX_AUDIO_SOURCE_SYNTH) {
+        box_audio_synth_pitch(&source->data.synth, pitch);
     }
 }
 
@@ -116,6 +119,8 @@ int32_t box_audio_source_render(
     *stereo = false;
     if (source->kind == BOX_AUDIO_SOURCE_SAMPLE) {
         done = box_audio_sample_render(core, &source->data.sample, frames, stereo);
+    } else if (source->kind == BOX_AUDIO_SOURCE_SYNTH) {
+        done = box_audio_synth_render(core, &source->data.synth, frames);
     }
 
     for (i = done; i < frames; i ++) {

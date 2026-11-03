@@ -21,6 +21,7 @@ ECS_COMPONENT_DECLARE(AudioBusState);
 ECS_COMPONENT_DECLARE(AudioVoice);
 ECS_COMPONENT_DECLARE(AudioReverbState);
 ECS_COMPONENT_DECLARE(AudioSample);
+ECS_COMPONENT_DECLARE(AudioSynth);
 
 /** Construct AudioBus values: unity volume to the master, centered, no send.
  *
@@ -78,6 +79,44 @@ static void box_audio_reverb_ctor(
     for (i = 0; i < count; i ++) {
         values[i] = (Reverb){
             .decay = 1.5f, .damping = 0.5f, .predelay = 0.02f, .size = 0.5f, .mix = 1.0f };
+    }
+}
+
+/** Construct SynthOscillator values: a sine at 440 Hz at unity level, without a sweep.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_synth_oscillator_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    SynthOscillator *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (SynthOscillator){ .wave = SynthSine, .frequency = 440.0f, .level = 1.0f };
+    }
+}
+
+/** Construct SynthFilter values: a lowpass at 1000 Hz without resonance or sweep.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_synth_filter_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    SynthFilter *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (SynthFilter){ .kind = SynthLowPass, .cutoff = 1000.0f };
     }
 }
 
@@ -242,7 +281,8 @@ bool box_audio_play(
     box_audio_module_t *state = box_audio_module_get(world);
     bool result = false;
     if (!state || !sound || !ecs_is_alive(world, sound) ||
-        (!ecs_has(world, sound, AudioPcm) && !ecs_has(world, sound, SoundFile)))
+        (!ecs_has(world, sound, AudioPcm) && !ecs_has(world, sound, SoundFile) &&
+        !ecs_has(world, sound, SynthSound)))
     {
         goto done;
     }
@@ -506,6 +546,14 @@ void BoxAudioImport(
     ecs_set_hooks(world, AudioSource, { .ctor = box_audio_source_ctor });
     ECS_META_COMPONENT(world, Reverb);
     ecs_set_hooks(world, Reverb, { .ctor = box_audio_reverb_ctor });
+    ECS_META_COMPONENT(world, SynthWave);
+    ECS_META_COMPONENT(world, SynthFilterKind);
+    ECS_META_COMPONENT(world, SynthOscillator);
+    ecs_set_hooks(world, SynthOscillator, { .ctor = box_audio_synth_oscillator_ctor });
+    ECS_META_COMPONENT(world, SynthEnvelope);
+    ECS_META_COMPONENT(world, SynthFilter);
+    ecs_set_hooks(world, SynthFilter, { .ctor = box_audio_synth_filter_ctor });
+    ECS_META_COMPONENT(world, SynthSound);
     ECS_META_COMPONENT(world, AudioSettings);
     ecs_set_hooks(world, AudioSettings, { .ctor = box_audio_settings_ctor });
     ECS_META_COMPONENT(world, AudioStatus);
@@ -515,7 +563,9 @@ void BoxAudioImport(
     ECS_COMPONENT_DEFINE(world, AudioVoice);
     ECS_COMPONENT_DEFINE(world, AudioReverbState);
     ECS_COMPONENT_DEFINE(world, AudioSample);
+    ECS_COMPONENT_DEFINE(world, AudioSynth);
     ecs_set_hooks(world, AudioSoundId, { .copy = box_audio_track_copy });
+    ecs_set_hooks(world, AudioSynth, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioBusState, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioVoice, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioReverbState, { .copy = box_audio_track_copy });
@@ -525,6 +575,8 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(AudioSource), EcsWith, ecs_id(AudioVoice));
     ecs_add_pair(world, ecs_id(Reverb), EcsWith, ecs_id(AudioReverbState));
     ecs_add_pair(world, ecs_id(SoundFile), EcsWith, ecs_id(AudioSample));
+    ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSoundId));
+    ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSynth));
 
     ecs_entity(world, { .name = "master" });
     ecs_singleton_add(world, AudioSettings);
@@ -543,5 +595,6 @@ void BoxAudioImport(
 
     box_audio_sync_init(world, state);
     box_audio_sample_init(world, state);
+    box_audio_synth_init(world);
     box_audio_functions_init(world);
 }

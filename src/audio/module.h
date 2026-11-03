@@ -58,7 +58,15 @@ typedef struct box_audio_reverb_sent_t {
     box_audio_reverb_params_t params; /**< Parameters sent */
 } box_audio_reverb_sent_t;
 
+/** What box.audio compiled for a SynthSound */
+typedef struct AudioSynth {
+    box_audio_synth_patch_t patch;  /**< The patch of the last compile */
+    bool compiled;          /**< The patch holds the components; false once one changed */
+    bool pending;           /**< The patch changed since it was last sent */
+} AudioSynth;
+
 extern ECS_COMPONENT_DECLARE(AudioSoundId);
+extern ECS_COMPONENT_DECLARE(AudioSynth);
 extern ECS_COMPONENT_DECLARE(AudioBusState);
 extern ECS_COMPONENT_DECLARE(AudioVoice);
 extern ECS_COMPONENT_DECLARE(AudioReverbState);
@@ -138,6 +146,7 @@ typedef struct box_audio_module_stats_t {
     int64_t reverbs;        /**< REVERB commands written */
     int64_t not_ready;      /**< Plays dropped while their sound file loaded */
     int64_t decodes;        /**< Decodes of sound files submitted */
+    int64_t synths;         /**< Compiles of synth sounds */
 } box_audio_module_stats_t;
 
 /** A capture that waits for its frames */
@@ -152,6 +161,7 @@ typedef struct box_audio_module_t {
     ecs_query_t *buses;           /**< AudioBus, disabled ones included */
     ecs_query_t *sources;         /**< AudioSource, disabled ones included */
     ecs_query_t *sounds;          /**< AudioPcm */
+    ecs_query_t *synths;          /**< SynthSound, prefabs included */
     ecs_query_t *reverbs;         /**< Reverb on an AudioBus, disabled ones included */
     ecs_entity_t reverb_entity[BOX_AUDIO_REVERB_MAX]; /**< Entity of each reverb slot */
     box_audio_reverb_sent_t reverb_sent[BOX_AUDIO_REVERB_MAX]; /**< What each slot got */
@@ -239,6 +249,30 @@ int32_t box_audio_module_reverb_slot(
 void box_audio_sync_init(
     ecs_world_t *world,
     box_audio_module_t *state);
+
+/** Register the observers that mark a synth sound for a new compile when a component of it
+ * or of one of its layers changes.
+ *
+ * @param world The world
+ */
+void box_audio_synth_init(
+    ecs_world_t *world);
+
+/** Compile a synth sound into a patch: the root and its children with a SynthOscillator as
+ * layers, the root first. Logs one error per problem: too many layers, a layer that would
+ * never end, an envelope longer than the core plays.
+ *
+ * @param world The world
+ * @param state The state, for the counters
+ * @param e The root, with SynthSound
+ * @param synth What was compiled for it, receives the patch
+ * @return Whether the patch differs from the one compiled before
+ */
+bool box_audio_synth_compile(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    ecs_entity_t e,
+    AudioSynth *synth);
 
 /** Register the sound file components' observers and the headless wait of their decodes.
  *

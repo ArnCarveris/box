@@ -43,6 +43,7 @@ start of the next render block. They are:
 | `ORDER` | count, then per bus in processing order: bus, output, send |
 | `SOUND_RELEASE` | sound: freed once no voice plays it |
 | `REVERB` | slot, bus (or none), decay, damping, predelay, size, mix: see [Reverb](#reverb) |
+| `SYNTH` | sound, then a patch: makes a free sound id a synth or replaces its patch, see [Synth](#synth) |
 
 The sender picks the voice handles, so it addresses a voice without waiting for a reply. Values
 are clamped (volumes and send levels to 0..4, pans to -1..1, pitches to 1/64..16) and a NaN
@@ -71,8 +72,9 @@ the free of a sound released after it.
 
 **Voices** are a fixed pool of `BOX_AUDIO_VOICE_MAX` (64) voices, plus 16 slots for voices that
 fade out. A voice has a source, a bus, a volume, a pan and a pitch ratio. The source is a sample
-buffer, mono or stereo, looped or not, read with linear interpolation; it is a tagged union in
-`internal.h` with its functions in `source.c`, so the synth and music sources add a kind there.
+buffer, mono or stereo, looped or not, read with linear interpolation, or a synth patch (see
+[Synth](#synth)); it is a tagged union in `internal.h` with its functions in `source.c`, so the
+music source adds a kind there.
 A play when 64 voices play steals the one with the lowest level, the larger of its two gain
 targets (the first of equals), with a fade of 2 ms. This is the voice cap: there is no
 priority system.
@@ -161,6 +163,115 @@ the decay time at 44.1 and 48 kHz, damping, predelay, stereo correlation, densit
 extreme values, silence, changes without clicks, sends, the second reverb, a delete and no
 allocation. `bench/audio` has a `Reverb` suite in ns per frame, and
 `test/integration/web/audio_reverb.mjs` measures a tail and the load of the worklet in Chrome.
+
+## Synth
+
+`src/audio/core/synth.c` renders procedural sounds live, a new source kind of the voices, so
+synth voices share the pool, the cap, the buses, the ramps and the limiter. A sound id becomes a
+synth with a `SYNTH` command, whose patch (`box_audio_synth_patch_t` of `core.h`) is plain
+values in seconds and Hz, the same at every rate: a fixed topology of up to
+`BOX_AUDIO_SYNTH_LAYERS` (4) oscillators, each with an envelope, summed into one filter and an
+amp. There is no node graph. The core keeps up to `BOX_AUDIO_SYNTH_MAX` (256) patches; a play
+copies the patch into its voice, so a play allocates nothing, a new patch for the same id
+reaches the next play while the voices that play keep theirs, and a release frees the id at once
+with `SOUND_FREE`. The core clamps every value of a patch, a NaN to the low end.
+
+- **Oscillators.** Sine (`box_audio_core_sin`), saw, square, triangle and white noise. Saw and
+  square are band limited with polyBLEP. Frequencies are clamped to 20 kHz and to 0.48 of the
+  rate, so the top of the audible range plays at 44.1 and 48 kHz. A sweep moves the frequency
+  exponentially to its end over its time, and lands on it exactly. The pitch of the voice, the
+  play's and a `VOICE_SET`, multiplies every frequency but noise.
+- **Noise** is xorshift32, seeded per play from the seed of the patch and the count of its
+  plays, so a fixed run gives bit identical output and every play differs. The same generator
+  picks the pitch and level variances of the play.
+- **Envelopes** are linear and sample accurate: attack from 0 to 1, decay to the sustain level,
+  hold, release to 0. An attack, and a decay or a release that changes the level, takes at
+  least `BOX_AUDIO_SYNTH_EDGE` (0.5 ms), so neither end clicks; with a sustain of 0 the envelope
+  ends after its decay. A pass of an envelope is at most `BOX_AUDIO_SYNTH_LENGTH_MAX` (60 s); a
+  longer one loses its hold first. A voice ends, and frees its slot, once every envelope it
+  uses reached silence; a looping voice starts a new pass instead, with the state of its
+  filter. Synth voices start at their gain, without the ramp of the core, since the envelope
+  starts at 0: an attack of 1 ms takes 1 ms.
+- **The filter** is the trapezoidal state variable filter (Simper): lowpass and highpass at 12
+  dB per octave and a bandpass with unity gain at the cutoff. Resonance 0 is a Butterworth
+  response (Q 0.707), 1 a Q of 50. Its coefficients come from `tan(pi cutoff / rate)` with the
+  cutoff clamped to 0.49 of the rate, so it stays stable at every cutoff and resonance, a cutoff
+  at Nyquist and a fast sweep included; a sweep updates them every 8 frames. Its state is
+  flushed like a bus sample.
+- **Cost.** Render work only: per frame of a voice an envelope step per envelope, an oscillator
+  per layer and the filter. `bench/audio` has a `Synth` suite of 64 voices in ns per sample.
+
+The core needs no libm: the exponential sweeps use series for `log2` and `exp2` in `synth.c`.
+
+### Synth sounds
+
+A sound effect is a prefab in script, with no file. `SynthSound` marks the root; the layers are
+the root and its children that have a `SynthOscillator`, as particle effect layers are. The
+`SynthEnvelope` and the `SynthFilter` of the root apply to the mix of the layers; a layer may
+have its own `SynthEnvelope`, and one without uses the root's.
+
+| Component | What it is |
+|-----------|------------|
+| `SynthSound` | The root: `seed`, `pitch_variance` and `level_variance` (random shares per play, 0) |
+| `SynthOscillator` | A layer: `wave` (`SynthSine`, `SynthSaw`, `SynthSquare`, `SynthTriangle`, `SynthNoise`), `frequency` (440), `frequency_end` (0, no sweep), `sweep` (s), `level` (1) |
+| `SynthEnvelope` | `attack`, `decay`, `sustain`, `release`, `hold`: seconds and a sustain level, all 0 by default |
+| `SynthFilter` | `kind` (`SynthLowPass`, `SynthHighPass`, `SynthBandPass`), `cutoff` (1000), `cutoff_end`, `sweep`, `resonance` |
+
+The module (`src/audio/synth_sound.c`) compiles a sound once, and again when a component of it
+or of a layer changes, into a patch that the sync system sends with a `SYNTH` command before the
+plays of the frame. `box.audio.play(UiClick, 0.8)` plays it like any sound, and an `AudioSource`
+with `loop: true` starts it over at the end of its envelopes. A play allocates nothing.
+
+- More than 4 layers log one error that names the sound; the first 4 play.
+- A layer without any envelope (no `SynthEnvelope` on it or on the root) would never end: it
+  logs one error and the sound plays for `BOX_AUDIO_SYNTH_ENDLESS` (10) seconds.
+- An envelope that is not a time of 0 to 60 seconds logs one error and is cut.
+- Deleting the sound releases it and fades its one shots, as for `AudioPcm`.
+
+Three examples:
+
+```
+using box.audio
+
+ui { AudioBus: {volume: 1} }
+
+// A click: a burst of noise and a falling tone, 31 ms
+prefab UiClick {
+  AudioOutput: {bus: ui}
+  SynthSound: {pitch_variance: 0.05}
+  SynthEnvelope: {attack: 0.001, decay: 0.03}
+  noise { SynthOscillator: {wave: SynthNoise, level: 0.6} }
+  tone { SynthOscillator: {wave: SynthSine, frequency: 1800, frequency_end: 900, sweep: 0.03, level: 0.4} }
+}
+
+// A UI blip: a soft square that steps up a fifth, through a lowpass
+prefab UiBlip {
+  AudioOutput: {bus: ui}
+  SynthSound: {level_variance: 0.1}
+  SynthEnvelope: {attack: 0.004, decay: 0.06, sustain: 0.4, hold: 0.04, release: 0.05}
+  SynthFilter: {kind: SynthLowPass, cutoff: 3000, resonance: 0.2}
+  low { SynthOscillator: {wave: SynthSquare, frequency: 660, level: 0.25} }
+  high {
+    SynthOscillator: {wave: SynthTriangle, frequency: 990, level: 0.3}
+    SynthEnvelope: {attack: 0.04, decay: 0.08}
+  }
+}
+
+// A whoosh: noise through a resonant bandpass that sweeps up and fades
+prefab Whoosh {
+  SynthSound: {seed: 7, pitch_variance: 0.1}
+  SynthEnvelope: {attack: 0.15, decay: 0.25, sustain: 0.3, hold: 0.1, release: 0.3}
+  SynthFilter: {kind: SynthBandPass, cutoff: 300, cutoff_end: 4000, sweep: 0.5, resonance: 0.6}
+  SynthOscillator: {wave: SynthNoise, level: 0.8}
+}
+```
+
+The tests are the `Synth` suite of `test/cpu/audio`, on offline renders: frequencies of every
+wave at 44.1 and 48 kHz, sweeps, aliasing of a 5 kHz saw and square, flat and seeded noise, the
+times and edges of envelopes, the end of a voice, the filter one octave past its cutoff and
+under sweeps at full resonance and extreme values, layers, scripts from
+`test/assets/audio/synth.flecs` and errors; `NoAlloc` renders 64 synth voices. The browser
+check is `test/integration/web/audio_synth.mjs`.
 
 ## Transports
 
@@ -348,7 +459,7 @@ compiles, on every build of box. For a target other than Emscripten the script d
 clang --target=wasm32-unknown-unknown -O2 -msimd128 -std=c11 -ffreestanding -nostdlib \
     -DBOX_AUDIO_CORE_WASM -Wl,--no-entry -Wl,-z,stack-size=65536 \
     -Wl,--initial-memory=1048576 -Wl,--max-memory=268435456 -Wl,--strip-all \
-    -Wl,--export=box_audio_core_wasm_init ... command.c core.c source.c wasm.c \
+    -Wl,--export=box_audio_core_wasm_init ... command.c core.c reverb.c source.c synth.c wasm.c \
     -o box_audio_core.wasm
 ```
 
@@ -464,6 +575,7 @@ frame, the same on every platform.
 | `Reverb` | A reverb on the bus of the entity: `decay` (1.5 s), `damping` (0.5), `predelay` (0.02 s), `size` (0.5), `mix` (1) |
 | `AudioOutput` | The bus a source, or a sound by default, plays on |
 | `AudioSource` | A sound that plays while the entity exists: `sound`, `volume` (1), `pitch` (1), `loop`, `playing` (true) |
+| `SynthSound` | A sound made by the synth from its layers, see [Synth sounds](#synth-sounds) |
 | `AudioSettings` | Singleton: `master_volume` (1) and `mute` |
 | `AudioStatus` | Singleton, read only: `state`, `sample_rate`, `voices`, `voices_stolen`, `load`, `buses` |
 

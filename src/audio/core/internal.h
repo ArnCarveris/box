@@ -115,7 +115,8 @@ typedef struct box_audio_reverb_t {
 /** Kinds of sources a voice plays */
 typedef enum box_audio_source_kind_t {
     BOX_AUDIO_SOURCE_NONE = 0,   /**< No source, silent */
-    BOX_AUDIO_SOURCE_SAMPLE = 1  /**< A sample buffer, box_audio_sample_source_t */
+    BOX_AUDIO_SOURCE_SAMPLE = 1, /**< A sample buffer, box_audio_sample_source_t */
+    BOX_AUDIO_SOURCE_SYNTH = 2   /**< A synth patch, box_audio_synth_source_t */
 } box_audio_source_kind_t;
 
 /** A source that plays a sound, mono or stereo, with looping and linear interpolation */
@@ -127,9 +128,66 @@ typedef struct box_audio_sample_source_t {
     bool loop;         /**< Whether it starts over at its end */
 } box_audio_sample_source_t;
 
+/** Segments of a synth envelope */
+typedef enum box_audio_synth_segment_t {
+    BOX_AUDIO_SYNTH_ATTACK = 0,   /**< From 0 to 1 */
+    BOX_AUDIO_SYNTH_DECAY = 1,    /**< From 1 to the sustain level */
+    BOX_AUDIO_SYNTH_HOLD = 2,     /**< At the sustain level */
+    BOX_AUDIO_SYNTH_RELEASE = 3,  /**< From the sustain level to 0 */
+    BOX_AUDIO_SYNTH_DONE = 4      /**< Silent, the envelope ended */
+} box_audio_synth_segment_t;
+
+/** An envelope of a synth voice, advanced per frame */
+typedef struct box_audio_synth_env_t {
+    int32_t segment;      /**< A box_audio_synth_segment_t, -1 before the attack */
+    int32_t left;         /**< Frames left in the segment */
+    float value;          /**< Current level */
+    float target;         /**< Level at the end of the segment */
+    float step;           /**< Change per frame */
+    float sustain;        /**< Sustain level */
+    int32_t frames[4];    /**< Frames of the attack, the decay, the hold and the release */
+} box_audio_synth_env_t;
+
+/** An oscillator of a synth voice */
+typedef struct box_audio_synth_osc_t {
+    int32_t wave;         /**< A box_audio_synth_wave_t */
+    int32_t env;          /**< Envelope it uses: 0 the one of the patch, 1 + layer its own */
+    float level;          /**< Linear gain */
+    double phase;         /**< Phase in turns, 0..1 */
+    double inc;           /**< Turns per frame */
+    double ratio;         /**< Factor of inc per frame during the sweep */
+    double inc_end;       /**< Turns per frame at the end of the sweep */
+    int32_t sweep;        /**< Frames left of the sweep */
+} box_audio_synth_osc_t;
+
+/** A source that plays a synth patch, a copy of it, so it never allocates */
+typedef struct box_audio_synth_source_t {
+    box_audio_synth_patch_t patch;  /**< The patch, clamped, for the restart of a loop */
+    box_audio_synth_osc_t osc[BOX_AUDIO_SYNTH_LAYERS];  /**< The oscillators */
+    box_audio_synth_env_t env[1 + BOX_AUDIO_SYNTH_LAYERS]; /**< The envelope of the patch,
+                                     * then the own envelope of each layer */
+    uint32_t envs;        /**< Bit of each envelope a layer uses */
+    double inc_max;       /**< Largest turns per frame of an oscillator */
+    uint32_t rng;         /**< State of the noise, xorshift32, never 0 */
+    float pitch;          /**< Pitch ratio of the voice, the variance of the play included */
+    float variance;       /**< Factor of the pitch that the variance of the play picked */
+    float amp;            /**< Gain of the amp, the level variance of the play included */
+    bool loop;            /**< Whether it starts over at the end of its envelopes */
+    int32_t filter;       /**< A box_audio_synth_filter_t */
+    float k;              /**< Damping of the filter, 2 / Q */
+    float a1, a2, a3;     /**< Coefficients of the filter */
+    float ic1, ic2;       /**< State of the filter */
+    double cutoff;        /**< Cutoff in Hz */
+    double cutoff_ratio;  /**< Factor of the cutoff per frame during the sweep */
+    double cutoff_end;    /**< Cutoff at the end of the sweep */
+    int32_t cutoff_sweep; /**< Frames left of the sweep */
+    int32_t control;      /**< Frames until the filter takes the swept cutoff */
+} box_audio_synth_source_t;
+
 /** State of the kinds of sources */
 typedef union box_audio_source_data_t {
     box_audio_sample_source_t sample;  /**< BOX_AUDIO_SOURCE_SAMPLE */
+    box_audio_synth_source_t synth;    /**< BOX_AUDIO_SOURCE_SYNTH */
 } box_audio_source_data_t;
 
 /** What a voice plays */
@@ -175,7 +233,15 @@ typedef struct box_audio_sound_t {
     double rate;        /**< Frames of the sound per frame of the core */
     int32_t users;      /**< Voices that play it */
     int32_t state;      /**< A box_audio_sound_state_t */
+    int32_t synth;      /**< Slot of its patch plus 1 for a synth, 0 for frames */
 } box_audio_sound_t;
+
+/** A synth patch the core holds for a sound id */
+typedef struct box_audio_synth_slot_t {
+    box_audio_synth_patch_t patch;  /**< The patch, clamped */
+    uint32_t plays;     /**< Plays so far, which seed the noise and the variances */
+    bool used;          /**< Whether a sound has the slot */
+} box_audio_synth_slot_t;
 
 /** A bus: a volume, a pan, a mute, an output and one send, with a block of samples */
 typedef struct box_audio_bus_t {
@@ -220,6 +286,7 @@ struct box_audio_core_t {
                            * per block */
     float limiter_gain;   /**< Current gain of the limiter, 0..1 */
     float limiter_step;   /**< Largest rise of the gain of the limiter per frame */
+    box_audio_synth_slot_t synths[BOX_AUDIO_SYNTH_MAX]; /**< Patches of synth sounds */
 };
 
 /** Flush a sample: NaN, infinities, huge values and denormals become 0.
@@ -301,6 +368,52 @@ void box_audio_source_sample(
     uint32_t sound,
     float pitch,
     bool loop);
+
+/** Apply a synth command: give a free sound id a patch or replace the patch of a synth.
+ *
+ * @param core The core
+ * @param cmd The command
+ */
+void box_audio_synth_command(
+    box_audio_core_t *core,
+    const box_audio_cmd_synth_t *cmd);
+
+/** Start a synth source on the patch of a synth sound. Takes no use of the sound: the source
+ * plays a copy of the patch.
+ *
+ * @param core The core
+ * @param source The source
+ * @param sound Id of a ready synth sound
+ * @param pitch Pitch ratio
+ * @param loop Whether it starts over at the end of its envelopes
+ */
+void box_audio_source_synth(
+    box_audio_core_t *core,
+    box_audio_source_t *source,
+    uint32_t sound,
+    float pitch,
+    bool loop);
+
+/** Render a block of a synth source into core->src_l.
+ *
+ * @param core The core
+ * @param src The source
+ * @param frames Frames to render, at most BOX_AUDIO_CORE_BLOCK
+ * @return Frames it rendered; fewer than frames when its envelopes ended
+ */
+int32_t box_audio_synth_render(
+    box_audio_core_t *core,
+    box_audio_synth_source_t *src,
+    int32_t frames);
+
+/** Set the pitch ratio of a synth source.
+ *
+ * @param src The source
+ * @param pitch Pitch ratio
+ */
+void box_audio_synth_pitch(
+    box_audio_synth_source_t *src,
+    float pitch);
 
 /** Set the pitch ratio of a source, for kinds that have one.
  *

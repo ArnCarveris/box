@@ -2,7 +2,7 @@
     "id": "bench_audio",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the audio core: voices mixed through buses, and a reverb, in ns per frame",
+        "description": "Benchmarks for the audio core: voices mixed through buses, a reverb and synth voices, in ns per frame",
         "public": false,
         "use": [
             "box"
@@ -30,6 +30,13 @@
                     "voices_32_reverb",
                     "voices_32_dry",
                     "silent_tail"
+                ]
+            },
+            {
+                "id": "Synth",
+                "benchcases": [
+                    "voices_64",
+                    "voices_64_filter_sweep"
                 ]
             }
         ]

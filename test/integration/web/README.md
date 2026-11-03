@@ -148,6 +148,18 @@ node test/integration/web/audio_reverb.mjs \
     "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
 ```
 
+`audio_synth.mjs` checks synth sounds with `test/integration/web/audio_synth.flecs`. After a
+trusted click it records `audio capture 2` while a `script_write` plays the prefab `Beep` (a
+660 Hz sine at 0.5 with an envelope of 0.36 s) with `box.audio.play`, and measures its
+frequency, its level and its length at the rate of the context. It then starts 64 looping voices
+of `Hum` (a saw, a square and noise into a filter sweep) and prints the load of the worklet over
+2000 quanta, which has to stay under real time:
+
+```sh
+node test/integration/web/audio_synth.mjs \
+    "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
+```
+
 `audio_sample.mjs` checks sound files (`SoundFile`, see `docs/audio.md`) in Chrome. It preloads
 `test/integration/web/audio_sample.flecs` and the WAV and FLAC files of `test/assets/audio` with
 `?preload=`; the scene decodes one second of 440 Hz at 44100 Hz. After a trusted click it

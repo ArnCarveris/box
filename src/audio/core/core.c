@@ -372,7 +372,8 @@ static box_audio_voice_t* box_audio_voice_slot(
     return result;
 }
 
-/** Apply a play command.
+/** Apply a play command. A synth voice starts at its gains, without the ramp: its envelope
+ * starts from 0 itself, so an attack shorter than the ramp keeps its time.
  *
  * @param core The core
  * @param cmd The command
@@ -408,8 +409,16 @@ static void box_audio_cmd_play(
     box_audio_ramp_set(&v->left, 0);
     box_audio_ramp_set(&v->right, 0);
     box_audio_voice_gains(core, v);
-    box_audio_source_sample(core, &v->source, cmd->sound, v->pitch,
-        (cmd->flags & BOX_AUDIO_PLAY_LOOP) != 0);
+    if (core->sounds[cmd->sound].synth) {
+        box_audio_ramp_set(&v->left, v->left.target);
+        box_audio_ramp_set(&v->right, v->right.target);
+        box_audio_source_synth(core, &v->source, cmd->sound, v->pitch,
+            (cmd->flags & BOX_AUDIO_PLAY_LOOP) != 0);
+    } else {
+        box_audio_source_sample(core, &v->source, cmd->sound, v->pitch,
+            (cmd->flags & BOX_AUDIO_PLAY_LOOP) != 0);
+    }
+
     core->playing ++;
 
 done:
@@ -568,6 +577,11 @@ static void box_audio_cmd_release(
     }
 
     s = &core->sounds[cmd->sound];
+    if (s->synth) {
+        core->synths[s->synth - 1].used = false;
+        s->synth = 0;
+    }
+
     if (s->users > 0) {
         s->state = BOX_AUDIO_SOUND_RELEASED;
     } else {
@@ -598,6 +612,7 @@ static void box_audio_cmd(
     box_audio_cmd_set_t set;
     box_audio_cmd_release_t release;
     box_audio_cmd_reverb_t reverb;
+    box_audio_cmd_synth_t synth;
     box_audio_voice_t *v;
     if (type == BOX_AUDIO_CMD_PLAY && size >= (int32_t)sizeof(play)) {
         box_audio_copy(&play, bytes, (int32_t)sizeof(play));
@@ -622,6 +637,9 @@ static void box_audio_cmd(
     } else if (type == BOX_AUDIO_CMD_REVERB && size >= (int32_t)sizeof(reverb)) {
         box_audio_copy(&reverb, bytes, (int32_t)sizeof(reverb));
         box_audio_reverb_command(core, &reverb);
+    } else if (type == BOX_AUDIO_CMD_SYNTH && size >= (int32_t)sizeof(synth)) {
+        box_audio_copy(&synth, bytes, (int32_t)sizeof(synth));
+        box_audio_synth_command(core, &synth);
     } else {
         box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, type, size);
     }
@@ -756,6 +774,7 @@ bool box_audio_core_sound(
         (double)sample_rate / (double)core->sample_rate : 1.0;
     s->users = 0;
     s->state = BOX_AUDIO_SOUND_READY;
+    s->synth = 0;
     result = true;
 
 done:

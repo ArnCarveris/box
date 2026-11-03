@@ -174,3 +174,16 @@ bool box_audio_write_reverb(
 
     return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
 }
+
+bool box_audio_write_synth(
+    box_audio_writer_t *writer,
+    uint32_t sound,
+    const box_audio_synth_patch_t *patch)
+{
+    box_audio_cmd_synth_t cmd;
+    box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_SYNTH, sizeof(cmd));
+    cmd.sound = sound;
+    cmd.patch = *patch;
+
+    return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
+}

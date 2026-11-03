@@ -608,6 +608,28 @@ static void box_audio_reverbs(
     }
 }
 
+/** Pick a free sound id of the core, or log once that every id is taken.
+ *
+ * @param state The state
+ * @return The id, 0 when every id is taken
+ */
+static uint32_t box_audio_sound_id(
+    box_audio_module_t *state)
+{
+    uint32_t id;
+    for (id = 1; id < BOX_AUDIO_SOUND_MAX && state->sound_used[id]; id ++) { }
+    if (id == BOX_AUDIO_SOUND_MAX) {
+        if (!state->sound_overflow) {
+            ecs_err("box.audio: more than %d sounds", BOX_AUDIO_SOUND_MAX - 1);
+            state->sound_overflow = true;
+        }
+
+        id = 0;
+    }
+
+    return id;
+}
+
 /** Give a sound an id of the core and hand its frames to the output, which copies them.
  *
  * @param state The state
@@ -626,27 +648,61 @@ static uint32_t box_audio_sound_send(
     int32_t channels,
     float sample_rate)
 {
-    uint32_t id, result = 0;
-    for (id = 1; id < BOX_AUDIO_SOUND_MAX && state->sound_used[id]; id ++) { }
-    if (id == BOX_AUDIO_SOUND_MAX) {
-        if (!state->sound_overflow) {
-            ecs_err("box.audio: more than %d sounds", BOX_AUDIO_SOUND_MAX - 1);
-            state->sound_overflow = true;
-        }
-
-        goto done;
-    }
-
-    if (t->sound(t, id, data, frames, channels, sample_rate)) {
+    uint32_t id = box_audio_sound_id(state), result = 0;
+    if (id && t->sound(t, id, data, frames, channels, sample_rate)) {
         state->sound_used[id] = 1;
         result = id;
     }
 
-done:
     return result;
 }
 
-/** Send the samples of sounds the output does not have yet: AudioPcm and decoded files.
+/** Compile the synth sounds that changed and send their patches: a new one gets an id of the
+ * core, a changed one replaces the patch of its id, which the next play takes.
+ *
+ * @param world The world
+ * @param state The state
+ */
+static void box_audio_synths(
+    ecs_world_t *world,
+    box_audio_module_t *state)
+{
+    ecs_iter_t it = ecs_query_iter(world, state->synths);
+    int32_t i;
+    while (ecs_query_next(&it)) {
+        AudioSynth *synth = ecs_field(&it, AudioSynth, 1);
+        AudioSoundId *s = ecs_field(&it, AudioSoundId, 2);
+        for (i = 0; i < it.count; i ++) {
+            if (!synth[i].compiled &&
+                box_audio_synth_compile(world, state, it.entities[i], &synth[i]))
+            {
+                synth[i].pending = true;
+            }
+
+            if (s[i].id && s[i].serial == state->serial && !synth[i].pending) {
+                continue;
+            }
+
+            if (!s[i].id || s[i].serial != state->serial) {
+                s[i].id = box_audio_sound_id(state);
+                s[i].serial = state->serial;
+                if (!s[i].id) {
+                    continue;
+                }
+
+                state->sound_used[s[i].id] = 1;
+            }
+
+            if (box_audio_reserve(state)) {
+                box_audio_write_synth(&state->writer, s[i].id, &synth[i].patch);
+            }
+
+            synth[i].pending = false;
+        }
+    }
+}
+
+/** Send the sounds the output does not have yet: AudioPcm, decoded files and synth patches.
  *
  * @param world The world
  * @param state The state
@@ -688,6 +744,8 @@ static void box_audio_sounds(
             sample->channels, sample->sample_rate);
         sample->serial = state->serial;
     }
+
+    box_audio_synths(world, state);
 }
 
 /** Get the sound id of a sound entity in the current output.
@@ -1166,8 +1224,9 @@ done:
     return;
 }
 
-/** Release the sound of changed or removed samples. Voices that play changed samples finish
- * first, one shots of removed ones fade out as sources of a deleted sound do.
+/** Release the sound of changed or removed samples, and of removed synth sounds. Voices that
+ * play changed samples finish first, one shots of removed ones fade out as sources of a
+ * deleted sound do.
  *
  * @param it The iterator of the observer
  */
@@ -1232,6 +1291,17 @@ void box_audio_sync_init(
         .cache_kind = EcsQueryCacheAuto
     });
 
+    state->synths = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "AudioSynths" }),
+        .terms = {
+            { .id = ecs_id(SynthSound), .inout = EcsIn, .src.id = EcsSelf },
+            { .id = ecs_id(AudioSynth), .src.id = EcsSelf },
+            { .id = ecs_id(AudioSoundId), .src.id = EcsSelf }
+        },
+        .flags = EcsQueryMatchPrefab,
+        .cache_kind = EcsQueryCacheAuto
+    });
+
     state->reverbs = ecs_query(world, {
         .entity = ecs_entity(world, { .name = "AudioReverbs" }),
         .terms = {
@@ -1273,6 +1343,15 @@ void box_audio_sync_init(
         .entity = ecs_entity(world, { .name = "AudioPcmChange" }),
         .query.terms = {{ .id = ecs_id(AudioPcm), .src.id = EcsSelf }},
         .events = { EcsOnSet, EcsOnRemove },
+        .callback = BoxAudioPcmChange,
+        .ctx = state
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "AudioSynthRemove" }),
+        .query.flags = EcsQueryMatchPrefab,
+        .query.terms = {{ .id = ecs_id(SynthSound), .src.id = EcsSelf }},
+        .events = { EcsOnRemove },
         .callback = BoxAudioPcmChange,
         .ctx = state
     });

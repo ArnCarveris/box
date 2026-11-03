@@ -75,6 +75,22 @@
 /** Seconds of the fade of the wet signal around a change of size or predelay, out and in */
 #define BOX_AUDIO_REVERB_FADE 0.1f
 
+/** Oscillators of a synth patch, each with an envelope, mixed into one filter and an amp */
+#define BOX_AUDIO_SYNTH_LAYERS 4
+
+/** Synth patches a core holds at once */
+#define BOX_AUDIO_SYNTH_MAX 256
+
+/** Longest pass of a synth envelope in seconds; a longer one loses its hold first */
+#define BOX_AUDIO_SYNTH_LENGTH_MAX 60.0f
+
+/** Shortest attack, and shortest decay and release that change the level, in seconds, so an
+ * envelope never jumps */
+#define BOX_AUDIO_SYNTH_EDGE 0.0005f
+
+/** Highest frequency of an oscillator in Hz, the top of the audible range */
+#define BOX_AUDIO_SYNTH_FREQUENCY_MAX 20000.0f
+
 /** Commands of the byte stream. Each starts with a box_audio_cmd_header_t */
 typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_PLAY = 1,          /**< box_audio_cmd_play_t */
@@ -83,7 +99,8 @@ typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_BUS_SET = 4,       /**< box_audio_cmd_set_t on a bus */
     BOX_AUDIO_CMD_ORDER = 5,         /**< box_audio_cmd_order_t and its routes */
     BOX_AUDIO_CMD_SOUND_RELEASE = 6, /**< box_audio_cmd_release_t */
-    BOX_AUDIO_CMD_REVERB = 7         /**< box_audio_cmd_reverb_t */
+    BOX_AUDIO_CMD_REVERB = 7,        /**< box_audio_cmd_reverb_t */
+    BOX_AUDIO_CMD_SYNTH = 8          /**< box_audio_cmd_synth_t */
 } box_audio_cmd_type_t;
 
 /** Parameters of BOX_AUDIO_CMD_VOICE_SET and BOX_AUDIO_CMD_BUS_SET */
@@ -176,6 +193,69 @@ typedef struct box_audio_cmd_reverb_t {
     uint32_t bus;                      /**< Bus whose signal it processes, or BUS_NONE */
     box_audio_reverb_params_t params;  /**< The parameters, clamped by the core */
 } box_audio_cmd_reverb_t;
+
+/** Waves of a synth oscillator */
+typedef enum box_audio_synth_wave_t {
+    BOX_AUDIO_SYNTH_SINE = 0,      /**< Sine */
+    BOX_AUDIO_SYNTH_SAW = 1,       /**< Saw, band limited */
+    BOX_AUDIO_SYNTH_SQUARE = 2,    /**< Square, band limited */
+    BOX_AUDIO_SYNTH_TRIANGLE = 3,  /**< Triangle */
+    BOX_AUDIO_SYNTH_NOISE = 4      /**< White noise, seeded per play */
+} box_audio_synth_wave_t;
+
+/** Kinds of the filter of a synth patch */
+typedef enum box_audio_synth_filter_t {
+    BOX_AUDIO_SYNTH_FILTER_NONE = 0,  /**< No filter */
+    BOX_AUDIO_SYNTH_LOWPASS = 1,      /**< Lowpass, 12 dB per octave */
+    BOX_AUDIO_SYNTH_HIGHPASS = 2,     /**< Highpass, 12 dB per octave */
+    BOX_AUDIO_SYNTH_BANDPASS = 3      /**< Bandpass, unity at the cutoff */
+} box_audio_synth_filter_t;
+
+/** An envelope of a synth patch: a linear attack to 1, a decay to the sustain level, a hold
+ * there and a release to 0 */
+typedef struct box_audio_synth_envelope_t {
+    float attack;   /**< Seconds from 0 to 1 */
+    float decay;    /**< Seconds from 1 to the sustain level */
+    float sustain;  /**< Level after the decay, 0..1 */
+    float release;  /**< Seconds from the sustain level to 0 */
+    float hold;     /**< Seconds at the sustain level before the release */
+} box_audio_synth_envelope_t;
+
+/** An oscillator of a synth patch */
+typedef struct box_audio_synth_layer_t {
+    uint32_t wave;                        /**< A box_audio_synth_wave_t */
+    uint32_t has_envelope;                /**< 1 when it has its own envelope, 0 for the one
+                                           * of the patch */
+    float frequency;                      /**< Hz, ignored by noise */
+    float frequency_end;                  /**< Hz the pitch sweeps to, 0 for no sweep */
+    float sweep;                          /**< Seconds of the sweep */
+    float level;                          /**< Linear gain */
+    box_audio_synth_envelope_t envelope;  /**< Its own envelope, when has_envelope */
+} box_audio_synth_layer_t;
+
+/** A synth patch: up to BOX_AUDIO_SYNTH_LAYERS oscillators with envelopes, then one filter,
+ * then an amp. Plain values in seconds and Hz, the same at every sample rate */
+typedef struct box_audio_synth_patch_t {
+    uint32_t layers;                      /**< Oscillators that play, 0..BOX_AUDIO_SYNTH_LAYERS */
+    uint32_t seed;                        /**< Seed of the noise and of the variances */
+    float pitch_variance;                 /**< Random share of the pitch per play, 0..1 */
+    float level_variance;                 /**< Random share of the level per play, 0..1 */
+    box_audio_synth_envelope_t envelope;  /**< Envelope of the layers without their own */
+    uint32_t filter;                      /**< A box_audio_synth_filter_t */
+    float cutoff;                         /**< Hz */
+    float cutoff_end;                     /**< Hz the cutoff sweeps to, 0 for no sweep */
+    float cutoff_sweep;                   /**< Seconds of the sweep */
+    float resonance;                      /**< 0..1, 1 rings the longest */
+    box_audio_synth_layer_t layer[BOX_AUDIO_SYNTH_LAYERS]; /**< The oscillators */
+} box_audio_synth_patch_t;
+
+/** Make a sound id a synth patch, or replace the patch of a synth sound. Voices that play it
+ * keep the patch they started with; the next play takes the new one */
+typedef struct box_audio_cmd_synth_t {
+    box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_SYNTH */
+    uint32_t sound;                 /**< Id of the sound, free or a synth */
+    box_audio_synth_patch_t patch;  /**< The patch, clamped by the core */
+} box_audio_cmd_synth_t;
 
 /** Events the core reports to its transport */
 typedef enum box_audio_event_type_t {
@@ -460,6 +540,18 @@ bool box_audio_write_reverb(
     uint32_t slot,
     uint32_t bus,
     const box_audio_reverb_params_t *params);
+
+/** Write a command that makes a sound id a synth patch or replaces its patch.
+ *
+ * @param writer The writer
+ * @param sound Id of the sound
+ * @param patch The patch
+ * @return Whether the command fit
+ */
+bool box_audio_write_synth(
+    box_audio_writer_t *writer,
+    uint32_t sound,
+    const box_audio_synth_patch_t *patch);
 
 /** Write raw bytes, for commands the writer has no function for.
  *
