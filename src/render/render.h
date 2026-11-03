@@ -1486,6 +1486,7 @@ typedef struct box_render_transition_value_t {
     bool present;                   /**< A record set the component */
     bool active;                    /**< The transition runs */
     TimingFunction timing_function; /**< Curve */
+    TransitionBezier bezier;        /**< Handles of a CubicBezier */
     float delay;                    /**< Seconds the value holds still after the start */
     float duration;                 /**< Seconds from the end of the delay to the target */
     double start;                   /**< World time of the start */
@@ -1559,7 +1560,8 @@ bool box_render_transition_equal(
     const void *b);
 
 /** Interpolate two values of a component per field: floats linearly, uint8_t fields in float,
- * rounded. 0 and 1 give the exact end values.
+ * rounded and clamped to 0..255. 0 and 1 give the exact end values; a t outside 0..1, from a
+ * CubicBezier whose y overshoots, extrapolates past them.
  *
  * @param component The component
  * @param from The value at 0
@@ -1573,6 +1575,21 @@ void box_render_transition_mix(
     const void *to,
     float t,
     void *out);
+
+/** Widen the per field range of the targets of a transform component by what a CubicBezier
+ * can overshoot: from + (to - from) * e, with e in the hull of 0, y1, y2 and 1, lies at most
+ * max(y1, y2) - 1 or -min(y1, y2) range widths beyond it. The presets do not overshoot.
+ *
+ * @param component The component, nothing for one other than Position, Rotation or Scale
+ * @param spec The transition of the start
+ * @param lo The per field minimum, widened
+ * @param hi The per field maximum, widened
+ */
+void box_render_transition_widen(
+    box_render_transition_component_t component,
+    const TransitionSpec *spec,
+    float *lo,
+    float *hi);
 
 /** Linear progress of a transition at a time: 0 until the delay passed, then up to 1 over the
  * duration. A duration of 0 jumps from 0 to 1 at the end of the delay.

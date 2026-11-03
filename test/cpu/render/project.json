@@ -492,7 +492,14 @@
                     "transform_text_and_2d",
                     "transform_targets_on_game_thread",
                     "record_sizes",
-                    "idle_no_work"
+                    "idle_no_work",
+                    "bezier_values",
+                    "bezier_script",
+                    "bezier_matches_preset",
+                    "bezier_overshoot_float",
+                    "bezier_overshoot_rgb",
+                    "bezier_invalid_x",
+                    "bezier_interrupt"
                 ]
             },
             {

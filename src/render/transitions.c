@@ -289,6 +289,7 @@ static void box_transition_send(
     slot->timing_function = spec ? spec->timing_function : Linear;
     r->component = component;
     r->timing_function = slot->timing_function;
+    r->bezier = slot->timing_function == CubicBezier ? spec->bezier : (TransitionBezier){0};
     r->delay = slot->delay;
     r->duration = slot->duration;
     r->start = slot->start;
@@ -325,15 +326,14 @@ done:
     return;
 }
 
-/** Compare a transitioned component of an entity to the last target sent and send what
- * changed.
+/** Compare a transitioned component of an entity to the last target sent, send what changed.
  *
  * The first value sets without a transition, a changed value starts one with the spec of the
  * entry, and a value whose entry or component is gone snaps to its target.
  *
  * A transform component keeps the per field range of its targets since it was last idle: the
- * resolver starts from the value it renders, and the timing functions do not overshoot, so
- * every value it renders lies in that range, without the game thread knowing a start value.
+ * resolver starts from the value it renders, and the range is widened by what the timing
+ * function overshoots, so every value it renders lies in it without a start value.
  *
  * @param p The packet
  * @param node The node id
@@ -369,6 +369,7 @@ static void box_transition_compare(
             }
 
             box_transition_range_add(component, slot, packed, false);
+            box_render_transition_widen(component, spec, slot->lo, slot->hi);
             ecs_os_memcpy(slot->value, packed, BOX_RENDER_TRANSITION_VALUE);
             box_transition_send(p, node, component, slot, spec);
         }

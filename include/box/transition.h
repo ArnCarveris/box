@@ -24,13 +24,28 @@ extern "C" {
 
 /** Curve a transition follows from its start to its target value, default Linear.
  *
- * EaseIn, EaseOut and EaseInOut are the CSS cubic Beziers of the same names.
+ * EaseIn, EaseOut and EaseInOut are the CSS cubic Beziers of the same names; CubicBezier is a
+ * CSS cubic-bezier() with the handles of TransitionSpec.bezier.
  */
 ECS_ENUM(TimingFunction, {
-    Linear = 0,    /**< Constant speed */
-    EaseIn = 1,    /**< Starts slow, cubic Bezier (0.42, 0, 1, 1) */
-    EaseOut = 2,   /**< Ends slow, cubic Bezier (0, 0, 0.58, 1) */
-    EaseInOut = 3  /**< Starts and ends slow, cubic Bezier (0.42, 0, 0.58, 1) */
+    Linear = 0,     /**< Constant speed */
+    EaseIn = 1,     /**< Starts slow, cubic Bezier (0.42, 0, 1, 1) */
+    EaseOut = 2,    /**< Ends slow, cubic Bezier (0, 0, 0.58, 1) */
+    EaseInOut = 3,  /**< Starts and ends slow, cubic Bezier (0.42, 0, 0.58, 1) */
+    CubicBezier = 4 /**< Cubic Bezier with the handles of TransitionSpec.bezier */
+});
+
+/** Handles of a CSS cubic-bezier(x1, y1, x2, y2), a curve from (0, 0) to (1, 1) of progress in
+ * x to eased progress in y. In script {0.2, 0, 0, 1}.
+ *
+ * x1 and x2 must lie in 0..1, as in CSS. y1 and y2 may be outside, the eased progress then
+ * leaves 0..1 and the value overshoots its start or target.
+ */
+ECS_STRUCT(TransitionBezier, {
+    float x1;   /**< X of the first handle, 0..1 */
+    float y1;   /**< Y of the first handle */
+    float x2;   /**< X of the second handle, 0..1 */
+    float y2;   /**< Y of the second handle */
 });
 
 /** How changes of one component animate. Omitted fields are 0 and Linear. */
@@ -38,11 +53,13 @@ ECS_STRUCT(TransitionSpec, {
     float duration;                 /**< Seconds from start to target, 0 to switch at once */
     float delay;                    /**< Seconds the rendered value holds still before moving */
     TimingFunction timing_function; /**< Curve of the progress */
+    TransitionBezier bezier;        /**< Handles of CubicBezier, ignored by the others */
 });
 
 /** Map from a component id to the TransitionSpec of its changes, inherited by instances; an
  * instance that sets its own replaces the whole map. In script: Transition: [Position: {...}].
- * A key that is not transitionable or a negative duration or delay logs an error and is ignored.
+ * A key that is not transitionable, a negative duration or delay, or a CubicBezier with an x
+ * handle outside 0..1 or a handle that is not finite logs an error and is ignored.
  *
  * Transitionable keys: Position, Rotation, Scale, Rgb, Opacity, AlphaCutoff, Tint, PbrMaterial,
  * Emissive, TextureTransform, Transmission, ClearCoat, SpecularAnisotropy, Sheen and
@@ -57,7 +74,8 @@ typedef ecs_map_t Transition;
 /** Id of the Transition map type */
 extern ECS_COMPONENT_DECLARE(Transition);
 
-/** Progress along a timing function.
+/** Progress along a preset timing function. CubicBezier has no handles here and is Linear,
+ * use box_transition_ease_bezier for it.
  *
  * Pure, with no world access and no allocation, so the render thread can call it.
  *
@@ -68,6 +86,30 @@ extern ECS_COMPONENT_DECLARE(Transition);
 float box_transition_ease(
     TimingFunction fn,
     float t);
+
+/** Progress along a timing function with the handles of CubicBezier.
+ *
+ * The presets ignore the handles and give box_transition_ease. Pure, with no world access and
+ * no allocation, so the render thread can call it.
+ *
+ * @param fn The timing function
+ * @param bezier The handles of CubicBezier, x1 and x2 in 0..1; NULL is Linear for CubicBezier
+ * @param t Linear progress, clamped to 0..1
+ * @return The eased progress, exactly 0 at 0 and 1 at 1, outside 0..1 in between when a y
+ *         handle is
+ */
+float box_transition_ease_bezier(
+    TimingFunction fn,
+    const TransitionBezier *bezier,
+    float t);
+
+/** Whether the handles of a CubicBezier are valid: finite, with x1 and x2 in 0..1.
+ *
+ * @param bezier The handles
+ * @return True when they are valid
+ */
+bool box_transition_bezier_valid(
+    const TransitionBezier *bezier);
 
 /** Whether changes of a component can transition.
  *
@@ -83,8 +125,9 @@ bool box_transition_supported(
     const ecs_world_t *world,
     ecs_entity_t component);
 
-/** Whether an entry of a Transition is used: the component is transitionable and the duration
- * and delay are not negative. Entries that are not are ignored.
+/** Whether an entry of a Transition is used: the component is transitionable, the duration
+ * and delay are not negative, and the handles of a CubicBezier are valid
+ * (box_transition_bezier_valid). Entries that are not are ignored.
  *
  * @param world The world
  * @param component The key of the entry
