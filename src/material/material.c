@@ -216,7 +216,8 @@ static void box_texture_transform_ctor(
     }
 }
 
-/** Construct TextureMapping values that keep the UVs of the mesh, with a size of 1.
+/** Construct TextureMapping values that keep the UVs of the mesh, with a size of 1 and no
+ * blend.
  *
  * @param ptr The components
  * @param count Number of components
@@ -231,7 +232,7 @@ static void box_texture_mapping_ctor(
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
-        values[i] = (TextureMapping){ .mode = MappingUv, .size = 1.0f };
+        values[i] = (TextureMapping){ .mode = MappingUv, .size = 1.0f, .blend = 0.0f };
     }
 }
 

@@ -41,6 +41,10 @@ typedef struct box_texture_t {
     bool loaded;            /**< A load succeeded, so the backend should have an image */
     bool sent;              /**< The current backend has the image under handle */
     bool queued;            /**< The entity is in the list of textures to send */
+    bool waiting;           /**< Its TextureGen waits for its source to get a TextureGen, it
+                             *   fails at the next frame when none arrived */
+    char *source_name;      /**< Path of the source it waits for whose TextureGen was removed,
+                             *   or which was deleted, so the failure names it */
 } box_texture_t;
 
 /** Main thread state of the textures of a world */
@@ -54,6 +58,8 @@ typedef struct box_textures_t {
     box_texture_sync_t *sync;   /**< Decodes in flight */
     ecs_query_t *surfaces;      /**< Entities with a Surface */
     int32_t watch;              /**< Kind of the textures in the file watch */
+    ecs_entity_t removed;       /**< Source whose TextureGen is being removed, which the
+                                 *   textures derived from it see as gone */
 } box_textures_t;
 
 /** Singleton that holds the registry of a world */

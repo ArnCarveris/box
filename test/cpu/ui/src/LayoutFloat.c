@@ -6,6 +6,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include <math.h>
+#include <string.h>
 #include "render.h"
 #include "draw.h"
 
@@ -1168,4 +1169,96 @@ void LayoutFloat_hide_clipped_not_drawn(void) {
 
     ecs_fini(world);
     box_render_null_free(null);
+}
+
+static char float_warnings[4096];
+static int32_t float_warning_count;
+
+static void LayoutFloatCaptureLog(
+    int32_t level,
+    const char *file,
+    int32_t line,
+    const char *msg)
+{
+    (void)file;
+    (void)line;
+    if (level == -2) {
+        float_warning_count ++;
+        if (strlen(float_warnings) + strlen(msg) + 2 < sizeof(float_warnings)) {
+            strcat(float_warnings, msg);
+            strcat(float_warnings, "\n");
+        }
+    }
+}
+
+void LayoutFloat_warn_parent_without_layout(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t root = ecs_entity(world, { .name = "menu" });
+    ecs_set(world, root, Layout, { .direction = DirectionColumn });
+    ecs_set(world, root, LayoutItem, {
+        .width = { SizeModeFixed, 400 }, .height = { SizeModeFixed, 400 } });
+    ecs_entity_t button = ecs_entity(world, { .name = "button", .parent = root });
+    ecs_set(world, button, Rect, {1, 1});
+    ecs_set(world, button, LayoutItem, {
+        .width = { SizeModeFixed, 100 }, .height = { SizeModeFixed, 20 } });
+    ecs_entity_t list = ecs_entity(world, { .name = "list", .parent = button });
+    ecs_set(world, list, Position, {3, 4, 0});
+    ecs_set(world, list, Rect, {1, 1});
+    ecs_set(world, list, LayoutItem, {
+        .width = { SizeModeFixed, 80 }, .height = { SizeModeFixed, 50 } });
+    ecs_set(world, list, LayoutFloat, {
+        .h = AlignLeft, .v = VAlignTop, .anchor_h = AlignLeft, .anchor_v = VAlignBottom });
+
+    float_warnings[0] = '\0';
+    float_warning_count = 0;
+    int32_t level = ecs_log_set_level(-1);
+    bool colors = ecs_log_enable_colors(false);
+    ecs_os_api_log_t real_log = ecs_os_api.log_;
+    ecs_os_api.log_ = LayoutFloatCaptureLog;
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_os_api.log_ = real_log;
+    ecs_log_set_level(level);
+    ecs_log_enable_colors(colors);
+
+    test_int(float_warning_count, 1);
+    test_assert(strstr(float_warnings,
+        "layout: 'menu.button.list' has a LayoutFloat but its parent 'menu.button' has no "
+        "Layout, so the float is ignored") != NULL);
+    test_flt(ecs_get(world, list, Position)->x, 3);
+    test_flt(ecs_get(world, list, Position)->y, 4);
+
+    ecs_fini(world);
+}
+
+void LayoutFloat_warn_root(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t root = ecs_entity(world, { .name = "popup" });
+    ecs_set(world, root, Layout, { .direction = DirectionColumn });
+    ecs_set(world, root, LayoutItem, {
+        .width = { SizeModeFixed, 80 }, .height = { SizeModeFixed, 50 } });
+    ecs_set(world, root, LayoutFloat, { .anchor_v = VAlignBottom });
+
+    float_warnings[0] = '\0';
+    float_warning_count = 0;
+    int32_t level = ecs_log_set_level(-1);
+    bool colors = ecs_log_enable_colors(false);
+    ecs_os_api_log_t real_log = ecs_os_api.log_;
+    ecs_os_api.log_ = LayoutFloatCaptureLog;
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_os_api.log_ = real_log;
+    ecs_log_set_level(level);
+    ecs_log_enable_colors(colors);
+
+    test_int(float_warning_count, 1);
+    test_assert(strstr(float_warnings, "'popup' has a LayoutFloat") != NULL);
+    test_assert(strstr(float_warnings, "the float is ignored") != NULL);
+
+    ecs_fini(world);
 }

@@ -29,6 +29,7 @@ export const C_PANEL_HI: Rgb = {70, 92, 56}
 mv_ui_parchment { TexturePath: {path: "etc/scenes/mossvale/ui/parchment.jpg"} }
 mv_ui_leather { TexturePath: {path: "etc/scenes/mossvale/ui/leather.jpg"} }
 mv_ui_vignette { TexturePath: {path: "etc/scenes/mossvale/ui/vignette.png"} }
+mv_ui_scrim { TexturePath: {path: "etc/scenes/mossvale/ui/scrim.png"} }
 mv_ui_corner { TexturePath: {path: "etc/scenes/mossvale/ui/corner.svg", width: 128} }
 mv_ui_divider { TexturePath: {path: "etc/scenes/mossvale/ui/divider.svg", width: 1024} }
 mv_ui_ribbon { TexturePath: {path: "etc/scenes/mossvale/ui/ribbon.svg", width: 800} }
@@ -674,36 +675,37 @@ template Banner {
   }
 }
 
-template KeyHint {
-  prop keys: string = "E"
-  prop text: string = ""
-  Layout: {direction: Row, v: Middle, spacing: 7}
-  Keycap cap(key: keys)
-  Label what(text: text, size: 16, color: C_INK)
-}
-
 template Pulse {
   prop text: string = ""
+  prop size: f32 = 26
   mut glow = false
   Layout: {direction: Row}
-  Opacity: {match glow { true: 1; _: 0.35 }}
-  Transition: [Opacity: {duration: 0.9, timing_function: EaseInOut}]
-  Engraved label_(text: text, size: 26, color: C_GOLD, depth: 2)
+  Text: {value: text, size: size, font: mv_font_display}
+  Rgb: C_SHADE
+  face {
+    Position: {-1, 2, 0.02}
+    Text: {value: text, size: size, font: mv_font_display}
+    Rgb: match glow { true: {255, 246, 222}; _: C_GOLD }
+    Transition: [Rgb: {duration: 0.8, timing_function: EaseInOut}]
+  }
   async {
     while true {
       glow = !glow
-      await delay(0.9)
+      await delay(0.8)
     }
   }
 }
 
 template TitleCard {
+  mut shown = false
   Layout: {}
+  Opacity: {match shown { true: 1; _: 0 }}
+  Transition: [Opacity: {duration: 1.4, timing_function: EaseOut}]
   shade_ {
     LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
     Rect: {1, 1}
     Rgb: {14, 10, 20}
-    Opacity: {0.4}
+    Opacity: {0.45}
   }
   vignette_ {
     Position: {0, 0, 0.1}
@@ -712,35 +714,29 @@ template TitleCard {
     Image: {texture: mv_ui_vignette}
     Rgb: {255, 255, 255}
   }
+  scrim_ {
+    Position: {0, 0, 0.15}
+    LayoutFloat: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle}
+    LayoutItem: {width: {mode: Fixed, value: 1400}, height: {mode: Fixed, value: 880}}
+    Rect: {1, 1}
+    Image: {texture: mv_ui_scrim}
+    Rgb: {255, 255, 255}
+  }
   content {
     Position: {0, 0, 0.2}
     LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
-    Layout: {direction: Column, h: Center, v: Middle, spacing: 8, padding: {40, 40, 60, 60}}
-    Divider top_rule(w: 360, h: 30)
-    Engraved title(text: "MOSSVALE", size: 104, color: C_GOLD, depth: 4)
-    Engraved sub(text: "The Hedge Mage", size: 30, color: C_TEXT, depth: 2)
-    Divider rule(w: 560, h: 46)
-    Engraved story(text: "Old Thistlewood, the village mage, has passed on, leaving his cottage and his staff to you, his apprentice Wren. The folk of Mossvale have chores aplenty, and magic makes light work.", size: 19, color: C_MUTED, display: false, depth: 1.5, width: 640, align: Center)
-    gap_b { LayoutItem: {height: {mode: Fixed, value: 14}} }
-    Panel keys(pad: 16, padx: 30, gap: 10, h: Center) {
-      content_ {
-        Layout: {direction: Column, spacing: 10, h: Center}
-        row_a {
-          Layout: {direction: Row, v: Middle, spacing: 26}
-          KeyHint walk(keys: "W A S D", text: "walk")
-          KeyHint hurry(keys: "Shift", text: "hurry")
-          KeyHint talk(keys: "E", text: "talk")
-        }
-        row_b {
-          Layout: {direction: Row, v: Middle, spacing: 26}
-          KeyHint pick(keys: "1 - 6", text: "choose a spell")
-          KeyHint cast(keys: "Space", text: "cast at the nearest target")
-          KeyHint click(keys: "Click", text: "cast at the cursor")
-        }
-      }
-    }
-    gap_c { LayoutItem: {height: {mode: Fixed, value: 22}} }
-    Pulse go(text: "Press Enter to begin")
+    Layout: {direction: Column, h: Center, v: Middle, spacing: 10, padding: {40, 40, 60, 60}}
+    Divider top_rule(w: 420, h: 34)
+    Engraved title(text: "MOSSVALE", size: 150, color: C_GOLD, depth: 6)
+    Engraved sub(text: "The Hedge Mage", size: 36, color: C_TEXT, depth: 2.5)
+    Divider rule(w: 620, h: 50)
+    Engraved hook(text: "The old mage is gone. The village needs a new one.", size: 24, color: C_TEXT, display: false, depth: 2, align: Center)
+    gap_ { LayoutItem: {height: {mode: Fixed, value: 40}} }
+    Pulse go(text: "Press Enter", size: 32)
+  }
+  async {
+    await delay(0.1)
+    shown = true
   }
 }
 
