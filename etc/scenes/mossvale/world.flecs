@@ -8,11 +8,11 @@ using box.material
 using box.particle
 
 mossvale {
-  ground : MvGrass { Position: {0, -0.5, 0}; Box: {700, 1, 700} }
-  forest_floor : MvForestFloor { Position: {30, 0.004, -70}; Box: {170, 0.01, 78} }
-  hills_floor : MvHillGrass { Position: {30, 0.004, 70}; Box: {170, 0.01, 78} }
-  farm_floor : MvMeadow { Position: {65, 0.004, 0}; Box: {64, 0.01, 62} }
-  west_floor : MvMeadow { Position: {-80, 0.004, 0}; Box: {72, 0.01, 210} }
+  ground : MvGrass { Position: {0, -0.5, 0}; Box: {700, 1, 700}; TextureTransform: {64, 64, 0, 0} }
+  forest_floor : MvForestFloor { Position: {30, 0.004, -70}; Box: {170, 0.01, 78}; TextureTransform: {17, 7.8, 0, 0} }
+  hills_floor : MvHillGrass { Position: {30, 0.004, 70}; Box: {170, 0.01, 78}; TextureTransform: {15, 7, 0, 0} }
+  farm_floor : MvMeadow { Position: {65, 0.004, 0}; Box: {64, 0.01, 62}; TextureTransform: {6, 6, 0, 0} }
+  west_floor : MvMeadow { Position: {-80, 0.004, 0}; Box: {72, 0.01, 210}; TextureTransform: {6.5, 19, 0, 0} }
 
   roads {
     for (i, z) in [0..59] {
@@ -37,11 +37,11 @@ mossvale {
     }
     square : MvCobble { Position: {0, 0.03, 0}; Cylinder: {length: 0.04, radius: 11, segments: 32} }
     square_rim : MvStone { Position: {0, 0.028, 0}; Cylinder: {length: 0.04, radius: 11.6, segments: 32} }
-    camp_floor : MvDirt { Position: {-20, 0.02, -60}; Cylinder: {length: 0.02, radius: 9, segments: 24} }
+    camp_floor : MvDirt { Position: {-20, 0.02, -60}; Cylinder: {length: 0.02, radius: 9, segments: 24}; TextureTransform: {3.5, 3.5, 0, 0} }
     shrine_floor : MvStone { Position: {18, 0.02, -80}; Cylinder: {length: 0.03, radius: 8, segments: 24} }
     grove_floor : MvAsh { Position: {36, 0.02, -58}; Cylinder: {length: 0.02, radius: 7.5, segments: 24} }
-    quarry_floor : MvDirt { Position: {26, 0.02, 66}; Cylinder: {length: 0.02, radius: 13, segments: 24} }
-    pasture_floor : MvMeadow { Position: {-16, 0.02, 56}; Cylinder: {length: 0.02, radius: 9, segments: 24} }
+    quarry_floor : MvDirt { Position: {26, 0.02, 66}; Cylinder: {length: 0.02, radius: 13, segments: 24}; TextureTransform: {5, 5, 0, 0} }
+    pasture_floor : MvMeadow { Position: {-16, 0.02, 56}; Cylinder: {length: 0.02, radius: 9, segments: 24}; TextureTransform: {2, 2, 0, 0} }
   }
 
   water {
@@ -51,8 +51,8 @@ mossvale {
       "bank_{i}" : MvSand { Position: {river_x(zz), 0.012, zz}; Rotation: {0, ang, 0}; Box: {8.5, 0.02, 3.6} }
       "river_{i}" : MvWater { Position: {river_x(zz), 0.04, zz}; Rotation: {0, ang, 0}; Box: {6.2, 0.02, 3.6} }
     }
-    lake_bank : MvSand { Position: {LAKE_X, 0.014, LAKE_Z}; Cylinder: {length: 0.02, radius: LAKE_R + 1.8, segments: 48} }
-    lake : MvWater { Position: {LAKE_X, 0.042, LAKE_Z}; Cylinder: {length: 0.02, radius: LAKE_R, segments: 48} }
+    lake_bank : MvSand { Position: {LAKE_X, 0.014, LAKE_Z}; Cylinder: {length: 0.02, radius: LAKE_R + 1.8, segments: 48}; TextureTransform: {5, 5, 0, 0} }
+    lake : MvWater { Position: {LAKE_X, 0.042, LAKE_Z}; Cylinder: {length: 0.02, radius: LAKE_R, segments: 48}; TextureTransform: {6, 6, 0, 0} }
     lake_deep : MvDeepWater { Position: {LAKE_X, 0.046, LAKE_Z}; Cylinder: {length: 0.02, radius: LAKE_R - 5, segments: 40} }
     lake_shallow : MvSand { Position: {LAKE_X, 0.03, LAKE_Z}; Cylinder: {length: 0.02, radius: LAKE_R + 0.6, segments: 48}; Rgb: {200, 196, 150} }
     lake_glints {
@@ -132,20 +132,20 @@ mossvale {
       const z = -30 + hash(i * 5.71 + 2) * 60
       const r = 3 + hash(i * 1.9) * 6
       if hash(i * 7.3) > 0.5 {
-        "p_{i}" : MvGrassDark { Position: {x, 0.006, z}; Scale: {1, 1, 0.6 + hash(i) * 0.8}; Cylinder: {length: 0.004, radius: r, segments: 14} }
+        "p_{i}" : MvGrass { Position: {x, 0.006, z}; Rotation: {0, i, 0}; Scale: {1, 1, 0.6 + hash(i) * 0.8}; Cylinder: {length: 0.004, radius: r, segments: 28}; Rgb: {112, 164, 76}; TextureTransform: {r / 5, r / 5, 0.3, 0.7} }
       } else {
-        "p_{i}" : MvMeadow { Position: {x, 0.006, z}; Scale: {1, 1, 0.6 + hash(i) * 0.8}; Cylinder: {length: 0.004, radius: r, segments: 14} }
+        "p_{i}" : MvGrass { Position: {x, 0.006, z}; Rotation: {0, i, 0}; Scale: {1, 1, 0.6 + hash(i) * 0.8}; Cylinder: {length: 0.004, radius: r, segments: 28}; Rgb: {132, 178, 84}; TextureTransform: {r / 5, r / 5, 0.6, 0.2} }
       }
     }
     for i in 0..40 {
       const x = -38 + hash(i * 4.4) * 130
       const z = -92 + hash(i * 2.2 + 7) * 58
-      "fp_{i}" : MvLeafDark { Position: {x, 0.008, z}; Cylinder: {length: 0.004, radius: 3 + hash(i * 3) * 4, segments: 12} }
+      "fp_{i}" : MvForestFloor { Position: {x, 0.008, z}; Rotation: {0, i, 0}; Cylinder: {length: 0.004, radius: 3 + hash(i * 3) * 4, segments: 12}; Rgb: {150, 160, 120}; TextureTransform: {1.4, 1.4, 0, 0} }
     }
     for i in 0..40 {
       const x = -38 + hash(i * 6.6) * 130
       const z = 34 + hash(i * 1.3 + 5) * 58
-      "hp_{i}" { Position: {x, 0.008, z}; Scale: {1, 1, 0.7}; Cylinder: {length: 0.004, radius: 2 + hash(i * 3) * 4, segments: 12}; Rgb: {154, 150, 96}; PbrMaterial: {roughness: 1} }
+      "hp_{i}" : MvHillGrass { Position: {x, 0.008, z}; Scale: {1, 1, 0.7}; Cylinder: {length: 0.004, radius: 2 + hash(i * 3) * 4, segments: 12}; Rgb: {176, 168, 104} }
     }
   }
 
@@ -233,16 +233,16 @@ mossvale {
     }
     for i in 0..24 {
       const a = i * 0.2618
-      "mount_{i}" : MvHillGrass { Position: {cos(a) * 170, -18, sin(a) * 170}; Scale: {50, 40 + hash(i) * 30, 50}; IcoSphere: {radius: 1, segments: 1} }
+      "mount_{i}" : MvHillGrass { Position: {cos(a) * 170, -18, sin(a) * 170}; Rotation: {0, i, 0}; Scale: {50, 40 + hash(i) * 30, 50}; IcoSphere: {radius: 1, segments: 3, smooth: true}; Rgb: {150 + hash(i * 2) * 20, 162, 96}; TextureTransform: {8, 5, 0, 0} }
     }
   }
 
   village {
     House cottage(x: -17, z: 18, w: 7, d: 5.5, face: 2, wall: 1, roof: 4)
-    House inn(x: -22, z: -17, w: 9, d: 7, face: 0, wall: 0, roof: 3, floors: 2)
+    House inn(x: -22, z: -17, w: 9, d: 7, face: 0, wall: 0, roof: 3, floors: 2, sign: 1)
     House hall(x: -9, z: -17.5, w: 8, d: 6, face: 0, wall: 3, roof: 2, floors: 2)
-    House bakery(x: 12, z: -16, w: 7, d: 6, face: 0, wall: 1, roof: 1)
-    House smithy(x: 15, z: 16.5, w: 8, d: 6, face: 2, wall: 3, roof: 1)
+    House bakery(x: 12, z: -16, w: 7, d: 6, face: 0, wall: 1, roof: 0, sign: 2)
+    House smithy(x: 15, z: 16.5, w: 8, d: 6, face: 2, wall: 3, roof: 1, sign: 3)
     House mira_house(x: -31, z: 18, w: 6.5, d: 5.5, face: 2, wall: 2, roof: 0)
     House tam_house(x: -8, z: 21.5, w: 7, d: 5.5, face: 1, wall: 0, roof: 1)
     House east_a(x: 25, z: -9, w: 6, d: 5, face: 0, wall: 2, roof: 0)
