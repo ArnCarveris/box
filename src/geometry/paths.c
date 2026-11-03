@@ -45,20 +45,38 @@ static bool box_path_equal(
     return result;
 }
 
-static void box_path_segment(const float *start, const float *end,
-    const float *control1, const float *control2, PathSegmentKind kind,
-    float t, int dimensions, float *out)
+/** Resolve a segment to the four points of its cubic Bezier.
+ *
+ * @param p0 Anchor before the segment, used by a Catmull-Rom segment.
+ * @param p1 Start anchor of the segment.
+ * @param p2 End anchor of the segment.
+ * @param p3 Anchor after the segment, used by a Catmull-Rom segment.
+ * @param control1 First control point, used by a cubic Bezier segment.
+ * @param control2 Second control point, used by a cubic Bezier segment.
+ * @param kind The segment kind.
+ * @param dimensions The number of coordinates.
+ * @param out Receives the four cubic points, unused coordinates set to 0.
+ */
+static void box_path_cubic(const float *p0, const float *p1, const float *p2,
+    const float *p3, const float *control1, const float *control2, PathSegmentKind kind,
+    int dimensions, vec3 out[4])
 {
-    vec3 a = {0}, b = {0}, c = {0}, d = {0}, point;
-    for (int i = 0; i < dimensions; i ++) {
-        a[i] = start[i];
-        d[i] = end[i];
-        b[i] = kind == PathLine ? start[i] + (end[i] - start[i]) / 3 : control1[i];
-        c[i] = kind == PathLine ? start[i] + (end[i] - start[i]) * (2.0f / 3) : control2[i];
+    for (int k = 0; k < 4; k ++) {
+        glm_vec3_zero(out[k]);
     }
-    box_curve_cubic3(a, b, c, d, t, point);
     for (int i = 0; i < dimensions; i ++) {
-        out[i] = point[i];
+        out[0][i] = p1[i];
+        out[3][i] = p2[i];
+        if (kind == PathCubicBezier) {
+            out[1][i] = control1[i];
+            out[2][i] = control2[i];
+        } else if (kind == PathCatmullRom) {
+            out[1][i] = p1[i] + (p2[i] - p0[i]) / 6;
+            out[2][i] = p2[i] - (p3[i] - p1[i]) / 6;
+        } else {
+            out[1][i] = p1[i] + (p2[i] - p1[i]) / 3;
+            out[2][i] = p1[i] + (p2[i] - p1[i]) * (2.0f / 3);
+        }
     }
 }
 
@@ -72,7 +90,7 @@ static bool box_path##D##_valid(const PATH *path) \
     if (count <= 0) { \
         return false; \
     } \
-    if (count > (INT_MAX / (int)sizeof(POINT) - 1) / 16) { \
+    if (count > (INT_MAX / (int)sizeof(POINT) - 1) / 16 - 1) { \
         ecs_err("path segment capacity exceeded"); \
         return false; \
     } \
@@ -82,7 +100,8 @@ static bool box_path##D##_valid(const PATH *path) \
     } \
     for (int i = 0; i < count; i ++) { \
         const SEGMENT *s = &segments[i]; \
-        if ((s->kind != PathLine && s->kind != PathCubicBezier) || \
+        if ((s->kind != PathLine && s->kind != PathCubicBezier && \
+                s->kind != PathCatmullRom) || \
             !box_path_point(s->end, D) || \
             (s->kind == PathCubicBezier && (!box_path_point(s->control1, D) || \
                 !box_path_point(s->control2, D)))) { \
@@ -91,24 +110,52 @@ static bool box_path##D##_valid(const PATH *path) \
     } \
     return true; \
 } \
+int box_path##D##_count(const PATH *path) \
+{ \
+    int count = ecs_vec_count(&path->segments); \
+    const SEGMENT *segments = ecs_vec_first(&path->segments); \
+    return count + (path->closed && \
+        !box_path_equal(segments[count - 1].end, path->start, D)); \
+} \
+static const float* box_path##D##_anchor(const PATH *path, int index) \
+{ \
+    int count = ecs_vec_count(&path->segments); \
+    const SEGMENT *segments = ecs_vec_first(&path->segments); \
+    return index > 0 && index <= count ? segments[index - 1].end : path->start; \
+} \
+PathSegmentKind box_path##D##_cubic(const PATH *path, int index, vec3 out[4]) \
+{ \
+    int count = ecs_vec_count(&path->segments); \
+    int total = box_path##D##_count(path); \
+    const SEGMENT *segments = ecs_vec_first(&path->segments); \
+    const SEGMENT *s = index < count ? &segments[index] : NULL; \
+    PathSegmentKind kind = s ? s->kind : \
+        (segments[count - 1].kind == PathCatmullRom ? PathCatmullRom : PathLine); \
+    int previous, next; \
+    if (path->closed) { \
+        previous = (index - 1 + total) % total; \
+        next = (index + 2) % total; \
+    } else { \
+        previous = index ? index - 1 : 0; \
+        next = index + 2 <= total ? index + 2 : total; \
+    } \
+    box_path_cubic(box_path##D##_anchor(path, previous), box_path##D##_anchor(path, index), \
+        box_path##D##_anchor(path, index + 1), box_path##D##_anchor(path, next), \
+        s ? s->control1 : NULL, s ? s->control2 : NULL, kind, D, out); \
+    return kind; \
+} \
 bool box_path##D##_evaluate(const PATH *path, float t, POINT out) \
 { \
     if (!isfinite(t) || t < 0 || t > 1 || !box_path##D##_valid(path)) { \
         return false; \
     } \
-    int count = ecs_vec_count(&path->segments); \
-    const SEGMENT *segments = ecs_vec_first(&path->segments); \
-    bool closing = path->closed && !box_path_equal(segments[count - 1].end, path->start, D); \
-    double parameter = (double)t * (count + closing); \
-    int index = (int)fmin(floor(parameter), count + closing - 1); \
-    float local = (float)(parameter - index); \
-    const float *start = index ? segments[index - 1].end : path->start; \
-    if (index == count) { \
-        box_path_segment(start, path->start, NULL, NULL, PathLine, local, D, out); \
-    } else { \
-        const SEGMENT *s = &segments[index]; \
-        box_path_segment(start, s->end, s->control1, s->control2, s->kind, local, D, out); \
-    } \
+    int total = box_path##D##_count(path); \
+    double parameter = (double)t * total; \
+    int index = (int)fmin(floor(parameter), total - 1); \
+    vec3 cubic[4], point; \
+    box_path##D##_cubic(path, index, cubic); \
+    box_curve_cubic3(cubic[0], cubic[1], cubic[2], cubic[3], (float)(parameter - index), point); \
+    ecs_os_memcpy(out, point, sizeof(POINT)); \
     return box_path_point(out, D); \
 } \
 bool box_path##D##_sample(const ecs_world_t *world, ecs_entity_t entity, ecs_vec_t *points) \
@@ -118,11 +165,11 @@ bool box_path##D##_sample(const ecs_world_t *world, ecs_entity_t entity, ecs_vec
     if (!box_path##D##_valid(path)) { \
         return false; \
     } \
-    int count = ecs_vec_count(&path->segments); \
-    const SEGMENT *segments = ecs_vec_first(&path->segments); \
+    int total = box_path##D##_count(path); \
     int length = 1; \
-    for (int i = 0; i < count; i ++) { \
-        length += segments[i].kind == PathLine ? 1 : 16; \
+    for (int i = 0; i < total; i ++) { \
+        vec3 cubic[4]; \
+        length += box_path##D##_cubic(path, i, cubic) == PathLine ? 1 : 16; \
     } \
     if ((int64_t)ecs_vec_count(points) + length > INT_MAX / (int)sizeof(POINT)) { \
         ecs_err("path sample allocation exceeds capacity"); \
@@ -131,18 +178,21 @@ bool box_path##D##_sample(const ecs_world_t *world, ecs_entity_t entity, ecs_vec
     ecs_vec_set_size_t(NULL, points, POINT, ecs_vec_count(points) + length); \
     POINT *first = ecs_vec_append_t(NULL, points, POINT); \
     ecs_os_memcpy(*first, path->start, sizeof(POINT)); \
-    const float *start = path->start; \
-    for (int i = 0; i < count; i ++) { \
-        const SEGMENT *s = &segments[i]; \
-        int steps = s->kind == PathLine ? 1 : 16; \
+    for (int i = 0; i < total; i ++) { \
+        vec3 cubic[4], point; \
+        int steps = box_path##D##_cubic(path, i, cubic) == PathLine ? 1 : 16; \
         for (int j = 1; j <= steps; j ++) { \
-            POINT *point = ecs_vec_append_t(NULL, points, POINT); \
-            box_path_segment(start, s->end, s->control1, s->control2, s->kind, \
-                (float)j / steps, D, *point); \
+            POINT *sample = ecs_vec_append_t(NULL, points, POINT); \
+            if (j == steps) { \
+                glm_vec3_copy(cubic[3], point); \
+            } else { \
+                box_curve_cubic3(cubic[0], cubic[1], cubic[2], cubic[3], \
+                    (float)j / steps, point); \
+            } \
+            ecs_os_memcpy(*sample, point, sizeof(POINT)); \
         } \
-        start = s->end; \
     } \
-    if (path->closed && box_path_equal(start, path->start, D)) { \
+    if (path->closed) { \
         ecs_vec_remove_last(points); \
     } \
     return true; \
