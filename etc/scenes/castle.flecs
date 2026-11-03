@@ -10,9 +10,10 @@
 // granary runs dry, folk leave and their buildings stand abandoned until they are demolished. Close
 // a ring of walls, towers and gatehouses to make a courtyard: cottages inside it gather protection
 // and grow into houses and manors, and the keep is worth twice the prestige. The blacksmith
-// researches farming, so the same land feeds more folk. Grow the realm from a Hamlet to a Royal
-// Citadel. X demolishes, Escape puts the tool down. WASD moves the view, Q and E turn it, the right
-// mouse button drags it around and the wheel zooms.
+// researches farming, so the same land feeds more folk, and quarrying, so the same deposit cuts
+// more stone. Grow the realm from a Hamlet to a Royal Citadel. X demolishes, Escape puts the tool
+// down. WASD moves the view, Q and E turn it, the right mouse button drags it around and the wheel
+// zooms.
 
 include castle/state
 include castle/materials

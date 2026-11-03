@@ -26,6 +26,9 @@ export const T_DEMOLISH: i32 = 12
 
 export const RANKS: i32 = 6
 export const RESEARCH_MAX: i32 = 4
+export const MINING_MAX: i32 = 3
+export const R_FARMING: i32 = 0
+export const R_MINING: i32 = 1
 export const FOOD_CAP: f64 = 250
 export const STARVE_SECONDS: i32 = 6
 export const FARM_SIZE: i32 = 4
@@ -35,7 +38,7 @@ export const RAID_GRACE: i32 = 60
 event Build(i: i32)
 event Upgrade(i: i32)
 event Demolish(i: i32)
-event Research()
+event Research(track: i32)
 event PickTool(t: i32)
 event Toast(text: string)
 event RankUp(rank: i32)
@@ -75,11 +78,11 @@ fn kind_blurb(k: i32) -> string {
     1: "A wooden palisade, rebuilt in stone once your keep allows. Walls, towers and gatehouses that close a ring turn the ground inside into a courtyard."
     2: "Round tower. Joins the walls next to it. Select it to raise it, as high as your keep allows."
     3: "A timber gate, rebuilt in stone once your keep allows. Turns to follow the wall it sits in, and closes the ring like a wall does."
-    4: "The lord's keep, one per realm. Collects taxes and caps the level of every other piece; the walls and gates rise with it. Eats 4 food, twice as much with every level."
-    5: "A cottage for 4 folk. Eats 1 food. Outside the walls bandits raid it for gold; safe inside them it grows into a house, then a manor."
-    6: "A fenced farm of 4 by 4 cells with a farmhouse. Grows 10 food a second for 5 gold a second in wages; the blacksmith can research better farming."
-    7: "The blacksmith, one per realm. Select it to research farming tools, so your fields feed more folk."
-    8: "A stone quarry, dug into a stone deposit where grey rock breaks through the grass. Cuts 1 stone a second for 10 gold a second in wages."
+    4: "The lord's keep, one per realm. Collects taxes and caps the level of every other piece; the walls and gates rise with it. It eats twice as much food with every level."
+    5: "A cottage for 4 folk. Outside the walls bandits raid it for gold; safe inside them it grows into a house, then a manor, eating twice as much food at every step."
+    6: "A fenced farm of 4 by 4 cells with a farmhouse. Grows 10 food a second; the blacksmith can research better farming."
+    7: "The blacksmith, one per realm. Select it to research farming and quarrying tools, so your fields feed more folk and your quarries cut more stone."
+    8: "A stone quarry, dug into a stone deposit where grey rock breaks through the grass. Cuts 1 stone a second; the blacksmith can research better quarrying."
     9: "A moat of still water."
     10: "An oak or a pine. Cheap, and pleasant to look at."
     11: "A cobbled path."
@@ -139,21 +142,6 @@ fn cost_text(k: i32, lvl: i32) -> string {
       _: match s > 0 {
         true: "{s} stone"
         _: "refund"
-      }
-    }
-  }
-}
-
-fn cost_words(k: i32, lvl: i32) -> string {
-  const g = cost_gold(k, lvl)
-  const s = cost_stone(k, lvl)
-  match g > 0 && s > 0 {
-    true: "{g} gold and {s} stone"
-    _: match g > 0 {
-      true: "{g} gold"
-      _: match s > 0 {
-        true: "{s} stone"
-        _: "free"
       }
     }
   }
@@ -244,7 +232,7 @@ fn wall_height(k: i32, lvl: i32) -> f32 {
 fn food_need(k: i32, lvl: i32) -> f64 {
   match k {
     4: match lvl { 1: 4; 2: 8; 3: 16; _: 32 }
-    5: lvl
+    5: match lvl { 1: 1; 2: 2; _: 4 }
     7: 1
     _: 0
   }
@@ -366,6 +354,51 @@ fn research_stone(r: i32) -> i32 {
 
 fn research_time(r: i32) -> f64 {
   match r { 0: 15; 1: 25; 2: 35; _: 45 }
+}
+
+fn mining_name(m: i32) -> string {
+  match m {
+    0: "Iron Wedges"
+    1: "Treadwheel Cranes"
+    2: "Frame Saws"
+    _: ""
+  }
+}
+
+fn mining_gold(m: i32) -> i32 {
+  match m { 0: 50; 1: 100; _: 160 }
+}
+
+fn mining_stone(m: i32) -> i32 {
+  match m { 0: 100; 1: 200; _: 300 }
+}
+
+fn mining_time(m: i32) -> f64 {
+  match m { 0: 20; 1: 30; _: 40 }
+}
+
+fn quarry_yield(m: i32) -> f64 {
+  1 + m * 0.5
+}
+
+fn study_max(track: i32) -> i32 {
+  match track { 1: MINING_MAX; _: RESEARCH_MAX }
+}
+
+fn study_name(track: i32, r: i32) -> string {
+  match track { 1: mining_name(r); _: research_name(r) }
+}
+
+fn study_gold(track: i32, r: i32) -> i32 {
+  match track { 1: mining_gold(r); _: research_gold(r) }
+}
+
+fn study_stone(track: i32, r: i32) -> i32 {
+  match track { 1: mining_stone(r); _: research_stone(r) }
+}
+
+fn study_time(track: i32, r: i32) -> f64 {
+  match track { 1: mining_time(r); _: research_time(r) }
 }
 
 fn prestige_of(k: i32, lvl: i32, safe: bool) -> f64 {
@@ -492,6 +525,8 @@ export mut starving = false
 export mut starve_time: i32 = 0
 
 export mut research: i32 = 0
+export mut mining: i32 = 0
+export mut research_track: i32 = 0
 export mut researching = false
 export mut research_left: f64 = 0
 
