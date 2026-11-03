@@ -117,6 +117,7 @@
                     "reverse_view_order",
                     "world_panel_occluded",
                     "render_to_texture",
+                    "render_to_texture_mapped",
                     "nameplate",
                     "bubbling",
                     "hover_enter_leave",

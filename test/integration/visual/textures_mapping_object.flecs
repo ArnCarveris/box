@@ -1,0 +1,113 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+
+// TextureMapping: the back row projects the letter from the object position times the size of
+// each box (MappingObject, one letter per 0.5 units), so the letters are the same size on every
+// face and box and upright on the side faces. The front row has the same boxes with the UVs of
+// the mesh, one letter per face whatever its size; its +x faces show the letter upright too.
+// The box on the right of the back row is normal mapped with the projected bumps.
+
+camera {
+  Position: {-0.4, 5.6, 6.8}
+  Rotation: {-0.6, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {26, 30, 40, 255}}}
+}
+
+letter {
+  TexturePath: {path: "test/integration/visual/assets/letter.png"}
+}
+
+bumps {
+  TexturePath: {path: "test/integration/visual/assets/bumps.png"}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {20, 0.2, 14}
+  Rgb: {90, 94, 104}
+  PbrMaterial: {roughness: 0.9}
+}
+
+mapped_cube {
+  Position: {-4.6, 0.25, -2}
+  Rotation: {0, -0.6, 0}
+  Box: {0.5, 0.5, 0.5}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.8}
+  PbrTextures: {albedo: letter}
+  TextureMapping: {mode: MappingObject, size: 0.5}
+}
+
+mapped_wall {
+  Position: {-2.3, 0.5, -2}
+  Rotation: {0, -0.6, 0}
+  Box: {4, 1, 0.5}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.8}
+  PbrTextures: {albedo: letter}
+  TextureMapping: {mode: MappingObject, size: 0.5}
+}
+
+mapped_slab {
+  Position: {0.8, 1.5, -2}
+  Rotation: {0, -0.6, 0}
+  Box: {0.2, 3, 2}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.8}
+  PbrTextures: {albedo: letter}
+  TextureMapping: {mode: MappingObject, size: 0.5}
+}
+
+mapped_bumps {
+  Position: {3.4, 0.75, -2}
+  Rotation: {0, -0.6, 0}
+  Box: {2.5, 1.5, 1.5}
+  Rgb: {90, 160, 220}
+  PbrMaterial: {roughness: 0.35}
+  PbrTextures: {normal: bumps}
+  TextureMapping: {mode: MappingObject, size: 0.5}
+}
+
+uv_cube {
+  Position: {-4.6, 0.25, 1.2}
+  Rotation: {0, -0.6, 0}
+  Box: {0.5, 0.5, 0.5}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.8}
+  PbrTextures: {albedo: letter}
+}
+
+uv_wall {
+  Position: {-2.3, 0.5, 1.2}
+  Rotation: {0, -0.6, 0}
+  Box: {4, 1, 0.5}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.8}
+  PbrTextures: {albedo: letter}
+}
+
+uv_slab {
+  Position: {0.8, 1.5, 1.2}
+  Rotation: {0, -0.6, 0}
+  Box: {0.2, 3, 2}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.8}
+  PbrTextures: {albedo: letter}
+}
+
+uv_bumps {
+  Position: {3.4, 0.75, 1.2}
+  Rotation: {0, -0.6, 0}
+  Box: {2.5, 1.5, 1.5}
+  Rgb: {90, 160, 220}
+  PbrMaterial: {roughness: 0.35}
+  PbrTextures: {normal: bumps}
+}

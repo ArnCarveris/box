@@ -167,9 +167,9 @@ static void box_rounded_face(
             pos[k] = sign * (h[k] - r) + r * dir[k];
             pos[u] = side_a * (h[u] - r) + r * dir[u];
             pos[v] = side_b * (h[v] - r) + r * dir[v];
-            float tu = glm_clamp(0.5f + 0.5f * pos[u] / h[u], 0.0f, 1.0f);
-            float tv = glm_clamp(0.5f - 0.5f * pos[v] / h[v], 0.0f, 1.0f);
-            box_mesh_vertex(mesh, pos, dir, tu, tv);
+            vec2 uv;
+            box_mesh_box_face_uv(k, sign, pos, h, uv);
+            box_mesh_vertex(mesh, pos, dir, uv[0], uv[1]);
         }
     }
 
@@ -369,19 +369,20 @@ static void box_bevel_ring(
  * @param pos The position
  * @param normal The normal
  * @param face Axis of the face whose projection gives the texture coordinates
+ * @param sign Side of that face, 1 or -1
  * @return The index of the vertex
  */
 static int32_t box_bevel_vertex(
     box_bevel_t *bevel,
     const vec3 pos,
     const vec3 normal,
-    int32_t face)
+    int32_t face,
+    float sign)
 {
-    int32_t u = (face + 1) % 3, v = (face + 2) % 3;
-    float tu = glm_clamp(0.5f + 0.5f * pos[u] / bevel->h[u], 0.0f, 1.0f);
-    float tv = glm_clamp(0.5f - 0.5f * pos[v] / bevel->h[v], 0.0f, 1.0f);
+    vec2 uv;
+    box_mesh_box_face_uv(face, sign, pos, bevel->h, uv);
 
-    return box_mesh_vertex(bevel->mesh, pos, normal, tu, tv);
+    return box_mesh_vertex(bevel->mesh, pos, normal, uv[0], uv[1]);
 }
 
 /** Check whether two vertices of a bevel are the same point.
@@ -566,7 +567,7 @@ static void box_bevel_patch(
         for (int32_t j = j0; j <= j1; j ++) {
             vec3 pos, normal;
             box_bevel_point(bevel, c, i, j, pos, normal);
-            box_bevel_vertex(bevel, pos, normal, face);
+            box_bevel_vertex(bevel, pos, normal, face, c->sign[face]);
         }
     }
 
@@ -593,12 +594,13 @@ static void box_bevel_strip(
     int32_t face)
 {
     int32_t base = bevel->mesh->vertex_count;
+    float sign = bevel->corners[c0].sign[face];
     for (int32_t t = t0; t <= t1; t ++) {
         vec3 pos, normal;
         box_bevel_ring(bevel, c0, axis, t, pos, normal);
-        box_bevel_vertex(bevel, pos, normal, face);
+        box_bevel_vertex(bevel, pos, normal, face, sign);
         box_bevel_ring(bevel, c1, axis, t, pos, normal);
-        box_bevel_vertex(bevel, pos, normal, face);
+        box_bevel_vertex(bevel, pos, normal, face, sign);
     }
 
     box_bevel_grid(bevel->mesh, base, t1 - t0 + 1, 2);
@@ -643,9 +645,9 @@ static void box_bevel_face(
     }
 
     glm_vec3_scale(center, 1.0f / (float)count, center);
-    int32_t hub = box_bevel_vertex(bevel, center, normal, k);
+    int32_t hub = box_bevel_vertex(bevel, center, normal, k, normal[k]);
     for (int32_t n = 0; n < count; n ++) {
-        box_bevel_vertex(bevel, points[n], normal, k);
+        box_bevel_vertex(bevel, points[n], normal, k, normal[k]);
     }
 
     for (int32_t n = 0; n < count; n ++) {
