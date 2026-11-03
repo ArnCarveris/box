@@ -317,7 +317,7 @@ bool box_audio_play(
  * box.audio.play_at(sound, position, volume).
  *
  * @param world The world
- * @param sound The sound, an entity with AudioPcm
+ * @param sound The sound, an entity with AudioPcm, SoundFile or SynthSound
  * @param position World position of the play
  * @param volume Linear gain
  * @return Whether the play was queued

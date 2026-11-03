@@ -1365,3 +1365,107 @@ void Screen_script(void) {
     ecs_os_free(path);
     ecs_fini(world);
 }
+
+/** Make a headless world with an orthographic UI camera of 1 point per pixel, a white view and
+ * a layout panel with a shadow around a child of a size.
+ *
+ * @param file The file the 64x64 surface writes
+ * @param width Width of the child
+ * @param height Height of the child
+ * @return The world
+ */
+static ecs_world_t* Screen_shadow_layout_world(
+    const char *file,
+    float width,
+    float height)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 100});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f,
+        .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera,
+        .clear = {.enabled = true, .color = {255, 255, 255, 255}}});
+    ecs_entity_t panel = ecs_entity(world, { .name = "panel" });
+    ecs_set(world, panel, Layout, {.direction = DirectionColumn,
+        .padding = {4, 4, 4, 4}});
+    ecs_set(world, panel, Rect, {1, 1});
+    ecs_set(world, panel, Rgb, {0, 0, 255});
+    ecs_set(world, panel, BoxShadow, {.offset_x = 3, .offset_y = -3, .blur = 4, .spread = 2,
+        .color = {0, 0, 0, 255}});
+    ecs_entity_t child = ecs_entity(world, { .name = "child", .parent = panel });
+    ecs_set(world, child, Rect, {width, height});
+    ecs_set(world, child, Rgb, {0, 255, 0});
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 64, .height = 64,
+        .write_to_file = ECS_CONST_CAST(char*, file), .resolution_scale = 1});
+
+    return world;
+}
+
+/** Render two frames and load the image a surface wrote.
+ *
+ * @param world The world
+ * @param file The file of the surface
+ * @return The pixels, RGBA, free with stbi_image_free
+ */
+static unsigned char* Screen_shadow_layout_render(
+    ecs_world_t *world,
+    const char *file)
+{
+    int w = 0, h = 0, n = 0;
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, file);
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    ecs_os_free(path);
+    test_assert(px != NULL);
+    test_int(w, 64);
+    test_int(h, 64);
+
+    return px;
+}
+
+void Screen_layout_resize_moves_box_shadow(void) {
+    // ui/box_shadow
+    ecs_world_t *world = Screen_shadow_layout_world("shadow_layout.png", 30, 20);
+    unsigned char *end = Screen_shadow_layout_render(world, "shadow_layout.png");
+    const LayoutBounds *bounds = ecs_get(world, ecs_lookup(world, "panel"), LayoutBounds);
+    test_flt(bounds->width, 38);
+    test_flt(bounds->height, 28);
+    ecs_fini(world);
+
+    world = Screen_shadow_layout_world("shadow_layout.png", 16, 10);
+    unsigned char *px = Screen_shadow_layout_render(world, "shadow_layout.png");
+    int32_t i, count = 0;
+    bool differ = false;
+    for (i = 0; i < 64 * 64 * 4; i ++) {
+        differ |= (i % 4) != 3 && abs((int)px[i] - (int)end[i]) > 40;
+    }
+
+    test_assert(differ);
+    stbi_image_free(px);
+
+    ecs_set(world, ecs_lookup(world, "panel.child"), Rect, {30, 20});
+    px = Screen_shadow_layout_render(world, "shadow_layout.png");
+    bounds = ecs_get(world, ecs_lookup(world, "panel"), LayoutBounds);
+    test_flt(bounds->width, 38);
+    test_flt(bounds->height, 28);
+    for (i = 0; i < 64 * 64 * 4; i ++) {
+        if ((i % 4) != 3 && abs((int)px[i] - (int)end[i]) > 2) {
+            count ++;
+        }
+    }
+
+    test_int(count, 0);
+    stbi_image_free(px);
+    stbi_image_free(end);
+    ecs_fini(world);
+}

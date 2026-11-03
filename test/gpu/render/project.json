@@ -684,7 +684,24 @@
                     "box_shadow_clipped",
                     "box_shadow_past_view_edge",
                     "box_shadow_needs_rect_or_circle",
-                    "box_shadow_slots_freed"
+                    "box_shadow_slots_freed",
+                    "box_shadow_follows_transform",
+                    "box_shadow_follows_dynamic_transform",
+                    "box_shadow_follows_size",
+                    "box_shadow_follows_fit",
+                    "box_shadow_follows_opacity",
+                    "box_shadow_follows_dynamic_material",
+                    "box_shadow_follows_tint",
+                    "box_shadow_follows_clip_added",
+                    "box_shadow_follows_clip_removed",
+                    "box_shadow_follows_z",
+                    "box_shadow_follows_child_order",
+                    "box_shadow_follows_float",
+                    "box_shadow_follows_reparent",
+                    "box_shadow_follows_scene",
+                    "box_shadow_follows_batch",
+                    "box_shadow_follows_disabled",
+                    "box_shadow_follows_enabled"
                 ]
             },
             {

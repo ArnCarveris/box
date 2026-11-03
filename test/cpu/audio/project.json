@@ -301,6 +301,7 @@
                     "no_listener",
                     "at_listener",
                     "play_at",
+                    "play_at_synth_and_file",
                     "out_of_range_loop",
                     "teleport_no_click",
                     "disabled_silent",

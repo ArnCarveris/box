@@ -221,3 +221,19 @@ page's file system without a new request:
 node test/integration/web/audio_stream.mjs \
     "$(tools/integration.py local-env --env audio)/wasm32-Emscripten/debug/bin"
 ```
+
+`audio_all_features.mjs` checks every part of `box.audio` together with
+`test/assets/audio/all_features.flecs`: buses with a reverb send, synth clicks with a pitch
+variance, a looping spatial synth drone on the left, music streamed from `tone.ogg`,
+`sine_16.wav` played with `play_at` on the right and a capture at load. The page preloads the
+scene and both files with `?preload=`. It expects the page to wait for a gesture, then after a
+trusted click a level on both channels (an `AnalyserNode` per channel), a 500 ms stall of the
+main thread with the worklet rendering on, no underrun of the stream and the frame count
+advancing, the levels back after it, a hidden page suspended and a visible one resumed with its
+levels, and a log without an error, an audio warning or an invalid WebGPU object. It prints the
+longest and the mean animation frame before the gesture and while everything plays:
+
+```sh
+node test/integration/web/audio_all_features.mjs \
+    "$(tools/integration.py local-env --env audio)/wasm32-Emscripten/debug/bin"
+```
