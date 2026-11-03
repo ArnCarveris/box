@@ -395,6 +395,19 @@ ECS_STRUCT(PbrTextures, {
  * result. Changing the mask, a layer, the PbrTextures or TextureTransform of a layer, or a
  * reload of one of their images updates the shapes.
  *
+ * With a contrast above 0 the layers meet at their heights rather than cross fading: each
+ * layer with a weight has a height, the red of its texture in heights (stored, sampled with
+ * the texture coordinates and TextureTransform of the layer, so it lines up with its albedo),
+ * or 0.5 for a layer without one, and its weight w is multiplied by
+ * exp(contrast * (height + w - m)), where m is the largest height + w of the layers with a
+ * weight, then the weights are normalized again. Where two layers meet the layer that is
+ * higher there wins (grass fills the gaps between cobbles instead of fading over them); where
+ * the mask weighs one layer alone it shows alone, as in the linear blend. The larger the
+ * contrast the sharper the border: about 1 / contrast in height + weight units wide, so 8 is
+ * soft and 32 crisp. A contrast of 0, the default, is the linear blend and samples no heights.
+ * A TextureGen height map works as a height. Changing a height, the contrast, or a reload of a
+ * height image updates the shapes.
+ *
  * Only opaque 3D shapes blend: a shape with AlphaCutoff, a BlendMode other than Opaque, an
  * Opacity under 1, Transmission, or a MappingObject or MappingWorld TextureMapping with a blend
  * above 0 (triplanar) draws as if it had no TextureBlend, and 2D shapes ignore it.
@@ -404,6 +417,10 @@ ECS_STRUCT(TextureBlend, {
                              *   0..3, 0 for layer 0 alone */
     ecs_entity_t layers[4]; /**< Entities with PbrTextures and an optional TextureTransform, 0
                              *   for an unused layer */
+    ecs_entity_t heights[4]; /**< Texture entity whose red is the height of each layer, stored,
+                             *   0 for a flat height of 0.5; unused with a contrast of 0 */
+    float contrast;         /**< Sharpness of the height based transitions, 0 (the default)
+                             *   for the linear blend; not finite or negative is 0 */
 });
 
 /** Material properties change every frame, applies to descendants */

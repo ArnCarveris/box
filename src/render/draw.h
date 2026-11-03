@@ -1536,8 +1536,10 @@ void box_draws_batch_textures(
     box_render_batch_t *out);
 
 /** Write the TextureBlend of a texture_blend batch into the packet data of its draw, as it is
- * now: the texture handles of the mask and the layers and the TextureTransform of each layer,
- * so a change of a layer reaches the draw without a change of the key.
+ * now: the texture handles of the mask, the layers and the heights, the TextureTransform of each
+ * layer and the contrast, so a change of a layer reaches the draw without a change of the key.
+ * Without a contrast the heights stay 0, so they neither split the bind groups nor make an
+ * array.
  *
  * @param p The packet
  * @param d The state

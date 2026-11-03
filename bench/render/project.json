@@ -63,7 +63,8 @@
                 "benchcases": [
                     "textured_batches",
                     "single_frame",
-                    "blend_four_frame"
+                    "blend_four_frame",
+                    "blend_four_height_frame"
                 ]
             },
             {

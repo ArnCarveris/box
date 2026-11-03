@@ -26,15 +26,20 @@ static const uint8_t box_gpu_white[4] = { 255, 255, 255, 255 };
 static const uint8_t box_gpu_flat[4] = { 128, 128, 255, 255 };
 
 /** Bindings of the blend group (blend_layout), fs_blend of mesh.wgsl: the emissive layer and the
- * sampler at the bindings of the plain group, then the arrays, the mask and the uniforms */
+ * sampler at the bindings of the plain group, then the arrays, the mask, the uniforms and the
+ * heights */
 #define BOX_GPU_BLEND_EMISSIVE (1)
 #define BOX_GPU_BLEND_SAMPLER (4)
 #define BOX_GPU_BLEND_ARRAYS (5)
 #define BOX_GPU_BLEND_MASK (8)
 #define BOX_GPU_BLEND_UNIFORMS (9)
+#define BOX_GPU_BLEND_HEIGHTS (10)
 
-/** Entries of the blend group */
-#define BOX_GPU_BLEND_ENTRIES (7)
+/** Entries of the blend group that box_gpu_texture_init makes blend_layout of.
+ *
+ * The fragment stage of fs_blend samples 15 of the 16 textures WebGPU guarantees: 9 of the view
+ * group (gpu_draw.c), the emissive layer, the 4 arrays and the mask. */
+#define BOX_GPU_BLEND_ENTRIES (8)
 
 /** BlendUniforms flag: the mask is loaded, else layer 0 shows alone */
 #define BOX_GPU_BLEND_MASKED (1u)
@@ -42,12 +47,17 @@ static const uint8_t box_gpu_flat[4] = { 128, 128, 255, 255 };
 /** BlendUniforms flag: the mask has a single channel, which weighs layers 0 and 1 by 1 - r, r */
 #define BOX_GPU_BLEND_SINGLE (2u)
 
+/** BlendUniforms flag of layer 0, shifted by the layer for the others: the layer has a height
+ * image, else it is flat at 0.5 */
+#define BOX_GPU_BLEND_HEIGHT (4u)
+
 /** BlendUniforms of mesh.wgsl */
 typedef struct box_gpu_blend_uniforms_t {
     float transforms[BOX_RENDER_BLEND_LAYERS][4]; /**< TextureTransform of each layer */
     uint32_t count;     /**< Slices of the arrays */
-    uint32_t flags;     /**< BOX_GPU_BLEND_MASKED, BOX_GPU_BLEND_SINGLE */
-    uint32_t pad[2];    /**< Unused, zero */
+    uint32_t flags;     /**< BOX_GPU_BLEND_MASKED, BOX_GPU_BLEND_SINGLE, BOX_GPU_BLEND_HEIGHT */
+    float contrast;     /**< TextureBlend.contrast, 0 samples no heights */
+    uint32_t pad;       /**< Unused, zero */
 } box_gpu_blend_uniforms_t;
 
 /** Color space the mip levels of a texture are averaged in */
@@ -257,9 +267,10 @@ void box_gpu_texture_init(
             }
         }
     };
-    for (i = 0; i < BOX_RENDER_BLEND_MAPS; i ++) {
+    for (i = 0; i < BOX_RENDER_BLEND_SOURCES; i ++) {
         blend[4 + i] = (WGPUBindGroupLayoutEntry){
-            .binding = BOX_GPU_BLEND_ARRAYS + (uint32_t)i,
+            .binding = i == BOX_RENDER_BLEND_HEIGHT
+                ? BOX_GPU_BLEND_HEIGHTS : BOX_GPU_BLEND_ARRAYS + (uint32_t)i,
             .visibility = WGPUShaderStage_Fragment,
             .texture = {
                 .sampleType = WGPUTextureSampleType_Float,
@@ -274,6 +285,15 @@ void box_gpu_texture_init(
             .entries = blend
         });
     gpu->white = box_gpu_texture_new(gpu, 1, 1, box_gpu_white, false);
+    WGPUTextureViewDescriptor heights = WGPU_TEXTURE_VIEW_DESCRIPTOR_INIT;
+    heights.format = BOX_GPU_TEXTURE_FORMAT;
+    heights.dimension = WGPUTextureViewDimension_2DArray;
+    heights.baseMipLevel = 0;
+    heights.mipLevelCount = 1;
+    heights.baseArrayLayer = 0;
+    heights.arrayLayerCount = 1;
+    heights.aspect = WGPUTextureAspect_All;
+    gpu->blend_flat_heights = wgpuTextureCreateView(gpu->white->texture, &heights);
     gpu->flat = box_gpu_texture_new(gpu, 1, 1, box_gpu_flat, false);
     gpu->no_cookie = box_gpu_texture_new(gpu, 1, 1, box_gpu_white, true);
     ecs_map_init(&gpu->textures, NULL);
@@ -302,6 +322,11 @@ void box_gpu_texture_fini(
                 gpu->samplers[w][a] = NULL;
             }
         }
+    }
+
+    if (gpu->blend_flat_heights) {
+        wgpuTextureViewRelease(gpu->blend_flat_heights);
+        gpu->blend_flat_heights = NULL;
     }
 
     if (gpu->white) {
@@ -935,9 +960,9 @@ static void box_gpu_blend_array_release(
  * map, capped by the texture quality, each source scaled into its slice by the blit pipeline
  * with filtering (through its mip chain when it has one), then the mip chain of every slice.
  *
- * The albedo renders and averages in linear light through the sRGB views, the ORM and normal
- * as stored; a missing source fills its slice with white or a flat normal. A single channel
- * source reads as (r, 0, 0, 1). Without a blit pipeline the next check builds it again.
+ * The albedo renders and averages in linear light through the sRGB views, the rest as stored;
+ * a missing source fills its slice with white or a flat normal, a single channel one reads as
+ * (r, 0, 0, 1). Without a blit pipeline the next check builds it again.
  *
  * @param gpu The backend
  * @param a The array, with its map, count, quality and sources
@@ -1049,7 +1074,7 @@ done:
  *
  * @param gpu The backend
  * @param r The blend
- * @param map BOX_RENDER_BLEND_ALBEDO, _ORM or _NORMAL
+ * @param map BOX_RENDER_BLEND_ALBEDO, _ORM, _NORMAL or _HEIGHT
  * @return The array
  */
 static box_gpu_blend_array_t* box_gpu_blend_array(
@@ -1108,7 +1133,7 @@ static void box_gpu_blend_group_free(
     box_gpu_blend_group_t *g)
 {
     int32_t m;
-    for (m = 0; m < BOX_RENDER_BLEND_MAPS; m ++) {
+    for (m = 0; m < BOX_RENDER_BLEND_SOURCES; m ++) {
         if (g->arrays[m]) {
             g->arrays[m]->refs --;
         }
@@ -1147,6 +1172,14 @@ static void box_gpu_blend_group_bind(
     u.count = g->arrays[0]->count;
     u.flags = (mask ? BOX_GPU_BLEND_MASKED : 0) |
         (mask && ((box_gpu_texture_entry_t*)mask)->single ? BOX_GPU_BLEND_SINGLE : 0);
+    u.contrast = g->arrays[BOX_RENDER_BLEND_HEIGHT] ? g->blend.contrast : 0.0f;
+    for (m = 0; u.contrast > 0.0f && m < (int32_t)u.count; m ++) {
+        uint32_t serial = g->arrays[BOX_RENDER_BLEND_HEIGHT]->serials[m];
+        if (serial && serial != UINT32_MAX) {
+            u.flags |= BOX_GPU_BLEND_HEIGHT << m;
+        }
+    }
+
     if (!g->uniforms) {
         g->uniforms = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
             .usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
@@ -1184,6 +1217,14 @@ static void box_gpu_blend_group_bind(
         g->versions[m] = g->arrays[m]->version;
     }
 
+    entries[4 + BOX_RENDER_BLEND_HEIGHT] = (WGPUBindGroupEntry){
+        .binding = BOX_GPU_BLEND_HEIGHTS,
+        .textureView = g->arrays[BOX_RENDER_BLEND_HEIGHT]
+            ? g->arrays[BOX_RENDER_BLEND_HEIGHT]->view : gpu->blend_flat_heights
+    };
+    g->versions[BOX_RENDER_BLEND_HEIGHT] = g->arrays[BOX_RENDER_BLEND_HEIGHT]
+        ? g->arrays[BOX_RENDER_BLEND_HEIGHT]->version : 0;
+
     g->mask_serial = box_gpu_blend_serial(gpu, g->blend.mask);
     g->emissive_serial = box_gpu_blend_serial(gpu, g->emissive);
     g->group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
@@ -1196,7 +1237,8 @@ static void box_gpu_blend_group_bind(
 /** Get the bind group of a TextureBlend batch, created on first use. Once per packet it checks
  * the arrays and the images it binds, and binds them again when one changed.
  *
- * The emissive layer and the mask sample loaded images only, not the image of a target.
+ * The emissive layer and the mask sample loaded images only, not the image of a target. The
+ * heights make an array only with a contrast above 0, as the shader samples none without one.
  *
  * @param gpu The backend
  * @param packet The packet of the batch
@@ -1241,19 +1283,23 @@ static WGPUBindGroup box_gpu_blend_group(
     g->checked = gpu->blend_frame;
     stale = !g->group || g->mask_serial != box_gpu_blend_serial(gpu, r->mask) ||
         g->emissive_serial != box_gpu_blend_serial(gpu, emissive);
-    for (m = 0; m < BOX_RENDER_BLEND_MAPS; m ++) {
-        box_gpu_blend_array_t *a = box_gpu_blend_array(gpu, r, (uint32_t)m);
+    for (m = 0; m < BOX_RENDER_BLEND_SOURCES; m ++) {
+        box_gpu_blend_array_t *a = m < BOX_RENDER_BLEND_MAPS || r->contrast > 0.0f
+            ? box_gpu_blend_array(gpu, r, (uint32_t)m) : NULL;
         if (a != g->arrays[m]) {
             if (g->arrays[m]) {
                 g->arrays[m]->refs --;
             }
 
-            a->refs ++;
+            if (a) {
+                a->refs ++;
+            }
+
             g->arrays[m] = a;
             stale = true;
         }
 
-        stale |= g->versions[m] != a->version;
+        stale |= a && g->versions[m] != a->version;
     }
 
     if (stale) {
