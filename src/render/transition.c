@@ -785,7 +785,7 @@ static void box_transition_material(
     if (r->op == BOX_RENDER_TRANSITION_MATERIAL) {
         material.kind = BOX_DRAW_TRANSITION_TABLE;
     } else if (material.kind == BOX_DRAW_TRANSITION_TABLE ||
-        material.kind > BOX_DRAW_TRANSITION_MESH)
+        material.kind > BOX_DRAW_TRANSITION_BOX_SHADOW)
     {
         goto done;
     } else if (material.kind == BOX_DRAW_TRANSITION_MESH) {

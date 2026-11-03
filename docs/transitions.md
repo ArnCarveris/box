@@ -619,6 +619,47 @@ Refinements of the design:
   gets is the blended one it has, so it stays in its slot. This costs a rekey check per frame
   for such shapes only, and keeps the per instance branch out of that path.
 
+## Box shadows
+
+The shadow of a 2D shape (`BoxShadow`, `src/render/box_shadow.c`) is a second slot of its entity
+(`BoxShadowSlot`), so the transitions that patch the slot of the shape patch the shadow slot too,
+the way they reach the glyph slots of a text (`TextSlots`).
+
+- **Batch key.** The shadow slot copies the key of the batch of its shape with the `AlphaBlend`
+  blend mode and no textures (`box_draws_box_shadow_update`), which the rekey of a tag reruns: it
+  is `dynamic_transform` and `dynamic_material` whenever its shape is, and already blended while
+  an `Opacity` transition keeps its shape blended (`TransitionOpacity`).
+- **Transforms.** `box_transition_send_slots` sends a `SLOT` record for the shadow slot of every
+  shape a node moves: the target chain from the node times the instance matrix of the shadow,
+  `box_draws_box_shadow_instance`, which is the matrix `box_shadow_transform` multiplies the
+  world matrix with: the quad of the shape stretched as `ShapeMesh.scale` stretches it, moved
+  by the offset and scaled to the quad of the shadow. The resolver multiplies it with the world
+  matrix it renders the node at, so the shadow keeps its offset and blur relative to its shape
+  through a `Position`, `Rotation` or `Scale` transition of the shape or an ancestor.
+  `box_draws_entity_casts` checks the shadow slot too, so the range math of
+  `transition_bounds.c` holds it; a shadow is blended and casts no light shadow, so it records
+  no region.
+- **Tint and opacity.** For a shape an active `Tint` or `Opacity` transition reaches,
+  `box_transition_send_box_shadow` sends a `SHADING` record of the kind
+  `BOX_DRAW_TRANSITION_BOX_SHADOW` for its shadow slot, with the fade node and chain of its shape
+  (`box_transition_fade_target`), the color of the shadow and the alpha the shape covers it with
+  at an opacity of 1 (`shadow_cover`, 0 for a blend mode that covers nothing). The resolver
+  encodes it with `box_draws_box_shadow_encode`, which writes the two words the update writes
+  from the opacity: `color` (the shadow color tinted as the border is, its alpha times the
+  rendered opacity and fade) and `material.w` (the cover alpha of `box_shadow_cover_alpha`), so
+  the shadow is cut out under its shape by the alpha the shape renders at and no seam shows
+  along its edge. The other words, the shadow box and the cut out box, do not depend on a
+  transitioned component. No existing kind writes `material.w` without the shape words.
+- **Rgb.** A transition of `Rgb` or another material component of a shape sends no shadow
+  record: the shadow does not read them.
+- **Cost.** A shape without `BoxShadow` pays one lookup of `BoxShadowSlot` per moving or fading
+  slot; the records are only sent for a shadow with a batch. A shape that lost its `BoxShadow`
+  keeps a `BoxShadowSlot` without a batch, which sends nothing, so a transition never patches
+  the freed slot.
+- **Not done.** A transition of `BoxShadow` itself (its offset, blur, spread or color) is not
+  supported: `BoxShadow` is not transitionable and a change of it snaps. Animating a shadow on
+  hover needs it, as a task of its own.
+
 ## The fast path
 
 An application without transitions, and every entity without `Transition` in an application
@@ -731,15 +772,16 @@ ms without it).
 - `test/cpu/render` (`Transition`, `TransitionMaterial`, `TransitionTintOpacity`,
   `TransitionShadow`): the records of the game thread and the values of the resolver with the
   null backend, and the shadow regions of moving casters, interrupted and nested.
-- `test/gpu/render`: the rendered transforms, materials, tints and opacity on a GPU, and in
+- `test/gpu/render`: the rendered transforms, materials, tints and opacity on a GPU, the box
+  shadows that follow them (`TransitionBoxShadow`), and in
   `ShadowCache` (`transition_*`) that a caster that transitions renders the tile of its light
   only, also on the frame it ends in, and the tiles of the other lights stay cached.
 - `test/integration/visual/transitions_*.flecs`: renders frozen in the middle of a transition,
   compared with their baselines: a transform transition with children
   (`transitions_transform`), a shadow caster mid move (`transitions_shadow`), material color and
   emissive transitions with a delayed one and a prefab (`transitions_material`), tint and opacity
-  on parents with children (`transitions_tint_opacity`) and a 2D shape and UI elements
-  (`transitions_2d_ui`). A scene cannot change a value after its first frame by itself, and the
+  on parents with children (`transitions_tint_opacity`) and a 2D shape, a shadowed card and UI
+  elements (`transitions_2d_ui`). A scene cannot change a value after its first frame by itself, and the
   first value never animates, so each changes its values with `SetAt` (`box.app`) at frame 1,
   at the start of the second frame: an entity with `SetAt: {frame: 1, entity: ball}` and the
   new values, which it copies to `ball` then. `SetAt` is written first in each body: written

@@ -12,6 +12,7 @@
 
 #include "draw.h"
 #include <math.h>
+#include <stddef.h>
 
 ECS_COMPONENT_DECLARE(BoxShadowSlot);
 
@@ -335,6 +336,68 @@ void box_draws_box_shadow_write(
         transform, material, kinds);
 done:
     return;
+}
+
+bool box_draws_box_shadow_instance(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    mat4 out)
+{
+    const BoxShadow *shadow = ecs_get(world, e, BoxShadow);
+    const Shape2D *shape = shadow ? ecs_get(world, e, Shape2D) : NULL;
+    box_shadow_box_t box;
+    bool result = shape &&
+        box_shadow_resolve(shape, ecs_get(world, e, ShapeMesh), shadow, &box);
+    if (result) {
+        glm_mat4_identity(out);
+        out[0][0] = box.size[0] * box.scale[0];
+        out[1][1] = box.size[1] * box.scale[1];
+        out[3][0] = box.scale[0] * box.offset[0];
+        out[3][1] = box.scale[1] * box.offset[1];
+    }
+
+    return result;
+}
+
+bool box_draws_box_shadow_target(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e,
+    const DrawSlot *s,
+    const box_draw_material_t *material,
+    box_draw_transition_material_t *out)
+{
+    const BoxShadowSlot *bs = ecs_get(world, e, BoxShadowSlot);
+    const BoxShadow *shadow = bs && bs->batch >= 0 ? ecs_get(world, e, BoxShadow) : NULL;
+    const Shape2D *shape = shadow && s->batch >= 0 ? ecs_get(world, e, Shape2D) : NULL;
+    bool result = shape != NULL;
+    if (!result) {
+        goto done;
+    }
+
+    box_draws_transition_target(out, material, BOX_DRAW_TRANSITION_BOX_SHADOW);
+    out->shadow = shadow->color;
+    out->shadow_cover = box_shadow_cover_alpha(shape, box_draws_batch(d, s->batch)->key.blend,
+        1.0f);
+done:
+    return result;
+}
+
+void box_draws_box_shadow_encode(
+    const box_draw_material_t *material,
+    const box_draw_transition_material_t *target,
+    void *dst)
+{
+    float alpha = box_draws_alpha(material);
+    float linear[4];
+    uint32_t color[2];
+    float cover = glm_clamp(alpha * target->shadow_cover, 0.0f, 1.0f);
+    box_shadow_color(linear, &target->shadow, material, alpha);
+    box_draws_color_pack(color, linear);
+    ecs_os_memcpy(ECS_OFFSET(dst, offsetof(box_render_shading_t, color)), color,
+        ECS_SIZEOF(color));
+    ecs_os_memcpy(ECS_OFFSET(dst, offsetof(box_render_shading_t, material) +
+        3 * sizeof(float)), &cover, ECS_SIZEOF(float));
 }
 
 void box_draws_box_shadow_remove(

@@ -1001,6 +1001,18 @@
                 ]
             },
             {
+                "id": "TransitionBoxShadow",
+                "testcases": [
+                    "transform_mid_transition",
+                    "ancestor_transform_mid_transition",
+                    "opacity_mid_transition",
+                    "ancestor_opacity_mid_transition",
+                    "rgb_keeps_shadow",
+                    "ancestor_tint_mid_transition",
+                    "shadow_removed_mid_transition"
+                ]
+            },
+            {
                 "id": "Transmission",
                 "testcases": [
                     "factor_zero_matches_blended_path",
