@@ -258,6 +258,8 @@ void Robust_unknown_commands(void) {
     box_audio_core_free(core);
 }
 
+/* A LOST event in the last slot counts the events dropped, a second overflow counts from 0 again
+ * and without an overflow there is no LOST event. */
 void Robust_events_overflow(void) {
     // audio/robust
     box_audio_core_t *core = audio_new();
@@ -279,7 +281,6 @@ void Robust_events_overflow(void) {
     test_int(box_audio_core_events_lost(core), 0);
     test_int(box_audio_core_read_events(core, events, BOX_AUDIO_EVENT_MAX), 0);
 
-    // A second overflow counts from 0 again
     for (i = 0; i < BOX_AUDIO_EVENT_MAX + 10; i ++) {
         audio_play(core, 1, 999, 0, 1, 0, 1, 0);
     }
@@ -290,7 +291,6 @@ void Robust_events_overflow(void) {
     test_int(events[BOX_AUDIO_EVENT_MAX - 1].value, 11);
     test_int(box_audio_core_events_lost(core), 0);
 
-    // Without an overflow there is no LOST event
     for (i = 0; i < BOX_AUDIO_EVENT_MAX - 1; i ++) {
         audio_play(core, 1, 999, 0, 1, 0, 1, 0);
     }
@@ -342,6 +342,8 @@ static int32_t robust_drain(
     return freed;
 }
 
+/* Steals and ends of the plays fill the ring before the release of the unused sound, whose id
+ * stays taken until the transport learns it is free. */
 void Robust_release_after_burst(void) {
     // audio/robust
     box_audio_core_t *core = audio_new();
@@ -352,7 +354,6 @@ void Robust_release_after_burst(void) {
     test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_FRAMES, 1, AUDIO_RATE));
     test_assert(box_audio_core_sound(core, 2, audio_sound_b, 100, 1, AUDIO_RATE));
 
-    // Steals and ends of the plays fill the ring before the release of the unused sound
     box_audio_writer_init(&w, robust_burst, sizeof(robust_burst));
     for (i = 0; i < ROBUST_BURST; i ++) {
         test_assert(box_audio_write_play(&w, (uint32_t)i, 1, 0, 0.5f, 0, 1, 0));
@@ -362,7 +363,6 @@ void Robust_release_after_burst(void) {
     box_audio_core_apply(core, w.data, w.size);
     test_assert(box_audio_core_events_lost(core) > 0);
 
-    // The id stays taken until the transport learns it is free
     test_assert(!box_audio_core_sound(core, 2, audio_sound_b, 100, 1, AUDIO_RATE));
     test_int(robust_drain(core, 2, &lost), 1);
     test_assert(lost > 0);
@@ -372,6 +372,8 @@ void Robust_release_after_burst(void) {
     box_audio_core_free(core);
 }
 
+/* The voice of sound 2 is the loudest, so the cap steals the plays of the burst instead. It ends
+ * in the render while the ring is full, so its SOUND_FREE comes from the end of the source. */
 void Robust_release_playing_after_burst(void) {
     // audio/robust
     box_audio_core_t *core = audio_new();
@@ -382,7 +384,6 @@ void Robust_release_playing_after_burst(void) {
     test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_FRAMES, 1, AUDIO_RATE));
     test_assert(box_audio_core_sound(core, 2, audio_sound_b, 100, 1, AUDIO_RATE));
 
-    // The voice of sound 2 is the loudest, so the cap steals the plays of the burst instead
     box_audio_writer_init(&w, robust_burst, sizeof(robust_burst));
     test_assert(box_audio_write_play(&w, 10000, 2, 0, 1, 0, 1, 0));
     test_assert(box_audio_write_release(&w, 2));
@@ -394,8 +395,6 @@ void Robust_release_playing_after_burst(void) {
     test_assert(box_audio_core_events_lost(core) > 0);
     test_assert(!box_audio_core_sound(core, 2, audio_sound_b, 100, 1, AUDIO_RATE));
 
-    // The voice ends in the render while the ring is full, so its SOUND_FREE comes from the
-    // end of the source
     audio_render(core, 0, 256);
     test_assert(!box_audio_core_sound(core, 2, audio_sound_b, 100, 1, AUDIO_RATE));
     test_int(robust_drain(core, 2, &lost), 1);

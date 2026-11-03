@@ -204,6 +204,7 @@ void Transport_null_sound_free(void) {
     box_audio_transport_free(t);
 }
 
+/* 300 plays at the cap report more events than the core holds before the release. */
 void Transport_null_sound_free_after_burst(void) {
     // audio/native
     transport_capture_t capture = {0};
@@ -217,7 +218,6 @@ void Transport_null_sound_free_after_burst(void) {
     test_bool(t->sound(t, 1, audio_sound_a, AUDIO_FRAMES, 1, AUDIO_RATE), true);
     test_bool(t->sound(t, 7, audio_sound_a, 480, 1, AUDIO_RATE), true);
 
-    // 300 plays at the cap report more events than the core holds before the release
     box_audio_writer_init(&writer, bytes, sizeof(bytes));
     for (i = 0; i < 300; i ++) {
         test_bool(box_audio_write_play(&writer, (uint32_t)i, 1, 0, 0.5f, 0, 1, 0), true);

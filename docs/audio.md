@@ -286,9 +286,10 @@ into `box_audio_core.wasm` in the generated folder of the build: a freestanding 
 few KB with its own memory, which starts at 1 MB and grows up to 256 MB, no imports (the core
 needs no libm) and the exports of `src/audio/core/wasm.c`: `box_audio_core_wasm_init`, a first
 fit heap with `_alloc` and `_free` that grows the memory, `_sound`, `_apply`, `_render`,
-`_left`, `_right`, `_read_events`, `_events`, `_events_lost` and `_voices`. It is not built with `emcc`: a standalone wasm of `emcc` links
-start code and libc from the Emscripten cache, which the core does not use, and building those
-for a new configuration fails when the cache folder is a symlink. The script writes the bytes as
+`_left`, `_right`, `_read_events`, `_events`, `_events_lost` and `_voices`. It is not built
+with `emcc`: a standalone wasm of `emcc` links start code and libc from the Emscripten cache,
+which the core does not use, and building those for a new configuration fails when the cache
+folder is a symlink. The script writes the bytes as
 a C array to `.bake/generated/box_audio_core_wasm.h` in the box folder, which
 `src/audio/platform_web.c` includes; bake3 puts the generated folder of a build on the include
 path of test harnesses only, so the header needs a fixed path. The core is built with `-O2` in

@@ -148,15 +148,14 @@ static inline float box_audio_clean(
     return a >= BOX_AUDIO_TINY && a <= BOX_AUDIO_HUGE ? x : 0.0f;
 }
 
-/** Push an event, or count it as lost when the ring is full.
+/** Push an event, or count it as lost when the ring is full. Does not allocate.
  *
  * Ordinary events take the slots but the last, which is kept for BOX_AUDIO_EVENT_LOST. When
- * they are full the event is counted in the LOST event, pushed into the last slot the first
- * time. A BOX_AUDIO_EVENT_SOUND_FREE that finds them full marks its sound
- * BOX_AUDIO_SOUND_PENDING instead, and read_events reports it once there is room. A sound is
- * freed once until its id is given again, which the pending state refuses, so the states bound
- * what waits without a slot per sound in the ring. Only the LOST event takes the last slot, and
- * the ring holds one at most. Does not allocate.
+ * they are full the event is counted in the one LOST event, pushed the first time.
+ *
+ * A BOX_AUDIO_EVENT_SOUND_FREE that finds them full marks its sound BOX_AUDIO_SOUND_PENDING
+ * instead, and read_events reports it once there is room. The pending state keeps the id
+ * taken, so a sound waits at most once and the states bound what waits outside the ring.
  *
  * @param core The core
  * @param type A box_audio_event_type_t
