@@ -2,7 +2,8 @@
  * @file ImageSlice.c
  * @brief ImageSlice rendered: the corners of test/integration/visual/assets/frame.png keep their
  * size on elements of any size, the edges stretch or repeat their stripes and a hollow frame
- * shows what is behind its center.
+ * shows what is behind its center. The texture of an offscreen Surface slices at its size in
+ * pixels too.
  */
 
 #include <box.h>
@@ -373,6 +374,113 @@ void ImageSlice_hollow_center(void) {
         /* The frame itself is drawn either way: the red corner and the edge */
         test_assert(corner[0] > 180 && corner[1] < 80 && corner[2] < 80);
         test_assert(!slice_same(edge, green, 20));
+        stbi_image_free(px);
+        ecs_fini(world);
+    }
+}
+
+/** Side of the offscreen surface of the surface tests in points and pixels */
+#define SLICE_SURFACE (48)
+
+/** Side of the solid corners the offscreen surface renders */
+#define SLICE_SURFACE_CORNER (16)
+
+/** The colors of the corners of the offscreen surface: top left, top right, bottom left and
+ * bottom right, as slice_corner numbers them */
+static const unsigned char slice_surface_colors[4][3] = {
+    {255, 0, 0}, {0, 255, 0}, {0, 0, 255}, {255, 255, 0}
+};
+
+/** An offscreen surface of 48 by 48 pixels that renders into surface_texture: four solid 16 by
+ * 16 squares in its corners, red, green, blue and yellow, on white */
+#define SLICE_SURFACE_SCENE \
+    "using box.transform\n" \
+    "using box.geometry\n" \
+    "using box.camera\n" \
+    "using box.view\n" \
+    "using box.surface\n" \
+    "surface_texture {}\n" \
+    "surface_ui {\n" \
+    "  Scene: {}\n" \
+    "  camera {\n" \
+    "    Position: {0, 0, 100}\n" \
+    "    Camera: {ortho: true, ortho_scale: 1}\n" \
+    "  }\n" \
+    "  top_left {\n" \
+    "    Position: {-16, 16, 0}\n" \
+    "    Rect: {16, 16}\n" \
+    "    Rgb: {255, 0, 0}\n" \
+    "  }\n" \
+    "  top_right {\n" \
+    "    Position: {16, 16, 0}\n" \
+    "    Rect: {16, 16}\n" \
+    "    Rgb: {0, 255, 0}\n" \
+    "  }\n" \
+    "  bottom_left {\n" \
+    "    Position: {-16, -16, 0}\n" \
+    "    Rect: {16, 16}\n" \
+    "    Rgb: {0, 0, 255}\n" \
+    "  }\n" \
+    "  bottom_right {\n" \
+    "    Position: {16, -16, 0}\n" \
+    "    Rect: {16, 16}\n" \
+    "    Rgb: {255, 255, 0}\n" \
+    "  }\n" \
+    "}\n" \
+    "surface_views {\n" \
+    "  view {\n" \
+    "    View: {camera: surface_ui.camera,\n" \
+    "      clear: {enabled: true, color: {255, 255, 255, 255}}}\n" \
+    "  }\n" \
+    "}\n" \
+    "corner_surface {\n" \
+    "  Surface: {width: 48, height: 48, texture: surface_texture, view_root: surface_views}\n" \
+    "}\n"
+
+void ImageSlice_surface_corners_keep_size(void) {
+    // ui/image_slice
+    ImageSlice slice = { .left = SLICE_SURFACE_CORNER, .top = SLICE_SURFACE_CORNER,
+        .right = SLICE_SURFACE_CORNER, .bottom = SLICE_SURFACE_CORNER, .scale = 1 };
+    int32_t sizes[2][2] = {{64, 64}, {160, 96}};
+    unsigned char white[3] = {255, 255, 255};
+    int32_t i, c, dx, dy;
+    for (i = 0; i < 2; i ++) {
+        ecs_world_t *world = slice_world("slice_surface.png", (rgba){0, 0, 0, 255});
+        test_assert(ecs_script_run(world, "surface", SLICE_SURFACE_SCENE, NULL) == 0);
+        ecs_entity_t tex = ecs_lookup(world, "surface_texture");
+        test_assert(tex != 0);
+        test_assert(!ecs_has(world, tex, Texture));
+        slice_panel(world, tex, (float)sizes[i][0], (float)sizes[i][1], &slice);
+        unsigned char *px = slice_render(world, "slice_surface.png");
+        int32_t w = sizes[i][0], h = sizes[i][1];
+
+        /* The offscreen surface rendered at its size in pixels, which the slicing counts in */
+        const SurfaceStatus *st = ecs_get(world, ecs_lookup(world, "corner_surface"),
+            SurfaceStatus);
+        test_assert(st != NULL);
+        test_int(st->width, SLICE_SURFACE);
+        test_int(st->height, SLICE_SURFACE);
+
+        /* Inside each corner, away from the filtered seam with the edges, the pixels are the
+         * solid color of the corner of the surface at its size of 16 pixels */
+        for (c = 0; c < 4; c ++) {
+            for (dy = 1; dy < SLICE_SURFACE_CORNER - 2; dy ++) {
+                for (dx = 1; dx < SLICE_SURFACE_CORNER - 2; dx ++) {
+                    test_assert(slice_same(slice_corner(px, w, h, c, dx, dy),
+                        slice_surface_colors[c], 3));
+                }
+            }
+        }
+
+        /* Past the corners the edges show the white between the squares: stretched as a plain
+         * Image the red square would cover 160 / 3 pixels of the top and 96 / 3 of the side */
+        for (c = 0; c < 4; c ++) {
+            test_assert(slice_same(slice_corner(px, w, h, c, SLICE_SURFACE_CORNER + 8, 8),
+                white, 3));
+            test_assert(slice_same(slice_corner(px, w, h, c, 8, SLICE_SURFACE_CORNER + 8),
+                white, 3));
+        }
+
         stbi_image_free(px);
         ecs_fini(world);
     }

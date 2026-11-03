@@ -323,7 +323,8 @@
                     "corners_keep_size",
                     "edges_stretch",
                     "edges_tile",
-                    "hollow_center"
+                    "hollow_center",
+                    "surface_corners_keep_size"
                 ]
             }
         ]
