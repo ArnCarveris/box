@@ -9,9 +9,10 @@ Usage:
 visual renders every <dir>/<scene>.flecs (test/integration/visual by default) headless with
 boxrun, a static camera and a fixed delta (--delta-time 1/60), and compares the last frame with
 <dir>/baseline/<scene>.png. A scene runs 3 frames before the capture, or the n of a line
-"// frames: n" in it, such as an effect that needs seconds to build up; --frames overrides both. A scene fails when the difference is strong and widespread: the
-largest channel delta is above 24 and more than 200 pixels have a channel off by more than 16,
-so GPU speckle and faint drift pass. A missing baseline fails too. A scene that has to change
+"// frames: n" in it, such as an effect that needs seconds to build up; --frames overrides
+both. A scene fails when the difference is strong and widespread: the largest channel delta
+is above 24 and more than 200 pixels have a channel off by more than 16, so GPU speckle and
+faint drift pass. A missing baseline fails too. A scene that has to change
 after its first frame, such as one frozen in the middle of a transition, does so with the
 box.app.SetAt component at a frame, never with the wall clock.
 
@@ -566,11 +567,14 @@ def render_scene(scene, png, args):
     # Include paths cannot leave the folder of the script: link etc, apps and test/assets so a
     # scene can include etc/..., a scene of a game apps/<game>/etc/<game> and the test scripts
     # test/assets/.... The links are relative, since the checkout may be reached by another path
-    # elsewhere (a container that mounts it), and an older link is made again.
+    # elsewhere (a container that mounts it), and an older link is made again. They are made
+    # between real paths, as a relative link resolves from where its folder really is: an --out
+    # under /tmp, a link to /private/tmp on macOS, would otherwise point one level off.
     for folder in ("etc", "apps", os.path.join("test", "assets")):
         link = os.path.join(os.path.dirname(png), folder)
         os.makedirs(os.path.dirname(link), exist_ok=True)
-        target = os.path.relpath(os.path.join(ROOT, folder), os.path.dirname(link))
+        target = os.path.relpath(os.path.realpath(os.path.join(ROOT, folder)),
+                                 os.path.realpath(os.path.dirname(link)))
         if os.path.islink(link) and os.readlink(link) != target:
             os.unlink(link)
         if not os.path.lexists(link):

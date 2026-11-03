@@ -236,7 +236,7 @@ void CurveRecipes_showcase_shockwave(void) {
 void CurveRecipes_showcase_orb(void) {
     // particle/curve_docs
     recipe_check("showcase/orb.flecs", "orb.halo", "box.particle.ParticleTimeline", true);
-    recipe_check("showcase/orb.flecs", "orb.motes", "box.particle.ParticleMotion", true);
+    recipe_check("showcase/orb.flecs", "orb.motes_front", "box.particle.ParticleMotion", true);
 }
 
 void CurveRecipes_showcase_chimney(void) {
@@ -271,6 +271,8 @@ void CurveRecipes_mistakes(void) {
         "not after time 0 of key 0, drawn as the default of spin");
     mistake_check("lamp.flecs", "invalid ParticleLight on lamp: curve max_keys is not allowed, a "
         "light has no random draw to blend two curves by, drawn as the default of curve");
+    mistake_check("still.flecs", "invalid ParticleLight on still: curve has keys but period is "
+        "0, set the seconds it spans with a period above 0, drawn as the default of curve");
     mistake_check("seconds.flecs", "invalid ParticleTimeline on seconds: rate key 1: time 2 is "
         "outside of 0 to 1, drawn as the default of rate");
 }

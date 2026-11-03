@@ -48,7 +48,9 @@ ECS_STRUCT(ParticleRange, {
 /** Forces on the particles of emitters, as a world singleton, on an entity that
  * ParticleEmitter.forces names or on the emitter entity itself.
  *
- * An emitter adds up the forces of the three, multiplying their turbulence scales. A frame
+ * An emitter adds up the forces of the three, multiplying their turbulence scales. The default
+ * gravity is that of a ParticleForces that exists: with none of the three, particles feel no
+ * force at all, so ParticleForces: {} on the emitter entity is what makes them fall. A frame
  * adds (acceleration + gravity + wander) * delta to the velocity v, pulls it toward the wind
  * with v = wind + (v - wind) * exp(-drag * delta), then moves by (v + drift) * delta.
  *
@@ -215,7 +217,7 @@ ECS_STRUCT(ParticleLight, {
                              *   1 of it, by box_curve_value; no keys, a bad curve or one with
                              *   max_keys, as a light has no random draw, for 1 */
     float period;           /**< Seconds of the playback clock the curve spans, default 0 for
-                             *   no curve */
+                             *   no curve, an error when the curve has keys */
     bool loop;              /**< Repeat the curve every period, default false for once */
     float fade;             /**< Seconds the light fades out over once the emitter stopped,
                              *   default 0 to go dark at once */
@@ -235,7 +237,7 @@ ECS_STRUCT(ParticleLight, {
  */
 ECS_STRUCT(ParticleTimeline, {
     float period;           /**< Seconds of the playback clock the curves span, default 0 for
-                             *   no curves */
+                             *   no curves, an error when a curve has keys */
     bool loop;              /**< Repeat the curves every period, default false for once and
                              *   then the last key */
     ParticleCurve rate;     /**< Multiplier of ParticleEmitter.rate, default 1, without

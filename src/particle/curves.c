@@ -262,6 +262,28 @@ static bool box_particle_motion_validate(
     return true;
 }
 
+/** Check a curve that spans period seconds of the playback clock: a curve with keys needs a
+ * period above 0, as period 0 means no curve.
+ *
+ * @param curve The curve
+ * @param period The period of its component
+ * @param check The check of the curve itself
+ * @return NULL when it is valid, else the first problem
+ */
+static char* box_particle_clock_curve_check(
+    const ParticleCurve *curve,
+    float period,
+    char* (*check)(const ParticleCurve*))
+{
+    char *result = check(curve);
+    if (!result && ecs_vec_count(&curve->keys) && !(period > 0.0f)) {
+        result = flecs_asprintf("has keys but period is %g, set the seconds it spans with a "
+            "period above 0", (double)period);
+    }
+
+    return result;
+}
+
 /** Validate hook for ParticleLight.
  *
  * @param world The world
@@ -276,7 +298,8 @@ static bool box_particle_light_validate(
 {
     const ParticleLight *light = ptr;
     box_particle_curves_report(world, entity, "ParticleLight", "curve",
-        box_particle_light_curve_check(&light->curve));
+        box_particle_clock_curve_check(&light->curve, light->period,
+            box_particle_light_curve_check));
 
     return true;
 }
@@ -295,9 +318,11 @@ static bool box_particle_timeline_validate(
 {
     const ParticleTimeline *timeline = ptr;
     box_particle_curves_report(world, entity, "ParticleTimeline", "rate",
-        box_particle_timeline_curve_check(&timeline->rate));
+        box_particle_clock_curve_check(&timeline->rate, timeline->period,
+            box_particle_timeline_curve_check));
     box_particle_curves_report(world, entity, "ParticleTimeline", "speed",
-        box_particle_timeline_curve_check(&timeline->speed));
+        box_particle_clock_curve_check(&timeline->speed, timeline->period,
+            box_particle_timeline_curve_check));
 
     return true;
 }

@@ -658,11 +658,13 @@ void Timeline_without_timeline_unchanged(void) {
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
     ecs_entity_t plain = emitter_new(world, 25);
+    int32_t level = ecs_log_set_level(-4);
     ecs_entity_t off = timeline_new(world, 25, (ParticleTimeline){
         .period = 0, .loop = true,
         .rate = { CurveLinear, BOX_CURVE_KEYS({0, 0}) },
         .speed = { CurveLinear, BOX_CURVE_KEYS({0, 3}) }
     });
+    ecs_log_set_level(level);
     ecs_entity_t empty = timeline_new(world, 25, (ParticleTimeline){ .period = 1 });
     static const int32_t expected[] = { 2, 3, 2, 3, 2, 3 };
     int32_t i;

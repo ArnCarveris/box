@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unit tests for the bake3 environment lookup of integration.py. Run with:
+"""Unit tests for the bake3 environment lookup and the scene frames of integration.py. Run with:
 python3 tools/test_integration.py [--json report.json]"""
 import argparse
 import datetime as dt
@@ -149,6 +149,26 @@ class BakeSettingsTests(unittest.TestCase):
                                     for d in dirs])
 
 
+class SceneFramesTests(unittest.TestCase):
+    def test_default(self):
+        args = argparse.Namespace(frames=None)
+        self.assertEqual(integration.scene_frames("camera {}\n", args),
+                         integration.DEFAULT_FRAMES)
+
+    def test_scene_line(self):
+        args = argparse.Namespace(frames=None)
+        self.assertEqual(integration.scene_frames("// A scene\n// frames: 168\n", args), 168)
+
+    def test_option_overrides_scene_line(self):
+        args = argparse.Namespace(frames=30)
+        self.assertEqual(integration.scene_frames("// frames: 168\n", args), 30)
+
+    def test_line_in_text_ignored(self):
+        args = argparse.Namespace(frames=None)
+        self.assertEqual(integration.scene_frames("// it runs frames: 168 of them\n", args),
+                         integration.DEFAULT_FRAMES)
+
+
 class JsonResult(unittest.TextTestResult):
     def record(self, test, status):
         if not hasattr(self, "records"):
@@ -178,7 +198,8 @@ def main():
         del argv[i:i + 2]
     start = time.monotonic()
     runner = unittest.TextTestRunner(resultclass=JsonResult, verbosity=2)
-    suite = unittest.defaultTestLoader.loadTestsFromTestCase(BakeSettingsTests)
+    suite = unittest.TestSuite(unittest.defaultTestLoader.loadTestsFromTestCase(case)
+                               for case in (BakeSettingsTests, SceneFramesTests))
     result = runner.run(suite)
     if json_path:
         records = sorted(getattr(result, "records", []), key=lambda r: r["case"])

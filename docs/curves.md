@@ -504,7 +504,7 @@ root entity, and shown together by `test/integration/visual/curves_showcase.flec
 |------|--------|------------------------------------------|
 | `campfire.flecs` | Flame, smoke, embers, light | Embers pop out and slow down (`ParticleMotion.speed`), keep rising (`velocity_y`), wander and twinkle each their own way (`max_keys` mirrored or out of phase); the light flickers |
 | `shockwave.flecs` | Flash, ring front, dust ring, debris | Rings that race out and stop dead (`speed`, `(1 - t)^3`), a light flash in step with the burst, debris that stops turning as it settles (`spin`) |
-| `orb.flecs` | Glowing ball, halo, motes | Motes on helices from Bezier velocity curves, a radius of their own from `max_keys`; the light and the halo emission pulse together |
+| `orb.flecs` | Glowing ball, halo, motes | Motes that stream along a double helix from Bezier velocity curves; the light and the halo emission pulse together |
 | `chimney.flecs` | Stack and puffing smoke | Two puffs a period of different strength (`ParticleTimeline.rate`), faster starts (`speed`), smoke that shoots up before the wind takes it (`ParticleMotion.drag`) |
 
 What they needed beyond the recipes:
@@ -514,13 +514,31 @@ What they needed beyond the recipes:
   `ParticleSprite` with a texture, or as a `ParticleBillboard` of the mesh of another entity:
   `ParticleAppearance: {shape: ParticleBillboard, mesh: chunk, lit: 0.8}`. The mesh entity is
   drawn itself, so put it out of view, `chunk { Position: {0, -1000, 0}, Box: {1, 0.7, 0.5} }`.
+- **Particles that fall.** Gravity is a field of `ParticleForces`, and without any
+  `ParticleForces` (on the emitter, on the entity its `forces` names or as a singleton) particles
+  feel no force at all. Debris thrown up without it flies off for good: give the emitter
+  `ParticleForces: {}` for the default gravity of -9.81.
 - **Shapes in space from velocity curves.** A velocity curve is in world units per second, but
   its time is the life, so the same keys trace a different path for every lifetime. Give a
   particle that must trace a shape a fixed `lifetime: {L, L}`. A circle of radius `r` turned
   `N` times over the life is `cos` on one axis and `sin` on the other with an amplitude
   `A = 2 pi N r / L`: keys at every quarter turn, `CurveBezier`, slope 0 at the peaks and
-  `+-2 pi N A` at the zero crossings (`orb.flecs`). `max_keys` with another amplitude gives each
-  particle its own radius, as the three velocity axes share one draw.
+  `+-2 pi N A` at the zero crossings (`orb.flecs`). The circle starts at the spawn point, so
+  its centre is `r` to the side of it, not at the emitter: particles spawned over a sphere make
+  a cloud of small circles, not an orbit. To circle an axis, spawn at one point `r` from the
+  axis (`EmitterPoint`) and give the emitter a speed along the axis: every particle then rides
+  the same path, and the particles of all ages draw a helix that stands still while they
+  stream along it. A second emitter on the other side of the axis with the curves negated
+  draws a second strand. `max_keys` with another amplitude gives each particle its own
+  radius, as the three velocity axes share one draw, but the circles all touch at the spawn
+  point, so it fans out from there rather than making rings around the axis.
+- **A darker or lighter color, not another hue.** `color_variance` draws each channel on its
+  own, so `{30, 25, 20}` on brown debris gives green and red chunks. Vary the brightness with a
+  constant `color` gradient between white and grey instead, `color: {keys: [{0, {255, 255,
+  255}}], max_keys: [{0, {130, 130, 130}}]}` (`shockwave.flecs`).
+- **Billboards that lie on the ground.** `ParticleCollision` stops the center of a particle at
+  `height`, so a resting billboard sinks half into the ground; raise `height` by half the
+  drawn size.
 - **A light in step with a burst.** A `ParticleBurst` with `at: 2.5, repeat: -1` goes off at
   2.5, 5, 7.5 s, and a `ParticleLight` with `period: 2.5, loop: true` starts its curve at 0, 2.5,
   5 s, so a flash at the start of the curve meets every burst. The light also flashes once at
@@ -543,8 +561,11 @@ invalid ParticleCurves on late: size key 2: time 1.5 is outside of 0 to 1, drawn
 invalid ParticleCurves on unordered: opacity key 2: time 0.5 is not after time 0.6 of key 1, drawn as the default of opacity
 invalid ParticleCurves on jump: spin max_keys key 1: time 0 is not after time 0 of key 0, drawn as the default of spin
 invalid ParticleLight on lamp: curve max_keys is not allowed, a light has no random draw to blend two curves by, drawn as the default of curve
+invalid ParticleLight on still: curve has keys but period is 0, set the seconds it spans with a period above 0, drawn as the default of curve
 invalid ParticleTimeline on seconds: rate key 1: time 2 is outside of 0 to 1, drawn as the default of rate
 ```
+
+`ParticleTimeline` logs the same as `still` for a `rate` or `speed` with keys and no `period`.
 
 The other problems of a key are `time is not finite`, `value is not finite`, `in is not finite`
 and `out is not finite`, and of a curve `kind 3 is not CurveLinear, CurveCatmullRom or
@@ -556,6 +577,19 @@ Script errors stop the script, so the entities after them are not made:
 
 - `unresolved reference 'Linear'`: a short kind name, see [The format](#the-format).
 - `value 300 is out of bounds for type U8`: a gradient channel above 255.
+- `invalid cast from flecs.meta.i64 to box.types.rgb`: a number where `color` wants a color,
+  `{0, 1}` instead of `{0, {255, 255, 255}}`.
+- `cannot open scope for type 'box.curve.CurveKey'`: a color, `{0, {255, 0, 0}}`, where a
+  curve wants a number.
+- `unknown member 'velocty_x' for type 'box.particle.ParticleMotion'`: a misspelled field.
+
+These name the line of the script, not the field: look for the curve on that line.
+
+Some mistakes log nothing, as they are valid:
+
+- `in` and `out` on a curve that is not `CurveBezier` are ignored, so a curve that should
+  start steep is a straight line. Give it `kind: CurveBezier`.
+- Particles without any `ParticleForces` do not fall, see [Showcase](#showcase).
 
 A script reports only its first error, curve errors included: with two bad curves in one file
 the second is logged only once the first is fixed (`test/assets/curves/mistakes/two.flecs`).
