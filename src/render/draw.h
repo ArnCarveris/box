@@ -365,6 +365,21 @@ typedef struct box_draw_batch_t {
                              *   that does not upload every frame the GPU does not have */
 } box_draw_batch_t;
 
+/** The slice record of a sliced 2D shape (box_draws_slice_of): two consecutive records of the
+ * clip buffer that hold its box_render_slice_t, which are 0 in the entities of the clips.
+ *
+ * The record is computed again in a send when the shape changed since, or when the Texture of
+ * its image got another size, such as when it finished loading.
+ */
+typedef struct box_draw_slice_t {
+    ecs_entity_t entity;    /**< The shape, 0 for a free entry */
+    ecs_entity_t texture;   /**< Texture entity of its Image when the record was computed */
+    int32_t index;          /**< First of the two clip indices of its record */
+    int32_t width;          /**< Texture size the record was computed with, 0 without one */
+    int32_t height;         /**< Texture height the record was computed with */
+    bool dirty;             /**< The shape changed since the record was computed */
+} box_draw_slice_t;
+
 /** The ClipChildren elements the 2D draws clip to, by clip index.
  *
  * An element gets an index when a 2D draw below it first asks for it and keeps it until it loses
@@ -380,11 +395,9 @@ typedef struct box_draw_clips_t {
     ecs_vec_t entities;     /**< ecs_entity_t per clip index, 0 for a free index */
     ecs_vec_t records;      /**< box_render_clip_t per clip index, as the backend has them */
     ecs_vec_t free;         /**< int32_t, clip indices to reuse */
-    ecs_map_t slices;       /**< Sliced 2D shape to the first of the two indices of its slice
-                             *   record (box_render_slice_t), whose second index is 0 in
-                             *   entities; freed in a send once the shape is gone or no longer
-                             *   sliced */
-    ecs_vec_t slice_free;   /**< int32_t, first indices of slice records to reuse */
+    ecs_map_t slices;       /**< Sliced 2D shape to its entry in slice_entries */
+    ecs_vec_t slice_entries; /**< box_draw_slice_t, the slice records */
+    ecs_vec_t slice_free;   /**< int32_t, entries of slice_entries to reuse with their records */
     uint32_t capacity;      /**< Clips the clip buffer holds, 0 before it is created */
     int32_t tagged;         /**< Entities with ClipChildren, so a world without any skips the
                              *   walk up the hierarchy */
@@ -1746,16 +1759,26 @@ void box_draws_clip_removed(
     box_render_draws_t *d,
     ecs_entity_t e);
 
-/** Get the index of the slice record of a sliced 2D shape, giving it one when it has none.
+/** Get the index of the slice record of a sliced 2D shape, giving it one when it has none, and
+ * mark the record to be computed again in the next send.
  *
- * A slice record takes two consecutive records of the clip buffer, computed every frame with
- * the clips from the Shape2D, Image, ImageSlice and the Texture of the image of the shape.
+ * A slice record takes two consecutive records of the clip buffer, computed in a send with the
+ * clips from the Shape2D, Image, ImageSlice and the Texture of the image of the shape.
  *
  * @param d The state
- * @param e The shape
+ * @param e The shape, which changed
  * @return The index of the first of its two records
  */
 int32_t box_draws_slice_of(
+    box_render_draws_t *d,
+    ecs_entity_t e);
+
+/** Free the slice record of a 2D shape that is removed or no longer sliced, if it has one.
+ *
+ * @param d The state
+ * @param e The shape
+ */
+void box_draws_slice_release(
     box_render_draws_t *d,
     ecs_entity_t e);
 
@@ -1773,7 +1796,7 @@ bool box_draws_slice_record(
     box_render_slice_t *out);
 
 /** Write the areas of the clips into the clip buffer when one changed: added, removed, moved,
- * resized or reparented.
+ * resized or reparented; and the slice records of the sliced 2D shapes that changed.
  *
  * @param world The world
  * @param d The state

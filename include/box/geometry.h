@@ -570,20 +570,25 @@ ECS_ENUM(SliceFill, {
  * parts as the drawing (box_image_slice_map); as a Surface texture has no Texture, that is
  * the plain Image until it has one.
  *
- * The frame of the castle WoodPanel as one entity, a 64 by 64 frame texture with 20 texel
- * corners whose wood grain tiles (instead of the cropped wood, the Border and the four
- * IronCorner children):
+ * The castle WoodPanel as one entity: a 64 by 64 frame texture holds the dark edge and the iron
+ * corners in its 20 texel insets and wood in its center, whose grain tiles at its own scale on
+ * every size (instead of the hand cropped wood, the Border outline and four IronCorner children):
  *
  *     template WoodPanel {
  *       prop w: f32 = 300
  *       prop h: f32 = 120
  *       prop pad: f32 = 16
- *       Layout: {direction: Column, padding: {pad, pad, pad + 4, pad + 4}, spacing: 6}
+ *       prop row: bool = false
+ *
+ *       Layout: {direction: match row { true: Row; _: Column }, padding: {pad, pad, pad + 4,
+ *         pad + 4}, spacing: 6, h: match row { true: Center; _: Left }, v: Middle}
  *       LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
  *       Rect: {1, 1}
  *       Image: {texture: castle_ui_frame}
- *       ImageSlice: {left: 20, top: 20, right: 20, bottom: 20, scale: 1,
- *         edges: SliceTile, center: SliceTile}
+ *       ImageSlice: {left: 20, top: 20, right: 20, bottom: 20, edges: SliceTile,
+ *         center: SliceTile}
+ *       Rgb: {214, 196, 180}
+ *       Border: {radius: 6}
  *       BoxShadow: {offset_y: -5, blur: 18, spread: 1, color: {0, 0, 0, 140}}
  *       InputBlocker
  *     }

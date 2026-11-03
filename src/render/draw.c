@@ -379,6 +379,7 @@ static void BoxDrawsOnRemove(
 
         box_draws_material_release(it->world, d, it->entities[i]);
         box_draws_box_shadow_remove(it->world, d, it->entities[i]);
+        box_draws_slice_release(d, it->entities[i]);
     }
 
 done:
@@ -747,6 +748,10 @@ write:
         int32_t slice = material.shape2d->sliced ? box_draws_slice_of(d, e) : 0;
         if (slice != s->slice) {
             kinds |= BOX_DRAW_SHADING;
+        }
+
+        if (!slice && s->slice) {
+            box_draws_slice_release(d, e);
         }
 
         s->slice = slice;

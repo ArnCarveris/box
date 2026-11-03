@@ -622,7 +622,8 @@
                     "remove",
                     "prefab",
                     "template",
-                    "record_waits_for_texture"
+                    "record_waits_for_texture",
+                    "record_lifecycle"
                 ]
             }
         ]

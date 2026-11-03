@@ -200,6 +200,9 @@ static const unsigned char* slice_corner(
 /** Measure the runs of the stripes along a row of the top edge of a centered element: the
  * pixels of the stripe color (low green) and of the white between them.
  *
+ * The texture is filtered in linear light, so a pixel is of the stripe below the display green
+ * of half way between the two in linear light (188), which splits the filtered seams evenly.
+ *
  * @param px The pixels
  * @param width Width of the element
  * @param height Height of the element
@@ -220,7 +223,7 @@ static int32_t slice_runs(
     int32_t x, count = 0;
     bool on = false;
     for (x = left; x < right; x ++) {
-        bool stripe = slice_at(px, x, y)[1] < 128;
+        bool stripe = slice_at(px, x, y)[1] < 188;
         if (x == left || stripe != on) {
             test_assert(count < 64);
             runs[count ++] = 0;
@@ -254,11 +257,18 @@ void ImageSlice_corners_keep_size(void) {
     unsigned char *px[2];
     int32_t i, c, dx, dy;
     int fw = 0, fh = 0, fn = 0;
-    unsigned char *frame = stbi_load(SLICE_FRAME, &fw, &fh, &fn, 4);
-    test_assert(frame != NULL);
-    test_int(fw, SLICE_FRAME_TEXELS);
+    unsigned char *frame = NULL;
     for (i = 0; i < 2; i ++) {
         ecs_world_t *world = slice_world("slice_corners.png", (rgba){0, 0, 0, 255});
+        if (!frame) {
+            /* box_app_locate allocates with the OS API of flecs, set up by a world */
+            char *file = box_app_locate(SLICE_FRAME);
+            frame = stbi_load(file, &fw, &fh, &fn, 4);
+            ecs_os_free(file);
+            test_assert(frame != NULL);
+            test_int(fw, SLICE_FRAME_TEXELS);
+        }
+
         slice_panel(world, slice_texture(world), (float)sizes[i][0], (float)sizes[i][1],
             &slice);
         px[i] = slice_render(world, "slice_corners.png");

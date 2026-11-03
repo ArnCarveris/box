@@ -529,3 +529,72 @@ void ImageSlice_record_waits_for_texture(void) {
     test_bool(box_draws_slice_record(world, ecs_lookup(world, "disc"), &record), false);
     ecs_fini(world);
 }
+
+/** Get the slice record of a sliced shape in the clip records of the draws.
+ *
+ * @param world The world
+ * @param d The draws
+ * @param e The shape
+ * @return The record
+ */
+static const box_render_slice_t* slice_record_of(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e)
+{
+    int32_t index = ecs_get(world, e, DrawSlot)->slice;
+    test_assert(index > 0);
+
+    return ecs_vec_get_t(&d->clips.records, box_render_clip_t, index);
+}
+
+void ImageSlice_record_lifecycle(void) {
+    // ui/image_slice
+    ecs_world_t *world = slice_world();
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 100});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    test_assert(system != 0);
+    box_render_draws_t *d = ecs_system_get(world, system)->ctx;
+    ecs_entity_t panel = ecs_lookup(world, "panel");
+
+    /* The panel and the instance of the prefab have a record, the plain Image until the texture
+     * has a size, the Circle has none */
+    test_int(ecs_map_count(&d->clips.slices), 2);
+    test_int(ecs_get(world, ecs_lookup(world, "disc"), DrawSlot)->slice, 0);
+    int32_t index = ecs_get(world, panel, DrawSlot)->slice;
+    slice_near(slice_record_of(world, d, panel)->x[1], 0);
+
+    /* The texture finishing its load slices the panel without a change of the panel */
+    ecs_set(world, ecs_lookup(world, "frame"), Texture, {48, 48});
+    ecs_progress(world, 0);
+    slice_near(slice_record_of(world, d, panel)->x[1], 32.0f / 200.0f);
+
+    /* A resized panel gets its record computed again, at the same index */
+    ecs_set(world, panel, Rect, {400, 100});
+    ecs_progress(world, 0);
+    test_int(ecs_get(world, panel, DrawSlot)->slice, index);
+    slice_near(slice_record_of(world, d, panel)->x[1], 32.0f / 400.0f);
+
+    /* Without its ImageSlice the panel frees its record, which the next sliced shape reuses */
+    ecs_remove(world, panel, ImageSlice);
+    ecs_progress(world, 0);
+    test_int(ecs_get(world, panel, DrawSlot)->slice, 0);
+    test_int(ecs_map_count(&d->clips.slices), 1);
+    ecs_set(world, panel, ImageSlice, {.left = 8, .top = 8, .right = 8, .bottom = 8,
+        .scale = 1});
+    ecs_progress(world, 0);
+    test_int(ecs_get(world, panel, DrawSlot)->slice, index);
+    slice_near(slice_record_of(world, d, panel)->x[1], 8.0f / 400.0f);
+
+    /* A deleted shape frees its record */
+    ecs_delete(world, panel);
+    ecs_progress(world, 0);
+    test_int(ecs_map_count(&d->clips.slices), 1);
+    ecs_fini(world);
+}
