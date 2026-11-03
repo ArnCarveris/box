@@ -99,7 +99,7 @@ proc recompute() {
       if k == K_KEEP {
         keep_lvl = lvl
       } else if k == K_QUARRY {
-        s += 1
+        s += quarry_yield(mining)
       } else if k == K_FARM {
         fields += 1
         make += farm_yield(research)
@@ -195,6 +195,8 @@ proc new_realm() {
   selected = -1
   rank = 0
   research = 0
+  mining = 0
+  research_track = R_FARMING
   researching = false
   research_left = 0
   starving = false
@@ -257,9 +259,10 @@ proc demolish_cell(c: i32) {
       stone += floor(spent_stone(k, lvl) / 2)
     }
     if k == K_SMITH && researching {
+      const lost = study_name(research_track, match research_track == R_MINING { true: mining; _: research })
       researching = false
       research_left = 0
-      emit Toast(text: "The forge is gone, and with it the research of {research_name(research)}.")
+      emit Toast(text: "The forge is gone, and with it the research of {lost}.")
     }
     if k == K_FARM {
       for dz in 0..FARM_SIZE {
@@ -519,28 +522,31 @@ async {
 
 async {
   while true {
-    await Research
-    const r = research
-    const g = research_gold(r)
-    const s = research_stone(r)
-    if smith_cell < 0 || researching || r >= RESEARCH_MAX {
+    const e = await Research
+    const track = e.track
+    const r = match track == R_MINING { true: mining; _: research }
+    const name = study_name(track, r)
+    const g = study_gold(track, r)
+    const s = study_stone(track, r)
+    if smith_cell < 0 || researching || r >= study_max(track) {
       const played = box.audio.play(SfxDeny, 0.6)
     } else if abandoned[smith_cell] {
       const played = box.audio.play(SfxDeny, 0.6)
       emit Toast(text: "The forge is cold. Demolish the abandoned smithy and build a new one.")
     } else if keep_level < r + 1 {
       const played = box.audio.play(SfxDeny, 0.6)
-      emit Toast(text: "{research_name(r)} needs a keep of level {r + 1}.")
+      emit Toast(text: "{name} needs a keep of level {r + 1}.")
     } else if gold < g || stone < s {
       const played = box.audio.play(SfxDeny, 0.6)
-      emit Toast(text: "{research_name(r)} needs {g} gold and {s} stone.")
+      emit Toast(text: "{name} needs {g} gold and {s} stone.")
     } else {
       gold -= g
       stone -= s
       researching = true
-      research_left = research_time(r)
+      research_track = track
+      research_left = study_time(track, r)
       const played = box.audio.play(SfxBuild, 0.7)
-      emit Toast(text: "The blacksmith sets to work on {research_name(r)}.")
+      emit Toast(text: "The blacksmith sets to work on {name}.")
     }
   }
 }
@@ -555,11 +561,18 @@ async {
       } else {
         research_left = max(research_left - 0.25, 0)
         if research_left <= 0 {
-          const done = research
-          research = done + 1
           researching = false
-          recompute()
-          emit Toast(text: "{research_name(done)} are ready! Every farm now grows {farm_yield(done + 1):.1} food.")
+          if research_track == R_MINING {
+            const done = mining
+            mining = done + 1
+            recompute()
+            emit Toast(text: "{mining_name(done)} are ready! Every quarry now cuts {quarry_yield(done + 1):.1} stone.")
+          } else {
+            const done = research
+            research = done + 1
+            recompute()
+            emit Toast(text: "{research_name(done)} are ready! Every farm now grows {farm_yield(done + 1):.1} food.")
+          }
           const f0 = box.audio.play(SfxFanfareA, 0.6)
           await delay(0.18)
           const f1 = box.audio.play(SfxFanfareC, 0.6)
