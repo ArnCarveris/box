@@ -1257,6 +1257,9 @@ bool box_gpu_fog_volumes_draw(
     const box_render_view_t *v,
     WGPUTextureView depth);
 
+/** Probes of a kind (light or reflection) the debug pass of a view draws at most */
+#define BOX_GPU_DEBUG_PROBES_MAX (65536u)
+
 /** Create the layouts of the debug passes, after the view layout.
  *
  * @param gpu The backend
@@ -1288,8 +1291,8 @@ bool box_gpu_debug_enabled(
     const box_render_view_t *v);
 
 /** Record the debug pass of a view after its effects: a render pass that loads the color of the
- * target and reads the depth of the view, drawing the enabled debug items (the grid). A view
- * without any, or whose shaders are not compiled yet, records nothing.
+ * target and reads the depth of the view, drawing the grid, then the probes and their boxes.
+ * A view without any, without probes to show or with shaders not compiled records nothing.
  *
  * @param gpu The backend
  * @param t The target, whose depth the pass reads and whose format it draws in

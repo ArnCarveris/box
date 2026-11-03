@@ -435,6 +435,7 @@
                     "ctor_defaults",
                     "literal_off",
                     "script_keeps_defaults",
+                    "script_probes_keep_others",
                     "packet_copy"
                 ]
             },

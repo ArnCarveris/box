@@ -72,6 +72,10 @@
 /** Shader handle of the engine shader that draws the infinite grid of the debug pass of a view */
 #define BOX_RENDER_SHADER_DEBUG_GRID (52)
 
+/** Shader handle of the engine shader that draws the light and reflection probes of the debug
+ * pass of a view */
+#define BOX_RENDER_SHADER_DEBUG_PROBES (53)
+
 /** Fog volumes a view draws at most, the nearest ones */
 #define BOX_RENDER_FOG_VOLUMES_MAX (32)
 

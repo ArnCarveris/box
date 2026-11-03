@@ -89,7 +89,7 @@ void box_gpu_draw_init(
         },
         {
             .binding = 5,
-            .visibility = WGPUShaderStage_Fragment,
+            .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
             .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
         },
         {

@@ -37,8 +37,8 @@
 #define BOX_GPU_PARTICLE_SORT_GROUP_LOG (9u)
 
 /** Storage buffers the vertex stage of the draw reads: particles, keys, corners and the curve
- * table; the view group adds none to the vertex stage */
-#define BOX_GPU_PARTICLE_VERTEX_STORAGE (4u)
+ * table, and the reflection probes of the view group, visible to the vertex stage */
+#define BOX_GPU_PARTICLE_VERTEX_STORAGE (5u)
 
 /** Storage buffers of the integrate and spawn passes: particles, spawn slots, mesh table,
  * arguments and the curve table */
