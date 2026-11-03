@@ -2350,11 +2350,14 @@ static void Shapes2D_dynamic_transform_change(
 {
     ecs_entity_t box = Shapes2D_named(world, "parent.box");
     float x[3] = {-6, 3, 8}, y[3] = {4, -2, -5}, angle[3] = {0.2f, -0.4f, 0.5f};
-    ecs_set(world, box, Position, {x[frame], y[frame], 0});
-    ecs_set(world, box, Rotation, {0, 0, angle[frame]});
-    if (frame == 2) {
+    if (frame == 0) {
+        /* A static parent that moves marks its subtree, so it moves first and the frames after
+         * it move the element through the per frame transforms only */
         ecs_set(world, Shapes2D_named(world, "parent"), Position, {-3, 2, 0});
     }
+
+    ecs_set(world, box, Position, {x[frame], y[frame], 0});
+    ecs_set(world, box, Rotation, {0, 0, angle[frame]});
 }
 
 void Shapes2D_box_shadow_follows_dynamic_transform(void) {
@@ -2384,6 +2387,44 @@ static void Shapes2D_size_change(
 void Shapes2D_box_shadow_follows_size(void) {
     // ui/box_shadow
     Shapes2D_follow("shadow_follow_size.png", Shapes2D_size_scene, Shapes2D_size_change, 1);
+}
+
+/** A panel with a blue 24x24 target and a 16x16 shadowed element over it, which a uniform Fit
+ * scales by 1.5 through its ShapeMesh.scale. The end state is a 24x24 element with its shadow
+ * scaled by 1.5, which does not fit.
+ *
+ * @param world The world
+ * @param end Whether to set up the state after the change
+ */
+static void Shapes2D_fit_scene(
+    ecs_world_t *world,
+    bool end)
+{
+    ecs_entity_t panel = Shapes2D_follow_parent(world, 0, "panel", 0, 0);
+    ecs_entity_t target = Shapes2D_follow_parent(world, panel, "target", 0, 0);
+    ecs_set(world, target, Rect, {24, 24});
+    ecs_set(world, target, Rgb, {0, 0, 255});
+    ecs_entity_t box = end ?
+        Shapes2D_shadowed(world, panel, 0, 0, 24, (BoxShadow){
+            .offset_x = 6, .offset_y = -6, .blur = 6, .spread = 3, .color = {0, 0, 0, 255}}) :
+        Shapes2D_shadowed(world, panel, 0, 0, 16, (BoxShadow){
+            .offset_x = 4, .offset_y = -4, .blur = 4, .spread = 2, .color = {0, 0, 0, 255}});
+    ecs_set_name(world, box, "box");
+}
+
+static void Shapes2D_fit_change(
+    ecs_world_t *world,
+    int32_t frame)
+{
+    if (frame == 0) {
+        ecs_set(world, Shapes2D_named(world, "panel.box"), Fit, {
+            .target = Shapes2D_named(world, "panel.target"), .axes = SpatialXY});
+    }
+}
+
+void Shapes2D_box_shadow_follows_fit(void) {
+    // ui/box_shadow
+    Shapes2D_follow("shadow_follow_fit.png", Shapes2D_fit_scene, Shapes2D_fit_change, 2);
 }
 
 static void Shapes2D_opacity_scene(
@@ -2435,8 +2476,10 @@ static void Shapes2D_dynamic_material_change(
     ecs_world_t *world,
     int32_t frame)
 {
-    ecs_set(world, Shapes2D_named(world, "box"), Opacity, {frame ? 0.3f : 0.6f});
-    ecs_set(world, Shapes2D_named(world, "parent"), Opacity, {frame ? 0.4f : 0.7f});
+    /* Written in place as an animation does, which marks nothing: only the per frame shading
+     * of the DynamicMaterial shapes reaches the shadows */
+    ecs_get_mut(world, Shapes2D_named(world, "box"), Opacity)->value = frame ? 0.3f : 0.6f;
+    ecs_get_mut(world, Shapes2D_named(world, "parent"), Opacity)->value = frame ? 0.4f : 0.7f;
 }
 
 void Shapes2D_box_shadow_follows_dynamic_material(void) {
@@ -2471,6 +2514,17 @@ static void Shapes2D_tint_change(
 void Shapes2D_box_shadow_follows_tint(void) {
     // ui/box_shadow
     Shapes2D_follow("shadow_follow_tint.png", Shapes2D_tint_scene, Shapes2D_tint_change, 2);
+
+    /* The black shadow mixes toward the red tint of the parent and the blue one of the element,
+     * where an untinted shadow is gray, next to the element */
+    ecs_world_t *world = Shapes2D_shadow_world("shadow_follow_tint.png", false);
+    Shapes2D_tint_scene(world, true);
+    unsigned char *px = Shapes2D_shadow_capture(world, "shadow_follow_tint.png");
+    const unsigned char *c = &px[(42 * 64 + 42) * 4];
+    test_assert(c[0] > c[1] + 25);
+    test_assert(c[2] > c[1] + 25);
+    stbi_image_free(px);
+    ecs_fini(world);
 }
 
 /** A white clip area with a child whose shadow reaches past it, clipped when on is set.

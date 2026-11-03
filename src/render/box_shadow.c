@@ -27,6 +27,8 @@ typedef struct box_shadow_box_t {
     float sigma;        /**< Standard deviation of the edge, at least BOX_SHADOW_SIGMA_MIN */
     float element[2];   /**< Half extents of the rounded box of the shape */
     float element_radius; /**< Corner radius of the rounded box of the shape */
+    float scale[2];     /**< Scale of the quad of the shape relative to its size, which a layout
+                         *   that fits the shape (ShapeMesh.scale) stretches it with */
 } box_shadow_box_t;
 
 /** Construct BoxShadowSlot values without a slot.
@@ -85,12 +87,14 @@ static void box_shadow_slot_move(
  * does, so a sharp corner stays sharp, and grown by 3 standard deviations on each side.
  *
  * @param shape The resolved shape, a rectangle
+ * @param mesh The mesh of the shape, NULL when it has none
  * @param shadow The shadow
  * @param out Receives the shadow box
  * @return Whether the shadow box has an area
  */
 static bool box_shadow_resolve(
     const Shape2D *shape,
+    const ShapeMesh *mesh,
     const BoxShadow *shadow,
     box_shadow_box_t *out)
 {
@@ -121,12 +125,15 @@ static bool box_shadow_resolve(
     out->element[0] = shape->size[0] * 0.5f;
     out->element[1] = shape->size[1] * 0.5f;
     out->element_radius = glm_clamp(shape->radius, 0.0f, half);
+    out->scale[0] = mesh ? mesh->scale[0] / shape->size[0] : 1.0f;
+    out->scale[1] = mesh ? mesh->scale[1] / shape->size[1] : 1.0f;
+    result = isfinite(out->scale[0]) && isfinite(out->scale[1]);
 done:
     return result;
 }
 
-/** Write the transform of a shadow: the world transform of its shape moved by the offset and
- * scaled to the quad of the shadow.
+/** Write the transform of a shadow: the world transform of its shape stretched as the quad of
+ * the shape is, moved by the offset and scaled to the quad of the shadow.
  *
  * @param out The transform
  * @param transform World transform of the shape, NULL for the identity
@@ -137,7 +144,7 @@ static void box_shadow_transform(
     const WorldTransform *transform,
     const box_shadow_box_t *box)
 {
-    float scale[3] = { box->size[0], box->size[1], 1.0f };
+    float scale[3] = { box->size[0] * box->scale[0], box->size[1] * box->scale[1], 1.0f };
     mat4 m;
     int32_t r, c;
     if (transform) {
@@ -151,7 +158,8 @@ static void box_shadow_transform(
             out->rows[r][c] = m[c][r] * scale[c];
         }
 
-        out->rows[r][3] = m[0][r] * box->offset[0] + m[1][r] * box->offset[1] + m[3][r];
+        out->rows[r][3] = m[0][r] * box->scale[0] * box->offset[0] +
+            m[1][r] * box->scale[1] * box->offset[1] + m[3][r];
     }
 }
 
@@ -319,7 +327,7 @@ void box_draws_box_shadow_write(
 
     shadow = ecs_get(world, e, BoxShadow);
     shape = shadow ? ecs_get(world, e, Shape2D) : NULL;
-    if (!shape || !box_shadow_resolve(shape, shadow, &box)) {
+    if (!shape || !box_shadow_resolve(shape, ecs_get(world, e, ShapeMesh), shadow, &box)) {
         goto done;
     }
 
@@ -376,7 +384,7 @@ void box_draws_box_shadow_update(
     }
 
     bool drawn = shape && shape->kind == BOX_SHAPE2D_RECT &&
-        box_shadow_resolve(shape, shadow, &box);
+        box_shadow_resolve(shape, ecs_get(world, e, ShapeMesh), shadow, &box);
     if (drawn) {
         ecs_os_memcpy_t(&key, &box_draws_batch(d, s->batch)->key, box_draw_key_t);
         drawn = key.pipeline == BOX_RENDER_SHADER_SHAPE2D;

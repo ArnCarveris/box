@@ -688,6 +688,7 @@
                     "box_shadow_follows_transform",
                     "box_shadow_follows_dynamic_transform",
                     "box_shadow_follows_size",
+                    "box_shadow_follows_fit",
                     "box_shadow_follows_opacity",
                     "box_shadow_follows_dynamic_material",
                     "box_shadow_follows_tint",
