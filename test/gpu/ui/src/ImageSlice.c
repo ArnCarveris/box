@@ -396,6 +396,7 @@ static const unsigned char slice_surface_colors[4][3] = {
 #define SLICE_SURFACE_SCENE \
     "using box.transform\n" \
     "using box.geometry\n" \
+    "using box.material\n" \
     "using box.camera\n" \
     "using box.view\n" \
     "using box.surface\n" \
@@ -429,7 +430,8 @@ static const unsigned char slice_surface_colors[4][3] = {
     "}\n" \
     "surface_views {\n" \
     "  view {\n" \
-    "    View: {camera: surface_ui.camera,\n" \
+    "    View: {camera: surface_ui.camera, lighting: {enabled: false},\n" \
+    "      culling: {enabled: false},\n" \
     "      clear: {enabled: true, color: {255, 255, 255, 255}}}\n" \
     "  }\n" \
     "}\n" \
