@@ -1,0 +1,71 @@
+// The scene of the browser check of keyframe animation (animation.mjs), where AnimatorPlay and
+// the render run on the main thread. The page opens a window only for a scene with a Surface;
+// its 640x480 points fill the viewport of the check, so the orthographic camera shows one logical
+// pixel per unit. A white square moves between the grey marker on the left and the green one on
+// the right in ping pong over 2 s, and a square with DynamicMaterial fades from red to blue and
+// back over 2 s.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.surface
+using box.animation
+using box.curve
+
+window {
+  Surface: {width: 640, height: 480}
+}
+
+camera {
+  Position: {0, 0, 100}
+  Camera: {ortho: true, ortho_scale: 1}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {10, 12, 20, 255}}}
+}
+
+start_marker {
+  Position: {-150, -80, 0}
+  Rect: {12, 12}
+  Rgb: {128, 128, 128}
+}
+
+target_marker {
+  Position: {150, -80, 0}
+  Rect: {12, 12}
+  Rgb: {0, 200, 0}
+}
+
+slide {
+  AnimationClip: {duration: 2}
+  x {
+    AnimationTrack: {component: Position, member: "x", curve: {keys: [{0, -150}, {2, 150}]}}
+  }
+}
+
+fade {
+  AnimationClip: {duration: 2}
+  red {
+    AnimationTrack: {component: Rgb, member: "r", curve: {keys: [{0, 255}, {2, 0}]}}
+  }
+  blue {
+    AnimationTrack: {component: Rgb, member: "b", curve: {keys: [{0, 0}, {2, 255}]}}
+  }
+}
+
+mover {
+  Position: {-150, 0, 0}
+  Rect: {30, 30}
+  Rgb: {255, 255, 255}
+  Animator: {clip: slide, mode: AnimationPingPong}
+}
+
+shifter {
+  Position: {0, 80, 0}
+  Rect: {30, 30}
+  Rgb: {255, 0, 0}
+  DynamicMaterial
+  Animator: {clip: fade, mode: AnimationPingPong}
+}

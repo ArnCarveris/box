@@ -6,6 +6,9 @@
  * A curve is baked when it changes, into the rows of an entry with the same baked content when
  * there is one, so the instances of an effect share them. Constant curves take no row, and a
  * curve that is not valid, or whose samples are not finite, is the default of its field.
+ *
+ * A curve with max_keys takes rows for both of its curves, also a flat one, unless the two are
+ * the same constant; the curve without max_keys takes no second row.
  */
 
 #ifndef BOX_RENDER_PARTICLE_ROWS_H
@@ -15,6 +18,9 @@
 
 /** Curves of an emitter: the size, opacity, rotation and spin curves and the gradient */
 #define BOX_PARTICLE_ROWS_CURVES (5)
+
+/** Entries a pool may use: those of its curves, then those of their max curves */
+#define BOX_PARTICLE_ROWS_ENTRIES (2 * BOX_PARTICLE_ROWS_CURVES)
 
 /** The curve table: the entries that hand out rows and the rows as they were sent */
 typedef struct box_particle_rows_t {
@@ -32,13 +38,18 @@ typedef struct box_particle_rows_use_t {
     bool had;               /**< The emitter had ParticleCurves when they were baked */
     uint64_t hash;          /**< Hash of the kinds and keys of the ParticleCurves they were
                              *   baked from */
-    int32_t entries[BOX_PARTICLE_ROWS_CURVES]; /**< Index plus 1 of the entries it uses, 0
-                             *   for a constant curve */
+    int32_t entries[BOX_PARTICLE_ROWS_ENTRIES]; /**< Index plus 1 of the entries it uses, 0
+                             *   for a constant curve: the curves, then their max curves */
     uint32_t rows[4];       /**< Rows of the size, opacity, rotation and spin curves,
                              *   BOX_PARTICLE_CURVE_CONSTANT for a constant */
+    uint32_t max_rows[4];   /**< Rows of their max curves, BOX_PARTICLE_CURVE_CONSTANT for a
+                             *   curve without max_keys or one whose two curves are the same
+                             *   constant */
     float values[4];        /**< Values of those curves while constant */
     uint32_t gradient_row;  /**< First row of the gradient, BOX_PARTICLE_CURVE_CONSTANT for a
                              *   constant */
+    uint32_t gradient_max_row; /**< First row of the max gradient, BOX_PARTICLE_CURVE_CONSTANT
+                             *   for none */
     float gradient[3];      /**< Linear color of a constant gradient */
 } box_particle_rows_use_t;
 

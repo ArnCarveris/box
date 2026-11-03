@@ -1,0 +1,121 @@
+// Keyframe animation at a known frame. The visual run advances a fixed 1/60 s per frame and
+// captures the third, so every Animator, set to start at time t, renders its clip at t + 0.05 s:
+// - rig, on the left: a parent whose clip turns it about y and lifts its arm, at 1 s a quarter
+//   turn, so the arm points at the camera, raised to 1.6 above the rig.
+// - lamp, in the middle: a sphere with DynamicMaterial whose clip fades it from red to blue, at
+//   1 s purple.
+// - four instances of the prefab Bob, on the right, whose clip lifts a box in ping pong, started
+//   at 0, 0.3, 0.6 and 0.9 s: a staircase from 0.35 to 2.15 that each instance keeps by its own
+//   time.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.animation
+using box.curve
+
+camera {
+  Position: {0, 3, 9}
+  Rotation: {-0.3, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {24, 28, 36, 255}}}
+}
+
+sun {
+  Rotation: {0.7, 2.4, 0}
+  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+  Rgb: {255, 250, 240}
+}
+
+$ {
+  AmbientLight: {intensity: 0.3}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {14, 0.2, 6}
+  Rgb: {90, 94, 100}
+}
+
+turn {
+  AnimationClip: {duration: 2}
+  spin {
+    AnimationTrack: {component: Rotation, member: "y", curve: {
+      keys: [{0, 0}, {2, flecs.script.math.PI}]
+    }}
+  }
+  lift {
+    AnimationTrack: {component: Position, member: "y", target: "arm", curve: {
+      keys: [{0, 1.1}, {2, 2.1}]
+    }}
+  }
+}
+
+fade {
+  AnimationClip: {duration: 2}
+  red {
+    AnimationTrack: {component: Rgb, member: "r", curve: {keys: [{0, 255}, {2, 0}]}}
+  }
+  blue {
+    AnimationTrack: {component: Rgb, member: "b", curve: {keys: [{0, 0}, {2, 255}]}}
+  }
+}
+
+bob {
+  AnimationClip: {duration: 1}
+  lift {
+    AnimationTrack: {component: Position, member: "y", curve: {keys: [{0, 0.25}, {1, 2.25}]}}
+  }
+}
+
+rig {
+  Position: {-4, 0.6, 0}
+  Rotation: {0, 0, 0}
+  Box: {0.8, 0.8, 0.8}
+  Rgb: {230, 120, 60}
+  Animator: {clip: turn, time: 0.95}
+
+  arm {
+    Position: {1, 1.1, 0}
+    Box: {0.4, 0.4, 0.4}
+    Rgb: {80, 150, 240}
+  }
+}
+
+lamp {
+  Position: {-0.5, 0.8, 0}
+  Sphere: {segments: 24, smooth: true, radius: 0.7}
+  Rgb: {255, 0, 0}
+  DynamicMaterial
+  Animator: {clip: fade, time: 0.95}
+}
+
+prefab Bob {
+  Box: {0.5, 0.5, 0.5}
+  Rgb: {80, 200, 120}
+  Animator: {clip: bob, mode: AnimationPingPong}
+}
+
+bob_0 : Bob {
+  Position: {2, 0.25, 0}
+}
+
+bob_1 : Bob {
+  Position: {2.9, 0.25, 0}
+  Animator: {clip: bob, time: 0.3, mode: AnimationPingPong}
+}
+
+bob_2 : Bob {
+  Position: {3.8, 0.25, 0}
+  Animator: {clip: bob, time: 0.6, mode: AnimationPingPong}
+}
+
+bob_3 : Bob {
+  Position: {4.7, 0.25, 0}
+  Animator: {clip: bob, time: 0.9, mode: AnimationPingPong}
+}

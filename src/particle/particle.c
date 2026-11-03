@@ -127,9 +127,13 @@ void BoxParticleImport(
     ECS_META_COMPONENT(world, ParticlePlayback);
     ECS_META_COMPONENT(world, ParticleBurst);
     ECS_META_COMPONENT(world, ParticleCurve);
-    box_owned_hooks(world, ParticleCurve, BOX_OWNED_VEC(ParticleCurve, keys, CurveKey));
+    box_owned_hooks(world, ParticleCurve,
+        BOX_OWNED_VEC(ParticleCurve, keys, CurveKey),
+        BOX_OWNED_VEC(ParticleCurve, max_keys, CurveKey));
     ECS_META_COMPONENT(world, ParticleLight);
-    box_owned_hooks(world, ParticleLight, BOX_OWNED_CURVE(ParticleLight, curve));
+    box_owned_hooks(world, ParticleLight,
+        BOX_OWNED_CURVE(ParticleLight, curve),
+        BOX_OWNED_VEC(ParticleLight, curve.max_keys, CurveKey));
     ecs_set_hooks(world, ParticleLight, { .ctor = box_particle_light_ctor });
     ECS_META_COMPONENT(world, ParticleTimeline);
     box_owned_hooks(world, ParticleTimeline,
@@ -139,14 +143,20 @@ void BoxParticleImport(
     ECS_META_COMPONENT(world, ParticleGradientKey);
     ECS_META_COMPONENT(world, ParticleGradient);
     box_owned_hooks(world, ParticleGradient,
-        BOX_OWNED_VEC(ParticleGradient, keys, ParticleGradientKey));
+        BOX_OWNED_VEC(ParticleGradient, keys, ParticleGradientKey),
+        BOX_OWNED_VEC(ParticleGradient, max_keys, ParticleGradientKey));
     ECS_META_COMPONENT(world, ParticleCurves);
     box_owned_hooks(world, ParticleCurves,
         BOX_OWNED_CURVE(ParticleCurves, size),
+        BOX_OWNED_VEC(ParticleCurves, size.max_keys, CurveKey),
         BOX_OWNED_CURVE(ParticleCurves, opacity),
+        BOX_OWNED_VEC(ParticleCurves, opacity.max_keys, CurveKey),
         BOX_OWNED_CURVE(ParticleCurves, rotation),
+        BOX_OWNED_VEC(ParticleCurves, rotation.max_keys, CurveKey),
         BOX_OWNED_VEC(ParticleCurves, color.keys, ParticleGradientKey),
-        BOX_OWNED_CURVE(ParticleCurves, spin));
+        BOX_OWNED_VEC(ParticleCurves, color.max_keys, ParticleGradientKey),
+        BOX_OWNED_CURVE(ParticleCurves, spin),
+        BOX_OWNED_VEC(ParticleCurves, spin.max_keys, CurveKey));
     box_particle_curves_import(world);
     ECS_META_COMPONENT(world, ParticleShape);
     ECS_META_COMPONENT(world, ParticleBlend);

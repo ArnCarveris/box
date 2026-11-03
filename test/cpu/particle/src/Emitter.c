@@ -323,7 +323,7 @@ void Emitter_extracted_block(void) {
     test_uint(b->delta_us, 16667);
     test_uint(b->life_min, 500000);
     test_uint(b->life_span, 1000000);
-    test_int(sizeof(box_render_particle_block_t), 432);
+    test_int(sizeof(box_render_particle_block_t), 464);
 
     frame(world);
     pool = pool_of(null, e);

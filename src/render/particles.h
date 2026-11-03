@@ -110,6 +110,12 @@ typedef struct box_render_particle_block_t {
     uint32_t sort_count;    /**< Keys sorted, a power of two of at least
                              *   BOX_RENDER_PARTICLE_SORT_MIN, 0 when not sorted */
     uint32_t styled;        /**< 1 when the emitter has a ParticleAppearance */
+    uint32_t curve_max_rows[4]; /**< Rows of the max curves of the size, opacity, rotation and
+                             *   spin, BOX_PARTICLE_CURVE_CONSTANT for none; the area of the
+                             *   max spin is in the row after its own */
+    uint32_t gradient_max_row; /**< First row of the max color multiplier,
+                             *   BOX_PARTICLE_CURVE_CONSTANT for none */
+    uint32_t unused[3];     /**< Padding to the size of Emitter */
 } box_render_particle_block_t;
 
 /** A particle pool of the frame: a range of a particle page, simulated after the scatters and

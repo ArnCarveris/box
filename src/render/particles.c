@@ -1063,6 +1063,7 @@ static void box_particles_block_look(
     int32_t i;
     for (i = 0; i < 4; i ++) {
         out->curve_rows[i] = pool->curves.rows[i];
+        out->curve_max_rows[i] = pool->curves.max_rows[i];
         out->curve_values[i] = pool->curves.values[i];
     }
 
@@ -1071,6 +1072,7 @@ static void box_particles_block_look(
     }
 
     out->gradient_row = pool->curves.gradient_row;
+    out->gradient_max_row = pool->curves.gradient_max_row;
 
     out->look = ParticleCircle;
     out->blend = ParticleAlpha;
@@ -1117,8 +1119,8 @@ static uint32_t box_particles_texture(
 }
 
 /** Evaluate the curve of a ParticleLight with the curve module, exactly at its time. Lights are
- * evaluated here on the CPU, not from the curve table; a curve without keys or a bad one, which
- * its validate hook logged, is 1.
+ * evaluated here on the CPU, not from the curve table; a curve without keys or a bad one, also
+ * one with max_keys, which its validate hook logged, is 1.
  *
  * @param curve The curve, its times from 0 to 1 of the period
  * @param t The time over the period, 0 to 1
@@ -1130,7 +1132,7 @@ static float box_particles_light_curve(
 {
     Curve view = { .kind = curve->kind, .keys = curve->keys };
     float result = 1.0f;
-    if (ecs_vec_count(&curve->keys) && box_particle_curve_valid(curve)) {
+    if (ecs_vec_count(&curve->keys) && box_particle_light_curve_valid(curve)) {
         result = box_curve_value(&view, t, 1.0f);
         result = isfinite(result) ? result : 1.0f;
     }

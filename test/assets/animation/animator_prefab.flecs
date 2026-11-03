@@ -1,0 +1,27 @@
+// A prefab whose Animator plays a clip in ping pong from 0.5 s, and two instances, the second
+// with a time of its own, for the Animator tests.
+using box.transform
+using box.animation
+using box.curve
+
+walk {
+  AnimationClip: {}
+  lift {
+    AnimationTrack: {component: Position, member: "y", target: "arm", curve: {
+      keys: [{0, 0}, {2, 4}]
+    }}
+  }
+}
+
+prefab Rig {
+  Animator: {clip: walk, time: 0.5, mode: AnimationPingPong}
+  arm {
+    Position: {0, 0, 0}
+  }
+}
+
+first : Rig {}
+
+second : Rig {
+  Animator: {clip: walk, time: 1.5, mode: AnimationPingPong}
+}
