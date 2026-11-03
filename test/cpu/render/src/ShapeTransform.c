@@ -188,3 +188,202 @@ void ShapeTransform_template_box_child_follows_parent(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+void ShapeTransform_box_added_to_existing_child(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, {5, 1, -3});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, parent);
+
+    frame(world);
+
+    /* The shape arrives after the child and its parent were transformed, nothing else of the
+     * tree changes. */
+    ecs_set(world, child, Box, {1, 1, 1});
+
+    frame(world);
+
+    expect_translation(world, child, 5, 1, -3);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ShapeTransform_box_child_keeps_own_position(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, {5, 1, -3});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, child, Position, {1, 2, 3});
+    ecs_set(world, child, Box, {1, 1, 1});
+
+    frame(world);
+
+    const Position *p = ecs_get(world, child, Position);
+    test_assert(p != NULL);
+    test_flt(p->x, 1);
+    test_flt(p->y, 2);
+    test_flt(p->z, 3);
+    expect_translation(world, child, 6, 3, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ShapeTransform_box_grandchild_follows_shape_child(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, {5, 1, -3});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, child, Box, {1, 1, 1});
+    ecs_entity_t grandchild = ecs_new_w_pair(world, EcsChildOf, child);
+    ecs_set(world, grandchild, Sphere, {.radius = 0.5f});
+    ecs_set(world, grandchild, Position, {0, 1, 0});
+
+    frame(world);
+
+    expect_translation(world, child, 5, 1, -3);
+    expect_translation(world, grandchild, 5, 2, -3);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ShapeTransform_box_child_follows_rotated_parent(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, {5, 1, -3});
+    ecs_set(world, parent, Rotation, {0, (float)GLM_PI_2, 0});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, child, Box, {1, 1, 1});
+
+    frame(world);
+
+    const WorldTransform *pt = ecs_get(world, parent, WorldTransform);
+    const WorldTransform *t = ecs_get(world, child, WorldTransform);
+    test_assert(pt != NULL);
+    test_assert(t != NULL);
+    for (int c = 0; c < 4; c ++) {
+        for (int r = 0; r < 4; r ++) {
+            test_assert(fabsf(t->m[c][r] - pt->m[c][r]) < 1e-4f);
+        }
+    }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ShapeTransform_spot_light_child_follows_parent(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, {5, 1, -3});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_add(world, child, SpotLight);
+
+    frame(world);
+
+    expect_translation(world, child, 5, 1, -3);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ShapeTransform_fog_volume_child_follows_parent(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, {5, 1, -3});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_add(world, child, FogVolume);
+
+    frame(world);
+
+    expect_translation(world, child, 5, 1, -3);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ShapeTransform_emitter_child_follows_parent(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, {5, 1, -3});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_add(world, child, ParticleEmitter);
+
+    frame(world);
+
+    expect_translation(world, child, 5, 1, -3);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ShapeTransform_layout_rect_child_keeps_layout_position(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    /* A laid out element gets the Position from its shape too; the layout still places it. */
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, {0, 0, 0});
+    ecs_set(world, parent, Rect, {100, 100});
+    ecs_set(world, parent, Layout, {.direction = DirectionColumn, .spacing = 5});
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, a, Rect, {20, 20});
+    ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, b, Rect, {20, 20});
+
+    frame(world);
+    frame(world);
+
+    const Position *pa = ecs_get(world, a, Position);
+    const Position *pb = ecs_get(world, b, Position);
+    test_assert(pa != NULL);
+    test_assert(pb != NULL);
+    test_assert(fabsf(pa->y - pb->y) > 1);
+    test_assert(ecs_has(world, a, WorldTransform));
+    test_assert(ecs_has(world, b, WorldTransform));
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ShapeTransform_direction_none_rect_child_follows_parent(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    /* A DirectionNone child keeps the position it was given, the origin of its parent when it
+     * was given none. */
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, {30, 40, 0});
+    ecs_set(world, parent, Rect, {100, 100});
+    ecs_set(world, parent, Layout, {.direction = DirectionNone});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, child, Rect, {20, 20});
+
+    frame(world);
+    frame(world);
+
+    const WorldTransform *pt = ecs_get(world, parent, WorldTransform);
+    const Position *p = ecs_get(world, child, Position);
+    test_assert(pt != NULL);
+    test_assert(p != NULL);
+    expect_translation(world, child, pt->m[3][0] + p->x, pt->m[3][1] + p->y,
+        pt->m[3][2] + p->z);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

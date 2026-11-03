@@ -621,7 +621,16 @@
                     "box_child_follows_dynamic_parent",
                     "rect_child_follows_parent",
                     "point_light_child_follows_parent",
-                    "template_box_child_follows_parent"
+                    "template_box_child_follows_parent",
+                    "box_added_to_existing_child",
+                    "box_child_keeps_own_position",
+                    "box_grandchild_follows_shape_child",
+                    "box_child_follows_rotated_parent",
+                    "spot_light_child_follows_parent",
+                    "fog_volume_child_follows_parent",
+                    "emitter_child_follows_parent",
+                    "layout_rect_child_keeps_layout_position",
+                    "direction_none_rect_child_follows_parent"
                 ]
             }
         ]

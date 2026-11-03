@@ -466,6 +466,18 @@ void TransformStaticImport(
         .callback = TransformStatic_OnChange
     });
 
+    /* A Position that comes with another component through With, such as a shape or a light,
+     * is added without being set, so the entity is transformed when it gets the Position. */
+    transformStaticObserver(world, state, (ecs_observer_desc_t){
+        .entity = ecs_entity(world, { .name = "TransformStatic_OnAddPosition" }),
+        .query.terms = {
+            { .id = ecs_id(Position), .src.id = EcsSelf },
+            { .id = ManualTransform, .oper = EcsNot }
+        },
+        .events = { EcsOnAdd },
+        .callback = TransformStatic_OnChange
+    });
+
     transformStaticObserver(world, state, (ecs_observer_desc_t){
         .entity = ecs_entity(world, { .name = "TransformStatic_OnRotation" }),
         .query.terms = {
