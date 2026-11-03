@@ -6,8 +6,10 @@
  *
  * The packet cases render into the null backend with one camera. The wire cases check the
  * wireframe settings and the extract of a view with WireframeOnly, which culls without occlusion
- * and renders no shadows. The capture case checks that a capture of the camera of a view copies
- * its debug settings, and that the other captures draw none.
+ * and renders no shadows.
+ *
+ * The capture case checks that a capture of the camera of a view copies its debug settings, and
+ * that the other captures draw none.
  */
 
 #include <box.h>

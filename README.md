@@ -44,7 +44,7 @@ builtins of the flecs shell (`ls`, `get`, `set`, `query`, ...):
 
 | Command | What it does |
 |---------|--------------|
-| `capture [camera]` | Write a PNG of the active camera or a camera to a session resource, with the debug drawing of the view that renders it |
+| `capture [camera]` | Write a PNG of the active camera or a camera, as its view shows it |
 | `render <subject>` | Write a PNG of an entity, prefab or template on its own |
 | `fit [camera]` | Move the active camera or a camera so that it sees the whole scene |
 | `audio` | Print the audio state, rate, voices, load and the buses in processing order |
@@ -56,7 +56,8 @@ builtins of the flecs shell (`ls`, `get`, `set`, `query`, ...):
 | `logs [level] [count]` | Show the last log messages |
 | `key_*`, `mouse_*`, `action_*` | Send input, see `help` |
 
-`capture` and `audio capture` return a resource at once and fill it when the frames are in;
+`capture` of a camera that a view renders shows it as on screen, with the debug drawing of the
+view. `capture` and `audio capture` return a resource at once and fill it when the frames are in;
 fetch it with `GET /shell/session/<id>/resource/<name>`, which is empty until then. In the
 browser, which has no REST port, `audio capture` writes `/tmp/audio_capture_<n>.wav` in the file
 system of the page and returns that path. Headless with a fixed `--delta-time`, two runs capture

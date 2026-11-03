@@ -126,10 +126,11 @@ ECS_ENUM(WireframeMode, {
 });
 
 /** Debug drawing of a view, in a pass after its effects into the color of its target, with the
- * depth of the view read only. A screenshot (capture) of a camera that a view renders includes
- * the debug drawing of that view, as on screen; the probe and reflection captures, the bakes
- * and a screenshot of a camera that no view renders do not draw it.
- * All zero (a C literal View) draws nothing and records no pass.
+ * depth of the view read only. All zero (a C literal View) draws nothing and records no pass.
+ *
+ * A screenshot (capture) of a camera that a view renders includes its debug drawing, as on
+ * screen. The probe and reflection captures, the bakes and a screenshot of a camera that no
+ * view renders do not draw it.
  *
  * The probe views show only what the view samples: light_probes the probes of the resident
  * volume of its scene with LightSettings.baked, reflection_probes the ReflectionProbes of its

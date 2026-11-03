@@ -560,10 +560,9 @@ typedef struct box_render_view_t {
     int32_t fog_first;          /**< Index of the first fog volume of the view in the packet */
     int32_t fog_count;          /**< Fog volumes the view draws, back to front, filled by the
                                  *   light extract for a lit view with LightSettings.fog_volumes */
-    ViewDebug debug;            /**< View.debug; a capture of a camera that a view renders
-                                 *   copies it from that view, the other captures (no view,
-                                 *   descriptions, probes, reflections, bakes) leave it all
-                                 *   zero and draw no debug pass */
+    ViewDebug debug;            /**< View.debug, copied by a capture of the camera of a view;
+                                 *   all zero for the other captures (probes, reflections,
+                                 *   bakes, no view), which draw no debug pass */
 } box_render_view_t;
 
 /** Kind of an effect pass of a view */

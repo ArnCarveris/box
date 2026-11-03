@@ -5,10 +5,9 @@
  * A capture becomes an offscreen target that exists for one packet: the packet creates it,
  * renders the view of the capture into it and writes the PNG, the next packet destroys it.
  *
- * A camera that a view renders is captured as that view renders it, with its lighting,
- * shadows, culling, effects and debug drawing; a camera without a view, or the camera of a
- * description, is captured lit, without shadows, effects or debug drawing and with the default
- * culling.
+ * A camera that a view renders is captured as on screen, with the lighting, shadows, culling,
+ * effects and debug drawing of the view; another camera is captured lit, without shadows,
+ * effects or debug drawing and with the default culling.
  */
 
 #include "render.h"
@@ -145,8 +144,9 @@ static const box_render_view_t* box_render_capture_view_of(
 /** Fill the view of a capture from its camera entity or its description.
  *
  * A camera that a view renders is captured with the settings of that view: its lighting,
- * shadows, culling and effects, which the later extracts resolve from the view entity, and its
- * debug drawing, copied with its culling so that a WireframeOnly capture also skips occlusion.
+ * shadows and effects, which the later extracts resolve from the view entity, and its culling
+ * and debug drawing, copied together so that a WireframeOnly capture also skips occlusion.
+ *
  * A camera without a view, or the camera of a description, draws no debug pass.
  *
  * @param world The world
