@@ -1,10 +1,8 @@
-// Widget gallery: the widgets of box.widgets in a screen space UI, each in its normal and
-// disabled state. The header holds the title, the status line with the last change and the
-// theme switch, which restyles the whole gallery. Below it a page scrolls the sections where the
-// window is too small for them: Basics (the simple widgets) and Text (the text fields) on top,
-// Containers (dropdowns, tabs, scroll views, a list view, collapsibles) and Form below. The form
-// edits a 3D preview rendered to a texture: its values apply with Apply or Enter in the name
-// field, Reset restores the defaults.
+// Widget gallery: the widgets of box.widgets in a screen space UI. The header holds the title and
+// the theme switch, which restyles the whole gallery. Below it a page scrolls the sections where
+// the window is too small for them: Basics and Containers on the left, Form and Text on the right.
+// The form edits a 3D preview rendered to a texture: its values apply with Apply or Enter in the
+// name field, Reset restores the defaults.
 //
 // Every widget works without a mouse: Tab moves the focus in reading order and scrolls the
 // focused widget into view, Enter, Space and the arrow keys operate it. The pointer shows what
@@ -29,12 +27,6 @@ using box.widgets
 
 window {
   Surface: {width: 1280, height: 800}
-}
-
-actions {
-  ping {
-    Action: {description: "Ping from the gallery"}
-  }
 }
 
 // The 200 entries of the list view of the Containers section
@@ -121,24 +113,12 @@ template BackdropView {
 }
 
 template Gallery {
-  mut last: string = "none"
-  mut changes: i32 = 0
-  mut pings: i32 = 0
-  mut submitted: string = ""
-
   // The form owns two sets of values: draft, what its widgets show, and applied, what the
   // preview shows. A change of a widget reads the values of every widget into draft, Apply (or
   // Enter in the name field) copies draft to applied, Reset assigns the defaults to draft,
   // which the widgets take as their values.
   mut draft: PreviewValues = preview_defaults
   mut applied: PreviewValues = preview_defaults
-
-  async {
-    while true {
-      await on.pressed(actions.ping)
-      pings = pings + 1
-    }
-  }
 
   // The background view is created before the UI view, so the UI draws over it
   backdrop_view {
@@ -151,7 +131,7 @@ template Gallery {
     Scene: {}
 
     camera {
-      Position: {0, 1.7, 4.6}
+      Position: {0, 2.2, 6.6}
       Rotation: {-0.3, 0, 0}
       Camera: {fov: 40}
     }
@@ -184,7 +164,7 @@ template Gallery {
 
     floor {
       Position: {0, -0.05, 0}
-      Box: {6, 0.1, 6}
+      Box: {10, 0.1, 10}
       Rgb: {150, 155, 160}
       PbrMaterial: {roughness: 0.9}
     }
@@ -246,7 +226,7 @@ template Gallery {
   }
 
   preview_surface {
-    Surface: {width: 600, height: 450, texture: preview_texture, view_root: preview_views}
+    Surface: {width: 600, height: 840, texture: preview_texture, view_root: preview_views}
   }
 
   // Screen space UI: one logical pixel is one point, the root fills the window
@@ -263,41 +243,6 @@ template Gallery {
       Layout: {direction: Column, spacing: 12, padding: {16, 16, 16, 16}}
       FocusScope
 
-      // The status line follows every change reported below the root. A text field reports
-      // its edits itself and its TextInput again, only the TextInput counts.
-      async {
-        while true {
-          const e = await on.change(this)
-          const w = e.widget
-          if !w.has(TextEdit) {
-            changes = changes + 1
-            if w.has(Slider) {
-              last = "{w.name()}: {w[Slider.mut].current:.2}"
-            } else if w.has(Stepper) {
-              last = "{w.name()}: {w[Stepper.mut].current:.0}"
-            } else if w.has(Checkbox) {
-              last = "{w.name()}: {w[Checkbox.mut].current}"
-            } else if w.has(Switch) {
-              last = "{w.name()}: {w[Switch.mut].current}"
-            } else if w.has(RadioGroup) {
-              last = "{w.name()}: {w[RadioGroup.mut].current}"
-            } else if w.has(TextInput) && !w[TextInput].password {
-              last = "{w.name()}: {w[TextInput.mut].current}"
-            } else if w.has(Dropdown) {
-              last = "{w.name()}: {w[Dropdown.mut].current}"
-            } else if w.has(TabView) {
-              last = "{w.name()}: {w[TabView.mut].current}"
-            } else if w.has(ListView) {
-              last = "{w.name()}: {w[ListView.mut].current}"
-            } else if w.has(Collapsible) {
-              last = "{w.name()}: {w[Collapsible.mut].current}"
-            } else {
-              last = "{w.name()}"
-            }
-          }
-        }
-      }
-
       // The header stays at the top while the page below it scrolls. The theme dropdown, the
       // first Tab stop, picks the theme ThemeSwitch assigns.
       header {
@@ -305,281 +250,213 @@ template Gallery {
         LayoutItem: {width: {mode: Grow}}
 
         Label title(text: "Widgets", variant: "heading")
-        Label status(text: "Last change: {last}", variant: "muted")
-        Label pings(text: "Pings: {pings}", variant: "caption")
 
         gap {
           LayoutItem: {width: {mode: Grow}}
         }
 
-        Label theme_label(text: "Theme", variant: "muted")
         Dropdown theme(options: ["Dark", "Light"], value: 0, width: 120)
       }
 
-      // The page: the sections in two rows, scrolled both ways where the window is smaller than
-      // they are. It is no Tab stop of its own; Tab scrolls the widget it focuses into view.
-      ScrollView page(horizontal: true, focusable: false) {
-        top {
+      // The page: the sections in two columns, scrolled both ways where the window is smaller
+      // than they are. It is no Tab stop of its own; Tab scrolls the widget it focuses into view.
+      ScrollView page(horizontal: true, focusable: false, frame: false) {
+        columns {
           Layout: {direction: Row, spacing: 16}
 
-          Panel basics(title: "Basics", width: 600) {
-            labels {
-              Layout: {direction: Row, spacing: 16, v: Bottom}
-              Label heading(text: "Heading", variant: "heading")
-              Label body(text: "Body text")
-              Label muted(text: "Muted text", variant: "muted")
-              Label caption(text: "Caption", variant: "caption")
-            }
+          left {
+            Layout: {direction: Column, spacing: 16}
 
-            Separator labels_end()
-
-            buttons {
-              Layout: {direction: Row, spacing: 8, v: Middle}
-              Button save(label: "Save")
-              Button cancel(label: "Cancel", variant: "secondary")
-              Button more(label: "More", variant: "ghost")
-              Button remove(label: "Delete", variant: "danger")
-              Button ping(label: "Ping", variant: "secondary", action: actions.ping)
-              Button off(label: "Disabled", disabled: true)
-            }
-
-            toggles {
-              Layout: {direction: Row, spacing: 16, v: Middle}
-              Checkbox sound(label: "Sound")
-              Checkbox music(label: "Music", value: true)
-              Checkbox locked(label: "Locked", disabled: true)
-              Switch wifi(label: "Wi-Fi")
-              Switch airplane(label: "Airplane", value: true, disabled: true)
-            }
-
-            radios {
-              Layout: {direction: Row, spacing: 48}
-
-              RadioGroup size(value: "Medium") {
-                RadioButton small(label: "Small")
-                RadioButton medium(label: "Medium")
-                RadioButton large(label: "Large")
-                RadioButton huge(label: "Huge", disabled: true)
+            Panel basics(title: "Basics", width: 616) {
+              buttons {
+                Layout: {direction: Row, spacing: 8, v: Middle}
+                Button save(label: "Save")
+                Button cancel(label: "Cancel", variant: "secondary")
+                Button more(label: "More", variant: "ghost")
+                Button remove(label: "Delete", variant: "danger")
+                Button off(label: "Disabled", disabled: true)
               }
 
-              RadioGroup quality(value: "High", disabled: true) {
-                RadioButton low(label: "Low")
-                RadioButton high(label: "High")
+              toggles {
+                Layout: {direction: Row, spacing: 24, v: Middle}
+                Checkbox sound(label: "Sound")
+                Checkbox music(label: "Music", value: true)
+                Switch wifi(label: "Wi-Fi")
+                Switch bluetooth(label: "Bluetooth", value: true)
               }
+
+              choices {
+                Layout: {direction: Row, spacing: 48, v: Middle}
+
+                RadioGroup size(value: "Medium") {
+                  RadioButton small(label: "Small")
+                  RadioButton medium(label: "Medium")
+                  RadioButton large(label: "Large")
+                }
+
+                Stepper count(min: 0, max: 5, value: 2)
+              }
+
+              Separator choices_end()
+
+              sliders {
+                Layout: {direction: Row, spacing: 24}
+                Slider volume(label: "Volume", width: 284, min: 0, max: 100, step: 10, value: 40, unit: "%")
+                Slider gain(label: "Gain", width: 284, min: 0, max: 1, step: 0, value: 0.5, decimals: 2)
+              }
+
+              ProgressBar download(label: "Download", value: 0.65, width: 592)
             }
 
-            Separator radios_end()
+            Panel containers(title: "Containers", width: 616) {
+              TabView tabs(width: 592, height: 100) {
+                Tab general(label: "General") {
+                  toggles {
+                    Layout: {direction: Row, spacing: 16, v: Middle}
+                    Checkbox notify(label: "Notifications", value: true)
+                    Switch sync(label: "Sync")
+                  }
+                }
 
-            sliders {
-              Layout: {direction: Row, spacing: 24}
-              Slider volume(label: "Volume", width: 168, min: 0, max: 100, step: 10, value: 40, unit: "%")
-              Slider gain(label: "Gain", width: 168, min: 0, max: 1, step: 0, value: 0.5, decimals: 2)
-              Slider muted(label: "Disabled", width: 168, value: 70, disabled: true)
-            }
+                Tab audio(label: "Audio") {
+                  Slider level(label: "Level", width: 200, value: 60, unit: "%")
+                  Stepper channels(min: 1, max: 8, value: 2)
+                }
 
-            progress {
-              Layout: {direction: Row, spacing: 24}
-              ProgressBar download(label: "Download", value: 0.65, width: 168)
-              ProgressBar done(label: "Done", value: 1, width: 168)
-            }
-
-            steppers {
-              Layout: {direction: Row, spacing: 16, v: Middle}
-              Stepper count(min: 0, max: 5, value: 2)
-              Stepper fixed(min: 0, max: 5, value: 3, disabled: true)
-            }
-          }
-
-          Panel text(title: "Text", width: 280) {
-            TextInput name(label: "Name", placeholder: "Your name", width: 248)
-            TextInput secret(label: "Password", placeholder: "Password", password: true, width: 248)
-            TextInput off(label: "Disabled", value: "Not editable", disabled: true, width: 248)
-            TextInput fixed(label: "Read only", value: "Copy me", read_only: true, width: 248)
-
-            Separator fields_end()
-
-            // Enter in the message field shows its text in the label below it
-            submit {
-              Layout: {direction: Column, spacing: 8}
-
-              async {
-                while true {
-                  const e = await on.submit(this)
-                  if e.widget.has(TextInput) {
-                    submitted = e.widget[TextInput.mut].current
+                Tab display(label: "Display") {
+                  RadioGroup mode(value: "Window") {
+                    RadioButton window(label: "Window")
+                    RadioButton full(label: "Fullscreen")
                   }
                 }
               }
-
-              TextInput message(label: "Message", placeholder: "Type and press Enter", width: 248)
-              Label echo(text: "Submitted: {submitted}", variant: "muted")
-            }
-          }
-        }
-
-        bottom {
-          Layout: {direction: Row, spacing: 16}
-
-          Panel containers(title: "Containers", width: 600) {
-            TabView tabs(width: 576, height: 100) {
-              Tab general(label: "General") {
-                toggles {
-                  Layout: {direction: Row, spacing: 16, v: Middle}
-                  Checkbox notify(label: "Notifications", value: true)
-                  Switch sync(label: "Sync")
-                }
-                Button apply(label: "Apply")
-              }
-
-              Tab audio(label: "Audio") {
-                Slider level(label: "Level", width: 200, value: 60, unit: "%")
-                Stepper channels(min: 1, max: 8, value: 2)
-              }
-
-              Tab display(label: "Display") {
-                RadioGroup mode(value: "Window") {
-                  RadioButton window(label: "Window")
-                  RadioButton full(label: "Fullscreen")
-                }
-              }
-            }
-
-            ScrollView notes(height: 280) {
-              Label intro(width: 540, text: "A scroll view clips its content and moves it with the wheel, its scroll bar and, while it has the focus, the arrow keys, PageUp, PageDown, Home and End. This paragraph is long enough to show the wrapping of a label inside the view. The list view below is a scroll view of its own: the wheel over it scrolls the list, elsewhere it scrolls this view. The dropdown under the list opens a list that floats over the edge of the view.")
 
               ListView files(items: files, value: 0, height: 120)
 
-              picker {
-                Layout: {direction: Row, spacing: 8, v: Middle}
-                Label picker_label(text: "Format")
-                Dropdown format(options: ["PNG", "JPEG", "WebP", "AVIF", "TIFF"], value: 0)
+              Collapsible advanced(title: "Advanced", width: 592) {
+                Switch experimental(label: "Experimental features")
               }
-
-              Label usage(width: 540, text: "Tab moves the focus into the view and through the widgets in it. A widget scrolled out of the view is clipped: it is not drawn and the pointer passes through it to whatever lies under it.")
-
-              Button share(label: "Share", variant: "secondary")
-
-              Label outro(width: 540, variant: "muted", text: "The end of the scroll view.")
-            }
-
-            Collapsible details(title: "Details", width: 576) {
-              Label details_text(text: "Hidden until the section opens", variant: "muted")
-              Checkbox verbose(label: "Verbose output")
-            }
-
-            Collapsible advanced(title: "Advanced", value: true, width: 576) {
-              Switch experimental(label: "Experimental features")
-            }
-
-            quality_row {
-              Layout: {direction: Row, spacing: 8, v: Middle}
-              Label quality_label(text: "Quality")
-              Dropdown quality(options: ["Low", "Medium", "High", "Ultra", "Custom"], value: 1)
             }
           }
 
-          // The form: its widgets show draft, the preview applied. The widgets take the members
-          // of draft as their values, so assigning draft (Reset) moves them.
-          Panel form(title: "Form", width: 600) {
-            body {
-              Layout: {direction: Row, spacing: 16}
+          right {
+            Layout: {direction: Column, spacing: 16}
+            LayoutItem: {height: {mode: Grow}}
+            // The form: its widgets show draft, the preview applied. The widgets take the members
+            // of draft as their values, so assigning draft (Reset) moves them.
+            Panel form(title: "Form", width: 616) {
+              body {
+                Layout: {direction: Row, spacing: 16}
 
-              // Every change reads the values of all widgets, the Apply and Reset buttons
-              // report a change of their own
-              async {
-                while true {
-                  const e = await on.change(this)
-                  const w = e.widget
-                  if w.name() == "apply" && w.has(Button) {
-                    applied = draft
-                  } else if w.name() == "reset" && w.has(Button) {
-                    draft = preview_defaults
-                  } else if !w.has(TextEdit) {
-                    const c = this.lookup("controls")
-                    draft = {
-                      name: c.lookup("name")[TextInput.mut].current,
-                      shape: c.lookup("shape_row").lookup("shape")[Dropdown.mut].current,
-                      color: {
-                        c.lookup("red")[Slider.mut].current,
-                        c.lookup("green")[Slider.mut].current,
-                        c.lookup("blue")[Slider.mut].current
-                      },
-                      size: c.lookup("size_row").lookup("size")[Stepper.mut].current,
-                      shadow: c.lookup("shadow")[Checkbox.mut].current,
-                      light: c.lookup("light_row").lookup("light")[RadioGroup.mut].current
+                // Every change reads the values of all widgets, the Apply and Reset buttons
+                // report a change of their own
+                async {
+                  while true {
+                    const e = await on.change(this)
+                    const w = e.widget
+                    if w.name() == "apply" && w.has(Button) {
+                      applied = draft
+                    } else if w.name() == "reset" && w.has(Button) {
+                      draft = preview_defaults
+                    } else if !w.has(TextEdit) {
+                      const c = this.lookup("controls")
+                      draft = {
+                        name: c.lookup("name")[TextInput.mut].current,
+                        shape: c.lookup("shape_row").lookup("shape")[Dropdown.mut].current,
+                        color: {
+                          c.lookup("red")[Slider.mut].current,
+                          c.lookup("green")[Slider.mut].current,
+                          c.lookup("blue")[Slider.mut].current
+                        },
+                        size: c.lookup("size_row").lookup("size")[Stepper.mut].current,
+                        shadow: c.lookup("shadow")[Checkbox.mut].current,
+                        light: c.lookup("light_row").lookup("light")[RadioGroup.mut].current
+                      }
                     }
                   }
                 }
-              }
 
-              // Enter in the name field applies the values, as Apply does
-              async {
-                while true {
-                  const e = await on.submit(this)
-                  if e.widget.has(TextInput) {
-                    applied = draft
-                  }
-                }
-              }
-
-              controls {
-                Layout: {direction: Column, spacing: 8}
-                LayoutItem: {width: {mode: Fixed, value: 260}}
-
-                TextInput name(
-                  label: "Name", placeholder: "Shown in the preview", value: draft.name, width: 260)
-
-                shape_row {
-                  Layout: {direction: Row, spacing: 8, v: Middle}
-                  Label shape_label(text: "Shape", width: 48)
-                  Dropdown shape(options: preview_shapes, value: draft.shape, width: 204)
-                }
-
-                Slider red(label: "Red", width: 260, max: 255, value: draft.color.r)
-                Slider green(label: "Green", width: 260, max: 255, value: draft.color.g)
-                Slider blue(label: "Blue", width: 260, max: 255, value: draft.color.b)
-
-                size_row {
-                  Layout: {direction: Row, spacing: 8, v: Middle}
-                  Label size_label(text: "Size", width: 48)
-                  Stepper size(min: 0.5, max: 1.5, step: 0.25, value: draft.size, decimals: 2)
-                }
-
-                Checkbox shadow(label: "Cast a shadow", value: draft.shadow)
-
-                light_row {
-                  Layout: {direction: Row, spacing: 8}
-                  Label light_label(text: "Light", width: 48)
-
-                  RadioGroup light(value: draft.light) {
-                    RadioButton day(label: "Day")
-                    RadioButton dusk(label: "Dusk")
-                    RadioButton night(label: "Night")
+                // Enter in the name field applies the values, as Apply does
+                async {
+                  while true {
+                    const e = await on.submit(this)
+                    if e.widget.has(TextInput) {
+                      applied = draft
+                    }
                   }
                 }
 
-                form_actions {
-                  Layout: {direction: Row, spacing: 8, v: Middle}
-                  Button apply(label: "Apply")
-                  Button reset(label: "Reset", variant: "secondary")
+                controls {
+                  Layout: {direction: Column, spacing: 8}
+                  LayoutItem: {width: {mode: Fixed, value: 260}}
+
+                  TextInput name(
+                    label: "Name", placeholder: "Shown in the preview", value: draft.name, width: 260)
+
+                  shape_row {
+                    Layout: {direction: Row, spacing: 8, v: Middle}
+                    Label shape_label(text: "Shape", width: 48)
+                    Dropdown shape(options: preview_shapes, value: draft.shape, width: 204)
+                  }
+
+                  Slider red(label: "Red", width: 260, max: 255, value: draft.color.r)
+                  Slider green(label: "Green", width: 260, max: 255, value: draft.color.g)
+                  Slider blue(label: "Blue", width: 260, max: 255, value: draft.color.b)
+
+                  size_row {
+                    Layout: {direction: Row, spacing: 8, v: Middle}
+                    Label size_label(text: "Size", width: 48)
+                    Stepper size(min: 0.5, max: 1.5, step: 0.25, value: draft.size, decimals: 2)
+                  }
+
+                  Checkbox shadow(label: "Cast a shadow", value: draft.shadow)
+
+                  light_row {
+                    Layout: {direction: Row, spacing: 8}
+                    Label light_label(text: "Light", width: 48)
+
+                    RadioGroup light(value: draft.light) {
+                      RadioButton day(label: "Day")
+                      RadioButton dusk(label: "Dusk")
+                      RadioButton night(label: "Night")
+                    }
+                  }
+
+                  form_actions {
+                    Layout: {direction: Row, spacing: 8, v: Middle}
+                    Button apply(label: "Apply")
+                    Button reset(label: "Reset", variant: "secondary")
+                  }
+                }
+
+                // The texture of the preview surface on a rect, as etc/scenes/ui.flecs shows its
+                // screen texture on its curved screen
+                preview {
+                  Layout: {direction: Column, spacing: 8}
+                  LayoutItem: {height: {mode: Grow}}
+
+                  image {
+                    LayoutItem: {width: {mode: Fixed, value: 300}, height: {mode: Grow}}
+                    Rect: {1, 1}
+                    Image: {texture: preview_texture, u0: 0, v0: 0, u1: 1, v1: 1}
+                    Border: {radius: 4}
+                  }
+
                 }
               }
+            }
 
-              // The texture of the preview surface on a rect, as etc/scenes/ui.flecs shows its
-              // screen texture on its curved screen
-              preview {
-                Layout: {direction: Column, spacing: 8}
+            Panel text(title: "Text", width: 616, grow: true) {
+              fields {
+                Layout: {direction: Row, spacing: 24}
+                TextInput name(label: "Name", placeholder: "Your name", width: 284)
+                TextInput secret(label: "Password", placeholder: "Password", password: true, width: 284)
+              }
 
-                image {
-                  LayoutItem: {width: {mode: Fixed, value: 300}, height: {mode: Fixed, value: 225}}
-                  Rect: {1, 1}
-                  Image: {texture: preview_texture, u0: 0, v0: 0, u1: 1, v1: 1}
-                  Border: {radius: 4}
-                }
-
-                const shown = preview_shapes[applied.shape]
-                Label applied_text(width: 300, variant: "muted",
-                  text: "{applied.name}: {shown}, size {applied.size:.2}, {applied.light} light")
+              more_fields {
+                Layout: {direction: Row, spacing: 24}
+                TextInput message(label: "Message", placeholder: "Type a message", width: 284)
+                TextInput fixed(label: "Read only", value: "Copy me", read_only: true, width: 284)
               }
             }
           }

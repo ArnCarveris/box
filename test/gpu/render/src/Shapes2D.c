@@ -1725,15 +1725,196 @@ void Shapes2D_box_shadow_under_element(void) {
     test_assert(Shapes2D_at(px, 43, 32)[1] > Shapes2D_at(px, 42, 32)[1]);
     stbi_image_free(px);
 
-    ecs_set(world, e, BoxShadow, {.color = {0, 0, 0, 255}});
+    ecs_set(world, e, BoxShadow, {.offset_x = 6, .color = {0, 0, 0, 255}});
     ecs_set(world, e, BlendMode, {Additive});
     px = Shapes2D_shadow_capture(world, "shadow_under.png");
     c = Shapes2D_at(px, 32, 32);
-    test_assert(c[0] > 245 && c[1] < 10 && c[2] < 10);
+    test_assert(c[0] > 245 && c[1] > 245 && c[2] > 245);
     c = Shapes2D_at(px, 39, 25);
-    test_assert(c[0] > 245 && c[1] < 10 && c[2] < 10);
+    test_assert(c[0] > 245 && c[1] > 245 && c[2] > 245);
+    c = Shapes2D_at(px, 46, 32);
+    test_assert(c[0] < 10 && c[1] < 10 && c[2] < 10);
     c = Shapes2D_at(px, 52, 32);
     test_assert(c[0] > 250 && c[1] > 250 && c[2] > 250);
+    stbi_image_free(px);
+
+    ecs_fini(world);
+}
+
+/** Test that two 64x64 captures are the same over an area.
+ *
+ * @param a The first capture
+ * @param b The second capture
+ * @param x0 First column
+ * @param y0 First row
+ * @param x1 Last column
+ * @param y1 Last row
+ */
+static void Shapes2D_same(
+    const unsigned char *a,
+    const unsigned char *b,
+    int32_t x0,
+    int32_t y0,
+    int32_t x1,
+    int32_t y1)
+{
+    int32_t x, y, i;
+    for (y = y0; y <= y1; y ++) {
+        for (x = x0; x <= x1; x ++) {
+            for (i = 0; i < 3; i ++) {
+                test_int(Shapes2D_at(a, x, y)[i], Shapes2D_at(b, x, y)[i]);
+            }
+        }
+    }
+}
+
+void Shapes2D_box_shadow_cutout_translucent(void) {
+    // ui/box_shadow
+    ecs_world_t *world = Shapes2D_shadow_world("shadow_cutout.png", false);
+    ecs_entity_t e = Shapes2D_shadowed(world, 0, 0, 0, 20,
+        (BoxShadow){.blur = 6, .spread = 2, .color = {0, 0, 0, 255}});
+    ecs_set(world, e, Rgb, {255, 0, 0});
+    ecs_set(world, e, Opacity, {0.5f});
+    unsigned char *shadowed = Shapes2D_shadow_capture(world, "shadow_cutout.png");
+    ecs_remove(world, e, BoxShadow);
+    unsigned char *plain = Shapes2D_shadow_capture(world, "shadow_cutout.png");
+    const unsigned char *c = Shapes2D_at(plain, 32, 32);
+    test_assert(c[0] > 245 && c[1] > 170 && c[1] < 205);
+    Shapes2D_same(shadowed, plain, 23, 23, 40, 40);
+    test_assert(Shapes2D_at(plain, 43, 32)[0] > 250);
+    test_assert(Shapes2D_at(shadowed, 43, 32)[0] < 230);
+    test_assert(Shapes2D_at(shadowed, 32, 43)[0] < 230);
+    test_assert(Shapes2D_at(shadowed, 20, 32)[0] < 230);
+    stbi_image_free(shadowed);
+    stbi_image_free(plain);
+
+    ecs_set(world, e, Rgb, {255, 255, 255});
+    ecs_set(world, e, Opacity, {0.25f});
+    ecs_remove(world, e, Rect);
+    ecs_set(world, e, Circle, {10});
+    ecs_set(world, e, BoxShadow, {.blur = 4, .color = {0, 0, 0, 255}});
+    shadowed = Shapes2D_shadow_capture(world, "shadow_cutout.png");
+    test_assert(Shapes2D_at(shadowed, 32, 32)[0] > 250);
+    test_assert(Shapes2D_at(shadowed, 26, 32)[0] > 250);
+    test_assert(Shapes2D_at(shadowed, 32, 38)[0] > 250);
+    test_assert(Shapes2D_at(shadowed, 42, 32)[0] < 245);
+    test_assert(Shapes2D_at(shadowed, 42, 32)[0] < Shapes2D_at(shadowed, 44, 32)[0]);
+    stbi_image_free(shadowed);
+
+    ecs_fini(world);
+}
+
+void Shapes2D_box_shadow_cutout_offset(void) {
+    // ui/box_shadow
+    ecs_world_t *world = Shapes2D_shadow_world("shadow_cutout_offset.png", false);
+    ecs_entity_t e = Shapes2D_shadowed(world, 0, 0, 0, 20, (BoxShadow){
+        .offset_x = 8, .offset_y = -8, .color = {0, 0, 0, 255}});
+    ecs_set(world, e, Rgb, {0, 0, 255});
+    ecs_set(world, e, Opacity, {0.5f});
+    unsigned char *shadowed = Shapes2D_shadow_capture(world, "shadow_cutout_offset.png");
+    ecs_remove(world, e, BoxShadow);
+    unsigned char *plain = Shapes2D_shadow_capture(world, "shadow_cutout_offset.png");
+    Shapes2D_same(shadowed, plain, 23, 23, 40, 40);
+    Shapes2D_same(shadowed, plain, 0, 0, 63, 20);
+    Shapes2D_same(shadowed, plain, 0, 0, 20, 63);
+    const unsigned char *c = Shapes2D_at(shadowed, 46, 38);
+    test_assert(c[0] > 175 && c[0] < 200 && c[1] == c[0] && c[2] == c[0]);
+    test_assert(abs((int)Shapes2D_at(shadowed, 38, 46)[0] - c[0]) <= 2);
+    test_assert(abs((int)Shapes2D_at(shadowed, 46, 46)[0] - c[0]) <= 2);
+    test_assert(abs((int)Shapes2D_at(shadowed, 42, 31)[0] - c[0]) <= 2);
+    test_assert(abs((int)Shapes2D_at(shadowed, 31, 42)[0] - c[0]) <= 2);
+    c = Shapes2D_at(shadowed, 53, 40);
+    test_assert(c[0] > 250 && c[1] > 250 && c[2] > 250);
+    c = Shapes2D_at(shadowed, 40, 53);
+    test_assert(c[0] > 250 && c[1] > 250 && c[2] > 250);
+    stbi_image_free(shadowed);
+    stbi_image_free(plain);
+
+    ecs_set(world, e, BoxShadow, {.offset_x = 8, .offset_y = -8, .blur = 6,
+        .color = {0, 0, 0, 255}});
+    shadowed = Shapes2D_shadow_capture(world, "shadow_cutout_offset.png");
+    ecs_remove(world, e, BoxShadow);
+    plain = Shapes2D_shadow_capture(world, "shadow_cutout_offset.png");
+    Shapes2D_same(shadowed, plain, 23, 23, 40, 40);
+    test_assert(Shapes2D_at(shadowed, 46, 46)[0] < 225);
+    test_assert(Shapes2D_at(plain, 46, 46)[0] > 250);
+    test_assert(Shapes2D_at(shadowed, 46, 40)[0] < Shapes2D_at(shadowed, 49, 40)[0]);
+    stbi_image_free(shadowed);
+    stbi_image_free(plain);
+
+    ecs_fini(world);
+}
+
+/** Test that a channel of the pixels of a capture from a point outward goes from the inside of a
+ * translucent element to its shadow with no light or dark seam: every step toward the shadow, and
+ * all within the inside and the shadow.
+ *
+ * @param px The capture
+ * @param channel The channel
+ * @param x Column of the first pixel, inside the element
+ * @param y Row of the first pixel
+ * @param dx Column step
+ * @param dy Row step
+ * @param count Pixels to test, the last one in the shadow outside the element
+ */
+static void Shapes2D_no_seam(
+    const unsigned char *px,
+    int32_t channel,
+    int32_t x,
+    int32_t y,
+    int32_t dx,
+    int32_t dy,
+    int32_t count)
+{
+    int32_t inside = Shapes2D_at(px, x, y)[channel];
+    int32_t outside = Shapes2D_at(px, x + dx * (count - 1), y + dy * (count - 1))[channel];
+    int32_t dir = outside > inside ? 1 : -1;
+    int32_t lo = glm_min(inside, outside), hi = glm_max(inside, outside);
+    int32_t last = inside, i;
+    test_assert(abs(inside - outside) > 10);
+    for (i = 0; i < count; i ++) {
+        int32_t v = Shapes2D_at(px, x + dx * i, y + dy * i)[channel];
+        test_assert((v - last) * dir >= -2);
+        test_assert(v >= lo - 2 && v <= hi + 2);
+        last = v;
+    }
+}
+
+void Shapes2D_box_shadow_cutout_no_seam(void) {
+    // ui/box_shadow
+    ecs_world_t *world = Shapes2D_shadow_world("shadow_seam.png", false);
+    ecs_entity_t e = Shapes2D_shadowed(world, 0, 0, 0, 30,
+        (BoxShadow){.spread = 6, .color = {0, 0, 0, 160}});
+    ecs_set(world, e, Rgb, {0, 0, 0});
+    ecs_set(world, e, Opacity, {0.5f});
+    ecs_set(world, e, Border, {.radius = 10});
+    unsigned char *px = Shapes2D_shadow_capture(world, "shadow_seam.png");
+    Shapes2D_no_seam(px, 0, 32, 32, 1, 0, 18);
+    Shapes2D_no_seam(px, 0, 32, 32, -1, 0, 18);
+    Shapes2D_no_seam(px, 0, 32, 32, 0, 1, 18);
+    Shapes2D_no_seam(px, 0, 32, 32, 0, -1, 18);
+    Shapes2D_no_seam(px, 0, 36, 28, 1, -1, 11);
+    Shapes2D_no_seam(px, 0, 28, 36, -1, 1, 11);
+    stbi_image_free(px);
+
+    ecs_set(world, e, Opacity, {0.8f});
+    ecs_set(world, e, Rgb, {255, 0, 0});
+    ecs_set(world, e, BoxShadow, {.spread = 4, .blur = 2, .color = {0, 0, 0, 200}});
+    px = Shapes2D_shadow_capture(world, "shadow_seam.png");
+    Shapes2D_no_seam(px, 1, 36, 28, 1, -1, 10);
+    Shapes2D_no_seam(px, 1, 32, 32, 1, 0, 16);
+    Shapes2D_no_seam(px, 1, 28, 36, -1, 1, 10);
+    stbi_image_free(px);
+
+    ecs_set(world, e, Opacity, {1.0f});
+    ecs_set(world, e, Rgb, {0, 0, 0});
+    ecs_set(world, e, BoxShadow, {.spread = 4, .color = {0, 0, 0, 255}});
+    px = Shapes2D_shadow_capture(world, "shadow_seam.png");
+    int32_t i;
+    for (i = 0; i < 10; i ++) {
+        test_assert(Shapes2D_at(px, 36 + i, 28 - i)[0] < 6);
+        test_assert(Shapes2D_at(px, 40 + i, 32)[0] < 6);
+    }
     stbi_image_free(px);
 
     ecs_fini(world);

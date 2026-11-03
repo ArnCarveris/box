@@ -5,6 +5,9 @@
  * A headless world renders 1000 boxes lit by a sun into a 1280x720 offscreen surface on the
  * main thread and waits for the GPU after every frame, so a case measures a whole frame; the
  * cost of an effect is the difference with the case without effects.
+ *
+ * The 2160p cases render into a 3840x2160 surface, where bloom halves the image twice before
+ * it filters it into its first mip.
  */
 
 #include <box.h>
@@ -43,10 +46,14 @@ static void bench_effects_add(
  *
  * @param b The benchmark
  * @param kind The effects of the view
+ * @param width Width of the surface
+ * @param height Height of the surface
  */
-static void bench_effects(
+static void bench_effects_sized(
     bench_t *b,
-    bench_effect_t kind)
+    bench_effect_t kind,
+    int32_t width,
+    int32_t height)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -120,7 +127,8 @@ static void bench_effects(
     }
 
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 1280, .height = 720, .resolution_scale = 1});
+    ecs_set(world, surface, Surface, {.width = width, .height = height,
+        .resolution_scale = 1});
     uint32_t word = 0;
     int32_t i;
     for (i = 0; i < 3; i ++) {
@@ -137,6 +145,18 @@ static void bench_effects(
     }
 
     ecs_fini(world);
+}
+
+/** Render frames of 1000 lit boxes with an effect chain at 1280x720.
+ *
+ * @param b The benchmark
+ * @param kind The effects of the view
+ */
+static void bench_effects(
+    bench_t *b,
+    bench_effect_t kind)
+{
+    bench_effects_sized(b, kind, 1280, 720);
 }
 
 void Effects_none(
@@ -172,6 +192,20 @@ void Effects_bloom(
 {
     // lighting/effects
     bench_effects(b, BENCH_EFFECT_BLOOM);
+}
+
+void Effects_none_2160p(
+    bench_t *b)
+{
+    // lighting/effects
+    bench_effects_sized(b, BENCH_EFFECT_NONE, 3840, 2160);
+}
+
+void Effects_bloom_2160p(
+    bench_t *b)
+{
+    // lighting/effects
+    bench_effects_sized(b, BENCH_EFFECT_BLOOM, 3840, 2160);
 }
 
 void Effects_smaa(

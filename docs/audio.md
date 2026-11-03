@@ -42,7 +42,9 @@ start of the next render block. They are:
 | `BUS_SET` | bus, `VOLUME`, `PAN`, `MUTE` or `SEND` (the send level), value |
 | `ORDER` | count, then per bus in processing order: bus, output, send |
 | `SOUND_RELEASE` | sound: freed once no voice plays it |
+| `STREAM` | voice handle, stream, bus, volume, channels, sample rate: opens a stream and starts a voice that reads it |
 | `REVERB` | slot, bus (or none), decay, damping, predelay, size, mix: see [Reverb](#reverb) |
+| `SYNTH` | sound, then a patch: makes a free sound id a synth or replaces its patch, see [Synth](#synth) |
 
 The sender picks the voice handles, so it addresses a voice without waiting for a reply. Values
 are clamped (volumes and send levels to 0..4, pans to -1..1, pitches to 1/64..16) and a NaN
@@ -72,10 +74,25 @@ has room, in the same call or a later one. A burst of hundreds of plays at the c
 each with a steal and an end, can therefore lose `VOICE_END` and `VOICE_STOLEN` events but not
 the free of a sound released after it.
 
+**Streams** are the source of music, `BOX_AUDIO_STREAM_MAX` (2) of them, so a stream can fade
+out while the next one starts. Each is a fixed ring of `BOX_AUDIO_STREAM_CHUNKS` (32) chunk
+descriptors: `box_audio_core_stream_chunk(core, stream, data, frames, last)` queues a chunk of at
+most `BOX_AUDIO_STREAM_CHUNK` (4096) frames, interleaved like a sound, whose memory belongs to
+the side that runs the core as a sound's does. `box_audio_core_stream_status` reports the voice
+that opened the stream, whether it is still open, whether it ended, the chunks consumed (read to
+their end, so the owner frees the oldest ones), the frames read of the next, the underruns and
+whether it starves. A closed stream holds no chunk. The render path never waits for a chunk:
+when the ring holds fewer frames than a fade of `BOX_AUDIO_STREAM_FADE` (5 ms) takes, the gain
+fades to 0 on the frames it still has, the stream counts an underrun and plays silence; when
+chunks arrive it fades back in from the frame where it stopped, so neither side clicks. A stream
+reads its frames with the linear interpolation of a sample at the rate of its chunks; the voice
+ends after the last frame of the chunk marked `last`.
+
 **Voices** are a fixed pool of `BOX_AUDIO_VOICE_MAX` (64) voices, plus 16 slots for voices that
 fade out. A voice has a source, a bus, a volume, a pan and a pitch ratio. The source is a sample
-buffer, mono or stereo, looped or not, read with linear interpolation; it is a tagged union in
-`internal.h` with its functions in `source.c`, so the synth and music sources add a kind there.
+buffer, mono or stereo, looped or not, read with linear interpolation, or a synth patch (see
+[Synth](#synth)); it is a tagged union in `internal.h` with its functions in `source.c`, so the
+music source adds a kind there.
 A play when 64 voices play steals the one with the lowest level, the larger of its two gain
 targets (the first of equals), with a fade of 2 ms. This is the voice cap: there is no
 priority system.
@@ -165,6 +182,116 @@ extreme values, silence, changes without clicks, sends, the second reverb, a del
 allocation. `bench/audio` has a `Reverb` suite in ns per frame, and
 `test/integration/web/audio_reverb.mjs` measures a tail and the load of the worklet in Chrome.
 
+## Synth
+
+`src/audio/core/synth.c` renders procedural sounds live, a new source kind of the voices, so
+synth voices share the pool, the cap, the buses, the ramps and the limiter. A sound id becomes a
+synth with a `SYNTH` command, whose patch (`box_audio_synth_patch_t` of `core.h`) is plain
+values in seconds and Hz, the same at every rate: a fixed topology of up to
+`BOX_AUDIO_SYNTH_LAYERS` (4) oscillators, each with an envelope, summed into one filter and an
+amp. There is no node graph. The core keeps up to `BOX_AUDIO_SYNTH_MAX` (256) patches; a play
+copies the patch into its voice, so a play allocates nothing, a new patch for the same id
+reaches the next play while the voices that play keep theirs, and a release frees the id at once
+with `SOUND_FREE`. The core clamps every value of a patch, a NaN to the low end.
+
+- **Oscillators.** Sine (`box_audio_core_sin`), saw, square, triangle and white noise. Saw and
+  square are band limited with polyBLEP, the corners of the triangle with polyBLAMP. Frequencies are clamped to 20 kHz and to 0.48 of the
+  rate, so the top of the audible range plays at 44.1 and 48 kHz. A sweep moves the frequency
+  exponentially to its end over its time, and lands on it exactly. The pitch of the voice, the
+  play's and a `VOICE_SET`, multiplies every frequency but noise.
+- **Noise** is xorshift32, seeded per play from the seed of the patch and the count of its
+  plays, so a fixed run gives bit identical output and every play differs. The same generator
+  picks the pitch and level variances of the play.
+- **Envelopes** are linear and sample accurate: attack from 0 to 1, decay to the sustain level,
+  hold, release to 0. An attack, and a decay or a release that changes the level, takes at
+  least `BOX_AUDIO_SYNTH_EDGE` (0.5 ms), so neither end clicks; with a sustain of 0 the envelope
+  ends after its decay. A pass of an envelope is at most `BOX_AUDIO_SYNTH_LENGTH_MAX` (60 s); a
+  longer one loses its hold first. A voice ends, and frees its slot, once every envelope it
+  uses reached silence; a looping voice starts a new pass instead, with the state of its
+  filter. Synth voices start at their gain, without the ramp of the core, since the envelope
+  starts at 0: an attack of 1 ms takes 1 ms.
+- **The filter** is the trapezoidal state variable filter (Simper): lowpass and highpass at 12
+  dB per octave and a bandpass with unity gain at the cutoff. Resonance 0 is a Butterworth
+  response (Q 0.707), 1 a Q of 50. Its coefficients come from `tan(pi cutoff / rate)` with the
+  cutoff clamped to 0.49 of the rate, so it stays stable at every cutoff and resonance, a cutoff
+  at Nyquist and a fast sweep included; a sweep updates them every 8 frames. Its state is
+  flushed like a bus sample.
+- **Cost.** Render work only: per frame of a voice an envelope step per envelope, an oscillator
+  per layer and the filter. `bench/audio` has a `Synth` suite of 64 voices in ns per sample.
+
+The core needs no libm: the exponential sweeps use series for `log2` and `exp2` in `synth.c`.
+
+### Synth sounds
+
+A sound effect is a prefab in script, with no file. `SynthSound` marks the root; the layers are
+the root and its children that have a `SynthOscillator`, as particle effect layers are. The
+`SynthEnvelope` and the `SynthFilter` of the root apply to the mix of the layers; a layer may
+have its own `SynthEnvelope`, and one without uses the root's.
+
+| Component | What it is |
+|-----------|------------|
+| `SynthSound` | The root: `seed`, `pitch_variance` and `level_variance` (random shares per play, 0) |
+| `SynthOscillator` | A layer: `wave` (`SynthSine`, `SynthSaw`, `SynthSquare`, `SynthTriangle`, `SynthNoise`), `frequency` (440), `frequency_end` (0, no sweep), `sweep` (s), `level` (1) |
+| `SynthEnvelope` | `attack`, `decay`, `sustain`, `release`, `hold`: seconds and a sustain level, all 0 by default |
+| `SynthFilter` | `kind` (`SynthLowPass`, `SynthHighPass`, `SynthBandPass`), `cutoff` (1000), `cutoff_end`, `sweep`, `resonance` |
+
+The module (`src/audio/synth_sound.c`) compiles a sound once, and again when a component of it
+or of a layer changes, into a patch that the sync system sends with a `SYNTH` command before the
+plays of the frame. `box.audio.play(UiClick, 0.8)` plays it like any sound, and an `AudioSource`
+with `loop: true` starts it over at the end of its envelopes. A play allocates nothing.
+
+- More than 4 layers log one error that names the sound; the first 4 play.
+- A layer without any envelope (no `SynthEnvelope` on it or on the root) would never end: it
+  logs one error and the sound plays for `BOX_AUDIO_SYNTH_ENDLESS` (10) seconds.
+- An envelope that is not a time of 0 to 60 seconds logs one error and is cut.
+- Deleting the sound releases it and fades its one shots, as for `AudioPcm`.
+
+Three examples:
+
+```
+using box.audio
+
+ui { AudioBus: {volume: 1} }
+
+// A click: a burst of noise and a falling tone, 31 ms
+prefab UiClick {
+  AudioOutput: {bus: ui}
+  SynthSound: {pitch_variance: 0.05}
+  SynthEnvelope: {attack: 0.001, decay: 0.03}
+  noise { SynthOscillator: {wave: SynthNoise, level: 0.6} }
+  tone { SynthOscillator: {wave: SynthSine, frequency: 1800, frequency_end: 900, sweep: 0.03, level: 0.4} }
+}
+
+// A UI blip: a soft square that steps up a fifth, through a lowpass
+prefab UiBlip {
+  AudioOutput: {bus: ui}
+  SynthSound: {level_variance: 0.1}
+  SynthEnvelope: {attack: 0.004, decay: 0.06, sustain: 0.4, hold: 0.04, release: 0.05}
+  SynthFilter: {kind: SynthLowPass, cutoff: 3000, resonance: 0.2}
+  low { SynthOscillator: {wave: SynthSquare, frequency: 660, level: 0.25} }
+  high {
+    SynthOscillator: {wave: SynthTriangle, frequency: 990, level: 0.3}
+    SynthEnvelope: {attack: 0.04, decay: 0.08}
+  }
+}
+
+// A whoosh: noise through a resonant bandpass that sweeps up and fades
+prefab Whoosh {
+  SynthSound: {seed: 7, level_variance: 0.1}
+  SynthEnvelope: {attack: 0.15, decay: 0.25, sustain: 0.3, hold: 0.1, release: 0.3}
+  SynthFilter: {kind: SynthBandPass, cutoff: 300, cutoff_end: 4000, sweep: 0.5, resonance: 0.6}
+  SynthOscillator: {wave: SynthNoise, level: 0.8}
+}
+```
+
+The tests are the `Synth` suite of `test/cpu/audio`, on offline renders: frequencies of every
+wave at 44.1 and 48 kHz, sweeps, aliasing of a 5 kHz saw, square and triangle, flat and seeded noise, the
+times and edges of envelopes, the end of a voice, the filter one octave past its cutoff and
+under sweeps at full resonance and extreme values, layers, scripts from
+`test/assets/audio/synth.flecs`, the three examples above from
+`test/assets/audio/synth_examples.flecs` and errors; `NoAlloc` renders 64 synth voices. The browser
+check is `test/integration/web/audio_synth.mjs`.
+
 ## Transports
 
 The main thread reaches the core through a transport, one small interface in
@@ -173,6 +300,8 @@ The main thread reaches the core through a transport, one small interface in
 ```c
 bool commands(t, data, size);                      // send a command batch, copied
 bool sound(t, id, data, frames, channels, rate);   // hand over a sound, copied
+bool stream_chunk(t, stream, voice, data, frames, channels, last); // a chunk, copied
+void stream_status(t, stream, status);             // a stream's status, frees consumed chunks
 int32_t read_events(t, events, max);               // the events of the core, oldest first
 box_audio_state_t state(t);                        // what the output does
 void update(t, delta);                             // once per frame
@@ -299,9 +428,15 @@ The two talk only over the `MessagePort` of the `AudioWorkletNode`, with plain o
 - `{ type: 'events', events }` from the worklet: the events of the core after a quantum that
   had any. The worklet reads until the core has none left, 64 per call, so no backlog builds
   up across quanta. On `SOUND_FREE` the worklet has already freed the frames in its heap.
+- `{ type: 'chunk', stream, frames, last, data }`: a chunk of a stream as a transferred
+  `ArrayBuffer`. The worklet copies it into the heap of its core, keeps the pointers of each
+  stream in order and frees the consumed ones after each quantum, all of them when the stream
+  closed.
+- `{ type: 'stream', status }` from the worklet: the status of a stream when it changed, and
+  every 8 quanta while it plays; `Module.boxAudio.streams` keeps the last of each.
 - `{ type: 'stats', id }` asks the worklet for its quantum count, clock, voices, sounds,
-  memory and the events the core lost since the last `LOST` was read, which the browser check
-  uses.
+  memory, the events the core lost since the last `LOST` was read, the chunks it holds and the
+  streams, which the browser checks use.
 
 The web transport of `transport.c` sends with these functions and reads the events from
 `Module.boxAudio.queue`, which keeps up to 4096 events until the main module takes them.
@@ -351,7 +486,7 @@ compiles, on every build of box. For a target other than Emscripten the script d
 clang --target=wasm32-unknown-unknown -O2 -msimd128 -std=c11 -ffreestanding -nostdlib \
     -DBOX_AUDIO_CORE_WASM -Wl,--no-entry -Wl,-z,stack-size=65536 \
     -Wl,--initial-memory=1048576 -Wl,--max-memory=268435456 -Wl,--strip-all \
-    -Wl,--export=box_audio_core_wasm_init ... command.c core.c source.c wasm.c \
+    -Wl,--export=box_audio_core_wasm_init ... command.c core.c reverb.c source.c synth.c wasm.c \
     -o box_audio_core.wasm
 ```
 
@@ -467,6 +602,9 @@ frame, the same on every platform.
 | `Reverb` | A reverb on the bus of the entity: `decay` (1.5 s), `damping` (0.5), `predelay` (0.02 s), `size` (0.5), `mix` (1) |
 | `AudioOutput` | The bus a source, or a sound by default, plays on |
 | `AudioSource` | A sound that plays while the entity exists: `sound`, `volume` (1), `pitch` (1), `loop`, `playing` (true) |
+| `AudioStream` | Music: an Ogg Vorbis file (`path`) that streams, `volume` (1), `loop` (true), `playing` (true), see [Music](#music) |
+| `AudioStreamStatus` | Read only: `state` (`AudioStreamLoading`, `AudioStreamPlaying`, `AudioStreamStopped`, `AudioStreamEnded`, `AudioStreamFailed`), `frames`, `channels`, `sample_rate`, `position`, `buffered`, `underruns`, `decode_ms`, `decode_max_ms` and `error` |
+| `SynthSound` | A sound made by the synth from its layers, see [Synth sounds](#synth-sounds) |
 | `AudioSpatial` | Places a source in the world: `min_distance` (1), `max_distance` (50), `rolloff` (1), see [Spatial audio](#spatial-audio) |
 | `AudioListener` | Tag of the entity whose `WorldTransform` hears the spatial sources |
 | `AudioSettings` | Singleton: `master_volume` (1) and `mute` |
@@ -617,7 +755,7 @@ hum_source { AudioSource: {sound: hum, loop: true} }
 ```
 
 `SoundFile` (`src/audio/sample.c`) plays short sounds decoded fully into memory; long music
-streams in a later task. The path is found as a `TexturePath` is: absolute, relative to the
+streams with `AudioStream`, see [Music](#music). The path is found as a `TexturePath` is: absolute, relative to the
 working directory or an ancestor of it, or to an ancestor of the folder of the executable.
 
 - **Decoding** runs on the job system (`box_job_submit`), as textures and fonts do, with the
@@ -667,6 +805,80 @@ embeds `etc`); a test file through `?preload=`.
 
 The tests are `Sample` in `test/cpu/audio`, with files in `test/assets/audio` that
 `make_sounds.py` next to them writes, and the browser check `audio_sample.mjs`.
+
+### Music
+
+```
+using box.audio
+music { AudioStream: {path: "etc/assets/music/theme.ogg"}  AudioOutput: {bus: music_bus} }
+```
+
+`AudioStream` (`src/audio/music.c`) plays one Ogg Vorbis file that is too long to decode into
+memory. The file is found as a `SoundFile` is, read into memory in its compressed form and
+decoded with the pull API of `stb_vorbis` (the `stb` bundle, compiled once in
+`src/audio/vorbis.c`) in chunks of 4096 frames, at most 2 seconds
+(`BOX_AUDIO_MUSIC_AHEAD`) ahead of what plays, never as a whole track. Mono and stereo stay as
+they are; more channels mix down to stereo as for sound files, by the channel order of Vorbis.
+
+- **Into the core.** The sync system starts the stream with a `STREAM` command once half a
+  second is decoded (or the whole of a shorter file) and hands the chunks over with
+  `stream_chunk` after the batch of the frame: on native a copy whose pointer goes to the audio
+  thread over the command ring, on the web a transferred `ArrayBuffer`. The core reads them from
+  the ring of the stream. The transport frees a chunk when the status of the stream says the
+  core consumed it; the native audio thread publishes that status after each render in one
+  atomic word (voice, open, ended, consumed), so the main thread frees by a consistent view.
+- **Loops.** The decoder goes on with the first frame after the last within the same chunk, so
+  the seam is like any other pair of frames: no gap, no click, the length of each loop exact. A
+  stream that does not loop marks its last chunk; the voice ends after it, `playing` goes false
+  and the state is `AudioStreamEnded`. Setting `playing` again starts over.
+- **Native** decodes on a job (`box_job_submit`) whenever less than 1.5 s is ahead, never on the
+  audio thread; headless frames wait for these jobs as for sound files.
+- **One stream at once.** A second `AudioStream` logs one error that names it, its state is
+  `AudioStreamFailed` and it stays silent. A change of `path` stops the old stream with the fade
+  of a stop (5 ms) and starts the new one on the other stream of the core; a delete fades out,
+  then frees the decoder and the chunks once the core closed the stream. `playing: false` fades
+  out and keeps the position, `true` resumes there.
+- **Status.** `AudioStreamStatus` says `AudioStreamLoading` while the file is fetched, opened or
+  decoded ahead of the start, then `AudioStreamPlaying`; a missing, empty or corrupt file, or a
+  failed fetch, logs one error and fails without a crash. `underruns` counts the times the
+  output ran short, `buffered` the seconds decoded ahead, `decode_ms` the time of the last
+  decode and `decode_max_ms` the largest.
+- **Before the gesture** a stream that loops starts and is heard from the gesture on; one that
+  does not loop is dropped, as a source is (see [Before the gesture](#before-the-gesture)).
+
+**The web.** The page has no worker threads and jobs run inline at the end of the frame, so
+decoding runs on the main thread. A decode there stops after `BOX_AUDIO_MUSIC_WEB_BUDGET`
+(2 ms) and goes on in the next frame, every frame that has less than 2 seconds ahead, which
+keeps more than 1.5 s of chunks in the worklet: a 500 ms stall of the main thread does not run it
+short. Once full, a frame decodes only what played since, about a sixtieth of a second, which
+`decode_ms` reports; `test/integration/web/audio_stream.mjs` prints it with the longest frame.
+
+**The web does not embed music.** `embed` puts all of `etc` into the download of the page, so a
+track there adds its whole size to the start of every visit. A stream looks in the page's file
+system first (a file of `etc` an app embeds, or one that `?preload=` fetched), then fetches the
+path relative to the page with `fetch` into memory; the status says `AudioStreamLoading` until it
+arrived, and a failed fetch logs one error and stays silent. To deploy a track, keep it out of
+the folders the app embeds and copy it next to the page under the same relative path the scene
+names:
+
+```sh
+BIN=<folder that holds boxrun.html>
+mkdir -p "$BIN/assets/music"
+cp assets/music/theme.ogg "$BIN/assets/music/"
+```
+
+with `AudioStream: {path: "assets/music/theme.ogg"}`; a native build finds the same path
+relative to its working directory. The server sends the file as it is, `audio/ogg` or any type,
+and the page reads it once, compressed; it is never decoded whole.
+
+The tests are `Stream` in `test/cpu/audio`, with `tone.ogg`, `tone_960.ogg` and `corrupt.ogg` in
+`test/assets/audio`, which `make_ogg.py` next to them writes with an encoder of its own from
+known tones, and the browser check `audio_stream.mjs`:
+
+```sh
+node test/integration/web/audio_stream.mjs \
+    "$(tools/integration.py local-env --env audio)/wasm32-Emscripten/debug/bin"
+```
 
 ### Before the gesture
 

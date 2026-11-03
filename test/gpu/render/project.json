@@ -677,6 +677,9 @@
                     "box_shadow_darkens_and_falls_off",
                     "box_shadow_offset_spread_edges",
                     "box_shadow_under_element",
+                    "box_shadow_cutout_translucent",
+                    "box_shadow_cutout_offset",
+                    "box_shadow_cutout_no_seam",
                     "box_shadow_sibling_order",
                     "box_shadow_clipped",
                     "box_shadow_past_view_edge",
@@ -726,6 +729,14 @@
                     "smaa_default_settings",
                     "smaa_settings_clamped",
                     "smaa_follows_surface_resize"
+                ]
+            },
+            {
+                "id": "BloomMotion",
+                "testcases": [
+                    "stable_at_720p",
+                    "stable_at_1440p_high_dpi",
+                    "stable_at_2160p"
                 ]
             },
             {

@@ -102,7 +102,8 @@
                 "id": "NoAlloc",
                 "testcases": [
                     "render",
-                    "events_and_release"
+                    "events_and_release",
+                    "synth_voices"
                 ]
             },
             {
@@ -198,6 +199,22 @@
                 ]
             },
             {
+                "id": "Stream",
+                "testcases": [
+                    "decode_matches",
+                    "loop_seamless",
+                    "no_loop_ends",
+                    "underrun_silent",
+                    "change_path",
+                    "stop_resume",
+                    "delete_frees",
+                    "missing_file",
+                    "corrupt_file",
+                    "second_stream_errors",
+                    "no_alloc"
+                ]
+            },
+            {
                 "id": "Script",
                 "testcases": [
                     "mixer_levels",
@@ -223,6 +240,43 @@
                     "second_reverb_errors",
                     "delete_fades",
                     "no_alloc"
+                ]
+            },
+            {
+                "id": "Synth",
+                "testcases": [
+                    "frequency_waves",
+                    "sweep_target",
+                    "alias_saw",
+                    "alias_square",
+                    "alias_triangle",
+                    "noise_flat",
+                    "noise_seed_differs",
+                    "noise_seed_identical",
+                    "envelope_segments",
+                    "envelope_no_click",
+                    "envelope_frees_slot",
+                    "one_shot_no_release_ends",
+                    "bounded_length",
+                    "filter_lowpass",
+                    "filter_highpass",
+                    "filter_bandpass",
+                    "filter_sweep_stable",
+                    "filter_extreme",
+                    "layers_sum",
+                    "layer_own_envelope",
+                    "pitch_variance",
+                    "voice_pitch",
+                    "loop_restarts",
+                    "release_patch",
+                    "script_parses",
+                    "script_renders",
+                    "script_change_next_play",
+                    "script_loop_source",
+                    "docs_examples",
+                    "too_many_layers",
+                    "endless_logs_error",
+                    "deleted_releases"
                 ]
             },
             {

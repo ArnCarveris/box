@@ -369,6 +369,8 @@ template ScrollBar {
 // A scroll view: a surface whose children are laid out in a column and scroll, with scroll bars
 // inside the right and bottom edges while the content does not fit; the padding leaves room for a
 // bar while it shows. width and height fix the view, 0 grows it to the space its parent gives.
+// Without frame it has no border or padding and the background of the theme, so only its content
+// and its bars show.
 //
 // The bars are in scrollbars, a clipped overlay (LayoutFloat with clip) of no size on the center
 // of the view: the column leaves it out of its flow and the scroll offset does not move it, yet
@@ -377,10 +379,11 @@ template ScrollBar {
 template ScrollView : HeadlessScrollView {
   prop bar: f32 = 10
   prop edge: f32 = 1
+  prop frame: bool = true
 
   const t = box.ui.theme[UiTheme]
   const ring = focused && FocusStatus[FocusStatus].visible
-  const pad = t.padding
+  const pad = match frame { true: t.padding; _: 0 }
   const b = this[LayoutBounds]
   const c = this[LayoutContent]
   const vbar = vertical && c.max_y > 0
@@ -402,14 +405,18 @@ template ScrollView : HeadlessScrollView {
     LayoutItem = {height: {mode: Grow}}
   }
   Rect: {1, 1}
-  Rgb: t.surface_alt
+  if frame {
+    Rgb: t.surface_alt
+  } else {
+    Rgb: t.background
+  }
 
   if ring {
     Border: {
       width: t.focus_width, radius: t.radius,
       color: {t.focus.r, t.focus.g, t.focus.b, 255}
     }
-  } else {
+  } else if frame {
     Border: {width: 1, radius: t.radius, color: {t.border.r, t.border.g, t.border.b, 255}}
   }
 

@@ -291,7 +291,12 @@
                     "prefab_instances",
                     "clone",
                     "set_in_system",
-                    "prefab_override_removed"
+                    "prefab_override_removed",
+                    "replace_shape_set_then_remove",
+                    "replace_shape_remove_then_set",
+                    "replace_shape_deferred_set_then_remove",
+                    "replace_shape_deferred_remove_then_set",
+                    "replace_shape_template_branch"
                 ]
             },
             {
@@ -362,6 +367,22 @@
                     "inherited_paths",
                     "open_contour",
                     "triangulation_failure"
+                ]
+            },
+            {
+                "id": "CatmullRom",
+                "testcases": [
+                    "anchors_2d",
+                    "anchors_3d",
+                    "slope_continuous",
+                    "slope_continuous_closed",
+                    "next_to_line",
+                    "next_to_bezier",
+                    "evaluate_sample_pack",
+                    "sweep_mesh",
+                    "lathe_mesh",
+                    "script",
+                    "invalid_kind"
                 ]
             }
         ]

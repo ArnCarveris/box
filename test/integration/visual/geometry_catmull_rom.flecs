@@ -1,0 +1,100 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.surface
+
+// A Sweep and a Lathe over Catmull-Rom paths. The swept tube follows an open Catmull-Rom route
+// with a closed Catmull-Rom profile, which only has its four anchors and gets a Catmull-Rom
+// closing segment, so its section must look round rather than a diamond. The vase is lathed from
+// an open Catmull-Rom profile that starts with a line, so its foot is flat and its belly smooth.
+
+window {
+    Surface: {width: 960, height: 600, write_to_file: "geometry-catmull-rom.png"}
+}
+
+camera {
+    Position: {0, 3.2, 8}
+    Rotation: {-0.3, 0, 0}
+    Camera: {fov: 48}
+}
+
+main_view {
+    View: {
+        camera: camera,
+        clear: {enabled: true, color: {28, 34, 45, 255}},
+        shadows: {enabled: true}
+    }
+}
+
+sun {
+    Rotation: {0.7, 2.4, 0}
+    DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+}
+
+$ {
+    AmbientLight: {sky: {150, 175, 210}, ground: {65, 60, 55}, intensity: 0.7}
+}
+
+floor {
+    Position: {0, -0.25, 0}
+    Box: {10, 0.2, 6}
+    Rgb: {95, 100, 110}
+}
+
+tube_profile {
+    Path2D: {
+        start: {0.25, 0},
+        segments: [
+            {kind: CatmullRom, end: {0, 0.25}},
+            {kind: CatmullRom, end: {-0.25, 0}},
+            {kind: CatmullRom, end: {0, -0.25}}
+        ],
+        closed: true
+    }
+}
+
+tube_section { Profile2D: {outer: tube_profile} }
+
+tube_route {
+    Path3D: {
+        start: {-1.5, 0.3, 0},
+        segments: [
+            {kind: CatmullRom, end: {-0.5, 2, 0.5}},
+            {kind: CatmullRom, end: {0.5, 0.6, -0.5}},
+            {kind: CatmullRom, end: {1.5, 2.2, 0}},
+            {kind: Line, end: {1.5, 2.8, 0}}
+        ]
+    }
+}
+
+tube {
+    Position: {-2, 0, 0}
+    Sweep: {
+        path: tube_route, profile: tube_section, scale: {1, 1},
+        taper: 1, cap_start: true, cap_end: true, rings: 96
+    }
+    Rgb: {230, 155, 65}
+}
+
+vase_outer {
+    Path2D: {
+        start: {0, 0},
+        segments: [
+            {kind: Line, end: {0.4, 0}},
+            {kind: CatmullRom, end: {0.75, 0.6}},
+            {kind: CatmullRom, end: {0.35, 1.4}},
+            {kind: CatmullRom, end: {0.3, 1.8}},
+            {kind: CatmullRom, end: {0.5, 2.1}}
+        ],
+        closed: false
+    }
+}
+
+vase {
+    Position: {2.2, 0, 0}
+    Lathe: {profile: vase_outer, cap_start: true, cap_end: true}
+    Rgb: {70, 165, 205}
+}

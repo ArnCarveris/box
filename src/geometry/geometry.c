@@ -332,7 +332,17 @@ static void box_shape_on_remove(
     bool kept = live && inherited && ecs_search_relation(it->world, it->other_table, 0,
         component, EcsIsA, EcsSelf | EcsUp, NULL, NULL, NULL) != -1;
     bool self = ecs_field_is_self(it, 0);
-    for (int32_t i = 0; live && !kept && i < it->count; i ++) {
+    bool replaced = false;
+    if (live) {
+        const ecs_type_t *type = ecs_table_get_type(it->other_table);
+        for (int32_t i = 0; !replaced && i < type->count; i ++) {
+            ecs_id_t id = type->array[i];
+            replaced = !ecs_id_is_pair(id) && !(id & ECS_ID_FLAGS_MASK) &&
+                ecs_has_pair(it->world, id, EcsWith, ecs_id(ShapeMesh));
+        }
+    }
+
+    for (int32_t i = 0; live && !kept && !replaced && i < it->count; i ++) {
         box_shape_drop(it->world, it->stage, shape, it->table, it->entities[i]);
         if (inherited && self) {
             box_shape_drop_instances(it->world, it->stage, shape, it->entities[i]);
@@ -535,7 +545,8 @@ void BoxGeometryImport(
     ECS_META_COMPONENT(world, SurfaceRegion);
     ECS_COMPONENT_DEFINE(world, PathSegmentKind);
     ecs_enum(world, {.entity = ecs_id(PathSegmentKind), .constants = {
-        {.name = "Line", .value = PathLine}, {.name = "CubicBezier", .value = PathCubicBezier}}});
+        {.name = "Line", .value = PathLine}, {.name = "CubicBezier", .value = PathCubicBezier},
+        {.name = "CatmullRom", .value = PathCatmullRom}}});
     ECS_META_COMPONENT(world, PathSegment2D);
     ECS_META_COMPONENT(world, PathSegment3D);
     ECS_META_COMPONENT(world, Path2D);

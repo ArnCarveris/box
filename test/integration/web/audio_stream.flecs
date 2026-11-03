@@ -1,0 +1,37 @@
+// The scene of the browser check of music streams (audio_stream.mjs). The page preloads only this
+// scene and tone_960.ogg with ?preload=; music fetches test/assets/audio/tone.ogg next to the
+// page, 480 Hz at a peak of 0.5 in a loop of 0.25 s, and plays from the gesture on. A box turns all
+// the time so every frame draws, which the check counts and times.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.movement
+using box.surface
+using box.audio
+
+window {
+  Surface: {width: 640, height: 480}
+}
+
+camera {
+  Position: {0, 0, 100}
+  Camera: {ortho: true, ortho_scale: 1}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {10, 12, 20, 255}}}
+}
+
+spinner {
+  Position: {0, 0, 0}
+  Rotation: {0, 0, 0}
+  Box: {120, 120, 120}
+  Rgb: {80, 160, 255}
+  AngularVelocity: {0.4, 0.9, 0}
+}
+
+music {
+  AudioStream: {path: "test/assets/audio/tone.ogg"}
+}
