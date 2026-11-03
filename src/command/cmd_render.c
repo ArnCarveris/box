@@ -114,6 +114,64 @@ done:
 
 #endif
 
+/** Create a resource in the session of the command that runs and get its file.
+ *
+ * @param world The world
+ * @param state The state of the render commands
+ * @param content_type The content type of the resource
+ * @param resource Receives the resource
+ * @return The file of the resource, NULL in the browser or when the command runs outside of a
+ * session; the caller frees it
+ */
+static char* box_cmd_render_resource_new(
+    ecs_world_t *world,
+    box_cmd_render_t *state,
+    const char *content_type,
+    ecs_shell_resource_t *resource)
+{
+    ecs_entity_t session = ecs_shell_get_session(world);
+    char *path = NULL;
+#ifdef __EMSCRIPTEN__
+    (void)session;
+    (void)state;
+    (void)content_type;
+    (void)resource;
+    goto done;
+#else
+    if (!session) {
+        ecs_err("resources are only written by commands that run in a shell session");
+        goto done;
+    }
+
+    box_cmd_render_folder(world, state, session);
+    if (ecs_shell_resource_create(world, session, content_type, NULL, 0, resource)) {
+        goto done;
+    }
+
+    path = box_command_resource_file(world, session, resource->name);
+#endif
+done:
+    return path;
+}
+
+char* box_cmd_render_resource(
+    ecs_world_t *world,
+    const char *content_type,
+    ecs_shell_resource_t *resource)
+{
+    ecs_entity_t system = ecs_lookup(world, "box.command.RenderCommands");
+    const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
+    char *result = NULL;
+    if (!s || !s->ctx) {
+        ecs_err("box.command is not imported");
+        goto done;
+    }
+
+    result = box_cmd_render_resource_new(world, s->ctx, content_type, resource);
+done:
+    return result;
+}
+
 /** Create the PNG resource of an image in the session of the command and get its file.
  *
  * @param ctx The call context
@@ -125,28 +183,15 @@ static char* box_cmd_render_file(
     const ecs_function_ctx_t *ctx,
     ecs_shell_resource_t *resource)
 {
-    ecs_world_t *world = ctx->world;
-    ecs_entity_t session = ecs_shell_get_session(world);
     char *path = NULL;
 #ifdef __EMSCRIPTEN__
-    (void)session;
+    (void)ctx;
     (void)resource;
     ecs_err("captures are not available in the browser");
-    goto done;
 #else
-    if (!session) {
-        ecs_err("images are only written by commands that run in a shell session");
-        goto done;
-    }
-
-    box_cmd_render_folder(world, ctx->ctx, session);
-    if (ecs_shell_resource_create(world, session, "image/png", NULL, 0, resource)) {
-        goto done;
-    }
-
-    path = box_command_resource_file(world, session, resource->name);
+    path = box_cmd_render_resource_new(ctx->world, ctx->ctx, "image/png", resource);
 #endif
-done:
+
     return path;
 }
 

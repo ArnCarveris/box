@@ -26,6 +26,8 @@ EXPORTS = [
     "box_audio_core_wasm_alloc",
     "box_audio_core_wasm_free",
     "box_audio_core_wasm_sound",
+    "box_audio_core_wasm_reverb_floats",
+    "box_audio_core_wasm_reverb",
     "box_audio_core_wasm_apply",
     "box_audio_core_wasm_render",
     "box_audio_core_wasm_read_events",

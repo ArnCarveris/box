@@ -59,6 +59,22 @@
 /** No bus, for the output of the master and a bus without a send */
 #define BOX_AUDIO_BUS_NONE 0xFF
 
+/** Reverbs that run at once; a reverb is addressed by a slot below this */
+#define BOX_AUDIO_REVERB_MAX 1
+
+/** Delay lines of the feedback delay network of a reverb */
+#define BOX_AUDIO_REVERB_LINES 8
+
+/** Longest predelay of a reverb in seconds */
+#define BOX_AUDIO_REVERB_PREDELAY_MAX 0.5f
+
+/** Shortest and longest decay of a reverb in seconds, the time until -60 dB */
+#define BOX_AUDIO_REVERB_DECAY_MIN 0.05f
+#define BOX_AUDIO_REVERB_DECAY_MAX 60.0f
+
+/** Seconds of the fade of the wet signal around a change of size or predelay, out and in */
+#define BOX_AUDIO_REVERB_FADE 0.1f
+
 /** Commands of the byte stream. Each starts with a box_audio_cmd_header_t */
 typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_PLAY = 1,          /**< box_audio_cmd_play_t */
@@ -66,7 +82,8 @@ typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_VOICE_SET = 3,     /**< box_audio_cmd_set_t on a voice */
     BOX_AUDIO_CMD_BUS_SET = 4,       /**< box_audio_cmd_set_t on a bus */
     BOX_AUDIO_CMD_ORDER = 5,         /**< box_audio_cmd_order_t and its routes */
-    BOX_AUDIO_CMD_SOUND_RELEASE = 6  /**< box_audio_cmd_release_t */
+    BOX_AUDIO_CMD_SOUND_RELEASE = 6, /**< box_audio_cmd_release_t */
+    BOX_AUDIO_CMD_REVERB = 7         /**< box_audio_cmd_reverb_t */
 } box_audio_cmd_type_t;
 
 /** Parameters of BOX_AUDIO_CMD_VOICE_SET and BOX_AUDIO_CMD_BUS_SET */
@@ -76,7 +93,9 @@ typedef enum box_audio_param_t {
     BOX_AUDIO_PARAM_PITCH = 2,   /**< Pitch ratio of a voice */
     BOX_AUDIO_PARAM_BUS = 3,     /**< Bus a voice plays into */
     BOX_AUDIO_PARAM_MUTE = 4,    /**< Mute of a bus, nonzero mutes, ramped */
-    BOX_AUDIO_PARAM_SEND = 5     /**< Level of the send of a bus, 0..BOX_AUDIO_VOLUME_MAX */
+    BOX_AUDIO_PARAM_SEND = 5,    /**< Level of the send of a bus, 0..BOX_AUDIO_VOLUME_MAX */
+    BOX_AUDIO_PARAM_POSITION = 6 /**< Read position of a voice in frames of its sound, wrapped
+                                  *   into a looping sound, at once */
 } box_audio_param_t;
 
 /** Flags of BOX_AUDIO_CMD_PLAY */
@@ -137,6 +156,28 @@ typedef struct box_audio_cmd_release_t {
     box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_SOUND_RELEASE */
     uint32_t sound;                 /**< Id of the sound */
 } box_audio_cmd_release_t;
+
+/** The parameters of a reverb */
+typedef struct box_audio_reverb_params_t {
+    float decay;     /**< Seconds until -60 dB, BOX_AUDIO_REVERB_DECAY_MIN..MAX */
+    float damping;   /**< High frequency loss, 0..1 */
+    float predelay;  /**< Seconds before the first reflection, 0..BOX_AUDIO_REVERB_PREDELAY_MAX */
+    float size;      /**< Room scale, 0..1, which sets the lengths of the delay lines */
+    float mix;       /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+} box_audio_reverb_params_t;
+
+/** Put a reverb on a bus, change its parameters or take it off.
+ *
+ * Decay, damping and mix change smoothly. A change of size, predelay or bus fades the wet
+ * signal out, swaps and fades it in. Bus BOX_AUDIO_BUS_NONE takes the reverb off: its tail
+ * fades out into the master. A reverb runs once the memory of its slot arrived.
+ */
+typedef struct box_audio_cmd_reverb_t {
+    box_audio_cmd_header_t header;     /**< BOX_AUDIO_CMD_REVERB */
+    uint32_t slot;                     /**< Slot of the reverb, below BOX_AUDIO_REVERB_MAX */
+    uint32_t bus;                      /**< Bus whose signal it processes, or BUS_NONE */
+    box_audio_reverb_params_t params;  /**< The parameters, clamped by the core */
+} box_audio_cmd_reverb_t;
 
 /** Events the core reports to its transport */
 typedef enum box_audio_event_type_t {
@@ -278,6 +319,43 @@ int32_t box_audio_core_events_lost(
 int32_t box_audio_core_voice_count(
     const box_audio_core_t *core);
 
+/** Get the floats of delay memory a reverb needs at a sample rate: its delay lines at the
+ * largest size and its longest predelay.
+ *
+ * @param sample_rate Frames per second of the core
+ * @return Number of floats
+ */
+int32_t box_audio_reverb_floats(
+    float sample_rate);
+
+/** Give a reverb slot its delay memory, on the thread that renders, between renders.
+ *
+ * The memory is in the address space of the core and stays with the side that runs the core,
+ * which frees it after the core. The core clears it. A slot takes memory once.
+ *
+ * @param core The core
+ * @param slot Slot of the reverb, below BOX_AUDIO_REVERB_MAX
+ * @param data The memory
+ * @param floats Floats of the memory, at least box_audio_reverb_floats of the rate
+ * @return Whether the core took the memory
+ */
+bool box_audio_core_reverb_memory(
+    box_audio_core_t *core,
+    uint32_t slot,
+    float *data,
+    int32_t floats);
+
+/** Check whether a reverb renders: it has memory, a bus or a tail that fades, and a tail that
+ * has not decayed to silence or a signal that comes in.
+ *
+ * @param core The core
+ * @param slot Slot of the reverb
+ * @return Whether it renders
+ */
+bool box_audio_core_reverb_running(
+    const box_audio_core_t *core,
+    uint32_t slot);
+
 /** Start a writer on a buffer of the caller.
  *
  * @param writer The writer
@@ -370,6 +448,20 @@ bool box_audio_write_order(
 bool box_audio_write_release(
     box_audio_writer_t *writer,
     uint32_t sound);
+
+/** Write a command that puts a reverb on a bus, changes it or takes it off.
+ *
+ * @param writer The writer
+ * @param slot Slot of the reverb
+ * @param bus Bus of the reverb, BOX_AUDIO_BUS_NONE to take it off
+ * @param params The parameters
+ * @return Whether the command fit
+ */
+bool box_audio_write_reverb(
+    box_audio_writer_t *writer,
+    uint32_t slot,
+    uint32_t bus,
+    const box_audio_reverb_params_t *params);
 
 /** Write raw bytes, for commands the writer has no function for.
  *

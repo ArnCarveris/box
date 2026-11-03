@@ -118,3 +118,59 @@ test/integration/web/quarantine.sh
 
 When Chrome still hangs at the start ("chrome did not start", while `Google Chrome --version`
 does not return either), look for another launch check holding it the same way.
+
+`audio_module.mjs` checks the `box.audio` module in headless Chrome with
+`test/integration/web/audio_module.flecs`, a scene that only uses the module and script: a
+looping 440 Hz tone at a peak of 0.25 on a bus, and a click that `box.audio.play` plays at load.
+It reads `AudioStatus` and runs commands through the shell of the page
+(`Module.cwrap('box_command_web_run', 'string', ['string'])`). It expects
+`AudioWaitingForGesture` before a trusted click and the click dropped, the tone at its level
+after it, half the level after a script that the shell writes (`script_write`) sets
+`AudioBus: {volume: 0.5}` on the bus, a suspended context (`AudioSuspended`) while the page is
+hidden and a resumed one when it shows again, a one second `audio capture 1` in `/tmp` of the
+page's file system with the tone, and the loop still playing after a 500 ms stall of the main
+thread:
+
+```sh
+node test/integration/web/audio_module.mjs \
+    "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
+```
+
+`audio_spatial.mjs` checks spatial audio in headless Chrome with
+`test/integration/web/audio_spatial.flecs`: a looping 440 Hz tone on an `AudioSpatial` source
+heard from an `AudioListener` at the origin. After a trusted click it moves the source with
+`script_write` from the left of the listener through its position to its right and beyond
+`max_distance`, and measures the RMS of each channel of the output through a
+`ChannelSplitter`: left louder on the left, both equal at the listener, right louder on the
+right, the same power at every place (equal power) and no voice beyond `max_distance`:
+
+```sh
+node test/integration/web/audio_spatial.mjs \
+    "$(tools/integration.py local-env --env audio)/wasm32-Emscripten/debug/bin"
+```
+
+`audio_reverb.mjs` checks the reverb with `test/integration/web/audio_reverb.flecs`, a bus
+`world` that sends to the bus `hall` with `Reverb: {decay: 2.4}`. After a trusted click it
+records `audio capture 4` while `box.audio.play` sends a click to the reverb, and measures the
+decay of the tail after the click at the rate of the context. It then starts 32 looping voices
+through the reverb and prints the load of the worklet, which `Module.boxAudio.bench` measures by
+rendering 2000 quanta back to back, and which has to stay under real time:
+
+```sh
+node test/integration/web/audio_reverb.mjs \
+    "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
+```
+
+`audio_sample.mjs` checks sound files (`SoundFile`, see `docs/audio.md`) in Chrome. It preloads
+`test/integration/web/audio_sample.flecs` and the WAV and FLAC files of `test/assets/audio` with
+`?preload=`; the scene decodes one second of 440 Hz at 44100 Hz. After a trusted click it
+records two seconds (`audio capture 2`) while a `script_write` plays the sound once, and expects
+440 Hz for one second at the actual rate of the context. It then sets the `SoundFile` of 2
+seconds of stereo WAV and FLAC and prints the longest animation frame callback, the main
+loop, while each decodes inline, and last deletes a sound whose looping source plays (`rm`) and
+expects the worklet to drop the voice and free the sound:
+
+```sh
+node test/integration/web/audio_sample.mjs \
+    "$(tools/integration.py local-env --env audio)/wasm32-Emscripten/debug/bin"
+```

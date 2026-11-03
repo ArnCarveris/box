@@ -261,7 +261,12 @@
                     "prefab_instances",
                     "clone",
                     "set_in_system",
-                    "prefab_override_removed"
+                    "prefab_override_removed",
+                    "replace_shape_set_then_remove",
+                    "replace_shape_remove_then_set",
+                    "replace_shape_deferred_set_then_remove",
+                    "replace_shape_deferred_remove_then_set",
+                    "replace_shape_template_branch"
                 ]
             },
             {

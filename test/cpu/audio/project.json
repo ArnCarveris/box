@@ -141,6 +141,118 @@
                     "failed_open",
                     "native_unavailable"
                 ]
+            },
+            {
+                "id": "Module",
+                "testcases": [
+                    "defaults_c",
+                    "defaults_script",
+                    "partial_keeps_defaults",
+                    "order_tree",
+                    "order_chain_send",
+                    "cycle_keeps_order",
+                    "deleted_bus_reroutes",
+                    "bus_volume_pan_mute",
+                    "master_settings",
+                    "no_commands_unchanged",
+                    "one_batch_per_frame",
+                    "import_opens_no_device",
+                    "new_output_resends"
+                ]
+            },
+            {
+                "id": "Source",
+                "testcases": [
+                    "play_stop",
+                    "end_clears_playing",
+                    "loop",
+                    "pitch",
+                    "volume",
+                    "disabled_source",
+                    "disabled_bus",
+                    "change_bus",
+                    "prefab_instances",
+                    "deleted_fades",
+                    "play_oneshot",
+                    "pcm_change",
+                    "drop_before_gesture"
+                ]
+            },
+            {
+                "id": "Sample",
+                "testcases": [
+                    "wav_16",
+                    "wav_float",
+                    "flac",
+                    "mono",
+                    "stereo",
+                    "rate_44100_on_48000",
+                    "missing_file",
+                    "corrupt_file",
+                    "empty_file",
+                    "multichannel",
+                    "loop_seam",
+                    "shared",
+                    "delete_while_playing",
+                    "not_ready"
+                ]
+            },
+            {
+                "id": "Script",
+                "testcases": [
+                    "mixer_levels",
+                    "level_change",
+                    "play_function",
+                    "spatial_scene",
+                    "reverb_hall"
+                ]
+            },
+            {
+                "id": "Reverb",
+                "testcases": [
+                    "decay_time",
+                    "damping",
+                    "predelay",
+                    "stereo",
+                    "density",
+                    "stable",
+                    "silent_after_tail",
+                    "live_change_no_click",
+                    "size_change_no_click",
+                    "send_routing",
+                    "second_reverb_errors",
+                    "delete_fades",
+                    "no_alloc"
+                ]
+            },
+            {
+                "id": "Capture",
+                "testcases": [
+                    "valid_wav",
+                    "two_runs_identical",
+                    "no_output"
+                ]
+            },
+            {
+                "id": "Spatial",
+                "testcases": [
+                    "distance_curve",
+                    "silent_at_max",
+                    "pan_left_right_center",
+                    "follows_parent",
+                    "follows_listener",
+                    "listener_default_view",
+                    "listener_explicit",
+                    "listener_two_warns",
+                    "no_listener",
+                    "at_listener",
+                    "play_at",
+                    "out_of_range_loop",
+                    "teleport_no_click",
+                    "disabled_silent",
+                    "core_position",
+                    "cost_changed_only"
+                ]
             }
         ]
     }

@@ -12,33 +12,31 @@ AudioWorklet, driven by command batches over the port while a scene renders.
 
   node test/integration/web/audio_core_safari.mjs [--safaridriver <path>] <bin dir>
 
-<bin dir> holds boxrun.html, .js and .wasm, e.g.
-.bake/local_env/<env>/wasm32-Emscripten/debug/bin, or under <output_dir>/local_env when
-bake3's bake.json sets output_dir; "$(tools/integration.py local-env --env <env>)" prints the
-local env folder either way. safaridriver comes from --safaridriver or $SAFARIDRIVER,
-/usr/bin/safaridriver by default, and runs on a free localhost port. Safari needs remote
-automation, enabled once with "sudo safaridriver --enable" and "Allow remote automation" in the
-Developer section of Safari Settings, and a logged-in GUI session; the check stops with exit status 2 and says so
-when either is missing. It prints the Safari and macOS versions and stops when Safari has no
-WebGPU, which the page needs.
+<bin dir> holds boxrun.html, .js and .wasm, e.g. .bake/local_env/<env>/wasm32-Emscripten/debug/bin,
+or under <output_dir>/local_env when bake3's bake.json sets output_dir; "$(tools/integration.py
+local-env --env <env>)" prints the local env folder either way. safaridriver comes from
+--safaridriver or $SAFARIDRIVER, /usr/bin/safaridriver by default, and runs on a free localhost
+port. Safari needs remote automation, enabled once with "sudo safaridriver --enable" and "Allow
+remote automation" in the Developer section of Safari Settings, and a logged-in GUI session; the
+check stops with exit status 2 and says so when either is missing. It prints the Safari and macOS
+versions and stops when Safari has no WebGPU, which the page needs.
 
 The page is served on a free localhost port without COOP/COEP headers and opened with
-test/integration/web/audio_core.flecs (?preload=). Safari WebDriver has no log
-endpoint, so the server injects a script at the top of the <head> of boxrun.html, before the
-page runs, which wraps console.log, info, warn and error, records uncaught errors and rejections,
-and counts the frames the page draws; the check reads that log from the page. The check expects
-the audio context suspended before a gesture while the scene renders, then clicks the canvas
-with WebDriver Actions (pointer down and up). When Safari does not take the click as a gesture
-(the context stays suspended without a failure), it tries a key press with Actions. It reports
-how many gestures reached the page (Module.boxAudio.gestures) and how many called resume()
-(Module.boxAudio.resumes), which tells a gesture that never arrives from a resume Safari
-refuses. Once the context runs, it sends a sound of a 440 Hz sine at 0.25 (Module.boxAudio.sound)
-and a batch that plays it looped (Module.boxAudio.commands, the port that box_audio_web_apply
-of C posts to); an AnalyserNode on the worklet node has to measure 440 Hz at a peak of 0.25. A
-pitch command of 1.5 has to change the frequency to 660 Hz at the same peak, and
-Module._box_audio_web_apply and _box_audio_web_sound have to be exported. The frames keep advancing and the log has no error and no box.audio
-warning. Exits 0 on a pass, 1 on a failure and 2 when safaridriver, Safari or the page cannot
-start.`;
+test/integration/web/audio_core.flecs (?preload=). Safari WebDriver has no log endpoint, so the
+server injects a script at the top of the <head> of boxrun.html, before the page runs, which wraps
+console.log, info, warn and error, records uncaught errors and rejections, and counts the frames the
+page draws; the check reads that log from the page. The check expects the audio context suspended
+before a gesture while the scene renders, then clicks the canvas with WebDriver Actions (pointer
+down and up). When Safari does not take the click as a gesture (the context stays suspended without
+a failure), it tries a key press with Actions. It reports how many gestures reached the page
+(Module.boxAudio.gestures) and how many called resume() (Module.boxAudio.resumes), which tells a
+gesture that never arrives from a resume Safari refuses. Once the context runs, it sends a sound of
+a 440 Hz sine at 0.25 (Module.boxAudio.sound) and a batch that plays it looped
+(Module.boxAudio.commands, the port that box_audio_web_apply of C posts to); an AnalyserNode on the
+worklet node has to measure 440 Hz at a peak of 0.25. A pitch command of 1.5 has to change the
+frequency to 660 Hz at the same peak, and Module._box_audio_web_apply and _box_audio_web_sound have
+to be exported. The frames keep advancing and the log has no error and no box.audio warning. Exits 0
+on a pass, 1 on a failure and 2 when safaridriver, Safari or the page cannot start.`;
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const SCENE = '/test/integration/web/audio_core.flecs';

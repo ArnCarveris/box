@@ -71,7 +71,9 @@
 /** Kinds of the messages of the command ring */
 typedef enum box_audio_msg_kind_t {
     BOX_AUDIO_MSG_COMMANDS = 1,  /**< A batch of commands of the core */
-    BOX_AUDIO_MSG_SOUND = 2      /**< A box_audio_msg_sound_t */
+    BOX_AUDIO_MSG_SOUND = 2,     /**< A box_audio_msg_sound_t */
+    BOX_AUDIO_MSG_CAPTURE = 3,   /**< A box_audio_capture_t to record into */
+    BOX_AUDIO_MSG_REVERB = 4     /**< A box_audio_msg_reverb_t */
 } box_audio_msg_kind_t;
 
 /** Header of a message of the command ring, followed by size bytes */
@@ -88,6 +90,14 @@ typedef struct box_audio_msg_sound_t {
     int32_t channels;    /**< 1 or 2 */
     float sample_rate;   /**< Frames per second of the sound */
 } box_audio_msg_sound_t;
+
+/** The delay memory of a reverb slot handed to the audio thread; it stays with the main
+ * thread */
+typedef struct box_audio_msg_reverb_t {
+    float *data;         /**< The memory, cleared */
+    uint32_t slot;       /**< Slot of the reverb */
+    int32_t floats;      /**< Floats of the memory */
+} box_audio_msg_reverb_t;
 
 /** The native transport */
 typedef struct box_audio_native_t {
@@ -107,6 +117,13 @@ typedef struct box_audio_native_t {
     box_audio_state_t state;        /**< RUNNING or LOST */
     float retry;                    /**< Seconds until the next attempt to reopen */
     bool warned;                    /**< Whether the loss of the device was logged */
+    box_audio_capture_t capture;    /**< The capture the audio thread records into */
+    float *capture_data;            /**< Frames of the capture that records, main thread */
+    int32_t capture_frames;         /**< Frames of that capture, main thread */
+    atomic_int captured;            /**< Set by the audio thread when the capture is complete */
+    atomic_int voices;              /**< Voices of the core after the last render */
+    atomic_uint load;               /**< Bits of the smoothed load of the renders, a float */
+    float load_audio;               /**< The smoothed load, audio thread */
     uint8_t message[BOX_AUDIO_TRANSPORT_CHUNK];   /**< A message the audio thread took */
     float left[BOX_AUDIO_TRANSPORT_FRAMES];       /**< Rendered left channel */
     float right[BOX_AUDIO_TRANSPORT_FRAMES];      /**< Rendered right channel */
@@ -137,6 +154,12 @@ static void box_audio_native_receive(
 
         if (msg.kind == BOX_AUDIO_MSG_COMMANDS) {
             box_audio_core_apply(n->core, n->message, (int32_t)msg.size);
+        } else if (msg.kind == BOX_AUDIO_MSG_CAPTURE && msg.size == sizeof(box_audio_capture_t)) {
+            memcpy(&n->capture, n->message, sizeof(n->capture));
+        } else if (msg.kind == BOX_AUDIO_MSG_REVERB && msg.size == sizeof(box_audio_msg_reverb_t)) {
+            box_audio_msg_reverb_t reverb;
+            memcpy(&reverb, n->message, sizeof(reverb));
+            box_audio_core_reverb_memory(n->core, reverb.slot, reverb.data, reverb.floats);
         } else if (msg.kind == BOX_AUDIO_MSG_SOUND && msg.size == sizeof(box_audio_msg_sound_t)) {
             box_audio_msg_sound_t sound;
             memcpy(&sound, n->message, sizeof(sound));
@@ -183,7 +206,9 @@ static void box_audio_native_process(
     float *out,
     uint32_t frames)
 {
-    uint32_t done = 0, i;
+    uint32_t done = 0, i, bits;
+    ecs_time_t start;
+    ecs_time_measure(&start);
     box_audio_native_receive(n);
     while (done < frames) {
         uint32_t block = frames - done;
@@ -200,10 +225,20 @@ static void box_audio_native_process(
             }
         }
 
+        if (box_audio_capture_write(&n->capture, n->left, n->right, (int32_t)block)) {
+            n->capture = (box_audio_capture_t){0};
+            atomic_store(&n->captured, 1);
+        }
+
         done += block;
     }
 
     box_audio_native_send_events(n);
+    n->load_audio = box_audio_load_update(n->load_audio, ecs_time_measure(&start),
+        (int32_t)frames, box_audio_core_sample_rate(n->core));
+    memcpy(&bits, &n->load_audio, sizeof(bits));
+    atomic_store(&n->load, bits);
+    atomic_store(&n->voices, box_audio_core_voice_count(n->core));
 }
 
 /** The device callback, on the audio thread.
@@ -481,6 +516,38 @@ done:
     return result;
 }
 
+/** Allocate the delay memory of a reverb slot and hand it to the audio thread; it stays with
+ * the main thread, which frees it after the core.
+ *
+ * @param t The transport
+ * @param slot Slot of the reverb
+ * @return Whether the memory went out
+ */
+static bool box_audio_native_reverb(
+    box_audio_transport_t *t,
+    uint32_t slot)
+{
+    box_audio_native_t *n = (box_audio_native_t*)t;
+    box_audio_msg_reverb_t reverb = { NULL, slot, 0 };
+    bool result = slot < BOX_AUDIO_REVERB_MAX && n->host.reverbs[slot];
+    if (result || slot >= BOX_AUDIO_REVERB_MAX) {
+        goto done;
+    }
+
+    reverb.data = box_audio_host_reverb(&n->host, slot, t->sample_rate, &reverb.floats);
+    result = reverb.data && box_audio_native_queue(n, BOX_AUDIO_MSG_REVERB, &reverb,
+        (int32_t)sizeof(reverb));
+    if (!result && reverb.data) {
+        ecs_os_free(reverb.data);
+        n->host.reverbs[slot] = NULL;
+        goto done;
+    }
+
+    box_audio_native_flush(n);
+done:
+    return result;
+}
+
 /** Take the events of the audio thread.
  *
  * @param t The transport
@@ -564,6 +631,81 @@ static void box_audio_native_update(
     box_audio_native_collect(n);
 }
 
+/** Report the voices and the load the audio thread measured last.
+ *
+ * @param t The transport
+ * @param stats Receives the stats
+ */
+static void box_audio_native_stats(
+    box_audio_transport_t *t,
+    box_audio_transport_stats_t *stats)
+{
+    box_audio_native_t *n = (box_audio_native_t*)t;
+    uint32_t bits = atomic_load(&n->load);
+    memcpy(&stats->load, &bits, sizeof(bits));
+    stats->voices = atomic_load(&n->voices);
+}
+
+/** Hand the audio thread a buffer to record its next frames into; it stays with the main
+ * thread, which takes it back once the audio thread reports it complete.
+ *
+ * @param t The transport
+ * @param frames Frames to record
+ * @return Whether the capture started
+ */
+static bool box_audio_native_capture(
+    box_audio_transport_t *t,
+    int32_t frames)
+{
+    box_audio_native_t *n = (box_audio_native_t*)t;
+    box_audio_capture_t capture = { NULL, frames, 0 };
+    bool result = false;
+    if (n->capture_data || frames <= 0) {
+        goto done;
+    }
+
+    capture.data = ecs_os_malloc_n(float, frames * 2);
+    if (!capture.data) {
+        goto done;
+    }
+
+    atomic_store(&n->captured, 0);
+    if (!box_audio_native_queue(n, BOX_AUDIO_MSG_CAPTURE, &capture, (int32_t)sizeof(capture))) {
+        ecs_os_free(capture.data);
+        goto done;
+    }
+
+    n->capture_data = capture.data;
+    n->capture_frames = frames;
+    box_audio_native_flush(n);
+    result = true;
+done:
+    return result;
+}
+
+/** Take the frames of a capture the audio thread completed.
+ *
+ * @param t The transport
+ * @param frames Receives the number of frames
+ * @return The frames, owned by the caller, NULL while the capture records
+ */
+static float* box_audio_native_capture_take(
+    box_audio_transport_t *t,
+    int32_t *frames)
+{
+    box_audio_native_t *n = (box_audio_native_t*)t;
+    float *result = NULL;
+    if (n->capture_data && atomic_load(&n->captured)) {
+        result = n->capture_data;
+        *frames = n->capture_frames;
+        n->capture_data = NULL;
+        n->capture_frames = 0;
+        atomic_store(&n->captured, 0);
+    }
+
+    return result;
+}
+
 /** Close the device and free the transport.
  *
  * @param t The transport
@@ -573,6 +715,7 @@ static void box_audio_native_free(
 {
     box_audio_native_t *n = (box_audio_native_t*)t;
     box_audio_native_close(n);
+    ecs_os_free(n->capture_data);
     ma_context_uninit(&n->context);
     box_audio_core_free(n->core);
     box_audio_host_fini(&n->host);
@@ -603,6 +746,9 @@ box_audio_transport_t* box_audio_transport_native_new(
 
     atomic_init(&n->lost, 0);
     atomic_init(&n->stopping, 0);
+    atomic_init(&n->captured, 0);
+    atomic_init(&n->voices, 0);
+    atomic_init(&n->load, 0);
     if (box_audio_host_init(&n->host) ||
         box_audio_ring_init(&n->commands, BOX_AUDIO_TRANSPORT_COMMAND_RING) ||
         box_audio_ring_init(&n->events,
@@ -630,10 +776,14 @@ box_audio_transport_t* box_audio_transport_native_new(
         .sample_rate = box_audio_core_sample_rate(n->core),
         .commands = box_audio_native_commands,
         .sound = box_audio_native_sound,
+        .reverb = box_audio_native_reverb,
         .read_events = box_audio_native_read_events,
         .state = box_audio_native_state,
         .update = box_audio_native_update,
-        .free = box_audio_native_free
+        .free = box_audio_native_free,
+        .stats = box_audio_native_stats,
+        .capture = box_audio_native_capture,
+        .capture_take = box_audio_native_capture_take
     };
     result = &n->base;
 done:

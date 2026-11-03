@@ -105,6 +105,28 @@ bool box_cmd_render_corners(
     ecs_entity_t e,
     vec3 out[8]);
 
+/** Create a resource in the session of the command that runs, in the resource folder of the
+ * process, and get its file.
+ *
+ * @param world The world
+ * @param content_type The content type, such as "audio/wav"
+ * @param resource Receives the resource
+ * @return The file, which the caller frees; NULL with an error logged outside of a session,
+ * NULL in the browser
+ */
+char* box_cmd_render_resource(
+    ecs_world_t *world,
+    const char *content_type,
+    ecs_shell_resource_t *resource);
+
+/** Register the audio command that prints the status of the audio, sets its volume and
+ * mute and records captures.
+ *
+ * @param world The world
+ */
+void box_cmd_audio_init(
+    ecs_world_t *world);
+
 /** Register the fit command that moves a camera to a tight fit of its scene.
  *
  * @param world The world

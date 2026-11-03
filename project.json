@@ -148,6 +148,11 @@
     },
     "${os Emscripten}": {
         "bundle": {
+            "miniaudio": {
+                "repository": "https://github.com/mackron/miniaudio.git",
+                "tag": "0.11.26",
+                "header-only": true
+            },
             "resvg": {
                 "repository": "https://github.com/linebender/resvg.git",
                 "tag": "v0.47.0",

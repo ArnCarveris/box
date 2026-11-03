@@ -45,4 +45,12 @@ void box_audio_web_sound(
     int32_t channels,
     float sample_rate);
 
+/** Ask the worklet to allocate the delay memory of a reverb slot in the heap of its core, which
+ * keeps it as long as the page. Nothing on native builds.
+ *
+ * @param slot Slot of the reverb
+ */
+void box_audio_web_reverb(
+    uint32_t slot);
+
 #endif

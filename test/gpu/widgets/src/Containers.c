@@ -6,6 +6,7 @@
 
 #include "gallery.h"
 #include "render.h"
+#include "draw.h"
 #include "picking.h"
 #include <bake_test.h>
 #include <math.h>
@@ -749,6 +750,94 @@ void Containers_dropdown_opens_upward(void) {
     containers_rect(world, FORMAT, button);
     containers_rect(world, FORMAT ".list", list);
     test_assert(list[1] >= button[3]);
+
+    ecs_fini(world);
+}
+
+/** Get the clip record the draws of the list of a dropdown nest in, the clip of the list that
+ * hides it while its button is clipped out.
+ *
+ * @param world The world
+ * @param path Path of the list
+ * @return The record
+ */
+static const box_render_clip_t* containers_list_clip(
+    ecs_world_t *world,
+    const char *path)
+{
+    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    test_assert(system != 0);
+    box_render_draws_t *d = ecs_system_get(world, system)->ctx;
+    const DrawSlot *slot = ecs_get(world, ecs_lookup(world, path), DrawSlot);
+    test_assert(slot != NULL);
+    test_assert(slot->clip > 0);
+
+    return ecs_vec_get_t(&d->clips.records, box_render_clip_t, slot->clip);
+}
+
+void Containers_dropdown_list_hides_scrolled_out(void) {
+    // widgets/containers
+    ecs_entity_t s = 0;
+    ecs_world_t *world = containers_load(&s);
+    float page[4], button[4], option[4];
+
+    /* With notes scrolled to its end and a window this low, the page can scroll the button
+     * above its top. Opened near the top of the page, the list is drawn and picked */
+    containers_resize(world, 1280, 360);
+    ecs_os_free(gallery_run(world, s, "set " NOTES " box.widgets.ScrollView.mut.y %.1f",
+        (double)containers_content(world, NOTES)->max_y));
+    gallery_settle(world, s);
+    gallery_rect(world, PAGE, page);
+    containers_page_top(world, s, FORMAT, page[1] + 20);
+    gallery_click(world, s, FORMAT, 0, 0, FORMAT);
+    containers_expect(world, s, FORMAT, "Dropdown", "open", "true");
+    ecs_entity_t list = ecs_lookup(world, FORMAT ".list");
+    test_assert(list != 0);
+    test_bool(ecs_get(world, list, LayoutFloat)->hide_clipped, true);
+    test_bool(box_render_float_hidden(world, list), false);
+    test_assert(containers_list_clip(world, FORMAT ".list")->area[0] > 0);
+    containers_rect(world, FORMAT ".list.option_1", option);
+    float x = (option[0] + option[2]) * 0.5f, y = (option[1] + option[3]) * 0.5f;
+    test_bool(containers_clip_keeps(world, FORMAT ".list.option_1", x, y), true);
+    char *handler = containers_handler_at(world, s, x, y);
+    test_str(handler, "\"" FORMAT "\"");
+    ecs_os_free(handler);
+
+    /* The page scrolls the button above its top: the list stays open, floating over the page,
+     * but is neither drawn nor picked */
+    containers_rect(world, FORMAT, button);
+    containers_page_top(world, s, FORMAT, page[1] - (button[3] - button[1]) - 10);
+    containers_rect(world, FORMAT, button);
+    test_assert(button[3] < page[1]);
+    containers_expect(world, s, FORMAT, "Dropdown", "open", "true");
+    test_bool(box_render_float_hidden(world, list), true);
+    test_flt(containers_list_clip(world, FORMAT ".list")->area[0], 0);
+    test_flt(containers_list_clip(world, FORMAT ".list")->area[1], 0);
+    containers_rect(world, FORMAT ".list.option_1", option);
+    x = (option[0] + option[2]) * 0.5f;
+    y = (option[1] + option[3]) * 0.5f;
+    test_assert(y > page[1] && y < page[3]);
+    test_bool(containers_clip_keeps(world, FORMAT ".list.option_1", x, y), false);
+    handler = containers_handler_at(world, s, x, y);
+    test_assert(strcmp(handler, "\"" FORMAT "\"") != 0);
+    ecs_os_free(handler);
+
+    /* Scrolled back into view, the list shows and takes the pointer again */
+    containers_page_top(world, s, FORMAT, page[1] + 20);
+    containers_rect(world, FORMAT, button);
+    test_assert(button[1] >= page[1]);
+    test_bool(box_render_float_hidden(world, list), false);
+    test_assert(containers_list_clip(world, FORMAT ".list")->area[0] > 0);
+    containers_rect(world, FORMAT ".list.option_1", option);
+    x = (option[0] + option[2]) * 0.5f;
+    y = (option[1] + option[3]) * 0.5f;
+    handler = containers_handler_at(world, s, x, y);
+    test_str(handler, "\"" FORMAT "\"");
+    ecs_os_free(handler);
+    ecs_os_free(gallery_run(world, s, "mouse_click left [%.1f, %.1f]", (double)x, (double)y));
+    gallery_settle(world, s);
+    containers_expect(world, s, FORMAT, "Dropdown", "current", "1");
+    containers_expect(world, s, FORMAT, "Dropdown", "open", "false");
 
     ecs_fini(world);
 }
