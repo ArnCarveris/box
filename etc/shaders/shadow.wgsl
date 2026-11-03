@@ -55,11 +55,12 @@ const OCTANT_AXIS: f32 = 0.57735026919;
 @group(2) @binding(4) var material_sampler: sampler;
 
 // The blend group of an alpha tested caster with a TextureBlend (fs_cutout_blend and
-// fs_point_cutout_blend only): the albedo of each layer as a slice of an array, the mask and the
-// uniforms, at the bindings mesh.wgsl has them.
+// fs_point_cutout_blend only): the albedo of each layer as a slice of an array, the mask, the
+// uniforms and the heights, at the bindings mesh.wgsl has them.
 @group(2) @binding(5) var blend_albedo: texture_2d_array<f32>;
 @group(2) @binding(8) var blend_mask: texture_2d<f32>;
 @group(2) @binding(9) var<uniform> blending: BlendUniforms;
+@group(2) @binding(10) var blend_heights: texture_2d_array<f32>;
 
 struct VertexIn {
     @location(0) position: vec3f,
@@ -246,8 +247,8 @@ fn cutout_test(uv: vec2f, alpha: f32, cutoff: f32, mapped: f32, object: vec4f,
 // of the albedo alpha of the batch.
 fn cutout_test_blend(uv: vec2f, alpha: f32, cutoff: f32, mapped: f32, object: vec4f,
     object_normal: vec3f) {
-    if (alpha * blend_alpha(blend_albedo, blend_mask, material_sampler, blending, uv, mapped,
-        object, object_normal) < cutoff)
+    if (alpha * blend_alpha(blend_albedo, blend_mask, blend_heights, material_sampler, blending,
+        uv, mapped, object, object_normal) < cutoff)
     {
         discard;
     }

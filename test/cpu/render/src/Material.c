@@ -1985,39 +1985,6 @@ void Material_texture_blend_layer_deleted(void) {
     box_render_null_free(null);
 }
 
-<<<<<<< HEAD
-/** Check that a mesh draws in one batch with the TextureBlend whose layer 0 samples an image,
- * and get that batch.
- *
- * @param world The world
- * @param null The backend
- * @param e The shape
- * @param tex The texture entity of the albedo of layer 0
- * @return The batch
- */
-static const box_render_batch_t* blend_only_batch(
-    ecs_world_t *world,
-    const box_render_null_t *null,
-    ecs_entity_t e,
-    ecs_entity_t tex)
-{
-    const box_render_batch_t *found[2];
-    test_int(blend_batches(null, cutout_mesh(world, e), found, 2), 1);
-    test_bool(found[0]->texture_blend, true);
-    test_uint(blend_record(null, found[0])->layers[0][BOX_RENDER_BLEND_ALBEDO],
-        blend_handle(world, tex));
-
-    return found[0];
-}
-
-/** A shape with a TextureBlend blends whatever draws it: alpha tested in the opaque pass and
- * the shadow pass, with AlphaBlend or an Opacity under 1 in the sorted blended pass, with
- * Transmission in the transmissive pass, and with a triplanar TextureMapping.
- *
- * Its own albedo, which the blend replaces, is not bound, and without the alpha test and the
- * blend mode it still blends, now opaque. */
-void Material_texture_blend_every_shape(void) {
-=======
 /** The contrast and the heights of a TextureBlend reach the record of its batch, the bind group
  * key of the backend, as the layers do: with a contrast of 0 the heights stay 0 so they split no
  * bind group, with a contrast above 0 each layer carries the handle of its height.
@@ -2169,10 +2136,37 @@ void Material_texture_blend_height_key(void) {
     box_render_null_free(null);
 }
 
-/** A shape with a TextureBlend draws as a plain shape with its own PbrTextures when it is alpha
- * tested, blended or has a triplanar TextureMapping, and blends again without them. */
-void Material_texture_blend_plain_fallback(void) {
->>>>>>> dcd428d2f59705127d318ab404c7f52eaee7d2e8
+/** Check that a mesh draws in one batch with the TextureBlend whose layer 0 samples an image,
+ * and get that batch.
+ *
+ * @param world The world
+ * @param null The backend
+ * @param e The shape
+ * @param tex The texture entity of the albedo of layer 0
+ * @return The batch
+ */
+static const box_render_batch_t* blend_only_batch(
+    ecs_world_t *world,
+    const box_render_null_t *null,
+    ecs_entity_t e,
+    ecs_entity_t tex)
+{
+    const box_render_batch_t *found[2];
+    test_int(blend_batches(null, cutout_mesh(world, e), found, 2), 1);
+    test_bool(found[0]->texture_blend, true);
+    test_uint(blend_record(null, found[0])->layers[0][BOX_RENDER_BLEND_ALBEDO],
+        blend_handle(world, tex));
+
+    return found[0];
+}
+
+/** A shape with a TextureBlend blends whatever draws it: alpha tested in the opaque pass and
+ * the shadow pass, with AlphaBlend or an Opacity under 1 in the sorted blended pass, with
+ * Transmission in the transmissive pass, and with a triplanar TextureMapping.
+ *
+ * Its own albedo, which the blend replaces, is not bound, and without the alpha test and the
+ * blend mode it still blends, now opaque. */
+void Material_texture_blend_every_shape(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
