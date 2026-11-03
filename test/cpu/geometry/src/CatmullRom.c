@@ -27,7 +27,7 @@ static void catmull_segment3(Path3D *path, PathSegmentKind kind, float x, float 
 static void catmull_near(const float *a, const float *b, int dimensions, float tolerance)
 {
     for (int i = 0; i < dimensions; i ++) {
-        test_assert(fabsf(a[i] - b[i]) < tolerance);
+        test_assert(fabsf(a[i] - b[i]) <= tolerance);
     }
 }
 
@@ -162,6 +162,7 @@ void CatmullRom_anchors_3d(void)
 
 void CatmullRom_slope_continuous(void)
 {
+    ecs_world_t *world = catmull_world();
     Path3D path = {0};
     catmull_segment3(&path, PathCatmullRom, 1, 2, 0);
     catmull_segment3(&path, PathCatmullRom, 3, 1, 1);
@@ -196,10 +197,12 @@ void CatmullRom_slope_continuous(void)
     catmull_near(first[1], (vec3){1.0f / 6, 2.0f / 6, 0}, 3, 0.00001f);
     catmull_near(last[2], (vec3){4 - 1.0f / 6, 4 - 3.0f / 6, -1 + 2.0f / 6}, 3, 0.00001f);
     ecs_vec_fini_t(NULL, &path.segments, PathSegment3D);
+    ecs_fini(world);
 }
 
 void CatmullRom_slope_continuous_closed(void)
 {
+    ecs_world_t *world = catmull_world();
     /* Without a closing segment: the last segment ends at the start. */
     Path2D path = {.closed = true};
     catmull_segment2(&path, PathCatmullRom, 2, 0);
@@ -252,6 +255,7 @@ void CatmullRom_slope_continuous_closed(void)
     test_int(box_path2_cubic(&path, 3, closing), PathLine);
     catmull_near(closing[1], (vec3){0, 2 - 2.0f / 3, 0}, 3, 0.00001f);
     ecs_vec_fini_t(NULL, &path.segments, PathSegment2D);
+    ecs_fini(world);
 }
 
 void CatmullRom_next_to_line(void)
@@ -298,6 +302,7 @@ void CatmullRom_next_to_line(void)
 
 void CatmullRom_next_to_bezier(void)
 {
+    ecs_world_t *world = catmull_world();
     Path3D path = {0};
     *ecs_vec_append_t(NULL, &path.segments, PathSegment3D) = (PathSegment3D){
         .kind = PathCubicBezier, .control1 = {0, 5, 0}, .control2 = {1, 5, 0}, .end = {1, 1, 0}};
@@ -325,6 +330,7 @@ void CatmullRom_next_to_bezier(void)
     test_bool(box_path3_evaluate(&path, 2.0f / 3, p), true);
     catmull_near(p, (vec3){2, 0, 1}, 3, 0.00001f);
     ecs_vec_fini_t(NULL, &path.segments, PathSegment3D);
+    ecs_fini(world);
 }
 
 void CatmullRom_evaluate_sample_pack(void)
@@ -494,6 +500,7 @@ void CatmullRom_script(void)
 
 void CatmullRom_invalid_kind(void)
 {
+    ecs_world_t *world = catmull_world();
     Path2D path = {0};
     catmull_segment2(&path, PathCatmullRom, 1, 1);
     vec2 p;
@@ -501,4 +508,5 @@ void CatmullRom_invalid_kind(void)
     ecs_vec_first_t(&path.segments, PathSegment2D)->kind = (PathSegmentKind)3;
     test_bool(box_path2_evaluate(&path, 0.5f, p), false);
     ecs_vec_fini_t(NULL, &path.segments, PathSegment2D);
+    ecs_fini(world);
 }
