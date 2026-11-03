@@ -58,6 +58,25 @@
 /** Hash stream of the radial speed of a particle */
 #define BOX_PARTICLE_STREAM_RADIAL (19u)
 
+/** First of the five hash streams of the blend of a particle between a curve of ParticleCurves
+ * and its max_keys, one per field in the order of BOX_PARTICLE_CURVE_SIZE to _COLOR */
+#define BOX_PARTICLE_STREAM_CURVE (20u)
+
+/** Curve of the size, the offset of its stream from BOX_PARTICLE_STREAM_CURVE */
+#define BOX_PARTICLE_CURVE_SIZE (0u)
+
+/** Curve of the opacity */
+#define BOX_PARTICLE_CURVE_OPACITY (1u)
+
+/** Curve of the rotation */
+#define BOX_PARTICLE_CURVE_ROTATION (2u)
+
+/** Curve of the spin */
+#define BOX_PARTICLE_CURVE_SPIN (3u)
+
+/** Gradient of the color */
+#define BOX_PARTICLE_CURVE_COLOR (4u)
+
 /** Ground collision mode of an emitter without a ground plane */
 #define BOX_PARTICLE_GROUND_NONE (0u)
 
@@ -219,6 +238,21 @@ static inline float box_particle_draw(
 {
     return box_particle_range(min, max,
         box_particle_unit(box_particle_hash(seed, index, stream)));
+}
+
+/** Get the blend of a particle between a curve and its max curve, the same for its whole life.
+ *
+ * @param seed The seed of the emitter
+ * @param index The spawn index of the particle
+ * @param curve The curve, BOX_PARTICLE_CURVE_SIZE to BOX_PARTICLE_CURVE_COLOR
+ * @return The blend, 0 to 1
+ */
+static inline float box_particle_blend(
+    uint32_t seed,
+    uint32_t index,
+    uint32_t curve)
+{
+    return box_particle_unit(box_particle_hash(seed, index, BOX_PARTICLE_STREAM_CURVE + curve));
 }
 
 /** Decode a display encoded channel to linear.
@@ -722,31 +756,94 @@ static inline float box_particle_curve_area(
     return result;
 }
 
+/** Evaluate the curve of a particle at a normalized age: the curve, or with a max curve its
+ * blend toward it by the draw of the particle. A curve without a max curve reads one row at most.
+ *
+ * @param table The curve table
+ * @param row Row of the curve, BOX_PARTICLE_CURVE_CONSTANT for a constant
+ * @param max_row Row of the max curve, BOX_PARTICLE_CURVE_CONSTANT for none
+ * @param value The value of a constant curve
+ * @param t The normalized age, clamped to 0 to 1
+ * @param u The blend of the particle, box_particle_blend
+ * @return The value
+ */
+static inline float box_particle_curve_range(
+    const float *table,
+    uint32_t row,
+    uint32_t max_row,
+    float value,
+    float t,
+    float u)
+{
+    float result = box_particle_curve(table, row, value, t);
+    if (max_row != BOX_PARTICLE_CURVE_CONSTANT) {
+        float max = box_particle_curve(table, max_row, value, t);
+        result = result + (max - result) * u;
+    }
+
+    return result;
+}
+
+/** Get the area under the curve of a particle from age 0 up to a normalized age: with a max
+ * curve the areas of the two blended by the draw of the particle, which is the area under the
+ * blended curve.
+ *
+ * @param table The curve table
+ * @param row Row of the values, the area in the row after it, BOX_PARTICLE_CURVE_CONSTANT for
+ *        a constant
+ * @param max_row Row of the values of the max curve, its area in the row after it,
+ *        BOX_PARTICLE_CURVE_CONSTANT for none
+ * @param value The value of a constant curve
+ * @param t The normalized age, clamped to 0 to 1
+ * @param u The blend of the particle, box_particle_blend
+ * @return The area, in normalized age times value
+ */
+static inline float box_particle_curve_area_range(
+    const float *table,
+    uint32_t row,
+    uint32_t max_row,
+    float value,
+    float t,
+    float u)
+{
+    float result = box_particle_curve_area(table, row, value, t);
+    if (max_row != BOX_PARTICLE_CURVE_CONSTANT) {
+        float max = box_particle_curve_area(table, max_row, value, t);
+        result = result + (max - result) * u;
+    }
+
+    return result;
+}
+
 /** Get the degrees a particle has turned by its spin, the area under its spin curve up to its
  * age; a constant curve turns it by its spin times the value times its age.
  *
  * @param spin Spin the particle spawned with, degrees per second
  * @param table The curve table
  * @param row Row of the spin curve, BOX_PARTICLE_CURVE_CONSTANT for a constant
+ * @param max_row Row of its max curve, BOX_PARTICLE_CURVE_CONSTANT for none
  * @param value The value of a constant spin curve
  * @param age Seconds the particle lived
  * @param life Seconds it lives
+ * @param u The blend of the particle between the two curves
  * @return The degrees
  */
 static inline float box_particle_turned(
     float spin,
     const float *table,
     uint32_t row,
+    uint32_t max_row,
     float value,
     float age,
-    float life)
+    float life,
+    float u)
 {
     float result;
     if (row == BOX_PARTICLE_CURVE_CONSTANT) {
         result = spin * value * age;
     } else {
-        result = spin * life *
-            box_particle_curve_area(table, row, value, box_particle_norm_age(age, life));
+        result = spin * life * box_particle_curve_area_range(
+            table, row, max_row, value, box_particle_norm_age(age, life), u);
     }
 
     return result;
@@ -759,9 +856,13 @@ static inline float box_particle_turned(
  * @param spin Spin it spawned with in degrees per second
  * @param table The curve table
  * @param rotation_row Row of the rotation curve, in turns, or BOX_PARTICLE_CURVE_CONSTANT
+ * @param rotation_max Row of its max curve, BOX_PARTICLE_CURVE_CONSTANT for none
  * @param rotation_value Value of a constant rotation curve
+ * @param rotation_u Blend of the particle between the rotation curves
  * @param spin_row Row of the spin curve, or BOX_PARTICLE_CURVE_CONSTANT
+ * @param spin_max Row of its max curve, BOX_PARTICLE_CURVE_CONSTANT for none
  * @param spin_value Value of a constant spin curve
+ * @param spin_u Blend of the particle between the spin curves
  * @param age Seconds the particle lived
  * @param life Seconds it lives
  * @return The degrees
@@ -771,16 +872,21 @@ static inline float box_particle_rotation(
     float spin,
     const float *table,
     uint32_t rotation_row,
+    uint32_t rotation_max,
     float rotation_value,
+    float rotation_u,
     uint32_t spin_row,
+    uint32_t spin_max,
     float spin_value,
+    float spin_u,
     float age,
     float life)
 {
     float t = box_particle_norm_age(age, life);
 
-    return rotation + 360.0f * box_particle_curve(table, rotation_row, rotation_value, t) +
-        box_particle_turned(spin, table, spin_row, spin_value, age, life);
+    return rotation + 360.0f * box_particle_curve_range(
+            table, rotation_row, rotation_max, rotation_value, t, rotation_u) +
+        box_particle_turned(spin, table, spin_row, spin_max, spin_value, age, life, spin_u);
 }
 
 /** Evaluate a gradient at a normalized age from its rows in the curve table, linear between two
@@ -815,24 +921,59 @@ static inline void box_particle_gradient(
     }
 }
 
+/** Evaluate the gradient of a particle at a normalized age: the gradient, or with a max
+ * gradient its blend toward it in linear light by the draw of the particle.
+ *
+ * @param table The curve table
+ * @param row First row of the gradient, or BOX_PARTICLE_CURVE_CONSTANT
+ * @param max_row First row of the max gradient, BOX_PARTICLE_CURVE_CONSTANT for none
+ * @param value Linear color of a constant gradient
+ * @param t The normalized age, clamped to 0 to 1
+ * @param u The blend of the particle, box_particle_blend
+ * @param out Receives the linear color
+ */
+static inline void box_particle_gradient_range(
+    const float *table,
+    uint32_t row,
+    uint32_t max_row,
+    const float *value,
+    float t,
+    float u,
+    float *out)
+{
+    float max[3];
+    int32_t c;
+    box_particle_gradient(table, row, value, t, out);
+    if (max_row != BOX_PARTICLE_CURVE_CONSTANT) {
+        box_particle_gradient(table, max_row, value, t, max);
+        for (c = 0; c < 3; c ++) {
+            out[c] = out[c] + (max[c] - out[c]) * u;
+        }
+    }
+}
+
 /** Get the size or opacity of a particle: the value it spawned with times its curve at a
  * normalized age, clamped at 0 as a curve that overshoots its keys may go below it.
  *
  * @param base The value it spawned with
  * @param table The curve table
  * @param row Row of the curve, BOX_PARTICLE_CURVE_CONSTANT for a constant
+ * @param max_row Row of its max curve, BOX_PARTICLE_CURVE_CONSTANT for none
  * @param value The value of a constant curve
  * @param t The normalized age, clamped to 0 to 1
+ * @param u The blend of the particle between the two curves
  * @return The value, 0 or more
  */
 static inline float box_particle_scaled(
     float base,
     const float *table,
     uint32_t row,
+    uint32_t max_row,
     float value,
-    float t)
+    float t,
+    float u)
 {
-    return fmaxf(base * box_particle_curve(table, row, value, t), 0.0f);
+    return fmaxf(base * box_particle_curve_range(table, row, max_row, value, t, u), 0.0f);
 }
 
 /** Get the color of a particle: the linear color it spawned with times its gradient at a
@@ -841,21 +982,25 @@ static inline float box_particle_scaled(
  * @param color The linear color it spawned with
  * @param table The curve table
  * @param row First row of the gradient, or BOX_PARTICLE_CURVE_CONSTANT
+ * @param max_row First row of the max gradient, BOX_PARTICLE_CURVE_CONSTANT for none
  * @param value Linear color of a constant gradient
  * @param t The normalized age, clamped to 0 to 1
+ * @param u The blend of the particle between the two gradients
  * @param out Receives the linear color, may alias color
  */
 static inline void box_particle_tinted(
     const float *color,
     const float *table,
     uint32_t row,
+    uint32_t max_row,
     const float *value,
     float t,
+    float u,
     float *out)
 {
     float g[3];
     int32_t c;
-    box_particle_gradient(table, row, value, t, g);
+    box_particle_gradient_range(table, row, max_row, value, t, u, g);
     for (c = 0; c < 3; c ++) {
         out[c] = fmaxf(color[c] * g[c], 0.0f);
     }

@@ -197,6 +197,28 @@
                 ]
             },
             {
+                "id": "CurveRange",
+                "testcases": [
+                    "script_rows",
+                    "without_max_no_second_row",
+                    "same_blend_every_age",
+                    "between_linear_curves",
+                    "distribution_covers_range",
+                    "other_fields_unchanged",
+                    "streams_new",
+                    "spin_area_blended",
+                    "gradient_blends",
+                    "flat_curves_take_rows",
+                    "equal_curves_share_rows",
+                    "copy_owns_max_keys",
+                    "error_none",
+                    "error_max_keys",
+                    "error_gradient_max_keys",
+                    "bad_max_keys_default",
+                    "error_light"
+                ]
+            },
+            {
                 "id": "CurveTable",
                 "testcases": [
                     "block_reads_rows",

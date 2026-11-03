@@ -67,6 +67,12 @@ struct Emitter {
     // x: vertices per particle, y: 1 when drawn through the sort keys, z: keys sorted, w: 1 when
     // the emitter has a ParticleAppearance
     draw: vec4u,
+    // Rows of the max curves of the size, opacity, rotation and spin, which each particle blends
+    // toward by its own draw, CURVE_CONSTANT for a curve without max_keys; the area of the max
+    // spin is in the row after it
+    curve_max: vec4u,
+    // x: first of the GRADIENT_ROWS rows of the max gradient, CURVE_CONSTANT for none
+    gradient_max: vec4u,
 };
 
 // A corner of a triangle of a billboard mesh, box_render_particle_corner_t: xyz the position
@@ -120,6 +126,15 @@ const STREAM_DIRECTION: u32 = 9u;
 const STREAM_POINT: u32 = 11u;
 const STREAM_COLOR: u32 = 15u;
 const STREAM_RADIAL: u32 = 19u;
+const STREAM_CURVE: u32 = 20u;
+
+// Curves of ParticleCurves, the offsets of their blend streams from STREAM_CURVE,
+// BOX_PARTICLE_CURVE_*
+const CURVE_SIZE: u32 = 0u;
+const CURVE_OPACITY: u32 = 1u;
+const CURVE_ROTATION: u32 = 2u;
+const CURVE_SPIN: u32 = 3u;
+const CURVE_COLOR: u32 = 4u;
 
 // Ground collision modes, BOX_PARTICLE_GROUND_*
 const GROUND_NONE: u32 = 0u;
@@ -165,6 +180,11 @@ fn particle_range(r: vec2f, u: f32) -> f32 {
 // A draw of one stream of a particle from a range.
 fn particle_draw(seed: u32, index: u32, stream: u32, r: vec2f) -> f32 {
     return particle_range(r, particle_unit(particle_hash(seed, index, stream)));
+}
+
+// The blend of a particle between a curve and its max curve, the same for its whole life.
+fn particle_blend(seed: u32, index: u32, curve: u32) -> f32 {
+    return particle_unit(particle_hash(seed, index, STREAM_CURVE + curve));
 }
 
 // A display encoded color decoded to linear.
@@ -320,23 +340,50 @@ fn particle_curve_area(row: u32, value: f32, t: f32) -> f32 {
     return curves[k + CURVE_SAMPLES] + at.y * dt * (v + 0.5 * at.y * (curves[k + 1u] - v));
 }
 
+// The curve of a particle at a normalized age: the curve, or with a max curve at max_row its
+// blend toward it by the draw u of the particle. Without a max curve it reads one row at most.
+fn particle_curve_range(row: u32, max_row: u32, value: f32, t: f32, u: f32) -> f32 {
+    let a = particle_curve(row, value, t);
+    if (max_row == CURVE_CONSTANT) {
+        return a;
+    }
+
+    return a + (particle_curve(max_row, value, t) - a) * u;
+}
+
+// Area under the curve of a particle up to a normalized age: with a max curve the two areas
+// blended by the draw u of the particle, the area under the blended curve.
+fn particle_curve_area_range(row: u32, max_row: u32, value: f32, t: f32, u: f32) -> f32 {
+    let a = particle_curve_area(row, value, t);
+    if (max_row == CURVE_CONSTANT) {
+        return a;
+    }
+
+    return a + (particle_curve_area(max_row, value, t) - a) * u;
+}
+
 // Degrees a particle has turned by its spin: the area under the spin curve up to its age, and
 // for a constant curve the spin times its value times the age.
-fn particle_turned(spin: f32, row: u32, value: f32, age: f32, life: f32) -> f32 {
+fn particle_turned(spin: f32, row: u32, max_row: u32, value: f32, age: f32, life: f32,
+    u: f32) -> f32
+{
     if (row == CURVE_CONSTANT) {
         return spin * value * age;
     }
 
-    return spin * life * particle_curve_area(row, value, particle_norm_age(age, life));
+    return spin * life *
+        particle_curve_area_range(row, max_row, value, particle_norm_age(age, life), u);
 }
 
 // Rotation of a particle in degrees: spawned, plus the turns of the rotation curve, plus spin.
-fn particle_rotation(rotation: f32, spin: f32, rotation_row: u32, rotation_value: f32,
-    spin_row: u32, spin_value: f32, age: f32, life: f32) -> f32
+fn particle_rotation(rotation: f32, spin: f32, rotation_row: u32, rotation_max: u32,
+    rotation_value: f32, rotation_u: f32, spin_row: u32, spin_max: u32, spin_value: f32,
+    spin_u: f32, age: f32, life: f32) -> f32
 {
     let t = particle_norm_age(age, life);
-    return rotation + 360.0 * particle_curve(rotation_row, rotation_value, t) +
-        particle_turned(spin, spin_row, spin_value, age, life);
+    return rotation +
+        360.0 * particle_curve_range(rotation_row, rotation_max, rotation_value, t, rotation_u) +
+        particle_turned(spin, spin_row, spin_max, spin_value, age, life, spin_u);
 }
 
 // A gradient at a normalized age from its rows of the curve table, a linear color of four
@@ -353,15 +400,26 @@ fn particle_gradient(row: u32, value: vec3f, t: f32) -> vec3f {
     return mix(a, b, at.y);
 }
 
+// The gradient of a particle at a normalized age: the gradient, or with a max gradient at
+// max_row its blend toward it in linear light by the draw u of the particle.
+fn particle_gradient_range(row: u32, max_row: u32, value: vec3f, t: f32, u: f32) -> vec3f {
+    let a = particle_gradient(row, value, t);
+    if (max_row == CURVE_CONSTANT) {
+        return a;
+    }
+
+    return mix(a, particle_gradient(max_row, value, t), u);
+}
+
 // Size or opacity of a particle: the value it spawned with times its curve, clamped at 0 as a
 // curve that overshoots its keys may go below it.
-fn particle_scaled(base: f32, row: u32, value: f32, t: f32) -> f32 {
-    return max(base * particle_curve(row, value, t), 0.0);
+fn particle_scaled(base: f32, row: u32, max_row: u32, value: f32, t: f32, u: f32) -> f32 {
+    return max(base * particle_curve_range(row, max_row, value, t, u), 0.0);
 }
 
 // Color of a particle: the linear color it spawned with times its gradient, clamped at 0.
-fn particle_tinted(color: vec3f, row: u32, value: vec3f, t: f32) -> vec3f {
-    return max(color * particle_gradient(row, value, t), vec3f(0.0));
+fn particle_tinted(color: vec3f, row: u32, max_row: u32, value: vec3f, t: f32, u: f32) -> vec3f {
+    return max(color * particle_gradient_range(row, max_row, value, t, u), vec3f(0.0));
 }
 
 // Frame of a sprite sheet a particle shows, row by row from the top left.

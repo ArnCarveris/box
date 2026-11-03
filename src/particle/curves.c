@@ -7,17 +7,94 @@
 #include "curves.h"
 #include <math.h>
 
+/** Check one list of keys of a ParticleCurve: a valid Curve whose times are from 0 to 1.
+ *
+ * @param kind The kind of the curve
+ * @param keys The keys
+ * @return NULL when it is valid, else the first problem naming the key
+ */
+static char* box_particle_curve_keys_check(
+    CurveKind kind,
+    const ecs_vec_t *keys)
+{
+    Curve view = { .kind = kind, .keys = *keys };
+    const CurveKey *k = ecs_vec_first_t(keys, CurveKey);
+    int32_t i, count = ecs_vec_count(keys);
+    char *result = box_curve_validate(&view);
+    for (i = 0; i < count && !result; i ++) {
+        if (k[i].time < 0.0f || k[i].time > 1.0f) {
+            result = flecs_asprintf("key %d: time %g is outside of 0 to 1",
+                (int)i, (double)k[i].time);
+        }
+    }
+
+    return result;
+}
+
+/** Name the second list in the problem of its keys.
+ *
+ * @param problem The problem of max_keys, NULL for none, freed
+ * @return The problem starting with max_keys, NULL for none
+ */
+static char* box_particle_curve_max_problem(
+    char *problem)
+{
+    char *result = NULL;
+    if (problem) {
+        result = flecs_asprintf("max_keys %s", problem);
+        ecs_os_free(problem);
+    }
+
+    return result;
+}
+
 char* box_particle_curve_check(
     const ParticleCurve *curve)
 {
-    Curve view = { .kind = curve->kind, .keys = curve->keys };
-    const CurveKey *keys = ecs_vec_first_t(&curve->keys, CurveKey);
-    int32_t i, count = ecs_vec_count(&curve->keys);
-    char *result = box_curve_validate(&view);
+    char *result = box_particle_curve_keys_check(curve->kind, &curve->keys);
+    if (!result && ecs_vec_count(&curve->max_keys)) {
+        result = box_particle_curve_max_problem(
+            box_particle_curve_keys_check(curve->kind, &curve->max_keys));
+    }
+
+    return result;
+}
+
+char* box_particle_light_curve_check(
+    const ParticleCurve *curve)
+{
+    char *result = NULL;
+    if (ecs_vec_count(&curve->max_keys)) {
+        result = flecs_asprintf(
+            "max_keys is not allowed, a light has no random draw to blend two curves by");
+    } else {
+        result = box_particle_curve_check(curve);
+    }
+
+    return result;
+}
+
+/** Check one list of keys of a ParticleGradient: the times are finite, increase strictly and
+ * are from 0 to 1.
+ *
+ * @param keys The keys
+ * @return NULL when it is valid, else the first problem naming the key
+ */
+static char* box_particle_gradient_keys_check(
+    const ecs_vec_t *keys)
+{
+    const ParticleGradientKey *k = ecs_vec_first_t(keys, ParticleGradientKey);
+    int32_t i, count = ecs_vec_count(keys);
+    char *result = NULL;
     for (i = 0; i < count && !result; i ++) {
-        if (keys[i].time < 0.0f || keys[i].time > 1.0f) {
-            result = flecs_asprintf("key %d: time %g is outside of 0 to 1",
-                (int)i, (double)keys[i].time);
+        float time = k[i].time;
+        if (!isfinite(time)) {
+            result = flecs_asprintf("key %d: time is not finite", (int)i);
+        } else if (i > 0 && !(time > k[i - 1].time)) {
+            result = flecs_asprintf("key %d: time %g is not after time %g of key %d",
+                (int)i, (double)time, (double)k[i - 1].time, (int)(i - 1));
+        } else if (time < 0.0f || time > 1.0f) {
+            result = flecs_asprintf("key %d: time %g is outside of 0 to 1", (int)i, (double)time);
         }
     }
 
@@ -27,8 +104,6 @@ char* box_particle_curve_check(
 char* box_particle_gradient_check(
     const ParticleGradient *gradient)
 {
-    const ParticleGradientKey *keys = ecs_vec_first_t(&gradient->keys, ParticleGradientKey);
-    int32_t i, count = ecs_vec_count(&gradient->keys);
     char *result = NULL;
     if (gradient->kind < CurveLinear || gradient->kind > CurveBezier) {
         result = flecs_asprintf(
@@ -36,16 +111,10 @@ char* box_particle_gradient_check(
         goto done;
     }
 
-    for (i = 0; i < count && !result; i ++) {
-        float time = keys[i].time;
-        if (!isfinite(time)) {
-            result = flecs_asprintf("key %d: time is not finite", (int)i);
-        } else if (i > 0 && !(time > keys[i - 1].time)) {
-            result = flecs_asprintf("key %d: time %g is not after time %g of key %d",
-                (int)i, (double)time, (double)keys[i - 1].time, (int)(i - 1));
-        } else if (time < 0.0f || time > 1.0f) {
-            result = flecs_asprintf("key %d: time %g is outside of 0 to 1", (int)i, (double)time);
-        }
+    result = box_particle_gradient_keys_check(&gradient->keys);
+    if (!result && ecs_vec_count(&gradient->max_keys)) {
+        result = box_particle_curve_max_problem(
+            box_particle_gradient_keys_check(&gradient->max_keys));
     }
 
 done:
@@ -56,6 +125,16 @@ bool box_particle_curve_valid(
     const ParticleCurve *curve)
 {
     char *problem = box_particle_curve_check(curve);
+    bool result = problem == NULL;
+    ecs_os_free(problem);
+
+    return result;
+}
+
+bool box_particle_light_curve_valid(
+    const ParticleCurve *curve)
+{
+    char *problem = box_particle_light_curve_check(curve);
     bool result = problem == NULL;
     ecs_os_free(problem);
 
@@ -137,7 +216,7 @@ static bool box_particle_light_validate(
 {
     const ParticleLight *light = ptr;
     box_particle_curves_report(world, entity, "ParticleLight", "curve",
-        box_particle_curve_check(&light->curve));
+        box_particle_light_curve_check(&light->curve));
 
     return true;
 }

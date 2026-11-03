@@ -181,13 +181,19 @@ ECS_STRUCT(ParticleBurst, {
  * to 1 at death: {kind: CurveCatmullRom, keys: [{0, 0.3}, {0.4, 1.8}, {1, 2.2}]}. Without keys
  * it is the default of its field, one key is a constant, and outside the keys it holds the ends.
  *
+ * With max_keys each particle draws u from 0 to 1 from a stream of its field and follows
+ * mix(keys(t), max_keys(t), u) for its whole life: {keys: [{0, 1}, {1, 0}], max_keys: [{0, 2},
+ * {1, 0.5}]}. Both lists use the kind; without keys the first is the default of the field.
+ *
  * Baked to 64 samples, a sharp change softens over 1/63 of the life. A bad kind, a number that is
  * not finite or times that do not increase strictly from 0 to 1 log an error naming the entity,
- * component, field and key, and the curve draws as the default of its field.
+ * component, field, list and key, and the curve draws as the default of its field.
  */
 ECS_STRUCT(ParticleCurve, {
     CurveKind kind;         /**< Shape of the spans, default CurveLinear */
     ecs_vec(CurveKey) keys; /**< Keys in order of strictly increasing time from 0 to 1 */
+    ecs_vec(CurveKey) max_keys; /**< Keys of the second curve each particle blends toward by
+                             *   its own draw, as keys; none for one curve */
 });
 
 /** Drives the intensity of the PointLight or SpotLight of a ParticleEmitter entity from its
@@ -203,8 +209,8 @@ ECS_STRUCT(ParticleCurve, {
 ECS_STRUCT(ParticleLight, {
     float intensity;        /**< Intensity of the light while the emitter plays, default 1 */
     ParticleCurve curve;    /**< Multiplier of the intensity over period, its times from 0 to
-                             *   1 of it, evaluated exactly by box_curve_value; no keys or a
-                             *   bad curve for 1 */
+                             *   1 of it, by box_curve_value; no keys, a bad curve or one with
+                             *   max_keys, as a light has no random draw, for 1 */
     float period;           /**< Seconds of the playback clock the curve spans, default 0 for
                              *   no curve */
     bool loop;              /**< Repeat the curve every period, default false for once */
@@ -237,11 +243,15 @@ ECS_STRUCT(ParticleGradientKey, {
  * {kind: CurveCatmullRom, keys: [{0, {255, 220, 60}}, {0.6, {255, 90, 20}}, {1, {120, 20, 10}}]}.
  *
  * Without keys it is white, one key is a constant, and keys follow the rules of ParticleCurve.
+ * With max_keys each particle blends between the two gradients in linear light by its own draw
+ * for its whole life, as a ParticleCurve does.
  */
 ECS_STRUCT(ParticleGradient, {
     CurveKind kind;         /**< Shape of the spans of every channel, default CurveLinear */
     ecs_vec(ParticleGradientKey) keys; /**< Keys in order of strictly increasing time from 0
                              *   to 1 */
+    ecs_vec(ParticleGradientKey) max_keys; /**< Keys of the second gradient each particle
+                             *   blends toward by its own draw, as keys; none for one */
 });
 
 /** How the particles of an emitter change over their life, evaluated on the GPU, for example
@@ -251,6 +261,8 @@ ECS_STRUCT(ParticleGradient, {
  * Every curve multiplies the value a particle spawned with except rotation, which adds turns.
  * Without keys a curve is the default of its field, so `ParticleCurves: {}` changes nothing.
  * Size, opacity and color clamp at 0 where a curve overshoots; rotation and spin may go negative.
+ *
+ * A curve with max_keys draws its blend from a stream of its own, so the other draws stay.
  */
 ECS_STRUCT(ParticleCurves, {
     ParticleCurve size;     /**< Multiplier of the size, default 1 */
