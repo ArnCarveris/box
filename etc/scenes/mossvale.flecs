@@ -2,6 +2,7 @@ include mossvale/state
 include mossvale/geo
 include mossvale/materials
 include mossvale/props
+include mossvale/town
 include mossvale/targets
 include mossvale/npcs
 include mossvale/player
