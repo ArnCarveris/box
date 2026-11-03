@@ -89,7 +89,7 @@ void box_gpu_draw_init(
         },
         {
             .binding = 5,
-            .visibility = WGPUShaderStage_Fragment,
+            .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
             .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
         },
         {
@@ -247,6 +247,7 @@ void box_gpu_draw_init(
     box_gpu_atmosphere_init(gpu);
     box_gpu_particles_init(gpu);
     box_gpu_fog_volumes_init(gpu);
+    box_gpu_debug_init(gpu);
 }
 
 /** Release the buffers of a mesh and the mesh.
@@ -597,6 +598,7 @@ void box_gpu_draw_fini(
     box_gpu_atmosphere_fini(gpu);
     box_gpu_particles_fini(gpu);
     box_gpu_fog_volumes_fini(gpu);
+    box_gpu_debug_fini(gpu);
     if (gpu->view_buffer) {
         wgpuBufferRelease(gpu->view_buffer);
         gpu->view_buffer = NULL;
@@ -1774,7 +1776,9 @@ static void box_gpu_draw_pass(
         .encoder = encoder,
         .color = hdr ? hdr : color,
         .depth = t->depth_view,
-        .depth_store = phase == 1 || hdr || fog ? WGPUStoreOp_Store : WGPUStoreOp_Discard,
+        .depth_store = phase == 1 || hdr || fog || box_gpu_debug_enabled(v)
+            ? WGPUStoreOp_Store
+            : WGPUStoreOp_Discard,
         .soft = phase != 1 && box_gpu_particles_soft(gpu, v),
         .fog = fog,
         .snapshot = phase != 1 ? snapshot : NULL,
@@ -1976,11 +1980,15 @@ void box_gpu_draw_views(
             }
         }
 
-        wgpuBindGroupRelease(group);
-
         if (hdr) {
             box_gpu_effects_run(gpu, t, encoder, packet, v, color);
         }
+
+        if (box_gpu_debug_enabled(v)) {
+            box_gpu_debug_record(gpu, t, encoder, color, packet, v, group, slot);
+        }
+
+        wgpuBindGroupRelease(group);
 
         box_gpu_count(gpu, BOX_GPU_STAT_PASS);
         slot ++;

@@ -42,6 +42,9 @@ typedef struct box_render_gpu_stats_t {
                                  *   that draw opaque meshes: one per frame, two for a view
                                  *   that culls by occlusion */
     int32_t prepass_draws;      /**< Draw calls recorded in the depth prepasses */
+    int32_t debug_passes;       /**< Debug render passes recorded, one per frame of each view
+                                 *   that draws a debug item (View.debug), after its effects;
+                                 *   their draw calls count among draws */
     int32_t fog_volumes;        /**< Fog volumes drawn, one per volume of a view in each frame
                                  *   it renders; their draw calls count among draws */
     int32_t transmission_snapshots; /**< Opaque snapshots recorded for transmission, one per

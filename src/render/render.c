@@ -249,6 +249,7 @@ static void box_render_extract_view(
     v->scene = box_render_scene_of(world, camera);
     v->camera_data = *data;
     v->clear = view->clear;
+    v->debug = view->debug;
     v->cull.enabled = view->culling.enabled;
     v->cull.occlusion = view->culling.enabled && view->culling.occlusion;
     v->cull.min_dimension = view->culling.min_dimension_px;

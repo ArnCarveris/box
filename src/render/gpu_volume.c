@@ -304,7 +304,7 @@ void box_gpu_volume_init(
     WGPUBindGroupLayoutEntry entries[4] = {
         {
             .binding = 0,
-            .visibility = WGPUShaderStage_Fragment,
+            .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
             .buffer = {
                 .type = WGPUBufferBindingType_Uniform,
                 .minBindingSize = sizeof(box_gpu_volume_uniforms_t)

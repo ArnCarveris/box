@@ -91,6 +91,49 @@ ECS_STRUCT(CullSettings, {
     float min_dimension_px; /**< Projected size in pixels below which an instance is culled */
 });
 
+/** Settings of the infinite grid a view draws in its debug pass: the plane y = height, with
+ * anti aliased lines at every cell, major lines every major_every cells and the world X (red)
+ * and Z (blue) axes, faded out with the distance from the camera and toward the horizon.
+ *
+ * The lines are drawn in their colors as given, not tone mapped, fogged or bloomed; the depth of
+ * the view hides the grid behind geometry. A cell_size of 0, as in a C literal, draws no grid.
+ */
+ECS_STRUCT(GridSettings, {
+    bool enabled;           /**< Draw the grid */
+    float height;           /**< World Y of the plane, default 0 */
+    float cell_size;        /**< World size of a cell, default 1 */
+    int32_t major_every;    /**< Cells between major lines, default 10, 0 for none */
+    float fade_distance;    /**< Distance from the camera at which it is gone, default 100 */
+    float line_width;       /**< Width of the lines in pixels, default 1 */
+    rgba color;             /**< Minor lines, default gray with alpha 128 */
+    rgba major_color;       /**< Major lines, default gray with alpha 200 */
+});
+
+/** Debug drawing of a view, in a pass after its effects into the color of its target, with the
+ * depth of the view read only. Not drawn by the probe and reflection captures and the bakes.
+ * All zero (a C literal View) draws nothing and records no pass.
+ *
+ * The probe views show only what the view samples: light_probes the probes of the resident
+ * volume of its scene with LightSettings.baked, reflection_probes the ReflectionProbes of its
+ * scene with LightSettings.reflections. A view with those off shows nothing.
+ */
+ECS_STRUCT(ViewDebug, {
+    GridSettings grid;      /**< Infinite grid */
+    bool light_probes;      /**< Spheres at the probes of the volume the view samples, lit by
+                             *   their SH, unshadowed; a probe invalid for every cell around it
+                             *   (inside static geometry) in a dark red hatch */
+    bool reflection_probes; /**< Mirror spheres of the reflection probes the view samples at
+                             *   their capture points, gray until captured, with the influence
+                             *   box in yellow and the projection box, if any, in cyan.
+                             *
+                             *   The scene probe of a ReflectionBake has no sphere and no box:
+                             *   it has no position of its own in view. At most 65536 probes of
+                             *   a kind draw, with a warning naming the view past it. */
+    float probe_size;       /**< World radius of the spheres, 0 for a quarter of the probe
+                             *   spacing for a light probe and 0.25 for a reflection probe;
+                             *   default 0 */
+});
+
 /** Element in view effects array. */
 ECS_STRUCT(ViewEffect, {
     bool enabled;           /**< Whether effect is enabled. */
@@ -112,9 +155,11 @@ ECS_STRUCT(ViewEffect, {
 /** What a frame draws: a camera, the target it draws into and its settings.
  *
  * Views render in ascending order and are picked and get input in descending order, so a view
- * of a higher order draws over and is hit first. Ties keep entity id (creation) order.
+ * of a higher order draws over and is hit first. Ties keep entity id (creation) order. A
+ * changed order takes effect in the next frame.
  *
- * A changed order takes effect in the next frame.
+ * The debug settings draw over the image after the effects of the view, in colors that are not
+ * tone mapped; a view of a higher order draws over them.
  */
 ECS_STRUCT(View, {
     ecs_entity_t camera;            /**< Camera the view renders, a view without one is skipped */
@@ -123,6 +168,7 @@ ECS_STRUCT(View, {
     ShadowSettings shadows;         /**< Shadow settings */
     CullSettings culling;           /**< Cull settings */
     ecs_vec(ViewEffect) effects;    /**< Post process effects */
+    ViewDebug debug;                /**< Debug drawing, after the effects */
     int32_t order;                  /**< Render order, default 0; box's overlays use
                                      *   BOX_VIEW_ORDER_EDITOR, BOX_VIEW_ORDER_FPS and
                                      *   BOX_VIEW_ORDER_CONSOLE */
@@ -156,9 +202,10 @@ int box_view_compare(
  *
  * View gets a constructor that enables lighting, baked lighting, reflections, the atmosphere
  * and the fog volumes, sets the environment intensity to 1 and the ShadowSettings defaults with
- * shadows disabled and enables culling with occlusion and a smallest size of one pixel.
+ * shadows disabled, enables culling with occlusion and a smallest size of one pixel.
  *
- * A C literal View starts from zero instead: unlit, drawing every instance.
+ * It sets the GridSettings defaults with the grid disabled. A C literal View starts from zero
+ * instead: unlit, drawing every instance, without debug drawing.
  *
  * @param world The world
  */

@@ -1,7 +1,7 @@
 /**
  * @file animation/animation.c
  * @brief Animation clips and tracks: resolving a track through reflection, sampling its curve
- * and writing the sampled value into a component.
+ * and writing the sampled value into a component. Playback is in animator.c.
  */
 
 #define BOX_ANIMATION_IMPL
@@ -322,6 +322,91 @@ bool box_animation_sample(
     return result;
 }
 
+/** The child of an instance that was spawned from a child of its prefab.
+ *
+ * @param world The world
+ * @param parent The instance
+ * @param base_child The child of the prefab
+ * @return The child of the instance with an IsA pair to the prefab child, 0 when none
+ */
+static ecs_entity_t box_animation_spawned_child(
+    const ecs_world_t *world,
+    ecs_entity_t parent,
+    ecs_entity_t base_child)
+{
+    ecs_entity_t result = 0;
+    ecs_iter_t it = ecs_children(world, parent);
+    while (ecs_children_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count && !result; i ++) {
+            result = ecs_has_pair(world, it.entities[i], EcsIsA, base_child) ? it.entities[i] : 0;
+        }
+    }
+
+    return result;
+}
+
+/** The child of an instance spawned from a child of its prefab. Such a child has no name of
+ * its own, only an IsA pair to the prefab child.
+ *
+ * @param world The world
+ * @param parent The instance
+ * @param name The name of the child in the prefab
+ * @param length The length of the name
+ * @return The child, 0 when the instance has none of that name
+ */
+static ecs_entity_t box_animation_instance_child(
+    const ecs_world_t *world,
+    ecs_entity_t parent,
+    const char *name,
+    ecs_size_t length)
+{
+    ecs_entity_t result = 0;
+    ecs_entity_t base;
+    int32_t i;
+    for (i = 0; !result && (base = ecs_get_target(world, parent, EcsIsA, i)); i ++) {
+        ecs_entity_t base_child = box_animation_child(world, base, name, length);
+        result = base_child ? box_animation_spawned_child(world, parent, base_child) : 0;
+    }
+
+    return result;
+}
+
+ecs_entity_t box_animation_child(
+    const ecs_world_t *world,
+    ecs_entity_t parent,
+    const char *name,
+    ecs_size_t length)
+{
+    char buf[256];
+    ecs_entity_t result = 0;
+    if (length > 0 && length < (ecs_size_t)sizeof(buf)) {
+        ecs_os_memcpy(buf, name, length);
+        buf[length] = '\0';
+        result = ecs_lookup_child(world, parent, buf);
+        result = result ? result : box_animation_instance_child(world, parent, name, length);
+    }
+
+    return result;
+}
+
+ecs_entity_t box_animation_lookup(
+    const ecs_world_t *world,
+    ecs_entity_t entity,
+    const char *path)
+{
+    ecs_entity_t result = entity;
+    const char *cur = path;
+    while (result && cur && cur[0]) {
+        const char *dot = strchr(cur, '.');
+        ecs_size_t length = dot ? (ecs_size_t)(dot - cur) : ecs_os_strlen(cur);
+        result = box_animation_child(world, result, cur, length);
+        cur = dot ? dot + 1 : NULL;
+    }
+
+    return result;
+}
+
 bool box_animation_write(
     ecs_world_t *world,
     ecs_entity_t track,
@@ -333,7 +418,7 @@ bool box_animation_write(
     const AnimationTrack *t = state ? ecs_get(world, track, AnimationTrack) : NULL;
     ecs_entity_t target = entity;
     if (t && t->target && t->target[0]) {
-        target = ecs_lookup_path_w_sep(world, entity, t->target, ".", NULL, false);
+        target = box_animation_lookup(world, entity, t->target);
     }
 
     if (t && target && ecs_is_alive(world, target)) {
@@ -417,6 +502,8 @@ static void BoxAnimationTrackResolve(
 
         ecs_set_ptr(it->stage, it->entities[i], AnimationTrackState, &state);
     }
+
+    box_animator_changed(it->world);
 }
 
 /** Remove the resolved state of tracks whose AnimationTrack is removed.
@@ -430,6 +517,8 @@ static void BoxAnimationTrackRemove(
     for (i = 0; i < it->count; i ++) {
         ecs_remove(it->stage, it->entities[i], AnimationTrackState);
     }
+
+    box_animator_changed(it->world);
 }
 
 void BoxAnimationImport(
@@ -444,6 +533,9 @@ void BoxAnimationImport(
         BOX_OWNED_CURVE(AnimationTrack, curve));
     ECS_META_COMPONENT(world, AnimationClip);
     ECS_COMPONENT_DEFINE(world, AnimationTrackState);
+    ECS_META_COMPONENT(world, AnimationMode);
+    ECS_META_COMPONENT(world, Animator);
+    box_animator_import(world);
 
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "BoxAnimationTrackResolve" }),

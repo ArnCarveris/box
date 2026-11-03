@@ -256,11 +256,13 @@ void CurveKeys_spin_area_uneven(void) {
     ParticleCurve c = { CurveLinear, BOX_CURVE_KEYS({0, 0}, {0.25f, 1}, {1, 1}) };
     near_eps(area(&c, 0.25f), 0.125f, SAMPLED);
     near_eps(area(&c, 1), 0.875f, SAMPLED);
-    near_eps(box_particle_turned(100, NULL, BOX_PARTICLE_CURVE_CONSTANT, 1, 1, 2), 100, EPS);
+    near_eps(box_particle_turned(100, NULL, BOX_PARTICLE_CURVE_CONSTANT,
+        BOX_PARTICLE_CURVE_CONSTANT, 1, 1, 2, 0), 100, EPS);
 
     float table[TABLE];
     bake(&c, 1, table);
-    near_eps(box_particle_turned(100, table, 0, 0, 2, 2), 100 * 2 * 0.875f, SAMPLED);
+    near_eps(box_particle_turned(100, table, 0, BOX_PARTICLE_CURVE_CONSTANT, 0, 2, 2, 0),
+        100 * 2 * 0.875f, SAMPLED);
 }
 
 void CurveKeys_spin_area_each_kind(void) {
@@ -355,20 +357,21 @@ void CurveKeys_overshoot_clamps(void) {
     float table[TABLE], g[TABLE], color[3] = {1, 1, 1}, raw[3], tinted[3];
     bake(&dip, 1, table);
     test_assert(box_particle_curve(table, 0, 0, 0.1f) < 0);
-    test_flt(box_particle_scaled(2, table, 0, 0, 0.1f), 0);
-    near(box_particle_scaled(2, table, 0, 0, 1), 2);
-    test_flt(box_particle_scaled(2, NULL, BOX_PARTICLE_CURVE_CONSTANT, -1, 0.5f), 0);
-    test_assert(box_particle_rotation(0, 0, table, 0, 0, BOX_PARTICLE_CURVE_CONSTANT, 1,
-        0.1f, 1) < 0);
+    test_flt(box_particle_scaled(2, table, 0, BOX_PARTICLE_CURVE_CONSTANT, 0, 0.1f, 0), 0);
+    near(box_particle_scaled(2, table, 0, BOX_PARTICLE_CURVE_CONSTANT, 0, 1, 0), 2);
+    test_flt(box_particle_scaled(2, NULL, BOX_PARTICLE_CURVE_CONSTANT,
+        BOX_PARTICLE_CURVE_CONSTANT, -1, 0.5f, 0), 0);
+    test_assert(box_particle_rotation(0, 0, table, 0, BOX_PARTICLE_CURVE_CONSTANT, 0, 0,
+        BOX_PARTICLE_CURVE_CONSTANT, BOX_PARTICLE_CURVE_CONSTANT, 1, 0, 0.1f, 1) < 0);
 
     box_particle_gradient_bake(&dark, g);
     box_particle_gradient(g, 0, NULL, 0.3f, raw);
     test_assert(raw[0] < 0);
-    box_particle_tinted(color, g, 0, NULL, 0.3f, tinted);
+    box_particle_tinted(color, g, 0, BOX_PARTICLE_CURVE_CONSTANT, NULL, 0.3f, 0, tinted);
     test_flt(tinted[0], 0);
     test_flt(tinted[1], 0);
     test_flt(tinted[2], 0);
-    box_particle_tinted(color, g, 0, NULL, 0.1f, tinted);
+    box_particle_tinted(color, g, 0, BOX_PARTICLE_CURVE_CONSTANT, NULL, 0.1f, 0, tinted);
     test_assert(tinted[0] > 0.9f);
 }
 

@@ -447,7 +447,9 @@ static void box_shader_changed(
  * image or a view with a background, or it simulates or draws particles
  * and the packet has a particle pool, or it blurs the opaque snapshot and a batch is
  * transmissive, or it raymarches fog volumes or assigns lights to clusters and a view of the
- * packet draws a fog volume, which reads the clusters for its point and spot lights
+ * packet draws a fog volume, which reads the clusters for its point and spot lights, or it
+ * draws the debug grid and a view of the packet has it enabled, or it draws the probe debug
+ * views and a view of the packet has one enabled
  */
 static bool box_shader_used(
     const box_render_packet_t *p,
@@ -482,6 +484,23 @@ static bool box_shader_used(
         ecs_vec_count(&p->fog_volumes))
     {
         result = true;
+    }
+
+    if (handle == BOX_RENDER_SHADER_DEBUG_GRID) {
+        for (i = 0; i < ecs_vec_count(&p->views); i ++) {
+            if (ecs_vec_get_t(&p->views, box_render_view_t, i)->debug.grid.enabled) {
+                result = true;
+            }
+        }
+    }
+
+    if (handle == BOX_RENDER_SHADER_DEBUG_PROBES) {
+        for (i = 0; i < ecs_vec_count(&p->views); i ++) {
+            const ViewDebug *debug = &ecs_vec_get_t(&p->views, box_render_view_t, i)->debug;
+            if (debug->light_probes || debug->reflection_probes) {
+                result = true;
+            }
+        }
     }
 
     if (handle == BOX_RENDER_SHADER_BAKE && (ecs_vec_count(&p->bakes) ||
@@ -807,4 +826,8 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_TRANSMISSION, true);
     box_shader_builtin(world, state, builtin, "fog_volume", "etc/shaders/fog_volume.wgsl",
         BOX_RENDER_SHADER_FOG_VOLUME, true);
+    box_shader_builtin(world, state, builtin, "debug_grid", "etc/shaders/debug_grid.wgsl",
+        BOX_RENDER_SHADER_DEBUG_GRID, true);
+    box_shader_builtin(world, state, builtin, "debug_probes", "etc/shaders/debug_probes.wgsl",
+        BOX_RENDER_SHADER_DEBUG_PROBES, true);
 }

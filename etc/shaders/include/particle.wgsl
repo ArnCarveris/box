@@ -8,6 +8,26 @@
 // curves: array<f32>, BOX_PARTICLE_CURVE_SAMPLES floats per row, baked by the extract.
 #pragma once
 
+// Rows of the curves of a ParticleMotion, box_particle_motion_rows_t: two vector curves of four
+// floats per sample, x, y and z of the velocity and w the speed, and x, y and z of the force and
+// w the drag. rows is the first row of the velocity, of its max, of the force and of its max,
+// CURVE_CONSTANT for a constant vector or one without a max.
+struct MotionRows {
+    rows: vec4u,
+    // Velocity xyz and speed w while constant
+    velocity: vec4f,
+    // Force xyz and drag w while constant
+    force: vec4f,
+};
+
+// The curves of ParticleMotion of a particle at its age, box_particle_motion_t.
+struct Motion {
+    velocity: vec3f,
+    speed: f32,
+    force: vec3f,
+    drag: f32,
+};
+
 // box_render_particle_block_t: ranges are (min, max) pairs, a max not above min hands out min.
 struct Emitter {
     // World transform of the emitter
@@ -67,6 +87,15 @@ struct Emitter {
     // x: vertices per particle, y: 1 when drawn through the sort keys, z: keys sorted, w: 1 when
     // the emitter has a ParticleAppearance
     draw: vec4u,
+    // Rows of the max curves of the size, opacity, rotation and spin, which each particle blends
+    // toward by its own draw, CURVE_CONSTANT for a curve without max_keys; the area of the max
+    // spin is in the row after it
+    curve_max: vec4u,
+    // x: first of the GRADIENT_ROWS rows of the max gradient, CURVE_CONSTANT for none, y: 1
+    // when the emitter has a ParticleMotion that changes its motion
+    gradient_max: vec4u,
+    // Rows of the curves of the ParticleMotion, read only while gradient_max.y is 1
+    motion: MotionRows,
 };
 
 // A corner of a triangle of a billboard mesh, box_render_particle_corner_t: xyz the position
@@ -120,6 +149,23 @@ const STREAM_DIRECTION: u32 = 9u;
 const STREAM_POINT: u32 = 11u;
 const STREAM_COLOR: u32 = 15u;
 const STREAM_RADIAL: u32 = 19u;
+const STREAM_CURVE: u32 = 20u;
+const STREAM_MOTION: u32 = 25u;
+
+// Curves of ParticleCurves, the offsets of their blend streams from STREAM_CURVE,
+// BOX_PARTICLE_CURVE_*
+const CURVE_SIZE: u32 = 0u;
+const CURVE_OPACITY: u32 = 1u;
+const CURVE_ROTATION: u32 = 2u;
+const CURVE_SPIN: u32 = 3u;
+const CURVE_COLOR: u32 = 4u;
+
+// Quantities of ParticleMotion, the offsets of their blend streams from STREAM_MOTION,
+// BOX_PARTICLE_MOTION_*
+const MOTION_VELOCITY: u32 = 0u;
+const MOTION_SPEED: u32 = 1u;
+const MOTION_FORCE: u32 = 2u;
+const MOTION_DRAG: u32 = 3u;
 
 // Ground collision modes, BOX_PARTICLE_GROUND_*
 const GROUND_NONE: u32 = 0u;
@@ -165,6 +211,11 @@ fn particle_range(r: vec2f, u: f32) -> f32 {
 // A draw of one stream of a particle from a range.
 fn particle_draw(seed: u32, index: u32, stream: u32, r: vec2f) -> f32 {
     return particle_range(r, particle_unit(particle_hash(seed, index, stream)));
+}
+
+// The blend of a particle between a curve and its max curve, the same for its whole life.
+fn particle_blend(seed: u32, index: u32, curve: u32) -> f32 {
+    return particle_unit(particle_hash(seed, index, STREAM_CURVE + curve));
 }
 
 // A display encoded color decoded to linear.
@@ -245,17 +296,19 @@ fn particle_wander(position: vec3f, phase: vec3f, scale: f32, turbulence: f32) -
         sin(q.x) + sin(1.618 * q.y));
 }
 
-// Advance a particle by a frame: v += (acceleration + wander(p)) * delta, then the exact drag
-// v = wind + (v - wind) * exp(-drag * delta), then p += (v + drift) * delta. wind.w is the drag,
-// turbulence.x the acceleration of the wander field and turbulence.y its scale. The drift
-// moves the particle without entering its velocity.
+// Advance a particle by a frame: v += (acceleration + wander(p) + force) * delta, then the exact
+// drag v = wind + (v - wind) * exp(-drag * motion drag * delta), then
+// p += (speed * v + velocity + drift) * delta, with the force, drag, speed and velocity of the
+// motion curves. wind.w is the drag, turbulence.x the acceleration of the wander field and
+// turbulence.y its scale. The drift and the velocity curve move the particle without entering
+// its velocity; particle_motion_none() leaves every value as without them.
 fn particle_integrate(p: ptr<function, Particle>, acceleration: vec3f, wind: vec4f,
-    turbulence: vec2f, phase: vec3f, drift: vec3f, delta: f32)
+    turbulence: vec2f, phase: vec3f, drift: vec3f, motion: Motion, delta: f32)
 {
     let wander = particle_wander((*p).position, phase, turbulence.y, turbulence.x);
-    let v = (*p).velocity + (acceleration + wander) * delta;
-    (*p).velocity = wind.xyz + (v - wind.xyz) * exp(-wind.w * delta);
-    (*p).position += ((*p).velocity + drift) * delta;
+    let v = (*p).velocity + (acceleration + wander + motion.force) * delta;
+    (*p).velocity = wind.xyz + (v - wind.xyz) * exp(-wind.w * max(motion.drag, 0.0) * delta);
+    (*p).position += ((*p).velocity * motion.speed + motion.velocity + drift) * delta;
 }
 
 // Collide a particle with the ground plane of height ground.x after its step: a particle
@@ -320,23 +373,120 @@ fn particle_curve_area(row: u32, value: f32, t: f32) -> f32 {
     return curves[k + CURVE_SAMPLES] + at.y * dt * (v + 0.5 * at.y * (curves[k + 1u] - v));
 }
 
+// The curve of a particle at a normalized age: the curve, or with a max curve at max_row its
+// blend toward it by the draw u of the particle. Without a max curve it reads one row at most.
+fn particle_curve_range(row: u32, max_row: u32, value: f32, t: f32, u: f32) -> f32 {
+    let a = particle_curve(row, value, t);
+    if (max_row == CURVE_CONSTANT) {
+        return a;
+    }
+
+    return a + (particle_curve(max_row, value, t) - a) * u;
+}
+
+// Area under the curve of a particle up to a normalized age: with a max curve the two areas
+// blended by the draw u of the particle, the area under the blended curve.
+fn particle_curve_area_range(row: u32, max_row: u32, value: f32, t: f32, u: f32) -> f32 {
+    let a = particle_curve_area(row, value, t);
+    if (max_row == CURVE_CONSTANT) {
+        return a;
+    }
+
+    return a + (particle_curve_area(max_row, value, t) - a) * u;
+}
+
+// The curves of an emitter without ParticleMotion, which change nothing.
+fn particle_motion_none() -> Motion {
+    return Motion(vec3f(0.0), 1.0, vec3f(0.0), 1.0);
+}
+
+// The normalized age of a particle from its lifetime and the microseconds it has left, as the
+// draw computes it.
+fn particle_life_age(life_us: u32, remaining: u32) -> f32 {
+    let age = f32(life_us - remaining) * 1e-6;
+    return particle_norm_age(age, f32(life_us) * 1e-6);
+}
+
+// The blend of a particle between the curves of a quantity of ParticleMotion and their max
+// curves, the same for its whole life.
+fn particle_motion_blend(seed: u32, index: u32, which: u32) -> f32 {
+    return particle_unit(particle_hash(seed, index, STREAM_MOTION + which));
+}
+
+// A vector curve at a normalized age from its rows of the curve table, four floats per sample,
+// linear between two samples; a constant vector reads no row.
+fn particle_vector(row: u32, value: vec4f, t: f32) -> vec4f {
+    if (row == CURVE_CONSTANT) {
+        return value;
+    }
+
+    let at = particle_curve_sample(t);
+    let k = row * CURVE_SAMPLES + u32(at.x) * 4u;
+    let a = vec4f(curves[k], curves[k + 1u], curves[k + 2u], curves[k + 3u]);
+    let b = vec4f(curves[k + 4u], curves[k + 5u], curves[k + 6u], curves[k + 7u]);
+    return a + (b - a) * at.y;
+}
+
+// The vector curve of a particle at a normalized age: the vector, or with a max vector at
+// max_row each value blended toward that of the max by its own blend u of the particle.
+fn particle_vector_range(row: u32, max_row: u32, value: vec4f, t: f32, u: vec4f) -> vec4f {
+    let a = particle_vector(row, value, t);
+    if (max_row == CURVE_CONSTANT) {
+        return a;
+    }
+
+    return a + (particle_vector(max_row, value, t) - a) * u;
+}
+
+// The velocity and speed curves of ParticleMotion of a particle at a normalized age, the three
+// axes of the velocity blended by one draw and the speed by another, its force 0 and drag 1.
+fn particle_motion_velocity(m: MotionRows, seed: u32, index: u32, t: f32) -> Motion {
+    let uv = particle_motion_blend(seed, index, MOTION_VELOCITY);
+    let u = vec4f(uv, uv, uv, particle_motion_blend(seed, index, MOTION_SPEED));
+    let v = particle_vector_range(m.rows.x, m.rows.y, m.velocity, t, u);
+    return Motion(v.xyz, v.w, vec3f(0.0), 1.0);
+}
+
+// The curves of ParticleMotion of a particle at a normalized age, each blended toward its max
+// curve by the draw of its quantity.
+fn particle_motion(m: MotionRows, seed: u32, index: u32, t: f32) -> Motion {
+    let uf = particle_motion_blend(seed, index, MOTION_FORCE);
+    let u = vec4f(uf, uf, uf, particle_motion_blend(seed, index, MOTION_DRAG));
+    let f = particle_vector_range(m.rows.z, m.rows.w, m.force, t, u);
+    var out = particle_motion_velocity(m, seed, index, t);
+    out.force = f.xyz;
+    out.drag = f.w;
+    return out;
+}
+
+// The velocity a particle moves with but for the drift, which a stretched sprite stretches
+// along: speed times its stored velocity plus the velocity curve.
+fn particle_moving(velocity: vec3f, motion: Motion) -> vec3f {
+    return velocity * motion.speed + motion.velocity;
+}
+
 // Degrees a particle has turned by its spin: the area under the spin curve up to its age, and
 // for a constant curve the spin times its value times the age.
-fn particle_turned(spin: f32, row: u32, value: f32, age: f32, life: f32) -> f32 {
+fn particle_turned(spin: f32, row: u32, max_row: u32, value: f32, age: f32, life: f32,
+    u: f32) -> f32
+{
     if (row == CURVE_CONSTANT) {
         return spin * value * age;
     }
 
-    return spin * life * particle_curve_area(row, value, particle_norm_age(age, life));
+    return spin * life *
+        particle_curve_area_range(row, max_row, value, particle_norm_age(age, life), u);
 }
 
 // Rotation of a particle in degrees: spawned, plus the turns of the rotation curve, plus spin.
-fn particle_rotation(rotation: f32, spin: f32, rotation_row: u32, rotation_value: f32,
-    spin_row: u32, spin_value: f32, age: f32, life: f32) -> f32
+fn particle_rotation(rotation: f32, spin: f32, rotation_row: u32, rotation_max: u32,
+    rotation_value: f32, rotation_u: f32, spin_row: u32, spin_max: u32, spin_value: f32,
+    spin_u: f32, age: f32, life: f32) -> f32
 {
     let t = particle_norm_age(age, life);
-    return rotation + 360.0 * particle_curve(rotation_row, rotation_value, t) +
-        particle_turned(spin, spin_row, spin_value, age, life);
+    return rotation +
+        360.0 * particle_curve_range(rotation_row, rotation_max, rotation_value, t, rotation_u) +
+        particle_turned(spin, spin_row, spin_max, spin_value, age, life, spin_u);
 }
 
 // A gradient at a normalized age from its rows of the curve table, a linear color of four
@@ -353,15 +503,26 @@ fn particle_gradient(row: u32, value: vec3f, t: f32) -> vec3f {
     return mix(a, b, at.y);
 }
 
+// The gradient of a particle at a normalized age: the gradient, or with a max gradient at
+// max_row its blend toward it in linear light by the draw u of the particle.
+fn particle_gradient_range(row: u32, max_row: u32, value: vec3f, t: f32, u: f32) -> vec3f {
+    let a = particle_gradient(row, value, t);
+    if (max_row == CURVE_CONSTANT) {
+        return a;
+    }
+
+    return mix(a, particle_gradient(max_row, value, t), u);
+}
+
 // Size or opacity of a particle: the value it spawned with times its curve, clamped at 0 as a
 // curve that overshoots its keys may go below it.
-fn particle_scaled(base: f32, row: u32, value: f32, t: f32) -> f32 {
-    return max(base * particle_curve(row, value, t), 0.0);
+fn particle_scaled(base: f32, row: u32, max_row: u32, value: f32, t: f32, u: f32) -> f32 {
+    return max(base * particle_curve_range(row, max_row, value, t, u), 0.0);
 }
 
 // Color of a particle: the linear color it spawned with times its gradient, clamped at 0.
-fn particle_tinted(color: vec3f, row: u32, value: vec3f, t: f32) -> vec3f {
-    return max(color * particle_gradient(row, value, t), vec3f(0.0));
+fn particle_tinted(color: vec3f, row: u32, max_row: u32, value: vec3f, t: f32, u: f32) -> vec3f {
+    return max(color * particle_gradient_range(row, max_row, value, t, u), vec3f(0.0));
 }
 
 // Frame of a sprite sheet a particle shows, row by row from the top left.

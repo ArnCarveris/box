@@ -6,15 +6,23 @@
  * A curve is baked when it changes, into the rows of an entry with the same baked content when
  * there is one, so the instances of an effect share them. Constant curves take no row, and a
  * curve that is not valid, or whose samples are not finite, is the default of its field.
+ *
+ * A curve with max_keys takes rows for both of its curves, also a flat one, unless the two are
+ * the same constant; the curve without max_keys takes no second row. The curves of a
+ * ParticleMotion are two vectors of four floats per sample, velocity and speed, force and drag.
  */
 
 #ifndef BOX_RENDER_PARTICLE_ROWS_H
 #define BOX_RENDER_PARTICLE_ROWS_H
 
 #include "render.h"
+#include "../particle/simulate.h"
 
 /** Curves of an emitter: the size, opacity, rotation and spin curves and the gradient */
 #define BOX_PARTICLE_ROWS_CURVES (5)
+
+/** Entries a pool may use: those of its curves, then those of their max curves */
+#define BOX_PARTICLE_ROWS_ENTRIES (2 * BOX_PARTICLE_ROWS_CURVES)
 
 /** The curve table: the entries that hand out rows and the rows as they were sent */
 typedef struct box_particle_rows_t {
@@ -32,15 +40,33 @@ typedef struct box_particle_rows_use_t {
     bool had;               /**< The emitter had ParticleCurves when they were baked */
     uint64_t hash;          /**< Hash of the kinds and keys of the ParticleCurves they were
                              *   baked from */
-    int32_t entries[BOX_PARTICLE_ROWS_CURVES]; /**< Index plus 1 of the entries it uses, 0
-                             *   for a constant curve */
+    int32_t entries[BOX_PARTICLE_ROWS_ENTRIES]; /**< Index plus 1 of the entries it uses, 0
+                             *   for a constant curve: the curves, then their max curves */
     uint32_t rows[4];       /**< Rows of the size, opacity, rotation and spin curves,
                              *   BOX_PARTICLE_CURVE_CONSTANT for a constant */
+    uint32_t max_rows[4];   /**< Rows of their max curves, BOX_PARTICLE_CURVE_CONSTANT for a
+                             *   curve without max_keys or one whose two curves are the same
+                             *   constant */
     float values[4];        /**< Values of those curves while constant */
     uint32_t gradient_row;  /**< First row of the gradient, BOX_PARTICLE_CURVE_CONSTANT for a
                              *   constant */
+    uint32_t gradient_max_row; /**< First row of the max gradient, BOX_PARTICLE_CURVE_CONSTANT
+                             *   for none */
     float gradient[3];      /**< Linear color of a constant gradient */
 } box_particle_rows_use_t;
+
+/** The rows the curves of the ParticleMotion of one pool use and what its block reads */
+typedef struct box_particle_rows_motion_t {
+    bool baked;             /**< The members below follow hash */
+    bool had;               /**< The emitter had ParticleMotion when they were baked */
+    bool active;            /**< A curve is not the default of its field, so the passes
+                             *   evaluate the motion */
+    uint64_t hash;          /**< Hash of the kinds and keys of the ParticleMotion they were
+                             *   baked from */
+    int32_t entries[4];     /**< Index plus 1 of the entries it uses, 0 for none: the
+                             *   velocity, its max, the force and its max */
+    box_particle_motion_rows_t rows; /**< Rows and constants of the curves */
+} box_particle_rows_motion_t;
 
 /** Initialize an empty curve table.
  *
@@ -75,6 +101,35 @@ void box_particle_rows_update(
     box_particle_rows_t *t,
     box_particle_rows_use_t *use,
     const ParticleCurves *curves);
+
+/** Give a pool the rows of the curves of the ParticleMotion of its emitter, baked only when
+ * they changed since the last call, as box_particle_rows_update.
+ *
+ * @param t The table
+ * @param use The rows of the pool
+ * @param motion The ParticleMotion of the emitter, NULL for none
+ */
+void box_particle_rows_motion_update(
+    box_particle_rows_t *t,
+    box_particle_rows_motion_t *use,
+    const ParticleMotion *motion);
+
+/** Stop using the rows of the ParticleMotion of a pool.
+ *
+ * @param t The table
+ * @param use The rows of the pool
+ */
+void box_particle_rows_motion_release(
+    box_particle_rows_t *t,
+    box_particle_rows_motion_t *use);
+
+/** Check whether the ParticleMotion of a pool reads rows of the table.
+ *
+ * @param use The rows of the pool
+ * @return Whether one of its curves has rows
+ */
+bool box_particle_rows_motion_used(
+    const box_particle_rows_motion_t *use);
 
 /** Stop using the rows of a pool, which are handed out again to other curves.
  *

@@ -1258,6 +1258,63 @@ bool box_gpu_fog_volumes_draw(
     const box_render_view_t *v,
     WGPUTextureView depth);
 
+/** Probes of a kind (light or reflection) the debug pass of a view draws at most */
+#define BOX_GPU_DEBUG_PROBES_MAX ((uint32_t)BOX_RENDER_DEBUG_PROBES_MAX)
+
+/** Create the layouts of the debug passes, after the view layout.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_debug_init(
+    box_gpu_t *gpu);
+
+/** Release the pipelines, layouts and buffer of the debug passes.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_debug_fini(
+    box_gpu_t *gpu);
+
+/** Start the debug passes of a packet, which fill the uniform buffer from its start.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_debug_begin(
+    box_gpu_t *gpu);
+
+/** Check whether a view has a debug option on (View.debug), so it records a debug pass and
+ * keeps its depth for it.
+ *
+ * @param v The view
+ * @return Whether an item of the debug settings of the view is enabled
+ */
+bool box_gpu_debug_enabled(
+    const box_render_view_t *v);
+
+/** Record the debug pass of a view after its effects: a render pass that loads the color of the
+ * target and reads the depth of the view, drawing the grid, then the probes and their boxes.
+ * A view without any, without probes to show or with shaders not compiled records nothing.
+ *
+ * @param gpu The backend
+ * @param t The target, whose depth the pass reads and whose format it draws in
+ * @param encoder The encoder of the frame
+ * @param color The texture view of the target, the final color of the view with and without
+ * effects
+ * @param packet The packet
+ * @param v The view
+ * @param group The bind group of the view
+ * @param slot Slot of the view in the view buffer
+ */
+void box_gpu_debug_record(
+    box_gpu_t *gpu,
+    box_gpu_target_t *t,
+    WGPUCommandEncoder encoder,
+    WGPUTextureView color,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    WGPUBindGroup group,
+    int32_t slot);
+
 /** Create the layouts, sampler and placeholders of the effect passes.
  *
  * @param gpu The backend

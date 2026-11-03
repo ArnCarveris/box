@@ -28,6 +28,19 @@ node test/integration/web/transitions.mjs \
     "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
 ```
 
+`animation.mjs` checks keyframe animation in the browser, where `AnimatorPlay` and the render run
+on the main thread. It opens `test/integration/web/animation.flecs` the same way, at the same
+fixed delta and size: a white square moves between a grey and a green marker in ping pong over
+2 s, and a square with `DynamicMaterial` fades from red to blue and back. The check takes
+screenshots for 6 s once both squares show and passes when the square was seen near both markers
+and in between, the color mostly red and mostly blue, and the log has no error and no invalid
+WebGPU object:
+
+```sh
+node test/integration/web/animation.mjs \
+    "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
+```
+
 `transmission.mjs` checks that a rough transmissive shape is never dark in the browser before
 `etc/shaders/transmission.wgsl` compiles, the case `Transmission_first_frame_not_dark` of
 `test/gpu/render` simulates natively. It opens `test/integration/web/transmission.flecs` the same

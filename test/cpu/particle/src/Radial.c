@@ -233,7 +233,7 @@ static void replay_step(
 
         p->remaining = box_particle_age(p->remaining, b->delta_us);
         if (p->remaining) {
-            box_particle_integrate(p->position, p->velocity, &f, delta);
+            box_particle_integrate(p->position, p->velocity, &f, NULL, delta);
         }
     }
 

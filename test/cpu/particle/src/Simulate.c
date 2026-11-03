@@ -288,7 +288,7 @@ void Simulate_integrate_constant_acceleration(void) {
     box_particle_forces_t f = { .acceleration = {0, -9.8f, 2}, .scale = 1 };
     int32_t i, c, n = 120;
     for (i = 0; i < n; i ++) {
-        box_particle_integrate(p, v, &f, dt);
+        box_particle_integrate(p, v, &f, NULL, dt);
     }
 
     float t = (float)n * dt;
@@ -379,7 +379,7 @@ void Simulate_integrate_drag_toward_wind(void) {
     float p[3] = {1, 2, 3}, v[3] = {0, 5, 1};
     int32_t i, c, n = 120;
     for (i = 0; i < n; i ++) {
-        box_particle_integrate(p, v, &f, DT);
+        box_particle_integrate(p, v, &f, NULL, DT);
     }
 
     float t = (float)n * DT, e = expf(-f.drag * DT), decay = expf(-f.drag * t);
@@ -402,7 +402,7 @@ void Simulate_integrate_gravity_and_drag(void) {
     float v0[3] = {0, 8, 2}, v[3] = {0, 8, 2}, p[3] = {0, 0, 0};
     int32_t i, c, n = 90;
     for (i = 0; i < n; i ++) {
-        box_particle_integrate(p, v, &f, DT);
+        box_particle_integrate(p, v, &f, NULL, DT);
     }
 
     float t = (float)n * DT, e = expf(-f.drag * DT), decay = expf(-f.drag * t);
@@ -417,7 +417,7 @@ void Simulate_integrate_gravity_and_drag(void) {
     }
 
     for (i = 0; i < 1200; i ++) {
-        box_particle_integrate(p, v, &f, DT);
+        box_particle_integrate(p, v, &f, NULL, DT);
     }
 
     test_assert(fabsf(v[0] - 1) < 1e-3f);
@@ -431,7 +431,7 @@ void Simulate_integrate_wind_needs_drag(void) {
     float p[3] = {0, 0, 0}, v[3] = {1, 2, 3};
     int32_t i;
     for (i = 0; i < 60; i ++) {
-        box_particle_integrate(p, v, &f, DT);
+        box_particle_integrate(p, v, &f, NULL, DT);
     }
 
     test_flt(v[0], 1);
@@ -516,7 +516,7 @@ void Simulate_integrate_turbulence(void) {
         expect_p[c] = p[c] + expect_v[c] * DT;
     }
 
-    box_particle_integrate(p, v, &f, DT);
+    box_particle_integrate(p, v, &f, NULL, DT);
     for (c = 0; c < 3; c ++) {
         test_assert(fabsf(v[c] - expect_v[c]) < 1e-6f);
         test_assert(fabsf(p[c] - expect_p[c]) < 1e-6f);
@@ -722,7 +722,7 @@ void Simulate_ground_bounce(void) {
     int32_t i, hits = 0;
     bool falling = true;
     for (i = 0; i < 1200; i ++) {
-        box_particle_integrate(q, w, &f, 1.0f / 600.0f);
+        box_particle_integrate(q, w, &f, NULL, 1.0f / 600.0f);
         bool down = w[1] < 0;
         box_particle_collide(q, w, &g);
         test_assert(q[1] >= 0);
@@ -756,7 +756,7 @@ void Simulate_ground_friction(void) {
     float q[3] = {0, 1, 0}, w[3] = {2, 0, 0};
     int32_t i;
     for (i = 0; i < 10; i ++) {
-        box_particle_integrate(q, w, &f, DT);
+        box_particle_integrate(q, w, &f, NULL, DT);
         box_particle_collide(q, w, &g);
         test_flt(q[1], 1);
     }
