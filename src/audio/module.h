@@ -135,12 +135,9 @@ typedef struct box_audio_module_stats_t {
     int64_t orders;         /**< ORDER commands written */
     int64_t cycles;         /**< Compiles that found a cycle */
     int64_t dropped;        /**< Plays dropped before a gesture */
-<<<<<<< HEAD
     int64_t reverbs;        /**< REVERB commands written */
-=======
     int64_t not_ready;      /**< Plays dropped while their sound file loaded */
     int64_t decodes;        /**< Decodes of sound files submitted */
->>>>>>> 5caf645c2aa6d05f0f3fd6bbc7c5f6000d6f1880
 } box_audio_module_stats_t;
 
 /** A capture that waits for its frames */

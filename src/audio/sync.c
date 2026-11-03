@@ -473,7 +473,6 @@ done:
     state->order_dirty = false;
 }
 
-<<<<<<< HEAD
 /** Write a reverb command and remember what it sent.
  *
  * @param state The state
@@ -609,8 +608,6 @@ static void box_audio_reverbs(
     }
 }
 
-/** Send the samples of sounds the output does not have yet.
-=======
 /** Give a sound an id of the core and hand its frames to the output, which copies them.
  *
  * @param state The state
@@ -650,7 +647,6 @@ done:
 }
 
 /** Send the samples of sounds the output does not have yet: AudioPcm and decoded files.
->>>>>>> 5caf645c2aa6d05f0f3fd6bbc7c5f6000d6f1880
  *
  * @param world The world
  * @param state The state

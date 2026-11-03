@@ -136,7 +136,6 @@ node test/integration/web/audio_module.mjs \
     "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
 ```
 
-<<<<<<< HEAD
 `audio_reverb.mjs` checks the reverb with `test/integration/web/audio_reverb.flecs`, a bus
 `world` that sends to the bus `hall` with `Reverb: {decay: 2.4}`. After a trusted click it
 records `audio capture 4` while `box.audio.play` sends a click to the reverb, and measures the
@@ -147,7 +146,8 @@ rendering 2000 quanta back to back, and which has to stay under real time:
 ```sh
 node test/integration/web/audio_reverb.mjs \
     "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
-=======
+```
+
 `audio_sample.mjs` checks sound files (`SoundFile`, see `docs/audio.md`) in Chrome. It preloads
 `test/integration/web/audio_sample.flecs` and the WAV and FLAC files of `test/assets/audio` with
 `?preload=`; the scene decodes one second of 440 Hz at 44100 Hz. After a trusted click it
@@ -160,5 +160,4 @@ expects the worklet to drop the voice and free the sound:
 ```sh
 node test/integration/web/audio_sample.mjs \
     "$(tools/integration.py local-env --env audio)/wasm32-Emscripten/debug/bin"
->>>>>>> 5caf645c2aa6d05f0f3fd6bbc7c5f6000d6f1880
 ```

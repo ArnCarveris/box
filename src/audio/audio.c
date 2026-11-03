@@ -19,11 +19,8 @@ static ECS_COMPONENT_DECLARE(AudioModuleState);
 ECS_COMPONENT_DECLARE(AudioSoundId);
 ECS_COMPONENT_DECLARE(AudioBusState);
 ECS_COMPONENT_DECLARE(AudioVoice);
-<<<<<<< HEAD
 ECS_COMPONENT_DECLARE(AudioReverbState);
-=======
 ECS_COMPONENT_DECLARE(AudioSample);
->>>>>>> 5caf645c2aa6d05f0f3fd6bbc7c5f6000d6f1880
 
 /** Construct AudioBus values: unity volume to the master, centered, no send.
  *
@@ -158,7 +155,6 @@ int32_t box_audio_module_order(
     return result;
 }
 
-<<<<<<< HEAD
 int32_t box_audio_module_reverb_slot(
     const ecs_world_t *world,
     ecs_entity_t e)
@@ -176,7 +172,9 @@ int32_t box_audio_module_reverb_slot(
     }
 
 done:
-=======
+    return result;
+}
+
 int32_t box_audio_module_sounds(
     const ecs_world_t *world)
 {
@@ -186,7 +184,6 @@ int32_t box_audio_module_sounds(
         result += state->sound_used[i] != 0;
     }
 
->>>>>>> 5caf645c2aa6d05f0f3fd6bbc7c5f6000d6f1880
     return result;
 }
 
@@ -516,27 +513,18 @@ void BoxAudioImport(
     ECS_COMPONENT_DEFINE(world, AudioSoundId);
     ECS_COMPONENT_DEFINE(world, AudioBusState);
     ECS_COMPONENT_DEFINE(world, AudioVoice);
-<<<<<<< HEAD
     ECS_COMPONENT_DEFINE(world, AudioReverbState);
-    ecs_set_hooks(world, AudioSoundId, { .copy = box_audio_track_copy });
-    ecs_set_hooks(world, AudioBusState, { .copy = box_audio_track_copy });
-    ecs_set_hooks(world, AudioVoice, { .copy = box_audio_track_copy });
-    ecs_set_hooks(world, AudioReverbState, { .copy = box_audio_track_copy });
-    ecs_add_pair(world, ecs_id(AudioPcm), EcsWith, ecs_id(AudioSoundId));
-    ecs_add_pair(world, ecs_id(AudioBus), EcsWith, ecs_id(AudioBusState));
-    ecs_add_pair(world, ecs_id(AudioSource), EcsWith, ecs_id(AudioVoice));
-    ecs_add_pair(world, ecs_id(Reverb), EcsWith, ecs_id(AudioReverbState));
-=======
     ECS_COMPONENT_DEFINE(world, AudioSample);
     ecs_set_hooks(world, AudioSoundId, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioBusState, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioVoice, { .copy = box_audio_track_copy });
+    ecs_set_hooks(world, AudioReverbState, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioSample, { .copy = box_audio_track_copy });
     ecs_add_pair(world, ecs_id(AudioPcm), EcsWith, ecs_id(AudioSoundId));
     ecs_add_pair(world, ecs_id(AudioBus), EcsWith, ecs_id(AudioBusState));
     ecs_add_pair(world, ecs_id(AudioSource), EcsWith, ecs_id(AudioVoice));
+    ecs_add_pair(world, ecs_id(Reverb), EcsWith, ecs_id(AudioReverbState));
     ecs_add_pair(world, ecs_id(SoundFile), EcsWith, ecs_id(AudioSample));
->>>>>>> 5caf645c2aa6d05f0f3fd6bbc7c5f6000d6f1880
 
     ecs_entity(world, { .name = "master" });
     ecs_singleton_add(world, AudioSettings);
