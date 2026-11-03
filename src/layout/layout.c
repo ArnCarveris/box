@@ -578,7 +578,114 @@ static void LayoutFillUpdate(
     }
 }
 
+/** Check whether an element is part of a UI layout: it is sized or placed by the layout, or
+ * its parent has a Layout.
+ *
+ * @param world The world
+ * @param e The element
+ * @return Whether the element is part of a UI layout
+ */
+static bool box_layout_in_ui(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    ecs_entity_t parent = ecs_get_parent(world, e);
+
+    return ecs_has(world, e, LayoutItem) || ecs_has(world, e, LayoutBounds) ||
+        ecs_has(world, e, LayoutFill) || (parent && ecs_has(world, parent, Layout));
+}
+
+/** Warn once about an element that a missing Layout of its parent leaves unplaced: a
+ * LayoutFloat whose parent has no Layout, or a LayoutItem whose parent has no Layout but is
+ * part of a UI layout.
+ *
+ * The warning is kept until the mistake is fixed, so it fires again when it is made again.
+ *
+ * @param world The world
+ * @param state The state of the layout module
+ * @param e The element
+ */
+static void box_layout_check(
+    const ecs_world_t *world,
+    box_layout_state_t *state,
+    ecs_entity_t e)
+{
+    ecs_map_key_t key = (ecs_map_key_t)e;
+    ecs_entity_t parent = ecs_get_parent(world, e);
+    bool has_float = ecs_has(world, e, LayoutFloat);
+    bool broken = false;
+    if (ecs_has_id(world, e, EcsPrefab) || (parent && ecs_has(world, parent, Layout))) {
+        goto done;
+    }
+
+    if (has_float) {
+        broken = true;
+    } else if (parent && ecs_has(world, e, LayoutItem)) {
+        broken = box_layout_in_ui(world, parent);
+    }
+
+    if (!broken || ecs_map_get(&state->warned, key)) {
+        goto done;
+    }
+
+    ecs_map_insert(&state->warned, key, 1);
+    char *path = ecs_get_path(world, e);
+    char *parent_path = parent ? ecs_get_path(world, parent) : NULL;
+    if (has_float && parent) {
+        ecs_warn("layout: '%s' has a LayoutFloat but its parent '%s' has no Layout, "
+            "so the float is ignored", path, parent_path);
+    } else if (has_float) {
+        ecs_warn("layout: '%s' has a LayoutFloat but no parent with a Layout, "
+            "so the float is ignored", path);
+    } else {
+        ecs_warn("layout: '%s' has a LayoutItem but its parent '%s' has no Layout, "
+            "so it is laid out as a root at its own Position", path, parent_path);
+    }
+
+    ecs_os_free(parent_path);
+    ecs_os_free(path);
+
+done:
+    if (!broken && ecs_map_count(&state->warned)) {
+        ecs_map_remove(&state->warned, key);
+    }
+}
+
+/** Check a marked element and, when it has no Layout or warnings are kept, its children: a
+ * parent that lost its Layout or became part of a UI layout breaks them, one that got a Layout
+ * fixes them.
+ *
+ * @param world The world
+ * @param state The state of the layout module
+ * @param e The marked element
+ */
+static void box_layout_check_marked(
+    const ecs_world_t *world,
+    box_layout_state_t *state,
+    ecs_entity_t e)
+{
+    int32_t c;
+    box_layout_check(world, state, e);
+    if (ecs_has(world, e, Layout) && !ecs_map_count(&state->warned)) {
+        goto done;
+    }
+
+    ecs_iter_t ci = ecs_children(world, e);
+    while (ecs_children_next(&ci)) {
+        for (c = 0; c < ci.count; c ++) {
+            box_layout_check(world, state, ci.entities[c]);
+        }
+    }
+
+done:
+    return;
+}
+
 /** Lay out the trees of the elements marked so far.
+ *
+ * Elements that a missing Layout of their parent leaves unplaced are warned about here rather
+ * than in the observers, so a template that adds the Layout of a parent after its children in
+ * the same frame does not warn.
  *
  * @param world The world
  * @param state The state of the layout module
@@ -597,6 +704,12 @@ static void box_layout_marked(
     for (i = 0; i < count; i ++) {
         bool alive = ecs_is_alive(world, marks[i]);
         ecs_entity_t root = alive ? box_layout_root(world, marks[i]) : 0;
+        if (alive) {
+            box_layout_check_marked(world, state, marks[i]);
+        } else if (ecs_map_count(&state->warned)) {
+            ecs_map_remove(&state->warned, (ecs_map_key_t)marks[i]);
+        }
+
         if (root) {
             *ecs_vec_append_t(NULL, &state->roots, ecs_entity_t) = root;
         } else if (alive && state->text.wrap &&
@@ -704,6 +817,7 @@ static void box_layout_registry_dtor(
             ecs_vec_fini_t(NULL, &state->ordered, ecs_entity_t);
             ecs_vec_fini_t(NULL, &state->placing, box_layout_placing_t);
             ecs_map_fini(&state->parents);
+            ecs_map_fini(&state->warned);
             ecs_map_fini(&state->scrolled);
             ecs_map_fini(&state->anchor_sizes);
             ecs_os_free(state);
@@ -799,6 +913,7 @@ void BoxLayoutImport(
     ecs_map_init(&state->anchor_sizes, NULL);
     state->child_tag = ecs_entity(world, { .name = "LayoutChild" });
     ecs_map_init(&state->parents, NULL);
+    ecs_map_init(&state->warned, NULL);
     ecs_singleton_ensure(world, LayoutRegistry)->state = state;
 
     ecs_id_t elements[] = {

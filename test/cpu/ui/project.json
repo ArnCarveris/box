@@ -79,6 +79,12 @@
                     "unchanged_tree_not_laid_out",
                     "root_item",
                     "script",
+                    "warn_parent_without_layout",
+                    "warn_plain_parent_in_layout",
+                    "no_warn_root_item",
+                    "no_warn_valid",
+                    "warn_again_after_fix",
+                    "warn_script",
                     "module_child_fini",
                     "module_child_text_fini"
                 ]
@@ -304,6 +310,8 @@
                     "remove_float_rejoins_flow",
                     "keeps_z",
                     "script",
+                    "warn_parent_without_layout",
+                    "warn_root",
                     "clip_overlay_clipped",
                     "float_escapes_clips",
                     "clip_overlay_nested_clips",
