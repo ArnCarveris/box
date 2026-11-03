@@ -38,6 +38,9 @@
 // derivatives that anti-alias it the same way the element is. Wide, faint shadows band on 8-bit
 // sRGB targets, so the alpha of a shadow is dithered by about a step of the target with
 // interleaved gradient noise of the pixel position, stable from frame to frame (shadow_dither).
+// The shadows are drawn by pipelines of their own with the fs_shadow entry point (a batch of
+// box_shadow instances), so fs takes none of these steps and a shadow pays for no texture
+// samples.
 //
 // ids.x of the shading is the clip index of the instance, 0 when no ClipChildren ancestor clips
 // it. A clip maps the world position of a fragment into the local plane of its
@@ -361,9 +364,6 @@ fn ranked_depth(depth: f32, rank: u32) -> f32 {
     let inner_extent = max(extent - vec2f(f.params.y), vec2f(0.0));
     let inner = rounded_box(f.local, inner_extent, f.params.x - f.params.y);
     let px = length(vec2f(dpdx(d), dpdy(d)));
-    let cut = rounded_box(f.local - f.uv_transform.xy, max(f.uv_transform.zw, footprint * 0.5),
-        f.border.x);
-    let cut_px = length(vec2f(dpdx(cut), dpdy(cut)));
     let inner_px = length(vec2f(dpdx(inner), dpdy(inner)));
     let uv = clamp(f.uv, vec2f(0.0), vec2f(1.0)) * f.uv_transform.xy + f.uv_transform.zw;
     let texel = textureSample(albedo_map, material_sampler, uv);
@@ -372,19 +372,10 @@ fn ranked_depth(depth: f32, rank: u32) -> f32 {
     let shape_cover = coverage(d, px);
     let fill = select(1.0, coverage(inner, inner_px), f.params.y > 0.0);
     let shape_color = mix(f.border.rgb, f.color.rgb * texel.rgb, fill);
-    var color = select(shape_color, f.color.rgb, glyph) + f.emissive;
+    let color = select(shape_color, f.color.rgb, glyph) + f.emissive;
     let shape_alpha = shape_cover * thin * f.color.a * mix(f.border.a, texel.a, fill);
     var alpha = select(shape_alpha, glyph_cover * f.color.a, glyph);
     var cover = select(shape_cover, glyph_cover, glyph);
-    if (f.params.y < 0.0) {
-        cover = shadow_coverage(f.local, f.extent, f.params.x, -f.params.y,
-            max(footprint.x, footprint.y));
-        cover *= cutout(coverage(cut, cut_px), f.border.y);
-        color = f.color.rgb;
-        alpha = cover * f.color.a;
-        alpha = shadow_dither(alpha, color, f.pos.xy);
-    }
-
     if (f.clip != 0u) {
         let clipped = clip_coverage(f.clip, f.world, world_dx, world_dy);
         alpha *= clipped;
@@ -396,4 +387,33 @@ fn ranked_depth(depth: f32, rank: u32) -> f32 {
     }
 
     return FragmentOut(output(color, alpha, cover), depth);
+}
+
+// The shadows of the 2D shapes, drawn by pipelines of their own: no texture samples and none of
+// the shape and glyph coverage of fs, only the blurred shadow box cut out by its element.
+@fragment fn fs_shadow(f: VertexOut) -> FragmentOut {
+    let depth = ranked_depth(f.pos.z, f.rank);
+    let world_dx = dpdx(f.world);
+    let world_dy = dpdy(f.world);
+    let footprint = vec2f(
+        length(vec2f(dpdx(f.local.x), dpdy(f.local.x))),
+        length(vec2f(dpdx(f.local.y), dpdy(f.local.y))));
+    let cut = rounded_box(f.local - f.uv_transform.xy, max(f.uv_transform.zw, footprint * 0.5),
+        f.border.x);
+    let cut_px = length(vec2f(dpdx(cut), dpdy(cut)));
+    var cover = shadow_coverage(f.local, f.extent, f.params.x, -f.params.y,
+        max(footprint.x, footprint.y));
+    cover *= cutout(coverage(cut, cut_px), f.border.y);
+    var alpha = shadow_dither(cover * f.color.a, f.color.rgb, f.pos.xy);
+    if (f.clip != 0u) {
+        let clipped = clip_coverage(f.clip, f.world, world_dx, world_dy);
+        alpha *= clipped;
+        cover *= clipped;
+    }
+
+    if (alpha <= 0.001) {
+        discard;
+    }
+
+    return FragmentOut(output(f.color.rgb, alpha, cover), depth);
 }

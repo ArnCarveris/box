@@ -157,6 +157,8 @@ whose work was under 2 ms: the sleep woke late on a busy machine, not the scene;
 | `effects_chain` | post effects | 120 | Auto exposure, GTAO, height fog, bloom and tonemapping over 10,000 lit blocks and 2,500 glowing spheres. | 11k..12.3k | 0 | 0.1k..1.6k |
 | `text_10k` | text | 120 | 10,000 labels, about 50,000 glyphs, lying on a board. | 20k..22k | 26k..28k | 0..0.1k |
 | `shapes2d_100k` | 2D shapes | 120 | 100,467 bordered rectangles, bordered circles and lines on the ground, one batch. | 87k..88k | 12.5k..13.4k | 0..1k |
+| `box_shadow_ui` | 2D shadows | 120 | A dashboard of 37 shadowed panels lying on the ground: header, sidebar items, 12 cards with buttons and a dialog, blurs of 3 to 64. | 75 | 0 | 0 |
+| `box_shadow_1000` | 2D shadows, stress | 120 | 1,000 opaque list items with a blur of 48, whose 312 by 188 shadow quads overlap 20 neighbours each: 2,001 instances (the shadows count as instances) drawn as 2,001 runs. | 2,001 | 0 | 0 |
 | `walk_1m` | 1M collision | 120 | A first person controller walks a circle through 1,000,000 boxes, spheres, cylinders and cones (250,000 each), colliding through the spatial index, while the view looks at the field through a 5 degree lens on the orbit. | 78k | 922k | 0 |
 | `town_orbit_30` .. `town_orbit_120` | windowed town | 30, 60, 90, 120 | The town at the retina size of its window for a minute, orbiting, presenting to its window. | 2.5k..3.6k | 0.1k | 1.1k..2.2k |
 | `town_fly_30` .. `town_fly_120` | moving through the town | 30, 60, 90, 120 | The same, flown through the streets by the scene's `CameraController` with synthetic input for a minute. | 0..2.4k | 0.1k..4.8k | 0..2.4k |
@@ -164,6 +166,6 @@ whose work was under 2 ms: the sleep woke late on a busy machine, not the scene;
 | `walk_1m_first_person` | 1M collision, two views | 120 | `walk_1m` with a second view through the walking controller's own camera, rendered after the orbit view. | 78k | 922k | 0 |
 
 Frustum culled includes the size cull: shapes below one pixel (the far street boxes of the city,
-far glyphs, the 1M field outside the lens) count there. `trivial` and `lights_1000` see their
-whole scene from every angle, so their counts do not change; every other scene changes its counts
-in nearly every sample.
+far glyphs, the 1M field outside the lens) count there. `trivial`, `lights_1000` and the
+`box_shadow` scenes see their whole scene from every angle, so their counts do not change; every
+other scene changes its counts in nearly every sample.

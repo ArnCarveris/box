@@ -272,7 +272,7 @@ bool box_draws_entity_casts(
     const TextSlots *ts = ecs_get(world, e, TextSlots);
     bool result = ds && box_draws_caster_at(d, ds->batch);
     int32_t i;
-    if (!result && ds && ds->batch >= 0 && ecs_has(world, e, BoxShadow)) {
+    if (!result && d->box_shadows && ds && ds->batch >= 0 && ecs_has(world, e, BoxShadow)) {
         const BoxShadowSlot *bs = ecs_get(world, e, BoxShadowSlot);
         result = bs && box_draws_caster_at(d, bs->batch);
     }

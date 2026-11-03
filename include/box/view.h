@@ -109,6 +109,22 @@ ECS_STRUCT(GridSettings, {
     rgba major_color;       /**< Major lines, default gray with alpha 200 */
 });
 
+/** Wireframe of the 3D meshes of a view (ViewDebug.wireframe): anti aliased lines along the
+ * edges of the triangles of the instances the view draws after its culling, from barycentric
+ * coordinates, so it needs no line polygon mode. 2D shapes, text and particles are not wired.
+ *
+ * A line is drawn inside the triangles on either side of its edge, so the edge of a silhouette,
+ * with a triangle on one side only, has half its width.
+ *
+ * WireframeOnly culls by frustum and size only and renders no shadows, ambient occlusion or
+ * transmission; the sky, the particles and the 2D shapes still draw.
+ */
+ECS_ENUM(WireframeMode, {
+    WireframeOff = 0,     /**< No wireframe */
+    WireframeOverlay = 1, /**< Over the shaded image, hidden by what is in front */
+    WireframeOnly = 2     /**< Only the lines: see through, no shaded meshes */
+});
+
 /** Debug drawing of a view, in a pass after its effects into the color of its target, with the
  * depth of the view read only. Not drawn by the probe and reflection captures and the bakes.
  * All zero (a C literal View) draws nothing and records no pass.
@@ -119,6 +135,9 @@ ECS_STRUCT(GridSettings, {
  */
 ECS_STRUCT(ViewDebug, {
     GridSettings grid;      /**< Infinite grid */
+    WireframeMode wireframe; /**< Wireframe of the meshes, default WireframeOff */
+    rgba wireframe_color;   /**< Color of the wireframe lines, default white with alpha 200 */
+    float wireframe_width;  /**< Width of the wireframe lines in pixels, default 1 */
     bool light_probes;      /**< Spheres at the probes of the volume the view samples, lit by
                              *   their SH, unshadowed; a probe invalid for every cell around it
                              *   (inside static geometry) in a dark red hatch */
@@ -204,7 +223,8 @@ int box_view_compare(
  * and the fog volumes, sets the environment intensity to 1 and the ShadowSettings defaults with
  * shadows disabled, enables culling with occlusion and a smallest size of one pixel.
  *
- * It sets the GridSettings defaults with the grid disabled. A C literal View starts from zero
+ * It sets the GridSettings defaults with the grid disabled, and the wireframe defaults with the
+ * wireframe off. A C literal View starts from zero
  * instead: unlit, drawing every instance, without debug drawing.
  *
  * @param world The world

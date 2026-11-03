@@ -72,6 +72,8 @@
 /** Shader handle of the engine shader that draws the infinite grid of the debug pass of a view */
 #define BOX_RENDER_SHADER_DEBUG_GRID (52)
 
+/** Shader handle of the engine shader that draws the wireframe of the debug pass of a view */
+#define BOX_RENDER_SHADER_DEBUG_WIRE (54)
 /** Shader handle of the engine shader that draws the light and reflection probes of the debug
  * pass of a view */
 #define BOX_RENDER_SHADER_DEBUG_PROBES (53)
@@ -506,7 +508,8 @@ typedef struct box_render_fog_volume_t {
 /** The culling of a view, resolved from its CullSettings */
 typedef struct box_render_view_cull_t {
     bool enabled;           /**< Instances outside the frustum or too small are not drawn */
-    bool occlusion;         /**< Instances hidden behind what the view drew are not drawn */
+    bool occlusion;         /**< Instances hidden behind what the view drew are not drawn,
+                             *   false for a view with WireframeOnly, which writes no depth */
     float min_dimension;    /**< Projected size in pixels below which an instance is culled */
 } box_render_view_cull_t;
 
@@ -1044,6 +1047,8 @@ typedef struct box_render_batch_t {
     bool shadow;                /**< The instances cast shadows, false for NoShadow */
     bool bake;                  /**< Static 3D instances without NoBake of a scene with LightBake or
                                  *   ReflectionBake, drawn by the captures */
+    bool box_shadow;            /**< The instances are the shadows of 2D shapes (BoxShadow),
+                                 *   drawn with the fs_shadow entry point of the 2D shape shader */
     uint32_t mesh;              /**< Mesh handle */
     uint32_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture handles of the layers, 0 for none */
     uint32_t wrap;              /**< TextureWrap of the samplers */

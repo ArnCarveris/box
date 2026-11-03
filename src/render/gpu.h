@@ -523,7 +523,8 @@ void box_gpu_forward_reset(
 
 /** Create a forward pipeline from a mesh or 2D shape module inside an error scope, to find out
  * whether the module fits the pipeline layout before it replaces the module that renders. A
- * mesh module also creates the depth prepass pipelines, so it needs their entry points.
+ * mesh module also creates the depth prepass pipelines and a 2D shape module the shadow pipeline
+ * (fs_shadow), so they need their entry points.
  *
  * wgpu-native reports the scope at once; the browser reports it later, so there the check
  * passes and an invalid pipeline shows as a device error.
@@ -1290,9 +1291,18 @@ void box_gpu_debug_begin(
 bool box_gpu_debug_enabled(
     const box_render_view_t *v);
 
+/** Release the group of the wire draws of a mesh, before the mesh.
+ *
+ * @param m The mesh
+ */
+void box_gpu_debug_mesh_free(
+    box_gpu_mesh_t *m);
+
 /** Record the debug pass of a view after its effects: a render pass that loads the color of the
- * target and reads the depth of the view, drawing the grid, then the probes and their boxes.
- * A view without any, without probes to show or with shaders not compiled records nothing.
+ * target and reads the depth of the view, drawing the grid, the wireframe of the mesh draws of
+ * its cull view, then the probes and their boxes. A view without any records nothing.
+ *
+ * A debug item whose shader is not compiled yet draws nothing.
  *
  * @param gpu The backend
  * @param t The target, whose depth the pass reads and whose format it draws in
@@ -1977,6 +1987,34 @@ bool box_gpu_cull_draw(
     uint32_t group,
     bool late,
     bool shading,
+    WGPUBindGroup *bound);
+
+/** Record the wire draw of a batch of a cull view (debug_wire.wgsl): the indirect draw of
+ * box_gpu_cull_draw with its arguments unchanged, the shared sequence 0, 1, 2, ... as the index
+ * buffer and the visible slots at vertex slot 0; the shader loads index and vertex itself.
+ *
+ * The arguments have a firstIndex, baseVertex and firstInstance of 0 (gpu_cull_group.c), so
+ * vertex_index runs over 0 to index_count - 1; a debug build asserts it. Binds the depth only instance group at group;
+ * the caller binds the group of the mesh with its vertices and indices.
+ *
+ * @param gpu The backend
+ * @param pass The render pass
+ * @param packet The packet
+ * @param draw The draw
+ * @param group Bind group index the instance page is bound at
+ * @param late Draw what the late phase kept instead of the early or only phase
+ * @param sequence Index buffer of the sequence, at least index_count of the mesh long
+ * @param bound Instance bind group bound last in the pass, NULL for none, updated
+ * @return Whether the draw was recorded
+ */
+bool box_gpu_cull_draw_wire(
+    box_gpu_t *gpu,
+    WGPURenderPassEncoder pass,
+    const box_render_packet_t *packet,
+    const box_gpu_cull_draw_t *draw,
+    uint32_t group,
+    bool late,
+    WGPUBuffer sequence,
     WGPUBindGroup *bound);
 
 /** Record a copy of a presented image into the readback buffer of its target.
