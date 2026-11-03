@@ -448,7 +448,8 @@ static void box_shader_changed(
  * and the packet has a particle pool, or it blurs the opaque snapshot and a batch is
  * transmissive, or it raymarches fog volumes or assigns lights to clusters and a view of the
  * packet draws a fog volume, which reads the clusters for its point and spot lights, or it
- * draws the debug grid and a view of the packet has it enabled
+ * draws the debug grid and a view of the packet has it enabled, or it draws the wireframe and
+ * a view of the packet has one
  */
 static bool box_shader_used(
     const box_render_packet_t *p,
@@ -488,6 +489,16 @@ static bool box_shader_used(
     if (handle == BOX_RENDER_SHADER_DEBUG_GRID) {
         for (i = 0; i < ecs_vec_count(&p->views); i ++) {
             if (ecs_vec_get_t(&p->views, box_render_view_t, i)->debug.grid.enabled) {
+                result = true;
+            }
+        }
+    }
+
+    if (handle == BOX_RENDER_SHADER_DEBUG_WIRE) {
+        for (i = 0; i < ecs_vec_count(&p->views); i ++) {
+            if (ecs_vec_get_t(&p->views, box_render_view_t, i)->debug.wireframe !=
+                WireframeOff)
+            {
                 result = true;
             }
         }
@@ -818,4 +829,6 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_FOG_VOLUME, true);
     box_shader_builtin(world, state, builtin, "debug_grid", "etc/shaders/debug_grid.wgsl",
         BOX_RENDER_SHADER_DEBUG_GRID, true);
+    box_shader_builtin(world, state, builtin, "debug_wire", "etc/shaders/debug_wire.wgsl",
+        BOX_RENDER_SHADER_DEBUG_WIRE, true);
 }

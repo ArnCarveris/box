@@ -1,0 +1,196 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.surface
+
+// The wireframe of a view (ViewDebug.wireframe) side by side: two cameras of one scene render
+// into two textures, the left one with WireframeOverlay and the right one with WireframeOnly,
+// shown on two tiles. The scene has a box, a sphere, a cup turned on a Lathe, a cable swept
+// along a curve and a row of instances of a prefab.
+//
+// On the left the shaded shapes carry white anti aliased lines along the edges of their
+// triangles, the diagonals of the faces of the boxes included, and only on the faces in view:
+// the lines of the back faces and of what is behind another shape are hidden. On the right
+// there are no shaded shapes: the lines of every triangle show over the clear color, those of
+// the back faces and of the hidden instances included, the lines of the cup and the cable
+// following their surfaces.
+
+shapes {
+  Scene: {}
+  AmbientLight: {sky: {120, 128, 140}, ground: {50, 46, 42}}
+
+  sun {
+    Rotation: {0.9, 0.6, 0}
+    DirectionalLight: {intensity: 1.0 * flecs.script.math.PI}
+    Rgb: {255, 244, 228}
+  }
+
+  overlay_camera {
+    Position: {0, 3.2, 7.5}
+    Rotation: {-0.36, 0, 0}
+    Camera: {fov: 55}
+  }
+
+  only_camera {
+    Position: {0, 3.2, 7.5}
+    Rotation: {-0.36, 0, 0}
+    Camera: {fov: 55}
+  }
+
+  floor {
+    Position: {0, -0.1, 0}
+    Box: {8, 0.2, 6}
+    Rgb: {90, 96, 104}
+  }
+
+  cube {
+    Position: {-2.2, 0.6, 0.8}
+    Rotation: {0, 0.5, 0}
+    Box: {1.2, 1.2, 1.2}
+    Rgb: {220, 120, 80}
+  }
+
+  ball {
+    Position: {-0.4, 0.7, 1.4}
+    Sphere: {segments: 16, radius: 0.7}
+    Rgb: {90, 160, 220}
+  }
+
+  cup_outer {
+    Path2D: {
+      start: {0, 0},
+      segments: [
+        {kind: Line, end: {0.6, 0}},
+        {kind: Line, end: {0.8, 1.4}}
+      ],
+      closed: false
+    }
+  }
+
+  cup_inner {
+    Path2D: {
+      start: {0, 0.1},
+      segments: [
+        {kind: Line, end: {0.5, 0.1}},
+        {kind: Line, end: {0.7, 1.4}}
+      ],
+      closed: false
+    }
+  }
+
+  cup {
+    Position: {1.4, 0, 1}
+    Lathe: {profile: cup_outer, inner: cup_inner, cap_start: true, cap_end: true,
+      segments: 20, rings: 6}
+    Rgb: {200, 90, 85}
+  }
+
+  cable_outline {
+    Path2D: {
+      start: {0.15, -0.15},
+      segments: [
+        {kind: Line, end: {0.15, 0.15}},
+        {kind: Line, end: {-0.15, 0.15}},
+        {kind: Line, end: {-0.15, -0.15}}
+      ],
+      closed: true
+    }
+  }
+
+  cable_profile { Profile2D: {outer: cable_outline} }
+
+  cable_route {
+    Path3D: {start: {-1.5, 0, 0}, segments: [{kind: CubicBezier, control1: {-1.5, 2, 0},
+      control2: {1.5, 2, 0}, end: {1.5, 0, 0}}]}
+  }
+
+  cable {
+    Position: {2.6, 0, -1.2}
+    Rotation: {0, 1.2, 0}
+    Sweep: {path: cable_route, profile: cable_profile, scale: {1, 1}, taper: 1,
+      cap_start: true, cap_end: true, rings: 12}
+    Rgb: {230, 155, 65}
+  }
+
+  crate_0 : Crate { Position: {-3, 0.35, -1.8} }
+  crate_1 : Crate { Position: {-2, 0.35, -1.8} }
+  crate_2 : Crate { Position: {-1, 0.35, -1.8} }
+  crate_3 : Crate { Position: {0, 0.35, -1.8} }
+  crate_4 : Crate { Position: {1, 0.35, -1.8} }
+  crate_5 : Crate { Position: {-3, 0.35, -2.6} }
+  crate_6 : Crate { Position: {-2, 0.35, -2.6} }
+  crate_7 : Crate { Position: {-1, 0.35, -2.6} }
+  crate_8 : Crate { Position: {0, 0.35, -2.6} }
+  crate_9 : Crate { Position: {1, 0.35, -2.6} }
+}
+
+prefab Crate {
+  Box: {0.7, 0.7, 0.7}
+  Rgb: {150, 200, 140}
+}
+
+overlay_texture {}
+
+overlay_views {
+  view {
+    View: {
+      camera: shapes.overlay_camera
+      clear: {enabled: true, color: {24, 26, 32, 255}}
+      debug: {wireframe: WireframeOverlay}
+    }
+  }
+}
+
+overlay_surface {
+  Surface: {width: 312, height: 312, texture: overlay_texture, view_root: overlay_views}
+}
+
+only_texture {}
+
+only_views {
+  view {
+    View: {
+      camera: shapes.only_camera
+      clear: {enabled: true, color: {24, 26, 32, 255}}
+      debug: {wireframe: WireframeOnly, wireframe_color: {120, 255, 160, 230}}
+    }
+  }
+}
+
+only_surface {
+  Surface: {width: 312, height: 312, texture: only_texture, view_root: only_views}
+}
+
+gallery {
+  Scene: {}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+
+  overlay_tile {
+    Position: {-160, 0, 0}
+    Quad: {312, 312}
+    Rgb: {0, 0, 0}
+    Emissive: {strength: 1, color: {255, 255, 255}}
+    PbrTextures: {albedo: overlay_texture, emissive: overlay_texture}
+  }
+
+
+  only_tile {
+    Position: {160, 0, 0}
+    Quad: {312, 312}
+    Rgb: {0, 0, 0}
+    Emissive: {strength: 1, color: {255, 255, 255}}
+    PbrTextures: {albedo: only_texture, emissive: only_texture}
+  }
+
+}
+
+gallery_view {
+  View: {camera: gallery.camera, clear: {enabled: true, color: {0, 0, 0, 255}}, lighting: {enabled: false}}
+}

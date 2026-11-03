@@ -1089,7 +1089,19 @@
                     "grid_not_tonemapped",
                     "grid_not_in_captures",
                     "grid_camera_below",
-                    "grid_resize"
+                    "grid_resize",
+                    "wire_off_unchanged",
+                    "wire_overlay_quad",
+                    "wire_overlay_hidden",
+                    "wire_only_see_through",
+                    "wire_only_no_occlusion",
+                    "wire_width",
+                    "wire_parametric_surface",
+                    "wire_instances",
+                    "wire_transmissive_and_blended",
+                    "wire_2d_not_wired",
+                    "wire_per_view",
+                    "wire_mesh_replaced"
                 ]
             }
         ]

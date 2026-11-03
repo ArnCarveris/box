@@ -72,6 +72,9 @@
 /** Shader handle of the engine shader that draws the infinite grid of the debug pass of a view */
 #define BOX_RENDER_SHADER_DEBUG_GRID (52)
 
+/** Shader handle of the engine shader that draws the wireframe of the debug pass of a view */
+#define BOX_RENDER_SHADER_DEBUG_WIRE (53)
+
 /** Fog volumes a view draws at most, the nearest ones */
 #define BOX_RENDER_FOG_VOLUMES_MAX (32)
 
@@ -498,7 +501,8 @@ typedef struct box_render_fog_volume_t {
 /** The culling of a view, resolved from its CullSettings */
 typedef struct box_render_view_cull_t {
     bool enabled;           /**< Instances outside the frustum or too small are not drawn */
-    bool occlusion;         /**< Instances hidden behind what the view drew are not drawn */
+    bool occlusion;         /**< Instances hidden behind what the view drew are not drawn,
+                             *   false for a view with WireframeOnly, which writes no depth */
     float min_dimension;    /**< Projected size in pixels below which an instance is culled */
 } box_render_view_cull_t;
 

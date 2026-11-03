@@ -61,6 +61,8 @@ static void box_view_ctor(
             .color = {128, 128, 128, 128},
             .major_color = {128, 128, 128, 200}
         };
+        values[i].debug.wireframe_color = (rgba){255, 255, 255, 200};
+        values[i].debug.wireframe_width = 1.0f;
     }
 }
 
@@ -110,6 +112,7 @@ void BoxViewImport(
     ECS_META_COMPONENT(world, ShadowSettings);
     ECS_META_COMPONENT(world, CullSettings);
     ECS_META_COMPONENT(world, GridSettings);
+    ECS_META_COMPONENT(world, WireframeMode);
     ECS_META_COMPONENT(world, ViewDebug);
     ECS_META_COMPONENT(world, ViewEffect);
     ecs_set_hooks(world, ViewEffect, { .ctor = box_view_effect_ctor });

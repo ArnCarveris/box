@@ -251,7 +251,8 @@ static void box_render_extract_view(
     v->clear = view->clear;
     v->debug = view->debug;
     v->cull.enabled = view->culling.enabled;
-    v->cull.occlusion = view->culling.enabled && view->culling.occlusion;
+    v->cull.occlusion = view->culling.enabled && view->culling.occlusion &&
+        view->debug.wireframe != WireframeOnly;
     v->cull.min_dimension = view->culling.min_dimension_px;
     if (transform) {
         ecs_os_memcpy_t(v->camera_transform, transform->m, mat4);

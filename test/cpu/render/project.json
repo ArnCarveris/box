@@ -435,7 +435,11 @@
                     "ctor_defaults",
                     "literal_off",
                     "script_keeps_defaults",
-                    "packet_copy"
+                    "packet_copy",
+                    "wire_defaults",
+                    "wire_script_keeps_defaults",
+                    "wire_packet_copy",
+                    "wire_only_no_occlusion"
                 ]
             },
             {
