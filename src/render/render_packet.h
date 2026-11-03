@@ -895,7 +895,7 @@ typedef struct box_render_material_t {
     float uv[4];            /**< TextureTransform: u scale, v scale, u offset, v offset */
     float transmission_factor; /**< Transmission.transmission_factor, 0 without one */
     float ior;              /**< Transmission.ior, BOX_MATERIAL_IOR without one */
-    float thickness_factor; /**< Transmission.thickness_factor, 0 without one */
+    float thickness_factor; /**< Transmission.thickness_factor, 0 without one or when negative */
     float attenuation_distance; /**< Transmission.attenuation_distance,
                              *   BOX_MATERIAL_ATTENUATION_DISTANCE without one */
     uint32_t clear_coat;    /**< ClearCoat strength | roughness << 16, two unorm16 clamped to
@@ -1149,6 +1149,7 @@ typedef struct box_render_transition_record_t {
                                      *   record patches */
     box_render_transition_component_t component; /**< Component of a start */
     TimingFunction timing_function; /**< Curve of a start */
+    TransitionBezier bezier;        /**< Handles of a CubicBezier start, zero for the others */
     float delay;                    /**< Seconds the value holds still after the start */
     float duration;                 /**< Seconds from the end of the delay to the target */
     double start;                   /**< World time of the start, the time of its packet */

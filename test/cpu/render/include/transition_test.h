@@ -293,4 +293,56 @@ static inline void tr_test_static(
     test_assert(!ecs_os_memcmp_t(&rendered, &expected, box_render_transform_t));
 }
 
+
+/** Run frames with the fixed delta and wait until the render thread resolved the last packet.
+ *
+ * @param world The world
+ * @param count Frames to run
+ */
+static inline void tr_frames(
+    ecs_world_t *world,
+    int32_t count)
+{
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        ecs_progress(world, TR_DELTA);
+    }
+
+    box_render_sync(world);
+}
+
+/** Read the rendered Position of an entity.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The value the resolver computed for the last packet
+ */
+static inline Position tr_position(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    Position result = {0};
+    box_render_sync(world);
+    test_assert(box_render_transition_test_value(world, e, ecs_id(Position), &result));
+
+    return result;
+}
+
+/** Create an entity at the origin with a transition of its Position.
+ *
+ * @param world The world
+ * @param spec The transition of Position
+ * @return The entity
+ */
+static inline ecs_entity_t tr_entity(
+    ecs_world_t *world,
+    const TransitionSpec *spec)
+{
+    ecs_entity_t result = ecs_new(world);
+    ecs_set(world, result, Position, {0, 0, 0});
+    box_transition_set(world, result, ecs_id(Position), spec);
+
+    return result;
+}
+
 #endif

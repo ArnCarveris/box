@@ -5,6 +5,7 @@
 
 #define BOX_TRANSITION_IMPL
 #include <box.h>
+#include <math.h>
 
 /* A runtime map type, so that flecs installs the map hooks that copy and free the entries and
  * the script parser accepts Transition: [Position: {...}] */
@@ -55,6 +56,36 @@ float box_transition_ease(
     return result;
 }
 
+float box_transition_ease_bezier(
+    TimingFunction fn,
+    const TransitionBezier *bezier,
+    float t)
+{
+    float result;
+    if (fn != CubicBezier) {
+        result = box_transition_ease(fn, t);
+    } else if (!(t > 0.0f)) {
+        result = 0.0f;
+    } else if (t >= 1.0f) {
+        result = 1.0f;
+    } else if (!bezier) {
+        result = t;
+    } else {
+        result = box_curve_ease(bezier->x1, bezier->y1, bezier->x2, bezier->y2, t);
+    }
+
+    return result;
+}
+
+bool box_transition_bezier_valid(
+    const TransitionBezier *bezier)
+{
+    return bezier != NULL &&
+        bezier->x1 >= 0.0f && bezier->x1 <= 1.0f &&
+        bezier->x2 >= 0.0f && bezier->x2 <= 1.0f &&
+        isfinite(bezier->y1) && isfinite(bezier->y2);
+}
+
 bool box_transition_supported(
     const ecs_world_t *world,
     ecs_entity_t component)
@@ -85,7 +116,8 @@ bool box_transition_valid(
     const TransitionSpec *spec)
 {
     return spec != NULL && box_transition_supported(world, component) &&
-        spec->duration >= 0.0f && spec->delay >= 0.0f;
+        spec->duration >= 0.0f && spec->delay >= 0.0f &&
+        (spec->timing_function != CubicBezier || box_transition_bezier_valid(&spec->bezier));
 }
 
 /** Get the pending maps of a world.
@@ -356,6 +388,11 @@ static void BoxTransitionValidate(
             if (!box_transition_supported(it->world, component)) {
                 ecs_err("Transition of '%s': component '%s' is not transitionable, ignored",
                     entity, name ? name : "<invalid>");
+            } else if (spec->duration >= 0.0f && spec->delay >= 0.0f) {
+                ecs_err("Transition of '%s': component '%s' has a CubicBezier with handles "
+                    "(%g, %g, %g, %g) whose x is outside 0..1 or that are not finite, ignored",
+                    entity, name, (double)spec->bezier.x1, (double)spec->bezier.y1,
+                    (double)spec->bezier.x2, (double)spec->bezier.y2);
             } else {
                 ecs_err("Transition of '%s': component '%s' has a negative duration or delay "
                     "(%g, %g), ignored", entity, name, (double)spec->duration,
@@ -377,6 +414,7 @@ void BoxTransitionImport(
     ECS_IMPORT(world, BoxMaterial);
 
     ECS_META_COMPONENT(world, TimingFunction);
+    ECS_META_COMPONENT(world, TransitionBezier);
     ECS_META_COMPONENT(world, TransitionSpec);
 
     ecs_id(Transition) = ecs_map_type(world, {

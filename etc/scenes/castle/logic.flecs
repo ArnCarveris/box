@@ -1,0 +1,277 @@
+// The rules in motion: building, raising and demolishing pieces, the courtyard (every cell that
+// walls, towers and gatehouses cut off from the edge of the plot), the income of the realm and its
+// rank. Cells send Build, the toolbar and the keys send PickTool.
+
+using flecs.script
+using flecs.script.math
+using box.audio
+using box.particle
+
+// Finds the courtyard with a flood fill from the edge of the plot through every cell that is not
+// a barrier, then tallies prestige, income and rank from the pieces.
+proc recompute() {
+  mut seen: bool[196] = {}
+  mut queue: i32[196] = {}
+  mut head: i32 = 0
+  mut tail: i32 = 0
+
+  for i in 0..CELLS {
+    const x = i % GRID
+    const z = (i - x) / GRID
+    if (x == 0 || z == 0 || x == GRID - 1 || z == GRID - 1) && !barrier(kind[i]) {
+      seen[i] = true
+      queue[tail] = i
+      tail += 1
+    }
+  }
+
+  while head < tail {
+    const c = queue[head]
+    head += 1
+    const x = c % GRID
+    if x > 0 && !seen[c - 1] && !barrier(kind[c - 1]) {
+      seen[c - 1] = true
+      queue[tail] = c - 1
+      tail += 1
+    }
+    if x < GRID - 1 && !seen[c + 1] && !barrier(kind[c + 1]) {
+      seen[c + 1] = true
+      queue[tail] = c + 1
+      tail += 1
+    }
+    if c >= GRID && !seen[c - GRID] && !barrier(kind[c - GRID]) {
+      seen[c - GRID] = true
+      queue[tail] = c - GRID
+      tail += 1
+    }
+    if c < CELLS - GRID && !seen[c + GRID] && !barrier(kind[c + GRID]) {
+      seen[c + GRID] = true
+      queue[tail] = c + GRID
+      tail += 1
+    }
+  }
+
+  mut safe: bool[196] = {}
+  mut p: f64 = 0
+  mut g: f64 = 1
+  mut s: f64 = 1
+  mut court: i32 = 0
+  mut count: i32 = 0
+  mut keep: i32 = -1
+  for i in 0..CELLS {
+    const k = kind[i]
+    const lvl = level[i]
+    const in_court = !seen[i] && !barrier(k)
+    safe[i] = in_court
+    if in_court {
+      court += 1
+    }
+    if k != K_EMPTY {
+      count += 1
+    }
+    p += prestige_of(k, lvl, in_court)
+    if k == K_HOUSE {
+      g += match in_court { true: 2; _: 1 }
+    } else if k == K_KEEP {
+      keep = i
+      g += lvl * 3
+    } else if k == K_QUARRY {
+      s += 2
+    }
+  }
+
+  p += floor(court / 3)
+  inside = safe
+  prestige = p
+  gold_rate = g
+  stone_rate = s
+  courtyard = court
+  pieces = count
+  keep_cell = keep
+
+  const r = rank_of(p)
+  if r > rank {
+    emit RankUp(rank: r)
+  }
+  rank = r
+}
+
+proc new_realm() {
+  mut k: i32[196] = {}
+  mut l: i32[196] = {}
+  for i in 0..CELLS {
+    const x = i % GRID
+    const z = (i - x) / GRID
+    const edge = x < 2 || z < 2 || x > GRID - 3 || z > GRID - 3
+    if edge && hash(i * 3 + 7) < 0.22 {
+      k[i] = K_TREE
+      l[i] = 1
+    }
+  }
+  kind = k
+  level = l
+  gold = 150
+  stone = 120
+  tool = 0
+  rank = 0
+  crowned = false
+  recompute()
+}
+
+async {
+  new_realm()
+  await delay(1.0)
+  emit Toast(text: "Welcome, my liege. Choose a piece below and click the meadow to build.")
+}
+
+async {
+  while true {
+    await NewRealm
+    new_realm()
+    const played = box.audio.play(SfxRaze, 0.8)
+    emit Toast(text: "A fresh meadow awaits your castle.")
+  }
+}
+
+async {
+  while true {
+    const e = await PickTool
+    if tool == e.t {
+      tool = 0
+    } else {
+      tool = e.t
+    }
+    const played = box.audio.play(SfxClick, 0.7)
+  }
+}
+
+async {
+  while true {
+    const e = await Build
+    const i = e.i
+    const k = kind[i]
+    const lvl = level[i]
+    const t = tool
+
+    if t == 0 {
+      if k == K_EMPTY {
+        emit Toast(text: "Pick a piece from the bar below, or press 1 to 9.")
+      } else {
+        emit Toast(text: "{kind_name(k)}. Pick a tool to build, or X to demolish.")
+      }
+    } else if t == T_DEMOLISH {
+      if k == K_EMPTY {
+        const played = box.audio.play(SfxDeny, 0.6)
+      } else {
+        gold += floor(spent_gold(k, lvl) / 2)
+        stone += floor(spent_stone(k, lvl) / 2)
+        kind[i] = K_EMPTY
+        level[i] = 0
+        recompute()
+        const played = box.audio.play(SfxRaze, 0.9)
+        const fx = box.particle.burst_at(RubbleBurst, {cell_x(i), 0.2, cell_z(i)}, 1)
+      }
+    } else if k == K_EMPTY || (k == t && lvl < max_level(t)) {
+      const nl = match k == K_EMPTY { true: 1; _: lvl + 1 }
+      const g = cost_gold(t, nl)
+      const s = cost_stone(t, nl)
+      if t == K_KEEP && k == K_EMPTY && keep_cell >= 0 {
+        const played = box.audio.play(SfxDeny, 0.6)
+        emit Toast(text: "Your realm has a keep already. Click it to build it higher.")
+      } else if gold < g || stone < s {
+        const played = box.audio.play(SfxDeny, 0.6)
+        if gold < g && stone < s {
+          emit Toast(text: "That needs {g} gold and {s} stone.")
+        } else if gold < g {
+          emit Toast(text: "That needs {g} gold. Cottages and the keep bring in taxes.")
+        } else {
+          emit Toast(text: "That needs {s} stone. A quarry cuts more.")
+        }
+      } else {
+        gold -= g
+        stone -= s
+        rising = i
+        kind[i] = t
+        level[i] = nl
+        recompute()
+        if t == K_MOAT {
+          const played = box.audio.play(SfxSplash, 0.8)
+          const fx = box.particle.burst_at(SplashBurst, {cell_x(i), -0.3, cell_z(i)}, 1)
+        } else if t == K_TREE || t == K_PATH {
+          const played = box.audio.play(SfxPlant, 0.8)
+          const fx = box.particle.burst_at(DustBurst, {cell_x(i), 0.2, cell_z(i)}, 0.6)
+        } else {
+          const played = box.audio.play(SfxBuild, 0.9)
+          const fx = box.particle.burst_at(DustBurst, {cell_x(i), 0.2, cell_z(i)}, 1)
+        }
+        if nl > 1 {
+          emit Toast(text: "The {kind_name(t)} rises to level {nl}.")
+        }
+        await next_frame()
+        await next_frame()
+        rising = -1
+      }
+    } else if k == t {
+      const played = box.audio.play(SfxDeny, 0.6)
+      emit Toast(text: "This {kind_name(k)} cannot be built any higher.")
+    } else {
+      const played = box.audio.play(SfxDeny, 0.6)
+      emit Toast(text: "A {kind_name(k)} stands here. Demolish it first with X.")
+    }
+  }
+}
+
+async {
+  while true {
+    await delay(1)
+    gold = min(gold + gold_rate, 99999)
+    stone = min(stone + stone_rate, 99999)
+  }
+}
+
+async {
+  while true {
+    const e = await Toast
+    toast = e.text
+    toast_until = clock + 3.5
+  }
+}
+
+async {
+  while true {
+    await delay(0.25)
+    if toast != "" && clock > toast_until {
+      toast = ""
+    }
+  }
+}
+
+async {
+  while true {
+    const e = await RankUp
+    if e.rank >= RANKS - 1 {
+      crowned = true
+      emit Toast(text: "Long live the crown! Your Royal Citadel is complete.")
+    } else {
+      emit Toast(text: "Your realm is now a {rank_name(e.rank)}!")
+    }
+    const cx = match keep_cell >= 0 { true: cell_x(keep_cell); _: 0 }
+    const cz = match keep_cell >= 0 { true: cell_z(keep_cell); _: 0 }
+    const bursts = match e.rank >= RANKS - 1 { true: 12; _: 4 }
+    const f0 = box.audio.play(SfxFanfareA, 0.7)
+    await delay(0.18)
+    const f1 = box.audio.play(SfxFanfareB, 0.7)
+    await delay(0.18)
+    const f2 = box.audio.play(SfxFanfareC, 0.7)
+    await delay(0.3)
+    const f3 = box.audio.play(SfxFanfareD, 0.8)
+    for b in 0..bursts {
+      const ox = (hash(b * 31 + e.rank) - 0.5) * 10
+      const oz = (hash(b * 17 + e.rank * 3) - 0.5) * 10
+      const oy = 11 + hash(b * 7 + e.rank) * 5
+      const fx = box.particle.burst_at(Firework, {cx + ox, oy, cz + oz}, 1)
+      const boom = box.audio.play(SfxPop, 0.5)
+      await delay(0.35)
+    }
+  }
+}

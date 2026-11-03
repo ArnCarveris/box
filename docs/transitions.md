@@ -36,11 +36,50 @@ e {
 |-------------------|------------------|----------|-----------------------------------------------|
 | `duration`        | `float`          | 0        | Seconds from the start to the target value    |
 | `delay`           | `float`          | 0        | Seconds the rendered value holds still first  |
-| `timing_function` | `TimingFunction` | `Linear` | `Linear`, `EaseIn`, `EaseOut` or `EaseInOut`  |
+| `timing_function` | `TimingFunction` | `Linear` | `Linear`, `EaseIn`, `EaseOut`, `EaseInOut` or `CubicBezier` |
+| `bezier`          | `TransitionBezier` | 0      | Handles `{x1, y1, x2, y2}` of `CubicBezier`, ignored by the others |
 
 `EaseIn`, `EaseOut` and `EaseInOut` are the CSS cubic Beziers (0.42, 0, 1, 1), (0, 0, 0.58, 1)
 and (0.42, 0, 0.58, 1). `box_transition_ease(fn, t)` evaluates them; it is pure and allocates
 nothing, so the render thread can call it.
+
+### Custom easing
+
+`CubicBezier` is a CSS `cubic-bezier(x1, y1, x2, y2)`: a curve from (0, 0) to (1, 1) with its
+handles at (x1, y1) and (x2, y2), mapping the linear progress on x to the eased progress on y.
+
+```flecs
+using box.material
+using box.transition
+
+panel {
+  Opacity: {1}
+  Transition: [Opacity: {duration: 0.3, timing_function: CubicBezier, bezier: {0.2, 0, 0, 1}}]
+}
+```
+
+`box_transition_ease_bezier(fn, &bezier, t)` evaluates it, solving x for the curve parameter
+(`box_curve_ease`), and gives `box_transition_ease(fn, t)` for the presets. Handles equal to a
+preset, `{0.42, 0, 0.58, 1}` for `EaseInOut`, give the values of the preset.
+
+- `x1` and `x2` must lie in 0..1, as in CSS, so that x increases and every progress has one y.
+  A handle outside, or one that is not finite, logs an error naming the entity and the
+  component, and the entry is ignored like one with a negative `duration`
+  (`box_transition_bezier_valid()`, `box_transition_valid()`).
+- `y1` and `y2` are free. Outside 0..1 the eased progress leaves 0..1 between the ends, and
+  the rendered value overshoots past its target or, before it, back past its start, as a CSS
+  `back` easing does. Float fields extrapolate; `uint8_t` fields (`Rgb`, `Tint`, the colors of
+  `Emissive`, `Transmission`, `Sheen` and `DiffuseTransmission`) are clamped to 0..255 when
+  they are rounded. The encodings clamp what has a range: `Opacity`, `AlphaCutoff`,
+  `PbrMaterial`, `ClearCoat`, `SpecularAnisotropy.strength`, the factor and roughness of
+  `Sheen` and `DiffuseTransmission` to 0..1, a negative `Emissive.strength` and
+  `Transmission.thickness_factor` and the thickness and blur of `DiffuseTransmission` to 0; the
+  shader keeps `Transmission.ior` and `attenuation_distance` above 0.001. `Position`,
+  `Rotation`, `TextureTransform` and `Scale` are free, so a `Scale` that overshoots past 0
+  mirrors, as in CSS.
+- The handles travel to the render thread in the start record with the timing function. A
+  record and a node value are 16 bytes larger; the presets pay nothing else, they never touch
+  the handles.
 
 ### Authoring from script
 
@@ -122,7 +161,8 @@ storage is a flecs map (`ecs_map_t`) keyed by the component entity whose values 
   `SpecularAnisotropy`, `Sheen` and `DiffuseTransmission` (`box_transition_supported()`). Others are rejected: `PbrTextures` holds handles that are part of
   the batch key, `WorldTransform` and `MaterialId` are computed by the engine, and enums and tags
   have nothing to interpolate.
-- A key that is not transitionable, or an entry with a negative `duration` or `delay`, logs an
+- A key that is not transitionable, an entry with a negative `duration` or `delay`, or a
+  `CubicBezier` whose `x1` or `x2` is outside 0..1 or whose handles are not finite, logs an
   error naming the component when `Transition` is set, and the entry is ignored
   (`box_transition_valid()`). The rest of the map works; nothing asserts.
 
@@ -226,7 +266,7 @@ patches them into the packet before the backend sees it.
   observers, queries or extraction of entities without `Transition`.
 - It allocates a node id per entity with `Transition` and adds records to the packet: node
   created or destroyed, and a transition started (node, component, target value, `delay`,
-  `duration`, timing function, start time). Never a `from` value.
+  `duration`, timing function and its handles, start time). Never a `from` value.
 - It knows when a transition ends, from the start time and the packet clock. While a node is
   active, it sends one record per affected instance or material slot with the byte offset of the
   record in the packet data, so the resolver can patch it. After the last active frame the
@@ -250,7 +290,8 @@ Implemented in `src/render/transitions.c`, a system of `RenderExtract`:
   state over: the create record resets the node on the render thread.
 - Records (`box_render_transition_record_t`, in `box_render_packet_t.transitions`):
   `CREATE` and `DESTROY` of a node, and `START` of a component with its target, `delay`,
-  `duration`, timing function and start time (`packet->time`). A first value, and a snap
+  `duration`, timing function, the `bezier` handles of a `CubicBezier` (zero for the others) and
+  start time (`packet->time`). A first value, and a snap
   (an entry or a component removed), is a `START` with a `delay` and `duration` of 0, which sets
   the value without a transition. After a snap the component is not tracked until it has a
   valid entry and a value again; that value is then a first value and does not animate.
@@ -361,6 +402,9 @@ transition of their own (an entity that transitions only `Position` and has a `R
   interpolate per field with timing functions that do not overshoot (`box_transition_ease`),
   and a transition starts from the value rendered at that time, so each rendered field lies
   between the minimum and maximum of the targets the component had since it was last idle.
+  A `CubicBezier` whose y handles leave 0..1 can overshoot: its start widens the range on both
+  sides by its width times `max(max(y1, y2) - 1, -min(y1, y2))`, the most the hull of the
+  handles lets the eased progress leave 0..1 (`box_render_transition_widen`).
   The private per entity state keeps that range per field for `Position`, `Rotation` and
   `Scale` (`lo` and `hi` of `box_transition_slot_t`): a start of a component whose transition
   no longer runs resets it to the last target, any other start widens it with the new target.
