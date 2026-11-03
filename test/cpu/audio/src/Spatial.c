@@ -567,3 +567,51 @@ void Spatial_core_position(void) {
     test_assert(fabsf(audio_l[1000] - (float)1000 / AUDIO_RATE) < 1e-4f);
     box_audio_core_free(core);
 }
+
+void Spatial_cost_changed_only(void) {
+    // audio/spatial
+    ecs_world_t *world = audio_world();
+    ecs_entity_t dc = audio_dc(world, "dc", 0.01f, AUDIO_RATE);
+    ecs_entity_t listener = spatial_listener(world, 0, 0, 0);
+    ecs_entity_t parent = ecs_new(world);
+    ecs_entity_t sources[100], dynamic;
+    int64_t before;
+    int32_t i;
+    ecs_set(world, parent, Position, {0, 0, 0});
+    for (i = 0; i < 100; i ++) {
+        sources[i] = spatial_source(world, dc, true, (float)i, -200, 1, 50, 1);
+    }
+
+    ecs_add_pair(world, sources[99], EcsChildOf, parent);
+    audio_run(world, 3);
+
+    before = box_audio_module_stats(world).spatial_updates;
+    audio_run(world, 3);
+    test_int(box_audio_module_stats(world).spatial_updates, before);
+
+    spatial_move(world, sources[3], 3, -10);
+    audio_run(world, 2);
+    test_assert(box_audio_module_stats(world).spatial_updates - before >= 1);
+    test_assert(box_audio_module_stats(world).spatial_updates - before <= 2);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 1);
+
+    before = box_audio_module_stats(world).spatial_updates;
+    spatial_move(world, parent, -99, 190);
+    audio_run(world, 2);
+    test_assert(box_audio_module_stats(world).spatial_updates - before >= 1);
+    test_assert(box_audio_module_stats(world).spatial_updates - before <= 2);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 2);
+
+    before = box_audio_module_stats(world).spatial_updates;
+    spatial_move(world, listener, 1, 0);
+    audio_run(world, 1);
+    test_int(box_audio_module_stats(world).spatial_updates - before, 100);
+
+    dynamic = spatial_source(world, dc, true, 0, -300, 1, 50, 1);
+    ecs_add(world, dynamic, DynamicTransform);
+    audio_run(world, 2);
+    before = box_audio_module_stats(world).spatial_updates;
+    audio_run(world, 3);
+    test_assert(box_audio_module_stats(world).spatial_updates - before <= 3);
+    ecs_fini(world);
+}

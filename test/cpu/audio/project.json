@@ -212,7 +212,8 @@
                     "out_of_range_loop",
                     "teleport_no_click",
                     "disabled_silent",
-                    "core_position"
+                    "core_position",
+                    "cost_changed_only"
                 ]
             }
         ]
