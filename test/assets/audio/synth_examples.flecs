@@ -1,0 +1,35 @@
+// The three synth sounds of docs/audio.md, kept the same: the Synth suite of test/cpu/audio
+// checks that they parse, compile without errors, play and end.
+using box.audio
+
+ui { AudioBus: {volume: 1} }
+
+// A click: a burst of noise and a falling tone, 31 ms
+prefab UiClick {
+  AudioOutput: {bus: ui}
+  SynthSound: {pitch_variance: 0.05}
+  SynthEnvelope: {attack: 0.001, decay: 0.03}
+  noise { SynthOscillator: {wave: SynthNoise, level: 0.6} }
+  tone { SynthOscillator: {wave: SynthSine, frequency: 1800, frequency_end: 900, sweep: 0.03, level: 0.4} }
+}
+
+// A UI blip: a soft square that steps up a fifth, through a lowpass
+prefab UiBlip {
+  AudioOutput: {bus: ui}
+  SynthSound: {level_variance: 0.1}
+  SynthEnvelope: {attack: 0.004, decay: 0.06, sustain: 0.4, hold: 0.04, release: 0.05}
+  SynthFilter: {kind: SynthLowPass, cutoff: 3000, resonance: 0.2}
+  low { SynthOscillator: {wave: SynthSquare, frequency: 660, level: 0.25} }
+  high {
+    SynthOscillator: {wave: SynthTriangle, frequency: 990, level: 0.3}
+    SynthEnvelope: {attack: 0.04, decay: 0.08}
+  }
+}
+
+// A whoosh: noise through a resonant bandpass that sweeps up and fades
+prefab Whoosh {
+  SynthSound: {seed: 7, level_variance: 0.1}
+  SynthEnvelope: {attack: 0.15, decay: 0.25, sustain: 0.3, hold: 0.1, release: 0.3}
+  SynthFilter: {kind: SynthBandPass, cutoff: 300, cutoff_end: 4000, sweep: 0.5, resonance: 0.6}
+  SynthOscillator: {wave: SynthNoise, level: 0.8}
+}

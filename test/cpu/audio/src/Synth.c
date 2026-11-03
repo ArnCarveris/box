@@ -148,14 +148,13 @@ static bool synth_finite(
     int32_t from,
     int32_t to)
 {
+    bool result = true;
     int32_t i;
-    for (i = from; i < to; i ++) {
-        if (!isfinite(x[i])) {
-            return false;
-        }
+    for (i = from; i < to && result; i ++) {
+        result = isfinite(x[i]);
     }
 
-    return true;
+    return result;
 }
 
 /** First frame of a range within a tolerance of a value.
@@ -172,14 +171,14 @@ static int32_t synth_first(
     int32_t to,
     float value)
 {
-    int32_t i;
-    for (i = from; i < to; i ++) {
+    int32_t result = -1, i;
+    for (i = from; i < to && result < 0; i ++) {
         if (fabsf(x[i] - value) < 1e-4f) {
-            return i;
+            result = i;
         }
     }
 
-    return -1;
+    return result;
 }
 
 /** Last frame of a range that is not silent.
@@ -194,14 +193,14 @@ static int32_t synth_last(
     int32_t from,
     int32_t to)
 {
-    int32_t i;
-    for (i = to - 1; i >= from; i --) {
+    int32_t result = -1, i;
+    for (i = to - 1; i >= from && result < 0; i --) {
         if (x[i] != 0) {
-            return i;
+            result = i;
         }
     }
 
-    return -1;
+    return result;
 }
 
 /** Render a steady oscillator at a rate and check its frequency.
@@ -303,7 +302,7 @@ void Synth_alias_saw(void) {
     double alias = synth_alias(BOX_AUDIO_SYNTH_SAW);
     printf("saw at 5 kHz: %.2f dB outside its harmonics\n", 10 * log10(alias));
     test_assert(alias >= 0);
-    test_assert(alias < 0.03);
+    test_assert(alias < 0.01);
 }
 
 void Synth_alias_square(void) {
@@ -311,7 +310,15 @@ void Synth_alias_square(void) {
     double alias = synth_alias(BOX_AUDIO_SYNTH_SQUARE);
     printf("square at 5 kHz: %.2f dB outside its harmonics\n", 10 * log10(alias));
     test_assert(alias >= 0);
-    test_assert(alias < 0.03);
+    test_assert(alias < 0.01);
+}
+
+void Synth_alias_triangle(void) {
+    // audio/synth
+    double alias = synth_alias(BOX_AUDIO_SYNTH_TRIANGLE);
+    printf("triangle at 5 kHz: %.2f dB outside its harmonics\n", 10 * log10(alias));
+    test_assert(alias >= 0);
+    test_assert(alias < 0.003);
 }
 
 /** Render a noise patch with a seed in a new core.
@@ -369,6 +376,7 @@ void Synth_noise_flat(void) {
     test_assert(audio_peak(audio_sound_a, 1024, AUDIO_FRAMES) > 0.4f);
 }
 
+/** The next play of the same patch takes the next count of plays. */
 void Synth_noise_seed_differs(void) {
     // audio/synth
     box_audio_core_t *core;
@@ -377,7 +385,6 @@ void Synth_noise_seed_differs(void) {
     synth_noise(2, audio_sound_b, 4800);
     test_assert(memcmp(audio_sound_a, audio_sound_b, 4800 * sizeof(float)) != 0);
 
-    /* The next play of the same patch takes the next count of plays */
     core = synth_core(AUDIO_RATE);
     p.seed = 1;
     synth_define(core, 1, &p);
@@ -425,13 +432,13 @@ void Synth_envelope_segments(void) {
     box_audio_core_free(core);
 }
 
+/** No attack and no release: the edges keep both ends from jumping. */
 void Synth_envelope_no_click(void) {
     // audio/synth
     box_audio_core_t *core = synth_core(AUDIO_RATE);
     box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SINE, 100, 0.5f, 0);
     int32_t last;
 
-    /* No attack and no release: the edges keep both ends from jumping */
     p.envelope = (box_audio_synth_envelope_t){ .sustain = 1, .hold = 0.05f };
     synth_define(core, 1, &p);
     audio_play(core, 1, 1, 0, 1, 0, 1, 0);
@@ -445,6 +452,7 @@ void Synth_envelope_no_click(void) {
     box_audio_core_free(core);
 }
 
+/** Every slot is free again: 64 more plays steal nothing. */
 void Synth_envelope_frees_slot(void) {
     // audio/synth
     box_audio_core_t *core = synth_core(AUDIO_RATE);
@@ -461,7 +469,6 @@ void Synth_envelope_frees_slot(void) {
     test_int(box_audio_core_voice_count(core), 0);
     test_int(audio_events(core, BOX_AUDIO_EVENT_VOICE_END, NULL), BOX_AUDIO_VOICE_MAX);
 
-    /* Every slot is free again: 64 more plays steal nothing */
     for (i = 0; i < BOX_AUDIO_VOICE_MAX; i ++) {
         audio_play(core, 100 + i, 1, 0, 1, 0, 1, 0);
     }
@@ -724,6 +731,7 @@ void Synth_voice_pitch(void) {
     box_audio_core_free(core);
 }
 
+/** Each pass of 51 ms starts loud again. */
 void Synth_loop_restarts(void) {
     // audio/synth
     box_audio_core_t *core = synth_core(AUDIO_RATE);
@@ -735,13 +743,16 @@ void Synth_loop_restarts(void) {
     test_int(box_audio_core_voice_count(core), 1);
     test_int(audio_events(core, BOX_AUDIO_EVENT_VOICE_END, NULL), 0);
 
-    /* Each pass of 51 ms starts loud again */
     test_assert(audio_peak(audio_l, 2448 * 4, 2448 * 4 + 200) > 0.3f);
     test_assert(audio_peak(audio_l, 2448 * 4 - 100, 2448 * 4) < 0.05f);
     test_assert(audio_max_step(audio_l, 0, AUDIO_FRAMES / 2) < 0.2f);
     box_audio_core_free(core);
 }
 
+/** A sound id that is a synth takes no frames, and frames take no synth.
+ * A release frees the id at once; the voice that plays keeps its copy.
+ * The id takes frames again.
+ */
 void Synth_release_patch(void) {
     // audio/synth
     box_audio_core_t *core = synth_core(AUDIO_RATE);
@@ -751,7 +762,6 @@ void Synth_release_patch(void) {
     box_audio_writer_t w;
     synth_define(core, 3, &p);
 
-    /* A sound id that is a synth takes no frames, and frames take no synth */
     audio_fill(audio_sound_a, 100, 0.1f);
     test_assert(!box_audio_core_sound(core, 3, audio_sound_a, 100, 1, AUDIO_RATE));
     test_assert(box_audio_core_sound(core, 4, audio_sound_a, 100, 1, AUDIO_RATE));
@@ -759,7 +769,6 @@ void Synth_release_patch(void) {
     test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, &e), 1);
     test_int(e.id, BOX_AUDIO_CMD_SYNTH);
 
-    /* A release frees the id at once; the voice that plays keeps its copy */
     audio_play(core, 1, 3, 0, 1, 0, 1, 0);
     box_audio_writer_init(&w, bytes, sizeof(bytes));
     test_assert(box_audio_write_release(&w, 3));
@@ -769,7 +778,6 @@ void Synth_release_patch(void) {
     audio_render(core, 0, 9600);
     test_assert(fabs(audio_frequency(audio_l, 480, 9600) - 440) < 0.5);
 
-    /* The id takes frames again */
     test_assert(box_audio_core_sound(core, 3, audio_sound_a, 100, 1, AUDIO_RATE));
     box_audio_core_free(core);
 }
@@ -907,6 +915,37 @@ void Synth_script_loop_source(void) {
     audio_run(world, 20);
     test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
     test_bool(ecs_get(world, src, AudioSource)->playing, false);
+    ecs_fini(world);
+}
+
+/** The examples of docs/audio.md compile without errors, play and end: the click within 3
+ * frames of AUDIO_DT, the blip within 12 and the whoosh within 70. */
+void Synth_docs_examples(void) {
+    // audio/synth
+    ecs_world_t *world = audio_world();
+    char *code = synth_read("test/assets/audio/synth_examples.flecs");
+    const char *names[] = { "UiClick", "UiBlip", "Whoosh" };
+    const int32_t frames[] = { 3, 12, 70 };
+    int32_t i, start;
+    audio_log_start();
+    test_assert(ecs_script_run(world, "examples", code, NULL) == 0);
+    ecs_os_free(code);
+    audio_run(world, 1);
+    for (i = 0; i < 3; i ++) {
+        ecs_entity_t sound = ecs_lookup(world, names[i]);
+        test_assert(sound != 0);
+        test_assert(ecs_get(world, sound, AudioSynth)->compiled);
+        start = audio_tap_count;
+        test_assert(box_audio_play(world, sound, 1.0f));
+        audio_run(world, frames[i]);
+        test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.05f);
+        test_assert(synth_finite(audio_tap_l, start, audio_tap_count));
+        test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+        test_flt(audio_peak(audio_tap_l, audio_tap_count - AUDIO_FRAME, audio_tap_count), 0);
+    }
+
+    audio_log_stop();
+    test_int(audio_log_errors, 0);
     ecs_fini(world);
 }
 

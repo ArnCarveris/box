@@ -177,7 +177,7 @@ reaches the next play while the voices that play keep theirs, and a release free
 with `SOUND_FREE`. The core clamps every value of a patch, a NaN to the low end.
 
 - **Oscillators.** Sine (`box_audio_core_sin`), saw, square, triangle and white noise. Saw and
-  square are band limited with polyBLEP. Frequencies are clamped to 20 kHz and to 0.48 of the
+  square are band limited with polyBLEP, the corners of the triangle with polyBLAMP. Frequencies are clamped to 20 kHz and to 0.48 of the
   rate, so the top of the audible range plays at 44.1 and 48 kHz. A sweep moves the frequency
   exponentially to its end over its time, and lands on it exactly. The pitch of the voice, the
   play's and a `VOICE_SET`, multiplies every frequency but noise.
@@ -259,7 +259,7 @@ prefab UiBlip {
 
 // A whoosh: noise through a resonant bandpass that sweeps up and fades
 prefab Whoosh {
-  SynthSound: {seed: 7, pitch_variance: 0.1}
+  SynthSound: {seed: 7, level_variance: 0.1}
   SynthEnvelope: {attack: 0.15, decay: 0.25, sustain: 0.3, hold: 0.1, release: 0.3}
   SynthFilter: {kind: SynthBandPass, cutoff: 300, cutoff_end: 4000, sweep: 0.5, resonance: 0.6}
   SynthOscillator: {wave: SynthNoise, level: 0.8}
@@ -267,10 +267,11 @@ prefab Whoosh {
 ```
 
 The tests are the `Synth` suite of `test/cpu/audio`, on offline renders: frequencies of every
-wave at 44.1 and 48 kHz, sweeps, aliasing of a 5 kHz saw and square, flat and seeded noise, the
+wave at 44.1 and 48 kHz, sweeps, aliasing of a 5 kHz saw, square and triangle, flat and seeded noise, the
 times and edges of envelopes, the end of a voice, the filter one octave past its cutoff and
 under sweeps at full resonance and extreme values, layers, scripts from
-`test/assets/audio/synth.flecs` and errors; `NoAlloc` renders 64 synth voices. The browser
+`test/assets/audio/synth.flecs`, the three examples above from
+`test/assets/audio/synth_examples.flecs` and errors; `NoAlloc` renders 64 synth voices. The browser
 check is `test/integration/web/audio_synth.mjs`.
 
 ## Transports

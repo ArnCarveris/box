@@ -597,6 +597,29 @@ static inline float box_audio_synth_blep(
     return result;
 }
 
+/** The correction of polyBLAMP for a corner of the wave at phase 0, the integral of the
+ * polyBLEP: a change of the slope by 1 per frame.
+ *
+ * @param t Phase in turns, 0..1
+ * @param dt Turns per frame
+ * @return The correction
+ */
+static inline float box_audio_synth_blamp(
+    double t,
+    double dt)
+{
+    float result = 0;
+    if (t < dt) {
+        t = t / dt - 1;
+        result = (float)(t * t * t * (-1.0 / 3));
+    } else if (t > 1 - dt) {
+        t = (t - 1) / dt + 1;
+        result = (float)(t * t * t * (1.0 / 3));
+    }
+
+    return result;
+}
+
 /** Render a frame of an oscillator and advance it.
  *
  * @param o The oscillator
@@ -618,7 +641,9 @@ static inline float box_audio_synth_osc_next(
             box_audio_synth_blep(t < 0.5 ? t + 0.5 : t - 0.5, dt);
         break;
     case BOX_AUDIO_SYNTH_TRIANGLE:
-        x = (float)(t < 0.5 ? 4 * t - 1 : 3 - 4 * t);
+        x = (float)(t < 0.5 ? 4 * t - 1 : 3 - 4 * t) + (float)(4 * dt) *
+            (box_audio_synth_blamp(t, dt) -
+             box_audio_synth_blamp(t < 0.5 ? t + 0.5 : t - 0.5, dt));
         break;
     case BOX_AUDIO_SYNTH_NOISE:
         x = box_audio_synth_noise(rng);

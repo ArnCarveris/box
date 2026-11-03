@@ -232,6 +232,7 @@
                     "sweep_target",
                     "alias_saw",
                     "alias_square",
+                    "alias_triangle",
                     "noise_flat",
                     "noise_seed_differs",
                     "noise_seed_identical",
@@ -255,6 +256,7 @@
                     "script_renders",
                     "script_change_next_play",
                     "script_loop_source",
+                    "docs_examples",
                     "too_many_layers",
                     "endless_logs_error",
                     "deleted_releases"
