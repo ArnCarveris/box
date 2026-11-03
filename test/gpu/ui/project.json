@@ -251,7 +251,12 @@
                     "wrapped_paragraph_keeps_colors",
                     "world_space",
                     "render_to_texture",
-                    "no_extra_batches"
+                    "no_extra_batches",
+                    "bold_more_coverage",
+                    "italic_leans",
+                    "regular_unchanged",
+                    "same_batches",
+                    "world_text_styled"
                 ]
             },
             {

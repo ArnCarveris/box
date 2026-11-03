@@ -6,6 +6,8 @@
 #include <box.h>
 #include <bake_test.h>
 #include <stdlib.h>
+#include <string.h>
+#include <math.h>
 #include "render.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -433,6 +435,242 @@ void TextSpans_no_extra_batches(void) {
     box_render_draws_stats(world, &colored);
     test_int(colored.batches, plain.batches);
     test_int(colored.instances, plain.instances);
+
+    ecs_fini(world);
+}
+
+/** Font file of the tests of styled spans, in the test assets */
+#define SPANS_FONT "test/assets/fonts/B612-Regular.ttf"
+
+/** Channel value a pixel passes to count as ink */
+#define SPANS_LIT (128)
+
+/** Create a white Text at the origin in a font of the test assets.
+ *
+ * @param world The world
+ * @param parent Parent of the Text, 0 for none
+ * @param value The string
+ * @param size Em size
+ * @return The entity
+ */
+static ecs_entity_t spans_styled(
+    ecs_world_t *world,
+    ecs_entity_t parent,
+    const char *value,
+    float size)
+{
+    ecs_entity_t font = ecs_lookup(world, "spans_font");
+    if (!font) {
+        font = ecs_entity(world, { .name = "spans_font" });
+        ecs_set(world, font, Font, { .path = SPANS_FONT, .atlas_pages = 4 });
+    }
+
+    ecs_entity_t e = parent ? ecs_new_w_pair(world, EcsChildOf, parent) : ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Text, {.value = (char*)value, .size = size,
+        .line_height = size * 1.25f, .font = font});
+    ecs_set(world, e, Rgb, {255, 255, 255});
+
+    return e;
+}
+
+/** Count the pixels of an image whose red channel passes SPANS_LIT.
+ *
+ * @param px The pixels
+ * @param width Width of the image
+ * @param height Height of the image
+ * @return The pixels
+ */
+static int32_t spans_lit(
+    const unsigned char *px,
+    int32_t width,
+    int32_t height)
+{
+    int32_t i, result = 0;
+    for (i = 0; i < width * height; i ++) {
+        result += px[i * 4] >= SPANS_LIT;
+    }
+
+    return result;
+}
+
+/** Get how far the ink at the top of an image is right of the ink at its bottom: the mean x of
+ * the lit pixels of the top rows of the ink minus that of its bottom rows.
+ *
+ * @param px The pixels
+ * @param width Width of the image
+ * @param height Height of the image
+ * @return The lean in pixels, positive to the right at the top
+ */
+static float spans_lean(
+    const unsigned char *px,
+    int32_t width,
+    int32_t height)
+{
+    int32_t x, y, top = -1, bottom = -1;
+    double sum[2] = {0}, count[2] = {0};
+    for (y = 0; y < height; y ++) {
+        for (x = 0; x < width; x ++) {
+            if (px[(y * width + x) * 4] >= SPANS_LIT) {
+                top = top < 0 ? y : top;
+                bottom = y;
+            }
+        }
+    }
+
+    test_assert(top >= 0);
+    test_assert(bottom - top > 12);
+    for (y = top; y <= bottom; y ++) {
+        int32_t band = y < top + 5 ? 0 : (y > bottom - 5 ? 1 : -1);
+        for (x = 0; band >= 0 && x < width; x ++) {
+            if (px[(y * width + x) * 4] >= SPANS_LIT) {
+                sum[band] += x;
+                count[band] ++;
+            }
+        }
+    }
+
+    test_assert(count[0] > 0 && count[1] > 0);
+
+    return (float)(sum[0] / count[0] - sum[1] / count[1]);
+}
+
+void TextSpans_bold_more_coverage(void) {
+    float sizes[3] = { 20, 36, 60 };
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        ecs_world_t *world = spans_world();
+        spans_view(world);
+        ecs_entity_t e = spans_styled(world, 0, "Hello", sizes[i]);
+        spans_surface(world, 256, 96, "bold.png");
+
+        unsigned char *px = spans_frame(world, "bold.png", 3);
+        int32_t regular = spans_lit(px, 256, 96);
+        stbi_image_free(px);
+        test_assert(regular > 0);
+
+        spans_set(world, e, (TextSpan[]){
+            { 0, 5, {0}, .bold = true, .keep_color = true }}, 1);
+        px = spans_frame(world, "bold.png", 1);
+        int32_t bold = spans_lit(px, 256, 96);
+        stbi_image_free(px);
+        test_assert(bold > regular + regular / 10);
+
+        ecs_fini(world);
+    }
+}
+
+void TextSpans_italic_leans(void) {
+    ecs_world_t *world = spans_world();
+    spans_view(world);
+    ecs_entity_t e = spans_styled(world, 0, "I", 80);
+    spans_surface(world, 128, 128, "italic.png");
+
+    unsigned char *px = spans_frame(world, "italic.png", 3);
+    float regular = spans_lean(px, 128, 128);
+    int32_t ink = spans_lit(px, 128, 128);
+    stbi_image_free(px);
+    test_assert(fabsf(regular) < 1.5f);
+
+    spans_set(world, e, (TextSpan[]){{ 0, 1, {0}, .italic = true, .keep_color = true }}, 1);
+    px = spans_frame(world, "italic.png", 1);
+    float italic = spans_lean(px, 128, 128);
+    int32_t leaning = spans_lit(px, 128, 128);
+    stbi_image_free(px);
+
+    test_assert(italic > regular + 6.0f);
+    test_assert(leaning > ink * 9 / 10);
+    test_assert(leaning < ink * 11 / 10);
+
+    ecs_fini(world);
+}
+
+void TextSpans_regular_unchanged(void) {
+    ecs_world_t *world = spans_world();
+    spans_view(world);
+    ecs_entity_t e = spans_styled(world, 0, "Hello", 36);
+    spans_surface(world, 256, 96, "regular.png");
+
+    unsigned char *px = spans_frame(world, "regular.png", 3);
+    unsigned char *none = ecs_os_malloc(256 * 96 * 4);
+    ecs_os_memcpy(none, px, 256 * 96 * 4);
+    stbi_image_free(px);
+
+    spans_set(world, e, (TextSpan[]){
+        { 0, 5, {0}, .bold = false, .italic = false, .keep_color = true }}, 1);
+    px = spans_frame(world, "regular.png", 1);
+    test_assert(!memcmp(px, none, 256 * 96 * 4));
+    stbi_image_free(px);
+
+    spans_set(world, e, (TextSpan[]){{ 0, 5, { 255, 255, 255, 255 } }}, 1);
+    px = spans_frame(world, "regular.png", 1);
+    test_assert(!memcmp(px, none, 256 * 96 * 4));
+    stbi_image_free(px);
+
+    ecs_os_free(none);
+    ecs_fini(world);
+}
+
+void TextSpans_same_batches(void) {
+    ecs_world_t *world = spans_world();
+    spans_view(world);
+    ecs_entity_t e = spans_styled(world, 0, "II II", 60);
+    spans_surface(world, 128, 64, "styled_batches.png");
+
+    unsigned char *px = spans_frame(world, "styled_batches.png", 3);
+    stbi_image_free(px);
+    box_render_draws_stats_t plain = {0}, styled = {0};
+    box_render_draws_stats(world, &plain);
+    test_int(plain.instances, 4);
+
+    spans_set(world, e, (TextSpan[]){
+        { 0, 1, {0}, .bold = true, .keep_color = true },
+        { 1, 2, {0}, .italic = true, .keep_color = true },
+        { 3, 5, { 255, 0, 0, 255 }, .bold = true, .italic = true }
+    }, 3);
+    px = spans_frame(world, "styled_batches.png", 1);
+    stbi_image_free(px);
+    box_render_draws_stats(world, &styled);
+    test_int(styled.batches, plain.batches);
+    test_int(styled.instances, plain.instances);
+    test_int(styled.dynamic, plain.dynamic);
+
+    ecs_fini(world);
+}
+
+void TextSpans_world_text_styled(void) {
+    ecs_world_t *world = spans_world();
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 2});
+    ecs_set(world, camera, Rotation, {0, 0, 0.2f});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true,
+        .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t panel = ecs_new(world);
+    ecs_set(world, panel, Position, {0, 0, 0});
+    ecs_set(world, panel, Scale, {0.01f, 0.01f, 0.01f});
+    ecs_entity_t e = spans_styled(world, panel, "I", 100);
+    spans_surface(world, 128, 128, "world_styled.png");
+
+    unsigned char *px = spans_frame(world, "world_styled.png", 3);
+    float upright = spans_lean(px, 128, 128);
+    int32_t regular = spans_lit(px, 128, 128);
+    stbi_image_free(px);
+
+    spans_set(world, e, (TextSpan[]){
+        { 0, 1, {0}, .italic = true, .keep_color = true }}, 1);
+    px = spans_frame(world, "world_styled.png", 1);
+    float italic = spans_lean(px, 128, 128);
+    stbi_image_free(px);
+    test_assert(italic > upright + 3.0f);
+
+    spans_set(world, e, (TextSpan[]){
+        { 0, 1, {0}, .bold = true, .keep_color = true }}, 1);
+    px = spans_frame(world, "world_styled.png", 1);
+    int32_t bold = spans_lit(px, 128, 128);
+    stbi_image_free(px);
+    test_assert(bold > regular + regular / 10);
 
     ecs_fini(world);
 }

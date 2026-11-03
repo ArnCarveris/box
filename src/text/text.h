@@ -21,6 +21,22 @@
 /** Texels a glyph field reaches beyond the outline of the glyph */
 #define BOX_TEXT_PAD (3)
 
+/** Ems a bold glyph advances further than the regular one */
+#define BOX_TEXT_BOLD_ADVANCE (0.04f)
+
+/** Part of the field a bold glyph lowers its threshold by: one texel of BOX_TEXT_EM per em of
+ * outline grown on each side, 1 / BOX_TEXT_RANGE, within BOX_TEXT_PAD */
+#define BOX_TEXT_BOLD_FIELD (1.0f / BOX_TEXT_RANGE)
+
+/** Shear of an italic glyph: x moves by tan(12 degrees) per unit above the baseline */
+#define BOX_TEXT_ITALIC_SHEAR (0.21255656f)
+
+/** Style flag of a bold glyph */
+#define BOX_TEXT_STYLE_BOLD (1u)
+
+/** Style flag of an italic glyph */
+#define BOX_TEXT_STYLE_ITALIC (2u)
+
 /** Texels left empty between two glyphs of a page */
 #define BOX_TEXT_SPACING (4)
 
@@ -61,6 +77,9 @@ typedef struct box_text_glyph_t {
     float range;    /**< Distance range of the field in texture coordinates of the page */
     uint32_t page;  /**< Backend texture handle of the atlas page */
     int32_t offset; /**< Byte offset of the first byte of the character of the glyph */
+    float shear;    /**< X the quad moves per unit above its center, 0 upright; x is the
+                     *   center already moved by the shear about the baseline of its line */
+    float weight;   /**< Part of the field the outline threshold falls by, 0 regular */
 } box_text_glyph_t;
 
 /** Caret before a character of a laid out Text, or after its last one */
@@ -87,6 +106,7 @@ typedef struct TextGlyphs {
     float top;          /**< Y of the top of the first line, local */
     float line_height;  /**< Logical pixels between two baselines */
     uint64_t key;       /**< box_text_key of the Text laid out last */
+    uint64_t style;     /**< box_text_style_key of the TextSpans laid out last */
     bool ready;         /**< The carets and rows hold the last layout, its font loaded */
 } TextGlyphs;
 
@@ -125,7 +145,15 @@ typedef struct box_text_placed_t {
     int32_t line;                           /**< Line of the glyph */
     int32_t offset;                         /**< Byte offset of the character of the glyph */
     const box_text_atlas_glyph_t *glyph;    /**< Atlas area of the glyph */
+    uint8_t style;                          /**< BOX_TEXT_STYLE_ flags of the glyph */
 } box_text_placed_t;
+
+/** A byte range of a string with a style, the styles of the spans over it added up */
+typedef struct box_text_style_t {
+    int32_t start;      /**< First byte of the range */
+    int32_t end;        /**< Byte after the range */
+    uint8_t flags;      /**< BOX_TEXT_STYLE_ flags, never 0 */
+} box_text_style_t;
 
 /** Counter of the jobs in flight, shared by the registry and its jobs */
 typedef struct box_text_sync_t {
@@ -158,6 +186,8 @@ typedef struct box_text_state_t {
     ecs_vec_t carets;           /**< Scratch of the layout: box_text_caret_t of a string */
     ecs_vec_t rows;             /**< Scratch of the layout: box_text_row_t per line */
     ecs_vec_t texts;            /**< Scratch: entities to lay out again */
+    ecs_vec_t styles;           /**< Scratch of the layout: box_text_style_t, sorted */
+    ecs_vec_t edges;            /**< Scratch of the styles: box_text_style_t edges of spans */
     uint32_t next_page;         /**< Next page handle */
     box_text_sync_t *sync;      /**< Jobs in flight */
     ecs_query_t *query;         /**< Entities with a Text, disabled ones included */
@@ -303,9 +333,22 @@ float box_text_face_kern(
 uint64_t box_text_key(
     const Text *text);
 
+/** Get the key of the styles of the spans of a Text, which a layout depends on.
+ *
+ * A hash over the start, end, bold and italic of the spans with a style, clipped to the string;
+ * colors and spans without a style do not change it.
+ *
+ * @param spans The spans, NULL for none
+ * @param length Byte length of Text.value
+ * @return The key, 0 when no span has a style
+ */
+uint64_t box_text_style_key(
+    const TextSpans *spans,
+    int32_t length);
+
 /** Get the color of the span a byte offset of a Text falls in.
  *
- * The last span whose range, clipped to the string, holds the offset wins.
+ * The last span without keep_color whose range, clipped to the string, holds the offset wins.
  *
  * @param spans The spans of the Text, NULL for none
  * @param length Byte length of Text.value
@@ -329,6 +372,35 @@ void box_text_layout(
     box_text_state_t *s,
     ecs_entity_t e,
     const Text *text);
+
+/** Lay out a Text into its TextGlyphs and TextBounds with given spans, as box_text_layout.
+ *
+ * @param world The world
+ * @param s The registry
+ * @param e The entity
+ * @param text Its Text
+ * @param spans The spans whose styles it takes, NULL for none, not those of the entity
+ */
+void box_text_layout_spans(
+    ecs_world_t *world,
+    box_text_state_t *s,
+    ecs_entity_t e,
+    const Text *text,
+    const TextSpans *spans);
+
+/** Check whether a Text laid out from its current string, parameters and span styles.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param text Its Text
+ * @param glyphs Its TextGlyphs
+ * @return Whether the layout is current
+ */
+bool box_text_current_layout(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const Text *text,
+    const TextGlyphs *glyphs);
 
 /** Get the sizes box.layout fits a text element to, the measure hook of the layout.
  *

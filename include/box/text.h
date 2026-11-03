@@ -75,21 +75,25 @@ ECS_STRUCT(Text, {
                          *   the width; the caret after spaces at the end past it too */
 });
 
-/** A byte range of Text.value drawn in a color of its own */
+/** A byte range of Text.value drawn in a color or a style of its own */
 ECS_STRUCT(TextSpan, {
-    int32_t start; /**< Byte offset of the first byte of the range */
-    int32_t end;   /**< Byte offset after the range */
-    rgba color;    /**< Display encoded color, its alpha multiplies the opacity of the text */
+    int32_t start;   /**< Byte offset of the first byte of the range */
+    int32_t end;     /**< Byte offset after the range */
+    rgba color;      /**< Display encoded color, its alpha multiplies the opacity of the text */
+    bool bold;       /**< Glyphs are drawn bold, synthesized from the regular glyph */
+    bool italic;     /**< Glyphs lean to the right, synthesized from the regular glyph */
+    bool keep_color; /**< The span leaves the color alone, color is ignored */
 });
 
-/** Colored byte ranges of the Text of the entity.
+/** Colored and styled byte ranges of the Text of the entity.
  *
- * A glyph whose first byte falls in a span takes its color instead of the Rgb of the entity;
- * a later span wins where spans overlap, ranges are clipped to the string and a glyph outside
- * every span keeps the entity color. Tint, Opacity, Emissive and BlendMode apply as before.
+ * A glyph whose first byte falls in a span takes its color, a later span without keep_color
+ * winning, ranges clipped to the string; outside them it keeps the entity color. Styles add up:
+ * a glyph is bold or italic if any span over its first byte is, synthesized from the glyph.
  *
- * Spans only color glyphs: layout, kerning, wrapping, TextBounds and the glyph atlas do not
- * depend on them, so a change of TextSpans alone recolors the glyphs without a new layout.
+ * A color only span changes no layout, a styled one does: TextBounds, wrapping and carets follow
+ * the wider advance of bold glyphs. The lean of italic glyphs is not in TextBounds, a caret sits
+ * on the advance without it.
  */
 ECS_STRUCT(TextSpans, {
     ecs_vec(TextSpan) spans; /**< The spans, TextSpan, later ones over earlier ones */
@@ -123,7 +127,8 @@ ECS_STRUCT(TextCaret, {
  * At a wrap point the caret starts the next line, after a trailing newline an empty line, and
  * after spaces at the end that pass the width an empty line at the hang indent.
  *
- * A Text whose value or parameters changed since its last layout is laid out again first.
+ * A Text whose value, parameters or span styles changed since its last layout is laid out again
+ * first.
  *
  * @param world The world
  * @param text The entity with the Text
@@ -190,6 +195,22 @@ int32_t box_text_line(
 int32_t box_text_break_lines(
     ecs_world_t *world,
     const Text *text,
+    ecs_vec_t *starts);
+
+/** Break a Text into its lines without an entity, with the styles of spans: as
+ * box_text_break_lines, a bold glyph advancing as in the layout of a Text with these spans.
+ *
+ * @param world The world
+ * @param text The Text, its font loaded when no other Text requested it before
+ * @param spans The spans of the Text, NULL for none
+ * @param starts Receives the int32_t byte offset of the first character of every line, an
+ * initialized vector that is cleared first, NULL to only count
+ * @return The line count, 0 while the font is not loaded or for a Text without font
+ */
+int32_t box_text_break_lines_spans(
+    ecs_world_t *world,
+    const Text *text,
+    const TextSpans *spans,
     ecs_vec_t *starts);
 
 /** Register the box.text module.

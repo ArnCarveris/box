@@ -880,7 +880,9 @@ typedef struct box_render_transform_t {
  *   its edge (0 for a blend mode that does not cover). emissive.xyz and the texture are unused.
  * - A line: emissive.w is its negated width, material.xy its start and material.zw its end.
  * - A glyph of a Text: emissive.w is 0, material.xy the distance range of its atlas page,
- *   material.zw 0 and uv the area of the glyph on the page.
+ *   material.z (f32 bits) the part of the field its threshold falls by, 0 regular and
+ *   BOX_TEXT_BOLD_FIELD bold, material.w 0 and uv the area of the glyph on the page. An italic
+ *   glyph leans through the shear of its transform.
  * - A shape without a 2D shape: material.xy metallic and roughness, emissive.w and material.zw 0.
  */
 typedef struct box_render_shading_t {

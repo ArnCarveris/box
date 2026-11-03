@@ -1306,6 +1306,7 @@ static void box_transition_send_slots(
         const box_text_glyph_t *g = ecs_vec_get_t(&tg->glyphs, box_text_glyph_t, i);
         glm_mat4_identity(instance);
         instance[0][0] = g->width;
+        instance[1][0] = g->shear * g->height;
         instance[1][1] = g->height;
         instance[3][0] = g->x;
         instance[3][1] = g->y;

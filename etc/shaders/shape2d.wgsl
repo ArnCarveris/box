@@ -13,9 +13,11 @@
 // both ends, twice the largest coordinate plus the width on each axis. A glyph of a Text has an
 // emissive.w of 0: its quad is the glyph area, uv the area of the atlas page and shape.xy the
 // distance range of the page; its coverage comes from the multi channel signed distance field
-// of the page (distance_map, a linear layer), so the edge stays sharp at any scale. Instances
-// are read by the slot the cull pass wrote, from the transform and shading streams of the
-// instance page of the batch (group 2).
+// of the page (distance_map, a linear layer), so the edge stays sharp at any scale. shape.z of a
+// glyph (f32 bits) is the part of the field its threshold falls by, 0 for a regular glyph, so a
+// bold glyph grows its outline; an italic glyph leans through the shear of its transform.
+// Instances are read by the slot the cull pass wrote, from the transform and shading streams of
+// the instance page of the batch (group 2).
 //
 // The shadow of a Rect or Circle with a BoxShadow is a rectangle instance with a negative border
 // width: shape.y is the negated standard deviation of its edge and shape.x the corner radius of
@@ -116,6 +118,7 @@ struct VertexOut {
     @location(2) @interpolate(flat) extent: vec2f,
     // Corner radius and border width in shape units
     @location(3) @interpolate(flat) params: vec2f,
+    // Border color of a rectangle; x the field offset of a glyph, its bold weight
     @location(4) @interpolate(flat) border: vec4f,
     @location(5) @interpolate(flat) color: vec4f,
     @location(6) @interpolate(flat) emissive: vec3f,
@@ -160,6 +163,7 @@ fn pixels_per_unit(mvp: mat4x4f, clip: vec4f, dir: vec2f) -> f32 {
     if (glyph) {
         extent = vec2f(0.5);
         o.params = vec2f(bitcast<f32>(inst.shape.x), bitcast<f32>(inst.shape.y));
+        o.border = vec4f(bitcast<f32>(inst.shape.z), 0.0, 0.0, 0.0);
     } else if (inst.emissive.w < 0.0) {
         let a = bitcast<vec2f>(inst.shape.xy);
         let b = bitcast<vec2f>(inst.shape.zw);
@@ -275,14 +279,15 @@ fn median(v: vec3f) -> f32 {
 // (a mip would average the channels and break the median) is the distance to the outline,
 // scaled from the range of the page to screen pixels with the Euclidean footprint of a pixel, so
 // rotation changes nothing. Below one pixel of range the edge stays one pixel wide and the glyph
-// fades with the range instead of aliasing.
-fn glyph_coverage(uv: vec2f, range: vec2f) -> f32 {
+// fades with the range instead of aliasing. offset is added to the distance, 0 for a regular
+// glyph and the bold weight for a bold one.
+fn glyph_coverage(uv: vec2f, range: vec2f, offset: f32) -> f32 {
     let field = textureSampleLevel(distance_map, material_sampler, uv, 0.0);
     let footprint = vec2f(length(vec2f(dpdx(uv.x), dpdy(uv.x))),
         length(vec2f(dpdx(uv.y), dpdy(uv.y))));
     let texels = vec2f(1.0) / max(footprint, vec2f(1e-9));
     let px_range = 0.5 * dot(range, texels);
-    let cover = clamp((median(field.rgb) - 0.5) * max(px_range, 1.0) + 0.5, 0.0, 1.0);
+    let cover = clamp((median(field.rgb) - 0.5 + offset) * max(px_range, 1.0) + 0.5, 0.0, 1.0);
     return cover * clamp(px_range, 0.0, 1.0);
 }
 
@@ -359,7 +364,7 @@ fn ranked_depth(depth: f32, rank: u32) -> f32 {
     let uv = clamp(f.uv, vec2f(0.0), vec2f(1.0)) * f.uv_transform.xy + f.uv_transform.zw;
     let texel = textureSample(albedo_map, material_sampler, uv);
     let glyph = f.glyph > 0.5;
-    let glyph_cover = glyph_coverage(uv, f.params);
+    let glyph_cover = glyph_coverage(uv, f.params, f.border.x);
     let shape_cover = coverage(d, px);
     let fill = select(1.0, coverage(inner, inner_px), f.params.y > 0.0);
     let shape_color = mix(f.border.rgb, f.color.rgb * texel.rgb, fill);

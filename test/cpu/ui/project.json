@@ -221,7 +221,22 @@
                     "span_change_no_relayout",
                     "remove_spans_no_relayout",
                     "script_sets_spans",
-                    "copy_owns_spans"
+                    "copy_owns_spans",
+                    "color_only_no_layout",
+                    "bold_grows_bounds",
+                    "bold_wraps_earlier",
+                    "bold_moves_carets",
+                    "bold_hit_test",
+                    "italic_same_bounds",
+                    "style_change_lays_out",
+                    "style_removed_lays_out",
+                    "keep_color",
+                    "overlap_styles_add",
+                    "spans_clip_to_string",
+                    "span_mid_utf8",
+                    "empty_span",
+                    "break_lines_spans",
+                    "from_script"
                 ]
             },
             {
