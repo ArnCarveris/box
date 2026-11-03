@@ -143,7 +143,8 @@
                     "enable_shows_shape_again",
                     "moved_while_disabled",
                     "created_disabled",
-                    "deleted_while_disabled"
+                    "deleted_while_disabled",
+                    "shape_child_follows_parent"
                 ]
             },
             {
@@ -372,6 +373,16 @@
                     "albedo_red",
                     "mips_average",
                     "quality_caps"
+                ]
+            },
+            {
+                "id": "TextureBlend",
+                "testcases": [
+                    "layer_zero_alone",
+                    "single_channel_mask",
+                    "rgba_mask",
+                    "arrays_shared_released",
+                    "layer_change_rebuilds"
                 ]
             },
             {
@@ -1104,6 +1115,8 @@
                     "grid_per_view",
                     "grid_not_tonemapped",
                     "grid_not_in_captures",
+                    "grid_in_view_capture",
+                    "grid_not_in_view_capture_without_view",
                     "grid_camera_below",
                     "grid_resize",
                     "wire_off_unchanged",

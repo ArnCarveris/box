@@ -170,6 +170,44 @@ typedef struct box_gpu_material_t {
     struct box_gpu_material_t *next; /**< Next material with the same hash */
 } box_gpu_material_t;
 
+/** A texture array of one map of the layers of TextureBlend batches, a slice per layer, shared
+ * by every blend with the same sources */
+typedef struct box_gpu_blend_array_t {
+    uint32_t map;                   /**< BOX_RENDER_BLEND_ALBEDO, _ORM or _NORMAL */
+    uint32_t count;                 /**< Slices */
+    uint32_t quality;               /**< Largest dimension of a slice */
+    uint32_t sources[BOX_RENDER_BLEND_LAYERS]; /**< Texture handle of each slice, 0 for the
+                                     *   default of the map */
+    uint32_t serials[BOX_RENDER_BLEND_LAYERS]; /**< Serial of the image of each source it was
+                                     *   built from, 0 for none: another serial rebuilds it */
+    uint32_t version;               /**< Builds of the array, which the bind groups compare */
+    WGPUTexture texture;            /**< The array, BOX_GPU_TEXTURE_FORMAT */
+    WGPUTextureView view;           /**< 2D array view of every level, decoded from sRGB for the
+                                     *   albedo */
+    uint64_t bytes;                 /**< Bytes of the array with its mip levels */
+    int32_t refs;                   /**< Bind groups that bind it */
+    int64_t used;                   /**< Frame of the last packet that drew with it */
+    struct box_gpu_blend_array_t *next; /**< Next array */
+} box_gpu_blend_array_t;
+
+/** Bind group of the texture_blend variant of the mesh pipeline: the arrays of the layers, the
+ * mask, the emissive layer, the sampler and the uniforms of the layers */
+typedef struct box_gpu_blend_group_t {
+    box_render_texture_blend_t blend; /**< The blend it binds */
+    uint32_t emissive;              /**< Texture handle of the emissive layer, 0 for none */
+    uint32_t wrap;                  /**< TextureWrap of the sampler */
+    uint32_t anisotropy;            /**< Anisotropic samples of the sampler */
+    box_gpu_blend_array_t *arrays[BOX_RENDER_BLEND_MAPS]; /**< Its arrays, referenced */
+    uint32_t versions[BOX_RENDER_BLEND_MAPS]; /**< Versions of the arrays it binds */
+    uint32_t mask_serial;           /**< Serial of the image of the mask it binds */
+    uint32_t emissive_serial;       /**< Serial of the image of the emissive layer it binds */
+    WGPUBuffer uniforms;            /**< BlendUniforms of mesh.wgsl */
+    WGPUBindGroup group;            /**< The bind group, NULL until made */
+    int64_t used;                   /**< Frame of the last packet that drew with it */
+    int64_t checked;                /**< Frame its arrays and images were last checked */
+    struct box_gpu_blend_group_t *next; /**< Next group */
+} box_gpu_blend_group_t;
+
 /** Bind group of an instance page with the surface assets of a mesh that has them */
 typedef struct box_gpu_instance_group_t {
     uint32_t mesh;                  /**< Handle of the mesh */
@@ -692,6 +730,14 @@ typedef struct box_gpu_t {
     ecs_map_t textures;             /**< Handle to box_gpu_texture_t */
     ecs_map_t materials;            /**< Key hash to the first box_gpu_material_t */
     ecs_vec_t mips;                 /**< uint32_t, textures whose mip levels are not generated */
+    uint32_t texture_serial;        /**< Serial of the last image written into a texture */
+    WGPUBindGroupLayout blend_layout; /**< Bind group layout of the texture_blend variant */
+    WGPUPipelineLayout blend_mesh_layout; /**< Pipeline layout of the texture_blend variant of
+                                     *   the forward pass: mesh_layout with blend_layout */
+    box_gpu_blend_array_t *blend_arrays; /**< Texture arrays of the TextureBlend layers */
+    box_gpu_blend_group_t *blend_groups; /**< Bind groups of the TextureBlend batches */
+    uint64_t blend_bytes;           /**< Bytes of the blend arrays */
+    int64_t blend_frame;            /**< Packets the blend caches have seen */
     WGPUPipelineLayout mesh_layout; /**< Pipeline layout of the forward pass */
     WGPUBindGroupLayout prepass_empty_layout; /**< Group 1 of the plain depth prepass, empty */
     WGPUBindGroup prepass_empty;    /**< The empty group 1 of the plain depth prepass */

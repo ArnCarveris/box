@@ -69,7 +69,9 @@ void Assets_multisegment_sweep(void)
         vec3 center;
         box_surface_sample_t sample;
         float t = (float)i / 30;
-        test_bool(box_path3_evaluate(&path, t, center), true);
+        /* v is a fraction of the path length, mapped to the path parameter */
+        float parameter = box_surface_sweep_parameter(&ecs_get(world, e, ShapeMesh)->surface, t);
+        test_bool(box_path3_evaluate(&path, parameter, center), true);
         test_bool(box_surface_evaluate(world, e, SurfaceOuter, 0, t, &sample), true);
         test_assert(fabsf(glm_vec3_distance(center, sample.position) - 0.1f) < 0.0001f);
     }

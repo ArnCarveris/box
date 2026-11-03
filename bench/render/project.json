@@ -61,7 +61,9 @@
             {
                 "id": "Texture",
                 "benchcases": [
-                    "textured_batches"
+                    "textured_batches",
+                    "single_frame",
+                    "blend_four_frame"
                 ]
             },
             {

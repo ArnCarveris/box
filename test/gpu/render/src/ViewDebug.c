@@ -3,8 +3,9 @@
  * @brief Tests for the debug pass of a view (View.debug) and its infinite grid: no pass without
  * debug items, lines at every cell with their width in pixels, major lines and axes, the depth of
  * the view, the fade with the distance and toward the horizon, the height of the plane,
- * orthographic cameras, several views of a target, effects, captures, a camera under the plane
- * and resizes; then the light and reflection probe views: spheres at the probes of the volume
+ * orthographic cameras, several views of a target, effects, probe captures, screenshots of the
+ * camera of a view (with the grid) and of a camera without a view (without), a camera under the
+ * plane and resizes; then the light and reflection probe views: spheres at the probes of the volume
  * and at the capture points of the reflection probes, their colors, invalid probes, the boxes of
  * the reflection probes, the probe size and views that sample no probes; and the wireframe: no
  * change while off, the edges and diagonals of the triangles, hidden lines of the overlay,
@@ -816,6 +817,82 @@ void ViewDebug_grid_not_in_captures(void) {
                 1e-4f + 0.01f * fabsf(sh_plain[i][c]));
         }
     }
+}
+
+/** Capture a camera looking down from 10 units through the capture API into a black square
+ * PNG. A view with the grid renders a camera at the same place; the capture is of that camera,
+ * or of a second camera that no view renders.
+ *
+ * @param of_view Whether the captured camera is the one of the view
+ * @param file Name of the PNG in the temporary directory
+ * @return The pixels, RGBA, freed with stbi_image_free
+ */
+static unsigned char* dg_capture_api(
+    bool of_view,
+    const char *file)
+{
+    ecs_world_t *world = dg_world();
+    ecs_entity_t camera = dg_camera(world, 10, -(float)GLM_PI_2);
+    ecs_entity_t lone = dg_camera(world, 10, -(float)GLM_PI_2);
+    dg_view(world, camera, &dg_grid);
+    dg_surface(world, 64, 48, NULL);
+    box_render_gpu_stats_t before = dg_frames(world, 1), after;
+
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, file);
+    test_int(box_render_capture(world, &(box_render_capture_desc_t){
+        .camera = of_view ? camera : lone,
+        .clear = {.enabled = true, .color = {0, 0, 0, 255}},
+        .width = DG_SIZE, .height = DG_SIZE, .path = path}), 0);
+    ecs_os_free(path);
+    after = dg_frames(world, 3);
+    test_int(box_render_captures_pending(world), 0);
+    test_int(after.errors, before.errors);
+    test_int(after.shader_errors, before.shader_errors);
+
+    unsigned char *px = dg_load(world, file, DG_SIZE, DG_SIZE);
+    ecs_fini(world);
+
+    return px;
+}
+
+/** A capture of the camera of a view with the grid shows the grid as the view draws it: white
+ * minor lines at every cell and green major lines every 5 cells. */
+void ViewDebug_grid_in_view_capture(void) {
+    // debug/captures
+    unsigned char *px = dg_capture_api(true, "debug_view_capture.png");
+    dg_expect_lines(px, DG_SCALE, 1);
+
+    int32_t k, row = (int32_t)dg_pos(2.5f, DG_SCALE);
+    float majors[2] = { 5.0f, -5.0f };
+    for (k = 0; k < 2; k ++) {
+        float center = dg_pos(majors[k], DG_SCALE);
+        int32_t from = (int32_t)(center - 4), to = (int32_t)(center + 4);
+        from = from < 0 ? 0 : from;
+        to = to >= DG_SIZE ? DG_SIZE - 1 : to;
+        dg_scan_t s = dg_scan(px, row, from, to, false);
+        test_assert(s.sum[1] > 0.9f);
+        test_assert(s.sum[0] < 0.4f * s.sum[1]);
+    }
+
+    stbi_image_free(px);
+}
+
+/** A capture of a camera that no view renders draws no grid, though a view of the same scene
+ * at the same place has one. */
+void ViewDebug_grid_not_in_view_capture_without_view(void) {
+    // debug/captures
+    unsigned char *px = dg_capture_api(false, "debug_lone_capture.png");
+    int32_t row = (int32_t)dg_pos(2.5f, DG_SCALE);
+    int32_t column = (int32_t)dg_pos(2.5f, DG_SCALE);
+    dg_scan_t across = dg_scan(px, row, 0, DG_SIZE - 1, false);
+    dg_scan_t down = dg_scan(px, column, 0, DG_SIZE - 1, true);
+    int32_t c;
+    for (c = 0; c < 3; c ++) {
+        test_assert(across.sum[c] < 0.05f);
+        test_assert(down.sum[c] < 0.05f);
+    }
+
+    stbi_image_free(px);
 }
 
 /** A camera 10 units under the plane looking up sees the grid as from above. */

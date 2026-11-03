@@ -1,0 +1,104 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+// TextureBlend: the large plane blends four layers under a mask of four quadrants with soft
+// borders (checker top left, letter top right, stripes bottom left, a normal mapped layer with
+// bumps and an ORM bottom right), each layer tiled by its own TextureTransform. On the right, the
+// upper quad blends layer 0 alone without a mask and the lower one has the same textures through
+// PbrTextures: the two must look the same.
+
+camera {
+  Position: {0, 2.2, 9}
+  Rotation: {-0.12, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {20, 22, 28, 255}}}
+}
+
+$ {
+  AmbientLight: {sky: {50, 54, 64}, ground: {24, 22, 20}}
+}
+
+key {
+  Rotation: {0.7359, 2.3726, 0}
+  DirectionalLight: {intensity: 1.2 * flecs.script.math.PI}
+  Rgb: {255, 240, 225}
+}
+
+mask {
+  TexturePath: {path: "test/integration/visual/assets/blend_mask.png"}
+}
+
+checker {
+  TexturePath: {path: "test/integration/visual/assets/checker.png"}
+}
+
+letter {
+  TexturePath: {path: "test/integration/visual/assets/letter.png"}
+}
+
+stripes {
+  TexturePath: {path: "test/integration/visual/assets/stripes.png"}
+}
+
+bumps {
+  TexturePath: {path: "test/integration/visual/assets/bumps.png"}
+}
+
+orm {
+  TexturePath: {path: "test/integration/visual/assets/orm.png"}
+}
+
+checker_layer {
+  PbrTextures: {albedo: checker}
+  TextureTransform: {scale_x: 2, scale_y: 2}
+}
+
+letter_layer {
+  PbrTextures: {albedo: letter}
+}
+
+stripes_layer {
+  PbrTextures: {albedo: stripes}
+  TextureTransform: {scale_x: 3, scale_y: 3}
+}
+
+bumpy_layer {
+  PbrTextures: {orm: orm, normal: bumps}
+  TextureTransform: {scale_x: 4, scale_y: 4}
+}
+
+blended {
+  Position: {-1.5, 2, 0}
+  Rotation: {-0.1, 0.25, 0}
+  Quad: {4, 4}
+  Rgb: {240, 240, 240}
+  PbrMaterial: {roughness: 0.5}
+  TextureBlend: {mask: mask, layers: [checker_layer, letter_layer, stripes_layer, bumpy_layer]}
+}
+
+layer_zero {
+  Position: {2.6, 3, 0}
+  Rotation: {-0.1, -0.2, 0}
+  Quad: {1.8, 1.8}
+  Rgb: {240, 240, 240}
+  PbrMaterial: {roughness: 0.5}
+  TextureBlend: {layers: [checker_layer]}
+}
+
+plain {
+  Position: {2.6, 1, 0}
+  Rotation: {-0.1, -0.2, 0}
+  Quad: {1.8, 1.8}
+  Rgb: {240, 240, 240}
+  PbrMaterial: {roughness: 0.5}
+  PbrTextures: {albedo: checker}
+  TextureTransform: {scale_x: 2, scale_y: 2}
+}

@@ -61,7 +61,12 @@
                     "texture_mapping_ids",
                     "texture_mapping_world_defaults",
                     "texture_mapping_world_pack",
-                    "texture_mapping_world_ids"
+                    "texture_mapping_world_ids",
+                    "texture_blend_batches",
+                    "texture_blend_prefab",
+                    "texture_blend_layer_changes",
+                    "texture_blend_layer_deleted",
+                    "texture_blend_plain_fallback"
                 ]
             },
             {
@@ -447,7 +452,8 @@
                     "wire_defaults",
                     "wire_script_keeps_defaults",
                     "wire_packet_copy",
-                    "wire_only_no_occlusion"
+                    "wire_only_no_occlusion",
+                    "capture_copies_debug"
                 ]
             },
             {
@@ -627,6 +633,27 @@
                     "packed_color_tint_2d",
                     "tint_stays_in_bake",
                     "opacity_stays_out_of_bake"
+                ]
+            },
+            {
+                "id": "ShapeTransform",
+                "testcases": [
+                    "box_child_follows_parent",
+                    "box_child_follows_moved_parent",
+                    "box_child_follows_dynamic_parent",
+                    "rect_child_follows_parent",
+                    "point_light_child_follows_parent",
+                    "template_box_child_follows_parent",
+                    "box_added_to_existing_child",
+                    "box_child_keeps_own_position",
+                    "box_grandchild_follows_shape_child",
+                    "box_child_follows_rotated_parent",
+                    "spot_light_child_follows_parent",
+                    "fog_volume_child_follows_parent",
+                    "emitter_child_follows_parent",
+                    "layout_rect_child_keeps_layout_position",
+                    "direction_none_rect_child_follows_parent",
+                    "text_child_follows_parent"
                 ]
             }
         ]

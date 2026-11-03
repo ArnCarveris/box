@@ -93,6 +93,21 @@ node test/integration/web/wireframe.mjs \
     "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
 ```
 
+`texture_blend.mjs` checks `TextureBlend` in the browser build: the `fs_blend` variant of the mesh
+pipeline, its bind group and the texture arrays the blit pipeline builds. It opens
+`test/integration/web/texture_blend.flecs` the same way, at the same fixed delta and size, and
+preloads the images it opens (`test/integration/visual/assets/blend_mask.png`,
+`test/assets/textures/mask_red.png` and `mask_rgb.png`). A quad blends a red, an olive and a
+white layer under the four quadrants of the mask; the bottom right weighs layer 3, which is
+unused, so layer 0 shows alone there. The check takes screenshots until the quadrants show red,
+olive, white and red and passes when they do and the log has no error and no invalid WebGPU
+object:
+
+```sh
+node test/integration/web/texture_blend.mjs \
+    "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
+```
+
 `text_variants.mjs` checks that the browser build loads the font variants of
 `box.text.DefaultFont` from the `etc` folder it embeds. It opens
 `test/integration/web/text_variants.flecs` the same way, at the same fixed delta and size: a Text

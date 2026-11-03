@@ -166,6 +166,10 @@ typedef struct box_draw_key_t {
                              *   fs_shadow entry point of the 2D shape shader */
     bool slice;             /**< Rects with an ImageSlice, drawn with the fs_slice entry point
                              *   of the 2D shape shader */
+    bool texture_blend;     /**< Opaque 3D shapes with a TextureBlend, drawn with the
+                             *   texture_blend variant of the mesh pipeline: textures[0] is the
+                             *   entity that owns the TextureBlend, textures[2] and textures[3]
+                             *   are 0, so the key does not grow */
     ecs_entity_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture entities of PbrTextures */
     uint32_t atlas;         /**< Texture handle of the glyph atlas page of a glyph batch, or 0 */
 } box_draw_key_t;
@@ -1567,6 +1571,35 @@ void box_draws_batch_textures(
     const box_render_draws_t *d,
     const box_draw_batch_t *b,
     box_render_batch_t *out);
+
+/** Write the TextureBlend of a texture_blend batch into the packet data of its draw, as it is
+ * now: the texture handles of the mask and the layers and the TextureTransform of each layer,
+ * so a change of a layer reaches the draw without a change of the key.
+ *
+ * @param p The packet
+ * @param d The state
+ * @param b The batch
+ * @param out The draw, unchanged for a batch without texture_blend
+ */
+void box_draws_batch_blend(
+    box_render_packet_t *p,
+    const box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    box_render_batch_t *out);
+
+/** Get the entity whose TextureBlend a 3D shape draws with: the owner of the TextureBlend it
+ * has or inherits, 0 when it has none or draws as if it had none (alpha tested, blended,
+ * transmissive or with a triplanar TextureMapping).
+ *
+ * @param world The world
+ * @param e The shape
+ * @param key Its key, with blend, cutout and transmissive resolved
+ * @return The owner, 0 for none
+ */
+ecs_entity_t box_draws_blend_owner(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const box_draw_key_t *key);
 
 /** Register the glyph batches of the texts: their slots, quad mesh and observers.
  *

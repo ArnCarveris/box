@@ -774,8 +774,9 @@ static void BoxMaterialsOnIsA(
  * next extract; flecs does not propagate past an owner of the component, so an owner of the
  * changed field is left alone. 2D shapes and texts write their shading again.
  *
- * Mesh shapes reference the slot and write nothing, unless an added or removed AlphaCutoff or
- * Transmission changes their batch, or the owner of a shared slot moves to another slot.
+ * Mesh shapes reference the slot and write nothing, unless their batch changes (an added or
+ * removed AlphaCutoff or Transmission, a TextureMapping of a shape with a TextureBlend) or the
+ * owner of a shared slot moves to another slot.
  *
  * @param it The iterator of the observer
  */
@@ -798,12 +799,14 @@ static void BoxMaterialsOnComponent(
     bool keyed = (it->event_id == ecs_id(AlphaCutoff) || it->event_id == ecs_id(Transmission)) &&
         it->event != EcsOnSet;
     bool mark = !prefab && (inline_ || keyed);
+    bool blended = !prefab && !mark && it->event_id == ecs_id(TextureMapping) &&
+        ecs_id_in_use(world, ecs_id(TextureBlend));
     for (i = 0; i < it->count; i ++) {
         if (owners) {
             box_draws_material_changed(d, it->entities[i]);
         }
 
-        if (mark) {
+        if (mark || (blended && ecs_get(world, it->entities[i], TextureBlend))) {
             box_draws_mark(world, d, it->entities[i], BOX_DRAW_SHADING);
         }
     }
