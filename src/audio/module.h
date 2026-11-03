@@ -79,6 +79,13 @@ typedef struct box_audio_sample_t {
     uint32_t serial;        /**< Serial of the output it was sent to */
 } box_audio_sample_t;
 
+/** Drop a reference to the counter of decodes, freeing it with the last one.
+ *
+ * @param sync The counter
+ */
+void box_audio_sample_sync_release(
+    box_audio_sample_sync_t *sync);
+
 /** The decode of a sound file on the job system */
 typedef struct box_audio_sample_job_t {
     uint64_t key;           /**< Key of the sample */
@@ -98,6 +105,112 @@ typedef struct AudioSample {
 } AudioSample;
 
 extern ECS_COMPONENT_DECLARE(AudioSample);
+
+/** Seconds of music decoded ahead of what plays */
+#define BOX_AUDIO_MUSIC_AHEAD (2.0)
+
+/** Seconds decoded ahead below which a native stream decodes again; the web decodes every frame
+ * it has less than BOX_AUDIO_MUSIC_AHEAD */
+#define BOX_AUDIO_MUSIC_REFILL (1.5)
+
+/** Seconds decoded before a stream starts, unless the file is shorter */
+#define BOX_AUDIO_MUSIC_START (0.5)
+
+/** Seconds the main thread of the web decodes at most per frame */
+#define BOX_AUDIO_MUSIC_WEB_BUDGET (0.002)
+
+/** Frames decoded at once, between two checks of the budget */
+#define BOX_AUDIO_MUSIC_STEP (1024)
+
+/** Largest music file read, in bytes */
+#define BOX_AUDIO_MUSIC_MAX_FILE (256 * 1024 * 1024)
+
+/** An open Ogg Vorbis file, in vorbis.c */
+typedef struct box_audio_vorbis_t box_audio_vorbis_t;
+
+/** The decoder of a stream and the chunk it fills. Owned by its stream, or by the job that
+ * decodes while one runs */
+typedef struct box_audio_music_decoder_t {
+    box_audio_vorbis_t *vorbis; /**< The file */
+    float *partial;         /**< The chunk being filled, NULL for none */
+    int32_t filled;         /**< Frames in partial */
+    int64_t partial_pos;    /**< Frame of the file partial starts at */
+    bool ended;             /**< A stream that does not loop decoded its last frame */
+} box_audio_music_decoder_t;
+
+/** A decoded chunk of a stream */
+typedef struct box_audio_music_chunk_t {
+    float *data;            /**< Frames, interleaved when stereo; NULL once sent */
+    int32_t frames;         /**< Number of frames */
+    int64_t pos;            /**< Frame of the file it starts at */
+    bool last;              /**< Whether the stream ends with it */
+} box_audio_music_chunk_t;
+
+/** A music stream: the file, its decoder, the chunks decoded and sent, and its voice */
+typedef struct box_audio_music_t {
+    uint64_t key;           /**< Serial of the stream, which its jobs find it by */
+    ecs_entity_t entity;    /**< The entity, 0 once it retired after a change or a delete */
+    char *path;             /**< AudioStream.path as written */
+    AudioStreamState state; /**< What it does */
+    char *error;            /**< Why it failed */
+    box_audio_music_decoder_t *decoder; /**< NULL before the file opened and while a job runs */
+    bool job;               /**< A decode job runs */
+    int32_t generation;     /**< Changes when decoded chunks no longer fit, after a stop */
+    int64_t seek;           /**< Frame the next job seeks to first, -1 for none */
+    int32_t fetch;          /**< Fetch of the file on the web, 0 for none */
+    int32_t frames;         /**< Frames of the file */
+    int32_t channels;       /**< 1 or 2 */
+    float sample_rate;      /**< Frames per second of the file */
+    box_audio_music_chunk_t ready[BOX_AUDIO_STREAM_CHUNKS]; /**< Decoded, not sent, oldest
+                                                              * first */
+    int32_t ready_count;    /**< Chunks in ready */
+    box_audio_music_chunk_t sent[BOX_AUDIO_STREAM_CHUNKS];  /**< Sent and not consumed, a
+                                                              * ring */
+    int32_t sent_first;     /**< Oldest of sent */
+    int32_t sent_count;     /**< Chunks in sent */
+    int32_t slot;           /**< Stream of the core it plays on, -1 for none */
+    uint32_t voice;         /**< Handle of the voice, 0 for none */
+    uint32_t serial;        /**< Serial of the output of the voice */
+    uint32_t consumed;      /**< Consumed chunks seen in the status of the stream */
+    int32_t at;             /**< Frames of the oldest sent chunk that played */
+    int64_t position;       /**< Frame of the file that plays */
+    bool stopping;          /**< A stop was sent, the stream waits for the core to close it */
+    bool ended;             /**< It played to its end */
+    float volume;           /**< Volume sent */
+    uint8_t bus;            /**< Bus index sent */
+    int32_t underruns;      /**< Underruns of the earlier voices of the stream */
+    int32_t voice_underruns; /**< Underruns of the voice that plays */
+    float decode_ms;        /**< Milliseconds of the last decode */
+    float decode_max_ms;    /**< Largest decode_ms */
+} box_audio_music_t;
+
+/** The decode of a part of a stream on the job system */
+typedef struct box_audio_music_job_t {
+    uint64_t key;           /**< Key of the stream */
+    int32_t generation;     /**< Generation of the stream at the submit */
+    char *path;             /**< The file to open, NULL when the decoder is open */
+    uint8_t *bytes;         /**< The file the web fetched, NULL to read path */
+    int32_t size;           /**< Bytes of bytes */
+    box_audio_music_decoder_t *decoder; /**< The decoder, NULL until the file opened */
+    box_audio_sample_sync_t *sync; /**< Decodes in flight */
+    bool loop;              /**< Whether the end goes on with the start */
+    int64_t seek;           /**< Frame to seek to first, -1 for none */
+    int64_t want;           /**< Frames to decode at most */
+    int32_t max_chunks;     /**< Chunks it may complete at most */
+    double budget;          /**< Seconds it may take, 0 for no limit */
+    box_audio_music_chunk_t chunks[BOX_AUDIO_STREAM_CHUNKS]; /**< Completed chunks */
+    int32_t count;          /**< Chunks in chunks */
+    double seconds;         /**< Seconds it took */
+    char *error;            /**< Why the file did not open */
+} box_audio_music_job_t;
+
+/** The stream of an entity with AudioStream */
+typedef struct AudioMusic {
+    box_audio_music_t *music; /**< The stream, NULL when none plays for the entity */
+    bool refused;           /**< The entity is a second stream, whose error was logged */
+} AudioMusic;
+
+extern ECS_COMPONENT_DECLARE(AudioMusic);
 
 /** A voice of box_audio_play, kept until it ends so a deleted bus can reroute it */
 typedef struct box_audio_oneshot_t {
@@ -122,6 +235,8 @@ typedef struct box_audio_module_stats_t {
     int64_t dropped;        /**< Plays dropped before a gesture */
     int64_t not_ready;      /**< Plays dropped while their sound file loaded */
     int64_t decodes;        /**< Decodes of sound files submitted */
+    int64_t music_jobs;     /**< Decode jobs of streams submitted */
+    int64_t music_starts;   /**< Voices of streams started */
 } box_audio_module_stats_t;
 
 /** A capture that waits for its frames */
@@ -157,6 +272,10 @@ typedef struct box_audio_module_t {
     uint64_t next_sample;         /**< Key of the next sample */
     box_audio_sample_sync_t *sample_sync; /**< Decodes in flight */
     ecs_query_t *sample_users;    /**< AudioSample, to update the status of its entities */
+    ecs_query_t *music_query;     /**< AudioStream with AudioMusic, disabled ones included */
+    ecs_vec_t music;              /**< box_audio_music_t*, the streams, retired ones included */
+    uint64_t next_music;          /**< Key of the next stream */
+    box_audio_music_t *music_active; /**< The stream of an entity, the one that may play */
     AudioSettings settings;       /**< Settings sent */
     bool settings_sent;           /**< settings holds what the output has */
     int64_t voices_stolen;        /**< Steals the core reported */
@@ -268,6 +387,164 @@ int32_t box_audio_sample_count(
  */
 int32_t box_audio_module_sounds(
     const ecs_world_t *world);
+
+/** Make room in the batch of the frame for one more command.
+ *
+ * @param state The state
+ * @return Whether the batch has room
+ */
+bool box_audio_reserve(
+    box_audio_module_t *state);
+
+/** Pick the handle of a new voice.
+ *
+ * @param state The state
+ * @return The handle, never 0
+ */
+uint32_t box_audio_new_voice(
+    box_audio_module_t *state);
+
+/** Register the observers of AudioStream.
+ *
+ * @param world The world
+ * @param state The state
+ */
+void box_audio_music_init(
+    ecs_world_t *world,
+    box_audio_module_t *state);
+
+/** Free the streams of the module; the jobs in flight free what they hold.
+ *
+ * @param state The state
+ */
+void box_audio_music_fini(
+    box_audio_module_t *state);
+
+/** Forget the voices of the streams after the output changed; they start again from where
+ * they were.
+ *
+ * @param state The state
+ */
+void box_audio_music_reset(
+    box_audio_module_t *state);
+
+/** Start, stop and update the voices of the streams, into the batch of the frame.
+ *
+ * @param world The world
+ * @param state The state
+ * @param t The transport, NULL for none
+ * @param waiting Whether the page waits for a gesture
+ */
+void box_audio_music_update(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    box_audio_transport_t *t,
+    bool waiting);
+
+/** After the batch went out: send the decoded chunks, submit decodes and write the status.
+ *
+ * @param world The world
+ * @param state The state
+ * @param t The transport, NULL for none
+ */
+void box_audio_music_send(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    box_audio_transport_t *t);
+
+/** Count the streams the module holds, retired ones that fade out included.
+ *
+ * @param world The world
+ * @return Number of streams
+ */
+int32_t box_audio_music_count(
+    const ecs_world_t *world);
+
+/** Open an Ogg Vorbis file in memory, which the decoder takes.
+ *
+ * @param bytes The file, freed with ecs_os_free by the decoder, also on failure
+ * @param size Bytes of the file
+ * @param error Receives the error code of stb_vorbis on failure
+ * @return The decoder, NULL when the bytes are no Ogg Vorbis stream
+ */
+box_audio_vorbis_t* box_audio_vorbis_open(
+    uint8_t *bytes,
+    int32_t size,
+    int32_t *error);
+
+/** Close a decoder and free its file.
+ *
+ * @param v The decoder, may be NULL
+ */
+void box_audio_vorbis_close(
+    box_audio_vorbis_t *v);
+
+/** Get the frames of the file of a decoder.
+ *
+ * @param v The decoder
+ * @return Number of frames
+ */
+int32_t box_audio_vorbis_frames(
+    const box_audio_vorbis_t *v);
+
+/** Get the channels a decoder writes: 1 or 2, more mixed down to 2.
+ *
+ * @param v The decoder
+ * @return Number of channels
+ */
+int32_t box_audio_vorbis_channels(
+    const box_audio_vorbis_t *v);
+
+/** Get the sample rate of the file of a decoder.
+ *
+ * @param v The decoder
+ * @return Frames per second
+ */
+float box_audio_vorbis_rate(
+    const box_audio_vorbis_t *v);
+
+/** Get the frame of the file the next read starts at.
+ *
+ * @param v The decoder
+ * @return The frame
+ */
+int64_t box_audio_vorbis_position(
+    const box_audio_vorbis_t *v);
+
+/** Seek a decoder to a frame of the file.
+ *
+ * @param v The decoder
+ * @param frame The frame, wrapped into the file
+ * @return Whether the seek succeeded
+ */
+bool box_audio_vorbis_seek(
+    box_audio_vorbis_t *v,
+    int64_t frame);
+
+/** Decode frames with the pull API of stb_vorbis. A loop goes on with the first frame after the
+ * last, without a gap.
+ *
+ * @param v The decoder
+ * @param out Receives frames times channels floats, interleaved
+ * @param frames Frames to decode
+ * @param loop Whether the end goes on with the start
+ * @return Frames decoded, fewer than frames only at the end of a file that does not loop
+ */
+int32_t box_audio_vorbis_read(
+    box_audio_vorbis_t *v,
+    float *out,
+    int32_t frames,
+    bool loop);
+
+/** Read a file into memory.
+ *
+ * @param path The file
+ * @param size Receives the bytes read, 0 for an empty file, -1 when it cannot be read
+ * @return The bytes, NULL when the file cannot be read, is empty or too large
+ */
+uint8_t* box_audio_music_read_file(
+    const char *path,
+    int32_t *size);
 
 /** Decode the file of a job on a worker: WAV or FLAC to float frames, more than two channels
  * mixed down to stereo, at the sample rate of the file.

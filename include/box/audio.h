@@ -1,7 +1,7 @@
 /**
  * @file box/audio.h
- * @brief Data driven audio: buses, sources, sound files, one shot plays, settings, status and
- * captures.
+ * @brief Data driven audio: buses, sources, sound files, music streams, one shot plays,
+ * settings, status and captures.
  *
  * Components that a script, the REST API or the set command write, which one system at the end
  * of the frame turns into one command batch for the audio core (docs/audio.md). The same
@@ -102,6 +102,47 @@ ECS_STRUCT(AudioSource, {
     float pitch;           /**< Ratio of the playback speed, default 1 */
     bool loop;             /**< Play the sound over and over, default false */
     bool playing;          /**< Whether it plays, default true */
+});
+
+/** Music: one Ogg Vorbis file that streams while the entity exists and playing is true.
+ *
+ * Decoded ahead in chunks, never whole: on a job natively, on the main thread for a bounded
+ * time per frame on the web, which fetches the file next to the page if its file system lacks it.
+ *
+ * One stream plays at once; a second one logs one error and is silent. A new path fades the old
+ * stream out and starts the new one. At its end a stream that does not loop sets playing to
+ * false; a delete fades it out and frees it. With an AudioOutput it plays on that bus.
+ */
+ECS_STRUCT(AudioStream, {
+    char *path;            /**< An .ogg file, found as a TexturePath is */
+    float volume;          /**< Linear gain, default 1 */
+    bool loop;             /**< Start over at the end without a gap, default true */
+    bool playing;          /**< Whether it plays, default true; false fades it out and true
+                            *   resumes it where it stopped */
+});
+
+/** Progress of an AudioStream */
+ECS_ENUM(AudioStreamState, {
+    AudioStreamLoading = 0,  /**< The file is fetched or opened, or decodes ahead of its start */
+    AudioStreamPlaying = 1,  /**< It plays */
+    AudioStreamStopped = 2,  /**< playing is false, or no output plays it */
+    AudioStreamEnded = 3,    /**< A stream that does not loop played to its end */
+    AudioStreamFailed = 4    /**< It cannot play, error says why */
+});
+
+/** What an AudioStream does, written by box.audio and read only for applications */
+ECS_STRUCT(AudioStreamStatus, {
+    AudioStreamState state; /**< What it does */
+    int32_t frames;        /**< Frames of the file, 0 until it opened */
+    int32_t channels;      /**< 1 or 2 after the mix down, 0 until it opened */
+    float sample_rate;     /**< Frames per second of the file, 0 until it opened */
+    float position;        /**< Seconds into the file of what plays */
+    float buffered;        /**< Seconds decoded ahead of what plays */
+    int32_t underruns;     /**< Times the output ran out of decoded frames and faded to silence */
+    float decode_ms;       /**< Milliseconds the last decode took; on the web the main thread
+                            *   spends it in its frame */
+    float decode_max_ms;   /**< Largest decode_ms so far */
+    char *error;           /**< Why it failed, NULL unless state is AudioStreamFailed */
 });
 
 /** Settings of the audio of the world, a singleton */

@@ -468,6 +468,72 @@ done:
     return;
 }
 
+/** Apply a stream command: open the stream and start a voice that reads it.
+ *
+ * @param core The core
+ * @param cmd The command
+ */
+static void box_audio_cmd_stream(
+    box_audio_core_t *core,
+    const box_audio_cmd_stream_t *cmd)
+{
+    box_audio_voice_t *v = NULL;
+    box_audio_stream_t *s;
+    int32_t i;
+    if (cmd->stream >= BOX_AUDIO_STREAM_MAX || cmd->bus >= BOX_AUDIO_BUS_MAX ||
+        (cmd->channels != 1 && cmd->channels != 2) || core->streams[cmd->stream].open)
+    {
+        box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_STREAM, 0);
+        goto done;
+    }
+
+    if (core->playing >= BOX_AUDIO_VOICE_MAX) {
+        box_audio_voice_steal(core);
+    }
+
+    v = box_audio_voice_slot(core);
+    if (!v) {
+        box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_STREAM, 0);
+        goto done;
+    }
+
+    s = &core->streams[cmd->stream];
+    for (i = 0; i < BOX_AUDIO_STREAM_CHUNKS; i ++) {
+        s->chunks[i].data = NULL;
+        s->chunks[i].frames = 0;
+    }
+
+    s->head = 0;
+    s->count = 0;
+    s->at = 0;
+    s->avail = 0;
+    s->channels = (int32_t)cmd->channels;
+    s->rate = cmd->sample_rate > 0 && cmd->sample_rate < 1e7f ?
+        (double)cmd->sample_rate / (double)core->sample_rate : 1.0;
+    s->voice = cmd->voice;
+    s->open = true;
+    s->last = false;
+    s->ended = false;
+    s->consumed = 0;
+    s->underruns = 0;
+    s->starved = false;
+
+    v->state = BOX_AUDIO_VOICE_PLAYING;
+    v->handle = cmd->voice;
+    v->bus = cmd->bus;
+    v->volume = box_audio_clamp(cmd->volume, 0, BOX_AUDIO_VOLUME_MAX);
+    v->pan = 0;
+    v->pitch = 1;
+    box_audio_ramp_set(&v->left, 0);
+    box_audio_ramp_set(&v->right, 0);
+    box_audio_voice_gains(core, v);
+    box_audio_source_stream(core, &v->source, cmd->stream);
+    core->playing ++;
+
+done:
+    return;
+}
+
 /** Apply a set command of a voice.
  *
  * @param core The core
@@ -649,6 +715,7 @@ static void box_audio_cmd(
     box_audio_cmd_stop_t stop;
     box_audio_cmd_set_t set;
     box_audio_cmd_release_t release;
+    box_audio_cmd_stream_t stream;
     box_audio_voice_t *v;
     if (type == BOX_AUDIO_CMD_PLAY && size >= (int32_t)sizeof(play)) {
         box_audio_copy(&play, bytes, (int32_t)sizeof(play));
@@ -670,6 +737,9 @@ static void box_audio_cmd(
     } else if (type == BOX_AUDIO_CMD_SOUND_RELEASE && size >= (int32_t)sizeof(release)) {
         box_audio_copy(&release, bytes, (int32_t)sizeof(release));
         box_audio_cmd_release(core, &release);
+    } else if (type == BOX_AUDIO_CMD_STREAM && size >= (int32_t)sizeof(stream)) {
+        box_audio_copy(&stream, bytes, (int32_t)sizeof(stream));
+        box_audio_cmd_stream(core, &stream);
     } else {
         box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, type, size);
     }
@@ -807,6 +877,63 @@ bool box_audio_core_sound(
 
 done:
     return result;
+}
+
+bool box_audio_core_stream_chunk(
+    box_audio_core_t *core,
+    uint32_t stream,
+    const float *data,
+    int32_t frames,
+    bool last)
+{
+    bool result = false;
+    box_audio_stream_t *s;
+    box_audio_chunk_t *c;
+    if (!core || stream >= BOX_AUDIO_STREAM_MAX || !data || frames <= 0 ||
+        frames > BOX_AUDIO_STREAM_CHUNK)
+    {
+        goto done;
+    }
+
+    s = &core->streams[stream];
+    if (!s->open || s->last || s->count >= BOX_AUDIO_STREAM_CHUNKS) {
+        goto done;
+    }
+
+    c = &s->chunks[(s->head + s->count) % BOX_AUDIO_STREAM_CHUNKS];
+    c->data = data;
+    c->frames = frames;
+    s->count ++;
+    s->avail += frames;
+    s->last = last;
+    result = true;
+
+done:
+    return result;
+}
+
+void box_audio_core_stream_status(
+    const box_audio_core_t *core,
+    uint32_t stream,
+    box_audio_stream_status_t *status)
+{
+    const box_audio_stream_t *s;
+    *status = (box_audio_stream_status_t){0};
+    if (!core || stream >= BOX_AUDIO_STREAM_MAX) {
+        goto done;
+    }
+
+    s = &core->streams[stream];
+    status->voice = s->voice;
+    status->open = s->open;
+    status->ended = s->ended;
+    status->consumed = s->consumed;
+    status->at = s->at;
+    status->underruns = s->underruns;
+    status->starved = s->starved;
+
+done:
+    return;
 }
 
 int32_t box_audio_core_read_events(

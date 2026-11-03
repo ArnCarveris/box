@@ -19,12 +19,126 @@ int box_audio_host_init(
     return host->events ? 0 : -1;
 }
 
+/** Free the oldest chunks of a stream.
+ *
+ * @param host The host
+ * @param stream Index of the stream
+ * @param count Number of chunks, at most the chunks held
+ */
+static void box_audio_host_chunks_free(
+    box_audio_host_t *host,
+    uint32_t stream,
+    int32_t count)
+{
+    box_audio_host_stream_t *s = &host->streams[stream];
+    int32_t i;
+    for (i = 0; i < count && s->count; i ++) {
+        ecs_os_free(s->chunks[s->first]);
+        s->chunks[s->first] = NULL;
+        s->first = (s->first + 1) % BOX_AUDIO_HOST_CHUNKS;
+        s->count --;
+        host->chunks --;
+    }
+}
+
+float* box_audio_host_chunk(
+    box_audio_host_t *host,
+    uint32_t stream,
+    uint32_t voice,
+    const float *data,
+    int32_t count)
+{
+    box_audio_host_stream_t *s;
+    float *result = NULL;
+    if (stream >= BOX_AUDIO_STREAM_MAX || !data || count <= 0 ||
+        count > BOX_AUDIO_STREAM_CHUNK * 2)
+    {
+        goto done;
+    }
+
+    s = &host->streams[stream];
+    if (s->voice != voice) {
+        box_audio_host_chunks_free(host, stream, s->count);
+        s->voice = voice;
+        s->freed = 0;
+    }
+
+    if (s->count >= BOX_AUDIO_HOST_CHUNKS) {
+        goto done;
+    }
+
+    result = ecs_os_malloc_n(float, count);
+    if (!result) {
+        goto done;
+    }
+
+    memcpy(result, data, (size_t)count * sizeof(float));
+    s->chunks[(s->first + s->count) % BOX_AUDIO_HOST_CHUNKS] = result;
+    s->count ++;
+    host->chunks ++;
+done:
+    return result;
+}
+
+void box_audio_host_chunk_drop(
+    box_audio_host_t *host,
+    uint32_t stream)
+{
+    box_audio_host_stream_t *s;
+    int32_t at;
+    if (stream >= BOX_AUDIO_STREAM_MAX || !host->streams[stream].count) {
+        goto done;
+    }
+
+    s = &host->streams[stream];
+    at = (s->first + s->count - 1) % BOX_AUDIO_HOST_CHUNKS;
+    ecs_os_free(s->chunks[at]);
+    s->chunks[at] = NULL;
+    s->count --;
+    host->chunks --;
+done:
+    return;
+}
+
+void box_audio_host_stream_sync(
+    box_audio_host_t *host,
+    uint32_t stream,
+    const box_audio_stream_status_t *status)
+{
+    box_audio_host_stream_t *s;
+    if (stream >= BOX_AUDIO_STREAM_MAX) {
+        goto done;
+    }
+
+    s = &host->streams[stream];
+    if (!s->count || status->voice != s->voice) {
+        goto done;
+    }
+
+    if (!status->open) {
+        box_audio_host_chunks_free(host, stream, s->count);
+        s->freed = 0;
+    } else if (status->consumed > s->freed) {
+        int32_t count = (int32_t)(status->consumed - s->freed);
+        count = count < s->count ? count : s->count;
+        box_audio_host_chunks_free(host, stream, count);
+        s->freed += (uint32_t)count;
+    }
+
+done:
+    return;
+}
+
 void box_audio_host_fini(
     box_audio_host_t *host)
 {
     uint32_t i;
     for (i = 0; i < BOX_AUDIO_SOUND_MAX; i ++) {
         box_audio_host_sound_free(host, i);
+    }
+
+    for (i = 0; i < BOX_AUDIO_STREAM_MAX; i ++) {
+        box_audio_host_chunks_free(host, i, host->streams[i].count);
     }
 
     ecs_os_free(host->events);
@@ -252,6 +366,58 @@ done:
     return result;
 }
 
+/** Copy a chunk of a stream and give it to the core.
+ *
+ * @param t The transport
+ * @param stream Index of the stream
+ * @param voice Voice that reads the stream
+ * @param data Frames, interleaved when stereo
+ * @param frames Number of frames
+ * @param channels 1 or 2
+ * @param last Whether the stream ends with it
+ * @return Whether the core took the chunk
+ */
+static bool box_audio_null_stream_chunk(
+    box_audio_transport_t *t,
+    uint32_t stream,
+    uint32_t voice,
+    const float *data,
+    int32_t frames,
+    int32_t channels,
+    bool last)
+{
+    box_audio_null_t *n = (box_audio_null_t*)t;
+    float *copy = box_audio_host_chunk(&n->host, stream, voice, data, frames * channels);
+    bool result = false;
+    if (!copy) {
+        goto done;
+    }
+
+    result = box_audio_core_stream_chunk(n->core, stream, copy, frames, last);
+    if (!result) {
+        box_audio_host_chunk_drop(&n->host, stream);
+    }
+
+done:
+    return result;
+}
+
+/** Read the status of a stream of the core and free the chunks it is done with.
+ *
+ * @param t The transport
+ * @param stream Index of the stream
+ * @param status Receives the status
+ */
+static void box_audio_null_stream_status(
+    box_audio_transport_t *t,
+    uint32_t stream,
+    box_audio_stream_status_t *status)
+{
+    box_audio_null_t *n = (box_audio_null_t*)t;
+    box_audio_core_stream_status(n->core, stream, status);
+    box_audio_host_stream_sync(&n->host, stream, status);
+}
+
 /** Take the events of the core.
  *
  * @param t The transport
@@ -331,6 +497,7 @@ static void box_audio_null_stats(
     box_audio_null_t *n = (box_audio_null_t*)t;
     stats->voices = box_audio_core_voice_count(n->core);
     stats->load = n->load;
+    stats->chunks = n->host.chunks;
 }
 
 /** Start to record the frames of the next renders.
@@ -419,6 +586,8 @@ box_audio_transport_t* box_audio_transport_null_new(
         .sample_rate = box_audio_core_sample_rate(n->core),
         .commands = box_audio_null_commands,
         .sound = box_audio_null_sound,
+        .stream_chunk = box_audio_null_stream_chunk,
+        .stream_status = box_audio_null_stream_status,
         .read_events = box_audio_null_read_events,
         .state = box_audio_null_state,
         .update = box_audio_null_update,
@@ -511,6 +680,20 @@ EM_JS(int, box_audio_web_capture_take, (float *dst, int frames), {
     return 1;
 });
 
+/** Read the status of a stream the worklet reported last.
+ *
+ * @param stream Index of the stream
+ * @param out Receives voice, open, ended, consumed, at, underruns and starved
+ */
+EM_JS(void, box_audio_web_stream_status, (int stream, int32_t *out), {
+    var audio = Module.boxAudio;
+    var s = audio && audio.streams && audio.streams[stream];
+    var fields = ['voice', 'open', 'ended', 'consumed', 'at', 'underruns', 'starved'];
+    for (var i = 0; i < fields.length; i++) {
+        HEAP32[(out >> 2) + i] = s ? (s[fields[i]] | 0) : 0;
+    }
+});
+
 /** Take the events the worklet reported since the last call.
  *
  * @param events Receives type, id and value per event
@@ -574,6 +757,53 @@ static bool box_audio_webt_sound(
     box_audio_web_sound(id, data, frames, channels, sample_rate);
 
     return data && frames > 0 && (channels == 1 || channels == 2);
+}
+
+/** Post a chunk of a stream to the worklet, which copies it into the heap of its core and frees
+ * it there once the core consumed it.
+ *
+ * @param t The transport
+ * @param stream Index of the stream
+ * @param voice Voice that reads the stream
+ * @param data Frames, interleaved when stereo
+ * @param frames Number of frames
+ * @param channels 1 or 2
+ * @param last Whether the stream ends with it
+ * @return Whether the chunk was posted
+ */
+static bool box_audio_webt_stream_chunk(
+    box_audio_transport_t *t,
+    uint32_t stream,
+    uint32_t voice,
+    const float *data,
+    int32_t frames,
+    int32_t channels,
+    bool last)
+{
+    (void)t;
+    (void)voice;
+    bool result = data && frames > 0 && frames <= BOX_AUDIO_STREAM_CHUNK &&
+        (channels == 1 || channels == 2) && stream < BOX_AUDIO_STREAM_MAX;
+    if (result) {
+        box_audio_web_chunk(stream, data, frames, channels, last);
+    }
+
+    return result;
+}
+
+/** Report the status of a stream the worklet posted last; the worklet frees its chunks.
+ *
+ * @param t The transport
+ * @param stream Index of the stream
+ * @param status Receives the status
+ */
+static void box_audio_webt_stream_status(
+    box_audio_transport_t *t,
+    uint32_t stream,
+    box_audio_stream_status_t *status)
+{
+    (void)t;
+    box_audio_web_stream_status((int)stream, (int32_t*)status);
 }
 
 /** Take the events the worklet reported.
@@ -708,6 +938,8 @@ box_audio_transport_t* box_audio_transport_web_new(void)
             .kind = BOX_AUDIO_TRANSPORT_WEB,
             .commands = box_audio_webt_commands,
             .sound = box_audio_webt_sound,
+            .stream_chunk = box_audio_webt_stream_chunk,
+            .stream_status = box_audio_webt_stream_status,
             .read_events = box_audio_webt_read_events,
             .state = box_audio_webt_state,
             .update = box_audio_webt_update,

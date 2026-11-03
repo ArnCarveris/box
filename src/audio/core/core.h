@@ -59,6 +59,18 @@
 /** No bus, for the output of the master and a bus without a send */
 #define BOX_AUDIO_BUS_NONE 0xFF
 
+/** Streams a core reads at once: one that plays and one that fades out after a change */
+#define BOX_AUDIO_STREAM_MAX 2
+
+/** Chunks the ring of a stream holds */
+#define BOX_AUDIO_STREAM_CHUNKS 32
+
+/** Frames of a chunk at most */
+#define BOX_AUDIO_STREAM_CHUNK 4096
+
+/** Seconds of the fade of a stream that runs out of chunks, and of its recovery */
+#define BOX_AUDIO_STREAM_FADE 0.005f
+
 /** Commands of the byte stream. Each starts with a box_audio_cmd_header_t */
 typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_PLAY = 1,          /**< box_audio_cmd_play_t */
@@ -66,7 +78,8 @@ typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_VOICE_SET = 3,     /**< box_audio_cmd_set_t on a voice */
     BOX_AUDIO_CMD_BUS_SET = 4,       /**< box_audio_cmd_set_t on a bus */
     BOX_AUDIO_CMD_ORDER = 5,         /**< box_audio_cmd_order_t and its routes */
-    BOX_AUDIO_CMD_SOUND_RELEASE = 6  /**< box_audio_cmd_release_t */
+    BOX_AUDIO_CMD_SOUND_RELEASE = 6, /**< box_audio_cmd_release_t */
+    BOX_AUDIO_CMD_STREAM = 7         /**< box_audio_cmd_stream_t */
 } box_audio_cmd_type_t;
 
 /** Parameters of BOX_AUDIO_CMD_VOICE_SET and BOX_AUDIO_CMD_BUS_SET */
@@ -137,6 +150,32 @@ typedef struct box_audio_cmd_release_t {
     box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_SOUND_RELEASE */
     uint32_t sound;                 /**< Id of the sound */
 } box_audio_cmd_release_t;
+
+/** Open a stream and start a voice that reads it. The chunks of the stream come with
+ * box_audio_core_stream_chunk; a stop fades the voice out and closes the stream */
+typedef struct box_audio_cmd_stream_t {
+    box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_STREAM */
+    uint32_t voice;                 /**< Handle the sender picks to address the voice */
+    uint32_t stream;                /**< Index of the stream, below BOX_AUDIO_STREAM_MAX, closed */
+    uint32_t bus;                   /**< Bus the voice plays into */
+    float volume;                   /**< Volume, ramped from 0 so the start does not click */
+    uint32_t channels;              /**< 1 or 2, interleaved in the chunks */
+    float sample_rate;              /**< Frames per second of the chunks, the rate of the core
+                                     * when not positive */
+} box_audio_cmd_stream_t;
+
+/** What a stream does, for the side that owns its chunks */
+typedef struct box_audio_stream_status_t {
+    uint32_t voice;      /**< Handle of the voice that opened the stream last, 0 for none */
+    int32_t open;        /**< 1 while that voice reads the stream; once 0 the core holds none of
+                          * its chunks */
+    int32_t ended;       /**< 1 when the voice read the last chunk to its end */
+    uint32_t consumed;   /**< Chunks read to their end since the stream opened, oldest first;
+                          * the core holds none of them any more */
+    int32_t at;          /**< Frames read of the oldest chunk that is not consumed */
+    int32_t underruns;   /**< Times the stream ran out of chunks since it opened */
+    int32_t starved;     /**< 1 while it plays silence for want of chunks */
+} box_audio_stream_status_t;
 
 /** Events the core reports to its transport */
 typedef enum box_audio_event_type_t {
@@ -219,6 +258,38 @@ bool box_audio_core_sound(
     int32_t frames,
     int32_t channels,
     float sample_rate);
+
+/** Queue a chunk of a stream, on the thread that renders, between renders.
+ *
+ * The data is in the address space of the core and stays with the side that runs the core; the
+ * consumed count of box_audio_core_stream_status says when it may be freed, and so does a stream
+ * that is no longer open. Does not allocate.
+ *
+ * @param core The core
+ * @param stream Index of an open stream
+ * @param data Frames, interleaved when stereo
+ * @param frames Number of frames, at most BOX_AUDIO_STREAM_CHUNK
+ * @param last Whether the stream ends with this chunk
+ * @return Whether the core took the chunk; false when the stream is not open, its ring is
+ *         full or its last chunk came already
+ */
+bool box_audio_core_stream_chunk(
+    box_audio_core_t *core,
+    uint32_t stream,
+    const float *data,
+    int32_t frames,
+    bool last);
+
+/** Get what a stream does. Does not allocate.
+ *
+ * @param core The core
+ * @param stream Index of the stream
+ * @param status Receives the status, zero for an invalid stream
+ */
+void box_audio_core_stream_status(
+    const box_audio_core_t *core,
+    uint32_t stream,
+    box_audio_stream_status_t *status);
 
 /** Apply a batch of commands. They take effect at the start of the next render block.
  *
@@ -360,6 +431,26 @@ bool box_audio_write_order(
     box_audio_writer_t *writer,
     const box_audio_route_t *routes,
     int32_t count);
+
+/** Write a command that opens a stream and starts a voice that reads it.
+ *
+ * @param writer The writer
+ * @param voice Handle of the new voice
+ * @param stream Index of the stream
+ * @param bus Bus of the voice
+ * @param volume Volume
+ * @param channels 1 or 2
+ * @param sample_rate Frames per second of the chunks
+ * @return Whether the command fit
+ */
+bool box_audio_write_stream(
+    box_audio_writer_t *writer,
+    uint32_t voice,
+    uint32_t stream,
+    uint32_t bus,
+    float volume,
+    uint32_t channels,
+    float sample_rate);
 
 /** Write a command that releases a sound.
  *

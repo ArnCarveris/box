@@ -11,12 +11,7 @@
 #include "module.h"
 #include <math.h>
 
-/** Make room in the batch for one more command.
- *
- * @param state The state
- * @return Whether the batch has room
- */
-static bool box_audio_reserve(
+bool box_audio_reserve(
     box_audio_module_t *state)
 {
     box_audio_writer_t *w = &state->writer;
@@ -87,12 +82,7 @@ static void box_audio_stop(
     }
 }
 
-/** Pick the handle of a new voice.
- *
- * @param state The state
- * @return The handle, never 0
- */
-static uint32_t box_audio_new_voice(
+uint32_t box_audio_new_voice(
     box_audio_module_t *state)
 {
     uint32_t result = state->next_voice ++;
@@ -122,6 +112,7 @@ static void box_audio_reset(
     state->settings_sent = false;
     state->order_dirty = true;
     state->voices_stolen = 0;
+    box_audio_music_reset(state);
     if (state->capture.path && state->capture.serial) {
         ecs_err("box.audio: the output changed, the capture of '%s' is dropped",
             state->capture.path);
@@ -959,8 +950,10 @@ static void BoxAudioSync(
         box_audio_settings(world, state);
         box_audio_sounds(world, state, t);
         box_audio_sources(world, state, waiting);
+        box_audio_music_update(world, state, t, waiting);
         box_audio_queued(world, state, waiting);
     } else {
+        box_audio_music_update(world, state, NULL, false);
         ecs_vec_clear(&state->plays);
         ecs_vec_clear(&state->stops);
         ecs_vec_clear(&state->releases);
@@ -975,6 +968,7 @@ static void BoxAudioSync(
 
     state->writer.size = 0;
     state->bus_freed = 0;
+    box_audio_music_send(world, state, t);
     box_audio_status(world, state, t);
     box_audio_capture_update(state, t);
 }

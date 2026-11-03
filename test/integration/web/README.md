@@ -149,3 +149,21 @@ expects the worklet to drop the voice and free the sound:
 node test/integration/web/audio_sample.mjs \
     "$(tools/integration.py local-env --env audio)/wasm32-Emscripten/debug/bin"
 ```
+
+`audio_stream.mjs` checks music streams (`AudioStream`, see `docs/audio.md`) in Chrome with
+`test/integration/web/audio_stream.flecs`, whose stream plays `test/assets/audio/tone.ogg`, 480 Hz
+at a peak of 0.5 in a loop of 0.25 s. The server serves the Ogg files by their path and the page
+preloads only the scene and `tone_960.ogg`, so the stream fetches `tone.ogg` next to the page.
+After a trusted click it records two seconds (`audio capture 2`), which have to hold 480 Hz at 0.5
+without a step larger than the sine's over the eight loop crossings and without a gap. It prints
+`AudioStreamStatus.decode_ms`, the decode cost of a frame, and the longest animation frame, then
+expects at least 1.5 s buffered in the worklet and no underrun, in the status and in the worklet,
+after a 500 ms stall of the main thread. The file has to be fetched once and not be in the file
+system of the page. A stream of a file served at no path has to fail with one error while the page
+keeps drawing, and a stream of the preloaded `tone_960.ogg` has to play 960 Hz at 0.25 from the
+page's file system without a new request:
+
+```sh
+node test/integration/web/audio_stream.mjs \
+    "$(tools/integration.py local-env --env audio)/wasm32-Emscripten/debug/bin"
+```

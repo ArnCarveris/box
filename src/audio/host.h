@@ -8,9 +8,23 @@
 
 #include "transport.h"
 
+/** Chunks of a stream the main thread holds for the core, oldest first */
+#define BOX_AUDIO_HOST_CHUNKS (BOX_AUDIO_STREAM_CHUNKS * 2)
+
+/** The chunks of a stream that the main thread copied for the core, in the order it sent them */
+typedef struct box_audio_host_stream_t {
+    uint32_t voice;                        /**< Voice the chunks were sent for */
+    float *chunks[BOX_AUDIO_HOST_CHUNKS];  /**< A ring of the chunks */
+    int32_t first;                         /**< Index of the oldest */
+    int32_t count;                         /**< Chunks held */
+    uint32_t freed;                        /**< Chunks of the voice freed as consumed */
+} box_audio_host_stream_t;
+
 /** What the main thread owns for a core that may run elsewhere */
 typedef struct box_audio_host_t {
     float *sounds[BOX_AUDIO_SOUND_MAX];  /**< Frames of the sounds, freed on SOUND_FREE */
+    box_audio_host_stream_t streams[BOX_AUDIO_STREAM_MAX]; /**< Chunks of the streams */
+    int32_t chunks;                      /**< Chunks held by all streams */
     box_audio_event_t *events;           /**< Events not read yet, a ring */
     int32_t event_first;                 /**< Oldest event */
     int32_t event_count;                 /**< Events kept */
@@ -95,6 +109,44 @@ float* box_audio_host_sound(
 void box_audio_host_sound_free(
     box_audio_host_t *host,
     uint32_t id);
+
+/** Copy a chunk of a stream and keep it, after the chunks sent before it. The chunks of an
+ * earlier voice of the stream, which the core no longer reads, are freed.
+ *
+ * @param host The host
+ * @param stream Index of the stream
+ * @param voice Voice that reads the stream
+ * @param data The frames
+ * @param count Number of floats, frames times channels
+ * @return The copy, owned by the host, NULL when the host holds too many or it is invalid
+ */
+float* box_audio_host_chunk(
+    box_audio_host_t *host,
+    uint32_t stream,
+    uint32_t voice,
+    const float *data,
+    int32_t count);
+
+/** Free the chunk that box_audio_host_chunk kept last, which the core refused.
+ *
+ * @param host The host
+ * @param stream Index of the stream
+ */
+void box_audio_host_chunk_drop(
+    box_audio_host_t *host,
+    uint32_t stream);
+
+/** Free the chunks the core is done with by the status of their stream: the consumed ones while
+ * the voice reads it, all of them once it closed.
+ *
+ * @param host The host
+ * @param stream Index of the stream
+ * @param status The status, read once from the side that renders
+ */
+void box_audio_host_stream_sync(
+    box_audio_host_t *host,
+    uint32_t stream,
+    const box_audio_stream_status_t *status);
 
 /** Take an event of the core: free the frames a SOUND_FREE or a refusal names and keep the
  * events the transport reports.

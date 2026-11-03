@@ -12,11 +12,7 @@
 #include "module.h"
 #include "../jobs/jobs.h"
 
-/** Drop a reference to the counter of decodes, freeing it with the last one.
- *
- * @param sync The counter
- */
-static void box_audio_sample_sync_release(
+void box_audio_sample_sync_release(
     box_audio_sample_sync_t *sync)
 {
     if (-- sync->refs) {

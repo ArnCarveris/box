@@ -12,6 +12,7 @@
 
 #include <emscripten/emscripten.h>
 #include <flecs.h>
+#include <string.h>
 #include "core/core.h"
 #include "../../.bake/generated/box_audio_core_wasm.h"
 
@@ -42,6 +43,8 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
         var EVENTS = 64;
         var SOUND_FREE = 3;
         var STATUS_QUANTA = 32;
+        var STREAMS = 2;
+        var STREAM_FIELDS = ['voice', 'open', 'ended', 'consumed', 'at', 'underruns', 'starved'];
         class BoxAudioProcessor extends AudioWorkletProcessor {
             constructor(options) {
                 super();
@@ -58,6 +61,19 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                 this.batches = 0;
                 this.capture = null;
                 this.voices = -1;
+                // Chunks of each stream in the heap, oldest first, and what was posted of it
+                this.chunks = [];
+                this.chunksFreed = [];
+                this.streamVoice = [];
+                this.streamPosted = [];
+                this.streamKeys = [];
+                for (var s = 0; s < STREAMS; s++) {
+                    this.chunks.push([]);
+                    this.chunksFreed.push(0);
+                    this.streamVoice.push(0);
+                    this.streamPosted.push(String());
+                    this.streamKeys.push(String());
+                }
                 this.views();
                 var self = this;
                 this.port.onmessage = function(e) { self.command(e.data); };
@@ -107,6 +123,16 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                         core.box_audio_core_wasm_free(at);
                     }
                     this.port.postMessage({ type: 'sound', id: m.id, ok: ok });
+                } else if (m.type === 'chunk') {
+                    bytes = new Uint8Array(m.data);
+                    at = this.copy(bytes);
+                    ok = !!at && !!core.box_audio_core_wasm_chunk(m.stream, at, m.frames,
+                        m.last ? 1 : 0);
+                    if (ok) {
+                        this.chunks[m.stream].push(at);
+                    } else if (at) {
+                        core.box_audio_core_wasm_free(at);
+                    }
                 } else if (m.type === 'capture') {
                     this.capture = { data: new Float32Array(m.frames * 2), frames: m.frames,
                         at: 0 };
@@ -115,7 +141,10 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                         frame: currentFrame, time: currentTime, sampleRate: sampleRate,
                         voices: core.box_audio_core_wasm_voices(), batches: this.batches,
                         sounds: this.sounds.size, memory: this.buffer.byteLength,
-                        lost: core.box_audio_core_wasm_events_lost() });
+                        lost: core.box_audio_core_wasm_events_lost(),
+                        chunks: this.chunks.reduce(function(n, c) { return n + c.length; }, 0),
+                        streams: this.streamPosted.map(function(p) {
+                            return p ? JSON.parse(p) : null; }) });
                 }
             }
 
@@ -137,6 +166,45 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                 }
                 if (list.length) {
                     this.port.postMessage({ type: 'events', events: list });
+                }
+            }
+
+            // Frees the chunks the core consumed, all of a stream that closed, and posts the
+            // status of a stream when it changed, and its position every few quanta
+            streams() {
+                for (var s = 0; s < STREAMS; s++) {
+                    var p = this.core.box_audio_core_wasm_stream_status(s) >> 2;
+                    var words = new Int32Array(this.buffer, p << 2, STREAM_FIELDS.length);
+                    var st = { stream: s };
+                    for (var i = 0; i < STREAM_FIELDS.length; i++) {
+                        st[STREAM_FIELDS[i]] = STREAM_FIELDS[i] === 'voice' ||
+                            STREAM_FIELDS[i] === 'consumed' ? words[i] >>> 0 : words[i];
+                    }
+                    var list = this.chunks[s];
+                    if (st.voice !== this.streamVoice[s]) {
+                        this.streamVoice[s] = st.voice;
+                        this.chunksFreed[s] = 0;
+                    }
+                    if (!st.open) {
+                        while (list.length) {
+                            this.core.box_audio_core_wasm_free(list.shift());
+                        }
+                        this.chunksFreed[s] = 0;
+                    } else {
+                        while (this.chunksFreed[s] < st.consumed && list.length) {
+                            this.core.box_audio_core_wasm_free(list.shift());
+                            this.chunksFreed[s]++;
+                        }
+                    }
+                    var key = JSON.stringify([st.voice, st.open, st.ended, st.consumed,
+                        st.underruns, st.starved]);
+                    if (st.voice && (key !== this.streamKeys[s] ||
+                        (st.open && this.quanta % 8 === 0)))
+                    {
+                        this.streamKeys[s] = key;
+                        this.streamPosted[s] = JSON.stringify(st);
+                        this.port.postMessage({ type: 'stream', status: st });
+                    }
                 }
             }
 
@@ -183,6 +251,7 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                     }
                 }
                 this.receive();
+                this.streams();
                 this.quanta++;
                 if (this.quanta % STATUS_QUANTA === 0) {
                     this.status();
@@ -212,7 +281,7 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
     var audio = { ctx: ctx, node: null, pending: [], requests: {}, sounds: {}, id: 0,
         failed: 0, coreSize: size, events: [], queue: [], onevents: null, gestures: 0,
         resumes: 0, voices: 0, gain: null, hidden: false, wasRunning: false, suspends: 0,
-        visibilityResumes: 0, capturing: false, captured: null };
+        visibilityResumes: 0, capturing: false, captured: null, streams: [], chunksSent: 0 };
     audio.post = function(m, transfer) {
         if (audio.node) {
             audio.node.port.postMessage(m, transfer || []);
@@ -274,6 +343,8 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
             m = m.ok;
         } else if (m.type === 'status') {
             audio.voices = m.voices;
+        } else if (m.type === 'stream') {
+            audio.streams[m.status.stream] = m.status;
         } else if (m.type === 'capture') {
             audio.captured = new Float32Array(m.data);
         } else if (m.type === 'events') {
@@ -414,6 +485,100 @@ EM_JS(void, box_audio_web_post_sound, (unsigned id, const float *data, int count
     }
 });
 
+/** Post a copy of a chunk of a stream to the worklet, as a transferred ArrayBuffer.
+ *
+ * @param stream Index of the stream
+ * @param data Frames, interleaved when stereo
+ * @param count Number of floats, frames times channels
+ * @param frames Number of frames
+ * @param last 1 when the stream ends with this chunk
+ */
+EM_JS(void, box_audio_web_post_chunk, (unsigned stream, const float *data, int count,
+    int frames, int last), {
+    var audio = Module.boxAudio;
+    if (audio && !audio.failed) {
+        var buffer = HEAPU8.slice(data, data + count * 4).buffer;
+        audio.chunksSent++;
+        audio.post({ type: 'chunk', stream: stream >>> 0, frames: frames, last: !!last,
+            data: buffer }, [buffer]);
+    }
+});
+
+/** Start to fetch a file relative to the page into the memory of the page.
+ *
+ * @param path The path
+ * @param size Bytes of the path
+ * @return Id of the fetch
+ */
+EM_JS(int, box_audio_web_fetch_start, (const char *path, int size), {
+    var fetches = Module.boxAudioFetches || (Module.boxAudioFetches = { id: 0, list: {} });
+    var url = new TextDecoder().decode(HEAPU8.slice(path, path + size));
+    var id = ++fetches.id;
+    var entry = { state: 0, status: 0, bytes: null, url: url };
+    fetches.list[id] = entry;
+    if (typeof fetch === 'undefined') {
+        entry.state = -1;
+        return id;
+    }
+    fetch(url).then(function(r) {
+        entry.status = r.status;
+        if (!r.ok) {
+            throw new Error('HTTP ' + r.status);
+        }
+        return r.arrayBuffer();
+    }).then(function(buffer) {
+        entry.bytes = new Uint8Array(buffer);
+        entry.state = 1;
+    }).catch(function() {
+        entry.state = -1;
+    });
+    return id;
+});
+
+/** Check a fetch.
+ *
+ * @param id Id of the fetch
+ * @param out Receives the size and the HTTP status
+ * @return 0 while it runs, 1 when it arrived, -1 when it failed or is unknown
+ */
+EM_JS(int, box_audio_web_fetch_state, (int id, int32_t *out), {
+    var fetches = Module.boxAudioFetches;
+    var entry = fetches && fetches.list[id];
+    if (!entry) {
+        return -1;
+    }
+    HEAP32[out >> 2] = entry.bytes ? entry.bytes.length : 0;
+    HEAP32[(out >> 2) + 1] = entry.status;
+    return entry.state;
+});
+
+/** Copy the bytes of a fetch into the heap and forget it.
+ *
+ * @param id Id of the fetch
+ * @param dst Receives the bytes
+ */
+EM_JS(void, box_audio_web_fetch_copy, (int id, void *dst), {
+    var fetches = Module.boxAudioFetches;
+    var entry = fetches && fetches.list[id];
+    if (entry && entry.bytes) {
+        HEAPU8.set(entry.bytes, dst);
+    }
+    if (fetches) {
+        delete fetches.list[id];
+    }
+});
+
+/** Forget a fetch.
+ *
+ * @param id Id of the fetch
+ */
+EM_JS(void, box_audio_web_fetch_forget, (int id), {
+    var fetches = Module.boxAudioFetches;
+    if (fetches) {
+        delete fetches.list[id];
+    }
+});
+
 /** Log the one warning of a failed audio, which the page reports when the worklet or the core
  * fails after box_audio_web_create returned.
  *
@@ -447,6 +612,50 @@ EMSCRIPTEN_KEEPALIVE void box_audio_web_sound(
     if (box_audio_web_started && data && frames > 0 && (channels == 1 || channels == 2)) {
         box_audio_web_post_sound(id, data, frames * channels, channels, sample_rate);
     }
+}
+
+void box_audio_web_chunk(
+    uint32_t stream,
+    const float *data,
+    int32_t frames,
+    int32_t channels,
+    bool last)
+{
+    if (box_audio_web_started && data && frames > 0 && (channels == 1 || channels == 2)) {
+        box_audio_web_post_chunk(stream, data, frames * channels, frames, last ? 1 : 0);
+    }
+}
+
+int32_t box_audio_web_fetch(
+    const char *path)
+{
+    return path ? box_audio_web_fetch_start(path, (int)strlen(path)) : 0;
+}
+
+int32_t box_audio_web_fetch_poll(
+    int32_t id,
+    int32_t *size,
+    int32_t *status)
+{
+    int32_t out[2] = {0, 0};
+    int32_t result = box_audio_web_fetch_state(id, out);
+    *size = out[0];
+    *status = out[1];
+
+    return result;
+}
+
+void box_audio_web_fetch_take(
+    int32_t id,
+    void *dst)
+{
+    box_audio_web_fetch_copy(id, dst);
+}
+
+void box_audio_web_fetch_cancel(
+    int32_t id)
+{
+    box_audio_web_fetch_forget(id);
 }
 
 void box_audio_web_start(void)
@@ -504,6 +713,54 @@ void box_audio_web_sound(
     (void)frames;
     (void)channels;
     (void)sample_rate;
+}
+
+void box_audio_web_chunk(
+    uint32_t stream,
+    const float *data,
+    int32_t frames,
+    int32_t channels,
+    bool last)
+{
+    (void)stream;
+    (void)data;
+    (void)frames;
+    (void)channels;
+    (void)last;
+}
+
+int32_t box_audio_web_fetch(
+    const char *path)
+{
+    (void)path;
+
+    return 0;
+}
+
+int32_t box_audio_web_fetch_poll(
+    int32_t id,
+    int32_t *size,
+    int32_t *status)
+{
+    (void)id;
+    *size = 0;
+    *status = 0;
+
+    return -1;
+}
+
+void box_audio_web_fetch_take(
+    int32_t id,
+    void *dst)
+{
+    (void)id;
+    (void)dst;
+}
+
+void box_audio_web_fetch_cancel(
+    int32_t id)
+{
+    (void)id;
 }
 
 #endif
