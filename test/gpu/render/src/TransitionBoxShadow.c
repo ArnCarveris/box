@@ -29,6 +29,10 @@
  * that state: the edges of the shape and the blur of the shadow may round apart */
 #define TBS_TOLERANCE (4)
 
+/** Largest difference of the linear darkness of the shadow from the opacity times its darkness
+ * at opacity 1: a channel of 8 bits rounds by up to 0.01 in the light of the background */
+#define TBS_DARK_TOLERANCE (0.02f)
+
 /** Captures after a change that render at progress 1/2 */
 #define TBS_MID (3)
 
@@ -264,19 +268,23 @@ static int32_t tbs_diff(
     return tbs_diff_area(a, b, 0, 0, TBS_SIZE - 1, TBS_SIZE - 1);
 }
 
-/** Get how much the shadow darkens the white background at a pixel, from its green channel.
+/** Get how much the shadow darkens the white background at a pixel, in linear light, from its
+ * green channel: the shadow blends in linear light, so this scales with its alpha.
  *
  * @param px The capture
  * @param x The column
  * @param y The row
- * @return 255 minus the green channel
+ * @return 1 minus the linear green channel
  */
-static int32_t tbs_dark(
+static float tbs_dark(
     const unsigned char *px,
     int32_t x,
     int32_t y)
 {
-    return 255 - (int32_t)tbs_at(px, x, y)[1];
+    float c = (float)tbs_at(px, x, y)[1] / 255.0f;
+    float linear = c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f);
+
+    return 1.0f - linear;
 }
 
 /** Check that a world has no device errors and free it.
@@ -388,7 +396,7 @@ void TransitionBoxShadow_ancestor_transform_mid_transition(void) {
 
 /** Check a capture of a shadowed rect at the center that fades: under the rect the pixels are
  * those of the rect without a shadow, as the rect cuts its shadow out by its alpha, and outside
- * the rect the shadow darkens the background by the opacity times what it does at opacity 1.
+ * it the shadow darkens the background, in linear light, by opacity times its darkness at 1.
  *
  * @param px The capture
  * @param plain The rect without a shadow at the same opacity
@@ -408,10 +416,9 @@ static void tbs_check_fade(
     test_assert(tbs_diff(px, shadowed) <= TBS_TOLERANCE);
     for (i = 0; i < 3; i ++) {
         int32_t x = 42 + i, y = 42 - i;
-        int32_t dark = tbs_dark(full, x, y);
-        test_assert(dark > 60);
-        test_assert(abs(tbs_dark(px, x, y) - (int32_t)((float)dark * opacity + 0.5f)) <=
-            TBS_TOLERANCE);
+        float dark = tbs_dark(full, x, y);
+        test_assert(dark > 0.4f);
+        test_assert(fabsf(tbs_dark(px, x, y) - dark * opacity) <= TBS_DARK_TOLERANCE);
     }
 }
 
