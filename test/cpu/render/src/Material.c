@@ -713,8 +713,8 @@ void Material_clear_coat_pack(void) {
     test_uint(record.clear_coat, 0);
     test_uint(record.anisotropy, 0);
     test_uint(record.sheen, 0);
-    test_uint(record.reserved[0], 0);
-    test_uint(record.reserved[1], 0);
+    test_uint(record.mapping, 0);
+    test_flt(record.mapping_size, 0);
     test_flt(record.diffuse_blur, 0);
     test_uint(record.diffuse_transmission, 0);
     test_flt(record.thickness, 0);
@@ -923,8 +923,8 @@ void Material_sheen_pack(void) {
     ecs_os_memset_t(&record, 0x55, box_render_material_t);
     box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
     test_uint(record.sheen, 0);
-    test_uint(record.reserved[0], 0);
-    test_uint(record.reserved[1], 0);
+    test_uint(record.mapping, 0);
+    test_flt(record.mapping_size, 0);
     test_flt(record.diffuse_blur, 0);
     test_uint(record.diffuse_transmission, 0);
     test_flt(record.thickness, 0);
@@ -1051,8 +1051,8 @@ void Material_diffuse_transmission_pack(void) {
     box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
     test_uint(record.diffuse_transmission, 0);
     test_flt(record.thickness, 0);
-    test_uint(record.reserved[0], 0);
-    test_uint(record.reserved[1], 0);
+    test_uint(record.mapping, 0);
+    test_flt(record.mapping_size, 0);
     test_flt(record.diffuse_blur, 0);
     plain = record;
 
@@ -1163,8 +1163,8 @@ void Material_diffuse_transmission_blur_pack(void) {
     ecs_os_memset_t(&record, 0x55, box_render_material_t);
     box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
     test_flt(record.diffuse_blur, 0);
-    test_uint(record.reserved[0], 0);
-    test_uint(record.reserved[1], 0);
+    test_uint(record.mapping, 0);
+    test_flt(record.mapping_size, 0);
     plain = record;
 
     DiffuseTransmission frosted = {
@@ -1174,8 +1174,8 @@ void Material_diffuse_transmission_blur_pack(void) {
     test_flt(record.diffuse_blur, 0.125f);
     test_flt(record.thickness, 0.25f);
     test_uint(record.diffuse_transmission >> 24, 128u);
-    test_uint(record.reserved[0], 0);
-    test_uint(record.reserved[1], 0);
+    test_uint(record.mapping, 0);
+    test_flt(record.mapping_size, 0);
 
     DiffuseTransmission plain_blur = { .factor = 0.5f, .color = {255, 255, 255} };
     box_draws_material_pack(&record, &(box_draw_material_t){
@@ -1215,4 +1215,236 @@ void Material_diffuse_transmission_blur_pack(void) {
     box_draws_transition_encode(&target, &encoded);
     test_assert(!ecs_os_memcmp_t(&encoded, &record, box_render_material_t));
     test_flt(encoded.diffuse_blur, 0.125f);
+}
+
+void Material_texture_mapping_defaults(void) {
+    // materials/texture_mapping
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script_run(world, "texture_mapping",
+        "using box.material\n"
+        "object { TextureMapping: {mode: MappingObject} }\n"
+        "sized { TextureMapping: {mode: MappingObject, size: 2} }\n", NULL) == 0);
+
+    ecs_entity_t added = ecs_new(world);
+    ecs_add(world, added, TextureMapping);
+    const TextureMapping *m = ecs_get(world, added, TextureMapping);
+    test_assert(m != NULL);
+    test_int(m->mode, MappingUv);
+    test_flt(m->size, 1);
+    test_bool(ecs_owns(world, added, MaterialId), true);
+
+    m = ecs_get(world, ecs_lookup(world, "object"), TextureMapping);
+    test_assert(m != NULL);
+    test_int(m->mode, MappingObject);
+    test_flt(m->size, 1);
+
+    m = ecs_get(world, ecs_lookup(world, "sized"), TextureMapping);
+    test_assert(m != NULL);
+    test_int(m->mode, MappingObject);
+    test_flt(m->size, 2);
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, TextureMapping, {.mode = MappingObject, .size = 0.5f});
+    ecs_entity_t instance = ecs_new_w_pair(world, EcsIsA, prefab);
+    test_bool(ecs_owns(world, instance, TextureMapping), false);
+    test_int(ecs_get(world, instance, TextureMapping)->mode, MappingObject);
+    test_flt(ecs_get(world, instance, TextureMapping)->size, 0.5f);
+
+    ecs_fini(world);
+}
+
+/** The record holds the mode and size of MappingObject, the record without a mapping for
+ * MappingUv, and a transition of another component encodes the record again with them. */
+void Material_texture_mapping_pack(void) {
+    // materials/texture_mapping
+    box_render_material_t record, plain;
+    ecs_os_memset_t(&record, 0x55, box_render_material_t);
+    box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
+    test_uint(record.mapping, 0);
+    test_flt(record.mapping_size, 0);
+    plain = record;
+
+    TextureMapping uv = { .mode = MappingUv, .size = 3 };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .mapping = &uv, .fade = 1 });
+    test_assert(!ecs_os_memcmp_t(&record, &plain, box_render_material_t));
+
+    TextureMapping object = { .mode = MappingObject, .size = 2 };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .mapping = &object, .fade = 1 });
+    test_uint(record.mapping, MappingObject);
+    test_flt(record.mapping_size, 2);
+    record.mapping = 0;
+    record.mapping_size = 0;
+    test_assert(!ecs_os_memcmp_t(&record, &plain, box_render_material_t));
+
+    TextureMapping zero = { .mode = MappingObject, .size = 0 };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .mapping = &zero, .fade = 1 });
+    test_uint(record.mapping, MappingObject);
+    test_flt(record.mapping_size, 1);
+
+    TextureMapping negative = { .mode = MappingObject, .size = -2 };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .mapping = &negative, .fade = 1 });
+    test_flt(record.mapping_size, 1);
+
+    TextureMapping nan = { .mode = MappingObject, .size = NAN };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .mapping = &nan, .fade = 1 });
+    test_flt(record.mapping_size, 1);
+
+    TextureTransform tt = { .scale_x = 2, .scale_y = 3, .offset_x = 0.5f, .offset_y = 0.25f };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .mapping = &object, .uv = &tt, .fade = 1 });
+    test_uint(record.mapping, MappingObject);
+    test_flt(record.mapping_size, 2);
+    test_flt(record.uv[0], 2);
+    test_flt(record.uv[1], 3);
+    test_flt(record.uv[2], 0.5f);
+    test_flt(record.uv[3], 0.25f);
+
+    box_draw_transition_material_t target;
+    box_render_material_t encoded;
+    box_draws_transition_target(&target, &(box_draw_material_t){
+        .mapping = &object, .uv = &tt, .fade = 1 }, BOX_DRAW_TRANSITION_TABLE);
+    box_draws_transition_encode(&target, &encoded);
+    test_assert(!ecs_os_memcmp_t(&encoded, &record, box_render_material_t));
+}
+
+/** Create a world that renders with a null backend and has a view.
+ *
+ * @param null Receives the backend
+ * @return The world
+ */
+static ecs_world_t* mapping_world(
+    box_render_null_t **null)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(*null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+
+    return world;
+}
+
+/** Run a frame and wait until the backend has its packet.
+ *
+ * @param world The world
+ */
+static void mapping_frame(
+    ecs_world_t *world)
+{
+    ecs_progress(world, 0);
+    box_render_sync(world);
+}
+
+/** Get the record of the MaterialId an entity owns or inherits, as the extract packed it.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The record
+ */
+static const box_render_material_t* mapping_record(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    const ecs_system_t *s = ecs_system_get(world, system);
+    test_assert(s != NULL && s->ctx != NULL);
+    box_render_draws_t *d = s->ctx;
+    const MaterialId *id = ecs_get(world, e, MaterialId);
+    test_assert(id != NULL);
+    test_assert(id->value < (uint32_t)ecs_vec_count(&d->materials.records));
+
+    return ecs_vec_get_t(&d->materials.records, box_render_material_t, (int32_t)id->value);
+}
+
+/** Create a box with a color and a texture mapping.
+ *
+ * @param world The world
+ * @param x Its x position
+ * @param mapping The mapping, NULL for none
+ * @return The box
+ */
+static ecs_entity_t mapping_box(
+    ecs_world_t *world,
+    float x,
+    const TextureMapping *mapping)
+{
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {x, 0, 0});
+    ecs_set(world, e, Box, {1, 2, 3});
+    ecs_set(world, e, Rgb, {200, 100, 50});
+    if (mapping) {
+        ecs_set_ptr(world, e, TextureMapping, mapping);
+    }
+
+    return e;
+}
+
+/** Materials that differ only in the mapping get different slots, an instance shares the slot of
+ * its prefab with the mapping, and a change of the mapping reaches the record. */
+void Material_texture_mapping_ids(void) {
+    // materials/texture_mapping
+    box_render_null_t *null;
+    ecs_world_t *world = mapping_world(&null);
+    TextureMapping uv = { .mode = MappingUv, .size = 1 };
+    TextureMapping object = { .mode = MappingObject, .size = 1 };
+    TextureMapping sized = { .mode = MappingObject, .size = 2 };
+    ecs_entity_t a = mapping_box(world, 0, NULL);
+    ecs_entity_t b = mapping_box(world, 1, &object);
+    ecs_entity_t c = mapping_box(world, 2, &sized);
+    ecs_entity_t d = mapping_box(world, 3, &uv);
+    ecs_entity_t e = mapping_box(world, 4, &object);
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, Box, {1, 1, 1});
+    ecs_set(world, prefab, TextureMapping, {.mode = MappingObject, .size = 4});
+    ecs_entity_t instance = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_set(world, instance, Position, {5, 0, 0});
+    mapping_frame(world);
+    mapping_frame(world);
+
+    uint32_t id_a = ecs_get(world, a, MaterialId)->value;
+    uint32_t id_b = ecs_get(world, b, MaterialId)->value;
+    uint32_t id_c = ecs_get(world, c, MaterialId)->value;
+    uint32_t id_d = ecs_get(world, d, MaterialId)->value;
+    uint32_t id_e = ecs_get(world, e, MaterialId)->value;
+    test_assert(id_a != id_b);
+    test_assert(id_a != id_c);
+    test_assert(id_b != id_c);
+    test_uint(id_d, id_a);
+    test_uint(id_e, id_b);
+
+    test_uint(mapping_record(world, a)->mapping, MappingUv);
+    test_flt(mapping_record(world, a)->mapping_size, 0);
+    test_uint(mapping_record(world, b)->mapping, MappingObject);
+    test_flt(mapping_record(world, b)->mapping_size, 1);
+    test_uint(mapping_record(world, c)->mapping, MappingObject);
+    test_flt(mapping_record(world, c)->mapping_size, 2);
+    test_uint(mapping_record(world, b)->color, 200u | (100u << 8) | (50u << 16));
+
+    test_bool(ecs_owns(world, instance, TextureMapping), false);
+    test_uint(ecs_get(world, instance, MaterialId)->value,
+        ecs_get(world, prefab, MaterialId)->value);
+    test_uint(mapping_record(world, instance)->mapping, MappingObject);
+    test_flt(mapping_record(world, instance)->mapping_size, 4);
+
+    ecs_set(world, prefab, TextureMapping, {.mode = MappingObject, .size = 8});
+    ecs_set(world, c, TextureMapping, {.mode = MappingObject, .size = 1});
+    mapping_frame(world);
+    test_flt(mapping_record(world, instance)->mapping_size, 8);
+    test_uint(ecs_get(world, c, MaterialId)->value, ecs_get(world, b, MaterialId)->value);
+
+    ecs_remove(world, b, TextureMapping);
+    mapping_frame(world);
+    test_uint(ecs_get(world, b, MaterialId)->value, ecs_get(world, a, MaterialId)->value);
+    test_uint(mapping_record(world, b)->mapping, MappingUv);
+
+    ecs_fini(world);
+    box_render_null_free(null);
 }

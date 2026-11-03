@@ -55,7 +55,10 @@
                     "diffuse_transmission_defaults",
                     "diffuse_transmission_pack",
                     "diffuse_transmission_blur_defaults",
-                    "diffuse_transmission_blur_pack"
+                    "diffuse_transmission_blur_pack",
+                    "texture_mapping_defaults",
+                    "texture_mapping_pack",
+                    "texture_mapping_ids"
                 ]
             },
             {

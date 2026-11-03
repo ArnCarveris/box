@@ -260,6 +260,33 @@
                 ]
             },
             {
+                "id": "TextureGen",
+                "testcases": [
+                    "noise_tiles",
+                    "blocks_tiles",
+                    "cells_tiles",
+                    "cells_nearest_tiles",
+                    "pattern_wraps",
+                    "same_seed_same_bytes",
+                    "other_seed_other_bytes",
+                    "height_spans_unit",
+                    "flat_normal",
+                    "normal_green_up",
+                    "albedo_ramp",
+                    "writes_texture_and_status",
+                    "change_regenerates",
+                    "source_change_regenerates",
+                    "source_missing",
+                    "with_path_error",
+                    "remove",
+                    "default_size",
+                    "capped_by_quality",
+                    "hash_noise",
+                    "hash_blocks",
+                    "hash_cells"
+                ]
+            },
+            {
                 "id": "TextureLinear",
                 "testcases": [
                     "encode_table",

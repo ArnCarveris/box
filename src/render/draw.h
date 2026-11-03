@@ -210,6 +210,8 @@ typedef struct box_draw_material_t {
     const PbrMaterial *pbr;     /**< Metallic and roughness */
     const Emissive *emissive;   /**< Emitted light */
     const TextureTransform *uv; /**< Scale and offset of the texture coordinates */
+    const TextureMapping *mapping; /**< Source of the texture coordinates of a 3D shape, ignored
+                                 *   by 2D shapes */
     const Transmission *transmission; /**< Light passing through a 3D shape */
     const ClearCoat *clear_coat; /**< Dielectric layer over a 3D shape, ignored by 2D shapes */
     const SpecularAnisotropy *anisotropy; /**< Stretched highlight of a 3D shape, ignored by 2D
@@ -256,6 +258,8 @@ typedef struct box_draw_transition_material_t {
     PbrMaterial pbr;        /**< PbrMaterial */
     Emissive emissive;      /**< Emissive */
     TextureTransform uv;    /**< TextureTransform */
+    TextureMapping mapping; /**< TextureMapping, which has no transition: the record keeps it */
+    bool mapped;            /**< The material has a TextureMapping */
     Transmission transmission; /**< Transmission */
     ClearCoat clear_coat;   /**< ClearCoat */
     SpecularAnisotropy anisotropy; /**< SpecularAnisotropy */

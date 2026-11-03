@@ -410,6 +410,13 @@ static int32_t box_pick_mesh_walk(
     return w.hit;
 }
 
+/** Where a ray hits the triangle of a plain mesh, in the frame of its mesh */
+typedef struct box_pick_mesh_hit_t {
+    vec3 position;  /**< The position times the ShapeMesh scale */
+    vec3 normal;    /**< The normal of the unit mesh, interpolated */
+    bool plain;     /**< The hit is on a triangle of a mesh without a parametric surface */
+} box_pick_mesh_hit_t;
+
 /** Intersect a ray with the triangles of the mesh of a shape, through the triangle hierarchy of
  * its unit mesh when it has many triangles.
  *
@@ -420,6 +427,7 @@ static int32_t box_pick_mesh_walk(
  * @param dir Direction of the ray
  * @param t Receives the distance of the nearest hit
  * @param uv Receives the texture coordinate of the mesh at the hit
+ * @param point Receives the position and normal of the hit, NULL for none
  * @return Whether the ray hits a triangle
  */
 static bool box_pick_mesh(
@@ -429,7 +437,8 @@ static bool box_pick_mesh(
     const vec3 origin,
     const vec3 dir,
     float *t,
-    vec2 uv)
+    vec2 uv,
+    box_pick_mesh_hit_t *point)
 {
     const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
     box_mesh_cache_t *cache = box_mesh_cache_of(world);
@@ -484,6 +493,18 @@ found:
         for (k = 0; k < 2; k ++) {
             uv[k] = w0 * mesh->vertices[i0].uv[k] + best[1] * mesh->vertices[i1].uv[k] +
                 best[2] * mesh->vertices[i2].uv[k];
+        }
+
+        if (point) {
+            point->plain = !shape->surface.p[0][0];
+            for (k = 0; k < 3; k ++) {
+                point->position[k] = (w0 * mesh->vertices[i0].position[k] +
+                    best[1] * mesh->vertices[i1].position[k] +
+                    best[2] * mesh->vertices[i2].position[k]) * shape->scale[k];
+                point->normal[k] = w0 * mesh->vertices[i0].normal[k] +
+                    best[1] * mesh->vertices[i1].normal[k] +
+                    best[2] * mesh->vertices[i2].normal[k];
+            }
         }
 
         *t = best[0];
@@ -605,7 +626,8 @@ static bool box_pick_filter(
         box_pick_transform(cast->world, e, m);
         result = box_pick_plane(m, size, circle, ray->origin, ray->dir, &t, local);
     } else {
-        result = box_pick_mesh(cast->world, cast->st, e, ray->origin, ray->dir, &t, local);
+        result = box_pick_mesh(cast->world, cast->st, e, ray->origin, ray->dir, &t, local,
+            NULL);
     }
 
     result = result && (ray->max_distance <= 0 || t <= ray->max_distance);
@@ -965,11 +987,57 @@ static float box_pick_wrap(
     return result;
 }
 
+/** Texture coordinates of a hit on a plain mesh with a MappingObject TextureMapping, before the
+ * TextureTransform, as mapping_uv of material.wgsl projects them.
+ *
+ * The position times the scale of the world transform over the mapping size is projected onto
+ * the plane of the dominant axis of the interpolated normal, plus half a repeat.
+ *
+ * @param m The world transform of the entity, without the ShapeMesh scale
+ * @param mapping The mapping
+ * @param hit The hit
+ * @param uv Receives the texture coordinates
+ */
+static void box_pick_mapping_uv(
+    mat4 m,
+    const TextureMapping *mapping,
+    const box_pick_mesh_hit_t *hit,
+    vec2 uv)
+{
+    float size = isfinite(mapping->size) && mapping->size > 0.0f ? mapping->size : 1.0f;
+    vec3 p, a;
+    int32_t k;
+    for (k = 0; k < 3; k ++) {
+        p[k] = hit->position[k] * glm_vec3_norm(m[k]) / size;
+        a[k] = fabsf(hit->normal[k]);
+    }
+
+    if (a[1] >= a[0] && a[1] >= a[2]) {
+        uv[0] = (hit->normal[1] >= 0.0f ? 1.0f : -1.0f) * p[2];
+        uv[1] = -p[0];
+    } else if (a[0] >= a[2]) {
+        uv[0] = -(hit->normal[0] >= 0.0f ? 1.0f : -1.0f) * p[2];
+        uv[1] = -p[1];
+    } else {
+        uv[0] = (hit->normal[2] >= 0.0f ? 1.0f : -1.0f) * p[0];
+        uv[1] = -p[1];
+    }
+
+    uv[0] += 0.5f;
+    uv[1] += 0.5f;
+}
+
 /** Map a hit on an entity that shows the texture of a surface to a cursor on that surface.
  *
+<<<<<<< HEAD
  * An Image maps the area of the element to its texture area, through the nine parts of its
  * ImageSlice as the renderer draws it, PbrTextures map the UV of the mesh through
  * TextureTransform and TextureWrap.
+=======
+ * An Image maps the area of the element to its texture area, PbrTextures map the UV of the
+ * mesh, or the projection of a MappingObject TextureMapping, through TextureTransform and
+ * TextureWrap.
+>>>>>>> 24663f7f184f96173c0f25b9bd7094c7b2eed016
  *
  * @param world The world
  * @param st The module state
@@ -1020,7 +1088,15 @@ static bool box_pick_texture(
     {
         const TextureTransform *tt = ecs_get(world, e, TextureTransform);
         const TextureWrap *wrap = ecs_get(world, e, TextureWrap);
-        result = box_pick_mesh(world, st, e, ray->origin, ray->dir, &t, uv);
+        const TextureMapping *mapping = ecs_get(world, e, TextureMapping);
+        box_pick_mesh_hit_t hit = {0};
+        result = box_pick_mesh(world, st, e, ray->origin, ray->dir, &t, uv, &hit);
+        if (result && hit.plain && mapping && mapping->mode == MappingObject) {
+            mat4 m;
+            box_pick_transform(world, e, m);
+            box_pick_mapping_uv(m, mapping, &hit, uv);
+        }
+
         if (tt) {
             uv[0] = uv[0] * tt->scale_x + tt->offset_x;
             uv[1] = uv[1] * tt->scale_y + tt->offset_y;

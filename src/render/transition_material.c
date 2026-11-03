@@ -47,6 +47,11 @@ void box_draws_transition_target(
         out->uv = *material->uv;
     }
 
+    if (material->mapping) {
+        out->mapped = true;
+        out->mapping = *material->mapping;
+    }
+
     if (material->transmission) {
         out->present |= 1u << BOX_RENDER_TRANSITION_TRANSMISSION;
         out->transmission = *material->transmission;
@@ -124,6 +129,7 @@ void box_draws_transition_encode(
             &material->emissive),
         .uv = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM,
             &material->uv),
+        .mapping = material->mapped ? &material->mapping : NULL,
         .transmission = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TRANSMISSION,
             &material->transmission),
         .clear_coat = box_draws_transition_part(material, BOX_RENDER_TRANSITION_CLEAR_COAT,

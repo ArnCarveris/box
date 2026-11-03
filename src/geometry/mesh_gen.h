@@ -41,6 +41,25 @@ void box_mesh_lathe(
     float arc,
     bool planar);
 
+/** Texture coordinates of a point on a face of a box, projected onto the face.
+ *
+ * On the side faces (k 0 and 2) u runs along the horizontal tangent seen from outside, up × n,
+ * and v down toward -y. The top face has u along +z and v along -x, the bottom face u along -z
+ * and v along -x. No face is mirrored seen from outside.
+ *
+ * @param k Axis of the face normal
+ * @param sign Direction of the face normal, 1 or -1
+ * @param pos The point
+ * @param h Half sizes of the box
+ * @param out The texture coordinates, 0..1 over the face, clamped
+ */
+void box_mesh_box_face_uv(
+    int32_t k,
+    float sign,
+    const vec3 pos,
+    const vec3 h,
+    vec2 out);
+
 /** Cube from -0.5 to 0.5.
  *
  * @param mesh The mesh

@@ -979,8 +979,13 @@ void box_draws_material_pack(
         isfinite(material->diffuse_transmission->blur) &&
         material->diffuse_transmission->blur > 0.0f
         ? material->diffuse_transmission->blur : 0.0f;
-    out->reserved[0] = 0;
-    out->reserved[1] = 0;
+    out->mapping = (uint32_t)MappingUv;
+    out->mapping_size = 0.0f;
+    if (material->mapping && material->mapping->mode == MappingObject) {
+        float size = material->mapping->size;
+        out->mapping = (uint32_t)MappingObject;
+        out->mapping_size = isfinite(size) && size > 0.0f ? size : 1.0f;
+    }
 }
 
 void box_draws_mesh_shading(

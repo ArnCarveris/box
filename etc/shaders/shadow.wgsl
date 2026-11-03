@@ -5,7 +5,8 @@
 // Alpha tested casters (AlphaCutoff) draw with vs_cutout and fs_cutout, which also bind the
 // shading stream and the material table, read the alpha of the instance and the UV transform and
 // the cutoff of its material, and discard where the alpha times the albedo alpha of the batch
-// (group 2) is below the cutoff, as the forward pass does.
+// (group 2) is below the cutoff, as the forward pass does. A MappingObject material projects
+// the UV in the fragment stage, as mesh.wgsl does (mapping_uv).
 //
 // Spot light tiles of the shadow atlas draw with vs and vs_cutout too. A point light tile is
 // drawn once per octant of its octahedron with vs_point and vs_point_cutout, the octant in the
@@ -59,11 +60,16 @@ struct CutoutIn {
     @location(3) slot: u32,
 };
 
+// The UV of an alpha tested vertex, or for a MappingObject material (mapped 1) the offset of its
+// projection, with the object position and normal mapping_uv projects, as mesh.wgsl has them.
 struct CutoutOut {
     @builtin(position) pos: vec4f,
     @location(0) uv: vec2f,
     @location(1) @interpolate(flat) alpha: f32,
     @location(2) @interpolate(flat) cutoff: f32,
+    @location(3) @interpolate(flat) mapped: f32,
+    @location(4) object: vec4f,
+    @location(5) object_normal: vec3f,
 };
 
 // A vertex of a caster in an octant of a point light tile, with the 3 half space distances of
@@ -83,10 +89,13 @@ struct PointCutoutOut {
     @location(0) uv: vec2f,
     @location(1) @interpolate(flat) alpha: f32,
     @location(2) @interpolate(flat) cutoff: f32,
+    @location(3) @interpolate(flat) mapped: f32,
+    @location(4) object: vec4f,
+    @location(5) object_normal: vec3f,
 #ifdef BOX_SHADOW_CLIP_DISTANCES
     @builtin(clip_distances) clip: array<f32, 3>,
 #else
-    @location(3) clip: vec3f,
+    @location(6) clip: vec3f,
 #endif
 };
 
@@ -156,14 +165,26 @@ fn octant_distances(world: vec3f) -> vec3f {
 }
 
 // The alpha tested attributes of a vertex: the UV as vs of mesh.wgsl transforms it (the side
-// region of a kind 7 surface, whose UVs start two tiles over, moves back), the alpha of the
-// instance and the cutoff of its material. Reads surface_data, so the position comes first.
+// region of a kind 7 surface, whose UVs start two tiles over, moves back), or the projection of
+// a MappingObject material on a plain mesh, the alpha of the instance and the cutoff of its
+// material. Reads surface_data, so the position comes first.
 fn cutout_attributes(v: CutoutIn, o: ptr<function, CutoutOut>) {
     let shading = shadings[v.slot];
     let material = material_fetch(shading.material);
     (*o).uv = v.uv * material.uv.xy + material.uv.zw;
     if (surface_data.p[0].x == 7.0 && v.uv.x >= 2.0 && abs(v.normal.y) <= 0.5) {
         (*o).uv.x -= 2.0 * material.uv.x;
+    }
+    (*o).mapped = 0.0;
+    (*o).object = vec4f(0.0);
+    (*o).object_normal = vec3f(0.0);
+    if (material_mapped(material) && surface_data.p[0].x == 0.0) {
+        let model = instance_model(transforms[v.slot]);
+        let scale = vec3f(length(model[0].xyz), length(model[1].xyz), length(model[2].xyz));
+        (*o).mapped = 1.0;
+        (*o).uv = mapping_offset(material);
+        (*o).object = mapping_object(material, v.position, scale);
+        (*o).object_normal = v.normal;
     }
     (*o).alpha = shading.alpha;
     (*o).cutoff = material.cutoff;
@@ -183,8 +204,17 @@ fn cutout_test(uv: vec2f, alpha: f32, cutoff: f32) {
     }
 }
 
+// The UV of an alpha tested fragment: interpolated, or projected for a MappingObject material.
+fn cutout_uv(uv: vec2f, mapped: f32, object: vec4f, object_normal: vec3f) -> vec2f {
+    var result = uv;
+    if (mapped != 0.0) {
+        result = mapping_uv(object, object_normal, uv);
+    }
+    return result;
+}
+
 @fragment fn fs_cutout(f: CutoutOut) {
-    cutout_test(f.uv, f.alpha, f.cutoff);
+    cutout_test(cutout_uv(f.uv, f.mapped, f.object, f.object_normal), f.alpha, f.cutoff);
 }
 
 @vertex fn vs_point(v: VertexIn) -> PointOut {
@@ -210,6 +240,9 @@ fn cutout_test(uv: vec2f, alpha: f32, cutoff: f32) {
     o.uv = c.uv;
     o.alpha = c.alpha;
     o.cutoff = c.cutoff;
+    o.mapped = c.mapped;
+    o.object = c.object;
+    o.object_normal = c.object_normal;
 #ifdef BOX_SHADOW_CLIP_DISTANCES
     o.clip = array<f32, 3>(d.x, d.y, d.z);
 #else
@@ -221,7 +254,7 @@ fn cutout_test(uv: vec2f, alpha: f32, cutoff: f32) {
 #ifdef BOX_SHADOW_CLIP_DISTANCES
 // The clip distances already kept the fragment to its octant.
 @fragment fn fs_point_cutout(f: CutoutOut) {
-    cutout_test(f.uv, f.alpha, f.cutoff);
+    cutout_test(cutout_uv(f.uv, f.mapped, f.object, f.object_normal), f.alpha, f.cutoff);
 }
 #else
 // Discard a fragment outside the octant of its draw, which core WebGPU cannot clip.
@@ -236,7 +269,7 @@ fn octant_discard(clip: vec3f) {
 }
 
 @fragment fn fs_point_cutout(f: PointCutoutOut) {
-    cutout_test(f.uv, f.alpha, f.cutoff);
+    cutout_test(cutout_uv(f.uv, f.mapped, f.object, f.object_normal), f.alpha, f.cutoff);
     octant_discard(f.clip);
 }
 #endif

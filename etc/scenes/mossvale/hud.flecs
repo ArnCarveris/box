@@ -11,6 +11,7 @@ using box.texture
 using box.input
 using box.picking
 using box.transition
+using box.movement
 
 window {}
 
@@ -27,13 +28,14 @@ export const C_PANEL_HI: Rgb = {70, 92, 56}
 
 mv_ui_parchment { TexturePath: {path: "etc/scenes/mossvale/ui/parchment.jpg"} }
 mv_ui_leather { TexturePath: {path: "etc/scenes/mossvale/ui/leather.jpg"} }
-mv_ui_map { TexturePath: {path: "etc/scenes/mossvale/ui/map.jpg"} }
 mv_ui_vignette { TexturePath: {path: "etc/scenes/mossvale/ui/vignette.png"} }
 mv_ui_corner { TexturePath: {path: "etc/scenes/mossvale/ui/corner.svg", width: 128} }
 mv_ui_divider { TexturePath: {path: "etc/scenes/mossvale/ui/divider.svg", width: 1024} }
 mv_ui_ribbon { TexturePath: {path: "etc/scenes/mossvale/ui/ribbon.svg", width: 800} }
 mv_ui_roller { TexturePath: {path: "etc/scenes/mossvale/ui/roller.svg", width: 96} }
 mv_ui_compass { TexturePath: {path: "etc/scenes/mossvale/ui/compass.svg", width: 256} }
+mv_ui_vial_frame { TexturePath: {path: "etc/scenes/mossvale/ui/vial_frame.svg", width: 512} }
+mv_ui_vial_gloss { TexturePath: {path: "etc/scenes/mossvale/ui/vial_gloss.svg", width: 512} }
 mv_ui_quill { TexturePath: {path: "etc/scenes/mossvale/ui/quill.svg", width: 96} }
 mv_ui_wisp { TexturePath: {path: "etc/scenes/mossvale/ui/wisp.svg", width: 96} }
 mv_ui_leaf { TexturePath: {path: "etc/scenes/mossvale/ui/leaf.svg", width: 96} }
@@ -271,38 +273,74 @@ template SpellSlot {
   }
 }
 
-template SpellBar {
-  const ratio = clamp(mana / mana_max, 0, 1)
-  const fw = max(412 * ratio, 10)
-  Layout: {direction: Column, h: Center, spacing: 8}
-  mana_row {
-    Layout: {direction: Row, v: Middle, spacing: 12, padding: {6, 6, 16, 16}}
-    Rect: {1, 1}
-    Image: {texture: mv_ui_leather}
-    Rgb: {255, 255, 255}
-    Border: {width: 2, radius: 16, color: {170, 128, 62, 255}}
-    BoxShadow: {offset_y: -3, blur: 10, color: {0, 0, 0, 130}}
-    InputBlocker
-    Engraved mana_label(text: "Mana", size: 14, color: C_GOLD, depth: 1.5)
-    vial {
-      Layout: {direction: Row, padding: {4, 4, 4, 4}}
-      LayoutItem: {width: {mode: Fixed, value: 420}, height: {mode: Fixed, value: 20}}
-      Rect: {1, 1}
-      Rgb: {26, 30, 46}
-      Border: {width: 2, radius: 10, color: {214, 172, 92, 255}}
-      fill {
-        LayoutItem: {width: {mode: Fixed, value: fw}, height: {mode: Fixed, value: 12}}
-        Rect: {1, 1}
-        Rgb: {104, 136, 255}
-        Border: {radius: 6}
-        BoxShadow: {blur: 10, spread: 1, color: {110, 150, 255, 150}}
-        deep { Position: {0, -2.5, 0.05}; Rect: {fw - 4, 4}; Rgb: {72, 82, 210}; Border: {radius: 2}; Opacity: {0.8} }
-        sheen { Position: {0, 2.6, 0.1}; Rect: {max(fw - 10, 2), 2.4}; Rgb: {236, 244, 255}; Border: {radius: 1.2}; Opacity: {0.65} }
-      }
-      glass { LayoutFloat: {h: Center, v: Top, anchor_h: Center, anchor_v: Top, y: -3}; LayoutItem: {width: {mode: Fixed, value: 396}, height: {mode: Fixed, value: 2.5}}; Rect: {1, 1}; Rgb: {255, 255, 255}; Border: {radius: 1.2}; Opacity: {0.3} }
-    }
-    Label mana_value(text: "{mana:.0} / {mana_max:.0}", size: 14, color: C_MUTED)
+template ManaVial {
+  prop size: f32 = 168
+  const u = size / 256
+  const inner = 212 * u
+  const face = inner * 2.1
+  const level = clamp(mana / mana_max, 0, 1)
+  const surface = (level - 0.5) * inner
+  const cy = -40 * u
+  InputBlocker
+  Layout: {}
+  LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: 340 * u}}
+  aura { Position: {0, cy, -0.2}; Circle: {inner * 0.5}; Rgb: {20, 30, 80}; BoxShadow: {blur: 46, spread: 4, color: {70, 110, 255, 120 + level * 60}} }
+  neck {
+    Position: {0, 88 * u, 0}
+    Rect: {48 * u, 60 * u}
+    Rgb: match level > 0.98 { true: {64, 104, 236}; _: {14, 20, 46} }
   }
+  glass {
+    Position: {0, cy, 0}
+    Rect: {inner, inner}
+    Rgb: {10, 14, 36}
+    Border: {radius: inner / 2}
+    ClipChildren
+    back {
+      Position: {0, surface - face * 0.545, 1}
+      Rect: {face, face}
+      Rgb: {22, 42, 150}
+      Border: {radius: face * 0.31}
+      AngularVelocity: {0, 0, 0.95}
+      Transition: [Position: {duration: 0.9, timing_function: EaseOut}]
+    }
+    front {
+      Position: {0, surface - face * 0.575, 2}
+      Rect: {face, face}
+      Rgb: {66, 116, 248}
+      Border: {radius: face * 0.36}
+      AngularVelocity: {0, 0, -0.62}
+      Transition: [Position: {duration: 0.9, timing_function: EaseOut}]
+    }
+    depth {
+      Position: {0, surface - face * 0.62, 3}
+      Rect: {face, face}
+      Rgb: {30, 54, 170}
+      Opacity: {0.6}
+      Border: {radius: face * 0.42}
+      AngularVelocity: {0, 0, 0.35}
+      Transition: [Position: {duration: 0.9, timing_function: EaseOut}]
+    }
+    motes {
+      Position: {0, 0, 3.5}
+      for m in 0..5 {
+        const mx = (m - 2) * inner * 0.16
+        const my = inner * (0.12 * (m % 3) - 0.38)
+        "m_{m}" { Position: {mx, min(my, surface - 8), 0}; Circle: {2 + (m % 2) * 1.5}; Rgb: {190, 214, 255}; Opacity: {match my < surface - 8 { true: 0.55; _: 0 }} }
+      }
+    }
+  }
+  gloss { Position: {0, 0, 4}; Rect: {size, 340 * u}; Image: {texture: mv_ui_vial_gloss}; Rgb: {255, 255, 255}; BlendMode: Additive }
+  frame { Position: {0, 0, 5}; Rect: {size, 340 * u}; Image: {texture: mv_ui_vial_frame}; Rgb: {255, 255, 255} }
+  readout {
+    Position: {0, cy, 6}
+    Engraved amount(text: "{mana:.0}", size: 28, color: {255, 255, 255}, depth: 2) { Position: {0, 8, 0} }
+    Engraved name(text: "Mana", size: 13, color: C_GOLD, depth: 1.5) { Position: {0, -16, 0} }
+  }
+}
+
+template SpellBar {
+  Layout: {direction: Column, h: Center, spacing: 8}
   slots {
     Layout: {direction: Row, spacing: 6, padding: {12, 10, 18, 18}}
     Rect: {1, 1}
@@ -345,6 +383,109 @@ template MapMarker {
   }
 }
 
+template MapStreet {
+  prop path: entity = 0
+  prop w: f32 = 3
+  prop color: Rgb = {220, 210, 190}
+  const p = path[Path3D]
+  const n = p.segments.count()
+  const lw = max(w * MAP_K, 1.4)
+  start_ { Position: {p.start.x * MAP_K, 0 - p.start.z * MAP_K, 0}; Circle: {lw / 2}; Rgb: color }
+  first { Position: {0, 0, 0}; Line: {x1: p.start.x * MAP_K, y1: 0 - p.start.z * MAP_K, x2: p.segments[0].end.x * MAP_K, y2: 0 - p.segments[0].end.z * MAP_K, width: lw}; Rgb: color }
+  for (j, g) in p.segments {
+    "j_{j}" { Position: {g.end.x * MAP_K, 0 - g.end.z * MAP_K, 0}; Circle: {lw / 2}; Rgb: color }
+  }
+  for j in 1..n {
+    "l_{j}" { Position: {0, 0, 0}; Line: {x1: p.segments[j - 1].end.x * MAP_K, y1: 0 - p.segments[j - 1].end.z * MAP_K, x2: p.segments[j].end.x * MAP_K, y2: 0 - p.segments[j].end.z * MAP_K, width: lw}; Rgb: color }
+  }
+}
+
+template MapLand {
+  Rect: {200 * MAP_K, 200 * MAP_K}
+  Rgb: {168, 190, 116}
+  Border: {width: 1.5, radius: 3, color: {48, 30, 14, 255}}
+  ClipChildren
+  areas {
+    Position: {0, 0, 0.01}
+    for (i, a) in MV_AREAS {
+      const c: Rgb = match a.kind {
+        0: {176, 198, 124}
+        1: {112, 138, 86}
+        2: {192, 188, 126}
+        3: {184, 200, 118}
+        4: {198, 170, 122}
+        5: {140, 132, 120}
+        6: {204, 198, 184}
+        7: {186, 156, 116}
+        10: {166, 198, 110}
+        _: {222, 212, 192}
+      }
+      const lift = match a.kind { 0: 0; 1: 0; 2: 0; 3: 0; _: 0.01 }
+      "a_{i}" { Position: {a.x * MAP_K, 0 - a.z * MAP_K, lift}; Rect: {a.w * MAP_K, a.d * MAP_K}; Border: {radius: a.r * MAP_K}; Rgb: c }
+    }
+  }
+  water {
+    Position: {0, 0, 0.03}
+    MapStreet bank(path: MV_RIVER, w: 9, color: {222, 210, 164}) { Position: {0, 0, 0} }
+    MapStreet river(path: MV_RIVER, w: 6.2, color: {84, 138, 176}) { Position: {0, 0, 0.002} }
+    lake_bank { Position: {LAKE_X * MAP_K, 0 - LAKE_Z * MAP_K, 0}; Circle: {(LAKE_R + 1.8) * MAP_K}; Rgb: {222, 210, 164} }
+    lake { Position: {LAKE_X * MAP_K, 0 - LAKE_Z * MAP_K, 0.002}; Circle: {LAKE_R * MAP_K}; Rgb: {84, 138, 176} }
+    deep { Position: {LAKE_X * MAP_K, 0 - LAKE_Z * MAP_K, 0.003}; Circle: {(LAKE_R - 5) * MAP_K}; Rgb: {66, 116, 160} }
+    isle { Position: {ISLE_X * MAP_K, 0 - ISLE_Z * MAP_K, 0.004}; Circle: {ISLE_R * MAP_K}; Rgb: {150, 184, 104} }
+  }
+  streets {
+    Position: {0, 0, 0.05}
+    for (i, s) in MV_STREETS {
+      const st = s[MvStreet]
+      const c: Rgb = match st.kind {
+        0: {232, 222, 200}
+        1: {222, 210, 188}
+        2: {212, 202, 184}
+        3: {214, 184, 132}
+        _: {204, 174, 128}
+      }
+      const lift = match st.kind { 0: 0.004; 1: 0.003; 2: 0.002; 3: 0.001; _: 0 }
+      MapStreet "s_{i}"(path: s, w: st.w, color: c) { Position: {0, 0, lift} }
+    }
+  }
+  plazas {
+    Position: {0, 0, 0.06}
+    for (i, a) in MV_AREAS {
+      if a.kind == AR_SQUARE || a.kind == AR_COURT {
+        "p_{i}" { Position: {a.x * MAP_K, 0 - a.z * MAP_K, 0}; Rect: {a.w * MAP_K, a.d * MAP_K}; Border: {width: 0.8, radius: a.r * MAP_K, color: {150, 136, 110, 255}}; Rgb: {236, 228, 210} }
+      }
+    }
+    fountain { Position: {SQ_X * MAP_K, 0 - SQ_Z * MAP_K, 0.01}; Circle: {3.2 * MAP_K}; Rgb: {96, 150, 186}; Border: {width: 0.8, color: {150, 136, 110, 255}} }
+  }
+  houses {
+    Position: {0, 0, 0.08}
+    for (i, h) in MV_HOUSES {
+      const rc: Rgb = match h.roof { 0: {204, 168, 100}; 1: {178, 80, 58}; 2: {80, 100, 146}; 3: {86, 122, 80}; _: {110, 80, 140} }
+      "h_{i}" { Position: {h.x * MAP_K, 0 - h.z * MAP_K, 0}; Rect: {house_hw(h.face, h.w, h.d) * 2 * MAP_K, house_hd(h.face, h.w, h.d) * 2 * MAP_K}; Border: {width: 0.8, radius: 0.6, color: {54, 34, 20, 255}}; Rgb: rc }
+    }
+  }
+  woods {
+    Position: {0, 0, 0.1}
+    for j in 0..19 {
+      for i in 0..39 {
+        if tree_here(i, j) {
+          const h = hash2(i * 3.3, j * 7.1)
+          "t_{i}_{j}" { Position: {tree_x(i, j) * MAP_K, 0 - tree_z(i, j) * MAP_K, h * 0.001}; Circle: {(1.2 + h * 0.5) * MAP_K}; Rgb: {50 + h * 30, 88 + h * 30, 56}; Border: {width: 0.5, color: {34, 58, 38, 255}} }
+        }
+      }
+    }
+    for j in 0..14 {
+      for i in 0..29 {
+        if rock_here(i, j) {
+          const h = hash2(i * 1.3, j * 2.7)
+          "r_{i}_{j}" { Position: {rock_x(i, j) * MAP_K, 0 - rock_z(i, j) * MAP_K, 0}; Circle: {(0.8 + h * 0.5) * MAP_K}; Rgb: {150 + h * 20, 142 + h * 20, 126}; Border: {width: 0.5, color: {96, 88, 76, 255}} }
+        }
+      }
+    }
+  }
+  paper { Position: {0, 0, 0.2}; Rect: {200 * MAP_K, 200 * MAP_K}; Image: {texture: mv_ui_parchment}; Rgb: {255, 240, 210}; Opacity: {0.22} }
+}
+
 template MiniMap {
   InputBlocker
   LayoutItem: {width: {mode: Fixed, value: 240}, height: {mode: Fixed, value: 240}}
@@ -352,7 +493,7 @@ template MiniMap {
   Rgb: {84, 56, 32}
   Border: {width: 3, radius: 6, color: {214, 168, 82, 255}}
   BoxShadow: {offset_y: -5, blur: 18, spread: 1, color: {0, 0, 0, 150}}
-  land { Position: {0, 0, 0.05}; Rect: {200 * MAP_K, 200 * MAP_K}; Image: {texture: mv_ui_map}; Rgb: {255, 255, 255}; Border: {width: 1.5, radius: 3, color: {48, 30, 14, 255}} }
+  MapLand land() { Position: {0, 0, 0.05} }
   compass { Position: {80, 80, 0.7}; Rect: {54, 54}; Image: {texture: mv_ui_compass}; Rgb: {255, 255, 255} }
   for c in 0..4 {
     const sx = match c % 2 { 0: -1; _: 1 }
@@ -410,16 +551,21 @@ template Tracker {
   Layout: {direction: Column, spacing: 6, h: Right}
   if track_n > 0 {
     Panel box_(w: 352, pad: 14) {
-      Layout: {}
-      head {
-        Layout: {direction: Row, v: Middle, spacing: 8}
-        Picture quill(tex: mv_ui_quill, w: 22, h: 22)
-        Label title_(text: "Tasks at Hand", size: 18, color: C_RUBRIC, display: true)
-      }
-      Divider rule(w: 300, h: 18)
-      for i in 0..4 {
-        if i < track_n {
-          "entry_{i}" { Layout: {direction: Row}; TrackEntry entry(title: track_t[i], sub: track_s[i]) }
+      content_ {
+        Layout: {direction: Column, spacing: 6}
+        head {
+          Layout: {direction: Row, v: Middle, spacing: 8}
+          Picture quill(tex: mv_ui_quill, w: 22, h: 22)
+          Label title_(text: "Tasks at Hand", size: 18, color: C_RUBRIC, display: true)
+        }
+        Divider rule(w: 300, h: 18)
+        entries {
+          Layout: {direction: Column, spacing: 9}
+          for i in 0..4 {
+            if i < track_n {
+              "entry_{i}" { Layout: {direction: Row}; TrackEntry entry(title: track_t[i], sub: track_s[i]) }
+            }
+          }
         }
       }
     }
@@ -440,14 +586,16 @@ template Badge {
     Position: {0, 0, 0.5}
   }
   Panel card(pad: 10, padx: 20, gap: 2, corners: false) {
-    Layout: {}
-    Label name(text: "Wren", size: 24, color: C_RUBRIC, display: true)
-    rank_slot { Layout: {direction: Row}; Label rank(text: rank_name(done_count), size: 14, color: C_MOSS, display: true) }
-    Divider rule(w: 170, h: 14)
-    counts {
-      Layout: {direction: Row, spacing: 14, v: Middle}
-      tasks_slot { Layout: {direction: Row}; Counter tasks(tex: mv_ui_quill, text: "{done_count} / 25") }
-      wisps_slot { Layout: {direction: Row}; Counter wisps(tex: mv_ui_wisp, text: "{motes} / 20") }
+    content_ {
+      Layout: {direction: Column, spacing: 2}
+      Label name(text: "Wren", size: 24, color: C_RUBRIC, display: true)
+      rank_slot { Layout: {direction: Row}; Label rank(text: rank_name(done_count), size: 14, color: C_MOSS, display: true) }
+      Divider rule(w: 170, h: 14)
+      counts {
+        Layout: {direction: Row, spacing: 14, v: Middle}
+        tasks_slot { Layout: {direction: Row}; Counter tasks(tex: mv_ui_quill, text: "{done_count} / 25") }
+        wisps_slot { Layout: {direction: Row}; Counter wisps(tex: mv_ui_wisp, text: "{motes} / 20") }
+      }
     }
   }
 }
@@ -476,26 +624,28 @@ template Dialog {
   Layout: {direction: Row, h: Center}
   if show {
     Panel box_(w: 880, ht: 168, pad: 16, padx: 46, gap: 20, row: true, corners: false) {
-      Layout: {}
       roll_l { LayoutFloat: {h: Center, v: Middle, anchor_h: Left, anchor_v: Middle, x: 2}; LayoutItem: {width: {mode: Fixed, value: 34}, height: {mode: Fixed, value: 196}}; Rect: {1, 1}; Image: {texture: mv_ui_roller}; Rgb: {255, 255, 255} }
       roll_r { LayoutFloat: {h: Center, v: Middle, anchor_h: Right, anchor_v: Middle, x: -2}; LayoutItem: {width: {mode: Fixed, value: 34}, height: {mode: Fixed, value: 196}}; Rect: {1, 1}; Image: {texture: mv_ui_roller}; Rgb: {255, 255, 255} }
-      face_slot { Layout: {direction: Row}; Portrait face(id: talk_npc) }
-      body {
-        Layout: {direction: Column, spacing: 6}
-        plate {
-          Layout: {direction: Row, h: Center, v: Middle, padding: {0, 8, 0, 0}}
-          LayoutItem: {width: {mode: Fixed, value: 330}, height: {mode: Fixed, value: 52}}
-          Rect: {1, 1}
-          Image: {texture: mv_ui_ribbon}
-          Rgb: {255, 255, 255}
-          Engraved who(text: npc_name(talk_npc), size: 17, color: C_GOLD, depth: 1.5)
-        }
-        say_slot { Layout: {direction: Row}; Label say_(text: line(talk_topic * 10 + talk_line), size: 19, color: C_INK, width: 660) }
-        more {
-          Layout: {direction: Row, h: Right, v: Middle, spacing: 7}
-          LayoutItem: {width: {mode: Fixed, value: 660}}
-          Keycap key(key: "E", size: 11)
-          Label hint(text: match last { true: "farewell"; _: "continue" }, size: 14, color: C_INK_SOFT, display: true)
+      content_ {
+        Layout: {direction: Row, spacing: 20, v: Middle}
+        face_slot { Layout: {direction: Row}; Portrait face(id: talk_npc) }
+        body {
+          Layout: {direction: Column, spacing: 6}
+          plate {
+            Layout: {direction: Row, h: Center, v: Middle, padding: {0, 8, 0, 0}}
+            LayoutItem: {width: {mode: Fixed, value: 330}, height: {mode: Fixed, value: 52}}
+            Rect: {1, 1}
+            Image: {texture: mv_ui_ribbon}
+            Rgb: {255, 255, 255}
+            Engraved who(text: npc_name(talk_npc), size: 17, color: C_GOLD, depth: 1.5)
+          }
+          say_slot { Layout: {direction: Row}; Label say_(text: line(talk_topic * 10 + talk_line), size: 19, color: C_INK, width: 660) }
+          more {
+            Layout: {direction: Row, h: Right, v: Middle, spacing: 7}
+            LayoutItem: {width: {mode: Fixed, value: 660}}
+            Keycap key(key: "E", size: 11)
+            Label hint(text: match last { true: "farewell"; _: "continue" }, size: 14, color: C_INK_SOFT, display: true)
+          }
         }
       }
     }
@@ -506,9 +656,11 @@ template ToastLine {
   Layout: {direction: Row, h: Center}
   if toast != "" && game_state == 1 {
     Panel box_(row: true, pad: 9, padx: 18, gap: 10, h: Center, corners: false) {
-      Layout: {}
-      Picture icon(tex: mv_ui_leaf, w: 18, h: 18)
-      Label text(text: toast, size: 16, color: C_INK, width: 600, align: Center)
+      content_ {
+        Layout: {direction: Row, spacing: 10, v: Middle}
+        Picture icon(tex: mv_ui_leaf, w: 18, h: 18)
+        Label text(text: toast, size: 16, color: C_INK, width: 600, align: Center)
+      }
     }
   }
 }
@@ -571,18 +723,20 @@ template TitleCard {
     Engraved story(text: "Old Thistlewood, the village mage, has passed on, leaving his cottage and his staff to you, his apprentice Wren. The folk of Mossvale have chores aplenty, and magic makes light work.", size: 19, color: C_MUTED, display: false, depth: 1.5, width: 640, align: Center)
     gap_b { LayoutItem: {height: {mode: Fixed, value: 14}} }
     Panel keys(pad: 16, padx: 30, gap: 10, h: Center) {
-      Layout: {}
-      row_a {
-        Layout: {direction: Row, v: Middle, spacing: 26}
-        KeyHint walk(keys: "W A S D", text: "walk")
-        KeyHint hurry(keys: "Shift", text: "hurry")
-        KeyHint talk(keys: "E", text: "talk")
-      }
-      row_b {
-        Layout: {direction: Row, v: Middle, spacing: 26}
-        KeyHint pick(keys: "1 - 6", text: "choose a spell")
-        KeyHint cast(keys: "Space", text: "cast at the nearest target")
-        KeyHint click(keys: "Click", text: "cast at the cursor")
+      content_ {
+        Layout: {direction: Column, spacing: 10, h: Center}
+        row_a {
+          Layout: {direction: Row, v: Middle, spacing: 26}
+          KeyHint walk(keys: "W A S D", text: "walk")
+          KeyHint hurry(keys: "Shift", text: "hurry")
+          KeyHint talk(keys: "E", text: "talk")
+        }
+        row_b {
+          Layout: {direction: Row, v: Middle, spacing: 26}
+          KeyHint pick(keys: "1 - 6", text: "choose a spell")
+          KeyHint cast(keys: "Space", text: "cast at the nearest target")
+          KeyHint click(keys: "Click", text: "cast at the cursor")
+        }
       }
     }
     gap_c { LayoutItem: {height: {mode: Fixed, value: 22}} }
@@ -615,14 +769,16 @@ template EndCard {
     Engraved sub(text: "Mossvale has its mage again.", size: 26, color: C_TEXT, depth: 2)
     gap { LayoutItem: {height: {mode: Fixed, value: 12}} }
     Panel stats_box(pad: 18, padx: 34, gap: 10, h: Center) {
-      Layout: {}
-      Medallion medal(id: 13, size: 84)
-      rank_slot { Layout: {direction: Row}; Label rank(text: "Wren, {rank_name(done_count)}", size: 24, color: C_RUBRIC, display: true) }
-      counts {
-        Layout: {direction: Row, v: Middle, spacing: 26}
-        tasks_slot { Layout: {direction: Row}; Counter tasks(tex: mv_ui_quill, text: "Tasks completed: {done_count}") }
-        wisps_slot { Layout: {direction: Row}; Counter wisps(tex: mv_ui_wisp, text: "Wisps gathered: {motes} of 20") }
-        time_slot { Layout: {direction: Row}; Label time(text: "Time: {mins:.0} minutes", size: 15, color: C_INK) }
+      content_ {
+        Layout: {direction: Column, spacing: 10, h: Center}
+        Medallion medal(id: 13, size: 84)
+        rank_slot { Layout: {direction: Row}; Label rank(text: "Wren, {rank_name(done_count)}", size: 24, color: C_RUBRIC, display: true) }
+        counts {
+          Layout: {direction: Row, v: Middle, spacing: 26}
+          tasks_slot { Layout: {direction: Row}; Counter tasks(tex: mv_ui_quill, text: "Tasks completed: {done_count}") }
+          wisps_slot { Layout: {direction: Row}; Counter wisps(tex: mv_ui_wisp, text: "Wisps gathered: {motes} of 20") }
+          time_slot { Layout: {direction: Row}; Label time(text: "Time: {mins:.0} minutes", size: 15, color: C_INK) }
+        }
       }
     }
     gap_b { LayoutItem: {height: {mode: Fixed, value: 18}} }
@@ -665,6 +821,9 @@ hud {
         SpellBar spells()
         MiniMap minimap {
           LayoutFloat: {h: Right, v: Bottom, anchor_h: Right, anchor_v: Bottom, x: 0, y: 0}
+        }
+        ManaVial vial {
+          LayoutFloat: {h: Left, v: Bottom, anchor_h: Left, anchor_v: Bottom, x: 4, y: 0}
         }
       }
     }

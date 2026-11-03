@@ -1179,3 +1179,107 @@ void TextField_budget_releases_idle_pages(void) {
     free(data);
     ecs_os_fini();
 }
+
+/** Ink of a line of text at 13, 14 and 15 px over a flat Rect of another color, on an offscreen
+ * surface of pixel ratio 1: the sum over the pixels of their difference from the background in
+ * display encoded values, divided by the difference of the two colors.
+ *
+ * @param world The world
+ * @param font Font of the text
+ * @param fg Color of the text
+ * @param bg Color of the Rect
+ * @return The ink in pixels of full text color
+ */
+static double text_field_display_ink(
+    ecs_world_t *world,
+    ecs_entity_t font,
+    const uint8_t fg[3],
+    const uint8_t bg[3])
+{
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {bg[0], bg[1], bg[2], 255}}});
+    ecs_entity_t panel = ecs_new(world);
+    ecs_set(world, panel, Position, {0, 0, 0});
+    ecs_set(world, panel, Rect, {256, 96});
+    ecs_set(world, panel, Rgb, {bg[0], bg[1], bg[2]});
+    float sizes[3] = { 13, 14, 15 };
+    int32_t i, c;
+    for (i = 0; i < 3; i ++) {
+        ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, panel);
+        ecs_set(world, e, Position, {0, 25.0f - 25.0f * (float)i, 0});
+        ecs_set(world, e, Rgb, {fg[0], fg[1], fg[2]});
+        ecs_set(world, e, Text, {.value = "Hamburgefonstiv quill", .size = sizes[i],
+            .font = font});
+    }
+
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 256, .height = 96, .write_to_file = "ink.png",
+        .resolution_scale = 1, .pixel_ratio = 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *png = flecs_asprintf("%s/ink.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0, p;
+    unsigned char *px = stbi_load(png, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 256);
+    test_int(h, 96);
+    double span = 0, ink = 0;
+    for (c = 0; c < 3; c ++) {
+        span += abs((int)fg[c] - (int)bg[c]);
+    }
+
+    for (p = 0; p < w * h; p ++) {
+        double d = 0;
+        for (c = 0; c < 3; c ++) {
+            d += abs((int)px[p * 4 + c] - (int)bg[c]);
+        }
+
+        ink += d / span;
+    }
+
+    stbi_image_free(px);
+    ecs_os_free(png);
+    return ink;
+}
+
+void TextField_dark_on_light_same_ink(void) {
+    // ui_authoring/text_dark_on_light
+    const char *fonts[2] = {
+        "test/assets/fonts/Spectral-Regular.ttf",
+        "test/assets/fonts/B612-Regular.ttf"
+    };
+    /* Light on dark ink measured before the correction, it must not grow by more than a few
+     * percent */
+    const double light_before[2] = { 1354.7, 1714.3 };
+    const uint8_t ink[3] = { 58, 36, 20 }, parchment[3] = { 244, 226, 186 };
+    int32_t f;
+    for (f = 0; f < 2; f ++) {
+        double sums[2];
+        int32_t k;
+        for (k = 0; k < 2; k ++) {
+            ecs_world_t *world = ecs_init();
+            ECS_IMPORT(world, Box);
+            App *app = ecs_singleton_get_mut(world, App);
+            app->headless = true;
+            ecs_singleton_modified(world, App);
+            ecs_entity_t font = ecs_new(world);
+            ecs_set(world, font, Font, { .path = (char*)fonts[f], .atlas_pages = 4 });
+            sums[k] = k ? text_field_display_ink(world, font, parchment, ink)
+                : text_field_display_ink(world, font, ink, parchment);
+            ecs_fini(world);
+        }
+
+        printf("%s: dark on light %.1f, light on dark %.1f, ratio %.3f\n",
+            fonts[f], sums[0], sums[1], sums[0] / sums[1]);
+        test_assert(sums[1] > 200);
+        test_assert(sums[1] < light_before[f] * 1.04);
+        test_assert(fabs(sums[0] - sums[1]) < 0.15 * sums[1]);
+    }
+}

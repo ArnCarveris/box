@@ -29,6 +29,29 @@ static void box_mesh_quad_face(
     box_mesh_triangle(mesh, idx[0], idx[2], idx[3]);
 }
 
+void box_mesh_box_face_uv(
+    int32_t k,
+    float sign,
+    const vec3 pos,
+    const vec3 h,
+    vec2 out)
+{
+    float tu, tv;
+    if (k == 1) {
+        tu = 0.5f + 0.5f * sign * pos[2] / h[2];
+        tv = 0.5f - 0.5f * pos[0] / h[0];
+    } else if (k == 0) {
+        tu = 0.5f - 0.5f * sign * pos[2] / h[2];
+        tv = 0.5f - 0.5f * pos[1] / h[1];
+    } else {
+        tu = 0.5f + 0.5f * sign * pos[0] / h[0];
+        tv = 0.5f - 0.5f * pos[1] / h[1];
+    }
+
+    out[0] = glm_clamp(tu, 0.0f, 1.0f);
+    out[1] = glm_clamp(tv, 0.0f, 1.0f);
+}
+
 void box_mesh_gen_box(
     box_mesh_t *mesh)
 {
@@ -45,8 +68,11 @@ void box_mesh_gen_box(
                 corners[i][k] = 0.5f * (float)sign;
                 corners[i][u] = su[i];
                 corners[i][v] = sv[i];
-                uvs[i][0] = su[i] * (float)sign + 0.5f;
-                uvs[i][1] = 0.5f - sv[i];
+            }
+
+            for (int32_t i = 0; i < 4; i ++) {
+                box_mesh_box_face_uv(k, (float)sign, corners[i],
+                    (vec3){ 0.5f, 0.5f, 0.5f }, uvs[i]);
             }
 
             box_mesh_quad_face(mesh, corners, uvs, normal);

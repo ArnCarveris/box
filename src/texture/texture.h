@@ -2,7 +2,7 @@
  * @file texture/texture.h
  * @brief Registry of the loaded textures, shared by box.texture and the render extract.
  *
- * box.texture decodes images on the job system into the registry; box.render sends the
+ * box.texture decodes or generates images on the job system into the registry; box.render sends the
  * decoded pixels to the backend and resolves texture entities to backend handles.
  */
 
@@ -25,7 +25,7 @@ typedef struct box_texture_sync_t {
     int32_t refs;           /**< The registry and every job, changed on the main thread */
 } box_texture_sync_t;
 
-/** A texture entity with a TexturePath */
+/** A texture entity with a TexturePath or a TextureGen */
 typedef struct box_texture_t {
     ecs_entity_t entity;    /**< The texture entity */
     uint32_t generation;    /**< Bumped by every load request, older results are dropped */
@@ -64,12 +64,26 @@ typedef struct TextureRegistry {
 /** Component id of TextureRegistry */
 extern ECS_COMPONENT_DECLARE(TextureRegistry);
 
+/** What a generation job makes: a TextureGen with its source resolved and its size capped */
+typedef struct box_texture_gen_t {
+    int32_t width;              /**< Width of the result */
+    int32_t height;             /**< Height of the result */
+    int32_t seed;               /**< Seed of the height field */
+    TextureGenLayer *layers;    /**< Layers of the height field */
+    int32_t layer_count;        /**< Number of layers */
+    TextureGenOutput output;    /**< What is stored */
+    TextureGenKey *colors;      /**< Color ramp of GenAlbedo */
+    int32_t color_count;        /**< Number of keys of the ramp */
+    float strength;             /**< Steepness of GenNormal */
+} box_texture_gen_t;
+
 /** A decode that runs on a worker: what to load and what came out */
 typedef struct box_texture_job_t {
     box_texture_sync_t *sync;   /**< Counter of the registry */
     ecs_entity_t entity;        /**< Texture entity */
     uint32_t generation;        /**< Load request the result belongs to */
     char *path;                 /**< Image file */
+    box_texture_gen_t *gen;     /**< What to generate instead of decoding a file, or NULL */
     char *file;                 /**< The file the decode found, NULL when it was not found */
     box_file_stamp_t stamp;     /**< Stamp of file, taken before it was read */
     int32_t request_width;      /**< Requested width, 0 for the source width */
@@ -141,6 +155,80 @@ float* box_texture_decode_float(
     char **error,
     char **file,
     box_file_stamp_t *stamp);
+
+/** Generate the image of a job with a gen on a worker thread: RGBA8 pixels for GenAlbedo and
+ * GenNormal, R8 pixels for GenHeight.
+ *
+ * @param job The job, receives the pixels
+ */
+void box_texture_generate(
+    box_texture_job_t *job);
+
+/** Fill the raw value and id of one layer, before its amount, for every pixel.
+ *
+ * @param layer The layer
+ * @param seed Seed of its generator
+ * @param width Width in pixels
+ * @param height Height in pixels
+ * @param value Receives the value of the pattern of each pixel row by row, 0..1
+ * @param id Receives the random block or cell id of each pixel, 0..1, 0 for GenNoise
+ */
+void box_texture_gen_pattern(
+    const TextureGenLayer *layer,
+    int32_t seed,
+    int32_t width,
+    int32_t height,
+    float *value,
+    float *id);
+
+/** Fill the height field of a generator: its layers combined and scaled to span 0..1, 0.5
+ * where they are flat.
+ *
+ * @param gen The generator
+ * @param height Receives width * height values row by row from the top
+ */
+void box_texture_gen_height(
+    const box_texture_gen_t *gen,
+    float *height);
+
+/** Map a height field through a color ramp into opaque RGBA8 pixels, linearly between the
+ * display encoded keys; gray without keys.
+ *
+ * @param height The heights, 0..1
+ * @param count Number of pixels
+ * @param keys The keys in order of position
+ * @param key_count Number of keys
+ * @param rgba Receives four bytes per pixel
+ */
+void box_texture_gen_albedo(
+    const float *height,
+    int32_t count,
+    const TextureGenKey *keys,
+    int32_t key_count,
+    uint8_t *rgba);
+
+/** Make a tangent space normal map from a height field by central differences across the
+ * wrap, green up the image: a field rising down the image tilts the normals up it.
+ *
+ * @param height The heights row by row from the top
+ * @param width Width in pixels
+ * @param h Height in pixels
+ * @param strength Steepness, see TextureGen.strength; 0 for 1
+ * @param rgba Receives four bytes per pixel, (128, 128, 255, 255) where flat
+ */
+void box_texture_gen_normal(
+    const float *height,
+    int32_t width,
+    int32_t h,
+    float strength,
+    uint8_t *rgba);
+
+/** Free a generation description.
+ *
+ * @param gen The description, may be NULL
+ */
+void box_texture_gen_free(
+    box_texture_gen_t *gen);
 
 /** Get the registry of a world.
  *

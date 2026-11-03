@@ -9,6 +9,7 @@
 #include <math.h>
 #include <stddef.h>
 #include "mesh_cache.h"
+#include "face_uvs.h"
 
 /** Edge of a box by its Bevel member and the two axes and sides it lies on */
 typedef struct bevel_edge_t {
@@ -628,5 +629,21 @@ void Bevel_prefab_override(void) {
     ecs_set(world, plain, Box, { 2, 1, 1.5f });
     ecs_remove(world, bevel_override, Bevel);
     test_uint(bevel_shape(world, bevel_override)->mesh, bevel_shape(world, plain)->mesh);
+    ecs_fini(world);
+}
+
+void Bevel_face_orientation(void) {
+    ecs_world_t *world = bevel_world();
+    ecs_entity_t e = bevel_entity(world, (Box){ 2, 1, 1.5f },
+        (Bevel){ .top_front = 0.3f, .front_right = 0.2f, .bottom_left = 0.1f, .segments = 4 });
+    test_int(face_uvs_check(bevel_mesh(world, e)), 63);
+
+    ecs_entity_t all = bevel_entity(world, (Box){ 1, 2, 3 },
+        (Bevel){ .top_front = 0.2f, .top_back = 0.2f, .top_left = 0.2f, .top_right = 0.2f,
+            .bottom_front = 0.1f, .bottom_back = 0.1f, .bottom_left = 0.1f,
+            .bottom_right = 0.1f, .front_left = 0.15f, .front_right = 0.15f,
+            .back_left = 0.15f, .back_right = 0.15f, .segments = 3 });
+    test_int(face_uvs_check(bevel_mesh(world, all)), 63);
+
     ecs_fini(world);
 }
