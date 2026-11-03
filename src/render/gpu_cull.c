@@ -1331,6 +1331,49 @@ done:
     return result;
 }
 
+bool box_gpu_cull_draw_wire(
+    box_gpu_t *gpu,
+    WGPURenderPassEncoder pass,
+    const box_render_packet_t *packet,
+    const box_gpu_cull_draw_t *draw,
+    uint32_t group,
+    bool late,
+    WGPUBuffer sequence,
+    WGPUBindGroup *bound)
+{
+    box_gpu_cull_t *c = &gpu->cull;
+    const box_render_batch_t *b = ecs_vec_get_t(
+        &packet->batches, box_render_batch_t, draw->batch);
+    box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, b->mesh);
+    WGPUBindGroup instances = m
+        ? box_gpu_instance_group(gpu, b->instances, b->mesh, m, false) : NULL;
+    uint32_t args = late ? draw->late : draw->args;
+    uint32_t base = late ? draw->base + draw->count : draw->base;
+    bool result = m && instances && sequence && args != UINT32_MAX;
+    if (!result) {
+        goto done;
+    }
+
+    ecs_assert(!ecs_vec_get_t(&c->arg_data, uint32_t, (int32_t)args * BOX_GPU_CULL_ARGS)[2] &&
+        !ecs_vec_get_t(&c->arg_data, uint32_t, (int32_t)args * BOX_GPU_CULL_ARGS)[3],
+        ECS_INTERNAL_ERROR, "a wire draw needs firstIndex and baseVertex 0");
+    if (instances != *bound) {
+        wgpuRenderPassEncoderSetBindGroup(pass, group, instances, 0, NULL);
+        box_gpu_count(gpu, BOX_GPU_STAT_INSTANCE_BIND);
+        *bound = instances;
+    }
+
+    wgpuRenderPassEncoderSetVertexBuffer(pass, 0, ecs_vec_get_t(&c->pages,
+        box_gpu_cull_page_t, (int32_t)draw->page)->visible,
+        (uint64_t)base * sizeof(uint32_t), (uint64_t)draw->count * sizeof(uint32_t));
+    wgpuRenderPassEncoderSetIndexBuffer(
+        pass, sequence, WGPUIndexFormat_Uint32, 0, WGPU_WHOLE_SIZE);
+    wgpuRenderPassEncoderDrawIndexedIndirect(pass, c->args,
+        (uint64_t)args * BOX_GPU_CULL_ARGS * sizeof(uint32_t));
+done:
+    return result;
+}
+
 /** Read back what the frustums of the cull pass of a view kept in the last rendered target.
  *
  * @param world The world

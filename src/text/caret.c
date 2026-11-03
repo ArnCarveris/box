@@ -22,7 +22,7 @@ static const TextGlyphs* box_text_current(
     box_text_state_t *s = box_text_state_get(world);
     const Text *text = s ? ecs_get(world, e, Text) : NULL;
     const TextGlyphs *result = text ? ecs_get(world, e, TextGlyphs) : NULL;
-    if (result && result->key != box_text_key(text)) {
+    if (result && !box_text_current_layout(world, e, text, result)) {
         box_text_layout(world, s, e, text);
         result = ecs_get(world, e, TextGlyphs);
     }

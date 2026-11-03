@@ -54,6 +54,10 @@ typedef struct box_render_draws_stats_t {
                                  *   scatter segments, only when a ShapeMesh changed; plain mesh
                                  *   and 2D pages have no surface stream */
     int32_t clips;              /**< ClipChildren elements in the clip buffer */
+    int32_t runs;               /**< Runs of consecutive 2D slots of the order, the draws of
+                                 *   the ordered 2D shapes before a view splits them: a shadow
+                                 *   in another batch than its element breaks a run */
+    int32_t box_shadows;        /**< Shadows of 2D shapes (BoxShadow) drawn */
     int64_t clip_bytes;         /**< Bytes the last extract uploaded into the clip buffer */
     int32_t materials;          /**< Slots of the material table alive, slot 0 included */
     int64_t material_bytes;     /**< Bytes of the material table the last extract uploaded */

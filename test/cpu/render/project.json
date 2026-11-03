@@ -435,7 +435,13 @@
                     "ctor_defaults",
                     "literal_off",
                     "script_keeps_defaults",
-                    "packet_copy"
+                    "script_probes_keep_others",
+                    "packet_copy",
+                    "light_probes_warn_once",
+                    "wire_defaults",
+                    "wire_script_keeps_defaults",
+                    "wire_packet_copy",
+                    "wire_only_no_occlusion"
                 ]
             },
             {

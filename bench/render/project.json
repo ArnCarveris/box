@@ -71,6 +71,9 @@
                     "changed_1pct",
                     "ui_tree_idle",
                     "ui_tree_add_remove",
+                    "ui_tree_shadows_idle",
+                    "ui_tree_shadows_add_remove",
+                    "ui_tree_shadows_toggle",
                     "clipped_1000_moving_clips"
                 ]
             },

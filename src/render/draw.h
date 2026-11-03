@@ -160,6 +160,8 @@ typedef struct box_draw_key_t {
                              *   already tells surfaces apart, the bit selects the store */
     bool bake;              /**< Static 3D instances without NoBake of a scene with LightBake or
                              *   ReflectionBake, drawn by the captures */
+    bool box_shadow;        /**< The shadows of 2D shapes (BoxShadow), drawn with the
+                             *   fs_shadow entry point of the 2D shape shader */
     ecs_entity_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture entities of PbrTextures */
     uint32_t atlas;         /**< Texture handle of the glyph atlas page of a glyph batch, or 0 */
 } box_draw_key_t;
@@ -183,7 +185,7 @@ extern ECS_COMPONENT_DECLARE(TextSlots);
 /** Batch, slot and rank of the shadow of a 2D shape with a BoxShadow, added with every BoxShadow.
  *
  * The shadow is a second instance of the entity drawn just before its shape, in the batch of the
- * shape with the AlphaBlend blend mode and no textures. A removed BoxShadow frees the slot and
+ * shape with the AlphaBlend blend mode, no textures and box_shadow set. A removed BoxShadow frees the slot and
  * leaves the component without a batch; the changes of the entity then skip it, as they check
  * for BoxShadow. */
 typedef struct BoxShadowSlot {
@@ -486,6 +488,9 @@ typedef struct box_render_draws_t {
                                  *   transform, which alpha tested casters read, changed in this
                                  *   extract while recording */
     bool shadow_record;         /**< Record shadow_regions, while a scene keeps shadow tiles */
+    int32_t box_shadows;        /**< BoxShadowSlot values with a batch, so the paths every 2D
+                                 *   shape takes (the runs, the transitions) skip the lookup of
+                                 *   the slot while no shadow is drawn */
     int32_t refs;               /**< Observers and systems that use the state */
 } box_render_draws_t;
 

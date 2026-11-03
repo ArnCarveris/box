@@ -78,6 +78,21 @@ node test/integration/web/particles.mjs \
     "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
 ```
 
+`wireframe.mjs` checks the wireframe of a view (`ViewDebug.wireframe`) in the browser build,
+where WebGPU has no line polygon mode: the lines come from barycentric coordinates and the vertex
+stage pulls the vertices from storage buffers. It opens `test/integration/web/wireframe.flecs` the
+same way, at the same fixed delta and size: a red box and a red sphere with green lines of
+`WireframeOverlay`, until `SetAt` turns the view to `WireframeOnly` at frame 120. Before the page
+runs, the check wraps `requestDevice` of WebGPU to create the device without the optional
+features the page asks for, and prints them. It takes screenshots until the red is gone and
+passes when one showed the red shapes with green lines, the last shows the lines and no red, and
+the log has no error and no invalid WebGPU object:
+
+```sh
+node test/integration/web/wireframe.mjs \
+    "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
+```
+
 `audio_core.mjs` checks the audio of the browser build (`docs/audio.md`): the mixer of the
 audio core runs from its own wasm in an AudioWorklet, without shared memory, starts on a user
 gesture and is driven by command batches over the port. It serves the page without COOP/COEP

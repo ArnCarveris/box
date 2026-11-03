@@ -129,7 +129,7 @@ prefab DustBurst {
     }
     ParticleBurst: {count: 40}
     ParticleForces: {gravity: {0, -2.5, 0}, drag: 2.2}
-    ParticleCurves: {size: {0.6, 1.4, 2, 2.4}, opacity: {1, 0.8, 0.4, 0}}
+    ParticleCurves: {size: {keys: [{0, 0.6}, {0.333, 1.4}, {0.667, 2}, {1, 2.4}]}, opacity: {keys: [{0, 1}, {0.333, 0.8}, {0.667, 0.4}, {1, 0}]}}
   }
 }
 
@@ -146,7 +146,7 @@ prefab RubbleBurst {
     }
     ParticleBurst: {count: 56}
     ParticleForces: {gravity: {0, -1.5, 0}, drag: 1.8}
-    ParticleCurves: {size: {0.6, 1.5, 2.1, 2.6}, opacity: {1, 0.8, 0.4, 0}}
+    ParticleCurves: {size: {keys: [{0, 0.6}, {0.333, 1.5}, {0.667, 2.1}, {1, 2.6}]}, opacity: {keys: [{0, 1}, {0.333, 0.8}, {0.667, 0.4}, {1, 0}]}}
   }
   stones {
     ParticleEmitter: {
@@ -193,9 +193,9 @@ prefab Firework {
     ParticleBurst: {count: 140}
     ParticleForces: {gravity: {0, -3, 0}, drag: 1.2}
     ParticleCurves: {
-      size: {1, 1, 0.8, 0.4},
-      opacity: {1, 1, 0.7, 0},
-      color: {start: {255, 255, 255}, early: {255, 220, 160}, late: {255, 120, 140}, end: {120, 80, 255}}
+      size: {keys: [{0, 1}, {0.333, 1}, {0.667, 0.8}, {1, 0.4}]},
+      opacity: {keys: [{0, 1}, {0.333, 1}, {0.667, 0.7}, {1, 0}]},
+      color: {keys: [{0, {255, 255, 255}}, {0.333, {255, 220, 160}}, {0.667, {255, 120, 140}}, {1, {120, 80, 255}}]}
     }
   }
 }

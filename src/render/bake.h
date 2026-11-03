@@ -126,6 +126,8 @@ typedef struct box_bake_volume_t {
     bool converged;         /**< The backend reported every pass of every valid probe */
     bool pending;           /**< The bake can progress this frame and has not converged */
     bool resort;            /**< The queue is sorted again before the next probes are taken */
+    bool debug_warned;      /**< A view with ViewDebug.light_probes was warned that the grid has
+                             *   more than BOX_RENDER_DEBUG_PROBES_MAX probes */
     float sh[BOX_RENDER_SH_COEFFICIENTS][4]; /**< Irradiance the probes are filled with */
     ecs_entity_t environment; /**< LightBake.environment of this frame */
     uint32_t env_handle;    /**< Cubemap of that source the captures see where nothing covers

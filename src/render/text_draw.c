@@ -3,8 +3,8 @@
  * @brief Glyphs of the texts as instances of the 2D batches and the atlas pages they sample.
  *
  * Every glyph of a Text is a slot of a glyph batch keyed like a 2D shape plus its atlas page,
- * drawn with etc/shaders/shape2d.wgsl, which reads the page as a multi channel distance field.
- * TextSpans color glyphs through the color of their instances, in the same batches.
+ * drawn with etc/shaders/shape2d.wgsl, which reads the page as a distance field. TextSpans
+ * color and style glyphs in the same batches: italic shears the quad, bold lowers the threshold.
  *
  * Pages reach the backend as texture updates: whole when new or grown, then per frame the area
  * of the glyphs completed since the last one.
@@ -192,6 +192,10 @@ static void box_draws_text_key(
 /** Write the instance of a glyph: its quad in world space into the transform, the material and
  * the atlas area into the shading.
  *
+ * The local quad of an italic glyph is sheared in its own plane before the transform of the
+ * text: its y axis leans by the shear, about the center the layout already moved to its sheared
+ * place. A bold glyph lowers the threshold of the field by its weight.
+ *
  * @param transform_out The transform of the glyph, NULL to leave it
  * @param shading_out The shading of the glyph, NULL to leave it
  * @param transform World transform of the text, NULL for the identity
@@ -215,7 +219,9 @@ static void box_draws_glyph(
 
     for (r = 0; transform_out && r < 3; r ++) {
         transform_out->rows[r][0] = m[0][r] * g->width;
-        transform_out->rows[r][1] = m[1][r] * g->height;
+        transform_out->rows[r][1] = g->shear != 0.0f
+            ? (m[0][r] * g->shear + m[1][r]) * g->height
+            : m[1][r] * g->height;
         transform_out->rows[r][2] = m[2][r];
         transform_out->rows[r][3] = m[0][r] * g->x + m[1][r] * g->y + m[3][r];
     }
@@ -225,7 +231,7 @@ static void box_draws_glyph(
         shading_out->emissive[3] = 0.0f;
         shading_out->material[0] = g->range;
         shading_out->material[1] = g->range;
-        shading_out->material[2] = 0.0f;
+        shading_out->material[2] = g->weight;
         shading_out->material[3] = 0.0f;
         ecs_os_memcpy(shading_out->uv, g->uv, ECS_SIZEOF(g->uv));
     }

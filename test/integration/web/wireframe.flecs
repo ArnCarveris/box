@@ -1,0 +1,54 @@
+// The scene of the browser check of the wireframe (wireframe.mjs), which renders on the main
+// thread. The page opens a window only for a scene with a Surface; its 640x480 points fill the
+// viewport of the check. A red box and a red sphere, black with a red emission, carry green
+// lines of 2 pixels: WireframeOverlay over the shaded shapes until frame 120, when SetAt turns
+// the view to WireframeOnly, which draws the lines alone over the clear color.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.app
+using box.surface
+
+window {
+  Surface: {width: 640, height: 480}
+}
+
+camera {
+  Position: {0, 1.5, 7}
+  Rotation: {-0.2, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {
+    camera: camera
+    clear: {enabled: true, color: {20, 22, 30, 255}}
+    debug: {wireframe: WireframeOverlay, wireframe_color: {0, 255, 0, 255}, wireframe_width: 2}
+  }
+}
+
+cube {
+  Position: {-1.4, 0, 0}
+  Rotation: {0.3, 0.6, 0}
+  Box: {1.8, 1.8, 1.8}
+  Rgb: {0, 0, 0}
+  Emissive: {strength: 1, color: {255, 0, 0}}
+}
+
+ball {
+  Position: {1.4, 0, 0}
+  Sphere: {segments: 12, radius: 1}
+  Rgb: {0, 0, 0}
+  Emissive: {strength: 1, color: {255, 0, 0}}
+}
+
+change_view {
+  SetAt: {frame: 120, entity: main_view}
+  View: {
+    camera: camera
+    clear: {enabled: true, color: {20, 22, 30, 255}}
+    debug: {wireframe: WireframeOnly, wireframe_color: {0, 255, 0, 255}, wireframe_width: 2}
+  }
+}

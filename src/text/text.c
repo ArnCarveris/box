@@ -36,6 +36,10 @@ const rgba* box_text_span_color(
     }
 
     while (i -- > 0) {
+        if (first[i].keep_color) {
+            continue;
+        }
+
         int32_t start = first[i].start > 0 ? first[i].start : 0;
         int32_t end = first[i].end < length ? first[i].end : length;
         if (offset >= start && offset < end) {
@@ -67,6 +71,8 @@ static void box_text_state_free(
     ecs_vec_fini_t(NULL, &s->carets, box_text_caret_t);
     ecs_vec_fini_t(NULL, &s->rows, box_text_row_t);
     ecs_vec_fini_t(NULL, &s->texts, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &s->styles, box_text_style_t);
+    ecs_vec_fini_t(NULL, &s->edges, box_text_style_t);
     if (-- s->sync->refs == 0) {
         ecs_os_mutex_free(s->sync->lock);
         ecs_os_free(s->sync);
@@ -162,6 +168,45 @@ static void BoxTextOnRemove(
         }
 
         ecs_set(it->stage, it->entities[i], TextBounds, {0});
+    }
+
+done:
+    return;
+}
+
+/** Lay out a Text again whose TextSpans changed their styles; a change of colors only, or of
+ * spans without a style, keeps the layout. Removed spans lay out without styles.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxTextSpansOnChange(
+    ecs_iter_t *it)
+{
+    box_text_state_t *s = box_text_state_get(it->world);
+    const TextSpans *spans = ecs_field(it, TextSpans, 0);
+    bool removed = it->event == EcsOnRemove;
+    int32_t i;
+    if (!s || ecs_is_fini(it->world)) {
+        goto done;
+    }
+
+    if (removed && (!it->other_table || !ecs_table_get_type(it->other_table)->count)) {
+        goto done;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        ecs_entity_t e = it->entities[i];
+        const Text *text = ecs_get(it->world, e, Text);
+        const TextGlyphs *glyphs = text ? ecs_get(it->world, e, TextGlyphs) : NULL;
+        if (!glyphs) {
+            continue;
+        }
+
+        const TextSpans *now = removed ? NULL : &spans[i];
+        int32_t length = text->value ? (int32_t)strlen(text->value) : 0;
+        if (glyphs->style != box_text_style_key(now, length)) {
+            box_text_layout_spans(it->world, s, e, text, now);
+        }
     }
 
 done:
@@ -366,6 +411,8 @@ static void box_text_state_init(
     ecs_vec_init_t(NULL, &s->carets, box_text_caret_t, 0);
     ecs_vec_init_t(NULL, &s->rows, box_text_row_t, 0);
     ecs_vec_init_t(NULL, &s->texts, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &s->styles, box_text_style_t, 0);
+    ecs_vec_init_t(NULL, &s->edges, box_text_style_t, 0);
     s->next_page = BOX_TEXT_PAGE_FIRST;
     s->watch = box_file_watch_kind(world, "font", box_text_font_changed, NULL);
     s->sync = ecs_os_calloc_t(box_text_sync_t);
@@ -474,6 +521,13 @@ static void box_text_systems_init(
         .query.flags = EcsQueryMatchDisabled,
         .events = { EcsOnRemove },
         .callback = BoxTextOnRemove
+    });
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "TextSpansOnChange" }),
+        .query.terms = {{ .id = ecs_id(TextSpans) }},
+        .query.flags = EcsQueryMatchDisabled,
+        .events = { EcsOnSet, EcsOnRemove },
+        .callback = BoxTextSpansOnChange
     });
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "FontOnSet" }),

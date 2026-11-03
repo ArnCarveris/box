@@ -6,12 +6,13 @@
  * line, a word wider than the width breaks inside. The block is centered on the origin, y up.
  * A Text is measured at Text.width for box.layout, which can wrap it narrower afterwards.
  *
- * A wrapped line starts at the hang indent, the caret x of Text.hang; so does the last caret
- * when spaces at the end pass the width, as spaces never start a line themselves. The caret
- * before every character and the byte range of every line are kept for editing.
+ * A wrapped line starts at the hang indent, the caret x of Text.hang, as does the last caret
+ * after spaces past the width. Carets and line ranges are kept for editing. Span styles are
+ * clipped once per run into sorted ranges; a bold glyph advances further, an italic one leans.
  */
 
 #include "text.h"
+#include <stdlib.h>
 
 /** Logical pixels a line may pass its width by, so a block wraps at its own measured width */
 #define BOX_TEXT_WRAP_SLACK (0.001f)
@@ -23,6 +24,8 @@ typedef struct box_text_run_t {
     float hang;             /**< Pen x the lines a width wraps start at */
     int32_t hang_at;        /**< Byte of the first line whose pen x is the hang */
     bool draw;              /**< Glyphs are drawn, so they are added to the atlas */
+    float em;               /**< Em size in logical pixels */
+    int32_t style_at;       /**< Style range of the registry at or after the last code point */
     float pen;              /**< Pen x of the line */
     float line_end;         /**< Right edge of the last glyph of the line */
     float word_x;           /**< Pen x of the first glyph of the current word */
@@ -109,6 +112,27 @@ static void box_text_wrap(
     }
 }
 
+/** Get the style of a code point, walking the style ranges of the registry forward: offsets
+ * only grow along a run, so a lookup is O(1) amortized.
+ *
+ * @param run The run
+ * @param offset Byte offset of the code point
+ * @return The BOX_TEXT_STYLE_ flags of the code point
+ */
+static uint8_t box_text_style_of(
+    box_text_run_t *run,
+    int32_t offset)
+{
+    const box_text_style_t *styles = ecs_vec_first(&run->s->styles);
+    int32_t count = ecs_vec_count(&run->s->styles);
+    while (run->style_at < count && styles[run->style_at].end <= offset) {
+        run->style_at ++;
+    }
+
+    return run->style_at < count && styles[run->style_at].start <= offset
+        ? styles[run->style_at].flags : 0;
+}
+
 /** Advance the run over one code point and place the caret before it.
  *
  * @param world The world
@@ -146,8 +170,13 @@ static void box_text_char(
         goto done;
     }
 
+    uint8_t style = box_text_style_of(run, offset);
     int32_t glyph = box_text_face_glyph(font->face, codepoint == '\t' ? ' ' : codepoint);
     float advance = box_text_face_advance(font->face, glyph) * px;
+    if (style & BOX_TEXT_STYLE_BOLD) {
+        advance += BOX_TEXT_BOLD_ADVANCE * run->em;
+    }
+
     float x = run->pen;
     if (run->prev >= 0) {
         x += box_text_face_kern(font->face, run->prev, glyph) * px;
@@ -185,6 +214,7 @@ static void box_text_char(
     p->line = run->line;
     p->offset = offset;
     p->glyph = area;
+    p->style = style;
     run->pen = x + advance;
     run->line_end = run->pen;
     if (run->line_end - run->word_x > run->longest) {
@@ -277,11 +307,22 @@ static void box_text_emit(
         float baseline = height * 0.5f - (float)placed[i].line * metrics[2] - lead - metrics[0];
         float top = baseline - (float)g->top * k;
         float p = (float)page->size;
+        uint8_t style = placed[i].style;
         box_text_glyph_t *q = ecs_vec_append_t(NULL, &out->glyphs, box_text_glyph_t);
         q->width = (float)g->width * k;
         q->height = (float)g->height * k;
         q->x = left + q->width * 0.5f;
         q->y = top - q->height * 0.5f;
+        q->shear = style & BOX_TEXT_STYLE_ITALIC ? BOX_TEXT_ITALIC_SHEAR : 0.0f;
+        q->weight = style & BOX_TEXT_STYLE_BOLD ? BOX_TEXT_BOLD_FIELD : 0.0f;
+        if (style & BOX_TEXT_STYLE_BOLD) {
+            q->x += BOX_TEXT_BOLD_ADVANCE * size * 0.5f;
+        }
+
+        if (style & BOX_TEXT_STYLE_ITALIC) {
+            q->x += q->shear * (q->y - baseline);
+        }
+
         q->uv[0] = (float)g->width / p;
         q->uv[1] = (float)g->height / p;
         q->uv[2] = (float)g->x / p;
@@ -294,13 +335,122 @@ static void box_text_emit(
     box_text_emit_carets(run, text, width, height, out);
 }
 
+/** Order two edges of style ranges by their byte.
+ *
+ * @param a The first edge
+ * @param b The second edge
+ * @return Negative, 0 or positive as the first byte is before, at or after the second
+ */
+static int box_text_edge_compare(
+    const void *a,
+    const void *b)
+{
+    const box_text_style_t *l = a, *r = b;
+
+    return (l->start > r->start) - (l->start < r->start);
+}
+
+/** Get the style flags of a span.
+ *
+ * @param span The span
+ * @return Its BOX_TEXT_STYLE_ flags, 0 for a span that only colors
+ */
+static uint8_t box_text_span_style(
+    const TextSpan *span)
+{
+    return (uint8_t)((span->bold ? BOX_TEXT_STYLE_BOLD : 0u) |
+        (span->italic ? BOX_TEXT_STYLE_ITALIC : 0u));
+}
+
+/** Clip the range of a span to a string.
+ *
+ * @param span The span
+ * @param length Byte length of the string
+ * @param start Receives the first byte
+ * @param end Receives the byte after the range
+ * @return Whether the clipped range holds a byte
+ */
+static bool box_text_span_clip(
+    const TextSpan *span,
+    int32_t length,
+    int32_t *start,
+    int32_t *end)
+{
+    *start = span->start > 0 ? span->start : 0;
+    *end = span->end < length ? span->end : length;
+
+    return *start < *end;
+}
+
+/** Clip the styled spans of a Text into the sorted style ranges of the registry, the styles of
+ * overlapping spans added up and neighbors of the same style merged.
+ *
+ * @param s The registry
+ * @param spans The spans, NULL for none
+ * @param length Byte length of the string
+ */
+static void box_text_styles(
+    box_text_state_t *s,
+    const TextSpans *spans,
+    int32_t length)
+{
+    const TextSpan *first = spans ? ecs_vec_first(&spans->spans) : NULL;
+    int32_t i, start, end, count = first ? ecs_vec_count(&spans->spans) : 0;
+    int32_t bold = 0, italic = 0;
+    ecs_vec_clear(&s->styles);
+    ecs_vec_clear(&s->edges);
+    for (i = 0; i < count; i ++) {
+        uint8_t flags = box_text_span_style(&first[i]);
+        if (!flags || !box_text_span_clip(&first[i], length, &start, &end)) {
+            continue;
+        }
+
+        *ecs_vec_append_t(NULL, &s->edges, box_text_style_t) = (box_text_style_t){
+            .start = start, .end = 1, .flags = flags };
+        *ecs_vec_append_t(NULL, &s->edges, box_text_style_t) = (box_text_style_t){
+            .start = end, .end = -1, .flags = flags };
+    }
+
+    box_text_style_t *edges = ecs_vec_first(&s->edges);
+    count = ecs_vec_count(&s->edges);
+    if (count > 1) {
+        qsort(edges, (size_t)count, sizeof(box_text_style_t), box_text_edge_compare);
+    }
+
+    for (i = 0; i < count;) {
+        int32_t at = edges[i].start;
+        for (; i < count && edges[i].start == at; i ++) {
+            bold += edges[i].flags & BOX_TEXT_STYLE_BOLD ? edges[i].end : 0;
+            italic += edges[i].flags & BOX_TEXT_STYLE_ITALIC ? edges[i].end : 0;
+        }
+
+        uint8_t flags = (uint8_t)((bold > 0 ? BOX_TEXT_STYLE_BOLD : 0u) |
+            (italic > 0 ? BOX_TEXT_STYLE_ITALIC : 0u));
+        if (!flags || i == count) {
+            continue;
+        }
+
+        int32_t styles = ecs_vec_count(&s->styles);
+        box_text_style_t *last = styles
+            ? ecs_vec_get_t(&s->styles, box_text_style_t, styles - 1) : NULL;
+        if (last && last->end == at && last->flags == flags) {
+            last->end = edges[i].start;
+        } else {
+            *ecs_vec_append_t(NULL, &s->styles, box_text_style_t) = (box_text_style_t){
+                .start = at, .end = edges[i].start, .flags = flags };
+        }
+    }
+}
+
 /** Break a string into lines at a width, filling the placed and lines scratch of the registry.
  *
  * @param world The world
  * @param s The registry
  * @param font The font, its face loaded
  * @param str The string
+ * @param spans The spans whose styles the glyphs take, NULL for none
  * @param px Logical pixels per font unit
+ * @param em Em size in logical pixels
  * @param wrap Width lines break at, 0 for newlines only
  * @param hang Byte of the first line whose pen x the lines a width wraps start at
  * @param draw Add the glyphs to the atlas, false to only measure them
@@ -311,15 +461,18 @@ static box_text_run_t box_text_run(
     box_text_state_t *s,
     box_text_font_t *font,
     const char *str,
+    const TextSpans *spans,
     float px,
+    float em,
     float wrap,
     int32_t hang,
     bool draw)
 {
     box_text_run_t result = {
-        .s = s, .wrap = wrap, .hang_at = hang, .draw = draw, .prev = -1, .cr = -1 };
+        .s = s, .wrap = wrap, .hang_at = hang, .draw = draw, .em = em, .prev = -1, .cr = -1 };
     const char *p = str;
     int32_t last = 0;
+    box_text_styles(s, spans, (int32_t)strlen(str));
     ecs_vec_clear(&s->placed);
     ecs_vec_clear(&s->lines);
     ecs_vec_clear(&s->carets);
@@ -413,6 +566,39 @@ uint64_t box_text_key(
     return box_text_hash(result, ids, sizeof(ids));
 }
 
+uint64_t box_text_style_key(
+    const TextSpans *spans,
+    int32_t length)
+{
+    const TextSpan *first = spans ? ecs_vec_first(&spans->spans) : NULL;
+    int32_t i, count = first ? ecs_vec_count(&spans->spans) : 0;
+    uint64_t result = 14695981039346656037ull;
+    bool styled = false;
+    for (i = 0; i < count; i ++) {
+        int32_t words[3] = { 0, 0, box_text_span_style(&first[i]) };
+        if (!words[2] || !box_text_span_clip(&first[i], length, &words[0], &words[1])) {
+            continue;
+        }
+
+        result = box_text_hash(result, words, sizeof(words));
+        styled = true;
+    }
+
+    return !styled ? 0 : (result ? result : 1);
+}
+
+bool box_text_current_layout(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const Text *text,
+    const TextGlyphs *glyphs)
+{
+    int32_t length = text->value ? (int32_t)strlen(text->value) : 0;
+
+    return glyphs->key == box_text_key(text) &&
+        glyphs->style == box_text_style_key(ecs_get(world, e, TextSpans), length);
+}
+
 /** Lay out a Text into its TextGlyphs and TextBounds.
  *
  * The lines break at Text.width, which gives the sizes box.layout fits the Text to, and again
@@ -422,6 +608,7 @@ uint64_t box_text_key(
  * @param s The registry
  * @param e The entity
  * @param text Its Text
+ * @param spans The spans whose styles it takes, NULL for none
  * @param measure Measure the Text again, false when only the width of the layout changed
  */
 static void box_text_typeset(
@@ -429,6 +616,7 @@ static void box_text_typeset(
     box_text_state_t *s,
     ecs_entity_t e,
     const Text *text,
+    const TextSpans *spans,
     bool measure)
 {
     TextGlyphs *glyphs = ecs_get_mut(world, e, TextGlyphs);
@@ -445,6 +633,7 @@ static void box_text_typeset(
     ecs_vec_clear(&glyphs->rows);
     glyphs->ready = false;
     glyphs->key = box_text_key(text);
+    glyphs->style = box_text_style_key(spans, text->value ? (int32_t)strlen(text->value) : 0);
     if (measure) {
         glyphs->natural[0] = glyphs->natural[1] = glyphs->longest = 0.0f;
     }
@@ -471,14 +660,15 @@ static void box_text_typeset(
     float wrap = text->width > 0.0f ? text->width : 0.0f;
     float box = text->wrap == TextWrapWords ? glyphs->box : 0.0f;
     bool narrow = !measure && box > 0.0f && box < glyphs->natural[0];
-    box_text_run_t run = box_text_run(world, s, font, str, px, narrow ? box : wrap,
-        text->hang, true);
+    box_text_run_t run = box_text_run(world, s, font, str, spans, px, text->size,
+        narrow ? box : wrap, text->hang, true);
     if (measure) {
         glyphs->natural[0] = box_text_widest(s);
         glyphs->natural[1] = (float)ecs_vec_count(&s->lines) * metrics[2];
         glyphs->longest = run.longest;
         if (box > 0.0f && box < glyphs->natural[0]) {
-            run = box_text_run(world, s, font, str, px, box, text->hang, true);
+            run = box_text_run(world, s, font, str, spans, px, text->size, box, text->hang,
+                true);
         }
     }
 
@@ -502,12 +692,31 @@ void box_text_layout(
     ecs_entity_t e,
     const Text *text)
 {
-    box_text_typeset(world, s, e, text, true);
+    box_text_typeset(world, s, e, text, ecs_get(world, e, TextSpans), true);
+}
+
+void box_text_layout_spans(
+    ecs_world_t *world,
+    box_text_state_t *s,
+    ecs_entity_t e,
+    const Text *text,
+    const TextSpans *spans)
+{
+    box_text_typeset(world, s, e, text, spans, true);
 }
 
 int32_t box_text_break_lines(
     ecs_world_t *world,
     const Text *text,
+    ecs_vec_t *starts)
+{
+    return box_text_break_lines_spans(world, text, NULL, starts);
+}
+
+int32_t box_text_break_lines_spans(
+    ecs_world_t *world,
+    const Text *text,
+    const TextSpans *spans,
     ecs_vec_t *starts)
 {
     box_text_state_t *s = box_text_state_get(world);
@@ -533,8 +742,8 @@ int32_t box_text_break_lines(
     }
 
     float px = text->size / box_text_face_metrics(font->face, &ascent, &descent, &gap);
-    box_text_run(world, s, font, str, px, text->width > 0.0f ? text->width : 0.0f,
-        text->hang, false);
+    box_text_run(world, s, font, str, spans, px, text->size,
+        text->width > 0.0f ? text->width : 0.0f, text->hang, false);
     const box_text_row_t *rows = ecs_vec_first(&s->rows);
     const box_text_caret_t *carets = ecs_vec_first(&s->carets);
     int32_t caret_count = ecs_vec_count(&s->carets);
@@ -582,7 +791,7 @@ float box_text_wrap_to(
     float box = width > 0.0f ? width : 0.0f;
     if (s && glyphs && text && glyphs->box != box) {
         glyphs->box = box;
-        box_text_typeset(world, s, e, text, false);
+        box_text_typeset(world, s, e, text, ecs_get(world, e, TextSpans), false);
     }
 
     const TextBounds *b = ecs_get(world, e, TextBounds);

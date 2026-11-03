@@ -72,6 +72,16 @@
 /** Shader handle of the engine shader that draws the infinite grid of the debug pass of a view */
 #define BOX_RENDER_SHADER_DEBUG_GRID (52)
 
+/** Shader handle of the engine shader that draws the wireframe of the debug pass of a view */
+#define BOX_RENDER_SHADER_DEBUG_WIRE (54)
+/** Shader handle of the engine shader that draws the light and reflection probes of the debug
+ * pass of a view */
+#define BOX_RENDER_SHADER_DEBUG_PROBES (53)
+
+/** Probes of a kind (light or reflection) the debug pass of a view draws at most; the bake
+ * warns once about a volume with more for the first view that shows it */
+#define BOX_RENDER_DEBUG_PROBES_MAX (65536)
+
 /** Fog volumes a view draws at most, the nearest ones */
 #define BOX_RENDER_FOG_VOLUMES_MAX (32)
 
@@ -498,7 +508,8 @@ typedef struct box_render_fog_volume_t {
 /** The culling of a view, resolved from its CullSettings */
 typedef struct box_render_view_cull_t {
     bool enabled;           /**< Instances outside the frustum or too small are not drawn */
-    bool occlusion;         /**< Instances hidden behind what the view drew are not drawn */
+    bool occlusion;         /**< Instances hidden behind what the view drew are not drawn,
+                             *   false for a view with WireframeOnly, which writes no depth */
     float min_dimension;    /**< Projected size in pixels below which an instance is culled */
 } box_render_view_cull_t;
 
@@ -872,7 +883,9 @@ typedef struct box_render_transform_t {
  *   its edge (0 for a blend mode that does not cover). emissive.xyz and the texture are unused.
  * - A line: emissive.w is its negated width, material.xy its start and material.zw its end.
  * - A glyph of a Text: emissive.w is 0, material.xy the distance range of its atlas page,
- *   material.zw 0 and uv the area of the glyph on the page.
+ *   material.z (f32 bits) the part of the field its threshold falls by, 0 regular and
+ *   BOX_TEXT_BOLD_FIELD bold, material.w 0 and uv the area of the glyph on the page. An italic
+ *   glyph leans through the shear of its transform.
  * - A shape without a 2D shape: material.xy metallic and roughness, emissive.w and material.zw 0.
  */
 typedef struct box_render_shading_t {
@@ -1034,6 +1047,8 @@ typedef struct box_render_batch_t {
     bool shadow;                /**< The instances cast shadows, false for NoShadow */
     bool bake;                  /**< Static 3D instances without NoBake of a scene with LightBake or
                                  *   ReflectionBake, drawn by the captures */
+    bool box_shadow;            /**< The instances are the shadows of 2D shapes (BoxShadow),
+                                 *   drawn with the fs_shadow entry point of the 2D shape shader */
     uint32_t mesh;              /**< Mesh handle */
     uint32_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture handles of the layers, 0 for none */
     uint32_t wrap;              /**< TextureWrap of the samplers */

@@ -1289,7 +1289,7 @@ static void box_transition_send_slots(
         box_transition_send_slot(world, s, d, p, item->node, ds->batch, ds->slot, m, range);
     }
 
-    const BoxShadowSlot *bs = ds && ds->batch >= 0
+    const BoxShadowSlot *bs = d->box_shadows && ds && ds->batch >= 0
         ? ecs_get(world, item->entity, BoxShadowSlot) : NULL;
     if (bs && bs->batch >= 0 && box_draws_box_shadow_instance(world, item->entity, instance)) {
         glm_mul(rel, instance, m);
@@ -1306,6 +1306,7 @@ static void box_transition_send_slots(
         const box_text_glyph_t *g = ecs_vec_get_t(&tg->glyphs, box_text_glyph_t, i);
         glm_mat4_identity(instance);
         instance[0][0] = g->width;
+        instance[1][0] = g->shear * g->height;
         instance[1][1] = g->height;
         instance[3][0] = g->x;
         instance[3][1] = g->y;
@@ -1651,7 +1652,7 @@ static void box_transition_send_box_shadow(
     const DrawSlot *ds,
     const box_draw_material_t *material)
 {
-    const BoxShadowSlot *bs = ecs_get(world, e, BoxShadowSlot);
+    const BoxShadowSlot *bs = d->box_shadows ? ecs_get(world, e, BoxShadowSlot) : NULL;
     box_draw_transition_material_t target;
     uint32_t offset;
     if (!bs || bs->batch < 0 || !ecs_map_get(&s->fade_index, e) ||

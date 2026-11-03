@@ -1,0 +1,115 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.layout
+using box.text
+
+// Bold and italic synthesized from the regular glyphs of one font of the test assets: bold by
+// a thicker outline and a wider advance, italic by a sheared quad.
+
+assets_font {
+  Font: {path: "test/assets/fonts/B612-Regular.ttf"}
+}
+
+camera {
+  Position: {0, 0, 7}
+  Camera: {fov: 55}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {28, 30, 40, 255}}}
+}
+
+panel {
+  Position: {-0.6, 0.35, 0}
+  Scale: {0.01, 0.01, 0.01}
+  Layout: {direction: Column, spacing: 10, padding: {14, 14, 14, 14}}
+  LayoutItem: {width: {mode: Fixed, value: 520}}
+  Rect: {1, 1}
+  Rgb: {44, 48, 62}
+  Border: {width: 2, radius: 12, color: {120, 140, 200, 255}}
+
+  title {
+    Position: {0, 0, 1}
+    Text: {value: "Synthesized styles", size: 30, font: assets_font}
+    Rgb: {250, 190, 60}
+    TextSpans: {spans: [{start: 0, end: 11, bold: true, keep_color: true}]}
+  }
+
+  small {
+    Position: {0, 0, 1}
+    Text: {value: "Regular Bold Italic Both", size: 14, font: assets_font}
+    Rgb: {230, 232, 240}
+    TextSpans: {spans: [
+      {start: 8, end: 12, bold: true, keep_color: true},
+      {start: 13, end: 19, italic: true, keep_color: true},
+      {start: 20, end: 24, bold: true, italic: true, keep_color: true}
+    ]}
+  }
+
+  medium {
+    Position: {0, 0, 1}
+    Text: {value: "Regular Bold Italic Both", size: 22, font: assets_font}
+    Rgb: {230, 232, 240}
+    TextSpans: {spans: [
+      {start: 8, end: 12, bold: true, keep_color: true},
+      {start: 13, end: 19, italic: true, keep_color: true},
+      {start: 20, end: 24, bold: true, italic: true, keep_color: true}
+    ]}
+  }
+
+  large {
+    Position: {0, 0, 1}
+    Text: {value: "Regular Bold Italic Both", size: 36, font: assets_font}
+    Rgb: {230, 232, 240}
+    TextSpans: {spans: [
+      {start: 8, end: 12, bold: true, keep_color: true},
+      {start: 13, end: 19, italic: true, keep_color: true},
+      {start: 20, end: 24, bold: true, italic: true, keep_color: true}
+    ]}
+  }
+
+  paragraph {
+    Position: {0, 0, 1}
+    Text: {
+      value: "Plain words, then bold words, then italic words, and bold italic words; a colored bold span overlaps an italic one, and the lines wrap where the wider bold glyphs push them.",
+      size: 17, font: assets_font
+    }
+    LayoutItem: {width: {mode: Grow, content_min: true}}
+    Rgb: {220, 222, 230}
+    TextSpans: {spans: [
+      {start: 18, end: 28, bold: true, keep_color: true},
+      {start: 35, end: 47, italic: true, keep_color: true},
+      {start: 53, end: 70, bold: true, keep_color: true},
+      {start: 53, end: 70, italic: true, keep_color: true},
+      {start: 74, end: 100, bold: true, color: {240, 110, 90, 255}},
+      {start: 92, end: 114, italic: true, color: {90, 170, 255, 255}},
+      {start: 145, end: 162, bold: true, keep_color: true}
+    ]}
+  }
+}
+
+sign {
+  Position: {2.7, -1.95, 0}
+  Rotation: {0, -0.5, 0.08}
+  Scale: {0.01, 0.01, 1}
+
+  board {
+    Position: {0, 0, -0.5}
+    Rect: {280, 110}
+    Rgb: {30, 90, 160}
+  }
+
+  label {
+    Position: {0, 0, 0}
+    Text: {value: "World label\nbold italic", size: 36, align: Center, font: assets_font}
+    Rgb: {255, 255, 255}
+    TextSpans: {spans: [
+      {start: 0, end: 5, bold: true, keep_color: true},
+      {start: 6, end: 11, italic: true, color: {250, 220, 120, 255}},
+      {start: 12, end: 23, bold: true, italic: true, keep_color: true}
+    ]}
+  }
+}

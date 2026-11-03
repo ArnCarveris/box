@@ -224,7 +224,9 @@ static void box_shadows_view(
     const Camera *c = &v->camera_data;
     ShadowSettings s;
     ecs_os_memset_t(out, 0, box_render_view_shadows_t);
-    if (!view || !view->shadows.enabled || !v->lights.enabled) {
+    if (!view || !view->shadows.enabled || !v->lights.enabled ||
+        view->debug.wireframe == WireframeOnly)
+    {
         goto done;
     }
 

@@ -63,6 +63,7 @@
 #include "include/point_shadow.wgsl"
 #include "include/cookie.wgsl"
 #include "include/ambient.wgsl"
+#include "include/probes.wgsl"
 #include "include/aerial.wgsl"
 
 // BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
@@ -122,28 +123,6 @@ const MIN_ROUGHNESS: f32 = 0.045;
 @group(2) @binding(3) var<storage, read> surfaces: array<SurfaceData>;
 @group(2) @binding(4) var<storage, read> materials: array<Material>;
 
-// Grid of the probe volume: probe (x, y, z) sits at origin.xyz + (x, y, z) * origin.w, x
-// fastest in the probe buffer. size.w is 0 for the 1x1x1 volume of views that keep the
-// hemisphere ambient, 1 when the view samples the probes.
-struct Volume {
-    origin: vec4f,
-    size: vec4u,
-};
-
-// Every probe is SH_COEFFICIENTS rgb irradiance coefficients E_lm (Ramamoorthi and Hanrahan),
-// in Sloan's real SH basis; cell_valid has a byte per cell of the grid, four to a word, whose
-// bit x + 2y + 4z is set when that corner probe of the cell is valid: clear inside static
-// geometry. A cell is a probe with a neighbour after it on every axis with more than one probe.
-// probe_visibility holds an octahedral map per probe of VISIBILITY_SIZE texels on each side,
-// each the mean and mean square distance to the surfaces its faces saw in probe spacings, packed
-// as two halves (bake_sh.wgsl).
-@group(3) @binding(0) var<uniform> volume: Volume;
-@group(3) @binding(1) var<storage, read> probes: array<vec4f>;
-@group(3) @binding(2) var<storage, read> cell_valid: array<u32>;
-@group(3) @binding(3) var<storage, read> probe_visibility: array<u32>;
-
-const SH_COEFFICIENTS: u32 = 9u;
-
 // Texels per edge of the octahedral distance map of a probe.
 const VISIBILITY_SIZE: i32 = 8;
 
@@ -167,13 +146,7 @@ const REFLECTION_EPSILON: f32 = 1e-3;
 const REFLECTION_NORMALIZE_MIN: f32 = 0.0;
 const REFLECTION_NORMALIZE_MAX: f32 = 2.0;
 
-struct VertexIn {
-    @builtin(vertex_index) vertex: u32,
-    @location(0) position: vec3f,
-    @location(1) normal: vec3f,
-    @location(2) uv: vec2f,
-    @location(3) slot: u32,
-};
+#include "include/place.wgsl"
 
 struct VertexOut {
     @builtin(position) @invariant pos: vec4f,
@@ -200,49 +173,6 @@ struct VertexOut {
     @location(8) @interpolate(flat) attenuation: vec3f,
     @location(9) @interpolate(flat) model_scale: vec3f,
 };
-
-// A vertex placed in the world: the model matrix of its instance, the normal of its mesh or
-// parametric surface in the frame of the instance, its world and its clip position. vs and the
-// depth prepass entry points all place their vertices with it, and the clip position is
-// invariant, so the forward pass of a view with a depth prepass rasterizes the depths the
-// prepass wrote and tests them with Equal. It reads the transform and surface streams and the
-// surface assets only, which the plain prepass binds, and sets surface_data. A plain mesh page
-// binds one zero record as its surface stream, so the record of a slot is loaded only when it is
-// inside the buffer, without relying on robust buffer access; surface_data stays zero otherwise,
-// which is the plain mesh path.
-struct Placed {
-    model: mat4x4f,
-    normal: vec3f,
-    world: vec4f,
-    pos: vec4f,
-};
-
-fn place(v: VertexIn) -> Placed {
-    if (v.slot < arrayLength(&surfaces)) {
-        surface_data = surfaces[v.slot];
-    }
-    let model = instance_model(transforms[v.slot]);
-    var position = v.position;
-    var normal = v.normal;
-    if (surface_data.p[19].x != 0.0) {
-        position = v.position;
-        normal = v.normal;
-    } else if (surface_data.p[0].x == 7.0) {
-        position.y *= surface_data.p[1].y;
-    } else if (surface_data.p[0].x == 1.0 && v.position.z < 2.0) {
-        let sample = surface_sweep_sample(i32(v.position.z), v.position.x, v.position.y);
-        position = sample.position;
-        normal = sv_unit(sample.normal);
-        if (sv_dot(sample.normal, sample.normal) < 0.000000000001) {
-            normal = surface_normal(i32(v.position.z), v.position.x, v.position.y);
-        }
-    } else if (surface_data.p[0].x != 0.0) {
-        position = surface_position(i32(v.position.z), v.position.x, v.position.y);
-        normal = surface_normal(i32(v.position.z), v.position.x, v.position.y);
-    }
-    let world = model * vec4f(position, 1.0);
-    return Placed(model, normal, world, view.view_proj * world);
-}
 
 // Color, metallic and roughness, and UV of a vertex from the shading of its instance and its
 // material, with the tint and material of its region on a parametric surface. Reads the
