@@ -2,11 +2,7 @@
     "id": "bench_audio",
     "type": "application",
     "value": {
-<<<<<<< HEAD
-        "description": "Benchmarks for the audio core: voices mixed through buses, a reverb and synth voices, in ns per frame",
-=======
-        "description": "Benchmarks for the audio core: voices mixed through buses, and a reverb, in ns per frame, and the spatial sources of box.audio, in ns per source",
->>>>>>> 32d0d7896c24f47815eadce65be0c3c9b86e49e8
+        "description": "Benchmarks for the audio core: voices mixed through buses, a reverb and synth voices, in ns per frame, and the spatial sources of box.audio, in ns per source",
         "public": false,
         "use": [
             "box"

@@ -128,7 +128,6 @@ ECS_STRUCT(AudioSource, {
     bool playing;          /**< Whether it plays, default true */
 });
 
-<<<<<<< HEAD
 /** Wave of a synth oscillator */
 ECS_ENUM(SynthWave, {
     SynthSine,             /**< Sine */
@@ -193,7 +192,8 @@ ECS_STRUCT(SynthSound, {
     uint32_t seed;         /**< Seed of the noise and the variances, with a count of plays */
     float pitch_variance;  /**< Random share of the pitch per play, 0..1, default 0 */
     float level_variance;  /**< Random share of the level per play, 0..1, default 0 */
-=======
+});
+
 /** The ears of the world: sources with AudioSpatial are heard from its WorldTransform.
  *
  * Without one the camera of the first enabled View that has one listens. With several the
@@ -215,7 +215,6 @@ ECS_STRUCT(AudioSpatial, {
     float min_distance;    /**< Full volume within this distance, default 1 */
     float max_distance;    /**< Silent from this distance, default 50 */
     float rolloff;         /**< How fast the volume falls beyond min_distance, default 1 */
->>>>>>> 32d0d7896c24f47815eadce65be0c3c9b86e49e8
 });
 
 /** Settings of the audio of the world, a singleton */
