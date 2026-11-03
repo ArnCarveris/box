@@ -1,0 +1,62 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+// The infinite debug grid of a view at a grazing angle: a camera 1.6 units above the plane looks
+// along it toward the horizon over a few shapes, one of them sunk halfway into the plane. Minor
+// lines every unit, major lines every 5 and the red X and blue Z axes keep their width in pixels
+// close up and blend into an even tone further away without moire, then fade out with the
+// distance and toward the horizon without an edge. The shapes hide the grid behind them and the
+// grid crosses the part of the sunk sphere below the plane.
+
+camera {
+  Position: {2.5, 1.6, 9}
+  Rotation: {-0.12, 0.25, 0}
+  Camera: {fov: 60}
+}
+
+main_view {
+  View: {
+    camera: camera
+    clear: {enabled: true, color: {24, 26, 32, 255}}
+    debug: {grid: {enabled: true, fade_distance: 80}}
+  }
+}
+
+$ {
+  AmbientLight: {sky: {120, 128, 140}, ground: {50, 46, 42}}
+}
+
+sun {
+  Rotation: {0.9, 0.6, 0}
+  DirectionalLight: {intensity: 1.0 * flecs.script.math.PI}
+  Rgb: {255, 244, 228}
+}
+
+cube {
+  Position: {-1.5, 0.75, 2}
+  Rotation: {0, 0.5, 0}
+  Box: {1.5, 1.5, 1.5}
+  Rgb: {220, 120, 80}
+}
+
+ball {
+  Position: {1.5, 0, 0}
+  Sphere: {segments: 32, smooth: true, radius: 1}
+  Rgb: {90, 160, 220}
+}
+
+pillar {
+  Position: {4, 1.5, -4}
+  Box: {0.8, 3, 0.8}
+  Rgb: {210, 200, 120}
+}
+
+block {
+  Position: {-4, 0.4, -8}
+  Box: {3, 0.8, 1.5}
+  Rgb: {150, 200, 140}
+}

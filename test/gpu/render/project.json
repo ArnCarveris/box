@@ -1044,6 +1044,24 @@
                     "light_outside_clusters",
                     "no_new_splits"
                 ]
+            },
+            {
+                "id": "ViewDebug",
+                "testcases": [
+                    "off_records_nothing",
+                    "grid_lines",
+                    "grid_hidden_by_geometry",
+                    "grid_over_geometry_below",
+                    "grid_fades",
+                    "grid_no_edge",
+                    "grid_height",
+                    "grid_orthographic",
+                    "grid_per_view",
+                    "grid_not_tonemapped",
+                    "grid_not_in_captures",
+                    "grid_camera_below",
+                    "grid_resize"
+                ]
             }
         ]
     }
