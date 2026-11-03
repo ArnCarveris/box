@@ -53,6 +53,23 @@ typedef struct box_owned_t {
 /** Owned ecs_vec_t member of component T with trivially copyable elements of type E */
 #define BOX_OWNED_VEC(T, member, E) { (ecs_size_t)offsetof(T, member), ECS_SIZEOF(E) }
 
+/** Elements in a literal array of type T */
+#define BOX_VEC_LITERAL_COUNT(T, ...) ((int32_t)(sizeof((T[]){ __VA_ARGS__ }) / sizeof(T)))
+
+/** A literal array of type T as an ecs_vec_t that owns nothing, for a value that ecs_set copies
+ * into a component with owned hooks; C only:
+ *
+ *     ecs_set(world, e, Curve, { .keys = BOX_VEC_VIEW(CurveKey, {0, 1}, {1, 2}) });
+ */
+#ifdef FLECS_SANITIZE
+#define BOX_VEC_VIEW(T, ...) ((ecs_vec_t){ .array = (T[]){ __VA_ARGS__ },\
+    .count = BOX_VEC_LITERAL_COUNT(T, __VA_ARGS__), .size = BOX_VEC_LITERAL_COUNT(T, __VA_ARGS__),\
+    .elem_size = ECS_SIZEOF(T), .type_name = #T })
+#else
+#define BOX_VEC_VIEW(T, ...) ((ecs_vec_t){ .array = (T[]){ __VA_ARGS__ },\
+    .count = BOX_VEC_LITERAL_COUNT(T, __VA_ARGS__), .size = BOX_VEC_LITERAL_COUNT(T, __VA_ARGS__) })
+#endif
+
 /** Install the lifecycle hooks of reflected component T from its owned members.
  *
  * Flecs generates no dtor, copy or move for C structs registered with ECS_META_COMPONENT,

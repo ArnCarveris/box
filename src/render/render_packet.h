@@ -69,6 +69,9 @@
 /** Shader handle of the engine shader that raymarches the fog volumes of a view */
 #define BOX_RENDER_SHADER_FOG_VOLUME (51)
 
+/** Shader handle of the engine shader that draws the infinite grid of the debug pass of a view */
+#define BOX_RENDER_SHADER_DEBUG_GRID (52)
+
 /** Fog volumes a view draws at most, the nearest ones */
 #define BOX_RENDER_FOG_VOLUMES_MAX (32)
 
@@ -546,6 +549,8 @@ typedef struct box_render_view_t {
     int32_t fog_first;          /**< Index of the first fog volume of the view in the packet */
     int32_t fog_count;          /**< Fog volumes the view draws, back to front, filled by the
                                  *   light extract for a lit view with LightSettings.fog_volumes */
+    ViewDebug debug;            /**< View.debug, all zero for the captures, which draw no debug
+                                 *   pass */
 } box_render_view_t;
 
 /** Kind of an effect pass of a view */

@@ -353,6 +353,17 @@ fn particle_gradient(row: u32, value: vec3f, t: f32) -> vec3f {
     return mix(a, b, at.y);
 }
 
+// Size or opacity of a particle: the value it spawned with times its curve, clamped at 0 as a
+// curve that overshoots its keys may go below it.
+fn particle_scaled(base: f32, row: u32, value: f32, t: f32) -> f32 {
+    return max(base * particle_curve(row, value, t), 0.0);
+}
+
+// Color of a particle: the linear color it spawned with times its gradient, clamped at 0.
+fn particle_tinted(color: vec3f, row: u32, value: vec3f, t: f32) -> vec3f {
+    return max(color * particle_gradient(row, value, t), vec3f(0.0));
+}
+
 // Frame of a sprite sheet a particle shows, row by row from the top left.
 fn particle_frame(columns: u32, rows: u32, fps: f32, age: f32, life: f32) -> u32 {
     let frames = max(columns, 1u) * max(rows, 1u);

@@ -22,11 +22,23 @@ template SparkBurst {
   ParticleForces: {gravity: {0, -5.8, 0}, drag: 0.5}
   ParticleCollision: {ground: true, height: 0.02, bounce: 0.46, friction: 0.3}
   ParticleAppearance: {shape: ParticleCircle, blend: ParticleAdditive, stretch: 0.03}
-  ParticleCurves: {opacity: {1, 1, 0.7, 0}, color: {start: {255, 240, 200}, early: {255, 190, 90}, late: {255, 120, 50}, end: {180, 50, 20}}}
+  ParticleCurves: {
+    opacity: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 0.7}, {1, 0}]}
+    color: {keys: [
+      {0, {255, 240, 200}},
+      {0.33333334, {255, 190, 90}},
+      {0.6666667, {255, 120, 50}},
+      {1, {180, 50, 20}}
+    ]}
+  }
   ParticleBurst: {count: 130, at: 0}
   PointLight: {intensity: 1.4, range: 2.2}
   Rgb: {255, 190, 110}
-  ParticleLight: {intensity: 1.4, curve: {1, 0.5, 0.2, 0}, period: 0.7}
+  ParticleLight: {
+    intensity: 1.4
+    curve: {keys: [{0, 1}, {0.33333334, 0.5}, {0.6666667, 0.2}, {1, 0}]}
+    period: 0.7
+  }
 }
 
 template CabinMotes {
@@ -38,7 +50,7 @@ template CabinMotes {
   }
   ParticleForces: {gravity: {0, 0, 0}, turbulence: 0.03, drag: 0.6}
   ParticleAppearance: {shape: ParticleCircle, blend: ParticleAdditive, lit: 1}
-  ParticleCurves: {opacity: {0, 1, 1, 0}}
+  ParticleCurves: {opacity: {keys: [{0, 0}, {0.33333334, 1}, {0.6666667, 1}, {1, 0}]}}
   SpatialIgnore
 }
 
@@ -68,7 +80,10 @@ template VentSmoke {
   }
   ParticleForces: {gravity: {0, -0.03, 0}, turbulence: 0.18, drag: 0.5}
   ParticleAppearance: {shape: ParticleCircle, blend: ParticleAlpha, softness: 0.05, lit: 0.8}
-  ParticleCurves: {size: {0.4, 1, 1.6, 2.4}, opacity: {0, 1, 0.6, 0}}
+  ParticleCurves: {
+    size: {keys: [{0, 0.4}, {0.33333334, 1}, {0.6666667, 1.6}, {1, 2.4}]}
+    opacity: {keys: [{0, 0}, {0.33333334, 1}, {0.6666667, 0.6}, {1, 0}]}
+  }
   SpatialIgnore
 }
 
@@ -82,7 +97,10 @@ template CargoLeak {
   }
   ParticleForces: {gravity: {0, 0, 0}, turbulence: 0.08, drag: 0.05}
   ParticleAppearance: {shape: ParticleCircle, blend: ParticleAlpha, softness: 0.05, lit: 0.9}
-  ParticleCurves: {size: {0.5, 1, 1.7, 2.6}, opacity: {0, 1, 0.7, 0}}
+  ParticleCurves: {
+    size: {keys: [{0, 0.5}, {0.33333334, 1}, {0.6666667, 1.7}, {1, 2.6}]}
+    opacity: {keys: [{0, 0}, {0.33333334, 1}, {0.6666667, 0.7}, {1, 0}]}
+  }
   SpatialIgnore
 }
 

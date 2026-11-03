@@ -1,0 +1,41 @@
+// Materials of the castle: flat colors on rough surfaces for a toy-like look, with a little
+// clear coat on the water, the slate and the gilded finials.
+
+using flecs.script
+using box.material
+using box.text
+
+castle_font_display { Font: {path: "etc/scenes/castle/fonts/Cinzel.ttf"} }
+castle_font_body { Font: {path: "etc/scenes/castle/fonts/Spectral-Regular.ttf"} }
+
+prefab CastleStone { Rgb: {196, 186, 166}; PbrMaterial: {roughness: 0.92} }
+prefab CastlePaleStone { Rgb: {214, 206, 188}; PbrMaterial: {roughness: 0.9} }
+prefab CastleDarkStone { Rgb: {132, 124, 112}; PbrMaterial: {roughness: 0.95} }
+prefab CastleSlate { Rgb: {64, 80, 112}; PbrMaterial: {roughness: 0.55}; ClearCoat: {strength: 0.3, roughness: 0.3} }
+prefab CastleTile { Rgb: {160, 70, 50}; PbrMaterial: {roughness: 0.7} }
+prefab CastleThatch { Rgb: {198, 158, 92}; PbrMaterial: {roughness: 1} }
+prefab CastlePlaster { Rgb: {236, 224, 196}; PbrMaterial: {roughness: 0.95} }
+prefab CastleTimber { Rgb: {86, 58, 38}; PbrMaterial: {roughness: 0.85} }
+prefab CastleWood { Rgb: {132, 92, 58}; PbrMaterial: {roughness: 0.8} }
+prefab CastleIron { Rgb: {48, 46, 46}; PbrMaterial: {metallic: 0.8, roughness: 0.45} }
+prefab CastleGold { Rgb: {232, 184, 72}; PbrMaterial: {metallic: 1, roughness: 0.25} }
+prefab CastleBanner { Rgb: {168, 28, 36}; PbrMaterial: {roughness: 0.85} }
+prefab CastleBannerBlue { Rgb: {36, 62, 140}; PbrMaterial: {roughness: 0.85} }
+prefab CastleDark { Rgb: {28, 24, 22}; PbrMaterial: {roughness: 0.9} }
+prefab CastleWindow { Rgb: {60, 40, 20}; PbrMaterial: {roughness: 0.6}; Emissive: {strength: 1.2, color: {255, 170, 80}} }
+prefab CastleFlame { Rgb: {255, 190, 90}; Emissive: {strength: 6, color: {255, 140, 40}}; NoShadow }
+
+prefab CastleGrass { Rgb: {104, 142, 64}; PbrMaterial: {roughness: 1} }
+prefab CastleMeadow { Rgb: {92, 130, 58}; PbrMaterial: {roughness: 1} }
+prefab CastleCourt { Rgb: {170, 156, 124}; PbrMaterial: {roughness: 1} }
+prefab CastleSoil { Rgb: {104, 80, 56}; PbrMaterial: {roughness: 1} }
+prefab CastleDirt { Rgb: {152, 126, 88}; PbrMaterial: {roughness: 1} }
+prefab CastleCobble { Rgb: {150, 144, 132}; PbrMaterial: {roughness: 0.95} }
+prefab CastleWater { Rgb: {44, 92, 112}; PbrMaterial: {roughness: 0.08}; ClearCoat: {strength: 1, roughness: 0.04} }
+prefab CastleRock { Rgb: {150, 146, 138}; PbrMaterial: {roughness: 0.95} }
+prefab CastleLeaf { Rgb: {64, 112, 46}; PbrMaterial: {roughness: 1} }
+prefab CastleLeafDark { Rgb: {40, 82, 44}; PbrMaterial: {roughness: 1} }
+prefab CastleLeafAutumn { Rgb: {170, 132, 52}; PbrMaterial: {roughness: 1} }
+prefab CastleBark { Rgb: {96, 68, 46}; PbrMaterial: {roughness: 1} }
+prefab CastleHill { Rgb: {86, 124, 60}; PbrMaterial: {roughness: 1} }
+prefab CastleFarHill { Rgb: {92, 122, 84}; PbrMaterial: {roughness: 1} }

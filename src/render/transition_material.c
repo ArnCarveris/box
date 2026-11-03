@@ -1,6 +1,7 @@
 /**
  * @file render/transition_material.c
- * @brief The target material of a material transition and the records it encodes again.
+ * @brief The target material of a material transition and the records it encodes again, and
+ * the fade records of the nodes of Tint and Opacity transitions.
  *
  * The game thread copies the material components a record was encoded from into the target of
  * a transition; the resolver encodes the record again from it, with the values its nodes
@@ -155,6 +156,11 @@ void box_draws_transition_encode(
         goto done;
     }
 
+    if (material->kind == BOX_DRAW_TRANSITION_BOX_SHADOW) {
+        box_draws_box_shadow_encode(&m, material, dst);
+        goto done;
+    }
+
     box_draws_material(&shading, &m);
     ecs_os_memcpy(ECS_OFFSET(dst, offsetof(box_render_shading_t, color)), shading.color,
         ECS_SIZEOF(shading.color));
@@ -170,4 +176,73 @@ void box_draws_transition_encode(
     }
 done:
     return;
+}
+
+void box_draws_transition_fade_own(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    box_draw_tint_t *tint,
+    float *alpha)
+{
+    const Tint *own_tint = ecs_get(world, e, Tint);
+    const Opacity *opacity = ecs_get(world, e, Opacity);
+    int32_t i;
+    if (own_tint) {
+        float a = (float)own_tint->a / 255.0f;
+        const uint8_t *own = &own_tint->r;
+        for (i = 0; i < 3; i ++) {
+            tint->add[i] = tint->add[i] * (1.0f - a) + (float)own[i] / 255.0f * a;
+        }
+
+        tint->keep *= 1.0f - a;
+    }
+
+    if (opacity) {
+        *alpha *= glm_clamp(opacity->value, 0.0f, 1.0f);
+    }
+}
+
+void box_draws_transition_send_fade(
+    const ecs_world_t *world,
+    box_render_packet_t *p,
+    ecs_entity_t e,
+    uint32_t node,
+    uint32_t parent,
+    const box_draw_tint_t *tint,
+    float alpha)
+{
+    box_render_transition_fade_t fade = {0};
+    const Tint *own_tint = ecs_get(world, e, Tint);
+    const Opacity *opacity = ecs_get(world, e, Opacity);
+    box_draw_tint_t ancestors;
+    uint32_t offset = 0;
+    if (tint) {
+        glm_vec3_copy(ECS_CONST_CAST(float*, tint->add), fade.add);
+        fade.keep = tint->keep;
+        fade.alpha = alpha;
+    } else {
+        fade.alpha = box_draws_fade(world, e, &ancestors);
+        glm_vec3_copy(ancestors.add, fade.add);
+        fade.keep = ancestors.keep;
+    }
+
+    if (own_tint) {
+        fade.present |= 1u << BOX_RENDER_TRANSITION_TINT;
+        fade.tint[0] = own_tint->r;
+        fade.tint[1] = own_tint->g;
+        fade.tint[2] = own_tint->b;
+        fade.tint[3] = own_tint->a;
+    }
+
+    if (opacity) {
+        fade.present |= 1u << BOX_RENDER_TRANSITION_OPACITY;
+        fade.opacity = opacity->value;
+    }
+
+    void *dst = box_render_packet_reserve(p, (uint32_t)sizeof(fade), &offset);
+    ecs_os_memcpy(dst, &fade, ECS_SIZEOF(fade));
+    box_render_transition_record_t *r = box_render_packet_transition(
+        p, BOX_RENDER_TRANSITION_FADE, node);
+    r->parent = parent;
+    r->data = offset;
 }

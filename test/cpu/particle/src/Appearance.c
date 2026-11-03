@@ -363,11 +363,15 @@ void Appearance_block_curves(void) {
     ecs_world_t *world = world_new(&null);
     ecs_entity_t e = emitter_new(world, 2, 100);
     ecs_set(world, e, ParticleCurves, {
-        .size = {1, 2, 3, 4},
-        .opacity = {0, 1, 1, 0},
-        .rotation = {0, 0.25f, 0.5f, 1},
-        .color = {{255, 0, 0}, {0, 255, 0}, {0, 0, 255}, {128, 128, 128}},
-        .spin = {1, 0, 0, 1}
+        .size = { .keys = BOX_CURVE_KEYS({0, 1}, {1.0f / 3.0f, 2}, {2.0f / 3.0f, 3}, {1, 4}) },
+        .opacity = { .keys = BOX_CURVE_KEYS(
+            {0, 0}, {1.0f / 3.0f, 1}, {2.0f / 3.0f, 1}, {1, 0}) },
+        .rotation = { .keys = BOX_CURVE_KEYS(
+            {0, 0}, {1.0f / 3.0f, 0.25f}, {2.0f / 3.0f, 0.5f}, {1, 1}) },
+        .color = { .keys = BOX_VEC_VIEW(ParticleGradientKey,
+            {0, {255, 0, 0}}, {1.0f / 3.0f, {0, 255, 0}}, {2.0f / 3.0f, {0, 0, 255}},
+            {1, {128, 128, 128}}) },
+        .spin = { .keys = BOX_CURVE_KEYS({0, 1}, {1.0f / 3.0f, 0}, {2.0f / 3.0f, 0}, {1, 1}) }
     });
     frame(world);
 

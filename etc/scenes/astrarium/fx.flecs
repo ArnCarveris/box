@@ -39,7 +39,10 @@ template Burst {
   }
   ParticleForces: {gravity: {0, lift, 0}, drag: 2.2, turbulence: 90, turbulence_scale: 0.03}
   ParticleAppearance: {shape: ParticleCircle, blend: ParticleAdditive, stretch: 0.006}
-  ParticleCurves: {opacity: {1, 1, 0.5, 0}, size: {1, 1, 0.7, 0.1}}
+  ParticleCurves: {
+    opacity: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 0.5}, {1, 0}]}
+    size: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 0.7}, {1, 0.1}]}
+  }
   ParticleBurst: {count: count, at: 0}
 }
 
@@ -76,7 +79,10 @@ template FallingStar {
   }
   ParticleForces: {gravity: {0, 0, 0}}
   ParticleAppearance: {shape: ParticleCircle, blend: ParticleAdditive, stretch: 0.042}
-  ParticleCurves: {opacity: {0, 1, 0.9, 0}, size: {1, 1, 0.8, 0.3}}
+  ParticleCurves: {
+    opacity: {keys: [{0, 0}, {0.33333334, 1}, {0.6666667, 0.9}, {1, 0}]}
+    size: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 0.8}, {1, 0.3}]}
+  }
   ParticleBurst: {count: 16, at: 0.08, repeat: 7}
 }
 

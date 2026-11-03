@@ -1,0 +1,55 @@
+// The kinds of keyed particle curves, plotted: three rows of 16 emitters with the same uneven keys
+// for size and color, from top to bottom CurveLinear, CurveCatmullRom and CurveBezier. Every
+// emitter bursts one still particle on the first frame, whose lifetime puts it at a normalized age
+// t from 1/32 on the left to 31/32 on the right when the frame is captured, two frames later, so
+// each row draws its curves at 16 ages. The size rises steeply to its peak at 0.2, falls to a
+// narrow waist at 0.55 and grows again: the linear row has straight runs with sharp corners at the
+// keys, the Catmull-Rom row rounds them and overshoots the peak and the waist a little, and the
+// Bezier row leaves its first key steeply and swells right after the waist along its slopes. The
+// colors blend white, gold, red and violet with the kind of their row.
+using box.transform
+using box.camera
+using box.view
+using box.curve
+using box.particle
+
+camera {
+  Position: {0, 0, 9}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {20, 22, 30, 255}}}
+}
+
+// Seconds a particle has lived when the frame is captured: two frames of 1/60
+const age = 2.0 / 60.0
+
+template Dot {
+  prop kind: CurveKind = CurveLinear
+  prop t = 0.5
+
+  ParticleEmitter: {
+    max: 1, rate: 0, speed: {0, 0}, lifetime: {age / t, age / t}, size: {0.3, 0.3},
+    opacity: {1, 1}, color: {255, 255, 255}
+  }
+  ParticleBurst: {count: 1}
+  ParticleAppearance: {}
+  ParticleCurves: {
+    size: {kind: kind, keys: [
+      {time: 0, value: 0.3, out: 20},
+      {time: 0.2, value: 2.2},
+      {time: 0.55, value: 0.2, in: -4, out: 6},
+      {time: 1, value: 1.6, in: -2}
+    ]}
+    color: {kind: kind, keys: [
+      {0, {255, 255, 255}}, {0.3, {255, 200, 40}}, {0.6, {255, 60, 20}}, {1, {120, 40, 255}}
+    ]}
+  }
+}
+
+for i in 0..16 {
+  Dot(kind: CurveLinear, t: (i + 0.5) / 16) { Position: {-5.625 + i * 0.75, 1.6, 0} }
+  Dot(kind: CurveCatmullRom, t: (i + 0.5) / 16) { Position: {-5.625 + i * 0.75, 0, 0} }
+  Dot(kind: CurveBezier, t: (i + 0.5) / 16) { Position: {-5.625 + i * 0.75, -1.6, 0} }
+}

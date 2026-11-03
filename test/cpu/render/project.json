@@ -430,6 +430,15 @@
                 ]
             },
             {
+                "id": "ViewDebug",
+                "testcases": [
+                    "ctor_defaults",
+                    "literal_off",
+                    "script_keeps_defaults",
+                    "packet_copy"
+                ]
+            },
+            {
                 "id": "ViewOrder",
                 "testcases": [
                     "default_is_zero",

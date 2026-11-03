@@ -1,0 +1,463 @@
+// The HUD, a screen space scene drawn over the world: the name and rank of the realm at the top
+// left, the treasury at the top right, messages in the middle and the toolbar at the bottom. The
+// icons of the tools are drawn with rects, circles and lines.
+
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.camera
+using box.view
+using box.geometry
+using box.material
+using box.layout
+using box.text
+using box.input
+using box.picking
+
+window {}
+
+export const C_TEXT: Rgb = {240, 228, 204}
+export const C_MUTED: Rgb = {186, 166, 134}
+export const C_GOLD: Rgb = {238, 196, 100}
+export const C_RED: Rgb = {236, 112, 96}
+export const C_PANEL: Rgb = {44, 34, 26}
+
+template Card {
+  prop pad: f32 = 12
+  Layout: {direction: Column, padding: {pad, pad, pad + 4, pad + 4}, spacing: 6, v: Middle}
+  Rect: {1, 1}
+  Rgb: C_PANEL
+  Border: {width: 1.5, radius: 8, color: {176, 138, 72, 255}}
+  BoxShadow: {offset_y: -3, blur: 16, color: {0, 0, 0, 110}}
+  InputBlocker
+}
+
+template Caption {
+  prop text: string = ""
+  prop size: f32 = 13
+  prop color: Rgb = C_TEXT
+  prop display: bool = false
+
+  Text: {value: text, size: size, font: match display { true: castle_font_display; _: castle_font_body }}
+  Rgb: color
+}
+
+template IconRect {
+  prop x: f32 = 0
+  prop y: f32 = 0
+  prop w: f32 = 10
+  prop h: f32 = 10
+  prop z: f32 = 0
+  prop angle: f32 = 0
+  prop radius: f32 = 0
+  prop color: Rgb = {255, 255, 255}
+
+  Position: {x, y, z}
+  Rotation: {0, 0, angle}
+  Rect: {w, h}
+  Border: {radius: radius}
+  Rgb: color
+}
+
+template IconDot {
+  prop x: f32 = 0
+  prop y: f32 = 0
+  prop z: f32 = 0
+  prop r: f32 = 4
+  prop color: Rgb = {255, 255, 255}
+
+  Position: {x, y, z}
+  Circle: {r}
+  Rgb: color
+}
+
+template IconLine {
+  prop x1: f32 = 0
+  prop y1: f32 = 0
+  prop x2: f32 = 10
+  prop y2: f32 = 0
+  prop w: f32 = 1.5
+  prop z: f32 = 0
+  prop color: Rgb = {255, 255, 255}
+
+  Position: {0, 0, z}
+  Line: {x1, y1, x2, y2, w}
+  Rgb: color
+}
+
+template ToolIcon {
+  prop t: i32 = 1
+
+  const i_stone: Rgb = {206, 194, 170}
+  const i_dark: Rgb = {116, 104, 92}
+  const i_slate: Rgb = {96, 120, 168}
+  const i_red: Rgb = {196, 52, 52}
+  const i_wood: Rgb = {156, 108, 66}
+  const i_leaf: Rgb = {104, 162, 74}
+  const i_water: Rgb = {74, 150, 200}
+  const i_tan: Rgb = {196, 164, 116}
+
+  Layout: {}
+  LayoutItem: {width: {mode: Fixed, value: 40}, height: {mode: Fixed, value: 36}}
+
+  if t == K_WALL {
+    IconRect body(y: -6, w: 34, h: 16, color: i_stone)
+    IconRect m1(x: -13.5, y: 5, w: 7, h: 6, color: i_stone)
+    IconRect m2(x: -4.5, y: 5, w: 7, h: 6, color: i_stone)
+    IconRect m3(x: 4.5, y: 5, w: 7, h: 6, color: i_stone)
+    IconRect m4(x: 13.5, y: 5, w: 7, h: 6, color: i_stone)
+    IconLine j1(x1: -17, y1: -6, x2: 17, y2: -6, w: 1, z: 0.1, color: i_dark)
+    IconLine j2(x1: -4, y1: -6, x2: -4, y2: 2, w: 1, z: 0.1, color: i_dark)
+    IconLine j3(x1: 7, y1: -14, x2: 7, y2: -6, w: 1, z: 0.1, color: i_dark)
+  } else if t == K_TOWER {
+    IconRect roof(y: 4, w: 14, h: 14, angle: 0.7854, color: i_slate)
+    IconRect body(y: -7, w: 14, h: 20, z: 0.1, color: i_stone)
+    IconRect slit(y: -6, w: 2.5, h: 7, z: 0.2, color: i_dark)
+    IconLine pole(x1: 0, y1: 13, x2: 0, y2: 18, w: 1.2, color: i_dark)
+    IconRect flag(x: 3, y: 16, w: 6, h: 3.5, color: i_red)
+  } else if t == K_GATE {
+    IconRect left(x: -11, y: -3, w: 11, h: 28, color: i_stone)
+    IconRect right(x: 11, y: -3, w: 11, h: 28, color: i_stone)
+    IconRect lintel(y: 5, w: 12, h: 12, color: i_stone)
+    IconRect gap(y: -10, w: 12, h: 14, z: 0.1, color: i_dark)
+    IconDot arch(y: -3, r: 6, z: 0.1, color: i_dark)
+    IconLine b1(x1: -3, y1: -17, x2: -3, y2: 1, w: 1, z: 0.2, color: i_stone)
+    IconLine b2(x1: 0, y1: -17, x2: 0, y2: 3, w: 1, z: 0.2, color: i_stone)
+    IconLine b3(x1: 3, y1: -17, x2: 3, y2: 1, w: 1, z: 0.2, color: i_stone)
+    IconRect banner(y: 8, w: 6, h: 6, z: 0.2, color: i_red)
+  } else if t == K_KEEP {
+    IconRect body(y: -5, w: 22, h: 24, color: i_stone)
+    IconRect tl(x: -12, y: -3, w: 6, h: 28, z: 0.1, color: i_stone)
+    IconRect tr(x: 12, y: -3, w: 6, h: 28, z: 0.1, color: i_stone)
+    IconRect rl(x: -12, y: 12, w: 6, h: 6, angle: 0.7854, color: i_slate)
+    IconRect rr(x: 12, y: 12, w: 6, h: 6, angle: 0.7854, color: i_slate)
+    IconRect w1(x: -4, y: -2, w: 3, h: 5, z: 0.2, color: i_dark)
+    IconRect w2(x: 4, y: -2, w: 3, h: 5, z: 0.2, color: i_dark)
+    IconRect door(y: -13, w: 6, h: 8, z: 0.2, color: i_wood)
+    IconLine pole(x1: 0, y1: 7, x2: 0, y2: 18, w: 1.2, color: i_dark)
+    IconRect flag(x: 4, y: 15.5, w: 8, h: 5, color: {52, 84, 168})
+  } else if t == K_HOUSE {
+    IconRect roof(y: 0, w: 22, h: 22, angle: 0.7854, color: {200, 160, 96})
+    IconRect walls(y: -9, w: 24, h: 14, z: 0.1, color: {236, 224, 196})
+    IconRect door(y: -12, w: 5, h: 8, z: 0.2, color: i_wood)
+    IconRect win(x: 7, y: -8, w: 4, h: 4, z: 0.2, color: {240, 170, 80})
+    IconRect beam(y: -2.5, w: 24, h: 1.5, z: 0.2, color: {90, 62, 40})
+  } else if t == K_QUARRY {
+    IconDot r1(x: -7, y: -6, r: 9, color: {150, 146, 138})
+    IconDot r2(x: 7, y: -9, r: 6, color: i_dark)
+    IconRect b1(x: 9, y: 5, w: 9, h: 8, color: i_stone)
+    IconRect b2(x: -2, y: 8, w: 9, h: 8, angle: 0.2, color: i_stone)
+    IconLine pick(x1: -16, y1: 14, x2: -4, y2: 2, w: 2, z: 0.2, color: i_wood)
+  } else if t == K_MOAT {
+    IconRect pool(y: -2, w: 36, h: 24, radius: 5, color: i_water)
+    IconLine wa(x1: -12, y1: 2, x2: -2, y2: 2, w: 1.5, z: 0.1, color: {170, 214, 236})
+    IconLine wb(x1: 2, y1: -6, x2: 12, y2: -6, w: 1.5, z: 0.1, color: {170, 214, 236})
+  } else if t == K_TREE {
+    IconRect trunk(y: -11, w: 4, h: 12, color: i_wood)
+    IconDot crown(y: 3, r: 11, z: 0.1, color: i_leaf)
+    IconDot crown_b(x: 6, y: 7, r: 6, z: 0.2, color: {128, 186, 92})
+  } else if t == K_PATH {
+    IconRect way(y: -2, w: 34, h: 18, radius: 4, color: i_tan)
+    IconDot c1(x: -10, y: -4, r: 3.5, z: 0.1, color: {150, 140, 126})
+    IconDot c2(x: -1, y: 1, r: 3, z: 0.1, color: {150, 140, 126})
+    IconDot c3(x: 8, y: -5, r: 3.5, z: 0.1, color: {150, 140, 126})
+    IconDot c4(x: 11, y: 3, r: 2.5, z: 0.1, color: {150, 140, 126})
+  } else if t == T_DEMOLISH {
+    IconLine handle(x1: -12, y1: -14, x2: 6, y2: 6, w: 3.5, color: i_wood)
+    IconRect head(x: 7, y: 7, w: 18, h: 8, angle: 0.7854, z: 0.1, color: {150, 150, 156})
+    IconRect rubble_a(x: -12, y: 10, w: 6, h: 5, angle: 0.3, color: i_stone)
+    IconRect rubble_b(x: 14, y: -12, w: 5, h: 4, angle: -0.4, color: i_stone)
+  }
+}
+
+template ToolButton {
+  prop t: i32 = 1
+  prop key: string = "1"
+
+  mut over = false
+
+  const active = tool == t
+  const afford = gold >= cost_gold(t, 1) && stone >= cost_stone(t, 1)
+
+  Layout: {direction: Column, h: Center, v: Middle, spacing: 2, padding: {8, 6, 4, 4}}
+  LayoutItem: {width: {mode: Fixed, value: 78}, height: {mode: Fixed, value: 90}}
+  Rect: {1, 1}
+  if active {
+    Rgb: {124, 90, 44}
+    Border: {width: 2, radius: 6, color: {246, 206, 112, 255}}
+  } else if over {
+    Rgb: {78, 60, 44}
+    Border: {width: 1, radius: 6, color: {176, 138, 72, 255}}
+  } else {
+    Rgb: {58, 45, 34}
+    Border: {width: 1, radius: 6, color: {104, 82, 56, 255}}
+  }
+  Interactive
+  Cursor: {CursorPointer}
+
+  ToolIcon icon(t: t)
+  Caption name(text: kind_name(t), size: 13)
+  if afford {
+    Caption cost(text: cost_text(t, 1), size: 11, color: C_MUTED)
+  } else {
+    Caption cost(text: cost_text(t, 1), size: 11, color: C_RED)
+  }
+  hotkey {
+    LayoutFloat: {h: Left, v: Top, anchor_h: Left, anchor_v: Top, x: 6, y: -4}
+    Text: {value: key, size: 10, font: castle_font_display}
+    Rgb: C_MUTED
+  }
+
+  async {
+    while true {
+      await on.enter(this)
+      over = true
+      hover_tool = t
+      await on.leave(this)
+      over = false
+      if hover_tool == t {
+        hover_tool = 0
+      }
+    }
+  }
+
+  async {
+    while true {
+      await on.click(this)
+      emit PickTool(t: t)
+    }
+  }
+}
+
+template ProgressBar {
+  prop ratio: f32 = 0
+  prop width: f32 = 230
+
+  Layout: {direction: Row}
+  LayoutItem: {width: {mode: Fixed, value: width}, height: {mode: Fixed, value: 8}}
+  Rect: {1, 1}
+  Rgb: {26, 20, 16}
+  Border: {radius: 4}
+
+  fill {
+    LayoutItem: {width: {mode: Fixed, value: max(width * clamp(ratio, 0, 1), 8)}, height: {mode: Fixed, value: 8}}
+    Rect: {1, 1}
+    Rgb: C_GOLD
+    Border: {radius: 4}
+  }
+}
+
+template NewRealmButton {
+  mut over = false
+  mut armed = false
+
+  Layout: {direction: Row, h: Center, v: Middle, padding: {4, 4, 10, 10}}
+  LayoutItem: {height: {mode: Fixed, value: 24}}
+  Rect: {1, 1}
+  if armed {
+    Rgb: {150, 52, 40}
+  } else if over {
+    Rgb: {82, 64, 46}
+  } else {
+    Rgb: {60, 46, 35}
+  }
+  Border: {width: 1, radius: 4, color: {120, 94, 62, 255}}
+  Interactive
+  Cursor: {CursorPointer}
+
+  Caption label(text: match armed { true: "Click again to raze everything"; _: "New realm" }, size: 12)
+
+  async {
+    while true {
+      await on.enter(this)
+      over = true
+      await on.leave(this)
+      over = false
+    }
+  }
+
+  async {
+    while true {
+      await on.click(this)
+      if armed {
+        armed = false
+        emit NewRealm()
+      } else {
+        armed = true
+        await delay(3)
+        armed = false
+      }
+    }
+  }
+}
+
+template RealmCard : Card {
+  const top_rank = rank >= RANKS - 1
+  const lo = rank_need(rank)
+  const hi = rank_need(rank + 1)
+  const ratio = match top_rank { true: 1; _: (prestige - lo) / (hi - lo) }
+
+  Caption title(text: "CASTLEWRIGHT", size: 24, color: C_GOLD, display: true)
+  rank_row {
+    Layout: {direction: Row, spacing: 8, v: Middle}
+    Caption label(text: "Rank", size: 13, color: C_MUTED)
+    Caption value(text: rank_name(rank), size: 17, color: match crowned { true: C_GOLD; _: C_TEXT }, display: true)
+  }
+  ProgressBar bar(ratio: ratio)
+  Caption detail(
+    text: match top_rank {
+      true: "Prestige {prestige:.0}. The realm is complete."
+      _: "Prestige {prestige:.0} of {hi:.0} for {rank_name(rank + 1)}"
+    },
+    size: 12, color: C_MUTED)
+  NewRealmButton new_realm()
+}
+
+template CoinIcon {
+  Layout: {}
+  LayoutItem: {width: {mode: Fixed, value: 22}, height: {mode: Fixed, value: 22}}
+  IconDot outer(r: 10, color: {196, 148, 56})
+  IconDot inner(r: 7.5, z: 0.1, color: {244, 204, 104})
+  IconRect mark(w: 3, h: 9, z: 0.2, color: {196, 148, 56})
+}
+
+template StoneIcon {
+  Layout: {}
+  LayoutItem: {width: {mode: Fixed, value: 22}, height: {mode: Fixed, value: 22}}
+  IconRect a(x: -3, y: -4, w: 13, h: 9, radius: 2, color: {170, 162, 150})
+  IconRect b(x: 4, y: -4, w: 10, h: 9, radius: 2, z: 0.1, color: {140, 132, 122})
+  IconRect c(x: 0, y: 5, w: 12, h: 8, radius: 2, z: 0.2, color: {204, 196, 182})
+}
+
+template CourtIcon {
+  Layout: {}
+  LayoutItem: {width: {mode: Fixed, value: 22}, height: {mode: Fixed, value: 22}}
+  IconRect ring(w: 20, h: 20, radius: 3, color: {206, 194, 170})
+  IconRect yard(w: 13, h: 13, radius: 1, z: 0.1, color: {176, 156, 118})
+}
+
+template Stat {
+  prop value: string = ""
+  prop rate: string = ""
+
+  Layout: {direction: Column, spacing: 0}
+  Caption amount(text: value, size: 19, color: C_TEXT, display: true)
+  Caption per(text: rate, size: 11, color: C_MUTED)
+}
+
+template TreasuryCard : Card {
+  row {
+    Layout: {direction: Row, spacing: 10, v: Middle}
+    CoinIcon coin()
+    Stat gold_stat(value: "{gold:.0}", rate: "+{gold_rate:.0} a second")
+    gap_a { LayoutItem: {width: {mode: Fixed, value: 8}} }
+    StoneIcon stone_icon()
+    Stat stone_stat(value: "{stone:.0}", rate: "+{stone_rate:.0} a second")
+    gap_b { LayoutItem: {width: {mode: Fixed, value: 8}} }
+    CourtIcon court()
+    Stat court_stat(value: "{courtyard}", rate: "courtyard cells")
+  }
+}
+
+template HintLine {
+  const ht = hover_tool
+  const hc = hover_cell
+  const hk = match hc >= 0 { true: kind[hc]; _: 0 }
+  const hl = match hc >= 0 { true: level[hc]; _: 0 }
+  const hs = match hc >= 0 { true: inside[hc]; _: false }
+  const where_ = match hs { true: ", inside the walls"; _: "" }
+
+  const text = match ht > 0 {
+    true: "{kind_name(ht)}: {kind_blurb(ht)}"
+    _: match hk > 0 {
+      true: match max_level(hk) > 1 {
+        true: "{kind_name(hk)}, level {hl} of {max_level(hk)}{where_}"
+        _: "{kind_name(hk)}{where_}"
+      }
+      _: match tool > 0 {
+        true: "{kind_name(tool)}: click the plot. Esc puts the tool down."
+        _: "WASD move   Q E turn   right drag look around   wheel zoom   1-9 pick a piece   X demolish"
+      }
+    }
+  }
+
+  Layout: {direction: Row, h: Center, v: Middle, padding: {6, 6, 14, 14}}
+  LayoutItem: {width: {max: 760}}
+  Rect: {1, 1}
+  Rgb: {30, 23, 18}
+  Opacity: {0.85}
+  Border: {radius: 12}
+  Caption line(text: text, size: 13, color: C_TEXT)
+}
+
+template Toolbar : Card {
+  row {
+    Layout: {direction: Row, spacing: 6}
+    ToolButton b1(t: K_WALL, key: "1")
+    ToolButton b2(t: K_TOWER, key: "2")
+    ToolButton b3(t: K_GATE, key: "3")
+    ToolButton b4(t: K_KEEP, key: "4")
+    ToolButton b5(t: K_HOUSE, key: "5")
+    ToolButton b6(t: K_QUARRY, key: "6")
+    ToolButton b7(t: K_MOAT, key: "7")
+    ToolButton b8(t: K_TREE, key: "8")
+    ToolButton b9(t: K_PATH, key: "9")
+    sep { LayoutItem: {width: {mode: Fixed, value: 1}, height: {mode: Fixed, value: 70}}; Rect: {1, 1}; Rgb: {110, 88, 60} }
+    ToolButton b10(t: T_DEMOLISH, key: "X")
+  }
+}
+
+template ToastBanner {
+  Layout: {direction: Column, h: Center}
+
+  if toast != "" {
+    banner {
+      Layout: {direction: Row, h: Center, v: Middle, padding: {10, 10, 20, 20}}
+      Rect: {1, 1}
+      Rgb: {44, 34, 26}
+      Opacity: {0.94}
+      Border: {width: 1.5, radius: 10, color: {222, 182, 96, 255}}
+      BoxShadow: {offset_y: -3, blur: 18, color: {0, 0, 0, 120}}
+      Caption line(text: toast, size: 16, color: C_TEXT)
+    }
+  }
+}
+
+hud {
+  Scene: {}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+
+  screen {
+    LayoutFill: {surface: window}
+    Layout: {direction: Column, padding: {18, 18, 18, 18}, spacing: 10}
+
+    top {
+      Layout: {direction: Row, spacing: 12}
+      LayoutItem: {width: {mode: Grow}}
+      RealmCard realm()
+      spacer { LayoutItem: {width: {mode: Grow}} }
+      TreasuryCard treasury()
+    }
+
+    middle {
+      Layout: {direction: Column, h: Center, padding: {24, 0, 0, 0}}
+      LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+      ToastBanner toast_banner()
+    }
+
+    bottom {
+      Layout: {direction: Column, h: Center, spacing: 8}
+      LayoutItem: {width: {mode: Grow}}
+      HintLine hint()
+      Toolbar toolbar()
+    }
+  }
+}
+
+hud_view {
+  View: {camera: hud.camera, order: 1, lighting: {enabled: false}, culling: {enabled: false}}
+}
