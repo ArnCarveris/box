@@ -162,6 +162,23 @@ def leaf(x, y):
     return color + (int(round(coverage * 255)),)
 
 
+def smoothstep(e0, e1, x):
+    """Hermite step from 0 at e0 to 1 at e1."""
+    t = max(0.0, min(1.0, (x - e0) / (e1 - e0)))
+    return t * t * (3.0 - 2.0 * t)
+
+
+def blend_mask(x, y):
+    """TextureBlend mask of the textures_blend scene: four quadrants that weigh one layer each,
+    red the top left (layer 0), green the top right (layer 1), blue the bottom left (layer 2) and
+    alpha the bottom right (layer 3), with soft borders a fifth of the image wide between them.
+    The weights of a texel sum to 255, stored as they are (the scene does not load it linear)."""
+    wu = smoothstep(0.4, 0.6, (x + 0.5) / SIZE)
+    wv = smoothstep(0.4, 0.6, (y + 0.5) / SIZE)
+    weights = ((1 - wu) * (1 - wv), wu * (1 - wv), (1 - wu) * wv, wu * wv)
+    return tuple(int(round(w * 255)) for w in weights)
+
+
 FRAME = 48
 FRAME_INSET = 16
 FRAME_STRIPE = 4
@@ -196,7 +213,7 @@ def main():
     for name, fn in (("checker.png", checker), ("letter.png", letter),
                      ("bumps.png", bumps), ("stripes.png", stripes), ("ring.png", ring),
                      ("orm.png", orm), ("fence.png", fence), ("leaf.png", leaf),
-                     ("cookie_grid.png", cookie_grid)):
+                     ("cookie_grid.png", cookie_grid), ("blend_mask.png", blend_mask)):
         write_png(name, SIZE, image(SIZE, fn))
         print("%s %d bytes" % (name, os.path.getsize(os.path.join(HERE, name))))
     write_png("frame.png", FRAME, image(FRAME, frame))

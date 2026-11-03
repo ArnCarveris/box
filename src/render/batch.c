@@ -136,8 +136,8 @@ static uint64_t box_draws_hash(
         h = (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull + key->textures[i];
     }
 
-    h ^= ((((uint64_t)key->shadow * 2 + key->bake) * 2 + key->box_shadow) * 2 + key->slice) *
-        0x94D049BB133111EBull;
+    h ^= (((((uint64_t)key->shadow * 2 + key->bake) * 2 + key->box_shadow) * 2 + key->slice) *
+        2 + key->texture_blend) * 0x94D049BB133111EBull;
     h ^= ((uint64_t)key->atlas + 1) * 0xD6E8FEB86659FD93ull;
 
     return h ^ (h >> 29);
@@ -160,7 +160,8 @@ static bool box_draws_key_eq(
         a->dynamic_material == b->dynamic_material &&
         a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures, ECS_SIZEOF(a->textures)) &&
         a->shadow == b->shadow && a->bake == b->bake && a->atlas == b->atlas &&
-        a->surface == b->surface && a->box_shadow == b->box_shadow && a->slice == b->slice;
+        a->surface == b->surface && a->box_shadow == b->box_shadow && a->slice == b->slice &&
+        a->texture_blend == b->texture_blend;
 }
 
 box_draw_batch_t* box_draws_batch(
@@ -1434,6 +1435,92 @@ void box_draws_batch_textures(
     out->wrap = b->key.wrap;
 }
 
+/** Get the texture handle a layer of a batch samples a texture entity through: its image, or
+ * the image of the surface that renders into it.
+ *
+ * @param d The state
+ * @param e The texture entity, 0 for none
+ * @return The handle, 0 while the entity has no image
+ */
+static uint32_t box_draws_texture_handle(
+    const box_render_draws_t *d,
+    ecs_entity_t e)
+{
+    uint32_t result = e ? box_textures_handle(d->textures, e) : 0;
+    if (e && !result && d->world) {
+        result = box_render_texture_target_handle(d->world, e);
+    }
+
+    return result;
+}
+
+void box_draws_batch_blend(
+    box_render_packet_t *p,
+    const box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    box_render_batch_t *out)
+{
+    const TextureBlend *blend = b->key.texture_blend && d->world
+        ? ecs_get(d->world, b->key.textures[0], TextureBlend)
+        : NULL;
+    uint32_t offset = 0;
+    int32_t k;
+    if (!b->key.texture_blend) {
+        goto done;
+    }
+
+    box_render_texture_blend_t *r = box_render_packet_reserve(p,
+        (uint32_t)sizeof(box_render_texture_blend_t), &offset);
+    ecs_os_memset_t(r, 0, box_render_texture_blend_t);
+    r->count = 1;
+    r->quality = d->textures && d->textures->quality
+        ? (uint32_t)d->textures->quality : BOX_TEXTURE_QUALITY_DEFAULT;
+    for (k = 0; k < BOX_RENDER_BLEND_LAYERS; k ++) {
+        r->transforms[k][0] = 1.0f;
+        r->transforms[k][1] = 1.0f;
+    }
+
+    if (blend) {
+        r->mask = box_draws_texture_handle(d, blend->mask);
+        for (k = 0; k < BOX_RENDER_BLEND_LAYERS; k ++) {
+            /* TextureBlend stores plain ids: a deleted layer counts as one without
+             * PbrTextures */
+            ecs_entity_t layer = blend->layers[k];
+            bool alive = layer && ecs_is_alive(d->world, layer);
+            const PbrTextures *textures = alive ? ecs_get(d->world, layer, PbrTextures) : NULL;
+            const TextureTransform *uv = alive
+                ? ecs_get(d->world, layer, TextureTransform) : NULL;
+            if (!layer) {
+                continue;
+            }
+
+            r->count = (uint32_t)k + 1;
+            if (textures) {
+                r->layers[k][BOX_RENDER_BLEND_ALBEDO] = box_draws_texture_handle(d,
+                    textures->albedo);
+                r->layers[k][BOX_RENDER_BLEND_ORM] = box_draws_texture_handle(d, textures->orm);
+                r->layers[k][BOX_RENDER_BLEND_NORMAL] = box_draws_texture_handle(d,
+                    textures->normal);
+            }
+
+            if (uv) {
+                r->transforms[k][0] = uv->scale_x;
+                r->transforms[k][1] = uv->scale_y;
+                r->transforms[k][2] = uv->offset_x;
+                r->transforms[k][3] = uv->offset_y;
+            }
+        }
+    }
+
+    out->texture_blend = true;
+    out->blend_layers = offset;
+    out->textures[0] = 0;
+    out->textures[2] = 0;
+    out->textures[3] = 0;
+done:
+    return;
+}
+
 /** Compute the local bounds of the slots of a batch with parametric surfaces: the union of the
  * bounds of each surface, and of the mesh for a slot without one. A plain mesh batch keeps no
  * surfaces, so it is not bounded and draws with the bounds of its mesh.
@@ -1646,6 +1733,7 @@ static void box_draws_send_batch(
     out->bake = b->key.bake;
     out->mesh = b->key.mesh;
     box_draws_batch_textures(d, b, out);
+    box_draws_batch_blend(p, d, b, out);
     box_draws_batch_page(d, b, out);
     out->instance_count = count;
 done:

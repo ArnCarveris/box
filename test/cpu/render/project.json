@@ -61,7 +61,12 @@
                     "texture_mapping_ids",
                     "texture_mapping_world_defaults",
                     "texture_mapping_world_pack",
-                    "texture_mapping_world_ids"
+                    "texture_mapping_world_ids",
+                    "texture_blend_batches",
+                    "texture_blend_prefab",
+                    "texture_blend_layer_changes",
+                    "texture_blend_layer_deleted",
+                    "texture_blend_plain_fallback"
                 ]
             },
             {

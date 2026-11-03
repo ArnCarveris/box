@@ -466,6 +466,12 @@ A segment takes its tangents from the anchors of the segments next to it, whatev
 and a closed path whose last segment is Catmull-Rom closes with a Catmull-Rom segment, so four
 anchors make a round section. Profiles sample a curved segment in 16 steps.
 
+A Sweep maps its texture by arc length: u runs around the profile and v along the path by
+distance, so the anchors need not be evenly spaced for an even texture. With
+`TextureMapping: {mode: MappingObject, size: 2}` the texture repeats every 2 units along and
+across the swept surface whatever the length of the path. Along a horizontal path the profile y
+points down (-Y), so a road profile puts its top at negative y.
+
 ### A custom ease for UI
 
 A panel that springs to a new scale with a small overshoot, a CSS "back" ease, and fades with a

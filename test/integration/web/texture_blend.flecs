@@ -1,0 +1,66 @@
+// The scene of the browser check of TextureBlend (texture_blend.mjs), which renders on the main
+// thread. The page opens a window only for a scene with a Surface; its 640x480 points fill the
+// viewport of the check. A quad facing the camera blends three layers under the mask of four
+// quadrants of the visual scene textures_blend: red (128, 0, 0) top left, (128, 200, 50) top
+// right, a layer without PbrTextures (white) bottom left. The bottom right weighs layer 3, which
+// is unused, so the weights there sum to 0 and layer 0, red, shows alone.
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+using box.surface
+
+window {
+  Surface: {width: 640, height: 480}
+}
+
+camera {
+  Position: {0, 0, 6}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {20, 22, 30, 255}}}
+}
+
+$ {
+  AmbientLight: {sky: {60, 60, 60}, ground: {60, 60, 60}}
+}
+
+sun {
+  Rotation: {0, 3.14159265, 0}
+  DirectionalLight: {intensity: 3.14159265}
+  Rgb: {255, 255, 255}
+}
+
+mask {
+  TexturePath: {path: "test/integration/visual/assets/blend_mask.png"}
+}
+
+red {
+  TexturePath: {path: "test/assets/textures/mask_red.png"}
+}
+
+green {
+  TexturePath: {path: "test/assets/textures/mask_rgb.png"}
+}
+
+red_layer {
+  PbrTextures: {albedo: red}
+}
+
+green_layer {
+  PbrTextures: {albedo: green}
+}
+
+white_layer {}
+
+blended {
+  Quad: {4, 4}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 1}
+  TextureBlend: {mask: mask, layers: [red_layer, green_layer, white_layer]}
+}

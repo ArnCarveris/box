@@ -1,0 +1,158 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+// Sweeps map their textures by arc length. Every shape carries the 4 x 4 checker, whose cells
+// must be square everywhere: on long and short path segments and on long and short profile edges.
+//
+// Back: a flat road with a wide, unevenly split top and thin sides, swept along a Catmull-Rom
+// gently curving path whose points are spaced 1.2 to 2.8 apart, with a MappingObject TextureMapping of size 1,
+// so the cells are 0.25 wide along and across it without knowing its length.
+// Middle: a pipe of an irregular polygon section (points 10 to 80 degrees apart) along an
+// S-shaped Catmull-Rom path with uneven points, MappingObject of size 0.5.
+// Front: the default UVs (fractions of the lengths) on a 1.2 by 0.3 bar, 3 around, swept along
+// two lines 0.8 and 4 long, 4.8 along, with a TextureTransform of 6 by 9.6 repeats, 0.5 each.
+// The profiles put their top at negative y: along a horizontal path the profile y points down.
+
+camera {
+  Position: {0, 6.5, 7.5}
+  Rotation: {-0.72, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {120, 160, 210, 255}}, shadows: {enabled: true}}
+}
+
+$ {
+  AmbientLight: {sky: {150, 170, 200}, ground: {70, 64, 56}, intensity: 0.6}
+}
+
+sun {
+  Rotation: {0.9, 0.4, 0}
+  DirectionalLight: {intensity: 1.4 * flecs.script.math.PI}
+  Rgb: {255, 245, 230}
+}
+
+checker {
+  TexturePath: {path: "test/integration/visual/assets/checker.png"}
+}
+
+floor {
+  Position: {0, -0.6, 0}
+  Box: {16, 0.2, 12}
+  Rgb: {90, 94, 104}
+  PbrMaterial: {roughness: 0.9}
+}
+
+road_shape {
+  Path2D: {
+    start: {-1, 0},
+    segments: [
+      {kind: Line, end: {1, 0}},
+      {kind: Line, end: {1, -0.1}},
+      {kind: Line, end: {0.6, -0.1}},
+      {kind: Line, end: {-1, -0.1}}
+    ],
+    closed: true
+  }
+}
+
+road_section { Profile2D: {outer: road_shape} }
+
+road_path {
+  Path3D: {
+    start: {-5.5, 0, -2.84},
+    segments: [
+      {kind: CatmullRom, end: {-4.3, 0, -3.05}},
+      {kind: CatmullRom, end: {-1.5, 0, -3.06}},
+      {kind: CatmullRom, end: {-0.3, 0, -2.86}},
+      {kind: CatmullRom, end: {2.5, 0, -2.46}},
+      {kind: CatmullRom, end: {3.7, 0, -2.49}},
+      {kind: CatmullRom, end: {5.5, 0, -2.76}}
+    ]
+  }
+}
+
+road {
+  Sweep: {path: road_path, profile: road_section, rings: 128}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.8}
+  PbrTextures: {albedo: checker}
+  TextureMapping: {mode: MappingObject, size: 1}
+}
+
+pipe_shape {
+  Path2D: {
+    start: {0.3, 0},
+    segments: [
+      {kind: Line, end: {0.2954, 0.0521}},
+      {kind: Line, end: {0.0521, 0.2954}},
+      {kind: Line, end: {-0.1026, 0.2819}},
+      {kind: Line, end: {-0.2954, -0.0521}},
+      {kind: Line, end: {-0.2121, -0.2121}},
+      {kind: Line, end: {0.1026, -0.2819}}
+    ],
+    closed: true
+  }
+}
+
+pipe_section { Profile2D: {outer: pipe_shape} }
+
+pipe_path {
+  Path3D: {
+    start: {-5.5, 0.4, 0.18},
+    segments: [
+      {kind: CatmullRom, end: {-4.4, 0.4, -0.14}},
+      {kind: CatmullRom, end: {-1.6, 0.4, -0.31}},
+      {kind: CatmullRom, end: {-0.5, 0.4, -0.05}},
+      {kind: CatmullRom, end: {2.3, 0.4, 0.59}},
+      {kind: CatmullRom, end: {3.4, 0.4, 0.55}},
+      {kind: CatmullRom, end: {5.5, 0.4, 0.02}}
+    ]
+  }
+}
+
+pipe {
+  Sweep: {path: pipe_path, profile: pipe_section, rings: 160}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.6}
+  PbrTextures: {albedo: checker}
+  TextureMapping: {mode: MappingObject, size: 0.5}
+}
+
+bar_shape {
+  Path2D: {
+    start: {-0.6, 0},
+    segments: [
+      {kind: Line, end: {0.6, 0}},
+      {kind: Line, end: {0.6, -0.3}},
+      {kind: Line, end: {-0.6, -0.3}}
+    ],
+    closed: true
+  }
+}
+
+bar_section { Profile2D: {outer: bar_shape} }
+
+bar_path {
+  Path3D: {
+    start: {-2.4, 0, 2.6},
+    segments: [
+      {kind: Line, end: {-1.6, 0, 2.6}},
+      {kind: Line, end: {2.4, 0, 2.6}}
+    ]
+  }
+}
+
+bar {
+  Sweep: {path: bar_path, profile: bar_section, rings: 48}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.8}
+  PbrTextures: {albedo: checker}
+  TextureTransform: {6, 9.6, 0, 0}
+}

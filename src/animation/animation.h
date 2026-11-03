@@ -16,6 +16,7 @@ typedef struct AnimationTrackState {
     ecs_size_t size;        /**< Size of the component */
     int32_t offset;         /**< Offset of the member in the component */
     int32_t kind;           /**< ecs_primitive_kind_t of the member, 0 when invalid */
+    uint32_t version;       /**< AnimatorWorld.version of the set, so a key edit is seen */
 } AnimationTrackState;
 
 /** Id of the private resolved track component */
@@ -103,8 +104,9 @@ extern ECS_COMPONENT_DECLARE(AnimatorWorld);
 /** Signal that a track or a clip changed, so that every animator rebuilds its tracks.
  *
  * @param world The world
+ * @return The new AnimatorWorld.version, 0 during ecs_fini
  */
-void box_animator_changed(
+uint32_t box_animator_changed(
     ecs_world_t *world);
 
 /** Register Animator, its private state, the observers that keep it current and AnimatorPlay.

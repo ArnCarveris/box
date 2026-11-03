@@ -261,6 +261,7 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, TextureMappingMode);
     ECS_META_COMPONENT(world, TextureMapping);
     ECS_META_COMPONENT(world, PbrTextures);
+    ECS_META_COMPONENT(world, TextureBlend);
     ecs_set_hooks(world, Opacity, { .ctor = box_opacity_ctor });
     ecs_set_hooks(world, AlphaCutoff, { .ctor = box_alpha_cutoff_ctor });
     ecs_set_hooks(world, PbrMaterial, { .ctor = box_pbr_material_ctor });
@@ -274,6 +275,7 @@ void BoxMaterialImport(
     ecs_set_hooks(world, MaterialId, { .ctor = box_material_id_ctor });
     ecs_add_pair(world, ecs_id(MaterialId), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(PbrTextures), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(TextureBlend), EcsOnInstantiate, EcsInherit);
 
     ecs_entity_t materials[11] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
