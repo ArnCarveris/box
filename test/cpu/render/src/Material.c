@@ -2136,57 +2136,110 @@ void Material_texture_blend_height_key(void) {
     box_render_null_free(null);
 }
 
-/** A shape with a TextureBlend draws as a plain shape with its own PbrTextures when it is alpha
- * tested, blended or has a triplanar TextureMapping, and blends again without them. */
-void Material_texture_blend_plain_fallback(void) {
+/** Check that a mesh draws in one batch with the TextureBlend whose layer 0 samples an image,
+ * and get that batch.
+ *
+ * @param world The world
+ * @param null The backend
+ * @param e The shape
+ * @param tex The texture entity of the albedo of layer 0
+ * @return The batch
+ */
+static const box_render_batch_t* blend_only_batch(
+    ecs_world_t *world,
+    const box_render_null_t *null,
+    ecs_entity_t e,
+    ecs_entity_t tex)
+{
+    const box_render_batch_t *found[2];
+    test_int(blend_batches(null, cutout_mesh(world, e), found, 2), 1);
+    test_bool(found[0]->texture_blend, true);
+    test_uint(blend_record(null, found[0])->layers[0][BOX_RENDER_BLEND_ALBEDO],
+        blend_handle(world, tex));
+
+    return found[0];
+}
+
+/** A shape with a TextureBlend blends whatever draws it: alpha tested in the opaque pass and
+ * the shadow pass, with AlphaBlend or an Opacity under 1 in the sorted blended pass, with
+ * Transmission in the transmissive pass, and with a triplanar TextureMapping.
+ *
+ * Its own albedo, which the blend replaces, is not bound, and without the alpha test and the
+ * blend mode it still blends, now opaque. */
+void Material_texture_blend_every_shape(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
+    ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
     ecs_entity_t layer = ecs_new(world);
     ecs_set(world, layer, PbrTextures, {.albedo = a});
     ecs_entity_t cut = cutout_shape(world, 9);
-    ecs_set(world, cut, PbrTextures, {.albedo = a});
+    ecs_set(world, cut, Position, {-2, 0, 0});
+    ecs_set(world, cut, PbrTextures, {.albedo = g});
     ecs_set(world, cut, TextureBlend, {.layers = {layer}});
     ecs_set(world, cut, AlphaCutoff, {0.5f});
-    ecs_entity_t faded = cutout_shape(world, 10);
+    ecs_entity_t blended = cutout_shape(world, 10);
+    ecs_set(world, blended, Position, {0, 0, 0});
+    ecs_set(world, blended, TextureBlend, {.layers = {layer}});
+    ecs_set(world, blended, BlendMode, {AlphaBlend});
+    ecs_entity_t faded = cutout_shape(world, 11);
+    ecs_set(world, faded, Position, {0, 1, 0});
     ecs_set(world, faded, TextureBlend, {.layers = {layer}});
     ecs_set(world, faded, Opacity, {0.5f});
-    ecs_set(world, faded, Position, {0, 1, 0});
-    ecs_entity_t mapped = cutout_shape(world, 11);
+    ecs_entity_t clear = cutout_shape(world, 12);
+    ecs_set(world, clear, Position, {2, 0, 0});
+    ecs_set(world, clear, TextureBlend, {.layers = {layer}});
+    ecs_set(world, clear, Transmission, {.transmission_factor = 1, .ior = 1.5f});
+    ecs_entity_t mapped = cutout_shape(world, 13);
+    ecs_set(world, mapped, Position, {0, -1, 0});
     ecs_set(world, mapped, TextureBlend, {.layers = {layer}});
     ecs_set(world, mapped, TextureMapping, {.mode = MappingWorld, .size = 1, .blend = 0.5f});
-    ecs_entity_t hard = cutout_shape(world, 12);
-    ecs_set(world, hard, TextureBlend, {.layers = {layer}});
-    ecs_set(world, hard, TextureMapping, {.mode = MappingWorld, .size = 1});
-    ecs_entity_t textures[1] = { a };
-    blend_wait(world, textures, 1);
+    ecs_entity_t textures[2] = { a, g };
+    blend_wait(world, textures, 2);
 
-    const box_render_batch_t *found[2];
-    test_int(blend_batches(null, cutout_mesh(world, cut), found, 2), 1);
-    test_bool(found[0]->texture_blend, false);
-    test_bool(found[0]->cutout, true);
-    test_uint(found[0]->textures[0], blend_handle(world, a));
-    test_int(blend_batches(null, cutout_mesh(world, faded), found, 2), 1);
-    test_bool(found[0]->texture_blend, false);
-    test_int(found[0]->blend, AlphaBlend);
-    test_int(blend_batches(null, cutout_mesh(world, mapped), found, 2), 1);
-    test_bool(found[0]->texture_blend, false);
-    test_int(blend_batches(null, cutout_mesh(world, hard), found, 2), 1);
-    test_bool(found[0]->texture_blend, true);
+    const box_render_batch_t *b = blend_only_batch(world, null, cut, a);
+    test_bool(b->cutout, true);
+    test_int(b->blend, Opaque);
+    test_int(b->view, -1);
+    test_bool(b->shadow, true);
+    test_bool(b->transmissive, false);
+    test_uint(b->textures[0], 0);
+
+    b = blend_only_batch(world, null, blended, a);
+    test_int(b->blend, AlphaBlend);
+    test_bool(b->listed, true);
+    test_assert(b->view >= 0);
+    test_bool(b->cutout, false);
+    test_bool(b->transmissive, false);
+
+    b = blend_only_batch(world, null, faded, a);
+    test_int(b->blend, AlphaBlend);
+    test_bool(b->listed, true);
+    test_assert(b->view >= 0);
+
+    b = blend_only_batch(world, null, clear, a);
+    test_bool(b->transmissive, true);
+    test_int(b->blend, AlphaBlend);
+    test_bool(b->listed, true);
+    test_assert(b->view >= 0);
+    test_bool(b->cutout, false);
+    test_bool(b->shadow, false);
+
+    b = blend_only_batch(world, null, mapped, a);
+    test_int(b->blend, Opaque);
+    test_bool(b->cutout, false);
+    test_int(b->view, -1);
 
     ecs_remove(world, cut, AlphaCutoff);
-    ecs_set(world, mapped, TextureMapping, {.mode = MappingWorld, .size = 1});
-    ecs_set(world, hard, TextureMapping, {.mode = MappingObject, .size = 1, .blend = 1});
+    ecs_remove(world, blended, BlendMode);
     mapping_frame(world);
-    test_int(blend_batches(null, cutout_mesh(world, cut), found, 2), 1);
-    test_bool(found[0]->texture_blend, true);
-    test_uint(blend_record(null, found[0])->layers[0][BOX_RENDER_BLEND_ALBEDO],
-        blend_handle(world, a));
-    test_int(blend_batches(null, cutout_mesh(world, mapped), found, 2), 1);
-    test_bool(found[0]->texture_blend, true);
-    test_int(blend_batches(null, cutout_mesh(world, hard), found, 2), 1);
-    test_bool(found[0]->texture_blend, false);
+    b = blend_only_batch(world, null, cut, a);
+    test_bool(b->cutout, false);
+    test_int(b->blend, Opaque);
+    b = blend_only_batch(world, null, blended, a);
+    test_int(b->blend, Opaque);
+    test_int(b->view, -1);
 
     ecs_fini(world);
     box_render_null_free(null);

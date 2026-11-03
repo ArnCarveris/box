@@ -510,6 +510,74 @@ void Appearance_sorted_only_with_color_curve(void) {
     box_render_null_free(null);
 }
 
+void Appearance_sorted_with_color_variance(void) {
+    // particle/curve_cost
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t e = emitter_new(world, 2, 100);
+    ecs_entity_t plain = emitter_new(world, 2, 100);
+    ecs_entity_t bare = emitter_new(world, 2, 100);
+    ecs_entity_t added = emitter_new(world, 2, 100);
+    ecs_get_mut(world, e, ParticleEmitter)->color_variance = (rgb){40, 0, 0};
+    ecs_modified(world, e, ParticleEmitter);
+    ecs_get_mut(world, bare, ParticleEmitter)->color_variance = (rgb){0, 0, 30};
+    ecs_modified(world, bare, ParticleEmitter);
+    ecs_get_mut(world, added, ParticleEmitter)->color_variance = (rgb){0, 20, 0};
+    ecs_modified(world, added, ParticleEmitter);
+    ecs_set(world, e, ParticleCurves, {
+        .opacity = { .keys = BOX_CURVE_KEYS({0, 0}, {0.2f, 1}, {1, 0}) }
+    });
+    ecs_set(world, plain, ParticleCurves, {
+        .opacity = { .keys = BOX_CURVE_KEYS({0, 0}, {0.2f, 1}, {1, 0}) }
+    });
+    ecs_set(world, added, ParticleAppearance, {.blend = ParticleAdditive});
+    ecs_set(world, added, ParticleCurves, {
+        .opacity = { .keys = BOX_CURVE_KEYS({0, 0}, {0.2f, 1}, {1, 0}) }
+    });
+    frame(world);
+
+    const box_render_particle_pool_t *pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_uint(pool->block.blend, ParticleAlpha);
+    test_uint(pool->block.gradient_row, BOX_PARTICLE_CURVE_CONSTANT);
+    test_uint(pool->block.gradient_max_row, BOX_PARTICLE_CURVE_CONSTANT);
+    test_assert(pool->block.variance[0] != 0);
+    test_uint(pool->block.sorted, 1);
+    test_uint(pool->block.sort_count, BOX_RENDER_PARTICLE_SORT_MIN);
+
+    pool = pool_of(null, plain);
+    test_assert(pool != NULL);
+    test_uint(pool->block.blend, ParticleAlpha);
+    test_flt(pool->block.variance[0], 0);
+    test_flt(pool->block.variance[1], 0);
+    test_flt(pool->block.variance[2], 0);
+    test_uint(pool->block.sorted, 0);
+    test_uint(pool->block.sort_count, 0);
+
+    pool = pool_of(null, bare);
+    test_assert(pool != NULL);
+    test_uint(pool->block.blend, ParticleAlpha);
+    test_assert(pool->block.variance[2] != 0);
+    test_uint(pool->block.sorted, 1);
+
+    pool = pool_of(null, added);
+    test_assert(pool != NULL);
+    test_uint(pool->block.blend, ParticleAdditive);
+    test_uint(pool->block.sorted, 0);
+    test_uint(pool->block.sort_count, 0);
+
+    ecs_get_mut(world, e, ParticleEmitter)->color_variance = (rgb){0, 0, 0};
+    ecs_modified(world, e, ParticleEmitter);
+    frame(world);
+    pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_uint(pool->block.sorted, 0);
+    test_uint(pool->block.sort_count, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
 void Appearance_sort_count_power_of_two(void) {
     // particle/sort
     box_render_null_t *null;

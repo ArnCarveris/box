@@ -250,8 +250,10 @@ WGPUBindGroup box_gpu_material_group(
     const box_render_packet_t *packet,
     const box_render_batch_t *b);
 
-/** Check whether a batch draws with the texture_blend variant of the mesh pipeline: an opaque
- * batch of the mesh shader with a TextureBlend, not alpha tested nor transmissive.
+/** Check whether a batch draws with the texture_blend variant of the mesh pipeline: a batch of
+ * the mesh shader with a TextureBlend, of any blend mode, alpha tested or transmissive. Its
+ * alpha tested depth prepass (fs_depth_cutout_blend) and shadow (fs_cutout_blend) pipelines bind
+ * the blend group too.
  *
  * @param b The batch
  * @return Whether it blends texture layers
@@ -502,7 +504,8 @@ void box_gpu_bake_capture(
  *
  * The cache grows with the states in use; a recompiled or released mesh or 2D shape shader
  * empties it, and a batch whose shader does not exist draws nothing. A TextureBlend batch
- * (box_gpu_texture_blends) gets the texture_blend variant, fs_blend with blend_mesh_layout.
+ * (box_gpu_texture_blends) gets the texture_blend variant, fs_blend with blend_mesh_layout, in
+ * every pass it draws in.
  *
  * @param gpu The backend
  * @param format The format of the color target
@@ -545,7 +548,8 @@ void box_gpu_forward_reset(
 
 /** Create a forward pipeline from a mesh or 2D shape module inside an error scope, to find out
  * whether the module fits the pipeline layout before it replaces the module that renders. A
- * mesh module also creates the depth prepass and the texture_blend pipelines (fs_blend) and a
+ * mesh module also creates the depth prepass and the texture_blend pipelines (fs_blend and
+ * fs_depth_cutout_blend) and a
  * 2D shape module the shadow and the slice pipelines (fs_shadow, fs_slice), so they need their
  * entry points.
  *
@@ -1314,7 +1318,33 @@ void box_gpu_debug_begin(
 bool box_gpu_debug_enabled(
     const box_render_view_t *v);
 
-/** Release the group of the wire draws of a mesh, before the mesh.
+/** Neighbor of an edge on the border of a mesh, in its edge adjacency */
+#define BOX_GPU_WIRE_NONE (0xFFFFFFFFu)
+
+/** Upload the edge adjacency of a mesh that can be wired (box_gpu_mesh_t.wireable) for its
+ * wire draws (debug_wire.wgsl): for each index, the vertex of the neighbor triangle across the
+ * edge opposite that corner which is not on the edge, or BOX_GPU_WIRE_NONE on a border.
+ *
+ * Edges are matched by the positions of their vertices, welded within a tiny distance, so the
+ * vertices a face or a uv seam duplicates still join, in linear time.
+ *
+ * The backend keeps no CPU copy of a mesh, so it is built at the upload; it has one uint32_t
+ * per index, the size of the indices.
+ *
+ * @param gpu The backend
+ * @param m The mesh, with its index count
+ * @param vertices The vertices
+ * @param vertex_count Number of vertices
+ * @param indices The indices, three per triangle
+ */
+void box_gpu_debug_mesh_adjacency(
+    box_gpu_t *gpu,
+    box_gpu_mesh_t *m,
+    const box_vertex_t *vertices,
+    uint32_t vertex_count,
+    const uint32_t *indices);
+
+/** Release the group of the wire draws of a mesh and its edge adjacency, before the mesh.
  *
  * @param m The mesh
  */

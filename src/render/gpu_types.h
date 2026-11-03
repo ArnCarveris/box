@@ -143,8 +143,11 @@ typedef struct box_gpu_mesh_t {
     uint32_t index_count;           /**< Indices to draw */
     WGPUBindGroup wire;             /**< Vertices and indices as the storage buffers of a wire
                                      *   draw (debug_wire.wgsl), NULL until the first one */
-    bool wireable;                  /**< The vertices fit in a storage buffer binding, so the
-                                     *   mesh can be wired */
+    WGPUBuffer adjacency;           /**< Edge adjacency of the wire draws, one uint32_t per
+                                     *   index (box_gpu_debug_adjacency), NULL when the mesh is
+                                     *   not wireable */
+    bool wireable;                  /**< The vertices and the adjacency fit in a storage buffer
+                                     *   binding, so the mesh can be wired */
     bool wire_reported;             /**< The error of a mesh that is not wireable was logged */
     float center[3];                /**< Center of the box around the vertex positions */
     float extent[3];                /**< Half size of the box around the vertex positions */
@@ -749,6 +752,9 @@ typedef struct box_gpu_t {
                                      *   the empty group and the transform stream */
     WGPUPipelineLayout prepass_cutout_layout; /**< Pipeline layout of the alpha tested depth
                                      *   prepass: the view, the material and the instance group */
+    WGPUPipelineLayout prepass_blend_layout; /**< Pipeline layout of the alpha tested depth
+                                     *   prepass of TextureBlend batches: the view, the blend and
+                                     *   the instance group, NULL until the first one draws */
     WGPUBindGroupLayout volume_layout; /**< Binds the probe volume a view samples */
     ecs_map_t volumes;              /**< Handle to box_gpu_volume_t */
     box_gpu_volume_t *no_volume;    /**< 1x1x1 volume of the views that use the hemisphere */
@@ -767,8 +773,9 @@ typedef struct box_gpu_t {
     box_gpu_reflect_t *reflect_source; /**< Source cubes of a chunk, NULL before the first */
     box_gpu_reflect_t *no_reflection; /**< One black slot, bound by views without probes */
     ecs_map_t forward;              /**< Forward pipeline by shader, format, blend, back face,
-                                     *   alpha test and depth mode, and the depth prepass
-                                     *   pipelines by back face and alpha test */
+                                     *   alpha test, texture blend and depth mode, and the
+                                     *   depth prepass pipelines by back face, alpha test and
+                                     *   texture blend */
     WGPUBuffer view_buffer;         /**< Uniforms of the views of a target */
     int32_t view_capacity;          /**< Views the view buffer holds */
     WGPUBindGroupLayout cluster_layout; /**< Bind group layout of the cluster pass */
@@ -789,6 +796,15 @@ typedef struct box_gpu_t {
     int32_t shadow_revision;        /**< Revision of the shader the pipelines were made with */
     WGPURenderPipeline shadow_point; /**< Pipeline of the octants of the point light tiles */
     WGPURenderPipeline shadow_point_cutout; /**< Its pipeline of the alpha tested casters */
+    WGPUPipelineLayout shadow_blend_layout; /**< Pipeline layout of the alpha tested casters
+                                     *   with a TextureBlend: the shadow pass groups and the blend
+                                     *   group, NULL until the first one draws */
+    WGPURenderPipeline shadow_cutout_blend; /**< Shadow pipeline of the alpha tested casters with
+                                     *   a TextureBlend (fs_cutout_blend), NULL until the first
+                                     *   one draws with the current shader */
+    WGPURenderPipeline shadow_point_cutout_blend; /**< Its point light pipeline
+                                     *   (fs_point_cutout_blend), NULL until the first one draws
+                                     *   with the current variant */
     uint32_t shadow_point_shader;   /**< Handle of the shadow shader variant they were made
                                      *   with, BOX_RENDER_SHADER_SHADOW_CLIP or _SHADOW */
     int32_t shadow_point_revision;  /**< Revision of that shader */

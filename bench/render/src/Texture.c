@@ -152,13 +152,19 @@ static char* bench_texture_noise(
  * Every frame waits for the GPU, so a case measures a frame. With a contrast above 0 the layers
  * have the noise as their heights.
  *
+ * With triplanar the sphere has a MappingObject TextureMapping with a blend of 1, so most
+ * fragments weigh the three projections; blended as well, that is the worst case of a
+ * TextureBlend, the mask and up to four layers sampled once per projection.
+ *
  * @param b The benchmark
  * @param blended Whether the sphere blends four layers
+ * @param triplanar Whether the sphere blends three projections
  * @param contrast TextureBlend.contrast of the blended sphere, 0 for the linear blend
  */
 static void bench_texture_frame(
     bench_t *b,
     bool blended,
+    bool triplanar,
     float contrast)
 {
     ecs_world_t *world = ecs_init();
@@ -190,6 +196,10 @@ static void bench_texture_frame(
     ecs_set(world, e, Rgb, {220, 200, 180});
     ecs_set(world, e, PbrTextures, {.albedo = tex, .orm = tex, .normal = tex, .emissive = tex});
     ecs_set(world, e, Emissive, {.strength = 0.1f, .color = {255, 255, 255}});
+    if (triplanar) {
+        ecs_set(world, e, TextureMapping, {.mode = MappingObject, .size = 1.5f, .blend = 1});
+    }
+
     if (blended) {
         TextureBlend blend = { .mask = mask, .contrast = contrast };
         int32_t i;
@@ -243,19 +253,33 @@ void Texture_single_frame(
     bench_t *b)
 {
     // materials/texture_blend
-    bench_texture_frame(b, false, 0.0f);
+    bench_texture_frame(b, false, false, 0.0f);
 }
 
 void Texture_blend_four_frame(
     bench_t *b)
 {
     // materials/texture_blend
-    bench_texture_frame(b, true, 0.0f);
+    bench_texture_frame(b, true, false, 0.0f);
 }
 
 void Texture_blend_four_height_frame(
     bench_t *b)
 {
     // materials/texture_blend
-    bench_texture_frame(b, true, 16.0f);
+    bench_texture_frame(b, true, false, 16.0f);
+}
+
+void Texture_single_triplanar_frame(
+    bench_t *b)
+{
+    // materials/texture_blend
+    bench_texture_frame(b, false, true, 0.0f);
+}
+
+void Texture_blend_four_triplanar_frame(
+    bench_t *b)
+{
+    // materials/texture_blend
+    bench_texture_frame(b, true, true, 0.0f);
 }

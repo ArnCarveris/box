@@ -873,8 +873,7 @@ done:
 bool box_gpu_texture_blends(
     const box_render_batch_t *b)
 {
-    return b->texture_blend && b->pipeline == BOX_RENDER_SHADER_MESH && b->blend == Opaque &&
-        !b->cutout && !b->transmissive;
+    return b->texture_blend && b->pipeline == BOX_RENDER_SHADER_MESH;
 }
 
 /** Get a texture a blend samples: an image of the backend, not the image of a target.

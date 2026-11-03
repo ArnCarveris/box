@@ -11,7 +11,8 @@
  * change while off, the edges and diagonals of the triangles, hidden lines of the overlay,
  * WireframeOnly without shaded meshes and occlusion, the width in pixels, parametric surfaces,
  * instances, blended and transmissive meshes, 2D shapes that are not wired, several views,
- * replaced meshes and the grid with the wireframe; checked on PNG captures.
+ * replaced meshes, the grid with the wireframe, and lines on the outline of a quad and a sphere
+ * and on the edges of a box with the width of the view; checked on PNG captures.
  *
  * Most cases look straight down from 10 units with a 60 degree field of view into a black 128
  * pixel capture: 11.09 pixels a unit, +X right and +Z down, the origin at the center, white
@@ -2637,6 +2638,135 @@ void ViewDebug_wire_with_grid(void) {
     test_assert(top[0] < 30);
     test_assert(top[1] < 30);
     test_assert(top[2] < 30);
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+/** The border edge of a quad, with a triangle on one side only, has the width of the view like
+ * its diagonal between two triangles, and at 3 pixels is three times as wide as at 1.
+ *
+ * At 1 pixel the left edge crosses a row over about a pixel and the diagonal over about two:
+ * fwidth measures the distance to a diagonal edge short by the square root of two, and a row
+ * crosses it over that much more. */
+void ViewDebug_wire_silhouette_quad(void) {
+    // debug/wireframe
+    float borders[2], diagonals[2];
+    int32_t w;
+    for (w = 0; w < 2; w ++) {
+        ecs_world_t *world = dg_world();
+        dw_view(world, dw_camera(world, 10), WireframeOverlay, dw_green, w ? 3.0f : 1.0f);
+        ecs_entity_t quad = dw_shape(world, 0, 0, 0, (Rgb){255, 0, 0});
+        ecs_set(world, quad, Quad, {6, 6});
+        unsigned char *px = dg_render(world,
+            w ? "wire_silhouette_quad_b.png" : "wire_silhouette_quad_a.png");
+        float s = dw_scale(10);
+        int32_t row = (int32_t)(64.0f - 1.5f * s);
+        float left = 64.0f - 3.0f * s;
+        borders[w] = dw_green_sum(px, row, (int32_t)left - 4, (int32_t)left + 6);
+        diagonals[w] = dw_green_sum(px, row, (int32_t)(64.0f - 1.5f * s) - 8,
+            (int32_t)(64.0f - 1.5f * s) + 8) + dw_green_sum(px, row,
+            (int32_t)(64.0f + 1.5f * s) - 8, (int32_t)(64.0f + 1.5f * s) + 8);
+        stbi_image_free(px);
+        ecs_fini(world);
+    }
+
+    test_assert(borders[0] > 0.7f);
+    test_assert(borders[0] < 1.4f);
+    test_assert(borders[0] / (diagonals[0] * 0.5f) > 0.7f);
+    test_assert(borders[0] / (diagonals[0] * 0.5f) < 1.4f);
+    test_assert(borders[1] > 2.3f);
+    test_assert(borders[1] < 3.7f);
+    test_assert(borders[1] / borders[0] > 2.4f);
+    test_assert(borders[1] / borders[0] < 3.6f);
+}
+
+/** The outline of a sphere at 1 pixel in the overlay has the width of its interior lines.
+ *
+ * Seen from the side by an orthographic camera, its silhouette is the meridian at the left
+ * edge, between triangles facing the camera and away from it; the next meridian, between two
+ * triangles facing it, crosses a row of the band above the equator over as many pixels. */
+void ViewDebug_wire_silhouette_sphere(void) {
+    // debug/wireframe
+    ecs_world_t *world = dg_world();
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Rotation, {0, 0, 0});
+    ecs_set(world, camera, Camera, {.near_ = 0.1f, .far_ = 100, .ortho = true,
+        .ortho_height = 6});
+    dw_view(world, camera, WireframeOverlay, dw_green, 1);
+    ecs_entity_t sphere = dw_shape(world, 0, 0, 0, (Rgb){255, 0, 0});
+    ecs_set(world, sphere, Sphere, {.segments = 8, .radius = 2});
+    unsigned char *px = dg_render(world, "wire_silhouette_sphere.png");
+
+    float s = 128.0f / 6.0f;
+    int32_t row = 64 - 4;
+    float outline = 64.0f - 2.0f * s, meridian = 64.0f - 2.0f * 0.70710678f * s;
+    float outer = dw_green_sum(px, row, (int32_t)outline - 3, (int32_t)outline + 3);
+    float inner = dw_green_sum(px, row, (int32_t)meridian - 3, (int32_t)meridian + 3);
+    test_assert(inner > 0.6f);
+    test_assert(inner < 1.6f);
+    test_assert(outer / inner > 0.7f);
+    test_assert(outer / inner < 1.45f);
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+/** The seam of a sphere, where its first and last meridian meet at positions computed apart,
+ * is not double width: turned around Y in steps of a segment, each meridian in turn crosses the
+ * same row at the same column with the width of the view. */
+void ViewDebug_wire_sphere_seam(void) {
+    // debug/wireframe
+    float s = 128.0f / 6.0f, lo = 1e9f, hi = 0;
+    float meridian = 64.0f - 2.0f * 0.70710678f * s;
+    int32_t k;
+    for (k = 0; k < 8; k ++) {
+        ecs_world_t *world = dg_world();
+        ecs_entity_t camera = ecs_new(world);
+        ecs_set(world, camera, Position, {0, 0, 10});
+        ecs_set(world, camera, Rotation, {0, 0, 0});
+        ecs_set(world, camera, Camera, {.near_ = 0.1f, .far_ = 100, .ortho = true,
+            .ortho_height = 6});
+        dw_view(world, camera, WireframeOverlay, dw_green, 1);
+        ecs_entity_t sphere = dw_shape(world, 0, 0, 0, (Rgb){255, 0, 0});
+        ecs_set(world, sphere, Sphere, {.segments = 8, .radius = 2});
+        ecs_set(world, sphere, Rotation, {0, (float)k * (float)GLM_PI_4, 0});
+        unsigned char *px = dg_render(world, "wire_sphere_seam.png");
+        float sum = dw_green_sum(px, 64 - 4, (int32_t)meridian - 3, (int32_t)meridian + 3);
+        lo = sum < lo ? sum : lo;
+        hi = sum > hi ? sum : hi;
+        stbi_image_free(px);
+        ecs_fini(world);
+    }
+
+    test_assert(lo > 0.6f);
+    test_assert(hi < 1.6f);
+    test_assert(hi / lo < 1.45f);
+}
+
+/** The edges of a box, whose faces have vertices of their own, are not double width: turned by
+ * 45 degrees around Y, the edge between the two faces the camera sees has the width of the
+ * view, as do its outline edges on either side. */
+void ViewDebug_wire_box_edges(void) {
+    // debug/wireframe
+    ecs_world_t *world = dg_world();
+    dw_view(world, dw_camera(world, 10), WireframeOverlay, dw_green, 1);
+    ecs_entity_t box = dw_shape(world, 0, 0, 0, (Rgb){255, 0, 0});
+    ecs_set(world, box, Box, {2, 2, 2});
+    ecs_set(world, box, Rotation, {0, (float)GLM_PI_4, 0});
+    unsigned char *px = dg_render(world, "wire_box_edges.png");
+
+    int32_t row = 64;
+    float middle = dw_green_sum(px, row, 64 - 3, 64 + 3);
+    float side = 1.41421356f * dw_scale(10);
+    float left = dw_green_sum(px, row, (int32_t)(64.0f - side) - 3, (int32_t)(64.0f - side) + 3);
+    float right = dw_green_sum(px, row, (int32_t)(64.0f + side) - 3,
+        (int32_t)(64.0f + side) + 3);
+    test_assert(middle > 0.6f);
+    test_assert(middle < 1.45f);
+    test_assert(left > 0.6f);
+    test_assert(left < 1.45f);
+    test_assert(right > 0.6f);
+    test_assert(right < 1.45f);
     stbi_image_free(px);
     ecs_fini(world);
 }

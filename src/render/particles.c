@@ -1093,13 +1093,14 @@ static void box_particles_block_still(
 /** Write the changes over the life and the appearance of an emitter into its block.
  *
  * Without ParticleCurves the curves change nothing; without ParticleAppearance the particles
- * are soft alpha blended circles, unsorted unless a color curve changes their color over their
- * life: particles of one color blend the same in any order, whatever their opacity and size.
+ * are soft alpha blended circles, unsorted unless their colors can differ: a color curve that
+ * changes their color over their life or a color variance that gives each its own color.
+ * Particles of one color blend the same in any order, whatever their opacity and size.
  *
  * @param look The ParticleAppearance of the emitter, NULL for none
  * @param pool The pool, with its billboard corners and the rows of its curves and of its
  *             ParticleMotion
- * @param out The block, its other members written
+ * @param out The block, its other members written, its color variance among them
  */
 static void box_particles_block_look(
     const ParticleAppearance *look,
@@ -1155,6 +1156,7 @@ static void box_particles_block_look(
 
     out->styled = look ? 1u : 0u;
     out->sorted = out->blend == ParticleAlpha && (look ||
+        out->variance[0] != 0 || out->variance[1] != 0 || out->variance[2] != 0 ||
         out->gradient_row != BOX_PARTICLE_CURVE_CONSTANT ||
         out->gradient_max_row != BOX_PARTICLE_CURVE_CONSTANT) ? 1u : 0u;
     out->sort_count = out->sorted ? box_particles_sort_count(pool->used, pool->capacity) : 0;
