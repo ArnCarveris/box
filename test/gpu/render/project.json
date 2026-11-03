@@ -382,7 +382,8 @@
                     "single_channel_mask",
                     "rgba_mask",
                     "arrays_shared_released",
-                    "layer_change_rebuilds"
+                    "layer_change_rebuilds",
+                    "height_contrast"
                 ]
             },
             {
@@ -1029,7 +1030,14 @@
                     "ancestor_opacity_mid_transition",
                     "rgb_keeps_shadow",
                     "ancestor_tint_mid_transition",
-                    "shadow_removed_mid_transition"
+                    "shadow_removed_mid_transition",
+                    "box_shadow_offset_blur",
+                    "box_shadow_color",
+                    "box_shadow_with_opacity",
+                    "box_shadow_with_position",
+                    "box_shadow_end_matches_target",
+                    "box_shadow_no_area",
+                    "box_shadow_removed"
                 ]
             },
             {

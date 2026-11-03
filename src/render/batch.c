@@ -666,7 +666,9 @@ static void box_draws_shadow_materials(
     ecs_vec_clear(&d->shadow_materials);
 }
 
-/** Get the revision of the albedo image an alpha tested caster batch renders its tiles with.
+/** Get the revision of the albedo image an alpha tested caster batch renders its tiles with,
+ * for a batch with a TextureBlend the sum of the revisions of its mask and of the albedo of
+ * each layer, which only grow, so a new image of any of them changes it.
  *
  * @param d The state
  * @param b The batch
@@ -676,9 +678,35 @@ static uint32_t box_draws_shadow_texture(
     const box_render_draws_t *d,
     const box_draw_batch_t *b)
 {
-    return b->key.cutout && box_draws_caster(b)
-        ? box_textures_revision(d->textures, b->key.textures[0])
-        : 0;
+    const TextureBlend *blend;
+    uint32_t result = 0;
+    int32_t k;
+    if (!b->key.cutout || !box_draws_caster(b)) {
+        goto done;
+    }
+
+    if (!b->key.texture_blend) {
+        result = box_textures_revision(d->textures, b->key.textures[0]);
+        goto done;
+    }
+
+    blend = d->world ? ecs_get(d->world, b->key.textures[0], TextureBlend) : NULL;
+    if (!blend) {
+        goto done;
+    }
+
+    result = box_textures_revision(d->textures, blend->mask);
+    for (k = 0; k < BOX_RENDER_BLEND_LAYERS; k ++) {
+        ecs_entity_t layer = blend->layers[k];
+        const PbrTextures *textures = layer && ecs_is_alive(d->world, layer)
+            ? ecs_get(d->world, layer, PbrTextures) : NULL;
+        if (textures) {
+            result += box_textures_revision(d->textures, textures->albedo);
+        }
+    }
+
+done:
+    return result;
 }
 
 void box_draws_slot_remove(
@@ -1481,7 +1509,10 @@ void box_draws_batch_blend(
     }
 
     if (blend) {
+        float contrast = isfinite(blend->contrast) && blend->contrast > 0.0f
+            ? blend->contrast : 0.0f;
         r->mask = box_draws_texture_handle(d, blend->mask);
+        r->contrast = contrast;
         for (k = 0; k < BOX_RENDER_BLEND_LAYERS; k ++) {
             /* TextureBlend stores plain ids: a deleted layer counts as one without
              * PbrTextures */
@@ -1495,6 +1526,11 @@ void box_draws_batch_blend(
             }
 
             r->count = (uint32_t)k + 1;
+            if (contrast > 0.0f) {
+                r->layers[k][BOX_RENDER_BLEND_HEIGHT] = box_draws_texture_handle(d,
+                    blend->heights[k]);
+            }
+
             if (textures) {
                 r->layers[k][BOX_RENDER_BLEND_ALBEDO] = box_draws_texture_handle(d,
                     textures->albedo);
@@ -1845,6 +1881,7 @@ static void box_draws_send_blended(
             out->shadow = b->key.shadow;
             out->mesh = b->key.mesh;
             box_draws_batch_textures(d, b, out);
+            box_draws_batch_blend(p, d, b, out);
             box_draws_batch_page(d, b, out);
             out->first_instance = 0;
             out->listed = true;

@@ -66,7 +66,9 @@
                     "texture_blend_prefab",
                     "texture_blend_layer_changes",
                     "texture_blend_layer_deleted",
-                    "texture_blend_plain_fallback"
+                    "texture_blend_height_record",
+                    "texture_blend_height_key",
+                    "texture_blend_every_shape"
                 ]
             },
             {
@@ -527,6 +529,22 @@
                     "bezier_overshoot_rgb",
                     "bezier_invalid_x",
                     "bezier_interrupt"
+                ]
+            },
+            {
+                "id": "TransitionBoxShadow",
+                "testcases": [
+                    "values",
+                    "dynamic_batch",
+                    "mid_matches_static",
+                    "end_matches_static",
+                    "with_opacity",
+                    "with_position",
+                    "removed_mid_transition",
+                    "no_area",
+                    "no_transition_snaps",
+                    "prefab_instance",
+                    "layout"
                 ]
             },
             {

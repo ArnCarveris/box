@@ -250,8 +250,10 @@ WGPUBindGroup box_gpu_material_group(
     const box_render_packet_t *packet,
     const box_render_batch_t *b);
 
-/** Check whether a batch draws with the texture_blend variant of the mesh pipeline: an opaque
- * batch of the mesh shader with a TextureBlend, not alpha tested nor transmissive.
+/** Check whether a batch draws with the texture_blend variant of the mesh pipeline: a batch of
+ * the mesh shader with a TextureBlend, of any blend mode, alpha tested or transmissive. Its
+ * alpha tested depth prepass (fs_depth_cutout_blend) and shadow (fs_cutout_blend) pipelines bind
+ * the blend group too.
  *
  * @param b The batch
  * @return Whether it blends texture layers
@@ -502,7 +504,8 @@ void box_gpu_bake_capture(
  *
  * The cache grows with the states in use; a recompiled or released mesh or 2D shape shader
  * empties it, and a batch whose shader does not exist draws nothing. A TextureBlend batch
- * (box_gpu_texture_blends) gets the texture_blend variant, fs_blend with blend_mesh_layout.
+ * (box_gpu_texture_blends) gets the texture_blend variant, fs_blend with blend_mesh_layout, in
+ * every pass it draws in.
  *
  * @param gpu The backend
  * @param format The format of the color target
@@ -545,7 +548,8 @@ void box_gpu_forward_reset(
 
 /** Create a forward pipeline from a mesh or 2D shape module inside an error scope, to find out
  * whether the module fits the pipeline layout before it replaces the module that renders. A
- * mesh module also creates the depth prepass and the texture_blend pipelines (fs_blend) and a
+ * mesh module also creates the depth prepass and the texture_blend pipelines (fs_blend and
+ * fs_depth_cutout_blend) and a
  * 2D shape module the shadow and the slice pipelines (fs_shadow, fs_slice), so they need their
  * entry points.
  *

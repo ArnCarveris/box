@@ -550,17 +550,8 @@ ecs_entity_t box_draws_blend_owner(
     const box_draw_key_t *key)
 {
     ecs_entity_t result = 0;
-    const TextureMapping *mapping;
-    if (key->pipeline != BOX_RENDER_SHADER_MESH || key->blend != Opaque || key->cutout ||
-        key->transmissive || !ecs_id_in_use(world, ecs_id(TextureBlend)) ||
+    if (key->pipeline != BOX_RENDER_SHADER_MESH || !ecs_id_in_use(world, ecs_id(TextureBlend)) ||
         !ecs_get(world, e, TextureBlend))
-    {
-        goto done;
-    }
-
-    mapping = ecs_get(world, e, TextureMapping);
-    if (mapping && mapping->mode != MappingUv && isfinite(mapping->blend) &&
-        mapping->blend > 0.0f)
     {
         goto done;
     }
@@ -1077,6 +1068,9 @@ static void box_draws_observers(
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
     box_draws_observer(world, d, "DrawsOnTransitionOpacity", (ecs_observer_desc_t){
         .query.terms = {{ .id = TransitionOpacity }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
+    box_draws_observer(world, d, "DrawsOnTransitionBoxShadow", (ecs_observer_desc_t){
+        .query.terms = {{ .id = TransitionBoxShadow }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
     box_draws_observer(world, d, "DrawsOnLightBake", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(LightBake) }},
