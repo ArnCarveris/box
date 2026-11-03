@@ -28,6 +28,7 @@ typedef struct AnimatorState {
     bool started;           /**< The clip played at least one frame */
     bool dirty;             /**< The hierarchy under the entity changed */
     ecs_vec_t bindings;     /**< animator_binding_t, the valid tracks with a target */
+    ecs_vec_t previous;     /**< animator_binding_t, the bindings before the last build */
     ecs_vec_t warned;       /**< ecs_entity_t, tracks whose missing target was reported */
 } AnimatorState;
 
@@ -41,6 +42,7 @@ static void box_animator_state_free(
     AnimatorState *s)
 {
     ecs_vec_fini_t(NULL, &s->bindings, animator_binding_t);
+    ecs_vec_fini_t(NULL, &s->previous, animator_binding_t);
     ecs_vec_fini_t(NULL, &s->warned, ecs_entity_t);
 }
 
@@ -135,13 +137,16 @@ static AnimatorWorld* box_animator_world(
     return result;
 }
 
-void box_animator_changed(
+uint32_t box_animator_changed(
     ecs_world_t *world)
 {
     AnimatorWorld *w = box_animator_world(world);
+    uint32_t result = 0;
     if (w) {
-        w->version ++;
+        result = ++ w->version;
     }
+
+    return result;
 }
 
 /** Clamp a value to a range.
@@ -224,6 +229,29 @@ static void box_animator_bind(
     }
 }
 
+/** Whether the bindings of an animator differ from the ones before its last build: a track,
+ * its target, its resolved member or its version, so a key edit of a track counts.
+ *
+ * @param s The state
+ * @return True when the bindings changed
+ */
+static bool box_animator_rebound(
+    const AnimatorState *s)
+{
+    const animator_binding_t *b = ecs_vec_first_t(&s->bindings, animator_binding_t);
+    const animator_binding_t *p = ecs_vec_first_t(&s->previous, animator_binding_t);
+    int32_t i, count = ecs_vec_count(&s->bindings);
+    bool result = count != ecs_vec_count(&s->previous);
+    for (i = 0; i < count && !result; i ++) {
+        result = b[i].track != p[i].track || b[i].target != p[i].target ||
+            b[i].state.component != p[i].state.component ||
+            b[i].state.size != p[i].state.size || b[i].state.offset != p[i].state.offset ||
+            b[i].state.kind != p[i].state.kind || b[i].state.version != p[i].state.version;
+    }
+
+    return result;
+}
+
 /** Rebuild the bindings of an animator: the target of each track of its clip.
  *
  * @param world The world
@@ -231,26 +259,34 @@ static void box_animator_bind(
  * @param a Its animator
  * @param s Its state
  * @param version The current AnimatorWorld.version
+ * @return True when the clip, its duration or the bindings changed, so the values are written
  */
-static void box_animator_build(
+static bool box_animator_build(
     const ecs_world_t *world,
     ecs_entity_t e,
     const Animator *a,
     AnimatorState *s,
     uint32_t version)
 {
+    bool result = !s->built || s->clip != a->clip;
     if (s->clip != a->clip) {
         ecs_vec_clear(&s->warned);
         s->back = false;
         s->started = false;
     }
 
+    ecs_vec_t previous = s->previous;
+    s->previous = s->bindings;
+    s->bindings = previous;
     ecs_vec_clear(&s->bindings);
+
+    float duration = box_animation_clip_duration(world, a->clip);
+    result = result || duration != s->duration;
     s->clip = a->clip;
     s->version = version;
     s->dirty = false;
     s->built = true;
-    s->duration = box_animation_clip_duration(world, a->clip);
+    s->duration = duration;
 
     ecs_iter_t it = ecs_children(world, a->clip);
     while (ecs_children_next(&it)) {
@@ -259,6 +295,8 @@ static void box_animator_build(
             box_animator_bind(world, e, s, it.entities[i]);
         }
     }
+
+    return result || box_animator_rebound(s);
 }
 
 /** Advance the time of an animator by a step and wrap it by its mode.
@@ -367,12 +405,13 @@ static void box_animator_play(
     ecs_entity_t clip = a->clip;
     if (clip && ecs_is_alive(world, clip) && ecs_has(world, clip, AnimationClip)) {
         bool rebuild = !s->built || s->clip != clip || s->version != version || s->dirty;
+        bool changed = false;
         if (rebuild) {
-            box_animator_build(world, e, a, s, version);
+            changed = box_animator_build(world, e, a, s, version);
         }
 
         float time = a->time;
-        bool write = rebuild || !s->started || time != s->time;
+        bool write = changed || !s->started || time != s->time;
         if (!s->started && a->speed < 0.0f && time <= 0.0f) {
             time = s->duration;
         }
