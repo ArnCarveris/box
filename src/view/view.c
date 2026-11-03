@@ -8,7 +8,7 @@
 
 /** Construct View values that are lit, sample the baked lighting and the reflection probes of
  * their scene, render its atmosphere and fog volumes, light with an environment at intensity 1,
- * have the documented shadow defaults and cull with occlusion and a smallest size of one pixel.
+ * have the documented shadow and grid defaults and cull with occlusion down to one pixel.
  *
  * The shadow lookup moves along the geometric normal by 2 texels times 1 - N.L: Esoterica's
  * offset scale, and the smallest offset that keeps a normal mapped floor under a 10 degree sun
@@ -52,6 +52,14 @@ static void box_view_ctor(
             .enabled = true,
             .occlusion = true,
             .min_dimension_px = 1.0f
+        };
+        values[i].debug.grid = (GridSettings){
+            .cell_size = 1.0f,
+            .major_every = 10,
+            .fade_distance = 100.0f,
+            .line_width = 1.0f,
+            .color = {128, 128, 128, 128},
+            .major_color = {128, 128, 128, 200}
         };
     }
 }
@@ -101,6 +109,8 @@ void BoxViewImport(
     ECS_META_COMPONENT(world, LightSettings);
     ECS_META_COMPONENT(world, ShadowSettings);
     ECS_META_COMPONENT(world, CullSettings);
+    ECS_META_COMPONENT(world, GridSettings);
+    ECS_META_COMPONENT(world, ViewDebug);
     ECS_META_COMPONENT(world, ViewEffect);
     ecs_set_hooks(world, ViewEffect, { .ctor = box_view_effect_ctor });
     ECS_META_COMPONENT(world, View);

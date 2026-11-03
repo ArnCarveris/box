@@ -2,7 +2,7 @@
     "id": "bench_core",
     "type": "application",
     "value": {
-        "description": "Benchmarks for box.app and box.jobs",
+        "description": "Benchmarks for box.app, box.jobs, box.movement and box.animation",
         "public": false,
         "use": [
             "box"
@@ -40,6 +40,13 @@
                 "benchcases": [
                     "set_100k",
                     "modified_100k"
+                ]
+            },
+            {
+                "id": "Animator",
+                "benchcases": [
+                    "position_y_1k",
+                    "position_y_10k"
                 ]
             }
         ]

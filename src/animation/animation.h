@@ -33,6 +33,35 @@ char* box_animation_resolve(
     const AnimationTrack *track,
     AnimationTrackState *out);
 
+/** Look up a child by name. A child of an instance spawned from its prefab has no name of its
+ * own; it is found through the IsA pair to the prefab child of that name.
+ *
+ * @param world The world
+ * @param parent The parent
+ * @param name The name, not terminated
+ * @param length The length of the name
+ * @return The child, 0 when there is none
+ */
+ecs_entity_t box_animation_child(
+    const ecs_world_t *world,
+    ecs_entity_t parent,
+    const char *name,
+    ecs_size_t length);
+
+/** Look up the target of a track: a path of names separated by dots, relative to an entity.
+ * Each name is looked up with box_animation_child, so a path reaches the children of an
+ * instance.
+ *
+ * @param world The world
+ * @param entity The animated entity
+ * @param path The path
+ * @return The target, 0 when a name is missing
+ */
+ecs_entity_t box_animation_lookup(
+    const ecs_world_t *world,
+    ecs_entity_t entity,
+    const char *path);
+
 /** Store a value into a numeric member. An integer rounds to nearest and clamps to the range
  * of its type, so an overshooting curve keeps a uint8_t channel in 0..255.
  *
@@ -61,5 +90,28 @@ bool box_animation_write(
     ecs_entity_t track,
     ecs_entity_t entity,
     float value);
+
+/** World state of the animators, a singleton on its component */
+typedef struct AnimatorWorld {
+    uint32_t version;   /**< Bumped when a track or a clip changes, so animators rebuild */
+    int32_t count;      /**< Entities with the private state of an Animator */
+} AnimatorWorld;
+
+/** Id of the private animator world singleton */
+extern ECS_COMPONENT_DECLARE(AnimatorWorld);
+
+/** Signal that a track or a clip changed, so that every animator rebuilds its tracks.
+ *
+ * @param world The world
+ */
+void box_animator_changed(
+    ecs_world_t *world);
+
+/** Register Animator, its private state, the observers that keep it current and AnimatorPlay.
+ *
+ * @param world The world
+ */
+void box_animator_import(
+    ecs_world_t *world);
 
 #endif

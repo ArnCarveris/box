@@ -423,6 +423,40 @@
                     "sample_deleted_track",
                     "sample_no_alloc"
                 ]
+            },
+            {
+                "id": "Animator",
+                "testcases": [
+                    "defaults",
+                    "position_moves",
+                    "rgb_changes",
+                    "member_only_keeps_other_members",
+                    "light_intensity",
+                    "speed",
+                    "negative_speed",
+                    "paused",
+                    "seek_while_paused",
+                    "seek_while_playing",
+                    "once_holds_and_finishes",
+                    "loop_wraps",
+                    "ping_pong_turns",
+                    "large_delta_boundary",
+                    "child_target",
+                    "missing_target_warns_once",
+                    "reparented_child_resolves",
+                    "deleted_child_skips",
+                    "instances_own_time",
+                    "prefab_write_overrides",
+                    "script_prefab",
+                    "onset_fires",
+                    "transform_follows",
+                    "change_clip",
+                    "changed_track",
+                    "deleted_clip",
+                    "disabled_not_played",
+                    "no_clip_no_op",
+                    "no_animators_no_cost"
+                ]
             }
         ]
     }

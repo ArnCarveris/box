@@ -1248,9 +1248,9 @@ done:
     return;
 }
 
-/** Send the slot records of the shape and the glyphs of an entity a node moves: the target
- * chain from the node with the instance matrix of each, as box_draws_transform and the glyph
- * quads write them.
+/** Send the slot records of the shape, the shadow and the glyphs of an entity a node moves: the
+ * target chain from the node with the instance matrix of each, as box_draws_transform, the
+ * shadow (box_draws_box_shadow_instance) and the glyph quads write them.
  *
  * @param world The world
  * @param s The state of the extract
@@ -1287,6 +1287,13 @@ static void box_transition_send_slots(
         instance[2][2] = shape->scale[2];
         glm_mul(rel, instance, m);
         box_transition_send_slot(world, s, d, p, item->node, ds->batch, ds->slot, m, range);
+    }
+
+    const BoxShadowSlot *bs = ds && ds->batch >= 0
+        ? ecs_get(world, item->entity, BoxShadowSlot) : NULL;
+    if (bs && bs->batch >= 0 && box_draws_box_shadow_instance(world, item->entity, instance)) {
+        glm_mul(rel, instance, m);
+        box_transition_send_slot(world, s, d, p, item->node, bs->batch, bs->slot, m, range);
     }
 
     count = ts && tg ? ecs_vec_count(&ts->slots) : 0;
@@ -1476,86 +1483,6 @@ done:
     return;
 }
 
-/** Apply the Tint and Opacity of an entity after a chain, as box_draws_fade and
- * box_draws_mesh_shading compose them.
- *
- * @param world The world
- * @param e The entity
- * @param rel The chain
- */
-static void box_transition_fade_own(
-    const ecs_world_t *world,
-    ecs_entity_t e,
-    box_transition_fade_rel_t *rel)
-{
-    const Tint *tint = ecs_get(world, e, Tint);
-    const Opacity *opacity = ecs_get(world, e, Opacity);
-    int32_t i;
-    if (tint) {
-        float a = (float)tint->a / 255.0f;
-        const uint8_t *own = &tint->r;
-        for (i = 0; i < 3; i ++) {
-            rel->tint.add[i] = rel->tint.add[i] * (1.0f - a) + (float)own[i] / 255.0f * a;
-        }
-
-        rel->tint.keep *= 1.0f - a;
-    }
-
-    if (opacity) {
-        rel->alpha *= glm_clamp(opacity->value, 0.0f, 1.0f);
-    }
-}
-
-/** Send the fade record of a node: the composed Tint and Opacity from its parent node, or of
- * every ancestor without a parent node, and its target Tint and Opacity.
- *
- * @param world The world
- * @param p The packet
- * @param item The item of the node
- * @param rel The chain from the parent node, NULL without a parent node
- */
-static void box_transition_send_fade(
-    const ecs_world_t *world,
-    box_render_packet_t *p,
-    const box_transition_item_t *item,
-    const box_transition_fade_rel_t *rel)
-{
-    box_render_transition_fade_t fade = {0};
-    const Tint *tint = ecs_get(world, item->entity, Tint);
-    const Opacity *opacity = ecs_get(world, item->entity, Opacity);
-    box_draw_tint_t ancestors;
-    uint32_t offset = 0;
-    if (rel) {
-        glm_vec3_copy(ECS_CONST_CAST(float*, rel->tint.add), fade.add);
-        fade.keep = rel->tint.keep;
-        fade.alpha = rel->alpha;
-    } else {
-        fade.alpha = box_draws_fade(world, item->entity, &ancestors);
-        glm_vec3_copy(ancestors.add, fade.add);
-        fade.keep = ancestors.keep;
-    }
-
-    if (tint) {
-        fade.present |= 1u << BOX_RENDER_TRANSITION_TINT;
-        fade.tint[0] = tint->r;
-        fade.tint[1] = tint->g;
-        fade.tint[2] = tint->b;
-        fade.tint[3] = tint->a;
-    }
-
-    if (opacity) {
-        fade.present |= 1u << BOX_RENDER_TRANSITION_OPACITY;
-        fade.opacity = opacity->value;
-    }
-
-    void *dst = box_render_packet_reserve(p, (uint32_t)sizeof(fade), &offset);
-    ecs_os_memcpy(dst, &fade, ECS_SIZEOF(fade));
-    box_render_transition_record_t *r = box_render_packet_transition(
-        p, BOX_RENDER_TRANSITION_FADE, item->node);
-    r->parent = item->parent;
-    r->data = offset;
-}
-
 /** Send the shading record of the mesh shape of an entity an active Tint or Opacity transition
  * reaches, when its batch uploaded its shading into this packet. An alpha tested caster records
  * its region, as its shadow reads the alpha.
@@ -1626,10 +1553,11 @@ static void box_transition_send_fades(
         }
 
         if (item->is_node) {
-            box_transition_send_fade(world, p, item, item->parent ? up : NULL);
+            box_draws_transition_send_fade(world, p, item->entity, item->node, item->parent,
+                item->parent && up ? &up->tint : NULL, item->parent && up ? up->alpha : 1.0f);
         } else if (up) {
             *rel = *up;
-            box_transition_fade_own(world, item->entity, rel);
+            box_draws_transition_fade_own(world, item->entity, &rel->tint, &rel->alpha);
         }
 
         box_transition_send_mesh(world, s, d, p, item->entity);
@@ -1702,9 +1630,48 @@ done:
     return;
 }
 
+/** Send the shading record of the shadow of a 2D shape an active Tint or Opacity transition
+ * reaches, when the batch of the shadow uploaded its shading into this packet. An Rgb or other
+ * material transition of the shape does not change its shadow.
+ *
+ * @param world The world
+ * @param s The state of the extract
+ * @param d The state of the batches
+ * @param p The packet
+ * @param e The entity
+ * @param ds The DrawSlot of the entity
+ * @param material Material components of its shape
+ */
+static void box_transition_send_box_shadow(
+    const ecs_world_t *world,
+    const box_render_transitions_t *s,
+    box_render_draws_t *d,
+    box_render_packet_t *p,
+    ecs_entity_t e,
+    const DrawSlot *ds,
+    const box_draw_material_t *material)
+{
+    const BoxShadowSlot *bs = ecs_get(world, e, BoxShadowSlot);
+    box_draw_transition_material_t target;
+    uint32_t offset;
+    if (!bs || bs->batch < 0 || !ecs_map_get(&s->fade_index, e) ||
+        !box_transition_shading_data(d, p, bs->batch, bs->slot, &offset) ||
+        !box_draws_box_shadow_target(world, d, e, ds, material, &target))
+    {
+        goto done;
+    }
+
+    box_transition_fade_target(s, e, p->time, &target);
+    if (target.fade_node) {
+        box_transition_send_material(p, BOX_RENDER_TRANSITION_SHADING, &target, offset);
+    }
+done:
+    return;
+}
+
 /** Send a material record for every slot of the material table an active material transition
- * patches and that the table uploaded into this packet, and a shading record for the 2D shape
- * and the glyphs of every drawn entity it patches whose batch uploaded its shading.
+ * patches and that the table uploaded into this packet, and a shading record for the 2D shape,
+ * its shadow and the glyphs of every drawn entity it patches whose batch uploaded its shading.
  *
  * @param world The world
  * @param s The state of the extract
@@ -1752,6 +1719,7 @@ static void box_transition_send_materials(
             ecs_os_memcpy(target.nodes, item->nodes, ECS_SIZEOF(target.nodes));
             box_transition_fade_target(s, item->entity, p->time, &target);
             box_transition_send_material(p, BOX_RENDER_TRANSITION_SHADING, &target, offset);
+            box_transition_send_box_shadow(world, s, d, p, item->entity, ds, &material);
         }
 
         box_transition_send_glyphs(world, s, d, p, item);
