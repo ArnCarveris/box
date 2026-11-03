@@ -77,6 +77,7 @@
                     "dropdown_press_outside_closes",
                     "dropdown_list_covers_below",
                     "dropdown_opens_upward",
+                    "dropdown_list_hides_scrolled_out",
                     "dropdown_space_binding",
                     "tabs_click",
                     "tabs_arrows",

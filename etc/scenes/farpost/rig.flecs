@@ -1,0 +1,152 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.camera
+using box.view
+using box.effects
+using box.light
+using box.geometry
+using box.material
+using box.spatial
+using box.surface
+using box.transition
+using box.app
+using box.input
+
+$ {
+  AmbientLight: {sky: {62, 54, 46}, ground: {46, 32, 22}, intensity: 0.9}
+  ReflectionBake: {resolution: 128, budget_ms: 1, scene_probe: false, environment: space_light}
+}
+
+eye {
+  Position: {eye_x, eye_y, eye_z}
+  Rotation: {eye_pitch, eye_yaw, eye_roll}
+  Camera: {fov: eye_fov, near_: 0.03, far_: 60000}
+}
+
+fx_ao { Gtao: {radius: 0.14, final_value_power: 2.0, quality: GtaoMedium} }
+fx_bloom { Bloom: {intensity: 0.3, threshold: 0.95, threshold_softness: 0.6, low_frequency_boost: 0.4} }
+fx_exposure { AutoExposure: {min_brightness: 0.09, max_brightness: 0.22, speed_up: 1.4, speed_down: 0.7, min_exposure: 0.45, max_exposure: 2.4} }
+fx_film { Tonemap: {operator_: TonyMcMapface} }
+fx_edge { Smaa: {} }
+
+main_view {
+  View: {
+    camera: eye,
+    clear: {enabled: true, color: {0, 0, 0, 255}},
+    shadows: {enabled: true, max_distance: 900, resolution: 2048, cascades: 3, split_lambda: 0.95, depth_bias: 1.4, normal_offset: 1.6, filter_size: 3},
+    lighting: {environment: {source: space_light, intensity: 0.5, background: false}},
+    culling: {enabled: true, occlusion: false, min_dimension_px: 1},
+    effects: [{enabled: true, effect: fx_ao}, {enabled: true, effect: fx_bloom}, {enabled: true, effect: fx_film}, {enabled: true, effect: fx_edge}]
+  }
+}
+
+tex_cctv {}
+tex_feed_a {}
+
+fn feed_px(c: i32) -> f32 {
+  match c { 0: 54; 1: -46; 2: 120; 3: -240; 4: 30; _: 18 }
+}
+
+fn feed_py(c: i32) -> f32 {
+  match c { 0: 20; 1: 24; 2: 80; 3: 150; 4: -66; _: 46 }
+}
+
+fn feed_pz(c: i32) -> f32 {
+  match c { 0: -36; 1: -40; 2: -420; 3: -560; 4: -70; _: -420 }
+}
+
+fn feed_rx(c: i32) -> f32 {
+  match c { 0: -0.3; 1: -0.26; 2: -0.04; 3: 0.04; 4: 0.42; _: -0.1 }
+}
+
+fn feed_ry(c: i32) -> f32 {
+  match c { 0: 0.38; 1: -0.56; 2: -0.1; 3: -0.46; 4: 0.14; _: 3.1 }
+}
+
+fn feed_fov(c: i32) -> f32 {
+  match c { 0: 54; 1: 46; 2: 46; 3: 40; 4: 60; _: 24 }
+}
+
+fn cctv_x(c: i32) -> f32 {
+  floor(c / 2) * 40 + match c % 2 { 0: -6.4; _: 6.4 }
+}
+
+fn cctv_ry(c: i32) -> f32 {
+  match c % 2 { 0: -0.72; _: 0.72 }
+}
+
+template ExtFeed {
+  prop tex: entity = 0
+  prop which: i32 = 0
+  prop live: bool = false
+
+  cam {
+    Position: {feed_px(which), feed_py(which), feed_pz(which)}
+    Rotation: {feed_rx(which), feed_ry(which), 0}
+    Camera: {fov: feed_fov(which), near_: 0.5, far_: 60000}
+  }
+  views {
+    view {
+      View: {
+        camera: match live { true: cam; _: 0 },
+        clear: {enabled: true, color: {0, 0, 0, 255}},
+        lighting: {fog_volumes: false, environment: {source: space_light, intensity: 0.5, background: false}},
+        culling: {enabled: true, occlusion: false, min_dimension_px: 1.5},
+        effects: [{enabled: true, effect: fx_film}]
+      }
+    }
+  }
+  surface { Surface: {width: 640, height: 360, texture: tex, view_root: views} }
+}
+
+ExtFeed feed_rig_a(tex: tex_feed_a, which: feed_a, live: station == ST_OVERVIEW)
+
+async {
+  const TURN = 2 * PI
+  mut cx: f32 = 0
+  mut cy: f32 = 1.62
+  mut cz: f32 = 0.5
+  mut cp: f32 = -0.03
+  mut cw: f32 = 0
+  mut px: f32 = 0
+  mut py: f32 = 0
+  mut last: f64 = box.app.AppStatus[box.app.AppStatus].elapsed
+  while true {
+    await next_frame()
+    const now = box.app.AppStatus[box.app.AppStatus].elapsed
+    const fixed = box.app.App[box.app.App].delta_time
+    const dt = match fixed > 0 { true: fixed; _: clamp(now - last, 0.001, 0.1) }
+    last = now
+    clock += dt
+    const at = box.input.Input[box.input.Input].mouse.position
+    const ws = window[box.surface.SurfaceStatus]
+    const s = station
+    const k = 1 - exp(0 - dt * 4.5)
+    const over = s == ST_OVERVIEW
+    const tx = match over { true: 0; _: cam_x(s) }
+    const ty = match over { true: 1.62; _: cam_y(s) }
+    const tz = match over { true: 0.5; _: cam_z(s) }
+    const mx = (0.5 - at.x / max(ws.point_width, 1)) * 2
+    const my = (0.5 - at.y / max(ws.point_height, 1)) * 2
+    const swing = match abs(mx) > 0.22 { true: (abs(mx) - 0.22) * match mx > 0 { true: 1; _: -1 } * 2.3; _: 0 }
+    const tw = match over { true: swing; _: 0 - st_angle(s) }
+    const tp = match over { true: -0.09 + my * 0.34; _: 0 - CON_TILT }
+    cx += (tx - cx) * k
+    cy += (ty - cy) * k
+    cz += (tz - cz) * k
+    cw += (tw - cw) * k * 0.7
+    cp += (tp - cp) * k * 0.7
+    const pk = 1 - exp(0 - dt * 2.5)
+    px += ((match over { true: 0; _: mx * 0.016 }) - px) * pk
+    py += ((match over { true: 0; _: my * 0.012 }) - py) * pk
+    const rumble = match main_on { true: 0.0006; _: 0.0002 }
+    eye_x = cx + perlin2(clock * 0.31, 3.1) * rumble * 6
+    eye_y = cy + perlin2(clock * 0.27, 9.4) * rumble * 6
+    eye_z = cz
+    eye_yaw = cw + px
+    eye_pitch = cp + py
+    eye_roll = perlin2(clock * 0.2, 7.7) * rumble * 4
+    eye_fov = match over { true: 66; _: 60 }
+  }
+}

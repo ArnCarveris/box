@@ -1,11 +1,12 @@
 /**
  * @file audio/audio.c
  * @brief Registers the box.audio components, the play and capture functions and their script
- * functions, and writes the WAV files of captures.
+ * functions, and writes the WAV files of captures. Sound files are in sample.c.
  */
 
 #define BOX_AUDIO_IMPL
 #include "module.h"
+#include "../jobs/jobs.h"
 #include <stdio.h>
 #include <math.h>
 
@@ -18,7 +19,11 @@ static ECS_COMPONENT_DECLARE(AudioModuleState);
 ECS_COMPONENT_DECLARE(AudioSoundId);
 ECS_COMPONENT_DECLARE(AudioBusState);
 ECS_COMPONENT_DECLARE(AudioVoice);
+<<<<<<< HEAD
 ECS_COMPONENT_DECLARE(AudioReverbState);
+=======
+ECS_COMPONENT_DECLARE(AudioSample);
+>>>>>>> 5caf645c2aa6d05f0f3fd6bbc7c5f6000d6f1880
 
 /** Construct AudioBus values: unity volume to the master, centered, no send.
  *
@@ -153,6 +158,7 @@ int32_t box_audio_module_order(
     return result;
 }
 
+<<<<<<< HEAD
 int32_t box_audio_module_reverb_slot(
     const ecs_world_t *world,
     ecs_entity_t e)
@@ -170,6 +176,17 @@ int32_t box_audio_module_reverb_slot(
     }
 
 done:
+=======
+int32_t box_audio_module_sounds(
+    const ecs_world_t *world)
+{
+    box_audio_module_t *state = box_audio_module_get(world);
+    int32_t i, result = 0;
+    for (i = 0; state && i < BOX_AUDIO_SOUND_MAX; i ++) {
+        result += state->sound_used[i] != 0;
+    }
+
+>>>>>>> 5caf645c2aa6d05f0f3fd6bbc7c5f6000d6f1880
     return result;
 }
 
@@ -210,6 +227,7 @@ ecs_entity_t box_audio_sound_from_pcm(
 
     result = sound ? sound : ecs_new(world);
     pcm = ecs_ensure(world, result, AudioPcm);
+    ecs_vec_init_if_t(&pcm->samples, float);
     ecs_vec_set_count_t(NULL, &pcm->samples, float, frames * channels);
     ecs_os_memcpy_n(ecs_vec_first_t(&pcm->samples, float), data, float, frames * channels);
     pcm->channels = channels;
@@ -226,7 +244,9 @@ bool box_audio_play(
 {
     box_audio_module_t *state = box_audio_module_get(world);
     bool result = false;
-    if (!state || !sound || !ecs_is_alive(world, sound) || !ecs_has(world, sound, AudioPcm)) {
+    if (!state || !sound || !ecs_is_alive(world, sound) ||
+        (!ecs_has(world, sound, AudioPcm) && !ecs_has(world, sound, SoundFile)))
+    {
         goto done;
     }
 
@@ -432,6 +452,7 @@ static void box_audio_module_free(
     ecs_vec_fini_t(NULL, &state->plays, box_audio_play_t);
     ecs_vec_fini_t(NULL, &state->stops, uint32_t);
     ecs_vec_fini_t(NULL, &state->releases, uint32_t);
+    box_audio_sample_fini(state);
     ecs_os_free(state->capture.path);
     ecs_os_free(state);
 }
@@ -471,6 +492,7 @@ void BoxAudioImport(
 {
     ECS_MODULE(world, BoxAudio);
     ECS_IMPORT(world, BoxTypes);
+    ECS_IMPORT(world, BoxJobs);
 
     ECS_META_COMPONENT(world, AudioState);
     ECS_META_COMPONENT(world, AudioBus);
@@ -478,6 +500,11 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, AudioOutput);
     ECS_META_COMPONENT(world, AudioPcm);
     box_owned_hooks(world, AudioPcm, BOX_OWNED_VEC(AudioPcm, samples, float));
+    ECS_META_COMPONENT(world, SoundFile);
+    box_owned_hooks(world, SoundFile, BOX_OWNED_STR(SoundFile, path));
+    ECS_META_COMPONENT(world, SoundState);
+    ECS_META_COMPONENT(world, SoundStatus);
+    box_owned_hooks(world, SoundStatus, BOX_OWNED_STR(SoundStatus, error));
     ECS_META_COMPONENT(world, AudioSource);
     ecs_set_hooks(world, AudioSource, { .ctor = box_audio_source_ctor });
     ECS_META_COMPONENT(world, Reverb);
@@ -489,6 +516,7 @@ void BoxAudioImport(
     ECS_COMPONENT_DEFINE(world, AudioSoundId);
     ECS_COMPONENT_DEFINE(world, AudioBusState);
     ECS_COMPONENT_DEFINE(world, AudioVoice);
+<<<<<<< HEAD
     ECS_COMPONENT_DEFINE(world, AudioReverbState);
     ecs_set_hooks(world, AudioSoundId, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioBusState, { .copy = box_audio_track_copy });
@@ -498,6 +526,17 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(AudioBus), EcsWith, ecs_id(AudioBusState));
     ecs_add_pair(world, ecs_id(AudioSource), EcsWith, ecs_id(AudioVoice));
     ecs_add_pair(world, ecs_id(Reverb), EcsWith, ecs_id(AudioReverbState));
+=======
+    ECS_COMPONENT_DEFINE(world, AudioSample);
+    ecs_set_hooks(world, AudioSoundId, { .copy = box_audio_track_copy });
+    ecs_set_hooks(world, AudioBusState, { .copy = box_audio_track_copy });
+    ecs_set_hooks(world, AudioVoice, { .copy = box_audio_track_copy });
+    ecs_set_hooks(world, AudioSample, { .copy = box_audio_track_copy });
+    ecs_add_pair(world, ecs_id(AudioPcm), EcsWith, ecs_id(AudioSoundId));
+    ecs_add_pair(world, ecs_id(AudioBus), EcsWith, ecs_id(AudioBusState));
+    ecs_add_pair(world, ecs_id(AudioSource), EcsWith, ecs_id(AudioVoice));
+    ecs_add_pair(world, ecs_id(SoundFile), EcsWith, ecs_id(AudioSample));
+>>>>>>> 5caf645c2aa6d05f0f3fd6bbc7c5f6000d6f1880
 
     ecs_entity(world, { .name = "master" });
     ecs_singleton_add(world, AudioSettings);
@@ -515,5 +554,6 @@ void BoxAudioImport(
     ecs_atfini(world, box_audio_module_free, state);
 
     box_audio_sync_init(world, state);
+    box_audio_sample_init(world, state);
     box_audio_functions_init(world);
 }

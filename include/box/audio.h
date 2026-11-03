@@ -1,6 +1,7 @@
 /**
  * @file box/audio.h
- * @brief Data driven audio: buses, sources, one shot plays, settings, status and captures.
+ * @brief Data driven audio: buses, sources, sound files, one shot plays, settings, status and
+ * captures.
  *
  * Components that a script, the REST API or the set command write, which one system at the end
  * of the frame turns into one command batch for the audio core (docs/audio.md). The same
@@ -80,13 +81,39 @@ ECS_STRUCT(AudioPcm, {
     float sample_rate;     /**< Frames per second, 0 for the rate of the output */
 });
 
+/** A sound decoded from a WAV or FLAC file on the job system, found as a TexturePath is.
+ *
+ * Decoded fully at the rate of the file, mono or stereo, more channels mixed down; every
+ * SoundFile with the same path shares one copy. A play of a sound that still loads starts once
+ * ready when it loops and is dropped otherwise. On the web the decode stalls its frame.
+ */
+ECS_STRUCT(SoundFile, {
+    char *path;            /**< Audio file, resolved as a texture path is */
+});
+
+/** Progress of the load of a SoundFile */
+ECS_ENUM(SoundState, {
+    SoundLoading = 0,      /**< The file decodes */
+    SoundReady = 1,        /**< The samples are decoded and play */
+    SoundFailed = 2        /**< The load failed, error says why */
+});
+
+/** Outcome of the load of a SoundFile, written by box.audio and read only for applications */
+ECS_STRUCT(SoundStatus, {
+    SoundState state;      /**< Progress of the load */
+    int32_t frames;        /**< Frames of the decoded sound, 0 unless ready */
+    int32_t channels;      /**< 1 or 2 after the mix down, 0 unless ready */
+    float sample_rate;     /**< Frames per second of the file, 0 unless ready */
+    char *error;           /**< Why the load failed, NULL unless state is SoundFailed */
+});
+
 /** A sound that plays while the entity exists and playing is true.
  *
  * A sound that does not loop sets playing to false when it ends; set it to true to play again.
  * A Disabled source is silent and deleting a source stops it with a short fade.
  */
 ECS_STRUCT(AudioSource, {
-    ecs_entity_t sound;    /**< The sound to play, an entity with AudioPcm */
+    ecs_entity_t sound;    /**< The sound to play, an entity with AudioPcm or SoundFile */
     float volume;          /**< Linear gain, default 1 */
     float pitch;           /**< Ratio of the playback speed, default 1 */
     bool loop;             /**< Play the sound over and over, default false */
@@ -131,10 +158,11 @@ ecs_entity_t box_audio_sound_from_pcm(
 /** Play a sound once on the bus of its AudioOutput, without an entity per play.
  *
  * The play goes out with the command batch at the end of the frame. While the page waits for a
- * gesture it is dropped. Scripts call it as box.audio.play(sound, volume).
+ * gesture, or while the SoundFile of the sound still loads, it is dropped. Scripts call it as
+ * box.audio.play(sound, volume).
  *
  * @param world The world
- * @param sound The sound, an entity with AudioPcm
+ * @param sound The sound, an entity with AudioPcm or SoundFile
  * @param volume Linear gain
  * @return Whether the play was queued
  */

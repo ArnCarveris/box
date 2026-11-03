@@ -81,7 +81,8 @@ template Chevron {
 // focus) closes the list. Choosing another option reports a change.
 //
 // The list is the child list, a LayoutFloat below the button that flips above it when it does not
-// fit below; its options are row points tall with inset points above and below them. over is
+// fit below and hides (not drawn, not clicked) while a scroll view clips the button out of view,
+// staying open; its options are row points tall with inset points above and below them. over is
 // whether the pointer is over the list. The template reads no component, so its async blocks only
 // restart when a prop changes. The pointer shows a hand over the button and the list, a crossed
 // circle while the dropdown is disabled.
@@ -124,7 +125,9 @@ template HeadlessDropdown {
   }
 
   list {
-    LayoutFloat: {h: Left, v: Top, anchor_h: Left, anchor_v: Bottom, y: -2, flip: true}
+    LayoutFloat: {
+      h: Left, v: Top, anchor_h: Left, anchor_v: Bottom, y: -2, flip: true, hide_clipped: true
+    }
   }
 
   // A disabled dropdown ignores the pointer, so it never shows as hovered or pressed

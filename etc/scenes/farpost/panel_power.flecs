@@ -1,0 +1,103 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.text
+using box.layout
+using box.spatial
+using box.picking
+using box.transition
+
+fn bus_x(j: i32) -> f32 {
+  -216 + j * 144
+}
+
+template BusBar {
+  prop j: i32 = 0
+  const root = isl[j]
+  const live = main_on && j_factor[root] > 0.01
+  const factor = j_factor[root]
+  const hue: Rgb = match !live { true: LUM_FAINT; _: match factor < 0.75 { true: match pulse { true: ALERT; _: WARM }; _: MINT } }
+
+  Hair bar(x1: bus_x(j), y1: 120, x2: bus_x(j), y2: -120, w: 4, hue: hue, glow: 2)
+  Ink name(text: "BUS {j + 1}", size: 13, font: font_data, hue: hue, x: bus_x(j), y: 136, align: Center)
+  for k in 0..3 {
+    const s = j * 3 + k
+    const y = 76 - k * 76
+    const kind = slot_kind[s]
+    const closed = slot_on[s] && kind != M_NONE
+    const gen = kind == M_REACTOR || kind == M_SOLAR
+    const tone: Rgb = match kind == M_NONE { true: LUM_WIRE; _: match !closed { true: LUM_FAINT; _: match gen { true: GOLD; _: hue } } }
+    Hair "stub_{k}"(x1: bus_x(j), y1: y, x2: bus_x(j) + 28, y2: y, w: 1.6, hue: tone)
+    Outline "tag_{k}"(x: bus_x(j) + 58, y: y, w: 60, h: 40, hue: tone)
+    Ink "code_{k}"(text: mod_code(kind), size: 14, font: font_data, hue: tone, x: bus_x(j) + 58, y: y + 7, align: Center)
+    Ink "mw_{k}"(text: match gen { true: "+{mod_output(kind) * match kind { 1: kn[KN_BURN]; _: 1 }:.0}"; _: "-{mod_load(kind):.0}" }, size: 10.5, hue: tone, x: bus_x(j) + 58, y: y - 9, align: Center)
+    Pick "hit_{k}"(x: bus_x(j) + 58, y: y, w: 60, h: 40, op: OP_BRANCH, a: s, tone: tone)
+  }
+  if tie[j] {
+    Hair tie_line(x1: bus_x(j), y1: 112 - (j % 2) * 4, x2: bus_x((j + 1) % 4), y2: 112 - (j % 2) * 4, w: 2.4, hue: hue, z: 1, glow: 1.6)
+  }
+}
+
+template IslandReadout {
+  prop j: i32 = 0
+  prop x: f32 = 0
+  const root = j == isl[j]
+  if root {
+    const sup = j_supply[j]
+    const dem = j_demand[j]
+    Ink t(text: "NET {j + 1}", size: 13, font: font_data, hue: LUMEN, x: x, y: -158, align: Center)
+    Ink s_(text: "{sup:.0} / {dem:.0} MW", size: 13, hue: match j_factor[j] < 0.99 { true: ALERT; _: MINT }, x: x, y: -176, align: Center)
+    Meter m(x: x, y: -194, w: 124, h: 8, value: match sup > 0 { true: dem / (sup * 1.25); _: 0 }, hue: match j_factor[j] < 0.99 { true: ALERT; _: MINT }, mark: 0.8, ticks: 5)
+    if j_over[j] > 0.5 {
+      Ink warn(text: "TRIP IN {9 - j_over[j]:.0} S", size: 13, hue: ALERT, x: x, y: -214, align: Center, glow: 2.6)
+    }
+  }
+}
+
+Console console_power(st: ST_POWER, slab_w: 660, slab_x: -280, hw_x: 330, hw_w: 540, hw_yaw: -0.08, cold: 0.5) {
+  GlassLayer ui(x: -280) {
+    Ink t_a(text: "ONE LINE", size: 13, hue: LUM_DIM, x: -314, y: 190, font: font_data)
+    Ink t_b(text: "TIE THE BUSES TO SHARE MW. SHED LOAD BEFORE IT TRIPS.", size: 11, hue: LUM_DIM, x: -240, y: 190)
+    diagram {
+      Position: {-20, 20, 4}
+      for j in 0..JUNCS {
+        BusBar "bus_{j}"(j: j)
+      }
+    }
+    readouts {
+      Position: {0, 0, 4}
+      for j in 0..JUNCS {
+        IslandReadout "net_{j}"(j: j, x: -236 + j * 158)
+      }
+    }
+    Ink tot(text: "TOTAL {supply_total:.0} MW AVAILABLE, {demand_total:.0} MW ASKED.  BREAKER TRIPS {trips}", size: 12, hue: LUM_DIM, x: -314, y: -246)
+  }
+
+  HwLayer hardware(x: 330, yaw: -0.08, always: true) {
+    MainTile main_lever(x: -170, y: 172)
+    Fader burn(label: "CORE BURN", sig: KN_BURN, top: "HOT", low: "IDLE", travel: 118, x: -60, y: 164)
+    ArcGauge load_(label: "LOAD", value: match supply_total > 0 { true: demand_total / (supply_total * 1.25); _: 0 }, r: 44, x: -176, y: 26, red_from: 0.8)
+    Led alarm_led(lit: alarm > 0.08 && pulse, hue: K_RED, r: 7, power: 14) { Position: {-66, 44, 6} }
+    Tap ack(legend: "ACK", hue: WARM, w: 66, h: 30, size: 12, op: OP_ACK, x: -66, y: 14)
+    Stencil c0(text: "BUS TIES", size: 12, x: -130, y: -40)
+    for j in 0..JUNCS {
+      Latch "tie_{j}"(on: tie[j], label: "{j + 1}-{(j + 1) % 4 + 1}", op: OP_TIE, a: j, w: 60, h: 62, x: -226 + (j % 2) * 66 + floor(j / 2) * 132, y: -86)
+    }
+    Ink h_a(text: "NEW BAYS ARE DEAD", size: 11, hue: WARM, x: -256, y: -146)
+    Ink h_b(text: "UNTIL A TIE IS CLOSED.", size: 11, hue: WARM, x: -256, y: -164)
+    Ink h_c(text: "OVERLOAD TRIPS THE", size: 11, hue: LUM_DIM, x: -256, y: -188)
+    Ink h_d(text: "BIGGEST LOAD ON THE NET.", size: 11, hue: LUM_DIM, x: -256, y: -204)
+    Stencil c1(text: "BRANCH BREAKERS", size: 12, x: 116, y: 250)
+    for s in 0..SLOTS {
+      BreakerTile "br_{s}"(on: slot_on[s], usable: slot_kind[s] != M_NONE, label: "BAY {s + 1}", sub: mod_code(slot_kind[s]), op: OP_BRANCH, a: s, x: 40 + (s % 3) * 76, y: 216 - floor(s / 3) * 58)
+    }
+    Readout sup_r(value: floor(supply_total), label: "MW AVAILABLE", x: 56, y: -46, size: 30, hue: MINT)
+    Readout dem_r(value: floor(demand_total), label: "MW ASKED", x: 176, y: -46, size: 30)
+    Readout fuel_r(value: floor(stock[G_FUEL]), label: "FUEL T", x: 56, y: -116, size: 30, hue: WARM)
+    Readout trip_r(value: trips, label: "TRIPS", x: 176, y: -116, size: 30, hue: match trips > 0 { true: ALERT; _: LUMEN })
+    Ink h_e(text: "CORE BURN = MW + FUEL DRAIN", size: 11, hue: LUM_DIM, x: 8, y: -188)
+    Ink h_f(text: "SOLAR IS FREE. AND WEAK.", size: 11, hue: LUM_DIM, x: 8, y: -204)
+  }
+}

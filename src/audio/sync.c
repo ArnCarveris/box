@@ -1,7 +1,8 @@
 /**
  * @file audio/sync.c
  * @brief The system that turns the changes of the audio components into one command batch per
- * frame: bus parameters and the processing order, sounds, sources, plays, stops and releases.
+ * frame: bus parameters and the processing order, sounds (AudioPcm and the decoded samples of
+ * sound files), sources, plays, stops and releases.
  *
  * The system remembers what it sent to the output and writes a command only for what differs,
  * so a frame without changes sends nothing. A new output (a new serial) gets everything again.
@@ -117,6 +118,7 @@ static void box_audio_reset(
     ecs_vec_clear(&state->oneshots);
     ecs_vec_clear(&state->stops);
     ecs_vec_clear(&state->releases);
+    ecs_vec_clear(&state->fades);
     state->settings_sent = false;
     state->order_dirty = true;
     state->voices_stolen = 0;
@@ -471,6 +473,7 @@ done:
     state->order_dirty = false;
 }
 
+<<<<<<< HEAD
 /** Write a reverb command and remember what it sent.
  *
  * @param state The state
@@ -607,6 +610,47 @@ static void box_audio_reverbs(
 }
 
 /** Send the samples of sounds the output does not have yet.
+=======
+/** Give a sound an id of the core and hand its frames to the output, which copies them.
+ *
+ * @param state The state
+ * @param t The transport
+ * @param data Frames, interleaved when stereo
+ * @param frames Number of frames
+ * @param channels 1 or 2
+ * @param sample_rate Frames per second, 0 for the rate of the output
+ * @return The id, 0 when the output did not take the sound
+ */
+static uint32_t box_audio_sound_send(
+    box_audio_module_t *state,
+    box_audio_transport_t *t,
+    const float *data,
+    int32_t frames,
+    int32_t channels,
+    float sample_rate)
+{
+    uint32_t id, result = 0;
+    for (id = 1; id < BOX_AUDIO_SOUND_MAX && state->sound_used[id]; id ++) { }
+    if (id == BOX_AUDIO_SOUND_MAX) {
+        if (!state->sound_overflow) {
+            ecs_err("box.audio: more than %d sounds", BOX_AUDIO_SOUND_MAX - 1);
+            state->sound_overflow = true;
+        }
+
+        goto done;
+    }
+
+    if (t->sound(t, id, data, frames, channels, sample_rate)) {
+        state->sound_used[id] = 1;
+        result = id;
+    }
+
+done:
+    return result;
+}
+
+/** Send the samples of sounds the output does not have yet: AudioPcm and decoded files.
+>>>>>>> 5caf645c2aa6d05f0f3fd6bbc7c5f6000d6f1880
  *
  * @param world The world
  * @param state The state
@@ -618,7 +662,7 @@ static void box_audio_sounds(
     box_audio_transport_t *t)
 {
     ecs_iter_t it = ecs_query_iter(world, state->sounds);
-    uint32_t id;
+    box_audio_sample_t **samples = ecs_vec_first(&state->samples);
     int32_t i;
     while (ecs_query_next(&it)) {
         const AudioPcm *pcm = ecs_field(&it, AudioPcm, 0);
@@ -632,25 +676,21 @@ static void box_audio_sounds(
                 continue;
             }
 
-            s[i].id = 0;
-            for (id = 1; id < BOX_AUDIO_SOUND_MAX && state->sound_used[id]; id ++) { }
-            if (id == BOX_AUDIO_SOUND_MAX) {
-                if (!state->sound_overflow) {
-                    ecs_err("box.audio: more than %d sounds", BOX_AUDIO_SOUND_MAX - 1);
-                    state->sound_overflow = true;
-                }
-
-                continue;
-            }
-
-            if (t->sound(t, id, ecs_vec_first_t(&pcm[i].samples, float), frames, channels,
-                pcm[i].sample_rate))
-            {
-                state->sound_used[id] = 1;
-                s[i].id = id;
-                s[i].serial = state->serial;
-            }
+            s[i].id = box_audio_sound_send(state, t, ecs_vec_first_t(&pcm[i].samples, float),
+                frames, channels, pcm[i].sample_rate);
+            s[i].serial = state->serial;
         }
+    }
+
+    for (i = 0; i < ecs_vec_count(&state->samples); i ++) {
+        box_audio_sample_t *sample = samples[i];
+        if (sample->state != SoundReady || (sample->id && sample->serial == state->serial)) {
+            continue;
+        }
+
+        sample->id = box_audio_sound_send(state, t, sample->data, sample->frames,
+            sample->channels, sample->sample_rate);
+        sample->serial = state->serial;
     }
 }
 
@@ -666,10 +706,32 @@ static uint32_t box_audio_sound_of(
     const box_audio_module_t *state,
     ecs_entity_t sound)
 {
-    const AudioSoundId *s = sound && ecs_is_alive(world, sound) ?
+    const box_audio_sample_t *sample = box_audio_sample_of(world, sound);
+    const AudioSoundId *s = !sample && sound && ecs_is_alive(world, sound) ?
         ecs_get(world, sound, AudioSoundId) : NULL;
+    uint32_t result = 0;
+    if (sample) {
+        result = sample->serial == state->serial ? sample->id : 0;
+    } else if (s) {
+        result = s->serial == state->serial ? s->id : 0;
+    }
 
-    return s && s->serial == state->serial ? s->id : 0;
+    return result;
+}
+
+/** Check whether the SoundFile of a sound still decodes.
+ *
+ * @param world The world
+ * @param sound The sound entity
+ * @return Whether its sample is loading
+ */
+static bool box_audio_sound_loading(
+    ecs_world_t *world,
+    ecs_entity_t sound)
+{
+    const box_audio_sample_t *sample = box_audio_sample_of(world, sound);
+
+    return sample && sample->state == SoundLoading;
 }
 
 /** Get the bus a sound plays on by default: the bus of its AudioOutput.
@@ -721,6 +783,11 @@ static void box_audio_source(
         box_audio_stop(state, v->handle);
         ecs_map_remove(&state->voices, v->handle);
         v->handle = 0;
+    }
+
+    if (!sound && src->playing && !src->loop && box_audio_sound_loading(world, src->sound)) {
+        src->playing = false;
+        state->stats.not_ready ++;
     }
 
     if (!sound) {
@@ -811,7 +878,8 @@ static void box_audio_queued(
     box_audio_oneshot_t *shots = ecs_vec_first(&state->oneshots);
     uint32_t *stops = ecs_vec_first(&state->stops);
     uint32_t *releases = ecs_vec_first(&state->releases);
-    int32_t i;
+    uint32_t *fades = ecs_vec_first(&state->fades);
+    int32_t i, k;
     for (i = 0; state->bus_freed && i < ecs_vec_count(&state->oneshots); i ++) {
         if (shots[i].bus && (state->bus_freed & (1u << shots[i].bus))) {
             box_audio_voice_set(state, shots[i].handle, BOX_AUDIO_PARAM_BUS, 0.0f);
@@ -822,6 +890,7 @@ static void box_audio_queued(
     for (i = 0; i < ecs_vec_count(&state->plays); i ++) {
         uint32_t sound = box_audio_sound_of(world, state, plays[i].sound);
         if (!sound) {
+            state->stats.not_ready += box_audio_sound_loading(world, plays[i].sound);
             continue;
         }
 
@@ -837,6 +906,7 @@ static void box_audio_queued(
         box_audio_oneshot_t *shot = ecs_vec_append_t(NULL, &state->oneshots,
             box_audio_oneshot_t);
         shot->handle = box_audio_new_voice(state);
+        shot->sound = sound;
         shot->bus = box_audio_sound_bus(world, state, plays[i].sound);
         if (box_audio_reserve(state)) {
             box_audio_write_play(&state->writer, shot->handle, sound, shot->bus,
@@ -848,6 +918,16 @@ static void box_audio_queued(
         box_audio_stop(state, stops[i]);
     }
 
+    for (k = 0; k < ecs_vec_count(&state->fades); k ++) {
+        shots = ecs_vec_first(&state->oneshots);
+        for (i = ecs_vec_count(&state->oneshots) - 1; i >= 0; i --) {
+            if (shots[i].sound == fades[k]) {
+                box_audio_stop(state, shots[i].handle);
+                ecs_vec_remove_ordered_t(&state->oneshots, box_audio_oneshot_t, i);
+            }
+        }
+    }
+
     for (i = 0; i < ecs_vec_count(&state->releases); i ++) {
         if (box_audio_reserve(state)) {
             box_audio_write_release(&state->writer, releases[i]);
@@ -857,6 +937,7 @@ static void box_audio_queued(
     ecs_vec_clear(&state->plays);
     ecs_vec_clear(&state->stops);
     ecs_vec_clear(&state->releases);
+    ecs_vec_clear(&state->fades);
 }
 
 /** Send the master volume and mute of AudioSettings when they changed.
@@ -1023,6 +1104,7 @@ static void BoxAudioSync(
         ecs_vec_clear(&state->plays);
         ecs_vec_clear(&state->stops);
         ecs_vec_clear(&state->releases);
+        ecs_vec_clear(&state->fades);
     }
 
     if (t && state->writer.size) {
@@ -1088,7 +1170,8 @@ done:
     return;
 }
 
-/** Release the sound of changed or removed samples; voices that play it finish first.
+/** Release the sound of changed or removed samples. Voices that play changed samples finish
+ * first, one shots of removed ones fade out as sources of a deleted sound do.
  *
  * @param it The iterator of the observer
  */
@@ -1105,6 +1188,9 @@ static void BoxAudioPcmChange(
         AudioSoundId *s = ecs_get_mut(it->world, it->entities[i], AudioSoundId);
         if (s && s->id && s->serial == state->serial && state->serial) {
             ecs_vec_append_t(NULL, &state->releases, uint32_t)[0] = s->id;
+            if (it->event == EcsOnRemove) {
+                ecs_vec_append_t(NULL, &state->fades, uint32_t)[0] = s->id;
+            }
         }
 
         if (s) {

@@ -222,8 +222,9 @@ start of the next render.
 
 ## Native output
 
-`src/audio/native.c` is the only file that includes miniaudio, bundled header only in
-`project.json` (tag `0.11.26`) for macOS and Linux. It uses the device API alone, built with
+`src/audio/native.c` is the only file that includes the device part of miniaudio, bundled
+header only in `project.json` (tag `0.11.26`); `src/audio/decode.c` includes its decoders
+alone, on every platform. It uses the device API alone, built with
 `MA_NO_ENGINE`, `MA_NO_NODE_GRAPH`, `MA_NO_RESOURCE_MANAGER`, `MA_NO_DECODING`,
 `MA_NO_ENCODING`, `MA_NO_GENERATION` and `MA_NO_NULL` (so a machine without audio fails the
 open instead of playing into the silent null backend of miniaudio). Mixing, panning and
@@ -267,8 +268,8 @@ flags. A notarized macOS build, whose hardened runtime may refuse to load them, 
 CoreAudio -framework AudioToolbox`, or keeps runtime linking and signs with the entitlements
 the miniaudio documentation lists for macOS.
 
-The web does not compile the device part: the bundle is not fetched for Emscripten and
-`native.c` compiles to a stub there.
+The web does not compile the device part: `native.c` compiles to a stub there, and only the
+decoders of `decode.c` use the bundle.
 
 The tests are `Ring`, `Transport` and `NoDevice` in `test/cpu/audio`, which need no device.
 
@@ -332,8 +333,9 @@ Fixing that takes a nightly Rust with `-Zbuild-std` in bake3 and on every runner
 memory requires COOP/COEP headers on every host that serves a box page. A separate module needs
 neither: the page works with `crossOriginIsolated` false and without `SharedArrayBuffer`.
 
-miniaudio is not used on the web: its web backend forbids `-std=c*` flags, while box sets `c11`,
-and its worklet mode needs `-sASYNCIFY` on the whole binary.
+The device part of miniaudio is not used on the web: its web backend forbids `-std=c*` flags,
+while box sets `c11`, and its worklet mode needs `-sASYNCIFY` on the whole binary. Its decoders
+are, see [Sound files](#sound-files).
 
 ## How the core is built and delivered
 
@@ -455,9 +457,16 @@ frame, the same on every platform.
 
 | Component | What it is |
 |-----------|------------|
+<<<<<<< HEAD
 | `AudioPcm` | The samples of a sound (`samples`, `channels`, `sample_rate`, 0 for the output rate); `box_audio_sound_from_pcm` sets it from C. Later tasks add other sound kinds |
 | `AudioBus` | A mixer bus: `output` (0 or `master` for the master), `volume` (1), `pan`, `mute`, `send` and `send_level` |
 | `Reverb` | A reverb on the bus of the entity: `decay` (1.5 s), `damping` (0.5), `predelay` (0.02 s), `size` (0.5), `mix` (1) |
+=======
+| `AudioPcm` | The samples of a sound (`samples`, `channels`, `sample_rate`, 0 for the output rate); `box_audio_sound_from_pcm` sets it from C |
+| `SoundFile` | A sound decoded from a WAV or FLAC file (`path`), see [Sound files](#sound-files) |
+| `SoundStatus` | Read only: `state` (`SoundLoading`, `SoundReady`, `SoundFailed`), `frames`, `channels`, `sample_rate` and `error` of a `SoundFile` |
+| `AudioBus` | A mixer bus: `output` (0 for the master), `volume` (1), `pan`, `mute`, `send` and `send_level` |
+>>>>>>> 5caf645c2aa6d05f0f3fd6bbc7c5f6000d6f1880
 | `AudioOutput` | The bus a source, or a sound by default, plays on |
 | `AudioSource` | A sound that plays while the entity exists: `sound`, `volume` (1), `pitch` (1), `loop`, `playing` (true) |
 | `AudioSettings` | Singleton: `master_volume` (1) and `mute` |
@@ -519,6 +528,67 @@ copy of `AudioSource` and play on their own, as `ParticleEmitter` instances do.
 **Sounds** are sent to the output once, with an id of the core; a change of `AudioPcm` releases
 the old id and sends the new samples, and a deleted sound is released, freed by the side that
 owns the frames once no voice plays it.
+
+### Sound files
+
+```
+using box.audio
+click { SoundFile: {path: "etc/assets/sounds/click.wav"} }
+hum { SoundFile: {path: "etc/assets/sounds/hum.flac"} }
+hum_source { AudioSource: {sound: hum, loop: true} }
+```
+
+`SoundFile` (`src/audio/sample.c`) plays short sounds decoded fully into memory; long music
+streams in a later task. The path is found as a `TexturePath` is: absolute, relative to the
+working directory or an ancestor of it, or to an ancestor of the folder of the executable.
+
+- **Decoding** runs on the job system (`box_job_submit`), as textures and fonts do, with the
+  WAV and FLAC decoders of miniaudio in `src/audio/decode.c`, to float frames at the sample rate
+  of the file. The voice of the core plays them at the rate of the output with the linear
+  interpolation of the pitch, so a 44100 Hz file plays in its time and at its pitch on a 48000
+  Hz output. Mono and stereo stay as they are; more channels are mixed down to stereo: each side
+  is the mean of the channels on it, by the channel map of the file (FL FR FC LFE BL BR for
+  5.1), a center counts on both sides and the LFE on none. A file is read up to 256 MB and
+  decodes to at most 512 MB of frames.
+- **Status.** `SoundStatus` is `SoundLoading` until the decode completes, then `SoundReady` with
+  the frames, the channels after the mix down and the rate, or `SoundFailed` with an `error`.
+  A failed load (a missing, empty or corrupt file, or another format) logs one error that names
+  the file, and the other sounds keep playing.
+- **Not ready yet.** A source of a sound that still loads starts once it is ready if it loops;
+  otherwise it is dropped and its `playing` goes false, and so is a `box.audio.play` of it.
+- **One copy.** The decoded frames are shared by path: every `SoundFile` with the same path,
+  prefab instances included, uses one sample with one id of the core, and any number of sources
+  play it. Deleting the last of them releases the sound: the sources and one shots that play it
+  fade out over the ramp of the core, the main thread frees its frames at once and the side that
+  runs the core frees its own after `SOUND_FREE`. Deleting an entity with `AudioPcm` fades its
+  one shots the same way. Changing the path takes the sample of the new path.
+- **Handing over.** The sync system sends a ready sample like an `AudioPcm`, with the `sound` of
+  the transport: on native a copy whose pointer goes to the audio thread over the ring, on the
+  web a transferred `ArrayBuffer` that the worklet copies into the heap of its core. A new
+  output gets every sample again.
+- **Headless** frames wait for the decodes in flight, at most 10 seconds, as they wait for
+  textures, so a fixed delta time hears the same sounds in every run.
+
+miniaudio is built in `decode.c` with `MA_NO_DEVICE_IO`, `MA_NO_ENGINE`, `MA_NO_NODE_GRAPH`,
+`MA_NO_RESOURCE_MANAGER`, `MA_NO_ENCODING`, `MA_NO_GENERATION`, `MA_NO_MP3`, `MA_NO_VORBIS` and
+`MA_NO_THREADING`, its functions static (`MA_API static`) so they do not clash with the device
+part of `native.c`. Its warning that the web build cannot use `-std=c*` is about the Web Audio
+backend; without device IO the decoders compile with `-std=c11` under emcc 6.0.8, so
+`project.json` fetches the bundle for Emscripten too and the web uses the same decoders.
+
+**The web stalls while it decodes.** Jobs run inline in the browser, at the end of the frame
+that submitted them, so decoding a sound stalls that frame for the whole decode. Load sounds
+at the start of a scene, behind a loading screen, rather than in the middle of play; the audio
+itself does not stall, since the worklet keeps rendering. `test/integration/web/audio_sample.mjs`
+measures the longest animation frame while 2 seconds of 48000 Hz stereo (384 KB) decode. In
+headless Chrome on an Apple M-series Mac the frame grows from about 0.5 ms to under 1 ms for
+the 16 bit WAV and to 2 to 3 ms for the FLAC in a release build (about 1 and 4.5 ms in a debug
+build), well within a frame at 60 Hz; the decode time grows with the length of the sound.
+A file under `etc` reaches the page through the `embed` of the app (`apps/boxrun/project.json`
+embeds `etc`); a test file through `?preload=`.
+
+The tests are `Sample` in `test/cpu/audio`, with files in `test/assets/audio` that
+`make_sounds.py` next to them writes, and the browser check `audio_sample.mjs`.
 
 ### Before the gesture
 
