@@ -625,29 +625,35 @@ void Synth_filter_envelope_stable(void) {
     }
 }
 
-/** Energy of the first difference of a range, which grows with the energy at high frequencies.
+/** Frequency of the saw of synth_render_envelope in Hz: a period of 400 frames */
+#define SYNTH_ENVELOPE_SAW 120.0
+
+/** Energy of the harmonics of the saw of synth_render_envelope above a frequency in a range,
+ * each measured on its exact bin.
  *
  * @param x Samples
- * @param from First frame, above 0
- * @param to End frame
- * @return The mean square of the difference
+ * @param from First frame
+ * @param to End frame, a whole number of periods of the saw after from
+ * @param above Hz the harmonics are above
+ * @return The mean square of the harmonics per frame
  */
 static double synth_bright(
     const float *x,
     int32_t from,
-    int32_t to)
+    int32_t to,
+    double above)
 {
-    double sum = 0, d;
-    int32_t i;
-    for (i = from; i < to; i ++) {
-        d = (double)x[i] - x[i - 1];
-        sum += d * d;
+    double sum = 0, f;
+    for (f = SYNTH_ENVELOPE_SAW; f < AUDIO_RATE / 2; f += SYNTH_ENVELOPE_SAW) {
+        if (f > above) {
+            sum += synth_bin_energy(x + from, to - from, f, AUDIO_RATE);
+        }
     }
 
     return sum / (to - from);
 }
 
-/** Render a steady saw of 110 Hz through a lowpass with a filter envelope.
+/** Render a steady saw of SYNTH_ENVELOPE_SAW Hz through a lowpass with a filter envelope.
  *
  * @param cutoff Cutoff of the patch in Hz
  * @param amount Octaves of the filter envelope
@@ -659,7 +665,8 @@ static void synth_render_envelope(
     box_audio_synth_envelope_t env)
 {
     box_audio_core_t *core = synth_core(AUDIO_RATE);
-    box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SAW, 110, 0.25f, 0.6f);
+    box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SAW, SYNTH_ENVELOPE_SAW, 0.25f,
+        0.6f);
     p.envelope.attack = 0.001f;
     p.filter = BOX_AUDIO_SYNTH_LOWPASS;
     p.cutoff = cutoff;
@@ -673,17 +680,18 @@ static void synth_render_envelope(
 }
 
 /** A saw through a lowpass at 200 Hz whose envelope opens it 4 octaves: attack 0 to 4800,
- * decay to 9600, hold at half (800 Hz) to 14400, release to 19200, then back at 200 Hz. */
+ * decay to 9600, hold at half (800 Hz) to 14400, release to 19200, then back at 200 Hz. The
+ * energy of the harmonics above 1 kHz follows the envelope. */
 void Synth_filter_envelope_follows(void) {
     // audio/synth
     double start, peak, sustain, release, end;
     synth_render_envelope(200, 4, (box_audio_synth_envelope_t){
         .attack = 0.1f, .decay = 0.1f, .sustain = 0.5f, .hold = 0.1f, .release = 0.1f });
-    start = synth_bright(audio_l, 600, 1800);
-    peak = synth_bright(audio_l, 3600, 4800);
-    sustain = synth_bright(audio_l, 10800, 13200);
-    release = synth_bright(audio_l, 16800, 18000);
-    end = synth_bright(audio_l, 20400, 22800);
+    start = synth_bright(audio_l, 600, 1800, 1000);
+    peak = synth_bright(audio_l, 3600, 4800, 1000);
+    sustain = synth_bright(audio_l, 10800, 13200, 1000);
+    release = synth_bright(audio_l, 16800, 18000, 1000);
+    end = synth_bright(audio_l, 20400, 22800, 1000);
     printf("filter envelope: start %.3g, peak %.3g, sustain %.3g, release %.3g, end %.3g\n",
         start, peak, sustain, release, end);
     test_assert(peak > 4 * start);
@@ -702,11 +710,11 @@ void Synth_filter_envelope_negative(void) {
         .attack = 0.02f, .sustain = 1, .hold = 0.2f, .release = 0.02f };
     double open_sustain, open_end, closed_sustain, closed_end;
     synth_render_envelope(4000, 0, env);
-    open_sustain = synth_bright(audio_l, 4800, 9600);
-    open_end = synth_bright(audio_l, 16800, 21600);
+    open_sustain = synth_bright(audio_l, 4800, 9600, 1000);
+    open_end = synth_bright(audio_l, 16800, 21600, 1000);
     synth_render_envelope(4000, -4, env);
-    closed_sustain = synth_bright(audio_l, 4800, 9600);
-    closed_end = synth_bright(audio_l, 16800, 21600);
+    closed_sustain = synth_bright(audio_l, 4800, 9600, 1000);
+    closed_end = synth_bright(audio_l, 16800, 21600, 1000);
     printf("negative amount: %.3g open, %.3g closed, %.3g and %.3g after\n",
         open_sustain, closed_sustain, open_end, closed_end);
     test_assert(closed_sustain < open_sustain / 10);
