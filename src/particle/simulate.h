@@ -617,7 +617,9 @@ static inline void box_particle_gradient_bake(
     const ParticleGradientKey *keys = ecs_vec_first_t(&gradient->keys, ParticleGradientKey);
     int32_t c, i, count = ecs_vec_count(&gradient->keys);
     float row[BOX_PARTICLE_CURVE_SAMPLES];
-    CurveKey *channel = count ? ecs_os_calloc_n(CurveKey, count) : NULL;
+    CurveKey local[BOX_PARTICLE_CURVE_SAMPLES];
+    CurveKey *channel = count > BOX_PARTICLE_CURVE_SAMPLES
+        ? ecs_os_malloc_n(CurveKey, count) : local;
     Curve curve = {
         .kind = gradient->kind,
         .keys = { .array = channel, .count = count, .size = count }
@@ -642,7 +644,9 @@ static inline void box_particle_gradient_bake(
         out[i * 4 + 3] = 1.0f;
     }
 
-    ecs_os_free(channel);
+    if (channel != local) {
+        ecs_os_free(channel);
+    }
 }
 
 /** Get the sample a normalized age falls after in a row and how far it is toward the next.

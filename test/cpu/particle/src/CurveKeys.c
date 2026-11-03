@@ -381,6 +381,9 @@ static int32_t curve_level;
 /** Log function before capturing */
 static ecs_os_api_log_t curve_log;
 
+/** Whether the log was colored before capturing */
+static bool curve_colors;
+
 /** Log function that keeps the errors.
  *
  * @param level The level
@@ -407,6 +410,7 @@ static void errors_begin(void)
 {
     curve_errors[0] = '\0';
     curve_level = ecs_log_set_level(-1);
+    curve_colors = ecs_log_enable_colors(false);
     curve_log = ecs_os_api.log_;
     ecs_os_api.log_ = curve_capture;
 }
@@ -415,6 +419,7 @@ static void errors_begin(void)
 static void errors_end(void)
 {
     ecs_os_api.log_ = curve_log;
+    ecs_log_enable_colors(curve_colors);
     ecs_log_set_level(curve_level);
 }
 
@@ -446,10 +451,12 @@ static void has(
     const char *errors,
     const char *text)
 {
-    if (!strstr(errors, text)) {
+    bool found = strstr(errors, text) != NULL;
+    if (!found) {
         printf("expected '%s' in:\n%s\n", text, errors);
-        test_assert(false);
     }
+
+    test_assert(found);
 }
 
 void CurveKeys_error_none(void) {
