@@ -200,7 +200,8 @@ struct VertexOut {
 // surface_data place set. A MappingObject or MappingWorld material on a plain mesh sets mapped
 // to 1 plus its blend, uv to the offset of its projection and object and object_normal to what
 // mapping_uv projects in the fragment stage, and rotation to what turns the axes of its
-// projections to the world; a parametric surface keeps its own UVs.
+// projections to the world; a parametric surface keeps its own UVs, which a MappingObject
+// material on a Sweep turns into lengths over the mapping size (surface_sweep_lengths).
 struct VertexShading {
     color: vec4f,
     material: vec2f,
@@ -239,6 +240,11 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Plac
                 o.rotation = mapping_rotation(p.model[0].xyz, p.model[1].xyz, p.model[2].xyz);
             }
         }
+    }
+    if (material_mapped(material) && !material_world(material) && surface_data.p[0].x == 1.0 &&
+        surface_data.p[19].x == 0.0) {
+        o.uv = surface_sweep_lengths(v.uv, i32(v.position.z)) / material.mapping_size *
+            material.uv.xy + material.uv.zw;
     }
     if (surface_data.p[0].x != 0.0) {
         var region = i32(v.position.z);

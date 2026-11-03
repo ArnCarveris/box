@@ -237,6 +237,52 @@ uint32_t box_mesh_cache_resolve(box_mesh_cache_t *cache, const ShapeMesh *shape)
 void box_shape_mesh_release(box_mesh_cache_t *cache, const ShapeMesh *shape);
 void box_geometry_surfaces_init(ecs_world_t *world);
 void box_surface_build_frames(const box_surface_data_t *data, vec4 *frames, int steps);
+
+/** Store in the w of each sweep frame the path parameter at the arc length fraction of the frame
+ * (frame j of steps sits at fraction j / steps), the inverse of the cumulative length table of
+ * the path sampled at the frame steps, and return the length of the path.
+ *
+ * @param data The surface data with the path packed
+ * @param frames The frames from box_surface_build_frames
+ * @param steps The number of frame steps
+ * @param length Receives the length of the path
+ */
+void box_surface_build_lengths(const box_surface_data_t *data, vec4 *frames, int steps,
+    float *length);
+
+/** Path parameter of a Sweep at a fraction of the length of its path.
+ *
+ * @param data The surface data
+ * @param s The fraction of the path length, 0..1
+ * @return The path parameter, 0..1
+ */
+float box_surface_sweep_parameter(const box_surface_data_t *data, float s);
+
+/** Length of the edge of a Sweep profile from a point to the next, with the Sweep scale.
+ *
+ * @param data The surface data
+ * @param point The index of the point in the profile
+ * @return The length of the edge, 0 for the last point of an open contour
+ */
+float box_surface_profile_edge(const box_surface_data_t *data, int point);
+
+/** Length around the outer ring or the hole rings of a Sweep profile, with the Sweep scale.
+ *
+ * @param data The surface data
+ * @param inner 1 for the holes, 0 for the outer ring
+ * @return The length
+ */
+float box_surface_profile_length(const box_surface_data_t *data, int inner);
+
+/** Profile parameter of a Sweep, as surface_boundary takes it, at a fraction of the length
+ * around the outer ring or the hole rings of the profile.
+ *
+ * @param data The surface data
+ * @param s The fraction of the length, 0..1
+ * @param inner 1 for the holes, 0 for the outer ring
+ * @return The profile parameter, 0..1
+ */
+float box_surface_profile_parameter(const box_surface_data_t *data, float s, int inner);
 void box_surface_sample(const box_surface_data_t *data, int region,
     float u, float v, box_surface_sample_t *sample);
 void box_surface_vertex(const ShapeMesh *shape, const box_vertex_t *vertex, vec3 position);

@@ -861,6 +861,142 @@ void box_surface_sample(const box_surface_data_t *data, int region,
     glm_vec3_copy((vec3){tangent.x, tangent.y, tangent.z}, sample->tangent);
 }
 
+void box_surface_build_lengths(
+    const box_surface_data_t *d,
+    vec4 *frames,
+    int steps,
+    float *length)
+{
+    float *table = ecs_os_malloc_n(float, steps + 1);
+    float total = 0.0f;
+    if (table) {
+        box_sv previous = surface_curve(d, 0.0f);
+        table[0] = 0.0f;
+        for (int i = 1; i <= steps; i ++) {
+            box_sv point = surface_curve(d, (float)i / steps);
+            box_sv delta = sv_sub(point, previous);
+            total += sqrtf(sv_dot(delta, delta));
+            table[i] = total;
+            previous = point;
+        }
+    }
+
+    int k = 0;
+    for (int j = 0; j <= steps; j ++) {
+        float parameter = (float)j / steps;
+        if (table && total > 0.0f && isfinite(total)) {
+            float target = total * (float)j / steps;
+            while (k < steps - 1 && table[k + 1] < target) {
+                k ++;
+            }
+
+            float span = table[k + 1] - table[k];
+            float local = span > 0.0f ? (target - table[k]) / span : 0.0f;
+            parameter = ((float)k + fminf(fmaxf(local, 0.0f), 1.0f)) / steps;
+        }
+
+        frames[j][3] = j == steps ? 1.0f : parameter;
+    }
+
+    ecs_os_free(table);
+    *length = isfinite(total) ? total : 0.0f;
+}
+
+float box_surface_sweep_parameter(
+    const box_surface_data_t *d,
+    float s)
+{
+    int steps = (int)sf(d, 8, 1);
+    float result = s;
+    if (steps > 0) {
+        float x = fminf(fmaxf(s, 0.0f), 1.0f) * (float)steps;
+        int index = (int)fminf(floorf(x), (float)(steps - 1));
+        int offset = (int)sf(d, 8, 0) + index;
+        float a = sf(d, offset, 3), b = sf(d, offset + 1, 3);
+        result = a + (b - a) * (x - (float)index);
+    }
+
+    return result;
+}
+
+/** Find the points and edges of a profile ring as surface_boundary() walks them.
+ *
+ * @param d The surface data
+ * @param inner 1 for the hole rings, otherwise the outer ring
+ * @param first Receives the index of the first point of the ring
+ * @param edges Receives the number of edges u spans
+ */
+static void surface_ring(
+    const box_surface_data_t *d,
+    int inner,
+    int *first,
+    int *edges)
+{
+    int count = (int)sf(d, 5, 2);
+    *first = 0;
+    if (inner == 1) {
+        *first = count;
+        count = (int)sf(d, 5, 1) - count;
+    }
+
+    *edges = count;
+    if (sf(d, 0, 0) == 1.0f && sf(d, 4, 3) == 0.0f) {
+        *edges = count - 1;
+    }
+}
+
+float box_surface_profile_edge(
+    const box_surface_data_t *d,
+    int point)
+{
+    int offset = (int)sf(d, 5, 0);
+    box_sv a = sp(d, offset + point);
+    box_sv b = sp(d, offset + (int)sf(d, offset + point, 3));
+
+    return hypotf((b.x - a.x) * sf(d, 2, 0), (b.y - a.y) * sf(d, 2, 1));
+}
+
+float box_surface_profile_length(
+    const box_surface_data_t *d,
+    int inner)
+{
+    int first, edges;
+    surface_ring(d, inner, &first, &edges);
+    float result = 0.0f;
+    for (int i = 0; i < edges; i ++) {
+        result += box_surface_profile_edge(d, first + i);
+    }
+
+    return result;
+}
+
+float box_surface_profile_parameter(
+    const box_surface_data_t *d,
+    float s,
+    int inner)
+{
+    int first, edges;
+    surface_ring(d, inner, &first, &edges);
+    float total = box_surface_profile_length(d, inner);
+    float result = s;
+    if (edges > 0 && total > 0.0f && isfinite(total)) {
+        float target = fminf(fmaxf(s, 0.0f), 1.0f) * total, start = 0.0f;
+        result = 1.0f;
+        for (int i = 0; i < edges; i ++) {
+            float length = box_surface_profile_edge(d, first + i);
+            if (length > 0.0f && start + length >= target) {
+                result = ((float)i + fminf(fmaxf((target - start) / length, 0.0f), 1.0f)) /
+                    (float)edges;
+                break;
+            }
+
+            start += length;
+        }
+    }
+
+    return result;
+}
+
 void box_surface_vertex(
     const ShapeMesh *shape,
     const box_vertex_t *vertex,

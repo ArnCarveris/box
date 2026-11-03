@@ -287,6 +287,12 @@ bool box_surface_evaluate(const ecs_world_t *world, ecs_entity_t entity,
             return false;
         }
     }
+    if (kind == 1 && region <= SurfaceInner) {
+        /* The walls of a Sweep take u and v as fractions of the length around the profile and
+         * along the path, as its texture coordinates run */
+        u = box_surface_profile_parameter(&shape->surface, u, region);
+        v = box_surface_sweep_parameter(&shape->surface, v);
+    }
     box_surface_sample(&shape->surface, region, u, v, sample);
     if (shape->surface.p[0][0] == 7 && region >= 2 &&
         !box_profile_contains(&shape->surface, sample->position[0], sample->position[2]))

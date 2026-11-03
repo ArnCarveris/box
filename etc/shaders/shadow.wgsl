@@ -167,7 +167,8 @@ fn octant_distances(world: vec3f) -> vec3f {
 }
 
 // The alpha tested attributes of a vertex: the UV as vs of mesh.wgsl transforms it (the side
-// region of a kind 7 surface, whose UVs start two tiles over, moves back), or the projection of
+// region of a kind 7 surface, whose UVs start two tiles over, moves back, and a MappingObject
+// material on a Sweep takes lengths over its size), or the projection of
 // a MappingObject or MappingWorld material on a plain mesh, the alpha of the instance and the
 // cutoff of its material. Reads surface_data, so the position comes first.
 fn cutout_attributes(v: CutoutIn, o: ptr<function, CutoutOut>) {
@@ -176,6 +177,11 @@ fn cutout_attributes(v: CutoutIn, o: ptr<function, CutoutOut>) {
     (*o).uv = v.uv * material.uv.xy + material.uv.zw;
     if (surface_data.p[0].x == 7.0 && v.uv.x >= 2.0 && abs(v.normal.y) <= 0.5) {
         (*o).uv.x -= 2.0 * material.uv.x;
+    }
+    if (material_mapped(material) && !material_world(material) && surface_data.p[0].x == 1.0 &&
+        surface_data.p[19].x == 0.0) {
+        (*o).uv = surface_sweep_lengths(v.uv, i32(v.position.z)) / material.mapping_size *
+            material.uv.xy + material.uv.zw;
     }
     (*o).mapped = 0.0;
     (*o).object = vec4f(0.0);

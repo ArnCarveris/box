@@ -334,7 +334,9 @@ ECS_ENUM(TextureMappingMode, {
  * and MappingWorld; MappingUv ignores it.
  *
  * Parametric surfaces (Sweep, Extrude and the other shapes of box/geometry.h that evaluate a
- * surface in the vertex stage) keep their own UVs and ignore the mapping. Picking onto a
+ * surface in the vertex stage) keep their own UVs and ignore the mapping, except a Sweep with
+ * MappingObject: its UVs, by arc length, become lengths over the size, around the profile and
+ * along the path on its walls and the scaled profile on its caps (see Sweep). Picking onto a
  * surface texture (PbrTextures of a Surface) follows the mapping on the dominant axis, with the
  * normal of the mesh interpolated at the hit. Alpha tested shapes (AlphaCutoff) test and cast
  * shadows with the mapped texture.
