@@ -50,6 +50,9 @@ static float box_audio_core_wasm_r[BOX_AUDIO_CORE_QUANTUM];
 /** Events of the last read */
 static box_audio_event_t box_audio_core_wasm_ev[BOX_AUDIO_WASM_EVENTS];
 
+/** Status of the last stream asked for */
+static box_audio_stream_status_t box_audio_core_wasm_st;
+
 /** Fill bytes, for the code the compiler generates.
  *
  * @param dst The bytes
@@ -250,6 +253,38 @@ int32_t box_audio_core_wasm_sound(
 {
     return box_audio_core_sound(box_audio_core_wasm, id, data, frames, channels,
         sample_rate) ? 1 : 0;
+}
+
+/** Give a stream a chunk the worklet copied into the heap.
+ *
+ * @param stream Index of the stream
+ * @param data Frames in the heap
+ * @param frames Number of frames
+ * @param last 1 when the stream ends with this chunk
+ * @return 1 when the core took it
+ */
+int32_t box_audio_core_wasm_chunk(
+    uint32_t stream,
+    const float *data,
+    int32_t frames,
+    int32_t last)
+{
+    return box_audio_core_stream_chunk(box_audio_core_wasm, stream, data, frames,
+        last != 0) ? 1 : 0;
+}
+
+/** Get the status of a stream, 7 words: voice, open, ended, consumed, at, underruns and
+ * starved.
+ *
+ * @param stream Index of the stream
+ * @return Its address in the memory of the core
+ */
+box_audio_stream_status_t* box_audio_core_wasm_stream_status(
+    uint32_t stream)
+{
+    box_audio_core_stream_status(box_audio_core_wasm, stream, &box_audio_core_wasm_st);
+
+    return &box_audio_core_wasm_st;
 }
 
 /** Get the floats of delay memory a reverb of the core needs.

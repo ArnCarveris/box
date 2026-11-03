@@ -149,6 +149,27 @@ done:
     return result;
 }
 
+bool box_audio_write_stream(
+    box_audio_writer_t *writer,
+    uint32_t voice,
+    uint32_t stream,
+    uint32_t bus,
+    float volume,
+    uint32_t channels,
+    float sample_rate)
+{
+    box_audio_cmd_stream_t cmd;
+    box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_STREAM, sizeof(cmd));
+    cmd.voice = voice;
+    cmd.stream = stream;
+    cmd.bus = bus;
+    cmd.volume = volume;
+    cmd.channels = channels;
+    cmd.sample_rate = sample_rate;
+
+    return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
+}
+
 bool box_audio_write_release(
     box_audio_writer_t *writer,
     uint32_t sound)

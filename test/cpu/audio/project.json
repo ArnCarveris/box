@@ -199,6 +199,22 @@
                 ]
             },
             {
+                "id": "Stream",
+                "testcases": [
+                    "decode_matches",
+                    "loop_seamless",
+                    "no_loop_ends",
+                    "underrun_silent",
+                    "change_path",
+                    "stop_resume",
+                    "delete_frees",
+                    "missing_file",
+                    "corrupt_file",
+                    "second_stream_errors",
+                    "no_alloc"
+                ]
+            },
+            {
                 "id": "Script",
                 "testcases": [
                     "mixer_levels",

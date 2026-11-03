@@ -42,6 +42,7 @@ start of the next render block. They are:
 | `BUS_SET` | bus, `VOLUME`, `PAN`, `MUTE` or `SEND` (the send level), value |
 | `ORDER` | count, then per bus in processing order: bus, output, send |
 | `SOUND_RELEASE` | sound: freed once no voice plays it |
+| `STREAM` | voice handle, stream, bus, volume, channels, sample rate: opens a stream and starts a voice that reads it |
 | `REVERB` | slot, bus (or none), decay, damping, predelay, size, mix: see [Reverb](#reverb) |
 | `SYNTH` | sound, then a patch: makes a free sound id a synth or replaces its patch, see [Synth](#synth) |
 
@@ -72,6 +73,20 @@ pending at most once) and `read_events` turns the pending frees into events as s
 has room, in the same call or a later one. A burst of hundreds of plays at the cap in one batch,
 each with a steal and an end, can therefore lose `VOICE_END` and `VOICE_STOLEN` events but not
 the free of a sound released after it.
+
+**Streams** are the source of music, `BOX_AUDIO_STREAM_MAX` (2) of them, so a stream can fade
+out while the next one starts. Each is a fixed ring of `BOX_AUDIO_STREAM_CHUNKS` (32) chunk
+descriptors: `box_audio_core_stream_chunk(core, stream, data, frames, last)` queues a chunk of at
+most `BOX_AUDIO_STREAM_CHUNK` (4096) frames, interleaved like a sound, whose memory belongs to
+the side that runs the core as a sound's does. `box_audio_core_stream_status` reports the voice
+that opened the stream, whether it is still open, whether it ended, the chunks consumed (read to
+their end, so the owner frees the oldest ones), the frames read of the next, the underruns and
+whether it starves. A closed stream holds no chunk. The render path never waits for a chunk:
+when the ring holds fewer frames than a fade of `BOX_AUDIO_STREAM_FADE` (5 ms) takes, the gain
+fades to 0 on the frames it still has, the stream counts an underrun and plays silence; when
+chunks arrive it fades back in from the frame where it stopped, so neither side clicks. A stream
+reads its frames with the linear interpolation of a sample at the rate of its chunks; the voice
+ends after the last frame of the chunk marked `last`.
 
 **Voices** are a fixed pool of `BOX_AUDIO_VOICE_MAX` (64) voices, plus 16 slots for voices that
 fade out. A voice has a source, a bus, a volume, a pan and a pitch ratio. The source is a sample
@@ -285,6 +300,8 @@ The main thread reaches the core through a transport, one small interface in
 ```c
 bool commands(t, data, size);                      // send a command batch, copied
 bool sound(t, id, data, frames, channels, rate);   // hand over a sound, copied
+bool stream_chunk(t, stream, voice, data, frames, channels, last); // a chunk, copied
+void stream_status(t, stream, status);             // a stream's status, frees consumed chunks
 int32_t read_events(t, events, max);               // the events of the core, oldest first
 box_audio_state_t state(t);                        // what the output does
 void update(t, delta);                             // once per frame
@@ -411,9 +428,15 @@ The two talk only over the `MessagePort` of the `AudioWorkletNode`, with plain o
 - `{ type: 'events', events }` from the worklet: the events of the core after a quantum that
   had any. The worklet reads until the core has none left, 64 per call, so no backlog builds
   up across quanta. On `SOUND_FREE` the worklet has already freed the frames in its heap.
+- `{ type: 'chunk', stream, frames, last, data }`: a chunk of a stream as a transferred
+  `ArrayBuffer`. The worklet copies it into the heap of its core, keeps the pointers of each
+  stream in order and frees the consumed ones after each quantum, all of them when the stream
+  closed.
+- `{ type: 'stream', status }` from the worklet: the status of a stream when it changed, and
+  every 8 quanta while it plays; `Module.boxAudio.streams` keeps the last of each.
 - `{ type: 'stats', id }` asks the worklet for its quantum count, clock, voices, sounds,
-  memory and the events the core lost since the last `LOST` was read, which the browser check
-  uses.
+  memory, the events the core lost since the last `LOST` was read, the chunks it holds and the
+  streams, which the browser checks use.
 
 The web transport of `transport.c` sends with these functions and reads the events from
 `Module.boxAudio.queue`, which keeps up to 4096 events until the main module takes them.
@@ -579,6 +602,8 @@ frame, the same on every platform.
 | `Reverb` | A reverb on the bus of the entity: `decay` (1.5 s), `damping` (0.5), `predelay` (0.02 s), `size` (0.5), `mix` (1) |
 | `AudioOutput` | The bus a source, or a sound by default, plays on |
 | `AudioSource` | A sound that plays while the entity exists: `sound`, `volume` (1), `pitch` (1), `loop`, `playing` (true) |
+| `AudioStream` | Music: an Ogg Vorbis file (`path`) that streams, `volume` (1), `loop` (true), `playing` (true), see [Music](#music) |
+| `AudioStreamStatus` | Read only: `state` (`AudioStreamLoading`, `AudioStreamPlaying`, `AudioStreamStopped`, `AudioStreamEnded`, `AudioStreamFailed`), `frames`, `channels`, `sample_rate`, `position`, `buffered`, `underruns`, `decode_ms`, `decode_max_ms` and `error` |
 | `SynthSound` | A sound made by the synth from its layers, see [Synth sounds](#synth-sounds) |
 | `AudioSpatial` | Places a source in the world: `min_distance` (1), `max_distance` (50), `rolloff` (1), see [Spatial audio](#spatial-audio) |
 | `AudioListener` | Tag of the entity whose `WorldTransform` hears the spatial sources |
@@ -730,7 +755,7 @@ hum_source { AudioSource: {sound: hum, loop: true} }
 ```
 
 `SoundFile` (`src/audio/sample.c`) plays short sounds decoded fully into memory; long music
-streams in a later task. The path is found as a `TexturePath` is: absolute, relative to the
+streams with `AudioStream`, see [Music](#music). The path is found as a `TexturePath` is: absolute, relative to the
 working directory or an ancestor of it, or to an ancestor of the folder of the executable.
 
 - **Decoding** runs on the job system (`box_job_submit`), as textures and fonts do, with the
@@ -780,6 +805,80 @@ embeds `etc`); a test file through `?preload=`.
 
 The tests are `Sample` in `test/cpu/audio`, with files in `test/assets/audio` that
 `make_sounds.py` next to them writes, and the browser check `audio_sample.mjs`.
+
+### Music
+
+```
+using box.audio
+music { AudioStream: {path: "etc/assets/music/theme.ogg"}  AudioOutput: {bus: music_bus} }
+```
+
+`AudioStream` (`src/audio/music.c`) plays one Ogg Vorbis file that is too long to decode into
+memory. The file is found as a `SoundFile` is, read into memory in its compressed form and
+decoded with the pull API of `stb_vorbis` (the `stb` bundle, compiled once in
+`src/audio/vorbis.c`) in chunks of 4096 frames, at most 2 seconds
+(`BOX_AUDIO_MUSIC_AHEAD`) ahead of what plays, never as a whole track. Mono and stereo stay as
+they are; more channels mix down to stereo as for sound files, by the channel order of Vorbis.
+
+- **Into the core.** The sync system starts the stream with a `STREAM` command once half a
+  second is decoded (or the whole of a shorter file) and hands the chunks over with
+  `stream_chunk` after the batch of the frame: on native a copy whose pointer goes to the audio
+  thread over the command ring, on the web a transferred `ArrayBuffer`. The core reads them from
+  the ring of the stream. The transport frees a chunk when the status of the stream says the
+  core consumed it; the native audio thread publishes that status after each render in one
+  atomic word (voice, open, ended, consumed), so the main thread frees by a consistent view.
+- **Loops.** The decoder goes on with the first frame after the last within the same chunk, so
+  the seam is like any other pair of frames: no gap, no click, the length of each loop exact. A
+  stream that does not loop marks its last chunk; the voice ends after it, `playing` goes false
+  and the state is `AudioStreamEnded`. Setting `playing` again starts over.
+- **Native** decodes on a job (`box_job_submit`) whenever less than 1.5 s is ahead, never on the
+  audio thread; headless frames wait for these jobs as for sound files.
+- **One stream at once.** A second `AudioStream` logs one error that names it, its state is
+  `AudioStreamFailed` and it stays silent. A change of `path` stops the old stream with the fade
+  of a stop (5 ms) and starts the new one on the other stream of the core; a delete fades out,
+  then frees the decoder and the chunks once the core closed the stream. `playing: false` fades
+  out and keeps the position, `true` resumes there.
+- **Status.** `AudioStreamStatus` says `AudioStreamLoading` while the file is fetched, opened or
+  decoded ahead of the start, then `AudioStreamPlaying`; a missing, empty or corrupt file, or a
+  failed fetch, logs one error and fails without a crash. `underruns` counts the times the
+  output ran short, `buffered` the seconds decoded ahead, `decode_ms` the time of the last
+  decode and `decode_max_ms` the largest.
+- **Before the gesture** a stream that loops starts and is heard from the gesture on; one that
+  does not loop is dropped, as a source is (see [Before the gesture](#before-the-gesture)).
+
+**The web.** The page has no worker threads and jobs run inline at the end of the frame, so
+decoding runs on the main thread. A decode there stops after `BOX_AUDIO_MUSIC_WEB_BUDGET`
+(2 ms) and goes on in the next frame, every frame that has less than 2 seconds ahead, which
+keeps more than 1.5 s of chunks in the worklet: a 500 ms stall of the main thread does not run it
+short. Once full, a frame decodes only what played since, about a sixtieth of a second, which
+`decode_ms` reports; `test/integration/web/audio_stream.mjs` prints it with the longest frame.
+
+**The web does not embed music.** `embed` puts all of `etc` into the download of the page, so a
+track there adds its whole size to the start of every visit. A stream looks in the page's file
+system first (a file of `etc` an app embeds, or one that `?preload=` fetched), then fetches the
+path relative to the page with `fetch` into memory; the status says `AudioStreamLoading` until it
+arrived, and a failed fetch logs one error and stays silent. To deploy a track, keep it out of
+the folders the app embeds and copy it next to the page under the same relative path the scene
+names:
+
+```sh
+BIN=<folder that holds boxrun.html>
+mkdir -p "$BIN/assets/music"
+cp assets/music/theme.ogg "$BIN/assets/music/"
+```
+
+with `AudioStream: {path: "assets/music/theme.ogg"}`; a native build finds the same path
+relative to its working directory. The server sends the file as it is, `audio/ogg` or any type,
+and the page reads it once, compressed; it is never decoded whole.
+
+The tests are `Stream` in `test/cpu/audio`, with `tone.ogg`, `tone_960.ogg` and `corrupt.ogg` in
+`test/assets/audio`, which `make_ogg.py` next to them writes with an encoder of its own from
+known tones, and the browser check `audio_stream.mjs`:
+
+```sh
+node test/integration/web/audio_stream.mjs \
+    "$(tools/integration.py local-env --env audio)/wasm32-Emscripten/debug/bin"
+```
 
 ### Before the gesture
 

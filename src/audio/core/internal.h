@@ -116,7 +116,8 @@ typedef struct box_audio_reverb_t {
 typedef enum box_audio_source_kind_t {
     BOX_AUDIO_SOURCE_NONE = 0,   /**< No source, silent */
     BOX_AUDIO_SOURCE_SAMPLE = 1, /**< A sample buffer, box_audio_sample_source_t */
-    BOX_AUDIO_SOURCE_SYNTH = 2   /**< A synth patch, box_audio_synth_source_t */
+    BOX_AUDIO_SOURCE_SYNTH = 2,  /**< A synth patch, box_audio_synth_source_t */
+    BOX_AUDIO_SOURCE_STREAM = 3  /**< The ring of chunks of a stream, box_audio_stream_source_t */
 } box_audio_source_kind_t;
 
 /** A source that plays a sound, mono or stereo, with looping and linear interpolation */
@@ -128,6 +129,30 @@ typedef struct box_audio_sample_source_t {
     bool loop;         /**< Whether it starts over at its end */
 } box_audio_sample_source_t;
 
+/** Phases of a stream source */
+typedef enum box_audio_stream_phase_t {
+    BOX_AUDIO_STREAM_PRIMING = 0,    /**< Waits for the first chunks; the voice ramp fades it in */
+    BOX_AUDIO_STREAM_PLAYING = 1,    /**< Reads frames at full gain */
+    BOX_AUDIO_STREAM_FADING = 2,     /**< Ran short of frames and fades out over the fade */
+    BOX_AUDIO_STREAM_STARVED = 3,    /**< Plays silence until chunks arrive */
+    BOX_AUDIO_STREAM_RECOVERING = 4, /**< Chunks arrived; fades back in over the fade */
+    BOX_AUDIO_STREAM_ENDED = 5       /**< Read the last frame of the last chunk */
+} box_audio_stream_phase_t;
+
+/** A source that reads the ring of a stream with linear interpolation between two frames. It
+ * never waits: a ring that runs short fades out to silence and back in when chunks arrive */
+typedef struct box_audio_stream_source_t {
+    uint32_t stream;   /**< Index of the stream */
+    double frac;       /**< Position between frame a and frame b, 0..1 */
+    double step;       /**< Frames of the stream per frame of the core */
+    float a[2];        /**< Frame at the position */
+    float b[2];        /**< Frame after it */
+    float gain;        /**< Gain of the fade of an underrun, 0..1 */
+    float fade_step;   /**< Change of gain per frame of a fade */
+    int32_t need;      /**< Frames the ring holds at least to play on without a fade */
+    int32_t phase;     /**< A box_audio_stream_phase_t */
+    bool drained;      /**< Frame b repeats a, the last frame of the stream */
+} box_audio_stream_source_t;
 /** Segments of a synth envelope */
 typedef enum box_audio_synth_segment_t {
     BOX_AUDIO_SYNTH_ATTACK = 0,   /**< From 0 to 1 */
@@ -187,6 +212,7 @@ typedef struct box_audio_synth_source_t {
 /** State of the kinds of sources */
 typedef union box_audio_source_data_t {
     box_audio_sample_source_t sample;  /**< BOX_AUDIO_SOURCE_SAMPLE */
+    box_audio_stream_source_t stream;  /**< BOX_AUDIO_SOURCE_STREAM */
     box_audio_synth_source_t synth;    /**< BOX_AUDIO_SOURCE_SYNTH */
 } box_audio_source_data_t;
 
@@ -236,6 +262,29 @@ typedef struct box_audio_sound_t {
     int32_t synth;      /**< Slot of its patch plus 1 for a synth, 0 for frames */
 } box_audio_sound_t;
 
+/** A chunk of a stream: frames in the memory of the side that runs the core */
+typedef struct box_audio_chunk_t {
+    const float *data;  /**< Frames, interleaved when stereo */
+    int32_t frames;     /**< Number of frames */
+} box_audio_chunk_t;
+
+/** A stream: a fixed ring of chunks that one voice reads */
+typedef struct box_audio_stream_t {
+    box_audio_chunk_t chunks[BOX_AUDIO_STREAM_CHUNKS]; /**< The ring */
+    int32_t head;        /**< Index of the oldest chunk */
+    int32_t count;       /**< Chunks in the ring */
+    int32_t at;          /**< Frames read of the oldest chunk */
+    int32_t avail;       /**< Frames in the ring that were not read */
+    int32_t channels;    /**< 1 or 2 */
+    double rate;         /**< Frames of the stream per frame of the core */
+    uint32_t voice;      /**< Handle of the voice that opened it last */
+    bool open;           /**< Whether a voice reads it */
+    bool last;           /**< Whether its last chunk is in the ring */
+    bool ended;          /**< Whether the voice read the last chunk to its end */
+    uint32_t consumed;   /**< Chunks read to their end since it opened */
+    int32_t underruns;   /**< Times it ran out of chunks since it opened */
+    bool starved;        /**< Whether it plays silence for want of chunks */
+} box_audio_stream_t;
 /** A synth patch the core holds for a sound id */
 typedef struct box_audio_synth_slot_t {
     box_audio_synth_patch_t patch;  /**< The patch, clamped */
@@ -279,6 +328,7 @@ struct box_audio_core_t {
                            * event was read */
     int32_t event_lost_at; /**< Slot of the LOST event in the ring, -1 when it has none */
     int32_t free_pending; /**< Sounds in BOX_AUDIO_SOUND_PENDING */
+    box_audio_stream_t streams[BOX_AUDIO_STREAM_MAX]; /**< Streams by index */
     float src_l[BOX_AUDIO_CORE_BLOCK];  /**< Left or mono output of a source */
     float src_r[BOX_AUDIO_CORE_BLOCK];  /**< Right output of a stereo source */
     box_audio_reverb_t reverbs[BOX_AUDIO_REVERB_MAX]; /**< Reverbs by slot */
@@ -369,6 +419,16 @@ void box_audio_source_sample(
     float pitch,
     bool loop);
 
+/** Start a stream source on an open stream.
+ *
+ * @param core The core
+ * @param source The source
+ * @param stream Index of the stream
+ */
+void box_audio_source_stream(
+    box_audio_core_t *core,
+    box_audio_source_t *source,
+    uint32_t stream);
 /** Apply a synth command: give a free sound id a patch or replace the patch of a synth.
  *
  * @param core The core
@@ -450,7 +510,7 @@ int32_t box_audio_source_render(
     int32_t frames,
     bool *stereo);
 
-/** End a source: give back what it uses, which can free a released sound.
+/** End a source: give back what it uses, which can free a released sound or close a stream.
  *
  * @param core The core
  * @param source The source

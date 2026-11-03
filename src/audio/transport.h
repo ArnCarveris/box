@@ -51,6 +51,8 @@ typedef enum box_audio_state_t {
 typedef struct box_audio_transport_stats_t {
     int32_t voices;  /**< Voices that play, without the ones that fade out */
     float load;      /**< Share of real time the render takes, smoothed, 0 when not measured */
+    int32_t chunks;  /**< Chunks of streams the main thread holds for the core, 0 on the web,
+                      * whose worklet holds them */
 } box_audio_transport_stats_t;
 
 /** Kind of a transport */
@@ -82,6 +84,17 @@ struct box_audio_transport_t {
      * @return Whether the transport took the sound */
     bool (*sound)(box_audio_transport_t *t, uint32_t id, const float *data, int32_t frames,
         int32_t channels, float sample_rate);
+
+    /** Hand over a chunk of a stream that a STREAM command opened for a voice; the frames are
+     * copied and freed once the core consumed them or the stream closed.
+     * @return Whether the transport took the chunk */
+    bool (*stream_chunk)(box_audio_transport_t *t, uint32_t stream, uint32_t voice,
+        const float *data, int32_t frames, int32_t channels, bool last);
+
+    /** Report what a stream does as far as the main thread knows, and free the chunks the
+     * core is done with. A status of another voice than the last one opened is not current */
+    void (*stream_status)(box_audio_transport_t *t, uint32_t stream,
+        box_audio_stream_status_t *status);
 
     /** Give the core the delay memory of a reverb slot, before its first reverb command. The
      * transport allocates it where the core runs and frees it after the core; a slot gets it

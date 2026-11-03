@@ -36,6 +36,8 @@ EXPORTS = [
     "box_audio_core_wasm_voices",
     "box_audio_core_wasm_left",
     "box_audio_core_wasm_right",
+    "box_audio_core_wasm_chunk",
+    "box_audio_core_wasm_stream_status",
 ]
 
 # clang, not emcc: emcc links start code and libc of its cache into a standalone wasm, which the
