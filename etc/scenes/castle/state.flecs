@@ -79,7 +79,7 @@ fn kind_blurb(k: i32) -> string {
     5: "A cottage for 4 folk. Eats 1 food. Outside the walls bandits raid it for gold; safe inside them it grows into a house, then a manor."
     6: "A fenced farm of 4 by 4 cells with a farmhouse. Grows 10 food a second for 5 gold a second in wages; the blacksmith can research better farming."
     7: "The blacksmith, one per realm. Select it to research farming tools, so your fields feed more folk."
-    8: "A stone quarry, dug into a stone deposit where grey rock breaks through the grass. Cuts 2 stone a second for 10 gold a second in wages."
+    8: "A stone quarry, dug into a stone deposit where grey rock breaks through the grass. Cuts 1 stone a second for 10 gold a second in wages."
     9: "A moat of still water."
     10: "An oak or a pine. Cheap, and pleasant to look at."
     11: "A cobbled path."
@@ -473,8 +473,8 @@ export mut drag_end: i32 = -1
 export mut gold: f64 = 200
 export mut stone: f64 = 160
 export mut food: f64 = 60
-export mut gold_rate: f64 = 1
-export mut stone_rate: f64 = 1
+export mut gold_rate: f64 = 0
+export mut stone_rate: f64 = 0
 export mut food_make: f64 = 0
 export mut food_eat: f64 = 0
 export mut food_rate: f64 = 0
