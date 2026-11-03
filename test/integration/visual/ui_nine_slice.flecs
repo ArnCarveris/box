@@ -11,7 +11,7 @@ using box.layout
 // and a wide panel that stretch, a wide one that tiles and a tall one that tiles at a scale of
 // 1. Bottom row: a hollow frame over an orange backdrop, a frame rounded by a Border with an
 // outline, a tinted translucent one, one too small for its corners, which shrink until they
-// meet, and a scroll view whose ClipChildren cuts the frame in it at the top and the right.
+// meet, and a scroll view whose ClipChildren cuts the frame in it on three sides.
 
 camera {
   Position: {0, 0, 100}

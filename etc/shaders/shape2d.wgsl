@@ -401,25 +401,32 @@ fn ranked_depth(depth: f32, rank: u32) -> f32 {
 
 // Texture coordinate of a position along one axis of a sliced image and its rate of change per
 // unit of the position: edges are the four edges of the parts, coords the coordinates at them,
-// period the length the middle part repeats at, 0 when it stretches.
-fn slice_axis(p: f32, edges: vec4f, coords: vec4f, period: f32) -> vec2f {
+// period the length the middle part repeats at, 0 when it stretches, half half a texel. The
+// coordinate stays half a texel inside its part, so the filter does not blend in the texels of
+// the next part at a seam or of the far end of a tile where it repeats.
+fn slice_axis(p: f32, edges: vec4f, coords: vec4f, period: f32, half: f32) -> vec2f {
+    var c = vec2f(coords.y, coords.z);
+    var r: vec2f;
     if (p < edges.y) {
         let k = (coords.y - coords.x) / max(edges.y - edges.x, 1e-9);
-        return vec2f(coords.x + (p - edges.x) * k, k);
-    }
-
-    if (p > edges.z) {
+        c = vec2f(coords.x, coords.y);
+        r = vec2f(coords.x + (p - edges.x) * k, k);
+    } else if (p > edges.z) {
         let k = (coords.w - coords.z) / max(edges.w - edges.z, 1e-9);
-        return vec2f(coords.z + (p - edges.z) * k, k);
-    }
-
-    if (period > 0.0) {
+        c = vec2f(coords.z, coords.w);
+        r = vec2f(coords.z + (p - edges.z) * k, k);
+    } else if (period > 0.0) {
         let t = fract((p - edges.y) / period);
-        return vec2f(coords.y + (coords.z - coords.y) * t, (coords.z - coords.y) / period);
+        r = vec2f(coords.y + (coords.z - coords.y) * t, (coords.z - coords.y) / period);
+    } else {
+        let k = (coords.z - coords.y) / max(edges.z - edges.y, 1e-9);
+        r = vec2f(coords.y + (p - edges.y) * k, k);
     }
 
-    let k = (coords.z - coords.y) / max(edges.z - edges.y, 1e-9);
-    return vec2f(coords.y + (p - edges.y) * k, k);
+    let lo = min(c.x, c.y);
+    let hi = max(c.x, c.y);
+    let inset = min(half, (hi - lo) * 0.5);
+    return vec2f(clamp(r.x, lo + inset, hi - inset), r.y);
 }
 
 // The 2D shapes with an ImageSlice: fs with the texel of the part of the nine slice image under
@@ -450,8 +457,9 @@ fn slice_axis(p: f32, edges: vec4f, coords: vec4f, period: f32) -> vec2f {
         let p = clamp(f.uv, vec2f(0.0), vec2f(1.0));
         let mid_x = (p.x >= a.x.y) & (p.x <= a.x.z);
         let mid_y = (p.y >= a.y.y) & (p.y <= a.y.z);
-        let su = slice_axis(p.x, a.x, a.area, select(b.y.x, b.y.z, mid_y));
-        let sv = slice_axis(p.y, a.y, b.x, select(b.y.y, b.y.w, mid_x));
+        let half = 0.5 / vec2f(textureDimensions(albedo_map));
+        let su = slice_axis(p.x, a.x, a.area, select(b.y.x, b.y.z, mid_y), half.x);
+        let sv = slice_axis(p.y, a.y, b.x, select(b.y.y, b.y.w, mid_x), half.y);
         let k = vec2f(su.y, sv.y);
         texel = textureSampleGrad(albedo_map, material_sampler, vec2f(su.x, sv.x), uv_dx * k,
             uv_dy * k);

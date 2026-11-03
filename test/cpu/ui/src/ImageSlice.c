@@ -545,7 +545,8 @@ static const box_render_slice_t* slice_record_of(
     int32_t index = ecs_get(world, e, DrawSlot)->slice;
     test_assert(index > 0);
 
-    return ecs_vec_get_t(&d->clips.records, box_render_clip_t, index);
+    return (const box_render_slice_t*)ecs_vec_get_t(
+        &d->clips.records, box_render_clip_t, index);
 }
 
 void ImageSlice_record_lifecycle(void) {
