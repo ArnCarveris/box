@@ -1,5 +1,5 @@
 // The scene of the browser check of the synth (audio_synth.mjs): a beep of 660 Hz that the
-// check plays from a script after a gesture, and a hum of three layers through a filter sweep
+// check plays from a script after a gesture, and a hum of three layers through a filter envelope
 // for the load of 64 voices. A box turns all the time so every frame draws, which the check
 // counts.
 using box.transform
@@ -42,7 +42,8 @@ prefab Beep {
 prefab Hum {
   SynthSound: {seed: 3}
   SynthEnvelope: {attack: 0.05, decay: 0.2, sustain: 0.6, hold: 2, release: 0.2}
-  SynthFilter: {kind: SynthLowPass, cutoff: 400, cutoff_end: 6000, sweep: 2, resonance: 0.6}
+  SynthFilter: {kind: SynthLowPass, cutoff: 400, resonance: 0.6}
+  SynthFilterEnvelope: {attack: 2, sustain: 1, hold: 0.46, amount: 3.907}
   saw { SynthOscillator: {wave: SynthSaw, frequency: 110, frequency_end: 220, sweep: 2, level: 0.4} }
   square {
     SynthOscillator: {wave: SynthSquare, frequency: 330, level: 0.2}

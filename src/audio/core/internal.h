@@ -171,6 +171,11 @@ typedef struct box_audio_synth_env_t {
     float step;           /**< Change per frame */
     float sustain;        /**< Sustain level */
     int32_t frames[4];    /**< Frames of the attack, the decay, the hold and the release */
+    float curve[4];       /**< Curves of the attack, the decay, the hold (0) and the release */
+    bool curved;          /**< The segment follows level, not step */
+    double level;         /**< Current level of a curved segment */
+    double mul;           /**< Factor per frame of a curved segment */
+    double add;           /**< Term per frame of a curved segment */
 } box_audio_synth_env_t;
 
 /** An oscillator of a synth voice */
@@ -184,6 +189,13 @@ typedef struct box_audio_synth_osc_t {
     double inc_end;       /**< Turns per frame at the end of the sweep */
     int32_t sweep;        /**< Frames left of the sweep */
 } box_audio_synth_osc_t;
+
+/** A stage of the filter of a synth voice: a trapezoidal state variable filter */
+typedef struct box_audio_synth_svf_t {
+    float k;              /**< Damping, 2 / Q */
+    float a1, a2, a3;     /**< Coefficients */
+    float ic1, ic2;       /**< State */
+} box_audio_synth_svf_t;
 
 /** A source that plays a synth patch, a copy of it, so it never allocates */
 typedef struct box_audio_synth_source_t {
@@ -199,14 +211,14 @@ typedef struct box_audio_synth_source_t {
     float amp;            /**< Gain of the amp, the level variance of the play included */
     bool loop;            /**< Whether it starts over at the end of its envelopes */
     int32_t filter;       /**< A box_audio_synth_filter_t */
-    float k;              /**< Damping of the filter, 2 / Q */
-    float a1, a2, a3;     /**< Coefficients of the filter */
-    float ic1, ic2;       /**< State of the filter */
+    int32_t stages;       /**< Stages of the filter: 1 for 12 dB per octave, 2 for 24 */
+    box_audio_synth_svf_t svf[2]; /**< The resonant stage, then the stage before it at 24 dB */
     double cutoff;        /**< Cutoff in Hz */
-    double cutoff_ratio;  /**< Factor of the cutoff per frame during the sweep */
-    double cutoff_end;    /**< Cutoff at the end of the sweep */
-    int32_t cutoff_sweep; /**< Frames left of the sweep */
-    int32_t control;      /**< Frames until the filter takes the swept cutoff */
+    double cutoff_base;   /**< Cutoff of the patch, clamped, in Hz */
+    double cutoff_top;    /**< Highest cutoff in Hz, under Nyquist */
+    float amount;         /**< Octaves of the filter envelope, 0 without one */
+    box_audio_synth_env_t fenv; /**< The filter envelope, when amount is not 0 */
+    int32_t control;      /**< Frames until the filter takes the cutoff of the envelope */
 } box_audio_synth_source_t;
 
 /** State of the kinds of sources */

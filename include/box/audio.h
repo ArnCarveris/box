@@ -180,9 +180,15 @@ ECS_ENUM(SynthWave, {
 
 /** Kind of the filter of a synth sound */
 ECS_ENUM(SynthFilterKind, {
-    SynthLowPass,          /**< Lowpass, 12 dB per octave */
-    SynthHighPass,         /**< Highpass, 12 dB per octave */
+    SynthLowPass,          /**< Lowpass */
+    SynthHighPass,         /**< Highpass */
     SynthBandPass          /**< Bandpass, unity at the cutoff */
+});
+
+/** Slope of the filter of a synth sound */
+ECS_ENUM(SynthFilterSlope, {
+    SynthSlope12,          /**< 12 dB per octave, one stage */
+    SynthSlope24           /**< 24 dB per octave, two cascaded stages */
 });
 
 /** An oscillator of a synth sound, a layer: on the root of the sound or on a child of it.
@@ -197,8 +203,13 @@ ECS_STRUCT(SynthOscillator, {
     float level;           /**< Linear gain, default 1 */
 });
 
-/** An envelope: linear from 0 to 1 over attack, to sustain over decay, hold seconds there,
- * then to 0 over release.
+/** An envelope: from 0 to 1 over attack, to sustain over decay, hold seconds there, then to
+ * 0 over release.
+ *
+ * Each segment is linear by default. A positive curve bends it toward an exponential shape,
+ * fast at first and slow toward its target, as analog envelopes do, and still reaches the
+ * target at the end of its time; a negative one bends it the other way. Plucks use a curve of
+ * 4 to 6, pads 2 to 3.
  *
  * On the root it applies to every layer without its own, on a layer to that layer. A sound
  * ends once every envelope reached silence, so a one shot without a release still ends. A
@@ -211,6 +222,9 @@ ECS_STRUCT(SynthEnvelope, {
     float sustain;         /**< Level after the decay, 0..1, default 0 */
     float release;         /**< Seconds from the sustain level to 0 */
     float hold;            /**< Seconds at the sustain level before the release */
+    float curve;           /**< Curve of the decay and the release, 0 linear (default),
+                            *   -16..16 */
+    float attack_curve;    /**< Curve of the attack, 0 linear (default), -16..16 */
 });
 
 /** The filter of a synth sound, on its root: a state variable filter on the mix of the layers,
@@ -218,13 +232,34 @@ ECS_STRUCT(SynthEnvelope, {
 ECS_STRUCT(SynthFilter, {
     SynthFilterKind kind;  /**< The kind, default SynthLowPass */
     float cutoff;          /**< Hz, default 1000, clamped under Nyquist */
-    float cutoff_end;      /**< Hz the cutoff sweeps to, 0 for no sweep */
-    float sweep;           /**< Seconds of the sweep, exponential in frequency */
     float resonance;       /**< 0 (a Butterworth response) to 1 (rings the longest) */
+    SynthFilterSlope slope; /**< Steepness, default SynthSlope12; at SynthSlope24 the resonance
+                            *   applies to the second stage only */
+});
+
+/** An envelope of the cutoff of the SynthFilter of the same root, with the segments of a
+ * SynthEnvelope: the cutoff is cutoff times 2 to the amount times the level of the envelope,
+ * so it rises over the attack, settles at the sustain and returns over the release.
+ *
+ * It does not keep a sound playing: the sound ends with its SynthEnvelope. Without a
+ * SynthFilter it does nothing.
+ */
+ECS_STRUCT(SynthFilterEnvelope, {
+    float attack;          /**< Seconds from 0 to 1, at least 0.5 ms */
+    float decay;           /**< Seconds from 1 to the sustain level */
+    float sustain;         /**< Level after the decay, 0..1, default 0 */
+    float release;         /**< Seconds from the sustain level to 0 */
+    float hold;            /**< Seconds at the sustain level before the release */
+    float curve;           /**< Curve of the decay and the release, 0 linear (default),
+                            *   -16..16 */
+    float attack_curve;    /**< Curve of the attack, 0 linear (default), -16..16 */
+    float amount;          /**< Octaves the cutoff moves at level 1, -10..10, negative closes
+                            *   the filter, default 0 */
 });
 
 /** A sound made by the synth from the components of this entity and its children, without a
- * file: SynthOscillator layers, a SynthEnvelope and a SynthFilter. Usually a prefab.
+ * file: SynthOscillator layers, a SynthEnvelope, a SynthFilter and a SynthFilterEnvelope.
+ * Usually a prefab.
  *
  * It is compiled once, and again when one of its components changes, into a patch the core
  * holds; box_audio_play and AudioSource play it like any sound, with no allocation per play.

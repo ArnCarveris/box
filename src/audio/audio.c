@@ -143,7 +143,8 @@ static void box_audio_synth_oscillator_ctor(
     }
 }
 
-/** Construct SynthFilter values: a lowpass at 1000 Hz without resonance or sweep.
+/** Construct SynthFilter values: a lowpass at 1000 Hz and 12 dB per octave without
+ * resonance.
  *
  * @param ptr The components
  * @param count Number of components
@@ -665,11 +666,13 @@ void BoxAudioImport(
     ecs_set_hooks(world, Reverb, { .ctor = box_audio_reverb_ctor });
     ECS_META_COMPONENT(world, SynthWave);
     ECS_META_COMPONENT(world, SynthFilterKind);
+    ECS_META_COMPONENT(world, SynthFilterSlope);
     ECS_META_COMPONENT(world, SynthOscillator);
     ecs_set_hooks(world, SynthOscillator, { .ctor = box_audio_synth_oscillator_ctor });
     ECS_META_COMPONENT(world, SynthEnvelope);
     ECS_META_COMPONENT(world, SynthFilter);
     ecs_set_hooks(world, SynthFilter, { .ctor = box_audio_synth_filter_ctor });
+    ECS_META_COMPONENT(world, SynthFilterEnvelope);
     ECS_META_COMPONENT(world, SynthSound);
     ECS_META_COMPONENT(world, AudioSettings);
     ecs_set_hooks(world, AudioSettings, { .ctor = box_audio_settings_ctor });

@@ -23,7 +23,8 @@ template Pad {
   AudioOutput: {bus: band}
   SynthSound: {seed: 5}
   SynthEnvelope: {attack: 0.7, decay: 0.5, sustain: 0.75, hold: 0.6, release: 1.1}
-  SynthFilter: {kind: SynthLowPass, cutoff: 900, cutoff_end: 1600, sweep: 1.5, resonance: 0.15}
+  SynthFilter: {kind: SynthLowPass, cutoff: 900, resonance: 0.15}
+  SynthFilterEnvelope: {attack: 1.5, sustain: 1, hold: 1.41, amount: 0.83}
   low { SynthOscillator: {wave: SynthSaw, frequency: a, level: 0.15} }
   mid { SynthOscillator: {wave: SynthSaw, frequency: b * 1.003, level: 0.12} }
   high { SynthOscillator: {wave: SynthTriangle, frequency: c, level: 0.2} }
@@ -37,7 +38,8 @@ template Bass {
   AudioOutput: {bus: band}
   SynthSound: {level_variance: 0.05}
   SynthEnvelope: {attack: 0.004, decay: 0.42}
-  SynthFilter: {kind: SynthLowPass, cutoff: 700, cutoff_end: 220, sweep: 0.3, resonance: 0.25}
+  SynthFilter: {kind: SynthLowPass, cutoff: 220, resonance: 0.25}
+  SynthFilterEnvelope: {decay: 0.3, amount: 1.67}
   body { SynthOscillator: {wave: SynthSaw, frequency: f, level: 0.4} }
   sub { SynthOscillator: {wave: SynthSine, frequency: f, level: 0.5} }
 }
@@ -49,7 +51,8 @@ template Lead {
   AudioOutput: {bus: band}
   SynthSound: {level_variance: 0.08}
   SynthEnvelope: {attack: 0.006, decay: 0.5}
-  SynthFilter: {kind: SynthLowPass, cutoff: 3200, cutoff_end: 700, sweep: 0.35, resonance: 0.3}
+  SynthFilter: {kind: SynthLowPass, cutoff: 700, resonance: 0.3}
+  SynthFilterEnvelope: {decay: 0.35, amount: 2.193}
   pluck { SynthOscillator: {wave: SynthSquare, frequency: f, level: 0.14} }
   body { SynthOscillator: {wave: SynthTriangle, frequency: f, level: 0.28} }
   ring {
