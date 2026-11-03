@@ -6,17 +6,18 @@ using box.camera
 using box.view
 using box.light
 
-// Height based TextureBlend transitions: two quads blend a cobble layer (left half of the mask)
-// and a grass layer (right half) under the mask of textures_blend.flecs, whose red and blue weigh
-// the cobble and green and alpha the grass, so the border is a soft vertical band through the
-// middle of each quad. Both layers have a TextureGen height: the stones are domes that are high
-// in the middle and low in the joints, the grass is noise around the middle height. The left
-// quad has a contrast of 0, the linear blend, where the grass fades over the stones as a double
-// exposure; the right one a contrast of 24, where the grass fills the joints between the stones
-// and the stones stand out of the grass, with no ghosting. Away from the band both quads match.
+// Height based TextureBlend transitions: two quads blend a cobble layer (top half of the mask)
+// and a grass layer (bottom half) under the mask of textures_blend.flecs, whose red and green
+// weigh the cobble and blue and alpha the grass, so the border is a soft horizontal band through
+// the middle of each quad. The camera is close to the inner halves of the quads, around their
+// borders. Both layers have a TextureGen height: the stones are domes that are high in the middle
+// and low in the joints, the grass is noise around the middle height. The left quad has a
+// contrast of 0, the linear blend, where the grass fades over the stones as a double exposure;
+// the right one a contrast of 24, where the grass fills the joints between the stones and the
+// stones stand out of the grass, with no ghosting. Away from the band both quads match.
 
 camera {
-  Position: {0, 0, 4.6}
+  Position: {0, 0, 2.1}
   Camera: {fov: 50}
 }
 
@@ -88,26 +89,26 @@ grass_layer {
 }
 
 linear {
-  Position: {-1.65, 0, 0}
+  Position: {-1.55, 0, 0}
   Quad: {3, 3}
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.8}
   TextureBlend: {
     mask: mask
-    layers: [cobble_layer, grass_layer, cobble_layer, grass_layer]
-    heights: [cobble_height, grass_height, cobble_height, grass_height]
+    layers: [cobble_layer, cobble_layer, grass_layer, grass_layer]
+    heights: [cobble_height, cobble_height, grass_height, grass_height]
   }
 }
 
 sharp {
-  Position: {1.65, 0, 0}
+  Position: {1.55, 0, 0}
   Quad: {3, 3}
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.8}
   TextureBlend: {
     mask: mask
-    layers: [cobble_layer, grass_layer, cobble_layer, grass_layer]
-    heights: [cobble_height, grass_height, cobble_height, grass_height]
+    layers: [cobble_layer, cobble_layer, grass_layer, grass_layer]
+    heights: [cobble_height, cobble_height, grass_height, grass_height]
     contrast: 24
   }
 }

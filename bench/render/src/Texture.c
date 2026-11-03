@@ -147,8 +147,10 @@ static char* bench_texture_noise(
 
 /** Render frames of a lit sphere that fills a 3840x2160 surface, either with one set of
  * PbrTextures or with a TextureBlend of four layers of PbrTextures under a noise mask, so most
- * fragments weigh several layers. Every frame waits for the GPU, so a case measures a frame.
- * With a contrast above 0 the layers have the noise as their heights.
+ * fragments weigh several layers.
+ *
+ * Every frame waits for the GPU, so a case measures a frame. With a contrast above 0 the layers
+ * have the noise as their heights.
  *
  * @param b The benchmark
  * @param blended Whether the sphere blends four layers

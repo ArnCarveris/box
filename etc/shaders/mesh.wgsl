@@ -131,6 +131,10 @@ const BLEND_SINGLE: u32 = 2u;
 // Layer 0 has a height image, shifted left by k for layer k; a layer without one is flat at 0.5.
 const BLEND_HEIGHT: u32 = 4u;
 
+// Share of the shaped weights below which a layer of a blend with a contrast is dropped, under a
+// step of an 8 bit channel, so the fragments past a border sample the maps of one layer only.
+const BLEND_HEIGHT_DROP: f32 = 1.0 / 256.0;
+
 // Group 1 of fs_blend besides emissive_map and material_sampler: the albedo (decoded from sRGB),
 // ORM and normal of each layer as a slice of an array, the mask as stored, the uniforms and the
 // height of each layer in the red of a slice, as stored (a one slice placeholder with a contrast
@@ -849,7 +853,8 @@ fn blend_weights(mask: vec4f) -> vec4f {
 // takes its height h (0.5 without a height image) at its coordinates, and its weight is
 // multiplied by exp(contrast * (h + w - m)), m the largest h + w, then normalized. Near a border
 // the higher layer wins, with a transition about 1 / contrast wide; a layer the mask weighs
-// alone keeps its weight of 1. Only the layers with a weight sample their height.
+// alone keeps its weight of 1. Only the layers with a weight sample their height, and a layer
+// whose shaped weight is under BLEND_HEIGHT_DROP of the sum is dropped, so it samples no maps.
 fn blend_height_weights(w: vec4f, uv: vec2f, gx: vec2f, gy: vec2f) -> vec4f {
     var s = vec4f(0.0);
     var m = -1e30;
@@ -873,7 +878,11 @@ fn blend_height_weights(w: vec4f, uv: vec2f, gx: vec2f, gy: vec2f) -> vec4f {
         }
     }
     let sum = o.x + o.y + o.z + o.w;
-    return select(w, o / sum, sum > 1e-12);
+    if (!(sum > 1e-12)) {
+        return w;
+    }
+    o = select(vec4f(0.0), o, o > vec4f(sum * BLEND_HEIGHT_DROP));
+    return o / (o.x + o.y + o.z + o.w);
 }
 
 // The layers of a fragment of a TextureBlend: the mask and the emissive layer at the texture

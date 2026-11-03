@@ -1987,9 +1987,10 @@ void Material_texture_blend_layer_deleted(void) {
 
 /** The contrast and the heights of a TextureBlend reach the record of its batch, the bind group
  * key of the backend, as the layers do: with a contrast of 0 the heights stay 0 so they split no
- * bind group, with a contrast above 0 each layer carries the handle of its height. A change of
- * the contrast, of a height or of the image of a height updates the record, and the shape keeps
- * its batch. A contrast that is negative or not finite is 0. */
+ * bind group, with a contrast above 0 each layer carries the handle of its height.
+ *
+ * A change of the contrast, of a height or of the image of a height updates the record, and the
+ * shape keeps its batch. A contrast that is negative or not finite is 0. */
 void Material_texture_blend_height_record(void) {
     // materials/texture_blend
     box_render_null_t *null;
