@@ -12,8 +12,8 @@ using box.view
 // The box on the right of the back row is normal mapped with the projected bumps.
 
 camera {
-  Position: {0, 6.5, 12.5}
-  Rotation: {-0.45, 0, 0}
+  Position: {-0.4, 5.6, 6.8}
+  Rotation: {-0.6, 0, 0}
   Camera: {fov: 50}
 }
 
@@ -37,7 +37,7 @@ floor {
 }
 
 mapped_cube {
-  Position: {-6, 0.25, -2.5}
+  Position: {-4.6, 0.25, -2}
   Rotation: {0, -0.6, 0}
   Box: {0.5, 0.5, 0.5}
   Rgb: {255, 255, 255}
@@ -47,7 +47,7 @@ mapped_cube {
 }
 
 mapped_wall {
-  Position: {-3, 0.5, -2.5}
+  Position: {-2.3, 0.5, -2}
   Rotation: {0, -0.6, 0}
   Box: {4, 1, 0.5}
   Rgb: {255, 255, 255}
@@ -57,7 +57,7 @@ mapped_wall {
 }
 
 mapped_slab {
-  Position: {1.5, 1.5, -2.5}
+  Position: {0.8, 1.5, -2}
   Rotation: {0, -0.6, 0}
   Box: {0.2, 3, 2}
   Rgb: {255, 255, 255}
@@ -67,7 +67,7 @@ mapped_slab {
 }
 
 mapped_bumps {
-  Position: {5, 0.75, -2.5}
+  Position: {3.4, 0.75, -2}
   Rotation: {0, -0.6, 0}
   Box: {2.5, 1.5, 1.5}
   Rgb: {90, 160, 220}
@@ -77,7 +77,7 @@ mapped_bumps {
 }
 
 uv_cube {
-  Position: {-6, 0.25, 2}
+  Position: {-4.6, 0.25, 1.2}
   Rotation: {0, -0.6, 0}
   Box: {0.5, 0.5, 0.5}
   Rgb: {255, 255, 255}
@@ -86,7 +86,7 @@ uv_cube {
 }
 
 uv_wall {
-  Position: {-3, 0.5, 2}
+  Position: {-2.3, 0.5, 1.2}
   Rotation: {0, -0.6, 0}
   Box: {4, 1, 0.5}
   Rgb: {255, 255, 255}
@@ -95,7 +95,7 @@ uv_wall {
 }
 
 uv_slab {
-  Position: {1.5, 1.5, 2}
+  Position: {0.8, 1.5, 1.2}
   Rotation: {0, -0.6, 0}
   Box: {0.2, 3, 2}
   Rgb: {255, 255, 255}
@@ -104,7 +104,7 @@ uv_slab {
 }
 
 uv_bumps {
-  Position: {5, 0.75, 2}
+  Position: {3.4, 0.75, 1.2}
   Rotation: {0, -0.6, 0}
   Box: {2.5, 1.5, 1.5}
   Rgb: {90, 160, 220}
