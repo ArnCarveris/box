@@ -1,0 +1,129 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.text
+using box.layout
+using box.spatial
+using box.picking
+using box.transition
+
+fn faction_short(f: i32) -> string {
+  match f { 0: "MERIDIAN"; 1: "UNION"; 2: "ASH"; _: "WARDENS" }
+}
+
+fn contraband_text(f: i32) -> string {
+  match f { 2: "CONTRABAND: CORE-SALT NARCOTIC"; _: "CONTRABAND: UNDECLARED ARMS" }
+}
+
+template ShipRow {
+  prop i: i32 = 0
+  prop y: f32 = 0
+  const st = ships[i].state
+  const holding = st == SH_HOLD
+  const chosen = sel_ship == i && holding
+  const wait = 1 - clamp01(ships[i].t / 120)
+
+  if holding {
+    Pick hit(y: y, w: 246, h: 34, x: 0, op: OP_SELECT_SHIP, a: i, selected: chosen)
+    Ink name(text: ship_name(ships[i].name), size: 14, hue: match chosen { true: LUMEN; _: LUM_DIM }, x: -116, y: y + 6, font: font_data)
+    Ink tag(text: "{faction_code(ships[i].faction)} {ship_class(ships[i].kind)}", size: 11, hue: LUM_DIM, x: -116, y: y - 9)
+    Meter patience(x: 66, y: y - 9, w: 96, h: 5, value: wait, hue: match wait < 0.3 { true: ALERT; _: MINT }, ticks: 1)
+  } else if st != SH_NONE {
+    Ink bus(text: match st { 1: "JUMP FLASH..."; 3: "ON APPROACH"; 4: "DOCKED"; _: "OUTBOUND" }, size: 11, hue: LUM_FAINT, x: -116, y: y)
+  } else {
+    Hair blank(x1: -116, y1: y, x2: 116, y2: y, w: 0.7, hue: LUM_WIRE)
+  }
+}
+
+template TrafficCard {
+  const i = sel_ship
+  const open = i >= 0 && ships[i].state == SH_HOLD
+  const fac = match open { true: ships[i].faction; _: 0 }
+
+  Outline frame(w: 500, h: 268, hue: LUM_FAINT, z: 0)
+  Corners corners(w: 500, h: 268, hue: match open { true: LUMEN; _: LUM_FAINT })
+  if open {
+    Ink name(text: ship_name(ships[i].name), size: 28, hue: LUMEN, x: -236, y: 100, font: font_head, glow: 2.2)
+    Ink cls(text: "{ship_class(ships[i].kind)} / {faction_name(fac)}", size: 14, hue: LUM_DIM, x: -236, y: 74)
+    Hair r1(x1: -236, y1: 58, x2: 236, y2: 58, hue: LUM_FAINT)
+    Ink k1(text: "TRANSPONDER", size: 11, hue: LUM_DIM, x: -236, y: 40)
+    Ink v1(text: cred_name(ships[i].cred), size: 20, font: font_data, hue: match ships[i].cred { 0: MINT; 1: WARM; _: ALERT }, x: -236, y: 18, glow: 2.2)
+    Ink k2(text: "BERTH FEE OFFERED", size: 11, hue: LUM_DIM, x: 10, y: 40)
+    Ink v2(text: "{ships[i].fee:.0} CR", size: 20, font: font_data, hue: GOLD, x: 10, y: 18, glow: 2.2)
+    Ink k3(text: "DECLARED CARGO", size: 11, hue: LUM_DIM, x: -236, y: -8)
+    Ink v3(text: match ships[i].tons > 0 { true: "{ships[i].tons:.0} T {good_name(ships[i].good)}"; _: "EMPTY HOLDS" }, size: 16, font: font_data, hue: LUMEN, x: -236, y: -28)
+    Ink k4(text: "STANDING", size: 11, hue: LUM_DIM, x: 10, y: -8)
+    Meter v4(x: 130, y: -28, w: 214, h: 12, value: standing[fac], hue: match standing[fac] < 0.3 { true: ALERT; _: LUMEN })
+    Hair r2(x1: -236, y1: -50, x2: 236, y2: -50, hue: LUM_FAINT)
+    Ink k5(text: "MANIFEST SCAN", size: 11, hue: LUM_DIM, x: -236, y: -66)
+    if ships[i].scan_t > 0 {
+      const f = 1 - ships[i].scan_t / 2.5
+      Plate sweep(x: -236 + f * 472, y: -96, w: 3, h: 44, hue: TY_INK, z: 6, glow: 4)
+      Meter prog(x: 0, y: -96, w: 472, h: 8, value: f, hue: TY_INK, ticks: 1)
+    } else if ships[i].scanned {
+      Ink v5(text: match ships[i].contraband { true: contraband_text(fac); _: "MANIFEST MATCHES. CLEAN." }, size: 18, font: font_data, hue: match ships[i].contraband { true: ALERT; _: MINT }, x: -236, y: -92, glow: 2.2)
+    } else {
+      Ink v5b(text: "NOT SCANNED. YOUR CALL, BOSS.", size: 15, hue: WARM, x: -236, y: -92)
+    }
+    if fac == embargo {
+      Plate warn_b(x: 0, y: -118, w: 472, h: 20, hue: {ALERT.r * 0.25, ALERT.g * 0.25, ALERT.b * 0.25}, z: 1)
+      Ink warn(text: "WARDEN EMBARGO ON THIS FLAG", size: 12, hue: ALERT, x: 0, y: -118, align: Center, z: 3)
+    }
+  } else {
+    Ink idle(text: "NO SHIP SELECTED", size: 22, hue: LUM_FAINT, x: 0, y: 12, align: Center, font: font_head)
+    Ink idle2(text: match berth_count > 0 { true: "CHANNEL 16 OPEN"; _: "NO POWERED BERTHS" }, size: 13, hue: LUM_FAINT, x: 0, y: -14, align: Center)
+  }
+}
+
+Console console_traffic(st: ST_TRAFFIC) {
+  GlassLayer ui() {
+    Hair v_div(x1: -135, y1: 200, x2: -135, y2: -258, hue: LUM_WIRE)
+    Ink q_title(text: "HOLDING PATTERN", size: 13, hue: LUM_DIM, x: -384, y: 190, font: font_data)
+    queue {
+      Position: {-258, 0, 6}
+      for i in 0..SHIPS {
+        ShipRow "row_{i}"(i: i, y: 164 - i * 42)
+      }
+    }
+    TrafficCard card() { Position: {122, 58, 8} }
+
+    Ink berth_title(text: "BERTHS", size: 13, hue: LUM_DIM, x: -116, y: -94, font: font_data)
+    for b in 0..12 {
+      const slot = b / 2
+      const usable = slot_kind[slot] == M_DOCK && slot_build[slot] >= 1
+      const used = usable && berth_of[b] > 0
+      "chip_{b}" {
+        Position: {-76 + (b % 12) * 41, -122, 5}
+        Rect: {36, 22}
+        Rgb: match used { true: {MINT.r * 0.4, MINT.g * 0.4, MINT.b * 0.4}; _: {0, 0, 0} }
+        BlendMode: Additive
+        Border: {width: 1, color: match usable { true: {MINT.r, MINT.g, MINT.b, 255}; _: {LUM_WIRE.r, LUM_WIRE.g, LUM_WIRE.b, 255} }}
+        SpatialIgnore
+      }
+    }
+    Ink log_t(text: "VOX", size: 11, hue: LUM_DIM, x: -116, y: -150, font: font_data)
+    Ink log_a(text: log0, size: 13, hue: LUMEN, x: -116, y: -170)
+    Ink log_b(text: log1, size: 12, hue: LUM_DIM, x: -116, y: -188)
+    Ink log_c(text: log2, size: 12, hue: LUM_FAINT, x: -116, y: -204)
+    Ink log_d(text: log3, size: 12, hue: LUM_FAINT, x: -116, y: -220)
+    Ink log_e(text: log4, size: 12, hue: LUM_WIRE, x: -116, y: -236)
+  }
+
+  HwLayer hardware() {
+    Stencil c0(text: "CLEARANCE", size: 13, y: 248)
+    Tap scan(legend: "SCAN MANIFEST", hue: K_TY, w: 270, h: 40, size: 15, op: OP_SCAN_SHIP, y: 214, enabled: sel_ship >= 0)
+    Tap grant(legend: "GRANT", sub: "ASSIGN BERTH", hue: K_GREEN, w: 134, h: 66, size: 20, op: OP_GRANT, x: -68, y: 152, enabled: sel_ship >= 0, c: 12)
+    Tap deny(legend: "DENY", sub: "TURN AWAY", hue: K_RED, w: 134, h: 66, size: 20, op: OP_DENY, x: 68, y: 152, enabled: sel_ship >= 0, c: 12)
+    Hair r_a(x1: -135, y1: 104, x2: 135, y2: 104, hue: LUM_FAINT)
+    Stencil c1(text: "FACTION STANDING", size: 11, y: 90)
+    for f in 0..FACTIONS {
+      ArcGauge "stand_{f}"(label: faction_short(f), value: standing[f], r: 40, red_from: 0, red_to: 0.25, x: match f % 2 { 0: -70; _: 70 }, y: match floor(f / 2) { 0: 26; _: -106 })
+    }
+    Hair r_b(x1: -135, y1: -170, x2: 135, y2: -170, hue: LUM_FAINT)
+    Ink e_a(text: "WARDEN NOTICE", size: 11, hue: LUM_DIM, x: -135, y: -188)
+    Ink e_b(text: "EMBARGO: {faction_name(embargo)}", size: 13, hue: ALERT, x: -135, y: -208, font: font_data)
+    Ink e_c(text: "CLEARED {docked_total}  CAUGHT {denied_ok}", size: 11, hue: LUM_DIM, x: -135, y: -230)
+  }
+}

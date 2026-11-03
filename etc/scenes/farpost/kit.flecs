@@ -1,0 +1,125 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.spatial
+
+struct P3(x: f32, y: f32, z: f32)
+
+fn span(a: P3, b: P3) -> f32 {
+  sqrt(sqr(b.x - a.x) + sqr(b.y - a.y) + sqr(b.z - a.z))
+}
+
+fn yaw_of(a: P3, b: P3) -> f32 {
+  atan2(b.x - a.x, b.z - a.z)
+}
+
+fn pitch_of(a: P3, b: P3) -> f32 {
+  0 - atan2(b.y - a.y, sqrt(sqr(b.x - a.x) + sqr(b.z - a.z)))
+}
+
+template Beam3 {
+  prop a: P3 = {0, 0, 0}
+  prop b: P3 = {0, 0, 1}
+  prop w: f32 = 0.05
+  prop h: f32 = 0.05
+  prop roll: f32 = 0
+
+  Position: {(a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2}
+  Rotation: {pitch_of(a, b), yaw_of(a, b), roll}
+  Box: {w, h, span(a, b)}
+}
+
+template Rod3 {
+  prop a: P3 = {0, 0, 0}
+  prop b: P3 = {0, 0, 1}
+  prop r: f32 = 0.02
+  prop tone: Rgb = {150, 150, 154}
+  prop metal: f32 = 1
+  prop rough: f32 = 0.36
+  prop segs: i32 = 10
+
+  Position: {(a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2}
+  Rotation: {pitch_of(a, b), yaw_of(a, b), 0}
+  rod { Rotation: {PI / 2, 0, 0}; Cylinder: {radius: r, length: span(a, b), segments: segs, smooth: true}; Rgb: tone; PbrMaterial: {metallic: metal, roughness: rough} }
+}
+
+prefab RoundShape {
+  Path2D: {
+    start: {0.5, 0},
+    segments: [
+      {kind: Line, end: {0.35, 0.35}}, {kind: Line, end: {0, 0.5}}, {kind: Line, end: {-0.35, 0.35}},
+      {kind: Line, end: {-0.5, 0}}, {kind: Line, end: {-0.35, -0.35}}, {kind: Line, end: {0, -0.5}},
+      {kind: Line, end: {0.35, -0.35}}
+    ],
+    closed: true
+  }
+}
+prefab RoundProfile { Profile2D: {outer: RoundShape} }
+
+template Cable3 {
+  prop a: P3 = {0, 0, 0}
+  prop b: P3 = {0, 0, 1}
+  prop sag: f32 = 0.1
+  prop thick: f32 = 0.018
+  prop tone: Rgb = {24, 24, 26}
+  prop rough: f32 = 0.55
+  prop metal: f32 = 0
+
+  run {
+    Path3D: {
+      start: {a.x, a.y, a.z},
+      segments: [{
+        kind: CubicBezier,
+        end: {b.x, b.y, b.z},
+        control1: {lerp(a.x, b.x, 0.3), lerp(a.y, b.y, 0.3) - sag, lerp(a.z, b.z, 0.3)},
+        control2: {lerp(a.x, b.x, 0.7), lerp(a.y, b.y, 0.7) - sag, lerp(a.z, b.z, 0.7)}
+      }]
+    }
+  }
+
+  Sweep: {path: run, profile: RoundProfile, scale: {thick, thick}, rings: 20}
+  Rgb: tone
+  PbrMaterial: {metallic: metal, roughness: rough}
+  SpatialIgnore
+}
+
+template Decal {
+  prop x: f32 = 0
+  prop y: f32 = 0
+  prop z: f32 = 0.2
+  prop w: f32 = 100
+  prop h: f32 = 100
+  prop tilt: f32 = 0
+  prop tint: Rgb = {30, 24, 18}
+  prop fade: f32 = 1
+  prop tex: entity = tex_patch
+
+  Position: {x, y, z}
+  Rotation: {0, 0, tilt}
+  Quad: {w, h}
+  Rgb: tint
+  BlendMode: AlphaBlend
+  Opacity: {fade}
+  PbrMaterial: {metallic: 0, roughness: 0.95}
+  PbrTextures: {albedo: tex}
+  NoShadow
+  SpatialIgnore
+}
+
+template Glow {
+  prop r: f32 = 10
+  prop hue: Rgb = {255, 200, 140}
+  prop power: f32 = 1
+  prop tex: entity = tex_halo
+  prop at: P3 = {0, 0, 0}
+
+  Position: {at.x, at.y, at.z}
+  Rect: {r * 2, r * 2}
+  Image: {texture: tex}
+  Rgb: {hue.r * power, hue.g * power, hue.b * power}
+  BlendMode: Additive
+  NoShadow
+  SpatialIgnore
+}

@@ -1,0 +1,136 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.text
+using box.layout
+using box.spatial
+using box.picking
+using box.transition
+
+fn slot_title(s: i32) -> string {
+  match slot_kind[s] { 0: "OPEN SLIP"; _: mod_name(slot_kind[s]) }
+}
+
+template BayChip {
+  prop s: i32 = 0
+  const j = slot_junction(s)
+  const k = slot_kind[s]
+  const b = slot_build[s]
+  const chosen = sel_slot == s
+  const sx = -270 + j * 108
+  const dy: f32 = match s % 3 { 1: 72; _: -62 }
+  const dx: f32 = match s % 3 { 0: -26; 1: 0; _: 26 }
+  const sy = 18 + dy
+  const px = sx + dx
+  const hue: Rgb = match k == M_NONE { true: LUM_FAINT; _: match b < 1 { true: WARM; _: match slot_eff[s] > 0.2 { true: MINT; _: ALERT } } }
+
+  Position: {px, sy, 6}
+  Hair stem(x1: 0, y1: match s % 3 { 1: -23; _: 23 }, x2: 0 - dx, y2: 0 - dy, w: 1.1, hue: hue, z: -2)
+  Outline box_(w: 50, h: 44, hue: hue, thick: match chosen { true: 2; _: 1 })
+  Ink code(text: mod_code(k), size: 13, font: font_data, hue: hue, x: 0, y: 8, align: Center)
+  Ink num(text: "BAY {s + 1}", size: 9, hue: LUM_DIM, x: 0, y: -9, align: Center)
+  if b < 1 && k != M_NONE {
+    Meter prog(y: -30, w: 50, h: 6, value: b, hue: WARM, ticks: 1)
+  }
+  Pick hit(w: 50, h: 44, op: OP_SELECT_SLOT, a: s, selected: chosen, tone: GOLD)
+}
+
+template CatalogRow {
+  prop k: i32 = 1
+  prop y: f32 = 0
+  const open = milestone >= mod_unlock(k)
+  const chosen = sel_mod == k
+  const rich = creds >= mod_cost(k) && stock[G_PARTS] >= mod_parts(k)
+
+  Pick hit(x: 0, y: y, w: 316, h: 27, op: OP_SELECT_MOD, a: k, selected: chosen, tone: GOLD, usable: open)
+  if open {
+    Ink a(text: mod_name(k), size: 12.5, font: font_data, hue: match chosen { true: LUMEN; _: LUM_DIM }, x: -152, y: y + 1)
+    Ink b(text: "{mod_cost(k):.0}", size: 12, font: font_data, hue: match creds >= mod_cost(k) { true: GOLD; _: ALERT }, x: 60, y: y + 1, align: Right, width: 60)
+    Ink c(text: "{mod_parts(k):.0}P", size: 12, font: font_data, hue: match stock[G_PARTS] >= mod_parts(k) { true: LUM_DIM; _: ALERT }, x: 106, y: y + 1, align: Right, width: 36)
+    Ink d(text: match mod_output(k) > 0 { true: "+{mod_output(k):.0}"; _: "-{mod_load(k):.0}" }, size: 11, hue: match mod_output(k) > 0 { true: MINT; _: LUM_DIM }, x: 142, y: y + 1, align: Right, width: 30)
+  } else {
+    Ink a(text: "LOCKED: {milestone_name(mod_unlock(k))}", size: 11, hue: LUM_FAINT, x: -152, y: y)
+  }
+}
+
+template MilestoneStep {
+  prop m: i32 = 0
+  prop x: f32 = 0
+  const done = milestone >= m
+  const now = milestone + 1 == m
+
+  Position: {x, -170, 6}
+  mark { Position: {0, 0, 0}; Rotation: {0, 0, PI / 4}; Rect: {20, 20}; Rgb: match done { true: {GOLD.r * 0.6, GOLD.g * 0.6, GOLD.b * 0.6}; _: {0, 0, 0} }; BlendMode: Additive; Border: {width: 1.4, color: match done { true: {GOLD.r, GOLD.g, GOLD.b, 255}; _: match now { true: {LUMEN.r, LUMEN.g, LUMEN.b, 255}; _: {LUM_FAINT.r, LUM_FAINT.g, LUM_FAINT.b, 255} } }}; SpatialIgnore }
+  Ink n(text: "{m}", size: 11, font: font_data, hue: match done { true: {8, 8, 8}; _: LUM_DIM }, x: 0, y: 0, align: Center, z: 4, glow: 0)
+}
+
+Console console_builder(st: ST_BUILDER) {
+  GlassLayer ui() {
+    Ink t_a(text: "STATION BLUEPRINT", size: 13, hue: LUM_DIM, x: -384, y: 190, font: font_data)
+    bp {
+      Position: {-120, 40, 2}
+      for i in 0..24 {
+        Hair "gx_{i}"(x1: (i - 11.5) * 22, y1: -130, x2: (i - 11.5) * 22, y2: 130, w: 0.5, hue: LUM_WIRE, z: -6)
+      }
+      for i in 0..12 {
+        Hair "gy_{i}"(x1: -258, y1: (i - 5.5) * 22, x2: 258, y2: (i - 5.5) * 22, w: 0.5, hue: LUM_WIRE, z: -6)
+      }
+      Plate spine(x: -40, y: 18, w: 410, h: 7, hue: {LUM_DIM.r * 0.6, LUM_DIM.g * 0.6, LUM_DIM.b * 0.6})
+      for j in 0..JUNCS {
+        Outline "drum_{j}"(x: -270 + j * 108 + 60, y: 18, w: 40, h: 24, hue: LUM_DIM, thick: 1.2)
+        Ink "drum_t_{j}"(text: "J{j + 1}", size: 10, hue: LUM_DIM, x: -270 + j * 108 + 60, y: 18, align: Center)
+      }
+      for s in 0..SLOTS {
+        "bay_{s}" {
+          Position: {60, 0, 0}
+          BayChip chip(s: s)
+        }
+      }
+    }
+    Ink sel_a(text: "BAY {sel_slot + 1}: {slot_title(sel_slot)}", size: 14, font: font_data, hue: GOLD, x: -384, y: -106)
+    Ink sel_b(text: mod_blurb(sel_mod), size: 12, hue: LUM_DIM, x: -384, y: -126)
+    Hair r_a(x1: -384, y1: -144, x2: 384, y2: -144, hue: LUM_FAINT)
+    for m in 1..MILESTONES {
+      MilestoneStep "step_{m}"(m: m, x: -366 + (m - 1) * 36)
+    }
+    Ink goal_a(text: "NOW: {milestone_name(milestone)}", size: 15, font: font_head, hue: GOLD, x: -110, y: -162, glow: 2)
+    Ink goal_b(text: "NEXT: {milestone_goal(milestone)}", size: 11.5, hue: LUMEN, x: -384, y: -204, width: 760)
+    Ink goal_c(text: "UNLOCKS: {milestone_unlocks(milestone + 1)}", size: 11.5, hue: LUM_DIM, x: -384, y: -226, width: 760)
+    Hair v_b(x1: 216, y1: 200, x2: 216, y2: -142, hue: LUM_WIRE)
+    Ink t_c(text: "SLIP CATALOG", size: 13, hue: LUM_DIM, x: 226, y: 190, font: font_data)
+    catalog {
+      Position: {228, 0, 6}
+      for k in 1..MODS {
+        CatalogRow "row_{k}"(k: k, y: 166 - (k - 1) * 30)
+      }
+    }
+  }
+
+  HwLayer hardware() {
+    Tap build(legend: "START BUILD", sub: "{mod_name(sel_mod)}", hue: K_GREEN, w: 276, h: 70, size: 20, op: OP_BUILD, y: 206, enabled: slot_kind[sel_slot] == M_NONE && can_build(sel_mod), c: 14)
+    Readout parts(value: floor(stock[G_PARTS]), label: "PARTS", x: -70, y: 118, size: 30)
+    Readout pop_d(value: floor(pop), label: "SOULS", x: 70, y: 118, size: 30)
+    Tap scrap(legend: "SCRAP BAY", sub: "25% BACK", hue: K_RED, w: 276, h: 40, size: 13, op: OP_SCRAP, y: 56)
+    Hair r_a(x1: -135, y1: 26, x2: 135, y2: 26, hue: LUM_FAINT)
+    Stencil c1(text: "CLOCK RATE", size: 12, y: 10)
+    Tap r1(legend: "1X", lit: time_rate == 1, w: 84, h: 36, size: 15, op: OP_RATE, a: 1, x: -92, y: -22)
+    Tap r2(legend: "2X", lit: time_rate == 2, w: 84, h: 36, size: 15, op: OP_RATE, a: 2, x: 0, y: -22)
+    Tap r4(legend: "4X", lit: time_rate == 4, w: 84, h: 36, size: 15, op: OP_RATE, a: 4, x: 92, y: -22)
+    Hair r_b(x1: -135, y1: -56, x2: 135, y2: -56, hue: LUM_FAINT)
+    Stencil c2(text: "CHARTER PROGRESS", size: 12, y: -72)
+    for m in 1..MILESTONES {
+      "ms_{m}" {
+        Position: {(m - 4) * 40, -104, 5}
+        ChamferFill plate(w: 32, h: 32, c1: 6, c2: 0, c3: 6, c4: 0, hue: GOLD, glow: match milestone >= m { true: 0.7; _: 0.03 })
+        ChamferRing ring(w: 32, h: 32, c1: 6, c2: 0, c3: 6, c4: 0, t: 1.2, hue: GOLD, glow: match milestone + 1 == m && pulse { true: 5; _: 2 })
+        Stencil n(text: "{m}", size: 13, ink: LUMEN)
+      }
+    }
+    Ink h_a(text: "PARTS COME BY IMPORT ROUTE", size: 11, hue: LUM_DIM, x: -135, y: -150)
+    Ink h_b(text: "OR FROM FREELANCER HOLDS.", size: 11, hue: LUM_DIM, x: -135, y: -168)
+    Ink h_c(text: "A BAY WITH NO POWER IS SCRAP", size: 11, hue: WARM, x: -135, y: -194)
+    Ink h_d(text: "WITH A NICE VIEW.", size: 11, hue: WARM, x: -135, y: -212)
+  }
+}

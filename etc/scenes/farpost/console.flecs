@@ -1,0 +1,195 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.layout
+using box.text
+using box.spatial
+using box.picking
+using box.input
+using box.transition
+using box.light
+
+export const CON_R: f32 = 2.2
+export const CON_Y: f32 = 1.02
+export const CON_TILT: f32 = 0.42
+export const CON_W: f32 = 1270
+export const CON_H: f32 = 720
+
+fn st_angle(s: i32) -> f32 {
+  match s { 0: 0; 1: -0.66; 2: -1.32; 3: -1.98; 4: 0.66; 5: 1.32; _: 1.98 }
+}
+
+fn st_name(s: i32) -> string {
+  match s { 0: "TRAFFIC"; 1: "TRADE"; 2: "MINING"; 3: "CARGO"; 4: "SECURITY"; 5: "POWER"; 6: "BUILDER"; _: "OVERVIEW" }
+}
+
+fn st_accent(s: i32) -> Rgb {
+  match s { 2: {214, 150, 255}; 4: {255, 96, 60}; _: {255, 138, 24} }
+}
+
+fn st_x(s: i32) -> f32 {
+  sin(st_angle(s)) * CON_R
+}
+
+fn st_z(s: i32) -> f32 {
+  0 - cos(st_angle(s)) * CON_R
+}
+
+fn cam_x(s: i32) -> f32 {
+  st_x(s) - sin(st_angle(s)) * cos(CON_TILT) * 0.8
+}
+
+fn cam_y(s: i32) -> f32 {
+  CON_Y + sin(CON_TILT) * 0.8
+}
+
+fn cam_z(s: i32) -> f32 {
+  st_z(s) + cos(st_angle(s)) * cos(CON_TILT) * 0.8
+}
+
+template StatusBar {
+  prop w: f32 = 800
+  prop accent: Rgb = NEON
+  prop name: string = ""
+
+  Ink title(text: name, size: 32, font: font_head, hue: LUMEN, x: 0 - w / 2 + 46, y: 2, glow: 3)
+  Hair rule(x1: 0 - w / 2 + 16, y1: -24, x2: w / 2 - 16, y2: -24, w: 1.6, hue: accent, glow: 2.4)
+  Ink cash(text: "{creds:.0} CR", size: 19, font: font_head, hue: match creds < 0 { true: ALERT; _: GOLD }, x: w / 2 - 34, y: 10, align: Right, width: 200, glow: 2.2)
+  Ink rate(text: "{shown_rate:+.0} /MIN", size: 11, hue: LUM_DIM, x: w / 2 - 34, y: -10, align: Right, width: 200)
+  Ink goal(text: milestone_goal(milestone), size: 11, hue: LUM_DIM, x: 0 - w / 2 + 205, y: 2, width: w - 420)
+}
+
+template NavStrip {
+  prop here: i32 = 0
+  prop y: f32 = -312
+
+  for i in 0..7 {
+    Tap "nav_{i}"(legend: st_name(i), hue: st_accent(i), lit: i == here, w: 124, h: 34, size: 13, op: OP_VIEW, a: i, x: -510 + i * 134, y: y)
+  }
+  Tap stand_back(legend: "STAND BACK", hue: WARM, w: 124, h: 34, size: 12, op: OP_VIEW, a: ST_OVERVIEW, x: 516, y: y)
+}
+
+template FocusPad {
+  prop st: i32 = 0
+  prop accent: Rgb = NEON
+  mut hover = false
+
+  Position: {0, 0, 120}
+  Interactive
+  Cursor: {CursorPointer}
+  ChamferFill hit(w: CON_W, h: CON_H, c1: 40, c2: 0, c3: 40, c4: 0, hue: accent, glow: match hover { true: 0.03; _: 0 })
+  if hover {
+    ChamferRing edge(w: CON_W, h: CON_H, c1: 40, c2: 0, c3: 40, c4: 0, t: 4, hue: accent, glow: 5)
+    Ink tag(text: "OPEN {st_name(st)}", size: 34, font: font_head, hue: LUMEN, x: 0, y: CON_H / 2 + 34, align: Center, glow: 3)
+  }
+  async {
+    while true {
+      await on.enter(this)
+      hover = true
+      await on.leave(this)
+      hover = false
+    }
+  }
+  async {
+    while true {
+      await on.click(this)
+      emit Cmd(op: OP_VIEW, a: st, b: 0)
+    }
+  }
+}
+
+template GlassLayer {
+  prop x: f32 = -196
+  prop y: f32 = 42
+  const lit = match main_on { true: clamp01(hub_eff + 0.25); _: 0 }
+
+  Position: {x, y, 12}
+  Opacity: {match pulse && hub_eff < 0.6 { true: lit * 0.6; _: lit }}
+  Transition: [Opacity: {duration: 0.6}]
+}
+
+template HwLayer {
+  prop x: f32 = 440
+  prop y: f32 = 42
+  prop yaw: f32 = -0.16
+  prop always: bool = false
+  const lit = match main_on { true: clamp01(hub_eff + 0.25); _: match always { true: 1; _: 0 } }
+
+  Position: {x, y, 26}
+  Rotation: {0, yaw, 0}
+  Opacity: {lit}
+  Transition: [Opacity: {duration: 0.6}]
+}
+
+template Console {
+  prop st: i32 = 0
+  prop slab_w: f32 = 830
+  prop slab_h: f32 = 544
+  prop slab_x: f32 = -196
+  prop slab_y: f32 = 42
+  prop hw_x: f32 = 440
+  prop hw_w: f32 = 316
+  prop hw_yaw: f32 = -0.16
+  prop cold: f32 = 0.02
+
+  const ang = st_angle(st)
+  const here = station == st
+  const lit = match main_on { true: clamp01(hub_eff + 0.25); _: cold }
+  const accent: Rgb = st_accent(st)
+
+  Position: {st_x(st), CON_Y, st_z(st)}
+  Rotation: {0 - CON_TILT, 0 - ang, 0}
+  Scale: {0.001, 0.001, 0.001}
+
+  desk : StainedDark {
+    ChamferBlock: {w: CON_W, h: CON_H, c1: 44, c2: 44, c3: 18, c4: 18, depth: 90, z: -46}
+    TextureTransform: {scale_x: 1.3, scale_y: 0.8, offset_x: st * 0.31, offset_y: st * 0.17}
+  }
+  lip_a : Trim { Position: {0, 0 - CON_H / 2 + 5, 2}; Box: {CON_W - 50, 8, 6}; TextureTransform: {scale_x: 1, scale_y: 0.02} }
+  lip_b : Trim { Position: {0, CON_H / 2 - 6, 2}; Box: {CON_W - 100, 6, 6}; TextureTransform: {scale_x: 1, scale_y: 0.02} }
+  Etch brand(text: "HARROW INTERFACES", size: 15, x: 0, y: -347, z: 0.4, tone: {26, 24, 22})
+  Decal rust_a(x: 500 - st * 90, y: 230, z: 0.3, w: 300, h: 300, fade: 0.8, tint: {64, 28, 12}, tex: tex_streak)
+  Decal rust_b(x: -560 + st * 70, y: 190, z: 0.3, w: 160, h: 360, fade: 0.7, tint: {44, 24, 14}, tex: tex_streak)
+
+  for i in 0..9 {
+    Led "tick_{i}"(lit: main_on && (i * 7 + st) % 3 != 0, hue: match i % 4 { 0: MINT; 1: WARM; 2: WARM; _: ALERT }, r: 2) { Position: {-100 + i * 24, CON_H / 2 - 19, 3} }
+  }
+
+  lamp_light { Position: {0, 160, 620}; SpotLight: {intensity: 0.12 * lit + 0.004, range: 1.8, inner_angle: 42, outer_angle: 62}; Rotation: {0, 3.14159, 0}; Rgb: {255, 196, 130} }
+
+  slab {
+    Position: {slab_x, slab_y, 0}
+    Shard pane_(w: slab_w, h: slab_h, c1: 54, c2: 12, c3: 54, c4: 12, hue: accent, power: lit)
+    layer {
+      Position: {0, 0, 12}
+      Opacity: {match main_on { true: clamp01(lit + match pulse && hub_eff < 0.6 { true: -0.3; _: 0 }); _: 0 }}
+      Transition: [Opacity: {duration: 0.6}]
+      StatusBar status(w: slab_w, accent: accent, name: st_name(st)) { Position: {0, slab_h / 2 - 32, 8} }
+      if flash_gold > 0.55 {
+        toast {
+          Position: {0, 10, 46}
+          ChamferBlock back(w: slab_w * 0.74, h: 150, c1: 26, c2: 0, c3: 26, c4: 0, depth: 2, z: -1)
+          { Rgb: {8, 5, 2}; PbrMaterial: {metallic: 0, roughness: 1} }
+          ChamferRing ring(w: slab_w * 0.74, h: 150, c1: 26, c2: 0, c3: 26, c4: 0, t: 3.4, hue: GOLD, glow: 7, z: 1)
+          Ink a(text: "MILESTONE: {milestone_name(milestone)}", size: 32, font: font_head, hue: GOLD, x: 0, y: 34, z: 3, align: Center, glow: 3)
+          Ink b(text: "UNLOCKED: {milestone_unlocks(milestone)}", size: 15, hue: LUMEN, x: 0, y: -6, z: 3, align: Center)
+          Ink c(text: milestone_goal(milestone), size: 12, hue: LUM_DIM, x: 0, y: -38, z: 3, align: Center, width: slab_w * 0.68)
+        }
+      }
+    }
+  }
+
+  side {
+    Position: {hw_x, slab_y, 16}
+    Rotation: {0, hw_yaw, 0}
+    Shard pane_(w: hw_w, h: slab_h, c1: 12, c2: 40, c3: 12, c4: 40, hue: accent, power: lit, lamp: false)
+  }
+
+  NavStrip nav(here: st)
+
+  if station == ST_OVERVIEW {
+    FocusPad focus(st: st, accent: accent)
+  }
+}
