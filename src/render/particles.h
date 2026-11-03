@@ -125,7 +125,8 @@ typedef struct box_render_particle_pool_t {
     uint32_t slots;         /**< Data offset of the block.count uint32_t spawn slots */
     uint32_t texture;       /**< Texture handle of a sprite, 0 for white */
     uint32_t mesh;          /**< Buffer handle of the corners of a billboard, 0 for none */
-    uint32_t curves;        /**< Buffer handle of the curve table, 0 before it exists */
+    uint32_t curves;        /**< Buffer handle of the curve table, 0 when no curve of the
+                             *   pool reads a row */
     box_render_particle_block_t block; /**< Parameters of the frame */
 } box_render_particle_pool_t;
 

@@ -48,6 +48,23 @@ node test/integration/web/transmission.mjs \
     "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
 ```
 
+`particles.mjs` checks particle curves in the browser build, which read the curve table of the
+particles from a storage buffer of the vertex stage. It opens `test/integration/web/particles.flecs`
+the same way, at the same fixed delta and size: three jets rise, on the left one that cools from
+white to red, in the middle one without `ParticleCurves` that stays white, on the right two with
+equal curves that share their rows, from magenta to cyan. At frame 180 the scene changes the
+gradient of the left jet to green and blue and gives six emitters out of view gradients of their
+own, so the table grows and is created again. The check takes screenshots until the left jet
+shows the new gradient and passes when an earlier screenshot showed the warm one there, the last
+shows white in the middle and magenta and cyan on the right, and the log has no error and no
+invalid WebGPU object. The frames before the browser compiled the simulation shader skip the
+pools with an error, which the check ignores:
+
+```sh
+node test/integration/web/particles.mjs \
+    "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
+```
+
 `audio_core.mjs` checks the audio of the browser build (`docs/audio.md`): the mixer of the
 audio core runs from its own wasm in an AudioWorklet, without shared memory, starts on a user
 gesture and is driven by command batches over the port. It serves the page without COOP/COEP

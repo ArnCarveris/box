@@ -568,6 +568,8 @@ static inline float box_particle_norm_age(
  * age 0 to 1, as the curve table holds it: a linear Curve with the keys at 0, 1/3, 2/3 and 1,
  * baked by box_curve_bake. 63 intervals put the keys exactly on the samples 0, 21, 42 and 63.
  *
+ * The Curve views keys on the stack, so it allocates nothing and runs without a world.
+ *
  * @param keys Values at the ages 0, 1/3, 2/3 and 1
  * @param out Receives BOX_PARTICLE_CURVE_SAMPLES samples
  */
@@ -575,17 +577,16 @@ static inline void box_particle_curve_bake(
     const float *keys,
     float *out)
 {
-    Curve curve = { .kind = CurveLinear };
+    CurveKey key[4];
     int32_t i;
-    ecs_vec_init_t(NULL, &curve.keys, CurveKey, 4);
     for (i = 0; i < 4; i ++) {
-        *ecs_vec_append_t(NULL, &curve.keys, CurveKey) = (CurveKey){
-            .time = (float)i / 3.0f, .value = keys[i]
-        };
+        key[i] = (CurveKey){ .time = (float)i / 3.0f, .value = keys[i] };
     }
 
+    Curve curve = {
+        .kind = CurveLinear, .keys = { .array = key, .count = 4, .size = 4 }
+    };
     box_curve_bake(&curve, 0.0f, 1.0f, BOX_PARTICLE_CURVE_SAMPLES, keys[0], out);
-    ecs_vec_fini_t(NULL, &curve.keys, CurveKey);
 }
 
 /** Bake the accumulated area under a row of samples, the row the curve table holds after the
