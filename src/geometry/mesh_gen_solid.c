@@ -415,7 +415,101 @@ static void box_bevel_triangle(
     }
 }
 
+/** Get the face normal of a triangle of a bevel, not normalized.
+ *
+ * @param mesh The mesh
+ * @param a First vertex index
+ * @param b Second vertex index
+ * @param c Third vertex index
+ * @param face The normal to fill, with the length of twice the area
+ */
+static void box_bevel_face_normal(
+    const box_mesh_t *mesh,
+    int32_t a,
+    int32_t b,
+    int32_t c,
+    vec3 face)
+{
+    vec3 ab, ac;
+    glm_vec3_sub(mesh->vertices[b].position, mesh->vertices[a].position, ab);
+    glm_vec3_sub(mesh->vertices[c].position, mesh->vertices[a].position, ac);
+    glm_vec3_cross(ab, ac, face);
+}
+
+/** Get whether the quads of a grid wind against the normals of their vertices.
+ *
+ * The winding is the same for every quad of a grid; summing over the grid keeps it reliable
+ * where a corner pinches and a single triangle stands across the vertex normals.
+ *
+ * @param mesh The mesh
+ * @param base Index of the first vertex
+ * @param rows Number of rows
+ * @param cols Number of vertices per row
+ * @return -1 when the quads wind clockwise seen from outside, else 1
+ */
+static float box_bevel_winding(
+    const box_mesh_t *mesh,
+    int32_t base,
+    int32_t rows,
+    int32_t cols)
+{
+    float sum = 0.0f;
+    for (int32_t r = 0; r < rows - 1; r ++) {
+        for (int32_t c = 0; c < cols - 1; c ++) {
+            int32_t i0 = base + r * cols + c;
+            int32_t i1 = i0 + cols;
+            vec3 face, other, normal;
+            box_bevel_face_normal(mesh, i0, i1, i1 + 1, face);
+            box_bevel_face_normal(mesh, i0, i1 + 1, i0 + 1, other);
+            glm_vec3_add(face, other, face);
+            glm_vec3_add(mesh->vertices[i0].normal, mesh->vertices[i1 + 1].normal, normal);
+            sum += glm_vec3_dot(face, normal);
+        }
+    }
+
+    return sum < 0.0f ? -1.0f : 1.0f;
+}
+
+/** Check whether the diagonal from the first to the third vertex of a quad folds it inward.
+ *
+ * The beveled box is convex, so the fourth vertex must not lie in front of the triangle of the
+ * first three. A quad whose second and fourth vertex are the same point folds as well, into
+ * two triangles back to back.
+ *
+ * @param mesh The mesh
+ * @param winding Winding of the quad, from box_bevel_winding
+ * @param a First vertex index
+ * @param b Second vertex index
+ * @param c Third vertex index
+ * @param d Fourth vertex index
+ * @return True when the quad must be split along the diagonal from b to d
+ */
+static bool box_bevel_concave(
+    const box_mesh_t *mesh,
+    float winding,
+    int32_t a,
+    int32_t b,
+    int32_t c,
+    int32_t d)
+{
+    const float *pa = mesh->vertices[a].position;
+    const float *pd = mesh->vertices[d].position;
+    bool result = box_bevel_same(mesh->vertices[b].position, pd);
+    if (!result && !box_bevel_same(pa, mesh->vertices[c].position)) {
+        vec3 face, ad;
+        box_bevel_face_normal(mesh, a, b, c, face);
+        glm_vec3_sub((float*)pd, (float*)pa, ad);
+        result = winding * glm_vec3_dot(face, ad) >
+            1e-4f * glm_vec3_norm(face) * glm_vec3_norm(ad);
+    }
+
+    return result;
+}
+
 /** Append the quads of a grid of vertices, rows of cols vertices.
+ *
+ * Each quad is split along the diagonal that keeps it convex. Where a corner pinches, as at
+ * the end of a degenerate cap ellipse, the other diagonal gives a sliver across the surface.
  *
  * @param mesh The mesh
  * @param base Index of the first vertex
@@ -428,12 +522,18 @@ static void box_bevel_grid(
     int32_t rows,
     int32_t cols)
 {
+    float winding = box_bevel_winding(mesh, base, rows, cols);
     for (int32_t r = 0; r < rows - 1; r ++) {
         for (int32_t c = 0; c < cols - 1; c ++) {
             int32_t i0 = base + r * cols + c;
             int32_t i1 = i0 + cols;
-            box_bevel_triangle(mesh, i0, i1, i1 + 1);
-            box_bevel_triangle(mesh, i0, i1 + 1, i0 + 1);
+            if (box_bevel_concave(mesh, winding, i0, i1, i1 + 1, i0 + 1)) {
+                box_bevel_triangle(mesh, i0, i1, i0 + 1);
+                box_bevel_triangle(mesh, i1, i1 + 1, i0 + 1);
+            } else {
+                box_bevel_triangle(mesh, i0, i1, i1 + 1);
+                box_bevel_triangle(mesh, i0, i1 + 1, i0 + 1);
+            }
         }
     }
 }

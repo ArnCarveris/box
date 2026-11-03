@@ -1352,6 +1352,33 @@ void Watertight_bevel(void) {
         }
     }
 
+    static const float levels[3] = { 0.0f, 0.1f, 0.2f };
+    ecs_set(world, e, Box, { 1, 0.8f, 1.2f });
+    for (int32_t corner = 0; corner < 8; corner ++) {
+        int32_t right = corner & 1, top = (corner >> 1) & 1, front = (corner >> 2) & 1;
+        int32_t x_edge = top ? (front ? 0 : 1) : (front ? 4 : 5);
+        int32_t y_edge = front ? (right ? 9 : 8) : (right ? 11 : 10);
+        int32_t z_edge = top ? (right ? 3 : 2) : (right ? 7 : 6);
+        for (int32_t mix = 0; mix < 27; mix ++) {
+            for (int32_t s = 1; s <= 2; s ++) {
+                Bevel bevel = { .segments = 2 * s };
+                float radii[12];
+                for (int32_t edge = 0; edge < 12; edge ++) {
+                    radii[edge] = 0.05f;
+                }
+
+                radii[x_edge] = levels[mix % 3];
+                radii[y_edge] = levels[(mix / 3) % 3];
+                radii[z_edge] = levels[mix / 9];
+                watertight_bevel_edges(&bevel, radii);
+                ecs_set_ptr(world, e, Bevel, &bevel);
+                snprintf(label, sizeof(label), "bevel corner %d mix %d segments %d",
+                    corner, mix, bevel.segments);
+                failures += !watertight_check(world, e, label);
+            }
+        }
+    }
+
     static const float large[4] = { 0.0f, 0.4f, 0.8f, 1.2f };
     ecs_set(world, e, Box, { 1, 0.6f, 0.8f });
     for (int32_t round = 0; round < 400; round ++) {
