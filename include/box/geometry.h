@@ -542,6 +542,121 @@ ECS_STRUCT(Image, {
     float v1;             /**< Bottom edge of the area, default 1 */
 });
 
+/** How a part of an ImageSlice fills its area */
+ECS_ENUM(SliceFill, {
+    SliceStretch = 0, /**< The part stretches to its area */
+    SliceTile = 1     /**< The part repeats at its own size from its start, cut at the far end */
+});
+
+/** Nine-slice scaling of the Image of a Rect, the CSS border-image model.
+ *
+ * The insets cut the area of the Image (u0, v0 to u1, v1) into nine parts. The corners draw at
+ * their size in texels times scale; the top and bottom edges fill the width between them, the
+ * left and right edges the height and the center the rest, each stretched or tiled as edges and
+ * center say. A tiled part repeats at its size in texels times scale, starting at its top left
+ * and cut at the far end. When the corners do not fit, because the element is smaller than the
+ * insets, they scale down together until they meet, edges and tiles with them, as CSS does.
+ *
+ * The insets are in texels of the loaded Texture of the image, so the slicing waits for its
+ * size: until the texture entity has a Texture (for instance while it loads, or for the texture
+ * of a Surface, which has none) the element draws as with the plain Image. Insets are clamped to
+ * the area, the left one first, so left plus right never exceed its width; a scale that is not
+ * above 0 or not finite draws at 1.
+ *
+ * The Rgb and Opacity tint the sliced image, a Border draws over it, the corner radius of the
+ * Border rounds it and ClipChildren cuts it, as for a plain Image. The TextureTransform of the
+ * entity does not apply to it. A Circle with an ImageSlice is not sliced, it shows the plain
+ * Image. Picking onto the texture of a Surface shown by an Image maps the hit through the same
+ * parts as the drawing (box_image_slice_map); as a Surface texture has no Texture, that is
+ * the plain Image until it has one.
+ *
+ * The castle WoodPanel as one entity: a 64 by 64 frame texture holds the dark edge and the iron
+ * corners in its 20 texel insets and wood in its center, whose grain tiles at its own scale on
+ * every size (instead of the hand cropped wood, the Border outline and four IronCorner children):
+ *
+ *     template WoodPanel {
+ *       prop w: f32 = 300
+ *       prop h: f32 = 120
+ *       prop pad: f32 = 16
+ *       prop row: bool = false
+ *
+ *       Layout: {direction: match row { true: Row; _: Column }, padding: {pad, pad, pad + 4,
+ *         pad + 4}, spacing: 6, h: match row { true: Center; _: Left }, v: Middle}
+ *       LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
+ *       Rect: {1, 1}
+ *       Image: {texture: castle_ui_frame}
+ *       ImageSlice: {left: 20, top: 20, right: 20, bottom: 20, edges: SliceTile,
+ *         center: SliceTile}
+ *       Rgb: {214, 196, 180}
+ *       Border: {radius: 6}
+ *       BoxShadow: {offset_y: -5, blur: 18, spread: 1, color: {0, 0, 0, 140}}
+ *       InputBlocker
+ *     }
+ */
+ECS_STRUCT(ImageSlice, {
+    float left;         /**< Inset of the left slices in texels of the texture, from the area */
+    float top;          /**< Inset of the top slices */
+    float right;        /**< Inset of the right slices */
+    float bottom;       /**< Inset of the bottom slices */
+    float scale;        /**< Logical pixels per texel of the corners and edges, default 1 */
+    SliceFill edges;    /**< Fill of the four edges, default SliceStretch */
+    SliceFill center;   /**< Fill of the center, default SliceStretch */
+    bool hollow;        /**< The center is not drawn, default false */
+});
+
+/** The nine parts of a sliced Image on an element of a size (box_image_slice_resolve).
+ *
+ * The columns and rows are the edges of the parts in the units of the element from its top left
+ * corner: x[0] is 0, x[1] the right edge of the left corners, x[2] the left edge of the right
+ * corners and x[3] the width; u and v are the texture coordinates at those edges.
+ */
+typedef struct box_image_slice_t {
+    float x[4];         /**< Column edges, 0 to the width */
+    float y[4];         /**< Row edges, 0 to the height, down */
+    float u[4];         /**< Texture u at the column edges */
+    float v[4];         /**< Texture v at the row edges */
+    float period[4];    /**< Length a tiled part repeats at, 0 for a stretched one: the top and
+                         *   bottom edges along x, the left and right edges along y, the center
+                         *   along x and along y */
+    float scale;        /**< Units of the element per texel of the corners, after they fit */
+    bool hollow;        /**< The center is not drawn */
+} box_image_slice_t;
+
+/** Resolve the nine parts of a sliced Image on an element.
+ *
+ * @param image The Image
+ * @param slice The ImageSlice
+ * @param texture_width Width of the texture in texels
+ * @param texture_height Height of the texture in texels
+ * @param width Width of the element
+ * @param height Height of the element
+ * @param out Receives the parts
+ * @return Whether the image is sliced, false when the texture or the element or the area of
+ * the image has no size, in which case out maps the element to the plain area
+ */
+bool box_image_slice_resolve(
+    const Image *image,
+    const ImageSlice *slice,
+    float texture_width,
+    float texture_height,
+    float width,
+    float height,
+    box_image_slice_t *out);
+
+/** Map a point of an element to the texture coordinate of its sliced Image, as the shader does.
+ *
+ * @param slice The resolved parts
+ * @param x Distance of the point from the left of the element
+ * @param y Distance of the point from the top of the element
+ * @param uv Receives the texture coordinate
+ * @return Whether the image is drawn there, false in the center of a hollow one
+ */
+bool box_image_slice_map(
+    const box_image_slice_t *slice,
+    float x,
+    float y,
+    float uv[2]);
+
 /** Vertex of a shape mesh, laid out to be copied into a vertex buffer as is */
 typedef struct box_vertex_t {
     vec3 position; /**< Position in unit shape space */

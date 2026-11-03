@@ -9,6 +9,7 @@ void bench_render_memory(
     bench_t *b,
     const box_render_draws_stats_t *stats)
 {
+    bench_counter(b, "materials", (double)stats->materials);
     bench_counter(b, "transform_bytes", (double)stats->transform_bytes);
     bench_counter(b, "shading_bytes", (double)stats->shading_bytes);
     bench_counter(b, "surface_bytes", (double)stats->surface_bytes);

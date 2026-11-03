@@ -1029,9 +1029,9 @@ static void box_pick_mapping_uv(
 
 /** Map a hit on an entity that shows the texture of a surface to a cursor on that surface.
  *
- * An Image maps the area of the element to its texture area, PbrTextures map the UV of the
- * mesh, or the projection of a MappingObject TextureMapping, through TextureTransform and
- * TextureWrap.
+ * An Image maps the area of the element to its texture area, through the nine parts of its
+ * ImageSlice as the renderer draws it, PbrTextures map the UV of the mesh, or the projection of
+ * a MappingObject TextureMapping, through TextureTransform and TextureWrap.
  *
  * @param world The world
  * @param st The module state
@@ -1062,9 +1062,20 @@ static bool box_pick_texture(
             box_pick_plane(m, size, circle, ray->origin, ray->dir, &t, local))
         {
             float u = local[0] / size[0] + 0.5f, v = 0.5f - local[1] / size[1];
+            const ImageSlice *slice = ecs_has(world, e, Rect)
+                ? ecs_get(world, e, ImageSlice) : NULL;
+            const Texture *tex = slice && ecs_is_alive(world, img->texture)
+                ? ecs_get(world, img->texture, Texture) : NULL;
+            box_image_slice_t parts;
             uv[0] = img->u0 + u * (img->u1 - img->u0);
             uv[1] = img->v0 + v * (img->v1 - img->v0);
             result = true;
+            if (tex && box_image_slice_resolve(img, slice, (float)tex->width,
+                (float)tex->height, size[0], size[1], &parts))
+            {
+                result = box_image_slice_map(&parts, glm_clamp(u, 0.0f, 1.0f) * size[0],
+                    glm_clamp(v, 0.0f, 1.0f) * size[1], uv);
+            }
         }
     } else if (pt && (box_pick_texture_surface(world, st, pt->albedo, out) ||
         box_pick_texture_surface(world, st, pt->emissive, out)))

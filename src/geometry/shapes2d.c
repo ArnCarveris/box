@@ -3,6 +3,7 @@
  * @brief Resolves Rect, Circle and Line with their Border and Image into Shape2D and ShapeMesh.
  *
  * Every 2D shape shares one cached unit quad; the renderer shades it with a signed distance.
+ * The nine parts of an ImageSlice are resolved here too, for the renderer and picking.
  */
 
 #include "shape2d.h"
@@ -130,6 +131,7 @@ static void box_shape2d_fill(
 {
     const Border *border = box_shape2d_get(world, e, ecs_id(Border), ignore);
     const Image *image = box_shape2d_get(world, e, ecs_id(Image), ignore);
+    const ImageSlice *slice = box_shape2d_get(world, e, ecs_id(ImageSlice), ignore);
     out->uv[0] = 1.0f;
     out->uv[1] = 1.0f;
     if (border) {
@@ -146,6 +148,8 @@ static void box_shape2d_fill(
         out->uv[1] = image->v1 - image->v0;
         out->uv[2] = image->u0;
         out->uv[3] = image->v0;
+        out->sliced = slice && out->kind == BOX_SHAPE2D_RECT &&
+            box_shape2d_get(world, e, ecs_id(Rect), ignore) != NULL;
     }
 }
 
@@ -197,6 +201,147 @@ static void box_shape2d_resolve(
 
 done:
     return;
+}
+
+/** Resolve the slices of one axis of a sliced Image: the edges of the three parts before the
+ * corners are fit and the texture coordinates at them.
+ *
+ * @param lo Inset at the start in texels
+ * @param hi Inset at the end in texels
+ * @param texels Texels of the area along the axis
+ * @param c0 Texture coordinate of the start of the area
+ * @param c1 Texture coordinate of the end of the area
+ * @param coords Receives the texture coordinates at the four edges
+ * @param insets Receives the clamped insets in texels
+ */
+static void box_image_slice_axis(
+    float lo,
+    float hi,
+    float texels,
+    float c0,
+    float c1,
+    float coords[4],
+    float insets[2])
+{
+    lo = isfinite(lo) ? glm_clamp(lo, 0.0f, texels) : 0.0f;
+    hi = isfinite(hi) ? glm_clamp(hi, 0.0f, texels - lo) : 0.0f;
+    insets[0] = lo;
+    insets[1] = hi;
+    coords[0] = c0;
+    coords[1] = c0 + (c1 - c0) * (lo / texels);
+    coords[2] = c1 - (c1 - c0) * (hi / texels);
+    coords[3] = c1;
+}
+
+bool box_image_slice_resolve(
+    const Image *image,
+    const ImageSlice *slice,
+    float texture_width,
+    float texture_height,
+    float width,
+    float height,
+    box_image_slice_t *out)
+{
+    float tw = fabsf(image->u1 - image->u0) * texture_width;
+    float th = fabsf(image->v1 - image->v0) * texture_height;
+    float ix[2], iy[2];
+    bool result = isfinite(tw) && isfinite(th) && tw > 0.0f && th > 0.0f &&
+        isfinite(width) && isfinite(height) && width > 0.0f && height > 0.0f;
+    ecs_os_zeromem(out);
+    out->x[2] = out->x[3] = width;
+    out->y[2] = out->y[3] = height;
+    out->u[0] = out->u[1] = image->u0;
+    out->u[2] = out->u[3] = image->u1;
+    out->v[0] = out->v[1] = image->v0;
+    out->v[2] = out->v[3] = image->v1;
+    out->scale = 1.0f;
+    if (!result) {
+        goto done;
+    }
+
+    float scale = isfinite(slice->scale) && slice->scale > 0.0f ? slice->scale : 1.0f;
+    box_image_slice_axis(slice->left, slice->right, tw, image->u0, image->u1, out->u, ix);
+    box_image_slice_axis(slice->top, slice->bottom, th, image->v0, image->v1, out->v, iy);
+    float fit = 1.0f, across = (ix[0] + ix[1]) * scale, down = (iy[0] + iy[1]) * scale;
+    if (across > width) {
+        fit = width / across;
+    }
+
+    if (down > height) {
+        fit = glm_min(fit, height / down);
+    }
+
+    scale *= fit;
+    out->scale = scale;
+    out->x[1] = ix[0] * scale;
+    out->x[2] = glm_max(width - ix[1] * scale, out->x[1]);
+    out->y[1] = iy[0] * scale;
+    out->y[2] = glm_max(height - iy[1] * scale, out->y[1]);
+    float mid_x = (tw - ix[0] - ix[1]) * scale, mid_y = (th - iy[0] - iy[1]) * scale;
+    if (slice->edges == SliceTile) {
+        out->period[0] = mid_x;
+        out->period[1] = mid_y;
+    }
+
+    if (slice->center == SliceTile) {
+        out->period[2] = mid_x;
+        out->period[3] = mid_y;
+    }
+
+    out->hollow = slice->hollow;
+done:
+    return result;
+}
+
+/** Map a position along one axis of a sliced Image to its texture coordinate.
+ *
+ * @param p The position
+ * @param edges The edges of the parts
+ * @param coords The texture coordinates at the edges
+ * @param period Length the middle part repeats at, 0 when it stretches
+ * @return The texture coordinate
+ */
+static float box_image_slice_axis_map(
+    float p,
+    const float edges[4],
+    const float coords[4],
+    float period)
+{
+    float t, result;
+    if (p < edges[1]) {
+        t = (p - edges[0]) / glm_max(edges[1] - edges[0], 1e-9f);
+        result = coords[0] + (coords[1] - coords[0]) * t;
+    } else if (p > edges[2]) {
+        t = (p - edges[2]) / glm_max(edges[3] - edges[2], 1e-9f);
+        result = coords[2] + (coords[3] - coords[2]) * t;
+    } else {
+        if (period > 0.0f) {
+            t = (p - edges[1]) / period;
+            t -= floorf(t);
+        } else {
+            t = (p - edges[1]) / glm_max(edges[2] - edges[1], 1e-9f);
+        }
+
+        result = coords[1] + (coords[2] - coords[1]) * t;
+    }
+
+    return result;
+}
+
+bool box_image_slice_map(
+    const box_image_slice_t *slice,
+    float x,
+    float y,
+    float uv[2])
+{
+    bool mid_x = x >= slice->x[1] && x <= slice->x[2];
+    bool mid_y = y >= slice->y[1] && y <= slice->y[2];
+    uv[0] = box_image_slice_axis_map(x, slice->x, slice->u,
+        slice->period[mid_y ? 2 : 0]);
+    uv[1] = box_image_slice_axis_map(y, slice->y, slice->v,
+        slice->period[mid_x ? 3 : 1]);
+
+    return !(slice->hollow && mid_x && mid_y);
 }
 
 /** Resolve the entities whose 2D shape, Border or Image was set.
@@ -308,12 +453,32 @@ static void box_image_ctor(
     }
 }
 
+/** Construct ImageSlice values without insets at a scale of 1.
+ *
+ * @param ptr The values
+ * @param count Number of values
+ * @param ti The type info
+ */
+static void box_image_slice_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    ImageSlice *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (ImageSlice){ .scale = 1.0f };
+    }
+}
+
 void box_geometry_shapes2d_init(
     ecs_world_t *world)
 {
     ecs_entity_t shapes[3] = { ecs_id(Rect), ecs_id(Circle), ecs_id(Line) };
-    ecs_entity_t parts[5] = {
-        ecs_id(Rect), ecs_id(Circle), ecs_id(Line), ecs_id(Border), ecs_id(Image)
+    ecs_entity_t parts[6] = {
+        ecs_id(Rect), ecs_id(Circle), ecs_id(Line), ecs_id(Border), ecs_id(Image),
+        ecs_id(ImageSlice)
     };
     int32_t i;
     ECS_COMPONENT_DEFINE(world, Shape2D);
@@ -322,6 +487,7 @@ void box_geometry_shapes2d_init(
     ecs_set_hooks(world, BoxShadow, { .ctor = box_box_shadow_ctor });
     ecs_set_hooks(world, Line, { .ctor = box_line_ctor });
     ecs_set_hooks(world, Image, { .ctor = box_image_ctor });
+    ecs_set_hooks(world, ImageSlice, { .ctor = box_image_slice_ctor });
     box_shape_t *quad = box_mesh_cache_add_shape(box_mesh_cache_of(world),
         &(box_shape_desc_t){
             .component = ecs_id(Rect),
@@ -333,7 +499,7 @@ void box_geometry_shapes2d_init(
         ecs_add_pair(world, shapes[i], EcsWith, ecs_id(Shape2D));
     }
 
-    for (i = 0; i < 5; i ++) {
+    for (i = 0; i < 6; i ++) {
         ecs_observer(world, {
             .query.terms = {{ .id = parts[i] }},
             .events = { EcsOnSet },

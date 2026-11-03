@@ -116,7 +116,6 @@ static void bench_material(
 
     bench_counter(b, "upload_bytes", (double)stats.upload_bytes);
     bench_counter(b, "material_bytes", (double)stats.material_bytes);
-    bench_counter(b, "materials", (double)stats.materials);
     bench_counter(b, "setup_material_bytes", (double)setup_material_bytes);
     bench_render_memory(b, &stats);
     box_render_sync(world);
@@ -199,7 +198,6 @@ void Material_tint_subtree(
     bench_counter(b, "instructions", (double)(bench_material_instructions() - start));
     bench_counter(b, "frames", frames);
     bench_counter(b, "upload_bytes", (double)stats.upload_bytes);
-    bench_counter(b, "materials", (double)stats.materials);
     bench_counter(b, "setup_material_bytes", (double)setup_material_bytes);
     bench_render_memory(b, &stats);
     box_render_sync(world);

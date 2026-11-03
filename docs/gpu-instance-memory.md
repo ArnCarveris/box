@@ -10,27 +10,37 @@ Sizes are in bytes, and MB is 10^6 bytes.
 
 ## Summary
 
-- The surface stream is 384 of the 448 bytes of a mesh slot and 384 of the 512 bytes of a 2D
-  slot. In every bench scene it holds only zero records. Nothing on the GPU reads the surface
-  stream of a 2D page, and a mesh page reads it only for parametric surfaces. These were 1.9% of
-  the instances of the spaceship scene and 0% of every bench scene. It still takes 75% to 86% of
-  the allocated page memory. It also takes 75% to 86% of every full upload: new shapes, batches
-  that move to a new run, grown pages and text relayout.
+- Before S1 and S2 the surface stream was 384 of the 448 bytes of a mesh slot and 384 of the 512
+  bytes of a 2D slot. In every bench scene it held only zero records. Nothing on the GPU read the
+  surface stream of a 2D page, and a mesh page read it only for parametric surfaces. These were
+  1.9% of the instances of the spaceship scene and 0% of every bench scene. It took 75% to 86% of
+  the allocated page memory and of every full upload: new shapes, batches that move to a new run,
+  grown pages and text relayout. S1 and S2 (implemented) drop it from 2D pages and from mesh
+  batches without a parametric surface, and D1 packs the 2D shading. A plain mesh slot is now 64
+  bytes and a 2D slot 112; only surface batches keep the 448 byte slot.
 - In steady state the surface stream costs nothing, because a slot uploads it only when its
   `ShapeMesh` changes or the slot is written again. Steady traffic is the transforms of
   `DynamicTransform` shapes, the shading of `DynamicMaterial` shapes and their material records.
-- Runs and pages are allocated in powers of two, so a page holds 1.2 to 3.7 times as many slots as
-  there are live instances. In the shipped scenes the 64 slot minimum run of small batches adds
-  more.
+- Runs and pages were allocated in powers of two, with 1.2 to 3.7 slots per live instance and a
+  64 slot minimum run. O2 (implemented) grows runs and page buffers by 1.5, rounded up to 4
+  slots, with a 16 slot minimum run: Extract holds 262,144 → 137,568 slots for its 110,000
+  instances, and the spaceship sized Parametric scene 32,768 → 13,880 for 8,792, 1.0 to 1.6 slots
+  per instance. Its follow-up InstanceRunExact gives a new batch a run of just its count, 110,000
+  slots in Extract. A moved run that is not at the top of its page still leaves a hole, and page
+  buffers do not shrink.
 - A shape that owned a material component got an 80 byte record of its own in the material
   table. In the Extract bench the table held 100,001 records whose contents took only 2 distinct
-  values. The table now shares records by content (O1, implemented) and holds 2.
+  values. The table now shares records by content (O1, implemented) and holds 2. Town's 4,802
+  records are 49 after O1, its number of distinct contents.
 - The transform stream cannot shrink without loss. 23% of the instances of the Japanese garden
   scene have a sheared model matrix, which a TRS encoding cannot hold.
 
-The recommended order: drop the surface stream from 2D pages, then from mesh batches without a
-parametric surface, deduplicate the material table by content, and copy grown pages on the GPU.
-The first two take a mesh slot from 448 to 64 bytes and a 2D slot from 512 to 128 bytes.
+The recommended order was: drop the surface stream from 2D pages, then from mesh batches without
+a parametric surface, deduplicate the material table by content, copy grown pages on the GPU,
+tighten run and page growth and pack the 2D shading. All of these steps are done, and so is the
+follow-up that sizes the pages of each store by its own largest stride. The first two took a mesh
+slot from 448 to 64 bytes and a 2D slot from 512 to 128 bytes, and the 2D packing to 112. Only
+the deferred items, S3 and M1, are left.
 
 ## How the numbers were obtained
 
@@ -52,10 +62,10 @@ the transforms and the distinct shading and material records. The counters agree
 packet totals in every case. All figures are byte counts. They do not depend on timing or on the
 debug build that was used (arm64 Linux).
 
-**Rebuilt scenes.** The job has no GPU, so the Cull and LargeBatch benches cannot run as they are:
-they open a headless surface and read GPU buffers back. Their scenes were rebuilt in the driver
-with the same entities and a backend that drops packets. These are Cull's 100k box scene,
-`many_batches_shadows` and `town` (`etc/scenes/town.flecs`). The extract does not depend on the
+**Rebuilt scenes.** The job had no GPU, so the Cull and LargeBatch benches could not run as
+they are: they open a headless surface and read GPU buffers back. Their scenes were rebuilt in
+the driver with the same entities and a backend that drops packets. These are Cull's 100k box scene,
+`many_batches_shadows` and `town` (`test/assets/town.flecs`). The extract does not depend on the
 backend, so the instance traffic is the same. Five shipped scenes that are not benches were run
 the same way: `spaceship`, `santorini`, `japanese_garden`, `cheese_market` and `ui_showcase`.
 No bench scene contains a parametric surface, so these were needed. The spawn scene, 1,000 boxes
@@ -66,6 +76,13 @@ of `bench/scene` (`Spatial.build_1m`), exceeded the 2 GiB memory limit of the jo
 below are derived from the allocator in `store.c` and `batch.c` and labeled as derived. The
 `bench/scene` suites set no render backend and no view, so as they run they upload no instance
 data at all. Their figure is for the same 1M boxes with a view added.
+
+**After the changes.** The current page buffers and material records come from the counters of
+a release run of `bench/render` (`bake3 run --cfg release bench/render`) on a job with a GPU
+(arm64 macOS), the Cull suite included, listed with each table. The records of japanese_garden,
+cheese_market and spaceship after O1, which are not benches, come from a driver outside the
+repository like the one above: it loads the scene without its `Surface` and `LightBake` with the
+null backend (`src/render/null.c`) and reads `box_render_draws_stats_t.materials` after setup.
 
 **Not measured.** GPU time is not measured: render, cull and scatter passes, and the cost of a
 vertex shader loading the surface record. Every statement about shader cost below is derived
@@ -112,20 +129,19 @@ primitives scene has one instance of each of the 7 kinds; 6 have a render mesh.
 
 Bytes of the page buffers alive after setup. Slots are the slots of the page buffers. Instances
 are the live slots.
-The Extract, Shapes2D, Text, Material and Cull suites of `bench/render` report these as the
-`page_slots`, `page_transform_bytes`, `page_shading_bytes`, `page_surface_bytes` and `page_bytes`
-counters of `box_render_draws_stats_t` (one helper, `bench_render_memory` in
+The Extract, Shapes2D, Text, Material, Parametric and Cull suites of `bench/render` report these
+as the `page_slots`, `page_transform_bytes`, `page_shading_bytes`, `page_surface_bytes` and
+`page_bytes` counters of `box_render_draws_stats_t` (one helper, `bench_render_memory` in
 `bench/render/src/bench_memory.c`). Material reports them in every case, Cull after the measured
-frames of every case; the Cull suite needs a GPU. The counters cover both stores, so `Cull.town`
-reports its mesh and 2D pages together.
+frames of every case; the Cull suite needs a GPU. The Cull 100k scene is `offscreen_100k`,
+`offscreen_100k_unculled` and `shadows_100k`; the `occluded_city_100k` cases are a city of
+102,501 instances. The counters cover both stores, so `Cull.town` reports its mesh and 2D pages
+together.
 
-The mesh rows are reproduced exactly: Extract 262,144 slots and 117.4 MB, Material.tint_subtree
-and the Cull 100k scene (every case but `many_batches_shadows` and `town`) 131,072 slots and
-58.7 MB, `Cull.many_batches_shadows` 32,768 slots and 14.7 MB. The 2D rows were measured before
-S1 and D1. The slot counts still match, but a 2D slot is now 112 bytes: 48 transform, 64 shading
-and no surface. The benches report Shapes2D.dynamic_material 29.4 MB (12.6 transform, 16.8
-shading), Shapes2D.ui_tree_idle 1.8 MB, Text.layout_10k 14.7 MB (6.3 transform, 8.4 shading)
-and `Cull.town` 8,448 slots and 3.70 MB, of which 0.03 MB are the 2D page.
+The first table was measured with the driver before S1, D1 and S2, with a 448 byte mesh slot and
+a 512 byte 2D slot that both carry a surface stream, and before O2. It is kept as the baseline.
+
+Measured before S1, D1 and S2:
 
 | Scene | Instances | Slots | Transform | Shading | Surface | Total | Surface share |
 |---|---|---|---|---|---|---|---|
@@ -145,10 +161,43 @@ and `Cull.town` 8,448 slots and 3.70 MB, of which 0.03 MB are the 2D page.
 | LargeBatch 1.5M, **derived** | 1,572,864 | 1,660,244 | 79.7 MB | 26.6 MB | 637.5 MB | 743.8 MB | 86% |
 | bench/scene 1M boxes with a view, **derived** | 1,000,000 | 1,048,575 | 50.3 MB | 16.8 MB | 402.7 MB | 469.8 MB | 86% |
 
-Derivation for the large scenes: a batch holds at most `BOX_DRAWS_CHUNK` = 349,525 instances
-(128 MiB / 384), so 1M boxes of one key take three full pages. A full run's capacity is capped
-at the chunk, and so are its page buffers. The last batch of 1M boxes holds 1 instance in a 64
-slot run on a fourth page. The fifth batch of 1.5M holds 174,764 instances in a 262,144 slot run.
+Derivation for the large scenes of the baseline: a batch held at most `BOX_DRAWS_CHUNK` = 349,525
+instances (128 MiB / 384), so 1M boxes of one key took three full pages. A full run's capacity was
+capped at the chunk, and so were its page buffers. The last batch of 1M boxes held 1 instance in
+a 64 slot run on a fourth page. The fifth batch of 1.5M held 174,764 instances in a 262,144 slot
+run.
+
+The second table holds the current values, after S1, D1, S2, O2 and its follow-up
+InstanceRunExact: a 64 byte plain mesh slot (48 transform, 16 shading), a 112 byte 2D slot (48
+transform, 64 shading) and no surface stream outside surface batches. They are the counters of a
+release run of `bench/render`. `Cull.town` is split with the counters: every slot has a 48 byte
+transform, and a mesh slot has 16 bytes of shading where a 2D slot has 64, so the mesh slots are
+(64 × `page_slots` − `page_shading_bytes`) / 48. The spaceship row is the spaceship sized scene
+of `Parametric.extract_spaceship_size`, whose 8,792 instances include its parametric surfaces.
+The spawn row is `InstanceStore.spawn_grows_pages_without_moves` (see O2). The large scenes are
+derived again: each store now derives its chunk from its own largest stride (StoreChunkSize), so
+a plain mesh page holds 2,796,202 slots, and the 1M and 1.5M boxes created in one frame are one
+batch on one page with a run of just their count. A null backend driver like the one of the O1
+records confirmed both rows. japanese_garden and the 1M boxes of `bench/scene` are not benches of
+`bench/render` and stay baseline only.
+
+Measured after S1, D1, S2, O2 and InstanceRunExact:
+
+| Scene | Instances | Slots | Transform | Shading | Surface | Total | Surface share |
+|---|---|---|---|---|---|---|---|
+| Extract (100k `Box` + 10k dynamic `Sphere`) | 110,000 | 110,000 | 5.3 MB | 1.8 MB | 0 | 7.0 MB | 0% |
+| Material.tint_subtree | 110,000 | 110,000 | 5.3 MB | 1.8 MB | 0 | 7.0 MB | 0% |
+| Cull 100k scene | 100,001 | 100,004 | 4.8 MB | 1.6 MB | 0 | 6.4 MB | 0% |
+| Cull.many_batches_shadows (400 batches) | 20,000 | 20,800 | 1.0 MB | 0.33 MB | 0 | 1.3 MB | 0% |
+| Cull.town, mesh | 4,801 | 4,864 | 0.23 MB | 0.08 MB | 0 | 0.31 MB | 0% |
+| Cull.town, 2D | 120 | 124 | 0.006 MB | 0.008 MB | 0 | 0.014 MB | 0% |
+| Shapes2D.dynamic_material | 110,000 | 110,000 | 5.3 MB | 7.0 MB | 0 | 12.3 MB | 0% |
+| Shapes2D.ui_tree_idle | 10,100 | 10,100 | 0.48 MB | 0.65 MB | 0 | 1.1 MB | 0% |
+| Text.layout_10k (glyphs) | 110,000 | 110,000 | 5.3 MB | 7.0 MB | 0 | 12.3 MB | 0% |
+| spaceship (`Parametric.extract_spaceship_size`) | 8,792 | 10,960 | 0.53 MB | 0.18 MB | 0.98 MB | 1.7 MB | 58% |
+| Spawn, 64 × 1,000 boxes | 64,000 | 84,312 | 4.0 MB | 1.3 MB | 0 | 5.4 MB | 0% |
+| LargeBatch 1M, **derived** | 1,048,576 | 1,048,576 | 50.3 MB | 16.8 MB | 0 | 67.1 MB | 0% |
+| LargeBatch 1.5M, **derived** | 1,572,864 | 1,572,864 | 75.5 MB | 25.2 MB | 0 | 100.7 MB | 0% |
 
 ### Uploads, measured
 
@@ -369,14 +418,15 @@ The 80 bytes per slot:
     `box_draws_shape2d`, `text_draw.c`, `shape2d.wgsl`, and the shading records that
     `transition.c` patches.
   - Effort: small to medium.
-- **D2. Reuse the material table for 2D.** Rejected. The material table is per owner. UI
-  elements own their `Rgb`, so it would hold one record per element. Glyphs carry their atlas
-  area in `uv`, and every 2D instance carries its shape words, aspect, clip and rank. A table
-  could only take the color, emissive and border color, and would add a dependent load. The
-  measured contents are highly redundant: Shapes2D.ui_tree_idle has 3 distinct records among
-  10,100 when the rank is ignored, and Text.layout_10k has 9 among 110,000. A content
-  deduplicated style table (32 bytes per instance) may be worth a look after O1 shows how
-  deduplication behaves.
+- **D2. Reuse the material table for 2D.** Rejected. Glyphs carry their atlas area in `uv`, and
+  every 2D instance carries its shape words, aspect, clip and rank. A table could only take the
+  color, emissive and border color, and would add a dependent load in `shape2d.wgsl`. Since O1
+  the material table shares records by content: Extract's 100,001 records became 2 and town's
+  4,802 became 49, so UI elements that own their `Rgb` would share records too. The
+  measured 2D contents are as redundant: Shapes2D.ui_tree_idle has 3 distinct records among
+  10,100 when the rank is ignored, and Text.layout_10k has 9 among 110,000. That argues for a
+  content deduplicated 2D style table (32 bytes per instance) later rather than for the material
+  table.
 
 ## Other per slot costs
 
@@ -385,17 +435,27 @@ The 80 bytes per slot:
 `materials.c` gave every prefab, and every mesh shape that owns a material component, a record
 of its own. Records were not shared by content. Every bench scene sets `Rgb` per shape, so in
 those scenes each instance paid an 80 byte record (`box_render_material_t`) in a buffer that
-doubles (`capacity`), next to its stream slots. Measured before the change:
+doubles (`capacity`), next to its stream slots. Measured before the change, with the records
+after it in the last column:
 
-| Scene | Records | Distinct contents | Buffer records | Buffer |
-|---|---|---|---|---|
-| Extract | 100,001 | 2 | 131,072 | 10.5 MB |
-| Material.tint_subtree | 110,001 | 3 | 131,072 | 10.5 MB |
-| Cull.many_batches_shadows | 20,001 | 2 | 32,768 | 2.6 MB |
-| Cull.town | 4,802 | 49 | 8,192 | 0.7 MB |
-| japanese_garden | 21,684 | 262 | 32,768 | 2.6 MB |
-| cheese_market | 19,028 | 130 | 32,768 | 2.6 MB |
-| spaceship (prefabs) | 330 | 39 | 512 | 0.04 MB |
+| Scene | Records | Distinct contents | Buffer records | Buffer | Records after O1 |
+|---|---|---|---|---|---|
+| Extract | 100,001 | 2 | 131,072 | 10.5 MB | 2 |
+| Material.tint_subtree | 110,001 | 3 | 131,072 | 10.5 MB | 3 |
+| Cull.many_batches_shadows | 20,001 | 2 | 32,768 | 2.6 MB | 2 |
+| Cull.town | 4,802 | 49 | 8,192 | 0.7 MB | 49 |
+| japanese_garden | 21,684 | 262 | 32,768 | 2.6 MB | 262 |
+| cheese_market | 19,028 | 130 | 32,768 | 2.6 MB | 130 |
+| spaceship (prefabs) | 330 | 39 | 512 | 0.04 MB | 39 |
+
+The records after O1 are the `materials` counter after setup, slot 0 included like the records
+before. Extract, Material.tint_subtree and the Cull rows report it in `bench/render` (release),
+the Cull rows from the Cull suite on a GPU. The japanese_garden, cheese_market and spaceship
+scenes are not benches; a driver outside the repository loaded each with the null backend
+(`src/render/null.c`) and read the counter after setup. The driver also gave town 49. Every
+count is its distinct count: no row has `DynamicMaterial` shapes or a running transition. The
+spaceship row is not only prefab records after O1: 13 of its 39 are the private records of the
+prefabs that own a material, and the 329 other owners share the rest.
 
 Implemented: the table shares records by content, with reference counts. This removes about 80
 bytes per instance that owns its material. Prefabs, `DynamicMaterial` shapes and shapes with a
@@ -423,8 +483,8 @@ instances upload N records per frame, and hash N records on the frame the transi
 
 ### O2. Unused capacity of runs and pages
 
-Measured slots per live instance: 1.19 to 2.38 in the benches, 3.02 in the garden and 3.74 in
-the spaceship scene. There are three causes:
+Measured slots per live instance before O2: 1.19 to 2.38 in the benches, 3.02 in the garden and
+3.74 in the spaceship scene. There are three causes:
 
 - A run's capacity is the power of two at or above its count, and at least
   `BOX_DRAWS_MIN_CAPACITY` (64). The spaceship scene's 162 batches have 20,352 run slots for
@@ -434,9 +494,9 @@ the spaceship scene. There are three causes:
 - A batch that outgrows its run leaves a hole. The spawn scene ends with 64,512 free slots below
   its top, and page buffers never shrink.
 
-Today every unused slot costs 448 or 512 bytes. After S1 and S2 it costs 64 or 128, so S2 alone
-removes 86% of this waste. What is left, for example 16.8 MB for Extract's 7.0 MB of live
-slots, can be reduced as follows:
+Before S1 and S2 every unused slot cost 448 or 512 bytes. After S1 and S2 it costs 64 or 128
+(112 with D1), so S2 alone removed 86% of this waste. What was left, for example 16.8 MB for
+Extract's 7.0 MB of live slots, could be reduced as follows:
 
 - Grow runs and page buffers by 1.5 instead of 2, or round page buffers up to a multiple of
   4,096 slots.
@@ -504,10 +564,11 @@ at 86,672 slots, off the steps.
 The cost is one move for a batch that, right after it was created with more than 16 instances,
 gains instances its old growth step would have held: 1,000 shapes and one more move to a run of
 1,460, or extend it in place at the top of the page. The move copies the 1,000 instances once on
-the GPU (64 bytes each for a mesh, 112 for a 2D shape: 64 or 112 KB) instead of uploading them, and leaves a
-hole of 1,000 slots that later runs reuse. A batch that starts at 16 instances or less starts on
-the growth steps and grows exactly as before. A run just below a step gains little headroom on
-its first growth (968 grows to 972), so it can move once more before it reaches the step above.
+the GPU (64 bytes each for a mesh, 112 for a 2D shape: 64 or 112 KB) instead of uploading them,
+and leaves a hole of 1,000 slots that later runs reuse. A batch that starts at 16 instances or
+less starts on the growth steps and grows exactly as before. A run just below a step gains little
+headroom on its first growth (968 grows to 972), so it can move once more before it reaches the
+step above.
 
 ### O3. Full re-uploads when a run moves or a page grows
 
@@ -565,33 +626,35 @@ batches, saving 42 MB in Extract. `ShapeMesh` belongs to `box.geometry` and is o
 
 Each item can become its own task. The savings use the measured scenes above.
 
-1. **Drop the surface stream from 2D pages (S1).**
+1. **Drop the surface stream from 2D pages (S1).** Implemented.
    - 2D slots go from 512 to 128 bytes.
    - Text relayout uploads 75% less per frame, and 2D page memory is 75% smaller.
    - No shader reads change.
    - Effort: small.
 2. **Give mesh batches without a parametric surface a layout without the surface stream (S2).**
+   Implemented.
    - Mesh slots go from 448 to 64 bytes, and mesh page memory and full uploads are 86% smaller.
    - Plain meshes skip the per vertex surface load.
    - Effort: medium. It reuses the zero buffer binding of item 1.
 3. **Deduplicate the material table by content (O1).** Implemented.
    - Removes the 80 byte record per instance of shapes that own their material: 100,001 → 2
-     records in Extract, 4,802 → 49 in town.
+     records in Extract, 4,802 → 49 in town, measured.
    - Extract's setup upload of material records goes from 8,000,080 to 160 bytes.
    - Effort: medium.
 4. **Copy grown pages and moved runs on the GPU instead of uploading them again (O3).**
+   Implemented.
    - Removes the repeated uploads of growth: spawning uploads half as much.
    - This makes item 5 safe.
    - Effort: medium.
-5. **Tighten run and page growth (O2).**
-   - Use a factor of 1.5 or 4,096 slot steps for page buffers, and a 16 slot minimum run.
-   - After items 2 and 4, this cuts most of the 1.2 to 3.7 slots allocated per instance.
+5. **Tighten run and page growth (O2).** Implemented.
+   - Runs and page buffers grow by 1.5, chosen over 4,096 slot steps, with a 16 slot minimum run.
+   - Extract holds 262,144 → 137,568 slots for 110,000 instances, 110,000 with InstanceRunExact.
    - Effort: small.
-6. **Pack the 2D shading into 64 bytes (D1).**
+6. **Pack the 2D shading into 64 bytes (D1).** Implemented.
    - Drop the reserved words and store the color as unorm16x4.
    - Saves 16 of the 128 bytes per 2D slot that remain after item 1.
    - Effort: small to medium.
-7. **Size the pages of each store by its own largest stride (follow-up of S2).**
+7. **Size the pages of each store by its own largest stride (follow-up of S2).** Implemented.
    - Plain mesh pages hold 2,796,202 slots, so 1M boxes are one batch.
    - Effort: small.
 
@@ -607,8 +670,9 @@ Rejected:
 - T3 (quantized translation): no precision at UI and world coordinates.
 - T4 (2D affine transform): world space UI is rotated in 3D.
 - M2 (unorm8 alpha): steps in fades.
-- D2 (material table for 2D): the material table is per owner, and glyphs carry their atlas
-  area per instance.
+- D2 (material table for 2D): glyphs carry their atlas area and every 2D instance its shape
+  words, aspect, clip and rank, so a table could take only the colors, and it adds a dependent
+  load in `shape2d.wgsl`.
 
 ## Follow-ups
 

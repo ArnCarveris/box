@@ -100,6 +100,48 @@ template TileCursor {
   }
 }
 
+// A see-through preview of the wall or path that a drag lays from drag_start to drag_end
+template LineGhost {
+  prop idx: i32 = 0
+  prop k: i32 = 0
+  prop seed: f32 = 0
+  prop kn: i32 = 0
+  prop ke: i32 = 0
+  prop ks: i32 = 0
+  prop kw: i32 = 0
+
+  const t = tool
+  const x = idx % GRID
+  const z = (idx - x) / GRID
+  const sx = drag_start % GRID
+  const sz = (drag_start - sx) / GRID
+
+  if k == K_EMPTY && on_line(x, z, drag_start, drag_end) {
+    const n = abs(x - sx) + abs(z - sz) + 1
+    const ok = gold >= n * cost_gold(t, 1) && stone >= n * cost_stone(t, 1)
+    const color: Rgb = match ok { true: {120, 235, 110}; _: {235, 64, 52} }
+    CursorEdge edge_n(len: 2, color: color) { Position: {0, 0.05, -0.955} }
+    CursorEdge edge_s(len: 2, color: color) { Position: {0, 0.05, 0.955} }
+    CursorEdge edge_e(len: 2, color: color) { Position: {0.955, 0.05, 0}; Rotation: {0, HALF_PI, 0} }
+    CursorEdge edge_w(len: 2, color: color) { Position: {-0.955, 0.05, 0}; Rotation: {0, HALF_PI, 0} }
+    ghost {
+      Opacity: {match ok { true: 0.5; _: 0.3 }}
+      SpatialIgnore
+      if t == K_PATH {
+        dirt : CastleDirt { Position: {0, 0.01, 0}; Box: {1.9, 0.02, 1.9} }
+        PathPiece path(seed: seed)
+      } else {
+        WallPiece wall(
+          level_: 1, seed: seed,
+          n: barrier(kn) || on_line(x, z - 1, drag_start, drag_end),
+          e: barrier(ke) || (x < GRID - 1 && on_line(x + 1, z, drag_start, drag_end)),
+          s: barrier(ks) || on_line(x, z + 1, drag_start, drag_end),
+          w: barrier(kw) || (x > 0 && on_line(x - 1, z, drag_start, drag_end)))
+      }
+    }
+  }
+}
+
 template Tile {
   prop idx: i32 = 0
 
@@ -233,6 +275,10 @@ template Tile {
     }
   }
 
+  if raid_cell == idx {
+    BanditRaid raid(seed: seed)
+  }
+
   if marked {
     marker_ {
       Position: {0, match lvl { 1: 2.5; _: 3.3 }, 0}
@@ -254,7 +300,11 @@ template Tile {
     }
   }
 
-  if hover {
+  if dragging && drag_tool(tool) {
+    LineGhost line(idx: idx, k: k, seed: seed, kn: kn, ke: ke, ks: ks, kw: kw)
+  }
+
+  if hover && !dragging {
     TileCursor cursor(idx: idx, k: k, lvl: lvl, seed: seed, n: n, e: e, s: s, w: w, hn: hn, he: he, hs: hs, hw: hw, kn: kn, ke: ke, ks: ks, kw: kw, tn: tn, te: te, ts: ts, tw: tw)
   }
 
@@ -278,11 +328,9 @@ template Tile {
         extends = drag_tool(tool) && kind[idx] == tool
         painted = drag_tool(tool) && (kind[idx] == K_EMPTY || extends)
         if painted {
-          dragging = true
-          drag_last = idx
           drag_start = idx
-          drag_axis = 0
-          build_at(idx, true)
+          drag_end = idx
+          dragging = true
         }
       }
     }
@@ -292,10 +340,12 @@ template Tile {
     while true {
       const ev = await on.click(this)
       if ev.button == 0 {
-        if painted && !(extends && drag_last == idx) {
+        if painted {
           painted = false
+          if extends && drag_start == idx && drag_end == idx {
+            emit Build(i: idx)
+          }
         } else {
-          painted = false
           emit Build(i: idx)
         }
       }
@@ -446,12 +496,12 @@ template Landscape {
     }
   }
 
-  for i in 0..120 {
-    const side = floor(i / 30)
-    const t = (i % 30) / 29.0 - 0.5
+  for i in 0..64 {
+    const side = floor(i / 16)
+    const t = (i % 16) / 15.0 - 0.5
     const half = GRID * PITCH / 2 + 0.9
-    const bx = match side { 0: t * 58; 1: half; 2: t * 58; _: 0 - half }
-    const bz = match side { 0: 0 - half; 1: t * 58; 2: half; _: t * 58 }
+    const bx = match side { 0: t * (GRID * PITCH + 2); 1: half; 2: t * (GRID * PITCH + 2); _: 0 - half }
+    const bz = match side { 0: 0 - half; 1: t * (GRID * PITCH + 2); 2: half; _: t * (GRID * PITCH + 2) }
     if hash(i + 2000) < 0.55 && !(side == 2 && abs(bx) < 2.5) {
       "bush_{i}" : CastleLeafDark {
         Position: {bx, -0.9, bz}

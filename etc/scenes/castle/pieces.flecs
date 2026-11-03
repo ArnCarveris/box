@@ -1307,6 +1307,99 @@ template StoneOutcrop {
   Tuft tuft(seed: seed) { Position: {-0.5, 0, 0.45} }
 }
 
+template Bandit {
+  prop seed: f32 = 0
+  prop loot: bool = false
+
+  const cloak: Rgb = match floor(fract(seed * 7.7) * 3) { 0: {46, 40, 34}; 1: {58, 44, 30}; _: {40, 46, 40} }
+
+  leg_a : CastleDark { Position: {-0.035, 0.07, 0}; Box: {0.045, 0.14, 0.05} }
+  leg_b : CastleDark { Position: {0.035, 0.07, 0}; Box: {0.045, 0.14, 0.05} }
+  cloak_ { Position: {0, 0.19, 0}; Frustum: {length: 0.26, radius_bottom: 0.1, radius_top: 0.06, segments: 8}; Rgb: cloak; PbrMaterial: {roughness: 1} }
+  arm_a { Position: {-0.075, 0.25, 0.02}; Rotation: {-0.4, 0, 0.15}; Box: {0.035, 0.14, 0.04}; Rgb: cloak; PbrMaterial: {roughness: 1} }
+  arm_b { Position: {0.075, 0.27, 0.04}; Rotation: {-1.0, 0, -0.15}; Box: {0.035, 0.14, 0.04}; Rgb: cloak; PbrMaterial: {roughness: 1} }
+  head : CastleSkin { Position: {0, 0.35, 0}; Sphere: {radius: 0.05, segments: 10, smooth: true} }
+  mask : CastleBanner { Position: {0, 0.345, 0.022}; Box: {0.09, 0.03, 0.06} }
+  hood { Position: {0, 0.39, -0.01}; Cone: {length: 0.12, radius: 0.065, segments: 8}; Rgb: cloak; PbrMaterial: {roughness: 1} }
+  if loot {
+    sack : CastleCloth { Position: {0, 0.3, -0.1}; Scale: {1, 1.1, 0.9}; IcoSphere: {radius: 0.08, segments: 1} }
+  } else {
+    stick : CastleTimber { Position: {0.08, 0.36, 0.12}; Rotation: {0.5, 0, 0}; Cylinder: {length: 0.22, radius: 0.012, segments: 5} }
+    flame : CastleFlame { Position: {0.08, 0.47, 0.18}; Sphere: {radius: 0.04, segments: 8} }
+  }
+}
+
+// Bandits run in from the meadow, set the house alight and run off with their loot
+template BanditRaid {
+  prop seed: f32 = 0
+
+  mut phase: i32 = 0
+
+  marker {
+    Position: {0, 3.4, 0}
+    Rotation: {PI, 0, 0}
+    Cone: {length: 0.5, radius: 0.22, segments: 4}
+    Rgb: {255, 70, 50}
+    Emissive: {strength: 4, color: {255, 60, 40}}
+    NoShadow
+  }
+
+  if phase == 1 {
+    for f in 0..3 {
+      const fa = seed * 9 + f * 2.1
+      "flame_{f}" : CastleFlame { Position: {sin(fa) * 0.35, 1.25, cos(fa) * 0.25}; Cone: {length: 0.4 + f * 0.1, radius: 0.13, segments: 6} }
+    }
+    fire {
+      Position: {0, 1.3, 0}
+      ParticleEmitter: {
+        max: 120, rate: 60,
+        shape: EmitterSphere, radius: 0.45,
+        direction: {0, 1, 0}, spread: 25, speed: {0.7, 1.5},
+        lifetime: {0.5, 0.9}, size: {0.12, 0.24}, opacity: {0.8, 1},
+        color: {255, 140, 50}, color_variance: {0, 50, 30},
+        seed: seed * 500
+      }
+      ParticleAppearance: {blend: ParticleAdditive}
+    }
+    smoke {
+      Position: {0, 1.6, 0}
+      ParticleEmitter: {
+        max: 60, rate: 14,
+        shape: EmitterSphere, radius: 0.4,
+        direction: {0, 1, 0}, spread: 15, speed: {0.4, 0.7},
+        lifetime: {2, 3}, size: {0.3, 0.5}, opacity: {0.45, 0.6},
+        color: {60, 56, 52}, color_variance: {10, 10, 10},
+        seed: seed * 700
+      }
+      ParticleCurves: {size: {keys: [{0, 0.6}, {0.5, 1.6}, {1, 2.6}]}, opacity: {keys: [{0, 0}, {0.25, 1}, {1, 0}]}}
+    }
+  }
+
+  for b in 0..3 {
+    const a = seed * 6.283 + (b - 1) * 0.55
+    const fx = sin(a)
+    const fz = cos(a)
+    "bandit_{b}" {
+      Position: match phase {
+        0: {fx * 5.5, 0, fz * 5.5}
+        1: {fx * 1.35, 0, fz * 1.35}
+        _: {fx * 7 + fz * (b - 1) * 1.5, 0, fz * 7 - fx * (b - 1) * 1.5}
+      }
+      Rotation: {0, match phase { 2: a; _: a + PI }, 0}
+      Scale: {2.2, 2.2, 2.2}
+      Transition: [Position: {duration: match phase { 1: 1.3; _: 2.2 }, timing_function: EaseOut}]
+      Bandit body(seed: seed + b * 0.31, loot: phase == 2)
+    }
+  }
+
+  async {
+    await delay(0.1)
+    phase = 1
+    await delay(6)
+    phase = 2
+  }
+}
+
 template TreePiece {
   prop seed: f32 = 0
 

@@ -379,6 +379,7 @@ static void BoxDrawsOnRemove(
 
         box_draws_material_release(it->world, d, it->entities[i]);
         box_draws_box_shadow_remove(it->world, d, it->entities[i]);
+        box_draws_slice_release(d, it->entities[i]);
     }
 
 done:
@@ -591,6 +592,7 @@ static void box_draws_key(
     key->surface = shape->surface.p[0][0] != 0.0f;
     if (shape2d && shape2d->texture) {
         key->textures[0] = shape2d->texture;
+        key->slice = shape2d->sliced;
     }
 
     key->dynamic_transform = box_transform_dynamic(world, ecs_get_table(world, e)) ||
@@ -743,6 +745,17 @@ write:
         s->clip = clip;
         material.clip = clip;
         material.rank = s->rank;
+        int32_t slice = material.shape2d->sliced ? box_draws_slice_of(d, e) : 0;
+        if (slice != s->slice) {
+            kinds |= BOX_DRAW_SHADING;
+        }
+
+        if (!slice && s->slice) {
+            box_draws_slice_release(d, e);
+        }
+
+        s->slice = slice;
+        material.slice = slice;
     }
 
     if (kinds & BOX_DRAW_TRANSFORM) {
@@ -791,6 +804,7 @@ void box_draws_shape_material(
     };
     if (out->shape2d) {
         out->clip = s->clip;
+        out->slice = s->slice;
         out->rank = s->rank;
     }
 }

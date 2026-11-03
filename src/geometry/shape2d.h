@@ -33,12 +33,14 @@ typedef struct Shape2D {
     rgba border_color;      /**< Color of the border, display encoded */
     float uv[4];            /**< Image area: u scale, v scale, u offset, v offset */
     ecs_entity_t texture;   /**< Texture of the Image, 0 for none */
+    bool sliced;            /**< A Rect whose Image has an ImageSlice, drawn by the slice
+                             *   pipeline of the renderer with uv holding its slice index */
 } Shape2D;
 
 /** Component id of Shape2D */
 extern ECS_COMPONENT_DECLARE(Shape2D);
 
-/** Register the 2D shapes: Rect, Circle and Line, with Border and Image.
+/** Register the 2D shapes: Rect, Circle and Line, with Border, Image and ImageSlice.
  *
  * @param world The world
  */
