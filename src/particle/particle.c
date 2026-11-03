@@ -131,6 +131,10 @@ void BoxParticleImport(
     ECS_META_COMPONENT(world, ParticleLight);
     box_owned_hooks(world, ParticleLight, BOX_OWNED_CURVE(ParticleLight, curve));
     ecs_set_hooks(world, ParticleLight, { .ctor = box_particle_light_ctor });
+    ECS_META_COMPONENT(world, ParticleTimeline);
+    box_owned_hooks(world, ParticleTimeline,
+        BOX_OWNED_CURVE(ParticleTimeline, rate),
+        BOX_OWNED_CURVE(ParticleTimeline, speed));
     ECS_META_COMPONENT(world, EffectFlash);
     ECS_META_COMPONENT(world, ParticleGradientKey);
     ECS_META_COMPONENT(world, ParticleGradient);

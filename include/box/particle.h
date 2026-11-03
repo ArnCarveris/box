@@ -212,6 +212,28 @@ ECS_STRUCT(ParticleLight, {
                              *   default 0 to go dark at once */
 });
 
+/** Emission of a ParticleEmitter over its playback clock: curves over period seconds multiply
+ * its rate and start speed, once and then their last key, or with loop, their times from 0 to 1
+ * of the period. In script {period: 2, loop: true, rate: {keys: [{0, 0}, {0.5, 1}, {1, 0}]}}.
+ *
+ * A frame spawns rate times the area of the rate curve above 0 over its clock, so the count does
+ * not depend on the frame rate; the speed curve at the clock after the frame scales the speed of
+ * its spawns, kept in their velocity. Paused holds, stopped emits nothing, bursts are not scaled.
+ *
+ * Size, lifetime, rotation and opacity have no curve here: every frame computes them from the
+ * current ranges, so a curve would change live particles too. No keys, a bad curve, which its
+ * validate hook logs, or period 0 is 1; the CPU evaluates them, without rows on the GPU.
+ */
+ECS_STRUCT(ParticleTimeline, {
+    float period;           /**< Seconds of the playback clock the curves span, default 0 for
+                             *   no curves */
+    bool loop;              /**< Repeat the curves every period, default false for once and
+                             *   then the last key */
+    ParticleCurve rate;     /**< Multiplier of ParticleEmitter.rate, default 1 */
+    ParticleCurve speed;    /**< Multiplier of the start speed of the particles spawned now,
+                             *   default 1 */
+});
+
 /** A flash of the PointLight next to it in an effect template each time box_particle_burst_at
  * plays the effect: it starts at intensity and fades linearly to zero over seconds of the play,
  * then stays dark until the next play.

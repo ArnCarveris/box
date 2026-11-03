@@ -14,6 +14,7 @@
 #include "render.h"
 #include "../particle/simulate.h"
 #include "../particle/curves.h"
+#include "../particle/timeline.h"
 #include "particle_rows.h"
 #include "../geometry/mesh_cache.h"
 #include "../texture/texture.h"
@@ -108,8 +109,8 @@ typedef struct box_particle_burst_t {
 /** Main thread state of the particle extract */
 typedef struct box_render_particles_t {
     ecs_query_t *emitters;  /**< ParticleEmitter, WorldTransform, Scene(self|up), Playback,
-                             *   Curves, Appearance, ParticleLight, PointLight(self) and
-                             *   SpotLight(self), NULL without box.particle */
+                             *   Curves, Appearance, ParticleLight, Point and SpotLight(self)
+                             *   and ParticleTimeline, NULL without box.particle */
     ecs_query_t *burst_query; /**< ParticleBurst and ParticleEmitter(self|up), NULL without
                              *   box.particle */
     ecs_vec_t bursts;       /**< box_particle_burst_t of the frame, sorted by emitter */
@@ -661,19 +662,20 @@ static void box_particles_retire(
  *
  * @param pool The pool
  * @param emitter The emitter values
- * @param delta Seconds of the frame
+ * @param seconds Seconds of emission of the frame at the rate, see
+ *                box_particle_timeline_seconds
  * @param burst Particles the bursts of the frame add
  * @return Particles to spawn, at most the free slots of the pool
  */
 static uint32_t box_particles_owed(
     box_particle_pool_t *pool,
     const ParticleEmitter *emitter,
-    double delta,
+    double seconds,
     double burst)
 {
     uint32_t free = (uint32_t)(pool->max - pool->live);
     double whole;
-    pool->carry += (emitter->rate > 0 ? (double)emitter->rate : 0.0) * delta;
+    pool->carry += (emitter->rate > 0 ? (double)emitter->rate : 0.0) * seconds;
     whole = floor(pool->carry);
     pool->carry -= whole;
     whole += burst;
@@ -1203,7 +1205,8 @@ static void box_particles_light_write(
  * and spawns nothing, and a reset empties the pool and zeroes the playback clock in a frame that
  * does nothing else. Only a playing emitter advances the playback clock its bursts go off by.
  *
- * The lights of a ParticleLight follow the clock after the frame.
+ * The lights of a ParticleLight follow the clock after the frame. A ParticleTimeline shapes
+ * the rate over the clock of the frame and the start speed at the clock after it.
  *
  * @param world The world
  * @param s The state
@@ -1214,6 +1217,7 @@ static void box_particles_light_write(
  * @param scene Its scene
  * @param playback Its playback control, NULL to play; receives the clock and a cleared reset
  * @param curves Its ParticleCurves, NULL for none
+ * @param timeline Its ParticleTimeline, NULL for none
  * @param look Its ParticleAppearance, NULL for none
  * @param effect The ParticleEffect of the instance it plays in, NULL for none
  * @param lights The lights its ParticleLight drives
@@ -1229,6 +1233,7 @@ static void box_particles_emitter(
     ecs_entity_t scene,
     ParticlePlayback *playback,
     const ParticleCurves *curves,
+    const ParticleTimeline *timeline,
     const ParticleAppearance *look,
     const ParticleEffect *effect,
     const box_particles_light_t *lights,
@@ -1315,7 +1320,8 @@ static void box_particles_emitter(
     if (!reset && state != ParticlePaused && state != ParticleStopped) {
         uint64_t t0 = pool->time;
         pool->time += delta_us;
-        count = box_particles_owed(pool, emitter, p->delta,
+        count = box_particles_owed(pool, emitter,
+            box_particle_timeline_seconds(timeline, t0, pool->time, p->delta),
             box_particles_bursts_owed(s, e, t0, pool->time, !pool->started));
         pool->started = true;
     }
@@ -1355,6 +1361,12 @@ static void box_particles_emitter(
     box_particles_block(emitter, transform, ecs_get(world, e, ParticleCollision), velocity,
         age_us ? p->delta : 0.0f, effect && effect->scale > 0 ? effect->scale : 1.0f,
         &entry->block);
+    if (timeline) {
+        float speed = box_particle_timeline_speed(timeline, pool->time);
+        entry->block.speed[0] *= speed;
+        entry->block.speed[1] *= speed;
+    }
+
     box_particles_block_forces(pool, emitter->acceleration, &forces, moves, &entry->block);
     box_particle_rows_update(&s->curves, &pool->curves, curves);
     box_particles_block_look(curves, look, pool, &entry->block);
@@ -1543,10 +1555,12 @@ static void BoxRenderExtractParticles(
         const ParticleLight *lights = ecs_field(&qit, ParticleLight, 6);
         PointLight *points = ecs_field(&qit, PointLight, 7);
         SpotLight *spots = ecs_field(&qit, SpotLight, 8);
+        const ParticleTimeline *timelines = ecs_field(&qit, ParticleTimeline, 9);
         bool lights_shared = lights && !ecs_field_is_self(&qit, 6);
         bool shared = ecs_field_is_set(&qit, 1) && !ecs_field_is_self(&qit, 1);
         bool curves_shared = curves && !ecs_field_is_self(&qit, 4);
         bool looks_shared = looks && !ecs_field_is_self(&qit, 5);
+        bool timelines_shared = timelines && !ecs_field_is_self(&qit, 9);
         ecs_entity_t effect_src = 0;
         bool effect_self = box_particles_effect_of(world, qit.table, 0, &effect_src);
         bool effect_rows = !effect_self && ecs_table_has_id(world, qit.table, ecs_id(EcsParent));
@@ -1569,6 +1583,7 @@ static void BoxRenderExtractParticles(
             box_particles_emitter(world, s, p, qit.entities[i], &emitters[i], t,
                 box_render_scene_field(&qit, 2, i), playbacks ? &playbacks[i] : NULL,
                 curves ? &curves[curves_shared ? 0 : i] : NULL,
+                timelines ? &timelines[timelines_shared ? 0 : i] : NULL,
                 looks ? &looks[looks_shared ? 0 : i] : NULL,
                 effect_self ? ecs_get(world, qit.entities[i], ParticleEffect) : shared_effect,
                 &light, &stats);
@@ -1722,7 +1737,8 @@ void box_render_particles_import(
                     .src.id = EcsSelf,
                     .inout = EcsInOut,
                     .oper = EcsOptional
-                }
+                },
+                { .id = ecs_id(ParticleTimeline), .inout = EcsIn, .oper = EcsOptional }
             },
             .cache_kind = EcsQueryCacheAuto
         });
