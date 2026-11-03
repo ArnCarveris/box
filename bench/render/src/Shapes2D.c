@@ -388,7 +388,7 @@ void Shapes2D_ui_tree_shadows_add_remove(
     bench_t *b)
 {
     // ui/box_shadow
-    ecs_entity_t *panels = ecs_os_malloc_n(ecs_entity_t, BENCH_SHAPES2D_PANELS);
+    ecs_entity_t panels[BENCH_SHAPES2D_PANELS];
     ecs_world_t *world = bench_shapes2d_shadow_tree(panels);
     box_render_draws_stats_t stats = {0};
     ecs_entity_t added = 0;
@@ -413,14 +413,13 @@ void Shapes2D_ui_tree_shadows_add_remove(
     bench_shapes2d_shadow_counters(b, &stats);
     box_render_sync(world);
     ecs_fini(world);
-    ecs_os_free(panels);
 }
 
 void Shapes2D_ui_tree_shadows_toggle(
     bench_t *b)
 {
     // ui/box_shadow
-    ecs_entity_t *panels = ecs_os_malloc_n(ecs_entity_t, BENCH_SHAPES2D_PANELS);
+    ecs_entity_t panels[BENCH_SHAPES2D_PANELS];
     ecs_world_t *world = bench_shapes2d_shadow_tree(panels);
     box_render_draws_stats_t stats = {0};
     int32_t frame = 0;
@@ -443,7 +442,6 @@ void Shapes2D_ui_tree_shadows_toggle(
     bench_shapes2d_shadow_counters(b, &stats);
     box_render_sync(world);
     ecs_fini(world);
-    ecs_os_free(panels);
 }
 
 void Shapes2D_clipped_1000_moving_clips(
@@ -509,3 +507,4 @@ void Shapes2D_clipped_1000_moving_clips(
     box_render_sync(world);
     ecs_fini(world);
 }
+

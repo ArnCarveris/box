@@ -2081,7 +2081,7 @@ void Shapes2D_box_shadow_slots_freed(void) {
     box_render_sync(world);
     box_render_draws_stats(world, &stats);
     test_int(stats.instances, 6);
-    test_int(stats.batches, 2);
+    test_int(stats.batches, 3); // the shadows have a batch of their own, apart from b
     test_int(Shapes2D_drawn(null), 6);
 
     ecs_set(world, a, BoxShadow, {.blur = 2, .spread = 1});
@@ -2130,6 +2130,50 @@ void Shapes2D_box_shadow_slots_freed(void) {
     test_int(stats.instances, 1);
     test_int(stats.batches, 1);
     test_int(Shapes2D_drawn(null), 1);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Shapes2D_box_shadow_own_batch(void) {
+    // ui/box_shadow
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    ecs_entity_t translucent = ecs_new(world);
+    ecs_set(world, translucent, Position, {0, 0, -10});
+    ecs_set(world, translucent, Rect, {1, 1});
+    ecs_set(world, translucent, Opacity, {0.5f});
+    ecs_entity_t opaque = ecs_new(world);
+    ecs_set(world, opaque, Position, {2, 0, -10});
+    ecs_set(world, opaque, Rect, {1, 1});
+    ecs_set(world, opaque, BoxShadow, {.blur = 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    int32_t i, shadows = 0, blended = 0;
+    for (i = 0; i < ecs_vec_count(&null->last.batches); i ++) {
+        const box_render_batch_t *b = ecs_vec_get_t(&null->last.batches, box_render_batch_t, i);
+        if (b->box_shadow) {
+            test_int(b->blend, AlphaBlend);
+            test_int(b->instance_count, 1);
+            shadows ++;
+        } else if (b->blend == AlphaBlend) {
+            test_int(b->instance_count, 1);
+            blended ++;
+        }
+    }
+
+    test_int(shadows, 1);
+    test_int(blended, 1);
 
     ecs_fini(world);
     box_render_null_free(null);

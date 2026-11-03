@@ -8,7 +8,7 @@ using box.perf
 // A dashboard of 37 shadowed panels lying on the ground: a header, a sidebar with 8 items, 12 cards
 // with a button each and a dialog with 2 buttons over them, every one with a BoxShadow of a real
 // UI (small blurs on the items and buttons, 24 on the cards, 64 on the dialog). The shadows of
-// the opaque panels are in the AlphaBlend batch of their shape, so each one breaks a run.
+// the opaque panels are in the shadow batch (fs_shadow), so each one breaks a run.
 camera {
   Camera: {fov: 50}
 }

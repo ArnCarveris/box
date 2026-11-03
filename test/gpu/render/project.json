@@ -685,6 +685,7 @@
                     "box_shadow_past_view_edge",
                     "box_shadow_needs_rect_or_circle",
                     "box_shadow_slots_freed",
+                    "box_shadow_own_batch",
                     "box_shadow_follows_transform",
                     "box_shadow_follows_dynamic_transform",
                     "box_shadow_follows_size",

@@ -2,8 +2,9 @@
  * @file render/box_shadow.c
  * @brief Soft shadows of the 2D shapes: a second instance of a Rect or Circle with a BoxShadow.
  *
- * A shadow is a slot of the batch of its shape with the AlphaBlend blend mode and no textures,
- * drawn just before the shape (order.c), so it writes no depth and the shape draws over it.
+ * A shadow is a slot of the batch of its shape with the AlphaBlend blend mode, no textures and
+ * box_shadow set, drawn just before the shape (order.c), so it writes no depth and the shape draws
+ * over it. Its pipeline shades it with fs_shadow, which takes no texture samples.
  *
  * Its quad is the shadow box plus 3 standard deviations on each side, which shape2d.wgsl blurs
  * with an erf, and cuts out by the rounded box of the shape as CSS does (in its shading, with the
@@ -454,6 +455,7 @@ void box_draws_box_shadow_update(
         drawn = key.pipeline == BOX_RENDER_SHADER_SHAPE2D;
         blend = key.blend;
         key.blend = AlphaBlend;
+        key.box_shadow = true;
         ecs_os_memset(key.textures, 0, ECS_SIZEOF(key.textures));
     }
 

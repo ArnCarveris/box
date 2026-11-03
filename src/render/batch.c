@@ -136,7 +136,8 @@ static uint64_t box_draws_hash(
         h = (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull + key->textures[i];
     }
 
-    h ^= ((uint64_t)key->shadow * 2 + key->bake) * 0x94D049BB133111EBull;
+    h ^= (((uint64_t)key->shadow * 2 + key->bake) * 2 + key->box_shadow) *
+        0x94D049BB133111EBull;
     h ^= ((uint64_t)key->atlas + 1) * 0xD6E8FEB86659FD93ull;
 
     return h ^ (h >> 29);
@@ -159,7 +160,7 @@ static bool box_draws_key_eq(
         a->dynamic_material == b->dynamic_material &&
         a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures, ECS_SIZEOF(a->textures)) &&
         a->shadow == b->shadow && a->bake == b->bake && a->atlas == b->atlas &&
-        a->surface == b->surface;
+        a->surface == b->surface && a->box_shadow == b->box_shadow;
 }
 
 box_draw_batch_t* box_draws_batch(

@@ -7,10 +7,10 @@ using box.perf
 
 // Stress of the shadows of 2D shapes: 1,000 opaque list items in 20 columns of 50 lying on the
 // ground, each with a large BoxShadow: a blur of 48 and a spread of 4 make a quad of 312 by 188
-// around an item of 160 by 36, which overlaps the quads of about 25 neighbours. The shadow of
-// every item is in the AlphaBlend batch and its item in the opaque one, so the 2,000 instances
-// draw as about 2,000 runs, and a tenth of the blended pixels lie under the item, which the
-// cutout discards.
+// around an item of 160 by 36, which overlaps the quads of 20 neighbours, about 7 shadows over
+// every pixel of the list. The shadows are in the shadow batch (fs_shadow) and the items in the
+// opaque one, so the list draws as 2,001 runs, and a tenth of the blended pixels lie under the
+// item, which the cutout discards.
 camera {
   Camera: {fov: 50}
 }

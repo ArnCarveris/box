@@ -1029,6 +1029,8 @@ typedef struct box_render_batch_t {
     bool shadow;                /**< The instances cast shadows, false for NoShadow */
     bool bake;                  /**< Static 3D instances without NoBake of a scene with LightBake or
                                  *   ReflectionBake, drawn by the captures */
+    bool box_shadow;            /**< The instances are the shadows of 2D shapes (BoxShadow),
+                                 *   drawn with the fs_shadow entry point of the 2D shape shader */
     uint32_t mesh;              /**< Mesh handle */
     uint32_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture handles of the layers, 0 for none */
     uint32_t wrap;              /**< TextureWrap of the samplers */
