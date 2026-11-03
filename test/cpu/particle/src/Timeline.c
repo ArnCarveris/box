@@ -16,6 +16,11 @@
 #include "simulate.h"
 #include "timeline.h"
 
+/* The curve cases call no flecs function that would set up the OS API they allocate with. */
+void Timeline_setup(void) {
+    ecs_os_set_api_defaults();
+}
+
 /** Frame delta of most tests, a fixed clock of a whole number of microseconds */
 #define DELTA (0.1f)
 
@@ -828,6 +833,7 @@ static double rate_at(
     return box_particle_timeline_seconds(timeline, time - 500, time + 500, 0.001) / 0.001;
 }
 
+/* The value and the slopes meet at the wrap, for the speed and for the rate. */
 void Timeline_catmull_rom_loop_wrap(void) {
     // particle/timeline
     ParticleTimeline timeline = {
@@ -838,11 +844,11 @@ void Timeline_catmull_rom_loop_wrap(void) {
     Curve view = { .kind = CurveCatmullRom, .keys = timeline.rate.keys };
     const CurveKey *keys = ecs_vec_first_t(&timeline.rate.keys, CurveKey);
     float slope = (keys[1].value - keys[3].value) / (keys[1].time - keys[3].time + 1.0f);
-    float h = 0.01f, speed[5];
+    float h = 0.002f, speed[5];
     double rate[5];
     int32_t i;
     for (i = 0; i < 5; i ++) {
-        uint64_t time = 980000 + (uint64_t)i * 10000;
+        uint64_t time = 996000 + (uint64_t)i * 2000;
         float t = (float)((double)(time % 1000000) / 1e6);
         speed[i] = box_particle_timeline_speed(&timeline, time);
         rate[i] = rate_at(&timeline, time);
@@ -852,10 +858,12 @@ void Timeline_catmull_rom_loop_wrap(void) {
         }
     }
 
-    /* The value and the slopes meet at the wrap, for the speed and for the rate */
     test_assert(fabsf(speed[2] - keys[0].value) < 1e-5f);
     test_assert(fabs(rate[2] - keys[0].value) < 1e-3);
-    test_assert(fabsf(speed[1] - speed[3]) < 0.01f);
+    test_assert(fabsf(speed[1] - speed[2]) < 0.005f);
+    test_assert(fabsf(speed[3] - speed[2]) < 0.005f);
+    test_assert(fabs(rate[1] - rate[2]) < 0.005);
+    test_assert(fabs(rate[3] - rate[2]) < 0.005);
     float before = (3.0f * speed[2] - 4.0f * speed[1] + speed[0]) / (2.0f * h);
     float after = (4.0f * speed[3] - 3.0f * speed[2] - speed[4]) / (2.0f * h);
     test_assert(fabsf(before - slope) < 0.05f);
@@ -866,6 +874,7 @@ void Timeline_catmull_rom_loop_wrap(void) {
     test_assert(fabs(rate_after - slope) < 0.1);
 }
 
+/* An emitter of 1000 a second over three periods of half a second. */
 void Timeline_catmull_rom_loop_count(void) {
     // particle/timeline
     ParticleTimeline timeline = {
@@ -885,7 +894,6 @@ void Timeline_catmull_rom_loop_count(void) {
     test_assert(fabs(box_particle_timeline_seconds(&timeline, 0, 3000000, 3.0) - 3.0 * full) <
         1e-5);
 
-    /* An emitter of 1000 a second over three periods of half a second */
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
     timeline.period = 0.5f;

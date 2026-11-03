@@ -108,8 +108,9 @@ parameter, so they differ only in the two control values of each span:
   a key is `(v[k + 1] - v[k - 1]) / (t[k + 1] - t[k - 1])`, using the real time spacing so uneven
   keys work. At the first and last key the missing neighbour has the value of the key and lies one
   span further, so the end slope is half that of the end span; a looping light or timeline curve
-  takes its end neighbours across the wrap instead (see [Flicker on a light](#flicker-on-a-light)). Use it for
-  organic shapes: growth, flicker, a smooth path through points.
+  takes its end neighbours across the wrap instead (see
+  [Flicker on a light](#flicker-on-a-light)). Use it for organic shapes: growth, flicker, a smooth
+  path through points.
 - **`CurveBezier`**: you write the slopes. The controls of a span from key a to key b are
   `a.value + a.out * dt / 3` and `b.value - b.in * dt / 3`, a third of the span `dt` along. Use it
   for eases and for shapes the others cannot make, such as a fast start that settles.
@@ -368,8 +369,8 @@ curve: {kind: CurveCatmullRom, keys: [{0, 0.4}, {0.3, 1.3}, {0.6, 0.8}, {1, 0.4}
 
 This holds only when the first key is at 0 and the last at 1. Keys that start after 0 or end
 before 1 hold their end values across the wrap, and their end slopes keep the mirrored neighbour
-of a curve that does not loop. A cycle cannot make a loop whose last value differs from its first
-continuous: it still jumps, so end on the starting value. `CurveLinear` and `CurveBezier` are the
+of a curve that does not loop. A loop whose last value differs from its first still jumps at the
+wrap, so end on the starting value. `CurveLinear` and `CurveBezier` are the
 same with or without `loop`; for a Bezier loop give the first key an `out` equal to the `in` of the
 last. Curves of `ParticleCurves`, animation tracks and all other fields have no loop and keep the
 end neighbours of [Choosing a kind](#choosing-a-kind). This refines the end rule of the Curves epic

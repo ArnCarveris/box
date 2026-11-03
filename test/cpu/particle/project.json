@@ -319,6 +319,7 @@
             },
             {
                 "id": "Timeline",
+                "setup": true,
                 "testcases": [
                     "c_defaults",
                     "script_values",

@@ -330,6 +330,8 @@ static const CurveKey curve_loop_keys[] = {
     { 0.0f, 0.4f }, { 0.15f, 1.2f }, { 0.45f, 0.7f }, { 0.8f, 1.1f }, { 1.0f, 0.4f }
 };
 
+/* Without a period the ends mirror themselves and the slopes differ at the wrap. The inner keys
+ * keep their slopes, the keys their values. */
 void Curve_loop_catmull_rom_wrap(void) {
     // curve/loop
     Curve curve = curve_make(CurveCatmullRom, curve_loop_keys, 5);
@@ -355,14 +357,12 @@ void Curve_loop_catmull_rom_wrap(void) {
     test_assert(fabsf(before - expected) < 1e-2f);
     test_assert(fabsf(after - expected) < 1e-2f);
 
-    /* Without a period the ends mirror themselves and the slopes differ at the wrap */
     float plain_before = (3.0f * v1 - 4.0f * box_curve_value(&curve, 1.0f - e, 0.0f) +
         box_curve_value(&curve, 1.0f - 2.0f * e, 0.0f)) / (2.0f * e);
     float plain_after = (4.0f * box_curve_value(&curve, e, 0.0f) - 3.0f * v0 -
         box_curve_value(&curve, 2.0f * e, 0.0f)) / (2.0f * e);
     test_assert(fabsf(plain_before - plain_after) > 1.0f);
 
-    /* The inner keys keep their slopes, the keys their values */
     int32_t k;
     for (k = 1; k < 3; k ++) {
         box_curve_span_controls(&curve, k, &c1, &c2);
