@@ -1,12 +1,7 @@
 /**
  * @file particle/curves.c
-<<<<<<< HEAD
- * @brief Checks of the keyed curves of ParticleCurves, ParticleMotion and ParticleLight and their
- * validate hooks.
-=======
- * @brief Checks of the keyed curves of ParticleCurves, ParticleLight and ParticleTimeline and
- * their validate hooks.
->>>>>>> 3a518e63fed6c81879fc7d4cc46f55995ab6d204
+ * @brief Checks of the keyed curves of ParticleCurves, ParticleMotion, ParticleLight and
+ * ParticleTimeline and their validate hooks.
  */
 
 #include "curves.h"
