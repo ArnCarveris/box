@@ -4,8 +4,10 @@
  *
  * A headless world renders 1000 boxes lit by a sun into a 1280x720 offscreen surface on the
  * main thread and waits for the GPU after every frame, so a case measures a whole frame; the
- * cost of an effect is the difference with the case without effects. The 2160p cases render
- * into a 3840x2160 surface, where bloom halves the image twice before its first mip.
+ * cost of an effect is the difference with the case without effects.
+ *
+ * The 2160p cases render into a 3840x2160 surface, where bloom halves the image twice before
+ * it filters it into its first mip.
  */
 
 #include <box.h>

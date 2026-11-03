@@ -187,7 +187,7 @@ typedef struct box_gpu_measure_uniforms_t {
 typedef struct box_gpu_bloom_uniforms_t {
     float threshold[4];             /**< Threshold, threshold - knee, 2 knee, 0.25 / knee */
     float params[4];                /**< Firefly clamp, blend of the first mip, history blend */
-    float first[4];                 /**< Tap offset of the step into the first mip in uv */
+    float first[4];                 /**< Size of a texel of the first mip in uv */
 } box_gpu_bloom_uniforms_t;
 
 /** Uniforms of the SMAA passes, matching Smaa in etc/shaders/smaa.wgsl */
@@ -1112,10 +1112,10 @@ done:
 
 /** Make the mip chain of a bloom match the render size and its settings.
  *
- * The first mip is half the render size, or smaller when max_mip_dimension limits it. A
- * smaller first mip gets prefilter levels, the halvings of the image down to the last one that
- * is at most twice the first mip, so that no filter shrinks its input more than twice and a
- * small bright detail never falls between the taps.
+ * The first mip is half the render size, or smaller when max_mip_dimension limits it.
+ *
+ * A smaller first mip gets prefilter levels, the halvings of the image down to the last one
+ * at most twice the first mip, so no filter shrinks its input more than twice.
  *
  * @param gpu The backend
  * @param ctx The chain
@@ -1204,8 +1204,8 @@ static void box_gpu_fx_bloom_settings(
     out->params[0] = b->firefly_clamp;
     out->params[1] = box_gpu_fx_bloom_blend(b, 0, (float)(s->mip_count - 1));
     out->params[2] = s->history_valid ? b->temporal : 0.0f;
-    out->first[0] = 0.5f / (float)s->width;
-    out->first[1] = 0.5f / (float)s->height;
+    out->first[0] = 1.0f / (float)s->width;
+    out->first[1] = 1.0f / (float)s->height;
 }
 
 /** Blend the first mip of a bloom with the previous frame.
@@ -1251,6 +1251,8 @@ static WGPUTextureView box_gpu_fx_bloom_history(
 /** Record the passes of a bloom: halve the image, downsample it through the prefilter levels
  * into the mip chain, upsample back up and add the first mip to the image.
  *
+ * The first halving uses a cheaper filter when it is halved again, which smooths it further.
+ *
  * @param gpu The backend
  * @param ctx The chain
  * @param e The pass
@@ -1279,7 +1281,7 @@ static bool box_gpu_fx_bloom(
 
     box_gpu_fx_bloom_settings(s, b, &u);
     box_gpu_fx_uniforms(gpu, s, &u, sizeof(u));
-    pass.entry = "downsample_first";
+    pass.entry = s->prefilter_count > 1 ? "downsample_first_tent" : "downsample_first";
     pass.input = ctx->input;
     pass.output = s->prefilter_count ? s->prefilter_mips[0] : s->mips[0];
     if (!box_gpu_fx_draw(gpu, ctx, &pass)) {

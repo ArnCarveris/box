@@ -29,14 +29,12 @@ extern "C" {
 /** Glow around pixels brighter than the threshold.
  *
  * Every pixel is clamped against fireflies, weighted down by its brightness (Karis) and
- * thresholded on its own before the image is filtered to half its size, so the glow of a small
- * or thin bright detail stays the same as it moves across the pixels. The first mip is that
- * half size image, or when max_mip_dimension is smaller, the image halved again until one more
- * filter brings it to the first mip, so no filter shrinks its input more than twice. Each mip
- * is half the one above; upsampled back up, the first mip is added to the image with a cubic
- * B-spline. Past twice max_mip_dimension a render size adds passes: with the default 512, one
- * at 1280x720 and two at 2560x1440 and 3840x2160. The glow is stable in motion without
- * temporal, which only smooths it further at the cost of ghosting.
+ * thresholded before the image is halved, so the glow of a small or thin bright detail stays
+ * the same as it moves across the pixels, without temporal, which adds ghosting.
+ *
+ * The first mip is half the image or, past twice max_mip_dimension, the image halved until a
+ * B-spline filter brings it to that size: with the default 512, one extra pass at 1280x720 and
+ * two at 2560x1440 and 3840x2160. A cubic B-spline of the first mip is added to the image.
  */
 ECS_STRUCT(Bloom, {
     float intensity;                     /**< Blend into the image, default 0.3 */
