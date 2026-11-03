@@ -72,10 +72,10 @@ static ecs_entity_t sized_new(
     float end)
 {
     ecs_entity_t e = emitter_new(world);
-    ecs_add(world, e, ParticleCurves);
-    ParticleCurves *c = ecs_get_mut(world, e, ParticleCurves);
-    c->size = (ParticleCurve){0, 1, 2, end};
-    ecs_modified(world, e, ParticleCurves);
+    ecs_set(world, e, ParticleCurves, {
+        .size = { .keys = BOX_CURVE_KEYS(
+            {0, 0}, {1.0f / 3.0f, 1}, {2.0f / 3.0f, 2}, {1, end}) }
+    });
 
     return e;
 }
@@ -185,11 +185,11 @@ void CurveTable_block_reads_rows(void) {
     ecs_world_t *world = world_new(&null);
     ecs_entity_t e = emitter_new(world);
     ecs_set(world, e, ParticleCurves, {
-        .size = {1, 2, 3, 4},
-        .opacity = {0.5f, 0.5f, 0.5f, 0.5f},
-        .rotation = {0, 0, 0, 0},
-        .color = {{255, 255, 255}, {255, 255, 255}, {255, 255, 255}, {255, 255, 255}},
-        .spin = {1, 0, 0, 1}
+        .size = { .keys = BOX_CURVE_KEYS({0, 1}, {1.0f / 3.0f, 2}, {2.0f / 3.0f, 3}, {1, 4}) },
+        .opacity = { .keys = BOX_CURVE_KEYS({0, 0.5f}) },
+        .rotation = { .keys = BOX_CURVE_KEYS({0, 0}) },
+        .color = { .keys = BOX_VEC_VIEW(ParticleGradientKey, {0, {255, 255, 255}}) },
+        .spin = { .keys = BOX_CURVE_KEYS({0, 1}, {1.0f / 3.0f, 0}, {2.0f / 3.0f, 0}, {1, 1}) }
     });
     frame(world);
 
@@ -287,7 +287,7 @@ void CurveTable_change_rebakes(void) {
     test_uint(table_created(null), 0);
 
     ParticleCurves *c = ecs_get_mut(world, e, ParticleCurves);
-    c->size.end = 6;
+    ecs_vec_get_t(&c->size.keys, CurveKey, 3)->value = 6;
     ecs_modified(world, e, ParticleCurves);
     frame(world);
     test_int(stats_of(world).bakes, 2);
@@ -405,6 +405,156 @@ void CurveTable_growth_creates_table_again(void) {
         test_uint(pool->curves, BOX_RENDER_BUFFER_PARTICLE_CURVES);
         test_flt(size_at(world, pool, 1), 10.0f + (float)i);
     }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Run the world with the error log silenced, for curves the validate hook reports.
+ *
+ * @param world The world
+ */
+static void frame_quiet(
+    ecs_world_t *world)
+{
+    int32_t level = ecs_log_set_level(-4);
+    frame(world);
+    ecs_log_set_level(level);
+}
+
+void CurveTable_bad_curve_default(void) {
+    // particle/curve_table
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t e = emitter_new(world);
+    int32_t level = ecs_log_set_level(-4);
+    ecs_set(world, e, ParticleCurves, {
+        .size = { .keys = BOX_CURVE_KEYS({0, 3}, {1.5f, 4}) },
+        .opacity = { .keys = BOX_CURVE_KEYS({0.5f, 2}, {0.5f, 0}) },
+        .rotation = { .kind = (CurveKind)7, .keys = BOX_CURVE_KEYS({0, 1}, {1, 2}) },
+        .color = { .keys = BOX_VEC_VIEW(ParticleGradientKey,
+            {0, {255, 0, 0}}, {-0.5f, {0, 0, 255}}) },
+        .spin = { .keys = BOX_CURVE_KEYS({0, NAN}) }
+    });
+    ecs_log_set_level(level);
+    frame_quiet(world);
+
+    const box_render_particle_pool_t *pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    const box_render_particle_block_t *b = &pool->block;
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        test_uint(b->curve_rows[i], BOX_PARTICLE_CURVE_CONSTANT);
+    }
+
+    test_flt(b->curve_values[0], 1);
+    test_flt(b->curve_values[1], 1);
+    test_flt(b->curve_values[2], 0);
+    test_flt(b->curve_values[3], 1);
+    test_uint(b->gradient_row, BOX_PARTICLE_CURVE_CONSTANT);
+    for (i = 0; i < 3; i ++) {
+        test_flt(b->gradient[i], 1);
+    }
+
+    test_uint(pool->curves, 0);
+    test_int(stats_of(world).bakes, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void CurveTable_not_finite_default(void) {
+    // particle/curve_table
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t e = emitter_new(world);
+    ecs_set(world, e, ParticleCurves, {
+        .size = { .kind = CurveBezier,
+            .keys = BOX_CURVE_KEYS({0, 0, 0, 3e38f}, {1, 3e38f, -3e38f, 0}) },
+        .spin = { .kind = CurveCatmullRom,
+            .keys = BOX_CURVE_KEYS({0, -3e38f}, {0.5f, 3e38f}, {1, -3e38f}) }
+    });
+    frame_quiet(world);
+
+    const box_render_particle_pool_t *pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    const box_render_particle_block_t *b = &pool->block;
+    test_uint(b->curve_rows[0], BOX_PARTICLE_CURVE_CONSTANT);
+    test_flt(b->curve_values[0], 1);
+    test_uint(b->curve_rows[3], BOX_PARTICLE_CURVE_CONSTANT);
+    test_flt(b->curve_values[3], 1);
+    test_int(stats_of(world).bakes, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void CurveTable_one_key_constant(void) {
+    // particle/curve_table
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t e = emitter_new(world);
+    ecs_set(world, e, ParticleCurves, {
+        .size = { .kind = CurveCatmullRom, .keys = BOX_CURVE_KEYS({0.4f, 2.5f}) },
+        .opacity = { .kind = CurveCatmullRom,
+            .keys = BOX_CURVE_KEYS({0, 0.5f}, {0.3f, 0.5f}, {1, 0.5f}) },
+        .color = { .keys = BOX_VEC_VIEW(ParticleGradientKey, {0.5f, {255, 0, 0}}) }
+    });
+    frame(world);
+
+    const box_render_particle_pool_t *pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    const box_render_particle_block_t *b = &pool->block;
+    test_uint(b->curve_rows[0], BOX_PARTICLE_CURVE_CONSTANT);
+    test_flt(b->curve_values[0], 2.5f);
+    test_uint(b->curve_rows[1], BOX_PARTICLE_CURVE_CONSTANT);
+    test_flt(b->curve_values[1], 0.5f);
+    test_uint(b->gradient_row, BOX_PARTICLE_CURVE_CONSTANT);
+    test_flt(b->gradient[0], 1);
+    test_flt(b->gradient[1], 0);
+    test_flt(b->gradient[2], 0);
+    test_uint(pool->curves, 0);
+    test_int(stats_of(world).rows, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void CurveTable_kinds_bake_rows(void) {
+    // particle/curve_table
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    CurveKind kinds[3] = { CurveLinear, CurveCatmullRom, CurveBezier };
+    ecs_entity_t e[3];
+    int32_t k, i;
+    for (k = 0; k < 3; k ++) {
+        e[k] = emitter_new(world);
+        ecs_set(world, e[k], ParticleCurves, {
+            .size = { .kind = kinds[k],
+                .keys = BOX_CURVE_KEYS({0, 0, 0, 4}, {0.5f, 1}, {1, 0}) }
+        });
+    }
+
+    frame(world);
+    const float *table = box_render_particles_curve_table(box_render_particles_get(world), NULL);
+    test_assert(table != NULL);
+    for (k = 0; k < 3; k ++) {
+        const box_render_particle_pool_t *pool = pool_of(null, e[k]);
+        test_assert(pool != NULL);
+        const ParticleCurves *c = ecs_get(world, e[k], ParticleCurves);
+        float row[BOX_PARTICLE_CURVE_SAMPLES];
+        box_particle_curve_bake(&c->size, 1, row);
+        const float *sent = table + pool->block.curve_rows[0] * BOX_PARTICLE_CURVE_SAMPLES;
+        for (i = 0; i < BOX_PARTICLE_CURVE_SAMPLES; i ++) {
+            test_assert(sent[i] == row[i]);
+        }
+    }
+
+    test_assert(pool_of(null, e[0])->block.curve_rows[0] !=
+        pool_of(null, e[1])->block.curve_rows[0]);
+    test_assert(pool_of(null, e[1])->block.curve_rows[0] !=
+        pool_of(null, e[2])->block.curve_rows[0]);
+    test_int(stats_of(world).entries, 3);
 
     ecs_fini(world);
     box_render_null_free(null);

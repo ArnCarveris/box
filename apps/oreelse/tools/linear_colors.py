@@ -23,8 +23,9 @@ also ran over apps/oreelse/test/visual); the scan still lists the UI's health ba
 etc/config.flecs, which stay as they are. What counts as a color literal: three integers, or
 four with an alpha (rgba) or strength (Tint) that stays as it is, in braces, positional or
 named r, g, b, a, that are
-  - the value of a color component or member: Rgb, Tint, color, and the keys start, early,
-    late and end of a ParticleGradient (inside color), the live, dead, warn and ok of
+  - the value of a color component or member: Rgb, Tint, color, and the color of each
+    {time, {r, g, b}} key of a ParticleGradient (inside color: {keys: [...]}, before the
+    keyed curves the keys start, early, late and end), the live, dead, warn and ok of
     OreStatusLamp, and the props of the templates declared with a color type (the Light's
     dead, warn and ok, the tints of the deposits and the flora, the astronaut's suit);
   - the value of a constant or prop declared with a color type: Rgb, rgb, rgba, Tint;
@@ -134,6 +135,9 @@ def is_color(group):
         return True
     if group.kind == "key" and group.name in GRADIENT_KEYS:
         return parent is not None and parent.kind == "key" and parent.name == "color"
+    if group.kind == "pos" and parent is not None and parent.kind in ("other", "pos"):
+        grand = parent.parent
+        return grand is not None and grand.kind == "key" and grand.name == "color"
     if group.kind == "key" and parent is not None and parent.kind == "match":
         return parent.name in COLOR_TYPES
     if group.kind == "pos" and parent is not None and parent.kind == "key":

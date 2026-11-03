@@ -158,11 +158,12 @@ void Particle_smoke_fill(
     p->opacity = (ParticleRange){0.05f, 0.15f};
     ecs_modified(world, e, ParticleEmitter);
     ecs_set(world, e, ParticleCurves, {
-        .size = {0.5f, 1, 1.3f, 1.5f},
-        .opacity = {0, 1, 1, 0},
-        .rotation = {0, 0, 0, 0},
-        .color = {{230, 230, 230}, {200, 200, 200}, {160, 160, 160}, {120, 120, 120}},
-        .spin = {1, 1, 1, 1}
+        .size = { .keys = BOX_CURVE_KEYS(
+            {0, 0.5f}, {1.0f / 3.0f, 1}, {2.0f / 3.0f, 1.3f}, {1, 1.5f}) },
+        .opacity = { .keys = BOX_CURVE_KEYS({0, 0}, {1.0f / 3.0f, 1}, {2.0f / 3.0f, 1}, {1, 0}) },
+        .color = { .keys = BOX_VEC_VIEW(ParticleGradientKey,
+            {0, {230, 230, 230}}, {1.0f / 3.0f, {200, 200, 200}},
+            {2.0f / 3.0f, {160, 160, 160}}, {1, {120, 120, 120}}) }
     });
     ecs_set(world, e, ParticleAppearance, {.softness = 0.5f, .lit = 0.5f});
     ecs_entity_t surface = ecs_new(world);

@@ -42,9 +42,13 @@ sparks {
     acceleration: {0, -2500, 0}, color: {255, 230, 180}, seed: 5
   }
   ParticleCurves: {
-    opacity: {1, 1, 0.8, 0},
-    color: {start: {255, 255, 255}, early: {255, 220, 140}, late: {255, 140, 50},
-      end: {200, 60, 20}}
+    opacity: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 0.8}, {1, 0}]},
+    color: {keys: [
+      {0, {255, 255, 255}},
+      {0.33333334, {255, 220, 140}},
+      {0.6666667, {255, 140, 50}},
+      {1, {200, 60, 20}}
+    ]}
   }
   ParticleAppearance: {blend: ParticleAdditive, stretch: 0.04}
 }

@@ -7,6 +7,7 @@
 #include <box.h>
 #include "../render/render.h"
 #include "effect.h"
+#include "curves.h"
 
 /** Construct ParticleEmitter values: a white stream of 1000 particles that rise at 1 unit per
  * second for 1 to 2 seconds.
@@ -82,35 +83,8 @@ static void box_particle_collision_ctor(
     }
 }
 
-/** Construct ParticleCurves values that change nothing: multipliers of 1, no added turns and a
- * white gradient.
- *
- * @param ptr The components
- * @param count Number of components
- * @param ti Type info
- */
-static void box_particle_curves_ctor(
-    void *ptr,
-    int32_t count,
-    const ecs_type_info_t *ti)
-{
-    ParticleCurves *values = ptr;
-    int32_t i;
-    (void)ti;
-    for (i = 0; i < count; i ++) {
-        values[i] = (ParticleCurves){
-            .size = { 1.0f, 1.0f, 1.0f, 1.0f },
-            .opacity = { 1.0f, 1.0f, 1.0f, 1.0f },
-            .color = {
-                {255, 255, 255}, {255, 255, 255}, {255, 255, 255}, {255, 255, 255}
-            },
-            .spin = { 1.0f, 1.0f, 1.0f, 1.0f }
-        };
-    }
-}
-
-/** Construct ParticleLight values: a light at intensity 1 while the emitter plays, without a
- * curve, that goes dark at once when it stops.
+/** Construct ParticleLight values: a light at intensity 1 while the emitter plays, with a curve
+ * without keys, that goes dark at once when it stops.
  *
  * @param ptr The components
  * @param count Number of components
@@ -125,10 +99,7 @@ static void box_particle_light_ctor(
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
-        values[i] = (ParticleLight){
-            .intensity = 1.0f,
-            .curve = { 1.0f, 1.0f, 1.0f, 1.0f }
-        };
+        values[i] = (ParticleLight){ .intensity = 1.0f };
     }
 }
 
@@ -137,6 +108,7 @@ void BoxParticleImport(
 {
     ECS_MODULE(world, BoxParticle);
     ECS_IMPORT(world, BoxTypes);
+    ECS_IMPORT(world, BoxCurve);
     ECS_IMPORT(world, BoxTransform);
     ECS_IMPORT(world, BoxGeometry);
     ECS_IMPORT(world, BoxView);
@@ -155,12 +127,23 @@ void BoxParticleImport(
     ECS_META_COMPONENT(world, ParticlePlayback);
     ECS_META_COMPONENT(world, ParticleBurst);
     ECS_META_COMPONENT(world, ParticleCurve);
+    box_owned_hooks(world, ParticleCurve, BOX_OWNED_VEC(ParticleCurve, keys, CurveKey));
     ECS_META_COMPONENT(world, ParticleLight);
+    box_owned_hooks(world, ParticleLight, BOX_OWNED_CURVE(ParticleLight, curve));
     ecs_set_hooks(world, ParticleLight, { .ctor = box_particle_light_ctor });
     ECS_META_COMPONENT(world, EffectFlash);
+    ECS_META_COMPONENT(world, ParticleGradientKey);
     ECS_META_COMPONENT(world, ParticleGradient);
+    box_owned_hooks(world, ParticleGradient,
+        BOX_OWNED_VEC(ParticleGradient, keys, ParticleGradientKey));
     ECS_META_COMPONENT(world, ParticleCurves);
-    ecs_set_hooks(world, ParticleCurves, { .ctor = box_particle_curves_ctor });
+    box_owned_hooks(world, ParticleCurves,
+        BOX_OWNED_CURVE(ParticleCurves, size),
+        BOX_OWNED_CURVE(ParticleCurves, opacity),
+        BOX_OWNED_CURVE(ParticleCurves, rotation),
+        BOX_OWNED_VEC(ParticleCurves, color.keys, ParticleGradientKey),
+        BOX_OWNED_CURVE(ParticleCurves, spin));
+    box_particle_curves_import(world);
     ECS_META_COMPONENT(world, ParticleShape);
     ECS_META_COMPONENT(world, ParticleBlend);
     ECS_META_COMPONENT(world, ParticleAppearance);

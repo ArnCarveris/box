@@ -42,9 +42,13 @@ jet {
   Position: {-2.5, -1, 0}
   Jet: {seed: 3}
   ParticleCurves: {
-    size: {0.5, 1.6, 1.6, 0.4},
-    color: {start: {255, 255, 255}, early: {255, 220, 60}, late: {255, 90, 20},
-      end: {120, 20, 10}}
+    size: {keys: [{0, 0.5}, {0.33333334, 1.6}, {0.6666667, 1.6}, {1, 0.4}]},
+    color: {keys: [
+      {0, {255, 255, 255}},
+      {0.33333334, {255, 220, 60}},
+      {0.6666667, {255, 90, 20}},
+      {1, {120, 20, 10}}
+    ]}
   }
 }
 
@@ -57,9 +61,13 @@ twin_a {
   Position: {2, -1, 0}
   Jet: {seed: 7}
   ParticleCurves: {
-    opacity: {1, 1, 0.8, 0.2},
-    color: {start: {255, 40, 220}, early: {200, 80, 255}, late: {80, 160, 255},
-      end: {40, 255, 255}}
+    opacity: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 0.8}, {1, 0.2}]},
+    color: {keys: [
+      {0, {255, 40, 220}},
+      {0.33333334, {200, 80, 255}},
+      {0.6666667, {80, 160, 255}},
+      {1, {40, 255, 255}}
+    ]}
   }
 }
 
@@ -67,9 +75,13 @@ twin_b {
   Position: {3, -1, 0}
   Jet: {seed: 9}
   ParticleCurves: {
-    opacity: {1, 1, 0.8, 0.2},
-    color: {start: {255, 40, 220}, early: {200, 80, 255}, late: {80, 160, 255},
-      end: {40, 255, 255}}
+    opacity: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 0.8}, {1, 0.2}]},
+    color: {keys: [
+      {0, {255, 40, 220}},
+      {0.33333334, {200, 80, 255}},
+      {0.6666667, {80, 160, 255}},
+      {1, {40, 255, 255}}
+    ]}
   }
 }
 
@@ -83,38 +95,84 @@ filler_6 { Filler: {} }
 change_jet {
   SetAt: {frame: 1, entity: jet}
   ParticleCurves: {
-    size: {0.5, 1.6, 1.6, 0.4},
-    color: {start: {200, 255, 200}, early: {60, 255, 80}, late: {20, 160, 255},
-      end: {10, 30, 160}}
+    size: {keys: [{0, 0.5}, {0.33333334, 1.6}, {0.6666667, 1.6}, {1, 0.4}]},
+    color: {keys: [
+      {0, {200, 255, 200}},
+      {0.33333334, {60, 255, 80}},
+      {0.6666667, {20, 160, 255}},
+      {1, {10, 30, 160}}
+    ]}
   }
 }
 
 change_1 {
   SetAt: {frame: 1, entity: filler_1}
-  ParticleCurves: {color: {start: {255, 0, 0}, end: {0, 0, 0}}}
+  ParticleCurves: {
+    color: {keys: [
+      {0, {255, 0, 0}},
+      {0.33333334, {255, 255, 255}},
+      {0.6666667, {255, 255, 255}},
+      {1, {0, 0, 0}}
+    ]}
+  }
 }
 
 change_2 {
   SetAt: {frame: 1, entity: filler_2}
-  ParticleCurves: {color: {start: {0, 255, 0}, end: {0, 0, 0}}}
+  ParticleCurves: {
+    color: {keys: [
+      {0, {0, 255, 0}},
+      {0.33333334, {255, 255, 255}},
+      {0.6666667, {255, 255, 255}},
+      {1, {0, 0, 0}}
+    ]}
+  }
 }
 
 change_3 {
   SetAt: {frame: 1, entity: filler_3}
-  ParticleCurves: {color: {start: {0, 0, 255}, end: {0, 0, 0}}}
+  ParticleCurves: {
+    color: {keys: [
+      {0, {0, 0, 255}},
+      {0.33333334, {255, 255, 255}},
+      {0.6666667, {255, 255, 255}},
+      {1, {0, 0, 0}}
+    ]}
+  }
 }
 
 change_4 {
   SetAt: {frame: 1, entity: filler_4}
-  ParticleCurves: {color: {start: {255, 255, 0}, end: {0, 0, 0}}}
+  ParticleCurves: {
+    color: {keys: [
+      {0, {255, 255, 0}},
+      {0.33333334, {255, 255, 255}},
+      {0.6666667, {255, 255, 255}},
+      {1, {0, 0, 0}}
+    ]}
+  }
 }
 
 change_5 {
   SetAt: {frame: 1, entity: filler_5}
-  ParticleCurves: {color: {start: {0, 255, 255}, end: {0, 0, 0}}}
+  ParticleCurves: {
+    color: {keys: [
+      {0, {0, 255, 255}},
+      {0.33333334, {255, 255, 255}},
+      {0.6666667, {255, 255, 255}},
+      {1, {0, 0, 0}}
+    ]}
+  }
 }
 
 change_6 {
   SetAt: {frame: 1, entity: filler_6}
-  ParticleCurves: {color: {start: {255, 0, 255}, end: {0, 0, 0}}}
+  ParticleCurves: {
+    color: {keys: [
+      {0, {255, 0, 255}},
+      {0.33333334, {255, 255, 255}},
+      {0.6666667, {255, 255, 255}},
+      {1, {0, 0, 0}}
+    ]}
+  }
 }

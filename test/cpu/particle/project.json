@@ -161,6 +161,42 @@
                 ]
             },
             {
+                "id": "CurveKeys",
+                "testcases": [
+                    "uneven_keys",
+                    "kind_linear",
+                    "kind_catmull_rom",
+                    "kind_bezier",
+                    "one_key",
+                    "no_keys",
+                    "keys_hold_outside",
+                    "spin_area_uneven",
+                    "spin_area_each_kind",
+                    "spin_area_one_and_no_key",
+                    "gradient_uneven",
+                    "gradient_each_kind",
+                    "gradient_one_and_no_key",
+                    "overshoot_clamps",
+                    "error_none",
+                    "error_kind",
+                    "error_time_not_finite",
+                    "error_value_not_finite",
+                    "error_slope_not_finite",
+                    "error_not_increasing",
+                    "error_time_outside",
+                    "error_gradient_kind",
+                    "error_gradient_not_increasing",
+                    "error_gradient_time_outside",
+                    "error_light",
+                    "error_script",
+                    "prefab_inherit",
+                    "instance_override",
+                    "copy_delete_no_leak",
+                    "effect_instance",
+                    "script_reload"
+                ]
+            },
+            {
                 "id": "CurveTable",
                 "testcases": [
                     "block_reads_rows",
@@ -169,7 +205,11 @@
                     "change_rebakes",
                     "no_curves_no_rows",
                     "delete_frees_rows",
-                    "growth_creates_table_again"
+                    "growth_creates_table_again",
+                    "bad_curve_default",
+                    "not_finite_default",
+                    "one_key_constant",
+                    "kinds_bake_rows"
                 ]
             },
             {
@@ -238,7 +278,10 @@
                     "lights_same_frame",
                     "prefab_instance_own_light",
                     "effect_layers_own_lights",
-                    "goes_out_with_entity"
+                    "goes_out_with_entity",
+                    "curve_kinds_once",
+                    "curve_kinds_loop",
+                    "bad_curve_is_one"
                 ]
             },
             {

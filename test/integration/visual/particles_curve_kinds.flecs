@@ -1,0 +1,73 @@
+// The kinds of keyed particle curves: three jets with the same uneven keys for size, opacity and
+// color, from left to right CurveLinear, CurveCatmullRom and CurveBezier. The linear jet has
+// straight flanks with sharp corners at the keys, the Catmull-Rom one bulges smoothly through
+// the keys and dips a little past its narrow waist, and the Bezier one leaves its first key
+// steeply and swells again right after the waist along its slopes. The gradients blend white,
+// gold, red and violet with the kind of their jet.
+using box.transform
+using box.camera
+using box.view
+using box.curve
+using box.particle
+
+camera {
+  Position: {0, 2, 9}
+  Rotation: {-0.12, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {20, 22, 30, 255}}}
+}
+
+template Jet {
+  prop seed = 1
+
+  ParticleEmitter: {
+    max: 600, rate: 12000, shape: EmitterDisc, radius: 0.1, spread: 4,
+    speed: {70, 80}, lifetime: {0.045, 0.05}, size: {0.3, 0.35}, opacity: {1, 1},
+    color: {255, 255, 255}, seed: seed
+  }
+  ParticleAppearance: {}
+}
+
+linear {
+  Position: {-2.5, -1, 0}
+  Jet: {seed: 3}
+  ParticleCurves: {
+    size: {keys: [{0, 0.3}, {0.2, 2.2}, {0.55, 0.2}, {1, 1.6}]}
+    opacity: {keys: [{0, 0}, {0.1, 1}, {0.8, 1}, {1, 0}]}
+    color: {keys: [
+      {0, {255, 255, 255}}, {0.3, {255, 200, 40}}, {0.6, {255, 60, 20}}, {1, {120, 40, 255}}
+    ]}
+  }
+}
+
+catmull_rom {
+  Position: {0, -1, 0}
+  Jet: {seed: 5}
+  ParticleCurves: {
+    size: {kind: CurveCatmullRom, keys: [{0, 0.3}, {0.2, 2.2}, {0.55, 0.2}, {1, 1.6}]}
+    opacity: {kind: CurveCatmullRom, keys: [{0, 0}, {0.1, 1}, {0.8, 1}, {1, 0}]}
+    color: {kind: CurveCatmullRom, keys: [
+      {0, {255, 255, 255}}, {0.3, {255, 200, 40}}, {0.6, {255, 60, 20}}, {1, {120, 40, 255}}
+    ]}
+  }
+}
+
+bezier {
+  Position: {2.5, -1, 0}
+  Jet: {seed: 7}
+  ParticleCurves: {
+    size: {kind: CurveBezier, keys: [
+      {time: 0, value: 0.3, out: 20},
+      {time: 0.2, value: 2.2},
+      {time: 0.55, value: 0.2, in: -4, out: 6},
+      {time: 1, value: 1.6, in: -2}
+    ]}
+    opacity: {kind: CurveBezier, keys: [{0, 0, 0, 20}, {0.1, 1}, {0.8, 1}, {1, 0}]}
+    color: {kind: CurveBezier, keys: [
+      {0, {255, 255, 255}}, {0.3, {255, 200, 40}}, {0.6, {255, 60, 20}}, {1, {120, 40, 255}}
+    ]}
+  }
+}

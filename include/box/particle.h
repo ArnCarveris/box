@@ -177,20 +177,24 @@ ECS_STRUCT(ParticleBurst, {
                              *   long as the emitter plays, default 0 */
 });
 
-/** Four keys of a value over the life of a particle, at normalized age 0, 1/3, 2/3 and 1,
- * linear between two keys; a curve naming one value four times is a constant */
+/** A value over the life of a particle, the kind and keys of a Curve with times from 0 at birth
+ * to 1 at death: {kind: CurveCatmullRom, keys: [{0, 0.3}, {0.4, 1.8}, {1, 2.2}]}. Without keys
+ * it is the default of its field, one key is a constant, and outside the keys it holds the ends.
+ *
+ * Baked to 64 samples, a sharp change softens over 1/63 of the life. A bad kind, a number that is
+ * not finite or times that do not increase strictly from 0 to 1 log an error naming the entity,
+ * component, field and key, and the curve draws as the default of its field.
+ */
 ECS_STRUCT(ParticleCurve, {
-    float start;            /**< Value at birth */
-    float early;            /**< Value at a third of the life */
-    float late;             /**< Value at two thirds of the life */
-    float end;              /**< Value at death */
+    CurveKind kind;         /**< Shape of the spans, default CurveLinear */
+    ecs_vec(CurveKey) keys; /**< Keys in order of strictly increasing time from 0 to 1 */
 });
 
 /** Drives the intensity of the PointLight or SpotLight of a ParticleEmitter entity from its
  * playback, written by the render extract every frame before the lights are collected.
  *
  * While it plays the light has intensity, times the curve over period seconds of the playback
- * clock when period is above 0, once and then its end key, or with loop. Paused holds the light,
+ * clock when period is above 0, once and then its last key, or with loop. Paused holds the light,
  * stopped fades it linearly to zero over fade seconds of stopped frames, playing restarts it.
  *
  * Every emitter of an effect instance, root and layers, drives the light it owns, the copy of
@@ -198,8 +202,9 @@ ECS_STRUCT(ParticleCurve, {
  */
 ECS_STRUCT(ParticleLight, {
     float intensity;        /**< Intensity of the light while the emitter plays, default 1 */
-    ParticleCurve curve;    /**< Multiplier of the intensity over period, its keys at 0, 1/3,
-                             *   2/3 and 1 of it, default 1 */
+    ParticleCurve curve;    /**< Multiplier of the intensity over period, its times from 0 to
+                             *   1 of it, evaluated exactly by box_curve_value; no keys or a
+                             *   bad curve for 1 */
     float period;           /**< Seconds of the playback clock the curve spans, default 0 for
                              *   no curve */
     bool loop;              /**< Repeat the curve every period, default false for once */
@@ -221,20 +226,31 @@ ECS_STRUCT(EffectFlash, {
                              *   a second */
 });
 
-/** Four display encoded colors over the life of a particle, at the keys of ParticleCurve,
- * blended in linear light between two keys */
-ECS_STRUCT(ParticleGradient, {
-    rgb start;              /**< Color at birth */
-    rgb early;              /**< Color at a third of the life */
-    rgb late;               /**< Color at two thirds of the life */
-    rgb end;                /**< Color at death */
+/** Key of a ParticleGradient. In script {time, color} or {time: 0.5, color: {255, 128, 0}}. */
+ECS_STRUCT(ParticleGradientKey, {
+    float time;             /**< Normalized age of the key, 0 to 1, after the previous key */
+    rgb color;              /**< Display encoded color at the time */
 });
 
-/** How the particles of an emitter change over their life, evaluated on the GPU.
+/** Colors over the life of a particle, blended in linear light: each channel of the linear
+ * colors of the keys is a Curve of kind, CurveBezier with flat slopes at the keys. In script
+ * {kind: CurveCatmullRom, keys: [{0, {255, 220, 60}}, {0.6, {255, 90, 20}}, {1, {120, 20, 10}}]}.
+ *
+ * Without keys it is white, one key is a constant, and keys follow the rules of ParticleCurve.
+ */
+ECS_STRUCT(ParticleGradient, {
+    CurveKind kind;         /**< Shape of the spans of every channel, default CurveLinear */
+    ecs_vec(ParticleGradientKey) keys; /**< Keys in order of strictly increasing time from 0
+                             *   to 1 */
+});
+
+/** How the particles of an emitter change over their life, evaluated on the GPU, for example
+ * {opacity: {keys: [{0, 0}, {0.1, 1}, {1, 0}]}, size: {kind: CurveCatmullRom, keys: [{0, 0.3},
+ * {1, 2.2}]}}. It owns its keys, so copies, prefabs, IsA and effect instances have their own.
  *
  * Every curve multiplies the value a particle spawned with except rotation, which adds turns.
- * The ctor sets the multipliers to 1, rotation to 0 and the gradient to white, so
- * `ParticleCurves: {}` changes nothing.
+ * Without keys a curve is the default of its field, so `ParticleCurves: {}` changes nothing.
+ * Size, opacity and color clamp at 0 where a curve overshoots; rotation and spin may go negative.
  */
 ECS_STRUCT(ParticleCurves, {
     ParticleCurve size;     /**< Multiplier of the size, default 1 */
