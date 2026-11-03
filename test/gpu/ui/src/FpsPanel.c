@@ -1,12 +1,13 @@
 /**
  * @file FpsPanel.c
  * @brief The fps panel renders after the editor and before the console when all three are open,
- * in the top right corner of the surface, its chart red for frames slower than 30 fps, and clicks
- * and the mouse wheel over it go to the game.
+ * in the top right corner of the surface, its bars green, yellow and red by frame time with a gap
+ * between them, and clicks and the mouse wheel over it go to the game.
  */
 
 #include <box.h>
 #include <bake_test.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include "render.h"
@@ -154,6 +155,25 @@ static bool fps_pixel(
     return abs((int)p[0] - c.r) < 4 && abs((int)p[1] - c.g) < 4 && abs((int)p[2] - c.b) < 4;
 }
 
+/** Get the edges of the chart on the surface in pixels: the panel is at the top right of the
+ * surface, its heading above the chart, as etc/fps/fps.flecs lays them out.
+ *
+ * @param world The world
+ * @param left Receives the column of the left edge of the chart
+ * @param bottom Receives the row below the bottom edge of the chart
+ */
+static void fps_chart_edges(
+    ecs_world_t *world,
+    int32_t *left,
+    int32_t *bottom)
+{
+    const UiTheme *t = ecs_get(world, ecs_lookup(world, "box.ui.theme"), UiTheme);
+    test_assert(t != NULL);
+    float top = BOX_FPS_MARGIN + t->padding + ceilf(t->font_size * 1.4f) + t->spacing / 2;
+    left[0] = (int32_t)(FPS_W - BOX_FPS_MARGIN - t->padding - BOX_FPS_CHART_WIDTH);
+    bottom[0] = (int32_t)(top + BOX_FPS_CHART_HEIGHT);
+}
+
 /** Check the order of the views: the game, the editor, the fps panel, the console.
  *
  * @param world The world
@@ -185,8 +205,10 @@ void FpsPanel_between_editor_and_console(void) {
     fps_check_order(world, game);
 
     rgb red = BOX_FPS_RED;
+    int32_t left, bottom;
+    fps_chart_edges(world, &left, &bottom);
     unsigned char *px = fps_render(world, "fps_stack.png");
-    test_assert(fps_pixel(px, 600, 80, (Rgb){red.r, red.g, red.b}));
+    test_assert(fps_pixel(px, left + 114 * 4 + 2, bottom - 5, (Rgb){red.r, red.g, red.b}));
     test_assert(fps_pixel(px, 315, 80, (Rgb){200, 0, 0}));
     test_assert(fps_pixel(px, 100, 300, (Rgb){200, 0, 0}));
     test_assert(!fps_pixel(px, 600, 300, (Rgb){0, 0, 255}));
@@ -306,6 +328,55 @@ void FpsPanel_scroll_reaches_game(void) {
     test_assert(!fps_in_scope(world, status->handler, BOX_FPS_UI));
     test_flt(scroll, 3);
     test_int(((const Mut*)ecs_get_id(world, wall, mut))->scrolls, 1);
+
+    ecs_fini(world);
+}
+
+/* A bar fills the last 3 columns of its slot from the bottom up to its height; the first column
+ * of the slot is the gap and above the bar is the panel. */
+void FpsPanel_bar_colors(void) {
+    // fps/panel
+    ecs_entity_t game;
+    ecs_world_t *world = fps_world("fps_bars.png", &game);
+    FrameSamples *samples = ecs_singleton_get_mut(world, FrameSamples);
+    samples->count = 0;
+    samples->next = 0;
+    for (int32_t i = 0; i < BOX_FPS_BARS; i ++) {
+        box_frame_samples_add(samples, i < 40 ? 10.0 : (i < 80 ? 25.0 : 45.0));
+    }
+
+    ecs_singleton_modified(world, FrameSamples);
+    FpsPanel *p = ecs_singleton_get_mut(world, FpsPanel);
+    p->open = true;
+    ecs_singleton_modified(world, FpsPanel);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    const UiTheme *t = ecs_get(world, ecs_lookup(world, "box.ui.theme"), UiTheme);
+    Rgb surface = t->surface;
+    rgb green = BOX_FPS_GREEN, yellow = BOX_FPS_YELLOW, red = BOX_FPS_RED;
+    Rgb colors[] = {
+        {green.r, green.g, green.b}, {yellow.r, yellow.g, yellow.b}, {red.r, red.g, red.b}
+    };
+    float heights[] = { 12, 30, 54 };
+    int32_t left, bottom;
+    fps_chart_edges(world, &left, &bottom);
+    unsigned char *px = fps_render(world, "fps_bars.png");
+    for (int32_t g = 0; g < 3; g ++) {
+        for (int32_t i = g * 40 + 2; i < g * 40 + 38; i += 7) {
+            int32_t x = left + i * (int32_t)BOX_FPS_BAR_SLOT;
+            int32_t top = bottom - (int32_t)heights[g];
+            test_assert(fps_pixel(px, x + 1, bottom - 2, colors[g]));
+            test_assert(fps_pixel(px, x + 2, bottom - 2, colors[g]));
+            test_assert(fps_pixel(px, x + 3, bottom - 2, colors[g]));
+            test_assert(fps_pixel(px, x + 2, top + 2, colors[g]));
+            test_assert(!fps_pixel(px, x, bottom - 2, colors[g]));
+            test_assert(fps_pixel(px, x, bottom - 2, surface));
+            test_assert(!fps_pixel(px, x + 2, top - 3, colors[g]));
+        }
+    }
+
+    stbi_image_free(px);
 
     ecs_fini(world);
 }
