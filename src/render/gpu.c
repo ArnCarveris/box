@@ -772,6 +772,9 @@ void box_gpu_stats_publish(
     s->copies_direct += p->copies_direct;
     s->copies_staged += p->copies_staged;
     s->copy_staging = (int64_t)gpu->copy_staging_size;
+    s->blend_bytes = (int64_t)gpu->blend_bytes;
+    s->blend_arrays += p->blend_arrays;
+    s->blend_builds += p->blend_builds;
     if (s->copy_staging > s->copy_staging_peak) {
         s->copy_staging_peak = s->copy_staging;
     }

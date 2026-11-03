@@ -544,6 +544,32 @@ static void BoxDrawsOnLightBake(
     }
 }
 
+ecs_entity_t box_draws_blend_owner(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const box_draw_key_t *key)
+{
+    ecs_entity_t result = 0;
+    const TextureMapping *mapping;
+    if (key->pipeline != BOX_RENDER_SHADER_MESH || key->blend != Opaque || key->cutout ||
+        key->transmissive || !ecs_id_in_use(world, ecs_id(TextureBlend)) ||
+        !ecs_get(world, e, TextureBlend))
+    {
+        goto done;
+    }
+
+    mapping = ecs_get(world, e, TextureMapping);
+    if (mapping && mapping->mode != MappingUv && isfinite(mapping->blend) &&
+        mapping->blend > 0.0f)
+    {
+        goto done;
+    }
+
+    result = ecs_get_target_for_id(world, e, EcsIsA, ecs_id(TextureBlend));
+done:
+    return result;
+}
+
 /** Compute the batch key of a shape.
  *
  * A shape under an active Opacity transition (TransitionOpacity) is keyed as if its alpha were
@@ -607,6 +633,14 @@ static void box_draws_key(
         key->blend = AlphaBlend;
         key->cutout = false;
         key->shadow = false;
+    }
+
+    ecs_entity_t blend = shape2d ? 0 : box_draws_blend_owner(world, e, key);
+    if (blend) {
+        key->texture_blend = true;
+        key->textures[0] = blend;
+        key->textures[2] = 0;
+        key->textures[3] = 0;
     }
 
     key->bake = !shape2d && key->blend == Opaque && !ecs_has_id(world, e, DynamicTransform) &&
@@ -958,6 +992,14 @@ static void box_draws_material_observers(
     box_draws_observer(world, d, "DrawsOnPbrTextures", (ecs_observer_desc_t){
         .query.terms = {{
             .id = ecs_id(PbrTextures),
+            .src.id = EcsSelf | EcsUp,
+            .trav = EcsIsA
+        }},
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShading);
+
+    box_draws_observer(world, d, "DrawsOnTextureBlend", (ecs_observer_desc_t){
+        .query.terms = {{
+            .id = ecs_id(TextureBlend),
             .src.id = EcsSelf | EcsUp,
             .trav = EcsIsA
         }},

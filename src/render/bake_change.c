@@ -322,6 +322,61 @@ done:
     return;
 }
 
+/** Remember the static shapes whose TextureBlend uses an entity as its mask or a layer.
+ *
+ * @param world The world
+ * @param b The state
+ * @param e The entity
+ */
+static void box_bake_record_blends(
+    const ecs_world_t *world,
+    box_render_bake_t *b,
+    ecs_entity_t e)
+{
+    ecs_iter_t it = ecs_query_iter(world, b->blends);
+    int32_t i, k;
+    while (ecs_query_next(&it)) {
+        const TextureBlend *blends = ecs_field(&it, TextureBlend, 0);
+        bool self = ecs_field_is_self(&it, 0);
+        for (i = 0; i < it.count; i ++) {
+            const TextureBlend *blend = &blends[self ? i : 0];
+            bool used = blend->mask == e;
+            for (k = 0; k < 4; k ++) {
+                used |= blend->layers[k] == e;
+            }
+
+            if (used && box_bake_captured_but(world, it.table, it.entities[i], 0)) {
+                box_bake_record(world, b, it.entities[i], false, false);
+            }
+        }
+    }
+}
+
+/** Remember the static shapes whose TextureBlend has a changed entity as a layer: its
+ * PbrTextures or TextureTransform changed what the captures see of them. Nothing counts once
+ * the world quits, as for BakeOnChange.
+ *
+ * @param it The iterator of the observer
+ */
+static void BakeOnLayer(
+    ecs_iter_t *it)
+{
+    box_render_bake_t *b = it->ctx;
+    int32_t i;
+    if (ecs_should_quit(it->world) || !box_bake_recording(b) || !b->blends ||
+        !ecs_id_in_use(it->world, ecs_id(TextureBlend)))
+    {
+        goto done;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        box_bake_record_blends(it->world, b, it->entities[i]);
+    }
+
+done:
+    return;
+}
+
 /** Remember an entity and the static shapes below it, whose look an Opacity changed.
  *
  * @param world The world
@@ -783,6 +838,9 @@ void box_bake_lights(
  * AlphaCutoff and Transmission also when they are added, as its holes change what the captures
  * see and a transmissive shape leaves them.
  *
+ * A TextureBlend counts like PbrTextures, and so does a change of the PbrTextures or
+ * TextureTransform of an entity that is a layer of one.
+ *
  * The terms take the default source, so the change of a material component of a prefab
  * reaches the instances that inherit it.
  *
@@ -847,5 +905,38 @@ void box_bake_observers(
         .callback = BakeOnChange,
         .ctx = b
     });
+    ecs_observer(world, {
+        .query.terms = {{
+            .id = ecs_id(TextureBlend),
+            .src.id = EcsSelf | EcsUp,
+            .trav = EcsIsA
+        }},
+        .events = { EcsOnSet, EcsOnRemove },
+        .callback = BakeOnChange,
+        .ctx = b
+    });
+
+    b->blends = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "RenderBakeBlends" }),
+        .terms = {
+            {
+                .id = ecs_id(TextureBlend),
+                .src.id = EcsSelf | EcsUp,
+                .trav = EcsIsA,
+                .inout = EcsIn
+            },
+            { .id = ecs_id(ShapeMesh), .inout = EcsInOutNone }
+        }
+    });
+    ecs_entity_t layers[2] = { ecs_id(PbrTextures), ecs_id(TextureTransform) };
+    for (i = 0; i < 2; i ++) {
+        ecs_observer(world, {
+            .query.terms = {{ .id = layers[i] }},
+            .events = { EcsOnSet, EcsOnRemove },
+            .callback = BakeOnLayer,
+            .ctx = b
+        });
+    }
+
     box_transform_on_moved(world, box_bake_on_moved, b, NULL);
 }

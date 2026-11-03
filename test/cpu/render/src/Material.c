@@ -1636,3 +1636,366 @@ void Material_texture_mapping_world_ids(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+/** RGB PNG of 4 by 2 pixels, an image a layer of a TextureBlend samples */
+#define BLEND_RGB_PNG "test/assets/textures/rgb.png"
+
+/** Grayscale PNG of 4 by 2 pixels, another image of a layer */
+#define BLEND_GRAY_PNG "test/assets/textures/gray.png"
+
+/** RGB mask PNG, the mask of a TextureBlend */
+#define BLEND_MASK_PNG "test/assets/textures/mask_rgb.png"
+
+/** Create a headless world with a null backend and a view, whose texture loads complete.
+ *
+ * @param null Receives the backend
+ * @return The world
+ */
+static ecs_world_t* blend_world(
+    box_render_null_t **null)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(*null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+
+    return world;
+}
+
+/** Create a texture entity that loads an image of the test assets.
+ *
+ * @param world The world
+ * @param path The image, from the repository root
+ * @return The texture entity
+ */
+static ecs_entity_t blend_texture(
+    ecs_world_t *world,
+    const char *path)
+{
+    ecs_entity_t result = ecs_new(world);
+    ecs_set(world, result, TexturePath, {.path = ECS_CONST_CAST(char*, path)});
+
+    return result;
+}
+
+/** Run frames until no texture of a list is loading, then two more so the backend has them.
+ *
+ * @param world The world
+ * @param textures The texture entities
+ * @param count Number of texture entities
+ */
+static void blend_wait(
+    ecs_world_t *world,
+    const ecs_entity_t *textures,
+    int32_t count)
+{
+    int32_t frames, i;
+    for (frames = 0; frames < 200; frames ++) {
+        bool loading = false;
+        mapping_frame(world);
+        for (i = 0; i < count; i ++) {
+            const TextureStatus *status = ecs_get(world, textures[i], TextureStatus);
+            loading |= !status || status->state == TextureLoading;
+        }
+
+        if (!loading) {
+            break;
+        }
+    }
+
+    mapping_frame(world);
+    mapping_frame(world);
+}
+
+/** Collect the batches of a mesh in the last packet of a null backend.
+ *
+ * @param null The backend
+ * @param mesh The mesh handle
+ * @param out Receives the batches
+ * @param max Batches out holds
+ * @return The number of batches of the mesh
+ */
+static int32_t blend_batches(
+    const box_render_null_t *null,
+    uint32_t mesh,
+    const box_render_batch_t **out,
+    int32_t max)
+{
+    int32_t i, result = 0;
+    for (i = 0; i < ecs_vec_count(&null->last.batches); i ++) {
+        const box_render_batch_t *b = ecs_vec_get_t(&null->last.batches, box_render_batch_t, i);
+        if (b->mesh == mesh) {
+            if (result < max) {
+                out[result] = b;
+            }
+
+            result ++;
+        }
+    }
+
+    return result;
+}
+
+/** Get the TextureBlend record of a batch with texture_blend in the last packet.
+ *
+ * @param null The backend
+ * @param b The batch
+ * @return The record
+ */
+static const box_render_texture_blend_t* blend_record(
+    const box_render_null_t *null,
+    const box_render_batch_t *b)
+{
+    test_assert(b->texture_blend);
+
+    return box_render_packet_data(&null->last, b->blend_layers);
+}
+
+/** Get the handle the backend knows the image of a texture entity by.
+ *
+ * @param world The world
+ * @param tex The texture entity
+ * @return The handle, 0 before it was sent
+ */
+static uint32_t blend_handle(
+    ecs_world_t *world,
+    ecs_entity_t tex)
+{
+    return box_textures_handle(box_textures_get(world), tex);
+}
+
+/** Shapes with the same TextureBlend share a batch, shapes with and without one do not, and two
+ * shapes whose blends differ only in a layer draw in different batches. */
+void Material_texture_blend_batches(void) {
+    // materials/texture_blend
+    box_render_null_t *null;
+    ecs_world_t *world = blend_world(&null);
+    ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
+    ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
+    ecs_entity_t grass = ecs_new(world);
+    ecs_set(world, grass, PbrTextures, {.albedo = a});
+    ecs_entity_t rock = ecs_new(world);
+    ecs_set(world, rock, PbrTextures, {.albedo = g, .normal = a});
+    ecs_entity_t earth = ecs_new(world);
+    ecs_set(world, earth, PbrTextures, {.orm = g});
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, NGon, {.sides = 5, .radius = 0.5f});
+    ecs_set(world, prefab, TextureBlend, {.layers = {grass, rock}});
+    ecs_entity_t first = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_set(world, first, Position, {0, 0, 0});
+    ecs_entity_t second = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_set(world, second, Position, {1, 0, 0});
+    ecs_entity_t plain = cutout_shape(world, 5);
+
+    ecs_entity_t left = cutout_shape(world, 7);
+    ecs_set(world, left, TextureBlend, {.layers = {grass, rock}});
+    ecs_entity_t right = cutout_shape(world, 7);
+    ecs_set(world, right, TextureBlend, {.layers = {grass, earth}});
+    ecs_entity_t textures[2] = { a, g };
+    blend_wait(world, textures, 2);
+
+    const box_render_batch_t *found[4];
+    test_int(blend_batches(null, cutout_mesh(world, first), found, 4), 2);
+    const box_render_batch_t *blended = found[0]->texture_blend ? found[0] : found[1];
+    const box_render_batch_t *other = found[0]->texture_blend ? found[1] : found[0];
+    test_bool(blended->texture_blend, true);
+    test_bool(other->texture_blend, false);
+    test_uint(blended->instance_count, 2);
+    test_uint(other->instance_count, 1);
+    test_uint(cutout_mesh(world, plain), cutout_mesh(world, first));
+
+    const box_render_texture_blend_t *r = blend_record(null, blended);
+    test_uint(r->count, 2);
+    test_uint(r->mask, 0);
+    test_assert(blend_handle(world, a) != 0);
+    test_assert(blend_handle(world, g) != 0);
+    test_uint(r->layers[0][BOX_RENDER_BLEND_ALBEDO], blend_handle(world, a));
+    test_uint(r->layers[0][BOX_RENDER_BLEND_ORM], 0);
+    test_uint(r->layers[1][BOX_RENDER_BLEND_ALBEDO], blend_handle(world, g));
+    test_uint(r->layers[1][BOX_RENDER_BLEND_NORMAL], blend_handle(world, a));
+    test_flt(r->transforms[1][0], 1);
+    test_flt(r->transforms[1][1], 1);
+    test_flt(r->transforms[1][2], 0);
+    test_uint(blended->textures[0], 0);
+    test_uint(blended->textures[2], 0);
+    test_uint(blended->textures[3], 0);
+
+    test_int(blend_batches(null, cutout_mesh(world, left), found, 4), 2);
+    test_bool(found[0]->texture_blend, true);
+    test_bool(found[1]->texture_blend, true);
+    test_uint(found[0]->instance_count, 1);
+    test_uint(found[1]->instance_count, 1);
+    const box_render_texture_blend_t *r0 = blend_record(null, found[0]);
+    const box_render_texture_blend_t *r1 = blend_record(null, found[1]);
+    test_uint(r0->layers[0][BOX_RENDER_BLEND_ALBEDO], r1->layers[0][BOX_RENDER_BLEND_ALBEDO]);
+    test_assert(r0->layers[1][BOX_RENDER_BLEND_ORM] != r1->layers[1][BOX_RENDER_BLEND_ORM]);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** An instance draws with the TextureBlend of its prefab until it sets its own, and a change of
+ * the TextureBlend of the prefab reaches it. */
+void Material_texture_blend_prefab(void) {
+    // materials/texture_blend
+    box_render_null_t *null;
+    ecs_world_t *world = blend_world(&null);
+    ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
+    ecs_entity_t mask = blend_texture(world, BLEND_MASK_PNG);
+    ecs_entity_t grass = ecs_new(world);
+    ecs_set(world, grass, PbrTextures, {.albedo = a});
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, NGon, {.sides = 6, .radius = 0.5f});
+    ecs_set(world, prefab, PbrTextures, {.albedo = a});
+    ecs_set(world, prefab, TextureBlend, {.layers = {0, grass}});
+    ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_set(world, inst, Position, {0, 0, 0});
+    ecs_entity_t textures[2] = { a, mask };
+    blend_wait(world, textures, 2);
+
+    test_bool(ecs_owns(world, inst, TextureBlend), false);
+    const box_render_batch_t *found[2];
+    test_int(blend_batches(null, cutout_mesh(world, inst), found, 2), 1);
+    const box_render_texture_blend_t *r = blend_record(null, found[0]);
+    test_uint(r->count, 2);
+    test_uint(r->layers[0][BOX_RENDER_BLEND_ALBEDO], 0);
+    test_uint(r->layers[1][BOX_RENDER_BLEND_ALBEDO], blend_handle(world, a));
+    test_uint(r->mask, 0);
+
+    ecs_set(world, prefab, TextureBlend, {.mask = mask, .layers = {grass}});
+    mapping_frame(world);
+    test_int(blend_batches(null, cutout_mesh(world, inst), found, 2), 1);
+    r = blend_record(null, found[0]);
+    test_uint(r->count, 1);
+    test_uint(r->mask, blend_handle(world, mask));
+    test_assert(r->mask != 0);
+    test_uint(r->layers[0][BOX_RENDER_BLEND_ALBEDO], blend_handle(world, a));
+
+    ecs_remove(world, prefab, TextureBlend);
+    mapping_frame(world);
+    test_int(blend_batches(null, cutout_mesh(world, inst), found, 2), 1);
+    test_bool(found[0]->texture_blend, false);
+    test_uint(found[0]->textures[0], blend_handle(world, a));
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** A change of the TextureTransform or the PbrTextures of a layer reaches the shapes that blend
+ * it, which keep their batch. */
+void Material_texture_blend_layer_changes(void) {
+    // materials/texture_blend
+    box_render_null_t *null;
+    ecs_world_t *world = blend_world(&null);
+    ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
+    ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
+    ecs_entity_t layer = ecs_new(world);
+    ecs_set(world, layer, PbrTextures, {.albedo = a});
+    ecs_entity_t e = cutout_shape(world, 8);
+    ecs_set(world, e, TextureBlend, {.layers = {layer}});
+    ecs_entity_t textures[2] = { a, g };
+    blend_wait(world, textures, 2);
+
+    const box_render_batch_t *found[2];
+    test_int(blend_batches(null, cutout_mesh(world, e), found, 2), 1);
+    const box_render_texture_blend_t *r = blend_record(null, found[0]);
+    test_flt(r->transforms[0][0], 1);
+    test_uint(r->layers[0][BOX_RENDER_BLEND_ALBEDO], blend_handle(world, a));
+    int32_t batch = ecs_get(world, e, DrawSlot)->batch;
+
+    ecs_set(world, layer, TextureTransform, {.scale_x = 20, .scale_y = 10, .offset_x = 0.5f});
+    mapping_frame(world);
+    test_int(blend_batches(null, cutout_mesh(world, e), found, 2), 1);
+    r = blend_record(null, found[0]);
+    test_flt(r->transforms[0][0], 20);
+    test_flt(r->transforms[0][1], 10);
+    test_flt(r->transforms[0][2], 0.5f);
+    test_flt(r->transforms[0][3], 0);
+    test_int(ecs_get(world, e, DrawSlot)->batch, batch);
+
+    ecs_set(world, layer, PbrTextures, {.albedo = g, .orm = a});
+    mapping_frame(world);
+    test_int(blend_batches(null, cutout_mesh(world, e), found, 2), 1);
+    r = blend_record(null, found[0]);
+    test_uint(r->layers[0][BOX_RENDER_BLEND_ALBEDO], blend_handle(world, g));
+    test_uint(r->layers[0][BOX_RENDER_BLEND_ORM], blend_handle(world, a));
+    test_uint(r->layers[0][BOX_RENDER_BLEND_NORMAL], 0);
+    test_int(ecs_get(world, e, DrawSlot)->batch, batch);
+
+    ecs_remove(world, layer, PbrTextures);
+    mapping_frame(world);
+    test_int(blend_batches(null, cutout_mesh(world, e), found, 2), 1);
+    r = blend_record(null, found[0]);
+    test_uint(r->layers[0][BOX_RENDER_BLEND_ALBEDO], 0);
+    test_uint(r->count, 1);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** A shape with a TextureBlend draws as a plain shape with its own PbrTextures when it is alpha
+ * tested, blended or has a triplanar TextureMapping, and blends again without them. */
+void Material_texture_blend_plain_fallback(void) {
+    // materials/texture_blend
+    box_render_null_t *null;
+    ecs_world_t *world = blend_world(&null);
+    ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
+    ecs_entity_t layer = ecs_new(world);
+    ecs_set(world, layer, PbrTextures, {.albedo = a});
+    ecs_entity_t cut = cutout_shape(world, 9);
+    ecs_set(world, cut, PbrTextures, {.albedo = a});
+    ecs_set(world, cut, TextureBlend, {.layers = {layer}});
+    ecs_set(world, cut, AlphaCutoff, {0.5f});
+    ecs_entity_t faded = cutout_shape(world, 10);
+    ecs_set(world, faded, TextureBlend, {.layers = {layer}});
+    ecs_set(world, faded, Opacity, {0.5f});
+    ecs_set(world, faded, Position, {0, 1, 0});
+    ecs_entity_t mapped = cutout_shape(world, 11);
+    ecs_set(world, mapped, TextureBlend, {.layers = {layer}});
+    ecs_set(world, mapped, TextureMapping, {.mode = MappingWorld, .size = 1, .blend = 0.5f});
+    ecs_entity_t hard = cutout_shape(world, 12);
+    ecs_set(world, hard, TextureBlend, {.layers = {layer}});
+    ecs_set(world, hard, TextureMapping, {.mode = MappingWorld, .size = 1});
+    ecs_entity_t textures[1] = { a };
+    blend_wait(world, textures, 1);
+
+    const box_render_batch_t *found[2];
+    test_int(blend_batches(null, cutout_mesh(world, cut), found, 2), 1);
+    test_bool(found[0]->texture_blend, false);
+    test_bool(found[0]->cutout, true);
+    test_uint(found[0]->textures[0], blend_handle(world, a));
+    test_int(blend_batches(null, cutout_mesh(world, faded), found, 2), 1);
+    test_bool(found[0]->texture_blend, false);
+    test_int(found[0]->blend, AlphaBlend);
+    test_int(blend_batches(null, cutout_mesh(world, mapped), found, 2), 1);
+    test_bool(found[0]->texture_blend, false);
+    test_int(blend_batches(null, cutout_mesh(world, hard), found, 2), 1);
+    test_bool(found[0]->texture_blend, true);
+
+    ecs_remove(world, cut, AlphaCutoff);
+    ecs_set(world, mapped, TextureMapping, {.mode = MappingWorld, .size = 1});
+    ecs_set(world, hard, TextureMapping, {.mode = MappingObject, .size = 1, .blend = 1});
+    mapping_frame(world);
+    test_int(blend_batches(null, cutout_mesh(world, cut), found, 2), 1);
+    test_bool(found[0]->texture_blend, true);
+    test_uint(blend_record(null, found[0])->layers[0][BOX_RENDER_BLEND_ALBEDO],
+        blend_handle(world, a));
+    test_int(blend_batches(null, cutout_mesh(world, mapped), found, 2), 1);
+    test_bool(found[0]->texture_blend, true);
+    test_int(blend_batches(null, cutout_mesh(world, hard), found, 2), 1);
+    test_bool(found[0]->texture_blend, false);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

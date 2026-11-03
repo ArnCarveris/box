@@ -185,6 +185,8 @@ typedef struct box_bake_volume_t {
 /** Main thread state of the bake extract */
 typedef struct box_render_bake_t {
     ecs_query_t *bakes;     /**< Entities with LightBake and their scene */
+    ecs_query_t *blends;    /**< Shapes with a TextureBlend, owned or inherited, whose layers
+                             *   a change of a layer entity reaches */
     ecs_vec_t volumes;      /**< box_bake_volume_t */
     ecs_vec_t free_handles; /**< uint32_t, volume handles to reuse */
     uint32_t next_handle;   /**< Next volume handle */
