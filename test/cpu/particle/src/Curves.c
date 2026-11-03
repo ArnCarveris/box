@@ -196,7 +196,8 @@ static float turned(
     float table[TABLE], value;
     uint32_t row = row_of(c, table, &value);
 
-    return box_particle_turned(spin, table, row, value, age, life);
+    return box_particle_turned(spin, table, row, BOX_PARTICLE_CURVE_CONSTANT, value, age, life,
+        0);
 }
 
 /** Get the rotation of a particle, as the draw computes it from the block.
@@ -224,8 +225,9 @@ static float rotation_of(
         spin_row = TABLE / BOX_PARTICLE_CURVE_SAMPLES;
     }
 
-    return box_particle_rotation(rotation, spin, table, rotation_row, rotation_value,
-        spin_row, spin_value, age, life);
+    return box_particle_rotation(rotation, spin, table, rotation_row,
+        BOX_PARTICLE_CURVE_CONSTANT, rotation_value, 0, spin_row, BOX_PARTICLE_CURVE_CONSTANT,
+        spin_value, 0, age, life);
 }
 
 /** Evaluate a gradient from its baked rows.

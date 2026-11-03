@@ -197,6 +197,28 @@
                 ]
             },
             {
+                "id": "CurveRange",
+                "testcases": [
+                    "script_rows",
+                    "without_max_no_second_row",
+                    "same_blend_every_age",
+                    "between_linear_curves",
+                    "distribution_covers_range",
+                    "other_fields_unchanged",
+                    "streams_new",
+                    "spin_area_blended",
+                    "gradient_blends",
+                    "flat_curves_take_rows",
+                    "equal_curves_share_rows",
+                    "copy_owns_max_keys",
+                    "error_none",
+                    "error_max_keys",
+                    "error_gradient_max_keys",
+                    "bad_max_keys_default",
+                    "error_light"
+                ]
+            },
+            {
                 "id": "CurveTable",
                 "testcases": [
                     "block_reads_rows",
@@ -285,6 +307,25 @@
                 ]
             },
             {
+                "id": "Timeline",
+                "testcases": [
+                    "c_defaults",
+                    "script_values",
+                    "area_at_frame_rates",
+                    "loop_across_wrap",
+                    "once_holds_last_key",
+                    "zero_rate_spawns_nothing",
+                    "negative_keys",
+                    "paused_holds",
+                    "stopped_and_reset",
+                    "bursts_unchanged",
+                    "speed_scales_new_particles",
+                    "without_timeline_unchanged",
+                    "bad_curve_is_one",
+                    "copies_own_keys"
+                ]
+            },
+            {
                 "id": "Flash",
                 "testcases": [
                     "c_defaults",
@@ -327,6 +368,29 @@
                     "adds_to_direction_speed",
                     "rotated_scaled_effect",
                     "zero_keeps_results"
+                ]
+            },
+            {
+                "id": "Motion",
+                "testcases": [
+                    "c_defaults",
+                    "script_values",
+                    "error_names_field",
+                    "no_component_unchanged",
+                    "defaults_change_nothing",
+                    "velocity_alone",
+                    "force_alone",
+                    "speed_alone",
+                    "drag_alone",
+                    "constant_velocity_is_drift",
+                    "constant_force_is_gravity",
+                    "constant_drag_is_drag",
+                    "block_reads_rows",
+                    "constants_take_no_row",
+                    "stretch_sees_velocity",
+                    "ground_velocity_curve",
+                    "random_between_two",
+                    "burst_slows_and_rises"
                 ]
             },
             {

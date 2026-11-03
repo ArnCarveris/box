@@ -1,0 +1,45 @@
+// Random between two curves: three rows, each one emitter whose size curve has max_keys, so every
+// particle blends between a curve that grows from 0.2 to 1.6 and one that shrinks from 1.6 to 0.2
+// by its own draw for its whole life. Each emitter bursts 24 still particles along a line on the
+// first frame, whose lifetime puts them all at the normalized age t of their row when the frame is
+// captured, two frames later. At t = 0.1 at the top and t = 0.9 at the bottom the sizes spread from
+// small to large across the row, and at t = 0.5 in the middle, where the two curves cross, every
+// particle has the same size. The color blends from gold to blue by a draw of its own stream, so
+// it does not follow the size.
+using box.transform
+using box.camera
+using box.view
+using box.curve
+using box.particle
+
+camera {
+  Position: {0, 0, 9}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {20, 22, 30, 255}}}
+}
+
+// Seconds a particle has lived when the frame is captured: two frames of 1/60
+const age = 2.0 / 60.0
+
+template Row {
+  prop t = 0.5
+
+  ParticleEmitter: {
+    max: 24, rate: 0, shape: EmitterBox, extents: {5.4, 0, 0}, speed: {0, 0},
+    lifetime: {age / t, age / t}, size: {0.4, 0.4}, opacity: {1, 1}, color: {255, 255, 255},
+    seed: 11
+  }
+  ParticleBurst: {count: 24}
+  ParticleAppearance: {}
+  ParticleCurves: {
+    size: {keys: [{0, 0.2}, {1, 1.6}], max_keys: [{0, 1.6}, {1, 0.2}]}
+    color: {keys: [{0, {255, 200, 60}}], max_keys: [{0, {80, 140, 255}}]}
+  }
+}
+
+Row(t: 0.1) { Position: {0, 1.8, 0} }
+Row(t: 0.5) { Position: {0, 0, 0} }
+Row(t: 0.9) { Position: {0, -1.8, 0} }

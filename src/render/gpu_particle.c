@@ -20,6 +20,9 @@
  * webgpu */
 #define BOX_GPU_PARTICLE_STRIDE (512u)
 
+_Static_assert(sizeof(box_render_particle_block_t) <= BOX_GPU_PARTICLE_STRIDE,
+    "a particle block must fit in its stride");
+
 /** Bytes of the indirect draw arguments of a pool */
 #define BOX_GPU_PARTICLE_ARGS (16u)
 

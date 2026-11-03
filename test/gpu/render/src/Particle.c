@@ -4,8 +4,10 @@
  * are, scenes and full pools are respected, a fixed seed renders the same image twice, additive
  * pools brighten, soft particles fade near geometry and sprites show the frame of their age.
  * An effect flash lights a wall while it plays, a deleted lingering emitter still draws and the
- * drift of the forces carries particles at rest across the image, and a radial speed expands
- * a ring in the rotated plane of its emitter and by the scale of its effect.
+ * drift of the forces carries particles at rest across the image, a radial speed expands
+ * a ring in the rotated plane of its emitter and by the scale of its effect, and the velocity
+ * and force curves of a ParticleMotion move particles at rest by their age: 2 units in their
+ * first second.
  *
  * Frames advance a fixed 1/60 s.
  * An unlit orthographic camera 10 units in front of the origin looks into a 32x32 capture of
@@ -625,6 +627,63 @@ void Particle_radial_burst_scaled(void) {
     test_assert(green_at(px, 3.25f, 0) < 8);
     test_int(ecs_singleton_get(world, ParticleStats)->effects, 1);
     test_int(ecs_singleton_get(world, ParticleStats)->particles, 400);
+
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+/** Create an emitter of one particle at rest with a lifetime of 2 seconds.
+ *
+ * @param world The world
+ * @param x World x of the emitter
+ * @param y World y of the emitter
+ * @return The emitter
+ */
+static ecs_entity_t motion_single_new(
+    ecs_world_t *world,
+    float x,
+    float y)
+{
+    ecs_entity_t e = single_new(world, x, 1);
+    ecs_set(world, e, Position, {x, y, 0});
+    ParticleEmitter *p = ecs_get_mut(world, e, ParticleEmitter);
+    p->lifetime = (ParticleRange){2, 2};
+    ecs_modified(world, e, ParticleEmitter);
+
+    return e;
+}
+
+void Particle_motion_velocity_curve_moves(void) {
+    // particle/motion
+    ecs_world_t *world = world_new("motion_velocity.png");
+    ecs_entity_t e = motion_single_new(world, -2, 0);
+    ecs_set(world, e, ParticleMotion, {
+        .velocity_x = { CurveLinear, BOX_CURVE_KEYS({0, 0}, {1, 8}) }
+    });
+    unsigned char *px = run(world, "motion_velocity.png", 61);
+
+    test_assert(green_at(px, 0, 0) > 128);
+    test_assert(green_at(px, -2, 0) < 8);
+    test_assert(green_at(px, 2, 0) < 8);
+    test_int(ecs_singleton_get(world, ParticleStats)->particles, 1);
+
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+void Particle_motion_force_curve_moves(void) {
+    // particle/motion
+    ecs_world_t *world = world_new("motion_force.png");
+    ecs_entity_t e = motion_single_new(world, 0, -1);
+    ecs_set(world, e, ParticleMotion, {
+        .force_y = { CurveLinear, BOX_CURVE_KEYS({0, 0}, {1, 24}) },
+        .drag = { CurveLinear, BOX_CURVE_KEYS({0, 0}, {1, 0}) }
+    });
+    unsigned char *px = run(world, "motion_force.png", 61);
+
+    test_assert(green_at(px, 0, 1) > 128);
+    test_assert(green_at(px, 0, -1) < 8);
+    test_assert(green_at(px, 0, 2.5f) < 8);
 
     stbi_image_free(px);
     ecs_fini(world);
