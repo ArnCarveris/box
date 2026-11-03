@@ -1,0 +1,105 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.light
+using box.spatial
+using box.particle
+using box.transition
+
+export mut belt_spin: f32 = 0
+
+prefab RockA : RockMesh0, Rock
+prefab RockB : RockMesh1, Rock
+prefab RockC : RockMesh2, Rock
+prefab RockD : RockMesh3, Rock
+prefab PebbleA : RockMesh4, Rock
+prefab PebbleB : RockMesh5, Rock
+
+prefab RingDust { Torus: {radius: 2300, tube: 460, segments: 64, rings: 16} }
+
+template FieldRock {
+  prop i: i32 = 0
+  const a = rnd(i * 1.13 + 0.7) * 2 * PI
+  const rr = 900 + sqrt(rnd(i * 2.31 + 1.9)) * 4200
+  const scatter = rnd(i * 3.7 + 2.2) - 0.5
+  const px = cos(a * 0.5 + scatter * 1.1) * rr * (rnd(i * 5.1) * 2 - 1) * 1.15
+  const pz = 0 - 980 - rr * 0.9 * rnd(i * 6.1 + 0.3)
+  const py = (rnd(i * 7.7 + 0.1) - 0.28) * (150 + rr * 0.16)
+  const size = 2 + pow(rnd(i * 8.3 + 0.9), 5) * 90 + rnd(i * 11.3) * 5
+  const rate = (rnd(i * 13.7) - 0.5) * 3
+  const sx = i * 1.3 + belt_spin * rate
+  const sy = i * 2.1 + belt_spin * rate * 0.7
+
+  Position: {px, py, pz}
+  Rotation: {sx, sy, i * 0.7}
+  Scale: {size, size * (0.7 + rnd(i * 2.9) * 0.5), size * (0.8 + rnd(i * 4.3) * 0.4)}
+  Transition: [Rotation: {duration: 7200, timing_function: Linear}]
+}
+
+template ClaimRock {
+  prop c: i32 = 0
+  const known = claim_known[c]
+  const left = claim_left[c] / claim_max(c)
+  const drilled = rig_site[0] == c || rig_site[1] == c || rig_site[2] == c || rig_site[3] == c
+
+  Position: {claim_x(c), claim_y(c), claim_z(c)}
+  Rotation: {c * 1.1, c * 2.3 + belt_spin * 0.1, c * 0.4}
+  Transition: [Rotation: {duration: 7200, timing_function: Linear}]
+
+  rock : RockMesh0, Rock {
+    Scale: {claim_r(c), claim_r(c) * 0.84, claim_r(c) * 0.92}
+    TextureTransform: {scale_x: 2 + claim_r(c) * 0.012, scale_y: 2 + claim_r(c) * 0.012}
+    if known {
+      PbrTextures: {albedo: tex_rock, orm: tex_rock_orm, normal: tex_rock_normal, emissive: tex_veins}
+      Emissive: {strength: 1.1 + left * 2.2 + bool_f(drilled) * 2.6, color: {214, 176, 255}}
+      Transition: [Emissive: {duration: 1.2}]
+    }
+  }
+
+  if known {
+    glow {
+      PointLight: {intensity: claim_r(c) * claim_r(c) * 0.12 * (0.4 + left), range: claim_r(c) * 5}
+      Position: {0, claim_r(c) * 1.3, claim_r(c) * 0.6}
+      Rgb: {178, 136, 255}
+    }
+  }
+}
+
+template Debris {
+  prop seed: i32 = 1
+  prop count: i32 = 40000
+  prop lo: f32 = 0.2
+  prop hi: f32 = 0.9
+  prop hue: Rgb = {150, 136, 124}
+
+  Position: {0, 30, -2400}
+  ParticleEmitter: {
+    max: count, rate: count / 300, shape: EmitterMesh, source: RingDust, direction: {0, 0, 0},
+    speed: {0, 0}, lifetime: {260, 340}, size: {lo, hi}, color: {hue.r, hue.g, hue.b}, color_variance: {26, 26, 28}, opacity: {0.2, 0.6}, seed: seed
+  }
+  ParticleForces: {gravity: {0, 0, 0}, turbulence: 0.04, turbulence_scale: 0.01, drift: {0.4, 0, 0.2}}
+  ParticleAppearance: {shape: ParticleCircle, blend: ParticleAlpha, lit: 1}
+  ParticleCurves: {opacity: {0, 1, 1, 0}}
+  ParticlePlayback: {}
+  SpatialIgnore
+}
+
+belt {
+  SpatialIgnore
+
+  for i in 0..70 {
+    "a_{i}" : RockA { FieldRock: {i: i * 6} }
+    "b_{i}" : RockB { FieldRock: {i: i * 6 + 1} }
+    "c_{i}" : RockC { FieldRock: {i: i * 6 + 2} }
+    "d_{i}" : RockD { FieldRock: {i: i * 6 + 3} }
+    "e_{i}" : PebbleA { FieldRock: {i: i * 6 + 4} }
+    "f_{i}" : PebbleB { FieldRock: {i: i * 6 + 5} }
+  }
+  for c in 0..CLAIMS {
+    ClaimRock "claim_{c}"(c: c)
+  }
+
+
+}

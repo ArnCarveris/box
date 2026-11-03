@@ -1,0 +1,74 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.text
+using box.layout
+using box.spatial
+using box.picking
+using box.transition
+
+fn good_hue(g: i32) -> Rgb {
+  match g { 0: {176, 130, 255}; 1: {130, 230, 255}; 2: {255, 196, 112}; 3: {226, 226, 214}; _: {255, 110, 70} }
+}
+
+template HoldColumn {
+  prop g: i32 = 0
+  prop x: f32 = 0
+  const fill = stock[g] / max(cap[g], 1)
+  const hue: Rgb = good_hue(g)
+
+  Position: {x, 0, 4}
+  Ink name(text: good_name(g), size: 14, font: font_data, hue: hue, x: 0, y: 150, align: Center)
+  Outline shell(w: 106, h: 240, y: 10, hue: LUM_FAINT)
+  for i in 1..10 {
+    Hair "t_{i}"(x1: -53, y1: -110 + i * 24, x2: -46, y2: -110 + i * 24, w: 0.8, hue: LUM_FAINT)
+  }
+  fill_bar {
+    Position: {0, -110 + clamp01(fill) * 118, 3}
+    Scale: {1, max(clamp01(fill), 0.002), 1}
+    Transition: [Position: {duration: 0.4}, Scale: {duration: 0.4}]
+    Rect: {98, 236}
+    Rgb: {hue.r * 0.14, hue.g * 0.14, hue.b * 0.14}
+    Emissive: {strength: 0.32, color: hue}
+    BlendMode: Additive
+    SpatialIgnore
+  }
+  Ink qty(text: "{stock[g]:.0}", size: 24, font: font_head, hue: match fill > 0.95 { true: ALERT; _: LUMEN }, x: 0, y: 12, align: Center, z: 9, glow: 2.2)
+  Ink capt(text: "OF {cap[g]:.0} T", size: 11, hue: LUM_DIM, x: 0, y: -10, align: Center, z: 9)
+  Pick dump(x: 0, y: -132, w: 104, h: 24, op: OP_JETTISON, a: g, selected: jettison[g], tone: ALERT)
+  Ink dump_t(text: match jettison[g] { true: "DUMPING"; _: "JETTISON" }, size: 10.5, hue: match jettison[g] { true: ALERT; _: LUM_FAINT }, x: 0, y: -132, align: Center, z: 14)
+}
+
+Console console_cargo(st: ST_CARGO) {
+  GlassLayer ui() {
+    Ink t_a(text: "HOLD MANIFEST", size: 13, hue: LUM_DIM, x: -384, y: 190, font: font_data)
+    Ink t_b(text: "{stock_total:.0} OF {cap_total:.0} T ABOARD", size: 13, hue: LUMEN, x: 260, y: 190, align: Right, width: 300)
+    Meter all(x: 0, y: 172, w: 768, h: 7, value: stock_total / cap_total, hue: LUMEN, ticks: 20)
+    cols {
+      Position: {0, -24, 0}
+      for g in 0..GOODS {
+        HoldColumn "col_{g}"(g: g, x: (g - 2) * 152)
+      }
+    }
+    Hair r_a(x1: -384, y1: -176, x2: 384, y2: -176, hue: LUM_FAINT)
+    Ink f_a(text: "REFINERY", size: 13, hue: LUM_DIM, x: -384, y: -192, font: font_data)
+    Ink f_b(text: match refine_rate > 0 { true: "{refine_rate * 60:.0} T/MIN ORE > {refine_rate * 24:.0} CELLS/MIN"; _: match milestone < 2 { true: "NOT LICENSED YET"; _: "IDLE. BUILD ONE, FEED IT, POWER IT." } }, size: 13, hue: match refine_rate > 0 { true: MINT; _: LUM_FAINT }, x: -290, y: -192)
+    Ink f_c(text: "FUEL BURN", size: 13, hue: LUM_DIM, x: -384, y: -214, font: font_data)
+    Ink f_d(text: "{fuel_rate * 60:.1} T/MIN, {match fuel_rate > 0 { true: stock[G_FUEL] / fuel_rate / 60; _: 999 }:.0} MIN LEFT", size: 13, hue: match fuel_rate > 0 && stock[G_FUEL] / fuel_rate < 300 { true: ALERT; _: LUMEN }, x: -290, y: -214)
+    Ink f_e(text: "RATIONS", size: 13, hue: LUM_DIM, x: -384, y: -236, font: font_data)
+    Ink f_f(text: match hungry { true: "STATION IS STARVING"; _: "{(pop + visitors * 3) * 0.1:.1} T/MIN FOR {pop:.0} SOULS" }, size: 13, hue: match hungry { true: ALERT; _: LUMEN }, x: -290, y: -236)
+  }
+
+  HwLayer hardware() {
+    for g in 0..GOODS {
+      SegColumn "tube_{g}"(label: good_code(g), value: stock[g] / max(cap[g], 1), hue: good_hue(g), h: 170, w: 28, x: (g - 2) * 56, y: 148)
+      Fader "bay_{g}"(label: "", sig: KN_BAY + g, travel: 120, x: (g - 2) * 56, y: -30, w: 44)
+    }
+    Stencil c1(text: "BAY ALLOTMENT", size: 11, y: 44)
+    ArcDial valve(label: "REFINERY VALVE", sig: KN_VALVE, r: 44, lo: "SHUT", hi: "OPEN", x: -60, y: -172)
+    Readout tons(value: floor(stock_total), label: "ABOARD T", x: 76, y: -146, size: 26)
+    Readout capt(value: floor(cap_total), label: "CAPACITY T", x: 76, y: -204, size: 26)
+  }
+}

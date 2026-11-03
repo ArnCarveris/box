@@ -1,0 +1,56 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.light
+using box.spatial
+using box.particle
+using box.text
+using box.layout
+using box.transition
+
+template GateSegment {
+  prop i: i32 = 0
+  prop on: bool = false
+
+  Position: {0, 0, 0}
+  Rotation: {0, 0, i * 2 * PI / 12}
+  block : HullDark { Position: {210, 0, 0}; RoundedBox: {38, 60, 40, 4, segments: 2}; TextureTransform: {scale_x: 1, scale_y: 1.4} }
+  coil { Position: {192, 0, 0}; Box: {4, 48, 30}; Rgb: {20, 14, 34}; Emissive: {strength: match on { true: 22; _: 0.05 }, color: TY_GLOW}; Transition: [Emissive: {duration: 2.4, delay: i * 0.12}]; NoShadow }
+}
+
+charter_gate {
+  SpatialIgnore
+  Position: {-620, 190, -1040}
+  Rotation: {0.05, 0.42, 0}
+
+  for i in 0..12 {
+    GateSegment "seg_{i}"(i: i, on: won)
+  }
+  ring : Hull { Position: {0, 0, 0}; Rotation: {PI / 2, 0, 0}; Torus: {radius: 215, tube: 7, segments: 64, rings: 10, smooth: true}; TextureTransform: {scale_x: 24, scale_y: 1} }
+  if won {
+    disc {
+      Position: {0, 0, 0}
+      Scale: {1, 1, 1}
+      Circle: {192}
+      Image: {texture: tex_halo}
+      Rgb: {150, 110, 255}
+      Emissive: {strength: 5, color: TY_GLOW}
+      BlendMode: Additive
+      NoShadow
+    }
+    surge {
+      Position: {0, 0, 0}
+      Rotation: {PI / 2, 0, 0}
+      ParticleEmitter: {max: 9000, rate: 2600, shape: EmitterDisc, radius: 190, direction: {0, -1, 0}, spread: 8, speed: {60, 320}, lifetime: {1, 4}, size: {1, 4}, color: {190, 150, 255}, color_variance: {40, 40, 0}, opacity: {0.4, 1}, seed: 88}
+      ParticleForces: {gravity: {0, 0, 0}}
+      ParticleAppearance: {shape: ParticleCircle, blend: ParticleAdditive, stretch: 0.08}
+      PointLight: {intensity: 90000, range: 1500}
+      Rgb: {170, 130, 255}
+    }
+    Glow halo(r: 520, hue: TY_GLOW, power: 0.7, at: {0, 0, 2}, tex: tex_halo)
+  }
+  Strobe s_a(big: 16, phase: true, power: 1) { Position: {0, 240, 0} }
+  Strobe s_b(big: 16, phase: false, power: 1) { Position: {0, -240, 0} }
+}

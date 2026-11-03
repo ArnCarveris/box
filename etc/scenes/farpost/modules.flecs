@@ -1,0 +1,384 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.light
+using box.spatial
+using box.particle
+using box.text
+using box.layout
+using box.transition
+
+export const TY_GLOW: Rgb = {180, 136, 255}
+export const SODIUM: Rgb = {255, 176, 96}
+export const NAV_RED: Rgb = {255, 50, 34}
+export const NAV_GREEN: Rgb = {60, 255, 150}
+
+export mut slow_turn: f32 = 0
+
+prefab ArmTube { Cylinder: {radius: 1, length: 1, segments: 12, smooth: true} }
+
+template Strut {
+  prop h: f32 = 12
+  prop r: f32 = 1.3
+
+  Position: {0, h / 2, 0}
+  tube : HullDark { Position: {0, 0, 0}; Cylinder: {radius: r, length: h, segments: 14, smooth: true}; TextureTransform: {scale_x: 2, scale_y: h * 0.12} }
+  collar_a : Iron { Position: {0, 0 - h / 2 + 0.6, 0}; Cylinder: {radius: r * 1.5, length: 1.2, segments: 14, smooth: true} }
+  collar_b : Iron { Position: {0, h / 2 - 0.6, 0}; Cylinder: {radius: r * 1.5, length: 1.2, segments: 14, smooth: true} }
+}
+
+template Strobe {
+  prop hue: Rgb = NAV_RED
+  prop power: f32 = 1
+  prop big: f32 = 3
+  prop phase: bool = true
+
+  bulb {
+    Position: {0, 0, 0}
+    Sphere: {radius: 0.3, segments: 8}
+    Rgb: {hue.r * 0.2, hue.g * 0.2, hue.b * 0.2}
+    Emissive: {strength: match pulse == phase { true: 18 * power; _: 0.4 }, color: hue}
+    NoShadow
+  }
+  if pulse == phase {
+    Glow flare(r: big, hue: hue, power: 0.9 * power)
+  }
+}
+
+template Flood {
+  prop power: f32 = 2200
+  prop range: f32 = 90
+  prop hue: Rgb = SODIUM
+  prop angle: f32 = 44
+  prop on: bool = true
+
+  head : IronDark { Position: {0, 0, 0}; Box: {1.4, 1, 0.8} }
+  lens { Position: {0, 0, -0.42}; Quad: {1.2, 0.8}; Rotation: {0, PI, 0}; Rgb: {hue.r * 0.3, hue.g * 0.3, hue.b * 0.3}; Emissive: {strength: match on { true: 22; _: 0 }, color: hue}; NoShadow }
+  beam {
+    Position: {0, 0, 0}
+    Rotation: {0, PI, 0}
+    SpotLight: {intensity: match on { true: power; _: 0 }, range: range, inner_angle: angle * 0.6, outer_angle: angle}
+    Rgb: hue
+  }
+}
+
+prefab ModuleWindowBand {
+  Rgb: {12, 12, 13}
+  PbrMaterial: {metallic: 0.8, roughness: 0.5}
+  PbrTextures: {emissive: tex_hull_lights}
+}
+
+template ModReactor {
+  prop live: f32 = 0
+  const glow = 0.4 + live * 12
+
+  Strut mast(h: 16, r: 2)
+  head {
+    Position: {0, 22, 0}
+    ring : Hull { Position: {0, 0, 0}; Rotation: {PI / 2, 0, 0}; Torus: {radius: 11, tube: 3.4, segments: 48, rings: 14, smooth: true}; TextureTransform: {scale_x: 4, scale_y: 1}; SurfaceMaterials: {outer: {color: {150, 146, 140, 255}, metallic: 1, roughness: 1}} }
+    for i in 0..8 {
+      "coil_{i}" : IronOxide {
+        Position: {cos(i * PI / 4) * 11, sin(i * PI / 4) * 11, 0}
+        Rotation: {0, 0, i * PI / 4}
+        RoundedBox: {3.2, 5.4, 9, 0.5, segments: 2}
+      }
+    }
+    core {
+      Position: {0, 0, 0}
+      Sphere: {radius: 5.4, segments: 32, smooth: true}
+      Rgb: {30, 24, 44}
+      PbrMaterial: {metallic: 0, roughness: 0.2}
+      Emissive: {strength: glow, color: TY_GLOW}
+      Transition: [Emissive: {duration: 1.4}]
+      NoShadow
+    }
+    shine { Position: {0, 0, 0}; PointLight: {intensity: live * 900, range: 50}; Rgb: TY_GLOW }
+    for i in 0..4 {
+      "fin_{i}" {
+        Position: {0, 0, 0}
+        Rotation: {0, 0, i * PI / 2 + PI / 4}
+        vane : HullDark { Position: {27, 0, 0}; Box: {24, 8.6, 0.5}; TextureTransform: {scale_x: 2.4, scale_y: 1} }
+        for k in 0..6 {
+          "strip_{k}" { Position: {27, (k - 2.5) * 1.3, 0}; Box: {21, 0.34, 0.7}; Rgb: {24, 16, 12}; Emissive: {strength: live * 0.8, color: {255, 92, 30}}; Transition: [Emissive: {duration: 3}]; NoShadow }
+        }
+      }
+    }
+  }
+  Strobe tip(big: 5, phase: true) { Position: {0, 40, 0} }
+}
+
+template ModSolar {
+  prop live: f32 = 0
+  prop seed: i32 = 0
+
+  Strut mast(h: 44, r: 1)
+  rig {
+    Position: {0, 0, 0}
+    Rotation: {0, seed * 0.7 + slow_turn * 0.05, 0}
+    Transition: [Rotation: {duration: 7200, timing_function: Linear}]
+    for i in 0..5 {
+      const y = 10 + i * 7.6
+      "bar_{i}" : Iron { Position: {0, y, 0}; Box: {52, 0.4, 0.4} }
+      "panel_a_{i}" { Position: {-14.6, y, 0}; Box: {24, 6.6, 0.16}; Rgb: {18, 26, 56}; PbrMaterial: {metallic: 0.9, roughness: 0.22}; ClearCoat: {strength: 1, roughness: 0.05}; PbrTextures: {normal: tex_deck_normal}; TextureTransform: {scale_x: 3, scale_y: 1} }
+      "panel_b_{i}" { Position: {14.6, y, 0}; Box: {24, 6.6, 0.16}; Rgb: {24, 30, 50}; PbrMaterial: {metallic: 0.9, roughness: 0.22}; ClearCoat: {strength: 1, roughness: 0.05}; PbrTextures: {normal: tex_deck_normal}; TextureTransform: {scale_x: 3, scale_y: 1} }
+    }
+  }
+  Strobe tip(big: 3, phase: false, hue: NAV_GREEN) { Position: {0, 46, 0} }
+}
+
+template ModDock {
+  prop live: f32 = 0
+  const on = live > 0.3
+
+  Strut mast(h: 12, r: 1.8)
+  bar : HullMustard { Position: {0, 13, 0}; RoundedBox: {44, 3.2, 5, 0.6, segments: 2}; TextureTransform: {scale_x: 3, scale_y: 0.3} }
+  for side in 0..2 {
+    const sx = side * 2 - 1
+    "cradle_{side}" {
+      Position: {sx * 20, 13, 0}
+      Rotation: {0, 0, 0}
+      collar : Iron { Position: {0, 4.2, 0}; Tube: {radius: 3.6, thickness: 0.8, length: 6, segments: 24, smooth: true} }
+      clamp_a : IronOxide { Position: {3.6, 8, 0}; Box: {0.8, 4, 2.2} }
+      clamp_b : IronOxide { Position: {-3.6, 8, 0}; Box: {0.8, 4, 2.2} }
+      Flood lamp(power: match on { true: 1400; _: 0 }, range: 50, on: on) { Position: {sx * 5, 3, 3}; Rotation: {-0.9, sx * -0.5, 0} }
+      Strobe tip(big: 2.4, hue: match side { 0: NAV_RED; _: NAV_GREEN }, phase: side == 0) { Position: {sx * 2.8, 10.4, 0} }
+    }
+  }
+  hazard { Position: {0, 13, 2.6}; Quad: {42, 1.4}; Rgb: {200, 190, 170}; PbrMaterial: {metallic: 0, roughness: 0.8}; PbrTextures: {albedo: tex_hazard}; TextureTransform: {scale_x: 8, scale_y: 1} }
+}
+
+template Container {
+  prop x: f32 = 0
+  prop y: f32 = 0
+  prop z: f32 = 0
+  prop tone: i32 = 0
+
+  Position: {x, y, z}
+  Rgb: match tone % 5 { 0: {134, 70, 44}; 1: {64, 104, 106}; 2: {176, 132, 56}; 3: {150, 146, 138}; _: {84, 92, 96} }
+  PbrMaterial: {metallic: 1, roughness: 1}
+  PbrTextures: {albedo: tex_plate, orm: tex_plate_orm, normal: tex_plate_normal}
+  Box: {5.6, 2.6, 2.6}
+  TextureTransform: {scale_x: 0.6, scale_y: 0.3}
+}
+
+template ModHold {
+  prop live: f32 = 0
+  prop seed: i32 = 0
+
+  Strut mast(h: 5, r: 1.8)
+  deck_a : HullDark { Position: {0, 6, 0}; Box: {25, 0.8, 16}; TextureTransform: {scale_x: 2, scale_y: 1.4} }
+  for k in 0..3 {
+    for j in 0..3 {
+      for i in 0..4 {
+        const skip = rnd(seed * 3.1 + i * 7.7 + j * 1.9 + k * 5.3) < 0.14 + k * 0.1
+        if !skip {
+          Container "box_{i}_{j}_{k}"(x: (i - 1.5) * 6, y: 7.8 + k * 2.75, z: (j - 1) * 4.4, tone: seed + i * 3 + j + k * 2)
+        }
+      }
+    }
+  }
+  gantry_a : IronMustard { Position: {-12.6, 12, 7}; Box: {0.7, 12, 0.7} }
+  gantry_b : IronMustard { Position: {12.6, 12, 7}; Box: {0.7, 12, 0.7} }
+  gantry_c : IronMustard { Position: {0, 18, 7}; Box: {26, 0.7, 0.7} }
+  Flood lamp(power: 900, range: 44, on: live > 0.3) { Position: {0, 17.4, 7.6}; Rotation: {-1.0, 0, 0} }
+}
+
+prefab ColumnShape {
+  Path2D: {
+    start: {3.8, 0},
+    segments: [
+      {kind: Line, end: {3.8, 1.2}}, {kind: Line, end: {3.1, 1.6}}, {kind: Line, end: {3.1, 9}}, {kind: Line, end: {3.7, 9.4}},
+      {kind: Line, end: {3.7, 10.6}}, {kind: Line, end: {2.8, 11.2}}, {kind: Line, end: {2.8, 18}},
+      {kind: CubicBezier, end: {0.9, 21.6}, control1: {2.8, 19.6}, control2: {1.5, 20.4}}, {kind: Line, end: {0.9, 24}}
+    ]
+  }
+}
+
+template ModRefinery {
+  prop live: f32 = 0
+  const hot = live > 0.2 && stock[G_ORE] > 0.5 && kn[KN_VALVE] > 0.02
+
+  Strut mast(h: 5, r: 2)
+  base : HullDark { Position: {0, 6, 0}; RoundedBox: {24, 2.4, 14, 0.8, segments: 2}; TextureTransform: {scale_x: 2, scale_y: 1} }
+  for i in 0..3 {
+    const cx = (i - 1) * 8.2
+    "col_{i}" : HullOxide {
+      Position: {cx, 7, 0}
+      Scale: {1, 0.8 + i * 0.2, 1}
+      Lathe: {profile: ColumnShape, cap_end: true, segments: 24, rings: 24}
+      TextureTransform: {scale_x: 3, scale_y: 2}
+    }
+  }
+  flask : Optic { Position: {0, 12, 8.2}; Sphere: {radius: 3.6, segments: 32, smooth: true}; Rotation: {0, 0, 0}; Transmission: {transmission_factor: 1, ior: 1.3, thickness_factor: 2, attenuation_distance: 3, attenuation_color: {170, 120, 255}} }
+  flask_core { Position: {0, 12, 8.2}; Sphere: {radius: 1.7, segments: 20, smooth: true}; Rgb: {20, 14, 34}; Emissive: {strength: match hot { true: 16; _: 0.6 }, color: TY_GLOW}; Transition: [Emissive: {duration: 1}]; NoShadow }
+  flask_light { Position: {0, 12, 11}; PointLight: {intensity: match hot { true: 300; _: 10 }, range: 40}; Rgb: TY_GLOW }
+  Cable3 pipe_a(a: {-8.2, 12, 3}, b: {-2.6, 13, 7}, sag: -2, thick: 0.9, tone: {130, 110, 90}, metal: 1, rough: 0.4)
+  Cable3 pipe_b(a: {8.2, 12, 3}, b: {2.6, 13, 7}, sag: -2, thick: 0.9, tone: {130, 110, 90}, metal: 1, rough: 0.4)
+  stack { Position: {8.2, 26, 0}
+    if hot {
+      ParticleEmitter: {max: 280, rate: 34, shape: EmitterDisc, radius: 0.8, direction: {0, 1, 0}, spread: 9, speed: {3, 6}, lifetime: {6, 12}, size: {2, 4}, color: {150, 134, 170}, opacity: {0.1, 0.3}, seed: 31}
+      ParticleForces: {gravity: {0, 0, 0}, turbulence: 0.5, turbulence_scale: 0.1, drag: 0.1}
+      ParticleAppearance: {shape: ParticleCircle, blend: ParticleAlpha, lit: 0.8}
+      ParticleCurves: {size: {0.4, 1, 1.8, 3}, opacity: {0, 1, 0.5, 0}}
+    }
+  }
+  Strobe tip(big: 3, phase: true) { Position: {-8.2, 28, 0} }
+}
+
+template ModHabitat {
+  prop live: f32 = 0
+  prop seed: i32 = 0
+  const spin = slow_turn * 1.4 + seed
+
+  Strut mast(h: 26, r: 1.8)
+  wheel {
+    Position: {0, 26, 0}
+    Rotation: {0, 0, spin}
+    Transition: [Rotation: {duration: 7200, timing_function: Linear}]
+    rim : Hull { Position: {0, 0, 0}; Rotation: {PI / 2, 0, 0}; Torus: {radius: 24, tube: 4, segments: 64, rings: 16, smooth: true}; TextureTransform: {scale_x: 12, scale_y: 1} }
+    bands {
+      Position: {0, 0, 0}
+      Rotation: {PI / 2, 0, 0}
+      Tube: {radius: 28.2, thickness: 0.3, length: 3.6, segments: 64, smooth: true}
+      Rgb: {12, 11, 10}
+      PbrMaterial: {metallic: 0.8, roughness: 0.5}
+      Emissive: {strength: 0.2 + live * 3.4, color: {255, 226, 180}}
+      PbrTextures: {emissive: tex_hull_lights}
+      TextureTransform: {scale_x: 7, scale_y: 0.2}
+      Transition: [Emissive: {duration: 2}]
+      NoShadow
+    }
+    for i in 0..4 {
+      "spoke_{i}" : HullDark { Position: {0, 0, 0}; Rotation: {0, 0, i * PI / 2}; Box: {46, 1.8, 1.8}; TextureTransform: {scale_x: 4, scale_y: 0.2} }
+    }
+    hub : IronBone { Position: {0, 0, 0}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 4.6, length: 7, segments: 24, smooth: true}; TextureTransform: {scale_x: 2, scale_y: 0.6} }
+  }
+}
+
+prefab DishShape {
+  Path2D: {
+    start: {0.3, 0},
+    segments: [{kind: CubicBezier, end: {12, 5.2}, control1: {3.4, 0.2}, control2: {8.8, 2.2}}]
+  }
+}
+
+template ModRelay {
+  prop live: f32 = 0
+  prop seed: i32 = 0
+
+  Strut mast(h: 22, r: 1.2)
+  dish_mount {
+    Position: {0, 22, 0}
+    Rotation: {0.85 + sin(seed * 2.1) * 0.2, seed * 1.3, 0}
+    dish { Position: {0, 0, 0}; Lathe: {profile: DishShape, segments: 40, rings: 12}; Rgb: {186, 180, 164}; PbrMaterial: {metallic: 0.6, roughness: 0.46}; PbrTextures: {orm: tex_iron_orm, normal: tex_iron_normal}; BackFaceMode: BackFacePlain }
+    feed : Steel { Position: {0, 6, 0}; Cylinder: {radius: 0.26, length: 12, segments: 8, smooth: true} }
+    horn { Position: {0, 12.4, 0}; Sphere: {radius: 0.7, segments: 12}; Rgb: {20, 16, 30}; Emissive: {strength: live * 16, color: TY_GLOW}; NoShadow }
+    if live > 0.4 {
+      Glow horn_flare(r: 7, hue: TY_GLOW, power: 0.6, at: {0, 12.4, 0})
+    }
+  }
+  Strobe tip(big: 3, phase: false) { Position: {0, 34, 0} }
+}
+
+template ModSecurity {
+  prop live: f32 = 0
+  prop seed: i32 = 0
+  const sweep = sin(sim_t * 0.3 + seed) * 1.2
+
+  Strut mast(h: 8, r: 2.4)
+  keep : HullDark { Position: {0, 12, 0}; BeveledPrism: {footprint: [{-9, -7}, {9, -7}, {9, 7}, {-9, 7}], depth: 8, inset: 2.6, bevel: 0.5}; TextureTransform: {scale_x: 1, scale_y: 1} }
+  slit { Position: {0, 12, 7.1}; Box: {12, 0.8, 0.2}; Rgb: {10, 18, 30}; Emissive: {strength: live * 6, color: {120, 190, 255}}; NoShadow }
+  turret {
+    Position: {0, 17, 0}
+    Rotation: {0, sweep, 0}
+    Transition: [Rotation: {duration: 1.2}]
+    drum : IronMustard { Position: {0, 0, 0}; Cylinder: {radius: 3.2, length: 2.8, segments: 20, smooth: true} }
+    Flood lamp(power: match live > 0.3 { true: 2600; _: 0 }, range: 160, hue: {190, 220, 255}, angle: 16, on: live > 0.3) { Position: {0, 0.3, 3.4}; Rotation: {0.12, PI, 0} }
+    gun_a : Soot { Position: {1, -0.4, 6}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 0.3, length: 7, segments: 8, smooth: true} }
+    gun_b : Soot { Position: {-1, -0.4, 6}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 0.3, length: 7, segments: 8, smooth: true} }
+  }
+  Strobe a(big: 2.6, hue: {80, 150, 255}, phase: true) { Position: {6, 16.4, 0} }
+  Strobe b(big: 2.6, hue: NAV_RED, phase: false) { Position: {-6, 16.4, 0} }
+}
+
+template NeonSign {
+  prop text: string = ""
+  prop size: f32 = 5
+  prop hue: Rgb = {255, 60, 140}
+  prop power: f32 = 7
+
+  front {
+    Position: {0, 0, 0}
+    Text: {value: text, size: size, font: font_head, align: Center}
+    Rgb: {hue.r, hue.g, hue.b}
+    Emissive: {strength: power, color: hue}
+    BlendMode: Additive
+    Transition: [Emissive: {duration: 0.2}]
+    NoShadow
+  }
+}
+
+template ModCommerce {
+  prop live: f32 = 0
+  prop seed: i32 = 0
+  const on = live > 0.3
+
+  Strut mast(h: 6, r: 2.2)
+  for i in 0..7 {
+    const w = 7 + rnd(seed + i * 1.7) * 7
+    const h = 4 + rnd(seed + i * 2.9) * 8
+    const d = 6 + rnd(seed + i * 4.3) * 6
+    const bx = (i - 3) * 6.2
+    const by = 7 + rnd(seed + i * 6.1) * 7
+    const lit: Rgb = match i % 3 { 0: {255, 120, 190}; 1: {120, 240, 255}; _: {255, 200, 90} }
+    "stall_{i}" {
+      Position: {bx, by + h / 2, (i % 2) * 5 - 2}
+      Box: {w, h, d}
+      Rgb: match i % 4 { 0: {134, 70, 44}; 1: {64, 104, 106}; 2: {176, 132, 56}; _: {96, 96, 100} }
+      PbrMaterial: {metallic: 1, roughness: 1}
+      PbrTextures: {albedo: tex_plate, orm: tex_plate_orm, normal: tex_plate_normal}
+      TextureTransform: {scale_x: 0.8, scale_y: 0.5}
+      window_i {
+        Position: {0, 0, d / 2 + 0.06}
+        Quad: {w * 0.8, h * 0.5}
+        Rgb: {lit.r * 0.2, lit.g * 0.2, lit.b * 0.2}
+        Emissive: {strength: match on { true: 5; _: 0.1 }, color: {lit.r, lit.g, lit.b}}
+        PbrTextures: {emissive: tex_hull_lights}
+        Transition: [Emissive: {duration: 1.4, delay: i * 0.2}]
+        NoShadow
+      }
+    }
+  }
+  NeonSign sign(text: "BAZAAR", size: 6.4, hue: {120, 240, 255}, power: match on { true: match pulse { true: 7; _: 5 }; _: 0.1 }) { Position: {0, 26, 8} }
+  shine { Position: {0, 24, 14}; PointLight: {intensity: match on { true: 900; _: 0 }, range: 60}; Rgb: {150, 230, 255} }
+}
+
+template ModLeisure {
+  prop live: f32 = 0
+  prop seed: i32 = 0
+  const on = live > 0.3
+  const hue: Rgb = match floor(sim_t * 0.5) % 3 { 0: {255, 60, 160}; 1: {90, 220, 255}; _: {255, 186, 60} }
+
+  Strut mast(h: 8, r: 2.6)
+  plinth : HullBone { Position: {0, 9, 0}; Cylinder: {radius: 20, length: 2.4, segments: 48, smooth: true}; TextureTransform: {scale_x: 8, scale_y: 0.2} }
+  for i in 0..7 {
+    const a = i * 2 * PI / 7
+    "pod_{i}" {
+      Position: {cos(a) * 9, 12.4, sin(a) * 9}
+      Sphere: {radius: 3 + (i % 3), segments: 16, smooth: true}
+      Rgb: {30, 20, 30}
+      Emissive: {strength: match on { true: 6 + (i % 3) * 3; _: 0.1 }, color: {hue.r, hue.g, hue.b}}
+      Transition: [Emissive: {duration: 1.4, delay: i * 0.1}]
+      NoShadow
+    }
+  }
+  dome : Optic { Position: {0, 10, 0}; HemiSphere: {radius: 19, segments: 48, smooth: true}; Transmission: {transmission_factor: 1, ior: 1.12, thickness_factor: 1, attenuation_distance: 240, attenuation_color: {200, 220, 255}} }
+  for i in 0..24 {
+    const a = i * 2 * PI / 24
+    "rib_{i}" { Position: {cos(a) * 20, 10.6, sin(a) * 20}; Sphere: {radius: 0.3, segments: 6}; Rgb: {30, 20, 10}; Emissive: {strength: match on { true: 12; _: 0 }, color: {255, 214, 150}}; NoShadow }
+  }
+  NeonSign sign(text: "PLEASURE DOME", size: 5.6, hue: {255, 60, 160}, power: match on { true: match pulse { true: 8; _: 5 }; _: 0.1 }) { Position: {0, 34, 2} }
+  shine { Position: {0, 18, 0}; PointLight: {intensity: match on { true: 1800; _: 0 }, range: 90}; Rgb: {255, 150, 210} }
+}

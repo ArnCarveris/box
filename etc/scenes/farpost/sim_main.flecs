@@ -1,0 +1,300 @@
+using flecs.script
+using flecs.script.math
+
+fn guards_free() -> i32 {
+  guards - deck_guards[0] - deck_guards[1] - deck_guards[2] - deck_guards[3]
+}
+
+fn guard_cap() -> i32 {
+  const posts = bool_f(slot_kind[0] == M_SECURITY && slot_build[0] >= 1) + bool_f(slot_kind[1] == M_SECURITY && slot_build[1] >= 1) + bool_f(slot_kind[2] == M_SECURITY && slot_build[2] >= 1) + bool_f(slot_kind[3] == M_SECURITY && slot_build[3] >= 1) + bool_f(slot_kind[4] == M_SECURITY && slot_build[4] >= 1) + bool_f(slot_kind[5] == M_SECURITY && slot_build[5] >= 1) + bool_f(slot_kind[6] == M_SECURITY && slot_build[6] >= 1) + bool_f(slot_kind[7] == M_SECURITY && slot_build[7] >= 1) + bool_f(slot_kind[8] == M_SECURITY && slot_build[8] >= 1) + bool_f(slot_kind[9] == M_SECURITY && slot_build[9] >= 1) + bool_f(slot_kind[10] == M_SECURITY && slot_build[10] >= 1) + bool_f(slot_kind[11] == M_SECURITY && slot_build[11] >= 1)
+  4 + floor(posts) * 6
+}
+
+fn can_build(k: i32) -> bool {
+  milestone >= mod_unlock(k)
+}
+
+fn rig_cost(r: i32) -> f32 {
+  match r { 1: 5400; 2: 12000; _: 24000 }
+}
+
+fn rig_unlocked(r: i32) -> bool {
+  match r { 1: milestone >= 2; 2: milestone >= 3; _: milestone >= 4 }
+}
+
+proc handle_cmd(op: i32, a: i32, b: i32) {
+  if op == OP_MAIN {
+    main_on = !main_on
+    if main_on {
+      log_add("MAIN BUS CLOSED. FARPOST-9 IS AWAKE.")
+    } else {
+      log_add("MAIN BUS OPEN. RUNNING ON BATTERY.")
+    }
+  } else if op == OP_VIEW {
+    station = a
+  } else if op == OP_TIE {
+    tie[a] = !tie[a]
+  } else if op == OP_BRANCH {
+    slot_on[a] = !slot_on[a]
+  } else if op == OP_SELECT_SLOT {
+    sel_slot = a
+  } else if op == OP_SELECT_MOD {
+    sel_mod = a
+  } else if op == OP_BUILD {
+    const s = sel_slot
+    const k = sel_mod
+    if slot_kind[s] == M_NONE && can_build(k) && creds >= mod_cost(k) && stock[G_PARTS] >= mod_parts(k) {
+      creds -= mod_cost(k)
+      stock[G_PARTS] = stock[G_PARTS] - mod_parts(k)
+      slot_kind[s] = k
+      slot_build[s] = 0
+      slot_on[s] = true
+      build_serial += 1
+      log_add("BAY {s + 1}: {mod_name(k)} ON THE SLIP")
+    } else if slot_kind[s] != M_NONE {
+      log_add("BAY {s + 1} IS OCCUPIED")
+    } else if !can_build(k) {
+      log_add("{mod_name(k)} NOT LICENSED YET")
+    } else if creds < mod_cost(k) {
+      log_add("NOT ENOUGH CREDITS FOR {mod_name(k)}")
+    } else {
+      log_add("NOT ENOUGH PARTS FOR {mod_name(k)}")
+    }
+  } else if op == OP_SCRAP {
+    const s = sel_slot
+    if slot_kind[s] != M_NONE && s > 0 && slot_build[s] >= 1 {
+      earn(mod_cost(slot_kind[s]) * 0.25)
+      log_add("BAY {s + 1}: {mod_name(slot_kind[s])} SCRAPPED")
+      slot_kind[s] = M_NONE
+      slot_build[s] = 0
+      recompute_capacity()
+    }
+  } else if op == OP_SELECT_RIG {
+    sel_rig = a
+  } else if op == OP_ASSIGN_RIG {
+    if claim_known[a] && sel_rig < rig_count && claim_left[a] > 0 {
+      if rig_site[sel_rig] != a {
+        rig_site[sel_rig] = a
+        log_add("RIG {sel_rig + 1} TASKED TO {claim_name(a)}")
+      }
+      sel_claim = a
+    } else if !claim_known[a] {
+      log_add("NO SURVEY DATA FOR THAT SECTOR")
+    }
+  } else if op == OP_RECALL_RIG {
+    rig_site[sel_rig] = -1
+    log_add("RIG {sel_rig + 1} RECALLED")
+  } else if op == OP_SERVICE_RIG {
+    const fee = 200 + rig_wear[sel_rig] * 900
+    if sel_rig < rig_count && creds >= fee && rig_wear[sel_rig] > 0.01 {
+      creds -= fee
+      rig_wear[sel_rig] = 0
+      log_add("RIG {sel_rig + 1} SERVICED, {fee:.0} CR")
+    }
+  } else if op == OP_BUY_RIG {
+    if rig_count < RIGS && rig_unlocked(rig_count) && creds >= rig_cost(rig_count) {
+      creds -= rig_cost(rig_count)
+      rig_count += 1
+      sel_rig = rig_count - 1
+      log_add("RIG {rig_count} DELIVERED")
+    } else if rig_count < RIGS && !rig_unlocked(rig_count) {
+      log_add("NO RIG LICENCE AT THIS MILESTONE")
+    }
+  } else if op == OP_SCAN_BELT {
+    if scan_t <= 0 && creds >= 600 {
+      creds -= 600
+      scan_t = 16
+      log_add("DEEP SURVEY RUNNING, 600 CR")
+    }
+  } else if op == OP_JETTISON {
+    jettison[a] = !jettison[a]
+  } else if op == OP_SELECT_SYS {
+    if a > 0 {
+      sel_sys = a
+    }
+  } else if op == OP_SELECT_GOOD {
+    sel_good = a
+  } else if op == OP_SELECT_DIR {
+    sel_export = a == 1
+  } else if op == OP_OPEN_ROUTE {
+    mut used: i32 = 0
+    mut slot: i32 = -1
+    for i in 0..ROUTES {
+      if routes[i].active {
+        used += 1
+      } else if slot < 0 {
+        slot = i
+      }
+    }
+    if used >= route_slots {
+      log_add("ALL ROUTE LICENCES IN USE. BUILD A LANE RELAY.")
+    } else if slot >= 0 {
+      routes[slot].active = true
+      routes[slot].dest = sel_sys
+      routes[slot].good = sel_good
+      routes[slot].exporting = sel_export
+      routes[slot].phase = RT_LOADING
+      routes[slot].t = 0
+      routes[slot].hop = 0
+      routes[slot].load = 0
+      routes[slot].wait = 0
+      log_add("ROUTE OPEN: {good_name(sel_good)} TO {sys_name(sel_sys)}")
+    }
+  } else if op == OP_CLOSE_ROUTE {
+    routes[a].active = false
+    log_add("ROUTE {a + 1} CLOSED")
+  } else if op == OP_SELECT_LANE {
+    sel_lane = a
+  } else if op == OP_PATROL_ADD {
+    if creds >= 500 && patrol[sel_lane] < 4 {
+      creds -= 500
+      patrol[sel_lane] = patrol[sel_lane] + 1
+      log_add("WING HIRED FOR {sys_name(lane_a(sel_lane))}-{sys_name(lane_b(sel_lane))}")
+    }
+  } else if op == OP_PATROL_SUB {
+    if patrol[sel_lane] > 0 {
+      patrol[sel_lane] = patrol[sel_lane] - 1
+    }
+  } else if op == OP_SELECT_SHIP {
+    sel_ship = a
+  } else if op == OP_SCAN_SHIP {
+    if sel_ship >= 0 && ships[sel_ship].state == SH_HOLD && !ships[sel_ship].scanned && ships[sel_ship].scan_t <= 0 {
+      ships[sel_ship].scan_t = 2.5
+    }
+  } else if op == OP_GRANT {
+    grant_ship()
+  } else if op == OP_DENY {
+    deny_ship()
+  } else if op == OP_GUARD_HIRE {
+    if guards < guard_cap() && creds >= 400 {
+      creds -= 400
+      guards += 1
+    } else if guards >= guard_cap() {
+      log_add("NO BUNKS LEFT. BUILD A WATCH POST.")
+    }
+  } else if op == OP_GUARD_FIRE {
+    if guards_free() > 0 {
+      guards -= 1
+    }
+  } else if op == OP_GUARD_ADD {
+    if guards_free() > 0 {
+      deck_guards[a] = deck_guards[a] + 1
+    }
+  } else if op == OP_GUARD_SUB {
+    if deck_guards[a] > 0 {
+      deck_guards[a] = deck_guards[a] - 1
+    }
+  } else if op == OP_SELECT_INCIDENT {
+    sel_incident = a
+    cam = incidents[a].deck * 2
+  } else if op == OP_DISPATCH {
+    if sel_incident >= 0 && incidents[sel_incident].active && creds >= 150 {
+      creds -= 150
+      incidents[sel_incident].helped = true
+      log_add("RESPONSE TEAM ROLLING")
+    }
+  } else if op == OP_LOCKDOWN {
+    lockdown = !lockdown
+    log_add(match lockdown { true: "STATION LOCKDOWN. REVENUE WILL SUFFER."; _: "LOCKDOWN LIFTED." })
+  } else if op == OP_CAM_NEXT {
+    cam = (cam + 1) % 8
+  } else if op == OP_CAM_PREV {
+    cam = (cam + 7) % 8
+  } else if op == OP_FEED_NEXT {
+    if a == 0 {
+      feed_a = (feed_a + 1) % 6
+    } else {
+      feed_b = (feed_b + 1) % 6
+    }
+  } else if op == OP_FEED_PREV {
+    if a == 0 {
+      feed_a = (feed_a + 5) % 6
+    } else {
+      feed_b = (feed_b + 5) % 6
+    }
+  } else if op == OP_RATE {
+    time_rate = a
+  } else if op == OP_ACK {
+    acked = true
+    alarm = 0
+  }
+}
+
+async {
+  while true {
+    const e = await Cmd
+    handle_cmd(e.op, e.a, e.b)
+  }
+}
+
+async {
+  while true {
+    await delay(0.25)
+    if clock < 0 {
+      clock = 0
+    }
+    const step = 0.25 * time_rate
+    sim_t += step
+    power_step(step)
+    if main_on {
+      build_step(step)
+      mining_step(step)
+      refinery_step(step)
+      cargo_step(step)
+      trade_step(step)
+      traffic_step(step)
+      settlement_step(step)
+      security_step(step)
+      milestone_step()
+    }
+    if alarm > 0 {
+      alarm = max(0, alarm - 0.25 * 0.2)
+    }
+    if flash_gold > 0 {
+      flash_gold = max(0, flash_gold - 0.25 * 0.25)
+    }
+  }
+}
+
+async {
+  while true {
+    await delay(8)
+    shown_rate = income_rate * 7.5
+    income_rate = 0
+  }
+}
+
+async {
+  while true {
+    await delay(18)
+    for r in 0..rig_count {
+      if rig_site[r] >= 0 && rig_yield[r] > 0 {
+        rig_trip[r] = rig_trip[r] + 1
+      } else if rig_trip[r] % 2 == 1 {
+        rig_trip[r] = rig_trip[r] + 1
+      }
+    }
+  }
+}
+
+async {
+  while true {
+    await delay(0.42)
+    pulse = !pulse
+  }
+}
+
+async {
+  while true {
+    await delay(1.1)
+    slow = !slow
+  }
+}
+
+async {
+  await delay(0.3)
+  belt_spin = 300
+  slow_turn = 800
+  recompute_capacity()
+  power_step(0.25)
+}
