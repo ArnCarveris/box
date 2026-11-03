@@ -987,11 +987,12 @@ static float box_pick_wrap(
     return result;
 }
 
-/** Texture coordinates of a hit on a plain mesh with a MappingObject TextureMapping, before the
- * TextureTransform, as mapping_uv of material.wgsl projects them.
+/** Texture coordinates of a hit on a plain mesh with a MappingObject or MappingWorld
+ * TextureMapping, before the TextureTransform, as mapping_uv of material.wgsl projects them.
  *
- * The position times the scale of the world transform over the mapping size is projected onto
- * the plane of the dominant axis of the interpolated normal, plus half a repeat.
+ * MappingObject projects the position times the scale of the world transform, MappingWorld the
+ * world position, over the mapping size, onto the plane of the dominant axis of the normal
+ * (in the world for MappingWorld), plus half a repeat; a blend picks on the dominant axis.
  *
  * @param m The world transform of the entity, without the ShapeMesh scale
  * @param mapping The mapping
@@ -1005,21 +1006,36 @@ static void box_pick_mapping_uv(
     vec2 uv)
 {
     float size = isfinite(mapping->size) && mapping->size > 0.0f ? mapping->size : 1.0f;
-    vec3 p, a;
+    vec3 p, n, a;
     int32_t k;
+    if (mapping->mode == MappingWorld) {
+        mat3 r, cofactor;
+        glm_mat4_mulv3(m, (float*)hit->position, 1.0f, p);
+        glm_mat4_pick3(m, r);
+        glm_mat3_inv(r, cofactor);
+        glm_mat3_transpose(cofactor);
+        glm_mat3_mulv(cofactor, (float*)hit->normal, n);
+        glm_vec3_scale(p, 1.0f / size, p);
+    } else {
+        for (k = 0; k < 3; k ++) {
+            p[k] = hit->position[k] * glm_vec3_norm(m[k]) / size;
+        }
+
+        glm_vec3_copy((float*)hit->normal, n);
+    }
+
     for (k = 0; k < 3; k ++) {
-        p[k] = hit->position[k] * glm_vec3_norm(m[k]) / size;
-        a[k] = fabsf(hit->normal[k]);
+        a[k] = fabsf(n[k]);
     }
 
     if (a[1] >= a[0] && a[1] >= a[2]) {
-        uv[0] = (hit->normal[1] >= 0.0f ? 1.0f : -1.0f) * p[2];
+        uv[0] = (n[1] >= 0.0f ? 1.0f : -1.0f) * p[2];
         uv[1] = -p[0];
     } else if (a[0] >= a[2]) {
-        uv[0] = -(hit->normal[0] >= 0.0f ? 1.0f : -1.0f) * p[2];
+        uv[0] = -(n[0] >= 0.0f ? 1.0f : -1.0f) * p[2];
         uv[1] = -p[1];
     } else {
-        uv[0] = (hit->normal[2] >= 0.0f ? 1.0f : -1.0f) * p[0];
+        uv[0] = (n[2] >= 0.0f ? 1.0f : -1.0f) * p[0];
         uv[1] = -p[1];
     }
 
@@ -1031,7 +1047,7 @@ static void box_pick_mapping_uv(
  *
  * An Image maps the area of the element to its texture area, through the nine parts of its
  * ImageSlice as the renderer draws it, PbrTextures map the UV of the mesh, or the projection of
- * a MappingObject TextureMapping, through TextureTransform and TextureWrap.
+ * a MappingObject or MappingWorld TextureMapping, through TextureTransform and TextureWrap.
  *
  * @param world The world
  * @param st The module state
@@ -1085,7 +1101,9 @@ static bool box_pick_texture(
         const TextureMapping *mapping = ecs_get(world, e, TextureMapping);
         box_pick_mesh_hit_t hit = {0};
         result = box_pick_mesh(world, st, e, ray->origin, ray->dir, &t, uv, &hit);
-        if (result && hit.plain && mapping && mapping->mode == MappingObject) {
+        if (result && hit.plain && mapping &&
+            (mapping->mode == MappingObject || mapping->mode == MappingWorld))
+        {
             mat4 m;
             box_pick_transform(world, e, m);
             box_pick_mapping_uv(m, mapping, &hit, uv);

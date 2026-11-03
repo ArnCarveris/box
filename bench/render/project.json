@@ -2,7 +2,7 @@
     "id": "bench_render",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the packet data, the extract of the instanced batches and lights, the shadow pass, the frustum and occlusion cull passes, the effect passes, the fog volumes, the baked lighting, prefab instantiation, the atmosphere extract, the particle passes, the transitions and a scene with parametric surfaces of box.render",
+        "description": "Benchmarks for the packet data, the extract of the instanced batches and lights, the shadow pass, the frustum and occlusion cull passes, the effect passes, the fragment cost of the texture mappings, the fog volumes, the baked lighting, prefab instantiation, the atmosphere extract, the particle passes, the transitions and a scene with parametric surfaces of box.render",
         "public": false,
         "use": [
             "box"
@@ -62,6 +62,16 @@
                 "id": "Texture",
                 "benchcases": [
                     "textured_batches"
+                ]
+            },
+            {
+                "id": "TextureMapping",
+                "benchcases": [
+                    "none",
+                    "uv",
+                    "object",
+                    "world",
+                    "triplanar"
                 ]
             },
             {

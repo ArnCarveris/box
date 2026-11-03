@@ -58,7 +58,10 @@
                     "diffuse_transmission_blur_pack",
                     "texture_mapping_defaults",
                     "texture_mapping_pack",
-                    "texture_mapping_ids"
+                    "texture_mapping_ids",
+                    "texture_mapping_world_defaults",
+                    "texture_mapping_world_pack",
+                    "texture_mapping_world_ids"
                 ]
             },
             {

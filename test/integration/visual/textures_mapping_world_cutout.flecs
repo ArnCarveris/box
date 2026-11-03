@@ -1,0 +1,79 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+// An alpha tested shape with a world mapped texture (TextureMapping MappingWorld, AlphaCutoff)
+// casts the shadow it shows: a row of three touching fence panels of different widths, the
+// middle one turned around, shows one continuous lattice (fence.png) projected from the world
+// position, and the sun from behind casts the same continuous lattice of holes toward the
+// camera. A box with a triplanar world mapped lattice (blend 0.4) beside them casts the
+// blended holes of its faces.
+
+camera {
+  Position: {0.4, 2.8, 7.5}
+  Rotation: {-0.27, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {120, 160, 210, 255}}, shadows: {enabled: true}}
+}
+
+sun {
+  Rotation: {0.7, -0.4, 0}
+  DirectionalLight: {intensity: 1.5 * flecs.script.math.PI}
+  Rgb: {255, 245, 230}
+}
+
+fence_tex {
+  TexturePath: {path: "test/integration/visual/assets/fence.png"}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {16, 0.2, 10}
+  Rgb: {176, 180, 166}
+}
+
+fence_left {
+  Position: {-3.5, 0.8, -0.8}
+  Box: {1, 1.6, 0.06}
+  Rgb: {235, 215, 190}
+  PbrTextures: {albedo: fence_tex}
+  TextureMapping: {mode: MappingWorld, size: 1.6}
+  AlphaCutoff: {value: 0.5}
+}
+
+fence_middle {
+  Position: {-2, 0.8, -0.8}
+  Rotation: {0, flecs.script.math.PI, 0}
+  Box: {2, 1.6, 0.06}
+  Rgb: {235, 215, 190}
+  PbrTextures: {albedo: fence_tex}
+  TextureMapping: {mode: MappingWorld, size: 1.6}
+  AlphaCutoff: {value: 0.5}
+}
+
+fence_right {
+  Position: {0.25, 0.8, -0.8}
+  Box: {2.5, 1.6, 0.06}
+  Rgb: {235, 215, 190}
+  PbrTextures: {albedo: fence_tex}
+  TextureMapping: {mode: MappingWorld, size: 1.6}
+  AlphaCutoff: {value: 0.5}
+}
+
+lattice_box {
+  Position: {3, 0.8, -0.6}
+  Rotation: {0, 0.5, 0}
+  Box: {1.4, 1.4, 1.4}
+  Rgb: {200, 170, 130}
+  PbrTextures: {albedo: fence_tex}
+  TextureMapping: {mode: MappingWorld, size: 1.4, blend: 0.4}
+  AlphaCutoff: {value: 0.5}
+  BackFaceMode: {BackFacePlain}
+}

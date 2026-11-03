@@ -981,9 +981,13 @@ void box_draws_material_pack(
         ? material->diffuse_transmission->blur : 0.0f;
     out->mapping = (uint32_t)MappingUv;
     out->mapping_size = 0.0f;
-    if (material->mapping && material->mapping->mode == MappingObject) {
+    if (material->mapping && (material->mapping->mode == MappingObject ||
+        material->mapping->mode == MappingWorld))
+    {
         float size = material->mapping->size;
-        out->mapping = (uint32_t)MappingObject;
+        float blend = material->mapping->blend;
+        out->mapping = (uint32_t)material->mapping->mode |
+            (box_draws_unorm16(isfinite(blend) ? blend : 0.0f) << 16);
         out->mapping_size = isfinite(size) && size > 0.0f ? size : 1.0f;
     }
 }
