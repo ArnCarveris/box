@@ -16,7 +16,8 @@
 #define BOX_DRAWS_CLIP_WALK (256)
 
 /** Get the next ancestor whose ClipChildren can clip an entity: its parent, none above a
- * floating element (LayoutFloat), which its ancestors do not clip.
+ * floating element (LayoutFloat), which its ancestors do not clip. A clipped overlay (a
+ * LayoutFloat with clip) stays clipped by its ancestors, so the walk goes on to its parent.
  *
  * @param world The world
  * @param e The entity
@@ -27,22 +28,29 @@ static ecs_entity_t box_draws_clip_up(
     ecs_entity_t e)
 {
     ecs_entity_t result = 0;
-    if (e && !ecs_has(world, e, LayoutFloat)) {
-        result = ecs_get_parent(world, e);
+    if (e) {
+        const LayoutFloat *fl = ecs_get(world, e, LayoutFloat);
+        if (!fl || fl->clip) {
+            result = ecs_get_parent(world, e);
+        }
     }
 
     return result;
 }
 
-float box_render_clip_area(
+/** Get the bounds of an element: half its LayoutBounds, else half its Rect, 0 for neither.
+ *
+ * @param world The world
+ * @param e The element
+ * @param half Receives half its width and half its height
+ */
+static void box_draws_clip_bounds(
     const ecs_world_t *world,
     ecs_entity_t e,
     float half[2])
 {
     const LayoutBounds *lb = ecs_get(world, e, LayoutBounds);
     const Rect *r = lb ? NULL : ecs_get(world, e, Rect);
-    const Border *b = ecs_get(world, e, Border);
-    float result = 0;
     half[0] = half[1] = 0;
     if (lb) {
         half[0] = lb->width * 0.5f;
@@ -54,8 +62,22 @@ float box_render_clip_area(
 
     half[0] = half[0] > 0 ? half[0] : 0;
     half[1] = half[1] > 0 ? half[1] : 0;
+}
+
+float box_render_clip_area(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    float half[2])
+{
+    const Border *b = ecs_get(world, e, Border);
+    float result = 0;
+    box_draws_clip_bounds(world, e, half);
     if (b) {
+        float width = b->width > 0 ? b->width : 0;
         result = glm_clamp(b->radius, 0.0f, glm_min(half[0], half[1]));
+        half[0] = glm_max(half[0] - width, 0.0f);
+        half[1] = glm_max(half[1] - width, 0.0f);
+        result = glm_clamp(result - width, 0.0f, glm_min(half[0], half[1]));
     }
 
     return result;
@@ -189,7 +211,7 @@ bool box_render_clip_hides(
     ecs_entity_t cur = box_draws_clip_up(world, e);
     int32_t i, depth = 0, clips = 0;
     bool result = false;
-    box_render_clip_area(world, e, half);
+    box_draws_clip_bounds(world, e, half);
     for (i = 0; i < 4; i ++) {
         vec3 local = { (i & 1) ? half[0] : -half[0], (i & 2) ? half[1] : -half[1], 0 };
         if (t) {

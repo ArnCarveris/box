@@ -78,7 +78,9 @@ typedef struct box_audio_voice_t {
 typedef enum box_audio_sound_state_t {
     BOX_AUDIO_SOUND_FREE = 0,     /**< The slot is free */
     BOX_AUDIO_SOUND_READY = 1,    /**< Voices can play it */
-    BOX_AUDIO_SOUND_RELEASED = 2  /**< Released, freed once no voice plays it */
+    BOX_AUDIO_SOUND_RELEASED = 2, /**< Released, freed once no voice plays it */
+    BOX_AUDIO_SOUND_PENDING = 3   /**< Freed, but its SOUND_FREE found the ring full and waits
+                                   * for room; the id stays taken until it is reported */
 } box_audio_sound_state_t;
 
 /** A sound: frames in the memory of the side that runs the core */
@@ -123,7 +125,10 @@ struct box_audio_core_t {
     box_audio_event_t events[BOX_AUDIO_EVENT_MAX];  /**< Ring of events */
     int32_t event_head;   /**< Index of the oldest event */
     int32_t event_count;  /**< Events in the ring */
-    int32_t events_lost;  /**< Events dropped because the ring was full */
+    int32_t events_lost;  /**< Events dropped because the ring was full, since the last LOST
+                           * event was read */
+    int32_t event_lost_at; /**< Slot of the LOST event in the ring, -1 when it has none */
+    int32_t free_pending; /**< Sounds in BOX_AUDIO_SOUND_PENDING */
     float src_l[BOX_AUDIO_CORE_BLOCK];  /**< Left or mono output of a source */
     float src_r[BOX_AUDIO_CORE_BLOCK];  /**< Right output of a stereo source */
     float limiter_gain;   /**< Current gain of the limiter, 0..1 */
@@ -143,7 +148,14 @@ static inline float box_audio_clean(
     return a >= BOX_AUDIO_TINY && a <= BOX_AUDIO_HUGE ? x : 0.0f;
 }
 
-/** Push an event, or count it as lost when the ring is full.
+/** Push an event, or count it as lost when the ring is full. Does not allocate.
+ *
+ * Ordinary events take the slots but the last, which is kept for BOX_AUDIO_EVENT_LOST. When
+ * they are full the event is counted in the one LOST event, pushed the first time.
+ *
+ * A BOX_AUDIO_EVENT_SOUND_FREE that finds them full marks its sound BOX_AUDIO_SOUND_PENDING
+ * instead, and read_events reports it once there is room. The pending state keeps the id
+ * taken, so a sound waits at most once and the states bound what waits outside the ring.
  *
  * @param core The core
  * @param type A box_audio_event_type_t

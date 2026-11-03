@@ -260,6 +260,46 @@ static void BoxDrawsOnHierarchy(
     box_draws_on_move(it, BOX_DRAW_BOTH);
 }
 
+/** Follow an element that got or lost LayoutFloat, or whose clip changed: a float leaves the
+ * clips of its ancestors and draws after the rest, a clipped overlay keeps the clips and draws
+ * after its siblings, so the subtree takes its clip index again and the order is made again.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnLayoutFloat(
+    ecs_iter_t *it)
+{
+    box_render_draws_t *d = it->ctx;
+    int32_t i;
+    if (ecs_is_fini(it->world)) {
+        goto done;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        ecs_entity_t e = it->entities[i];
+        const LayoutFloat *fl = it->event == EcsOnRemove ? NULL :
+            ecs_get(it->world, e, LayoutFloat);
+        bool clip = fl && fl->clip, was = ecs_map_get(&d->overlays, e) != NULL;
+        if (it->event == EcsOnSet && clip == was) {
+            continue;
+        }
+
+        if (clip) {
+            ecs_map_ensure(&d->overlays, e)[0] = 1;
+        } else {
+            ecs_map_remove(&d->overlays, e);
+        }
+
+        d->order_dirty = true;
+        *ecs_vec_append_t(NULL, &d->moved, box_draw_moved_t) = (box_draw_moved_t){
+            .root = e, .kinds = BOX_DRAW_BOTH
+        };
+    }
+
+done:
+    return;
+}
+
 /** Follow an element that got or lost ClipChildren: its descendants take the clip index of
  * their nearest clip again, which their shading holds.
  *
@@ -1002,7 +1042,7 @@ static void box_draws_observers(
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnClip);
     box_draws_observer(world, d, "DrawsOnLayoutFloat", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(LayoutFloat) }},
-        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnHierarchy);
+        .events = { EcsOnAdd, EcsOnSet, EcsOnRemove } }, BoxDrawsOnLayoutFloat);
     box_draws_observer(world, d, "DrawsOnOrderedChildren", (ecs_observer_desc_t){
         .query.terms = {{ .id = EcsOrderedChildren }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnOrdered);

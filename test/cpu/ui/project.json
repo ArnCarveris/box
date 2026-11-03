@@ -200,7 +200,10 @@
                     "runtime_change",
                     "console_order_over_editor",
                     "many_views_keep_top_created_first",
-                    "many_views_keep_top_created_last"
+                    "many_views_keep_top_created_last",
+                    "clip_overlay_over_siblings",
+                    "clip_overlay_not_picked_outside_clips",
+                    "float_picked_outside_clips"
                 ]
             },
             {
@@ -272,7 +275,22 @@
                     "nested_float",
                     "remove_float_rejoins_flow",
                     "keeps_z",
-                    "script"
+                    "script",
+                    "clip_overlay_clipped",
+                    "float_escapes_clips",
+                    "clip_overlay_nested_clips",
+                    "float_escapes_nested_clips",
+                    "clip_overlay_inside_float"
+                ]
+            },
+            {
+                "id": "ClipBorder",
+                "testcases": [
+                    "point_on_border_clipped",
+                    "inner_radius",
+                    "border_wider_than_radius",
+                    "border_wider_than_half",
+                    "no_border_width"
                 ]
             },
             {
@@ -354,7 +372,8 @@
                     "scroll_gutter_with_bar",
                     "scroll_thumb_hover_look",
                     "panel_title_in_column",
-                    "list_keeps_width"
+                    "list_keeps_width",
+                    "scroll_content_added_after_bars"
                 ]
             },
             {

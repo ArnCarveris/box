@@ -7,6 +7,7 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include "picking.h"
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -460,13 +461,15 @@ void Widgets_scroll_bar_in_view(void) {
     test_assert(c != NULL);
     test_assert(c->max_y > 0);
 
-    /* The bars do not float, so the clips of the view and its ancestors clip them; they are the
-     * last child of the column, drawn and picked over the content */
-    test_bool(ecs_has(world, bars, LayoutFloat), false);
+    /* The bars are a clipped overlay, so the clips of the view and its ancestors clip them, out
+     * of the column and drawn and picked over the content */
+    const LayoutFloat *overlay = ecs_get(world, bars, LayoutFloat);
+    test_assert(overlay != NULL);
+    test_bool(overlay->clip, true);
     test_bool(ecs_has(world, bar, LayoutFloat), false);
     ecs_entities_t children = ecs_get_ordered_children(world, view);
     test_assert(children.count == 7);
-    test_assert(children.ids[6] == bars);
+    test_bool(box_pick_drawn_after(world, bar, ecs_lookup(world, "view.b5")), true);
 
     /* The track runs one point inside the right, top and bottom edges, 10 points thick, opaque
      * on a color of its own */
@@ -563,12 +566,12 @@ void Widgets_scroll_gutter_with_bar(void) {
     widgets_frames(world);
 
     /* The vertical bar shows: room on the right, the bottom keeps the padding below the last
-     * block, the spacing before the bars included */
+     * block, the bars taking no place in the column */
     ecs_entity_t view = ecs_lookup(world, "view");
     const Layout *l = ecs_get(world, view, Layout);
     test_assert(l != NULL);
     test_flt(l->padding.right, 18);
-    test_flt(l->padding.bottom + l->spacing, 8);
+    test_flt(l->padding.bottom, 8);
     const LayoutContent *c = ecs_get(world, view, LayoutContent);
     test_flt(c->height, 6 * 40 + 5 * 8 + 16);
     test_flt(c->max_y, c->height - 100);
@@ -672,6 +675,86 @@ void Widgets_list_keeps_width(void) {
     test_flt(at[0], 150 - 1 - 5);
     test_flt(ecs_get(world, ecs_lookup(world, "column.list.rows"), LayoutBounds)->width,
         300 - 1 - 1 - 10);
+
+    char *logs = widgets_warnings(world);
+    test_str(logs, "");
+    ecs_os_free(logs);
+    ecs_fini(world);
+}
+
+void Widgets_scroll_content_added_after_bars(void) {
+    // ui/widgets
+    ecs_world_t *world = widgets_scene(WIDGETS_TALL_VIEW);
+    widgets_frames(world);
+    ecs_entity_t view = ecs_lookup(world, "view");
+    ecs_entity_t bars = ecs_lookup(world, "view.scrollbars");
+    ecs_entity_t bar = ecs_lookup(world, "view.scrollbars.vscroll");
+    test_assert(view != 0 && bars != 0 && bar != 0);
+
+    /* Content added after the bars show comes after them among the children */
+    test_assert(ecs_script_run(world, "more",
+        "using box.layout\n"
+        "view {\n"
+        "  for i in 6..10 {\n"
+        "    \"b{i}\" {\n"
+        "      LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}}\n"
+        "    }\n"
+        "  }\n"
+        "}\n", NULL) == 0);
+    widgets_frames(world);
+    ecs_entity_t last = ecs_lookup(world, "view.b9");
+    test_assert(last != 0);
+    test_assert(ecs_lookup(world, "view.scrollbars") == bars);
+    test_assert(ecs_lookup(world, "view.scrollbars.vscroll") == bar);
+    ecs_entities_t children = ecs_get_ordered_children(world, view);
+    test_int(children.count, 11);
+    test_assert(children.ids[children.count - 1] == last);
+
+    /* The column lays out the ten blocks without a gap for the bars */
+    const LayoutContent *c = ecs_get(world, view, LayoutContent);
+    test_flt(c->height, 10 * 40 + 9 * 8 + 16);
+    float first[2], end[2];
+    widgets_offset(world, ecs_lookup(world, "view.b0"), view, first);
+    widgets_offset(world, last, view, end);
+    test_flt(first[1] - end[1], 9 * 48);
+
+    /* The bar stays at the right edge of the view, the thumb at the top of the track, shorter
+     * for the longer content */
+    float at[2];
+    widgets_offset(world, bar, view, at);
+    test_flt(at[0], 100 - 1 - 5);
+    test_flt(at[1], 0);
+    test_flt(ecs_get(world, bar, Rect)->height, 98);
+    ecs_entity_t knob = ecs_lookup(world, "view.scrollbars.vscroll.knob");
+    test_assert(knob != 0);
+    const Rect *k = ecs_get(world, knob, Rect);
+    float thumb[2];
+    widgets_offset(world, knob, view, thumb);
+    test_flt(thumb[1] + k->height / 2, 50 - 1 - 2);
+    test_flt(k->height + 4, 98 * 100 / c->height);
+
+    /* It draws and picks over every block, the ones added after it included */
+    int32_t i;
+    for (i = 0; i < children.count; i ++) {
+        if (children.ids[i] != bars) {
+            test_bool(box_pick_drawn_after(world, bar, children.ids[i]), true);
+            test_bool(box_pick_drawn_after(world, knob, children.ids[i]), true);
+        }
+    }
+
+    /* Scrolled to the end it stays where it is, the thumb at the end of the track */
+    widgets_set_mut(world, "view", "box.widgets.ScrollView.mut", "y", 1000);
+    widgets_frames(world);
+    c = ecs_get(world, view, LayoutContent);
+    test_flt(c->y, c->max_y);
+    widgets_offset(world, bar, view, at);
+    test_flt(at[0], 100 - 1 - 5);
+    test_flt(at[1], 0);
+    widgets_offset(world, knob, view, thumb);
+    k = ecs_get(world, knob, Rect);
+    test_flt(thumb[1] - k->height / 2, -50 + 1 + 2);
+    widgets_offset(world, last, view, end);
+    test_flt(end[1] - 20, -50 + 8);
 
     char *logs = widgets_warnings(world);
     test_str(logs, "");

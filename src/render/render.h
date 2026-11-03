@@ -82,12 +82,13 @@ void box_render_draws_stats(
     const ecs_world_t *world,
     box_render_draws_stats_t *stats);
 
-/** Get the clip area of a ClipChildren element: its LayoutBounds, else its Rect, with the
- * corners rounded by its Border.radius.
+/** Get the clip area of a ClipChildren element: its LayoutBounds, else its Rect, shrunk by its
+ * Border.width on each side and with the corners rounded by its Border.radius less the width,
+ * the inner edge of the border as the 2D shader draws it.
  *
  * @param world The world
  * @param e The element
- * @param half Receives half its width and half its height, 0 when it has neither
+ * @param half Receives half the width and half the height of the area, 0 when it has neither
  * @return The corner radius, clamped to half the smaller side
  */
 float box_render_clip_area(
@@ -96,8 +97,8 @@ float box_render_clip_area(
     float half[2]);
 
 /** Check whether a world position is inside the clip areas of the ClipChildren ancestors of an
- * entity, in the local XY plane of each, as the 2D shader clips it. A clip with an empty area
- * contains no position. The ancestors of a floating element (LayoutFloat) do not clip it.
+ * entity, in the local XY plane of each, as the 2D shader clips it; an empty area contains none.
+ * The ancestors of a floating element (LayoutFloat without clip) do not clip it.
  *
  * @param world The world
  * @param e The entity, whose own ClipChildren does not clip it
@@ -115,7 +116,8 @@ bool box_render_clip_contains(
  * inside the area of one of them. A clip with an empty area hides everything below it.
  *
  * A clip that scrolls (with a LayoutScroll) is skipped so Tab can scroll its content into view,
- * and the ancestors of a floating element (LayoutFloat) do not clip it.
+ * and the ancestors of a floating element (LayoutFloat) do not clip it, unless it is a clipped
+ * overlay (LayoutFloat.clip).
  *
  * @param world The world
  * @param e The entity

@@ -245,7 +245,8 @@
                     "ignored_by_unlit",
                     "ignored_by_2d",
                     "prefab",
-                    "change_and_remove"
+                    "change_and_remove",
+                    "transition_mid"
                 ]
             },
             {
@@ -275,7 +276,8 @@
                     "blur_orthographic",
                     "blur_resize",
                     "blur_two_views",
-                    "blur_no_snapshot_no_copy"
+                    "blur_no_snapshot_no_copy",
+                    "transition_mid"
                 ]
             },
             {
@@ -289,7 +291,8 @@
                     "ignored_by_unlit",
                     "ignored_by_2d",
                     "prefab",
-                    "change_and_remove"
+                    "change_and_remove",
+                    "transition_mid"
                 ]
             },
             {

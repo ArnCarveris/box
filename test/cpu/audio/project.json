@@ -86,7 +86,9 @@
                     "odd_frames",
                     "one_frame_at_a_time",
                     "unknown_commands",
-                    "events_overflow"
+                    "events_overflow",
+                    "release_after_burst",
+                    "release_playing_after_burst"
                 ]
             },
             {
@@ -124,6 +126,7 @@
                     "null_bit_identical",
                     "null_sound_free",
                     "null_sound_in_use",
+                    "null_sound_free_after_burst",
                     "command_before_render"
                 ]
             },

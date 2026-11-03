@@ -56,8 +56,17 @@ when no voice uses the sound any more, so the side that owns it frees it, never 
 
 **Events** are `{ type, id, value }`: `VOICE_END` (id the handle, for an end, a stop or a
 steal), `VOICE_STOLEN` (id the handle, value the steals so far), `SOUND_FREE`,
-`ORDER_REFUSED` and `IGNORED` (id the command type). The core holds 256; newer ones are lost
-when nobody reads them.
+`ORDER_REFUSED`, `IGNORED` (id the command type) and `LOST` (value the events lost). The core
+holds `BOX_AUDIO_EVENT_MAX` (256) until `read_events`. The last slot is kept for `LOST`: when
+the other 255 are full a newer event is dropped and counted in a single `LOST` event in that
+slot, whose value grows with each further loss until it is read; reading it resets the count,
+which `box_audio_core_events_lost` returns. `SOUND_FREE` is never lost, since the owner frees a
+sound's memory only when it sees it. When it finds the ring full, the core marks the sound as
+free pending (a state of its slot, so the id stays taken and no memory is needed: a sound is
+pending at most once) and `read_events` turns the pending frees into events as soon as the ring
+has room, in the same call or a later one. A burst of hundreds of plays at the cap in one batch,
+each with a steal and an end, can therefore lose `VOICE_END` and `VOICE_STOLEN` events but not
+the free of a sound released after it.
 
 **Voices** are a fixed pool of `BOX_AUDIO_VOICE_MAX` (64) voices, plus 16 slots for voices that
 fade out. A voice has a source, a bus, a volume, a pan and a pitch ratio. The source is a sample
@@ -229,9 +238,11 @@ The two talk only over the `MessagePort` of the `AudioWorkletNode`, with plain o
   `ArrayBuffer`, transferred. The worklet copies them into the heap of its core and keeps the
   pointer; the reply `{ type: 'sound', id, ok }` says whether the core took it.
 - `{ type: 'events', events }` from the worklet: the events of the core after a quantum that
-  had any. On `SOUND_FREE` the worklet has already freed the frames in its heap.
-- `{ type: 'stats', id }` asks the worklet for its quantum count, clock, voices, sounds and
-  memory, which the browser check uses.
+  had any. The worklet reads until the core has none left, 64 per call, so no backlog builds
+  up across quanta. On `SOUND_FREE` the worklet has already freed the frames in its heap.
+- `{ type: 'stats', id }` asks the worklet for its quantum count, clock, voices, sounds,
+  memory and the events the core lost since the last `LOST` was read, which the browser check
+  uses.
 
 The web transport of `transport.c` sends with these functions and reads the events from
 `Module.boxAudio.queue`, which keeps up to 4096 events until the main module takes them.
@@ -288,9 +299,10 @@ into `box_audio_core.wasm` in the generated folder of the build: a freestanding 
 few KB with its own memory, which starts at 1 MB and grows up to 256 MB, no imports (the core
 needs no libm) and the exports of `src/audio/core/wasm.c`: `box_audio_core_wasm_init`, a first
 fit heap with `_alloc` and `_free` that grows the memory, `_sound`, `_apply`, `_render`,
-`_left`, `_right`, `_read_events`, `_events` and `_voices`. It is not built with `emcc`: a standalone wasm of `emcc` links
-start code and libc from the Emscripten cache, which the core does not use, and building those
-for a new configuration fails when the cache folder is a symlink. The script writes the bytes as
+`_left`, `_right`, `_read_events`, `_events`, `_events_lost` and `_voices`. It is not built
+with `emcc`: a standalone wasm of `emcc` links start code and libc from the Emscripten cache,
+which the core does not use, and building those for a new configuration fails when the cache
+folder is a symlink. The script writes the bytes as
 a C array to `.bake/generated/box_audio_core_wasm.h` in the box folder, which
 `src/audio/platform_web.c` includes; bake3 puts the generated folder of a build on the include
 path of test harnesses only, so the header needs a fixed path. The core is built with `-O2` in

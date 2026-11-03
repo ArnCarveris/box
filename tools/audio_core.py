@@ -30,6 +30,7 @@ EXPORTS = [
     "box_audio_core_wasm_render",
     "box_audio_core_wasm_read_events",
     "box_audio_core_wasm_events",
+    "box_audio_core_wasm_events_lost",
     "box_audio_core_wasm_voices",
     "box_audio_core_wasm_left",
     "box_audio_core_wasm_right",
