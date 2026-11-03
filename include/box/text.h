@@ -86,6 +86,13 @@ ECS_ENUM(TextWrap, {
  * layout a Text fits its lines at Text.width and narrows to its widest word in a narrower parent.
  *
  * Color, opacity, emission and tint come from Rgb, Opacity, Emissive, Tint and BlendMode.
+ *
+ * The anti-aliased edges of the glyphs blend in linear light, which makes small dark text on a
+ * light background look thinner than light text on a dark one. Dark text gets fuller edges for
+ * it, keyed on the luminance of the color of each glyph (a TextSpan color too), so both look
+ * equally heavy; text from mid gray up keeps its edges. The background is not known, the
+ * correction takes it to be the opposite of the text. It holds in views with and without
+ * effects, for source over blend modes only.
  */
 ECS_STRUCT(Text, {
     char *value;        /**< The string, UTF-8 */

@@ -1,0 +1,135 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+// Generated textures (TextureGen): a row of three boxes with ashlar-like blocks, Voronoi cobble
+// and fbm noise, each with the albedo and normal map derived from one height field, lit by a low
+// sun from the left so the joints, domes and bumps of the normal maps cast highlights. Behind them
+// a wall tiles the ashlar 4 x 4 to show that it has no seams.
+
+camera {
+  Position: {0, 2.4, 9}
+  Rotation: {-0.16, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {30, 34, 42, 255}}}
+}
+
+$ {
+  AmbientLight: {sky: {110, 120, 140}, ground: {60, 56, 50}, intensity: 0.5}
+}
+
+sun {
+  Rotation: {0.45, 2.2, 0}
+  DirectionalLight: {intensity: 1.3 * flecs.script.math.PI}
+  Rgb: {255, 242, 224}
+}
+
+ashlar_height {
+  TextureGen: {
+    width: 256, height: 256, seed: 11
+    layers: [
+      {kind: GenBlocks, courses: 8, per_course: 4, gap: 0.008, jitter: 0.22, stagger: 0.5,
+       amount: 0.8, id_amount: 0.2}
+      {kind: GenNoise, frequency: 16, octaves: 4, amount: 0.2}
+      {kind: GenNoise, frequency: 4, octaves: 3, amount: 0.18, seed: 1}
+    ]
+  }
+}
+
+ashlar {
+  TextureGen: {source: ashlar_height, output: GenAlbedo,
+               colors: [{0, {150, 146, 138}}, {0.5, {214, 208, 196}}, {1, {240, 234, 222}}]}
+}
+
+ashlar_n {
+  TextureGen: {source: ashlar_height, output: GenNormal, strength: 3}
+}
+
+cobble_height {
+  TextureGen: {
+    width: 256, height: 256, seed: 111
+    layers: [
+      {kind: GenCells, count: 36, distance: GenEdge, edge: 0.14, amount: 0.5, id_amount: 0.15}
+      {kind: GenCells, count: 36, distance: GenEdge, edge: 0.45, amount: 0.6}
+      {kind: GenNoise, frequency: 32, octaves: 3, amount: 0.15}
+    ]
+  }
+}
+
+cobble {
+  TextureGen: {source: cobble_height, output: GenAlbedo,
+               colors: [{0, {72, 66, 58}}, {0.3, {120, 114, 106}}, {1, {222, 214, 202}}]}
+}
+
+cobble_n {
+  TextureGen: {source: cobble_height, output: GenNormal, strength: 3.6}
+}
+
+earth_height {
+  TextureGen: {
+    width: 256, height: 256, seed: 41
+    layers: [
+      {kind: GenNoise, frequency: 4, octaves: 6, amount: 1}
+      {kind: GenNoise, frequency: 32, octaves: 2, amount: 0.25, seed: 1}
+    ]
+  }
+}
+
+earth {
+  TextureGen: {source: earth_height, output: GenAlbedo,
+               colors: [{0, {70, 52, 36}}, {0.6, {128, 98, 66}}, {1, {170, 150, 110}}]}
+}
+
+earth_n {
+  TextureGen: {source: earth_height, output: GenNormal, strength: 4}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {14, 0.2, 8}
+  Rgb: {90, 90, 96}
+  PbrMaterial: {roughness: 0.9}
+}
+
+wall {
+  Position: {0, 3, -3}
+  Quad: {8, 6}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.8}
+  PbrTextures: {albedo: ashlar, normal: ashlar_n}
+  TextureTransform: {scale_x: 4, scale_y: 4}
+}
+
+ashlar_box {
+  Position: {-3, 0.9, 1}
+  Rotation: {0, 0.5, 0}
+  Box: {1.8, 1.8, 1.8}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.8}
+  PbrTextures: {albedo: ashlar, normal: ashlar_n}
+}
+
+cobble_box {
+  Position: {0, 0.9, 1}
+  Rotation: {0, 0.5, 0}
+  Box: {1.8, 1.8, 1.8}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.7}
+  PbrTextures: {albedo: cobble, normal: cobble_n}
+}
+
+earth_box {
+  Position: {3, 0.9, 1}
+  Rotation: {0, 0.5, 0}
+  Box: {1.8, 1.8, 1.8}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.9}
+  PbrTextures: {albedo: earth, normal: earth_n}
+}

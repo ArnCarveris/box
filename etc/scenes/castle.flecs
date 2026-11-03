@@ -2,10 +2,11 @@
 //
 //   bake3 run apps/boxrun --local-env -- etc/scenes/castle.flecs
 //
-// Pick a piece from the toolbar (or press 1 to 9, 0 and P) and click the plot to build it; drag to
-// lay a straight wall or a winding path. Click a piece to select it and upgrade it from the panel
-// (or press U); no piece rises above the level of the keep, and the keep rises with the number of
-// folk in the realm. Cottages, the keep and the blacksmith eat food that farms grow: when the
+// Pick a piece from the toolbar (or press 1 to 9, 0 and P), press R to turn it and click the plot to
+// build it; drag to preview a straight line of wall or path and let go to build it. Walls and gates start as timber and are
+// rebuilt in stone, quarries are dug into the stone deposits of the plot and a cottage built next to
+// a path turns to face it. Click a piece to select it and upgrade it from the panel (or press U); no
+// piece rises above the level of the keep, and the keep rises with the number of folk in the realm. Cottages, the keep and the blacksmith eat food that farms grow: when the
 // granary runs dry, folk leave and their buildings stand abandoned until they are demolished. Close
 // a ring of walls, towers and gatehouses to make a courtyard: cottages inside it gather protection
 // and grow into houses and manors, and the keep is worth twice the prestige. The blacksmith

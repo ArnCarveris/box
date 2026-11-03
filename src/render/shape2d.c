@@ -126,8 +126,16 @@ void box_draws_shape2d(
         box_shape2d_rect(out, s, border);
     }
 
+    if (s->sliced) {
+        out->uv[0] = (float)(material->slice > 0 ? material->slice : 0);
+        out->uv[1] = out->uv[2] = out->uv[3] = 0.0f;
+        goto done;
+    }
+
     out->uv[2] = s->uv[2] * out->uv[0] + out->uv[2];
     out->uv[3] = s->uv[3] * out->uv[1] + out->uv[3];
     out->uv[0] *= s->uv[0];
     out->uv[1] *= s->uv[1];
+done:
+    return;
 }

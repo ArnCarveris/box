@@ -66,6 +66,15 @@ fn tool_icon(t: i32) -> entity {
   }
 }
 
+fn tool_key(t: i32) -> string {
+  match t {
+    10: "0"
+    11: "P"
+    12: "X"
+    _: "{t}"
+  }
+}
+
 template Caption {
   prop text: string = ""
   prop size: f32 = 13
@@ -177,7 +186,6 @@ template WoodPanel {
 
 template ToolButton {
   prop t: i32 = 1
-  prop key: string = "1"
 
   mut over = false
 
@@ -185,9 +193,9 @@ template ToolButton {
   const afford = gold >= cost_gold(t, 1) && stone >= cost_stone(t, 1)
 
   Layout: {direction: Column, h: Center, v: Middle, spacing: 1, padding: {6, 6, 4, 4}}
-  LayoutItem: {width: {mode: Fixed, value: 80}, height: {mode: Fixed, value: 100}}
+  LayoutItem: {width: {mode: Fixed, value: 80}, height: {mode: Fixed, value: 82}}
   Rect: {1, 1}
-  Image: {texture: castle_ui_parchment, u0: 0.05 + t * 0.05, v0: 0.2, u1: 0.13 + t * 0.05, v1: 0.6}
+  Image: {texture: castle_ui_parchment, u0: 0.05 + t * 0.05, v0: 0.2, u1: 0.13 + t * 0.05, v1: 0.53}
   if active {
     Rgb: {196, 138, 70}
     Border: {width: 3, radius: 5, color: {250, 206, 102, 255}}
@@ -208,24 +216,6 @@ template ToolButton {
   name {
     Text: {value: kind_name(t), size: 12, font: castle_font_display}
     Rgb: match active { true: {255, 246, 222}; _: C_TEXT }
-  }
-  cost {
-    Text: {value: cost_text(t, 1), size: 11, font: castle_font_body}
-    Rgb: match afford { true: match active { true: {255, 230, 170}; _: C_MUTED }; _: C_RED }
-  }
-
-  hotkey {
-    LayoutFloat: {h: Center, v: Middle, anchor_h: Left, anchor_v: Top, x: 13, y: -13}
-    LayoutItem: {width: {mode: Fixed, value: 18}, height: {mode: Fixed, value: 18}}
-    Layout: {}
-    Circle: {9}
-    Rgb: match active { true: {196, 146, 56}; _: {84, 78, 72} }
-    Border: {width: 1.5, color: {20, 17, 15, 255}}
-    label {
-      Position: {0, 0.5, 0.1}
-      Text: {value: key, size: 10, font: castle_font_display}
-      Rgb: match active { true: C_INK; _: C_TEXT }
-    }
   }
 
   async {
@@ -393,7 +383,7 @@ template TreasuryCard {
   WoodPanel panel(w: 618, h: 86, pad: 14, u: 0.4, v: 0.3) {
     row {
       Layout: {direction: Row, spacing: 10, v: Middle}
-      Stat gold_stat(icon: castle_icon_coin, value: "{gold:.0}", rate: "+{gold_rate:.0} per second")
+      Stat gold_stat(icon: castle_icon_coin, value: "{gold:.0}", rate: match gold_rate >= 0 { true: "+{gold_rate:.0} per second"; _: "{gold_rate:.0} per second" }, alarm: gold_rate < 0)
       Stat stone_stat(icon: castle_icon_stone, value: "{stone:.0}", rate: "+{stone_rate:.0} per second")
       Stat food_stat(icon: castle_icon_food, value: "{food:.0}", rate: "{signed(food_rate)} per sec", alarm: food_rate < 0)
       Stat folk_stat(icon: castle_icon_folk, value: "{folk}", rate: match keep_next > 0 { true: "keep needs {keep_next}"; _: "folk in the realm" })
@@ -419,70 +409,100 @@ template HintLine {
   const hk = match hc >= 0 { true: kind[hc]; _: 0 }
   const hl = match hc >= 0 { true: level[hc]; _: 0 }
   const hs = match hc >= 0 { true: inside[hc]; _: false }
-  const where_ = match hs { true: ", inside the walls"; _: "" }
+  const where_ = match hs {
+    true: ", inside the walls"
+    _: match hk == K_HOUSE { true: ", outside the walls where bandits raid it"; _: "" }
+  }
 
   const hr = match hc >= 0 { true: abandoned[hc]; _: false }
-  const text = match ht > 0 {
-    true: "{kind_name(ht)}: {kind_blurb(ht)}"
-    _: match hk > 0 {
-      true: match hr {
-        true: "Abandoned {piece_name(hk, hl)}. Demolish it to clear the ruin."
-        _: match max_level(hk) > 1 {
-          true: "{piece_name(hk, hl)}, level {hl} of {max_level(hk)}{where_}. Click to select."
-          _: "{piece_name(hk, hl)}{where_}. Click to select."
-        }
+  const hd = match hc >= 0 { true: deposit[hc]; _: false }
+  const afford = gold >= cost_gold(ht, 1) && stone >= cost_stone(ht, 1)
+  const price = match afford { true: cost_words(ht, 1); _: "{cost_words(ht, 1)}, more than you have" }
+  const turn_ = match turns(tool) { true: " R turns it."; _: "" }
+  const dsx = drag_start % GRID
+  const dsz = (drag_start - dsx) / GRID
+  const dex = drag_end % GRID
+  const dez = (drag_end - dex) / GRID
+  const span = abs(dex - dsx) + abs(dez - dsz) + 1
+  const text = match dragging && drag_tool(tool) {
+    true: "{kind_name(tool)}: a line of {span:.0}, up to {span * cost_gold(tool, 1):.0} gold and {span * cost_stone(tool, 1):.0} stone. Let go to build it, Esc to cancel."
+      _: match ht > 0 {
+      true: match ht == T_DEMOLISH {
+        true: "Demolish [X]. {kind_blurb(ht)}"
+        _: "{kind_name(ht)} [{tool_key(ht)}], {price}. {kind_blurb(ht)}"
       }
-      _: match tool > 0 {
-        true: match drag_tool(tool) {
-          true: "{kind_name(tool)}: click, or drag across the plot to build a line. Esc puts the tool down."
-          _: "{kind_name(tool)}: click the plot. Esc puts the tool down."
+      _: match hk > 0 {
+        true: match hr {
+          true: "Abandoned {piece_name(hk, hl)}. Demolish it to clear the ruin."
+          _: match max_level(hk) > 1 {
+            true: "{piece_name(hk, hl)}, level {hl} of {max_level(hk)}{where_}. Click to select."
+            _: "{piece_name(hk, hl)}{where_}. Click to select."
+          }
         }
-        _: "WASD move   Q E turn   right drag look   wheel zoom   1-9 0 P pick a piece   X demolish   U upgrade"
+        _: match tool == K_QUARRY && !hd {
+          true: "Quarry: dig it into a stone deposit, where grey rock breaks through the grass.{turn_}"
+          _: match tool > 0 {
+            true: match drag_tool(tool) {
+              true: "{kind_name(tool)}: click, or drag a straight line across the plot. Esc puts the tool down."
+              _: "{kind_name(tool)}: click the plot.{turn_} Esc puts the tool down."
+            }
+            _: match hd {
+              true: "A stone deposit. Dig a quarry [8] here to cut stone."
+              _: ""
+            }
+          }
+        }
       }
     }
   }
 
-  Layout: {direction: Row, h: Center, v: Middle, padding: {7, 7, 26, 26}}
-  LayoutItem: {width: {mode: Fixed, value: 900}}
-  Rect: {1, 1}
-  Image: {texture: castle_ui_parchment, u0: 0.04, v0: 0.12, u1: 0.96, v1: 0.88}
-  Border: {width: 1.5, radius: 3, color: {96, 62, 32, 255}}
-  BoxShadow: {offset_y: -3, blur: 10, color: {0, 0, 0, 110}}
+  Layout: {direction: Column, h: Center}
 
-  ScrollRod rod_l(h: Left)
-  ScrollRod rod_r(h: Right)
-  line {
-    Text: {value: text, size: 14, width: 840, align: Center, font: castle_font_body}
-    Rgb: C_INK
+  if text != "" {
+    scroll {
+      Layout: {direction: Row, h: Center, v: Middle, padding: {7, 7, 26, 26}}
+      LayoutItem: {width: {mode: Fixed, value: 900}}
+      Rect: {1, 1}
+      Image: {texture: castle_ui_parchment, u0: 0.04, v0: 0.12, u1: 0.96, v1: 0.88}
+      Border: {width: 1.5, radius: 3, color: {96, 62, 32, 255}}
+      BoxShadow: {offset_y: -3, blur: 10, color: {0, 0, 0, 110}}
+
+      ScrollRod rod_l(h: Left)
+      ScrollRod rod_r(h: Right)
+      line {
+        Text: {value: text, size: 14, width: 840, align: Center, font: castle_font_body}
+        Rgb: C_INK
+      }
+    }
   }
 }
 
 template Toolbar {
   Layout: {direction: Column}
 
-  WoodPanel panel(w: 1100, h: 146, pad: 14, u: 0.04, v: 0.55, row: true) {
+  WoodPanel panel(w: 1100, h: 128, pad: 14, u: 0.04, v: 0.55, row: true) {
     IronStrap strap_top(w: 1000, top: true)
     IronStrap strap_bottom(w: 1000, top: false)
     row {
       Layout: {direction: Row, spacing: 6, v: Middle}
-      ToolButton b1(t: K_WALL, key: "1")
-      ToolButton b2(t: K_TOWER, key: "2")
-      ToolButton b3(t: K_GATE, key: "3")
-      ToolButton b4(t: K_KEEP, key: "4")
-      ToolButton b5(t: K_HOUSE, key: "5")
-      ToolButton b6(t: K_FARM, key: "6")
-      ToolButton b7(t: K_SMITH, key: "7")
-      ToolButton b8(t: K_QUARRY, key: "8")
-      ToolButton b9(t: K_MOAT, key: "9")
-      ToolButton b10(t: K_TREE, key: "0")
-      ToolButton b11(t: K_PATH, key: "P")
+      ToolButton b1(t: K_WALL)
+      ToolButton b2(t: K_TOWER)
+      ToolButton b3(t: K_GATE)
+      ToolButton b4(t: K_KEEP)
+      ToolButton b5(t: K_HOUSE)
+      ToolButton b6(t: K_FARM)
+      ToolButton b7(t: K_SMITH)
+      ToolButton b8(t: K_QUARRY)
+      ToolButton b9(t: K_MOAT)
+      ToolButton b10(t: K_TREE)
+      ToolButton b11(t: K_PATH)
       sep {
-        LayoutItem: {width: {mode: Fixed, value: 6}, height: {mode: Fixed, value: 92}}
+        LayoutItem: {width: {mode: Fixed, value: 6}, height: {mode: Fixed, value: 76}}
         Rect: {1, 1}
         Rgb: {62, 58, 54}
         Border: {width: 1.5, radius: 2, color: {20, 17, 15, 255}}
       }
-      ToolButton b12(t: T_DEMOLISH, key: "X")
+      ToolButton b12(t: T_DEMOLISH)
     }
   }
 }
@@ -625,6 +645,7 @@ template InfoPanel {
     const eats = food_need(k, lvl)
     const people = folk_of(k, lvl)
     const coin = gold_of(k, lvl, safe)
+    const wages = upkeep_of(k)
     const r = research
     const rg = research_gold(r)
     const rs = research_stone(r)
@@ -640,12 +661,12 @@ template InfoPanel {
       true: "Hungry folk left this place. It eats nothing and pays nothing. Demolish it to clear the ground."
       _: match k == K_HOUSE {
         true: match lvl {
-          1: "A cottage for 4 folk. Inside the walls it gathers protection and grows into a house."
-          2: "A timber house for 9 folk. Inside the walls it gathers protection and grows into a manor."
+          1: "A cottage for 4 folk. Inside the walls it gathers protection and grows into a house; outside them bandits raid it for gold."
+          2: "A timber house for 9 folk. Inside the walls it gathers protection and grows into a manor; outside them bandits raid it for gold."
           _: "A stone manor for 16 folk and their servants."
         }
         _: match k == K_KEEP {
-          true: "The seat of the lord. Its level caps the level of every other piece, and it rises with the folk of the realm."
+          true: "The seat of the lord. Its level caps the level of every other piece, it rises with the folk of the realm and the walls and gates rise with it."
           _: match k == K_FARM {
             true: "Grows {farm_yield(research):.1} food a second. The blacksmith can research better farming."
             _: kind_blurb(k)
@@ -693,6 +714,8 @@ template InfoPanel {
             LayoutItem: {width: {mode: Grow}}
             if !ruined && coin > 0 {
               InfoLine line_(label: "Taxes", value: "{coin:.0} gold a second")
+            } else if wages > 0 {
+              InfoLine line_(label: "Wages", value: "{wages:.0} gold a second", color: match gold_rate < 0 { true: C_RED; _: C_TEXT })
             }
           }
           extra_slot {
@@ -701,7 +724,7 @@ template InfoPanel {
             if k == K_FARM {
               InfoLine line_(label: "Grows", value: "{farm_yield(research):.1} food a second", color: {150, 210, 110})
             } else if k == K_HOUSE && !ruined && !top {
-              InfoLine line_(label: "Protection", value: match safe { true: "{pts:.0} of {protect_need(lvl):.0}"; _: "none outside the walls" }, color: match safe { true: C_TEXT; _: C_RED })
+              InfoLine line_(label: "Protection", value: match safe { true: "{pts:.0} of {protect_need(lvl):.0}"; _: "none, bandits steal up to {raid_loot(lvl):.0} gold" }, color: match safe { true: C_TEXT; _: C_RED })
             } else if k == K_KEEP && !ruined && !top {
               InfoLine line_(label: "Folk to rise", value: "{folk} of {keep_folk(lvl + 1)}", color: match folk >= keep_folk(lvl + 1) { true: C_TEXT; _: C_RED })
             } else if smith {

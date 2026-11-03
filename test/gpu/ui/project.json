@@ -64,6 +64,7 @@
                     "small_budget_reuses_pages",
                     "cusp_glyph",
                     "rotated_small_text_same_ink",
+                    "dark_on_light_same_ink",
                     "budget_keeps_shown_pages",
                     "budget_values_in_one_frame",
                     "budget_releases_idle_pages"
@@ -313,6 +314,15 @@
                     "between_editor_and_console",
                     "click_reaches_game",
                     "scroll_reaches_game"
+                ]
+            },
+            {
+                "id": "ImageSlice",
+                "testcases": [
+                    "corners_keep_size",
+                    "edges_stretch",
+                    "edges_tile",
+                    "hollow_center"
                 ]
             }
         ]

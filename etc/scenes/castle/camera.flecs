@@ -1,7 +1,7 @@
 // The camera orbits a point on the plot: WASD or the arrow keys move the point, Q and E turn
 // around it, the right mouse button drags the view around, the wheel or + and - zoom. The number
-// keys and P pick a tool, X the demolish tool, U upgrades the selected piece, Escape puts the tool
-// down and clears the selection.
+// keys and P pick a tool, X the demolish tool, R turns the piece before it is placed, U upgrades the
+// selected piece, Escape puts the tool down and clears the selection.
 
 using flecs.script
 using flecs.script.math
@@ -54,21 +54,22 @@ castle_actions {
   ToolKey Tool12(t: 12, key: X)
   PutDown { Action: {description: "Put the tool down and clear the selection"}; Binding: {key: Escape} }
   UpgradeKey { Action: {description: "Upgrade the selected piece"}; Binding: {key: U} }
+  RotateKey { Action: {description: "Turn the piece before placing it"}; Binding: {key: R} }
 }
 
 // Where the view eases to; the keys, the mouse and scripts move these
 export mut view_x: f32 = 0
-export mut view_z: f32 = 2
+export mut view_z: f32 = 1
 export mut view_yaw: f32 = 0.55
 export mut view_pitch: f32 = 0.74
-export mut view_dist: f32 = 58
+export mut view_dist: f32 = 36
 
 // Where the view is, read by the camera rig of the scene
 export mut cam_x: f32 = 0
-export mut cam_z: f32 = 2
+export mut cam_z: f32 = 1
 export mut cam_yaw: f32 = 0.55
 export mut cam_pitch: f32 = 0.74
-export mut cam_dist: f32 = 58
+export mut cam_dist: f32 = 36
 
 async {
   while true {
@@ -91,6 +92,13 @@ async {
         emit Upgrade(i: selected)
       }
     }
+  }
+}
+
+async {
+  while true {
+    await on.pressed(castle_actions.RotateKey)
+    build_rot = (build_rot + 1) % 4
   }
 }
 
@@ -130,8 +138,21 @@ async {
     }
 
     if dragging {
-      if !castle_actions.Paint[ActionState].down || !drag_tool(tool) {
+      if !drag_tool(tool) {
         dragging = false
+      } else if !castle_actions.Paint[ActionState].down {
+        dragging = false
+        build_line()
+      } else if hover_cell >= 0 && hover_cell != drag_start {
+        const hx = hover_cell % GRID
+        const hz = (hover_cell - hx) / GRID
+        const sx = drag_start % GRID
+        const sz = (drag_start - sx) / GRID
+        const across = abs(hx - sx) >= abs(hz - sz)
+        const end: i32 = match across { true: sz * GRID + hx; _: hz * GRID + sx }
+        if drag_end != end {
+          drag_end = end
+        }
       } else {
         const ps = PickStatus[PickStatus]
         const ss = window[SurfaceStatus]
@@ -153,25 +174,12 @@ async {
           const cz = clamp(floor(gz / PITCH + GRID / 2.0), 0, GRID - 1)
           const sx = drag_start % GRID
           const sz = (drag_start - sx) / GRID
-          if tool == K_WALL && drag_axis == 0 && (cx != sx || cz != sz) {
-            drag_axis = match abs(cx - sx) >= abs(cz - sz) { true: 1; _: 2 }
-          }
-          const col = match tool == K_WALL && drag_axis == 2 { true: sx; _: cx }
-          const row = match tool == K_WALL && drag_axis == 1 { true: sz; _: cz }
-          if drag_last >= 0 && drag_start >= 0 {
-            mut x = drag_last % GRID
-            mut z = (drag_last - x) / GRID
-            mut steps = 0
-            while dragging && (x != col || z != row) && steps < 64 {
-              if x != col {
-                x += match col > x { true: 1; _: -1 }
-              } else {
-                z += match row > z { true: 1; _: -1 }
-              }
-              steps += 1
-              drag_last = z * GRID + x
-              build_at(drag_last, true)
-            }
+          const across = abs(cx - sx) >= abs(cz - sz)
+          const ex = match across { true: cx; _: sx }
+          const ez = match across { true: sz; _: cz }
+          const end: i32 = ez * GRID + ex
+          if drag_end != end {
+            drag_end = end
           }
         }
       }

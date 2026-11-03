@@ -1,0 +1,148 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.layout
+
+// Nine slice images (ImageSlice) of test/integration/visual/assets/frame.png, a 48 texel frame
+// with 16 texel corners: solid corners, striped edges and a checker center. Top row: a small
+// and a wide panel that stretch, a wide one that tiles and a tall one that tiles at a scale of
+// 1. Bottom row: a hollow frame over an orange backdrop, a frame rounded by a Border with an
+// outline, a tinted translucent one, one too small for its corners, which shrink until they
+// meet, and a scroll view whose ClipChildren cuts the frame in it on three sides.
+
+camera {
+  Position: {0, 0, 100}
+  Camera: {ortho: true, ortho_scale: 1}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {236, 238, 242, 255}}}
+}
+
+frame {
+  TexturePath: {path: "test/integration/visual/assets/frame.png"}
+}
+
+screen {
+  Position: {0, 0, 0}
+  Layout: {direction: None}
+  LayoutItem: {width: {mode: Fixed, value: 640}, height: {mode: Fixed, value: 360}}
+  Rect: {1, 1}
+  Rgb: {24, 26, 34}
+
+  stretch_small {
+    LayoutItem: {
+      width: {mode: Fixed, value: 64}, height: {mode: Fixed, value: 64},
+      h: Left, v: Top, x: 20, y: -20
+    }
+    Rect: {1, 1}
+    Image: {texture: frame}
+    ImageSlice: {left: 16, top: 16, right: 16, bottom: 16, scale: 1}
+  }
+
+  stretch_wide {
+    LayoutItem: {
+      width: {mode: Fixed, value: 200}, height: {mode: Fixed, value: 90},
+      h: Left, v: Top, x: 100, y: -20
+    }
+    Rect: {1, 1}
+    Image: {texture: frame}
+    ImageSlice: {left: 16, top: 16, right: 16, bottom: 16, scale: 1.5}
+  }
+
+  tile_wide {
+    LayoutItem: {
+      width: {mode: Fixed, value: 200}, height: {mode: Fixed, value: 90},
+      h: Left, v: Top, x: 316, y: -20
+    }
+    Rect: {1, 1}
+    Image: {texture: frame}
+    ImageSlice: {left: 16, top: 16, right: 16, bottom: 16, scale: 1.5, edges: SliceTile, center: SliceTile}
+  }
+
+  tile_tall {
+    LayoutItem: {
+      width: {mode: Fixed, value: 90}, height: {mode: Fixed, value: 150},
+      h: Left, v: Top, x: 532, y: -20
+    }
+    Rect: {1, 1}
+    Image: {texture: frame}
+    ImageSlice: {left: 16, top: 16, right: 16, bottom: 16, scale: 1, edges: SliceTile, center: SliceTile}
+  }
+
+  backdrop {
+    Layout: {direction: None}
+    LayoutItem: {
+      width: {mode: Fixed, value: 150}, height: {mode: Fixed, value: 120},
+      h: Left, v: Top, x: 20, y: -200
+    }
+    Rect: {1, 1}
+    Rgb: {250, 150, 40}
+
+    hollow {
+      LayoutItem: {
+        width: {mode: Fixed, value: 130}, height: {mode: Fixed, value: 100},
+        h: Center, v: Middle
+      }
+      Rect: {1, 1}
+      Image: {texture: frame}
+      ImageSlice: {left: 16, top: 16, right: 16, bottom: 16, scale: 1, hollow: true}
+    }
+  }
+
+  rounded {
+    LayoutItem: {
+      width: {mode: Fixed, value: 140}, height: {mode: Fixed, value: 100},
+      h: Left, v: Top, x: 186, y: -210
+    }
+    Rect: {1, 1}
+    Image: {texture: frame}
+    ImageSlice: {left: 16, top: 16, right: 16, bottom: 16, scale: 1.25}
+    Border: {width: 3, radius: 22, color: {250, 250, 255, 255}}
+  }
+
+  tinted {
+    LayoutItem: {
+      width: {mode: Fixed, value: 110}, height: {mode: Fixed, value: 100},
+      h: Left, v: Top, x: 342, y: -210
+    }
+    Rect: {1, 1}
+    Image: {texture: frame}
+    ImageSlice: {left: 16, top: 16, right: 16, bottom: 16, scale: 1, edges: SliceTile}
+    Rgb: {120, 200, 255}
+    Opacity: {0.75}
+  }
+
+  tiny {
+    LayoutItem: {
+      width: {mode: Fixed, value: 24}, height: {mode: Fixed, value: 40},
+      h: Left, v: Top, x: 466, y: -210
+    }
+    Rect: {1, 1}
+    Image: {texture: frame}
+    ImageSlice: {left: 16, top: 16, right: 16, bottom: 16, scale: 1}
+  }
+
+  scroll {
+    Layout: {direction: Column, padding: {6, 6, 6, 6}}
+    LayoutItem: {
+      width: {mode: Fixed, value: 110}, height: {mode: Fixed, value: 110},
+      h: Left, v: Top, x: 508, y: -200
+    }
+    LayoutScroll: {x: 30, y: 40, horizontal: true, vertical: true}
+    Rect: {1, 1}
+    Rgb: {44, 48, 62}
+    Border: {radius: 10}
+    ClipChildren
+
+    framed {
+      LayoutItem: {width: {mode: Fixed, value: 160}, height: {mode: Fixed, value: 150}}
+      Rect: {1, 1}
+      Image: {texture: frame}
+      ImageSlice: {left: 16, top: 16, right: 16, bottom: 16, scale: 2, edges: SliceTile}
+    }
+  }
+}

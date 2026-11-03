@@ -37,6 +37,14 @@ template TileCursor {
   prop he: f32 = 0
   prop hs: f32 = 0
   prop hw: f32 = 0
+  prop kn: i32 = 0
+  prop ke: i32 = 0
+  prop ks: i32 = 0
+  prop kw: i32 = 0
+  prop tn: bool = false
+  prop te: bool = false
+  prop ts: bool = false
+  prop tw: bool = false
 
   const t = tool
   const builds = t >= K_WALL && t <= K_PATH
@@ -44,7 +52,8 @@ template TileCursor {
   const afford = gold >= cost_gold(t, 1) && stone >= cost_stone(t, 1)
   const unique_ok = (t != K_KEEP || keep_cell < 0) && (t != K_SMITH || smith_cell < 0)
   const big = t == K_FARM && place
-  const ok = place && afford && unique_ok && (t != K_FARM || fits4[idx])
+  const ok = place && afford && unique_ok && (t != K_FARM || fits4[idx]) && (t != K_QUARRY || deposit[idx])
+  const face = build_face(t, build_rot, kn, ke, ks, kw)
   const razes = t == T_DEMOLISH && k != K_EMPTY
   const picks = t != T_DEMOLISH && k != K_EMPTY
   const y = match k == K_MOAT { true: -0.28; _: 0.05 }
@@ -74,9 +83,9 @@ template TileCursor {
         dirt : CastleDirt { Position: {0, 0.01, 0}; Box: {1.9, 0.02, 1.9} }
         PathPiece path(seed: seed)
       } else if t == K_FARM {
-        FarmPiece farm(seed: hash(idx - GRID - 1), research: research) { Position: {1, 0, 1} }
+        FarmPiece farm(seed: hash(idx - GRID - 1), research: research) { Position: {1, 0, 1}; Rotation: {0, face * HALF_PI, 0} }
       } else {
-        PieceView view(k: t, lvl: 1, seed: seed, n: n, e: e, s: s, w: w, hn: hn, he: he, hs: hs, hw: hw)
+        PieceView view(k: t, lvl: 1, seed: seed, face: face, n: n, e: e, s: s, w: w, hn: hn, he: he, hs: hs, hw: hw, tn: tn, te: te, ts: ts, tw: tw)
       }
     }
   }
@@ -87,6 +96,48 @@ template TileCursor {
       Rotation: {0, 0.7854, 0}
       CursorEdge a(len: 1.6, color: color, glow: 3)
       CursorEdge b(len: 1.6, color: color, glow: 3) { Rotation: {0, HALF_PI, 0} }
+    }
+  }
+}
+
+// A see-through preview of the wall or path that a drag lays from drag_start to drag_end
+template LineGhost {
+  prop idx: i32 = 0
+  prop k: i32 = 0
+  prop seed: f32 = 0
+  prop kn: i32 = 0
+  prop ke: i32 = 0
+  prop ks: i32 = 0
+  prop kw: i32 = 0
+
+  const t = tool
+  const x = idx % GRID
+  const z = (idx - x) / GRID
+  const sx = drag_start % GRID
+  const sz = (drag_start - sx) / GRID
+
+  if k == K_EMPTY && on_line(x, z, drag_start, drag_end) {
+    const n = abs(x - sx) + abs(z - sz) + 1
+    const ok = gold >= n * cost_gold(t, 1) && stone >= n * cost_stone(t, 1)
+    const color: Rgb = match ok { true: {120, 235, 110}; _: {235, 64, 52} }
+    CursorEdge edge_n(len: 2, color: color) { Position: {0, 0.05, -0.955} }
+    CursorEdge edge_s(len: 2, color: color) { Position: {0, 0.05, 0.955} }
+    CursorEdge edge_e(len: 2, color: color) { Position: {0.955, 0.05, 0}; Rotation: {0, HALF_PI, 0} }
+    CursorEdge edge_w(len: 2, color: color) { Position: {-0.955, 0.05, 0}; Rotation: {0, HALF_PI, 0} }
+    ghost {
+      Opacity: {match ok { true: 0.5; _: 0.3 }}
+      SpatialIgnore
+      if t == K_PATH {
+        dirt : CastleDirt { Position: {0, 0.01, 0}; Box: {1.9, 0.02, 1.9} }
+        PathPiece path(seed: seed)
+      } else {
+        WallPiece wall(
+          level_: 1, seed: seed,
+          n: barrier(kn) || on_line(x, z - 1, drag_start, drag_end),
+          e: barrier(ke) || (x < GRID - 1 && on_line(x + 1, z, drag_start, drag_end)),
+          s: barrier(ks) || on_line(x, z + 1, drag_start, drag_end),
+          w: barrier(kw) || (x > 0 && on_line(x - 1, z, drag_start, drag_end)))
+      }
     }
   }
 }
@@ -109,6 +160,8 @@ template Tile {
   const crops = match anchor { true: research; _: 0 }
   const forging = k == K_SMITH && researching
   const seed = hash(idx)
+  const face = facing[idx]
+  const rocky = deposit[idx]
 
   const kn = match idx >= GRID { true: kind[idx - GRID]; _: 0 }
   const ks = match idx < CELLS - GRID { true: kind[idx + GRID]; _: 0 }
@@ -127,6 +180,10 @@ template Tile {
   const hs = wall_height(ks, ls)
   const he = wall_height(ke, le)
   const hw = wall_height(kw, lw)
+  const tn = wooden(kn, ln)
+  const ts = wooden(ks, ls)
+  const te = wooden(ke, le)
+  const tw = wooden(kw, lw)
 
   const sunk = rising == idx
   const shade = hash(idx + 517) * 8
@@ -163,11 +220,11 @@ template Tile {
       } else if k == K_FARM {
         Rgb: {150 + shade, 116 + shade, 80 + shade}
         PbrTextures: {albedo: castle_tex_earth, normal: castle_tex_earth_n}
-      } else if k == K_QUARRY {
+      } else if k == K_QUARRY || rocky {
         Rgb: {170 + shade, 160 + shade, 144 + shade}
         PbrTextures: {albedo: castle_tex_earth, normal: castle_tex_earth_n}
       } else if safe {
-        Rgb: {200 + shade, 182 + shade, 142 + shade}
+        Rgb: {112 + shade, 86 + shade, 60 + shade}
         PbrTextures: {albedo: castle_tex_earth, normal: castle_tex_earth_n}
       } else {
         Rgb: {116 + shade, 156 + shade, 70 + shade}
@@ -177,7 +234,32 @@ template Tile {
     }
   }
 
-  if k == K_EMPTY && safe && hash(idx + 91) < 0.3 {
+  if safe && k == K_EMPTY && hash(idx + 211) < 0.4 {
+    const ga = hash(idx + 213) * 6.283
+    const gx = sin(ga) * 0.45
+    const gz = cos(ga) * 0.45
+    for p in 0..3 {
+      const pa = ga + p * 2.1
+      const pr = 0.1 + hash(idx * 3 + p + 215) * 0.14
+      "green_{p}" : CastleGrass {
+        Position: {gx + sin(pa) * 0.16, 0.004 + p * 0.001, gz + cos(pa) * 0.16}
+        Rotation: {0, pa, 0}
+        Scale: {1.4, 1, 1}
+        Rgb: {88, 116, 54}
+        Cylinder: {length: 0.01, radius: pr, segments: 7}
+        TextureTransform: {scale_x: 0.2, scale_y: 0.2}
+      }
+    }
+    Tuft tuft_a(seed: hash(idx + 217)) { Position: {gx + 0.1, 0, gz - 0.05} }
+    Tuft tuft_b(seed: hash(idx + 219)) { Position: {gx - 0.12, 0, gz + 0.08} }
+  }
+  if safe && k == K_EMPTY && hash(idx + 223) < 0.12 {
+    puddle : CastleWater { Position: {(hash(idx + 225) - 0.5) * 0.9, 0.003, (hash(idx + 227) - 0.5) * 0.9}; Scale: {1.5, 1, 1}; Cylinder: {length: 0.008, radius: 0.16, segments: 10} }
+  }
+
+  if k == K_EMPTY && rocky {
+    StoneOutcrop outcrop(seed: hash(idx + 57))
+  } else if k == K_EMPTY && safe && hash(idx + 91) < 0.3 {
     CourtProps props(seed: hash(idx + 93))
   } else if k == K_EMPTY && !safe && hash(idx + 71) < 0.2 {
     MeadowProps props(seed: hash(idx + 73))
@@ -187,10 +269,14 @@ template Tile {
     Transition: [Position: {duration: match sunk { true: 0; _: 0.7 }, timing_function: EaseOut}]
     Position: {0, match sunk { true: -5; _: 0 }, 0}
     if anchor {
-      FarmPiece farm(seed: seed, research: crops) { Position: {3, 0, 3} }
+      FarmPiece farm(seed: seed, research: crops) { Position: {3, 0, 3}; Rotation: {0, face * HALF_PI, 0} }
     } else {
-      PieceView view(k: k, lvl: lvl, seed: seed, ruined: ruined, working: forging, n: n, e: e, s: s, w: w, hn: hn, he: he, hs: hs, hw: hw)
+      PieceView view(k: k, lvl: lvl, seed: seed, face: face, ruined: ruined, working: forging, n: n, e: e, s: s, w: w, hn: hn, he: he, hs: hs, hw: hw, tn: tn, te: te, ts: ts, tw: tw)
     }
+  }
+
+  if raid_cell == idx {
+    BanditRaid raid(seed: seed)
   }
 
   if marked {
@@ -214,8 +300,12 @@ template Tile {
     }
   }
 
-  if hover {
-    TileCursor cursor(idx: idx, k: k, lvl: lvl, seed: seed, n: n, e: e, s: s, w: w, hn: hn, he: he, hs: hs, hw: hw)
+  if dragging && drag_tool(tool) {
+    LineGhost line(idx: idx, k: k, seed: seed, kn: kn, ke: ke, ks: ks, kw: kw)
+  }
+
+  if hover && !dragging {
+    TileCursor cursor(idx: idx, k: k, lvl: lvl, seed: seed, n: n, e: e, s: s, w: w, hn: hn, he: he, hs: hs, hw: hw, kn: kn, ke: ke, ks: ks, kw: kw, tn: tn, te: te, ts: ts, tw: tw)
   }
 
   async {
@@ -238,11 +328,9 @@ template Tile {
         extends = drag_tool(tool) && kind[idx] == tool
         painted = drag_tool(tool) && (kind[idx] == K_EMPTY || extends)
         if painted {
-          dragging = true
-          drag_last = idx
           drag_start = idx
-          drag_axis = 0
-          build_at(idx, true)
+          drag_end = idx
+          dragging = true
         }
       }
     }
@@ -252,10 +340,12 @@ template Tile {
     while true {
       const ev = await on.click(this)
       if ev.button == 0 {
-        if painted && !(extends && drag_last == idx) {
+        if painted {
           painted = false
+          if extends && drag_start == idx && drag_end == idx {
+            emit Build(i: idx)
+          }
         } else {
-          painted = false
           emit Build(i: idx)
         }
       }
@@ -406,12 +496,12 @@ template Landscape {
     }
   }
 
-  for i in 0..120 {
-    const side = floor(i / 30)
-    const t = (i % 30) / 29.0 - 0.5
+  for i in 0..64 {
+    const side = floor(i / 16)
+    const t = (i % 16) / 15.0 - 0.5
     const half = GRID * PITCH / 2 + 0.9
-    const bx = match side { 0: t * 58; 1: half; 2: t * 58; _: 0 - half }
-    const bz = match side { 0: 0 - half; 1: t * 58; 2: half; _: t * 58 }
+    const bx = match side { 0: t * (GRID * PITCH + 2); 1: half; 2: t * (GRID * PITCH + 2); _: 0 - half }
+    const bz = match side { 0: 0 - half; 1: t * (GRID * PITCH + 2); 2: half; _: t * (GRID * PITCH + 2) }
     if hash(i + 2000) < 0.55 && !(side == 2 && abs(bx) < 2.5) {
       "bush_{i}" : CastleLeafDark {
         Position: {bx, -0.9, bz}
