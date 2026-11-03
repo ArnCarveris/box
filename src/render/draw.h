@@ -128,6 +128,8 @@ typedef struct DrawSlot {
     uint32_t rank;  /**< Rank of a 2D shape in the draw order of its tree (box_draw_order_t),
                      *   which lifts its depth over the elements drawn before it */
     int32_t clip;   /**< Clip index of the nearest ClipChildren ancestor of a 2D shape, 0 none */
+    int32_t slice;  /**< Index of the slice record of a sliced 2D shape in the clip buffer
+                     *   (box_draws_slice_of), 0 for none */
     bool dirty;     /**< The entity is in the list of changed entities */
     uint8_t changed; /**< box_draw_kind_t, the streams its changes since the last extract write */
     bool tinted;    /**< An ancestor has a Tint of a strength above 0 */
@@ -162,6 +164,8 @@ typedef struct box_draw_key_t {
                              *   ReflectionBake, drawn by the captures */
     bool box_shadow;        /**< The shadows of 2D shapes (BoxShadow), drawn with the
                              *   fs_shadow entry point of the 2D shape shader */
+    bool slice;             /**< Rects with an ImageSlice, drawn with the fs_slice entry point
+                             *   of the 2D shape shader */
     ecs_entity_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture entities of PbrTextures */
     uint32_t atlas;         /**< Texture handle of the glyph atlas page of a glyph batch, or 0 */
 } box_draw_key_t;
@@ -218,6 +222,7 @@ typedef struct box_draw_material_t {
     const Shape2D *shape2d;     /**< Resolved 2D shape, NULL for a 3D shape */
     float fade;                 /**< Product of the Opacity of the ancestors */
     int32_t clip;               /**< Clip index of a 2D shape or glyph, 0 for none */
+    int32_t slice;              /**< Slice record index of a sliced 2D shape, 0 for none */
     uint32_t rank;              /**< Rank of a 2D shape or glyph in the draw order of its tree */
 } box_draw_material_t;
 
@@ -375,6 +380,11 @@ typedef struct box_draw_clips_t {
     ecs_vec_t entities;     /**< ecs_entity_t per clip index, 0 for a free index */
     ecs_vec_t records;      /**< box_render_clip_t per clip index, as the backend has them */
     ecs_vec_t free;         /**< int32_t, clip indices to reuse */
+    ecs_map_t slices;       /**< Sliced 2D shape to the first of the two indices of its slice
+                             *   record (box_render_slice_t), whose second index is 0 in
+                             *   entities; freed in a send once the shape is gone or no longer
+                             *   sliced */
+    ecs_vec_t slice_free;   /**< int32_t, first indices of slice records to reuse */
     uint32_t capacity;      /**< Clips the clip buffer holds, 0 before it is created */
     int32_t tagged;         /**< Entities with ClipChildren, so a world without any skips the
                              *   walk up the hierarchy */
@@ -1042,7 +1052,8 @@ void box_draws_mesh_shading(
 /** Write the shape of a 2D shape into its instance data, over the 3D surface constants.
  *
  * Material holds the corner radius, border width and border color of a rectangle or the end
- * points of a line, emissive w the aspect of a rectangle or the negated width of a line.
+ * points of a line, emissive w the aspect of a rectangle or the negated width of a line. A
+ * sliced rectangle holds its slice index in uv.x instead of the area of its image.
  *
  * @param out The shading
  * @param material Material components of the entity, with its Shape2D
@@ -1734,6 +1745,32 @@ void box_draws_clip_added(
 void box_draws_clip_removed(
     box_render_draws_t *d,
     ecs_entity_t e);
+
+/** Get the index of the slice record of a sliced 2D shape, giving it one when it has none.
+ *
+ * A slice record takes two consecutive records of the clip buffer, computed every frame with
+ * the clips from the Shape2D, Image, ImageSlice and the Texture of the image of the shape.
+ *
+ * @param d The state
+ * @param e The shape
+ * @return The index of the first of its two records
+ */
+int32_t box_draws_slice_of(
+    box_render_draws_t *d,
+    ecs_entity_t e);
+
+/** Compute the slice record of a sliced 2D shape: the nine parts of its Image, as fractions of
+ * the element, or the plain Image while the texture has no Texture.
+ *
+ * @param world The world
+ * @param e The shape
+ * @param out Receives the record
+ * @return Whether the shape is still sliced
+ */
+bool box_draws_slice_record(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    box_render_slice_t *out);
 
 /** Write the areas of the clips into the clip buffer when one changed: added, removed, moved,
  * resized or reparented.

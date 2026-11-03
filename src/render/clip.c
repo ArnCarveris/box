@@ -4,6 +4,10 @@
  *
  * Every clip has an index into the clip buffer that the 2D instances below it hold; its area is
  * computed every frame from the element and uploaded when one changed.
+ *
+ * The slice records of the Rects with an ImageSlice live in the same buffer, two clip records
+ * each, so the 2D shape shader reads them without a binding of their own; they are computed
+ * every frame too, which picks up a texture that finished loading.
  */
 
 #include "draw.h"
@@ -11,6 +15,9 @@
 
 /** Clips the smallest clip buffer holds */
 #define BOX_DRAWS_MIN_CLIPS (16)
+
+_Static_assert(sizeof(box_render_slice_t) == 2 * sizeof(box_render_clip_t),
+    "a slice record takes two clip records, as fs_slice of shape2d.wgsl reads it");
 
 /** Most ancestors a walk up the hierarchy visits looking for clips */
 #define BOX_DRAWS_CLIP_WALK (256)
@@ -334,6 +341,8 @@ void box_draws_clips_init(
     ecs_vec_init_t(NULL, &c->entities, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &c->records, box_render_clip_t, 0);
     ecs_vec_init_t(NULL, &c->free, int32_t, 0);
+    ecs_map_init(&c->slices, NULL);
+    ecs_vec_init_t(NULL, &c->slice_free, int32_t, 0);
     *ecs_vec_append_t(NULL, &c->entities, ecs_entity_t) = 0;
     ecs_os_zeromem(ecs_vec_append_t(NULL, &c->records, box_render_clip_t));
 }
@@ -347,6 +356,8 @@ void box_draws_clips_fini(
     ecs_vec_fini_t(NULL, &c->entities, ecs_entity_t);
     ecs_vec_fini_t(NULL, &c->records, box_render_clip_t);
     ecs_vec_fini_t(NULL, &c->free, int32_t);
+    ecs_map_fini(&c->slices);
+    ecs_vec_fini_t(NULL, &c->slice_free, int32_t);
 }
 
 /** Get the clip index of an element, giving it one when it has none.
@@ -430,6 +441,78 @@ void box_draws_clip_removed(
     }
 }
 
+int32_t box_draws_slice_of(
+    box_render_draws_t *d,
+    ecs_entity_t e)
+{
+    box_draw_clips_t *c = &d->clips;
+    uint64_t *found = ecs_map_get(&c->slices, e);
+    int32_t result;
+    if (found) {
+        result = (int32_t)*found;
+        goto done;
+    }
+
+    if (ecs_vec_count(&c->slice_free)) {
+        result = *ecs_vec_last_t(&c->slice_free, int32_t);
+        ecs_vec_remove_last(&c->slice_free);
+    } else {
+        result = ecs_vec_count(&c->entities);
+        ecs_vec_append_t(NULL, &c->entities, ecs_entity_t);
+        ecs_vec_append_t(NULL, &c->entities, ecs_entity_t);
+        ecs_vec_append_t(NULL, &c->records, box_render_clip_t);
+        ecs_vec_append_t(NULL, &c->records, box_render_clip_t);
+    }
+
+    *ecs_vec_get_t(&c->entities, ecs_entity_t, result) = e;
+    *ecs_vec_get_t(&c->entities, ecs_entity_t, result + 1) = 0;
+    ecs_os_zeromem(ecs_vec_get_t(&c->records, box_render_clip_t, result));
+    ecs_os_zeromem(ecs_vec_get_t(&c->records, box_render_clip_t, result + 1));
+    ecs_map_insert(&c->slices, e, (uint64_t)result);
+    c->dirty = true;
+done:
+    return result;
+}
+
+bool box_draws_slice_record(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    box_render_slice_t *out)
+{
+    const Shape2D *shape = ecs_get(world, e, Shape2D);
+    const Image *image = shape && shape->sliced ? ecs_get(world, e, Image) : NULL;
+    const ImageSlice *slice = image ? ecs_get(world, e, ImageSlice) : NULL;
+    const Texture *texture = slice && image->texture && ecs_is_alive(world, image->texture)
+        ? ecs_get(world, image->texture, Texture) : NULL;
+    box_image_slice_t parts;
+    int32_t i;
+    bool result = slice != NULL;
+    ecs_os_zeromem(out);
+    if (!result) {
+        goto done;
+    }
+
+    float w = shape->size[0], h = shape->size[1];
+    box_image_slice_resolve(image, slice, texture ? (float)texture->width : 0.0f,
+        texture ? (float)texture->height : 0.0f, w, h, &parts);
+    w = w > 0.0f ? w : 1.0f;
+    h = h > 0.0f ? h : 1.0f;
+    for (i = 0; i < 4; i ++) {
+        out->x[i] = parts.x[i] / w;
+        out->y[i] = parts.y[i] / h;
+        out->u[i] = parts.u[i];
+        out->v[i] = parts.v[i];
+    }
+
+    out->period[0] = parts.period[0] / w;
+    out->period[1] = parts.period[1] / h;
+    out->period[2] = parts.period[2] / w;
+    out->period[3] = parts.period[3] / h;
+    out->flags[0] = parts.hollow ? 1.0f : 0.0f;
+done:
+    return result;
+}
+
 /** Compute the record of the clip of a hide_clipped float, which its draws and those of its
  * descendants nest in: an empty area while its anchor is clipped out, else one that contains
  * every position.
@@ -463,6 +546,27 @@ void box_draws_clips_send(
     for (i = 1; i < ecs_vec_count(&c->entities); i ++) {
         ecs_entity_t e = *ecs_vec_get_t(&c->entities, ecs_entity_t, i);
         if (!e) {
+            continue;
+        }
+
+        uint64_t *sl = ecs_map_get(&c->slices, e);
+        if (sl && *sl == (uint64_t)i) {
+            box_render_slice_t slice;
+            if (!ecs_is_alive(world, e) || !box_draws_slice_record(world, e, &slice)) {
+                *ecs_vec_get_t(&c->entities, ecs_entity_t, i) = 0;
+                *ecs_vec_append_t(NULL, &c->slice_free, int32_t) = i;
+                ecs_map_remove(&c->slices, e);
+                i ++;
+                continue;
+            }
+
+            box_render_clip_t *cur = ecs_vec_get_t(&c->records, box_render_clip_t, i);
+            if (ecs_os_memcmp(cur, &slice, ECS_SIZEOF(slice))) {
+                ecs_os_memcpy(cur, &slice, ECS_SIZEOF(slice));
+                c->dirty = true;
+            }
+
+            i ++;
             continue;
         }
 

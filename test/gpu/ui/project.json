@@ -313,6 +313,15 @@
                     "click_reaches_game",
                     "scroll_reaches_game"
                 ]
+            },
+            {
+                "id": "ImageSlice",
+                "testcases": [
+                    "corners_keep_size",
+                    "edges_stretch",
+                    "edges_tile",
+                    "hollow_center"
+                ]
             }
         ]
     }

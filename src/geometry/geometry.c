@@ -575,6 +575,8 @@ void BoxGeometryImport(
     ECS_META_COMPONENT(world, Border);
     ECS_META_COMPONENT(world, BoxShadow);
     ECS_META_COMPONENT(world, Image);
+    ECS_META_COMPONENT(world, SliceFill);
+    ECS_META_COMPONENT(world, ImageSlice);
 
     ECS_COMPONENT_DEFINE(world, ShapeMesh);
     ecs_set_hooks(world, ShapeMesh, {

@@ -1,0 +1,54 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.perf
+
+// A screen of 200 nine slice panels lying on the ground, 20 by 10, each the frame of
+// test/integration/visual/assets/frame.png on a Rect with an ImageSlice: every other column
+// stretches and the others tile their edges and center, a fifth are hollow. Each panel is one
+// instance of the slice batch (fs_slice) that reads its slice record from the clip buffer.
+camera {
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {24, 28, 38, 255}}}
+}
+
+frame {
+  TexturePath: {path: "test/integration/visual/assets/frame.png"}
+}
+
+ui {
+  Position: {0, 0.01, 0}
+  Rotation: {-1.5708, 0, 0}
+  Scale: {0.01, 0.01, 0.01}
+
+  screen {
+    Position: {0, 0, 0}
+    Rect: {1280, 720}
+    Rgb: {236, 238, 242}
+
+    for x in 0..20 {
+      for y in 0..10 {
+        "panel_{x}_{y}" {
+          Position: {x * 62 - 589, y * 70 - 315, 1}
+          Rect: {56 + (y % 3) * 2, 60 + (x % 2) * 4}
+          Image: {texture: frame}
+          ImageSlice: {
+            left: 16, top: 16, right: 16, bottom: 16, scale: 1,
+            edges: match x % 2 { 0: SliceStretch; _: SliceTile },
+            center: match x % 2 { 0: SliceStretch; _: SliceTile }, hollow: (x + y) % 5 == 0
+          }
+        }
+      }
+    }
+  }
+}
+
+$ {
+  PerfRun: {fps: 120, frames: 600, warmup: 120, period: 5, elevation: 60, camera: camera}
+}
