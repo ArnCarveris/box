@@ -24,6 +24,8 @@
 @group(0) @binding(5) var<storage, read_write> keys: array<vec2u>;
 @group(0) @binding(6) var<uniform> view: View;
 @group(0) @binding(7) var<uniform> step: SortStep;
+// Rows of the curves of the emitters, for the curves of motion; no entry point reads it yet
+@group(0) @binding(8) var<storage, read> curves: array<f32>;
 
 // Run length k and compare distance j of a step of the bitonic sort.
 struct SortStep {

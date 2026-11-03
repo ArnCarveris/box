@@ -3,6 +3,9 @@
 // twin with a box_ prefix in src/particle/simulate.h; a change to one is a change to both.
 // Lifetimes are whole microseconds, so the spawn accounting of the CPU and the integrate pass
 // agree on the frame each particle dies in.
+//
+// Curves are rows of the curve table, which a shader that includes this file declares as
+// curves: array<f32>, BOX_PARTICLE_CURVE_SAMPLES floats per row, baked by the extract.
 #pragma once
 
 // box_render_particle_block_t: ranges are (min, max) pairs, a max not above min hands out min.
@@ -52,13 +55,15 @@ struct Emitter {
     look: vec4u,
     // x: frames a second, y: softness, z: stretch, w: fraction lit
     params: vec4f,
-    // Keys of the size, opacity, rotation (turns) and spin curves at the ages 0, 1/3, 2/3, 1
-    curve_size: vec4f,
-    curve_opacity: vec4f,
-    curve_rotation: vec4f,
-    curve_spin: vec4f,
-    // Linear colors of the gradient at the same ages
-    gradient: array<vec4f, 4>,
+    // Rows of the size, opacity, rotation (turns) and spin curves in the curve table,
+    // CURVE_CONSTANT for a constant curve; the area of the spin curve is in the row after it
+    curve_rows: vec4u,
+    // Values of those curves while constant
+    curve_values: vec4f,
+    // Linear color of a constant gradient
+    gradient: vec3f,
+    // First of the GRADIENT_ROWS rows of the gradient, CURVE_CONSTANT for a constant one
+    gradient_row: u32,
     // x: vertices per particle, y: 1 when drawn through the sort keys, z: keys sorted, w: 1 when
     // the emitter has a ParticleAppearance
     draw: vec4u,
@@ -123,6 +128,15 @@ const GROUND_DIE: u32 = 2u;
 
 // Slot of a spawn with a lifetime of 0, which takes no slot
 const NO_SLOT: u32 = 0xFFFFFFFFu;
+
+// Samples of a row of the curve table, BOX_PARTICLE_CURVE_SAMPLES, from age 0 to 1
+const CURVE_SAMPLES: u32 = 64u;
+
+// Row of a constant curve, which reads no row, BOX_PARTICLE_CURVE_CONSTANT
+const CURVE_CONSTANT: u32 = 0xFFFFFFFFu;
+
+// Rows of the curve table a gradient takes, BOX_PARTICLE_GRADIENT_ROWS
+const GRADIENT_ROWS: u32 = 4u;
 
 const TAU: f32 = 6.28318530718;
 
@@ -271,57 +285,72 @@ fn particle_norm_age(age: f32, life: f32) -> f32 {
     return clamp(select(0.0, age / life, life > 0.0), 0.0, 1.0);
 }
 
-// A curve of four keys at the ages 0, 1/3, 2/3 and 1, linear between two keys.
-fn particle_curve(keys: vec4f, t: f32) -> f32 {
-    let s = clamp(t, 0.0, 1.0) * 3.0;
-    let i = min(floor(s), 2.0);
-    let f = s - i;
-    var a = keys.x;
-    var b = keys.y;
-    if (i >= 2.0) {
-        a = keys.z;
-        b = keys.w;
-    } else if (i >= 1.0) {
-        a = keys.y;
-        b = keys.z;
-    }
-    return a + (b - a) * f;
+// The sample a normalized age falls after in a row of the curve table, and in y how far it is
+// toward the next.
+fn particle_curve_sample(t: f32) -> vec2f {
+    let s = clamp(t, 0.0, 1.0) * f32(CURVE_SAMPLES - 1u);
+    let i = min(floor(s), f32(CURVE_SAMPLES - 2u));
+    return vec2f(i, s - i);
 }
 
-// Area under a curve from age 0 up to a normalized age.
-fn particle_curve_area(keys: vec4f, t: f32) -> f32 {
-    let s = clamp(t, 0.0, 1.0) * 3.0;
-    let f = clamp(vec3f(s) - vec3f(0.0, 1.0, 2.0), vec3f(0.0), vec3f(1.0));
-    let a = keys.xyz;
-    let b = keys.yzw;
-    return dot(f * a + 0.5 * f * f * (b - a), vec3f(1.0)) / 3.0;
-}
-
-// Degrees a particle has turned by its spin: the area under the spin curve up to its age.
-fn particle_turned(spin: f32, keys: vec4f, age: f32, life: f32) -> f32 {
-    if (all(keys == keys.xxxx)) {
-        return spin * keys.x * age;
+// A curve at a normalized age from its row of the curve table, linear between two samples; a
+// constant curve reads no row.
+fn particle_curve(row: u32, value: f32, t: f32) -> f32 {
+    if (row == CURVE_CONSTANT) {
+        return value;
     }
 
-    return spin * life * particle_curve_area(keys, particle_norm_age(age, life));
+    let at = particle_curve_sample(t);
+    let k = row * CURVE_SAMPLES + u32(at.x);
+    let a = curves[k];
+    return a + (curves[k + 1u] - a) * at.y;
+}
+
+// Area under a curve from age 0 up to a normalized age, from the accumulated area in the row
+// after its values: area[i] + f dt (v[i] + f (v[i + 1] - v[i]) / 2), exact for the samples.
+fn particle_curve_area(row: u32, value: f32, t: f32) -> f32 {
+    if (row == CURVE_CONSTANT) {
+        return value * clamp(t, 0.0, 1.0);
+    }
+
+    let at = particle_curve_sample(t);
+    let k = row * CURVE_SAMPLES + u32(at.x);
+    let v = curves[k];
+    let dt = 1.0 / f32(CURVE_SAMPLES - 1u);
+    return curves[k + CURVE_SAMPLES] + at.y * dt * (v + 0.5 * at.y * (curves[k + 1u] - v));
+}
+
+// Degrees a particle has turned by its spin: the area under the spin curve up to its age, and
+// for a constant curve the spin times its value times the age.
+fn particle_turned(spin: f32, row: u32, value: f32, age: f32, life: f32) -> f32 {
+    if (row == CURVE_CONSTANT) {
+        return spin * value * age;
+    }
+
+    return spin * life * particle_curve_area(row, value, particle_norm_age(age, life));
 }
 
 // Rotation of a particle in degrees: spawned, plus the turns of the rotation curve, plus spin.
-fn particle_rotation(rotation: f32, spin: f32, rotation_keys: vec4f, spin_keys: vec4f,
-    age: f32, life: f32) -> f32
+fn particle_rotation(rotation: f32, spin: f32, rotation_row: u32, rotation_value: f32,
+    spin_row: u32, spin_value: f32, age: f32, life: f32) -> f32
 {
     let t = particle_norm_age(age, life);
-    return rotation + 360.0 * particle_curve(rotation_keys, t) +
-        particle_turned(spin, spin_keys, age, life);
+    return rotation + 360.0 * particle_curve(rotation_row, rotation_value, t) +
+        particle_turned(spin, spin_row, spin_value, age, life);
 }
 
-// A gradient of four linear colors at the keys of a curve.
-fn particle_gradient(keys: array<vec4f, 4>, t: f32) -> vec3f {
-    let s = clamp(t, 0.0, 1.0) * 3.0;
-    let i = min(floor(s), 2.0);
-    let k = u32(i);
-    var g = keys;
-    return mix(g[k].rgb, g[k + 1u].rgb, s - i);
+// A gradient at a normalized age from its rows of the curve table, a linear color of four
+// floats per sample; a constant gradient reads no row.
+fn particle_gradient(row: u32, value: vec3f, t: f32) -> vec3f {
+    if (row == CURVE_CONSTANT) {
+        return value;
+    }
+
+    let at = particle_curve_sample(t);
+    let k = (row * CURVE_SAMPLES + u32(at.x) * 4u);
+    let a = vec3f(curves[k], curves[k + 1u], curves[k + 2u]);
+    let b = vec3f(curves[k + 4u], curves[k + 5u], curves[k + 6u]);
+    return mix(a, b, at.y);
 }
 
 // Frame of a sprite sheet a particle shows, row by row from the top left.

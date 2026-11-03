@@ -143,13 +143,16 @@ static void check_identity_curves(
 {
     int32_t i;
     for (i = 0; i < 4; i ++) {
-        test_flt(b->curve_size[i], 1);
-        test_flt(b->curve_opacity[i], 1);
-        test_flt(b->curve_rotation[i], 0);
-        test_flt(b->curve_spin[i], 1);
-        test_flt(b->gradient[i][0], 1);
-        test_flt(b->gradient[i][1], 1);
-        test_flt(b->gradient[i][2], 1);
+        test_uint(b->curve_rows[i], BOX_PARTICLE_CURVE_CONSTANT);
+    }
+
+    test_flt(b->curve_values[0], 1);
+    test_flt(b->curve_values[1], 1);
+    test_flt(b->curve_values[2], 0);
+    test_flt(b->curve_values[3], 1);
+    test_uint(b->gradient_row, BOX_PARTICLE_CURVE_CONSTANT);
+    for (i = 0; i < 3; i ++) {
+        test_flt(b->gradient[i], 1);
     }
 }
 
@@ -371,17 +374,26 @@ void Appearance_block_curves(void) {
     const box_render_particle_pool_t *pool = pool_of(null, e);
     test_assert(pool != NULL);
     const box_render_particle_block_t *b = &pool->block;
-    test_flt(b->curve_size[0], 1);
-    test_flt(b->curve_size[3], 4);
-    test_flt(b->curve_opacity[1], 1);
-    test_flt(b->curve_opacity[3], 0);
-    test_flt(b->curve_rotation[1], 0.25f);
-    test_flt(b->curve_spin[1], 0);
-    test_flt(b->gradient[0][0], 1);
-    test_flt(b->gradient[0][1], 0);
-    test_flt(b->gradient[1][1], 1);
-    test_flt(b->gradient[2][2], 1);
-    test_assert(fabsf(b->gradient[3][0] - box_particle_linear(128)) < 1e-6f);
+    const float *table = box_render_particles_curve_table(box_render_particles_get(world), NULL);
+    float c[3];
+    test_assert(table != NULL);
+    test_uint(pool->curves, BOX_RENDER_BUFFER_PARTICLE_CURVES);
+    test_flt(box_particle_curve(table, b->curve_rows[0], b->curve_values[0], 0), 1);
+    test_flt(box_particle_curve(table, b->curve_rows[0], b->curve_values[0], 1), 4);
+    test_flt(box_particle_curve(table, b->curve_rows[1], b->curve_values[1], 1.0f / 3.0f), 1);
+    test_flt(box_particle_curve(table, b->curve_rows[1], b->curve_values[1], 1), 0);
+    test_flt(box_particle_curve(table, b->curve_rows[2], b->curve_values[2], 1.0f / 3.0f),
+        0.25f);
+    test_flt(box_particle_curve(table, b->curve_rows[3], b->curve_values[3], 1.0f / 3.0f), 0);
+    box_particle_gradient(table, b->gradient_row, b->gradient, 0, c);
+    test_flt(c[0], 1);
+    test_flt(c[1], 0);
+    box_particle_gradient(table, b->gradient_row, b->gradient, 1.0f / 3.0f, c);
+    test_flt(c[1], 1);
+    box_particle_gradient(table, b->gradient_row, b->gradient, 2.0f / 3.0f, c);
+    test_flt(c[2], 1);
+    box_particle_gradient(table, b->gradient_row, b->gradient, 1, c);
+    test_assert(fabsf(c[0] - box_particle_linear(128)) < 1e-6f);
     test_uint(b->look, ParticleCircle);
     test_uint(b->sorted, 1);
     test_uint(b->sort_count, BOX_RENDER_PARTICLE_SORT_MIN);

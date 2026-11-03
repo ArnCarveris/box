@@ -80,6 +80,19 @@
 /** Points of the table an EmitterMesh spawns from */
 #define BOX_PARTICLE_MESH_POINTS (4096)
 
+/** Samples of a row of the curve table, from age 0 to 1: 63 intervals, so the keys of a
+ * ParticleCurve at 1/3 and 2/3 fall on the samples 21 and 42 */
+#define BOX_PARTICLE_CURVE_SAMPLES (64)
+
+/** Row of a constant curve, which reads no row of the curve table */
+#define BOX_PARTICLE_CURVE_CONSTANT (0xFFFFFFFFu)
+
+/** Rows of the curve table a gradient takes, a linear color of four floats per sample */
+#define BOX_PARTICLE_GRADIENT_ROWS (4)
+
+/** Rows of the curve table a spin curve takes, its values and their accumulated area */
+#define BOX_PARTICLE_SPIN_ROWS (2)
+
 /** A sampled point of the surface of a mesh, as TablePoint in particle.wgsl */
 typedef struct box_particle_point_t {
     float position[4];      /**< Position in the space of the source shape, w unused */
@@ -551,63 +564,177 @@ static inline float box_particle_norm_age(
     return fminf(fmaxf(t, 0.0f), 1.0f);
 }
 
-/** Evaluate a ParticleCurve at a normalized age, linear between its four keys.
+/** Bake the four keys of a ParticleCurve to a row of BOX_PARTICLE_CURVE_SAMPLES samples from
+ * age 0 to 1, as the curve table holds it: a linear Curve with the keys at 0, 1/3, 2/3 and 1,
+ * baked by box_curve_bake. 63 intervals put the keys exactly on the samples 0, 21, 42 and 63.
+ *
+ * The Curve views keys on the stack, so it allocates nothing and runs without a world.
  *
  * @param keys Values at the ages 0, 1/3, 2/3 and 1
+ * @param out Receives BOX_PARTICLE_CURVE_SAMPLES samples
+ */
+static inline void box_particle_curve_bake(
+    const float *keys,
+    float *out)
+{
+    CurveKey key[4];
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        key[i] = (CurveKey){ .time = (float)i / 3.0f, .value = keys[i] };
+    }
+
+    Curve curve = {
+        .kind = CurveLinear, .keys = { .array = key, .count = 4, .size = 4 }
+    };
+    box_curve_bake(&curve, 0.0f, 1.0f, BOX_PARTICLE_CURVE_SAMPLES, keys[0], out);
+}
+
+/** Bake the accumulated area under a row of samples, the row the curve table holds after the
+ * values of a spin curve: area[i] is the area under the sampled curve from age 0 to sample i,
+ * exact for the curve linear between the samples.
+ *
+ * @param values BOX_PARTICLE_CURVE_SAMPLES samples from age 0 to 1
+ * @param out Receives BOX_PARTICLE_CURVE_SAMPLES areas, in normalized age times value
+ */
+static inline void box_particle_curve_bake_area(
+    const float *values,
+    float *out)
+{
+    double dt = 1.0 / (double)(BOX_PARTICLE_CURVE_SAMPLES - 1), sum = 0.0;
+    int32_t i;
+    out[0] = 0.0f;
+    for (i = 1; i < BOX_PARTICLE_CURVE_SAMPLES; i ++) {
+        sum += 0.5 * dt * ((double)values[i - 1] + (double)values[i]);
+        out[i] = (float)sum;
+    }
+}
+
+/** Bake four linear colors of a ParticleGradient to BOX_PARTICLE_GRADIENT_ROWS rows of the
+ * curve table: a linear color of four floats per sample, w 1, each channel baked as a curve.
+ *
+ * @param keys Linear colors at the ages 0, 1/3, 2/3 and 1, four floats each, w unused
+ * @param out Receives BOX_PARTICLE_CURVE_SAMPLES colors of four floats
+ */
+static inline void box_particle_gradient_bake(
+    const float *keys,
+    float *out)
+{
+    float channel[4], row[BOX_PARTICLE_CURVE_SAMPLES];
+    int32_t c, i;
+    for (c = 0; c < 3; c ++) {
+        for (i = 0; i < 4; i ++) {
+            channel[i] = keys[i * 4 + c];
+        }
+
+        box_particle_curve_bake(channel, row);
+        for (i = 0; i < BOX_PARTICLE_CURVE_SAMPLES; i ++) {
+            out[i * 4 + c] = row[i];
+        }
+    }
+
+    for (i = 0; i < BOX_PARTICLE_CURVE_SAMPLES; i ++) {
+        out[i * 4 + 3] = 1.0f;
+    }
+}
+
+/** Get the sample a normalized age falls after in a row and how far it is toward the next.
+ *
+ * @param t The normalized age, clamped to 0 to 1
+ * @param f Receives the fraction of the interval, 0 to 1
+ * @return The sample, 0 to BOX_PARTICLE_CURVE_SAMPLES - 2
+ */
+static inline int32_t box_particle_curve_sample(
+    float t,
+    float *f)
+{
+    float s = fminf(fmaxf(t, 0.0f), 1.0f) * (float)(BOX_PARTICLE_CURVE_SAMPLES - 1);
+    float i = fminf(floorf(s), (float)(BOX_PARTICLE_CURVE_SAMPLES - 2));
+    *f = s - i;
+
+    return (int32_t)i;
+}
+
+/** Evaluate a curve at a normalized age from its row in the curve table, linear between two
+ * samples; a constant curve reads no row.
+ *
+ * @param table The curve table, BOX_PARTICLE_CURVE_SAMPLES floats per row
+ * @param row Row of the curve, BOX_PARTICLE_CURVE_CONSTANT for a constant
+ * @param value The value of a constant curve
  * @param t The normalized age, clamped to 0 to 1
  * @return The value
  */
 static inline float box_particle_curve(
-    const float *keys,
+    const float *table,
+    uint32_t row,
+    float value,
     float t)
 {
-    float s = fminf(fmaxf(t, 0.0f), 1.0f) * 3.0f;
-    float i = fminf(floorf(s), 2.0f);
-    int32_t k = (int32_t)i;
+    float result = value, f;
+    if (row != BOX_PARTICLE_CURVE_CONSTANT) {
+        const float *v = table + (size_t)row * BOX_PARTICLE_CURVE_SAMPLES;
+        int32_t k = box_particle_curve_sample(t, &f);
+        result = v[k] + (v[k + 1] - v[k]) * f;
+    }
 
-    return keys[k] + (keys[k + 1] - keys[k]) * (s - i);
+    return result;
 }
 
-/** Get the area under a ParticleCurve from age 0 up to a normalized age.
+/** Get the area under a curve from age 0 up to a normalized age, from its row and the row of
+ * accumulated area after it: area[i] + f dt (v[i] + f (v[i + 1] - v[i]) / 2), exact for the
+ * sampled curve.
  *
- * @param keys Values at the ages 0, 1/3, 2/3 and 1
+ * @param table The curve table, BOX_PARTICLE_CURVE_SAMPLES floats per row
+ * @param row Row of the values, the area in the row after it, BOX_PARTICLE_CURVE_CONSTANT for
+ *        a constant
+ * @param value The value of a constant curve
  * @param t The normalized age, clamped to 0 to 1
  * @return The area, in normalized age times value
  */
 static inline float box_particle_curve_area(
-    const float *keys,
+    const float *table,
+    uint32_t row,
+    float value,
     float t)
 {
-    float s = fminf(fmaxf(t, 0.0f), 1.0f) * 3.0f, sum = 0.0f;
-    int32_t k;
-    for (k = 0; k < 3; k ++) {
-        float f = fminf(fmaxf(s - (float)k, 0.0f), 1.0f);
-        sum += f * keys[k] + 0.5f * f * f * (keys[k + 1] - keys[k]);
+    float result, f;
+    if (row == BOX_PARTICLE_CURVE_CONSTANT) {
+        result = value * fminf(fmaxf(t, 0.0f), 1.0f);
+    } else {
+        const float *v = table + (size_t)row * BOX_PARTICLE_CURVE_SAMPLES;
+        const float *area = v + BOX_PARTICLE_CURVE_SAMPLES;
+        float dt = 1.0f / (float)(BOX_PARTICLE_CURVE_SAMPLES - 1);
+        int32_t k = box_particle_curve_sample(t, &f);
+        result = area[k] + f * dt * (v[k] + 0.5f * f * (v[k + 1] - v[k]));
     }
 
-    return sum / 3.0f;
+    return result;
 }
 
 /** Get the degrees a particle has turned by its spin, the area under its spin curve up to its
- * age; a constant curve turns it by its spin times the key times its age.
+ * age; a constant curve turns it by its spin times the value times its age.
  *
  * @param spin Spin the particle spawned with, degrees per second
- * @param keys Keys of the spin curve
+ * @param table The curve table
+ * @param row Row of the spin curve, BOX_PARTICLE_CURVE_CONSTANT for a constant
+ * @param value The value of a constant spin curve
  * @param age Seconds the particle lived
  * @param life Seconds it lives
  * @return The degrees
  */
 static inline float box_particle_turned(
     float spin,
-    const float *keys,
+    const float *table,
+    uint32_t row,
+    float value,
     float age,
     float life)
 {
     float result;
-    if (keys[0] == keys[1] && keys[1] == keys[2] && keys[2] == keys[3]) {
-        result = spin * keys[0] * age;
+    if (row == BOX_PARTICLE_CURVE_CONSTANT) {
+        result = spin * value * age;
     } else {
-        result = spin * life * box_particle_curve_area(keys, box_particle_norm_age(age, life));
+        result = spin * life *
+            box_particle_curve_area(table, row, value, box_particle_norm_age(age, life));
     }
 
     return result;
@@ -618,8 +745,11 @@ static inline float box_particle_turned(
  *
  * @param rotation Rotation it spawned with in degrees
  * @param spin Spin it spawned with in degrees per second
- * @param rotation_keys Keys of the rotation curve, in turns
- * @param spin_keys Keys of the spin curve
+ * @param table The curve table
+ * @param rotation_row Row of the rotation curve, in turns, or BOX_PARTICLE_CURVE_CONSTANT
+ * @param rotation_value Value of a constant rotation curve
+ * @param spin_row Row of the spin curve, or BOX_PARTICLE_CURVE_CONSTANT
+ * @param spin_value Value of a constant spin curve
  * @param age Seconds the particle lived
  * @param life Seconds it lives
  * @return The degrees
@@ -627,33 +757,49 @@ static inline float box_particle_turned(
 static inline float box_particle_rotation(
     float rotation,
     float spin,
-    const float *rotation_keys,
-    const float *spin_keys,
+    const float *table,
+    uint32_t rotation_row,
+    float rotation_value,
+    uint32_t spin_row,
+    float spin_value,
     float age,
     float life)
 {
     float t = box_particle_norm_age(age, life);
 
-    return rotation + 360.0f * box_particle_curve(rotation_keys, t) +
-        box_particle_turned(spin, spin_keys, age, life);
+    return rotation + 360.0f * box_particle_curve(table, rotation_row, rotation_value, t) +
+        box_particle_turned(spin, table, spin_row, spin_value, age, life);
 }
 
-/** Evaluate a ParticleGradient at a normalized age, linear between its four linear colors.
+/** Evaluate a gradient at a normalized age from its rows in the curve table, linear between two
+ * samples; a constant gradient reads no row.
  *
- * @param keys Linear colors at the ages 0, 1/3, 2/3 and 1, four floats each, w unused
+ * @param table The curve table
+ * @param row First of the BOX_PARTICLE_GRADIENT_ROWS rows of the gradient, or
+ *        BOX_PARTICLE_CURVE_CONSTANT
+ * @param value Linear color of a constant gradient
  * @param t The normalized age, clamped to 0 to 1
  * @param out Receives the linear color
  */
 static inline void box_particle_gradient(
-    const float *keys,
+    const float *table,
+    uint32_t row,
+    const float *value,
     float t,
     float *out)
 {
-    float s = fminf(fmaxf(t, 0.0f), 1.0f) * 3.0f;
-    float i = fminf(floorf(s), 2.0f);
-    int32_t k = (int32_t)i * 4, c;
-    for (c = 0; c < 3; c ++) {
-        out[c] = keys[k + c] + (keys[k + 4 + c] - keys[k + c]) * (s - i);
+    float f;
+    int32_t c;
+    if (row == BOX_PARTICLE_CURVE_CONSTANT) {
+        for (c = 0; c < 3; c ++) {
+            out[c] = value[c];
+        }
+    } else {
+        const float *g = table + (size_t)row * BOX_PARTICLE_CURVE_SAMPLES;
+        int32_t k = box_particle_curve_sample(t, &f) * 4;
+        for (c = 0; c < 3; c ++) {
+            out[c] = g[k + c] + (g[k + 4 + c] - g[k + c]) * f;
+        }
     }
 }
 
