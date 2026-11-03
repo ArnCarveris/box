@@ -137,14 +137,13 @@ void box_audio_host_fini(
         box_audio_host_sound_free(host, i);
     }
 
-<<<<<<< HEAD
     for (i = 0; i < BOX_AUDIO_STREAM_MAX; i ++) {
         box_audio_host_chunks_free(host, i, host->streams[i].count);
-=======
+    }
+
     for (i = 0; i < BOX_AUDIO_REVERB_MAX; i ++) {
         ecs_os_free(host->reverbs[i]);
         host->reverbs[i] = NULL;
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
     }
 
     ecs_os_free(host->events);
@@ -390,7 +389,6 @@ done:
     return result;
 }
 
-<<<<<<< HEAD
 /** Copy a chunk of a stream and give it to the core.
  *
  * @param t The transport
@@ -423,7 +421,10 @@ static bool box_audio_null_stream_chunk(
         box_audio_host_chunk_drop(&n->host, stream);
     }
 
-=======
+done:
+    return result;
+}
+
 /** Allocate the delay memory of a reverb slot and give it to the core.
  *
  * @param t The transport
@@ -444,12 +445,10 @@ static bool box_audio_null_reverb(
 
     memory = box_audio_host_reverb(&n->host, slot, t->sample_rate, &floats);
     result = memory && box_audio_core_reverb_memory(n->core, slot, memory, floats);
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 done:
     return result;
 }
 
-<<<<<<< HEAD
 /** Read the status of a stream of the core and free the chunks it is done with.
  *
  * @param t The transport
@@ -466,8 +465,6 @@ static void box_audio_null_stream_status(
     box_audio_host_stream_sync(&n->host, stream, status);
 }
 
-=======
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 /** Take the events of the core.
  *
  * @param t The transport
@@ -636,12 +633,9 @@ box_audio_transport_t* box_audio_transport_null_new(
         .sample_rate = box_audio_core_sample_rate(n->core),
         .commands = box_audio_null_commands,
         .sound = box_audio_null_sound,
-<<<<<<< HEAD
         .stream_chunk = box_audio_null_stream_chunk,
         .stream_status = box_audio_null_stream_status,
-=======
         .reverb = box_audio_null_reverb,
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
         .read_events = box_audio_null_read_events,
         .state = box_audio_null_state,
         .update = box_audio_null_update,
@@ -820,7 +814,6 @@ static bool box_audio_webt_sound(
     return data && frames > 0 && (channels == 1 || channels == 2);
 }
 
-<<<<<<< HEAD
 /** Post a chunk of a stream to the worklet, which copies it into the heap of its core and frees
  * it there once the core consumed it.
  *
@@ -848,7 +841,11 @@ static bool box_audio_webt_stream_chunk(
         (channels == 1 || channels == 2) && stream < BOX_AUDIO_STREAM_MAX;
     if (result) {
         box_audio_web_chunk(stream, data, frames, channels, last);
-=======
+    }
+
+    return result;
+}
+
 /** Ask the worklet to allocate the delay memory of a reverb slot in the heap of its core.
  *
  * @param t The transport
@@ -864,13 +861,11 @@ static bool box_audio_webt_reverb(
     if (result && !(w->reverbs & (1u << slot))) {
         box_audio_web_reverb(slot);
         w->reverbs |= 1u << slot;
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
     }
 
     return result;
 }
 
-<<<<<<< HEAD
 /** Report the status of a stream the worklet posted last; the worklet frees its chunks.
  *
  * @param t The transport
@@ -886,8 +881,6 @@ static void box_audio_webt_stream_status(
     box_audio_web_stream_status((int)stream, (int32_t*)status);
 }
 
-=======
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 /** Take the events the worklet reported.
  *
  * @param t The transport
@@ -1014,12 +1007,9 @@ box_audio_transport_t* box_audio_transport_web_new(void)
             .kind = BOX_AUDIO_TRANSPORT_WEB,
             .commands = box_audio_webt_commands,
             .sound = box_audio_webt_sound,
-<<<<<<< HEAD
             .stream_chunk = box_audio_webt_stream_chunk,
             .stream_status = box_audio_webt_stream_status,
-=======
             .reverb = box_audio_webt_reverb,
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
             .read_events = box_audio_webt_read_events,
             .state = box_audio_webt_state,
             .update = box_audio_webt_update,

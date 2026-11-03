@@ -255,7 +255,6 @@ int32_t box_audio_core_wasm_sound(
         sample_rate) ? 1 : 0;
 }
 
-<<<<<<< HEAD
 /** Give a stream a chunk the worklet copied into the heap.
  *
  * @param stream Index of the stream
@@ -286,7 +285,8 @@ box_audio_stream_status_t* box_audio_core_wasm_stream_status(
     box_audio_core_stream_status(box_audio_core_wasm, stream, &box_audio_core_wasm_st);
 
     return &box_audio_core_wasm_st;
-=======
+}
+
 /** Get the floats of delay memory a reverb of the core needs.
  *
  * @return Number of floats
@@ -310,7 +310,6 @@ int32_t box_audio_core_wasm_reverb(
     int32_t floats)
 {
     return box_audio_core_reverb_memory(box_audio_core_wasm, slot, data, floats) ? 1 : 0;
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 }
 
 /** Apply a command batch the worklet copied into the heap.

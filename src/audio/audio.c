@@ -23,11 +23,8 @@ ECS_COMPONENT_DECLARE(AudioBusState);
 ECS_COMPONENT_DECLARE(AudioVoice);
 ECS_COMPONENT_DECLARE(AudioReverbState);
 ECS_COMPONENT_DECLARE(AudioSample);
-<<<<<<< HEAD
 ECS_COMPONENT_DECLARE(AudioMusic);
-=======
 ECS_COMPONENT_DECLARE(AudioSynth);
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 
 /** Construct AudioBus values: unity volume to the master, centered, no send.
  *
@@ -67,32 +64,36 @@ static void box_audio_source_ctor(
     }
 }
 
-<<<<<<< HEAD
 /** Construct AudioStream values: a stream that loops and plays at once at unity volume.
-=======
-/** Construct AudioSpatial values: full volume within 1, silent from 50, rolloff 1.
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
  *
  * @param ptr The components
  * @param count Number of components
  * @param ti Type info
  */
-<<<<<<< HEAD
 static void box_audio_stream_ctor(
-=======
-static void box_audio_spatial_ctor(
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
     void *ptr,
     int32_t count,
     const ecs_type_info_t *ti)
 {
-<<<<<<< HEAD
     AudioStream *values = ptr;
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
         values[i] = (AudioStream){ .volume = 1.0f, .loop = true, .playing = true };
-=======
+    }
+}
+
+/** Construct AudioSpatial values: full volume within 1, silent from 50, rolloff 1.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_spatial_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
     AudioSpatial *values = ptr;
     int32_t i;
     (void)ti;
@@ -158,7 +159,6 @@ static void box_audio_synth_filter_ctor(
     (void)ti;
     for (i = 0; i < count; i ++) {
         values[i] = (SynthFilter){ .kind = SynthLowPass, .cutoff = 1000.0f };
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
     }
 }
 
@@ -572,11 +572,8 @@ static void box_audio_module_free(
     ecs_vec_fini_t(NULL, &state->plays, box_audio_play_t);
     ecs_vec_fini_t(NULL, &state->stops, uint32_t);
     ecs_vec_fini_t(NULL, &state->releases, uint32_t);
-<<<<<<< HEAD
     box_audio_music_fini(state);
-=======
     ecs_vec_fini_t(NULL, &state->moved, ecs_entity_t);
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
     box_audio_sample_fini(state);
     ecs_os_free(state->capture.path);
     ecs_os_free(state);
@@ -646,14 +643,12 @@ void BoxAudioImport(
     box_owned_hooks(world, SoundStatus, BOX_OWNED_STR(SoundStatus, error));
     ECS_META_COMPONENT(world, AudioSource);
     ecs_set_hooks(world, AudioSource, { .ctor = box_audio_source_ctor });
-<<<<<<< HEAD
     ECS_META_COMPONENT(world, AudioStream);
     box_owned_hooks(world, AudioStream, BOX_OWNED_STR(AudioStream, path));
     ecs_set_hooks(world, AudioStream, { .ctor = box_audio_stream_ctor });
     ECS_META_COMPONENT(world, AudioStreamState);
     ECS_META_COMPONENT(world, AudioStreamStatus);
     box_owned_hooks(world, AudioStreamStatus, BOX_OWNED_STR(AudioStreamStatus, error));
-=======
     ECS_TAG_DEFINE(world, AudioListener);
     ECS_META_COMPONENT(world, AudioSpatial);
     ecs_set_hooks(world, AudioSpatial, { .ctor = box_audio_spatial_ctor });
@@ -667,7 +662,6 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, SynthFilter);
     ecs_set_hooks(world, SynthFilter, { .ctor = box_audio_synth_filter_ctor });
     ECS_META_COMPONENT(world, SynthSound);
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
     ECS_META_COMPONENT(world, AudioSettings);
     ecs_set_hooks(world, AudioSettings, { .ctor = box_audio_settings_ctor });
     ECS_META_COMPONENT(world, AudioStatus);
@@ -677,11 +671,8 @@ void BoxAudioImport(
     ECS_COMPONENT_DEFINE(world, AudioVoice);
     ECS_COMPONENT_DEFINE(world, AudioReverbState);
     ECS_COMPONENT_DEFINE(world, AudioSample);
-<<<<<<< HEAD
     ECS_COMPONENT_DEFINE(world, AudioMusic);
-=======
     ECS_COMPONENT_DEFINE(world, AudioSynth);
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
     ecs_set_hooks(world, AudioSoundId, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioSynth, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioBusState, { .copy = box_audio_track_copy });
@@ -694,12 +685,9 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(AudioSource), EcsWith, ecs_id(AudioVoice));
     ecs_add_pair(world, ecs_id(Reverb), EcsWith, ecs_id(AudioReverbState));
     ecs_add_pair(world, ecs_id(SoundFile), EcsWith, ecs_id(AudioSample));
-<<<<<<< HEAD
     ecs_add_pair(world, ecs_id(AudioStream), EcsWith, ecs_id(AudioMusic));
-=======
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSoundId));
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSynth));
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 
     ecs_entity(world, { .name = "master" });
     ecs_singleton_add(world, AudioSettings);
@@ -719,10 +707,7 @@ void BoxAudioImport(
 
     box_audio_sync_init(world, state);
     box_audio_sample_init(world, state);
-<<<<<<< HEAD
     box_audio_music_init(world, state);
-=======
     box_audio_synth_init(world);
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
     box_audio_functions_init(world);
 }

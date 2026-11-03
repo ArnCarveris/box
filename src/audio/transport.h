@@ -85,7 +85,6 @@ struct box_audio_transport_t {
     bool (*sound)(box_audio_transport_t *t, uint32_t id, const float *data, int32_t frames,
         int32_t channels, float sample_rate);
 
-<<<<<<< HEAD
     /** Hand over a chunk of a stream that a STREAM command opened for a voice; the frames are
      * copied and freed once the core consumed them or the stream closed.
      * @return Whether the transport took the chunk */
@@ -96,13 +95,12 @@ struct box_audio_transport_t {
      * core is done with. A status of another voice than the last one opened is not current */
     void (*stream_status)(box_audio_transport_t *t, uint32_t stream,
         box_audio_stream_status_t *status);
-=======
+
     /** Give the core the delay memory of a reverb slot, before its first reverb command. The
      * transport allocates it where the core runs and frees it after the core; a slot gets it
      * once per transport, and a later call returns true.
      * @return Whether the memory went out */
     bool (*reverb)(box_audio_transport_t *t, uint32_t slot);
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 
     /** Take the events of the core, oldest first.
      * @return Number of events written */

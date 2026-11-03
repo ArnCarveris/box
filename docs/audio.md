@@ -42,12 +42,9 @@ start of the next render block. They are:
 | `BUS_SET` | bus, `VOLUME`, `PAN`, `MUTE` or `SEND` (the send level), value |
 | `ORDER` | count, then per bus in processing order: bus, output, send |
 | `SOUND_RELEASE` | sound: freed once no voice plays it |
-<<<<<<< HEAD
 | `STREAM` | voice handle, stream, bus, volume, channels, sample rate: opens a stream and starts a voice that reads it |
-=======
 | `REVERB` | slot, bus (or none), decay, damping, predelay, size, mix: see [Reverb](#reverb) |
 | `SYNTH` | sound, then a patch: makes a free sound id a synth or replaces its patch, see [Synth](#synth) |
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 
 The sender picks the voice handles, so it addresses a voice without waiting for a reply. Values
 are clamped (volumes and send levels to 0..4, pans to -1..1, pitches to 1/64..16) and a NaN
@@ -605,14 +602,11 @@ frame, the same on every platform.
 | `Reverb` | A reverb on the bus of the entity: `decay` (1.5 s), `damping` (0.5), `predelay` (0.02 s), `size` (0.5), `mix` (1) |
 | `AudioOutput` | The bus a source, or a sound by default, plays on |
 | `AudioSource` | A sound that plays while the entity exists: `sound`, `volume` (1), `pitch` (1), `loop`, `playing` (true) |
-<<<<<<< HEAD
 | `AudioStream` | Music: an Ogg Vorbis file (`path`) that streams, `volume` (1), `loop` (true), `playing` (true), see [Music](#music) |
 | `AudioStreamStatus` | Read only: `state` (`AudioStreamLoading`, `AudioStreamPlaying`, `AudioStreamStopped`, `AudioStreamEnded`, `AudioStreamFailed`), `frames`, `channels`, `sample_rate`, `position`, `buffered`, `underruns`, `decode_ms`, `decode_max_ms` and `error` |
-=======
 | `SynthSound` | A sound made by the synth from its layers, see [Synth sounds](#synth-sounds) |
 | `AudioSpatial` | Places a source in the world: `min_distance` (1), `max_distance` (50), `rolloff` (1), see [Spatial audio](#spatial-audio) |
 | `AudioListener` | Tag of the entity whose `WorldTransform` hears the spatial sources |
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 | `AudioSettings` | Singleton: `master_volume` (1) and `mute` |
 | `AudioStatus` | Singleton, read only: `state`, `sample_rate`, `voices`, `voices_stolen`, `load`, `buses` |
 

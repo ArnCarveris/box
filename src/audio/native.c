@@ -73,11 +73,8 @@ typedef enum box_audio_msg_kind_t {
     BOX_AUDIO_MSG_COMMANDS = 1,  /**< A batch of commands of the core */
     BOX_AUDIO_MSG_SOUND = 2,     /**< A box_audio_msg_sound_t */
     BOX_AUDIO_MSG_CAPTURE = 3,   /**< A box_audio_capture_t to record into */
-<<<<<<< HEAD
-    BOX_AUDIO_MSG_CHUNK = 4      /**< A box_audio_msg_chunk_t */
-=======
-    BOX_AUDIO_MSG_REVERB = 4     /**< A box_audio_msg_reverb_t */
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
+    BOX_AUDIO_MSG_REVERB = 4,    /**< A box_audio_msg_reverb_t */
+    BOX_AUDIO_MSG_CHUNK = 5      /**< A box_audio_msg_chunk_t */
 } box_audio_msg_kind_t;
 
 /** Header of a message of the command ring, followed by size bytes */
@@ -95,7 +92,6 @@ typedef struct box_audio_msg_sound_t {
     float sample_rate;   /**< Frames per second of the sound */
 } box_audio_msg_sound_t;
 
-<<<<<<< HEAD
 /** A chunk of a stream handed to the audio thread; the frames stay with the main thread */
 typedef struct box_audio_msg_chunk_t {
     const float *data;   /**< Frames, interleaved when stereo */
@@ -113,7 +109,6 @@ typedef struct box_audio_native_stream_t {
     atomic_int underruns;        /**< Underruns since the stream opened */
     atomic_int starved;          /**< 1 while it plays silence */
 } box_audio_native_stream_t;
-=======
 /** The delay memory of a reverb slot handed to the audio thread; it stays with the main
  * thread */
 typedef struct box_audio_msg_reverb_t {
@@ -121,7 +116,6 @@ typedef struct box_audio_msg_reverb_t {
     uint32_t slot;       /**< Slot of the reverb */
     int32_t floats;      /**< Floats of the memory */
 } box_audio_msg_reverb_t;
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 
 /** The native transport */
 typedef struct box_audio_native_t {
@@ -557,7 +551,6 @@ done:
     return result;
 }
 
-<<<<<<< HEAD
 /** Copy a chunk of a stream and hand the copy to the audio thread; it stays with the main
  * thread until the status of the stream says the core is done with it.
  *
@@ -590,7 +583,14 @@ static bool box_audio_native_stream_chunk(
     result = box_audio_native_queue(n, BOX_AUDIO_MSG_CHUNK, &chunk, (int32_t)sizeof(chunk));
     if (!result) {
         box_audio_host_chunk_drop(&n->host, stream);
-=======
+        goto done;
+    }
+
+    box_audio_native_flush(n);
+done:
+    return result;
+}
+
 /** Allocate the delay memory of a reverb slot and hand it to the audio thread; it stays with
  * the main thread, which frees it after the core.
  *
@@ -615,7 +615,6 @@ static bool box_audio_native_reverb(
     if (!result && reverb.data) {
         ecs_os_free(reverb.data);
         n->host.reverbs[slot] = NULL;
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
         goto done;
     }
 
@@ -624,7 +623,6 @@ done:
     return result;
 }
 
-<<<<<<< HEAD
 /** Read the status of a stream the audio thread published and free the chunks it is done
  * with.
  *
@@ -659,8 +657,6 @@ done:
     return;
 }
 
-=======
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 /** Take the events of the audio thread.
  *
  * @param t The transport
@@ -897,12 +893,9 @@ box_audio_transport_t* box_audio_transport_native_new(
         .sample_rate = box_audio_core_sample_rate(n->core),
         .commands = box_audio_native_commands,
         .sound = box_audio_native_sound,
-<<<<<<< HEAD
         .stream_chunk = box_audio_native_stream_chunk,
         .stream_status = box_audio_native_stream_status,
-=======
         .reverb = box_audio_native_reverb,
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
         .read_events = box_audio_native_read_events,
         .state = box_audio_native_state,
         .update = box_audio_native_update,

@@ -679,12 +679,9 @@ static void box_audio_cmd(
     box_audio_cmd_stop_t stop;
     box_audio_cmd_set_t set;
     box_audio_cmd_release_t release;
-<<<<<<< HEAD
     box_audio_cmd_stream_t stream;
-=======
     box_audio_cmd_reverb_t reverb;
     box_audio_cmd_synth_t synth;
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
     box_audio_voice_t *v;
     if (type == BOX_AUDIO_CMD_PLAY && size >= (int32_t)sizeof(play)) {
         box_audio_copy(&play, bytes, (int32_t)sizeof(play));
@@ -706,18 +703,15 @@ static void box_audio_cmd(
     } else if (type == BOX_AUDIO_CMD_SOUND_RELEASE && size >= (int32_t)sizeof(release)) {
         box_audio_copy(&release, bytes, (int32_t)sizeof(release));
         box_audio_cmd_release(core, &release);
-<<<<<<< HEAD
     } else if (type == BOX_AUDIO_CMD_STREAM && size >= (int32_t)sizeof(stream)) {
         box_audio_copy(&stream, bytes, (int32_t)sizeof(stream));
         box_audio_cmd_stream(core, &stream);
-=======
     } else if (type == BOX_AUDIO_CMD_REVERB && size >= (int32_t)sizeof(reverb)) {
         box_audio_copy(&reverb, bytes, (int32_t)sizeof(reverb));
         box_audio_reverb_command(core, &reverb);
     } else if (type == BOX_AUDIO_CMD_SYNTH && size >= (int32_t)sizeof(synth)) {
         box_audio_copy(&synth, bytes, (int32_t)sizeof(synth));
         box_audio_synth_command(core, &synth);
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
     } else {
         box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, type, size);
     }

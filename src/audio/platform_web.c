@@ -124,7 +124,6 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                         core.box_audio_core_wasm_free(at);
                     }
                     this.port.postMessage({ type: 'sound', id: m.id, ok: ok });
-<<<<<<< HEAD
                 } else if (m.type === 'chunk') {
                     bytes = new Uint8Array(m.data);
                     at = this.copy(bytes);
@@ -135,7 +134,6 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                     } else if (at) {
                         core.box_audio_core_wasm_free(at);
                     }
-=======
                 } else if (m.type === 'reverb') {
                     var floats = core.box_audio_core_wasm_reverb_floats();
                     at = this.reverbs.has(m.slot) ? 0 :
@@ -159,7 +157,6 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                     this.port.postMessage({ type: 'bench', id: m.id, quanta: m.quanta,
                         seconds: seconds, voices: core.box_audio_core_wasm_voices(),
                         load: seconds / (m.quanta * this.quantum / sampleRate) });
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
                 } else if (m.type === 'capture') {
                     this.capture = { data: new Float32Array(m.frames * 2), frames: m.frames,
                         at: 0 };
@@ -167,17 +164,12 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                     this.port.postMessage({ type: 'stats', id: m.id, quanta: this.quanta,
                         frame: currentFrame, time: currentTime, sampleRate: sampleRate,
                         voices: core.box_audio_core_wasm_voices(), batches: this.batches,
-<<<<<<< HEAD
-                        sounds: this.sounds.size, memory: this.buffer.byteLength,
+                        sounds: this.sounds.size, reverbs: this.reverbs.size,
+                        memory: this.buffer.byteLength,
                         lost: core.box_audio_core_wasm_events_lost(),
                         chunks: this.chunks.reduce(function(n, c) { return n + c.length; }, 0),
                         streams: this.streamPosted.map(function(p) {
                             return p ? JSON.parse(p) : null; }) });
-=======
-                        sounds: this.sounds.size, reverbs: this.reverbs.size,
-                        memory: this.buffer.byteLength,
-                        lost: core.box_audio_core_wasm_events_lost() });
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
                 }
             }
 
@@ -533,7 +525,6 @@ EM_JS(void, box_audio_web_post_sound, (unsigned id, const float *data, int count
     }
 });
 
-<<<<<<< HEAD
 /** Post a copy of a chunk of a stream to the worklet, as a transferred ArrayBuffer.
  *
  * @param stream Index of the stream
@@ -625,7 +616,9 @@ EM_JS(void, box_audio_web_fetch_forget, (int id), {
     var fetches = Module.boxAudioFetches;
     if (fetches) {
         delete fetches.list[id];
-=======
+    }
+});
+
 /** Post a request for the delay memory of a reverb slot to the worklet.
  *
  * @param slot Slot of the reverb
@@ -634,7 +627,6 @@ EM_JS(void, box_audio_web_post_reverb, (unsigned slot), {
     var audio = Module.boxAudio;
     if (audio && !audio.failed) {
         audio.reverb(slot >>> 0);
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
     }
 });
 
@@ -673,7 +665,6 @@ EMSCRIPTEN_KEEPALIVE void box_audio_web_sound(
     }
 }
 
-<<<<<<< HEAD
 void box_audio_web_chunk(
     uint32_t stream,
     const float *data,
@@ -718,7 +709,6 @@ void box_audio_web_fetch_cancel(
     box_audio_web_fetch_forget(id);
 }
 
-=======
 EMSCRIPTEN_KEEPALIVE void box_audio_web_reverb(
     uint32_t slot)
 {
@@ -727,7 +717,6 @@ EMSCRIPTEN_KEEPALIVE void box_audio_web_reverb(
     }
 }
 
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 void box_audio_web_start(void)
 {
     int reason;
@@ -785,7 +774,6 @@ void box_audio_web_sound(
     (void)sample_rate;
 }
 
-<<<<<<< HEAD
 void box_audio_web_chunk(
     uint32_t stream,
     const float *data,
@@ -832,12 +820,12 @@ void box_audio_web_fetch_cancel(
     int32_t id)
 {
     (void)id;
-=======
+}
+
 void box_audio_web_reverb(
     uint32_t slot)
 {
     (void)slot;
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 }
 
 #endif

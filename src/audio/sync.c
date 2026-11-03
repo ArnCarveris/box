@@ -112,11 +112,8 @@ static void box_audio_reset(
     state->settings_sent = false;
     state->order_dirty = true;
     state->voices_stolen = 0;
-<<<<<<< HEAD
     box_audio_music_reset(state);
-=======
     state->spatial_dirty = true;
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
     if (state->capture.path && state->capture.serial) {
         ecs_err("box.audio: the output changed, the capture of '%s' is dropped",
             state->capture.path);
@@ -1416,23 +1413,17 @@ static void BoxAudioSync(
         box_audio_sounds(world, state, t);
         state->rate = t->sample_rate;
         box_audio_sources(world, state, waiting);
-<<<<<<< HEAD
         box_audio_music_update(world, state, t, waiting);
-=======
         box_audio_spatial_sources(world, state, waiting);
         if (listener_moved) {
             box_audio_spatial_oneshots(state);
         }
 
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
         box_audio_queued(world, state, waiting);
         state->spatial_dirty = false;
     } else {
-<<<<<<< HEAD
         box_audio_music_update(world, state, NULL, false);
-=======
         ecs_vec_clear(&state->moved);
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
         ecs_vec_clear(&state->plays);
         ecs_vec_clear(&state->stops);
         ecs_vec_clear(&state->releases);

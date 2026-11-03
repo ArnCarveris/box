@@ -128,7 +128,6 @@ ECS_STRUCT(AudioSource, {
     bool playing;          /**< Whether it plays, default true */
 });
 
-<<<<<<< HEAD
 /** Music: one Ogg Vorbis file that streams while the entity exists and playing is true.
  *
  * Decoded ahead in chunks, never whole: on a job natively, on the main thread for a bounded
@@ -168,7 +167,8 @@ ECS_STRUCT(AudioStreamStatus, {
                             *   spends it in its frame */
     float decode_max_ms;   /**< Largest decode_ms so far */
     char *error;           /**< Why it failed, NULL unless state is AudioStreamFailed */
-=======
+});
+
 /** Wave of a synth oscillator */
 ECS_ENUM(SynthWave, {
     SynthSine,             /**< Sine */
@@ -256,7 +256,6 @@ ECS_STRUCT(AudioSpatial, {
     float min_distance;    /**< Full volume within this distance, default 1 */
     float max_distance;    /**< Silent from this distance, default 50 */
     float rolloff;         /**< How fast the volume falls beyond min_distance, default 1 */
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 });
 
 /** Settings of the audio of the world, a singleton */

@@ -285,12 +285,9 @@ typedef struct box_audio_module_stats_t {
     int64_t reverbs;        /**< REVERB commands written */
     int64_t not_ready;      /**< Plays dropped while their sound file loaded */
     int64_t decodes;        /**< Decodes of sound files submitted */
-<<<<<<< HEAD
     int64_t music_jobs;     /**< Decode jobs of streams submitted */
     int64_t music_starts;   /**< Voices of streams started */
-=======
     int64_t synths;         /**< Compiles of synth sounds */
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 } box_audio_module_stats_t;
 
 /** A capture that waits for its frames */

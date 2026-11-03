@@ -59,7 +59,6 @@
 /** No bus, for the output of the master and a bus without a send */
 #define BOX_AUDIO_BUS_NONE 0xFF
 
-<<<<<<< HEAD
 /** Streams a core reads at once: one that plays and one that fades out after a change */
 #define BOX_AUDIO_STREAM_MAX 2
 
@@ -71,7 +70,6 @@
 
 /** Seconds of the fade of a stream that runs out of chunks, and of its recovery */
 #define BOX_AUDIO_STREAM_FADE 0.005f
-=======
 /** Reverbs that run at once; a reverb is addressed by a slot below this */
 #define BOX_AUDIO_REVERB_MAX 1
 
@@ -103,7 +101,6 @@
 
 /** Highest frequency of an oscillator in Hz, the top of the audible range */
 #define BOX_AUDIO_SYNTH_FREQUENCY_MAX 20000.0f
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 
 /** Commands of the byte stream. Each starts with a box_audio_cmd_header_t */
 typedef enum box_audio_cmd_type_t {
@@ -113,12 +110,9 @@ typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_BUS_SET = 4,       /**< box_audio_cmd_set_t on a bus */
     BOX_AUDIO_CMD_ORDER = 5,         /**< box_audio_cmd_order_t and its routes */
     BOX_AUDIO_CMD_SOUND_RELEASE = 6, /**< box_audio_cmd_release_t */
-<<<<<<< HEAD
-    BOX_AUDIO_CMD_STREAM = 7         /**< box_audio_cmd_stream_t */
-=======
     BOX_AUDIO_CMD_REVERB = 7,        /**< box_audio_cmd_reverb_t */
-    BOX_AUDIO_CMD_SYNTH = 8          /**< box_audio_cmd_synth_t */
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
+    BOX_AUDIO_CMD_SYNTH = 8,         /**< box_audio_cmd_synth_t */
+    BOX_AUDIO_CMD_STREAM = 9         /**< box_audio_cmd_stream_t */
 } box_audio_cmd_type_t;
 
 /** Parameters of BOX_AUDIO_CMD_VOICE_SET and BOX_AUDIO_CMD_BUS_SET */
@@ -192,7 +186,6 @@ typedef struct box_audio_cmd_release_t {
     uint32_t sound;                 /**< Id of the sound */
 } box_audio_cmd_release_t;
 
-<<<<<<< HEAD
 /** Open a stream and start a voice that reads it. The chunks of the stream come with
  * box_audio_core_stream_chunk; a stop fades the voice out and closes the stream */
 typedef struct box_audio_cmd_stream_t {
@@ -218,7 +211,6 @@ typedef struct box_audio_stream_status_t {
     int32_t underruns;   /**< Times the stream ran out of chunks since it opened */
     int32_t starved;     /**< 1 while it plays silence for want of chunks */
 } box_audio_stream_status_t;
-=======
 /** The parameters of a reverb */
 typedef struct box_audio_reverb_params_t {
     float decay;     /**< Seconds until -60 dB, BOX_AUDIO_REVERB_DECAY_MIN..MAX */
@@ -303,7 +295,6 @@ typedef struct box_audio_cmd_synth_t {
     uint32_t sound;                 /**< Id of the sound, free or a synth */
     box_audio_synth_patch_t patch;  /**< The patch, clamped by the core */
 } box_audio_cmd_synth_t;
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 
 /** Events the core reports to its transport */
 typedef enum box_audio_event_type_t {

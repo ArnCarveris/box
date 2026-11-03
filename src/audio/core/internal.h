@@ -116,11 +116,8 @@ typedef struct box_audio_reverb_t {
 typedef enum box_audio_source_kind_t {
     BOX_AUDIO_SOURCE_NONE = 0,   /**< No source, silent */
     BOX_AUDIO_SOURCE_SAMPLE = 1, /**< A sample buffer, box_audio_sample_source_t */
-<<<<<<< HEAD
-    BOX_AUDIO_SOURCE_STREAM = 2  /**< The ring of chunks of a stream, box_audio_stream_source_t */
-=======
-    BOX_AUDIO_SOURCE_SYNTH = 2   /**< A synth patch, box_audio_synth_source_t */
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
+    BOX_AUDIO_SOURCE_SYNTH = 2,  /**< A synth patch, box_audio_synth_source_t */
+    BOX_AUDIO_SOURCE_STREAM = 3  /**< The ring of chunks of a stream, box_audio_stream_source_t */
 } box_audio_source_kind_t;
 
 /** A source that plays a sound, mono or stereo, with looping and linear interpolation */
@@ -132,7 +129,6 @@ typedef struct box_audio_sample_source_t {
     bool loop;         /**< Whether it starts over at its end */
 } box_audio_sample_source_t;
 
-<<<<<<< HEAD
 /** Phases of a stream source */
 typedef enum box_audio_stream_phase_t {
     BOX_AUDIO_STREAM_PRIMING = 0,    /**< Waits for the first chunks; the voice ramp fades it in */
@@ -157,7 +153,6 @@ typedef struct box_audio_stream_source_t {
     int32_t phase;     /**< A box_audio_stream_phase_t */
     bool drained;      /**< Frame b repeats a, the last frame of the stream */
 } box_audio_stream_source_t;
-=======
 /** Segments of a synth envelope */
 typedef enum box_audio_synth_segment_t {
     BOX_AUDIO_SYNTH_ATTACK = 0,   /**< From 0 to 1 */
@@ -213,16 +208,12 @@ typedef struct box_audio_synth_source_t {
     int32_t cutoff_sweep; /**< Frames left of the sweep */
     int32_t control;      /**< Frames until the filter takes the swept cutoff */
 } box_audio_synth_source_t;
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 
 /** State of the kinds of sources */
 typedef union box_audio_source_data_t {
     box_audio_sample_source_t sample;  /**< BOX_AUDIO_SOURCE_SAMPLE */
-<<<<<<< HEAD
     box_audio_stream_source_t stream;  /**< BOX_AUDIO_SOURCE_STREAM */
-=======
     box_audio_synth_source_t synth;    /**< BOX_AUDIO_SOURCE_SYNTH */
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 } box_audio_source_data_t;
 
 /** What a voice plays */
@@ -271,7 +262,6 @@ typedef struct box_audio_sound_t {
     int32_t synth;      /**< Slot of its patch plus 1 for a synth, 0 for frames */
 } box_audio_sound_t;
 
-<<<<<<< HEAD
 /** A chunk of a stream: frames in the memory of the side that runs the core */
 typedef struct box_audio_chunk_t {
     const float *data;  /**< Frames, interleaved when stereo */
@@ -295,14 +285,12 @@ typedef struct box_audio_stream_t {
     int32_t underruns;   /**< Times it ran out of chunks since it opened */
     bool starved;        /**< Whether it plays silence for want of chunks */
 } box_audio_stream_t;
-=======
 /** A synth patch the core holds for a sound id */
 typedef struct box_audio_synth_slot_t {
     box_audio_synth_patch_t patch;  /**< The patch, clamped */
     uint32_t plays;     /**< Plays so far, which seed the noise and the variances */
     bool used;          /**< Whether a sound has the slot */
 } box_audio_synth_slot_t;
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 
 /** A bus: a volume, a pan, a mute, an output and one send, with a block of samples */
 typedef struct box_audio_bus_t {
@@ -431,7 +419,6 @@ void box_audio_source_sample(
     float pitch,
     bool loop);
 
-<<<<<<< HEAD
 /** Start a stream source on an open stream.
  *
  * @param core The core
@@ -442,7 +429,6 @@ void box_audio_source_stream(
     box_audio_core_t *core,
     box_audio_source_t *source,
     uint32_t stream);
-=======
 /** Apply a synth command: give a free sound id a patch or replace the patch of a synth.
  *
  * @param core The core
@@ -488,7 +474,6 @@ int32_t box_audio_synth_render(
 void box_audio_synth_pitch(
     box_audio_synth_source_t *src,
     float pitch);
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 
 /** Set the pitch ratio of a source, for kinds that have one.
  *

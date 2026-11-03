@@ -1,12 +1,7 @@
 /**
  * @file audio/core/source.c
-<<<<<<< HEAD
- * @brief Sources of voices: a sample buffer and the ring of chunks of a stream. New kinds add a
- * case to each function.
-=======
- * @brief Sources of voices: a sample buffer, or a synth patch (synth.c). A new kind adds a case
- * to each function.
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
+ * @brief Sources of voices: a sample buffer, a synth patch (synth.c) or the ring of chunks of
+ * a stream. A new kind adds a case to each function.
  */
 
 #include "internal.h"
@@ -318,13 +313,10 @@ int32_t box_audio_source_render(
     *stereo = false;
     if (source->kind == BOX_AUDIO_SOURCE_SAMPLE) {
         done = box_audio_sample_render(core, &source->data.sample, frames, stereo);
-<<<<<<< HEAD
     } else if (source->kind == BOX_AUDIO_SOURCE_STREAM) {
         done = box_audio_stream_render(core, &source->data.stream, frames, stereo);
-=======
     } else if (source->kind == BOX_AUDIO_SOURCE_SYNTH) {
         done = box_audio_synth_render(core, &source->data.synth, frames);
->>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
     }
 
     for (i = done; i < frames; i ++) {
