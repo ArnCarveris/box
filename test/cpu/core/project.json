@@ -280,6 +280,7 @@
                     "source_declared_after",
                     "source_gen_removed",
                     "source_deleted",
+                    "source_deleted_with_derived",
                     "with_path_error",
                     "remove",
                     "default_size",

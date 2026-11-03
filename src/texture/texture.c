@@ -60,6 +60,7 @@ static void box_textures_free(
     while (ecs_map_next(&it)) {
         box_texture_t *tex = ecs_map_ptr(&it);
         ecs_os_free(tex->pixels);
+        ecs_os_free(tex->source_name);
         ecs_os_free(tex);
     }
 
@@ -324,6 +325,8 @@ static void box_texture_fail(
     box_texture_t *tex = box_texture_entry(t, e);
     tex->generation ++;
     tex->waiting = false;
+    ecs_os_free(tex->source_name);
+    tex->source_name = NULL;
     ecs_err("%s", error);
     box_texture_status(world, e, TextureFailed, box_texture_revision(world, e), error);
 }
@@ -347,6 +350,8 @@ static void box_texture_submit(
     job->entity = e;
     job->generation = ++ tex->generation;
     tex->waiting = false;
+    ecs_os_free(tex->source_name);
+    tex->source_name = NULL;
     t->sync->refs ++;
     ecs_os_mutex_lock(t->sync->lock);
     t->sync->working ++;
@@ -408,9 +413,11 @@ static void box_texture_request(
 
 /** Submit a generation of the TextureGen of an entity, with the layers of its source.
  *
- * A source that exists but has no TextureGen yet, such as one declared later in a script, makes
- * the texture wait in TextureLoading when wait is set; one that is deleted, loses its
- * TextureGen or has no layers fails it.
+ * A source without a TextureGen, such as one declared later in a script, one whose TextureGen
+ * is being removed or one being deleted, makes the texture wait in TextureLoading when wait is
+ * set, so a texture deleted with its source does not fail.
+ *
+ * A source that is deleted or has no layers otherwise fails it.
  *
  * @param world The world or a stage
  * @param t The registry
@@ -428,21 +435,25 @@ static void box_texture_request_gen(
     const TextureGen *field = gen;
     if (gen->source) {
         bool exists = ecs_is_alive(world, gen->source);
-        bool removed = exists && gen->source == t->removed;
+        bool removed = gen->source == t->removed;
         field = exists && !removed ? ecs_get(world, gen->source, TextureGen) : NULL;
-        if (!field && exists && !removed && wait) {
+        if (!field && wait && (exists || removed)) {
             box_texture_t *tex = box_texture_entry(t, e);
             tex->generation ++;
             tex->waiting = true;
+            ecs_os_free(tex->source_name);
+            tex->source_name = removed && exists ? ecs_get_path(world, gen->source) : NULL;
             box_texture_status(world, e, TextureLoading, box_texture_revision(world, e), NULL);
             goto done;
         }
 
         if (!field || !ecs_vec_count(&field->layers)) {
+            box_texture_t *tex = box_texture_entry(t, e);
             char *name = ecs_get_path(world, e);
             char *source = exists ? ecs_get_path(world, gen->source) : NULL;
+            const char *source_name = source ? source : tex->source_name;
             char *error = flecs_asprintf("texture '%s': source '%s' has no TextureGen with "
-                "layers", name, source ? source : "(deleted)");
+                "layers", name, source_name ? source_name : "(deleted)");
             box_texture_fail(world, t, e, error);
             ecs_os_free(error);
             ecs_os_free(source);
@@ -631,8 +642,11 @@ done:
 }
 
 /** Forget the textures whose TexturePath or TextureGen is removed and release their backend
- * image; one that keeps the other loads from it instead, keeping its entry and image. The
- * textures derived from a removed TextureGen, also on deletion of its entity, fail.
+ * image; one that keeps the other loads from it instead, keeping its entry and image.
+ *
+ * The textures derived from a removed TextureGen, also on deletion of its entity, wait for it
+ * and fail at the next frame unless they were deleted with it or got a source back. They are
+ * updated after the entries of the batch are dropped, so the ones deleted with it are gone.
  *
  * @param it The iterator of the observer
  */
@@ -668,6 +682,7 @@ static void BoxTextureOnRemove(
 
             ecs_map_remove(&t->textures, e);
             ecs_os_free(tex->pixels);
+            ecs_os_free(tex->source_name);
             ecs_os_free(tex);
         }
 
@@ -677,8 +692,6 @@ static void BoxTextureOnRemove(
         }
     }
 
-    /* After the loop, so derived textures deleted with their source in this batch are
-     * already forgotten */
     for (i = 0; !is_path && i < it->count; i ++) {
         t->removed = it->entities[i];
         box_texture_regenerate_derived(it->stage, t, it->entities[i]);
@@ -744,7 +757,8 @@ static void box_textures_warn_timeout(
     ecs_os_free(list);
 }
 
-/** Fail the textures that still wait for their source to get a TextureGen.
+/** Fail the textures that still wait for their source to get a TextureGen, or whose source
+ * lost it or was deleted.
  *
  * @param world The world
  * @param t The registry
@@ -778,8 +792,8 @@ static void box_textures_fail_waiting(
 }
 
 /** Fail the textures whose source got no TextureGen since the last frame, load the textures
- * again when the texture quality of the surfaces changed and, in a headless run, wait for the decodes in flight so a frame always sees the same images, and
- * warn when the wait gives up.
+ * again when the texture quality of the surfaces changed and, in a headless run, wait for the
+ * decodes in flight so a frame always sees the same images, and warn when the wait gives up.
  *
  * @param it The iterator of the system
  */

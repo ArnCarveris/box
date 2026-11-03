@@ -137,6 +137,10 @@ ECS_STRUCT(TextureGenKey, {
  * change of it or its source generates it again, keeping the previous image until the new one is
  * ready. A TextureGen and a TexturePath on one entity is an error.
  *
+ * A source that exists without a TextureGen yet, such as one declared first and given its
+ * TextureGen later in the script, keeps the texture in TextureLoading; it fails at the next frame
+ * when none arrived. A source that loses its TextureGen or is deleted fails it the same way.
+ *
  * @par Ashlar of generate.py: the blocks are the face mask, their id the tone of each stone (ids *
  * 0.2), the two noise layers its fine and big noise.
  * @code

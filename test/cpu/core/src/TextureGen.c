@@ -604,6 +604,7 @@ void TextureGen_source_declared_after(void) {
     ecs_world_t *world = world_new();
     const char *code =
         "using box.texture\n"
+        "ashlar_height {}\n"
         "ashlar { TextureGen: {source: ashlar_height, output: GenNormal} }\n"
         "ashlar_height { TextureGen: {width: 16, height: 16, seed: 3,\n"
         "  layers: [{kind: GenNoise, frequency: 4, octaves: 2, amount: 1}]} }\n";
@@ -753,4 +754,28 @@ void TextureGen_hash_blocks(void) {
 void TextureGen_hash_cells(void) {
     // materials/textures
     test_hash(GEN_CELLS, "cells", 0x68a56d43U);
+}
+
+void TextureGen_source_deleted_with_derived(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    const char *code =
+        "using box.texture\n"
+        "stone {\n"
+        "  field { TextureGen: {width: 16, height: 16, seed: 1,\n"
+        "    layers: [{kind: GenNoise, frequency: 4, octaves: 2, amount: 1}]} }\n"
+        "  field_n { TextureGen: {source: field, output: GenNormal} }\n"
+        "}\n";
+    test_assert(ecs_script_run(world, "gen", code, NULL) == 0);
+    ecs_entity_t stone = ecs_lookup(world, "stone");
+    ecs_entity_t normal = ecs_lookup(world, "stone.field_n");
+    test_int(wait_texture(world, normal)->state, TextureReady);
+
+    /* In another table than its source, so its OnRemove runs in another batch */
+    ecs_add_id(world, normal, ecs_new(world));
+    ecs_delete(world, stone);
+    test_assert(!ecs_is_alive(world, normal));
+    ecs_progress(world, 0);
+
+    ecs_fini(world);
 }
