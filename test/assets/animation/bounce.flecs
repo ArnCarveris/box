@@ -1,0 +1,21 @@
+// A clip that bounces Position.y and fades Rgb from red to blue over two seconds, for the
+// AnimationClip tests.
+using box.transform
+using box.material
+using box.animation
+using box.curve
+
+bounce {
+  AnimationClip: {duration: 2}
+  height {
+    AnimationTrack: {component: Position, member: "y", curve: {
+      kind: CurveCatmullRom, keys: [{0, 0}, {1, 2}, {2, 0}]
+    }}
+  }
+  red {
+    AnimationTrack: {component: Rgb, member: "r", curve: {keys: [{0, 255}, {2, 0}]}}
+  }
+  blue {
+    AnimationTrack: {component: Rgb, member: "b", curve: {keys: [{0, 0}, {2, 255}]}}
+  }
+}

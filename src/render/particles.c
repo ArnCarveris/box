@@ -13,6 +13,7 @@
 
 #include "render.h"
 #include "../particle/simulate.h"
+#include "../particle/curves.h"
 #include "particle_rows.h"
 #include "../geometry/mesh_cache.h"
 #include "../texture/texture.h"
@@ -1113,22 +1114,26 @@ static uint32_t box_particles_texture(
     return result;
 }
 
-/** Evaluate the curve of a ParticleLight, linear between its four keys. Lights are evaluated
- * here on the CPU, not from the curve table.
+/** Evaluate the curve of a ParticleLight with the curve module, exactly at its time. Lights are
+ * evaluated here on the CPU, not from the curve table; a curve without keys or a bad one, which
+ * its validate hook logged, is 1.
  *
- * @param keys Values at 0, 1/3, 2/3 and 1 of the period
- * @param t The time over the period, clamped to 0 to 1
+ * @param curve The curve, its times from 0 to 1 of the period
+ * @param t The time over the period, 0 to 1
  * @return The value
  */
 static float box_particles_light_curve(
-    const float *keys,
+    const ParticleCurve *curve,
     float t)
 {
-    float s = fminf(fmaxf(t, 0.0f), 1.0f) * 3.0f;
-    float i = fminf(floorf(s), 2.0f);
-    int32_t k = (int32_t)i;
+    Curve view = { .kind = curve->kind, .keys = curve->keys };
+    float result = 1.0f;
+    if (ecs_vec_count(&curve->keys) && box_particle_curve_valid(curve)) {
+        result = box_curve_value(&view, t, 1.0f);
+        result = isfinite(result) ? result : 1.0f;
+    }
 
-    return keys[k] + (keys[k + 1] - keys[k]) * (s - i);
+    return result;
 }
 
 /** Get the intensity a ParticleLight gives its light.
@@ -1155,7 +1160,7 @@ static float box_particles_light_value(
             t = time >= period ? 1.0f : (float)((double)time / (double)period);
         }
 
-        result *= box_particles_light_curve(&light->curve.start, t);
+        result *= box_particles_light_curve(&light->curve, t);
     }
 
     if (stopped) {

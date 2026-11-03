@@ -124,7 +124,10 @@ template Sky {
       }
       ParticleForces: {gravity: {0, 0, 0}, turbulence: 3, turbulence_scale: 0.01}
       ParticleAppearance: {shape: ParticleCircle, blend: ParticleAdditive}
-      ParticleCurves: {opacity: {0, 1, 0.7, 0}, size: {0.6, 1, 1, 0.8}}
+      ParticleCurves: {
+        opacity: {keys: [{0, 0}, {0.33333334, 1}, {0.6666667, 0.7}, {1, 0}]}
+        size: {keys: [{0, 0.6}, {0.33333334, 1}, {0.6666667, 1}, {1, 0.8}]}
+      }
     }
   }
 

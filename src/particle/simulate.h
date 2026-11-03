@@ -80,8 +80,8 @@
 /** Points of the table an EmitterMesh spawns from */
 #define BOX_PARTICLE_MESH_POINTS (4096)
 
-/** Samples of a row of the curve table, from age 0 to 1: 63 intervals, so the keys of a
- * ParticleCurve at 1/3 and 2/3 fall on the samples 21 and 42 */
+/** Samples of a row of the curve table, from age 0 to 1: 63 intervals, so keys at 1/3 and 2/3,
+ * as the float of 1.0f / 3.0f and 2.0f / 3.0f, fall on the samples 21 and 42 */
 #define BOX_PARTICLE_CURVE_SAMPLES (64)
 
 /** Row of a constant curve, which reads no row of the curve table */
@@ -564,29 +564,23 @@ static inline float box_particle_norm_age(
     return fminf(fmaxf(t, 0.0f), 1.0f);
 }
 
-/** Bake the four keys of a ParticleCurve to a row of BOX_PARTICLE_CURVE_SAMPLES samples from
- * age 0 to 1, as the curve table holds it: a linear Curve with the keys at 0, 1/3, 2/3 and 1,
- * baked by box_curve_bake. 63 intervals put the keys exactly on the samples 0, 21, 42 and 63.
+/** Bake a ParticleCurve to a row of BOX_PARTICLE_CURVE_SAMPLES samples from age 0 to 1, as the
+ * curve table holds it, by box_curve_bake: sample i is at the time i / 63, so a key at the float
+ * of 1.0f / 3.0f or 2.0f / 3.0f lands exactly on the sample 21 or 42.
  *
- * The Curve views keys on the stack, so it allocates nothing and runs without a world.
+ * The Curve views the keys of the ParticleCurve, so it allocates nothing.
  *
- * @param keys Values at the ages 0, 1/3, 2/3 and 1
+ * @param curve The curve, valid by box_particle_curve_check
+ * @param fallback The value without keys, the default of its field
  * @param out Receives BOX_PARTICLE_CURVE_SAMPLES samples
  */
 static inline void box_particle_curve_bake(
-    const float *keys,
+    const ParticleCurve *curve,
+    float fallback,
     float *out)
 {
-    CurveKey key[4];
-    int32_t i;
-    for (i = 0; i < 4; i ++) {
-        key[i] = (CurveKey){ .time = (float)i / 3.0f, .value = keys[i] };
-    }
-
-    Curve curve = {
-        .kind = CurveLinear, .keys = { .array = key, .count = 4, .size = 4 }
-    };
-    box_curve_bake(&curve, 0.0f, 1.0f, BOX_PARTICLE_CURVE_SAMPLES, keys[0], out);
+    Curve view = { .kind = curve->kind, .keys = curve->keys };
+    box_curve_bake(&view, 0.0f, 1.0f, BOX_PARTICLE_CURVE_SAMPLES, fallback, out);
 }
 
 /** Bake the accumulated area under a row of samples, the row the curve table holds after the
@@ -609,24 +603,38 @@ static inline void box_particle_curve_bake_area(
     }
 }
 
-/** Bake four linear colors of a ParticleGradient to BOX_PARTICLE_GRADIENT_ROWS rows of the
- * curve table: a linear color of four floats per sample, w 1, each channel baked as a curve.
+/** Bake a ParticleGradient to BOX_PARTICLE_GRADIENT_ROWS rows of the curve table, a linear color
+ * of four floats per sample, w 1: each channel of the linear colors of the keys is a Curve of the
+ * kind of the gradient with flat slopes, baked as a ParticleCurve; without keys it is white.
  *
- * @param keys Linear colors at the ages 0, 1/3, 2/3 and 1, four floats each, w unused
+ * @param gradient The gradient, valid by box_particle_gradient_check
  * @param out Receives BOX_PARTICLE_CURVE_SAMPLES colors of four floats
  */
 static inline void box_particle_gradient_bake(
-    const float *keys,
+    const ParticleGradient *gradient,
     float *out)
 {
-    float channel[4], row[BOX_PARTICLE_CURVE_SAMPLES];
-    int32_t c, i;
+    const ParticleGradientKey *keys = ecs_vec_first_t(&gradient->keys, ParticleGradientKey);
+    int32_t c, i, count = ecs_vec_count(&gradient->keys);
+    float row[BOX_PARTICLE_CURVE_SAMPLES];
+    CurveKey local[BOX_PARTICLE_CURVE_SAMPLES];
+    CurveKey *channel = count > BOX_PARTICLE_CURVE_SAMPLES
+        ? ecs_os_malloc_n(CurveKey, count) : local;
+    Curve curve = {
+        .kind = gradient->kind,
+        .keys = { .array = channel, .count = count, .size = count }
+    };
+#ifdef FLECS_SANITIZE
+    curve.keys.elem_size = ECS_SIZEOF(CurveKey);
+#endif
     for (c = 0; c < 3; c ++) {
-        for (i = 0; i < 4; i ++) {
-            channel[i] = keys[i * 4 + c];
+        for (i = 0; i < count; i ++) {
+            const rgb *color = &keys[i].color;
+            uint8_t v = c == 0 ? color->r : (c == 1 ? color->g : color->b);
+            channel[i] = (CurveKey){ .time = keys[i].time, .value = box_particle_linear(v) };
         }
 
-        box_particle_curve_bake(channel, row);
+        box_curve_bake(&curve, 0.0f, 1.0f, BOX_PARTICLE_CURVE_SAMPLES, 1.0f, row);
         for (i = 0; i < BOX_PARTICLE_CURVE_SAMPLES; i ++) {
             out[i * 4 + c] = row[i];
         }
@@ -634,6 +642,10 @@ static inline void box_particle_gradient_bake(
 
     for (i = 0; i < BOX_PARTICLE_CURVE_SAMPLES; i ++) {
         out[i * 4 + 3] = 1.0f;
+    }
+
+    if (channel != local) {
+        ecs_os_free(channel);
     }
 }
 
@@ -800,6 +812,52 @@ static inline void box_particle_gradient(
         for (c = 0; c < 3; c ++) {
             out[c] = g[k + c] + (g[k + 4 + c] - g[k + c]) * f;
         }
+    }
+}
+
+/** Get the size or opacity of a particle: the value it spawned with times its curve at a
+ * normalized age, clamped at 0 as a curve that overshoots its keys may go below it.
+ *
+ * @param base The value it spawned with
+ * @param table The curve table
+ * @param row Row of the curve, BOX_PARTICLE_CURVE_CONSTANT for a constant
+ * @param value The value of a constant curve
+ * @param t The normalized age, clamped to 0 to 1
+ * @return The value, 0 or more
+ */
+static inline float box_particle_scaled(
+    float base,
+    const float *table,
+    uint32_t row,
+    float value,
+    float t)
+{
+    return fmaxf(base * box_particle_curve(table, row, value, t), 0.0f);
+}
+
+/** Get the color of a particle: the linear color it spawned with times its gradient at a
+ * normalized age, each channel clamped at 0.
+ *
+ * @param color The linear color it spawned with
+ * @param table The curve table
+ * @param row First row of the gradient, or BOX_PARTICLE_CURVE_CONSTANT
+ * @param value Linear color of a constant gradient
+ * @param t The normalized age, clamped to 0 to 1
+ * @param out Receives the linear color, may alias color
+ */
+static inline void box_particle_tinted(
+    const float *color,
+    const float *table,
+    uint32_t row,
+    const float *value,
+    float t,
+    float *out)
+{
+    float g[3];
+    int32_t c;
+    box_particle_gradient(table, row, value, t, g);
+    for (c = 0; c < 3; c ++) {
+        out[c] = fmaxf(color[c] * g[c], 0.0f);
     }
 }
 

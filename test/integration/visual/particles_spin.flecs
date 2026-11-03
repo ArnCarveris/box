@@ -48,7 +48,7 @@ debris {
     spin: {2000, 4000}, opacity: {1, 1}, color: {200, 150, 110}, seed: 13
   }
   ParticleCurves: {
-    spin: {0, 1, 2, 4}
+    spin: {keys: [{0, 0}, {0.33333334, 1}, {0.6666667, 2}, {1, 4}]}
   }
   ParticleAppearance: {shape: ParticleBillboard, mesh: rock, lit: 1}
 }
@@ -61,7 +61,7 @@ letters {
     color: {255, 255, 255}, seed: 17
   }
   ParticleCurves: {
-    rotation: {0, 0.25, 0.5, 1}
+    rotation: {keys: [{0, 0}, {0.33333334, 0.25}, {0.6666667, 0.5}, {1, 1}]}
   }
   ParticleAppearance: {shape: ParticleSprite, texture: letter_tex}
 }

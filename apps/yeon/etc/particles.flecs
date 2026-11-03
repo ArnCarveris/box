@@ -29,7 +29,7 @@ prefab LanternSparkle {
     ParticleForces: {gravity: {0, -1, 0}, drag: 1.5}
     ParticleAppearance: {blend: ParticleAdditive}
     ParticleCurves: {
-      opacity: {0.8, 1.1, 0.8, 0}
+      opacity: {keys: [{0, 0.8}, {0.33333334, 1.1}, {0.6666667, 0.8}, {1, 0}]}
     }
   }
 
@@ -53,7 +53,7 @@ prefab LanternSparkle {
     ParticleForces: {gravity: {0, -1, 0}, drag: 1.5}
     ParticleAppearance: {blend: ParticleAdditive}
     ParticleCurves: {
-      opacity: {0.8, 1.1, 0.8, 0}
+      opacity: {keys: [{0, 0.8}, {0.33333334, 1.1}, {0.6666667, 0.8}, {1, 0}]}
     }
   }
 }
@@ -76,8 +76,8 @@ prefab StringCut {
     ParticleBurst: {count: 32}
     ParticleForces: {gravity: {0, -6, 0}, drag: 2}
     ParticleCurves: {
-      size: {1, 1, 0.9, 0.7},
-      opacity: {1, 1, 0.8, 0}
+      size: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 0.9}, {1, 0.7}]},
+      opacity: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 0.8}, {1, 0}]}
     }
   }
 
@@ -99,7 +99,7 @@ prefab StringCut {
     ParticleForces: {gravity: {0, -4, 0}, drag: 2}
     ParticleAppearance: {blend: ParticleAdditive}
     ParticleCurves: {
-      opacity: {1, 1, 0.6, 0}
+      opacity: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 0.6}, {1, 0}]}
     }
   }
 }

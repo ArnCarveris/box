@@ -55,6 +55,12 @@ ECS_STRUCT(Curve, {
  */
 #define BOX_OWNED_CURVE(T, member) BOX_OWNED_VEC(T, member.keys, CurveKey)
 
+/** Literal keys as an ecs_vec(CurveKey) that owns nothing, for a value that ecs_set copies; C only:
+ *
+ *     ecs_set(world, e, Curve, { CurveCatmullRom, BOX_CURVE_KEYS({0, 0.3f}, {1, 2}) });
+ */
+#define BOX_CURVE_KEYS(...) BOX_VEC_VIEW(CurveKey, __VA_ARGS__)
+
 /** Evaluate a scalar cubic Bezier with de Casteljau's algorithm.
  *
  * @param start Value at 0

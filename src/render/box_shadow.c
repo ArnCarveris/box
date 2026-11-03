@@ -12,6 +12,7 @@
 
 #include "draw.h"
 #include <math.h>
+#include <stddef.h>
 
 ECS_COMPONENT_DECLARE(BoxShadowSlot);
 
@@ -27,6 +28,8 @@ typedef struct box_shadow_box_t {
     float sigma;        /**< Standard deviation of the edge, at least BOX_SHADOW_SIGMA_MIN */
     float element[2];   /**< Half extents of the rounded box of the shape */
     float element_radius; /**< Corner radius of the rounded box of the shape */
+    float scale[2];     /**< Scale of the quad of the shape relative to its size, which a layout
+                         *   that fits the shape (ShapeMesh.scale) stretches it with */
 } box_shadow_box_t;
 
 /** Construct BoxShadowSlot values without a slot.
@@ -85,12 +88,14 @@ static void box_shadow_slot_move(
  * does, so a sharp corner stays sharp, and grown by 3 standard deviations on each side.
  *
  * @param shape The resolved shape, a rectangle
+ * @param mesh The mesh of the shape, NULL when it has none
  * @param shadow The shadow
  * @param out Receives the shadow box
  * @return Whether the shadow box has an area
  */
 static bool box_shadow_resolve(
     const Shape2D *shape,
+    const ShapeMesh *mesh,
     const BoxShadow *shadow,
     box_shadow_box_t *out)
 {
@@ -121,12 +126,15 @@ static bool box_shadow_resolve(
     out->element[0] = shape->size[0] * 0.5f;
     out->element[1] = shape->size[1] * 0.5f;
     out->element_radius = glm_clamp(shape->radius, 0.0f, half);
+    out->scale[0] = mesh ? mesh->scale[0] / shape->size[0] : 1.0f;
+    out->scale[1] = mesh ? mesh->scale[1] / shape->size[1] : 1.0f;
+    result = isfinite(out->scale[0]) && isfinite(out->scale[1]);
 done:
     return result;
 }
 
-/** Write the transform of a shadow: the world transform of its shape moved by the offset and
- * scaled to the quad of the shadow.
+/** Write the transform of a shadow: the world transform of its shape stretched as the quad of
+ * the shape is, moved by the offset and scaled to the quad of the shadow.
  *
  * @param out The transform
  * @param transform World transform of the shape, NULL for the identity
@@ -137,7 +145,7 @@ static void box_shadow_transform(
     const WorldTransform *transform,
     const box_shadow_box_t *box)
 {
-    float scale[3] = { box->size[0], box->size[1], 1.0f };
+    float scale[3] = { box->size[0] * box->scale[0], box->size[1] * box->scale[1], 1.0f };
     mat4 m;
     int32_t r, c;
     if (transform) {
@@ -151,7 +159,8 @@ static void box_shadow_transform(
             out->rows[r][c] = m[c][r] * scale[c];
         }
 
-        out->rows[r][3] = m[0][r] * box->offset[0] + m[1][r] * box->offset[1] + m[3][r];
+        out->rows[r][3] = m[0][r] * box->scale[0] * box->offset[0] +
+            m[1][r] * box->scale[1] * box->offset[1] + m[3][r];
     }
 }
 
@@ -188,6 +197,32 @@ static float box_shadow_cover_alpha(
     return covers ? glm_clamp(alpha * edge, 0.0f, 1.0f) : 0.0f;
 }
 
+/** Write the color of a shadow as linear light with its alpha: mixed toward the tints of the
+ * ancestors and the own Tint of its shape as the border color is, its alpha times the resolved
+ * opacity of the shape.
+ *
+ * @param out Four floats receiving the color
+ * @param color Display encoded color of the shadow
+ * @param material Material components of the shape, of which inherited and tint are read
+ * @param alpha Resolved opacity of the shape
+ */
+static void box_shadow_color(
+    float *out,
+    const rgba *color,
+    const box_draw_material_t *material,
+    float alpha)
+{
+    if (material->inherited || material->tint) {
+        box_draws_tinted(out, &color->r, material);
+    } else {
+        out[0] = box_shadow_linear(color->r);
+        out[1] = box_shadow_linear(color->g);
+        out[2] = box_shadow_linear(color->b);
+    }
+
+    out[3] = (float)color->a / 255.0f * alpha;
+}
+
 /** Write the shading of a shadow, which has no border, image or emission: emissive.w is the
  * aspect of its quad, material.x the corner radius of the shadow box and material.y the negated
  * standard deviation, both in units of half the smaller side of the quad.
@@ -198,8 +233,7 @@ static float box_shadow_cover_alpha(
  *
  * @param out The shading
  * @param box The shadow box
- * @param color Display encoded color of the shadow
- * @param alpha Resolved opacity of the shape
+ * @param linear Linear color and alpha of the shadow, box_shadow_color
  * @param cover Alpha the shape covers the shadow with, box_shadow_cover_alpha
  * @param clip Clip index of the shape
  * @param rank Rank of the shadow
@@ -207,19 +241,12 @@ static float box_shadow_cover_alpha(
 static void box_shadow_shading(
     box_render_shading_t *out,
     const box_shadow_box_t *box,
-    const rgba *color,
-    float alpha,
+    const float *linear,
     float cover,
     int32_t clip,
     uint32_t rank)
 {
     float half = glm_min(box->size[0], box->size[1]) * 0.5f;
-    float linear[4] = {
-        box_shadow_linear(color->r),
-        box_shadow_linear(color->g),
-        box_shadow_linear(color->b),
-        (float)color->a / 255.0f * alpha
-    };
     ecs_os_memset_t(out, 0, box_render_shading_t);
     out->emissive[3] = box->size[0] / box->size[1];
     out->material[0] = glm_clamp(box->radius / half, 0.0f, 1.0f);
@@ -233,6 +260,144 @@ static void box_shadow_shading(
     out->ids[0] = clip > 0 ? (uint32_t)clip : 0u;
     out->ids[1] = rank;
     box_draws_color_pack(out->color, linear);
+}
+
+/** Write streams of the instance of a shadow from its shape.
+ *
+ * @param d The state
+ * @param bs The shadow slot, in a batch
+ * @param box The resolved shadow box
+ * @param shadow The shadow
+ * @param shape The resolved shape
+ * @param blend Blend mode of the batch of the shape
+ * @param transform World transform of the shape, NULL for the identity
+ * @param material Material components of the shape, read when kinds has the shading
+ * @param kinds box_draw_kind_t, the streams to write
+ */
+static void box_shadow_write(
+    box_render_draws_t *d,
+    const BoxShadowSlot *bs,
+    const box_shadow_box_t *box,
+    const BoxShadow *shadow,
+    const Shape2D *shape,
+    uint8_t blend,
+    const WorldTransform *transform,
+    const box_draw_material_t *material,
+    uint8_t kinds)
+{
+    box_draw_batch_t *b = box_draws_batch(d, bs->batch);
+    if (kinds & BOX_DRAW_TRANSFORM) {
+        box_shadow_transform(box_draws_slot_transform(b, bs->slot), transform, box);
+    }
+
+    if (kinds & BOX_DRAW_SHADING) {
+        float alpha = box_draws_alpha(material);
+        float linear[4];
+        box_shadow_color(linear, &shadow->color, material, alpha);
+        box_shadow_shading(box_draws_slot_shading(b, bs->slot), box, linear,
+            box_shadow_cover_alpha(shape, blend, alpha), material->clip, bs->rank);
+    }
+
+    box_draws_slot_changed(b, bs->slot, kinds);
+}
+
+const BoxShadowSlot* box_draws_box_shadows(
+    const ecs_iter_t *it)
+{
+    return ecs_table_get_id(it->world, it->table, ecs_id(BoxShadowSlot), it->offset);
+}
+
+void box_draws_box_shadow_write(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e,
+    const BoxShadowSlot *bs,
+    const DrawSlot *s,
+    const WorldTransform *transform,
+    const box_draw_material_t *material,
+    uint8_t kinds)
+{
+    const BoxShadow *shadow;
+    const Shape2D *shape;
+    box_shadow_box_t box;
+    if (bs->batch < 0 || s->batch < 0 ||
+        bs->slot >= ecs_vec_count(&box_draws_batch(d, bs->batch)->entities))
+    {
+        goto done;
+    }
+
+    shadow = ecs_get(world, e, BoxShadow);
+    shape = shadow ? ecs_get(world, e, Shape2D) : NULL;
+    if (!shape || !box_shadow_resolve(shape, ecs_get(world, e, ShapeMesh), shadow, &box)) {
+        goto done;
+    }
+
+    box_shadow_write(d, bs, &box, shadow, shape, box_draws_batch(d, s->batch)->key.blend,
+        transform, material, kinds);
+done:
+    return;
+}
+
+bool box_draws_box_shadow_instance(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    mat4 out)
+{
+    const BoxShadow *shadow = ecs_get(world, e, BoxShadow);
+    const Shape2D *shape = shadow ? ecs_get(world, e, Shape2D) : NULL;
+    box_shadow_box_t box;
+    bool result = shape &&
+        box_shadow_resolve(shape, ecs_get(world, e, ShapeMesh), shadow, &box);
+    if (result) {
+        glm_mat4_identity(out);
+        out[0][0] = box.size[0] * box.scale[0];
+        out[1][1] = box.size[1] * box.scale[1];
+        out[3][0] = box.scale[0] * box.offset[0];
+        out[3][1] = box.scale[1] * box.offset[1];
+    }
+
+    return result;
+}
+
+bool box_draws_box_shadow_target(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e,
+    const DrawSlot *s,
+    const box_draw_material_t *material,
+    box_draw_transition_material_t *out)
+{
+    const BoxShadowSlot *bs = ecs_get(world, e, BoxShadowSlot);
+    const BoxShadow *shadow = bs && bs->batch >= 0 ? ecs_get(world, e, BoxShadow) : NULL;
+    const Shape2D *shape = shadow && s->batch >= 0 ? ecs_get(world, e, Shape2D) : NULL;
+    bool result = shape != NULL;
+    if (!result) {
+        goto done;
+    }
+
+    box_draws_transition_target(out, material, BOX_DRAW_TRANSITION_BOX_SHADOW);
+    out->shadow = shadow->color;
+    out->shadow_cover = box_shadow_cover_alpha(shape, box_draws_batch(d, s->batch)->key.blend,
+        1.0f);
+done:
+    return result;
+}
+
+void box_draws_box_shadow_encode(
+    const box_draw_material_t *material,
+    const box_draw_transition_material_t *target,
+    void *dst)
+{
+    float alpha = box_draws_alpha(material);
+    float linear[4];
+    uint32_t color[2];
+    float cover = glm_clamp(alpha * target->shadow_cover, 0.0f, 1.0f);
+    box_shadow_color(linear, &target->shadow, material, alpha);
+    box_draws_color_pack(color, linear);
+    ecs_os_memcpy(ECS_OFFSET(dst, offsetof(box_render_shading_t, color)), color,
+        ECS_SIZEOF(color));
+    ecs_os_memcpy(ECS_OFFSET(dst, offsetof(box_render_shading_t, material) +
+        3 * sizeof(float)), &cover, ECS_SIZEOF(float));
 }
 
 void box_draws_box_shadow_remove(
@@ -282,7 +447,7 @@ void box_draws_box_shadow_update(
     }
 
     bool drawn = shape && shape->kind == BOX_SHAPE2D_RECT &&
-        box_shadow_resolve(shape, shadow, &box);
+        box_shadow_resolve(shape, ecs_get(world, e, ShapeMesh), shadow, &box);
     if (drawn) {
         ecs_os_memcpy_t(&key, &box_draws_batch(d, s->batch)->key, box_draw_key_t);
         drawn = key.pipeline == BOX_RENDER_SHADER_SHAPE2D;
@@ -310,14 +475,15 @@ void box_draws_box_shadow_update(
         bs->slot = slot;
     }
 
-    const Opacity *opacity = ecs_get(world, e, Opacity);
-    float alpha = glm_clamp(opacity ? opacity->value : 1.0f, 0.0f, 1.0f) * s->fade;
-    box_draw_batch_t *b = box_draws_batch(d, bs->batch);
-    box_shadow_transform(box_draws_slot_transform(b, bs->slot),
-        ecs_get(world, e, WorldTransform), &box);
-    box_shadow_shading(box_draws_slot_shading(b, bs->slot), &box, &shadow->color, alpha,
-        box_shadow_cover_alpha(shape, blend, alpha), s->clip, bs->rank);
-    box_draws_slot_changed(b, bs->slot, BOX_DRAW_BOTH);
+    box_draw_material_t material = {
+        .opacity = ecs_get(world, e, Opacity),
+        .tint = ecs_get(world, e, Tint),
+        .inherited = s->tinted ? &s->tint : NULL,
+        .fade = s->fade,
+        .clip = s->clip
+    };
+    box_shadow_write(d, bs, &box, shadow, shape, blend, ecs_get(world, e, WorldTransform),
+        &material, BOX_DRAW_BOTH);
 done:
     return;
 }

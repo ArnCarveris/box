@@ -3,8 +3,9 @@
  * @brief The curve table of the particle extract: the curves of the emitters baked into rows of
  * BOX_PARTICLE_CURVE_SAMPLES floats of one storage buffer, which the particle shaders read.
  *
- * A curve is baked when it changes, into the rows of an entry with the same content when there
- * is one, so the instances of an effect share them. Constant curves take no row.
+ * A curve is baked when it changes, into the rows of an entry with the same baked content when
+ * there is one, so the instances of an effect share them. Constant curves take no row, and a
+ * curve that is not valid, or whose samples are not finite, is the default of its field.
  */
 
 #ifndef BOX_RENDER_PARTICLE_ROWS_H
@@ -27,9 +28,10 @@ typedef struct box_particle_rows_t {
 
 /** The rows the curves of one pool use and what its block reads */
 typedef struct box_particle_rows_use_t {
-    bool baked;             /**< The members below follow key */
+    bool baked;             /**< The members below follow hash */
     bool had;               /**< The emitter had ParticleCurves when they were baked */
-    ParticleCurves key;     /**< The ParticleCurves they were baked from */
+    uint64_t hash;          /**< Hash of the kinds and keys of the ParticleCurves they were
+                             *   baked from */
     int32_t entries[BOX_PARTICLE_ROWS_CURVES]; /**< Index plus 1 of the entries it uses, 0
                              *   for a constant curve */
     uint32_t rows[4];       /**< Rows of the size, opacity, rotation and spin curves,

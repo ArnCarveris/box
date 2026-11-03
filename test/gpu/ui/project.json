@@ -105,7 +105,8 @@
                     "texture_surface_removed",
                     "texture_surface_not_sampled_by_itself",
                     "view_root_views_skipped_by_other_surfaces",
-                    "script"
+                    "script",
+                    "layout_resize_moves_box_shadow"
                 ]
             },
             {

@@ -9,6 +9,7 @@
     },
     "lang.c": {
         "include": [
+            "../../../src/animation",
             "../../../src/app",
             "../../../src/jobs",
             "../../../src/render",
@@ -389,6 +390,38 @@
                 "id": "WindowWarning",
                 "testcases": [
                     "no_warning_without_glfw"
+                ]
+            },
+            {
+                "id": "AnimationClip",
+                "testcases": [
+                    "sample_linear",
+                    "sample_catmull_rom",
+                    "sample_bezier",
+                    "sample_before_first",
+                    "sample_after_last",
+                    "sample_one_key",
+                    "duration_from_keys",
+                    "duration_from_component",
+                    "write_position_y",
+                    "write_nested_member",
+                    "write_rotation_y",
+                    "write_double",
+                    "write_int32",
+                    "write_rgb_round_clamp",
+                    "changed_track",
+                    "write_target",
+                    "error_no_reflection",
+                    "error_unknown_member",
+                    "error_struct_member",
+                    "error_not_numeric",
+                    "error_no_keys",
+                    "error_keys_out_of_order",
+                    "error_deleted_component",
+                    "script",
+                    "delete_clip",
+                    "sample_deleted_track",
+                    "sample_no_alloc"
                 ]
             }
         ]
