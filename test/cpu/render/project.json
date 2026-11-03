@@ -630,7 +630,8 @@
                     "fog_volume_child_follows_parent",
                     "emitter_child_follows_parent",
                     "layout_rect_child_keeps_layout_position",
-                    "direction_none_rect_child_follows_parent"
+                    "direction_none_rect_child_follows_parent",
+                    "text_child_follows_parent"
                 ]
             }
         ]

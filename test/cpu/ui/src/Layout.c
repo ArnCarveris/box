@@ -1625,7 +1625,8 @@ void Layout_prefab_layout(void) {
     test_flt(ecs_get(world, i1, LayoutBounds)->width, 32);
     test_flt(ecs_get(world, i1, LayoutBounds)->height, 12);
     test_flt(ecs_get(world, i2, LayoutBounds)->width, 32);
-    test_assert(!ecs_has(world, pa, Position));
+    test_flt(ecs_get(world, pa, Position)->x, 0);
+    test_flt(ecs_get(world, pa, Position)->y, 0);
     test_assert(!ecs_has(world, pb, Position));
 
     ecs_entity_t a = 0, b = 0;
@@ -1649,7 +1650,8 @@ void Layout_prefab_layout(void) {
     ecs_progress(world, 0);
 
     test_flt(ecs_get(world, i1, LayoutBounds)->width, 52);
-    test_assert(!ecs_has(world, pa, Position));
+    test_flt(ecs_get(world, pa, Position)->x, 0);
+    test_flt(ecs_get(world, pa, Position)->y, 0);
 
     ecs_entity_t variant = ecs_new_w_id(world, EcsPrefab);
     ecs_add_pair(world, variant, EcsIsA, prefab);
@@ -1688,8 +1690,10 @@ void Layout_prefab_child_of_tree(void) {
     test_flt(ecs_get(world, r, LayoutBounds)->width, 10);
     test_flt(ecs_get(world, r, LayoutBounds)->height, 10);
     test_flt(ecs_get(world, c, Position)->x, 0);
-    test_assert(!ecs_has(world, py, Position));
-    test_assert(!ecs_has(world, px, Position));
+    test_flt(ecs_get(world, py, Position)->x, 0);
+    test_flt(ecs_get(world, py, Position)->y, 0);
+    test_flt(ecs_get(world, px, Position)->x, 0);
+    test_flt(ecs_get(world, px, Position)->y, 0);
     test_assert(ecs_is_alive(world, iy));
     test_assert(ecs_is_alive(world, ix));
 
@@ -1697,7 +1701,8 @@ void Layout_prefab_child_of_tree(void) {
     ecs_progress(world, 0);
 
     test_flt(ecs_get(world, r, LayoutBounds)->width, 12);
-    test_assert(!ecs_has(world, py, Position));
+    test_flt(ecs_get(world, py, Position)->x, 0);
+    test_flt(ecs_get(world, py, Position)->y, 0);
 
     ecs_fini(world);
 }
@@ -1729,8 +1734,10 @@ void Layout_prefab_childof_and_slot(void) {
     test_flt(ecs_get(world, ia, LayoutBounds)->height, 7);
     test_flt(ecs_get(world, pa, LayoutBounds)->width, 0);
     test_flt(ecs_get(world, pb, LayoutBounds)->width, 0);
-    test_assert(!ecs_has(world, pb1, Position));
-    test_assert(!ecs_has(world, pa1, Position));
+    test_flt(ecs_get(world, pb1, Position)->x, 0);
+    test_flt(ecs_get(world, pb1, Position)->y, 0);
+    test_flt(ecs_get(world, pa1, Position)->x, 0);
+    test_flt(ecs_get(world, pa1, Position)->y, 0);
     test_assert(!ecs_has(world, slot, Position));
 
     ecs_fini(world);

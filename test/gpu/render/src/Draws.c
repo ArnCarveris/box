@@ -317,3 +317,55 @@ void Draws_deleted_while_disabled(void) {
 
     ecs_fini(world);
 }
+
+void Draws_shape_child_follows_parent(void) {
+    // ShapeWithoutPosition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "child.png",
+        .resolution_scale = 1});
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, {2, -1, 0});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, child, Box, {1, 1, 1});
+    ecs_set(world, child, Rgb, {0, 0, 0});
+    ecs_set(world, child, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, child, Emissive, {.strength = 1, .color = {255, 0, 0}});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/child.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_assert(px[(20 * 32 + 24) * 4] > 200);
+    test_assert(px[(16 * 32 + 16) * 4] < 40);
+    test_assert(px[(12 * 32 + 8) * 4] < 40);
+    stbi_image_free(px);
+
+    ecs_set(world, parent, Position, {-2, 1, 0});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_assert(px[(12 * 32 + 8) * 4] > 200);
+    test_assert(px[(20 * 32 + 24) * 4] < 40);
+    test_assert(px[(16 * 32 + 16) * 4] < 40);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}

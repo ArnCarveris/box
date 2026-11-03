@@ -389,8 +389,6 @@ void BoxLightImport(
     box_owned_hooks(world, EnvironmentImage, BOX_OWNED_STR(EnvironmentImage, path));
     ecs_add_pair(world, ecs_id(EnvironmentImage), EcsWith, ecs_id(Environment));
 
-    /* Lights and volumes with a place follow their parent, a child without a pose gets a
-     * Position and so a WorldTransform instead of sitting at the world origin. */
     ECS_IMPORT(world, BoxTransform);
     ecs_add_pair(world, ecs_id(PointLight), EcsWith, ecs_id(Position));
     ecs_add_pair(world, ecs_id(SpotLight), EcsWith, ecs_id(Position));

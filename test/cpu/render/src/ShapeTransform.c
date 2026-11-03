@@ -387,3 +387,20 @@ void ShapeTransform_direction_none_rect_child_follows_parent(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+void ShapeTransform_text_child_follows_parent(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, {5, 1, -3});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, child, Text, {.value = "label", .size = 16});
+
+    frame(world);
+
+    expect_translation(world, child, 5, 1, -3);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

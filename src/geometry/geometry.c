@@ -588,8 +588,6 @@ void BoxGeometryImport(
         .ctx_free = box_mesh_cache_free
     });
 
-    /* A shape follows its parent: an entity with a shape and no pose gets a Position, so the
-     * transform systems give it a WorldTransform instead of drawing it at the world origin. */
     ECS_IMPORT(world, BoxTransform);
     ecs_add_pair(world, ecs_id(ShapeMesh), EcsWith, ecs_id(Position));
 
