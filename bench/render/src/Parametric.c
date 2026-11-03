@@ -279,16 +279,15 @@ void Parametric_extract_spaceship_size(
     int64_t setup_upload_bytes = stats.upload_bytes;
     int64_t setup_surface_bytes = stats.surface_bytes;
     ecs_progress(world, 0);
-    double frames = 0;
     bench_set_items(b, BENCH_PARAMETRIC_SHAPES);
     while (bench_iter(b)) {
         ecs_progress(world, 0);
         box_render_draws_stats(world, &stats);
         bench_keep(stats.upload_bytes);
-        frames ++;
     }
 
-    bench_counter(b, "frames", frames);
+    // A case keeps at most 16 counters (BAKE_BENCH_MAX_COUNTERS), so this case leaves out the
+    // frames counter to keep every memory counter.
     bench_counter(b, "instances", (double)(stats.instances + stats.dynamic));
     bench_counter(b, "parametric", (double)bench_parametric_count(world));
     bench_counter(b, "batches", (double)stats.batches);

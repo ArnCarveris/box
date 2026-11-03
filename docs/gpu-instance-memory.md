@@ -31,7 +31,7 @@ Sizes are in bytes, and MB is 10^6 bytes.
 - A shape that owned a material component got an 80 byte record of its own in the material
   table. In the Extract bench the table held 100,001 records whose contents took only 2 distinct
   values. The table now shares records by content (O1, implemented) and holds 2. Town's 4,802
-  records, 49 distinct, are [measure] after O1.
+  records are 49 after O1, its number of distinct contents.
 - The transform stream cannot shrink without loss. 23% of the instances of the Japanese garden
   scene have a sheared model matrix, which a TRS encoding cannot hold.
 
@@ -62,9 +62,9 @@ the transforms and the distinct shading and material records. The counters agree
 packet totals in every case. All figures are byte counts. They do not depend on timing or on the
 debug build that was used (arm64 Linux).
 
-**Rebuilt scenes.** The job has no GPU, so the Cull and LargeBatch benches cannot run as they are:
-they open a headless surface and read GPU buffers back. Their scenes were rebuilt in the driver
-with the same entities and a backend that drops packets. These are Cull's 100k box scene,
+**Rebuilt scenes.** The job had no GPU, so the Cull and LargeBatch benches could not run as
+they are: they open a headless surface and read GPU buffers back. Their scenes were rebuilt in
+the driver with the same entities and a backend that drops packets. These are Cull's 100k box scene,
 `many_batches_shadows` and `town` (`test/assets/town.flecs`). The extract does not depend on the
 backend, so the instance traffic is the same. Five shipped scenes that are not benches were run
 the same way: `spaceship`, `santorini`, `japanese_garden`, `cheese_market` and `ui_showcase`.
@@ -78,10 +78,11 @@ below are derived from the allocator in `store.c` and `batch.c` and labeled as d
 data at all. Their figure is for the same 1M boxes with a view added.
 
 **After the changes.** The current page buffers and material records come from the counters of
-a release run of `bench/render` (`bake3 run --cfg release bench/render`), listed with each table.
-The records of japanese_garden, cheese_market and spaceship after O1, which are not benches, come
-from a driver outside the repository like the one above: it loads the scene with the null backend
-(`src/render/null.c`) and reads `box_render_draws_stats_t.materials` after setup.
+a release run of `bench/render` (`bake3 run --cfg release bench/render`) on a job with a GPU
+(arm64 macOS), the Cull suite included, listed with each table. The records of japanese_garden,
+cheese_market and spaceship after O1, which are not benches, come from a driver outside the
+repository like the one above: it loads the scene without its `Surface` and `LightBake` with the
+null backend (`src/render/null.c`) and reads `box_render_draws_stats_t.materials` after setup.
 
 **Not measured.** GPU time is not measured: render, cull and scatter passes, and the cost of a
 vertex shader loading the surface record. Every statement about shader cost below is derived
@@ -132,9 +133,10 @@ The Extract, Shapes2D, Text, Material, Parametric and Cull suites of `bench/rend
 as the `page_slots`, `page_transform_bytes`, `page_shading_bytes`, `page_surface_bytes` and
 `page_bytes` counters of `box_render_draws_stats_t` (one helper, `bench_render_memory` in
 `bench/render/src/bench_memory.c`). Material reports them in every case, Cull after the measured
-frames of every case; the Cull suite needs a GPU. The Cull 100k scene is every Cull case but
-`many_batches_shadows` and `town`. The counters cover both stores, so `Cull.town` reports its mesh
-and 2D pages together.
+frames of every case; the Cull suite needs a GPU. The Cull 100k scene is `offscreen_100k`,
+`offscreen_100k_unculled` and `shadows_100k`; the `occluded_city_100k` cases are a city of
+102,501 instances. The counters cover both stores, so `Cull.town` reports its mesh and 2D pages
+together.
 
 The first table was measured with the driver before S1, D1 and S2, with a 448 byte mesh slot and
 a 512 byte 2D slot that both carry a surface stream, and before O2. It is kept as the baseline.
@@ -175,23 +177,24 @@ of `Parametric.extract_spaceship_size`, whose 8,792 instances include its parame
 The spawn row is `InstanceStore.spawn_grows_pages_without_moves` (see O2). The large scenes are
 derived again: each store now derives its chunk from its own largest stride (StoreChunkSize), so
 a plain mesh page holds 2,796,202 slots, and the 1M and 1.5M boxes created in one frame are one
-batch on one page with a run of just their count. japanese_garden and the 1M boxes of
-`bench/scene` are not benches of `bench/render` and stay baseline only.
+batch on one page with a run of just their count. A null backend driver like the one of the O1
+records confirmed both rows. japanese_garden and the 1M boxes of `bench/scene` are not benches of
+`bench/render` and stay baseline only.
 
-Measured after S1, D1, S2 and O2:
+Measured after S1, D1, S2, O2 and InstanceRunExact:
 
 | Scene | Instances | Slots | Transform | Shading | Surface | Total | Surface share |
 |---|---|---|---|---|---|---|---|
 | Extract (100k `Box` + 10k dynamic `Sphere`) | 110,000 | 110,000 | 5.3 MB | 1.8 MB | 0 | 7.0 MB | 0% |
-| Material.tint_subtree | 110,000 | [measure] | [measure] | [measure] | [measure] | [measure] | [measure] |
-| Cull 100k scene | 100,001 | [measure] | [measure] | [measure] | [measure] | [measure] | [measure] |
-| Cull.many_batches_shadows (400 batches) | 20,000 | [measure] | [measure] | [measure] | [measure] | [measure] | [measure] |
-| Cull.town, mesh | 4,801 | [measure] | [measure] | [measure] | [measure] | [measure] | [measure] |
-| Cull.town, 2D | 120 | [measure] | [measure] | [measure] | 0 | [measure] | 0% |
+| Material.tint_subtree | 110,000 | 110,000 | 5.3 MB | 1.8 MB | 0 | 7.0 MB | 0% |
+| Cull 100k scene | 100,001 | 100,004 | 4.8 MB | 1.6 MB | 0 | 6.4 MB | 0% |
+| Cull.many_batches_shadows (400 batches) | 20,000 | 20,800 | 1.0 MB | 0.33 MB | 0 | 1.3 MB | 0% |
+| Cull.town, mesh | 4,801 | 4,864 | 0.23 MB | 0.08 MB | 0 | 0.31 MB | 0% |
+| Cull.town, 2D | 120 | 124 | 0.006 MB | 0.008 MB | 0 | 0.014 MB | 0% |
 | Shapes2D.dynamic_material | 110,000 | 110,000 | 5.3 MB | 7.0 MB | 0 | 12.3 MB | 0% |
 | Shapes2D.ui_tree_idle | 10,100 | 10,100 | 0.48 MB | 0.65 MB | 0 | 1.1 MB | 0% |
 | Text.layout_10k (glyphs) | 110,000 | 110,000 | 5.3 MB | 7.0 MB | 0 | 12.3 MB | 0% |
-| spaceship (`Parametric.extract_spaceship_size`) | 8,792 | 10,960 | [measure] | [measure] | [measure] | 1.7 MB | [measure] |
+| spaceship (`Parametric.extract_spaceship_size`) | 8,792 | 10,960 | 0.53 MB | 0.18 MB | 0.98 MB | 1.7 MB | 58% |
 | Spawn, 64 × 1,000 boxes | 64,000 | 84,312 | 4.0 MB | 1.3 MB | 0 | 5.4 MB | 0% |
 | LargeBatch 1M, **derived** | 1,048,576 | 1,048,576 | 50.3 MB | 16.8 MB | 0 | 67.1 MB | 0% |
 | LargeBatch 1.5M, **derived** | 1,572,864 | 1,572,864 | 75.5 MB | 25.2 MB | 0 | 100.7 MB | 0% |
@@ -419,7 +422,7 @@ The 80 bytes per slot:
   every 2D instance carries its shape words, aspect, clip and rank. A table could only take the
   color, emissive and border color, and would add a dependent load in `shape2d.wgsl`. Since O1
   the material table shares records by content: Extract's 100,001 records became 2 and town's
-  4,802 became [measure], so UI elements that own their `Rgb` would share records too. The
+  4,802 became 49, so UI elements that own their `Rgb` would share records too. The
   measured 2D contents are as redundant: Shapes2D.ui_tree_idle has 3 distinct records among
   10,100 when the rank is ignored, and Text.layout_10k has 9 among 110,000. That argues for a
   content deduplicated 2D style table (32 bytes per instance) later rather than for the material
@@ -439,20 +442,20 @@ after it in the last column:
 |---|---|---|---|---|---|
 | Extract | 100,001 | 2 | 131,072 | 10.5 MB | 2 |
 | Material.tint_subtree | 110,001 | 3 | 131,072 | 10.5 MB | 3 |
-| Cull.many_batches_shadows | 20,001 | 2 | 32,768 | 2.6 MB | [measure] |
-| Cull.town | 4,802 | 49 | 8,192 | 0.7 MB | [measure] |
-| japanese_garden | 21,684 | 262 | 32,768 | 2.6 MB | [measure] |
-| cheese_market | 19,028 | 130 | 32,768 | 2.6 MB | [measure] |
-| spaceship (prefabs) | 330 | 39 | 512 | 0.04 MB | [measure] |
+| Cull.many_batches_shadows | 20,001 | 2 | 32,768 | 2.6 MB | 2 |
+| Cull.town | 4,802 | 49 | 8,192 | 0.7 MB | 49 |
+| japanese_garden | 21,684 | 262 | 32,768 | 2.6 MB | 262 |
+| cheese_market | 19,028 | 130 | 32,768 | 2.6 MB | 130 |
+| spaceship (prefabs) | 330 | 39 | 512 | 0.04 MB | 39 |
 
 The records after O1 are the `materials` counter after setup, slot 0 included like the records
-before. Extract, Material.tint_subtree and the Cull rows report it in `bench/render` (release);
-[how the Cull rows were measured: Cull suite on a GPU, or the null backend driver]. The
-japanese_garden, cheese_market and spaceship scenes are not benches; a driver outside the
-repository loaded each with the null backend (`src/render/null.c`) and read the counter after
-setup. [One sentence for each count above its distinct count: prefabs, `DynamicMaterial` shapes
-and shapes with a running material transition keep private records; the spaceship row is prefab
-records only.]
+before. Extract, Material.tint_subtree and the Cull rows report it in `bench/render` (release),
+the Cull rows from the Cull suite on a GPU. The japanese_garden, cheese_market and spaceship
+scenes are not benches; a driver outside the repository loaded each with the null backend
+(`src/render/null.c`) and read the counter after setup. The driver also gave town 49. Every
+count is its distinct count: no row has `DynamicMaterial` shapes or a running transition. The
+spaceship row is not only prefab records after O1: 13 of its 39 are the private records of the
+prefabs that own a material, and the 329 other owners share the rest.
 
 Implemented: the table shares records by content, with reference counts. This removes about 80
 bytes per instance that owns its material. Prefabs, `DynamicMaterial` shapes and shapes with a
@@ -561,10 +564,11 @@ at 86,672 slots, off the steps.
 The cost is one move for a batch that, right after it was created with more than 16 instances,
 gains instances its old growth step would have held: 1,000 shapes and one more move to a run of
 1,460, or extend it in place at the top of the page. The move copies the 1,000 instances once on
-the GPU (64 bytes each for a mesh, 112 for a 2D shape: 64 or 112 KB) instead of uploading them, and leaves a
-hole of 1,000 slots that later runs reuse. A batch that starts at 16 instances or less starts on
-the growth steps and grows exactly as before. A run just below a step gains little headroom on
-its first growth (968 grows to 972), so it can move once more before it reaches the step above.
+the GPU (64 bytes each for a mesh, 112 for a 2D shape: 64 or 112 KB) instead of uploading them,
+and leaves a hole of 1,000 slots that later runs reuse. A batch that starts at 16 instances or
+less starts on the growth steps and grows exactly as before. A run just below a step gains little
+headroom on its first growth (968 grows to 972), so it can move once more before it reaches the
+step above.
 
 ### O3. Full re-uploads when a run moves or a page grows
 
@@ -634,7 +638,7 @@ Each item can become its own task. The savings use the measured scenes above.
    - Effort: medium. It reuses the zero buffer binding of item 1.
 3. **Deduplicate the material table by content (O1).** Implemented.
    - Removes the 80 byte record per instance of shapes that own their material: 100,001 → 2
-     records in Extract, 4,802 → [measure] in town (49 distinct contents).
+     records in Extract, 4,802 → 49 in town, measured.
    - Extract's setup upload of material records goes from 8,000,080 to 160 bytes.
    - Effort: medium.
 4. **Copy grown pages and moved runs on the GPU instead of uploading them again (O3).**
