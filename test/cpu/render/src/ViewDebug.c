@@ -6,7 +6,8 @@
  *
  * The packet cases render into the null backend with one camera. The wire cases check the
  * wireframe settings and the extract of a view with WireframeOnly, which culls without occlusion
- * and renders no shadows.
+ * and renders no shadows. The capture case checks that a capture of the camera of a view copies
+ * its debug settings, and that the other captures draw none.
  */
 
 #include <box.h>
@@ -428,6 +429,97 @@ void ViewDebug_wire_only_no_occlusion(void) {
     box_render_sync(world);
     p = &null->last;
     test_bool(ecs_vec_get_t(&p->views, box_render_view_t, 2)->cull.occlusion, true);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Find the view of the packet that renders into a target.
+ *
+ * @param p The packet
+ * @param target Handle of the target
+ * @return The view, NULL when no view renders into the target
+ */
+static const box_render_view_t* debug_view_of_target(
+    const box_render_packet_t *p,
+    uint32_t target)
+{
+    const box_render_view_t *result = NULL;
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&p->views); i ++) {
+        const box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t, i);
+        if (v->target == target) {
+            result = v;
+        }
+    }
+
+    return result;
+}
+
+void ViewDebug_capture_copies_debug(void) {
+    // debug/capture
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t lone = ecs_new(world);
+    ecs_set(world, lone, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_add(world, view, View);
+    View *data = ecs_get_mut(world, view, View);
+    data->camera = camera;
+    data->debug.grid.enabled = true;
+    data->debug.grid.cell_size = 0.5f;
+    data->debug.wireframe = WireframeOnly;
+    data->debug.wireframe_width = 2;
+    data->debug.light_probes = true;
+    ecs_modified(world, view, View);
+
+    test_int(box_render_capture(world, &(box_render_capture_desc_t){
+        .camera = camera, .width = 16, .height = 16, .path = "capture_debug.png"}), 0);
+    test_int(box_render_capture(world, &(box_render_capture_desc_t){
+        .camera = lone, .width = 16, .height = 16, .path = "capture_lone.png"}), 0);
+    test_int(box_render_capture(world, &(box_render_capture_desc_t){
+        .camera_data = {.fov = 60, .near_ = 0.1f}, .transform = GLM_MAT4_IDENTITY_INIT,
+        .width = 16, .height = 16, .path = "capture_desc.png"}), 0);
+
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    const box_render_packet_t *p = &null->last;
+    test_int(ecs_vec_count(&p->views), 4);
+
+    const box_render_view_t *source = ecs_vec_get_t(&p->views, box_render_view_t, 0);
+    test_uint(source->view, view);
+    test_uint(source->target, 0);
+
+    const box_render_view_t *v = debug_view_of_target(p, BOX_RENDER_CAPTURE_TARGET_FIRST);
+    test_assert(v != NULL);
+    test_uint(v->view, view);
+    test_uint(v->camera, camera);
+    test_assert(memcmp(&v->debug, &source->debug, sizeof(ViewDebug)) == 0);
+    test_bool(v->debug.grid.enabled, true);
+    test_flt(v->debug.grid.cell_size, 0.5f);
+    test_int(v->debug.wireframe, WireframeOnly);
+    test_flt(v->debug.wireframe_width, 2);
+    test_bool(v->debug.light_probes, true);
+    test_bool(v->cull.occlusion, false);
+    test_bool(v->cull.occlusion, source->cull.occlusion);
+
+    ViewDebug zero = {0};
+    v = debug_view_of_target(p, BOX_RENDER_CAPTURE_TARGET_FIRST + 1);
+    test_assert(v != NULL);
+    test_uint(v->view, 0);
+    test_uint(v->camera, lone);
+    test_assert(memcmp(&v->debug, &zero, sizeof(ViewDebug)) == 0);
+
+    v = debug_view_of_target(p, BOX_RENDER_CAPTURE_TARGET_FIRST + 2);
+    test_assert(v != NULL);
+    test_uint(v->view, 0);
+    test_uint(v->camera, 0);
+    test_assert(memcmp(&v->debug, &zero, sizeof(ViewDebug)) == 0);
 
     ecs_fini(world);
     box_render_null_free(null);

@@ -447,7 +447,8 @@
                     "wire_defaults",
                     "wire_script_keeps_defaults",
                     "wire_packet_copy",
-                    "wire_only_no_occlusion"
+                    "wire_only_no_occlusion",
+                    "capture_copies_debug"
                 ]
             },
             {

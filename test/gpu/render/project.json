@@ -1098,6 +1098,8 @@
                     "grid_per_view",
                     "grid_not_tonemapped",
                     "grid_not_in_captures",
+                    "grid_in_view_capture",
+                    "grid_not_in_view_capture_without_view",
                     "grid_camera_below",
                     "grid_resize",
                     "wire_off_unchanged",

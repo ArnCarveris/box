@@ -126,7 +126,9 @@ ECS_ENUM(WireframeMode, {
 });
 
 /** Debug drawing of a view, in a pass after its effects into the color of its target, with the
- * depth of the view read only. Not drawn by the probe and reflection captures and the bakes.
+ * depth of the view read only. A screenshot (capture) of a camera that a view renders includes
+ * the debug drawing of that view, as on screen; the probe and reflection captures, the bakes
+ * and a screenshot of a camera that no view renders do not draw it.
  * All zero (a C literal View) draws nothing and records no pass.
  *
  * The probe views show only what the view samples: light_probes the probes of the resident
@@ -178,7 +180,8 @@ ECS_STRUCT(ViewEffect, {
  * changed order takes effect in the next frame.
  *
  * The debug settings draw over the image after the effects of the view, in colors that are not
- * tone mapped; a view of a higher order draws over them.
+ * tone mapped; a view of a higher order draws over them. A screenshot of the camera of the view
+ * includes them, the probe and reflection captures and the bakes do not.
  */
 ECS_STRUCT(View, {
     ecs_entity_t camera;            /**< Camera the view renders, a view without one is skipped */

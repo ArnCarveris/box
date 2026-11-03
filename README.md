@@ -44,7 +44,7 @@ builtins of the flecs shell (`ls`, `get`, `set`, `query`, ...):
 
 | Command | What it does |
 |---------|--------------|
-| `capture [camera]` | Write a PNG of the active camera or a camera to a session resource |
+| `capture [camera]` | Write a PNG of the active camera or a camera to a session resource, with the debug drawing of the view that renders it |
 | `render <subject>` | Write a PNG of an entity, prefab or template on its own |
 | `fit [camera]` | Move the active camera or a camera so that it sees the whole scene |
 | `audio` | Print the audio state, rate, voices, load and the buses in processing order |
