@@ -906,11 +906,12 @@ static bool box_text_font_stale(
     return font && font->relayout;
 }
 
-/** Check whether a Text lays out again: its font or a variant of FontVariants on it asks for
- * it, or every Text does.
+/** Check whether a Text lays out again: its font asks for it, a variant of FontVariants on it
+ * does and the Text has spans, or every Text does.
  *
  * @param world The world
  * @param s The registry
+ * @param entity The entity of the Text
  * @param text The Text
  * @param all Every Text lays out again
  * @return Whether the Text lays out again
@@ -918,6 +919,7 @@ static bool box_text_font_stale(
 static bool box_text_stale(
     const ecs_world_t *world,
     box_text_state_t *s,
+    ecs_entity_t entity,
     const Text *text,
     bool all)
 {
@@ -930,8 +932,8 @@ static bool box_text_stale(
     const FontVariants *v = ecs_get(world, e, FontVariants);
     if (box_text_font_stale(s, e)) {
         result = true;
-    } else if (v && (box_text_font_stale(s, v->bold) || box_text_font_stale(s, v->italic) ||
-        box_text_font_stale(s, v->bold_italic)))
+    } else if (v && ecs_has(world, entity, TextSpans) && (box_text_font_stale(s, v->bold) ||
+        box_text_font_stale(s, v->italic) || box_text_font_stale(s, v->bold_italic)))
     {
         result = true;
     }
@@ -986,7 +988,7 @@ void box_text_relayout(
         while (ecs_query_next(&it)) {
             const Text *texts = ecs_field(&it, Text, 0);
             for (i = 0; i < it.count; i ++) {
-                if (box_text_stale(world, s, &texts[i], every)) {
+                if (box_text_stale(world, s, it.entities[i], &texts[i], every)) {
                     *ecs_vec_append_t(NULL, &s->texts, ecs_entity_t) = it.entities[i];
                 }
             }

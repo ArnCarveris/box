@@ -7,8 +7,13 @@
 #include <box.h>
 #include <bake_test.h>
 #include <text.h>
+#include <preprocess.h>
 #include <string.h>
 #include <math.h>
+#include <stdio.h>
+#include <time.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 /** a, e acute of 2 bytes, euro sign of 3 bytes and b: glyphs at offsets 0, 1, 3 and 6 */
 #define SPANS_MULTI_BYTE "a\xC3\xA9\xE2\x82\xAC" "b"
@@ -1333,9 +1338,12 @@ void TextSpans_variant_loading_falls_back(void) {
     ecs_entity_t bold = spans_font_at(world, SPANS_FONT_BOLD);
     ecs_entity_t font = spans_font_variants(world, bold, 0, 0);
     ecs_entity_t e = spans_styled(world, 0, font, "abcd", 0);
+    ecs_entity_t plain = spans_styled(world, 0, font, "abcd", 0);
     spans_settle(world);
     float regular = ecs_get(world, e, TextBounds)->width;
     test_int(spans_font_state(world, bold), -1);
+    int32_t layouts = 0;
+    spans_watch_layouts(world, plain, &layouts);
 
     spans_set(world, e, (TextSpan[]){{ 0, 4, {0}, .bold = true, .keep_color = true }}, 1);
     test_int(spans_font_state(world, bold), FontLoading);
@@ -1347,6 +1355,10 @@ void TextSpans_variant_loading_falls_back(void) {
     test_int(spans_font_state(world, bold), FontReady);
     spans_face_expect(world, e, bold, false, false);
     spans_near(ecs_get(world, e, TextBounds)->width, spans_face_width(world, bold, "abcd"));
+
+    /* A Text of the font without spans does not wait for the variant */
+    spans_settle(world);
+    test_int(layouts, 0);
 
     ecs_fini(world);
 }
@@ -1566,8 +1578,8 @@ void TextSpans_variant_atlas_trim(void) {
     ecs_entity_t bold = ecs_new(world);
     ecs_set(world, bold, Font, { .path = SPANS_FONT_BOLD, .atlas_pages = 0 });
     ecs_entity_t font = spans_font_variants(world, bold, 0, 0);
-    ecs_entity_t e = spans_styled(world, 0, font, "bold words", 0);
-    spans_set(world, e, (TextSpan[]){{ 0, 10, {0}, .bold = true, .keep_color = true }}, 1);
+    ecs_entity_t e = spans_styled(world, 0, font, "boldwords", 0);
+    spans_set(world, e, (TextSpan[]){{ 0, 9, {0}, .bold = true, .keep_color = true }}, 1);
     spans_settle(world);
     spans_face_expect(world, e, bold, false, false);
 
@@ -1585,5 +1597,67 @@ void TextSpans_variant_atlas_trim(void) {
     spans_settle(world);
     test_int(ecs_vec_count(&spans_registry_font(world, bold)->pages), 0);
 
+    ecs_fini(world);
+}
+
+/** Copy a font of the test assets to a file with a modification time.
+ *
+ * @param from The font of the test assets
+ * @param to The file to write
+ * @param mtime Seconds of the modification time
+ */
+static void spans_copy_font(
+    const char *from,
+    const char *to,
+    int64_t mtime)
+{
+    char *src = box_shader_locate(from);
+    test_assert(src != NULL);
+    FILE *in = fopen(src, "rb");
+    test_assert(in != NULL);
+    fseek(in, 0, SEEK_END);
+    long size = ftell(in);
+    fseek(in, 0, SEEK_SET);
+    uint8_t *data = ecs_os_malloc((ecs_size_t)size);
+    test_int((long)fread(data, 1, (size_t)size, in), size);
+    fclose(in);
+
+    FILE *out = fopen(to, "wb");
+    test_assert(out != NULL);
+    test_int((long)fwrite(data, 1, (size_t)size, out), size);
+    fclose(out);
+    struct timespec times[2] = {{ .tv_sec = (time_t)mtime }, { .tv_sec = (time_t)mtime }};
+    test_int(utimensat(AT_FDCWD, to, times, 0), 0);
+    ecs_os_free(data);
+    ecs_os_free(src);
+}
+
+void TextSpans_variant_file_change(void) {
+    ecs_world_t *world = spans_world();
+    ecs_singleton_set(world, FileWatch, { .interval = 0 });
+    char *path = flecs_asprintf("%s/variant.ttf", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    spans_copy_font(SPANS_FONT_BOLD, path, 1000000000);
+
+    ecs_entity_t bold = spans_font_at(world, path);
+    ecs_entity_t font = spans_font_variants(world, bold, 0, 0);
+    ecs_entity_t e = spans_styled(world, 0, font, "Hava", 0);
+    spans_set(world, e, (TextSpan[]){{ 0, 4, {0}, .bold = true, .keep_color = true }}, 1);
+    spans_settle(world);
+    test_int(ecs_get(world, bold, FontStatus)->revision, 1);
+    spans_face_expect(world, e, bold, false, false);
+    float before = ecs_get(world, e, TextBounds)->width;
+    int32_t layouts = 0;
+    spans_watch_layouts(world, e, &layouts);
+
+    /* The file of the variant changes: it loads again and its texts lay out with the new face */
+    spans_copy_font(SPANS_FONT_BOLD_ITALIC, path, 1000000100);
+    spans_settle(world);
+    test_int(ecs_get(world, bold, FontStatus)->state, FontReady);
+    test_int(ecs_get(world, bold, FontStatus)->revision, 2);
+    test_assert(layouts > 0);
+    spans_face_expect(world, e, bold, false, false);
+    test_assert(fabsf(ecs_get(world, e, TextBounds)->width - before) > 0.01f);
+
+    ecs_os_free(path);
     ecs_fini(world);
 }

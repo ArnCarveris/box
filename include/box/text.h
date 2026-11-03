@@ -34,10 +34,11 @@ ECS_STRUCT(Font, {
     int32_t atlas_pages; /**< Atlas pages kept before an idle page is cleared for new glyphs */
 });
 
-/** The bold, italic and bold italic faces of a Font, each another entity with a Font, 0 for none.
+/** The bold, italic and bold italic faces of a Font, each another Font entity, 0 for none.
  *
- * A glyph of a styled span (TextSpan) takes its face from the variants of the font of its Text,
- * f below, and synthesizes what the face lacks from it, as for a font without variants:
+ * A glyph of a styled span (TextSpan) takes its face from this table, f the font of its Text, and
+ * synthesizes what the face lacks. A variant loads once a glyph needs it; until then, or when its
+ * load fails, the glyph takes the next row, and its Text lays out again once the variant loaded.
  *
  * | Style                              | Face                 | Synthesized on top |
  * |------------------------------------|----------------------|--------------------|
@@ -48,11 +49,9 @@ ECS_STRUCT(Font, {
  * | bold                               | f.bold, or f         | bold if f          |
  * | italic                             | f.italic, or f       | italic if f        |
  *
- * A variant loads on the job system once a glyph needs it; until then, or when its load fails,
- * a glyph takes the next row, and the texts that wait for it lay out again once it loaded.
- * Advance, glyph and kerning come from the face of a glyph, kerning only between two glyphs of
- * one face. Ascent, descent, line height and baseline stay those of f, so a line keeps its
- * height. A variant that is deleted, or whose Font is removed, counts as none.
+ * Advance, glyph and kerning come from the face, kerning only within one face; ascent, descent,
+ * line height and baseline stay those of f, so a line keeps its height. A variant that is
+ * deleted, or whose Font is removed, counts as none.
  */
 ECS_STRUCT(FontVariants, {
     ecs_entity_t bold;        /**< Font of bold glyphs, 0 for none */
@@ -106,7 +105,7 @@ ECS_STRUCT(TextSpan, {
     int32_t start;   /**< Byte offset of the first byte of the range */
     int32_t end;     /**< Byte offset after the range */
     rgba color;      /**< Display encoded color, its alpha multiplies the opacity of the text */
-    bool bold;       /**< Glyphs are drawn bold, from the bold face of FontVariants or synthesized */
+    bool bold;       /**< Glyphs are drawn bold, from the bold face or thickened */
     bool italic;     /**< Glyphs are drawn italic, from the italic face or leaning to the right */
     bool keep_color; /**< The span leaves the color alone, color is ignored */
 });
@@ -114,9 +113,8 @@ ECS_STRUCT(TextSpan, {
 /** Colored and styled byte ranges of the Text of the entity.
  *
  * A glyph whose first byte falls in a span takes its color, a later span without keep_color
- * winning, ranges clipped to the string; outside them it keeps the entity color. Styles add up:
- * a glyph is bold or italic if any span over its first byte is. Its face comes from the
- * FontVariants of the font, what the face lacks is synthesized from the glyph.
+ * winning, ranges clipped to the string; outside them it keeps the entity color. Styles add up,
+ * a glyph is bold or italic if any span over its first byte is, from a face of FontVariants.
  *
  * A color only span changes no layout, a styled one does: TextBounds, wrapping and carets follow
  * the advances of the variant faces, and the wider advance of synthesized bold glyphs. The lean

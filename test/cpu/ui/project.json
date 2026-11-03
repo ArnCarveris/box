@@ -247,7 +247,8 @@
                     "variant_line_height",
                     "variant_changed",
                     "variant_deleted",
-                    "variant_atlas_trim"
+                    "variant_atlas_trim",
+                    "variant_file_change"
                 ]
             },
             {

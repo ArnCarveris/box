@@ -41,7 +41,7 @@ main_view {
 }
 
 panel {
-  Position: {-0.6, 0.35, 0}
+  Position: {-0.6, 0.8, 0}
   Scale: {0.01, 0.01, 0.01}
   Layout: {direction: Column, spacing: 10, padding: {14, 14, 14, 14}}
   LayoutItem: {width: {mode: Fixed, value: 520}}

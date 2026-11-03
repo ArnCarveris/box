@@ -792,5 +792,9 @@ void TextSpans_variant_batches(void) {
     test_int(again.instances, plain.instances);
     test_int(again.batches, mixed.batches);
 
+    box_render_gpu_stats_t gpu = {0};
+    test_assert(box_render_gpu_stats(world, &gpu));
+    test_int(gpu.errors, 0);
+
     ecs_fini(world);
 }

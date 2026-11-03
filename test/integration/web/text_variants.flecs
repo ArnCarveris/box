@@ -1,0 +1,36 @@
+// The scene of the browser check of font variants (text_variants.mjs). The page opens a window
+// only for a scene with a Surface; its 640x480 points fill the viewport of the check. A Text in
+// box.text.DefaultFont has a bold, an italic and a bold italic span, so the page loads the
+// variants of the default font, DefaultFontBold, DefaultFontItalic and DefaultFontBoldItalic,
+// from the etc folder embedded in the wasm build.
+using box.transform
+using box.camera
+using box.view
+using box.surface
+using box.material
+using box.text
+
+window {
+  Surface: {width: 640, height: 480}
+}
+
+camera {
+  Position: {0, 0, 7}
+  Camera: {fov: 55}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {20, 22, 30, 255}}}
+}
+
+label {
+  Position: {0, 0, 0}
+  Scale: {0.01, 0.01, 0.01}
+  Text: {value: "Regular Bold Italic Both", size: 48}
+  Rgb: {255, 255, 255}
+  TextSpans: {spans: [
+    {start: 8, end: 12, bold: true, keep_color: true},
+    {start: 13, end: 19, italic: true, keep_color: true},
+    {start: 20, end: 24, bold: true, italic: true, keep_color: true}
+  ]}
+}
