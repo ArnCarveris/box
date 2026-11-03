@@ -150,7 +150,7 @@ void box_gpu_debug_init(
             .bindGroupLayoutCount = 2,
             .bindGroupLayouts = groups
         });
-    WGPUBindGroupLayoutEntry mesh_entries[2] = {{
+    WGPUBindGroupLayoutEntry mesh_entries[3] = {{
         .binding = 0,
         .visibility = WGPUShaderStage_Vertex,
         .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
@@ -158,9 +158,13 @@ void box_gpu_debug_init(
         .binding = 1,
         .visibility = WGPUShaderStage_Vertex,
         .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+    }, {
+        .binding = 2,
+        .visibility = WGPUShaderStage_Vertex,
+        .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
     }};
     d->wire_mesh_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 2, .entries = mesh_entries });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 3, .entries = mesh_entries });
     WGPUBindGroupLayoutEntry wire_entry = {
         .binding = 0,
         .visibility = WGPUShaderStage_Fragment,
@@ -841,8 +845,159 @@ static WGPUBindGroup box_gpu_debug_wire_group(
     });
 }
 
-/** Get the group of a mesh with its vertices and indices as the storage buffers of its wire
- * draws, created on first use and kept with the mesh, which releases it.
+/** Hash of a vertex position, the same for 0 and -0.
+ *
+ * @param p The position
+ * @return The hash
+ */
+static uint64_t box_gpu_debug_position_hash(
+    const float *p)
+{
+    uint64_t h = 1469598103934665603ull;
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        float f = p[i] == 0.0f ? 0.0f : p[i];
+        uint32_t bits;
+        ecs_os_memcpy(&bits, &f, sizeof(bits));
+        h = (h ^ bits) * 1099511628211ull;
+        h ^= h >> 29;
+    }
+
+    return h;
+}
+
+/** Weld the vertices of a mesh by position: the first vertex at the position of each, found
+ * with an open addressing hash table of the positions.
+ *
+ * @param vertices The vertices
+ * @param vertex_count Number of vertices
+ * @return The first vertex at the position of each vertex, freed with ecs_os_free
+ */
+static uint32_t* box_gpu_debug_weld(
+    const box_vertex_t *vertices,
+    uint32_t vertex_count)
+{
+    uint32_t *weld = ecs_os_malloc_n(uint32_t, vertex_count);
+    uint32_t size = 1, i;
+    while (size < vertex_count * 2u) {
+        size <<= 1;
+    }
+
+    uint32_t *table = ecs_os_calloc_n(uint32_t, size);
+    for (i = 0; i < vertex_count; i ++) {
+        const float *p = vertices[i].position;
+        uint32_t slot = (uint32_t)box_gpu_debug_position_hash(p) & (size - 1);
+        weld[i] = i;
+        while (table[slot]) {
+            const float *q = vertices[table[slot] - 1].position;
+            if (p[0] == q[0] && p[1] == q[1] && p[2] == q[2]) {
+                weld[i] = table[slot] - 1;
+                break;
+            }
+
+            slot = (slot + 1) & (size - 1);
+        }
+
+        if (!table[slot]) {
+            table[slot] = i + 1;
+        }
+    }
+
+    ecs_os_free(table);
+
+    return weld;
+}
+
+/** Compute the edge adjacency of a mesh by matching the edges of its welded vertices with a
+ * map of their sorted pairs.
+ *
+ * The edge opposite corner k of a triangle is the one between its corners k + 1 and k + 2, so
+ * the neighbor across the edge e gets the vertex indices[e]. An edge of more than two triangles
+ * keeps the first one as the neighbor of the others.
+ *
+ * @param vertices The vertices
+ * @param vertex_count Number of vertices
+ * @param indices The indices, three per triangle
+ * @param index_count Number of indices
+ * @return One neighbor per index, freed with ecs_os_free
+ */
+static uint32_t* box_gpu_debug_adjacency(
+    const box_vertex_t *vertices,
+    uint32_t vertex_count,
+    const uint32_t *indices,
+    uint32_t index_count)
+{
+    uint32_t *result = ecs_os_malloc_n(uint32_t, index_count);
+    uint32_t *weld = box_gpu_debug_weld(vertices, vertex_count);
+    uint32_t i, k;
+    ecs_map_t edges;
+    ecs_map_init(&edges, NULL);
+    for (i = 0; i < index_count; i ++) {
+        result[i] = BOX_GPU_WIRE_NONE;
+    }
+
+    for (i = 0; i + 2 < index_count; i += 3) {
+        if (indices[i] >= vertex_count || indices[i + 1] >= vertex_count ||
+            indices[i + 2] >= vertex_count)
+        {
+            continue;
+        }
+
+        for (k = 0; k < 3; k ++) {
+            uint32_t a = weld[indices[i + (k + 1) % 3]];
+            uint32_t b = weld[indices[i + (k + 2) % 3]];
+            if (a == b) {
+                continue;
+            }
+
+            uint64_t key = a < b ? ((uint64_t)a << 32) | b : ((uint64_t)b << 32) | a;
+            uint32_t e = i + k;
+            ecs_map_val_t *other = ecs_map_get(&edges, key);
+            if (!other) {
+                ecs_map_insert(&edges, key, e);
+                continue;
+            }
+
+            uint32_t o = (uint32_t)*other;
+            result[e] = indices[o];
+            if (result[o] == BOX_GPU_WIRE_NONE) {
+                result[o] = indices[e];
+            }
+        }
+    }
+
+    ecs_map_fini(&edges);
+    ecs_os_free(weld);
+
+    return result;
+}
+
+void box_gpu_debug_mesh_adjacency(
+    box_gpu_t *gpu,
+    box_gpu_mesh_t *m,
+    const box_vertex_t *vertices,
+    uint32_t vertex_count,
+    const uint32_t *indices)
+{
+    if (!m->wireable) {
+        goto done;
+    }
+
+    uint64_t size = (uint64_t)m->index_count * sizeof(uint32_t);
+    uint32_t *adjacency = box_gpu_debug_adjacency(vertices, vertex_count, indices,
+        m->index_count);
+    m->adjacency = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
+        .size = size
+    });
+    wgpuQueueWriteBuffer(gpu->queue, m->adjacency, 0, adjacency, (size_t)size);
+    ecs_os_free(adjacency);
+done:
+    return;
+}
+
+/** Get the group of a mesh with its vertices, indices and edge adjacency as the storage buffers
+ * of its wire draws, created on first use and kept with the mesh, which releases it.
  *
  * A mesh whose vertices exceed the storage buffer binding size of the device is not wired; it
  * logs one error.
@@ -864,7 +1019,7 @@ static WGPUBindGroup box_gpu_debug_mesh_group(
         goto done;
     }
 
-    WGPUBindGroupEntry entries[2] = {
+    WGPUBindGroupEntry entries[3] = {
         {
             .binding = 0,
             .buffer = m->vertices,
@@ -874,11 +1029,16 @@ static WGPUBindGroup box_gpu_debug_mesh_group(
             .binding = 1,
             .buffer = m->indices,
             .size = wgpuBufferGetSize(m->indices)
+        },
+        {
+            .binding = 2,
+            .buffer = m->adjacency,
+            .size = wgpuBufferGetSize(m->adjacency)
         }
     };
     m->wire = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = gpu->debug->wire_mesh_layout,
-        .entryCount = 2,
+        .entryCount = 3,
         .entries = entries
     });
 done:
@@ -891,6 +1051,11 @@ void box_gpu_debug_mesh_free(
     if (m->wire) {
         wgpuBindGroupRelease(m->wire);
         m->wire = NULL;
+    }
+
+    if (m->adjacency) {
+        wgpuBufferRelease(m->adjacency);
+        m->adjacency = NULL;
     }
 }
 

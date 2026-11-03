@@ -719,7 +719,8 @@ void box_gpu_mesh_apply(
     m = ecs_os_calloc_t(box_gpu_mesh_t);
     m->vertices = box_gpu_buffer_new(gpu, vertex_size,
         WGPUBufferUsage_Vertex | WGPUBufferUsage_Storage);
-    m->wireable = vertex_size <= limits.maxStorageBufferBindingSize;
+    m->wireable = vertex_size <= limits.maxStorageBufferBindingSize &&
+        index_size <= limits.maxStorageBufferBindingSize;
     m->indices = box_gpu_buffer_new(gpu, index_size,
         WGPUBufferUsage_Index | WGPUBufferUsage_Storage);
     m->surface_asset_size = desc->surface_asset_count ?
@@ -735,6 +736,8 @@ void box_gpu_mesh_apply(
     box_gpu_mesh_bounds(m, (const box_vertex_t*)vertices, desc->vertex_count);
     wgpuQueueWriteBuffer(gpu->queue, m->vertices, 0, vertices, (size_t)vertex_size);
     wgpuQueueWriteBuffer(gpu->queue, m->indices, 0, vertices + vertex_size, (size_t)index_size);
+    box_gpu_debug_mesh_adjacency(gpu, m, (const box_vertex_t*)vertices, desc->vertex_count,
+        (const uint32_t*)(vertices + vertex_size));
     ecs_map_insert_ptr(&gpu->meshes, handle, m);
     box_gpu_count(gpu, BOX_GPU_STAT_MESH_CREATED);
 done:

@@ -113,8 +113,9 @@ ECS_STRUCT(GridSettings, {
  * edges of the triangles of the instances the view draws after its culling, from barycentric
  * coordinates, so it needs no line polygon mode. 2D shapes, text and particles are not wired.
  *
- * A line is drawn inside the triangles on either side of its edge, so the edge of a silhouette,
- * with a triangle on one side only, has half its width.
+ * A line is drawn inside the triangles on either side of its edge, half on each. An edge with a
+ * line on one side only, on the border of an open mesh or the silhouette of a closed one, draws
+ * the whole width on that side, so every line has the width of the view.
  *
  * WireframeOnly culls by frustum and size only and renders no shadows, ambient occlusion or
  * transmission; the sky, the particles and the 2D shapes still draw.

@@ -143,8 +143,11 @@ typedef struct box_gpu_mesh_t {
     uint32_t index_count;           /**< Indices to draw */
     WGPUBindGroup wire;             /**< Vertices and indices as the storage buffers of a wire
                                      *   draw (debug_wire.wgsl), NULL until the first one */
-    bool wireable;                  /**< The vertices fit in a storage buffer binding, so the
-                                     *   mesh can be wired */
+    WGPUBuffer adjacency;           /**< Edge adjacency of the wire draws, one uint32_t per
+                                     *   index (box_gpu_debug_adjacency), NULL when the mesh is
+                                     *   not wireable */
+    bool wireable;                  /**< The vertices and the adjacency fit in a storage buffer
+                                     *   binding, so the mesh can be wired */
     bool wire_reported;             /**< The error of a mesh that is not wireable was logged */
     float center[3];                /**< Center of the box around the vertex positions */
     float extent[3];                /**< Half size of the box around the vertex positions */
