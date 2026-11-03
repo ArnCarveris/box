@@ -1,11 +1,12 @@
 /**
  * @file audio/audio.c
  * @brief Registers the box.audio components, the play and capture functions and their script
- * functions, and writes the WAV files of captures.
+ * functions, and writes the WAV files of captures. Sound files are in sample.c.
  */
 
 #define BOX_AUDIO_IMPL
 #include "module.h"
+#include "../jobs/jobs.h"
 #include <stdio.h>
 #include <math.h>
 
@@ -19,6 +20,8 @@ ECS_TAG_DECLARE(AudioListener);
 ECS_COMPONENT_DECLARE(AudioSoundId);
 ECS_COMPONENT_DECLARE(AudioBusState);
 ECS_COMPONENT_DECLARE(AudioVoice);
+ECS_COMPONENT_DECLARE(AudioReverbState);
+ECS_COMPONENT_DECLARE(AudioSample);
 
 /** Construct AudioBus values: unity volume to the master, centered, no send.
  *
@@ -58,23 +61,41 @@ static void box_audio_source_ctor(
     }
 }
 
+<<<<<<< HEAD
 /** Construct AudioSpatial values: full volume within 1, silent from 50, rolloff 1.
+=======
+/** Construct Reverb values: a decay of 1.5 seconds, half damped, 20 ms of predelay, a middle
+ * size, fully wet.
+>>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
  *
  * @param ptr The components
  * @param count Number of components
  * @param ti Type info
  */
+<<<<<<< HEAD
 static void box_audio_spatial_ctor(
+=======
+static void box_audio_reverb_ctor(
+>>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
     void *ptr,
     int32_t count,
     const ecs_type_info_t *ti)
 {
+<<<<<<< HEAD
     AudioSpatial *values = ptr;
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
         values[i] = (AudioSpatial){
             .min_distance = 1.0f, .max_distance = 50.0f, .rolloff = 1.0f };
+=======
+    Reverb *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Reverb){
+            .decay = 1.5f, .damping = 0.5f, .predelay = 0.02f, .size = 0.5f, .mix = 1.0f };
+>>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
     }
 }
 
@@ -152,6 +173,38 @@ int32_t box_audio_module_order(
     return result;
 }
 
+int32_t box_audio_module_reverb_slot(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    box_audio_module_t *state = box_audio_module_get(world);
+    const AudioReverbState *s = NULL;
+    int32_t result = -1;
+    if (!state || !e || !ecs_is_alive(world, e)) {
+        goto done;
+    }
+
+    s = ecs_get(world, e, AudioReverbState);
+    if (s && s->slot && state->reverb_entity[s->slot - 1] == e) {
+        result = s->slot - 1;
+    }
+
+done:
+    return result;
+}
+
+int32_t box_audio_module_sounds(
+    const ecs_world_t *world)
+{
+    box_audio_module_t *state = box_audio_module_get(world);
+    int32_t i, result = 0;
+    for (i = 0; state && i < BOX_AUDIO_SOUND_MAX; i ++) {
+        result += state->sound_used[i] != 0;
+    }
+
+    return result;
+}
+
 int32_t box_audio_module_bus_index(
     const ecs_world_t *world,
     ecs_entity_t bus)
@@ -189,6 +242,7 @@ ecs_entity_t box_audio_sound_from_pcm(
 
     result = sound ? sound : ecs_new(world);
     pcm = ecs_ensure(world, result, AudioPcm);
+    ecs_vec_init_if_t(&pcm->samples, float);
     ecs_vec_set_count_t(NULL, &pcm->samples, float, frames * channels);
     ecs_os_memcpy_n(ecs_vec_first_t(&pcm->samples, float), data, float, frames * channels);
     pcm->channels = channels;
@@ -205,7 +259,9 @@ bool box_audio_play(
 {
     box_audio_module_t *state = box_audio_module_get(world);
     bool result = false;
-    if (!state || !sound || !ecs_is_alive(world, sound) || !ecs_has(world, sound, AudioPcm)) {
+    if (!state || !sound || !ecs_is_alive(world, sound) ||
+        (!ecs_has(world, sound, AudioPcm) && !ecs_has(world, sound, SoundFile)))
+    {
         goto done;
     }
 
@@ -452,7 +508,11 @@ static void box_audio_module_free(
     ecs_vec_fini_t(NULL, &state->plays, box_audio_play_t);
     ecs_vec_fini_t(NULL, &state->stops, uint32_t);
     ecs_vec_fini_t(NULL, &state->releases, uint32_t);
+<<<<<<< HEAD
     ecs_vec_fini_t(NULL, &state->moved, ecs_entity_t);
+=======
+    box_audio_sample_fini(state);
+>>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
     ecs_os_free(state->capture.path);
     ecs_os_free(state);
 }
@@ -504,8 +564,12 @@ void BoxAudioImport(
 {
     ECS_MODULE(world, BoxAudio);
     ECS_IMPORT(world, BoxTypes);
+<<<<<<< HEAD
     ECS_IMPORT(world, BoxTransform);
     ECS_IMPORT(world, BoxView);
+=======
+    ECS_IMPORT(world, BoxJobs);
+>>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
 
     ECS_META_COMPONENT(world, AudioState);
     ECS_META_COMPONENT(world, AudioBus);
@@ -513,11 +577,21 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, AudioOutput);
     ECS_META_COMPONENT(world, AudioPcm);
     box_owned_hooks(world, AudioPcm, BOX_OWNED_VEC(AudioPcm, samples, float));
+    ECS_META_COMPONENT(world, SoundFile);
+    box_owned_hooks(world, SoundFile, BOX_OWNED_STR(SoundFile, path));
+    ECS_META_COMPONENT(world, SoundState);
+    ECS_META_COMPONENT(world, SoundStatus);
+    box_owned_hooks(world, SoundStatus, BOX_OWNED_STR(SoundStatus, error));
     ECS_META_COMPONENT(world, AudioSource);
     ecs_set_hooks(world, AudioSource, { .ctor = box_audio_source_ctor });
+<<<<<<< HEAD
     ECS_TAG_DEFINE(world, AudioListener);
     ECS_META_COMPONENT(world, AudioSpatial);
     ecs_set_hooks(world, AudioSpatial, { .ctor = box_audio_spatial_ctor });
+=======
+    ECS_META_COMPONENT(world, Reverb);
+    ecs_set_hooks(world, Reverb, { .ctor = box_audio_reverb_ctor });
+>>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
     ECS_META_COMPONENT(world, AudioSettings);
     ecs_set_hooks(world, AudioSettings, { .ctor = box_audio_settings_ctor });
     ECS_META_COMPONENT(world, AudioStatus);
@@ -525,13 +599,20 @@ void BoxAudioImport(
     ECS_COMPONENT_DEFINE(world, AudioSoundId);
     ECS_COMPONENT_DEFINE(world, AudioBusState);
     ECS_COMPONENT_DEFINE(world, AudioVoice);
+    ECS_COMPONENT_DEFINE(world, AudioReverbState);
+    ECS_COMPONENT_DEFINE(world, AudioSample);
     ecs_set_hooks(world, AudioSoundId, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioBusState, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioVoice, { .copy = box_audio_track_copy });
+    ecs_set_hooks(world, AudioReverbState, { .copy = box_audio_track_copy });
+    ecs_set_hooks(world, AudioSample, { .copy = box_audio_track_copy });
     ecs_add_pair(world, ecs_id(AudioPcm), EcsWith, ecs_id(AudioSoundId));
     ecs_add_pair(world, ecs_id(AudioBus), EcsWith, ecs_id(AudioBusState));
     ecs_add_pair(world, ecs_id(AudioSource), EcsWith, ecs_id(AudioVoice));
+    ecs_add_pair(world, ecs_id(Reverb), EcsWith, ecs_id(AudioReverbState));
+    ecs_add_pair(world, ecs_id(SoundFile), EcsWith, ecs_id(AudioSample));
 
+    ecs_entity(world, { .name = "master" });
     ecs_singleton_add(world, AudioSettings);
     ecs_singleton_set(world, AudioStatus, {0});
 
@@ -548,5 +629,6 @@ void BoxAudioImport(
     ecs_atfini(world, box_audio_module_free, state);
 
     box_audio_sync_init(world, state);
+    box_audio_sample_init(world, state);
     box_audio_functions_init(world);
 }

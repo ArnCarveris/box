@@ -42,6 +42,7 @@ start of the next render block. They are:
 | `BUS_SET` | bus, `VOLUME`, `PAN`, `MUTE` or `SEND` (the send level), value |
 | `ORDER` | count, then per bus in processing order: bus, output, send |
 | `SOUND_RELEASE` | sound: freed once no voice plays it |
+| `REVERB` | slot, bus (or none), decay, damping, predelay, size, mix: see [Reverb](#reverb) |
 
 The sender picks the voice handles, so it addresses a voice without waiting for a reply. Values
 are clamped (volumes and send levels to 0..4, pans to -1..1, pitches to 1/64..16) and a NaN
@@ -110,6 +111,60 @@ whether the frames are rendered one at a time or in one large block.
 The tests are `test/cpu/audio`, which render offline; `bench/audio` mixes 64 voices through 8
 buses and reports the time per frame.
 
+## Reverb
+
+`src/audio/core/reverb.c` is an algorithmic reverb that runs on a bus: a feedback delay network
+of `BOX_AUDIO_REVERB_LINES` (8) delay lines. A send bus with a reverb is the usual setup, so
+sources reach it through the send of their bus.
+
+- **The network.** The input, the mean of both channels, goes through a predelay line, then into
+  every line with a sign pattern that is no row of the matrix, so the first reflection already
+  spreads over all lines. The lengths are distinct primes, so mutually prime, from 39 to 98 ms
+  at size 1, scaled down to a fifth at size 0. Each line has a one pole lowpass, the damping,
+  and a gain `10^(-3 L / (decay x rate))`, so every line loses 60 dB in `decay` seconds whatever
+  its length `L`. The feedback matrix is the 8 x 8 Hadamard matrix over `sqrt(8)`, orthogonal.
+  The left and the right outputs take the lines with two orthogonal sign patterns, which keeps
+  the channels decorrelated.
+- **It cannot blow up.** The matrix keeps the energy, the lowpass has a gain of at most 1 and
+  each gain is at most `0.9999`, so the loop gain stays under unity. A `REVERB` command is
+  clamped: decay to `BOX_AUDIO_REVERB_DECAY_MIN..MAX` (0.05..60 s), damping, size and mix to
+  0..1 and predelay to 0..`BOX_AUDIO_REVERB_PREDELAY_MAX` (0.5 s), a NaN to the low end. Every
+  value a line keeps is flushed like a bus sample, so no denormal forms in a tail.
+- **Mix.** The bus outputs its signal at `1 - mix` and the reverb at `mix`; 1, the default, is
+  the fully wet send bus.
+- **Changes.** Decay and damping move to a new value over about 50 ms, a block at a time, and
+  mix ramps over 20 ms. A change of size or predelay would change the lengths of the lines,
+  which clicks: the wet signal fades out over 50 ms, the lines are cleared and take their new
+  lengths, and it fades back in over 50 ms (`BOX_AUDIO_REVERB_FADE`, 100 ms in all), while the
+  input fades into the clear lines over the same 50 ms, so a steady sound does not enter them
+  with a step. A change of the bus does the same.
+- **Silence costs nothing.** The tail rings out after its sources stop. Once the input has been
+  silent for longer than the predelay plus the longest line, and every line has read out under
+  -140 dB for a whole length of the longest line, so nothing louder is left in them, the reverb
+  clears its lines and stops; while it is stopped and no signal comes in, a block costs a scan
+  of the input for a sample over 1e-9. `box_audio_core_reverb_running` tells whether it runs.
+- **Taking it off.** A `REVERB` with bus `BOX_AUDIO_BUS_NONE` takes the reverb off its bus at
+  once: it gets no more input and its tail fades out over 50 ms into the master, so deleting a
+  reverb bus does not cut the tail.
+- **Memory.** The delay memory belongs to the side that runs the core, like sound memory:
+  `box_audio_reverb_floats(rate)` floats per slot (about 200 KB at 48 kHz), sized for the
+  largest size and predelay at the rate. `box_audio_core_reverb_memory` gives it to a slot once,
+  and the core clears it; the render path never allocates. Until a slot has memory a reverb on
+  it does not run and its bus stays dry. The transports allocate it on the `reverb` call of the
+  transport interface: the null transport on the main thread, the native one on the main thread
+  and hands it to the audio thread as a message of the command ring, the web one with a
+  `{ type: 'reverb', slot }` message, on which the worklet allocates it in the heap of its core.
+  Each frees it after its core.
+
+`BOX_AUDIO_REVERB_MAX` (1) reverbs run at once; the slots are an array, so more only cost their
+memory and their time. Convolution is not used, since it needs recorded impulse responses.
+
+The tests are the `Reverb` suite of `test/cpu/audio`, from an impulse in an offline render:
+the decay time at 44.1 and 48 kHz, damping, predelay, stereo correlation, density, stability at
+extreme values, silence, changes without clicks, sends, the second reverb, a delete and no
+allocation. `bench/audio` has a `Reverb` suite in ns per frame, and
+`test/integration/web/audio_reverb.mjs` measures a tail and the load of the worklet in Chrome.
+
 ## Transports
 
 The main thread reaches the core through a transport, one small interface in
@@ -170,8 +225,9 @@ start of the next render.
 
 ## Native output
 
-`src/audio/native.c` is the only file that includes miniaudio, bundled header only in
-`project.json` (tag `0.11.26`) for macOS and Linux. It uses the device API alone, built with
+`src/audio/native.c` is the only file that includes the device part of miniaudio, bundled
+header only in `project.json` (tag `0.11.26`); `src/audio/decode.c` includes its decoders
+alone, on every platform. It uses the device API alone, built with
 `MA_NO_ENGINE`, `MA_NO_NODE_GRAPH`, `MA_NO_RESOURCE_MANAGER`, `MA_NO_DECODING`,
 `MA_NO_ENCODING`, `MA_NO_GENERATION` and `MA_NO_NULL` (so a machine without audio fails the
 open instead of playing into the silent null backend of miniaudio). Mixing, panning and
@@ -215,8 +271,8 @@ flags. A notarized macOS build, whose hardened runtime may refuse to load them, 
 CoreAudio -framework AudioToolbox`, or keeps runtime linking and signs with the entitlements
 the miniaudio documentation lists for macOS.
 
-The web does not compile the device part: the bundle is not fetched for Emscripten and
-`native.c` compiles to a stub there.
+The web does not compile the device part: `native.c` compiles to a stub there, and only the
+decoders of `decode.c` use the bundle.
 
 The tests are `Ring`, `Transport` and `NoDevice` in `test/cpu/audio`, which need no device.
 
@@ -280,8 +336,9 @@ Fixing that takes a nightly Rust with `-Zbuild-std` in bake3 and on every runner
 memory requires COOP/COEP headers on every host that serves a box page. A separate module needs
 neither: the page works with `crossOriginIsolated` false and without `SharedArrayBuffer`.
 
-miniaudio is not used on the web: its web backend forbids `-std=c*` flags, while box sets `c11`,
-and its worklet mode needs `-sASYNCIFY` on the whole binary.
+The device part of miniaudio is not used on the web: its web backend forbids `-std=c*` flags,
+while box sets `c11`, and its worklet mode needs `-sASYNCIFY` on the whole binary. Its decoders
+are, see [Sound files](#sound-files).
 
 ## How the core is built and delivered
 
@@ -301,8 +358,8 @@ clang --target=wasm32-unknown-unknown -O2 -msimd128 -std=c11 -ffreestanding -nos
 into `box_audio_core.wasm` in the generated folder of the build: a freestanding module of a
 few KB with its own memory, which starts at 1 MB and grows up to 256 MB, no imports (the core
 needs no libm) and the exports of `src/audio/core/wasm.c`: `box_audio_core_wasm_init`, a first
-fit heap with `_alloc` and `_free` that grows the memory, `_sound`, `_apply`, `_render`,
-`_left`, `_right`, `_read_events`, `_events`, `_events_lost` and `_voices`. It is not built
+fit heap with `_alloc` and `_free` that grows the memory, `_sound`, `_reverb_floats`,
+`_reverb`, `_apply`, `_render`, `_left`, `_right`, `_read_events`, `_events`, `_events_lost` and `_voices`. It is not built
 with `emcc`: a standalone wasm of `emcc` links start code and libc from the Emscripten cache,
 which the core does not use, and building those for a new configuration fails when the cache
 folder is a symlink. The script writes the bytes as
@@ -403,8 +460,11 @@ frame, the same on every platform.
 
 | Component | What it is |
 |-----------|------------|
-| `AudioPcm` | The samples of a sound (`samples`, `channels`, `sample_rate`, 0 for the output rate); `box_audio_sound_from_pcm` sets it from C. Later tasks add other sound kinds |
-| `AudioBus` | A mixer bus: `output` (0 for the master), `volume` (1), `pan`, `mute`, `send` and `send_level` |
+| `AudioPcm` | The samples of a sound (`samples`, `channels`, `sample_rate`, 0 for the output rate); `box_audio_sound_from_pcm` sets it from C |
+| `SoundFile` | A sound decoded from a WAV or FLAC file (`path`), see [Sound files](#sound-files) |
+| `SoundStatus` | Read only: `state` (`SoundLoading`, `SoundReady`, `SoundFailed`), `frames`, `channels`, `sample_rate` and `error` of a `SoundFile` |
+| `AudioBus` | A mixer bus: `output` (0 or `master` for the master), `volume` (1), `pan`, `mute`, `send` and `send_level` |
+| `Reverb` | A reverb on the bus of the entity: `decay` (1.5 s), `damping` (0.5), `predelay` (0.02 s), `size` (0.5), `mix` (1) |
 | `AudioOutput` | The bus a source, or a sound by default, plays on |
 | `AudioSource` | A sound that plays while the entity exists: `sound`, `volume` (1), `pitch` (1), `loop`, `playing` (true) |
 | `AudioSpatial` | Places a source in the world: `min_distance` (1), `max_distance` (50), `rolloff` (1), see [Spatial audio](#spatial-audio) |
@@ -446,6 +506,22 @@ names the buses on it and keeps the last valid order, which the core keeps playi
 bus, or an output or send that names no bus, routes to the master: its sources and one shots are
 moved to the master and the index is reused a frame later. A Disabled bus is muted.
 
+**Reverbs.** A scene sets its reverb by having an entity with `AudioBus` and `Reverb`, and
+unloading the scene deletes it, which fades its tail out:
+
+```
+hall { AudioBus: {output: master}; Reverb: {decay: 2.4, damping: 0.4, predelay: 0.02} }
+world { AudioBus: {output: master, send: hall, send_level: 0.3} }
+```
+
+Components on one line are separated by `;` (or a newline): flecs script does not take a comma
+there. `master` is `box.audio.master`, an entity without components that names the master. A reverb
+gets a slot of the core and the module asks the transport for its memory before the first
+`REVERB` command; it sends the parameters again when they change. One reverb runs at once: a
+second one logs one error that names its entity (`box.audio: more than 1 reverb, '...' stays
+dry`) and its bus stays dry, until the first one is deleted. Reverb zones, rooms from geometry
+and other effects are later work.
+
 **Sources** start a voice when `playing` is true and their sound is known, and stop it when
 `playing` goes false, the sound or `loop` changes or the entity is deleted, which fades it out
 over the ramp of the core. A sound that does not loop sets `playing` to false when it ends. A
@@ -456,6 +532,7 @@ copy of `AudioSource` and play on their own, as `ParticleEmitter` instances do.
 the old id and sends the new samples, and a deleted sound is released, freed by the side that
 owns the frames once no voice plays it.
 
+<<<<<<< HEAD
 ### Spatial audio
 
 `src/audio/spatial.c` places sounds in the world with a simple model: a sound gets quieter with
@@ -530,6 +607,68 @@ listener, a moving listener and 10 moving sources, against the same world withou
 
 **Disabled** works as for other sources: a Disabled spatial source keeps its voice at volume 0,
 or none when it is out of range.
+=======
+### Sound files
+
+```
+using box.audio
+click { SoundFile: {path: "etc/assets/sounds/click.wav"} }
+hum { SoundFile: {path: "etc/assets/sounds/hum.flac"} }
+hum_source { AudioSource: {sound: hum, loop: true} }
+```
+
+`SoundFile` (`src/audio/sample.c`) plays short sounds decoded fully into memory; long music
+streams in a later task. The path is found as a `TexturePath` is: absolute, relative to the
+working directory or an ancestor of it, or to an ancestor of the folder of the executable.
+
+- **Decoding** runs on the job system (`box_job_submit`), as textures and fonts do, with the
+  WAV and FLAC decoders of miniaudio in `src/audio/decode.c`, to float frames at the sample rate
+  of the file. The voice of the core plays them at the rate of the output with the linear
+  interpolation of the pitch, so a 44100 Hz file plays in its time and at its pitch on a 48000
+  Hz output. Mono and stereo stay as they are; more channels are mixed down to stereo: each side
+  is the mean of the channels on it, by the channel map of the file (FL FR FC LFE BL BR for
+  5.1), a center counts on both sides and the LFE on none. A file is read up to 256 MB and
+  decodes to at most 512 MB of frames.
+- **Status.** `SoundStatus` is `SoundLoading` until the decode completes, then `SoundReady` with
+  the frames, the channels after the mix down and the rate, or `SoundFailed` with an `error`.
+  A failed load (a missing, empty or corrupt file, or another format) logs one error that names
+  the file, and the other sounds keep playing.
+- **Not ready yet.** A source of a sound that still loads starts once it is ready if it loops;
+  otherwise it is dropped and its `playing` goes false, and so is a `box.audio.play` of it.
+- **One copy.** The decoded frames are shared by path: every `SoundFile` with the same path,
+  prefab instances included, uses one sample with one id of the core, and any number of sources
+  play it. Deleting the last of them releases the sound: the sources and one shots that play it
+  fade out over the ramp of the core, the main thread frees its frames at once and the side that
+  runs the core frees its own after `SOUND_FREE`. Deleting an entity with `AudioPcm` fades its
+  one shots the same way. Changing the path takes the sample of the new path.
+- **Handing over.** The sync system sends a ready sample like an `AudioPcm`, with the `sound` of
+  the transport: on native a copy whose pointer goes to the audio thread over the ring, on the
+  web a transferred `ArrayBuffer` that the worklet copies into the heap of its core. A new
+  output gets every sample again.
+- **Headless** frames wait for the decodes in flight, at most 10 seconds, as they wait for
+  textures, so a fixed delta time hears the same sounds in every run.
+
+miniaudio is built in `decode.c` with `MA_NO_DEVICE_IO`, `MA_NO_ENGINE`, `MA_NO_NODE_GRAPH`,
+`MA_NO_RESOURCE_MANAGER`, `MA_NO_ENCODING`, `MA_NO_GENERATION`, `MA_NO_MP3`, `MA_NO_VORBIS` and
+`MA_NO_THREADING`, its functions static (`MA_API static`) so they do not clash with the device
+part of `native.c`. Its warning that the web build cannot use `-std=c*` is about the Web Audio
+backend; without device IO the decoders compile with `-std=c11` under emcc 6.0.8, so
+`project.json` fetches the bundle for Emscripten too and the web uses the same decoders.
+
+**The web stalls while it decodes.** Jobs run inline in the browser, at the end of the frame
+that submitted them, so decoding a sound stalls that frame for the whole decode. Load sounds
+at the start of a scene, behind a loading screen, rather than in the middle of play; the audio
+itself does not stall, since the worklet keeps rendering. `test/integration/web/audio_sample.mjs`
+measures the longest animation frame while 2 seconds of 48000 Hz stereo (384 KB) decode. In
+headless Chrome on an Apple M-series Mac the frame grows from about 0.5 ms to under 1 ms for
+the 16 bit WAV and to 2 to 3 ms for the FLAC in a release build (about 1 and 4.5 ms in a debug
+build), well within a frame at 60 Hz; the decode time grows with the length of the sound.
+A file under `etc` reaches the page through the `embed` of the app (`apps/boxrun/project.json`
+embeds `etc`); a test file through `?preload=`.
+
+The tests are `Sample` in `test/cpu/audio`, with files in `test/assets/audio` that
+`make_sounds.py` next to them writes, and the browser check `audio_sample.mjs`.
+>>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
 
 ### Before the gesture
 
@@ -543,7 +682,8 @@ nothing.
 ### The audio command and captures
 
 The shell command `audio` (`src/command/cmd_audio.c`) prints the state, the rate, the voices, the
-steals and the load, then the master and the buses in processing order. `audio volume <v>` and
+steals and the load, then the master and the buses in processing order, with the values of the
+reverb of a bus and `(dry, every slot taken)` for a reverb that has no slot. `audio volume <v>` and
 `audio mute [on|off]` write `AudioSettings`. `audio capture <seconds>` records the master output
 to a 16 bit stereo WAV resource of the session, fetched like a `capture` PNG with
 `GET /shell/session/<id>/resource/<name>`, empty until the file is written in one rename. In the

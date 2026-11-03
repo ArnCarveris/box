@@ -159,3 +159,18 @@ bool box_audio_write_release(
 
     return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
 }
+
+bool box_audio_write_reverb(
+    box_audio_writer_t *writer,
+    uint32_t slot,
+    uint32_t bus,
+    const box_audio_reverb_params_t *params)
+{
+    box_audio_cmd_reverb_t cmd;
+    box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_REVERB, sizeof(cmd));
+    cmd.slot = slot;
+    cmd.bus = bus;
+    cmd.params = *params;
+
+    return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
+}

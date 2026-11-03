@@ -1,0 +1,252 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.light
+using box.spatial
+using box.particle
+using box.text
+using box.layout
+using box.transition
+using box.camera
+using box.view
+using box.surface
+using box.effects
+
+export mut crowd_tick: i32 = 0
+
+async {
+  while true {
+    await delay(2.6)
+    crowd_tick += 1
+  }
+}
+
+template Walker {
+  prop d: i32 = 0
+  prop i: i32 = 0
+  prop guard: bool = false
+  prop alarm_x: f32 = 0
+  prop alarm_z: f32 = 0
+  prop alarm_on: bool = false
+
+  const tick = floor(crowd_tick / (2 + i % 3))
+  const wx = (rnd(i * 3.3 + tick * 1.7 + d) - 0.5) * 12
+  const wz = (rnd(i * 5.1 + tick * 2.3 + d * 2) - 0.5) * 9
+  const go_x = match guard && alarm_on { true: alarm_x + (i % 3 - 1) * 0.8; _: match !guard && alarm_on && i % 3 == 0 { true: alarm_x + cos(i * 2.4) * 1.1; _: wx } }
+  const go_z = match guard && alarm_on { true: alarm_z + 0.9; _: match !guard && alarm_on && i % 3 == 0 { true: alarm_z + sin(i * 2.4) * 1.1; _: wz } }
+  const tone: Rgb = match guard { true: {40, 74, 130}; _: match i % 5 { 0: {120, 92, 66}; 1: {80, 96, 90}; 2: {132, 70, 50}; 3: {156, 136, 100}; _: {70, 70, 84} } }
+
+  Position: {go_x, 0, go_z}
+  Transition: [Position: {duration: match guard && alarm_on { true: 1.4; _: 2.5 }, timing_function: EaseInOut}]
+  body { Position: {0, 0.86, 0}; Capsule: {radius: 0.24, length: 0.9, segments: 10, smooth: true}; Rgb: tone; PbrMaterial: {metallic: 0, roughness: 0.8} }
+  head { Position: {0, 1.68, 0}; Sphere: {radius: 0.17, segments: 10, smooth: true}; Rgb: {168, 132, 106}; PbrMaterial: {metallic: 0, roughness: 0.6} }
+  if guard {
+    vest { Position: {0, 1.14, 0.2}; Box: {0.34, 0.16, 0.04}; Rgb: {10, 30, 50}; Emissive: {strength: 3, color: {100, 180, 255}} }
+  }
+}
+
+template Incident3D {
+  prop d: i32 = 0
+  prop on: bool = false
+  prop kind: i32 = 0
+  prop x: f32 = 0
+  prop z: f32 = 0
+
+  if on {
+    alert {
+      Position: {x, 2.2, z}
+      PointLight: {intensity: match pulse { true: 34; _: 8 }, range: 13}
+      Rgb: {255, 40, 24}
+    }
+    if kind == 3 || kind == 4 {
+      flame {
+        Position: {x, 0.2, z}
+        ParticleEmitter: {max: 500, rate: 170, shape: EmitterDisc, radius: 0.7, direction: {0, 1, 0}, spread: 18, speed: {0.8, 2.6}, lifetime: {0.4, 1.2}, size: {0.2, 0.6}, color: {255, 150, 60}, color_variance: {0, 40, 20}, opacity: {0.6, 1}, seed: 7 + d}
+        ParticleForces: {gravity: {0, 1.1, 0}, turbulence: 2, drag: 0.5}
+        ParticleAppearance: {shape: ParticleCircle, blend: ParticleAdditive}
+        ParticleCurves: {size: {0.6, 1, 0.6, 0.1}, opacity: {1, 1, 0.5, 0}}
+        PointLight: {intensity: 26, range: 9}
+        Rgb: {255, 140, 60}
+      }
+    }
+    smoke {
+      Position: {x, 1.2, z}
+      ParticleEmitter: {max: 260, rate: 40, shape: EmitterSphere, radius: 0.5, direction: {0, 1, 0}, spread: 40, speed: {0.2, 0.6}, lifetime: {2, 5}, size: {0.5, 1.2}, color: {130, 120, 116}, opacity: {0.1, 0.26}, seed: 3 + d}
+      ParticleForces: {gravity: {0, 0.1, 0}, turbulence: 0.5, drag: 0.4}
+      ParticleAppearance: {shape: ParticleCircle, blend: ParticleAlpha, lit: 0.8, softness: 0.3}
+      ParticleCurves: {size: {0.4, 1, 1.5, 2.2}, opacity: {0, 1, 0.6, 0}}
+    }
+  }
+}
+
+template DeckShell {
+  prop d: i32 = 0
+  prop wall: Rgb = {90, 90, 92}
+  prop light: Rgb = {255, 214, 170}
+  prop level: f32 = 24
+
+  floor_ : Deck { Position: {0, -0.1, 0}; Box: {20, 0.2, 16}; TextureTransform: {scale_x: 6, scale_y: 5} }
+  ceil_ : Iron { Position: {0, 4.1, 0}; Box: {20, 0.2, 16}; Rgb: {60, 58, 56}; TextureTransform: {scale_x: 3, scale_y: 2.4} }
+  back { Position: {0, 2, -8}; Box: {20, 4.2, 0.2}; Rgb: wall; PbrMaterial: {metallic: 1, roughness: 1}; PbrTextures: {albedo: tex_plate, orm: tex_plate_orm, normal: tex_plate_normal}; TextureTransform: {scale_x: 3, scale_y: 0.8} }
+  front { Position: {0, 2, 8}; Box: {20, 4.2, 0.2}; Rgb: wall; PbrMaterial: {metallic: 1, roughness: 1}; PbrTextures: {albedo: tex_plate, orm: tex_plate_orm, normal: tex_plate_normal}; TextureTransform: {scale_x: 3, scale_y: 0.8} }
+  left { Position: {-10, 2, 0}; Box: {0.2, 4.2, 16}; Rgb: wall; PbrMaterial: {metallic: 1, roughness: 1}; PbrTextures: {albedo: tex_plate, orm: tex_plate_orm, normal: tex_plate_normal}; TextureTransform: {scale_x: 2.4, scale_y: 0.8} }
+  right { Position: {10, 2, 0}; Box: {0.2, 4.2, 16}; Rgb: wall; PbrMaterial: {metallic: 1, roughness: 1}; PbrTextures: {albedo: tex_plate, orm: tex_plate_orm, normal: tex_plate_normal}; TextureTransform: {scale_x: 2.4, scale_y: 0.8} }
+  for i in 0..4 {
+    "pipe_{i}" : Iron { Position: {0, 3.7 - i * 0.04, -4 + i * 2.6}; Rotation: {0, 0, PI / 2}; Cylinder: {radius: 0.09 + (i % 2) * 0.05, length: 20, segments: 8, smooth: true}; Rgb: match i % 3 { 0: {120, 80, 50}; 1: {90, 100, 100}; _: {150, 130, 70} } }
+    "tube_{i}" { Position: {-6 + i * 4, 3.96, 0}; Box: {0.2, 0.06, 6}; Rgb: {50, 44, 30}; Emissive: {strength: 7, color: light}; NoShadow }
+    "lamp_{i}" { Position: {-6 + i * 4, 3.6, 0}; Rotation: {PI / 2, 0, 0}; SpotLight: {intensity: level, range: 12, inner_angle: 56, outer_angle: 78}; Rgb: light }
+  }
+  haze {
+    Position: {0, 2, 0}
+    FogVolume: {extent: {10, 2.1, 8}, density: 0.012, color: {200, 200, 210}, asymmetry: 0.4, edge_fade: 0.5, ambient_inscatter: 0.4, light_inscatter: 1, steps: 10, noise_strength: 0.5, noise_scale: 3, wind: {0.1, 0.02, 0.1}}
+  }
+}
+
+template DeckSign {
+  prop text: string = ""
+  prop hue: Rgb = {120, 240, 255}
+  prop size: f32 = 0.7
+
+  Text: {value: text, size: size, font: font_head, align: Center}
+  Rgb: {hue.r, hue.g, hue.b}
+  Emissive: {strength: 6, color: hue}
+  BlendMode: Additive
+}
+
+template DockDeck {
+  DeckShell shell(d: 0, wall: {120, 112, 96}, light: {255, 196, 130})
+  door_a : HullMustard { Position: {-4.4, 1.9, -7.8}; Box: {3.2, 3.8, 0.3}; TextureTransform: {scale_x: 0.5, scale_y: 0.6} }
+  door_b : HullMustard { Position: {4.4, 1.9, -7.8}; Box: {3.2, 3.8, 0.3}; TextureTransform: {scale_x: 0.5, scale_y: 0.6} }
+  stripe_a { Position: {-4.4, 0.4, -7.62}; Quad: {3.2, 0.5}; Rgb: {220, 210, 190}; PbrTextures: {albedo: tex_hazard}; TextureTransform: {scale_x: 2, scale_y: 1} }
+  stripe_b { Position: {4.4, 0.4, -7.62}; Quad: {3.2, 0.5}; Rgb: {220, 210, 190}; PbrTextures: {albedo: tex_hazard}; TextureTransform: {scale_x: 2, scale_y: 1} }
+  for i in 0..9 {
+    Container "crate_{i}"(x: -7 + (i % 3) * 7 + rnd(i) * 1.4, y: 0.6, z: 5 - floor(i / 3) * 1.2, tone: i)
+    { Scale: {0.4, 0.46, 0.46} }
+  }
+  DeckSign a(text: "LOCK 1", hue: {255, 200, 90}) { Position: {-4.4, 3.4, -7.6} }
+  DeckSign b(text: "LOCK 2", hue: {90, 240, 150}) { Position: {4.4, 3.4, -7.6} }
+}
+
+template ConcourseDeck {
+  DeckShell shell(d: 1, wall: {60, 56, 66}, light: {255, 170, 190}, level: 16)
+  for i in 0..4 {
+    const x = -7.2 + i * 4.8
+    "shop_{i}" {
+      Position: {x, 1.5, -7}
+      frame_ : HullDark { Position: {0, 0, 0}; Box: {4, 3, 1.4}; TextureTransform: {scale_x: 0.4, scale_y: 0.3} }
+      glow { Position: {0, -0.2, 0.74}; Quad: {3.4, 1.8}; Rgb: {30, 26, 26}; Emissive: {strength: 3, color: match i % 3 { 0: {255, 90, 160}; 1: {90, 220, 255}; _: {255, 200, 90} }}; PbrTextures: {emissive: tex_hull_lights} }
+    }
+  }
+  DeckSign a(text: "NOODLES") { Position: {-7.2, 3.3, -6.2} }
+  DeckSign b(text: "ORE EXCH", hue: {255, 90, 160}) { Position: {-2.4, 3.3, -6.2} }
+  DeckSign c(text: "SAINTS", hue: {255, 200, 90}) { Position: {2.4, 3.3, -6.2} }
+  DeckSign e(text: "LUCKY 9", hue: {120, 255, 180}) { Position: {7.2, 3.3, -6.2} }
+  bar : Bakelite { Position: {6, 0.55, 4}; Box: {6, 1.1, 1}; Rgb: {60, 30, 20} }
+  for i in 0..5 {
+    "stool_{i}" : Steel { Position: {3.6 + i * 1.1, 0.34, 3}; Cylinder: {radius: 0.2, length: 0.68, segments: 10} }
+  }
+}
+
+template HabDeck {
+  DeckShell shell(d: 2, wall: {96, 110, 106}, light: {226, 236, 255}, level: 20)
+  for k in 0..2 {
+    for i in 0..5 {
+      "door_{k}_{i}" : HullBone { Position: {-8 + i * 4, 1 + k * 1.9, -7.8}; Box: {3, 1.7, 0.2}; Rgb: match (i + k) % 3 { 0: {120, 130, 124}; 1: {150, 110, 80}; _: {100, 110, 120} }; TextureTransform: {scale_x: 0.4, scale_y: 0.3} }
+      "num_{k}_{i}" { Position: {-8 + i * 4, 1.5 + k * 1.9, -7.66}; Text: {value: "{k + 1}{i + 1}", size: 0.28, font: font_plate, align: Center}; Rgb: {30, 30, 30} }
+    }
+  }
+  catwalk : Grate { Position: {0, 1.9, -5.8}; Box: {20, 0.06, 3.6}; TextureTransform: {scale_x: 16, scale_y: 3} }
+  rail_ : Steel { Position: {0, 2.8, -4}; Box: {20, 0.05, 0.05} }
+  for i in 0..8 {
+    "post_{i}" : Steel { Position: {-9 + i * 2.6, 2.35, -4}; Box: {0.05, 0.9, 0.05} }
+  }
+  table_ : IronBone { Position: {-5, 0.72, 3}; Box: {4, 0.08, 1.4}; TextureTransform: {scale_x: 0.5, scale_y: 0.2} }
+  table_b : IronBone { Position: {3, 0.72, 3}; Box: {4, 0.08, 1.4}; TextureTransform: {scale_x: 0.5, scale_y: 0.2} }
+}
+
+template CargoDeck {
+  DeckShell shell(d: 3, wall: {120, 96, 70}, light: {255, 226, 170}, level: 18)
+  for k in 0..3 {
+    for i in 0..5 {
+      Container "c_{k}_{i}"(x: -8 + i * 3.8, y: 0.68 + k * 1.34, z: -6.4, tone: i * 2 + k)
+      { Scale: {0.6, 0.5, 0.5} }
+    }
+  }
+  for i in 0..4 {
+    Container "floor_{i}"(x: -6 + i * 4.2, y: 0.68, z: 4, tone: i + 6)
+    { Scale: {0.6, 0.5, 0.5} }
+  }
+  rack : IronMustard { Position: {0, 2.2, -5.4}; Box: {20, 0.14, 0.14} }
+  rack_b : IronMustard { Position: {0, 1, -5.4}; Box: {20, 0.14, 0.14} }
+  crane : IronOxide { Position: {3, 3.5, 0}; Box: {0.3, 0.3, 16} }
+  hook : Steel { Position: {3, 2.6, 1.6}; Cylinder: {radius: 0.03, length: 1.6, segments: 6} }
+}
+
+decks {
+  Scene: {}
+  AmbientLight: {sky: {54, 56, 66}, ground: {30, 28, 26}, intensity: 0.5}
+  SpatialIgnore
+
+  cctv_cam {
+    Position: {cctv_x(cam), 3.5, 6.2}
+    Rotation: {-0.28, cctv_ry(cam), 0}
+    Camera: {fov: 74, near_: 0.05, far_: 90}
+  }
+
+  for d in 0..DECKS {
+    const inc_a = incidents[0].active && incidents[0].deck == d
+    const inc_b = incidents[1].active && incidents[1].deck == d
+    const inc_c = incidents[2].active && incidents[2].deck == d
+    const inc_d = incidents[3].active && incidents[3].deck == d
+    const inc_e = incidents[4].active && incidents[4].deck == d
+    const inc_f = incidents[5].active && incidents[5].deck == d
+    const any = inc_a || inc_b || inc_c || inc_d || inc_e || inc_f
+    const idx: i32 = match inc_a { true: 0; _: match inc_b { true: 1; _: match inc_c { true: 2; _: match inc_d { true: 3; _: match inc_e { true: 4; _: 5 } } } } }
+    const ax = (rnd(d * 3.3 + 1.1) - 0.5) * 8
+    const az = (rnd(d * 7.1 + 2.3) - 0.5) * 6
+    const folks = match d { 0: 2 + visitors * 2; 1: 1 + visitors * 2 + floor(pop * 0.03); 2: 1 + floor(pop * 0.06); _: 1 + floor(stock_total * 0.008) }
+    "deck_{d}" {
+      Position: {d * 40, 0, 0}
+      if d == 0 {
+        DockDeck set_()
+      } else if d == 1 {
+        ConcourseDeck set_()
+      } else if d == 2 {
+        HabDeck set_()
+      } else {
+        CargoDeck set_()
+      }
+      for i in 0..14 {
+        if folks > i {
+          Walker "w_{i}"(d: d, i: i, alarm_on: any, alarm_x: ax, alarm_z: az)
+        }
+      }
+      for g in 0..6 {
+        if deck_guards[d] > g {
+          Walker "g_{g}"(d: d, i: g + 20, guard: true, alarm_on: any, alarm_x: ax, alarm_z: az)
+        }
+      }
+      Incident3D fire(d: d, on: any, kind: incidents[idx].kind, x: ax, z: az)
+    }
+  }
+}
+
+fx_cctv_bloom { Bloom: {intensity: 0.3, threshold: 0.9, threshold_softness: 0.5} }
+fx_cctv_film { Tonemap: {operator_: TonyMcMapface} }
+
+cctv_rig {
+  views {
+    view {
+      View: {
+        camera: match station == ST_SECURITY { true: decks.cctv_cam; _: 0 },
+        clear: {enabled: true, color: {0, 0, 0, 255}},
+        lighting: {},
+        culling: {enabled: true, occlusion: false, min_dimension_px: 1},
+        effects: [{enabled: true, effect: fx_cctv_bloom}, {enabled: true, effect: fx_cctv_film}]
+      }
+    }
+  }
+  surface { Surface: {width: 640, height: 384, texture: tex_cctv, view_root: views} }
+}

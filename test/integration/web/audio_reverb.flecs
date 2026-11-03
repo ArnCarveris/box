@@ -1,0 +1,58 @@
+// The scene of the browser check of the reverb (audio_reverb.mjs): the hall reverb on its own
+// bus, the bus world that sends to it at 0.5, and a click of 10 ms on world that the check
+// plays after a gesture. A box turns all the time so every frame draws, which the check counts.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.movement
+using box.surface
+using box.audio
+
+window {
+  Surface: {width: 640, height: 480}
+}
+
+camera {
+  Position: {0, 0, 100}
+  Camera: {ortho: true, ortho_scale: 1}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {10, 12, 20, 255}}}
+}
+
+spinner {
+  Position: {0, 0, 0}
+  Rotation: {0, 0, 0}
+  Box: {120, 120, 120}
+  Rgb: {80, 160, 255}
+  AngularVelocity: {0.4, 0.9, 0}
+}
+
+hall {
+  AudioBus: {output: master}
+  Reverb: {decay: 2.4, damping: 0.4, predelay: 0.02}
+}
+
+world {
+  AudioBus: {output: master, send: hall, send_level: 0.5}
+}
+
+// 10 ms of 0.5 at 1000 Hz, which plays as a click at any rate of the output
+click {
+  AudioPcm: {samples: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], sample_rate: 1000}
+  AudioOutput: {bus: world}
+}
+
+// A tone for the load of 32 voices, which the check starts with a script
+tone {
+  AudioPcm: {
+    samples: [0, 0.0772542, 0.146946, 0.202254, 0.237764, 0.25, 0.237764, 0.202254, 0.146946,
+      0.0772542, 0, -0.0772542, -0.146946, -0.202254, -0.237764, -0.25, -0.237764, -0.202254,
+      -0.146946, -0.0772542],
+    sample_rate: 8800
+  }
+  AudioOutput: {bus: world}
+}

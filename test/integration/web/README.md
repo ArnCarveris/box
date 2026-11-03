@@ -136,6 +136,7 @@ node test/integration/web/audio_module.mjs \
     "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
 ```
 
+<<<<<<< HEAD
 `audio_spatial.mjs` checks spatial audio in headless Chrome with
 `test/integration/web/audio_spatial.flecs`: a looping 440 Hz tone on an `AudioSpatial` source
 heard from an `AudioListener` at the origin. After a trusted click it moves the source with
@@ -146,5 +147,30 @@ right, the same power at every place (equal power) and no voice beyond `max_dist
 
 ```sh
 node test/integration/web/audio_spatial.mjs \
+=======
+`audio_reverb.mjs` checks the reverb with `test/integration/web/audio_reverb.flecs`, a bus
+`world` that sends to the bus `hall` with `Reverb: {decay: 2.4}`. After a trusted click it
+records `audio capture 4` while `box.audio.play` sends a click to the reverb, and measures the
+decay of the tail after the click at the rate of the context. It then starts 32 looping voices
+through the reverb and prints the load of the worklet, which `Module.boxAudio.bench` measures by
+rendering 2000 quanta back to back, and which has to stay under real time:
+
+```sh
+node test/integration/web/audio_reverb.mjs \
+    "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
+```
+
+`audio_sample.mjs` checks sound files (`SoundFile`, see `docs/audio.md`) in Chrome. It preloads
+`test/integration/web/audio_sample.flecs` and the WAV and FLAC files of `test/assets/audio` with
+`?preload=`; the scene decodes one second of 440 Hz at 44100 Hz. After a trusted click it
+records two seconds (`audio capture 2`) while a `script_write` plays the sound once, and expects
+440 Hz for one second at the actual rate of the context. It then sets the `SoundFile` of 2
+seconds of stereo WAV and FLAC and prints the longest animation frame callback, the main
+loop, while each decodes inline, and last deletes a sound whose looping source plays (`rm`) and
+expects the worklet to drop the voice and free the sound:
+
+```sh
+node test/integration/web/audio_sample.mjs \
+>>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
     "$(tools/integration.py local-env --env audio)/wasm32-Emscripten/debug/bin"
 ```

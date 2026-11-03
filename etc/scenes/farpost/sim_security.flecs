@@ -1,0 +1,95 @@
+using flecs.script
+using flecs.script.math
+
+proc raise_incident(d: i32, k: i32) {
+  mut slot: i32 = -1
+  for i in 0..INCIDENTS {
+    if !incidents[i].active && slot < 0 {
+      slot = i
+    }
+  }
+  if slot >= 0 {
+    incidents[slot].active = true
+    incidents[slot].deck = d
+    incidents[slot].kind = k
+    incidents[slot].t = 0
+    incidents[slot].helped = false
+    alarm = max(alarm, 0.25)
+    if sel_incident < 0 {
+      sel_incident = slot
+    }
+    log_add("{deck_name(d)}: {incident_name(k)}")
+  }
+}
+
+proc security_step(dt: f32) {
+  mut watch: f32 = 0
+  mut bazaar: f32 = 0
+  mut dome: f32 = 0
+  for s in 0..SLOTS {
+    if slot_build[s] >= 1 {
+      const k = slot_kind[s]
+      if k == M_SECURITY {
+        watch += slot_eff[s]
+      } else if k == M_COMMERCE {
+        bazaar += slot_eff[s]
+      } else if k == M_LEISURE {
+        dome += slot_eff[s]
+      }
+    }
+  }
+  const calm = match lockdown { true: 2.6; _: 1 }
+  mut sum: f32 = 0
+  for d in 0..DECKS {
+    const press = match d {
+      0: visitors * 0.34
+      1: visitors * 0.14 + bazaar * 1.4 + dome * 3
+      2: pop * 0.009 + bool_f(hungry) * 3
+      _: stock_total * 0.0024
+    }
+    const hold = deck_guards[d] * 0.62 * calm * (1 + watch * 0.25) + 0.05
+    crime[d] = clamp(crime[d] + (press - hold) * dt * 0.1, 0, 100)
+    sum += crime[d]
+  }
+  crime_avg = sum / DECKS
+  for d in 0..DECKS {
+    rs += 1
+    if main_on && rnd(rs) < sqr(max(crime[d] - 14, 0)) * 0.000014 * dt {
+      rs += 1
+      const k: i32 = match d { 0: match rnd(rs) < 0.6 { true: 2; _: 0 }; 1: match rnd(rs) < 0.7 { true: 0; _: 4 }; 2: match rnd(rs) < 0.5 { true: 0; _: 3 }; _: match rnd(rs) < 0.7 { true: 1; _: 3 } }
+      raise_incident(d, k)
+    }
+  }
+  mut open_count: i32 = 0
+  for i in 0..INCIDENTS {
+    if incidents[i].active {
+      open_count += 1
+      incidents[i].t = incidents[i].t + dt
+      const d = incidents[i].deck
+      const force = deck_guards[d] + bool_f(incidents[i].helped) * 2
+      if force > 0 && incidents[i].t * force > 24 {
+        incidents[i].active = false
+        incidents_won += 1
+        crime[d] = max(0, crime[d] - 2)
+        log_add("{deck_name(d)}: {incident_name(incidents[i].kind)} CONTAINED")
+        if sel_incident == i {
+          sel_incident = -1
+        }
+      } else if incidents[i].t > 60 {
+        incidents[i].active = false
+        incidents_lost += 1
+        crime[d] = min(100, crime[d] + 9)
+        const hit = 180 + crime[d] * 12
+        creds -= hit
+        alarm = 0.5
+        log_add("{deck_name(d)}: {incident_name(incidents[i].kind)} RAN WILD, -{hit:.0} CR")
+        if sel_incident == i {
+          sel_incident = -1
+        }
+      }
+    }
+  }
+  if open_count != incidents_active {
+    incidents_active = open_count
+  }
+}

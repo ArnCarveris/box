@@ -1,7 +1,8 @@
 /**
  * @file audio/sync.c
  * @brief The system that turns the changes of the audio components into one command batch per
- * frame: bus parameters and the processing order, sounds, sources, plays, stops and releases.
+ * frame: bus parameters and the processing order, sounds (AudioPcm and the decoded samples of
+ * sound files), sources, plays, stops and releases.
  *
  * The system remembers what it sent to the output and writes a command only for what differs,
  * so a frame without changes sends nothing. A new output (a new serial) gets everything again.
@@ -117,6 +118,7 @@ static void box_audio_reset(
     ecs_vec_clear(&state->oneshots);
     ecs_vec_clear(&state->stops);
     ecs_vec_clear(&state->releases);
+    ecs_vec_clear(&state->fades);
     state->settings_sent = false;
     state->order_dirty = true;
     state->voices_stolen = 0;
@@ -474,7 +476,180 @@ done:
     state->order_dirty = false;
 }
 
-/** Send the samples of sounds the output does not have yet.
+/** Write a reverb command and remember what it sent.
+ *
+ * @param state The state
+ * @param slot Slot of the reverb
+ * @param bus Bus index, BOX_AUDIO_BUS_NONE to take the reverb off
+ * @param params The parameters
+ */
+static void box_audio_reverb_send(
+    box_audio_module_t *state,
+    uint32_t slot,
+    uint32_t bus,
+    const box_audio_reverb_params_t *params)
+{
+    box_audio_reverb_sent_t *sent = &state->reverb_sent[slot];
+    if (box_audio_reserve(state)) {
+        box_audio_write_reverb(&state->writer, slot, bus, params);
+        state->stats.reverbs ++;
+    }
+
+    sent->serial = state->serial;
+    sent->bus = bus;
+    sent->params = *params;
+}
+
+/** Free the reverb slots whose entity was deleted or lost its Reverb or its bus; their tails
+ * fade out.
+ *
+ * @param world The world
+ * @param state The state
+ */
+static void box_audio_reverbs_free(
+    ecs_world_t *world,
+    box_audio_module_t *state)
+{
+    uint32_t i;
+    for (i = 0; i < BOX_AUDIO_REVERB_MAX; i ++) {
+        ecs_entity_t e = state->reverb_entity[i];
+        const AudioReverbState *rs = e && ecs_is_alive(world, e) ?
+            ecs_get(world, e, AudioReverbState) : NULL;
+        box_audio_reverb_sent_t *sent = &state->reverb_sent[i];
+        if (!e || (rs && rs->slot == i + 1 && ecs_has(world, e, Reverb) &&
+            ecs_has(world, e, AudioBus)))
+        {
+            continue;
+        }
+
+        if (state->serial && sent->serial == state->serial && sent->bus != BOX_AUDIO_BUS_NONE) {
+            box_audio_reverb_send(state, i, BOX_AUDIO_BUS_NONE, &sent->params);
+        }
+
+        state->reverb_entity[i] = 0;
+    }
+}
+
+/** Give a reverb a free slot, or log once that every slot is taken.
+ *
+ * @param world The world
+ * @param state The state
+ * @param e The entity
+ * @param rs What was done for it
+ * @return The slot, -1 when it stays dry
+ */
+static int32_t box_audio_reverb_alloc(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    ecs_entity_t e,
+    AudioReverbState *rs)
+{
+    int32_t i, result = -1;
+    for (i = 0; i < BOX_AUDIO_REVERB_MAX && result < 0; i ++) {
+        if (!state->reverb_entity[i]) {
+            state->reverb_entity[i] = e;
+            state->reverb_sent[i].serial = 0;
+            rs->slot = (uint8_t)(i + 1);
+            rs->refused = false;
+            result = i;
+        }
+    }
+
+    if (result < 0 && !rs->refused) {
+        char *path = ecs_get_path(world, e);
+        ecs_err("box.audio: more than %d reverb, '%s' stays dry", BOX_AUDIO_REVERB_MAX, path);
+        ecs_os_free(path);
+        rs->refused = true;
+        rs->slot = 0;
+    }
+
+    return result;
+}
+
+/** Give reverbs their slots and delay memory and send their parameters when they changed.
+ *
+ * @param world The world
+ * @param state The state
+ * @param t The transport
+ */
+static void box_audio_reverbs(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    box_audio_transport_t *t)
+{
+    ecs_iter_t it = ecs_query_iter(world, state->reverbs);
+    int32_t i, slot;
+    box_audio_reverbs_free(world, state);
+    while (ecs_query_next(&it)) {
+        const Reverb *reverb = ecs_field(&it, Reverb, 0);
+        AudioReverbState *rs = ecs_field(&it, AudioReverbState, 1);
+        for (i = 0; i < it.count; i ++) {
+            ecs_entity_t e = it.entities[i];
+            uint8_t index = box_audio_bus_of(world, state, e);
+            uint32_t bus = index ? index : BOX_AUDIO_BUS_NONE;
+            box_audio_reverb_params_t params = {
+                .decay = reverb[i].decay, .damping = reverb[i].damping,
+                .predelay = reverb[i].predelay, .size = reverb[i].size, .mix = reverb[i].mix };
+            box_audio_reverb_sent_t *sent;
+            slot = rs[i].slot && state->reverb_entity[rs[i].slot - 1] == e ? rs[i].slot - 1 :
+                box_audio_reverb_alloc(world, state, e, &rs[i]);
+            if (slot < 0) {
+                continue;
+            }
+
+            sent = &state->reverb_sent[slot];
+            if (sent->memory != state->serial && t->reverb(t, (uint32_t)slot)) {
+                sent->memory = state->serial;
+            }
+
+            if (sent->serial != state->serial || sent->bus != bus ||
+                ecs_os_memcmp_t(&sent->params, &params, box_audio_reverb_params_t))
+            {
+                box_audio_reverb_send(state, (uint32_t)slot, bus, &params);
+            }
+        }
+    }
+}
+
+/** Give a sound an id of the core and hand its frames to the output, which copies them.
+ *
+ * @param state The state
+ * @param t The transport
+ * @param data Frames, interleaved when stereo
+ * @param frames Number of frames
+ * @param channels 1 or 2
+ * @param sample_rate Frames per second, 0 for the rate of the output
+ * @return The id, 0 when the output did not take the sound
+ */
+static uint32_t box_audio_sound_send(
+    box_audio_module_t *state,
+    box_audio_transport_t *t,
+    const float *data,
+    int32_t frames,
+    int32_t channels,
+    float sample_rate)
+{
+    uint32_t id, result = 0;
+    for (id = 1; id < BOX_AUDIO_SOUND_MAX && state->sound_used[id]; id ++) { }
+    if (id == BOX_AUDIO_SOUND_MAX) {
+        if (!state->sound_overflow) {
+            ecs_err("box.audio: more than %d sounds", BOX_AUDIO_SOUND_MAX - 1);
+            state->sound_overflow = true;
+        }
+
+        goto done;
+    }
+
+    if (t->sound(t, id, data, frames, channels, sample_rate)) {
+        state->sound_used[id] = 1;
+        result = id;
+    }
+
+done:
+    return result;
+}
+
+/** Send the samples of sounds the output does not have yet: AudioPcm and decoded files.
  *
  * @param world The world
  * @param state The state
@@ -486,7 +661,7 @@ static void box_audio_sounds(
     box_audio_transport_t *t)
 {
     ecs_iter_t it = ecs_query_iter(world, state->sounds);
-    uint32_t id;
+    box_audio_sample_t **samples = ecs_vec_first(&state->samples);
     int32_t i;
     while (ecs_query_next(&it)) {
         const AudioPcm *pcm = ecs_field(&it, AudioPcm, 0);
@@ -500,6 +675,7 @@ static void box_audio_sounds(
                 continue;
             }
 
+<<<<<<< HEAD
             s[i].id = 0;
             for (id = 1; id < BOX_AUDIO_SOUND_MAX && state->sound_used[id]; id ++) { }
             if (id == BOX_AUDIO_SOUND_MAX) {
@@ -519,7 +695,23 @@ static void box_audio_sounds(
                 s[i].serial = state->serial;
                 state->spatial_dirty = true;
             }
+=======
+            s[i].id = box_audio_sound_send(state, t, ecs_vec_first_t(&pcm[i].samples, float),
+                frames, channels, pcm[i].sample_rate);
+            s[i].serial = state->serial;
+>>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
         }
+    }
+
+    for (i = 0; i < ecs_vec_count(&state->samples); i ++) {
+        box_audio_sample_t *sample = samples[i];
+        if (sample->state != SoundReady || (sample->id && sample->serial == state->serial)) {
+            continue;
+        }
+
+        sample->id = box_audio_sound_send(state, t, sample->data, sample->frames,
+            sample->channels, sample->sample_rate);
+        sample->serial = state->serial;
     }
 }
 
@@ -535,10 +727,32 @@ static uint32_t box_audio_sound_of(
     const box_audio_module_t *state,
     ecs_entity_t sound)
 {
-    const AudioSoundId *s = sound && ecs_is_alive(world, sound) ?
+    const box_audio_sample_t *sample = box_audio_sample_of(world, sound);
+    const AudioSoundId *s = !sample && sound && ecs_is_alive(world, sound) ?
         ecs_get(world, sound, AudioSoundId) : NULL;
+    uint32_t result = 0;
+    if (sample) {
+        result = sample->serial == state->serial ? sample->id : 0;
+    } else if (s) {
+        result = s->serial == state->serial ? s->id : 0;
+    }
 
-    return s && s->serial == state->serial ? s->id : 0;
+    return result;
+}
+
+/** Check whether the SoundFile of a sound still decodes.
+ *
+ * @param world The world
+ * @param sound The sound entity
+ * @return Whether its sample is loading
+ */
+static bool box_audio_sound_loading(
+    ecs_world_t *world,
+    ecs_entity_t sound)
+{
+    const box_audio_sample_t *sample = box_audio_sample_of(world, sound);
+
+    return sample && sample->state == SoundLoading;
 }
 
 /** Get the bus a sound plays on by default: the bus of its AudioOutput.
@@ -643,6 +857,11 @@ static void box_audio_source(
         }
 
         v->parked = false;
+    }
+
+    if (!sound && src->playing && !src->loop && box_audio_sound_loading(world, src->sound)) {
+        src->playing = false;
+        state->stats.not_ready ++;
     }
 
     if (!sound) {
@@ -899,7 +1118,8 @@ static void box_audio_queued(
     box_audio_oneshot_t *shots = ecs_vec_first(&state->oneshots);
     uint32_t *stops = ecs_vec_first(&state->stops);
     uint32_t *releases = ecs_vec_first(&state->releases);
-    int32_t i;
+    uint32_t *fades = ecs_vec_first(&state->fades);
+    int32_t i, k;
     for (i = 0; state->bus_freed && i < ecs_vec_count(&state->oneshots); i ++) {
         if (shots[i].bus && (state->bus_freed & (1u << shots[i].bus))) {
             box_audio_voice_set(state, shots[i].handle, BOX_AUDIO_PARAM_BUS, 0.0f);
@@ -912,6 +1132,7 @@ static void box_audio_queued(
         const AudioSpatial *spatial = NULL;
         float gain = 1.0f, pan = 0;
         if (!sound) {
+            state->stats.not_ready += box_audio_sound_loading(world, plays[i].sound);
             continue;
         }
 
@@ -940,6 +1161,7 @@ static void box_audio_queued(
 
         box_audio_oneshot_t *shot = ecs_vec_append_t(NULL, &state->oneshots,
             box_audio_oneshot_t);
+<<<<<<< HEAD
         *shot = (box_audio_oneshot_t){
             .handle = box_audio_new_voice(state),
             .bus = box_audio_sound_bus(world, state, plays[i].sound),
@@ -952,6 +1174,11 @@ static void box_audio_queued(
             .sent_pan = pan
         };
 
+=======
+        shot->handle = box_audio_new_voice(state);
+        shot->sound = sound;
+        shot->bus = box_audio_sound_bus(world, state, plays[i].sound);
+>>>>>>> 54bc1fac198f7433a3e6a3cbc316b4a7a3ae9d57
         if (box_audio_reserve(state)) {
             box_audio_write_play(&state->writer, shot->handle, sound, shot->bus,
                 shot->sent_volume, pan, 1.0f, 0);
@@ -960,6 +1187,16 @@ static void box_audio_queued(
 
     for (i = 0; i < ecs_vec_count(&state->stops); i ++) {
         box_audio_stop(state, stops[i]);
+    }
+
+    for (k = 0; k < ecs_vec_count(&state->fades); k ++) {
+        shots = ecs_vec_first(&state->oneshots);
+        for (i = ecs_vec_count(&state->oneshots) - 1; i >= 0; i --) {
+            if (shots[i].sound == fades[k]) {
+                box_audio_stop(state, shots[i].handle);
+                ecs_vec_remove_ordered_t(&state->oneshots, box_audio_oneshot_t, i);
+            }
+        }
     }
 
     for (i = 0; i < ecs_vec_count(&state->releases); i ++) {
@@ -971,6 +1208,7 @@ static void box_audio_queued(
     ecs_vec_clear(&state->plays);
     ecs_vec_clear(&state->stops);
     ecs_vec_clear(&state->releases);
+    ecs_vec_clear(&state->fades);
 }
 
 /** Send the master volume and mute of AudioSettings when they changed.
@@ -1144,6 +1382,7 @@ static void BoxAudioSync(
 
     if (t) {
         box_audio_settings(world, state);
+        box_audio_reverbs(world, state, t);
         box_audio_sounds(world, state, t);
         state->rate = t->sample_rate;
         box_audio_sources(world, state, waiting);
@@ -1159,6 +1398,7 @@ static void BoxAudioSync(
         ecs_vec_clear(&state->plays);
         ecs_vec_clear(&state->stops);
         ecs_vec_clear(&state->releases);
+        ecs_vec_clear(&state->fades);
     }
 
     if (t && state->writer.size) {
@@ -1225,7 +1465,8 @@ done:
     return;
 }
 
-/** Release the sound of changed or removed samples; voices that play it finish first.
+/** Release the sound of changed or removed samples. Voices that play changed samples finish
+ * first, one shots of removed ones fade out as sources of a deleted sound do.
  *
  * @param it The iterator of the observer
  */
@@ -1242,6 +1483,9 @@ static void BoxAudioPcmChange(
         AudioSoundId *s = ecs_get_mut(it->world, it->entities[i], AudioSoundId);
         if (s && s->id && s->serial == state->serial && state->serial) {
             ecs_vec_append_t(NULL, &state->releases, uint32_t)[0] = s->id;
+            if (it->event == EcsOnRemove) {
+                ecs_vec_append_t(NULL, &state->fades, uint32_t)[0] = s->id;
+            }
         }
 
         if (s) {
@@ -1342,6 +1586,17 @@ void box_audio_sync_init(
             { .id = ecs_id(AudioPcm), .inout = EcsIn, .src.id = EcsSelf },
             { .id = ecs_id(AudioSoundId), .src.id = EcsSelf }
         },
+        .cache_kind = EcsQueryCacheAuto
+    });
+
+    state->reverbs = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "AudioReverbs" }),
+        .terms = {
+            { .id = ecs_id(Reverb), .inout = EcsIn, .src.id = EcsSelf },
+            { .id = ecs_id(AudioReverbState), .src.id = EcsSelf },
+            { .id = ecs_id(AudioBus), .inout = EcsInOutNone, .src.id = EcsSelf }
+        },
+        .flags = EcsQueryMatchDisabled,
         .cache_kind = EcsQueryCacheAuto
     });
 
