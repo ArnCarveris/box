@@ -1179,3 +1179,200 @@ void Watertight_rounded_box(void) {
 
     ecs_fini(world);
 }
+
+/** Check that the mesh of an entity is closed, without degenerate or inward triangles.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param label Description of the shape printed when the check fails
+ * @return True when the mesh is watertight
+ */
+static bool watertight_check(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const char *label)
+{
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    const ShapeMesh *sm = ecs_get(world, e, ShapeMesh);
+    const box_mesh_t *mesh = sm ? box_mesh_cache_get(cache, sm->mesh) : NULL;
+    bool result = false;
+    if (!mesh || !mesh->index_count || mesh->index_count % 3) {
+        printf("%s: no mesh\n", label);
+        goto done;
+    }
+
+    int32_t n = mesh->vertex_count;
+    watertight_vertex_t *sorted = ecs_os_malloc_n(watertight_vertex_t, n);
+    int32_t *weld = ecs_os_malloc_n(int32_t, n);
+    for (int32_t i = 0; i < n; i ++) {
+        glm_vec3_copy(mesh->vertices[i].position, sorted[i].p);
+        sorted[i].index = i;
+    }
+
+    qsort(sorted, (size_t)n, sizeof(watertight_vertex_t), watertight_compare);
+    for (int32_t i = 0; i < n; i ++) {
+        weld[sorted[i].index] = sorted[i].index;
+        for (int32_t j = i - 1; j >= 0 && sorted[i].p[0] - sorted[j].p[0] < 1e-4f; j --) {
+            if (glm_vec3_distance(sorted[i].p, sorted[j].p) < 1e-4f) {
+                weld[sorted[i].index] = weld[sorted[j].index];
+                break;
+            }
+        }
+    }
+
+    ecs_map_t edges;
+    ecs_map_init(&edges, NULL);
+    int32_t degenerate = 0, open = 0, inward = 0;
+    double volume = 0.0;
+    vec3 center;
+    glm_vec3_center((float*)mesh->min, (float*)mesh->max, center);
+    for (int32_t t = 0; t < mesh->index_count; t += 3) {
+        uint64_t v[3];
+        for (int32_t k = 0; k < 3; k ++) {
+            v[k] = (uint64_t)weld[mesh->indices[t + k]];
+        }
+
+        if (v[0] == v[1] || v[1] == v[2] || v[2] == v[0]) {
+            degenerate ++;
+        }
+
+        for (int32_t k = 0; k < 3; k ++) {
+            ecs_map_val_t *c = ecs_map_ensure(&edges, (v[k] << 32) | v[(k + 1) % 3]);
+            (*c) ++;
+        }
+
+        const float *a = mesh->vertices[mesh->indices[t]].position;
+        const float *b = mesh->vertices[mesh->indices[t + 1]].position;
+        const float *c = mesh->vertices[mesh->indices[t + 2]].position;
+        vec3 ab, ac, face, mid, out;
+        glm_vec3_sub((float*)b, (float*)a, ab);
+        glm_vec3_sub((float*)c, (float*)a, ac);
+        glm_vec3_cross(ab, ac, face);
+        volume += (double)glm_vec3_dot((float*)a, face) / 6.0;
+        glm_vec3_add((float*)a, (float*)b, mid);
+        glm_vec3_add(mid, (float*)c, mid);
+        glm_vec3_scale(mid, 1.0f / 3.0f, mid);
+        glm_vec3_sub(mid, center, out);
+        if (glm_vec3_dot(face, out) <= 0.0f) {
+            inward ++;
+        }
+    }
+
+    for (int32_t t = 0; t < mesh->index_count; t += 3) {
+        for (int32_t k = 0; k < 3; k ++) {
+            uint64_t a = (uint64_t)weld[mesh->indices[t + k]];
+            uint64_t b = (uint64_t)weld[mesh->indices[t + (k + 1) % 3]];
+            ecs_map_val_t *fwd = ecs_map_get(&edges, (a << 32) | b);
+            ecs_map_val_t *back = ecs_map_get(&edges, (b << 32) | a);
+            if (!fwd || *fwd != 1 || !back || *back != 1) {
+                open ++;
+            }
+        }
+    }
+
+    result = !degenerate && !open && !inward && volume > 0.0;
+    if (!result) {
+        printf("%s: degenerate %d, open edges %d, inward faces %d, volume %f\n",
+            label, degenerate, open, inward, volume);
+    }
+
+    ecs_map_fini(&edges);
+    ecs_os_free(sorted);
+    ecs_os_free(weld);
+done:
+    return result;
+}
+
+/** Set the edge radii of a Bevel in the order of its members.
+ *
+ * @param bevel The bevel
+ * @param radii The 12 radii
+ */
+static void watertight_bevel_edges(
+    Bevel *bevel,
+    const float *radii)
+{
+    bevel->top_front = radii[0];
+    bevel->top_back = radii[1];
+    bevel->top_left = radii[2];
+    bevel->top_right = radii[3];
+    bevel->bottom_front = radii[4];
+    bevel->bottom_back = radii[5];
+    bevel->bottom_left = radii[6];
+    bevel->bottom_right = radii[7];
+    bevel->front_left = radii[8];
+    bevel->front_right = radii[9];
+    bevel->back_left = radii[10];
+    bevel->back_right = radii[11];
+}
+
+void Watertight_bevel(void) {
+    // geometry/bevel
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    ecs_entity_t e = ecs_new(world);
+    char label[160];
+    int32_t failures = 0;
+    ecs_set(world, e, Box, { 1, 0.8f, 1.2f });
+
+    int32_t segments[2] = { 4, 6 };
+    for (int32_t s = 0; s < 2; s ++) {
+        for (int32_t pattern = 0; pattern < 4096; pattern ++) {
+            Bevel bevel = { .segments = segments[s] };
+            float radii[12];
+            for (int32_t edge = 0; edge < 12; edge ++) {
+                radii[edge] = (pattern >> edge) & 1 ? 0.15f : 0.0f;
+            }
+
+            watertight_bevel_edges(&bevel, radii);
+            ecs_set_ptr(world, e, Bevel, &bevel);
+            snprintf(label, sizeof(label), "bevel pattern %03x segments %d",
+                pattern, segments[s]);
+            failures += !watertight_check(world, e, label);
+        }
+    }
+
+    static const float choices[5] = { 0.0f, 0.05f, 0.1f, 0.2f, 0.3f };
+    static const float sizes[3][3] = { { 1, 0.8f, 1.2f }, { 2, 1, 1.5f }, { 1.4f, 2, 0.9f } };
+    uint32_t seed = 12345;
+    for (int32_t z = 0; z < 3; z ++) {
+        ecs_set(world, e, Box, { sizes[z][0], sizes[z][1], sizes[z][2] });
+        for (int32_t round = 0; round < 400; round ++) {
+            Bevel bevel = { .segments = 2 + 2 * (round % 3) };
+            float radii[12];
+            for (int32_t edge = 0; edge < 12; edge ++) {
+                seed = seed * 1664525u + 1013904223u;
+                radii[edge] = choices[(seed >> 16) % 5];
+            }
+
+            watertight_bevel_edges(&bevel, radii);
+            ecs_set_ptr(world, e, Bevel, &bevel);
+            snprintf(label, sizeof(label), "bevel size %d round %d", z, round);
+            failures += !watertight_check(world, e, label);
+        }
+    }
+
+    static const float large[4] = { 0.0f, 0.4f, 0.8f, 1.2f };
+    ecs_set(world, e, Box, { 1, 0.6f, 0.8f });
+    for (int32_t round = 0; round < 400; round ++) {
+        Bevel bevel = { .segments = 4 };
+        float radii[12];
+        for (int32_t edge = 0; edge < 12; edge ++) {
+            seed = seed * 1664525u + 1013904223u;
+            radii[edge] = large[(seed >> 16) % 4];
+        }
+
+        watertight_bevel_edges(&bevel, radii);
+        ecs_set_ptr(world, e, Bevel, &bevel);
+        snprintf(label, sizeof(label), "bevel scaled round %d", round);
+        failures += !watertight_check(world, e, label);
+    }
+
+    Bevel half = { .top_front = 0.6f, .top_back = 0.6f, .segments = 4 };
+    ecs_set(world, e, Box, { 1, 1, 1.2f });
+    ecs_set_ptr(world, e, Bevel, &half);
+    failures += !watertight_check(world, e, "bevel half cylinder");
+
+    test_int(failures, 0);
+    ecs_fini(world);
+}

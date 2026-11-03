@@ -5,6 +5,7 @@
 
 #include "mesh_cache.h"
 #include "mesh_gen.h"
+#include <math.h>
 
 /** Largest number of segments around an axis */
 #define BOX_MAX_SEGMENTS (512)
@@ -87,6 +88,25 @@ static void box_rounded_box_ctor(
     (void)ti;
     for (i = 0; i < count; i ++) {
         values[i] = (RoundedBox){ .segments = BOX_ROUNDED_BOX_SEGMENTS };
+    }
+}
+
+/** Construct Bevel values with the documented subdivisions per edge.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_bevel_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Bevel *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Bevel){ .segments = BOX_ROUNDED_BOX_SEGMENTS };
     }
 }
 
@@ -656,6 +676,187 @@ static void box_gen_rounded_box(
     box_mesh_gen_rounded_box(mesh, key->f, key->f[3], key->i[0]);
 }
 
+/** Marker in i[1] of the key of a Bevel whose edges share one radius */
+#define BOX_BEVEL_UNIFORM (1)
+
+/** Marker in i[1] of the key of a Bevel with a radius per edge */
+#define BOX_BEVEL_PER_EDGE (2)
+
+/** Get a radius that applies, with negative and non-finite radii as 0.
+ *
+ * @param radius The authored radius
+ * @return The radius, at least 0
+ */
+static float box_bevel_radius(
+    float radius)
+{
+    return isfinite(radius) && radius > 0.0f ? radius : 0.0f;
+}
+
+/** Get the edge radii of a Bevel in the order of its members.
+ *
+ * @param bevel The bevel
+ * @param radii The radii to fill, negative and non-finite radii as 0
+ */
+static void box_bevel_edges(
+    const Bevel *bevel,
+    float radii[BOX_BEVEL_EDGES])
+{
+    const float edges[BOX_BEVEL_EDGES] = {
+        bevel->top_front, bevel->top_back, bevel->top_left, bevel->top_right,
+        bevel->bottom_front, bevel->bottom_back, bevel->bottom_left, bevel->bottom_right,
+        bevel->front_left, bevel->front_right, bevel->back_left, bevel->back_right
+    };
+    for (int32_t i = 0; i < BOX_BEVEL_EDGES; i ++) {
+        radii[i] = box_bevel_radius(edges[i]);
+    }
+}
+
+/** Check whether every edge of a Bevel has the same radius.
+ *
+ * @param bevel The bevel
+ * @param radius Receives the radius of every edge
+ * @return True when radius applies or the 12 edge radii are equal
+ */
+static bool box_bevel_uniform(
+    const Bevel *bevel,
+    float *radius)
+{
+    bool result = true;
+    if (bevel->radius != 0.0f) {
+        *radius = box_bevel_radius(bevel->radius);
+    } else {
+        float radii[BOX_BEVEL_EDGES];
+        box_bevel_edges(bevel, radii);
+        *radius = radii[0];
+        for (int32_t i = 1; i < BOX_BEVEL_EDGES; i ++) {
+            result &= radii[i] == radii[0];
+        }
+    }
+
+    return result;
+}
+
+bool box_bevel_flat(
+    const Bevel *bevel)
+{
+    float radius = 0.0f;
+
+    return box_bevel_uniform(bevel, &radius) && radius == 0.0f;
+}
+
+/** Get the quantized proportions and edge radii of a Bevel relative to the largest size.
+ *
+ * @param value The Box and the Bevel
+ * @param size The proportions to fill, as in the key of a RoundedBox
+ * @param radii The edge radii to fill
+ */
+static void box_bevel_quantize(
+    const box_bevel_value_t *value,
+    vec3 size,
+    float radii[BOX_BEVEL_EDGES])
+{
+    const Box *box = &value->box;
+    float max = glm_max(glm_max(box->x, box->y), box->z);
+    vec3 sizes = { box->x, box->y, box->z };
+    for (int32_t i = 0; i < 3; i ++) {
+        float f = box_shape_quantize(box_ratio(sizes[i], max, 1.0f));
+        size[i] = glm_max(f, 1.0f / 4096.0f);
+    }
+
+    box_bevel_edges(&value->bevel, radii);
+    for (int32_t i = 0; i < BOX_BEVEL_EDGES; i ++) {
+        radii[i] = glm_max(box_shape_quantize(box_ratio(radii[i], max, 0.0f)), 0.0f);
+    }
+}
+
+/** Get the subdivisions per edge of a Bevel as in the key of a RoundedBox.
+ *
+ * @param bevel The bevel
+ * @return The subdivisions, from 1 to 64
+ */
+static int32_t box_bevel_segments(
+    const Bevel *bevel)
+{
+    return bevel->segments < 1 ? 1 : (bevel->segments > 64 ? 64 : bevel->segments);
+}
+
+/** Key of a Bevel: the key of a RoundedBox when the edges share a radius, else a hash of the
+ * quantized proportions and edge radii.
+ *
+ * @param value The Box and the Bevel
+ * @param key The key
+ */
+static void box_key_bevel(
+    const void *value,
+    box_shape_key_t *key)
+{
+    const box_bevel_value_t *v = value;
+    float radius;
+    if (box_bevel_uniform(&v->bevel, &radius)) {
+        RoundedBox rounded = {
+            .x = v->box.x, .y = v->box.y, .z = v->box.z,
+            .radius = radius, .segments = v->bevel.segments
+        };
+        box_key_rounded_box(&rounded, key);
+        key->i[1] = BOX_BEVEL_UNIFORM;
+    } else {
+        vec3 size;
+        float radii[BOX_BEVEL_EDGES];
+        box_bevel_quantize(v, size, radii);
+        uint64_t hash = 14695981039346656037ull;
+        const uint8_t *bytes = (const uint8_t*)size;
+        for (size_t i = 0; i < sizeof(vec3); i ++) {
+            hash = (hash ^ bytes[i]) * 1099511628211ull;
+        }
+
+        bytes = (const uint8_t*)radii;
+        for (size_t i = 0; i < sizeof(radii); i ++) {
+            hash = (hash ^ bytes[i]) * 1099511628211ull;
+        }
+
+        glm_vec3_copy(size, key->f);
+        key->i[0] = box_bevel_segments(&v->bevel);
+        key->i[1] = BOX_BEVEL_PER_EDGE;
+        key->i[2] = (int32_t)(uint32_t)hash;
+        key->i[3] = (int32_t)(uint32_t)(hash >> 32);
+    }
+}
+
+/** Scale of a Bevel, the largest size of its Box as for a RoundedBox.
+ *
+ * @param value The Box and the Bevel
+ * @param scale The scale
+ */
+static void box_scale_bevel(
+    const void *value,
+    vec3 scale)
+{
+    const Box *v = &((const box_bevel_value_t*)value)->box;
+    glm_vec3_broadcast(glm_max(glm_max(glm_max(v->x, v->y), v->z), 0.0f), scale);
+}
+
+/** Generate a Bevel mesh.
+ *
+ * @param value The Box and the Bevel that produced the key
+ * @param key The key
+ * @param mesh The mesh
+ */
+static void box_gen_bevel(
+    const void *value,
+    const box_shape_key_t *key,
+    box_mesh_t *mesh)
+{
+    if (key->i[1] == BOX_BEVEL_UNIFORM) {
+        box_mesh_gen_rounded_box(mesh, key->f, key->f[3], key->i[0]);
+    } else {
+        vec3 size;
+        float radii[BOX_BEVEL_EDGES];
+        box_bevel_quantize(value, size, radii);
+        box_mesh_gen_bevel(mesh, size, radii, key->i[0]);
+    }
+}
+
 /** Hash bytes into a running FNV-1a hash.
  *
  * @param hash The running hash
@@ -742,7 +943,13 @@ void box_geometry_shapes_init(
     ecs_world_t *world)
 {
     box_shape_builtin(world, ecs_id(Mesh3), box_key_mesh3, box_gen_mesh3, NULL);
-    box_shape_builtin(world, ecs_id(Box), box_key_none, box_gen_box, box_scale_xyz);
+    box_shape_register(world, &(box_shape_desc_t){
+        .component = ecs_id(Box),
+        .key = box_key_none,
+        .generate = box_gen_box,
+        .scale = box_scale_xyz,
+        .exclude = ecs_id(Bevel)
+    });
     box_shape_builtin(world, ecs_id(Quad), box_key_none, box_gen_quad, box_scale_xy);
     box_shape_builtin(world, ecs_id(Triangle), box_key_none, box_gen_triangle, box_scale_xy);
     box_shape_builtin(world, ecs_id(RightTriangle), box_key_none,
@@ -779,4 +986,18 @@ void box_geometry_shapes_init(
     box_shape_count_hooks(world, ecs_id(Frustum), BOX_SEGMENTS);
     ecs_set_hooks(world, Torus, { .ctor = box_torus_ctor });
     ecs_set_hooks(world, RoundedBox, { .ctor = box_rounded_box_ctor });
+    ecs_set_hooks(world, Bevel, { .ctor = box_bevel_ctor });
+
+    box_shape_t *bevel = box_mesh_cache_add_shape(box_mesh_cache_of(world),
+        &(box_shape_desc_t){
+            .component = ecs_id(Bevel),
+            .key = box_key_bevel,
+            .generate = box_gen_bevel,
+            .scale = box_scale_bevel
+        });
+    if (bevel) {
+        bevel->size = ECS_SIZEOF(box_bevel_value_t);
+        bevel->world = world;
+        box_geometry_bevel_init(world, bevel);
+    }
 }

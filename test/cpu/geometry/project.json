@@ -23,7 +23,11 @@
                     "invalid_footprint",
                     "missing_profile",
                     "degenerate_path",
-                    "unsupported_sweep_inputs"
+                    "unsupported_sweep_inputs",
+                    "valid_bevel",
+                    "negative_bevel",
+                    "infinite_bevel",
+                    "bevel_before_box"
                 ]
             },
             {
@@ -229,6 +233,31 @@
                 ]
             },
             {
+                "id": "Bevel",
+                "testcases": [
+                    "size",
+                    "normals",
+                    "continuous_normals",
+                    "uvs",
+                    "edge_names",
+                    "scaled_radii",
+                    "radius_overrides",
+                    "equal_edges",
+                    "cache_shared",
+                    "cache_single_edge",
+                    "resolve_order",
+                    "resolve_script",
+                    "zero_radii",
+                    "remove_bevel",
+                    "update_size",
+                    "update_radius",
+                    "remove_box",
+                    "delete",
+                    "prefab_instance",
+                    "prefab_override"
+                ]
+            },
+            {
                 "id": "Mesh3",
                 "testcases": [
                     "with_normals",
@@ -289,7 +318,8 @@
                     "torus",
                     "tube",
                     "frustum",
-                    "rounded_box"
+                    "rounded_box",
+                    "bevel"
                 ]
             },
             {

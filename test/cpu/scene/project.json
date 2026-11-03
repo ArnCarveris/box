@@ -112,6 +112,7 @@
                 "id": "SpatialLayout",
                 "testcases": [
                     "fit_stretch",
+                    "fit_bevel",
                     "fit_modes",
                     "fit_chained_resize",
                     "align_bounds_keep",

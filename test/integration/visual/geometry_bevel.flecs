@@ -1,0 +1,84 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+camera {
+  Position: {0, 4.2, 9}
+  Rotation: {-0.4, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {38, 44, 56, 255}},
+    shadows: {enabled: true}
+  }
+}
+
+sun {
+  Rotation: {0.8, 2.5, 0}
+  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+}
+
+$ {
+  AmbientLight: {sky: {150, 175, 210}, ground: {65, 60, 55}, intensity: 0.7}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {14, 0.2, 6}
+  Rgb: {150, 150, 160}
+}
+
+// A tabletop: the top rim rounded, the bottom and the vertical edges sharp
+tabletop {
+  Position: {-5, 0.3, 0}
+  Rotation: {0, 0.5, 0}
+  Box: {1.8, 0.6, 1.4}
+  Bevel: {top_front: 0.25, top_back: 0.25, top_left: 0.25, top_right: 0.25}
+  Rgb: {200, 150, 100}
+}
+
+// A rounded rectangle extruded along Y: rounded vertical edges ending in a sharp top rim
+extrusion {
+  Position: {-2.5, 0.7, 0}
+  Rotation: {0, 0.5, 0}
+  Box: {1.4, 1.4, 1.2}
+  Bevel: {front_left: 0.4, front_right: 0.4, back_left: 0.4, back_right: 0.4}
+  Rgb: {90, 200, 110}
+}
+
+// A single rounded edge, a bar counter rounded on the customer's side
+one_edge {
+  Position: {0, 0.6, 0}
+  Rotation: {0, 0.5, 0}
+  Box: {1.6, 1.2, 1.2}
+  Bevel: {top_front: 0.45}
+  Rgb: {80, 160, 240}
+}
+
+// Every edge with a different radius
+all_different {
+  Position: {2.5, 0.7, 0}
+  Rotation: {0, 0.5, 0}
+  Box: {1.5, 1.4, 1.4}
+  Bevel: {
+    top_front: 0.45, top_back: 0.1, top_left: 0.3, top_right: 0.2,
+    bottom_front: 0.15, bottom_back: 0.35, bottom_left: 0.05, bottom_right: 0.25,
+    front_left: 0.2, front_right: 0.4, back_left: 0.3, back_right: 0.1
+  }
+  Rgb: {250, 120, 160}
+}
+
+// Sharp edges next to rounded ones: the top and the front right edge rounded, the rest sharp
+mixed {
+  Position: {5, 0.6, 0}
+  Rotation: {0, 0.5, 0}
+  Box: {1.3, 1.2, 1.3}
+  Bevel: {top_front: 0.35, top_left: 0.35, front_right: 0.35, back_left: 0.2}
+  Rgb: {240, 200, 60}
+}
