@@ -226,11 +226,12 @@ void Sample_rate_44100_on_48000(void) {
     // audio/sample
     ecs_world_t *world = sample_world();
     ecs_entity_t s = sample_file(world, "s", SAMPLE_DIR "tone_44100.wav");
+    audio_run(world, 2);
+    test_int(ecs_get(world, s, SoundStatus)->state, SoundReady);
     ecs_entity_t src = audio_source(world, s, 1.0f, false, 0);
     audio_run(world, 75);
 
     const SoundStatus *status = ecs_get(world, s, SoundStatus);
-    test_int(status->state, SoundReady);
     test_int(status->frames, 44100);
     test_flt(status->sample_rate, 44100);
     test_bool(ecs_get(world, src, AudioSource)->playing, false);

@@ -182,6 +182,7 @@ ecs_entity_t box_audio_sound_from_pcm(
 
     result = sound ? sound : ecs_new(world);
     pcm = ecs_ensure(world, result, AudioPcm);
+    ecs_vec_init_if_t(&pcm->samples, float);
     ecs_vec_set_count_t(NULL, &pcm->samples, float, frames * channels);
     ecs_os_memcpy_n(ecs_vec_first_t(&pcm->samples, float), data, float, frames * channels);
     pcm->channels = channels;

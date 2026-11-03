@@ -503,8 +503,10 @@ backend; without device IO the decoders compile with `-std=c11` under emcc 6.0.8
 that submitted them, so decoding a sound stalls that frame for the whole decode. Load sounds
 at the start of a scene, behind a loading screen, rather than in the middle of play; the audio
 itself does not stall, since the worklet keeps rendering. `test/integration/web/audio_sample.mjs`
-measures the longest gap between two animation frames while 2 seconds of 48000 Hz stereo
-decode, as a WAV and as a FLAC (see the summary of the change that added it for the figures).
+measures the longest animation frame while 2 seconds of 48000 Hz stereo (384 KB) decode. In
+headless Chrome on an Apple M-series Mac the frame grows from about 0.5 ms to under 1 ms for
+the 16 bit WAV and to 2 to 3 ms for the FLAC in a release build (about 1 and 4.5 ms in a debug
+build), well within a frame at 60 Hz; the decode time grows with the length of the sound.
 A file under `etc` reaches the page through the `embed` of the app (`apps/boxrun/project.json`
 embeds `etc`); a test file through `?preload=`.
 

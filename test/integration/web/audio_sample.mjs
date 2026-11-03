@@ -16,9 +16,9 @@ sounds with ?preload=.
 <bin dir> holds boxrun.html, .js and .wasm (see audio_core.mjs). After a trusted click the check
 records two seconds (audio capture 2) while a script plays the tone once: the capture has to
 hold 440 Hz for one second at the actual rate of the context. It then sets the SoundFile of 2
-seconds of stereo WAV and FLAC (long_stereo.wav, .flac) and reports the longest gap between two
-animation frames while each decodes, the stall of the inline job, against the longest gap
-before. Last it deletes a sound whose looping source plays: the worklet has to drop the voice
+seconds of stereo WAV and FLAC (long_stereo.wav, .flac) and reports the longest animation frame
+callback while each decodes, the stall of the inline job, against the longest one before, and
+the longest gap between two frames. Last it deletes a sound whose looping source plays: the worklet has to drop the voice
 and free the sound. The log has no error and no audio warning. Exits 0 on a pass, 1 on a
 failure and 2 when Chrome or the page cannot start.`;
 
@@ -33,17 +33,18 @@ const TONE = 440;
 const LEVEL = 0.25;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Counts the frames the page draws and keeps the time of each animation frame, before the page
-// runs
+// Counts the frames the page draws and keeps the start and the length of each animation frame
+// callback, the main loop, before the page runs
 const INSTRUMENT = `(() => {
   window.boxFrames = 0;
   window.boxFrameTimes = [];
   const raf = window.requestAnimationFrame;
   window.requestAnimationFrame = function (cb) {
     return raf.call(window, (t) => {
-      window.boxFrameTimes.push(performance.now());
-      if (window.boxFrameTimes.length > 4096) window.boxFrameTimes.shift();
+      const start = performance.now();
       cb(t);
+      window.boxFrameTimes.push([start, performance.now() - start]);
+      if (window.boxFrameTimes.length > 4096) window.boxFrameTimes.shift();
     });
   };
   if (!window.GPUCanvasContext) return;
@@ -58,12 +59,16 @@ const INSTRUMENT = `(() => {
 const shell = (line) => `Module.cwrap('box_command_web_run', 'string', ['string'])(` +
   `${JSON.stringify(line)})`;
 
-// The longest gap between two animation frames since a time, in ms
-const longestGap = (since) => `(() => {
-  const t = window.boxFrameTimes.filter((x) => x >= ${since});
-  let gap = 0;
-  for (let i = 1; i < t.length; i++) gap = Math.max(gap, t[i] - t[i - 1]);
-  return { gap, frames: t.length };
+// The longest animation frame callback and the longest gap between two of them since a time,
+// in ms
+const longestFrame = (since) => `(() => {
+  const t = window.boxFrameTimes.filter((x) => x[0] >= ${since});
+  let gap = 0, work = 0;
+  for (let i = 0; i < t.length; i++) {
+    work = Math.max(work, t[i][1]);
+    if (i) gap = Math.max(gap, t[i][0] - t[i - 1][0]);
+  }
+  return { gap, work, frames: t.length };
 })()`;
 
 // Reads a capture of the file system of the page: its rate, the first and last frame of the
@@ -249,7 +254,9 @@ async function main() {
     // One play of the tone during a capture of two seconds: one second of 440 Hz at the rate of
     // the context, whatever it is
     const path = await evaluate(shell('audio capture 2'));
-    await evaluate(shell('script_write player ' +
+    // The capture starts with the next frames, so the play has to come after them
+    await sleep(250);
+    await evaluate(shell('script_write player_script ' +
       JSON.stringify('using box.audio\nplayer {\n  AudioSource: {sound: tone}\n}\n')));
     let capture = null;
     const deadline = Date.now() + 6000;
@@ -265,33 +272,32 @@ async function main() {
     expect(capture && Math.abs(capture.peak - LEVEL) < 0.02, `the peak is not ${LEVEL}`);
 
     // The stall of the decode of two seconds of stereo, which runs inline on the main thread
-    const stalls = {};
     for (const [name, file] of [['wav', 'long_stereo.wav'], ['flac', 'long_stereo.flac']]) {
       await sleep(500);
       const since = await evaluate('performance.now()');
       await sleep(1000);
-      const before = await evaluate(longestGap(since));
+      const before = await evaluate(longestFrame(since));
       const start = await evaluate('performance.now()');
-      await evaluate(shell(`script_write long_${name} ` + JSON.stringify(
+      await evaluate(shell(`script_write long_${name}_script ` + JSON.stringify(
         `using box.audio\nlong_${name} {\n  SoundFile: {path: "test/assets/audio/${file}"}\n}\n`)));
       const ready = await waitFor(`${shell(`get long_${name} box.audio.SoundStatus`)}` +
         `.includes('SoundReady')`, 5000);
       await sleep(500);
-      const during = await evaluate(longestGap(start));
-      stalls[name] = { before: before.gap, during: during.gap };
-      console.log(`decode of 2 s stereo ${name.toUpperCase()}: longest frame gap ` +
+      const during = await evaluate(longestFrame(start));
+      console.log(`decode of 2 s stereo ${name.toUpperCase()}: longest frame ` +
+        `${during.work.toFixed(1)} ms (${before.work.toFixed(1)} ms before), longest gap ` +
         `${during.gap.toFixed(1)} ms (${before.gap.toFixed(1)} ms before), ready ${ready}`);
       expect(ready, `the ${name} of two seconds did not decode`);
     }
 
     // Deleting a sound while its looping source plays fades the voice and frees the sound
-    await evaluate(shell('script_write loop_sound ' + JSON.stringify(
+    await evaluate(shell('script_write loop_script ' + JSON.stringify(
       'using box.audio\nloop_sound {\n  SoundFile: {path: "test/assets/audio/loop.wav"}\n}\n')));
-    await evaluate(shell('script_write looper ' + JSON.stringify(
+    await evaluate(shell('script_write looper_script ' + JSON.stringify(
       'using box.audio\nlooper {\n  AudioSource: {sound: loop_sound, loop: true}\n}\n')));
     await sleep(1000);
     const playing = await evaluate('Module.boxAudio.stats()');
-    await evaluate(shell('script_write loop_sound ' + JSON.stringify('// deleted\n')));
+    await evaluate(shell('rm loop_sound'));
     await sleep(1000);
     const deleted = await evaluate('Module.boxAudio.stats()');
     console.log(`delete while playing: voices ${playing.voices} -> ${deleted.voices}, sounds ` +

@@ -141,9 +141,9 @@ node test/integration/web/audio_module.mjs \
 `?preload=`; the scene decodes one second of 440 Hz at 44100 Hz. After a trusted click it
 records two seconds (`audio capture 2`) while a `script_write` plays the sound once, and expects
 440 Hz for one second at the actual rate of the context. It then sets the `SoundFile` of 2
-seconds of stereo WAV and FLAC and prints the longest gap between two animation frames while
-each decodes inline, and last deletes a sound whose looping source plays and expects the
-worklet to drop the voice and free the sound:
+seconds of stereo WAV and FLAC and prints the longest animation frame callback, the main
+loop, while each decodes inline, and last deletes a sound whose looping source plays (`rm`) and
+expects the worklet to drop the voice and free the sound:
 
 ```sh
 node test/integration/web/audio_sample.mjs \
