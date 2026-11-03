@@ -10,6 +10,30 @@
 #include <box.h>
 #include <bake_test.h>
 #include "render.h"
+#include <string.h>
+
+/** Warnings logged while the log hook is set that name the view "probed" */
+static int32_t debug_warnings;
+
+/** Log hook that counts the warnings naming the view "probed".
+ *
+ * @param level Level of the message
+ * @param file File that logged it
+ * @param line Line that logged it
+ * @param msg The message
+ */
+static void debug_count_warnings(
+    int32_t level,
+    const char *file,
+    int32_t line,
+    const char *msg)
+{
+    (void)file;
+    (void)line;
+    if (level == -2 && msg && strstr(msg, "probed")) {
+        debug_warnings ++;
+    }
+}
 
 /** Check that grid settings have the defaults of the View constructor, but for enabled.
  *
@@ -202,6 +226,48 @@ void ViewDebug_packet_copy(void) {
     test_bool(v1->debug.light_probes, false);
     test_bool(v1->debug.reflection_probes, true);
     test_flt(v1->debug.probe_size, 0.75f);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ViewDebug_light_probes_warn_once(void) {
+    // debug/probes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t scene = ecs_new(world);
+    ecs_add(world, scene, Scene);
+    ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0,
+        .budget_ms = 0});
+    ecs_entity_t floor = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, floor, Position, {0, 0, 0});
+    ecs_set(world, floor, Box, {100, 8, 100});
+    ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_entity(world, {.name = "probed"});
+    ecs_add(world, view, View);
+    View *v = ecs_get_mut(world, view, View);
+    v->camera = camera;
+    v->debug.light_probes = true;
+    ecs_modified(world, view, View);
+
+    ecs_os_api_log_t log = ecs_os_api.log_;
+    debug_warnings = 0;
+    ecs_os_api.log_ = debug_count_warnings;
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+    }
+
+    ecs_os_api.log_ = log;
+    test_int(debug_warnings, 1);
+    const box_render_view_t *rv = ecs_vec_get_t(&null->last.views, box_render_view_t, 0);
+    test_assert(rv->volume != 0);
+    test_assert(ecs_get(world, scene, LightBakeStatus)->probes > BOX_RENDER_DEBUG_PROBES_MAX);
 
     ecs_fini(world);
     box_render_null_free(null);

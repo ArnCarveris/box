@@ -71,7 +71,6 @@ struct box_gpu_debug_t {
     WGPUBindGroup probe_group;      /**< Binds the whole probe buffer at a dynamic offset */
     uint64_t probe_size;            /**< Bytes of the probe buffer */
     uint64_t probe_used;            /**< Bytes of the probe buffer the draws of the packet took */
-    ecs_map_t probe_warned;         /**< Views warned about drawing BOX_GPU_DEBUG_PROBES_MAX */
 };
 
 /** Convert a display encoded channel to linear light.
@@ -144,7 +143,6 @@ void box_gpu_debug_init(
             .bindGroupLayouts = probe_groups
         });
     ecs_map_init(&d->probe_pipelines, NULL);
-    ecs_map_init(&d->probe_warned, NULL);
     gpu->debug = d;
 }
 
@@ -210,7 +208,6 @@ void box_gpu_debug_fini(
 
     box_gpu_debug_probe_pipelines_free(d);
     ecs_map_fini(&d->probe_pipelines);
-    ecs_map_fini(&d->probe_warned);
     if (d->probe_group) {
         wgpuBindGroupRelease(d->probe_group);
     }
@@ -450,36 +447,16 @@ done:
     return result;
 }
 
-/** Bound the probes of a kind a view draws to BOX_GPU_DEBUG_PROBES_MAX, warning once per view
- * past it.
+/** Bound the probes of a kind a view draws to BOX_GPU_DEBUG_PROBES_MAX; the bake warns about
+ * a volume past it, naming the view.
  *
- * @param gpu The backend
- * @param v The view
  * @param count The probes of the kind
- * @param kind Name of the kind for the warning
  * @return The probes to draw
  */
 static uint32_t box_gpu_debug_probe_bound(
-    box_gpu_t *gpu,
-    const box_render_view_t *v,
-    uint32_t count,
-    const char *kind)
+    uint32_t count)
 {
-    box_gpu_debug_t *d = gpu->debug;
-    uint32_t result = count;
-    if (count <= BOX_GPU_DEBUG_PROBES_MAX) {
-        goto done;
-    }
-
-    if (!ecs_map_get(&d->probe_warned, (ecs_map_key_t)v->view)) {
-        ecs_map_insert(&d->probe_warned, (ecs_map_key_t)v->view, 1);
-        ecs_warn("view #%u shows %u of its %u %s probes (BOX_GPU_DEBUG_PROBES_MAX)",
-            (uint32_t)v->view, BOX_GPU_DEBUG_PROBES_MAX, count, kind);
-    }
-
-    result = BOX_GPU_DEBUG_PROBES_MAX;
-done:
-    return result;
+    return count < BOX_GPU_DEBUG_PROBES_MAX ? count : BOX_GPU_DEBUG_PROBES_MAX;
 }
 
 /** Count the light probes a view draws: the probes of the resident volume it samples.
@@ -496,7 +473,7 @@ static uint32_t box_gpu_debug_light_count(
         ? ecs_map_get_deref(&gpu->volumes, box_gpu_volume_t, v->volume)
         : NULL;
 
-    return volume ? box_gpu_debug_probe_bound(gpu, v, volume->count, "light") : 0;
+    return volume ? box_gpu_debug_probe_bound(volume->count) : 0;
 }
 
 /** Count the reflection probes a view draws: those its clusters list, within its probe buffer.
@@ -514,8 +491,8 @@ static uint32_t box_gpu_debug_reflection_count(
         : NULL;
     uint32_t capacity = b ? b->size / (uint32_t)sizeof(box_render_reflection_probe_t) : 0;
 
-    return box_gpu_debug_probe_bound(gpu, v,
-        v->reflection_listed < capacity ? v->reflection_listed : capacity, "reflection");
+    return box_gpu_debug_probe_bound(
+        v->reflection_listed < capacity ? v->reflection_listed : capacity);
 }
 
 /** Write the uniform of the probe draws of a view into the probe buffer of the packet,

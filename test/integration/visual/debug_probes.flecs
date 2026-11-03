@@ -5,16 +5,17 @@ using box.camera
 using box.view
 using box.light
 
-// The light and reflection probe debug views of a view in a colored room: a red wall on the left,
-// a blue wall on the right, a green back wall, a white ceiling and a gray floor, lit by a point
-// light under the ceiling. The irradiance probes of the bake show as small spheres lit by their
-// own SH, red toward the left wall and blue toward the right one; the probes inside the block on
-// the floor are marked invalid in a dark red hatch. Two reflection probes show as mirror spheres
-// of their captures with their influence boxes in yellow; the right one is turned about Y and has
-// a projection box, in cyan.
+// The light and reflection probe debug views of a view in a colored room: a glowing red wall on
+// the left, a glowing blue wall on the right, a green back wall, a white ceiling and a gray floor,
+// lit by a point light under the ceiling. The irradiance probes of the bake show as spheres of
+// probe_size 0.15 lit by their own SH, red toward the left wall and blue toward the right one;
+// the probes in the middle of the room, more than a spacing from any surface, are invalid and
+// marked in a dark red hatch (those inside the block and the walls are hidden by them). Two
+// reflection probes show as mirror spheres of their captures with their influence boxes in
+// yellow; the right one is turned about Y and has a projection box, in cyan.
 room {
   Scene: {}
-  LightBake: {probe_spacing: 1.5, bounds_padding: 0.5, budget_ms: 0}
+  LightBake: {probe_spacing: 1.25, bounds_padding: 0}
   ReflectionBake: {resolution: 64, scene_probe: false}
   AmbientLight: {intensity: 0.1}
 
@@ -45,12 +46,14 @@ room {
     Position: {-4.1, 2, 1}
     Box: {0.2, 4, 8.4}
     Rgb: {220, 40, 30}
+    Emissive: {strength: 0.4, color: {255, 30, 20}}
   }
 
   right_wall {
     Position: {4.1, 2, 1}
     Box: {0.2, 4, 8.4}
     Rgb: {30, 70, 220}
+    Emissive: {strength: 0.4, color: {30, 60, 255}}
   }
 
   back_wall {
@@ -67,13 +70,13 @@ room {
 
   left_probe {
     Position: {-2, 1.5, 0.5}
-    ReflectionProbe: {extent: {1.5, 1.5, 2}, blend: 0.5, projection: {0, 0, 0}}
+    ReflectionProbe: {extent: {1.4, 1.4, 2}, blend: 0.5, projection: {0, 0, 0}}
   }
 
   right_probe {
     Position: {2, 1.5, 0.5}
     Rotation: {0, 0.5, 0}
-    ReflectionProbe: {extent: {1.5, 1.5, 1.5}, blend: 0.5, projection: {2, 1.5, 2.5}}
+    ReflectionProbe: {extent: {1.4, 1.4, 1.4}, blend: 0.5, projection: {2, 1.3, 2.5}}
   }
 }
 
@@ -81,6 +84,6 @@ main_view {
   View: {
     camera: room.camera
     clear: {enabled: true, color: {0, 0, 0, 255}}
-    debug: {light_probes: true, reflection_probes: true}
+    debug: {light_probes: true, reflection_probes: true, probe_size: 0.15}
   }
 }

@@ -436,7 +436,8 @@
                     "literal_off",
                     "script_keeps_defaults",
                     "script_probes_keep_others",
-                    "packet_copy"
+                    "packet_copy",
+                    "light_probes_warn_once"
                 ]
             },
             {

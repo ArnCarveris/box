@@ -1310,27 +1310,30 @@ void ViewDebug_light_probes_at_grid(void) {
 }
 
 /** A volume baked next to a red emissive wall shows a probe red on the side toward the wall
- * and not on the opposite side, seen from 3 units above: 37 pixels a unit, a radius of about
- * 15 pixels. */
+ * and not on the opposite side. The camera looks along -Z from 0.6 units in front of a probe at
+ * mid height half a unit from the wall, between the probes, so that probe covers the middle of
+ * the capture and its neighbours are outside it. */
 void ViewDebug_light_probes_colors(void) {
     // debug/probes
     ecs_world_t *world = dg_world();
     LightBake bake = dp_light_bake(1, 0.5f);
     ecs_entity_t scene = dp_scene(world, &bake, NULL, 0);
     dp_box(world, scene, (float[]){0, -1, 0}, (float[]){6, 0.2f, 6}, (Rgb){0, 0, 0}, 0);
-    dp_box(world, scene, (float[]){3, 0.5f, 0}, (float[]){0.2f, 3, 6}, (Rgb){255, 0, 0}, 4);
+    dp_box(world, scene, (float[]){3, 0.5f, 0}, (float[]){0.2f, 3, 6}, (Rgb){255, 0, 0}, 0.5f);
     ecs_progress(world, 0);
 
     box_render_probe_t probe;
-    test_assert(box_render_bake_probe(world, scene, (vec3){1.5f, 100, 0}, &probe));
-    ViewDebug debug = {.light_probes = true, .probe_size = 0.4f};
-    dp_view(world, dp_camera(world, scene, (float[]){probe.position[0], probe.position[1] + 3,
-        probe.position[2]}, (float[]){-(float)GLM_PI_2, 0, 0}, 0), &debug);
+    test_assert(box_render_bake_probe(world, scene, (vec3){2.4f, 0.5f, 0}, &probe));
+    test_bool(probe.valid, true);
+    test_assert(probe.position[0] < 2.9f);
+    ViewDebug debug = {.light_probes = true};
+    dp_view(world, dp_camera(world, scene, (float[]){probe.position[0], probe.position[1],
+        probe.position[2] + 0.6f}, (float[]){0, 0, 0}, 0), &debug);
     unsigned char *px = dp_render(world, scene, "light_probes_colors.png", NULL);
 
     float toward[3], away[3];
-    dp_mean(px, 64 + 10, 64, 1, toward);
-    dp_mean(px, 64 - 10, 64, 1, away);
+    dp_mean(px, 64 + 40, 64, 1, toward);
+    dp_mean(px, 64 - 40, 64, 1, away);
     test_assert(toward[0] > 0.02f);
     test_assert(toward[0] > 2 * toward[1]);
     test_assert(toward[0] > 2 * toward[2]);

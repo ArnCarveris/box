@@ -1258,7 +1258,7 @@ bool box_gpu_fog_volumes_draw(
     WGPUTextureView depth);
 
 /** Probes of a kind (light or reflection) the debug pass of a view draws at most */
-#define BOX_GPU_DEBUG_PROBES_MAX (65536u)
+#define BOX_GPU_DEBUG_PROBES_MAX ((uint32_t)BOX_RENDER_DEBUG_PROBES_MAX)
 
 /** Create the layouts of the debug passes, after the view layout.
  *
