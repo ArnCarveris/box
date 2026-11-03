@@ -301,10 +301,12 @@ fn median(v: vec3f) -> f32 {
 // encodes: a pixel half covered by light text on a dark background shows about two thirds of the
 // text, by dark text on a light background about a third, so small dark text loses its edges and
 // looks thin and faint next to the same text in light (glyph_contrast corrects for it).
-fn glyph_coverage(uv: vec2f, range: vec2f, offset: f32) -> f32 {
+//
+// uv_dx and uv_dy are the derivatives of uv, taken by the caller in uniform control flow, so the
+// coverage takes none itself and runs under a branch for the glyph fragments only.
+fn glyph_coverage(uv: vec2f, uv_dx: vec2f, uv_dy: vec2f, range: vec2f, offset: f32) -> f32 {
     let field = textureSampleLevel(distance_map, material_sampler, uv, 0.0);
-    let footprint = vec2f(length(vec2f(dpdx(uv.x), dpdy(uv.x))),
-        length(vec2f(dpdx(uv.y), dpdy(uv.y))));
+    let footprint = vec2f(length(vec2f(uv_dx.x, uv_dy.x)), length(vec2f(uv_dx.y, uv_dy.y)));
     let texels = vec2f(1.0) / max(footprint, vec2f(1e-9));
     let px_range = 0.5 * dot(range, texels);
     let scale = max(px_range, 1.0);
@@ -410,17 +412,22 @@ fn ranked_depth(depth: f32, rank: u32) -> f32 {
     let px = length(vec2f(dpdx(d), dpdy(d)));
     let inner_px = length(vec2f(dpdx(inner), dpdy(inner)));
     let uv = clamp(f.uv, vec2f(0.0), vec2f(1.0)) * f.uv_transform.xy + f.uv_transform.zw;
+    let uv_dx = dpdx(uv);
+    let uv_dy = dpdy(uv);
     let texel = textureSample(albedo_map, material_sampler, uv);
     let glyph = f.glyph > 0.5;
     let shape_cover = coverage(d, px);
     let fill = select(1.0, coverage(inner, inner_px), f.params.y > 0.0);
     let shape_color = mix(f.border.rgb, f.color.rgb * texel.rgb, fill);
     let color = select(shape_color, f.color.rgb, glyph) + f.emissive;
-    // glyph_coverage takes derivatives and stays in uniform control flow; the contrast
-    // correction takes none and runs only for glyphs.
-    var glyph_cover = glyph_coverage(uv, f.params, f.border.x);
-    if (blend_mode <= 2u && glyph) {
-        glyph_cover = glyph_contrast(glyph_cover, color);
+    // The glyph coverage and its contrast correction take no derivatives and run only for
+    // glyphs; the other shapes discard them.
+    var glyph_cover = 0.0;
+    if (glyph) {
+        glyph_cover = glyph_coverage(uv, uv_dx, uv_dy, f.params, f.border.x);
+        if (blend_mode <= 2u) {
+            glyph_cover = glyph_contrast(glyph_cover, color);
+        }
     }
     let shape_alpha = shape_cover * thin * f.color.a * mix(f.border.a, texel.a, fill);
     var alpha = select(shape_alpha, glyph_cover * f.color.a, glyph);
