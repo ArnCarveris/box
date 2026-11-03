@@ -183,6 +183,13 @@ typedef struct box_audio_synth_osc_t {
     double ratio;         /**< Factor of inc per frame during the sweep */
     double inc_end;       /**< Turns per frame at the end of the sweep */
     int32_t sweep;        /**< Frames left of the sweep */
+    int32_t target;       /**< Layer it modulates, -1 for none */
+    bool ring;            /**< Whether it multiplies its target instead of moving its phase */
+    bool audible;         /**< Whether a modulator is heard as well */
+    float index;          /**< Phase: turns of its target per unit of its signal, limited
+                           * against the frequency; ring: depth */
+    float feedback;       /**< Turns of its phase per unit of its own output */
+    float fb1, fb2;       /**< Its last two outputs, for the feedback */
 } box_audio_synth_osc_t;
 
 /** A source that plays a synth patch, a copy of it, so it never allocates */
@@ -192,6 +199,8 @@ typedef struct box_audio_synth_source_t {
     box_audio_synth_env_t env[1 + BOX_AUDIO_SYNTH_LAYERS]; /**< The envelope of the patch,
                                      * then the own envelope of each layer */
     uint32_t envs;        /**< Bit of each envelope a layer uses */
+    bool modulated;       /**< Whether a layer modulates another or itself, which renders
+                           * through box_audio_synth_modulate */
     double inc_max;       /**< Largest turns per frame of an oscillator */
     uint32_t rng;         /**< State of the noise, xorshift32, never 0 */
     float pitch;          /**< Pitch ratio of the voice, the variance of the play included */

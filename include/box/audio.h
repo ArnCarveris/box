@@ -185,9 +185,21 @@ ECS_ENUM(SynthFilterKind, {
     SynthBandPass          /**< Bandpass, unity at the cutoff */
 });
 
-/** An oscillator of a synth sound, a layer: on the root of the sound or on a child of it.
+/** What a synth oscillator does with its signal */
+ECS_ENUM(SynthModulation, {
+    SynthMix,              /**< It is heard, added to the mix of the layers */
+    SynthPhase,            /**< It modulates the phase of its parent layer (FM), not heard */
+    SynthRing              /**< It multiplies its parent layer (ring modulation), not heard */
+});
+
+/** An oscillator of a synth sound, a layer: on the root of the sound, on a child of it, or on
+ * a child of a layer.
  *
- * Up to BOX_AUDIO_SYNTH_LAYERS layers, the root first; more log one error and are left out.
+ * Up to BOX_AUDIO_SYNTH_LAYERS layers, the root first, then each layer before its children;
+ * more log one error and are left out.
+ *
+ * A layer with the modulation SynthPhase or SynthRing modulates its parent layer by its wave
+ * times its own envelope, so the index follows that envelope. It is heard only when audible.
  */
 ECS_STRUCT(SynthOscillator, {
     SynthWave wave;        /**< The wave, default SynthSine */
@@ -195,6 +207,12 @@ ECS_STRUCT(SynthOscillator, {
     float frequency_end;   /**< Hz the pitch sweeps to, 0 for no sweep */
     float sweep;           /**< Seconds of the sweep, exponential in frequency */
     float level;           /**< Linear gain, default 1 */
+    SynthModulation modulation; /**< What it does with its signal, default SynthMix */
+    float index;           /**< SynthPhase: peak index in radians at the top of its envelope,
+                            *   0..32, limited against the frequency so FM aliases little;
+                            *   SynthRing: depth 0..1. Default 1 */
+    float feedback;        /**< Radians of its own output on its phase, 0..1.5, a sawlike tone */
+    bool audible;          /**< Whether a modulator is heard as well, at its level */
 });
 
 /** An envelope: linear from 0 to 1 over attack, to sustain over decay, hold seconds there,

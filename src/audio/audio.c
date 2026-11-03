@@ -124,7 +124,8 @@ static void box_audio_reverb_ctor(
     }
 }
 
-/** Construct SynthOscillator values: a sine at 440 Hz at unity level, without a sweep.
+/** Construct SynthOscillator values: a sine at 440 Hz at unity level, without a sweep, heard,
+ * with an index of 1 for when it modulates.
  *
  * @param ptr The components
  * @param count Number of components
@@ -139,7 +140,8 @@ static void box_audio_synth_oscillator_ctor(
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
-        values[i] = (SynthOscillator){ .wave = SynthSine, .frequency = 440.0f, .level = 1.0f };
+        values[i] = (SynthOscillator){
+            .wave = SynthSine, .frequency = 440.0f, .level = 1.0f, .index = 1.0f };
     }
 }
 
@@ -665,6 +667,7 @@ void BoxAudioImport(
     ecs_set_hooks(world, Reverb, { .ctor = box_audio_reverb_ctor });
     ECS_META_COMPONENT(world, SynthWave);
     ECS_META_COMPONENT(world, SynthFilterKind);
+    ECS_META_COMPONENT(world, SynthModulation);
     ECS_META_COMPONENT(world, SynthOscillator);
     ecs_set_hooks(world, SynthOscillator, { .ctor = box_audio_synth_oscillator_ctor });
     ECS_META_COMPONENT(world, SynthEnvelope);

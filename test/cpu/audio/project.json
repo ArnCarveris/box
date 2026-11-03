@@ -269,6 +269,14 @@
                     "voice_pitch",
                     "loop_restarts",
                     "release_patch",
+                    "fm_bessel",
+                    "fm_sidebands",
+                    "fm_index_zero_identical",
+                    "fm_index_follows_envelope",
+                    "fm_index_limited",
+                    "ring_sum_difference",
+                    "modulator_audible",
+                    "feedback_harmonics",
                     "script_parses",
                     "script_renders",
                     "script_change_next_play",
@@ -276,7 +284,8 @@
                     "docs_examples",
                     "too_many_layers",
                     "endless_logs_error",
-                    "deleted_releases"
+                    "deleted_releases",
+                    "script_modulators"
                 ]
             },
             {

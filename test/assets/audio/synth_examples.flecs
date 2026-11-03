@@ -1,4 +1,4 @@
-// The three synth sounds of docs/audio.md, kept the same: the Synth suite of test/cpu/audio
+// The six synth sounds of docs/audio.md, kept the same: the Synth suite of test/cpu/audio
 // checks that they parse, compile without errors, play and end.
 using box.audio
 
@@ -32,4 +32,52 @@ prefab Whoosh {
   SynthEnvelope: {attack: 0.15, decay: 0.25, sustain: 0.3, hold: 0.1, release: 0.3}
   SynthFilter: {kind: SynthBandPass, cutoff: 300, cutoff_end: 4000, sweep: 0.5, resonance: 0.6}
   SynthOscillator: {wave: SynthNoise, level: 0.8}
+}
+
+// A bell: a modulator at 3.5 times the pitch makes an inharmonic spectrum, and its envelope
+// is shorter than the carrier's, so the bell starts bright and rings out pure, 2.5 s
+prefab Bell {
+  SynthSound: {level_variance: 0.05}
+  SynthEnvelope: {attack: 0.002, decay: 2.5}
+  SynthOscillator: {frequency: 660, level: 0.4}
+  bright {
+    SynthOscillator: {frequency: 2310, modulation: SynthPhase, index: 4}
+    SynthEnvelope: {attack: 0.001, decay: 1.2}
+  }
+}
+
+// An electric piano: a 1:1 pair for the body and a short tine, a modulator at 14 times the
+// pitch that fades in 80 ms, 1.6 s
+prefab ElectricPiano {
+  SynthSound: {}
+  body {
+    SynthOscillator: {frequency: 220, level: 0.35}
+    SynthEnvelope: {attack: 0.002, decay: 1.6}
+    warmth {
+      SynthOscillator: {frequency: 220, modulation: SynthPhase, index: 1.8}
+      SynthEnvelope: {attack: 0.002, decay: 0.6}
+    }
+  }
+  tine {
+    SynthOscillator: {frequency: 220, level: 0.12}
+    SynthEnvelope: {attack: 0.001, decay: 0.3}
+    strike {
+      SynthOscillator: {frequency: 3080, modulation: SynthPhase, index: 2.5}
+      SynthEnvelope: {attack: 0.001, decay: 0.08}
+    }
+  }
+}
+
+// A metallic hit: two partials that do not share harmonics, ring modulated, the modulator
+// gritty with feedback, and a short clang of FM on top, through a highpass, 0.6 s
+prefab MetalHit {
+  SynthSound: {pitch_variance: 0.03}
+  SynthEnvelope: {attack: 0.001, decay: 0.6}
+  SynthFilter: {kind: SynthHighPass, cutoff: 400}
+  SynthOscillator: {frequency: 587, level: 0.4}
+  ring { SynthOscillator: {frequency: 1371, modulation: SynthRing, index: 1, feedback: 0.6} }
+  clang {
+    SynthOscillator: {frequency: 1960, modulation: SynthPhase, index: 3}
+    SynthEnvelope: {attack: 0.001, decay: 0.15}
+  }
 }

@@ -102,6 +102,13 @@
 /** Highest frequency of an oscillator in Hz, the top of the audible range */
 #define BOX_AUDIO_SYNTH_FREQUENCY_MAX 20000.0f
 
+/** Largest index of phase modulation in radians, before the limit against the frequency */
+#define BOX_AUDIO_SYNTH_INDEX_MAX 32.0f
+
+/** Largest feedback of an oscillator onto its own phase in radians, under the point where the
+ * tone turns to noise */
+#define BOX_AUDIO_SYNTH_FEEDBACK_MAX 1.5f
+
 /** Commands of the byte stream. Each starts with a box_audio_cmd_header_t */
 typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_PLAY = 1,          /**< box_audio_cmd_play_t */
@@ -250,6 +257,12 @@ typedef enum box_audio_synth_filter_t {
     BOX_AUDIO_SYNTH_BANDPASS = 3      /**< Bandpass, unity at the cutoff */
 } box_audio_synth_filter_t;
 
+/** How a synth oscillator that modulates another one changes it */
+typedef enum box_audio_synth_modulation_t {
+    BOX_AUDIO_SYNTH_PHASE = 0,  /**< Adds to the phase of the carrier, FM as DX synths do it */
+    BOX_AUDIO_SYNTH_RING = 1    /**< Multiplies the carrier */
+} box_audio_synth_modulation_t;
+
 /** An envelope of a synth patch: a linear attack to 1, a decay to the sustain level, a hold
  * there and a release to 0 */
 typedef struct box_audio_synth_envelope_t {
@@ -270,6 +283,14 @@ typedef struct box_audio_synth_layer_t {
     float sweep;                          /**< Seconds of the sweep */
     float level;                          /**< Linear gain */
     box_audio_synth_envelope_t envelope;  /**< Its own envelope, when has_envelope */
+    uint32_t modulates;                   /**< 1 + the layer it modulates, which comes before
+                                           * it, or 0: a modulator is not heard unless it is
+                                           * audible */
+    uint32_t modulation;                  /**< A box_audio_synth_modulation_t */
+    float index;                          /**< Phase: peak index in radians at the top of its
+                                           * envelope; ring: depth, 0..1 */
+    float feedback;                       /**< Radians of its own output on its phase */
+    uint32_t audible;                     /**< 1 when a modulator is heard as well, at level */
 } box_audio_synth_layer_t;
 
 /** A synth patch: up to BOX_AUDIO_SYNTH_LAYERS oscillators with envelopes, then one filter,
