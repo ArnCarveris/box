@@ -6,17 +6,18 @@ using box.camera
 using box.view
 using box.light
 
-// TextureBlend on alpha tested and blended shapes. On the left a blended fence panel (AlphaCutoff)
-// whose mask (blend_mask.png, red top left, green top right) shows the lattice of fence.png on
-// its left and bottom and the leaf of leaf.png in its top right quadrant: the cutout follows the
-// weighted alpha of the two layers, and the sun from behind casts a shadow toward the camera with
-// the same holes, the lattice and the leaf. On the right a blended quad with BlendMode AlphaBlend
-// and the same mask over a checkered floor: where the leaf and the lattice are transparent the
-// floor shows through, where they are opaque they cover it.
+// TextureBlend on alpha tested and blended shapes. On the left a blended fence panel, a Quad with
+// AlphaCutoff, whose mask (blend_mask.png, red top left, green top right) shows the lattice of
+// fence.png on its left and bottom and the leaf of leaf.png, tiled twice so that one leaf fills
+// the quadrant, in its top right: the cutout follows the weighted alpha of the two layers, and
+// the sun from behind casts a shadow toward the camera with the same holes, the lattice and the
+// leaf. On the right a blended quad with BlendMode AlphaBlend and the same mask over a checkered
+// floor: where the leaf and the lattice are transparent the floor shows through, where they are
+// opaque they cover it.
 
 camera {
-  Position: {0, 2.6, 7.5}
-  Rotation: {-0.25, 0, 0}
+  Position: {0, 4.5, 7.5}
+  Rotation: {-0.5, 0, 0}
   Camera: {fov: 50}
 }
 
@@ -29,7 +30,7 @@ $ {
 }
 
 sun {
-  Rotation: {0.7, -0.3, 0}
+  Rotation: {0.8, 0.1, 0}
   DirectionalLight: {intensity: 1.5 * flecs.script.math.PI}
   Rgb: {255, 245, 230}
 }
@@ -56,6 +57,7 @@ fence_layer {
 }
 
 leaf_layer {
+  TextureTransform: {scale_x: 2, scale_y: 2}
   PbrTextures: {albedo: leaf_tex}
 }
 
@@ -70,7 +72,7 @@ floor {
 fence {
   Position: {-1.8, 1.2, -0.8}
   Rotation: {0, 0.2, 0}
-  Box: {2.4, 2.4, 0.06}
+  Quad: {2.4, 2.4}
   Rgb: {235, 215, 190}
   PbrMaterial: {roughness: 0.7}
   TextureBlend: {mask: mask, layers: [fence_layer, leaf_layer]}
