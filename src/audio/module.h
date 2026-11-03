@@ -48,9 +48,61 @@ extern ECS_COMPONENT_DECLARE(AudioSoundId);
 extern ECS_COMPONENT_DECLARE(AudioBusState);
 extern ECS_COMPONENT_DECLARE(AudioVoice);
 
+/** Largest sound file read, in bytes */
+#define BOX_AUDIO_SAMPLE_MAX_FILE (256 * 1024 * 1024)
+
+/** Largest decoded sound, in bytes of float frames */
+#define BOX_AUDIO_SAMPLE_MAX_BYTES (512 * 1024 * 1024)
+
+/** Seconds a headless frame waits at most for the sounds that decode */
+#define BOX_AUDIO_SAMPLE_HEADLESS_WAIT (10.0)
+
+/** Decodes in flight, shared by the module and its jobs, freed by the last of them */
+typedef struct box_audio_sample_sync_t {
+    ecs_os_mutex_t lock;    /**< Protects working */
+    int32_t working;        /**< Jobs whose decode did not finish */
+    int32_t refs;           /**< The module and every job, main thread only */
+} box_audio_sample_sync_t;
+
+/** One decoded copy of a sound file, shared by every SoundFile with the same path */
+typedef struct box_audio_sample_t {
+    uint64_t key;           /**< Serial of the sample, which its decode job finds it by */
+    char *path;             /**< SoundFile.path as written */
+    SoundState state;       /**< Progress of the decode */
+    char *error;            /**< Why the decode failed, NULL unless it failed */
+    float *data;            /**< Frames, interleaved when stereo, NULL until ready */
+    int32_t frames;         /**< Number of frames */
+    int32_t channels;       /**< 1 or 2 */
+    float sample_rate;      /**< Frames per second of the file */
+    int32_t refs;           /**< Sound entities that use it */
+    uint32_t id;            /**< Id of the sound in the core, 0 when not sent */
+    uint32_t serial;        /**< Serial of the output it was sent to */
+} box_audio_sample_t;
+
+/** The decode of a sound file on the job system */
+typedef struct box_audio_sample_job_t {
+    uint64_t key;           /**< Key of the sample */
+    char *path;             /**< The file as written */
+    box_audio_sample_sync_t *sync; /**< Decodes in flight */
+    float *data;            /**< Decoded frames, NULL on failure */
+    int32_t frames;         /**< Number of frames */
+    int32_t channels;       /**< 1 or 2, after the mix down */
+    int32_t source_channels;/**< Channels of the file */
+    float sample_rate;      /**< Frames per second of the file */
+    char *error;            /**< Why the decode failed */
+} box_audio_sample_job_t;
+
+/** The sample of a SoundFile entity */
+typedef struct AudioSample {
+    box_audio_sample_t *sample; /**< The shared sample, NULL before a SoundFile is set */
+} AudioSample;
+
+extern ECS_COMPONENT_DECLARE(AudioSample);
+
 /** A voice of box_audio_play, kept until it ends so a deleted bus can reroute it */
 typedef struct box_audio_oneshot_t {
     uint32_t handle;        /**< Voice handle */
+    uint32_t sound;         /**< Sound id it plays, so a deleted sound fades it */
     uint8_t bus;            /**< Bus index */
 } box_audio_oneshot_t;
 
@@ -68,6 +120,8 @@ typedef struct box_audio_module_stats_t {
     int64_t orders;         /**< ORDER commands written */
     int64_t cycles;         /**< Compiles that found a cycle */
     int64_t dropped;        /**< Plays dropped before a gesture */
+    int64_t not_ready;      /**< Plays dropped while their sound file loaded */
+    int64_t decodes;        /**< Decodes of sound files submitted */
 } box_audio_module_stats_t;
 
 /** A capture that waits for its frames */
@@ -98,6 +152,11 @@ typedef struct box_audio_module_t {
     ecs_vec_t plays;              /**< box_audio_play_t */
     ecs_vec_t stops;              /**< uint32_t voice handles of deleted sources */
     ecs_vec_t releases;           /**< uint32_t sound ids */
+    ecs_vec_t fades;              /**< uint32_t ids of deleted sounds whose one shots fade */
+    ecs_vec_t samples;            /**< box_audio_sample_t*, the decoded sound files */
+    uint64_t next_sample;         /**< Key of the next sample */
+    box_audio_sample_sync_t *sample_sync; /**< Decodes in flight */
+    ecs_query_t *sample_users;    /**< AudioSample, to update the status of its entities */
     AudioSettings settings;       /**< Settings sent */
     bool settings_sent;           /**< settings holds what the output has */
     int64_t voices_stolen;        /**< Steals the core reported */
@@ -151,6 +210,72 @@ int32_t box_audio_module_bus_index(
 void box_audio_sync_init(
     ecs_world_t *world,
     box_audio_module_t *state);
+
+/** Register the sound file components' observers and the headless wait of their decodes.
+ *
+ * @param world The world
+ * @param state The state
+ */
+void box_audio_sample_init(
+    ecs_world_t *world,
+    box_audio_module_t *state);
+
+/** Free the samples of the module and drop its reference to the decodes in flight.
+ *
+ * @param state The state
+ */
+void box_audio_sample_fini(
+    box_audio_module_t *state);
+
+/** Get the sample of a sound entity with a SoundFile.
+ *
+ * @param world The world
+ * @param sound The sound entity
+ * @return The sample, NULL when the entity has no SoundFile
+ */
+box_audio_sample_t* box_audio_sample_of(
+    const ecs_world_t *world,
+    ecs_entity_t sound);
+
+/** Get the decoded frames of a sound file, for the tests.
+ *
+ * @param world The world
+ * @param sound The sound entity
+ * @param frames Receives the number of frames
+ * @param channels Receives 1 or 2
+ * @param sample_rate Receives the rate of the file
+ * @return The frames, NULL while the sound is not ready
+ */
+const float* box_audio_sample_frames(
+    const ecs_world_t *world,
+    ecs_entity_t sound,
+    int32_t *frames,
+    int32_t *channels,
+    float *sample_rate);
+
+/** Count the decoded copies of sound files the module holds, loading or not.
+ *
+ * @param world The world
+ * @return Number of samples
+ */
+int32_t box_audio_sample_count(
+    const ecs_world_t *world);
+
+/** Count the sound ids in use in the core of the current output.
+ *
+ * @param world The world
+ * @return Number of sounds sent and not yet freed
+ */
+int32_t box_audio_module_sounds(
+    const ecs_world_t *world);
+
+/** Decode the file of a job on a worker: WAV or FLAC to float frames, more than two channels
+ * mixed down to stereo, at the sample rate of the file.
+ *
+ * @param job The job, receives the frames or an error naming the file
+ */
+void box_audio_decode(
+    box_audio_sample_job_t *job);
 
 /** Write a capture as a 16 bit stereo WAV file, through a temporary file and one rename.
  *

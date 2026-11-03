@@ -179,6 +179,25 @@
                 ]
             },
             {
+                "id": "Sample",
+                "testcases": [
+                    "wav_16",
+                    "wav_float",
+                    "flac",
+                    "mono",
+                    "stereo",
+                    "rate_44100_on_48000",
+                    "missing_file",
+                    "corrupt_file",
+                    "empty_file",
+                    "multichannel",
+                    "loop_seam",
+                    "shared",
+                    "delete_while_playing",
+                    "not_ready"
+                ]
+            },
+            {
                 "id": "Script",
                 "testcases": [
                     "mixer_levels",
