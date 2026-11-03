@@ -851,6 +851,23 @@ typedef struct box_render_clip_t {
     float area[4];          /**< Half width, half height, corner radius, index of the parent clip */
 } box_render_clip_t;
 
+/** The nine parts of a sliced Image (ImageSlice) as fs_slice of shape2d.wgsl reads them from
+ * two consecutive records of the clip buffer, the index of the first in uv.x of the shading.
+ *
+ * Positions are fractions of the element from its top left, as the uv of the quad.
+ */
+typedef struct box_render_slice_t {
+    float x[4];             /**< Column edges: 0, the end of the left corners, the start of the
+                             *   right corners, 1 */
+    float y[4];             /**< Row edges, down */
+    float u[4];             /**< Texture u at the column edges */
+    float v[4];             /**< Texture v at the row edges */
+    float period[4];        /**< Lengths the tiled parts repeat at, 0 for a stretched part: top
+                             *   and bottom edges along x, left and right edges along y, the
+                             *   center along x and y */
+    float flags[4];         /**< x 1 for a hollow center, the others 0 */
+} box_render_slice_t;
+
 /** Description of a BOX_RENDER_BUFFER create; creating an existing handle replaces it */
 typedef struct box_render_buffer_desc_t {
     uint64_t size;          /**< Bytes of the buffer */
@@ -873,7 +890,9 @@ typedef struct box_render_transform_t {
  * box_draws_glyph):
  * - A rectangle (Rect, Circle): emissive.w is its width over its height, material.x its corner
  *   radius and material.y its border width in units of half its smaller side, material.zw its
- *   linear border color as four half floats (r | g << 16, b | a << 16).
+ *   linear border color as four half floats (r | g << 16, b | a << 16). A Rect with an
+ *   ImageSlice (a batch with slice set) has the index of its slice record in the clip buffer in
+ *   uv.x, as a float, and uv.yzw 0: the record holds the area of its image.
  * - The shadow of a rectangle (BoxShadow, box_shadow.c): a rectangle whose quad is the shadow
  *   box plus 3 standard deviations on each side; material.y is negative, the negated standard
  *   deviation of its edge, material.x the corner radius of the shadow box, both in units of half
@@ -1054,6 +1073,8 @@ typedef struct box_render_batch_t {
                                  *   ReflectionBake, drawn by the captures */
     bool box_shadow;            /**< The instances are the shadows of 2D shapes (BoxShadow),
                                  *   drawn with the fs_shadow entry point of the 2D shape shader */
+    bool slice;                 /**< The instances are Rects with an ImageSlice, drawn with the
+                                 *   fs_slice entry point of the 2D shape shader */
     uint32_t mesh;              /**< Mesh handle */
     uint32_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture handles of the layers, 0 for none */
     uint32_t wrap;              /**< TextureWrap of the samplers */

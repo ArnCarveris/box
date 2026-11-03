@@ -456,6 +456,7 @@ void box_draws_box_shadow_update(
         blend = key.blend;
         key.blend = AlphaBlend;
         key.box_shadow = true;
+        key.slice = false;
         ecs_os_memset(key.textures, 0, ECS_SIZEOF(key.textures));
     }
 

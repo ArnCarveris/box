@@ -42,6 +42,16 @@
 // box_shadow instances), so fs takes none of these steps and a shadow pays for no texture
 // samples.
 //
+// A Rect with an ImageSlice is drawn by pipelines of their own with the fs_slice entry point:
+// uv.x of its shading is the index of its slice record (box_render_slice_t), which takes two
+// consecutive records of the clip buffer, so it needs no binding of its own. The record cuts the
+// element into nine parts at fractions of its size and holds the texture coordinates at those
+// edges: a fragment maps its position on the element through its column and row to the texture,
+// a corner scaled, an edge or the center stretched or repeated at its period. The texture is
+// sampled with the gradients of the mapping of its part, so a seam between parts or tiles does not
+// pick a coarse mip. Everything else is fs: the border, the corner radius, the tint and the clip.
+// A plain Image pays nothing for it.
+//
 // ids.x of the shading is the clip index of the instance, 0 when no ClipChildren ancestor clips
 // it. A clip maps the world position of a fragment into the local plane of its
 // element, where the coverage of its rounded area multiplies the alpha, anti-aliased over the
@@ -413,6 +423,91 @@ fn ranked_depth(depth: f32, rank: u32) -> f32 {
     let shape_alpha = shape_cover * thin * f.color.a * mix(f.border.a, texel.a, fill);
     var alpha = select(shape_alpha, glyph_cover * f.color.a, glyph);
     var cover = select(shape_cover, glyph_cover, glyph);
+    if (f.clip != 0u) {
+        let clipped = clip_coverage(f.clip, f.world, world_dx, world_dy);
+        alpha *= clipped;
+        cover *= clipped;
+    }
+
+    if (alpha <= 0.001) {
+        discard;
+    }
+
+    return FragmentOut(output(color, alpha, cover), depth);
+}
+
+// Texture coordinate of a position along one axis of a sliced image and its rate of change per
+// unit of the position: edges are the four edges of the parts, coords the coordinates at them,
+// period the length the middle part repeats at, 0 when it stretches, half half a texel. The
+// coordinate stays half a texel inside its part, so the filter does not blend in the texels of
+// the next part at a seam or of the far end of a tile where it repeats.
+fn slice_axis(p: f32, edges: vec4f, coords: vec4f, period: f32, half: f32) -> vec2f {
+    var c = vec2f(coords.y, coords.z);
+    var r: vec2f;
+    if (p < edges.y) {
+        let k = (coords.y - coords.x) / max(edges.y - edges.x, 1e-9);
+        c = vec2f(coords.x, coords.y);
+        r = vec2f(coords.x + (p - edges.x) * k, k);
+    } else if (p > edges.z) {
+        let k = (coords.w - coords.z) / max(edges.w - edges.z, 1e-9);
+        c = vec2f(coords.z, coords.w);
+        r = vec2f(coords.z + (p - edges.z) * k, k);
+    } else if (period > 0.0) {
+        let t = fract((p - edges.y) / period);
+        r = vec2f(coords.y + (coords.z - coords.y) * t, (coords.z - coords.y) / period);
+    } else {
+        let k = (coords.z - coords.y) / max(edges.z - edges.y, 1e-9);
+        r = vec2f(coords.y + (p - edges.y) * k, k);
+    }
+
+    let lo = min(c.x, c.y);
+    let hi = max(c.x, c.y);
+    let inset = min(half, (hi - lo) * 0.5);
+    return vec2f(clamp(r.x, lo + inset, hi - inset), r.y);
+}
+
+// The 2D shapes with an ImageSlice: fs with the texel of the part of the nine slice image under
+// the fragment, transparent in the center of a hollow one.
+@fragment fn fs_slice(f: VertexOut) -> FragmentOut {
+    let depth = ranked_depth(f.pos.z, f.rank);
+    let world_dx = dpdx(f.world);
+    let world_dy = dpdy(f.world);
+    let uv_dx = dpdx(f.uv);
+    let uv_dy = dpdy(f.uv);
+    let footprint = vec2f(
+        length(vec2f(dpdx(f.local.x), dpdy(f.local.x))),
+        length(vec2f(dpdx(f.local.y), dpdy(f.local.y))));
+    let extent = max(f.extent, footprint * 0.5);
+    let thin = f.extent.x * f.extent.y / max(extent.x * extent.y, 1e-20);
+    let d = rounded_box(f.local, extent, f.params.x);
+    let inner_extent = max(extent - vec2f(f.params.y), vec2f(0.0));
+    let inner = rounded_box(f.local, inner_extent, f.params.x - f.params.y);
+    let px = length(vec2f(dpdx(d), dpdy(d)));
+    let inner_px = length(vec2f(dpdx(inner), dpdy(inner)));
+
+    let index = u32(max(f.uv_transform.x, 0.0) + 0.5);
+    let count = arrayLength(&clips);
+    var texel = vec4f(0.0);
+    if (index != 0u && index + 1u < count) {
+        let a = clips[index];
+        let b = clips[index + 1u];
+        let p = clamp(f.uv, vec2f(0.0), vec2f(1.0));
+        let mid_x = (p.x >= a.x.y) & (p.x <= a.x.z);
+        let mid_y = (p.y >= a.y.y) & (p.y <= a.y.z);
+        let half = 0.5 / vec2f(textureDimensions(albedo_map));
+        let su = slice_axis(p.x, a.x, a.area, select(b.y.x, b.y.z, mid_y), half.x);
+        let sv = slice_axis(p.y, a.y, b.x, select(b.y.y, b.y.w, mid_x), half.y);
+        let k = vec2f(su.y, sv.y);
+        texel = textureSampleGrad(albedo_map, material_sampler, vec2f(su.x, sv.x), uv_dx * k,
+            uv_dy * k);
+        texel = select(texel, vec4f(0.0), mid_x & mid_y & (b.area.x > 0.5));
+    }
+
+    let shape_cover = coverage(d, px);
+    let fill = select(1.0, coverage(inner, inner_px), f.params.y > 0.0);
+    let color = mix(f.border.rgb, f.color.rgb * texel.rgb, fill) + f.emissive;
+    var alpha = shape_cover * thin * f.color.a * mix(f.border.a, texel.a, fill);
+    var cover = shape_cover;
     if (f.clip != 0u) {
         let clipped = clip_coverage(f.clip, f.world, world_dx, world_dy);
         alpha *= clipped;

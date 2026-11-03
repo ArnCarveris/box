@@ -383,7 +383,7 @@ template TreasuryCard {
   WoodPanel panel(w: 618, h: 86, pad: 14, u: 0.4, v: 0.3) {
     row {
       Layout: {direction: Row, spacing: 10, v: Middle}
-      Stat gold_stat(icon: castle_icon_coin, value: "{gold:.0}", rate: "+{gold_rate:.0} per second")
+      Stat gold_stat(icon: castle_icon_coin, value: "{gold:.0}", rate: match gold_rate >= 0 { true: "+{gold_rate:.0} per second"; _: "{gold_rate:.0} per second" }, alarm: gold_rate < 0)
       Stat stone_stat(icon: castle_icon_stone, value: "{stone:.0}", rate: "+{stone_rate:.0} per second")
       Stat food_stat(icon: castle_icon_food, value: "{food:.0}", rate: "{signed(food_rate)} per sec", alarm: food_rate < 0)
       Stat folk_stat(icon: castle_icon_folk, value: "{folk}", rate: match keep_next > 0 { true: "keep needs {keep_next}"; _: "folk in the realm" })
@@ -419,47 +419,61 @@ template HintLine {
   const afford = gold >= cost_gold(ht, 1) && stone >= cost_stone(ht, 1)
   const price = match afford { true: cost_words(ht, 1); _: "{cost_words(ht, 1)}, more than you have" }
   const turn_ = match turns(tool) { true: " R turns it."; _: "" }
-  const text = match ht > 0 {
-    true: match ht == T_DEMOLISH {
-      true: "Demolish [X]. {kind_blurb(ht)}"
-      _: "{kind_name(ht)} [{tool_key(ht)}], {price}. {kind_blurb(ht)}"
-    }
-    _: match hk > 0 {
-      true: match hr {
-        true: "Abandoned {piece_name(hk, hl)}. Demolish it to clear the ruin."
-        _: match max_level(hk) > 1 {
-          true: "{piece_name(hk, hl)}, level {hl} of {max_level(hk)}{where_}. Click to select."
-          _: "{piece_name(hk, hl)}{where_}. Click to select."
-        }
+  const dsx = drag_start % GRID
+  const dsz = (drag_start - dsx) / GRID
+  const dex = drag_end % GRID
+  const dez = (drag_end - dex) / GRID
+  const span = abs(dex - dsx) + abs(dez - dsz) + 1
+  const text = match dragging && drag_tool(tool) {
+    true: "{kind_name(tool)}: a line of {span:.0}, up to {span * cost_gold(tool, 1):.0} gold and {span * cost_stone(tool, 1):.0} stone. Let go to build it, Esc to cancel."
+      _: match ht > 0 {
+      true: match ht == T_DEMOLISH {
+        true: "Demolish [X]. {kind_blurb(ht)}"
+        _: "{kind_name(ht)} [{tool_key(ht)}], {price}. {kind_blurb(ht)}"
       }
-      _: match tool == K_QUARRY && !hd {
-        true: "Quarry: dig it into a stone deposit, where grey rock breaks through the grass.{turn_}"
-        _: match tool > 0 {
-          true: match drag_tool(tool) {
-            true: "{kind_name(tool)}: click, or drag across the plot to build a line. Esc puts the tool down."
-            _: "{kind_name(tool)}: click the plot.{turn_} Esc puts the tool down."
+      _: match hk > 0 {
+        true: match hr {
+          true: "Abandoned {piece_name(hk, hl)}. Demolish it to clear the ruin."
+          _: match max_level(hk) > 1 {
+            true: "{piece_name(hk, hl)}, level {hl} of {max_level(hk)}{where_}. Click to select."
+            _: "{piece_name(hk, hl)}{where_}. Click to select."
           }
-          _: match hd {
-            true: "A stone deposit. Dig a quarry [8] here to cut stone."
-            _: "WASD move   Q E turn   right drag look   wheel zoom   1-9 0 P pick a piece   R turn it   X demolish   U upgrade"
+        }
+        _: match tool == K_QUARRY && !hd {
+          true: "Quarry: dig it into a stone deposit, where grey rock breaks through the grass.{turn_}"
+          _: match tool > 0 {
+            true: match drag_tool(tool) {
+              true: "{kind_name(tool)}: click, or drag a straight line across the plot. Esc puts the tool down."
+              _: "{kind_name(tool)}: click the plot.{turn_} Esc puts the tool down."
+            }
+            _: match hd {
+              true: "A stone deposit. Dig a quarry [8] here to cut stone."
+              _: ""
+            }
           }
         }
       }
     }
   }
 
-  Layout: {direction: Row, h: Center, v: Middle, padding: {7, 7, 26, 26}}
-  LayoutItem: {width: {mode: Fixed, value: 900}}
-  Rect: {1, 1}
-  Image: {texture: castle_ui_parchment, u0: 0.04, v0: 0.12, u1: 0.96, v1: 0.88}
-  Border: {width: 1.5, radius: 3, color: {96, 62, 32, 255}}
-  BoxShadow: {offset_y: -3, blur: 10, color: {0, 0, 0, 110}}
+  Layout: {direction: Column, h: Center}
 
-  ScrollRod rod_l(h: Left)
-  ScrollRod rod_r(h: Right)
-  line {
-    Text: {value: text, size: 14, width: 840, align: Center, font: castle_font_body}
-    Rgb: C_INK
+  if text != "" {
+    scroll {
+      Layout: {direction: Row, h: Center, v: Middle, padding: {7, 7, 26, 26}}
+      LayoutItem: {width: {mode: Fixed, value: 900}}
+      Rect: {1, 1}
+      Image: {texture: castle_ui_parchment, u0: 0.04, v0: 0.12, u1: 0.96, v1: 0.88}
+      Border: {width: 1.5, radius: 3, color: {96, 62, 32, 255}}
+      BoxShadow: {offset_y: -3, blur: 10, color: {0, 0, 0, 110}}
+
+      ScrollRod rod_l(h: Left)
+      ScrollRod rod_r(h: Right)
+      line {
+        Text: {value: text, size: 14, width: 840, align: Center, font: castle_font_body}
+        Rgb: C_INK
+      }
+    }
   }
 }
 
@@ -631,6 +645,7 @@ template InfoPanel {
     const eats = food_need(k, lvl)
     const people = folk_of(k, lvl)
     const coin = gold_of(k, lvl, safe)
+    const wages = upkeep_of(k)
     const r = research
     const rg = research_gold(r)
     const rs = research_stone(r)
@@ -699,6 +714,8 @@ template InfoPanel {
             LayoutItem: {width: {mode: Grow}}
             if !ruined && coin > 0 {
               InfoLine line_(label: "Taxes", value: "{coin:.0} gold a second")
+            } else if wages > 0 {
+              InfoLine line_(label: "Wages", value: "{wages:.0} gold a second", color: match gold_rate < 0 { true: C_RED; _: C_TEXT })
             }
           }
           extra_slot {

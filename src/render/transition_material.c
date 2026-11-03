@@ -177,8 +177,10 @@ void box_draws_transition_encode(
             shading.emissive, ECS_SIZEOF(vec4));
         ecs_os_memcpy(ECS_OFFSET(dst, offsetof(box_render_shading_t, material)),
             shading.material, ECS_SIZEOF(vec4));
-        ecs_os_memcpy(ECS_OFFSET(dst, offsetof(box_render_shading_t, uv)), shading.uv,
-            ECS_SIZEOF(vec4));
+        if (!material->shape2d.sliced) {
+            ecs_os_memcpy(ECS_OFFSET(dst, offsetof(box_render_shading_t, uv)), shading.uv,
+                ECS_SIZEOF(vec4));
+        }
     }
 done:
     return;

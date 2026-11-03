@@ -596,6 +596,35 @@
                     "corner_shapes",
                     "corner_sweep"
                 ]
+            },
+            {
+                "id": "ImageSlice",
+                "testcases": [
+                    "corners_at_texel_size",
+                    "scale",
+                    "invalid_scale_is_one",
+                    "corners_do_not_fit_width",
+                    "corners_do_not_fit_height",
+                    "corners_do_not_fit_both",
+                    "insets_clamped",
+                    "image_area",
+                    "flipped_area",
+                    "tile_periods",
+                    "tile_periods_follow_fit",
+                    "map_corners",
+                    "map_stretch",
+                    "map_tile",
+                    "map_center_tile",
+                    "map_hollow",
+                    "no_texture_is_plain",
+                    "script",
+                    "circle_not_sliced",
+                    "remove",
+                    "prefab",
+                    "template",
+                    "record_waits_for_texture",
+                    "record_lifecycle"
+                ]
             }
         ]
     }

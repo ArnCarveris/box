@@ -18,8 +18,8 @@ proc refresh_ready() {
 }
 
 proc recompute() {
-  mut seen: bool[784] = {}
-  mut queue: i32[784] = {}
+  mut seen: bool[196] = {}
+  mut queue: i32[196] = {}
   mut head: i32 = 0
   mut tail: i32 = 0
 
@@ -60,8 +60,8 @@ proc recompute() {
   }
 
   mut p: f64 = 0
-  mut g: f64 = 1
-  mut s: f64 = 1
+  mut g: f64 = 0
+  mut s: f64 = 0
   mut make: f64 = 0
   mut eat: f64 = 0
   mut people: i32 = 0
@@ -93,13 +93,13 @@ proc recompute() {
     }
     if !abandoned[i] && !part {
       p += prestige_of(k, lvl, in_court)
-      g += gold_of(k, lvl, in_court)
+      g += gold_of(k, lvl, in_court) - upkeep_of(k)
       eat += food_need(k, lvl)
       people += folk_of(k, lvl)
       if k == K_KEEP {
         keep_lvl = lvl
       } else if k == K_QUARRY {
-        s += 2
+        s += 1
       } else if k == K_FARM {
         fields += 1
         make += farm_yield(research)
@@ -161,25 +161,21 @@ proc clear_cell(i: i32) {
 }
 
 proc new_realm() {
-  mut k: i32[784] = {}
-  mut l: i32[784] = {}
-  mut a: bool[784] = {}
-  mut p: f64[784] = {}
-  mut r: bool[784] = {}
-  mut d: bool[784] = {}
-  mut f: i32[784] = {}
+  mut k: i32[196] = {}
+  mut l: i32[196] = {}
+  mut a: bool[196] = {}
+  mut p: f64[196] = {}
+  mut r: bool[196] = {}
+  mut d: bool[196] = {}
+  mut f: i32[196] = {}
   for i in 0..CELLS {
     const x = i % GRID
     const z = (i - x) / GRID
-    for q in 0..5 {
-      const qx = match q { 0: 6; 1: 21; 2: 4; 3: 22; _: 13 }
-      const qz = match q { 0: 6; 1: 5; 2: 19; 3: 21; _: 2 }
-      const d2 = (x - qx) * (x - qx) + (z - qz) * (z - qz)
-      if d2 + hash(i * 5 + 13) * 2.5 < 3.2 {
-        d[i] = true
-      }
+    const d2 = (x - 10) * (x - 10) + (z - 3) * (z - 3)
+    if d2 + hash(i * 5 + 13) * 2.5 < 3.2 {
+      d[i] = true
     }
-    const edge = x < 2 || z < 2 || x > GRID - 3 || z > GRID - 3
+    const edge = x < 1 || z < 1 || x > GRID - 2 || z > GRID - 2
     if edge && !d[i] && hash(i * 3 + 7) < 0.22 {
       k[i] = K_TREE
       l[i] = 1
@@ -206,6 +202,7 @@ proc new_realm() {
   crowned = false
   raid_timer = RAID_SECONDS - RAID_GRACE
   raids = 0
+  raid_cell = -1
   recompute()
 }
 
@@ -232,6 +229,8 @@ proc raid_one() {
     if target >= 0 {
       const loot = floor(min(gold, raid_loot(level[target])))
       gold -= loot
+      raid_cell = target
+      raid_until = clock + 10
       const played = box.audio.play(SfxRaze, 0.7)
       const fx = box.particle.burst_at(RubbleBurst, {cell_x(target), 0.4, cell_z(target)}, 0.6)
       const dust = box.particle.burst_at(DustBurst, {cell_x(target), 0.2, cell_z(target)}, 1)
@@ -423,9 +422,37 @@ proc build_at(i: i32, painting: bool) {
         const played = box.audio.play(SfxBuild, match painting { true: 0.5; _: 0.9 })
         const fx = box.particle.burst_at(DustBurst, {cell_x(i), 0.2, cell_z(i)}, match painting { true: 0.6; _: 1 })
       }
-      if food_need(t, 1) > 0 && food_rate < 0 {
+      if upkeep_of(t) > 0 && gold_rate < 0 {
+        emit Toast(text: "Your realm now pays more in wages than it collects in taxes. Build cottages, or the treasury will run dry.")
+      } else if food_need(t, 1) > 0 && food_rate < 0 {
         emit Toast(text: "Your folk eat more than your farms grow. Build farms before the granary runs dry.")
       }
+    }
+  }
+}
+
+proc build_line() {
+  const t = tool
+  const sx = drag_start % GRID
+  const sz = (drag_start - sx) / GRID
+  const ex = drag_end % GRID
+  const ez = (drag_end - ex) / GRID
+  const step = match ex > sx {
+    true: 1
+    _: match ex < sx {
+      true: -1
+      _: match ez > sz { true: GRID; _: match ez < sz { true: 0 - GRID; _: 0 } }
+    }
+  }
+  const count: i32 = abs(ex - sx) + abs(ez - sz) + 1
+  mut go = true
+  for k in 0..count {
+    const c = drag_start + k * step
+    if go && kind[c] == K_EMPTY {
+      if gold < cost_gold(t, 1) || stone < cost_stone(t, 1) {
+        go = false
+      }
+      build_at(c, true)
     }
   }
 }
@@ -546,7 +573,7 @@ async {
   mut warned = false
   while true {
     await delay(1)
-    gold = min(gold + gold_rate, 99999)
+    gold = clamp(gold + gold_rate, 0, 99999)
     stone = min(stone + stone_rate, 99999)
     food = clamp(food + food_rate, 0, FOOD_CAP)
 
@@ -623,6 +650,9 @@ async {
     await delay(0.25)
     if toast != "" && clock > toast_until {
       toast = ""
+    }
+    if raid_cell >= 0 && clock > raid_until {
+      raid_cell = -1
     }
   }
 }

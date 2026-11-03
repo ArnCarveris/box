@@ -162,6 +162,36 @@ def leaf(x, y):
     return color + (int(round(coverage * 255)),)
 
 
+FRAME = 48
+FRAME_INSET = 16
+FRAME_STRIPE = 4
+
+# Solid colors of the corners of frame.png: top left, top right, bottom left, bottom right
+FRAME_CORNERS = ((220, 40, 40), (40, 180, 60), (40, 80, 220), (240, 200, 40))
+
+# Stripe colors of the edges of frame.png, on white: top, bottom, left, right
+FRAME_EDGES = ((200, 40, 200), (40, 190, 200), (240, 130, 30), (110, 50, 170))
+
+
+def frame(x, y):
+    """Nine slice frame of FRAME texels with insets of FRAME_INSET: a solid color per corner,
+    stripes FRAME_STRIPE texels wide across each edge (alternating with white along the edge,
+    so they repeat every 2 * FRAME_STRIPE texels along it) and a gray checker of FRAME_STRIPE
+    texel cells in the center, so every part shows in a render."""
+    col = 0 if x < FRAME_INSET else (2 if x >= FRAME - FRAME_INSET else 1)
+    row = 0 if y < FRAME_INSET else (2 if y >= FRAME - FRAME_INSET else 1)
+    if col != 1 and row != 1:
+        return FRAME_CORNERS[(row // 2) * 2 + col // 2] + (255,)
+    if row != 1:
+        on = ((x - FRAME_INSET) // FRAME_STRIPE) % 2 == 0
+        return (FRAME_EDGES[row // 2] if on else (255, 255, 255)) + (255,)
+    if col != 1:
+        on = ((y - FRAME_INSET) // FRAME_STRIPE) % 2 == 0
+        return (FRAME_EDGES[2 + col // 2] if on else (255, 255, 255)) + (255,)
+    odd = ((x // FRAME_STRIPE) + (y // FRAME_STRIPE)) % 2
+    return ((150, 150, 150) if odd else (90, 90, 90)) + (255,)
+
+
 def main():
     for name, fn in (("checker.png", checker), ("letter.png", letter),
                      ("bumps.png", bumps), ("stripes.png", stripes), ("ring.png", ring),
@@ -169,6 +199,8 @@ def main():
                      ("cookie_grid.png", cookie_grid)):
         write_png(name, SIZE, image(SIZE, fn))
         print("%s %d bytes" % (name, os.path.getsize(os.path.join(HERE, name))))
+    write_png("frame.png", FRAME, image(FRAME, frame))
+    print("frame.png %d bytes" % os.path.getsize(os.path.join(HERE, "frame.png")))
 
 
 main()

@@ -129,7 +129,6 @@ static void bench_render_extract(
     bench_counter(b, "instructions", (double)(bench_extract_instructions() - start));
     bench_counter(b, "frames", frames);
     bench_counter(b, "scattered", (double)stats.scattered);
-    bench_counter(b, "materials", (double)stats.materials);
     bench_counter(b, "setup_material_bytes", (double)setup_material_bytes);
     bench_counter(b, "setup_upload_bytes", (double)setup_upload_bytes);
     bench_render_memory(b, &stats);

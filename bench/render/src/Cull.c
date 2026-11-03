@@ -40,8 +40,8 @@ static uint64_t bench_cull_instructions(void)
  *
  * The cull_gpu_ns counter is the GPU time of the cull passes of the views read back over the
  * frames (timestamp queries), cull_passes the passes it covers. The memory counters are the
- * stream uploads of the last frame and the page buffers alive after the measured frames, of the
- * mesh and 2D instances together.
+ * material records, the stream uploads of the last frame and the page buffers alive after the
+ * measured frames, of the mesh and 2D instances together.
  *
  * @param b The benchmark
  * @param world The world
