@@ -6,6 +6,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include <math.h>
+#include <string.h>
 
 void Layout_row_places_children(void) {
     // ui/layout
@@ -1879,6 +1880,280 @@ void Layout_script(void) {
     test_flt(ecs_get(world, body, LayoutBounds)->width, 60);
     test_flt(ecs_get(world, body, Position)->y, -6);
     test_flt(ecs_get(world, right, Position)->x, -13);
+
+    ecs_fini(world);
+}
+
+static char layout_warnings[4096];
+static int32_t layout_warning_count;
+
+static void LayoutCaptureLog(
+    int32_t level,
+    const char *file,
+    int32_t line,
+    const char *msg)
+{
+    (void)file;
+    (void)line;
+    if (level == -2) {
+        layout_warning_count ++;
+        if (strlen(layout_warnings) + strlen(msg) + 2 < sizeof(layout_warnings)) {
+            strcat(layout_warnings, msg);
+            strcat(layout_warnings, "\n");
+        }
+    }
+}
+
+void Layout_warn_parent_without_layout(void) {
+    // ui/layout
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t p = ecs_entity(world, { .name = "panel" });
+    ecs_set(world, p, Rect, {1, 1});
+    ecs_set(world, p, LayoutItem, {
+        .width = { SizeModeFixed, 100 }, .height = { SizeModeFixed, 100 } });
+    ecs_entity_t c = ecs_entity(world, { .name = "title", .parent = p });
+    ecs_set(world, c, Position, {3, 4, 5});
+    ecs_set(world, c, LayoutItem, {
+        .width = { SizeModeFixed, 20 }, .height = { SizeModeFixed, 10 }, .x = 30, .y = 30 });
+
+    layout_warnings[0] = '\0';
+    layout_warning_count = 0;
+    int32_t level = ecs_log_set_level(-1);
+    bool colors = ecs_log_enable_colors(false);
+    ecs_os_api_log_t real_log = ecs_os_api.log_;
+    ecs_os_api.log_ = LayoutCaptureLog;
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_os_api.log_ = real_log;
+    ecs_log_set_level(level);
+    ecs_log_enable_colors(colors);
+
+    test_int(layout_warning_count, 1);
+    test_assert(strstr(layout_warnings, "'panel.title' has a LayoutItem") != NULL);
+    test_assert(strstr(layout_warnings, "parent 'panel' has no Layout") != NULL);
+    test_flt(ecs_get(world, c, LayoutBounds)->width, 20);
+    test_flt(ecs_get(world, c, Position)->x, 3);
+    test_flt(ecs_get(world, c, Position)->y, 4);
+    test_flt(ecs_get(world, c, Position)->z, 5);
+
+    ecs_fini(world);
+}
+
+void Layout_warn_plain_parent_in_layout(void) {
+    // ui/layout
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t root = ecs_entity(world, { .name = "root" });
+    ecs_set(world, root, Layout, { .direction = DirectionColumn });
+    ecs_set(world, root, LayoutItem, {
+        .width = { SizeModeFixed, 100 }, .height = { SizeModeFixed, 100 } });
+    ecs_entity_t group = ecs_entity(world, { .name = "group", .parent = root });
+    ecs_entity_t c = ecs_entity(world, { .name = "item", .parent = group });
+    ecs_set(world, c, Rect, {10, 10});
+    ecs_set(world, c, LayoutItem, {
+        .width = { SizeModeFixed, 20 }, .height = { SizeModeFixed, 10 } });
+
+    layout_warnings[0] = '\0';
+    layout_warning_count = 0;
+    int32_t level = ecs_log_set_level(-1);
+    bool colors = ecs_log_enable_colors(false);
+    ecs_os_api_log_t real_log = ecs_os_api.log_;
+    ecs_os_api.log_ = LayoutCaptureLog;
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_os_api.log_ = real_log;
+    ecs_log_set_level(level);
+    ecs_log_enable_colors(colors);
+
+    test_int(layout_warning_count, 1);
+    test_assert(strstr(layout_warnings, "'root.group.item' has a LayoutItem") != NULL);
+    test_assert(strstr(layout_warnings, "parent 'root.group' has no Layout") != NULL);
+
+    ecs_fini(world);
+}
+
+void Layout_no_warn_root_item(void) {
+    // ui/layout
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {7, 8, 9});
+    ecs_set(world, e, Rect, {1, 1});
+    ecs_set(world, e, LayoutItem, {
+        .width = { SizeModeFixed, 50 }, .height = { SizeModeFixed, 40 }, .x = 30, .y = 30 });
+
+    ecs_entity_t scene = ecs_entity(world, { .name = "hud" });
+    ecs_entity_t screen = ecs_entity(world, { .name = "screen", .parent = scene });
+    ecs_set(world, screen, Layout, { .direction = DirectionColumn });
+    ecs_set(world, screen, LayoutItem, {
+        .width = { SizeModeFixed, 100 }, .height = { SizeModeFixed, 100 } });
+
+    layout_warnings[0] = '\0';
+    layout_warning_count = 0;
+    int32_t level = ecs_log_set_level(-1);
+    bool colors = ecs_log_enable_colors(false);
+    ecs_os_api_log_t real_log = ecs_os_api.log_;
+    ecs_os_api.log_ = LayoutCaptureLog;
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_os_api.log_ = real_log;
+    ecs_log_set_level(level);
+    ecs_log_enable_colors(colors);
+
+    test_int(layout_warning_count, 0);
+    test_flt(ecs_get(world, e, Rect)->width, 50);
+    test_flt(ecs_get(world, e, Position)->x, 7);
+
+    ecs_fini(world);
+}
+
+void Layout_no_warn_valid(void) {
+    // ui/layout
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t root = ecs_new(world);
+    ecs_set(world, root, Layout, { .direction = DirectionRow });
+    ecs_set(world, root, LayoutItem, {
+        .width = { SizeModeFixed, 300 }, .height = { SizeModeFixed, 100 } });
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, root);
+    ecs_set(world, a, Rect, {50, 20});
+    ecs_set(world, a, LayoutItem, { .width = { SizeModeGrow, 1 } });
+
+    ecs_entity_t panel = ecs_new_w_pair(world, EcsChildOf, root);
+    ecs_set(world, panel, Rect, {40, 40});
+    ecs_set(world, panel, LayoutItem, {
+        .width = { SizeModeFixed, 40 }, .height = { SizeModeFixed, 40 } });
+    ecs_entity_t glint = ecs_new_w_pair(world, EcsChildOf, panel);
+    ecs_set(world, glint, Position, {2, 3, 0});
+    ecs_set(world, glint, Rect, {4, 4});
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, Rect, {1, 1});
+    ecs_set(world, prefab, LayoutItem, {
+        .width = { SizeModeFixed, 40 }, .height = { SizeModeFixed, 40 } });
+    ecs_entity_t pc = ecs_new_w_pair(world, EcsChildOf, prefab);
+    ecs_set(world, pc, Rect, {4, 4});
+    ecs_set(world, pc, LayoutItem, {
+        .width = { SizeModeFixed, 4 }, .height = { SizeModeFixed, 4 } });
+
+    layout_warnings[0] = '\0';
+    layout_warning_count = 0;
+    int32_t level = ecs_log_set_level(-1);
+    bool colors = ecs_log_enable_colors(false);
+    ecs_os_api_log_t real_log = ecs_os_api.log_;
+    ecs_os_api.log_ = LayoutCaptureLog;
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_os_api.log_ = real_log;
+    ecs_log_set_level(level);
+    ecs_log_enable_colors(colors);
+
+    test_int(layout_warning_count, 0);
+    test_flt(ecs_get(world, glint, Position)->x, 2);
+    test_flt(ecs_get(world, glint, Position)->y, 3);
+
+    ecs_fini(world);
+}
+
+void Layout_warn_again_after_fix(void) {
+    // ui/layout
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t p = ecs_entity(world, { .name = "panel" });
+    ecs_set(world, p, Rect, {1, 1});
+    ecs_set(world, p, LayoutItem, {
+        .width = { SizeModeFixed, 100 }, .height = { SizeModeFixed, 100 } });
+    ecs_entity_t c = ecs_entity(world, { .name = "title", .parent = p });
+    ecs_set(world, c, Position, {3, 4, 0});
+    ecs_set(world, c, Rect, {1, 1});
+    ecs_set(world, c, LayoutItem, {
+        .width = { SizeModeFixed, 20 }, .height = { SizeModeFixed, 10 } });
+
+    layout_warnings[0] = '\0';
+    layout_warning_count = 0;
+    int32_t level = ecs_log_set_level(-1);
+    bool colors = ecs_log_enable_colors(false);
+    ecs_os_api_log_t real_log = ecs_os_api.log_;
+    ecs_os_api.log_ = LayoutCaptureLog;
+    ecs_progress(world, 0);
+    test_int(layout_warning_count, 1);
+    test_flt(ecs_get(world, c, Position)->x, 3);
+
+    ecs_set(world, p, Layout, { .direction = DirectionRow });
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(layout_warning_count, 1);
+    test_flt(ecs_get(world, c, Position)->x, -40);
+    test_flt(ecs_get(world, c, Position)->y, 45);
+
+    ecs_remove(world, p, Layout);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_os_api.log_ = real_log;
+    ecs_log_set_level(level);
+    ecs_log_enable_colors(colors);
+
+    test_int(layout_warning_count, 2);
+    test_assert(strstr(layout_warnings, "'panel.title' has a LayoutItem") != NULL);
+
+    ecs_fini(world);
+}
+
+void Layout_warn_script(void) {
+    // ui/layout
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    const char *code =
+        "using box.layout\n"
+        "using box.geometry\n"
+        "hud {\n"
+        "  screen {\n"
+        "    Layout: {direction: Column}\n"
+        "    LayoutItem: {width: {mode: Fixed, value: 200}, height: {mode: Fixed, value: 100}}\n"
+        "    top {\n"
+        "      Rect: {1, 1}\n"
+        "      LayoutItem: {width: {mode: Grow}}\n"
+        "      realm {\n"
+        "        Rect: {1, 1}\n"
+        "        LayoutItem: {}\n"
+        "        title {\n"
+        "          Rect: {40, 10}\n"
+        "          LayoutItem: {}\n"
+        "        }\n"
+        "      }\n"
+        "    }\n"
+        "  }\n"
+        "}\n";
+
+    layout_warnings[0] = '\0';
+    layout_warning_count = 0;
+    int32_t level = ecs_log_set_level(-1);
+    bool colors = ecs_log_enable_colors(false);
+    ecs_os_api_log_t real_log = ecs_os_api.log_;
+    ecs_os_api.log_ = LayoutCaptureLog;
+    test_assert(ecs_script_run(world, "layout", code, NULL) == 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_os_api.log_ = real_log;
+    ecs_log_set_level(level);
+    ecs_log_enable_colors(colors);
+
+    test_int(layout_warning_count, 2);
+    test_assert(strstr(layout_warnings,
+        "layout: 'hud.screen.top.realm' has a LayoutItem but its parent "
+        "'hud.screen.top' has no Layout, so it is laid out as a root at its own Position")
+        != NULL);
+    test_assert(strstr(layout_warnings,
+        "'hud.screen.top.realm.title' has a LayoutItem but its parent "
+        "'hud.screen.top.realm' has no Layout") != NULL);
 
     ecs_fini(world);
 }

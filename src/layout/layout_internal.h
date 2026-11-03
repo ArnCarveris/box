@@ -63,6 +63,7 @@ typedef struct {
     ecs_map_t scrolled;           /**< Laid out scrolling element to the axes it scrolled */
     ecs_map_t anchor_sizes;       /**< Float to the anchor size it got, two packed floats */
     ecs_map_t parents;            /**< Element laid out through Parent to its layout parent */
+    ecs_map_t warned;             /**< Elements warned about a parent without Layout, until fixed */
     ecs_vec_t untagged;           /**< Children collect found without the child tag */
     ecs_entity_t child_tag;       /**< Tag of the children of a Layout the change query watches */
     const ecs_table_t *child_table; /**< Table of the last child collect checked */
