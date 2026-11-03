@@ -256,7 +256,9 @@
                     "italic_leans",
                     "regular_unchanged",
                     "same_batches",
-                    "world_text_styled"
+                    "world_text_styled",
+                    "variant_real_bold_differs",
+                    "variant_batches"
                 ]
             },
             {

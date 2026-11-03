@@ -34,6 +34,31 @@ ECS_STRUCT(Font, {
     int32_t atlas_pages; /**< Atlas pages kept before an idle page is cleared for new glyphs */
 });
 
+/** The bold, italic and bold italic faces of a Font, each another Font entity, 0 for none.
+ *
+ * A glyph of a styled span (TextSpan) takes its face from this table, f the font of its Text, and
+ * synthesizes what the face lacks. A variant loads once a glyph needs it; until then, or when its
+ * load fails, the glyph takes the next row, and its Text lays out again once the variant loaded.
+ *
+ * | Style                              | Face                 | Synthesized on top |
+ * |------------------------------------|----------------------|--------------------|
+ * | bold italic                        | f.bold_italic        | nothing            |
+ * | bold italic, without it            | f.bold               | italic             |
+ * | bold italic, without those         | f.italic             | bold               |
+ * | bold italic, without any           | f                    | bold and italic    |
+ * | bold                               | f.bold, or f         | bold if f          |
+ * | italic                             | f.italic, or f       | italic if f        |
+ *
+ * Advance, glyph and kerning come from the face, kerning only within one face; ascent, descent,
+ * line height and baseline stay those of f, so a line keeps its height. A variant that is
+ * deleted, or whose Font is removed, counts as none.
+ */
+ECS_STRUCT(FontVariants, {
+    ecs_entity_t bold;        /**< Font of bold glyphs, 0 for none */
+    ecs_entity_t italic;      /**< Font of italic glyphs, 0 for none */
+    ecs_entity_t bold_italic; /**< Font of bold italic glyphs, 0 for none */
+});
+
 /** Progress of the load of a Font */
 ECS_ENUM(FontState, {
     FontLoading = 0, /**< A load is in flight */
@@ -80,20 +105,20 @@ ECS_STRUCT(TextSpan, {
     int32_t start;   /**< Byte offset of the first byte of the range */
     int32_t end;     /**< Byte offset after the range */
     rgba color;      /**< Display encoded color, its alpha multiplies the opacity of the text */
-    bool bold;       /**< Glyphs are drawn bold, synthesized from the regular glyph */
-    bool italic;     /**< Glyphs lean to the right, synthesized from the regular glyph */
+    bool bold;       /**< Glyphs are drawn bold, from the bold face or thickened */
+    bool italic;     /**< Glyphs are drawn italic, from the italic face or leaning to the right */
     bool keep_color; /**< The span leaves the color alone, color is ignored */
 });
 
 /** Colored and styled byte ranges of the Text of the entity.
  *
  * A glyph whose first byte falls in a span takes its color, a later span without keep_color
- * winning, ranges clipped to the string; outside them it keeps the entity color. Styles add up:
- * a glyph is bold or italic if any span over its first byte is, synthesized from the glyph.
+ * winning, ranges clipped to the string; outside them it keeps the entity color. Styles add up,
+ * a glyph is bold or italic if any span over its first byte is, from a face of FontVariants.
  *
  * A color only span changes no layout, a styled one does: TextBounds, wrapping and carets follow
- * the wider advance of bold glyphs. The lean of italic glyphs is not in TextBounds, a caret sits
- * on the advance without it.
+ * the advances of the variant faces, and the wider advance of synthesized bold glyphs. The lean
+ * of italic glyphs is not in TextBounds, a caret sits on the advance without it.
  */
 ECS_STRUCT(TextSpans, {
     ecs_vec(TextSpan) spans; /**< The spans, TextSpan, later ones over earlier ones */
@@ -198,7 +223,8 @@ int32_t box_text_break_lines(
     ecs_vec_t *starts);
 
 /** Break a Text into its lines without an entity, with the styles of spans: as
- * box_text_break_lines, a bold glyph advancing as in the layout of a Text with these spans.
+ * box_text_break_lines, a styled glyph measured with the face and the advance it has in the
+ * layout of a Text with these spans; a variant face it needs starts to load.
  *
  * @param world The world
  * @param text The Text, its font loaded when no other Text requested it before

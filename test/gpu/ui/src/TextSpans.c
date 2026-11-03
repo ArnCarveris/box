@@ -674,3 +674,127 @@ void TextSpans_world_text_styled(void) {
 
     ecs_fini(world);
 }
+
+/** Bold face of the font of the tests of styled spans, in the test assets */
+#define SPANS_FONT_BOLD "test/assets/fonts/B612-Bold.ttf"
+
+/** Create a white Text at the origin in a font of the test assets whose bold variant is the
+ * bold face of the test assets.
+ *
+ * @param world The world
+ * @param value The string
+ * @param size Em size
+ * @return The entity
+ */
+static ecs_entity_t spans_variant(
+    ecs_world_t *world,
+    const char *value,
+    float size)
+{
+    ecs_entity_t bold = ecs_lookup(world, "spans_font_bold");
+    if (!bold) {
+        bold = ecs_entity(world, { .name = "spans_font_bold" });
+        ecs_set(world, bold, Font, { .path = SPANS_FONT_BOLD, .atlas_pages = 4 });
+    }
+
+    ecs_entity_t font = ecs_lookup(world, "spans_font_variants");
+    if (!font) {
+        font = ecs_entity(world, { .name = "spans_font_variants" });
+        ecs_set(world, font, Font, { .path = SPANS_FONT, .atlas_pages = 4 });
+        ecs_set(world, font, FontVariants, { .bold = bold });
+    }
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Text, {.value = (char*)value, .size = size,
+        .line_height = size * 1.25f, .font = font});
+    ecs_set(world, e, Rgb, {255, 255, 255});
+
+    return e;
+}
+
+/** Render a glyph regular, synthesized bold or from the bold face into pixels.
+ *
+ * @param mode 0 regular, 1 synthesized bold, 2 the bold face
+ * @return RGBA8 pixels of 128 by 128, freed with ecs_os_free
+ */
+static unsigned char* spans_bold_frame(
+    int32_t mode)
+{
+    ecs_world_t *world = spans_world();
+    spans_view(world);
+    ecs_entity_t e = mode == 2 ? spans_variant(world, "R", 80)
+        : spans_styled(world, 0, "R", 80);
+    if (mode) {
+        spans_set(world, e, (TextSpan[]){{ 0, 1, {0}, .bold = true, .keep_color = true }}, 1);
+    }
+
+    spans_surface(world, 128, 128, "variant_bold.png");
+    unsigned char *px = spans_frame(world, "variant_bold.png", 4);
+    unsigned char *result = ecs_os_malloc(128 * 128 * 4);
+    ecs_os_memcpy(result, px, 128 * 128 * 4);
+    stbi_image_free(px);
+    ecs_fini(world);
+
+    return result;
+}
+
+void TextSpans_variant_real_bold_differs(void) {
+    unsigned char *regular = spans_bold_frame(0);
+    unsigned char *synth = spans_bold_frame(1);
+    unsigned char *real = spans_bold_frame(2);
+    int32_t i, differ = 0;
+    for (i = 0; i < 128 * 128; i ++) {
+        differ += abs((int)real[i * 4] - (int)synth[i * 4]) > 64;
+    }
+
+    int32_t lit = spans_lit(regular, 128, 128);
+    test_assert(lit > 0);
+    test_assert(differ > lit / 20);
+    test_assert(spans_lit(real, 128, 128) > lit + lit / 10);
+
+    ecs_os_free(regular);
+    ecs_os_free(synth);
+    ecs_os_free(real);
+}
+
+void TextSpans_variant_batches(void) {
+    ecs_world_t *world = spans_world();
+    spans_view(world);
+    ecs_entity_t e = spans_variant(world, "II II", 60);
+    spans_surface(world, 128, 64, "variant_batches.png");
+
+    unsigned char *px = spans_frame(world, "variant_batches.png", 3);
+    stbi_image_free(px);
+    box_render_draws_stats_t plain = {0}, mixed = {0}, again = {0};
+    box_render_draws_stats(world, &plain);
+    test_int(plain.instances, 4);
+
+    /* The bold face draws from its own page: one batch more for the line */
+    spans_set(world, e, (TextSpan[]){
+        { 0, 1, {0}, .bold = true, .keep_color = true },
+        { 3, 5, { 255, 0, 0, 255 }, .bold = true }
+    }, 2);
+    px = spans_frame(world, "variant_batches.png", 3);
+    stbi_image_free(px);
+    box_render_draws_stats(world, &mixed);
+    test_int(mixed.instances, plain.instances);
+    test_int(mixed.batches, plain.batches + 1);
+
+    /* More glyphs of the faces on the same pages add no batch */
+    spans_set(world, e, (TextSpan[]){
+        { 0, 2, {0}, .bold = true, .keep_color = true },
+        { 4, 5, {0}, .bold = true, .italic = true, .keep_color = true }
+    }, 2);
+    px = spans_frame(world, "variant_batches.png", 3);
+    stbi_image_free(px);
+    box_render_draws_stats(world, &again);
+    test_int(again.instances, plain.instances);
+    test_int(again.batches, mixed.batches);
+
+    box_render_gpu_stats_t gpu = {0};
+    test_assert(box_render_gpu_stats(world, &gpu));
+    test_int(gpu.errors, 0);
+
+    ecs_fini(world);
+}

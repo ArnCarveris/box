@@ -93,6 +93,19 @@ node test/integration/web/wireframe.mjs \
     "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
 ```
 
+`text_variants.mjs` checks that the browser build loads the font variants of
+`box.text.DefaultFont` from the `etc` folder it embeds. It opens
+`test/integration/web/text_variants.flecs` the same way, at the same fixed delta and size: a Text
+in the default font with a bold, an italic and a bold italic span. It reads the `FontStatus` of
+`box.text.DefaultFontBold`, `DefaultFontItalic` and `DefaultFontBoldItalic` through the shell of
+the page and passes when all three are `FontReady`, a screenshot shows the text and the log has
+no error and no invalid WebGPU object:
+
+```sh
+node test/integration/web/text_variants.mjs \
+    "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
+```
+
 `audio_core.mjs` checks the audio of the browser build (`docs/audio.md`): the mixer of the
 audio core runs from its own wasm in an AudioWorklet, without shared memory, starts on a user
 gesture and is driven by command batches over the port. It serves the page without COOP/COEP

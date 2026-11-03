@@ -61,6 +61,15 @@
 /** Font file of box.text.DefaultFont */
 #define BOX_TEXT_DEFAULT_FONT "etc/fonts/B612-Regular.ttf"
 
+/** Font file of box.text.DefaultFontBold */
+#define BOX_TEXT_DEFAULT_FONT_BOLD "etc/fonts/B612-Bold.ttf"
+
+/** Font file of box.text.DefaultFontItalic */
+#define BOX_TEXT_DEFAULT_FONT_ITALIC "etc/fonts/B612-Italic.ttf"
+
+/** Font file of box.text.DefaultFontBoldItalic */
+#define BOX_TEXT_DEFAULT_FONT_BOLD_ITALIC "etc/fonts/B612-BoldItalic.ttf"
+
 /** Seconds a headless frame waits at most for the font loads and glyph fields in flight */
 #define BOX_TEXT_HEADLESS_WAIT (10.0)
 
@@ -139,13 +148,17 @@ typedef struct box_text_atlas_glyph_t {
     bool ready;     /**< The field is on the page */
 } box_text_atlas_glyph_t;
 
+/** A font entity of the registry */
+typedef struct box_text_font_t box_text_font_t;
+
 /** A glyph of a string placed on its line, before the lines are aligned */
 typedef struct box_text_placed_t {
     float x;                                /**< Pen x of the glyph on its line */
     int32_t line;                           /**< Line of the glyph */
     int32_t offset;                         /**< Byte offset of the character of the glyph */
-    const box_text_atlas_glyph_t *glyph;    /**< Atlas area of the glyph */
-    uint8_t style;                          /**< BOX_TEXT_STYLE_ flags of the glyph */
+    const box_text_atlas_glyph_t *glyph;    /**< Atlas area of the glyph, in the atlas of font */
+    const box_text_font_t *font;            /**< Face of the glyph: the font or a variant */
+    uint8_t style;                          /**< BOX_TEXT_STYLE_ flags synthesized on the face */
 } box_text_placed_t;
 
 /** A byte range of a string with a style, the styles of the spans over it added up */
@@ -163,7 +176,7 @@ typedef struct box_text_sync_t {
 } box_text_sync_t;
 
 /** A font entity of the registry */
-typedef struct box_text_font_t {
+struct box_text_font_t {
     ecs_entity_t entity;    /**< The font entity */
     uint32_t generation;    /**< Bumped by every load request, older results are dropped */
     uint32_t epoch;         /**< Bumped when the atlas is dropped, older glyph fields are too */
@@ -172,10 +185,11 @@ typedef struct box_text_font_t {
     ecs_map_t glyphs;       /**< Glyph index to box_text_atlas_glyph_t* */
     ecs_vec_t pages;        /**< box_text_page_t*, the atlas of the face */
     bool requested;         /**< A Text uses the font, so the font loads */
-    bool relayout;          /**< A page grew, the texts of the font lay out again */
+    bool relayout;          /**< A page grew or the face loaded: the texts of the font lay out
+                             *   again, and those of the fonts that name it in FontVariants */
     bool oversized;         /**< A glyph of the face did not fit a page, which was logged */
     bool malformed;         /**< A composite glyph of the face nests too deep, which was logged */
-} box_text_font_t;
+};
 
 /** Main thread state of the fonts of a world */
 typedef struct box_text_state_t {
@@ -193,7 +207,7 @@ typedef struct box_text_state_t {
     ecs_query_t *query;         /**< Entities with a Text, disabled ones included */
     ecs_query_t *shown;         /**< Entities with TextGlyphs, disabled ones included */
     bool trim;                  /**< A layout or a budget changed, idle pages may be released */
-    ecs_entity_t default_font;  /**< box.text.DefaultFont */
+    ecs_entity_t default_font;  /**< box.text.DefaultFont, its variants named in FontVariants */
     bool relayout;              /**< A font was removed, every Text lays out again */
     int32_t watch;              /**< Kind of the fonts in the file watch */
 } box_text_state_t;
@@ -214,7 +228,8 @@ extern ECS_COMPONENT_DECLARE(TextRegistry);
 box_text_state_t* box_text_state_get(
     const ecs_world_t *world);
 
-/** Get the font a Text uses, requesting its load when no Text used it before.
+/** Get the font a Text uses, requesting its load when no Text used it before; also the
+ * variant faces of FontVariants, once a glyph needs them.
  *
  * @param world The world
  * @param s The registry
