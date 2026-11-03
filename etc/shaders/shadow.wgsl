@@ -55,6 +55,7 @@ struct VertexIn {
 };
 
 struct CutoutIn {
+    @builtin(vertex_index) vertex: u32,
     @location(0) position: vec3f,
     @location(1) normal: vec3f,
     @location(2) uv: vec2f,
@@ -178,9 +179,8 @@ fn cutout_attributes(v: CutoutIn, o: ptr<function, CutoutOut>) {
     if (surface_data.p[0].x == 7.0 && v.uv.x >= 2.0 && abs(v.normal.y) <= 0.5) {
         (*o).uv.x -= 2.0 * material.uv.x;
     }
-    if (material_mapped(material) && !material_world(material) && surface_data.p[0].x == 1.0 &&
-        surface_data.p[19].x == 0.0) {
-        (*o).uv = surface_sweep_lengths(v.uv, i32(v.position.z)) / material.mapping_size *
+    if (material_mapped(material) && !material_world(material) && surface_data.p[0].x == 1.0) {
+        (*o).uv = surface_sweep_lengths(v.uv, v.position, v.vertex) / material.mapping_size *
             material.uv.xy + material.uv.zw;
     }
     (*o).mapped = 0.0;

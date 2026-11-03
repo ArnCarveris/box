@@ -241,9 +241,8 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Plac
             }
         }
     }
-    if (material_mapped(material) && !material_world(material) && surface_data.p[0].x == 1.0 &&
-        surface_data.p[19].x == 0.0) {
-        o.uv = surface_sweep_lengths(v.uv, i32(v.position.z)) / material.mapping_size *
+    if (material_mapped(material) && !material_world(material) && surface_data.p[0].x == 1.0) {
+        o.uv = surface_sweep_lengths(v.uv, v.position, v.vertex) / material.mapping_size *
             material.uv.xy + material.uv.zw;
     }
     if (surface_data.p[0].x != 0.0) {

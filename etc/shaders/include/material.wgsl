@@ -125,14 +125,20 @@ fn mapping_offset(m: Material) -> vec2f {
 }
 
 // Texture coordinates of a Sweep vertex as lengths in the units of its path, for a MappingObject
-// material: on the walls (region 0 and 1) the fractions of the length around the profile and
-// along the path that the mesh stores in uv times those lengths (p[9].x around the outer ring,
-// p[9].y around the holes, whose u starts at 2, and p[9].z along the path), on the caps
-// (regions 8 and 9) the profile x and y in uv times the scale p[2].xy. Reads the surface_data
-// of surface.wgsl; box_surface_build_lengths and box_surface_profile_length of
+// material: on the walls the fractions of the length around the profile and along the path that
+// the mesh stores in uv times those lengths (p[9].x around the outer ring, p[9].y around the
+// holes, whose u starts at 2, and p[9].z along the path), on the caps the profile x and y in uv
+// times the scale p[2].xy. The region is the z of a grid vertex (0 and 1 the walls, 8 and 9 the
+// caps), or on a baked render mesh (p[19]) the material region surface_assets holds per vertex
+// (0 and 1 the walls, 3 the caps). Reads the surface_data of surface.wgsl and the surface_assets
+// of the shader; box_surface_build_lengths and box_surface_profile_length of
 // src/geometry/surface_math.c compute the lengths.
-fn surface_sweep_lengths(uv: vec2f, region: i32) -> vec2f {
+fn surface_sweep_lengths(uv: vec2f, position: vec3f, vertex: u32) -> vec2f {
     let p = surface_data.p;
+    var region = i32(position.z);
+    if (p[19].x != 0.0) {
+        region = i32(surface_assets[vertex / 4u][vertex % 4u]);
+    }
     var result = uv * p[2].xy;
     if (region == 0) {
         result = uv * p[9].xz;

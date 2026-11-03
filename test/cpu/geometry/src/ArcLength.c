@@ -49,8 +49,9 @@ void ArcLength_path_table(void) {
     test_assert(fabsf(d->p[9][2] - 5) < 0.001f);
     test_assert(fabsf(box_surface_sweep_parameter(d, 0) - 0) < 0.0001f);
     test_assert(fabsf(box_surface_sweep_parameter(d, 1) - 1) < 0.0001f);
-    /* The first fifth of the length is the first segment, half the parameter */
-    test_assert(fabsf(box_surface_sweep_parameter(d, 0.2f) - 0.5f) < 0.002f);
+    /* The first fifth of the length is the first segment, half the parameter. The table is linear
+     * between its steps of 1/64, so at the kink between the segments it is off by a step at most */
+    test_assert(fabsf(box_surface_sweep_parameter(d, 0.2f) - 0.5f) < 1.0f / 64);
     test_assert(fabsf(box_surface_sweep_parameter(d, 0.1f) - 0.25f) < 0.002f);
     test_assert(fabsf(box_surface_sweep_parameter(d, 0.6f) - 0.75f) < 0.002f);
     float previous = -1;

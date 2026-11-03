@@ -10,7 +10,7 @@ using box.light
 // must be square everywhere: on long and short path segments and on long and short profile edges.
 //
 // Back: a flat road with a wide, unevenly split top and thin sides, swept along a Catmull-Rom
-// path whose points are spaced 0.6 to 3.6 apart, with a MappingObject TextureMapping of size 1,
+// gently curving path whose points are spaced 1.2 to 2.8 apart, with a MappingObject TextureMapping of size 1,
 // so the cells are 0.25 wide along and across it without knowing its length.
 // Middle: a pipe of an irregular polygon section (points 10 to 80 degrees apart) along an
 // S-shaped Catmull-Rom path with uneven points, MappingObject of size 0.5.
@@ -66,14 +66,14 @@ road_section { Profile2D: {outer: road_shape} }
 
 road_path {
   Path3D: {
-    start: {-5.5, 0, -2.6},
+    start: {-5.5, 0, -2.84},
     segments: [
-      {kind: CatmullRom, end: {-4.9, 0, -2.7}},
-      {kind: CatmullRom, end: {-1.4, 0, -3.3}},
-      {kind: CatmullRom, end: {-0.6, 0, -3.2}},
-      {kind: CatmullRom, end: {3, 0, -2.4}},
-      {kind: CatmullRom, end: {3.8, 0, -2.5}},
-      {kind: CatmullRom, end: {5.5, 0, -2.9}}
+      {kind: CatmullRom, end: {-4.3, 0, -3.05}},
+      {kind: CatmullRom, end: {-1.5, 0, -3.06}},
+      {kind: CatmullRom, end: {-0.3, 0, -2.86}},
+      {kind: CatmullRom, end: {2.5, 0, -2.46}},
+      {kind: CatmullRom, end: {3.7, 0, -2.49}},
+      {kind: CatmullRom, end: {5.5, 0, -2.76}}
     ]
   }
 }
@@ -105,14 +105,14 @@ pipe_section { Profile2D: {outer: pipe_shape} }
 
 pipe_path {
   Path3D: {
-    start: {-5.5, 0.4, 0.4},
+    start: {-5.5, 0.4, 0.18},
     segments: [
-      {kind: CatmullRom, end: {-5, 0.4, 0.2}},
-      {kind: CatmullRom, end: {-2, 0.4, -0.6}},
-      {kind: CatmullRom, end: {-1.5, 0.4, -0.5}},
-      {kind: CatmullRom, end: {1.5, 0.4, 0.8}},
-      {kind: CatmullRom, end: {2.2, 0.4, 0.7}},
-      {kind: CatmullRom, end: {5.5, 0.4, -0.2}}
+      {kind: CatmullRom, end: {-4.4, 0.4, -0.14}},
+      {kind: CatmullRom, end: {-1.6, 0.4, -0.31}},
+      {kind: CatmullRom, end: {-0.5, 0.4, -0.05}},
+      {kind: CatmullRom, end: {2.3, 0.4, 0.59}},
+      {kind: CatmullRom, end: {3.4, 0.4, 0.55}},
+      {kind: CatmullRom, end: {5.5, 0.4, 0.02}}
     ]
   }
 }
