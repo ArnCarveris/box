@@ -1,0 +1,339 @@
+// The pieces that can stand on a cell, each centered on the cell and standing on y = 0. A cell is
+// PITCH (2) units wide, so a piece spans -1 to 1 on x and z. Walls reach out to the walls, towers
+// and gatehouses next to them with a WallArm per side; hn, he, hs and hw are the heights of those
+// arms, 0 where there is no neighbor to join.
+
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.particle
+
+export const HALF_PI: f32 = 1.5708
+
+// A stretch of wall from start to the edge of the cell along +x, with merlons on both parapets
+template WallArm {
+  prop h: f32 = 1.9
+  prop start: f32 = 0.4
+  prop merlons: bool = true
+
+  const len = 1.0 - start
+  const cx = start + len / 2
+
+  body : CastleStone { Position: {cx, h / 2, 0}; Box: {len + 0.02, h, 0.8} }
+  base : CastleDarkStone { Position: {cx, 0.2, 0}; Box: {len + 0.02, 0.4, 0.94} }
+  walk : CastleDarkStone { Position: {cx, h + 0.005, 0}; Box: {len + 0.02, 0.01, 0.32} }
+  if merlons {
+    m_out : CastleStone { Position: {0.72, h + 0.17, 0.28}; Box: {0.3, 0.34, 0.24} }
+    m_in : CastleStone { Position: {0.72, h + 0.17, -0.28}; Box: {0.3, 0.34, 0.24} }
+  }
+}
+
+template WallPiece {
+  prop lvl: i32 = 1
+  prop n: bool = false
+  prop e: bool = false
+  prop s: bool = false
+  prop w: bool = false
+
+  const h = wall_height(K_WALL, lvl)
+  const straight_x = (e || w) && !n && !s
+  const straight_z = (n || s) && !e && !w
+
+  core : CastleStone { Position: {0, h / 2, 0}; Box: {0.8, h, 0.8} }
+  base : CastleDarkStone { Position: {0, 0.2, 0}; Box: {0.94, 0.4, 0.94} }
+  walk : CastleDarkStone { Position: {0, h + 0.005, 0}; Box: {0.32, 0.01, 0.32} }
+
+  if straight_x {
+    m_a : CastleStone { Position: {0, h + 0.17, 0.28}; Box: {0.3, 0.34, 0.24} }
+    m_b : CastleStone { Position: {0, h + 0.17, -0.28}; Box: {0.3, 0.34, 0.24} }
+  } else if straight_z {
+    m_a : CastleStone { Position: {0.28, h + 0.17, 0}; Box: {0.24, 0.34, 0.3} }
+    m_b : CastleStone { Position: {-0.28, h + 0.17, 0}; Box: {0.24, 0.34, 0.3} }
+  } else {
+    m_a : CastleStone { Position: {0.28, h + 0.17, 0.28}; Box: {0.24, 0.34, 0.24} }
+    m_b : CastleStone { Position: {-0.28, h + 0.17, -0.28}; Box: {0.24, 0.34, 0.24} }
+    m_c : CastleStone { Position: {0.28, h + 0.17, -0.28}; Box: {0.24, 0.34, 0.24} }
+    m_d : CastleStone { Position: {-0.28, h + 0.17, 0.28}; Box: {0.24, 0.34, 0.24} }
+  }
+
+  if e { WallArm arm_e(h: h) }
+  if n { WallArm arm_n(h: h) { Rotation: {0, HALF_PI, 0} } }
+  if w { WallArm arm_w(h: h) { Rotation: {0, PI, 0} } }
+  if s { WallArm arm_s(h: h) { Rotation: {0, -HALF_PI, 0} } }
+}
+
+template TowerPiece {
+  prop lvl: i32 = 1
+  prop seed: f32 = 0
+  prop hn: f32 = 0
+  prop he: f32 = 0
+  prop hs: f32 = 0
+  prop hw: f32 = 0
+
+  const h = 2.6 + lvl * 1.1
+  const rl = 1.5 + lvl * 0.25
+  const top = h + 0.4 + rl
+
+  if he > 0 { WallArm arm_e(h: he, start: 0.55, merlons: false) }
+  if hn > 0 { WallArm arm_n(h: hn, start: 0.55, merlons: false) { Rotation: {0, HALF_PI, 0} } }
+  if hw > 0 { WallArm arm_w(h: hw, start: 0.55, merlons: false) { Rotation: {0, PI, 0} } }
+  if hs > 0 { WallArm arm_s(h: hs, start: 0.55, merlons: false) { Rotation: {0, -HALF_PI, 0} } }
+
+  plinth : CastleDarkStone { Position: {0, 0.3, 0}; Frustum: {length: 0.6, radius_bottom: 1.0, radius_top: 0.84, segments: 20} }
+  body : CastleStone { Position: {0, h / 2, 0}; Cylinder: {length: h, radius: 0.84, segments: 20} }
+  corbel : CastlePaleStone { Position: {0, h + 0.1, 0}; Frustum: {length: 0.24, radius_bottom: 0.84, radius_top: 0.98, segments: 20} }
+  rim : CastlePaleStone { Position: {0, h + 0.3, 0}; Cylinder: {length: 0.18, radius: 0.98, segments: 20} }
+  roof : CastleSlate { Position: {0, h + 0.39 + rl / 2, 0}; Cone: {length: rl, radius: 1.14, segments: 20} }
+  finial : CastleGold { Position: {0, top + 0.05, 0}; Sphere: {radius: 0.1, segments: 10, smooth: true} }
+  pole : CastleIron { Position: {0, top + 0.5, 0}; Cylinder: {length: 0.9, radius: 0.025, segments: 6} }
+  pennant : CastleBanner { Position: {0.27, top + 0.78, 0}; Rotation: {0, 0, -HALF_PI}; TrianglePrism: {0.3, 0.52, 0.02} }
+
+  for k in 0..(lvl + 1) {
+    const a = seed * 6.283 + k * 2.1
+    if k == lvl {
+      "slit_{k}" : CastleWindow {
+        Position: {sin(a) * 0.835, 1.1 + k * 1.1, cos(a) * 0.835}
+        Rotation: {0, a, 0}
+        Box: {0.16, 0.36, 0.04}
+      }
+    } else {
+      "slit_{k}" : CastleDark {
+        Position: {sin(a) * 0.835, 1.1 + k * 1.1, cos(a) * 0.835}
+        Rotation: {0, a, 0}
+        Box: {0.1, 0.42, 0.04}
+      }
+    }
+  }
+}
+
+template GatePiece {
+  prop along_z: bool = false
+
+  frame {
+    Rotation: {0, match along_z { true: HALF_PI; _: 0 }, 0}
+
+    floor_ : CastleCobble { Position: {0, 0.02, 0}; Box: {0.66, 0.04, 2.0} }
+    left : CastleStone { Position: {-0.66, 1.7, 0}; Box: {0.68, 3.4, 1.3} }
+    right : CastleStone { Position: {0.66, 1.7, 0}; Box: {0.68, 3.4, 1.3} }
+    left_base : CastleDarkStone { Position: {-0.66, 0.2, 0}; Box: {0.76, 0.4, 1.38} }
+    right_base : CastleDarkStone { Position: {0.66, 0.2, 0}; Box: {0.76, 0.4, 1.38} }
+    lintel : CastleStone { Position: {0, 2.95, 0}; Box: {0.66, 0.9, 1.1} }
+    arch : CastlePaleStone { Position: {0, 2.42, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {length: 1.12, radius: 0.33, segments: 16} }
+    walk : CastleDarkStone { Position: {0, 3.405, 0}; Box: {2.0, 0.01, 0.5} }
+
+    for b in 0..5 {
+      "bar_{b}" : CastleIron { Position: {-0.24 + b * 0.12, 1.25, 0.42}; Box: {0.035, 2.5, 0.035} }
+    }
+    for r in 0..4 {
+      "rail_{r}" : CastleIron { Position: {0, 0.35 + r * 0.6, 0.42}; Box: {0.64, 0.035, 0.035} }
+    }
+
+    for m in 0..4 {
+      const mx = match m % 2 { 0: -0.2; _: 0.2 }
+      const mz = match m < 2 { true: 0.53; _: -0.53 }
+      "merlon_l_{m}" : CastleStone { Position: {mx - 0.66, 3.57, mz}; Box: {0.2, 0.34, 0.22} }
+      "merlon_r_{m}" : CastleStone { Position: {mx + 0.66, 3.57, mz}; Box: {0.2, 0.34, 0.22} }
+    }
+
+    banner_f : CastleBanner { Position: {0, 2.8, 0.565}; Box: {0.36, 0.72, 0.02} }
+    stripe_f : CastleGold { Position: {0, 2.8, 0.58}; Box: {0.06, 0.6, 0.01} }
+    banner_b : CastleBanner { Position: {0, 2.8, -0.565}; Box: {0.36, 0.72, 0.02} }
+    stripe_b : CastleGold { Position: {0, 2.8, -0.58}; Box: {0.06, 0.6, 0.01} }
+
+    for t in 0..2 {
+      const tx = match t { 0: -0.42; _: 0.42 }
+      "bracket_{t}" : CastleIron { Position: {tx, 1.75, 0.7}; Box: {0.05, 0.22, 0.1} }
+      "torch_{t}" : CastleFlame { Position: {tx, 1.92, 0.72}; Sphere: {radius: 0.07, segments: 8} }
+    }
+  }
+}
+
+template KeepPiece {
+  prop lvl: i32 = 1
+
+  const h = 3.4 + lvl * 1.2
+  const storeys = lvl + 1
+
+  plinth : CastleDarkStone { Position: {0, 0.25, 0}; Box: {1.96, 0.5, 1.96} }
+  body : CastleStone { Position: {0, h / 2, 0}; Box: {1.7, h, 1.7} }
+  roof_ : CastleDarkStone { Position: {0, h + 0.005, 0}; Box: {1.5, 0.01, 1.5} }
+  steps : CastleDarkStone { Position: {0, 0.55, 1.0}; Box: {0.64, 0.1, 0.2} }
+  door : CastleWood { Position: {0, 0.95, 0.855}; Box: {0.44, 0.8, 0.03} }
+  door_arch : CastleWood { Position: {0, 1.35, 0.855}; Rotation: {HALF_PI, 0, 0}; Cylinder: {length: 0.03, radius: 0.22, segments: 12} }
+
+  for b in 1..(storeys + 1) {
+    "band_{b}" : CastlePaleStone { Position: {0, b * (h / (storeys + 1)), 0}; Box: {1.76, 0.1, 1.76} }
+  }
+
+  for f in 0..4 {
+    "face_{f}" {
+      Rotation: {0, f * HALF_PI, 0}
+      for k in 1..(storeys + 1) {
+        const wy = (k + 0.5) * (h / (storeys + 1))
+        "win_{k}_a" : CastleWindow { Position: {-0.3, wy, 0.855}; Box: {0.16, 0.34, 0.03} }
+        "win_{k}_b" : CastleWindow { Position: {0.3, wy, 0.855}; Box: {0.16, 0.34, 0.03} }
+      }
+      "merlon_a" : CastleStone { Position: {-0.36, h + 0.18, 0.76}; Box: {0.22, 0.36, 0.18} }
+      "merlon_b" : CastleStone { Position: {0, h + 0.18, 0.76}; Box: {0.22, 0.36, 0.18} }
+      "merlon_c" : CastleStone { Position: {0.36, h + 0.18, 0.76}; Box: {0.22, 0.36, 0.18} }
+    }
+  }
+
+  for c in 0..4 {
+    const sx = match c { 0: -1; 1: 1; 2: 1; _: -1 }
+    const sz = match c { 0: -1; 1: -1; 2: 1; _: 1 }
+    "turret_{c}" {
+      Position: {sx * 0.84, 0, sz * 0.84}
+      body : CastleStone { Position: {0, (h + 0.9) / 2, 0}; Cylinder: {length: h + 0.9, radius: 0.32, segments: 14} }
+      rim : CastlePaleStone { Position: {0, h + 0.92, 0}; Cylinder: {length: 0.1, radius: 0.38, segments: 14} }
+      roof : CastleSlate { Position: {0, h + 1.47, 0}; Cone: {length: 1.0, radius: 0.44, segments: 14} }
+      finial : CastleGold { Position: {0, h + 2.0, 0}; Sphere: {radius: 0.06, segments: 8, smooth: true} }
+    }
+  }
+
+  lantern : CastlePaleStone { Position: {0, h + 0.5, 0}; Box: {0.7, 1.0, 0.7} }
+  lantern_win : CastleWindow { Position: {0, h + 0.55, 0.355}; Box: {0.16, 0.3, 0.02} }
+  lantern_roof : CastleSlate { Position: {0, h + 1.4, 0}; Rotation: {0, 0.7854, 0}; Cone: {length: 0.8, radius: 0.56, segments: 4} }
+  pole : CastleIron { Position: {0, h + 2.35, 0}; Cylinder: {length: 1.5, radius: 0.03, segments: 6} }
+  flag : CastleBannerBlue { Position: {0.44, h + 2.8, 0}; Box: {0.84, 0.52, 0.02} }
+  flag_band : CastleGold { Position: {0.44, h + 2.8, 0}; Box: {0.84, 0.08, 0.025} }
+}
+
+template HousePiece {
+  prop seed: f32 = 0
+
+  const turn = match seed > 0.5 { true: HALF_PI; _: 0 }
+  const thatch = fract(seed * 7.3) > 0.45
+
+  frame {
+    Rotation: {0, turn, 0}
+    plinth : CastleDarkStone { Position: {0, 0.06, 0}; Box: {1.36, 0.12, 1.06} }
+    walls : CastlePlaster { Position: {0, 0.52, 0}; Box: {1.3, 0.8, 1.0} }
+    plate : CastleTimber { Position: {0, 0.93, 0}; Box: {1.34, 0.06, 1.04} }
+    sill : CastleTimber { Position: {0, 0.5, 0}; Box: {1.32, 0.05, 1.02} }
+    for c in 0..4 {
+      const px = match c % 2 { 0: -0.63; _: 0.63 }
+      const pz = match c < 2 { true: -0.48; _: 0.48 }
+      "post_{c}" : CastleTimber { Position: {px, 0.52, pz}; Box: {0.07, 0.8, 0.07} }
+    }
+    brace_a : CastleTimber { Position: {-0.4, 0.72, 0.505}; Rotation: {0, 0, 0.7}; Box: {0.05, 0.5, 0.02} }
+    brace_b : CastleTimber { Position: {0.4, 0.72, 0.505}; Rotation: {0, 0, -0.7}; Box: {0.05, 0.5, 0.02} }
+    door : CastleWood { Position: {0, 0.37, 0.505}; Box: {0.26, 0.5, 0.02} }
+    win_a : CastleWindow { Position: {-0.38, 0.32, 0.505}; Box: {0.18, 0.16, 0.02} }
+    win_b : CastleWindow { Position: {0.38, 0.32, 0.505}; Box: {0.18, 0.16, 0.02} }
+    if thatch {
+      roof : CastleThatch { Position: {0, 1.3, 0}; Rotation: {0, HALF_PI, 0}; TrianglePrism: {1.34, 0.74, 1.56} }
+    } else {
+      roof : CastleTile { Position: {0, 1.3, 0}; Rotation: {0, HALF_PI, 0}; TrianglePrism: {1.3, 0.8, 1.5} }
+    }
+    chimney : CastleDarkStone { Position: {0.4, 1.4, -0.2}; Box: {0.18, 0.7, 0.18} }
+    smoke {
+      Position: {0.4, 1.8, -0.2}
+      ParticleEmitter: {
+        max: 24, rate: 3,
+        shape: EmitterSphere, radius: 0.04,
+        direction: {0, 1, 0}, spread: 12, speed: {0.25, 0.45},
+        lifetime: {2.5, 4}, size: {0.14, 0.24}, opacity: {0.25, 0.4},
+        acceleration: {0.08, 0.05, 0.03},
+        color: {200, 196, 190}, color_variance: {12, 12, 12},
+        seed: seed * 1000
+      }
+      ParticleCurves: {size: {0.6, 1.4, 2.2, 3}, opacity: {0, 1, 0.6, 0}}
+    }
+  }
+}
+
+template QuarryPiece {
+  prop seed: f32 = 0
+
+  rock_a : CastleRock { Position: {-0.35, 0.2, -0.3}; Scale: {1.15, 0.75, 1}; IcoSphere: {radius: 0.5, segments: 1} }
+  rock_b : CastleDarkStone { Position: {0.42, 0.15, -0.45}; Rotation: {0, seed * 3, 0}; IcoSphere: {radius: 0.36, segments: 1} }
+  rock_c : CastleRock { Position: {-0.55, 0.1, 0.45}; Rotation: {0.4, 1, 0}; IcoSphere: {radius: 0.26, segments: 1} }
+  block_a : CastlePaleStone { Position: {0.32, 0.14, 0.42}; Rotation: {0, 0.1, 0}; Box: {0.3, 0.28, 0.3} }
+  block_b : CastlePaleStone { Position: {0.66, 0.14, 0.4}; Rotation: {0, -0.08, 0}; Box: {0.3, 0.28, 0.3} }
+  block_c : CastlePaleStone { Position: {0.5, 0.42, 0.42}; Rotation: {0, 0.3, 0}; Box: {0.3, 0.28, 0.3} }
+  post : CastleWood { Position: {0.05, 0.8, 0.1}; Cylinder: {length: 1.6, radius: 0.05, segments: 8} }
+  brace : CastleWood { Position: {0.18, 0.45, 0.1}; Rotation: {0, 0, -0.5}; Box: {0.05, 0.6, 0.05} }
+  jib : CastleWood { Position: {0.42, 1.52, 0.1}; Rotation: {0, 0, 0.12}; Box: {0.9, 0.06, 0.06} }
+  rope : CastleIron { Position: {0.8, 1.17, 0.1}; Cylinder: {length: 0.62, radius: 0.012, segments: 4} }
+  load : CastlePaleStone { Position: {0.8, 0.8, 0.1}; Box: {0.22, 0.2, 0.22} }
+  pick : CastleWood { Position: {-0.1, 0.06, 0.6}; Rotation: {0, 0.6, HALF_PI}; Cylinder: {length: 0.6, radius: 0.02, segments: 4} }
+}
+
+template TreePiece {
+  prop seed: f32 = 0
+
+  const pine = seed < 0.45
+  const sz = 0.85 + fract(seed * 13.7) * 0.35
+  const autumn = seed > 0.9
+
+  tree {
+    Rotation: {0, seed * 6.283, 0}
+    Scale: {sz, sz, sz}
+    trunk : CastleBark { Position: {0, 0.4, 0}; Cylinder: {length: 0.8, radius: 0.1, segments: 8} }
+    if pine {
+      low : CastleLeafDark { Position: {0, 1.0, 0}; Cone: {length: 1.1, radius: 0.72, segments: 9} }
+      mid : CastleLeafDark { Position: {0, 1.55, 0}; Cone: {length: 0.95, radius: 0.55, segments: 9} }
+      tip : CastleLeafDark { Position: {0, 2.05, 0}; Cone: {length: 0.8, radius: 0.38, segments: 9} }
+    } else {
+      if autumn {
+        crown : CastleLeafAutumn { Position: {0, 1.35, 0}; IcoSphere: {radius: 0.68, segments: 1} }
+        crown_b : CastleLeafAutumn { Position: {0.3, 1.7, 0.1}; IcoSphere: {radius: 0.46, segments: 1} }
+        crown_c : CastleLeafAutumn { Position: {-0.3, 1.6, -0.2}; IcoSphere: {radius: 0.44, segments: 1} }
+      } else {
+        crown : CastleLeaf { Position: {0, 1.35, 0}; IcoSphere: {radius: 0.68, segments: 1} }
+        crown_b : CastleLeaf { Position: {0.3, 1.7, 0.1}; IcoSphere: {radius: 0.46, segments: 1} }
+        crown_c : CastleLeaf { Position: {-0.3, 1.6, -0.2}; IcoSphere: {radius: 0.44, segments: 1} }
+      }
+    }
+  }
+}
+
+template PathPiece {
+  prop seed: f32 = 0
+
+  for c in 0..7 {
+    const a = seed * 40 + c * 2.39
+    const r = 0.25 + fract(seed * 3.1 + c * 0.37) * 0.6
+    "cobble_{c}" : CastleCobble {
+      Position: {sin(a) * r, 0.015, cos(a) * r}
+      Rotation: {0, a, 0}
+      Cylinder: {length: 0.03, radius: 0.14 + fract(a) * 0.08, segments: 7}
+    }
+  }
+}
+
+// Picks the piece of a kind. The moat has no piece: the cell itself shows the water.
+template PieceView {
+  prop k: i32 = 0
+  prop lvl: i32 = 1
+  prop seed: f32 = 0
+  prop n: bool = false
+  prop e: bool = false
+  prop s: bool = false
+  prop w: bool = false
+  prop hn: f32 = 0
+  prop he: f32 = 0
+  prop hs: f32 = 0
+  prop hw: f32 = 0
+
+  if k == K_WALL {
+    WallPiece piece(lvl: lvl, n: n, e: e, s: s, w: w)
+  } else if k == K_TOWER {
+    TowerPiece piece(lvl: lvl, seed: seed, hn: hn, he: he, hs: hs, hw: hw)
+  } else if k == K_GATE {
+    GatePiece piece(along_z: (n || s) && !e && !w)
+  } else if k == K_KEEP {
+    KeepPiece piece(lvl: lvl)
+  } else if k == K_HOUSE {
+    HousePiece piece(seed: seed)
+  } else if k == K_QUARRY {
+    QuarryPiece piece(seed: seed)
+  } else if k == K_TREE {
+    TreePiece piece(seed: seed)
+  } else if k == K_PATH {
+    PathPiece piece(seed: seed)
+  }
+}

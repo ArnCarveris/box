@@ -1,0 +1,239 @@
+// The board: a raised plot of GRID x GRID cells on a meadow. Every cell is a Tile that shows the
+// piece on it, the ground under it (grass, courtyard, path, quarry dirt or moat water) and, while
+// the cursor is over it, a frame and a see-through preview of what the tool would build there.
+
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.picking
+using box.input
+using box.spatial
+using box.transition
+
+template CursorEdge {
+  prop len: f32 = 2
+  prop color: Rgb = {255, 255, 255}
+  prop glow: f32 = 2
+
+  Box: {len, 0.06, 0.09}
+  Rgb: color
+  Emissive: {strength: glow, color: color}
+  NoShadow
+  SpatialIgnore
+}
+
+template TileCursor {
+  prop idx: i32 = 0
+  prop k: i32 = 0
+  prop lvl: i32 = 0
+  prop seed: f32 = 0
+  prop n: bool = false
+  prop e: bool = false
+  prop s: bool = false
+  prop w: bool = false
+  prop hn: f32 = 0
+  prop he: f32 = 0
+  prop hs: f32 = 0
+  prop hw: f32 = 0
+
+  const t = tool
+  const builds = t >= K_WALL && t <= K_PATH
+  const upgrade = builds && k == t && lvl < max_level(t)
+  const place = builds && k == K_EMPTY
+  const nl = match upgrade { true: lvl + 1; _: 1 }
+  const afford = gold >= cost_gold(t, nl) && stone >= cost_stone(t, nl)
+  const keep_ok = t != K_KEEP || upgrade || keep_cell < 0
+  const ok = (place || upgrade) && afford && keep_ok
+  const razes = t == T_DEMOLISH && k != K_EMPTY
+  const y = match k == K_MOAT { true: -0.28; _: 0.05 }
+
+  const color: Rgb = match ok {
+    true: {120, 235, 110}
+    _: match razes {
+      true: {255, 128, 48}
+      _: match t == 0 { true: {255, 236, 190}; _: {235, 64, 52} }
+    }
+  }
+
+  CursorEdge edge_n(len: 2, color: color) { Position: {0, y, -0.955} }
+  CursorEdge edge_s(len: 2, color: color) { Position: {0, y, 0.955} }
+  CursorEdge edge_e(len: 2, color: color) { Position: {0.955, y, 0}; Rotation: {0, HALF_PI, 0} }
+  CursorEdge edge_w(len: 2, color: color) { Position: {-0.955, y, 0}; Rotation: {0, HALF_PI, 0} }
+
+  if place || upgrade {
+    ghost {
+      Opacity: {match ok { true: 0.5; _: 0.3 }}
+      SpatialIgnore
+      if t == K_MOAT {
+        water : CastleWater { Position: {0, 0.03, 0}; Box: {1.9, 0.04, 1.9} }
+      } else if t == K_PATH {
+        dirt : CastleDirt { Position: {0, 0.01, 0}; Box: {1.9, 0.02, 1.9} }
+        PathPiece path(seed: seed)
+      } else {
+        PieceView view(k: t, lvl: nl, seed: seed, n: n, e: e, s: s, w: w, hn: hn, he: he, hs: hs, hw: hw)
+      }
+    }
+  }
+
+  if razes {
+    marker {
+      Position: {0, 0.06, 0}
+      Rotation: {0, 0.7854, 0}
+      CursorEdge a(len: 1.6, color: color, glow: 3)
+      CursorEdge b(len: 1.6, color: color, glow: 3) { Rotation: {0, HALF_PI, 0} }
+    }
+  }
+}
+
+template Tile {
+  prop idx: i32 = 0
+
+  mut hover = false
+
+  const k = kind[idx]
+  const lvl = level[idx]
+  const col = idx % GRID
+  const safe = inside[idx]
+  const seed = hash(idx)
+
+  const kn = match idx >= GRID { true: kind[idx - GRID]; _: 0 }
+  const ks = match idx < CELLS - GRID { true: kind[idx + GRID]; _: 0 }
+  const ke = match col < GRID - 1 { true: kind[idx + 1]; _: 0 }
+  const kw = match col > 0 { true: kind[idx - 1]; _: 0 }
+  const ln = match idx >= GRID { true: level[idx - GRID]; _: 0 }
+  const ls = match idx < CELLS - GRID { true: level[idx + GRID]; _: 0 }
+  const le = match col < GRID - 1 { true: level[idx + 1]; _: 0 }
+  const lw = match col > 0 { true: level[idx - 1]; _: 0 }
+
+  const n = barrier(kn)
+  const s = barrier(ks)
+  const e = barrier(ke)
+  const w = barrier(kw)
+  const hn = wall_height(kn, ln)
+  const hs = wall_height(ks, ls)
+  const he = wall_height(ke, le)
+  const hw = wall_height(kw, lw)
+
+  const sunk = rising == idx
+  const shade = hash(idx + 517) * 14
+
+  Position: {cell_x(idx), 0, cell_z(idx)}
+  Interactive
+
+  soil : CastleSoil {
+    Position: {0, match k == K_MOAT { true: -1.15; _: -0.55 }, 0}
+    Box: {2, 0.9, 2}
+  }
+
+  if k == K_MOAT {
+    water : CastleWater { Position: {0, -0.32, 0}; Box: {2, 0.06, 2} }
+  } else {
+    turf {
+      Position: {0, -0.05, 0}
+      Box: {1.96, 0.1, 1.96}
+      PbrMaterial: {roughness: 1}
+      if k == K_PATH {
+        Rgb: {152 + shade, 126 + shade, 88 + shade}
+      } else if k == K_QUARRY {
+        Rgb: {138 + shade, 128 + shade, 112 + shade}
+      } else if safe {
+        Rgb: {172 + shade, 158 + shade, 124 + shade}
+      } else {
+        Rgb: {98 + shade, 138 + shade, 60 + shade}
+      }
+      Transition: [Rgb: {duration: 0.6}]
+    }
+  }
+
+  piece {
+    Transition: [Position: {duration: match sunk { true: 0; _: 0.7 }, timing_function: EaseOut}]
+    Position: {0, match sunk { true: -5; _: 0 }, 0}
+    PieceView view(k: k, lvl: lvl, seed: seed, n: n, e: e, s: s, w: w, hn: hn, he: he, hs: hs, hw: hw)
+  }
+
+  if hover {
+    TileCursor cursor(idx: idx, k: k, lvl: lvl, seed: seed, n: n, e: e, s: s, w: w, hn: hn, he: he, hs: hs, hw: hw)
+  }
+
+  async {
+    while true {
+      await on.enter(this)
+      hover = true
+      hover_cell = idx
+      await on.leave(this)
+      hover = false
+      if hover_cell == idx {
+        hover_cell = -1
+      }
+    }
+  }
+
+  async {
+    while true {
+      const ev = await on.click(this)
+      if ev.button == 0 {
+        emit Build(i: idx)
+      }
+    }
+  }
+}
+
+// A tree of the countryside around the plot, on the meadow below it
+template WildTree {
+  prop seed: f32 = 0
+  TreePiece tree(seed: seed)
+}
+
+template Landscape {
+  meadow : CastleMeadow { Position: {0, -1.6, 0}; Box: {400, 1.2, 400} }
+
+  rim : CastleSoil { Position: {0, -1.05, 0}; Box: {GRID * PITCH + 1.2, 0.1, GRID * PITCH + 1.2} }
+  edge_n : CastleDarkStone { Position: {0, -0.5, -GRID * PITCH / 2 - 0.3}; Box: {GRID * PITCH + 1.2, 1.0, 0.6} }
+  edge_s : CastleDarkStone { Position: {0, -0.5, GRID * PITCH / 2 + 0.3}; Box: {GRID * PITCH + 1.2, 1.0, 0.6} }
+  edge_e : CastleDarkStone { Position: {GRID * PITCH / 2 + 0.3, -0.5, 0}; Box: {0.6, 1.0, GRID * PITCH} }
+  edge_w : CastleDarkStone { Position: {-GRID * PITCH / 2 - 0.3, -0.5, 0}; Box: {0.6, 1.0, GRID * PITCH} }
+
+  for i in 0..90 {
+    const a = hash(i * 7 + 3) * 6.283
+    const r = 19 + hash(i * 5 + 11) * 46
+    const tx = sin(a) * r
+    const tz = cos(a) * r
+    if abs(tx) > 16.5 || abs(tz) > 16.5 {
+      "tree_{i}" {
+        Position: {tx, -1, tz}
+        Scale: {1.4, 1.4, 1.4}
+        WildTree tree(seed: hash(i * 13 + 1))
+      }
+    }
+  }
+
+  for i in 0..14 {
+    const a = i * 0.4488 + hash(i + 300) * 0.3
+    const r = 120 + hash(i + 400) * 40
+    "hill_{i}" : CastleFarHill {
+      Position: {sin(a) * r, -18, cos(a) * r}
+      Scale: {30 + hash(i + 500) * 30, 14 + hash(i + 600) * 16, 30 + hash(i + 700) * 20}
+      Sphere: {radius: 1, segments: 18, smooth: true}
+    }
+  }
+
+  for i in 0..10 {
+    const a = hash(i + 900) * 6.283
+    const r = 22 + hash(i + 950) * 30
+    "boulder_{i}" : CastleRock {
+      Position: {sin(a) * r, -1, cos(a) * r}
+      Rotation: {hash(i + 990), hash(i + 991) * 6, 0}
+      IcoSphere: {radius: 0.5 + hash(i + 992) * 0.6, segments: 1}
+    }
+  }
+}
+
+template Board {
+  Landscape land()
+
+  for i in 0..CELLS {
+    Tile "cell_{i}"(idx: i)
+  }
+}
