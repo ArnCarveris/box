@@ -100,6 +100,9 @@ static void transformStaticDirty(
 
 /** Add entities with a changed transform input to the dirty list, unless they are dynamic.
  *
+ * A Position that comes with another component through With, such as a shape or a light, is
+ * added without being set, so OnAdd of Position counts as a change too.
+ *
  * The DynamicTransform filter runs in the callback, because a Not term on an inherited tag
  * allocates for every event.
  *
@@ -463,6 +466,16 @@ void TransformStaticImport(
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },
+        .callback = TransformStatic_OnChange
+    });
+
+    transformStaticObserver(world, state, (ecs_observer_desc_t){
+        .entity = ecs_entity(world, { .name = "TransformStatic_OnAddPosition" }),
+        .query.terms = {
+            { .id = ecs_id(Position), .src.id = EcsSelf },
+            { .id = ManualTransform, .oper = EcsNot }
+        },
+        .events = { EcsOnAdd },
         .callback = TransformStatic_OnChange
     });
 

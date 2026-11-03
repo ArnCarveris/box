@@ -11,8 +11,8 @@ mossvale {
   ground : MvGrass { Position: {0, -0.5, 0}; Box: {700, 1, 700}; TextureTransform: {700 / TILE_GRASS, 700 / TILE_GRASS, 0, 0} }
 
   water {
-    river_bank : MvSand { Sweep: {path: MV_RIVER, profile: MvRoadProfile, scale: {8.8, 0.03}, rings: 256}; TextureTransform: {4 * 8.8 / 5, 210 / 5, 0, 0} }
-    river : MvWater { Sweep: {path: MV_RIVER, profile: MvRoadProfile, scale: {6.2, 0.06}, rings: 256}; TextureTransform: {4 * 6.2 / 8, 210 / 8, 0, 0} }
+    river_bank : MvSand { Sweep: {path: MV_RIVER, profile: MvRoadProfile, scale: {8.8, 0.03}, rings: 256}; TextureMapping: {mode: MappingObject, size: 5}; TextureTransform: {1, 1, 0, 0} }
+    river : MvWater { Sweep: {path: MV_RIVER, profile: MvRoadProfile, scale: {6.2, 0.06}, rings: 256}; TextureMapping: {mode: MappingObject, size: 8}; TextureTransform: {1, 1, 0, 0} }
     lake_bank : MvSand { Position: {LAKE_X, 0.019, LAKE_Z}; Cylinder: {length: 0.01, radius: LAKE_R + 1.8, segments: 48}; TextureTransform: {(LAKE_R + 1.8) * 2 / 5, (LAKE_R + 1.8) * 2 / 5, 0, 0} }
     lake_shallow : MvSand { Position: {LAKE_X, 0.031, LAKE_Z}; Cylinder: {length: 0.01, radius: LAKE_R + 0.6, segments: 48}; Rgb: {200, 196, 150}; TextureTransform: {(LAKE_R + 0.6) * 2 / 5, (LAKE_R + 0.6) * 2 / 5, 0, 0} }
     lake : MvWater { Position: {LAKE_X, 0.047, LAKE_Z}; Cylinder: {length: 0.01, radius: LAKE_R, segments: 48}; TextureTransform: {LAKE_R * 2 / 5, LAKE_R * 2 / 5, 0, 0} }

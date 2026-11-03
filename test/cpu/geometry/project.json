@@ -356,6 +356,20 @@
                 ]
             },
             {
+                "id": "ArcLength",
+                "testcases": [
+                    "path_table",
+                    "path_curve",
+                    "profile_table",
+                    "profile_scale",
+                    "profile_holes",
+                    "open_contour",
+                    "mesh_uvs",
+                    "evaluate",
+                    "scale_ratio_key"
+                ]
+            },
+            {
                 "id": "Assets",
                 "testcases": [
                     "mixed_paths",

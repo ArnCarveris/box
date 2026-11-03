@@ -1,0 +1,74 @@
+// The fps panel at the top right of the surface over a 3D scene, with fixed frame samples that
+// hold: green bars of 120 to 60 fps, yellow ones under 60 fps, red ones under 30 fps of which
+// some reach the top of the chart at 50 ms, the reference lines at 60 and 30 fps and the summary
+// of the last second. The panel is the FpsWidget template of etc/fps/fps.flecs.
+
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.app
+using box.fps
+
+camera {
+  Position: {0, 2.5, 6}
+  Rotation: {-0.35, 0, 0}
+  Camera: {fov: 60}
+}
+
+main_view {
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {120, 150, 190, 255}},
+    shadows: {enabled: true}
+  }
+}
+
+sun {
+  Rotation: {0.7359, 2.3726, 0}
+  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+  Rgb: {255, 244, 225}
+}
+
+$ {
+  AmbientLight: {sky: {90, 110, 140}, ground: {40, 36, 30}, intensity: 0.6}
+}
+
+ground {
+  Position: {0, -0.05, 0}
+  Box: {20, 0.1, 20}
+  Rgb: {170, 170, 165}
+  PbrMaterial: {roughness: 0.9}
+}
+
+cube {
+  Position: {0, 0.5, 0}
+  Rotation: {0, 0.4, 0}
+  Box: {1, 1, 1}
+  Rgb: {220, 90, 60}
+  PbrMaterial: {roughness: 0.4, metallic: 0}
+}
+
+// 120 samples, the oldest first, that the engine does not add to
+$ {
+  FrameSamples: {
+    interval: [
+      8.3, 9.2, 10.1, 11.0, 11.9, 8.3, 9.2, 10.1, 11.0, 11.9, 8.3, 9.2,
+      10.1, 11.0, 11.9, 8.3, 9.2, 10.1, 11.0, 11.9, 8.3, 9.2, 10.1, 11.0,
+      11.9, 8.3, 9.2, 10.1, 11.0, 11.9, 16.7, 16.7, 16.7, 16.7, 16.7, 16.7,
+      16.7, 16.7, 16.7, 16.7, 28.0, 30.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0,
+      30.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0, 18.0, 20.0, 22.0, 24.0,
+      26.0, 28.0, 30.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0, 40.0, 46.0,
+      52.0, 58.0, 64.0, 15.0, 9.0, 11.0, 13.0, 15.0, 9.0, 11.0, 13.0, 15.0,
+      9.0, 11.0, 13.0, 15.0, 9.0, 11.0, 13.0, 15.0, 9.0, 11.0, 13.0, 15.0,
+      9.0, 11.0, 13.0, 15.0, 9.0, 11.0, 13.0, 15.0, 9.0, 22.0, 26.0, 30.0,
+      22.0, 26.0, 30.0, 22.0, 14.0, 16.0, 14.0, 16.0, 14.0, 16.0, 14.0, 16.0
+    ],
+    count: 120,
+    next: 120,
+    hold: true
+  }
+  FpsPanel: {open: true}
+}

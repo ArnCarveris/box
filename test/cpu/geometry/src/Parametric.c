@@ -21,7 +21,9 @@ void Parametric_sweep_shared_topology(void) {
     ecs_world_t *world = surface_world();
     ecs_entity_t a = ecs_new(world), b = ecs_new(world);
     Sweep first = test_sweep(world), second = first;
+    /* A uniform scale keeps the lengths around the profile in proportion, so the UVs */
     second.scale[0] = 2;
+    second.scale[1] = 2;
     second.taper = 0.25f;
     ecs_set_ptr(world, a, Sweep, &first);
     ecs_set_ptr(world, b, Sweep, &second);

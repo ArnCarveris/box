@@ -272,7 +272,24 @@ ECS_STRUCT(Path3D, {
 /** Sweeps a profile along a Path3D, with u around the profile and v along the path.
  *
  * The profile x follows a rotation minimizing frame of the path and its y the binormal. The
- * scale, taper and roll apply to the profile; taper and roll grow linearly along the path.
+ * scale, taper and roll apply to the profile; taper and roll grow linearly with the path
+ * parameter, segment by segment.
+ *
+ * The frame starts with its x axis at cross(up, tangent), up being +Y (+X for a path that starts
+ * along Y), and the binormal is cross(x, tangent). Along a horizontal path the profile y
+ * therefore points down, toward -Y: a road profile puts its top surface at negative y.
+ *
+ * The walls map u and v by arc length: u is the fraction of the length around the profile, with
+ * the scale (the holes run from 2 to 3, all holes after another), and v the fraction of the
+ * length along the path, so a texel covers the same distance on every profile edge and every
+ * path segment however the points are spaced. The rings sit at even lengths along the path.
+ * SurfaceAttachment and box_surface_evaluate take the same fractions on SurfaceOuter and
+ * SurfaceInner. The caps map the profile x and y, without the scale.
+ *
+ * With a MappingObject TextureMapping (box/material.h) the coordinates are lengths in the units
+ * of the path instead, over the mapping size: the walls the length around the profile and along
+ * the path, the caps the profile x and y times the scale, so a road gets a texture density in
+ * meters without knowing its length. The taper and the instance Scale do not change them.
  */
 ECS_STRUCT(Sweep, {
     ecs_entity_t path;    /**< Entity with the Path3D to follow */

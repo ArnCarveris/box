@@ -425,6 +425,7 @@ static bool box_resolve(const ecs_world_t *world, const void *value, int kind,
             }
             d->assets = ecs_vec_first(&data);
             box_surface_build_frames(d, frames, (int)steps);
+            box_surface_build_lengths(d, frames, (int)steps, &d->p[9][2]);
             d->assets = NULL;
             d->p[8][0] = 24 + ecs_vec_count(&data);
             d->p[8][1] = (float)steps;
@@ -553,6 +554,10 @@ static bool box_resolve(const ecs_world_t *world, const void *value, int kind,
     d->p[3][3] = 1 | (d->p[1][0] > 0 ? 2 : 0) | (start ? 4 : 0) | (end ? 8 : 0);
     d->asset_count = ecs_vec_count(&data);
     d->assets = ecs_vec_first(&data);
+    if (kind == 1) {
+        d->p[9][0] = box_surface_profile_length(d, 0);
+        d->p[9][1] = count > outer ? box_surface_profile_length(d, 1) : 0;
+    }
     data = (ecs_vec_t){0};
     ok = true;
 done:
@@ -604,6 +609,16 @@ static void box_asset_key(const ecs_world_t *world, const void *value, int kind,
     for (size_t i = 0; i < (size_t)d.asset_count * sizeof(vec4); i ++) {
         hash = (hash ^ bytes[i]) * 1099511628211ull;
     }
+    if (kind == 1) {
+        /* The texture coordinates around the profile follow its length with the scale, which
+         * only the ratio of the scale changes */
+        float sx = fabsf(d.p[2][0]), sy = fabsf(d.p[2][1]);
+        float ratio = sx > sy ? (sx ? sy / sx : 0) : (sy ? 2 - sx / sy : 0);
+        bytes = (const uint8_t*)&ratio;
+        for (size_t i = 0; i < sizeof(ratio); i ++) {
+            hash = (hash ^ bytes[i]) * 1099511628211ull;
+        }
+    }
     ecs_os_memcpy(key->f, &hash, sizeof(hash));
     key->f[2] = d.p[4][1];
     key->f[3] = d.p[4][3];
@@ -649,6 +664,8 @@ static void box_asset_generate(const ecs_world_t *world, const void *value, int 
     mesh->vertex_capacity = (int32_t)vertices;
     mesh->index_capacity = (int32_t)indices;
     const vec4 *points = kind == 3 ? NULL : d.assets + (int)d.p[5][0] - 24;
+    float ring_length[2] = {d.p[9][0], d.p[9][1]};
+    float along[2] = {0, 0};
     for (int region = 0; region < (kind == 3 ? 4 : 1); region ++) {
         if (!(regions & (1 << region))) {
             continue;
@@ -667,11 +684,21 @@ static void box_asset_generate(const ecs_world_t *world, const void *value, int 
             }
             float u0 = (float)(i - first) / n;
             float u1 = (float)(next - first) / n;
+            float t0 = u0, t1 = u1;
+            if (kind == 1 && ring_length[inner] > 0) {
+                /* A Sweep maps its texture by the length around the profile, the closing edge
+                 * of a ring included, and its rows sit at even lengths along the path */
+                t0 = along[inner] / ring_length[inner];
+                along[inner] += box_surface_profile_edge(&d, i);
+                t1 = fminf(along[inner] / ring_length[inner], 1);
+            }
             int base = mesh->vertex_count;
             for (int j = 0; j <= nrows; j ++) {
                 for (int side = 0; side < 2; side ++) {
                     float u = side ? u1 : u0, v = (float)j / nrows;
-                    vec3 position = {u, v, kind == 3 ? region : inner};
+                    float tu = side ? t1 : t0;
+                    float pv = kind == 1 ? box_surface_sweep_parameter(&d, v) : v;
+                    vec3 position = {u, pv, kind == 3 ? region : inner};
                     vec3 normal = {0};
                     if (kind == 7) {
                         int p = side ? next : i;
@@ -680,7 +707,7 @@ static void box_asset_generate(const ecs_world_t *world, const void *value, int 
                             points[i][0] - points[next][0]}, normal);
                         glm_vec3_normalize(normal);
                     }
-                    box_mesh_vertex(mesh, position, normal, u + (inner ? 2 : 0), v);
+                    box_mesh_vertex(mesh, position, normal, tu + (inner ? 2 : 0), v);
                 }
             }
             for (int j = 0; j < nrows; j ++) {
