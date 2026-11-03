@@ -3,12 +3,12 @@
  * @brief Lays out a Text: kerning, line breaks between words, alignment and its bounds.
  *
  * Glyphs advance along a pen in logical pixels; a word that passes the width moves to the next
- * line, a word wider than the width breaks inside. The block is centered on the origin, y up.
+ * line, a word wider than the width breaks inside, a wrapped line starting at the hang indent.
  * A Text is measured at Text.width for box.layout, which can wrap it narrower afterwards.
  *
- * A wrapped line starts at the hang indent, the caret x of Text.hang, as does the last caret
- * after spaces past the width. Carets and line ranges are kept for editing. Span styles are
- * clipped once per run into sorted ranges; a bold glyph advances further, an italic one leans.
+ * Span styles are clipped once per run into sorted ranges. A styled glyph takes the variant
+ * face FontVariants names for its style once loaded; what the face lacks is synthesized: a
+ * bold glyph advances further, an italic one leans.
  */
 
 #include "text.h"
@@ -17,9 +17,23 @@
 /** Logical pixels a line may pass its width by, so a block wraps at its own measured width */
 #define BOX_TEXT_WRAP_SLACK (0.001f)
 
+/** Style combinations of glyphs, indexed by BOX_TEXT_STYLE_ flags */
+#define BOX_TEXT_STYLES (4)
+
+/** The face of a style in a run, resolved on the first glyph of the style */
+typedef struct box_text_run_face_t {
+    box_text_font_t *font;  /**< The face: the font of the Text or a loaded variant */
+    float px;               /**< Logical pixels per font unit of the face */
+    uint8_t synth;          /**< BOX_TEXT_STYLE_ flags synthesized on the face */
+    bool resolved;          /**< The face was resolved */
+} box_text_run_face_t;
+
 /** State of the layout of one string */
 typedef struct box_text_run_t {
     box_text_state_t *s;    /**< The registry, its placed and lines vectors are filled */
+    box_text_font_t *font;  /**< Font of the Text, its face loaded */
+    box_text_run_face_t faces[BOX_TEXT_STYLES]; /**< Face per style */
+    const box_text_font_t *prev_face; /**< Face of prev */
     float wrap;             /**< Width lines break at, 0 for newlines only */
     float hang;             /**< Pen x the lines a width wraps start at */
     int32_t hang_at;        /**< Byte of the first line whose pen x is the hang */
@@ -133,22 +147,98 @@ static uint8_t box_text_style_of(
         ? styles[run->style_at].flags : 0;
 }
 
+/** Get the loaded font of a variant entity, requesting its load when no glyph needed it before.
+ *
+ * @param world The world
+ * @param s The registry
+ * @param e The variant entity, 0 for none
+ * @return The font, NULL without a variant, for an entity without Font or until it loaded
+ */
+static box_text_font_t* box_text_variant_of(
+    ecs_world_t *world,
+    box_text_state_t *s,
+    ecs_entity_t e)
+{
+    box_text_font_t *result = NULL;
+    if (!e || !ecs_is_alive(world, e) || !ecs_has(world, e, Font)) {
+        goto done;
+    }
+
+    result = box_text_font_of(world, s, e);
+    if (!result->face) {
+        result = NULL;
+    }
+
+done:
+    return result;
+}
+
+/** Get the face of a style of a run, as the table of FontVariants gives it: the first loaded
+ * variant for the style, else the font of the Text, and what it lacks synthesized.
+ *
+ * @param world The world
+ * @param run The run
+ * @param style BOX_TEXT_STYLE_ flags of the glyph
+ * @return The face of the style
+ */
+static const box_text_run_face_t* box_text_face_of(
+    ecs_world_t *world,
+    box_text_run_t *run,
+    uint8_t style)
+{
+    box_text_run_face_t *result = &run->faces[style];
+    float ascent, descent, gap;
+    int32_t i, count = 0;
+    if (result->resolved) {
+        goto done;
+    }
+
+    const FontVariants *v = style ? ecs_get(world, run->font->entity, FontVariants) : NULL;
+    ecs_entity_t order[3] = {0};
+    uint8_t lacks[3] = {0};
+    result->font = run->font;
+    result->synth = style;
+    result->resolved = true;
+    if (!v) {
+        count = 0;
+    } else if (style == (BOX_TEXT_STYLE_BOLD | BOX_TEXT_STYLE_ITALIC)) {
+        order[0] = v->bold_italic;
+        order[1] = v->bold;
+        lacks[1] = BOX_TEXT_STYLE_ITALIC;
+        order[2] = v->italic;
+        lacks[2] = BOX_TEXT_STYLE_BOLD;
+        count = 3;
+    } else {
+        order[0] = style == BOX_TEXT_STYLE_BOLD ? v->bold : v->italic;
+        count = 1;
+    }
+
+    for (i = 0; i < count; i ++) {
+        box_text_font_t *face = box_text_variant_of(world, run->s, order[i]);
+        if (face) {
+            result->font = face;
+            result->synth = lacks[i];
+            break;
+        }
+    }
+
+    result->px = run->em / box_text_face_metrics(result->font->face, &ascent, &descent, &gap);
+done:
+    return result;
+}
+
 /** Advance the run over one code point and place the caret before it.
  *
  * @param world The world
  * @param run The run
- * @param font The font, its face loaded
  * @param codepoint The code point
  * @param offset Byte offset of the code point in the string
- * @param px Logical pixels per font unit
  */
 static void box_text_char(
     ecs_world_t *world,
     box_text_run_t *run,
-    box_text_font_t *font,
     int32_t codepoint,
-    int32_t offset,
-    float px)
+    int32_t offset)
 {
     int32_t count = ecs_vec_count(&run->s->placed);
     int32_t caret = ecs_vec_count(&run->s->carets), cr = run->cr;
@@ -170,7 +260,10 @@ static void box_text_char(
         goto done;
     }
 
-    uint8_t style = box_text_style_of(run, offset);
+    const box_text_run_face_t *face = box_text_face_of(world, run, box_text_style_of(run, offset));
+    box_text_font_t *font = face->font;
+    float px = face->px;
+    uint8_t style = face->synth;
     int32_t glyph = box_text_face_glyph(font->face, codepoint == '\t' ? ' ' : codepoint);
     float advance = box_text_face_advance(font->face, glyph) * px;
     if (style & BOX_TEXT_STYLE_BOLD) {
@@ -178,11 +271,12 @@ static void box_text_char(
     }
 
     float x = run->pen;
-    if (run->prev >= 0) {
+    if (run->prev >= 0 && run->prev_face == font) {
         x += box_text_face_kern(font->face, run->prev, glyph) * px;
     }
 
     run->prev = glyph;
+    run->prev_face = font;
     c->x = x;
     if (codepoint == ' ' || codepoint == '\t') {
         run->pen = x + advance;
@@ -214,6 +308,7 @@ static void box_text_char(
     p->line = run->line;
     p->offset = offset;
     p->glyph = area;
+    p->font = font;
     p->style = style;
     run->pen = x + advance;
     run->line_end = run->pen;
@@ -261,10 +356,10 @@ static void box_text_emit_carets(
     out->ready = true;
 }
 
-/** Turn the placed glyphs into quads: align the lines and center the block on the origin.
+/** Turn the placed glyphs into quads: align the lines and center the block on the origin. A
+ * glyph takes its page from its face, its baseline from the metrics of the font of the Text.
  *
  * @param run The finished run
- * @param font The font
  * @param text The Text
  * @param metrics Ascent, descent below the baseline and line height in logical pixels
  * @param box Width the lines align in when it is wider than the widest line
@@ -273,7 +368,6 @@ static void box_text_emit_carets(
  */
 static void box_text_emit(
     const box_text_run_t *run,
-    const box_text_font_t *font,
     const Text *text,
     const float *metrics,
     float box,
@@ -299,6 +393,7 @@ static void box_text_emit(
             continue;
         }
 
+        const box_text_font_t *font = placed[i].font;
         const box_text_page_t *page = *ecs_vec_get_t(&font->pages, box_text_page_t*, g->page);
         float free = width - widths[placed[i].line];
         float indent = text->align == AlignCenter ? free * 0.5f
@@ -446,10 +541,9 @@ static void box_text_styles(
  *
  * @param world The world
  * @param s The registry
- * @param font The font, its face loaded
+ * @param font The font, its face loaded; styled glyphs take its variants
  * @param str The string
  * @param spans The spans whose styles the glyphs take, NULL for none
- * @param px Logical pixels per font unit
  * @param em Em size in logical pixels
  * @param wrap Width lines break at, 0 for newlines only
  * @param hang Byte of the first line whose pen x the lines a width wraps start at
@@ -462,14 +556,13 @@ static box_text_run_t box_text_run(
     box_text_font_t *font,
     const char *str,
     const TextSpans *spans,
-    float px,
     float em,
     float wrap,
     int32_t hang,
     bool draw)
 {
-    box_text_run_t result = {
-        .s = s, .wrap = wrap, .hang_at = hang, .draw = draw, .em = em, .prev = -1, .cr = -1 };
+    box_text_run_t result = { .s = s, .font = font, .wrap = wrap, .hang_at = hang,
+        .draw = draw, .em = em, .prev = -1, .cr = -1 };
     const char *p = str;
     int32_t last = 0;
     box_text_styles(s, spans, (int32_t)strlen(str));
@@ -480,7 +573,7 @@ static box_text_run_t box_text_run(
     while (*p) {
         int32_t offset = (int32_t)(p - str);
         last = box_utf8_next(&p);
-        box_text_char(world, &result, font, last, offset, px);
+        box_text_char(world, &result, last, offset);
     }
 
     int32_t length = (int32_t)(p - str);
@@ -660,19 +753,18 @@ static void box_text_typeset(
     float wrap = text->width > 0.0f ? text->width : 0.0f;
     float box = text->wrap == TextWrapWords ? glyphs->box : 0.0f;
     bool narrow = !measure && box > 0.0f && box < glyphs->natural[0];
-    box_text_run_t run = box_text_run(world, s, font, str, spans, px, text->size,
+    box_text_run_t run = box_text_run(world, s, font, str, spans, text->size,
         narrow ? box : wrap, text->hang, true);
     if (measure) {
         glyphs->natural[0] = box_text_widest(s);
         glyphs->natural[1] = (float)ecs_vec_count(&s->lines) * metrics[2];
         glyphs->longest = run.longest;
         if (box > 0.0f && box < glyphs->natural[0]) {
-            run = box_text_run(world, s, font, str, spans, px, text->size, box, text->hang,
-                true);
+            run = box_text_run(world, s, font, str, spans, text->size, box, text->hang, true);
         }
     }
 
-    box_text_emit(&run, font, text, metrics, box, glyphs, &bounds);
+    box_text_emit(&run, text, metrics, box, glyphs, &bounds);
 write:
     s->trim = true;
     ecs_modified(world, e, TextGlyphs);
@@ -722,7 +814,6 @@ int32_t box_text_break_lines_spans(
     box_text_state_t *s = box_text_state_get(world);
     box_text_font_t *font = s && text->font ? box_text_font_of(world, s, text->font) : NULL;
     const char *str = text->value ? text->value : "";
-    float ascent, descent, gap;
     int32_t i, result = 0;
     if (starts) {
         ecs_vec_clear(starts);
@@ -741,8 +832,7 @@ int32_t box_text_break_lines_spans(
         goto done;
     }
 
-    float px = text->size / box_text_face_metrics(font->face, &ascent, &descent, &gap);
-    box_text_run(world, s, font, str, spans, px, text->size,
+    box_text_run(world, s, font, str, spans, text->size,
         text->width > 0.0f ? text->width : 0.0f, text->hang, false);
     const box_text_row_t *rows = ecs_vec_first(&s->rows);
     const box_text_caret_t *carets = ecs_vec_first(&s->carets);
@@ -799,7 +889,25 @@ float box_text_wrap_to(
     return b ? b->height : 0.0f;
 }
 
-/** Check whether a Text lays out again: its font asks for it, or every Text does.
+/** Check whether a font asks for its texts to lay out again.
+ *
+ * @param s The registry
+ * @param e The font entity, 0 for none
+ * @return Whether the font is in the registry and asks for it
+ */
+static bool box_text_font_stale(
+    box_text_state_t *s,
+    ecs_entity_t e)
+{
+    const box_text_font_t *font = e
+        ? ecs_map_get_deref(&s->fonts, box_text_font_t, e)
+        : NULL;
+
+    return font && font->relayout;
+}
+
+/** Check whether a Text lays out again: its font or a variant of FontVariants on it asks for
+ * it, or every Text does.
  *
  * @param world The world
  * @param s The registry
@@ -819,8 +927,12 @@ static bool box_text_stale(
         e = s->default_font;
     }
 
-    const box_text_font_t *font = ecs_map_get_deref(&s->fonts, box_text_font_t, e);
-    if (font && font->relayout) {
+    const FontVariants *v = ecs_get(world, e, FontVariants);
+    if (box_text_font_stale(s, e)) {
+        result = true;
+    } else if (v && (box_text_font_stale(s, v->bold) || box_text_font_stale(s, v->italic) ||
+        box_text_font_stale(s, v->bold_italic)))
+    {
         result = true;
     }
 

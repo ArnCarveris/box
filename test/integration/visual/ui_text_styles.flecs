@@ -7,10 +7,28 @@ using box.layout
 using box.text
 
 // Bold and italic synthesized from the regular glyphs of one font of the test assets: bold by
-// a thicker outline and a wider advance, italic by a sheared quad.
+// a thicker outline and a wider advance, italic by a sheared quad. Below them the same styles
+// from the bold, italic and bold italic faces a second font names in FontVariants.
 
 assets_font {
   Font: {path: "test/assets/fonts/B612-Regular.ttf"}
+}
+
+assets_bold {
+  Font: {path: "test/assets/fonts/B612-Bold.ttf"}
+}
+
+assets_italic {
+  Font: {path: "test/assets/fonts/B612-Italic.ttf"}
+}
+
+assets_bold_italic {
+  Font: {path: "test/assets/fonts/B612-BoldItalic.ttf"}
+}
+
+variants_font {
+  Font: {path: "test/assets/fonts/B612-Regular.ttf"}
+  FontVariants: {bold: assets_bold, italic: assets_italic, bold_italic: assets_bold_italic}
 }
 
 camera {
@@ -87,6 +105,35 @@ panel {
       {start: 74, end: 100, bold: true, color: {240, 110, 90, 255}},
       {start: 92, end: 114, italic: true, color: {90, 170, 255, 255}},
       {start: 145, end: 162, bold: true, keep_color: true}
+    ]}
+  }
+
+  variants_title {
+    Position: {0, 0, 1}
+    Text: {value: "Font variants", size: 30, font: variants_font}
+    Rgb: {120, 210, 140}
+    TextSpans: {spans: [{start: 0, end: 13, bold: true, keep_color: true}]}
+  }
+
+  variants_medium {
+    Position: {0, 0, 1}
+    Text: {value: "Regular Bold Italic Both", size: 22, font: variants_font}
+    Rgb: {230, 232, 240}
+    TextSpans: {spans: [
+      {start: 8, end: 12, bold: true, keep_color: true},
+      {start: 13, end: 19, italic: true, keep_color: true},
+      {start: 20, end: 24, bold: true, italic: true, keep_color: true}
+    ]}
+  }
+
+  variants_large {
+    Position: {0, 0, 1}
+    Text: {value: "Regular Bold Italic Both", size: 36, font: variants_font}
+    Rgb: {230, 232, 240}
+    TextSpans: {spans: [
+      {start: 8, end: 12, bold: true, keep_color: true},
+      {start: 13, end: 19, italic: true, keep_color: true},
+      {start: 20, end: 24, bold: true, italic: true, keep_color: true}
     ]}
   }
 }

@@ -3,8 +3,10 @@
  * @brief Text components, the font registry and the systems that keep texts laid out.
  *
  * Setting a Text lays it out at once; a font that loads or an atlas page that grows lays out
- * the texts of its font again. The file watch loads a font again when its file changes.
- * Headless frames wait for the font and glyph jobs in flight.
+ * the texts of its font again, and of the fonts that name it in FontVariants.
+ *
+ * The file watch loads a font again when its file changes. Headless frames wait for the font
+ * and glyph jobs in flight, variant faces included.
  */
 
 #define BOX_TEXT_IMPL
@@ -290,6 +292,30 @@ done:
     return;
 }
 
+/** Lay out the texts of a font again whose FontVariants changed or was removed.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxFontVariantsOnChange(
+    ecs_iter_t *it)
+{
+    box_text_state_t *s = box_text_state_get(it->world);
+    int32_t i;
+    if (!s || ecs_is_fini(it->world)) {
+        goto done;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        box_text_font_t *font = ecs_map_get_deref(&s->fonts, box_text_font_t, it->entities[i]);
+        if (font) {
+            font->relayout = true;
+        }
+    }
+
+done:
+    return;
+}
+
 /** Count the font and glyph jobs in flight.
  *
  * @param sync The counter
@@ -396,7 +422,29 @@ static void BoxTextRefresh(
     }
 }
 
-/** Create the registry of a world and box.text.DefaultFont.
+/** Create a font entity of box.text with a path, which loads once a Text or a styled glyph
+ * needs it.
+ *
+ * @param world The world
+ * @param name Name of the entity
+ * @param path The font file
+ * @return The entity
+ */
+static ecs_entity_t box_text_default_font(
+    ecs_world_t *world,
+    const char *name,
+    const char *path)
+{
+    ecs_entity_t result = ecs_entity(world, { .name = name });
+    ecs_set(world, result, Font, {
+        .path = ECS_CONST_CAST(char*, path),
+        .atlas_pages = BOX_TEXT_ATLAS_PAGES_DEFAULT
+    });
+
+    return result;
+}
+
+/** Create the registry of a world and box.text.DefaultFont with its variants.
  *
  * @param world The world
  */
@@ -431,10 +479,13 @@ static void box_text_state_init(
         .flags = EcsQueryMatchDisabled
     });
     ecs_singleton_ensure(world, TextRegistry)->state = s;
-    s->default_font = ecs_entity(world, { .name = "DefaultFont" });
-    ecs_set(world, s->default_font, Font, {
-        .path = BOX_TEXT_DEFAULT_FONT,
-        .atlas_pages = BOX_TEXT_ATLAS_PAGES_DEFAULT
+    s->default_font = box_text_default_font(world, "DefaultFont", BOX_TEXT_DEFAULT_FONT);
+    ecs_set(world, s->default_font, FontVariants, {
+        .bold = box_text_default_font(world, "DefaultFontBold", BOX_TEXT_DEFAULT_FONT_BOLD),
+        .italic = box_text_default_font(world, "DefaultFontItalic",
+            BOX_TEXT_DEFAULT_FONT_ITALIC),
+        .bold_italic = box_text_default_font(world, "DefaultFontBoldItalic",
+            BOX_TEXT_DEFAULT_FONT_BOLD_ITALIC)
     });
 }
 
@@ -541,6 +592,12 @@ static void box_text_systems_init(
         .events = { EcsOnRemove },
         .callback = BoxFontOnRemove
     });
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "FontVariantsOnChange" }),
+        .query.terms = {{ .id = ecs_id(FontVariants) }},
+        .events = { EcsOnSet, EcsOnRemove },
+        .callback = BoxFontVariantsOnChange
+    });
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "TextFrame" }),
         .phase = EcsPreFrame,
@@ -568,6 +625,7 @@ void BoxTextImport(
     ECS_IMPORT(world, BoxJobs);
 
     ECS_META_COMPONENT(world, Font);
+    ECS_META_COMPONENT(world, FontVariants);
     ECS_META_COMPONENT(world, FontState);
     ECS_META_COMPONENT(world, FontStatus);
     ECS_META_COMPONENT(world, TextWrap);

@@ -1036,3 +1036,554 @@ void TextSpans_from_script(void) {
 
     ecs_fini(world);
 }
+
+/** Bold face of the font of the tests of styled spans, in the test assets */
+#define SPANS_FONT_BOLD "test/assets/fonts/B612-Bold.ttf"
+
+/** Italic face of the font of the tests of styled spans, in the test assets */
+#define SPANS_FONT_ITALIC "test/assets/fonts/B612-Italic.ttf"
+
+/** Bold italic face of the font of the tests of styled spans, in the test assets */
+#define SPANS_FONT_BOLD_ITALIC "test/assets/fonts/B612-BoldItalic.ttf"
+
+/** Frames the tests of variants run for the loads of a font and its variants to apply */
+#define SPANS_SETTLE (4)
+
+/** Create a font of the test assets with a path.
+ *
+ * @param world The world
+ * @param path The font file
+ * @return The font entity
+ */
+static ecs_entity_t spans_font_at(
+    ecs_world_t *world,
+    const char *path)
+{
+    ecs_entity_t font = ecs_new(world);
+    ecs_set(world, font, Font, { .path = (char*)path, .atlas_pages = 4 });
+
+    return font;
+}
+
+/** Create a font of the test assets with variant faces.
+ *
+ * @param world The world
+ * @param bold The bold variant, 0 for none
+ * @param italic The italic variant, 0 for none
+ * @param bold_italic The bold italic variant, 0 for none
+ * @return The font entity
+ */
+static ecs_entity_t spans_font_variants(
+    ecs_world_t *world,
+    ecs_entity_t bold,
+    ecs_entity_t italic,
+    ecs_entity_t bold_italic)
+{
+    ecs_entity_t font = spans_font(world);
+    ecs_set(world, font, FontVariants, {
+        .bold = bold, .italic = italic, .bold_italic = bold_italic });
+
+    return font;
+}
+
+/** Run the frames that apply the loads of fonts and variants and the layouts after them.
+ *
+ * @param world The world
+ */
+static void spans_settle(
+    ecs_world_t *world)
+{
+    int32_t i;
+    for (i = 0; i < SPANS_SETTLE; i ++) {
+        ecs_progress(world, 0);
+    }
+}
+
+/** Get the font of the registry of a font entity, NULL when no Text requested it.
+ *
+ * @param world The world
+ * @param font The font entity
+ * @return The font
+ */
+static box_text_font_t* spans_registry_font(
+    ecs_world_t *world,
+    ecs_entity_t font)
+{
+    box_text_state_t *s = box_text_state_get(world);
+    test_assert(s != NULL);
+
+    return ecs_map_get_deref(&s->fonts, box_text_font_t, font);
+}
+
+/** Get the loaded face of a font entity.
+ *
+ * @param world The world
+ * @param font The font entity
+ * @return The face
+ */
+static const box_text_face_t* spans_face(
+    ecs_world_t *world,
+    ecs_entity_t font)
+{
+    box_text_font_t *f = spans_registry_font(world, font);
+    test_assert(f != NULL);
+    test_assert(f->face != NULL);
+
+    return f->face;
+}
+
+/** Get the pen advance of a string in one face at SPANS_SIZE: the advances of its glyphs and
+ * the kerning between them, from box_text_face_advance and box_text_face_kern.
+ *
+ * @param world The world
+ * @param font The font entity of the face, loaded
+ * @param str The string, ASCII
+ * @return The advance in logical pixels
+ */
+static float spans_face_width(
+    ecs_world_t *world,
+    ecs_entity_t font,
+    const char *str)
+{
+    const box_text_face_t *face = spans_face(world, font);
+    float ascent, descent, gap;
+    float px = SPANS_SIZE / box_text_face_metrics(face, &ascent, &descent, &gap);
+    float result = 0.0f;
+    int32_t i, prev = -1;
+    for (i = 0; str[i]; i ++) {
+        int32_t glyph = box_text_face_glyph(face, str[i]);
+        if (prev >= 0) {
+            result += box_text_face_kern(face, prev, glyph) * px;
+        }
+
+        result += box_text_face_advance(face, glyph) * px;
+        prev = glyph;
+    }
+
+    return result;
+}
+
+/** Check whether a page handle belongs to the atlas of a font.
+ *
+ * @param world The world
+ * @param font The font entity
+ * @param page The backend handle of the page
+ * @return Whether the font has the page
+ */
+static bool spans_page_of(
+    ecs_world_t *world,
+    ecs_entity_t font,
+    uint32_t page)
+{
+    box_text_font_t *f = spans_registry_font(world, font);
+    int32_t i;
+    bool result = false;
+    for (i = 0; f && i < ecs_vec_count(&f->pages); i ++) {
+        result |= (*ecs_vec_get_t(&f->pages, box_text_page_t*, i))->handle == page;
+    }
+
+    return result;
+}
+
+/** Check the face, the advance and the synthesized style of the styled glyphs of a Text whose
+ * whole string has a style.
+ *
+ * @param world The world
+ * @param e The entity, its glyphs all styled
+ * @param face The font entity the glyphs take
+ * @param bold Whether bold is synthesized
+ * @param italic Whether italic is synthesized
+ */
+static void spans_face_expect(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_entity_t face,
+    bool bold,
+    bool italic)
+{
+    const Text *text = ecs_get(world, e, Text);
+    int32_t i, count = 0, length = (int32_t)strlen(text->value);
+    const box_text_glyph_t *glyphs = spans_glyphs(world, e, &count);
+    test_int(count, length);
+    for (i = 0; i < count; i ++) {
+        test_assert(spans_page_of(world, face, glyphs[i].page));
+        spans_style_expect(world, e, i, bold, italic);
+    }
+
+    float width = spans_face_width(world, face, text->value) +
+        (bold ? (float)length * SPANS_BOLD : 0.0f);
+    spans_near(spans_caret(world, e, length).x - spans_caret(world, e, 0).x, width);
+    spans_near(ecs_get(world, e, TextBounds)->width, width);
+}
+
+/** Get the FontStatus state of a font, -1 without status.
+ *
+ * @param world The world
+ * @param font The font entity
+ * @return The state
+ */
+static int32_t spans_font_state(
+    ecs_world_t *world,
+    ecs_entity_t font)
+{
+    const FontStatus *status = ecs_get(world, font, FontStatus);
+
+    return status ? (int32_t)status->state : -1;
+}
+
+void TextSpans_variant_bold_face(void) {
+    ecs_world_t *world = spans_world();
+    ecs_entity_t bold = spans_font_at(world, SPANS_FONT_BOLD);
+    ecs_entity_t font = spans_font_variants(world, bold, 0, 0);
+    ecs_entity_t e = spans_styled(world, 0, font, "abc def", 0);
+    spans_set(world, e, (TextSpan[]){{ 0, 3, {0}, .bold = true, .keep_color = true }}, 1);
+    spans_settle(world);
+
+    test_int(spans_font_state(world, bold), FontReady);
+    float word = spans_face_width(world, bold, "abc");
+    spans_near(spans_caret(world, e, 3).x - spans_caret(world, e, 0).x, word);
+    spans_near(ecs_get(world, e, TextBounds)->width,
+        word + spans_face_width(world, font, " def"));
+
+    int32_t i, count = 0;
+    const box_text_glyph_t *glyphs = spans_glyphs(world, e, &count);
+    test_int(count, 6);
+    for (i = 0; i < 3; i ++) {
+        spans_style_expect(world, e, i, false, false);
+        test_assert(spans_page_of(world, bold, glyphs[i].page));
+        test_assert(!spans_page_of(world, font, glyphs[i].page));
+    }
+
+    for (i = 3; i < 6; i ++) {
+        spans_style_expect(world, e, i, false, false);
+        test_assert(spans_page_of(world, font, glyphs[i].page));
+    }
+
+    ecs_fini(world);
+}
+
+void TextSpans_variant_missing_synthesizes(void) {
+    ecs_world_t *world = spans_world();
+    ecs_entity_t italic = spans_font_at(world, SPANS_FONT_ITALIC);
+    ecs_entity_t font = spans_font_variants(world, 0, italic, 0);
+    ecs_entity_t plain = spans_font(world);
+    ecs_entity_t e = spans_styled(world, 0, font, "abc def", 0);
+    ecs_entity_t ref = spans_styled(world, 0, plain, "abc def", 0);
+    float regular = ecs_get(world, e, TextBounds)->width;
+    TextSpan span = { 0, 3, {0}, .bold = true, .keep_color = true };
+    spans_set(world, e, &span, 1);
+    spans_set(world, ref, &span, 1);
+    spans_settle(world);
+
+    spans_near(ecs_get(world, e, TextBounds)->width, regular + 3 * SPANS_BOLD);
+    test_flt(ecs_get(world, e, TextBounds)->width, ecs_get(world, ref, TextBounds)->width);
+    spans_style_expect(world, e, 0, true, false);
+    spans_style_expect(world, e, 2, true, false);
+    spans_style_expect(world, e, 3, false, false);
+    test_int(spans_font_state(world, italic), -1);
+
+    ecs_fini(world);
+}
+
+void TextSpans_variant_table(void) {
+    ecs_world_t *world = spans_world();
+    ecs_entity_t bold = spans_font_at(world, SPANS_FONT_BOLD);
+    ecs_entity_t italic = spans_font_at(world, SPANS_FONT_ITALIC);
+    ecs_entity_t both = spans_font_at(world, SPANS_FONT_BOLD_ITALIC);
+    ecs_entity_t all = spans_font_variants(world, bold, italic, both);
+    ecs_entity_t no_both = spans_font_variants(world, bold, italic, 0);
+    ecs_entity_t only_italic = spans_font_variants(world, 0, italic, 0);
+    ecs_entity_t none = spans_font_variants(world, 0, 0, 0);
+    TextSpan bi = { 0, 4, {0}, .bold = true, .italic = true, .keep_color = true };
+    TextSpan b = { 0, 4, {0}, .bold = true, .keep_color = true };
+    TextSpan i = { 0, 4, {0}, .italic = true, .keep_color = true };
+    struct {
+        ecs_entity_t font;
+        const TextSpan *span;
+        ecs_entity_t face;
+        bool bold;
+        bool italic;
+    } rows[] = {
+        { all, &bi, both, false, false },
+        { no_both, &bi, bold, false, true },
+        { only_italic, &bi, italic, true, false },
+        { none, &bi, none, true, true },
+        { all, &b, bold, false, false },
+        { only_italic, &b, only_italic, true, false },
+        { all, &i, italic, false, false },
+        { none, &i, none, false, true }
+    };
+    int32_t r, count = (int32_t)(sizeof(rows) / sizeof(rows[0]));
+    ecs_entity_t texts[8];
+    for (r = 0; r < count; r ++) {
+        texts[r] = spans_styled(world, 0, rows[r].font, "Hava", 0);
+        spans_set(world, texts[r], rows[r].span, 1);
+    }
+
+    spans_settle(world);
+    for (r = 0; r < count; r ++) {
+        spans_face_expect(world, texts[r], rows[r].face, rows[r].bold, rows[r].italic);
+    }
+
+    ecs_fini(world);
+}
+
+void TextSpans_variant_loading_falls_back(void) {
+    ecs_world_t *world = spans_world();
+    ecs_entity_t bold = spans_font_at(world, SPANS_FONT_BOLD);
+    ecs_entity_t font = spans_font_variants(world, bold, 0, 0);
+    ecs_entity_t e = spans_styled(world, 0, font, "abcd", 0);
+    spans_settle(world);
+    float regular = ecs_get(world, e, TextBounds)->width;
+    test_int(spans_font_state(world, bold), -1);
+
+    spans_set(world, e, (TextSpan[]){{ 0, 4, {0}, .bold = true, .keep_color = true }}, 1);
+    test_int(spans_font_state(world, bold), FontLoading);
+    spans_near(ecs_get(world, e, TextBounds)->width, regular + 4 * SPANS_BOLD);
+    spans_face_expect(world, e, font, true, false);
+
+    /* A headless frame waits for the load of the variant, which lays the Text out again */
+    ecs_progress(world, 0);
+    test_int(spans_font_state(world, bold), FontReady);
+    spans_face_expect(world, e, bold, false, false);
+    spans_near(ecs_get(world, e, TextBounds)->width, spans_face_width(world, bold, "abcd"));
+
+    ecs_fini(world);
+}
+
+void TextSpans_variant_failed_keeps_fallback(void) {
+    ecs_world_t *world = spans_world();
+    ecs_entity_t bold = spans_font_at(world, "test/assets/fonts/missing.ttf");
+    ecs_entity_t font = spans_font_variants(world, bold, 0, 0);
+    ecs_entity_t e = spans_styled(world, 0, font, "abcd", 0);
+    spans_settle(world);
+    float regular = ecs_get(world, e, TextBounds)->width;
+
+    int32_t level = ecs_log_set_level(-4);
+    spans_set(world, e, (TextSpan[]){{ 0, 4, {0}, .bold = true, .keep_color = true }}, 1);
+    spans_settle(world);
+    ecs_log_set_level(level);
+
+    const FontStatus *status = ecs_get(world, bold, FontStatus);
+    test_assert(status != NULL);
+    test_int(status->state, FontFailed);
+    test_assert(status->error != NULL);
+    spans_face_expect(world, e, font, true, false);
+    spans_near(ecs_get(world, e, TextBounds)->width, regular + 4 * SPANS_BOLD);
+
+    ecs_fini(world);
+}
+
+void TextSpans_variant_lazy(void) {
+    ecs_world_t *world = spans_world();
+    ecs_entity_t bold = spans_font_at(world, SPANS_FONT_BOLD);
+    ecs_entity_t italic = spans_font_at(world, SPANS_FONT_ITALIC);
+    ecs_entity_t both = spans_font_at(world, SPANS_FONT_BOLD_ITALIC);
+    ecs_entity_t font = spans_font_variants(world, bold, italic, both);
+    ecs_entity_t e = spans_styled(world, 0, font, "plain text", 0);
+    spans_set(world, e, (TextSpan[]){{ 0, 5, { 255, 0, 0, 255 } }}, 1);
+    spans_settle(world);
+
+    test_int(spans_font_state(world, font), FontReady);
+    test_int(spans_font_state(world, bold), -1);
+    test_int(spans_font_state(world, italic), -1);
+    test_int(spans_font_state(world, both), -1);
+    test_assert(spans_registry_font(world, bold) == NULL);
+    test_assert(spans_registry_font(world, italic) == NULL);
+    test_assert(spans_registry_font(world, both) == NULL);
+
+    /* The variants of box.text.DefaultFont are named without being loaded */
+    ecs_entity_t def = ecs_lookup(world, "box.text.DefaultFont");
+    const FontVariants *v = ecs_get(world, def, FontVariants);
+    test_assert(v != NULL);
+    test_assert(v->bold == ecs_lookup(world, "box.text.DefaultFontBold"));
+    test_assert(v->italic == ecs_lookup(world, "box.text.DefaultFontItalic"));
+    test_assert(v->bold_italic == ecs_lookup(world, "box.text.DefaultFontBoldItalic"));
+    test_assert(v->bold != 0 && v->italic != 0 && v->bold_italic != 0);
+    test_assert(ecs_has(world, v->bold, Font));
+    test_int(spans_font_state(world, v->bold), -1);
+    test_int(spans_font_state(world, v->italic), -1);
+    test_int(spans_font_state(world, v->bold_italic), -1);
+
+    ecs_fini(world);
+}
+
+void TextSpans_variant_kerning_within_face(void) {
+    ecs_world_t *world = spans_world();
+    ecs_entity_t bold = spans_font_at(world, SPANS_FONT_BOLD);
+    ecs_entity_t font = spans_font_variants(world, bold, 0, 0);
+    ecs_entity_t ref = spans_styled(world, 0, font, "AV", 0);
+    ecs_entity_t bref = spans_styled(world, 0, bold, "AV", 0);
+    spans_settle(world);
+
+    /* A pair the regular and the bold face both kern */
+    const char *pairs[] = { "AV", "AT", "AY", "AW", "LT", "LV", "To", "Ta", "Te", "Ty", "Vo",
+        "Va", "Yo", "Ya", "Wa", "PA", "FA", "LY", "TA", "VA", "YA", "rv", "ry", "\"A" };
+    const box_text_face_t *regular = spans_face(world, font);
+    const box_text_face_t *boldface = spans_face(world, bold);
+    const char *pair = NULL;
+    int32_t p;
+    for (p = 0; p < (int32_t)(sizeof(pairs) / sizeof(pairs[0])) && !pair; p ++) {
+        int32_t l = box_text_face_glyph(regular, pairs[p][0]);
+        int32_t r = box_text_face_glyph(regular, pairs[p][1]);
+        int32_t bl = box_text_face_glyph(boldface, pairs[p][0]);
+        int32_t br = box_text_face_glyph(boldface, pairs[p][1]);
+        if (box_text_face_kern(regular, l, r) != 0 && box_text_face_kern(boldface, bl, br) != 0) {
+            pair = pairs[p];
+        }
+    }
+
+    test_assert(pair != NULL);
+    char first[2] = { pair[0], 0 };
+    ecs_entity_t e = spans_styled(world, 0, font, pair, 0);
+    ecs_set(world, ref, Text, { .value = (char*)pair, .size = SPANS_SIZE, .font = font });
+    ecs_set(world, bref, Text, { .value = (char*)pair, .size = SPANS_SIZE, .font = font });
+    spans_set(world, bref, (TextSpan[]){{ 0, 2, {0}, .bold = true, .keep_color = true }}, 1);
+    spans_set(world, e, (TextSpan[]){{ 1, 2, {0}, .bold = true, .keep_color = true }}, 1);
+    spans_settle(world);
+
+    /* One face kerns its pair */
+    spans_near(spans_caret(world, ref, 1).x - spans_caret(world, ref, 0).x,
+        spans_face_width(world, font, pair) - spans_face_width(world, font, pair + 1));
+    spans_near(spans_caret(world, bref, 1).x - spans_caret(world, bref, 0).x,
+        spans_face_width(world, bold, pair) - spans_face_width(world, bold, pair + 1));
+
+    /* Across a face change the pen only advances */
+    spans_near(spans_caret(world, e, 1).x - spans_caret(world, e, 0).x,
+        spans_face_width(world, font, first));
+    spans_near(ecs_get(world, e, TextBounds)->width,
+        spans_face_width(world, font, first) + spans_face_width(world, bold, pair + 1));
+    spans_style_expect(world, e, 1, false, false);
+
+    ecs_fini(world);
+}
+
+void TextSpans_variant_line_height(void) {
+    ecs_world_t *world = spans_world();
+    ecs_entity_t bold = spans_font_at(world, SPANS_FONT_BOLD);
+    ecs_entity_t italic = spans_font_at(world, SPANS_FONT_ITALIC);
+    ecs_entity_t font = spans_font_variants(world, bold, italic, 0);
+    ecs_entity_t e = spans_styled(world, 0, font, "abcd\nefgh", 0);
+    spans_settle(world);
+    TextBounds regular = *ecs_get(world, e, TextBounds);
+    float line = ecs_get(world, e, TextGlyphs)->line_height;
+    int32_t count = 0;
+    const box_text_glyph_t *glyphs = spans_glyphs(world, e, &count);
+    float plain[8];
+    int32_t i;
+    test_int(count, 8);
+    for (i = 0; i < count; i ++) {
+        plain[i] = glyphs[i].y + glyphs[i].height * 0.5f;
+    }
+
+    TextCaret caret = spans_caret(world, e, 5);
+    spans_set(world, e, (TextSpan[]){
+        { 0, 4, {0}, .bold = true, .keep_color = true },
+        { 5, 9, {0}, .italic = true, .keep_color = true }
+    }, 2);
+    spans_settle(world);
+
+    test_flt(ecs_get(world, e, TextBounds)->height, regular.height);
+    test_flt(ecs_get(world, e, TextGlyphs)->line_height, line);
+    TextCaret now = spans_caret(world, e, 5);
+    test_flt(now.y, caret.y);
+    test_flt(now.height, caret.height);
+    glyphs = spans_glyphs(world, e, &count);
+    test_int(count, 8);
+    test_assert(spans_page_of(world, bold, glyphs[0].page));
+    test_assert(spans_page_of(world, italic, glyphs[4].page));
+
+    /* B612 and its variants share their vertical metrics: the glyph tops sit where the ink of
+     * the face puts them, on the baseline of the line */
+    for (i = 0; i < count; i ++) {
+        float top = glyphs[i].y + glyphs[i].height * 0.5f;
+        test_assert(fabsf(top - plain[i]) < SPANS_SIZE * 0.25f);
+    }
+
+    ecs_fini(world);
+}
+
+void TextSpans_variant_changed(void) {
+    ecs_world_t *world = spans_world();
+    ecs_entity_t bold = spans_font_at(world, SPANS_FONT_BOLD);
+    ecs_entity_t font = spans_font(world);
+    ecs_entity_t e = spans_styled(world, 0, font, "abcd", 0);
+    spans_set(world, e, (TextSpan[]){{ 0, 4, {0}, .bold = true, .keep_color = true }}, 1);
+    spans_settle(world);
+    spans_face_expect(world, e, font, true, false);
+    int32_t layouts = 0;
+    spans_watch_layouts(world, e, &layouts);
+
+    /* Variants set on the font lay out its texts */
+    ecs_set(world, font, FontVariants, { .bold = bold });
+    spans_settle(world);
+    test_assert(layouts > 0);
+    spans_face_expect(world, e, bold, false, false);
+
+    /* A new path of the variant loads it again and lays out the texts that use it */
+    layouts = 0;
+    ecs_set(world, bold, Font, { .path = SPANS_FONT_BOLD_ITALIC, .atlas_pages = 4 });
+    spans_settle(world);
+    test_assert(layouts > 0);
+    test_int(ecs_get(world, bold, FontStatus)->revision, 2);
+    spans_face_expect(world, e, bold, false, false);
+
+    /* Variants removed synthesize again */
+    layouts = 0;
+    ecs_remove(world, font, FontVariants);
+    spans_settle(world);
+    test_assert(layouts > 0);
+    spans_face_expect(world, e, font, true, false);
+
+    ecs_fini(world);
+}
+
+void TextSpans_variant_deleted(void) {
+    ecs_world_t *world = spans_world();
+    ecs_entity_t bold = spans_font_at(world, SPANS_FONT_BOLD);
+    ecs_entity_t font = spans_font_variants(world, bold, 0, 0);
+    ecs_entity_t e = spans_styled(world, 0, font, "abcd", 0);
+    spans_set(world, e, (TextSpan[]){{ 0, 4, {0}, .bold = true, .keep_color = true }}, 1);
+    spans_settle(world);
+    spans_face_expect(world, e, bold, false, false);
+
+    ecs_delete(world, bold);
+    spans_settle(world);
+    test_assert(spans_registry_font(world, bold) == NULL);
+    spans_face_expect(world, e, font, true, false);
+
+    /* A Text set while the variant is gone lays out too */
+    ecs_entity_t other = spans_styled(world, 0, font, "ab", 0);
+    spans_set(world, other, (TextSpan[]){{ 0, 2, {0}, .bold = true, .keep_color = true }}, 1);
+    spans_settle(world);
+    spans_face_expect(world, other, font, true, false);
+
+    ecs_fini(world);
+}
+
+void TextSpans_variant_atlas_trim(void) {
+    ecs_world_t *world = spans_world();
+    ecs_entity_t bold = ecs_new(world);
+    ecs_set(world, bold, Font, { .path = SPANS_FONT_BOLD, .atlas_pages = 0 });
+    ecs_entity_t font = spans_font_variants(world, bold, 0, 0);
+    ecs_entity_t e = spans_styled(world, 0, font, "bold words", 0);
+    spans_set(world, e, (TextSpan[]){{ 0, 10, {0}, .bold = true, .keep_color = true }}, 1);
+    spans_settle(world);
+    spans_face_expect(world, e, bold, false, false);
+
+    box_text_state_t *s = box_text_state_get(world);
+    box_text_font_t *f = spans_registry_font(world, bold);
+    test_assert(ecs_vec_count(&f->pages) > 0);
+    int32_t pages = ecs_vec_count(&f->pages);
+    box_text_atlas_trim(world, s);
+    spans_settle(world);
+    test_int(ecs_vec_count(&f->pages), pages);
+    spans_face_expect(world, e, bold, false, false);
+
+    /* Once no Text shows them, the pages beyond the budget of the variant are released */
+    ecs_delete(world, e);
+    spans_settle(world);
+    test_int(ecs_vec_count(&spans_registry_font(world, bold)->pages), 0);
+
+    ecs_fini(world);
+}

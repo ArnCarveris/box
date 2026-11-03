@@ -236,7 +236,18 @@
                     "span_mid_utf8",
                     "empty_span",
                     "break_lines_spans",
-                    "from_script"
+                    "from_script",
+                    "variant_bold_face",
+                    "variant_missing_synthesizes",
+                    "variant_table",
+                    "variant_loading_falls_back",
+                    "variant_failed_keeps_fallback",
+                    "variant_lazy",
+                    "variant_kerning_within_face",
+                    "variant_line_height",
+                    "variant_changed",
+                    "variant_deleted",
+                    "variant_atlas_trim"
                 ]
             },
             {

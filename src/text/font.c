@@ -367,7 +367,8 @@ static int32_t box_text_revision(
     return status ? status->revision : 0;
 }
 
-/** Install the face a load produced and lay out the texts of the font again.
+/** Install the face a load produced and lay out the texts of the font again, and the texts of
+ * the fonts that name it as a variant.
  *
  * @param world The world
  * @param ctx The job
@@ -654,7 +655,8 @@ static int32_t box_text_page_index(
 }
 
 /** Find the least recently used page of a font that no laid out Text shows (a disabled Text is
- * still drawn, so it counts) and that the layout in progress does not use.
+ * still drawn, so it counts) and that the layout in progress does not use. A Text shows the
+ * pages of a variant face through the page handles of its glyphs, as those of its own font.
  *
  * @param world The world
  * @param s The registry
@@ -670,7 +672,9 @@ static int32_t box_text_page_idle(
     bool *shown = ecs_os_calloc_n(bool, count);
     const box_text_placed_t *placed = ecs_vec_first(&s->placed);
     for (i = 0; i < ecs_vec_count(&s->placed); i ++) {
-        if (placed[i].glyph && placed[i].glyph->page >= 0 && placed[i].glyph->page < count) {
+        if (placed[i].font == font && placed[i].glyph && placed[i].glyph->page >= 0 &&
+            placed[i].glyph->page < count)
+        {
             shown[placed[i].glyph->page] = true;
         }
     }
