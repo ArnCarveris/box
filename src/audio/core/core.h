@@ -259,19 +259,14 @@ typedef enum box_audio_synth_filter_t {
     BOX_AUDIO_SYNTH_BANDPASS = 3      /**< Bandpass, unity at the cutoff */
 } box_audio_synth_filter_t;
 
-<<<<<<< HEAD
 /** Slopes of the filter of a synth patch */
 typedef enum box_audio_synth_slope_t {
     BOX_AUDIO_SYNTH_SLOPE_12 = 0,  /**< 12 dB per octave, one stage */
     BOX_AUDIO_SYNTH_SLOPE_24 = 1   /**< 24 dB per octave, two cascaded stages */
 } box_audio_synth_slope_t;
 
-/** An envelope of a synth patch: a linear attack to 1, a decay to the sustain level, a hold
- * there and a release to 0 */
-=======
 /** An envelope of a synth patch: an attack to 1, a decay to the sustain level, a hold there
  * and a release to 0, each linear or curved and ending on time */
->>>>>>> 0a5adfddc7d9aa76bf5de78c241c09dd22a1c240
 typedef struct box_audio_synth_envelope_t {
     float attack;        /**< Seconds from 0 to 1 */
     float decay;         /**< Seconds from 1 to the sustain level */

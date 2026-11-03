@@ -1253,27 +1253,21 @@ void Synth_script_loop_source(void) {
 }
 
 /** The examples of docs/audio.md compile without errors, play and end: the click within 3
- * frames of AUDIO_DT, the blip within 12, the whoosh within 70 and the pluck within 48. */
+ * frames of AUDIO_DT, the blip within 12, the whoosh within 70, the pluck within 48 and the ring
+ * within 40. */
 void Synth_docs_examples(void) {
     // audio/synth
     ecs_world_t *world = audio_world();
     char *code = synth_read("test/assets/audio/synth_examples.flecs");
-    const char *names[] = { "UiClick", "UiBlip", "Whoosh", "Pluck" };
-<<<<<<< HEAD
-    const int32_t frames[] = { 3, 12, 70, 48 };
-=======
-    const int32_t frames[] = { 3, 12, 70, 40 };
->>>>>>> 0a5adfddc7d9aa76bf5de78c241c09dd22a1c240
+    const char *names[] = { "UiClick", "UiBlip", "Whoosh", "Pluck", "Ring" };
+    const int32_t frames[] = { 3, 12, 70, 48, 40 };
     int32_t i, start;
     audio_log_start();
     test_assert(ecs_script_run(world, "examples", code, NULL) == 0);
     ecs_os_free(code);
     audio_run(world, 1);
-<<<<<<< HEAD
-=======
-    test_flt(ecs_get(world, ecs_lookup(world, "Pluck"), AudioSynth)->patch.envelope.curve, 5);
->>>>>>> 0a5adfddc7d9aa76bf5de78c241c09dd22a1c240
-    for (i = 0; i < 4; i ++) {
+    test_flt(ecs_get(world, ecs_lookup(world, "Ring"), AudioSynth)->patch.envelope.curve, 5);
+    for (i = 0; i < 5; i ++) {
         ecs_entity_t sound = ecs_lookup(world, names[i]);
         test_assert(sound != 0);
         test_assert(ecs_get(world, sound, AudioSynth)->compiled);
@@ -1327,12 +1321,15 @@ void Synth_script_filter_envelope(void) {
     test_flt(synth->patch.filter_amount, 3.737f);
     test_flt(synth->patch.filter_envelope.attack, 0.5f);
 
-    ecs_set(world, pluck, SynthFilterEnvelope, { .decay = 0.1f, .amount = -2 });
+    ecs_set(world, pluck, SynthFilterEnvelope, { .decay = 0.1f, .curve = 3,
+        .attack_curve = -2, .amount = -2 });
     audio_run(world, 1);
     synth = ecs_get(world, pluck, AudioSynth);
     test_assert(synth->compiled);
     test_flt(synth->patch.filter_amount, -2);
     test_flt(synth->patch.filter_envelope.decay, 0.1f);
+    test_flt(synth->patch.filter_envelope.curve, 3);
+    test_flt(synth->patch.filter_envelope.attack_curve, -2);
     ecs_remove(world, pluck, SynthFilterEnvelope);
     audio_run(world, 1);
     synth = ecs_get(world, pluck, AudioSynth);

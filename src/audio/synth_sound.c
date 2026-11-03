@@ -158,7 +158,8 @@ bool box_audio_synth_compile(
         p.filter_amount = fenv->amount;
         p.filter_envelope = (box_audio_synth_envelope_t){
             .attack = fenv->attack, .decay = fenv->decay, .sustain = fenv->sustain,
-            .release = fenv->release, .hold = fenv->hold };
+            .release = fenv->release, .hold = fenv->hold, .curve = fenv->curve,
+            .attack_curve = fenv->attack_curve };
         fits = fits && box_audio_synth_envelope_fits(&p.filter_envelope);
     }
 

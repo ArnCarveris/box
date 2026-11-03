@@ -20,14 +20,9 @@ template Harp {
   prop f: f32 = 220
   AudioOutput: {bus: mv_music}
   SynthSound: {level_variance: 0.1}
-<<<<<<< HEAD
-  SynthEnvelope: {attack: 0.003, decay: 1.4}
+  SynthEnvelope: {attack: 0.003, decay: 1.8, curve: 4.5}
   SynthFilter: {kind: SynthLowPass, cutoff: 900, resonance: 0.1}
   SynthFilterEnvelope: {decay: 0.8, amount: 1.918}
-=======
-  SynthEnvelope: {attack: 0.003, decay: 1.8, curve: 4.5}
-  SynthFilter: {kind: SynthLowPass, cutoff: 3400, cutoff_end: 900, sweep: 0.8, resonance: 0.1}
->>>>>>> 0a5adfddc7d9aa76bf5de78c241c09dd22a1c240
   pluck { SynthOscillator: {wave: SynthTriangle, frequency: f, level: 0.32} }
   body { SynthOscillator: {wave: SynthSine, frequency: f, level: 0.3} }
   ring { SynthOscillator: {wave: SynthSine, frequency: f * 2, level: 0.08}; SynthEnvelope: {attack: 0.002, decay: 0.6, curve: 5} }
@@ -52,14 +47,9 @@ template Bass {
   prop f: f32 = 98
   AudioOutput: {bus: mv_music}
   SynthSound: {level_variance: 0.05}
-<<<<<<< HEAD
-  SynthEnvelope: {attack: 0.01, decay: 0.9}
+  SynthEnvelope: {attack: 0.01, decay: 1.0, curve: 3}
   SynthFilter: {kind: SynthLowPass, cutoff: 200, resonance: 0.2}
   SynthFilterEnvelope: {decay: 0.5, amount: 1.322}
-=======
-  SynthEnvelope: {attack: 0.01, decay: 1.0, curve: 3}
-  SynthFilter: {kind: SynthLowPass, cutoff: 500, cutoff_end: 200, sweep: 0.5, resonance: 0.2}
->>>>>>> 0a5adfddc7d9aa76bf5de78c241c09dd22a1c240
   body { SynthOscillator: {wave: SynthTriangle, frequency: f, level: 0.45} }
   sub { SynthOscillator: {wave: SynthSine, frequency: f, level: 0.4} }
 }

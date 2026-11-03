@@ -250,6 +250,9 @@ ECS_STRUCT(SynthFilterEnvelope, {
     float sustain;         /**< Level after the decay, 0..1, default 0 */
     float release;         /**< Seconds from the sustain level to 0 */
     float hold;            /**< Seconds at the sustain level before the release */
+    float curve;           /**< Curve of the decay and the release, 0 linear (default),
+                            *   -16..16 */
+    float attack_curve;    /**< Curve of the attack, 0 linear (default), -16..16 */
     float amount;          /**< Octaves the cutoff moves at level 1, -10..10, negative closes
                             *   the filter, default 0 */
 });

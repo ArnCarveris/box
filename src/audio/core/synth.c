@@ -1,14 +1,8 @@
 /**
  * @file audio/core/synth.c
-<<<<<<< HEAD
- * @brief The synth source: band limited oscillators and seeded noise, each with a linear
- * envelope, mixed into a state variable filter of one or two stages, whose cutoff an envelope
- * may move, and an amp, rendered per frame from a copy of the patch.
-=======
  * @brief The synth source: band limited oscillators and seeded noise, each with a linear or
- * curved envelope, mixed into a state variable filter and an amp, rendered per frame from a copy of
- * the patch.
->>>>>>> 0a5adfddc7d9aa76bf5de78c241c09dd22a1c240
+ * curved envelope, mixed into a state variable filter of one or two stages, whose cutoff an
+ * envelope may move, and an amp, rendered per frame from a copy of the patch.
  *
  * Every voice holds its own copy of the patch, so a play allocates nothing and a new patch for
  * the same sound reaches the next play while the voices that play keep theirs.
