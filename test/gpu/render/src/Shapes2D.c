@@ -5,6 +5,7 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "render.h"
@@ -2132,4 +2133,666 @@ void Shapes2D_box_shadow_slots_freed(void) {
 
     ecs_fini(world);
     box_render_null_free(null);
+}
+
+/** Set up the scene of a case of a shadow that follows its element, in the state before the
+ * change or in the state after it.
+ *
+ * @param world The world
+ * @param end Whether to set up the state after the change
+ */
+typedef void (*Shapes2D_follow_scene_t)(
+    ecs_world_t *world,
+    bool end);
+
+/** Change the scene of a case of a shadow that follows its element.
+ *
+ * @param world The world
+ * @param frame The frame of the change, from 0
+ */
+typedef void (*Shapes2D_follow_change_t)(
+    ecs_world_t *world,
+    int32_t frame);
+
+/** Test that two 64x64 captures differ: a channel of a pixel by more than 40.
+ *
+ * @param a The first capture
+ * @param b The second capture
+ * @return Whether they differ
+ */
+static bool Shapes2D_differ(
+    const unsigned char *a,
+    const unsigned char *b)
+{
+    int32_t i;
+    bool result = false;
+    for (i = 0; i < 64 * 64 * 4 && !result; i ++) {
+        result = (i % 4) != 3 && abs((int)a[i] - (int)b[i]) > 40;
+    }
+
+    return result;
+}
+
+/** Test that two 64x64 captures match: every channel of every pixel within 2.
+ *
+ * @param a The first capture
+ * @param b The second capture
+ */
+static void Shapes2D_close(
+    const unsigned char *a,
+    const unsigned char *b)
+{
+    int32_t i, count = 0;
+    for (i = 0; i < 64 * 64 * 4; i ++) {
+        if ((i % 4) != 3 && abs((int)a[i] - (int)b[i]) > 2) {
+            if (!count) {
+                printf("first mismatch at %d, %d channel %d: %d != %d\n",
+                    (i / 4) % 64, (i / 4) / 64, i % 4, a[i], b[i]);
+            }
+
+            count ++;
+        }
+    }
+
+    test_int(count, 0);
+}
+
+/** Test that a shadow follows its element through a change: the pixels after the change match
+ * a scene set up in the state after the change from the start, and differ from the pixels
+ * before it.
+ *
+ * @param file The name of the capture
+ * @param scene Sets up the scene
+ * @param change Makes the change, once per frame
+ * @param frames Frames to change and render
+ */
+static void Shapes2D_follow(
+    const char *file,
+    Shapes2D_follow_scene_t scene,
+    Shapes2D_follow_change_t change,
+    int32_t frames)
+{
+    int32_t f;
+    ecs_world_t *world = Shapes2D_shadow_world(file, false);
+    scene(world, true);
+    unsigned char *end = Shapes2D_shadow_capture(world, file);
+    ecs_fini(world);
+
+    world = Shapes2D_shadow_world(file, false);
+    scene(world, false);
+    unsigned char *px = Shapes2D_shadow_capture(world, file);
+    test_assert(Shapes2D_differ(px, end));
+    for (f = 0; f < frames; f ++) {
+        stbi_image_free(px);
+        change(world, f);
+        px = Shapes2D_shadow_capture(world, file);
+    }
+
+    Shapes2D_close(px, end);
+    stbi_image_free(px);
+    stbi_image_free(end);
+    ecs_fini(world);
+}
+
+/** Look up an entity of a follow scene by name.
+ *
+ * @param world The world
+ * @param name The name
+ * @return The entity
+ */
+static ecs_entity_t Shapes2D_named(
+    ecs_world_t *world,
+    const char *name)
+{
+    ecs_entity_t result = ecs_lookup(world, name);
+    test_assert(result != 0);
+
+    return result;
+}
+
+/** Add a named white rect with an offset soft shadow under a parent.
+ *
+ * @param world The world
+ * @param parent The parent, 0 for none
+ * @param name The name of the rect
+ * @param x Its x position
+ * @param y Its y position
+ * @return The rect
+ */
+static ecs_entity_t Shapes2D_follow_box(
+    ecs_world_t *world,
+    ecs_entity_t parent,
+    const char *name,
+    float x,
+    float y)
+{
+    ecs_entity_t e = Shapes2D_shadowed(world, parent, x, y, 16, (BoxShadow){
+        .offset_x = 4, .offset_y = -4, .blur = 4, .spread = 2, .color = {0, 0, 0, 255}});
+    ecs_set_name(world, e, name);
+
+    return e;
+}
+
+/** Add a named plain parent at a position.
+ *
+ * @param world The world
+ * @param parent Its parent, 0 for none
+ * @param name The name
+ * @param x Its x position
+ * @param y Its y position
+ * @return The entity
+ */
+static ecs_entity_t Shapes2D_follow_parent(
+    ecs_world_t *world,
+    ecs_entity_t parent,
+    const char *name,
+    float x,
+    float y)
+{
+    ecs_entity_t e = parent ? ecs_new_w_pair(world, EcsChildOf, parent) : ecs_new(world);
+    ecs_set_name(world, e, name);
+    ecs_set(world, e, Position, {x, y, 0});
+
+    return e;
+}
+
+static void Shapes2D_transform_scene(
+    ecs_world_t *world,
+    bool end)
+{
+    ecs_entity_t parent = Shapes2D_follow_parent(world, 0, "parent", 0, 0);
+    ecs_entity_t box = Shapes2D_follow_box(world, parent, "box", 0, 0);
+    if (end) {
+        ecs_set(world, parent, Position, {6, -4, 0});
+        ecs_set(world, parent, Rotation, {0, 0, 0.3f});
+        ecs_set(world, parent, Scale, {1.25f, 1.25f, 1});
+        ecs_set(world, box, Position, {2, 3, 0});
+    }
+}
+
+static void Shapes2D_transform_change(
+    ecs_world_t *world,
+    int32_t frame)
+{
+    ecs_entity_t parent = Shapes2D_named(world, "parent");
+    if (frame == 0) {
+        ecs_set(world, parent, Position, {6, -4, 0});
+        ecs_set(world, parent, Rotation, {0, 0, 0.3f});
+        ecs_set(world, parent, Scale, {1.25f, 1.25f, 1});
+    } else {
+        ecs_set(world, Shapes2D_named(world, "parent.box"), Position, {2, 3, 0});
+    }
+}
+
+void Shapes2D_box_shadow_follows_transform(void) {
+    // ui/box_shadow
+    Shapes2D_follow("shadow_follow_transform.png", Shapes2D_transform_scene,
+        Shapes2D_transform_change, 2);
+}
+
+static void Shapes2D_dynamic_transform_scene(
+    ecs_world_t *world,
+    bool end)
+{
+    ecs_entity_t parent = Shapes2D_follow_parent(world, 0, "parent", 0, 0);
+    ecs_entity_t box = Shapes2D_follow_box(world, parent, "box", 0, 0);
+    ecs_add(world, box, DynamicTransform);
+    if (end) {
+        ecs_set(world, parent, Position, {-3, 2, 0});
+        ecs_set(world, box, Position, {8, -5, 0});
+        ecs_set(world, box, Rotation, {0, 0, 0.5f});
+    }
+}
+
+static void Shapes2D_dynamic_transform_change(
+    ecs_world_t *world,
+    int32_t frame)
+{
+    ecs_entity_t box = Shapes2D_named(world, "parent.box");
+    float x[3] = {-6, 3, 8}, y[3] = {4, -2, -5}, angle[3] = {0.2f, -0.4f, 0.5f};
+    ecs_set(world, box, Position, {x[frame], y[frame], 0});
+    ecs_set(world, box, Rotation, {0, 0, angle[frame]});
+    if (frame == 2) {
+        ecs_set(world, Shapes2D_named(world, "parent"), Position, {-3, 2, 0});
+    }
+}
+
+void Shapes2D_box_shadow_follows_dynamic_transform(void) {
+    // ui/box_shadow
+    Shapes2D_follow("shadow_follow_dynamic_transform.png", Shapes2D_dynamic_transform_scene,
+        Shapes2D_dynamic_transform_change, 3);
+}
+
+static void Shapes2D_size_scene(
+    ecs_world_t *world,
+    bool end)
+{
+    ecs_entity_t box = Shapes2D_follow_box(world, 0, "box", 0, 0);
+    if (end) {
+        ecs_set(world, box, Rect, {26, 12});
+    }
+}
+
+static void Shapes2D_size_change(
+    ecs_world_t *world,
+    int32_t frame)
+{
+    (void)frame;
+    ecs_set(world, Shapes2D_named(world, "box"), Rect, {26, 12});
+}
+
+void Shapes2D_box_shadow_follows_size(void) {
+    // ui/box_shadow
+    Shapes2D_follow("shadow_follow_size.png", Shapes2D_size_scene, Shapes2D_size_change, 1);
+}
+
+static void Shapes2D_opacity_scene(
+    ecs_world_t *world,
+    bool end)
+{
+    ecs_entity_t parent = Shapes2D_follow_parent(world, 0, "parent", 0, 0);
+    ecs_entity_t box = Shapes2D_follow_box(world, parent, "box", 0, 0);
+    ecs_set(world, box, Rgb, {255, 0, 0});
+    if (end) {
+        ecs_set(world, box, Opacity, {0.5f});
+        ecs_set(world, parent, Opacity, {0.6f});
+    }
+}
+
+static void Shapes2D_opacity_change(
+    ecs_world_t *world,
+    int32_t frame)
+{
+    if (frame == 0) {
+        ecs_set(world, Shapes2D_named(world, "parent.box"), Opacity, {0.5f});
+    } else {
+        ecs_set(world, Shapes2D_named(world, "parent"), Opacity, {0.6f});
+    }
+}
+
+void Shapes2D_box_shadow_follows_opacity(void) {
+    // ui/box_shadow
+    Shapes2D_follow("shadow_follow_opacity.png", Shapes2D_opacity_scene,
+        Shapes2D_opacity_change, 2);
+}
+
+static void Shapes2D_dynamic_material_scene(
+    ecs_world_t *world,
+    bool end)
+{
+    ecs_entity_t parent = Shapes2D_follow_parent(world, 0, "parent", -12, 0);
+    ecs_entity_t box = Shapes2D_follow_box(world, 0, "box", 12, 0);
+    ecs_entity_t child = Shapes2D_follow_box(world, parent, "child", 0, 0);
+    ecs_add(world, box, DynamicMaterial);
+    ecs_add(world, parent, DynamicMaterial);
+    ecs_set(world, box, Rgb, {0, 0, 255});
+    ecs_set(world, child, Rgb, {0, 255, 0});
+    ecs_set(world, box, Opacity, {end ? 0.3f : 0.9f});
+    ecs_set(world, parent, Opacity, {end ? 0.4f : 0.9f});
+}
+
+static void Shapes2D_dynamic_material_change(
+    ecs_world_t *world,
+    int32_t frame)
+{
+    ecs_set(world, Shapes2D_named(world, "box"), Opacity, {frame ? 0.3f : 0.6f});
+    ecs_set(world, Shapes2D_named(world, "parent"), Opacity, {frame ? 0.4f : 0.7f});
+}
+
+void Shapes2D_box_shadow_follows_dynamic_material(void) {
+    // ui/box_shadow
+    Shapes2D_follow("shadow_follow_dynamic_material.png", Shapes2D_dynamic_material_scene,
+        Shapes2D_dynamic_material_change, 2);
+}
+
+static void Shapes2D_tint_scene(
+    ecs_world_t *world,
+    bool end)
+{
+    ecs_entity_t parent = Shapes2D_follow_parent(world, 0, "parent", 0, 0);
+    ecs_entity_t box = Shapes2D_follow_box(world, parent, "box", 0, 0);
+    if (end) {
+        ecs_set(world, parent, Tint, {255, 0, 0, 128});
+        ecs_set(world, box, Tint, {0, 0, 255, 100});
+    }
+}
+
+static void Shapes2D_tint_change(
+    ecs_world_t *world,
+    int32_t frame)
+{
+    if (frame == 0) {
+        ecs_set(world, Shapes2D_named(world, "parent"), Tint, {255, 0, 0, 128});
+    } else {
+        ecs_set(world, Shapes2D_named(world, "parent.box"), Tint, {0, 0, 255, 100});
+    }
+}
+
+void Shapes2D_box_shadow_follows_tint(void) {
+    // ui/box_shadow
+    Shapes2D_follow("shadow_follow_tint.png", Shapes2D_tint_scene, Shapes2D_tint_change, 2);
+}
+
+/** A white clip area with a child whose shadow reaches past it, clipped when on is set.
+ *
+ * @param world The world
+ * @param on Whether the area has ClipChildren
+ */
+static void Shapes2D_clip_scene_of(
+    ecs_world_t *world,
+    bool on)
+{
+    ecs_entity_t clip = Shapes2D_follow_parent(world, 0, "clip", 0, 0);
+    ecs_set(world, clip, Rect, {24, 24});
+    ecs_set(world, clip, Rgb, {255, 255, 255});
+    Shapes2D_shadowed(world, clip, 0, 0, 10, (BoxShadow){.spread = 10, .color = {0, 0, 0, 255}});
+    if (on) {
+        ecs_add_id(world, clip, ClipChildren);
+    }
+}
+
+static void Shapes2D_clip_added_scene(
+    ecs_world_t *world,
+    bool end)
+{
+    Shapes2D_clip_scene_of(world, end);
+}
+
+static void Shapes2D_clip_added_change(
+    ecs_world_t *world,
+    int32_t frame)
+{
+    (void)frame;
+    ecs_add_id(world, Shapes2D_named(world, "clip"), ClipChildren);
+}
+
+void Shapes2D_box_shadow_follows_clip_added(void) {
+    // ui/box_shadow
+    Shapes2D_follow("shadow_follow_clip_added.png", Shapes2D_clip_added_scene,
+        Shapes2D_clip_added_change, 1);
+}
+
+static void Shapes2D_clip_removed_scene(
+    ecs_world_t *world,
+    bool end)
+{
+    Shapes2D_clip_scene_of(world, !end);
+}
+
+static void Shapes2D_clip_removed_change(
+    ecs_world_t *world,
+    int32_t frame)
+{
+    (void)frame;
+    ecs_remove_id(world, Shapes2D_named(world, "clip"), ClipChildren);
+}
+
+void Shapes2D_box_shadow_follows_clip_removed(void) {
+    // ui/box_shadow
+    Shapes2D_follow("shadow_follow_clip_removed.png", Shapes2D_clip_removed_scene,
+        Shapes2D_clip_removed_change, 1);
+}
+
+/** Add a named green rect left and a named red rect right of the origin to a panel, 16x40, so
+ * the shadow of an element at the origin reaches both.
+ *
+ * @param world The world
+ * @param panel The panel
+ * @param left Whether to add the left rect
+ * @param right Whether to add the right rect
+ */
+static void Shapes2D_order_sides(
+    ecs_world_t *world,
+    ecs_entity_t panel,
+    bool left,
+    bool right)
+{
+    if (left) {
+        ecs_entity_t early = Shapes2D_follow_parent(world, panel, "early", -12, 0);
+        ecs_set(world, early, Rect, {16, 40});
+        ecs_set(world, early, Rgb, {0, 255, 0});
+    }
+
+    if (right) {
+        ecs_entity_t late = Shapes2D_follow_parent(world, panel, "late", 12, 0);
+        ecs_set(world, late, Rect, {16, 40});
+        ecs_set(world, late, Rgb, {255, 0, 0});
+    }
+}
+
+/** Add the element of the draw order cases: a 12x12 rect with a shadow over its neighbors.
+ *
+ * @param world The world
+ * @param parent The parent
+ * @return The element
+ */
+static ecs_entity_t Shapes2D_order_box(
+    ecs_world_t *world,
+    ecs_entity_t parent)
+{
+    ecs_entity_t e = Shapes2D_shadowed(world, parent, 0, 0, 12,
+        (BoxShadow){.spread = 10, .color = {0, 0, 0, 255}});
+    ecs_set_name(world, e, "box");
+
+    return e;
+}
+
+static void Shapes2D_z_scene(
+    ecs_world_t *world,
+    bool end)
+{
+    ecs_entity_t panel = Shapes2D_follow_parent(world, 0, "panel", 0, 0);
+    Shapes2D_order_sides(world, panel, true, false);
+    ecs_entity_t box = Shapes2D_order_box(world, panel);
+    Shapes2D_order_sides(world, panel, false, true);
+    if (end) {
+        ecs_set(world, box, Position, {0, 0, 1});
+    }
+}
+
+static void Shapes2D_z_change(
+    ecs_world_t *world,
+    int32_t frame)
+{
+    (void)frame;
+    ecs_set(world, Shapes2D_named(world, "panel.box"), Position, {0, 0, 1});
+}
+
+void Shapes2D_box_shadow_follows_z(void) {
+    // ui/box_shadow
+    Shapes2D_follow("shadow_follow_z.png", Shapes2D_z_scene, Shapes2D_z_change, 1);
+}
+
+static void Shapes2D_child_order_scene(
+    ecs_world_t *world,
+    bool end)
+{
+    ecs_entity_t panel = Shapes2D_follow_parent(world, 0, "panel", 0, 0);
+    ecs_add_id(world, panel, EcsOrderedChildren);
+    if (end) {
+        Shapes2D_order_sides(world, panel, true, true);
+        Shapes2D_order_box(world, panel);
+    } else {
+        Shapes2D_order_box(world, panel);
+        Shapes2D_order_sides(world, panel, true, true);
+    }
+}
+
+static void Shapes2D_child_order_change(
+    ecs_world_t *world,
+    int32_t frame)
+{
+    ecs_entity_t order[3] = {
+        Shapes2D_named(world, "panel.early"),
+        Shapes2D_named(world, "panel.late"),
+        Shapes2D_named(world, "panel.box")
+    };
+    (void)frame;
+    ecs_set_child_order(world, Shapes2D_named(world, "panel"), order, 3);
+}
+
+void Shapes2D_box_shadow_follows_child_order(void) {
+    // ui/box_shadow
+    Shapes2D_follow("shadow_follow_child_order.png", Shapes2D_child_order_scene,
+        Shapes2D_child_order_change, 1);
+}
+
+static void Shapes2D_float_scene(
+    ecs_world_t *world,
+    bool end)
+{
+    ecs_entity_t panel = Shapes2D_follow_parent(world, 0, "panel", 0, 0);
+    Shapes2D_order_sides(world, panel, true, false);
+    ecs_entity_t box = Shapes2D_order_box(world, panel);
+    Shapes2D_order_sides(world, panel, false, true);
+    if (end) {
+        ecs_set(world, box, LayoutFloat, {0});
+    }
+}
+
+static void Shapes2D_float_change(
+    ecs_world_t *world,
+    int32_t frame)
+{
+    (void)frame;
+    ecs_set(world, Shapes2D_named(world, "panel.box"), LayoutFloat, {0});
+}
+
+void Shapes2D_box_shadow_follows_float(void) {
+    // ui/box_shadow
+    Shapes2D_follow("shadow_follow_float.png", Shapes2D_float_scene, Shapes2D_float_change, 1);
+}
+
+static void Shapes2D_reparent_scene(
+    ecs_world_t *world,
+    bool end)
+{
+    ecs_entity_t panel = Shapes2D_follow_parent(world, 0, "panel", 0, 0);
+    ecs_entity_t back = Shapes2D_follow_parent(world, panel, "back", 0, 0);
+    Shapes2D_order_sides(world, panel, true, true);
+    ecs_entity_t front = Shapes2D_follow_parent(world, panel, "front", 0, 0);
+    Shapes2D_order_box(world, end ? front : back);
+}
+
+static void Shapes2D_reparent_change(
+    ecs_world_t *world,
+    int32_t frame)
+{
+    (void)frame;
+    ecs_add_pair(world, Shapes2D_named(world, "panel.back.box"), EcsChildOf,
+        Shapes2D_named(world, "panel.front"));
+}
+
+void Shapes2D_box_shadow_follows_reparent(void) {
+    // ui/box_shadow
+    Shapes2D_follow("shadow_follow_reparent.png", Shapes2D_reparent_scene,
+        Shapes2D_reparent_change, 1);
+}
+
+static void Shapes2D_scene_scene(
+    ecs_world_t *world,
+    bool end)
+{
+    ecs_entity_t root = Shapes2D_follow_parent(world, 0, "root", 0, 0);
+    Shapes2D_follow_box(world, root, "box", 0, 0);
+    if (end) {
+        ecs_add(world, root, Scene);
+    }
+}
+
+static void Shapes2D_scene_change(
+    ecs_world_t *world,
+    int32_t frame)
+{
+    (void)frame;
+    ecs_add(world, Shapes2D_named(world, "root"), Scene);
+}
+
+void Shapes2D_box_shadow_follows_scene(void) {
+    // ui/box_shadow
+    Shapes2D_follow("shadow_follow_scene.png", Shapes2D_scene_scene, Shapes2D_scene_change, 1);
+}
+
+static void Shapes2D_batch_scene(
+    ecs_world_t *world,
+    bool end)
+{
+    ecs_entity_t box = Shapes2D_follow_box(world, 0, "box", 0, 0);
+    ecs_set(world, box, Rgb, {255, 0, 0});
+    if (end) {
+        ecs_set(world, box, BlendMode, {Additive});
+    }
+}
+
+static void Shapes2D_batch_change(
+    ecs_world_t *world,
+    int32_t frame)
+{
+    (void)frame;
+    ecs_set(world, Shapes2D_named(world, "box"), BlendMode, {Additive});
+}
+
+void Shapes2D_box_shadow_follows_batch(void) {
+    // ui/box_shadow
+    Shapes2D_follow("shadow_follow_batch.png", Shapes2D_batch_scene, Shapes2D_batch_change, 1);
+}
+
+/** A shadowed element next to one without a shadow, disabled when off is set.
+ *
+ * @param world The world
+ * @param off Whether the element is disabled
+ */
+static void Shapes2D_disabled_scene_of(
+    ecs_world_t *world,
+    bool off)
+{
+    ecs_entity_t box = Shapes2D_follow_box(world, 0, "box", -10, 0);
+    ecs_entity_t other = Shapes2D_follow_parent(world, 0, "other", 16, 0);
+    ecs_set(world, other, Rect, {10, 10});
+    ecs_set(world, other, Rgb, {0, 0, 255});
+    if (off) {
+        ecs_enable(world, box, false);
+    }
+}
+
+static void Shapes2D_disabled_scene(
+    ecs_world_t *world,
+    bool end)
+{
+    Shapes2D_disabled_scene_of(world, end);
+}
+
+static void Shapes2D_disabled_change(
+    ecs_world_t *world,
+    int32_t frame)
+{
+    (void)frame;
+    ecs_enable(world, Shapes2D_named(world, "box"), false);
+}
+
+void Shapes2D_box_shadow_follows_disabled(void) {
+    // ui/box_shadow
+    Shapes2D_follow("shadow_follow_disabled.png", Shapes2D_disabled_scene,
+        Shapes2D_disabled_change, 1);
+}
+
+static void Shapes2D_enabled_scene(
+    ecs_world_t *world,
+    bool end)
+{
+    Shapes2D_disabled_scene_of(world, !end);
+}
+
+static void Shapes2D_enabled_change(
+    ecs_world_t *world,
+    int32_t frame)
+{
+    (void)frame;
+    ecs_enable(world, Shapes2D_named(world, "box"), true);
+}
+
+void Shapes2D_box_shadow_follows_enabled(void) {
+    // ui/box_shadow
+    Shapes2D_follow("shadow_follow_enabled.png", Shapes2D_enabled_scene,
+        Shapes2D_enabled_change, 1);
 }

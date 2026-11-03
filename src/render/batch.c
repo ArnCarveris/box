@@ -92,13 +92,7 @@ static float box_draws_linear_f(
     return box_draws_srgb[i] + (box_draws_srgb[i + 1] - box_draws_srgb[i]) * f;
 }
 
-/** Write the base color of a shape, mixed toward its tints, as linear light.
- *
- * @param out Three floats receiving the color
- * @param color The base color, display encoded
- * @param material Material components of the entity
- */
-static void box_draws_tinted(
+void box_draws_tinted(
     float *out,
     const uint8_t *color,
     const box_draw_material_t *material)
@@ -1948,6 +1942,7 @@ static void box_draws_fill_material(
     const Shape2D *shapes2d = ecs_field(it, Shape2D, 11);
     const void *cutoffs = ecs_field(it, AlphaCutoff, 12);
     const Tint *tints = ecs_table_get_id(it->world, it->table, ecs_id(Tint), it->offset);
+    const BoxShadowSlot *shadows = shapes2d ? box_draws_box_shadows(it) : NULL;
     ecs_size_t color_step = box_draws_stride(it, colors, ECS_SIZEOF(Rgb), 3);
     ecs_size_t opacity_step = box_draws_stride(it, opacities, ECS_SIZEOF(Opacity), 4);
     ecs_size_t pbr_step = box_draws_stride(it, pbrs, ECS_SIZEOF(PbrMaterial), 5);
@@ -1991,6 +1986,10 @@ static void box_draws_fill_material(
             box_render_shading_t *out = box_draws_slot_shading(b, slots[i].slot);
             box_draws_material(out, &material);
             alpha = box_draws_alpha(&material);
+            if (shadows) {
+                box_draws_box_shadow_write(it->world, d, it->entities[i], &shadows[i],
+                    &slots[i], NULL, &material, BOX_DRAW_SHADING);
+            }
         } else {
             uint32_t id = box_draws_material_id(it->world, d, it->entities[i], true, true);
             box_render_mesh_shading_t *out = box_draws_slot_mesh_shading(b, slots[i].slot);
@@ -2025,6 +2024,7 @@ static void box_draws_fill_transform(
     const ShapeMesh *shapes = ecs_field(it, ShapeMesh, 0);
     const DrawSlot *slots = ecs_field(it, DrawSlot, 1);
     const WorldTransform *transforms = ecs_field(it, WorldTransform, 2);
+    const BoxShadowSlot *shadows = box_draws_box_shadows(it);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         if (slots[i].batch < 0) {
@@ -2039,6 +2039,11 @@ static void box_draws_fill_transform(
         box_render_transform_t *out = box_draws_slot_transform(b, slots[i].slot);
         box_render_transform_t was = *out;
         box_draws_transform(out, transforms ? &transforms[i] : NULL, &shapes[i]);
+        if (shadows) {
+            box_draws_box_shadow_write(it->world, d, it->entities[i], &shadows[i], &slots[i],
+                transforms ? &transforms[i] : NULL, NULL, BOX_DRAW_TRANSFORM);
+        }
+
         if (!box_draws_is_2d(b) && d->shadow_record &&
             ecs_os_memcmp_t(&was, out, box_render_transform_t))
         {

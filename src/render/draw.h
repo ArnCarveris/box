@@ -183,7 +183,9 @@ extern ECS_COMPONENT_DECLARE(TextSlots);
 /** Batch, slot and rank of the shadow of a 2D shape with a BoxShadow, added with every BoxShadow.
  *
  * The shadow is a second instance of the entity drawn just before its shape, in the batch of the
- * shape with the AlphaBlend blend mode and no textures. */
+ * shape with the AlphaBlend blend mode and no textures. A removed BoxShadow frees the slot and
+ * leaves the component without a batch; the changes of the entity then skip it, as they check
+ * for BoxShadow. */
 typedef struct BoxShadowSlot {
     int32_t batch;  /**< Index of the batch, -1 when no shadow is drawn */
     int32_t slot;   /**< Slot of the shadow in the batch */
@@ -725,6 +727,18 @@ void box_draws_surface(
  */
 void box_draws_material(
     box_render_shading_t *out,
+    const box_draw_material_t *material);
+
+/** Write a display encoded color mixed toward the tints of a shape as linear light: those of
+ * its ancestors and then its own, as its base and border color are.
+ *
+ * @param out Three floats receiving the color
+ * @param color The color, display encoded, three channels
+ * @param material Material components of the entity, of which inherited and tint are read
+ */
+void box_draws_tinted(
+    float *out,
+    const uint8_t *color,
     const box_draw_material_t *material);
 
 /** Pack a linear color and alpha into the color of a 2D shading as unorm16x4: r | g << 16,
@@ -1517,6 +1531,39 @@ void box_draws_box_shadow_update(
     box_render_draws_t *d,
     ecs_entity_t e,
     const DrawSlot *s);
+
+/** Get the shadow slots of the rows of a query result, so the per frame paths check for a shadow
+ * once per table.
+ *
+ * @param it The query result
+ * @return The BoxShadowSlot of each row, NULL when the table has none. A slot stays when its
+ *         BoxShadow is removed, without a batch, so it costs a check of the batch per row
+ */
+const BoxShadowSlot* box_draws_box_shadows(
+    const ecs_iter_t *it);
+
+/** Write the streams of the shadow of an entity that its batch uploads every frame, as the
+ * shape of the entity writes them: the transform of a DynamicTransform shape, the shading of a
+ * DynamicMaterial shape. A shadow without a slot is left as it is.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ * @param bs The BoxShadowSlot of the entity
+ * @param s The DrawSlot of the entity
+ * @param transform World transform of the entity, NULL for the identity
+ * @param material Material components of the shape, read when kinds has the shading
+ * @param kinds box_draw_kind_t, the streams to write
+ */
+void box_draws_box_shadow_write(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e,
+    const BoxShadowSlot *bs,
+    const DrawSlot *s,
+    const WorldTransform *transform,
+    const box_draw_material_t *material,
+    uint8_t kinds);
 
 /** Free the shadow slot of an entity.
  *

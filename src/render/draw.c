@@ -816,7 +816,7 @@ static void box_draws_update(
     kinds = s->changed;
     s->changed = 0;
     box_draws_update_shape(world, d, e, s, kinds);
-    if (ecs_has(world, e, BoxShadowSlot)) {
+    if (ecs_has(world, e, BoxShadow)) {
         box_draws_box_shadow_update(world, d, e, s);
     }
 
