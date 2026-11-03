@@ -38,7 +38,6 @@ static ecs_entity_t box_draws_clip_up(
     return result;
 }
 
-<<<<<<< HEAD
 /** Most hide_clipped floats a check of whether a float hides goes through, its anchor inside
  * another one */
 #define BOX_DRAWS_FLOAT_NEST (8)
@@ -67,8 +66,6 @@ static const LayoutFloat* box_draws_float_hiding(
     return result;
 }
 
-float box_render_clip_area(
-=======
 /** Get the bounds of an element: half its LayoutBounds, else half its Rect, 0 for neither.
  *
  * @param world The world
@@ -76,7 +73,6 @@ float box_render_clip_area(
  * @param half Receives half its width and half its height
  */
 static void box_draws_clip_bounds(
->>>>>>> d961877dae8bc1c1218c55d9237eff01d669815e
     const ecs_world_t *world,
     ecs_entity_t e,
     float half[2])
