@@ -1,7 +1,7 @@
 /**
  * @file animation/animation.c
  * @brief Animation clips and tracks: resolving a track through reflection, sampling its curve
- * and writing the sampled value into a component.
+ * and writing the sampled value into a component. Playback is in animator.c.
  */
 
 #define BOX_ANIMATION_IMPL
@@ -417,6 +417,8 @@ static void BoxAnimationTrackResolve(
 
         ecs_set_ptr(it->stage, it->entities[i], AnimationTrackState, &state);
     }
+
+    box_animator_changed(it->world);
 }
 
 /** Remove the resolved state of tracks whose AnimationTrack is removed.
@@ -430,6 +432,8 @@ static void BoxAnimationTrackRemove(
     for (i = 0; i < it->count; i ++) {
         ecs_remove(it->stage, it->entities[i], AnimationTrackState);
     }
+
+    box_animator_changed(it->world);
 }
 
 void BoxAnimationImport(
@@ -444,6 +448,9 @@ void BoxAnimationImport(
         BOX_OWNED_CURVE(AnimationTrack, curve));
     ECS_META_COMPONENT(world, AnimationClip);
     ECS_COMPONENT_DEFINE(world, AnimationTrackState);
+    ECS_META_COMPONENT(world, AnimationMode);
+    ECS_META_COMPONENT(world, Animator);
+    box_animator_import(world);
 
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "BoxAnimationTrackResolve" }),

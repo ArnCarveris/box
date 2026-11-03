@@ -62,4 +62,27 @@ bool box_animation_write(
     ecs_entity_t entity,
     float value);
 
+/** World state of the animators, a singleton on its component */
+typedef struct AnimatorWorld {
+    uint32_t version;   /**< Bumped when a track or a clip changes, so animators rebuild */
+    int32_t count;      /**< Entities with the private state of an Animator */
+} AnimatorWorld;
+
+/** Id of the private animator world singleton */
+extern ECS_COMPONENT_DECLARE(AnimatorWorld);
+
+/** Signal that a track or a clip changed, so that every animator rebuilds its tracks.
+ *
+ * @param world The world
+ */
+void box_animator_changed(
+    ecs_world_t *world);
+
+/** Register Animator, its private state, the observers that keep it current and AnimatorPlay.
+ *
+ * @param world The world
+ */
+void box_animator_import(
+    ecs_world_t *world);
+
 #endif
