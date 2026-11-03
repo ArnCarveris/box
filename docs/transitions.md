@@ -9,7 +9,8 @@ its descendants (see [Transform transitions](#transform-transitions)), transitio
 `AlphaCutoff`, `PbrMaterial`, `Emissive`, `TextureTransform`, `Transmission`, `ClearCoat`,
 `SpecularAnisotropy`, `Sheen` and `DiffuseTransmission` for mesh shapes, 2D shapes and texts (see [Material transitions](#material-transitions)), and
 transitions of `Tint` and `Opacity` composed down the hierarchy (see [Tint and opacity
-transitions](#tint-and-opacity-transitions)). It works on the render thread, in main thread mode
+transitions](#tint-and-opacity-transitions)), and transitions of `BoxShadow`, the offset, blur,
+spread and color of the shadow of a 2D shape (see [Box shadows](#box-shadows)). It works on the render thread, in main thread mode
 (the browser) and with the null backend. What it does not do is listed in
 [Limitations](#limitations), and what it costs in [The fast path](#the-fast-path).
 
@@ -72,7 +73,7 @@ preset, `{0.42, 0, 0.58, 1}` for `EaseInOut`, give the values of the preset.
 - `y1` and `y2` are free. Outside 0..1 the eased progress leaves 0..1 between the ends, and
   the rendered value overshoots past its target or, before it, back past its start, as a CSS
   `back` easing does. Float fields extrapolate; `uint8_t` fields (`Rgb`, `Tint`, the colors of
-  `Emissive`, `Transmission`, `Sheen` and `DiffuseTransmission`) are clamped to 0..255 when
+  `Emissive`, `Transmission`, `Sheen`, `DiffuseTransmission` and `BoxShadow`) are clamped to 0..255 when
   they are rounded. The encodings clamp what has a range: `Opacity`, `AlphaCutoff`,
   `PbrMaterial`, `ClearCoat`, `SpecularAnisotropy.strength`, the factor and roughness of
   `Sheen` and `DiffuseTransmission` to 0..1, a negative `Emissive.strength` and
@@ -161,7 +162,8 @@ storage is a flecs map (`ecs_map_t`) keyed by the component entity whose values 
   on the render thread. Only rendered pixels show it.
 - Transitionable: `Position`, `Rotation`, `Scale`, `Rgb`, `Opacity`, `AlphaCutoff`, `Tint`,
   `PbrMaterial`, `Emissive`, `TextureTransform`, `Transmission`, `ClearCoat`,
-  `SpecularAnisotropy`, `Sheen` and `DiffuseTransmission` (`box_transition_supported()`). Others are rejected: `PbrTextures` holds handles that are part of
+  `SpecularAnisotropy`, `Sheen`, `DiffuseTransmission` and `BoxShadow`
+  (`box_transition_supported()`). Others are rejected: `PbrTextures` holds handles that are part of
   the batch key, `WorldTransform` and `MaterialId` are computed by the engine, and enums and tags
   have nothing to interpolate.
 - A key that is not transitionable, an entry with a negative `duration` or `delay`, or a
@@ -196,8 +198,9 @@ storage is a flecs map (`ecs_map_t`) keyed by the component entity whose values 
   which uses the new spec.
 - `duration: 0` with `delay: 0` is no transition. `duration: 0` with a delay switches after the
   delay.
-- `Rotation` interpolates per Euler axis without wrapping. `Rgb`, `Tint` and emissive color
-  interpolate per channel in the authored (display) values, and the existing encoding runs on
+- `Rotation` interpolates per Euler axis without wrapping. `Rgb`, `Tint`, emissive color and
+  the color of `BoxShadow` (with its alpha) interpolate per channel in the authored (display)
+  values, and the existing encoding runs on
   the result. All other fields are linear per field after the timing function.
 - `Transition` is inherited over `IsA` (`(OnInstantiate, Inherit)`), so a prefab can declare it
   for its instances. An instance that sets its own `Transition` replaces the whole map. A
@@ -655,14 +658,81 @@ the way they reach the glyph slots of a text (`TextSlots`).
   along its edge. The other words, the shadow box and the cut out box, do not depend on a
   transitioned component. No existing kind writes `material.w` without the shape words.
 - **Rgb.** A transition of `Rgb` or another material component of a shape sends no shadow
-  record: the shadow does not read them.
+  record: the shadow does not read them. A transition of `BoxShadow` itself does, below.
 - **Cost.** A shape without `BoxShadow` pays one lookup of `BoxShadowSlot` per moving or fading
   slot; the records are only sent for a shadow with a batch. A shape that lost its `BoxShadow`
   keeps a `BoxShadowSlot` without a batch, which sends nothing, so a transition never patches
   the freed slot.
-- **Not done.** A transition of `BoxShadow` itself (its offset, blur, spread or color) is not
-  supported: `BoxShadow` is not transitionable and a change of it snaps. Animating a shadow on
-  hover needs it, as a task of its own.
+
+### BoxShadow transitions
+
+`BoxShadow` is transitionable like `Rgb` or `Tint`, so a card can lift on hover by growing and
+softening its shadow:
+
+```flecs
+using box.geometry
+using box.material
+using box.transition
+
+card {
+  Rect: {200, 120}
+  Rgb: {255, 255, 255}
+  BoxShadow: {offset_y: -2, blur: 4, color: {0, 0, 0, 120}}
+  Transition: [BoxShadow: {duration: 0.15, timing_function: EaseOut}]
+}
+
+// On hover, from a system or the shell:
+card { BoxShadow: {offset_y: -12, blur: 24, spread: 2, color: {0, 0, 0, 160}} }
+```
+
+- **Values.** Its record is 20 bytes and 8 fields: `offset_x`, `offset_y`, `blur` and `spread`
+  interpolate linearly, and the four channels of `color` (alpha included) per channel in display
+  encoding, as `Rgb` does. It sets `BOX_RENDER_TRANSITION_FIELDS` to 8; `BOX_RENDER_TRANSITION_VALUE`
+  stays 20, so the size of a record and of a value of a node do not change, and
+  `BOX_RENDER_TRANSITION_COMPONENTS` is 16, the bits of `box_draw_transition_material_t.present`.
+  The value belongs to the entity that owns it: a prefab whose `BoxShadow` transitions animates
+  the shadow of every `IsA` instance that inherits it.
+- **Tag and batches.** A node *lifts* in a frame when its `BoxShadow` is active at the packet
+  time. Before the batches are sent, the extract walks the entity of each such node and its `IsA`
+  instances that inherit the value (a table that owns a `BoxShadow` of its own is skipped) and
+  gives every drawn one the private tag `TransitionBoxShadow` (`(OnInstantiate,
+  DontInherit)`). `box_draws_box_shadow_update` keys the shadow slot of a tagged entity as
+  `dynamic_transform` and `dynamic_material`, so both its streams upload every frame and have
+  one byte location to patch; the slot of the shape keeps its key. `DrawsOnTransitionBoxShadow`
+  rekeys the shadow when the tag is added or removed, and the frame after the last active frame
+  puts it back in its static batch with its target, byte for byte.
+- **Records.** The shadow box (`box_shadow_resolve`: size, sigma, corner radius, offset) shapes
+  both the instance matrix and most words of the shading, so a `BoxShadow` transition patches the
+  whole of both. After the poses, the slot system sends one `SHADOW_BOX` record per lifting
+  entity (`box_draw_transition_box_shadow_t`): the target material of the shadow record of
+  [Tint and opacity](#tint-and-opacity-transitions) with its fade node and chain
+  (`box_transition_fade_target`), the resolved `Rect`, the target `BoxShadow`, the mesh scale of
+  the shape, its target world matrix, and the offsets of the transform and the shading. The
+  resolver takes the `BoxShadow` its node renders and calls `box_draws_box_shadow_patch`, which
+  runs the functions of the game thread (`box_shadow_resolve`, `box_shadow_transform`,
+  `box_shadow_color`, `box_shadow_shading`), pure, on the render thread.
+- **With the other transitions.** When a transform transition moves the shape in the same frame,
+  the shadow gets no `SLOT` record: the record carries the node that moves the shape (in
+  `parent`) and the target chain from it, and the resolver builds the shadow on `W_r(node) *
+  rel`, the matrix the shape renders at. A `Tint` or `Opacity` transition of the shape or an
+  ancestor is read through the fade node of the record, and no separate shadow `SHADING` record
+  is sent for it. So a shadow can lift while its card moves, turns, fades or is tinted.
+- **No area.** A shadow box that has no area (`box_shadow_resolve` returns false, such as a
+  negative spread past half the smaller side of the shape) draws an instance of no size and no
+  color. While the tag is on, the update keeps the slot of a target without an area, so a shadow
+  that grows out of nothing or shrinks into nothing animates; when the transition ends the
+  update frees the slot. Adding or removing `BoxShadow` is not a transition and snaps. A removed
+  `BoxShadow` frees the slot at once and ends the transition (its start snaps, the node no longer
+  lifts), and the record looks the slot up after the batches, so it never patches a freed or
+  reused slot.
+- **Bounds.** The range of a `BoxShadow` keeps its four floats, as for `Position`, `Rotation` and
+  `Scale` (`lo` and `hi`, widened by an overshooting `CubicBezier`). When a moving node holds a
+  lifting shadow in a caster batch, its region is that of `box_draws_box_shadow_bound`: the
+  quad of the widest blur and spread, grown by half the range of the offset. A shadow is
+  blended and casts no light shadow, so this records nothing today.
+- **Cost.** A frame without an active `BoxShadow` transition checks one component per node and
+  walks nothing. An entity without `Transition` pays nothing; a moving shape whose shadow does
+  not lift pays one lookup in an empty map. No shader field is added.
 
 ## The fast path
 
@@ -677,8 +747,8 @@ that has them, pays nothing per entity:
 - The extract query has no matched tables when `Transition` is not used.
 
 The only observers the module adds are the OnSet validation of `Transition` itself,
-`DrawsOnTransitionTransform`, `DrawsOnTransitionMaterial` and `DrawsOnTransitionOpacity`, on the
-private tags, which only entities a transition patches ever get. A frame without an active
+`DrawsOnTransitionTransform`, `DrawsOnTransitionMaterial`, `DrawsOnTransitionOpacity` and
+`DrawsOnTransitionBoxShadow`, on the private tags, which only entities a transition patches ever get. A frame without an active
 `Tint` or `Opacity` transition walks no entity for them. The material table records the runs it
 uploads, one entry per run. A frame without an active material transition walks no slot or
 entity, and a frame with one visits only the entities of its nodes and those of their `IsA`
@@ -774,18 +844,20 @@ ms without it).
 
 - `test/cpu/core` (`Transition`): the component, its validation and the timing functions.
 - `test/cpu/render` (`Transition`, `TransitionMaterial`, `TransitionTintOpacity`,
-  `TransitionShadow`): the records of the game thread and the values of the resolver with the
-  null backend, and the shadow regions of moving casters, interrupted and nested.
+  `TransitionShadow`, `TransitionBoxShadow`): the records of the game thread and the values of
+  the resolver with the null backend, the shadow regions of moving casters, interrupted and
+  nested, and the shadow slots a `BoxShadow` transition patches, compared with static worlds.
 - `test/gpu/render`: the rendered transforms, materials, tints and opacity on a GPU, the box
-  shadows that follow them (`TransitionBoxShadow`), and in
+  shadows that follow them and the transitions of `BoxShadow` itself (`TransitionBoxShadow`), and
+  in
   `ShadowCache` (`transition_*`) that a caster that transitions renders the tile of its light
   only, also on the frame it ends in, and the tiles of the other lights stay cached.
 - `test/integration/visual/transitions_*.flecs`: renders frozen in the middle of a transition,
   compared with their baselines: a transform transition with children
   (`transitions_transform`), a shadow caster mid move (`transitions_shadow`), material color and
   emissive transitions with a delayed one and a prefab (`transitions_material`), tint and opacity
-  on parents with children (`transitions_tint_opacity`) and a 2D shape, a shadowed card and UI
-  elements (`transitions_2d_ui`). A scene cannot change a value after its first frame by itself, and the
+  on parents with children (`transitions_tint_opacity`) and a 2D shape, a shadowed card, a card
+  frozen mid hover lift and UI elements (`transitions_2d_ui`). A scene cannot change a value after its first frame by itself, and the
   first value never animates, so each changes its values with `SetAt` (`box.app`) at frame 1,
   at the start of the second frame: an entity with `SetAt: {frame: 1, entity: ball}` and the
   new values, which it copies to `ball` then. `SetAt` is written first in each body: written

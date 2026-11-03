@@ -112,11 +112,16 @@ static const void* box_draws_transition_part(
     return (material->present & (1u << component)) ? value : NULL;
 }
 
-void box_draws_transition_encode(
+/** Point the material components of a record at the values of its target material.
+ *
+ * @param material The target material
+ * @param out Receives the material components
+ */
+static void box_draws_transition_parts(
     const box_draw_transition_material_t *material,
-    void *dst)
+    box_draw_material_t *out)
 {
-    box_draw_material_t m = {
+    *out = (box_draw_material_t){
         .color = box_draws_transition_part(material, BOX_RENDER_TRANSITION_RGB,
             &material->color),
         .opacity = box_draws_transition_part(material, BOX_RENDER_TRANSITION_OPACITY,
@@ -146,9 +151,17 @@ void box_draws_transition_encode(
         .shape2d = material->kind == BOX_DRAW_TRANSITION_SHAPE ? &material->shape2d : NULL,
         .fade = material->fade
     };
+}
+
+void box_draws_transition_encode(
+    const box_draw_transition_material_t *material,
+    void *dst)
+{
+    box_draw_material_t m;
     box_render_material_t record;
     box_render_shading_t shading;
     box_render_mesh_shading_t mesh;
+    box_draws_transition_parts(material, &m);
     if (material->kind == BOX_DRAW_TRANSITION_TABLE) {
         box_draws_material_pack(&record, &m);
         ecs_os_memcpy(dst, &record, ECS_SIZEOF(record));
@@ -184,6 +197,18 @@ void box_draws_transition_encode(
     }
 done:
     return;
+}
+
+void box_draws_transition_box_shadow(
+    const box_draw_transition_box_shadow_t *record,
+    const BoxShadow *shadow,
+    mat4 world,
+    void *transform,
+    void *shading)
+{
+    box_draw_material_t m;
+    box_draws_transition_parts(&record->material, &m);
+    box_draws_box_shadow_patch(&m, record, shadow, world, transform, shading);
 }
 
 void box_draws_transition_fade_own(

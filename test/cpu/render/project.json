@@ -524,6 +524,21 @@
                 ]
             },
             {
+                "id": "TransitionBoxShadow",
+                "testcases": [
+                    "values",
+                    "dynamic_batch",
+                    "mid_matches_static",
+                    "end_matches_static",
+                    "with_opacity",
+                    "with_position",
+                    "removed_mid_transition",
+                    "no_area",
+                    "no_transition_snaps",
+                    "layout"
+                ]
+            },
+            {
                 "id": "TransitionShadow",
                 "testcases": [
                     "interrupted",

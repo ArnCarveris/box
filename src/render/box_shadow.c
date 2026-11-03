@@ -88,15 +88,18 @@ static void box_shadow_slot_move(
 /** Resolve the shadow box of a rectangle: grown by the spread, its corner radius with it as CSS
  * does, so a sharp corner stays sharp, and grown by 3 standard deviations on each side.
  *
+ * Pure, so the resolver of the render thread resolves the BoxShadow a transition renders with
+ * the same function.
+ *
  * @param shape The resolved shape, a rectangle
- * @param mesh The mesh of the shape, NULL when it has none
+ * @param mesh_scale The x and y of the ShapeMesh.scale of the shape, NULL when it has none
  * @param shadow The shadow
  * @param out Receives the shadow box
  * @return Whether the shadow box has an area
  */
 static bool box_shadow_resolve(
     const Shape2D *shape,
-    const ShapeMesh *mesh,
+    const float *mesh_scale,
     const BoxShadow *shadow,
     box_shadow_box_t *out)
 {
@@ -127,30 +130,41 @@ static bool box_shadow_resolve(
     out->element[0] = shape->size[0] * 0.5f;
     out->element[1] = shape->size[1] * 0.5f;
     out->element_radius = glm_clamp(shape->radius, 0.0f, half);
-    out->scale[0] = mesh ? mesh->scale[0] / shape->size[0] : 1.0f;
-    out->scale[1] = mesh ? mesh->scale[1] / shape->size[1] : 1.0f;
+    out->scale[0] = mesh_scale ? mesh_scale[0] / shape->size[0] : 1.0f;
+    out->scale[1] = mesh_scale ? mesh_scale[1] / shape->size[1] : 1.0f;
     result = isfinite(out->scale[0]) && isfinite(out->scale[1]);
 done:
     return result;
+}
+
+/** Get the ShapeMesh.scale of a shape for box_shadow_resolve.
+ *
+ * @param mesh The mesh of the shape, NULL when it has none
+ * @return Its scale, NULL without a mesh
+ */
+static const float* box_shadow_mesh_scale(
+    const ShapeMesh *mesh)
+{
+    return mesh ? mesh->scale : NULL;
 }
 
 /** Write the transform of a shadow: the world transform of its shape stretched as the quad of
  * the shape is, moved by the offset and scaled to the quad of the shadow.
  *
  * @param out The transform
- * @param transform World transform of the shape, NULL for the identity
+ * @param transform World matrix of the shape, NULL for the identity
  * @param box The shadow box
  */
 static void box_shadow_transform(
     box_render_transform_t *out,
-    const WorldTransform *transform,
+    const vec4 *transform,
     const box_shadow_box_t *box)
 {
     float scale[3] = { box->size[0] * box->scale[0], box->size[1] * box->scale[1], 1.0f };
     mat4 m;
     int32_t r, c;
     if (transform) {
-        glm_mat4_copy(ECS_CONST_CAST(vec4*, transform->m), m);
+        glm_mat4_copy(ECS_CONST_CAST(vec4*, transform), m);
     } else {
         glm_mat4_identity(m);
     }
@@ -263,6 +277,31 @@ static void box_shadow_shading(
     box_draws_color_pack(out->color, linear);
 }
 
+/** Write the instance of a shadow whose box has no area, which keeps its slot while a BoxShadow
+ * transition runs: a quad of no size at the origin of its shape and no color, so it draws
+ * nothing.
+ *
+ * @param transform The transform
+ * @param shading The shading
+ * @param world World matrix of the shape, NULL for the identity
+ * @param clip Clip index of the shape
+ * @param rank Rank of the shadow
+ */
+static void box_shadow_hidden(
+    box_render_transform_t *transform,
+    box_render_shading_t *shading,
+    const vec4 *world,
+    int32_t clip,
+    uint32_t rank)
+{
+    box_shadow_box_t box;
+    ecs_os_memset_t(&box, 0, box_shadow_box_t);
+    box_shadow_transform(transform, world, &box);
+    ecs_os_memset_t(shading, 0, box_render_shading_t);
+    shading->ids[0] = clip > 0 ? (uint32_t)clip : 0u;
+    shading->ids[1] = rank;
+}
+
 /** Write streams of the instance of a shadow from its shape.
  *
  * @param d The state
@@ -288,7 +327,8 @@ static void box_shadow_write(
 {
     box_draw_batch_t *b = box_draws_batch(d, bs->batch);
     if (kinds & BOX_DRAW_TRANSFORM) {
-        box_shadow_transform(box_draws_slot_transform(b, bs->slot), transform, box);
+        box_shadow_transform(box_draws_slot_transform(b, bs->slot),
+            transform ? ECS_CONST_CAST(vec4*, transform->m) : NULL, box);
     }
 
     if (kinds & BOX_DRAW_SHADING) {
@@ -329,7 +369,9 @@ void box_draws_box_shadow_write(
 
     shadow = ecs_get(world, e, BoxShadow);
     shape = shadow ? ecs_get(world, e, Shape2D) : NULL;
-    if (!shape || !box_shadow_resolve(shape, ecs_get(world, e, ShapeMesh), shadow, &box)) {
+    if (!shape || !box_shadow_resolve(shape,
+        box_shadow_mesh_scale(ecs_get(world, e, ShapeMesh)), shadow, &box))
+    {
         goto done;
     }
 
@@ -339,16 +381,25 @@ done:
     return;
 }
 
-bool box_draws_box_shadow_instance(
+/** Get the instance matrix of a shadow relative to the world transform of its shape: the quad
+ * of the shape stretched, moved by the offset and scaled to the quad of the shadow.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param shadow The shadow
+ * @param out Receives the matrix
+ * @return Whether the shadow box has an area
+ */
+static bool box_shadow_instance(
     const ecs_world_t *world,
     ecs_entity_t e,
+    const BoxShadow *shadow,
     mat4 out)
 {
-    const BoxShadow *shadow = ecs_get(world, e, BoxShadow);
-    const Shape2D *shape = shadow ? ecs_get(world, e, Shape2D) : NULL;
+    const Shape2D *shape = ecs_get(world, e, Shape2D);
     box_shadow_box_t box;
-    bool result = shape &&
-        box_shadow_resolve(shape, ecs_get(world, e, ShapeMesh), shadow, &box);
+    bool result = shape && box_shadow_resolve(shape,
+        box_shadow_mesh_scale(ecs_get(world, e, ShapeMesh)), shadow, &box);
     if (result) {
         glm_mat4_identity(out);
         out[0][0] = box.size[0] * box.scale[0];
@@ -358,6 +409,34 @@ bool box_draws_box_shadow_instance(
     }
 
     return result;
+}
+
+bool box_draws_box_shadow_instance(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    mat4 out)
+{
+    const BoxShadow *shadow = ecs_get(world, e, BoxShadow);
+
+    return shadow && box_shadow_instance(world, e, shadow, out);
+}
+
+bool box_draws_box_shadow_bound(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const float *lo,
+    const float *hi,
+    mat4 out)
+{
+    float reach = glm_max(hi[0] - lo[0], hi[1] - lo[1]) * 0.5f;
+    BoxShadow wide = {
+        .offset_x = (lo[0] + hi[0]) * 0.5f,
+        .offset_y = (lo[1] + hi[1]) * 0.5f,
+        .blur = glm_max(lo[2], hi[2]),
+        .spread = glm_max(lo[3], hi[3]) + reach
+    };
+
+    return box_shadow_instance(world, e, &wide, out);
 }
 
 bool box_draws_box_shadow_target(
@@ -382,6 +461,75 @@ bool box_draws_box_shadow_target(
         1.0f);
 done:
     return result;
+}
+
+bool box_draws_box_shadow_transition(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e,
+    const DrawSlot *s,
+    const box_draw_material_t *material,
+    box_draw_transition_box_shadow_t *out)
+{
+    const BoxShadow *shadow = ecs_get(world, e, BoxShadow);
+    const Shape2D *shape = ecs_get(world, e, Shape2D);
+    const ShapeMesh *mesh = ecs_get(world, e, ShapeMesh);
+    const WorldTransform *transform = ecs_get(world, e, WorldTransform);
+    mat4 identity;
+    bool result;
+    ecs_os_memset_t(out, 0, box_draw_transition_box_shadow_t);
+    result = shadow && shape &&
+        box_draws_box_shadow_target(world, d, e, s, material, &out->material);
+    if (!result) {
+        goto done;
+    }
+
+    glm_mat4_identity(identity);
+    out->material.shape2d = *shape;
+    out->shadow = *shadow;
+    out->meshed = mesh != NULL;
+    if (mesh) {
+        out->mesh_scale[0] = mesh->scale[0];
+        out->mesh_scale[1] = mesh->scale[1];
+    }
+
+    ecs_os_memcpy(out->world, transform ? (const void*)transform->m : (const void*)identity,
+        ECS_SIZEOF(mat4));
+    ecs_os_memcpy(out->rel, identity, ECS_SIZEOF(mat4));
+done:
+    return result;
+}
+
+void box_draws_box_shadow_patch(
+    const box_draw_material_t *material,
+    const box_draw_transition_box_shadow_t *record,
+    const BoxShadow *shadow,
+    mat4 world,
+    void *transform,
+    void *shading)
+{
+    box_render_transform_t t;
+    box_render_shading_t out;
+    box_shadow_box_t box;
+    uint32_t ids[2];
+    ecs_os_memcpy(ids, ECS_OFFSET(shading, offsetof(box_render_shading_t, ids)),
+        ECS_SIZEOF(ids));
+    if (box_shadow_resolve(&record->material.shape2d,
+        record->meshed ? record->mesh_scale : NULL, shadow, &box))
+    {
+        float alpha = box_draws_alpha(material);
+        float linear[4];
+        box_shadow_color(linear, &shadow->color, material, alpha);
+        box_shadow_shading(&out, &box, linear,
+            glm_clamp(alpha * record->material.shadow_cover, 0.0f, 1.0f), (int32_t)ids[0],
+            ids[1]);
+        box_shadow_transform(&t, world, &box);
+    } else {
+        box_shadow_hidden(&t, &out, world, (int32_t)ids[0], ids[1]);
+    }
+
+    ecs_os_memcpy(transform, &t, ECS_SIZEOF(t));
+    ecs_os_memcpy(shading, &out, ECS_SIZEOF(out));
 }
 
 void box_draws_box_shadow_encode(
@@ -448,8 +596,11 @@ void box_draws_box_shadow_update(
         goto done;
     }
 
-    bool drawn = shape && shape->kind == BOX_SHAPE2D_RECT &&
-        box_shadow_resolve(shape, ecs_get(world, e, ShapeMesh), shadow, &box);
+    bool rect = shape && shape->kind == BOX_SHAPE2D_RECT;
+    bool transitions = rect && ecs_has_id(world, e, TransitionBoxShadow);
+    bool area = rect && box_shadow_resolve(shape,
+        box_shadow_mesh_scale(ecs_get(world, e, ShapeMesh)), shadow, &box);
+    bool drawn = area || transitions;
     if (drawn) {
         ecs_os_memcpy_t(&key, &box_draws_batch(d, s->batch)->key, box_draw_key_t);
         drawn = key.pipeline == BOX_RENDER_SHADER_SHAPE2D;
@@ -458,6 +609,10 @@ void box_draws_box_shadow_update(
         key.box_shadow = true;
         key.slice = false;
         ecs_os_memset(key.textures, 0, ECS_SIZEOF(key.textures));
+        if (transitions) {
+            key.dynamic_transform = true;
+            key.dynamic_material = true;
+        }
     }
 
     if (bs->batch >= 0 && (!drawn ||
@@ -487,8 +642,17 @@ void box_draws_box_shadow_update(
         .fade = s->fade,
         .clip = s->clip
     };
-    box_shadow_write(d, bs, &box, shadow, shape, blend, ecs_get(world, e, WorldTransform),
-        &material, BOX_DRAW_BOTH);
+    if (area) {
+        box_shadow_write(d, bs, &box, shadow, shape, blend, ecs_get(world, e, WorldTransform),
+            &material, BOX_DRAW_BOTH);
+    } else {
+        const WorldTransform *transform = ecs_get(world, e, WorldTransform);
+        box_draw_batch_t *b = box_draws_batch(d, bs->batch);
+        box_shadow_hidden(box_draws_slot_transform(b, bs->slot),
+            box_draws_slot_shading(b, bs->slot),
+            transform ? ECS_CONST_CAST(vec4*, transform->m) : NULL, material.clip, bs->rank);
+        box_draws_slot_changed(b, bs->slot, BOX_DRAW_BOTH);
+    }
 done:
     return;
 }
