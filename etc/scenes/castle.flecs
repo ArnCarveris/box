@@ -2,12 +2,16 @@
 //
 //   bake3 run apps/boxrun --local-env -- etc/scenes/castle.flecs
 //
-// Pick a piece from the toolbar (or press 1 to 9) and click the plot to build it. Click a wall,
-// tower or keep again to build it higher. Close a ring of walls, towers and gatehouses to make a
-// courtyard: cottages inside it pay double and the keep is worth twice the prestige. Cottages,
-// the keep and quarries pay gold and stone every second. Grow the realm from a Hamlet to a Royal
-// Citadel. X demolishes, Escape puts the tool down. WASD moves the view, Q and E turn it, the
-// right mouse button drags it around and the wheel zooms.
+// Pick a piece from the toolbar (or press 1 to 9, 0 and P) and click the plot to build it; drag to
+// lay a straight wall or a winding path. Click a piece to select it and upgrade it from the panel
+// (or press U); no piece rises above the level of the keep, and the keep rises with the number of
+// folk in the realm. Cottages, the keep and the blacksmith eat food that farms grow: when the
+// granary runs dry, folk leave and their buildings stand abandoned until they are demolished. Close
+// a ring of walls, towers and gatehouses to make a courtyard: cottages inside it gather protection
+// and grow into houses and manors, and the keep is worth twice the prestige. The blacksmith
+// researches farming, so the same land feeds more folk. Grow the realm from a Hamlet to a Royal
+// Citadel. X demolishes, Escape puts the tool down. WASD moves the view, Q and E turn it, the right
+// mouse button drags it around and the wheel zooms.
 
 include castle/state
 include castle/materials
@@ -69,7 +73,7 @@ castle {
       Rotation: {-cam_pitch, 0, 0}
       camera {
         Position: {0, 0, cam_dist}
-        Camera: {fov: 40, near_: 0.3, far_: 900}
+        Camera: {fov: 40, near_: 0.3, far_: 1000}
       }
     }
   }
@@ -90,7 +94,7 @@ castle_view {
       enabled: true,
       cascades: 4,
       resolution: 2048,
-      max_distance: 140,
+      max_distance: 200,
       split_lambda: 0.7,
       depth_bias: 2,
       normal_offset: 2,

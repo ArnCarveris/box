@@ -66,6 +66,8 @@ prefab CastleTunicBlue { Rgb: {58, 78, 128}; PbrMaterial: {roughness: 0.95} }
 prefab CastleTunicBrown { Rgb: {120, 88, 60}; PbrMaterial: {roughness: 0.95} }
 prefab CastlePumpkin { Rgb: {222, 120, 36}; PbrMaterial: {roughness: 0.6} }
 prefab CastleCabbage { Rgb: {120, 168, 84}; PbrMaterial: {roughness: 0.8} }
+prefab CastleWheatRow { Rgb: {232, 192, 96}; PbrMaterial: {roughness: 0.95}; Sheen: {color: {255, 230, 160}, roughness: 0.5} }
+prefab CastleGreenRow { Rgb: {104, 156, 70}; PbrMaterial: {roughness: 0.9} }
 
 prefab CastleGrass { Rgb: {116, 156, 70}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: castle_tex_grass, normal: castle_tex_grass_n} }
 prefab CastleMeadow { Rgb: {112, 148, 70}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: castle_tex_grass, normal: castle_tex_grass_n}; TextureTransform: {scale_x: 60, scale_y: 60} }
