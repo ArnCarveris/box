@@ -580,6 +580,7 @@
                     "bars_full_window",
                     "bars_follow_new_sample",
                     "bars_not_laid_out",
+                    "bars_set_when_changed",
                     "reference_lines",
                     "summary_text",
                     "summary_colors",
@@ -590,6 +591,7 @@
                     "script_reload",
                     "script_missing",
                     "samples_ring",
+                    "engine_samples_open",
                     "engine_records_samples",
                     "engine_notifies_samples",
                     "engine_hold_no_notify"

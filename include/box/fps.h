@@ -47,9 +47,9 @@ extern "C" {
 /** Path of the heading of the panel, a Text above the chart */
 #define BOX_FPS_HEADING BOX_FPS_PANEL ".heading"
 
-/** Path of the chart. Its children are the bars bar_0 to bar_N, N BOX_FPS_BARS - 1, from the
- * oldest sample on the left to the newest on the right, and the reference lines line_60 and
- * line_30 over them. It has no Layout, so changing the bars lays nothing out. */
+/** Path of the chart. Its children are the bars bar_0 to bar_N, N BOX_FPS_BARS - 1, instances
+ * of BOX_FPS_BAR from the oldest sample on the left to the newest on the right, and the reference
+ * lines line_60 and line_30 over them. It has no Layout, so a bar that changes lays nothing out. */
 #define BOX_FPS_CHART BOX_FPS_PANEL ".chart"
 
 /** Path of the summary row under the chart. Its children are the Texts times, the mean and
@@ -64,6 +64,9 @@ extern "C" {
 
 /** Path of the template of the script that the panel instantiates */
 #define BOX_FPS_TEMPLATE "box.fps.FpsWidget"
+
+/** Path of the template of the script that every bar of the chart instantiates */
+#define BOX_FPS_BAR "box.fps.FpsBar"
 
 /** Points between the panel and the top and right edges of the surface */
 #define BOX_FPS_MARGIN (10.0f)
@@ -84,7 +87,8 @@ extern "C" {
 #define BOX_FPS_CHART_HEIGHT (60.0f)
 
 /** Frame time at the top of the chart in milliseconds. The vertical axis is linear in frame
- * time, from 0 at the bottom; a bar is at least BOX_FPS_BAR_WIDTH high and at most the chart. */
+ * time, from 0 at the bottom; a bar is a whole number of points high, at least BOX_FPS_BAR_WIDTH
+ * and at most the chart. */
 #define BOX_FPS_CHART_MS (50.0)
 
 /** Milliseconds of samples the summary covers, the last second */

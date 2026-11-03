@@ -164,7 +164,7 @@ static ecs_entity_t fps_bar(
 }
 
 /** Get the height a bar of a frame time has: linear in the time, BOX_FPS_CHART_MS at the top
- * of the chart, rounded to a quarter point, at least as high as the bar is wide.
+ * of the chart, rounded to a whole point, at least as high as the bar is wide.
  *
  * @param ms The frame time in milliseconds, 0 for no sample
  * @return The height in points
@@ -175,7 +175,7 @@ static float fps_height(
     float result = 0;
     if (ms > 0) {
         double share = ms / BOX_FPS_CHART_MS < 1 ? ms / BOX_FPS_CHART_MS : 1;
-        result = roundf((float)share * BOX_FPS_CHART_HEIGHT * 4) / 4;
+        result = roundf((float)share * BOX_FPS_CHART_HEIGHT);
         result = result > BOX_FPS_BAR_WIDTH ? result : BOX_FPS_BAR_WIDTH;
     }
 
@@ -548,8 +548,11 @@ void FpsPanel_bars_count_and_order(void) {
     test_flt(b->width, BOX_FPS_CHART_WIDTH);
     test_flt(b->height, BOX_FPS_CHART_HEIGHT);
 
+    ecs_entity_t bar_tmpl = ecs_lookup(world, BOX_FPS_BAR);
+    test_assert(bar_tmpl != 0);
     float prev = -BOX_FPS_CHART_WIDTH;
     for (int32_t i = 0; i < BOX_FPS_BARS; i ++) {
+        test_assert(ecs_has_id(world, fps_bar(world, i), bar_tmpl));
         const Position *p = ecs_get(world, fps_bar(world, i), Position);
         test_assert(p != NULL);
         if (i) {
@@ -698,6 +701,68 @@ void FpsPanel_bars_not_laid_out(void) {
         test_assert(!ecs_has(world, bar, LayoutItem));
         test_assert(!ecs_has(world, bar, LayoutBounds));
     }
+
+    ecs_fini(world);
+}
+
+/** Count the bars of the chart whose Rect was set in the int32_t of the observer context.
+ *
+ * @param it Iterator of the observer
+ */
+static void fps_rect_on_set(
+    ecs_iter_t *it)
+{
+    int32_t *fired = it->ctx;
+    ecs_entity_t chart = ecs_lookup(it->world, BOX_FPS_CHART);
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        if (ecs_get_parent(it->world, it->entities[i]) == chart) {
+            (*fired) ++;
+        }
+    }
+}
+
+void FpsPanel_bars_set_when_changed(void) {
+    // fps/panel
+    ecs_world_t *world = fps_world();
+    fps_open(world, true);
+    fps_samples_all(world, 10.0, BOX_FRAME_WINDOW);
+
+    int32_t fired = 0;
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(Rect) }},
+        .events = { EcsOnSet },
+        .callback = fps_rect_on_set,
+        .ctx = &fired
+    });
+
+    FrameSamples *samples = ecs_singleton_get_mut(world, FrameSamples);
+    box_frame_samples_add(samples, 10.0);
+    ecs_singleton_modified(world, FrameSamples);
+    ecs_progress(world, 0);
+    test_int(fired, 0);
+
+    samples = ecs_singleton_get_mut(world, FrameSamples);
+    box_frame_samples_add(samples, 10.2);
+    ecs_singleton_modified(world, FrameSamples);
+    ecs_progress(world, 0);
+    test_int(fired, 0);
+
+    samples = ecs_singleton_get_mut(world, FrameSamples);
+    box_frame_samples_add(samples, 45.0);
+    ecs_singleton_modified(world, FrameSamples);
+    ecs_progress(world, 0);
+    test_int(fired, 1);
+    fps_check_bar(world, BOX_FPS_BARS - 1, 45.0, BOX_FPS_RED);
+
+    fired = 0;
+    samples = ecs_singleton_get_mut(world, FrameSamples);
+    box_frame_samples_add(samples, 10.0);
+    ecs_singleton_modified(world, FrameSamples);
+    ecs_progress(world, 0);
+    test_int(fired, 2);
+    fps_check_bar(world, BOX_FPS_BARS - 2, 45.0, BOX_FPS_RED);
+    fps_check_bar(world, BOX_FPS_BARS - 1, 10.0, BOX_FPS_GREEN);
 
     ecs_fini(world);
 }
@@ -1041,6 +1106,29 @@ void FpsPanel_samples_ring(void) {
     test_flt(box_frame_sample(&samples, BOX_FRAME_WINDOW - 1), 11);
     test_flt(box_frame_sample(&samples, BOX_FRAME_WINDOW), 0);
     test_flt(box_frame_sample(&samples, -1), 0);
+}
+
+void FpsPanel_engine_samples_open(void) {
+    // fps/panel
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, FpsPanel, { .open = true });
+    for (int32_t i = 0; i < 6; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    const FrameSamples *samples = ecs_singleton_get(world, FrameSamples);
+    test_assert(samples->count > 0);
+    test_bool(samples->hold, false);
+    double ms = box_frame_sample(samples, 0);
+    ecs_entity_t bar = fps_bar(world, BOX_FPS_BARS - 1);
+    test_flt(ecs_get(world, bar, Rect)->height, fps_height(ms));
+    test_flt(ecs_get(world, fps_bar(world, BOX_FPS_BARS - samples->count), Rect)->height,
+        fps_height(box_frame_sample(samples, samples->count - 1)));
+    test_flt(ecs_get(world, fps_bar(world, BOX_FPS_BARS - samples->count - 1), Rect)->height, 0);
+    test_int(ecs_singleton_get(world, FpsSummary)->frames, samples->count);
+
+    ecs_fini(world);
 }
 
 void FpsPanel_engine_records_samples(void) {

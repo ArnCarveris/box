@@ -768,6 +768,10 @@ static box_app_clock_t* box_app_clock(
 /** Record the timing of the frame that starts: its delta, the wall time since the previous one
  * and the presents, and publish the ranges of the recent frames in FrameTiming.
  *
+ * The system is immediate, so FrameTiming and FrameSamples are set while the world is not
+ * readonly: their OnSet runs at once and a reactive script that reads them, such as the fps
+ * panel, can update its entities.
+ *
  * @param it The iterator of the system
  */
 static void BoxAppTiming(
@@ -1062,7 +1066,8 @@ void BoxAppImport(
         .phase = EcsPreFrame,
         .run = BoxAppTiming,
         .ctx = clock,
-        .ctx_free = box_app_clock_free
+        .ctx_free = box_app_clock_free,
+        .immediate = true
     });
 
     ecs_system(world, {
