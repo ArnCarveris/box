@@ -1,12 +1,14 @@
 // Motion over life: a burst that flies out, stops and then rises, which constant forces cannot
-// do. The emitter sprays particles in every direction at 90 units per second every frame, with a
-// lifetime of 2.2 frames, so the three frames of a visual run show three shells at the normalized
-// ages 0, 0.45 and 0.91. The ParticleMotion drag curve is 0 until 0.5 and the velocity_y curve 0
-// until 0.6: the middle shell is a sphere of about 1.5 around the emitter that flew out at full
-// speed, and the oldest shell is a sphere of the same size, stopped by the drag of 300 that came
-// on late, lifted 2 units by the velocity curve. The sprites stretch along the velocity they move
-// with: the middle shell outward, the oldest shell upward, although its stored velocity is near
-// zero, since the velocity curve moves it without entering it.
+// do, on the left, next to the same burst without ParticleMotion on the right. Both spray
+// particles in every direction at 90 units per second every frame, with a lifetime of 2.2
+// frames, so the three frames of a visual run show three shells at the normalized ages 0, 0.45
+// and 0.91. On the right the shells are spheres of 1.5 and 3 around the emitter. On the left the
+// ParticleMotion drag curve is 0 until 0.5 and the velocity_y curve 0 until 0.6: the middle shell
+// is the same sphere of 1.5, and the oldest shell is a sphere of the same size, stopped by the
+// drag of 300 that came on late, lifted 2 units by the velocity curve. The sprites stretch along
+// the velocity they move with: outward on the right and in the middle shell on the left, upward
+// in the oldest shell on the left, although its stored velocity is near zero, since the velocity
+// curve moves it without entering it. The bursts inherit their emitter from one prefab.
 using box.transform
 using box.camera
 using box.view
@@ -15,7 +17,7 @@ using box.particle
 
 camera {
   Position: {0, 0, 10}
-  Camera: {fov: 50}
+  Camera: {fov: 60}
 }
 
 main_view {
@@ -25,17 +27,25 @@ main_view {
 // Seconds of a frame of a visual run
 const dt = 1.0 / 60.0
 
-burst {
-  Position: {0, -1.5, 0}
+prefab Burst {
   ParticleEmitter: {
     max: 4000, rate: 30000, shape: EmitterSphere, radius: 0.05, spread: 180,
     speed: {90, 90}, lifetime: {2.2 * dt, 2.2 * dt}, size: {0.08, 0.12},
     opacity: {0.8, 1}, color: {255, 190, 90}, seed: 5
   }
-  ParticleForces: {gravity: {0, 0, 0}, drag: 300}
   ParticleAppearance: {blend: ParticleAdditive, stretch: 0.01}
+}
+
+curved : Burst {
+  Position: {-3.5, -1.5, 0}
+  ParticleForces: {gravity: {0, 0, 0}, drag: 300}
   ParticleMotion: {
     drag: {keys: [{0, 0}, {0.5, 0}, {0.6, 1}]}
     velocity_y: {keys: [{0, 0}, {0.6, 0}, {0.8, 120}]}
   }
+}
+
+constant : Burst {
+  Position: {3.5, -0.5, 0}
+  ParticleForces: {gravity: {0, 0, 0}}
 }

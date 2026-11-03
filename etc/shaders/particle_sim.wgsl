@@ -62,6 +62,9 @@ fn integrate(@builtin(global_invocation_id) id: vec3u) {
 
     p.remaining = particle_age(p.remaining, emitter.life.x);
     if (p.remaining != 0u) {
+        // Without motion the identity of particle_motion_none() moves the particle as before,
+        // bit for bit; one integrate after the check keeps the compiled step the same, where a
+        // second call in an else branch was seen to change it by a rounding
         var motion = particle_motion_none();
         if (emitter.gradient_max.y != 0u) {
             let seed = emitter.spawn.y;

@@ -38,14 +38,18 @@
 /** Tolerance of comparisons with a closed form, relative to its size */
 #define EPS (1e-4f)
 
-/** Floats of the table of the twin tests: one row per curve of ParticleMotion */
-#define TABLE (BOX_PARTICLE_MOTION_CURVES * BOX_PARTICLE_CURVE_SAMPLES)
+/** Floats of the table of the twin tests: the rows of the velocity vector, then of the force */
+#define TABLE (2 * BOX_PARTICLE_VECTOR_ROWS * BOX_PARTICLE_CURVE_SAMPLES)
 
-/** Index of the velocity x curve in the rows of a ParticleMotion */
+/** Index of the velocity x curve in the channels of a ParticleMotion: the velocity vector, then
+ * the force vector */
 #define VX (0)
 
 /** Index of the velocity y curve */
 #define VY (1)
+
+/** Index of the velocity z curve */
+#define VZ (2)
 
 /** Index of the speed curve */
 #define SPEED (3)
@@ -102,27 +106,42 @@ static void same3(
     test_assert(!memcmp(a, b, 3 * sizeof(float)));
 }
 
-/** The rows of a ParticleMotion without curves: every curve constant at its default.
+/** The rows of a ParticleMotion without curves: both vectors constant at their defaults.
  *
  * @param out Receives the rows
  */
 static void rows_none(
     box_particle_motion_rows_t *out)
 {
-    static const float defaults[BOX_PARTICLE_MOTION_CURVES] = {0, 0, 0, 1, 0, 0, 0, 1};
-    int32_t i;
-    for (i = 0; i < BOX_PARTICLE_MOTION_CURVES; i ++) {
-        out->rows[i] = BOX_PARTICLE_CURVE_CONSTANT;
-        out->max_rows[i] = BOX_PARTICLE_CURVE_CONSTANT;
-        out->values[i] = defaults[i];
-    }
+    *out = (box_particle_motion_rows_t){
+        .velocity_row = BOX_PARTICLE_CURVE_CONSTANT,
+        .velocity_max_row = BOX_PARTICLE_CURVE_CONSTANT,
+        .force_row = BOX_PARTICLE_CURVE_CONSTANT,
+        .force_max_row = BOX_PARTICLE_CURVE_CONSTANT,
+        .velocity = {0, 0, 0, 1},
+        .force = {0, 0, 0, 1}
+    };
 }
 
-/** Bake a linear curve into row i of a table and point curve i of the rows at it.
+/** Get the constant of a channel of the rows.
  *
- * @param table The table, a row per curve of ParticleMotion
  * @param rows The rows
- * @param i Index of the curve, and of its row
+ * @param i Index of the channel, VX to DRAG
+ * @return The constant
+ */
+static float* rows_value(
+    box_particle_motion_rows_t *rows,
+    int32_t i)
+{
+    return i < 4 ? &rows->velocity[i] : &rows->force[i - 4];
+}
+
+/** Bake a linear curve into channel i of the rows of its vector in a table, the velocity
+ * vector at row 0 and the force vector after it, the other channels at their constants.
+ *
+ * @param table The table, TABLE floats
+ * @param rows The rows
+ * @param i Index of the channel, VX to DRAG
  * @param keys The keys
  */
 static void rows_bake(
@@ -131,9 +150,48 @@ static void rows_bake(
     int32_t i,
     ecs_vec_t keys)
 {
+    uint32_t *row = i < 4 ? &rows->velocity_row : &rows->force_row;
+    float *values = i < 4 ? rows->velocity : rows->force;
+    float samples[BOX_PARTICLE_CURVE_SAMPLES];
+    int32_t c = i % 4, k, j;
+    if (*row == BOX_PARTICLE_CURVE_CONSTANT) {
+        *row = i < 4 ? 0 : BOX_PARTICLE_VECTOR_ROWS;
+        for (k = 0; k < BOX_PARTICLE_CURVE_SAMPLES; k ++) {
+            for (j = 0; j < 4; j ++) {
+                table[*row * BOX_PARTICLE_CURVE_SAMPLES + k * 4 + j] = values[j];
+            }
+        }
+    }
+
     ParticleCurve curve = { .kind = CurveLinear, .keys = keys };
-    box_particle_curve_bake(&curve, rows->values[i], table + i * BOX_PARTICLE_CURVE_SAMPLES);
-    rows->rows[i] = (uint32_t)i;
+    box_particle_curve_bake(&curve, values[c], samples);
+    for (k = 0; k < BOX_PARTICLE_CURVE_SAMPLES; k ++) {
+        table[*row * BOX_PARTICLE_CURVE_SAMPLES + k * 4 + c] = samples[k];
+    }
+}
+
+/** Evaluate channel i of the rows of a ParticleMotion at a normalized age, without a max.
+ *
+ * @param table The table
+ * @param rows The rows
+ * @param i Index of the channel, VX to DRAG
+ * @param t The normalized age
+ * @return The value
+ */
+static float rows_eval(
+    const float *table,
+    const box_particle_motion_rows_t *rows,
+    int32_t i,
+    float t)
+{
+    float out[4];
+    if (i < 4) {
+        box_particle_vector(table, rows->velocity_row, rows->velocity, t, out);
+    } else {
+        box_particle_vector(table, rows->force_row, rows->force, t, out);
+    }
+
+    return out[i % 4];
 }
 
 /** Forces of a test: none, and no gravity.
@@ -308,9 +366,12 @@ static void scene_rows(
     box_particle_motion_rows_t *out)
 {
     const box_render_particle_block_t *b = &s->pool->block;
-    memcpy(out->rows, b->motion_rows, sizeof(out->rows));
-    memcpy(out->max_rows, b->motion_max_rows, sizeof(out->max_rows));
-    memcpy(out->values, b->motion_values, sizeof(out->values));
+    out->velocity_row = b->motion_rows[0];
+    out->velocity_max_row = b->motion_rows[1];
+    out->force_row = b->motion_rows[2];
+    out->force_max_row = b->motion_rows[3];
+    memcpy(out->velocity, b->motion_velocity, sizeof(out->velocity));
+    memcpy(out->force, b->motion_force, sizeof(out->force));
 }
 
 /** Check that the ParticleMotion of the block of a test changes nothing.
@@ -599,7 +660,7 @@ void Motion_speed_alone(void) {
     }
 
     rows_none(&rows);
-    rows.values[SPEED] = 0.5f;
+    *rows_value(&rows, SPEED) = 0.5f;
     p = twin_new();
     p.velocity[1] = 4;
     for (n = 1; n <= FRAMES; n ++) {
@@ -635,7 +696,7 @@ void Motion_drag_alone(void) {
     near(p.velocity[2], 4.0f * expf(-1.5f * 2.0f * DT * DT));
 
     rows_none(&rows);
-    rows.values[DRAG] = -2;
+    *rows_value(&rows, DRAG) = -2;
     p = twin_new();
     p.velocity[2] = 4;
     twin_step(&p, table, &rows, &f, NULL);
@@ -654,8 +715,8 @@ void Motion_constant_velocity_is_drift(void) {
     twin_t p = twin_new(), q = twin_new();
     int32_t n;
     rows_none(&rows);
-    rows.values[VX] = 2;
-    rows.values[2] = -1;
+    *rows_value(&rows, VX) = 2;
+    *rows_value(&rows, VZ) = -1;
     drift.drift[0] = 2;
     drift.drift[2] = -1;
     p.velocity[1] = q.velocity[1] = 5;
@@ -678,8 +739,8 @@ void Motion_constant_force_is_gravity(void) {
     twin_t p = twin_new(), q = twin_new();
     int32_t n;
     rows_none(&rows);
-    rows.values[FX] = 1;
-    rows.values[FY] = -9.81f;
+    *rows_value(&rows, FX) = 1;
+    *rows_value(&rows, FY) = -9.81f;
     gravity.acceleration[0] = 1;
     gravity.acceleration[1] = -9.81f;
     p.velocity[0] = q.velocity[0] = 3;
@@ -702,7 +763,7 @@ void Motion_constant_drag_is_drag(void) {
     twin_t p = twin_new(), q = twin_new();
     int32_t n;
     rows_none(&rows);
-    rows.values[DRAG] = 4;
+    *rows_value(&rows, DRAG) = 4;
     drag.drag = f.drag * 4;
     p.velocity[1] = q.velocity[1] = 6;
     for (n = 1; n <= FRAMES; n ++) {
@@ -723,25 +784,20 @@ void Motion_block_reads_rows(void) {
     scene_rows(&s, &rows);
     test_uint(b->motion, 1);
     test_uint(s.pool->curves, BOX_RENDER_BUFFER_PARTICLE_CURVES);
-    test_int(s.rows, 2);
-    test_assert(rows.rows[VY] != BOX_PARTICLE_CURVE_CONSTANT);
-    test_assert(rows.rows[SPEED] != BOX_PARTICLE_CURVE_CONSTANT);
-    test_assert(rows.rows[VY] != rows.rows[SPEED]);
-    test_uint(rows.rows[DRAG], BOX_PARTICLE_CURVE_CONSTANT);
-    test_flt(rows.values[DRAG], 3);
-    test_uint(rows.rows[VX], BOX_PARTICLE_CURVE_CONSTANT);
-    test_flt(rows.values[VX], 0);
-    test_uint(rows.rows[FY], BOX_PARTICLE_CURVE_CONSTANT);
-    test_flt(rows.values[FY], 0);
-    int32_t i;
-    for (i = 0; i < BOX_PARTICLE_MOTION_CURVES; i ++) {
-        test_uint(rows.max_rows[i], BOX_PARTICLE_CURVE_CONSTANT);
-    }
+    test_int(s.rows, BOX_PARTICLE_VECTOR_ROWS);
+    test_assert(rows.velocity_row != BOX_PARTICLE_CURVE_CONSTANT);
+    test_uint(rows.velocity_max_row, BOX_PARTICLE_CURVE_CONSTANT);
+    test_uint(rows.force_row, BOX_PARTICLE_CURVE_CONSTANT);
+    test_uint(rows.force_max_row, BOX_PARTICLE_CURVE_CONSTANT);
+    test_flt(rows.force[3], 3);
+    test_flt(rows.force[1], 0);
 
-    near(box_particle_curve(s.table, rows.rows[VY], 0, 0.25f), 0);
-    near(box_particle_curve(s.table, rows.rows[VY], 0, 1), 2);
-    near(box_particle_curve(s.table, rows.rows[SPEED], 0, 0), 1);
-    near(box_particle_curve(s.table, rows.rows[SPEED], 0, 1), 0.2f);
+    near(rows_eval(s.table, &rows, VY, 0.25f), 0);
+    near(rows_eval(s.table, &rows, VY, 1), 2);
+    near(rows_eval(s.table, &rows, SPEED, 0), 1);
+    near(rows_eval(s.table, &rows, SPEED, 1), 0.2f);
+    test_flt(rows_eval(s.table, &rows, VX, 0.5f), 0);
+    test_flt(rows_eval(s.table, &rows, VZ, 0.5f), 0);
 
     box_particle_motion_t m;
     box_particle_motion(s.table, &rows, SEED, 3, 1, &m);
@@ -752,11 +808,47 @@ void Motion_block_reads_rows(void) {
 
     box_render_particle_curve_stats_t stats;
     box_render_particles_curve_stats(box_render_particles_get(s.world), &stats);
-    test_int(stats.used, 2);
+    test_int(stats.used, BOX_PARTICLE_VECTOR_ROWS);
     ecs_delete(s.world, s.e);
     frame(s.world);
     box_render_particles_curve_stats(box_render_particles_get(s.world), &stats);
     test_int(stats.used, 0);
+    scene_fini(&s);
+}
+
+void Motion_constants_take_no_row(void) {
+    // particle/motion
+    scene_t s;
+    box_particle_motion_rows_t rows;
+    scene_init(&s, "ParticleMotion: {velocity_y: {keys: [{0, 2}]}, "
+        "force_x: {keys: [{0, -1}, {1, -1}]}, drag: {keys: [{0, 0.5}], max_keys: [{0, 0.5}]}}");
+    scene_rows(&s, &rows);
+    test_uint(s.pool->block.motion, 1);
+    test_uint(s.pool->curves, 0);
+    test_int(s.rows, 0);
+    test_uint(rows.velocity_row, BOX_PARTICLE_CURVE_CONSTANT);
+    test_uint(rows.velocity_max_row, BOX_PARTICLE_CURVE_CONSTANT);
+    test_uint(rows.force_row, BOX_PARTICLE_CURVE_CONSTANT);
+    test_uint(rows.force_max_row, BOX_PARTICLE_CURVE_CONSTANT);
+    test_flt(rows.velocity[0], 0);
+    test_flt(rows.velocity[1], 2);
+    test_flt(rows.velocity[3], 1);
+    test_flt(rows.force[0], -1);
+    test_flt(rows.force[3], 0.5f);
+    scene_fini(&s);
+
+    scene_init(&s, "ParticleMotion: {force_z: {keys: [{0, 1}], max_keys: [{0, 3}]}}");
+    scene_rows(&s, &rows);
+    test_uint(s.pool->block.motion, 1);
+    test_uint(rows.velocity_row, BOX_PARTICLE_CURVE_CONSTANT);
+    test_assert(rows.force_row != BOX_PARTICLE_CURVE_CONSTANT);
+    test_assert(rows.force_max_row != BOX_PARTICLE_CURVE_CONSTANT);
+    test_int(s.rows, 2 * BOX_PARTICLE_VECTOR_ROWS);
+    box_particle_motion_t m;
+    box_particle_motion(s.table, &rows, SEED, 5, 0.5f, &m);
+    near(m.force[2], 1 + 2 * box_particle_motion_blend(SEED, 5, BOX_PARTICLE_MOTION_FORCE));
+    test_flt(m.force[0], 0);
+    test_flt(m.drag, 1);
     scene_fini(&s);
 }
 
@@ -813,8 +905,8 @@ void Motion_ground_velocity_curve(void) {
     twin_t p = twin_new();
     int32_t n, landed = 0;
     rows_none(&rows);
-    rows.values[VX] = 1;
-    rows.values[VY] = -3;
+    *rows_value(&rows, VX) = 1;
+    *rows_value(&rows, VY) = -3;
     p.position[1] = 0.5f;
     for (n = 1; n <= FRAMES; n ++) {
         twin_step(&p, table, &rows, &f, &g);
@@ -863,13 +955,11 @@ void Motion_random_between_two(void) {
         "  }");
     scene_rows(&s, &rows);
     test_uint(s.pool->block.motion, 1);
-    test_assert(rows.rows[VX] != BOX_PARTICLE_CURVE_CONSTANT);
-    test_assert(rows.max_rows[VX] != BOX_PARTICLE_CURVE_CONSTANT);
-    test_assert(rows.rows[VY] != BOX_PARTICLE_CURVE_CONSTANT);
-    test_assert(rows.max_rows[VY] != BOX_PARTICLE_CURVE_CONSTANT);
-    test_assert(rows.max_rows[SPEED] != BOX_PARTICLE_CURVE_CONSTANT);
-    test_uint(rows.max_rows[2], BOX_PARTICLE_CURVE_CONSTANT);
-    test_uint(rows.max_rows[DRAG], BOX_PARTICLE_CURVE_CONSTANT);
+    test_assert(rows.velocity_row != BOX_PARTICLE_CURVE_CONSTANT);
+    test_assert(rows.velocity_max_row != BOX_PARTICLE_CURVE_CONSTANT);
+    test_assert(rows.velocity_row != rows.velocity_max_row);
+    test_uint(rows.force_row, BOX_PARTICLE_CURVE_CONSTANT);
+    test_uint(rows.force_max_row, BOX_PARTICLE_CURVE_CONSTANT);
 
     uint32_t i;
     int32_t same = 0, low = 0, high = 0;

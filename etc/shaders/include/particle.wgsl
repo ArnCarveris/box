@@ -8,16 +8,16 @@
 // curves: array<f32>, BOX_PARTICLE_CURVE_SAMPLES floats per row, baked by the extract.
 #pragma once
 
-// Rows of the curves of a ParticleMotion, box_particle_motion_rows_t: x, y and z of the velocity
-// and w the speed, then x, y and z of the force and w the drag. A row is CURVE_CONSTANT for a
-// constant curve, a max row CURVE_CONSTANT for a curve without max_keys.
+// Rows of the curves of a ParticleMotion, box_particle_motion_rows_t: two vector curves of four
+// floats per sample, x, y and z of the velocity and w the speed, and x, y and z of the force and
+// w the drag. rows is the first row of the velocity, of its max, of the force and of its max,
+// CURVE_CONSTANT for a constant vector or one without a max.
 struct MotionRows {
-    velocity_rows: vec4u,
-    force_rows: vec4u,
-    velocity_max: vec4u,
-    force_max: vec4u,
-    velocity_values: vec4f,
-    force_values: vec4f,
+    rows: vec4u,
+    // Velocity xyz and speed w while constant
+    velocity: vec4f,
+    // Force xyz and drag w while constant
+    force: vec4f,
 };
 
 // The curves of ParticleMotion of a particle at its age, box_particle_motion_t.
@@ -413,32 +413,49 @@ fn particle_motion_blend(seed: u32, index: u32, which: u32) -> f32 {
     return particle_unit(particle_hash(seed, index, STREAM_MOTION + which));
 }
 
-// The velocity and speed curves of ParticleMotion of a particle at a normalized age, its force
-// 0 and drag 1.
+// A vector curve at a normalized age from its rows of the curve table, four floats per sample,
+// linear between two samples; a constant vector reads no row.
+fn particle_vector(row: u32, value: vec4f, t: f32) -> vec4f {
+    if (row == CURVE_CONSTANT) {
+        return value;
+    }
+
+    let at = particle_curve_sample(t);
+    let k = row * CURVE_SAMPLES + u32(at.x) * 4u;
+    let a = vec4f(curves[k], curves[k + 1u], curves[k + 2u], curves[k + 3u]);
+    let b = vec4f(curves[k + 4u], curves[k + 5u], curves[k + 6u], curves[k + 7u]);
+    return a + (b - a) * at.y;
+}
+
+// The vector curve of a particle at a normalized age: the vector, or with a max vector at
+// max_row each value blended toward that of the max by its own blend u of the particle.
+fn particle_vector_range(row: u32, max_row: u32, value: vec4f, t: f32, u: vec4f) -> vec4f {
+    let a = particle_vector(row, value, t);
+    if (max_row == CURVE_CONSTANT) {
+        return a;
+    }
+
+    return a + (particle_vector(max_row, value, t) - a) * u;
+}
+
+// The velocity and speed curves of ParticleMotion of a particle at a normalized age, the three
+// axes of the velocity blended by one draw and the speed by another, its force 0 and drag 1.
 fn particle_motion_velocity(m: MotionRows, seed: u32, index: u32, t: f32) -> Motion {
     let uv = particle_motion_blend(seed, index, MOTION_VELOCITY);
-    let us = particle_motion_blend(seed, index, MOTION_SPEED);
-    var out = particle_motion_none();
-    out.velocity = vec3f(
-        particle_curve_range(m.velocity_rows.x, m.velocity_max.x, m.velocity_values.x, t, uv),
-        particle_curve_range(m.velocity_rows.y, m.velocity_max.y, m.velocity_values.y, t, uv),
-        particle_curve_range(m.velocity_rows.z, m.velocity_max.z, m.velocity_values.z, t, uv));
-    out.speed = particle_curve_range(m.velocity_rows.w, m.velocity_max.w, m.velocity_values.w,
-        t, us);
-    return out;
+    let u = vec4f(uv, uv, uv, particle_motion_blend(seed, index, MOTION_SPEED));
+    let v = particle_vector_range(m.rows.x, m.rows.y, m.velocity, t, u);
+    return Motion(v.xyz, v.w, vec3f(0.0), 1.0);
 }
 
 // The curves of ParticleMotion of a particle at a normalized age, each blended toward its max
 // curve by the draw of its quantity.
 fn particle_motion(m: MotionRows, seed: u32, index: u32, t: f32) -> Motion {
     let uf = particle_motion_blend(seed, index, MOTION_FORCE);
-    let ud = particle_motion_blend(seed, index, MOTION_DRAG);
+    let u = vec4f(uf, uf, uf, particle_motion_blend(seed, index, MOTION_DRAG));
+    let f = particle_vector_range(m.rows.z, m.rows.w, m.force, t, u);
     var out = particle_motion_velocity(m, seed, index, t);
-    out.force = vec3f(
-        particle_curve_range(m.force_rows.x, m.force_max.x, m.force_values.x, t, uf),
-        particle_curve_range(m.force_rows.y, m.force_max.y, m.force_values.y, t, uf),
-        particle_curve_range(m.force_rows.z, m.force_max.z, m.force_values.z, t, uf));
-    out.drag = particle_curve_range(m.force_rows.w, m.force_max.w, m.force_values.w, t, ud);
+    out.force = f.xyz;
+    out.drag = f.w;
     return out;
 }
 

@@ -367,6 +367,7 @@
                     "constant_force_is_gravity",
                     "constant_drag_is_drag",
                     "block_reads_rows",
+                    "constants_take_no_row",
                     "stretch_sees_velocity",
                     "ground_velocity_curve",
                     "random_between_two",

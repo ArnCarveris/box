@@ -1096,11 +1096,15 @@ static void box_particles_block_look(
         }
     }
 
+    const box_particle_motion_rows_t *motion = &pool->motion.rows;
     out->motion = pool->motion.active ? 1u : 0u;
-    for (i = 0; i < BOX_PARTICLE_MOTION_CURVES; i ++) {
-        out->motion_rows[i] = pool->motion.rows.rows[i];
-        out->motion_max_rows[i] = pool->motion.rows.max_rows[i];
-        out->motion_values[i] = pool->motion.rows.values[i];
+    out->motion_rows[0] = motion->velocity_row;
+    out->motion_rows[1] = motion->velocity_max_row;
+    out->motion_rows[2] = motion->force_row;
+    out->motion_rows[3] = motion->force_max_row;
+    for (i = 0; i < 4; i ++) {
+        out->motion_velocity[i] = motion->velocity[i];
+        out->motion_force[i] = motion->force[i];
     }
 
     out->styled = look ? 1u : 0u;
