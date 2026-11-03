@@ -5,10 +5,10 @@
 using flecs.script
 using flecs.script.math
 
-export const GRID: i32 = 28
-export const CELLS: i32 = 784
+export const GRID: i32 = 14
+export const CELLS: i32 = 196
 export const PITCH: f32 = 2
-export const HALF: f32 = 28
+export const HALF: f32 = 14
 
 export const K_EMPTY: i32 = 0
 export const K_WALL: i32 = 1
@@ -77,9 +77,9 @@ fn kind_blurb(k: i32) -> string {
     3: "A timber gate, rebuilt in stone once your keep allows. Turns to follow the wall it sits in, and closes the ring like a wall does."
     4: "The lord's keep, one per realm. Collects taxes and caps the level of every other piece; the walls and gates rise with it. Eats 4 food, twice as much with every level."
     5: "A cottage for 4 folk. Eats 1 food. Outside the walls bandits raid it for gold; safe inside them it grows into a house, then a manor."
-    6: "A fenced farm of 4 by 4 cells with a farmhouse. Grows 10 food a second; the blacksmith can research better farming."
+    6: "A fenced farm of 4 by 4 cells with a farmhouse. Grows 10 food a second for 5 gold a second in wages; the blacksmith can research better farming."
     7: "The blacksmith, one per realm. Select it to research farming tools, so your fields feed more folk."
-    8: "A stone quarry, dug into a stone deposit where grey rock breaks through the grass. Cuts 2 stone a second."
+    8: "A stone quarry, dug into a stone deposit where grey rock breaks through the grass. Cuts 2 stone a second for 10 gold a second in wages."
     9: "A moat of still water."
     10: "An oak or a pine. Cheap, and pleasant to look at."
     11: "A cobbled path."
@@ -224,6 +224,14 @@ fn build_face(t: i32, r: i32, kn: i32, ke: i32, ks: i32, kw: i32) -> i32 {
   match t == 5 { true: house_face(r, kn, ke, ks, kw); _: r }
 }
 
+fn on_line(x: i32, z: i32, a: i32, b: i32) -> bool {
+  const ax = a % GRID
+  const az = (a - ax) / GRID
+  const bx = b % GRID
+  const bz = (b - bx) / GRID
+  (z == az && z == bz && x >= min(ax, bx) && x <= max(ax, bx)) || (x == ax && x == bx && z >= min(az, bz) && z <= max(az, bz))
+}
+
 fn wall_height(k: i32, lvl: i32) -> f32 {
   match k {
     1: 1.2 + lvl * 0.7
@@ -254,6 +262,14 @@ fn gold_of(k: i32, lvl: i32, safe: bool) -> f64 {
   match k {
     4: lvl * 3
     5: match lvl { 1: match safe { true: 2; _: 1 }; 2: 4; _: 8 }
+    _: 0
+  }
+}
+
+fn upkeep_of(k: i32) -> f64 {
+  match k {
+    6: 5
+    8: 10
     _: 0
   }
 }
@@ -432,16 +448,16 @@ fn signed(v: f64) -> string {
   match v >= 0 { true: "+{v:.1}"; _: "{v:.1}" }
 }
 
-export mut kind: i32[784] = {}
-export mut level: i32[784] = {}
-export mut inside: bool[784] = {}
-export mut abandoned: bool[784] = {}
-export mut points: f64[784] = {}
-export mut ready: bool[784] = {}
-export mut farm_origin: i32[784] = {}
-export mut fits4: bool[784] = {}
-export mut deposit: bool[784] = {}
-export mut facing: i32[784] = {}
+export mut kind: i32[196] = {}
+export mut level: i32[196] = {}
+export mut inside: bool[196] = {}
+export mut abandoned: bool[196] = {}
+export mut points: f64[196] = {}
+export mut ready: bool[196] = {}
+export mut farm_origin: i32[196] = {}
+export mut fits4: bool[196] = {}
+export mut deposit: bool[196] = {}
+export mut facing: i32[196] = {}
 
 export mut tool: i32 = 0
 export mut hover_tool: i32 = 0
@@ -451,9 +467,8 @@ export mut selected: i32 = -1
 export mut rising: i32 = -1
 export mut rising_age: i32 = 0
 export mut dragging = false
-export mut drag_last: i32 = -1
 export mut drag_start: i32 = -1
-export mut drag_axis: i32 = 0
+export mut drag_end: i32 = -1
 
 export mut gold: f64 = 200
 export mut stone: f64 = 160
@@ -486,3 +501,5 @@ export mut toast_until: f64 = 0
 
 export mut raid_timer: i32 = 0
 export mut raids: i32 = 0
+export mut raid_cell: i32 = -1
+export mut raid_until: f64 = 0
