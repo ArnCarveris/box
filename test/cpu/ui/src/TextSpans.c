@@ -150,7 +150,11 @@ static void spans_count_layouts(
     ecs_iter_t *it)
 {
     int32_t *count = it->ctx;
-    *count += it->count;
+    ecs_entity_t e = (ecs_entity_t)(uintptr_t)it->callback_ctx;
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        *count += it->entities[i] == e;
+    }
 }
 
 /** Observe the layouts of an entity.
@@ -165,10 +169,11 @@ static void spans_watch_layouts(
     int32_t *count)
 {
     ecs_observer(world, {
-        .query.terms = {{ .id = ecs_id(TextGlyphs), .src.id = e }},
+        .query.terms = {{ .id = ecs_id(TextGlyphs) }},
         .events = { EcsOnSet },
         .callback = spans_count_layouts,
-        .ctx = count
+        .ctx = count,
+        .callback_ctx = (void*)(uintptr_t)e
     });
 }
 

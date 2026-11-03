@@ -280,15 +280,19 @@ fn median(v: vec3f) -> f32 {
 // scaled from the range of the page to screen pixels with the Euclidean footprint of a pixel, so
 // rotation changes nothing. Below one pixel of range the edge stays one pixel wide and the glyph
 // fades with the range instead of aliasing. offset is added to the distance, 0 for a regular
-// glyph and the bold weight for a bold one.
+// glyph and the bold weight for a bold one. A small bold glyph spreads its edge over more of the
+// field than the offset leaves below the threshold, so the empty field of the quad would cover
+// a little: the coverage is scaled so that it is 0 there, which leaves a regular glyph as is.
 fn glyph_coverage(uv: vec2f, range: vec2f, offset: f32) -> f32 {
     let field = textureSampleLevel(distance_map, material_sampler, uv, 0.0);
     let footprint = vec2f(length(vec2f(dpdx(uv.x), dpdy(uv.x))),
         length(vec2f(dpdx(uv.y), dpdy(uv.y))));
     let texels = vec2f(1.0) / max(footprint, vec2f(1e-9));
     let px_range = 0.5 * dot(range, texels);
-    let cover = clamp((median(field.rgb) - 0.5 + offset) * max(px_range, 1.0) + 0.5, 0.0, 1.0);
-    return cover * clamp(px_range, 0.0, 1.0);
+    let scale = max(px_range, 1.0);
+    let empty = clamp((offset - 0.5) * scale + 0.5, 0.0, 0.999);
+    let cover = clamp((median(field.rgb) - 0.5 + offset) * scale + 0.5, 0.0, 1.0);
+    return (cover - empty) / (1.0 - empty) * clamp(px_range, 0.0, 1.0);
 }
 
 // Coverage of a fragment by the clips of its instance, the product over the chain of nested
