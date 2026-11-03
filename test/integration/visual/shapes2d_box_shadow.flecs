@@ -1,8 +1,10 @@
 using box.transform
 using box.geometry
 using box.material
+using box.texture
 using box.camera
 using box.view
+using box.layout
 
 // Soft shadows (BoxShadow) of cards with different offsets, blurs, spreads, radii and colors, over a
 // light and a dark panel in a screen space UI (top) and on a turned world space panel (middle).

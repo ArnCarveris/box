@@ -33,10 +33,9 @@
 // shadow exactly on the part of the pixel outside the element, so no light or dark seam shows
 // along its edge, and an opaque element looks as without the cutout. The distance to the element
 // is taken in uniform control flow, a rounded box per fragment of every instance, for the
-// derivatives that anti-alias it the same way the element is. Soft shadows band on 8-bit targets,
-// so their alpha is dithered by half a step of 8 bits with interleaved gradient noise of the
-// pixel position, stable from frame to frame, where the alpha is above a step. Every other
-// instance pays one comparison for it.
+// derivatives that anti-alias it the same way the element is. Wide, faint shadows band on 8-bit
+// sRGB targets, so the alpha of a shadow is dithered by about a step of the target with
+// interleaved gradient noise of the pixel position, stable from frame to frame (shadow_dither).
 //
 // ids.x of the shading is the clip index of the instance, 0 when no ClipChildren ancestor clips
 // it. A clip maps the world position of a fragment into the local plane of its
@@ -244,11 +243,28 @@ fn cutout(cover: f32, alpha: f32) -> f32 {
     return select(0.0, clamp((1.0 - cover) / max(rest, 1e-6), 0.0, 1.0), rest > 1e-5);
 }
 
-// Dither of the alpha of a shadow at a pixel, half a step of 8 bits either way: interleaved
-// gradient noise (Jimenez 2014) of the pixel position, the same every frame.
-fn shadow_dither(pos: vec2f) -> f32 {
+// Linear light one step of an 8-bit sRGB target spans at a linear value, from the slope of the
+// sRGB curve (constant on its linear segment below 0.0031308).
+fn srgb_step(l: f32) -> f32 {
+    return 2.4 / (1.055 * 255.0) * pow(max(l, 0.0031308), 1.0 - 1.0 / 2.4);
+}
+
+// Dithered alpha of a shadow of a linear color at a pixel: interleaved gradient noise (Jimenez
+// 2014) of the pixel position, the same every frame, of about one step of an 8-bit sRGB target
+// from end to end. The step it changes the target by depends on what is under the shadow, which
+// the shader does not know, so the amplitude is the smaller of the one for black under it (its
+// brightest channel lightening it) and for white under it (its darkest channel darkening it),
+// which keeps the noise within a step over any background. It is bounded by the distance of the
+// alpha to 0 and 1, so it never clamps: the average stays the alpha and the faint tail of a shadow
+// is not speckled out to the edge of its quad.
+fn shadow_dither(alpha: f32, color: vec3f, pos: vec2f) -> f32 {
+    let bright = max(max(color.r, color.g), color.b);
+    let dark = 1.0 - min(min(color.r, color.g), color.b);
+    let over_black = srgb_step(alpha * bright) / max(bright, 1e-6);
+    let over_white = srgb_step(1.0 - alpha * dark) / max(dark, 1e-6);
+    let amplitude = min(min(over_black, over_white), 2.0 * min(alpha, 1.0 - alpha));
     let n = fract(52.9829189 * fract(dot(floor(pos), vec2f(0.06711056, 0.00583715))));
-    return (n - 0.5) / 255.0;
+    return alpha + (n - 0.5) * amplitude;
 }
 
 fn median(v: vec3f) -> f32 {
@@ -357,7 +373,7 @@ fn ranked_depth(depth: f32, rank: u32) -> f32 {
         cover *= cutout(coverage(cut, cut_px), f.border.y);
         color = f.color.rgb;
         alpha = cover * f.color.a;
-        alpha = clamp(alpha + select(0.0, shadow_dither(f.pos.xy), alpha > 1.0 / 255.0), 0.0, 1.0);
+        alpha = shadow_dither(alpha, color, f.pos.xy);
     }
 
     if (f.clip != 0u) {
