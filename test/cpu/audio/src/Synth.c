@@ -432,6 +432,183 @@ void Synth_envelope_segments(void) {
     box_audio_core_free(core);
 }
 
+/** The level of the linear envelope as the core made it before curves: a float step per
+ * frame, the target on the last frame of a segment.
+ *
+ * @param levels Receives the level of each frame
+ * @param frames Frames of the attack, the decay, the hold and the release
+ * @param sustain Sustain level
+ * @param count Frames to fill, silent past the release
+ */
+static void synth_linear_levels(
+    float *levels,
+    const int32_t *frames,
+    float sustain,
+    int32_t count)
+{
+    const float targets[4] = { 1.0f, sustain, sustain, 0.0f };
+    float value = 0, step;
+    int32_t at = 0, s, k;
+    for (s = 0; s < 4; s ++) {
+        step = (targets[s] - value) / (float)frames[s];
+        for (k = frames[s] - 1; k >= 0 && at < count; k --) {
+            value = k ? value + step : targets[s];
+            levels[at ++] = value;
+        }
+    }
+
+    while (at < count) {
+        levels[at ++] = 0;
+    }
+}
+
+/** Share of the way a segment of a curve has gone at its middle.
+ *
+ * @param curve The curve
+ * @return 0.5 for a linear segment, more for a positive curve
+ */
+static double synth_curve_mid(
+    double curve)
+{
+    return curve == 0 ? 0.5 : 1 / (1 + exp(-curve / 2));
+}
+
+/** Curves of 0, and curves too small to bend a segment, render the linear envelope bit
+ * identical: the old recurrence, a square of 1 Hz at 0.5 through its first half. */
+void Synth_envelope_linear_identical(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SQUARE, 1, 0.5f, 0);
+    const int32_t frames[4] = { 480, 960, 4800, 2400 };
+    int32_t i;
+    p.envelope = (box_audio_synth_envelope_t){
+        .attack = 0.01f, .decay = 0.02f, .sustain = 0.5f, .hold = 0.1f, .release = 0.05f };
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 12000);
+    synth_linear_levels(audio_sound_b, frames, 0.5f, 12000);
+    for (i = 1; i < 12000; i ++) {
+        test_assert(audio_l[i] == 0.5f * audio_sound_b[i]);
+    }
+
+    memcpy(audio_sound_a, audio_l, 12000 * sizeof(float));
+    p.envelope.curve = BOX_AUDIO_SYNTH_CURVE_MIN * 0.5f;
+    p.envelope.attack_curve = -BOX_AUDIO_SYNTH_CURVE_MIN * 0.5f;
+    synth_define(core, 2, &p);
+    audio_play(core, 2, 2, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 12000);
+    test_assert(memcmp(audio_l, audio_sound_a, 12000 * sizeof(float)) == 0);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_VOICE_END, NULL), 2);
+    box_audio_core_free(core);
+}
+
+/** A curved decay is below the linear one at its middle by what its curve predicts, falls
+ * without a step and reaches the sustain level at the end of the decay. */
+void Synth_envelope_curved_decay(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SQUARE, 1, 0.5f, 0);
+    const float sustain = 0.2f, curve = 4;
+    const int32_t attack = 480, decay = 4800, hold = 4800;
+    int32_t mid = attack + decay / 2 - 1, end = attack + decay - 1, i;
+    double linear, curved;
+    p.envelope = (box_audio_synth_envelope_t){ .attack = 0.01f, .decay = 0.1f,
+        .sustain = sustain, .hold = 0.1f, .release = 0.05f };
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 15000);
+    memcpy(audio_sound_a, audio_l, 15000 * sizeof(float));
+
+    p.envelope.curve = curve;
+    synth_define(core, 2, &p);
+    audio_play(core, 2, 2, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 15000);
+
+    linear = 0.5 * (1 - (1 - sustain) * synth_curve_mid(0));
+    curved = 0.5 * (1 - (1 - sustain) * synth_curve_mid(curve));
+    test_assert(fabs(audio_sound_a[mid] - linear) < 1e-4);
+    test_assert(fabs(audio_l[mid] - curved) < 1e-4);
+    test_assert(audio_l[mid] < audio_sound_a[mid] - 0.1f);
+
+    /* The attack is still linear, the decay falls all the way and lands on the sustain */
+    for (i = 1; i < attack; i ++) {
+        test_assert(audio_l[i] == audio_sound_a[i]);
+    }
+
+    for (i = attack; i < end; i ++) {
+        test_assert(audio_l[i + 1] <= audio_l[i]);
+        test_assert(audio_l[i] >= 0.5f * sustain - 1e-6f);
+    }
+
+    test_assert(audio_l[end] == 0.5f * sustain);
+    for (i = end; i < end + hold; i ++) {
+        test_assert(fabsf(audio_l[i] - 0.5f * sustain) < 1e-6f);
+    }
+
+    test_assert(audio_max_step(audio_l, 1, 15000) < 0.01f);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_VOICE_END, NULL), 2);
+    box_audio_core_free(core);
+}
+
+/** A curved release, and a curved attack, still end the voice at the end of its release. */
+void Synth_envelope_curved_release_ends(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SQUARE, 1, 0.5f, 0);
+    const float curve = 6;
+    const int32_t attack = 480, decay = 960, hold = 2400, release = 4800;
+    int32_t start = attack + decay + hold, end = start + release - 1, at;
+    double expected;
+    p.envelope = (box_audio_synth_envelope_t){ .attack = 0.01f, .decay = 0.02f,
+        .sustain = 0.5f, .hold = 0.05f, .release = 0.1f, .curve = curve,
+        .attack_curve = 3 };
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, end);
+    test_int(box_audio_core_voice_count(core), 1);
+    audio_render(core, end, 12000 - end);
+
+    at = synth_last(audio_l, 0, 12000);
+    test_int(at, end - 1);
+    test_flt(audio_peak(audio_l, end, 12000), 0);
+    test_int(box_audio_core_voice_count(core), 0);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_VOICE_END, NULL), 1);
+
+    /* Fast at first: at the middle of the release under half of the linear level */
+    expected = 0.25 * (1 - synth_curve_mid(curve));
+    test_assert(fabs(audio_l[start + release / 2 - 1] - expected) < 1e-4);
+    test_assert(audio_l[start + release / 2 - 1] < 0.125f * 0.5f);
+
+    /* A curved attack is above the linear one at its middle */
+    test_assert(fabs(audio_l[attack / 2 - 1] - 0.5 * synth_curve_mid(3)) < 1e-4);
+    test_assert(audio_max_step(audio_l, 1, 12000) < 0.02f);
+    box_audio_core_free(core);
+}
+
+/** The core clamps curves that are NaN or too large either way: the voice stays finite and
+ * still ends on time. */
+void Synth_envelope_curve_clamped(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SINE, 200, 0.5f, 0);
+    float bad[3] = { NAN, 1e9f, -1e9f };
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        p.envelope = (box_audio_synth_envelope_t){ .attack = 0.005f, .decay = 0.02f,
+            .sustain = 0.5f, .hold = 0.02f, .release = 0.03f, .curve = bad[i],
+            .attack_curve = bad[i] };
+        synth_define(core, 1 + i, &p);
+        audio_play(core, 1 + i, 1 + i, 0, 1, 0, 1, 0);
+        audio_render(core, 0, 4800);
+        test_assert(synth_finite(audio_l, 0, 4800));
+        test_assert(audio_peak(audio_l, 0, 4800) <= 0.5f + 1e-4f);
+        test_int(box_audio_core_voice_count(core), 0);
+    }
+
+    test_int(audio_events(core, BOX_AUDIO_EVENT_VOICE_END, NULL), 3);
+    box_audio_core_free(core);
+}
+
 /** No attack and no release: the edges keep both ends from jumping. */
 void Synth_envelope_no_click(void) {
     // audio/synth
@@ -1082,12 +1259,20 @@ void Synth_docs_examples(void) {
     ecs_world_t *world = audio_world();
     char *code = synth_read("test/assets/audio/synth_examples.flecs");
     const char *names[] = { "UiClick", "UiBlip", "Whoosh", "Pluck" };
+<<<<<<< HEAD
     const int32_t frames[] = { 3, 12, 70, 48 };
+=======
+    const int32_t frames[] = { 3, 12, 70, 40 };
+>>>>>>> 0a5adfddc7d9aa76bf5de78c241c09dd22a1c240
     int32_t i, start;
     audio_log_start();
     test_assert(ecs_script_run(world, "examples", code, NULL) == 0);
     ecs_os_free(code);
     audio_run(world, 1);
+<<<<<<< HEAD
+=======
+    test_flt(ecs_get(world, ecs_lookup(world, "Pluck"), AudioSynth)->patch.envelope.curve, 5);
+>>>>>>> 0a5adfddc7d9aa76bf5de78c241c09dd22a1c240
     for (i = 0; i < 4; i ++) {
         ecs_entity_t sound = ecs_lookup(world, names[i]);
         test_assert(sound != 0);

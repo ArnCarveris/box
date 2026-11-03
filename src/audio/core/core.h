@@ -99,6 +99,12 @@
  * envelope never jumps */
 #define BOX_AUDIO_SYNTH_EDGE 0.0005f
 
+/** Largest curve of a segment of a synth envelope, either way; a larger one is clamped */
+#define BOX_AUDIO_SYNTH_CURVE_MAX 16.0f
+
+/** Smallest curve of a segment of a synth envelope that bends it; a smaller one is linear */
+#define BOX_AUDIO_SYNTH_CURVE_MIN 0.001f
+
 /** Highest frequency of an oscillator in Hz, the top of the audible range */
 #define BOX_AUDIO_SYNTH_FREQUENCY_MAX 20000.0f
 
@@ -253,6 +259,7 @@ typedef enum box_audio_synth_filter_t {
     BOX_AUDIO_SYNTH_BANDPASS = 3      /**< Bandpass, unity at the cutoff */
 } box_audio_synth_filter_t;
 
+<<<<<<< HEAD
 /** Slopes of the filter of a synth patch */
 typedef enum box_audio_synth_slope_t {
     BOX_AUDIO_SYNTH_SLOPE_12 = 0,  /**< 12 dB per octave, one stage */
@@ -261,12 +268,19 @@ typedef enum box_audio_synth_slope_t {
 
 /** An envelope of a synth patch: a linear attack to 1, a decay to the sustain level, a hold
  * there and a release to 0 */
+=======
+/** An envelope of a synth patch: an attack to 1, a decay to the sustain level, a hold there
+ * and a release to 0, each linear or curved and ending on time */
+>>>>>>> 0a5adfddc7d9aa76bf5de78c241c09dd22a1c240
 typedef struct box_audio_synth_envelope_t {
-    float attack;   /**< Seconds from 0 to 1 */
-    float decay;    /**< Seconds from 1 to the sustain level */
-    float sustain;  /**< Level after the decay, 0..1 */
-    float release;  /**< Seconds from the sustain level to 0 */
-    float hold;     /**< Seconds at the sustain level before the release */
+    float attack;        /**< Seconds from 0 to 1 */
+    float decay;         /**< Seconds from 1 to the sustain level */
+    float sustain;       /**< Level after the decay, 0..1 */
+    float release;       /**< Seconds from the sustain level to 0 */
+    float hold;          /**< Seconds at the sustain level before the release */
+    float curve;         /**< Curve of the decay and the release, 0 linear, positive fast at
+                          *   first, -BOX_AUDIO_SYNTH_CURVE_MAX..BOX_AUDIO_SYNTH_CURVE_MAX */
+    float attack_curve;  /**< Curve of the attack, the same way */
 } box_audio_synth_envelope_t;
 
 /** An oscillator of a synth patch */

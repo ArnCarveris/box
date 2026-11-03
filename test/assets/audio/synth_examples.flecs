@@ -35,6 +35,7 @@ prefab Whoosh {
   SynthOscillator: {wave: SynthNoise, level: 0.8}
 }
 
+<<<<<<< HEAD
 // A pluck: a saw through a 24 dB lowpass that its filter envelope opens 4 octaves on the attack
 // and closes with the note
 prefab Pluck {
@@ -43,4 +44,14 @@ prefab Pluck {
   SynthFilter: {kind: SynthLowPass, cutoff: 300, resonance: 0.3, slope: SynthSlope24}
   SynthFilterEnvelope: {attack: 0.002, decay: 0.25, sustain: 0.2, hold: 0.25, release: 0.2, amount: 4}
   SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.5}
+=======
+// A pluck: a curved decay that falls fast and rings out, no sustain
+prefab Pluck {
+  AudioOutput: {bus: ui}
+  SynthSound: {level_variance: 0.1}
+  SynthEnvelope: {attack: 0.002, decay: 0.6, curve: 5}
+  SynthFilter: {kind: SynthLowPass, cutoff: 4000, cutoff_end: 1200, sweep: 0.3, resonance: 0.1}
+  string { SynthOscillator: {wave: SynthTriangle, frequency: 330, level: 0.4} }
+  body { SynthOscillator: {wave: SynthSine, frequency: 330, level: 0.3} }
+>>>>>>> 0a5adfddc7d9aa76bf5de78c241c09dd22a1c240
 }
