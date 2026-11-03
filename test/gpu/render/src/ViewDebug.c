@@ -2711,6 +2711,38 @@ void ViewDebug_wire_silhouette_sphere(void) {
     ecs_fini(world);
 }
 
+/** The seam of a sphere, where its first and last meridian meet at positions computed apart,
+ * is not double width: turned around Y in steps of a segment, each meridian in turn crosses the
+ * same row at the same column with the width of the view. */
+void ViewDebug_wire_sphere_seam(void) {
+    // debug/wireframe
+    float s = 128.0f / 6.0f, lo = 1e9f, hi = 0;
+    float meridian = 64.0f - 2.0f * 0.70710678f * s;
+    int32_t k;
+    for (k = 0; k < 8; k ++) {
+        ecs_world_t *world = dg_world();
+        ecs_entity_t camera = ecs_new(world);
+        ecs_set(world, camera, Position, {0, 0, 10});
+        ecs_set(world, camera, Rotation, {0, 0, 0});
+        ecs_set(world, camera, Camera, {.near_ = 0.1f, .far_ = 100, .ortho = true,
+            .ortho_height = 6});
+        dw_view(world, camera, WireframeOverlay, dw_green, 1);
+        ecs_entity_t sphere = dw_shape(world, 0, 0, 0, (Rgb){255, 0, 0});
+        ecs_set(world, sphere, Sphere, {.segments = 8, .radius = 2});
+        ecs_set(world, sphere, Rotation, {0, (float)k * (float)GLM_PI_4, 0});
+        unsigned char *px = dg_render(world, "wire_sphere_seam.png");
+        float sum = dw_green_sum(px, 64 - 4, (int32_t)meridian - 3, (int32_t)meridian + 3);
+        lo = sum < lo ? sum : lo;
+        hi = sum > hi ? sum : hi;
+        stbi_image_free(px);
+        ecs_fini(world);
+    }
+
+    test_assert(lo > 0.6f);
+    test_assert(hi < 1.6f);
+    test_assert(hi / lo < 1.45f);
+}
+
 /** The edges of a box, whose faces have vertices of their own, are not double width: turned by
  * 45 degrees around Y, the edge between the two faces the camera sees has the width of the
  * view, as do its outline edges on either side. */

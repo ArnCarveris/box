@@ -1321,9 +1321,11 @@ bool box_gpu_debug_enabled(
  * wire draws (debug_wire.wgsl): for each index, the vertex of the neighbor triangle across the
  * edge opposite that corner which is not on the edge, or BOX_GPU_WIRE_NONE on a border.
  *
- * Edges are matched by the positions of their vertices, so the vertices a face or a uv seam
- * duplicates still join, in linear time. The backend keeps no CPU copy of a mesh, so it is
- * built at the upload; it has one uint32_t per index, the size of the indices.
+ * Edges are matched by the positions of their vertices, welded within a tiny distance, so the
+ * vertices a face or a uv seam duplicates still join, in linear time.
+ *
+ * The backend keeps no CPU copy of a mesh, so it is built at the upload; it has one uint32_t
+ * per index, the size of the indices.
  *
  * @param gpu The backend
  * @param m The mesh, with its index count

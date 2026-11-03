@@ -1127,6 +1127,7 @@
                     "wire_with_grid",
                     "wire_silhouette_quad",
                     "wire_silhouette_sphere",
+                    "wire_sphere_seam",
                     "wire_box_edges",
                     "probes_off_unchanged",
                     "light_probes_at_grid",
