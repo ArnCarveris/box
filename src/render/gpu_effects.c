@@ -30,6 +30,9 @@
 /** Smallest edge of the last bloom mip, in pixels, of a chain that is long enough */
 #define BOX_GPU_BLOOM_LEAF (4)
 
+/** Prefilter levels of a bloom at most, the halvings of the image above the first mip */
+#define BOX_GPU_BLOOM_PREFILTER (12)
+
 /** Bins of the luminance histogram of the exposure */
 #define BOX_GPU_EXPOSURE_BINS (256)
 
@@ -80,6 +83,12 @@ typedef struct box_gpu_fx_state_t {
     int32_t mip_count;              /**< Mips of the chain */
     uint32_t width;                 /**< Width of the first mip */
     uint32_t height;                /**< Height of the first mip */
+    uint32_t render_width;          /**< Render width the chain was made for */
+    uint32_t render_height;         /**< Render height the chain was made for */
+    WGPUTexture prefilter;          /**< Halvings of the image above the first mip of a bloom,
+                                     *   NULL when the first mip is half the image */
+    WGPUTextureView prefilter_mips[BOX_GPU_BLOOM_PREFILTER]; /**< View of every level */
+    int32_t prefilter_count;        /**< Levels of the prefilter */
     WGPUTexture history[2];         /**< First mip of the previous and the current frame */
     WGPUTextureView history_views[2]; /**< Views of the history images */
     int32_t history_index;          /**< History image that holds the last frame */
@@ -178,7 +187,7 @@ typedef struct box_gpu_measure_uniforms_t {
 typedef struct box_gpu_bloom_uniforms_t {
     float threshold[4];             /**< Threshold, threshold - knee, 2 knee, 0.25 / knee */
     float params[4];                /**< Firefly clamp, blend of the first mip, history blend */
-    float first[4];                 /**< Tap offset of the first downsample in uv */
+    float first[4];                 /**< Size of a texel of the first mip in uv */
 } box_gpu_bloom_uniforms_t;
 
 /** Uniforms of the SMAA passes, matching Smaa in etc/shaders/smaa.wgsl */
@@ -485,7 +494,7 @@ static void box_gpu_fx_history_free(
     s->history_index = 0;
 }
 
-/** Release the mip chain of a bloom.
+/** Release the mip chain and the prefilter levels of a bloom.
  *
  * @param s The state
  */
@@ -503,9 +512,22 @@ static void box_gpu_fx_mips_free(
         s->bloom = NULL;
     }
 
+    for (i = 0; i < s->prefilter_count; i ++) {
+        wgpuTextureViewRelease(s->prefilter_mips[i]);
+        s->prefilter_mips[i] = NULL;
+    }
+
+    if (s->prefilter) {
+        wgpuTextureRelease(s->prefilter);
+        s->prefilter = NULL;
+    }
+
     s->mip_count = 0;
+    s->prefilter_count = 0;
     s->width = 0;
     s->height = 0;
+    s->render_width = 0;
+    s->render_height = 0;
 }
 
 /** Release the state of an effect and everything it owns.
@@ -1090,6 +1112,11 @@ done:
 
 /** Make the mip chain of a bloom match the render size and its settings.
  *
+ * The first mip is half the render size, or smaller when max_mip_dimension limits it.
+ *
+ * A smaller first mip gets prefilter levels, the halvings of the image down to the last one
+ * at most twice the first mip, so no filter shrinks its input more than twice.
+ *
  * @param gpu The backend
  * @param ctx The chain
  * @param s The state
@@ -1104,19 +1131,38 @@ static void box_gpu_fx_bloom_mips(
     uint32_t rw = (uint32_t)ctx->ft->width, rh = (uint32_t)ctx->ft->height;
     uint32_t longer = rw > rh ? rw : rh;
     uint32_t limit = (uint32_t)b->max_mip_dimension;
-    uint32_t edge = longer / 2 < limit ? longer / 2 : limit;
-    uint32_t w, h, shorter, count = 1, i;
-    edge = edge ? edge : 1;
-    w = (uint32_t)(((uint64_t)rw * edge + longer / 2) / longer);
-    h = (uint32_t)(((uint64_t)rh * edge + longer / 2) / longer);
-    w = w ? w : 1;
-    h = h ? h : 1;
-    if (s->bloom && s->width == w && s->height == h) {
+    uint32_t hw = rw >> 1 ? rw >> 1 : 1, hh = rh >> 1 ? rh >> 1 : 1;
+    uint32_t w = hw, h = hh, shorter, level, count = 1, levels = 0, i;
+    if (longer / 2 > limit) {
+        w = (uint32_t)(((uint64_t)rw * limit + longer / 2) / longer);
+        h = (uint32_t)(((uint64_t)rh * limit + longer / 2) / longer);
+        w = w ? w : 1;
+        h = h ? h : 1;
+    }
+
+    if (s->bloom && s->width == w && s->height == h &&
+        s->render_width == rw && s->render_height == rh)
+    {
         goto done;
     }
 
     box_gpu_fx_mips_free(s);
     box_gpu_fx_history_free(s);
+    if (w != hw || h != hh) {
+        uint32_t edge = w > h ? w : h;
+        level = hw > hh ? hw : hh;
+        levels = 1;
+        while (level > edge * 2 && levels < BOX_GPU_BLOOM_PREFILTER) {
+            levels ++;
+            level >>= 1;
+        }
+
+        s->prefilter = box_gpu_fx_texture(gpu, hw, hh, BOX_GPU_HDR_FORMAT, levels);
+        for (i = 0; i < levels; i ++) {
+            s->prefilter_mips[i] = box_gpu_fx_level(s->prefilter, i);
+        }
+    }
+
     shorter = w < h ? w : h;
     while (shorter >= BOX_GPU_BLOOM_LEAF * 2 && count < BOX_GPU_BLOOM_MIPS) {
         count ++;
@@ -1129,8 +1175,11 @@ static void box_gpu_fx_bloom_mips(
     }
 
     s->mip_count = (int32_t)count;
+    s->prefilter_count = (int32_t)levels;
     s->width = w;
     s->height = h;
+    s->render_width = rw;
+    s->render_height = rh;
 done:
     return;
 }
@@ -1155,8 +1204,8 @@ static void box_gpu_fx_bloom_settings(
     out->params[0] = b->firefly_clamp;
     out->params[1] = box_gpu_fx_bloom_blend(b, 0, (float)(s->mip_count - 1));
     out->params[2] = s->history_valid ? b->temporal : 0.0f;
-    out->first[0] = 0.5f / (float)s->width;
-    out->first[1] = 0.5f / (float)s->height;
+    out->first[0] = 1.0f / (float)s->width;
+    out->first[1] = 1.0f / (float)s->height;
 }
 
 /** Blend the first mip of a bloom with the previous frame.
@@ -1199,8 +1248,10 @@ static WGPUTextureView box_gpu_fx_bloom_history(
     return result;
 }
 
-/** Record the passes of a bloom: downsample into the mip chain, upsample back up and add the
- * first mip to the image.
+/** Record the passes of a bloom: halve the image, downsample it through the prefilter levels
+ * into the mip chain, upsample back up and add the first mip to the image.
+ *
+ * The first halving uses a cheaper filter when it is halved again, which smooths it further.
  *
  * @param gpu The backend
  * @param ctx The chain
@@ -1230,14 +1281,28 @@ static bool box_gpu_fx_bloom(
 
     box_gpu_fx_bloom_settings(s, b, &u);
     box_gpu_fx_uniforms(gpu, s, &u, sizeof(u));
-    pass.entry = "downsample_first";
+    pass.entry = s->prefilter_count > 1 ? "downsample_first_tent" : "downsample_first";
     pass.input = ctx->input;
-    pass.output = s->mips[0];
+    pass.output = s->prefilter_count ? s->prefilter_mips[0] : s->mips[0];
     if (!box_gpu_fx_draw(gpu, ctx, &pass)) {
         goto done;
     }
 
     pass.entry = "downsample";
+    for (i = 1; i < s->prefilter_count; i ++) {
+        pass.input = s->prefilter_mips[i - 1];
+        pass.output = s->prefilter_mips[i];
+        box_gpu_fx_draw(gpu, ctx, &pass);
+    }
+
+    if (s->prefilter_count) {
+        pass.entry = "downsample_fit";
+        pass.input = s->prefilter_mips[s->prefilter_count - 1];
+        pass.output = s->mips[0];
+        box_gpu_fx_draw(gpu, ctx, &pass);
+        pass.entry = "downsample";
+    }
+
     for (i = 1; i < s->mip_count; i ++) {
         pass.input = s->mips[i - 1];
         pass.output = s->mips[i];

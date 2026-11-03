@@ -77,6 +77,15 @@ static void box_cmd_audio_bus(
         box_cmd_audio_bus_name(world, buf, bus->send);
     }
 
+    const Reverb *reverb = ecs_get(world, e, Reverb);
+    const AudioReverbState *rs = ecs_get(world, e, AudioReverbState);
+    if (reverb) {
+        ecs_strbuf_append(buf, ", reverb decay %.2f damping %.2f predelay %.3f size %.2f "
+            "mix %.2f%s", (double)reverb->decay, (double)reverb->damping,
+            (double)reverb->predelay, (double)reverb->size, (double)reverb->mix,
+            rs && rs->refused ? " (dry, every slot taken)" : "");
+    }
+
     if (!in_order) {
         ecs_strbuf_appendstr(buf, " (not in the order, silent)");
     }

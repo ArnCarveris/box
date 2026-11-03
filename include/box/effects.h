@@ -26,7 +26,16 @@
 extern "C" {
 #endif
 
-/** Glow around pixels brighter than the threshold */
+/** Glow around pixels brighter than the threshold.
+ *
+ * Every pixel is clamped against fireflies, weighted down by its brightness (Karis) and
+ * thresholded before the image is halved, so the glow of a small or thin bright detail stays
+ * the same as it moves across the pixels, without temporal, which adds ghosting.
+ *
+ * The first mip is half the image or, past twice max_mip_dimension, the image halved until a
+ * B-spline filter brings it to that size: with the default 512, one extra pass at 1280x720 and
+ * two at 2560x1440 and 3840x2160. A cubic B-spline of the first mip is added to the image.
+ */
 ECS_STRUCT(Bloom, {
     float intensity;                     /**< Blend into the image, default 0.3 */
     float low_frequency_boost;           /**< Extra weight of the wide mips, default 0.7 */
@@ -36,7 +45,8 @@ ECS_STRUCT(Bloom, {
     float threshold_softness;            /**< Width of the knee around the threshold, default 0 */
     float firefly_clamp;                 /**< Clamp against fireflies, default 12, 0 off */
     float temporal;                      /**< Blend with last frame, default 0, max 0.95 */
-    int32_t max_mip_dimension;           /**< Longest edge of the first mip, default 512 */
+    int32_t max_mip_dimension;           /**< Longest edge of the first mip, at most half the
+                                          *   image, default 512, at least 8 */
 });
 
 /** Slices and steps per slice of the horizon search of Gtao, the quality levels of XeGTAO */

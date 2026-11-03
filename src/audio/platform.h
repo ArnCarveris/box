@@ -46,6 +46,7 @@ void box_audio_web_sound(
     int32_t channels,
     float sample_rate);
 
+<<<<<<< HEAD
 /** Send a chunk of a stream to the worklet as a transferred ArrayBuffer; the worklet copies it
  * into the heap of its core and frees it there once the core consumed it. Nothing on native
  * builds.
@@ -99,5 +100,14 @@ void box_audio_web_fetch_take(
  */
 void box_audio_web_fetch_cancel(
     int32_t id);
+=======
+/** Ask the worklet to allocate the delay memory of a reverb slot in the heap of its core, which
+ * keeps it as long as the page. Nothing on native builds.
+ *
+ * @param slot Slot of the reverb
+ */
+void box_audio_web_reverb(
+    uint32_t slot);
+>>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 
 #endif

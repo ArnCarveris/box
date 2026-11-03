@@ -40,13 +40,40 @@ typedef struct AudioVoice {
     uint32_t sound;         /**< Sound id the voice plays */
     bool loop;              /**< Whether the voice loops */
     float volume;           /**< Volume sent, 0 for a Disabled source */
+    float pan;              /**< Pan sent */
     float pitch;            /**< Pitch sent */
     uint8_t bus;            /**< Bus index sent */
+    bool parked;            /**< A looping spatial source out of range: no voice, its time
+                             *   runs on from origin */
+    double origin;          /**< Module time at which the sound was at its start, at pitch */
 } AudioVoice;
 
+/** What box.audio did with a Reverb */
+typedef struct AudioReverbState {
+    uint8_t slot;           /**< Slot of the reverb in the core plus 1, 0 when it has none */
+    bool refused;           /**< The error that every slot is taken was logged */
+} AudioReverbState;
+
+/** What box.audio sent for a reverb slot */
+typedef struct box_audio_reverb_sent_t {
+    uint32_t serial;        /**< Serial of the output the parameters were sent to */
+    uint32_t memory;        /**< Serial of the output the delay memory was given to */
+    uint32_t bus;           /**< Bus index sent, BOX_AUDIO_BUS_NONE for none */
+    box_audio_reverb_params_t params; /**< Parameters sent */
+} box_audio_reverb_sent_t;
+
+/** What box.audio compiled for a SynthSound */
+typedef struct AudioSynth {
+    box_audio_synth_patch_t patch;  /**< The patch of the last compile */
+    bool compiled;          /**< The patch holds the components; false once one changed */
+    bool pending;           /**< The patch changed since it was last sent */
+} AudioSynth;
+
 extern ECS_COMPONENT_DECLARE(AudioSoundId);
+extern ECS_COMPONENT_DECLARE(AudioSynth);
 extern ECS_COMPONENT_DECLARE(AudioBusState);
 extern ECS_COMPONENT_DECLARE(AudioVoice);
+extern ECS_COMPONENT_DECLARE(AudioReverbState);
 
 /** Largest sound file read, in bytes */
 #define BOX_AUDIO_SAMPLE_MAX_FILE (256 * 1024 * 1024)
@@ -217,13 +244,33 @@ typedef struct box_audio_oneshot_t {
     uint32_t handle;        /**< Voice handle */
     uint32_t sound;         /**< Sound id it plays, so a deleted sound fades it */
     uint8_t bus;            /**< Bus index */
+    bool spatial;           /**< A play of box_audio_play_at */
+    float position[3];      /**< World position of a spatial play */
+    AudioSpatial distances; /**< Distances of a spatial play */
+    float volume;           /**< Volume of the play, before the distance */
+    float sent_volume;      /**< Volume sent */
+    float sent_pan;         /**< Pan sent */
 } box_audio_oneshot_t;
 
 /** A play of box_audio_play, sent with the next batch */
 typedef struct box_audio_play_t {
     ecs_entity_t sound;     /**< The sound */
     float volume;           /**< The volume */
+    bool spatial;           /**< A play of box_audio_play_at */
+    float position[3];      /**< World position of a spatial play */
 } box_audio_play_t;
+
+/** Where a spatial source is heard from the listener */
+typedef struct box_audio_place_t {
+    float gain;             /**< Gain of the distance, 0 out of range */
+    float pan;              /**< Pan, -1 left to 1 right */
+} box_audio_place_t;
+
+/** The listener the spatial sources are heard from */
+typedef struct box_audio_listener_t {
+    ecs_entity_t entity;    /**< Entity that listens, 0 for none */
+    mat4 m;                 /**< Its world transform, identity without a listener */
+} box_audio_listener_t;
 
 /** Counters of the module, for the tests */
 typedef struct box_audio_module_stats_t {
@@ -233,10 +280,17 @@ typedef struct box_audio_module_stats_t {
     int64_t orders;         /**< ORDER commands written */
     int64_t cycles;         /**< Compiles that found a cycle */
     int64_t dropped;        /**< Plays dropped before a gesture */
+    int64_t spatial_updates; /**< Spatial sources and plays whose gain was computed */
+    int64_t out_of_range;   /**< Spatial plays that did not start beyond max_distance */
+    int64_t reverbs;        /**< REVERB commands written */
     int64_t not_ready;      /**< Plays dropped while their sound file loaded */
     int64_t decodes;        /**< Decodes of sound files submitted */
+<<<<<<< HEAD
     int64_t music_jobs;     /**< Decode jobs of streams submitted */
     int64_t music_starts;   /**< Voices of streams started */
+=======
+    int64_t synths;         /**< Compiles of synth sounds */
+>>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 } box_audio_module_stats_t;
 
 /** A capture that waits for its frames */
@@ -249,8 +303,15 @@ typedef struct box_audio_capture_job_t {
 /** The state of the module in a world */
 typedef struct box_audio_module_t {
     ecs_query_t *buses;           /**< AudioBus, disabled ones included */
-    ecs_query_t *sources;         /**< AudioSource, disabled ones included */
+    ecs_query_t *sources;         /**< AudioSource without AudioSpatial, disabled ones included */
+    ecs_query_t *spatial;         /**< AudioSource with AudioSpatial, change detected */
+    ecs_query_t *listeners;       /**< AudioListener with WorldTransform */
+    ecs_query_t *views;           /**< Enabled views, for a camera that listens */
     ecs_query_t *sounds;          /**< AudioPcm */
+    ecs_query_t *synths;          /**< SynthSound, prefabs included */
+    ecs_query_t *reverbs;         /**< Reverb on an AudioBus, disabled ones included */
+    ecs_entity_t reverb_entity[BOX_AUDIO_REVERB_MAX]; /**< Entity of each reverb slot */
+    box_audio_reverb_sent_t reverb_sent[BOX_AUDIO_REVERB_MAX]; /**< What each slot got */
     uint32_t serial;              /**< Serial of the output the state was sent to */
     box_audio_writer_t writer;    /**< The batch of the frame, grown as needed */
     uint32_t next_voice;          /**< Next voice handle */
@@ -267,6 +328,7 @@ typedef struct box_audio_module_t {
     ecs_vec_t plays;              /**< box_audio_play_t */
     ecs_vec_t stops;              /**< uint32_t voice handles of deleted sources */
     ecs_vec_t releases;           /**< uint32_t sound ids */
+    ecs_vec_t moved;              /**< ecs_entity_t spatial sources whose static transform moved */
     ecs_vec_t fades;              /**< uint32_t ids of deleted sounds whose one shots fade */
     ecs_vec_t samples;            /**< box_audio_sample_t*, the decoded sound files */
     uint64_t next_sample;         /**< Key of the next sample */
@@ -280,6 +342,12 @@ typedef struct box_audio_module_t {
     bool settings_sent;           /**< settings holds what the output has */
     int64_t voices_stolen;        /**< Steals the core reported */
     box_audio_capture_job_t capture; /**< The capture that waits */
+    box_audio_listener_t listener;   /**< The listener of the last frame */
+    bool listener_warned;         /**< The warning of several listeners was logged */
+    bool spatial_dirty;           /**< Update every spatial source, not only changed ones */
+    bool waiting;                 /**< The page waited for a gesture in the last frame */
+    double time;                  /**< Seconds of output since the module started */
+    float rate;                   /**< Frames per second of the output */
     box_audio_module_stats_t stats;  /**< Counters */
 } box_audio_module_t;
 
@@ -321,6 +389,28 @@ int32_t box_audio_module_bus_index(
     const ecs_world_t *world,
     ecs_entity_t bus);
 
+/** Find the listener of the frame: the first AudioListener, else the camera of the first
+ * enabled View that has one.
+ *
+ * @param world The world
+ * @param state The state
+ * @param listener Receives the listener
+ */
+void box_audio_listener_find(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    box_audio_listener_t *listener);
+
+/** Get the slot of the reverb of an entity in the core.
+ *
+ * @param world The world
+ * @param e The entity with Reverb
+ * @return The slot, -1 when it has none
+ */
+int32_t box_audio_module_reverb_slot(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
 /** Register the sync system and the observers of the module.
  *
  * @param world The world
@@ -329,6 +419,30 @@ int32_t box_audio_module_bus_index(
 void box_audio_sync_init(
     ecs_world_t *world,
     box_audio_module_t *state);
+
+/** Register the observers that mark a synth sound for a new compile when a component of it
+ * or of one of its layers changes.
+ *
+ * @param world The world
+ */
+void box_audio_synth_init(
+    ecs_world_t *world);
+
+/** Compile a synth sound into a patch: the root and its children with a SynthOscillator as
+ * layers, the root first. Logs one error per problem: too many layers, a layer that would
+ * never end, an envelope longer than the core plays.
+ *
+ * @param world The world
+ * @param state The state, for the counters
+ * @param e The root, with SynthSound
+ * @param synth What was compiled for it, receives the patch
+ * @return Whether the patch differs from the one compiled before
+ */
+bool box_audio_synth_compile(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    ecs_entity_t e,
+    AudioSynth *synth);
 
 /** Register the sound file components' observers and the headless wait of their decodes.
  *

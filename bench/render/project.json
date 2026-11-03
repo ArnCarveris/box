@@ -126,6 +126,8 @@
                     "tonemap",
                     "auto_exposure",
                     "bloom",
+                    "none_2160p",
+                    "bloom_2160p",
                     "smaa",
                     "gtao",
                     "fog",

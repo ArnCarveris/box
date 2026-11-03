@@ -137,8 +137,14 @@ void box_audio_host_fini(
         box_audio_host_sound_free(host, i);
     }
 
+<<<<<<< HEAD
     for (i = 0; i < BOX_AUDIO_STREAM_MAX; i ++) {
         box_audio_host_chunks_free(host, i, host->streams[i].count);
+=======
+    for (i = 0; i < BOX_AUDIO_REVERB_MAX; i ++) {
+        ecs_os_free(host->reverbs[i]);
+        host->reverbs[i] = NULL;
+>>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
     }
 
     ecs_os_free(host->events);
@@ -167,6 +173,24 @@ float* box_audio_host_sound(
 
     memcpy(result, data, (size_t)frames * (size_t)channels * sizeof(float));
     host->sounds[id] = result;
+done:
+    return result;
+}
+
+float* box_audio_host_reverb(
+    box_audio_host_t *host,
+    uint32_t slot,
+    float sample_rate,
+    int32_t *floats)
+{
+    float *result = NULL;
+    if (slot >= BOX_AUDIO_REVERB_MAX || host->reverbs[slot]) {
+        goto done;
+    }
+
+    *floats = box_audio_reverb_floats(sample_rate);
+    result = ecs_os_calloc_n(float, *floats);
+    host->reverbs[slot] = result;
 done:
     return result;
 }
@@ -366,6 +390,7 @@ done:
     return result;
 }
 
+<<<<<<< HEAD
 /** Copy a chunk of a stream and give it to the core.
  *
  * @param t The transport
@@ -398,10 +423,33 @@ static bool box_audio_null_stream_chunk(
         box_audio_host_chunk_drop(&n->host, stream);
     }
 
+=======
+/** Allocate the delay memory of a reverb slot and give it to the core.
+ *
+ * @param t The transport
+ * @param slot Slot of the reverb
+ * @return Whether the core has the memory
+ */
+static bool box_audio_null_reverb(
+    box_audio_transport_t *t,
+    uint32_t slot)
+{
+    box_audio_null_t *n = (box_audio_null_t*)t;
+    int32_t floats = 0;
+    float *memory;
+    bool result = slot < BOX_AUDIO_REVERB_MAX && n->host.reverbs[slot];
+    if (result || slot >= BOX_AUDIO_REVERB_MAX) {
+        goto done;
+    }
+
+    memory = box_audio_host_reverb(&n->host, slot, t->sample_rate, &floats);
+    result = memory && box_audio_core_reverb_memory(n->core, slot, memory, floats);
+>>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 done:
     return result;
 }
 
+<<<<<<< HEAD
 /** Read the status of a stream of the core and free the chunks it is done with.
  *
  * @param t The transport
@@ -418,6 +466,8 @@ static void box_audio_null_stream_status(
     box_audio_host_stream_sync(&n->host, stream, status);
 }
 
+=======
+>>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 /** Take the events of the core.
  *
  * @param t The transport
@@ -586,8 +636,12 @@ box_audio_transport_t* box_audio_transport_null_new(
         .sample_rate = box_audio_core_sample_rate(n->core),
         .commands = box_audio_null_commands,
         .sound = box_audio_null_sound,
+<<<<<<< HEAD
         .stream_chunk = box_audio_null_stream_chunk,
         .stream_status = box_audio_null_stream_status,
+=======
+        .reverb = box_audio_null_reverb,
+>>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
         .read_events = box_audio_null_read_events,
         .state = box_audio_null_state,
         .update = box_audio_null_update,
@@ -717,6 +771,13 @@ EM_JS(int, box_audio_web_events, (int32_t *events, int max), {
     return n;
 });
 
+/** The web transport: the worklet renders, the main module waits for its captures */
+typedef struct box_audio_webt_t {
+    box_audio_transport_t base;  /**< The interface, first */
+    int32_t capture;             /**< Frames of the capture that records, 0 for none */
+    uint32_t reverbs;            /**< Reverb slots whose memory was asked for, a bit each */
+} box_audio_webt_t;
+
 /** Post a batch to the worklet.
  *
  * @param t The transport
@@ -759,6 +820,7 @@ static bool box_audio_webt_sound(
     return data && frames > 0 && (channels == 1 || channels == 2);
 }
 
+<<<<<<< HEAD
 /** Post a chunk of a stream to the worklet, which copies it into the heap of its core and frees
  * it there once the core consumed it.
  *
@@ -786,11 +848,29 @@ static bool box_audio_webt_stream_chunk(
         (channels == 1 || channels == 2) && stream < BOX_AUDIO_STREAM_MAX;
     if (result) {
         box_audio_web_chunk(stream, data, frames, channels, last);
+=======
+/** Ask the worklet to allocate the delay memory of a reverb slot in the heap of its core.
+ *
+ * @param t The transport
+ * @param slot Slot of the reverb
+ * @return Whether the request was posted
+ */
+static bool box_audio_webt_reverb(
+    box_audio_transport_t *t,
+    uint32_t slot)
+{
+    box_audio_webt_t *w = (box_audio_webt_t*)t;
+    bool result = slot < BOX_AUDIO_REVERB_MAX;
+    if (result && !(w->reverbs & (1u << slot))) {
+        box_audio_web_reverb(slot);
+        w->reverbs |= 1u << slot;
+>>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
     }
 
     return result;
 }
 
+<<<<<<< HEAD
 /** Report the status of a stream the worklet posted last; the worklet frees its chunks.
  *
  * @param t The transport
@@ -806,6 +886,8 @@ static void box_audio_webt_stream_status(
     box_audio_web_stream_status((int)stream, (int32_t*)status);
 }
 
+=======
+>>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 /** Take the events the worklet reported.
  *
  * @param t The transport
@@ -848,12 +930,6 @@ static void box_audio_webt_update(
     (void)t;
     (void)delta;
 }
-
-/** The web transport: the worklet renders, the main module waits for its captures */
-typedef struct box_audio_webt_t {
-    box_audio_transport_t base;  /**< The interface, first */
-    int32_t capture;             /**< Frames of the capture that records, 0 for none */
-} box_audio_webt_t;
 
 /** Free the transport; the audio of the page stays.
  *
@@ -938,8 +1014,12 @@ box_audio_transport_t* box_audio_transport_web_new(void)
             .kind = BOX_AUDIO_TRANSPORT_WEB,
             .commands = box_audio_webt_commands,
             .sound = box_audio_webt_sound,
+<<<<<<< HEAD
             .stream_chunk = box_audio_webt_stream_chunk,
             .stream_status = box_audio_webt_stream_status,
+=======
+            .reverb = box_audio_webt_reverb,
+>>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
             .read_events = box_audio_webt_read_events,
             .state = box_audio_webt_state,
             .update = box_audio_webt_update,

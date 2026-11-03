@@ -102,7 +102,8 @@
                 "id": "NoAlloc",
                 "testcases": [
                     "render",
-                    "events_and_release"
+                    "events_and_release",
+                    "synth_voices"
                 ]
             },
             {
@@ -218,7 +219,64 @@
                 "testcases": [
                     "mixer_levels",
                     "level_change",
-                    "play_function"
+                    "play_function",
+                    "spatial_scene",
+                    "reverb_hall"
+                ]
+            },
+            {
+                "id": "Reverb",
+                "testcases": [
+                    "decay_time",
+                    "damping",
+                    "predelay",
+                    "stereo",
+                    "density",
+                    "stable",
+                    "silent_after_tail",
+                    "live_change_no_click",
+                    "size_change_no_click",
+                    "send_routing",
+                    "second_reverb_errors",
+                    "delete_fades",
+                    "no_alloc"
+                ]
+            },
+            {
+                "id": "Synth",
+                "testcases": [
+                    "frequency_waves",
+                    "sweep_target",
+                    "alias_saw",
+                    "alias_square",
+                    "alias_triangle",
+                    "noise_flat",
+                    "noise_seed_differs",
+                    "noise_seed_identical",
+                    "envelope_segments",
+                    "envelope_no_click",
+                    "envelope_frees_slot",
+                    "one_shot_no_release_ends",
+                    "bounded_length",
+                    "filter_lowpass",
+                    "filter_highpass",
+                    "filter_bandpass",
+                    "filter_sweep_stable",
+                    "filter_extreme",
+                    "layers_sum",
+                    "layer_own_envelope",
+                    "pitch_variance",
+                    "voice_pitch",
+                    "loop_restarts",
+                    "release_patch",
+                    "script_parses",
+                    "script_renders",
+                    "script_change_next_play",
+                    "script_loop_source",
+                    "docs_examples",
+                    "too_many_layers",
+                    "endless_logs_error",
+                    "deleted_releases"
                 ]
             },
             {
@@ -227,6 +285,27 @@
                     "valid_wav",
                     "two_runs_identical",
                     "no_output"
+                ]
+            },
+            {
+                "id": "Spatial",
+                "testcases": [
+                    "distance_curve",
+                    "silent_at_max",
+                    "pan_left_right_center",
+                    "follows_parent",
+                    "follows_listener",
+                    "listener_default_view",
+                    "listener_explicit",
+                    "listener_two_warns",
+                    "no_listener",
+                    "at_listener",
+                    "play_at",
+                    "out_of_range_loop",
+                    "teleport_no_click",
+                    "disabled_silent",
+                    "core_position",
+                    "cost_changed_only"
                 ]
             }
         ]

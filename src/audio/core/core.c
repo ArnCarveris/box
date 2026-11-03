@@ -123,58 +123,6 @@ static void box_audio_pan(
     }
 }
 
-/** Move a ramp to a target over a number of frames.
- *
- * @param ramp The ramp
- * @param target The target
- * @param frames Frames to reach it, at least 1
- */
-static void box_audio_ramp_to(
-    box_audio_ramp_t *ramp,
-    float target,
-    int32_t frames)
-{
-    ramp->target = target;
-    if (ramp->value == target) {
-        ramp->left = 0;
-        ramp->step = 0;
-    } else {
-        ramp->left = frames > 0 ? frames : 1;
-        ramp->step = (target - ramp->value) / (float)ramp->left;
-    }
-}
-
-/** Set a ramp to a value at once.
- *
- * @param ramp The ramp
- * @param value The value
- */
-static void box_audio_ramp_set(
-    box_audio_ramp_t *ramp,
-    float value)
-{
-    ramp->value = value;
-    ramp->target = value;
-    ramp->step = 0;
-    ramp->left = 0;
-}
-
-/** Advance a ramp by a frame.
- *
- * @param ramp The ramp
- * @return Its value for the frame
- */
-static inline float box_audio_ramp_next(
-    box_audio_ramp_t *ramp)
-{
-    if (ramp->left > 0) {
-        ramp->left --;
-        ramp->value = ramp->left ? ramp->value + ramp->step : ramp->target;
-    }
-
-    return ramp->value;
-}
-
 /** Clamp a value of a command; NaN becomes the low end.
  *
  * @param v The value
@@ -424,7 +372,8 @@ static box_audio_voice_t* box_audio_voice_slot(
     return result;
 }
 
-/** Apply a play command.
+/** Apply a play command. A synth voice starts at its gains, without the ramp: its envelope
+ * starts from 0 itself, so an attack shorter than the ramp keeps its time.
  *
  * @param core The core
  * @param cmd The command
@@ -460,8 +409,16 @@ static void box_audio_cmd_play(
     box_audio_ramp_set(&v->left, 0);
     box_audio_ramp_set(&v->right, 0);
     box_audio_voice_gains(core, v);
-    box_audio_source_sample(core, &v->source, cmd->sound, v->pitch,
-        (cmd->flags & BOX_AUDIO_PLAY_LOOP) != 0);
+    if (core->sounds[cmd->sound].synth) {
+        box_audio_ramp_set(&v->left, v->left.target);
+        box_audio_ramp_set(&v->right, v->right.target);
+        box_audio_source_synth(core, &v->source, cmd->sound, v->pitch,
+            (cmd->flags & BOX_AUDIO_PLAY_LOOP) != 0);
+    } else {
+        box_audio_source_sample(core, &v->source, cmd->sound, v->pitch,
+            (cmd->flags & BOX_AUDIO_PLAY_LOOP) != 0);
+    }
+
     core->playing ++;
 
 done:
@@ -560,6 +517,8 @@ static void box_audio_cmd_voice_set(
         box_audio_source_pitch(&v->source, v->pitch);
     } else if (cmd->param == BOX_AUDIO_PARAM_BUS && value >= 0 && value < BOX_AUDIO_BUS_MAX) {
         v->bus = (uint32_t)value;
+    } else if (cmd->param == BOX_AUDIO_PARAM_POSITION) {
+        box_audio_source_seek(core, &v->source, value);
     } else {
         box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_VOICE_SET, 0);
     }
@@ -686,6 +645,11 @@ static void box_audio_cmd_release(
     }
 
     s = &core->sounds[cmd->sound];
+    if (s->synth) {
+        core->synths[s->synth - 1].used = false;
+        s->synth = 0;
+    }
+
     if (s->users > 0) {
         s->state = BOX_AUDIO_SOUND_RELEASED;
     } else {
@@ -715,7 +679,12 @@ static void box_audio_cmd(
     box_audio_cmd_stop_t stop;
     box_audio_cmd_set_t set;
     box_audio_cmd_release_t release;
+<<<<<<< HEAD
     box_audio_cmd_stream_t stream;
+=======
+    box_audio_cmd_reverb_t reverb;
+    box_audio_cmd_synth_t synth;
+>>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
     box_audio_voice_t *v;
     if (type == BOX_AUDIO_CMD_PLAY && size >= (int32_t)sizeof(play)) {
         box_audio_copy(&play, bytes, (int32_t)sizeof(play));
@@ -737,9 +706,18 @@ static void box_audio_cmd(
     } else if (type == BOX_AUDIO_CMD_SOUND_RELEASE && size >= (int32_t)sizeof(release)) {
         box_audio_copy(&release, bytes, (int32_t)sizeof(release));
         box_audio_cmd_release(core, &release);
+<<<<<<< HEAD
     } else if (type == BOX_AUDIO_CMD_STREAM && size >= (int32_t)sizeof(stream)) {
         box_audio_copy(&stream, bytes, (int32_t)sizeof(stream));
         box_audio_cmd_stream(core, &stream);
+=======
+    } else if (type == BOX_AUDIO_CMD_REVERB && size >= (int32_t)sizeof(reverb)) {
+        box_audio_copy(&reverb, bytes, (int32_t)sizeof(reverb));
+        box_audio_reverb_command(core, &reverb);
+    } else if (type == BOX_AUDIO_CMD_SYNTH && size >= (int32_t)sizeof(synth)) {
+        box_audio_copy(&synth, bytes, (int32_t)sizeof(synth));
+        box_audio_synth_command(core, &synth);
+>>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
     } else {
         box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, type, size);
     }
@@ -824,6 +802,7 @@ box_audio_core_t* box_audio_core_new(
     core->order_count = 1;
     core->bus_active[0] = true;
     core->event_lost_at = -1;
+    box_audio_reverbs_init(core);
 
 done:
     return core;
@@ -873,6 +852,7 @@ bool box_audio_core_sound(
         (double)sample_rate / (double)core->sample_rate : 1.0;
     s->users = 0;
     s->state = BOX_AUDIO_SOUND_READY;
+    s->synth = 0;
     result = true;
 
 done:
@@ -1061,6 +1041,7 @@ static void box_audio_buses_render(
             &core->buses[route->output] : NULL;
         box_audio_bus_t *send = route->send != BOX_AUDIO_BUS_NONE ?
             &core->buses[route->send] : NULL;
+        box_audio_reverbs_render(core, route->bus, b->l, b->r, frames);
         for (i = 0; i < frames; i ++) {
             float l = box_audio_clean(b->l[i] * box_audio_ramp_next(&b->left));
             float r = box_audio_clean(b->r[i] * box_audio_ramp_next(&b->right));

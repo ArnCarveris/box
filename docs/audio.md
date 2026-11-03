@@ -38,15 +38,23 @@ start of the next render block. They are:
 |---------|--------|
 | `PLAY` | voice handle, sound, bus, volume, pan, pitch, flags (`BOX_AUDIO_PLAY_LOOP`) |
 | `STOP` | voice handle: the voice fades out over the ramp and ends |
-| `VOICE_SET` | voice handle, `VOLUME`, `PAN`, `PITCH` or `BUS`, value |
+| `VOICE_SET` | voice handle, `VOLUME`, `PAN`, `PITCH`, `BUS` or `POSITION`, value |
 | `BUS_SET` | bus, `VOLUME`, `PAN`, `MUTE` or `SEND` (the send level), value |
 | `ORDER` | count, then per bus in processing order: bus, output, send |
 | `SOUND_RELEASE` | sound: freed once no voice plays it |
+<<<<<<< HEAD
 | `STREAM` | voice handle, stream, bus, volume, channels, sample rate: opens a stream and starts a voice that reads it |
+=======
+| `REVERB` | slot, bus (or none), decay, damping, predelay, size, mix: see [Reverb](#reverb) |
+| `SYNTH` | sound, then a patch: makes a free sound id a synth or replaces its patch, see [Synth](#synth) |
+>>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 
 The sender picks the voice handles, so it addresses a voice without waiting for a reply. Values
 are clamped (volumes and send levels to 0..4, pans to -1..1, pitches to 1/64..16) and a NaN
-becomes the low end.
+becomes the low end. `POSITION` moves the read position of a voice at once, in frames of its
+sound: a looping sound wraps it and one that does not loop clamps it to its end, and a NaN, a
+negative or a huge position is 0. Sent in the batch of the `PLAY`, it starts the voice there,
+which is how `box.audio` brings a looping spatial source back in time.
 
 **Sound memory belongs to the side that runs the core.** `box_audio_core_sound` gives the core
 an id, a pointer in the core's own address space, a frame count, the channels (1, or 2
@@ -85,8 +93,9 @@ ends after the last frame of the chunk marked `last`.
 
 **Voices** are a fixed pool of `BOX_AUDIO_VOICE_MAX` (64) voices, plus 16 slots for voices that
 fade out. A voice has a source, a bus, a volume, a pan and a pitch ratio. The source is a sample
-buffer, mono or stereo, looped or not, read with linear interpolation; it is a tagged union in
-`internal.h` with its functions in `source.c`, so the synth and music sources add a kind there.
+buffer, mono or stereo, looped or not, read with linear interpolation, or a synth patch (see
+[Synth](#synth)); it is a tagged union in `internal.h` with its functions in `source.c`, so the
+music source adds a kind there.
 A play when 64 voices play steals the one with the lowest level, the larger of its two gain
 targets (the first of equals), with a fade of 2 ms. This is the voice cap: there is no
 priority system.
@@ -121,6 +130,170 @@ whether the frames are rendered one at a time or in one large block.
 
 The tests are `test/cpu/audio`, which render offline; `bench/audio` mixes 64 voices through 8
 buses and reports the time per frame.
+
+## Reverb
+
+`src/audio/core/reverb.c` is an algorithmic reverb that runs on a bus: a feedback delay network
+of `BOX_AUDIO_REVERB_LINES` (8) delay lines. A send bus with a reverb is the usual setup, so
+sources reach it through the send of their bus.
+
+- **The network.** The input, the mean of both channels, goes through a predelay line, then into
+  every line with a sign pattern that is no row of the matrix, so the first reflection already
+  spreads over all lines. The lengths are distinct primes, so mutually prime, from 39 to 98 ms
+  at size 1, scaled down to a fifth at size 0. Each line has a one pole lowpass, the damping,
+  and a gain `10^(-3 L / (decay x rate))`, so every line loses 60 dB in `decay` seconds whatever
+  its length `L`. The feedback matrix is the 8 x 8 Hadamard matrix over `sqrt(8)`, orthogonal.
+  The left and the right outputs take the lines with two orthogonal sign patterns, which keeps
+  the channels decorrelated.
+- **It cannot blow up.** The matrix keeps the energy, the lowpass has a gain of at most 1 and
+  each gain is at most `0.9999`, so the loop gain stays under unity. A `REVERB` command is
+  clamped: decay to `BOX_AUDIO_REVERB_DECAY_MIN..MAX` (0.05..60 s), damping, size and mix to
+  0..1 and predelay to 0..`BOX_AUDIO_REVERB_PREDELAY_MAX` (0.5 s), a NaN to the low end. Every
+  value a line keeps is flushed like a bus sample, so no denormal forms in a tail.
+- **Mix.** The bus outputs its signal at `1 - mix` and the reverb at `mix`; 1, the default, is
+  the fully wet send bus.
+- **Changes.** Decay and damping move to a new value over about 50 ms, a block at a time, and
+  mix ramps over 20 ms. A change of size or predelay would change the lengths of the lines,
+  which clicks: the wet signal fades out over 50 ms, the lines are cleared and take their new
+  lengths, and it fades back in over 50 ms (`BOX_AUDIO_REVERB_FADE`, 100 ms in all), while the
+  input fades into the clear lines over the same 50 ms, so a steady sound does not enter them
+  with a step. A change of the bus does the same.
+- **Silence costs nothing.** The tail rings out after its sources stop. Once the input has been
+  silent for longer than the predelay plus the longest line, and every line has read out under
+  -140 dB for a whole length of the longest line, so nothing louder is left in them, the reverb
+  clears its lines and stops; while it is stopped and no signal comes in, a block costs a scan
+  of the input for a sample over 1e-9. `box_audio_core_reverb_running` tells whether it runs.
+- **Taking it off.** A `REVERB` with bus `BOX_AUDIO_BUS_NONE` takes the reverb off its bus at
+  once: it gets no more input and its tail fades out over 50 ms into the master, so deleting a
+  reverb bus does not cut the tail.
+- **Memory.** The delay memory belongs to the side that runs the core, like sound memory:
+  `box_audio_reverb_floats(rate)` floats per slot (about 200 KB at 48 kHz), sized for the
+  largest size and predelay at the rate. `box_audio_core_reverb_memory` gives it to a slot once,
+  and the core clears it; the render path never allocates. Until a slot has memory a reverb on
+  it does not run and its bus stays dry. The transports allocate it on the `reverb` call of the
+  transport interface: the null transport on the main thread, the native one on the main thread
+  and hands it to the audio thread as a message of the command ring, the web one with a
+  `{ type: 'reverb', slot }` message, on which the worklet allocates it in the heap of its core.
+  Each frees it after its core.
+
+`BOX_AUDIO_REVERB_MAX` (1) reverbs run at once; the slots are an array, so more only cost their
+memory and their time. Convolution is not used, since it needs recorded impulse responses.
+
+The tests are the `Reverb` suite of `test/cpu/audio`, from an impulse in an offline render:
+the decay time at 44.1 and 48 kHz, damping, predelay, stereo correlation, density, stability at
+extreme values, silence, changes without clicks, sends, the second reverb, a delete and no
+allocation. `bench/audio` has a `Reverb` suite in ns per frame, and
+`test/integration/web/audio_reverb.mjs` measures a tail and the load of the worklet in Chrome.
+
+## Synth
+
+`src/audio/core/synth.c` renders procedural sounds live, a new source kind of the voices, so
+synth voices share the pool, the cap, the buses, the ramps and the limiter. A sound id becomes a
+synth with a `SYNTH` command, whose patch (`box_audio_synth_patch_t` of `core.h`) is plain
+values in seconds and Hz, the same at every rate: a fixed topology of up to
+`BOX_AUDIO_SYNTH_LAYERS` (4) oscillators, each with an envelope, summed into one filter and an
+amp. There is no node graph. The core keeps up to `BOX_AUDIO_SYNTH_MAX` (256) patches; a play
+copies the patch into its voice, so a play allocates nothing, a new patch for the same id
+reaches the next play while the voices that play keep theirs, and a release frees the id at once
+with `SOUND_FREE`. The core clamps every value of a patch, a NaN to the low end.
+
+- **Oscillators.** Sine (`box_audio_core_sin`), saw, square, triangle and white noise. Saw and
+  square are band limited with polyBLEP, the corners of the triangle with polyBLAMP. Frequencies are clamped to 20 kHz and to 0.48 of the
+  rate, so the top of the audible range plays at 44.1 and 48 kHz. A sweep moves the frequency
+  exponentially to its end over its time, and lands on it exactly. The pitch of the voice, the
+  play's and a `VOICE_SET`, multiplies every frequency but noise.
+- **Noise** is xorshift32, seeded per play from the seed of the patch and the count of its
+  plays, so a fixed run gives bit identical output and every play differs. The same generator
+  picks the pitch and level variances of the play.
+- **Envelopes** are linear and sample accurate: attack from 0 to 1, decay to the sustain level,
+  hold, release to 0. An attack, and a decay or a release that changes the level, takes at
+  least `BOX_AUDIO_SYNTH_EDGE` (0.5 ms), so neither end clicks; with a sustain of 0 the envelope
+  ends after its decay. A pass of an envelope is at most `BOX_AUDIO_SYNTH_LENGTH_MAX` (60 s); a
+  longer one loses its hold first. A voice ends, and frees its slot, once every envelope it
+  uses reached silence; a looping voice starts a new pass instead, with the state of its
+  filter. Synth voices start at their gain, without the ramp of the core, since the envelope
+  starts at 0: an attack of 1 ms takes 1 ms.
+- **The filter** is the trapezoidal state variable filter (Simper): lowpass and highpass at 12
+  dB per octave and a bandpass with unity gain at the cutoff. Resonance 0 is a Butterworth
+  response (Q 0.707), 1 a Q of 50. Its coefficients come from `tan(pi cutoff / rate)` with the
+  cutoff clamped to 0.49 of the rate, so it stays stable at every cutoff and resonance, a cutoff
+  at Nyquist and a fast sweep included; a sweep updates them every 8 frames. Its state is
+  flushed like a bus sample.
+- **Cost.** Render work only: per frame of a voice an envelope step per envelope, an oscillator
+  per layer and the filter. `bench/audio` has a `Synth` suite of 64 voices in ns per sample.
+
+The core needs no libm: the exponential sweeps use series for `log2` and `exp2` in `synth.c`.
+
+### Synth sounds
+
+A sound effect is a prefab in script, with no file. `SynthSound` marks the root; the layers are
+the root and its children that have a `SynthOscillator`, as particle effect layers are. The
+`SynthEnvelope` and the `SynthFilter` of the root apply to the mix of the layers; a layer may
+have its own `SynthEnvelope`, and one without uses the root's.
+
+| Component | What it is |
+|-----------|------------|
+| `SynthSound` | The root: `seed`, `pitch_variance` and `level_variance` (random shares per play, 0) |
+| `SynthOscillator` | A layer: `wave` (`SynthSine`, `SynthSaw`, `SynthSquare`, `SynthTriangle`, `SynthNoise`), `frequency` (440), `frequency_end` (0, no sweep), `sweep` (s), `level` (1) |
+| `SynthEnvelope` | `attack`, `decay`, `sustain`, `release`, `hold`: seconds and a sustain level, all 0 by default |
+| `SynthFilter` | `kind` (`SynthLowPass`, `SynthHighPass`, `SynthBandPass`), `cutoff` (1000), `cutoff_end`, `sweep`, `resonance` |
+
+The module (`src/audio/synth_sound.c`) compiles a sound once, and again when a component of it
+or of a layer changes, into a patch that the sync system sends with a `SYNTH` command before the
+plays of the frame. `box.audio.play(UiClick, 0.8)` plays it like any sound, and an `AudioSource`
+with `loop: true` starts it over at the end of its envelopes. A play allocates nothing.
+
+- More than 4 layers log one error that names the sound; the first 4 play.
+- A layer without any envelope (no `SynthEnvelope` on it or on the root) would never end: it
+  logs one error and the sound plays for `BOX_AUDIO_SYNTH_ENDLESS` (10) seconds.
+- An envelope that is not a time of 0 to 60 seconds logs one error and is cut.
+- Deleting the sound releases it and fades its one shots, as for `AudioPcm`.
+
+Three examples:
+
+```
+using box.audio
+
+ui { AudioBus: {volume: 1} }
+
+// A click: a burst of noise and a falling tone, 31 ms
+prefab UiClick {
+  AudioOutput: {bus: ui}
+  SynthSound: {pitch_variance: 0.05}
+  SynthEnvelope: {attack: 0.001, decay: 0.03}
+  noise { SynthOscillator: {wave: SynthNoise, level: 0.6} }
+  tone { SynthOscillator: {wave: SynthSine, frequency: 1800, frequency_end: 900, sweep: 0.03, level: 0.4} }
+}
+
+// A UI blip: a soft square that steps up a fifth, through a lowpass
+prefab UiBlip {
+  AudioOutput: {bus: ui}
+  SynthSound: {level_variance: 0.1}
+  SynthEnvelope: {attack: 0.004, decay: 0.06, sustain: 0.4, hold: 0.04, release: 0.05}
+  SynthFilter: {kind: SynthLowPass, cutoff: 3000, resonance: 0.2}
+  low { SynthOscillator: {wave: SynthSquare, frequency: 660, level: 0.25} }
+  high {
+    SynthOscillator: {wave: SynthTriangle, frequency: 990, level: 0.3}
+    SynthEnvelope: {attack: 0.04, decay: 0.08}
+  }
+}
+
+// A whoosh: noise through a resonant bandpass that sweeps up and fades
+prefab Whoosh {
+  SynthSound: {seed: 7, level_variance: 0.1}
+  SynthEnvelope: {attack: 0.15, decay: 0.25, sustain: 0.3, hold: 0.1, release: 0.3}
+  SynthFilter: {kind: SynthBandPass, cutoff: 300, cutoff_end: 4000, sweep: 0.5, resonance: 0.6}
+  SynthOscillator: {wave: SynthNoise, level: 0.8}
+}
+```
+
+The tests are the `Synth` suite of `test/cpu/audio`, on offline renders: frequencies of every
+wave at 44.1 and 48 kHz, sweeps, aliasing of a 5 kHz saw, square and triangle, flat and seeded noise, the
+times and edges of envelopes, the end of a voice, the filter one octave past its cutoff and
+under sweeps at full resonance and extreme values, layers, scripts from
+`test/assets/audio/synth.flecs`, the three examples above from
+`test/assets/audio/synth_examples.flecs` and errors; `NoAlloc` renders 64 synth voices. The browser
+check is `test/integration/web/audio_synth.mjs`.
 
 ## Transports
 
@@ -316,15 +489,15 @@ compiles, on every build of box. For a target other than Emscripten the script d
 clang --target=wasm32-unknown-unknown -O2 -msimd128 -std=c11 -ffreestanding -nostdlib \
     -DBOX_AUDIO_CORE_WASM -Wl,--no-entry -Wl,-z,stack-size=65536 \
     -Wl,--initial-memory=1048576 -Wl,--max-memory=268435456 -Wl,--strip-all \
-    -Wl,--export=box_audio_core_wasm_init ... command.c core.c source.c wasm.c \
+    -Wl,--export=box_audio_core_wasm_init ... command.c core.c reverb.c source.c synth.c wasm.c \
     -o box_audio_core.wasm
 ```
 
 into `box_audio_core.wasm` in the generated folder of the build: a freestanding module of a
 few KB with its own memory, which starts at 1 MB and grows up to 256 MB, no imports (the core
 needs no libm) and the exports of `src/audio/core/wasm.c`: `box_audio_core_wasm_init`, a first
-fit heap with `_alloc` and `_free` that grows the memory, `_sound`, `_apply`, `_render`,
-`_left`, `_right`, `_read_events`, `_events`, `_events_lost` and `_voices`. It is not built
+fit heap with `_alloc` and `_free` that grows the memory, `_sound`, `_reverb_floats`,
+`_reverb`, `_apply`, `_render`, `_left`, `_right`, `_read_events`, `_events`, `_events_lost` and `_voices`. It is not built
 with `emcc`: a standalone wasm of `emcc` links start code and libc from the Emscripten cache,
 which the core does not use, and building those for a new configuration fails when the cache
 folder is a symlink. The script writes the bytes as
@@ -428,11 +601,18 @@ frame, the same on every platform.
 | `AudioPcm` | The samples of a sound (`samples`, `channels`, `sample_rate`, 0 for the output rate); `box_audio_sound_from_pcm` sets it from C |
 | `SoundFile` | A sound decoded from a WAV or FLAC file (`path`), see [Sound files](#sound-files) |
 | `SoundStatus` | Read only: `state` (`SoundLoading`, `SoundReady`, `SoundFailed`), `frames`, `channels`, `sample_rate` and `error` of a `SoundFile` |
-| `AudioBus` | A mixer bus: `output` (0 for the master), `volume` (1), `pan`, `mute`, `send` and `send_level` |
+| `AudioBus` | A mixer bus: `output` (0 or `master` for the master), `volume` (1), `pan`, `mute`, `send` and `send_level` |
+| `Reverb` | A reverb on the bus of the entity: `decay` (1.5 s), `damping` (0.5), `predelay` (0.02 s), `size` (0.5), `mix` (1) |
 | `AudioOutput` | The bus a source, or a sound by default, plays on |
 | `AudioSource` | A sound that plays while the entity exists: `sound`, `volume` (1), `pitch` (1), `loop`, `playing` (true) |
+<<<<<<< HEAD
 | `AudioStream` | Music: an Ogg Vorbis file (`path`) that streams, `volume` (1), `loop` (true), `playing` (true), see [Music](#music) |
 | `AudioStreamStatus` | Read only: `state` (`AudioStreamLoading`, `AudioStreamPlaying`, `AudioStreamStopped`, `AudioStreamEnded`, `AudioStreamFailed`), `frames`, `channels`, `sample_rate`, `position`, `buffered`, `underruns`, `decode_ms`, `decode_max_ms` and `error` |
+=======
+| `SynthSound` | A sound made by the synth from its layers, see [Synth sounds](#synth-sounds) |
+| `AudioSpatial` | Places a source in the world: `min_distance` (1), `max_distance` (50), `rolloff` (1), see [Spatial audio](#spatial-audio) |
+| `AudioListener` | Tag of the entity whose `WorldTransform` hears the spatial sources |
+>>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
 | `AudioSettings` | Singleton: `master_volume` (1) and `mute` |
 | `AudioStatus` | Singleton, read only: `state`, `sample_rate`, `voices`, `voices_stolen`, `load`, `buses` |
 
@@ -449,15 +629,18 @@ const played: bool = box.audio.play(click, 0.8)
 
 `box_audio_play(world, sound, volume)`, in scripts `box.audio.play(sound, volume)`, plays a
 sound once on the bus of its `AudioOutput`, without an entity per play; there is no control of a
-voice after it started. `box_audio_capture(world, seconds, path)`, in scripts
+voice after it started. `box_audio_play_at(world, sound, position, volume)`, in scripts
+`box.audio.play_at(sound, {x, y, z}, volume)`, plays it once at a place in the world (see
+[Spatial audio](#spatial-audio)). `box_audio_capture(world, seconds, path)`, in scripts
 `box.audio.capture(seconds, path)`, records the master output to a WAV file.
 
 **One batch per frame.** The system `AudioSync` runs in `PreStore`, after the transforms and
 before the output renders in `OnStore`. It remembers what it sent and writes a command only for
 what differs, all into one batch, and sends nothing in a frame without changes. Its order:
-the events of the output (ended voices, steals, freed sounds), the buses, the order, the master
-settings, new sounds, the sources, then the plays, the stops of deleted sources and the releases
-of sounds. A world without audio components pays the empty queries.
+the events of the output (ended voices, steals, freed sounds), the listener, the buses, the
+order, the master settings, new sounds, the sources, the spatial sources and the one shots of
+`play_at` when the listener moved, then the plays, the stops of deleted sources and the
+releases of sounds. A world without audio components pays the empty queries.
 
 **Buses** get an index of the core, up to 31 besides the master; more log one error and are
 silent. The order is compiled whenever a bus appears, disappears or changes its output or send:
@@ -466,6 +649,22 @@ deepest buses come first, the master last. A cycle through outputs and sends log
 names the buses on it and keeps the last valid order, which the core keeps playing. A deleted
 bus, or an output or send that names no bus, routes to the master: its sources and one shots are
 moved to the master and the index is reused a frame later. A Disabled bus is muted.
+
+**Reverbs.** A scene sets its reverb by having an entity with `AudioBus` and `Reverb`, and
+unloading the scene deletes it, which fades its tail out:
+
+```
+hall { AudioBus: {output: master}; Reverb: {decay: 2.4, damping: 0.4, predelay: 0.02} }
+world { AudioBus: {output: master, send: hall, send_level: 0.3} }
+```
+
+Components on one line are separated by `;` (or a newline): flecs script does not take a comma
+there. `master` is `box.audio.master`, an entity without components that names the master. A reverb
+gets a slot of the core and the module asks the transport for its memory before the first
+`REVERB` command; it sends the parameters again when they change. One reverb runs at once: a
+second one logs one error that names its entity (`box.audio: more than 1 reverb, '...' stays
+dry`) and its bus stays dry, until the first one is deleted. Reverb zones, rooms from geometry
+and other effects are later work.
 
 **Sources** start a voice when `playing` is true and their sound is known, and stop it when
 `playing` goes false, the sound or `loop` changes or the entity is deleted, which fades it out
@@ -476,6 +675,81 @@ copy of `AudioSource` and play on their own, as `ParticleEmitter` instances do.
 **Sounds** are sent to the output once, with an id of the core; a change of `AudioPcm` releases
 the old id and sends the new samples, and a deleted sound is released, freed by the side that
 owns the frames once no voice plays it.
+
+### Spatial audio
+
+`src/audio/spatial.c` places sounds in the world with a simple model: a sound gets quieter with
+its distance from the listener and pans with its direction. There is no Doppler, no distance
+filter, no occlusion and no HRTF yet. All of it runs in `AudioSync` on the main thread, which
+sends the result as the volume and the pan of the voice, so the core knows nothing of it and the
+web plays as native does.
+
+```
+ears { Position: {0, 1.7, 0}  AudioListener }
+engine {
+  Position: {4, 0, -10}
+  AudioSource: {sound: hum, loop: true}
+  AudioSpatial: {min_distance: 2, max_distance: 40}
+}
+const shot: bool = box.audio.play_at(bang, {-3, 0, -5}, 1.0)
+```
+
+**The listener** is the entity with `AudioListener` and a `WorldTransform`. Without one it is the
+camera of the first enabled `View` that has a camera with a `WorldTransform`, first in render
+order (`box_view_compare`), so a game view listens before the overlays of the editor and the
+console. Several `AudioListener` entities use the one with the lowest id and log one warning,
+`box.audio: <n> entities have AudioListener, '<path>' listens`, again only after the count
+dropped to one. To make a character listen while the camera follows it, tag the character,
+or a child at the height of its head; to make the camera listen, give it nothing. Without a
+listener a spatial source plays centered at full volume, beyond `max_distance` too, and nothing
+is logged.
+
+**A source** is an `AudioSource` with `AudioSpatial`. With a `WorldTransform` it is heard at the
+translation of that transform, which is the world position of the entity: a child of a moving
+parent follows the parent, ChildOf or `Parent` alike, its own `Position` an offset in the space
+of the parent; the rotation and scale of the source do not matter. A source with `AudioSpatial`
+and no `WorldTransform` plays as one without it. On a sound entity, `AudioSpatial` gives the
+distances of the plays of `box_audio_play_at`, the defaults without one. A one shot of
+`play_at` stays at the position it started at, while the listener moves.
+
+**Distance.** Within `min_distance` the gain is 1. Beyond it the gain is the inverse distance
+`g(d) = min / (min + rolloff (d - min))`, faded so that it reaches exactly 0 at `max_distance`:
+`(g(d) - g(max)) / (1 - g(max))`. A `rolloff` of 0 keeps full volume up to `max_distance` and is
+silent from there. A `min_distance` of 0 counts as 0.001. The volume of the voice is the
+`volume` of the source times this gain.
+
+**Pan.** The pan is the component of the direction to the source along the right axis of the
+listener (the first column of its `WorldTransform`, its +X), over the distance: 1 straight to the
+right, -1 to the left, 0 in front, behind, above and below. The core turns it into equal power
+gains. **Front and back sound alike** in this version: a source behind the listener is as loud as
+the same source in front. Within `min_distance` the pan narrows to the center (the component is
+divided by `min_distance` instead of the distance), so a source at the listener's position is
+centered, with no division by zero, and one that passes through the listener sweeps across
+instead of jumping from side to side.
+
+**Out of range.** A looping source at or beyond `max_distance` uses no voice: the module stops
+it, with the fade of a stop, and keeps the time of the sound running on the main thread from the
+time it started, at its pitch. Back in range it starts a new voice with a `POSITION` where the
+sound would be had it kept playing. A source that does not loop and a `play_at` beyond
+`max_distance` do not start (the source's `playing` goes false); a source that does not loop and
+leaves the range while it plays keeps its voice, silent, until it ends.
+
+**Smoothing.** The gain and the pan are computed once per frame, after the transforms, and the
+ramps of the core move the voice to them over 5 ms, so a fast source or a camera that jumps does
+not click. During a stall on the web no command arrives and the voice holds the last target and
+keeps playing.
+
+**Cost.** The spatial sources have a query of their own with change detection: a frame updates
+the sources of the tables that changed (a new source, a changed `AudioSource` or `AudioSpatial`,
+a dynamic transform, which its systems write every frame) and the sources whose static
+transform moved, which box.transform reports (`box_transform_on_moved`). When the listener moves,
+or the output, the sounds, the buses or the gesture state change, every spatial source and every
+`play_at` one shot that still plays is updated. A frame allocates nothing once its vectors have
+grown. `bench/audio` (`Spatial`) runs 1000 looping sources, 32 of them in range, with a still
+listener, a moving listener and 10 moving sources, against the same world without sources.
+
+**Disabled** works as for other sources: a Disabled spatial source keeps its voice at volume 0,
+or none when it is out of range.
 
 ### Sound files
 
@@ -624,7 +898,8 @@ nothing.
 ### The audio command and captures
 
 The shell command `audio` (`src/command/cmd_audio.c`) prints the state, the rate, the voices, the
-steals and the load, then the master and the buses in processing order. `audio volume <v>` and
+steals and the load, then the master and the buses in processing order, with the values of the
+reverb of a bus and `(dry, every slot taken)` for a reverb that has no slot. `audio volume <v>` and
 `audio mute [on|off]` write `AudioSettings`. `audio capture <seconds>` records the master output
 to a 16 bit stereo WAV resource of the session, fetched like a `capture` PNG with
 `GET /shell/session/<id>/resource/<name>`, empty until the file is written in one rename. In the
@@ -634,8 +909,11 @@ Headless with a fixed `--delta-time`, two runs write identical captures, which i
 tests inspect audio and how a render can be listened to. `box.perf` reports the largest load of
 a run as `PerfStatus.audio_load` and `audio_load` in its report.
 
-The tests are `Module`, `Source`, `Script` and `Capture` in `test/cpu/audio`, through the null
-transport; `test/integration/e2e/audio.py` drives the command on a headless app, and
+The tests are `Module`, `Source`, `Script`, `Capture` and `Spatial` in `test/cpu/audio`,
+through the null transport; `test/integration/e2e/audio.py` drives the command on a headless
+app, `test/integration/web/audio_spatial.mjs` moves a source from the left of the listener to
+its right in Chrome and measures both channels with `test/integration/web/audio_spatial.flecs`,
+and
 `test/integration/web/audio_module.mjs` checks the gesture, the levels, a hidden page, a capture
 and a stall in Chrome with `test/integration/web/audio_module.flecs`:
 

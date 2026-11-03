@@ -1,7 +1,12 @@
 /**
  * @file audio/core/source.c
+<<<<<<< HEAD
  * @brief Sources of voices: a sample buffer and the ring of chunks of a stream. New kinds add a
  * case to each function.
+=======
+ * @brief Sources of voices: a sample buffer, or a synth patch (synth.c). A new kind adds a case
+ * to each function.
+>>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
  */
 
 #include "internal.h"
@@ -29,6 +34,8 @@ void box_audio_source_pitch(
 {
     if (source->kind == BOX_AUDIO_SOURCE_SAMPLE) {
         source->data.sample.step = source->data.sample.rate * (double)pitch;
+    } else if (source->kind == BOX_AUDIO_SOURCE_SYNTH) {
+        box_audio_synth_pitch(&source->data.synth, pitch);
     }
 }
 
@@ -49,6 +56,34 @@ static double box_audio_wrap(
     }
 
     return position;
+}
+
+void box_audio_source_seek(
+    box_audio_core_t *core,
+    box_audio_source_t *source,
+    float position)
+{
+    box_audio_sample_source_t *src = &source->data.sample;
+    int32_t frames;
+    double p = position > 0 && position < 1e9f ? (double)position : 0;
+    if (source->kind != BOX_AUDIO_SOURCE_SAMPLE) {
+        goto done;
+    }
+
+    frames = core->sounds[src->sound].frames;
+    if (frames <= 0) {
+        goto done;
+    }
+
+    if (src->loop) {
+        p = box_audio_wrap(p, frames);
+    } else if (p > (double)frames) {
+        p = (double)frames;
+    }
+
+    src->position = p;
+done:
+    return;
 }
 
 /** Render a block of a sample source.
@@ -283,8 +318,13 @@ int32_t box_audio_source_render(
     *stereo = false;
     if (source->kind == BOX_AUDIO_SOURCE_SAMPLE) {
         done = box_audio_sample_render(core, &source->data.sample, frames, stereo);
+<<<<<<< HEAD
     } else if (source->kind == BOX_AUDIO_SOURCE_STREAM) {
         done = box_audio_stream_render(core, &source->data.stream, frames, stereo);
+=======
+    } else if (source->kind == BOX_AUDIO_SOURCE_SYNTH) {
+        done = box_audio_synth_render(core, &source->data.synth, frames);
+>>>>>>> 433c1626425e0da16a562b984a8e59e5297632c4
     }
 
     for (i = done; i < frames; i ++) {

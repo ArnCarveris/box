@@ -729,6 +729,14 @@
                 ]
             },
             {
+                "id": "BloomMotion",
+                "testcases": [
+                    "stable_at_720p",
+                    "stable_at_1440p_high_dpi",
+                    "stable_at_2160p"
+                ]
+            },
+            {
                 "id": "ShaderCompile",
                 "testcases": [
                     "failed_recompile_keeps_module",
