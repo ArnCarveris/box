@@ -183,7 +183,26 @@
                 "testcases": [
                     "mixer_levels",
                     "level_change",
-                    "play_function"
+                    "play_function",
+                    "reverb_hall"
+                ]
+            },
+            {
+                "id": "Reverb",
+                "testcases": [
+                    "decay_time",
+                    "damping",
+                    "predelay",
+                    "stereo",
+                    "density",
+                    "stable",
+                    "silent_after_tail",
+                    "live_change_no_click",
+                    "size_change_no_click",
+                    "send_routing",
+                    "second_reverb_errors",
+                    "delete_fades",
+                    "no_alloc"
                 ]
             },
             {

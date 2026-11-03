@@ -18,6 +18,7 @@ static ECS_COMPONENT_DECLARE(AudioModuleState);
 ECS_COMPONENT_DECLARE(AudioSoundId);
 ECS_COMPONENT_DECLARE(AudioBusState);
 ECS_COMPONENT_DECLARE(AudioVoice);
+ECS_COMPONENT_DECLARE(AudioReverbState);
 
 /** Construct AudioBus values: unity volume to the master, centered, no send.
  *
@@ -54,6 +55,27 @@ static void box_audio_source_ctor(
     (void)ti;
     for (i = 0; i < count; i ++) {
         values[i] = (AudioSource){ .volume = 1.0f, .pitch = 1.0f, .playing = true };
+    }
+}
+
+/** Construct Reverb values: a decay of 1.5 seconds, half damped, 20 ms of predelay, a middle
+ * size, fully wet.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_reverb_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Reverb *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Reverb){
+            .decay = 1.5f, .damping = 0.5f, .predelay = 0.02f, .size = 0.5f, .mix = 1.0f };
     }
 }
 
@@ -128,6 +150,26 @@ int32_t box_audio_module_order(
         }
     }
 
+    return result;
+}
+
+int32_t box_audio_module_reverb_slot(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    box_audio_module_t *state = box_audio_module_get(world);
+    const AudioReverbState *s = NULL;
+    int32_t result = -1;
+    if (!state || !e || !ecs_is_alive(world, e)) {
+        goto done;
+    }
+
+    s = ecs_get(world, e, AudioReverbState);
+    if (s && s->slot && state->reverb_entity[s->slot - 1] == e) {
+        result = s->slot - 1;
+    }
+
+done:
     return result;
 }
 
@@ -438,6 +480,8 @@ void BoxAudioImport(
     box_owned_hooks(world, AudioPcm, BOX_OWNED_VEC(AudioPcm, samples, float));
     ECS_META_COMPONENT(world, AudioSource);
     ecs_set_hooks(world, AudioSource, { .ctor = box_audio_source_ctor });
+    ECS_META_COMPONENT(world, Reverb);
+    ecs_set_hooks(world, Reverb, { .ctor = box_audio_reverb_ctor });
     ECS_META_COMPONENT(world, AudioSettings);
     ecs_set_hooks(world, AudioSettings, { .ctor = box_audio_settings_ctor });
     ECS_META_COMPONENT(world, AudioStatus);
@@ -445,13 +489,17 @@ void BoxAudioImport(
     ECS_COMPONENT_DEFINE(world, AudioSoundId);
     ECS_COMPONENT_DEFINE(world, AudioBusState);
     ECS_COMPONENT_DEFINE(world, AudioVoice);
+    ECS_COMPONENT_DEFINE(world, AudioReverbState);
     ecs_set_hooks(world, AudioSoundId, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioBusState, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioVoice, { .copy = box_audio_track_copy });
+    ecs_set_hooks(world, AudioReverbState, { .copy = box_audio_track_copy });
     ecs_add_pair(world, ecs_id(AudioPcm), EcsWith, ecs_id(AudioSoundId));
     ecs_add_pair(world, ecs_id(AudioBus), EcsWith, ecs_id(AudioBusState));
     ecs_add_pair(world, ecs_id(AudioSource), EcsWith, ecs_id(AudioVoice));
+    ecs_add_pair(world, ecs_id(Reverb), EcsWith, ecs_id(AudioReverbState));
 
+    ecs_entity(world, { .name = "master" });
     ecs_singleton_add(world, AudioSettings);
     ecs_singleton_set(world, AudioStatus, {0});
 

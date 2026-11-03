@@ -42,6 +42,7 @@ start of the next render block. They are:
 | `BUS_SET` | bus, `VOLUME`, `PAN`, `MUTE` or `SEND` (the send level), value |
 | `ORDER` | count, then per bus in processing order: bus, output, send |
 | `SOUND_RELEASE` | sound: freed once no voice plays it |
+| `REVERB` | slot, bus (or none), decay, damping, predelay, size, mix: see [Reverb](#reverb) |
 
 The sender picks the voice handles, so it addresses a voice without waiting for a reply. Values
 are clamped (volumes and send levels to 0..4, pans to -1..1, pitches to 1/64..16) and a NaN
@@ -106,6 +107,58 @@ whether the frames are rendered one at a time or in one large block.
 
 The tests are `test/cpu/audio`, which render offline; `bench/audio` mixes 64 voices through 8
 buses and reports the time per frame.
+
+## Reverb
+
+`src/audio/core/reverb.c` is an algorithmic reverb that runs on a bus: a feedback delay network
+of `BOX_AUDIO_REVERB_LINES` (8) delay lines. A send bus with a reverb is the usual setup, so
+sources reach it through the send of their bus.
+
+- **The network.** The input, the mean of both channels, goes through a predelay line, then into
+  every line with a sign pattern that is no row of the matrix, so the first reflection already
+  spreads over all lines. The lengths are distinct primes, so mutually prime, from 39 to 98 ms
+  at size 1, scaled down to a fifth at size 0. Each line has a one pole lowpass, the damping,
+  and a gain `10^(-3 L / (decay x rate))`, so every line loses 60 dB in `decay` seconds whatever
+  its length `L`. The feedback matrix is the 8 x 8 Hadamard matrix over `sqrt(8)`, orthogonal.
+  The left and the right outputs take the lines with two orthogonal sign patterns, which keeps
+  the channels decorrelated.
+- **It cannot blow up.** The matrix keeps the energy, the lowpass has a gain of at most 1 and
+  each gain is at most `0.9999`, so the loop gain stays under unity. A `REVERB` command is
+  clamped: decay to `BOX_AUDIO_REVERB_DECAY_MIN..MAX` (0.05..60 s), damping, size and mix to
+  0..1 and predelay to 0..`BOX_AUDIO_REVERB_PREDELAY_MAX` (0.5 s), a NaN to the low end. Every
+  value a line keeps is flushed like a bus sample, so no denormal forms in a tail.
+- **Mix.** The bus outputs its signal at `1 - mix` and the reverb at `mix`; 1, the default, is
+  the fully wet send bus.
+- **Changes.** Decay and damping move to a new value over about 50 ms, a block at a time, and
+  mix ramps over 20 ms. A change of size or predelay would change the lengths of the lines,
+  which clicks: the wet signal fades out over 50 ms, the lines are cleared and take their new
+  lengths, and it fades back in over 50 ms (`BOX_AUDIO_REVERB_FADE`, 100 ms in all). A change of
+  the bus does the same.
+- **Silence costs nothing.** The tail rings out after its sources stop. Once the input has been
+  silent for longer than the predelay and the lines have decayed under -140 dB, the reverb
+  clears its lines and stops; while it is stopped and no signal comes in, a block costs a scan
+  of the input for a sample over 1e-9. `box_audio_core_reverb_running` tells whether it runs.
+- **Taking it off.** A `REVERB` with bus `BOX_AUDIO_BUS_NONE` takes the reverb off its bus at
+  once: it gets no more input and its tail fades out over 50 ms into the master, so deleting a
+  reverb bus does not cut the tail.
+- **Memory.** The delay memory belongs to the side that runs the core, like sound memory:
+  `box_audio_reverb_floats(rate)` floats per slot (about 200 KB at 48 kHz), sized for the
+  largest size and predelay at the rate. `box_audio_core_reverb_memory` gives it to a slot once,
+  and the core clears it; the render path never allocates. Until a slot has memory a reverb on
+  it does not run and its bus stays dry. The transports allocate it on the `reverb` call of the
+  transport interface: the null transport on the main thread, the native one on the main thread
+  and hands it to the audio thread as a message of the command ring, the web one with a
+  `{ type: 'reverb', slot }` message, on which the worklet allocates it in the heap of its core.
+  Each frees it after its core.
+
+`BOX_AUDIO_REVERB_MAX` (1) reverbs run at once; the slots are an array, so more only cost their
+memory and their time. Convolution is not used, since it needs recorded impulse responses.
+
+The tests are the `Reverb` suite of `test/cpu/audio`, from an impulse in an offline render:
+the decay time at 44.1 and 48 kHz, damping, predelay, stereo correlation, density, stability at
+extreme values, silence, changes without clicks, sends, the second reverb, a delete and no
+allocation. `bench/audio` has a `Reverb` suite in ns per frame, and
+`test/integration/web/audio_reverb.mjs` measures a tail and the load of the worklet in Chrome.
 
 ## Transports
 
@@ -298,8 +351,8 @@ clang --target=wasm32-unknown-unknown -O2 -msimd128 -std=c11 -ffreestanding -nos
 into `box_audio_core.wasm` in the generated folder of the build: a freestanding module of a
 few KB with its own memory, which starts at 1 MB and grows up to 256 MB, no imports (the core
 needs no libm) and the exports of `src/audio/core/wasm.c`: `box_audio_core_wasm_init`, a first
-fit heap with `_alloc` and `_free` that grows the memory, `_sound`, `_apply`, `_render`,
-`_left`, `_right`, `_read_events`, `_events`, `_events_lost` and `_voices`. It is not built
+fit heap with `_alloc` and `_free` that grows the memory, `_sound`, `_reverb_floats`,
+`_reverb`, `_apply`, `_render`, `_left`, `_right`, `_read_events`, `_events`, `_events_lost` and `_voices`. It is not built
 with `emcc`: a standalone wasm of `emcc` links start code and libc from the Emscripten cache,
 which the core does not use, and building those for a new configuration fails when the cache
 folder is a symlink. The script writes the bytes as
@@ -401,7 +454,8 @@ frame, the same on every platform.
 | Component | What it is |
 |-----------|------------|
 | `AudioPcm` | The samples of a sound (`samples`, `channels`, `sample_rate`, 0 for the output rate); `box_audio_sound_from_pcm` sets it from C. Later tasks add other sound kinds |
-| `AudioBus` | A mixer bus: `output` (0 for the master), `volume` (1), `pan`, `mute`, `send` and `send_level` |
+| `AudioBus` | A mixer bus: `output` (0 or `master` for the master), `volume` (1), `pan`, `mute`, `send` and `send_level` |
+| `Reverb` | A reverb on the bus of the entity: `decay` (1.5 s), `damping` (0.5), `predelay` (0.02 s), `size` (0.5), `mix` (1) |
 | `AudioOutput` | The bus a source, or a sound by default, plays on |
 | `AudioSource` | A sound that plays while the entity exists: `sound`, `volume` (1), `pitch` (1), `loop`, `playing` (true) |
 | `AudioSettings` | Singleton: `master_volume` (1) and `mute` |
@@ -437,6 +491,21 @@ deepest buses come first, the master last. A cycle through outputs and sends log
 names the buses on it and keeps the last valid order, which the core keeps playing. A deleted
 bus, or an output or send that names no bus, routes to the master: its sources and one shots are
 moved to the master and the index is reused a frame later. A Disabled bus is muted.
+
+**Reverbs.** A scene sets its reverb by having an entity with `AudioBus` and `Reverb`, and
+unloading the scene deletes it, which fades its tail out:
+
+```
+hall { AudioBus: {output: master}, Reverb: {decay: 2.4, damping: 0.4, predelay: 0.02} }
+world { AudioBus: {output: master, send: hall, send_level: 0.3} }
+```
+
+`master` is `box.audio.master`, an entity without components that names the master. A reverb
+gets a slot of the core and the module asks the transport for its memory before the first
+`REVERB` command; it sends the parameters again when they change. One reverb runs at once: a
+second one logs one error that names its entity (`box.audio: more than 1 reverb, '...' stays
+dry`) and its bus stays dry, until the first one is deleted. Reverb zones, rooms from geometry
+and other effects are later work.
 
 **Sources** start a voice when `playing` is true and their sound is known, and stop it when
 `playing` goes false, the sound or `loop` changes or the entity is deleted, which fades it out

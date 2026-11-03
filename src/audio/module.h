@@ -44,9 +44,24 @@ typedef struct AudioVoice {
     uint8_t bus;            /**< Bus index sent */
 } AudioVoice;
 
+/** What box.audio did with a Reverb */
+typedef struct AudioReverbState {
+    uint8_t slot;           /**< Slot of the reverb in the core plus 1, 0 when it has none */
+    bool refused;           /**< The error that every slot is taken was logged */
+} AudioReverbState;
+
+/** What box.audio sent for a reverb slot */
+typedef struct box_audio_reverb_sent_t {
+    uint32_t serial;        /**< Serial of the output the parameters were sent to */
+    uint32_t memory;        /**< Serial of the output the delay memory was given to */
+    uint32_t bus;           /**< Bus index sent, BOX_AUDIO_BUS_NONE for none */
+    box_audio_reverb_params_t params; /**< Parameters sent */
+} box_audio_reverb_sent_t;
+
 extern ECS_COMPONENT_DECLARE(AudioSoundId);
 extern ECS_COMPONENT_DECLARE(AudioBusState);
 extern ECS_COMPONENT_DECLARE(AudioVoice);
+extern ECS_COMPONENT_DECLARE(AudioReverbState);
 
 /** A voice of box_audio_play, kept until it ends so a deleted bus can reroute it */
 typedef struct box_audio_oneshot_t {
@@ -68,6 +83,7 @@ typedef struct box_audio_module_stats_t {
     int64_t orders;         /**< ORDER commands written */
     int64_t cycles;         /**< Compiles that found a cycle */
     int64_t dropped;        /**< Plays dropped before a gesture */
+    int64_t reverbs;        /**< REVERB commands written */
 } box_audio_module_stats_t;
 
 /** A capture that waits for its frames */
@@ -82,6 +98,9 @@ typedef struct box_audio_module_t {
     ecs_query_t *buses;           /**< AudioBus, disabled ones included */
     ecs_query_t *sources;         /**< AudioSource, disabled ones included */
     ecs_query_t *sounds;          /**< AudioPcm */
+    ecs_query_t *reverbs;         /**< Reverb on an AudioBus, disabled ones included */
+    ecs_entity_t reverb_entity[BOX_AUDIO_REVERB_MAX]; /**< Entity of each reverb slot */
+    box_audio_reverb_sent_t reverb_sent[BOX_AUDIO_REVERB_MAX]; /**< What each slot got */
     uint32_t serial;              /**< Serial of the output the state was sent to */
     box_audio_writer_t writer;    /**< The batch of the frame, grown as needed */
     uint32_t next_voice;          /**< Next voice handle */
@@ -142,6 +161,16 @@ int32_t box_audio_module_order(
 int32_t box_audio_module_bus_index(
     const ecs_world_t *world,
     ecs_entity_t bus);
+
+/** Get the slot of the reverb of an entity in the core.
+ *
+ * @param world The world
+ * @param e The entity with Reverb
+ * @return The slot, -1 when it has none
+ */
+int32_t box_audio_module_reverb_slot(
+    const ecs_world_t *world,
+    ecs_entity_t e);
 
 /** Register the sync system and the observers of the module.
  *

@@ -471,6 +471,141 @@ done:
     state->order_dirty = false;
 }
 
+/** Write a reverb command and remember what it sent.
+ *
+ * @param state The state
+ * @param slot Slot of the reverb
+ * @param bus Bus index, BOX_AUDIO_BUS_NONE to take the reverb off
+ * @param params The parameters
+ */
+static void box_audio_reverb_send(
+    box_audio_module_t *state,
+    uint32_t slot,
+    uint32_t bus,
+    const box_audio_reverb_params_t *params)
+{
+    box_audio_reverb_sent_t *sent = &state->reverb_sent[slot];
+    if (box_audio_reserve(state)) {
+        box_audio_write_reverb(&state->writer, slot, bus, params);
+        state->stats.reverbs ++;
+    }
+
+    sent->serial = state->serial;
+    sent->bus = bus;
+    sent->params = *params;
+}
+
+/** Free the reverb slots whose entity was deleted or lost its Reverb or its bus; their tails
+ * fade out.
+ *
+ * @param world The world
+ * @param state The state
+ */
+static void box_audio_reverbs_free(
+    ecs_world_t *world,
+    box_audio_module_t *state)
+{
+    uint32_t i;
+    for (i = 0; i < BOX_AUDIO_REVERB_MAX; i ++) {
+        ecs_entity_t e = state->reverb_entity[i];
+        const AudioReverbState *rs = e && ecs_is_alive(world, e) ?
+            ecs_get(world, e, AudioReverbState) : NULL;
+        box_audio_reverb_sent_t *sent = &state->reverb_sent[i];
+        if (!e || (rs && rs->slot == i + 1 && ecs_has(world, e, Reverb) &&
+            ecs_has(world, e, AudioBus)))
+        {
+            continue;
+        }
+
+        if (state->serial && sent->serial == state->serial && sent->bus != BOX_AUDIO_BUS_NONE) {
+            box_audio_reverb_send(state, i, BOX_AUDIO_BUS_NONE, &sent->params);
+        }
+
+        state->reverb_entity[i] = 0;
+    }
+}
+
+/** Give a reverb a free slot, or log once that every slot is taken.
+ *
+ * @param world The world
+ * @param state The state
+ * @param e The entity
+ * @param rs What was done for it
+ * @return The slot, -1 when it stays dry
+ */
+static int32_t box_audio_reverb_alloc(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    ecs_entity_t e,
+    AudioReverbState *rs)
+{
+    int32_t i, result = -1;
+    for (i = 0; i < BOX_AUDIO_REVERB_MAX && result < 0; i ++) {
+        if (!state->reverb_entity[i]) {
+            state->reverb_entity[i] = e;
+            state->reverb_sent[i].serial = 0;
+            rs->slot = (uint8_t)(i + 1);
+            rs->refused = false;
+            result = i;
+        }
+    }
+
+    if (result < 0 && !rs->refused) {
+        char *path = ecs_get_path(world, e);
+        ecs_err("box.audio: more than %d reverb, '%s' stays dry", BOX_AUDIO_REVERB_MAX, path);
+        ecs_os_free(path);
+        rs->refused = true;
+        rs->slot = 0;
+    }
+
+    return result;
+}
+
+/** Give reverbs their slots and delay memory and send their parameters when they changed.
+ *
+ * @param world The world
+ * @param state The state
+ * @param t The transport
+ */
+static void box_audio_reverbs(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    box_audio_transport_t *t)
+{
+    ecs_iter_t it = ecs_query_iter(world, state->reverbs);
+    int32_t i, slot;
+    box_audio_reverbs_free(world, state);
+    while (ecs_query_next(&it)) {
+        const Reverb *reverb = ecs_field(&it, Reverb, 0);
+        AudioReverbState *rs = ecs_field(&it, AudioReverbState, 1);
+        for (i = 0; i < it.count; i ++) {
+            ecs_entity_t e = it.entities[i];
+            uint8_t index = box_audio_bus_of(world, state, e);
+            uint32_t bus = index ? index : BOX_AUDIO_BUS_NONE;
+            box_audio_reverb_params_t params = {
+                .decay = reverb[i].decay, .damping = reverb[i].damping,
+                .predelay = reverb[i].predelay, .size = reverb[i].size, .mix = reverb[i].mix };
+            box_audio_reverb_sent_t *sent;
+            slot = rs[i].slot && state->reverb_entity[rs[i].slot - 1] == e ? rs[i].slot - 1 :
+                box_audio_reverb_alloc(world, state, e, &rs[i]);
+            if (slot < 0) {
+                continue;
+            }
+
+            sent = &state->reverb_sent[slot];
+            if (sent->memory != state->serial && t->reverb(t, (uint32_t)slot)) {
+                sent->memory = state->serial;
+            }
+
+            if (sent->serial != state->serial || sent->bus != bus ||
+                ecs_os_memcmp_t(&sent->params, &params, box_audio_reverb_params_t))
+            {
+                box_audio_reverb_send(state, (uint32_t)slot, bus, &params);
+            }
+        }
+    }
+}
+
 /** Send the samples of sounds the output does not have yet.
  *
  * @param world The world
@@ -880,6 +1015,7 @@ static void BoxAudioSync(
 
     if (t) {
         box_audio_settings(world, state);
+        box_audio_reverbs(world, state, t);
         box_audio_sounds(world, state, t);
         box_audio_sources(world, state, waiting);
         box_audio_queued(world, state, waiting);
@@ -1011,6 +1147,17 @@ void box_audio_sync_init(
             { .id = ecs_id(AudioPcm), .inout = EcsIn, .src.id = EcsSelf },
             { .id = ecs_id(AudioSoundId), .src.id = EcsSelf }
         },
+        .cache_kind = EcsQueryCacheAuto
+    });
+
+    state->reverbs = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "AudioReverbs" }),
+        .terms = {
+            { .id = ecs_id(Reverb), .inout = EcsIn, .src.id = EcsSelf },
+            { .id = ecs_id(AudioReverbState), .src.id = EcsSelf },
+            { .id = ecs_id(AudioBus), .inout = EcsInOutNone, .src.id = EcsSelf }
+        },
+        .flags = EcsQueryMatchDisabled,
         .cache_kind = EcsQueryCacheAuto
     });
 

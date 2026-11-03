@@ -86,3 +86,42 @@ void Script_play_function(void) {
     test_int(ecs_count(world, AudioSource), 0);
     ecs_fini(world);
 }
+
+void Script_reverb_hall(void) {
+    // audio/script
+    ecs_world_t *world = audio_world();
+    char *code = script_read("test/assets/audio/reverb.flecs");
+    ecs_entity_t script = ecs_script(world, {
+        .entity = ecs_entity(world, { .name = "hall_scene" }),
+        .code = code
+    });
+    ecs_os_free(code);
+    test_assert(script != 0);
+
+    ecs_entity_t hall = ecs_lookup(world, "hall");
+    ecs_entity_t room = ecs_lookup(world, "world");
+    test_assert(hall != 0);
+    test_assert(room != 0);
+    const Reverb *reverb = ecs_get(world, hall, Reverb);
+    test_assert(reverb != NULL);
+    test_flt(reverb->decay, 2.4f);
+    test_flt(reverb->damping, 0.4f);
+    test_flt(reverb->predelay, 0.02f);
+    test_flt(reverb->size, 0.5f);
+    test_flt(reverb->mix, 1.0f);
+    test_assert(ecs_get(world, room, AudioBus)->send == hall);
+    test_flt(ecs_get(world, room, AudioBus)->send_level, 0.3f);
+    test_int(ecs_get(world, hall, AudioBus)->output, ecs_lookup(world, "box.audio.master"));
+
+    audio_run(world, 30);
+    test_int(box_audio_module_reverb_slot(world, hall), 0);
+    test_assert(audio_position(world, room) < audio_position(world, hall));
+    test_assert(audio_peak(audio_tap_l, audio_tap_count - AUDIO_FRAME * 10,
+        audio_tap_count) > 0.0001f);
+
+    ecs_script_clear(world, script, 0);
+    test_assert(ecs_lookup(world, "hall") == 0);
+    audio_run(world, 10);
+    test_flt(audio_peak(audio_tap_l, audio_tap_count - AUDIO_FRAME * 2, audio_tap_count), 0);
+    ecs_fini(world);
+}

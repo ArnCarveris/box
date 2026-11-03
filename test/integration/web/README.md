@@ -135,3 +135,15 @@ thread:
 node test/integration/web/audio_module.mjs \
     "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
 ```
+
+`audio_reverb.mjs` checks the reverb with `test/integration/web/audio_reverb.flecs`, a bus
+`world` that sends to the bus `hall` with `Reverb: {decay: 2.4}`. After a trusted click it
+records `audio capture 4` while `box.audio.play` sends a click to the reverb, and measures the
+decay of the tail after the click at the rate of the context. It then starts 32 looping voices
+through the reverb and prints the load of the worklet, which `Module.boxAudio.bench` measures by
+rendering 2000 quanta back to back, and which has to stay under real time:
+
+```sh
+node test/integration/web/audio_reverb.mjs \
+    "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
+```

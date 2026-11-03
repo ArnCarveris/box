@@ -72,7 +72,8 @@
 typedef enum box_audio_msg_kind_t {
     BOX_AUDIO_MSG_COMMANDS = 1,  /**< A batch of commands of the core */
     BOX_AUDIO_MSG_SOUND = 2,     /**< A box_audio_msg_sound_t */
-    BOX_AUDIO_MSG_CAPTURE = 3    /**< A box_audio_capture_t to record into */
+    BOX_AUDIO_MSG_CAPTURE = 3,   /**< A box_audio_capture_t to record into */
+    BOX_AUDIO_MSG_REVERB = 4     /**< A box_audio_msg_reverb_t */
 } box_audio_msg_kind_t;
 
 /** Header of a message of the command ring, followed by size bytes */
@@ -89,6 +90,14 @@ typedef struct box_audio_msg_sound_t {
     int32_t channels;    /**< 1 or 2 */
     float sample_rate;   /**< Frames per second of the sound */
 } box_audio_msg_sound_t;
+
+/** The delay memory of a reverb slot handed to the audio thread; it stays with the main
+ * thread */
+typedef struct box_audio_msg_reverb_t {
+    float *data;         /**< The memory, cleared */
+    uint32_t slot;       /**< Slot of the reverb */
+    int32_t floats;      /**< Floats of the memory */
+} box_audio_msg_reverb_t;
 
 /** The native transport */
 typedef struct box_audio_native_t {
@@ -147,6 +156,10 @@ static void box_audio_native_receive(
             box_audio_core_apply(n->core, n->message, (int32_t)msg.size);
         } else if (msg.kind == BOX_AUDIO_MSG_CAPTURE && msg.size == sizeof(box_audio_capture_t)) {
             memcpy(&n->capture, n->message, sizeof(n->capture));
+        } else if (msg.kind == BOX_AUDIO_MSG_REVERB && msg.size == sizeof(box_audio_msg_reverb_t)) {
+            box_audio_msg_reverb_t reverb;
+            memcpy(&reverb, n->message, sizeof(reverb));
+            box_audio_core_reverb_memory(n->core, reverb.slot, reverb.data, reverb.floats);
         } else if (msg.kind == BOX_AUDIO_MSG_SOUND && msg.size == sizeof(box_audio_msg_sound_t)) {
             box_audio_msg_sound_t sound;
             memcpy(&sound, n->message, sizeof(sound));
@@ -503,6 +516,38 @@ done:
     return result;
 }
 
+/** Allocate the delay memory of a reverb slot and hand it to the audio thread; it stays with
+ * the main thread, which frees it after the core.
+ *
+ * @param t The transport
+ * @param slot Slot of the reverb
+ * @return Whether the memory went out
+ */
+static bool box_audio_native_reverb(
+    box_audio_transport_t *t,
+    uint32_t slot)
+{
+    box_audio_native_t *n = (box_audio_native_t*)t;
+    box_audio_msg_reverb_t reverb = { NULL, slot, 0 };
+    bool result = slot < BOX_AUDIO_REVERB_MAX && n->host.reverbs[slot];
+    if (result || slot >= BOX_AUDIO_REVERB_MAX) {
+        goto done;
+    }
+
+    reverb.data = box_audio_host_reverb(&n->host, slot, t->sample_rate, &reverb.floats);
+    result = reverb.data && box_audio_native_queue(n, BOX_AUDIO_MSG_REVERB, &reverb,
+        (int32_t)sizeof(reverb));
+    if (!result && reverb.data) {
+        ecs_os_free(reverb.data);
+        n->host.reverbs[slot] = NULL;
+        goto done;
+    }
+
+    box_audio_native_flush(n);
+done:
+    return result;
+}
+
 /** Take the events of the audio thread.
  *
  * @param t The transport
@@ -731,6 +776,7 @@ box_audio_transport_t* box_audio_transport_native_new(
         .sample_rate = box_audio_core_sample_rate(n->core),
         .commands = box_audio_native_commands,
         .sound = box_audio_native_sound,
+        .reverb = box_audio_native_reverb,
         .read_events = box_audio_native_read_events,
         .state = box_audio_native_state,
         .update = box_audio_native_update,

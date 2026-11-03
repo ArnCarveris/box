@@ -40,8 +40,9 @@ ECS_ENUM(AudioState, {
 
 /** A mixer bus. Sources and plays mix into a bus, a bus into its output, the master last.
  *
- * Up to 31 buses besides the master. A cycle through outputs and sends logs one error that
- * names the buses and keeps the last valid order. A Disabled bus is silent.
+ * Up to 31 buses besides the master, which scripts can name master (box.audio.master), an
+ * entity without components. A cycle through outputs and sends logs one error that names the
+ * buses and keeps the last valid order. A Disabled bus is silent.
  */
 ECS_STRUCT(AudioBus, {
     ecs_entity_t output;   /**< Bus it feeds, 0 (or a deleted bus) for the master */
@@ -50,6 +51,21 @@ ECS_STRUCT(AudioBus, {
     bool mute;             /**< Silence the bus, default false */
     ecs_entity_t send;     /**< Bus that also receives the output, after the volume, 0 for none */
     float send_level;      /**< Linear gain of the send, default 0 */
+});
+
+/** A reverb on the bus of the same entity, which sources reach through the send of their bus.
+ *
+ * One reverb runs at once (BOX_AUDIO_REVERB_MAX of the core); another logs one error and its
+ * bus stays dry. Decay, damping and mix change smoothly; a change of size or predelay fades the
+ * wet signal out and in. Deleting the entity, as unloading its scene does, fades the tail out.
+ */
+ECS_STRUCT(Reverb, {
+    float decay;           /**< Seconds until -60 dB, default 1.5 */
+    float damping;         /**< High frequency loss, 0 to 1, default 0.5 */
+    float predelay;        /**< Seconds before the first reflection, default 0.02 */
+    float size;            /**< Room scale, 0 to 1, default 0.5 */
+    float mix;             /**< Wet level, 0 to 1, default 1 on a send bus; the dry signal
+                            *   passes at 1 - mix */
 });
 
 /** The bus a sound or a source plays on. On a source it wins over the one of its sound */

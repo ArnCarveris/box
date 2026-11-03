@@ -252,6 +252,31 @@ int32_t box_audio_core_wasm_sound(
         sample_rate) ? 1 : 0;
 }
 
+/** Get the floats of delay memory a reverb of the core needs.
+ *
+ * @return Number of floats
+ */
+int32_t box_audio_core_wasm_reverb_floats(void)
+{
+    return box_audio_core_wasm ?
+        box_audio_reverb_floats(box_audio_core_sample_rate(box_audio_core_wasm)) : 0;
+}
+
+/** Give a reverb slot the delay memory the worklet allocated in the heap.
+ *
+ * @param slot Slot of the reverb
+ * @param data The memory
+ * @param floats Floats of the memory
+ * @return 1 when the core took it
+ */
+int32_t box_audio_core_wasm_reverb(
+    uint32_t slot,
+    float *data,
+    int32_t floats)
+{
+    return box_audio_core_reverb_memory(box_audio_core_wasm, slot, data, floats) ? 1 : 0;
+}
+
 /** Apply a command batch the worklet copied into the heap.
  *
  * @param commands The bytes
