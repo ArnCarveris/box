@@ -7,7 +7,8 @@
  * and resizes; and for its wireframe: no change while off, the edges and diagonals of the
  * triangles, hidden lines of the overlay, WireframeOnly without shaded meshes and occlusion, the
  * width in pixels, parametric surfaces, instances, blended and transmissive meshes, 2D shapes
- * that are not wired, several views and replaced meshes; checked on PNG captures.
+ * that are not wired, several views, replaced meshes and the grid with the wireframe; checked
+ * on PNG captures.
  *
  * Most cases look straight down from 10 units with a 60 degree field of view into a black 128
  * pixel capture: 11.09 pixels a unit, +X right and +Z down, the origin at the center, white
@@ -1535,6 +1536,67 @@ void ViewDebug_wire_mesh_replaced(void) {
     test_int(after.errors, before.errors);
     px = dg_load(world, "wire_replaced.png", DG_SIZE, DG_SIZE);
     test_assert(dw_green_sum(px, row, (int32_t)small - 3, (int32_t)small + 3) > 0.4f);
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+/** Largest of red and blue over green of the pixels of a square around a pixel, which is high
+ * for magenta and about 0 for white or gray.
+ *
+ * @param px The pixels
+ * @param x Column of the center
+ * @param y Row of the center
+ * @param radius Pixels from the center to the edges of the square
+ * @return The largest of the smaller of red and blue minus green, display encoded
+ */
+static int32_t dw_magenta_peak(
+    const unsigned char *px,
+    int32_t x,
+    int32_t y,
+    int32_t radius)
+{
+    int32_t i, j, result = -255;
+    for (j = y - radius; j <= y + radius; j ++) {
+        for (i = x - radius; i <= x + radius; i ++) {
+            if (i < 0 || j < 0 || i >= DG_SIZE || j >= DG_SIZE) {
+                continue;
+            }
+
+            const unsigned char *p = dg_px(px, i, j);
+            int32_t rb = p[0] < p[2] ? p[0] : p[2];
+            int32_t d = rb - (int32_t)p[1];
+            result = d > result ? d : result;
+        }
+    }
+
+    return result;
+}
+
+/** A view with the grid and the overlay on from its first frame draws both in its debug pass,
+ * without validation errors: the grid lines away from a box, magenta lines along the edges of
+ * the box, and neither in the black top of the box between its lines. */
+void ViewDebug_wire_with_grid(void) {
+    // debug/wireframe
+    ecs_world_t *world = dg_world();
+    ecs_entity_t view = dg_view(world, dg_camera(world, 10, -(float)GLM_PI_2), &dg_grid);
+    dw_set(world, view, WireframeOverlay, (rgba){255, 0, 255, 255}, 2);
+    dg_box(world, (float[]){2.5f, 0.5f, -2.5f}, (float[]){3, 1, 3}, (Rgb){0, 0, 0});
+    unsigned char *px = dg_render(world, "wire_grid.png");
+    int32_t draws, passes;
+    dw_count(world, &draws, &passes);
+    test_int(passes, 2);
+
+    dg_expect_lines(px, DG_SCALE, 1);
+
+    float s = dw_scale(9);
+    int32_t row = (int32_t)(64.0f - 2.5f * s);
+    test_assert(dw_magenta_peak(px, (int32_t)(64.0f + 1.0f * s), row, 3) > 100);
+    test_assert(dw_magenta_peak(px, (int32_t)(64.0f + 4.0f * s), row, 3) > 100);
+
+    const unsigned char *top = dg_px(px, (int32_t)(64.0f + 3.25f * s), row);
+    test_assert(top[0] < 30);
+    test_assert(top[1] < 30);
+    test_assert(top[2] < 30);
     stbi_image_free(px);
     ecs_fini(world);
 }

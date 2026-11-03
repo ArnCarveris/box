@@ -155,22 +155,29 @@ void box_gpu_debug_init(
     gpu->debug = d;
 }
 
-/** Release the debug pipelines of every kind and format.
+/** Release the debug pipelines of some kinds, in every format.
+ *
+ * A released entry stays in the cache with a NULL value, so that a pipeline of another kind
+ * that a caller already holds is not touched when one shader is recompiled.
  *
  * @param d The debug state
+ * @param kinds Bit 1 << kind for each kind to release
  */
 static void box_gpu_debug_pipelines_free(
-    box_gpu_debug_t *d)
+    box_gpu_debug_t *d,
+    uint32_t kinds)
 {
     ecs_map_iter_t it = ecs_map_iter(&d->pipelines);
     while (ecs_map_next(&it)) {
+        uint32_t kind = (uint32_t)(ecs_map_key(&it) >> 32);
         WGPURenderPipeline pipeline = (WGPURenderPipeline)(uintptr_t)ecs_map_value(&it);
-        if (pipeline) {
-            wgpuRenderPipelineRelease(pipeline);
+        if (!(kinds & (1u << kind)) || !pipeline) {
+            continue;
         }
-    }
 
-    ecs_map_clear(&d->pipelines);
+        wgpuRenderPipelineRelease(pipeline);
+        ecs_map_value(&it) = 0;
+    }
 }
 
 void box_gpu_debug_fini(
@@ -181,7 +188,7 @@ void box_gpu_debug_fini(
         goto done;
     }
 
-    box_gpu_debug_pipelines_free(d);
+    box_gpu_debug_pipelines_free(d, UINT32_MAX);
     ecs_map_fini(&d->pipelines);
     if (d->buffer) {
         wgpuBufferRelease(d->buffer);
@@ -254,13 +261,13 @@ static WGPURenderPipeline box_gpu_debug_grid_pipeline(
     }
 
     if (d->grid_revision != shader->revision) {
-        box_gpu_debug_pipelines_free(d);
+        box_gpu_debug_pipelines_free(d, 1u << BOX_GPU_DEBUG_GRID);
         d->grid_revision = shader->revision;
     }
 
     key = box_gpu_debug_key(BOX_GPU_DEBUG_GRID, format);
     cached = ecs_map_get(&d->pipelines, key);
-    if (cached) {
+    if (cached && *cached) {
         result = (WGPURenderPipeline)(uintptr_t)*cached;
         goto done;
     }
@@ -310,7 +317,7 @@ static WGPURenderPipeline box_gpu_debug_grid_pipeline(
         .multisample = { .count = 1, .mask = 0xFFFFFFFF },
         .fragment = &fragment
     });
-    ecs_map_insert_ptr(&d->pipelines, key, result);
+    *ecs_map_ensure(&d->pipelines, key) = (ecs_map_val_t)(uintptr_t)result;
 done:
     return result;
 }
@@ -344,14 +351,15 @@ static WGPURenderPipeline box_gpu_debug_wire_pipeline(
     }
 
     if (d->wire_revision != shader->revision) {
-        box_gpu_debug_pipelines_free(d);
+        box_gpu_debug_pipelines_free(d,
+            (1u << BOX_GPU_DEBUG_WIRE_OVERLAY) | (1u << BOX_GPU_DEBUG_WIRE_ONLY));
         d->wire_revision = shader->revision;
     }
 
     key = box_gpu_debug_key(
         overlay ? BOX_GPU_DEBUG_WIRE_OVERLAY : BOX_GPU_DEBUG_WIRE_ONLY, format);
     cached = ecs_map_get(&d->pipelines, key);
-    if (cached) {
+    if (cached && *cached) {
         result = (WGPURenderPipeline)(uintptr_t)*cached;
         goto done;
     }
@@ -415,7 +423,7 @@ static WGPURenderPipeline box_gpu_debug_wire_pipeline(
         .multisample = { .count = 1, .mask = 0xFFFFFFFF },
         .fragment = &fragment
     });
-    ecs_map_insert_ptr(&d->pipelines, key, result);
+    *ecs_map_ensure(&d->pipelines, key) = (ecs_map_val_t)(uintptr_t)result;
 done:
     return result;
 }

@@ -1101,7 +1101,8 @@
                     "wire_transmissive_and_blended",
                     "wire_2d_not_wired",
                     "wire_per_view",
-                    "wire_mesh_replaced"
+                    "wire_mesh_replaced",
+                    "wire_with_grid"
                 ]
             }
         ]
