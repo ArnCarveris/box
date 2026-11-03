@@ -3,7 +3,8 @@
 // particle faces the camera, its size wide and turned by its rotation; a free slot collapses
 // outside the clip volume. Size, rotation, spin and opacity are drawn from the seed and the spawn
 // index, each from its own stream, then the curves of the emitter scale them by the age over the
-// life (particle.wgsl), read from their rows of the curve table unless they are constant.
+// life (particle.wgsl), read from their rows of the curve table unless they are constant; the
+// size, opacity and color clamp at 0.
 //
 // A circle is shaded smoothstep(1, 0, d^2) over its quad, a sprite shows a frame of its sheet and
 // a billboard is the mesh of the corner buffer turned to face the camera. A soft particle fades
@@ -80,8 +81,8 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
     let age = f32(life_us - p.remaining) * 1e-6;
     let life = f32(life_us) * 1e-6;
     let t = particle_norm_age(age, life);
-    let size = particle_draw(seed, p.index, STREAM_SIZE, emitter.speed_size.zw) *
-        particle_curve(emitter.curve_rows.x, emitter.curve_values.x, t);
+    let size = particle_scaled(particle_draw(seed, p.index, STREAM_SIZE, emitter.speed_size.zw),
+        emitter.curve_rows.x, emitter.curve_values.x, t);
     let rotation = particle_draw(seed, p.index, STREAM_ROTATION, emitter.rotation_spin.xy);
     let spin = particle_draw(seed, p.index, STREAM_SPIN, emitter.rotation_spin.zw);
     let angle = radians(particle_rotation(rotation, spin, emitter.curve_rows.z,
@@ -128,10 +129,12 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
     out.clip = view.view_proj * vec4f(world, 1.0);
     out.world = world;
     out.depth = -(view.view * vec4f(world, 1.0)).z;
-    out.opacity = particle_draw(seed, p.index, STREAM_OPACITY, emitter.opacity_radial.xy) *
-        particle_curve(emitter.curve_rows.y, emitter.curve_values.y, t);
-    out.color = particle_color(seed, p.index, emitter.color.rgb, emitter.variance.rgb) *
-        particle_gradient(emitter.gradient_row, emitter.gradient, t);
+    out.opacity = particle_scaled(
+        particle_draw(seed, p.index, STREAM_OPACITY, emitter.opacity_radial.xy),
+        emitter.curve_rows.y, emitter.curve_values.y, t);
+    out.color = particle_tinted(
+        particle_color(seed, p.index, emitter.color.rgb, emitter.variance.rgb),
+        emitter.gradient_row, emitter.gradient, t);
     if (emitter.params.y > 0.0) {
         out.proj = view_projection_depth();
     }

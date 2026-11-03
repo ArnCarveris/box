@@ -73,9 +73,11 @@ static ecs_entity_t emitter_new(
  */
 static ParticleLight ramp(void)
 {
+    static CurveKey keys[2] = { {0, 0}, {1, 3} };
+
     return (ParticleLight){
         .intensity = 1,
-        .curve = { 0, 1, 2, 3 },
+        .curve = { .keys = { .array = keys, .count = 2, .size = 2 } },
         .period = 1
     };
 }
@@ -161,10 +163,8 @@ void Light_c_defaults(void) {
     const ParticleLight *l = ecs_get(world, e, ParticleLight);
     test_assert(l != NULL);
     test_flt(l->intensity, 1);
-    test_flt(l->curve.start, 1);
-    test_flt(l->curve.early, 1);
-    test_flt(l->curve.late, 1);
-    test_flt(l->curve.end, 1);
+    test_int(l->curve.kind, CurveLinear);
+    test_int(ecs_vec_count(&l->curve.keys), 0);
     test_flt(l->period, 0);
     test_bool(l->loop, false);
     test_flt(l->fade, 0);
@@ -178,19 +178,26 @@ void Light_script_values(void) {
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
     test_assert(ecs_script_run(world, "light",
+        "using box.curve\n"
         "using box.particle\n"
         "e {\n"
-        "  ParticleLight: {intensity: 5, curve: {0, 1, 0.5, 0}, period: 2, loop: true, "
-        "fade: 0.5}\n"
+        "  ParticleLight: {intensity: 5, curve: {kind: CurveCatmullRom, keys: [{0, 0}, "
+        "{0.33333334, 1}, {0.6666667, 0.5}, {1, 0}]}, period: 2, loop: true, fade: 0.5}\n"
         "}\n", NULL) == 0);
     ecs_entity_t e = ecs_lookup(world, "e");
     const ParticleLight *l = ecs_get(world, e, ParticleLight);
     test_assert(l != NULL);
     test_flt(l->intensity, 5);
-    test_flt(l->curve.start, 0);
-    test_flt(l->curve.early, 1);
-    test_flt(l->curve.late, 0.5);
-    test_flt(l->curve.end, 0);
+    test_int(l->curve.kind, CurveCatmullRom);
+    test_int(ecs_vec_count(&l->curve.keys), 4);
+    const CurveKey *keys = ecs_vec_first_t(&l->curve.keys, CurveKey);
+    test_flt(keys[0].value, 0);
+    test_assert(keys[1].time == 1.0f / 3.0f);
+    test_flt(keys[1].value, 1);
+    test_assert(keys[2].time == 2.0f / 3.0f);
+    test_flt(keys[2].value, 0.5);
+    test_flt(keys[3].time, 1);
+    test_flt(keys[3].value, 0);
     test_flt(l->period, 2);
     test_bool(l->loop, true);
     test_flt(l->fade, 0.5);
@@ -335,7 +342,7 @@ void Light_curve_once(void) {
     ecs_world_t *world = world_new(&null);
     ecs_entity_t e = emitter_new(world, (ParticleLight){
         .intensity = 2,
-        .curve = { 1, 2, 4, 8 },
+        .curve = { .keys = BOX_CURVE_KEYS({0, 1}, {1.0f / 3.0f, 2}, {2.0f / 3.0f, 4}, {1, 8}) },
         .period = 0.3f
     });
 
@@ -358,7 +365,7 @@ void Light_curve_loop(void) {
     ecs_world_t *world = world_new(&null);
     ecs_entity_t e = emitter_new(world, (ParticleLight){
         .intensity = 2,
-        .curve = { 1, 2, 4, 8 },
+        .curve = { .keys = BOX_CURVE_KEYS({0, 1}, {1.0f / 3.0f, 2}, {2.0f / 3.0f, 4}, {1, 8}) },
         .period = 0.3f,
         .loop = true
     });
@@ -503,6 +510,135 @@ void Light_goes_out_with_entity(void) {
     frame(world);
     test_int(lights_lit(world), 1);
     near(intensity_of(world, other), 2);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Get a ParticleLight whose curve of a kind rises from 0 to 1 at half its period of 0.4
+ * seconds and falls back to 0, its Bezier key at 0 leaving at a slope of 4.
+ *
+ * @param kind The kind
+ * @param loop Whether it repeats
+ * @param keys Receives the keys the light views, three
+ * @return The ParticleLight
+ */
+static ParticleLight hump(
+    CurveKind kind,
+    bool loop,
+    CurveKey *keys)
+{
+    keys[0] = (CurveKey){ .time = 0, .value = 0, .out = 4 };
+    keys[1] = (CurveKey){ .time = 0.5f, .value = 1 };
+    keys[2] = (CurveKey){ .time = 1, .value = 0 };
+
+    return (ParticleLight){
+        .intensity = 2,
+        .curve = { .kind = kind, .keys = { .array = keys, .count = 3, .size = 3 } },
+        .period = 0.4f,
+        .loop = loop
+    };
+}
+
+/** Value of the hump curve of a kind at a quarter of its period: linear 1/2, Catmull-Rom 9/16
+ * with the slope 1 of the mirrored first key, and Bezier 3/4 with its slope of 4.
+ *
+ * @param kind The kind
+ * @return The value
+ */
+static float hump_quarter(
+    CurveKind kind)
+{
+    float result = 0.5f;
+    if (kind == CurveCatmullRom) {
+        result = 0.5625f;
+    } else if (kind == CurveBezier) {
+        result = 0.75f;
+    }
+
+    return result;
+}
+
+/** Value of the hump curve of a kind at three quarters of its period: linear and Bezier 1/2,
+ * Catmull-Rom 9/16.
+ *
+ * @param kind The kind
+ * @return The value
+ */
+static float hump_three_quarters(
+    CurveKind kind)
+{
+    return kind == CurveCatmullRom ? 0.5625f : 0.5f;
+}
+
+void Light_curve_kinds_once(void) {
+    // particle/light
+    CurveKind kinds[3] = { CurveLinear, CurveCatmullRom, CurveBezier };
+    int32_t k;
+    for (k = 0; k < 3; k ++) {
+        box_render_null_t *null;
+        ecs_world_t *world = world_new(&null);
+        CurveKey keys[3];
+        ecs_entity_t e = emitter_new(world, hump(kinds[k], false, keys));
+
+        frame(world);
+        near(intensity_of(world, e), 2 * hump_quarter(kinds[k]));
+        frame(world);
+        near(intensity_of(world, e), 2);
+        frame(world);
+        near(intensity_of(world, e), 2 * hump_three_quarters(kinds[k]));
+        frame(world);
+        near(intensity_of(world, e), 0);
+        frames(world, 3);
+        near(intensity_of(world, e), 0);
+
+        ecs_fini(world);
+        box_render_null_free(null);
+    }
+}
+
+void Light_curve_kinds_loop(void) {
+    // particle/light
+    CurveKind kinds[3] = { CurveLinear, CurveCatmullRom, CurveBezier };
+    int32_t k;
+    for (k = 0; k < 3; k ++) {
+        box_render_null_t *null;
+        ecs_world_t *world = world_new(&null);
+        CurveKey keys[3];
+        ecs_entity_t e = emitter_new(world, hump(kinds[k], true, keys));
+
+        frame(world);
+        near(intensity_of(world, e), 2 * hump_quarter(kinds[k]));
+        frame(world);
+        near(intensity_of(world, e), 2);
+        frame(world);
+        near(intensity_of(world, e), 2 * hump_three_quarters(kinds[k]));
+        frame(world);
+        near(intensity_of(world, e), 0);
+        frame(world);
+        near(intensity_of(world, e), 2 * hump_quarter(kinds[k]));
+        frame(world);
+        near(intensity_of(world, e), 2);
+
+        ecs_fini(world);
+        box_render_null_free(null);
+    }
+}
+
+void Light_bad_curve_is_one(void) {
+    // particle/light
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    int32_t level = ecs_log_set_level(-4);
+    ecs_entity_t e = emitter_new(world, (ParticleLight){
+        .intensity = 3,
+        .curve = { .keys = BOX_CURVE_KEYS({0, 0}, {2, 5}) },
+        .period = 0.4f
+    });
+
+    frame(world);
+    ecs_log_set_level(level);
+    near(intensity_of(world, e), 3);
 
     ecs_fini(world);
     box_render_null_free(null);

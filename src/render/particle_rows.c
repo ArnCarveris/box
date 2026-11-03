@@ -4,12 +4,16 @@
  * emitters, counted by the pools that use them and handed out again when none does.
  *
  * A scalar curve takes a row of values, a spin curve a row of values and a row of their
- * accumulated area, and a gradient BOX_PARTICLE_GRADIENT_ROWS rows of linear colors. The rows
- * are baked by the C twin of the shaders in src/particle/simulate.h.
+ * accumulated area, and a gradient BOX_PARTICLE_GRADIENT_ROWS rows of linear colors, baked by
+ * the C twin of the shaders in src/particle/simulate.h. Entries are shared by baked content.
  */
 
 #include "particle_rows.h"
 #include "../particle/simulate.h"
+#include "../particle/curves.h"
+
+/** Floats of the largest content of an entry, the rows of a gradient */
+#define BOX_PARTICLE_ROWS_MAX_FLOATS (BOX_PARTICLE_GRADIENT_ROWS * BOX_PARTICLE_CURVE_SAMPLES)
 
 /** What the rows of an entry hold */
 typedef enum box_particle_rows_kind_t {
@@ -21,8 +25,6 @@ typedef enum box_particle_rows_kind_t {
 /** Rows baked from one curve, shared by the pools with that curve */
 typedef struct box_particle_rows_entry_t {
     box_particle_rows_kind_t kind; /**< What the rows hold */
-    float keys[16];         /**< The four keys of a curve, or the four linear colors of a
-                             *   gradient with w 1, the rest zero */
     uint32_t row;           /**< First row */
     uint32_t rows;          /**< Rows it takes */
     int32_t refs;           /**< Pools that use it, 0 for rows that are handed out again */
@@ -72,26 +74,21 @@ static uint32_t box_particle_rows_of(
     return result;
 }
 
-/** Bake the rows of an entry and mark them for the send.
+/** Write the content of an entry to its rows and mark them for the send.
  *
  * @param t The table
  * @param entry The entry, its rows handed out
+ * @param samples The content, BOX_PARTICLE_CURVE_SAMPLES floats per row of the entry
  */
-static void box_particle_rows_bake(
+static void box_particle_rows_write(
     box_particle_rows_t *t,
-    const box_particle_rows_entry_t *entry)
+    const box_particle_rows_entry_t *entry,
+    const float *samples)
 {
     float *out = ecs_vec_get_t(&t->data, float,
         (int32_t)(entry->row * BOX_PARTICLE_CURVE_SAMPLES));
-    if (entry->kind == BOX_PARTICLE_ROWS_GRADIENT) {
-        box_particle_gradient_bake(entry->keys, out);
-    } else {
-        box_particle_curve_bake(entry->keys, out);
-        if (entry->kind == BOX_PARTICLE_ROWS_SPIN) {
-            box_particle_curve_bake_area(out, out + BOX_PARTICLE_CURVE_SAMPLES);
-        }
-    }
-
+    ecs_os_memcpy(out, samples,
+        (ecs_size_t)(entry->rows * BOX_PARTICLE_CURVE_SAMPLES * sizeof(float)));
     if (entry->row < t->dirty_first) {
         t->dirty_first = entry->row;
     }
@@ -103,26 +100,29 @@ static void box_particle_rows_bake(
     t->bakes ++;
 }
 
-/** Get the rows of a curve: those of an entry with the same content, else rows nothing uses
- * or new rows, baked. The old rows of a pool are released after its new ones are acquired, so
- * its unchanged curves keep theirs.
+/** Get the rows of a baked curve: those of an entry of the same kind and content, else rows
+ * nothing uses or new rows, written. The old rows of a pool are released after its new ones are
+ * acquired, so its unchanged curves keep theirs.
  *
  * @param t The table
  * @param kind What the rows hold
- * @param keys The content, 16 floats
+ * @param samples The content, BOX_PARTICLE_CURVE_SAMPLES floats per row of the kind
  * @return Index of the entry, its use counted
  */
 static int32_t box_particle_rows_acquire(
     box_particle_rows_t *t,
     box_particle_rows_kind_t kind,
-    const float *keys)
+    const float *samples)
 {
     uint32_t rows = box_particle_rows_of(kind);
+    size_t bytes = rows * BOX_PARTICLE_CURVE_SAMPLES * sizeof(float);
     int32_t i, count = ecs_vec_count(&t->entries), result = -1, unused = -1;
     box_particle_rows_entry_t *entry;
     for (i = 0; i < count; i ++) {
         entry = ecs_vec_get_t(&t->entries, box_particle_rows_entry_t, i);
-        if (entry->kind == kind && !memcmp(entry->keys, keys, sizeof(entry->keys))) {
+        if (entry->kind == kind && !memcmp(ecs_vec_get_t(&t->data, float,
+            (int32_t)(entry->row * BOX_PARTICLE_CURVE_SAMPLES)), samples, bytes))
+        {
             result = i;
             break;
         }
@@ -148,9 +148,8 @@ static int32_t box_particle_rows_acquire(
     }
 
     entry->kind = kind;
-    ecs_os_memcpy(entry->keys, keys, ECS_SIZEOF(entry->keys));
     entry->refs = 0;
-    box_particle_rows_bake(t, entry);
+    box_particle_rows_write(t, entry, samples);
 done:
     ecs_vec_get_t(&t->entries, box_particle_rows_entry_t, result)->refs ++;
 
@@ -184,82 +183,193 @@ void box_particle_rows_release(
     use->baked = false;
 }
 
-/** Check whether the four keys of a curve are equal.
+/** Check whether samples are finite, so that no NaN reaches the GPU.
  *
- * @param keys The keys
- * @return Whether the curve is constant
+ * @param samples The samples
+ * @param count Number of samples
+ * @return Whether every sample is finite
  */
-static bool box_particle_rows_constant(
-    const float *keys)
+static bool box_particle_rows_finite(
+    const float *samples,
+    int32_t count)
 {
-    return keys[0] == keys[1] && keys[1] == keys[2] && keys[2] == keys[3];
+    bool result = true;
+    int32_t i;
+    for (i = 0; i < count && result; i ++) {
+        result = isfinite(samples[i]);
+    }
+
+    return result;
 }
 
-/** Give a use the rows of the scalar curves of ParticleCurves.
+/** Check whether the samples of a row, each stride floats apart, are all equal.
+ *
+ * @param samples The first sample
+ * @param stride Floats from one sample to the next
+ * @return Whether the row is flat
+ */
+static bool box_particle_rows_flat(
+    const float *samples,
+    int32_t stride)
+{
+    bool result = true;
+    int32_t i;
+    for (i = 1; i < BOX_PARTICLE_CURVE_SAMPLES && result; i ++) {
+        result = samples[i * stride] == samples[0];
+    }
+
+    return result;
+}
+
+/** Give a use the row of one scalar curve of ParticleCurves: none for a curve without keys, a
+ * bad one or a flat one, which are constants.
  *
  * @param t The table
  * @param use The use, its constants set to the defaults
- * @param curves The curves
+ * @param i Index of the curve: size, opacity, rotation or spin
+ * @param curve The curve
  */
-static void box_particle_rows_scalars(
+static void box_particle_rows_scalar(
     box_particle_rows_t *t,
     box_particle_rows_use_t *use,
+    int32_t i,
+    const ParticleCurve *curve)
+{
+    float samples[BOX_PARTICLE_SPIN_ROWS * BOX_PARTICLE_CURVE_SAMPLES];
+    box_particle_rows_kind_t kind = i == 3 ? BOX_PARTICLE_ROWS_SPIN : BOX_PARTICLE_ROWS_SCALAR;
+    int32_t count = ecs_vec_count(&curve->keys);
+    if (!count || !box_particle_curve_valid(curve)) {
+        goto done;
+    }
+
+    if (count == 1) {
+        use->values[i] = ecs_vec_first_t(&curve->keys, CurveKey)->value;
+        goto done;
+    }
+
+    box_particle_curve_bake(curve, use->values[i], samples);
+    if (kind == BOX_PARTICLE_ROWS_SPIN) {
+        box_particle_curve_bake_area(samples, samples + BOX_PARTICLE_CURVE_SAMPLES);
+    }
+
+    if (!box_particle_rows_finite(samples,
+        (int32_t)box_particle_rows_of(kind) * BOX_PARTICLE_CURVE_SAMPLES))
+    {
+        goto done;
+    }
+
+    if (box_particle_rows_flat(samples, 1)) {
+        use->values[i] = samples[0];
+        goto done;
+    }
+
+    int32_t entry = box_particle_rows_acquire(t, kind, samples);
+    use->entries[i] = entry + 1;
+    use->rows[i] = ecs_vec_get_t(&t->entries, box_particle_rows_entry_t, entry)->row;
+done:
+    return;
+}
+
+/** Give a use the rows of the gradient of ParticleCurves: none for a gradient without keys, a
+ * bad one or a flat one, which are constants.
+ *
+ * @param t The table
+ * @param use The use, its constant gradient white
+ * @param gradient The gradient
+ */
+static void box_particle_rows_gradient(
+    box_particle_rows_t *t,
+    box_particle_rows_use_t *use,
+    const ParticleGradient *gradient)
+{
+    float samples[BOX_PARTICLE_ROWS_MAX_FLOATS];
+    bool flat = true;
+    int32_t c;
+    if (!ecs_vec_count(&gradient->keys) || !box_particle_gradient_valid(gradient)) {
+        goto done;
+    }
+
+    box_particle_gradient_bake(gradient, samples);
+    if (!box_particle_rows_finite(samples, BOX_PARTICLE_ROWS_MAX_FLOATS)) {
+        goto done;
+    }
+
+    for (c = 0; c < 3; c ++) {
+        flat = flat && box_particle_rows_flat(samples + c, 4);
+    }
+
+    if (flat) {
+        for (c = 0; c < 3; c ++) {
+            use->gradient[c] = samples[c];
+        }
+
+        goto done;
+    }
+
+    int32_t entry = box_particle_rows_acquire(t, BOX_PARTICLE_ROWS_GRADIENT, samples);
+    use->entries[4] = entry + 1;
+    use->gradient_row = ecs_vec_get_t(&t->entries, box_particle_rows_entry_t, entry)->row;
+done:
+    return;
+}
+
+/** Add bytes to an FNV-1a hash.
+ *
+ * @param hash The hash so far
+ * @param data The bytes
+ * @param size Number of bytes
+ * @return The hash
+ */
+static uint64_t box_particle_rows_hash_bytes(
+    uint64_t hash,
+    const void *data,
+    size_t size)
+{
+    const uint8_t *bytes = data;
+    size_t i;
+    for (i = 0; i < size; i ++) {
+        hash = (hash ^ bytes[i]) * 1099511628211ull;
+    }
+
+    return hash;
+}
+
+/** Hash the kinds and keys of ParticleCurves, which changes when a key does, also one written in
+ * place in the vector of its curve.
+ *
+ * @param curves The curves
+ * @return The hash
+ */
+static uint64_t box_particle_rows_hash(
     const ParticleCurves *curves)
 {
     const ParticleCurve *scalars[4] = {
         &curves->size, &curves->opacity, &curves->rotation, &curves->spin
     };
-    float keys[16];
-    int32_t i;
+    const ParticleGradientKey *keys = ecs_vec_first_t(
+        &curves->color.keys, ParticleGradientKey);
+    uint64_t hash = 14695981039346656037ull;
+    int32_t i, count;
     for (i = 0; i < 4; i ++) {
-        const float *k = &scalars[i]->start;
-        if (box_particle_rows_constant(k)) {
-            use->values[i] = k[0];
-            continue;
+        count = ecs_vec_count(&scalars[i]->keys);
+        hash = box_particle_rows_hash_bytes(hash, &scalars[i]->kind, sizeof(CurveKind));
+        hash = box_particle_rows_hash_bytes(hash, &count, sizeof(count));
+        if (count) {
+            hash = box_particle_rows_hash_bytes(hash, ecs_vec_first(&scalars[i]->keys),
+                (size_t)count * sizeof(CurveKey));
         }
-
-        ecs_os_memset(keys, 0, ECS_SIZEOF(keys));
-        ecs_os_memcpy(keys, k, 4 * ECS_SIZEOF(float));
-        int32_t entry = box_particle_rows_acquire(t,
-            i == 3 ? BOX_PARTICLE_ROWS_SPIN : BOX_PARTICLE_ROWS_SCALAR, keys);
-        use->entries[i] = entry + 1;
-        use->rows[i] = ecs_vec_get_t(&t->entries, box_particle_rows_entry_t, entry)->row;
-    }
-}
-
-/** Give a use the rows of the gradient of ParticleCurves, none for a constant one.
- *
- * @param t The table
- * @param use The use
- * @param curves The curves
- */
-static void box_particle_rows_gradient(
-    box_particle_rows_t *t,
-    box_particle_rows_use_t *use,
-    const ParticleCurves *curves)
-{
-    const rgb *colors = &curves->color.start;
-    float keys[16];
-    bool constant = true;
-    int32_t i, c;
-    for (i = 0; i < 4; i ++) {
-        keys[i * 4 + 0] = box_particle_linear(colors[i].r);
-        keys[i * 4 + 1] = box_particle_linear(colors[i].g);
-        keys[i * 4 + 2] = box_particle_linear(colors[i].b);
-        keys[i * 4 + 3] = 1.0f;
     }
 
-    for (c = 0; c < 3; c ++) {
-        float channel[4] = {keys[c], keys[4 + c], keys[8 + c], keys[12 + c]};
-        constant = constant && box_particle_rows_constant(channel);
-        use->gradient[c] = keys[c];
+    count = ecs_vec_count(&curves->color.keys);
+    hash = box_particle_rows_hash_bytes(hash, &curves->color.kind, sizeof(CurveKind));
+    hash = box_particle_rows_hash_bytes(hash, &count, sizeof(count));
+    for (i = 0; i < count; i ++) {
+        uint8_t color[3] = { keys[i].color.r, keys[i].color.g, keys[i].color.b };
+        hash = box_particle_rows_hash_bytes(hash, &keys[i].time, sizeof(float));
+        hash = box_particle_rows_hash_bytes(hash, color, sizeof(color));
     }
 
-    if (!constant) {
-        int32_t entry = box_particle_rows_acquire(t, BOX_PARTICLE_ROWS_GRADIENT, keys);
-        use->entries[4] = entry + 1;
-        use->gradient_row = ecs_vec_get_t(&t->entries, box_particle_rows_entry_t, entry)->row;
-    }
+    return hash;
 }
 
 void box_particle_rows_update(
@@ -268,10 +378,9 @@ void box_particle_rows_update(
     const ParticleCurves *curves)
 {
     static const float defaults[4] = {1.0f, 1.0f, 0.0f, 1.0f};
+    uint64_t hash = curves ? box_particle_rows_hash(curves) : 0;
     int32_t i, old[BOX_PARTICLE_ROWS_CURVES];
-    if (use->baked && use->had == (curves != NULL) &&
-        (!curves || !memcmp(curves, &use->key, sizeof(ParticleCurves))))
-    {
+    if (use->baked && use->had == (curves != NULL) && (!curves || hash == use->hash)) {
         goto done;
     }
 
@@ -285,12 +394,15 @@ void box_particle_rows_update(
     use->gradient_row = BOX_PARTICLE_CURVE_CONSTANT;
     use->gradient[0] = use->gradient[1] = use->gradient[2] = 1.0f;
     if (curves) {
-        box_particle_rows_scalars(t, use, curves);
-        box_particle_rows_gradient(t, use, curves);
-        use->key = *curves;
+        box_particle_rows_scalar(t, use, 0, &curves->size);
+        box_particle_rows_scalar(t, use, 1, &curves->opacity);
+        box_particle_rows_scalar(t, use, 2, &curves->rotation);
+        box_particle_rows_scalar(t, use, 3, &curves->spin);
+        box_particle_rows_gradient(t, use, &curves->color);
     }
 
     box_particle_rows_unref(t, old);
+    use->hash = hash;
     use->had = curves != NULL;
     use->baked = true;
 done:

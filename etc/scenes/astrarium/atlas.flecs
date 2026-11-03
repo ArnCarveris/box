@@ -38,7 +38,10 @@ template StarSparks {
   }
   ParticleForces: {gravity: {0, -40, 0}, drag: 2.6}
   ParticleAppearance: {shape: ParticleCircle, blend: ParticleAdditive, stretch: 0.005}
-  ParticleCurves: {opacity: {1, 1, 0.5, 0}, size: {1.2, 1, 0.6, 0.1}}
+  ParticleCurves: {
+    opacity: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 0.5}, {1, 0}]}
+    size: {keys: [{0, 1.2}, {0.33333334, 1}, {0.6666667, 0.6}, {1, 0.1}]}
+  }
   ParticleBurst: {count: 80, at: at}
 }
 
