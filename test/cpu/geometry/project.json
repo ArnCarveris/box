@@ -337,6 +337,22 @@
                     "open_contour",
                     "triangulation_failure"
                 ]
+            },
+            {
+                "id": "CatmullRom",
+                "testcases": [
+                    "anchors_2d",
+                    "anchors_3d",
+                    "slope_continuous",
+                    "slope_continuous_closed",
+                    "next_to_line",
+                    "next_to_bezier",
+                    "evaluate_sample_pack",
+                    "sweep_mesh",
+                    "lathe_mesh",
+                    "script",
+                    "invalid_kind"
+                ]
             }
         ]
     }

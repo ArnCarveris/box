@@ -1,7 +1,7 @@
 /**
  * @file box/audio.h
- * @brief Data driven audio: buses, sources, sound files, one shot plays, settings, status and
- * captures.
+ * @brief Data driven audio: buses, sources, sound files, music streams, one shot plays,
+ * settings, status and captures.
  *
  * Components that a script, the REST API or the set command write, which one system at the end
  * of the frame turns into one command batch for the audio core (docs/audio.md). The same
@@ -25,6 +25,12 @@ extern "C" {
 
 /** Longest capture in seconds */
 #define BOX_AUDIO_CAPTURE_MAX (60.0f)
+
+/** Oscillators of a synth sound: the root and its children with a SynthOscillator */
+#define BOX_AUDIO_SYNTH_LAYERS 4
+
+/** Seconds a synth sound plays when it would never end, a layer without any envelope */
+#define BOX_AUDIO_SYNTH_ENDLESS (10.0f)
 
 /** What the audio output does */
 ECS_ENUM(AudioState, {
@@ -113,11 +119,120 @@ ECS_STRUCT(SoundStatus, {
  * A Disabled source is silent and deleting a source stops it with a short fade.
  */
 ECS_STRUCT(AudioSource, {
-    ecs_entity_t sound;    /**< The sound to play, an entity with AudioPcm or SoundFile */
+    ecs_entity_t sound;    /**< The sound to play, an entity with AudioPcm, SoundFile or
+                            *   SynthSound; a looping synth starts over at the end of its
+                            *   envelopes */
     float volume;          /**< Linear gain, default 1 */
     float pitch;           /**< Ratio of the playback speed, default 1 */
     bool loop;             /**< Play the sound over and over, default false */
     bool playing;          /**< Whether it plays, default true */
+});
+
+/** Music: one Ogg Vorbis file that streams while the entity exists and playing is true.
+ *
+ * Decoded ahead in chunks, never whole: on a job natively, on the main thread for a bounded
+ * time per frame on the web, which fetches the file next to the page if its file system lacks it.
+ *
+ * One stream plays at once; a second one logs one error and is silent. A new path fades the old
+ * stream out and starts the new one. At its end a stream that does not loop sets playing to
+ * false; a delete fades it out and frees it. With an AudioOutput it plays on that bus.
+ */
+ECS_STRUCT(AudioStream, {
+    char *path;            /**< An .ogg file, found as a TexturePath is */
+    float volume;          /**< Linear gain, default 1 */
+    bool loop;             /**< Start over at the end without a gap, default true */
+    bool playing;          /**< Whether it plays, default true; false fades it out and true
+                            *   resumes it where it stopped */
+});
+
+/** Progress of an AudioStream */
+ECS_ENUM(AudioStreamState, {
+    AudioStreamLoading = 0,  /**< The file is fetched or opened, or decodes ahead of its start */
+    AudioStreamPlaying = 1,  /**< It plays */
+    AudioStreamStopped = 2,  /**< playing is false, or no output plays it */
+    AudioStreamEnded = 3,    /**< A stream that does not loop played to its end */
+    AudioStreamFailed = 4    /**< It cannot play, error says why */
+});
+
+/** What an AudioStream does, written by box.audio and read only for applications */
+ECS_STRUCT(AudioStreamStatus, {
+    AudioStreamState state; /**< What it does */
+    int32_t frames;        /**< Frames of the file, 0 until it opened */
+    int32_t channels;      /**< 1 or 2 after the mix down, 0 until it opened */
+    float sample_rate;     /**< Frames per second of the file, 0 until it opened */
+    float position;        /**< Seconds into the file of what plays */
+    float buffered;        /**< Seconds decoded ahead of what plays */
+    int32_t underruns;     /**< Times the output ran out of decoded frames and faded to silence */
+    float decode_ms;       /**< Milliseconds the last decode took; on the web the main thread
+                            *   spends it in its frame */
+    float decode_max_ms;   /**< Largest decode_ms so far */
+    char *error;           /**< Why it failed, NULL unless state is AudioStreamFailed */
+});
+
+/** Wave of a synth oscillator */
+ECS_ENUM(SynthWave, {
+    SynthSine,             /**< Sine */
+    SynthSaw,              /**< Saw, band limited */
+    SynthSquare,           /**< Square, band limited */
+    SynthTriangle,         /**< Triangle */
+    SynthNoise             /**< White noise, seeded per play from SynthSound.seed */
+});
+
+/** Kind of the filter of a synth sound */
+ECS_ENUM(SynthFilterKind, {
+    SynthLowPass,          /**< Lowpass, 12 dB per octave */
+    SynthHighPass,         /**< Highpass, 12 dB per octave */
+    SynthBandPass          /**< Bandpass, unity at the cutoff */
+});
+
+/** An oscillator of a synth sound, a layer: on the root of the sound or on a child of it.
+ *
+ * Up to BOX_AUDIO_SYNTH_LAYERS layers, the root first; more log one error and are left out.
+ */
+ECS_STRUCT(SynthOscillator, {
+    SynthWave wave;        /**< The wave, default SynthSine */
+    float frequency;       /**< Hz, default 440, ignored by noise */
+    float frequency_end;   /**< Hz the pitch sweeps to, 0 for no sweep */
+    float sweep;           /**< Seconds of the sweep, exponential in frequency */
+    float level;           /**< Linear gain, default 1 */
+});
+
+/** An envelope: linear from 0 to 1 over attack, to sustain over decay, hold seconds there,
+ * then to 0 over release.
+ *
+ * On the root it applies to every layer without its own, on a layer to that layer. A sound
+ * ends once every envelope reached silence, so a one shot without a release still ends. A
+ * layer without any envelope would never end: it logs one error and the sound plays for
+ * BOX_AUDIO_SYNTH_ENDLESS seconds.
+ */
+ECS_STRUCT(SynthEnvelope, {
+    float attack;          /**< Seconds from 0 to 1, at least 0.5 ms so it does not click */
+    float decay;           /**< Seconds from 1 to the sustain level */
+    float sustain;         /**< Level after the decay, 0..1, default 0 */
+    float release;         /**< Seconds from the sustain level to 0 */
+    float hold;            /**< Seconds at the sustain level before the release */
+});
+
+/** The filter of a synth sound, on its root: a state variable filter on the mix of the layers,
+ * stable at any cutoff and resonance */
+ECS_STRUCT(SynthFilter, {
+    SynthFilterKind kind;  /**< The kind, default SynthLowPass */
+    float cutoff;          /**< Hz, default 1000, clamped under Nyquist */
+    float cutoff_end;      /**< Hz the cutoff sweeps to, 0 for no sweep */
+    float sweep;           /**< Seconds of the sweep, exponential in frequency */
+    float resonance;       /**< 0 (a Butterworth response) to 1 (rings the longest) */
+});
+
+/** A sound made by the synth from the components of this entity and its children, without a
+ * file: SynthOscillator layers, a SynthEnvelope and a SynthFilter. Usually a prefab.
+ *
+ * It is compiled once, and again when one of its components changes, into a patch the core
+ * holds; box_audio_play and AudioSource play it like any sound, with no allocation per play.
+ */
+ECS_STRUCT(SynthSound, {
+    uint32_t seed;         /**< Seed of the noise and the variances, with a count of plays */
+    float pitch_variance;  /**< Random share of the pitch per play, 0..1, default 0 */
+    float level_variance;  /**< Random share of the level per play, 0..1, default 0 */
 });
 
 /** The ears of the world: sources with AudioSpatial are heard from its WorldTransform.
@@ -185,7 +300,7 @@ ecs_entity_t box_audio_sound_from_pcm(
  * box.audio.play(sound, volume).
  *
  * @param world The world
- * @param sound The sound, an entity with AudioPcm or SoundFile
+ * @param sound The sound, an entity with AudioPcm, SoundFile or SynthSound
  * @param volume Linear gain
  * @return Whether the play was queued
  */

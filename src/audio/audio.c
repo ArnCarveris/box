@@ -1,7 +1,8 @@
 /**
  * @file audio/audio.c
  * @brief Registers the box.audio components, the play and capture functions and their script
- * functions, and writes the WAV files of captures. Sound files are in sample.c.
+ * functions, and writes the WAV files of captures. Sound files are in sample.c, music streams
+ * in music.c.
  */
 
 #define BOX_AUDIO_IMPL
@@ -22,6 +23,8 @@ ECS_COMPONENT_DECLARE(AudioBusState);
 ECS_COMPONENT_DECLARE(AudioVoice);
 ECS_COMPONENT_DECLARE(AudioReverbState);
 ECS_COMPONENT_DECLARE(AudioSample);
+ECS_COMPONENT_DECLARE(AudioMusic);
+ECS_COMPONENT_DECLARE(AudioSynth);
 
 /** Construct AudioBus values: unity volume to the master, centered, no send.
  *
@@ -58,6 +61,25 @@ static void box_audio_source_ctor(
     (void)ti;
     for (i = 0; i < count; i ++) {
         values[i] = (AudioSource){ .volume = 1.0f, .pitch = 1.0f, .playing = true };
+    }
+}
+
+/** Construct AudioStream values: a stream that loops and plays at once at unity volume.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_stream_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    AudioStream *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (AudioStream){ .volume = 1.0f, .loop = true, .playing = true };
     }
 }
 
@@ -99,6 +121,44 @@ static void box_audio_reverb_ctor(
     for (i = 0; i < count; i ++) {
         values[i] = (Reverb){
             .decay = 1.5f, .damping = 0.5f, .predelay = 0.02f, .size = 0.5f, .mix = 1.0f };
+    }
+}
+
+/** Construct SynthOscillator values: a sine at 440 Hz at unity level, without a sweep.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_synth_oscillator_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    SynthOscillator *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (SynthOscillator){ .wave = SynthSine, .frequency = 440.0f, .level = 1.0f };
+    }
+}
+
+/** Construct SynthFilter values: a lowpass at 1000 Hz without resonance or sweep.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_synth_filter_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    SynthFilter *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (SynthFilter){ .kind = SynthLowPass, .cutoff = 1000.0f };
     }
 }
 
@@ -263,7 +323,8 @@ bool box_audio_play(
     box_audio_module_t *state = box_audio_module_get(world);
     bool result = false;
     if (!state || !sound || !ecs_is_alive(world, sound) ||
-        (!ecs_has(world, sound, AudioPcm) && !ecs_has(world, sound, SoundFile)))
+        (!ecs_has(world, sound, AudioPcm) && !ecs_has(world, sound, SoundFile) &&
+        !ecs_has(world, sound, SynthSound)))
     {
         goto done;
     }
@@ -511,6 +572,7 @@ static void box_audio_module_free(
     ecs_vec_fini_t(NULL, &state->plays, box_audio_play_t);
     ecs_vec_fini_t(NULL, &state->stops, uint32_t);
     ecs_vec_fini_t(NULL, &state->releases, uint32_t);
+    box_audio_music_fini(state);
     ecs_vec_fini_t(NULL, &state->moved, ecs_entity_t);
     box_audio_sample_fini(state);
     ecs_os_free(state->capture.path);
@@ -581,11 +643,25 @@ void BoxAudioImport(
     box_owned_hooks(world, SoundStatus, BOX_OWNED_STR(SoundStatus, error));
     ECS_META_COMPONENT(world, AudioSource);
     ecs_set_hooks(world, AudioSource, { .ctor = box_audio_source_ctor });
+    ECS_META_COMPONENT(world, AudioStream);
+    box_owned_hooks(world, AudioStream, BOX_OWNED_STR(AudioStream, path));
+    ecs_set_hooks(world, AudioStream, { .ctor = box_audio_stream_ctor });
+    ECS_META_COMPONENT(world, AudioStreamState);
+    ECS_META_COMPONENT(world, AudioStreamStatus);
+    box_owned_hooks(world, AudioStreamStatus, BOX_OWNED_STR(AudioStreamStatus, error));
     ECS_TAG_DEFINE(world, AudioListener);
     ECS_META_COMPONENT(world, AudioSpatial);
     ecs_set_hooks(world, AudioSpatial, { .ctor = box_audio_spatial_ctor });
     ECS_META_COMPONENT(world, Reverb);
     ecs_set_hooks(world, Reverb, { .ctor = box_audio_reverb_ctor });
+    ECS_META_COMPONENT(world, SynthWave);
+    ECS_META_COMPONENT(world, SynthFilterKind);
+    ECS_META_COMPONENT(world, SynthOscillator);
+    ecs_set_hooks(world, SynthOscillator, { .ctor = box_audio_synth_oscillator_ctor });
+    ECS_META_COMPONENT(world, SynthEnvelope);
+    ECS_META_COMPONENT(world, SynthFilter);
+    ecs_set_hooks(world, SynthFilter, { .ctor = box_audio_synth_filter_ctor });
+    ECS_META_COMPONENT(world, SynthSound);
     ECS_META_COMPONENT(world, AudioSettings);
     ecs_set_hooks(world, AudioSettings, { .ctor = box_audio_settings_ctor });
     ECS_META_COMPONENT(world, AudioStatus);
@@ -595,16 +671,23 @@ void BoxAudioImport(
     ECS_COMPONENT_DEFINE(world, AudioVoice);
     ECS_COMPONENT_DEFINE(world, AudioReverbState);
     ECS_COMPONENT_DEFINE(world, AudioSample);
+    ECS_COMPONENT_DEFINE(world, AudioMusic);
+    ECS_COMPONENT_DEFINE(world, AudioSynth);
     ecs_set_hooks(world, AudioSoundId, { .copy = box_audio_track_copy });
+    ecs_set_hooks(world, AudioSynth, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioBusState, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioVoice, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioReverbState, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioSample, { .copy = box_audio_track_copy });
+    ecs_set_hooks(world, AudioMusic, { .copy = box_audio_track_copy });
     ecs_add_pair(world, ecs_id(AudioPcm), EcsWith, ecs_id(AudioSoundId));
     ecs_add_pair(world, ecs_id(AudioBus), EcsWith, ecs_id(AudioBusState));
     ecs_add_pair(world, ecs_id(AudioSource), EcsWith, ecs_id(AudioVoice));
     ecs_add_pair(world, ecs_id(Reverb), EcsWith, ecs_id(AudioReverbState));
     ecs_add_pair(world, ecs_id(SoundFile), EcsWith, ecs_id(AudioSample));
+    ecs_add_pair(world, ecs_id(AudioStream), EcsWith, ecs_id(AudioMusic));
+    ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSoundId));
+    ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSynth));
 
     ecs_entity(world, { .name = "master" });
     ecs_singleton_add(world, AudioSettings);
@@ -624,5 +707,7 @@ void BoxAudioImport(
 
     box_audio_sync_init(world, state);
     box_audio_sample_init(world, state);
+    box_audio_music_init(world, state);
+    box_audio_synth_init(world);
     box_audio_functions_init(world);
 }

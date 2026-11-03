@@ -191,12 +191,17 @@ ECS_ENUM(SurfaceRegion, {
 /** Kind of a path segment */
 ECS_ENUM(PathSegmentKind, {
     PathLine,       /**< Straight line to the end, the control points are ignored */
-    PathCubicBezier /**< Cubic Bezier curve to the end through control1 and control2 */
+    PathCubicBezier, /**< Cubic Bezier curve to the end through control1 and control2 */
+    PathCatmullRom   /**< Uniform Catmull-Rom curve to the end, the control points are ignored.
+                      *   Its tangents come from the anchors of the adjacent segments, whatever
+                      *   their kind: the endpoint itself at the ends of an open path, wrapping
+                      *   around a closed one. Resolves to the cubic Bezier with
+                      *   c1 = p1 + (p2 - p0) / 6 and c2 = p2 - (p3 - p1) / 6. */
 });
 
 /** Segment of a Path2D that continues from the end of the previous segment */
 ECS_STRUCT(PathSegment2D, {
-    PathSegmentKind kind; /**< Line or cubic Bezier */
+    PathSegmentKind kind; /**< Line, cubic Bezier or Catmull-Rom */
     vec2 end;             /**< End point */
     vec2 control1;        /**< First control point of a cubic Bezier */
     vec2 control2;        /**< Second control point of a cubic Bezier */
@@ -204,7 +209,7 @@ ECS_STRUCT(PathSegment2D, {
 
 /** Segment of a Path3D that continues from the end of the previous segment */
 ECS_STRUCT(PathSegment3D, {
-    PathSegmentKind kind; /**< Line or cubic Bezier */
+    PathSegmentKind kind; /**< Line, cubic Bezier or Catmull-Rom */
     vec3 end;             /**< End point */
     vec3 control1;        /**< First control point of a cubic Bezier */
     vec3 control2;        /**< Second control point of a cubic Bezier */
@@ -213,7 +218,9 @@ ECS_STRUCT(PathSegment3D, {
 /** 2D path asset of a profile, contour or lathe, inherited by instances.
  *
  * A path needs at least one segment and finite points. A closed path whose last segment does
- * not end at the start gets a line back to it. Profiles sample a cubic segment in 16 steps.
+ * not end at the start gets a segment back to it: Catmull-Rom when the last segment is
+ * Catmull-Rom, so that a closed Catmull-Rom path is smooth all the way round, otherwise a line.
+ * Profiles sample a cubic Bezier or Catmull-Rom segment in 16 steps.
  */
 ECS_STRUCT(Path2D, {
     vec2 start;                     /**< Start point */
@@ -224,7 +231,9 @@ ECS_STRUCT(Path2D, {
 /** 3D path asset that a Sweep follows, inherited by instances.
  *
  * A path needs at least one segment and finite points. A closed path whose last segment does
- * not end at the start gets a line back to it.
+ * not end at the start gets a segment back to it: Catmull-Rom when the last segment is
+ * Catmull-Rom, otherwise a line. Every segment resolves to a cubic Bezier, so a Sweep evaluates
+ * all kinds alike.
  */
 ECS_STRUCT(Path3D, {
     vec3 start;                     /**< Start point */

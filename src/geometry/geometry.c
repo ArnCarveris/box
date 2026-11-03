@@ -392,7 +392,8 @@ void BoxGeometryImport(
     ECS_META_COMPONENT(world, SurfaceRegion);
     ECS_COMPONENT_DEFINE(world, PathSegmentKind);
     ecs_enum(world, {.entity = ecs_id(PathSegmentKind), .constants = {
-        {.name = "Line", .value = PathLine}, {.name = "CubicBezier", .value = PathCubicBezier}}});
+        {.name = "Line", .value = PathLine}, {.name = "CubicBezier", .value = PathCubicBezier},
+        {.name = "CatmullRom", .value = PathCatmullRom}}});
     ECS_META_COMPONENT(world, PathSegment2D);
     ECS_META_COMPONENT(world, PathSegment3D);
     ECS_META_COMPONENT(world, Path2D);

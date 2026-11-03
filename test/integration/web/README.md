@@ -161,6 +161,18 @@ node test/integration/web/audio_reverb.mjs \
     "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
 ```
 
+`audio_synth.mjs` checks synth sounds with `test/integration/web/audio_synth.flecs`. After a
+trusted click it records `audio capture 2` while a `script_write` plays the prefab `Beep` (a
+660 Hz sine at 0.5 with an envelope of 0.36 s) with `box.audio.play`, and measures its
+frequency, its level and its length at the rate of the context. It then starts 64 looping voices
+of `Hum` (a saw, a square and noise into a filter sweep) and prints the load of the worklet over
+2000 quanta, which has to stay under real time:
+
+```sh
+node test/integration/web/audio_synth.mjs \
+    "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
+```
+
 `audio_sample.mjs` checks sound files (`SoundFile`, see `docs/audio.md`) in Chrome. It preloads
 `test/integration/web/audio_sample.flecs` and the WAV and FLAC files of `test/assets/audio` with
 `?preload=`; the scene decodes one second of 440 Hz at 44100 Hz. After a trusted click it
@@ -172,5 +184,23 @@ expects the worklet to drop the voice and free the sound:
 
 ```sh
 node test/integration/web/audio_sample.mjs \
+    "$(tools/integration.py local-env --env audio)/wasm32-Emscripten/debug/bin"
+```
+
+`audio_stream.mjs` checks music streams (`AudioStream`, see `docs/audio.md`) in Chrome with
+`test/integration/web/audio_stream.flecs`, whose stream plays `test/assets/audio/tone.ogg`, 480 Hz
+at a peak of 0.5 in a loop of 0.25 s. The server serves the Ogg files by their path and the page
+preloads only the scene and `tone_960.ogg`, so the stream fetches `tone.ogg` next to the page.
+After a trusted click it records two seconds (`audio capture 2`), which have to hold 480 Hz at 0.5
+without a step larger than the sine's over the eight loop crossings and without a gap. It prints
+`AudioStreamStatus.decode_ms`, the decode cost of a frame, and the longest animation frame, then
+expects at least 1.5 s buffered in the worklet and no underrun, in the status and in the worklet,
+after a 500 ms stall of the main thread. The file has to be fetched once and not be in the file
+system of the page. A stream of a file served at no path has to fail with one error while the page
+keeps drawing, and a stream of the preloaded `tone_960.ogg` has to play 960 Hz at 0.25 from the
+page's file system without a new request:
+
+```sh
+node test/integration/web/audio_stream.mjs \
     "$(tools/integration.py local-env --env audio)/wasm32-Emscripten/debug/bin"
 ```

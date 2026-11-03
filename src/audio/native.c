@@ -73,7 +73,8 @@ typedef enum box_audio_msg_kind_t {
     BOX_AUDIO_MSG_COMMANDS = 1,  /**< A batch of commands of the core */
     BOX_AUDIO_MSG_SOUND = 2,     /**< A box_audio_msg_sound_t */
     BOX_AUDIO_MSG_CAPTURE = 3,   /**< A box_audio_capture_t to record into */
-    BOX_AUDIO_MSG_REVERB = 4     /**< A box_audio_msg_reverb_t */
+    BOX_AUDIO_MSG_REVERB = 4,    /**< A box_audio_msg_reverb_t */
+    BOX_AUDIO_MSG_CHUNK = 5      /**< A box_audio_msg_chunk_t */
 } box_audio_msg_kind_t;
 
 /** Header of a message of the command ring, followed by size bytes */
@@ -91,6 +92,23 @@ typedef struct box_audio_msg_sound_t {
     float sample_rate;   /**< Frames per second of the sound */
 } box_audio_msg_sound_t;
 
+/** A chunk of a stream handed to the audio thread; the frames stay with the main thread */
+typedef struct box_audio_msg_chunk_t {
+    const float *data;   /**< Frames, interleaved when stereo */
+    uint32_t stream;     /**< Index of the stream */
+    int32_t frames;      /**< Number of frames */
+    int32_t last;        /**< 1 when the stream ends with it */
+} box_audio_msg_chunk_t;
+
+/** The status of a stream as the audio thread publishes it after each render. head packs the
+ * voice, open and the consumed count into one word, so the main thread frees chunks by a
+ * consistent view; the other fields only inform */
+typedef struct box_audio_native_stream_t {
+    atomic_uint_least64_t head;  /**< voice << 32 | open << 31 | ended << 30 | consumed */
+    atomic_int at;               /**< Frames read of the oldest chunk not consumed */
+    atomic_int underruns;        /**< Underruns since the stream opened */
+    atomic_int starved;          /**< 1 while it plays silence */
+} box_audio_native_stream_t;
 /** The delay memory of a reverb slot handed to the audio thread; it stays with the main
  * thread */
 typedef struct box_audio_msg_reverb_t {
@@ -123,6 +141,7 @@ typedef struct box_audio_native_t {
     atomic_int captured;            /**< Set by the audio thread when the capture is complete */
     atomic_int voices;              /**< Voices of the core after the last render */
     atomic_uint load;               /**< Bits of the smoothed load of the renders, a float */
+    box_audio_native_stream_t streams[BOX_AUDIO_STREAM_MAX]; /**< Status of the streams */
     float load_audio;               /**< The smoothed load, audio thread */
     uint8_t message[BOX_AUDIO_TRANSPORT_CHUNK];   /**< A message the audio thread took */
     float left[BOX_AUDIO_TRANSPORT_FRAMES];       /**< Rendered left channel */
@@ -154,6 +173,11 @@ static void box_audio_native_receive(
 
         if (msg.kind == BOX_AUDIO_MSG_COMMANDS) {
             box_audio_core_apply(n->core, n->message, (int32_t)msg.size);
+        } else if (msg.kind == BOX_AUDIO_MSG_CHUNK && msg.size == sizeof(box_audio_msg_chunk_t)) {
+            box_audio_msg_chunk_t chunk;
+            memcpy(&chunk, n->message, sizeof(chunk));
+            box_audio_core_stream_chunk(n->core, chunk.stream, chunk.data, chunk.frames,
+                chunk.last != 0);
         } else if (msg.kind == BOX_AUDIO_MSG_CAPTURE && msg.size == sizeof(box_audio_capture_t)) {
             memcpy(&n->capture, n->message, sizeof(n->capture));
         } else if (msg.kind == BOX_AUDIO_MSG_REVERB && msg.size == sizeof(box_audio_msg_reverb_t)) {
@@ -239,6 +263,17 @@ static void box_audio_native_process(
     memcpy(&bits, &n->load_audio, sizeof(bits));
     atomic_store(&n->load, bits);
     atomic_store(&n->voices, box_audio_core_voice_count(n->core));
+    for (i = 0; i < BOX_AUDIO_STREAM_MAX; i ++) {
+        box_audio_stream_status_t status;
+        box_audio_native_stream_t *ns = &n->streams[i];
+        box_audio_core_stream_status(n->core, i, &status);
+        atomic_store(&ns->at, status.at);
+        atomic_store(&ns->underruns, status.underruns);
+        atomic_store(&ns->starved, status.starved);
+        atomic_store(&ns->head, ((uint64_t)status.voice << 32) |
+            ((uint64_t)(status.open ? 1 : 0) << 31) | ((uint64_t)(status.ended ? 1 : 0) << 30) |
+            (uint64_t)(status.consumed & 0x3FFFFFFFu));
+    }
 }
 
 /** The device callback, on the audio thread.
@@ -516,6 +551,46 @@ done:
     return result;
 }
 
+/** Copy a chunk of a stream and hand the copy to the audio thread; it stays with the main
+ * thread until the status of the stream says the core is done with it.
+ *
+ * @param t The transport
+ * @param stream Index of the stream
+ * @param voice Voice that reads the stream
+ * @param data Frames, interleaved when stereo
+ * @param frames Number of frames
+ * @param channels 1 or 2
+ * @param last Whether the stream ends with it
+ * @return Whether the chunk was kept
+ */
+static bool box_audio_native_stream_chunk(
+    box_audio_transport_t *t,
+    uint32_t stream,
+    uint32_t voice,
+    const float *data,
+    int32_t frames,
+    int32_t channels,
+    bool last)
+{
+    box_audio_native_t *n = (box_audio_native_t*)t;
+    float *copy = box_audio_host_chunk(&n->host, stream, voice, data, frames * channels);
+    bool result = false;
+    if (!copy) {
+        goto done;
+    }
+
+    box_audio_msg_chunk_t chunk = { copy, stream, frames, last ? 1 : 0 };
+    result = box_audio_native_queue(n, BOX_AUDIO_MSG_CHUNK, &chunk, (int32_t)sizeof(chunk));
+    if (!result) {
+        box_audio_host_chunk_drop(&n->host, stream);
+        goto done;
+    }
+
+    box_audio_native_flush(n);
+done:
+    return result;
+}
+
 /** Allocate the delay memory of a reverb slot and hand it to the audio thread; it stays with
  * the main thread, which frees it after the core.
  *
@@ -546,6 +621,40 @@ static bool box_audio_native_reverb(
     box_audio_native_flush(n);
 done:
     return result;
+}
+
+/** Read the status of a stream the audio thread published and free the chunks it is done
+ * with.
+ *
+ * @param t The transport
+ * @param stream Index of the stream
+ * @param status Receives the status
+ */
+static void box_audio_native_stream_status(
+    box_audio_transport_t *t,
+    uint32_t stream,
+    box_audio_stream_status_t *status)
+{
+    box_audio_native_t *n = (box_audio_native_t*)t;
+    box_audio_native_stream_t *ns;
+    uint64_t head;
+    *status = (box_audio_stream_status_t){0};
+    if (stream >= BOX_AUDIO_STREAM_MAX) {
+        goto done;
+    }
+
+    ns = &n->streams[stream];
+    head = atomic_load(&ns->head);
+    status->voice = (uint32_t)(head >> 32);
+    status->open = (int32_t)((head >> 31) & 1);
+    status->ended = (int32_t)((head >> 30) & 1);
+    status->consumed = (uint32_t)(head & 0x3FFFFFFFu);
+    status->at = atomic_load(&ns->at);
+    status->underruns = atomic_load(&ns->underruns);
+    status->starved = atomic_load(&ns->starved);
+    box_audio_host_stream_sync(&n->host, stream, status);
+done:
+    return;
 }
 
 /** Take the events of the audio thread.
@@ -644,6 +753,7 @@ static void box_audio_native_stats(
     uint32_t bits = atomic_load(&n->load);
     memcpy(&stats->load, &bits, sizeof(bits));
     stats->voices = atomic_load(&n->voices);
+    stats->chunks = n->host.chunks;
 }
 
 /** Hand the audio thread a buffer to record its next frames into; it stays with the main
@@ -749,6 +859,13 @@ box_audio_transport_t* box_audio_transport_native_new(
     atomic_init(&n->captured, 0);
     atomic_init(&n->voices, 0);
     atomic_init(&n->load, 0);
+    for (int32_t i = 0; i < BOX_AUDIO_STREAM_MAX; i ++) {
+        atomic_init(&n->streams[i].head, 0);
+        atomic_init(&n->streams[i].at, 0);
+        atomic_init(&n->streams[i].underruns, 0);
+        atomic_init(&n->streams[i].starved, 0);
+    }
+
     if (box_audio_host_init(&n->host) ||
         box_audio_ring_init(&n->commands, BOX_AUDIO_TRANSPORT_COMMAND_RING) ||
         box_audio_ring_init(&n->events,
@@ -776,6 +893,8 @@ box_audio_transport_t* box_audio_transport_native_new(
         .sample_rate = box_audio_core_sample_rate(n->core),
         .commands = box_audio_native_commands,
         .sound = box_audio_native_sound,
+        .stream_chunk = box_audio_native_stream_chunk,
+        .stream_status = box_audio_native_stream_status,
         .reverb = box_audio_native_reverb,
         .read_events = box_audio_native_read_events,
         .state = box_audio_native_state,

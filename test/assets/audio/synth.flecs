@@ -1,0 +1,22 @@
+// Synth sounds for the Synth suite of test/cpu/audio: the click of docs/audio.md on a ui bus,
+// and a steady tone whose frequency the suite changes between two plays.
+using box.audio
+
+ui {
+  AudioBus: {volume: 1}
+}
+
+prefab UiClick {
+  AudioOutput: {bus: ui}
+  SynthSound: {pitch_variance: 0.05}
+  SynthEnvelope: {attack: 0.001, decay: 0.03}
+  noise { SynthOscillator: {wave: SynthNoise, level: 0.6} }
+  tone { SynthOscillator: {wave: SynthSine, frequency: 1800, frequency_end: 900, sweep: 0.03, level: 0.4} }
+}
+
+// A sine of 440 Hz at 0.5 for 0.2 seconds
+prefab Beep {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.005, sustain: 1, hold: 0.2, release: 0.005}
+  SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.5}
+}
