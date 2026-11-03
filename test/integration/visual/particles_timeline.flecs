@@ -1,7 +1,8 @@
 // A ParticleTimeline that pulses emission, three frames in, so its period of 0.05 s plays once:
-// on the left an emitter whose rate curve peaks in the middle frame and whose speed curve rises
-// over the period and wraps after the third, so each frame spawns a shell of points of its own
-// density and radius, the middle one the densest and the last one slowest; on the right the same
+// on the left an emitter whose rate curve peaks in the middle frame and whose speed curve falls
+// over the period, so each frame spawns a shell of points of its own density and radius: the
+// outer shell of the first frame sparse and inside the right one, the shell of the middle frame
+// the densest and the smallest; the third frame is the dot at the centre. On the right the same
 // emitter without the timeline spawns even shells at full speed.
 using box.transform
 using box.curve
@@ -19,24 +20,24 @@ main_view {
 }
 
 pulse {
-  Position: {-2, 1, 0}
+  Position: {-2.2, 1, 0}
   ParticleEmitter: {
     max: 4000, rate: 60000, shape: EmitterPoint, spread: 180,
-    speed: {20, 20}, lifetime: {1, 1}, size: {0.04, 0.04}, opacity: {1, 1},
+    speed: {40, 40}, lifetime: {1, 1}, size: {0.04, 0.04}, opacity: {1, 1},
     color: {120, 220, 255}, seed: 5
   }
   ParticleTimeline: {
     period: 0.05, loop: true,
     rate: {kind: CurveCatmullRom, keys: [{0, 0.1}, {0.5, 1}, {1, 0.1}]},
-    speed: {keys: [{0, 0.2}, {1, 1}]}
+    speed: {keys: [{0, 1}, {1, 0.4}]}
   }
 }
 
 steady {
-  Position: {2, 1, 0}
+  Position: {2.2, 1, 0}
   ParticleEmitter: {
     max: 4000, rate: 60000, shape: EmitterPoint, spread: 180,
-    speed: {20, 20}, lifetime: {1, 1}, size: {0.04, 0.04}, opacity: {1, 1},
+    speed: {40, 40}, lifetime: {1, 1}, size: {0.04, 0.04}, opacity: {1, 1},
     color: {255, 200, 120}, seed: 5
   }
 }

@@ -19,7 +19,7 @@
 #define DELTA (0.1f)
 
 /** Slots of a replayed pool */
-#define SLOTS (1024)
+#define SLOTS (4096)
 
 /** Create a world that renders into a null backend.
  *
