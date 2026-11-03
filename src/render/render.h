@@ -1718,8 +1718,7 @@ extern ECS_TAG_DECLARE(TransitionMaterial);
  * removes it, which rekeys them to the batch of their target at the end. */
 extern ECS_TAG_DECLARE(TransitionOpacity);
 
-/** Private tag of the drawn entities whose BoxShadow, owned or inherited over IsA, has an active
- * transition in this frame.
+/** Private tag of the drawn entities whose BoxShadow has an active transition in this frame.
  *
  * It keys the slot of their shadow as dynamic_transform and dynamic_material, and keeps it while
  * the target shadow box has no area; the transition extract adds and removes it, which rekeys

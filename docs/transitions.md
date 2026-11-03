@@ -690,15 +690,15 @@ card { BoxShadow: {offset_y: -12, blur: 24, spread: 2, color: {0, 0, 0, 160}} }
   encoding, as `Rgb` does. It sets `BOX_RENDER_TRANSITION_FIELDS` to 8; `BOX_RENDER_TRANSITION_VALUE`
   stays 20, so the size of a record and of a value of a node do not change, and
   `BOX_RENDER_TRANSITION_COMPONENTS` is 16, the bits of `box_draw_transition_material_t.present`.
-  The value belongs to the entity that owns it: a prefab whose `BoxShadow` transitions animates
-  the shadow of every `IsA` instance that inherits it.
+  `BoxShadow` is copied into an `IsA` instance (`(OnInstantiate, Override)`), so every instance
+  owns its value: an instance of a prefab that declares the transition is a node of its own and
+  lifts alone when its copy changes.
 - **Tag and batches.** A node *lifts* in a frame when its `BoxShadow` is active at the packet
-  time. Before the batches are sent, the extract walks the entity of each such node and its `IsA`
-  instances that inherit the value (a table that owns a `BoxShadow` of its own is skipped) and
-  gives every drawn one the private tag `TransitionBoxShadow` (`(OnInstantiate,
-  DontInherit)`). `box_draws_box_shadow_update` keys the shadow slot of a tagged entity as
-  `dynamic_transform` and `dynamic_material`, so both its streams upload every frame and have
-  one byte location to patch; the slot of the shape keeps its key. `DrawsOnTransitionBoxShadow`
+  time. Before the batches are sent, the extract gives the entity of each such node that draws a
+  shadow the private tag `TransitionBoxShadow` (`(OnInstantiate, DontInherit)`).
+  `box_draws_box_shadow_update` keys the shadow slot of a tagged entity as `dynamic_transform`
+  and `dynamic_material`, so both its streams upload every frame and have one byte location to
+  patch; the slot of the shape keeps its key. `DrawsOnTransitionBoxShadow`
   rekeys the shadow when the tag is added or removed, and the frame after the last active frame
   puts it back in its static batch with its target, byte for byte.
 - **Records.** The shadow box (`box_shadow_resolve`: size, sigma, corner radius, offset) shapes

@@ -1717,7 +1717,7 @@ bool box_draws_box_shadow_target(
 
 /** Get the target of the box shadow record of an entity whose BoxShadow transitions: the
  * target material of box_draws_box_shadow_target with the resolved Rect in shape2d, the
- * BoxShadow (owned or inherited), the mesh scale and the world matrix of its shape.
+ * BoxShadow, the mesh scale and the world matrix of its shape.
  *
  * No node is set, rel is the identity and transform 0.
  *

@@ -457,14 +457,80 @@ void TransitionBoxShadow_no_transition_snaps(void) {
     test_assert(!ecs_os_memcmp_t(&shading, &expected_shading, box_render_shading_t));
 }
 
+/** Create two IsA instances of a prefab of a shadowed rect, side by side.
+ *
+ * @param world The world
+ * @param transition Whether the prefab declares a BoxShadow transition for its instances
+ * @param out Receives the instances
+ */
+static void tr_shadow_instances(
+    ecs_world_t *world,
+    bool transition,
+    ecs_entity_t *out)
+{
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    int32_t i;
+    ecs_set(world, prefab, Rect, {10, 20});
+    ecs_set(world, prefab, Rgb, {200, 100, 50});
+    ecs_set_ptr(world, prefab, BoxShadow, &tr_shadow_from);
+    if (transition) {
+        tr_shadow_transition(world, prefab, ecs_id(BoxShadow));
+    }
+
+    for (i = 0; i < 2; i ++) {
+        out[i] = ecs_new_w_pair(world, EcsIsA, prefab);
+        ecs_set(world, out[i], Position, {(float)i * 20.0f, 0, 0});
+    }
+}
+
+/** Instances of a prefab that declares the transition for them own a copy of its BoxShadow, so
+ * a change of the copy of one lifts its shadow alone, which halfway through is that of a static
+ * instance at the halfway values.
+ */
+void TransitionBoxShadow_prefab_instance(void) {
+    // ui/box_shadow
+    box_render_null_t *null;
+    box_render_transform_t transform, expected_transform;
+    box_render_shading_t shading, expected_shading;
+    ecs_entity_t e[2];
+    ecs_world_t *world = tr_scene(&null);
+    tr_shadow_instances(world, true, e);
+    tr_frame(world);
+    test_assert(ecs_owns(world, e[0], BoxShadow));
+    ecs_set_ptr(world, e[0], BoxShadow, &tr_shadow_to);
+    tr_frames(world, TR_SHADOW_MID);
+    test_int(tr_records(null, BOX_RENDER_TRANSITION_SHADOW_BOX), 1);
+    test_assert(ecs_has_id(world, e[0], TransitionBoxShadow));
+    test_assert(!ecs_has_id(world, e[1], TransitionBoxShadow));
+    test_assert(tr_shadow_batch(world, e[0])->key.dynamic_material);
+    test_assert(!tr_shadow_batch(world, e[1])->key.dynamic_material);
+    tr_shadow_rendered(world, null, e[0], &transform, &shading);
+    tr_frames(world, TR_SHADOW_END - TR_SHADOW_MID);
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_SHADOW_BOX), 0);
+    test_assert(!ecs_has_id(world, e[0], TransitionBoxShadow));
+    tr_fini(world, null);
+
+    world = tr_scene(&null);
+    tr_shadow_instances(world, false, e);
+    ecs_set_ptr(world, e[0], BoxShadow, &tr_shadow_mid);
+    tr_frames(world, 2);
+    tr_shadow_rendered(world, null, e[0], &expected_transform, &expected_shading);
+    tr_fini(world, null);
+    tr_shadow_transform_near(&transform, &expected_transform);
+    tr_shadow_shading_near(&shading, &expected_shading);
+}
+
 void TransitionBoxShadow_layout(void) {
     // ui/box_shadow
     const box_render_transition_layout_t *layout =
         box_render_transition_layout(BOX_RENDER_TRANSITION_BOX_SHADOW);
     box_render_transition_component_t c;
+    box_render_null_t *null;
     float lo[4] = {0, 0, 0, 0}, hi[4] = {2, 4, 8, 16};
+    ecs_world_t *world = tr_world(&null);
     test_assert(box_render_transition_component(ecs_id(BoxShadow), &c));
     test_int(c, BOX_RENDER_TRANSITION_BOX_SHADOW);
+    tr_fini(world, null);
     test_int(layout->size, ECS_SIZEOF(BoxShadow));
     test_int(layout->count, 8);
     test_assert(layout->count <= BOX_RENDER_TRANSITION_FIELDS);

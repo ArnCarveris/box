@@ -54,11 +54,10 @@ typedef struct box_transition_fade_rel_t {
     float alpha;                    /**< Product of the opacities */
 } box_transition_fade_rel_t;
 
-/** A drawn entity whose BoxShadow, owned or inherited over IsA, has an active transition in
- * this frame */
+/** A drawn entity whose BoxShadow has an active transition in this frame */
 typedef struct box_transition_box_shadow_t {
     ecs_entity_t entity;            /**< The entity */
-    uint32_t node;                  /**< Node of the owner of the BoxShadow */
+    uint32_t node;                  /**< Node of the entity */
     uint32_t moving;                /**< Node of a transform transition that moves the entity in
                                      *   this frame, 0 for none */
     mat4 rel;                       /**< The target chain from that node down to the entity */

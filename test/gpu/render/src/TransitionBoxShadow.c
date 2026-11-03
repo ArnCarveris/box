@@ -14,6 +14,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include "render.h"
 
@@ -632,8 +633,9 @@ static void tbs_shadow_case(
     tbs_pose_t start = moves ? (tbs_pose_t){-10, 4, 1.0f, 0.0f} : center;
     tbs_pose_t end_pose = moves ? (tbs_pose_t){10, -4, 1.0f, 0.0f} : center;
     float mid_opacity = opacity >= 0 ? (1.0f + opacity) * 0.5f : -1.0f;
-    char *file = flecs_asprintf("tbs_%s.png", name);
-    char *ref = flecs_asprintf("tbs_%s_ref.png", name);
+    char file[64], ref[64];
+    snprintf(file, sizeof(file), "tbs_%s.png", name);
+    snprintf(ref, sizeof(ref), "tbs_%s_ref.png", name);
     ecs_world_t *world = tbs_world();
     ecs_entity_t e = tbs_rect(world, 0, start, false);
     ecs_set_ptr(world, e, BoxShadow, from);
@@ -673,8 +675,6 @@ static void tbs_shadow_case(
     stbi_image_free(end);
     stbi_image_free(at_mid);
     stbi_image_free(at_end);
-    ecs_os_free(file);
-    ecs_os_free(ref);
 }
 
 /** The shadow a card rests with: close under it and sharp */

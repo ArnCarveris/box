@@ -10,49 +10,30 @@
 
 #include "transitions.h"
 
-/** Add the drawn entities that read the BoxShadow of a node with an active BoxShadow
- * transition: the entity and its IsA instances, down every level, but for the tables that own
- * a BoxShadow of their own, which an instance node of its own transitions.
+/** Add the entity of a node with an active BoxShadow transition when it draws a shadow.
  *
- * Transition is inherited over IsA, so this visits only entities with Transition.
+ * BoxShadow is copied into an IsA instance (OnInstantiate, Override), so an entity always draws
+ * its shadow with its own value: an instance that inherits Transition and changes its copy is a
+ * node of its own, and no change of a prefab reaches the instances made before it.
  *
  * @param world The world
  * @param s The state of the extract
  * @param e The entity of the node
  * @param node Its node id
  */
-static void box_transition_box_shadow_walk(
+static void box_transition_box_shadow_add(
     const ecs_world_t *world,
     box_render_transitions_t *s,
     ecs_entity_t e,
     uint32_t node)
 {
-    int32_t i;
-    ecs_vec_clear(&s->instances);
-    *ecs_vec_append_t(NULL, &s->instances, ecs_entity_t) = e;
-    while (ecs_vec_count(&s->instances)) {
-        ecs_entity_t cur = *ecs_vec_last_t(&s->instances, ecs_entity_t);
-        ecs_vec_remove_last(&s->instances);
-        if (!ecs_has_id(world, cur, EcsPrefab) && ecs_has(world, cur, DrawSlot) &&
-            ecs_has(world, cur, BoxShadowSlot) && !ecs_map_get(&s->box_shadow_index, cur))
-        {
-            *ecs_vec_append_t(NULL, &s->box_shadows, box_transition_box_shadow_t) =
-                (box_transition_box_shadow_t){ .entity = cur, .node = node };
-            ecs_map_insert(&s->box_shadow_index, cur,
-                (ecs_map_val_t)ecs_vec_count(&s->box_shadows));
-            box_transitions_keep(s, &s->tagged_box_shadow, cur);
-        }
-
-        ecs_iter_t it = ecs_each_id(world, ecs_pair(EcsIsA, cur));
-        while (ecs_each_next(&it)) {
-            if (ecs_table_has_id(world, it.table, ecs_id(BoxShadow))) {
-                continue;
-            }
-
-            for (i = 0; i < it.count; i ++) {
-                *ecs_vec_append_t(NULL, &s->instances, ecs_entity_t) = it.entities[i];
-            }
-        }
+    if (!ecs_has_id(world, e, EcsPrefab) && ecs_has(world, e, DrawSlot) &&
+        ecs_has(world, e, BoxShadowSlot))
+    {
+        *ecs_vec_append_t(NULL, &s->box_shadows, box_transition_box_shadow_t) =
+            (box_transition_box_shadow_t){ .entity = e, .node = node };
+        ecs_map_insert(&s->box_shadow_index, e, (ecs_map_val_t)ecs_vec_count(&s->box_shadows));
+        box_transitions_keep(s, &s->tagged_box_shadow, e);
     }
 }
 
@@ -75,7 +56,7 @@ void box_transitions_box_shadows(
                 s, (uint32_t)i, BOX_RENDER_TRANSITION_BOX_SHADOW, p->time) &&
             ecs_is_alive(world, node->entity))
         {
-            box_transition_box_shadow_walk(world, s, node->entity, (uint32_t)i);
+            box_transition_box_shadow_add(world, s, node->entity, (uint32_t)i);
         }
     }
 

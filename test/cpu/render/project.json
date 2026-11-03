@@ -535,6 +535,7 @@
                     "removed_mid_transition",
                     "no_area",
                     "no_transition_snaps",
+                    "prefab_instance",
                     "layout"
                 ]
             },
