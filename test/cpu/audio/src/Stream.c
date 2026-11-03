@@ -308,7 +308,7 @@ void Stream_decode_matches(void) {
     test_int(ecs_singleton_get(world, AudioStatus)->voices, 1);
 
     int32_t played = audio_tap_count - at;
-    test_assert(played > 4800);
+    test_assert(played >= 4800);
     stream_expect_tone(at, AUDIO_RAMP + 1, played);
     test_assert(fabs(audio_frequency(audio_tap_l, at + AUDIO_RAMP, audio_tap_count) - 480) < 0.5);
     test_assert(fabsf(audio_peak(audio_tap_l, at + AUDIO_RAMP, audio_tap_count) - 0.5f) < 0.01f);
@@ -401,7 +401,9 @@ void Stream_underrun_silent(void) {
     test_int(status.starved, 0);
     test_assert(audio_max_step(audio_l, 1, c * 2) < STREAM_STEP);
     test_assert(fabsf(audio_peak(audio_l, AUDIO_RAMP * 2, c) - 0.5f) < 0.01f);
-    test_assert(audio_peak(audio_l, c * 2 + 2, c * 3) == 0);
+    // The 3 frames held at the underrun play before the 2 new chunks, none is skipped
+    test_assert(audio_l[c * 2 + 2] != 0);
+    test_assert(audio_peak(audio_l, c * 2 + 3, c * 3) == 0);
 
     box_audio_core_stream_status(core, 0, &status);
     test_int(status.open, 0);

@@ -12,7 +12,7 @@ build box, so this script is a small one of its own, enough for a known tone:
 - residue 1 in partitions of 16 bins with two classes, silent or coded, and a codebook of
   4096 entries of 12 bits that holds the integers -2048..2047;
 - the forward MDCT that the inverse MDCT of the decoders inverts, so the quantizer is the only
-  loss: a sample is within about 1e-3 of the tone.
+  loss: a sample is within about 2.5e-3 of the tone.
 
 The granule positions are exact: packet k ends at sample k * 128 and the last page ends at the
 length of the tone, so a decoder returns exactly the frames of the tone and a loop of a tone of
@@ -190,7 +190,7 @@ def floor_level(y):
 
 def spectra(signal):
     """The MDCT of every block: block k covers the frames (k - 1) * HALF .. (k + 1) * HALF, so
-    the decoder returns frames from 0 on. Scaled by 2 / BLOCK, which the inverse of the
+    the decoder returns frames from 0 on. Scaled by 4 / BLOCK, which the inverse of the
     decoders, without a factor, undoes."""
     w = window()
     blocks = (len(signal) + HALF - 1) // HALF + 1
@@ -201,7 +201,7 @@ def spectra(signal):
         start = (b - 1) * HALF
         frame = [w[i] * (signal[start + i] if 0 <= start + i < len(signal) else 0.0)
                  for i in range(BLOCK)]
-        result.append([2.0 / BLOCK * sum(a * c for a, c in zip(frame, row)) for row in basis])
+        result.append([4.0 / BLOCK * sum(a * c for a, c in zip(frame, row)) for row in basis])
     return result
 
 
