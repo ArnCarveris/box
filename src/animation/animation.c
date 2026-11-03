@@ -415,7 +415,7 @@ static void BoxAnimationTrackResolve(
             ecs_os_free(reason);
         }
 
-        ecs_set_ptr(it->world, it->entities[i], AnimationTrackState, &state);
+        ecs_set_ptr(it->stage, it->entities[i], AnimationTrackState, &state);
     }
 }
 
@@ -428,7 +428,7 @@ static void BoxAnimationTrackRemove(
 {
     int32_t i;
     for (i = 0; i < it->count; i ++) {
-        ecs_remove(it->world, it->entities[i], AnimationTrackState);
+        ecs_remove(it->stage, it->entities[i], AnimationTrackState);
     }
 }
 
