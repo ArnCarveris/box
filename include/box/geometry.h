@@ -478,9 +478,10 @@ ECS_STRUCT(Border, {
  * grown by the spread on each side with its corner radius; a negative spread shrinks it, down to
  * nothing. As in CSS the edge is a Gaussian of a standard deviation of half the blur.
  *
- * The alpha is that of the color times the opacity of the entity. It follows the outline of a Rect
- * or Circle, not the alpha of an Image, and draws nothing on a Line or Text. Picking and layout
- * ignore it.
+ * The alpha is that of the color times the opacity of the entity. As in CSS it is not drawn under
+ * the Rect or Circle, so it does not show through a translucent one. It follows the outline of a
+ * Rect or Circle, not the alpha of an Image, and draws nothing on a Line or Text. Picking and
+ * layout ignore it.
  */
 ECS_STRUCT(BoxShadow, {
     float offset_x; /**< Horizontal offset of the shadow */

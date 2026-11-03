@@ -5,7 +5,14 @@ using box.camera
 using box.view
 
 // Soft shadows (BoxShadow) of cards with different offsets, blurs, spreads, radii and colors, over a
-// light and a dark panel in a screen space UI (top) and on a turned world space panel (bottom).
+// light and a dark panel in a screen space UI (top) and on a turned world space panel (middle).
+// Bottom left, translucent cards over a checker: the shadow is not drawn under them, so the checker
+// shows through them unshadowed and with no seam along their rounded edges. Bottom right, wide
+// faint shadows on a light and a dark panel, which must not band.
+
+checker {
+  TexturePath: {path: "test/integration/visual/assets/checker.png"}
+}
 
 world_camera {
   Position: {0, 0, 4}
@@ -137,6 +144,76 @@ hud {
     cards {
       Position: {0, 0, 1}
       Cards: {a: 200, strong: 230, fill_r: 70, fill_g: 76, fill_b: 96}
+    }
+  }
+
+  patterned {
+    Position: {-185, -135, 0}
+    Rect: {250, 76}
+    Image: {texture: checker}
+    Border: {radius: 8}
+    ClipChildren
+
+    glass {
+      Position: {-80, 0, 1}
+      Rect: {64, 44}
+      Rgb: {255, 255, 255}
+      Opacity: {0.5}
+      Border: {radius: 12}
+      BoxShadow: {offset_x: 8, offset_y: -8, blur: 6, color: {0, 0, 0, 200}}
+    }
+
+    tinted {
+      Position: {0, 0, 1}
+      Rect: {64, 44}
+      Rgb: {40, 90, 220}
+      Opacity: {0.35}
+      Border: {width: 3, radius: 22, color: {240, 240, 250, 255}}
+      BoxShadow: {blur: 16, spread: 2, color: {0, 0, 0, 230}}
+    }
+
+    ring {
+      Position: {80, 0, 1}
+      Circle: {24}
+      Rgb: {230, 80, 70}
+      Opacity: {0.6}
+      BoxShadow: {offset_x: -6, offset_y: 6, color: {20, 20, 30, 255}}
+    }
+  }
+
+  faint {
+    Position: {185, -135, 0}
+
+    light {
+      Position: {-64, 0, 0}
+      Rect: {124, 76}
+      Rgb: {236, 238, 242}
+      Border: {radius: 8}
+      ClipChildren
+
+      card {
+        Position: {0, 0, 1}
+        Rect: {44, 24}
+        Rgb: {255, 255, 255}
+        Border: {radius: 6}
+        BoxShadow: {offset_y: -6, blur: 48, spread: 4, color: {0, 0, 0, 40}}
+      }
+    }
+
+    dark {
+      Position: {64, 0, 0}
+      Rect: {124, 76}
+      Rgb: {24, 26, 34}
+      Border: {radius: 8}
+      ClipChildren
+
+      card {
+        Position: {0, 0, 1}
+        Rect: {44, 24}
+        Rgb: {70, 76, 96}
+        Border: {radius: 6}
+        BoxShadow: {offset_y: -6, blur: 48, spread: 4, color: {120, 140, 255, 40}}
+      }
     }
   }
 }
