@@ -5,12 +5,19 @@ Every case runs in a fresh headless apps/boxrun process with test/assets/audio/t
 from the repository root): a looping 440 Hz tone at a peak of 0.25 on the bus music. Headless
 runs open no device and render with the null transport at 48000 Hz, which is not an error: the
 runner fails a case on any logged error.
+
+test_all_features starts two more processes of its own with test/assets/audio/all_features.flecs,
+the scene that uses every part of box.audio, which captures its first 3 seconds at load: both
+channels have their levels, the reverb tail rings after a click, and the two runs write bit
+identical captures.
 """
 import io
 import math
+import os
 import struct
 import wave
 
+import box_client
 from box_client import parse_value
 
 APP = "apps/boxrun"
@@ -110,3 +117,102 @@ def test_no_device_no_error(app):
     app.check("box.audio" not in out, "the app logged %s without a device" % out)
     app.check(math.isfinite(float(app.exec("get $ box.audio.AudioStatus.load"))),
               "AudioStatus.load is not a number")
+
+
+ALL_FEATURES = ["test/assets/audio/all_features.flecs"]
+ALL_FEATURES_WAV = "/tmp/box_audio_all_features.wav"
+ALL_FEATURES_SECONDS = 3.0
+
+
+def all_features_run(app, run, frames=900):
+    """Run all_features.flecs in a process of its own until it wrote its capture: the bytes of
+    the WAV and the output of the audio command."""
+    if os.path.exists(ALL_FEATURES_WAV):
+        os.unlink(ALL_FEATURES_WAV)
+    other = box_client.App(app.binary, ALL_FEATURES, log=app.log, timeout=app.timeout,
+                           out=app.out, prefix="%s.run%d" % (app.prefix, run))
+    other.start()
+    try:
+        start = None
+        while not os.path.isfile(ALL_FEATURES_WAV):
+            frame = other.frame()
+            start = frame if start is None else start
+            if frame - start > frames:
+                other.fail("%s was not written within %d frames" % (ALL_FEATURES_WAV, frames))
+        status = parse_value(other.exec("audio"))
+        other.expect("logs error", '""')
+        warnings = other.exec("logs warning")
+        other.check("box.audio" not in warnings, "the scene logged %s" % warnings)
+        other.quit()
+    finally:
+        other.kill()
+    with open(ALL_FEATURES_WAV, "rb") as f:
+        data = f.read()
+    os.unlink(ALL_FEATURES_WAV)
+    if app.out:
+        with open("%s/%s.run%d.wav" % (app.out, app.prefix, run), "wb") as f:
+            f.write(data)
+    return data, status
+
+
+def channels_of(app, data):
+    """The left and the right channel of a 16 bit stereo WAV at RATE."""
+    with wave.open(io.BytesIO(data)) as w:
+        app.check(w.getnchannels() == 2 and w.getframerate() == RATE and
+                  w.getsampwidth() == 2, "the capture is %d channels of %d bytes at %d Hz" %
+                  (w.getnchannels(), w.getsampwidth(), w.getframerate()))
+        count = w.getnframes()
+        raw = w.readframes(count)
+    samples = struct.unpack("<%dh" % (count * 2), raw)
+    return [v / 32767.0 for v in samples[0::2]], [v / 32767.0 for v in samples[1::2]]
+
+
+def window(x, start, end):
+    return x[int(start * RATE):int(end * RATE)]
+
+
+def rms(x, start, end):
+    w = window(x, start, end)
+    return math.sqrt(sum(v * v for v in w) / len(w)) if w else 0.0
+
+
+def peak_of(x, start, end):
+    return max((abs(v) for v in window(x, start, end)), default=0.0)
+
+
+def test_all_features(app):
+    first, status = all_features_run(app, 1)
+    for bus in ("room", "world", "ui", "music"):
+        app.check("%s:" % bus in status, "audio does not show the bus %s: %r" % (bus, status))
+    left, right = channels_of(app, first)
+    app.check(len(left) == int(ALL_FEATURES_SECONDS * RATE),
+              "the capture has %d frames" % len(left))
+
+    # Nothing plays before the click at 0.25 s
+    quiet = max(peak_of(left, 0, 0.2), peak_of(right, 0, 0.2))
+    app.check(quiet < 1e-3, "the capture peaks at %.4f before the click" % quiet)
+    click = max(peak_of(left, 0.25, 0.32), peak_of(right, 0.25, 0.32))
+    app.check(click > 0.05, "the click peaks at %.4f" % click)
+
+    # The click ends after 30 ms; what rings on in both channels is the reverb of room, decaying
+    for name, x in (("left", left), ("right", right)):
+        early, late = rms(x, 0.4, 0.6), rms(x, 0.75, 0.95)
+        app.check(early > 3e-4, "no reverb tail on the %s: %.6f after the click" %
+                  (name, early))
+        app.check(late < early, "the tail on the %s does not decay: %.6f, then %.6f" %
+                  (name, early, late))
+
+    # From 1 s the engine on the left, the music in the center and the clicks and the chime
+    for name, x in (("left", left), ("right", right)):
+        level = rms(x, 1.5, 3.0)
+        app.check(level > 0.01, "the %s channel is at %.4f with every source" % (name, level))
+    lr, rr = rms(left, 1.1, 1.45), rms(right, 1.1, 1.45)
+    app.check(lr > rr * 1.1, "the engine at x -4 is not on the left: %.4f left, %.4f right" %
+              (lr, rr))
+    total = max(peak_of(left, 0, 3), peak_of(right, 0, 3))
+    app.check(total < 0.96, "the capture peaks at %.4f, over the limiter" % total)
+
+    second, _ = all_features_run(app, 2)
+    app.check(first == second, "two runs wrote different captures (%d and %d bytes, first "
+              "difference at byte %s)" % (len(first), len(second), next(
+                  (i for i, (a, b) in enumerate(zip(first, second)) if a != b), "none")))

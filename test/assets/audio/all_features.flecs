@@ -1,0 +1,125 @@
+// Every part of box.audio in one small scene, for the all features case of
+// test/integration/e2e/audio.py and the browser check test/integration/web/audio_all_features.mjs.
+// Its assets are in this folder: tone.ogg (480 Hz at a peak of 0.5 in a loop of 0.25 s) and
+// sine_16.wav (1000 Hz at 0.5 for 0.25 s), both written by the scripts next to them.
+//
+// The buses ui, world and music go into the master and world sends to room, the bus with the
+// reverb. The listener is ears, at the origin and looking down -Z, so +X is to its right. The
+// scene captures the first 3 seconds of the master to /tmp/box_audio_all_features.wav at load
+// (in the file system of the page on the web), and plays on a fixed timeline:
+//
+// - 0 to 0.25 s: silence;
+// - 0.25 s: a synth click on world, 30 ms, whose reverb tail rings until well after 1 s;
+// - from 1 s: the engine, a looping synth drone at x -4, so fully on the left, and the music,
+//   tone.ogg streamed on music, centered; a ui click every 0.25 s, a synth sound with a pitch
+//   variance; at 1.5 s and 2.5 s, sine_16.wav played once with play_at at x 3, on the right.
+//
+// A box turns all the time so every frame draws, which the browser check counts.
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.movement
+using box.surface
+using box.audio
+
+window {
+  Surface: {width: 640, height: 480}
+}
+
+camera {
+  Position: {0, 0, 100}
+  Camera: {ortho: true, ortho_scale: 1}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {10, 12, 20, 255}}}
+}
+
+spinner {
+  Position: {0, 0, 0}
+  Rotation: {0, 0, 0}
+  Box: {120, 120, 120}
+  Rgb: {80, 160, 255}
+  AngularVelocity: {0.4, 0.9, 0}
+}
+
+ears {
+  Position: {0, 0, 0}
+  AudioListener
+}
+
+room {
+  AudioBus: {output: master}
+  Reverb: {decay: 1.2, damping: 0.5, predelay: 0.01, size: 0.4}
+}
+world { AudioBus: {output: master, send: room, send_level: 0.5} }
+ui { AudioBus: {output: master, volume: 0.8} }
+music { AudioBus: {output: master, volume: 0.3} }
+
+prefab WorldClick {
+  AudioOutput: {bus: world}
+  SynthSound: {seed: 1}
+  SynthEnvelope: {attack: 0.001, decay: 0.03}
+  noise { SynthOscillator: {wave: SynthNoise, level: 0.6} }
+  tone { SynthOscillator: {wave: SynthSine, frequency: 1800, frequency_end: 900, sweep: 0.03, level: 0.4} }
+}
+
+prefab UiClick {
+  AudioOutput: {bus: ui}
+  SynthSound: {seed: 2, pitch_variance: 0.1, level_variance: 0.1}
+  SynthEnvelope: {attack: 0.0005, decay: 0.02}
+  SynthFilter: {kind: SynthHighPass, cutoff: 800}
+  snap { SynthOscillator: {wave: SynthNoise, level: 0.4} }
+  tick { SynthOscillator: {wave: SynthTriangle, frequency: 2400, frequency_end: 1200, sweep: 0.02, level: 0.4} }
+}
+
+prefab EngineHum {
+  SynthSound: {seed: 3}
+  SynthEnvelope: {attack: 0.05, sustain: 1, hold: 59.9, release: 0.05}
+  SynthFilter: {kind: SynthLowPass, cutoff: 400, resonance: 0.3}
+  base { SynthOscillator: {wave: SynthSaw, frequency: 55, level: 0.5} }
+  rumble { SynthOscillator: {wave: SynthNoise, level: 0.2} }
+}
+
+chime {
+  SoundFile: {path: "test/assets/audio/sine_16.wav"}
+  AudioOutput: {bus: world}
+  AudioSpatial: {min_distance: 1, max_distance: 50, rolloff: 0}
+}
+
+mut loops_on: bool = false
+
+engine {
+  Position: {-4, 0, 0}
+  AudioSource: {sound: EngineHum, loop: true, playing: loops_on}
+  AudioOutput: {bus: world}
+  AudioSpatial: {min_distance: 1, max_distance: 50, rolloff: 0.5}
+}
+
+music_track {
+  AudioStream: {path: "test/assets/audio/tone.ogg", playing: loops_on}
+  AudioOutput: {bus: music}
+}
+
+const captured: bool = box.audio.capture(3, "/tmp/box_audio_all_features.wav")
+
+async {
+  await delay(0.25)
+  const click = box.audio.play(WorldClick, 1.0)
+  await delay(0.75)
+  loops_on = true
+  for i in 0..8 {
+    const tick = box.audio.play(UiClick, 0.8)
+    if i == 2 || i == 6 {
+      const ding = box.audio.play_at(chime, {3, 0, 0}, 0.6)
+    }
+    await delay(0.25)
+  }
+  while true {
+    const tick = box.audio.play(UiClick, 0.8)
+    await delay(0.25)
+  }
+}

@@ -1,13 +1,273 @@
 # Audio
 
-Box renders its sound in the audio core, `src/audio/core`: plain C without flecs, box or
-platform code. The core is a mixer of voices and buses that renders blocks of float samples
-into a left and a right channel. It is driven by a byte stream of commands and reports back
-with events. Rendering does not allocate, lock, log or wait. This page describes the
-[`box.audio` module](#the-boxaudio-module) that apps use, the core, the native output and the
-web, the platform where audio is the hardest to get right.
+This page is the guide to audio in box: how sound is put together, the components a scene uses, a
+worked example, the rules of the web, notes for native apps, the limits of this version and how
+to capture and inspect what an app plays. After the guide comes the [reference](#reference): the
+audio core, the reverb, the synth, the transports, the native and the web outputs and the
+`box.audio` module in detail.
 
-On macOS and Linux the core plays on a miniaudio device, see [Native output](#native-output).
+## The model
+
+A scene makes sound with components, from a script, the REST API or C; nothing needs to be
+written in C to play a sound. The `box.audio` module turns them into commands of the **audio
+core**, a small mixer in plain C that renders on its own thread, once per frame and in one batch
+(see [The box.audio module](#the-boxaudio-module)):
+
+- **Sounds** are what can play: samples in memory (`AudioPcm`), a WAV or FLAC file
+  (`SoundFile`), or a synth patch made in script (`SynthSound`). A sound plays once with
+  `box.audio.play` or `box.audio.play_at`, or for as long as an entity with an `AudioSource`
+  exists. Music is not a sound: an `AudioStream` streams one Ogg Vorbis file.
+- **Voices** play the sounds, 64 at once; a play past that steals the quietest. A voice has a
+  volume, a pan and a pitch, and plays on a bus.
+- **Buses** mix voices and other buses: each has a volume, a pan, a mute, an output and one send
+  with a level. Bus 0 is the master, `box.audio.master` in script; every other bus ends there.
+  A bus with a `Reverb` is a reverb bus, which other buses reach through their send.
+- **Space**: a source with `AudioSpatial` gets its volume and pan every frame from its distance
+  to the listener and its direction, the camera of the main view or the entity with
+  `AudioListener`.
+- **The master** has a limiter that keeps the peak under 0.95, and `AudioSettings` sets its volume
+  and mute.
+
+The core never waits for the main thread: a slow frame delays the next commands, never the
+sound that plays. Everything ramps over 5 ms, so nothing clicks.
+
+## Components
+
+| Component | Use it for |
+|-----------|------------|
+| `AudioBus` | A bus of the mixer: `output`, `volume`, `pan`, `mute`, `send`, `send_level` |
+| `Reverb` | The reverb of a room on the bus of its entity, see [Reverb](#reverb) |
+| `AudioOutput` | The bus a source, a stream or a sound plays on (the master without one) |
+| `AudioPcm` | A sound from samples, from script or C |
+| `SoundFile` | A short sound from a WAV or FLAC file, decoded into memory, see [Sound files](#sound-files) |
+| `SoundStatus` | Read only: whether a `SoundFile` loads, is ready or failed |
+| `SynthSound` | A sound made by the synth from layers of `SynthOscillator`, `SynthEnvelope` and `SynthFilter`, see [Synth sounds](#synth-sounds) |
+| `AudioSource` | A sound that plays while its entity exists, once or in a loop, with a volume and a pitch |
+| `AudioSpatial` | Places a source in the world: `min_distance`, `max_distance`, `rolloff`, see [Spatial audio](#spatial-audio) |
+| `AudioListener` | The entity that hears the spatial sources, the camera without one |
+| `AudioStream` | Music: one Ogg Vorbis file that streams, see [Music](#music) |
+| `AudioStreamStatus` | Read only: the state, position, buffer, underruns and decode time of a stream |
+| `AudioSettings` | Singleton: the master volume and mute |
+| `AudioStatus` | Singleton, read only: the state of the output, its rate, the voices, steals and load |
+
+The functions are `box.audio.play(sound, volume)`, `box.audio.play_at(sound, {x, y, z},
+volume)` and `box.audio.capture(seconds, path)`, the same as `box_audio_play`,
+`box_audio_play_at` and `box_audio_capture` in C. The members and their defaults are in the
+table of [The box.audio module](#the-boxaudio-module).
+
+## A worked example: the dust merchant
+
+`etc/scenes/dust_merchant/audio.flecs` gives the cabin of `etc/scenes/dust_merchant.flecs` its
+sound, in script only. Run it with `bake3 run apps/boxrun --local-env --
+etc/scenes/dust_merchant.flecs`. It has four buses, all into the master:
+
+```
+cabin_verb {
+  AudioBus: {output: master}
+  Reverb: {decay: 0.75, damping: 0.6, predelay: 0.008, size: 0.25}
+}
+world { AudioBus: {output: master, send: cabin_verb, send_level: 0.28} }
+ui { AudioBus: {output: master, volume: 0.8} }
+music { AudioBus: {output: master, volume: 0.32} }
+```
+
+A small metal cabin rings briefly: a short decay, a small size and little predelay. `world`, the
+bus of the engine, sends to it; the controls play on `ui`, dry and close.
+
+**The controls** click with synth sounds, prefabs that need no file. Each has a pitch and a level
+variance, so a row of switches flipped in a row does not sound like one sample repeated:
+
+```
+prefab SfxToggle {
+  AudioOutput: {bus: ui}
+  SynthSound: {seed: 21, pitch_variance: 0.08, level_variance: 0.12}
+  SynthEnvelope: {attack: 0.0005, decay: 0.04}
+  SynthFilter: {kind: SynthHighPass, cutoff: 600, resonance: 0.15}
+  snap {
+    SynthOscillator: {wave: SynthNoise, level: 0.5}
+    SynthEnvelope: {attack: 0.0005, decay: 0.012}
+  }
+  tick {
+    SynthOscillator: {wave: SynthTriangle, frequency: 2600, frequency_end: 1400, sweep: 0.02, level: 0.45}
+    SynthEnvelope: {attack: 0.0005, decay: 0.025}
+  }
+  knock { SynthOscillator: {wave: SynthSine, frequency: 1100, frequency_end: 700, sweep: 0.04, level: 0.35} }
+}
+```
+
+The widgets of `etc/scenes/dust_merchant/widgets.flecs` play them where they handle their input,
+in the same async blocks that flip and turn them, so a sound is never out of step with what the
+control does:
+
+```
+async {
+  while true {
+    await on.click(this)
+    sw[sig] = !sw[sig]
+    const snap = box.audio.play(SfxToggle, 0.8)
+    emit Flipped(sig: sig)
+  }
+}
+```
+
+A knob or a lever ticks at each of its 24 detents while it is dragged: the handler compares the
+detent before and after the move (`floor(kn[sig] * DETENTS)`). The guard of the main switch, the
+breakers, the cap buttons and the radio have sounds of their own. `audio.flecs` is included after
+`state.flecs`, whose state the engine reads, and before `widgets.flecs`, whose controls name the
+sounds.
+
+**The engine** is a looping synth drone at a fixed pitch, placed on the starboard engine pod
+behind the cabin. The camera of the main view is the listener, so the drone pans and changes its
+level as the camera moves between the stations (keys 1 to 6) and as it looks around:
+
+```
+engine_sound {
+  Position: {3.1, 0.6, 3.8}
+  AudioSource: {sound: EngineHum, loop: true, volume: 0.3 + 0.2 * bool_f(bus) + 0.5 * bool_f(reactor_on)}
+  AudioOutput: {bus: world}
+  AudioSpatial: {min_distance: 1.5, max_distance: 30}
+}
+```
+
+Its volume follows two booleans of the scene, the main bus and the reactor, which change a few
+times in a session; a script that changes the volume or the pitch of a source every frame works
+too, but re-evaluates the entity every frame.
+
+**The music** is one looping track, `etc/scenes/dust_merchant/assets/dust_merchant_loop.ogg`, on
+the bus `music`:
+
+```
+music_track {
+  AudioStream: {path: "etc/scenes/dust_merchant/assets/dust_merchant_loop.ogg"}
+  AudioOutput: {bus: music}
+}
+```
+
+It is made in this repository with the synth of box, see
+[Making music with the synth](#making-music-with-the-synth). A track from elsewhere replaces it by
+taking its path.
+
+## Making music with the synth
+
+`etc/scenes/dust_merchant/assets/music_score.flecs` is a score: synth instruments as templates
+(a pad, a bass, a lead) and prefabs (a kick, a rim, a hat), and one async block that plays 16
+bars at 120 bpm, a step of an eighth note every 15 frames. `make_music.py` next to it renders and
+encodes it:
+
+```sh
+python3 etc/scenes/dust_merchant/assets/make_music.py <boxrun binary>
+```
+
+It runs the score headless at a fixed delta of 1/60 s with `box.audio.capture` at load, so the
+render is the same in every run, adds the tail after the 32 seconds (the release of the last
+notes and the reverb) to the start, which makes a seamless loop, normalizes it and encodes it
+with `tools/ogg_vorbis.py`, a small mono Vorbis encoder of this repository, at the finest
+quantizer that keeps the file under 1 MB. The track is checked in; run the script again after a
+change of the score.
+
+## The web rules
+
+The web build plays the same scene as native, with a few rules of the browser (details in
+[Starting and failing](#starting-and-failing) and [Two threads on the web](#two-threads-on-the-web)):
+
+- **A gesture starts the audio.** Until the first key or mouse button, `AudioStatus.state` is
+  `AudioWaitingForGesture` and the app runs silently. Plays that do not loop are dropped in that
+  time; looping sources and streams start and are heard from the gesture on, see
+  [Before the gesture](#before-the-gesture). Do not count on a sound at load.
+- **A hidden page is silent.** It fades out over 50 ms and suspends the context
+  (`AudioSuspended`); shown again it resumes. Native apps keep playing without focus.
+- **Music files.** A track under `etc` is embedded in the download of the page; that is fine for
+  a short loop such as the dust merchant's (well under 1 MB), not for an album. A longer track is
+  kept out of the embedded folders and copied next to the page under the path the scene names;
+  the stream fetches it once and decodes it in chunks, see [Music](#music).
+- **Stalls.** The core runs in an AudioWorklet, so a stall of the main thread does not stop the
+  sound: what plays keeps playing and only new commands wait. A stream keeps more than 1.5 s
+  decoded in the worklet, so a stall of 500 ms does not run it short.
+- **Decode cost.** The page has no worker threads, so decoding runs on the main thread. A
+  `SoundFile` decodes in the frame that loads it (a few ms for a second of FLAC), so load sounds
+  with the scene; a stream decodes at most 2 ms per frame, about a sixtieth of a second of music
+  once its buffer is full.
+- **Rates.** The context runs at 44100 or 48000 Hz, as the browser chooses; sounds and streams
+  play at their own rate on either.
+
+Open the dust merchant in the browser with the scene embedded:
+
+```sh
+bake3 --target em --local-env=audio apps/boxrun
+python3 -m http.server 8080 -d "$(tools/integration.py local-env --env audio)/wasm32-Emscripten/debug/bin"
+```
+
+then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chrome or Safari
+(`localhost` is a secure context, which the AudioWorklet requires), and click the canvas.
+
+## Native notes
+
+- macOS and Linux play on the default device through miniaudio, at its rate, on a real time
+  audio thread, see [Native output](#native-output).
+- No device is not an error: the app logs one warning and renders on the main thread with the null
+  transport (`AudioNoDevice`). `--headless` always uses the null transport, `--no-audio` opens
+  nothing.
+- Unplugging a device does not stop the app: it renders on the main thread and reopens the
+  default device every 2 seconds.
+- Sound files and music decode on the job system, never on the audio thread.
+
+## Limits of this version
+
+- **Space**: distance and pan only. No Doppler, no distance filter, no occlusion, no HRTF, and
+  front and back sound alike.
+- **Effects**: one reverb at once, an algorithmic one; no reverb zones, no rooms from geometry, no
+  EQ, compressor or delay on a bus.
+- **Voices**: 64, with the quietest stolen; no priorities. A one shot cannot be controlled after
+  it started.
+- **Synth**: up to 4 oscillators and one filter per sound, linear envelopes, no LFO and no node
+  graph. A looping synth sound starts a new pass of its envelopes at the end of the last, at most
+  every 60 seconds, which a drone hears as a short dip.
+- **Files**: WAV and FLAC for sounds, Ogg Vorbis for music, one stream at once (a change of path
+  fades over 5 ms, there is no crossfade).
+- **Tools**: no mixer UI, and the UI theme of box has no sounds; a scene adds them in its own
+  widgets, as the dust merchant does.
+- **Web**: no shared memory, decoding on the main thread, and no load measurement in the
+  worklet (it reports 0).
+
+## Captures and the audio command
+
+The audio a box app plays can be inspected without listening:
+
+- `audio` prints the state, the rate, the voices, the steals, the load and every bus with its
+  routing and reverb; `audio volume <v>` and `audio mute` set the master.
+- `audio capture <seconds>` records the master to a 16 bit stereo WAV resource of the shell
+  session, `box.audio.capture(seconds, path)` to a file from a script, at load if it should
+  start with the scene. In the browser `audio capture` writes `/tmp/audio_capture_<n>.wav` in
+  the file system of the page.
+- Headless with a fixed `--delta-time` the null transport renders the same frames in every run,
+  so two runs capture bit identical audio: a render can be compared, measured and listened to.
+
+A capture of the running dust merchant over the REST port:
+
+```sh
+boxrun --headless --delta-time 0.016666667 --timeout 120 --port 8000 etc/scenes/dust_merchant.flecs &
+S=$(curl -s -X PUT http://127.0.0.1:8000/shell/session | python3 -c 'import json,sys; print(json.load(sys.stdin)["session"])')
+curl -s -X PUT --data 'audio capture 20' http://127.0.0.1:8000/shell/session/$S
+curl -s -o dust_merchant.wav http://127.0.0.1:8000/shell/session/$S/resource/<name it returned>
+```
+
+The resource is empty until the capture is complete. Input commands (`key_press space`,
+`mouse_click`) drive the scene meanwhile, so a capture can hear the switches and the reactor.
+`box.perf` reports the largest load of a run as `PerfStatus.audio_load`.
+
+The tests that use all of it together are the `all_features` case of
+`test/integration/e2e/audio.py` and `test/integration/web/audio_all_features.mjs`, both on
+`test/assets/audio/all_features.flecs`.
+
+## Reference
+
+The rest of this page describes the parts of audio in box in detail. Box renders its sound in the
+audio core, `src/audio/core`: plain C without flecs, box or platform code. The core is a mixer of
+voices and buses that renders blocks of float samples into a left and a right channel. It is
+driven by a byte stream of commands and reports back with events. Rendering does not allocate,
+lock, log or wait. On macOS and Linux the core plays on a miniaudio device, see
+[Native output](#native-output); on the web in an AudioWorklet, the platform where audio is the
+hardest to get right.
 
 ## The core
 
@@ -853,8 +1113,9 @@ keeps more than 1.5 s of chunks in the worklet: a 500 ms stall of the main threa
 short. Once full, a frame decodes only what played since, about a sixtieth of a second, which
 `decode_ms` reports; `test/integration/web/audio_stream.mjs` prints it with the longest frame.
 
-**The web does not embed music.** `embed` puts all of `etc` into the download of the page, so a
-track there adds its whole size to the start of every visit. A stream looks in the page's file
+**The web does not embed long music.** `embed` puts all of `etc` into the download of the page, so a
+track there adds its whole size to the start of every visit; a short loop, such as the 32 seconds
+of the dust merchant under 1 MB, can stay in `etc`. A stream looks in the page's file
 system first (a file of `etc` an app embeds, or one that `?preload=` fetched), then fetches the
 path relative to the page with `fetch` into memory; the status says `AudioStreamLoading` until it
 arrived, and a failed fetch logs one error and stays silent. To deploy a track, keep it out of
@@ -909,7 +1170,10 @@ app, `test/integration/web/audio_spatial.mjs` moves a source from the left of th
 its right in Chrome and measures both channels with `test/integration/web/audio_spatial.flecs`,
 and
 `test/integration/web/audio_module.mjs` checks the gesture, the levels, a hidden page, a capture
-and a stall in Chrome with `test/integration/web/audio_module.flecs`:
+and a stall in Chrome with `test/integration/web/audio_module.flecs`. The `all_features` case of
+`audio.py` and `test/integration/web/audio_all_features.mjs` run
+`test/assets/audio/all_features.flecs`, which uses every part together: levels on both channels,
+a reverb tail, bit identical captures, a stall and a hidden page.
 
 ```sh
 node test/integration/web/audio_module.mjs \

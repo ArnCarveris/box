@@ -17,6 +17,9 @@ export const GREEN: Rgb = {98, 255, 142}
 export const RED: Rgb = {255, 56, 36}
 export const CYAN: Rgb = {96, 216, 255}
 
+// The steps of a knob or a lever over its travel that click, see audio.flecs
+export const DETENTS: f32 = 24
+
 template Label {
   prop text: string = ""
   prop size: f32 = 14
@@ -322,6 +325,7 @@ template Breaker {
     while true {
       await on.click(this)
       out = !out
+      const clack = box.audio.play(SfxBreaker, 0.7)
     }
   }
 }
@@ -369,6 +373,7 @@ template Thump {
   async {
     while true {
       await on.click(this)
+      const thump = box.audio.play(SfxThump, 0.9)
       emit Whack()
     }
   }
@@ -463,6 +468,7 @@ template ToggleSwitch {
     while true {
       await on.click(this)
       sw[sig] = !sw[sig]
+      const snap = box.audio.play(SfxToggle, 0.8)
       emit Flipped(sig: sig)
     }
   }
@@ -535,12 +541,16 @@ template GuardSwitch {
       await on.click(this)
       if !armed && !sw[sig] {
         armed = true
+        const lift = box.audio.play(SfxGuard, 0.8)
       } else if !sw[sig] {
         sw[sig] = true
+        const snap = box.audio.play(SfxToggle, 1.0)
         emit Flipped(sig: sig)
       } else {
         sw[sig] = false
         armed = false
+        const snap = box.audio.play(SfxToggle, 1.0)
+        const shut = box.audio.play(SfxGuard, 0.7)
         emit Flipped(sig: sig)
       }
     }
@@ -641,8 +651,10 @@ template CapButton {
     while true {
       await on.press(this)
       down = true
+      const press = box.audio.play(SfxButton, 0.8)
       await on.release(this)
       down = false
+      const release = box.audio.play(SfxButton, 0.45)
     }
   }
 
@@ -718,14 +730,22 @@ template Knob {
   async {
     while true {
       const e = await on.drag(this)
+      const was = kn[sig]
       kn[sig] = clamp(kn[sig] + (e.delta_x - e.delta_y) * speed, 0, 1)
+      if floor(kn[sig] * DETENTS) != floor(was * DETENTS) {
+        const tick = box.audio.play(SfxDetent, 0.7)
+      }
     }
   }
 
   async {
     while true {
       const e = await on.scroll(this)
+      const was = kn[sig]
       kn[sig] = clamp(kn[sig] + e.delta_y * 0.02, 0, 1)
+      if floor(kn[sig] * DETENTS) != floor(was * DETENTS) {
+        const tick = box.audio.play(SfxDetent, 0.7)
+      }
     }
   }
 }
@@ -803,8 +823,9 @@ template Lever {
       dragging = true
       await on.release(this)
       dragging = false
-      if spring {
+      if spring && kn[sig] > 0 {
         kn[sig] = 0
+        const back = box.audio.play(SfxBreaker, 0.6)
       }
     }
   }
@@ -813,7 +834,11 @@ template Lever {
     while true {
       const e = await on.drag(this)
       if !locked {
+        const was = kn[sig]
         kn[sig] = clamp(kn[sig] + (match pull { true: e.delta_y; _: 0 - e.delta_y }) * speed, 0, 1)
+        if floor(kn[sig] * DETENTS) != floor(was * DETENTS) {
+          const tick = box.audio.play(SfxDetent, 0.5)
+        }
       }
     }
   }
