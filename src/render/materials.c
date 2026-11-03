@@ -241,8 +241,8 @@ static void box_materials_pack(
     box_draws_material_pack(out, &material);
 }
 
-/** Record the shadow regions of the alpha tested casters that render with a slot whose cutoff
- * or UV transform changed, while shadow regions are recorded.
+/** Record the shadow regions of the alpha tested casters that render with a slot whose cutoff,
+ * UV transform or texture mapping changed, while shadow regions are recorded.
  *
  * @param d The state
  * @param slot The slot
@@ -256,7 +256,8 @@ static void box_materials_shadow(
     const box_render_material_t *record)
 {
     if (d->shadow_record && (was->cutoff != record->cutoff ||
-        ecs_os_memcmp(was->uv, record->uv, ECS_SIZEOF(float) * 4)))
+        ecs_os_memcmp(was->uv, record->uv, ECS_SIZEOF(float) * 4) ||
+        was->mapping != record->mapping || was->mapping_size != record->mapping_size))
     {
         *ecs_vec_append_t(NULL, &d->shadow_materials, uint32_t) = slot;
     }
@@ -815,15 +816,16 @@ void box_draws_materials_observers(
     ecs_world_t *world,
     box_render_draws_t *d)
 {
-    ecs_entity_t components[10] = {
+    ecs_entity_t components[11] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
         ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy),
-        ecs_id(Sheen), ecs_id(DiffuseTransmission)
+        ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping)
     };
-    const char *names[10] = {
+    const char *names[11] = {
         "DrawsOnColor", "DrawsOnPbrMaterial", "DrawsOnEmissive", "DrawsOnTextureTransform",
         "DrawsOnAlphaCutoff", "DrawsOnTransmission", "DrawsOnClearCoat",
-        "DrawsOnSpecularAnisotropy", "DrawsOnSheen", "DrawsOnDiffuseTransmission"
+        "DrawsOnSpecularAnisotropy", "DrawsOnSheen", "DrawsOnDiffuseTransmission",
+        "DrawsOnTextureMapping"
     };
     int32_t i;
     box_draws_observer(world, d, "MaterialsOnPrefab", (ecs_observer_desc_t){
@@ -848,7 +850,7 @@ void box_draws_materials_observers(
         .query.flags = EcsQueryMatchPrefab,
         .events = { EcsOnAdd, EcsOnRemove } }, BoxMaterialsOnIsA);
 
-    for (i = 0; i < 10; i ++) {
+    for (i = 0; i < 11; i ++) {
         bool keyed = components[i] == ecs_id(AlphaCutoff) ||
             components[i] == ecs_id(Transmission);
         box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
@@ -874,6 +876,7 @@ void box_draws_material_of(
         out->pbr = ecs_get(world, owner, PbrMaterial);
         out->emissive = ecs_get(world, owner, Emissive);
         out->uv = ecs_get(world, owner, TextureTransform);
+        out->mapping = ecs_get(world, owner, TextureMapping);
         out->cutoff = ecs_get(world, owner, AlphaCutoff);
         out->transmission = ecs_get(world, owner, Transmission);
         out->clear_coat = ecs_get(world, owner, ClearCoat);

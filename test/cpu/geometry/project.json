@@ -37,7 +37,9 @@
                     "normals",
                     "uvs",
                     "cache_shared",
-                    "scale"
+                    "scale",
+                    "face_orientation",
+                    "rounded_face_orientation"
                 ]
             },
             {
@@ -255,7 +257,8 @@
                     "remove_box",
                     "delete",
                     "prefab_instance",
-                    "prefab_override"
+                    "prefab_override",
+                    "face_orientation"
                 ]
             },
             {

@@ -26,8 +26,9 @@ extern "C" {
  * applications, inherited by instances.
  *
  * Rgb, PbrMaterial, ClearCoat, SpecularAnisotropy, Sheen, DiffuseTransmission, Emissive,
- * Transmission, TextureTransform and AlphaCutoff bring it along. A prefab that owns one gets a
- * slot its instances share, a 3D shape that owns one a slot of what it owns and still inherits.
+ * Transmission, TextureTransform, TextureMapping and AlphaCutoff bring it along. A prefab that
+ * owns one gets a slot its instances share, a 3D shape that owns one a slot of what it owns and
+ * still inherits.
  *
  * Slot 0 is the default material, of a shape without any material component. An owned id that
  * was never handed a slot (a light, a 2D shape, a text) is UINT32_MAX.
@@ -295,6 +296,36 @@ ECS_STRUCT(TextureTransform, {
     float scale_y;  /**< V multiplier */
     float offset_x; /**< U addend, applied after the scale */
     float offset_y; /**< V addend, applied after the scale */
+});
+
+/** Where the texture coordinates of a material come from */
+ECS_ENUM(TextureMappingMode, {
+    MappingUv = 0,      /**< The UVs of the mesh, the default */
+    MappingObject = 1   /**< Projected from the object space position times the instance scale */
+});
+
+/** How the texture coordinates of a material are made, default MappingUv with a size of 1,
+ * inherited by instances, like TextureTransform.
+ *
+ * MappingObject projects each fragment onto the plane of the dominant axis of its object space
+ * normal, from its object space position times the scale of the instance (the lengths of the
+ * columns of its model matrix, which hold the size of a Box), divided by size. The texture has
+ * the same density in world units on every face and every size of a shape, and moves with it.
+ * The projection is oriented as the faces of a Box: on the side faces (±x, ±z) u runs
+ * horizontally seen from outside and v down the image, toward -y; the top has u along +z and v
+ * along -x, the bottom u along -z and v along -x; no face is mirrored. A unit cube with a size
+ * of 1 maps as its UVs do. TextureTransform applies after the mapping.
+ *
+ * The axis is chosen per fragment, so a smooth mesh changes axis inside a triangle where its
+ * normal turns, with a seam there. Parametric surfaces (Sweep, Extrude and the other shapes of
+ * box/geometry.h that evaluate a surface in the vertex stage) keep their own UVs and ignore the
+ * mapping. Picking onto a surface texture (PbrTextures of a Surface) follows the mapping, with
+ * the normal of the mesh interpolated at the hit.
+ */
+ECS_STRUCT(TextureMapping, {
+    TextureMappingMode mode; /**< Source of the texture coordinates */
+    float size;         /**< World units one repeat of the texture covers with MappingObject,
+                         *   default 1; a size that is not positive and finite is 1 */
 });
 
 /** Texture entities for each PBR layer, 0 for none, inherited by instances like Rgb, part of the

@@ -930,7 +930,10 @@ typedef struct box_render_material_t {
     float thickness;        /**< DiffuseTransmission.thickness, 0 without one */
     float diffuse_blur;     /**< DiffuseTransmission.blur, 0 without one or with a negative or
                              *   non finite blur */
-    uint32_t reserved[2];   /**< 0, pads the record to the 16 byte alignment of Material */
+    uint32_t mapping;       /**< TextureMapping.mode, MappingUv (0) without one */
+    float mapping_size;     /**< TextureMapping.size of MappingObject, 1 when it is not positive
+                             *   and finite; 0 for MappingUv, so it matches the record without
+                             *   one */
 } box_render_material_t;
 
 /** Shading of a mesh instance, the shading stream of a mesh instance page, MeshShading of
