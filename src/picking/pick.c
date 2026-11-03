@@ -1029,15 +1029,9 @@ static void box_pick_mapping_uv(
 
 /** Map a hit on an entity that shows the texture of a surface to a cursor on that surface.
  *
-<<<<<<< HEAD
  * An Image maps the area of the element to its texture area, through the nine parts of its
- * ImageSlice as the renderer draws it, PbrTextures map the UV of the mesh through
- * TextureTransform and TextureWrap.
-=======
- * An Image maps the area of the element to its texture area, PbrTextures map the UV of the
- * mesh, or the projection of a MappingObject TextureMapping, through TextureTransform and
- * TextureWrap.
->>>>>>> 24663f7f184f96173c0f25b9bd7094c7b2eed016
+ * ImageSlice as the renderer draws it, PbrTextures map the UV of the mesh, or the projection of
+ * a MappingObject TextureMapping, through TextureTransform and TextureWrap.
  *
  * @param world The world
  * @param st The module state
