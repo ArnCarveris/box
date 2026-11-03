@@ -483,7 +483,8 @@ static void box_animation_report(
     ecs_os_free(clip_path);
 }
 
-/** Resolve tracks when their AnimationTrack is set, and log the invalid ones.
+/** Resolve tracks when their AnimationTrack is set, and log the invalid ones. Each resolved
+ * track carries the new AnimatorWorld.version, so an animator sees a key edit of its own tracks.
  *
  * @param it The iterator
  */
@@ -491,6 +492,7 @@ static void BoxAnimationTrackResolve(
     ecs_iter_t *it)
 {
     const AnimationTrack *tracks = ecs_field(it, AnimationTrack, 0);
+    uint32_t version = box_animator_changed(it->world);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         AnimationTrackState state;
@@ -500,10 +502,9 @@ static void BoxAnimationTrackResolve(
             ecs_os_free(reason);
         }
 
+        state.version = version;
         ecs_set_ptr(it->stage, it->entities[i], AnimationTrackState, &state);
     }
-
-    box_animator_changed(it->world);
 }
 
 /** Remove the resolved state of tracks whose AnimationTrack is removed.

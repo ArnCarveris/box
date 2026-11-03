@@ -454,7 +454,8 @@
                     "wire_defaults",
                     "wire_script_keeps_defaults",
                     "wire_packet_copy",
-                    "wire_only_no_occlusion"
+                    "wire_only_no_occlusion",
+                    "capture_copies_debug"
                 ]
             },
             {
@@ -528,6 +529,22 @@
                     "bezier_overshoot_rgb",
                     "bezier_invalid_x",
                     "bezier_interrupt"
+                ]
+            },
+            {
+                "id": "TransitionBoxShadow",
+                "testcases": [
+                    "values",
+                    "dynamic_batch",
+                    "mid_matches_static",
+                    "end_matches_static",
+                    "with_opacity",
+                    "with_position",
+                    "removed_mid_transition",
+                    "no_area",
+                    "no_transition_snaps",
+                    "prefab_instance",
+                    "layout"
                 ]
             },
             {

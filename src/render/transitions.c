@@ -8,16 +8,17 @@
  * Transition are not visited, and a world that does not use Transition matches no table.
  *
  * Shapes a transform transition moves carry TransitionTransform, shapes whose shading one
- * patches TransitionMaterial, and shapes under an Opacity transition TransitionOpacity; a second
- * system, after the batches were sent, sends the records that patch them.
+ * patches TransitionMaterial, shapes under an Opacity transition TransitionOpacity and shapes
+ * whose BoxShadow transitions TransitionBoxShadow; a later system sends what patches them.
  */
 
-#include "draw.h"
+#include "transitions.h"
 #include <string.h>
 
 ECS_TAG_DECLARE(TransitionTransform);
 ECS_TAG_DECLARE(TransitionMaterial);
 ECS_TAG_DECLARE(TransitionOpacity);
+ECS_TAG_DECLARE(TransitionBoxShadow);
 ECS_COMPONENT_DECLARE(RenderTransitionState);
 
 /** Material components whose transitions patch the material table and the 2D shading */
@@ -63,105 +64,6 @@ static const box_render_transition_component_t box_transition_material_component
     ((1u << BOX_RENDER_TRANSITION_ALPHA_CUTOFF) | \
      (1u << BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM))
 
-/** A transitioned component of an entity, as the extract last sent it */
-typedef struct box_transition_slot_t {
-    bool present;                   /**< A target was sent and is the value of the node */
-    TimingFunction timing_function; /**< Curve of the last start */
-    float delay;                    /**< Delay of the last start */
-    float duration;                 /**< Duration of the last start */
-    double start;                   /**< Time of the last start */
-    uint8_t value[BOX_RENDER_TRANSITION_VALUE]; /**< The last target sent */
-    float lo[3];                    /**< Per field minimum of the targets sent since the
-                                     *   component was last idle, which bounds the value it
-                                     *   renders: Position, Rotation and Scale only */
-    float hi[3];                    /**< Per field maximum of those targets */
-} box_transition_slot_t;
-
-/** Private state of an entity with Transition */
-typedef struct box_transition_node_t {
-    ecs_entity_t entity;            /**< The entity, 0 for a free node */
-    int64_t seen;                   /**< Stamp of the last extract that matched the entity */
-    box_transition_slot_t slots[BOX_RENDER_TRANSITION_COMPONENTS]; /**< By
-                                     *   box_render_transition_component_t */
-} box_transition_node_t;
-
-/** An entity a transform transition moves in this frame, in the order of the walk: a node
- * before its descendants, so a parent node comes before its child nodes */
-typedef struct box_transition_item_t {
-    ecs_entity_t entity;            /**< The entity */
-    uint32_t node;                  /**< The node that moves it, its own for a node */
-    uint32_t parent;                /**< Parent node of a node, 0 for none or a member */
-    int32_t up;                     /**< Item of its parent, -1 for a node without parent node */
-    bool is_node;                   /**< The entity has an active transition of the walk */
-    bool opacity;                   /**< An Opacity transition of its node or a node above runs,
-                                     *   for the walk of Tint and Opacity */
-} box_transition_item_t;
-
-/** The composed Tint and Opacity of a chain of entities of the walk of Tint and Opacity: a
- * display encoded color c becomes c * tint.keep + tint.add */
-typedef struct box_transition_fade_rel_t {
-    box_draw_tint_t tint;           /**< Composed tints, applied from the top down */
-    float alpha;                    /**< Product of the opacities */
-} box_transition_fade_rel_t;
-
-/** Main thread state of the transition extract */
-struct box_render_transitions_t {
-    ecs_query_t *query;             /**< Transition(self|up IsA), prefabs included */
-    ecs_map_t by_entity;            /**< Entity to node id */
-    ecs_vec_t nodes;                /**< box_transition_node_t by node id, 0 unused */
-    ecs_vec_t free;                 /**< uint32_t node ids to reuse */
-    int64_t stamp;                  /**< Extracts run */
-    ecs_map_t moving;               /**< Entity to node id, nodes with an active transform
-                                     *   transition in this frame */
-    ecs_vec_t items;                /**< box_transition_item_t of this frame */
-    ecs_vec_t stack;                /**< int32_t items of the walk still to visit */
-    ecs_vec_t rels;                 /**< mat4 per item: the target chain from its node down to
-                                     *   it, identity for a node */
-    ecs_map_t tagged;               /**< Entity with TransitionTransform to the stamp of the
-                                     *   last extract that kept it */
-    ecs_vec_t tag_add;              /**< ecs_entity_t that get TransitionTransform */
-    ecs_vec_t tag_remove;           /**< ecs_entity_t that lose TransitionTransform */
-    ecs_vec_t ranges;               /**< box_draw_transition_range_t per item: the world
-                                     *   matrices the node of the item can render with, while
-                                     *   the draws record shadow regions */
-    ecs_vec_t casting;              /**< bool per item: a shadow caster slot is at or below
-                                     *   it, so it needs a range, while the draws record shadow
-                                     *   regions */
-    ecs_vec_t shadow_regions;       /**< box_render_shadow_region_t, the bounds of every pose
-                                     *   the moving shadow casters can render at this frame */
-    ecs_vec_t shadow_last;          /**< box_render_shadow_region_t, those of the last frame */
-    box_render_draws_t *draws;      /**< State of the batches, stored when the slot system is
-                                     *   registered, so no frame looks it up by name */
-    ecs_vec_t material_slots;       /**< box_transition_material_t, the slots of the material
-                                     *   table an active material transition patches in this
-                                     *   frame, kept until the next so their target uploads */
-    ecs_vec_t shadings;             /**< box_transition_material_t, the 2D shapes and texts an
-                                     *   active material transition patches in this frame */
-    ecs_map_t tagged_material;      /**< Entity with TransitionMaterial to the stamp of the last
-                                     *   extract that kept it */
-    ecs_map_t visited;              /**< Entity to 1, entities the walk of IsA instances saw */
-    ecs_vec_t instances;            /**< ecs_entity_t, stack of the walk of IsA instances */
-    ecs_map_t fading;               /**< Entity to node id, nodes with an active Tint or Opacity
-                                     *   transition in this frame */
-    ecs_vec_t fade_items;           /**< box_transition_item_t of the walk of Tint and Opacity
-                                     *   in this frame, a node before its descendants */
-    ecs_vec_t fade_rels;            /**< box_transition_fade_rel_t per fade item: the chain from
-                                     *   its node, excluded, down to it, included; identity for
-                                     *   a node */
-    ecs_map_t fade_index;           /**< Entity to its fade item plus 1 */
-    ecs_map_t tagged_opacity;       /**< Entity with TransitionOpacity to the stamp of the last
-                                     *   extract that kept it */
-};
-
-/** A record an active material transition patches: a slot of the material table or a drawn
- * 2D shape or text, and the node of each of its components that runs a transition */
-typedef struct box_transition_material_t {
-    ecs_entity_t entity;            /**< Owner of the slot, or the drawn entity */
-    uint32_t slot;                  /**< Slot of the material table */
-    bool shadow;                    /**< An AlphaCutoff or TextureTransform of the slot runs */
-    uint32_t nodes[BOX_RENDER_TRANSITION_COMPONENTS]; /**< Node of a component that runs a
-                                     *   transition, 0 for the target */
-} box_transition_material_t;
 
 /** Get the component id of a transitionable component.
  *
@@ -188,6 +90,7 @@ static ecs_entity_t box_transition_id(
     case BOX_RENDER_TRANSITION_ANISOTROPY: result = ecs_id(SpecularAnisotropy); break;
     case BOX_RENDER_TRANSITION_SHEEN: result = ecs_id(Sheen); break;
     case BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION: result = ecs_id(DiffuseTransmission); break;
+    case BOX_RENDER_TRANSITION_BOX_SHADOW: result = ecs_id(BoxShadow); break;
     case BOX_RENDER_TRANSITION_COMPONENTS: break;
     }
 
@@ -210,13 +113,7 @@ bool box_render_transition_component(
     return result;
 }
 
-/** Get the private state of a node.
- *
- * @param s The state of the extract
- * @param node The node id
- * @return The node, NULL when the id is not in use
- */
-static box_transition_node_t* box_transition_node(
+box_transition_node_t* box_transitions_node_state(
     const box_render_transitions_t *s,
     uint32_t node)
 {
@@ -296,9 +193,10 @@ static void box_transition_send(
     ecs_os_memcpy(r->value, slot->value, BOX_RENDER_TRANSITION_VALUE);
 }
 
-/** Set or widen the per field range of the targets of a transform component.
+/** Set or widen the per field range of the targets of a transform component or a BoxShadow.
  *
- * @param component The component, nothing for one other than Position, Rotation or Scale
+ * @param component The component, nothing for one other than Position, Rotation, Scale or
+ * BoxShadow
  * @param slot The slot of the component
  * @param value A target, in the layout of the component
  * @param reset Whether the range becomes the target alone
@@ -311,12 +209,16 @@ static void box_transition_range_add(
 {
     const box_render_transition_layout_t *layout;
     int32_t i;
-    if (component > BOX_RENDER_TRANSITION_SCALE) {
+    if (component > BOX_RENDER_TRANSITION_SCALE &&
+        component != BOX_RENDER_TRANSITION_BOX_SHADOW)
+    {
         goto done;
     }
 
     layout = box_render_transition_layout(component);
-    for (i = 0; i < 3 && i < layout->count; i ++) {
+    for (i = 0; i < BOX_TRANSITION_RANGE && i < layout->count &&
+        layout->fields[i].kind == BOX_RENDER_TRANSITION_F32; i ++)
+    {
         float v;
         ecs_os_memcpy(&v, ECS_OFFSET(value, layout->fields[i].offset), ECS_SIZEOF(float));
         slot->lo[i] = reset ? v : glm_min(slot->lo[i], v);
@@ -331,9 +233,9 @@ done:
  * The first value sets without a transition, a changed value starts one with the spec of the
  * entry, and a value whose entry or component is gone snaps to its target.
  *
- * A transform component keeps the per field range of its targets since it was last idle: the
- * resolver starts from the value it renders, and the range is widened by what the timing
- * function overshoots, so every value it renders lies in it without a start value.
+ * A transform component and a BoxShadow keep the per field range of their targets since they
+ * were last idle, widened by what the timing function overshoots: the resolver starts from the
+ * value it renders, so every value it renders lies in it without a start value.
  *
  * @param p The packet
  * @param node The node id
@@ -510,13 +412,7 @@ static void box_transition_walk(
     }
 }
 
-/** Keep a private tag on an entity in this frame, queueing its add when it does not have it.
- *
- * @param s The state of the extract
- * @param tagged The entities with the tag to the stamp of the last extract that kept them
- * @param e The entity
- */
-static void box_transition_keep(
+void box_transitions_keep(
     box_render_transitions_t *s,
     ecs_map_t *tagged,
     ecs_entity_t e)
@@ -529,15 +425,7 @@ static void box_transition_keep(
     *stamp = (ecs_map_val_t)s->stamp;
 }
 
-/** Take a private tag from the entities this frame did not keep it on and give it to the new
- * ones, which rekeys their slots.
- *
- * @param world The world
- * @param s The state of the extract
- * @param tagged The entities with the tag to the stamp of the last extract that kept them
- * @param tag The tag
- */
-static void box_transition_retag(
+void box_transitions_retag(
     ecs_world_t *world,
     box_render_transitions_t *s,
     ecs_map_t *tagged,
@@ -588,10 +476,10 @@ static void box_transition_tag(
             continue;
         }
 
-        box_transition_keep(s, &s->tagged, e);
+        box_transitions_keep(s, &s->tagged, e);
     }
 
-    box_transition_retag(world, s, &s->tagged, TransitionTransform);
+    box_transitions_retag(world, s, &s->tagged, TransitionTransform);
 }
 
 /** Find the entities the active transform transitions move in this frame, nodes first and
@@ -805,7 +693,7 @@ static void box_transition_material_walk(
         box_transition_material_t item = { .entity = cur };
         if (mask && box_transition_material_nodes(world, s, cur, mask, time, item.nodes)) {
             *ecs_vec_append_t(NULL, &s->shadings, box_transition_material_t) = item;
-            box_transition_keep(s, &s->tagged_material, cur);
+            box_transitions_keep(s, &s->tagged_material, cur);
         }
 
         ecs_iter_t it = ecs_each_id(world, ecs_pair(EcsIsA, cur));
@@ -920,7 +808,7 @@ static void box_transition_fades(
         const ecs_map_val_t *stamp = ecs_map_get(&s->tagged_material, e);
         bool listed = stamp && *stamp == (ecs_map_val_t)s->stamp;
         uint32_t mask = box_transition_shading_mask(world, e);
-        box_transition_keep(s, &s->tagged_material, e);
+        box_transitions_keep(s, &s->tagged_material, e);
         if (!listed && mask) {
             box_transition_material_t shading = { .entity = e };
             box_transition_material_nodes(world, s, e, mask, p->time, shading.nodes);
@@ -947,12 +835,12 @@ static void box_transition_fade_tag(
         const box_transition_item_t *item = ecs_vec_get_t(
             &s->fade_items, box_transition_item_t, i);
         if (item->opacity && box_transition_drawn(world, item->entity)) {
-            box_transition_keep(s, &s->tagged_opacity, item->entity);
+            box_transitions_keep(s, &s->tagged_opacity, item->entity);
         }
     }
 
     if (ecs_map_count(&s->tagged_opacity)) {
-        box_transition_retag(world, s, &s->tagged_opacity, TransitionOpacity);
+        box_transitions_retag(world, s, &s->tagged_opacity, TransitionOpacity);
     }
 }
 
@@ -1026,7 +914,7 @@ static void box_transition_materials(
 
     box_transition_fades(world, s, p);
     if (ecs_map_count(&s->tagged_material)) {
-        box_transition_retag(world, s, &s->tagged_material, TransitionMaterial);
+        box_transitions_retag(world, s, &s->tagged_material, TransitionMaterial);
     }
 
     box_transition_fade_tag(world, s);
@@ -1117,6 +1005,7 @@ static void BoxRenderExtractTransitions(
 
     box_transition_affect(world, s, ecs_map_count(&s->by_entity) ? p : NULL);
     box_transition_materials(world, s, ecs_map_count(&s->by_entity) ? p : NULL);
+    box_transitions_box_shadows(world, s, ecs_map_count(&s->by_entity) ? p : NULL);
 }
 
 /** Copy a matrix into the packet data.
@@ -1163,7 +1052,7 @@ static void box_transition_send_pose(
     const Position *position = ecs_get(world, item->entity, Position);
     const Rotation *rotation = ecs_get(world, item->entity, Rotation);
     const Scale *scale = ecs_get(world, item->entity, Scale);
-    const box_transition_node_t *node = box_transition_node(s, item->node);
+    const box_transition_node_t *node = box_transitions_node_state(s, item->node);
     float *targets[3] = { pose.position, pose.rotation, pose.scale };
     vec3 lo[3], hi[3];
     uint32_t offset = 0;
@@ -1252,6 +1141,10 @@ done:
  * target chain from the node with the instance matrix of each, as box_draws_transform, the
  * shadow (box_draws_box_shadow_instance) and the glyph quads write them.
  *
+ * A shadow whose BoxShadow transitions gets no slot record: its box shadow record, sent after
+ * the poses, takes the node and the chain, and a caster records the region of every shadow box
+ * between the bounds of its BoxShadow (box_draws_box_shadow_bound).
+ *
  * @param world The world
  * @param s The state of the extract
  * @param d The state of the batches
@@ -1291,7 +1184,25 @@ static void box_transition_send_slots(
 
     const BoxShadowSlot *bs = d->box_shadows && ds && ds->batch >= 0
         ? ecs_get(world, item->entity, BoxShadowSlot) : NULL;
-    if (bs && bs->batch >= 0 && box_draws_box_shadow_instance(world, item->entity, instance)) {
+    box_transition_box_shadow_t *animated = bs && bs->batch >= 0
+        ? box_transitions_box_shadow_of(s, item->entity) : NULL;
+    if (animated) {
+        const box_transition_node_t *owner = box_transitions_node_state(s, animated->node);
+        box_draw_batch_t *b = box_draws_batch(d, bs->batch);
+        animated->moving = item->node;
+        glm_mat4_copy(rel, animated->rel);
+        if (owner && range && d->shadow_record && b->alive && box_draws_caster(b) &&
+            box_draws_box_shadow_bound(world, item->entity,
+                owner->slots[BOX_RENDER_TRANSITION_BOX_SHADOW].lo,
+                owner->slots[BOX_RENDER_TRANSITION_BOX_SHADOW].hi, instance))
+        {
+            glm_mul(rel, instance, m);
+            box_draws_range_region(world, b, bs->slot, range, m, ecs_vec_append_t(
+                NULL, &s->shadow_regions, box_render_shadow_region_t));
+        }
+    } else if (bs && bs->batch >= 0 &&
+        box_draws_box_shadow_instance(world, item->entity, instance))
+    {
         glm_mul(rel, instance, m);
         box_transition_send_slot(world, s, d, p, item->node, bs->batch, bs->slot, m, range);
     }
@@ -1410,18 +1321,7 @@ static void box_transition_send_material(
     r->offset = offset;
 }
 
-/** Get the packet data offset of the shading of a slot of a batch that uploaded its run into
- * this packet: a box_render_shading_t of a 2D batch, a box_render_mesh_shading_t of a mesh
- * batch.
- *
- * @param d The state of the batches
- * @param p The packet
- * @param batch Index of the batch
- * @param slot The slot
- * @param out Receives the offset
- * @return Whether the batch uploaded the shading of the slot
- */
-static bool box_transition_shading_data(
+bool box_transitions_shading_data(
     box_render_draws_t *d,
     const box_render_packet_t *p,
     int32_t batch,
@@ -1442,16 +1342,7 @@ static bool box_transition_shading_data(
     return result;
 }
 
-/** Point the target material of a shading record of an entity at the fade node it is under,
- * with the chain from the node down to it, when an active Tint or Opacity transition reaches
- * it. The node of the entity itself renders its own Tint and Opacity.
- *
- * @param s The state of the extract
- * @param e The entity
- * @param time World time, the time of the packet
- * @param target The target material
- */
-static void box_transition_fade_target(
+void box_transitions_fade_target(
     const box_render_transitions_t *s,
     ecs_entity_t e,
     double time,
@@ -1506,14 +1397,14 @@ static void box_transition_send_mesh(
     box_draw_material_t material;
     uint32_t offset;
     if (!ds || ecs_has(world, e, Shape2D) || !ecs_has(world, e, ShapeMesh) ||
-        !box_transition_shading_data(d, p, ds->batch, ds->slot, &offset))
+        !box_transitions_shading_data(d, p, ds->batch, ds->slot, &offset))
     {
         goto done;
     }
 
     box_draws_shape_material(world, e, ds, &material);
     box_draws_transition_target(&target, &material, BOX_DRAW_TRANSITION_MESH);
-    box_transition_fade_target(s, e, p->time, &target);
+    box_transitions_fade_target(s, e, p->time, &target);
     box_transition_send_material(p, BOX_RENDER_TRANSITION_SHADING, &target, offset);
     box_draw_batch_t *b = box_draws_batch(d, ds->batch);
     if (d->shadow_record && b->key.cutout && box_draws_caster(b)) {
@@ -1605,12 +1496,12 @@ static void box_transition_send_glyphs(
     box_draws_text_material(world, item->entity, &tint, &material);
     box_draws_transition_target(&base, &material, BOX_DRAW_TRANSITION_GLYPH);
     ecs_os_memcpy(base.nodes, item->nodes, ECS_SIZEOF(base.nodes));
-    box_transition_fade_target(s, item->entity, p->time, &base);
+    box_transitions_fade_target(s, item->entity, p->time, &base);
     for (i = 0; i < count; i ++) {
         const box_draw_glyph_slot_t *at = ecs_vec_get_t(&ts->slots, box_draw_glyph_slot_t, i);
         const box_text_glyph_t *g = ecs_vec_get_t(&tg->glyphs, box_text_glyph_t, i);
         const rgba *color = length ? box_text_span_color(spans, length, g->offset) : NULL;
-        if (!box_transition_shading_data(d, p, at->batch, at->slot, &offset)) {
+        if (!box_transitions_shading_data(d, p, at->batch, at->slot, &offset)) {
             continue;
         }
 
@@ -1622,7 +1513,7 @@ static void box_transition_send_glyphs(
         box_draws_glyph_span_material(&material, color, &m, &rgb, &opacity);
         box_draws_transition_target(&span, &m, BOX_DRAW_TRANSITION_GLYPH);
         ecs_os_memcpy(span.nodes, item->nodes, ECS_SIZEOF(span.nodes));
-        box_transition_fade_target(s, item->entity, p->time, &span);
+        box_transitions_fade_target(s, item->entity, p->time, &span);
         span.nodes[BOX_RENDER_TRANSITION_RGB] = 0;
         span.opacity_scale = (float)color->a / 255.0f;
         box_transition_send_material(p, BOX_RENDER_TRANSITION_SHADING, &span, offset);
@@ -1632,8 +1523,10 @@ done:
 }
 
 /** Send the shading record of the shadow of a 2D shape an active Tint or Opacity transition
- * reaches, when the batch of the shadow uploaded its shading into this packet. An Rgb or other
- * material transition of the shape does not change its shadow.
+ * reaches, when the batch of the shadow uploaded its shading into this packet.
+ *
+ * An Rgb or other material transition of the shape does not change its shadow, and a shadow
+ * whose BoxShadow transitions gets its tints and opacity from its box shadow record instead.
  *
  * @param world The world
  * @param s The state of the extract
@@ -1656,13 +1549,14 @@ static void box_transition_send_box_shadow(
     box_draw_transition_material_t target;
     uint32_t offset;
     if (!bs || bs->batch < 0 || !ecs_map_get(&s->fade_index, e) ||
-        !box_transition_shading_data(d, p, bs->batch, bs->slot, &offset) ||
+        box_transitions_box_shadow_of(s, e) ||
+        !box_transitions_shading_data(d, p, bs->batch, bs->slot, &offset) ||
         !box_draws_box_shadow_target(world, d, e, ds, material, &target))
     {
         goto done;
     }
 
-    box_transition_fade_target(s, e, p->time, &target);
+    box_transitions_fade_target(s, e, p->time, &target);
     if (target.fade_node) {
         box_transition_send_material(p, BOX_RENDER_TRANSITION_SHADING, &target, offset);
     }
@@ -1713,12 +1607,12 @@ static void box_transition_send_materials(
 
         const DrawSlot *ds = ecs_get(world, item->entity, DrawSlot);
         if (ds && ecs_has(world, item->entity, Shape2D) &&
-            box_transition_shading_data(d, p, ds->batch, ds->slot, &offset))
+            box_transitions_shading_data(d, p, ds->batch, ds->slot, &offset))
         {
             box_draws_shape_material(world, item->entity, ds, &material);
             box_draws_transition_target(&target, &material, BOX_DRAW_TRANSITION_SHAPE);
             ecs_os_memcpy(target.nodes, item->nodes, ECS_SIZEOF(target.nodes));
-            box_transition_fade_target(s, item->entity, p->time, &target);
+            box_transitions_fade_target(s, item->entity, p->time, &target);
             box_transition_send_material(p, BOX_RENDER_TRANSITION_SHADING, &target, offset);
             box_transition_send_box_shadow(world, s, d, p, item->entity, ds, &material);
         }
@@ -1728,32 +1622,20 @@ static void box_transition_send_materials(
 }
 
 /** Send the pose of every node the walk of this frame found, parent nodes first, and a slot
- * record for every transform it moves that a batch uploaded into the packet, after the
- * batches were sent.
+ * record for every transform it moves that a batch uploaded into the packet.
  *
- * @param it The iterator of the system
+ * @param world The world
+ * @param s The state of the extract
+ * @param d The state of the batches
+ * @param p The packet
  */
-static void BoxRenderExtractTransitionSlots(
-    ecs_iter_t *it)
+static void box_transition_send_poses(
+    ecs_world_t *world,
+    box_render_transitions_t *s,
+    box_render_draws_t *d,
+    box_render_packet_t *p)
 {
-    box_render_transitions_t *s = it->ctx;
-    ecs_world_t *world = it->world;
-    box_render_draws_t *d = s->draws;
-    box_render_packet_t *p;
     int32_t i, count = ecs_vec_count(&s->items);
-    if (d && ecs_vec_count(&s->fade_items)) {
-        box_transition_send_fades(world, s, d, box_render_packet(world));
-    }
-
-    if (d && (ecs_vec_count(&s->material_slots) || ecs_vec_count(&s->shadings))) {
-        box_transition_send_materials(world, s, d, box_render_packet(world));
-    }
-
-    if (!d || (!count && !ecs_vec_count(&s->shadow_last))) {
-        goto done;
-    }
-
-    p = box_render_packet(world);
     ecs_vec_set_count_t(NULL, &s->rels, mat4, count);
     ecs_vec_set_count_t(NULL, &s->ranges, box_draw_transition_range_t,
         d->shadow_record ? count : 0);
@@ -1805,6 +1687,39 @@ static void BoxRenderExtractTransitionSlots(
     }
 
     box_transition_shadows(s, d);
+}
+
+/** Send the records that patch the batches of this frame, after the batches were sent: the
+ * fades, the materials and shadings, the poses and slots, and the box shadows, which read the
+ * poses.
+ *
+ * @param it The iterator of the system
+ */
+static void BoxRenderExtractTransitionSlots(
+    ecs_iter_t *it)
+{
+    box_render_transitions_t *s = it->ctx;
+    ecs_world_t *world = it->world;
+    box_render_draws_t *d = s->draws;
+    if (!d) {
+        goto done;
+    }
+
+    if (ecs_vec_count(&s->fade_items)) {
+        box_transition_send_fades(world, s, d, box_render_packet(world));
+    }
+
+    if (ecs_vec_count(&s->material_slots) || ecs_vec_count(&s->shadings)) {
+        box_transition_send_materials(world, s, d, box_render_packet(world));
+    }
+
+    if (ecs_vec_count(&s->items) || ecs_vec_count(&s->shadow_last)) {
+        box_transition_send_poses(world, s, d, box_render_packet(world));
+    }
+
+    if (ecs_vec_count(&s->box_shadows)) {
+        box_transitions_send_box_shadows(world, s, d, box_render_packet(world));
+    }
 done:
     return;
 }
@@ -1825,6 +1740,9 @@ static void box_transitions_free(
     ecs_map_fini(&s->fading);
     ecs_map_fini(&s->fade_index);
     ecs_map_fini(&s->tagged_opacity);
+    ecs_map_fini(&s->box_shadow_index);
+    ecs_map_fini(&s->tagged_box_shadow);
+    ecs_vec_fini_t(NULL, &s->box_shadows, box_transition_box_shadow_t);
     ecs_vec_fini_t(NULL, &s->fade_items, box_transition_item_t);
     ecs_vec_fini_t(NULL, &s->fade_rels, box_transition_fade_rel_t);
     ecs_vec_fini_t(NULL, &s->material_slots, box_transition_material_t);
@@ -1868,7 +1786,7 @@ bool box_render_transitions_active(
     box_render_transition_component_t component,
     double time)
 {
-    const box_transition_node_t *n = box_transition_node(s, node);
+    const box_transition_node_t *n = box_transitions_node_state(s, node);
     const box_transition_slot_t *slot = n ? &n->slots[component] : NULL;
 
     return slot && slot->present &&
@@ -1906,6 +1824,8 @@ void box_render_transitions_init(
     ecs_add_pair(world, TransitionMaterial, EcsOnInstantiate, EcsDontInherit);
     ECS_TAG_DEFINE(world, TransitionOpacity);
     ecs_add_pair(world, TransitionOpacity, EcsOnInstantiate, EcsDontInherit);
+    ECS_TAG_DEFINE(world, TransitionBoxShadow);
+    ecs_add_pair(world, TransitionBoxShadow, EcsOnInstantiate, EcsDontInherit);
     ECS_COMPONENT_DEFINE(world, RenderTransitionState);
     ecs_map_init(&s->by_entity, NULL);
     ecs_map_init(&s->moving, NULL);
@@ -1915,6 +1835,9 @@ void box_render_transitions_init(
     ecs_map_init(&s->fading, NULL);
     ecs_map_init(&s->fade_index, NULL);
     ecs_map_init(&s->tagged_opacity, NULL);
+    ecs_map_init(&s->box_shadow_index, NULL);
+    ecs_map_init(&s->tagged_box_shadow, NULL);
+    ecs_vec_init_t(NULL, &s->box_shadows, box_transition_box_shadow_t, 0);
     ecs_vec_init_t(NULL, &s->fade_items, box_transition_item_t, 0);
     ecs_vec_init_t(NULL, &s->fade_rels, box_transition_fade_rel_t, 0);
     ecs_vec_init_t(NULL, &s->material_slots, box_transition_material_t, 0);

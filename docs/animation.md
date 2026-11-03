@@ -196,7 +196,10 @@ and a backwards loop starts at its last value.
 - A **paused** animator holds its time and writes nothing per frame: the values of its tracks are
   free for the application or another system to change. Setting its `time` writes the values at
   that time once, so seeking while paused shows the frame, and the frame in which `paused`
-  becomes true writes nothing. Changing the clip or one of its tracks also writes once.
+  becomes true writes nothing. Changing the clip (`clip`, or `AnimationClip` on it) or one of
+  its tracks, including a key edit, or a change that moves a track to another target, also
+  writes once. Nothing else writes: editing another clip or adding, removing or renaming
+  children under the animated entity leaves the values the application set alone.
 - A finished `AnimationOnce` animator, or one with speed 0, writes only when its time changes.
 
 ### Prefabs and the time of instances

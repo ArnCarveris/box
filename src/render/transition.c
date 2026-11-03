@@ -39,6 +39,7 @@ _Static_assert(sizeof(SpecularAnisotropy) <= BOX_RENDER_TRANSITION_VALUE,
 _Static_assert(sizeof(Sheen) <= BOX_RENDER_TRANSITION_VALUE, "Sheen fits a value");
 _Static_assert(sizeof(DiffuseTransmission) <= BOX_RENDER_TRANSITION_VALUE,
     "DiffuseTransmission fits a value");
+_Static_assert(sizeof(BoxShadow) <= BOX_RENDER_TRANSITION_VALUE, "BoxShadow fits a value");
 _Static_assert(BOX_RENDER_TRANSITION_VALUE % sizeof(float) == 0, "A value holds floats");
 _Static_assert(BOX_RENDER_TRANSITION_COMPONENTS <= 16,
     "box_draw_transition_material_t.present holds a bit per component");
@@ -110,7 +111,16 @@ static const box_render_transition_layout_t box_transition_layouts[
         BOX_TRANSITION_U8(DiffuseTransmission, color.g),
         BOX_TRANSITION_U8(DiffuseTransmission, color.b),
         BOX_TRANSITION_FLOAT(DiffuseTransmission, thickness),
-        BOX_TRANSITION_FLOAT(DiffuseTransmission, blur) } }
+        BOX_TRANSITION_FLOAT(DiffuseTransmission, blur) } },
+    [BOX_RENDER_TRANSITION_BOX_SHADOW] = { ECS_SIZEOF(BoxShadow), 8, {
+        BOX_TRANSITION_FLOAT(BoxShadow, offset_x),
+        BOX_TRANSITION_FLOAT(BoxShadow, offset_y),
+        BOX_TRANSITION_FLOAT(BoxShadow, blur),
+        BOX_TRANSITION_FLOAT(BoxShadow, spread),
+        BOX_TRANSITION_U8(BoxShadow, color.r),
+        BOX_TRANSITION_U8(BoxShadow, color.g),
+        BOX_TRANSITION_U8(BoxShadow, color.b),
+        BOX_TRANSITION_U8(BoxShadow, color.a) } }
 };
 
 const box_render_transition_layout_t* box_render_transition_layout(
@@ -211,8 +221,11 @@ void box_render_transition_widen(
     float *hi)
 {
     float over;
-    int32_t i;
-    if (component > BOX_RENDER_TRANSITION_SCALE || spec->timing_function != CubicBezier) {
+    int32_t i, count = component == BOX_RENDER_TRANSITION_BOX_SHADOW ? 4 : 3;
+    if ((component > BOX_RENDER_TRANSITION_SCALE &&
+        component != BOX_RENDER_TRANSITION_BOX_SHADOW) ||
+        spec->timing_function != CubicBezier)
+    {
         goto done;
     }
 
@@ -222,7 +235,7 @@ void box_render_transition_widen(
         goto done;
     }
 
-    for (i = 0; i < 3; i ++) {
+    for (i = 0; i < count; i ++) {
         float width = (hi[i] - lo[i]) * over;
         lo[i] -= width;
         hi[i] += width;
@@ -752,11 +765,43 @@ static void* box_transition_material_value(
     case BOX_RENDER_TRANSITION_POSITION:
     case BOX_RENDER_TRANSITION_ROTATION:
     case BOX_RENDER_TRANSITION_SCALE:
+    case BOX_RENDER_TRANSITION_BOX_SHADOW:
     case BOX_RENDER_TRANSITION_COMPONENTS:
         break;
     }
 
     return result;
+}
+
+/** Replace the value of each component of a material that has a node by the value the node
+ * renders.
+ *
+ * @param t The table
+ * @param material The material
+ */
+static void box_transition_material_rendered(
+    const box_render_transition_table_t *t,
+    box_draw_transition_material_t *material)
+{
+    int32_t c;
+    for (c = 0; c < BOX_RENDER_TRANSITION_COMPONENTS; c ++) {
+        box_render_transition_component_t component = (box_render_transition_component_t)c;
+        const box_render_transition_node_t *node = material->nodes[c]
+            ? box_transition_node_get(t, material->nodes[c]) : NULL;
+        void *value = box_transition_material_value(material, component);
+        if (!node || !node->alive || !node->values[c].present || !value ||
+            !(material->present & (1u << c)))
+        {
+            continue;
+        }
+
+        ecs_os_memcpy(value, node->values[c].current,
+            box_render_transition_layout(component)->size);
+        if (component == BOX_RENDER_TRANSITION_OPACITY) {
+            material->opacity.value = glm_clamp(material->opacity.value, 0.0f, 1.0f) *
+                material->opacity_scale;
+        }
+    }
 }
 
 /** Patch a record of the material table or a 2D shading in the packet data: the target
@@ -776,7 +821,6 @@ static void box_transition_material(
     const void *src = box_transition_data(p, r->data, ECS_SIZEOF(material));
     ecs_size_t size = ECS_SIZEOF(box_render_material_t);
     void *dst;
-    int32_t c;
     if (!src) {
         goto done;
     }
@@ -803,33 +847,74 @@ static void box_transition_material(
         goto done;
     }
 
-    for (c = 0; c < BOX_RENDER_TRANSITION_COMPONENTS; c ++) {
-        box_render_transition_component_t component = (box_render_transition_component_t)c;
-        const box_render_transition_node_t *node = material.nodes[c]
-            ? box_transition_node_get(t, material.nodes[c]) : NULL;
-        void *value = box_transition_material_value(&material, component);
-        if (!node || !node->alive || !node->values[c].present || !value ||
-            !(material.present & (1u << c)))
-        {
-            continue;
-        }
-
-        ecs_os_memcpy(value, node->values[c].current,
-            box_render_transition_layout(component)->size);
-        if (component == BOX_RENDER_TRANSITION_OPACITY) {
-            material.opacity.value = glm_clamp(material.opacity.value, 0.0f, 1.0f) *
-                material.opacity_scale;
-        }
-    }
-
+    box_transition_material_rendered(t, &material);
     box_draws_transition_encode(&material, dst);
 done:
     return;
 }
 
-/** Apply the pose, slot, fade and material records of a packet, in the order they were made,
- * which puts a parent node before its children and every pose and fade before the records that
- * read it.
+/** Patch the transform and the shading of the shadow of a 2D shape whose BoxShadow transitions
+ * with the functions of the game thread (box_draws_box_shadow_patch): the BoxShadow its node
+ * renders, with the Tint and Opacity its shape renders at.
+ *
+ * The world matrix is that of the node that moves the shape times the target chain, else the
+ * target. A fade node without a fade record in the packet leaves the tints of the target.
+ *
+ * @param t The table
+ * @param p The packet
+ * @param r The record
+ */
+static void box_transition_box_shadow(
+    box_render_transition_table_t *t,
+    box_render_packet_t *p,
+    const box_render_transition_record_t *r)
+{
+    box_draw_transition_box_shadow_t record;
+    const void *src = box_transition_data(p, r->data, ECS_SIZEOF(record));
+    void *shading = box_transition_data(p, r->offset, ECS_SIZEOF(box_render_shading_t));
+    const box_render_transition_node_t *node = box_transition_node_get(t, r->node);
+    const box_render_transition_node_t *mover = r->parent
+        ? box_transition_node_get(t, r->parent) : NULL;
+    const box_render_transition_value_t *v;
+    BoxShadow shadow;
+    void *transform;
+    mat4 world, rel;
+    if (!src || !shading || !node || !node->alive) {
+        goto done;
+    }
+
+    ecs_os_memcpy(&record, src, ECS_SIZEOF(record));
+    transform = box_transition_data(p, record.transform, ECS_SIZEOF(box_render_transform_t));
+    if (!transform) {
+        goto done;
+    }
+
+    shadow = record.shadow;
+    v = &node->values[BOX_RENDER_TRANSITION_BOX_SHADOW];
+    if (v->present) {
+        ecs_os_memcpy(&shadow, v->current, ECS_SIZEOF(BoxShadow));
+    }
+
+    if (mover && mover->alive && mover->posed == p->frame) {
+        ecs_os_memcpy(rel, record.rel, ECS_SIZEOF(mat4));
+        glm_mul(ECS_CONST_CAST(vec4*, mover->world), rel, world);
+    } else {
+        ecs_os_memcpy(world, record.world, ECS_SIZEOF(mat4));
+    }
+
+    if (record.material.fade_node) {
+        box_transition_material_fade(t, p, &record.material);
+    }
+
+    box_transition_material_rendered(t, &record.material);
+    box_draws_transition_box_shadow(&record, &shadow, world, transform, shading);
+done:
+    return;
+}
+
+/** Apply the pose, slot, fade, material and box shadow records of a packet, in the order they
+ * were made, which puts a parent node before its children and every pose and fade before the
+ * records that read it.
  *
  * @param t The table
  * @param p The packet
@@ -852,6 +937,8 @@ static void box_transition_patch(
             box_transition_material(t, p, r);
         } else if (r->op == BOX_RENDER_TRANSITION_FADE) {
             box_transition_fade(t, p, r);
+        } else if (r->op == BOX_RENDER_TRANSITION_SHADOW_BOX) {
+            box_transition_box_shadow(t, p, r);
         }
     }
 }
