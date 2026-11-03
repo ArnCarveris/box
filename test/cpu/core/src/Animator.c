@@ -512,6 +512,94 @@ void Animator_seek_while_paused(void) {
     ecs_fini(world);
 }
 
+void Animator_paused_ignores_other_clip(void) {
+    ecs_world_t *world = animator_world();
+    ecs_entity_t clip = animator_clip(world, "clip", 0);
+    animator_track(world, clip, "y", ecs_id(Position), "y", NULL, animator_ramp, 2);
+    ecs_entity_t other = animator_clip(world, "other", 0);
+    ecs_entity_t track = animator_track(world, other, "x", ecs_id(Position), "x", NULL,
+        animator_ramp, 2);
+    ecs_entity_t e = ecs_new(world);
+    animator_play(world, e, clip, AnimationLoop, 1);
+
+    ecs_progress(world, 0.5f);
+    test_flt(ecs_get(world, e, Position)->y, 1);
+
+    animator_pause(world, e, true);
+    ecs_set(world, e, Position, {0, 100, 0});
+    ecs_progress(world, 0.5f);
+    test_flt(ecs_get(world, e, Position)->y, 100);
+
+    CurveKey keys[] = {{0, 0}, {2, 40}};
+    animator_track_set(world, track, ecs_id(Position), "x", NULL, keys, 2);
+    ecs_progress(world, 0.5f);
+    test_flt(ecs_get(world, e, Animator)->time, 0.5f);
+    test_flt(ecs_get(world, e, Position)->y, 100);
+
+    ecs_set(world, other, AnimationClip, { 3 });
+    ecs_progress(world, 0.5f);
+    test_flt(ecs_get(world, e, Position)->y, 100);
+
+    ecs_fini(world);
+}
+
+void Animator_paused_ignores_new_child(void) {
+    ecs_world_t *world = animator_world();
+    ecs_entity_t clip = animator_clip(world, "clip", 0);
+    animator_track(world, clip, "y", ecs_id(Position), "y", NULL, animator_ramp, 2);
+    ecs_entity_t e = ecs_entity(world, { .name = "e" });
+    animator_play(world, e, clip, AnimationLoop, 1);
+
+    ecs_progress(world, 0.5f);
+    test_flt(ecs_get(world, e, Position)->y, 1);
+
+    animator_pause(world, e, true);
+    ecs_set(world, e, Position, {0, 100, 0});
+    ecs_progress(world, 0.5f);
+    test_flt(ecs_get(world, e, Position)->y, 100);
+
+    ecs_new_w_pair(world, EcsChildOf, e);
+    ecs_progress(world, 0.5f);
+    test_flt(ecs_get(world, e, Animator)->time, 0.5f);
+    test_flt(ecs_get(world, e, Position)->y, 100);
+
+    ecs_entity_t child = ecs_new(world);
+    ecs_set(world, child, EcsParent, {e});
+    ecs_progress(world, 0.5f);
+    test_flt(ecs_get(world, e, Position)->y, 100);
+
+    ecs_fini(world);
+}
+
+void Animator_paused_own_track_edit_writes(void) {
+    ecs_world_t *world = animator_world();
+    ecs_entity_t clip = animator_clip(world, "clip", 0);
+    ecs_entity_t track = animator_track(world, clip, "y", ecs_id(Position), "y", NULL,
+        animator_ramp, 2);
+    ecs_entity_t e = ecs_new(world);
+    animator_play(world, e, clip, AnimationLoop, 1);
+
+    ecs_progress(world, 0.5f);
+    test_flt(ecs_get(world, e, Position)->y, 1);
+
+    animator_pause(world, e, true);
+    ecs_set(world, e, Position, {0, 100, 0});
+    ecs_progress(world, 0.5f);
+    test_flt(ecs_get(world, e, Position)->y, 100);
+
+    CurveKey keys[] = {{0, 0}, {2, 40}};
+    animator_track_set(world, track, ecs_id(Position), "y", NULL, keys, 2);
+    ecs_progress(world, 0.5f);
+    test_flt(ecs_get(world, e, Animator)->time, 0.5f);
+    test_flt(ecs_get(world, e, Position)->y, 10);
+
+    ecs_set(world, e, Position, {0, 100, 0});
+    ecs_progress(world, 0.5f);
+    test_flt(ecs_get(world, e, Position)->y, 100);
+
+    ecs_fini(world);
+}
+
 void Animator_seek_while_playing(void) {
     ecs_world_t *world = animator_world();
     ecs_entity_t clip = animator_clip(world, "clip", 0);
