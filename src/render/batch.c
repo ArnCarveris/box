@@ -967,7 +967,7 @@ void box_draws_material_pack(
     out->uv[3] = uv ? uv->offset_y : 0.0f;
     out->transmission_factor = transmission ? transmission->transmission_factor : 0.0f;
     out->ior = transmission ? transmission->ior : BOX_MATERIAL_IOR;
-    out->thickness_factor = transmission ? transmission->thickness_factor : 0.0f;
+    out->thickness_factor = transmission ? glm_max(transmission->thickness_factor, 0.0f) : 0.0f;
     out->attenuation_distance = transmission
         ? transmission->attenuation_distance : BOX_MATERIAL_ATTENUATION_DISTANCE;
     out->clear_coat = coat && box_draws_unorm16(coat->strength)

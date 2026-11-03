@@ -5,8 +5,9 @@
  * A shadow is a slot of the batch of its shape with the AlphaBlend blend mode and no textures,
  * drawn just before the shape (order.c), so it writes no depth and the shape draws over it.
  *
- * Its quad is the shadow box plus 3 standard deviations on each side; shape2d.wgsl tells it apart
- * by its negative border width, the negated standard deviation, and blurs it with an erf.
+ * Its quad is the shadow box plus 3 standard deviations on each side, which shape2d.wgsl blurs
+ * with an erf, and cuts out by the rounded box of the shape as CSS does (in its shading, with the
+ * alpha the shape covers it with), so it does not show through a translucent shape.
  */
 
 #include "draw.h"
@@ -24,6 +25,8 @@ typedef struct box_shadow_box_t {
     float offset[2];    /**< Offset of the shadow from the shape */
     float radius;       /**< Corner radius of the shadow box */
     float sigma;        /**< Standard deviation of the edge, at least BOX_SHADOW_SIGMA_MIN */
+    float element[2];   /**< Half extents of the rounded box of the shape */
+    float element_radius; /**< Corner radius of the rounded box of the shape */
 } box_shadow_box_t;
 
 /** Construct BoxShadowSlot values without a slot.
@@ -115,6 +118,9 @@ static bool box_shadow_resolve(
     out->size[1] = h + 6.0f * out->sigma;
     out->offset[0] = isfinite(shadow->offset_x) ? shadow->offset_x : 0.0f;
     out->offset[1] = isfinite(shadow->offset_y) ? shadow->offset_y : 0.0f;
+    out->element[0] = shape->size[0] * 0.5f;
+    out->element[1] = shape->size[1] * 0.5f;
+    out->element_radius = glm_clamp(shape->radius, 0.0f, half);
 done:
     return result;
 }
@@ -162,14 +168,39 @@ static float box_shadow_linear(
     return c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f);
 }
 
+/** Get the alpha a shape covers what is under it with at its edge, which the shadow is cut out
+ * by: its opacity, times the alpha of its border when it has one, for the blend modes that draw
+ * over the target, 0 for the others (Additive, Multiply and the like), which cover nothing.
+ *
+ * @param shape The resolved shape
+ * @param blend The blend mode of the shape
+ * @param alpha Resolved opacity of the shape
+ * @return The alpha from 0 to 1
+ */
+static float box_shadow_cover_alpha(
+    const Shape2D *shape,
+    uint8_t blend,
+    float alpha)
+{
+    bool covers = blend == Opaque || blend == AlphaBlend || blend == PremultipliedAlpha;
+    float edge = shape->border > 0.0f ? (float)shape->border_color.a / 255.0f : 1.0f;
+
+    return covers ? glm_clamp(alpha * edge, 0.0f, 1.0f) : 0.0f;
+}
+
 /** Write the shading of a shadow, which has no border, image or emission: emissive.w is the
  * aspect of its quad, material.x the corner radius of the shadow box and material.y the negated
  * standard deviation, both in units of half the smaller side of the quad.
+ *
+ * The rounded box of the shape it is cut out by, in the same units: uv.xy its center relative to
+ * the shadow, uv.zw its half extents, material.z its corner radius and material.w the alpha it
+ * covers the shadow with.
  *
  * @param out The shading
  * @param box The shadow box
  * @param color Display encoded color of the shadow
  * @param alpha Resolved opacity of the shape
+ * @param cover Alpha the shape covers the shadow with, box_shadow_cover_alpha
  * @param clip Clip index of the shape
  * @param rank Rank of the shadow
  */
@@ -178,6 +209,7 @@ static void box_shadow_shading(
     const box_shadow_box_t *box,
     const rgba *color,
     float alpha,
+    float cover,
     int32_t clip,
     uint32_t rank)
 {
@@ -192,8 +224,12 @@ static void box_shadow_shading(
     out->emissive[3] = box->size[0] / box->size[1];
     out->material[0] = glm_clamp(box->radius / half, 0.0f, 1.0f);
     out->material[1] = -box->sigma / half;
-    out->uv[0] = 1.0f;
-    out->uv[1] = 1.0f;
+    out->material[2] = box->element_radius / half;
+    out->material[3] = cover;
+    out->uv[0] = -box->offset[0] / half;
+    out->uv[1] = -box->offset[1] / half;
+    out->uv[2] = box->element[0] / half;
+    out->uv[3] = box->element[1] / half;
     out->ids[0] = clip > 0 ? (uint32_t)clip : 0u;
     out->ids[1] = rank;
     box_draws_color_pack(out->color, linear);
@@ -240,6 +276,7 @@ void box_draws_box_shadow_update(
     const Shape2D *shape = shadow && s->batch >= 0 ? ecs_get(world, e, Shape2D) : NULL;
     box_shadow_box_t box;
     box_draw_key_t key;
+    uint8_t blend = Opaque;
     if (!bs) {
         goto done;
     }
@@ -249,6 +286,7 @@ void box_draws_box_shadow_update(
     if (drawn) {
         ecs_os_memcpy_t(&key, &box_draws_batch(d, s->batch)->key, box_draw_key_t);
         drawn = key.pipeline == BOX_RENDER_SHADER_SHAPE2D;
+        blend = key.blend;
         key.blend = AlphaBlend;
         ecs_os_memset(key.textures, 0, ECS_SIZEOF(key.textures));
     }
@@ -278,7 +316,7 @@ void box_draws_box_shadow_update(
     box_shadow_transform(box_draws_slot_transform(b, bs->slot),
         ecs_get(world, e, WorldTransform), &box);
     box_shadow_shading(box_draws_slot_shading(b, bs->slot), &box, &shadow->color, alpha,
-        s->clip, bs->rank);
+        box_shadow_cover_alpha(shape, blend, alpha), s->clip, bs->rank);
     box_draws_slot_changed(b, bs->slot, BOX_DRAW_BOTH);
 done:
     return;

@@ -13,6 +13,7 @@
 
 #include "render.h"
 #include "../particle/simulate.h"
+#include "particle_rows.h"
 #include "../geometry/mesh_cache.h"
 #include "../texture/texture.h"
 #include <math.h>
@@ -94,6 +95,7 @@ typedef struct box_particle_pool_t {
     bool has_own;           /**< The emitter entity had ParticleForces in that frame */
     box_render_particle_pool_t entry; /**< The pool of the last frame of a lingering emitter
                              *   in the packet, which a lingering pool runs again */
+    box_particle_rows_use_t curves; /**< Rows of the curve table its curves use */
 } box_particle_pool_t;
 
 /** A burst of the frame and the emitter whose pool it spawns into */
@@ -124,6 +126,7 @@ typedef struct box_render_particles_t {
     const void *backend;    /**< Context of the backend the pages were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     int32_t generation;     /**< Generation of that backend, see box_render_backend_t */
+    box_particle_rows_t curves; /**< The curve table */
 } box_render_particles_t;
 
 /** Check whether a death comes before another, by clock and then by slot.
@@ -432,6 +435,8 @@ static void box_particles_pool_free(
         box_particles_mesh_free(s, p, pool);
     }
 
+    box_particle_rows_release(&s->curves, &pool->curves);
+
     if (!pool->lingering) {
         ecs_map_remove(&s->by_entity, pool->entity);
     }
@@ -457,6 +462,7 @@ static void box_particles_reset_backend(
     ecs_vec_clear(&s->page_handles);
     ecs_vec_clear(&s->table_handles);
     ecs_vec_clear(&s->mesh_handles);
+    box_particle_rows_reset(&s->curves);
     s->next_page = BOX_RENDER_BUFFER_PARTICLE_FIRST;
     s->next_table = BOX_RENDER_BUFFER_PARTICLE_TABLE_FIRST;
     s->next_mesh = BOX_RENDER_BUFFER_PARTICLE_MESH_FIRST;
@@ -1042,7 +1048,7 @@ static uint32_t box_particles_sort_count(
  *
  * @param curves The ParticleCurves of the emitter, NULL for none
  * @param look The ParticleAppearance of the emitter, NULL for none
- * @param pool The pool, with its billboard corners
+ * @param pool The pool, with its billboard corners and the rows of its curves
  * @param out The block, its other members written
  */
 static void box_particles_block_look(
@@ -1051,19 +1057,17 @@ static void box_particles_block_look(
     const box_particle_pool_t *pool,
     box_render_particle_block_t *out)
 {
-    const rgb *colors = NULL;
     int32_t i;
     for (i = 0; i < 4; i ++) {
-        out->curve_size[i] = curves ? (&curves->size.start)[i] : 1.0f;
-        out->curve_opacity[i] = curves ? (&curves->opacity.start)[i] : 1.0f;
-        out->curve_rotation[i] = curves ? (&curves->rotation.start)[i] : 0.0f;
-        out->curve_spin[i] = curves ? (&curves->spin.start)[i] : 1.0f;
-        colors = curves ? &(&curves->color.start)[i] : NULL;
-        out->gradient[i][0] = colors ? box_particle_linear(colors->r) : 1.0f;
-        out->gradient[i][1] = colors ? box_particle_linear(colors->g) : 1.0f;
-        out->gradient[i][2] = colors ? box_particle_linear(colors->b) : 1.0f;
-        out->gradient[i][3] = 1.0f;
+        out->curve_rows[i] = pool->curves.rows[i];
+        out->curve_values[i] = pool->curves.values[i];
     }
+
+    for (i = 0; i < 3; i ++) {
+        out->gradient[i] = pool->curves.gradient[i];
+    }
+
+    out->gradient_row = pool->curves.gradient_row;
 
     out->look = ParticleCircle;
     out->blend = ParticleAlpha;
@@ -1109,6 +1113,24 @@ static uint32_t box_particles_texture(
     return result;
 }
 
+/** Evaluate the curve of a ParticleLight, linear between its four keys. Lights are evaluated
+ * here on the CPU, not from the curve table.
+ *
+ * @param keys Values at 0, 1/3, 2/3 and 1 of the period
+ * @param t The time over the period, clamped to 0 to 1
+ * @return The value
+ */
+static float box_particles_light_curve(
+    const float *keys,
+    float t)
+{
+    float s = fminf(fmaxf(t, 0.0f), 1.0f) * 3.0f;
+    float i = fminf(floorf(s), 2.0f);
+    int32_t k = (int32_t)i;
+
+    return keys[k] + (keys[k + 1] - keys[k]) * (s - i);
+}
+
 /** Get the intensity a ParticleLight gives its light.
  *
  * @param light The ParticleLight
@@ -1133,7 +1155,7 @@ static float box_particles_light_value(
             t = time >= period ? 1.0f : (float)((double)time / (double)period);
         }
 
-        result *= box_particle_curve(&light->curve.start, t);
+        result *= box_particles_light_curve(&light->curve.start, t);
     }
 
     if (stopped) {
@@ -1329,7 +1351,11 @@ static void box_particles_emitter(
         age_us ? p->delta : 0.0f, effect && effect->scale > 0 ? effect->scale : 1.0f,
         &entry->block);
     box_particles_block_forces(pool, emitter->acceleration, &forces, moves, &entry->block);
+    box_particle_rows_update(&s->curves, &pool->curves, curves);
     box_particles_block_look(curves, look, pool, &entry->block);
+    entry->curves = box_particle_rows_used(&pool->curves)
+        ? BOX_RENDER_BUFFER_PARTICLE_CURVES
+        : 0;
     entry->block.count = count;
     entry->block.first = first;
     entry->block.used = pool->used;
@@ -1572,6 +1598,7 @@ static void BoxRenderExtractParticles(
         }
     }
 
+    box_particle_rows_send(&s->curves, p);
     for (i = 0; i < ecs_vec_count(&s->pages); i ++) {
         const box_particle_page_t *page = ecs_vec_get_t(&s->pages, box_particle_page_t, i);
         stats.bytes += (int64_t)page->pools * page->capacity * BOX_RENDER_PARTICLE_SIZE;
@@ -1608,6 +1635,7 @@ static void box_particles_free(
     ecs_vec_fini_t(NULL, &s->bursts, box_particle_burst_t);
     ecs_vec_fini_t(NULL, &s->mesh_handles, uint32_t);
     ecs_vec_fini_t(NULL, &s->corners, box_render_particle_corner_t);
+    box_particle_rows_fini(&s->curves);
     ecs_os_free(s);
 }
 
@@ -1638,6 +1666,7 @@ void box_render_particles_init(
     ecs_vec_init_t(NULL, &s->bursts, box_particle_burst_t, 0);
     ecs_vec_init_t(NULL, &s->mesh_handles, uint32_t, 0);
     ecs_vec_init_t(NULL, &s->corners, box_render_particle_corner_t, 0);
+    box_particle_rows_init(&s->curves);
     s->next_mesh = BOX_RENDER_BUFFER_PARTICLE_MESH_FIRST;
     s->next_page = BOX_RENDER_BUFFER_PARTICLE_FIRST;
     s->next_table = BOX_RENDER_BUFFER_PARTICLE_TABLE_FIRST;
@@ -1734,6 +1763,32 @@ bool box_render_particles_use(
     bool result = false;
     if (handle == BOX_RENDER_SHADER_PARTICLE_SIM || handle == BOX_RENDER_SHADER_PARTICLE_DRAW) {
         result = ecs_vec_count(&p->particles) != 0;
+    }
+
+    return result;
+}
+
+void box_render_particles_curve_stats(
+    const box_render_particles_t *s,
+    box_render_particle_curve_stats_t *out)
+{
+    ecs_os_memset_t(out, 0, box_render_particle_curve_stats_t);
+    if (s) {
+        box_particle_rows_stats(&s->curves, out);
+    }
+}
+
+const float* box_render_particles_curve_table(
+    const box_render_particles_t *s,
+    int32_t *rows)
+{
+    const float *result = NULL;
+    if (rows) {
+        *rows = 0;
+    }
+
+    if (s) {
+        result = box_particle_rows_data(&s->curves, rows);
     }
 
     return result;

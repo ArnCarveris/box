@@ -40,6 +40,23 @@ void SpatialLayout_fit_stretch(void) {
     ecs_fini(world);
 }
 
+void SpatialLayout_fit_bevel(void) {
+    ecs_world_t *world = setup();
+    ecs_entity_t hull = shape(world, 8, 3, 18), armor = shape(world, 1, 0.2f, 1);
+    ecs_set(world, armor, Bevel, {.top_front = 0.05f, .top_back = 0.05f, .segments = 4});
+    ecs_set(world, armor, Fit, {.target = hull, .axes = SpatialXZ, .padding = {0.4f, 0, 0.8f}});
+    ecs_progress(world, 0);
+    const ResolvedBox *b = ecs_get(world, armor, ResolvedBox);
+    test_assert(b != NULL);
+    near(b->x, 7.2f); near(b->y, 0.2f); near(b->z, 16.4f);
+    near(ecs_get(world, armor, Box)->x, 1);
+    near(ecs_get(world, armor, IntrinsicBounds)->max[0], 0.5f);
+    vec3 min, max;
+    test_assert(box_spatial_bounds(world, armor, NULL, min, max));
+    near(max[0] - min[0], 7.2f);
+    ecs_fini(world);
+}
+
 void SpatialLayout_fit_modes(void) {
     ecs_world_t *world = setup();
     ecs_entity_t target = shape(world, 8, 3, 18), e = shape(world, 2, 1, 3);

@@ -861,7 +861,10 @@ typedef struct box_render_transform_t {
  * - The shadow of a rectangle (BoxShadow, box_shadow.c): a rectangle whose quad is the shadow
  *   box plus 3 standard deviations on each side; material.y is negative, the negated standard
  *   deviation of its edge, material.x the corner radius of the shadow box, both in units of half
- *   the smaller side of the quad, and material.zw, emissive.xyz and the texture are unused.
+ *   the smaller side of the quad. It is cut out by the rounded box of its shape, in the same
+ *   units: uv.xy is the center of that box relative to the shadow, uv.zw its half extents,
+ *   material.z its corner radius and material.w the alpha the shape covers the shadow with at
+ *   its edge (0 for a blend mode that does not cover). emissive.xyz and the texture are unused.
  * - A line: emissive.w is its negated width, material.xy its start and material.zw its end.
  * - A glyph of a Text: emissive.w is 0, material.xy the distance range of its atlas page,
  *   material.zw 0 and uv the area of the glyph on the page.
@@ -871,7 +874,8 @@ typedef struct box_render_shading_t {
     vec4 emissive;          /**< Linear emitted color times its strength; w the aspect, the
                              *   negated line width or 0 for a glyph */
     vec4 material;          /**< The words of the shape, or metallic and roughness */
-    vec4 uv;                /**< TextureTransform: u scale, v scale, u offset, v offset */
+    vec4 uv;                /**< TextureTransform: u scale, v scale, u offset, v offset; the
+                             *   rounded box of its shape for a shadow */
     uint32_t color[2];      /**< Linear base color and alpha (the opacity with its ancestors) as
                              *   unorm16x4: r | g << 16, b | a << 16 (box_draws_color_pack) */
     uint32_t ids[2];        /**< Clip index of a 2D instance (0 for none), its rank in the draw
@@ -891,7 +895,7 @@ typedef struct box_render_material_t {
     float uv[4];            /**< TextureTransform: u scale, v scale, u offset, v offset */
     float transmission_factor; /**< Transmission.transmission_factor, 0 without one */
     float ior;              /**< Transmission.ior, BOX_MATERIAL_IOR without one */
-    float thickness_factor; /**< Transmission.thickness_factor, 0 without one */
+    float thickness_factor; /**< Transmission.thickness_factor, 0 without one or when negative */
     float attenuation_distance; /**< Transmission.attenuation_distance,
                              *   BOX_MATERIAL_ATTENUATION_DISTANCE without one */
     uint32_t clear_coat;    /**< ClearCoat strength | roughness << 16, two unorm16 clamped to
@@ -1145,6 +1149,7 @@ typedef struct box_render_transition_record_t {
                                      *   record patches */
     box_render_transition_component_t component; /**< Component of a start */
     TimingFunction timing_function; /**< Curve of a start */
+    TransitionBezier bezier;        /**< Handles of a CubicBezier start, zero for the others */
     float delay;                    /**< Seconds the value holds still after the start */
     float duration;                 /**< Seconds from the end of the delay to the target */
     double start;                   /**< World time of the start, the time of its packet */

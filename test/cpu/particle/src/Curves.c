@@ -68,33 +68,175 @@ static void check_defaults(
     check_white(&c->color.end);
 }
 
+/** Floats of a table that holds a curve and its area, or a gradient */
+#define TABLE (BOX_PARTICLE_GRADIENT_ROWS * BOX_PARTICLE_CURVE_SAMPLES)
+
+/** Bake a curve into row 0 of a table and its accumulated area into row 1, as the extract
+ * bakes a spin curve.
+ *
+ * @param keys The four keys
+ * @param table Receives the rows, TABLE floats
+ * @return The table
+ */
+static const float* bake(
+    const float *keys,
+    float *table)
+{
+    box_particle_curve_bake(keys, table);
+    box_particle_curve_bake_area(table, table + BOX_PARTICLE_CURVE_SAMPLES);
+
+    return table;
+}
+
+/** Evaluate a curve from its baked row.
+ *
+ * @param keys The four keys
+ * @param t The normalized age
+ * @return The value
+ */
+static float curve(
+    const float *keys,
+    float t)
+{
+    float table[TABLE];
+
+    return box_particle_curve(bake(keys, table), 0, 0, t);
+}
+
+/** Get the area under a curve from its baked rows.
+ *
+ * @param keys The four keys
+ * @param t The normalized age
+ * @return The area
+ */
+static float area(
+    const float *keys,
+    float t)
+{
+    float table[TABLE];
+
+    return box_particle_curve_area(bake(keys, table), 0, 0, t);
+}
+
+/** Get the row and value of a curve the way the extract writes them in the block: no row for a
+ * constant curve, else row 0 of a table it is baked into.
+ *
+ * @param keys The four keys
+ * @param table Receives the rows of a curve that is not constant, TABLE floats
+ * @param value Receives the value of a constant curve
+ * @return The row
+ */
+static uint32_t row_of(
+    const float *keys,
+    float *table,
+    float *value)
+{
+    uint32_t result = 0;
+    *value = keys[0];
+    if (keys[0] == keys[1] && keys[1] == keys[2] && keys[2] == keys[3]) {
+        result = BOX_PARTICLE_CURVE_CONSTANT;
+    } else {
+        bake(keys, table);
+    }
+
+    return result;
+}
+
+/** Get the degrees a particle turned by its spin, as the draw computes them from the block.
+ *
+ * @param spin Spin it spawned with
+ * @param keys The four keys of the spin curve
+ * @param age Seconds it lived
+ * @param life Seconds it lives
+ * @return The degrees
+ */
+static float turned(
+    float spin,
+    const float *keys,
+    float age,
+    float life)
+{
+    float table[TABLE], value;
+    uint32_t row = row_of(keys, table, &value);
+
+    return box_particle_turned(spin, table, row, value, age, life);
+}
+
+/** Get the rotation of a particle, as the draw computes it from the block.
+ *
+ * @param rotation Rotation it spawned with
+ * @param spin Spin it spawned with
+ * @param rotation_keys Keys of the rotation curve
+ * @param spin_keys Keys of the spin curve
+ * @param age Seconds it lived
+ * @param life Seconds it lives
+ * @return The degrees
+ */
+static float rotation_of(
+    float rotation,
+    float spin,
+    const float *rotation_keys,
+    const float *spin_keys,
+    float age,
+    float life)
+{
+    float table[2 * TABLE], rotation_value, spin_value;
+    uint32_t rotation_row = row_of(rotation_keys, table, &rotation_value);
+    uint32_t spin_row = row_of(spin_keys, table + TABLE, &spin_value);
+    if (spin_row != BOX_PARTICLE_CURVE_CONSTANT) {
+        spin_row = TABLE / BOX_PARTICLE_CURVE_SAMPLES;
+    }
+
+    return box_particle_rotation(rotation, spin, table, rotation_row, rotation_value,
+        spin_row, spin_value, age, life);
+}
+
+/** Evaluate a gradient from its baked rows.
+ *
+ * @param keys Four linear colors of four floats
+ * @param t The normalized age
+ * @param out Receives the color
+ */
+static void gradient(
+    const float *keys,
+    float t,
+    float *out)
+{
+    float table[TABLE];
+    box_particle_gradient_bake(keys, table);
+    box_particle_gradient(table, 0, NULL, t, out);
+}
+
 void Curves_constant_curve(void) {
     // particle/curves
-    float keys[4] = {2.5f, 2.5f, 2.5f, 2.5f};
+    float keys[4] = {2.5f, 2.5f, 2.5f, 2.5f}, table[TABLE], value;
     int32_t i;
+    uint32_t row = row_of(keys, table, &value);
+    test_uint(row, BOX_PARTICLE_CURVE_CONSTANT);
     for (i = 0; i <= 20; i ++) {
-        test_flt(box_particle_curve(keys, (float)i / 20.0f), 2.5f);
+        test_flt(box_particle_curve(NULL, row, value, (float)i / 20.0f), 2.5f);
+        test_flt(curve(keys, (float)i / 20.0f), 2.5f);
     }
 }
 
 void Curves_curve_at_sampled_ages(void) {
     // particle/curves
     float keys[4] = {0, 3, 1, 4};
-    near(box_particle_curve(keys, 0), 0);
-    near(box_particle_curve(keys, 1.0f / 3.0f), 3);
-    near(box_particle_curve(keys, 2.0f / 3.0f), 1);
-    near(box_particle_curve(keys, 1), 4);
-    near(box_particle_curve(keys, 1.0f / 6.0f), 1.5f);
-    near(box_particle_curve(keys, 0.5f), 2);
-    near(box_particle_curve(keys, 5.0f / 6.0f), 2.5f);
-    near(box_particle_curve(keys, 0.25f), 2.25f);
+    near(curve(keys, 0), 0);
+    near(curve(keys, 1.0f / 3.0f), 3);
+    near(curve(keys, 2.0f / 3.0f), 1);
+    near(curve(keys, 1), 4);
+    near(curve(keys, 1.0f / 6.0f), 1.5f);
+    near(curve(keys, 0.5f), 2);
+    near(curve(keys, 5.0f / 6.0f), 2.5f);
+    near(curve(keys, 0.25f), 2.25f);
 }
 
 void Curves_curve_clamps_age(void) {
     // particle/curves
     float keys[4] = {1, 2, 3, 4};
-    test_flt(box_particle_curve(keys, -1), 1);
-    test_flt(box_particle_curve(keys, 2), 4);
+    test_flt(curve(keys, -1), 1);
+    test_flt(curve(keys, 2), 4);
     test_flt(box_particle_norm_age(3, 2), 1);
     test_flt(box_particle_norm_age(-1, 2), 0);
     test_flt(box_particle_norm_age(1, 0), 0);
@@ -106,27 +248,31 @@ void Curves_gradient_at_sampled_ages(void) {
     float keys[4][4] = {
         {1, 0, 0, 1}, {0, 1, 0, 1}, {0, 0, 1, 1}, {1, 1, 1, 1}
     };
-    float c[3];
-    box_particle_gradient(keys[0], 0, c);
+    float c[3], white[3] = {1, 1, 1};
+    gradient(keys[0], 0, c);
     near(c[0], 1);
     near(c[1], 0);
     near(c[2], 0);
-    box_particle_gradient(keys[0], 1.0f / 3.0f, c);
+    gradient(keys[0], 1.0f / 3.0f, c);
     near(c[0], 0);
     near(c[1], 1);
     near(c[2], 0);
-    box_particle_gradient(keys[0], 0.5f, c);
+    gradient(keys[0], 0.5f, c);
     near(c[0], 0);
     near(c[1], 0.5f);
     near(c[2], 0.5f);
-    box_particle_gradient(keys[0], 1, c);
+    gradient(keys[0], 1, c);
     near(c[0], 1);
     near(c[1], 1);
     near(c[2], 1);
-    box_particle_gradient(keys[0], 5.0f / 6.0f, c);
+    gradient(keys[0], 5.0f / 6.0f, c);
     near(c[0], 0.5f);
     near(c[1], 0.5f);
     near(c[2], 1);
+    box_particle_gradient(NULL, BOX_PARTICLE_CURVE_CONSTANT, white, 0.5f, c);
+    test_flt(c[0], 1);
+    test_flt(c[1], 1);
+    test_flt(c[2], 1);
     test_flt(box_particle_linear(255), 1);
     test_flt(box_particle_linear(0), 0);
     near(box_particle_linear(128), 0.2158605f);
@@ -135,12 +281,12 @@ void Curves_gradient_at_sampled_ages(void) {
 void Curves_spin_area_constant(void) {
     // particle/curves
     float ones[4] = {1, 1, 1, 1}, halves[4] = {0.5f, 0.5f, 0.5f, 0.5f};
-    test_flt(box_particle_turned(90, ones, 0.75f, 2), 67.5f);
-    test_flt(box_particle_turned(90, halves, 1, 2), 45);
-    near(box_particle_curve_area(ones, 1), 1);
-    near(box_particle_curve_area(ones, 0.4f), 0.4f);
-    near(box_particle_curve_area(halves, 1), 0.5f);
-    test_flt(box_particle_curve_area(ones, 0), 0);
+    test_flt(turned(90, ones, 0.75f, 2), 67.5f);
+    test_flt(turned(90, halves, 1, 2), 45);
+    near(area(ones, 1), 1);
+    near(area(ones, 0.4f), 0.4f);
+    near(area(halves, 1), 0.5f);
+    test_flt(area(ones, 0), 0);
 }
 
 void Curves_spin_area_ramp(void) {
@@ -150,36 +296,78 @@ void Curves_spin_area_ramp(void) {
     int32_t i;
     for (i = 0; i <= 12; i ++) {
         float t = (float)i / 12.0f;
-        near(box_particle_curve_area(ramp, t), 0.5f * t * t);
+        near(area(ramp, t), 0.5f * t * t);
     }
 
-    near(box_particle_curve_area(steps, 1.0f / 3.0f), 0.5f);
-    near(box_particle_curve_area(steps, 2.0f / 3.0f), 1.5f);
-    near(box_particle_curve_area(steps, 1), 2);
-    near(box_particle_turned(100, ramp, 1, 2), 25);
-    near(box_particle_turned(100, ramp, 2, 2), 200 * 0.5f);
+    near(area(steps, 1.0f / 3.0f), 0.5f);
+    near(area(steps, 2.0f / 3.0f), 1.5f);
+    near(area(steps, 1), 2);
+    near(turned(100, ramp, 1, 2), 25);
+    near(turned(100, ramp, 2, 2), 200 * 0.5f);
 }
 
 void Curves_spin_area_not_spin_times_age(void) {
     // particle/curves
     float down[4] = {1, 2.0f / 3.0f, 1.0f / 3.0f, 0};
     float life = 3, age = 3;
-    float turned = box_particle_turned(60, down, age, life);
-    float naive = 60 * box_particle_curve(down, 1) * age;
-    near(turned, 90);
+    float t = turned(60, down, age, life);
+    float naive = 60 * curve(down, 1) * age;
+    near(t, 90);
     test_flt(naive, 0);
-    near(box_particle_turned(60, down, 1.5f, life), 60 * 3 * (0.5f - 0.125f));
+    near(turned(60, down, 1.5f, life), 60 * 3 * (0.5f - 0.125f));
 }
 
 void Curves_rotation_adds_turns(void) {
     // particle/curves
     float none[4] = {0, 0, 0, 0}, ones[4] = {1, 1, 1, 1};
     float quarter[4] = {0.25f, 0.25f, 0.25f, 0.25f}, spin_up[4] = {0, 0.5f, 1, 1.5f};
-    test_flt(box_particle_rotation(30, 0, none, ones, 1, 2), 30);
-    test_flt(box_particle_rotation(30, 10, none, ones, 1, 2), 40);
-    test_flt(box_particle_rotation(30, 0, quarter, ones, 1, 2), 120);
-    near(box_particle_rotation(0, 0, spin_up, ones, 1, 2), 270);
-    near(box_particle_rotation(10, 20, quarter, ones, 0.5f, 2), 10 + 90 + 10);
+    test_flt(rotation_of(30, 0, none, ones, 1, 2), 30);
+    test_flt(rotation_of(30, 10, none, ones, 1, 2), 40);
+    test_flt(rotation_of(30, 0, quarter, ones, 1, 2), 120);
+    near(rotation_of(0, 0, spin_up, ones, 1, 2), 270);
+    near(rotation_of(10, 20, quarter, ones, 0.5f, 2), 10 + 90 + 10);
+}
+
+void Curves_row_holds_keys(void) {
+    // particle/curves
+    float keys[4] = {0.25f, 3.1f, -1.7f, 4.3f}, row[BOX_PARTICLE_CURVE_SAMPLES];
+    float colors[4][4] = {
+        {0.1f, 0.2f, 0.3f, 1}, {0.4f, 0.5f, 0.6f, 1}, {0.7f, 0.8f, 0.9f, 1}, {1, 0, 0.5f, 1}
+    };
+    float g[TABLE];
+    int32_t i, c;
+    test_int(BOX_PARTICLE_CURVE_SAMPLES, 64);
+    box_particle_curve_bake(keys, row);
+    test_assert(row[0] == keys[0]);
+    test_assert(row[21] == keys[1]);
+    test_assert(row[42] == keys[2]);
+    test_assert(row[63] == keys[3]);
+    near(row[7], keys[0] + (keys[1] - keys[0]) / 3.0f);
+    near(row[49], keys[2] + (keys[3] - keys[2]) / 3.0f);
+
+    box_particle_gradient_bake(colors[0], g);
+    for (i = 0; i < 4; i ++) {
+        for (c = 0; c < 3; c ++) {
+            test_assert(g[i * 21 * 4 + c] == colors[i][c]);
+        }
+
+        test_flt(g[i * 21 * 4 + 3], 1);
+    }
+}
+
+void Curves_area_row_accumulates(void) {
+    // particle/curves
+    float keys[4] = {0, 3, 3, 0}, table[TABLE];
+    const float *v = bake(keys, table), *a = table + BOX_PARTICLE_CURVE_SAMPLES;
+    int32_t i;
+    test_flt(a[0], 0);
+    for (i = 1; i < BOX_PARTICLE_CURVE_SAMPLES; i ++) {
+        near(a[i], a[i - 1] + 0.5f * (v[i - 1] + v[i]) / 63.0f);
+    }
+
+    near(a[21], 0.5f);
+    near(a[42], 1.5f);
+    near(a[63], 2);
 }
 
 void Curves_c_defaults(void) {

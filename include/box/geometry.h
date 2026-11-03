@@ -164,6 +164,34 @@ ECS_STRUCT(RoundedBox, {
     int32_t segments; /**< Subdivisions per corner rounded up to even, default 4 */
 });
 
+/** Rounded edges of the Box of the entity, with one radius for every edge or one per edge.
+ *
+ * Right is +X, top is +Y and front is +Z, the side facing a camera that looks down its -Z. Radii
+ * are in the units of the Box; edge radii that do not fit scale down together as in a CSS
+ * border-radius, and each corner blends between the three edges that meet there.
+ *
+ * Without a Box it has no effect, and it does not apply to other shapes such as RoundedBox.
+ * Resizing a beveled Box can generate a new mesh when its proportions change, and a non-uniform
+ * Scale or a stretched Fit stretches the bevels.
+ */
+ECS_STRUCT(Bevel, {
+    float radius;       /**< Radius of every edge, clamped to half the smallest size of the Box;
+                         *   when not 0 the edge radii are ignored */
+    float top_front;    /**< Edge between the top and the front, 0 for a sharp edge */
+    float top_back;     /**< Edge between the top and the back */
+    float top_left;     /**< Edge between the top and the left */
+    float top_right;    /**< Edge between the top and the right */
+    float bottom_front; /**< Edge between the bottom and the front */
+    float bottom_back;  /**< Edge between the bottom and the back */
+    float bottom_left;  /**< Edge between the bottom and the left */
+    float bottom_right; /**< Edge between the bottom and the right */
+    float front_left;   /**< Vertical edge between the front and the left */
+    float front_right;  /**< Vertical edge between the front and the right */
+    float back_left;    /**< Vertical edge between the back and the left */
+    float back_right;   /**< Vertical edge between the back and the right */
+    int32_t segments;   /**< Subdivisions per rounded edge rounded up to even, default 4 */
+});
+
 /** Flat star polygon in the XY plane, the worked example of the shape registry */
 ECS_STRUCT(Star, {
     int32_t points; /**< Points of the star, at least three */
@@ -191,12 +219,17 @@ ECS_ENUM(SurfaceRegion, {
 /** Kind of a path segment */
 ECS_ENUM(PathSegmentKind, {
     PathLine,       /**< Straight line to the end, the control points are ignored */
-    PathCubicBezier /**< Cubic Bezier curve to the end through control1 and control2 */
+    PathCubicBezier, /**< Cubic Bezier curve to the end through control1 and control2 */
+    PathCatmullRom   /**< Uniform Catmull-Rom curve to the end, the control points are ignored.
+                      *   Its tangents come from the anchors of the adjacent segments, whatever
+                      *   their kind: the endpoint itself at the ends of an open path, wrapping
+                      *   around a closed one. Resolves to the cubic Bezier with
+                      *   c1 = p1 + (p2 - p0) / 6 and c2 = p2 - (p3 - p1) / 6. */
 });
 
 /** Segment of a Path2D that continues from the end of the previous segment */
 ECS_STRUCT(PathSegment2D, {
-    PathSegmentKind kind; /**< Line or cubic Bezier */
+    PathSegmentKind kind; /**< Line, cubic Bezier or Catmull-Rom */
     vec2 end;             /**< End point */
     vec2 control1;        /**< First control point of a cubic Bezier */
     vec2 control2;        /**< Second control point of a cubic Bezier */
@@ -204,7 +237,7 @@ ECS_STRUCT(PathSegment2D, {
 
 /** Segment of a Path3D that continues from the end of the previous segment */
 ECS_STRUCT(PathSegment3D, {
-    PathSegmentKind kind; /**< Line or cubic Bezier */
+    PathSegmentKind kind; /**< Line, cubic Bezier or Catmull-Rom */
     vec3 end;             /**< End point */
     vec3 control1;        /**< First control point of a cubic Bezier */
     vec3 control2;        /**< Second control point of a cubic Bezier */
@@ -213,7 +246,9 @@ ECS_STRUCT(PathSegment3D, {
 /** 2D path asset of a profile, contour or lathe, inherited by instances.
  *
  * A path needs at least one segment and finite points. A closed path whose last segment does
- * not end at the start gets a line back to it. Profiles sample a cubic segment in 16 steps.
+ * not end at the start gets a segment back to it: Catmull-Rom when the last segment is
+ * Catmull-Rom, so that a closed Catmull-Rom path is smooth all the way round, otherwise a line.
+ * Profiles sample a cubic Bezier or Catmull-Rom segment in 16 steps.
  */
 ECS_STRUCT(Path2D, {
     vec2 start;                     /**< Start point */
@@ -224,7 +259,9 @@ ECS_STRUCT(Path2D, {
 /** 3D path asset that a Sweep follows, inherited by instances.
  *
  * A path needs at least one segment and finite points. A closed path whose last segment does
- * not end at the start gets a line back to it.
+ * not end at the start gets a segment back to it: Catmull-Rom when the last segment is
+ * Catmull-Rom, otherwise a line. Every segment resolves to a cubic Bezier, so a Sweep evaluates
+ * all kinds alike.
  */
 ECS_STRUCT(Path3D, {
     vec3 start;                     /**< Start point */
@@ -478,9 +515,10 @@ ECS_STRUCT(Border, {
  * grown by the spread on each side with its corner radius; a negative spread shrinks it, down to
  * nothing. As in CSS the edge is a Gaussian of a standard deviation of half the blur.
  *
- * The alpha is that of the color times the opacity of the entity. It follows the outline of a Rect
- * or Circle, not the alpha of an Image, and draws nothing on a Line or Text. Picking and layout
- * ignore it.
+ * The alpha is that of the color times the opacity of the entity. As in CSS it is not drawn under
+ * the Rect or Circle, so it does not show through a translucent one. It follows the outline of a
+ * Rect or Circle, not the alpha of an Image, and draws nothing on a Line or Text. Picking and
+ * layout ignore it.
  */
 ECS_STRUCT(BoxShadow, {
     float offset_x; /**< Horizontal offset of the shadow */
@@ -614,6 +652,8 @@ typedef struct box_shape_desc_t {
     box_shape_surface_world_fn surface_world;   /**< Surface function that reads other
                                                  *   entities, NULL for none */
     box_shape_surface_fn surface;   /**< Parametric surface function, NULL for none */
+    ecs_entity_t exclude;           /**< Component of entities whose shape another resolver
+                                     *   sets, 0 for none */
 } box_shape_desc_t;
 
 /** Register a shape so that setting its component selects a cached mesh.

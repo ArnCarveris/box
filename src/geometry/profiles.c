@@ -322,48 +322,19 @@ static bool box_path_pack(const ecs_world_t *world, ecs_entity_t entity, bool th
         return false;
     }
     *offset = 24 + ecs_vec_count(data);
-    *count = ecs_vec_count(three ? &p3->segments : &p2->segments);
-    vec3 start = {0}, origin = {0};
-    ecs_os_memcpy(start, three ? p3->start : p2->start, (three ? 3 : 2) * sizeof(float));
-    glm_vec3_copy(start, origin);
+    *count = three ? box_path3_count(p3) : box_path2_count(p2);
     for (int i = 0; i < *count; i ++) {
-        vec3 end = {0}, c1 = {0}, c2 = {0};
-        PathSegmentKind kind;
+        vec3 cubic[4];
         if (three) {
-            const PathSegment3D *s = ecs_vec_get_t(&p3->segments, PathSegment3D, i);
-            kind = s->kind;
-            glm_vec3_copy(ECS_CONST_CAST(float*, s->end), end);
-            glm_vec3_copy(ECS_CONST_CAST(float*, s->control1), c1);
-            glm_vec3_copy(ECS_CONST_CAST(float*, s->control2), c2);
+            box_path3_cubic(p3, i, cubic);
         } else {
-            const PathSegment2D *s = ecs_vec_get_t(&p2->segments, PathSegment2D, i);
-            kind = s->kind;
-            glm_vec2_copy(ECS_CONST_CAST(float*, s->end), end);
-            glm_vec2_copy(ECS_CONST_CAST(float*, s->control1), c1);
-            glm_vec2_copy(ECS_CONST_CAST(float*, s->control2), c2);
+            box_path2_cubic(p2, i, cubic);
         }
-        if (kind == PathLine) {
-            glm_vec3_lerp(start, end, 1.0f / 3, c1);
-            glm_vec3_lerp(start, end, 2.0f / 3, c2);
-        }
-        if (!box_asset_append(data, (vec4){start[0], start[1], start[2], 0}) ||
-            !box_asset_append(data, (vec4){c1[0], c1[1], c1[2], 0}) ||
-            !box_asset_append(data, (vec4){c2[0], c2[1], c2[2], 0}) ||
-            !box_asset_append(data, (vec4){end[0], end[1], end[2], 0}))
-        {
-            return false;
-        }
-        glm_vec3_copy(end, start);
-    }
-    if ((three ? p3->closed : p2->closed) && !glm_vec3_eqv(start, origin)) {
-        for (int i = 0; i < 4; i ++) {
-            vec3 point;
-            glm_vec3_lerp(start, origin, (float)i / 3, point);
-            if (!box_asset_append(data, (vec4){point[0], point[1], point[2], 0})) {
+        for (int k = 0; k < 4; k ++) {
+            if (!box_asset_append(data, (vec4){cubic[k][0], cubic[k][1], cubic[k][2], 0})) {
                 return false;
             }
         }
-        (*count) ++;
     }
     return true;
 }

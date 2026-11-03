@@ -329,6 +329,22 @@ done:
     return result;
 }
 
+box_shape_t* box_mesh_cache_shape(
+    const box_mesh_cache_t *cache,
+    ecs_entity_t component)
+{
+    box_shape_t *result = NULL;
+    box_shape_t **shapes = ecs_vec_first(&cache->shapes);
+    for (int32_t i = 0; i < ecs_vec_count(&cache->shapes); i ++) {
+        if (shapes[i]->desc.component == component) {
+            result = shapes[i];
+            break;
+        }
+    }
+
+    return result;
+}
+
 /** Shape value used to cache a source mesh resolved against a parametric surface */
 typedef struct box_resolved_mesh_t {
     const ShapeMesh *shape;   /**< Shape with the surface parameters */
