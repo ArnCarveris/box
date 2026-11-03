@@ -189,7 +189,10 @@ static uint32_t hash_file(
     ecs_world_t *world = world_new();
     uint32_t hash = 2166136261U;
     int32_t i;
-    test_assert(ecs_script_run_file(world, file) == 0);
+    char *path = box_app_locate(file);
+    test_assert(path != NULL);
+    test_assert(ecs_script_run_file(world, path) == 0);
+    ecs_os_free(path);
     for (i = 0; i < 3; i ++) {
         char name[64];
         int32_t size = 0;
@@ -279,6 +282,8 @@ void TextureGen_pattern_wraps(void) {
     static const TextureGenLayer *layers[3] = { &noise_layer, &blocks_layer, &cells_layer };
     float value[64 * 48], id[64 * 48];
     int32_t l, x, y;
+
+    ecs_world_t *world = world_new();
     for (l = 0; l < 3; l ++) {
         box_texture_gen_pattern(layers[l], 9, 64, 48, value, id);
         for (y = 0; y < 48; y ++) {
@@ -289,7 +294,6 @@ void TextureGen_pattern_wraps(void) {
         }
     }
 
-    // noise varies smoothly, so across the wrap it is as close as between neighbors
     box_texture_gen_pattern(&noise_layer, 9, 64, 48, value, id);
     for (y = 0; y < 48; y ++) {
         test_assert(fabsf(value[y * 64] - value[y * 64 + 63]) < 0.1f);
@@ -298,6 +302,8 @@ void TextureGen_pattern_wraps(void) {
     for (x = 0; x < 64; x ++) {
         test_assert(fabsf(value[x] - value[47 * 64 + x]) < 0.1f);
     }
+
+    ecs_fini(world);
 }
 
 void TextureGen_same_seed_same_bytes(void) {
@@ -365,7 +371,6 @@ void TextureGen_flat_normal(void) {
         test_int(rgba[i * 4 + 3], 255);
     }
 
-    // a generator without layers is flat as well
     ecs_world_t *world = world_new();
     ecs_entity_t tex = ecs_new(world);
     ecs_set(world, tex, TextureGen, { .width = 16, .height = 16, .output = GenNormal });
@@ -388,7 +393,6 @@ void TextureGen_normal_green_up(void) {
     uint8_t rgba[8 * 8 * 4];
     int32_t x, y;
 
-    // rising down the image, so the surface faces up the image: green above 0.5
     for (y = 0; y < 8; y ++) {
         for (x = 0; x < 8; x ++) {
             height[y * 8 + x] = y / 8.0f;
@@ -405,7 +409,6 @@ void TextureGen_normal_green_up(void) {
         }
     }
 
-    // rising down the image falls up it: green below 0.5
     for (y = 0; y < 8; y ++) {
         for (x = 0; x < 8; x ++) {
             height[y * 8 + x] = 1.0f - y / 8.0f;
@@ -417,7 +420,6 @@ void TextureGen_normal_green_up(void) {
         test_assert(rgba[(y * 8) * 4 + 1] < 116);
     }
 
-    // rising to the right, so the surface faces left: red below 0.5
     for (y = 0; y < 8; y ++) {
         for (x = 0; x < 8; x ++) {
             height[y * 8 + x] = x / 8.0f;
@@ -498,7 +500,6 @@ void TextureGen_writes_texture_and_status(void) {
         test_assert(entry->pixels != NULL);
     }
 
-    // the albedo maps the height through the ramp
     const box_texture_t *h = entry_of(world, stone);
     const box_texture_t *c = entry_of(world, color);
     for (i = 0; i < 32 * 16; i ++) {
@@ -587,7 +588,6 @@ void TextureGen_source_missing(void) {
     test_assert(strstr(status->error, "derived") != NULL);
     test_assert(strstr(status->error, "plain") != NULL);
 
-    // a TextureGen on the source later generates the derived one
     TextureGen gen = { .width = 8, .height = 8 };
     ecs_vec_init_t(NULL, &gen.layers, TextureGenLayer, 1);
     *ecs_vec_append_t(NULL, &gen.layers, TextureGenLayer) = noise_layer;
@@ -620,7 +620,6 @@ void TextureGen_with_path_error(void) {
     test_assert(strstr(status->error, "TextureGen") != NULL);
     test_assert(ecs_get(world, both, Texture) == NULL);
 
-    // removing the TexturePath leaves the TextureGen, which generates
     ecs_remove(world, both, TexturePath);
     status = wait_texture(world, both);
     test_int(status->state, TextureReady);
@@ -674,15 +673,15 @@ void TextureGen_capped_by_quality(void) {
 
 void TextureGen_hash_noise(void) {
     // materials/textures
-    test_hash(GEN_NOISE, "noise", 0x00000000U);
+    test_hash(GEN_NOISE, "noise", 0xaee82167U);
 }
 
 void TextureGen_hash_blocks(void) {
     // materials/textures
-    test_hash(GEN_BLOCKS, "blocks", 0x00000000U);
+    test_hash(GEN_BLOCKS, "blocks", 0xd1e196bfU);
 }
 
 void TextureGen_hash_cells(void) {
     // materials/textures
-    test_hash(GEN_CELLS, "cells", 0x00000000U);
+    test_hash(GEN_CELLS, "cells", 0x68a56d43U);
 }
