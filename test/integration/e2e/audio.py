@@ -8,8 +8,8 @@ runner fails a case on any logged error.
 
 test_all_features starts two more processes of its own with test/assets/audio/all_features.flecs,
 the scene that uses every part of box.audio, which captures its first 3 seconds at load: both
-channels have their levels, the reverb tail rings after a click, and the two runs write bit
-identical captures.
+channels have their levels, the reverb tail rings after a click, the engine is on the left and
+the chime of play_at on the right, and the two runs write bit identical captures.
 """
 import io
 import math
@@ -209,6 +209,10 @@ def test_all_features(app):
     lr, rr = rms(left, 1.1, 1.45), rms(right, 1.1, 1.45)
     app.check(lr > rr * 1.1, "the engine at x -4 is not on the left: %.4f left, %.4f right" %
               (lr, rr))
+    # The chime of play_at at x 3, from 1.5 s for 0.25 s, on the right
+    lc, rc = rms(left, 1.55, 1.7), rms(right, 1.55, 1.7)
+    app.check(rc > lc * 1.3 and rc > rr * 2, "the chime at x 3 is not on the right: %.4f left, "
+              "%.4f right" % (lc, rc))
     total = max(peak_of(left, 0, 3), peak_of(right, 0, 3))
     app.check(total < 0.96, "the capture peaks at %.4f, over the limiter" % total)
 

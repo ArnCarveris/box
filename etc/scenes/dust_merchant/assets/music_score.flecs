@@ -7,11 +7,12 @@
 // make_music.py runs with, so every note starts on a frame.
 using flecs.script
 using flecs.script.math
+using box.app
 using box.audio
 
 hall { AudioBus: {output: master}; Reverb: {decay: 1.6, damping: 0.55, predelay: 0.03, size: 0.7} }
-band { AudioBus: {output: master, volume: 0.8, send: hall, send_level: 0.35} }
-kit { AudioBus: {output: master, volume: 0.7, send: hall, send_level: 0.12} }
+band { AudioBus: {output: master, volume: 0.55, send: hall, send_level: 0.35} }
+kit { AudioBus: {output: master, volume: 0.5, send: hall, send_level: 0.12} }
 
 // A chord of three notes and an octave, swelling over a bar
 template Pad {
@@ -111,14 +112,18 @@ Lead lead_e4(f: 329.63)
 Lead lead_b4(f: 493.88)
 Lead lead_gs4(f: 415.3)
 
+const PADS = [pad_am, pad_f, pad_c, pad_g, pad_dm, pad_e]
+const BASSES = [bass_a, bass_f, bass_c, bass_g, bass_d, bass_e]
+const LEADS = [lead_a4, lead_c5, lead_d5, lead_e5, lead_g5, lead_a5, lead_g4, lead_e4, lead_b4, lead_gs4]
+
 // The chord of every bar: 0 Am, 1 F, 2 C, 3 G, 4 Dm, 5 E
-const BARS: i32[16] = [0, 0, 1, 3, 0, 0, 1, 5, 4, 0, 1, 2, 1, 3, 5, 5]
-const BASS_HITS: i32[8] = [1, 0, 0, 1, 1, 0, 1, 0]
-const KICKS: i32[8] = [1, 0, 0, 0, 1, 0, 0, 0]
+const BARS = [0, 0, 1, 3, 0, 0, 1, 5, 4, 0, 1, 2, 1, 3, 5, 5]
+const BASS_HITS = [1, 0, 0, 1, 1, 0, 1, 0]
+const KICKS = [1, 0, 0, 0, 1, 0, 0, 0]
 
 // The lead per eighth note, -1 a rest: 0 A4, 1 C5, 2 D5, 3 E5, 4 G5, 5 A5, 6 G4, 7 E4, 8 B4,
 // 9 G#4
-const MELODY: i32[128] = [
+const MELODY = [
   -1, -1, -1, -1, -1, -1, -1, -1,
   -1, -1, -1, -1, 3, -1, 2, -1,
   0, -1, -1, 1, -1, -1, 0, -1,
@@ -142,12 +147,10 @@ async {
     const chord = BARS[bar]
     for beat in 0..8 {
       if beat == 0 {
-        const pad: entity = match chord { 0: pad_am; 1: pad_f; 2: pad_c; 3: pad_g; 4: pad_dm; _: pad_e }
-        const pad_on = box.audio.play(pad, 0.9)
+        const pad_on = box.audio.play(PADS[chord], 0.9)
       }
       if BASS_HITS[beat] == 1 {
-        const bass: entity = match chord { 0: bass_a; 1: bass_f; 2: bass_c; 3: bass_g; 4: bass_d; _: bass_e }
-        const bass_on = box.audio.play(bass, match beat == 0 { true: 0.9; _: 0.65 })
+        const bass_on = box.audio.play(BASSES[chord], match beat == 0 { true: 0.9; _: 0.65 })
       }
       if KICKS[beat] == 1 && (bar > 0 || beat == 0) {
         const kick_on = box.audio.play(Kick, 0.9)
@@ -160,11 +163,7 @@ async {
       }
       const n = MELODY[bar * 8 + beat]
       if n >= 0 {
-        const lead: entity = match n {
-          0: lead_a4; 1: lead_c5; 2: lead_d5; 3: lead_e5; 4: lead_g5; 5: lead_a5; 6: lead_g4
-          7: lead_e4; 8: lead_b4; _: lead_gs4
-        }
-        const lead_on = box.audio.play(lead, 0.75)
+        const lead_on = box.audio.play(LEADS[n], 0.75)
       }
       for f in 0..15 {
         await next_frame()

@@ -67,8 +67,8 @@ cabin_verb {
   Reverb: {decay: 0.75, damping: 0.6, predelay: 0.008, size: 0.25}
 }
 world { AudioBus: {output: master, send: cabin_verb, send_level: 0.28} }
-ui { AudioBus: {output: master, volume: 0.8} }
-music { AudioBus: {output: master, volume: 0.32} }
+ui { AudioBus: {output: master, volume: 0.55} }
+music { AudioBus: {output: master, volume: 0.45} }
 ```
 
 A small metal cabin rings briefly: a short decay, a small size and little predelay. `world`, the
@@ -117,13 +117,17 @@ breakers, the cap buttons and the radio have sounds of their own. `audio.flecs` 
 sounds.
 
 **The engine** is a looping synth drone at a fixed pitch, placed on the starboard engine pod
-behind the cabin. The camera of the main view is the listener, so the drone pans and changes its
-level as the camera moves between the stations (keys 1 to 6) and as it looks around:
+behind the cabin. `eye`, the camera of the main view, is the listener, so the drone pans and
+changes its level as the camera moves between the stations (keys 1 to 6) and as it looks around.
+The scene tags it: its screens render their own views before the main one, and without a tag the
+camera of the first view would listen, far from the engine:
 
 ```
+eye { AudioListener }
+
 engine_sound {
   Position: {3.1, 0.6, 3.8}
-  AudioSource: {sound: EngineHum, loop: true, volume: 0.3 + 0.2 * bool_f(bus) + 0.5 * bool_f(reactor_on)}
+  AudioSource: {sound: EngineHum, loop: true, volume: 0.3 + 0.2 * bool_f(bus) + 0.3 * bool_f(reactor_on)}
   AudioOutput: {bus: world}
   AudioSpatial: {min_distance: 1.5, max_distance: 30}
 }
@@ -220,8 +224,9 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
 - **Voices**: 64, with the quietest stolen; no priorities. A one shot cannot be controlled after
   it started.
 - **Synth**: up to 4 oscillators and one filter per sound, linear envelopes, no LFO and no node
-  graph. A looping synth sound starts a new pass of its envelopes at the end of the last, at most
-  every 60 seconds, which a drone hears as a short dip.
+  graph. A looping synth sound starts a new pass of its envelopes and oscillators at the end of
+  the last, at most every 60 seconds; a drone keeps that gap short with edges of a few ms, as
+  the dust merchant's engine does with 2 ms.
 - **Files**: WAV and FLAC for sounds, Ogg Vorbis for music, one stream at once (a change of path
   fades over 5 ms, there is no crossfade).
 - **Tools**: no mixer UI, and the UI theme of box has no sounds; a scene adds them in its own
@@ -257,7 +262,9 @@ The resource is empty until the capture is complete. Input commands (`key_press 
 
 The tests that use all of it together are the `all_features` case of
 `test/integration/e2e/audio.py` and `test/integration/web/audio_all_features.mjs`, both on
-`test/assets/audio/all_features.flecs`.
+`test/assets/audio/all_features.flecs`. Its timeline is a list of `SetAt` entities, which change
+the scene at known frames: they start the loops and give the `Play` and `PlayAt` templates a new
+count, whose async block then calls `box.audio.play` or `box.audio.play_at`.
 
 ## Reference
 
@@ -884,8 +891,8 @@ const played: bool = box.audio.play(click, 0.8)
 `box_audio_play(world, sound, volume)`, in scripts `box.audio.play(sound, volume)`, plays a
 sound once on the bus of its `AudioOutput`, without an entity per play; there is no control of a
 voice after it started. `box_audio_play_at(world, sound, position, volume)`, in scripts
-`box.audio.play_at(sound, {x, y, z}, volume)`, plays it once at a place in the world (see
-[Spatial audio](#spatial-audio)). `box_audio_capture(world, seconds, path)`, in scripts
+`box.audio.play_at(sound, {x, y, z}, volume)`, plays any of them once at a place in the world
+(see [Spatial audio](#spatial-audio)). `box_audio_capture(world, seconds, path)`, in scripts
 `box.audio.capture(seconds, path)`, records the master output to a WAV file.
 
 **One batch per frame.** The system `AudioSync` runs in `PreStore`, after the transforms and
@@ -954,9 +961,10 @@ order (`box_view_compare`), so a game view listens before the overlays of the ed
 console. Several `AudioListener` entities use the one with the lowest id and log one warning,
 `box.audio: <n> entities have AudioListener, '<path>' listens`, again only after the count
 dropped to one. To make a character listen while the camera follows it, tag the character,
-or a child at the height of its head; to make the camera listen, give it nothing. Without a
-listener a spatial source plays centered at full volume, beyond `max_distance` too, and nothing
-is logged.
+or a child at the height of its head; to make the camera listen, give it nothing, unless the
+scene renders to textures: their views come first in render order, so tag the camera of the main
+view, as the dust merchant does. Without a listener a spatial source plays centered at full
+volume, beyond `max_distance` too, and nothing is logged.
 
 **A source** is an `AudioSource` with `AudioSpatial`. With a `WorldTransform` it is heard at the
 translation of that transform, which is the world position of the entity: a child of a moving

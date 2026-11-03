@@ -255,7 +255,7 @@ async function main() {
       }
     };
     const audioState = async () => (await component('$', 'AudioStatus')).state;
-    const streamOf = () => component('music_track', 'AudioStreamStatus');
+    const streamOf = () => component('loops.music_track', 'AudioStreamStatus');
     const openStream = (stats) => (stats.streams || []).find((s) => s && s.open);
 
     // Before the gesture: the page waits, and the scene plays its timeline silently
@@ -276,7 +276,7 @@ async function main() {
     const runningBy = Date.now() + 3000;
     while (Date.now() < runningBy && await audioState() !== 'AudioRunning') await sleep(100);
     expect(await audioState() === 'AudioRunning', 'AudioStatus is not AudioRunning');
-    expect(await waitFor(`${shell('get music_track box.audio.AudioStreamStatus')}` +
+    expect(await waitFor(`${shell('get loops.music_track box.audio.AudioStreamStatus')}` +
       `.includes('AudioStreamPlaying')`, 5000), 'the music does not play');
     await sleep(1000);
 

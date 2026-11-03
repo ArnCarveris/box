@@ -2,10 +2,12 @@
  * @file Spatial.c
  * @brief Spatial audio of box.audio, measured through a null output: the distance curve, the
  * equal power pan, the listener, sources that follow an entity, one shots of
- * box_audio_play_at, loops out of range and the ramps that keep a jump from clicking.
+ * box_audio_play_at of every kind of sound, loops out of range and the ramps that keep a jump
+ * from clicking.
  */
 
 #include "world.h"
+#include "../../../../src/jobs/jobs.h"
 
 /** Frames the levels of a case are measured over, the second half of a frame */
 #define SPATIAL_MEASURE (AUDIO_FRAME / 2)
@@ -441,6 +443,40 @@ void Spatial_play_at(void) {
     audio_run(world, 120);
     test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
     spatial_expect(0, 0);
+    ecs_fini(world);
+}
+
+void Spatial_play_at_synth_and_file(void) {
+    // audio/spatial
+    ecs_world_t *world = audio_world();
+    test_int(box_jobs_set_workers(world, 0), 0);
+    test_assert(ecs_script_run(world, "beep",
+        "using box.audio\n"
+        "prefab Beep {\n"
+        "  SynthSound: {}\n"
+        "  SynthEnvelope: {attack: 0.001, sustain: 1, hold: 0.5, release: 0.01}\n"
+        "  SynthOscillator: {frequency: 500, level: 0.5}\n"
+        "  AudioSpatial: {min_distance: 1, max_distance: 50, rolloff: 0}\n"
+        "}\n"
+        "chime {\n"
+        "  SoundFile: {path: \"test/assets/audio/sine_16.wav\"}\n"
+        "  AudioSpatial: {min_distance: 1, max_distance: 50, rolloff: 0}\n"
+        "}\n", NULL) == 0);
+    ecs_entity_t sounds[] = { ecs_lookup(world, "Beep"), ecs_lookup(world, "chime") };
+    int32_t i, start;
+    spatial_listener(world, 0, 0, 0);
+    audio_run(world, 2);
+    test_int(ecs_get(world, sounds[1], SoundStatus)->state, SoundReady);
+    for (i = 0; i < 2; i ++) {
+        test_bool(box_audio_play_at(world, sounds[i], (vec3){-5, 0, 0}, 1.0f), true);
+        start = audio_tap_count;
+        audio_run(world, 6);
+        test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.6f);
+        test_assert(audio_peak(audio_tap_r, start, audio_tap_count) < 1e-4f);
+        audio_run(world, 60);
+        test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+    }
+
     ecs_fini(world);
 }
 
