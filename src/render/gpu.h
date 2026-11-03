@@ -1299,15 +1299,10 @@ void box_gpu_debug_mesh_free(
     box_gpu_mesh_t *m);
 
 /** Record the debug pass of a view after its effects: a render pass that loads the color of the
-<<<<<<< HEAD
- * target and reads the depth of the view, drawing the enabled debug items (the grid, then the
- * wireframe of the mesh draws of its cull view). A view without any records nothing.
+ * target and reads the depth of the view, drawing the grid, the wireframe of the mesh draws of
+ * its cull view, then the probes and their boxes. A view without any records nothing.
  *
  * A debug item whose shader is not compiled yet draws nothing.
-=======
- * target and reads the depth of the view, drawing the grid, then the probes and their boxes.
- * A view without any, without probes to show or with shaders not compiled records nothing.
->>>>>>> 89c3e831373618cfe934e5517cac76518eb68583
  *
  * @param gpu The backend
  * @param t The target, whose depth the pass reads and whose format it draws in

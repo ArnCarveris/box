@@ -1093,7 +1093,6 @@
                     "grid_not_in_captures",
                     "grid_camera_below",
                     "grid_resize",
-<<<<<<< HEAD
                     "wire_off_unchanged",
                     "wire_overlay_quad",
                     "wire_overlay_hidden",
@@ -1106,8 +1105,7 @@
                     "wire_2d_not_wired",
                     "wire_per_view",
                     "wire_mesh_replaced",
-                    "wire_with_grid"
-=======
+                    "wire_with_grid",
                     "probes_off_unchanged",
                     "light_probes_at_grid",
                     "light_probes_colors",
@@ -1122,7 +1120,6 @@
                     "probes_per_view",
                     "probes_with_effects",
                     "probes_not_in_captures"
->>>>>>> 89c3e831373618cfe934e5517cac76518eb68583
                 ]
             }
         ]

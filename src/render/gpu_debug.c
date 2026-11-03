@@ -1,26 +1,16 @@
 /**
  * @file render/gpu_debug.c
  * @brief Debug passes of the webgpu backend: what View.debug draws over a view after its effects,
-<<<<<<< HEAD
- * the infinite grid of etc/shaders/debug_grid.wgsl and the wireframe of etc/shaders/
- * debug_wire.wgsl.
-=======
- * the grid of etc/shaders/debug_grid.wgsl and the probes of etc/shaders/debug_probes.wgsl.
->>>>>>> 89c3e831373618cfe934e5517cac76518eb68583
+ * the infinite grid of etc/shaders/debug_grid.wgsl, the wireframe of etc/shaders/debug_wire.wgsl
+ * and the probes of etc/shaders/debug_probes.wgsl.
  *
  * A view with a debug item on records one render pass after its effects that loads the color
  * of the target and reads the depth of the view; without debug items it records nothing, and
  * the captures and bakes never do.
  *
-<<<<<<< HEAD
- * A grid draw binds its uniform in group 1, a wire draw in group 3, from one growing buffer of
- * the packet; a wire draw binds the vertices and indices of its mesh in group 1, kept with the
- * mesh, the depth only instance group in group 2 and a shared sequence index buffer.
-=======
- * Group 1 holds the uniform of a grid draw, in a growing buffer, or of the probe draws of a
- * view, at a dynamic offset of a buffer of their own; the probe draws also bind the view (0),
- * the empty group (2) and the volume (3) of the forward pass.
->>>>>>> 89c3e831373618cfe934e5517cac76518eb68583
+ * A grid draw binds its uniform in group 1 and a wire draw in group 3, from one growing buffer;
+ * a wire draw binds its mesh in group 1, the depth only instances in group 2 and a shared index
+ * sequence. Probe draws bind theirs in group 1 at a dynamic offset, with groups 0, 2 and 3.
  */
 
 #include "gpu.h"
@@ -160,7 +150,6 @@ void box_gpu_debug_init(
             .bindGroupLayoutCount = 2,
             .bindGroupLayouts = groups
         });
-<<<<<<< HEAD
     WGPUBindGroupLayoutEntry mesh_entries[2] = {{
         .binding = 0,
         .visibility = WGPUShaderStage_Vertex,
@@ -191,8 +180,6 @@ void box_gpu_debug_init(
             .bindGroupLayouts = wire_groups
         });
     ecs_map_init(&d->pipelines, NULL);
-=======
-    ecs_map_init(&d->grid_pipelines, NULL);
 
     WGPUBindGroupLayoutEntry probe = {
         .binding = 0,
@@ -214,7 +201,6 @@ void box_gpu_debug_init(
             .bindGroupLayouts = probe_groups
         });
     ecs_map_init(&d->probe_pipelines, NULL);
->>>>>>> 89c3e831373618cfe934e5517cac76518eb68583
     gpu->debug = d;
 }
 
@@ -285,7 +271,6 @@ void box_gpu_debug_fini(
         wgpuBufferRelease(d->buffer);
     }
 
-<<<<<<< HEAD
     if (d->sequence) {
         wgpuBufferRelease(d->sequence);
     }
@@ -293,7 +278,7 @@ void box_gpu_debug_fini(
     wgpuPipelineLayoutRelease(d->wire_pipeline_layout);
     wgpuBindGroupLayoutRelease(d->wire_layout);
     wgpuBindGroupLayoutRelease(d->wire_mesh_layout);
-=======
+
     box_gpu_debug_probe_pipelines_free(d);
     ecs_map_fini(&d->probe_pipelines);
     if (d->probe_group) {
@@ -307,7 +292,6 @@ void box_gpu_debug_fini(
     wgpuPipelineLayoutRelease(d->probe_pipeline_layout);
     wgpuBindGroupLayoutRelease(d->probe_layout);
 
->>>>>>> 89c3e831373618cfe934e5517cac76518eb68583
     wgpuPipelineLayoutRelease(d->pipeline_layout);
     wgpuBindGroupLayoutRelease(d->layout);
     ecs_os_free(d);
@@ -352,8 +336,8 @@ static bool box_gpu_debug_reflection_probes(
 bool box_gpu_debug_enabled(
     const box_render_view_t *v)
 {
-<<<<<<< HEAD
-    return v->debug.grid.enabled || v->debug.wireframe != WireframeOff;
+    return v->debug.grid.enabled || v->debug.wireframe != WireframeOff ||
+        box_gpu_debug_light_probes(v) || box_gpu_debug_reflection_probes(v);
 }
 
 /** Key of a debug pipeline in the cache.
@@ -367,10 +351,6 @@ static ecs_map_key_t box_gpu_debug_key(
     WGPUTextureFormat format)
 {
     return ((ecs_map_key_t)kind << 32) | (ecs_map_key_t)(uint32_t)format;
-=======
-    return v->debug.grid.enabled || box_gpu_debug_light_probes(v) ||
-        box_gpu_debug_reflection_probes(v);
->>>>>>> 89c3e831373618cfe934e5517cac76518eb68583
 }
 
 /** Get the grid pipeline that draws into a color format, created on first use and again when
@@ -1071,16 +1051,10 @@ void box_gpu_debug_record(
     WGPUBindGroup group,
     int32_t slot)
 {
-<<<<<<< HEAD
     WGPURenderPipeline grid = NULL, wire = NULL;
-    WGPUBindGroup grid_group = NULL;
-=======
-    WGPURenderPipeline grid = NULL;
     const box_gpu_probe_pipelines_t *probes = NULL;
     uint32_t lights = 0, reflections = 0, probe_offset = 0;
     WGPUBindGroup grid_group = NULL;
-    (void)packet;
->>>>>>> 89c3e831373618cfe934e5517cac76518eb68583
     if (!gpu->debug || !color || !t->depth_view) {
         goto done;
     }
@@ -1089,16 +1063,10 @@ void box_gpu_debug_record(
         grid = box_gpu_debug_grid_pipeline(gpu, t->format);
     }
 
-<<<<<<< HEAD
     if (v->debug.wireframe == WireframeOverlay || v->debug.wireframe == WireframeOnly) {
         wire = box_gpu_debug_wire_pipeline(gpu, v->debug.wireframe, t->format);
     }
 
-    if (!grid && !wire) {
-        goto done;
-    }
-
-=======
     if (v->debug.light_probes || v->debug.reflection_probes) {
         lights = box_gpu_debug_light_count(gpu, v);
         reflections = box_gpu_debug_reflection_count(gpu, v);
@@ -1111,7 +1079,7 @@ void box_gpu_debug_record(
         }
     }
 
-    if (!grid && !lights && !reflections) {
+    if (!grid && !wire && !lights && !reflections) {
         goto done;
     }
 
@@ -1123,7 +1091,6 @@ void box_gpu_debug_record(
         probe_offset = box_gpu_debug_probe_uniform(gpu, v);
     }
 
->>>>>>> 89c3e831373618cfe934e5517cac76518eb68583
     WGPURenderPassColorAttachment attachment = {
         .view = color,
         .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
@@ -1145,20 +1112,16 @@ void box_gpu_debug_record(
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
     if (grid) {
-<<<<<<< HEAD
-        grid_group = box_gpu_debug_grid_group(gpu, &v->debug.grid);
-=======
->>>>>>> 89c3e831373618cfe934e5517cac76518eb68583
         wgpuRenderPassEncoderSetPipeline(pass, grid);
         wgpuRenderPassEncoderSetBindGroup(pass, 1, grid_group, 0, NULL);
         wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);
         box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
     }
 
-<<<<<<< HEAD
     if (wire) {
         box_gpu_debug_wire_draws(gpu, pass, wire, packet, v, slot);
-=======
+    }
+
     if (lights || reflections) {
         wgpuRenderPassEncoderSetBindGroup(pass, 1, gpu->debug->probe_group, 1, &probe_offset);
         wgpuRenderPassEncoderSetBindGroup(pass, 2, gpu->prepass_empty, 0, NULL);
@@ -1178,7 +1141,6 @@ void box_gpu_debug_record(
         wgpuRenderPassEncoderSetPipeline(pass, probes->box);
         wgpuRenderPassEncoderDraw(pass, BOX_GPU_DEBUG_BOX_VERTICES, reflections * 2u, 0, 0);
         box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
->>>>>>> 89c3e831373618cfe934e5517cac76518eb68583
     }
 
     wgpuRenderPassEncoderEnd(pass);

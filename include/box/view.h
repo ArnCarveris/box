@@ -135,11 +135,9 @@ ECS_ENUM(WireframeMode, {
  */
 ECS_STRUCT(ViewDebug, {
     GridSettings grid;      /**< Infinite grid */
-<<<<<<< HEAD
     WireframeMode wireframe; /**< Wireframe of the meshes, default WireframeOff */
     rgba wireframe_color;   /**< Color of the wireframe lines, default white with alpha 200 */
     float wireframe_width;  /**< Width of the wireframe lines in pixels, default 1 */
-=======
     bool light_probes;      /**< Spheres at the probes of the volume the view samples, lit by
                              *   their SH, unshadowed; a probe invalid for every cell around it
                              *   (inside static geometry) in a dark red hatch */
@@ -153,7 +151,6 @@ ECS_STRUCT(ViewDebug, {
     float probe_size;       /**< World radius of the spheres, 0 for a quarter of the probe
                              *   spacing for a light probe and 0.25 for a reflection probe;
                              *   default 0 */
->>>>>>> 89c3e831373618cfe934e5517cac76518eb68583
 });
 
 /** Element in view effects array. */
