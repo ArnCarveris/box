@@ -64,6 +64,7 @@
                     "small_budget_reuses_pages",
                     "cusp_glyph",
                     "rotated_small_text_same_ink",
+                    "dark_on_light_same_ink",
                     "budget_keeps_shown_pages",
                     "budget_values_in_one_frame",
                     "budget_releases_idle_pages"
