@@ -286,6 +286,11 @@ fn median(v: vec3f) -> f32 {
 // glyph and the bold weight for a bold one. A small bold glyph spreads its edge over more of the
 // field than the offset leaves below the threshold, so the empty field of the quad would cover
 // a little: the coverage is scaled so that it is 0 there, which leaves a regular glyph as is.
+//
+// The coverage is linear in screen pixels and blended in linear light, which the target then
+// encodes: a pixel half covered by light text on a dark background shows about two thirds of the
+// text, by dark text on a light background about a third, so small dark text loses its edges and
+// looks thin and faint next to the same text in light (glyph_contrast corrects for it).
 fn glyph_coverage(uv: vec2f, range: vec2f, offset: f32) -> f32 {
     let field = textureSampleLevel(distance_map, material_sampler, uv, 0.0);
     let footprint = vec2f(length(vec2f(dpdx(uv.x), dpdy(uv.x))),
@@ -296,6 +301,35 @@ fn glyph_coverage(uv: vec2f, range: vec2f, offset: f32) -> f32 {
     let empty = clamp((offset - 0.5) * scale + 0.5, 0.0, 0.999);
     let cover = clamp((median(field.rgb) - 0.5 + offset) * scale + 0.5, 0.0, 1.0);
     return (cover - empty) / (1.0 - empty) * clamp(px_range, 0.0, 1.0);
+}
+
+// sRGB encoding and decoding of a linear value in 0..1.
+fn srgb_encode(l: f32) -> f32 {
+    return select(1.055 * pow(l, 1.0 / 2.4) - 0.055, 12.92 * l, l <= 0.0031308);
+}
+
+fn srgb_decode(e: f32) -> f32 {
+    return select(pow((e + 0.055) / 1.055, 2.4), e / 12.92, e <= 0.04045);
+}
+
+// Coverage of a glyph of a linear color corrected for the blend in linear light, so dark text on
+// a light background is as heavy to the eye as light text on a dark one. The background is not
+// known to the shader: a text of display luminance t is taken to lie on a background of 1 - t.
+// Light text (t of 0.5 and up) keeps its coverage, the look it has today. Dark text gets the
+// alpha that moves the display value of the background toward it by as much as the coverage
+// moves the display value of the mirrored pair, light text of 1 - t on a background of t:
+// 1 - enc(L + c (B - L)) is the display value it should reach, L and B the linear luminances
+// of the text and of the background. The alpha is 0 and 1 where the coverage is, so the inside of
+// a glyph and the empty field stay as they are, and it goes to the coverage as the text nears
+// mid gray. The same correction holds in views with effects, whose tone mapping and encoding
+// shape the display values the same way.
+fn glyph_contrast(cover: f32, color: vec3f) -> f32 {
+    let lum = clamp(dot(color, vec3f(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
+    let t = srgb_encode(lum);
+    let b = srgb_decode(1.0 - t);
+    let reach = srgb_decode(1.0 - srgb_encode(lum + cover * (b - lum)));
+    let alpha = clamp((b - reach) / max(b - lum, 1e-6), 0.0, 1.0);
+    return select(alpha, cover, t >= 0.499);
 }
 
 // Coverage of a fragment by the clips of its instance, the product over the chain of nested
@@ -368,11 +402,14 @@ fn ranked_depth(depth: f32, rank: u32) -> f32 {
     let uv = clamp(f.uv, vec2f(0.0), vec2f(1.0)) * f.uv_transform.xy + f.uv_transform.zw;
     let texel = textureSample(albedo_map, material_sampler, uv);
     let glyph = f.glyph > 0.5;
-    let glyph_cover = glyph_coverage(uv, f.params, f.border.x);
     let shape_cover = coverage(d, px);
     let fill = select(1.0, coverage(inner, inner_px), f.params.y > 0.0);
     let shape_color = mix(f.border.rgb, f.color.rgb * texel.rgb, fill);
     let color = select(shape_color, f.color.rgb, glyph) + f.emissive;
+    var glyph_cover = glyph_coverage(uv, f.params, f.border.x);
+    if (blend_mode <= 2u) {
+        glyph_cover = glyph_contrast(glyph_cover, color);
+    }
     let shape_alpha = shape_cover * thin * f.color.a * mix(f.border.a, texel.a, fill);
     var alpha = select(shape_alpha, glyph_cover * f.color.a, glyph);
     var cover = select(shape_cover, glyph_cover, glyph);
