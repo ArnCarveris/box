@@ -65,6 +65,15 @@
 // the far side reaches it without ambient occlusion. The clear coat and the sheen attenuate it as
 // they do the front diffuse lobe. It stays in the opaque pass. Without it (factor 0) a fragment
 // skips all of it, and every texture it reads is read without implicit derivatives.
+// A TextureBlend batch draws with the fs_blend entry point and its own group 1 (blend_*): the
+// mask, sampled once at the texture coordinates of the shape, weighs up to four layers whose
+// albedo, ORM and normal are slices of three texture arrays, each at the coordinates of the
+// shape times the TextureTransform of its layer. Only the layers with a weight are sampled, with
+// explicit gradients scaled from those of the shape, so a fragment with one weight samples each
+// map once; the decoded normals blend and renormalize before they perturb the normal. The
+// emissive layer, the material constants and everything after the layers are those of fs, and
+// fs itself binds and samples nothing of the blend: an override cannot hide the bindings of a
+// branch from the static use of an entry point, so the variant is an entry point of its own.
 #include "include/instance.wgsl"
 #include "include/material.wgsl"
 #include "include/lights.wgsl"
@@ -99,6 +108,28 @@ const MIN_ROUGHNESS: f32 = 0.045;
 @group(1) @binding(2) var orm_map: texture_2d<f32>;
 @group(1) @binding(3) var normal_map: texture_2d<f32>;
 @group(1) @binding(4) var material_sampler: sampler;
+
+// The layers of a TextureBlend (fs_blend only): the TextureTransform of each layer (scale in
+// xy, offset in zw), the slices of the arrays, and BLEND_MASKED and BLEND_SINGLE flags.
+struct BlendUniforms {
+    transforms: array<vec4f, 4>,
+    count: u32,
+    flags: u32,
+};
+
+// The mask is loaded; without it layer 0 shows alone.
+const BLEND_MASKED: u32 = 1u;
+
+// The mask has a single channel r, which weighs layers 0 and 1 by 1 - r and r.
+const BLEND_SINGLE: u32 = 2u;
+
+// Group 1 of fs_blend besides emissive_map and material_sampler: the albedo (decoded from sRGB),
+// ORM and normal of each layer as a slice of an array, the mask as stored and the uniforms.
+@group(1) @binding(5) var blend_albedo: texture_2d_array<f32>;
+@group(1) @binding(6) var blend_orm: texture_2d_array<f32>;
+@group(1) @binding(7) var blend_normal: texture_2d_array<f32>;
+@group(1) @binding(8) var blend_mask: texture_2d<f32>;
+@group(1) @binding(9) var<uniform> blending: BlendUniforms;
 
 // Reflection probes of the scene in blend order (box_render_reflection_probe_t), the cubemap
 // array with a slot per probe, mip k of N prefiltered for the perceptual roughness k / (N - 1)
@@ -789,6 +820,61 @@ fn triplanar(f: VertexOut, geometric: vec3f) -> Layers {
     return o;
 }
 
+// Weights of the layers of a TextureBlend from its mask: red, green, blue and alpha, or 1 - r and
+// r for a single channel mask, without the layers past the slice count, normalized by their sum;
+// layer 0 alone where the sum is 0 and without a mask.
+fn blend_weights(mask: vec4f) -> vec4f {
+    var w = mask;
+    if ((blending.flags & BLEND_SINGLE) != 0u) {
+        w = vec4f(1.0 - mask.r, mask.r, 0.0, 0.0);
+    }
+    w = select(vec4f(0.0), max(w, vec4f(0.0)), vec4u(0u, 1u, 2u, 3u) < vec4u(blending.count));
+    let sum = w.x + w.y + w.z + w.w;
+    let alone = (blending.flags & BLEND_MASKED) == 0u || !(sum > 1e-6);
+    return select(w / max(sum, 1e-6), vec4f(1.0, 0.0, 0.0, 0.0), alone);
+}
+
+// The layers of a fragment of a TextureBlend: the mask and the emissive layer at the texture
+// coordinates of the shape (the UV, or the projection of a MappingObject or MappingWorld material
+// without a blend on its dominant axis), and the albedo, ORM and normal of each layer with a
+// weight at those coordinates times its TextureTransform. The derivatives of the coordinates
+// are taken before the layers branch on their weights, and each layer samples with them scaled
+// by its transform; the tangent space normals of the layers blend and renormalize, with the
+// cotangent frame of the coordinates of the shape. surface_blend calls it for every fragment,
+// and f.scalars.w is flat, so the implicit derivatives hold.
+@diagnostic(off, derivative_uniformity)
+fn blend_layers(f: VertexOut, geometric: vec3f) -> Layers {
+    var uv = f.uv.xy;
+    if (f.scalars.w != 0.0) {
+        uv = mapping_uv(f.object, f.object_normal, f.uv.xy);
+    }
+    let gx = dpdx(uv);
+    let gy = dpdy(uv);
+    var o: Layers;
+    o.emissive = textureSample(emissive_map, material_sampler, uv).rgb;
+    o.frame = cotangent_frame(geometric, f.world, uv);
+    let w = blend_weights(textureSample(blend_mask, material_sampler, uv));
+    o.albedo = vec4f(0.0);
+    o.orm = vec3f(0.0);
+    var m = vec3f(0.0);
+    for (var k = 0u; k < 4u; k++) {
+        if (w[k] <= 0.0) {
+            continue;
+        }
+        let t = blending.transforms[k];
+        let at = uv * t.xy + t.zw;
+        let lx = gx * t.xy;
+        let ly = gy * t.xy;
+        o.albedo += w[k] * textureSampleGrad(blend_albedo, material_sampler, at, k, lx, ly);
+        o.orm += w[k] * textureSampleGrad(blend_orm, material_sampler, at, k, lx, ly).rgb;
+        m += w[k] * (textureSampleGrad(blend_normal, material_sampler, at, k, lx, ly).xyz * 2.0 -
+            1.0);
+    }
+    m = select(vec3f(0.0, 0.0, 1.0), normalize(m), dot(m, m) > 1e-12);
+    o.normal = perturb(geometric, o.frame, m);
+    return o;
+}
+
 fn surface(f: VertexOut, front: bool) -> Surface {
     let geometric = normalize(f.normal);
     var layers: Layers;
@@ -797,6 +883,19 @@ fn surface(f: VertexOut, front: bool) -> Surface {
     } else {
         layers = hard_layers(f, geometric);
     }
+    return surface_of(f, front, geometric, layers);
+}
+
+// The surface of a fragment of a TextureBlend batch (fs_blend), with the blended layers.
+fn surface_blend(f: VertexOut, front: bool) -> Surface {
+    let geometric = normalize(f.normal);
+    return surface_of(f, front, geometric, blend_layers(f, geometric));
+}
+
+// The surface of a fragment from its material, its interpolated geometric normal and its texture
+// layers, which a front face applies and a back face (BackFacePlain) ignores but for the albedo
+// alpha of an alpha tested pipeline.
+fn surface_of(f: VertexOut, front: bool, geometric: vec3f, layers: Layers) -> Surface {
     let mapped = layers.normal;
     let albedo = layers.albedo;
     let emissive = layers.emissive;
@@ -1355,16 +1454,10 @@ fn transmission(f: VertexOut, s: Surface) -> vec4f {
     return vec4f(final_color, 1.0);
 }
 
-@fragment fn fs(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
-    var s = surface(f, front);
-    if (transmissive) {
-        return transmission(f, s);
-    }
-
-    if (alpha_cutout && s.alpha < f.scalars.x) {
-        discard;
-    }
-
+// The output of a shaded opaque or blended fragment: the ambient occlusion of the view applies
+// to an opaque one, then its lighting, the aerial perspective of the view and the blend output.
+fn lit(f: VertexOut, shaded: Surface) -> vec4f {
+    var s = shaded;
     if (blend_mode == 0u) {
         s.occlusion = min(s.occlusion, view_occlusion(f.pos));
     }
@@ -1376,4 +1469,22 @@ fn transmission(f: VertexOut, s: Surface) -> vec4f {
     }
 
     return output(color, s.alpha);
+}
+
+@fragment fn fs(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
+    let s = surface(f, front);
+    if (transmissive) {
+        return transmission(f, s);
+    }
+
+    if (alpha_cutout && s.alpha < f.scalars.x) {
+        discard;
+    }
+
+    return lit(f, s);
+}
+
+// A TextureBlend batch: opaque, not alpha tested nor transmissive.
+@fragment fn fs_blend(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
+    return lit(f, surface_blend(f, front));
 }

@@ -235,15 +235,36 @@ WGPUSampler box_gpu_texture_sampler(
  * A layer whose handle has BOX_RENDER_TEXTURE_TARGET samples the image of that target, or the
  * default of the layer while the target itself renders or does not exist.
  *
+ * A batch that draws with the texture_blend variant (box_gpu_texture_blends) gets the group of
+ * its TextureBlend instead (blend_layout): the texture arrays of its layers, its mask, its
+ * emissive layer, the sampler and the uniforms of its layers.
+ *
  * @param gpu The backend
+ * @param packet The packet of the batch, whose data holds its TextureBlend and which sets the
+ * anisotropic samples of the sampler
  * @param b The batch
- * @param anisotropy Anisotropic samples of the sampler
  * @return The bind group
  */
 WGPUBindGroup box_gpu_material_group(
     box_gpu_t *gpu,
-    const box_render_batch_t *b,
-    uint32_t anisotropy);
+    const box_render_packet_t *packet,
+    const box_render_batch_t *b);
+
+/** Check whether a batch draws with the texture_blend variant of the mesh pipeline: an opaque
+ * batch of the mesh shader with a TextureBlend, not alpha tested nor transmissive.
+ *
+ * @param b The batch
+ * @return Whether it blends texture layers
+ */
+bool box_gpu_texture_blends(
+    const box_render_batch_t *b);
+
+/** Release the texture arrays and bind groups of the TextureBlend batches.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_blends_clear(
+    box_gpu_t *gpu);
 
 /** Bytes of the SH of one probe */
 #define BOX_GPU_PROBE_SIZE (BOX_RENDER_SH_COEFFICIENTS * 4 * sizeof(float))
@@ -480,7 +501,8 @@ void box_gpu_bake_capture(
 /** Get the forward pipeline of a color format and the state of a batch, created on first use.
  *
  * The cache grows with the states in use; a recompiled or released mesh or 2D shape shader
- * empties it, and a batch whose shader does not exist draws nothing.
+ * empties it, and a batch whose shader does not exist draws nothing. A TextureBlend batch
+ * (box_gpu_texture_blends) gets the texture_blend variant, fs_blend with blend_mesh_layout.
  *
  * @param gpu The backend
  * @param format The format of the color target
@@ -523,8 +545,9 @@ void box_gpu_forward_reset(
 
 /** Create a forward pipeline from a mesh or 2D shape module inside an error scope, to find out
  * whether the module fits the pipeline layout before it replaces the module that renders. A
- * mesh module also creates the depth prepass pipelines and a 2D shape module the shadow and the
- * slice pipelines (fs_shadow, fs_slice), so they need their entry points.
+ * mesh module also creates the depth prepass and the texture_blend pipelines (fs_blend) and a
+ * 2D shape module the shadow and the slice pipelines (fs_shadow, fs_slice), so they need their
+ * entry points.
  *
  * wgpu-native reports the scope at once; the browser reports it later, so there the check
  * passes and an invalid pipeline shows as a device error.

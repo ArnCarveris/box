@@ -112,6 +112,10 @@ typedef struct box_render_gpu_stats_t {
     int64_t copy_staging_peak;  /**< Most bytes copy_staging held at a publish */
     bool clip_distances;        /**< The device has the clip distances feature, which clips the
                                  *   octants of the point light tiles */
+    int64_t blend_bytes;        /**< Bytes of the texture arrays of the TextureBlend layers now,
+                                 *   with their mip levels */
+    int32_t blend_arrays;       /**< Texture arrays of the TextureBlend layers alive */
+    int32_t blend_builds;       /**< Times such an array was built */
 } box_render_gpu_stats_t;
 
 /** GPU time of the probe captures the GPU backend measured since the last time it was taken */

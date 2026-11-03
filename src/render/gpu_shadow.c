@@ -696,7 +696,7 @@ static void box_gpu_shadow_draw(
         }
 
         if (cutout) {
-            WGPUBindGroup group = box_gpu_material_group(gpu, b, packet->anisotropy);
+            WGPUBindGroup group = box_gpu_material_group(gpu, packet, b);
             if (group != material) {
                 wgpuRenderPassEncoderSetBindGroup(pass, 2, group, 0, NULL);
                 material = group;

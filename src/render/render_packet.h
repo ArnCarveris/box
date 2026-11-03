@@ -221,6 +221,21 @@
 /** Texture layers of a batch: albedo, emissive, ORM and normal, as in PbrTextures */
 #define BOX_RENDER_TEXTURE_SLOTS (4)
 
+/** Layers of a TextureBlend */
+#define BOX_RENDER_BLEND_LAYERS (4)
+
+/** Maps each layer of a TextureBlend samples: albedo, ORM and normal */
+#define BOX_RENDER_BLEND_MAPS (3)
+
+/** Map of a layer of a TextureBlend: albedo, display encoded */
+#define BOX_RENDER_BLEND_ALBEDO (0)
+
+/** Map of a layer of a TextureBlend: occlusion, roughness and metallic, stored */
+#define BOX_RENDER_BLEND_ORM (1)
+
+/** Map of a layer of a TextureBlend: tangent space normal, stored */
+#define BOX_RENDER_BLEND_NORMAL (2)
+
 /** Anisotropic samples of the texture samplers when no surface sets them */
 #define BOX_RENDER_ANISOTROPY_DEFAULT (4)
 
@@ -1050,6 +1065,23 @@ typedef struct box_render_target_t {
     bool exclusive;         /**< Renders only the views whose target is this handle */
 } box_render_target_t;
 
+/** The textures and transforms of a TextureBlend as a batch draws them, in the packet data of a
+ * batch with texture_blend.
+ *
+ * The backend blits the textures of each map into a texture array with a slice per layer, shared
+ * by every batch with the same sources, and binds it with the mask, the emissive layer of the
+ * batch (textures[1]) and the transforms in the texture_blend variant of the mesh pipeline. */
+typedef struct box_render_texture_blend_t {
+    uint32_t mask;      /**< Texture handle of the mask, 0 while it is not loaded */
+    uint32_t layers[BOX_RENDER_BLEND_LAYERS][BOX_RENDER_BLEND_MAPS]; /**< Texture handles of the
+                         *   albedo, ORM and normal of each layer, 0 for the default */
+    float transforms[BOX_RENDER_BLEND_LAYERS][4]; /**< TextureTransform of each layer: u scale,
+                         *   v scale, u offset, v offset */
+    uint32_t count;     /**< Layers up to the last one with an entity, at least 1: the slices of
+                         *   the arrays */
+    uint32_t quality;   /**< Largest dimension of a slice, the texture quality of the surfaces */
+} box_render_texture_blend_t;
+
 /** Instanced draw of one mesh with one pipeline, drawn by the views of its scene.
  *
  * Opaque batches come first in a packet; the blended instances follow as draws of one view,
@@ -1075,8 +1107,13 @@ typedef struct box_render_batch_t {
                                  *   drawn with the fs_shadow entry point of the 2D shape shader */
     bool slice;                 /**< The instances are Rects with an ImageSlice, drawn with the
                                  *   fs_slice entry point of the 2D shape shader */
+    bool texture_blend;         /**< The instances have a TextureBlend: the texture_blend variant
+                                 *   of the mesh pipeline samples the layers at blend_layers in
+                                 *   place of the albedo, ORM and normal textures */
     uint32_t mesh;              /**< Mesh handle */
     uint32_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture handles of the layers, 0 for none */
+    uint32_t blend_layers;      /**< Data offset of the box_render_texture_blend_t of a batch
+                                 *   with texture_blend */
     uint32_t wrap;              /**< TextureWrap of the samplers */
     uint32_t instances;         /**< Handle of the transform stream of the instance page
                                  *   holding the instance data; its other streams follow */

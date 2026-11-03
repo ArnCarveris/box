@@ -641,7 +641,7 @@ static void box_gpu_bake_draws(
                 .region = b->stride,
                 .count = rb->instance_count,
                 .pipeline = box_gpu_forward_pipeline(gpu, BOX_GPU_HDR_FORMAT, rb, false),
-                .material = box_gpu_material_group(gpu, rb, packet->anisotropy),
+                .material = box_gpu_material_group(gpu, packet, rb),
                 .instances = box_gpu_instance_group(gpu, rb->instances, rb->mesh, m, true),
                 .page = box_gpu_instance_group(gpu, rb->instances, 0, NULL, false),
                 .vertices = m->vertices,

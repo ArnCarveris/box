@@ -371,6 +371,41 @@ ECS_STRUCT(PbrTextures, {
     ecs_entity_t normal;    /**< Tangent space normal map, green points up the image */
 });
 
+/** Blend of up to four texture layers weighed by a mask (terrain, a path worn into turf), for
+ * 3D shapes, inherited by instances like PbrTextures and, like it, part of the batch of a shape,
+ * not the material table. Shapes with the same TextureBlend (owned by the same entity, such as
+ * a prefab) share their batches.
+ *
+ * The mask is sampled with the texture coordinates of the shape: its mesh UV, TextureMapping
+ * and TextureTransform. Its red, green, blue and alpha weigh layers 0..3, read as stored
+ * (linear) whatever TexturePath.linear says; a TexturePath.single_channel mask weighs layers 0
+ * and 1 by 1 - r and r. The weights are normalized by their sum; where the sum is 0, and until
+ * the mask is loaded, layer 0 shows alone.
+ *
+ * Each layer entity samples the albedo, ORM and normal textures of its own PbrTextures (its
+ * emissive is ignored), with its own TextureTransform on top of the texture coordinates of the
+ * shape, so a layer with a scale of 20 tiles 20 times across a mask that covers the mesh once.
+ * A layer that is 0, deleted, has no PbrTextures or whose texture is not loaded yet contributes
+ * white albedo and ORM and a flat normal, except that the layers after the last one that is not
+ * 0 are unused: their mask channels are ignored, so an RGB mask weighs a 3 layer blend. A
+ * TextureGen texture works as a mask or a layer.
+ *
+ * While a shape draws with a TextureBlend the albedo, ORM and normal of its own PbrTextures are
+ * ignored; its PbrTextures.emissive, Rgb, PbrMaterial, Tint and Emissive apply to the blended
+ * result. Changing the mask, a layer, the PbrTextures or TextureTransform of a layer, or a
+ * reload of one of their images updates the shapes.
+ *
+ * Only opaque 3D shapes blend: a shape with AlphaCutoff, a BlendMode other than Opaque, an
+ * Opacity under 1, Transmission, or a MappingObject or MappingWorld TextureMapping with a blend
+ * above 0 (triplanar) draws as if it had no TextureBlend, and 2D shapes ignore it.
+ */
+ECS_STRUCT(TextureBlend, {
+    ecs_entity_t mask;      /**< Texture entity whose red, green, blue and alpha weigh layers
+                             *   0..3, 0 for layer 0 alone */
+    ecs_entity_t layers[4]; /**< Entities with PbrTextures and an optional TextureTransform, 0
+                             *   for an unused layer */
+});
+
 /** Material properties change every frame, applies to descendants */
 extern ECS_TAG_DECLARE(DynamicMaterial);
 
