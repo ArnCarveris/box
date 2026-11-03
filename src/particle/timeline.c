@@ -12,18 +12,23 @@
 /** Evaluate a curve of a ParticleTimeline with the curve module, exactly at its time; a curve
  * without keys or a bad one, also one with max_keys, which its validate hook logged, is 1.
  *
+ * With loop the curve loops over a period of 1, so a Catmull-Rom curve from 0 to 1 takes its
+ * end neighbours across the wrap.
+ *
  * @param curve The curve, its times from 0 to 1 of the period
+ * @param loop Whether the curve repeats every period
  * @param t The time over the period, 0 to 1
  * @return The value
  */
 static float box_particle_timeline_curve(
     const ParticleCurve *curve,
+    bool loop,
     float t)
 {
     Curve view = { .kind = curve->kind, .keys = curve->keys };
     float result = 1.0f;
     if (ecs_vec_count(&curve->keys) && box_particle_timeline_curve_valid(curve)) {
-        result = box_curve_value(&view, t, 1.0f);
+        result = box_curve_loop_value(&view, loop ? 1.0f : 0.0f, t, 1.0f);
         result = isfinite(result) ? result : 1.0f;
     }
 
@@ -58,17 +63,21 @@ static float box_particle_timeline_t(
 
 /** Area under the part of a curve above 0 between two times, exact per piece of constant sign.
  *
- * A span with every control at or above 0 lies above 0 and has the area of box_curve_area. A span
- * with controls on both sides is cut where its cubic crosses 0, by bisection between fixed samples.
+ * A span with every control at or above 0 lies above 0 and has the area of box_curve_loop_area.
+ * A span with controls on both sides is cut where its cubic crosses 0, by bisection between fixed
+ * samples.
+ *
  * The cuts do not depend on from and to, so the areas of consecutive frames add up exactly.
  *
  * @param curve The curve, with keys and valid
+ * @param period The period it loops over, 1 with loop, else 0, see box_curve_loop_span_controls
  * @param from The start time
  * @param to The end time, at or after from
  * @return The area of max(curve, 0) from from to to
  */
 static double box_particle_timeline_area(
     const Curve *curve,
+    float period,
     float from,
     float to)
 {
@@ -98,12 +107,12 @@ static double box_particle_timeline_area(
             continue;
         }
 
-        box_curve_span_controls(curve, i, &c1, &c2);
+        box_curve_loop_span_controls(curve, period, i, &c1, &c2);
         float p0 = keys[i].value, p3 = keys[i + 1].value;
         float least = glm_min(glm_min(p0, c1), glm_min(c2, p3));
         float most = glm_max(glm_max(p0, c1), glm_max(c2, p3));
         if (least >= 0) {
-            result += (double)box_curve_area(curve, lo, hi, 1.0f);
+            result += (double)box_curve_loop_area(curve, period, lo, hi, 1.0f);
             continue;
         }
 
@@ -140,7 +149,7 @@ static double box_particle_timeline_area(
             float a = glm_max(lo, t0 + cuts[j] * (t1 - t0));
             float b = glm_min(hi, t0 + cuts[j + 1] * (t1 - t0));
             if (b > a && box_curve_cubic(p0, c1, c2, p3, u) > 0) {
-                result += (double)box_curve_area(curve, a, b, 1.0f);
+                result += (double)box_curve_loop_area(curve, period, a, b, 1.0f);
             }
         }
     }
@@ -171,11 +180,11 @@ double box_particle_timeline_seconds(
         float f0 = box_particle_timeline_t(timeline, period, t0);
         float f1 = box_particle_timeline_t(timeline, period, t1);
         if (n0 == n1) {
-            result = box_particle_timeline_area(&view, f0, f1);
+            result = box_particle_timeline_area(&view, 1.0f, f0, f1);
         } else {
-            result = box_particle_timeline_area(&view, f0, 1.0f) +
-                (double)(n1 - n0 - 1) * box_particle_timeline_area(&view, 0.0f, 1.0f) +
-                box_particle_timeline_area(&view, 0.0f, f1);
+            result = box_particle_timeline_area(&view, 1.0f, f0, 1.0f) +
+                (double)(n1 - n0 - 1) * box_particle_timeline_area(&view, 1.0f, 0.0f, 1.0f) +
+                box_particle_timeline_area(&view, 1.0f, 0.0f, f1);
         }
 
         result *= seconds;
@@ -183,7 +192,7 @@ double box_particle_timeline_seconds(
         float f0 = box_particle_timeline_t(timeline, period, t0);
         float f1 = box_particle_timeline_t(timeline, period, t1);
         uint64_t h0 = t0 > period ? t0 : period, h1 = t1 > period ? t1 : period;
-        result = box_particle_timeline_area(&view, f0, f1) * seconds;
+        result = box_particle_timeline_area(&view, 0.0f, f0, f1) * seconds;
         result += (double)glm_max(box_curve_value(&view, 1.0f, 1.0f), 0.0f) *
             (double)(h1 - h0) * 1e-6;
     }
@@ -200,7 +209,7 @@ float box_particle_timeline_speed(
     uint64_t period = timeline ? box_particle_us(timeline->period) : 0;
     float result = 1.0f;
     if (period) {
-        result = box_particle_timeline_curve(&timeline->speed,
+        result = box_particle_timeline_curve(&timeline->speed, timeline->loop,
             box_particle_timeline_t(timeline, period, time));
     }
 

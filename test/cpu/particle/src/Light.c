@@ -597,6 +597,7 @@ void Light_curve_kinds_once(void) {
     }
 }
 
+/* Looping, Catmull-Rom takes the slope 0 of the peak across the wrap at its ends. */
 void Light_curve_kinds_loop(void) {
     // particle/light
     CurveKind kinds[3] = { CurveLinear, CurveCatmullRom, CurveBezier };
@@ -606,22 +607,119 @@ void Light_curve_kinds_loop(void) {
         ecs_world_t *world = world_new(&null);
         CurveKey keys[3];
         ecs_entity_t e = emitter_new(world, hump(kinds[k], true, keys));
+        float quarter = kinds[k] == CurveCatmullRom ? 0.5f : hump_quarter(kinds[k]);
+        float three_quarters = kinds[k] == CurveCatmullRom
+            ? 0.5f : hump_three_quarters(kinds[k]);
 
         frame(world);
-        near(intensity_of(world, e), 2 * hump_quarter(kinds[k]));
+        near(intensity_of(world, e), 2 * quarter);
         frame(world);
         near(intensity_of(world, e), 2);
         frame(world);
-        near(intensity_of(world, e), 2 * hump_three_quarters(kinds[k]));
+        near(intensity_of(world, e), 2 * three_quarters);
         frame(world);
         near(intensity_of(world, e), 0);
         frame(world);
-        near(intensity_of(world, e), 2 * hump_quarter(kinds[k]));
+        near(intensity_of(world, e), 2 * quarter);
         frame(world);
         near(intensity_of(world, e), 2);
 
         ecs_fini(world);
         box_render_null_free(null);
+    }
+}
+
+/** Get a looping ParticleLight at intensity 2 over a second with a Catmull-Rom curve of uneven
+ * keys that ends on its start value.
+ *
+ * @param loop Whether it repeats
+ * @return The ParticleLight
+ */
+static ParticleLight wrap_light(
+    bool loop)
+{
+    static CurveKey keys[5] = {
+        { 0.0f, 0.4f }, { 0.15f, 1.2f }, { 0.45f, 0.7f }, { 0.8f, 1.1f }, { 1.0f, 0.4f }
+    };
+
+    return (ParticleLight){
+        .intensity = 2,
+        .curve = { .kind = CurveCatmullRom, .keys = { .array = keys, .count = 5, .size = 5 } },
+        .period = 1,
+        .loop = loop
+    };
+}
+
+/** Run frames of a delta from a new emitter and keep the intensity after each.
+ *
+ * @param light The ParticleLight
+ * @param first Seconds of the first frame
+ * @param delta Seconds of the next frames
+ * @param count Frames to run
+ * @param out Receives count intensities
+ */
+static void wrap_samples(
+    ParticleLight light,
+    float first,
+    float delta,
+    int32_t count,
+    float *out)
+{
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t e = emitter_new(world, light);
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        ecs_progress(world, i ? delta : first);
+        box_render_sync(world);
+        out[i] = intensity_of(world, e);
+    }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/* The clock at 0.996, 0.998, 1 (the wrap), 1.002 and 1.004 seconds. Both sides meet the value at
+ * the wrap. One sided second order slopes meet the slope across the wrap, and each other. Without
+ * loop the plain end slopes would turn a corner here. */
+void Light_curve_catmull_rom_loop_wrap(void) {
+    // particle/light
+    ParticleLight light = wrap_light(true);
+    Curve view = { .kind = light.curve.kind, .keys = light.curve.keys };
+    const CurveKey *keys = ecs_vec_first_t(&light.curve.keys, CurveKey);
+    float h = 0.002f, v[5];
+    wrap_samples(light, 1.0f - 2.0f * h, h, 5, v);
+
+    near(v[0], 2 * box_curve_loop_value(&view, 1.0f, 1.0f - 2.0f * h, 1.0f));
+    near(v[1], 2 * box_curve_loop_value(&view, 1.0f, 1.0f - h, 1.0f));
+    near(v[2], 2 * keys[0].value);
+    near(v[3], 2 * box_curve_loop_value(&view, 1.0f, h, 1.0f));
+    near(v[4], 2 * box_curve_loop_value(&view, 1.0f, 2.0f * h, 1.0f));
+
+    test_assert(fabsf(v[1] - v[2]) < 0.005f);
+    test_assert(fabsf(v[3] - v[2]) < 0.005f);
+
+    float slope = 2 * (keys[1].value - keys[3].value) / (keys[1].time - keys[3].time + 1.0f);
+    float before = (3.0f * v[2] - 4.0f * v[1] + v[0]) / (2.0f * h);
+    float after = (4.0f * v[3] - 3.0f * v[2] - v[4]) / (2.0f * h);
+    test_assert(fabsf(before - slope) < 0.05f);
+    test_assert(fabsf(after - slope) < 0.05f);
+    test_assert(fabsf(before - after) < 0.05f);
+
+    float plain_before = 2 * (keys[4].value - box_curve_value(&view, 1.0f - h, 1.0f)) / h;
+    float plain_after = 2 * (box_curve_value(&view, h, 1.0f) - keys[0].value) / h;
+    test_assert(fabsf(plain_before - plain_after) > 0.5f);
+}
+
+void Light_curve_catmull_rom_once_unchanged(void) {
+    // particle/light
+    ParticleLight light = wrap_light(false);
+    Curve view = { .kind = light.curve.kind, .keys = light.curve.keys };
+    float v[10];
+    wrap_samples(light, DELTA, DELTA, 10, v);
+    int32_t i;
+    for (i = 0; i < 10; i ++) {
+        near(v[i], 2 * box_curve_value(&view, (float)(i + 1) * DELTA, 1.0f));
     }
 }
 
