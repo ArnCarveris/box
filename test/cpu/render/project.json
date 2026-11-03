@@ -66,7 +66,9 @@
                     "texture_blend_prefab",
                     "texture_blend_layer_changes",
                     "texture_blend_layer_deleted",
-                    "texture_blend_plain_fallback"
+                    "texture_blend_height_record",
+                    "texture_blend_height_key",
+                    "texture_blend_every_shape"
                 ]
             },
             {

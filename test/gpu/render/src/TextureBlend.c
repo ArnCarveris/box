@@ -22,6 +22,9 @@
 /** RGB PNG of 16 by 16 pixels of (128, 0, 0) */
 #define MASK_RED_PNG "test/assets/textures/mask_red.png"
 
+/** Gray PNG of 16 by 16 pixels of 0 */
+#define BLACK_PNG "test/assets/textures/cookie_black.png"
+
 /** Create a headless world with a camera, a view whose pixels 16 and 48 of row 16 see x of
  * -3.46 and 3.46 and a surface of 64 by 32 pixels.
  *
@@ -254,6 +257,36 @@ void TextureBlend_layer_change_rebuilds(void) {
     render_compare(world, "blend_change.png", &stats);
     test_int(stats.blend_arrays, 3);
     test_int(stats.blend_builds, 4);
+
+    ecs_fini(world);
+}
+
+/** With a contrast the heights shape the weights of a single channel mask of red 128: layer 0
+ * (red 128) weighs 0.498 at a height of 0.502, layer 1 (white) 0.502 at a height of 0.
+ *
+ * Layer 0 is higher by 0.498, so at a contrast of 32 it shows alone, as the plain quad with its
+ * albedo does. The heights make a fourth array. */
+void TextureBlend_height_contrast(void) {
+    // materials/texture_blend
+    ecs_world_t *world = world_new("blend_height.png");
+    ecs_entity_t mask = ecs_new(world);
+    ecs_set(world, mask, TexturePath, {.path = MASK_RED_PNG, .single_channel = true});
+    ecs_entity_t red = ecs_new(world);
+    ecs_set(world, red, TexturePath, {.path = MASK_RED_PNG});
+    ecs_entity_t black = ecs_new(world);
+    ecs_set(world, black, TexturePath, {.path = BLACK_PNG});
+    ecs_entity_t layer0 = ecs_new(world);
+    ecs_set(world, layer0, PbrTextures, {.albedo = red});
+    ecs_entity_t layer1 = ecs_new(world);
+    ecs_entity_t blended = quad_new(world, -3.46f);
+    ecs_set(world, blended, TextureBlend, {.mask = mask, .layers = {layer0, layer1},
+        .heights = {red, black}, .contrast = 32});
+    ecs_entity_t plain = quad_new(world, 3.46f);
+    ecs_set(world, plain, PbrTextures, {.albedo = red});
+
+    box_render_gpu_stats_t stats;
+    render_compare(world, "blend_height.png", &stats);
+    test_int(stats.blend_arrays, 4);
 
     ecs_fini(world);
 }

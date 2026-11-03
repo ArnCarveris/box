@@ -382,7 +382,8 @@
                     "single_channel_mask",
                     "rgba_mask",
                     "arrays_shared_released",
-                    "layer_change_rebuilds"
+                    "layer_change_rebuilds",
+                    "height_contrast"
                 ]
             },
             {

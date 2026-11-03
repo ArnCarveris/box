@@ -236,6 +236,13 @@
 /** Map of a layer of a TextureBlend: tangent space normal, stored */
 #define BOX_RENDER_BLEND_NORMAL (2)
 
+/** Map of a layer of a TextureBlend: height in red, stored, sampled only with a contrast above 0,
+ * after the maps every blend samples */
+#define BOX_RENDER_BLEND_HEIGHT (3)
+
+/** Textures of each layer of a TextureBlend in its record: the maps and the height */
+#define BOX_RENDER_BLEND_SOURCES (BOX_RENDER_BLEND_MAPS + 1)
+
 /** Anisotropic samples of the texture samplers when no surface sets them */
 #define BOX_RENDER_ANISOTROPY_DEFAULT (4)
 
@@ -1071,16 +1078,19 @@ typedef struct box_render_target_t {
  *
  * The backend blits the textures of each map into a texture array with a slice per layer, shared
  * by every batch with the same sources, and binds it with the mask, the emissive layer of the
- * batch (textures[1]) and the transforms in the texture_blend variant of the mesh pipeline. */
+ * batch (textures[1]) and the transforms in the texture_blend variant of the mesh pipeline. The
+ * heights make a fourth array only with a contrast above 0. */
 typedef struct box_render_texture_blend_t {
     uint32_t mask;      /**< Texture handle of the mask, 0 while it is not loaded */
-    uint32_t layers[BOX_RENDER_BLEND_LAYERS][BOX_RENDER_BLEND_MAPS]; /**< Texture handles of the
-                         *   albedo, ORM and normal of each layer, 0 for the default */
+    uint32_t layers[BOX_RENDER_BLEND_LAYERS][BOX_RENDER_BLEND_SOURCES]; /**< Texture handles
+                         *   of the albedo, ORM, normal and height of each layer, 0 for the
+                         *   default; the heights are 0 with a contrast of 0 */
     float transforms[BOX_RENDER_BLEND_LAYERS][4]; /**< TextureTransform of each layer: u scale,
                          *   v scale, u offset, v offset */
     uint32_t count;     /**< Layers up to the last one with an entity, at least 1: the slices of
                          *   the arrays */
     uint32_t quality;   /**< Largest dimension of a slice, the texture quality of the surfaces */
+    float contrast;     /**< TextureBlend.contrast, 0 for the linear blend without heights */
 } box_render_texture_blend_t;
 
 /** Instanced draw of one mesh with one pipeline, drawn by the views of its scene.

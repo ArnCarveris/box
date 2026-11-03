@@ -173,7 +173,7 @@ typedef struct box_gpu_material_t {
 /** A texture array of one map of the layers of TextureBlend batches, a slice per layer, shared
  * by every blend with the same sources */
 typedef struct box_gpu_blend_array_t {
-    uint32_t map;                   /**< BOX_RENDER_BLEND_ALBEDO, _ORM or _NORMAL */
+    uint32_t map;                   /**< BOX_RENDER_BLEND_ALBEDO, _ORM, _NORMAL or _HEIGHT */
     uint32_t count;                 /**< Slices */
     uint32_t quality;               /**< Largest dimension of a slice */
     uint32_t sources[BOX_RENDER_BLEND_LAYERS]; /**< Texture handle of each slice, 0 for the
@@ -191,14 +191,16 @@ typedef struct box_gpu_blend_array_t {
 } box_gpu_blend_array_t;
 
 /** Bind group of the texture_blend variant of the mesh pipeline: the arrays of the layers, the
- * mask, the emissive layer, the sampler and the uniforms of the layers */
+ * mask, the emissive layer, the sampler and the uniforms of the layers. The heights array is
+ * only made with a contrast above 0, else the group binds blend_flat_heights */
 typedef struct box_gpu_blend_group_t {
     box_render_texture_blend_t blend; /**< The blend it binds */
     uint32_t emissive;              /**< Texture handle of the emissive layer, 0 for none */
     uint32_t wrap;                  /**< TextureWrap of the sampler */
     uint32_t anisotropy;            /**< Anisotropic samples of the sampler */
-    box_gpu_blend_array_t *arrays[BOX_RENDER_BLEND_MAPS]; /**< Its arrays, referenced */
-    uint32_t versions[BOX_RENDER_BLEND_MAPS]; /**< Versions of the arrays it binds */
+    box_gpu_blend_array_t *arrays[BOX_RENDER_BLEND_SOURCES]; /**< Its arrays, referenced, the
+                                     *   heights NULL with a contrast of 0 */
+    uint32_t versions[BOX_RENDER_BLEND_SOURCES]; /**< Versions of the arrays it binds */
     uint32_t mask_serial;           /**< Serial of the image of the mask it binds */
     uint32_t emissive_serial;       /**< Serial of the image of the emissive layer it binds */
     WGPUBuffer uniforms;            /**< BlendUniforms of mesh.wgsl */
@@ -732,6 +734,8 @@ typedef struct box_gpu_t {
     ecs_vec_t mips;                 /**< uint32_t, textures whose mip levels are not generated */
     uint32_t texture_serial;        /**< Serial of the last image written into a texture */
     WGPUBindGroupLayout blend_layout; /**< Bind group layout of the texture_blend variant */
+    WGPUTextureView blend_flat_heights; /**< One slice array view of white, the heights a blend
+                                     *   with a contrast of 0 binds and does not sample */
     WGPUPipelineLayout blend_mesh_layout; /**< Pipeline layout of the texture_blend variant of
                                      *   the forward pass: mesh_layout with blend_layout */
     box_gpu_blend_array_t *blend_arrays; /**< Texture arrays of the TextureBlend layers */
@@ -745,6 +749,9 @@ typedef struct box_gpu_t {
                                      *   the empty group and the transform stream */
     WGPUPipelineLayout prepass_cutout_layout; /**< Pipeline layout of the alpha tested depth
                                      *   prepass: the view, the material and the instance group */
+    WGPUPipelineLayout prepass_blend_layout; /**< Pipeline layout of the alpha tested depth
+                                     *   prepass of TextureBlend batches: the view, the blend and
+                                     *   the instance group, NULL until the first one draws */
     WGPUBindGroupLayout volume_layout; /**< Binds the probe volume a view samples */
     ecs_map_t volumes;              /**< Handle to box_gpu_volume_t */
     box_gpu_volume_t *no_volume;    /**< 1x1x1 volume of the views that use the hemisphere */
@@ -763,8 +770,9 @@ typedef struct box_gpu_t {
     box_gpu_reflect_t *reflect_source; /**< Source cubes of a chunk, NULL before the first */
     box_gpu_reflect_t *no_reflection; /**< One black slot, bound by views without probes */
     ecs_map_t forward;              /**< Forward pipeline by shader, format, blend, back face,
-                                     *   alpha test and depth mode, and the depth prepass
-                                     *   pipelines by back face and alpha test */
+                                     *   alpha test, texture blend and depth mode, and the
+                                     *   depth prepass pipelines by back face, alpha test and
+                                     *   texture blend */
     WGPUBuffer view_buffer;         /**< Uniforms of the views of a target */
     int32_t view_capacity;          /**< Views the view buffer holds */
     WGPUBindGroupLayout cluster_layout; /**< Bind group layout of the cluster pass */
@@ -785,6 +793,15 @@ typedef struct box_gpu_t {
     int32_t shadow_revision;        /**< Revision of the shader the pipelines were made with */
     WGPURenderPipeline shadow_point; /**< Pipeline of the octants of the point light tiles */
     WGPURenderPipeline shadow_point_cutout; /**< Its pipeline of the alpha tested casters */
+    WGPUPipelineLayout shadow_blend_layout; /**< Pipeline layout of the alpha tested casters
+                                     *   with a TextureBlend: the shadow pass groups and the blend
+                                     *   group, NULL until the first one draws */
+    WGPURenderPipeline shadow_cutout_blend; /**< Shadow pipeline of the alpha tested casters with
+                                     *   a TextureBlend (fs_cutout_blend), NULL until the first
+                                     *   one draws with the current shader */
+    WGPURenderPipeline shadow_point_cutout_blend; /**< Its point light pipeline
+                                     *   (fs_point_cutout_blend), NULL until the first one draws
+                                     *   with the current variant */
     uint32_t shadow_point_shader;   /**< Handle of the shadow shader variant they were made
                                      *   with, BOX_RENDER_SHADER_SHADOW_CLIP or _SHADOW */
     int32_t shadow_point_revision;  /**< Revision of that shader */

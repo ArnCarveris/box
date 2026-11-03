@@ -198,6 +198,12 @@
                 ]
             },
             {
+                "id": "PickTexture",
+                "testcases": [
+                    "blend_mask_coordinates"
+                ]
+            },
+            {
                 "id": "PickOrder",
                 "testcases": [
                     "ties_last_created_first",

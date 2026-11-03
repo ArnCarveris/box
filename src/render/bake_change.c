@@ -322,7 +322,8 @@ done:
     return;
 }
 
-/** Remember the static shapes whose TextureBlend uses an entity as its mask or a layer.
+/** Remember the static shapes whose TextureBlend uses an entity as its mask, a layer or a
+ * height.
  *
  * @param world The world
  * @param b The state
@@ -342,7 +343,7 @@ static void box_bake_record_blends(
             const TextureBlend *blend = &blends[self ? i : 0];
             bool used = blend->mask == e;
             for (k = 0; k < 4; k ++) {
-                used |= blend->layers[k] == e;
+                used |= blend->layers[k] == e || blend->heights[k] == e;
             }
 
             if (used && box_bake_captured_but(world, it.table, it.entities[i], 0)) {

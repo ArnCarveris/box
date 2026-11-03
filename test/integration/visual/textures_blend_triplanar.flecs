@@ -1,0 +1,85 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+// TextureBlend with a triplanar world mapping (TextureMapping MappingWorld, blend 0.5): a sphere
+// and a rotated box blend two layers, a checker tiled twice and stripes with a bump map, under a
+// mask projected with them (blend_mask.png, red and green). Each projection samples the mask and
+// the layers it weighs, so the projections blend smoothly: there is no hard seam on the sphere
+// where the axis of the projection changes, nor along the edges of the box, and the layers keep
+// their soft mask borders across them.
+
+camera {
+  Position: {0, 2.6, 6.5}
+  Rotation: {-0.3, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {120, 160, 210, 255}}, shadows: {enabled: true}}
+}
+
+$ {
+  AmbientLight: {sky: {150, 170, 200}, ground: {70, 64, 56}, intensity: 0.5}
+}
+
+sun {
+  Rotation: {0.8, 0.5, 0}
+  DirectionalLight: {intensity: 1.4 * flecs.script.math.PI}
+  Rgb: {255, 245, 230}
+}
+
+mask {
+  TexturePath: {path: "test/integration/visual/assets/blend_mask.png"}
+}
+
+checker {
+  TexturePath: {path: "test/integration/visual/assets/checker.png"}
+}
+
+stripes {
+  TexturePath: {path: "test/integration/visual/assets/stripes.png"}
+}
+
+bumps {
+  TexturePath: {path: "test/integration/visual/assets/bumps.png"}
+}
+
+checker_layer {
+  PbrTextures: {albedo: checker}
+  TextureTransform: {scale_x: 2, scale_y: 2}
+}
+
+stripes_layer {
+  PbrTextures: {albedo: stripes, normal: bumps}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {16, 0.2, 10}
+  Rgb: {90, 94, 104}
+  PbrMaterial: {roughness: 0.9}
+}
+
+sphere {
+  Position: {-1.3, 1, 0}
+  Sphere: {radius: 1, smooth: true, segments: 48}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.6}
+  TextureBlend: {mask: mask, layers: [checker_layer, stripes_layer]}
+  TextureMapping: {mode: MappingWorld, size: 1.6, blend: 0.5}
+}
+
+crate {
+  Position: {1.4, 0.9, 0}
+  Rotation: {0.3, 0.6, 0.2}
+  Box: {1.4, 1.4, 1.4}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.6}
+  TextureBlend: {mask: mask, layers: [checker_layer, stripes_layer]}
+  TextureMapping: {mode: MappingWorld, size: 1.6, blend: 0.5}
+}
