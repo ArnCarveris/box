@@ -166,15 +166,27 @@ proc new_realm() {
   mut a: bool[784] = {}
   mut p: f64[784] = {}
   mut r: bool[784] = {}
+  mut d: bool[784] = {}
+  mut f: i32[784] = {}
   for i in 0..CELLS {
     const x = i % GRID
     const z = (i - x) / GRID
+    for q in 0..5 {
+      const qx = match q { 0: 6; 1: 21; 2: 4; 3: 22; _: 13 }
+      const qz = match q { 0: 6; 1: 5; 2: 19; 3: 21; _: 2 }
+      const d2 = (x - qx) * (x - qx) + (z - qz) * (z - qz)
+      if d2 + hash(i * 5 + 13) * 2.5 < 3.2 {
+        d[i] = true
+      }
+    }
     const edge = x < 2 || z < 2 || x > GRID - 3 || z > GRID - 3
-    if edge && hash(i * 3 + 7) < 0.22 {
+    if edge && !d[i] && hash(i * 3 + 7) < 0.22 {
       k[i] = K_TREE
       l[i] = 1
     }
   }
+  deposit = d
+  facing = f
   level = l
   kind = k
   abandoned = a
@@ -192,7 +204,44 @@ proc new_realm() {
   starving = false
   starve_time = 0
   crowned = false
+  raid_timer = RAID_SECONDS - RAID_GRACE
+  raids = 0
   recompute()
+}
+
+proc raid_one() {
+  mut exposed: i32 = 0
+  for i in 0..CELLS {
+    if kind[i] == K_HOUSE && !inside[i] && !abandoned[i] {
+      exposed += 1
+    }
+  }
+  if exposed > 0 {
+    const pick = floor(hash(raids * 7 + 3) * exposed)
+    raids += 1
+    mut n: i32 = 0
+    mut target: i32 = -1
+    for i in 0..CELLS {
+      if kind[i] == K_HOUSE && !inside[i] && !abandoned[i] {
+        if n == pick {
+          target = i
+        }
+        n += 1
+      }
+    }
+    if target >= 0 {
+      const loot = floor(min(gold, raid_loot(level[target])))
+      gold -= loot
+      const played = box.audio.play(SfxRaze, 0.7)
+      const fx = box.particle.burst_at(RubbleBurst, {cell_x(target), 0.4, cell_z(target)}, 0.6)
+      const dust = box.particle.burst_at(DustBurst, {cell_x(target), 0.2, cell_z(target)}, 1)
+      if loot > 0 {
+        emit Toast(text: "Bandits raided the {piece_name(K_HOUSE, level[target])} outside the walls and stole {loot:.0} gold. Walls keep them out.")
+      } else {
+        emit Toast(text: "Bandits raided the {piece_name(K_HOUSE, level[target])} outside the walls, but your coffers were empty.")
+      }
+    }
+  }
 }
 
 proc demolish_cell(c: i32) {
@@ -304,7 +353,6 @@ proc build_at(i: i32, painting: bool) {
     }
   } else if t == 0 {
     selected = -1
-    emit Toast(text: "Pick a piece from the bar below, or click a building to select it.")
   } else {
     const g = cost_gold(t, 1)
     const s = cost_stone(t, 1)
@@ -317,6 +365,9 @@ proc build_at(i: i32, painting: bool) {
     } else if t == K_FARM && !fits4[i] {
       const played = box.audio.play(SfxDeny, 0.6)
       emit Toast(text: "A farm needs 4 by 4 free cells of meadow.")
+    } else if t == K_QUARRY && !deposit[i] {
+      const played = box.audio.play(SfxDeny, 0.6)
+      emit Toast(text: "A quarry must be dug into a stone deposit, where grey rock breaks through the grass.")
     } else if gold < g || stone < s {
       dragging = false
       const played = box.audio.play(SfxDeny, 0.6)
@@ -341,14 +392,21 @@ proc build_at(i: i32, painting: bool) {
             points[c] = 0
             level[c] = 1
             farm_origin[c] = o
+            facing[c] = build_rot
             kind[c] = K_FARM
           }
         }
       } else {
+        const col = i % GRID
+        const kn = match i >= GRID { true: kind[i - GRID]; _: 0 }
+        const ks = match i < CELLS - GRID { true: kind[i + GRID]; _: 0 }
+        const ke = match col < GRID - 1 { true: kind[i + 1]; _: 0 }
+        const kw = match col > 0 { true: kind[i - 1]; _: 0 }
         rising = i
         abandoned[i] = false
         points[i] = 0
         level[i] = 1
+        facing[i] = build_face(t, build_rot, kn, ke, ks, kw)
         kind[i] = t
       }
       recompute()
@@ -410,10 +468,24 @@ async {
       rising_age = 0
       level[i] = lvl + 1
       points[i] = 0
+      mut raised: i32 = 0
+      if k == K_KEEP {
+        for c in 0..CELLS {
+          const kc = kind[c]
+          if (kc == K_WALL || kc == K_GATE) && !abandoned[c] && level[c] < min(lvl + 1, max_level(kc)) {
+            level[c] = min(lvl + 1, max_level(kc))
+            raised += 1
+          }
+        }
+      }
       recompute()
       const played = box.audio.play(SfxBuild, 0.9)
       const fx = box.particle.burst_at(DustBurst, {cell_x(i), 0.2, cell_z(i)}, 1)
-      emit Toast(text: "The {piece_name(k, lvl)} becomes a {piece_name(k, lvl + 1)}.")
+      if raised > 0 {
+        emit Toast(text: "The {piece_name(k, lvl)} becomes a {piece_name(k, lvl + 1)}, and the masons rebuild {raised} pieces of the walls with it.")
+      } else {
+        emit Toast(text: "The {piece_name(k, lvl)} becomes a {piece_name(k, lvl + 1)}.")
+      }
     }
   }
 }
@@ -510,6 +582,17 @@ async {
     } else {
       starving = false
       starve_time = 0
+    }
+  }
+}
+
+async {
+  while true {
+    await delay(1)
+    raid_timer += 1
+    if raid_timer >= RAID_SECONDS {
+      raid_timer = 0
+      raid_one()
     }
   }
 }
