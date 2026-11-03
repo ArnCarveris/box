@@ -772,9 +772,12 @@ static inline float box_audio_synth_modulate(
         box_audio_synth_osc_t *o = &src->osc[l];
         float level = levels[o->env];
         t = o->phase + offset[l] + (double)(o->feedback * 0.5f * (o->fb1 + o->fb2));
-        t -= (double)(int64_t)t;
-        t = t < 0 ? t + 1 : t;
-        t = t >= 1 ? t - 1 : t;
+        if (t < 0 || t >= 1) {
+            t -= (double)(int64_t)t;
+            t = t < 0 ? t + 1 : t;
+            t = t >= 1 ? t - 1 : t;
+        }
+
         x = box_audio_synth_wave(o->wave, t, o->inc, &src->rng);
         box_audio_synth_osc_advance(o);
         o->fb2 = o->fb1;

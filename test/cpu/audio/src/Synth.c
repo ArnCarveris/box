@@ -939,7 +939,7 @@ void Synth_fm_sidebands(void) {
 /** A modulator with an index of 0 leaves its carrier bit identical to the carrier alone. */
 void Synth_fm_index_zero_identical(void) {
     // audio/synth
-    box_audio_synth_patch_t alone = synth_steady(BOX_AUDIO_SYNTH_SINE, 440, 0.5f, 0.5f);
+    box_audio_synth_patch_t alone = synth_steady(BOX_AUDIO_SYNTH_SINE, 440, 0.5f, 1.0f);
     box_audio_synth_patch_t pair = synth_pair(440, 660, BOX_AUDIO_SYNTH_PHASE, 0);
     synth_render_patch(&alone);
     memcpy(audio_sound_a, audio_l, AUDIO_FRAMES * sizeof(float));
@@ -1060,15 +1060,20 @@ void Synth_feedback_harmonics(void) {
     }
 
     mean /= N;
-    for (h = 1; h <= 8; h ++) {
-        e[h - 1] = synth_bin_energy(x, N, 500.0 * h, AUDIO_RATE);
-        harmonics += e[h - 1];
-        printf("harmonic %d: %.4f\n", h, synth_bin_amplitude(x, N, 500.0 * h, AUDIO_RATE));
+    for (h = 1; h <= 40; h ++) {
+        double energy = synth_bin_energy(x, N, 500.0 * h, AUDIO_RATE);
+        if (h <= 8) {
+            e[h - 1] = energy;
+            printf("harmonic %d: %.4f\n", h, synth_bin_amplitude(x, N, 500.0 * h, AUDIO_RATE));
+        }
+
+        harmonics += energy;
     }
 
     test_assert(e[1] > e[0] * 0.01);
     test_assert(e[2] > e[0] * 0.001);
     test_assert(e[1] < e[0] && e[2] < e[1] && e[3] < e[2]);
+    printf("harmonics: %.6f of the energy\n", (harmonics + mean * mean * N) / total);
     test_assert((harmonics + mean * mean * N) / total > 0.999);
     test_assert(fabs(audio_frequency(audio_l, FROM, FROM + N) - 500) < 0.5);
 }

@@ -224,9 +224,10 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
 - **Voices**: 64, with the quietest stolen; no priorities. A one shot cannot be controlled after
   it started.
 - **Synth**: up to 4 oscillators and one filter per sound, linear envelopes, no LFO and no node
-  graph; an oscillator may phase or ring modulate another, but FM is not band limited. A looping synth sound starts a new pass of its envelopes and oscillators at the end of
-  the last, at most every 60 seconds; a drone keeps that gap short with edges of a few ms, as
-  the dust merchant's engine does with 2 ms.
+  graph; an oscillator may phase or ring modulate another, but FM is not band limited. A
+  looping synth sound starts a new pass of its envelopes and oscillators at the end of the last,
+  at most every 60 seconds; a drone keeps that gap short with edges of a few ms, as the dust
+  merchant's engine does with 2 ms.
 - **Files**: WAV and FLAC for sounds, Ogg Vorbis for music, one stream at once (a change of path
   fades over 5 ms, there is no crossfade).
 - **Tools**: no mixer UI, and the UI theme of box has no sounds; a scene adds them in its own
@@ -456,10 +457,10 @@ synth voices share the pool, the cap, the buses, the ramps and the limiter. A so
 synth with a `SYNTH` command, whose patch (`box_audio_synth_patch_t` of `core.h`) is plain
 values in seconds and Hz, the same at every rate: a fixed topology of up to
 `BOX_AUDIO_SYNTH_LAYERS` (4) oscillators, each with an envelope, summed into one filter and an
-amp; an oscillator may modulate an earlier one instead of being heard. There is no node graph. The core keeps up to `BOX_AUDIO_SYNTH_MAX` (256) patches; a play
-copies the patch into its voice, so a play allocates nothing, a new patch for the same id
-reaches the next play while the voices that play keep theirs, and a release frees the id at once
-with `SOUND_FREE`. The core clamps every value of a patch, a NaN to the low end.
+amp; an oscillator may modulate an earlier one instead of being heard. There is no node graph.
+The core keeps up to `BOX_AUDIO_SYNTH_MAX` (256) patches; a play copies the patch into its
+voice, so a play allocates nothing, a new patch for the same id reaches the next play while the
+voices that play keep theirs, and a release frees the id at once with `SOUND_FREE`. The core clamps every value of a patch, a NaN to the low end.
 
 - **Oscillators.** Sine (`box_audio_core_sin`), saw, square, triangle and white noise. Saw and
   square are band limited with polyBLEP, the corners of the triangle with polyBLAMP. Frequencies are clamped to 20 kHz and to 0.48 of the
@@ -507,7 +508,9 @@ with `SOUND_FREE`. The core clamps every value of a patch, a NaN to the low end.
   at Nyquist and a fast sweep included; a sweep updates them every 8 frames. Its state is
   flushed like a bus sample.
 - **Cost.** Render work only: per frame of a voice an envelope step per envelope, an oscillator
-  per layer and the filter; a modulated patch adds a wrap of the phase per layer. `bench/audio` has a `Synth` suite of 64 voices in ns per sample.
+  per layer and the filter; a modulated patch adds a phase offset and a wrap per layer.
+  `bench/audio` has a `Synth` suite of 64 voices in ns per sample; `voices_64_fm`, two FM pairs
+  per voice, measures the modulated path.
 
 The core needs no libm: the exponential sweeps use series for `log2` and `exp2` in `synth.c`.
 
