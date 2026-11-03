@@ -1909,3 +1909,25 @@ void Transition_idle_no_work(void) {
 
     tr_fini(world, null);
 }
+
+void Transition_bezier_values(void) {
+}
+
+void Transition_bezier_script(void) {
+}
+
+void Transition_bezier_matches_preset(void) {
+}
+
+void Transition_bezier_overshoot_float(void) {
+}
+
+void Transition_bezier_overshoot_rgb(void) {
+}
+
+void Transition_bezier_invalid_x(void) {
+}
+
+void Transition_bezier_interrupt(void) {
+}
+
