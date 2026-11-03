@@ -416,8 +416,10 @@ fn ranked_depth(depth: f32, rank: u32) -> f32 {
     let fill = select(1.0, coverage(inner, inner_px), f.params.y > 0.0);
     let shape_color = mix(f.border.rgb, f.color.rgb * texel.rgb, fill);
     let color = select(shape_color, f.color.rgb, glyph) + f.emissive;
+    // glyph_coverage takes derivatives and stays in uniform control flow; the contrast
+    // correction takes none and runs only for glyphs.
     var glyph_cover = glyph_coverage(uv, f.params, f.border.x);
-    if (blend_mode <= 2u) {
+    if (blend_mode <= 2u && glyph) {
         glyph_cover = glyph_contrast(glyph_cover, color);
     }
     let shape_alpha = shape_cover * thin * f.color.a * mix(f.border.a, texel.a, fill);
