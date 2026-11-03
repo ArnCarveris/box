@@ -410,6 +410,7 @@ void box_draws_box_shadow_remove(
         int32_t batch = bs->batch, slot = bs->slot;
         bs->batch = -1;
         bs->slot = -1;
+        d->box_shadows --;
         box_draws_slot_remove(world, d, batch, slot);
     }
 }
@@ -473,6 +474,7 @@ void box_draws_box_shadow_update(
         bs = ecs_get_mut(world, e, BoxShadowSlot);
         bs->batch = batch;
         bs->slot = slot;
+        d->box_shadows ++;
     }
 
     box_draw_material_t material = {

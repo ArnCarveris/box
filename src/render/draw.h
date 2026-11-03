@@ -486,6 +486,9 @@ typedef struct box_render_draws_t {
                                  *   transform, which alpha tested casters read, changed in this
                                  *   extract while recording */
     bool shadow_record;         /**< Record shadow_regions, while a scene keeps shadow tiles */
+    int32_t box_shadows;        /**< BoxShadowSlot values with a batch, so the paths every 2D
+                                 *   shape takes (the runs, the transitions) skip the lookup of
+                                 *   the slot while no shadow is drawn */
     int32_t refs;               /**< Observers and systems that use the state */
 } box_render_draws_t;
 

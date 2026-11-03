@@ -4,6 +4,9 @@
  *
  * Rects, circles and lines with borders run frames against a backend that drops the packets,
  * so a case measures the main thread: resolving changed shapes and filling their instances.
+ *
+ * The ui_tree_shadows cases give the panels and rows of the UI tree a BoxShadow and report the
+ * runs (draws of the ordered 2D slots) and shadows next to the batches and upload bytes.
  */
 
 #include <box.h>
@@ -218,6 +221,7 @@ void Shapes2D_ui_tree_idle(
     }
 
     bench_counter(b, "batches", (double)stats.batches);
+    bench_counter(b, "runs", (double)stats.runs);
     bench_render_memory(b, &stats);
     box_render_sync(world);
     ecs_fini(world);
@@ -284,7 +288,159 @@ void Shapes2D_ui_tree_add_remove(
     }
 
     bench_counter(b, "batches", (double)stats.batches);
+    bench_counter(b, "runs", (double)stats.runs);
     bench_render_memory(b, &stats);
+    box_render_sync(world);
+    ecs_fini(world);
+    ecs_os_free(panels);
+}
+
+/** Create the world of a shadowed UI tree: the panels of ui_tree_idle, each with a large soft
+ * shadow, whose rows are cards with a small shadow and an icon without one.
+ *
+ * @param panels Receives the panels, NULL when not needed
+ * @return The world
+ */
+static ecs_world_t* bench_shapes2d_shadow_tree(
+    ecs_entity_t *panels)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    app->unpaced = true;
+    ecs_singleton_modified(world, App);
+    box_render_backend_t backend = { .render = bench_shapes2d_drop };
+    box_render_set_backend(world, &backend);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    int32_t p, r;
+    for (p = 0; p < BENCH_SHAPES2D_PANELS; p ++) {
+        ecs_entity_t panel = ecs_new(world);
+        if (panels) {
+            panels[p] = panel;
+        }
+
+        ecs_add_id(world, panel, EcsOrderedChildren);
+        ecs_set(world, panel, Position, {(float)(p % 10) * 120, (float)(p / 10) * 220, 0});
+        ecs_set(world, panel, Rect, {110, 210});
+        ecs_set(world, panel, Rgb, {40, 44, 56});
+        ecs_set(world, panel, Border, {.radius = 8});
+        ecs_set(world, panel, BoxShadow, {.offset_y = -4, .blur = 24, .color = {0, 0, 0, 120}});
+        for (r = 0; r < BENCH_SHAPES2D_ROWS; r ++) {
+            ecs_entity_t row = ecs_new_w_pair(world, EcsChildOf, panel);
+            ecs_set(world, row, Position, {0, (float)r * 4 - 100, 0});
+            ecs_set(world, row, Rect, {100, 3});
+            ecs_set(world, row, Rgb, {60, 66, 84});
+            ecs_set(world, row, BoxShadow, {.offset_y = -1, .blur = 2, .color = {0, 0, 0, 90}});
+            ecs_entity_t icon = ecs_new_w_pair(world, EcsChildOf, row);
+            ecs_set(world, icon, Position, {-45, 0, 0});
+            ecs_set(world, icon, Circle, {1.5f});
+            ecs_set(world, icon, Rgb, {250, 190, 60});
+        }
+    }
+
+    for (p = 0; p < 4; p ++) {
+        ecs_progress(world, 0);
+    }
+
+    return world;
+}
+
+/** Report the counters of a shadowed UI tree.
+ *
+ * @param b The bench
+ * @param stats Counters of the last extract
+ */
+static void bench_shapes2d_shadow_counters(
+    bench_t *b,
+    const box_render_draws_stats_t *stats)
+{
+    bench_counter(b, "batches", (double)stats->batches);
+    bench_counter(b, "runs", (double)stats->runs);
+    bench_counter(b, "box_shadows", (double)stats->box_shadows);
+    bench_counter(b, "upload_bytes", (double)stats->upload_bytes);
+    bench_render_memory(b, stats);
+}
+
+void Shapes2D_ui_tree_shadows_idle(
+    bench_t *b)
+{
+    // ui/box_shadow
+    ecs_world_t *world = bench_shapes2d_shadow_tree(NULL);
+    box_render_draws_stats_t stats = {0};
+    bench_set_items(b, BENCH_SHAPES2D_PANELS * (1 + BENCH_SHAPES2D_ROWS * 2));
+    while (bench_iter(b)) {
+        ecs_progress(world, 0);
+        box_render_draws_stats(world, &stats);
+        bench_keep(stats.upload_bytes);
+    }
+
+    bench_shapes2d_shadow_counters(b, &stats);
+    box_render_sync(world);
+    ecs_fini(world);
+}
+
+void Shapes2D_ui_tree_shadows_add_remove(
+    bench_t *b)
+{
+    // ui/box_shadow
+    ecs_entity_t *panels = ecs_os_malloc_n(ecs_entity_t, BENCH_SHAPES2D_PANELS);
+    ecs_world_t *world = bench_shapes2d_shadow_tree(panels);
+    box_render_draws_stats_t stats = {0};
+    ecs_entity_t added = 0;
+    int32_t frame = 0;
+    bench_set_items(b, 1);
+    while (bench_iter(b)) {
+        if (added) {
+            ecs_delete(world, added);
+        }
+
+        added = ecs_new_w_pair(world, EcsChildOf, panels[(frame * 37) % BENCH_SHAPES2D_PANELS]);
+        ecs_set(world, added, Position, {0, 100, 0});
+        ecs_set(world, added, Rect, {100, 3});
+        ecs_set(world, added, Rgb, {230, 80, 70});
+        ecs_set(world, added, BoxShadow, {.offset_y = -1, .blur = 2, .color = {0, 0, 0, 90}});
+        ecs_progress(world, 0);
+        box_render_draws_stats(world, &stats);
+        bench_keep(stats.upload_bytes);
+        frame ++;
+    }
+
+    bench_shapes2d_shadow_counters(b, &stats);
+    box_render_sync(world);
+    ecs_fini(world);
+    ecs_os_free(panels);
+}
+
+void Shapes2D_ui_tree_shadows_toggle(
+    bench_t *b)
+{
+    // ui/box_shadow
+    ecs_entity_t *panels = ecs_os_malloc_n(ecs_entity_t, BENCH_SHAPES2D_PANELS);
+    ecs_world_t *world = bench_shapes2d_shadow_tree(panels);
+    box_render_draws_stats_t stats = {0};
+    int32_t frame = 0;
+    bench_set_items(b, 1);
+    while (bench_iter(b)) {
+        ecs_entity_t panel = panels[(frame * 37) % BENCH_SHAPES2D_PANELS];
+        if (ecs_has(world, panel, BoxShadow)) {
+            ecs_remove(world, panel, BoxShadow);
+        } else {
+            ecs_set(world, panel, BoxShadow,
+                {.offset_y = -4, .blur = 24, .color = {0, 0, 0, 120}});
+        }
+
+        ecs_progress(world, 0);
+        box_render_draws_stats(world, &stats);
+        bench_keep(stats.upload_bytes);
+        frame ++;
+    }
+
+    bench_shapes2d_shadow_counters(b, &stats);
     box_render_sync(world);
     ecs_fini(world);
     ecs_os_free(panels);

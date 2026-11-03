@@ -460,7 +460,7 @@ static void box_draws_order_runs(
         }
 
         ecs_map_val_t *tree = ecs_map_ensure(&d->tree_ranks, order[i].tree);
-        BoxShadowSlot *bs = ecs_get_mut(world, e, BoxShadowSlot);
+        BoxShadowSlot *bs = d->box_shadows ? ecs_get_mut(world, e, BoxShadowSlot) : NULL;
         if (bs && bs->batch >= 0) {
             bs->rank = box_draws_rank_next(tree, bs->rank);
             box_draws_run_add(d, bs->batch, bs->slot);
@@ -489,6 +489,8 @@ static void box_draws_order_runs(
             box_draws_rank_write(box_draws_batch(d, at->batch), at->slot, ts->rank);
         }
     }
+
+    d->stats.runs = ecs_vec_count(&d->runs);
 }
 
 /** Check whether an OrderedChildren parent the order read reordered its children.

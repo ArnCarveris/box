@@ -1,0 +1,48 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.perf
+
+// Stress of the shadows of 2D shapes: 1,000 opaque list items in 20 columns of 50 lying on the
+// ground, each with a large BoxShadow: a blur of 48 and a spread of 4 make a quad of 312 by 188
+// around an item of 160 by 36, which overlaps the quads of about 25 neighbours. The shadow of
+// every item is in the AlphaBlend batch and its item in the opaque one, so the 2,000 instances
+// draw as about 2,000 runs, and a tenth of the blended pixels lie under the item, which the
+// cutout discards.
+camera {
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {24, 28, 38, 255}}}
+}
+
+list {
+  Position: {0, 0.01, 0}
+  Rotation: {-1.5708, 0, 0}
+  Scale: {0.01, 0.01, 0.01}
+
+  background {
+    Position: {0, 0, 0}
+    Rect: {3700, 2500}
+    Rgb: {236, 238, 242}
+
+    for x in 0..20 {
+      for y in 0..50 {
+        "item_{x}_{y}" {
+          Position: {x * 180 - 1710, y * 48 - 1176, 1}
+          Rect: {160, 36}
+          Rgb: {255, 255, 255}
+          Border: {radius: 8}
+          BoxShadow: {offset_y: -8, blur: 48, spread: 4, color: {0, 0, 0, 90}}
+        }
+      }
+    }
+  }
+}
+
+$ {
+  PerfRun: {fps: 120, frames: 600, warmup: 120, period: 5, elevation: 60, camera: camera}
+}

@@ -2093,6 +2093,7 @@ void box_draws_send(
     d->textures = box_textures_get(world);
     d->world = world;
     d->stats.batches = 0;
+    d->stats.box_shadows = d->box_shadows;
     d->stats.instances = 0;
     d->stats.dynamic = 0;
     d->stats.scatters = 0;
