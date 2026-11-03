@@ -1354,6 +1354,9 @@ bool box_gpu_cull_draw_wire(
         goto done;
     }
 
+    ecs_assert(!ecs_vec_get_t(&c->arg_data, uint32_t, (int32_t)args * BOX_GPU_CULL_ARGS)[2] &&
+        !ecs_vec_get_t(&c->arg_data, uint32_t, (int32_t)args * BOX_GPU_CULL_ARGS)[3],
+        ECS_INTERNAL_ERROR, "a wire draw needs firstIndex and baseVertex 0");
     if (instances != *bound) {
         wgpuRenderPassEncoderSetBindGroup(pass, group, instances, 0, NULL);
         box_gpu_count(gpu, BOX_GPU_STAT_INSTANCE_BIND);

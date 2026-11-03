@@ -58,8 +58,11 @@ struct WireOut {
     return o;
 }
 
+// A triangle covers its side of an edge up to width - 0.5 pixels from it, so the half width of
+// the line plus half a pixel makes the line of an edge between two triangles the width of the
+// view, and a silhouette edge, which has one side, half of it.
 @fragment fn fs(f: WireOut) -> @location(0) vec4f {
-    let width = wire.params.x;
+    let width = wire.params.x * 0.5 + 0.5;
     let b = f.bary;
     let d = b / max(fwidth(b), vec3f(1e-5));
     let edge = min(min(d.x, d.y), d.z);

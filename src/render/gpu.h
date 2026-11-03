@@ -1990,7 +1990,7 @@ bool box_gpu_cull_draw(
  * buffer and the visible slots at vertex slot 0; the shader loads index and vertex itself.
  *
  * The arguments have a firstIndex, baseVertex and firstInstance of 0 (gpu_cull_group.c), so
- * vertex_index runs over 0 to index_count - 1. Binds the depth only instance group at group;
+ * vertex_index runs over 0 to index_count - 1; a debug build asserts it. Binds the depth only instance group at group;
  * the caller binds the group of the mesh with its vertices and indices.
  *
  * @param gpu The backend

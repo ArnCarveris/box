@@ -18,6 +18,11 @@ using box.surface
 // the back faces and of the hidden instances included, the lines of the cup and the cable
 // following their surfaces.
 
+prefab Crate {
+  Box: {0.7, 0.7, 0.7}
+  Rgb: {150, 200, 140}
+}
+
 shapes {
   Scene: {}
   AmbientLight: {sky: {120, 128, 140}, ground: {50, 46, 42}}
@@ -82,7 +87,7 @@ shapes {
   }
 
   cup {
-    Position: {1.4, 0, 1}
+    Position: {1.2, 0, 1.2}
     Lathe: {profile: cup_outer, inner: cup_inner, cap_start: true, cap_end: true,
       segments: 20, rings: 6}
     Rgb: {200, 90, 85}
@@ -108,8 +113,8 @@ shapes {
   }
 
   cable {
-    Position: {2.6, 0, -1.2}
-    Rotation: {0, 1.2, 0}
+    Position: {2.3, 0, -1.6}
+    Rotation: {0, 0.4, 0}
     Sweep: {path: cable_route, profile: cable_profile, scale: {1, 1}, taper: 1,
       cap_start: true, cap_end: true, rings: 12}
     Rgb: {230, 155, 65}
@@ -125,11 +130,6 @@ shapes {
   crate_7 : Crate { Position: {-1, 0.35, -2.6} }
   crate_8 : Crate { Position: {0, 0.35, -2.6} }
   crate_9 : Crate { Position: {1, 0.35, -2.6} }
-}
-
-prefab Crate {
-  Box: {0.7, 0.7, 0.7}
-  Rgb: {150, 200, 140}
 }
 
 overlay_texture {}
@@ -180,7 +180,6 @@ gallery {
     PbrTextures: {albedo: overlay_texture, emissive: overlay_texture}
   }
 
-
   only_tile {
     Position: {160, 0, 0}
     Quad: {312, 312}
@@ -188,7 +187,6 @@ gallery {
     Emissive: {strength: 1, color: {255, 255, 255}}
     PbrTextures: {albedo: only_texture, emissive: only_texture}
   }
-
 }
 
 gallery_view {

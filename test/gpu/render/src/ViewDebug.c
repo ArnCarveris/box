@@ -1049,7 +1049,7 @@ void ViewDebug_wire_off_unchanged(void) {
 void ViewDebug_wire_overlay_quad(void) {
     // debug/wireframe
     ecs_world_t *world = dg_world();
-    dw_view(world, dw_camera(world, 10), WireframeOverlay, dw_white, 1);
+    dw_view(world, dw_camera(world, 10), WireframeOverlay, dw_white, 2);
     ecs_entity_t quad = dw_shape(world, 0, 0, 0, (Rgb){255, 0, 0});
     ecs_set(world, quad, Quad, {6, 6});
     unsigned char *px = dg_render(world, "wire_quad.png");
@@ -1204,7 +1204,9 @@ void ViewDebug_wire_only_no_occlusion(void) {
     ecs_fini(world);
 }
 
-/** Lines of 3 pixels are three times as wide as lines of 1 pixel, close up and far away. */
+/** Lines of 3 pixels are three times as wide as lines of 1 pixel, close up and far away: the
+ * diagonal of a quad, an edge between two triangles, crosses a row over twice the width, as
+ * fwidth, the sum of the derivatives, measures the distance to a diagonal edge. */
 void ViewDebug_wire_width(void) {
     // debug/wireframe
     float distances[2] = { 10, 25 };
@@ -1219,15 +1221,15 @@ void ViewDebug_wire_width(void) {
             ecs_set(world, quad, Quad, {6, 6});
             unsigned char *px = dg_render(world, w ? "wire_width_b.png" : "wire_width_a.png");
             float s = dw_scale(distances[d]);
-            float left = 64.0f - 3.0f * s;
+            float diagonal = 64.0f + 0.3f * s;
             int32_t row = (int32_t)(64.0f - 0.3f * s);
-            sums[w] = dw_green_sum(px, row, (int32_t)left - 4, (int32_t)left + 6);
+            sums[w] = dw_green_sum(px, row, (int32_t)diagonal - 8, (int32_t)diagonal + 8);
             stbi_image_free(px);
             ecs_fini(world);
         }
 
-        test_assert(sums[0] > 0.6f);
-        test_assert(sums[0] < 1.6f);
+        test_assert(sums[0] > 1.4f);
+        test_assert(sums[0] < 2.6f);
         test_assert(sums[1] / sums[0] > 2.4f);
         test_assert(sums[1] / sums[0] < 3.6f);
     }
@@ -1471,7 +1473,7 @@ void ViewDebug_wire_per_view(void) {
     int32_t k;
     for (k = 0; k < 2; k ++) {
         ecs_world_t *world = dg_world();
-        dw_view(world, dw_camera(world, 10), k ? WireframeOff : WireframeOverlay, dw_green, 1);
+        dw_view(world, dw_camera(world, 10), k ? WireframeOff : WireframeOverlay, dw_green, 2);
         ecs_entity_t left = dw_shape(world, -3, 0, 0, (Rgb){255, 0, 0});
         ecs_set(world, left, Quad, {3, 3});
 
@@ -1484,7 +1486,7 @@ void ViewDebug_wire_per_view(void) {
         ecs_entity_t second = ecs_new(world);
         ecs_set(world, second, View, {.camera = camera, .lighting = {.enabled = true},
             .order = 1});
-        dw_set(world, second, k ? WireframeOverlay : WireframeOff, dw_green, 1);
+        dw_set(world, second, k ? WireframeOverlay : WireframeOff, dw_green, 2);
         ecs_entity_t right = dw_shape(world, 3, 0, 0, (Rgb){0, 0, 255});
         ecs_add_pair(world, right, EcsChildOf, scene);
         ecs_set(world, right, Quad, {3, 3});
@@ -1498,7 +1500,7 @@ void ViewDebug_wire_per_view(void) {
         test_assert(k ? first < 0.05f : first > 0.4f);
         test_assert(k ? later > 0.4f : later < 0.05f);
         test_assert(dg_px(px, (int32_t)(64.0f - 3.0f * s), row)[0] > 100);
-        test_assert(dg_px(px, (int32_t)(64.0f + 3.0f * s + 4.0f), row)[2] > 100);
+        test_assert(dg_px(px, (int32_t)(64.0f + 3.0f * s - 4.0f), row)[2] > 100);
         stbi_image_free(px);
         ecs_fini(world);
     }
@@ -1509,7 +1511,7 @@ void ViewDebug_wire_per_view(void) {
 void ViewDebug_wire_mesh_replaced(void) {
     // debug/wireframe
     ecs_world_t *world = dg_world();
-    dw_view(world, dw_camera(world, 10), WireframeOverlay, dw_green, 1);
+    dw_view(world, dw_camera(world, 10), WireframeOverlay, dw_green, 2);
     ecs_entity_t box = dw_shape(world, 0, 0, 0, (Rgb){255, 0, 0});
     ecs_set(world, box, Box, {2, 2, 2});
     unsigned char *px = dg_render(world, "wire_replaced.png");
