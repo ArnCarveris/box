@@ -36,9 +36,10 @@ typedef struct box_particle_rows_entry_t {
     uint32_t row;           /**< First row */
     uint32_t rows;          /**< Rows it takes */
     int32_t refs;           /**< Pools that use it, 0 for rows that are handed out again */
+    bool listed;            /**< It is in the unused list of its rows */
     uint32_t generation;    /**< Times its rows were written, so a remembered use can tell
                              *   that they still hold what it baked */
-    uint64_t hash;          /**< Hash of its content, compared before the content */
+    uint64_t hash;          /**< Hash of its kind and content, its key in by_hash */
 } box_particle_rows_entry_t;
 
 /** The rows a ParticleCurves took when it was sampled, remembered by the hash of its keys */
@@ -56,8 +57,14 @@ typedef struct box_particle_rows_known_motion_t {
 void box_particle_rows_init(
     box_particle_rows_t *t)
 {
+    int32_t i;
     ecs_os_memset_t(t, 0, box_particle_rows_t);
     ecs_vec_init_t(NULL, &t->entries, box_particle_rows_entry_t, 0);
+    ecs_map_init(&t->by_hash, NULL);
+    for (i = 0; i <= BOX_PARTICLE_GRADIENT_ROWS; i ++) {
+        ecs_vec_init_t(NULL, &t->unused[i], int32_t, 0);
+    }
+
     ecs_vec_init_t(NULL, &t->data, float, 0);
     ecs_vec_init_t(NULL, &t->known, box_particle_rows_known_t, 0);
     ecs_vec_init_t(NULL, &t->known_motion, box_particle_rows_known_motion_t, 0);
@@ -69,7 +76,13 @@ void box_particle_rows_init(
 void box_particle_rows_fini(
     box_particle_rows_t *t)
 {
+    int32_t i;
     ecs_vec_fini_t(NULL, &t->entries, box_particle_rows_entry_t);
+    ecs_map_fini(&t->by_hash);
+    for (i = 0; i <= BOX_PARTICLE_GRADIENT_ROWS; i ++) {
+        ecs_vec_fini_t(NULL, &t->unused[i], int32_t);
+    }
+
     ecs_vec_fini_t(NULL, &t->data, float);
     ecs_vec_fini_t(NULL, &t->known, box_particle_rows_known_t);
     ecs_vec_fini_t(NULL, &t->known_motion, box_particle_rows_known_motion_t);
@@ -93,7 +106,13 @@ static void box_particle_rows_forget(
 void box_particle_rows_reset(
     box_particle_rows_t *t)
 {
+    int32_t i;
     ecs_vec_clear(&t->entries);
+    ecs_map_clear(&t->by_hash);
+    for (i = 0; i <= BOX_PARTICLE_GRADIENT_ROWS; i ++) {
+        ecs_vec_clear(&t->unused[i]);
+    }
+
     ecs_vec_clear(&t->data);
     box_particle_rows_forget(t);
     t->last = NULL;
@@ -194,9 +213,35 @@ static void box_particle_rows_write(
     t->bakes ++;
 }
 
-/** Get the rows of a baked curve: those of an entry of the same kind and content, compared
- * only with entries of the same hash, else rows nothing uses or new rows, written. The old rows
- * of a pool are released after its new ones are acquired, so its unchanged curves keep theirs.
+/** Take an entry that no pool uses with a number of rows, from the unused list of its rows.
+ *
+ * @param t The table
+ * @param rows Rows of the entry
+ * @return Index of the entry, -1 for none
+ */
+static int32_t box_particle_rows_unused(
+    box_particle_rows_t *t,
+    uint32_t rows)
+{
+    ecs_vec_t *list = &t->unused[rows];
+    int32_t result = -1;
+    while (result < 0 && ecs_vec_count(list)) {
+        int32_t i = *ecs_vec_last_t(list, int32_t);
+        box_particle_rows_entry_t *entry = ecs_vec_get_t(
+            &t->entries, box_particle_rows_entry_t, i);
+        ecs_vec_remove_last(list);
+        entry->listed = false;
+        if (!entry->refs) {
+            result = i;
+        }
+    }
+
+    return result;
+}
+
+/** Get the rows of a baked curve: those of an entry of the same kind and content, found by
+ * their hash, else the rows of an entry nothing uses or new rows, written. The old rows of a
+ * pool are released after its new ones are acquired, so its unchanged curves keep theirs.
  *
  * @param t The table
  * @param kind What the rows hold
@@ -210,33 +255,32 @@ static int32_t box_particle_rows_acquire(
 {
     uint32_t rows = box_particle_rows_of(kind);
     size_t bytes = rows * BOX_PARTICLE_CURVE_SAMPLES * sizeof(float);
-    uint64_t hash = box_particle_rows_hash_bytes(14695981039346656037ull, samples, bytes);
-    int32_t i, count = ecs_vec_count(&t->entries), result = -1, unused = -1;
+    uint64_t hash = box_particle_rows_mix(
+        box_particle_rows_hash_bytes(14695981039346656037ull, samples, bytes), (uint64_t)kind);
+    ecs_map_val_t *found = ecs_map_get(&t->by_hash, hash);
     box_particle_rows_entry_t *entry;
-    for (i = 0; i < count; i ++) {
-        entry = ecs_vec_get_t(&t->entries, box_particle_rows_entry_t, i);
-        if (entry->hash == hash && entry->kind == kind && !memcmp(ecs_vec_get_t(&t->data, float,
+    int32_t result = -1;
+    if (found) {
+        entry = ecs_vec_get_t(&t->entries, box_particle_rows_entry_t, (int32_t)*found);
+        if (entry->kind == kind && !memcmp(ecs_vec_get_t(&t->data, float,
             (int32_t)(entry->row * BOX_PARTICLE_CURVE_SAMPLES)), samples, bytes))
         {
-            result = i;
-            break;
-        }
-
-        if (unused < 0 && !entry->refs && entry->rows == rows) {
-            unused = i;
+            result = (int32_t)*found;
+            goto done;
         }
     }
 
+    result = box_particle_rows_unused(t, rows);
     if (result >= 0) {
-        goto done;
-    }
-
-    if (unused >= 0) {
-        result = unused;
         entry = ecs_vec_get_t(&t->entries, box_particle_rows_entry_t, result);
+        found = ecs_map_get(&t->by_hash, entry->hash);
+        if (found && *found == (ecs_map_val_t)result) {
+            ecs_map_remove(&t->by_hash, entry->hash);
+        }
     } else {
-        result = count;
+        result = ecs_vec_count(&t->entries);
         entry = ecs_vec_append_t(NULL, &t->entries, box_particle_rows_entry_t);
+        ecs_os_memset_t(entry, 0, box_particle_rows_entry_t);
         entry->row = (uint32_t)ecs_vec_count(&t->data) / BOX_PARTICLE_CURVE_SAMPLES;
         entry->rows = rows;
         ecs_vec_grow_t(NULL, &t->data, float, (int32_t)(rows * BOX_PARTICLE_CURVE_SAMPLES));
@@ -245,6 +289,7 @@ static int32_t box_particle_rows_acquire(
     entry->kind = kind;
     entry->refs = 0;
     entry->hash = hash;
+    ecs_map_ensure(&t->by_hash, hash)[0] = (ecs_map_val_t)result;
     box_particle_rows_write(t, entry, samples);
 done:
     ecs_vec_get_t(&t->entries, box_particle_rows_entry_t, result)->refs ++;
@@ -266,7 +311,13 @@ static void box_particle_rows_unref(
     int32_t i;
     for (i = 0; i < count; i ++) {
         if (entries[i] > 0 && entries[i] <= ecs_vec_count(&t->entries)) {
-            ecs_vec_get_t(&t->entries, box_particle_rows_entry_t, entries[i] - 1)->refs --;
+            box_particle_rows_entry_t *entry = ecs_vec_get_t(
+                &t->entries, box_particle_rows_entry_t, entries[i] - 1);
+            entry->refs --;
+            if (!entry->refs && !entry->listed) {
+                entry->listed = true;
+                *ecs_vec_append_t(NULL, &t->unused[entry->rows], int32_t) = entries[i] - 1;
+            }
         }
 
         entries[i] = 0;

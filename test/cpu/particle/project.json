@@ -238,7 +238,8 @@
                     "change_back_takes_known_rows",
                     "in_place_write_rebakes",
                     "seen_motion_not_sampled",
-                    "motion_from_prefab"
+                    "motion_from_prefab",
+                    "change_reuses_freed_rows"
                 ]
             },
             {
@@ -258,6 +259,7 @@
                     "block_curves",
                     "block_sprite",
                     "block_additive_unsorted",
+                    "sorted_only_with_color_curve",
                     "sort_count_power_of_two",
                     "billboard_corners_sent",
                     "billboard_without_mesh_is_circle"

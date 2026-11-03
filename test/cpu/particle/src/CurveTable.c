@@ -775,3 +775,59 @@ void CurveTable_motion_from_prefab(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+/** Write the last key of the size curve of an emitter.
+ *
+ * @param world The world
+ * @param e The emitter
+ * @param end The value
+ */
+static void sized_set(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    float end)
+{
+    ParticleCurves *c = ecs_get_mut(world, e, ParticleCurves);
+    ecs_vec_get_t(&c->size.keys, CurveKey, 3)->value = end;
+    ecs_modified(world, e, ParticleCurves);
+}
+
+void CurveTable_change_reuses_freed_rows(void) {
+    // particle/curve_cost
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t a = sized_new(world, 4);
+    ecs_entity_t b = sized_new(world, 5);
+    frame(world);
+    test_int(stats_of(world).rows, 2);
+
+    sized_set(world, a, 6);
+    frame(world);
+    box_render_particle_curve_stats_t st = stats_of(world);
+    test_int(st.rows, 3);
+    test_int(st.used, 2);
+
+    sized_set(world, b, 7);
+    frame(world);
+    st = stats_of(world);
+    test_int(st.rows, 3);
+    test_int(st.used, 2);
+    test_int(st.bakes, 4);
+    const box_render_particle_pool_t *pa = pool_of(null, a);
+    const box_render_particle_pool_t *pb = pool_of(null, b);
+    test_assert(pa != NULL && pb != NULL);
+    test_flt(size_at(world, pa, 1), 6);
+    test_flt(size_at(world, pb, 1), 7);
+
+    ecs_entity_t c = sized_new(world, 6);
+    frame(world);
+    st = stats_of(world);
+    test_int(st.rows, 3);
+    test_int(st.bakes, 4);
+    const box_render_particle_pool_t *pc = pool_of(null, c);
+    test_assert(pc != NULL);
+    test_uint(pc->block.curve_rows[0], pool_of(null, a)->block.curve_rows[0]);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

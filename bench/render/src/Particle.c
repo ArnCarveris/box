@@ -4,12 +4,12 @@
  * spawn passes alone, with three active forces, and with the draw of the pool in a view; the
  * fill rate of a screen covering smoke; and a thousand plays a second of a layered effect.
  *
- * The cost of curves: one million particles drawn with constant, keyed and max_keys curves and
- * ParticleMotion; the extract of thousands of emitters without, with constant and with keyed
- * curves, also with one changing per frame; and the plays of an effect with keyed curves.
+ * The cost of curves: one million particles drawn with constant curves, with keyed curves at
+ * their values, which differ only by the reads of their rows, and with keyed and max_keys
+ * curves and ParticleMotion; and the plays of an effect with keyed curves.
  *
- * The GPU cases render on the main thread and read a word of the particle page back each frame.
- * The effect and extract cases extract into a null backend and count the allocations of a frame.
+ * The extract of thousands of emitters without, with constant and with keyed curves, also with
+ * one curve changing per frame, into a null backend; the GPU cases render on the main thread.
  */
 
 #include <box.h>
@@ -26,6 +26,9 @@
 typedef enum bench_curves_t {
     BENCH_CURVES_NONE,      /**< No ParticleCurves */
     BENCH_CURVES_CONSTANT,  /**< ParticleCurves of one key each, which read no row */
+    BENCH_CURVES_FLAT,      /**< The constant curves with two keys at almost their values
+                             *   but for the color, so that size, opacity, rotation and spin
+                             *   read their rows: the cost of the reads alone */
     BENCH_CURVES_KEYED,     /**< Keyed size, opacity, rotation, spin and color curves */
     BENCH_CURVES_KEYED_MAX  /**< The keyed curves, each with max_keys */
 } bench_curves_t;
@@ -49,6 +52,14 @@ static void bench_curves_set(
             .opacity = { .keys = BOX_CURVE_KEYS({0, 0.9f}) },
             .rotation = { .keys = BOX_CURVE_KEYS({0, 0.1f}) },
             .spin = { .keys = BOX_CURVE_KEYS({0, 0.5f}) },
+            .color = { .keys = BOX_VEC_VIEW(ParticleGradientKey, {0, {200, 180, 160}}) }
+        });
+    } else if (curves == BENCH_CURVES_FLAT) {
+        ecs_set(world, e, ParticleCurves, {
+            .size = { .keys = BOX_CURVE_KEYS({0, 0.8f}, {1, 0.801f}) },
+            .opacity = { .keys = BOX_CURVE_KEYS({0, 0.9f}, {1, 0.901f}) },
+            .rotation = { .keys = BOX_CURVE_KEYS({0, 0.1f}, {1, 0.101f}) },
+            .spin = { .keys = BOX_CURVE_KEYS({0, 0.5f}, {1, 0.501f}) },
             .color = { .keys = BOX_VEC_VIEW(ParticleGradientKey, {0, {200, 180, 160}}) }
         });
     } else if (curves == BENCH_CURVES_KEYED) {
@@ -235,6 +246,13 @@ void Particle_draw_1m_constant_curves(
 {
     // particle/curve_cost
     bench_particles(b, true, false, BENCH_CURVES_CONSTANT, false);
+}
+
+void Particle_draw_1m_flat_curves(
+    bench_t *b)
+{
+    // particle/curve_cost
+    bench_particles(b, true, false, BENCH_CURVES_FLAT, false);
 }
 
 void Particle_draw_1m_curves(

@@ -31,12 +31,18 @@
  *
  * The table remembers the rows of the ParticleCurves and ParticleMotion it sampled by the hash
  * of their keys, so a pool whose curves were seen before, such as a new instance of an effect,
- * takes their rows without sampling them. Within a frame it also remembers the hash of the last
- * ParticleCurves and ParticleMotion by address, so the instances that share the curves of their
- * template hash them once.
+ * takes their rows without sampling them.
+ *
+ * Within a frame it remembers the hash of the last ParticleCurves and ParticleMotion by address,
+ * so the instances that share the curves of their template hash them once.
  */
 typedef struct box_particle_rows_t {
     ecs_vec_t entries;      /**< box_particle_rows_entry_t of particle_rows.c */
+    ecs_map_t by_hash;      /**< Hash of the kind and content of an entry to its index, so a
+                             *   bake finds equal rows without visiting every entry */
+    ecs_vec_t unused[BOX_PARTICLE_GRADIENT_ROWS + 1]; /**< int32_t, by rows taken: entries no
+                             *   pool used when they were added, handed out again from the
+                             *   last; an entry used since is skipped */
     ecs_vec_t data;         /**< float, BOX_PARTICLE_CURVE_SAMPLES per row handed out */
     ecs_vec_t known;        /**< box_particle_rows_known_t of particle_rows.c */
     ecs_vec_t known_motion; /**< box_particle_rows_known_motion_t of particle_rows.c */

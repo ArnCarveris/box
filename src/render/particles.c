@@ -62,6 +62,8 @@ typedef struct box_particle_pool_t {
     uint64_t time;          /**< Microseconds the emitter has played, ParticlePlayback.time */
     bool started;           /**< A frame played since the playback clock was zeroed */
     bool stopped;           /**< ParticleStopped since the last frame it played */
+    bool curved;            /**< The emitter had ParticleCurves or ParticleMotion in the last
+                             *   frame; else the extract reads neither curves nor motion */
     uint32_t next;          /**< Spawn index of the next particle */
     int32_t live;           /**< Particles alive */
     uint32_t used;          /**< Slots from the start that were handed out */
@@ -1045,37 +1047,90 @@ static uint32_t box_particles_sort_count(
     return result < capacity ? result : capacity;
 }
 
+_Static_assert(offsetof(box_render_particle_block_t, corners) ==
+    offsetof(box_render_particle_block_t, gradient_row) + sizeof(uint32_t),
+    "the curves of a block end at gradient_row");
+_Static_assert(sizeof(box_render_particle_block_t) ==
+    offsetof(box_render_particle_block_t, motion_force) + 4 * sizeof(float),
+    "the max curves and the motion of a block are its last members");
+
+/** The curves and motion of the block of an emitter without ParticleCurves and ParticleMotion,
+ * which change nothing */
+static const box_render_particle_block_t box_particles_still = {
+    .curve_rows = {BOX_PARTICLE_CURVE_CONSTANT, BOX_PARTICLE_CURVE_CONSTANT,
+        BOX_PARTICLE_CURVE_CONSTANT, BOX_PARTICLE_CURVE_CONSTANT},
+    .curve_values = {1.0f, 1.0f, 0.0f, 1.0f},
+    .gradient = {1.0f, 1.0f, 1.0f},
+    .gradient_row = BOX_PARTICLE_CURVE_CONSTANT,
+    .curve_max_rows = {BOX_PARTICLE_CURVE_CONSTANT, BOX_PARTICLE_CURVE_CONSTANT,
+        BOX_PARTICLE_CURVE_CONSTANT, BOX_PARTICLE_CURVE_CONSTANT},
+    .gradient_max_row = BOX_PARTICLE_CURVE_CONSTANT,
+    .motion_rows = {BOX_PARTICLE_CURVE_CONSTANT, BOX_PARTICLE_CURVE_CONSTANT,
+        BOX_PARTICLE_CURVE_CONSTANT, BOX_PARTICLE_CURVE_CONSTANT},
+    .motion_velocity = {0.0f, 0.0f, 0.0f, 1.0f},
+    .motion_force = {0.0f, 0.0f, 0.0f, 1.0f}
+};
+
+/** Write the curves and motion of an emitter without ParticleCurves and ParticleMotion into its
+ * block: two copies of the ranges of box_particles_still, where member by member writes
+ * through the pool were a tenth of the extract of an emitter.
+ *
+ * @param out The block
+ */
+static void box_particles_block_still(
+    box_render_particle_block_t *out)
+{
+    size_t first = offsetof(box_render_particle_block_t, curve_rows);
+    size_t end = offsetof(box_render_particle_block_t, corners);
+    ecs_os_memcpy(ECS_OFFSET(out, first), ECS_OFFSET(&box_particles_still, first),
+        (ecs_size_t)(end - first));
+    first = offsetof(box_render_particle_block_t, curve_max_rows);
+    end = sizeof(box_render_particle_block_t);
+    ecs_os_memcpy(ECS_OFFSET(out, first), ECS_OFFSET(&box_particles_still, first),
+        (ecs_size_t)(end - first));
+}
+
 /** Write the changes over the life and the appearance of an emitter into its block.
  *
  * Without ParticleCurves the curves change nothing; without ParticleAppearance the particles
- * are soft alpha blended circles, unsorted because their one color blends the same in any
- * order.
+ * are soft alpha blended circles, unsorted unless a color curve changes their color over their
+ * life: particles of one color blend the same in any order, whatever their opacity and size.
  *
- * @param curves The ParticleCurves of the emitter, NULL for none
  * @param look The ParticleAppearance of the emitter, NULL for none
  * @param pool The pool, with its billboard corners and the rows of its curves and of its
  *             ParticleMotion
  * @param out The block, its other members written
  */
 static void box_particles_block_look(
-    const ParticleCurves *curves,
     const ParticleAppearance *look,
     const box_particle_pool_t *pool,
     box_render_particle_block_t *out)
 {
+    const box_particle_motion_rows_t *motion = &pool->motion.rows;
     int32_t i;
-    for (i = 0; i < 4; i ++) {
-        out->curve_rows[i] = pool->curves.rows[i];
-        out->curve_max_rows[i] = pool->curves.max_rows[i];
-        out->curve_values[i] = pool->curves.values[i];
-    }
+    if (!pool->curved) {
+        box_particles_block_still(out);
+    } else {
+        for (i = 0; i < 4; i ++) {
+            out->curve_rows[i] = pool->curves.rows[i];
+            out->curve_max_rows[i] = pool->curves.max_rows[i];
+            out->curve_values[i] = pool->curves.values[i];
+            out->motion_velocity[i] = motion->velocity[i];
+            out->motion_force[i] = motion->force[i];
+        }
 
-    for (i = 0; i < 3; i ++) {
-        out->gradient[i] = pool->curves.gradient[i];
-    }
+        for (i = 0; i < 3; i ++) {
+            out->gradient[i] = pool->curves.gradient[i];
+        }
 
-    out->gradient_row = pool->curves.gradient_row;
-    out->gradient_max_row = pool->curves.gradient_max_row;
+        out->gradient_row = pool->curves.gradient_row;
+        out->gradient_max_row = pool->curves.gradient_max_row;
+        out->motion = pool->motion.active ? 1u : 0u;
+        out->motion_rows[0] = motion->velocity_row;
+        out->motion_rows[1] = motion->velocity_max_row;
+        out->motion_rows[2] = motion->force_row;
+        out->motion_rows[3] = motion->force_max_row;
+    }
 
     out->look = ParticleCircle;
     out->blend = ParticleAlpha;
@@ -1098,19 +1153,10 @@ static void box_particles_block_look(
         }
     }
 
-    const box_particle_motion_rows_t *motion = &pool->motion.rows;
-    out->motion = pool->motion.active ? 1u : 0u;
-    out->motion_rows[0] = motion->velocity_row;
-    out->motion_rows[1] = motion->velocity_max_row;
-    out->motion_rows[2] = motion->force_row;
-    out->motion_rows[3] = motion->force_max_row;
-    for (i = 0; i < 4; i ++) {
-        out->motion_velocity[i] = motion->velocity[i];
-        out->motion_force[i] = motion->force[i];
-    }
-
     out->styled = look ? 1u : 0u;
-    out->sorted = out->blend == ParticleAlpha && (curves || look) ? 1u : 0u;
+    out->sorted = out->blend == ParticleAlpha && (look ||
+        out->gradient_row != BOX_PARTICLE_CURVE_CONSTANT ||
+        out->gradient_max_row != BOX_PARTICLE_CURVE_CONSTANT) ? 1u : 0u;
     out->sort_count = out->sorted ? box_particles_sort_count(pool->used, pool->capacity) : 0;
 }
 
@@ -1386,11 +1432,15 @@ static void box_particles_emitter(
     }
 
     box_particles_block_forces(pool, emitter->acceleration, &forces, moves, &entry->block);
-    box_particle_rows_update(&s->curves, &pool->curves, curves);
-    box_particle_rows_motion_update(&s->curves, &pool->motion, motion);
-    box_particles_block_look(curves, look, pool, &entry->block);
-    entry->curves = box_particle_rows_used(&pool->curves) ||
-        box_particle_rows_motion_used(&pool->motion)
+    if (curves || motion || pool->curved) {
+        box_particle_rows_update(&s->curves, &pool->curves, curves);
+        box_particle_rows_motion_update(&s->curves, &pool->motion, motion);
+        pool->curved = curves || motion;
+    }
+
+    box_particles_block_look(look, pool, &entry->block);
+    entry->curves = pool->curved && (box_particle_rows_used(&pool->curves) ||
+        box_particle_rows_motion_used(&pool->motion))
         ? BOX_RENDER_BUFFER_PARTICLE_CURVES
         : 0;
     entry->block.count = count;

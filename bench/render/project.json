@@ -205,6 +205,7 @@
                     "effect_plays_1k",
                     "simulate_1m_motion",
                     "draw_1m_constant_curves",
+                    "draw_1m_flat_curves",
                     "draw_1m_curves",
                     "draw_1m_curves_max",
                     "draw_1m_curves_motion",

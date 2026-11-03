@@ -466,6 +466,50 @@ void Appearance_block_additive_unsorted(void) {
     box_render_null_free(null);
 }
 
+void Appearance_sorted_only_with_color_curve(void) {
+    // particle/curve_cost
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t e = emitter_new(world, 2, 100);
+    ecs_set(world, e, ParticleCurves, {
+        .size = { .keys = BOX_CURVE_KEYS({0, 0.5f}, {1, 2}) },
+        .opacity = { .keys = BOX_CURVE_KEYS({0, 0}, {0.2f, 1}, {1, 0}) },
+        .color = { .keys = BOX_VEC_VIEW(ParticleGradientKey, {0, {200, 100, 50}}) }
+    });
+    frame(world);
+
+    const box_render_particle_pool_t *pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_assert(pool->block.curve_rows[0] != BOX_PARTICLE_CURVE_CONSTANT);
+    test_uint(pool->block.gradient_row, BOX_PARTICLE_CURVE_CONSTANT);
+    test_uint(pool->block.sorted, 0);
+    test_uint(pool->block.sort_count, 0);
+
+    ecs_set(world, e, ParticleCurves, {
+        .color = { .keys = BOX_VEC_VIEW(ParticleGradientKey,
+            {0, {200, 100, 50}}, {1, {50, 50, 50}}) }
+    });
+    frame(world);
+    pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_assert(pool->block.gradient_row != BOX_PARTICLE_CURVE_CONSTANT);
+    test_uint(pool->block.sorted, 1);
+    test_uint(pool->block.sort_count, BOX_RENDER_PARTICLE_SORT_MIN);
+
+    ecs_set(world, e, ParticleCurves, {
+        .color = { .keys = BOX_VEC_VIEW(ParticleGradientKey, {0, {200, 100, 50}}),
+            .max_keys = BOX_VEC_VIEW(ParticleGradientKey, {0, {50, 100, 200}}) }
+    });
+    frame(world);
+    pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_assert(pool->block.gradient_max_row != BOX_PARTICLE_CURVE_CONSTANT);
+    test_uint(pool->block.sorted, 1);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
 void Appearance_sort_count_power_of_two(void) {
     // particle/sort
     box_render_null_t *null;
