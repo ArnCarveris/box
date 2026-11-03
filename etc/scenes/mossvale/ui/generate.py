@@ -99,6 +99,20 @@ def vignette():
     to_image(out).save(os.path.join(OUT, "vignette.png"))
 
 
+def scrim():
+    n = 512
+    y = np.linspace(-1, 1, n)[:, None]
+    x = np.linspace(-1, 1, n)[None, :]
+    r = np.sqrt(x * x + y * y)
+    a = (1 - smooth(0.35, 1.0, r)) * 0.85
+    out = np.zeros((n, n, 4))
+    out[..., 0] = 0.09
+    out[..., 1] = 0.055
+    out[..., 2] = 0.025
+    out[..., 3] = a
+    to_image(out).save(os.path.join(OUT, "scrim.png"))
+
+
 GOLD_DEFS = """<linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff0b8"/><stop offset="0.35" stop-color="#e2b456"/><stop offset="0.7" stop-color="#b07a2a"/><stop offset="1" stop-color="#6e4614"/></linearGradient>
 <linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9cc070"/><stop offset="1" stop-color="#3e6a34"/></linearGradient>"""
 
@@ -389,6 +403,7 @@ if __name__ == "__main__":
     parchment()
     leather()
     vignette()
+    scrim()
     corner()
     divider()
     ribbon()

@@ -301,11 +301,12 @@ ECS_STRUCT(TextureTransform, {
 /** Where the texture coordinates of a material come from */
 ECS_ENUM(TextureMappingMode, {
     MappingUv = 0,      /**< The UVs of the mesh, the default */
-    MappingObject = 1   /**< Projected from the object space position times the instance scale */
+    MappingObject = 1,  /**< Projected from the object space position times the instance scale */
+    MappingWorld = 2    /**< Projected from the world position, fixed in the world */
 });
 
-/** How the texture coordinates of a material are made, default MappingUv with a size of 1,
- * inherited by instances, like TextureTransform.
+/** How the texture coordinates of a material are made, default MappingUv with a size of 1 and a
+ * blend of 0, inherited by instances, like TextureTransform.
  *
  * MappingObject projects each fragment onto the plane of the dominant axis of its object space
  * normal, from its object space position times the scale of the instance (the lengths of the
@@ -316,16 +317,35 @@ ECS_ENUM(TextureMappingMode, {
  * along -x, the bottom u along -z and v along -x; no face is mirrored. A unit cube with a size
  * of 1 maps as its UVs do. TextureTransform applies after the mapping.
  *
- * The axis is chosen per fragment, so a smooth mesh changes axis inside a triangle where its
- * normal turns, with a seam there. Parametric surfaces (Sweep, Extrude and the other shapes of
- * box/geometry.h that evaluate a surface in the vertex stage) keep their own UVs and ignore the
- * mapping. Picking onto a surface texture (PbrTextures of a Surface) follows the mapping, with
- * the normal of the mesh interpolated at the hit.
+ * MappingWorld projects the world position of each fragment, divided by size, onto the plane of
+ * the dominant axis of its world normal, with the same orientation. The texture is fixed in the
+ * world and does not move with the object: a shape that moves or turns slides under it, and
+ * shapes that touch show one continuous texture across the seam, whatever their size, rotation
+ * or shape. TextureTransform applies after the projection, so its offset moves the texture over
+ * the world and its scale stretches it.
+ *
+ * With a blend of 0 the axis is chosen per fragment, so a smooth mesh changes axis inside a
+ * triangle where its normal turns, with a seam there. A blend above 0 (up to 1) mixes the three
+ * axis projections (triplanar mapping) with weights from the normal raised to the power
+ * 1 / blend, so curved shapes have no hard seams; the larger the blend the wider the transition.
+ * Each texture layer is sampled once per projection with a weight, so a flat face aligned with
+ * an axis still samples once; the normal map of each projection turns to the world with the
+ * axes of that projection before the results are blended. The blend applies to MappingObject
+ * and MappingWorld; MappingUv ignores it.
+ *
+ * Parametric surfaces (Sweep, Extrude and the other shapes of box/geometry.h that evaluate a
+ * surface in the vertex stage) keep their own UVs and ignore the mapping. Picking onto a
+ * surface texture (PbrTextures of a Surface) follows the mapping on the dominant axis, with the
+ * normal of the mesh interpolated at the hit. Alpha tested shapes (AlphaCutoff) test and cast
+ * shadows with the mapped texture.
  */
 ECS_STRUCT(TextureMapping, {
     TextureMappingMode mode; /**< Source of the texture coordinates */
-    float size;         /**< World units one repeat of the texture covers with MappingObject,
-                         *   default 1; a size that is not positive and finite is 1 */
+    float size;         /**< World units one repeat of the texture covers with MappingObject
+                         *   and MappingWorld, default 1; a size that is not positive and finite
+                         *   is 1 */
+    float blend;        /**< Width of the triplanar blend, 0..1, default 0 for the hard
+                         *   projection on the dominant axis; clamped to 0..1, not finite is 0 */
 });
 
 /** Texture entities for each PBR layer, 0 for none, inherited by instances like Rgb, part of the
