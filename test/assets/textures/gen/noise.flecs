@@ -1,0 +1,23 @@
+// Fixed description of a GenNoise height field with its albedo and normal map, whose bytes the
+// TextureGen tests hash so a change of the output is noticed.
+
+using box.texture
+
+noise_height {
+  TextureGen: {
+    width: 64, height: 48, seed: 3
+    layers: [
+      {kind: GenNoise, frequency: 4, octaves: 4, amount: 1}
+      {kind: GenNoise, frequency: 2, octaves: 1, lacunarity: 3, gain: 0.4, amount: 0.5, seed: 1}
+    ]
+  }
+}
+
+noise_albedo {
+  TextureGen: {source: noise_height, output: GenAlbedo,
+               colors: [{0, {40, 60, 90}}, {0.5, {120, 140, 100}}, {1, {240, 230, 210}}]}
+}
+
+noise_normal {
+  TextureGen: {source: noise_height, output: GenNormal, strength: 2}
+}

@@ -1,15 +1,16 @@
 /**
  * @file texture/texture.c
- * @brief Texture components and the loads of TexturePath on the job system.
+ * @brief Texture components and the loads of TexturePath and TextureGen on the job system.
  *
- * Setting a TexturePath submits a decode job; its completion writes Texture and
- * TextureStatus and queues the pixels in the registry, which the render extract sends. The
- * file watch loads the image again when the file the decode read changes.
+ * Setting a TexturePath submits a decode job, a TextureGen a generation job (gen.c); its completion
+ * writes Texture and TextureStatus and queues the pixels in the registry, which the render
+ * extract sends. The file watch loads the image again when the file the decode read changes.
  */
 
 #define BOX_TEXTURE_IMPL
 #include "texture.h"
 #include "../jobs/jobs.h"
+#include <math.h>
 
 ECS_COMPONENT_DECLARE(TextureRegistry);
 
@@ -203,7 +204,7 @@ static int32_t box_texture_revision(
     return status ? status->revision : 0;
 }
 
-/** Decode the image of a job on a worker thread.
+/** Decode or generate the image of a job on a worker thread.
  *
  * @param ctx The job
  */
@@ -211,7 +212,12 @@ static void box_texture_work(
     void *ctx)
 {
     box_texture_job_t *job = ctx;
-    box_texture_decode(job);
+    if (job->gen) {
+        box_texture_generate(job);
+    } else {
+        box_texture_decode(job);
+    }
+
     ecs_os_mutex_lock(job->sync->lock);
     job->sync->working --;
     ecs_os_mutex_unlock(job->sync->lock);
@@ -274,6 +280,7 @@ static void box_texture_job_free(
 {
     box_texture_job_t *job = ctx;
     ecs_os_free(job->path);
+    box_texture_gen_free(job->gen);
     ecs_os_free(job->file);
     ecs_os_free(job->pixels);
     ecs_os_free(job->error);
@@ -281,41 +288,63 @@ static void box_texture_job_free(
     ecs_os_free(job);
 }
 
-/** Submit a decode of the TexturePath of an entity.
+/** Get the registry entry of a texture entity, creating it on first use.
  *
- * @param world The world or a stage
  * @param t The registry
  * @param e The texture entity
- * @param path Its TexturePath
+ * @return The entry
  */
-static void box_texture_request(
-    ecs_world_t *world,
+static box_texture_t* box_texture_entry(
     box_textures_t *t,
-    ecs_entity_t e,
-    const TexturePath *path)
+    ecs_entity_t e)
 {
     box_texture_t *tex = ecs_map_get_deref(&t->textures, box_texture_t, e);
-    int32_t revision = box_texture_revision(world, e);
     if (!tex) {
         tex = ecs_os_calloc_t(box_texture_t);
         tex->entity = e;
         ecs_map_insert_ptr(&t->textures, e, tex);
     }
 
-    if (!t->quality) {
-        t->quality = box_textures_quality(world, t);
-    }
+    return tex;
+}
 
-    box_texture_job_t *job = ecs_os_calloc_t(box_texture_job_t);
+/** Fail the load of a texture without a job, dropping the result of the load in flight.
+ *
+ * @param world The world or a stage
+ * @param t The registry
+ * @param e The texture entity
+ * @param error Why it failed
+ */
+static void box_texture_fail(
+    ecs_world_t *world,
+    box_textures_t *t,
+    ecs_entity_t e,
+    const char *error)
+{
+    box_texture_t *tex = box_texture_entry(t, e);
+    tex->generation ++;
+    ecs_err("%s", error);
+    box_texture_status(world, e, TextureFailed, box_texture_revision(world, e), error);
+}
+
+/** Submit the job of a texture: the decode of a file or a generation.
+ *
+ * @param world The world or a stage
+ * @param t The registry
+ * @param e The texture entity
+ * @param job The job with what to load, takes ownership
+ */
+static void box_texture_submit(
+    ecs_world_t *world,
+    box_textures_t *t,
+    ecs_entity_t e,
+    box_texture_job_t *job)
+{
+    box_texture_t *tex = box_texture_entry(t, e);
+    int32_t revision = box_texture_revision(world, e);
     job->sync = t->sync;
     job->entity = e;
     job->generation = ++ tex->generation;
-    job->path = path->path ? ecs_os_strdup(path->path) : NULL;
-    job->request_width = path->width;
-    job->request_height = path->height;
-    job->quality = t->quality;
-    job->linear = path->linear;
-    job->single_channel = path->single_channel;
     t->sync->refs ++;
     ecs_os_mutex_lock(t->sync->lock);
     t->sync->working ++;
@@ -335,6 +364,176 @@ static void box_texture_request(
     }
 }
 
+/** Get the largest dimension of the loads, computing it on first use.
+ *
+ * @param world The world or a stage
+ * @param t The registry
+ * @return The texture quality
+ */
+static int32_t box_texture_quality_of(
+    const ecs_world_t *world,
+    box_textures_t *t)
+{
+    if (!t->quality) {
+        t->quality = box_textures_quality(world, t);
+    }
+
+    return t->quality;
+}
+
+/** Submit a decode of the TexturePath of an entity.
+ *
+ * @param world The world or a stage
+ * @param t The registry
+ * @param e The texture entity
+ * @param path Its TexturePath
+ */
+static void box_texture_request(
+    ecs_world_t *world,
+    box_textures_t *t,
+    ecs_entity_t e,
+    const TexturePath *path)
+{
+    box_texture_job_t *job = ecs_os_calloc_t(box_texture_job_t);
+    job->path = path->path ? ecs_os_strdup(path->path) : NULL;
+    job->request_width = path->width;
+    job->request_height = path->height;
+    job->quality = box_texture_quality_of(world, t);
+    job->linear = path->linear;
+    job->single_channel = path->single_channel;
+    box_texture_submit(world, t, e, job);
+}
+
+/** Submit a generation of the TextureGen of an entity, with the layers of its source.
+ *
+ * @param world The world or a stage
+ * @param t The registry
+ * @param e The texture entity
+ * @param gen Its TextureGen
+ */
+static void box_texture_request_gen(
+    ecs_world_t *world,
+    box_textures_t *t,
+    ecs_entity_t e,
+    const TextureGen *gen)
+{
+    const TextureGen *field = gen;
+    if (gen->source) {
+        field = ecs_is_alive(world, gen->source)
+            ? ecs_get(world, gen->source, TextureGen)
+            : NULL;
+        if (!field || !ecs_vec_count(&field->layers)) {
+            char *name = ecs_get_path(world, e);
+            char *source = ecs_is_alive(world, gen->source)
+                ? ecs_get_path(world, gen->source)
+                : NULL;
+            char *error = flecs_asprintf("texture '%s': source '%s' has no TextureGen with "
+                "layers", name, source ? source : "(deleted)");
+            box_texture_fail(world, t, e, error);
+            ecs_os_free(error);
+            ecs_os_free(source);
+            ecs_os_free(name);
+            goto done;
+        }
+    }
+
+    double w = field->width > 0 ? field->width : 512;
+    double h = field->height > 0 ? field->height : w;
+    double largest = w > h ? w : h;
+    int32_t quality = box_texture_quality_of(world, t);
+    if (quality > 0 && largest > quality) {
+        w *= quality / largest;
+        h *= quality / largest;
+    }
+
+    box_texture_gen_t *desc = ecs_os_calloc_t(box_texture_gen_t);
+    desc->width = w < 1 ? 1 : (int32_t)floor(w + 0.5);
+    desc->height = h < 1 ? 1 : (int32_t)floor(h + 0.5);
+    desc->seed = field->seed;
+    desc->layer_count = ecs_vec_count(&field->layers);
+    if (desc->layer_count) {
+        desc->layers = ecs_os_memdup(ecs_vec_first(&field->layers),
+            desc->layer_count * ECS_SIZEOF(TextureGenLayer));
+    }
+
+    desc->output = gen->output;
+    desc->color_count = ecs_vec_count(&gen->colors);
+    if (desc->color_count) {
+        desc->colors = ecs_os_memdup(ecs_vec_first(&gen->colors),
+            desc->color_count * ECS_SIZEOF(TextureGenKey));
+    }
+
+    desc->strength = gen->strength;
+    box_texture_job_t *job = ecs_os_calloc_t(box_texture_job_t);
+    job->gen = desc;
+    job->quality = quality;
+    job->single_channel = gen->output == GenHeight;
+    box_texture_submit(world, t, e, job);
+done:
+    return;
+}
+
+/** Load the image of a texture entity from its TexturePath or its TextureGen; both on one
+ * entity is an error.
+ *
+ * @param world The world or a stage
+ * @param t The registry
+ * @param e The texture entity
+ */
+static void box_texture_load(
+    ecs_world_t *world,
+    box_textures_t *t,
+    ecs_entity_t e)
+{
+    const TexturePath *path = ecs_get(world, e, TexturePath);
+    const TextureGen *gen = ecs_get(world, e, TextureGen);
+    if (path && gen) {
+        char *name = ecs_get_path(world, e);
+        char *error = flecs_asprintf(
+            "texture '%s' has both a TexturePath and a TextureGen", name);
+        box_texture_fail(world, t, e, error);
+        ecs_os_free(error);
+        ecs_os_free(name);
+    } else if (path) {
+        box_texture_request(world, t, e, path);
+    } else if (gen) {
+        box_texture_request_gen(world, t, e, gen);
+    }
+}
+
+/** Generate the textures again whose TextureGen derives from a source that changed.
+ *
+ * @param world The world or a stage
+ * @param t The registry
+ * @param source The generator that changed
+ */
+static void box_texture_regenerate_derived(
+    ecs_world_t *world,
+    box_textures_t *t,
+    ecs_entity_t source)
+{
+    ecs_vec_t derived;
+    ecs_vec_init_t(NULL, &derived, ecs_entity_t, 0);
+    ecs_map_iter_t it = ecs_map_iter(&t->textures);
+    while (ecs_map_next(&it)) {
+        box_texture_t *tex = ecs_map_ptr(&it);
+        const TextureGen *gen = ecs_is_alive(world, tex->entity)
+            ? ecs_get(world, tex->entity, TextureGen)
+            : NULL;
+        if (gen && gen->source == source && tex->entity != source) {
+            *ecs_vec_append_t(NULL, &derived, ecs_entity_t) = tex->entity;
+        }
+    }
+
+    int32_t i, count = ecs_vec_count(&derived);
+    ecs_entity_t *entities = ecs_vec_first_t(&derived, ecs_entity_t);
+    for (i = 0; i < count; i ++) {
+        box_texture_load(world, t, entities[i]);
+    }
+
+    ecs_vec_fini_t(NULL, &derived, ecs_entity_t);
+}
+
 void box_textures_reload(
     ecs_world_t *world,
     box_textures_t *t,
@@ -343,13 +542,10 @@ void box_textures_reload(
     ecs_map_iter_t it = ecs_map_iter(&t->textures);
     while (ecs_map_next(&it)) {
         box_texture_t *tex = ecs_map_ptr(&it);
-        const TexturePath *path = ecs_is_alive(world, tex->entity)
-            ? ecs_get(world, tex->entity, TexturePath)
-            : NULL;
         bool reload = !sent_only || tex->sent;
         tex->sent = false;
-        if (path && reload) {
-            box_texture_request(world, t, tex->entity, path);
+        if (reload && ecs_is_alive(world, tex->entity)) {
+            box_texture_load(world, t, tex->entity);
         }
     }
 }
@@ -371,11 +567,12 @@ static void box_texture_changed(
         : NULL;
     (void)ctx;
     if (path) {
-        box_texture_request(world, t, owner, path);
+        box_texture_load(world, t, owner);
     }
 }
 
 /** Load the image of every set TexturePath, which stops watching the file of the previous one.
+
  *
  * @param it The iterator of the observer
  */
@@ -383,7 +580,6 @@ static void BoxTextureOnSet(
     ecs_iter_t *it)
 {
     box_textures_t *t = box_textures_get(it->world);
-    const TexturePath *paths = ecs_field(it, TexturePath, 0);
     int32_t i;
     if (!t) {
         goto done;
@@ -391,14 +587,37 @@ static void BoxTextureOnSet(
 
     for (i = 0; i < it->count; i ++) {
         box_file_watch_clear(it->world, t->watch, it->entities[i]);
-        box_texture_request(it->stage, t, it->entities[i], &paths[i]);
+        box_texture_load(it->stage, t, it->entities[i]);
     }
 
 done:
     return;
 }
 
-/** Forget the textures whose TexturePath is removed and release their backend image.
+/** Generate the image of every set TextureGen and of the generators derived from it.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxTextureGenOnSet(
+    ecs_iter_t *it)
+{
+    box_textures_t *t = box_textures_get(it->world);
+    int32_t i;
+    if (!t) {
+        goto done;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        box_texture_load(it->stage, t, it->entities[i]);
+        box_texture_regenerate_derived(it->stage, t, it->entities[i]);
+    }
+
+done:
+    return;
+}
+
+/** Forget the textures whose TexturePath or TextureGen is removed and release their backend
+ * image; one that keeps the other loads from it instead, keeping its entry and image.
  *
  * @param it The iterator of the observer
  */
@@ -407,6 +626,9 @@ static void BoxTextureOnRemove(
 {
     box_textures_t *t = box_textures_get(it->world);
     bool alive = it->other_table && ecs_table_get_type(it->other_table)->count;
+    bool is_path = it->event_id == ecs_id(TexturePath);
+    ecs_id_t other = is_path ? ecs_id(TextureGen) : ecs_id(TexturePath);
+    bool keep = alive && ecs_table_has_id(it->world, it->other_table, other);
     int32_t i;
     if (!t || ecs_is_fini(it->world)) {
         goto done;
@@ -416,6 +638,14 @@ static void BoxTextureOnRemove(
         ecs_entity_t e = it->entities[i];
         box_texture_t *tex = ecs_map_get_deref(&t->textures, box_texture_t, e);
         box_file_watch_clear(it->world, t->watch, e);
+        if (keep && is_path) {
+            box_texture_request_gen(it->stage, t, e, ecs_get(it->world, e, TextureGen));
+            continue;
+        } else if (keep) {
+            box_texture_request(it->stage, t, e, ecs_get(it->world, e, TexturePath));
+            continue;
+        }
+
         if (tex) {
             if (tex->handle) {
                 *ecs_vec_append_t(NULL, &t->released, uint32_t) = tex->handle;
@@ -537,15 +767,25 @@ void BoxTextureImport(
     ecs_world_t *world)
 {
     ECS_MODULE(world, BoxTexture);
+    ECS_IMPORT(world, BoxTypes);
     ECS_IMPORT(world, BoxSurface);
     ECS_IMPORT(world, BoxApp);
     ECS_IMPORT(world, BoxJobs);
 
     ECS_META_COMPONENT(world, Texture);
     ECS_META_COMPONENT(world, TexturePath);
+    ECS_META_COMPONENT(world, TextureGenPattern);
+    ECS_META_COMPONENT(world, TextureGenOp);
+    ECS_META_COMPONENT(world, TextureGenDistance);
+    ECS_META_COMPONENT(world, TextureGenOutput);
+    ECS_META_COMPONENT(world, TextureGenLayer);
+    ECS_META_COMPONENT(world, TextureGenKey);
+    ECS_META_COMPONENT(world, TextureGen);
     ECS_META_COMPONENT(world, TextureState);
     ECS_META_COMPONENT(world, TextureStatus);
     box_owned_hooks(world, TexturePath, BOX_OWNED_STR(TexturePath, path));
+    box_owned_hooks(world, TextureGen, BOX_OWNED_VEC(TextureGen, layers, TextureGenLayer),
+        BOX_OWNED_VEC(TextureGen, colors, TextureGenKey));
     box_owned_hooks(world, TextureStatus, BOX_OWNED_STR(TextureStatus, error));
 
     ECS_COMPONENT_DEFINE(world, TextureRegistry);
@@ -583,6 +823,20 @@ void BoxTextureImport(
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "TextureOnRemove" }),
         .query.terms = {{ .id = ecs_id(TexturePath) }},
+        .events = { EcsOnRemove },
+        .callback = BoxTextureOnRemove
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "TextureGenOnSet" }),
+        .query.terms = {{ .id = ecs_id(TextureGen) }},
+        .events = { EcsOnSet },
+        .callback = BoxTextureGenOnSet
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "TextureGenOnRemove" }),
+        .query.terms = {{ .id = ecs_id(TextureGen) }},
         .events = { EcsOnRemove },
         .callback = BoxTextureOnRemove
     });

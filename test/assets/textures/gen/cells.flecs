@@ -1,0 +1,24 @@
+// Fixed description of a GenCells height field (cobble-like domes with mortar) with its albedo
+// and normal map, whose bytes the TextureGen tests hash so a change of the output is noticed.
+
+using box.texture
+
+cells_height {
+  TextureGen: {
+    width: 64, height: 48, seed: 111
+    layers: [
+      {kind: GenCells, count: 12, distance: GenEdge, edge: 0.14, amount: 0.5, id_amount: 0.15}
+      {kind: GenCells, count: 12, distance: GenEdge, edge: 0.45, amount: 0.6}
+      {kind: GenCells, count: 20, squash: 1.6, amount: 0.2, seed: 2, op: GenMax}
+    ]
+  }
+}
+
+cells_albedo {
+  TextureGen: {source: cells_height, output: GenAlbedo,
+               colors: [{0, {72, 66, 58}}, {0.3, {120, 114, 106}}, {1, {222, 214, 202}}]}
+}
+
+cells_normal {
+  TextureGen: {source: cells_height, output: GenNormal, strength: 3.6}
+}

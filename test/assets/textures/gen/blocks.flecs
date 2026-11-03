@@ -1,0 +1,24 @@
+// Fixed description of a GenBlocks height field (ashlar-like courses with noise) with its albedo
+// and normal map, whose bytes the TextureGen tests hash so a change of the output is noticed.
+
+using box.texture
+
+blocks_height {
+  TextureGen: {
+    width: 64, height: 48, seed: 11
+    layers: [
+      {kind: GenBlocks, courses: 4, per_course: 3, gap: 0.04, jitter: 0.22, stagger: 0.5,
+       amount: 0.8, id_amount: 0.2}
+      {kind: GenNoise, frequency: 8, octaves: 2, amount: 0.2}
+    ]
+  }
+}
+
+blocks_albedo {
+  TextureGen: {source: blocks_height, output: GenAlbedo,
+               colors: [{0, {150, 146, 138}}, {0.5, {214, 208, 196}}, {1, {240, 234, 222}}]}
+}
+
+blocks_normal {
+  TextureGen: {source: blocks_height, output: GenNormal, strength: 3}
+}
