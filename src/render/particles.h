@@ -115,7 +115,15 @@ typedef struct box_render_particle_block_t {
                              *   max spin is in the row after its own */
     uint32_t gradient_max_row; /**< First row of the max color multiplier,
                              *   BOX_PARTICLE_CURVE_CONSTANT for none */
-    uint32_t unused[3];     /**< Padding to the size of Emitter */
+    uint32_t motion;        /**< 1 when the emitter has a ParticleMotion that changes its
+                             *   motion, which the passes read the members below for */
+    uint32_t unused[2];     /**< Padding to the vec4 of Emitter */
+    uint32_t motion_rows[8]; /**< Rows of the curves of the ParticleMotion: velocity x, y and
+                             *   z, speed, force x, y and z, drag, BOX_PARTICLE_CURVE_CONSTANT
+                             *   for a constant one, as box_particle_motion_rows_t */
+    uint32_t motion_max_rows[8]; /**< Rows of their max curves, BOX_PARTICLE_CURVE_CONSTANT for
+                             *   none */
+    float motion_values[8]; /**< Values of those curves while constant */
 } box_render_particle_block_t;
 
 /** A particle pool of the frame: a range of a particle page, simulated after the scatters and

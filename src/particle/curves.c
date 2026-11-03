@@ -1,7 +1,7 @@
 /**
  * @file particle/curves.c
- * @brief Checks of the keyed curves of ParticleCurves and ParticleLight and their validate
- * hooks.
+ * @brief Checks of the keyed curves of ParticleCurves, ParticleMotion and ParticleLight and their
+ * validate hooks.
  */
 
 #include "curves.h"
@@ -202,6 +202,36 @@ static bool box_particle_curves_validate(
     return true;
 }
 
+/** Validate hook for ParticleMotion.
+ *
+ * @param world The world
+ * @param entity The entity being validated
+ * @param ptr Pointer to the component value
+ * @return Always true; problems are only logged
+ */
+static bool box_particle_motion_validate(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    void *ptr)
+{
+    const ParticleMotion *m = ptr;
+    const ParticleCurve *curves[8] = {
+        &m->velocity_x, &m->velocity_y, &m->velocity_z,
+        &m->force_x, &m->force_y, &m->force_z, &m->speed, &m->drag
+    };
+    static const char *fields[8] = {
+        "velocity_x", "velocity_y", "velocity_z", "force_x", "force_y", "force_z", "speed",
+        "drag"
+    };
+    int32_t i;
+    for (i = 0; i < 8; i ++) {
+        box_particle_curves_report(world, entity, "ParticleMotion", fields[i],
+            box_particle_curve_check(curves[i]));
+    }
+
+    return true;
+}
+
 /** Validate hook for ParticleLight.
  *
  * @param world The world
@@ -225,5 +255,6 @@ void box_particle_curves_import(
     ecs_world_t *world)
 {
     ecs_set_hooks(world, ParticleCurves, { .on_validate = box_particle_curves_validate });
+    ecs_set_hooks(world, ParticleMotion, { .on_validate = box_particle_motion_validate });
     ecs_set_hooks(world, ParticleLight, { .on_validate = box_particle_light_validate });
 }

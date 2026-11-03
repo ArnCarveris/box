@@ -18,7 +18,7 @@
 
 /** Bytes between the blocks of two pools, a multiple of the dynamic offset alignment of
  * webgpu */
-#define BOX_GPU_PARTICLE_STRIDE (512u)
+#define BOX_GPU_PARTICLE_STRIDE (768u)
 
 _Static_assert(sizeof(box_render_particle_block_t) <= BOX_GPU_PARTICLE_STRIDE,
     "a particle block must fit in its stride");

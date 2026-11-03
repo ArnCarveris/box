@@ -7,7 +7,8 @@
  * accumulated area, and a gradient BOX_PARTICLE_GRADIENT_ROWS rows of linear colors, baked by
  * the C twin of the shaders in src/particle/simulate.h. Entries are shared by baked content.
  *
- * A curve with max_keys takes an entry for each of its two curves.
+ * A curve with max_keys takes an entry for each of its two curves. The curves of ParticleMotion
+ * take rows of values as the scalar curves of ParticleCurves do.
  */
 
 #include "particle_rows.h"
@@ -162,13 +163,15 @@ done:
  *
  * @param t The table
  * @param entries Index plus 1 of the entries, 0 for none, zeroed
+ * @param count Number of entries
  */
 static void box_particle_rows_unref(
     box_particle_rows_t *t,
-    int32_t *entries)
+    int32_t *entries,
+    int32_t count)
 {
     int32_t i;
-    for (i = 0; i < BOX_PARTICLE_ROWS_ENTRIES; i ++) {
+    for (i = 0; i < count; i ++) {
         if (entries[i] > 0 && entries[i] <= ecs_vec_count(&t->entries)) {
             ecs_vec_get_t(&t->entries, box_particle_rows_entry_t, entries[i] - 1)->refs --;
         }
@@ -181,7 +184,7 @@ void box_particle_rows_release(
     box_particle_rows_t *t,
     box_particle_rows_use_t *use)
 {
-    box_particle_rows_unref(t, use->entries);
+    box_particle_rows_unref(t, use->entries, BOX_PARTICLE_ROWS_ENTRIES);
     use->baked = false;
 }
 
@@ -226,22 +229,19 @@ static bool box_particle_rows_flat(
 /** Acquire the rows of baked content for one entry of a use.
  *
  * @param t The table
- * @param use The use
- * @param slot Index of the entry in the use: a curve, or a curve plus BOX_PARTICLE_ROWS_CURVES
- *        for its max curve
+ * @param slot Receives the index plus 1 of the entry
  * @param kind What the rows hold
  * @param samples The content
  * @return First row of the entry
  */
 static uint32_t box_particle_rows_take(
     box_particle_rows_t *t,
-    box_particle_rows_use_t *use,
-    int32_t slot,
+    int32_t *slot,
     box_particle_rows_kind_t kind,
     const float *samples)
 {
     int32_t entry = box_particle_rows_acquire(t, kind, samples);
-    use->entries[slot] = entry + 1;
+    *slot = entry + 1;
 
     return ecs_vec_get_t(&t->entries, box_particle_rows_entry_t, entry)->row;
 }
@@ -272,26 +272,33 @@ static bool box_particle_rows_bake_keys(
         (int32_t)box_particle_rows_of(rows) * BOX_PARTICLE_CURVE_SAMPLES);
 }
 
-/** Give a use the rows of a scalar curve with max_keys: rows for both of its curves, also a
+/** Where the rows of one scalar curve go: the entries, rows and constant of its use */
+typedef struct box_particle_rows_slot_t {
+    int32_t *entry;         /**< Index plus 1 of the entry of the curve */
+    int32_t *max_entry;     /**< Index plus 1 of the entry of its max curve */
+    uint32_t *row;          /**< Row of the curve */
+    uint32_t *max_row;      /**< Row of its max curve */
+    float *value;           /**< Value of the curve while constant, set to its default */
+} box_particle_rows_slot_t;
+
+/** Give a slot the rows of a scalar curve with max_keys: rows for both of its curves, also a
  * flat one, unless both are the same constant.
  *
  * @param t The table
- * @param use The use, its constants set to the defaults
- * @param i Index of the curve: size, opacity, rotation or spin
+ * @param slot The slot, its constant set to the default
  * @param curve The curve, valid
  * @param kind What its rows hold
  */
 static void box_particle_rows_scalar_range(
     box_particle_rows_t *t,
-    box_particle_rows_use_t *use,
-    int32_t i,
+    const box_particle_rows_slot_t *slot,
     const ParticleCurve *curve,
     box_particle_rows_kind_t kind)
 {
     float samples[BOX_PARTICLE_SPIN_ROWS * BOX_PARTICLE_CURVE_SAMPLES];
     float max[BOX_PARTICLE_SPIN_ROWS * BOX_PARTICLE_CURVE_SAMPLES];
-    if (!box_particle_rows_bake_keys(curve->kind, &curve->keys, kind, use->values[i], samples) ||
-        !box_particle_rows_bake_keys(curve->kind, &curve->max_keys, kind, use->values[i], max))
+    if (!box_particle_rows_bake_keys(curve->kind, &curve->keys, kind, *slot->value, samples) ||
+        !box_particle_rows_bake_keys(curve->kind, &curve->max_keys, kind, *slot->value, max))
     {
         goto done;
     }
@@ -299,19 +306,72 @@ static void box_particle_rows_scalar_range(
     if (box_particle_rows_flat(samples, 1) && box_particle_rows_flat(max, 1) &&
         samples[0] == max[0])
     {
-        use->values[i] = samples[0];
+        *slot->value = samples[0];
         goto done;
     }
 
-    use->rows[i] = box_particle_rows_take(t, use, i, kind, samples);
-    use->max_rows[i] = box_particle_rows_take(t, use, i + BOX_PARTICLE_ROWS_CURVES, kind, max);
+    *slot->row = box_particle_rows_take(t, slot->entry, kind, samples);
+    *slot->max_row = box_particle_rows_take(t, slot->max_entry, kind, max);
 done:
     return;
 }
 
-/** Give a use the row of one scalar curve of ParticleCurves: none for a curve without keys, a
- * bad one or a flat one, which are constants. A curve with max_keys also gets the row of its
- * max curve.
+/** Give a slot the row of one scalar curve: none for a curve without keys, a bad one or a flat
+ * one, which are constants. A curve with max_keys also gets the row of its max curve.
+ *
+ * @param t The table
+ * @param slot The slot, its constant set to the default
+ * @param curve The curve
+ * @param kind What its rows hold
+ */
+static void box_particle_rows_curve(
+    box_particle_rows_t *t,
+    const box_particle_rows_slot_t *slot,
+    const ParticleCurve *curve,
+    box_particle_rows_kind_t kind)
+{
+    float samples[BOX_PARTICLE_SPIN_ROWS * BOX_PARTICLE_CURVE_SAMPLES];
+    int32_t count = ecs_vec_count(&curve->keys);
+    if (!box_particle_curve_valid(curve)) {
+        goto done;
+    }
+
+    if (ecs_vec_count(&curve->max_keys)) {
+        box_particle_rows_scalar_range(t, slot, curve, kind);
+        goto done;
+    }
+
+    if (!count) {
+        goto done;
+    }
+
+    if (count == 1) {
+        *slot->value = ecs_vec_first_t(&curve->keys, CurveKey)->value;
+        goto done;
+    }
+
+    box_particle_curve_bake(curve, *slot->value, samples);
+    if (kind == BOX_PARTICLE_ROWS_SPIN) {
+        box_particle_curve_bake_area(samples, samples + BOX_PARTICLE_CURVE_SAMPLES);
+    }
+
+    if (!box_particle_rows_finite(samples,
+        (int32_t)box_particle_rows_of(kind) * BOX_PARTICLE_CURVE_SAMPLES))
+    {
+        goto done;
+    }
+
+    if (box_particle_rows_flat(samples, 1)) {
+        *slot->value = samples[0];
+        goto done;
+    }
+
+    *slot->row = box_particle_rows_take(t, slot->entry, kind, samples);
+done:
+    return;
+}
+
+/** Give a use the row of one scalar curve of ParticleCurves, box_particle_rows_curve.
  *
  * @param t The table
  * @param use The use, its constants set to the defaults
@@ -324,46 +384,15 @@ static void box_particle_rows_scalar(
     int32_t i,
     const ParticleCurve *curve)
 {
-    float samples[BOX_PARTICLE_SPIN_ROWS * BOX_PARTICLE_CURVE_SAMPLES];
-    box_particle_rows_kind_t kind = i == 3 ? BOX_PARTICLE_ROWS_SPIN : BOX_PARTICLE_ROWS_SCALAR;
-    int32_t count = ecs_vec_count(&curve->keys);
-    if (!box_particle_curve_valid(curve)) {
-        goto done;
-    }
-
-    if (ecs_vec_count(&curve->max_keys)) {
-        box_particle_rows_scalar_range(t, use, i, curve, kind);
-        goto done;
-    }
-
-    if (!count) {
-        goto done;
-    }
-
-    if (count == 1) {
-        use->values[i] = ecs_vec_first_t(&curve->keys, CurveKey)->value;
-        goto done;
-    }
-
-    box_particle_curve_bake(curve, use->values[i], samples);
-    if (kind == BOX_PARTICLE_ROWS_SPIN) {
-        box_particle_curve_bake_area(samples, samples + BOX_PARTICLE_CURVE_SAMPLES);
-    }
-
-    if (!box_particle_rows_finite(samples,
-        (int32_t)box_particle_rows_of(kind) * BOX_PARTICLE_CURVE_SAMPLES))
-    {
-        goto done;
-    }
-
-    if (box_particle_rows_flat(samples, 1)) {
-        use->values[i] = samples[0];
-        goto done;
-    }
-
-    use->rows[i] = box_particle_rows_take(t, use, i, kind, samples);
-done:
-    return;
+    box_particle_rows_slot_t slot = {
+        .entry = &use->entries[i],
+        .max_entry = &use->entries[i + BOX_PARTICLE_ROWS_CURVES],
+        .row = &use->rows[i],
+        .max_row = &use->max_rows[i],
+        .value = &use->values[i]
+    };
+    box_particle_rows_curve(t, &slot, curve,
+        i == 3 ? BOX_PARTICLE_ROWS_SPIN : BOX_PARTICLE_ROWS_SCALAR);
 }
 
 /** Check whether the colors of baked gradient rows are all the same.
@@ -426,10 +455,11 @@ static void box_particle_rows_gradient(
         goto done;
     }
 
-    use->gradient_row = box_particle_rows_take(t, use, 4, BOX_PARTICLE_ROWS_GRADIENT, samples);
+    use->gradient_row = box_particle_rows_take(t, &use->entries[4],
+        BOX_PARTICLE_ROWS_GRADIENT, samples);
     if (ranged) {
-        use->gradient_max_row = box_particle_rows_take(t, use, 4 + BOX_PARTICLE_ROWS_CURVES,
-            BOX_PARTICLE_ROWS_GRADIENT, max);
+        use->gradient_max_row = box_particle_rows_take(t,
+            &use->entries[4 + BOX_PARTICLE_ROWS_CURVES], BOX_PARTICLE_ROWS_GRADIENT, max);
     }
 done:
     return;
@@ -556,12 +586,120 @@ void box_particle_rows_update(
         box_particle_rows_gradient(t, use, &curves->color);
     }
 
-    box_particle_rows_unref(t, old);
+    box_particle_rows_unref(t, old, BOX_PARTICLE_ROWS_ENTRIES);
     use->hash = hash;
     use->had = curves != NULL;
     use->baked = true;
 done:
     return;
+}
+
+/** Get the curves of a ParticleMotion in the order of their rows.
+ *
+ * @param motion The ParticleMotion
+ * @param out Receives the BOX_PARTICLE_MOTION_CURVES curves
+ */
+static void box_particle_rows_motion_curves(
+    const ParticleMotion *motion,
+    const ParticleCurve **out)
+{
+    out[0] = &motion->velocity_x;
+    out[1] = &motion->velocity_y;
+    out[2] = &motion->velocity_z;
+    out[3] = &motion->speed;
+    out[4] = &motion->force_x;
+    out[5] = &motion->force_y;
+    out[6] = &motion->force_z;
+    out[7] = &motion->drag;
+}
+
+/** Hash the kinds and keys of a ParticleMotion, as box_particle_rows_hash.
+ *
+ * @param motion The ParticleMotion
+ * @return The hash
+ */
+static uint64_t box_particle_rows_motion_hash(
+    const ParticleMotion *motion)
+{
+    const ParticleCurve *curves[BOX_PARTICLE_MOTION_CURVES];
+    uint64_t hash = 14695981039346656037ull;
+    int32_t i;
+    box_particle_rows_motion_curves(motion, curves);
+    for (i = 0; i < BOX_PARTICLE_MOTION_CURVES; i ++) {
+        hash = box_particle_rows_hash_bytes(hash, &curves[i]->kind, sizeof(CurveKind));
+        hash = box_particle_rows_hash_keys(hash, &curves[i]->keys);
+        hash = box_particle_rows_hash_keys(hash, &curves[i]->max_keys);
+    }
+
+    return hash;
+}
+
+void box_particle_rows_motion_update(
+    box_particle_rows_t *t,
+    box_particle_rows_motion_t *use,
+    const ParticleMotion *motion)
+{
+    static const float defaults[BOX_PARTICLE_MOTION_CURVES] = {0, 0, 0, 1, 0, 0, 0, 1};
+    const ParticleCurve *curves[BOX_PARTICLE_MOTION_CURVES];
+    uint64_t hash = motion ? box_particle_rows_motion_hash(motion) : 0;
+    int32_t i, old[2 * BOX_PARTICLE_MOTION_CURVES];
+    if (use->baked && use->had == (motion != NULL) && (!motion || hash == use->hash)) {
+        goto done;
+    }
+
+    ecs_os_memcpy(old, use->entries, ECS_SIZEOF(old));
+    ecs_os_memset(use->entries, 0, ECS_SIZEOF(use->entries));
+    for (i = 0; i < BOX_PARTICLE_MOTION_CURVES; i ++) {
+        use->rows.rows[i] = BOX_PARTICLE_CURVE_CONSTANT;
+        use->rows.max_rows[i] = BOX_PARTICLE_CURVE_CONSTANT;
+        use->rows.values[i] = defaults[i];
+    }
+
+    use->active = false;
+    if (motion) {
+        box_particle_rows_motion_curves(motion, curves);
+        for (i = 0; i < BOX_PARTICLE_MOTION_CURVES; i ++) {
+            box_particle_rows_slot_t slot = {
+                .entry = &use->entries[i],
+                .max_entry = &use->entries[i + BOX_PARTICLE_MOTION_CURVES],
+                .row = &use->rows.rows[i],
+                .max_row = &use->rows.max_rows[i],
+                .value = &use->rows.values[i]
+            };
+            box_particle_rows_curve(t, &slot, curves[i], BOX_PARTICLE_ROWS_SCALAR);
+            use->active = use->active ||
+                use->rows.rows[i] != BOX_PARTICLE_CURVE_CONSTANT ||
+                use->rows.values[i] != defaults[i];
+        }
+    }
+
+    box_particle_rows_unref(t, old, 2 * BOX_PARTICLE_MOTION_CURVES);
+    use->hash = hash;
+    use->had = motion != NULL;
+    use->baked = true;
+done:
+    return;
+}
+
+void box_particle_rows_motion_release(
+    box_particle_rows_t *t,
+    box_particle_rows_motion_t *use)
+{
+    box_particle_rows_unref(t, use->entries, 2 * BOX_PARTICLE_MOTION_CURVES);
+    use->baked = false;
+    use->active = false;
+}
+
+bool box_particle_rows_motion_used(
+    const box_particle_rows_motion_t *use)
+{
+    bool result = false;
+    int32_t i;
+    for (i = 0; i < 2 * BOX_PARTICLE_MOTION_CURVES; i ++) {
+        result = result || use->entries[i] != 0;
+    }
+
+    return result;
 }
 
 bool box_particle_rows_used(

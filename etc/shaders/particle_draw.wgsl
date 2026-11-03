@@ -111,7 +111,13 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
         var axis_x = vec2f(c, s);
         var axis_y = vec2f(-s, c);
         var stretched = 1.0;
-        let velocity = (view.view * vec4f(p.velocity, 0.0)).xy;
+        var moving = p.velocity;
+        if (emitter.params.z > 0.0 && emitter.gradient_max.y != 0u) {
+            moving = particle_moving(p.velocity,
+                particle_motion_velocity(emitter.motion, seed, p.index, t));
+        }
+
+        let velocity = (view.view * vec4f(moving, 0.0)).xy;
         let speed = sqrt(dot(velocity, velocity));
         if (emitter.params.z > 0.0 && speed > 1e-6) {
             axis_x = velocity / speed;

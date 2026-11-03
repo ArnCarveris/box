@@ -1,12 +1,12 @@
 // Particle simulation: one dispatch of each entry point per pool of the packet. integrate ages
 // the used slots of the pool by the frame, frees the particles whose age reached their
 // lifetime, moves the others under the acceleration, gravity, wander field and drag toward the
-// wind and with the drift of their frame of reference, collides them with the ground plane,
-// and writes the indirect draw arguments of the pool. spawn then writes the spawned particles
-// into the slots the extract picked. Each spawn draws its lifetime, position, direction, speed
-// and radial speed from the seed and its spawn index, each from its own stream, and adds the
-// velocity it inherits from the emitter; the C twin is box_particle_* in
-// src/particle/simulate.h.
+// wind, by the curves of their ParticleMotion at their age and with the drift of their frame of
+// reference, collides them with the ground plane, and writes the indirect draw arguments of
+// the pool. spawn then writes the spawned particles into the slots the extract picked. Each
+// spawn draws its lifetime, position, direction, speed and radial speed from the seed and its
+// spawn index, each from its own stream, and adds the velocity it inherits from the emitter;
+// the C twin is box_particle_* in src/particle/simulate.h.
 //
 // An alpha blended pool that is drawn back to front is sorted for each view that draws it:
 // sort_keys writes the key of every slot from its view depth, then a bitonic sort orders the
@@ -24,7 +24,7 @@
 @group(0) @binding(5) var<storage, read_write> keys: array<vec2u>;
 @group(0) @binding(6) var<uniform> view: View;
 @group(0) @binding(7) var<uniform> step: SortStep;
-// Rows of the curves of the emitters, for the curves of motion; no entry point reads it yet
+// Rows of the curves of the emitters, which integrate reads for the curves of ParticleMotion
 @group(0) @binding(8) var<storage, read> curves: array<f32>;
 
 // Run length k and compare distance j of a step of the bitonic sort.
@@ -62,8 +62,16 @@ fn integrate(@builtin(global_invocation_id) id: vec3u) {
 
     p.remaining = particle_age(p.remaining, emitter.life.x);
     if (p.remaining != 0u) {
+        var motion = particle_motion_none();
+        if (emitter.gradient_max.y != 0u) {
+            let seed = emitter.spawn.y;
+            let life = particle_life(seed, p.index, emitter.life.y, emitter.life.z);
+            motion = particle_motion(emitter.motion, seed, p.index,
+                particle_life_age(life, p.remaining));
+        }
+
         particle_integrate(&p, emitter.acceleration.xyz, emitter.wind, emitter.turbulence.xy,
-            emitter.wander.xyz, emitter.drift, emitter.acceleration.w);
+            emitter.wander.xyz, emitter.drift, motion, emitter.acceleration.w);
         if (!particle_collide(&p, emitter.ground.xyz, emitter.collide)) {
             p.remaining = 0u;
         }

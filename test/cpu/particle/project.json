@@ -352,6 +352,28 @@
                 ]
             },
             {
+                "id": "Motion",
+                "testcases": [
+                    "c_defaults",
+                    "script_values",
+                    "error_names_field",
+                    "no_component_unchanged",
+                    "defaults_change_nothing",
+                    "velocity_alone",
+                    "force_alone",
+                    "speed_alone",
+                    "drag_alone",
+                    "constant_velocity_is_drift",
+                    "constant_force_is_gravity",
+                    "constant_drag_is_drag",
+                    "block_reads_rows",
+                    "stretch_sees_velocity",
+                    "ground_velocity_curve",
+                    "random_between_two",
+                    "burst_slows_and_rises"
+                ]
+            },
+            {
                 "id": "Linger",
                 "testcases": [
                     "c_default",

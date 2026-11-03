@@ -153,6 +153,24 @@ void BoxParticleImport(
         BOX_OWNED_VEC(ParticleCurves, color.max_keys, ParticleGradientKey),
         BOX_OWNED_CURVE(ParticleCurves, spin),
         BOX_OWNED_VEC(ParticleCurves, spin.max_keys, CurveKey));
+    ECS_META_COMPONENT(world, ParticleMotion);
+    box_owned_hooks(world, ParticleMotion,
+        BOX_OWNED_CURVE(ParticleMotion, velocity_x),
+        BOX_OWNED_VEC(ParticleMotion, velocity_x.max_keys, CurveKey),
+        BOX_OWNED_CURVE(ParticleMotion, velocity_y),
+        BOX_OWNED_VEC(ParticleMotion, velocity_y.max_keys, CurveKey),
+        BOX_OWNED_CURVE(ParticleMotion, velocity_z),
+        BOX_OWNED_VEC(ParticleMotion, velocity_z.max_keys, CurveKey),
+        BOX_OWNED_CURVE(ParticleMotion, force_x),
+        BOX_OWNED_VEC(ParticleMotion, force_x.max_keys, CurveKey),
+        BOX_OWNED_CURVE(ParticleMotion, force_y),
+        BOX_OWNED_VEC(ParticleMotion, force_y.max_keys, CurveKey),
+        BOX_OWNED_CURVE(ParticleMotion, force_z),
+        BOX_OWNED_VEC(ParticleMotion, force_z.max_keys, CurveKey),
+        BOX_OWNED_CURVE(ParticleMotion, speed),
+        BOX_OWNED_VEC(ParticleMotion, speed.max_keys, CurveKey),
+        BOX_OWNED_CURVE(ParticleMotion, drag),
+        BOX_OWNED_VEC(ParticleMotion, drag.max_keys, CurveKey));
     box_particle_curves_import(world);
     ECS_META_COMPONENT(world, ParticleShape);
     ECS_META_COMPONENT(world, ParticleBlend);

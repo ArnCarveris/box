@@ -97,6 +97,7 @@ typedef struct box_particle_pool_t {
     box_render_particle_pool_t entry; /**< The pool of the last frame of a lingering emitter
                              *   in the packet, which a lingering pool runs again */
     box_particle_rows_use_t curves; /**< Rows of the curve table its curves use */
+    box_particle_rows_motion_t motion; /**< Rows of the curve table its ParticleMotion uses */
 } box_particle_pool_t;
 
 /** A burst of the frame and the emitter whose pool it spawns into */
@@ -437,6 +438,7 @@ static void box_particles_pool_free(
     }
 
     box_particle_rows_release(&s->curves, &pool->curves);
+    box_particle_rows_motion_release(&s->curves, &pool->motion);
 
     if (!pool->lingering) {
         ecs_map_remove(&s->by_entity, pool->entity);
@@ -1049,7 +1051,8 @@ static uint32_t box_particles_sort_count(
  *
  * @param curves The ParticleCurves of the emitter, NULL for none
  * @param look The ParticleAppearance of the emitter, NULL for none
- * @param pool The pool, with its billboard corners and the rows of its curves
+ * @param pool The pool, with its billboard corners and the rows of its curves and of its
+ *             ParticleMotion
  * @param out The block, its other members written
  */
 static void box_particles_block_look(
@@ -1091,6 +1094,13 @@ static void box_particles_block_look(
         } else if (look->shape != ParticleSprite) {
             out->look = ParticleCircle;
         }
+    }
+
+    out->motion = pool->motion.active ? 1u : 0u;
+    for (i = 0; i < BOX_PARTICLE_MOTION_CURVES; i ++) {
+        out->motion_rows[i] = pool->motion.rows.rows[i];
+        out->motion_max_rows[i] = pool->motion.rows.max_rows[i];
+        out->motion_values[i] = pool->motion.rows.values[i];
     }
 
     out->styled = look ? 1u : 0u;
@@ -1359,8 +1369,11 @@ static void box_particles_emitter(
         &entry->block);
     box_particles_block_forces(pool, emitter->acceleration, &forces, moves, &entry->block);
     box_particle_rows_update(&s->curves, &pool->curves, curves);
+    box_particle_rows_motion_update(&s->curves, &pool->motion,
+        ecs_get(world, e, ParticleMotion));
     box_particles_block_look(curves, look, pool, &entry->block);
-    entry->curves = box_particle_rows_used(&pool->curves)
+    entry->curves = box_particle_rows_used(&pool->curves) ||
+        box_particle_rows_motion_used(&pool->motion)
         ? BOX_RENDER_BUFFER_PARTICLE_CURVES
         : 0;
     entry->block.count = count;

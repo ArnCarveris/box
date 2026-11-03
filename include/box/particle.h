@@ -273,6 +273,30 @@ ECS_STRUCT(ParticleCurves, {
                              *   particle has turned is the area under it up to its age */
 });
 
+/** How the particles of the emitter entity move over their life, in world space, evaluated in
+ * the integrate pass: {velocity_y: {keys: [{0, 0}, {1, 2}]}, drag: {keys: [{0, 0}, {0.2, 4}]}}.
+ * It owns its keys; without keys a curve is the default of its field and changes nothing.
+ *
+ * A frame moves a particle by (speed * v + velocity + drift) * delta, so the velocity curve does
+ * not enter the stored velocity v, and a stretched sprite stretches along speed * v + velocity.
+ * The ground plane lifts a particle whatever moved it in, but bounces and slows only v.
+ */
+ECS_STRUCT(ParticleMotion, {
+    ParticleCurve velocity_x; /**< World units per second added to the movement along x, not
+                             *   stored so drag does not act on it, default 0; the three axes
+                             *   share one draw between their two curves */
+    ParticleCurve velocity_y; /**< Along y, default 0 */
+    ParticleCurve velocity_z; /**< Along z, default 0 */
+    ParticleCurve force_x;  /**< World units per second squared added to the acceleration
+                             *   along x, default 0; the three axes share one draw */
+    ParticleCurve force_y;  /**< Along y, default 0 */
+    ParticleCurve force_z;  /**< Along z, default 0 */
+    ParticleCurve speed;    /**< Multiplier of the stored velocity in the movement of a frame,
+                             *   default 1 */
+    ParticleCurve drag;     /**< Multiplier of the drag rate of the ParticleForces, below 0
+                             *   for none, default 1 */
+});
+
 /** What a particle is drawn as */
 ECS_ENUM(ParticleShape, {
     ParticleCircle = 0,     /**< A soft round sprite, the look without an appearance */
