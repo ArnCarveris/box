@@ -68,6 +68,33 @@ static void animator_capture_end(void) {
     ecs_log_enable_colors(animator_prev.colors);
 }
 
+/** The child of an instance spawned from a child of its prefab. A prefab child made by a
+ * script spawns as a child without a name, with an IsA pair to the prefab child.
+ *
+ * @param world The world
+ * @param instance The instance
+ * @param base_child The child of the prefab
+ * @return The child of the instance, 0 when none
+ */
+static ecs_entity_t animator_spawned(
+    ecs_world_t *world,
+    ecs_entity_t instance,
+    ecs_entity_t base_child)
+{
+    ecs_entity_t result = 0;
+    ecs_iter_t it = ecs_children(world, instance);
+    while (ecs_children_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            if (ecs_has_pair(world, it.entities[i], EcsIsA, base_child)) {
+                result = it.entities[i];
+            }
+        }
+    }
+
+    return result;
+}
+
 /** Make a world with box.
  *
  * @return The world
@@ -798,9 +825,13 @@ void Animator_script_prefab(void) {
     ecs_progress(world, 0.25f);
     test_flt(ecs_get(world, first, Animator)->time, 0.75f);
     test_flt(ecs_get(world, second, Animator)->time, 1.75f);
-    test_flt(ecs_get(world, ecs_lookup(world, "first.arm"), Position)->y, 1.5f);
-    test_flt(ecs_get(world, ecs_lookup(world, "second.arm"), Position)->y, 3.5f);
-    test_flt(ecs_get(world, ecs_lookup(world, "Rig.arm"), Position)->y, 0);
+    ecs_entity_t rig_arm = ecs_lookup(world, "Rig.arm");
+    ecs_entity_t first_arm = animator_spawned(world, first, rig_arm);
+    ecs_entity_t second_arm = animator_spawned(world, second, rig_arm);
+    test_assert(first_arm != 0 && second_arm != 0);
+    test_flt(ecs_get(world, first_arm, Position)->y, 1.5f);
+    test_flt(ecs_get(world, second_arm, Position)->y, 3.5f);
+    test_flt(ecs_get(world, rig_arm, Position)->y, 0);
 
     ecs_fini(world);
 }

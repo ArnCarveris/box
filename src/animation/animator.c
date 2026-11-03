@@ -118,17 +118,6 @@ static void box_animator_ctor(
     }
 }
 
-/** The world of an iterator, never a stage.
- *
- * @param it The iterator
- * @return The world
- */
-static ecs_world_t* box_animator_real(
-    const ecs_iter_t *it)
-{
-    return ECS_CONST_CAST(ecs_world_t*, ecs_get_world(it->world));
-}
-
 /** The animator world, unless the world is being deleted.
  *
  * @param world The world
@@ -221,7 +210,7 @@ static void box_animator_bind(
         ? ecs_get(world, track, AnimationTrack) : NULL;
     ecs_entity_t target = e;
     if (t && t->target && t->target[0]) {
-        target = ecs_lookup_path_w_sep(world, e, t->target, ".", NULL, false);
+        target = box_animation_lookup(world, e, t->target);
     }
 
     if (t && target) {
@@ -413,15 +402,15 @@ static void BoxAnimatorPlay(
 {
     Animator *a = ecs_field(it, Animator, 0);
     AnimatorState *s = ecs_field(it, AnimatorState, 1);
-    const AnimatorWorld *w = ecs_singleton_get(box_animator_real(it), AnimatorWorld);
+    const AnimatorWorld *w = ecs_singleton_get(it->world, AnimatorWorld);
     uint32_t version = w ? w->version : 0;
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         if (s) {
-            box_animator_play(box_animator_real(it), it->world, it->entities[i], &a[i], &s[i],
+            box_animator_play(it->world, it->stage, it->entities[i], &a[i], &s[i],
                 version, it->delta_time);
         } else {
-            ecs_add(it->world, it->entities[i], AnimatorState);
+            ecs_add(it->stage, it->entities[i], AnimatorState);
         }
     }
 }
@@ -465,9 +454,9 @@ static bool box_animator_any(
 static void BoxAnimatorOnChildOf(
     ecs_iter_t *it)
 {
-    if (box_animator_any(box_animator_real(it))) {
+    if (box_animator_any(it->world)) {
         ecs_id_t pair = ecs_field_id(it, 0);
-        box_animator_mark(box_animator_real(it), ecs_pair_second(box_animator_real(it), pair));
+        box_animator_mark(it->world, ecs_pair_second(it->world, pair));
     }
 }
 
@@ -478,11 +467,11 @@ static void BoxAnimatorOnChildOf(
 static void BoxAnimatorOnParent(
     ecs_iter_t *it)
 {
-    if (box_animator_any(box_animator_real(it))) {
+    if (box_animator_any(it->world)) {
         const EcsParent *p = ecs_field(it, EcsParent, 0);
         int32_t i;
         for (i = 0; i < it->count; i ++) {
-            box_animator_mark(box_animator_real(it), p[i].value);
+            box_animator_mark(it->world, p[i].value);
         }
     }
 }
@@ -494,7 +483,7 @@ static void BoxAnimatorOnParent(
 static void BoxAnimatorOnName(
     ecs_iter_t *it)
 {
-    ecs_world_t *world = box_animator_real(it);
+    ecs_world_t *world = it->world;
     if (box_animator_any(world)) {
         int32_t i;
         for (i = 0; i < it->count; i ++) {
@@ -514,21 +503,23 @@ static void BoxAnimatorOnClip(
 }
 
 /** Add the private state to an instance that gained Animator without it, remove it with
- * Animator. Every other entity gains it with Animator through With.
+ * Animator unless the entity is deleted. Every other entity gains it with Animator through
+ * With. The changes go through the stage, the entity is mid table move.
  *
  * @param it The iterator
  */
 static void BoxAnimatorOnAnimator(
     ecs_iter_t *it)
 {
+    bool deleted = !it->other_table || !ecs_table_get_type(it->other_table)->count;
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         if (it->event == EcsOnAdd) {
-            if (!ecs_has(box_animator_real(it), it->entities[i], AnimatorState)) {
-                ecs_add(it->world, it->entities[i], AnimatorState);
+            if (!ecs_has(it->world, it->entities[i], AnimatorState)) {
+                ecs_add(it->stage, it->entities[i], AnimatorState);
             }
-        } else {
-            ecs_remove(it->world, it->entities[i], AnimatorState);
+        } else if (!deleted) {
+            ecs_remove(it->stage, it->entities[i], AnimatorState);
         }
     }
 }
@@ -540,7 +531,7 @@ static void BoxAnimatorOnAnimator(
 static void BoxAnimatorOnState(
     ecs_iter_t *it)
 {
-    AnimatorWorld *w = box_animator_world(box_animator_real(it));
+    AnimatorWorld *w = box_animator_world(it->world);
     if (w) {
         w->count += it->event == EcsOnAdd ? it->count : -it->count;
     }

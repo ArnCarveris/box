@@ -221,7 +221,9 @@ walker_b : Walker {
 ```
 
 The targets of an instance are resolved from the instance, so `walker_b` writes its own `legs`,
-never the prefab's.
+never the prefab's. A child that flecs spawns from a prefab child, as for a prefab made in a
+script, has no name of its own; a name of the path that is not a child of the instance is found
+through the `IsA` pair of the spawned child to the prefab child of that name.
 
 **A target that inherits the component gets its own copy.** The write is an `ecs_ensure`, so an
 instance whose `Rgb` comes from its prefab owns an `Rgb` after the first frame, copied from the
