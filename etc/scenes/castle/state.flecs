@@ -160,6 +160,10 @@ fn spent_stone(k: i32, lvl: i32) -> i32 {
   }
 }
 
+fn drag_tool(t: i32) -> bool {
+  t == 1 || t == 11
+}
+
 fn barrier(k: i32) -> bool {
   k == 1 || k == 2 || k == 3
 }
@@ -382,6 +386,11 @@ export mut hover_tool: i32 = 0
 export mut hover_cell: i32 = -1
 export mut selected: i32 = -1
 export mut rising: i32 = -1
+export mut rising_age: i32 = 0
+export mut dragging = false
+export mut drag_last: i32 = -1
+export mut drag_start: i32 = -1
+export mut drag_axis: i32 = 0
 
 export mut gold: f64 = 200
 export mut stone: f64 = 160

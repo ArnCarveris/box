@@ -95,6 +95,8 @@ template Tile {
   prop idx: i32 = 0
 
   mut hover = false
+  mut painted = false
+  mut extends = false
 
   const k = kind[idx]
   const lvl = level[idx]
@@ -231,9 +233,31 @@ template Tile {
 
   async {
     while true {
+      const ev = await on.press(this)
+      if ev.button == 0 {
+        extends = drag_tool(tool) && kind[idx] == tool
+        painted = drag_tool(tool) && (kind[idx] == K_EMPTY || extends)
+        if painted {
+          dragging = true
+          drag_last = idx
+          drag_start = idx
+          drag_axis = 0
+          build_at(idx, true)
+        }
+      }
+    }
+  }
+
+  async {
+    while true {
       const ev = await on.click(this)
       if ev.button == 0 {
-        emit Build(i: idx)
+        if painted && !(extends && drag_last == idx) {
+          painted = false
+        } else {
+          painted = false
+          emit Build(i: idx)
+        }
       }
     }
   }

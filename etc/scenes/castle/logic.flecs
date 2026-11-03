@@ -285,17 +285,15 @@ async {
   }
 }
 
-async {
-  while true {
-    const e = await Build
-    const i = e.i
-    const k = kind[i]
-    const lvl = level[i]
-    const t = tool
+proc build_at(i: i32, painting: bool) {
+  const k = kind[i]
+  const lvl = level[i]
+  const t = tool
 
-    if t == T_DEMOLISH {
-      demolish_cell(i)
-    } else if k != K_EMPTY {
+  if t == T_DEMOLISH {
+    demolish_cell(i)
+  } else if k != K_EMPTY {
+    if !painting {
       const pick = match k == K_FARM { true: farm_origin[i]; _: i }
       if selected == pick {
         selected = -1
@@ -303,75 +301,81 @@ async {
         selected = pick
       }
       const played = box.audio.play(SfxClick, 0.6)
-    } else if t == 0 {
-      selected = -1
-      emit Toast(text: "Pick a piece from the bar below, or click a building to select it.")
+    }
+  } else if t == 0 {
+    selected = -1
+    emit Toast(text: "Pick a piece from the bar below, or click a building to select it.")
+  } else {
+    const g = cost_gold(t, 1)
+    const s = cost_stone(t, 1)
+    if t == K_KEEP && keep_cell >= 0 {
+      const played = box.audio.play(SfxDeny, 0.6)
+      emit Toast(text: "Your realm has a keep already. Select it to raise it.")
+    } else if t == K_SMITH && smith_cell >= 0 {
+      const played = box.audio.play(SfxDeny, 0.6)
+      emit Toast(text: "Your realm has a blacksmith already. Select it to research.")
+    } else if t == K_FARM && !fits4[i] {
+      const played = box.audio.play(SfxDeny, 0.6)
+      emit Toast(text: "A farm needs 4 by 4 free cells of meadow.")
+    } else if gold < g || stone < s {
+      dragging = false
+      const played = box.audio.play(SfxDeny, 0.6)
+      if gold < g && stone < s {
+        emit Toast(text: "That needs {g} gold and {s} stone.")
+      } else if gold < g {
+        emit Toast(text: "That needs {g} gold. Cottages and the keep bring in taxes.")
+      } else {
+        emit Toast(text: "That needs {s} stone. A quarry cuts more.")
+      }
     } else {
-      const g = cost_gold(t, 1)
-      const s = cost_stone(t, 1)
-      if t == K_KEEP && keep_cell >= 0 {
-        const played = box.audio.play(SfxDeny, 0.6)
-        emit Toast(text: "Your realm has a keep already. Select it to raise it.")
-      } else if t == K_SMITH && smith_cell >= 0 {
-        const played = box.audio.play(SfxDeny, 0.6)
-        emit Toast(text: "Your realm has a blacksmith already. Select it to research.")
-      } else if t == K_FARM && !fits4[i] {
-        const played = box.audio.play(SfxDeny, 0.6)
-        emit Toast(text: "A farm needs 4 by 4 free cells of meadow.")
-      } else if gold < g || stone < s {
-        const played = box.audio.play(SfxDeny, 0.6)
-        if gold < g && stone < s {
-          emit Toast(text: "That needs {g} gold and {s} stone.")
-        } else if gold < g {
-          emit Toast(text: "That needs {g} gold. Cottages and the keep bring in taxes.")
-        } else {
-          emit Toast(text: "That needs {s} stone. A quarry cuts more.")
+      gold -= g
+      stone -= s
+      rising_age = 0
+      if t == K_FARM {
+        const o = i - GRID - 1
+        rising = o
+        for dz in 0..FARM_SIZE {
+          for dx in 0..FARM_SIZE {
+            const c = o + dz * GRID + dx
+            abandoned[c] = false
+            points[c] = 0
+            level[c] = 1
+            farm_origin[c] = o
+            kind[c] = K_FARM
+          }
         }
       } else {
-        gold -= g
-        stone -= s
-        if t == K_FARM {
-          const o = i - GRID - 1
-          rising = o
-          for dz in 0..FARM_SIZE {
-            for dx in 0..FARM_SIZE {
-              const c = o + dz * GRID + dx
-              abandoned[c] = false
-              points[c] = 0
-              level[c] = 1
-              farm_origin[c] = o
-              kind[c] = K_FARM
-            }
-          }
-        } else {
-          rising = i
-          abandoned[i] = false
-          points[i] = 0
-          level[i] = 1
-          kind[i] = t
-        }
-        recompute()
-        if t == K_MOAT {
-          const played = box.audio.play(SfxSplash, 0.8)
-          const fx = box.particle.burst_at(SplashBurst, {cell_x(i), -0.3, cell_z(i)}, 1)
-        } else if t == K_FARM {
-          const played = box.audio.play(SfxPlant, 0.8)
-          const fx = box.particle.burst_at(DustBurst, {cell_x(i) + 1, 0.2, cell_z(i) + 1}, 1)
-        } else if t == K_TREE || t == K_PATH {
-          const played = box.audio.play(SfxPlant, 0.8)
-          const fx = box.particle.burst_at(DustBurst, {cell_x(i), 0.2, cell_z(i)}, 0.6)
-        } else {
-          const played = box.audio.play(SfxBuild, 0.9)
-          const fx = box.particle.burst_at(DustBurst, {cell_x(i), 0.2, cell_z(i)}, 1)
-        }
-        if food_need(t, 1) > 0 && food_rate < 0 {
-          emit Toast(text: "Your folk eat more than your farms grow. Build farms before the granary runs dry.")
-        }
-        await next_frame()
-        await next_frame()
-        rising = -1
+        rising = i
+        abandoned[i] = false
+        points[i] = 0
+        level[i] = 1
+        kind[i] = t
+      }
+      recompute()
+      if t == K_MOAT {
+        const played = box.audio.play(SfxSplash, 0.8)
+        const fx = box.particle.burst_at(SplashBurst, {cell_x(i), -0.3, cell_z(i)}, 1)
+      } else if t == K_FARM {
+        const played = box.audio.play(SfxPlant, 0.8)
+        const fx = box.particle.burst_at(DustBurst, {cell_x(i) + 1, 0.2, cell_z(i) + 1}, 1)
+      } else if t == K_TREE || t == K_PATH {
+        const played = box.audio.play(SfxPlant, match painting { true: 0.5; _: 0.8 })
+        const fx = box.particle.burst_at(DustBurst, {cell_x(i), 0.2, cell_z(i)}, 0.6)
+      } else {
+        const played = box.audio.play(SfxBuild, match painting { true: 0.5; _: 0.9 })
+        const fx = box.particle.burst_at(DustBurst, {cell_x(i), 0.2, cell_z(i)}, match painting { true: 0.6; _: 1 })
+      }
+      if food_need(t, 1) > 0 && food_rate < 0 {
+        emit Toast(text: "Your folk eat more than your farms grow. Build farms before the granary runs dry.")
       }
     }
+  }
+}
+
+async {
+  while true {
+    const e = await Build
+    build_at(e.i, false)
   }
 }
 
@@ -403,15 +407,13 @@ async {
       gold -= g
       stone -= s
       rising = i
+      rising_age = 0
       level[i] = lvl + 1
       points[i] = 0
       recompute()
       const played = box.audio.play(SfxBuild, 0.9)
       const fx = box.particle.burst_at(DustBurst, {cell_x(i), 0.2, cell_z(i)}, 1)
       emit Toast(text: "The {piece_name(k, lvl)} becomes a {piece_name(k, lvl + 1)}.")
-      await next_frame()
-      await next_frame()
-      rising = -1
     }
   }
 }
@@ -508,6 +510,19 @@ async {
     } else {
       starving = false
       starve_time = 0
+    }
+  }
+}
+
+async {
+  while true {
+    await next_frame()
+    if rising >= 0 {
+      if rising_age >= 2 {
+        rising = -1
+      } else {
+        rising_age += 1
+      }
     }
   }
 }

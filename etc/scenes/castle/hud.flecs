@@ -433,7 +433,10 @@ template HintLine {
         }
       }
       _: match tool > 0 {
-        true: "{kind_name(tool)}: click the plot. Esc puts the tool down."
+        true: match drag_tool(tool) {
+          true: "{kind_name(tool)}: click, or drag across the plot to build a line. Esc puts the tool down."
+          _: "{kind_name(tool)}: click the plot. Esc puts the tool down."
+        }
         _: "WASD move   Q E turn   right drag look   wheel zoom   1-9 0 P pick a piece   X demolish   U upgrade"
       }
     }

@@ -9,6 +9,8 @@ using box.app
 using box.input
 using box.transform
 using box.camera
+using box.picking
+using box.surface
 
 // An action that picks tool t
 template ToolKey {
@@ -36,6 +38,7 @@ castle_actions {
   ZoomIn { Action: {description: "Zoom in"}; Binding: {key: Equal}; alt { Binding: {key: KpAdd} } }
   ZoomOut { Action: {description: "Zoom out"}; Binding: {key: Minus}; alt { Binding: {key: KpSubtract} } }
   Orbit { Action: {description: "Drag to turn the view"}; Binding: {key: MouseRight} }
+  Paint { Action: {description: "Drag walls and paths across the plot"}; Binding: {key: MouseLeft} }
 
   ToolKey Tool1(t: 1, key: Num1)
   ToolKey Tool2(t: 2, key: Num2)
@@ -124,6 +127,54 @@ async {
     }
     if mouse.scroll.y != 0 {
       view_dist = clamp(view_dist * (1 - mouse.scroll.y * 0.08), 10, 120)
+    }
+
+    if dragging {
+      if !castle_actions.Paint[ActionState].down || !drag_tool(tool) {
+        dragging = false
+      } else {
+        const ps = PickStatus[PickStatus]
+        const ss = window[SurfaceStatus]
+        const sw = match ss.point_width > 0 { true: ss.point_width; _: 1600 }
+        const sh = match ss.point_height > 0 { true: ss.point_height; _: 960 }
+        const th = tan(20 * PI / 180)
+        const nx = (ps.cursor.x / sw * 2 - 1) * th * sw / sh
+        const ny = (1 - ps.cursor.y / sh * 2) * th
+        const sp = sin(cam_pitch)
+        const cp = cos(cam_pitch)
+        const sy = sin(cam_yaw)
+        const cy = cos(cam_yaw)
+        const dy = cp * ny - sp
+        if dy < 0 {
+          const t = cam_dist * sp / (0 - dy)
+          const gx = cam_x + cam_dist * cp * sy + (cy * nx - cp * sy - sp * sy * ny) * t
+          const gz = cam_z + cam_dist * cp * cy + (0 - cp * cy - sy * nx - sp * cy * ny) * t
+          const cx = clamp(floor(gx / PITCH + GRID / 2.0), 0, GRID - 1)
+          const cz = clamp(floor(gz / PITCH + GRID / 2.0), 0, GRID - 1)
+          const sx = drag_start % GRID
+          const sz = (drag_start - sx) / GRID
+          if tool == K_WALL && drag_axis == 0 && (cx != sx || cz != sz) {
+            drag_axis = match abs(cx - sx) >= abs(cz - sz) { true: 1; _: 2 }
+          }
+          const col = match tool == K_WALL && drag_axis == 2 { true: sx; _: cx }
+          const row = match tool == K_WALL && drag_axis == 1 { true: sz; _: cz }
+          if drag_last >= 0 && drag_start >= 0 {
+            mut x = drag_last % GRID
+            mut z = (drag_last - x) / GRID
+            mut steps = 0
+            while dragging && (x != col || z != row) && steps < 64 {
+              if x != col {
+                x += match col > x { true: 1; _: -1 }
+              } else {
+                z += match row > z { true: 1; _: -1 }
+              }
+              steps += 1
+              drag_last = z * GRID + x
+              build_at(drag_last, true)
+            }
+          }
+        }
+      }
     }
 
     const ease = min(1, dt * 12)
