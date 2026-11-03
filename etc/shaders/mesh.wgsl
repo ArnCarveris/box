@@ -6,6 +6,10 @@
 // Instance normals use the cofactor matrix of the model rotation, the inverse transpose up to
 // a scale, so non-uniform scale keeps them perpendicular. Texture layers (group 1) are sampled
 // with the instance UV transform; the normal map uses a tangent frame from screen derivatives.
+// A MappingObject material (TextureMapping) projects its texture coordinates in the fragment
+// stage from the object position times the instance scale, on the plane of the dominant axis of
+// the interpolated object normal (mapping_uv of material.wgsl), so the axis never blends inside
+// a triangle; its tangent frame follows from the derivatives of the projected UV.
 // The ORM layer holds the glTF occlusion (red, of the indirect light only), roughness (green)
 // and metallic (blue) multipliers.
 // The cull pass writes the slots of the visible instances, which step per instance; the
@@ -155,14 +159,20 @@ struct VertexOut {
     @location(2) color: vec4f,
     @location(3) emissive: vec3f,
     @location(4) material: vec2f,
+    // The UV of the mesh after the TextureTransform; for a MappingObject material what
+    // mapping_uv adds after the projection (mapping_offset)
     @location(5) uv: vec2f,
     // Flat scalars of the material: the AlphaCutoff in x, the thickness of the
-    // DiffuseTransmission in y and its blur in z; w is 0
+    // DiffuseTransmission in y and its blur in z; w is 1 for a MappingObject material, else 0
     @location(6) @interpolate(flat) scalars: vec4f,
-    // ClearCoat of the material: strength and roughness, 0 strength without one
-    @location(10) @interpolate(flat) clear_coat: vec2f,
-    // SpecularAnisotropy of the material: strength and rotation over 2 pi, 0 strength without one
-    @location(11) @interpolate(flat) anisotropy: vec2f,
+    // ClearCoat of the material in xy: strength and roughness, 0 strength without one;
+    // SpecularAnisotropy in zw: strength and rotation over 2 pi, 0 strength without one
+    @location(10) @interpolate(flat) layers: vec4f,
+    // A MappingObject material: the object position as mapping_object makes it and the object
+    // normal; zero for the UVs of the mesh. The fragment stage reads at most 16 inter-stage
+    // variables, front_facing included, so the layers share a location to leave room for them.
+    @location(11) object: vec4f,
+    @location(14) object_normal: vec3f,
     // Sheen of the material: linear color and roughness, a black color without one
     @location(12) @interpolate(flat) sheen: vec4f,
     // DiffuseTransmission of the material: linear color and factor, 0 factor without one
@@ -176,20 +186,36 @@ struct VertexOut {
 
 // Color, metallic and roughness, and UV of a vertex from the shading of its instance and its
 // material, with the tint and material of its region on a parametric surface. Reads the
-// surface_data place set.
+// surface_data place set. A MappingObject material on a plain mesh sets mapped, uv to the
+// offset of its projection and object and object_normal to what mapping_uv projects in the
+// fragment stage; a parametric surface keeps its own UVs.
 struct VertexShading {
     color: vec4f,
     material: vec2f,
     uv: vec2f,
+    mapped: bool,
+    object: vec4f,
+    object_normal: vec3f,
 };
 
-fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material) -> VertexShading {
+// scale: the lengths of the model matrix columns of the instance.
+fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, scale: vec3f)
+    -> VertexShading {
     var o: VertexShading;
     let tint = select(mesh_shading_tint(shading), vec4f(0.0, 0.0, 0.0, 1.0),
         view.reflection.y != 0u);
     o.color = vec4f(material_color(material, tint), shading.alpha);
     o.material = vec2f(material.metallic, material.roughness);
     o.uv = v.uv * material.uv.xy + material.uv.zw;
+    o.mapped = false;
+    o.object = vec4f(0.0);
+    o.object_normal = vec3f(0.0);
+    if (material_mapped(material) && surface_data.p[0].x == 0.0) {
+        o.mapped = true;
+        o.uv = mapping_offset(material);
+        o.object = mapping_object(material, v.position, scale);
+        o.object_normal = v.normal;
+    }
     if (surface_data.p[0].x != 0.0) {
         var region = i32(v.position.z);
         if (surface_data.p[0].x == 7.0) {
@@ -231,7 +257,8 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material) -> Vert
     let c2 = p.model[2].xyz;
     let cofactor = mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1));
     let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
-    let s = vertex_shading(v, shading, material);
+    let model_scale = vec3f(length(c0), length(c1), length(c2));
+    let s = vertex_shading(v, shading, material, model_scale);
     var o: VertexOut;
     o.pos = p.pos;
     o.world = p.world.xyz;
@@ -239,9 +266,11 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material) -> Vert
     o.color = s.color;
     o.emissive = material.emissive;
     o.material = s.material;
-    o.scalars = vec4f(material.cutoff, material.thickness, material.diffuse_blur, 0.0);
-    o.clear_coat = unpack2x16unorm(material.clear_coat);
-    o.anisotropy = unpack2x16unorm(material.anisotropy);
+    o.scalars = vec4f(material.cutoff, material.thickness, material.diffuse_blur,
+        select(0.0, 1.0, s.mapped));
+    o.layers = vec4f(unpack2x16unorm(material.clear_coat), unpack2x16unorm(material.anisotropy));
+    o.object = s.object;
+    o.object_normal = s.object_normal;
     let sheen = unpack4x8unorm(material.sheen);
     o.sheen = vec4f(material_linear(sheen.rgb), sheen.a);
     let diffuse_transmission = unpack4x8unorm(material.diffuse_transmission);
@@ -251,7 +280,7 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material) -> Vert
     o.transmission = vec4f(material.transmission_factor, material.ior,
         material.thickness_factor, material.attenuation_distance);
     o.attenuation = material_linear(unpack4x8unorm(material.attenuation_color).rgb);
-    o.model_scale = vec3f(length(c0), length(c1), length(c2));
+    o.model_scale = model_scale;
     return o;
 }
 
@@ -276,18 +305,28 @@ struct DepthCutoutOut {
     @location(0) uv: vec2f,
     @location(1) alpha: f32,
     @location(2) @interpolate(flat) cutoff: f32,
+    // A MappingObject material: 1 in mapped, and what mapping_uv projects, as VertexOut has them
+    @location(3) @interpolate(flat) mapped: f32,
+    @location(4) object: vec4f,
+    @location(5) object_normal: vec3f,
 };
 
 @vertex fn vs_depth_cutout(v: VertexIn) -> DepthCutoutOut {
     let shading = shadings[v.slot];
     let material = material_fetch(shading.material);
     let p = place(v);
-    let s = vertex_shading(v, shading, material);
-    return DepthCutoutOut(p.pos, s.uv, s.color.a, material.cutoff);
+    let scale = vec3f(length(p.model[0].xyz), length(p.model[1].xyz), length(p.model[2].xyz));
+    let s = vertex_shading(v, shading, material, scale);
+    return DepthCutoutOut(p.pos, s.uv, s.color.a, material.cutoff, select(0.0, 1.0, s.mapped),
+        s.object, s.object_normal);
 }
 
 @fragment fn fs_depth_cutout(f: DepthCutoutOut) {
-    let alpha = f.alpha * textureSample(albedo_map, material_sampler, f.uv).a;
+    var uv = f.uv;
+    if (f.mapped != 0.0) {
+        uv = mapping_uv(f.object, f.object_normal, f.uv);
+    }
+    let alpha = f.alpha * textureSample(albedo_map, material_sampler, uv).a;
     if (alpha < f.cutoff) {
         discard;
     }
@@ -629,13 +668,24 @@ fn perturb(n: vec3f, frame: Frame, m: vec3f) -> vec3f {
     return select(normalize(tangent * m), n, frame.degenerate);
 }
 
+// Texture coordinates of a fragment: the interpolated UV, or the projection of a MappingObject
+// material.
+fn fragment_uv(f: VertexOut) -> vec2f {
+    var uv = f.uv;
+    if (f.scalars.w != 0.0) {
+        uv = mapping_uv(f.object, f.object_normal, f.uv);
+    }
+    return uv;
+}
+
 fn surface(f: VertexOut, front: bool) -> Surface {
-    let albedo = textureSample(albedo_map, material_sampler, f.uv);
-    let emissive = textureSample(emissive_map, material_sampler, f.uv).rgb;
-    let orm = textureSample(orm_map, material_sampler, f.uv).rgb;
-    let tangent_normal = textureSample(normal_map, material_sampler, f.uv).xyz * 2.0 - 1.0;
+    let uv = fragment_uv(f);
+    let albedo = textureSample(albedo_map, material_sampler, uv);
+    let emissive = textureSample(emissive_map, material_sampler, uv).rgb;
+    let orm = textureSample(orm_map, material_sampler, uv).rgb;
+    let tangent_normal = textureSample(normal_map, material_sampler, uv).xyz * 2.0 - 1.0;
     let geometric = normalize(f.normal);
-    let frame = cotangent_frame(geometric, f.world, f.uv);
+    let frame = cotangent_frame(geometric, f.world, uv);
     let mapped = perturb(geometric, frame, tangent_normal);
     var s: Surface;
     s.albedo = f.color.rgb;
@@ -646,8 +696,8 @@ fn surface(f: VertexOut, front: bool) -> Surface {
     s.emissive = f.emissive;
     s.normal = -geometric;
     s.geometric = -geometric;
-    s.coat = clamp(f.clear_coat.x, 0.0, 1.0);
-    s.coat_roughness = clamp(f.clear_coat.y, MIN_ROUGHNESS, 1.0);
+    s.coat = clamp(f.layers.x, 0.0, 1.0);
+    s.coat_roughness = clamp(f.layers.y, MIN_ROUGHNESS, 1.0);
     s.sheen = max(f.sheen.rgb, vec3f(0.0));
     s.sheen_roughness = clamp(f.sheen.w, SHEEN_MIN_ROUGHNESS, 1.0);
     if (front) {
@@ -677,13 +727,13 @@ fn surface(f: VertexOut, front: bool) -> Surface {
     s.anisotropy = 0.0;
     s.tangent = vec3f(0.0);
     s.bitangent = vec3f(0.0);
-    if (f.anisotropy.x > 0.0 && !frame.degenerate) {
-        let rotation = f.anisotropy.y * (2.0 * PI);
+    if (f.layers.z > 0.0 && !frame.degenerate) {
+        let rotation = f.layers.w * (2.0 * PI);
         let dir = frame.tangent * cos(rotation) + frame.bitangent * sin(rotation);
         let along = dir - s.normal * dot(dir, s.normal);
         let len2 = dot(along, along);
         if (len2 > 1e-12) {
-            s.anisotropy = clamp(f.anisotropy.x, 0.0, 1.0);
+            s.anisotropy = clamp(f.layers.z, 0.0, 1.0);
             s.tangent = along * inverseSqrt(len2);
             s.bitangent = cross(s.normal, s.tangent);
         }

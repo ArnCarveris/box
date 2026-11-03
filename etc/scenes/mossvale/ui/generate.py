@@ -99,329 +99,6 @@ def vignette():
     to_image(out).save(os.path.join(OUT, "vignette.png"))
 
 
-def fract(v):
-    return v - math.floor(v)
-
-
-def hash1(i):
-    return fract(math.sin(i * 12.9898 + 4.1414) * 43758.5453)
-
-
-def hash2(x, z):
-    return fract(math.sin(x * 12.9898 + z * 78.233) * 43758.5453)
-
-
-def dist2(ax, az, bx, bz):
-    return (ax - bx) ** 2 + (az - bz) ** 2
-
-
-LAKE = (-72, -6, 15)
-ISLE = (-75, -8, 5.5)
-WALL_N0, WALL_N1, WALL_S0, WALL_S1 = -41, -31, 31, 41
-
-
-def road_x(z):
-    return 2.5 * math.sin(z * 0.045)
-
-
-def road_z(x):
-    return 1.2 * math.sin(x * 0.05 + 0.5)
-
-
-def river_x(z):
-    return -44 + 2.5 * math.sin(z * 0.06 + 1)
-
-
-def on_ns_road(x, z):
-    return abs(x - road_x(z)) < 3 and -84 < z < 90
-
-
-def camp_spot(x, z):
-    return dist2(x, z, -20, -60) < 121 or (abs(z + 60) < 3 and -20 < x < 2)
-
-
-def shrine_spot(x, z):
-    return dist2(x, z, 18, -80) < 144 or (abs(z + 72) < 3 and 0 < x < 18)
-
-
-def grove_spot(x, z):
-    return dist2(x, z, 36, -58) < 100 or (abs(z + 58) < 3 and 0 < x < 36)
-
-
-HILL_SPOTS = [(-31, 70, 9), (-5, 80, 9), (12, 52, 9), (-36, 48, 9), (50, 50, 9), (-38, 88, 9), (48, 60, 9),
-              (60, 88, 9), (4, 92, 9), (-30, 86, 16), (-26, 79, 64)]
-
-
-def hill_spot(x, z):
-    return any(dist2(x, z, a, b) < r for a, b, r in HILL_SPOTS) or (abs(x + 22) < 3 and 60 < z < 80)
-
-
-def wood_spot(x, z):
-    return any(dist2(x, z, a, b) < 9 for a, b in [(-36, -70), (6, -90), (44, -82), (-6, -48)])
-
-
-def forest_clear(x, z):
-    return on_ns_road(x, z) or camp_spot(x, z) or shrine_spot(x, z) or grove_spot(x, z) or wood_spot(x, z) or abs(x - river_x(z)) < 5
-
-
-def quarry_spot(x, z):
-    return dist2(x, z, 26, 63) < 225 or (abs(z - 62) < 3 and 0 < x < 26)
-
-
-def pasture_spot(x, z):
-    return dist2(x, z, -16, 56) < 100 or (abs(z - 56) < 3 and -16 < x < 0)
-
-
-def hills_clear(x, z):
-    return on_ns_road(x, z) or quarry_spot(x, z) or pasture_spot(x, z) or hill_spot(x, z) or abs(x - river_x(z)) < 5
-
-
-def tree_pos(i, j):
-    x = -38 + i * 3.4 + (hash2(i, j) - 0.5) * 2.2
-    z = -93 + j * 3.4 + (hash2(j * 1.7, i * 3.1) - 0.5) * 2.2
-    return x, z
-
-
-def tree_here(i, j):
-    x, z = tree_pos(i, j)
-    wall = z > WALL_N0 - 1
-    h = hash2(i * 0.73 + 5, j * 1.31 + 2)
-    return x < 94 and not forest_clear(x, z) and (h > 0.04 if wall else h > 0.42)
-
-
-def rock_pos(i, j):
-    x = -38 + i * 4.6 + (hash2(i + 11, j) - 0.5) * 3
-    z = WALL_S0 + 0.5 + j * 4.6 + (hash2(j + 3, i * 2.3) - 0.5) * 3
-    return x, z
-
-
-def rock_here(i, j):
-    x, z = rock_pos(i, j)
-    h = hash2(i * 1.9 + 1, j * 0.77 + 9)
-    wall = z < WALL_S1 + 1
-    return x < 94 and z < 94 and not hills_clear(x, z) and (h > 0.0 if wall else h > 0.72)
-
-
-HOUSES = [(-17, 18, 7, 5.5, 2, 4), (-22, -17, 9, 7, 0, 3), (-9, -17.5, 8, 6, 0, 2), (12, -16, 7, 6, 0, 1),
-          (15, 16.5, 8, 6, 2, 1), (-31, 18, 6.5, 5.5, 2, 0), (-8, 21.5, 7, 5.5, 1, 1), (25, -9, 6, 5, 0, 0),
-          (26, 11, 6, 5, 2, 2), (24, -21, 6, 5, 3, 3), (-33, -16, 6, 5, 1, 1), (50, -14, 8, 6, 0, 1),
-          (64, -16, 10, 8, 0, 1), (84, 12, 7, 5.5, 3, 0), (-55, 15, 6, 5, 3, 2), (-24, -66.5, 6, 5, 0, 3)]
-
-ROOF = {0: (196, 160, 96), 1: (168, 74, 56), 2: (78, 96, 136), 3: (84, 116, 78), 4: (106, 78, 132)}
-
-
-def map_image():
-    n = 1024
-    k = n / 200.0
-
-    def px(x, z):
-        return ((x + 100) * k, (z + 100) * k)
-
-    paper = noise(n, n, 2.2, 21)
-    grain = noise(n, n, 0.8, 22)
-    wash = noise(n, n, 1.8, 23)
-    ys, xs = np.mgrid[0:n, 0:n]
-    wx = xs / k - 100
-    wz = ys / k - 100
-    base = mix(rgb(238, 224, 186), rgb(222, 204, 160), paper)
-    meadow = mix(rgb(190, 204, 136), rgb(170, 190, 118), wash)
-    base = mix(base, meadow, 0.55)
-    east = smooth(-52, -48, wx)
-    forest = smooth(-29, -33, wz) * east
-    base = mix(base, mix(rgb(132, 158, 102), rgb(116, 146, 92), wash), forest * 0.75)
-    hills = smooth(29, 33, wz) * east
-    base = mix(base, mix(rgb(206, 196, 140), rgb(190, 178, 124), wash), hills * 0.8)
-    farm = smooth(0, 1.5, np.minimum.reduce([wx - 33, 95 - wx, wz + 29, 29 - wz]))
-    base = mix(base, mix(rgb(208, 206, 122), rgb(196, 190, 108), wash), farm * 0.6)
-    rx = -44 + 2.5 * np.sin(wz * 0.06 + 1)
-    river = smooth(3.4, 2.6, np.abs(wx - rx))
-    lake = smooth(LAKE[2] + 0.4, LAKE[2] - 0.4, np.sqrt((wx - LAKE[0]) ** 2 + (wz - LAKE[1]) ** 2))
-    isle = smooth(ISLE[2] + 0.4, ISLE[2] - 0.4, np.sqrt((wx - ISLE[0]) ** 2 + (wz - ISLE[1]) ** 2))
-    water = np.clip(np.maximum(river, lake) - isle, 0, 1)
-    shore = np.clip(np.maximum(smooth(4.6, 3.0, np.abs(wx - rx)), smooth(LAKE[2] + 1.8, LAKE[2], np.sqrt((wx - LAKE[0]) ** 2 + (wz - LAKE[1]) ** 2))) - water, 0, 1)
-    base = mix(base, rgb(226, 210, 160), shore * 0.7)
-    depth = smooth(LAKE[2] - 2, LAKE[2] - 9, np.sqrt((wx - LAKE[0]) ** 2 + (wz - LAKE[1]) ** 2))
-    wcol = mix(rgb(132, 178, 196), rgb(96, 148, 178), np.maximum(depth, wash * 0.5))
-    base = mix(base, wcol, water)
-    base = base * (0.94 + grain[..., None] * 0.1)
-    edge = edge_distance(n, n)
-    base = mix(base, rgb(170, 128, 78), (1 - smooth(0.0, 0.06, edge + (paper - 0.5) * 0.02)) * 0.7)
-    img = to_image(base).convert("RGBA")
-
-    over = Image.new("RGBA", (n, n), (0, 0, 0, 0))
-    d = ImageDraw.Draw(over)
-
-    def poly_line(pts, color, width):
-        d.line(pts, fill=color, width=width, joint="curve")
-
-    rv_l = [px(river_x(z) - 3, z) for z in np.arange(-100, 101, 1.0)]
-    rv_r = [px(river_x(z) + 3, z) for z in np.arange(-100, 101, 1.0)]
-    poly_line(rv_l, (60, 92, 110, 200), 3)
-    poly_line(rv_r, (60, 92, 110, 200), 3)
-    for r, a in ((LAKE[2], 210), (LAKE[2] - 1.6, 70), (LAKE[2] - 3.2, 40)):
-        cx, cy = px(LAKE[0], LAKE[1])
-        d.ellipse([cx - r * k, cy - r * k, cx + r * k, cy + r * k], outline=(60, 92, 110, a), width=3 if a > 100 else 2)
-    cx, cy = px(ISLE[0], ISLE[1])
-    d.ellipse([cx - ISLE[2] * k, cy - ISLE[2] * k, cx + ISLE[2] * k, cy + ISLE[2] * k], outline=(80, 70, 50, 220), width=3)
-    for z in np.arange(-96, 96, 7.0):
-        x = river_x(z) + (hash1(z) - 0.5) * 2
-        a, b = px(x - 0.8, z), px(x + 0.8, z + 0.6)
-        d.arc([a[0], a[1] - 4, b[0], b[1] + 4], 200, 340, fill=(240, 248, 250, 160), width=2)
-
-    def road(pts):
-        poly_line(pts, (120, 88, 52, 230), 13)
-        poly_line(pts, (222, 196, 142, 255), 8)
-
-    road([px(road_x(z), z) for z in np.arange(-84, 91, 1.0)])
-    road([px(x, road_z(x)) for x in np.arange(-60, 93, 1.0)])
-    for path in ([(-2, -60), (-20, -60)], [(2, -58), (36, -58)], [(0, 62), (26, 62)], [(0, -72), (18, -72)], [(0, 56), (-16, 56)]):
-        poly_line([px(*p) for p in path], (130, 96, 60, 200), 5)
-        for t in np.linspace(0, 1, 14)[:-1]:
-            ax = path[0][0] + (path[1][0] - path[0][0]) * t
-            az = path[0][1] + (path[1][1] - path[0][1]) * t
-            d.ellipse([px(ax, az)[0] - 1.5, px(ax, az)[1] - 1.5, px(ax, az)[0] + 1.5, px(ax, az)[1] + 1.5], fill=(230, 210, 160, 255))
-    sx, sy = px(0, 0)
-    d.ellipse([sx - 11 * k, sy - 11 * k, sx + 11 * k, sy + 11 * k], fill=(214, 200, 168, 255), outline=(110, 84, 56, 255), width=3)
-    d.ellipse([sx - 3 * k, sy - 3 * k, sx + 3 * k, sy + 3 * k], fill=(140, 180, 196, 255), outline=(80, 70, 50, 255), width=2)
-    for c, r in (((-20, -60), 9), ((36, -58), 7.5), ((26, 66), 13)):
-        x, y = px(*c)
-        d.ellipse([x - r * k, y - r * k, x + r * k, y + r * k], fill=(214, 190, 140, 200), outline=(130, 96, 60, 160), width=2)
-    x, y = px(18, -80)
-    d.ellipse([x - 8 * k, y - 8 * k, x + 8 * k, y + 8 * k], fill=(206, 200, 184, 230), outline=(110, 100, 90, 220), width=2)
-    for i in range(9):
-        a = i * 0.698 + 0.2
-        mx, my = px(18 + math.cos(a) * 9.5, -80 + math.sin(a) * 9.5)
-        d.rectangle([mx - 4, my - 4, mx + 4, my + 4], fill=(150, 146, 136, 255), outline=(60, 50, 40, 255), width=2)
-    for i in range(6):
-        a = i * 1.047
-        fx, fy = px(-78 + math.cos(a) * 4, 44 + math.sin(a) * 4)
-        d.ellipse([fx - 5, fy - 5, fx + 5, fy + 5], fill=(214, 90, 80, 255), outline=(80, 40, 30, 255), width=2)
-    for i in range(10):
-        x0, y0 = px(40.4 + i * 2, -27.8)
-        x1, y1 = px(41.6 + i * 2, -22.2)
-        d.rectangle([x0, y0, x1, y1], fill=(222, 190, 96, 255), outline=(150, 116, 50, 255), width=1)
-    for i in range(8):
-        cx2 = 44 + (i % 4) * 7
-        cz2 = 9 + (i // 4) * 7
-        x0, y0 = px(cx2 - 2.6, cz2 - 2.6)
-        x1, y1 = px(cx2 + 2.6, cz2 + 2.6)
-        d.rectangle([x0, y0, x1, y1], fill=(150, 116, 74, 255), outline=(96, 70, 44, 255), width=2)
-        for r in range(4):
-            yy = y0 + (r + 0.5) * (y1 - y0) / 4
-            d.line([(x0 + 3, yy), (x1 - 3, yy)], fill=(110, 150, 70, 255), width=2)
-    for c, w2, d2 in (((40, -6), 6, 5), ((-16, 56), 10, 8)):
-        x0, y0 = px(c[0] - w2 / 2, c[1] - d2 / 2)
-        x1, y1 = px(c[0] + w2 / 2, c[1] + d2 / 2)
-        d.rectangle([x0, y0, x1, y1], outline=(110, 80, 50, 255), width=2)
-    x0, y0 = px(-59 - 7, 4 - 1.2)
-    x1, y1 = px(-59, 4 + 1.2)
-    d.rectangle([x0, y0, x1, y1], fill=(170, 124, 80, 255), outline=(90, 60, 36, 255), width=2)
-
-    glyphs = []
-    for j in range(19):
-        for i in range(39):
-            if tree_here(i, j):
-                x, z = tree_pos(i, j)
-                h = hash2(i * 3.3, j * 7.1)
-                glyphs.append((z, "pine" if h < 0.4 else ("autumn" if h > 0.92 else "tree"), x, h))
-    for i in range(56):
-        t = i * 3.6 - 100
-        glyphs.append((-99 - hash1(i * 3) * 4, "pine", t, hash1(i)))
-        glyphs.append((99 + hash1(i * 5) * 4, "pine", t, hash1(i + 9)))
-        glyphs.append((t, "pine" if i % 3 == 0 else "tree", 99 + hash1(i * 7) * 4, hash1(i + 17)))
-        glyphs.append((t, "pine" if i % 3 == 0 else "tree", -99 - hash1(i * 11) * 4, hash1(i + 23)))
-    for i in range(60):
-        x = -96 + hash1(i * 4.1) * 50
-        z = -94 + hash1(i * 3.3 + 1) * 188
-        if i % 4 == 0 and dist2(x, z, LAKE[0], LAKE[1]) > (LAKE[2] + 2.5) ** 2 and abs(x - river_x(z)) > 5 and abs(z - road_z(x)) >= 3:
-            glyphs.append((z, "tree", x, hash1(i * 7)))
-    for i in range(18):
-        x = -36 + i * 7.5 + hash1(i) * 3
-        if x < 92 and abs(x - road_x(0)) > 6 and not (-36 < x < 30):
-            glyphs.append((-27 + hash1(i * 3) * 2, "tree", x, hash1(i * 2)))
-    for i in range(6):
-        glyphs.append((-24 + (i // 2) * 5, "tree", 86 + (i % 2) * 5, 0.5 + i * 0.07))
-    for j in range(14):
-        for i in range(29):
-            if rock_here(i, j):
-                x, z = rock_pos(i, j)
-                glyphs.append((z, "rock", x, hash2(i * 1.3, j * 2.7)))
-            x, z = rock_pos(i, j)
-            x += 2.2
-            z += 1.6
-            h = hash2(i * 5.3, j * 1.9)
-            if h > 0.86 and not hills_clear(x, z) and z > WALL_S1 + 2 and x < 92 and z < 92:
-                glyphs.append((z, "pine", x, h))
-    for hx, hz, w, dd, face, roof in HOUSES:
-        glyphs.append((hz, "house", hx, (w, dd, face, roof)))
-    glyphs.append((-18, "mill", 80, 0))
-    glyphs.append((-9.5, "tower", -77.5, 0))
-    glyphs.append((86, "tower", -30, 0))
-    glyphs.append((51, "mine", 30, 0))
-    glyphs.append((-80, "altar", 18, 0))
-    glyphs.sort(key=lambda g: g[0])
-
-    outline = (52, 38, 24, 255)
-    for z, kind, x, h in glyphs:
-        cx, cy = px(x, z)
-        if not (-20 < cx < n + 20 and -20 < cy < n + 20):
-            continue
-        if kind == "tree" or kind == "autumn":
-            r = (1.7 + h * 0.5) * k
-            fill = (214, 150, 70, 255) if kind == "autumn" else (96 + int(h * 30), 140 + int(h * 20), 74, 255)
-            shade = tuple(int(c * 0.72) for c in fill[:3]) + (255,)
-            d.line([(cx, cy), (cx, cy + r * 0.9)], fill=outline, width=3)
-            d.ellipse([cx - r, cy - r * 1.55, cx + r, cy + r * 0.25], fill=shade, outline=outline, width=2)
-            d.ellipse([cx - r * 0.82, cy - r * 1.5, cx + r * 0.55, cy - r * 0.05], fill=fill)
-            d.ellipse([cx - r * 0.5, cy - r * 1.3, cx - r * 0.05, cy - r * 0.85], fill=tuple(min(255, int(c * 1.18)) for c in fill[:3]) + (255,))
-        elif kind == "pine":
-            r = (1.5 + h * 0.4) * k
-            fill = (62, 108, 78, 255)
-            d.line([(cx, cy - r * 0.2), (cx, cy + r * 0.7)], fill=outline, width=3)
-            d.polygon([(cx, cy - r * 2.2), (cx + r, cy + r * 0.2), (cx - r, cy + r * 0.2)], fill=fill, outline=outline, width=2)
-            d.polygon([(cx, cy - r * 2.0), (cx, cy + r * 0.1), (cx - r * 0.8, cy + r * 0.1)], fill=(84, 136, 98, 255))
-        elif kind == "rock":
-            r = (1.2 + h * 0.6) * k
-            d.chord([cx - r * 1.3, cy - r * 1.4, cx + r * 1.3, cy + r * 0.6], 180, 360, fill=(170, 160, 136, 255), outline=outline, width=2)
-            d.line([(cx - r * 1.3, cy - r * 0.4), (cx + r * 1.3, cy - r * 0.4)], fill=outline, width=2)
-            for s in range(3):
-                xx = cx + r * (0.2 + s * 0.3)
-                d.line([(xx, cy - r * 0.5), (xx - r * 0.2, cy - r * 1.0 + s * 0.15 * r)], fill=(110, 96, 74, 255), width=1)
-        elif kind == "house":
-            w, dd, face, roof = h
-            if face % 2:
-                w, dd = dd, w
-            x0, y0 = px(x - w / 2, z - dd / 2)
-            x1, y1 = px(x + w / 2, z + dd / 2)
-            rc = ROOF[roof]
-            d.rectangle([x0 + 3, y0 + 3, x1 + 3, y1 + 3], fill=(60, 44, 30, 120))
-            d.rectangle([x0, y0, x1, y1], fill=rc + (255,), outline=outline, width=2)
-            if face % 2:
-                d.line([((x0 + x1) / 2, y0), ((x0 + x1) / 2, y1)], fill=outline, width=2)
-                d.rectangle([(x0 + x1) / 2, y0 + 2, x1 - 2, y1 - 2], fill=tuple(int(c * 0.78) for c in rc) + (255,))
-            else:
-                d.line([(x0, (y0 + y1) / 2), (x1, (y0 + y1) / 2)], fill=outline, width=2)
-                d.rectangle([x0 + 2, (y0 + y1) / 2, x1 - 2, y1 - 2], fill=tuple(int(c * 0.78) for c in rc) + (255,))
-        elif kind == "mill":
-            r = 3 * k
-            d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(236, 226, 204, 255), outline=outline, width=2)
-            for a in range(4):
-                ang = a * math.pi / 2 + 0.4
-                d.line([(cx, cy), (cx + math.cos(ang) * r * 2.2, cy + math.sin(ang) * r * 2.2)], fill=outline, width=4)
-        elif kind == "tower":
-            r = 2.2 * k
-            d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(176, 170, 156, 255), outline=outline, width=2)
-            d.ellipse([cx - r * 0.6, cy - r * 0.6, cx + r * 0.6, cy + r * 0.6], fill=(110, 80, 136, 255), outline=outline, width=2)
-        elif kind == "mine":
-            d.chord([cx - 8 * k, cy - 6 * k, cx + 8 * k, cy + 3 * k], 180, 360, fill=(150, 130, 104, 255), outline=outline, width=2)
-            d.rectangle([cx - 1.6 * k, cy - 2.4 * k, cx + 1.6 * k, cy - 1.5], fill=(30, 24, 20, 255))
-        elif kind == "altar":
-            d.rectangle([cx - 1.2 * k, cy - 0.7 * k, cx + 1.2 * k, cy + 0.7 * k], fill=(120, 116, 106, 255), outline=outline, width=2)
-            d.ellipse([cx - 4, cy - 4, cx + 4, cy + 4], fill=(150, 210, 250, 255))
-    img = Image.alpha_composite(img, over.filter(ImageFilter.GaussianBlur(0.5)))
-    img.convert("RGB").save(os.path.join(OUT, "map.jpg"), quality=90)
-
-
 GOLD_DEFS = """<linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff0b8"/><stop offset="0.35" stop-color="#e2b456"/><stop offset="0.7" stop-color="#b07a2a"/><stop offset="1" stop-color="#6e4614"/></linearGradient>
 <linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9cc070"/><stop offset="1" stop-color="#3e6a34"/></linearGradient>"""
 
@@ -655,16 +332,69 @@ def portrait(i, p):
     svg("portrait_%d.svg" % i, 128, 128, "\n".join(s), defs)
 
 
+def vial():
+    cx, cy, r = 128, 210, 112
+    ticks = ""
+    for i in range(13):
+        a = math.radians(125 + i * 9)
+        long_ = i % 3 == 0
+        r0, r1 = 101, (88 if long_ else 94)
+        ticks += '<line x1="%.2f" y1="%.2f" x2="%.2f" y2="%.2f" stroke="#f4e8c8" stroke-width="%.1f" stroke-linecap="round" opacity="%.2f"/>\n' % (
+            cx + math.cos(a) * r0, cy - math.sin(a) * r0, cx + math.cos(a) * r1, cy - math.sin(a) * r1, 2.4 if long_ else 1.4, 0.75 if long_ else 0.5)
+    rivets = ""
+    for a in (45, 135, 225, 315):
+        x, y = cx + math.cos(math.radians(a)) * r, cy - math.sin(math.radians(a)) * r
+        rivets += '<circle cx="%.2f" cy="%.2f" r="5" fill="url(#gold)" stroke="#2a1c0e" stroke-width="1.6"/>\n' % (x, y)
+    leaves = ""
+    for x, y, a, sz in ((92, 104, 3.5, 30), (164, 104, -0.36, 30), (84, 96, 2.7, 22), (172, 96, 0.44, 22),
+                        (52, 286, 2.3, 26), (204, 286, 0.84, 26), (40, 266, 1.9, 20), (216, 266, 1.24, 20)):
+        leaves += '<path d="%s" fill="url(#leaf)" stroke="#2a1c0e" stroke-width="1.6"/>\n' % leaf_path(x, y, a, sz)
+    body = """<path d="M44 300 Q30 270 40 248" fill="none" stroke="#2a1c0e" stroke-width="5" stroke-linecap="round"/>
+<path d="M44 300 Q30 270 40 248" fill="none" stroke="#5c7a3a" stroke-width="2.6" stroke-linecap="round"/>
+<path d="M212 300 Q226 270 216 248" fill="none" stroke="#2a1c0e" stroke-width="5" stroke-linecap="round"/>
+<path d="M212 300 Q226 270 216 248" fill="none" stroke="#5c7a3a" stroke-width="2.6" stroke-linecap="round"/>
+<path d="M104 112 V60 H152 V112" fill="none" stroke="#2a1c0e" stroke-width="9" stroke-linejoin="round"/>
+<path d="M104 112 V60 H152 V112" fill="none" stroke="url(#gold)" stroke-width="5" stroke-linejoin="round"/>
+<circle cx="%d" cy="%d" r="%d" fill="none" stroke="#2a1c0e" stroke-width="17"/>
+<circle cx="%d" cy="%d" r="%d" fill="none" stroke="url(#gold)" stroke-width="11"/>
+<circle cx="%d" cy="%d" r="%d" fill="none" stroke="#2a1c0e" stroke-width="2" opacity="0.7"/>
+<circle cx="%d" cy="%d" r="%d" fill="none" stroke="#fff4c8" stroke-width="1.4" opacity="0.6"/>
+%s%s<rect x="90" y="94" width="76" height="20" rx="7" fill="url(#gold)" stroke="#2a1c0e" stroke-width="2.6"/>
+<line x1="96" y1="104" x2="160" y2="104" stroke="#6e4614" stroke-width="1.4" opacity="0.7"/>
+<circle cx="128" cy="104" r="6.5" fill="#6f9cff" stroke="#2a1c0e" stroke-width="1.8"/>
+<circle cx="126" cy="102" r="2" fill="#ffffff" opacity="0.9"/>
+<rect x="96" y="44" width="64" height="18" rx="7" fill="url(#gold)" stroke="#2a1c0e" stroke-width="2.6"/>
+<path d="M110 46 L108 16 Q108 8 116 8 H140 Q148 8 148 16 L146 46 Z" fill="url(#cork)" stroke="#2a1c0e" stroke-width="2.6" stroke-linejoin="round"/>
+<path d="M114 18 H142 M113 28 H143 M112 38 H144" fill="none" stroke="#5a3a1e" stroke-width="1.2" opacity="0.55"/>
+<circle cx="120" cy="22" r="1.6" fill="#5a3a1e" opacity="0.6"/><circle cx="135" cy="33" r="1.4" fill="#5a3a1e" opacity="0.6"/>
+<path d="M150 50 q16 4 18 22 q1 10 -6 14" fill="none" stroke="#2a1c0e" stroke-width="4.4" stroke-linecap="round"/>
+<path d="M150 50 q16 4 18 22 q1 10 -6 14" fill="none" stroke="#c9a46a" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M156 82 l12 4 l-2 26 l-14 -4 Z" fill="#f2e2b8" stroke="#2a1c0e" stroke-width="2" stroke-linejoin="round" transform="rotate(-8 160 96)"/>
+<path d="M158 92 l8 2 M157 99 l7 2" stroke="#7a5a36" stroke-width="1.4" transform="rotate(-8 160 96)"/>""" % (
+        cx, cy, r, cx, cy, r, cx, cy, r + 8, cx, cy, r - 7, ticks, rivets)
+    body += leaves
+    cork = '<linearGradient id="cork" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7a5230"/><stop offset="0.45" stop-color="#c08a56"/><stop offset="1" stop-color="#6a4426"/></linearGradient>'
+    svg("vial_frame.svg", 256, 340, body, cork)
+    gloss = """<g fill="none" stroke="#ffffff" stroke-linecap="round">
+<path d="M48 176 A86 86 0 0 1 104 132" stroke-width="11" opacity="0.32"/>
+<path d="M118 126 A86 86 0 0 1 132 125" stroke-width="11" opacity="0.32"/>
+<path d="M210 244 A86 86 0 0 1 162 290" stroke-width="6" opacity="0.14"/>
+<path d="M113 70 V104" stroke-width="5" opacity="0.3"/>
+</g>
+<ellipse cx="80" cy="172" rx="9" ry="5" fill="#ffffff" opacity="0.5" transform="rotate(-40 80 172)"/>"""
+    svg("vial_gloss.svg", 256, 340, gloss)
+
+
 if __name__ == "__main__":
     parchment()
     leather()
     vignette()
-    map_image()
     corner()
     divider()
     ribbon()
     roller()
     compass()
+    vial()
     spell_icons()
     small_icons()
     for i, p in NPCS.items():

@@ -7,6 +7,7 @@
 #include <bake_test.h>
 #include <math.h>
 #include "mesh_cache.h"
+#include "face_uvs.h"
 
 void Box_size(void) {
     // renderer/meshes
@@ -133,6 +134,64 @@ void Box_scale(void) {
     test_flt(sm->scale[0], 1.0f);
     test_flt(sm->scale[1], 2.0f);
     test_flt(sm->scale[2], 3.0f);
+
+    ecs_fini(world);
+}
+
+void Box_face_orientation(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Box, {1, 2, 3});
+    const ShapeMesh *sm = ecs_get(world, e, ShapeMesh);
+    test_assert(sm != NULL);
+    const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
+    test_assert(mesh != NULL);
+    test_int(face_uvs_check(mesh), 63);
+
+    /* The corners of the +x face: seen from +x the right edge is at -z, the top at +y */
+    int32_t corners = 0;
+    for (int32_t i = 0; i < mesh->vertex_count; i ++) {
+        const box_vertex_t *v = &mesh->vertices[i];
+        if (v->normal[0] > 0.9999f) {
+            test_flt(v->uv[0], 0.5f - v->position[2]);
+            test_flt(v->uv[1], 0.5f - v->position[1]);
+            corners ++;
+        } else if (v->normal[0] < -0.9999f) {
+            test_flt(v->uv[0], 0.5f + v->position[2]);
+            test_flt(v->uv[1], 0.5f - v->position[1]);
+            corners ++;
+        }
+    }
+
+    test_assert(corners >= 8);
+    ecs_fini(world);
+}
+
+void Box_rounded_face_orientation(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, RoundedBox, { .x = 2, .y = 1, .z = 1.5f, .radius = 0.25f, .segments = 4 });
+    const ShapeMesh *sm = ecs_get(world, e, ShapeMesh);
+    test_assert(sm != NULL);
+    const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
+    test_assert(mesh != NULL);
+    test_int(face_uvs_check(mesh), 63);
+
+    ecs_entity_t sharp = ecs_new(world);
+    ecs_set(world, sharp, RoundedBox, { .x = 2, .y = 1, .z = 1.5f, .radius = 0, .segments = 4 });
+    sm = ecs_get(world, sharp, ShapeMesh);
+    test_assert(sm != NULL);
+    mesh = box_mesh_cache_get(cache, sm->mesh);
+    test_assert(mesh != NULL);
+    test_int(face_uvs_check(mesh), 63);
 
     ecs_fini(world);
 }

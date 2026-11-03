@@ -50,8 +50,13 @@ prefab MvMeadow { Rgb: {138, 182, 88}; PbrMaterial: {roughness: 1}; PbrTextures:
 prefab MvForestFloor { Rgb: {176, 170, 140}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_forest, normal: mv_tex_forest_n} }
 prefab MvHillGrass { Rgb: {160, 166, 96}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_grass, normal: mv_tex_grass_n} }
 prefab MvDirt { Rgb: {196, 156, 108}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_dirt, normal: mv_tex_dirt_n} }
-prefab MvPath { Rgb: {218, 186, 136}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_dirt, normal: mv_tex_dirt_n} }
+prefab MvPath { Rgb: {208, 178, 130}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_dirt, normal: mv_tex_dirt_n} }
 prefab MvCobble { Rgb: {204, 194, 178}; PbrMaterial: {roughness: 0.85}; PbrTextures: {albedo: mv_tex_cobble, normal: mv_tex_cobble_n}; TextureTransform: {6, 6, 0, 0} }
+prefab MvLane { Rgb: {212, 200, 180}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_rubble, normal: mv_tex_rubble_n} }
+prefab MvFlags { Rgb: {200, 190, 172}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_ashlar, normal: mv_tex_ashlar_n} }
+prefab MvVerge { Rgb: {178, 168, 112}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_grass, normal: mv_tex_grass_n} }
+prefab MvRoadGrass { Rgb: {116, 150, 76}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_grass, normal: mv_tex_grass_n} }
+prefab MvYard { Rgb: {170, 140, 104}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_dirt, normal: mv_tex_dirt_n} }
 prefab MvSoil { Rgb: {124, 90, 62}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_dirt, normal: mv_tex_dirt_n} }
 prefab MvSoilDry { Rgb: {178, 142, 100}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_dirt, normal: mv_tex_dirt_n} }
 prefab MvSand { Rgb: {236, 216, 166}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_sand, normal: mv_tex_sand_n} }

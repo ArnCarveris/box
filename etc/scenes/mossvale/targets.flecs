@@ -772,10 +772,10 @@ template Fountain : Target {
   prop z: f32 = 0
   const full = ts[id] > 0
   Position: {x, 0, z}
-  step : MvStone { Position: {0, 0.1, 0}; Cylinder: {length: 0.2, radius: 3.5, segments: 32}; TextureTransform: {8, 0.3, 0, 0} }
-  basin : MvStone { Position: {0, 0.55, 0}; Tube: {length: 0.7, radius: 3.0, thickness: 0.35, segments: 32}; TextureTransform: {10, 0.6, 0, 0} }
-  rim : MvStone { Position: {0, 0.93, 0}; Torus: {radius: 2.83, tube: 0.2, segments: 40, rings: 6, smooth: true}; Rgb: {214, 206, 190}; TextureTransform: {12, 0.3, 0, 0} }
-  floor_ : MvDarkStone { Position: {0, 0.25, 0}; Cylinder: {length: 0.1, radius: 2.7, segments: 28} }
+  step : MvStone { Position: {0, 0.1, 0}; Cylinder: {length: 0.2, radius: 3.5, segments: 32}; TextureTransform: {9, 0.15, 0, 0} }
+  basin : MvStone { Position: {0, 0.55, 0}; Tube: {length: 0.7, radius: 3.0, thickness: 0.35, segments: 32}; TextureTransform: {8, 0.35, 0, 0} }
+  rim : MvStone { Position: {0, 0.93, 0}; Torus: {radius: 2.83, tube: 0.2, segments: 40, rings: 6, smooth: true}; Rgb: {214, 206, 190}; TextureTransform: {8, 0.5, 0, 0} }
+  floor_ : MvDarkStone { Position: {0, 0.25, 0}; Cylinder: {length: 0.1, radius: 2.7, segments: 28}; TextureTransform: {1.8, 1.8, 0, 0} }
   plinth : MvStone { Position: {0, 0.5, 0}; Cylinder: {length: 0.6, radius: 0.7, segments: 12}; TextureTransform: {2, 0.4, 0, 0} }
   column : MvStone { Position: {0, 0.5, 0}; Scale: {1.6, 1.0, 1.6}; Lathe: {profile: MvPostShape, cap_start: true, segments: 14, rings: 10}; Rgb: {214, 206, 190}; TextureTransform: {2, 2, 0, 0} }
   bowl : MvStone { Position: {0, 2.0, 0}; Lathe: {profile: MvBasinShape, cap_start: true, segments: 28, rings: 10}; Rgb: {214, 206, 190}; TextureTransform: {4, 1, 0, 0} }

@@ -192,16 +192,16 @@ export mut game_state: i32 = 0
 export mut clock: f64 = 0
 export mut dt: f32 = 0.016
 
-export mut px: f32 = -15
-export mut pz: f32 = 13
+export mut px: f32 = -10.6
+export mut pz: f32 = 14.6
 export mut pyaw: f32 = 3.14159
 export mut moving = false
 export mut sprinting = false
 export mut walk_phase: f32 = 0
 export mut cast_anim: f32 = 0
 
-export mut cam_x: f32 = -15
-export mut cam_z: f32 = 13
+export mut cam_x: f32 = -10.6
+export mut cam_z: f32 = 14.6
 export mut cam_dist: f32 = 30
 export mut cam_pitch: f32 = 1.02
 
