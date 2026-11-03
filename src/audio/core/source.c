@@ -53,6 +53,34 @@ static double box_audio_wrap(
     return position;
 }
 
+void box_audio_source_seek(
+    box_audio_core_t *core,
+    box_audio_source_t *source,
+    float position)
+{
+    box_audio_sample_source_t *src = &source->data.sample;
+    int32_t frames;
+    double p = position > 0 && position < 1e9f ? (double)position : 0;
+    if (source->kind != BOX_AUDIO_SOURCE_SAMPLE) {
+        goto done;
+    }
+
+    frames = core->sounds[src->sound].frames;
+    if (frames <= 0) {
+        goto done;
+    }
+
+    if (src->loop) {
+        p = box_audio_wrap(p, frames);
+    } else if (p > (double)frames) {
+        p = (double)frames;
+    }
+
+    src->position = p;
+done:
+    return;
+}
+
 /** Render a block of a sample source.
  *
  * @param core The core

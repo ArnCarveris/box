@@ -128,6 +128,7 @@ ECS_STRUCT(AudioSource, {
     bool playing;          /**< Whether it plays, default true */
 });
 
+<<<<<<< HEAD
 /** Wave of a synth oscillator */
 ECS_ENUM(SynthWave, {
     SynthSine,             /**< Sine */
@@ -192,6 +193,29 @@ ECS_STRUCT(SynthSound, {
     uint32_t seed;         /**< Seed of the noise and the variances, with a count of plays */
     float pitch_variance;  /**< Random share of the pitch per play, 0..1, default 0 */
     float level_variance;  /**< Random share of the level per play, 0..1, default 0 */
+=======
+/** The ears of the world: sources with AudioSpatial are heard from its WorldTransform.
+ *
+ * Without one the camera of the first enabled View that has one listens. With several the
+ * first, by entity id, listens and one warning is logged.
+ */
+extern ECS_TAG_DECLARE(AudioListener);
+
+/** Places an AudioSource in the world: it follows the WorldTransform of the entity, parents
+ * included, gets quieter with its distance from the listener and pans with its direction.
+ *
+ * The gain is inverse distance, min / (min + rolloff * (d - min)) beyond min_distance, faded so
+ * that it is exactly 0 at max_distance. Front and back sound alike.
+ *
+ * A looping source beyond max_distance uses no voice and keeps its place in time; a source
+ * that does not loop does not start beyond it. On a sound it sets the distances of
+ * box_audio_play_at.
+ */
+ECS_STRUCT(AudioSpatial, {
+    float min_distance;    /**< Full volume within this distance, default 1 */
+    float max_distance;    /**< Silent from this distance, default 50 */
+    float rolloff;         /**< How fast the volume falls beyond min_distance, default 1 */
+>>>>>>> 32d0d7896c24f47815eadce65be0c3c9b86e49e8
 });
 
 /** Settings of the audio of the world, a singleton */
@@ -244,6 +268,43 @@ bool box_audio_play(
     ecs_world_t *world,
     ecs_entity_t sound,
     float volume);
+
+/** Play a sound once at a place in the world, heard from the listener as an AudioSpatial
+ * source that stays where it started.
+ *
+ * The distances are those of the AudioSpatial of the sound, the defaults without one. A play
+ * beyond max_distance of the listener does not start. Scripts call it as
+ * box.audio.play_at(sound, position, volume).
+ *
+ * @param world The world
+ * @param sound The sound, an entity with AudioPcm
+ * @param position World position of the play
+ * @param volume Linear gain
+ * @return Whether the play was queued
+ */
+bool box_audio_play_at(
+    ecs_world_t *world,
+    ecs_entity_t sound,
+    const vec3 position,
+    float volume);
+
+/** Gain and pan of a spatial source, as box.audio computes them.
+ *
+ * The pan is the component of the direction along the right axis of the listener over the
+ * distance; within min_distance it is divided by min_distance instead, so a source that passes
+ * through the listener moves across instead of jumping from one side to the other.
+ *
+ * @param spatial The distances, NULL for the defaults
+ * @param listener World transform of the listener
+ * @param position World position of the source
+ * @param pan Receives the pan, -1 left to 1 right, may be NULL
+ * @return The gain, 0 at and beyond max_distance
+ */
+float box_audio_spatial_gain(
+    const AudioSpatial *spatial,
+    const mat4 listener,
+    const vec3 position,
+    float *pan);
 
 /** Record the master output of the next seconds to a 16 bit stereo WAV file.
  *

@@ -16,6 +16,7 @@ typedef struct AudioModuleState {
 } AudioModuleState;
 
 static ECS_COMPONENT_DECLARE(AudioModuleState);
+ECS_TAG_DECLARE(AudioListener);
 ECS_COMPONENT_DECLARE(AudioSoundId);
 ECS_COMPONENT_DECLARE(AudioBusState);
 ECS_COMPONENT_DECLARE(AudioVoice);
@@ -58,6 +59,26 @@ static void box_audio_source_ctor(
     (void)ti;
     for (i = 0; i < count; i ++) {
         values[i] = (AudioSource){ .volume = 1.0f, .pitch = 1.0f, .playing = true };
+    }
+}
+
+/** Construct AudioSpatial values: full volume within 1, silent from 50, rolloff 1.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_spatial_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    AudioSpatial *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (AudioSpatial){
+            .min_distance = 1.0f, .max_distance = 50.0f, .rolloff = 1.0f };
     }
 }
 
@@ -288,8 +309,29 @@ bool box_audio_play(
     }
 
     box_audio_play_t *play = ecs_vec_append_t(NULL, &state->plays, box_audio_play_t);
-    play->sound = sound;
-    play->volume = volume;
+    *play = (box_audio_play_t){ .sound = sound, .volume = volume };
+    result = true;
+done:
+    return result;
+}
+
+bool box_audio_play_at(
+    ecs_world_t *world,
+    ecs_entity_t sound,
+    const vec3 position,
+    float volume)
+{
+    box_audio_module_t *state = box_audio_module_get(world);
+    bool result = false;
+    if (!state || !sound || !position || !ecs_is_alive(world, sound) ||
+        !ecs_has(world, sound, AudioPcm))
+    {
+        goto done;
+    }
+
+    box_audio_play_t *play = ecs_vec_append_t(NULL, &state->plays, box_audio_play_t);
+    *play = (box_audio_play_t){ .sound = sound, .volume = volume, .spatial = true,
+        .position = { position[0], position[1], position[2] } };
     result = true;
 done:
     return result;
@@ -453,6 +495,26 @@ static void box_audio_play_function(
     *(bool*)result->ptr = box_audio_play(ctx->world, sound, volume);
 }
 
+/** The box.audio.play_at script function.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The sound, the position and the volume
+ * @param result Receives whether the play was queued
+ */
+static void box_audio_play_at_function(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    ecs_entity_t sound = *(ecs_entity_t*)argv[0].ptr;
+    const float *position = argv[1].ptr;
+    float volume = *(float*)argv[2].ptr;
+    (void)argc;
+    *(bool*)result->ptr = box_audio_play_at(ctx->world, sound, position, volume);
+}
+
 /** The box.audio.capture script function.
  *
  * @param ctx The call context
@@ -489,6 +551,7 @@ static void box_audio_module_free(
     ecs_vec_fini_t(NULL, &state->plays, box_audio_play_t);
     ecs_vec_fini_t(NULL, &state->stops, uint32_t);
     ecs_vec_fini_t(NULL, &state->releases, uint32_t);
+    ecs_vec_fini_t(NULL, &state->moved, ecs_entity_t);
     box_audio_sample_fini(state);
     ecs_os_free(state->capture.path);
     ecs_os_free(state);
@@ -513,6 +576,18 @@ static void box_audio_functions_init(
     });
 
     ecs_function(world, {
+        .name = "play_at",
+        .parent = ecs_get_scope(world),
+        .return_type = ecs_id(ecs_bool_t),
+        .params = {
+            { .name = "sound", .type = ecs_id(ecs_entity_t) },
+            { .name = "position", .type = ecs_id(vec3) },
+            { .name = "volume", .type = ecs_id(ecs_f32_t) }
+        },
+        .callback = box_audio_play_at_function
+    });
+
+    ecs_function(world, {
         .name = "capture",
         .parent = ecs_get_scope(world),
         .return_type = ecs_id(ecs_bool_t),
@@ -529,6 +604,8 @@ void BoxAudioImport(
 {
     ECS_MODULE(world, BoxAudio);
     ECS_IMPORT(world, BoxTypes);
+    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, BoxView);
     ECS_IMPORT(world, BoxJobs);
 
     ECS_META_COMPONENT(world, AudioState);
@@ -544,6 +621,9 @@ void BoxAudioImport(
     box_owned_hooks(world, SoundStatus, BOX_OWNED_STR(SoundStatus, error));
     ECS_META_COMPONENT(world, AudioSource);
     ecs_set_hooks(world, AudioSource, { .ctor = box_audio_source_ctor });
+    ECS_TAG_DEFINE(world, AudioListener);
+    ECS_META_COMPONENT(world, AudioSpatial);
+    ecs_set_hooks(world, AudioSpatial, { .ctor = box_audio_spatial_ctor });
     ECS_META_COMPONENT(world, Reverb);
     ecs_set_hooks(world, Reverb, { .ctor = box_audio_reverb_ctor });
     ECS_META_COMPONENT(world, SynthWave);
@@ -589,6 +669,7 @@ void BoxAudioImport(
     ecs_vec_init_t(NULL, &state->plays, box_audio_play_t, 0);
     ecs_vec_init_t(NULL, &state->stops, uint32_t, 0);
     ecs_vec_init_t(NULL, &state->releases, uint32_t, 0);
+    ecs_vec_init_t(NULL, &state->moved, ecs_entity_t, 0);
     ECS_COMPONENT_DEFINE(world, AudioModuleState);
     ecs_singleton_set(world, AudioModuleState, { .state = state });
     ecs_atfini(world, box_audio_module_free, state);

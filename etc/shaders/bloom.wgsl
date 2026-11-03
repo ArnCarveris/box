@@ -1,9 +1,17 @@
-// Bloom: `downsample_first` filters the image into the first mip with a 13 tap filter whose
-// groups are weighted against fireflies (Karis average), clamps bright pixels and keeps what
-// lies above the threshold with a soft knee; `downsample` filters every mip into the next,
-// `upsample` adds a 3x3 tent of a mip into the one above it with the blend constant of the
-// pass, `history` blends the first mip with the previous frame and `composite` adds a tent of
-// the first mip (binding 4) to the image, times the blend of the first mip.
+// Bloom: `downsample_first` and `downsample_first_tent` halve the image exactly. They gather
+// the pixels under their filter and clamp every pixel against fireflies, weight it with the
+// Karis weight and keep what lies above the threshold with a soft knee before they filter, so a
+// small bright detail adds the same glow wherever it lands on the pixel grid. `downsample_first`
+// uses the 13 tap filter, as 6x6 pixels, where the half size image is the last one above the
+// first mip; `downsample_first_tent` a cheaper 4x4 tent where it is halved again, which smooths
+// it further. `downsample` filters a level into the next, half its size, with the 13 tap
+// filter: the halvings of the image above the first mip and every mip into the next.
+// `downsample_fit` filters the last halving into the first mip, at most half its size, with a
+// cubic B-spline 4 texels of the first mip wide, which spreads every texel over the first mip
+// with the same total weight at any ratio. `upsample` adds a 3x3 tent of a mip into the one
+// above it with the blend constant of the pass, `history` blends the first mip with the
+// previous frame and `composite` adds a cubic B-spline of the first mip (binding 4) to the
+// image, times the blend of the first mip, which stays smooth where the first mip is upscaled.
 #include "include/effect.wgsl"
 
 struct Bloom {
@@ -11,7 +19,7 @@ struct Bloom {
     threshold: vec4f,
     // x: firefly clamp, 0 for none, y: blend of the first mip, z: history blend
     params: vec4f,
-    // xy: offset of the taps of the first downsample in uv, half a texel of the first mip
+    // xy: size of a texel of the first mip in uv
     first: vec4f,
 };
 
@@ -38,12 +46,40 @@ fn karis(color: vec3f) -> vec3f {
     return color / (1.0 + luminance(color) * 0.25);
 }
 
+// Clamp, weight and threshold one pixel of the image before the first downsample filters it.
+fn prefilter(color: vec3f) -> vec3f {
+    return soft_threshold(karis(clamp_firefly(max(color, vec3f(0.0)))));
+}
+
+// The 2x2 pixels around a pixel corner, each clamped, weighted and thresholded.
+struct Quad {
+    p00: vec3f,
+    p10: vec3f,
+    p01: vec3f,
+    p11: vec3f,
+};
+
+fn quad(corner: vec2f, texel: vec2f) -> Quad {
+    let uv = corner * texel;
+    let r = textureGather(0, input_texture, input_sampler, uv);
+    let g = textureGather(1, input_texture, input_sampler, uv);
+    let b = textureGather(2, input_texture, input_sampler, uv);
+    return Quad(prefilter(vec3f(r.w, g.w, b.w)), prefilter(vec3f(r.z, g.z, b.z)),
+        prefilter(vec3f(r.x, g.x, b.x)), prefilter(vec3f(r.y, g.y, b.y)));
+}
+
+// Sum of a quad, its left and top pixels weighted with w0 and its right and bottom ones with w1.
+fn quad_sum(q: Quad, w0: vec2f, w1: vec2f) -> vec3f {
+    return q.p00 * (w0.x * w0.y) + q.p10 * (w1.x * w0.y) + q.p01 * (w0.x * w1.y) +
+        q.p11 * (w1.x * w1.y);
+}
+
 fn tap(uv: vec2f, offset: vec2f, stride: vec2f) -> vec3f {
     let c = textureSampleLevel(input_texture, input_sampler, uv + offset * stride, 0.0).rgb;
     return max(c, vec3f(0.0));
 }
 
-fn sample13(uv: vec2f, stride: vec2f, weighted: bool) -> vec3f {
+fn sample13(uv: vec2f, stride: vec2f) -> vec3f {
     let a = tap(uv, vec2f(-2.0, 2.0), stride);
     let b = tap(uv, vec2f(0.0, 2.0), stride);
     let c = tap(uv, vec2f(2.0, 2.0), stride);
@@ -57,18 +93,11 @@ fn sample13(uv: vec2f, stride: vec2f, weighted: bool) -> vec3f {
     let k = tap(uv, vec2f(1.0, 1.0), stride);
     let l = tap(uv, vec2f(-1.0, -1.0), stride);
     let m = tap(uv, vec2f(1.0, -1.0), stride);
-    var g0 = (a + b + d + e) * 0.25;
-    var g1 = (b + c + e + f) * 0.25;
-    var g2 = (d + e + g + h) * 0.25;
-    var g3 = (e + f + h + i) * 0.25;
-    var g4 = (j + k + l + m) * 0.25;
-    if (weighted) {
-        g0 = karis(clamp_firefly(g0));
-        g1 = karis(clamp_firefly(g1));
-        g2 = karis(clamp_firefly(g2));
-        g3 = karis(clamp_firefly(g3));
-        g4 = karis(clamp_firefly(g4));
-    }
+    let g0 = (a + b + d + e) * 0.25;
+    let g1 = (b + c + e + f) * 0.25;
+    let g2 = (d + e + g + h) * 0.25;
+    let g3 = (e + f + h + i) * 0.25;
+    let g4 = (j + k + l + m) * 0.25;
     return (g0 + g1 + g2 + g3) * 0.125 + g4 * 0.5;
 }
 
@@ -86,15 +115,110 @@ fn tent(t: texture_2d<f32>, uv: vec2f) -> vec3f {
     return sum / 16.0;
 }
 
+// Weight of the cubic B-spline at a distance in texels, 0 from 2 texels on.
+fn bspline_weight(d: f32) -> f32 {
+    let x = abs(d);
+    if (x < 1.0) {
+        return 2.0 / 3.0 - x * x * (1.0 - 0.5 * x);
+    }
+
+    let r = max(2.0 - x, 0.0);
+    return r * r * r / 6.0;
+}
+
+// Cubic B-spline of an image from 4 bilinear taps, smooth across texels however much it is
+// upscaled.
+fn bspline(t: texture_2d<f32>, uv: vec2f) -> vec3f {
+    let size = vec2f(textureDimensions(t, 0));
+    let p = uv * size - 0.5;
+    let i = floor(p);
+    let f = p - i;
+    let r = 1.0 - f;
+    let w0 = r * r * r / 6.0;
+    let w3 = f * f * f / 6.0;
+    let w1 = 2.0 / 3.0 - 0.5 * f * f * (2.0 - f);
+    let w2 = 1.0 - w0 - w1 - w3;
+    let g0 = w0 + w1;
+    let g1 = w2 + w3;
+    let lo = (i - 0.5 + w1 / g0) / size;
+    let hi = (i + 1.5 + w3 / g1) / size;
+    var sum = textureSampleLevel(t, input_sampler, vec2f(lo.x, lo.y), 0.0).rgb * g0.x * g0.y;
+    sum += textureSampleLevel(t, input_sampler, vec2f(hi.x, lo.y), 0.0).rgb * g1.x * g0.y;
+    sum += textureSampleLevel(t, input_sampler, vec2f(lo.x, hi.y), 0.0).rgb * g0.x * g1.y;
+    sum += textureSampleLevel(t, input_sampler, vec2f(hi.x, hi.y), 0.0).rgb * g1.x * g1.y;
+    return sum;
+}
+
 @fragment fn downsample_first(v: FullscreenOut) -> @location(0) vec4f {
-    let stride = max(1.0 / vec2f(textureDimensions(input_texture, 0)), bloom.first.xy);
-    let c = sample13(v.uv, stride, true);
-    return vec4f(soft_threshold(c), 1.0);
+    // The 13 tap filter at a 2x reduction, its taps at pixel corners, as weights of the 6x6
+    // pixels under it: half the outer 3x3 taps (a) and half the inner 2x2 taps (b).
+    var a = array<f32, 6>(0.125, 0.125, 0.25, 0.25, 0.125, 0.125);
+    var b = array<f32, 6>(0.0, 0.25, 0.25, 0.25, 0.25, 0.0);
+    let texel = 1.0 / vec2f(textureDimensions(input_texture, 0));
+    let corner = floor(v.pos.xy) * 2.0 - 1.0;
+    var sum = vec3f(0.0);
+    for (var y = 0; y < 6; y += 2) {
+        for (var x = 0; x < 6; x += 2) {
+            let q = quad(corner + vec2f(f32(x), f32(y)), texel);
+            let a0 = vec2f(a[x], a[y]);
+            let a1 = vec2f(a[x + 1], a[y + 1]);
+            let b0 = vec2f(b[x], b[y]);
+            let b1 = vec2f(b[x + 1], b[y + 1]);
+            sum += (quad_sum(q, a0, a1) + quad_sum(q, b0, b1)) * 0.5;
+        }
+    }
+
+    return vec4f(sum, 1.0);
+}
+
+@fragment fn downsample_first_tent(v: FullscreenOut) -> @location(0) vec4f {
+    // A 4x4 tent at a 2x reduction, 1 3 3 1 / 8 along each axis, as 2x2 quads
+    let texel = 1.0 / vec2f(textureDimensions(input_texture, 0));
+    let corner = floor(v.pos.xy) * 2.0;
+    let outer = vec2f(0.125);
+    let inner = vec2f(0.375);
+    var sum = quad_sum(quad(corner, texel), outer, inner);
+    sum += quad_sum(quad(corner + vec2f(2.0, 0.0), texel), vec2f(0.375, 0.125),
+        vec2f(0.125, 0.375));
+    sum += quad_sum(quad(corner + vec2f(0.0, 2.0), texel), vec2f(0.125, 0.375),
+        vec2f(0.375, 0.125));
+    sum += quad_sum(quad(corner + vec2f(2.0, 2.0), texel), inner, outer);
+    return vec4f(sum, 1.0);
 }
 
 @fragment fn downsample(v: FullscreenOut) -> @location(0) vec4f {
     let stride = 1.0 / vec2f(textureDimensions(input_texture, 0));
-    return vec4f(sample13(v.uv, stride, false), 1.0);
+    return vec4f(sample13(v.uv, stride), 1.0);
+}
+
+@fragment fn downsample_fit(v: FullscreenOut) -> @location(0) vec4f {
+    // Every texel of the input weighted with the B-spline at its distance in texels of the
+    // first mip, 1 to 2 input texels each. Two texels next to each other are one bilinear tap
+    // between them, so a tap reads 2x2 texels.
+    let size = vec2f(textureDimensions(input_texture, 0));
+    let ratio = size * bloom.first.xy;
+    let center = v.uv * size;
+    let lo = ceil(center - 2.0 * ratio - 0.5);
+    let hi = floor(center + 2.0 * ratio - 0.5);
+    var sum = vec3f(0.0);
+    var total = 0.0;
+    for (var y = lo.y; y <= hi.y; y += 2.0) {
+        let y0 = bspline_weight((y + 0.5 - center.y) / ratio.y);
+        let y1 = bspline_weight((y + 1.5 - center.y) / ratio.y);
+        let wy = y0 + y1;
+        for (var x = lo.x; x <= hi.x; x += 2.0) {
+            let x0 = bspline_weight((x + 0.5 - center.x) / ratio.x);
+            let x1 = bspline_weight((x + 1.5 - center.x) / ratio.x);
+            let w = (x0 + x1) * wy;
+            if (w > 0.0) {
+                let p = vec2f(x + 0.5 + x1 / (x0 + x1), y + 0.5 + y1 / wy);
+                sum += textureSampleLevel(input_texture, input_sampler, p / size, 0.0).rgb * w;
+                total += w;
+            }
+        }
+    }
+
+    return vec4f(sum / max(total, 1e-5), 1.0);
 }
 
 @fragment fn upsample(v: FullscreenOut) -> @location(0) vec4f {
@@ -109,6 +233,6 @@ fn tent(t: texture_2d<f32>, uv: vec2f) -> vec3f {
 
 @fragment fn composite(v: FullscreenOut) -> @location(0) vec4f {
     let src = textureSampleLevel(input_texture, input_sampler, v.uv, 0.0);
-    let glow = tent(aux_texture, v.uv) * bloom.params.y;
+    let glow = bspline(aux_texture, v.uv) * bloom.params.y;
     return vec4f(src.rgb + glow, src.a);
 }

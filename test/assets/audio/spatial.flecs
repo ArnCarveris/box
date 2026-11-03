@@ -1,0 +1,29 @@
+// A spatial scene for the Script suite of test/cpu/audio: an AudioListener at the origin that
+// looks down -Z, so +X is to its right, a looping hum of 0.5 at x 4 and a click that
+// box.audio.play_at plays once at x -3. Neither falls off with distance (rolloff 0), so they
+// pan fully: the hum reads 0.5 sqrt(2) = 0.7071 on the right and the click 0.4 sqrt(2) =
+// 0.5657 on the left during its first 0.2 seconds, and 0 once it ended.
+using box.transform
+using box.audio
+
+ears {
+  Position: {0, 0, 0}
+  AudioListener
+}
+
+hum {
+  AudioPcm: {samples: [0.5, 0.5, 0.5, 0.5]}
+}
+
+click {
+  AudioPcm: {samples: [0.4, 0.4, 0.4], sample_rate: 10}
+  AudioSpatial: {rolloff: 0}
+}
+
+hum_source {
+  Position: {4, 0, 0}
+  AudioSource: {sound: hum, loop: true}
+  AudioSpatial: {min_distance: 1, max_distance: 50, rolloff: 0}
+}
+
+const played: bool = box.audio.play_at(click, {-3, 0, 0}, 1.0)

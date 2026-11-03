@@ -122,6 +122,7 @@ static void box_audio_reset(
     state->settings_sent = false;
     state->order_dirty = true;
     state->voices_stolen = 0;
+    state->spatial_dirty = true;
     if (state->capture.path && state->capture.serial) {
         ecs_err("box.audio: the output changed, the capture of '%s' is dropped",
             state->capture.path);
@@ -191,6 +192,7 @@ static void box_audio_events(
 
                 if (v) {
                     ecs_map_remove(&state->voices, e->id);
+                    state->spatial_dirty = true;
                 }
 
                 AudioVoice *voice = src && ecs_is_alive(world, src) ?
@@ -461,6 +463,7 @@ static void box_audio_compile(
         state->order[i] = order[i];
     }
 
+    state->spatial_dirty = true;
     routes[count] = (box_audio_route_t){ 0, BOX_AUDIO_BUS_NONE, BOX_AUDIO_BUS_NONE, 0 };
     state->order[count] = 0;
     state->order_count = count + 1;
@@ -731,6 +734,7 @@ static void box_audio_sounds(
             s[i].id = box_audio_sound_send(state, t, ecs_vec_first_t(&pcm[i].samples, float),
                 frames, channels, pcm[i].sample_rate);
             s[i].serial = state->serial;
+            state->spatial_dirty |= s[i].id != 0;
         }
     }
 
@@ -743,6 +747,7 @@ static void box_audio_sounds(
         sample->id = box_audio_sound_send(state, t, sample->data, sample->frames,
             sample->channels, sample->sample_rate);
         sample->serial = state->serial;
+        state->spatial_dirty |= sample->id != 0;
     }
 
     box_audio_synths(world, state);
@@ -805,7 +810,55 @@ static uint8_t box_audio_sound_bus(
     return out ? box_audio_bus_of(world, state, out->bus) : 0;
 }
 
+/** The pitch ratio the core plays at.
+ *
+ * @param pitch The pitch of a source
+ * @return The pitch, clamped as the core clamps it
+ */
+static double box_audio_pitch_of(
+    float pitch)
+{
+    return pitch > BOX_AUDIO_PITCH_MIN ?
+        (pitch < BOX_AUDIO_PITCH_MAX ? pitch : BOX_AUDIO_PITCH_MAX) : BOX_AUDIO_PITCH_MIN;
+}
+
+/** Get the position of a parked voice in frames of its sound: where it would play now had it
+ * kept its voice.
+ *
+ * @param world The world
+ * @param state The state
+ * @param sound The sound entity
+ * @param v What was sent for the source
+ * @return The position, wrapped into the sound
+ */
+static float box_audio_resume_position(
+    ecs_world_t *world,
+    const box_audio_module_t *state,
+    ecs_entity_t sound,
+    const AudioVoice *v)
+{
+    const box_audio_sample_t *sample = box_audio_sample_of(world, sound);
+    const AudioPcm *pcm = sample ? NULL : ecs_get(world, sound, AudioPcm);
+    int32_t channels = pcm && pcm->channels ? pcm->channels : 1;
+    double frames = sample ? (double)sample->frames :
+        pcm ? (double)(ecs_vec_count(&pcm->samples) / channels) : 0;
+    double rate = sample && sample->sample_rate > 0 ? sample->sample_rate :
+        pcm && pcm->sample_rate > 0 ? pcm->sample_rate : state->rate;
+    double result = (state->time - v->origin) * box_audio_pitch_of(v->pitch) * rate;
+    if (frames > 0 && result > 0) {
+        result = fmod(result, frames);
+    } else {
+        result = 0;
+    }
+
+    return (float)result;
+}
+
 /** Start, stop and update the voice of a source.
+ *
+ * A new pitch moves the origin so the source keeps its place in time. A looping spatial source
+ * out of range gives its voice back while the time of its sound runs on, and starts at that
+ * place when it comes back; one that does not loop does not start out of range.
  *
  * @param world The world
  * @param state The state
@@ -815,6 +868,7 @@ static uint8_t box_audio_sound_bus(
  * @param v What was sent for it
  * @param muted Whether the source is Disabled
  * @param waiting Whether the page waits for a gesture
+ * @param place Gain and pan from the listener of a spatial source, NULL for others
  */
 static void box_audio_source(
     ecs_world_t *world,
@@ -824,19 +878,26 @@ static void box_audio_source(
     const AudioOutput *out,
     AudioVoice *v,
     bool muted,
-    bool waiting)
+    bool waiting,
+    const box_audio_place_t *place)
 {
     uint32_t sound = src->playing ? box_audio_sound_of(world, state, src->sound) : 0;
-    float volume = muted ? 0.0f : src->volume;
+    float volume = muted ? 0.0f : src->volume * (place ? place->gain : 1.0f);
+    float pan = place ? place->pan : 0.0f;
+    bool away = place && !(place->gain > 0), resume;
     uint8_t bus;
     if (v->serial != state->serial) {
         *v = (AudioVoice){ .serial = state->serial };
     }
 
-    if (v->handle && (!sound || v->sound != sound || v->loop != src->loop)) {
-        box_audio_stop(state, v->handle);
-        ecs_map_remove(&state->voices, v->handle);
-        v->handle = 0;
+    if ((v->handle || v->parked) && (!sound || v->sound != sound || v->loop != src->loop)) {
+        if (v->handle) {
+            box_audio_stop(state, v->handle);
+            ecs_map_remove(&state->voices, v->handle);
+            v->handle = 0;
+        }
+
+        v->parked = false;
     }
 
     if (!sound && src->playing && !src->loop && box_audio_sound_loading(world, src->sound)) {
@@ -845,6 +906,39 @@ static void box_audio_source(
     }
 
     if (!sound) {
+        goto done;
+    }
+
+    if (v->pitch != src->pitch && (v->handle || v->parked)) {
+        double played = (state->time - v->origin) * box_audio_pitch_of(v->pitch);
+        v->origin = state->time - played / box_audio_pitch_of(src->pitch);
+        if (v->handle) {
+            box_audio_voice_set(state, v->handle, BOX_AUDIO_PARAM_PITCH, src->pitch);
+        }
+
+        v->pitch = src->pitch;
+    }
+
+    if (away && src->loop) {
+        if (v->handle) {
+            box_audio_stop(state, v->handle);
+            ecs_map_remove(&state->voices, v->handle);
+            v->handle = 0;
+            v->parked = true;
+        } else if (!v->parked) {
+            v->parked = true;
+            v->origin = state->time;
+            v->sound = sound;
+            v->loop = true;
+            v->pitch = src->pitch;
+        }
+
+        goto done;
+    }
+
+    if (away && !v->handle) {
+        src->playing = false;
+        state->stats.out_of_range ++;
         goto done;
     }
 
@@ -857,16 +951,28 @@ static void box_audio_source(
             goto done;
         }
 
+        resume = v->parked;
         v->handle = box_audio_new_voice(state);
         v->sound = sound;
         v->loop = src->loop;
         v->volume = volume;
+        v->pan = pan;
         v->pitch = src->pitch;
         v->bus = bus;
+        v->parked = false;
+        if (!resume) {
+            v->origin = state->time;
+        }
+
         ecs_map_insert(&state->voices, v->handle, e);
         if (box_audio_reserve(state)) {
-            box_audio_write_play(&state->writer, v->handle, sound, bus, volume, 0.0f,
+            box_audio_write_play(&state->writer, v->handle, sound, bus, volume, pan,
                 src->pitch, src->loop ? BOX_AUDIO_PLAY_LOOP : 0);
+        }
+
+        if (resume) {
+            box_audio_voice_set(state, v->handle, BOX_AUDIO_PARAM_POSITION,
+                box_audio_resume_position(world, state, src->sound, v));
         }
 
         goto done;
@@ -875,6 +981,11 @@ static void box_audio_source(
     if (v->volume != volume) {
         box_audio_voice_set(state, v->handle, BOX_AUDIO_PARAM_VOLUME, volume);
         v->volume = volume;
+    }
+
+    if (v->pan != pan) {
+        box_audio_voice_set(state, v->handle, BOX_AUDIO_PARAM_PAN, pan);
+        v->pan = pan;
     }
 
     if (v->pitch != src->pitch) {
@@ -911,7 +1022,123 @@ static void box_audio_sources(
         bool muted = ecs_table_has_id(world, it.table, EcsDisabled);
         for (i = 0; i < it.count; i ++) {
             box_audio_source(world, state, it.entities[i], &src[i], out ? &out[i] : NULL,
-                &v[i], muted, waiting);
+                &v[i], muted, waiting, NULL);
+        }
+    }
+}
+
+/** Compute where a spatial source is heard from the listener.
+ *
+ * @param state The state
+ * @param spatial Its distances
+ * @param wt Its world transform, NULL for none
+ * @return The gain and the pan, unity and centered without a listener or a transform
+ */
+static box_audio_place_t box_audio_place(
+    box_audio_module_t *state,
+    const AudioSpatial *spatial,
+    const WorldTransform *wt)
+{
+    box_audio_place_t result = { .gain = 1.0f };
+    state->stats.spatial_updates ++;
+    if (wt && state->listener.entity) {
+        result.gain = box_audio_spatial_gain(spatial, (vec4*)state->listener.m, wt->m[3],
+            &result.pan);
+    }
+
+    return result;
+}
+
+/** Update the voices of the spatial sources whose table changed, every one when the listener
+ * moved or something they depend on changed, and the ones whose static transform moved.
+ *
+ * @param world The world
+ * @param state The state
+ * @param waiting Whether the page waits for a gesture
+ */
+static void box_audio_spatial_sources(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    bool waiting)
+{
+    ecs_iter_t it = ecs_query_iter(world, state->spatial);
+    ecs_entity_t *moved = ecs_vec_first(&state->moved);
+    int32_t i;
+    while (ecs_query_next(&it)) {
+        if (!state->spatial_dirty && !ecs_iter_changed(&it)) {
+            ecs_iter_skip(&it);
+            continue;
+        }
+
+        AudioSource *src = ecs_field(&it, AudioSource, 0);
+        AudioVoice *v = ecs_field(&it, AudioVoice, 1);
+        const AudioSpatial *spatial = ecs_field(&it, AudioSpatial, 2);
+        const WorldTransform *wt = ecs_field(&it, WorldTransform, 3);
+        const AudioOutput *out = ecs_field(&it, AudioOutput, 4);
+        bool muted = ecs_table_has_id(world, it.table, EcsDisabled);
+        for (i = 0; i < it.count; i ++) {
+            box_audio_place_t place = box_audio_place(state, &spatial[i], wt ? &wt[i] : NULL);
+            box_audio_source(world, state, it.entities[i], &src[i], out ? &out[i] : NULL,
+                &v[i], muted, waiting, &place);
+        }
+    }
+
+    for (i = 0; !state->spatial_dirty && i < ecs_vec_count(&state->moved); i ++) {
+        ecs_entity_t e = moved[i];
+        if (!ecs_is_alive(world, e) || ecs_has_id(world, e, EcsPrefab)) {
+            continue;
+        }
+
+        AudioSource *src = ecs_get_mut(world, e, AudioSource);
+        AudioVoice *v = ecs_get_mut(world, e, AudioVoice);
+        const AudioSpatial *spatial = ecs_get(world, e, AudioSpatial);
+        if (!src || !v || !spatial) {
+            continue;
+        }
+
+        bool playing = src->playing;
+        box_audio_place_t place = box_audio_place(state, spatial,
+            ecs_get(world, e, WorldTransform));
+        box_audio_source(world, state, e, src, ecs_get(world, e, AudioOutput), v,
+            ecs_has_id(world, e, EcsDisabled), waiting, &place);
+        if (src->playing != playing) {
+            ecs_modified(world, e, AudioSource);
+        }
+    }
+
+    ecs_vec_clear(&state->moved);
+}
+
+/** Follow the listener with the volume and pan of the one shots of box_audio_play_at.
+ *
+ * @param state The state
+ */
+static void box_audio_spatial_oneshots(
+    box_audio_module_t *state)
+{
+    box_audio_oneshot_t *shots = ecs_vec_first(&state->oneshots);
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&state->oneshots); i ++) {
+        box_audio_oneshot_t *shot = &shots[i];
+        float pan = 0, gain = 1.0f;
+        if (!shot->spatial) {
+            continue;
+        }
+
+        state->stats.spatial_updates ++;
+        if (state->listener.entity) {
+            gain = box_audio_spatial_gain(&shot->distances, (vec4*)state->listener.m,
+                shot->position, &pan);
+        }
+
+        if (shot->sent_volume != shot->volume * gain) {
+            shot->sent_volume = shot->volume * gain;
+            box_audio_voice_set(state, shot->handle, BOX_AUDIO_PARAM_VOLUME, shot->sent_volume);
+        }
+
+        if (shot->sent_pan != pan) {
+            shot->sent_pan = pan;
+            box_audio_voice_set(state, shot->handle, BOX_AUDIO_PARAM_PAN, pan);
         }
     }
 }
@@ -943,6 +1170,8 @@ static void box_audio_queued(
 
     for (i = 0; i < ecs_vec_count(&state->plays); i ++) {
         uint32_t sound = box_audio_sound_of(world, state, plays[i].sound);
+        const AudioSpatial *spatial = NULL;
+        float gain = 1.0f, pan = 0;
         if (!sound) {
             state->stats.not_ready += box_audio_sound_loading(world, plays[i].sound);
             continue;
@@ -953,18 +1182,42 @@ static void box_audio_queued(
             continue;
         }
 
+        if (plays[i].spatial) {
+            spatial = ecs_get(world, plays[i].sound, AudioSpatial);
+            state->stats.spatial_updates ++;
+            if (state->listener.entity) {
+                gain = box_audio_spatial_gain(spatial, (vec4*)state->listener.m,
+                    plays[i].position, &pan);
+            }
+
+            if (!(gain > 0)) {
+                state->stats.out_of_range ++;
+                continue;
+            }
+        }
+
         if (ecs_vec_count(&state->oneshots) >= BOX_AUDIO_ONESHOT_MAX) {
             ecs_vec_remove_ordered_t(&state->oneshots, box_audio_oneshot_t, 0);
         }
 
         box_audio_oneshot_t *shot = ecs_vec_append_t(NULL, &state->oneshots,
             box_audio_oneshot_t);
-        shot->handle = box_audio_new_voice(state);
-        shot->sound = sound;
-        shot->bus = box_audio_sound_bus(world, state, plays[i].sound);
+        *shot = (box_audio_oneshot_t){
+            .handle = box_audio_new_voice(state),
+            .sound = sound,
+            .bus = box_audio_sound_bus(world, state, plays[i].sound),
+            .spatial = plays[i].spatial,
+            .position = { plays[i].position[0], plays[i].position[1], plays[i].position[2] },
+            .distances = spatial ? *spatial :
+                (AudioSpatial){ .min_distance = 1.0f, .max_distance = 50.0f, .rolloff = 1.0f },
+            .volume = plays[i].volume,
+            .sent_volume = plays[i].volume * gain,
+            .sent_pan = pan
+        };
+
         if (box_audio_reserve(state)) {
             box_audio_write_play(&state->writer, shot->handle, sound, shot->bus,
-                plays[i].volume, 0.0f, 1.0f, 0);
+                shot->sent_volume, pan, 1.0f, 0);
         }
     }
 
@@ -1133,7 +1386,8 @@ static void BoxAudioSync(
     box_audio_module_t *state = it->ctx;
     box_audio_transport_t *t = box_audio_output_transport(world);
     uint32_t serial = t ? box_audio_output_serial(world) : 0;
-    bool waiting;
+    box_audio_listener_t listener;
+    bool waiting, listener_moved = false;
     if (serial != state->serial) {
         box_audio_reset(state, serial);
     }
@@ -1143,6 +1397,20 @@ static void BoxAudioSync(
     }
 
     waiting = t && t->state(t) == BOX_AUDIO_STATE_WAITING;
+    if (waiting != state->waiting) {
+        state->waiting = waiting;
+        state->spatial_dirty = true;
+    }
+
+    box_audio_listener_find(world, state, &listener);
+    if (listener.entity != state->listener.entity ||
+        ecs_os_memcmp(listener.m, state->listener.m, ECS_SIZEOF(mat4)))
+    {
+        state->listener = listener;
+        state->spatial_dirty = true;
+        listener_moved = true;
+    }
+
     box_audio_buses(world, state);
     if (state->order_dirty) {
         box_audio_compile(world, state);
@@ -1152,9 +1420,17 @@ static void BoxAudioSync(
         box_audio_settings(world, state);
         box_audio_reverbs(world, state, t);
         box_audio_sounds(world, state, t);
+        state->rate = t->sample_rate;
         box_audio_sources(world, state, waiting);
+        box_audio_spatial_sources(world, state, waiting);
+        if (listener_moved) {
+            box_audio_spatial_oneshots(state);
+        }
+
         box_audio_queued(world, state, waiting);
+        state->spatial_dirty = false;
     } else {
+        ecs_vec_clear(&state->moved);
         ecs_vec_clear(&state->plays);
         ecs_vec_clear(&state->stops);
         ecs_vec_clear(&state->releases);
@@ -1171,6 +1447,7 @@ static void BoxAudioSync(
     state->bus_freed = 0;
     box_audio_status(world, state, t);
     box_audio_capture_update(state, t);
+    state->time += (double)it->delta_time;
 }
 
 /** Free the bus index of a deleted bus; its users go to the master.
@@ -1253,8 +1530,34 @@ static void BoxAudioPcmChange(
         }
     }
 
+    state->spatial_dirty = true;
+
 done:
     return;
+}
+
+/** Remember the spatial sources whose static transform moved, a box_transform_moved_t.
+ *
+ * @param world The world
+ * @param entities The entities
+ * @param count Number of entities
+ * @param ctx The state
+ */
+static void box_audio_on_moved(
+    ecs_world_t *world,
+    const ecs_entity_t *entities,
+    int32_t count,
+    void *ctx)
+{
+    box_audio_module_t *state = ctx;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        if (ecs_has(world, entities[i], AudioSpatial) &&
+            ecs_has(world, entities[i], AudioSource))
+        {
+            ecs_vec_append_t(NULL, &state->moved, ecs_entity_t)[0] = entities[i];
+        }
+    }
 }
 
 void box_audio_sync_init(
@@ -1276,11 +1579,43 @@ void box_audio_sync_init(
         .terms = {
             { .id = ecs_id(AudioSource), .src.id = EcsSelf },
             { .id = ecs_id(AudioVoice), .src.id = EcsSelf },
-            { .id = ecs_id(AudioOutput), .inout = EcsIn, .oper = EcsOptional }
+            { .id = ecs_id(AudioOutput), .inout = EcsIn, .oper = EcsOptional },
+            { .id = ecs_id(AudioSpatial), .src.id = EcsSelf, .oper = EcsNot }
         },
         .flags = EcsQueryMatchDisabled,
         .cache_kind = EcsQueryCacheAuto
     });
+
+    state->spatial = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "AudioSpatialSources" }),
+        .terms = {
+            { .id = ecs_id(AudioSource), .src.id = EcsSelf },
+            { .id = ecs_id(AudioVoice), .src.id = EcsSelf },
+            { .id = ecs_id(AudioSpatial), .inout = EcsIn, .src.id = EcsSelf },
+            { .id = ecs_id(WorldTransform), .inout = EcsIn, .src.id = EcsSelf,
+                .oper = EcsOptional },
+            { .id = ecs_id(AudioOutput), .inout = EcsIn, .oper = EcsOptional }
+        },
+        .flags = EcsQueryMatchDisabled | EcsQueryDetectChanges,
+        .cache_kind = EcsQueryCacheAuto
+    });
+
+    state->listeners = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "AudioListeners" }),
+        .terms = {
+            { .id = ecs_id(WorldTransform), .inout = EcsIn, .src.id = EcsSelf },
+            { .id = AudioListener, .src.id = EcsSelf }
+        },
+        .cache_kind = EcsQueryCacheAuto
+    });
+
+    state->views = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "AudioViews" }),
+        .terms = {{ .id = ecs_id(View), .inout = EcsIn, .src.id = EcsSelf }},
+        .cache_kind = EcsQueryCacheAuto
+    });
+
+    box_transform_on_moved(world, box_audio_on_moved, state, NULL);
 
     state->sounds = ecs_query(world, {
         .entity = ecs_entity(world, { .name = "AudioSounds" }),

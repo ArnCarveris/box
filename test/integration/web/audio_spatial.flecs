@@ -1,0 +1,55 @@
+// The scene of the browser check of spatial audio (audio_spatial.mjs). A looping 440 Hz tone
+// at a peak of 0.25 plays from source, which the check moves from the left of the listener to
+// its right with script_write. No rolloff within 500 units, so only the pan changes. A box
+// turns all the time so every frame draws, which the check counts.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.movement
+using box.surface
+using box.audio
+
+window {
+  Surface: {width: 640, height: 480}
+}
+
+camera {
+  Position: {0, 0, 100}
+  Camera: {ortho: true, ortho_scale: 1}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {10, 12, 20, 255}}}
+}
+
+spinner {
+  Position: {0, 0, 0}
+  Rotation: {0, 0, 0}
+  Box: {120, 120, 120}
+  Rgb: {80, 160, 255}
+  AngularVelocity: {0.4, 0.9, 0}
+}
+
+// The ears, at the origin and not rotated: +x is to the right
+listener {
+  Position: {0, 0, 0}
+  AudioListener
+}
+
+// One period of a sine in 20 samples at 8800 Hz plays at 440 Hz at any rate of the output
+tone {
+  AudioPcm: {
+    samples: [0, 0.0772542, 0.146946, 0.202254, 0.237764, 0.25, 0.237764, 0.202254, 0.146946,
+      0.0772542, 0, -0.0772542, -0.146946, -0.202254, -0.237764, -0.25, -0.237764, -0.202254,
+      -0.146946, -0.0772542],
+    sample_rate: 8800
+  }
+}
+
+source {
+  Position: {-10, 0, 0}
+  AudioSource: {sound: tone, loop: true}
+  AudioSpatial: {min_distance: 1, max_distance: 500, rolloff: 0}
+}

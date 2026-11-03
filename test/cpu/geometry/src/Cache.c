@@ -282,3 +282,166 @@ void Cache_prefab_override_removed(void) {
 
     ecs_fini(world);
 }
+
+void Cache_replace_shape_set_then_remove(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+
+    ecs_entity_t reference = ecs_new(world);
+    ecs_set(world, reference, Sphere, { .segments = 6, .radius = 1 });
+    uint32_t sphere_mesh = ecs_get(world, reference, ShapeMesh)->mesh;
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Box, {1, 1, 1});
+    test_int(box_mesh_cache_count(cache), 2);
+
+    ecs_set(world, e, Sphere, { .segments = 6, .radius = 1 });
+    ecs_remove(world, e, Box);
+
+    test_assert(ecs_has(world, e, Sphere));
+    test_assert(!ecs_has(world, e, Box));
+    const ShapeMesh *sm = ecs_get(world, e, ShapeMesh);
+    test_assert(sm != NULL);
+    test_int(sm->mesh, sphere_mesh);
+    test_int(box_mesh_cache_count(cache), 1);
+
+    ecs_fini(world);
+}
+
+void Cache_replace_shape_remove_then_set(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+
+    ecs_entity_t reference = ecs_new(world);
+    ecs_set(world, reference, Sphere, { .segments = 6, .radius = 1 });
+    uint32_t sphere_mesh = ecs_get(world, reference, ShapeMesh)->mesh;
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Box, {1, 1, 1});
+    test_int(box_mesh_cache_count(cache), 2);
+
+    ecs_remove(world, e, Box);
+    ecs_set(world, e, Sphere, { .segments = 6, .radius = 1 });
+
+    test_assert(ecs_has(world, e, Sphere));
+    test_assert(!ecs_has(world, e, Box));
+    const ShapeMesh *sm = ecs_get(world, e, ShapeMesh);
+    test_assert(sm != NULL);
+    test_int(sm->mesh, sphere_mesh);
+    test_int(box_mesh_cache_count(cache), 1);
+
+    ecs_fini(world);
+}
+
+void Cache_replace_shape_deferred_set_then_remove(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+
+    ecs_entity_t reference = ecs_new(world);
+    ecs_set(world, reference, Sphere, { .segments = 6, .radius = 1 });
+    uint32_t sphere_mesh = ecs_get(world, reference, ShapeMesh)->mesh;
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Box, {1, 1, 1});
+    test_int(box_mesh_cache_count(cache), 2);
+
+    ecs_readonly_begin(world, false);
+    ecs_world_t *stage = ecs_get_stage(world, 0);
+    ecs_set(stage, e, Sphere, { .segments = 6, .radius = 1 });
+    ecs_remove(stage, e, Box);
+    ecs_readonly_end(world);
+
+    test_assert(ecs_has(world, e, Sphere));
+    test_assert(!ecs_has(world, e, Box));
+    const ShapeMesh *sm = ecs_get(world, e, ShapeMesh);
+    test_assert(sm != NULL);
+    test_int(sm->mesh, sphere_mesh);
+    test_int(box_mesh_cache_count(cache), 1);
+
+    ecs_fini(world);
+}
+
+void Cache_replace_shape_deferred_remove_then_set(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+
+    ecs_entity_t reference = ecs_new(world);
+    ecs_set(world, reference, Sphere, { .segments = 6, .radius = 1 });
+    uint32_t sphere_mesh = ecs_get(world, reference, ShapeMesh)->mesh;
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Box, {1, 1, 1});
+    test_int(box_mesh_cache_count(cache), 2);
+
+    ecs_readonly_begin(world, false);
+    ecs_world_t *stage = ecs_get_stage(world, 0);
+    ecs_remove(stage, e, Box);
+    ecs_set(stage, e, Sphere, { .segments = 6, .radius = 1 });
+    ecs_readonly_end(world);
+
+    test_assert(ecs_has(world, e, Sphere));
+    test_assert(!ecs_has(world, e, Box));
+    const ShapeMesh *sm = ecs_get(world, e, ShapeMesh);
+    test_assert(sm != NULL);
+    test_int(sm->mesh, sphere_mesh);
+    test_int(box_mesh_cache_count(cache), 1);
+
+    ecs_fini(world);
+}
+
+void Cache_replace_shape_template_branch(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+
+    ecs_entity_t reference = ecs_new(world);
+    ecs_set(world, reference, Sphere, { .segments = 6, .radius = 1 });
+    uint32_t sphere_mesh = ecs_get(world, reference, ShapeMesh)->mesh;
+
+    test_int(ecs_script_run(world, "replace_shape_template_branch",
+        "using box.geometry\n"
+        "template Picker {\n"
+        "  mut kind: i32 = 0\n"
+        "  shape {\n"
+        "    if kind == 1 {\n"
+        "      Sphere: {segments: 6, radius: 1}\n"
+        "    } else {\n"
+        "      Box: {1, 1, 1}\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "picker {\n"
+        "  Picker: {}\n"
+        "}\n", NULL), 0);
+    ecs_progress(world, 0);
+
+    ecs_entity_t shape = ecs_lookup(world, "picker.shape");
+    test_assert(shape != 0);
+    test_assert(ecs_has(world, shape, Box));
+    test_assert(ecs_has(world, shape, ShapeMesh));
+
+    ecs_entity_t mut_type = ecs_lookup(world, "Picker.mut");
+    test_assert(mut_type != 0);
+    ecs_entity_t picker = ecs_lookup(world, "picker");
+    int32_t kind = 1;
+    ecs_set_id(world, picker, mut_type, sizeof(int32_t), &kind);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    test_assert(ecs_has(world, shape, Sphere));
+    test_assert(!ecs_has(world, shape, Box));
+    const ShapeMesh *sm = ecs_get(world, shape, ShapeMesh);
+    test_assert(sm != NULL);
+    test_int(sm->mesh, sphere_mesh);
+
+    ecs_fini(world);
+}

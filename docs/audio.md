@@ -38,7 +38,7 @@ start of the next render block. They are:
 |---------|--------|
 | `PLAY` | voice handle, sound, bus, volume, pan, pitch, flags (`BOX_AUDIO_PLAY_LOOP`) |
 | `STOP` | voice handle: the voice fades out over the ramp and ends |
-| `VOICE_SET` | voice handle, `VOLUME`, `PAN`, `PITCH` or `BUS`, value |
+| `VOICE_SET` | voice handle, `VOLUME`, `PAN`, `PITCH`, `BUS` or `POSITION`, value |
 | `BUS_SET` | bus, `VOLUME`, `PAN`, `MUTE` or `SEND` (the send level), value |
 | `ORDER` | count, then per bus in processing order: bus, output, send |
 | `SOUND_RELEASE` | sound: freed once no voice plays it |
@@ -47,7 +47,10 @@ start of the next render block. They are:
 
 The sender picks the voice handles, so it addresses a voice without waiting for a reply. Values
 are clamped (volumes and send levels to 0..4, pans to -1..1, pitches to 1/64..16) and a NaN
-becomes the low end.
+becomes the low end. `POSITION` moves the read position of a voice at once, in frames of its
+sound: a looping sound wraps it and one that does not loop clamps it to its end, and a NaN, a
+negative or a huge position is 0. Sent in the batch of the `PLAY`, it starts the voice there,
+which is how `box.audio` brings a looping spatial source back in time.
 
 **Sound memory belongs to the side that runs the core.** `box_audio_core_sound` gives the core
 an id, a pointer in the core's own address space, a frame count, the channels (1, or 2
@@ -576,7 +579,12 @@ frame, the same on every platform.
 | `Reverb` | A reverb on the bus of the entity: `decay` (1.5 s), `damping` (0.5), `predelay` (0.02 s), `size` (0.5), `mix` (1) |
 | `AudioOutput` | The bus a source, or a sound by default, plays on |
 | `AudioSource` | A sound that plays while the entity exists: `sound`, `volume` (1), `pitch` (1), `loop`, `playing` (true) |
+<<<<<<< HEAD
 | `SynthSound` | A sound made by the synth from its layers, see [Synth sounds](#synth-sounds) |
+=======
+| `AudioSpatial` | Places a source in the world: `min_distance` (1), `max_distance` (50), `rolloff` (1), see [Spatial audio](#spatial-audio) |
+| `AudioListener` | Tag of the entity whose `WorldTransform` hears the spatial sources |
+>>>>>>> 32d0d7896c24f47815eadce65be0c3c9b86e49e8
 | `AudioSettings` | Singleton: `master_volume` (1) and `mute` |
 | `AudioStatus` | Singleton, read only: `state`, `sample_rate`, `voices`, `voices_stolen`, `load`, `buses` |
 
@@ -593,15 +601,18 @@ const played: bool = box.audio.play(click, 0.8)
 
 `box_audio_play(world, sound, volume)`, in scripts `box.audio.play(sound, volume)`, plays a
 sound once on the bus of its `AudioOutput`, without an entity per play; there is no control of a
-voice after it started. `box_audio_capture(world, seconds, path)`, in scripts
+voice after it started. `box_audio_play_at(world, sound, position, volume)`, in scripts
+`box.audio.play_at(sound, {x, y, z}, volume)`, plays it once at a place in the world (see
+[Spatial audio](#spatial-audio)). `box_audio_capture(world, seconds, path)`, in scripts
 `box.audio.capture(seconds, path)`, records the master output to a WAV file.
 
 **One batch per frame.** The system `AudioSync` runs in `PreStore`, after the transforms and
 before the output renders in `OnStore`. It remembers what it sent and writes a command only for
 what differs, all into one batch, and sends nothing in a frame without changes. Its order:
-the events of the output (ended voices, steals, freed sounds), the buses, the order, the master
-settings, new sounds, the sources, then the plays, the stops of deleted sources and the releases
-of sounds. A world without audio components pays the empty queries.
+the events of the output (ended voices, steals, freed sounds), the listener, the buses, the
+order, the master settings, new sounds, the sources, the spatial sources and the one shots of
+`play_at` when the listener moved, then the plays, the stops of deleted sources and the
+releases of sounds. A world without audio components pays the empty queries.
 
 **Buses** get an index of the core, up to 31 besides the master; more log one error and are
 silent. The order is compiled whenever a bus appears, disappears or changes its output or send:
@@ -636,6 +647,81 @@ copy of `AudioSource` and play on their own, as `ParticleEmitter` instances do.
 **Sounds** are sent to the output once, with an id of the core; a change of `AudioPcm` releases
 the old id and sends the new samples, and a deleted sound is released, freed by the side that
 owns the frames once no voice plays it.
+
+### Spatial audio
+
+`src/audio/spatial.c` places sounds in the world with a simple model: a sound gets quieter with
+its distance from the listener and pans with its direction. There is no Doppler, no distance
+filter, no occlusion and no HRTF yet. All of it runs in `AudioSync` on the main thread, which
+sends the result as the volume and the pan of the voice, so the core knows nothing of it and the
+web plays as native does.
+
+```
+ears { Position: {0, 1.7, 0}  AudioListener }
+engine {
+  Position: {4, 0, -10}
+  AudioSource: {sound: hum, loop: true}
+  AudioSpatial: {min_distance: 2, max_distance: 40}
+}
+const shot: bool = box.audio.play_at(bang, {-3, 0, -5}, 1.0)
+```
+
+**The listener** is the entity with `AudioListener` and a `WorldTransform`. Without one it is the
+camera of the first enabled `View` that has a camera with a `WorldTransform`, first in render
+order (`box_view_compare`), so a game view listens before the overlays of the editor and the
+console. Several `AudioListener` entities use the one with the lowest id and log one warning,
+`box.audio: <n> entities have AudioListener, '<path>' listens`, again only after the count
+dropped to one. To make a character listen while the camera follows it, tag the character,
+or a child at the height of its head; to make the camera listen, give it nothing. Without a
+listener a spatial source plays centered at full volume, beyond `max_distance` too, and nothing
+is logged.
+
+**A source** is an `AudioSource` with `AudioSpatial`. With a `WorldTransform` it is heard at the
+translation of that transform, which is the world position of the entity: a child of a moving
+parent follows the parent, ChildOf or `Parent` alike, its own `Position` an offset in the space
+of the parent; the rotation and scale of the source do not matter. A source with `AudioSpatial`
+and no `WorldTransform` plays as one without it. On a sound entity, `AudioSpatial` gives the
+distances of the plays of `box_audio_play_at`, the defaults without one. A one shot of
+`play_at` stays at the position it started at, while the listener moves.
+
+**Distance.** Within `min_distance` the gain is 1. Beyond it the gain is the inverse distance
+`g(d) = min / (min + rolloff (d - min))`, faded so that it reaches exactly 0 at `max_distance`:
+`(g(d) - g(max)) / (1 - g(max))`. A `rolloff` of 0 keeps full volume up to `max_distance` and is
+silent from there. A `min_distance` of 0 counts as 0.001. The volume of the voice is the
+`volume` of the source times this gain.
+
+**Pan.** The pan is the component of the direction to the source along the right axis of the
+listener (the first column of its `WorldTransform`, its +X), over the distance: 1 straight to the
+right, -1 to the left, 0 in front, behind, above and below. The core turns it into equal power
+gains. **Front and back sound alike** in this version: a source behind the listener is as loud as
+the same source in front. Within `min_distance` the pan narrows to the center (the component is
+divided by `min_distance` instead of the distance), so a source at the listener's position is
+centered, with no division by zero, and one that passes through the listener sweeps across
+instead of jumping from side to side.
+
+**Out of range.** A looping source at or beyond `max_distance` uses no voice: the module stops
+it, with the fade of a stop, and keeps the time of the sound running on the main thread from the
+time it started, at its pitch. Back in range it starts a new voice with a `POSITION` where the
+sound would be had it kept playing. A source that does not loop and a `play_at` beyond
+`max_distance` do not start (the source's `playing` goes false); a source that does not loop and
+leaves the range while it plays keeps its voice, silent, until it ends.
+
+**Smoothing.** The gain and the pan are computed once per frame, after the transforms, and the
+ramps of the core move the voice to them over 5 ms, so a fast source or a camera that jumps does
+not click. During a stall on the web no command arrives and the voice holds the last target and
+keeps playing.
+
+**Cost.** The spatial sources have a query of their own with change detection: a frame updates
+the sources of the tables that changed (a new source, a changed `AudioSource` or `AudioSpatial`,
+a dynamic transform, which its systems write every frame) and the sources whose static
+transform moved, which box.transform reports (`box_transform_on_moved`). When the listener moves,
+or the output, the sounds, the buses or the gesture state change, every spatial source and every
+`play_at` one shot that still plays is updated. A frame allocates nothing once its vectors have
+grown. `bench/audio` (`Spatial`) runs 1000 looping sources, 32 of them in range, with a still
+listener, a moving listener and 10 moving sources, against the same world without sources.
+
+**Disabled** works as for other sources: a Disabled spatial source keeps its voice at volume 0,
+or none when it is out of range.
 
 ### Sound files
 
@@ -721,8 +807,11 @@ Headless with a fixed `--delta-time`, two runs write identical captures, which i
 tests inspect audio and how a render can be listened to. `box.perf` reports the largest load of
 a run as `PerfStatus.audio_load` and `audio_load` in its report.
 
-The tests are `Module`, `Source`, `Script` and `Capture` in `test/cpu/audio`, through the null
-transport; `test/integration/e2e/audio.py` drives the command on a headless app, and
+The tests are `Module`, `Source`, `Script`, `Capture` and `Spatial` in `test/cpu/audio`,
+through the null transport; `test/integration/e2e/audio.py` drives the command on a headless
+app, `test/integration/web/audio_spatial.mjs` moves a source from the left of the listener to
+its right in Chrome and measures both channels with `test/integration/web/audio_spatial.flecs`,
+and
 `test/integration/web/audio_module.mjs` checks the gesture, the levels, a hidden page, a capture
 and a stall in Chrome with `test/integration/web/audio_module.flecs`:
 

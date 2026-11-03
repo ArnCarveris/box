@@ -29,6 +29,9 @@ extern int32_t audio_tap_count;
 extern int32_t audio_log_errors;
 extern char audio_log_last[1024];
 
+/** Warnings logged while a capture of the log runs */
+extern int32_t audio_log_warnings;
+
 /** Append rendered frames to the tap, a box_audio_output_t.
  *
  * @param left Left channel
@@ -117,6 +120,14 @@ ecs_entity_t audio_bus(
     ecs_entity_t output,
     float volume);
 
+/** Mean of the right channel of the tap over the last frames.
+ *
+ * @param frames Number of frames
+ * @return The mean
+ */
+float audio_level_right(
+    int32_t frames);
+
 /** Mean of the left channel of the tap over the last frames.
  *
  * @param frames Number of frames
@@ -135,7 +146,7 @@ int32_t audio_position(
     ecs_world_t *world,
     ecs_entity_t bus);
 
-/** Start to count the errors that are logged, without printing them.
+/** Start to count the errors and warnings that are logged, without printing them.
  */
 void audio_log_start(void);
 

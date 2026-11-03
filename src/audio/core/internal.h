@@ -424,6 +424,18 @@ void box_audio_source_pitch(
     box_audio_source_t *source,
     float pitch);
 
+/** Move the read position of a source, for kinds that have one. A looping sound wraps the
+ * position, one that does not loop clamps it to its end; a NaN or a negative position is 0.
+ *
+ * @param core The core
+ * @param source The source
+ * @param position Position in frames of the sound
+ */
+void box_audio_source_seek(
+    box_audio_core_t *core,
+    box_audio_source_t *source,
+    float position);
+
 /** Render a block of a source into core->src_l and, when stereo, core->src_r.
  *
  * @param core The core

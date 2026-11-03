@@ -87,6 +87,26 @@ void Script_play_function(void) {
     ecs_fini(world);
 }
 
+void Script_spatial_scene(void) {
+    // audio/script
+    ecs_world_t *world = audio_world();
+    char *code = script_read("test/assets/audio/spatial.flecs");
+    test_assert(ecs_script_run(world, "spatial", code, NULL) == 0);
+    ecs_os_free(code);
+    test_assert(ecs_lookup(world, "ears") != 0);
+    test_flt(ecs_get(world, ecs_lookup(world, "click"), AudioSpatial)->max_distance, 50.0f);
+
+    audio_run(world, 6);
+    test_assert(fabsf(audio_level(AUDIO_FRAME / 2) - 0.5657f) < 1e-3f);
+    test_assert(fabsf(audio_level_right(AUDIO_FRAME / 2) - 0.7071f) < 1e-3f);
+
+    audio_run(world, 20);
+    test_assert(fabsf(audio_level(AUDIO_FRAME / 2)) < 1e-4f);
+    test_assert(fabsf(audio_level_right(AUDIO_FRAME / 2) - 0.7071f) < 1e-3f);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 1);
+    ecs_fini(world);
+}
+
 void Script_reverb_hall(void) {
     // audio/script
     ecs_world_t *world = audio_world();

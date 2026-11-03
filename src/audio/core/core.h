@@ -110,7 +110,9 @@ typedef enum box_audio_param_t {
     BOX_AUDIO_PARAM_PITCH = 2,   /**< Pitch ratio of a voice */
     BOX_AUDIO_PARAM_BUS = 3,     /**< Bus a voice plays into */
     BOX_AUDIO_PARAM_MUTE = 4,    /**< Mute of a bus, nonzero mutes, ramped */
-    BOX_AUDIO_PARAM_SEND = 5     /**< Level of the send of a bus, 0..BOX_AUDIO_VOLUME_MAX */
+    BOX_AUDIO_PARAM_SEND = 5,    /**< Level of the send of a bus, 0..BOX_AUDIO_VOLUME_MAX */
+    BOX_AUDIO_PARAM_POSITION = 6 /**< Read position of a voice in frames of its sound, wrapped
+                                  *   into a looping sound, at once */
 } box_audio_param_t;
 
 /** Flags of BOX_AUDIO_CMD_PLAY */
