@@ -1,0 +1,21 @@
+{
+    "id": "boxweb",
+    "type": "application",
+    "value": {
+        "use": ["box"]
+    },
+    "lang.c": {
+        "${os Emscripten}": {
+            "embed": [
+                "../../etc/shaders",
+                "../../etc/fonts",
+                "../../etc/luts",
+                "../../etc/environments",
+                "../../etc/assets",
+                "../../etc/fps",
+                "../../etc/editor"
+            ],
+            "ldflags": ["-sEXPORTED_RUNTIME_METHODS=cwrap,FS"]
+        }
+    }
+}

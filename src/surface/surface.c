@@ -229,8 +229,8 @@ static void box_surface_ctor(
 
 /** Give a surface its target handle and, unless it renders offscreen, its window.
  *
- * Without glfw (the browser) the canvas is the window and box_window_new returns NULL, which is
- * not a failure, so only glfw warns when it cannot open a window.
+ * In the browser the canvas is the window; box_window_new returns NULL without a canvas (node),
+ * which is not a failure, so only glfw warns when it cannot open a window.
  *
  * @param world The world
  * @param e The surface entity

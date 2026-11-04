@@ -141,10 +141,19 @@ void box_audio_host_fini(
         box_audio_host_chunks_free(host, i, host->streams[i].count);
     }
 
-    for (i = 0; i < BOX_AUDIO_REVERB_MAX; i ++) {
-        ecs_os_free(host->reverbs[i]);
-        host->reverbs[i] = NULL;
+    for (i = 0; i < BOX_AUDIO_EFFECT_MAX; i ++) {
+        ecs_os_free(host->effects[i]);
+        host->effects[i] = NULL;
+        host->effect_floats[i] = 0;
     }
+
+    for (i = 0; i < (uint32_t)host->retired_count; i ++) {
+        ecs_os_free(host->retired[i]);
+    }
+
+    ecs_os_free(host->retired);
+    host->retired = NULL;
+    host->retired_count = 0;
 
     ecs_os_free(host->events);
     host->events = NULL;
@@ -176,22 +185,49 @@ done:
     return result;
 }
 
-float* box_audio_host_reverb(
+float* box_audio_host_effect(
     box_audio_host_t *host,
     uint32_t slot,
-    float sample_rate,
-    int32_t *floats)
+    int32_t floats)
 {
     float *result = NULL;
-    if (slot >= BOX_AUDIO_REVERB_MAX || host->reverbs[slot]) {
+    if (slot >= BOX_AUDIO_EFFECT_MAX || floats <= 0 || host->effect_floats[slot] >= floats) {
         goto done;
     }
 
-    *floats = box_audio_reverb_floats(sample_rate);
-    result = ecs_os_calloc_n(float, *floats);
-    host->reverbs[slot] = result;
+    if (host->effects[slot]) {
+        float **retired = ecs_os_realloc_n(host->retired, float*, host->retired_count + 1);
+        if (!retired) {
+            goto done;
+        }
+
+        host->retired = retired;
+    }
+
+    result = ecs_os_calloc_n(float, floats);
+    if (!result) {
+        goto done;
+    }
+
+    if (host->effects[slot]) {
+        host->retired[host->retired_count ++] = host->effects[slot];
+    }
+
+    host->effects[slot] = result;
+    host->effect_floats[slot] = floats;
 done:
     return result;
+}
+
+void box_audio_host_effect_drop(
+    box_audio_host_t *host,
+    uint32_t slot)
+{
+    if (slot < BOX_AUDIO_EFFECT_MAX) {
+        ecs_os_free(host->effects[slot]);
+        host->effects[slot] = NULL;
+        host->effect_floats[slot] = 0;
+    }
 }
 
 void box_audio_host_sound_free(
@@ -425,26 +461,30 @@ done:
     return result;
 }
 
-/** Allocate the delay memory of a reverb slot and give it to the core.
+/** Allocate the memory of an effect slot and give it to the core.
  *
  * @param t The transport
- * @param slot Slot of the reverb
+ * @param slot Slot of the effect
+ * @param floats Floats it needs
  * @return Whether the core has the memory
  */
-static bool box_audio_null_reverb(
+static bool box_audio_null_effect_memory(
     box_audio_transport_t *t,
-    uint32_t slot)
+    uint32_t slot,
+    int32_t floats)
 {
     box_audio_null_t *n = (box_audio_null_t*)t;
-    int32_t floats = 0;
     float *memory;
-    bool result = slot < BOX_AUDIO_REVERB_MAX && n->host.reverbs[slot];
-    if (result || slot >= BOX_AUDIO_REVERB_MAX) {
+    bool result = slot < BOX_AUDIO_EFFECT_MAX && n->host.effect_floats[slot] >= floats;
+    if (result || slot >= BOX_AUDIO_EFFECT_MAX) {
         goto done;
     }
 
-    memory = box_audio_host_reverb(&n->host, slot, t->sample_rate, &floats);
-    result = memory && box_audio_core_reverb_memory(n->core, slot, memory, floats);
+    memory = box_audio_host_effect(&n->host, slot, floats);
+    result = memory && box_audio_core_effect_memory(n->core, slot, memory, floats);
+    if (memory && !result) {
+        box_audio_host_effect_drop(&n->host, slot);
+    }
 done:
     return result;
 }
@@ -646,7 +686,7 @@ box_audio_transport_t* box_audio_transport_null_new(
         .sound = box_audio_null_sound,
         .stream_chunk = box_audio_null_stream_chunk,
         .stream_status = box_audio_null_stream_status,
-        .reverb = box_audio_null_reverb,
+        .effect_memory = box_audio_null_effect_memory,
         .read_events = box_audio_null_read_events,
         .state = box_audio_null_state,
         .update = box_audio_null_update,
@@ -790,7 +830,7 @@ EM_JS(int, box_audio_web_events, (int32_t *events, int max), {
 typedef struct box_audio_webt_t {
     box_audio_transport_t base;  /**< The interface, first */
     int32_t capture;             /**< Frames of the capture that records, 0 for none */
-    uint32_t reverbs;            /**< Reverb slots whose memory was asked for, a bit each */
+    int32_t effects[BOX_AUDIO_EFFECT_MAX]; /**< Floats of memory asked for each effect slot */
 } box_audio_webt_t;
 
 /** Post a batch to the worklet.
@@ -867,21 +907,23 @@ static bool box_audio_webt_stream_chunk(
     return result;
 }
 
-/** Ask the worklet to allocate the delay memory of a reverb slot in the heap of its core.
+/** Ask the worklet to allocate the memory of an effect slot in the heap of its core.
  *
  * @param t The transport
- * @param slot Slot of the reverb
+ * @param slot Slot of the effect
+ * @param floats Floats it needs
  * @return Whether the request was posted
  */
-static bool box_audio_webt_reverb(
+static bool box_audio_webt_effect_memory(
     box_audio_transport_t *t,
-    uint32_t slot)
+    uint32_t slot,
+    int32_t floats)
 {
     box_audio_webt_t *w = (box_audio_webt_t*)t;
-    bool result = slot < BOX_AUDIO_REVERB_MAX;
-    if (result && !(w->reverbs & (1u << slot))) {
-        box_audio_web_reverb(slot);
-        w->reverbs |= 1u << slot;
+    bool result = slot < BOX_AUDIO_EFFECT_MAX && floats > 0;
+    if (result && w->effects[slot] < floats) {
+        box_audio_web_effect(slot, floats);
+        w->effects[slot] = floats;
     }
 
     return result;
@@ -1044,7 +1086,7 @@ box_audio_transport_t* box_audio_transport_web_new(void)
             .sound = box_audio_webt_sound,
             .stream_chunk = box_audio_webt_stream_chunk,
             .stream_status = box_audio_webt_stream_status,
-            .reverb = box_audio_webt_reverb,
+            .effect_memory = box_audio_webt_effect_memory,
             .read_events = box_audio_webt_read_events,
             .state = box_audio_webt_state,
             .update = box_audio_webt_update,

@@ -1,8 +1,14 @@
 /**
  * @file command/cmd_audio.c
+<<<<<<< HEAD
  * @brief The audio command: the status of the audio, its transport, its buses and its
  * instruments, the master volume and mute, play, stop, seek and tempo, and captures of the
  * master output to a WAV.
+=======
+ * @brief The audio command: the status of the audio, its transport, its buses and their insert
+ * slots, the master volume and mute, play, stop, seek and tempo, and captures of the master
+ * output to a WAV resource.
+>>>>>>> c21b46b92f471bd6aba722293015e82a9632c704
  *
  * The actions only write AudioSettings or Transport, which box.audio sends to the core at the
  * end of the frame, as for a change from a script or the REST API. A capture taps the core, so
@@ -73,7 +79,95 @@ static const char* box_cmd_audio_kind(
     return result;
 }
 
-/** Append the line of a bus: its kind, its parameters, its output and its sends.
+/** Tell whether the effect of an insert slot runs, and why not.
+ *
+ * @param world The world
+ * @param channel The bus entity of the slot
+ * @param j Index of the slot
+ * @param e The effect entity
+ * @return "runs", "bypassed" or why it does not run
+ */
+static const char* box_cmd_audio_effect_state(
+    ecs_world_t *world,
+    ecs_entity_t channel,
+    int32_t j,
+    ecs_entity_t e)
+{
+    box_audio_module_t *state = box_audio_module_get(world);
+    const AudioEffectState *es = ecs_get(world, e, AudioEffectState);
+    int32_t slot = box_audio_module_effect_slot(world, e);
+    uint32_t kind = box_audio_module_effect_kind(world, e, NULL);
+    const char *result = "runs";
+    if (!state) {
+        result = "does not run: no output";
+    } else if (es && state->effect_frame && es->frame == state->effect_frame &&
+        (es->channel != channel || es->index != j))
+    {
+        result = "does not run: in another slot";
+    } else if (slot < 0 && es && es->refused) {
+        result = "does not run: every effect of the pool is taken";
+    } else if (!state->serial) {
+        result = "does not run: no output";
+    } else if (slot < 0) {
+        result = "does not run: no slot yet";
+    } else if (ecs_has_id(world, e, EcsDisabled)) {
+        result = "bypassed";
+    } else if (box_audio_effect_floats(kind, state->rate) > 0 &&
+        (state->effects[slot].memory != state->serial ||
+            state->effects[slot].floats < box_audio_effect_floats(kind, state->rate)))
+    {
+        result = "does not run: waits for its memory";
+    }
+
+    return result;
+}
+
+/** Append the insert slots of a bus: each effect with its kind, its parameters and whether it
+ * runs.
+ *
+ * @param world The world
+ * @param buf The output
+ * @param channel The bus entity
+ * @param bus The bus
+ */
+static void box_cmd_audio_effects(
+    ecs_world_t *world,
+    ecs_strbuf_t *buf,
+    ecs_entity_t channel,
+    const AudioBus *bus)
+{
+    int32_t j;
+    for (j = 0; j < BOX_AUDIO_EFFECT_SLOTS; j ++) {
+        ecs_entity_t e = bus->effects[j];
+        const Reverb *reverb;
+        char *path;
+        if (!e) {
+            continue;
+        }
+
+        if (!ecs_is_alive(world, e) ||
+            box_audio_module_effect_kind(world, e, NULL) == BOX_AUDIO_EFFECT_NONE)
+        {
+            ecs_strbuf_append(buf, ", insert %d: no effect", j);
+            continue;
+        }
+
+        path = ecs_get_path(world, e);
+        ecs_strbuf_append(buf, ", insert %d %s: ", j, path);
+        reverb = ecs_get(world, e, Reverb);
+        if (reverb) {
+            ecs_strbuf_append(buf, "reverb decay %.2f damping %.2f predelay %.3f size %.2f "
+                "mix %.2f", (double)reverb->decay, (double)reverb->damping,
+                (double)reverb->predelay, (double)reverb->size, (double)reverb->mix);
+        }
+
+        ecs_strbuf_append(buf, " (%s)", box_cmd_audio_effect_state(world, channel, j, e));
+        ecs_os_free(path);
+    }
+}
+
+/** Append the line of a bus: its kind, its parameters, its output, its sends and its insert
+ * slots.
  *
  * @param world The world
  * @param buf The output
@@ -108,14 +202,7 @@ static void box_cmd_audio_bus(
         }
     }
 
-    const Reverb *reverb = ecs_get(world, e, Reverb);
-    const AudioReverbState *rs = ecs_get(world, e, AudioReverbState);
-    if (reverb) {
-        ecs_strbuf_append(buf, ", reverb decay %.2f damping %.2f predelay %.3f size %.2f "
-            "mix %.2f%s", (double)reverb->decay, (double)reverb->damping,
-            (double)reverb->predelay, (double)reverb->size, (double)reverb->mix,
-            rs && rs->refused ? " (dry, every slot taken)" : "");
-    }
+    box_cmd_audio_effects(world, buf, e, bus);
 
     if (!in_order) {
         ecs_strbuf_appendstr(buf, " (not in the order, silent)");
@@ -261,6 +348,7 @@ static char* box_cmd_audio_print(
     if (mb) {
         ecs_strbuf_append(&buf, ", bus volume %.2f pan %.2f width %.2f%s", (double)mb->volume,
             (double)mb->pan, (double)mb->width, mb->mute ? " muted" : "");
+        box_cmd_audio_effects(world, &buf, master, mb);
     }
 
     for (i = 0; i < count; i ++) {

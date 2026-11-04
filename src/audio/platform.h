@@ -99,12 +99,15 @@ void box_audio_web_fetch_take(
  */
 void box_audio_web_fetch_cancel(
     int32_t id);
-/** Ask the worklet to allocate the delay memory of a reverb slot in the heap of its core, which
- * keeps it as long as the page. Nothing on native builds.
+/** Ask the worklet to allocate the memory of an effect slot in the heap of its core, which
+ * keeps it as long as the page, or larger memory for a slot that has less. Nothing on native
+ * builds.
  *
- * @param slot Slot of the reverb
+ * @param slot Slot of the effect
+ * @param floats Floats the slot needs
  */
-void box_audio_web_reverb(
-    uint32_t slot);
+void box_audio_web_effect(
+    uint32_t slot,
+    int32_t floats);
 
 #endif

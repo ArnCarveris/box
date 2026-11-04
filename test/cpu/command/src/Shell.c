@@ -520,7 +520,8 @@ void Shell_audio_command(void) {
     ecs_entity_t hall = ecs_entity(world, { .name = "hall" });
     ecs_ensure(world, bus, AudioBus)->volume = 0.5f;
     ecs_modified(world, bus, AudioBus);
-    ecs_add(world, hall, AudioBus);
+    ecs_ensure(world, hall, AudioBus)->effects[0] = hall;
+    ecs_modified(world, hall, AudioBus);
     ecs_set(world, hall, Reverb, { .decay = 2.4f, .damping = 0.4f, .predelay = 0.02f,
         .size = 0.5f, .mix = 1 });
     ecs_progress(world, 0.016f);
@@ -532,7 +533,8 @@ void Shell_audio_command(void) {
     test_assert(strstr(out, "\nmaster: volume 1.00") != NULL);
     test_assert(strstr(out, "music: group volume 0.50 pan 0.00 width 1.00 -> master") != NULL);
     test_assert(strstr(out, "hall: group volume 1.00 pan 0.00 width 1.00 -> master, "
-        "reverb decay 2.40 damping 0.40 predelay 0.020 size 0.50 mix 1.00") != NULL);
+        "insert 0 hall: reverb decay 2.40 damping 0.40 predelay 0.020 size 0.50 mix 1.00 "
+        "(does not run: no output)") != NULL);
     ecs_os_free(out);
 
     out = box_command_run(world, s, "audio volume 0.25", &error);

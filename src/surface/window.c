@@ -253,6 +253,118 @@ bool box_window_closed(
     return glfwWindowShouldClose(window->window) != 0;
 }
 
+#elif defined(__EMSCRIPTEN__)
+
+#include <emscripten/emscripten.h>
+
+struct box_window_t {
+    ecs_entity_t surface;
+};
+
+EM_JS(bool, box_window_canvas, (int32_t *out), {
+    var c = typeof document !== 'undefined' ? document.querySelector('#canvas') : null;
+    if (!c) {
+        return false;
+    }
+    var ratio = window.devicePixelRatio || 1;
+    var w = c.clientWidth;
+    var h = c.clientHeight;
+    HEAP32[out >> 2] = w;
+    HEAP32[(out >> 2) + 1] = h;
+    HEAP32[(out >> 2) + 2] = Math.round(w * ratio);
+    HEAP32[(out >> 2) + 3] = Math.round(h * ratio);
+    return true;
+});
+
+box_window_t* box_window_new(
+    ecs_world_t *world,
+    ecs_entity_t surface,
+    int32_t width,
+    int32_t height,
+    const char *title)
+{
+    int32_t size[4];
+    box_window_t *result = NULL;
+    (void)width;
+    (void)height;
+    (void)title;
+    box_input_web_attach(ECS_CONST_CAST(ecs_world_t*, ecs_get_world(world)), surface);
+    if (box_window_canvas(size)) {
+        result = ecs_os_calloc_t(box_window_t);
+        result->surface = surface;
+    }
+
+    return result;
+}
+
+void box_window_free(
+    box_window_t *window)
+{
+    ecs_os_free(window);
+}
+
+void box_window_poll(void)
+{
+}
+
+void box_window_size(
+    box_window_t *window,
+    int32_t *width,
+    int32_t *height)
+{
+    int32_t size[4] = {0};
+    (void)window;
+    box_window_canvas(size);
+    *width = size[2];
+    *height = size[3];
+}
+
+void box_window_points(
+    box_window_t *window,
+    int32_t *width,
+    int32_t *height)
+{
+    int32_t size[4] = {0};
+    (void)window;
+    box_window_canvas(size);
+    *width = size[0];
+    *height = size[1];
+}
+
+void box_window_resize(
+    box_window_t *window,
+    int32_t width,
+    int32_t height)
+{
+    (void)window;
+    (void)width;
+    (void)height;
+}
+
+void* box_window_layer(
+    box_window_t *window)
+{
+    (void)window;
+
+    return NULL;
+}
+
+float box_window_refresh(
+    box_window_t *window)
+{
+    (void)window;
+
+    return 0;
+}
+
+bool box_window_closed(
+    box_window_t *window)
+{
+    (void)window;
+
+    return false;
+}
+
 #else
 
 box_window_t* box_window_new(

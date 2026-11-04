@@ -135,9 +135,10 @@ void Script_reverb_hall(void) {
     test_flt(ecs_vec_first_t(&room_bus->sends, AudioSend)[0].level, 0.3f);
     test_bool(ecs_vec_first_t(&room_bus->sends, AudioSend)[0].pre_fader, false);
     test_int(ecs_get(world, hall, AudioBus)->output, ecs_lookup(world, "box.audio.master"));
+    test_assert(ecs_get(world, hall, AudioBus)->effects[0] == hall);
 
     audio_run(world, 30);
-    test_int(box_audio_module_reverb_slot(world, hall), 0);
+    test_int(box_audio_module_effect_slot(world, hall), 0);
     test_assert(audio_position(world, room) < audio_position(world, hall));
     test_assert(audio_peak(audio_tap_l, audio_tap_count - AUDIO_FRAME * 10,
         audio_tap_count) > 0.0001f);

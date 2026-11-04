@@ -1,10 +1,11 @@
 /**
  * @file audio/core/reverb.c
- * @brief The reverb of a bus: a feedback delay network of 8 prime length lines, a Hadamard
- * feedback matrix, a one pole damping filter per line and a predelay line.
+ * @brief The reverb kind of effect: a feedback delay network of 8 prime length lines, a
+ * Hadamard feedback matrix, a one pole damping filter per line and a predelay line.
  *
- * The delay memory comes from the transport. The feedback gain of every line is below 1 and
- * the matrix is orthogonal, so no setting can make the network grow.
+ * The delay memory comes from the transport, as the memory of its effect slot. The feedback
+ * gain of every line is below 1 and the matrix is orthogonal, so no setting can make the
+ * network grow. Its params are a box_audio_reverb_params_t.
  */
 
 #include "internal.h"
@@ -55,9 +56,6 @@ static const float box_audio_reverb_right[BOX_AUDIO_REVERB_LINES] = {
 
 /** Seconds a change of the mix takes */
 #define BOX_AUDIO_REVERB_MIX_RAMP 0.02f
-
-/** Input under this magnitude counts as silence */
-#define BOX_AUDIO_REVERB_FLOOR 1e-9f
 
 /** A tail whose lines sum to less than this, -140 dB, has decayed to silence */
 #define BOX_AUDIO_REVERB_SILENCE 1e-7f
@@ -214,11 +212,12 @@ static void box_audio_reverb_gains(
 
 /** Clear the lines, the filters and the predelay line, as far as they are in use.
  *
- * @param rv The reverb
+ * @param fx The effect
  */
 static void box_audio_reverb_clear(
-    box_audio_reverb_t *rv)
+    box_audio_effect_t *fx)
 {
+    box_audio_reverb_t *rv = &fx->data.reverb;
     int32_t i, k;
     for (i = 0; i < BOX_AUDIO_REVERB_LINES; i ++) {
         for (k = 0; k < rv->length[i]; k ++) {
@@ -234,23 +233,24 @@ static void box_audio_reverb_clear(
     }
 
     rv->pre_pos = 0;
-    rv->quiet = 0;
+    fx->quiet = 0;
     rv->still = 0;
 }
 
-/** Apply the target: the bus, the lengths of the lines for the size, the predelay and the
- * gains, on clear lines. A reverb whose bus went stops.
+/** Apply the target: the lengths of the lines for the size, the predelay and the gains, on
+ * clear lines.
  *
  * @param core The core
- * @param rv The reverb
+ * @param fx The effect
  */
 static void box_audio_reverb_apply(
     box_audio_core_t *core,
-    box_audio_reverb_t *rv)
+    box_audio_effect_t *fx)
 {
+    box_audio_reverb_t *rv = &fx->data.reverb;
     int32_t room[BOX_AUDIO_REVERB_LINES], pre, i, prev = 1;
     float scale = BOX_AUDIO_REVERB_SIZE_MIN + (1 - BOX_AUDIO_REVERB_SIZE_MIN) * rv->target.size;
-    float *at = rv->memory;
+    float *at = fx->memory;
     box_audio_reverb_layout(core->sample_rate, room, &pre);
     rv->pre = at;
     at += pre;
@@ -271,17 +271,14 @@ static void box_audio_reverb_apply(
     rv->pre_length = rv->pre_length < pre ? rv->pre_length : pre;
     rv->size = rv->target.size;
     rv->predelay = rv->target.predelay;
-    rv->bus = rv->target_bus;
     rv->swap = false;
-    rv->attached = rv->bus != BOX_AUDIO_BUS_NONE;
-    box_audio_reverb_clear(rv);
+    box_audio_reverb_clear(fx);
     box_audio_reverb_gains(core, rv);
     for (i = 0; i < BOX_AUDIO_REVERB_LINES; i ++) {
         rv->gain[i] = rv->gain_target[i];
     }
 
     rv->damp = rv->damp_target;
-    rv->idle = true;
     box_audio_ramp_set(&rv->feed, 1);
 }
 
@@ -289,14 +286,15 @@ static void box_audio_reverb_apply(
  * reverb is silent anyway.
  *
  * @param core The core
- * @param rv The reverb
+ * @param fx The effect
  */
 static void box_audio_reverb_swap(
     box_audio_core_t *core,
-    box_audio_reverb_t *rv)
+    box_audio_effect_t *fx)
 {
-    if (rv->idle) {
-        box_audio_reverb_apply(core, rv);
+    box_audio_reverb_t *rv = &fx->data.reverb;
+    if (fx->idle) {
+        box_audio_reverb_apply(core, fx);
         box_audio_ramp_set(&rv->fade, 1);
     } else {
         rv->swap = true;
@@ -305,144 +303,69 @@ static void box_audio_reverb_swap(
     }
 }
 
-void box_audio_reverbs_init(
+/** Clamp the params of an effect into the target of its reverb; NaN becomes the low end.
+ *
+ * @param fx The effect
+ */
+static void box_audio_reverb_target(
+    box_audio_effect_t *fx)
+{
+    box_audio_reverb_t *rv = &fx->data.reverb;
+    const float *p = fx->params;
+    rv->target.decay = box_audio_reverb_clamp(p[0], BOX_AUDIO_REVERB_DECAY_MIN,
+        BOX_AUDIO_REVERB_DECAY_MAX);
+    rv->target.damping = box_audio_reverb_clamp(p[1], 0, 1);
+    rv->target.predelay = box_audio_reverb_clamp(p[2], 0, BOX_AUDIO_REVERB_PREDELAY_MAX);
+    rv->target.size = box_audio_reverb_clamp(p[3], 0, 1);
+    rv->target.mix = box_audio_reverb_clamp(p[4], 0, 1);
+}
+
+void box_audio_reverb_init(
     box_audio_core_t *core)
 {
-    int32_t i;
     core->reverb_smooth = (float)(1 - box_audio_reverb_exp(-(double)BOX_AUDIO_CORE_BLOCK /
         (BOX_AUDIO_REVERB_SMOOTH * (double)core->sample_rate)));
-    for (i = 0; i < BOX_AUDIO_REVERB_MAX; i ++) {
-        box_audio_reverb_t *rv = &core->reverbs[i];
-        rv->bus = BOX_AUDIO_BUS_NONE;
-        rv->target_bus = BOX_AUDIO_BUS_NONE;
-        rv->idle = true;
-        rv->target = (box_audio_reverb_params_t){
-            .decay = 1.5f, .damping = 0.5f, .predelay = 0.02f, .size = 0.5f, .mix = 1.0f };
-        box_audio_ramp_set(&rv->mix, 1);
-        box_audio_ramp_set(&rv->fade, 1);
-    }
 }
 
-bool box_audio_core_reverb_memory(
+void box_audio_reverb_start(
     box_audio_core_t *core,
-    uint32_t slot,
-    float *data,
-    int32_t floats)
+    box_audio_effect_t *fx,
+    bool fade_in)
 {
-    bool result = false;
-    box_audio_reverb_t *rv;
-    if (!core || slot >= BOX_AUDIO_REVERB_MAX || !data ||
-        floats < box_audio_reverb_floats(core->sample_rate) || core->reverbs[slot].memory)
-    {
-        goto done;
+    box_audio_reverb_t *rv = &fx->data.reverb;
+    box_audio_reverb_target(fx);
+    box_audio_reverb_apply(core, fx);
+    box_audio_ramp_set(&rv->fade, 1);
+    box_audio_ramp_set(&rv->mix, rv->target.mix);
+    if (fade_in) {
+        box_audio_ramp_set(&rv->feed, 0);
+        box_audio_ramp_to(&rv->feed, 1,
+            (int32_t)(BOX_AUDIO_REVERB_FADE * 0.5f * core->sample_rate));
     }
-
-    rv = &core->reverbs[slot];
-    rv->memory = data;
-    rv->floats = floats;
-    if (rv->target_bus != BOX_AUDIO_BUS_NONE) {
-        box_audio_reverb_apply(core, rv);
-        box_audio_ramp_set(&rv->fade, 1);
-        box_audio_ramp_set(&rv->mix, rv->target.mix);
-    }
-
-    result = true;
-done:
-    return result;
-}
-
-bool box_audio_core_reverb_running(
-    const box_audio_core_t *core,
-    uint32_t slot)
-{
-    const box_audio_reverb_t *rv = slot < BOX_AUDIO_REVERB_MAX ? &core->reverbs[slot] : NULL;
-
-    return rv && rv->memory && rv->attached && !rv->idle;
 }
 
 void box_audio_reverb_command(
     box_audio_core_t *core,
-    const box_audio_cmd_reverb_t *cmd)
+    box_audio_effect_t *fx)
 {
-    box_audio_reverb_t *rv;
-    const box_audio_reverb_params_t *p = &cmd->params;
-    bool reshape;
+    box_audio_reverb_t *rv = &fx->data.reverb;
     int32_t i;
-    if (cmd->slot >= BOX_AUDIO_REVERB_MAX ||
-        (cmd->bus >= BOX_AUDIO_BUS_MAX && cmd->bus != BOX_AUDIO_BUS_NONE))
-    {
-        box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_REVERB, 0);
-        goto done;
-    }
-
-    rv = &core->reverbs[cmd->slot];
-    rv->target.decay = box_audio_reverb_clamp(p->decay, BOX_AUDIO_REVERB_DECAY_MIN,
-        BOX_AUDIO_REVERB_DECAY_MAX);
-    rv->target.damping = box_audio_reverb_clamp(p->damping, 0, 1);
-    rv->target.predelay = box_audio_reverb_clamp(p->predelay, 0, BOX_AUDIO_REVERB_PREDELAY_MAX);
-    rv->target.size = box_audio_reverb_clamp(p->size, 0, 1);
-    rv->target.mix = box_audio_reverb_clamp(p->mix, 0, 1);
-    rv->target_bus = cmd->bus;
-    if (!rv->memory) {
-        goto done;
-    }
-
-    if (!rv->attached) {
-        if (rv->target_bus != BOX_AUDIO_BUS_NONE) {
-            box_audio_reverb_apply(core, rv);
-            box_audio_ramp_set(&rv->fade, 1);
-            box_audio_ramp_set(&rv->mix, rv->target.mix);
-        }
-
-        goto done;
-    }
-
+    box_audio_reverb_target(fx);
     box_audio_reverb_gains(core, rv);
-    for (i = 0; rv->idle && i < BOX_AUDIO_REVERB_LINES; i ++) {
+    for (i = 0; fx->idle && i < BOX_AUDIO_REVERB_LINES; i ++) {
         rv->gain[i] = rv->gain_target[i];
     }
 
-    rv->damp = rv->idle ? rv->damp_target : rv->damp;
+    rv->damp = fx->idle ? rv->damp_target : rv->damp;
     box_audio_ramp_to(&rv->mix, rv->target.mix,
         (int32_t)(BOX_AUDIO_REVERB_MIX_RAMP * core->sample_rate));
-    reshape = rv->target_bus != rv->bus || rv->target.size != rv->size ||
-        rv->target.predelay != rv->predelay;
-    if (rv->target_bus == BOX_AUDIO_BUS_NONE && rv->bus != BOX_AUDIO_BUS_NONE) {
-        rv->bus = BOX_AUDIO_BUS_NONE;
-        rv->quiet = 0;
-        box_audio_reverb_swap(core, rv);
-    } else if (reshape) {
-        box_audio_reverb_swap(core, rv);
-    } else if (rv->swap && rv->bus != BOX_AUDIO_BUS_NONE) {
+    if (rv->target.size != rv->size || rv->target.predelay != rv->predelay) {
+        box_audio_reverb_swap(core, fx);
+    } else if (rv->swap) {
         rv->swap = false;
         box_audio_ramp_to(&rv->fade, 1,
             (int32_t)(BOX_AUDIO_REVERB_FADE * 0.5f * core->sample_rate));
     }
-
-done:
-    return;
-}
-
-/** Check whether a block of input is silent.
- *
- * @param l Left samples
- * @param r Right samples
- * @param frames Frames of the block
- * @return Whether every sample is under BOX_AUDIO_REVERB_FLOOR
- */
-static bool box_audio_reverb_silent(
-    const float *l,
-    const float *r,
-    int32_t frames)
-{
-    bool result = true;
-    int32_t i;
-    for (i = 0; i < frames && result; i ++) {
-        float a = l[i] < 0 ? -l[i] : l[i], b = r[i] < 0 ? -r[i] : r[i];
-        result = a < BOX_AUDIO_REVERB_FLOOR && b < BOX_AUDIO_REVERB_FLOOR;
-    }
-
-    return result;
 }
 
 /** Move the gains and the pole of the damping a step toward their targets, once per block.
@@ -466,10 +389,9 @@ static void box_audio_reverb_smooth(
 /** Run the network over a block.
  *
  * @param rv The reverb
- * @param l Left samples, the input unless add, and the output
+ * @param l Left samples, the input and the output
  * @param r Right samples
  * @param frames Frames of the block
- * @param add Whether the input is silent and the wet signal adds to the samples
  * @return Frames at the end of the block in which the lines summed under
  * BOX_AUDIO_REVERB_SILENCE
  */
@@ -477,14 +399,13 @@ static int32_t box_audio_reverb_block(
     box_audio_reverb_t *rv,
     float *l,
     float *r,
-    int32_t frames,
-    bool add)
+    int32_t frames)
 {
     float v[BOX_AUDIO_REVERB_LINES], o[BOX_AUDIO_REVERB_LINES], a, b;
     float damp = rv->damp;
     int32_t i, k, h, j, still = 0;
     for (i = 0; i < frames; i ++) {
-        float x = add ? 0.0f : (l[i] + r[i]) * 0.5f * box_audio_ramp_next(&rv->feed);
+        float x = (l[i] + r[i]) * 0.5f * box_audio_ramp_next(&rv->feed);
         float wl = 0, wr = 0, sum = 0, wet, dry;
         if (rv->pre_length) {
             float p = rv->pre[rv->pre_pos];
@@ -524,91 +445,51 @@ static int32_t box_audio_reverb_block(
         wet = box_audio_ramp_next(&rv->mix);
         dry = 1 - wet;
         wet *= box_audio_ramp_next(&rv->fade) * BOX_AUDIO_REVERB_NORM;
-        if (add) {
-            l[i] += wl * wet;
-            r[i] += wr * wet;
-        } else {
-            l[i] = l[i] * dry + wl * wet;
-            r[i] = r[i] * dry + wr * wet;
-        }
+        l[i] = l[i] * dry + wl * wet;
+        r[i] = r[i] * dry + wr * wet;
     }
 
     return still;
 }
 
-/** Run a reverb over a block, or skip it when it is silent and nothing comes in.
- *
- * @param core The core
- * @param rv The reverb
- * @param l Left samples
- * @param r Right samples
- * @param frames Frames of the block
- * @param add Whether the tail fades out and adds to the samples
- */
-static void box_audio_reverb_render(
+bool box_audio_reverb_render(
     box_audio_core_t *core,
-    box_audio_reverb_t *rv,
+    box_audio_effect_t *fx,
     float *l,
     float *r,
     int32_t frames,
-    bool add)
+    bool silent)
 {
-    bool silent = add || box_audio_reverb_silent(l, r, frames);
+    box_audio_reverb_t *rv = &fx->data.reverb;
     int32_t still, longest = rv->length[BOX_AUDIO_REVERB_LINES - 1];
-    if (rv->idle && silent) {
-        if (rv->swap || !rv->attached || add) {
-            box_audio_reverb_apply(core, rv);
-            box_audio_ramp_set(&rv->fade, 1);
-        }
-
-        box_audio_ramp_set(&rv->mix, rv->mix.target);
-        goto done;
-    }
-
-    rv->idle = false;
+    bool result = false;
     box_audio_reverb_smooth(core, rv);
-    still = box_audio_reverb_block(rv, l, r, frames, add);
-    rv->quiet = !silent ? 0 : (rv->quiet < (1 << 30) ? rv->quiet + frames : rv->quiet);
+    still = box_audio_reverb_block(rv, l, r, frames);
     rv->still = still < frames ? still : (rv->still < (1 << 30) ? rv->still + frames : rv->still);
     if (rv->swap && rv->fade.left == 0 && rv->fade.value == 0) {
-        box_audio_reverb_apply(core, rv);
-        box_audio_ramp_to(&rv->fade, rv->attached ? 1.0f : 0.0f,
+        box_audio_reverb_apply(core, fx);
+        box_audio_ramp_to(&rv->fade, 1.0f,
             (int32_t)(BOX_AUDIO_REVERB_FADE * 0.5f * core->sample_rate));
         box_audio_ramp_set(&rv->feed, 0);
         box_audio_ramp_to(&rv->feed, 1,
             (int32_t)(BOX_AUDIO_REVERB_FADE * 0.5f * core->sample_rate));
-        rv->idle = false;
-    } else if (silent && rv->quiet >= rv->pre_length + longest && rv->still >= longest) {
-        box_audio_reverb_clear(rv);
-        rv->idle = true;
-        if (add) {
-            rv->attached = false;
-        }
+    } else if (silent && fx->quiet >= rv->pre_length + longest && rv->still >= longest) {
+        box_audio_reverb_clear(fx);
+        result = true;
     }
 
-done:
-    return;
+    return result;
 }
 
-void box_audio_reverbs_render(
+void box_audio_reverb_rest(
     box_audio_core_t *core,
-    uint32_t bus,
-    float *l,
-    float *r,
-    int32_t frames)
+    box_audio_effect_t *fx)
 {
-    int32_t i;
-    for (i = 0; i < BOX_AUDIO_REVERB_MAX; i ++) {
-        box_audio_reverb_t *rv = &core->reverbs[i];
-        if (rv->memory && rv->attached && rv->bus == bus) {
-            box_audio_reverb_render(core, rv, l, r, frames, false);
-        }
+    box_audio_reverb_t *rv = &fx->data.reverb;
+    if (rv->swap) {
+        box_audio_reverb_apply(core, fx);
+        box_audio_ramp_set(&rv->fade, 1);
     }
 
-    for (i = 0; bus == 0 && i < BOX_AUDIO_REVERB_MAX; i ++) {
-        box_audio_reverb_t *rv = &core->reverbs[i];
-        if (rv->memory && rv->attached && rv->bus == BOX_AUDIO_BUS_NONE) {
-            box_audio_reverb_render(core, rv, l, r, frames, true);
-        }
-    }
+    box_audio_ramp_set(&rv->mix, rv->mix.target);
 }

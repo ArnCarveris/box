@@ -135,6 +135,19 @@ void audio_send(
     float level,
     bool pre_fader);
 
+/** Put an effect entity into an insert slot of a bus.
+ *
+ * @param world The world
+ * @param bus The bus
+ * @param index Index of the insert slot
+ * @param effect The effect entity, 0 to empty the slot
+ */
+void audio_insert(
+    ecs_world_t *world,
+    ecs_entity_t bus,
+    int32_t index,
+    ecs_entity_t effect);
+
 /** Mean of the right channel of the tap over the last frames.
  *
  * @param frames Number of frames

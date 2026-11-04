@@ -25,7 +25,11 @@ typedef struct box_audio_host_t {
     float *sounds[BOX_AUDIO_SOUND_MAX];  /**< Frames of the sounds, freed on SOUND_FREE */
     box_audio_host_stream_t streams[BOX_AUDIO_STREAM_MAX]; /**< Chunks of the streams */
     int32_t chunks;                      /**< Chunks held by all streams */
-    float *reverbs[BOX_AUDIO_REVERB_MAX]; /**< Delay memory of the reverbs, freed at the end */
+    float *effects[BOX_AUDIO_EFFECT_MAX]; /**< Memory of the effect slots, freed at the end */
+    int32_t effect_floats[BOX_AUDIO_EFFECT_MAX]; /**< Floats of the memory of each slot */
+    float **retired;                     /**< Memory of effect slots that got larger memory,
+                                          *   which the core may still use; freed at the end */
+    int32_t retired_count;               /**< Memories in retired */
     box_audio_event_t *events;           /**< Events not read yet, a ring */
     int32_t event_first;                 /**< Oldest event */
     int32_t event_count;                 /**< Events kept */
@@ -79,7 +83,7 @@ float box_audio_load_update(
 int box_audio_host_init(
     box_audio_host_t *host);
 
-/** Free the sounds, the reverb memory and the events of a host, once no core uses them.
+/** Free the sounds, the effect memory and the events of a host, once no core uses them.
  *
  * @param host The host
  */
@@ -102,19 +106,28 @@ float* box_audio_host_sound(
     int32_t frames,
     int32_t channels);
 
-/** Allocate the cleared delay memory of a reverb slot that has none.
+/** Allocate the cleared memory of an effect slot that has less than floats. Its old memory is
+ * kept until the end, the core may still use it.
  *
  * @param host The host
- * @param slot Slot of the reverb
- * @param sample_rate Frames per second of the core
- * @param floats Receives the floats of the memory
- * @return The memory, owned by the host, NULL when the slot has memory or is invalid
+ * @param slot Slot of the effect
+ * @param floats Floats it needs
+ * @return The memory, owned by the host, NULL when the slot has as much memory, is invalid or
+ *     the allocation failed
  */
-float* box_audio_host_reverb(
+float* box_audio_host_effect(
     box_audio_host_t *host,
     uint32_t slot,
-    float sample_rate,
-    int32_t *floats);
+    int32_t floats);
+
+/** Undo box_audio_host_effect after the memory could not go out: free it, the slot has none.
+ *
+ * @param host The host
+ * @param slot Slot of the effect
+ */
+void box_audio_host_effect_drop(
+    box_audio_host_t *host,
+    uint32_t slot);
 
 /** Free the frames of a sound.
  *

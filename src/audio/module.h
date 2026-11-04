@@ -53,19 +53,29 @@ typedef struct AudioVoice {
     double origin;          /**< Module time at which the sound was at its start, at pitch */
 } AudioVoice;
 
-/** What box.audio did with a Reverb */
-typedef struct AudioReverbState {
-    uint8_t slot;           /**< Slot of the reverb in the core plus 1, 0 when it has none */
-    bool refused;           /**< The error that every slot is taken was logged */
-} AudioReverbState;
+/** What box.audio did with an effect entity, one with an effect component such as Reverb */
+typedef struct AudioEffectState {
+    uint8_t slot;           /**< Slot of the effect in the core plus 1, 0 when it has none */
+    bool refused;           /**< The error that every slot of the pool is taken was logged */
+    bool twice;             /**< The error that two insert slots name it was logged */
+    uint32_t frame;         /**< Frame of the module in which an insert slot named it last */
+    uint32_t twice_frame;   /**< Frame in which a second insert slot named it last */
+    ecs_entity_t channel;   /**< Bus entity of the insert slot that names it */
+    uint8_t bus;            /**< Index of that bus in the core */
+    uint8_t index;          /**< Index of the insert slot within the bus */
+} AudioEffectState;
 
-/** What box.audio sent for a reverb slot */
-typedef struct box_audio_reverb_sent_t {
-    uint32_t serial;        /**< Serial of the output the parameters were sent to */
-    uint32_t memory;        /**< Serial of the output the delay memory was given to */
-    uint32_t bus;           /**< Bus index sent, BOX_AUDIO_BUS_NONE for none */
-    box_audio_reverb_params_t params; /**< Parameters sent */
-} box_audio_reverb_sent_t;
+/** What box.audio sent for an effect slot of the core */
+typedef struct box_audio_effect_sent_t {
+    ecs_entity_t entity;    /**< Effect entity of the slot, 0 for a free slot */
+    uint32_t serial;        /**< Serial of the output the command was sent to */
+    uint32_t memory;        /**< Serial of the output the memory was given to */
+    int32_t floats;         /**< Floats of memory given on that output */
+    uint32_t kind;          /**< Kind sent, BOX_AUDIO_EFFECT_NONE when off or bypassed */
+    uint32_t bus;           /**< Bus index sent */
+    uint32_t index;         /**< Insert slot sent */
+    float params[BOX_AUDIO_EFFECT_PARAMS]; /**< Parameters sent */
+} box_audio_effect_sent_t;
 
 /** What box.audio compiled for a SynthSound */
 typedef struct AudioSynth {
@@ -84,7 +94,7 @@ extern ECS_COMPONENT_DECLARE(AudioSynth);
 extern ECS_COMPONENT_DECLARE(AudioInstrumentState);
 extern ECS_COMPONENT_DECLARE(AudioBusState);
 extern ECS_COMPONENT_DECLARE(AudioVoice);
-extern ECS_COMPONENT_DECLARE(AudioReverbState);
+extern ECS_COMPONENT_DECLARE(AudioEffectState);
 
 /** Largest sound file read, in bytes */
 #define BOX_AUDIO_SAMPLE_MAX_FILE (256 * 1024 * 1024)
@@ -304,7 +314,7 @@ typedef struct box_audio_module_stats_t {
     int64_t dropped;        /**< Plays dropped before a gesture */
     int64_t spatial_updates; /**< Spatial sources and plays whose gain was computed */
     int64_t out_of_range;   /**< Spatial plays that did not start beyond max_distance */
-    int64_t reverbs;        /**< REVERB commands written */
+    int64_t effects;        /**< EFFECT commands written */
     int64_t not_ready;      /**< Plays dropped while their sound file loaded */
     int64_t decodes;        /**< Decodes of sound files submitted */
     int64_t music_jobs;     /**< Decode jobs of streams submitted */
@@ -421,9 +431,10 @@ typedef struct box_audio_module_t {
     ecs_query_t *views;           /**< Enabled views, for a camera that listens */
     ecs_query_t *sounds;          /**< AudioPcm */
     ecs_query_t *synths;          /**< SynthSound, prefabs included */
-    ecs_query_t *reverbs;         /**< Reverb on an AudioBus, disabled ones included */
-    ecs_entity_t reverb_entity[BOX_AUDIO_REVERB_MAX]; /**< Entity of each reverb slot */
-    box_audio_reverb_sent_t reverb_sent[BOX_AUDIO_REVERB_MAX]; /**< What each slot got */
+    box_audio_effect_sent_t effects[BOX_AUDIO_EFFECT_MAX]; /**< What each effect slot of the
+                                   *   core holds and got */
+    uint32_t effect_frame;        /**< Frames of the module, which tell the insert slots of
+                                   *   this frame from older ones */
     uint32_t serial;              /**< Serial of the output the state was sent to */
     box_audio_writer_t writer;    /**< The batch of the frame, grown as needed */
     uint32_t next_voice;          /**< Next voice handle */
@@ -533,15 +544,41 @@ void box_audio_listener_find(
     box_audio_module_t *state,
     box_audio_listener_t *listener);
 
-/** Get the slot of the reverb of an entity in the core.
+/** Get the slot of an effect entity in the pool of the core.
  *
  * @param world The world
- * @param e The entity with Reverb
+ * @param e The entity with an effect component
  * @return The slot, -1 when it has none
  */
-int32_t box_audio_module_reverb_slot(
+int32_t box_audio_module_effect_slot(
     const ecs_world_t *world,
     ecs_entity_t e);
+
+/** Get the kind of effect of an entity: the kind of its effect component.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param params Receives the BOX_AUDIO_EFFECT_PARAMS parameters of its kind, may be NULL
+ * @return A box_audio_effect_kind_t, BOX_AUDIO_EFFECT_NONE for an entity that is no effect
+ */
+uint32_t box_audio_module_effect_kind(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    float *params);
+
+
+/** Give the effects that the insert slots of the channels name their slots of the pool and
+ * their memory, and send their kind, place and parameters when they changed, into the batch of
+ * the frame. A Disabled effect is sent as taken off, so it is bypassed with a fade.
+ *
+ * @param world The world
+ * @param state The state, whose bus indices are current
+ * @param t The transport
+ */
+void box_audio_effects_sync(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    box_audio_transport_t *t);
 
 /** Register the sync system and the observers of the module.
  *

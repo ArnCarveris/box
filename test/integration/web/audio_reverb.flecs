@@ -32,7 +32,7 @@ spinner {
 }
 
 hall {
-  AudioBus: {output: master}
+  AudioBus: {output: master, effects: [hall]}
   Reverb: {decay: 2.4, damping: 0.4, predelay: 0.02}
 }
 

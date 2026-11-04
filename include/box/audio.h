@@ -58,6 +58,15 @@ ECS_ENUM(AudioState, {
 #define BOX_AUDIO_SENDS 4
 #endif
 
+/** Insert slots of a mixer channel, AudioBus.effects */
+#define BOX_AUDIO_EFFECT_SLOTS 4
+
+/** Effect instances that run at once, in every channel together; more log one error that
+ * names the effect */
+#ifndef BOX_AUDIO_EFFECT_MAX
+#define BOX_AUDIO_EFFECT_MAX 64
+#endif
+
 /** What a mixer channel is, for the solo. A track is identified by Track and the master by
  * box.audio.master; both keep the default */
 ECS_ENUM(AudioChannelKind, {
@@ -88,24 +97,36 @@ ECS_STRUCT(AudioSend, {
  * When any channel is soloed, a channel is heard when it is soloed, on the output path of a
  * soloed channel, feeds a soloed channel, is a return or an SFX bus, or is downstream of one of
  * these. mute always wins.
+ *
+ * Its effects are entities with an effect component, such as Reverb, in up to
+ * BOX_AUDIO_EFFECT_SLOTS insert slots that run in order on its signal before its width, pan
+ * and volume; the master runs its own before the limiter. An empty slot (0) is skipped. The
+ * channel may name itself. An entity in two slots logs one error that names both channels, and
+ * the second slot stays empty. See Effects in docs/audio.md.
  */
 ECS_STRUCT(AudioBus, {
     ecs_entity_t output;   /**< Bus it feeds, 0 (or a deleted bus) for the master */
     float volume;          /**< Linear gain, default 1 */
     float pan;             /**< -1 left to 1 right, default 0 */
     float width;           /**< Stereo width, 0 mono, 1 as is (default), 2 doubles the side; a
-                            *   mid/side gain after the reverb and before the pan */
+                            *   mid/side gain after the inserts and before the pan */
     bool mute;             /**< Silence the bus, default false */
     bool solo;             /**< Solo the channel, default false */
     AudioChannelKind kind; /**< What the channel is, default AudioChannelGroup */
     ecs_vec(AudioSend) sends; /**< Up to BOX_AUDIO_SENDS sends to other buses */
+    ecs_entity_t effects[4]; /**< Effect entities of the BOX_AUDIO_EFFECT_SLOTS insert slots,
+                            *   in the order they run, 0 for an empty slot */
 });
 
-/** A reverb on the bus of the same entity, which sources reach through a send of their bus.
+/** A reverb, an effect: it runs in the insert slot of an AudioBus that names its entity in
+ * effects, and does nothing while no slot names it. Usually on a return bus that sources
+ * reach through a send of their bus, which may name itself:
+ * hall { AudioBus: {effects: [hall]}; Reverb: {decay: 2} }.
  *
- * One reverb runs at once (BOX_AUDIO_REVERB_MAX of the core); another logs one error and its
- * bus stays dry. Decay, damping and mix change smoothly; a change of size or predelay fades the
- * wet signal out and in. Deleting the entity, as unloading its scene does, fades the tail out.
+ * Every reverb runs with its own delay memory, up to BOX_AUDIO_EFFECT_MAX effects. Decay,
+ * damping and mix change smoothly; a change of size or predelay fades the wet signal out and
+ * in, and so does a move to another slot. Deleting the entity, as unloading its scene does,
+ * taking it out of its slot or disabling it takes it off with a fade.
  */
 ECS_STRUCT(Reverb, {
     float decay;           /**< Seconds until -60 dB, default 1.5 */

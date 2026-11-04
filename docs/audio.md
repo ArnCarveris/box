@@ -3,7 +3,7 @@
 This page is the guide to audio in box: how sound is put together, the components a scene uses, a
 worked example, the rules of the web, notes for native apps, the limits of this version and how
 to capture and inspect what an app plays. After the guide comes the [reference](#reference): the
-audio core, the reverb, the synth, the transports, the native and the web outputs and the
+audio core, the effects and the reverb, the synth, the transports, the native and the web outputs and the
 `box.audio` module in detail.
 
 ## The model
@@ -22,8 +22,9 @@ core**, a small mixer in plain C that renders on its own thread, once per frame 
 - **Buses** are the channels of the mixer and mix voices and other buses: each has a volume, a
   pan, a stereo width, a mute, a solo, a kind (group, return or SFX), an output and up to 4
   sends, pre or post fader. Bus 0 is the master, `box.audio.master` in script; every other bus
-  ends there. A bus with a `Reverb` is a reverb bus, a return, which other buses reach through
-  a send.
+  ends there. Each bus has 4 insert slots that run **effects**, entities such as a `Reverb`,
+  in order on its signal; a bus with a reverb in a slot is a reverb bus, a return, which other
+  buses reach through a send.
 - **Space**: a source with `AudioSpatial` gets its volume and pan every frame from its distance
   to the listener and its direction, the camera of the main view or the entity with
   `AudioListener`.
@@ -37,8 +38,8 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 
 | Component | Use it for |
 |-----------|------------|
-| `AudioBus` | A channel of the mixer: `output`, `volume`, `pan`, `width`, `mute`, `solo`, `kind` and up to 4 `sends`, see [Mixer channels](#mixer-channels) |
-| `Reverb` | The reverb of a room on the bus of its entity, see [Reverb](#reverb) |
+| `AudioBus` | A channel of the mixer: `output`, `volume`, `pan`, `width`, `mute`, `solo`, `kind`, up to 4 `sends` and 4 insert slots, `effects`, see [Mixer channels](#mixer-channels) |
+| `Reverb` | An effect: the reverb of a room, which runs in the insert slot of a bus that names its entity, see [Effects](#effects) and [Reverb](#reverb) |
 | `AudioOutput` | The bus a source, a stream or a sound plays on (the master without one) |
 | `AudioPcm` | A sound from samples, from script or C |
 | `SoundFile` | A short sound from a WAV or FLAC file, decoded into memory, see [Sound files](#sound-files) |
@@ -73,7 +74,7 @@ etc/scenes/dust_merchant.flecs`. It has four buses, all into the master:
 
 ```
 cabin_verb {
-  AudioBus: {output: master}
+  AudioBus: {output: master, kind: AudioChannelReturn, effects: [cabin_verb]}
   Reverb: {decay: 0.75, damping: 0.6, predelay: 0.008, size: 0.25}
 }
 world { AudioBus: {output: master, sends: [{bus: cabin_verb, level: 0.28}]} }
@@ -81,8 +82,8 @@ ui { AudioBus: {output: master, volume: 0.55} }
 music { AudioBus: {output: master, volume: 0.45} }
 ```
 
-A small metal cabin rings briefly: a short decay, a small size and little predelay. `world`, the
-bus of the engine, sends to it; the controls play on `ui`, dry and close.
+A small metal cabin rings briefly: a short decay, a small size and little predelay. The bus
+runs its own reverb in its first insert slot. `world`, the bus of the engine, sends to it; the controls play on `ui`, dry and close.
 
 **The controls** click with synth sounds, prefabs that need no file. Each has a pitch and a level
 variance, so a row of switches flipped in a row does not sound like one sample repeated:
@@ -229,8 +230,10 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
 
 - **Space**: distance and pan only. No Doppler, no distance filter, no occlusion, no HRTF, and
   front and back sound alike.
-- **Effects**: one reverb at once, an algorithmic one; no reverb zones, no rooms from geometry, no
-  EQ, compressor or delay on a bus.
+- **Effects**: `BOX_AUDIO_EFFECT_MAX` (64) effects at once in all channels together, 4 insert
+  slots per channel, and the reverb as the only kind, an algorithmic one; one more effect logs
+  one error and does nothing. No reverb zones, no rooms from geometry, no EQ, compressor or delay
+  yet, and no sidechain.
 - **Voices**: 64, with the quietest stolen; no priorities. A one shot cannot be controlled after
   it started.
 - **Synth**: up to 8 oscillators, one filter and two LFOs per sound, up to 7 unison voices per
@@ -272,8 +275,9 @@ The audio a box app plays can be inspected without listening:
 
 - `audio` prints the state, the rate, the voices, the steals, the load, the clock of the core
   (frames and seconds), the transport and every bus with its kind, width, solo, routing, sends
-  and reverb; `audio volume <v>` and `audio mute` set the master, `audio play`, `audio stop`,
-  `audio seek <beats>` and `audio tempo <bpm>` drive the [transport](#transport).
+  and the effects of its insert slots, with whether each runs; `audio volume <v>` and
+  `audio mute` set the master, `audio play`, `audio stop`, `audio seek <beats>` and
+  `audio tempo <bpm>` drive the [transport](#transport).
 - `audio capture <seconds>` records the master to a 16 bit stereo WAV resource of the shell
   session, `box.audio.capture(seconds, path)` to a file from a script, at load if it should
   start with the scene. In the browser `audio capture` writes `/tmp/audio_capture_<n>.wav` in
@@ -348,7 +352,7 @@ start of the next render block, but those with a `when` in the future (see
 | `ORDER` | count, then per bus in processing order: bus, output, the buses of its 4 sends (or none) and a mask of the pre-fader ones |
 | `SOUND_RELEASE` | sound: freed once no voice plays it |
 | `STREAM` | voice handle, stream, bus, volume, channels, sample rate: opens a stream and starts a voice that reads it |
-| `REVERB` | slot, bus (or none), decay, damping, predelay, size, mix: see [Reverb](#reverb) |
+| `EFFECT` (11) | slot, kind (`BOX_AUDIO_EFFECT_NONE` takes it off), bus (or none), index (0..3 within the bus), key (a sidechain bus, none for now), 16 params the kind reads: see [Effects](#effects) |
 | `SYNTH` | sound, then a patch up to its last layer: makes a free sound id a synth or replaces its patch, see [Synth](#synth) |
 
 The flags of a `PLAY`: `BOX_AUDIO_PLAY_LOOP` (1) loops the sound; `BOX_AUDIO_PLAY_GATE`
@@ -414,8 +418,8 @@ priority system.
 **Buses** are a fixed pool of `BOX_AUDIO_BUS_MAX` (64); bus 0 is the master. A bus that is not
 in the order costs nothing. Each has a volume, a pan, a width, a mute, an output and
 `BOX_AUDIO_SENDS` (4) sends with a level each. A bus renders its block in this order: its
-reverb, its width, its pre-fader sends, its volume, pan and mute, its output, then its
-post-fader sends. The width is a gain of the side signal: with `mid = (l + r) / 2` and
+inserts (see [Effects](#effects)), its width, its pre-fader sends, its volume, pan and mute, its
+output, then its post-fader sends; the master renders its limiter last. The width is a gain of the side signal: with `mid = (l + r) / 2` and
 `side = (l - r) / 2`, the bus plays `mid + width side` on the left and `mid - width side` on the
 right, so 0 is mono, 1 passes as is and 2 doubles the side; at 1 the bus skips it, bit
 identical. A post-fader send taps the bus after its volume and pan; a pre-fader send taps it
@@ -486,11 +490,64 @@ field stays 32 bits. The writers `box_audio_write_play`, `_stop`, `_voice_set`, 
 The tests are `test/cpu/audio`, which render offline; `bench/audio` mixes 64 voices through 8
 buses and reports the time per frame.
 
+## Effects
+
+`src/audio/core/effect.c` holds a pool of `BOX_AUDIO_EFFECT_MAX` (64) effect instances, which
+the `EFFECT` command puts into the insert slots of the buses. An effect is addressed by its slot
+of the pool; the command gives it a kind, a bus, an index within the bus and the parameters of
+its kind.
+
+- **Slots and order.** Each bus has `BOX_AUDIO_EFFECT_SLOTS` (4) insert slots. The effects of a
+  bus run in the order of their index on its block, in place, before its width, pan and volume:
+  they are pre-fader inserts, so a pre-fader send hears them too. The inserts of the master run
+  before the limiter. An index without an effect is skipped; two effects on the same index run
+  in the order of their slots.
+- **Kinds.** A kind is one file of `src/audio/core` and one row of the table of `effect.c`:
+  `floats` (the memory it needs at a rate), `init` (constants of a new core), `start` (on clear
+  memory at its parameters), `command` (new parameters while it runs), `render` (a block in
+  place) and `rest` (a block it skips). The reverb is the first kind,
+  `BOX_AUDIO_EFFECT_REVERB`; the parameters of a command are 16 floats
+  (`BOX_AUDIO_EFFECT_PARAMS`) that each kind reads in its own way, the reverb its first five
+  (`box_audio_reverb_params_t`). The core clamps them, a NaN to the low end.
+- **Changes.** A change of the parameters is smoothed by the kind. A change of kind, bus or index
+  blends the effect out of its bus over 50 ms, so the bus passes its dry signal, applies the new
+  place on clear memory and blends it into the new one over 50 ms (`BOX_AUDIO_EFFECT_FADE`,
+  100 ms in all); a reverb also fades its input into its clear lines over the second half.
+  An effect put on a bus from off, such as an enabled one or one put live into a slot, starts
+  at its first block: it blends in from the dry signal over 50 ms the same way, unless that
+  block is silent, when it starts at once since its output would be silent either way.
+- **Taking it off.** Kind `BOX_AUDIO_EFFECT_NONE` (or bus `BOX_AUDIO_BUS_NONE`) takes the effect
+  off: on a bus that stays in the order it blends out to the dry signal over 50 ms, so its tail
+  fades out where it was; when its bus left the order, as a deleted bus does in the same batch,
+  its tail gets no more input and fades out into the master over 50 ms instead, so deleting a
+  reverb bus does not cut it.
+- **Memory.** The memory of an effect belongs to the side that runs the core, like sound memory:
+  `box_audio_effect_floats(kind, rate)` floats, 0 for a kind that needs none (about 200 KB for
+  a reverb at 48 kHz). `box_audio_core_effect_memory(core, slot, data, floats)` gives a slot its
+  memory once, or larger memory for a kind that needs more, on which the effect starts over; the
+  render path never allocates. An effect whose kind needs memory runs once its slot has enough,
+  another at once. The transports allocate it on the `effect_memory` call of the transport
+  interface: the null transport on the main thread, the native one on the main thread and
+  hands it to the audio thread as a message of the command ring, the web one with an
+  `{ type: 'effect', slot, floats }` message, on which the worklet allocates it in the heap of
+  its core. Each frees it after its core, the memory a slot outgrew included.
+- **Tails.** A kind with a tail follows the silence rule: once its input has been silent long
+  enough and its state has decayed under -140 dB, it clears itself and stops; while it is stopped
+  and no signal comes in, a block costs a scan of its input for a sample over 1e-9.
+  `box_audio_core_effect_running` tells whether an effect runs.
+- **Cost.** A bus without effects pays one check of a mask per block and renders bit identical
+  to a core without effects; an effect that does not move costs its kind, and one that blends
+  copies its input once per block.
+
+The tests are the `Effect` suite of `test/cpu/audio` (several reverbs at once, an empty slot,
+the fades of a removal, a move and a disabled effect, the pool of 64, a channel without effects,
+an entity in two slots) and the `effects` case of `NoAlloc`.
+
 ## Reverb
 
-`src/audio/core/reverb.c` is an algorithmic reverb that runs on a bus: a feedback delay network
-of `BOX_AUDIO_REVERB_LINES` (8) delay lines. A send bus with a reverb is the usual setup, so
-sources reach it through a send of their bus.
+`src/audio/core/reverb.c` is the reverb kind of effect, an algorithmic reverb: a feedback delay
+network of `BOX_AUDIO_REVERB_LINES` (8) delay lines. A return bus with a reverb in its insert
+slot is the usual setup, so sources reach it through a send of their bus.
 
 - **The network.** The input, the mean of both channels, goes through a predelay line, then into
   every line with a sign pattern that is no row of the matrix, so the first reflection already
@@ -501,7 +558,7 @@ sources reach it through a send of their bus.
   The left and the right outputs take the lines with two orthogonal sign patterns, which keeps
   the channels decorrelated.
 - **It cannot blow up.** The matrix keeps the energy, the lowpass has a gain of at most 1 and
-  each gain is at most `0.9999`, so the loop gain stays under unity. A `REVERB` command is
+  each gain is at most `0.9999`, so the loop gain stays under unity. Its parameters are
   clamped: decay to `BOX_AUDIO_REVERB_DECAY_MIN..MAX` (0.05..60 s), damping, size and mix to
   0..1 and predelay to 0..`BOX_AUDIO_REVERB_PREDELAY_MAX` (0.5 s), a NaN to the low end. Every
   value a line keeps is flushed like a bus sample, so no denormal forms in a tail.
@@ -512,32 +569,23 @@ sources reach it through a send of their bus.
   which clicks: the wet signal fades out over 50 ms, the lines are cleared and take their new
   lengths, and it fades back in over 50 ms (`BOX_AUDIO_REVERB_FADE`, 100 ms in all), while the
   input fades into the clear lines over the same 50 ms, so a steady sound does not enter them
-  with a step. A change of the bus does the same.
+  with a step. A change of the bus or the slot blends it out and in, see [Effects](#effects).
 - **Silence costs nothing.** The tail rings out after its sources stop. Once the input has been
   silent for longer than the predelay plus the longest line, and every line has read out under
   -140 dB for a whole length of the longest line, so nothing louder is left in them, the reverb
   clears its lines and stops; while it is stopped and no signal comes in, a block costs a scan
-  of the input for a sample over 1e-9. `box_audio_core_reverb_running` tells whether it runs.
-- **Taking it off.** A `REVERB` with bus `BOX_AUDIO_BUS_NONE` takes the reverb off its bus at
-  once: it gets no more input and its tail fades out over 50 ms into the master, so deleting a
-  reverb bus does not cut the tail.
-- **Memory.** The delay memory belongs to the side that runs the core, like sound memory:
-  `box_audio_reverb_floats(rate)` floats per slot (about 200 KB at 48 kHz), sized for the
-  largest size and predelay at the rate. `box_audio_core_reverb_memory` gives it to a slot once,
-  and the core clears it; the render path never allocates. Until a slot has memory a reverb on
-  it does not run and its bus stays dry. The transports allocate it on the `reverb` call of the
-  transport interface: the null transport on the main thread, the native one on the main thread
-  and hands it to the audio thread as a message of the command ring, the web one with a
-  `{ type: 'reverb', slot }` message, on which the worklet allocates it in the heap of its core.
-  Each frees it after its core.
+  of the input for a sample over 1e-9. `box_audio_core_effect_running` tells whether it runs.
+- **Memory.** `box_audio_effect_floats(BOX_AUDIO_EFFECT_REVERB, rate)` floats per slot (about
+  200 KB at 48 kHz), sized for the largest size and predelay at the rate. Until its slot has
+  memory a reverb does not run and its bus stays dry.
 
-`BOX_AUDIO_REVERB_MAX` (1) reverbs run at once; the slots are an array, so more only cost their
+Every reverb runs with its own memory, up to the 64 effects of the pool; more only cost their
 memory and their time. Convolution is not used, since it needs recorded impulse responses.
 
 The tests are the `Reverb` suite of `test/cpu/audio`, from an impulse in an offline render:
 the decay time at 44.1 and 48 kHz, damping, predelay, stereo correlation, density, stability at
-extreme values, silence, changes without clicks, sends, the second reverb, a delete and no
-allocation. `bench/audio` has a `Reverb` suite in ns per frame, and
+extreme values, silence, changes without clicks, sends, a second reverb that runs, a delete and
+no allocation. `bench/audio` has a `Reverb` suite in ns per frame, and
 `test/integration/web/audio_reverb.mjs` measures a tail and the load of the worklet in Chrome.
 
 ## Synth
@@ -1491,6 +1539,11 @@ The two talk only over the `MessagePort` of the `AudioWorkletNode`, with plain o
 - `{ type: 'sound', id, frames, channels, sampleRate, data }`: the frames of a sound as an
   `ArrayBuffer`, transferred. The worklet copies them into the heap of its core and keeps the
   pointer; the reply `{ type: 'sound', id, ok }` says whether the core took it.
+- `{ type: 'effect', slot, floats }`: the memory of an effect slot. The worklet allocates
+  `floats` cleared floats in the heap of its core and gives them to the slot, or larger memory
+  for a slot that has less, after which it frees the old one, which the core let go of at once;
+  the reply `{ type: 'effect', slot, ok }` says whether the slot has the memory, and
+  `Module.boxAudio.effects` keeps the last reply of each slot.
 - `{ type: 'events', events }` from the worklet: the events of the core after a quantum that
   had any. The worklet reads until the core has none left, 64 per call, so no backlog builds
   up across quanta. On `SOUND_FREE` the worklet has already freed the frames in its heap.
@@ -1546,21 +1599,21 @@ are, see [Sound files](#sound-files).
 The `rules` of `project.json` run `tools/audio_core.py` for `src/audio/core/core.c` before box
 compiles, on every build of box. For a target other than Emscripten the script does nothing. For
 `--target em` it compiles the C files of `src/audio/core` with the clang of Emscripten (the
-`LLVM_ROOT` of `em-config`):
+`LLVM_ROOT` of `em-config`), every `.c` of the folder:
 
 ```sh
 clang --target=wasm32-unknown-unknown -O2 -msimd128 -std=c11 -ffreestanding -nostdlib \
     -DBOX_AUDIO_CORE_WASM -Wl,--no-entry -Wl,-z,stack-size=65536 \
     -Wl,--initial-memory=1048576 -Wl,--max-memory=268435456 -Wl,--strip-all \
-    -Wl,--export=box_audio_core_wasm_init ... command.c core.c reverb.c source.c synth.c synth_patch.c wasm.c \
+    -Wl,--export=box_audio_core_wasm_init ... command.c core.c effect.c reverb.c source.c synth.c synth_patch.c wasm.c \
     -o box_audio_core.wasm
 ```
 
 into `box_audio_core.wasm` in the generated folder of the build: a freestanding module of a
 few KB with its own memory, which starts at 1 MB and grows up to 256 MB, no imports (the core
 needs no libm) and the exports of `src/audio/core/wasm.c`: `box_audio_core_wasm_init`, a first
-fit heap with `_alloc` and `_free` that grows the memory, `_sound`, `_reverb_floats`,
-`_reverb`, `_apply`, `_render`, `_left`, `_right`, `_read_events`, `_events`, `_events_lost` and `_voices`. It is not built
+fit heap with `_alloc` and `_free` that grows the memory, `_sound`,
+`_effect`, `_apply`, `_render`, `_left`, `_right`, `_read_events`, `_events`, `_events_lost` and `_voices`. It is not built
 with `emcc`: a standalone wasm of `emcc` links start code and libc from the Emscripten cache,
 which the core does not use, and building those for a new configuration fails when the cache
 folder is a symlink. The script writes the bytes as
@@ -1669,8 +1722,8 @@ frame, the same on every platform.
 | `AudioPcm` | The samples of a sound (`samples`, `channels`, `sample_rate`, 0 for the output rate); `box_audio_sound_from_pcm` sets it from C |
 | `SoundFile` | A sound decoded from a WAV or FLAC file (`path`), see [Sound files](#sound-files) |
 | `SoundStatus` | Read only: `state` (`SoundLoading`, `SoundReady`, `SoundFailed`), `frames`, `channels`, `sample_rate` and `error` of a `SoundFile` |
-| `AudioBus` | A mixer channel: `output` (0 or `master` for the master), `volume` (1), `pan`, `width` (1), `mute`, `solo`, `kind` (`AudioChannelGroup`, `AudioChannelReturn` or `AudioChannelSfx`) and `sends`, up to 4 `AudioSend` of `bus`, `level` and `pre_fader`; see [Mixer channels](#mixer-channels) |
-| `Reverb` | A reverb on the bus of the entity: `decay` (1.5 s), `damping` (0.5), `predelay` (0.02 s), `size` (0.5), `mix` (1) |
+| `AudioBus` | A mixer channel: `output` (0 or `master` for the master), `volume` (1), `pan`, `width` (1), `mute`, `solo`, `kind` (`AudioChannelGroup`, `AudioChannelReturn` or `AudioChannelSfx`), `sends`, up to 4 `AudioSend` of `bus`, `level` and `pre_fader`, and `effects`, the effect entities of its 4 insert slots (0 for empty); see [Mixer channels](#mixer-channels) |
+| `Reverb` | An effect, a reverb in the insert slot of a bus that names its entity: `decay` (1.5 s), `damping` (0.5), `predelay` (0.02 s), `size` (0.5), `mix` (1) |
 | `AudioOutput` | The bus a source, or a sound by default, plays on |
 | `AudioSource` | A sound that plays while the entity exists: `sound`, `volume` (1), `pitch` (1), `loop`, `playing` (true) |
 | `AudioStream` | Music: an Ogg Vorbis file (`path`) that streams, `volume` (1), `loop` (true), `playing` (true), see [Music](#music) |
@@ -1743,7 +1796,7 @@ the script, so a reload of the scene does not delete it.
 using box.audio
 
 box { audio { master { AudioBus: {width: 0.9} } } }
-hall { AudioBus: {output: master, kind: AudioChannelReturn}; Reverb: {decay: 2} }
+hall { AudioBus: {output: master, kind: AudioChannelReturn, effects: [hall]}; Reverb: {decay: 2} }
 sfx { AudioBus: {output: master, kind: AudioChannelSfx} }
 band { AudioBus: {output: master, volume: 0.6} }
 lead { AudioBus: {output: band, solo: true, sends: [{bus: hall, level: 0.3}]} }
@@ -1752,8 +1805,8 @@ pad {
 }
 ```
 
-- **Width** (0..2, default 1) is a mid/side gain after the reverb of the channel and before its
-  pan: 0 is mono, 1 as is, 2 doubles the side.
+- **Width** (0..2, default 1) is a mid/side gain after the inserts of the channel and before
+  its pan: 0 is mono, 1 as is, 2 doubles the side.
 - **Sends**: up to `BOX_AUDIO_SENDS` (4) per channel, each with a `bus`, a `level` (0..4) and
   `pre_fader`. A post-fader send taps after the volume and pan, a pre-fader one before them; the
   mute and the solo silence both. More than 4 log one error that names the channel and the first
@@ -1772,21 +1825,37 @@ pad {
 A width of 1 and unused sends add no work per frame, and a world without a solo pays one check
 of a mask.
 
-**Reverbs.** A scene sets its reverb by having an entity with `AudioBus` and `Reverb`, and
-unloading the scene deletes it, which fades its tail out:
+**Effects.** An effect is an entity with an effect component, for now `Reverb`. It runs in an
+insert slot of a channel that names it in `effects`, an array of 4 entities that run in order;
+an empty slot (0) is skipped. A `Reverb` that no slot names does nothing. The channel may name
+itself, which is the usual reverb return, and unloading the scene deletes it, which fades its
+tail out:
 
 ```
-hall { AudioBus: {output: master}; Reverb: {decay: 2.4, damping: 0.4, predelay: 0.02} }
+hall { AudioBus: {output: master, kind: AudioChannelReturn, effects: [hall]}; Reverb: {decay: 2.4, damping: 0.4, predelay: 0.02} }
 world { AudioBus: {output: master, sends: [{bus: hall, level: 0.3}]} }
 ```
 
-Components on one line are separated by `;` (or a newline): flecs script does not take a comma
-there. `master` is `box.audio.master`, an entity without components that names the master. A reverb
-gets a slot of the core and the module asks the transport for its memory before the first
-`REVERB` command; it sends the parameters again when they change. One reverb runs at once: a
-second one logs one error that names its entity (`box.audio: more than 1 reverb, '...' stays
-dry`) and its bus stays dry, until the first one is deleted. Reverb zones, rooms from geometry
-and other effects are later work.
+An effect may also be an entity of its own, which a channel names in any slot, so several of a
+kind run at once: `band { AudioBus: {effects: [0, 0, band_verb]} }`. Components on one line are
+separated by `;` (or a newline): flecs script does not take a comma there. `master` is
+`box.audio.master`, an entity without components that names the master; its `AudioBus` may name
+effects too, which run before the limiter.
+
+- An effect gets a slot of the pool of the core and the module asks the transport for the
+  memory of its kind before the first `EFFECT` command; it sends the command again when the kind,
+  the channel, the slot or a parameter changes, so a move between slots or channels fades.
+- Deleting an effect entity, taking it out of its slot or removing its component takes it off
+  with its tail. A Disabled effect entity keeps its slot and is bypassed, with the fade of a
+  removal; enabling it fades it back in.
+- An entity in two slots logs one error that names it and both channels (`box.audio: the effect
+  '...' is in an insert slot of '...' and of '...', the slot of '...' stays empty`), and the
+  second slot stays empty.
+- More than `BOX_AUDIO_EFFECT_MAX` (64) effects in all channels log one error that names the
+  effect (`box.audio: more than 64 effects, '...' does nothing`), which does nothing until a slot
+  of the pool is free.
+
+Reverb zones, rooms from geometry and the other kinds of effects are later work.
 
 **Sources** start a voice when `playing` is true and their sound is known, and stop it when
 `playing` goes false, the sound or `loop` changes or the entity is deleted, which fades it out
@@ -2200,10 +2269,12 @@ steals and the load, the clock, the transport (`transport: 120.0 bpm 4/4, positi
 beats), playing, loop off`, the position as bar.beat counted from 1), then the master (with the
 volume, pan and width of its `AudioBus` when it has one) and the buses in processing order, each
 with its kind, volume, pan, width, `solo`, `muted`, its output, its sends (`send pre` for a
-pre-fader one) and the values of its reverb, and `(dry, every slot taken)` for a reverb that has
-no slot. `audio volume <v>` and `audio mute [on|off]` write `AudioSettings`; `audio play`,
-`audio stop`, `audio seek <beats>` and `audio tempo <bpm>` (20 to 999) write `Transport`.
-`audio capture <seconds>` records the master output
+pre-fader one) and its insert slots, each as `insert <index> <entity>:` with its kind and values
+and whether it runs: `(runs)`, `(bypassed)` for a Disabled effect, or `(does not run: ...)` with
+the reason (no output, in another slot, every effect of the pool taken, waits for its memory);
+the master lists its own after its `AudioBus`. `audio volume <v>` and `audio mute [on|off]` write
+`AudioSettings`; `audio play`, `audio stop`, `audio seek <beats>` and `audio tempo <bpm>` (20 to
+999) write `Transport`. `audio capture <seconds>` records the master output
 to a 16 bit stereo WAV resource of the session, fetched like a `capture` PNG with
 `GET /shell/session/<id>/resource/<name>`, empty until the file is written in one rename. In the
 browser it writes `/tmp/audio_capture_<n>.wav` in the file system of the page and returns the
@@ -2212,7 +2283,8 @@ Headless with a fixed `--delta-time`, two runs write identical captures, which i
 tests inspect audio and how a render can be listened to. `box.perf` reports the largest load of
 a run as `PerfStatus.audio_load` and `audio_load` in its report.
 
-The tests are `Module`, `Mixer`, `Source`, `Script`, `Capture` and `Spatial` in `test/cpu/audio`,
+The tests are `Module`, `Mixer`, `Effect`, `Source`, `Script`, `Capture` and `Spatial` in
+`test/cpu/audio`,
 through the null transport; `test/integration/e2e/audio.py` drives the command on a headless
 app, `test/integration/web/audio_spatial.mjs` moves a source from the left of the listener to
 its right in Chrome and measures both channels with `test/integration/web/audio_spatial.flecs`,

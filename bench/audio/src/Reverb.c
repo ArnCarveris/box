@@ -10,6 +10,7 @@
 #include <bake_bench.h>
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 /** A route of a bus to an output with send 0 to a bus, the other sends unused */
 #define BENCH_ROUTE(bus, output, send)\
@@ -49,9 +50,10 @@ static box_audio_core_t* bench_reverb_core(
         BENCH_ROUTE(2, 0, 1), BENCH_OUT(1, 0), BENCH_MASTER
     };
     box_audio_reverb_params_t params = { 2.4f, 0.4f, 0.02f, 0.7f, 1 };
+    float fx[BOX_AUDIO_EFFECT_PARAMS] = {0};
     box_audio_core_desc_t desc = { .sample_rate = BENCH_RATE };
     box_audio_core_t *core = box_audio_core_new(&desc);
-    int32_t floats = box_audio_reverb_floats(BENCH_RATE);
+    int32_t floats = box_audio_effect_floats(BOX_AUDIO_EFFECT_REVERB, BENCH_RATE);
     box_audio_writer_t w;
     uint32_t i;
     for (i = 0; i < BENCH_SOUND; i ++) {
@@ -61,13 +63,14 @@ static box_audio_core_t* bench_reverb_core(
     box_audio_core_sound(core, 1, bench_sound, BENCH_SOUND, 1, BENCH_RATE);
     if (reverb) {
         bench_memory = calloc((size_t)floats, sizeof(float));
-        box_audio_core_reverb_memory(core, 0, bench_memory, floats);
+        box_audio_core_effect_memory(core, 0, bench_memory, floats);
     }
 
     box_audio_writer_init(&w, bytes, sizeof(bytes));
     box_audio_write_order(&w, routes, 3);
     box_audio_write_bus_set(&w, 2, BOX_AUDIO_PARAM_SEND, 0.3f, 0);
-    box_audio_write_reverb(&w, 0, 1, &params);
+    memcpy(fx, &params, sizeof(params));
+    box_audio_write_effect(&w, 0, BOX_AUDIO_EFFECT_REVERB, 1, 0, BOX_AUDIO_BUS_NONE, fx);
     for (i = 0; i < voices; i ++) {
         box_audio_write_play(&w, i, 1, 2, 0.02f, -0.9f + 0.05f * (float)i,
             0.75f + 0.01f * (float)i, BOX_AUDIO_PLAY_LOOP, 0);

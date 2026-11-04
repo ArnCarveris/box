@@ -15,7 +15,8 @@ typedef struct box_window_t box_window_t;
 
 /** Open a window, available when built with BOX_PLATFORM_GLFW, whose input events go to a world.
  *
- * In the browser no window opens, but the page canvas sends its input events to the world.
+ * In the browser the page canvas is the window: it sends its input events to the world and the
+ * surface follows its size on the page.
  *
  * @param world The world or a stage of it
  * @param surface The surface the window presents, stamped on its input events

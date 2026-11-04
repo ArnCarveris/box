@@ -223,8 +223,9 @@ node test/integration/web/audio_spatial.mjs \
 ```
 
 `audio_reverb.mjs` checks the reverb with `test/integration/web/audio_reverb.flecs`, a bus
-`world` that sends to the bus `hall` with `Reverb: {decay: 2.4}`, through
-`sends: [{bus: hall, level: 0.5}]`. After a trusted click it
+`world` that sends to the bus `hall`, which runs its own `Reverb: {decay: 2.4}` in its insert
+slot (`effects: [hall]`), through `sends: [{bus: hall, level: 0.5}]`. After the worklet took the
+memory of the effect slot (an `effect` message) and a trusted click it
 records `audio capture 4` while `box.audio.play` sends a click to the reverb, and measures the
 decay of the tail after the click at the rate of the context. It then starts 32 looping voices
 through the reverb and prints the load of the worklet, which `Module.boxAudio.bench` measures by

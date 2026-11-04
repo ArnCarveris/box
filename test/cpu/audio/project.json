@@ -141,7 +141,11 @@
                     "events_and_release",
                     "synth_voices",
                     "scheduled",
+<<<<<<< HEAD
                     "gated"
+=======
+                    "effects"
+>>>>>>> c21b46b92f471bd6aba722293015e82a9632c704
                 ]
             },
             {
@@ -346,9 +350,24 @@
                     "live_change_no_click",
                     "size_change_no_click",
                     "send_routing",
-                    "second_reverb_errors",
+                    "second_reverb_runs",
                     "delete_fades",
                     "no_alloc"
+                ]
+            },
+            {
+                "id": "Effect",
+                "testcases": [
+                    "four_reverbs_run",
+                    "empty_slots_skipped",
+                    "remove_fades_tail",
+                    "move_fades",
+                    "pool_full",
+                    "no_effects_identical",
+                    "two_slots_error",
+                    "self_slot_script",
+                    "unnamed_does_nothing",
+                    "disabled_bypassed"
                 ]
             },
             {
