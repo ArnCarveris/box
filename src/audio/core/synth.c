@@ -470,12 +470,13 @@ done:
     return;
 }
 
-/** Advance an envelope by a frame.
+/** Advance an envelope by a frame other than one inside a linear segment: one that enters the
+ * next segments, the last frame of a segment, which takes its target, or one of a curve.
  *
  * @param e The envelope
  * @return Its level for the frame
  */
-static inline float box_audio_synth_env_next(
+static float box_audio_synth_env_step(
     box_audio_synth_env_t *e)
 {
     while (!e->left && e->segment < BOX_AUDIO_SYNTH_DONE) {
@@ -495,6 +496,28 @@ static inline float box_audio_synth_env_next(
     }
 
     return e->value;
+}
+
+/** Advance an envelope by a frame. A frame inside a linear segment adds the step here, as
+ * before curves, so a patch without curves pays a test of curved per frame and nothing else;
+ * every other frame takes box_audio_synth_env_step.
+ *
+ * @param e The envelope
+ * @return Its level for the frame
+ */
+static inline float box_audio_synth_env_next(
+    box_audio_synth_env_t *e)
+{
+    float result;
+    if (e->left > 1 && !e->curved) {
+        e->left --;
+        e->value = e->value + e->step;
+        result = e->value;
+    } else {
+        result = box_audio_synth_env_step(e);
+    }
+
+    return result;
 }
 
 /** Set the coefficients of the stages of the filter from its cutoff: g = tan(pi cutoff / rate)

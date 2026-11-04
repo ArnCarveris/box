@@ -61,6 +61,7 @@ static box_audio_core_t* bench_synth_core(
         p.layer[1].envelope.curve = 4;
         p.layer[1].envelope.attack_curve = 1.5f;
     }
+
     if (fm) {
         box_audio_synth_envelope_t decay = {
             .attack = 0.002f, .decay = 1.5f, .sustain = 0.2f, .hold = 2.0f, .release = 0.1f };
