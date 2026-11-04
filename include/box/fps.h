@@ -8,7 +8,7 @@
  * holds a panel at the top right of the surface; closing deletes the view and the content.
  *
  * The panel is the template BOX_FPS_TEMPLATE of BOX_FPS_SCRIPT_PATH, reloaded when it changes.
- * It reads FpsSummary, the frame time box.fps writes to the BOX_FPS_BAR_MUT of every bar, and the
+ * It reads FpsSummary, what box.fps writes to BOX_FPS_BAR_MUT and BOX_FPS_BARS_MUT, and the
  * colors and limits below, exported as box.fps.green, yellow, red, fast_ms and slow_ms.
  */
 
@@ -47,10 +47,18 @@ extern "C" {
 /** Path of the heading of the panel, a Text above the chart */
 #define BOX_FPS_HEADING BOX_FPS_PANEL ".heading"
 
-/** Path of the chart. Its children are the bars bar_0 to bar_N, N BOX_FPS_BARS - 1, instances
- * of BOX_FPS_BAR from the oldest sample on the left to the newest on the right, and the reference
- * lines line_60 and line_30 over them. It has no Layout, so a bar that changes lays nothing out. */
+/** Path of the chart. Its children are BOX_FPS_CHART_BARS, the parent of the bars, and the
+ * reference lines line_60 and line_30 over them. It has no Layout, so a bar that changes lays
+ * nothing out. */
 #define BOX_FPS_CHART BOX_FPS_PANEL ".chart"
+
+/** Path of the parent of the bars, an instance of BOX_FPS_BARS_TEMPLATE without a Layout. Its
+ * children are the bars bar_0 to bar_N, N BOX_FPS_BARS - 1, instances of BOX_FPS_BAR that show
+ * the oldest sample on the left to the newest on the right.
+ *
+ * A bar keeps its name and entity but not its place: the bars rotate, so bar_N is not always
+ * the newest sample. */
+#define BOX_FPS_CHART_BARS BOX_FPS_CHART ".bars"
 
 /** Path of the summary row under the chart. Its children are the Texts times, the mean and
  * worst frame time on the left, and rate, the fps on the right. */
@@ -68,12 +76,26 @@ extern "C" {
 /** Path of the template of the script that every bar of the chart instantiates */
 #define BOX_FPS_BAR "box.fps.FpsBar"
 
-/** Path of the mut variables of BOX_FPS_BAR. Its only member ms, an f64, is the frame time in
- * milliseconds of the sample the bar shows, 0 without a sample, from which the script draws it.
+/** Path of the mut variables of BOX_FPS_BAR, set as a whole: ms, an f64, the frame time in
+ * milliseconds of the sample the bar shows, 0 without a sample, and col, an i32, its column. The
+ * script draws the bar from them, col - first slots from the left, first of BOX_FPS_BARS_MUT.
  *
- * box.fps writes it while the panel is open, only to the bars whose sample changed, so a new
- * sample evaluates only those bars again. */
+ * box.fps writes them while the panel is open, only where they changed. A new sample goes to the
+ * bar of the oldest sample in the column right of the newest, so it evaluates one bar and the
+ * parent.
+ *
+ * Every BOX_FPS_BARS samples, and when the samples changed otherwise, bar_i gets the sample of
+ * age BOX_FPS_BARS - 1 - i in column i again. */
 #define BOX_FPS_BAR_MUT BOX_FPS_BAR ".mut"
+
+/** Path of the template of the script that the parent of the bars, BOX_FPS_CHART_BARS,
+ * instantiates */
+#define BOX_FPS_BARS_TEMPLATE "box.fps.FpsBars"
+
+/** Path of the mut variables of BOX_FPS_BARS_TEMPLATE, which box.fps sets as a whole: first, an
+ * i32, the column of the bar at the left of the chart. The script moves the bars first slots
+ * left, so a new sample moves one entity instead of every bar. */
+#define BOX_FPS_BARS_MUT BOX_FPS_BARS_TEMPLATE ".mut"
 
 /** Points between the panel and the top and right edges of the surface */
 #define BOX_FPS_MARGIN (10.0f)

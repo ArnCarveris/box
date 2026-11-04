@@ -16,6 +16,7 @@ main_view {
 }
 
 panel {
+  Position: {0, 0, 0}
   Layout: {direction: Column, spacing: 10, padding: {12, 12, 12, 12}}
   LayoutItem: {width: {mode: Fixed, value: 600}}
   Rect: {1, 1}

@@ -40,6 +40,7 @@ static ecs_entity_t emitter_new(
 {
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, ParticleEmitter);
+    ecs_set(world, e, Position, {0, 0, 0});
     ParticleEmitter *p = ecs_get_mut(world, e, ParticleEmitter);
     p->rate = 20;
     p->max = 1000;
@@ -520,7 +521,9 @@ void Playback_script_control(void) {
     ecs_world_t *world = world_new(&null);
     test_assert(ecs_script_run(world, "paused",
         "using box.particle\n"
+        "using box.transform\n"
         "e {\n"
+        "  Position: {0, 0, 0}\n"
         "  ParticleEmitter: {rate: 20, lifetime: {100, 100}}\n"
         "  ParticlePlayback: {state: ParticlePaused}\n"
         "}\n", NULL) == 0);

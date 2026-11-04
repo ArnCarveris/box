@@ -56,6 +56,7 @@ static ecs_entity_t emitter_new(
 {
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, ParticleEmitter);
+    ecs_set(world, e, Position, {0, 0, 0});
     ParticleEmitter *p = ecs_get_mut(world, e, ParticleEmitter);
     p->rate = per_frame / DELTA + 1;
     p->max = max;
@@ -615,6 +616,7 @@ void Appearance_billboard_corners_sent(void) {
     ecs_world_t *world = world_new(&null);
     ecs_entity_t rock = ecs_new(world);
     ecs_set(world, rock, Box, {2, 2, 2});
+    ecs_set(world, rock, Position, {0, 0, 0});
     ecs_entity_t e = emitter_new(world, 2, 100);
     ecs_set(world, e, ParticleAppearance, {.shape = ParticleBillboard, .mesh = rock});
     frame(world);

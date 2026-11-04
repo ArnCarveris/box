@@ -8,7 +8,7 @@ template CanopySkyDeck {
   prop width: f32 = 10
   prop depth: f32 = 8
   prop variant: i32 = 0
-  { (IsA, CanopyIvory); RoundedBox: {width, 0.55, depth, 0.65} }
+  { Position: {0, 0, 0}; (IsA, CanopyIvory); RoundedBox: {width, 0.55, depth, 0.65} }
   { (IsA, CanopyWood); Position: {0, -0.36, 0}; RoundedBox: {width - 0.3, 0.2, depth - 0.3, 0.5} }
   for side in 0..2 {
     const z = (side - 0.5) * (depth - 0.9)

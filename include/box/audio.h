@@ -427,6 +427,9 @@ ECS_STRUCT(AudioStatus, {
     float load;            /**< Share of real time the render takes, 0 where it is not
                             *   measured (the web) */
     int32_t buses;         /**< Buses in the processing order, the master included */
+    int64_t clock;         /**< Frame of the core that renders now, as far as the main thread
+                            *   can tell; stops while the output does not run, 0 for a new
+                            *   output */
 });
 
 /** Give an entity the samples of a sound, to play with AudioSource or box_audio_play.

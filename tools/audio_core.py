@@ -34,6 +34,7 @@ EXPORTS = [
     "box_audio_core_wasm_events",
     "box_audio_core_wasm_events_lost",
     "box_audio_core_wasm_voices",
+    "box_audio_core_wasm_clock",
     "box_audio_core_wasm_left",
     "box_audio_core_wasm_right",
     "box_audio_core_wasm_chunk",

@@ -62,12 +62,12 @@ static box_audio_core_t* bench_core(
     box_audio_core_sound(core, 2, bench_stereo, BENCH_SOUND, 2, 44100);
     box_audio_writer_init(&w, bytes, sizeof(bytes));
     box_audio_write_order(&w, routes, 8);
-    box_audio_write_bus_set(&w, 7, BOX_AUDIO_PARAM_SEND, 0.3f);
-    box_audio_write_bus_set(&w, 5, BOX_AUDIO_PARAM_SEND, 0.5f);
-    box_audio_write_bus_set(&w, 3, BOX_AUDIO_PARAM_PAN, -0.4f);
+    box_audio_write_bus_set(&w, 7, BOX_AUDIO_PARAM_SEND, 0.3f, 0);
+    box_audio_write_bus_set(&w, 5, BOX_AUDIO_PARAM_SEND, 0.5f, 0);
+    box_audio_write_bus_set(&w, 3, BOX_AUDIO_PARAM_PAN, -0.4f, 0);
     for (i = 0; i < voices; i ++) {
         box_audio_write_play(&w, i, 1 + i % 2, 1 + i % 7, 0.02f, -0.9f + 0.03f * (float)i,
-            0.75f + 0.01f * (float)i, BOX_AUDIO_PLAY_LOOP);
+            0.75f + 0.01f * (float)i, BOX_AUDIO_PLAY_LOOP, 0);
     }
 
     box_audio_core_apply(core, w.data, w.size);

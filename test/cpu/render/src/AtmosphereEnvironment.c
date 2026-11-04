@@ -585,6 +585,7 @@ void AtmosphereEnvironment_bake_fills_with_environment(void) {
     });
     ecs_entity_t shape = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, shape, Box, {1, 1, 1});
+    ecs_set(world, shape, Position, {0, 0, 0});
     view_new(world, scene, scene);
     box_render_volume_desc_t desc;
     int32_t i, fills = 0;
@@ -629,6 +630,7 @@ void AtmosphereEnvironment_bake_without_environment_uses_hemisphere(void) {
     });
     ecs_entity_t shape = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, shape, Box, {1, 1, 1});
+    ecs_set(world, shape, Position, {0, 0, 0});
     view_new(world, scene, scene);
     box_render_volume_desc_t desc;
     int32_t i, fills = 0;

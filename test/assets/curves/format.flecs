@@ -1,8 +1,10 @@
 // The format: a curve per field, linear by default, Catmull-Rom or Bezier per curve.
 using box.curve
 using box.particle
+using box.transform
 
 smoke {
+  Position: {0, 0, 0}
   ParticleEmitter: {rate: 20, lifetime: {2, 3}, size: {0.5, 0.5}, seed: 1}
   ParticleCurves: {
     opacity: {keys: [{0, 0}, {0.1, 1}, {1, 0}]}

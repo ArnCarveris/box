@@ -15,8 +15,10 @@ effects built from them are in [Showcase](#showcase).
 ```flecs
 using box.curve
 using box.particle
+using box.transform
 
 smoke {
+  Position: {0, 0, 0}
   ParticleEmitter: {rate: 20, lifetime: {2, 3}, size: {0.5, 0.5}, seed: 1}
   ParticleCurves: {
     opacity: {keys: [{0, 0}, {0.1, 1}, {1, 0}]}
@@ -171,8 +173,10 @@ so the stream has no hard edge where particles are born or die.
 ```flecs
 using box.curve
 using box.particle
+using box.transform
 
 fade {
+  Position: {0, 0, 0}
   ParticleEmitter: {
     rate: 30, spread: 20, speed: {0.5, 1}, lifetime: {2, 2.5}, size: {0.2, 0.2}, seed: 1
   }
@@ -193,8 +197,10 @@ up, and thin out to nothing.
 ```flecs
 using box.curve
 using box.particle
+using box.transform
 
 puff {
+  Position: {0, 0, 0}
   ParticleEmitter: {
     max: 200, rate: 25, shape: EmitterSphere, radius: 0.1, spread: 25,
     speed: {0.4, 0.8}, lifetime: {1.5, 2.5}, size: {0.4, 0.6},
@@ -218,8 +224,10 @@ Bright additive streaks that lose half their size in the first fifth of their li
 ```flecs
 using box.curve
 using box.particle
+using box.transform
 
 spark {
+  Position: {0, 0, 0}
   ParticleEmitter: {
     max: 400, rate: 120, spread: 35, speed: {4, 7}, lifetime: {0.4, 0.8},
     size: {0.06, 0.1}, color: {255, 200, 120}, seed: 3
@@ -244,8 +252,10 @@ because additive particles can only brighten and smoke must darken what is behin
 ```flecs
 using box.curve
 using box.particle
+using box.transform
 
 flame {
+  Position: {0, 0, 0}
   ParticleEmitter: {
     max: 600, rate: 120, shape: EmitterDisc, radius: 0.15, spread: 10,
     speed: {0.8, 1.2}, lifetime: {1.2, 1.8}, size: {0.25, 0.35}, seed: 4
@@ -275,8 +285,10 @@ curve comes on, then floats up as the velocity curve lifts it. Constant forces c
 ```flecs
 using box.curve
 using box.particle
+using box.transform
 
 burst {
+  Position: {0, 0, 0}
   ParticleEmitter: {
     max: 400, rate: 0, shape: EmitterSphere, radius: 0.05, spread: 180,
     speed: {4, 6}, lifetime: {1.4, 1.4}, size: {0.08, 0.12}, color: {255, 190, 90}, seed: 5
@@ -307,8 +319,10 @@ particles of the peak leave twice as fast as those of the quiet part, so each pu
 ```flecs
 using box.curve
 using box.particle
+using box.transform
 
 pulse {
+  Position: {0, 0, 0}
   ParticleEmitter: {
     max: 1000, rate: 200, spread: 180, speed: {1, 1}, lifetime: {1, 1},
     size: {0.05, 0.05}, color: {120, 220, 255}, seed: 6
@@ -334,8 +348,10 @@ using box.curve
 using box.light
 using box.material
 using box.particle
+using box.transform
 
 campfire {
+  Position: {0, 0, 0}
   Rgb: {255, 150, 60}
   PointLight: {intensity: 3, range: 6}
   ParticleEmitter: {
@@ -386,8 +402,10 @@ twice their size halfway and then collapse.
 ```flecs
 using box.curve
 using box.particle
+using box.transform
 
 bubbles {
+  Position: {0, 0, 0}
   ParticleEmitter: {
     rate: 40, spread: 30, speed: {0.5, 1}, lifetime: {2, 2}, size: {0.2, 0.2}, seed: 8
   }

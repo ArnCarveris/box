@@ -124,6 +124,7 @@ prefab SfxPop {
 // Dust thrown up around the foot of a new piece
 prefab DustBurst {
   particles {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 48, rate: 0,
       shape: EmitterBox, extents: {0.9, 0.05, 0.9},
@@ -141,6 +142,7 @@ prefab DustBurst {
 // Stones and dust of a piece torn down
 prefab RubbleBurst {
   dust {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 64, rate: 0,
       shape: EmitterBox, extents: {0.8, 0.6, 0.8},
@@ -154,6 +156,7 @@ prefab RubbleBurst {
     ParticleCurves: {size: {keys: [{0, 0.6}, {0.333, 1.5}, {0.667, 2.1}, {1, 2.6}]}, opacity: {keys: [{0, 1}, {0.333, 0.8}, {0.667, 0.4}, {1, 0}]}}
   }
   stones {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 40, rate: 0,
       shape: EmitterBox, extents: {0.6, 0.8, 0.6},
@@ -170,6 +173,7 @@ prefab RubbleBurst {
 // Spray where the moat fills
 prefab SplashBurst {
   particles {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 48, rate: 0,
       shape: EmitterBox, extents: {0.8, 0.02, 0.8},
@@ -186,6 +190,7 @@ prefab SplashBurst {
 // A burst of colored sparks high above the keep
 prefab Firework {
   sparks {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 160, rate: 0,
       shape: EmitterSphere, radius: 0.1,

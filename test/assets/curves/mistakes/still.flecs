@@ -2,8 +2,10 @@
 using box.curve
 using box.light
 using box.particle
+using box.transform
 
 still {
+  Position: {0, 0, 0}
   PointLight: {}
   ParticleEmitter: {rate: 10}
   ParticleLight: {loop: true, curve: {keys: [{0, 1}, {0.5, 0.2}, {1, 1}]}}

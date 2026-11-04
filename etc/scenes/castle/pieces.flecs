@@ -570,7 +570,7 @@ template TowerPiece {
       "slit_{k}" {
         Position: {sin(a) * 0.835, ky, cos(a) * 0.835}
         Rotation: {0, a, 0}
-        Pane glass { Box: {0.16, 0.36, 0.04} }
+        Pane glass { Position: {0, 0, 0}; Box: {0.16, 0.36, 0.04} }
         sill : CastlePaleStone { Position: {0, -0.2, 0.03}; Box: {0.26, 0.05, 0.08} }
         shutter_a : CastleWood { Position: {-0.15, 0, 0.04}; Rotation: {0, -0.5, 0}; Box: {0.12, 0.36, 0.02} }
         shutter_b : CastleWood { Position: {0.15, 0, 0.04}; Rotation: {0, 0.5, 0}; Box: {0.12, 0.36, 0.02} }

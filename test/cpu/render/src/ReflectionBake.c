@@ -163,6 +163,7 @@ void ReflectionBake_c_defaults(void) {
 
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, ReflectionProbe);
+    ecs_set(world, e, Position, {0, 0, 0});
     const ReflectionProbe *probe = ecs_get(world, e, ReflectionProbe);
     test_assert(probe != NULL);
     test_flt(probe->extent[0], 5);
@@ -219,6 +220,7 @@ void ReflectionBake_zero_is_literal(void) {
     test_flt(bake->scene_probe_height, 0);
 
     ecs_set(world, literal, ReflectionProbe, {0});
+    ecs_set(world, literal, Position, {0, 0, 0});
     probe = ecs_get(world, literal, ReflectionProbe);
     test_flt(probe->extent[0], 0);
     test_flt(probe->blend, 0);

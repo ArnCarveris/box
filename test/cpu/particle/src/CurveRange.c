@@ -129,7 +129,9 @@ static void range_init(
     snprintf(code, sizeof(code),
         "using box.curve\n"
         "using box.particle\n"
+        "using box.transform\n"
         "jet {\n"
+        "  Position: {0, 0, 0}\n"
         "  ParticleEmitter: {rate: 20, lifetime: {1, 1}, seed: %u}\n"
         "  ParticleCurves: {%s}\n"
         "}\n", SEED, curves);
@@ -690,6 +692,7 @@ void CurveRange_error_light(void) {
     box_render_set_backend(world, &backend);
     ecs_entity_t e = ecs_entity(world, { .name = "flash" });
     ecs_add(world, e, ParticleEmitter);
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, PointLight, { .intensity = 1, .range = 10 });
     errors_begin();
     ecs_set(world, e, ParticleLight, {

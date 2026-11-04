@@ -110,6 +110,8 @@ static char* box_cmd_audio_print(
     ecs_strbuf_append(&buf, "%s, %d Hz, %d voices, %lld stolen, load %.1f%%",
         box_cmd_audio_state(s.state), s.sample_rate, s.voices, (long long)s.voices_stolen,
         (double)(s.load * 100.0f));
+    ecs_strbuf_append(&buf, "\nclock: %lld frames (%.3f s)", (long long)s.clock,
+        s.sample_rate > 0 ? (double)s.clock / (double)s.sample_rate : 0.0);
     ecs_strbuf_append(&buf, "\nmaster: volume %.2f%s",
         settings ? (double)settings->master_volume : 1.0, settings && settings->mute ?
             " muted" : "");

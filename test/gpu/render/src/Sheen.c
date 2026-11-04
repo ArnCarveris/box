@@ -472,6 +472,7 @@ static unsigned char* sheen_emissive(
     ecs_world_t *world = sheen_world(true, 0);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Quad, {2, 2});
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, Rgb, {0, 0, 0});
     ecs_set(world, e, PbrMaterial, {.metallic = 0, .roughness = 1});
     ecs_set(world, e, Emissive, {.strength = 1, .color = {200, 100, 50}});

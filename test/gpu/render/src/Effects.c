@@ -166,6 +166,7 @@ void Effects_bloom_spreads_past_emissive_edge(void) {
         .color = {0, 0, 0, 255}}});
     ecs_entity_t cube = ecs_new(world);
     ecs_set(world, cube, Box, {1, 1, 1});
+    ecs_set(world, cube, Position, {0, 0, 0});
     ecs_set(world, cube, Rgb, {0, 0, 0});
     ecs_set(world, cube, Emissive, {.strength = 8, .color = {255, 255, 255}});
     ecs_entity_t s = ecs_new(world);
@@ -227,6 +228,7 @@ void Effects_bloom_threshold_keeps_dim_edges(void) {
     ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
     ecs_entity_t cube = ecs_new(world);
     ecs_set(world, cube, Box, {1, 1, 1});
+    ecs_set(world, cube, Position, {0, 0, 0});
     ecs_set(world, cube, Rgb, {0, 0, 0});
     ecs_set(world, cube, Emissive, {.strength = 0.8f, .color = {255, 255, 255}});
     ecs_entity_t s = ecs_new(world);
@@ -278,6 +280,7 @@ void Effects_bloom_intensity_change_applies(void) {
     ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
     ecs_entity_t cube = ecs_new(world);
     ecs_set(world, cube, Box, {1, 1, 1});
+    ecs_set(world, cube, Position, {0, 0, 0});
     ecs_set(world, cube, Rgb, {0, 0, 0});
     ecs_set(world, cube, Emissive, {.strength = 8, .color = {255, 255, 255}});
     ecs_entity_t s = ecs_new(world);
@@ -393,6 +396,7 @@ void Effects_tonemap_keeps_hue_of_bright_colors(void) {
     ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
     ecs_entity_t cube = ecs_new(world);
     ecs_set(world, cube, Box, {1, 1, 1});
+    ecs_set(world, cube, Position, {0, 0, 0});
     ecs_set(world, cube, Rgb, {0, 0, 0});
     ecs_set(world, cube, Emissive, {.strength = 4, .color = {255, 120, 40}});
     ecs_entity_t s = ecs_new(world);
@@ -523,6 +527,7 @@ void Effects_exposure_adapts_over_frames(void) {
     ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
     ecs_entity_t wall = ecs_new(world);
     ecs_set(world, wall, Box, {20, 20, 1});
+    ecs_set(world, wall, Position, {0, 0, 0});
     ecs_set(world, wall, Rgb, {0, 0, 0});
     ecs_set(world, wall, Emissive, {.strength = 0.02f, .color = {255, 255, 255}});
     ecs_entity_t s = ecs_new(world);
@@ -590,6 +595,7 @@ void Effects_exposure_deterministic_with_fixed_delta(void) {
         ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
         ecs_entity_t wall = ecs_new(world);
         ecs_set(world, wall, Box, {20, 20, 1});
+        ecs_set(world, wall, Position, {0, 0, 0});
         ecs_set(world, wall, Rgb, {0, 0, 0});
         ecs_set(world, wall, Emissive, {.strength = 2, .color = {255, 255, 255}});
         ecs_entity_t s = ecs_new(world);
@@ -1366,6 +1372,7 @@ void Effects_chain_order_matters(void) {
     ecs_set_ptr(world, view, View, &value);
     ecs_entity_t cube = ecs_new(world);
     ecs_set(world, cube, Box, {1, 1, 1});
+    ecs_set(world, cube, Position, {0, 0, 0});
     ecs_set(world, cube, Rgb, {0, 0, 0});
     ecs_set(world, cube, Emissive, {.strength = 8, .color = {255, 255, 255}});
     ecs_entity_t s = ecs_new(world);
@@ -1414,6 +1421,7 @@ void Effects_chain_reconfigured_on_change(void) {
         .color = {0, 0, 0, 255}}});
     ecs_entity_t cube = ecs_new(world);
     ecs_set(world, cube, Box, {1, 1, 1});
+    ecs_set(world, cube, Position, {0, 0, 0});
     ecs_set(world, cube, Rgb, {0, 0, 0});
     ecs_set(world, cube, Emissive, {.strength = 8, .color = {255, 160, 80}});
     ecs_entity_t floor = ecs_new(world);
@@ -1534,6 +1542,7 @@ void Effects_view_without_clear_composites_over(void) {
     ecs_entity_t cube = ecs_new(world);
     ecs_add_pair(world, cube, EcsChildOf, scene);
     ecs_set(world, cube, Box, {1, 1, 1});
+    ecs_set(world, cube, Position, {0, 0, 0});
     ecs_set(world, cube, Rgb, {0, 0, 0});
     ecs_set(world, cube, Emissive, {.strength = 0.5f, .color = {40, 220, 40}});
     ecs_entity_t s = ecs_new(world);
@@ -1581,6 +1590,7 @@ void Effects_zero_literal_applies_as_set(void) {
     ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
     ecs_entity_t cube = ecs_new(world);
     ecs_set(world, cube, Box, {1, 1, 1});
+    ecs_set(world, cube, Position, {0, 0, 0});
     ecs_set(world, cube, Rgb, {0, 0, 0});
     ecs_set(world, cube, Emissive, {.strength = 8, .color = {255, 255, 255}});
     ecs_entity_t s = ecs_new(world);
@@ -1710,6 +1720,7 @@ void Effects_bloom_temporal_keeps_last_frame(void) {
         ecs_set_ptr(world, view, View, &value);
         ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
         ecs_entity_t cube = ecs_new(world);
+        ecs_set(world, cube, Position, {0, 0, 0});
         ecs_set(world, cube, Box, {1, 1, 1});
         ecs_set(world, cube, Rgb, {0, 0, 0});
         ecs_set(world, cube, Emissive, {.strength = 8, .color = {255, 255, 255}});
@@ -1766,6 +1777,7 @@ void Effects_follow_surface_resize(void) {
     ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
     ecs_entity_t cube = ecs_new(world);
     ecs_set(world, cube, Box, {1, 1, 1});
+    ecs_set(world, cube, Position, {0, 0, 0});
     ecs_set(world, cube, Rgb, {0, 0, 0});
     ecs_set(world, cube, Emissive, {.strength = 8, .color = {255, 255, 255}});
     ecs_entity_t s = ecs_new(world);

@@ -524,18 +524,16 @@ static void box_reflect_prune(
  *
  * @param out Receives the data, all but the slot
  * @param probe The ReflectionProbe
- * @param transform World transform of the entity, NULL for the origin
+ * @param transform World transform of the entity
  */
 static void box_reflect_place(
     box_render_reflection_probe_t *out,
     const ReflectionProbe *probe,
     const WorldTransform *transform)
 {
-    mat4 m = GLM_MAT4_IDENTITY_INIT;
+    mat4 m;
     int32_t i, k;
-    if (transform) {
-        glm_mat4_copy(ECS_CONST_CAST(vec4*, transform->m), m);
-    }
+    glm_mat4_copy(ECS_CONST_CAST(vec4*, transform->m), m);
 
     ecs_os_memset_t(out, 0, box_render_reflection_probe_t);
     glm_vec3_copy(m[3], out->center);
@@ -961,7 +959,7 @@ static void box_reflect_probes(
 
             box_reflect_probe_t *probe = box_reflect_ensure_probe(s, qit.entities[row]);
             box_render_reflection_probe_t was = probe->data;
-            box_reflect_place(&probe->data, &probes[row], transforms ? &transforms[row] : NULL);
+            box_reflect_place(&probe->data, &probes[row], &transforms[row]);
             if (box_reflect_moved(&was, &probe->data)) {
                 box_reflect_queue(probe);
             }
@@ -1536,11 +1534,12 @@ static void box_reflect_free(
     ecs_os_free(r);
 }
 
-/** Create a query of a component and the optional Scene of its entity or an ancestor.
+/** Create a query of a component, the WorldTransform of its entity when asked, and the optional
+ * Scene of its entity or an ancestor.
  *
  * @param world The world
  * @param component The component
- * @param transform Whether the optional WorldTransform comes between them
+ * @param transform Whether the WorldTransform comes between them, which the entity needs
  * @param name The name of the query entity
  * @return The query
  */
@@ -1558,7 +1557,7 @@ static ecs_query_t* box_reflect_query(
     int32_t scene = 1;
     if (transform) {
         desc.terms[1] = (ecs_term_t){
-            .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional
+            .id = ecs_id(WorldTransform), .inout = EcsIn
         };
         scene = 2;
     }

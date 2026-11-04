@@ -108,6 +108,7 @@ prefab HitBurst {
 // are brighter than the sky and bloom, as the emissive strength 2 of the original did.
 prefab CarrotSparkle {
   particles {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 32,
       rate: 0,
@@ -133,6 +134,7 @@ prefab CarrotSparkle {
   // The same particles twice as large and fainter: the same seed and draws place them on the
   // sparkles of the layer above
   glow {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 32,
       rate: 0,

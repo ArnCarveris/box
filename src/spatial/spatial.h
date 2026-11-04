@@ -7,6 +7,8 @@
  *
  * UI elements without a shape (LayoutBounds, else TextBounds, flat in the XY plane of their
  * WorldTransform) are indexed too, and only ray casts that ask for them see them.
+ *
+ * An entity without a WorldTransform has no place in the world: it is not drawn, and not indexed.
  */
 
 #ifndef BOX_SPATIAL_PRIVATE_H

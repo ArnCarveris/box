@@ -1,8 +1,10 @@
 // A time after 1: particle curves run from 0 at birth to 1 at death
 using box.curve
 using box.particle
+using box.transform
 
 late {
+  Position: {0, 0, 0}
   ParticleEmitter: {rate: 10}
   ParticleCurves: {size: {keys: [{0, 1}, {1, 2}, {1.5, 0}]}}
 }

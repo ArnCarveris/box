@@ -148,3 +148,45 @@ void NoAlloc_synth_voices(void) {
     box_audio_core_free(core);
     test_int(noalloc_frees, 1);
 }
+
+/* Commands that wait in the schedule, apply on their frame, apply late on a full schedule and
+ * are cancelled by a stop, without a call of the allocator. */
+void NoAlloc_scheduled(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    static uint8_t bytes[128 * 1024];
+    box_audio_writer_t w;
+    uint32_t i;
+    audio_fill(audio_sound_a, 4000, 0.25f);
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, 4000, 1, AUDIO_RATE));
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    for (i = 1; i <= 1000; i ++) {
+        uint64_t at = 1 + (uint64_t)(i * 37 % 20000);
+        test_assert(box_audio_write_play(&w, i, 1, 0, 0.1f, 0, 1, BOX_AUDIO_PLAY_LOOP, at));
+        test_assert(box_audio_write_voice_set(&w, i, BOX_AUDIO_PARAM_PAN, 0.5f, at + 50));
+        test_assert(box_audio_write_bus_set(&w, 0, BOX_AUDIO_PARAM_VOLUME, 0.9f, at + 10));
+        test_assert(box_audio_write_stop(&w, i, at + 700));
+    }
+
+    test_assert(box_audio_write_stop(&w, 5, 0));
+    box_audio_core_apply(core, w.data, w.size);
+    test_assert(box_audio_core_scheduled(core) > 0);
+    audio_render(core, 0, AUDIO_FRAMES / 2);
+    test_int(box_audio_core_scheduled(core), 0);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_LATE, NULL), 0);
+
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    for (i = 0; i < BOX_AUDIO_SCHEDULE_MAX + 10; i ++) {
+        test_assert(box_audio_write_voice_set(&w, 7, BOX_AUDIO_PARAM_PAN, 0,
+            box_audio_core_clock(core) + 100 + i));
+    }
+
+    box_audio_core_apply(core, w.data, w.size);
+    test_int(box_audio_core_scheduled(core), BOX_AUDIO_SCHEDULE_MAX);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_LATE, NULL), 10);
+    audio_render(core, AUDIO_FRAMES / 2, AUDIO_FRAMES / 2);
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+}

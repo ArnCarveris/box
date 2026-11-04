@@ -266,6 +266,7 @@ void PipelineCache_released_shader_draws_nothing(void) {
         .color = {128, 128, 128, 255}}});
     ecs_entity_t cube = ecs_new(world);
     ecs_set(world, cube, Box, {8, 8, 8});
+    ecs_set(world, cube, Position, {0, 0, 0});
     ecs_set(world, cube, Rgb, {255, 0, 0});
     ecs_entity_t s = ecs_new(world);
     ecs_set(world, s, Surface, {.width = 32, .height = 32, .resolution_scale = 1,

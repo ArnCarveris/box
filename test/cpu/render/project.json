@@ -292,6 +292,19 @@
                 ]
             },
             {
+                "id": "DrawPosition",
+                "testcases": [
+                    "box_without_position",
+                    "dynamic_box_without_position",
+                    "rect_without_position",
+                    "point_light_without_position",
+                    "text_without_position",
+                    "layout_children_drawn",
+                    "layout_direction_none_child_drawn",
+                    "shape_without_position_not_indexed"
+                ]
+            },
+            {
                 "id": "InstanceStore",
                 "testcases": [
                     "static_changes_one_scatter_per_page",

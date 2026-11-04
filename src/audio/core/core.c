@@ -315,6 +315,75 @@ static box_audio_voice_t* box_audio_voice_find(
     return result;
 }
 
+/** The level of a voice to pick a victim by: the gain it fades from for a fading voice, the
+ * larger of its gain targets for a playing one.
+ *
+ * @param v The voice
+ * @return The level
+ */
+static float box_audio_voice_victim_level(
+    const box_audio_voice_t *v)
+{
+    return v->state == BOX_AUDIO_VOICE_STOPPING ?
+        (v->left.value > v->right.value ? v->left.value : v->right.value) :
+        box_audio_voice_level(v);
+}
+
+/** Whether a voice can give up what a play needs: any voice for a slot, a synth voice with
+ * parts for parts.
+ *
+ * @param v The voice
+ * @param parts Whether the play needs synth parts
+ * @return Whether it can be the victim
+ */
+static bool box_audio_voice_victim_fits(
+    const box_audio_voice_t *v,
+    bool parts)
+{
+    return !parts ||
+        (v->source.kind == BOX_AUDIO_SOURCE_SYNTH && v->source.data.synth.layers > 0);
+}
+
+/** Pick the voice to take from for a new play: the quietest voice of a state, the first of
+ * equals. Every steal, of a slot, of the cap or of synth parts, picks here.
+ *
+ * @param core The core
+ * @param state BOX_AUDIO_VOICE_PLAYING or BOX_AUDIO_VOICE_STOPPING
+ * @param parts Whether only synth voices that hold parts qualify
+ * @return The voice, NULL when none qualifies
+ */
+static box_audio_voice_t* box_audio_voice_victim(
+    box_audio_core_t *core,
+    int32_t state,
+    bool parts)
+{
+    box_audio_voice_t *quietest = NULL;
+    int32_t i;
+    for (i = 0; i < BOX_AUDIO_VOICE_SLOTS; i ++) {
+        box_audio_voice_t *v = &core->voices[i];
+        if (v->state == state && box_audio_voice_victim_fits(v, parts) && (!quietest ||
+            box_audio_voice_victim_level(v) < box_audio_voice_victim_level(quietest)))
+        {
+            quietest = v;
+        }
+    }
+
+    return quietest;
+}
+
+/** Report the steal of a playing voice.
+ *
+ * @param core The core
+ * @param v The voice
+ */
+static void box_audio_voice_stolen(
+    box_audio_core_t *core,
+    const box_audio_voice_t *v)
+{
+    core->steals ++;
+    box_audio_core_event(core, BOX_AUDIO_EVENT_VOICE_STOLEN, v->handle, core->steals);
+}
+
 /** Steal the playing voice with the lowest level, the first of equals, with a short fade.
  *
  * @param core The core
@@ -322,21 +391,9 @@ static box_audio_voice_t* box_audio_voice_find(
 static void box_audio_voice_steal(
     box_audio_core_t *core)
 {
-    box_audio_voice_t *quietest = NULL;
-    int32_t i;
-    for (i = 0; i < BOX_AUDIO_VOICE_SLOTS; i ++) {
-        box_audio_voice_t *v = &core->voices[i];
-        if (v->state == BOX_AUDIO_VOICE_PLAYING && (!quietest ||
-            box_audio_voice_level(v) < box_audio_voice_level(quietest)))
-        {
-            quietest = v;
-        }
-    }
-
+    box_audio_voice_t *quietest = box_audio_voice_victim(core, BOX_AUDIO_VOICE_PLAYING, false);
     if (quietest) {
-        core->steals ++;
-        box_audio_core_event(core, BOX_AUDIO_EVENT_VOICE_STOLEN, quietest->handle,
-            core->steals);
+        box_audio_voice_stolen(core, quietest);
         box_audio_voice_fade(core, quietest, core->steal_frames);
     }
 }
@@ -349,28 +406,88 @@ static void box_audio_voice_steal(
 static box_audio_voice_t* box_audio_voice_slot(
     box_audio_core_t *core)
 {
-    box_audio_voice_t *result = NULL, *quietest = NULL;
+    box_audio_voice_t *result = NULL;
     int32_t i;
     for (i = 0; i < BOX_AUDIO_VOICE_SLOTS && !result; i ++) {
-        box_audio_voice_t *v = &core->voices[i];
-        if (v->state == BOX_AUDIO_VOICE_FREE) {
-            result = v;
-        } else if (v->state == BOX_AUDIO_VOICE_STOPPING) {
-            float level = v->left.value > v->right.value ? v->left.value : v->right.value;
-            float best = quietest ? (quietest->left.value > quietest->right.value ?
-                quietest->left.value : quietest->right.value) : 0;
-            if (!quietest || level < best) {
-                quietest = v;
-            }
+        if (core->voices[i].state == BOX_AUDIO_VOICE_FREE) {
+            result = &core->voices[i];
         }
     }
 
-    if (!result && quietest) {
-        box_audio_voice_end(core, quietest);
-        result = quietest;
+    if (!result) {
+        result = box_audio_voice_victim(core, BOX_AUDIO_VOICE_STOPPING, false);
+        if (result) {
+            box_audio_voice_end(core, result);
+        }
     }
 
     return result;
+}
+
+/** Whether a new play finds a voice slot: a free one, a fading one to end, or one the cap
+ * steal makes fade.
+ *
+ * @param core The core
+ * @return Whether box_audio_voice_slot finds one after the steal of the cap
+ */
+static bool box_audio_voice_slot_fits(
+    const box_audio_core_t *core)
+{
+    bool result = false;
+    int32_t i;
+    for (i = 0; i < BOX_AUDIO_VOICE_SLOTS && !result; i ++) {
+        result = core->voices[i].state != BOX_AUDIO_VOICE_PLAYING ||
+            core->playing >= BOX_AUDIO_VOICE_MAX;
+    }
+
+    return result;
+}
+
+/** Whether the parts of the synth voices, free and held, hold the layers of a synth sound.
+ *
+ * @param core The core
+ * @param sound Id of a ready synth sound
+ * @return Whether box_audio_voice_reclaim frees enough
+ */
+static bool box_audio_voice_reclaim_fits(
+    const box_audio_core_t *core,
+    uint32_t sound)
+{
+    int32_t parts = core->synth_free_count, i;
+    for (i = 0; i < BOX_AUDIO_VOICE_SLOTS; i ++) {
+        const box_audio_voice_t *v = &core->voices[i];
+        if (v->state != BOX_AUDIO_VOICE_FREE && v->source.kind == BOX_AUDIO_SOURCE_SYNTH) {
+            parts += v->source.data.synth.layers;
+        }
+    }
+
+    return box_audio_synth_parts(core, sound) <= parts;
+}
+
+/** End synth voices until the free parts hold the layers of a synth sound: the quietest fading
+ * ones first, then the quietest playing ones, which report a steal.
+ *
+ * @param core The core
+ * @param sound Id of a ready synth sound, which box_audio_voice_reclaim_fits found
+ */
+static void box_audio_voice_reclaim(
+    box_audio_core_t *core,
+    uint32_t sound)
+{
+    int32_t need = box_audio_synth_parts(core, sound);
+    while (core->synth_free_count < need) {
+        box_audio_voice_t *v = box_audio_voice_victim(core, BOX_AUDIO_VOICE_STOPPING, true);
+        if (!v) {
+            v = box_audio_voice_victim(core, BOX_AUDIO_VOICE_PLAYING, true);
+            if (!v) {
+                break;
+            }
+
+            box_audio_voice_stolen(core, v);
+        }
+
+        box_audio_voice_end(core, v);
+    }
 }
 
 /** Apply a play command. A synth voice starts at its gains, without the ramp: its envelope
@@ -384,6 +501,7 @@ static void box_audio_cmd_play(
     const box_audio_cmd_play_t *cmd)
 {
     box_audio_voice_t *v = NULL;
+    bool synth;
     if (cmd->sound >= BOX_AUDIO_SOUND_MAX || cmd->bus >= BOX_AUDIO_BUS_MAX ||
         core->sounds[cmd->sound].state != BOX_AUDIO_SOUND_READY)
     {
@@ -391,12 +509,24 @@ static void box_audio_cmd_play(
         goto done;
     }
 
+    synth = core->sounds[cmd->sound].synth != 0;
+    if (!box_audio_voice_slot_fits(core) || (synth && (!box_audio_synth_strings_fit(core,
+        cmd->sound) || !box_audio_voice_reclaim_fits(core, cmd->sound))))
+    {
+        box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_PLAY, 0);
+        goto done;
+    }
+
+    if (synth) {
+        box_audio_voice_reclaim(core, cmd->sound);
+    }
+
     if (core->playing >= BOX_AUDIO_VOICE_MAX) {
         box_audio_voice_steal(core);
     }
 
     v = box_audio_voice_slot(core);
-    if (!v || (core->sounds[cmd->sound].synth && !box_audio_synth_fits(core, cmd->sound))) {
+    if (!v || (synth && !box_audio_synth_fits(core, cmd->sound))) {
         box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_PLAY, 0);
         goto done;
     }
@@ -712,6 +842,188 @@ done:
     return;
 }
 
+/** Apply a command that takes effect on a frame, now.
+ *
+ * @param core The core
+ * @param cmd The command
+ */
+static void box_audio_cmd_timed(
+    box_audio_core_t *core,
+    const box_audio_timed_cmd_t *cmd)
+{
+    box_audio_voice_t *v;
+    if (cmd->header.type == BOX_AUDIO_CMD_PLAY) {
+        box_audio_cmd_play(core, &cmd->play);
+    } else if (cmd->header.type == BOX_AUDIO_CMD_STOP) {
+        v = box_audio_voice_find(core, cmd->stop.voice);
+        if (v) {
+            box_audio_voice_fade(core, v, core->ramp_frames);
+        }
+    } else if (cmd->header.type == BOX_AUDIO_CMD_VOICE_SET) {
+        box_audio_cmd_voice_set(core, &cmd->set);
+    } else {
+        box_audio_cmd_bus_set(core, &cmd->set);
+    }
+}
+
+/** Whether a command of the schedule comes before another: an earlier frame, or the same
+ * frame and an earlier arrival.
+ *
+ * @param a A command
+ * @param b Another command
+ * @return Whether a comes first
+ */
+static bool box_audio_schedule_before(
+    const box_audio_scheduled_t *a,
+    const box_audio_scheduled_t *b)
+{
+    return a->when < b->when || (a->when == b->when && a->order < b->order);
+}
+
+/** Move a command of the schedule down the heap to its place.
+ *
+ * @param core The core
+ * @param at Index of the command
+ */
+static void box_audio_schedule_down(
+    box_audio_core_t *core,
+    int32_t at)
+{
+    box_audio_scheduled_t *heap = core->schedule, e = heap[at];
+    int32_t count = core->schedule_count;
+    for (;;) {
+        int32_t child = at * 2 + 1;
+        if (child >= count) {
+            break;
+        }
+
+        if (child + 1 < count && box_audio_schedule_before(&heap[child + 1], &heap[child])) {
+            child ++;
+        }
+
+        if (!box_audio_schedule_before(&heap[child], &e)) {
+            break;
+        }
+
+        heap[at] = heap[child];
+        at = child;
+    }
+
+    heap[at] = e;
+}
+
+/** Put a command into the schedule, which has room.
+ *
+ * @param core The core
+ * @param when Frame it applies at
+ * @param cmd The command
+ */
+static void box_audio_schedule_push(
+    box_audio_core_t *core,
+    uint64_t when,
+    const box_audio_timed_cmd_t *cmd)
+{
+    box_audio_scheduled_t *heap = core->schedule, e;
+    int32_t at = core->schedule_count ++;
+    e.when = when;
+    e.order = core->schedule_order ++;
+    e.cmd = *cmd;
+    while (at > 0) {
+        int32_t parent = (at - 1) / 2;
+        if (!box_audio_schedule_before(&e, &heap[parent])) {
+            break;
+        }
+
+        heap[at] = heap[parent];
+        at = parent;
+    }
+
+    heap[at] = e;
+}
+
+/** Apply the commands of the schedule whose frame the clock reached, in order.
+ *
+ * @param core The core
+ */
+static void box_audio_schedule_run(
+    box_audio_core_t *core)
+{
+    while (core->schedule_count && core->schedule[0].when <= core->clock) {
+        box_audio_timed_cmd_t cmd = core->schedule[0].cmd;
+        core->schedule_count --;
+        if (core->schedule_count) {
+            core->schedule[0] = core->schedule[core->schedule_count];
+            box_audio_schedule_down(core, 0);
+        }
+
+        box_audio_cmd_timed(core, &cmd);
+    }
+}
+
+/** Drop the commands of the schedule for a voice handle: its plays, stops and sets.
+ *
+ * @param core The core
+ * @param voice The handle
+ */
+static void box_audio_schedule_cancel(
+    box_audio_core_t *core,
+    uint32_t voice)
+{
+    int32_t i, kept = 0;
+    for (i = 0; i < core->schedule_count; i ++) {
+        const box_audio_timed_cmd_t *cmd = &core->schedule[i].cmd;
+        uint16_t type = cmd->header.type;
+        bool drop = (type == BOX_AUDIO_CMD_PLAY && cmd->play.voice == voice) ||
+            (type == BOX_AUDIO_CMD_STOP && cmd->stop.voice == voice) ||
+            (type == BOX_AUDIO_CMD_VOICE_SET && cmd->set.target == voice);
+        if (!drop) {
+            if (kept != i) {
+                core->schedule[kept] = core->schedule[i];
+            }
+
+            kept ++;
+        }
+    }
+
+    if (kept != core->schedule_count) {
+        core->schedule_count = kept;
+        for (i = kept / 2 - 1; i >= 0; i --) {
+            box_audio_schedule_down(core, i);
+        }
+    }
+}
+
+/** Take a command that takes effect on a frame: into the schedule when its frame is to come,
+ * else at once. A stop that applies at once drops the scheduled commands of its handle first.
+ * A full schedule applies the command at once and reports it late.
+ *
+ * @param core The core
+ * @param bytes The command, header included
+ * @param size Bytes of its type
+ */
+static void box_audio_cmd_when(
+    box_audio_core_t *core,
+    const uint8_t *bytes,
+    int32_t size)
+{
+    box_audio_timed_cmd_t cmd;
+    uint64_t when;
+    box_audio_copy(&cmd, bytes, size);
+    when = ((uint64_t)cmd.play.when_hi << 32) | cmd.play.when_lo;
+    if (when <= core->clock) {
+        if (cmd.header.type == BOX_AUDIO_CMD_STOP && core->schedule_count) {
+            box_audio_schedule_cancel(core, cmd.stop.voice);
+        }
+
+        box_audio_cmd_timed(core, &cmd);
+    } else if (core->schedule_count < BOX_AUDIO_SCHEDULE_MAX) {
+        box_audio_schedule_push(core, when, &cmd);
+    } else {
+        box_audio_core_event(core, BOX_AUDIO_EVENT_LATE, cmd.header.type, 0);
+        box_audio_cmd_timed(core, &cmd);
+    }
+}
+
 /** Apply one command whose bytes are all within the batch.
  *
  * @param core The core
@@ -725,34 +1037,23 @@ static void box_audio_cmd(
     uint16_t type,
     int32_t size)
 {
-    box_audio_cmd_play_t play;
     box_audio_cmd_legato_t legato;
-    box_audio_cmd_stop_t stop;
-    box_audio_cmd_set_t set;
     box_audio_cmd_release_t release;
     box_audio_cmd_stream_t stream;
     box_audio_cmd_reverb_t reverb;
     box_audio_cmd_synth_t synth;
-    box_audio_voice_t *v;
     uint32_t layers;
-    if (type == BOX_AUDIO_CMD_PLAY && size >= (int32_t)sizeof(play)) {
-        box_audio_copy(&play, bytes, (int32_t)sizeof(play));
-        box_audio_cmd_play(core, &play);
+    if (type == BOX_AUDIO_CMD_PLAY && size >= (int32_t)sizeof(box_audio_cmd_play_t)) {
+        box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_play_t));
     } else if (type == BOX_AUDIO_CMD_LEGATO && size >= (int32_t)sizeof(legato)) {
         box_audio_copy(&legato, bytes, (int32_t)sizeof(legato));
         box_audio_cmd_legato(core, &legato);
-    } else if (type == BOX_AUDIO_CMD_STOP && size >= (int32_t)sizeof(stop)) {
-        box_audio_copy(&stop, bytes, (int32_t)sizeof(stop));
-        v = box_audio_voice_find(core, stop.voice);
-        if (v) {
-            box_audio_voice_fade(core, v, core->ramp_frames);
-        }
-    } else if (type == BOX_AUDIO_CMD_VOICE_SET && size >= (int32_t)sizeof(set)) {
-        box_audio_copy(&set, bytes, (int32_t)sizeof(set));
-        box_audio_cmd_voice_set(core, &set);
-    } else if (type == BOX_AUDIO_CMD_BUS_SET && size >= (int32_t)sizeof(set)) {
-        box_audio_copy(&set, bytes, (int32_t)sizeof(set));
-        box_audio_cmd_bus_set(core, &set);
+    } else if (type == BOX_AUDIO_CMD_STOP && size >= (int32_t)sizeof(box_audio_cmd_stop_t)) {
+        box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_stop_t));
+    } else if ((type == BOX_AUDIO_CMD_VOICE_SET || type == BOX_AUDIO_CMD_BUS_SET) &&
+        size >= (int32_t)sizeof(box_audio_cmd_set_t))
+    {
+        box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_set_t));
     } else if (type == BOX_AUDIO_CMD_ORDER && size >= (int32_t)sizeof(box_audio_cmd_order_t)) {
         box_audio_cmd_order(core, bytes, size);
     } else if (type == BOX_AUDIO_CMD_SOUND_RELEASE && size >= (int32_t)sizeof(release)) {
@@ -1013,6 +1314,18 @@ int32_t box_audio_core_events_lost(
     return core->events_lost;
 }
 
+uint64_t box_audio_core_clock(
+    const box_audio_core_t *core)
+{
+    return core ? core->clock : 0;
+}
+
+int32_t box_audio_core_scheduled(
+    const box_audio_core_t *core)
+{
+    return core ? core->schedule_count : 0;
+}
+
 /** Render a block of a voice into its bus, and end it when its source ends or its fade does.
  *
  * @param core The core
@@ -1133,6 +1446,13 @@ void box_audio_core_render(
     while (at < frames) {
         int32_t n = frames - at < BOX_AUDIO_CORE_BLOCK ? frames - at : BOX_AUDIO_CORE_BLOCK;
         box_audio_bus_t *master = &core->buses[0];
+        if (core->schedule_count) {
+            box_audio_schedule_run(core);
+            if (core->schedule_count && core->schedule[0].when - core->clock < (uint64_t)n) {
+                n = (int32_t)(core->schedule[0].when - core->clock);
+            }
+        }
+
         for (k = 0; k < core->order_count; k ++) {
             box_audio_bus_t *b = &core->buses[core->order[k].bus];
             for (i = 0; i < n; i ++) {
@@ -1149,7 +1469,12 @@ void box_audio_core_render(
 
         box_audio_buses_render(core, n);
         box_audio_limit(core, master->l, master->r, left + at, right + at, n);
+        core->clock += (uint64_t)n;
         at += n;
+    }
+
+    if (core->schedule_count) {
+        box_audio_schedule_run(core);
     }
 
 done:

@@ -247,6 +247,7 @@ void Transition_mesh_color_mid_transition(void) {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Box, {2, 2, 2});
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, Rgb, {255, 0, 0});
     box_transition_set(world, e, ecs_id(Rgb), &(TransitionSpec){ .duration = 1.0f });
     unsigned char *px = trans_capture(world, "transition_color_0.png");
@@ -351,6 +352,7 @@ static ecs_world_t* trans_coat_world(
     ecs_set(world, sun, DirectionalLight, {.intensity = 0});
 
     ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, Quad, {4, 4});
     ecs_set(world, e, Rgb, {40, 40, 40});
     ecs_set(world, e, PbrMaterial, {.metallic = 0, .roughness = 1});

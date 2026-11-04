@@ -640,6 +640,7 @@ static const box_render_particle_pool_t* pool_of(
 #define PREFABS \
     "using box.curve\n" \
     "using box.particle\n" \
+    "using box.transform\n" \
     "prefab smoke {\n" \
     "  ParticleEmitter: {rate: 20, lifetime: {1, 1}}\n" \
     "  ParticleCurves: {\n" \
@@ -647,9 +648,14 @@ static const box_render_particle_pool_t* pool_of(
     "    color: {kind: CurveBezier, keys: [{0, {255, 220, 60}}, {1, {120, 20, 10}}]}\n" \
     "  }\n" \
     "}\n" \
-    "a : smoke {}\n" \
-    "b : smoke {}\n" \
+    "a : smoke {\n" \
+    "  Position: {0, 0, 0}\n" \
+    "}\n" \
+    "b : smoke {\n" \
+    "  Position: {0, 0, 0}\n" \
+    "}\n" \
     "c : smoke {\n" \
+    "  Position: {0, 0, 0}\n" \
     "  ParticleCurves: {\n" \
     "    size: {kind: CurveCatmullRom, keys: [{0, 0.3}, {0.4, 1.8}, {1, 2.2}]}\n" \
     "    opacity: {keys: [{0, 1}, {1, 0}]}\n" \
@@ -839,7 +845,9 @@ void CurveKeys_script_reload(void) {
         .code =
             "using box.curve\n"
             "using box.particle\n"
+            "using box.transform\n"
             "jet {\n"
+            "  Position: {0, 0, 0}\n"
             "  ParticleEmitter: {rate: 20, lifetime: {1, 1}}\n"
             "  ParticleCurves: {size: {keys: [{0, 1}, {1, 2}]}}\n"
             "}\n"
@@ -856,7 +864,9 @@ void CurveKeys_script_reload(void) {
     test_int(ecs_script_update(world, script, 0,
         "using box.curve\n"
         "using box.particle\n"
+        "using box.transform\n"
         "jet {\n"
+        "  Position: {0, 0, 0}\n"
         "  ParticleEmitter: {rate: 20, lifetime: {1, 1}}\n"
         "  ParticleCurves: {size: {kind: CurveBezier, keys: [{0, 1}, {0.5, 3}, {1, 4}]}}\n"
         "}\n"), 0);

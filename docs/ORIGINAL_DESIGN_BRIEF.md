@@ -118,7 +118,8 @@ The framework will be optimized for agent-based development, meaning:
 - Placement
     - In a row or column, the parent Layout aligns its children on both axes. h, v, x, y of a LayoutItem are ignored
     - In a DirectionNone parent, a LayoutItem anchors the element to an edge or the middle of the content box,
-      then offsets it by x, y. Children without LayoutItem keep their Position
+      then offsets it by x, y. Children without LayoutItem keep their Position; one without a Position
+      gets one at the origin of the parent, so it has a place and is drawn
 - Ownership
     - The layout writes Position x and y of every element it places, never z
     - A Rect is the input of a fitting element without Layout. On every other element the layout writes

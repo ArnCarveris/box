@@ -755,6 +755,7 @@ static void box_audio_synth_pass(
         o->audible = layer->audible != 0;
         o->fb1 = 0;
         o->fb2 = 0;
+        o->shift = 0;
         o->width_base = (double)layer->pulse_width;
         o->width = o->width_base;
         o->width_step = 0;
@@ -1286,9 +1287,14 @@ static inline float box_audio_synth_pulse(
 
 /** Render a frame of a wave at a phase.
  *
+ *
+ * A phase that moves backwards takes the magnitude of its speed as dt: the polyBLEP is odd in
+ * time and the step changes sign with the direction, the polyBLAMP is even in time and the
+ * change of slope keeps its sign, so both corrections stay the same function of the phase.
+ *
  * @param wave A box_audio_synth_wave_t
  * @param t Phase in turns, 0..1
- * @param dt Turns per frame
+ * @param dt Turns per frame, the magnitude of the speed of the phase
  * @param width Square: share of the period it is high
  * @param rng State of the noise
  * @return The sample, -1..1, a pulse 2 width - 2..2 width
@@ -1503,11 +1509,36 @@ static inline float box_audio_synth_layers_lfo(
     return mix;
 }
 
+/** Turns per frame an oscillator moves at under modulation, for its polyBLEP and polyBLAMP.
+ *
+ * The change of its modulated phase since the last frame, wrapped into -0.5..0.5 so that a
+ * phase moving backwards is a negative speed and not nearly a turn, as a magnitude under the
+ * top. A speed of 0 takes neither correction, so nothing divides by it.
+ *
+ * @param src The source
+ * @param d Change of the phase in turns, its inc plus the change of its modulation
+ * @return The magnitude of the speed, 0..inc_max
+ */
+static inline double box_audio_synth_speed(
+    const box_audio_synth_source_t *src,
+    double d)
+{
+    d -= (double)(int64_t)d;
+    d = d >= 0.5 ? d - 1 : (d < -0.5 ? d + 1 : d);
+    d = d < 0 ? -d : d;
+
+    return d < src->inc_max ? d : src->inc_max;
+}
+
 /** Render a frame of the layers of a source in which a layer modulates another or itself.
  *
  * Modulators come after their carriers, so the layers render from the last: each adds its wave
  * times its envelope, scaled by its index, to the phase of its target, or multiplies it. With
  * LFOs each also takes its vibrato and its tremolo, the signal of a modulator included.
+ *
+ * The edges of a saw, square or triangle are smoothed with the speed of its modulated phase:
+ * its inc plus the change of its modulation and feedback since the last frame. A frame in
+ * which they did not change keeps its inc, bit identical to the unmodulated wave.
  *
  * @param src The source
  * @param levels The level of each envelope for the frame
@@ -1519,7 +1550,7 @@ static inline float box_audio_synth_modulate(
     const float *levels,
     bool lfo)
 {
-    double offset[BOX_AUDIO_SYNTH_LAYERS], t;
+    double offset[BOX_AUDIO_SYNTH_LAYERS], t, shift;
     float ring[BOX_AUDIO_SYNTH_LAYERS], mix = 0, x, signal;
     int32_t l;
     for (l = 0; l < src->layers; l ++) {
@@ -1530,18 +1561,25 @@ static inline float box_audio_synth_modulate(
     for (l = src->layers - 1; l >= 0; l --) {
         box_audio_synth_osc_t *o = &src->part[l]->osc;
         float level = lfo ? levels[o->env] * o->tremolo : levels[o->env];
-        double inc = lfo ? box_audio_synth_osc_inc(src, o) : o->inc;
-        t = o->phase + offset[l] + (double)(o->feedback * 0.5f * (o->fb1 + o->fb2));
+        double inc = lfo ? box_audio_synth_osc_inc(src, o) : o->inc, dt = inc;
+        double fb = (double)(o->feedback * 0.5f * (o->fb1 + o->fb2));
+        t = o->phase + offset[l] + fb;
         if (t < 0 || t >= 1) {
             t -= (double)(int64_t)t;
             t = t < 0 ? t + 1 : t;
             t = t >= 1 ? t - 1 : t;
         }
 
+        shift = offset[l] + fb;
+        if (shift != o->shift) {
+            dt = box_audio_synth_speed(src, inc + (shift - o->shift));
+            o->shift = shift;
+        }
+
         if (o->wave == BOX_AUDIO_SYNTH_PLUCK) {
             x = box_audio_synth_string_next(src, src->part[l], inc);
         } else {
-            x = box_audio_synth_wave(o->wave, t, inc, o->width, &src->rng);
+            x = box_audio_synth_wave(o->wave, t, dt, o->width, &src->rng);
             box_audio_synth_osc_advance(o, inc);
         }
 
