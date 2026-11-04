@@ -1,7 +1,8 @@
 /**
  * @file command/cmd_audio.c
  * @brief The audio command: the status of the audio, its transport, its buses and their insert
- * slots, its instruments, its tracks with their placements and sounding notes, the master
+ * slots, its instruments, its tracks with their note and audio placements, sounding notes and
+ * playing audio clips, the master
  * volume and mute, play, stop, seek and tempo, and captures of the master output to a WAV
  * resource.
  *
@@ -318,8 +319,8 @@ static void box_cmd_audio_instruments(
     }
 }
 
-/** Append the placements of a track, each with its clip, start, duration, loop, offset, gain
- * and transpose.
+/** Append the placements of a track, note and audio ones, each with its clip, start, duration,
+ * loop, offset, gain and transpose.
  *
  * @param world The world
  * @param buf The output
@@ -336,19 +337,30 @@ static void box_cmd_audio_placements(
         for (i = 0; i < it.count; i ++) {
             const ClipPlacement *p = ecs_get(world, it.entities[i], ClipPlacement);
             const NoteClip *clip;
-            char *path, *name;
+            const AudioClip *audio;
+            char *path, *name, *sound;
+            bool alive;
             if (!p) {
                 continue;
             }
 
-            clip = p->clip && ecs_is_alive(world, p->clip) ?
-                ecs_get(world, p->clip, NoteClip) : NULL;
+            alive = p->clip && ecs_is_alive(world, p->clip);
+            clip = alive ? ecs_get(world, p->clip, NoteClip) : NULL;
+            audio = alive ? ecs_get(world, p->clip, AudioClip) : NULL;
             path = ecs_get_path(world, it.entities[i]);
-            name = clip ? ecs_get_path(world, p->clip) : NULL;
+            name = clip || audio ? ecs_get_path(world, p->clip) : NULL;
             ecs_strbuf_append(buf, "\n    placement %s: clip %s", path, name ? name : "none");
             if (clip) {
                 ecs_strbuf_append(buf, " (%d notes, %.3f beats)",
                     ecs_vec_count(&clip->notes), (double)clip->length);
+            }
+
+            if (audio) {
+                sound = audio->sound && ecs_is_alive(world, audio->sound) ?
+                    ecs_get_path(world, audio->sound) : NULL;
+                ecs_strbuf_append(buf, " (audio %s from %.3f s, %.3f beats)",
+                    sound ? sound : "none", (double)audio->offset, (double)audio->length);
+                ecs_os_free(sound);
             }
 
             ecs_strbuf_append(buf, ", start %.3f", p->start);
@@ -375,7 +387,8 @@ static void box_cmd_audio_placements(
     }
 }
 
-/** Append the lines of the tracks: the instrument, the placements and the notes that sound.
+/** Append the lines of the tracks: the instrument, the placements, the notes that sound and
+ * the audio clips that play.
  *
  * @param world The world
  * @param buf The output
@@ -386,7 +399,9 @@ static void box_cmd_audio_tracks(
 {
     box_audio_module_t *state = box_audio_module_get(world);
     const box_audio_sounding_t *sounding = ecs_vec_first(&state->sequencer.sounding);
+    const box_audio_clip_voice_t *voices = ecs_vec_first(&state->sequencer.voices);
     int32_t i, k, count = ecs_vec_count(&state->sequencer.sounding), listed, total;
+    int32_t voice_count = ecs_vec_count(&state->sequencer.voices);
     ecs_query_t *q = ecs_query(world, {
         .terms = {{ .id = ecs_id(Track), .inout = EcsIn, .src.id = EcsSelf }},
         .flags = EcsQueryMatchDisabled
@@ -420,6 +435,23 @@ static void box_cmd_audio_tracks(
 
             if (total > listed) {
                 ecs_strbuf_append(buf, "\n    %d more sounding", total - listed);
+            }
+
+            for (k = 0, listed = 0, total = 0; k < voice_count; k ++) {
+                if (voices[k].track != it.entities[i]) {
+                    continue;
+                }
+
+                total ++;
+                if (listed < BOX_AUDIO_SEQ_LIST_MAX) {
+                    ecs_strbuf_append(buf, "\n    playing: audio until beat %.3f%s",
+                        voices[k].end, voices[k].stop ? ", stopped" : "");
+                    listed ++;
+                }
+            }
+
+            if (total > listed) {
+                ecs_strbuf_append(buf, "\n    %d more playing", total - listed);
             }
 
             ecs_os_free(name);

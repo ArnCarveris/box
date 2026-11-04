@@ -556,6 +556,20 @@ ECS_STRUCT(NoteClip, {
     ecs_vec(Note) notes;   /**< The notes, in any order */
 });
 
+/** A clip of recorded audio, reusable as a NoteClip is: a part of a sound that a ClipPlacement
+ * plays on the bus of its track, a vocal, a loop or a stem.
+ *
+ * The offset is in seconds, not beats: a sound does not stretch with the tempo, so an offset in
+ * beats would land on another sample after a tempo change. A pass of the clip lasts length
+ * beats, or less when the sound ends first.
+ */
+ECS_STRUCT(AudioClip, {
+    ecs_entity_t sound;    /**< The sound, an entity with AudioPcm or SoundFile */
+    float offset;          /**< Seconds into the sound at which the clip starts */
+    float length;          /**< Beats, default 4: the length of a pass when a placement loops
+                            *   the clip, and of a placement of duration 0 */
+});
+
 /** A track of the timeline: a mixer channel whose notes play on an instrument. It brings an
  * AudioBus (the With trait), so it has a volume, a pan, a mute, an output and sends, and its
  * notes play on its own bus.
@@ -567,24 +581,30 @@ ECS_STRUCT(NoteClip, {
  * notes and logs once. See Clips and tracks in docs/audio.md.
  */
 ECS_STRUCT(Track, {
-    ecs_entity_t instrument; /**< The entity with Instrument that plays the notes */
+    ecs_entity_t instrument; /**< The entity with Instrument that plays the notes of its note
+                              *   clips; a track of only audio clips needs none */
 });
 
-/** A clip on the timeline, on a child of a Track.
+/** A clip on the timeline, on a child of a Track: a NoteClip or an AudioClip.
  *
  * A note ends at the earliest of its own end, the end of its pass of the clip, the end of the
  * placement and the loop_end of a Transport that loops. A Disabled or deleted placement
  * releases its notes.
+ *
+ * An AudioClip plays its sound on the bus of the track at the gain and the pitch ratio
+ * 2^(transpose / 12), each pass from its frame to the earliest of the end of the pass, of the
+ * sound, of the placement and loop_end. See Audio clips in docs/audio.md.
  */
 ECS_STRUCT(ClipPlacement, {
-    ecs_entity_t clip;     /**< The entity with NoteClip */
+    ecs_entity_t clip;     /**< The entity with NoteClip or AudioClip */
     double start;          /**< Beats on the timeline where the placement starts */
     double duration;       /**< Beats, 0 for the length of the clip minus the offset */
     bool loop;             /**< Repeat the clip every length beats until the duration ends */
     double offset;         /**< Beats into the clip at which the placement starts; with a loop
                             *   the passes go on from there and wrap at length */
     float gain;            /**< Linear gain, default 1, times the gain of the velocity */
-    float transpose;       /**< Semitones added to every pitch */
+    float transpose;       /**< Semitones added to every pitch; of an audio clip the pitch
+                            *   ratio 2^(transpose / 12) */
 });
 
 /** Where box_audio_play_quantized starts a play on the grid of the Transport */

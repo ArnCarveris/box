@@ -7,7 +7,7 @@
  *
  * Most cases play a sampler of a constant level with a velocity curve of 1 and the shortest
  * release: a note is exactly its level from its start frame, and its release is the first
- * frame below it.
+ * frame below it. The audio clip cases play a ramp whose every frame tells its position.
  */
 
 #include "world.h"
@@ -882,6 +882,502 @@ void Sequencer_command(void) {
     test_assert(strstr(out, "placement bass.answer") != NULL);
     test_assert(strstr(out, "transpose 12.00") != NULL);
     test_assert(strstr(out, "sounding: pitch 64.00") != NULL);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+/** Step of the ramp sound of the audio clip tests: its frame i holds (i + 1) * SEQ_STEP, so a
+ * frame of the tap tells which frame of the sound plays */
+#define SEQ_STEP 1e-6f
+
+/** Frames of the ramp sound, six seconds */
+#define SEQ_RAMP_FRAMES (AUDIO_RATE * 6)
+
+/** Create a mono ramp sound at AUDIO_RATE whose frame i holds (i + 1) * SEQ_STEP.
+ *
+ * @param world The world
+ * @param frames Frames of the sound
+ * @return The sound
+ */
+static ecs_entity_t seq_ramp(
+    ecs_world_t *world,
+    int32_t frames)
+{
+    float *data = ecs_os_malloc_n(float, frames);
+    ecs_entity_t e;
+    int32_t i;
+    for (i = 0; i < frames; i ++) {
+        data[i] = (float)(i + 1) * SEQ_STEP;
+    }
+
+    e = box_audio_sound_from_pcm(world, 0, data, frames, 1, AUDIO_RATE);
+    ecs_os_free(data);
+    test_assert(e != 0);
+
+    return e;
+}
+
+/** Get the frame of the ramp sound that a frame of the tap plays at unity gain.
+ *
+ * @param frame Frame of the tap
+ * @return Frame of the sound, -1 for silence
+ */
+static int64_t seq_pos(
+    int64_t frame)
+{
+    return llround((double)audio_tap_l[frame] / (double)SEQ_STEP) - 1;
+}
+
+/** Create an audio clip.
+ *
+ * @param world The world
+ * @param sound The sound
+ * @param offset Seconds into the sound
+ * @param length Beats of a pass
+ * @return The clip
+ */
+static ecs_entity_t seq_audio_clip(
+    ecs_world_t *world,
+    ecs_entity_t sound,
+    float offset,
+    float length)
+{
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, AudioClip, { .sound = sound, .offset = offset, .length = length });
+
+    return e;
+}
+
+/** The defaults of an audio clip: no sound, from its start, 4 beats long. */
+void Sequencer_audio_defaults(void) {
+    // audio/sequencer
+    ecs_world_t *world = audio_world();
+    ecs_entity_t e = ecs_new(world);
+    const AudioClip *clip;
+    ecs_add(world, e, AudioClip);
+    clip = ecs_get(world, e, AudioClip);
+    test_uint(clip->sound, 0);
+    test_flt(clip->offset, 0.0f);
+    test_flt(clip->length, 4.0f);
+    ecs_fini(world);
+}
+
+/** An audio clip starts on the frame of its placement and plays from the offset of the clip,
+ * on a track without an instrument. */
+void Sequencer_audio_start(void) {
+    // audio/sequencer
+    ecs_world_t *world = audio_world();
+    box_audio_module_t *state = box_audio_module_get(world);
+    ecs_entity_t sound = seq_ramp(world, SEQ_RAMP_FRAMES);
+    ecs_entity_t clip = seq_audio_clip(world, sound, 0.25f, 2);
+    ecs_entity_t track = seq_track(world, 0);
+    int64_t c0, f;
+    seq_place(world, track, clip, 1, 0, false, 0);
+    audio_run(world, 2);
+    audio_log_start();
+    c0 = seq_play(world, true);
+    seq_run_to(world, c0 + 4 * SEQ_BEAT);
+    audio_log_stop();
+    test_int(audio_log_warnings, 0);
+    f = c0 + SEQ_BEAT;
+    test_int(seq_onset(c0, f), -1);
+    test_int(seq_pos(f), AUDIO_RATE / 4);
+    test_int(seq_pos(f + 1), AUDIO_RATE / 4 + 1);
+    test_int(seq_pos(f + 1000), AUDIO_RATE / 4 + 1000);
+    test_int(seq_pos(f + 2 * SEQ_BEAT - 1), AUDIO_RATE / 4 + 2 * SEQ_BEAT - 1);
+    test_int(seq_onset(f + 2 * SEQ_BEAT + SEQ_FADE, c0 + 4 * SEQ_BEAT), -1);
+    test_int(state->sequencer.stats.passes, 1);
+    test_int(state->sequencer.stats.seeks, 1);
+    test_int(state->sequencer.stats.notes, 0);
+    test_int(ecs_vec_count(&state->sequencer.voices), 0);
+    ecs_fini(world);
+}
+
+/** The offset of a placement in beats is converted at the tempo and added to the offset of
+ * the clip: half a beat at 120 bpm after 0.1 seconds is frame 4800 + 12000 of the sound, and
+ * at 97 bpm frame 4800 + 0.5 * 60 / 97 * 48000. */
+void Sequencer_audio_placement_offset(void) {
+    // audio/sequencer
+    float tempi[] = { 120.0f, 97.0f };
+    int32_t t;
+    for (t = 0; t < 2; t ++) {
+        ecs_world_t *world = audio_world();
+        ecs_entity_t sound = seq_ramp(world, SEQ_RAMP_FRAMES);
+        ecs_entity_t clip = seq_audio_clip(world, sound, 0.1f, 4);
+        ecs_entity_t track = seq_track(world, 0);
+        double fpb = seq_fpb(tempi[t]);
+        int64_t c0, f, at;
+        seq_place(world, track, clip, 1, 0, false, 0.5);
+        seq_tempo(world, tempi[t]);
+        audio_run(world, 2);
+        c0 = seq_play(world, true);
+        f = c0 + llround(fpb);
+        seq_run_to(world, f + 2 * SEQ_BEAT);
+        at = llround(0.1 * AUDIO_RATE + 0.5 * fpb);
+        test_int(seq_onset(c0, f), -1);
+        test_assert(llabs(seq_pos(f) - at) <= 1);
+        test_int(seq_pos(f + 500) - seq_pos(f), 500);
+        ecs_fini(world);
+    }
+}
+
+/** A looping placement starts a new voice at the offset of the clip on every pass, on the
+ * frame where the voice before stops, without a gap. */
+void Sequencer_audio_loop(void) {
+    // audio/sequencer
+    ecs_world_t *world = audio_world();
+    box_audio_module_t *state = box_audio_module_get(world);
+    ecs_entity_t sound = seq_ramp(world, SEQ_RAMP_FRAMES);
+    ecs_entity_t clip = seq_audio_clip(world, sound, 0.5f, 1);
+    ecs_entity_t track = seq_track(world, 0);
+    int64_t c0, f, i;
+    int32_t pass;
+    seq_place(world, track, clip, 0, 4, true, 0);
+    audio_run(world, 2);
+    c0 = seq_play(world, true);
+    seq_run_to(world, c0 + 6 * SEQ_BEAT);
+    for (i = c0; i < c0 + 4 * SEQ_BEAT; i ++) {
+        if (audio_tap_l[i] < (float)(AUDIO_RATE / 2) * SEQ_STEP) {
+            test_assert(false);
+        }
+    }
+
+    for (pass = 0; pass < 4; pass ++) {
+        f = c0 + pass * SEQ_BEAT;
+        test_int(seq_pos(f + SEQ_FADE + 10), AUDIO_RATE / 2 + SEQ_FADE + 10);
+        test_int(seq_pos(f + SEQ_BEAT - 1), AUDIO_RATE / 2 + SEQ_BEAT - 1);
+    }
+
+    test_int(seq_onset(c0 + 4 * SEQ_BEAT + SEQ_FADE, c0 + 6 * SEQ_BEAT), -1);
+    test_int(state->sequencer.stats.passes, 4);
+    test_int(state->sequencer.stats.stops, 4);
+    ecs_fini(world);
+}
+
+/** A clip whose sound lasts longer than its pass stops at the end of the pass, also in a
+ * placement that lasts longer; a sound that ends first ends the pass. */
+void Sequencer_audio_pass_end(void) {
+    // audio/sequencer
+    ecs_world_t *world = audio_world();
+    ecs_entity_t sound = seq_ramp(world, SEQ_RAMP_FRAMES);
+    ecs_entity_t short_sound = seq_ramp(world, SEQ_BEAT / 2);
+    ecs_entity_t clip = seq_audio_clip(world, sound, 0, 1);
+    ecs_entity_t clip_short = seq_audio_clip(world, short_sound, 0, 2);
+    ecs_entity_t track = seq_track(world, 0);
+    int64_t c0;
+    seq_place(world, track, clip, 0, 3, false, 0);
+    seq_place(world, track, clip_short, 4, 0, false, 0);
+    audio_run(world, 2);
+    c0 = seq_play(world, true);
+    seq_run_to(world, c0 + 7 * SEQ_BEAT);
+    test_int(seq_pos(c0), 0);
+    test_int(seq_pos(c0 + SEQ_BEAT - 1), SEQ_BEAT - 1);
+    test_int(seq_onset(c0 + SEQ_BEAT + SEQ_FADE, c0 + 4 * SEQ_BEAT), -1);
+    test_int(seq_pos(c0 + 4 * SEQ_BEAT + 100), 100);
+    test_int(seq_pos(c0 + 4 * SEQ_BEAT + SEQ_BEAT / 2 - 1), SEQ_BEAT / 2 - 1);
+    test_int(seq_onset(c0 + 4 * SEQ_BEAT + SEQ_BEAT / 2 + SEQ_FADE, c0 + 7 * SEQ_BEAT), -1);
+    ecs_fini(world);
+}
+
+/** A seek goes on in the middle of the clip that covers the new position, at its sample. */
+void Sequencer_audio_seek(void) {
+    // audio/sequencer
+    ecs_world_t *world = audio_world();
+    box_audio_module_t *state = box_audio_module_get(world);
+    ecs_entity_t sound = seq_ramp(world, SEQ_RAMP_FRAMES);
+    ecs_entity_t clip = seq_audio_clip(world, sound, 0, 8);
+    ecs_entity_t track = seq_track(world, 0);
+    int64_t c0, c1;
+    seq_place(world, track, clip, 0, 0, false, 0);
+    audio_run(world, 2);
+    c0 = seq_play(world, true);
+    audio_run(world, 10);
+    test_int(seq_pos(c0 + 4000), 4000);
+    ecs_singleton_ensure(world, Transport)->position = 2;
+    ecs_singleton_modified(world, Transport);
+    c1 = audio_tap_count;
+    seq_run_to(world, c1 + 2 * SEQ_BEAT);
+    test_int(seq_pos(c1 + SEQ_FADE + 100), 2 * SEQ_BEAT + SEQ_FADE + 100);
+    test_int(seq_pos(c1 + SEQ_BEAT), 3 * SEQ_BEAT);
+    test_int(state->sequencer.stats.passes, 2);
+    test_int(state->sequencer.stats.seeks, 1);
+    ecs_fini(world);
+}
+
+/** A loop of the transport from beat 1 to 3 stops a clip on the frame of loop_end and goes on
+ * in its middle at loop_start. */
+void Sequencer_audio_transport_loop(void) {
+    // audio/sequencer
+    ecs_world_t *world = audio_world();
+    ecs_entity_t sound = seq_ramp(world, SEQ_RAMP_FRAMES);
+    ecs_entity_t clip = seq_audio_clip(world, sound, 0, 4);
+    ecs_entity_t track = seq_track(world, 0);
+    Transport *tr;
+    int64_t c0, at;
+    int32_t pass;
+    seq_place(world, track, clip, 0, 0, false, 0);
+    tr = ecs_singleton_ensure(world, Transport);
+    tr->loop = true;
+    tr->loop_start = 1;
+    tr->loop_end = 3;
+    ecs_singleton_modified(world, Transport);
+    audio_run(world, 2);
+    c0 = seq_play(world, true);
+    seq_run_to(world, c0 + 8 * SEQ_BEAT);
+    test_int(seq_pos(c0 + 100), 100);
+    test_int(seq_pos(c0 + 3 * SEQ_BEAT - 1), 3 * SEQ_BEAT - 1);
+    for (pass = 0; pass < 2; pass ++) {
+        at = c0 + 3 * SEQ_BEAT + pass * 2 * SEQ_BEAT;
+        test_int(seq_pos(at + SEQ_FADE + 10), SEQ_BEAT + SEQ_FADE + 10);
+        test_int(seq_pos(at + 2 * SEQ_BEAT - 1), 3 * SEQ_BEAT - 1);
+    }
+
+    ecs_fini(world);
+}
+
+/** A transpose of 12 doubles the rate of the sound. */
+void Sequencer_audio_transpose(void) {
+    // audio/sequencer
+    ecs_world_t *world = audio_world();
+    ecs_entity_t sound = seq_ramp(world, SEQ_RAMP_FRAMES);
+    ecs_entity_t clip = seq_audio_clip(world, sound, 0.1f, 2);
+    ecs_entity_t track = seq_track(world, 0);
+    ecs_entity_t p;
+    int64_t c0, f;
+    p = seq_place(world, track, clip, 1, 0, false, 0);
+    ecs_get_mut(world, p, ClipPlacement)->transpose = 12;
+    ecs_modified(world, p, ClipPlacement);
+    audio_run(world, 2);
+    c0 = seq_play(world, true);
+    f = c0 + SEQ_BEAT;
+    seq_run_to(world, f + 2 * SEQ_BEAT);
+    test_int(seq_pos(f), AUDIO_RATE / 10);
+    test_int(seq_pos(f + 1000), AUDIO_RATE / 10 + 2000);
+    test_int(seq_pos(f + 2 * SEQ_BEAT - 1), AUDIO_RATE / 10 + 2 * (2 * SEQ_BEAT - 1));
+    test_int(seq_onset(f + 2 * SEQ_BEAT + SEQ_FADE, f + 2 * SEQ_BEAT + 2000), -1);
+    ecs_fini(world);
+}
+
+/** The gain of a placement is the volume of its voice. */
+void Sequencer_audio_gain(void) {
+    // audio/sequencer
+    ecs_world_t *world = audio_world();
+    ecs_entity_t sound = audio_dc(world, NULL, 0.4f, AUDIO_RATE * 2);
+    ecs_entity_t clip = seq_audio_clip(world, sound, 0, 1);
+    ecs_entity_t track = seq_track(world, 0);
+    ecs_entity_t p;
+    int64_t c0;
+    p = seq_place(world, track, clip, 0, 0, false, 0);
+    ecs_get_mut(world, p, ClipPlacement)->gain = 0.5f;
+    ecs_modified(world, p, ClipPlacement);
+    audio_run(world, 2);
+    c0 = seq_play(world, true);
+    seq_run_to(world, c0 + 2 * SEQ_BEAT);
+    test_flt(audio_tap_l[c0 - 1], 0.0f);
+    test_flt(audio_tap_l[c0], 0.2f);
+    test_flt(audio_tap_r[c0 + 1000], 0.2f);
+    test_int(seq_edge(c0, c0 + SEQ_BEAT, 0.2f), -1);
+    ecs_fini(world);
+}
+
+/** A track with a note placement and an audio placement plays both: the note on its
+ * instrument, the audio clip on its bus. */
+void Sequencer_audio_with_notes(void) {
+    // audio/sequencer
+    ecs_world_t *world = audio_world();
+    box_audio_module_t *state = box_audio_module_get(world);
+    ecs_entity_t inst = seq_sampler(world, SEQ_LEVEL);
+    ecs_entity_t sound = audio_dc(world, NULL, 0.25f, AUDIO_RATE * 2);
+    Note notes[] = {{ .start = 0, .duration = 1, .pitch = 60, .velocity = 1 }};
+    ecs_entity_t clip = seq_clip(world, 1, notes, 1);
+    ecs_entity_t audio = seq_audio_clip(world, sound, 0, 2);
+    ecs_entity_t track = seq_track(world, inst);
+    int64_t c0;
+    seq_place(world, track, clip, 0, 0, false, 0);
+    seq_place(world, track, audio, 0, 0, false, 0);
+    audio_run(world, 2);
+    c0 = seq_play(world, true);
+    seq_run_to(world, c0 + 3 * SEQ_BEAT);
+    test_flt(audio_tap_l[c0], SEQ_LEVEL + 0.25f);
+    test_int(seq_edge(c0, c0 + SEQ_BEAT, SEQ_LEVEL + 0.25f), c0 + SEQ_BEAT);
+    test_int(seq_edge(c0 + SEQ_BEAT + SEQ_FADE, c0 + 2 * SEQ_BEAT, 0.25f), -1);
+    test_int(seq_onset(c0 + 2 * SEQ_BEAT + SEQ_FADE, c0 + 3 * SEQ_BEAT), -1);
+    test_int(state->sequencer.stats.notes, 1);
+    test_int(state->sequencer.stats.passes, 1);
+    ecs_fini(world);
+}
+
+/** A stop of the transport stops the voices of audio clips at once and cancels the passes
+ * scheduled that have not started. */
+void Sequencer_audio_stop(void) {
+    // audio/sequencer
+    ecs_world_t *world = audio_world();
+    box_audio_module_t *state = box_audio_module_get(world);
+    ecs_entity_t sound = seq_ramp(world, SEQ_RAMP_FRAMES);
+    ecs_entity_t clip = seq_audio_clip(world, sound, 0, 4);
+    ecs_entity_t later = seq_audio_clip(world, sound, 0, 1);
+    ecs_entity_t track = seq_track(world, 0);
+    int64_t c0;
+    seq_place(world, track, clip, 0, 0, false, 0);
+    seq_place(world, track, later, 0.25, 0, false, 0);
+    audio_run(world, 2);
+    c0 = seq_play(world, true);
+    audio_run(world, 1);
+    test_int(state->sequencer.stats.passes, 2);
+    test_int(ecs_vec_count(&state->sequencer.voices), 2);
+    seq_play(world, false);
+    audio_run(world, 1);
+    test_int(state->timeline.stats.cancels, 1);
+    test_int(ecs_vec_count(&state->sequencer.voices), 0);
+    audio_run(world, 40);
+    test_int(seq_pos(c0 + 700), 700);
+    test_int(seq_onset(c0 + 1600 + SEQ_FADE, audio_tap_count), -1);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+    ecs_fini(world);
+}
+
+/** Deleting the track and disabling the placement stop their voices at once. */
+void Sequencer_audio_delete_disable(void) {
+    // audio/sequencer
+    ecs_world_t *world = audio_world();
+    box_audio_module_t *state = box_audio_module_get(world);
+    ecs_entity_t sound = seq_ramp(world, SEQ_RAMP_FRAMES);
+    ecs_entity_t clip = seq_audio_clip(world, sound, 0, 4);
+    ecs_entity_t track = seq_track(world, 0);
+    ecs_entity_t other = seq_track(world, 0);
+    ecs_entity_t p;
+    int64_t c0, c1;
+    seq_place(world, track, clip, 0, 0, false, 0);
+    p = seq_place(world, other, clip, 0, 0, false, 0);
+    audio_run(world, 2);
+    c0 = seq_play(world, true);
+    audio_run(world, 20);
+    test_int(seq_pos(audio_tap_count - 1), 2 * (audio_tap_count - 1 - c0) + 1);
+    ecs_delete(world, track);
+    ecs_enable(world, p, false);
+    c1 = audio_tap_count;
+    seq_run_to(world, c0 + 5 * SEQ_BEAT);
+    test_int(seq_onset(c1 + AUDIO_FRAME + SEQ_FADE, audio_tap_count), -1);
+    test_int(ecs_vec_count(&state->sequencer.voices), 0);
+    test_int(state->sequencer.stats.passes, 2);
+    ecs_fini(world);
+}
+
+/** A sound that is not ready skips its passes and logs once. */
+void Sequencer_audio_not_ready(void) {
+    // audio/sequencer
+    ecs_world_t *world = audio_world();
+    box_audio_module_t *state = box_audio_module_get(world);
+    ecs_entity_t none = ecs_new(world);
+    ecs_entity_t clip = seq_audio_clip(world, none, 0, 1);
+    ecs_entity_t track = seq_track(world, 0);
+    seq_place(world, track, clip, 0, 8, true, 0);
+    audio_run(world, 2);
+    audio_log_start();
+    seq_play(world, true);
+    audio_run(world, 120);
+    audio_log_stop();
+    test_int(audio_log_warnings, 1);
+    test_int(state->sequencer.stats.passes, 0);
+    test_assert(state->sequencer.stats.skipped >= 4);
+    test_int(seq_onset(0, audio_tap_count), -1);
+    ecs_fini(world);
+}
+
+/** Record audio clips, looped, transposed, with offsets, a note track and an audio track, a
+ * tempo change and a seek.
+ *
+ * @param path The WAV to write
+ */
+static void seq_audio_scene(
+    const char *path)
+{
+    ecs_world_t *world = audio_world();
+    ecs_entity_t inst = seq_sampler(world, 0.2f);
+    ecs_entity_t ramp = seq_ramp(world, SEQ_RAMP_FRAMES);
+    ecs_entity_t tone = audio_tone(world, NULL, 330, 0.3f, AUDIO_RATE * 3);
+    Note notes[] = {
+        { .start = 0, .duration = 0.5f, .pitch = 60, .velocity = 1 },
+        { .start = 1.5f, .duration = 0.25f, .pitch = 67, .velocity = 0.7f }
+    };
+    ecs_entity_t clip = seq_clip(world, 2, notes, 2);
+    ecs_entity_t loop = seq_audio_clip(world, tone, 0.013f, 0.75f);
+    ecs_entity_t stem = seq_audio_clip(world, ramp, 0.2f, 8);
+    ecs_entity_t track = seq_track(world, inst);
+    ecs_entity_t audio = seq_track(world, 0);
+    ecs_entity_t p;
+    seq_place(world, track, clip, 0, 8, true, 0);
+    p = seq_place(world, track, loop, 0.5, 6, true, 0.3);
+    ecs_get_mut(world, p, ClipPlacement)->transpose = 7;
+    ecs_get_mut(world, p, ClipPlacement)->gain = 0.8f;
+    ecs_modified(world, p, ClipPlacement);
+    seq_place(world, audio, stem, 1, 0, false, 0.25);
+    seq_tempo(world, 132);
+    audio_run(world, 2);
+    seq_play(world, true);
+    test_int(box_audio_capture(world, 3.0f, path), 0);
+    audio_run(world, 60);
+    seq_tempo(world, 100);
+    audio_run(world, 30);
+    ecs_singleton_ensure(world, Transport)->position = 2.3;
+    ecs_singleton_modified(world, Transport);
+    seq_capture_wait(world);
+    ecs_fini(world);
+}
+
+/** Two runs of audio clips capture bit identical audio. */
+void Sequencer_audio_bit_identical(void) {
+    // audio/sequencer
+    const char *a = "audio_clip_a.wav", *b = "audio_clip_b.wav";
+    long size_a = 0, size_b = 0;
+    uint8_t *wav_a, *wav_b;
+    int32_t i, loud = 0;
+    seq_audio_scene(a);
+    seq_audio_scene(b);
+    wav_a = seq_read(a, &size_a);
+    wav_b = seq_read(b, &size_b);
+    test_assert(wav_a != NULL);
+    test_assert(wav_b != NULL);
+    test_int(size_a, 44 + 3 * 48000 * 4);
+    test_int(size_a, size_b);
+    test_assert(!memcmp(wav_a, wav_b, (size_t)size_a));
+    for (i = 44; i < size_a; i += 2) {
+        int16_t v = (int16_t)(wav_a[i] | (wav_a[i + 1] << 8));
+        loud += v > 3000 || v < -3000;
+    }
+
+    test_assert(loud > 1000);
+    ecs_os_free(wav_a);
+    ecs_os_free(wav_b);
+    remove(a);
+    remove(b);
+}
+
+/** The audio command lists audio placements with the note placements. */
+void Sequencer_audio_command(void) {
+    // audio/sequencer
+    ecs_world_t *world = audio_world();
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_entity_t sound = audio_dc(world, "vocal", 0.1f, AUDIO_RATE * 4);
+    ecs_entity_t clip = ecs_entity(world, { .name = "verse" });
+    ecs_entity_t track = ecs_entity(world, { .name = "vox" });
+    ecs_entity_t p = ecs_entity(world, { .name = "take", .parent = track });
+    bool error = false;
+    char *out;
+    ecs_set(world, clip, AudioClip, { .sound = sound, .offset = 0.5f, .length = 8 });
+    ecs_set(world, track, Track, { 0 });
+    ecs_set(world, p, ClipPlacement, { .clip = clip, .start = 0, .gain = 1 });
+    audio_run(world, 2);
+    seq_play(world, true);
+    audio_run(world, 10);
+    out = box_command_run(world, s, "audio", &error);
+    test_bool(error, false);
+    test_assert(out != NULL);
+    printf("%s\n", out);
+    test_assert(strstr(out, "track vox: instrument none") != NULL);
+    test_assert(strstr(out, "placement vox.take: clip verse (audio vocal from 0.500 s, "
+        "8.000 beats)") != NULL);
+    test_assert(strstr(out, "playing: audio until beat 8.000") != NULL);
     ecs_os_free(out);
     ecs_fini(world);
 }

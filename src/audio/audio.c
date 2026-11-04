@@ -326,6 +326,25 @@ static void box_audio_note_clip_ctor(
     }
 }
 
+/** Construct AudioClip values: no sound, from its start, 4 beats long.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_audio_clip_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    AudioClip *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (AudioClip){ .length = 4.0f };
+    }
+}
+
 /** Construct ClipPlacement values: no clip at beat 0, as long as the clip, at unity gain.
  *
  * @param ptr The components
@@ -941,6 +960,8 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, NoteClip);
     box_owned_hooks(world, NoteClip, BOX_OWNED_VEC(NoteClip, notes, Note));
     ecs_set_hooks(world, NoteClip, { .ctor = box_audio_note_clip_ctor });
+    ECS_META_COMPONENT(world, AudioClip);
+    ecs_set_hooks(world, AudioClip, { .ctor = box_audio_audio_clip_ctor });
     ECS_META_COMPONENT(world, Track);
     ECS_META_COMPONENT(world, ClipPlacement);
     ecs_set_hooks(world, ClipPlacement, { .ctor = box_audio_placement_ctor });
