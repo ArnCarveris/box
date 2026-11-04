@@ -2,10 +2,11 @@
  * @file Synth.c
  * @brief The synth of the audio core and synth sounds of box.audio, measured on offline
  * renders: frequencies, aliasing, noise, envelopes, the filter, layers, phase and ring
- * modulation, feedback, eight layers and scripts.
+ * modulation, feedback, eight layers, unison and stereo width, and scripts.
  */
 
 #include "world.h"
+#include "../../../../src/jobs/jobs.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -14,6 +15,9 @@
 
 /** Frames of the aliasing check, 0.8 seconds at SYNTH_ALIAS_RATE */
 #define SYNTH_ALIAS_FRAMES 35280
+
+/** Gain of a channel at full pan in the core, square root of 2 */
+#define SYNTH_SQRT2 1.41421356237309504880f
 
 /** Frames of a millisecond at AUDIO_RATE, the tolerance of a segment of an envelope */
 #define SYNTH_MS 48
@@ -44,7 +48,7 @@ static void synth_define(
     uint32_t sound,
     const box_audio_synth_patch_t *p)
 {
-    uint8_t bytes[1024];
+    uint8_t bytes[sizeof(box_audio_cmd_synth_t)];
     box_audio_writer_t w;
     box_audio_writer_init(&w, bytes, sizeof(bytes));
     test_assert(box_audio_write_synth(&w, sound, p));
@@ -1480,7 +1484,7 @@ void Synth_layers_command_size(void) {
     box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SINE, 440, 0.5f, 0.2f);
     box_audio_cmd_header_t header;
     box_audio_event_t e;
-    uint8_t bytes[1024];
+    uint8_t bytes[sizeof(box_audio_cmd_synth_t)];
     box_audio_writer_t w;
     p.layers = 2;
     p.layer[1] = (box_audio_synth_layer_t){ .frequency = 660, .level = 0.2f };
@@ -2410,4 +2414,1710 @@ void Synth_script_modulators(void) {
     test_assert(synth_finite(audio_tap_l, start, audio_tap_count));
     test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
     ecs_fini(world);
+}
+
+/** A patch of one oscillator held for a while with one LFO of every layer at a rate, at
+ * depth 0 on every destination.
+ *
+ * @param wave A box_audio_synth_wave_t
+ * @param frequency Hz
+ * @param level Level of the oscillator
+ * @param hold Seconds at the level
+ * @param rate Hz of the LFO
+ * @return The patch
+ */
+static box_audio_synth_patch_t synth_lfo_patch(
+    uint32_t wave,
+    float frequency,
+    float level,
+    float hold,
+    float rate)
+{
+    box_audio_synth_patch_t p = synth_steady(wave, frequency, level, hold);
+    p.lfos = 1;
+    p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = rate };
+
+    return p;
+}
+
+/** Upward zero crossings of a range, interpolated between frames.
+ *
+ * @param x Samples
+ * @param from First frame
+ * @param to End frame
+ * @param at Receives the frame of each crossing
+ * @param max Most crossings to keep
+ * @return Number of crossings
+ */
+static int32_t synth_crossings(
+    const float *x,
+    int32_t from,
+    int32_t to,
+    double *at,
+    int32_t max)
+{
+    int32_t count = 0, i;
+    for (i = from + 1; i < to && count < max; i ++) {
+        if (x[i - 1] < 0 && x[i] >= 0) {
+            at[count ++] = i - 1 + x[i - 1] / (double)(x[i - 1] - x[i]);
+        }
+    }
+
+    return count;
+}
+
+/** Energy of a harmonic of a window of frames, from a Goertzel filter.
+ *
+ * @param x Samples
+ * @param center Middle frame of the window
+ * @param n Frames of the window, a whole number of periods of the frequency
+ * @param frequency Hz
+ * @return The energy
+ */
+static double synth_window_energy(
+    const float *x,
+    int32_t center,
+    int32_t n,
+    double frequency)
+{
+    return synth_bin_energy(x + center - n / 2, n, frequency, AUDIO_RATE);
+}
+
+/** A vibrato of 100 cents at 4 Hz after a delay of 0.25 s: the pitch holds 1 kHz during the
+ * delay, then the frequency of each period follows 1 kHz times 2 to the cents of the LFO,
+ * peaks 100 cents up and down, and its peaks are a period of the LFO apart. */
+void Synth_lfo_vibrato(void) {
+    // audio/synth
+    enum { MAX = 1200 };
+    static double at[MAX];
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_lfo_patch(BOX_AUDIO_SYNTH_SINE, 1000, 0.5f, 1.2f, 4);
+    const int32_t delay = 12000;
+    double hi = -1e9, lo = 1e9, peaks[8], f, mid, t, expected, cents, last = 0, err = 0;
+    int32_t count, k, npeaks = 0;
+    p.lfo[0].delay = 0.25f;
+    p.lfo[0].pitch = 100;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES);
+    count = synth_crossings(audio_l, 0, AUDIO_FRAMES, at, MAX);
+    test_assert(count > 900);
+    for (k = 1; k + 1 < count; k ++) {
+        f = AUDIO_RATE / (at[k + 1] - at[k]);
+        mid = 0.5 * (at[k] + at[k + 1]);
+        if (at[k + 1] < delay) {
+            test_assert(fabs(f - 1000) < 0.1);
+            continue;
+        }
+
+        if (mid < delay + 480) {
+            continue;
+        }
+
+        t = (mid + 1 - delay) / AUDIO_RATE;
+        expected = 1000 * pow(2.0, 100.0 / 1200 * sin(2 * AUDIO_PI * 4 * t));
+        err = fabs(f - expected) > err ? fabs(f - expected) : err;
+        cents = 1200 * log2(f / 1000);
+        hi = cents > hi ? cents : hi;
+        lo = cents < lo ? cents : lo;
+        if (k > 1 && npeaks < 8 && cents > 99 && mid - last > 4800) {
+            peaks[npeaks ++] = mid;
+            last = mid;
+        }
+    }
+
+    printf("vibrato: %.2f to %.2f cents, %.3f Hz from the expected at most\n", lo, hi, err);
+    test_assert(err < 1);
+    test_assert(fabs(hi - 100) < 3);
+    test_assert(fabs(lo + 100) < 3);
+    test_assert(npeaks >= 2);
+    for (k = 1; k < npeaks; k ++) {
+        test_assert(fabs((peaks[k] - peaks[k - 1]) / AUDIO_RATE - 0.25) < 0.005);
+    }
+
+    box_audio_core_free(core);
+}
+
+/** A tremolo of depth 0.5 at 4 Hz on a steady level: the output dips from the level at the
+ * top of the LFO to half of it at its bottom, frame by frame as its formula says. */
+void Synth_lfo_tremolo(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_lfo_patch(BOX_AUDIO_SYNTH_SQUARE, 1, 0.5f, 0.6f, 4);
+    double expected, err = 0;
+    float hi, lo;
+    int32_t i, at_lo = 0;
+    p.lfo[0].amplitude = 0.5f;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 24000);
+    hi = audio_l[100];
+    lo = audio_l[100];
+    for (i = 100; i < 23000; i ++) {
+        expected = 0.5 * (1 - 0.5 * 0.5 * (1 - sin(2 * AUDIO_PI * 4 * (i + 1) / AUDIO_RATE)));
+        err = fabs(audio_l[i] - expected) > err ? fabs(audio_l[i] - expected) : err;
+        hi = audio_l[i] > hi ? audio_l[i] : hi;
+        if (audio_l[i] < lo) {
+            lo = audio_l[i];
+            at_lo = i;
+        }
+    }
+
+    printf("tremolo: %.4f to %.4f, %.6f from the expected at most\n", (double)lo, (double)hi,
+        err);
+    test_assert(err < 1e-3);
+    test_assert(fabsf(hi - 0.5f) < 1e-3f);
+    test_assert(fabsf(lo - 0.25f) < 1e-3f);
+    test_assert(abs(at_lo - 9000) < 200);
+    box_audio_core_free(core);
+}
+
+/** A tremolo of an LFO on one layer moves that layer alone. */
+void Synth_lfo_layer(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_lfo_patch(BOX_AUDIO_SYNTH_SQUARE, 1, 0.2f, 0.6f, 4);
+    float hi, lo;
+    int32_t i;
+    p.layers = 2;
+    p.layer[1] = (box_audio_synth_layer_t){
+        .wave = BOX_AUDIO_SYNTH_SQUARE, .frequency = 1, .level = 0.3f };
+    p.lfo[0].layer = 2;
+    p.lfo[0].amplitude = 1;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 24000);
+    hi = audio_l[100];
+    lo = audio_l[100];
+    for (i = 100; i < 23000; i ++) {
+        hi = audio_l[i] > hi ? audio_l[i] : hi;
+        lo = audio_l[i] < lo ? audio_l[i] : lo;
+    }
+
+    test_assert(fabsf(hi - 0.5f) < 1e-3f);
+    test_assert(fabsf(lo - 0.2f) < 1e-3f);
+    box_audio_core_free(core);
+}
+
+/** An LFO comes in after its delay and over its fade: the level holds during the delay, dips
+ * less while it fades in, and fully after. */
+void Synth_lfo_delay_fade(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_lfo_patch(BOX_AUDIO_SYNTH_SQUARE, 1, 0.5f, 0.6f, 10);
+    float lo_fade = 1, lo_full = 1;
+    int32_t i;
+    p.lfo[0].amplitude = 1;
+    p.lfo[0].delay = 0.1f;
+    p.lfo[0].fade = 0.2f;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 24000);
+    for (i = 100; i < 4800; i ++) {
+        test_assert(fabsf(audio_l[i] - 0.5f) < 1e-6f);
+    }
+
+    for (i = 4800; i < 9600; i ++) {
+        lo_fade = audio_l[i] < lo_fade ? audio_l[i] : lo_fade;
+    }
+
+    for (i = 14400; i < 23000; i ++) {
+        lo_full = audio_l[i] < lo_full ? audio_l[i] : lo_full;
+    }
+
+    printf("delay and fade: %.4f while it fades in, %.4f after\n", (double)lo_fade,
+        (double)lo_full);
+    test_assert(lo_fade > 0.24f);
+    test_assert(lo_fade < 0.49f);
+    test_assert(lo_full < 0.01f);
+    box_audio_core_free(core);
+}
+
+/** A slow LFO moves the level without zipper noise: the second difference of a slow tremolo
+ * stays at the rounding of a float, far under the steps a control block would leave. */
+void Synth_lfo_smooth(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_lfo_patch(BOX_AUDIO_SYNTH_SQUARE, 1, 0.5f, 0.6f, 0.5f);
+    double d2, worst = 0;
+    int32_t i;
+    p.lfo[0].amplitude = 1;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 24000);
+    for (i = 200; i < 23000; i ++) {
+        d2 = fabs((double)audio_l[i + 1] - 2.0 * audio_l[i] + audio_l[i - 1]);
+        worst = d2 > worst ? d2 : worst;
+    }
+
+    printf("slow tremolo: second difference %.3g at most\n", worst);
+    test_assert(worst < 1e-6);
+    box_audio_core_free(core);
+}
+
+/** A square LFO and a random one at full depth do not click: their steps are smoothed. */
+void Synth_lfo_square_no_click(void) {
+    // audio/synth
+    const uint32_t waves[] = { BOX_AUDIO_SYNTH_LFO_SQUARE, BOX_AUDIO_SYNTH_LFO_SAW,
+        BOX_AUDIO_SYNTH_LFO_RANDOM };
+    int32_t w;
+    for (w = 0; w < 3; w ++) {
+        box_audio_core_t *core = synth_core(AUDIO_RATE);
+        box_audio_synth_patch_t p = synth_lfo_patch(BOX_AUDIO_SYNTH_SQUARE, 1, 0.5f, 0.6f, 8);
+        float step, hi = 0, lo = 1;
+        int32_t i;
+        p.lfo[0].wave = waves[w];
+        p.lfo[0].amplitude = 1;
+        synth_define(core, 1, &p);
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, 24000);
+        step = audio_max_step(audio_l, 100, 23000);
+        for (i = 100; i < 23000; i ++) {
+            hi = audio_l[i] > hi ? audio_l[i] : hi;
+            lo = audio_l[i] < lo ? audio_l[i] : lo;
+        }
+
+        printf("lfo wave %u: largest step %.5f, %.4f to %.4f\n", waves[w], (double)step,
+            (double)lo, (double)hi);
+        test_assert(step < 0.01f);
+        test_assert(hi - lo > (waves[w] == BOX_AUDIO_SYNTH_LFO_RANDOM ? 0.05f : 0.4f));
+        box_audio_core_free(core);
+    }
+}
+
+/** An LFO of 2 octaves at 2 Hz on the cutoff of a lowpass: the 10th harmonic of a 220 Hz saw
+ * is strong at the top of the LFO, when the cutoff is 4 kHz, and weak at its bottom, at
+ * 250 Hz, once each period of the LFO. */
+void Synth_lfo_cutoff(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_lfo_patch(BOX_AUDIO_SYNTH_SAW, 220, 0.5f, 1.2f, 2);
+    double top[2], bottom[2];
+    int32_t k;
+    p.filter = BOX_AUDIO_SYNTH_LOWPASS;
+    p.cutoff = 1000;
+    p.lfo[0].cutoff = 2;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES);
+    for (k = 0; k < 2; k ++) {
+        top[k] = synth_window_energy(audio_l, 6000 + k * 24000, 2400, 2200);
+        bottom[k] = synth_window_energy(audio_l, 18000 + k * 24000, 2400, 2200);
+        printf("cutoff lfo, period %d: 2200 Hz %.3g at the top, %.3g at the bottom\n", k,
+            top[k], bottom[k]);
+        test_assert(top[k] > 100 * bottom[k]);
+    }
+
+    test_assert(fabs(top[1] / top[0] - 1) < 0.2);
+    test_assert(synth_finite(audio_l, 0, AUDIO_FRAMES));
+    box_audio_core_free(core);
+}
+
+/** An LFO on the pulse width of a 200 Hz square, from 0.375 by 0.125 at 2 Hz: at the top of
+ * the LFO the width is 0.5 and the 2nd harmonic is gone, at its bottom the width is 0.25 and
+ * the 2nd harmonic is strong, once each period of the LFO. */
+void Synth_lfo_pulse_width(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_lfo_patch(BOX_AUDIO_SYNTH_SQUARE, 200, 0.5f, 1.2f, 2);
+    double top[2], bottom[2];
+    int32_t k;
+    p.layer[0].pulse_width = 0.375f;
+    p.lfo[0].pulse_width = 0.125f;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES);
+    for (k = 0; k < 2; k ++) {
+        top[k] = synth_window_energy(audio_l, 6000 + k * 24000, 2400, 400);
+        bottom[k] = synth_window_energy(audio_l, 18000 + k * 24000, 2400, 400);
+        printf("pulse width lfo, period %d: 400 Hz %.3g at the top, %.3g at the bottom\n", k,
+            top[k], bottom[k]);
+        test_assert(bottom[k] > 50 * top[k]);
+    }
+
+    test_assert(fabs(bottom[1] / bottom[0] - 1) < 0.2);
+    test_assert(audio_max_step(audio_l, 100, AUDIO_FRAMES) < 1.5f);
+    box_audio_core_free(core);
+}
+
+/** A pulse at a fixed width has the harmonics of its width: none at multiples of 1 / width,
+ * the 1st and the 3rd in the ratio of |sin(pi n w)| / n. */
+void Synth_pulse_width_harmonics(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SQUARE, 200, 0.5f, 1.0f);
+    double h1, h3, h4, expected;
+    p.layer[0].pulse_width = 0.25f;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 24000);
+    h1 = synth_window_energy(audio_l, 12000, 9600, 200);
+    h3 = synth_window_energy(audio_l, 12000, 9600, 600);
+    h4 = synth_window_energy(audio_l, 12000, 9600, 800);
+    expected = pow(sin(3 * AUDIO_PI * 0.25) / 3 / sin(AUDIO_PI * 0.25), 2);
+    printf("pulse 0.25: 3rd over 1st %.4f, expected %.4f, 4th %.3g\n", h3 / h1, expected,
+        h4 / h1);
+    test_assert(fabs(h3 / h1 / expected - 1) < 0.05);
+    test_assert(h4 < 1e-4 * h1);
+    box_audio_core_free(core);
+}
+
+/** Share of the energy of a 5 kHz pulse at 44100 Hz outside its harmonics and DC.
+ *
+ * @param width The pulse width
+ * @return The share, 0..1
+ */
+static double synth_alias_pulse(
+    float width)
+{
+    box_audio_core_t *core = synth_core(SYNTH_ALIAS_RATE);
+    box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SQUARE, 5000, 0.5f, 1.0f);
+    const float *x = audio_l + 2048;
+    double total = 0, mean = 0, harmonics = 0;
+    int32_t i, k;
+    p.layer[0].pulse_width = width;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 2048 + SYNTH_ALIAS_FRAMES);
+    for (i = 0; i < SYNTH_ALIAS_FRAMES; i ++) {
+        total += (double)x[i] * x[i];
+        mean += x[i];
+    }
+
+    mean /= SYNTH_ALIAS_FRAMES;
+    for (k = 1; k * 5000 < SYNTH_ALIAS_RATE / 2; k ++) {
+        harmonics += synth_bin_energy(x, SYNTH_ALIAS_FRAMES, k * 5000.0, SYNTH_ALIAS_RATE);
+    }
+
+    box_audio_core_free(core);
+
+    return (total - harmonics - mean * mean * SYNTH_ALIAS_FRAMES) / total;
+}
+
+/** A pulse is band limited at every width, the narrow ones included. */
+void Synth_alias_pulse(void) {
+    // audio/synth
+    const float widths[] = { 0.1f, 0.25f, 0.4f, 0.75f, 0.95f };
+    int32_t i;
+    for (i = 0; i < 5; i ++) {
+        double alias = synth_alias_pulse(widths[i]);
+        printf("pulse %.2f at 5 kHz: %.2f dB outside its harmonics\n", (double)widths[i],
+            10 * log10(alias));
+        test_assert(alias >= 0);
+        test_assert(alias < 0.02);
+    }
+}
+
+/** A square at a width of 0.5, and a patch whose LFO has no depth, render bit identical to the
+ * patch as before: plain layers, noise, a filter envelope and phase modulation. */
+void Synth_lfo_zero_identical(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SQUARE, 330, 0.3f, 0.3f);
+    int32_t pass;
+    p.seed = 11;
+    p.layers = 4;
+    p.layer[1] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_NOISE, .level = 0.1f };
+    p.layer[2] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_SAW, .frequency = 220,
+        .level = 0.2f };
+    p.layer[3] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_SINE, .frequency = 440,
+        .modulates = 3, .index = 2 };
+    p.filter = BOX_AUDIO_SYNTH_LOWPASS;
+    p.cutoff = 800;
+    p.filter_amount = 2;
+    p.filter_envelope = (box_audio_synth_envelope_t){ .attack = 0.05f, .decay = 0.1f };
+    for (pass = 0; pass < 2; pass ++) {
+        uint32_t voice = 1 + 2 * (uint32_t)pass;
+        p.layers = pass ? 4 : 3;
+        p.lfos = 0;
+        p.layer[0].pulse_width = 0;
+        synth_define(core, 1, &p);
+        audio_play(core, voice, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, 16000);
+        test_int(box_audio_core_voice_count(core), 0);
+        memcpy(audio_sound_a, audio_l, 16000 * sizeof(float));
+
+        p.layer[0].pulse_width = 0.5f;
+        p.lfos = 1;
+        p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_RANDOM, .rate = 6,
+            .random_phase = 1 };
+        synth_define(core, 2, &p);
+        audio_play(core, voice + 1, 2, 0, 1, 0, 1, 0);
+        audio_render(core, 0, 16000);
+        test_int(box_audio_core_voice_count(core), 0);
+        test_assert(memcmp(audio_l, audio_sound_a, 16000 * sizeof(float)) == 0);
+    }
+
+    box_audio_core_free(core);
+}
+
+/** Render a saw through a filter envelope without LFOs, in a core whose voice slot first
+ * played a patch with a cutoff LFO to its end, or in a new core.
+ *
+ * @param before Whether the slot plays the patch with the LFO first
+ * @param out Receives 16000 samples
+ */
+static void synth_lfo_reuse(
+    bool before,
+    float *out)
+{
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_lfo_patch(BOX_AUDIO_SYNTH_SAW, 220, 0.3f, 0.1f, 3);
+    p.filter = BOX_AUDIO_SYNTH_LOWPASS;
+    p.cutoff = 300;
+    p.lfo[0].cutoff = 1;
+    if (before) {
+        synth_define(core, 2, &p);
+        audio_play(core, 2, 2, 0, 1, 0, 1, 0);
+        audio_render(core, 0, 16000);
+        test_int(box_audio_core_voice_count(core), 0);
+    }
+
+    p = synth_steady(BOX_AUDIO_SYNTH_SAW, 220, 0.3f, 0.2f);
+    p.filter = BOX_AUDIO_SYNTH_LOWPASS;
+    p.cutoff = 300;
+    p.filter_amount = 4;
+    p.filter_envelope = (box_audio_synth_envelope_t){ .attack = 0.05f, .decay = 0.2f };
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 16000);
+    test_int(box_audio_core_voice_count(core), 0);
+    memcpy(out, audio_l, 16000 * sizeof(float));
+    box_audio_core_free(core);
+}
+
+/** A voice slot that played a cutoff LFO keeps nothing of it: a filter envelope without LFOs
+ * in it renders bit identical to the one of a new core. */
+void Synth_lfo_slot_reuse(void) {
+    // audio/synth
+    synth_lfo_reuse(false, audio_sound_a);
+    synth_lfo_reuse(true, audio_sound_b);
+    test_assert(memcmp(audio_sound_a, audio_sound_b, 16000 * sizeof(float)) == 0);
+}
+
+/** An LFO with a delay and no fade still comes in over a few ms: a full tremolo that starts
+ * at its bottom does not step the level. */
+void Synth_lfo_delay_no_fade(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_lfo_patch(BOX_AUDIO_SYNTH_SQUARE, 1, 0.5f, 0.6f, 0.5f);
+    float step, worst = 0;
+    int32_t i;
+    p.lfo[0].amplitude = 1;
+    p.lfo[0].delay = 0.1f;
+    p.lfo[0].phase = 0.75f;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 24000);
+    for (i = 100; i < 23000; i ++) {
+        step = fabsf(audio_l[i + 1] - audio_l[i]);
+        worst = step > worst ? step : worst;
+    }
+
+    printf("delay without fade: %.5f largest step\n", (double)worst);
+    test_assert(worst < 0.005f);
+    test_assert(audio_l[4800 + 480] < 0.01f);
+    box_audio_core_free(core);
+}
+
+/** Render a vibrato at a random phase per play of a seed in a new core, the plays before it
+ * rendered and dropped.
+ *
+ * @param seed The seed
+ * @param play Count of the play to keep, from 1
+ * @param out Receives frames samples
+ * @param frames Number of frames
+ */
+static void synth_lfo_random(
+    uint32_t seed,
+    int32_t play,
+    float *out,
+    int32_t frames)
+{
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_lfo_patch(BOX_AUDIO_SYNTH_SINE, 500, 0.5f, 0.4f, 3);
+    int32_t i;
+    p.seed = seed;
+    p.lfo[0].random_phase = 1;
+    p.lfo[0].pitch = 50;
+    synth_define(core, 1, &p);
+    for (i = 1; i <= play; i ++) {
+        audio_play(core, (uint32_t)i, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, frames);
+    }
+
+    memcpy(out, audio_l, (size_t)frames * sizeof(float));
+    box_audio_core_free(core);
+}
+
+/** A random phase is the same for the same seed and count of plays, and differs with either. */
+void Synth_lfo_random_phase_seeded(void) {
+    // audio/synth
+    static float other[24000];
+    synth_lfo_random(21, 1, audio_sound_a, 24000);
+    synth_lfo_random(21, 1, audio_sound_b, 24000);
+    test_assert(memcmp(audio_sound_a, audio_sound_b, 24000 * sizeof(float)) == 0);
+    synth_lfo_random(21, 3, audio_sound_b, 24000);
+    synth_lfo_random(21, 3, other, 24000);
+    test_assert(memcmp(other, audio_sound_b, 24000 * sizeof(float)) == 0);
+    test_assert(memcmp(audio_sound_a, audio_sound_b, 24000 * sizeof(float)) != 0);
+    synth_lfo_random(22, 1, audio_sound_b, 24000);
+    test_assert(memcmp(audio_sound_a, audio_sound_b, 24000 * sizeof(float)) != 0);
+}
+
+/** The examples of LFOs of docs/audio.md, from test/assets/audio/synth_lfo.flecs, compile
+ * into their patches without errors, play and end. */
+void Synth_docs_lfo_examples(void) {
+    // audio/synth
+    ecs_world_t *world = audio_world();
+    char *code = audio_read("test/assets/audio/synth_lfo.flecs");
+    const char *names[] = { "flute_a4", "PwmPad" };
+    const int32_t frames[] = { 75, 300 };
+    const box_audio_synth_patch_t *p;
+    ecs_entity_t flute, pad;
+    int32_t i, start;
+    audio_log_start();
+    test_assert(ecs_script_run(world, "lfo", code, NULL) == 0);
+    ecs_os_free(code);
+    audio_run(world, 1);
+    flute = ecs_lookup(world, "flute_a4");
+    pad = ecs_lookup(world, "PwmPad");
+    test_assert(flute != 0);
+    test_assert(pad != 0);
+    test_flt(ecs_get(world, flute, SynthLfo)->rate, 5.2f);
+    test_int(ecs_get(world, flute, SynthLfo)->wave, SynthLfoSine);
+    test_bool(ecs_get(world, flute, SynthLfo)->random_phase, true);
+
+    p = &ecs_get(world, flute, AudioSynth)->patch;
+    test_int(p->layers, 4);
+    test_int(p->lfos, 1);
+    test_int(p->lfo[0].layer, 0);
+    test_int(p->lfo[0].wave, BOX_AUDIO_SYNTH_LFO_SINE);
+    test_flt(p->lfo[0].rate, 5.2f);
+    test_flt(p->lfo[0].delay, 0.2f);
+    test_flt(p->lfo[0].fade, 0.3f);
+    test_flt(p->lfo[0].pitch, 14);
+    test_flt(p->lfo[0].amplitude, 0.08f);
+    test_int(p->lfo[0].random_phase, 1);
+    test_flt(p->layer[0].pulse_width, 0.5f);
+
+    p = &ecs_get(world, pad, AudioSynth)->patch;
+    test_int(p->layers, 2);
+    test_int(p->lfos, 2);
+    test_int(p->lfo[0].layer, 0);
+    test_int(p->lfo[0].wave, BOX_AUDIO_SYNTH_LFO_TRIANGLE);
+    test_flt(p->lfo[0].pulse_width, 0.3f);
+    test_flt(p->lfo[0].cutoff, 0.5f);
+    test_int(p->lfo[1].layer, 2);
+    test_flt(p->lfo[1].pitch, 6);
+    test_flt(p->lfo[1].phase, 0.5f);
+    test_flt(p->layer[0].pulse_width, 0.5f);
+    test_flt(p->layer[1].pulse_width, 0.3f);
+
+    for (i = 0; i < 2; i ++) {
+        ecs_entity_t sound = ecs_lookup(world, names[i]);
+        start = audio_tap_count;
+        test_assert(box_audio_play(world, sound, 1.0f));
+        audio_run(world, frames[i]);
+        test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.05f);
+        test_assert(synth_finite(audio_tap_l, start, audio_tap_count));
+        test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+        test_flt(audio_peak(audio_tap_l, audio_tap_count - AUDIO_FRAME, audio_tap_count), 0);
+    }
+
+    audio_log_stop();
+    test_int(audio_log_errors, 0);
+    ecs_fini(world);
+}
+
+/** LFOs of a script: one on a child of the root without an oscillator moves every layer, a
+ * third logs one error and is left out, and a change or a removal compiles the sound again. */
+void Synth_script_lfo(void) {
+    // audio/synth
+    ecs_world_t *world = audio_world();
+    ecs_entity_t wobble;
+    const box_audio_synth_patch_t *p;
+    audio_log_start();
+    test_assert(ecs_script_run(world, "lfos",
+        "using box.audio\n"
+        "prefab Wobble {\n"
+        "  SynthSound: {seed: 4}\n"
+        "  SynthEnvelope: {attack: 0.01, decay: 0.1}\n"
+        "  SynthFilter: {cutoff: 800}\n"
+        "  tone {\n"
+        "    SynthOscillator: {wave: SynthSquare, frequency: 220, level: 0.3, pulse_width: 0.2}\n"
+        "    SynthLfo: {wave: SynthLfoSquare, rate: 3, pulse_width: 0.1}\n"
+        "  }\n"
+        "  wah { SynthLfo: {wave: SynthLfoRandom, rate: 7, cutoff: 1.5} }\n"
+        "  more { SynthLfo: {rate: 1, pitch: 10} }\n"
+        "}\n", NULL) == 0);
+    audio_run(world, 1);
+    audio_log_stop();
+    test_int(audio_log_errors, 1);
+    test_assert(strstr(audio_log_last, "Wobble") != NULL);
+    test_assert(strstr(audio_log_last, "LFO") != NULL);
+
+    wobble = ecs_lookup(world, "Wobble");
+    p = &ecs_get(world, wobble, AudioSynth)->patch;
+    test_int(p->layers, 1);
+    test_flt(p->layer[0].pulse_width, 0.2f);
+    test_int(p->lfos, 2);
+    test_int(p->lfo[0].layer, 1);
+    test_int(p->lfo[0].wave, BOX_AUDIO_SYNTH_LFO_SQUARE);
+    test_flt(p->lfo[0].pulse_width, 0.1f);
+    test_int(p->lfo[1].layer, 0);
+    test_int(p->lfo[1].wave, BOX_AUDIO_SYNTH_LFO_RANDOM);
+    test_flt(p->lfo[1].cutoff, 1.5f);
+
+    ecs_delete(world, ecs_lookup(world, "Wobble.more"));
+    ecs_set(world, ecs_lookup(world, "Wobble.wah"), SynthLfo, {
+        .wave = SynthLfoTriangle, .rate = 2, .amplitude = 0.5f });
+    audio_run(world, 1);
+    p = &ecs_get(world, wobble, AudioSynth)->patch;
+    test_int(p->lfos, 2);
+    test_int(p->lfo[1].wave, BOX_AUDIO_SYNTH_LFO_TRIANGLE);
+    test_flt(p->lfo[1].amplitude, 0.5f);
+    test_flt(p->lfo[1].cutoff, 0);
+
+    ecs_remove(world, ecs_lookup(world, "Wobble.tone"), SynthLfo);
+    audio_run(world, 1);
+    p = &ecs_get(world, wobble, AudioSynth)->patch;
+    test_int(p->lfos, 1);
+    test_int(p->lfo[0].layer, 0);
+
+    test_assert(box_audio_play(world, wobble, 1.0f));
+    audio_run(world, 10);
+    test_assert(synth_finite(audio_tap_l, 0, audio_tap_count));
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+    ecs_fini(world);
+}
+
+/** Seconds of the renders of the unison cases that measure levels and correlations */
+#define SYNTH_UNISON_SECONDS 4
+
+/** A patch of one oscillator with unison voices at a steady level for a while.
+ *
+ * @param wave A box_audio_synth_wave_t
+ * @param frequency Hz
+ * @param level Level of the layer
+ * @param voices Unison voices
+ * @param detune Cents from the lowest voice to the highest
+ * @param width Stereo width, 0..1
+ * @param hold Seconds at the level
+ * @return The patch
+ */
+static box_audio_synth_patch_t synth_unison(
+    uint32_t wave,
+    float frequency,
+    float level,
+    uint32_t voices,
+    float detune,
+    float width,
+    float hold)
+{
+    box_audio_synth_patch_t p = synth_steady(wave, frequency, level, hold);
+    p.layer[0].voices = voices;
+    p.layer[0].detune = detune;
+    p.layer[0].width = width;
+
+    return p;
+}
+
+/** Power of the component of a range at a frequency, through a Hann window, so that a peak
+ * leaks little into frequencies a few Hz away.
+ *
+ * @param x Samples
+ * @param n Number of samples
+ * @param frequency Hz
+ * @param rate Frames per second
+ * @return The power, in arbitrary units
+ */
+static double synth_hann_power(
+    const float *x,
+    int32_t n,
+    double frequency,
+    double rate)
+{
+    double re = 0, im = 0, w, a;
+    int32_t i;
+    for (i = 0; i < n; i ++) {
+        w = 0.5 - 0.5 * cos(2 * AUDIO_PI * i / (n - 1));
+        a = 2 * AUDIO_PI * frequency * i / rate;
+        re += x[i] * w * cos(a);
+        im -= x[i] * w * sin(a);
+    }
+
+    return re * re + im * im;
+}
+
+/** Statistics of the two channels of a render of SYNTH_UNISON_SECONDS seconds of a patch, from
+ * 0.05 seconds on.
+ *
+ * @param p The patch, which holds that long
+ * @param ms_l Receives the mean square of the left channel
+ * @param ms_r Receives the mean square of the right channel
+ * @param corr Receives the correlation of the channels
+ */
+static void synth_unison_stats(
+    const box_audio_synth_patch_t *p,
+    double *ms_l,
+    double *ms_r,
+    double *corr)
+{
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    double ll = 0, rr = 0, lr = 0;
+    int32_t s, i, n = 0;
+    synth_define(core, 1, p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    for (s = 0; s < SYNTH_UNISON_SECONDS; s ++) {
+        audio_render(core, 0, AUDIO_FRAMES);
+        for (i = s ? 0 : AUDIO_RATE / 20; i < AUDIO_FRAMES; i ++) {
+            ll += (double)audio_l[i] * audio_l[i];
+            rr += (double)audio_r[i] * audio_r[i];
+            lr += (double)audio_l[i] * audio_r[i];
+            n ++;
+        }
+    }
+
+    box_audio_core_free(core);
+    *ms_l = ll / n;
+    *ms_r = rr / n;
+    *corr = lr / sqrt(ll * rr);
+}
+
+/** The voices of a layer play at its frequency times 2 to the detune of each over 1200: the
+ * spectrum has a peak at each, of about the same height, and little between them. */
+void Synth_unison_detune_peaks(void) {
+    // audio/synth
+    const uint32_t voices[] = { 3, 4 };
+    const float detune[] = { 100, 60 };
+    const int32_t from = 2400, n = AUDIO_FRAMES - 2400;
+    int32_t c, k;
+    for (c = 0; c < 2; c ++) {
+        box_audio_core_t *core = synth_core(AUDIO_RATE);
+        box_audio_synth_patch_t p = synth_unison(
+            BOX_AUDIO_SYNTH_SINE, 440, 0.5f, voices[c], detune[c], 0, 1.5f);
+        double f[BOX_AUDIO_SYNTH_UNISON_MAX], lo = 1e300, hi = 0, between = 0, power;
+        synth_define(core, 1, &p);
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, AUDIO_FRAMES);
+        box_audio_core_free(core);
+        for (k = 0; k < (int32_t)voices[c]; k ++) {
+            double cents = detune[c] * ((double)k / (voices[c] - 1) - 0.5);
+            f[k] = 440 * pow(2, cents / 1200);
+            power = synth_hann_power(audio_l + from, n, f[k], AUDIO_RATE);
+            printf("%u voices over %.0f cents: %.2f Hz at %g\n", voices[c],
+                (double)detune[c], f[k], power);
+            lo = power < lo ? power : lo;
+            hi = power > hi ? power : hi;
+        }
+
+        for (k = 0; k + 1 < (int32_t)voices[c]; k ++) {
+            power = synth_hann_power(audio_l + from, n, 0.5 * (f[k] + f[k + 1]), AUDIO_RATE);
+            between = power > between ? power : between;
+        }
+
+        power = synth_hann_power(audio_l + from, n, 440 * pow(2, detune[c] / 1200), AUDIO_RATE);
+        between = power > between ? power : between;
+        printf("between the peaks: %g\n", between);
+        test_assert(hi / lo < 2);
+        test_assert(lo > 100 * between);
+    }
+}
+
+/** A width of 0 renders the same samples on both channels, whatever the voices and detune. */
+void Synth_unison_width_zero_mono(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_unison(
+        BOX_AUDIO_SYNTH_SAW, 220, 0.3f, 5, 30, 0, 0.8f);
+    p.filter = BOX_AUDIO_SYNTH_LOWPASS;
+    p.cutoff = 2000;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES);
+    box_audio_core_free(core);
+    test_assert(audio_peak(audio_l, 0, AUDIO_FRAMES) > 0.1f);
+    test_assert(memcmp(audio_l, audio_r, AUDIO_FRAMES * sizeof(float)) == 0);
+}
+
+/** The channels of a wide layer correlate as the mean of cos(pi pan / 2) over its voices: 0
+ * for 2 voices at width 1, 1/3 for 3, and more at a smaller width. */
+void Synth_unison_width_correlation(void) {
+    // audio/synth
+    const uint32_t voices[] = { 2, 2, 3, 5, 7 };
+    const float width[] = { 1, 0.5f, 1, 1, 1 };
+    int32_t c, k;
+    for (c = 0; c < 5; c ++) {
+        box_audio_synth_patch_t p = synth_unison(BOX_AUDIO_SYNTH_SINE, 440, 0.3f, voices[c],
+            100, width[c], SYNTH_UNISON_SECONDS + 1);
+        double ms_l, ms_r, corr, expected = 0;
+        for (k = 0; k < (int32_t)voices[c]; k ++) {
+            double pan = width[c] * (2.0 * k / (voices[c] - 1) - 1);
+            expected += cos(AUDIO_PI * pan / 2) / voices[c];
+        }
+
+        synth_unison_stats(&p, &ms_l, &ms_r, &corr);
+        printf("%u voices at width %.1f: correlation %.3f, expected %.3f, levels %.4f %.4f\n",
+            voices[c], (double)width[c], corr, expected, sqrt(ms_l), sqrt(ms_r));
+        test_assert(fabs(corr - expected) < 0.05);
+        test_assert(fabs(sqrt(ms_l / ms_r) - 1) < 0.05);
+    }
+}
+
+/** The level of a layer stays about the same from 1 to 7 voices, at width 0 and 1. */
+void Synth_unison_level_constant(void) {
+    // audio/synth
+    double base = 0, ms_l, ms_r, corr, ratio;
+    uint32_t v;
+    int32_t w;
+    for (w = 0; w < 2; w ++) {
+        for (v = 1; v <= BOX_AUDIO_SYNTH_UNISON_MAX; v ++) {
+            box_audio_synth_patch_t p = synth_unison(BOX_AUDIO_SYNTH_SAW, 220, 0.2f, v, 50,
+                (float)w, SYNTH_UNISON_SECONDS + 1);
+            synth_unison_stats(&p, &ms_l, &ms_r, &corr);
+            if (!base) {
+                base = ms_l;
+            }
+
+            ratio = sqrt(0.5 * (ms_l + ms_r) / base);
+            printf("%u voices at width %d: %.2f dB, left %.2f dB, right %.2f dB\n", v, (int)w,
+                20 * log10(ratio), 10 * log10(ms_l / base), 10 * log10(ms_r / base));
+            test_assert(fabs(20 * log10(ratio)) < 1.0);
+            test_assert(fabs(10 * log10(ms_l / base)) < 1.5);
+            test_assert(fabs(10 * log10(ms_r / base)) < 1.5);
+        }
+    }
+}
+
+/** Hash both channels of a render of a patch in a new core, and of a second play of it.
+ *
+ * @param p The patch
+ * @param second Receives the hash of the second play
+ * @return The hash of the first play
+ */
+static uint64_t synth_unison_hash(
+    const box_audio_synth_patch_t *p,
+    uint64_t *second)
+{
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    uint64_t result;
+    synth_define(core, 1, p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES / 2);
+    result = audio_hash(audio_l, AUDIO_FRAMES / 2) ^ (audio_hash(audio_r, AUDIO_FRAMES / 2) << 1);
+    audio_play(core, 2, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES / 2);
+    *second = audio_hash(audio_l, AUDIO_FRAMES / 2) ^
+        (audio_hash(audio_r, AUDIO_FRAMES / 2) << 1);
+    box_audio_core_free(core);
+
+    return result;
+}
+
+/** The same seed renders bit identical; another seed, and the next play of the same patch,
+ * start the voices at other phases. */
+void Synth_unison_seed_identical(void) {
+    // audio/synth
+    box_audio_synth_patch_t p = synth_unison(BOX_AUDIO_SYNTH_SAW, 220, 0.2f, 5, 25, 0.7f, 0.3f);
+    uint64_t a, b, c, a2, b2, c2;
+    p.layers = 3;
+    p.seed = 9;
+    p.filter = BOX_AUDIO_SYNTH_LOWPASS;
+    p.cutoff = 1500;
+    p.slope = BOX_AUDIO_SYNTH_SLOPE_24;
+    p.layer[1] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_NOISE, .level = 0.05f,
+        .voices = 2, .width = 1 };
+    p.layer[2] = (box_audio_synth_layer_t){ .frequency = 330, .level = 0.1f, .feedback = 0.4f,
+        .voices = 3, .detune = 10 };
+    a = synth_unison_hash(&p, &a2);
+    b = synth_unison_hash(&p, &b2);
+    p.seed = 10;
+    c = synth_unison_hash(&p, &c2);
+    printf("seed 9: 0x%016llXull\n", (unsigned long long)a);
+    test_assert(a == b);
+    test_assert(a2 == b2);
+    test_assert(a != a2);
+    test_assert(a != c);
+}
+
+/** A layer of one voice, or none, renders bit identical to a layer without unison, whatever
+ * its detune and width, and stays mono. */
+void Synth_unison_one_voice_identical(void) {
+    // audio/synth
+    box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SAW, 220, 0.3f, 0.3f);
+    uint64_t plain, one, none, second;
+    int32_t i;
+    p.layers = 2;
+    p.seed = 2;
+    p.filter = BOX_AUDIO_SYNTH_LOWPASS;
+    p.cutoff = 600;
+    p.filter_amount = 2;
+    p.filter_envelope = (box_audio_synth_envelope_t){ .attack = 0.05f, .decay = 0.1f };
+    p.layer[1] = (box_audio_synth_layer_t){ .frequency = 660, .level = 1, .modulates = 1,
+        .index = 1.5f };
+    plain = synth_unison_hash(&p, &second);
+    for (i = 0; i < 2; i ++) {
+        p.layer[i].voices = 1;
+        p.layer[i].detune = 50;
+        p.layer[i].width = 1;
+    }
+
+    one = synth_unison_hash(&p, &second);
+    test_assert(memcmp(audio_l, audio_r, (AUDIO_FRAMES / 2) * sizeof(float)) == 0);
+    for (i = 0; i < 2; i ++) {
+        p.layer[i].voices = 0;
+    }
+
+    none = synth_unison_hash(&p, &second);
+    test_assert(plain == one);
+    test_assert(plain == none);
+}
+
+/** Render a wide layer on bus 1 into audio_l and audio_r.
+ *
+ * @param routes The order
+ * @param count Routes in the order
+ * @param voice_pan Pan of the voice
+ * @param bus_pan Pan of bus 1
+ * @param send Send level of bus 1
+ */
+static void synth_unison_chain(
+    const box_audio_route_t *routes,
+    int32_t count,
+    float voice_pan,
+    float bus_pan,
+    float send)
+{
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_unison(BOX_AUDIO_SYNTH_SAW, 220, 0.15f, 2, 40, 1, 1.0f);
+    p.seed = 6;
+    synth_define(core, 1, &p);
+    audio_order(core, routes, count);
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_PAN, bus_pan);
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_SEND, send);
+    audio_play(core, 1, 1, 1, 1, voice_pan, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES / 2);
+    box_audio_core_free(core);
+}
+
+/** A wide voice is a stereo voice in the mixer: the pan of the voice and of its bus are a
+ * balance that keeps the power of its two channels on one side, and a send carries both. */
+void Synth_unison_stereo_chain(void) {
+    // audio/synth
+    static float ref_l[AUDIO_FRAMES / 2], ref_r[AUDIO_FRAMES / 2];
+    const box_audio_route_t plain[] = { { 1, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 } };
+    const box_audio_route_t sent[] = {
+        { 1, 0, 2 }, { 2, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 } };
+    const int32_t from = 2 * AUDIO_RAMP, to = AUDIO_FRAMES / 2;
+    double ms_l = 0, ms_r = 0, ms = 0, lr = 0;
+    float err = 0;
+    int32_t i;
+    synth_unison_chain(plain, 2, 0, 0, 0);
+    memcpy(ref_l, audio_l, sizeof(ref_l));
+    memcpy(ref_r, audio_r, sizeof(ref_r));
+    for (i = from; i < to; i ++) {
+        ms_l += (double)ref_l[i] * ref_l[i];
+        ms_r += (double)ref_r[i] * ref_r[i];
+        lr += (double)ref_l[i] * ref_r[i];
+    }
+
+    test_assert(audio_peak(ref_l, from, to) > 0.05f);
+    test_assert(fabs(lr / sqrt(ms_l * ms_r)) < 0.3);
+
+    synth_unison_chain(plain, 2, -1, 0, 0);
+    test_assert(audio_peak(audio_r, from, to) < 1e-6f);
+    for (i = from; i < to; i ++) {
+        float d = fabsf(audio_l[i] - SYNTH_SQRT2 * ref_l[i]);
+        err = d > err ? d : err;
+        ms += (double)audio_l[i] * audio_l[i];
+    }
+
+    printf("voice pan left: error %g, power %.3f of the centered one\n", (double)err,
+        ms / (ms_l + ms_r));
+    test_assert(err < 1e-5f);
+    test_assert(fabs(ms / (ms_l + ms_r) - 1) < 0.1);
+
+    synth_unison_chain(plain, 2, 0, 1, 0);
+    test_assert(audio_peak(audio_l, from, to) < 1e-6f);
+    err = 0;
+    for (i = from; i < to; i ++) {
+        float d = fabsf(audio_r[i] - SYNTH_SQRT2 * ref_r[i]);
+        err = d > err ? d : err;
+    }
+
+    printf("bus pan right: error %g\n", (double)err);
+    test_assert(err < 1e-5f);
+
+    synth_unison_chain(sent, 3, 0, 0, 1);
+    err = 0;
+    for (i = from; i < to; i ++) {
+        float dl = fabsf(audio_l[i] - 2 * ref_l[i]);
+        float dr = fabsf(audio_r[i] - 2 * ref_r[i]);
+        err = dl > err ? dl : err;
+        err = dr > err ? dr : err;
+    }
+
+    printf("send: error %g\n", (double)err);
+    test_assert(err < 1e-5f);
+}
+
+/** The pad of docs/audio.md and the sounds of test/assets/audio/synth_unison.flecs compile with
+ * their unison, the pad plays wide and ends, the defaults play mono, a change of a SynthUnison
+ * compiles the sound again, and a wide sound in space is heard from its side alone. */
+void Synth_script_unison(void) {
+    // audio/synth
+    ecs_world_t *world = audio_world();
+    char *code = audio_read("test/assets/audio/synth_unison.flecs");
+    ecs_entity_t pad, thick, beep, saw;
+    const box_audio_synth_patch_t *p;
+    int32_t i, start, found = 0;
+    float diff = 0;
+    ecs_entity_t ears;
+    test_int(box_jobs_set_workers(world, 0), 0);
+    audio_log_start();
+    test_assert(ecs_script_run(world, "unison", code, NULL) == 0);
+    ecs_os_free(code);
+    audio_run(world, 1);
+
+    pad = ecs_lookup(world, "WidePad");
+    thick = ecs_lookup(world, "Thick");
+    beep = ecs_lookup(world, "WideBeep");
+    saw = ecs_lookup(world, "WidePad.saw");
+    test_assert(pad != 0 && thick != 0 && beep != 0 && saw != 0);
+    test_int(ecs_get(world, thick, SynthUnison)->voices, 3);
+    test_flt(ecs_get(world, thick, SynthUnison)->detune, 10);
+    test_flt(ecs_get(world, thick, SynthUnison)->width, 0);
+    p = &ecs_get(world, pad, AudioSynth)->patch;
+    test_int(p->layers, 3);
+    for (i = 0; i < 3; i ++) {
+        if (p->layer[i].frequency == 220) {
+            test_int(p->layer[i].voices, 5);
+            test_flt(p->layer[i].detune, 20);
+            test_flt(p->layer[i].width, 0.8f);
+            found ++;
+        } else if (p->layer[i].frequency == 330) {
+            test_int(p->layer[i].voices, 3);
+            test_flt(p->layer[i].detune, 14);
+            test_flt(p->layer[i].width, 1);
+            found ++;
+        } else if (p->layer[i].frequency == 110) {
+            test_int(p->layer[i].voices, 1);
+            found ++;
+        }
+    }
+
+    test_int(found, 3);
+    p = &ecs_get(world, thick, AudioSynth)->patch;
+    test_int(p->layer[0].voices, 3);
+    test_flt(p->layer[0].detune, 10);
+
+    start = audio_tap_count;
+    test_assert(box_audio_play(world, pad, 1.0f));
+    audio_run(world, 140);
+    test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.05f);
+    test_assert(synth_finite(audio_tap_l, start, audio_tap_count));
+    test_assert(synth_finite(audio_tap_r, start, audio_tap_count));
+    for (i = start; i < audio_tap_count; i ++) {
+        float d = fabsf(audio_tap_l[i] - audio_tap_r[i]);
+        diff = d > diff ? d : diff;
+    }
+
+    test_assert(diff > 0.01f);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+    test_flt(audio_peak(audio_tap_l, audio_tap_count - AUDIO_FRAME, audio_tap_count), 0);
+
+    start = audio_tap_count;
+    test_assert(box_audio_play(world, thick, 1.0f));
+    audio_run(world, 30);
+    test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.1f);
+    test_assert(memcmp(audio_tap_l + start, audio_tap_r + start,
+        (size_t)(audio_tap_count - start) * sizeof(float)) == 0);
+
+    ecs_set(world, saw, SynthUnison, { .voices = 7, .detune = 30, .width = 1 });
+    audio_run(world, 1);
+    p = &ecs_get(world, pad, AudioSynth)->patch;
+    for (i = 0; i < 3; i ++) {
+        if (p->layer[i].frequency == 220) {
+            test_int(p->layer[i].voices, 7);
+            test_flt(p->layer[i].detune, 30);
+        }
+    }
+
+    ears = ecs_new(world);
+    ecs_set(world, ears, Position, {0, 0, 0});
+    ecs_set(world, ears, Rotation, {0, 0, 0});
+    ecs_add(world, ears, AudioListener);
+    audio_run(world, 2);
+    test_bool(box_audio_play_at(world, beep, (vec3){-5, 0, 0}, 1.0f), true);
+    start = audio_tap_count;
+    audio_run(world, 6);
+    test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.2f);
+    test_assert(audio_peak(audio_tap_r, start, audio_tap_count) < 1e-4f);
+    audio_run(world, 40);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+
+    test_bool(box_audio_play_at(world, beep, (vec3){0, 0, -5}, 1.0f), true);
+    start = audio_tap_count;
+    audio_run(world, 6);
+    diff = 0;
+    for (i = start; i < audio_tap_count; i ++) {
+        float d = fabsf(audio_tap_l[i] - audio_tap_r[i]);
+        diff = d > diff ? d : diff;
+    }
+
+    test_assert(diff > 0.05f);
+    audio_run(world, 40);
+    audio_log_stop();
+    test_int(audio_log_errors, 0);
+    ecs_fini(world);
+}
+
+/** A patch of one pluck string without any envelope, which rings out on its own.
+ *
+ * @param frequency Hz
+ * @param decay Seconds of the fundamental to -60 dB
+ * @param brightness Brightness of the loop, 0..1
+ * @param seed Seed of the noise of the pluck
+ * @return The patch
+ */
+static box_audio_synth_patch_t synth_pluck(
+    float frequency,
+    float decay,
+    float brightness,
+    uint32_t seed)
+{
+    box_audio_synth_patch_t p = {0};
+    p.layers = 1;
+    p.seed = seed;
+    p.layer[0] = (box_audio_synth_layer_t){
+        .wave = BOX_AUDIO_SYNTH_PLUCK, .frequency = frequency, .level = 0.5f,
+        .decay = decay, .brightness = brightness, .hardness = 0.5f, .rings_free = 1 };
+
+    return p;
+}
+
+/** Component of a range at a frequency over a Hann window, the phase relative to frame 0.
+ *
+ * @param x Samples
+ * @param from First frame of the window
+ * @param window Frames of the window
+ * @param frequency Hz
+ * @param rate Frames per second
+ * @param re Receives the real part
+ * @param im Receives the imaginary part
+ */
+static void synth_component(
+    const float *x,
+    int32_t from,
+    int32_t window,
+    double frequency,
+    double rate,
+    double *re,
+    double *im)
+{
+    double r = 0, m = 0, w, ph;
+    int32_t i;
+    for (i = 0; i < window; i ++) {
+        w = 0.5 - 0.5 * cos(2 * AUDIO_PI * i / window);
+        ph = 2 * AUDIO_PI * frequency * (double)(from + i) / rate;
+        r += w * x[from + i] * cos(ph);
+        m -= w * x[from + i] * sin(ph);
+    }
+
+    *re = r;
+    *im = m;
+}
+
+/** Frequency of the fundamental of a range near a guess, from the advance of its phase between
+ * two Hann windows a gap apart: exact to a small share of a cent, harmonics or not, as long as
+ * the guess is within rate / (2 gap) of it.
+ *
+ * @param x Samples
+ * @param from First frame of the first window
+ * @param gap Frames between the windows
+ * @param window Frames of a window
+ * @param guess Hz
+ * @param rate Frames per second
+ * @return Frequency in Hz
+ */
+static double synth_pitch(
+    const float *x,
+    int32_t from,
+    int32_t gap,
+    int32_t window,
+    double guess,
+    double rate)
+{
+    double r0, i0, r1, i1, phase;
+    synth_component(x, from, window, guess, rate, &r0, &i0);
+    synth_component(x, from + gap, window, guess, rate, &r1, &i1);
+    phase = atan2(i1 * r0 - r1 * i0, r1 * r0 + i1 * i0);
+
+    return guess + phase * rate / (2 * AUDIO_PI * gap);
+}
+
+/** Time until a render first falls 60 dB under its loudest window, in windows of 10 ms.
+ *
+ * @param x Samples
+ * @param frames Frames of the render
+ * @param rate Frames per second
+ * @return Seconds, -1 when it never does
+ */
+static double synth_t60(
+    const float *x,
+    int32_t frames,
+    double rate)
+{
+    int32_t window = (int32_t)(rate / 100), i, w, count = frames / window;
+    double top = 0, result = -1;
+    for (w = 0; w < count; w ++) {
+        double sum = 0;
+        for (i = 0; i < window; i ++) {
+            sum += (double)x[w * window + i] * x[w * window + i];
+        }
+
+        sum = sqrt(sum / window);
+        if (sum > top) {
+            top = sum;
+        } else if (result < 0 && sum < top * 1e-3) {
+            result = (double)(w * window) / rate;
+        }
+    }
+
+    return result;
+}
+
+/** A pluck string plays its pitch within 2 cents from 80 Hz to 2 kHz at 44.1 and 48 kHz: the
+ * allpass tunes the fraction of a frame, which a delay line of whole frames would miss by up
+ * to 70 cents at 2 kHz. */
+void Synth_pluck_pitch(void) {
+    // audio/synth
+    const float rates[] = { 44100, 48000 };
+    const float frequencies[] = { 80, 110, 146.83f, 220, 330, 440, 659.25f, 987.77f, 1500, 2000 };
+    int32_t r, i;
+    for (r = 0; r < 2; r ++) {
+        for (i = 0; i < 10; i ++) {
+            box_audio_core_t *core = synth_core(rates[r]);
+            box_audio_synth_patch_t p = synth_pluck(frequencies[i], 4, 0.3f, 1);
+            int32_t from = (int32_t)(rates[r] * 0.05f), gap = (int32_t)(rates[r] * 0.05f);
+            int32_t window = (int32_t)(rates[r] * 0.1f);
+            double f, cents;
+            synth_define(core, 1, &p);
+            audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+            audio_render(core, 0, from + gap + window);
+            test_assert(synth_finite(audio_l, 0, from + gap + window));
+            f = synth_pitch(audio_l, from, gap, window, frequencies[i], rates[r]);
+            cents = 1200 * log2(f / frequencies[i]);
+            printf("pluck %.2f Hz at %.0f: %.4f Hz, %.3f cents\n", (double)frequencies[i],
+                (double)rates[r], f, cents);
+            test_assert(fabs(cents) < 2);
+            box_audio_core_free(core);
+        }
+    }
+}
+
+/** The -60 dB time of a pluck string follows its decay: twice the decay rings twice as long. */
+void Synth_pluck_decay(void) {
+    // audio/synth
+    const float decays[] = { 0.15f, 0.3f };
+    double t[2];
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        box_audio_core_t *core = synth_core(AUDIO_RATE);
+        box_audio_synth_patch_t p = synth_pluck(220, decays[i], 0.5f, 1);
+        synth_define(core, 1, &p);
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, AUDIO_FRAMES);
+        t[i] = synth_t60(audio_l, AUDIO_FRAMES, AUDIO_RATE);
+        printf("pluck decay %.2f s: -60 dB after %.3f s\n", (double)decays[i], t[i]);
+        test_assert(t[i] > 0.5 * decays[i] && t[i] < 1.2 * decays[i]);
+        box_audio_core_free(core);
+    }
+
+    test_assert(t[1] / t[0] > 1.7 && t[1] / t[0] < 2.3);
+}
+
+/** A brighter string keeps more energy in its upper harmonics than a dark one: the share of
+ * harmonics 5 to 12 of 220 Hz against the fundamental, 0.1 s after the pluck. */
+void Synth_pluck_brightness(void) {
+    // audio/synth
+    const float brightness[] = { 0.1f, 0.9f };
+    double share[2];
+    int32_t i, k;
+    for (i = 0; i < 2; i ++) {
+        box_audio_core_t *core = synth_core(AUDIO_RATE);
+        box_audio_synth_patch_t p = synth_pluck(220, 2, brightness[i], 1);
+        double high = 0, low;
+        p.layer[0].hardness = 1;
+        synth_define(core, 1, &p);
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, 14400);
+        low = synth_bin_energy(audio_l + 4800, 9600, 220, AUDIO_RATE);
+        for (k = 5; k <= 12; k ++) {
+            high += synth_bin_energy(audio_l + 4800, 9600, 220.0 * k, AUDIO_RATE);
+        }
+
+        share[i] = high / low;
+        printf("pluck brightness %.1f: harmonics 5..12 at %.4f of the fundamental\n",
+            (double)brightness[i], share[i]);
+        box_audio_core_free(core);
+    }
+
+    test_assert(share[1] > 4 * share[0]);
+}
+
+/** The same seed plucks bit identical strings, another seed another one. */
+void Synth_pluck_seed(void) {
+    // audio/synth
+    const uint32_t seeds[] = { 3, 3, 4 };
+    uint64_t hash[3];
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        box_audio_core_t *core = synth_core(AUDIO_RATE);
+        box_audio_synth_patch_t p = synth_pluck(330, 1, 0.5f, seeds[i]);
+        synth_define(core, 1, &p);
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, 9600);
+        test_assert(audio_peak(audio_l, 0, 9600) > 0.1f);
+        hash[i] = audio_hash(audio_l, 9600);
+        box_audio_core_free(core);
+    }
+
+    test_assert(hash[0] == hash[1]);
+    test_assert(hash[0] != hash[2]);
+}
+
+/** A string plays as one voice: unison on a pluck layer renders bit identical to none, and a
+ * string next to a wide unison layer rings in the center of the stereo voice and ends it. */
+void Synth_pluck_unison(void) {
+    // audio/synth
+    box_audio_core_t *core;
+    box_audio_synth_patch_t p;
+    uint64_t hash[2];
+    int32_t i;
+    float diff = 0;
+    for (i = 0; i < 2; i ++) {
+        core = synth_core(AUDIO_RATE);
+        p = synth_pluck(330, 1, 0.5f, 3);
+        if (i == 1) {
+            p.layer[0].voices = 5;
+            p.layer[0].detune = 30;
+            p.layer[0].width = 1;
+        }
+
+        synth_define(core, 1, &p);
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, 9600);
+        test_assert(memcmp(audio_l, audio_r, 9600 * sizeof(float)) == 0);
+        hash[i] = audio_hash(audio_l, 9600);
+        box_audio_core_free(core);
+    }
+
+    test_assert(hash[0] == hash[1]);
+
+    core = synth_core(AUDIO_RATE);
+    p = synth_pluck(220, 0.1f, 0.5f, 3);
+    p.layers = 2;
+    p.layer[1] = (box_audio_synth_layer_t){
+        .wave = BOX_AUDIO_SYNTH_SAW, .frequency = 110, .level = 0.2f, .has_envelope = 1,
+        .envelope = { .attack = 0.001f, .sustain = 1, .hold = 0.05f, .release = 0.05f },
+        .voices = 3, .detune = 20, .width = 1 };
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES);
+    test_assert(synth_finite(audio_l, 0, AUDIO_FRAMES));
+    test_assert(synth_finite(audio_r, 0, AUDIO_FRAMES));
+    test_assert(audio_peak(audio_l, 0, 4800) > 0.1f);
+    for (i = 0; i < 4800; i ++) {
+        float d = fabsf(audio_l[i] - audio_r[i]);
+        diff = d > diff ? d : diff;
+    }
+
+    test_assert(diff > 0.01f);
+    test_assert(synth_last(audio_l, 0, AUDIO_FRAMES) < (int32_t)(0.5 * AUDIO_RATE));
+    test_int(box_audio_core_voice_count(core), 0);
+    box_audio_core_free(core);
+}
+
+/** A string ends its voice once it is silent: without an envelope, and with an envelope that
+ * would hold for seconds. */
+void Synth_pluck_ends(void) {
+    // audio/synth
+    int32_t i, last;
+    for (i = 0; i < 2; i ++) {
+        box_audio_core_t *core = synth_core(AUDIO_RATE);
+        box_audio_synth_patch_t p = synth_pluck(440, 0.1f, 0.5f, 1);
+        if (i == 1) {
+            p.layer[0].rings_free = 0;
+            p.envelope = (box_audio_synth_envelope_t){
+                .attack = 0.001f, .sustain = 1, .hold = 5, .release = 0.1f };
+        }
+
+        synth_define(core, 1, &p);
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, AUDIO_FRAMES);
+        last = synth_last(audio_l, 0, AUDIO_FRAMES);
+        printf("pluck %d: last sound at %.3f s\n", (int)i, (double)last / AUDIO_RATE);
+        test_assert(last > (int32_t)(0.08 * AUDIO_RATE));
+        test_assert(last < (int32_t)(0.3 * AUDIO_RATE));
+        test_int(box_audio_core_voice_count(core), 0);
+        box_audio_core_free(core);
+    }
+}
+
+/** A string follows the pitch of its voice: a glide moves it to the new pitch, and a jump
+ * lands it there within 2 cents. */
+void Synth_pluck_glide(void) {
+    // audio/synth
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        box_audio_core_t *core = synth_core(AUDIO_RATE);
+        box_audio_synth_patch_t p = synth_pluck(220, 4, 0.3f, 1);
+        double f, cents;
+        p.glide = i ? 0.05f : 0;
+        synth_define(core, 1, &p);
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, 4800);
+        audio_voice_set(core, 1, BOX_AUDIO_PARAM_PITCH, 1.5f);
+        audio_render(core, 0, 4800 + 2400 + 4800);
+        test_assert(synth_finite(audio_l, 0, 12000));
+        f = synth_pitch(audio_l, 4800, 2400, 4800, 330, AUDIO_RATE);
+        cents = 1200 * log2(f / 330);
+        printf("pluck glide %d: %.4f Hz, %.3f cents from 330\n", (int)i, f, cents);
+        test_assert(fabs(cents) < 2);
+        test_int(box_audio_core_voice_count(core), 1);
+        box_audio_core_free(core);
+    }
+}
+
+/** Strings come from a pool of BOX_AUDIO_SYNTH_STRINGS: a play that finds none free is
+ * ignored, and the strings come back when the voices end. */
+void Synth_pluck_pool(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_pluck(440, 0.05f, 0.5f, 1);
+    int32_t i;
+    synth_define(core, 1, &p);
+    for (i = 0; i < BOX_AUDIO_SYNTH_STRINGS; i ++) {
+        audio_play(core, (uint32_t)i, 1, 0, 0.01f, 0, 1, 0);
+    }
+
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
+    test_int(box_audio_core_voice_count(core), BOX_AUDIO_SYNTH_STRINGS);
+    audio_play(core, 1000, 1, 0, 0.01f, 0, 1, 0);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 1);
+    audio_render(core, 0, AUDIO_FRAMES);
+    test_int(box_audio_core_voice_count(core), 0);
+    audio_events(core, 0, NULL);
+    for (i = 0; i < BOX_AUDIO_SYNTH_STRINGS; i ++) {
+        audio_play(core, 2000 + (uint32_t)i, 1, 0, 0.01f, 0, 1, 0);
+    }
+
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
+    test_int(box_audio_core_voice_count(core), BOX_AUDIO_SYNTH_STRINGS);
+    box_audio_core_free(core);
+}
+
+/** A SynthPluck layer takes its SynthString, or the defaults without one, needs no envelope,
+ * and a frequency under BOX_AUDIO_SYNTH_PLUCK_LOWEST is clamped with one warning. */
+void Synth_script_pluck(void) {
+    // audio/synth
+    ecs_world_t *world = audio_world();
+    const box_audio_synth_patch_t *p;
+    ecs_entity_t low;
+    int32_t start;
+    audio_log_start();
+    test_assert(ecs_script_run(world, "pluck",
+        "using box.audio\n"
+        "prefab Plain {\n"
+        "  SynthSound: {}\n"
+        "  SynthOscillator: {wave: SynthPluck, frequency: 220, level: 0.5}\n"
+        "}\n"
+        "prefab Low {\n"
+        "  SynthSound: {}\n"
+        "  SynthOscillator: {wave: SynthPluck, frequency: 30, level: 0.5}\n"
+        "  SynthString: {decay: 0.2, brightness: 0.25, hardness: 0.3}\n"
+        "}\n", NULL) == 0);
+    audio_run(world, 2);
+    audio_log_stop();
+    test_int(audio_log_errors, 0);
+    test_int(audio_log_warnings, 1);
+
+    p = &ecs_get(world, ecs_lookup(world, "Plain"), AudioSynth)->patch;
+    test_int(p->layers, 1);
+    test_int(p->layer[0].wave, BOX_AUDIO_SYNTH_PLUCK);
+    test_int(p->layer[0].rings_free, 1);
+    test_flt(p->layer[0].decay, 2);
+    test_flt(p->layer[0].brightness, 0.5f);
+    test_flt(p->layer[0].hardness, 0.8f);
+
+    low = ecs_lookup(world, "Low");
+    p = &ecs_get(world, low, AudioSynth)->patch;
+    test_flt(p->layer[0].frequency, BOX_AUDIO_SYNTH_PLUCK_LOWEST);
+    test_flt(p->layer[0].decay, 0.2f);
+    test_flt(p->layer[0].brightness, 0.25f);
+    test_flt(p->layer[0].hardness, 0.3f);
+
+    ecs_set(world, low, SynthString, { .decay = 0.1f, .brightness = 0.5f, .hardness = 1 });
+    audio_run(world, 1);
+    test_flt(ecs_get(world, low, AudioSynth)->patch.layer[0].decay, 0.1f);
+
+    start = audio_tap_count;
+    test_assert(box_audio_play(world, low, 1.0f));
+    audio_run(world, 30);
+    test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.1f);
+    test_assert(synth_finite(audio_tap_l, start, audio_tap_count));
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+    ecs_fini(world);
+}
+
+/** The guitar and the koto of docs/audio.md and the harp of the Mossvale score compile without
+ * errors, play and end on their own: the guitar within 280 frames of AUDIO_DT, the koto and two
+ * notes of the harp within 230. */
+void Synth_docs_pluck_examples(void) {
+    // audio/synth
+    ecs_world_t *world = audio_world();
+    char *code = audio_read("test/assets/audio/synth_pluck.flecs");
+    const char *names[] = { "Guitar", "Koto", "hp_c3", "hp_a4" };
+    int32_t i, start;
+    audio_log_start();
+    test_assert(ecs_script_run(world, "pluck", code, NULL) == 0);
+    ecs_os_free(code);
+    audio_run(world, 1);
+    for (i = 0; i < 4; i ++) {
+        ecs_entity_t sound = ecs_lookup(world, names[i]);
+        test_assert(sound != 0);
+        test_assert(ecs_get(world, sound, AudioSynth)->compiled);
+    }
+
+    start = audio_tap_count;
+    test_assert(box_audio_play(world, ecs_lookup(world, "Guitar"), 1.0f));
+    audio_run(world, 280);
+    test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.05f);
+    test_assert(synth_finite(audio_tap_l, start, audio_tap_count));
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+
+    start = audio_tap_count;
+    for (i = 1; i < 4; i ++) {
+        test_assert(box_audio_play(world, ecs_lookup(world, names[i]), 1.0f));
+    }
+
+    audio_run(world, 2);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 3);
+    audio_run(world, 228);
+    test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.05f);
+    test_assert(synth_finite(audio_tap_l, start, audio_tap_count));
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+    test_flt(audio_peak(audio_tap_l, audio_tap_count - AUDIO_FRAME, audio_tap_count), 0);
+    audio_log_stop();
+    test_int(audio_log_errors, 0);
+    ecs_fini(world);
+}
+
+/** Cents of the fundamental of a render near a frequency, measured around a frame from the
+ * advance of its phase over 10 ms.
+ *
+ * @param x Samples
+ * @param center Frame in the middle of the measure
+ * @param frequency Hz the cents are from
+ * @return Cents
+ */
+static double synth_cents_at(
+    const float *x,
+    int32_t center,
+    double frequency)
+{
+    int32_t gap = AUDIO_RATE / 100, window = AUDIO_RATE / 50;
+    double f = synth_pitch(x, center - (gap + window) / 2, gap, window, frequency, AUDIO_RATE);
+
+    return 1200 * log2(f / frequency);
+}
+
+/** LFOs move a layer of unison voices in stereo: a tremolo scales both channels of the same
+ * render by its dip, so the voices keep their phases and detune, and a vibrato moves the pitch
+ * of every voice by its cents at the top and the bottom of the wave. */
+void Synth_lfo_unison(void) {
+    // audio/synth
+    enum { FRAMES = 24000 };
+    static float plain_l[FRAMES], plain_r[FRAMES];
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_unison(BOX_AUDIO_SYNTH_SAW, 220, 0.3f, 5, 20, 1, 0.6f);
+    double expected, dip, err = 0, top, bottom;
+    float diff = 0;
+    int32_t i;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, FRAMES);
+    memcpy(plain_l, audio_l, sizeof(plain_l));
+    memcpy(plain_r, audio_r, sizeof(plain_r));
+    for (i = 0; i < FRAMES; i ++) {
+        float d = fabsf(plain_l[i] - plain_r[i]);
+        diff = d > diff ? d : diff;
+    }
+
+    test_assert(diff > 0.05f);
+    box_audio_core_free(core);
+
+    core = synth_core(AUDIO_RATE);
+    p.lfos = 1;
+    p.lfo[0] = (box_audio_synth_lfo_t){
+        .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 4, .amplitude = 0.5f };
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, FRAMES);
+    for (i = 100; i < FRAMES - 1000; i ++) {
+        dip = 1 - 0.5 * 0.5 * (1 - sin(2 * AUDIO_PI * 4 * (i + 1) / AUDIO_RATE));
+        expected = plain_l[i] * dip;
+        err = fabs(audio_l[i] - expected) > err ? fabs(audio_l[i] - expected) : err;
+        expected = plain_r[i] * dip;
+        err = fabs(audio_r[i] - expected) > err ? fabs(audio_r[i] - expected) : err;
+    }
+
+    printf("unison tremolo: %.6f from the expected at most\n", err);
+    test_assert(err < 2e-3);
+    box_audio_core_free(core);
+
+    core = synth_core(AUDIO_RATE);
+    p = synth_unison(BOX_AUDIO_SYNTH_SINE, 400, 0.3f, 3, 0, 0.5f, 0.6f);
+    p.lfos = 1;
+    p.lfo[0] = (box_audio_synth_lfo_t){
+        .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 2, .pitch = 100 };
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, FRAMES);
+    test_assert(synth_finite(audio_l, 0, FRAMES));
+    top = synth_cents_at(audio_l, AUDIO_RATE / 8, 400);
+    bottom = synth_cents_at(audio_r, AUDIO_RATE * 3 / 8, 400);
+    printf("unison vibrato: %.2f cents at the top, %.2f at the bottom\n", top, bottom);
+    test_assert(fabs(top - 100) < 5);
+    test_assert(fabs(bottom + 100) < 5);
+    box_audio_core_free(core);
+}
+
+/** An LFO moves a pluck string: its pitch swings by the cents of a vibrato at the top and the
+ * bottom of the wave, and the string still rings out and ends the voice. */
+void Synth_lfo_pluck(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_pluck(220, 1, 0.3f, 1);
+    double top, bottom, back;
+    p.lfos = 1;
+    p.lfo[0] = (box_audio_synth_lfo_t){
+        .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 2, .pitch = 50 };
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES);
+    test_assert(synth_finite(audio_l, 0, AUDIO_FRAMES));
+    top = synth_cents_at(audio_l, AUDIO_RATE / 8, 220);
+    bottom = synth_cents_at(audio_l, AUDIO_RATE * 3 / 8, 220);
+    back = synth_cents_at(audio_l, AUDIO_RATE * 5 / 8, 220);
+    printf("pluck vibrato: %.2f, %.2f and %.2f cents\n", top, bottom, back);
+    test_assert(fabs(top - 50) < 4);
+    test_assert(fabs(bottom + 50) < 4);
+    test_assert(fabs(back - 50) < 4);
+    audio_render(core, 0, AUDIO_FRAMES);
+    test_assert(synth_finite(audio_l, 0, AUDIO_FRAMES));
+    test_int(box_audio_core_voice_count(core), 0);
+    box_audio_core_free(core);
 }

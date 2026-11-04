@@ -143,8 +143,7 @@
                     "enable_shows_shape_again",
                     "moved_while_disabled",
                     "created_disabled",
-                    "deleted_while_disabled",
-                    "shape_child_follows_parent"
+                    "deleted_while_disabled"
                 ]
             },
             {

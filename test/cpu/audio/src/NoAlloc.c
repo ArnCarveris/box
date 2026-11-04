@@ -101,7 +101,7 @@ void NoAlloc_synth_voices(void) {
     // audio/noalloc
     box_audio_core_t *core = noalloc_core();
     box_audio_synth_patch_t p = {0};
-    uint8_t bytes[512];
+    uint8_t bytes[sizeof(box_audio_cmd_synth_t)];
     box_audio_writer_t w;
     uint32_t i;
     p.layers = 3;
@@ -121,7 +121,13 @@ void NoAlloc_synth_voices(void) {
         .frequency_end = 440, .sweep = 0.1f, .level = 0.3f };
     p.layer[1] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_NOISE, .level = 0.2f };
     p.layer[2] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_SQUARE, .frequency = 220,
-        .level = 0.2f, .has_envelope = 1, .envelope = { .attack = 0.001f, .decay = 0.02f } };
+        .level = 0.2f, .has_envelope = 1, .envelope = { .attack = 0.001f, .decay = 0.02f },
+        .pulse_width = 0.3f };
+    p.lfos = 2;
+    p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 5,
+        .delay = 0.02f, .fade = 0.05f, .pitch = 20, .amplitude = 0.3f, .pulse_width = 0.2f };
+    p.lfo[1] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_RANDOM, .rate = 9,
+        .random_phase = 1, .layer = 3, .cutoff = 1 };
     box_audio_writer_init(&w, bytes, sizeof(bytes));
     test_assert(box_audio_write_synth(&w, 1, &p));
     box_audio_core_apply(core, w.data, w.size);

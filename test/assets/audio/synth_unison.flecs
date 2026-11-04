@@ -1,0 +1,40 @@
+// The unison example of docs/audio.md, kept the same, then the sounds the Synth suite of
+// test/cpu/audio measures unison from script with.
+using box.audio
+
+music { AudioBus: {volume: 1} }
+
+// A wide pad: a saw of five voices over 20 cents across most of the stereo field and a fifth
+// of three voices across all of it, over a sine sub in the center, 2.1 s
+prefab WidePad {
+  AudioOutput: {bus: music}
+  SynthSound: {seed: 3}
+  SynthEnvelope: {attack: 0.4, decay: 0.3, sustain: 0.7, hold: 0.6, release: 0.8, curve: 2.5, attack_curve: 1.5}
+  SynthFilter: {kind: SynthLowPass, cutoff: 1400, resonance: 0.1, slope: SynthSlope24}
+  saw {
+    SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.2}
+    SynthUnison: {voices: 5, detune: 20, width: 0.8}
+  }
+  fifth {
+    SynthOscillator: {wave: SynthSaw, frequency: 330, level: 0.12}
+    SynthUnison: {voices: 3, detune: 14, width: 1}
+  }
+  sub { SynthOscillator: {wave: SynthSine, frequency: 110, level: 0.15} }
+}
+
+// The defaults of SynthUnison on the root layer: 3 voices over 10 cents, in the center
+prefab Thick {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.01, sustain: 1, hold: 0.3, release: 0.05}
+  SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.3}
+  SynthUnison: {}
+}
+
+// A wide tone in space: three sines across the whole width, at full level up to 50 units
+prefab WideBeep {
+  SynthSound: {seed: 4}
+  SynthEnvelope: {attack: 0.005, sustain: 1, hold: 0.5, release: 0.01}
+  SynthOscillator: {frequency: 500, level: 0.4}
+  SynthUnison: {voices: 3, detune: 30, width: 1}
+  AudioSpatial: {min_distance: 1, max_distance: 50, rolloff: 0}
+}

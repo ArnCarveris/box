@@ -10,22 +10,22 @@ template Flute {
   SynthSound: {level_variance: 0.05}
   SynthEnvelope: {attack: 0.06, decay: 0.25, sustain: 0.55, hold: 0.22, release: 0.5, curve: 2.5, attack_curve: 1.5}
   SynthFilter: {kind: SynthLowPass, cutoff: 2600, resonance: 0.1}
+  SynthLfo: {rate: 5.2, delay: 0.2, fade: 0.3, random_phase: true, pitch: 14, amplitude: 0.08}
   tone { SynthOscillator: {wave: SynthSine, frequency: f, level: 0.42} }
   reed { SynthOscillator: {wave: SynthTriangle, frequency: f * 1.002, level: 0.14} }
   breath { SynthOscillator: {wave: SynthNoise, level: 0.025}; SynthEnvelope: {attack: 0.02, decay: 0.12} }
   octave { SynthOscillator: {wave: SynthSine, frequency: f * 2, level: 0.05} }
 }
 
+// A harp: a gut string plucked with a finger, which rings out on its own, over a soft sine
+// for the body of the soundboard
 template Harp {
   prop f: f32 = 220
   AudioOutput: {bus: mv_music}
   SynthSound: {level_variance: 0.1}
-  SynthEnvelope: {attack: 0.003, decay: 1.8, curve: 4.5}
-  SynthFilter: {kind: SynthLowPass, cutoff: 900, resonance: 0.1}
-  SynthFilterEnvelope: {decay: 0.8, amount: 1.918}
-  pluck { SynthOscillator: {wave: SynthTriangle, frequency: f, level: 0.32} }
-  body { SynthOscillator: {wave: SynthSine, frequency: f, level: 0.3} }
-  ring { SynthOscillator: {wave: SynthSine, frequency: f * 2, level: 0.08}; SynthEnvelope: {attack: 0.002, decay: 0.6, curve: 5} }
+  SynthFilter: {kind: SynthLowPass, cutoff: 3500, resonance: 0.05}
+  pluck { SynthOscillator: {wave: SynthPluck, frequency: f, level: 0.45}; SynthString: {decay: 2.2, brightness: 0.35, hardness: 0.45} }
+  body { SynthOscillator: {wave: SynthSine, frequency: f, level: 0.12}; SynthEnvelope: {attack: 0.004, decay: 1.2, curve: 4.5} }
 }
 
 template Strings {
@@ -37,10 +37,21 @@ template Strings {
   SynthEnvelope: {attack: 0.9, decay: 0.6, sustain: 0.7, hold: 1.2, release: 1.4}
   SynthFilter: {kind: SynthLowPass, cutoff: 900, resonance: 0.12}
   SynthFilterEnvelope: {attack: 1.8, sustain: 1, hold: 2.3, amount: 0.637}
-  low { SynthOscillator: {wave: SynthSaw, frequency: a, level: 0.09} }
-  mid { SynthOscillator: {wave: SynthSaw, frequency: b * 1.003, level: 0.08} }
+  SynthLfo: {rate: 0.23, fade: 1.2, random_phase: true, cutoff: 0.3, amplitude: 0.12}
+  low {
+    SynthOscillator: {wave: SynthSaw, frequency: a, level: 0.09}
+    SynthUnison: {voices: 3, detune: 12, width: 0.6}
+  }
+  mid {
+    SynthOscillator: {wave: SynthSaw, frequency: b, level: 0.08}
+    SynthUnison: {voices: 3, detune: 12, width: 0.8}
+    SynthLfo: {wave: SynthLfoTriangle, rate: 0.37, fade: 0.8, phase: 0.5, pitch: 7}
+  }
   high { SynthOscillator: {wave: SynthTriangle, frequency: c, level: 0.14} }
-  shimmer { SynthOscillator: {wave: SynthSine, frequency: a * 2.004, level: 0.05} }
+  shimmer {
+    SynthOscillator: {wave: SynthSine, frequency: a * 2, level: 0.05}
+    SynthUnison: {voices: 2, detune: 7, width: 1}
+  }
 }
 
 template Bass {

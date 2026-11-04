@@ -737,6 +737,8 @@ void Transition_deferred_no_leak(void) {
     box_transition_set(world, prefab, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
     box_transition_set(world, prefab, ecs_id(Rgb), &(TransitionSpec){ .duration = 2.0f });
 
+    // The second pass can still take fresh ids that open a page of the entity index
+    transition_deferred_churn(world, prefab);
     transition_deferred_churn(world, prefab);
     int64_t before = transition_live_allocs();
     int32_t i;
