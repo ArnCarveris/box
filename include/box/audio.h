@@ -246,6 +246,22 @@ ECS_STRUCT(SynthEnvelope, {
     float attack_curve;    /**< Curve of the attack, 0 linear (default), -16..16 */
 });
 
+/** Unison of a synth layer, on the entity of its SynthOscillator: the layer plays as several
+ * copies of its oscillator, detuned evenly over a spread in cents and placed from left to right
+ * over the stereo width, each starting at a seeded random phase.
+ *
+ * The voices share the level of the layer: each plays at 1 / sqrt(voices), so the level of the
+ * layer stays about the same as the count changes. One voice is the layer without unison. A
+ * sound in which a layer has voices and width renders in stereo, see docs/audio.md.
+ */
+ECS_STRUCT(SynthUnison, {
+    int32_t voices;        /**< Copies of the oscillator, 1 to 7, default 3 */
+    float detune;          /**< Cents from the lowest copy to the highest, 0 to 100,
+                            *   default 10 */
+    float width;           /**< 0 (every copy in the center, mono) to 1 (the lowest copy
+                            *   left, the highest right), default 0 */
+});
+
 /** The filter of a synth sound, on its root: a state variable filter on the mix of the layers,
  * stable at any cutoff and resonance */
 ECS_STRUCT(SynthFilter, {
@@ -294,8 +310,8 @@ ECS_STRUCT(SynthGlide, {
 });
 
 /** A sound made by the synth from the components of this entity and its children, without a
- * file: SynthOscillator layers, a SynthEnvelope, a SynthFilter, a SynthFilterEnvelope and a
- * SynthGlide. Usually a prefab.
+ * file: SynthOscillator layers, each with an optional SynthUnison, a SynthEnvelope, a
+ * SynthFilter, a SynthFilterEnvelope and a SynthGlide. Usually a prefab.
  *
  * It is compiled once, and again when one of its components changes, into a patch the core
  * holds; box_audio_play and AudioSource play it like any sound, with no allocation per play.

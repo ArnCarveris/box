@@ -121,6 +121,12 @@
 /** Longest glide of a synth patch in seconds */
 #define BOX_AUDIO_SYNTH_GLIDE_MAX 10.0f
 
+/** Most unison voices of a synth layer */
+#define BOX_AUDIO_SYNTH_UNISON_MAX 7
+
+/** Largest detune spread of the unison voices of a synth layer in cents, a semitone */
+#define BOX_AUDIO_SYNTH_DETUNE_MAX 100.0f
+
 /** Commands of the byte stream. Each starts with a box_audio_cmd_header_t */
 typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_PLAY = 1,          /**< box_audio_cmd_play_t */
@@ -328,6 +334,12 @@ typedef struct box_audio_synth_layer_t {
                                            * envelope; ring: depth, 0..1 */
     float feedback;                       /**< Radians of its own output on its phase */
     uint32_t audible;                     /**< 1 when a modulator is heard as well, at level */
+    uint32_t voices;                      /**< Unison voices, 1..BOX_AUDIO_SYNTH_UNISON_MAX,
+                                           * 0 counts as 1 */
+    float detune;                         /**< Cents from the lowest unison voice to the
+                                           * highest, 0..BOX_AUDIO_SYNTH_DETUNE_MAX */
+    float width;                          /**< Stereo width of the unison voices, 0 (mono)
+                                           * to 1 (from left to right) */
 } box_audio_synth_layer_t;
 
 /** A synth patch: up to BOX_AUDIO_SYNTH_LAYERS oscillators with envelopes, then one filter,

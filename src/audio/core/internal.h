@@ -210,6 +210,18 @@ typedef struct box_audio_synth_svf_t {
     float ic1, ic2;       /**< State */
 } box_audio_synth_svf_t;
 
+/** The unison voices of a layer of a synth voice: copies of its oscillator, each at its own
+ * phase, at a factor of the turns per frame of the oscillator and with a gain per channel. The
+ * oscillator keeps the sweep and the glide they all follow */
+typedef struct box_audio_synth_unison_t {
+    int32_t voices;       /**< Voices, 1 for a layer without unison, which renders the
+                           * oscillator alone */
+    double phase[BOX_AUDIO_SYNTH_UNISON_MAX];  /**< Phase of each voice in turns, 0..1 */
+    double detune[BOX_AUDIO_SYNTH_UNISON_MAX]; /**< Factor of inc of each voice */
+    float left[BOX_AUDIO_SYNTH_UNISON_MAX];    /**< Gain of each voice on the left channel */
+    float right[BOX_AUDIO_SYNTH_UNISON_MAX];   /**< Gain of each voice on the right channel */
+} box_audio_synth_unison_t;
+
 /** A layer of a synth voice: its layer of the patch, its oscillator and its own envelope. The
  * core holds BOX_AUDIO_SYNTH_PARTS of them for all its voices, so a voice holds only the layers
  * its patch has */
@@ -217,6 +229,7 @@ typedef struct box_audio_synth_part_t {
     box_audio_synth_layer_t layer;  /**< The layer of the patch, clamped */
     box_audio_synth_osc_t osc;      /**< The oscillator */
     box_audio_synth_env_t env;      /**< Its own envelope, when the layer has one */
+    box_audio_synth_unison_t unison; /**< Its unison voices */
 } box_audio_synth_part_t;
 
 /** A source that plays a synth patch, a copy of it, so it never allocates: the patch without
@@ -240,6 +253,11 @@ typedef struct box_audio_synth_source_t {
     int32_t filter;       /**< A box_audio_synth_filter_t */
     int32_t stages;       /**< Stages of the filter: 1 for 12 dB per octave, 2 for 24 */
     box_audio_synth_svf_t svf[2]; /**< The resonant stage, then the stage before it at 24 dB */
+    box_audio_synth_svf_t svf_r[2]; /**< The stages of the right channel, when stereo */
+    bool unison;          /**< Whether a layer has unison voices, which renders through
+                           * box_audio_synth_render_wide */
+    bool stereo;          /**< Whether a layer with unison voices has width, so the source
+                           * renders a right channel too */
     double cutoff;        /**< Cutoff in Hz */
     double cutoff_base;   /**< Cutoff of the patch, clamped, in Hz */
     double cutoff_top;    /**< Highest cutoff in Hz, under Nyquist */
@@ -525,7 +543,8 @@ void box_audio_source_synth(
     float pitch,
     bool loop);
 
-/** Render a block of a synth source into core->src_l.
+/** Render a block of a synth source into core->src_l, and core->src_r when it is stereo
+ * (box_audio_synth_source_t.stereo).
  *
  * @param core The core
  * @param src The source

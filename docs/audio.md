@@ -42,6 +42,7 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 | `SoundFile` | A short sound from a WAV or FLAC file, decoded into memory, see [Sound files](#sound-files) |
 | `SoundStatus` | Read only: whether a `SoundFile` loads, is ready or failed |
 | `SynthSound` | A sound made by the synth from layers of `SynthOscillator`, `SynthEnvelope`, `SynthFilter` and `SynthFilterEnvelope`, layers that may modulate each other, see [Synth sounds](#synth-sounds) |
+| `SynthUnison` | Unison voices of a synth layer, detuned and spread in stereo, see [Unison and width](#unison-and-width) |
 | `SynthGlide` | Portamento and mono legato of a synth sound, see [Glide and legato](#glide-and-legato) |
 | `AudioSource` | A sound that plays while its entity exists, once or in a loop, with a volume and a pitch |
 | `AudioSpatial` | Places a source in the world: `min_distance`, `max_distance`, `rolloff`, see [Spatial audio](#spatial-audio) |
@@ -224,8 +225,8 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   EQ, compressor or delay on a bus.
 - **Voices**: 64, with the quietest stolen; no priorities. A one shot cannot be controlled after
   it started.
-- **Synth**: up to 8 oscillators and one filter per sound, linear or curved envelopes, no LFO
-  and no node graph; an oscillator may phase or ring modulate another, but FM is not band
+- **Synth**: up to 8 oscillators and one filter per sound, up to 7 unison voices per oscillator,
+  linear or curved envelopes, no LFO and no node graph; an oscillator may phase or ring modulate another, but FM is not band
   limited. Legato is mono per channel and has no note off: a held note lasts its hold after the
   last note. A looping synth sound starts a new pass of its envelopes and oscillators at the end
   of the last, at most every 60 seconds; a drone keeps that gap short with edges of a few ms, as
@@ -381,7 +382,11 @@ fades; every change moves it linearly over `BOX_AUDIO_CORE_RAMP` (5 ms), and a v
 0, so nothing clicks, a start or a stop included. A change of the bus of a voice or of the order
 is immediate. The pan is equal power with unity at the center: the gains are
 `sqrt(2) cos(a)` and `sqrt(2) sin(a)` for `a` from 0 to pi/2, so a centered mono voice plays
-its samples as they are.
+its samples as they are. A stereo voice, a stereo sample or a wide synth, takes the same two
+gains on its two channels, so its pan, and the pan of a bus, is a balance: at the center both
+channels pass as they are, toward a side the far channel fades and the near one rises by up to
+3 dB. For two channels that are not correlated, a wide synth, the power stays the same at every
+pan; a send takes both channels of its bus, after its volume and pan.
 
 **The limiter** on the master keeps the peak at `BOX_AUDIO_LIMITER_THRESHOLD` (0.95): its gain,
 one for both channels so the image does not shift, drops at once to the threshold over the peak
@@ -466,15 +471,14 @@ voice, so a play allocates nothing, a new patch for the same id reaches the next
 voices that play keep theirs, and a release frees the id at once with `SOUND_FREE`.
 
 A patch costs only the layers it has. The `SYNTH` command ends after its last layer,
-`BOX_AUDIO_CMD_SYNTH_SIZE(layers)` bytes: 100 bytes and 72 per layer, 244 for 2 layers, 676 for 8;
+`BOX_AUDIO_CMD_SYNTH_SIZE(layers)` bytes: 104 bytes and 84 per layer, 272 for 2 layers, 776 for 8;
 a shorter one than its layers need is ignored. A voice holds the patch without its layers and
-takes, for each layer, a part from a pool the core allocates with itself: the layer, its oscillator
-and its own envelope, 240 bytes. The pool has 4 parts per voice slot (320), so patches of up to 4
-layers never run out of them and a voice of 8 takes the room of two of 4; a play that finds too few
-free parts is ignored like one without a voice slot. A voice renders and advances only its parts
-and gives them back when it ends. The 80 voice slots (504 bytes each) and the pool take 118 KB,
-against 115 KB for 80 voices of 4 fixed layers and 191 KB for 8 fixed layers. The 256 patches the
-core keeps are full size, 668 bytes each. The core clamps every value of a patch, a NaN to the low
+takes, for each layer, a part from a pool the core allocates with itself: the layer, its oscillator,
+its own envelope and the state of its unison voices, 440 bytes. The pool has 4 parts per voice slot
+(320), so patches of up to 4 layers never run out of them and a voice of 8 takes the room of two of
+4; a play that finds too few free parts is ignored like one without a voice slot. A voice renders
+and advances only its parts and gives them back when it ends. The 80 voice slots (560 bytes each)
+and the pool take 181 KB. The 256 patches the core keeps are full size, 768 bytes each. The core clamps every value of a patch, a NaN to the low
 end.
 
 - **Oscillators.** Sine (`box_audio_core_sin`), saw, square, triangle and white noise. Saw and
@@ -545,6 +549,24 @@ end.
   playing, and a looping voice restarts it with its pass. A patch with an amount of 0 runs no
   envelope and computes no coefficients per frame, and a 12 dB filter runs one stage, so a
   patch that uses neither costs what it did before.
+- **Unison.** A layer plays as `voices` copies of its oscillator, 1 to
+  `BOX_AUDIO_SYNTH_UNISON_MAX` (7), detuned evenly over `detune` cents from the lowest to the
+  highest (0 to `BOX_AUDIO_SYNTH_DETUNE_MAX`, 100): voice k of n plays at the frequency of the
+  layer times `2^(detune (k / (n - 1) - 1/2) / 1200)`, so 3 voices over 20 cents play 10 cents
+  under, on and 10 cents over the pitch. Each voice starts every pass at a random phase from the
+  generator of the noise, seeded per play, so the voices do not cancel on the attack and a fixed
+  run is bit identical. The voices follow the sweep, the pitch and the glide of the layer. Each
+  plays at `1 / sqrt(n)` of the level of the layer: voices at different frequencies add their
+  power, so the level of the layer stays the same as `voices` changes, while its peaks may rise
+  over those of one voice. `width`, 0 to 1, places voice k at the pan `width (2k / (n - 1) - 1)`
+  with the equal power gains of the core, from the lowest voice on the left to the highest on
+  the right; each channel keeps the level of the layer. The correlation of the two channels is
+  the mean of `cos(pi pan / 2)` over the voices: 0 for 2 voices at width 1, 1/3 for 3, 0.48 for
+  5, and 1 at width 0. A layer with `voices` and `width` makes the voice stereo: the mix of its
+  layers is rendered on two channels, a layer without unison the same on both, through two sets
+  of the stages of the filter with the same coefficients, and the voice reaches its bus as a
+  stereo sample does. A unison layer that modulates or feeds back does so with the mean of its
+  two channels; a modulator of a unison layer moves the phase of each of its voices.
 - **Glide.** The `glide` of a patch, 0 to `BOX_AUDIO_SYNTH_GLIDE_MAX` (10) seconds, makes a
   change of the pitch of a voice (`VOICE_SET` `PITCH`) move exponentially in frequency, linear
   in cents, over that time: each oscillator multiplies its turns per frame by
@@ -571,7 +593,10 @@ end.
   the voice as it was, with the new handle. A retarget allocates nothing.
 - **Cost.** Render work only: per frame of a voice an envelope step per envelope (a multiply
   and an add when curved), an oscillator per layer and the filter, one stage or two; a modulated
-  patch adds a phase offset and a wrap per layer; during a glide a multiply per oscillator.
+  patch adds a phase offset and a wrap per layer; during a glide a multiply per oscillator. A
+  unison layer costs an oscillator per voice; a stereo patch runs its filter twice. A patch
+  in which no layer has more than one voice takes the loop it took before, bit identical, and
+  costs one compare per block; a layer of one voice with a width is such a layer.
   `bench/audio` has a `Synth` suite of 64 voices in ns per sample, with a filter envelope, with a
   24 dB filter, and `voices_64_fm`, two FM pairs per voice, which measures the modulated path.
 
@@ -601,6 +626,7 @@ as the carrier for a harmonic spectrum, a ratio such as 3.5 or 1.41 for an inhar
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `release`, `hold`: seconds and a sustain level, all 0 by default; `curve` (decay and release) and `attack_curve`: 0 linear (default), positive fast at first, -16..16 |
 | `SynthFilter` | `kind` (`SynthLowPass`, `SynthHighPass`, `SynthBandPass`), `cutoff` (1000), `resonance` (0), `slope` (`SynthSlope12`, `SynthSlope24`) |
 | `SynthFilterEnvelope` | The envelope of the cutoff: `attack`, `decay`, `sustain`, `release`, `hold`, `curve` and `attack_curve` as in `SynthEnvelope`, and `amount`, the octaves the cutoff moves at level 1 (0, negative closes the filter); nothing without a `SynthFilter` |
+| `SynthUnison` | On a layer: `voices` (3, 1 to 7), `detune` (10 cents from the lowest voice to the highest, 0 to 100) and `width` (0 mono to 1, from left to right), see [Unison and width](#unison-and-width) |
 | `SynthGlide` | On the root: `time` of a glide (s, 0 jumps), `legato` (false) and `channel` (0), see [Glide and legato](#glide-and-legato) |
 
 The module (`src/audio/synth_sound.c`) compiles a sound once, and again when a component of it
@@ -619,6 +645,59 @@ with `loop: true` starts it over at the end of its envelopes. A play allocates n
   that closes with the note takes the same attack, decay, hold and release. One that should stay
   open while the sound plays takes a sustain of 1 and a hold that lasts the sound.
 - Deleting the sound releases it and fades its one shots, as for `AudioPcm`.
+
+#### Unison and width
+
+A `SynthUnison` next to the `SynthOscillator` of a layer thickens it into several detuned copies
+of itself, the chorus of an ensemble or a supersaw, from one layer instead of one layer per copy:
+
+| Field | What it is |
+|-------|------------|
+| `voices` | Copies of the oscillator, 1 to 7 (3); 1 is the layer without unison |
+| `detune` | Cents from the lowest copy to the highest, 0 to 100 (10), spread evenly around the pitch |
+| `width` | 0 (0, every copy in the center, mono) to 1 (the lowest copy left, the highest right) |
+
+The copies share the level of the layer, so adding voices thickens the sound without making it
+louder, and each starts at a random phase of the `seed` of the sound and the count of its plays,
+so the attack does not cancel and the same seed renders the same. A sound in which a layer has
+voices and width plays in stereo; layers without unison stay in the center. A detune of 5 to 15
+cents is a gentle chorus, 20 to 40 a supersaw; a width of 0.5 to 0.8 keeps a pad wide without
+leaving a hole in the middle.
+
+```
+using box.audio
+
+music { AudioBus: {volume: 1} }
+
+// A wide pad: a saw of five voices over 20 cents across most of the stereo field and a fifth
+// of three voices across all of it, over a sine sub in the center, 2.1 s
+prefab WidePad {
+  AudioOutput: {bus: music}
+  SynthSound: {seed: 3}
+  SynthEnvelope: {attack: 0.4, decay: 0.3, sustain: 0.7, hold: 0.6, release: 0.8, curve: 2.5, attack_curve: 1.5}
+  SynthFilter: {kind: SynthLowPass, cutoff: 1400, resonance: 0.1, slope: SynthSlope24}
+  saw {
+    SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.2}
+    SynthUnison: {voices: 5, detune: 20, width: 0.8}
+  }
+  fifth {
+    SynthOscillator: {wave: SynthSaw, frequency: 330, level: 0.12}
+    SynthUnison: {voices: 3, detune: 14, width: 1}
+  }
+  sub { SynthOscillator: {wave: SynthSine, frequency: 110, level: 0.15} }
+}
+```
+
+The pad takes three layers, where the hand detuned `Strings` below take six saws for one
+narrower, mono ensemble. Its render costs nine oscillators and two filters per frame.
+
+**In the mixer and in space** a wide sound is a stereo voice: the pan of the voice, of
+`box.audio.play` or of `AudioSpatial`, and the pan of its bus are a balance of its two channels
+(see [The core](#the-core)), and a send carries both. A spatial source keeps its width while it
+is in front of the listener, and as it moves to a side the far channel fades and the near one
+rises by 3 dB, so a wide sound at the side is heard from that side alone, at the same power,
+with the voices of that side. It does not narrow with distance. A sound that should be a point
+in space keeps `width` at 0: its unison voices still thicken it, in mono.
 
 #### Glide and legato
 
@@ -837,7 +916,11 @@ above from `test/assets/audio/synth_examples.flecs`, glides (the frequency halfw
 at the geometric mean, a glide of 0 bit identical to the jump, the pitch of a source) and legato
 notes (no new attack, a held sustain that holds again, a new voice after the release, also of a
 looping voice that then ends, and after the end, from script and from a source, the lead above
-from `test/assets/audio/synth_glide.flecs`) and errors; `NoAlloc` renders 64 synth voices. The
+from `test/assets/audio/synth_glide.flecs`), unison (peaks at the detuned frequencies, width 0
+identical on both channels, the correlation of the channels at width 1 and 0.5, the level as the
+count of voices changes, one voice bit identical to a layer without unison, the same seed bit
+identical, a wide voice through the pan of the voice and of its bus and a send, and the pad above
+from `test/assets/audio/synth_unison.flecs` from script, panned in space) and errors; `NoAlloc` renders 64 synth voices. The
 browser check is `test/integration/web/audio_synth.mjs`.
 
 ## Transports
@@ -1153,6 +1236,7 @@ frame, the same on every platform.
 | `AudioStream` | Music: an Ogg Vorbis file (`path`) that streams, `volume` (1), `loop` (true), `playing` (true), see [Music](#music) |
 | `AudioStreamStatus` | Read only: `state` (`AudioStreamLoading`, `AudioStreamPlaying`, `AudioStreamStopped`, `AudioStreamEnded`, `AudioStreamFailed`), `frames`, `channels`, `sample_rate`, `position`, `buffered`, `underruns`, `decode_ms`, `decode_max_ms` and `error` |
 | `SynthSound` | A sound made by the synth from its layers, see [Synth sounds](#synth-sounds) |
+| `SynthUnison` | Unison voices of a synth layer: `voices` (3), `detune` (10 cents), `width` (0), see [Unison and width](#unison-and-width) |
 | `SynthGlide` | Portamento and mono legato of a synth sound, see [Glide and legato](#glide-and-legato) |
 | `AudioSpatial` | Places a source in the world: `min_distance` (1), `max_distance` (50), `rolloff` (1), see [Spatial audio](#spatial-audio) |
 | `AudioListener` | Tag of the entity whose `WorldTransform` hears the spatial sources |
@@ -1265,7 +1349,8 @@ silent from there. A `min_distance` of 0 counts as 0.001. The volume of the voic
 **Pan.** The pan is the component of the direction to the source along the right axis of the
 listener (the first column of its `WorldTransform`, its +X), over the distance: 1 straight to the
 right, -1 to the left, 0 in front, behind, above and below. The core turns it into equal power
-gains. **Front and back sound alike** in this version: a source behind the listener is as loud as
+gains; a stereo voice, such as a synth sound with unison width, takes them as a balance of its
+two channels, see [Unison and width](#unison-and-width). **Front and back sound alike** in this version: a source behind the listener is as loud as
 the same source in front. Within `min_distance` the pan narrows to the center (the component is
 divided by `min_distance` instead of the distance), so a source at the listener's position is
 centered, with no division by zero, and one that passes through the listener sweeps across

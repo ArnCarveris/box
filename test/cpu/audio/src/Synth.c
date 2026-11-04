@@ -2,10 +2,11 @@
  * @file Synth.c
  * @brief The synth of the audio core and synth sounds of box.audio, measured on offline
  * renders: frequencies, aliasing, noise, envelopes, the filter, layers, phase and ring
- * modulation, feedback, eight layers and scripts.
+ * modulation, feedback, eight layers, unison and stereo width, and scripts.
  */
 
 #include "world.h"
+#include "../../../../src/jobs/jobs.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -14,6 +15,9 @@
 
 /** Frames of the aliasing check, 0.8 seconds at SYNTH_ALIAS_RATE */
 #define SYNTH_ALIAS_FRAMES 35280
+
+/** Gain of a channel at full pan in the core, square root of 2 */
+#define SYNTH_SQRT2 1.41421356237309504880f
 
 /** Frames of a millisecond at AUDIO_RATE, the tolerance of a segment of an envelope */
 #define SYNTH_MS 48
@@ -2409,5 +2413,486 @@ void Synth_script_modulators(void) {
     test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.1f);
     test_assert(synth_finite(audio_tap_l, start, audio_tap_count));
     test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+    ecs_fini(world);
+}
+
+/** Seconds of the renders of the unison cases that measure levels and correlations */
+#define SYNTH_UNISON_SECONDS 4
+
+/** A patch of one oscillator with unison voices at a steady level for a while.
+ *
+ * @param wave A box_audio_synth_wave_t
+ * @param frequency Hz
+ * @param level Level of the layer
+ * @param voices Unison voices
+ * @param detune Cents from the lowest voice to the highest
+ * @param width Stereo width, 0..1
+ * @param hold Seconds at the level
+ * @return The patch
+ */
+static box_audio_synth_patch_t synth_unison(
+    uint32_t wave,
+    float frequency,
+    float level,
+    uint32_t voices,
+    float detune,
+    float width,
+    float hold)
+{
+    box_audio_synth_patch_t p = synth_steady(wave, frequency, level, hold);
+    p.layer[0].voices = voices;
+    p.layer[0].detune = detune;
+    p.layer[0].width = width;
+
+    return p;
+}
+
+/** Power of the component of a range at a frequency, through a Hann window, so that a peak
+ * leaks little into frequencies a few Hz away.
+ *
+ * @param x Samples
+ * @param n Number of samples
+ * @param frequency Hz
+ * @param rate Frames per second
+ * @return The power, in arbitrary units
+ */
+static double synth_hann_power(
+    const float *x,
+    int32_t n,
+    double frequency,
+    double rate)
+{
+    double re = 0, im = 0, w, a;
+    int32_t i;
+    for (i = 0; i < n; i ++) {
+        w = 0.5 - 0.5 * cos(2 * AUDIO_PI * i / (n - 1));
+        a = 2 * AUDIO_PI * frequency * i / rate;
+        re += x[i] * w * cos(a);
+        im -= x[i] * w * sin(a);
+    }
+
+    return re * re + im * im;
+}
+
+/** Statistics of the two channels of a render of SYNTH_UNISON_SECONDS seconds of a patch, from
+ * 0.05 seconds on.
+ *
+ * @param p The patch, which holds that long
+ * @param ms_l Receives the mean square of the left channel
+ * @param ms_r Receives the mean square of the right channel
+ * @param corr Receives the correlation of the channels
+ */
+static void synth_unison_stats(
+    const box_audio_synth_patch_t *p,
+    double *ms_l,
+    double *ms_r,
+    double *corr)
+{
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    double ll = 0, rr = 0, lr = 0;
+    int32_t s, i, n = 0;
+    synth_define(core, 1, p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    for (s = 0; s < SYNTH_UNISON_SECONDS; s ++) {
+        audio_render(core, 0, AUDIO_FRAMES);
+        for (i = s ? 0 : AUDIO_RATE / 20; i < AUDIO_FRAMES; i ++) {
+            ll += (double)audio_l[i] * audio_l[i];
+            rr += (double)audio_r[i] * audio_r[i];
+            lr += (double)audio_l[i] * audio_r[i];
+            n ++;
+        }
+    }
+
+    box_audio_core_free(core);
+    *ms_l = ll / n;
+    *ms_r = rr / n;
+    *corr = lr / sqrt(ll * rr);
+}
+
+/** The voices of a layer play at its frequency times 2 to the detune of each over 1200: the
+ * spectrum has a peak at each, of about the same height, and little between them. */
+void Synth_unison_detune_peaks(void) {
+    // audio/synth
+    const uint32_t voices[] = { 3, 4 };
+    const float detune[] = { 100, 60 };
+    const int32_t from = 2400, n = AUDIO_FRAMES - 2400;
+    int32_t c, k;
+    for (c = 0; c < 2; c ++) {
+        box_audio_core_t *core = synth_core(AUDIO_RATE);
+        box_audio_synth_patch_t p = synth_unison(
+            BOX_AUDIO_SYNTH_SINE, 440, 0.5f, voices[c], detune[c], 0, 1.5f);
+        double f[BOX_AUDIO_SYNTH_UNISON_MAX], lo = 1e300, hi = 0, between = 0, power;
+        synth_define(core, 1, &p);
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, AUDIO_FRAMES);
+        box_audio_core_free(core);
+        for (k = 0; k < (int32_t)voices[c]; k ++) {
+            double cents = detune[c] * ((double)k / (voices[c] - 1) - 0.5);
+            f[k] = 440 * pow(2, cents / 1200);
+            power = synth_hann_power(audio_l + from, n, f[k], AUDIO_RATE);
+            printf("%u voices over %.0f cents: %.2f Hz at %g\n", voices[c],
+                (double)detune[c], f[k], power);
+            lo = power < lo ? power : lo;
+            hi = power > hi ? power : hi;
+        }
+
+        for (k = 0; k + 1 < (int32_t)voices[c]; k ++) {
+            power = synth_hann_power(audio_l + from, n, 0.5 * (f[k] + f[k + 1]), AUDIO_RATE);
+            between = power > between ? power : between;
+        }
+
+        power = synth_hann_power(audio_l + from, n, 440 * pow(2, detune[c] / 1200), AUDIO_RATE);
+        between = power > between ? power : between;
+        printf("between the peaks: %g\n", between);
+        test_assert(hi / lo < 2);
+        test_assert(lo > 100 * between);
+    }
+}
+
+/** A width of 0 renders the same samples on both channels, whatever the voices and detune. */
+void Synth_unison_width_zero_mono(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_unison(
+        BOX_AUDIO_SYNTH_SAW, 220, 0.3f, 5, 30, 0, 0.8f);
+    p.filter = BOX_AUDIO_SYNTH_LOWPASS;
+    p.cutoff = 2000;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES);
+    box_audio_core_free(core);
+    test_assert(audio_peak(audio_l, 0, AUDIO_FRAMES) > 0.1f);
+    test_assert(memcmp(audio_l, audio_r, AUDIO_FRAMES * sizeof(float)) == 0);
+}
+
+/** The channels of a wide layer correlate as the mean of cos(pi pan / 2) over its voices: 0
+ * for 2 voices at width 1, 1/3 for 3, and more at a smaller width. */
+void Synth_unison_width_correlation(void) {
+    // audio/synth
+    const uint32_t voices[] = { 2, 2, 3, 5, 7 };
+    const float width[] = { 1, 0.5f, 1, 1, 1 };
+    int32_t c, k;
+    for (c = 0; c < 5; c ++) {
+        box_audio_synth_patch_t p = synth_unison(BOX_AUDIO_SYNTH_SINE, 440, 0.3f, voices[c],
+            100, width[c], SYNTH_UNISON_SECONDS + 1);
+        double ms_l, ms_r, corr, expected = 0;
+        for (k = 0; k < (int32_t)voices[c]; k ++) {
+            double pan = width[c] * (2.0 * k / (voices[c] - 1) - 1);
+            expected += cos(AUDIO_PI * pan / 2) / voices[c];
+        }
+
+        synth_unison_stats(&p, &ms_l, &ms_r, &corr);
+        printf("%u voices at width %.1f: correlation %.3f, expected %.3f, levels %.4f %.4f\n",
+            voices[c], (double)width[c], corr, expected, sqrt(ms_l), sqrt(ms_r));
+        test_assert(fabs(corr - expected) < 0.05);
+        test_assert(fabs(sqrt(ms_l / ms_r) - 1) < 0.05);
+    }
+}
+
+/** The level of a layer stays about the same from 1 to 7 voices, at width 0 and 1. */
+void Synth_unison_level_constant(void) {
+    // audio/synth
+    double base = 0, ms_l, ms_r, corr, ratio;
+    uint32_t v;
+    int32_t w;
+    for (w = 0; w < 2; w ++) {
+        for (v = 1; v <= BOX_AUDIO_SYNTH_UNISON_MAX; v ++) {
+            box_audio_synth_patch_t p = synth_unison(BOX_AUDIO_SYNTH_SAW, 220, 0.2f, v, 50,
+                (float)w, SYNTH_UNISON_SECONDS + 1);
+            synth_unison_stats(&p, &ms_l, &ms_r, &corr);
+            if (!base) {
+                base = ms_l;
+            }
+
+            ratio = sqrt(0.5 * (ms_l + ms_r) / base);
+            printf("%u voices at width %d: %.2f dB, left %.2f dB, right %.2f dB\n", v, (int)w,
+                20 * log10(ratio), 10 * log10(ms_l / base), 10 * log10(ms_r / base));
+            test_assert(fabs(20 * log10(ratio)) < 1.0);
+            test_assert(fabs(10 * log10(ms_l / base)) < 1.5);
+            test_assert(fabs(10 * log10(ms_r / base)) < 1.5);
+        }
+    }
+}
+
+/** Hash both channels of a render of a patch in a new core, and of a second play of it.
+ *
+ * @param p The patch
+ * @param second Receives the hash of the second play
+ * @return The hash of the first play
+ */
+static uint64_t synth_unison_hash(
+    const box_audio_synth_patch_t *p,
+    uint64_t *second)
+{
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    uint64_t result;
+    synth_define(core, 1, p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES / 2);
+    result = audio_hash(audio_l, AUDIO_FRAMES / 2) ^ (audio_hash(audio_r, AUDIO_FRAMES / 2) << 1);
+    audio_play(core, 2, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES / 2);
+    *second = audio_hash(audio_l, AUDIO_FRAMES / 2) ^
+        (audio_hash(audio_r, AUDIO_FRAMES / 2) << 1);
+    box_audio_core_free(core);
+
+    return result;
+}
+
+/** The same seed renders bit identical; another seed, and the next play of the same patch,
+ * start the voices at other phases. */
+void Synth_unison_seed_identical(void) {
+    // audio/synth
+    box_audio_synth_patch_t p = synth_unison(BOX_AUDIO_SYNTH_SAW, 220, 0.2f, 5, 25, 0.7f, 0.3f);
+    uint64_t a, b, c, a2, b2, c2;
+    p.layers = 3;
+    p.seed = 9;
+    p.filter = BOX_AUDIO_SYNTH_LOWPASS;
+    p.cutoff = 1500;
+    p.slope = BOX_AUDIO_SYNTH_SLOPE_24;
+    p.layer[1] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_NOISE, .level = 0.05f,
+        .voices = 2, .width = 1 };
+    p.layer[2] = (box_audio_synth_layer_t){ .frequency = 330, .level = 0.1f, .feedback = 0.4f,
+        .voices = 3, .detune = 10 };
+    a = synth_unison_hash(&p, &a2);
+    b = synth_unison_hash(&p, &b2);
+    p.seed = 10;
+    c = synth_unison_hash(&p, &c2);
+    printf("seed 9: 0x%016llXull\n", (unsigned long long)a);
+    test_assert(a == b);
+    test_assert(a2 == b2);
+    test_assert(a != a2);
+    test_assert(a != c);
+}
+
+/** A layer of one voice, or none, renders bit identical to a layer without unison, whatever
+ * its detune and width, and stays mono. */
+void Synth_unison_one_voice_identical(void) {
+    // audio/synth
+    box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SAW, 220, 0.3f, 0.3f);
+    uint64_t plain, one, none, second;
+    int32_t i;
+    p.layers = 2;
+    p.seed = 2;
+    p.filter = BOX_AUDIO_SYNTH_LOWPASS;
+    p.cutoff = 600;
+    p.filter_amount = 2;
+    p.filter_envelope = (box_audio_synth_envelope_t){ .attack = 0.05f, .decay = 0.1f };
+    p.layer[1] = (box_audio_synth_layer_t){ .frequency = 660, .level = 1, .modulates = 1,
+        .index = 1.5f };
+    plain = synth_unison_hash(&p, &second);
+    for (i = 0; i < 2; i ++) {
+        p.layer[i].voices = 1;
+        p.layer[i].detune = 50;
+        p.layer[i].width = 1;
+    }
+
+    one = synth_unison_hash(&p, &second);
+    test_assert(memcmp(audio_l, audio_r, (AUDIO_FRAMES / 2) * sizeof(float)) == 0);
+    for (i = 0; i < 2; i ++) {
+        p.layer[i].voices = 0;
+    }
+
+    none = synth_unison_hash(&p, &second);
+    test_assert(plain == one);
+    test_assert(plain == none);
+}
+
+/** Render a wide layer on bus 1 into audio_l and audio_r.
+ *
+ * @param routes The order
+ * @param count Routes in the order
+ * @param voice_pan Pan of the voice
+ * @param bus_pan Pan of bus 1
+ * @param send Send level of bus 1
+ */
+static void synth_unison_chain(
+    const box_audio_route_t *routes,
+    int32_t count,
+    float voice_pan,
+    float bus_pan,
+    float send)
+{
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_unison(BOX_AUDIO_SYNTH_SAW, 220, 0.15f, 2, 40, 1, 1.0f);
+    p.seed = 6;
+    synth_define(core, 1, &p);
+    audio_order(core, routes, count);
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_PAN, bus_pan);
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_SEND, send);
+    audio_play(core, 1, 1, 1, 1, voice_pan, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES / 2);
+    box_audio_core_free(core);
+}
+
+/** A wide voice is a stereo voice in the mixer: the pan of the voice and of its bus are a
+ * balance that keeps the power of its two channels on one side, and a send carries both. */
+void Synth_unison_stereo_chain(void) {
+    // audio/synth
+    static float ref_l[AUDIO_FRAMES / 2], ref_r[AUDIO_FRAMES / 2];
+    const box_audio_route_t plain[] = { { 1, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 } };
+    const box_audio_route_t sent[] = {
+        { 1, 0, 2 }, { 2, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 } };
+    const int32_t from = 2 * AUDIO_RAMP, to = AUDIO_FRAMES / 2;
+    double ms_l = 0, ms_r = 0, ms = 0, lr = 0;
+    float err = 0;
+    int32_t i;
+    synth_unison_chain(plain, 2, 0, 0, 0);
+    memcpy(ref_l, audio_l, sizeof(ref_l));
+    memcpy(ref_r, audio_r, sizeof(ref_r));
+    for (i = from; i < to; i ++) {
+        ms_l += (double)ref_l[i] * ref_l[i];
+        ms_r += (double)ref_r[i] * ref_r[i];
+        lr += (double)ref_l[i] * ref_r[i];
+    }
+
+    test_assert(audio_peak(ref_l, from, to) > 0.05f);
+    test_assert(fabs(lr / sqrt(ms_l * ms_r)) < 0.3);
+
+    synth_unison_chain(plain, 2, -1, 0, 0);
+    test_assert(audio_peak(audio_r, from, to) < 1e-6f);
+    for (i = from; i < to; i ++) {
+        float d = fabsf(audio_l[i] - SYNTH_SQRT2 * ref_l[i]);
+        err = d > err ? d : err;
+        ms += (double)audio_l[i] * audio_l[i];
+    }
+
+    printf("voice pan left: error %g, power %.3f of the centered one\n", (double)err,
+        ms / (ms_l + ms_r));
+    test_assert(err < 1e-5f);
+    test_assert(fabs(ms / (ms_l + ms_r) - 1) < 0.1);
+
+    synth_unison_chain(plain, 2, 0, 1, 0);
+    test_assert(audio_peak(audio_l, from, to) < 1e-6f);
+    err = 0;
+    for (i = from; i < to; i ++) {
+        float d = fabsf(audio_r[i] - SYNTH_SQRT2 * ref_r[i]);
+        err = d > err ? d : err;
+    }
+
+    printf("bus pan right: error %g\n", (double)err);
+    test_assert(err < 1e-5f);
+
+    synth_unison_chain(sent, 3, 0, 0, 1);
+    err = 0;
+    for (i = from; i < to; i ++) {
+        float dl = fabsf(audio_l[i] - 2 * ref_l[i]);
+        float dr = fabsf(audio_r[i] - 2 * ref_r[i]);
+        err = dl > err ? dl : err;
+        err = dr > err ? dr : err;
+    }
+
+    printf("send: error %g\n", (double)err);
+    test_assert(err < 1e-5f);
+}
+
+/** The pad of docs/audio.md and the sounds of test/assets/audio/synth_unison.flecs compile with
+ * their unison, the pad plays wide and ends, the defaults play mono, a change of a SynthUnison
+ * compiles the sound again, and a wide sound in space is heard from its side alone. */
+void Synth_script_unison(void) {
+    // audio/synth
+    ecs_world_t *world = audio_world();
+    char *code = audio_read("test/assets/audio/synth_unison.flecs");
+    ecs_entity_t pad, thick, beep, saw;
+    const box_audio_synth_patch_t *p;
+    int32_t i, start, found = 0;
+    float diff = 0;
+    ecs_entity_t ears;
+    test_int(box_jobs_set_workers(world, 0), 0);
+    audio_log_start();
+    test_assert(ecs_script_run(world, "unison", code, NULL) == 0);
+    ecs_os_free(code);
+    audio_run(world, 1);
+
+    pad = ecs_lookup(world, "WidePad");
+    thick = ecs_lookup(world, "Thick");
+    beep = ecs_lookup(world, "WideBeep");
+    saw = ecs_lookup(world, "WidePad.saw");
+    test_assert(pad != 0 && thick != 0 && beep != 0 && saw != 0);
+    test_int(ecs_get(world, thick, SynthUnison)->voices, 3);
+    test_flt(ecs_get(world, thick, SynthUnison)->detune, 10);
+    test_flt(ecs_get(world, thick, SynthUnison)->width, 0);
+    p = &ecs_get(world, pad, AudioSynth)->patch;
+    test_int(p->layers, 3);
+    for (i = 0; i < 3; i ++) {
+        if (p->layer[i].frequency == 220) {
+            test_int(p->layer[i].voices, 5);
+            test_flt(p->layer[i].detune, 20);
+            test_flt(p->layer[i].width, 0.8f);
+            found ++;
+        } else if (p->layer[i].frequency == 330) {
+            test_int(p->layer[i].voices, 3);
+            test_flt(p->layer[i].detune, 14);
+            test_flt(p->layer[i].width, 1);
+            found ++;
+        } else if (p->layer[i].frequency == 110) {
+            test_int(p->layer[i].voices, 1);
+            found ++;
+        }
+    }
+
+    test_int(found, 3);
+    p = &ecs_get(world, thick, AudioSynth)->patch;
+    test_int(p->layer[0].voices, 3);
+    test_flt(p->layer[0].detune, 10);
+
+    start = audio_tap_count;
+    test_assert(box_audio_play(world, pad, 1.0f));
+    audio_run(world, 140);
+    test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.05f);
+    test_assert(synth_finite(audio_tap_l, start, audio_tap_count));
+    test_assert(synth_finite(audio_tap_r, start, audio_tap_count));
+    for (i = start; i < audio_tap_count; i ++) {
+        float d = fabsf(audio_tap_l[i] - audio_tap_r[i]);
+        diff = d > diff ? d : diff;
+    }
+
+    test_assert(diff > 0.01f);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+    test_flt(audio_peak(audio_tap_l, audio_tap_count - AUDIO_FRAME, audio_tap_count), 0);
+
+    start = audio_tap_count;
+    test_assert(box_audio_play(world, thick, 1.0f));
+    audio_run(world, 30);
+    test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.1f);
+    test_assert(memcmp(audio_tap_l + start, audio_tap_r + start,
+        (size_t)(audio_tap_count - start) * sizeof(float)) == 0);
+
+    ecs_set(world, saw, SynthUnison, { .voices = 7, .detune = 30, .width = 1 });
+    audio_run(world, 1);
+    p = &ecs_get(world, pad, AudioSynth)->patch;
+    for (i = 0; i < 3; i ++) {
+        if (p->layer[i].frequency == 220) {
+            test_int(p->layer[i].voices, 7);
+            test_flt(p->layer[i].detune, 30);
+        }
+    }
+
+    ears = ecs_new(world);
+    ecs_set(world, ears, Position, {0, 0, 0});
+    ecs_set(world, ears, Rotation, {0, 0, 0});
+    ecs_add(world, ears, AudioListener);
+    audio_run(world, 2);
+    test_bool(box_audio_play_at(world, beep, (vec3){-5, 0, 0}, 1.0f), true);
+    start = audio_tap_count;
+    audio_run(world, 6);
+    test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.2f);
+    test_assert(audio_peak(audio_tap_r, start, audio_tap_count) < 1e-4f);
+    audio_run(world, 40);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+
+    test_bool(box_audio_play_at(world, beep, (vec3){0, 0, -5}, 1.0f), true);
+    start = audio_tap_count;
+    audio_run(world, 6);
+    diff = 0;
+    for (i = start; i < audio_tap_count; i ++) {
+        float d = fabsf(audio_tap_l[i] - audio_tap_r[i]);
+        diff = d > diff ? d : diff;
+    }
+
+    test_assert(diff > 0.05f);
+    audio_run(world, 40);
+    audio_log_stop();
+    test_int(audio_log_errors, 0);
     ecs_fini(world);
 }

@@ -145,6 +145,25 @@ static void box_audio_synth_oscillator_ctor(
     }
 }
 
+/** Construct SynthUnison values: 3 voices over 10 cents, in the center.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_synth_unison_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    SynthUnison *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (SynthUnison){ .voices = 3, .detune = 10.0f, .width = 0.0f };
+    }
+}
+
 /** Construct SynthFilter values: a lowpass at 1000 Hz and 12 dB per octave without
  * resonance.
  *
@@ -672,6 +691,8 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, SynthModulation);
     ECS_META_COMPONENT(world, SynthOscillator);
     ecs_set_hooks(world, SynthOscillator, { .ctor = box_audio_synth_oscillator_ctor });
+    ECS_META_COMPONENT(world, SynthUnison);
+    ecs_set_hooks(world, SynthUnison, { .ctor = box_audio_synth_unison_ctor });
     ECS_META_COMPONENT(world, SynthEnvelope);
     ECS_META_COMPONENT(world, SynthFilter);
     ecs_set_hooks(world, SynthFilter, { .ctor = box_audio_synth_filter_ctor });

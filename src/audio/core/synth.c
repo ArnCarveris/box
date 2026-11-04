@@ -4,7 +4,9 @@
  * curved envelope, mixed into a state variable filter of one or two stages, whose cutoff an
  * envelope may move, and an amp, rendered per frame from a copy of the patch. A change of the
  * pitch glides exponentially in frequency over the glide of the patch, and a legato play
- * retargets the layers of a voice without a restart of its envelopes.
+ * retargets the layers of a voice without a restart of its envelopes. A layer may play as
+ * unison voices, detuned and spread in stereo, which render through
+ * box_audio_synth_render_wide, so a patch without them renders as before at the same cost.
  *
  * Every voice holds its own copy of the patch, so a play allocates nothing and a new patch for
  * the same sound reaches the next play while the voices that play keep theirs. Its layers are
@@ -57,6 +59,11 @@
 
 /** Turns per radian */
 #define BOX_AUDIO_SYNTH_TURNS (1.0 / 6.28318530717958647692)
+
+/** Gain of each of n unison voices, 1 / sqrt(n), so their power sums to that of one */
+static const double box_audio_synth_unison_gain[BOX_AUDIO_SYNTH_UNISON_MAX + 1] = {
+    1.0, 1.0, 0.70710678118654752440, 0.57735026918962576451, 0.5, 0.44721359549995793928,
+    0.40824829046386301637, 0.37796447300922722721 };
 
 /** Clamp a value of a patch; NaN becomes the low end.
  *
@@ -182,6 +189,10 @@ static void box_audio_synth_patch_clamp(
             1.0f : BOX_AUDIO_SYNTH_INDEX_MAX);
         l->feedback = box_audio_synth_clamp(l->feedback, 0, BOX_AUDIO_SYNTH_FEEDBACK_MAX);
         l->audible = l->audible != 0;
+        l->voices = l->voices < 1 ? 1 : (l->voices > BOX_AUDIO_SYNTH_UNISON_MAX ?
+            BOX_AUDIO_SYNTH_UNISON_MAX : l->voices);
+        l->detune = box_audio_synth_clamp(l->detune, 0, BOX_AUDIO_SYNTH_DETUNE_MAX);
+        l->width = box_audio_synth_clamp(l->width, 0, 1);
     }
 }
 
@@ -516,6 +527,11 @@ static void box_audio_synth_coefs(
         f->a1 = 1.0f / (1.0f + g * (g + f->k));
         f->a2 = g * f->a1;
         f->a3 = g * f->a2;
+        if (src->stereo) {
+            src->svf_r[s].a1 = f->a1;
+            src->svf_r[s].a2 = f->a2;
+            src->svf_r[s].a3 = f->a3;
+        }
     }
 }
 
@@ -569,6 +585,23 @@ static void box_audio_synth_cutoff(
     box_audio_synth_coefs(src, rate);
 }
 
+/** Next value of the white noise of a source, xorshift32.
+ *
+ * @param state The state, never 0
+ * @return A value in -1..1
+ */
+static inline float box_audio_synth_noise(
+    uint32_t *state)
+{
+    uint32_t x = *state;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    *state = x;
+
+    return (float)(int32_t)x * (1.0f / 2147483648.0f);
+}
+
 /** Start a pass of the envelopes, the oscillators and the filter envelope, at the start of a
  * play and at each restart of a loop. The state of the filter goes on.
  *
@@ -603,6 +636,11 @@ static void box_audio_synth_pass(
         o->audible = layer->audible != 0;
         o->fb1 = 0;
         o->fb2 = 0;
+        for (n = 0; n < part->unison.voices && part->unison.voices > 1; n ++) {
+            box_audio_synth_noise(&src->rng);
+            part->unison.phase[n] = (double)(src->rng >> 11) * (1.0 / 2097152.0);
+        }
+
         src->modulated = src->modulated || o->target >= 0 || layer->feedback > 0;
         src->envs |= 1u << o->env;
         if (layer->has_envelope) {
@@ -668,21 +706,35 @@ static uint32_t box_audio_synth_hash(
     return x ? x : 0x6D2B79F5u;
 }
 
-/** Next value of the white noise of a source, xorshift32.
+/** Set the unison voices of a part from its layer: the detune of each voice, evenly from half
+ * the spread down to half of it up, and its gains, 1 / sqrt(voices) times the equal power pan
+ * of the core at its place, evenly from -width to width.
  *
- * @param state The state, never 0
- * @return A value in -1..1
+ * @param part The part, its layer clamped
  */
-static inline float box_audio_synth_noise(
-    uint32_t *state)
+static void box_audio_synth_unison_init(
+    box_audio_synth_part_t *part)
 {
-    uint32_t x = *state;
-    x ^= x << 13;
-    x ^= x >> 17;
-    x ^= x << 5;
-    *state = x;
+    box_audio_synth_unison_t *u = &part->unison;
+    const box_audio_synth_layer_t *layer = &part->layer;
+    double gain, at, turns;
+    int32_t k;
+    u->voices = (int32_t)layer->voices;
+    if (u->voices <= 1) {
+        goto done;
+    }
 
-    return (float)(int32_t)x * (1.0f / 2147483648.0f);
+    gain = box_audio_synth_unison_gain[u->voices];
+    for (k = 0; k < u->voices; k ++) {
+        at = (double)k / (double)(u->voices - 1);
+        u->detune[k] = box_audio_synth_exp2((double)layer->detune * (at - 0.5) / 1200.0);
+        turns = ((double)layer->width * (2 * at - 1) + 1) * 0.125;
+        u->left[k] = (float)(BOX_AUDIO_SYNTH_SQRT2 * gain * box_audio_core_sin(turns + 0.25));
+        u->right[k] = (float)(BOX_AUDIO_SYNTH_SQRT2 * gain * box_audio_core_sin(turns));
+    }
+
+done:
+    return;
 }
 
 void box_audio_source_synth(
@@ -698,9 +750,16 @@ void box_audio_source_synth(
     int32_t l;
     source->kind = BOX_AUDIO_SOURCE_SYNTH;
     src->layers = (int32_t)p->layers;
+    src->unison = false;
+    src->stereo = false;
     for (l = 0; l < src->layers; l ++) {
         src->part[l] = &core->synth_parts[core->synth_free[-- core->synth_free_count]];
         src->part[l]->layer = p->layer[l];
+        box_audio_synth_unison_init(src->part[l]);
+        if (src->part[l]->unison.voices > 1) {
+            src->unison = true;
+            src->stereo = src->stereo || p->layer[l].width > 0;
+        }
     }
 
     src->envelope = p->envelope;
@@ -732,6 +791,8 @@ void box_audio_source_synth(
             (double)p->resonance);
     }
 
+    src->svf_r[0] = src->svf[0];
+    src->svf_r[1] = src->svf[1];
     box_audio_synth_pass(core, src);
 }
 
@@ -1149,6 +1210,202 @@ static inline float box_audio_synth_svf_next(
     return y;
 }
 
+/** Wrap a phase into 0..1.
+ *
+ * @param t Phase in turns
+ * @return The phase, 0..1
+ */
+static inline double box_audio_synth_wrap(
+    double t)
+{
+    if (t < 0 || t >= 1) {
+        t -= (double)(int64_t)t;
+        t = t < 0 ? t + 1 : t;
+        t = t >= 1 ? t - 1 : t;
+    }
+
+    return t;
+}
+
+/** Render a frame of the unison voices of a layer and advance them, with the sweep of its
+ * oscillator.
+ *
+ * @param src The source
+ * @param part The part of the layer, with more than one voice
+ * @param shift Turns added to the phase of every voice, its modulation and feedback
+ * @param left Receives the left sample
+ * @param right Receives the right sample
+ */
+static inline void box_audio_synth_unison_next(
+    box_audio_synth_source_t *src,
+    box_audio_synth_part_t *part,
+    double shift,
+    float *left,
+    float *right)
+{
+    box_audio_synth_osc_t *o = &part->osc;
+    box_audio_synth_unison_t *u = &part->unison;
+    float l = 0, r = 0, x;
+    double dt, t;
+    int32_t k;
+    for (k = 0; k < u->voices; k ++) {
+        dt = o->inc * u->detune[k];
+        dt = dt < src->inc_max ? dt : src->inc_max;
+        t = shift != 0 ? box_audio_synth_wrap(u->phase[k] + shift) : u->phase[k];
+        x = box_audio_synth_wave(o->wave, t, dt, &src->rng);
+        l += x * u->left[k];
+        r += x * u->right[k];
+        t = u->phase[k] + dt;
+        u->phase[k] = t >= 1 ? t - 1 : t;
+    }
+
+    box_audio_synth_osc_advance(o);
+    *left = l;
+    *right = r;
+}
+
+/** Render a frame of the layers of a source in which a layer has unison voices, in stereo.
+ *
+ * As box_audio_synth_modulate, the layers render from the last. A layer without unison is the
+ * same on both channels. A unison layer that modulates, or feeds back, does so with the mean
+ * of its channels, and a modulation of a unison layer moves the phase of each of its voices.
+ *
+ * @param src The source
+ * @param levels The level of each envelope for the frame
+ * @param left Receives the left mix of the layers
+ * @param right Receives the right mix
+ */
+static inline void box_audio_synth_mix_wide(
+    box_audio_synth_source_t *src,
+    const float *levels,
+    float *left,
+    float *right)
+{
+    double offset[BOX_AUDIO_SYNTH_LAYERS], shift;
+    float ring[BOX_AUDIO_SYNTH_LAYERS], l = 0, r = 0, x, xl, xr, gain, signal;
+    int32_t n;
+    for (n = 0; n < src->layers; n ++) {
+        offset[n] = 0;
+        ring[n] = 1;
+    }
+
+    for (n = src->layers - 1; n >= 0; n --) {
+        box_audio_synth_part_t *part = src->part[n];
+        box_audio_synth_osc_t *o = &part->osc;
+        float level = levels[o->env];
+        shift = offset[n];
+        if (o->feedback != 0) {
+            shift += (double)(o->feedback * 0.5f * (o->fb1 + o->fb2));
+        }
+
+        if (part->unison.voices > 1) {
+            box_audio_synth_unison_next(src, part, shift, &xl, &xr);
+            x = 0.5f * (xl + xr);
+        } else {
+            x = box_audio_synth_wave(o->wave, box_audio_synth_wrap(o->phase + shift), o->inc,
+                &src->rng);
+            box_audio_synth_osc_advance(o);
+            xl = x;
+            xr = x;
+        }
+
+        o->fb2 = o->fb1;
+        o->fb1 = x;
+        if (o->target < 0 || o->audible) {
+            gain = ring[n] * o->level * level;
+            l += xl * gain;
+            r += xr * gain;
+        }
+
+        if (o->target >= 0) {
+            signal = x * ring[n] * level;
+            if (o->ring) {
+                ring[o->target] *= 1 - o->index + o->index * signal;
+            } else {
+                offset[o->target] += (double)(o->index * signal);
+            }
+        }
+    }
+
+    *left = l;
+    *right = r;
+}
+
+/** Move the cutoff of a source by its filter envelope, every BOX_AUDIO_SYNTH_CONTROL frames.
+ *
+ * @param src The source, with a filter
+ * @param rate Frames per second
+ */
+static inline void box_audio_synth_control(
+    box_audio_synth_source_t *src,
+    float rate)
+{
+    if (src->amount != 0 && src->fenv.segment < BOX_AUDIO_SYNTH_DONE) {
+        float level = box_audio_synth_env_next(&src->fenv);
+        if (-- src->control <= 0 || src->fenv.segment >= BOX_AUDIO_SYNTH_DONE) {
+            src->control = BOX_AUDIO_SYNTH_CONTROL;
+            box_audio_synth_cutoff(src, level, rate);
+        }
+    }
+}
+
+/** Render a block of a source in which a layer has unison voices: into core->src_l, and
+ * core->src_r through the stages of the right channel when it is stereo.
+ *
+ * @param core The core
+ * @param src The source
+ * @param frames Frames to render
+ * @return Frames it rendered
+ */
+static int32_t box_audio_synth_render_wide(
+    box_audio_core_t *core,
+    box_audio_synth_source_t *src,
+    int32_t frames)
+{
+    float *out_l = core->src_l, *out_r = core->src_r, rate = core->sample_rate;
+    float levels[1 + BOX_AUDIO_SYNTH_LAYERS] = {0};
+    bool stereo = src->stereo;
+    int32_t i;
+    for (i = 0; i < frames; i ++) {
+        float l, r;
+        if (!box_audio_synth_envs_next(src, levels)) {
+            if (!src->loop || !src->envs) {
+                break;
+            }
+
+            box_audio_synth_pass(core, src);
+            box_audio_synth_envs_next(src, levels);
+        }
+
+        if (src->glide_left > 0) {
+            box_audio_synth_glide_next(src);
+        }
+
+        box_audio_synth_mix_wide(src, levels, &l, &r);
+        if (src->filter) {
+            box_audio_synth_control(src, rate);
+            if (src->stages > 1) {
+                l = box_audio_synth_svf_next(&src->svf[1], src->filter, l);
+                if (stereo) {
+                    r = box_audio_synth_svf_next(&src->svf_r[1], src->filter, r);
+                }
+            }
+
+            l = box_audio_synth_svf_next(&src->svf[0], src->filter, l);
+            if (stereo) {
+                r = box_audio_synth_svf_next(&src->svf_r[0], src->filter, r);
+            }
+        }
+
+        out_l[i] = box_audio_clean(l * src->amp);
+        if (stereo) {
+            out_r[i] = box_audio_clean(r * src->amp);
+        }
+    }
+
+    return i;
+}
+
 int32_t box_audio_synth_render(
     box_audio_core_t *core,
     box_audio_synth_source_t *src,
@@ -1157,6 +1414,11 @@ int32_t box_audio_synth_render(
     float *out = core->src_l, rate = core->sample_rate;
     float levels[1 + BOX_AUDIO_SYNTH_LAYERS] = {0};
     int32_t layers = src->layers, i, l;
+    if (src->unison) {
+        i = box_audio_synth_render_wide(core, src, frames);
+        goto done;
+    }
+
     for (i = 0; i < frames; i ++) {
         float mix = 0, y;
         if (!box_audio_synth_envs_next(src, levels)) {
@@ -1203,5 +1465,6 @@ int32_t box_audio_synth_render(
         out[i] = box_audio_clean(y * src->amp);
     }
 
+done:
     return i;
 }

@@ -308,7 +308,15 @@
                     "script_legato",
                     "script_legato_source",
                     "docs_glide_example",
-                    "script_modulators"
+                    "script_modulators",
+                    "unison_detune_peaks",
+                    "unison_width_zero_mono",
+                    "unison_width_correlation",
+                    "unison_level_constant",
+                    "unison_seed_identical",
+                    "unison_one_voice_identical",
+                    "unison_stereo_chain",
+                    "script_unison"
                 ]
             },
             {
