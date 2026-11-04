@@ -31,6 +31,9 @@ typedef struct box_shadow_box_t {
     float element_radius; /**< Corner radius of the rounded box of the shape */
     float scale[2];     /**< Scale of the quad of the shape relative to its size, which a layout
                          *   that fits the shape (ShapeMesh.scale) stretches it with */
+    float spread;       /**< Growth of the outline of a polygon */
+    bool polygon;       /**< The shadow of a polygon: offset is the center of the quad, element
+                         *   the center of the bounds of the outline */
 } box_shadow_box_t;
 
 /** Construct BoxShadowSlot values without a slot.
@@ -85,6 +88,43 @@ static void box_shadow_slot_move(
     ecs_os_memcpy(dst, src, ti->size * count);
 }
 
+/** Resolve the shadow quad of a filled polygon: the bounds of its outline moved by the offset and
+ * grown by the spread and 3 standard deviations on each side. The shader grows the outline
+ * itself by the spread, which rounds its outer corners.
+ *
+ * @param shape The resolved shape, a polygon
+ * @param shadow The shadow
+ * @param out Receives the shadow box
+ * @return Whether the shadow has an area, never for a stroked open polygon
+ */
+static bool box_shadow_resolve_polygon(
+    const Shape2D *shape,
+    const BoxShadow *shadow,
+    box_shadow_box_t *out)
+{
+    float spread = isfinite(shadow->spread) ? shadow->spread : 0.0f;
+    float w = shape->size[0] + 2.0f * spread;
+    float h = shape->size[1] + 2.0f * spread;
+    bool result = shape->width <= 0.0f && w > 0.0f && h > 0.0f && isfinite(w) && isfinite(h);
+    if (!result) {
+        goto done;
+    }
+
+    float blur = isfinite(shadow->blur) ? shadow->blur : 0.0f;
+    out->polygon = true;
+    out->spread = spread;
+    out->sigma = glm_max(blur * 0.5f, BOX_SHADOW_SIGMA_MIN * glm_min(w, h) * 0.5f);
+    out->size[0] = w + 6.0f * out->sigma;
+    out->size[1] = h + 6.0f * out->sigma;
+    out->element[0] = shape->center[0];
+    out->element[1] = shape->center[1];
+    out->offset[0] = shape->center[0] + (isfinite(shadow->offset_x) ? shadow->offset_x : 0.0f);
+    out->offset[1] = shape->center[1] + (isfinite(shadow->offset_y) ? shadow->offset_y : 0.0f);
+    out->scale[0] = out->scale[1] = 1.0f;
+done:
+    return result;
+}
+
 /** Resolve the shadow box of a rectangle: grown by the spread, its corner radius with it as CSS
  * does, so a sharp corner stays sharp, and grown by 3 standard deviations on each side.
  *
@@ -97,7 +137,7 @@ static void box_shadow_slot_move(
  * @param out Receives the shadow box
  * @return Whether the shadow box has an area
  */
-static bool box_shadow_resolve(
+static bool box_shadow_resolve_rect(
     const Shape2D *shape,
     const float *mesh_scale,
     const BoxShadow *shadow,
@@ -135,6 +175,27 @@ static bool box_shadow_resolve(
     result = isfinite(out->scale[0]) && isfinite(out->scale[1]);
 done:
     return result;
+}
+
+/** Resolve the shadow box of a shape: of a rectangle (box_shadow_resolve_rect) or of a polygon
+ * (box_shadow_resolve_polygon). Pure, as they are.
+ *
+ * @param shape The resolved shape
+ * @param mesh_scale The x and y of the ShapeMesh.scale of the shape, NULL when it has none
+ * @param shadow The shadow
+ * @param out Receives the shadow box
+ * @return Whether the shadow box has an area
+ */
+static bool box_shadow_resolve(
+    const Shape2D *shape,
+    const float *mesh_scale,
+    const BoxShadow *shadow,
+    box_shadow_box_t *out)
+{
+    ecs_os_memset_t(out, 0, box_shadow_box_t);
+
+    return shape->kind == BOX_SHAPE2D_POLYGON ? box_shadow_resolve_polygon(shape, shadow, out)
+        : box_shadow_resolve_rect(shape, mesh_scale, shadow, out);
 }
 
 /** Get the ShapeMesh.scale of a shape for box_shadow_resolve.
@@ -246,12 +307,17 @@ static void box_shadow_color(
  * the shadow, uv.zw its half extents, material.z its corner radius and material.w the alpha it
  * covers the shadow with.
  *
+ * The shadow of a polygon holds the index of its polygon record in material.x and its spread
+ * in material.z instead, uv.xy the center of the bounds of its outline relative to the shadow
+ * and uv.z half the smaller side of the quad, its outline being in the local units of the shape.
+ *
  * @param out The shading
  * @param box The shadow box
  * @param linear Linear color and alpha of the shadow, box_shadow_color
  * @param cover Alpha the shape covers the shadow with, box_shadow_cover_alpha
  * @param clip Clip index of the shape
  * @param rank Rank of the shadow
+ * @param record Index of the polygon record of a polygon, 0 for none
  */
 static void box_shadow_shading(
     box_render_shading_t *out,
@@ -259,11 +325,23 @@ static void box_shadow_shading(
     const float *linear,
     float cover,
     int32_t clip,
-    uint32_t rank)
+    uint32_t rank,
+    int32_t record)
 {
     float half = glm_min(box->size[0], box->size[1]) * 0.5f;
     ecs_os_memset_t(out, 0, box_render_shading_t);
     out->emissive[3] = box->size[0] / box->size[1];
+    if (box->polygon) {
+        out->material[0] = (float)(record > 0 ? record : 0);
+        out->material[1] = -box->sigma / half;
+        out->material[2] = box->spread;
+        out->material[3] = cover;
+        out->uv[0] = (box->element[0] - box->offset[0]) / half;
+        out->uv[1] = (box->element[1] - box->offset[1]) / half;
+        out->uv[2] = half;
+        goto done;
+    }
+
     out->material[0] = glm_clamp(box->radius / half, 0.0f, 1.0f);
     out->material[1] = -box->sigma / half;
     out->material[2] = box->element_radius / half;
@@ -272,6 +350,7 @@ static void box_shadow_shading(
     out->uv[1] = -box->offset[1] / half;
     out->uv[2] = box->element[0] / half;
     out->uv[3] = box->element[1] / half;
+done:
     out->ids[0] = clip > 0 ? (uint32_t)clip : 0u;
     out->ids[1] = rank;
     box_draws_color_pack(out->color, linear);
@@ -336,7 +415,8 @@ static void box_shadow_write(
         float linear[4];
         box_shadow_color(linear, &shadow->color, material, alpha);
         box_shadow_shading(box_draws_slot_shading(b, bs->slot), box, linear,
-            box_shadow_cover_alpha(shape, blend, alpha), material->clip, bs->rank);
+            box_shadow_cover_alpha(shape, blend, alpha), material->clip, bs->rank,
+            material->slice);
     }
 
     box_draws_slot_changed(b, bs->slot, kinds);
@@ -512,8 +592,11 @@ void box_draws_box_shadow_patch(
     box_render_shading_t out;
     box_shadow_box_t box;
     uint32_t ids[2];
+    float words[4];
     ecs_os_memcpy(ids, ECS_OFFSET(shading, offsetof(box_render_shading_t, ids)),
         ECS_SIZEOF(ids));
+    ecs_os_memcpy(words, ECS_OFFSET(shading, offsetof(box_render_shading_t, material)),
+        ECS_SIZEOF(words));
     if (box_shadow_resolve(&record->material.shape2d,
         record->meshed ? record->mesh_scale : NULL, shadow, &box))
     {
@@ -522,10 +605,13 @@ void box_draws_box_shadow_patch(
         box_shadow_color(linear, &shadow->color, material, alpha);
         box_shadow_shading(&out, &box, linear,
             glm_clamp(alpha * record->material.shadow_cover, 0.0f, 1.0f), (int32_t)ids[0],
-            ids[1]);
+            ids[1], box.polygon && isfinite(words[0]) ? (int32_t)words[0] : 0);
         box_shadow_transform(&t, world, &box);
     } else {
         box_shadow_hidden(&t, &out, world, (int32_t)ids[0], ids[1]);
+        if (record->material.shape2d.kind == BOX_SHAPE2D_POLYGON) {
+            out.material[0] = words[0];
+        }
     }
 
     ecs_os_memcpy(transform, &t, ECS_SIZEOF(t));
@@ -596,7 +682,8 @@ void box_draws_box_shadow_update(
         goto done;
     }
 
-    bool rect = shape && shape->kind == BOX_SHAPE2D_RECT;
+    bool rect = shape &&
+        (shape->kind == BOX_SHAPE2D_RECT || shape->kind == BOX_SHAPE2D_POLYGON);
     bool transitions = rect && ecs_has_id(world, e, TransitionBoxShadow);
     bool area = rect && box_shadow_resolve(shape,
         box_shadow_mesh_scale(ecs_get(world, e, ShapeMesh)), shadow, &box);
@@ -640,7 +727,8 @@ void box_draws_box_shadow_update(
         .tint = ecs_get(world, e, Tint),
         .inherited = s->tinted ? &s->tint : NULL,
         .fade = s->fade,
-        .clip = s->clip
+        .clip = s->clip,
+        .slice = s->slice
     };
     if (area) {
         box_shadow_write(d, bs, &box, shadow, shape, blend, ecs_get(world, e, WorldTransform),
@@ -651,6 +739,10 @@ void box_draws_box_shadow_update(
         box_shadow_hidden(box_draws_slot_transform(b, bs->slot),
             box_draws_slot_shading(b, bs->slot),
             transform ? ECS_CONST_CAST(vec4*, transform->m) : NULL, material.clip, bs->rank);
+        if (shape->kind == BOX_SHAPE2D_POLYGON) {
+            box_draws_slot_shading(b, bs->slot)->material[0] = (float)s->slice;
+        }
+
         box_draws_slot_changed(b, bs->slot, BOX_DRAW_BOTH);
     }
 done:

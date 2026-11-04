@@ -273,6 +273,11 @@
                     "filter_extreme",
                     "layers_sum",
                     "layer_own_envelope",
+                    "eight_layers",
+                    "layers_clamped",
+                    "layers_command_size",
+                    "layers_pool",
+                    "layers_identical",
                     "pitch_variance",
                     "voice_pitch",
                     "loop_restarts",
@@ -304,6 +309,7 @@
                     "script_legato_source",
                     "docs_glide_example",
                     "script_modulators",
+<<<<<<< HEAD
                     "lfo_vibrato",
                     "lfo_tremolo",
                     "lfo_layer",
@@ -320,6 +326,26 @@
                     "lfo_random_phase_seeded",
                     "docs_lfo_examples",
                     "script_lfo"
+=======
+                    "unison_detune_peaks",
+                    "unison_width_zero_mono",
+                    "unison_width_correlation",
+                    "unison_level_constant",
+                    "unison_seed_identical",
+                    "unison_one_voice_identical",
+                    "unison_stereo_chain",
+                    "script_unison",
+                    "pluck_pitch",
+                    "pluck_decay",
+                    "pluck_brightness",
+                    "pluck_seed",
+                    "pluck_unison",
+                    "pluck_ends",
+                    "pluck_glide",
+                    "pluck_pool",
+                    "script_pluck",
+                    "docs_pluck_examples"
+>>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
                 ]
             },
             {

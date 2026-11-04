@@ -52,6 +52,34 @@
 // pick a coarse mip. Everything else is fs: the border, the corner radius, the tint and the clip.
 // A plain Image pays nothing for it.
 //
+// A Polygon2D is drawn by pipelines of their own (a batch with polygon set): the polygon constant
+// turns the vertex stage to it and fs_polygon shades it. emissive.w of its shading is the index of
+// its polygon record in the clip buffer (box_render_polygon_t), which needs no binding of its own:
+// a header with the center and half extents of the bounds of its outline, its edge count and half
+// the width of a stroke (0 for a filled polygon), then its edges in chunks of 5 records: the bounds
+// of the edges of the chunk and 14 edges, each the start and the end of a segment in the local
+// units of the polygon. The vertex stage places the quad on
+// the bounds (the instance scale is that of a line, bounds centered on the origin), so local is
+// the position in the local units of the polygon. The fragment takes the signed distance to the
+// nearest edge, negative where a ray crosses the edges an odd number of times (the even-odd rule,
+// so holes need no winding of their own), or the distance to the polyline minus half the width
+// of a stroke, and anti-aliases it over the footprint of the pixel along its gradient, which
+// comes from the nearest edge; a stroke thinner than a pixel is widened to one and faded, as a
+// line is. shape.y is the border width in local units and shape.zw its color, as for a rectangle.
+// The cost per fragment is linear in the edges a fragment cannot skip, a few operations each: a
+// chunk whose bounds lie farther than the nearest edge found and that the ray of the even-odd
+// rule does not cross costs one test, so a pixel pays for the chunks near it and those its ray
+// crosses, and a stroke only for those near it.
+//
+// The shadow of a polygon (fs_shadow_polygon) is a shadow quad of the plain vertex stage: the
+// bounds of the outline moved by the offset and grown by the spread and 3 standard deviations.
+// shape.x (f32) is the index of the polygon record, shape.y the negated standard deviation in
+// units of half the smaller side of the quad, shape.z (f32 bits) the spread and shape.w the alpha
+// the polygon covers it with; uv.xy the center of the bounds of the polygon relative to the
+// shadow and uv.z half the smaller side of the quad in local units of the polygon. Its coverage is
+// the Gaussian falloff of the distance to the outline moved by the offset, minus the spread, cut
+// out by the coverage of the polygon itself as the shadow of a rectangle is.
+//
 // ids.x of the shading is the clip index of the instance, 0 when no ClipChildren ancestor clips
 // it. A clip maps the world position of a fragment into the local plane of its
 // element, where the coverage of its rounded area multiplies the alpha, anti-aliased over the
@@ -70,6 +98,10 @@
 
 // BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
 override blend_mode: u32 = 0u;
+
+// The instances are polygons (Polygon2D): the vertex stage places the quad on the bounds of the
+// polygon record of each instance.
+override polygon: bool = false;
 
 @group(0) @binding(0) var<uniform> view: View;
 
@@ -144,6 +176,8 @@ struct VertexOut {
     @location(10) @interpolate(flat) clip: u32,
     // Rank in the draw order of the tree of the instance
     @location(11) @interpolate(flat) rank: u32,
+    // Index of the polygon record of a polygon, 0 for any other shape
+    @location(12) @interpolate(flat) record: u32,
 };
 
 struct FragmentOut {
@@ -169,11 +203,25 @@ fn pixels_per_unit(mvp: mat4x4f, clip: vec4f, dir: vec2f) -> f32 {
     var axis = vec2f(1.0, 0.0);
     var to_model = vec2f(1.0);
     var extent: vec2f;
+    var bounds = vec4f(0.0);
     var o: VertexOut;
     o.params = vec2f(0.0);
     o.border = vec4f(0.0);
-    let glyph = inst.emissive.w == 0.0;
-    if (glyph) {
+    o.record = 0u;
+    let glyph = !polygon && inst.emissive.w == 0.0;
+    if (polygon) {
+        let index = u32(max(inst.emissive.w, 0.0) + 0.5);
+        if (index != 0u && index < arrayLength(&clips)) {
+            bounds = clips[index].x;
+        }
+
+        to_model = 1.0 / max(2.0 * (abs(bounds.xy) + bounds.zw), vec2f(1e-20));
+        origin = bounds.xy * to_model;
+        extent = bounds.zw;
+        o.params = vec2f(0.0, bitcast<f32>(inst.shape.y));
+        o.border = vec4f(unpack2x16float(inst.shape.z), unpack2x16float(inst.shape.w));
+        o.record = index;
+    } else if (glyph) {
         extent = vec2f(0.5);
         o.params = vec2f(bitcast<f32>(inst.shape.x), bitcast<f32>(inst.shape.y));
         o.border = vec4f(bitcast<f32>(inst.shape.z), 0.0, 0.0, 0.0);
@@ -211,7 +259,7 @@ fn pixels_per_unit(mvp: mat4x4f, clip: vec4f, dir: vec2f) -> f32 {
     o.world = (model * point).xyz;
     o.clip = inst.ids.x;
     o.rank = inst.ids.y;
-    o.local = q;
+    o.local = q + bounds.xy;
     o.uv = vec2f(q.x / (2.0 * extent.x) + 0.5, 0.5 - q.y / (2.0 * extent.y));
     o.extent = extent;
     o.color = vec4f(unpack2x16unorm(inst.color.x), unpack2x16unorm(inst.color.y));
@@ -443,6 +491,181 @@ fn ranked_depth(depth: f32, rank: u32) -> f32 {
     }
 
     return FragmentOut(output(color, alpha, cover), depth);
+}
+
+// Distance of a point to one edge of a polygon, squared, with the vector from the nearest point of
+// the edge to it, and whether a ray from it toward +x crosses the edge (1) or not (0): the edge is
+// its start in e.xy and its end in e.zw.
+fn polygon_edge(p: vec2f, e: vec4f) -> vec4f {
+    let ab = e.zw - e.xy;
+    let w = p - e.xy;
+    let len = dot(ab, ab);
+    let t = select(0.0, clamp(dot(w, ab) / len, 0.0, 1.0), len > 0.0);
+    let v = w - ab * t;
+    let crosses = (e.y > p.y) != (e.w > p.y) && p.x < e.x + (p.y - e.y) * ab.x / ab.y;
+    return vec4f(dot(v, v), v, select(0.0, 1.0, crosses));
+}
+
+// The nearest edge of a polygon so far: x its squared distance, yz the vector from it to the
+// point, w the edges a ray from the point toward +x crossed.
+struct PolygonNearest {
+    best: f32,
+    dir: vec2f,
+    crossings: f32,
+};
+
+// Take one edge of a polygon into the nearest edge so far, when it is one of its edges.
+fn polygon_step(p: vec2f, e: vec4f, valid: bool, n: ptr<function, PolygonNearest>) {
+    if (valid) {
+        let d = polygon_edge(p, e);
+        (*n).crossings += d.w;
+        if (d.x < (*n).best) {
+            (*n).best = d.x;
+            (*n).dir = d.yz;
+        }
+    }
+}
+
+// Distance of a point to the polygon of a polygon record: x the signed distance to the outline of
+// a filled polygon (negative inside by the even-odd rule) or the distance to the polyline of a
+// stroke, yz the unit direction it grows in, w half the width of a stroke, 0 for a filled one.
+// The edges come in chunks of 5 records, 14 edges after the bounds of the chunk: a chunk whose
+// bounds are farther than the nearest edge so far and that the ray toward +x cannot cross (any
+// chunk of a stroke, which counts no crossings) is skipped. The nearest distance starts at the
+// least distance to the farthest corner of the bounds of a chunk, within which that chunk has an
+// edge, so the first chunks are skipped too when they are far.
+// The loop is not uniform, so it takes no derivatives; its callers take them before it.
+fn polygon_distance(index: u32, p: vec2f) -> vec4f {
+    let count = arrayLength(&clips);
+    var head = vec4f(0.0);
+    if (index != 0u && index < count) {
+        head = clips[index].y;
+    }
+
+    let edges = u32(max(head.x, 0.0));
+    let filled = head.y <= 0.0;
+    var bound = 1e30;
+    for (var first = 0u; first < edges; first += 14u) {
+        let r = index + 1u + first / 14u * 5u;
+        if (r + 4u >= count) {
+            break;
+        }
+
+        let b = clips[r].x;
+        let far = max(abs(b.xy - p), abs(b.zw - p));
+        bound = min(bound, dot(far, far));
+    }
+
+    var n = PolygonNearest(bound * 1.0001 + 1e-12, vec2f(0.0, 1.0), 0.0);
+    for (var first = 0u; first < edges; first += 14u) {
+        let r = index + 1u + first / 14u * 5u;
+        if (r + 4u >= count) {
+            break;
+        }
+
+        let c = clips[r];
+        let outside = max(max(c.x.xy - p, p - c.x.zw), vec2f(0.0));
+        let crossed = filled && p.y >= c.x.y && p.y < c.x.w && p.x < c.x.z;
+        if (dot(outside, outside) >= n.best && !crossed) {
+            continue;
+        }
+
+        let left = edges - first;
+        polygon_step(p, c.y, true, &n);
+        polygon_step(p, c.area, left > 1u, &n);
+        for (var k = 1u; k < 5u; k += 1u) {
+            let e = clips[r + k];
+            polygon_step(p, e.x, left > k * 3u - 1u, &n);
+            polygon_step(p, e.y, left > k * 3u, &n);
+            polygon_step(p, e.area, left > k * 3u + 1u, &n);
+        }
+    }
+
+    let d = sqrt(n.best);
+    let dir = select(vec2f(0.0, 1.0), n.dir / d, d > 1e-20);
+    let inside = filled && fract(n.crossings * 0.5) > 0.25;
+    return select(vec4f(d, dir, head.y), vec4f(-d, -dir, 0.0), inside);
+}
+
+// Polygon2D shapes: the signed distance to the edges of the polygon record anti-aliased over the
+// footprint of the fragment along its gradient, with the border, the image over the bounds, the
+// tint and the clip of fs.
+@fragment fn fs_polygon(f: VertexOut) -> FragmentOut {
+    let depth = ranked_depth(f.pos.z, f.rank);
+    let world_dx = dpdx(f.world);
+    let world_dy = dpdy(f.world);
+    let local_dx = dpdx(f.local);
+    let local_dy = dpdy(f.local);
+    let uv = clamp(f.uv, vec2f(0.0), vec2f(1.0)) * f.uv_transform.xy + f.uv_transform.zw;
+    let texel = textureSample(albedo_map, material_sampler, uv);
+    let s = polygon_distance(f.record, f.local);
+    let px = length(vec2f(dot(s.yz, local_dx), dot(s.yz, local_dy)));
+    var d = s.x;
+    var thin = 1.0;
+    if (s.w > 0.0) {
+        let stroke = max(s.w, px * 0.5);
+        d = s.x - stroke;
+        thin = s.w / stroke;
+    }
+
+    let shape_cover = coverage(d, px);
+    let fill = select(1.0, coverage(d + f.params.y, px), f.params.y > 0.0);
+    let color = mix(f.border.rgb, f.color.rgb * texel.rgb, fill) + f.emissive;
+    var alpha = shape_cover * thin * f.color.a * mix(f.border.a, texel.a, fill);
+    var cover = shape_cover;
+    if (f.clip != 0u) {
+        let clipped = clip_coverage(f.clip, f.world, world_dx, world_dy);
+        alpha *= clipped;
+        cover *= clipped;
+    }
+
+    if (alpha <= 0.001) {
+        discard;
+    }
+
+    return FragmentOut(output(color, alpha, cover), depth);
+}
+
+// The shadows of Polygon2D shapes: the Gaussian falloff of the distance to the outline moved by
+// the offset and grown by the spread, cut out by the polygon.
+@fragment fn fs_shadow_polygon(f: VertexOut) -> FragmentOut {
+    let depth = ranked_depth(f.pos.z, f.rank);
+    let world_dx = dpdx(f.world);
+    let world_dy = dpdy(f.world);
+    let local_dx = dpdx(f.local);
+    let local_dy = dpdy(f.local);
+    let footprint = vec2f(
+        length(vec2f(local_dx.x, local_dy.x)),
+        length(vec2f(local_dx.y, local_dy.y)));
+    let half = f.uv_transform.z;
+    let index = u32(max(f.params.x, 0.0) + 0.5);
+    var center = vec2f(0.0);
+    if (index != 0u && index < arrayLength(&clips)) {
+        center = clips[index].x.xy;
+    }
+
+    let p = (f.local - f.uv_transform.xy) * half + center;
+    let shift = -f.uv_transform.xy * half;
+    let shape = polygon_distance(index, p);
+    let moved = polygon_distance(index, p - shift);
+    let sigma = -f.params.y * half;
+    let px = max(footprint.x, footprint.y) * half;
+    let sd = max(sqrt(sigma * sigma + 0.16 * px * px), 1e-9);
+    var cover = 0.5 - 0.5 * erf_approx((moved.x - f.border.x) / (sd * 1.41421356));
+    let cut_px = length(vec2f(dot(shape.yz, local_dx), dot(shape.yz, local_dy))) * half;
+    cover *= cutout(coverage(shape.x, cut_px), f.border.y);
+    var alpha = shadow_dither(cover * f.color.a, f.color.rgb, f.pos.xy);
+    if (f.clip != 0u) {
+        let clipped = clip_coverage(f.clip, f.world, world_dx, world_dy);
+        alpha *= clipped;
+        cover *= clipped;
+    }
+
+    if (alpha <= 0.001) {
+        discard;
+    }
+
+    return FragmentOut(output(f.color.rgb, alpha, cover), depth);
 }
 
 // Texture coordinate of a position along one axis of a sliced image and its rate of change per

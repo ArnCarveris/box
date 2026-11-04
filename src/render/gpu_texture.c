@@ -1171,8 +1171,8 @@ static void box_gpu_blend_group_bind(
     u.count = g->arrays[0]->count;
     u.flags = (mask ? BOX_GPU_BLEND_MASKED : 0) |
         (mask && ((box_gpu_texture_entry_t*)mask)->single ? BOX_GPU_BLEND_SINGLE : 0);
-    u.contrast = g->arrays[BOX_RENDER_BLEND_HEIGHT] ? g->blend.contrast : 0.0f;
-    for (m = 0; u.contrast > 0.0f && m < (int32_t)u.count; m ++) {
+    u.contrast = g->blend.contrast;
+    for (m = 0; g->arrays[BOX_RENDER_BLEND_HEIGHT] && m < (int32_t)u.count; m ++) {
         uint32_t serial = g->arrays[BOX_RENDER_BLEND_HEIGHT]->serials[m];
         if (serial && serial != UINT32_MAX) {
             u.flags |= BOX_GPU_BLEND_HEIGHT << m;
@@ -1237,7 +1237,10 @@ static void box_gpu_blend_group_bind(
  * the arrays and the images it binds, and binds them again when one changed.
  *
  * The emissive layer and the mask sample loaded images only, not the image of a target. The
- * heights make an array only with a contrast above 0, as the shader samples none without one.
+ * heights make an array only with a contrast above 0 and a height texture on some layer.
+ *
+ * Without a height every layer is flat at 0.5 and the group binds the one-slice placeholder;
+ * the contrast still sharpens the transitions of the mask.
  *
  * @param gpu The backend
  * @param packet The packet of the batch
@@ -1253,6 +1256,7 @@ static WGPUBindGroup box_gpu_blend_group(
     uint32_t emissive = b->textures[1] & BOX_RENDER_TEXTURE_TARGET ? 0 : b->textures[1];
     box_gpu_blend_group_t *g;
     int32_t m;
+    bool heights = false;
     bool stale;
     for (g = gpu->blend_groups; g; g = g->next) {
         if (g->emissive == emissive && g->wrap == b->wrap &&
@@ -1280,10 +1284,14 @@ static WGPUBindGroup box_gpu_blend_group(
     }
 
     g->checked = gpu->blend_frame;
+    for (m = 0; r->contrast > 0.0f && m < (int32_t)r->count; m ++) {
+        heights |= r->layers[m][BOX_RENDER_BLEND_HEIGHT] != 0;
+    }
+
     stale = !g->group || g->mask_serial != box_gpu_blend_serial(gpu, r->mask) ||
         g->emissive_serial != box_gpu_blend_serial(gpu, emissive);
     for (m = 0; m < BOX_RENDER_BLEND_SOURCES; m ++) {
-        box_gpu_blend_array_t *a = m < BOX_RENDER_BLEND_MAPS || r->contrast > 0.0f
+        box_gpu_blend_array_t *a = m < BOX_RENDER_BLEND_MAPS || heights
             ? box_gpu_blend_array(gpu, r, (uint32_t)m) : NULL;
         if (a != g->arrays[m]) {
             if (g->arrays[m]) {

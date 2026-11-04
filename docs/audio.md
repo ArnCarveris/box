@@ -42,6 +42,7 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 | `SoundFile` | A short sound from a WAV or FLAC file, decoded into memory, see [Sound files](#sound-files) |
 | `SoundStatus` | Read only: whether a `SoundFile` loads, is ready or failed |
 | `SynthSound` | A sound made by the synth from layers of `SynthOscillator`, `SynthEnvelope`, `SynthFilter` and `SynthFilterEnvelope`, layers that may modulate each other, see [Synth sounds](#synth-sounds) |
+| `SynthUnison` | Unison voices of a synth layer, detuned and spread in stereo, see [Unison and width](#unison-and-width) |
 | `SynthGlide` | Portamento and mono legato of a synth sound, see [Glide and legato](#glide-and-legato) |
 | `SynthLfo` | An LFO of a synth sound: vibrato, tremolo, a moving cutoff or pulse width, see [LFOs](#lfos) |
 | `AudioSource` | A sound that plays while its entity exists, once or in a loop, with a volume and a pitch |
@@ -225,6 +226,7 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   EQ, compressor or delay on a bus.
 - **Voices**: 64, with the quietest stolen; no priorities. A one shot cannot be controlled after
   it started.
+<<<<<<< HEAD
 - **Synth**: up to 4 oscillators, one filter and two LFOs per sound, linear or curved
   envelopes, and no node graph; an LFO has fixed destinations (pitch, level, cutoff, pulse
   width) and no LFO modulates another; an oscillator may phase or ring modulate another, but FM is not band
@@ -232,6 +234,15 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   last note. A looping synth sound starts a new pass of its envelopes and oscillators at the end
   of the last, at most every 60 seconds; a drone keeps that gap short with edges of a few ms, as
   the dust merchant's engine does with 2 ms.
+=======
+- **Synth**: up to 8 oscillators and one filter per sound, up to 7 unison voices per oscillator,
+  linear or curved envelopes, no LFO and no node graph; an oscillator may phase or ring modulate
+  another, but FM is not band limited. Plucked strings go down to 40 Hz, 32 of them ring at once,
+  and each plays as one voice. Legato is mono per channel and has no note off: a held note lasts
+  its hold after the last note. A looping synth sound starts a new pass of its envelopes and
+  oscillators at the end of the last, at most every 60 seconds; a drone keeps that gap short with
+  edges of a few ms, as the dust merchant's engine does with 2 ms.
+>>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
 - **Files**: WAV and FLAC for sounds, Ogg Vorbis for music, one stream at once (a change of path
   fades over 5 ms, there is no crossfade).
 - **Tools**: no mixer UI, and the UI theme of box has no sounds; a scene adds them in its own
@@ -317,7 +328,7 @@ start of the next render block. They are:
 | `SOUND_RELEASE` | sound: freed once no voice plays it |
 | `STREAM` | voice handle, stream, bus, volume, channels, sample rate: opens a stream and starts a voice that reads it |
 | `REVERB` | slot, bus (or none), decay, damping, predelay, size, mix: see [Reverb](#reverb) |
-| `SYNTH` | sound, then a patch: makes a free sound id a synth or replaces its patch, see [Synth](#synth) |
+| `SYNTH` | sound, then a patch up to its last layer: makes a free sound id a synth or replaces its patch, see [Synth](#synth) |
 
 The sender picks the voice handles, so it addresses a voice without waiting for a reply. Values
 are clamped (volumes and send levels to 0..4, pans to -1..1, pitches to 1/64..16) and a NaN
@@ -383,7 +394,11 @@ fades; every change moves it linearly over `BOX_AUDIO_CORE_RAMP` (5 ms), and a v
 0, so nothing clicks, a start or a stop included. A change of the bus of a voice or of the order
 is immediate. The pan is equal power with unity at the center: the gains are
 `sqrt(2) cos(a)` and `sqrt(2) sin(a)` for `a` from 0 to pi/2, so a centered mono voice plays
-its samples as they are.
+its samples as they are. A stereo voice, a stereo sample or a wide synth, takes the same two
+gains on its two channels, so its pan, and the pan of a bus, is a balance: at the center both
+channels pass as they are, toward a side the far channel fades and the near one rises by up to
+3 dB. For two channels that are not correlated, a wide synth, the power stays the same at every
+pan; a send takes both channels of its bus, after its volume and pan.
 
 **The limiter** on the master keeps the peak at `BOX_AUDIO_LIMITER_THRESHOLD` (0.95): its gain,
 one for both channels so the image does not shift, drops at once to the threshold over the peak
@@ -461,12 +476,32 @@ allocation. `bench/audio` has a `Reverb` suite in ns per frame, and
 synth voices share the pool, the cap, the buses, the ramps and the limiter. A sound id becomes a
 synth with a `SYNTH` command, whose patch (`box_audio_synth_patch_t` of `core.h`) is plain
 values in seconds and Hz, the same at every rate: a fixed topology of up to
+<<<<<<< HEAD
 `BOX_AUDIO_SYNTH_LAYERS` (4) oscillators, each with an envelope, summed into one filter and an
 amp; an oscillator may modulate an earlier one instead of being heard, and up to
 `BOX_AUDIO_SYNTH_LFOS` (2) LFOs move the pitch, the level, the cutoff and the pulse width. There is no node graph.
+=======
+`BOX_AUDIO_SYNTH_LAYERS` (8) oscillators, each with an envelope, summed into one filter and an
+amp; an oscillator may modulate an earlier one instead of being heard. There is no node graph.
+>>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
 The core keeps up to `BOX_AUDIO_SYNTH_MAX` (256) patches; a play copies the patch into its
 voice, so a play allocates nothing, a new patch for the same id reaches the next play while the
-voices that play keep theirs, and a release frees the id at once with `SOUND_FREE`. The core clamps every value of a patch, a NaN to the low end.
+voices that play keep theirs, and a release frees the id at once with `SOUND_FREE`.
+
+A patch costs only the layers it has. The `SYNTH` command ends after its last layer,
+`BOX_AUDIO_CMD_SYNTH_SIZE(layers)` bytes: 104 bytes and 100 per layer, 304 for 2 layers, 904 for 8;
+a shorter one than its layers need is ignored. A voice holds the patch without its layers and
+takes, for each layer, a part from a pool the core allocates with itself: the layer, its oscillator,
+its own envelope and the state of its unison voices, 464 bytes. The pool has 4 parts per voice slot
+(320), so patches of up to 4 layers never run out of them and a voice of 8 takes the room of two of
+4; a play that finds too few free parts is ignored like one without a voice slot. A voice renders
+and advances only its parts and gives them back when it ends. The 80 voice slots (568 bytes each)
+and the pool take 189 KB. The pluck strings are a second pool of `BOX_AUDIO_SYNTH_STRINGS` (32),
+each with a delay line of `BOX_AUDIO_SYNTH_STRING_FRAMES` (2048) floats, 8 KB, 259 KB in all; a
+voice takes one for each pluck layer, and a play that finds too few free is ignored the same way.
+The 256 patches the core keeps are full size, 896 bytes each. The core clamps every value of a
+patch, a NaN to the low
+end.
 
 - **Oscillators.** Sine (`box_audio_core_sin`), saw, square, triangle and white noise. Saw and
   square are band limited with polyBLEP, the corners of the triangle with polyBLAMP. Frequencies are clamped to 20 kHz and to 0.48 of the
@@ -532,7 +567,34 @@ voices that play keep theirs, and a release frees the id at once with `SOUND_FRE
   the polyBLEP of their unmodulated rate, so a sine carrier is the clean one.
 - **Noise** is xorshift32, seeded per play from the seed of the patch and the count of its
   plays, so a fixed run gives bit identical output and every play differs. The same generator
-  picks the pitch and level variances of the play.
+  picks the pitch and level variances of the play, and plucks the strings.
+- **Pluck strings.** A layer of the wave `BOX_AUDIO_SYNTH_PLUCK` is a Karplus-Strong string
+  instead of an oscillator. At the start of a pass the string takes a burst of the noise of the
+  play, one period long, through a one pole lowpass of its `hardness` (0 a soft finger, 1 a
+  pick) and one of its `brightness` (a coefficient of 0.1 at 0 to 1, no filter, at 1), without
+  its mean so it carries no DC, scaled to a peak of 1, into its delay line. Per
+  frame the frame out of the line goes through a lowpass `(b, 1 - 2b, b)` with `b` from 0.25 at
+  `brightness` 0 to 0.01 at 1, a first order allpass and the gain of the loop back into it; the
+  frame out of the line is the sample. The lowpass is symmetric, a delay of exactly 1 frame at
+  every frequency, so a period of n frames is a line of `d = floor(n - 1.5)` frames, the lowpass
+  and an allpass of `f = n - 1 - d`, 0.5 to 1.5 frames, whose coefficient
+  `c = sin(w (1 - f) / 2) / sin(w (1 + f) / 2)` gives it a phase delay of exactly f at the
+  fundamental w. The pitch is exact to a small share of a cent at any note, where a line of whole
+  frames is up to 70 cents off at 2 kHz. The gain of the loop is `10^(-3 n / (decay rate))`
+  over the gain of the lowpass at the fundamental, so the fundamental falls 60 dB over `decay`
+  seconds (0.01 to 60) and the harmonics faster, the more so the darker the string; it is at most
+  0.99999, so every string decays, and a high, bright, long string rings shorter than its
+  `decay`. The string follows the frequency of its layer: the pitch of the voice, sweeps, glides
+  and legato notes retune it at each change (two sines and an `exp2`, per frame during a glide or
+  a sweep), without a new pluck. Its period is 4 frames at the shortest, a quarter of the rate,
+  and at the longest the rate over `BOX_AUDIO_SYNTH_PLUCK_MIN` (40 Hz) and 2046 frames, which
+  limits the lowest note to the rate over 2046 above 81.8 kHz. Once the peak of a period is under
+  -80 dB of the pluck it is silent and costs nothing more. A layer that uses no envelope at all
+  (`rings_free`) plays at level 1 and the voice plays on while such a string rings; a voice of
+  only strings ends when they are all silent, envelopes or not; a looping voice plucks again. A
+  string ignores the phase modulation and the feedback of its layer, it may ring modulate or be
+  ring modulated, and a patch without strings renders as before, bit identical, and costs one
+  compare per frame.
 - **Envelopes** are sample accurate: attack from 0 to 1, decay to the sustain level, hold,
   release to 0. Each segment is linear, or curved with `curve` (decay and release) and
   `attack_curve`: a segment of curve c over n frames follows `v(k) = a + (v0 - a) r^k` with
@@ -570,6 +632,25 @@ voices that play keep theirs, and a release frees the id at once with `SOUND_FRE
   playing, and a looping voice restarts it with its pass. A patch with an amount of 0 runs no
   envelope and computes no coefficients per frame, and a 12 dB filter runs one stage, so a
   patch that uses neither costs what it did before.
+- **Unison.** A layer plays as `voices` copies of its oscillator, 1 to
+  `BOX_AUDIO_SYNTH_UNISON_MAX` (7), detuned evenly over `detune` cents from the lowest to the
+  highest (0 to `BOX_AUDIO_SYNTH_DETUNE_MAX`, 100): voice k of n plays at the frequency of the
+  layer times `2^(detune (k / (n - 1) - 1/2) / 1200)`, so 3 voices over 20 cents play 10 cents
+  under, on and 10 cents over the pitch. Each voice starts every pass at a random phase from the
+  generator of the noise, seeded per play, so the voices do not cancel on the attack and a fixed
+  run is bit identical. The voices follow the sweep, the pitch and the glide of the layer. Each
+  plays at `1 / sqrt(n)` of the level of the layer: voices at different frequencies add their
+  power, so the level of the layer stays the same as `voices` changes, while its peaks may rise
+  over those of one voice. `width`, 0 to 1, places voice k at the pan `width (2k / (n - 1) - 1)`
+  with the equal power gains of the core, from the lowest voice on the left to the highest on
+  the right; each channel keeps the level of the layer. The correlation of the two channels is
+  the mean of `cos(pi pan / 2)` over the voices: 0 for 2 voices at width 1, 1/3 for 3, 0.48 for
+  5, and 1 at width 0. A layer with `voices` and `width` makes the voice stereo: the mix of its
+  layers is rendered on two channels, a layer without unison the same on both, through two sets
+  of the stages of the filter with the same coefficients, and the voice reaches its bus as a
+  stereo sample does. A unison layer that modulates or feeds back does so with the mean of its
+  two channels; a modulator of a unison layer moves the phase of each of its voices. A pluck
+  layer always plays as one voice, its string in the center.
 - **Glide.** The `glide` of a patch, 0 to `BOX_AUDIO_SYNTH_GLIDE_MAX` (10) seconds, makes a
   change of the pitch of a voice (`VOICE_SET` `PITCH`) move exponentially in frequency, linear
   in cents, over that time: each oscillator multiplies its turns per frame by
@@ -597,6 +678,7 @@ voices that play keep theirs, and a release frees the id at once with `SOUND_FRE
 - **Cost.** Render work only: per frame of a voice an envelope step per envelope (a multiply
   and an add when curved), an oscillator per layer and the filter, one stage or two; a modulated
   patch adds a phase offset and a wrap per layer; during a glide a multiply per oscillator. A
+<<<<<<< HEAD
   patch with LFOs adds three adds and two multiplies per oscillator per frame and the control
   block every 8 frames; a patch without LFOs takes the loops it took before and renders bit
   identical, and a square at a width of 0.5 costs a compare.
@@ -605,6 +687,16 @@ voices that play keep theirs, and a release frees the id at once with `SOUND_FRE
   width (about twice the plain patch, most of it the coefficients of the moving cutoff, as with
   a filter envelope), and `voices_64_fm`, two FM pairs per voice, which measures the modulated
   path.
+=======
+  unison layer costs an oscillator per voice; a stereo patch runs its filter twice. A patch
+  in which no layer has more than one voice takes the loop it took before, bit identical, and
+  costs one compare per block; a layer of one voice with a width is such a layer. A string
+  costs a read and a write of its line, 6 multiplies and its peak per frame while it rings, and
+  a pluck writes its line of 2048 floats once.
+  `bench/audio` has a `Synth` suite of 64 voices in ns per sample, with a filter envelope, with a
+  24 dB filter, `voices_64_fm`, two FM pairs per voice, which measures the modulated path,
+  and `voices_32_pluck`, 32 ringing strings, one per voice.
+>>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
 
 The core needs no libm: the exponential sweeps, the filter envelope and the LFOs use series for
 `log2` and `exp2` in `synth.c`.
@@ -629,10 +721,16 @@ as the carrier for a harmonic spectrum, a ratio such as 3.5 or 1.41 for an inhar
 | Component | What it is |
 |-----------|------------|
 | `SynthSound` | The root: `seed`, `pitch_variance` and `level_variance` (random shares per play, 0) |
+<<<<<<< HEAD
 | `SynthOscillator` | A layer: `wave` (`SynthSine`, `SynthSaw`, `SynthSquare`, `SynthTriangle`, `SynthNoise`), `frequency` (440), `frequency_end` (0, no sweep), `sweep` (s), `level` (1), `modulation` (`SynthMix`, heard; `SynthPhase` or `SynthRing`, modulates its parent), `index` (1: radians for `SynthPhase` up to 32, limited against the frequency; a depth of 0..1 for `SynthRing`), `feedback` (0, radians on its own phase up to 1.5), `audible` (false: whether a modulator is heard as well), `pulse_width` (0.5: the share of the period a `SynthSquare` is high, 0.01..0.99) |
+=======
+| `SynthOscillator` | A layer: `wave` (`SynthSine`, `SynthSaw`, `SynthSquare`, `SynthTriangle`, `SynthNoise`, `SynthPluck`), `frequency` (440), `frequency_end` (0, no sweep), `sweep` (s), `level` (1), `modulation` (`SynthMix`, heard; `SynthPhase` or `SynthRing`, modulates its parent), `index` (1: radians for `SynthPhase` up to 32, limited against the frequency; a depth of 0..1 for `SynthRing`), `feedback` (0, radians on its own phase up to 1.5), `audible` (false: whether a modulator is heard as well) |
+| `SynthString` | On a `SynthPluck` layer: `decay` (2, seconds of the fundamental to -60 dB, 0.01..60), `brightness` (0.5, the lowpass of the pluck and in the loop: 0 dark, 1 metallic) and `hardness` (0.8, the lowpass of the pluck: 0 a soft finger, 1 a hard pick); a `SynthPluck` layer without one takes these defaults |
+>>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `release`, `hold`: seconds and a sustain level, all 0 by default; `curve` (decay and release) and `attack_curve`: 0 linear (default), positive fast at first, -16..16 |
 | `SynthFilter` | `kind` (`SynthLowPass`, `SynthHighPass`, `SynthBandPass`), `cutoff` (1000), `resonance` (0), `slope` (`SynthSlope12`, `SynthSlope24`) |
 | `SynthFilterEnvelope` | The envelope of the cutoff: `attack`, `decay`, `sustain`, `release`, `hold`, `curve` and `attack_curve` as in `SynthEnvelope`, and `amount`, the octaves the cutoff moves at level 1 (0, negative closes the filter); nothing without a `SynthFilter` |
+| `SynthUnison` | On a layer: `voices` (3, 1 to 7), `detune` (10 cents from the lowest voice to the highest, 0 to 100) and `width` (0 mono to 1, from left to right), see [Unison and width](#unison-and-width) |
 | `SynthGlide` | On the root: `time` of a glide (s, 0 jumps), `legato` (false) and `channel` (0), see [Glide and legato](#glide-and-legato) |
 | `SynthLfo` | On the root, a layer or another child of the root: `wave` (`SynthLfoSine`), `rate` (5 Hz), `delay`, `fade`, `phase`, `random_phase` and the depths `pitch` (cents), `amplitude`, `cutoff` (octaves) and `pulse_width`, all 0, see [LFOs](#lfos) |
 
@@ -641,20 +739,24 @@ or of a layer changes, into a patch that the sync system sends with a `SYNTH` co
 plays of the frame. `box.audio.play(UiClick, 0.8)` plays it like any sound, and an `AudioSource`
 with `loop: true` starts it over at the end of its envelopes. A play allocates nothing.
 
-- More than 4 layers log one error that names the sound; the first 4 play. A layer that is left
-  out takes its modulators with it.
+- More than 8 layers log one error that names the sound and their count; the first 8 play. A
+  layer that is left out takes its modulators with it.
 - A modulator whose parent is not a layer, such as a child of a root without a
   `SynthOscillator`, logs one error that names the sound and is left out.
 - More than 2 `SynthLfo` log one error that names the sound; the first 2 play, see
   [LFOs](#lfos).
 - A layer without any envelope (no `SynthEnvelope` on it or on the root) would never end: it
-  logs one error and the sound plays for `BOX_AUDIO_SYNTH_ENDLESS` (10) seconds.
+  logs one error and the sound plays for `BOX_AUDIO_SYNTH_ENDLESS` (10) seconds. A `SynthPluck`
+  layer is the exception: it rings out on its own and the sound ends once its string is silent.
+- A `SynthPluck` layer under `BOX_AUDIO_SYNTH_PLUCK_LOWEST` (40 Hz), its `frequency` or its
+  `frequency_end`, logs one warning that names the sound and plays at 40 Hz.
 - An envelope that is not a time of 0 to 60 seconds logs one error and is cut.
 - The filter envelope has its own times: it does not follow the `SynthEnvelope`, so a cutoff
   that closes with the note takes the same attack, decay, hold and release. One that should stay
   open while the sound plays takes a sustain of 1 and a hold that lasts the sound.
 - Deleting the sound releases it and fades its one shots, as for `AudioPcm`.
 
+<<<<<<< HEAD
 #### LFOs
 
 A `SynthLfo` moves a held note: vibrato on a flute, tremolo on an organ, a pad whose cutoff and
@@ -680,12 +782,32 @@ A delay and a fade bring a vibrato in after the attack, as players do; a fade on
 it swell from the start. The LFO restarts with every note and with each pass of a looping
 sound; a legato note keeps it running. The level only dips, so a tremolo never makes a sound
 louder than it is without it.
+=======
+#### Unison and width
+
+A `SynthUnison` next to the `SynthOscillator` of a layer thickens it into several detuned copies
+of itself, the chorus of an ensemble or a supersaw, from one layer instead of one layer per copy:
+
+| Field | What it is |
+|-------|------------|
+| `voices` | Copies of the oscillator, 1 to 7 (3); 1 is the layer without unison |
+| `detune` | Cents from the lowest copy to the highest, 0 to 100 (10), spread evenly around the pitch |
+| `width` | 0 (0, every copy in the center, mono) to 1 (the lowest copy left, the highest right) |
+
+The copies share the level of the layer, so adding voices thickens the sound without making it
+louder, and each starts at a random phase of the `seed` of the sound and the count of its plays,
+so the attack does not cancel and the same seed renders the same. A sound in which a layer has
+voices and width plays in stereo; layers without unison stay in the center. A detune of 5 to 15
+cents is a gentle chorus, 20 to 40 a supersaw; a width of 0.5 to 0.8 keeps a pad wide without
+leaving a hole in the middle.
+>>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
 
 ```
 using box.audio
 
 music { AudioBus: {volume: 1} }
 
+<<<<<<< HEAD
 // The Mossvale flute: a vibrato of 14 cents at 5.2 Hz with a slight tremolo, which comes in
 // 0.2 s after the start of the note and fades in over 0.3 s, at a random phase per note
 template Flute {
@@ -724,6 +846,37 @@ a second, at full depth from 0.5 s, and its level dips by up to 8 % with it. The
 closes its cutoff by half an octave over 3.3 s while the widths of its squares go from 0.2 to
 0.8 and back (the upper one from 0.01 to 0.6, clamped), and its fifth beats slowly against the
 root as the upper square drifts 6 cents either way.
+=======
+// A wide pad: a saw of five voices over 20 cents across most of the stereo field and a fifth
+// of three voices across all of it, over a sine sub in the center, 2.1 s
+prefab WidePad {
+  AudioOutput: {bus: music}
+  SynthSound: {seed: 3}
+  SynthEnvelope: {attack: 0.4, decay: 0.3, sustain: 0.7, hold: 0.6, release: 0.8, curve: 2.5, attack_curve: 1.5}
+  SynthFilter: {kind: SynthLowPass, cutoff: 1400, resonance: 0.1, slope: SynthSlope24}
+  saw {
+    SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.2}
+    SynthUnison: {voices: 5, detune: 20, width: 0.8}
+  }
+  fifth {
+    SynthOscillator: {wave: SynthSaw, frequency: 330, level: 0.12}
+    SynthUnison: {voices: 3, detune: 14, width: 1}
+  }
+  sub { SynthOscillator: {wave: SynthSine, frequency: 110, level: 0.15} }
+}
+```
+
+The pad takes three layers, where the hand detuned `Strings` below take six saws for one
+narrower, mono ensemble. Its render costs nine oscillators and two filters per frame.
+
+**In the mixer and in space** a wide sound is a stereo voice: the pan of the voice, of
+`box.audio.play` or of `AudioSpatial`, and the pan of its bus are a balance of its two channels
+(see [The core](#the-core)), and a send carries both. A spatial source keeps its width while it
+is in front of the listener, and as it moves to a side the far channel fades and the near one
+rises by 3 dB, so a wide sound at the side is heard from that side alone, at the same power,
+with the voices of that side. It does not narrow with distance. A sound that should be a point
+in space keeps `width` at 0: its unison voices still thicken it, in mono.
+>>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
 
 #### Glide and legato
 
@@ -788,7 +941,7 @@ release, and an `attack_curve` of 1 to 2 for a swell that settles. A sound that 
 linear envelope (curves of 0) renders exactly as before. A curve makes a segment quieter
 sooner, so a pluck usually wants a longer decay than its linear version.
 
-Eight examples, five that are plain layers and three that modulate:
+Nine examples, six that are plain layers and three that modulate:
 
 ```
 using box.audio
@@ -895,7 +1048,29 @@ prefab Ring {
   string { SynthOscillator: {wave: SynthTriangle, frequency: 330, level: 0.4} }
   body { SynthOscillator: {wave: SynthSine, frequency: 330, level: 0.3} }
 }
+
+// Strings: an ensemble of five saws detuned around 220 Hz and one an octave up, a sine an
+// octave down and a breath of noise, eight layers, through a 24 dB lowpass that opens with the
+// bow and swells in, 1.6 s
+prefab Strings {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.3, decay: 0.2, sustain: 0.7, hold: 0.5, release: 0.6, curve: 2.5, attack_curve: 1.5}
+  SynthFilter: {kind: SynthLowPass, cutoff: 900, resonance: 0.15, slope: SynthSlope24}
+  SynthFilterEnvelope: {attack: 0.4, sustain: 1, hold: 0.7, release: 0.5, amount: 1.5}
+  SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.08}
+  a { SynthOscillator: {wave: SynthSaw, frequency: 219.2, level: 0.08} }
+  b { SynthOscillator: {wave: SynthSaw, frequency: 220.9, level: 0.08} }
+  c { SynthOscillator: {wave: SynthSaw, frequency: 218.5, level: 0.07} }
+  d { SynthOscillator: {wave: SynthSaw, frequency: 221.6, level: 0.07} }
+  e { SynthOscillator: {wave: SynthSaw, frequency: 440.6, level: 0.04} }
+  sub { SynthOscillator: {wave: SynthSine, frequency: 110, level: 0.12} }
+  air { SynthOscillator: {wave: SynthNoise, level: 0.01} }
+}
 ```
+
+The strings use all 8 layers: the detuned saws beat slowly against each other, the chorus of
+an ensemble, which takes more oscillators than a lead does. A sound of 8 layers costs twice the
+render work of one of 4 and nothing more; the other sounds keep their cost.
 
 The whoosh opens from 300 Hz to `300 * 2^3.737`, 4 kHz, over half a second and stays there. A
 sweep from one cutoff to another over a time is an attack of that time with a sustain of 1 when
@@ -903,21 +1078,89 @@ it rises, and a decay of that time from the higher cutoff to the lower one, the 
 it falls: `SynthFilter: {cutoff: 300}` with `SynthFilterEnvelope: {decay: 0.2, amount: 3}`
 falls from 2400 Hz to 300 Hz in 0.2 s.
 
-The tests are the `Synth` suite of `test/cpu/audio`, on offline renders: frequencies of every
-wave at 44.1 and 48 kHz, sweeps, aliasing of a 5 kHz saw, square and triangle, flat and seeded noise, the
-times and edges of envelopes, curved envelopes (a linear one bit identical to the linear
-recurrence, a curved decay at its midpoint and on its sustain, a curved release that ends the
-voice on time), the end of a voice, the filter one octave past its cutoff at both slopes, the
-cutoff following a filter envelope up and down, stability under fast filter envelopes at full
-resonance and at Nyquist for both slopes and extreme values, layers, phase modulation at 1:1
-and 6:1 against Bessel amplitudes and without drift, an index that follows the envelope of its
-modulator and fades the high sidebands, the limit of the index, ring modulation at the sum and
-difference alone, audible modulators, feedback, scripts from `test/assets/audio/synth.flecs`
-and `test/assets/audio/synth_fm.flecs`, the eight examples above from
-`test/assets/audio/synth_examples.flecs`, glides (the frequency halfway through a glide at the
-geometric mean, a glide of 0 bit identical to the jump, the pitch of a source) and legato notes
-(no new attack, a held sustain that holds again, a new voice after the release, also of a
+#### Plucked strings
+
+Oscillators make a pluck that sounds like a synth: a triangle or a saw under a closing filter
+keeps the same harmonics while it fades. A real string loses its high harmonics first and its
+pitch lives on in a ringing tone. A `SynthPluck` layer is such a string, a physical model
+(Karplus-Strong, see [Synth](#synth)) that costs about what an oscillator does. It needs no
+envelope: it rings out on its own and the sound ends when it is silent. Its `SynthString` shapes
+it:
+
+| Field | What it is |
+|-------|------------|
+| `decay` | Seconds the fundamental takes to fall by 60 dB, 0.01 to 60 (2); the harmonics fall faster |
+| `brightness` | The lowpass of the pluck and in the loop, 0 to 1 (0.5): 0 a dark gut or nylon string that starts soft and whose harmonics die in a moment, 1 a bright, metallic ring |
+| `hardness` | The lowpass of the noise that plucks it, 0 to 1 (0.8): 0 a soft finger, round from the start, 1 a hard pick with a sharp attack |
+
+The `frequency`, `frequency_end`, `sweep` and `level` of the `SynthOscillator` apply as to any
+layer; `index` and `feedback` do not. Every play plucks with other noise, from the `seed` of the
+`SynthSound` and the count of plays, so repeated notes differ a little, as on a real string, and a
+fixed run renders bit identical. The lowest note is `BOX_AUDIO_SYNTH_PLUCK_LOWEST`, 40 Hz: a lower
+one plays at 40 Hz with one warning. A core rings 32 strings at once; a play that finds none free
+is ignored. The string follows the pitch of its voice: a change of `AudioSource.pitch`, a sweep,
+a `SynthGlide` and legato notes bend the ringing string without a new pluck. The synth has no
+LFO, and a string plays as one voice: a `SynthUnison` on a `SynthPluck` layer is ignored, so
+there is no vibrato of a string and no ensemble of detuned strings in one layer; several
+`SynthPluck` layers a few cents apart make a chorus, as the 12 string guitar has.
+A string may ring modulate or be ring modulated, but it ignores phase modulation and feedback.
+
+```
+using box.audio
+
+music { AudioBus: {volume: 1} }
+
+// A guitar: a steel string on G3 plucked with a pick, through the lowpass of its body, 3 s
+prefab Guitar {
+  AudioOutput: {bus: music}
+  SynthSound: {level_variance: 0.05}
+  SynthFilter: {kind: SynthLowPass, cutoff: 4500}
+  string {
+    SynthOscillator: {wave: SynthPluck, frequency: 196, level: 0.6}
+    SynthString: {decay: 3, brightness: 0.6, hardness: 0.9}
+  }
+}
+
+// A koto: a bright silk string on D4 plucked with a hard pick, pressed up a semitone after
+// the pluck, and a quieter string an octave up that dies sooner, 1.5 s
+prefab Koto {
+  AudioOutput: {bus: music}
+  SynthSound: {}
+  string {
+    SynthOscillator: {wave: SynthPluck, frequency: 293.66, frequency_end: 311.13, sweep: 0.25, level: 0.5}
+    SynthString: {decay: 1.5, brightness: 0.8, hardness: 1}
+  }
+  octave {
+    SynthOscillator: {wave: SynthPluck, frequency: 587.33, frequency_end: 622.25, sweep: 0.25, level: 0.12}
+    SynthString: {decay: 0.6, brightness: 0.7, hardness: 1}
+  }
+}
+```
+
+The guitar wants a `brightness` around 0.6 and a long `decay`, a nylon string 0.3 and a softer
+`hardness`; the koto rings bright and short. The harp of the Mossvale score
+(`etc/scenes/mossvale/music.flecs`) is a gut string, `SynthString: {decay: 2.2, brightness: 0.35,
+hardness: 0.45}`, over a soft sine with its own short envelope for the body; its notes ring out
+over each other as a harp's do, and each ends when its string is silent.
+
+The tests are the `Synth` suite of `test/cpu/audio`, on offline renders: frequencies of every wave
+at 44.1 and 48 kHz, sweeps, aliasing of a 5 kHz saw, square and triangle, flat and seeded noise,
+the times and edges of envelopes, curved envelopes (a linear one bit identical to the linear
+recurrence, a curved decay at its midpoint and on its sustain, a curved release that ends the voice
+on time), the end of a voice, the filter one octave past its cutoff at both slopes, the cutoff
+following a filter envelope up and down, stability under fast filter envelopes at full resonance
+and at Nyquist for both slopes and extreme values, layers, phase modulation at 1:1 and 6:1 against
+Bessel amplitudes and without drift, an index that follows the envelope of its modulator and fades
+the high sidebands, the limit of the index, ring modulation at the sum and difference alone,
+audible modulators, feedback, 8 layers each found at its own frequency with a Goertzel filter, a
+9th left out, the size of the command, the pool of parts, renders of patches of 4 layers bit
+identical whatever the unused layers hold, scripts from `test/assets/audio/synth.flecs` and
+`test/assets/audio/synth_fm.flecs` and `test/assets/audio/synth_layers.flecs`, the nine examples
+above from `test/assets/audio/synth_examples.flecs`, glides (the frequency halfway through a glide
+at the geometric mean, a glide of 0 bit identical to the jump, the pitch of a source) and legato
+notes (no new attack, a held sustain that holds again, a new voice after the release, also of a
 looping voice that then ends, and after the end, from script and from a source, the lead above
+<<<<<<< HEAD
 from `test/assets/audio/synth_glide.flecs`), LFOs (a vibrato that moves the pitch by its cents
 at its rate only after its delay, a tremolo that moves the envelope at its rate by its depth,
 a cutoff and a pulse width that move the spectrum at the rate, a pulse band limited at every
@@ -926,6 +1169,20 @@ width of 0.5 and a patch without LFOs bit identical, also in a voice slot that p
 cutoff LFO, smooth square LFOs, a delay without a fade that does not click, the examples of
 [LFOs](#lfos) from `test/assets/audio/synth_lfo.flecs`) and errors; `NoAlloc` renders 64
 synth voices. The browser check is `test/integration/web/audio_synth.mjs`.
+=======
+from `test/assets/audio/synth_glide.flecs`), unison (peaks at the detuned frequencies, width 0
+identical on both channels, the correlation of the channels at width 1 and 0.5, the level as the
+count of voices changes, one voice bit identical to a layer without unison, the same seed bit
+identical, a wide voice through the pan of the voice and of its bus and a send, and the pad above
+from `test/assets/audio/synth_unison.flecs` from script, panned in space), pluck strings (the
+pitch within 2 cents from 80 Hz to 2 kHz at 44.1 and 48 kHz, a -60 dB time that scales with the
+decay, more upper harmonics when brighter, bit identical for a seed and different for another,
+the end of a voice once its string is silent with and without an envelope, a jump and a glide of
+the pitch, the pool of strings, a string with unison as one voice and next to a wide layer, the
+defaults and the warning of a low note, and the guitar, the koto and the Mossvale harp from
+`test/assets/audio/synth_pluck.flecs`) and errors; `NoAlloc` renders 64 synth voices. The
+browser check is `test/integration/web/audio_synth.mjs`.
+>>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
 
 ## Transports
 
@@ -1240,6 +1497,7 @@ frame, the same on every platform.
 | `AudioStream` | Music: an Ogg Vorbis file (`path`) that streams, `volume` (1), `loop` (true), `playing` (true), see [Music](#music) |
 | `AudioStreamStatus` | Read only: `state` (`AudioStreamLoading`, `AudioStreamPlaying`, `AudioStreamStopped`, `AudioStreamEnded`, `AudioStreamFailed`), `frames`, `channels`, `sample_rate`, `position`, `buffered`, `underruns`, `decode_ms`, `decode_max_ms` and `error` |
 | `SynthSound` | A sound made by the synth from its layers, see [Synth sounds](#synth-sounds) |
+| `SynthUnison` | Unison voices of a synth layer: `voices` (3), `detune` (10 cents), `width` (0), see [Unison and width](#unison-and-width) |
 | `SynthGlide` | Portamento and mono legato of a synth sound, see [Glide and legato](#glide-and-legato) |
 | `SynthLfo` | An LFO of a synth sound, see [LFOs](#lfos) |
 | `AudioSpatial` | Places a source in the world: `min_distance` (1), `max_distance` (50), `rolloff` (1), see [Spatial audio](#spatial-audio) |
@@ -1353,7 +1611,8 @@ silent from there. A `min_distance` of 0 counts as 0.001. The volume of the voic
 **Pan.** The pan is the component of the direction to the source along the right axis of the
 listener (the first column of its `WorldTransform`, its +X), over the distance: 1 straight to the
 right, -1 to the left, 0 in front, behind, above and below. The core turns it into equal power
-gains. **Front and back sound alike** in this version: a source behind the listener is as loud as
+gains; a stereo voice, such as a synth sound with unison width, takes them as a balance of its
+two channels, see [Unison and width](#unison-and-width). **Front and back sound alike** in this version: a source behind the listener is as loud as
 the same source in front. Within `min_distance` the pan narrows to the center (the component is
 divided by `min_distance` instead of the distance), so a source at the listener's position is
 centered, with no division by zero, and one that passes through the listener sweeps across

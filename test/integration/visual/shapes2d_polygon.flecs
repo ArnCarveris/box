@@ -1,0 +1,227 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.layout
+
+// Polygon2D in screen UI: a concave outline, one with a hole, curved outlines from Bezier and
+// Catmull-Rom segments, borders, an image, a box shadow, a clipped polygon, a translucent one,
+// a tinted one, a tilted one and stroked open paths, with Rects for comparison of the edges.
+
+camera {
+  Position: {0, 0, 100}
+  Camera: {ortho: true, ortho_scale: 1}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {236, 238, 242, 255}}}
+}
+
+letter {
+  TexturePath: {path: "test/integration/visual/assets/letter.png"}
+}
+
+// A 4 by 4 L, the top right quarter missing
+l_path {
+  Path2D: {start: {0, 0}, closed: true, segments: [
+    {kind: Line, end: {4, 0}},
+    {kind: Line, end: {4, 2}},
+    {kind: Line, end: {2, 2}},
+    {kind: Line, end: {2, 4}},
+    {kind: Line, end: {0, 4}}
+  ]}
+}
+
+// A plaza: straight sides and a curved north edge
+plaza_path {
+  Path2D: {start: {-6, -4}, closed: true, segments: [
+    {kind: Line, end: {6, -4}},
+    {kind: CatmullRom, end: {7, 3}},
+    {kind: CatmullRom, end: {0, 6}},
+    {kind: CatmullRom, end: {-7, 3}}
+  ]}
+}
+
+frame_outer {
+  Path2D: {start: {-1, -1}, closed: true, segments: [
+    {kind: Line, end: {1, -1}},
+    {kind: Line, end: {1, 1}},
+    {kind: Line, end: {-1, 1}}
+  ]}
+}
+
+frame_hole {
+  Path2D: {start: {0.5, 0}, closed: true, segments: [
+    {kind: CubicBezier, control1: {0.5, 0.276}, control2: {0.276, 0.5}, end: {0, 0.5}},
+    {kind: CubicBezier, control1: {-0.276, 0.5}, control2: {-0.5, 0.276}, end: {-0.5, 0}},
+    {kind: CubicBezier, control1: {-0.5, -0.276}, control2: {-0.276, -0.5}, end: {0, -0.5}},
+    {kind: CubicBezier, control1: {0.276, -0.5}, control2: {0.5, -0.276}, end: {0.5, 0}}
+  ]}
+}
+
+frame_profile {
+  Profile2D: {outer: frame_outer, holes: [frame_hole]}
+}
+
+// A five pointed star, self intersecting: the even-odd rule leaves its pentagon open
+star_path {
+  Path2D: {start: {0, 1}, closed: true, segments: [
+    {kind: Line, end: {0.588, -0.809}},
+    {kind: Line, end: {-0.951, 0.309}},
+    {kind: Line, end: {0.951, 0.309}},
+    {kind: Line, end: {-0.588, -0.809}}
+  ]}
+}
+
+road_path {
+  Path2D: {start: {-60, -20}, segments: [
+    {kind: CatmullRom, end: {-30, 10}},
+    {kind: CatmullRom, end: {0, -10}},
+    {kind: CatmullRom, end: {30, 15}},
+    {kind: CatmullRom, end: {60, -5}}
+  ]}
+}
+
+zigzag_path {
+  Path2D: {start: {-60, 0}, segments: [
+    {kind: Line, end: {-40, 20}},
+    {kind: Line, end: {-20, -20}},
+    {kind: Line, end: {0, 20}},
+    {kind: Line, end: {20, -20}},
+    {kind: Line, end: {40, 20}},
+    {kind: Line, end: {60, 0}}
+  ]}
+}
+
+panel {
+  Rect: {600, 320}
+  Rgb: {40, 44, 56}
+  Border: {width: 3, radius: 18, color: {120, 140, 200, 255}}
+
+  concave {
+    Position: {-240, 90, 1}
+    Polygon2D: {path: l_path, scale: {16, 16}, offset: {-32, -32}}
+    Rgb: {230, 80, 70}
+  }
+
+  concave_border {
+    Position: {-150, 90, 1}
+    Polygon2D: {path: l_path, scale: {16, 16}, offset: {-32, -32}}
+    Rgb: {60, 70, 90}
+    Border: {width: 4, color: {120, 220, 140, 255}}
+  }
+
+  plaza {
+    Position: {-50, 85, 1}
+    Polygon2D: {path: plaza_path, scale: {6, 6}}
+    Rgb: {236, 228, 210}
+    Border: {width: 2, color: {150, 136, 110, 255}}
+  }
+
+  frame {
+    Position: {50, 90, 1}
+    Polygon2D: {path: frame_profile, scale: {32, 32}}
+    Rgb: {250, 190, 60}
+    Border: {width: 3, color: {200, 120, 40, 255}}
+  }
+
+  star {
+    Position: {140, 90, 1}
+    Polygon2D: {path: star_path, scale: {36, 36}}
+    Rgb: {90, 160, 250}
+  }
+
+  photo {
+    Position: {230, 90, 1}
+    Polygon2D: {path: plaza_path, scale: {5, 5}}
+    Image: {texture: letter}
+  }
+
+  shadowed {
+    Position: {-240, 0, 1}
+    Polygon2D: {path: l_path, scale: {14, 14}, offset: {-28, -28}}
+    Rgb: {250, 250, 250}
+    BoxShadow: {offset_x: 4, offset_y: -6, blur: 10, color: {0, 0, 0, 200}}
+  }
+
+  window {
+    Position: {-140, 0, 1}
+    Rect: {60, 60}
+    Rgb: {20, 22, 30}
+    Border: {radius: 8}
+    ClipChildren
+
+    clipped {
+      Position: {20, 20, 0.5}
+      Polygon2D: {path: plaza_path, scale: {7, 7}}
+      Rgb: {120, 220, 140}
+      Border: {width: 2, color: {255, 255, 255, 255}}
+    }
+  }
+
+  half {
+    Position: {-50, 0, 1}
+    Polygon2D: {path: frame_profile, scale: {30, 30}}
+    Rgb: {255, 255, 255}
+    Opacity: {0.5}
+  }
+
+  tinted {
+    Position: {40, 0, 1}
+    Polygon2D: {path: l_path, scale: {14, 14}, offset: {-28, -28}}
+    Rgb: {255, 255, 255}
+    Tint: {200, 110, 230, 255}
+  }
+
+  turned {
+    Position: {130, 0, 1}
+    Rotation: {0, 0, 0.5}
+    Polygon2D: {path: l_path, scale: {14, 14}, offset: {-28, -28}}
+    Rgb: {250, 120, 90}
+    Border: {width: 2, color: {255, 255, 255, 255}}
+  }
+
+  small {
+    Position: {215, 0, 1}
+    Polygon2D: {path: star_path, scale: {8, 8}}
+    Rgb: {255, 255, 255}
+  }
+
+  tiny {
+    Position: {245, 0, 1}
+    Polygon2D: {path: star_path, scale: {4, 4}}
+    Rgb: {255, 255, 255}
+  }
+
+  road_bank {
+    Position: {-160, -100, 1}
+    Polygon2D: {path: road_path, width: 12}
+    Rgb: {222, 210, 164}
+  }
+
+  road {
+    Position: {-160, -100, 1.1}
+    Polygon2D: {path: road_path, width: 7}
+    Rgb: {84, 138, 176}
+  }
+
+  zigzag {
+    Position: {20, -100, 1}
+    Polygon2D: {path: zigzag_path, width: 5}
+    Rgb: {250, 190, 60}
+  }
+
+  hair {
+    Position: {170, -100, 1}
+    Polygon2D: {path: zigzag_path, scale: {1, 1.5}, width: 1}
+    Rgb: {255, 255, 255}
+  }
+
+  thinner {
+    Position: {170, -130, 1}
+    Polygon2D: {path: road_path, scale: {1, 0.5}, width: 0.5}
+    Rgb: {255, 255, 255}
+  }
+}

@@ -154,4 +154,12 @@ void audio_log_start(void);
  */
 void audio_log_stop(void);
 
+/** Read a file of the repository.
+ *
+ * @param file Path from the root of the repository
+ * @return The contents, which the caller frees
+ */
+char* audio_read(
+    const char *file);
+
 #endif

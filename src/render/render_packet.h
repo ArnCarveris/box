@@ -874,6 +874,31 @@ typedef struct box_render_clip_t {
     float area[4];          /**< Half width, half height, corner radius, index of the parent clip */
 } box_render_clip_t;
 
+/** The header of the polygon record of a Polygon2D, which fs_polygon of shape2d.wgsl reads from
+ * the clip buffer, followed by its edges in chunks of BOX_RENDER_POLYGON_CHUNK_RECORDS records.
+ *
+ * Every vec4 of a chunk after its first is an edge, its start x, y and end x, y in the local
+ * units of the polygon; the first vec4 is the bounds of the edges of the chunk (min x, y, max x,
+ * y), which lets a fragment skip the chunks that are too far to be nearest and that its ray
+ * does not cross. The chunks hold BOX_RENDER_POLYGON_CHUNK_EDGES edges, the last fewer.
+ */
+typedef struct box_render_polygon_t {
+    float bounds[4];        /**< Center x, y and half width, half height of the bounds */
+    float shape[4];         /**< Edges, half the width of a stroke (0 for a filled polygon),
+                             *   0, 0 */
+    float unused[4];        /**< 0 */
+} box_render_polygon_t;
+
+/** Clip records of a chunk of the edges of a polygon record */
+#define BOX_RENDER_POLYGON_CHUNK_RECORDS (5)
+
+/** Edges of a chunk of a polygon record: three per clip record, but for its bounds */
+#define BOX_RENDER_POLYGON_CHUNK_EDGES (3 * BOX_RENDER_POLYGON_CHUNK_RECORDS - 1)
+
+/** Clip records a polygon record of a number of edges takes, its header included */
+#define BOX_RENDER_POLYGON_RECORDS(edges) (1 + BOX_RENDER_POLYGON_CHUNK_RECORDS * \
+    (((edges) + BOX_RENDER_POLYGON_CHUNK_EDGES - 1) / BOX_RENDER_POLYGON_CHUNK_EDGES))
+
 /** The nine parts of a sliced Image (ImageSlice) as fs_slice of shape2d.wgsl reads them from
  * two consecutive records of the clip buffer, the index of the first in uv.x of the shading.
  *
@@ -923,6 +948,18 @@ typedef struct box_render_transform_t {
  *   units: uv.xy is the center of that box relative to the shadow, uv.zw its half extents,
  *   material.z its corner radius and material.w the alpha the shape covers the shadow with at
  *   its edge (0 for a blend mode that does not cover). emissive.xyz and the texture are unused.
+ * - A polygon (Polygon2D, a batch with polygon set): emissive.w is the index of its polygon
+ *   record in the clip buffer (box_render_polygon_t), as a float, material.y its border width in
+ *   its local units (f32 bits), material.zw its linear border color as for a rectangle,
+ *   material.x 0 and uv the area of its image over its bounds. The vertex stage places the quad
+ *   on the bounds the record holds.
+ * - The shadow of a polygon (a batch with box_shadow and polygon set): a rectangle whose quad is
+ *   the bounds of the outline moved by the offset and grown by the spread and 3 standard
+ *   deviations on each side, as for a rectangle; material.x (f32) is the index of the polygon
+ *   record, material.y the negated standard deviation in units of half the smaller side of the
+ *   quad, material.z (f32 bits) the spread in the local units of the polygon, material.w the
+ *   alpha the shape covers the shadow with; uv.xy the center of the bounds of the polygon
+ *   relative to the shadow and uv.z half the smaller side of the quad in local units.
  * - A line: emissive.w is its negated width, material.xy its start and material.zw its end.
  * - A glyph of a Text: emissive.w is 0, material.xy the distance range of its atlas page,
  *   material.z (f32 bits) the part of the field its threshold falls by, 0 regular and
@@ -1079,7 +1116,7 @@ typedef struct box_render_target_t {
  * The backend blits the textures of each map into a texture array with a slice per layer, shared
  * by every batch with the same sources, and binds it with the mask, the emissive layer of the
  * batch (textures[1]) and the transforms in the texture_blend variant of the mesh pipeline. The
- * heights make a fourth array only with a contrast above 0. */
+ * heights make a fourth array only with a contrast above 0 and a height on at least one layer. */
 typedef struct box_render_texture_blend_t {
     uint32_t mask;      /**< Texture handle of the mask, 0 while it is not loaded */
     uint32_t layers[BOX_RENDER_BLEND_LAYERS][BOX_RENDER_BLEND_SOURCES]; /**< Texture handles
@@ -1118,6 +1155,10 @@ typedef struct box_render_batch_t {
                                  *   drawn with the fs_shadow entry point of the 2D shape shader */
     bool slice;                 /**< The instances are Rects with an ImageSlice, drawn with the
                                  *   fs_slice entry point of the 2D shape shader */
+    bool polygon;               /**< The instances are Polygon2D shapes or their shadows, drawn
+                                 *   with the polygon variant of the vertex stage of the 2D
+                                 *   shape shader and its fs_polygon entry point, fs_shadow_polygon
+                                 *   for the shadows */
     bool texture_blend;         /**< The instances have a TextureBlend: the texture_blend variant
                                  *   of the mesh pipeline samples the layers at blend_layers in
                                  *   place of the albedo, ORM and normal textures */

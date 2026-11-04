@@ -1,0 +1,82 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.perf
+
+// 10,000 Polygon2D shapes on the ground: a third concave L outlines of 6 edges with a border, a
+// third curved plazas of 34 edges and a third stroked roads of 32 edges, the cost of a map of
+// many small outlines. Each pixel of a polygon measures its distance to every edge of its
+// outline, so the cost grows with the edges times the pixels the polygons cover.
+camera {
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {24, 28, 38, 255}}}
+}
+
+board {
+  Position: {0, -0.1, 0}
+  Box: {120, 0.2, 120}
+  Rgb: {48, 54, 70}
+}
+
+l_path {
+  Path2D: {start: {0, 0}, closed: true, segments: [
+    {kind: Line, end: {4, 0}},
+    {kind: Line, end: {4, 2}},
+    {kind: Line, end: {2, 2}},
+    {kind: Line, end: {2, 4}},
+    {kind: Line, end: {0, 4}}
+  ]}
+}
+
+plaza_path {
+  Path2D: {start: {-6, -4}, closed: true, segments: [
+    {kind: Line, end: {6, -4}},
+    {kind: CatmullRom, end: {7, 3}},
+    {kind: CatmullRom, end: {0, 6}},
+    {kind: Line, end: {-6, 3}}
+  ]}
+}
+
+road_path {
+  Path2D: {start: {-6, -2}, segments: [
+    {kind: CatmullRom, end: {0, 2}},
+    {kind: CatmullRom, end: {6, -2}}
+  ]}
+}
+
+shapes {
+  Position: {0, 0.01, 0}
+  Rotation: {-1.5708, 0, 0}
+
+  for x in 0..58 {
+    for y in 0..58 {
+      "l_{x}_{y}" {
+        Position: {x * 2 - 58, y * 2 - 58, 0}
+        Polygon2D: {path: l_path, scale: {0.15, 0.15}, offset: {-0.3, -0.3}}
+        Rgb: {90, 160, 250}
+        Border: {width: 0.04, color: {255, 255, 255, 255}}
+      }
+
+      "p_{x}_{y}" {
+        Position: {x * 2 - 57, y * 2 - 58, 0}
+        Polygon2D: {path: plaza_path, scale: {0.06, 0.06}}
+        Rgb: {250, 190, 60}
+      }
+
+      "r_{x}_{y}" {
+        Position: {x * 2 - 57.5, y * 2 - 57, 0}
+        Polygon2D: {path: road_path, scale: {0.08, 0.08}, width: 0.08}
+        Rgb: {120, 220, 140}
+      }
+    }
+  }
+}
+
+$ {
+  PerfRun: {fps: 120, frames: 600, warmup: 120, period: 5, elevation: 30, camera: camera}
+}

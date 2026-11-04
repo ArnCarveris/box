@@ -87,7 +87,7 @@
 #define BOX_AUDIO_REVERB_FADE 0.1f
 
 /** Oscillators of a synth patch, each with an envelope, mixed into one filter and an amp */
-#define BOX_AUDIO_SYNTH_LAYERS 4
+#define BOX_AUDIO_SYNTH_LAYERS 8
 
 /** Synth patches a core holds at once */
 #define BOX_AUDIO_SYNTH_MAX 256
@@ -121,6 +121,7 @@
 /** Longest glide of a synth patch in seconds */
 #define BOX_AUDIO_SYNTH_GLIDE_MAX 10.0f
 
+<<<<<<< HEAD
 /** LFOs of a synth patch */
 #define BOX_AUDIO_SYNTH_LFOS 2
 
@@ -135,6 +136,28 @@
 
 /** Default pulse width of a square, the symmetric square */
 #define BOX_AUDIO_SYNTH_PULSE_DEFAULT 0.5f
+=======
+/** Most unison voices of a synth layer */
+#define BOX_AUDIO_SYNTH_UNISON_MAX 7
+
+/** Largest detune spread of the unison voices of a synth layer in cents, a semitone */
+#define BOX_AUDIO_SYNTH_DETUNE_MAX 100.0f
+/** Lowest frequency of a pluck string in Hz; a lower one is clamped. At rates above 81.8 kHz the
+ * delay line of BOX_AUDIO_SYNTH_STRING_FRAMES limits it further, to the rate over 2046 */
+#define BOX_AUDIO_SYNTH_PLUCK_MIN 40.0f
+
+/** Pluck strings the voices of a core play at once, each with its delay line. A play that
+ * does not find a string for each of its pluck layers is ignored */
+#define BOX_AUDIO_SYNTH_STRINGS 32
+
+/** Frames of the delay line of a pluck string, a power of 2: a period of up to 2046 frames,
+ * BOX_AUDIO_SYNTH_PLUCK_MIN up to a rate of 81.8 kHz */
+#define BOX_AUDIO_SYNTH_STRING_FRAMES 2048
+
+/** Shortest and longest decay of a pluck string in seconds, the time until -60 dB */
+#define BOX_AUDIO_SYNTH_PLUCK_DECAY_MIN 0.01f
+#define BOX_AUDIO_SYNTH_PLUCK_DECAY_MAX 60.0f
+>>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
 
 /** Commands of the byte stream. Each starts with a box_audio_cmd_header_t */
 typedef enum box_audio_cmd_type_t {
@@ -289,7 +312,8 @@ typedef enum box_audio_synth_wave_t {
     BOX_AUDIO_SYNTH_SAW = 1,       /**< Saw, band limited */
     BOX_AUDIO_SYNTH_SQUARE = 2,    /**< Square, band limited */
     BOX_AUDIO_SYNTH_TRIANGLE = 3,  /**< Triangle */
-    BOX_AUDIO_SYNTH_NOISE = 4      /**< White noise, seeded per play */
+    BOX_AUDIO_SYNTH_NOISE = 4,     /**< White noise, seeded per play */
+    BOX_AUDIO_SYNTH_PLUCK = 5      /**< A Karplus-Strong string plucked with seeded noise */
 } box_audio_synth_wave_t;
 
 /** Kinds of the filter of a synth patch */
@@ -354,9 +378,26 @@ typedef struct box_audio_synth_layer_t {
                                            * envelope; ring: depth, 0..1 */
     float feedback;                       /**< Radians of its own output on its phase */
     uint32_t audible;                     /**< 1 when a modulator is heard as well, at level */
+<<<<<<< HEAD
     float pulse_width;                    /**< Square: share of the period it is high,
                                            * BOX_AUDIO_SYNTH_PULSE_MIN..1 minus it; 0 for
                                            * BOX_AUDIO_SYNTH_PULSE_DEFAULT */
+=======
+    uint32_t voices;                      /**< Unison voices, 1..BOX_AUDIO_SYNTH_UNISON_MAX,
+                                           * 0 counts as 1 */
+    float detune;                         /**< Cents from the lowest unison voice to the
+                                           * highest, 0..BOX_AUDIO_SYNTH_DETUNE_MAX */
+    float width;                          /**< Stereo width of the unison voices, 0 (mono)
+                                           * to 1 (from left to right) */
+    float decay;                          /**< BOX_AUDIO_SYNTH_PLUCK: seconds the fundamental
+                                           * of the string takes to fall by 60 dB */
+    float brightness;                     /**< BOX_AUDIO_SYNTH_PLUCK: 0..1, 0 a lowpass in the
+                                           * loop that damps the harmonics fast, 1 almost none */
+    float hardness;                       /**< BOX_AUDIO_SYNTH_PLUCK: 0..1, lowpass of the noise
+                                           * that plucks the string, 0 a soft finger, 1 a pick */
+    uint32_t rings_free;                  /**< BOX_AUDIO_SYNTH_PLUCK: 1 when it uses no
+                                           * envelope at all and the string alone ends it */
+>>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
 } box_audio_synth_layer_t;
 
 /** An LFO of a synth patch: a wave at a rate that starts after a delay and fades in, with a
@@ -401,12 +442,21 @@ typedef struct box_audio_synth_patch_t {
 } box_audio_synth_patch_t;
 
 /** Make a sound id a synth patch, or replace the patch of a synth sound. Voices that play it
- * keep the patch they started with; the next play takes the new one */
+ * keep the patch they started with; the next play takes the new one.
+ *
+ * The command ends after the layers of its patch: it is BOX_AUDIO_CMD_SYNTH_SIZE(layers)
+ * bytes, so a patch of 2 layers does not send the room of BOX_AUDIO_SYNTH_LAYERS */
 typedef struct box_audio_cmd_synth_t {
     box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_SYNTH */
     uint32_t sound;                 /**< Id of the sound, free or a synth */
-    box_audio_synth_patch_t patch;  /**< The patch, clamped by the core */
+    box_audio_synth_patch_t patch;  /**< The patch, clamped by the core, up to its layers */
 } box_audio_cmd_synth_t;
+
+/** Bytes of a synth command whose patch has a number of layers, at most
+ * BOX_AUDIO_SYNTH_LAYERS */
+#define BOX_AUDIO_CMD_SYNTH_SIZE(layers) \
+    ((int32_t)(offsetof(box_audio_cmd_synth_t, patch.layer) + \
+    (size_t)(layers) * sizeof(box_audio_synth_layer_t)))
 
 /** Events the core reports to its transport */
 typedef enum box_audio_event_type_t {
@@ -768,7 +818,8 @@ bool box_audio_write_reverb(
     uint32_t bus,
     const box_audio_reverb_params_t *params);
 
-/** Write a command that makes a sound id a synth patch or replaces its patch.
+/** Write a command that makes a sound id a synth patch or replaces its patch, of
+ * BOX_AUDIO_CMD_SYNTH_SIZE bytes for the layers of the patch.
  *
  * @param writer The writer
  * @param sound Id of the sound

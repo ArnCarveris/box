@@ -12,8 +12,13 @@
 /** One shot voices the module keeps track of at most, the oldest are forgotten beyond this */
 #define BOX_AUDIO_ONESHOT_MAX (1024)
 
+<<<<<<< HEAD
 /** Bytes the module reserves in its batch before it writes a command, at least the largest
  * command (a synth patch) */
+=======
+/** Bytes the module reserves in its batch before it writes a command, room for the largest,
+ * a synth patch of BOX_AUDIO_SYNTH_LAYERS layers */
+>>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
 #define BOX_AUDIO_COMMAND_RESERVE (1024)
 
 /** The sound id of a sound entity in the core of the current output */

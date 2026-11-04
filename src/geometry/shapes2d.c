@@ -1,12 +1,15 @@
 /**
  * @file geometry/shapes2d.c
- * @brief Resolves Rect, Circle and Line with their Border and Image into Shape2D and ShapeMesh.
+ * @brief Resolves Rect, Circle, Line and Polygon2D with their Border and Image into Shape2D and
+ * ShapeMesh.
  *
  * Every 2D shape shares one cached unit quad; the renderer shades it with a signed distance.
- * The nine parts of an ImageSlice are resolved here too, for the renderer and picking.
+ * The nine parts of an ImageSlice are resolved here too, for the renderer and picking, and the
+ * edges of a Polygon2D, sampled from its path as the profiles sample theirs.
  */
 
 #include "shape2d.h"
+#include "paths.h"
 #include <math.h>
 
 ECS_COMPONENT_DECLARE(Shape2D);
@@ -63,7 +66,215 @@ static const void* box_shape2d_get(
     return id == ignore ? NULL : ecs_get_id(world, e, id);
 }
 
-/** Resolve the geometry of an entity: a Rect, else a Circle, else a Line.
+/** Append the edges of one closed or open ring of points, scaled and offset.
+ *
+ * @param points The points
+ * @param count Number of points
+ * @param closed Whether the ring closes back to its first point
+ * @param polygon The polygon, its scale and offset
+ * @param edges Receives the edges
+ */
+static void box_shape2d_ring(
+    const vec2 *points,
+    int32_t count,
+    bool closed,
+    const Polygon2D *polygon,
+    ecs_vec_t *edges)
+{
+    int32_t i, last = closed ? count : count - 1;
+    for (i = 0; i < last; i ++) {
+        const float *a = points[i], *b = points[(i + 1) % count];
+        float *out = *ecs_vec_append_t(NULL, edges, vec4);
+        out[0] = a[0] * polygon->scale[0] + polygon->offset[0];
+        out[1] = a[1] * polygon->scale[1] + polygon->offset[1];
+        out[2] = b[0] * polygon->scale[0] + polygon->offset[0];
+        out[3] = b[1] * polygon->scale[1] + polygon->offset[1];
+    }
+}
+
+/** Append the edges of a Path3D seen from above, its x and z as the x and y of the polygon.
+ *
+ * @param world The world
+ * @param asset The entity with the Path3D
+ * @param polygon The polygon, its scale and offset
+ * @param edges Receives the edges
+ * @return Whether the path has enough points
+ */
+static bool box_shape2d_path3(
+    const ecs_world_t *world,
+    ecs_entity_t asset,
+    const Polygon2D *polygon,
+    ecs_vec_t *edges)
+{
+    const Path3D *path = ecs_get(world, asset, Path3D);
+    ecs_vec_t samples = {0};
+    bool result = box_path3_sample(world, asset, &samples);
+    int32_t i, count = ecs_vec_count(&samples);
+    result = result && count >= (path->closed ? 3 : 2);
+    if (result) {
+        vec2 *points = ecs_os_malloc_n(vec2, count);
+        const vec3 *p = ecs_vec_first(&samples);
+        for (i = 0; i < count; i ++) {
+            points[i][0] = p[i][0];
+            points[i][1] = p[i][2];
+        }
+
+        box_shape2d_ring(points, count, path->closed, polygon, edges);
+        ecs_os_free(points);
+    }
+
+    ecs_vec_fini_t(NULL, &samples, vec3);
+
+    return result;
+}
+
+bool box_shape2d_polygon_edges(
+    const ecs_world_t *world,
+    const Polygon2D *polygon,
+    ecs_vec_t *edges,
+    bool *open)
+{
+    ecs_entity_t asset = polygon->path;
+    bool alive = asset && ecs_is_alive(world, asset);
+    const Profile2D *profile = alive ? ecs_get(world, asset, Profile2D) : NULL;
+    const Path2D *path = alive && !profile ? ecs_get(world, asset, Path2D) : NULL;
+    const Path3D *path3 = alive && !profile && !path ? ecs_get(world, asset, Path3D) : NULL;
+    int32_t holes = profile ? ecs_vec_count(&profile->holes) : 0;
+    const ecs_entity_t *hole = profile ? ecs_vec_first(&profile->holes) : NULL;
+    int32_t ring, first = ecs_vec_count(edges);
+    ecs_vec_t samples = {0};
+    bool result = (profile || path) && (!holes || hole);
+    *open = (path && !path->closed) || (path3 && !path3->closed);
+    if (path3) {
+        result = box_shape2d_path3(world, asset, polygon, edges);
+        holes = -1;
+    }
+
+    for (ring = 0; result && ring <= holes; ring ++) {
+        ecs_entity_t e = profile ? (ring ? hole[ring - 1] : profile->outer) : asset;
+        const Path2D *p = e && ecs_is_alive(world, e) ? ecs_get(world, e, Path2D) : NULL;
+        result = p && (p->closed || (!profile && *open));
+        ecs_vec_clear(&samples);
+        result = result && box_path2_sample(world, e, &samples);
+        int32_t count = ecs_vec_count(&samples);
+        result = result && count >= (*open ? 2 : 3);
+        if (result) {
+            box_shape2d_ring(ecs_vec_first(&samples), count, !*open, polygon, edges);
+        }
+    }
+
+    if (!result) {
+        ecs_vec_set_count_t(NULL, edges, vec4, first);
+    }
+
+    ecs_vec_fini_t(NULL, &samples, vec2);
+
+    return result;
+}
+
+float box_shape2d_polygon_distance(
+    const vec4 *edges,
+    int32_t count,
+    float stroke,
+    float x,
+    float y)
+{
+    float best = INFINITY;
+    bool inside = false;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        float ax = edges[i][0], ay = edges[i][1], ex = edges[i][2] - ax, ey = edges[i][3] - ay;
+        float wx = x - ax, wy = y - ay, len = ex * ex + ey * ey;
+        float t = len > 0.0f ? glm_clamp((wx * ex + wy * ey) / len, 0.0f, 1.0f) : 0.0f;
+        float dx = wx - ex * t, dy = wy - ey * t;
+        best = glm_min(best, dx * dx + dy * dy);
+        if ((ay > y) != (edges[i][3] > y) && x < ax + (y - ay) * ex / ey) {
+            inside = !inside;
+        }
+    }
+
+    float d = sqrtf(best);
+
+    return stroke > 0.0f ? d - stroke : (inside ? -d : d);
+}
+
+bool box_shape2d_polygon_contains(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    float x,
+    float y)
+{
+    const Shape2D *shape = ecs_get(world, e, Shape2D);
+    const Polygon2D *polygon = shape && shape->kind == BOX_SHAPE2D_POLYGON
+        ? ecs_get(world, e, Polygon2D) : NULL;
+    ecs_vec_t edges = {0};
+    bool open, result = false;
+    if (polygon && box_shape2d_polygon_edges(world, polygon, &edges, &open)) {
+        result = box_shape2d_polygon_distance(ecs_vec_first(&edges), ecs_vec_count(&edges),
+            open ? shape->width * 0.5f : 0.0f, x, y) <= 0.0f;
+    }
+
+    ecs_vec_fini_t(NULL, &edges, vec4);
+
+    return result;
+}
+
+/** Resolve the bounds of a polygon: of its edges, grown by half the width of a stroke.
+ *
+ * @param world The world
+ * @param polygon The polygon
+ * @param out The resolved shape
+ * @return Whether the polygon has an outline of at most BOX_POLYGON2D_MAX_EDGES edges with an
+ * area, or a stroke of a width
+ */
+static bool box_shape2d_polygon_bounds(
+    const ecs_world_t *world,
+    const Polygon2D *polygon,
+    Shape2D *out)
+{
+    ecs_vec_t edges = {0};
+    float lo[2] = { INFINITY, INFINITY }, hi[2] = { -INFINITY, -INFINITY };
+    int32_t i, count = 0;
+    bool open = false;
+    bool result = box_shape2d_polygon_edges(world, polygon, &edges, &open);
+    const vec4 *e = ecs_vec_first(&edges);
+    count = ecs_vec_count(&edges);
+    for (i = 0; i < count; i ++) {
+        lo[0] = glm_min(lo[0], glm_min(e[i][0], e[i][2]));
+        lo[1] = glm_min(lo[1], glm_min(e[i][1], e[i][3]));
+        hi[0] = glm_max(hi[0], glm_max(e[i][0], e[i][2]));
+        hi[1] = glm_max(hi[1], glm_max(e[i][1], e[i][3]));
+    }
+
+    float grow = 0.0f;
+    if (open) {
+        out->width = isfinite(polygon->width) ? glm_max(polygon->width, 0.0f) : 0.0f;
+        grow = out->width * 0.5f;
+        result = result && out->width > 0.0f;
+    }
+
+    if (count && result) {
+        out->center[0] = (lo[0] + hi[0]) * 0.5f;
+        out->center[1] = (lo[1] + hi[1]) * 0.5f;
+        out->size[0] = hi[0] - lo[0] + 2.0f * grow;
+        out->size[1] = hi[1] - lo[1] + 2.0f * grow;
+    }
+
+    out->edges = count;
+    result = result && count > 0 && count <= BOX_POLYGON2D_MAX_EDGES &&
+        isfinite(out->size[0]) && isfinite(out->size[1]) && isfinite(out->center[0]) &&
+        isfinite(out->center[1]) && out->size[0] > 0.0f && out->size[1] > 0.0f;
+    if (count > BOX_POLYGON2D_MAX_EDGES) {
+        ecs_warn("Polygon2D: %d edges, more than the %d drawn", count,
+            BOX_POLYGON2D_MAX_EDGES);
+    }
+
+    ecs_vec_fini_t(NULL, &edges, vec4);
+
+    return result;
+}
+
+/** Resolve the geometry of an entity: a Rect, else a Circle, else a Line, else a Polygon2D.
  *
  * @param world The world
  * @param e The entity
@@ -82,6 +293,7 @@ static bool box_shape2d_geometry(
     const Rect *rect = box_shape2d_get(world, e, ecs_id(Rect), ignore);
     const Circle *circle = box_shape2d_get(world, e, ecs_id(Circle), ignore);
     const Line *line = box_shape2d_get(world, e, ecs_id(Line), ignore);
+    const Polygon2D *polygon = box_shape2d_get(world, e, ecs_id(Polygon2D), ignore);
     bool result = false;
     glm_vec3_one(scale);
     if (rect) {
@@ -103,6 +315,9 @@ static bool box_shape2d_geometry(
         out->line[3] = line->y2;
         out->width = glm_max(line->width, 0.0f);
         result = out->width > 0.0f && (line->x1 != line->x2 || line->y1 != line->y2);
+    } else if (polygon) {
+        out->kind = BOX_SHAPE2D_POLYGON;
+        result = box_shape2d_polygon_bounds(world, polygon, out);
     }
 
     if (out->kind == BOX_SHAPE2D_RECT) {
@@ -111,6 +326,9 @@ static bool box_shape2d_geometry(
     } else if (out->kind == BOX_SHAPE2D_LINE) {
         scale[0] = 2.0f * glm_max(fabsf(out->line[0]), fabsf(out->line[2])) + out->width;
         scale[1] = 2.0f * glm_max(fabsf(out->line[1]), fabsf(out->line[3])) + out->width;
+    } else if (out->kind == BOX_SHAPE2D_POLYGON) {
+        scale[0] = 2.0f * (fabsf(out->center[0]) + out->size[0] * 0.5f);
+        scale[1] = 2.0f * (fabsf(out->center[1]) + out->size[1] * 0.5f);
     }
 
     return result;
@@ -434,6 +652,84 @@ static void box_line_ctor(
     }
 }
 
+/** Construct Polygon2D values at a scale of 1 with a stroke one unit wide.
+ *
+ * @param ptr The values
+ * @param count Number of values
+ * @param ti The type info
+ */
+static void box_polygon2d_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Polygon2D *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Polygon2D){ .scale = { 1.0f, 1.0f }, .width = 1.0f };
+    }
+}
+
+/** Check whether a polygon draws an asset: its Path2D or Path3D, its Profile2D or a path of it.
+ *
+ * @param world The world
+ * @param polygon The polygon
+ * @param asset The asset entity
+ * @return Whether the polygon uses it
+ */
+static bool box_polygon2d_uses(
+    const ecs_world_t *world,
+    const Polygon2D *polygon,
+    ecs_entity_t asset)
+{
+    const Profile2D *profile;
+    bool result = polygon->path == asset;
+    if (!result && polygon->path && ecs_is_alive(world, polygon->path)) {
+        profile = ecs_get(world, polygon->path, Profile2D);
+        if (profile) {
+            const ecs_entity_t *holes = ecs_vec_first(&profile->holes);
+            int32_t i;
+            result = profile->outer == asset;
+            for (i = 0; !result && i < ecs_vec_count(&profile->holes); i ++) {
+                result = holes[i] == asset;
+            }
+        }
+    }
+
+    return result;
+}
+
+/** Resolve the polygons again whose Path2D, Path3D or Profile2D changed.
+ *
+ * @param it The observer iterator
+ */
+static void box_polygon2d_asset_changed(
+    ecs_iter_t *it)
+{
+    ecs_query_t *query = ecs_query(it->world, {
+        .terms = {{ .id = ecs_id(Polygon2D), .src.id = EcsSelf }},
+        .flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled
+    });
+    ecs_iter_t qit = ecs_query_iter(it->world, query);
+    while (ecs_query_next(&qit)) {
+        const Polygon2D *polygons = ecs_field(&qit, Polygon2D, 0);
+        int32_t i, j;
+        for (i = 0; i < qit.count; i ++) {
+            bool affected = false;
+            for (j = 0; !affected && j < it->count; j ++) {
+                affected = box_polygon2d_uses(it->world, &polygons[i], it->entities[j]);
+            }
+
+            if (affected) {
+                ecs_modified(it->world, qit.entities[i], Polygon2D);
+            }
+        }
+    }
+
+    ecs_query_fini(query);
+}
+
 /** Construct Image values that show the whole texture.
  *
  * @param ptr The values
@@ -475,17 +771,19 @@ static void box_image_slice_ctor(
 void box_geometry_shapes2d_init(
     ecs_world_t *world)
 {
-    ecs_entity_t shapes[3] = { ecs_id(Rect), ecs_id(Circle), ecs_id(Line) };
-    ecs_entity_t parts[6] = {
-        ecs_id(Rect), ecs_id(Circle), ecs_id(Line), ecs_id(Border), ecs_id(Image),
-        ecs_id(ImageSlice)
+    ecs_entity_t shapes[4] = { ecs_id(Rect), ecs_id(Circle), ecs_id(Line), ecs_id(Polygon2D) };
+    ecs_entity_t parts[7] = {
+        ecs_id(Rect), ecs_id(Circle), ecs_id(Line), ecs_id(Polygon2D), ecs_id(Border),
+        ecs_id(Image), ecs_id(ImageSlice)
     };
+    ecs_entity_t assets[3] = { ecs_id(Path2D), ecs_id(Path3D), ecs_id(Profile2D) };
     int32_t i;
     ECS_COMPONENT_DEFINE(world, Shape2D);
     ecs_set_hooks(world, Shape2D, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Border, { .ctor = box_border_ctor });
     ecs_set_hooks(world, BoxShadow, { .ctor = box_box_shadow_ctor });
     ecs_set_hooks(world, Line, { .ctor = box_line_ctor });
+    ecs_set_hooks(world, Polygon2D, { .ctor = box_polygon2d_ctor });
     ecs_set_hooks(world, Image, { .ctor = box_image_ctor });
     ecs_set_hooks(world, ImageSlice, { .ctor = box_image_slice_ctor });
     box_shape_t *quad = box_mesh_cache_add_shape(box_mesh_cache_of(world),
@@ -494,12 +792,12 @@ void box_geometry_shapes2d_init(
             .key = box_shape2d_key,
             .generate = box_shape2d_generate
         });
-    for (i = 0; i < 3; i ++) {
+    for (i = 0; i < 4; i ++) {
         ecs_add_pair(world, shapes[i], EcsWith, ecs_id(ShapeMesh));
         ecs_add_pair(world, shapes[i], EcsWith, ecs_id(Shape2D));
     }
 
-    for (i = 0; i < 6; i ++) {
+    for (i = 0; i < 7; i ++) {
         ecs_observer(world, {
             .query.terms = {{ .id = parts[i] }},
             .events = { EcsOnSet },
@@ -511,6 +809,15 @@ void box_geometry_shapes2d_init(
             .events = { EcsOnRemove },
             .callback = box_shape2d_on_remove,
             .ctx = quad
+        });
+    }
+
+    for (i = 0; i < 3; i ++) {
+        ecs_observer(world, {
+            .query.terms = {{ .id = assets[i] }},
+            .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
+            .events = { EcsOnSet },
+            .callback = box_polygon2d_asset_changed
         });
     }
 }

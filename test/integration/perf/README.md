@@ -157,6 +157,8 @@ whose work was under 2 ms: the sleep woke late on a busy machine, not the scene;
 | `effects_chain` | post effects | 120 | Auto exposure, GTAO, height fog, bloom and tonemapping over 10,000 lit blocks and 2,500 glowing spheres. | 11k..12.3k | 0 | 0.1k..1.6k |
 | `text_10k` | text | 120 | 10,000 labels, about 50,000 glyphs, lying on a board. | 20k..22k | 26k..28k | 0..0.1k |
 | `shapes2d_100k` | 2D shapes | 120 | 100,467 bordered rectangles, bordered circles and lines on the ground, one batch. | 87k..88k | 12.5k..13.4k | 0..1k |
+| `polygons_10k` | 2D polygons | 120 | 10,092 `Polygon2D` shapes on the ground: bordered concave L outlines of 6 edges, curved plazas of 34 edges and stroked roads of 32 edges, one batch. | 10,093 | 0 | 0 |
+| `polygons_large` | 2D polygons, stress | 60 | 12 overlapping, translucent rings of 512 curved edges each with a hole, each covering most of the view: a pixel lies over up to 6,144 edges, of which it tests the chunks near it and those its ray crosses. | 12 | 0 | 0 |
 | `box_shadow_ui` | 2D shadows | 120 | A dashboard of 37 shadowed panels lying on the ground: header, sidebar items, 12 cards with buttons and a dialog, blurs of 3 to 64. | 75 | 0 | 0 |
 | `box_shadow_1000` | 2D shadows, stress | 120 | 1,000 opaque list items with a blur of 48, whose 312 by 188 shadow quads overlap 20 neighbours each: 2,001 instances (the shadows count as instances) drawn as 2,001 runs. | 2,001 | 0 | 0 |
 | `walk_1m` | 1M collision | 120 | A first person controller walks a circle through 1,000,000 boxes, spheres, cylinders and cones (250,000 each), colliding through the spatial index, while the view looks at the field through a 5 degree lens on the orbit. | 78k | 922k | 0 |

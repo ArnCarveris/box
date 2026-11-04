@@ -123,7 +123,7 @@ const MIN_ROUGHNESS: f32 = 0.045;
 // Group 1 of fs_blend and fs_depth_cutout_blend besides emissive_map and material_sampler: the
 // albedo (decoded from sRGB), ORM and normal of each layer as a slice of an array, the mask as
 // stored, the uniforms (BlendUniforms of blend.wgsl) and the height of each layer in the red of
-// a slice, as stored (a one slice placeholder with a contrast of 0).
+// a slice, as stored (a one slice placeholder with a contrast of 0 or without height images).
 @group(1) @binding(5) var blend_albedo: texture_2d_array<f32>;
 @group(1) @binding(6) var blend_orm: texture_2d_array<f32>;
 @group(1) @binding(7) var blend_normal: texture_2d_array<f32>;

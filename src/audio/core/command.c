@@ -227,9 +227,12 @@ bool box_audio_write_synth(
     const box_audio_synth_patch_t *patch)
 {
     box_audio_cmd_synth_t cmd;
-    box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_SYNTH, sizeof(cmd));
+    uint32_t layers = patch->layers < BOX_AUDIO_SYNTH_LAYERS ? patch->layers :
+        BOX_AUDIO_SYNTH_LAYERS;
+    int32_t size = BOX_AUDIO_CMD_SYNTH_SIZE(layers);
+    box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_SYNTH, (size_t)size);
     cmd.sound = sound;
     cmd.patch = *patch;
 
-    return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
+    return box_audio_write_bytes(writer, &cmd, size);
 }

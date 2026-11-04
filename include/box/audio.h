@@ -26,14 +26,19 @@ extern "C" {
 /** Longest capture in seconds */
 #define BOX_AUDIO_CAPTURE_MAX (60.0f)
 
-/** Oscillators of a synth sound: the root and its children with a SynthOscillator */
-#define BOX_AUDIO_SYNTH_LAYERS 4
+/** Oscillators of a synth sound: the root and its children with a SynthOscillator. A voice
+ * renders and stores only the layers its sound has */
+#define BOX_AUDIO_SYNTH_LAYERS 8
 
 /** LFOs of a synth sound: the SynthLfo of the root, of its layers and of its other children */
 #define BOX_AUDIO_SYNTH_LFOS 2
 
 /** Seconds a synth sound plays when it would never end, a layer without any envelope */
 #define BOX_AUDIO_SYNTH_ENDLESS (10.0f)
+
+/** Lowest frequency of a SynthPluck layer in Hz; a lower one, its frequency_end included, is
+ * clamped with one warning */
+#define BOX_AUDIO_SYNTH_PLUCK_LOWEST (40.0f)
 
 /** What the audio output does */
 ECS_ENUM(AudioState, {
@@ -178,7 +183,10 @@ ECS_ENUM(SynthWave, {
     SynthSaw,              /**< Saw, band limited */
     SynthSquare,           /**< Square, band limited */
     SynthTriangle,         /**< Triangle */
-    SynthNoise             /**< White noise, seeded per play from SynthSound.seed */
+    SynthNoise,            /**< White noise, seeded per play from SynthSound.seed */
+    SynthPluck             /**< A plucked string (Karplus-Strong), set by the SynthString of
+                            *   the layer; it rings out on its own and ends the sound when it
+                            *   is silent, so it needs no envelope */
 });
 
 /** Kind of the filter of a synth sound */
@@ -236,6 +244,23 @@ ECS_STRUCT(SynthOscillator, {
                             *   default 0.5; band limited at every width, without DC */
 });
 
+/** The string of a SynthPluck layer, on the layer: a delay line a period long, plucked with a
+ * burst of seeded noise, whose loop damps it. Without one a SynthPluck layer takes the defaults.
+ *
+ * The fundamental falls by 60 dB over decay seconds; the harmonics fall faster the darker the
+ * string. The pitch is tuned to a fraction of a frame, so it is exact at high notes too. The
+ * frequency, frequency_end, sweep and level of the layer apply; phase modulation does not.
+ */
+ECS_STRUCT(SynthString, {
+    float decay;           /**< Seconds the fundamental takes to fall by 60 dB, 0.01..60,
+                            *   default 2 */
+    float brightness;      /**< Lowpass of the pluck and in the loop: 0 dark, the harmonics
+                            *   start soft and die fast, to 1 bright, a metallic ring;
+                            *   default 0.5 */
+    float hardness;        /**< Lowpass of the noise that plucks: 0 a soft finger, 1 a hard
+                            *   pick; default 0.8 */
+});
+
 /** An envelope: from 0 to 1 over attack, to sustain over decay, hold seconds there, then to
  * 0 over release.
  *
@@ -258,6 +283,22 @@ ECS_STRUCT(SynthEnvelope, {
     float curve;           /**< Curve of the decay and the release, 0 linear (default),
                             *   -16..16 */
     float attack_curve;    /**< Curve of the attack, 0 linear (default), -16..16 */
+});
+
+/** Unison of a synth layer, on the entity of its SynthOscillator: the layer plays as several
+ * copies of its oscillator, detuned evenly over a spread in cents and placed from left to right
+ * over the stereo width, each starting at a seeded random phase.
+ *
+ * The voices share the level of the layer: each plays at 1 / sqrt(voices), so the level of the
+ * layer stays about the same as the count changes. One voice is the layer without unison. A
+ * sound in which a layer has voices and width renders in stereo, see docs/audio.md.
+ */
+ECS_STRUCT(SynthUnison, {
+    int32_t voices;        /**< Copies of the oscillator, 1 to 7, default 3 */
+    float detune;          /**< Cents from the lowest copy to the highest, 0 to 100,
+                            *   default 10 */
+    float width;           /**< 0 (every copy in the center, mono) to 1 (the lowest copy
+                            *   left, the highest right), default 0 */
 });
 
 /** The filter of a synth sound, on its root: a state variable filter on the mix of the layers,
@@ -332,8 +373,13 @@ ECS_STRUCT(SynthLfo, {
 });
 
 /** A sound made by the synth from the components of this entity and its children, without a
+<<<<<<< HEAD
  * file: SynthOscillator layers, a SynthEnvelope, a SynthFilter, a SynthFilterEnvelope, a
  * SynthGlide and SynthLfo. Usually a prefab.
+=======
+ * file: SynthOscillator layers, each with an optional SynthUnison, a SynthEnvelope, a
+ * SynthFilter, a SynthFilterEnvelope and a SynthGlide. Usually a prefab.
+>>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
  *
  * It is compiled once, and again when one of its components changes, into a patch the core
  * holds; box_audio_play and AudioSource play it like any sound, with no allocation per play.

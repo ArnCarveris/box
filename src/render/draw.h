@@ -129,7 +129,8 @@ typedef struct DrawSlot {
                      *   which lifts its depth over the elements drawn before it */
     int32_t clip;   /**< Clip index of the nearest ClipChildren ancestor of a 2D shape, 0 none */
     int32_t slice;  /**< Index of the slice record of a sliced 2D shape in the clip buffer
-                     *   (box_draws_slice_of), 0 for none */
+                     *   (box_draws_slice_of), or of the polygon record of a polygon
+                     *   (box_draws_polygon_of), 0 for none */
     bool dirty;     /**< The entity is in the list of changed entities */
     uint8_t changed; /**< box_draw_kind_t, the streams its changes since the last extract write */
     bool tinted;    /**< An ancestor has a Tint of a strength above 0 */
@@ -166,6 +167,8 @@ typedef struct box_draw_key_t {
                              *   fs_shadow entry point of the 2D shape shader */
     bool slice;             /**< Rects with an ImageSlice, drawn with the fs_slice entry point
                              *   of the 2D shape shader */
+    bool polygon;           /**< Polygons (Polygon2D), drawn with the polygon variant of the 2D
+                             *   shape shader */
     bool texture_blend;     /**< 3D shapes with a TextureBlend, drawn with the
                              *   texture_blend variant of the mesh pipeline: textures[0] is the
                              *   entity that owns the TextureBlend, textures[2] and textures[3]
@@ -228,7 +231,8 @@ typedef struct box_draw_material_t {
     const Shape2D *shape2d;     /**< Resolved 2D shape, NULL for a 3D shape */
     float fade;                 /**< Product of the Opacity of the ancestors */
     int32_t clip;               /**< Clip index of a 2D shape or glyph, 0 for none */
-    int32_t slice;              /**< Slice record index of a sliced 2D shape, 0 for none */
+    int32_t slice;              /**< Slice record index of a sliced 2D shape, polygon record
+                                 *   index of a polygon, 0 for none */
     uint32_t rank;              /**< Rank of a 2D shape or glyph in the draw order of its tree */
 } box_draw_material_t;
 
@@ -408,6 +412,23 @@ typedef struct box_draw_slice_t {
     bool dirty;             /**< The shape changed since the record was computed */
 } box_draw_slice_t;
 
+/** The polygon record of a Polygon2D (box_draws_polygon_of): consecutive records of the clip
+ * buffer that hold its box_render_polygon_t and its edges, which are 0 in the entities of the
+ * clips. The record is computed again in a send when the shape changed since.
+ */
+typedef struct box_draw_polygon_t {
+    ecs_entity_t entity;    /**< The shape, 0 for a free entry */
+    int32_t index;          /**< First clip index of its record */
+    int32_t count;          /**< Clip records the entry holds */
+    bool dirty;             /**< The shape changed since the record was computed */
+} box_draw_polygon_t;
+
+/** A run of free clip records of the polygon records, reused by a polygon that fits it */
+typedef struct box_draw_polygon_run_t {
+    int32_t index;          /**< First clip index */
+    int32_t count;          /**< Clip records */
+} box_draw_polygon_run_t;
+
 /** The ClipChildren elements the 2D draws clip to, by clip index.
  *
  * An element gets an index when a 2D draw below it first asks for it and keeps it until it loses
@@ -426,9 +447,16 @@ typedef struct box_draw_clips_t {
     ecs_map_t slices;       /**< Sliced 2D shape to its entry in slice_entries */
     ecs_vec_t slice_entries; /**< box_draw_slice_t, the slice records */
     ecs_vec_t slice_free;   /**< int32_t, entries of slice_entries to reuse with their records */
+    ecs_map_t polygons;     /**< Polygon to its entry in polygon_entries */
+    ecs_vec_t polygon_entries; /**< box_draw_polygon_t, the polygon records */
+    ecs_vec_t polygon_free; /**< box_draw_polygon_run_t, records of freed polygon entries */
+    ecs_vec_t polygon_edges; /**< vec4, scratch edges of the polygon being computed */
     uint32_t capacity;      /**< Clips the clip buffer holds, 0 before it is created */
     int32_t tagged;         /**< Entities with ClipChildren, so a world without any skips the
                              *   walk up the hierarchy */
+    int32_t changed_first;  /**< First record of the polygon records that changed since the
+                             *   last upload, uploaded alone when no other record changed */
+    int32_t changed_end;    /**< End of the changed polygon records, changed_first for none */
     bool dirty;             /**< A record changed since the last upload */
 } box_draw_clips_t;
 
@@ -857,7 +885,8 @@ void box_draws_transition_target(
  *
  * A shadow encodes its color and material.w with box_draws_box_shadow_encode. The other words
  * (the clip, the rank, the atlas area of a glyph, the material slot of a mesh) do not depend on
- * a transitioned component and are left as they are.
+ * a transitioned component and are left as they are, as is emissive.w of a polygon, the index of
+ * its polygon record, which the material does not hold.
  *
  * Pure: reads no world, so the resolver calls it on the render thread.
  *
@@ -1111,7 +1140,9 @@ void box_draws_mesh_shading(
  *
  * Material holds the corner radius, border width and border color of a rectangle or the end
  * points of a line, emissive w the aspect of a rectangle or the negated width of a line. A
- * sliced rectangle holds its slice index in uv.x instead of the area of its image.
+ * sliced rectangle holds its slice index in uv.x instead of the area of its image. A polygon
+ * holds its border width and color as a rectangle does, in its local units, and the index of
+ * its polygon record (material slice) in emissive w.
  *
  * @param out The shading
  * @param material Material components of the entity, with its Shape2D
@@ -1936,8 +1967,38 @@ bool box_draws_slice_record(
     ecs_entity_t e,
     box_render_slice_t *out);
 
+/** Get the index of the polygon record of a polygon, giving it one when it has none or when its
+ * record no longer holds its edges, and mark it to be computed in the next send when it is new,
+ * moved or its shape changed.
+ *
+ * The record takes BOX_RENDER_POLYGON_RECORDS(edges) consecutive records of the clip buffer,
+ * which the edges of its Shape2D size; its index changes only when they no longer fit.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The shape, with a polygon Shape2D
+ * @param changed Whether its shape may have changed, a write of its shading; a move alone
+ * keeps the record
+ * @return The index of the first clip record of its record
+ */
+int32_t box_draws_polygon_of(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e,
+    bool changed);
+
+/** Free the polygon record of a 2D shape that is removed or no longer a polygon, if it has one.
+ *
+ * @param d The state
+ * @param e The shape
+ */
+void box_draws_polygon_release(
+    box_render_draws_t *d,
+    ecs_entity_t e);
+
 /** Write the areas of the clips into the clip buffer when one changed: added, removed, moved,
- * resized or reparented; and the slice records of the sliced 2D shapes that changed.
+ * resized or reparented; and the slice records of the sliced 2D shapes and the polygon records
+ * of the polygons that changed.
  *
  * @param world The world
  * @param d The state

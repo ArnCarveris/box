@@ -241,3 +241,21 @@ void audio_workload(
         block ++;
     }
 }
+
+uint64_t audio_hash(
+    const float *x,
+    int32_t n)
+{
+    uint64_t h = 0xCBF29CE484222325ull;
+    uint32_t bits;
+    int32_t i, b;
+    for (i = 0; i < n; i ++) {
+        memcpy(&bits, &x[i], sizeof(bits));
+        for (b = 0; b < 4; b ++) {
+            h ^= (bits >> (8 * b)) & 0xFF;
+            h *= 0x100000001B3ull;
+        }
+    }
+
+    return h;
+}

@@ -572,6 +572,7 @@ void BoxGeometryImport(
     ECS_META_COMPONENT(world, Rect);
     ECS_META_COMPONENT(world, Circle);
     ECS_META_COMPONENT(world, Line);
+    ECS_META_COMPONENT(world, Polygon2D);
     ECS_META_COMPONENT(world, Border);
     ECS_META_COMPONENT(world, BoxShadow);
     ECS_META_COMPONENT(world, Image);
@@ -587,9 +588,6 @@ void BoxGeometryImport(
         .ctx = box_mesh_cache_new(),
         .ctx_free = box_mesh_cache_free
     });
-
-    ECS_IMPORT(world, BoxTransform);
-    ecs_add_pair(world, ecs_id(ShapeMesh), EcsWith, ecs_id(Position));
 
     box_geometry_shapes_init(world);
     box_surface_materials_init(world);
