@@ -484,10 +484,10 @@ its own envelope and the state of its unison voices, 512 bytes. The pool has 4 p
 (320), so patches of up to 4 layers never run out of them and a voice of 8 takes the room of two of
 4. A play that finds too few free parts takes them like one at the voice cap takes a voice: the core
 ends the quietest synth voices that fade out, then the quietest that play, which it reports as
-`VOICE_STOLEN` and counts as steals, until the parts are free, and only then starts the play. It first checks that the
-play can start at all, so a play that is ignored fades or ends no voice. A voice renders
-and advances only its parts and gives them back when it ends. The 80 voice slots (808 bytes each)
-and the pool take 223 KB. The pluck strings are a second pool of `BOX_AUDIO_SYNTH_STRINGS` (32),
+`VOICE_STOLEN` and counts as steals, until the parts are free, and only then starts the play. It
+first checks that the play can start at all, so a play that is ignored fades or ends no voice. A
+voice renders and advances only its parts and gives them back when it ends. The 80 voice slots
+(808 bytes each) and the pool take 223 KB. The pluck strings are a second pool of `BOX_AUDIO_SYNTH_STRINGS` (32),
 each with a delay line of `BOX_AUDIO_SYNTH_STRING_FRAMES` (2048) floats, 8 KB, 259 KB in all; a
 voice takes one for each pluck layer, and a play that finds too few free is ignored, without
 fading or ending a voice.

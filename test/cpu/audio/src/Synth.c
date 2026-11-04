@@ -4046,15 +4046,15 @@ void Synth_pluck_pool(void) {
     box_audio_core_free(core);
 }
 
-/** A pluck play rejected for its strings at the voice cap leaves every voice as it was: the cap
- * steals no voice for it and no voice ends. A play that fits still steals at the cap. */
-void Synth_pluck_pool_cap(void) {
-    // audio/synth
-    box_audio_core_t *core = synth_core(AUDIO_RATE);
+/** Fill a core to the voice cap with pluck voices that take every string and sine voices.
+ *
+ * @param core The core
+ */
+static void synth_pluck_cap_fill(
+    box_audio_core_t *core)
+{
     box_audio_synth_patch_t pluck = synth_pluck(440, 0.5f, 0.5f, 1);
     box_audio_synth_patch_t sine = synth_steady(BOX_AUDIO_SYNTH_SINE, 440, 0.5f, 0.5f);
-    int32_t counts[BOX_AUDIO_EVENT_LOST + 1];
-    box_audio_event_t stolen;
     int32_t i;
     synth_define(core, 1, &pluck);
     synth_define(core, 2, &sine);
@@ -4065,7 +4065,23 @@ void Synth_pluck_pool_cap(void) {
     for (i = BOX_AUDIO_SYNTH_STRINGS; i < BOX_AUDIO_VOICE_MAX; i ++) {
         audio_play(core, 100 + (uint32_t)i, 2, 0, 0.02f, 0, 1, 0);
     }
+}
 
+/** A pluck play rejected for its strings at the voice cap leaves every voice as it was: the cap
+ * steals no voice for it, no voice ends, and the core renders bit identical to one that never
+ * got the play. A play that fits still steals at the cap.
+ *
+ * With 8 layers at most and every synth voice reclaimable, no synth play is rejected for parts,
+ * so this is the rejection that remains. */
+void Synth_pluck_pool_cap(void) {
+    // audio/synth
+    static float expect[4800];
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_core_t *ref = synth_core(AUDIO_RATE);
+    int32_t counts[BOX_AUDIO_EVENT_LOST + 1];
+    box_audio_event_t stolen;
+    synth_pluck_cap_fill(core);
+    synth_pluck_cap_fill(ref);
     synth_pool_events(core, counts, &stolen);
     test_int(counts[BOX_AUDIO_EVENT_IGNORED], 0);
     test_int(box_audio_core_voice_count(core), BOX_AUDIO_VOICE_MAX);
@@ -4084,7 +4100,15 @@ void Synth_pluck_pool_cap(void) {
     test_uint(stolen.id, 100);
     test_int(stolen.value, 1);
     test_int(box_audio_core_voice_count(core), BOX_AUDIO_VOICE_MAX);
+
+    audio_play(ref, 1001, 2, 0, 0.02f, 0, 1, 0);
+    audio_render(ref, 0, 4800);
+    memcpy(expect, audio_l, sizeof(expect));
+    audio_render(core, 0, 4800);
+    test_assert(memcmp(expect, audio_l, sizeof(expect)) == 0);
+    test_int(box_audio_core_voice_count(core), box_audio_core_voice_count(ref));
     box_audio_core_free(core);
+    box_audio_core_free(ref);
 }
 
 /** A SynthPluck layer takes its SynthString, or the defaults without one, needs no envelope,
