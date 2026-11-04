@@ -715,14 +715,9 @@ void box_audio_source_synth(
     src->amp = src->amp > 0 ? src->amp : 0.0f;
     src->pitch = pitch * src->variance;
     src->loop = loop;
-<<<<<<< HEAD
     src->filter = (int32_t)p->filter;
     src->amount = src->filter ? p->filter_amount : 0.0f;
-=======
-    src->filter = (int32_t)src->patch.filter;
-    src->amount = src->filter ? src->patch.filter_amount : 0.0f;
-    src->glide_frames = box_audio_synth_frames(src->patch.glide, core->sample_rate);
->>>>>>> 3acff73a7b7acc2144119e318ab0c244ba700787
+    src->glide_frames = box_audio_synth_frames(p->glide, core->sample_rate);
     src->svf[0] = (box_audio_synth_svf_t){0};
     src->svf[1] = (box_audio_synth_svf_t){ .k = (float)BOX_AUDIO_SYNTH_BUTTERWORTH_1 };
     if (p->slope == BOX_AUDIO_SYNTH_SLOPE_24) {
@@ -784,27 +779,20 @@ void box_audio_synth_pitch(
     float p = pitch * src->variance;
     double f = (double)p / (double)src->pitch;
     int32_t l;
-<<<<<<< HEAD
-    for (l = 0; l < src->layers; l ++) {
-        box_audio_synth_osc_t *o = &src->part[l]->osc;
-        o->inc = o->inc * f < src->inc_max ? o->inc * f : src->inc_max;
-        o->inc_end = o->inc_end * f < src->inc_max ? o->inc_end * f : src->inc_max;
-=======
     if (src->glide_frames > 0 || src->glide_left > 0) {
-        for (l = 0; l < (int32_t)src->patch.layers; l ++) {
-            box_audio_synth_osc_t *o = &src->osc[l];
+        for (l = 0; l < src->layers; l ++) {
+            box_audio_synth_osc_t *o = &src->part[l]->osc;
             box_audio_synth_move(src, o, box_audio_synth_glide_rest(src, o) * f,
                 src->glide_frames);
         }
 
         src->glide_left = src->glide_frames;
     } else {
-        for (l = 0; l < (int32_t)src->patch.layers; l ++) {
-            box_audio_synth_osc_t *o = &src->osc[l];
+        for (l = 0; l < src->layers; l ++) {
+            box_audio_synth_osc_t *o = &src->part[l]->osc;
             o->inc = o->inc * f < src->inc_max ? o->inc * f : src->inc_max;
             o->inc_end = o->inc_end * f < src->inc_max ? o->inc_end * f : src->inc_max;
         }
->>>>>>> 3acff73a7b7acc2144119e318ab0c244ba700787
     }
 
     if (src->modulated) {
@@ -812,6 +800,19 @@ void box_audio_synth_pitch(
     }
 
     src->pitch = p;
+}
+
+/** An envelope of a source.
+ *
+ * @param src The source
+ * @param e 0 for the envelope of the patch, 1 + layer for the own one of a layer
+ * @return The envelope
+ */
+static box_audio_synth_env_t *box_audio_synth_env_of(
+    box_audio_synth_source_t *src,
+    int32_t e)
+{
+    return e == 0 ? &src->env : &src->part[e - 1]->env;
 }
 
 bool box_audio_synth_legato(
@@ -830,8 +831,10 @@ bool box_audio_synth_legato(
         top = BOX_AUDIO_SYNTH_FREQUENCY_MAX;
     }
 
-    for (e = 0; e <= BOX_AUDIO_SYNTH_LAYERS; e ++) {
-        if ((src->envs & (1u << e)) && src->env[e].segment < BOX_AUDIO_SYNTH_RELEASE) {
+    for (e = 0; e <= src->layers; e ++) {
+        if ((src->envs & (1u << e)) &&
+            box_audio_synth_env_of(src, e)->segment < BOX_AUDIO_SYNTH_RELEASE)
+        {
             held = true;
         }
     }
@@ -840,8 +843,8 @@ bool box_audio_synth_legato(
         goto done;
     }
 
-    for (e = 0; e <= BOX_AUDIO_SYNTH_LAYERS; e ++) {
-        box_audio_synth_env_t *env = &src->env[e];
+    for (e = 0; e <= src->layers; e ++) {
+        box_audio_synth_env_t *env = box_audio_synth_env_of(src, e);
         if ((src->envs & (1u << e)) && env->segment == BOX_AUDIO_SYNTH_HOLD &&
             env->frames[BOX_AUDIO_SYNTH_HOLD] > 0)
         {
@@ -855,10 +858,10 @@ bool box_audio_synth_legato(
         src->fenv.left = src->fenv.frames[BOX_AUDIO_SYNTH_HOLD];
     }
 
-    for (l = 0; l < (int32_t)src->patch.layers; l ++) {
-        box_audio_synth_osc_t *o = &src->osc[l];
+    for (l = 0; l < src->layers; l ++) {
+        box_audio_synth_osc_t *o = &src->part[l]->osc;
         if (l < (int32_t)np->layers) {
-            box_audio_synth_layer_t *layer = &src->patch.layer[l];
+            box_audio_synth_layer_t *layer = &src->part[l]->layer;
             const box_audio_synth_layer_t *next = &np->layer[l];
             layer->frequency = next->frequency;
             layer->frequency_end = next->frequency_end;
@@ -882,7 +885,6 @@ bool box_audio_synth_legato(
         }
     }
 
-    src->patch.glide = np->glide;
     src->glide_frames = n;
     src->glide_left = n;
     src->pitch = p;
@@ -904,8 +906,8 @@ static void box_audio_synth_glide_next(
     box_audio_synth_source_t *src)
 {
     int32_t l;
-    for (l = 0; l < (int32_t)src->patch.layers; l ++) {
-        box_audio_synth_osc_t *o = &src->osc[l];
+    for (l = 0; l < src->layers; l ++) {
+        box_audio_synth_osc_t *o = &src->part[l]->osc;
         o->inc = o->inc * o->glide;
         o->inc = o->inc < src->inc_max ? o->inc : src->inc_max;
         if (o->sweep > 0) {

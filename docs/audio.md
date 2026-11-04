@@ -820,7 +820,6 @@ it rises, and a decay of that time from the higher cutoff to the lower one, the 
 it falls: `SynthFilter: {cutoff: 300}` with `SynthFilterEnvelope: {decay: 0.2, amount: 3}`
 falls from 2400 Hz to 300 Hz in 0.2 s.
 
-<<<<<<< HEAD
 The tests are the `Synth` suite of `test/cpu/audio`, on offline renders: frequencies of every wave
 at 44.1 and 48 kHz, sweeps, aliasing of a 5 kHz saw, square and triangle, flat and seeded noise,
 the times and edges of envelopes, curved envelopes (a linear one bit identical to the linear
@@ -834,27 +833,12 @@ audible modulators, feedback, 8 layers each found at its own frequency with a Go
 9th left out, the size of the command, the pool of parts, renders of patches of 4 layers bit
 identical whatever the unused layers hold, scripts from `test/assets/audio/synth.flecs` and
 `test/assets/audio/synth_fm.flecs` and `test/assets/audio/synth_layers.flecs`, the nine examples
-above from `test/assets/audio/synth_examples.flecs` and errors; `NoAlloc` renders 64 synth voices.
-The browser check is `test/integration/web/audio_synth.mjs`.
-=======
-The tests are the `Synth` suite of `test/cpu/audio`, on offline renders: frequencies of every
-wave at 44.1 and 48 kHz, sweeps, aliasing of a 5 kHz saw, square and triangle, flat and seeded noise, the
-times and edges of envelopes, curved envelopes (a linear one bit identical to the linear
-recurrence, a curved decay at its midpoint and on its sustain, a curved release that ends the
-voice on time), the end of a voice, the filter one octave past its cutoff at both slopes, the
-cutoff following a filter envelope up and down, stability under fast filter envelopes at full
-resonance and at Nyquist for both slopes and extreme values, layers, phase modulation at 1:1
-and 6:1 against Bessel amplitudes and without drift, an index that follows the envelope of its
-modulator and fades the high sidebands, the limit of the index, ring modulation at the sum and
-difference alone, audible modulators, feedback, scripts from `test/assets/audio/synth.flecs`
-and `test/assets/audio/synth_fm.flecs`, the eight examples above from
-`test/assets/audio/synth_examples.flecs`, glides (the frequency halfway through a glide at the
-geometric mean, a glide of 0 bit identical to the jump, the pitch of a source) and legato notes
-(no new attack, a held sustain that holds again, a new voice after the release, also of a
+above from `test/assets/audio/synth_examples.flecs`, glides (the frequency halfway through a glide
+at the geometric mean, a glide of 0 bit identical to the jump, the pitch of a source) and legato
+notes (no new attack, a held sustain that holds again, a new voice after the release, also of a
 looping voice that then ends, and after the end, from script and from a source, the lead above
 from `test/assets/audio/synth_glide.flecs`) and errors; `NoAlloc` renders 64 synth voices. The
 browser check is `test/integration/web/audio_synth.mjs`.
->>>>>>> 3acff73a7b7acc2144119e318ab0c244ba700787
 
 ## Transports
 

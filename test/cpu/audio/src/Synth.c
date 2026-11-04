@@ -2210,7 +2210,7 @@ void Synth_legato_after_end(void) {
 static ecs_world_t* synth_glide_world(void)
 {
     ecs_world_t *world = audio_world();
-    char *code = synth_read("test/assets/audio/synth_glide.flecs");
+    char *code = audio_read("test/assets/audio/synth_glide.flecs");
     test_assert(ecs_script_run(world, "glide", code, NULL) == 0);
     ecs_os_free(code);
 
