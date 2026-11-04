@@ -96,6 +96,7 @@ zigzag_path {
 }
 
 panel {
+  Position: {0, 0, 0}
   Rect: {600, 320}
   Rgb: {40, 44, 56}
   Border: {width: 3, radius: 18, color: {120, 140, 200, 255}}

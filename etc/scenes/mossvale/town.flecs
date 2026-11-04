@@ -150,18 +150,18 @@ template Street {
   const vw = st.w + match st.kind { 0: 1.0; 1: 0.9; 2: 0.5; _: 2.4 }
   // Sweeps map by arc length, so a MappingObject size in meters sets the tile size along and
   // across the road however its points are spaced
-  verge : MvVerge { Sweep: {path: path, profile: MvRoadProfile, scale: {vw, verge_top(st.kind)}, rings: rings}; TextureMapping: {mode: MappingObject, size: TILE_VERGE}; TextureTransform: {1, 1, 0, 0} }
+  verge : MvVerge { Position: {0, 0, 0}; Sweep: {path: path, profile: MvRoadProfile, scale: {vw, verge_top(st.kind)}, rings: rings}; TextureMapping: {mode: MappingObject, size: TILE_VERGE}; TextureTransform: {1, 1, 0, 0} }
   if st.kind == ST_MAIN {
-    paving : MvCobble { Sweep: {path: path, profile: MvRoadProfile, scale: {st.w, top}, rings: rings}; TextureMapping: {mode: MappingObject, size: TILE_COBBLE}; TextureTransform: {1, 1, 0, 0} }
+    paving : MvCobble { Position: {0, 0, 0}; Sweep: {path: path, profile: MvRoadProfile, scale: {st.w, top}, rings: rings}; TextureMapping: {mode: MappingObject, size: TILE_COBBLE}; TextureTransform: {1, 1, 0, 0} }
   } else if st.kind == ST_LANE {
-    paving : MvLane { Sweep: {path: path, profile: MvRoadProfile, scale: {st.w, top}, rings: rings}; TextureMapping: {mode: MappingObject, size: TILE_LANE}; TextureTransform: {1, 1, 0, 0} }
+    paving : MvLane { Position: {0, 0, 0}; Sweep: {path: path, profile: MvRoadProfile, scale: {st.w, top}, rings: rings}; TextureMapping: {mode: MappingObject, size: TILE_LANE}; TextureTransform: {1, 1, 0, 0} }
   } else if st.kind == ST_ALLEY {
-    paving : MvFlags { Sweep: {path: path, profile: MvRoadProfile, scale: {st.w, top}, rings: rings}; TextureMapping: {mode: MappingObject, size: TILE_FLAGS}; TextureTransform: {1, 1, 0, 0} }
+    paving : MvFlags { Position: {0, 0, 0}; Sweep: {path: path, profile: MvRoadProfile, scale: {st.w, top}, rings: rings}; TextureMapping: {mode: MappingObject, size: TILE_FLAGS}; TextureTransform: {1, 1, 0, 0} }
   } else {
-    paving : MvPath { Sweep: {path: path, profile: MvRoadProfile, scale: {st.w, top}, rings: rings}; TextureMapping: {mode: MappingObject, size: TILE_DIRT}; TextureTransform: {1, 1, 0, 0} }
+    paving : MvPath { Position: {0, 0, 0}; Sweep: {path: path, profile: MvRoadProfile, scale: {st.w, top}, rings: rings}; TextureMapping: {mode: MappingObject, size: TILE_DIRT}; TextureTransform: {1, 1, 0, 0} }
   }
   if st.kind == ST_ROAD {
-    crown : MvRoadGrass { Sweep: {path: path, profile: MvRoadProfile, scale: {0.7, top + 0.005}, rings: rings}; TextureMapping: {mode: MappingObject, size: TILE_GRASS}; TextureTransform: {1, 1, 0, 0} }
+    crown : MvRoadGrass { Position: {0, 0, 0}; Sweep: {path: path, profile: MvRoadProfile, scale: {0.7, top + 0.005}, rings: rings}; TextureMapping: {mode: MappingObject, size: TILE_GRASS}; TextureTransform: {1, 1, 0, 0} }
   }
 }
 

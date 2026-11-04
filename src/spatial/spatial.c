@@ -20,9 +20,6 @@ ECS_COMPONENT_DECLARE(SpatialPose);
 ECS_COMPONENT_DECLARE(SpatialIndex);
 ECS_TAG_DECLARE(SpatialIgnore);
 
-/** World transform of a shape without one */
-static const WorldTransform box_spatial_identity = { .m = GLM_MAT4_IDENTITY_INIT };
-
 /** Construct SpatialProxy values that are not indexed.
  *
  * @param ptr The components
@@ -349,7 +346,7 @@ static bool box_spatial_local(
  *
  * @param l_min Minimum corner of the local bounds
  * @param l_max Maximum corner of the local bounds
- * @param t World transform of the entity, NULL for the identity
+ * @param t World transform of the entity
  * @param min Receives the minimum corner
  * @param max Receives the maximum corner
  */
@@ -360,7 +357,7 @@ static void box_spatial_world_bounds(
     vec3 min,
     vec3 max)
 {
-    const WorldTransform *m = t ? t : &box_spatial_identity;
+    const WorldTransform *m = t;
     vec3 c, e;
     int32_t i;
     for (i = 0; i < 3; i ++) {
@@ -383,7 +380,7 @@ static void box_spatial_world_bounds(
  * @param world The world
  * @param e The entity
  * @param dynamic The entity is an indexed dynamic shape
- * @param t World transform its bounds were computed from, NULL for the identity
+ * @param t World transform its bounds were computed from, read when it is dynamic
  */
 static void box_spatial_pose(
     ecs_world_t *world,
@@ -393,7 +390,7 @@ static void box_spatial_pose(
 {
     if (dynamic) {
         SpatialPose pose;
-        ecs_os_memcpy(pose.m, (t ? t : &box_spatial_identity)->m, sizeof(mat4));
+        ecs_os_memcpy(pose.m, t->m, sizeof(mat4));
         ecs_set_ptr(world, e, SpatialPose, &pose);
     } else if (ecs_has(world, e, SpatialPose)) {
         ecs_remove(world, e, SpatialPose);
@@ -445,7 +442,7 @@ static void box_spatial_refresh(
     const WorldTransform *t = ecs_get(world, e, WorldTransform);
     vec3 l_min, l_max;
     bool ui = false;
-    bool indexed = box_spatial_local(world, cache, e, l_min, l_max, &ui) &&
+    bool indexed = t && box_spatial_local(world, cache, e, l_min, l_max, &ui) &&
         !ecs_has_id(world, e, EcsPrefab) && !box_spatial_ignored(world, e);
     if (indexed) {
         box_spatial_world_bounds(l_min, l_max, t, min, max);
@@ -537,7 +534,7 @@ static void box_spatial_dynamic(
         for (i = 0; i < it.count; i ++) {
             vec3 l_min, l_max, min, max;
             bool ui = false;
-            const WorldTransform *m = t ? &t[i] : &box_spatial_identity;
+            const WorldTransform *m = &t[i];
             if (p[i].item < 0 || p[i].dirty || !ecs_os_memcmp(pose[i].m, m->m, sizeof(mat4))) {
                 continue;
             }
@@ -726,8 +723,9 @@ static void box_spatial_observer(
     ecs_observer_init(world, &desc);
 }
 
-/** Follow static transforms: the entities whose WorldTransform was set, and the entities whose
- * static transform was computed through box_transform_on_moved.
+/** Follow static transforms: the entities whose WorldTransform was set, added or removed, and
+ * the entities whose static transform was computed through box_transform_on_moved. An entity
+ * without a WorldTransform has no place in the world and is not indexed, as it is not drawn.
  *
  * @param world The world
  * @param index The index
@@ -739,6 +737,9 @@ static void box_spatial_transform_observers(
     box_spatial_observer(world, index, "SpatialOnWorldTransform", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(WorldTransform) }},
         .events = { EcsOnSet } }, BoxSpatialOnWorld);
+    box_spatial_observer(world, index, "SpatialOnWorldTransformAdd", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(WorldTransform) }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnChange);
     index->refs ++;
     box_transform_on_moved(world, box_spatial_on_moved, index, box_spatial_release);
 }
@@ -826,7 +827,7 @@ void BoxSpatialImport(
         .terms = {
             { .id = ecs_id(SpatialProxy), .inout = EcsIn },
             { .id = ecs_id(SpatialPose), .inout = EcsInOut },
-            { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional },
+            { .id = ecs_id(WorldTransform), .inout = EcsIn },
             { .id = ecs_id(ShapeMesh), .inout = EcsIn, .oper = EcsOptional }
         },
         .cache_kind = EcsQueryCacheAuto

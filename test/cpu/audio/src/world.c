@@ -120,6 +120,19 @@ ecs_entity_t audio_bus(
     return e;
 }
 
+void audio_send(
+    ecs_world_t *world,
+    ecs_entity_t bus,
+    ecs_entity_t to,
+    float level,
+    bool pre_fader)
+{
+    AudioBus *b = ecs_ensure(world, bus, AudioBus);
+    ecs_vec_append_t(NULL, &b->sends, AudioSend)[0] = (AudioSend){
+        .bus = to, .level = level, .pre_fader = pre_fader };
+    ecs_modified(world, bus, AudioBus);
+}
+
 float audio_level(
     int32_t frames)
 {

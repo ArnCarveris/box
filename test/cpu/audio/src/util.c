@@ -66,7 +66,7 @@ void audio_play(
     uint8_t bytes[64];
     box_audio_writer_t w;
     box_audio_writer_init(&w, bytes, sizeof(bytes));
-    test_assert(box_audio_write_play(&w, voice, sound, bus, volume, pan, pitch, flags));
+    test_assert(box_audio_write_play(&w, voice, sound, bus, volume, pan, pitch, flags, 0));
     box_audio_core_apply(core, w.data, w.size);
 }
 
@@ -79,7 +79,7 @@ void audio_bus_set(
     uint8_t bytes[64];
     box_audio_writer_t w;
     box_audio_writer_init(&w, bytes, sizeof(bytes));
-    test_assert(box_audio_write_bus_set(&w, bus, param, value));
+    test_assert(box_audio_write_bus_set(&w, bus, param, value, 0));
     box_audio_core_apply(core, w.data, w.size);
 }
 
@@ -92,7 +92,7 @@ void audio_voice_set(
     uint8_t bytes[64];
     box_audio_writer_t w;
     box_audio_writer_init(&w, bytes, sizeof(bytes));
-    test_assert(box_audio_write_voice_set(&w, voice, param, value));
+    test_assert(box_audio_write_voice_set(&w, voice, param, value, 0));
     box_audio_core_apply(core, w.data, w.size);
 }
 
@@ -101,7 +101,7 @@ void audio_order(
     const box_audio_route_t *routes,
     int32_t count)
 {
-    uint8_t bytes[256];
+    uint8_t bytes[1024];
     box_audio_writer_t w;
     box_audio_writer_init(&w, bytes, sizeof(bytes));
     test_assert(box_audio_write_order(&w, routes, count));
@@ -195,8 +195,8 @@ void audio_workload(
 {
     static uint8_t bytes[4096];
     box_audio_route_t routes[] = {
-        { 3, 1, 2 }, { 4, 2, BOX_AUDIO_BUS_NONE }, { 1, 0, 2 }, { 2, 0, BOX_AUDIO_BUS_NONE },
-        { 0, 255, 255 }
+        AUDIO_ROUTE(3, 1, 2), AUDIO_OUT(4, 2), AUDIO_ROUTE(1, 0, 2), AUDIO_OUT(2, 0),
+        AUDIO_MASTER
     };
     box_audio_event_t events[64];
     box_audio_writer_t w;
@@ -211,9 +211,9 @@ void audio_workload(
     test_assert(box_audio_core_sound(core, 2, audio_sound_b, 3000, 2, 44100));
     box_audio_writer_init(&w, bytes, sizeof(bytes));
     test_assert(box_audio_write_order(&w, routes, 5));
-    test_assert(box_audio_write_bus_set(&w, 1, BOX_AUDIO_PARAM_SEND, 0.3f));
-    test_assert(box_audio_write_bus_set(&w, 3, BOX_AUDIO_PARAM_SEND, 0.7f));
-    test_assert(box_audio_write_bus_set(&w, 2, BOX_AUDIO_PARAM_PAN, -0.4f));
+    test_assert(box_audio_write_bus_set(&w, 1, BOX_AUDIO_PARAM_SEND, 0.3f, 0));
+    test_assert(box_audio_write_bus_set(&w, 3, BOX_AUDIO_PARAM_SEND, 0.7f, 0));
+    test_assert(box_audio_write_bus_set(&w, 2, BOX_AUDIO_PARAM_PAN, -0.4f, 0));
     box_audio_core_apply(core, w.data, w.size);
     while (at < frames) {
         int32_t n = 37 + (block * 53) % 200;
@@ -223,15 +223,15 @@ void audio_workload(
             uint32_t voice = (uint32_t)(block * 6 + i);
             box_audio_write_play(&w, voice, 1 + (voice % 2), 1 + voice % 4,
                 0.05f + 0.01f * (float)(voice % 7), -1 + 0.13f * (float)(voice % 16),
-                0.5f + 0.1f * (float)(voice % 13), voice % 3 ? BOX_AUDIO_PLAY_LOOP : 0);
+                0.5f + 0.1f * (float)(voice % 13), voice % 3 ? BOX_AUDIO_PLAY_LOOP : 0, 0);
         }
 
-        box_audio_write_voice_set(&w, (uint32_t)(block * 6 - 5), BOX_AUDIO_PARAM_PITCH, 1.3f);
-        box_audio_write_voice_set(&w, (uint32_t)(block * 6 - 4), BOX_AUDIO_PARAM_PAN, 0.8f);
-        box_audio_write_stop(&w, (uint32_t)(block * 6 - 9));
+        box_audio_write_voice_set(&w, (uint32_t)(block * 6 - 5), BOX_AUDIO_PARAM_PITCH, 1.3f, 0);
+        box_audio_write_voice_set(&w, (uint32_t)(block * 6 - 4), BOX_AUDIO_PARAM_PAN, 0.8f, 0);
+        box_audio_write_stop(&w, (uint32_t)(block * 6 - 9), 0);
         box_audio_write_bus_set(&w, 1 + (uint32_t)block % 4, BOX_AUDIO_PARAM_VOLUME,
-            0.5f + 0.1f * (float)(block % 6));
-        box_audio_write_bus_set(&w, 4, BOX_AUDIO_PARAM_MUTE, (float)(block % 2));
+            0.5f + 0.1f * (float)(block % 6), 0);
+        box_audio_write_bus_set(&w, 4, BOX_AUDIO_PARAM_MUTE, (float)(block % 2), 0);
         box_audio_core_apply(core, w.data, w.size);
         box_audio_core_render(core, left + at, right + at, n);
         while (box_audio_core_read_events(core, events, 64) > 0) {

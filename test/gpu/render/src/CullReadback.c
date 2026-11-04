@@ -27,6 +27,7 @@ void CullReadback_older_frame_never_replaces_newer(void) {
         .min_dimension_px = 1}});
     ecs_entity_t cube = ecs_new(world);
     ecs_set(world, cube, Box, {1, 1, 1});
+    ecs_set(world, cube, Position, {0, 0, 0});
     ecs_entity_t s = ecs_new(world);
     ecs_set(world, s, Surface, {.width = 16, .height = 16, .resolution_scale = 1});
     uint32_t word = 0;
@@ -111,6 +112,7 @@ void CullReadback_older_frame_after_a_take_is_ignored(void) {
         .min_dimension_px = 1}});
     ecs_entity_t cube = ecs_new(world);
     ecs_set(world, cube, Box, {1, 1, 1});
+    ecs_set(world, cube, Position, {0, 0, 0});
     ecs_entity_t s = ecs_new(world);
     ecs_set(world, s, Surface, {.width = 16, .height = 16, .resolution_scale = 1});
     uint32_t word = 0;

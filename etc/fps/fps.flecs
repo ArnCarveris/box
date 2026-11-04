@@ -10,14 +10,22 @@
 // the colors of the bars (green, yellow, red) and the longest frame time of a green and a yellow
 // bar (fast_ms, slow_ms) from include/box/fps.h.
 //
-// The bars and the reference lines are children of the chart, which has no Layout, so a new
-// sample lays nothing out. Every bar is an FpsBar of its own, which reads only its own sample,
-// the mut ms. box.fps writes ms, the frame time of the sample the bar shows, whenever
-// FrameSamples is set or notified, and only to the bars whose sample changed, so a new sample
-// evaluates only those bars again, and none when it is as long as the one before it. A script
-// cannot do that: a bar that read FrameSamples itself would be evaluated again for every sample.
-// ms is data only: the height, color and place of a bar stay here. Heights are whole points, so
-// jitter below a point sets nothing.
+// The bars are children of chart.bars, an FpsBars, and the reference lines children of the
+// chart over them. Neither the chart nor bars has a Layout, so a new sample lays nothing out.
+//
+// Every bar is an FpsBar of its own with a fixed name, which reads only its own muts: ms, the
+// frame time of the sample it shows, and col, the column it stands in. bars reads only its mut
+// first, the column at the left edge of the chart, and moves all bars left by that many slots.
+// box.fps writes them whenever FrameSamples is set or notified, and only what changed. A new
+// sample rotates the bars: box.fps writes it only to the bar of the oldest sample, with the
+// column right of the newest bar, and moves bars one slot left, so a new sample evaluates one
+// bar and bars, whatever the samples are, and none when it is as long as the one before it.
+// Every 120 samples, and when the samples changed otherwise, box.fps writes the columns 0 to 119
+// and first 0 again, so the columns stay small and every position a whole point.
+//
+// A script cannot do that: a bar that read FrameSamples itself would be evaluated again for
+// every sample. ms, col and first are data only: the height, color and place of a bar stay
+// here. Heights are whole points, so jitter below a point sets no height.
 
 module box.fps
 
@@ -32,23 +40,25 @@ using box.transform
 
 // Bars of the chart, their width and the width of their slots, BOX_FPS_BARS,
 // BOX_FPS_BAR_WIDTH and BOX_FPS_BAR_SLOT
-const bars: i32 = 120
+const bar_count: i32 = 120
 const bar_w: f32 = 3
 const slot: f32 = 4
-const chart_w: f32 = bars * slot
+const chart_w: f32 = bar_count * slot
 
 // Height of the chart and the frame time at its top, BOX_FPS_CHART_HEIGHT and BOX_FPS_CHART_MS
 const chart_h: f32 = 60
 const top_ms: f64 = 50
 
-// Bar index of the chart: the sample of age bars - 1 - index, so the newest is on the right.
-// ms is the frame time of that sample in milliseconds, 0 without a sample, which box.fps
-// writes. Its bottom is the bottom of the chart and its edges are on whole points: 1 point of
-// gap, then bar_w of bar. Its height is linear in the frame time, at least bar_w and at most the
-// chart, 0 without a sample.
+// Bar index of the chart. ms is the frame time in milliseconds of the sample it shows, 0
+// without a sample, and col the column it stands in, which box.fps writes. In its parent, an
+// FpsBars, it stands col slots right of the left edge of the chart; FpsBars moves it left by its
+// first column. Its bottom is the bottom of the chart and its edges are on whole points: 1 point
+// of gap, then bar_w of bar. Its height is linear in the frame time, at least bar_w and at most
+// the chart, 0 without a sample.
 template FpsBar {
   prop index: i32 = 0
   mut ms: f64 = 0
+  mut col: i32 = index
 
   const h: f32 = match ms > 0 {
     true: max(bar_w, round(min(ms / top_ms, 1) * chart_h))
@@ -59,9 +69,18 @@ template FpsBar {
     _: match ms > fast_ms { true: 1; _: 0 }
   }
 
-  Position: {-chart_w / 2 + index * slot + slot - bar_w / 2, -chart_h / 2 + h / 2, 0}
+  Position: {-chart_w / 2 + col * slot + slot - bar_w / 2, -chart_h / 2 + h / 2, 0}
   Rect: {bar_w, h}
   Rgb: match level { 0: green; 1: yellow; _: red }
+}
+
+// The parent of the bars: first is the column at the left edge of the chart, which box.fps
+// writes, so the bars of the columns first to first + bar_count - 1 fill the chart from left to
+// right. A whole number of slots, so the bars stay on whole points.
+template FpsBars {
+  mut first: i32 = 0
+
+  Position: {-first * slot, 0, 0}
 }
 
 // The fps panel: the heading, the chart and the summary
@@ -89,13 +108,17 @@ template FpsWidget {
     Rgb: t.text
   }
 
-  // bar_0 to bar_119 from the oldest sample to the newest, then the reference lines over them
+  // The bars bar_0 to bar_119 in bars, then the reference lines over them
   chart {
     LayoutItem: {width: {mode: Fixed, value: chart_w}, height: {mode: Fixed, value: chart_h}}
 
-    for i in 0..bars {
-      "bar_{i}" {
-        FpsBar: {index: i}
+    bars {
+      FpsBars: {}
+
+      for i in 0..bar_count {
+        "bar_{i}" {
+          FpsBar: {index: i}
+        }
       }
     }
 

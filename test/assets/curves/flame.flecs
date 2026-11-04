@@ -2,8 +2,10 @@
 // red and end as grey smoke that grows and fades, alpha blended so the smoke can darken.
 using box.curve
 using box.particle
+using box.transform
 
 flame {
+  Position: {0, 0, 0}
   ParticleEmitter: {
     max: 600, rate: 120, shape: EmitterDisc, radius: 0.15, spread: 10,
     speed: {0.8, 1.2}, lifetime: {1.2, 1.8}, size: {0.25, 0.35}, seed: 4

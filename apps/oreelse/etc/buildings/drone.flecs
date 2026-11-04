@@ -96,6 +96,7 @@ prefab RepairDrone {
     OreSpinner: {speed: 0}
 
     hub {
+      Position: {0, 0, 0}
       Box: {0.07, 0.05, 0.07}
       Rgb: droneShade
     }
@@ -115,6 +116,7 @@ prefab RepairDrone {
     OreSpinner: {speed: 0}
 
     hub {
+      Position: {0, 0, 0}
       Box: {0.07, 0.05, 0.07}
       Rgb: droneShade
     }
@@ -134,6 +136,7 @@ prefab RepairDrone {
     OreSpinner: {speed: 0}
 
     hub {
+      Position: {0, 0, 0}
       Box: {0.07, 0.05, 0.07}
       Rgb: droneShade
     }
@@ -153,6 +156,7 @@ prefab RepairDrone {
     OreSpinner: {speed: 0}
 
     hub {
+      Position: {0, 0, 0}
       Box: {0.07, 0.05, 0.07}
       Rgb: droneShade
     }

@@ -113,7 +113,7 @@ VentSmoke vent_smoke()
 sparks_at {
   Position: {0.36, 2.15, -0.14}
   if spark_serial > 0 {
-    SparkBurst "burst_{spark_serial}"()
+    SparkBurst "burst_{spark_serial}"() { Position: {0, 0, 0} }
   }
 }
 

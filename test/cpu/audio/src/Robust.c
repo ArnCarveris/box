@@ -73,7 +73,7 @@ void Robust_nan_stereo(void) {
 
 void Robust_nan_commands(void) {
     // audio/robust
-    box_audio_route_t routes[] = { { 1, 0, 0 }, { 0, 255, 255 } };
+    box_audio_route_t routes[] = { AUDIO_ROUTE(1, 0, 0), AUDIO_MASTER };
     box_audio_core_t *core = audio_new();
     audio_sine(audio_sound_a, 4000, 200, 0.5f);
     test_assert(box_audio_core_sound(core, 1, audio_sound_a, 4000, 1, NAN));
@@ -114,8 +114,10 @@ void Robust_huge_chain(void) {
         routes[i].bus = (uint8_t)(BOX_AUDIO_BUS_MAX - 1 - i);
         routes[i].output = (uint8_t)(i < BOX_AUDIO_BUS_MAX - 1 ? BOX_AUDIO_BUS_MAX - 2 - i :
             BOX_AUDIO_BUS_NONE);
-        routes[i].send = (uint8_t)(i < BOX_AUDIO_BUS_MAX - 2 ? BOX_AUDIO_BUS_MAX - 2 - i :
+        routes[i].sends[0] = (uint8_t)(i < BOX_AUDIO_BUS_MAX - 2 ? BOX_AUDIO_BUS_MAX - 2 - i :
             BOX_AUDIO_BUS_NONE);
+        routes[i].sends[1] = routes[i].sends[2] = routes[i].sends[3] = BOX_AUDIO_BUS_NONE;
+        routes[i].pre_fader = 0;
         routes[i].unused = 0;
         audio_bus_set(core, (uint32_t)i, BOX_AUDIO_PARAM_VOLUME, BOX_AUDIO_VOLUME_MAX);
         audio_bus_set(core, (uint32_t)i, BOX_AUDIO_PARAM_SEND, BOX_AUDIO_VOLUME_MAX);
@@ -186,7 +188,7 @@ void Robust_odd_frames(void) {
 
 void Robust_one_frame_at_a_time(void) {
     // audio/robust
-    box_audio_route_t routes[] = { { 1, 0, 2 }, { 2, 0, 255 }, { 0, 255, 255 } };
+    box_audio_route_t routes[] = { AUDIO_ROUTE(1, 0, 2), AUDIO_OUT(2, 0), AUDIO_MASTER };
     box_audio_core_t *core;
     int32_t pass, i;
     audio_sine(audio_sound_a, 4800, 220, 0.6f);
@@ -236,9 +238,9 @@ void Robust_unknown_commands(void) {
     box_audio_writer_init(&w, bytes, sizeof(bytes));
     test_assert(box_audio_write_bytes(&w, unknown, sizeof(unknown)));
     test_assert(box_audio_write_bytes(&w, short_play, sizeof(short_play)));
-    test_assert(box_audio_write_play(&w, 1, 1, 0, 1, 0, 1, BOX_AUDIO_PLAY_LOOP));
-    test_assert(box_audio_write_bus_set(&w, 0, (box_audio_param_t)77, 1));
-    test_assert(box_audio_write_voice_set(&w, 1, (box_audio_param_t)77, 1));
+    test_assert(box_audio_write_play(&w, 1, 1, 0, 1, 0, 1, BOX_AUDIO_PLAY_LOOP, 0));
+    test_assert(box_audio_write_bus_set(&w, 0, (box_audio_param_t)77, 1, 0));
+    test_assert(box_audio_write_voice_set(&w, 1, (box_audio_param_t)77, 1, 0));
     test_assert(box_audio_write_bytes(&w, truncated, sizeof(truncated)));
     box_audio_core_apply(core, w.data, w.size);
     box_audio_core_apply(core, bytes, 3);
@@ -356,7 +358,7 @@ void Robust_release_after_burst(void) {
 
     box_audio_writer_init(&w, robust_burst, sizeof(robust_burst));
     for (i = 0; i < ROBUST_BURST; i ++) {
-        test_assert(box_audio_write_play(&w, (uint32_t)i, 1, 0, 0.5f, 0, 1, 0));
+        test_assert(box_audio_write_play(&w, (uint32_t)i, 1, 0, 0.5f, 0, 1, 0, 0));
     }
 
     test_assert(box_audio_write_release(&w, 2));
@@ -385,10 +387,10 @@ void Robust_release_playing_after_burst(void) {
     test_assert(box_audio_core_sound(core, 2, audio_sound_b, 100, 1, AUDIO_RATE));
 
     box_audio_writer_init(&w, robust_burst, sizeof(robust_burst));
-    test_assert(box_audio_write_play(&w, 10000, 2, 0, 1, 0, 1, 0));
+    test_assert(box_audio_write_play(&w, 10000, 2, 0, 1, 0, 1, 0, 0));
     test_assert(box_audio_write_release(&w, 2));
     for (i = 0; i < ROBUST_BURST; i ++) {
-        test_assert(box_audio_write_play(&w, (uint32_t)i, 1, 0, 0.5f, 0, 1, 0));
+        test_assert(box_audio_write_play(&w, (uint32_t)i, 1, 0, 0.5f, 0, 1, 0, 0));
     }
 
     box_audio_core_apply(core, w.data, w.size);

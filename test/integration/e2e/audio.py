@@ -14,6 +14,7 @@ the chime of play_at on the right, and the two runs write bit identical captures
 import io
 import math
 import os
+import re
 import struct
 import wave
 
@@ -68,8 +69,10 @@ def test_status(app):
     out = parse_value(app.exec("audio"))
     app.check(out.startswith("no device, 48000 Hz, 1 voices"),
               "audio printed %r, expected the null output with one voice" % out)
+    clock = re.search(r"clock: (\d+) frames", out)
+    app.check(clock and int(clock.group(1)) > 0, "audio does not show the clock: %r" % out)
     app.check("master: volume 1.00" in out, "audio does not show the master: %r" % out)
-    app.check("music: volume 1.00 pan 0.00 -> master" in out,
+    app.check("music: group volume 1.00 pan 0.00 width 1.00 -> master" in out,
               "audio does not show the bus music: %r" % out)
     state = app.exec("get $ box.audio.AudioStatus.state")
     app.check(state == '"AudioNoDevice"', "AudioStatus.state is %s" % state)

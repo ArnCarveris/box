@@ -20,8 +20,10 @@ void Module_defaults_c(void) {
     test_flt(bus->pan, 0.0f);
     test_bool(bus->mute, false);
     test_uint(bus->output, 0);
-    test_uint(bus->send, 0);
-    test_flt(bus->send_level, 0.0f);
+    test_flt(bus->width, 1.0f);
+    test_bool(bus->solo, false);
+    test_int(bus->kind, AudioChannelGroup);
+    test_int(ecs_vec_count(&bus->sends), 0);
 
     const AudioSource *src = ecs_get(world, e, AudioSource);
     test_flt(src->volume, 1.0f);
@@ -109,10 +111,7 @@ void Module_order_chain_send(void) {
     ecs_entity_t a = audio_bus(world, "a", 0, 1.0f);
     ecs_entity_t b = audio_bus(world, "b", a, 1.0f);
     ecs_entity_t c = audio_bus(world, "c", 0, 1.0f);
-    AudioBus *cb = ecs_ensure(world, c, AudioBus);
-    cb->send = b;
-    cb->send_level = 0.5f;
-    ecs_modified(world, c, AudioBus);
+    audio_send(world, c, b, 0.5f, false);
     audio_run(world, 1);
 
     int32_t pa = audio_position(world, a), pb = audio_position(world, b);

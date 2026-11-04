@@ -188,6 +188,7 @@ void Simulate_mesh_points_on_surface(void) {
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Box, {2, 4, 6});
+    ecs_set(world, e, Position, {0, 0, 0});
     const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
     test_assert(shape != NULL);
     const box_mesh_t *mesh = box_mesh_cache_get(box_mesh_cache_of(world), shape->mesh);

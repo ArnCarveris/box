@@ -2,8 +2,10 @@
 // fifth of their life, (1 - t)^3, and then glow out as small points while they fall.
 using box.curve
 using box.particle
+using box.transform
 
 spark {
+  Position: {0, 0, 0}
   ParticleEmitter: {
     max: 400, rate: 120, spread: 35, speed: {4, 7}, lifetime: {0.4, 0.8},
     size: {0.06, 0.1}, color: {255, 200, 120}, seed: 3

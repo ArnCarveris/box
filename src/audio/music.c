@@ -25,7 +25,7 @@ static void box_audio_stop_voice(
     uint32_t voice)
 {
     if (box_audio_reserve(state)) {
-        box_audio_write_stop(&state->writer, voice);
+        box_audio_write_stop(&state->writer, voice, 0);
     }
 }
 
@@ -43,7 +43,7 @@ static void box_audio_set_voice(
     float value)
 {
     if (box_audio_reserve(state)) {
-        box_audio_write_voice_set(&state->writer, voice, param, value);
+        box_audio_write_voice_set(&state->writer, voice, param, value, 0);
     }
 }
 

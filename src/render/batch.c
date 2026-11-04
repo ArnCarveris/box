@@ -1057,15 +1057,6 @@ void box_draws_transform(
     const ShapeMesh *shape)
 {
     int32_t r, c;
-    if (!transform) {
-        ecs_os_memset_t(out, 0, box_render_transform_t);
-        for (r = 0; r < 3; r ++) {
-            out->rows[r][r] = shape->scale[r];
-        }
-
-        goto done;
-    }
-
     for (r = 0; r < 3; r ++) {
         for (c = 0; c < 3; c ++) {
             out->rows[r][c] = transform->m[c][r] * shape->scale[c];
@@ -1073,9 +1064,6 @@ void box_draws_transform(
 
         out->rows[r][3] = transform->m[3][r];
     }
-
-done:
-    return;
 }
 
 void box_draws_surface(
@@ -2174,10 +2162,10 @@ static void box_draws_fill_transform(
 
         box_render_transform_t *out = box_draws_slot_transform(b, slots[i].slot);
         box_render_transform_t was = *out;
-        box_draws_transform(out, transforms ? &transforms[i] : NULL, &shapes[i]);
+        box_draws_transform(out, &transforms[i], &shapes[i]);
         if (shadows) {
             box_draws_box_shadow_write(it->world, d, it->entities[i], &shadows[i], &slots[i],
-                transforms ? &transforms[i] : NULL, NULL, BOX_DRAW_TRANSFORM);
+                &transforms[i], NULL, BOX_DRAW_TRANSFORM);
         }
 
         if (!box_draws_is_2d(b) && d->shadow_record &&

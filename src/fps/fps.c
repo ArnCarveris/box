@@ -7,8 +7,9 @@
  * The script draws everything the panel shows. C creates the scene, camera and view, places the
  * panel at the top right of the surface, loads the script and loads it again when it changes.
  *
- * C provides the data: FpsSummary, the frame time of the sample of every bar, written only when
- * it changed, and the colors and limits of the bars.
+ * C provides the data: FpsSummary, the frame time and column of every bar and the first column
+ * of their parent, which rotate the bars so a new sample writes one bar and the parent, written
+ * only when they changed, and the colors and limits of the bars.
  */
 
 #define BOX_FPS_IMPL
@@ -41,10 +42,18 @@ typedef struct box_fps_t {
     float width;                /**< Surface width in points the screen was sized for */
     float height;               /**< Surface height in points the screen was sized for */
     ecs_query_t *surfaces;      /**< Entities with a Surface */
-    ecs_entity_t bars[BOX_FPS_BARS];    /**< Bars of the chart, oldest first */
+    ecs_entity_t bars[BOX_FPS_BARS];    /**< Bars of the chart by index, bar_0 first */
     double bar_ms[BOX_FPS_BARS];        /**< Frame time last written to each bar */
+    int32_t bar_col[BOX_FPS_BARS];      /**< Column last written to each bar */
+    int32_t head;               /**< Index of the bar of the newest sample */
     ecs_entity_t bar_mut;       /**< Mut variables of the bar template, BOX_FPS_BAR_MUT */
-    bool bars_ready;            /**< bars, bar_mut and bar_ms are of the current content */
+    ecs_size_t bar_size;        /**< Size of the bar mut variables */
+    ecs_size_t bar_ms_offset;   /**< Offset of ms in the bar mut variables */
+    ecs_size_t bar_col_offset;  /**< Offset of col in the bar mut variables */
+    ecs_entity_t parent;        /**< Parent of the bars, BOX_FPS_CHART_BARS */
+    ecs_entity_t parent_mut;    /**< Mut variables of the parent template, BOX_FPS_BARS_MUT */
+    int32_t first;              /**< First column last written to the parent */
+    bool bars_ready;            /**< The bars, their parent and what was written are current */
 } box_fps_t;
 
 void box_fps_summarize(
@@ -87,42 +96,88 @@ static void box_fps_summary_sync(
     }
 }
 
-/** Find the bars of the chart and the mut variables of the bar template that hold their ms.
+/** Largest size of the bar mut variables, which C fills on the stack */
+#define BOX_FPS_BAR_MUT_MAX (64)
+
+/** Find a member of the struct of mut variables.
  *
- * The mut variables must be ms alone, an f64, since C sets them as a whole: a mut has an
- * on_replace hook, so it cannot be changed in place.
+ * @param world The world
+ * @param mut The mut variables
+ * @param count Number of members the struct must have
+ * @param name Name of the member
+ * @param type Type of the member
+ * @return The member, NULL when the struct has another number of members or not this one
+ */
+static const ecs_member_t* box_fps_member(
+    const ecs_world_t *world,
+    ecs_entity_t mut,
+    int32_t count,
+    const char *name,
+    ecs_entity_t type)
+{
+    const EcsStruct *st = mut ? ecs_get(world, mut, EcsStruct) : NULL;
+    const ecs_member_t *result = NULL;
+    int32_t i;
+    if (!st || ecs_vec_count(&st->members) != count) {
+        goto done;
+    }
+
+    for (i = 0; i < count && !result; i ++) {
+        const ecs_member_t *m = ecs_vec_get_t(&st->members, ecs_member_t, i);
+        if (!ecs_os_strcmp(m->name, name) && m->type == type) {
+            result = m;
+        }
+    }
+
+done:
+    return result;
+}
+
+/** Find the bars, their parent and the mut variables of the bar and parent templates.
+ *
+ * The bar mut variables must be ms, an f64, and col, an i32, and the parent mut variables first,
+ * an i32, alone, since C sets them as a whole: a mut has an on_replace hook, so it cannot be
+ * changed in place.
  *
  * @param world The world
  * @param fps The panel state
- * @return Whether the script created the bars, which have the mut variables
+ * @return Whether the script created the bars and their parent, which have the mut variables
  */
 static bool box_fps_bars_resolve(
     ecs_world_t *world,
     box_fps_t *fps)
 {
     ecs_entity_t mut = ecs_lookup(world, BOX_FPS_BAR_MUT);
-    ecs_entity_t chart = ecs_lookup(world, BOX_FPS_CHART);
-    const EcsStruct *st = mut ? ecs_get(world, mut, EcsStruct) : NULL;
-    const ecs_member_t *member = st && ecs_vec_count(&st->members) == 1 ?
-        ecs_vec_first_t(&st->members, ecs_member_t) : NULL;
+    ecs_entity_t parent_mut = ecs_lookup(world, BOX_FPS_BARS_MUT);
+    ecs_entity_t parent = ecs_lookup(world, BOX_FPS_CHART_BARS);
+    const ecs_member_t *ms = box_fps_member(world, mut, 2, "ms", ecs_id(ecs_f64_t));
+    const ecs_member_t *col = box_fps_member(world, mut, 2, "col", ecs_id(ecs_i32_t));
+    const ecs_member_t *first = box_fps_member(world, parent_mut, 1, "first",
+        ecs_id(ecs_i32_t));
+    const ecs_type_info_t *ti = ms ? ecs_get_type_info(world, mut) : NULL;
     bool result = false;
     char name[32];
     int32_t i;
-    if (!member || !chart || ecs_os_strcmp(member->name, "ms") ||
-        member->type != ecs_id(ecs_f64_t))
+    if (!ms || !col || !first || !ti || ti->size > BOX_FPS_BAR_MUT_MAX || !parent ||
+        !ecs_has_id(world, parent, parent_mut))
     {
         goto done;
     }
 
     for (i = 0; i < BOX_FPS_BARS; i ++) {
         ecs_os_snprintf(name, sizeof(name), "bar_%d", i);
-        fps->bars[i] = ecs_lookup_child(world, chart, name);
+        fps->bars[i] = ecs_lookup_child(world, parent, name);
         if (!fps->bars[i] || !ecs_has_id(world, fps->bars[i], mut)) {
             goto done;
         }
     }
 
     fps->bar_mut = mut;
+    fps->bar_size = ti->size;
+    fps->bar_ms_offset = ms->offset;
+    fps->bar_col_offset = col->offset;
+    fps->parent = parent;
+    fps->parent_mut = parent_mut;
     result = true;
 
 done:
@@ -140,11 +195,71 @@ static bool box_fps_bars_valid(
     const box_fps_t *fps)
 {
     return fps->bars_ready && ecs_is_alive(world, fps->bar_mut) &&
+        ecs_is_alive(world, fps->parent_mut) && ecs_is_alive(world, fps->parent) &&
         ecs_is_alive(world, fps->bars[0]) && ecs_is_alive(world, fps->bars[BOX_FPS_BARS - 1]);
 }
 
-/** Write the frame time of its sample to the mut ms of every bar whose sample changed, so a new
- * sample evaluates only the bars that show another sample. Bars found again get all of them.
+/** Get the bar that shows a sample.
+ *
+ * @param fps The panel state
+ * @param age Age of the sample, 0 for the newest, at most BOX_FPS_BARS - 1
+ * @return Index of the bar
+ */
+static int32_t box_fps_bar_of(
+    const box_fps_t *fps,
+    int32_t age)
+{
+    return (fps->head - age + BOX_FPS_BARS) % BOX_FPS_BARS;
+}
+
+/** Write the frame time and column of a bar to its mut variables.
+ *
+ * @param world The world
+ * @param fps The panel state
+ * @param i Index of the bar
+ * @param ms The frame time in milliseconds, 0 without a sample
+ * @param col The column
+ */
+static void box_fps_bar_write(
+    ecs_world_t *world,
+    box_fps_t *fps,
+    int32_t i,
+    double ms,
+    int32_t col)
+{
+    char value[BOX_FPS_BAR_MUT_MAX];
+    ecs_os_memset(value, 0, fps->bar_size);
+    ecs_os_memcpy(value + fps->bar_ms_offset, &ms, sizeof(double));
+    ecs_os_memcpy(value + fps->bar_col_offset, &col, sizeof(int32_t));
+    ecs_set_id(world, fps->bars[i], fps->bar_mut, fps->bar_size, value);
+    fps->bar_ms[i] = ms;
+    fps->bar_col[i] = col;
+}
+
+/** Write the first column to the mut variables of the parent of the bars.
+ *
+ * @param world The world
+ * @param fps The panel state
+ * @param first The column of the bar at the left of the chart
+ */
+static void box_fps_first_write(
+    ecs_world_t *world,
+    box_fps_t *fps,
+    int32_t first)
+{
+    ecs_set_id(world, fps->parent, fps->parent_mut, sizeof(int32_t), &first);
+    fps->first = first;
+}
+
+/** Make the bars show the samples, writing only what changed.
+ *
+ * Samples the bars show already write nothing. Those shifted by one, a new sample, go to the bar
+ * of the oldest sample with the column right of the newest bar, and the parent moves one slot
+ * left, so a new sample evaluates one bar and the parent, whatever the samples are.
+ *
+ * Otherwise, and when first would reach BOX_FPS_BARS, bar_i gets the sample of age BOX_FPS_BARS
+ * - 1 - i and column i and the parent first 0, so columns stay below 2 * BOX_FPS_BARS. Every bar
+ * whose sample or column changed is written, every bar when the bars were found again.
  *
  * @param world The world
  * @param fps The panel state
@@ -154,8 +269,9 @@ static void box_fps_bars_sync(
     box_fps_t *fps)
 {
     const FrameSamples *samples = ecs_singleton_get(world, FrameSamples);
-    bool all = false;
-    int32_t i;
+    double ms[BOX_FPS_BARS];
+    bool all = false, same = true, shifted;
+    int32_t age, i;
     if (!box_fps_bars_valid(world, fps)) {
         fps->bars_ready = box_fps_bars_resolve(world, fps);
         all = true;
@@ -165,12 +281,35 @@ static void box_fps_bars_sync(
         goto done;
     }
 
+    shifted = !all && fps->first + 1 < BOX_FPS_BARS;
+    for (age = 0; age < BOX_FPS_BARS; age ++) {
+        ms[age] = samples ? box_frame_sample(samples, age) : 0;
+        same = same && ms[age] == fps->bar_ms[box_fps_bar_of(fps, age)];
+        shifted = shifted && (!age || ms[age] == fps->bar_ms[box_fps_bar_of(fps, age - 1)]);
+    }
+
+    if (!all && same) {
+        goto done;
+    }
+
+    if (shifted) {
+        i = box_fps_bar_of(fps, BOX_FPS_BARS - 1);
+        box_fps_bar_write(world, fps, i, ms[0], fps->bar_col[fps->head] + 1);
+        fps->head = i;
+        box_fps_first_write(world, fps, fps->first + 1);
+        goto done;
+    }
+
     for (i = 0; i < BOX_FPS_BARS; i ++) {
-        double ms = samples ? box_frame_sample(samples, BOX_FPS_BARS - 1 - i) : 0;
-        if (all || ms != fps->bar_ms[i]) {
-            ecs_set_id(world, fps->bars[i], fps->bar_mut, sizeof(double), &ms);
-            fps->bar_ms[i] = ms;
+        double bar_ms = ms[BOX_FPS_BARS - 1 - i];
+        if (all || bar_ms != fps->bar_ms[i] || i != fps->bar_col[i]) {
+            box_fps_bar_write(world, fps, i, bar_ms, i);
         }
+    }
+
+    fps->head = BOX_FPS_BARS - 1;
+    if (all || fps->first) {
+        box_fps_first_write(world, fps, 0);
     }
 
 done:

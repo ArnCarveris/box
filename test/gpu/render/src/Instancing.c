@@ -555,8 +555,10 @@ void Instancing_dynamic_tag_toggles_uploads(void) {
     ecs_set(world, view, View, {.camera = camera});
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Box, {1, 1, 1});
+    ecs_set(world, a, Position, {0, 0, 0});
     ecs_entity_t b = ecs_new(world);
     ecs_set(world, b, Box, {1, 1, 1});
+    ecs_set(world, b, Position, {0, 0, 0});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(ecs_singleton_get(world, RenderStatus)->upload_bytes, 0);

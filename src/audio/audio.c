@@ -26,7 +26,7 @@ ECS_COMPONENT_DECLARE(AudioSample);
 ECS_COMPONENT_DECLARE(AudioMusic);
 ECS_COMPONENT_DECLARE(AudioSynth);
 
-/** Construct AudioBus values: unity volume to the master, centered, no send.
+/** Construct AudioBus values: unity volume and width to the master, centered, no sends.
  *
  * @param ptr The components
  * @param count Number of components
@@ -41,7 +41,7 @@ static void box_audio_bus_ctor(
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
-        values[i] = (AudioBus){ .volume = 1.0f };
+        values[i] = (AudioBus){ .volume = 1.0f, .width = 1.0f };
     }
 }
 
@@ -244,6 +244,27 @@ static void box_audio_settings_ctor(
     }
 }
 
+/** Construct Transport values: 120 quarter notes per minute in 4/4, stopped at beat 0,
+ * without a loop or a metronome, 0.15 seconds of lookahead.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_transport_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Transport *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Transport){
+            .tempo = 120.0f, .beats_per_bar = 4, .beat_unit = 4, .lookahead = 0.15f };
+    }
+}
+
 /** Copy what box.audio sent for an entity: a copy starts with nothing sent. A prefab
  * instance or a clone gets a sound, a bus or a voice of its own this way.
  *
@@ -349,6 +370,14 @@ int32_t box_audio_module_bus_index(
 
 done:
     return result;
+}
+
+uint64_t box_audio_module_clock(
+    const ecs_world_t *world)
+{
+    box_audio_transport_t *t = box_audio_output_transport(world);
+
+    return t ? t->clock(t) : 0;
 }
 
 ecs_entity_t box_audio_sound_from_pcm(
@@ -647,6 +676,7 @@ static void box_audio_module_free(
     box_audio_music_fini(state);
     ecs_vec_fini_t(NULL, &state->moved, ecs_entity_t);
     box_audio_sample_fini(state);
+    box_audio_timeline_fini(state);
     ecs_os_free(state->capture.path);
     ecs_os_free(state);
 }
@@ -703,7 +733,10 @@ void BoxAudioImport(
     ECS_IMPORT(world, BoxJobs);
 
     ECS_META_COMPONENT(world, AudioState);
+    ECS_META_COMPONENT(world, AudioChannelKind);
+    ECS_META_COMPONENT(world, AudioSend);
     ECS_META_COMPONENT(world, AudioBus);
+    box_owned_hooks(world, AudioBus, BOX_OWNED_VEC(AudioBus, sends, AudioSend));
     ecs_set_hooks(world, AudioBus, { .ctor = box_audio_bus_ctor });
     ECS_META_COMPONENT(world, AudioOutput);
     ECS_META_COMPONENT(world, AudioPcm);
@@ -748,6 +781,8 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, AudioSettings);
     ecs_set_hooks(world, AudioSettings, { .ctor = box_audio_settings_ctor });
     ECS_META_COMPONENT(world, AudioStatus);
+    ECS_META_COMPONENT(world, Transport);
+    ecs_set_hooks(world, Transport, { .ctor = box_audio_transport_ctor });
 
     ECS_COMPONENT_DEFINE(world, AudioSoundId);
     ECS_COMPONENT_DEFINE(world, AudioBusState);
@@ -772,18 +807,21 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSoundId));
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSynth));
 
-    ecs_entity(world, { .name = "master" });
+    ecs_entity_t master = ecs_entity(world, { .name = "master" });
     ecs_singleton_add(world, AudioSettings);
     ecs_singleton_set(world, AudioStatus, {0});
+    ecs_singleton_add(world, Transport);
 
     box_audio_module_t *state = ecs_os_calloc_t(box_audio_module_t);
     state->next_voice = 1;
+    state->master = master;
     ecs_map_init(&state->voices, NULL);
     ecs_vec_init_t(NULL, &state->oneshots, box_audio_oneshot_t, 0);
     ecs_vec_init_t(NULL, &state->plays, box_audio_play_t, 0);
     ecs_vec_init_t(NULL, &state->stops, uint32_t, 0);
     ecs_vec_init_t(NULL, &state->releases, uint32_t, 0);
     ecs_vec_init_t(NULL, &state->moved, ecs_entity_t, 0);
+    box_audio_timeline_init(state);
     ECS_COMPONENT_DEFINE(world, AudioModuleState);
     ecs_singleton_set(world, AudioModuleState, { .state = state });
     ecs_atfini(world, box_audio_module_free, state);

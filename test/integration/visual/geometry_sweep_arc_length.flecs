@@ -79,6 +79,7 @@ road_path {
 }
 
 road {
+  Position: {0, 0, 0}
   Sweep: {path: road_path, profile: road_section, rings: 128}
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.8}
@@ -118,6 +119,7 @@ pipe_path {
 }
 
 pipe {
+  Position: {0, 0, 0}
   Sweep: {path: pipe_path, profile: pipe_section, rings: 160}
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.6}
@@ -150,6 +152,7 @@ bar_path {
 }
 
 bar {
+  Position: {0, 0, 0}
   Sweep: {path: bar_path, profile: bar_section, rings: 48}
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.8}

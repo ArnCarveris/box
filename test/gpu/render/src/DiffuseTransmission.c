@@ -640,6 +640,7 @@ static unsigned char* dt_sphere(
     dt_sun(world, true, GLM_PIf);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Sphere, {.segments = 64, .smooth = true, .radius = 1});
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, Rgb, {DT_GRAY, DT_GRAY, DT_GRAY});
     ecs_set(world, e, PbrMaterial, {.metallic = 0, .roughness = 1});
     ecs_set(world, e, DiffuseTransmission, {

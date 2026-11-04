@@ -19,9 +19,11 @@ core**, a small mixer in plain C that renders on its own thread, once per frame 
   exists. Music is not a sound: an `AudioStream` streams one Ogg Vorbis file.
 - **Voices** play the sounds, 64 at once; a play past that steals the quietest. A voice has a
   volume, a pan and a pitch, and plays on a bus.
-- **Buses** mix voices and other buses: each has a volume, a pan, a mute, an output and one send
-  with a level. Bus 0 is the master, `box.audio.master` in script; every other bus ends there.
-  A bus with a `Reverb` is a reverb bus, which other buses reach through their send.
+- **Buses** are the channels of the mixer and mix voices and other buses: each has a volume, a
+  pan, a stereo width, a mute, a solo, a kind (group, return or SFX), an output and up to 4
+  sends, pre or post fader. Bus 0 is the master, `box.audio.master` in script; every other bus
+  ends there. A bus with a `Reverb` is a reverb bus, a return, which other buses reach through
+  a send.
 - **Space**: a source with `AudioSpatial` gets its volume and pan every frame from its distance
   to the listener and its direction, the camera of the main view or the entity with
   `AudioListener`.
@@ -35,7 +37,7 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 
 | Component | Use it for |
 |-----------|------------|
-| `AudioBus` | A bus of the mixer: `output`, `volume`, `pan`, `mute`, `send`, `send_level` |
+| `AudioBus` | A channel of the mixer: `output`, `volume`, `pan`, `width`, `mute`, `solo`, `kind` and up to 4 `sends`, see [Mixer channels](#mixer-channels) |
 | `Reverb` | The reverb of a room on the bus of its entity, see [Reverb](#reverb) |
 | `AudioOutput` | The bus a source, a stream or a sound plays on (the master without one) |
 | `AudioPcm` | A sound from samples, from script or C |
@@ -51,7 +53,8 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 | `AudioStream` | Music: one Ogg Vorbis file that streams, see [Music](#music) |
 | `AudioStreamStatus` | Read only: the state, position, buffer, underruns and decode time of a stream |
 | `AudioSettings` | Singleton: the master volume and mute |
-| `AudioStatus` | Singleton, read only: the state of the output, its rate, the voices, steals and load |
+| `AudioStatus` | Singleton, read only: the state of the output, its rate, the voices, steals, load and the clock of its core |
+| `Transport` | Singleton: the timeline in beats, its tempo, time signature, position, play and stop, loop and metronome, see [Transport](#transport) |
 
 The functions are `box.audio.play(sound, volume)`, `box.audio.play_at(sound, {x, y, z},
 volume)` and `box.audio.capture(seconds, path)`, the same as `box_audio_play`,
@@ -69,7 +72,7 @@ cabin_verb {
   AudioBus: {output: master}
   Reverb: {decay: 0.75, damping: 0.6, predelay: 0.008, size: 0.25}
 }
-world { AudioBus: {output: master, send: cabin_verb, send_level: 0.28} }
+world { AudioBus: {output: master, sends: [{bus: cabin_verb, level: 0.28}]} }
 ui { AudioBus: {output: master, volume: 0.55} }
 music { AudioBus: {output: master, volume: 0.45} }
 ```
@@ -229,25 +232,45 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
 - **Synth**: up to 8 oscillators, one filter and two LFOs per sound, up to 7 unison voices per
   oscillator, linear or curved envelopes and no node graph; an LFO has fixed destinations (pitch,
   level, cutoff, pulse width) and no LFO modulates another; an oscillator may phase or ring
+<<<<<<< HEAD
   modulate another, but FM is not band limited. Plucked strings go down to 40 Hz, 32 of them ring
   at once, and each plays as one voice; a pitch LFO gives them vibrato. Legato is mono per
   channel and has no note off: a held note lasts its hold after the last note. A looping synth
   sound starts a new pass of its envelopes and oscillators at the end of the last, at most every
   60 seconds; a drone keeps that gap short with edges of a few ms, as the dust merchant's engine
   does with 2 ms.
+=======
+  modulate another, but FM is not band limited. Plucked strings go down to 40 Hz and 32 of them ring
+  at once; a unison pluck takes one per voice, so a chord of 6 notes of 4 voices takes 24. Legato
+  is mono per channel and has no note off: a held note lasts its hold after the last note. A
+  looping synth sound starts a new pass of its envelopes and oscillators at the end of the last, at
+  most every 60 seconds; a drone keeps that gap short with edges of a few ms, as the dust
+  merchant's engine does with 2 ms.
+>>>>>>> a71c45859c86821c76644f0038d8faa6b52b2a41
 - **Files**: WAV and FLAC for sounds, Ogg Vorbis for music, one stream at once (a change of path
   fades over 5 ms, there is no crossfade).
+- **Mixer**: 63 buses besides the master and 4 sends per channel; more buses are silent and
+  more sends are ignored, both with one error.
 - **Tools**: no mixer UI, and the UI theme of box has no sounds; a scene adds them in its own
   widgets, as the dust merchant does.
 - **Web**: no shared memory, decoding on the main thread, and no load measurement in the
   worklet (it reports 0).
+- **Scheduling**: `BOX_AUDIO_SCHEDULE_MAX` (4096) commands wait in the core for their frame at
+  once; one more applies at once and reports `BOX_AUDIO_EVENT_LATE`. Only `PLAY`, `STOP`,
+  `VOICE_SET` and `BUS_SET` have a `when`.
+- **Transport**: one timeline per world, a tempo of 20 to 999 that changes in steps (no ramps),
+  time signatures up to 64/64 that only accent the metronome, one loop, and a lookahead of 0.05
+  to 0.5 seconds. On native the first beat after a start or a seek plays as soon as the batch
+  arrives, a few ms late; the beats after it are exact. The metronome click is fixed.
 
 ## Captures and the audio command
 
 The audio a box app plays can be inspected without listening:
 
-- `audio` prints the state, the rate, the voices, the steals, the load and every bus with its
-  routing and reverb; `audio volume <v>` and `audio mute` set the master.
+- `audio` prints the state, the rate, the voices, the steals, the load, the clock of the core
+  (frames and seconds), the transport and every bus with its kind, width, solo, routing, sends
+  and reverb; `audio volume <v>` and `audio mute` set the master, `audio play`, `audio stop`,
+  `audio seek <beats>` and `audio tempo <bpm>` drive the [transport](#transport).
 - `audio capture <seconds>` records the master to a 16 bit stereo WAV resource of the shell
   session, `box.audio.capture(seconds, path)` to a file from a script, at load if it should
   start with the scene. In the browser `audio capture` writes `/tmp/audio_capture_<n>.wav` in
@@ -294,6 +317,7 @@ bool box_audio_core_sound(box_audio_core_t *core, uint32_t id, const float *data
 void box_audio_core_apply(box_audio_core_t *core, const void *commands, int32_t size);
 void box_audio_core_render(box_audio_core_t *core, float *left, float *right, int32_t frames);
 int32_t box_audio_core_read_events(box_audio_core_t *core, box_audio_event_t *events, int32_t max);
+uint64_t box_audio_core_clock(const box_audio_core_t *core);
 ```
 
 `box_audio_core_new` is the only allocation, through the `alloc` and `free` hooks of the desc
@@ -307,23 +331,25 @@ fields in the byte order of the target (little endian everywhere box runs): the 
 `box_audio_cmd_*_t` of `core.h`. The `box_audio_write_*` functions write them into a buffer.
 A command of an unknown type is skipped by its size and a too short one is ignored, both with
 `BOX_AUDIO_EVENT_IGNORED`; a size that runs past the batch ends it. Commands take effect at the
-start of the next render block. They are:
+start of the next render block, but those with a `when` in the future (see
+[The clock and the schedule](#the-clock-and-the-schedule)). They are:
 
 | Command | Fields |
 |---------|--------|
-| `PLAY` | voice handle, sound, bus, volume, pan, pitch, flags (`BOX_AUDIO_PLAY_LOOP`) |
-| `LEGATO` | new voice handle, handle of the voice it follows, then the fields of `PLAY`: a note of a mono voice, see [Synth](#synth) |
-| `STOP` | voice handle: the voice fades out over the ramp and ends |
-| `VOICE_SET` | voice handle, `VOLUME`, `PAN`, `PITCH`, `BUS` or `POSITION`, value |
-| `BUS_SET` | bus, `VOLUME`, `PAN`, `MUTE` or `SEND` (the send level), value |
-| `ORDER` | count, then per bus in processing order: bus, output, send |
+| `PLAY` | when, voice handle, sound, bus, volume, pan, pitch, flags (`BOX_AUDIO_PLAY_LOOP`): the first sample of the voice is at `when` |
+| `LEGATO` | new voice handle, handle of the voice it follows, then the fields of `PLAY` but `when`: a note of a mono voice, see [Synth](#synth) |
+| `STOP` | when, voice handle: the voice fades out over the ramp from `when` and ends; one that applies now also drops the scheduled commands of its handle |
+| `VOICE_SET` | when, voice handle, `VOLUME`, `PAN`, `PITCH`, `BUS` or `POSITION`, value: the ramp starts at `when` |
+| `BUS_SET` | when, bus, `VOLUME`, `PAN`, `MUTE`, `WIDTH` (7), `SEND` (5, the level of send 0) or `SEND_1..3` (8..10, the levels of sends 1 to 3), value: the ramp starts at `when` |
+| `ORDER` | count, then per bus in processing order: bus, output, the buses of its 4 sends (or none) and a mask of the pre-fader ones |
 | `SOUND_RELEASE` | sound: freed once no voice plays it |
 | `STREAM` | voice handle, stream, bus, volume, channels, sample rate: opens a stream and starts a voice that reads it |
 | `REVERB` | slot, bus (or none), decay, damping, predelay, size, mix: see [Reverb](#reverb) |
 | `SYNTH` | sound, then a patch up to its last layer: makes a free sound id a synth or replaces its patch, see [Synth](#synth) |
 
 The sender picks the voice handles, so it addresses a voice without waiting for a reply. Values
-are clamped (volumes and send levels to 0..4, pans to -1..1, pitches to 1/64..16) and a NaN
+are clamped (volumes and send levels to 0..4, pans to -1..1, widths to 0..2, pitches to
+1/64..16) and a NaN
 becomes the low end. `POSITION` moves the read position of a voice at once, in frames of its
 sound: a looping sound wraps it and one that does not loop clamps it to its end, and a NaN, a
 negative or a huge position is 0. Sent in the batch of the `PLAY`, it starts the voice there,
@@ -338,7 +364,8 @@ when no voice uses the sound any more, so the side that owns it frees it, never 
 
 **Events** are `{ type, id, value }`: `VOICE_END` (id the handle, for an end, a stop or a
 steal), `VOICE_STOLEN` (id the handle, value the steals so far), `SOUND_FREE`,
-`ORDER_REFUSED`, `IGNORED` (id the command type) and `LOST` (value the events lost). The core
+`ORDER_REFUSED`, `IGNORED` (id the command type), `LOST` (value the events lost) and `LATE`
+(id the type of a command that found the schedule full and applied at once). The core
 holds `BOX_AUDIO_EVENT_MAX` (256) until `read_events`. The last slot is kept for `LOST`: when
 the other 255 are full a newer event is dropped and counted in a single `LOST` event in that
 slot, whose value grows with each further loss until it is read; reading it resets the count,
@@ -373,13 +400,20 @@ A play when 64 voices play steals the one with the lowest level, the larger of i
 targets (the first of equals), with a fade of 2 ms. This is the voice cap: there is no
 priority system.
 
-**Buses** are a fixed pool of `BOX_AUDIO_BUS_MAX` (32); bus 0 is the master. Each has a volume,
-a pan, a mute, an output and one send with a level, taken after its volume. An `ORDER` command
-replaces the processing order and the routing as a whole. The core checks it: the master comes
-last and outputs nowhere, every other bus outputs, and sends, only to buses after it, and no bus
-appears twice. An invalid order is ignored with `ORDER_REFUSED`, so a cycle cannot hang the
-render. A bus not in the order is silent and its ramps wait. The order starts as the master
-alone.
+**Buses** are a fixed pool of `BOX_AUDIO_BUS_MAX` (64); bus 0 is the master. A bus that is not
+in the order costs nothing. Each has a volume, a pan, a width, a mute, an output and
+`BOX_AUDIO_SENDS` (4) sends with a level each. A bus renders its block in this order: its
+reverb, its width, its pre-fader sends, its volume, pan and mute, its output, then its
+post-fader sends. The width is a gain of the side signal: with `mid = (l + r) / 2` and
+`side = (l - r) / 2`, the bus plays `mid + width side` on the left and `mid - width side` on the
+right, so 0 is mono, 1 passes as is and 2 doubles the side; at 1 the bus skips it, bit
+identical. A post-fader send taps the bus after its volume and pan; a pre-fader send taps it
+before them, and its gain follows the mute so that a muted bus sends nothing. A send without a
+bus does no work. An `ORDER` command replaces the processing order and the routing as a whole,
+the pre-fader sends included. The core checks it: the master comes last and outputs and sends
+nowhere, every other bus outputs, and sends, only to buses after it, and no bus appears twice.
+An invalid order is ignored with `ORDER_REFUSED`, so a cycle cannot hang the render. A bus not in
+the order is silent and its ramps wait. The order starts as the master alone.
 
 **Ramps.** A voice and a bus each hold a gain per channel that combines volume, pan, mute and
 fades; every change moves it linearly over `BOX_AUDIO_CORE_RAMP` (5 ms), and a voice starts at
@@ -390,7 +424,7 @@ its samples as they are. A stereo voice, a stereo sample or a wide synth, takes 
 gains on its two channels, so its pan, and the pan of a bus, is a balance: at the center both
 channels pass as they are, toward a side the far channel fades and the near one rises by up to
 3 dB. For two channels that are not correlated, a wide synth, the power stays the same at every
-pan; a send takes both channels of its bus, after its volume and pan.
+pan; a post-fader send takes both channels of its bus, after its volume and pan.
 
 **The limiter** on the master keeps the peak at `BOX_AUDIO_LIMITER_THRESHOLD` (0.95): its gain,
 one for both channels so the image does not shift, drops at once to the threshold over the peak
@@ -405,6 +439,36 @@ reaches the output or stays in a bus, and a silent tail costs no more than sound
 so the same commands at the same block boundaries give bit identical output on the same build,
 whether the frames are rendered one at a time or in one large block.
 
+### The clock and the schedule
+
+The core counts the frames it rendered since it was created in 64 bits:
+`box_audio_core_clock(core)` returns the count, 0 for a new core. `PLAY`, `STOP`, `VOICE_SET`
+and `BUS_SET` carry a `when` right after their header, the frame of that clock at which they
+take effect, as two 32 bit words `when_lo` and `when_hi`, so that every field stays 32 bits.
+The writers `box_audio_write_play`, `_stop`, `_voice_set` and `_bus_set` take it as their last
+argument, a `uint64_t`.
+
+- A `when` of 0, or of a frame that was already rendered, applies at the start of the next
+  block, as a command without a `when` would.
+- A later `when` waits in the schedule of the core, a fixed heap of `BOX_AUDIO_SCHEDULE_MAX`
+  (4096) commands ordered by frame; commands for the same frame keep the order in which they
+  arrived. The render splits its block at the frame of the next due command, so the command
+  takes effect on exactly its frame: the first sample of a play is at `when`, the ramp of a set
+  starts at `when` and the fade of a stop starts at `when`. The output stays bit identical
+  whether the core renders one frame at a time, blocks of 128 or one large block. The schedule
+  does not allocate, and an empty one costs a test of its count per block.
+- A command that finds the schedule full applies at once and the core reports
+  `BOX_AUDIO_EVENT_LATE` (7), the command type as its id: a late command is better than a lost
+  one, since a lost release would leave a note hanging.
+- A `STOP` that applies now (a `when` of 0 or in the past) also drops every scheduled `PLAY`,
+  `STOP` and `VOICE_SET` of its voice handle, so a scheduled play that has not started never
+  starts. A `STOP` with a future `when` only stops. This is how a sender cancels what it
+  scheduled ahead, on a transport stop or a seek.
+
+`box_audio_core_scheduled(core)` returns the commands that wait. On the main thread, the
+`clock` function of a transport tells the frame of the core that renders now, see
+[Transports](#transports).
+
 The tests are `test/cpu/audio`, which render offline; `bench/audio` mixes 64 voices through 8
 buses and reports the time per frame.
 
@@ -412,7 +476,7 @@ buses and reports the time per frame.
 
 `src/audio/core/reverb.c` is an algorithmic reverb that runs on a bus: a feedback delay network
 of `BOX_AUDIO_REVERB_LINES` (8) delay lines. A send bus with a reverb is the usual setup, so
-sources reach it through the send of their bus.
+sources reach it through a send of their bus.
 
 - **The network.** The input, the mean of both channels, goes through a predelay line, then into
   every line with a sign pattern that is no row of the matrix, so the first reflection already
@@ -483,11 +547,17 @@ carries them. A voice holds the patch without its layers and
 takes, for each layer, a part from a pool the core allocates with itself: the layer, its oscillator,
 its own envelope and the state of its unison voices, 512 bytes. The pool has 4 parts per voice slot
 (320), so patches of up to 4 layers never run out of them and a voice of 8 takes the room of two of
-4; a play that finds too few free parts is ignored like one without a voice slot. A voice renders
-and advances only its parts and gives them back when it ends. The 80 voice slots (808 bytes each)
-and the pool take 223 KB. The pluck strings are a second pool of `BOX_AUDIO_SYNTH_STRINGS` (32),
-each with a delay line of `BOX_AUDIO_SYNTH_STRING_FRAMES` (2048) floats, 8 KB, 259 KB in all; a
-voice takes one for each pluck layer, and a play that finds too few free is ignored the same way.
+4. A play that finds too few free parts takes them like one at the voice cap takes a voice: the core
+ends the quietest synth voices that fade out, then the quietest that play, which it reports as
+`VOICE_STOLEN` and counts as steals, until the parts are free, and only then starts the play. It
+first checks that the play can start at all, so a play that is ignored fades or ends no voice. A
+voice renders and advances only its parts and gives them back when it ends. The 80 voice slots
+(808 bytes each) and the pool take 223 KB. The pluck strings are a second pool of
+`BOX_AUDIO_SYNTH_STRINGS` (32), each with a delay line of `BOX_AUDIO_SYNTH_STRING_FRAMES` (2048)
+floats, 8 KB, 259 KB in all; a voice takes one for each unison voice of each pluck layer, and a
+play that finds too few free is ignored, without fading or ending a voice. A pluck layer still
+takes one part: its strings hang off it in a chain, so a part does not grow for the layers that
+are not plucks.
 The 256 patches the core keeps are full size, 1020 bytes each. The core clamps every value of a
 patch, a NaN to the low
 end.
@@ -554,17 +624,21 @@ end.
   ends of their sweeps counted: a 1 kHz pair at 48 kHz keeps up to 18, a 7 kHz pair 0.86. The
   sidebands past that rule are weak but not 0, so a high index on a high carrier still aliases
   a little; a modulator that is itself modulated, feedback and several modulators of one
-  carrier widen the spectrum past what the limit counts. Saw, square and triangle carriers keep
-  the polyBLEP of their unmodulated rate, so a sine carrier is the clean one.
+  carrier widen the spectrum past what the limit counts. Saw, square and triangle carriers
+  smooth their edges, the polyBLEP and polyBLAMP, with the speed their modulated phase moves at
+  in each frame, how far it moved since the last one, wrapped so that a phase running backwards
+  counts as a negative speed, and under the top; so FM on them is about as clean as the plain
+  waves. Unison layers keep the speed of their unmodulated rate.
 - **Noise** is xorshift32, seeded per play from the seed of the patch and the count of its
   plays, so a fixed run gives bit identical output and every play differs. The same generator
   picks the pitch and level variances of the play, and plucks the strings.
 - **Pluck strings.** A layer of the wave `BOX_AUDIO_SYNTH_PLUCK` is a Karplus-Strong string
-  instead of an oscillator. At the start of a pass the string takes a burst of the noise of the
-  play, one period long, through a one pole lowpass of its `hardness` (0 a soft finger, 1 a
-  pick) and one of its `brightness` (a coefficient of 0.1 at 0 to 1, no filter, at 1), without
-  its mean so it carries no DC, scaled to a peak of 1, into its delay line. Per
-  frame the frame out of the line goes through a lowpass `(b, 1 - 2b, b)` with `b` from 0.25 at
+  instead of an oscillator, one for each of its unison voices. At the start of a pass each string
+  takes its own burst of the noise of the play, one after the other, so a fixed run is bit
+  identical and the strings of a unison do not sound alike. The burst is one period long,
+  through a one pole lowpass of its `hardness` (0 a soft finger, 1 a pick) and one of its
+  `brightness` (a coefficient of 0.1 at 0 to 1, no filter, at 1), without its mean so it carries
+  no DC, scaled to a peak of 1, into its delay line. Per frame the frame out of the line goes through a lowpass `(b, 1 - 2b, b)` with `b` from 0.25 at
   `brightness` 0 to 0.01 at 1, a first order allpass and the gain of the loop back into it; the
   frame out of the line is the sample. The lowpass is symmetric, a delay of exactly 1 frame at
   every frequency, so a period of n frames is a line of `d = floor(n - 1.5)` frames, the lowpass
@@ -592,8 +666,8 @@ end.
   limits the lowest note to the rate over 2046 above 81.8 kHz. Once the peak of a period is under
   -80 dB of the pluck it is silent and costs nothing more. A layer that uses no envelope at all
   (`rings_free`) plays at level 1 and the voice plays on while such a string rings; a voice of
-  only strings ends when they are all silent, envelopes or not; a looping voice plucks again. A
-  string ignores the phase modulation and the feedback of its layer, it may ring modulate or be
+  only strings ends when they are all silent, those of every unison voice, envelopes or not; a
+  looping voice plucks again. A string ignores the phase modulation and the feedback of its layer, it may ring modulate or be
   ring modulated, and a patch without strings renders as before, bit identical, and costs one
   compare per frame.
 - **Envelopes** are sample accurate: attack from 0 to 1, decay to the sustain level, hold,
@@ -651,7 +725,9 @@ end.
   of the stages of the filter with the same coefficients, and the voice reaches its bus as a
   stereo sample does. A unison layer that modulates or feeds back does so with the mean of its
   two channels; a modulator of a unison layer moves the phase of each of its voices. A pluck
-  layer always plays as one voice, its string in the center.
+  layer with unison rings a string per voice, each at the detune and the pan of its voice, and
+  takes no random phases; a pluck layer of one voice is its string in the center, bit identical
+  to a pluck without unison.
 - **Glide.** The `glide` of a patch, 0 to `BOX_AUDIO_SYNTH_GLIDE_MAX` (10) seconds, makes a
   change of the pitch of a voice (`VOICE_SET` `PITCH`) move exponentially in frequency, linear
   in cents, over that time: each oscillator multiplies its turns per frame by
@@ -683,17 +759,31 @@ end.
   in which no layer has more than one voice takes the loop it took before, bit identical, and
   costs one compare per block; a layer of one voice with a width is such a layer. A string
   costs a read and a write of its line, 6 multiplies and its peak per frame while it rings, and
+<<<<<<< HEAD
   a pluck writes its line of 2048 floats once. A patch with LFOs adds three adds and two
   multiplies per oscillator per frame and the control block every 8 frames, and a string with a
   vibrato retunes cheaply every frame and exactly every 8 frames and, for 8 frames after each
   crossing of a whole frame, runs a second read point through its lowpass and allpass; a patch without LFOs takes the loops it
+=======
+  a pluck writes its line of 2048 floats once; a unison pluck layer costs that per voice. A
+  patch with LFOs adds three adds and two multiplies per oscillator per frame and the control
+  block every 8 frames, and a string with a
+  vibrato tunes itself again every frame, as in a glide; a patch without LFOs takes the loops it
+>>>>>>> a71c45859c86821c76644f0038d8faa6b52b2a41
   took before and renders bit identical, and a square at a width of 0.5 costs a compare.
   `bench/audio` has a `Synth` suite of 64 voices in ns per sample, with a filter envelope, with a
   24 dB filter, `voices_64_lfo`, two LFOs on the pitch, the level, the cutoff and the pulse
   width (about twice the plain patch, most of it the coefficients of the moving cutoff, as with
   a filter envelope), `voices_64_fm`, two FM pairs per voice, which measures the modulated
+<<<<<<< HEAD
   path, `voices_32_pluck`, 32 ringing strings, one per voice, `voices_32_pluck_vibrato`, the
   same strings under a vibrato of 25 cents, and `voices_64_curved`, which is
+=======
+  path, `voices_32_pluck`, 32 ringing strings, one per voice, `voices_8_pluck_unison`, the same
+  32 strings as 8 voices of a 4 voice unison in stereo (about half the time of
+  `voices_32_pluck`: a voice, its filter and its mix cost more than a string), and
+  `voices_64_curved`, which is
+>>>>>>> a71c45859c86821c76644f0038d8faa6b52b2a41
   `voices_64` with a curve of 4 and an attack curve of 1.5 on the patch envelope and on the
   envelope of the square. A frame inside a linear segment is an inlined add behind one test;
   entering a segment, the last frame of one and a curved frame take an out of line step, so a
@@ -841,7 +931,7 @@ A delay and a fade bring a vibrato in after the attack, as players do; a fade on
 it swell from the start. The LFO restarts with every note and with each pass of a looping
 sound; a legato note keeps it running. The level only dips, so a tremolo never makes a sound
 louder than it is without it. A vibrato moves every unison voice of a layer and the pitch of a
-`SynthPluck` string with it.
+`SynthPluck` string with it, each string of a unison pluck.
 
 ```
 using box.audio
@@ -1106,6 +1196,7 @@ The `frequency`, `frequency_end`, `sweep` and `level` of the `SynthOscillator` a
 layer; `index` and `feedback` do not. Every play plucks with other noise, from the `seed` of the
 `SynthSound` and the count of plays, so repeated notes differ a little, as on a real string, and a
 fixed run renders bit identical. The lowest note is `BOX_AUDIO_SYNTH_PLUCK_LOWEST`, 40 Hz: a lower
+<<<<<<< HEAD
 one plays at 40 Hz with one warning. A core rings 32 strings at once; a play that finds none free
 is ignored. The string follows the pitch of its voice: a change of `AudioSource.pitch`, a sweep,
 a `SynthGlide`, legato notes and the `pitch` of a `SynthLfo` bend the ringing string without a
@@ -1116,6 +1207,26 @@ one. A string plays as one voice: a `SynthUnison` on a `SynthPluck` layer is ign
 no ensemble of detuned strings in one layer; several `SynthPluck` layers a few cents apart make a
 chorus, as the 12 string guitar has.
 A string may ring modulate or be ring modulated, but it ignores phase modulation and feedback.
+=======
+one plays at 40 Hz with one warning. The string follows the pitch of its voice: a change of
+`AudioSource.pitch`, a sweep, a `SynthGlide`, legato notes and the vibrato of a `SynthLfo` bend
+the ringing string without a new pluck. A string may ring modulate or be ring modulated, but it
+ignores phase modulation and feedback.
+
+A `SynthUnison` on a `SynthPluck` layer rings a string for each of its `voices`, each detuned and
+panned as the voices of an oscillator (see [Unison and width](#unison-and-width)) and plucked with
+its own noise, so the strings beat against each other and do not sound alike: the pairs of a 12
+string guitar, or a harp ensemble, in one layer and wide. The strings share the level of the
+layer at `1 / sqrt(voices)` each, and the sound ends once the last of them is silent.
+
+A core rings 32 strings at once (`BOX_AUDIO_SYNTH_STRINGS`), each with its delay line of 8 KB,
+and a pluck takes one string per unison voice: a single string takes 1, the 12 string guitar
+below 3 per note, a 4 voice unison 4, so a chord of 6 notes of a 4 voice unison takes 24 and a
+second chord while the first rings finds too few. A play that does not find a string for each
+voice is ignored, as one without a voice slot, and its strings come back when its voice ends.
+Keep the unison of a pluck at 2 or 3 voices for parts of many ringing notes; a long `decay` keeps
+the strings of a note taken for longer.
+>>>>>>> a71c45859c86821c76644f0038d8faa6b52b2a41
 
 ```
 using box.audio
@@ -1132,6 +1243,23 @@ prefab Guitar {
     SynthOscillator: {wave: SynthPluck, frequency: 196, level: 0.6}
     SynthString: {decay: 3, brightness: 0.6, hardness: 0.9}
     SynthLfo: {rate: 5.5, delay: 0.4, fade: 0.5, pitch: 10}
+  }
+}
+
+// A 12 string guitar: G3 strung as a pair of steel strings 6 cents apart across half of the
+// stereo field, with a quieter octave string in the center, 3 strings, 3 s
+prefab TwelveString {
+  AudioOutput: {bus: music}
+  SynthSound: {level_variance: 0.05}
+  SynthFilter: {kind: SynthLowPass, cutoff: 5000}
+  string {
+    SynthOscillator: {wave: SynthPluck, frequency: 196, level: 0.6}
+    SynthUnison: {voices: 2, detune: 6, width: 0.5}
+    SynthString: {decay: 3, brightness: 0.6, hardness: 0.9}
+  }
+  octave {
+    SynthOscillator: {wave: SynthPluck, frequency: 392, level: 0.2}
+    SynthString: {decay: 2, brightness: 0.7, hardness: 0.9}
   }
 }
 
@@ -1152,7 +1280,8 @@ prefab Koto {
 ```
 
 The guitar wants a `brightness` around 0.6 and a long `decay`, a nylon string 0.3 and a softer
-`hardness`; the koto rings bright and short. The harp of the Mossvale score
+`hardness`; the 12 string guitar is the same string as a detuned pair, which shimmers as the two
+beat, with its octave; the koto rings bright and short. The harp of the Mossvale score
 (`etc/scenes/mossvale/music.flecs`) is a gut string, `SynthString: {decay: 2.2, brightness: 0.35,
 hardness: 0.45}`, over a soft sine with its own short envelope for the body; its notes ring out
 over each other as a harp's do, and each ends when its string is silent.
@@ -1182,8 +1311,11 @@ from `test/assets/audio/synth_unison.flecs` from script, panned in space), pluck
 pitch within 2 cents from 80 Hz to 2 kHz at 44.1 and 48 kHz, a -60 dB time that scales with the
 decay, more upper harmonics when brighter, bit identical for a seed and different for another,
 the end of a voice once its string is silent with and without an envelope, a jump and a glide of
-the pitch, the pool of strings, a string with unison as one voice and next to a wide layer, the
-defaults and the warning of a low note, and the guitar, the koto and the Mossvale harp from
+the pitch, the pool of strings, a string of one voice bit identical to one without unison and
+next to a wide layer, unison plucks (peaks at the detuned frequencies, width 0 identical on both
+channels and width 1 decorrelated, one string per voice from the pool, given back when the voice
+ends, and the same seed bit identical), the defaults and the warning of a low note, and the
+guitar, the 12 string guitar, the koto and the Mossvale harp from
 `test/assets/audio/synth_pluck.flecs`), LFOs (a vibrato that moves the pitch by its cents at its
 rate only after its delay, a tremolo that moves the envelope at its rate by its depth, a cutoff
 and a pulse width that move the spectrum at the rate, a pulse band limited at every width, a
@@ -1210,6 +1342,7 @@ int32_t read_events(t, events, max);               // the events of the core, ol
 box_audio_state_t state(t);                        // what the output does
 void update(t, delta);                             // once per frame
 void stats(t, stats);                              // voices and load of the core
+uint64_t clock(t);                                 // the frame of the core that renders now
 bool capture(t, frames);                           // record the next frames the core renders
 float* capture_take(t, &frames);                   // a finished capture, NULL while it records
 ```
@@ -1234,6 +1367,23 @@ over the time it renders, smoothed; the native audio thread and the null transpo
 the worklet does not (it has no clock finer than a millisecond) and reports 0. Every transport frees the frames of
 a sound itself after `SOUND_FREE`; the main thread keeps the last 4096 events until
 `read_events`.
+
+**The clock** of a transport is the frame of the core that is being rendered now, as far as the
+main thread can tell, the frame a command with a `when` is scheduled against:
+
+- null: the frames rendered so far, `box_audio_core_clock` of its core;
+- native: a 64 bit count that the audio thread publishes atomically after each callback (and
+  the main thread while the device is lost);
+- web: every 16 quanta the worklet posts the clock of its core with the `currentFrame` of its
+  global scope after the quantum, and the page extrapolates it from `AudioContext.currentTime`,
+  at most 32 quanta ahead of the report and never backward, so that it moves between messages.
+  `Module.boxAudio.clock()` returns it, and the `stats` of the worklet include `clock`.
+
+The clock stops while the output does not run: waiting for a gesture, suspended or off. A new
+output (a new serial) has a new core, whose clock starts at 0; on the web the core of the
+worklet lives as long as the page, so a second world of the same page starts at its clock.
+`AudioStatus.clock` holds it once per frame, and `box_audio_module_clock` (`module.h`) reads it
+for the parts of `box.audio` that schedule ahead.
 
 **Where the output opens.** A world that imports box opens nothing: thousands of tests import
 it and must not touch audio hardware. `box_app_run` opens the output of its world
@@ -1465,12 +1615,17 @@ developer console, a sound and a play command make a 440 Hz tone:
 const a = Module.boxAudio, rate = a.ctx.sampleRate, s = new Float32Array(rate);
 for (let i = 0; i < rate; i++) s[i] = 0.25 * Math.sin(2 * Math.PI * 440 * i / rate);
 await a.sound(1, s, 1, rate);
-const v = new DataView(new ArrayBuffer(32));
-v.setUint16(0, 1, true); v.setUint16(2, 32, true); v.setUint32(4, 1, true);
-v.setUint32(8, 1, true); v.setFloat32(16, 1, true); v.setFloat32(24, 1, true);
-v.setUint32(28, 1, true);
+const v = new DataView(new ArrayBuffer(40));
+v.setUint16(0, 1, true); v.setUint16(2, 40, true); v.setUint32(12, 1, true);
+v.setUint32(16, 1, true); v.setFloat32(24, 1, true); v.setFloat32(32, 1, true);
+v.setUint32(36, 1, true);
 a.commands(v.buffer);
 ```
+
+The bytes are a `PLAY`: the header at 0, `when_lo` and `when_hi` at 4 and 8 (0, so it plays
+now), the voice at 12, the sound at 16, the bus at 20, the volume at 24, the pan at 28, the
+pitch at 32 and the flags at 36 (looping). `a.clock()` is the frame of the core that renders
+now; a `when` of `a.clock() + rate` in the two words starts the tone a second later.
 
 The automated check of Chrome is `test/integration/web/audio_core.mjs`, and of Safari
 `test/integration/web/audio_core_safari.mjs`, which drives real Safari through `safaridriver`
@@ -1502,7 +1657,7 @@ frame, the same on every platform.
 | `AudioPcm` | The samples of a sound (`samples`, `channels`, `sample_rate`, 0 for the output rate); `box_audio_sound_from_pcm` sets it from C |
 | `SoundFile` | A sound decoded from a WAV or FLAC file (`path`), see [Sound files](#sound-files) |
 | `SoundStatus` | Read only: `state` (`SoundLoading`, `SoundReady`, `SoundFailed`), `frames`, `channels`, `sample_rate` and `error` of a `SoundFile` |
-| `AudioBus` | A mixer bus: `output` (0 or `master` for the master), `volume` (1), `pan`, `mute`, `send` and `send_level` |
+| `AudioBus` | A mixer channel: `output` (0 or `master` for the master), `volume` (1), `pan`, `width` (1), `mute`, `solo`, `kind` (`AudioChannelGroup`, `AudioChannelReturn` or `AudioChannelSfx`) and `sends`, up to 4 `AudioSend` of `bus`, `level` and `pre_fader`; see [Mixer channels](#mixer-channels) |
 | `Reverb` | A reverb on the bus of the entity: `decay` (1.5 s), `damping` (0.5), `predelay` (0.02 s), `size` (0.5), `mix` (1) |
 | `AudioOutput` | The bus a source, or a sound by default, plays on |
 | `AudioSource` | A sound that plays while the entity exists: `sound`, `volume` (1), `pitch` (1), `loop`, `playing` (true) |
@@ -1515,7 +1670,8 @@ frame, the same on every platform.
 | `AudioSpatial` | Places a source in the world: `min_distance` (1), `max_distance` (50), `rolloff` (1), see [Spatial audio](#spatial-audio) |
 | `AudioListener` | Tag of the entity whose `WorldTransform` hears the spatial sources |
 | `AudioSettings` | Singleton: `master_volume` (1) and `mute` |
-| `AudioStatus` | Singleton, read only: `state`, `sample_rate`, `voices`, `voices_stolen`, `load`, `buses` |
+| `AudioStatus` | Singleton, read only: `state`, `sample_rate`, `voices`, `voices_stolen`, `load`, `buses`, `clock` (the frame of the core that renders now) |
+| `Transport` | Singleton: `tempo` (120, 20..999), `beats_per_bar` (4), `beat_unit` (4), `position` (beats, written while it plays, clamped to ±2^31 like `loop_start` and `loop_end`), `playing` (false), `loop` (false), `loop_start`, `loop_end`, `lookahead` (0.15 s, 0.05..0.5), `metronome` (false), see [Transport](#transport) |
 
 Constructors give the defaults in parentheses, so `AudioSource: {sound: click}` in a script plays
 at unity volume and pitch. From C, `ecs_set` writes every member; use `ecs_ensure` to keep the
@@ -1541,22 +1697,65 @@ what differs, all into one batch, and sends nothing in a frame without changes. 
 the events of the output (ended voices, steals, freed sounds), the listener, the buses, the
 order, the master settings, new sounds, the sources, the spatial sources and the one shots of
 `play_at` when the listener moved, then the plays, the stops of deleted sources and the
-releases of sounds. A world without audio components pays the empty queries.
+releases of sounds, and last the [transport](#transport): its window and the metronome. A world without audio components pays the empty queries.
 
-**Buses** get an index of the core, up to 31 besides the master; more log one error and are
-silent. The order is compiled whenever a bus appears, disappears or changes its output or send:
+**Buses** get an index of the core, up to 63 besides the master; more log one error and are
+silent. The order is compiled whenever a bus appears, disappears or changes its output or sends:
 a depth first walk computes the longest path of each bus to the master and finds cycles; the
 deepest buses come first, the master last. A cycle through outputs and sends logs one error that
 names the buses on it and keeps the last valid order, which the core keeps playing. A deleted
 bus, or an output or send that names no bus, routes to the master: its sources and one shots are
 moved to the master and the index is reused a frame later. A Disabled bus is muted.
 
+### Mixer channels
+
+`AudioBus` is the component of every channel of a mix: a group, a return, an SFX bus, the bus of
+a track and the master. `kind` tells the solo what a channel is: `AudioChannelGroup` (the
+default) for groups and other buses, `AudioChannelReturn` for returns such as a reverb bus and
+`AudioChannelSfx` for the buses of the game sounds. A track is identified by its `Track` and the
+master by `box.audio.master`. A script cannot declare an entity by a path, so it sets the master's
+`AudioBus` in the scopes `box { audio { master { ... } } }`. The module keeps the master out of
+the script, so a reload of the scene does not delete it.
+
+```
+using box.audio
+
+box { audio { master { AudioBus: {width: 0.9} } } }
+hall { AudioBus: {output: master, kind: AudioChannelReturn}; Reverb: {decay: 2} }
+sfx { AudioBus: {output: master, kind: AudioChannelSfx} }
+band { AudioBus: {output: master, volume: 0.6} }
+lead { AudioBus: {output: band, solo: true, sends: [{bus: hall, level: 0.3}]} }
+pad {
+  AudioBus: {output: band, width: 1.5, sends: [{bus: hall, level: 0.5, pre_fader: true}]}
+}
+```
+
+- **Width** (0..2, default 1) is a mid/side gain after the reverb of the channel and before its
+  pan: 0 is mono, 1 as is, 2 doubles the side.
+- **Sends**: up to `BOX_AUDIO_SENDS` (4) per channel, each with a `bus`, a `level` (0..4) and
+  `pre_fader`. A post-fader send taps after the volume and pan, a pre-fader one before them; the
+  mute and the solo silence both. More than 4 log one error that names the channel and the first
+  4 play. A send to no bus, or to a deleted one, does nothing, and a cycle through any send logs
+  the error of a cycle through outputs.
+- **Solo** is computed by the module and sent as part of the mute, so it ramps. When any channel
+  is soloed, a channel is heard when it is soloed, is on the output path of a soloed channel,
+  feeds a soloed channel (the tracks of a soloed group), is a return (solo safe, so the reverb of
+  a soloed track is heard), is an SFX bus (solo is a tool of the music mix and never silences the
+  game), or is downstream of one of these. `mute` always wins, and a Disabled channel is muted
+  and does not solo.
+- **The master** may have an `AudioBus` for its pan and width. Its volume multiplies
+  `AudioSettings.master_volume` and its mute adds to `AudioSettings.mute`; its output, sends,
+  solo and kind are ignored.
+
+A width of 1 and unused sends add no work per frame, and a world without a solo pays one check
+of a mask.
+
 **Reverbs.** A scene sets its reverb by having an entity with `AudioBus` and `Reverb`, and
 unloading the scene deletes it, which fades its tail out:
 
 ```
 hall { AudioBus: {output: master}; Reverb: {decay: 2.4, damping: 0.4, predelay: 0.02} }
-world { AudioBus: {output: master, send: hall, send_level: 0.3} }
+world { AudioBus: {output: master, sends: [{bus: hall, level: 0.3}]} }
 ```
 
 Components on one line are separated by `;` (or a newline): flecs script does not take a comma
@@ -1790,6 +1989,72 @@ node test/integration/web/audio_stream.mjs \
     "$(tools/integration.py local-env --env audio)/wasm32-Emscripten/debug/bin"
 ```
 
+### Transport
+
+`src/audio/tempo.c` keeps one timeline in beats for the world, which the metronome, and later
+tracks, quantized plays and tempo synced delays, schedule against. The `Transport` singleton
+holds it:
+
+```
+using box.audio
+$ { Transport: {tempo: 96, beats_per_bar: 6, beat_unit: 8, playing: true, metronome: true} }
+```
+
+**Beats.** A beat is a quarter note in every time signature, and every time of the timeline is
+in these beats. A bar is `beats_per_bar * 4 / beat_unit` beats: 4 in 4/4, 3 in 6/8, 3.5 in 7/8.
+Bars start at beat 0. `tempo` is quarter notes per minute, clamped to 20..999 (a NaN to 20).
+
+**Position.** While `playing` is true the module writes `position` every frame from the clock
+of the output: the beat that the core renders now. It follows the audio, not the frame delta,
+so it stops while a page is suspended and while the output waits for its device. A write of
+`position` by the application is a seek: the module notices a value that differs from the one
+it wrote last, so a seek works from a script, the REST API and the `set` command alike.
+`playing: false` stops at the position and `playing: true` plays on from it; a position written
+while stopped is where the next start begins. `position`, `loop_start` and `loop_end` are
+clamped to -2^31..2^31 beats (a NaN to 0), so a bad value cannot overflow the frames.
+
+**Beats to frames.** The timeline is a list of anchors, each a frame of the core clock and the
+beat at that frame. A beat lasts `rate * 60 / tempo` frames, and the frame of a beat on an
+anchor is `anchor frame + round((beat - anchor beat) * rate * 60 / tempo)`. An anchor is set
+when the transport starts, on a seek, on a new output and on a change of the tempo or the loop.
+A change is anchored at the end of what was scheduled already, at the current position on that
+line: the position does not jump, and the new tempo applies to what has not been scheduled.
+`box_audio_timeline_beat` and `box_audio_timeline_frame` in `src/audio/module.h` convert both
+ways; `box_audio_anchor_frame` and `box_audio_anchor_beat` do it on one anchor.
+
+**Loop.** With `loop` on and `loop_end > loop_start`, the timeline wraps from `loop_end` to
+`loop_start` on the frame of `loop_end`, `anchor frame + round((loop_end - anchor beat) * rate *
+60 / tempo)`, where a new anchor starts at `loop_start`. A position before `loop_start` plays
+into the loop; a position at or past `loop_end` plays on without wrapping until a seek. A loop
+shorter than a frame does not wrap.
+
+**The lookahead window.** Each frame the module covers the frames from the end of the last
+window to `clock + lookahead`. The window is a list of segments, each with a beat range
+`[start, end)`, its frames `[frame, frame_end)` and its anchor, split at a loop wrap. The frames
+and the beats of consecutive segments and windows follow each other without a gap or an
+overlap, so an event whose beat is in a segment is scheduled once, as a command with the frame
+of its beat as its `when`. When the clock overtook the window, after a stall longer than the
+lookahead, the window starts at the clock and the beats in between are skipped rather than
+played late. The internal API in `src/audio/module.h` is for the parts that schedule:
+`box_audio_timeline_hook` adds a hook whose `window` callback gets the segments every frame the
+transport plays, and whose `reset` callback runs on a stop, a seek and a new output;
+`box_audio_timeline_play` writes a `PLAY` with a `when` and remembers its handle. On a stop and a
+seek the module cancels what it scheduled ahead that has not started with an immediate `STOP` of
+each handle, which also drops its scheduled play in the core; a new output has none of them.
+
+**Metronome.** With `metronome: true` and the transport playing, a click plays on the master on
+every beat counted from the start of each bar, accented on the first beat of a bar: volume 0.8
+and pitch 1.5 against 0.4 and 1. The click is a synth patch built in code, a 1600 Hz sine that
+decays in 30 ms, sent once to the output when the metronome first plays. Each click is a
+scheduled `PLAY` with its exact frame, so its first sample is at
+`round(beat * rate * 60 / tempo)` frames from the start, whatever the frame rate.
+
+A transport that does not play costs a read of the singleton per frame and sends nothing. The
+tests are the `Timeline` suite of `test/cpu/audio`, with the null transport at a fixed delta:
+the position, seeks, the loop, tempo changes, the coverage of the window, the frames and
+accents of the clicks in 4/4, 6/8 and a loop, the cancel on a stop, a new output, a script
+(`test/assets/audio/transport.flecs`), the command and two runs that capture identical audio.
+
 ### Before the gesture
 
 A scene plays the same on native, on the web and headless. On the web, plays requested while the
@@ -1802,9 +2067,14 @@ nothing.
 ### The audio command and captures
 
 The shell command `audio` (`src/command/cmd_audio.c`) prints the state, the rate, the voices, the
-steals and the load, then the master and the buses in processing order, with the values of the
-reverb of a bus and `(dry, every slot taken)` for a reverb that has no slot. `audio volume <v>` and
-`audio mute [on|off]` write `AudioSettings`. `audio capture <seconds>` records the master output
+steals and the load, the clock, the transport (`transport: 120.0 bpm 4/4, position 2.1 (4.250
+beats), playing, loop off`, the position as bar.beat counted from 1), then the master (with the
+volume, pan and width of its `AudioBus` when it has one) and the buses in processing order, each
+with its kind, volume, pan, width, `solo`, `muted`, its output, its sends (`send pre` for a
+pre-fader one) and the values of its reverb, and `(dry, every slot taken)` for a reverb that has
+no slot. `audio volume <v>` and `audio mute [on|off]` write `AudioSettings`; `audio play`,
+`audio stop`, `audio seek <beats>` and `audio tempo <bpm>` (20 to 999) write `Transport`.
+`audio capture <seconds>` records the master output
 to a 16 bit stereo WAV resource of the session, fetched like a `capture` PNG with
 `GET /shell/session/<id>/resource/<name>`, empty until the file is written in one rename. In the
 browser it writes `/tmp/audio_capture_<n>.wav` in the file system of the page and returns the
@@ -1813,7 +2083,7 @@ Headless with a fixed `--delta-time`, two runs write identical captures, which i
 tests inspect audio and how a render can be listened to. `box.perf` reports the largest load of
 a run as `PerfStatus.audio_load` and `audio_load` in its report.
 
-The tests are `Module`, `Source`, `Script`, `Capture` and `Spatial` in `test/cpu/audio`,
+The tests are `Module`, `Mixer`, `Source`, `Script`, `Capture` and `Spatial` in `test/cpu/audio`,
 through the null transport; `test/integration/e2e/audio.py` drives the command on a headless
 app, `test/integration/web/audio_spatial.mjs` moves a source from the left of the listener to
 its right in Chrome and measures both channels with `test/integration/web/audio_spatial.flecs`,

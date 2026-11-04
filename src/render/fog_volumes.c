@@ -244,7 +244,7 @@ void box_render_fog_offset(
  * time.
  *
  * @param fog The FogVolume
- * @param transform World transform of the entity, NULL for the origin
+ * @param transform World transform of the entity
  * @param time Seconds the world has advanced in total, the time of the packet
  * @param out Receives the record
  */
@@ -258,22 +258,18 @@ static void box_fog_record(
     ecs_os_memset_t(out, 0, box_render_fog_volume_t);
     for (k = 0; k < 3; k ++) {
         vec3 axis = {0, 0, 0};
+        vec3 column;
         axis[k] = 1.0f;
-        if (transform) {
-            vec3 column;
-            glm_vec3_copy(ECS_CONST_CAST(float*, transform->m[k]), column);
-            if (glm_vec3_norm(column) > 1e-12f) {
-                glm_vec3_normalize_to(column, axis);
-            }
+        glm_vec3_copy(ECS_CONST_CAST(float*, transform->m[k]), column);
+        if (glm_vec3_norm(column) > 1e-12f) {
+            glm_vec3_normalize_to(column, axis);
         }
 
         glm_vec3_copy(axis, out->axes[k]);
         out->extent[k] = glm_max(fog->extent[k], 0.0f);
     }
 
-    if (transform) {
-        glm_vec3_copy(ECS_CONST_CAST(float*, transform->m[3]), out->center);
-    }
+    glm_vec3_copy(ECS_CONST_CAST(float*, transform->m[3]), out->center);
 
     out->density = glm_max(fog->density, 0.0f);
     out->absorption = glm_clamp(fog->absorption, 0.0f, 1.0f);
@@ -311,8 +307,7 @@ static void box_fog_collect(
         for (i = 0; i < it.count; i ++) {
             box_fog_volume_t *f = ecs_vec_append_t(NULL, &l->fog_volumes, box_fog_volume_t);
             f->scene = box_render_scene_field(&it, 2, i);
-            box_fog_record(&fogs[i], transforms ? &transforms[i] : NULL, time,
-                &f->record);
+            box_fog_record(&fogs[i], &transforms[i], time, &f->record);
         }
     }
 }
@@ -498,7 +493,7 @@ box_render_fog_t* box_render_fog_new(
         .entity = ecs_entity(world, { .name = "RenderFogVolumes" }),
         .terms = {
             { .id = ecs_id(FogVolume), .inout = EcsIn },
-            { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional },
+            { .id = ecs_id(WorldTransform), .inout = EcsIn },
             {
                 .id = ecs_id(Scene),
                 .src.id = EcsSelf | EcsUp,

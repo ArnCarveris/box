@@ -11,6 +11,9 @@
  *
  * Rotation and Scale imply Position, and every pose component implies WorldTransform. Velocity
  * implies Position and AngularVelocity implies Rotation (see box/movement.h).
+ *
+ * An entity without a WorldTransform has no place in the world: its shape, text, point or spot
+ * light, fog volume, reflection probe or particle emitter is not drawn, and it is not picked.
  */
 
 #ifndef BOX_TRANSFORM_H

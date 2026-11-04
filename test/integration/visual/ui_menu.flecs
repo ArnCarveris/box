@@ -114,6 +114,7 @@ menu {
   }
 
   dim {
+    Position: {0, 0, 0}
     Rect: {640, 360}
     Rgb: {0, 0, 0}
     Opacity: {0.55}

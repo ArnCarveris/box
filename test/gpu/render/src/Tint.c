@@ -319,6 +319,7 @@ void Tint_change_updates_descendants(void) {
     ecs_set(world, child, Tint, {0, 0, 0, 128});
     ecs_entity_t grandchild = ecs_new_w_pair(world, EcsChildOf, child);
     ecs_set(world, grandchild, Box, {2, 2, 0.1f});
+    ecs_set(world, grandchild, Position, {0, 0, 0});
     ecs_set(world, grandchild, Rgb, {128, 192, 255});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "change.png",
@@ -383,6 +384,7 @@ void Tint_remove_tint(void) {
     ecs_set(world, child, Tint, {0, 0, 0, 128});
     ecs_entity_t grandchild = ecs_new_w_pair(world, EcsChildOf, child);
     ecs_set(world, grandchild, Box, {2, 2, 0.1f});
+    ecs_set(world, grandchild, Position, {0, 0, 0});
     ecs_set(world, grandchild, Rgb, {128, 192, 255});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "remove.png",
@@ -447,6 +449,7 @@ void Tint_reparent_childof(void) {
     ecs_set(world, group, Tint, {0, 0, 0, 128});
     ecs_entity_t shape = ecs_new_w_pair(world, EcsChildOf, group);
     ecs_set(world, shape, Box, {2, 2, 0.1f});
+    ecs_set(world, shape, Position, {0, 0, 0});
     ecs_set(world, shape, Rgb, {128, 192, 255});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "move.png",
@@ -513,6 +516,7 @@ void Tint_reparent_parent(void) {
     ecs_entity_t shape = ecs_new(world);
     ecs_set(world, shape, EcsParent, {group});
     ecs_set(world, shape, Box, {2, 2, 0.1f});
+    ecs_set(world, shape, Position, {0, 0, 0});
     ecs_set(world, shape, Rgb, {128, 192, 255});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "move.png",
@@ -636,6 +640,7 @@ void Tint_dynamic_material(void) {
     ecs_entity_t shape = ecs_new_w_pair(world, EcsChildOf, root);
     ecs_add(world, shape, DynamicMaterial);
     ecs_set(world, shape, Box, {2, 2, 0.1f});
+    ecs_set(world, shape, Position, {0, 0, 0});
     ecs_set(world, shape, Rgb, {128, 192, 255});
     ecs_set(world, shape, Tint, {0, 0, 0, 0});
     ecs_entity_t e = ecs_new(world);
@@ -702,6 +707,7 @@ void Tint_dynamic_material_inherited(void) {
     ecs_set(world, group, Tint, {0, 0, 0, 128});
     ecs_entity_t shape = ecs_new_w_pair(world, EcsChildOf, group);
     ecs_set(world, shape, Box, {2, 2, 0.1f});
+    ecs_set(world, shape, Position, {0, 0, 0});
     ecs_set(world, shape, Rgb, {128, 192, 255});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "dyninh.png",
@@ -758,6 +764,7 @@ void Tint_keeps_opacity(void) {
     ecs_set(world, root, Tint, {255, 0, 0, 255});
     ecs_entity_t shape = ecs_new_w_pair(world, EcsChildOf, root);
     ecs_set(world, shape, Box, {2, 2, 0.1f});
+    ecs_set(world, shape, Position, {0, 0, 0});
     ecs_set(world, shape, Rgb, {0, 0, 255});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "opacity.png",

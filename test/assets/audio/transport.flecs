@@ -1,0 +1,10 @@
+// The transport for the Timeline suite of test/cpu/audio: 90 quarter notes per minute in 6/8,
+// playing from beat 2 with the metronome, a loop from beat 2 to 4 that is off.
+//
+// A beat lasts 32000 frames at 48 kHz, a bar of 6/8 is 3 beats.
+using box.audio
+
+$ {
+  Transport: {tempo: 90, beats_per_bar: 6, beat_unit: 8, position: 2, playing: true,
+    loop_start: 2, loop_end: 4, metronome: true}
+}

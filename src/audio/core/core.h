@@ -32,8 +32,13 @@
 /** Extra voice slots for voices that fade out after a stop or a steal */
 #define BOX_AUDIO_VOICE_TAIL_MAX 16
 
-/** Buses of a core; bus 0 is the master */
-#define BOX_AUDIO_BUS_MAX 32
+/** Buses of a core; bus 0 is the master. A bus that is not in the order costs nothing */
+#define BOX_AUDIO_BUS_MAX 64
+
+/** Sends of a bus */
+#ifndef BOX_AUDIO_SENDS
+#define BOX_AUDIO_SENDS 4
+#endif
 
 /** Sounds a core knows at once; a sound id is below this */
 #define BOX_AUDIO_SOUND_MAX 1024
@@ -42,6 +47,10 @@
  * newer events are lost when the others are full, and that event counts them.
  * BOX_AUDIO_EVENT_SOUND_FREE is never lost; it waits in the core until there is room */
 #define BOX_AUDIO_EVENT_MAX 256
+
+/** Commands with a when in the future that the core holds until their frame. A command that
+ * finds the schedule full applies at once and reports BOX_AUDIO_EVENT_LATE */
+#define BOX_AUDIO_SCHEDULE_MAX 4096
 
 /** Largest volume of a voice or a bus */
 #define BOX_AUDIO_VOLUME_MAX 4.0f
@@ -130,8 +139,9 @@
  * delay line of BOX_AUDIO_SYNTH_STRING_FRAMES limits it further, to the rate over 2046 */
 #define BOX_AUDIO_SYNTH_PLUCK_MIN 40.0f
 
-/** Pluck strings the voices of a core play at once, each with its delay line. A play that
- * does not find a string for each of its pluck layers is ignored */
+/** Pluck strings the voices of a core play at once, each with its delay line. A pluck layer
+ * takes one for each of its unison voices; a play that does not find a string for each is
+ * ignored */
 #define BOX_AUDIO_SYNTH_STRINGS 32
 
 /** Frames of the delay line of a pluck string, a power of 2: a period of up to 2046 frames,
@@ -177,15 +187,25 @@ typedef enum box_audio_param_t {
     BOX_AUDIO_PARAM_PITCH = 2,   /**< Pitch ratio of a voice */
     BOX_AUDIO_PARAM_BUS = 3,     /**< Bus a voice plays into */
     BOX_AUDIO_PARAM_MUTE = 4,    /**< Mute of a bus, nonzero mutes, ramped */
-    BOX_AUDIO_PARAM_SEND = 5,    /**< Level of the send of a bus, 0..BOX_AUDIO_VOLUME_MAX */
-    BOX_AUDIO_PARAM_POSITION = 6 /**< Read position of a voice in frames of its sound, wrapped
+    BOX_AUDIO_PARAM_SEND = 5,    /**< Level of send 0 of a bus, 0..BOX_AUDIO_VOLUME_MAX, ramped */
+    BOX_AUDIO_PARAM_POSITION = 6, /**< Read position of a voice in frames of its sound, wrapped
                                   *   into a looping sound, at once */
+    BOX_AUDIO_PARAM_WIDTH = 7,   /**< Stereo width of a bus, 0 mono .. 1 as is .. 2 double
+                                  *   side, a mid/side gain before the volume and pan, ramped */
+    BOX_AUDIO_PARAM_SEND_1 = 8,  /**< Level of send 1 of a bus */
+    BOX_AUDIO_PARAM_SEND_2 = 9,  /**< Level of send 2 of a bus */
+    BOX_AUDIO_PARAM_SEND_3 = 10  /**< Level of send 3 of a bus */
 } box_audio_param_t;
 
 /** Flags of BOX_AUDIO_CMD_PLAY */
 #define BOX_AUDIO_PLAY_LOOP (1u << 0)
 
-/** Header of every command: its type and its size in bytes, header included */
+/** Header of every command: its type and its size in bytes, header included.
+ *
+ * PLAY, STOP, VOICE_SET and BUS_SET follow it with when_lo and when_hi, the frame of the core
+ * clock (box_audio_core_clock) at which the command takes effect, 64 bits in two words so that
+ * every field stays 32 bits. A when of 0, or of a frame that was already rendered, applies at
+ * the start of the next block; a later one waits in the schedule of the core for its frame */
 typedef struct box_audio_cmd_header_t {
     uint16_t type;  /**< A box_audio_cmd_type_t; an unknown type is skipped */
     uint16_t size;  /**< Bytes of the command, a multiple of 4, at least 4 */
@@ -194,6 +214,8 @@ typedef struct box_audio_cmd_header_t {
 /** Start a voice that plays a sound */
 typedef struct box_audio_cmd_play_t {
     box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_PLAY */
+    uint32_t when_lo;               /**< Low word of the frame it starts at, 0 for now */
+    uint32_t when_hi;               /**< High word of the frame */
     uint32_t voice;                 /**< Handle the sender picks to address the voice */
     uint32_t sound;                 /**< Id of the sound */
     uint32_t bus;                   /**< Bus the voice plays into */
@@ -218,32 +240,43 @@ typedef struct box_audio_cmd_legato_t {
     uint32_t flags;                 /**< BOX_AUDIO_PLAY_ flags of a new voice */
 } box_audio_cmd_legato_t;
 
-/** Stop a voice: it fades out and ends */
+/** Stop a voice: it fades out and ends. A stop that applies now, with a when of 0 or in the
+ * past, also drops every command of the schedule for its handle, so a play that waits for its
+ * frame never starts; a stop with a future when only stops */
 typedef struct box_audio_cmd_stop_t {
     box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_STOP */
+    uint32_t when_lo;               /**< Low word of the frame its fade starts at, 0 for now */
+    uint32_t when_hi;               /**< High word of the frame */
     uint32_t voice;                 /**< Handle of the voice */
 } box_audio_cmd_stop_t;
 
 /** Set a parameter of a voice or a bus */
 typedef struct box_audio_cmd_set_t {
     box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_VOICE_SET or BOX_AUDIO_CMD_BUS_SET */
+    uint32_t when_lo;               /**< Low word of the frame its ramp starts at, 0 for now */
+    uint32_t when_hi;               /**< High word of the frame */
     uint32_t target;                /**< Handle of the voice or index of the bus */
     uint32_t param;                 /**< A box_audio_param_t */
     float value;                    /**< The new value */
 } box_audio_cmd_set_t;
 
-/** A bus in the processing order, where it outputs and where it sends */
+/** A bus in the processing order, where it outputs and where it sends.
+ *
+ * Send j of a bus has the level of BOX_AUDIO_PARAM_SEND (j 0) or BOX_AUDIO_PARAM_SEND_1 + j - 1.
+ * A post-fader send taps the bus after its volume and pan; a pre-fader send taps it before them,
+ * after its reverb and width, and follows its mute */
 typedef struct box_audio_route_t {
     uint8_t bus;     /**< Index of the bus */
     uint8_t output;  /**< Bus the bus outputs to, BOX_AUDIO_BUS_NONE for the master */
-    uint8_t send;    /**< Bus of the send, BOX_AUDIO_BUS_NONE for none */
+    uint8_t sends[BOX_AUDIO_SENDS]; /**< Bus of each send, BOX_AUDIO_BUS_NONE for none */
+    uint8_t pre_fader; /**< Bit j set: send j is pre-fader */
     uint8_t unused;  /**< Padding, 0 */
 } box_audio_route_t;
 
 /** Replace the processing order, followed by count box_audio_route_t.
  *
- * The master comes last and outputs nowhere; every other bus outputs and sends only to buses
- * after it, so the routes have no cycle. A bus not in the order is silent.
+ * The master comes last and outputs and sends nowhere; every other bus outputs and sends only
+ * to buses after it, so the routes have no cycle. A bus not in the order is silent.
  */
 typedef struct box_audio_cmd_order_t {
     box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_ORDER */
@@ -456,14 +489,17 @@ typedef struct box_audio_cmd_synth_t {
 /** Events the core reports to its transport */
 typedef enum box_audio_event_type_t {
     BOX_AUDIO_EVENT_VOICE_END = 1,      /**< A voice ended, id is its handle */
-    BOX_AUDIO_EVENT_VOICE_STOLEN = 2,   /**< The cap stole a voice, id is its handle, value
-                                         * the steals so far */
+    BOX_AUDIO_EVENT_VOICE_STOLEN = 2,   /**< The cap or a play short of synth parts stole
+                                         * a voice, id is its handle, value the steals so
+                                         * far */
     BOX_AUDIO_EVENT_SOUND_FREE = 3,     /**< No voice uses a released sound, id is the sound */
     BOX_AUDIO_EVENT_ORDER_REFUSED = 4,  /**< An invalid order was ignored, value its count */
     BOX_AUDIO_EVENT_IGNORED = 5,        /**< A command was ignored, id is its type */
-    BOX_AUDIO_EVENT_LOST = 6            /**< The ring was full, value is the events lost since
+    BOX_AUDIO_EVENT_LOST = 6,           /**< The ring was full, value is the events lost since
                                          * the last LOST event was read; the last event of
                                          * the ring when it is full */
+    BOX_AUDIO_EVENT_LATE = 7            /**< A command with a future when found the schedule
+                                         * full and applied at once, id is its type */
 } box_audio_event_type_t;
 
 /** An event of the core */
@@ -567,7 +603,9 @@ void box_audio_core_stream_status(
     uint32_t stream,
     box_audio_stream_status_t *status);
 
-/** Apply a batch of commands. They take effect at the start of the next render block.
+/** Apply a batch of commands. They take effect at the start of the next render block, but
+ * a PLAY, STOP, VOICE_SET or BUS_SET with a future when, which waits in the schedule and takes
+ * effect on exactly its frame: the render splits its block there.
  *
  * Commands of an unknown type are skipped by their size; a truncated command ends the batch.
  * Does not allocate.
@@ -582,6 +620,9 @@ void box_audio_core_apply(
     int32_t size);
 
 /** Render frames into the left and right channel. Does not allocate, lock, log or wait.
+ *
+ * Advances the clock by frames. The commands of the schedule whose frame is reached apply at
+ * that frame, whatever the render sizes.
  *
  * @param core The core
  * @param left Receives frames samples of the left channel
@@ -608,6 +649,22 @@ int32_t box_audio_core_read_events(
     box_audio_core_t *core,
     box_audio_event_t *events,
     int32_t max);
+
+/** Get the clock of a core: the frames it rendered since it was created.
+ *
+ * @param core The core
+ * @return Number of frames, 0 for a new core
+ */
+uint64_t box_audio_core_clock(
+    const box_audio_core_t *core);
+
+/** Get the number of commands that wait in the schedule for their frame.
+ *
+ * @param core The core
+ * @return Number of commands
+ */
+int32_t box_audio_core_scheduled(
+    const box_audio_core_t *core);
 
 /** Get the number of events lost since the last BOX_AUDIO_EVENT_LOST was read.
  *
@@ -683,6 +740,7 @@ void box_audio_writer_init(
  * @param pan Pan, -1..1
  * @param pitch Pitch ratio
  * @param flags BOX_AUDIO_PLAY_ flags
+ * @param when Frame of the core clock of its first sample, 0 for now
  * @return Whether the command fit
  */
 bool box_audio_write_play(
@@ -693,7 +751,8 @@ bool box_audio_write_play(
     float volume,
     float pan,
     float pitch,
-    uint32_t flags);
+    uint32_t flags,
+    uint64_t when);
 
 /** Write a legato command: a note that follows the voice of a handle.
  *
@@ -723,11 +782,14 @@ bool box_audio_write_legato(
  *
  * @param writer The writer
  * @param voice Handle of the voice
+ * @param when Frame of the core clock its fade starts at, 0 for now, which also drops the
+ *     scheduled commands of the handle
  * @return Whether the command fit
  */
 bool box_audio_write_stop(
     box_audio_writer_t *writer,
-    uint32_t voice);
+    uint32_t voice,
+    uint64_t when);
 
 /** Write a command that sets a parameter of a voice.
  *
@@ -735,13 +797,15 @@ bool box_audio_write_stop(
  * @param voice Handle of the voice
  * @param param A box_audio_param_t
  * @param value The value
+ * @param when Frame of the core clock its ramp starts at, 0 for now
  * @return Whether the command fit
  */
 bool box_audio_write_voice_set(
     box_audio_writer_t *writer,
     uint32_t voice,
     box_audio_param_t param,
-    float value);
+    float value,
+    uint64_t when);
 
 /** Write a command that sets a parameter of a bus.
  *
@@ -749,13 +813,15 @@ bool box_audio_write_voice_set(
  * @param bus Index of the bus
  * @param param A box_audio_param_t
  * @param value The value
+ * @param when Frame of the core clock its ramp starts at, 0 for now
  * @return Whether the command fit
  */
 bool box_audio_write_bus_set(
     box_audio_writer_t *writer,
     uint32_t bus,
     box_audio_param_t param,
-    float value);
+    float value,
+    uint64_t when);
 
 /** Write a command that replaces the processing order.
  *

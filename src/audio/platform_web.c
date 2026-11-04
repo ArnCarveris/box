@@ -43,6 +43,7 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
         var EVENTS = 64;
         var SOUND_FREE = 3;
         var STATUS_QUANTA = 32;
+        var CLOCK_QUANTA = 16;
         var STREAMS = 2;
         var STREAM_FIELDS = ['voice', 'open', 'ended', 'consumed', 'at', 'underruns', 'starved'];
         class BoxAudioProcessor extends AudioWorkletProcessor {
@@ -164,6 +165,7 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                     this.port.postMessage({ type: 'stats', id: m.id, quanta: this.quanta,
                         frame: currentFrame, time: currentTime, sampleRate: sampleRate,
                         voices: core.box_audio_core_wasm_voices(), batches: this.batches,
+                        clock: core.box_audio_core_wasm_clock(),
                         sounds: this.sounds.size, reverbs: this.reverbs.size,
                         memory: this.buffer.byteLength,
                         lost: core.box_audio_core_wasm_events_lost(),
@@ -277,6 +279,13 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                 }
                 this.receive();
                 this.streams();
+                // The clock of the core goes with the frame of the context it reached, so the
+                // page can extrapolate it from currentTime between the messages
+                if (this.quanta % CLOCK_QUANTA === 0) {
+                    this.port.postMessage({ type: 'clock',
+                        clock: this.core.box_audio_core_wasm_clock(),
+                        frame: currentFrame + frames });
+                }
                 this.quanta++;
                 if (this.quanta % STATUS_QUANTA === 0) {
                     this.status();
@@ -306,7 +315,8 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
     var audio = { ctx: ctx, node: null, pending: [], requests: {}, sounds: {}, id: 0,
         failed: 0, coreSize: size, events: [], queue: [], onevents: null, gestures: 0,
         resumes: 0, voices: 0, gain: null, hidden: false, wasRunning: false, suspends: 0,
-        visibilityResumes: 0, capturing: false, captured: null, streams: [], chunksSent: 0 };
+        visibilityResumes: 0, capturing: false, captured: null, streams: [], chunksSent: 0,
+        clockCore: 0, clockFrame: -1, clockLast: 0 };
     audio.post = function(m, transfer) {
         if (audio.node) {
             audio.node.port.postMessage(m, transfer || []);
@@ -320,6 +330,18 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
             audio.requests[id] = resolve;
             audio.post({ type: 'stats', id: id });
         });
+    };
+    // The frame of the core of the worklet that renders now: the clock of its last report, moved
+    // on by the frames the context played since, at most as far as the reports are apart. It
+    // stops while the context does not run and never goes back
+    audio.clock = function() {
+        if (audio.failed || audio.clockFrame < 0 || ctx.state !== 'running') {
+            return audio.clockLast;
+        }
+        var played = Math.floor(ctx.currentTime * ctx.sampleRate) - audio.clockFrame;
+        var now = audio.clockCore + Math.min(Math.max(played, 0), 2 * 16 * quantum);
+        audio.clockLast = Math.max(audio.clockLast, now);
+        return audio.clockLast;
     };
     // Renders quanta of the worklet back to back and resolves with their load
     audio.bench = function(quanta) {
@@ -383,6 +405,9 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
             audio.reverbs[m.slot] = m.ok;
         } else if (m.type === 'status') {
             audio.voices = m.voices;
+        } else if (m.type === 'clock') {
+            audio.clockCore = m.clock;
+            audio.clockFrame = m.frame;
         } else if (m.type === 'stream') {
             audio.streams[m.status.stream] = m.status;
         } else if (m.type === 'capture') {

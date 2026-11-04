@@ -17,6 +17,23 @@ prefab Guitar {
   }
 }
 
+// A 12 string guitar: G3 strung as a pair of steel strings 6 cents apart across half of the
+// stereo field, with a quieter octave string in the center, 3 strings, 3 s
+prefab TwelveString {
+  AudioOutput: {bus: music}
+  SynthSound: {level_variance: 0.05}
+  SynthFilter: {kind: SynthLowPass, cutoff: 5000}
+  string {
+    SynthOscillator: {wave: SynthPluck, frequency: 196, level: 0.6}
+    SynthUnison: {voices: 2, detune: 6, width: 0.5}
+    SynthString: {decay: 3, brightness: 0.6, hardness: 0.9}
+  }
+  octave {
+    SynthOscillator: {wave: SynthPluck, frequency: 392, level: 0.2}
+    SynthString: {decay: 2, brightness: 0.7, hardness: 0.9}
+  }
+}
+
 // A koto: a bright silk string on D4 plucked with a hard pick, pressed up a semitone after
 // the pluck, and a quieter string an octave up that dies sooner, 1.5 s
 prefab Koto {

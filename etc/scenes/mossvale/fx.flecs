@@ -4,10 +4,10 @@ using box.audio
 using box.particle
 using box.transform
 
-mv_hall { AudioBus: {output: master}; Reverb: {decay: 1.4, damping: 0.5, predelay: 0.02, size: 0.6} }
-mv_sfx { AudioBus: {output: master, volume: 0.85, send: mv_hall, send_level: 0.18} }
-mv_ui { AudioBus: {output: master, volume: 0.6} }
-mv_music { AudioBus: {output: master, volume: 0.42, send: mv_hall, send_level: 0.3} }
+mv_hall { AudioBus: {output: master, kind: AudioChannelReturn}; Reverb: {decay: 1.4, damping: 0.5, predelay: 0.02, size: 0.6} }
+mv_sfx { AudioBus: {output: master, kind: AudioChannelSfx, volume: 0.85, sends: [{bus: mv_hall, level: 0.18}]} }
+mv_ui { AudioBus: {output: master, kind: AudioChannelSfx, volume: 0.6} }
+mv_music { AudioBus: {output: master, volume: 0.42, sends: [{bus: mv_hall, level: 0.3}]} }
 
 $ {
   ParticleSettings: {effect_max: 24, effect_total: 96, effect_overflow: EffectRecycle}
@@ -128,6 +128,7 @@ Note jingle_d6(f: 1174.66, len: 0.5)
 
 prefab SparkBurst {
   sparks {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 80, rate: 0, shape: EmitterSphere, radius: 0.2,
       direction: {0, 1, 0}, spread: 70, speed: {2, 5},
@@ -139,6 +140,7 @@ prefab SparkBurst {
     ParticleForces: {gravity: {0, -6, 0}, drag: 1.5}
   }
   flash {
+    Position: {0, 0, 0}
     ParticleEmitter: {max: 4, rate: 0, shape: EmitterPoint, direction: {0, 0, 0}, speed: {0, 0}, lifetime: {0.25, 0.25}, size: {2.2, 2.2}, opacity: {0.9, 0.9}, color: {255, 170, 80}, seed: 4}
     ParticleAppearance: {blend: ParticleAdditive}
     ParticleBurst: {count: 1}
@@ -148,6 +150,7 @@ prefab SparkBurst {
 
 prefab SplashBurst {
   drops {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 90, rate: 0, shape: EmitterSphere, radius: 0.3,
       direction: {0, 1, 0}, spread: 45, speed: {3, 6},
@@ -158,6 +161,7 @@ prefab SplashBurst {
     ParticleForces: {gravity: {0, -14, 0}}
   }
   mist {
+    Position: {0, 0, 0}
     ParticleEmitter: {max: 20, rate: 0, shape: EmitterSphere, radius: 0.6, direction: {0, 1, 0}, spread: 80, speed: {0.5, 1.2}, lifetime: {0.8, 1.4}, size: {0.6, 1.0}, opacity: {0.3, 0.5}, color: {220, 240, 255}, seed: 6}
     ParticleBurst: {count: 14}
     ParticleCurves: {size: {keys: [{0, 0.6}, {1, 1.8}]}, opacity: {keys: [{0, 1}, {1, 0}]}}
@@ -166,6 +170,7 @@ prefab SplashBurst {
 
 prefab GustBurst {
   swirl {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 70, rate: 0, shape: EmitterDisc, radius: 0.6,
       direction: {0, 0, 0}, radial: {4, 7}, speed: {0, 0.5},
@@ -177,6 +182,7 @@ prefab GustBurst {
     ParticleCurves: {opacity: {keys: [{0, 1}, {1, 0}]}, size: {keys: [{0, 0.6}, {1, 2}]}}
   }
   leaves {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 30, rate: 0, shape: EmitterDisc, radius: 0.5,
       direction: {0, 1, 0}, spread: 60, radial: {3, 6}, speed: {1, 3},
@@ -190,6 +196,7 @@ prefab GustBurst {
 
 prefab BloomBurst {
   petals {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 70, rate: 0, shape: EmitterSphere, radius: 0.4,
       direction: {0, 1, 0}, spread: 60, speed: {1.5, 3.5},
@@ -200,6 +207,7 @@ prefab BloomBurst {
     ParticleForces: {gravity: {0, -1.5, 0}, drag: 1.2}
   }
   glow {
+    Position: {0, 0, 0}
     ParticleEmitter: {max: 40, rate: 0, shape: EmitterSphere, radius: 0.8, direction: {0, 1, 0}, spread: 30, speed: {0.5, 1.5}, lifetime: {0.8, 1.4}, size: {0.1, 0.18}, opacity: {1, 1}, color: {170, 255, 120}, seed: 10}
     ParticleAppearance: {blend: ParticleAdditive}
     ParticleBurst: {count: 30}
@@ -208,6 +216,7 @@ prefab BloomBurst {
 
 prefab FrostBurst {
   shards {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 80, rate: 0, shape: EmitterSphere, radius: 0.3,
       direction: {0, 1, 0}, spread: 90, speed: {2, 4.5},
@@ -219,6 +228,7 @@ prefab FrostBurst {
     ParticleForces: {gravity: {0, -3, 0}, drag: 2}
   }
   cloud {
+    Position: {0, 0, 0}
     ParticleEmitter: {max: 20, rate: 0, shape: EmitterDisc, radius: 1, direction: {0, 1, 0}, spread: 80, speed: {0.3, 0.9}, lifetime: {1, 1.6}, size: {0.8, 1.3}, opacity: {0.3, 0.5}, color: {230, 245, 255}, seed: 12}
     ParticleBurst: {count: 14}
     ParticleCurves: {opacity: {keys: [{0, 1}, {1, 0}]}, size: {keys: [{0, 0.6}, {1, 1.8}]}}
@@ -227,6 +237,7 @@ prefab FrostBurst {
 
 prefab LiftBurst {
   motes {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 80, rate: 0, shape: EmitterDisc, radius: 1.2,
       direction: {0, 1, 0}, spread: 8, speed: {2, 4},
@@ -237,6 +248,7 @@ prefab LiftBurst {
     ParticleBurst: {count: 60}
   }
   ring {
+    Position: {0, 0, 0}
     ParticleEmitter: {max: 40, rate: 0, shape: EmitterDisc, radius: 0.3, direction: {0, 0, 0}, radial: {5, 6}, speed: {0, 0}, lifetime: {0.4, 0.6}, size: {0.15, 0.2}, opacity: {1, 1}, color: {200, 150, 255}, seed: 14}
     ParticleAppearance: {blend: ParticleAdditive}
     ParticleBurst: {count: 36}
@@ -245,6 +257,7 @@ prefab LiftBurst {
 
 prefab FizzleBurst {
   smoke {
+    Position: {0, 0, 0}
     ParticleEmitter: {max: 20, rate: 0, shape: EmitterSphere, radius: 0.2, direction: {0, 1, 0}, spread: 40, speed: {0.5, 1.2}, lifetime: {0.6, 1.0}, size: {0.3, 0.5}, opacity: {0.4, 0.6}, color: {120, 110, 130}, seed: 15}
     ParticleBurst: {count: 12}
     ParticleCurves: {opacity: {keys: [{0, 1}, {1, 0}]}}
@@ -253,6 +266,7 @@ prefab FizzleBurst {
 
 prefab LearnBurst {
   stars {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 160, rate: 0, shape: EmitterSphere, radius: 0.5,
       direction: {0, 1, 0}, spread: 180, speed: {2, 6},
@@ -267,6 +281,7 @@ prefab LearnBurst {
 
 prefab QuestBurst {
   stars {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 90, rate: 0, shape: EmitterDisc, radius: 0.4,
       direction: {0, 1, 0}, spread: 30, radial: {2, 4}, speed: {3, 6},
@@ -278,6 +293,7 @@ prefab QuestBurst {
     ParticleForces: {gravity: {0, -5, 0}, drag: 1.2}
   }
   ring {
+    Position: {0, 0, 0}
     ParticleEmitter: {max: 60, rate: 0, shape: EmitterDisc, radius: 0.2, direction: {0, 0, 0}, radial: {6, 7}, speed: {0, 0}, lifetime: {0.5, 0.7}, size: {0.2, 0.3}, opacity: {1, 1}, color: {255, 240, 190}, seed: 19}
     ParticleAppearance: {blend: ParticleAdditive}
     ParticleBurst: {count: 48}
@@ -287,6 +303,7 @@ prefab QuestBurst {
 
 prefab MoteBurst {
   glints {
+    Position: {0, 0, 0}
     ParticleEmitter: {max: 60, rate: 0, shape: EmitterSphere, radius: 0.3, direction: {0, 1, 0}, spread: 180, speed: {1.5, 3.5}, lifetime: {0.6, 1.2}, size: {0.08, 0.14}, opacity: {1, 1}, color: {170, 230, 255}, seed: 17}
     ParticleAppearance: {blend: ParticleAdditive}
     ParticleBurst: {count: 50}
@@ -296,6 +313,7 @@ prefab MoteBurst {
 
 prefab Firework {
   sparks {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 180, rate: 0, shape: EmitterSphere, radius: 0.1,
       direction: {0, 0, 0}, radial: {6, 9},

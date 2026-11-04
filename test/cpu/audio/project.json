@@ -50,7 +50,14 @@
                     "cycle_refused",
                     "order_one_block",
                     "not_in_order_silent",
-                    "voice_bus_change"
+                    "voice_bus_change",
+                    "width_mono",
+                    "width_double",
+                    "width_one_identical",
+                    "four_sends",
+                    "pre_fader_send",
+                    "send_earlier_refused",
+                    "buses_64"
                 ]
             },
             {
@@ -103,7 +110,47 @@
                 "testcases": [
                     "render",
                     "events_and_release",
-                    "synth_voices"
+                    "synth_voices",
+                    "scheduled"
+                ]
+            },
+            {
+                "id": "Schedule",
+                "setup": true,
+                "testcases": [
+                    "play_at_frame",
+                    "stop_at_frame",
+                    "set_at_frame",
+                    "past_when",
+                    "same_frame_order",
+                    "full_late",
+                    "stop_cancels",
+                    "bit_identical",
+                    "null_clock",
+                    "status_clock"
+                ]
+            },
+            {
+                "id": "Timeline",
+                "testcases": [
+                    "defaults",
+                    "advances",
+                    "stopped_holds",
+                    "seek",
+                    "seek_stopped",
+                    "loop_wraps",
+                    "loop_past_end",
+                    "tempo_continuous",
+                    "window_coverage",
+                    "metronome_4_4",
+                    "metronome_6_8",
+                    "metronome_loop",
+                    "stop_cancels",
+                    "bit_identical",
+                    "new_output",
+                    "script",
+                    "command",
+                    "huge_beats"
                 ]
             },
             {
@@ -159,6 +206,19 @@
                     "one_batch_per_frame",
                     "import_opens_no_device",
                     "new_output_resends"
+                ]
+            },
+            {
+                "id": "Mixer",
+                "testcases": [
+                    "solo_track",
+                    "solo_group",
+                    "mute_beats_solo",
+                    "cycle_third_send",
+                    "sends_over_max",
+                    "pre_fader_send",
+                    "master_bus",
+                    "scene_script"
                 ]
             },
             {
@@ -277,6 +337,8 @@
                     "layers_clamped",
                     "layers_command_size",
                     "layers_pool",
+                    "layers_steal_quietest",
+                    "layers_steal_cap",
                     "layers_identical",
                     "pitch_variance",
                     "voice_pitch",
@@ -287,6 +349,8 @@
                     "fm_index_zero_identical",
                     "fm_index_follows_envelope",
                     "fm_index_limited",
+                    "fm_alias_saw",
+                    "fm_alias_square",
                     "ring_sum_difference",
                     "modulator_audible",
                     "feedback_harmonics",
@@ -341,6 +405,11 @@
                     "pluck_ends",
                     "pluck_glide",
                     "pluck_pool",
+                    "pluck_unison_peaks",
+                    "pluck_unison_width",
+                    "pluck_unison_pool",
+                    "pluck_unison_seed",
+                    "pluck_pool_cap",
                     "script_pluck",
                     "docs_pluck_examples",
                     "lfo_unison",

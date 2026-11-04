@@ -120,6 +120,21 @@ ecs_entity_t audio_bus(
     ecs_entity_t output,
     float volume);
 
+/** Add a send to a bus.
+ *
+ * @param world The world
+ * @param bus The bus
+ * @param to Bus that receives the send
+ * @param level Level of the send
+ * @param pre_fader Whether it taps before the volume and pan
+ */
+void audio_send(
+    ecs_world_t *world,
+    ecs_entity_t bus,
+    ecs_entity_t to,
+    float level,
+    bool pre_fader);
+
 /** Mean of the right channel of the tap over the last frames.
  *
  * @param frames Number of frames
