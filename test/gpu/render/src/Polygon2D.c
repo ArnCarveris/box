@@ -917,6 +917,8 @@ void Polygon2D_one_batch(void) {
     ecs_entity_t l_path = ecs_lookup(world, "l_path");
     ecs_entity_t circle = ecs_lookup(world, "circle_path");
     ecs_entity_t a = ecs_new(world), b = ecs_new(world);
+    ecs_set(world, a, Position, {0, 0, 0});
+    ecs_set(world, b, Position, {0, 0, 0});
     ecs_set(world, a, Polygon2D, {.path = l_path, .scale = {1, 1}, .width = 1});
     ecs_set(world, b, Polygon2D, {.path = circle, .scale = {1, 1}, .width = 1});
     ecs_progress(world, 0);

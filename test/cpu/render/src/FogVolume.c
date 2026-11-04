@@ -186,6 +186,7 @@ void FogVolume_defaults(void) {
 
     ecs_entity_t added = ecs_new(world);
     ecs_add(world, added, FogVolume);
+    ecs_set(world, added, Position, {0, 0, 0});
     f = ecs_get(world, added, FogVolume);
     test_flt(f->density, 0.1f);
     test_flt(f->light_inscatter, 1);

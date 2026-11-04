@@ -415,6 +415,7 @@ void MaterialIds_plain_entity_own_slot_keeps_it_with_base(void) {
     ecs_world_t *world = world_new(&null);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Box, {1, 1, 1});
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, Rgb, {0, 255, 0});
     ecs_entity_t plain = ecs_new(world);
     ecs_set(world, plain, Position, {2, 0, 0});
@@ -539,6 +540,7 @@ void MaterialIds_tinted_instance_keeps_prefab_id(void) {
     ecs_set(world, parent, Tint, {0, 0, 255, 128});
     ecs_entity_t child = ecs_new_w_pair(world, EcsIsA, prefab);
     ecs_add_pair(world, child, EcsChildOf, parent);
+    ecs_set(world, child, Position, {0, 0, 0});
     box_render_draws_stats_t stats = frame(world);
     uint32_t id = id_of(world, prefab);
     test_int(stats.materials, 2);
@@ -612,6 +614,7 @@ void MaterialIds_dynamic_material_own_slot_repacks(void) {
     ecs_world_t *world = world_new(&null);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Box, {1, 1, 1});
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, Rgb, {200, 100, 50});
     ecs_add_id(world, e, DynamicMaterial);
     frame(world);
@@ -740,6 +743,7 @@ void MaterialIds_transmission_brings_material_id(void) {
     ecs_world_t *world = world_new(&null);
     ecs_entity_t glass = ecs_new(world);
     ecs_set(world, glass, Box, {1, 1, 1});
+    ecs_set(world, glass, Position, {0, 0, 0});
     ecs_set(world, glass, Transmission, {.transmission_factor = 0.9f, .ior = 1.2f,
         .thickness_factor = 2, .attenuation_distance = 3, .attenuation_color = {75, 200, 255}});
     ecs_entity_t plain = ecs_new(world);
@@ -925,6 +929,7 @@ void MaterialIds_clear_coat_dynamic_material_repacks(void) {
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, DynamicMaterial);
     ecs_set(world, e, Box, {1, 1, 1});
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, ClearCoat, {.strength = 0, .roughness = 0});
     frame(world);
     uint32_t id = id_of(world, e);
@@ -1485,6 +1490,7 @@ void MaterialIds_specular_anisotropy_brings_material_id(void) {
     ecs_world_t *world = world_new(&null);
     ecs_entity_t brushed = ecs_new(world);
     ecs_set(world, brushed, Box, {1, 1, 1});
+    ecs_set(world, brushed, Position, {0, 0, 0});
     ecs_set(world, brushed, SpecularAnisotropy, {.strength = 0.5f, .rotation = GLM_PIf});
     ecs_entity_t plain = ecs_new(world);
     ecs_set(world, plain, Position, {2, 0, 0});
@@ -1552,6 +1558,7 @@ void MaterialIds_sheen_brings_material_id(void) {
     ecs_world_t *world = world_new(&null);
     ecs_entity_t velvet = ecs_new(world);
     ecs_set(world, velvet, Box, {1, 1, 1});
+    ecs_set(world, velvet, Position, {0, 0, 0});
     ecs_set(world, velvet, Sheen, {.color = {255, 0, 128}, .roughness = 1});
     ecs_entity_t plain = ecs_new(world);
     ecs_set(world, plain, Position, {2, 0, 0});
@@ -1619,6 +1626,7 @@ void MaterialIds_diffuse_transmission_brings_material_id(void) {
     ecs_world_t *world = world_new(&null);
     ecs_entity_t leaf = ecs_new(world);
     ecs_set(world, leaf, Box, {1, 1, 1});
+    ecs_set(world, leaf, Position, {0, 0, 0});
     ecs_set(world, leaf, DiffuseTransmission, {
         .factor = 1, .color = {255, 0, 128}, .thickness = 0.5f});
     ecs_entity_t plain = ecs_new(world);

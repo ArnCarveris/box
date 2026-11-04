@@ -2,12 +2,14 @@
 // of the original.
 
 using box.particle
+using box.transform
 
 prefab SparkBurst {
   // The burst: 10 particles of the glow pool, from a sphere of 0.1, at {0, 1.4, 0} +-
   // {1.4, 1, 1.4}, radial 3.2, living 0.28 +- 0.14 s, sized 0.055 +- 0.025 stretched 2.2,
   // colored {255, 250, 232} through {255, 236, 176} at 0.3 to {255, 116, 26, 210}
   particles {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 10,
       rate: 0,

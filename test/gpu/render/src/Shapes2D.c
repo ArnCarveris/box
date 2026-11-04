@@ -1201,10 +1201,13 @@ void Shapes2D_empty_shapes_not_drawn(void) {
     ecs_set(world, view, View, {.camera = camera});
     ecs_entity_t rect = ecs_new(world);
     ecs_set(world, rect, Rect, {0, 2});
+    ecs_set(world, rect, Position, {0, 0, 0});
     ecs_entity_t circle = ecs_new(world);
     ecs_set(world, circle, Circle, {0});
+    ecs_set(world, circle, Position, {0, 0, 0});
     ecs_entity_t line = ecs_new(world);
     ecs_set(world, line, Line, {.x1 = 1, .y1 = 1, .x2 = 1, .y2 = 1, .width = 1});
+    ecs_set(world, line, Position, {0, 0, 0});
     ecs_entity_t decorated = ecs_new(world);
     ecs_set(world, decorated, Border, {.width = 2});
     ecs_set(world, decorated, Image, {0});
@@ -1214,6 +1217,7 @@ void Shapes2D_empty_shapes_not_drawn(void) {
 
     ecs_set(world, rect, Rect, {1, 2});
     ecs_set(world, decorated, Circle, {3});
+    ecs_set(world, decorated, Position, {0, 0, 0});
     ecs_progress(world, 0);
     box_render_sync(world);
     test_int(ecs_vec_count(&null->last.batches), 1);
@@ -2417,6 +2421,7 @@ static void Shapes2D_size_scene(
     ecs_entity_t box = Shapes2D_follow_box(world, 0, "box", 0, 0);
     if (end) {
         ecs_set(world, box, Rect, {26, 12});
+        ecs_set(world, box, Position, {0, 0, 0});
     }
 }
 

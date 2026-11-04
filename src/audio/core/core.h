@@ -139,8 +139,9 @@
  * delay line of BOX_AUDIO_SYNTH_STRING_FRAMES limits it further, to the rate over 2046 */
 #define BOX_AUDIO_SYNTH_PLUCK_MIN 40.0f
 
-/** Pluck strings the voices of a core play at once, each with its delay line. A play that
- * does not find a string for each of its pluck layers is ignored */
+/** Pluck strings the voices of a core play at once, each with its delay line. A pluck layer
+ * takes one for each of its unison voices; a play that does not find a string for each is
+ * ignored */
 #define BOX_AUDIO_SYNTH_STRINGS 32
 
 /** Frames of the delay line of a pluck string, a power of 2: a period of up to 2046 frames,
@@ -488,8 +489,9 @@ typedef struct box_audio_cmd_synth_t {
 /** Events the core reports to its transport */
 typedef enum box_audio_event_type_t {
     BOX_AUDIO_EVENT_VOICE_END = 1,      /**< A voice ended, id is its handle */
-    BOX_AUDIO_EVENT_VOICE_STOLEN = 2,   /**< The cap stole a voice, id is its handle, value
-                                         * the steals so far */
+    BOX_AUDIO_EVENT_VOICE_STOLEN = 2,   /**< The cap or a play short of synth parts stole
+                                         * a voice, id is its handle, value the steals so
+                                         * far */
     BOX_AUDIO_EVENT_SOUND_FREE = 3,     /**< No voice uses a released sound, id is the sound */
     BOX_AUDIO_EVENT_ORDER_REFUSED = 4,  /**< An invalid order was ignored, value its count */
     BOX_AUDIO_EVENT_IGNORED = 5,        /**< A command was ignored, id is its type */

@@ -658,6 +658,7 @@ void Light_unchanged_lights_upload_nothing(void) {
     ecs_set(world, light, PointLight, {.intensity = GLM_PIf, .range = 5});
     ecs_entity_t other = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, other, SpotLight, {.intensity = GLM_PIf, .range = 5, .outer_angle = 30});
+    ecs_set(world, other, Position, {0, 0, 0});
 
     box_render_lights_stats_t stats;
     ecs_progress(world, 0);
@@ -719,10 +720,12 @@ void Light_component_defaults(void) {
     test_int(spot->shadow_resolution, 512);
     ecs_entity_t literal = ecs_new(world);
     ecs_add(world, literal, SpotLight);
+    ecs_set(world, literal, Position, {0, 0, 0});
     test_bool(ecs_get(world, literal, SpotLight)->shadows, false);
     test_int(ecs_get(world, literal, SpotLight)->shadow_resolution, 512);
     ecs_entity_t bulb = ecs_new(world);
     ecs_add(world, bulb, PointLight);
+    ecs_set(world, bulb, Position, {0, 0, 0});
     test_bool(ecs_get(world, bulb, PointLight)->shadows, false);
     test_int(ecs_get(world, bulb, PointLight)->shadow_resolution, 512);
     const DirectionalLight *sun = ecs_get(world, ecs_lookup(world, "sun"), DirectionalLight);

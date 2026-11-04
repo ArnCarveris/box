@@ -840,6 +840,7 @@ void Screen_layout_children_draw_over_background(void) {
     ecs_set(world, second, Rect, {20, 10});
     ecs_set(world, second, Rgb, {0, 0, 255});
     ecs_entity_t panel = ecs_new(world);
+    ecs_set(world, panel, Position, {0, 0, 0});
     ecs_set(world, panel, Layout, {.direction = DirectionColumn, .spacing = 4,
         .padding = {5, 5, 5, 5}});
     ecs_set(world, panel, Rect, {1, 1});

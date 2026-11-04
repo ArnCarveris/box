@@ -325,6 +325,10 @@ ECS_STRUCT(SynthEnvelope, {
  * The voices share the level of the layer: each plays at 1 / sqrt(voices), so the level of the
  * layer stays about the same as the count changes. One voice is the layer without unison. A
  * sound in which a layer has voices and width renders in stereo, see docs/audio.md.
+ *
+ * On a SynthPluck layer each copy is a string of its own, plucked with its own noise, detuned
+ * and panned the same way; each takes one of the 32 strings of the core, and a play that does
+ * not find one for each copy is ignored.
  */
 ECS_STRUCT(SynthUnison, {
     int32_t voices;        /**< Copies of the oscillator, 1 to 7, default 3 */

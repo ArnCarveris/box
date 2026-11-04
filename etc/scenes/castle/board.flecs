@@ -94,7 +94,7 @@ template TileCursor {
     marker {
       Position: {0, 0.06, 0}
       Rotation: {0, 0.7854, 0}
-      CursorEdge a(len: 1.6, color: color, glow: 3)
+      CursorEdge a(len: 1.6, color: color, glow: 3) { Position: {0, 0, 0} }
       CursorEdge b(len: 1.6, color: color, glow: 3) { Rotation: {0, HALF_PI, 0} }
     }
   }

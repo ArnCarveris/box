@@ -934,7 +934,7 @@ static void box_particles_block_forces(
 /** Write the parameters of an emitter for this frame but its forces.
  *
  * @param emitter The emitter values
- * @param transform World transform of the emitter, NULL for the identity
+ * @param transform World transform of the emitter
  * @param collision Its ground collision, NULL for none
  * @param inherit World velocity its spawns get
  * @param delta Seconds of the frame
@@ -953,11 +953,7 @@ static void box_particles_block(
 {
     float spread = glm_clamp(emitter->spread, 0.0f, 180.0f);
     ecs_os_memset_t(out, 0, box_render_particle_block_t);
-    if (transform) {
-        ecs_os_memcpy_t(out->model, transform->m, mat4);
-    } else {
-        ecs_os_memcpy_t(out->model, GLM_MAT4_IDENTITY, mat4);
-    }
+    ecs_os_memcpy_t(out->model, transform->m, mat4);
 
     glm_vec3_copy(ECS_CONST_CAST(float*, emitter->direction), out->direction);
     if (glm_vec3_norm2(out->direction) > 0) {
@@ -1003,7 +999,7 @@ static void box_particles_block(
 /** Measure the world velocity of an emitter from its position in the last frame.
  *
  * @param pool The pool of the emitter, keeps the position
- * @param transform World transform of the emitter, NULL for the identity
+ * @param transform World transform of the emitter
  * @param delta Seconds of the frame
  * @param out Receives the velocity, zero in the first frame and for a frame without time
  */
@@ -1013,10 +1009,8 @@ static void box_particles_velocity(
     float delta,
     vec3 out)
 {
-    vec3 position = {0, 0, 0};
-    if (transform) {
-        glm_vec3_copy(ECS_CONST_CAST(float*, transform->m[3]), position);
-    }
+    vec3 position;
+    glm_vec3_copy(ECS_CONST_CAST(float*, transform->m[3]), position);
 
     glm_vec3_zero(out);
     if (pool->has_last && delta > 0) {
@@ -1282,7 +1276,7 @@ static void box_particles_light_write(
  * @param p The packet
  * @param e The emitter
  * @param emitter The emitter values
- * @param transform Its world transform, NULL for the identity
+ * @param transform Its world transform
  * @param scene Its scene
  * @param playback Its playback control, NULL to play; receives the clock and a cleared reset
  * @param curves Its ParticleCurves, NULL for none
@@ -1635,7 +1629,7 @@ static void BoxRenderExtractParticles(
         const ParticleTimeline *timelines = ecs_field(&qit, ParticleTimeline, 9);
         const ParticleMotion *motions = ecs_field(&qit, ParticleMotion, 10);
         bool lights_shared = lights && !ecs_field_is_self(&qit, 6);
-        bool shared = ecs_field_is_set(&qit, 1) && !ecs_field_is_self(&qit, 1);
+        bool shared = !ecs_field_is_self(&qit, 1);
         bool curves_shared = curves && !ecs_field_is_self(&qit, 4);
         bool looks_shared = looks && !ecs_field_is_self(&qit, 5);
         bool timelines_shared = timelines && !ecs_field_is_self(&qit, 9);
@@ -1652,7 +1646,7 @@ static void BoxRenderExtractParticles(
                 shared_effect = effect_src ? ecs_get(world, effect_src, ParticleEffect) : NULL;
             }
 
-            const WorldTransform *t = transforms ? &transforms[shared ? 0 : i] : NULL;
+            const WorldTransform *t = &transforms[shared ? 0 : i];
             box_particles_light_t light = {
                 .light = lights ? &lights[lights_shared ? 0 : i] : NULL,
                 .point = points ? &points[i] : NULL,
@@ -1789,7 +1783,7 @@ void box_render_particles_import(
             .entity = ecs_entity(world, { .name = "RenderParticleEmitters" }),
             .terms = {
                 { .id = ecs_id(ParticleEmitter), .inout = EcsIn },
-                { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional },
+                { .id = ecs_id(WorldTransform), .inout = EcsIn },
                 {
                     .id = ecs_id(Scene),
                     .src.id = EcsSelf | EcsUp,

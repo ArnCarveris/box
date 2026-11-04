@@ -321,6 +321,75 @@ static box_audio_voice_t* box_audio_voice_find(
     return result;
 }
 
+/** The level of a voice to pick a victim by: the gain it fades from for a fading voice, the
+ * larger of its gain targets for a playing one.
+ *
+ * @param v The voice
+ * @return The level
+ */
+static float box_audio_voice_victim_level(
+    const box_audio_voice_t *v)
+{
+    return v->state == BOX_AUDIO_VOICE_STOPPING ?
+        (v->left.value > v->right.value ? v->left.value : v->right.value) :
+        box_audio_voice_level(v);
+}
+
+/** Whether a voice can give up what a play needs: any voice for a slot, a synth voice with
+ * parts for parts.
+ *
+ * @param v The voice
+ * @param parts Whether the play needs synth parts
+ * @return Whether it can be the victim
+ */
+static bool box_audio_voice_victim_fits(
+    const box_audio_voice_t *v,
+    bool parts)
+{
+    return !parts ||
+        (v->source.kind == BOX_AUDIO_SOURCE_SYNTH && v->source.data.synth.layers > 0);
+}
+
+/** Pick the voice to take from for a new play: the quietest voice of a state, the first of
+ * equals. Every steal, of a slot, of the cap or of synth parts, picks here.
+ *
+ * @param core The core
+ * @param state BOX_AUDIO_VOICE_PLAYING or BOX_AUDIO_VOICE_STOPPING
+ * @param parts Whether only synth voices that hold parts qualify
+ * @return The voice, NULL when none qualifies
+ */
+static box_audio_voice_t* box_audio_voice_victim(
+    box_audio_core_t *core,
+    int32_t state,
+    bool parts)
+{
+    box_audio_voice_t *quietest = NULL;
+    int32_t i;
+    for (i = 0; i < BOX_AUDIO_VOICE_SLOTS; i ++) {
+        box_audio_voice_t *v = &core->voices[i];
+        if (v->state == state && box_audio_voice_victim_fits(v, parts) && (!quietest ||
+            box_audio_voice_victim_level(v) < box_audio_voice_victim_level(quietest)))
+        {
+            quietest = v;
+        }
+    }
+
+    return quietest;
+}
+
+/** Report the steal of a playing voice.
+ *
+ * @param core The core
+ * @param v The voice
+ */
+static void box_audio_voice_stolen(
+    box_audio_core_t *core,
+    const box_audio_voice_t *v)
+{
+    core->steals ++;
+    box_audio_core_event(core, BOX_AUDIO_EVENT_VOICE_STOLEN, v->handle, core->steals);
+}
+
 /** Steal the playing voice with the lowest level, the first of equals, with a short fade.
  *
  * @param core The core
@@ -328,21 +397,9 @@ static box_audio_voice_t* box_audio_voice_find(
 static void box_audio_voice_steal(
     box_audio_core_t *core)
 {
-    box_audio_voice_t *quietest = NULL;
-    int32_t i;
-    for (i = 0; i < BOX_AUDIO_VOICE_SLOTS; i ++) {
-        box_audio_voice_t *v = &core->voices[i];
-        if (v->state == BOX_AUDIO_VOICE_PLAYING && (!quietest ||
-            box_audio_voice_level(v) < box_audio_voice_level(quietest)))
-        {
-            quietest = v;
-        }
-    }
-
+    box_audio_voice_t *quietest = box_audio_voice_victim(core, BOX_AUDIO_VOICE_PLAYING, false);
     if (quietest) {
-        core->steals ++;
-        box_audio_core_event(core, BOX_AUDIO_EVENT_VOICE_STOLEN, quietest->handle,
-            core->steals);
+        box_audio_voice_stolen(core, quietest);
         box_audio_voice_fade(core, quietest, core->steal_frames);
     }
 }
@@ -355,28 +412,88 @@ static void box_audio_voice_steal(
 static box_audio_voice_t* box_audio_voice_slot(
     box_audio_core_t *core)
 {
-    box_audio_voice_t *result = NULL, *quietest = NULL;
+    box_audio_voice_t *result = NULL;
     int32_t i;
     for (i = 0; i < BOX_AUDIO_VOICE_SLOTS && !result; i ++) {
-        box_audio_voice_t *v = &core->voices[i];
-        if (v->state == BOX_AUDIO_VOICE_FREE) {
-            result = v;
-        } else if (v->state == BOX_AUDIO_VOICE_STOPPING) {
-            float level = v->left.value > v->right.value ? v->left.value : v->right.value;
-            float best = quietest ? (quietest->left.value > quietest->right.value ?
-                quietest->left.value : quietest->right.value) : 0;
-            if (!quietest || level < best) {
-                quietest = v;
-            }
+        if (core->voices[i].state == BOX_AUDIO_VOICE_FREE) {
+            result = &core->voices[i];
         }
     }
 
-    if (!result && quietest) {
-        box_audio_voice_end(core, quietest);
-        result = quietest;
+    if (!result) {
+        result = box_audio_voice_victim(core, BOX_AUDIO_VOICE_STOPPING, false);
+        if (result) {
+            box_audio_voice_end(core, result);
+        }
     }
 
     return result;
+}
+
+/** Whether a new play finds a voice slot: a free one, a fading one to end, or one the cap
+ * steal makes fade.
+ *
+ * @param core The core
+ * @return Whether box_audio_voice_slot finds one after the steal of the cap
+ */
+static bool box_audio_voice_slot_fits(
+    const box_audio_core_t *core)
+{
+    bool result = false;
+    int32_t i;
+    for (i = 0; i < BOX_AUDIO_VOICE_SLOTS && !result; i ++) {
+        result = core->voices[i].state != BOX_AUDIO_VOICE_PLAYING ||
+            core->playing >= BOX_AUDIO_VOICE_MAX;
+    }
+
+    return result;
+}
+
+/** Whether the parts of the synth voices, free and held, hold the layers of a synth sound.
+ *
+ * @param core The core
+ * @param sound Id of a ready synth sound
+ * @return Whether box_audio_voice_reclaim frees enough
+ */
+static bool box_audio_voice_reclaim_fits(
+    const box_audio_core_t *core,
+    uint32_t sound)
+{
+    int32_t parts = core->synth_free_count, i;
+    for (i = 0; i < BOX_AUDIO_VOICE_SLOTS; i ++) {
+        const box_audio_voice_t *v = &core->voices[i];
+        if (v->state != BOX_AUDIO_VOICE_FREE && v->source.kind == BOX_AUDIO_SOURCE_SYNTH) {
+            parts += v->source.data.synth.layers;
+        }
+    }
+
+    return box_audio_synth_parts(core, sound) <= parts;
+}
+
+/** End synth voices until the free parts hold the layers of a synth sound: the quietest fading
+ * ones first, then the quietest playing ones, which report a steal.
+ *
+ * @param core The core
+ * @param sound Id of a ready synth sound, which box_audio_voice_reclaim_fits found
+ */
+static void box_audio_voice_reclaim(
+    box_audio_core_t *core,
+    uint32_t sound)
+{
+    int32_t need = box_audio_synth_parts(core, sound);
+    while (core->synth_free_count < need) {
+        box_audio_voice_t *v = box_audio_voice_victim(core, BOX_AUDIO_VOICE_STOPPING, true);
+        if (!v) {
+            v = box_audio_voice_victim(core, BOX_AUDIO_VOICE_PLAYING, true);
+            if (!v) {
+                break;
+            }
+
+            box_audio_voice_stolen(core, v);
+        }
+
+        box_audio_voice_end(core, v);
+    }
 }
 
 /** Apply a play command. A synth voice starts at its gains, without the ramp: its envelope
@@ -390,6 +507,7 @@ static void box_audio_cmd_play(
     const box_audio_cmd_play_t *cmd)
 {
     box_audio_voice_t *v = NULL;
+    bool synth;
     if (cmd->sound >= BOX_AUDIO_SOUND_MAX || cmd->bus >= BOX_AUDIO_BUS_MAX ||
         core->sounds[cmd->sound].state != BOX_AUDIO_SOUND_READY)
     {
@@ -397,12 +515,24 @@ static void box_audio_cmd_play(
         goto done;
     }
 
+    synth = core->sounds[cmd->sound].synth != 0;
+    if (!box_audio_voice_slot_fits(core) || (synth && (!box_audio_synth_strings_fit(core,
+        cmd->sound) || !box_audio_voice_reclaim_fits(core, cmd->sound))))
+    {
+        box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_PLAY, 0);
+        goto done;
+    }
+
+    if (synth) {
+        box_audio_voice_reclaim(core, cmd->sound);
+    }
+
     if (core->playing >= BOX_AUDIO_VOICE_MAX) {
         box_audio_voice_steal(core);
     }
 
     v = box_audio_voice_slot(core);
-    if (!v || (core->sounds[cmd->sound].synth && !box_audio_synth_fits(core, cmd->sound))) {
+    if (!v || (synth && !box_audio_synth_fits(core, cmd->sound))) {
         box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_PLAY, 0);
         goto done;
     }

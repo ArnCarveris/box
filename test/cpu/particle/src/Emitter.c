@@ -73,6 +73,7 @@ static ecs_entity_t emitter_new(
 {
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, ParticleEmitter);
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_get_mut(world, e, ParticleEmitter)->rate = 60;
     ecs_modified(world, e, ParticleEmitter);
 
@@ -151,6 +152,7 @@ void Emitter_c_defaults(void) {
 
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, ParticleEmitter);
+    ecs_set(world, e, Position, {0, 0, 0});
     const ParticleEmitter *p = ecs_get(world, e, ParticleEmitter);
     test_assert(p != NULL);
     check_defaults(p);
@@ -244,6 +246,7 @@ void Emitter_c_literal_spawns_nothing(void) {
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, ParticleEmitter, {.rate = 600});
+    ecs_set(world, e, Position, {0, 0, 0});
     frame(world);
 
     const ParticleStats *stats = ecs_singleton_get(world, ParticleStats);
@@ -264,6 +267,7 @@ void Emitter_extracted_block(void) {
 
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, ParticleEmitter);
+    ecs_set(world, e, Position, {0, 0, 0});
     ParticleEmitter *p = ecs_get_mut(world, e, ParticleEmitter);
     p->rate = 120;
     p->shape = EmitterSphere;
@@ -375,6 +379,7 @@ void Emitter_spawn_slots_in_packet(void) {
 
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, ParticleEmitter);
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_get_mut(world, e, ParticleEmitter)->rate = 180;
     ecs_modified(world, e, ParticleEmitter);
     frame(world);
@@ -405,8 +410,10 @@ void Emitter_mesh_table_sent(void) {
 
     ecs_entity_t source = ecs_new(world);
     ecs_set(world, source, Box, {2, 2, 2});
+    ecs_set(world, source, Position, {0, 0, 0});
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, ParticleEmitter);
+    ecs_set(world, e, Position, {0, 0, 0});
     ParticleEmitter *p = ecs_get_mut(world, e, ParticleEmitter);
     p->rate = 60;
     p->shape = EmitterMesh;
@@ -489,10 +496,12 @@ void Emitter_forces_script(void) {
 
     test_assert(ecs_script_run(world, "forces",
         "using box.particle\n"
+        "using box.transform\n"
         "zone { ParticleForces: {wind: {5, 0, 0}, drag: 1, turbulence: 2, "
         "turbulence_scale: 3} }\n"
         "plain { ParticleForces: {} }\n"
-        "e { ParticleEmitter: {rate: 60, forces: zone, inherit_velocity: 0.5, "
+        "e { Position: {0, 0, 0}\n"
+        "    ParticleEmitter: {rate: 60, forces: zone, inherit_velocity: 0.5, "
         "color_variance: {10, 20, 30}}\n"
         "    ParticleCollision: {height: 1, die: true} }\n", NULL) == 0);
 
@@ -665,7 +674,6 @@ void Emitter_inherit_velocity(void) {
     ecs_world_t *world = world_new(&null);
 
     ecs_entity_t e = emitter_new(world);
-    ecs_set(world, e, Position, {0, 0, 0});
     ecs_get_mut(world, e, ParticleEmitter)->inherit_velocity = 0.5f;
     ecs_modified(world, e, ParticleEmitter);
     frame(world);

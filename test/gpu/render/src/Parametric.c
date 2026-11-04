@@ -45,6 +45,7 @@ static ecs_entity_t parametric_profile(ecs_world_t *world, const vec2 *points,
 {
     ecs_entity_t asset = test_profile(world, points, count, holes, hole_count);
     ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, ProfileExtrusion, {.profile = asset, .depth = 2,
         .cap_start = true, .cap_end = true});
     ecs_set(world, e, Rgb, {0, 0, 0});
@@ -83,6 +84,7 @@ void Parametric_profile_concave(void) {
 void Parametric_sweep(void) {
     ecs_world_t *world = parametric_scene();
     ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
     Sweep sweep = test_sweep(world);
     sweep.path = test_route(world, (vec3){-2,0,0}, (vec3){-1,0,0}, (vec3){1,0,0}, (vec3){2,0,0});
     sweep.scale[0] = sweep.scale[1] = 0.5f;
@@ -103,6 +105,7 @@ void Parametric_lathe_cavity(void) {
     lathe.profile = test_path2(world, outer, 2, false);
     lathe.inner = test_path2(world, inner, 2, false);
     ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_set_ptr(world, e, Lathe, &lathe);
     ecs_set(world, e, Rgb, {0, 0, 0});
     ecs_set(world, e, Emissive, {.color = {0, 255, 0}, .strength = 1});
@@ -136,6 +139,7 @@ void Parametric_bake_hollow(void) {
     ecs_add(world, scene, Scene);
     ecs_set(world, scene, LightBake, {.probe_spacing = 0.5f, .bounds_padding = 0.5f});
     ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, e, Position, {0, 0, 0});
     Sweep value = test_sweep(world);
     value.path = test_route(world, (vec3){0,-1,0}, (vec3){0,-0.333333f,0},
         (vec3){0,0.333333f,0}, (vec3){0,1,0});
@@ -192,6 +196,7 @@ void Parametric_loft_transform(void) {
         (LoftSection){.profile = profile, .offset = {1, 1, 0},
             .rotation = {0, GLM_PI_4, 0}, .scale = {0.8f, 0.4f}};
     ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_set_ptr(world, e, Loft, &loft);
     ecs_vec_fini_t(NULL, &loft.sections, LoftSection);
     ecs_set(world, e, Rgb, {0, 0, 0});

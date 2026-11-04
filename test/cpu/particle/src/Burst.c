@@ -44,6 +44,7 @@ static ecs_entity_t emitter_new(
 {
     ecs_entity_t e = parent ? ecs_new_w_pair(world, EcsChildOf, parent) : ecs_new(world);
     ecs_add(world, e, ParticleEmitter);
+    ecs_set(world, e, Position, {0, 0, 0});
     ParticleEmitter *p = ecs_get_mut(world, e, ParticleEmitter);
     p->rate = rate;
     p->max = max;

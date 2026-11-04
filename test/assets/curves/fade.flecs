@@ -2,8 +2,10 @@
 // over the last half, so the stream has no hard edge where particles are born or die.
 using box.curve
 using box.particle
+using box.transform
 
 fade {
+  Position: {0, 0, 0}
   ParticleEmitter: {
     rate: 30, spread: 20, speed: {0.5, 1}, lifetime: {2, 2.5}, size: {0.2, 0.2}, seed: 1
   }
