@@ -309,7 +309,6 @@
                     "script_legato_source",
                     "docs_glide_example",
                     "script_modulators",
-<<<<<<< HEAD
                     "lfo_vibrato",
                     "lfo_tremolo",
                     "lfo_layer",
@@ -325,8 +324,7 @@
                     "lfo_delay_no_fade",
                     "lfo_random_phase_seeded",
                     "docs_lfo_examples",
-                    "script_lfo"
-=======
+                    "script_lfo",
                     "unison_detune_peaks",
                     "unison_width_zero_mono",
                     "unison_width_correlation",
@@ -344,8 +342,9 @@
                     "pluck_glide",
                     "pluck_pool",
                     "script_pluck",
-                    "docs_pluck_examples"
->>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
+                    "docs_pluck_examples",
+                    "lfo_unison",
+                    "lfo_pluck"
                 ]
             },
             {

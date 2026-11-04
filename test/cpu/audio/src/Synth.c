@@ -48,7 +48,7 @@ static void synth_define(
     uint32_t sound,
     const box_audio_synth_patch_t *p)
 {
-    uint8_t bytes[1024];
+    uint8_t bytes[sizeof(box_audio_cmd_synth_t)];
     box_audio_writer_t w;
     box_audio_writer_init(&w, bytes, sizeof(bytes));
     test_assert(box_audio_write_synth(&w, sound, p));
@@ -1484,7 +1484,7 @@ void Synth_layers_command_size(void) {
     box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SINE, 440, 0.5f, 0.2f);
     box_audio_cmd_header_t header;
     box_audio_event_t e;
-    uint8_t bytes[1024];
+    uint8_t bytes[sizeof(box_audio_cmd_synth_t)];
     box_audio_writer_t w;
     p.layers = 2;
     p.layer[1] = (box_audio_synth_layer_t){ .frequency = 660, .level = 0.2f };
@@ -2416,7 +2416,6 @@ void Synth_script_modulators(void) {
     ecs_fini(world);
 }
 
-<<<<<<< HEAD
 /** A patch of one oscillator held for a while with one LFO of every layer at a rate, at
  * depth 0 on every destination.
  *
@@ -2437,40 +2436,10 @@ static box_audio_synth_patch_t synth_lfo_patch(
     box_audio_synth_patch_t p = synth_steady(wave, frequency, level, hold);
     p.lfos = 1;
     p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = rate };
-=======
-/** Seconds of the renders of the unison cases that measure levels and correlations */
-#define SYNTH_UNISON_SECONDS 4
-
-/** A patch of one oscillator with unison voices at a steady level for a while.
- *
- * @param wave A box_audio_synth_wave_t
- * @param frequency Hz
- * @param level Level of the layer
- * @param voices Unison voices
- * @param detune Cents from the lowest voice to the highest
- * @param width Stereo width, 0..1
- * @param hold Seconds at the level
- * @return The patch
- */
-static box_audio_synth_patch_t synth_unison(
-    uint32_t wave,
-    float frequency,
-    float level,
-    uint32_t voices,
-    float detune,
-    float width,
-    float hold)
-{
-    box_audio_synth_patch_t p = synth_steady(wave, frequency, level, hold);
-    p.layer[0].voices = voices;
-    p.layer[0].detune = detune;
-    p.layer[0].width = width;
->>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
 
     return p;
 }
 
-<<<<<<< HEAD
 /** Upward zero crossings of a range, interpolated between frames.
  *
  * @param x Samples
@@ -3001,7 +2970,7 @@ void Synth_lfo_random_phase_seeded(void) {
 void Synth_docs_lfo_examples(void) {
     // audio/synth
     ecs_world_t *world = audio_world();
-    char *code = synth_read("test/assets/audio/synth_lfo.flecs");
+    char *code = audio_read("test/assets/audio/synth_lfo.flecs");
     const char *names[] = { "flute_a4", "PwmPad" };
     const int32_t frames[] = { 75, 300 };
     const box_audio_synth_patch_t *p;
@@ -3056,7 +3025,104 @@ void Synth_docs_lfo_examples(void) {
         test_flt(audio_peak(audio_tap_l, audio_tap_count - AUDIO_FRAME, audio_tap_count), 0);
     }
 
-=======
+    audio_log_stop();
+    test_int(audio_log_errors, 0);
+    ecs_fini(world);
+}
+
+/** LFOs of a script: one on a child of the root without an oscillator moves every layer, a
+ * third logs one error and is left out, and a change or a removal compiles the sound again. */
+void Synth_script_lfo(void) {
+    // audio/synth
+    ecs_world_t *world = audio_world();
+    ecs_entity_t wobble;
+    const box_audio_synth_patch_t *p;
+    audio_log_start();
+    test_assert(ecs_script_run(world, "lfos",
+        "using box.audio\n"
+        "prefab Wobble {\n"
+        "  SynthSound: {seed: 4}\n"
+        "  SynthEnvelope: {attack: 0.01, decay: 0.1}\n"
+        "  SynthFilter: {cutoff: 800}\n"
+        "  tone {\n"
+        "    SynthOscillator: {wave: SynthSquare, frequency: 220, level: 0.3, pulse_width: 0.2}\n"
+        "    SynthLfo: {wave: SynthLfoSquare, rate: 3, pulse_width: 0.1}\n"
+        "  }\n"
+        "  wah { SynthLfo: {wave: SynthLfoRandom, rate: 7, cutoff: 1.5} }\n"
+        "  more { SynthLfo: {rate: 1, pitch: 10} }\n"
+        "}\n", NULL) == 0);
+    audio_run(world, 1);
+    audio_log_stop();
+    test_int(audio_log_errors, 1);
+    test_assert(strstr(audio_log_last, "Wobble") != NULL);
+    test_assert(strstr(audio_log_last, "LFO") != NULL);
+
+    wobble = ecs_lookup(world, "Wobble");
+    p = &ecs_get(world, wobble, AudioSynth)->patch;
+    test_int(p->layers, 1);
+    test_flt(p->layer[0].pulse_width, 0.2f);
+    test_int(p->lfos, 2);
+    test_int(p->lfo[0].layer, 1);
+    test_int(p->lfo[0].wave, BOX_AUDIO_SYNTH_LFO_SQUARE);
+    test_flt(p->lfo[0].pulse_width, 0.1f);
+    test_int(p->lfo[1].layer, 0);
+    test_int(p->lfo[1].wave, BOX_AUDIO_SYNTH_LFO_RANDOM);
+    test_flt(p->lfo[1].cutoff, 1.5f);
+
+    ecs_delete(world, ecs_lookup(world, "Wobble.more"));
+    ecs_set(world, ecs_lookup(world, "Wobble.wah"), SynthLfo, {
+        .wave = SynthLfoTriangle, .rate = 2, .amplitude = 0.5f });
+    audio_run(world, 1);
+    p = &ecs_get(world, wobble, AudioSynth)->patch;
+    test_int(p->lfos, 2);
+    test_int(p->lfo[1].wave, BOX_AUDIO_SYNTH_LFO_TRIANGLE);
+    test_flt(p->lfo[1].amplitude, 0.5f);
+    test_flt(p->lfo[1].cutoff, 0);
+
+    ecs_remove(world, ecs_lookup(world, "Wobble.tone"), SynthLfo);
+    audio_run(world, 1);
+    p = &ecs_get(world, wobble, AudioSynth)->patch;
+    test_int(p->lfos, 1);
+    test_int(p->lfo[0].layer, 0);
+
+    test_assert(box_audio_play(world, wobble, 1.0f));
+    audio_run(world, 10);
+    test_assert(synth_finite(audio_tap_l, 0, audio_tap_count));
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+    ecs_fini(world);
+}
+
+/** Seconds of the renders of the unison cases that measure levels and correlations */
+#define SYNTH_UNISON_SECONDS 4
+
+/** A patch of one oscillator with unison voices at a steady level for a while.
+ *
+ * @param wave A box_audio_synth_wave_t
+ * @param frequency Hz
+ * @param level Level of the layer
+ * @param voices Unison voices
+ * @param detune Cents from the lowest voice to the highest
+ * @param width Stereo width, 0..1
+ * @param hold Seconds at the level
+ * @return The patch
+ */
+static box_audio_synth_patch_t synth_unison(
+    uint32_t wave,
+    float frequency,
+    float level,
+    uint32_t voices,
+    float detune,
+    float width,
+    float hold)
+{
+    box_audio_synth_patch_t p = synth_steady(wave, frequency, level, hold);
+    p.layer[0].voices = voices;
+    p.layer[0].detune = detune;
+    p.layer[0].width = width;
+
+    return p;
+}
+
 /** Power of the component of a range at a frequency, through a Hann window, so that a peak
  * leaks little into frequencies a few Hz away.
  *
@@ -3502,75 +3568,11 @@ void Synth_script_unison(void) {
 
     test_assert(diff > 0.05f);
     audio_run(world, 40);
->>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
     audio_log_stop();
     test_int(audio_log_errors, 0);
     ecs_fini(world);
 }
 
-<<<<<<< HEAD
-/** LFOs of a script: one on a child of the root without an oscillator moves every layer, a
- * third logs one error and is left out, and a change or a removal compiles the sound again. */
-void Synth_script_lfo(void) {
-    // audio/synth
-    ecs_world_t *world = audio_world();
-    ecs_entity_t wobble;
-    const box_audio_synth_patch_t *p;
-    audio_log_start();
-    test_assert(ecs_script_run(world, "lfos",
-        "using box.audio\n"
-        "prefab Wobble {\n"
-        "  SynthSound: {seed: 4}\n"
-        "  SynthEnvelope: {attack: 0.01, decay: 0.1}\n"
-        "  SynthFilter: {cutoff: 800}\n"
-        "  tone {\n"
-        "    SynthOscillator: {wave: SynthSquare, frequency: 220, level: 0.3, pulse_width: 0.2}\n"
-        "    SynthLfo: {wave: SynthLfoSquare, rate: 3, pulse_width: 0.1}\n"
-        "  }\n"
-        "  wah { SynthLfo: {wave: SynthLfoRandom, rate: 7, cutoff: 1.5} }\n"
-        "  more { SynthLfo: {rate: 1, pitch: 10} }\n"
-        "}\n", NULL) == 0);
-    audio_run(world, 1);
-    audio_log_stop();
-    test_int(audio_log_errors, 1);
-    test_assert(strstr(audio_log_last, "Wobble") != NULL);
-    test_assert(strstr(audio_log_last, "LFO") != NULL);
-
-    wobble = ecs_lookup(world, "Wobble");
-    p = &ecs_get(world, wobble, AudioSynth)->patch;
-    test_int(p->layers, 1);
-    test_flt(p->layer[0].pulse_width, 0.2f);
-    test_int(p->lfos, 2);
-    test_int(p->lfo[0].layer, 1);
-    test_int(p->lfo[0].wave, BOX_AUDIO_SYNTH_LFO_SQUARE);
-    test_flt(p->lfo[0].pulse_width, 0.1f);
-    test_int(p->lfo[1].layer, 0);
-    test_int(p->lfo[1].wave, BOX_AUDIO_SYNTH_LFO_RANDOM);
-    test_flt(p->lfo[1].cutoff, 1.5f);
-
-    ecs_delete(world, ecs_lookup(world, "Wobble.more"));
-    ecs_set(world, ecs_lookup(world, "Wobble.wah"), SynthLfo, {
-        .wave = SynthLfoTriangle, .rate = 2, .amplitude = 0.5f });
-    audio_run(world, 1);
-    p = &ecs_get(world, wobble, AudioSynth)->patch;
-    test_int(p->lfos, 2);
-    test_int(p->lfo[1].wave, BOX_AUDIO_SYNTH_LFO_TRIANGLE);
-    test_flt(p->lfo[1].amplitude, 0.5f);
-    test_flt(p->lfo[1].cutoff, 0);
-
-    ecs_remove(world, ecs_lookup(world, "Wobble.tone"), SynthLfo);
-    audio_run(world, 1);
-    p = &ecs_get(world, wobble, AudioSynth)->patch;
-    test_int(p->lfos, 1);
-    test_int(p->lfo[0].layer, 0);
-
-    test_assert(box_audio_play(world, wobble, 1.0f));
-    audio_run(world, 10);
-    test_assert(synth_finite(audio_tap_l, 0, audio_tap_count));
-    test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
-    ecs_fini(world);
-}
-=======
 /** A patch of one pluck string without any envelope, which rings out on its own.
  *
  * @param frequency Hz
@@ -4012,4 +4014,110 @@ void Synth_docs_pluck_examples(void) {
     test_int(audio_log_errors, 0);
     ecs_fini(world);
 }
->>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
+
+/** Cents of the fundamental of a render near a frequency, measured around a frame from the
+ * advance of its phase over 10 ms.
+ *
+ * @param x Samples
+ * @param center Frame in the middle of the measure
+ * @param frequency Hz the cents are from
+ * @return Cents
+ */
+static double synth_cents_at(
+    const float *x,
+    int32_t center,
+    double frequency)
+{
+    int32_t gap = AUDIO_RATE / 100, window = AUDIO_RATE / 50;
+    double f = synth_pitch(x, center - (gap + window) / 2, gap, window, frequency, AUDIO_RATE);
+
+    return 1200 * log2(f / frequency);
+}
+
+/** LFOs move a layer of unison voices in stereo: a tremolo scales both channels of the same
+ * render by its dip, so the voices keep their phases and detune, and a vibrato moves the pitch
+ * of every voice by its cents at the top and the bottom of the wave. */
+void Synth_lfo_unison(void) {
+    // audio/synth
+    enum { FRAMES = 24000 };
+    static float plain_l[FRAMES], plain_r[FRAMES];
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_unison(BOX_AUDIO_SYNTH_SAW, 220, 0.3f, 5, 20, 1, 0.6f);
+    double expected, dip, err = 0, top, bottom;
+    float diff = 0;
+    int32_t i;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, FRAMES);
+    memcpy(plain_l, audio_l, sizeof(plain_l));
+    memcpy(plain_r, audio_r, sizeof(plain_r));
+    for (i = 0; i < FRAMES; i ++) {
+        float d = fabsf(plain_l[i] - plain_r[i]);
+        diff = d > diff ? d : diff;
+    }
+
+    test_assert(diff > 0.05f);
+    box_audio_core_free(core);
+
+    core = synth_core(AUDIO_RATE);
+    p.lfos = 1;
+    p.lfo[0] = (box_audio_synth_lfo_t){
+        .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 4, .amplitude = 0.5f };
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, FRAMES);
+    for (i = 100; i < FRAMES - 1000; i ++) {
+        dip = 1 - 0.5 * 0.5 * (1 - sin(2 * AUDIO_PI * 4 * (i + 1) / AUDIO_RATE));
+        expected = plain_l[i] * dip;
+        err = fabs(audio_l[i] - expected) > err ? fabs(audio_l[i] - expected) : err;
+        expected = plain_r[i] * dip;
+        err = fabs(audio_r[i] - expected) > err ? fabs(audio_r[i] - expected) : err;
+    }
+
+    printf("unison tremolo: %.6f from the expected at most\n", err);
+    test_assert(err < 2e-3);
+    box_audio_core_free(core);
+
+    core = synth_core(AUDIO_RATE);
+    p = synth_unison(BOX_AUDIO_SYNTH_SINE, 400, 0.3f, 3, 0, 0.5f, 0.6f);
+    p.lfos = 1;
+    p.lfo[0] = (box_audio_synth_lfo_t){
+        .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 2, .pitch = 100 };
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, FRAMES);
+    test_assert(synth_finite(audio_l, 0, FRAMES));
+    top = synth_cents_at(audio_l, AUDIO_RATE / 8, 400);
+    bottom = synth_cents_at(audio_r, AUDIO_RATE * 3 / 8, 400);
+    printf("unison vibrato: %.2f cents at the top, %.2f at the bottom\n", top, bottom);
+    test_assert(fabs(top - 100) < 5);
+    test_assert(fabs(bottom + 100) < 5);
+    box_audio_core_free(core);
+}
+
+/** An LFO moves a pluck string: its pitch swings by the cents of a vibrato at the top and the
+ * bottom of the wave, and the string still rings out and ends the voice. */
+void Synth_lfo_pluck(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_pluck(220, 1, 0.3f, 1);
+    double top, bottom, back;
+    p.lfos = 1;
+    p.lfo[0] = (box_audio_synth_lfo_t){
+        .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 2, .pitch = 50 };
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES);
+    test_assert(synth_finite(audio_l, 0, AUDIO_FRAMES));
+    top = synth_cents_at(audio_l, AUDIO_RATE / 8, 220);
+    bottom = synth_cents_at(audio_l, AUDIO_RATE * 3 / 8, 220);
+    back = synth_cents_at(audio_l, AUDIO_RATE * 5 / 8, 220);
+    printf("pluck vibrato: %.2f, %.2f and %.2f cents\n", top, bottom, back);
+    test_assert(fabs(top - 50) < 4);
+    test_assert(fabs(bottom + 50) < 4);
+    test_assert(fabs(back - 50) < 4);
+    audio_render(core, 0, AUDIO_FRAMES);
+    test_assert(synth_finite(audio_l, 0, AUDIO_FRAMES));
+    test_int(box_audio_core_voice_count(core), 0);
+    box_audio_core_free(core);
+}

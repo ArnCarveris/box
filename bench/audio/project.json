@@ -48,13 +48,9 @@
                     "voices_64",
                     "voices_64_filter_envelope",
                     "voices_64_filter_24",
-<<<<<<< HEAD
                     "voices_64_lfo",
-                    "voices_64_fm"
-=======
                     "voices_64_fm",
                     "voices_32_pluck"
->>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
                 ]
             }
         ]

@@ -121,22 +121,6 @@
 /** Longest glide of a synth patch in seconds */
 #define BOX_AUDIO_SYNTH_GLIDE_MAX 10.0f
 
-<<<<<<< HEAD
-/** LFOs of a synth patch */
-#define BOX_AUDIO_SYNTH_LFOS 2
-
-/** Highest rate of a synth LFO in Hz */
-#define BOX_AUDIO_SYNTH_LFO_RATE_MAX 100.0f
-
-/** Largest depth of the pitch of a synth LFO in cents, up or down */
-#define BOX_AUDIO_SYNTH_CENTS_MAX 2400.0f
-
-/** Narrowest pulse width of a square, as a share of its period; the widest is 1 minus it */
-#define BOX_AUDIO_SYNTH_PULSE_MIN 0.01f
-
-/** Default pulse width of a square, the symmetric square */
-#define BOX_AUDIO_SYNTH_PULSE_DEFAULT 0.5f
-=======
 /** Most unison voices of a synth layer */
 #define BOX_AUDIO_SYNTH_UNISON_MAX 7
 
@@ -157,7 +141,20 @@
 /** Shortest and longest decay of a pluck string in seconds, the time until -60 dB */
 #define BOX_AUDIO_SYNTH_PLUCK_DECAY_MIN 0.01f
 #define BOX_AUDIO_SYNTH_PLUCK_DECAY_MAX 60.0f
->>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
+/** LFOs of a synth patch */
+#define BOX_AUDIO_SYNTH_LFOS 2
+
+/** Highest rate of a synth LFO in Hz */
+#define BOX_AUDIO_SYNTH_LFO_RATE_MAX 100.0f
+
+/** Largest depth of the pitch of a synth LFO in cents, up or down */
+#define BOX_AUDIO_SYNTH_CENTS_MAX 2400.0f
+
+/** Narrowest pulse width of a square, as a share of its period; the widest is 1 minus it */
+#define BOX_AUDIO_SYNTH_PULSE_MIN 0.01f
+
+/** Default pulse width of a square, the symmetric square */
+#define BOX_AUDIO_SYNTH_PULSE_DEFAULT 0.5f
 
 /** Commands of the byte stream. Each starts with a box_audio_cmd_header_t */
 typedef enum box_audio_cmd_type_t {
@@ -378,11 +375,9 @@ typedef struct box_audio_synth_layer_t {
                                            * envelope; ring: depth, 0..1 */
     float feedback;                       /**< Radians of its own output on its phase */
     uint32_t audible;                     /**< 1 when a modulator is heard as well, at level */
-<<<<<<< HEAD
     float pulse_width;                    /**< Square: share of the period it is high,
                                            * BOX_AUDIO_SYNTH_PULSE_MIN..1 minus it; 0 for
                                            * BOX_AUDIO_SYNTH_PULSE_DEFAULT */
-=======
     uint32_t voices;                      /**< Unison voices, 1..BOX_AUDIO_SYNTH_UNISON_MAX,
                                            * 0 counts as 1 */
     float detune;                         /**< Cents from the lowest unison voice to the
@@ -397,7 +392,6 @@ typedef struct box_audio_synth_layer_t {
                                            * that plucks the string, 0 a soft finger, 1 a pick */
     uint32_t rings_free;                  /**< BOX_AUDIO_SYNTH_PLUCK: 1 when it uses no
                                            * envelope at all and the string alone ends it */
->>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
 } box_audio_synth_layer_t;
 
 /** An LFO of a synth patch: a wave at a rate that starts after a delay and fades in, with a
@@ -436,9 +430,10 @@ typedef struct box_audio_synth_patch_t {
                                            * keep the voice playing */
     float glide;                          /**< Seconds a change of the pitch of a voice takes,
                                            * exponential in frequency, 0 jumps at once */
-    box_audio_synth_layer_t layer[BOX_AUDIO_SYNTH_LAYERS]; /**< The oscillators */
     uint32_t lfos;                        /**< LFOs that run, 0..BOX_AUDIO_SYNTH_LFOS */
     box_audio_synth_lfo_t lfo[BOX_AUDIO_SYNTH_LFOS]; /**< The LFOs */
+    box_audio_synth_layer_t layer[BOX_AUDIO_SYNTH_LAYERS]; /**< The oscillators, last: a
+                                           * command sends only the layers of its patch */
 } box_audio_synth_patch_t;
 
 /** Make a sound id a synth patch, or replace the patch of a synth sound. Voices that play it

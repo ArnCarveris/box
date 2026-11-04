@@ -19,6 +19,15 @@
  * find a part for each of its layers is ignored */
 #define BOX_AUDIO_SYNTH_PARTS (BOX_AUDIO_VOICE_SLOTS * 4)
 
+/** Lowest frequency of an oscillator in Hz */
+#define BOX_AUDIO_SYNTH_FREQUENCY_MIN 1.0f
+
+/** Lowest cutoff in Hz */
+#define BOX_AUDIO_SYNTH_CUTOFF_MIN 10.0f
+
+/** Highest frequency or cutoff a patch keeps in Hz, before the clamp to the rate */
+#define BOX_AUDIO_SYNTH_HZ_MAX 1000000.0f
+
 /** Smallest magnitude a sample keeps; smaller ones are flushed to 0, so no denormal forms */
 #define BOX_AUDIO_TINY 1e-30f
 
@@ -307,8 +316,8 @@ typedef struct box_audio_synth_source_t {
     int32_t control;      /**< Frames until the filter takes the cutoff of the envelope */
     int32_t glide_frames; /**< Frames of a glide of the patch, 0 when a pitch jumps */
     int32_t glide_left;   /**< Frames left of the glide that runs, 0 for none */
-<<<<<<< HEAD
     int32_t lfos;         /**< LFOs that run, 0 without, which renders as before */
+    box_audio_synth_lfo_t lfo_patch[BOX_AUDIO_SYNTH_LFOS]; /**< The LFOs of the patch */
     box_audio_synth_mod_t lfo[BOX_AUDIO_SYNTH_LFOS]; /**< The LFOs */
     uint32_t lfo_rng;     /**< State of the random phases and waves of the LFOs, never 0 */
     float lfo_smooth;     /**< Share of the way a jumping wave moves per control block */
@@ -317,11 +326,9 @@ typedef struct box_audio_synth_source_t {
     double lfo_octaves;   /**< Octaves the LFOs move the cutoff by, 0 without */
     float tremolo;        /**< Factor of the output from the LFOs of every layer, 1 without */
     float tremolo_step;   /**< Change of tremolo per frame */
-=======
     int32_t strings;      /**< Pluck layers, each with a string, 0 for none */
     int32_t ringing;      /**< Strings that are still over the silence */
     int32_t ringing_free; /**< Strings of layers without an envelope still over the silence */
->>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
 } box_audio_synth_source_t;
 
 /** State of the kinds of sources */

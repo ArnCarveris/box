@@ -3,14 +3,9 @@
  * @brief Compiles a SynthSound and its layers into the patch of the synth of the core, and
  * marks it for a new compile when one of its components changes.
  *
- * The layers are the root and its children with a SynthOscillator, as particle effect layers
-<<<<<<< HEAD
- * are, and the children of layers with one, the modulators of their parent. The LFOs are the
- * SynthLfo of the root, of the layers and of the other children of the root.
-=======
- * are, and the children of layers with one, the modulators of their parent. A SynthPluck layer
- * takes the values of its SynthString.
->>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
+ * The layers are the root and its children with a SynthOscillator, and the children of layers
+ * with one, the modulators of their parent; a SynthPluck layer takes its SynthString. The LFOs
+ * are the SynthLfo of the root, of the layers and of the other children of the root.
  *
  * The sync system sends the patch with a SYNTH command when it changed; the core plays every
  * voice from a copy of it, so a play allocates nothing.
@@ -65,27 +60,16 @@ void box_audio_synth_init(
 {
     ecs_entity_t ids[] = {
         ecs_id(SynthSound), ecs_id(SynthOscillator), ecs_id(SynthEnvelope), ecs_id(SynthFilter),
-<<<<<<< HEAD
-        ecs_id(SynthFilterEnvelope), ecs_id(SynthGlide), ecs_id(SynthLfo)
-=======
         ecs_id(SynthFilterEnvelope), ecs_id(SynthGlide), ecs_id(SynthUnison),
-        ecs_id(SynthString)
->>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
+        ecs_id(SynthString), ecs_id(SynthLfo)
     };
     const char *names[] = {
         "AudioSynthSoundDirty", "AudioSynthOscillatorDirty", "AudioSynthEnvelopeDirty",
         "AudioSynthFilterDirty", "AudioSynthFilterEnvelopeDirty", "AudioSynthGlideDirty",
-<<<<<<< HEAD
-        "AudioSynthLfoDirty"
+        "AudioSynthUnisonDirty", "AudioSynthStringDirty", "AudioSynthLfoDirty"
     };
     int32_t i;
-    for (i = 0; i < 7; i ++) {
-=======
-        "AudioSynthUnisonDirty", "AudioSynthStringDirty"
-    };
-    int32_t i;
-    for (i = 0; i < 8; i ++) {
->>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
+    for (i = 0; i < 9; i ++) {
         ecs_observer(world, {
             .entity = ecs_entity(world, { .name = names[i] }),
             .query.flags = EcsQueryMatchPrefab,
@@ -162,8 +146,20 @@ static void box_audio_synth_layer(
     }
 
     l->feedback = osc->feedback;
-<<<<<<< HEAD
     l->pulse_width = osc->pulse_width;
+    l->voices = 1;
+    if (unison) {
+        l->voices = unison->voices > 1 ? (uint32_t)unison->voices : 1;
+        l->detune = unison->detune;
+        l->width = unison->width;
+    }
+
+    if (osc->wave == SynthPluck) {
+        string = string ? string : &box_audio_synth_string_default;
+        l->decay = string->decay;
+        l->brightness = string->brightness;
+        l->hardness = string->hardness;
+    }
 }
 
 /** Add an LFO to a patch, or count it when the patch has BOX_AUDIO_SYNTH_LFOS.
@@ -195,21 +191,6 @@ static void box_audio_synth_lfo(
         .cutoff = lfo->cutoff, .pulse_width = lfo->pulse_width };
 done:
     return;
-=======
-    l->voices = 1;
-    if (unison) {
-        l->voices = unison->voices > 1 ? (uint32_t)unison->voices : 1;
-        l->detune = unison->detune;
-        l->width = unison->width;
-    }
-
-    if (osc->wave == SynthPluck) {
-        string = string ? string : &box_audio_synth_string_default;
-        l->decay = string->decay;
-        l->brightness = string->brightness;
-        l->hardness = string->hardness;
-    }
->>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
 }
 
 /** Count the layers of an entity and its descendants that are left out of a full patch.
@@ -268,16 +249,11 @@ static void box_audio_synth_children(
             if (osc->modulation != SynthMix && !carrier) {
                 (*orphans) ++;
             } else if (p->layers < BOX_AUDIO_SYNTH_LAYERS) {
-<<<<<<< HEAD
-                box_audio_synth_layer(p, osc, ecs_get(world, child, SynthEnvelope), carrier);
-                box_audio_synth_lfo(p, ecs_get(world, child, SynthLfo), p->layers, lfos);
-                box_audio_synth_children(world, p, child, p->layers, extra, orphans, lfos);
-=======
                 box_audio_synth_layer(p, osc, ecs_get(world, child, SynthEnvelope),
                     ecs_get(world, child, SynthUnison), ecs_get(world, child, SynthString),
                     carrier);
-                box_audio_synth_children(world, p, child, p->layers, extra, orphans);
->>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
+                box_audio_synth_lfo(p, ecs_get(world, child, SynthLfo), p->layers, lfos);
+                box_audio_synth_children(world, p, child, p->layers, extra, orphans, lfos);
             } else {
                 *extra += box_audio_synth_count(world, child);
             }
@@ -298,12 +274,8 @@ bool box_audio_synth_compile(
     const SynthFilterEnvelope *fenv = ecs_get(world, e, SynthFilterEnvelope);
     const SynthOscillator *osc = ecs_get(world, e, SynthOscillator);
     const SynthGlide *glide = ecs_get(world, e, SynthGlide);
-<<<<<<< HEAD
-    int32_t extra = 0, orphans = 0, lfos = 0, i;
+    int32_t extra = 0, orphans = 0, low = 0, lfos = 0, i;
     ecs_iter_t it;
-=======
-    int32_t extra = 0, orphans = 0, low = 0, i;
->>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
     bool endless = false, fits = true, result;
     if (sound) {
         p.seed = sound->seed;
@@ -377,9 +349,6 @@ bool box_audio_synth_compile(
         }
     }
 
-<<<<<<< HEAD
-    if (extra || endless || !fits || orphans || lfos) {
-=======
     if (low) {
         char *path = ecs_get_path(world, e);
         ecs_warn("box.audio: synth '%s' plucks a string under %.0f Hz, it plays at %.0f Hz",
@@ -387,8 +356,7 @@ bool box_audio_synth_compile(
         ecs_os_free(path);
     }
 
-    if (extra || endless || !fits || orphans) {
->>>>>>> 6887583ba27587952f02068db26b4835f58ebb6e
+    if (extra || endless || !fits || orphans || lfos) {
         char *path = ecs_get_path(world, e);
         if (extra) {
             ecs_err("box.audio: synth '%s' has %d layers, more than %d, the rest are left out",

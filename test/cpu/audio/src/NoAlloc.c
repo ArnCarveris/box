@@ -101,7 +101,7 @@ void NoAlloc_synth_voices(void) {
     // audio/noalloc
     box_audio_core_t *core = noalloc_core();
     box_audio_synth_patch_t p = {0};
-    uint8_t bytes[1024];
+    uint8_t bytes[sizeof(box_audio_cmd_synth_t)];
     box_audio_writer_t w;
     uint32_t i;
     p.layers = 3;
