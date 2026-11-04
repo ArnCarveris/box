@@ -58,6 +58,9 @@
 /** Shortest fade in seconds of an LFO with a delay, so its depth does not jump in at once */
 #define BOX_AUDIO_SYNTH_LFO_FADE_MIN 0.005f
 
+/** Pi */
+#define BOX_AUDIO_SYNTH_PI 3.14159265358979323846
+
 /** Turns per radian */
 #define BOX_AUDIO_SYNTH_TURNS (1.0 / 6.28318530717958647692)
 
@@ -79,13 +82,17 @@ static const double box_audio_synth_unison_gain[BOX_AUDIO_SYNTH_UNISON_MAX + 1] 
 /** Largest gain of the loop of a string, under 1 so that every string decays */
 #define BOX_AUDIO_SYNTH_STRING_GAIN_MAX 0.99999
 
-/** Frames between the tunings of a string while its pitch moves, the control block of the
- * LFOs, so a vibrato costs its two sines and exponential once a block and not every frame */
+/** Frames between the exact tunings of a string while its pitch moves, the control block of
+ * the LFOs: between them a cheap tuning follows the pitch every frame, so a vibrato costs its
+ * two sines and exponential once a block and not every frame */
 #define BOX_AUDIO_SYNTH_STRING_RETUNE 8
 
-/** Frames of the crossfade of a string from its old read point to the new one when a tuning
- * moves its delay line by whole frames, at most BOX_AUDIO_SYNTH_STRING_RETUNE so that two
- * crossfades never overlap */
+/** Shortest period of a string in frames the cheap tuning serves, under which the series of
+ * its sines would lose accuracy and a moving pitch tunes exactly every frame */
+#define BOX_AUDIO_SYNTH_STRING_CHEAP 16.0
+
+/** Frames of the crossfade of a string from its old read point to the new one when its delay
+ * line moves by whole frames */
 #define BOX_AUDIO_SYNTH_STRING_FADE 8
 
 /** Frames of the past a new read point of a string runs through its lowpass and allpass
@@ -658,6 +665,7 @@ static void box_audio_synth_string_tune(
     f = n - 1 - (double)d;
     w = 1.0 / n;
     s->inc = inc;
+    s->period = n;
     s->delay = d;
     s->c = (float)((double)box_audio_core_sin(w * (1 - f) * 0.5) /
         (double)box_audio_core_sin(w * (1 + f) * 0.5));
@@ -695,11 +703,52 @@ static void box_audio_synth_string_prime(
     }
 }
 
-/** Retune a string whose pitch moves, at most every BOX_AUDIO_SYNTH_STRING_RETUNE frames.
+/** Tune a string cheaply to a frequency while its pitch moves: its delay line and its
+ * allpass as box_audio_synth_string_tune does, without its gain, which moves little.
+ *
+ * The period comes from the last one by two terms of the series of 1 / (1 - e), e the step
+ * of the pitch, or by a division when the pitch jumps.
+ *
+ * The sines of the coefficient come from the first terms of their series: within a few
+ * millionths of the exact one, far under a cent, from BOX_AUDIO_SYNTH_STRING_CHEAP frames on.
+ *
+ * @param s The string
+ * @param inc Turns per frame of its oscillator
+ */
+static void box_audio_synth_string_follow(
+    box_audio_synth_string_t *s,
+    double inc)
+{
+    double e = 1 - inc * s->period, n, f, w = inc;
+    float a, b;
+    int32_t d;
+    n = e > -0.01 && e < 0.01 ? s->period * (1 + e * (1 + e)) : 1.0 / inc;
+    if (n > s->period_max) {
+        n = s->period_max;
+        w = 1.0 / n;
+    }
+
+    d = (int32_t)(n - 1.5);
+    f = n - 1 - (double)d;
+    a = (float)(BOX_AUDIO_SYNTH_PI * (1 - f) * w);
+    b = (float)(BOX_AUDIO_SYNTH_PI * (1 + f) * w);
+    a *= a;
+    b *= b;
+    s->inc = inc;
+    s->period = n;
+    s->delay = d;
+    s->c = (float)(1 - f) * (1 - a * (1.0f / 6 - a * (1.0f / 120))) /
+        ((float)(1 + f) * (1 - b * (1.0f / 6 - b * (1.0f / 120))));
+}
+
+/** Retune a string whose pitch moves: exactly every BOX_AUDIO_SYNTH_STRING_RETUNE frames and
+ * at a short period, cheaply on the frames between.
  *
  * When the delay line changes by whole frames the allpass fraction jumps from one end of its
  * range to the other, and the read point by a frame. The old read point and its allpass play
  * on for BOX_AUDIO_SYNTH_STRING_FADE frames and crossfade into the new, primed one.
+ *
+ * A crossing during a crossfade ends it: the read point that was new becomes the old one.
  *
  * @param s The string
  * @param inc Turns per frame of its oscillator
@@ -710,8 +759,13 @@ static void box_audio_synth_string_move(
 {
     int32_t delay = s->delay;
     float c = s->c;
-    s->retune = BOX_AUDIO_SYNTH_STRING_RETUNE;
-    box_audio_synth_string_tune(s, inc);
+    if (-- s->retune <= 0 || inc * BOX_AUDIO_SYNTH_STRING_CHEAP > 1) {
+        s->retune = BOX_AUDIO_SYNTH_STRING_RETUNE;
+        box_audio_synth_string_tune(s, inc);
+    } else {
+        box_audio_synth_string_follow(s, inc);
+    }
+
     if (s->delay != delay && !s->rough) {
         s->delay_old = delay;
         s->c_old = c;
@@ -1425,8 +1479,10 @@ static inline float box_audio_synth_osc_next(
 /** Render a frame of a string and advance it and its oscillator.
  *
  * A string follows the turns per frame of its oscillator, its glides, sweeps and vibrato
- * included, tuned every BOX_AUDIO_SYNTH_STRING_RETUNE frames while it moves; a steady pitch
- * never retunes. A period under BOX_AUDIO_SYNTH_STRING_SILENCE silences it for good.
+ * included, tuned cheaply every frame and exactly every BOX_AUDIO_SYNTH_STRING_RETUNE frames
+ * while it moves; a steady pitch never retunes.
+ *
+ * A period under BOX_AUDIO_SYNTH_STRING_SILENCE silences it for good.
  *
  * Per frame the frame out of the delay line goes through the lowpass (b0, b1, b0), the
  * allpass and the gain of the loop back into it; during the crossfade of a crossing the old
@@ -1450,7 +1506,7 @@ static inline float box_audio_synth_string_next(
         goto done;
     }
 
-    if (inc != s->inc && -- s->retune <= 0) {
+    if (inc != s->inc) {
         box_audio_synth_string_move(s, inc);
     }
 

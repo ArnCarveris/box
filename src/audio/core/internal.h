@@ -264,7 +264,8 @@ typedef struct box_audio_synth_string_t {
     float x1, x2;         /**< The last two frames out of the delay line */
     float f1, a1;         /**< The last input and output of the allpass */
     double inc;           /**< Turns per frame it is tuned to */
-    int32_t retune;       /**< Frames of a moving pitch until its next tuning */
+    double period;        /**< Frames of the period it is tuned to */
+    int32_t retune;       /**< Frames of a moving pitch until its next exact tuning */
     int32_t fade;         /**< Frames left of the crossfade from the old read point, 0 for none */
     int32_t delay_old;    /**< Frames of the delay line of the old read point */
     float c_old;          /**< Coefficient of the allpass of the old read point */

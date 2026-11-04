@@ -4246,8 +4246,10 @@ void Synth_pluck_vibrato_rate(void) {
 }
 
 /** A string crosses whole frames of its delay line smoothly: a glide of an octave over 20 ms
- * and a vibrato of a semitone at 8 Hz have far less energy above 8 kHz than the same renders in
- * which the read point jumps at each crossing. */
+ * has under 0.4 and a vibrato of a semitone at 8 Hz under 0.05 of the energy above 8 kHz of
+ * the same renders in which the read point jumps at each crossing.
+ *
+ * The glide keeps some, as its allpass sweeps its whole range every 9 frames. */
 void Synth_pluck_crossing_smooth(void) {
     // audio/synth
     double glide[2], vibrato[2];
@@ -4288,8 +4290,8 @@ void Synth_pluck_crossing_smooth(void) {
 
     printf("pluck crossings above 8 kHz: glide %.3g smooth, %.3g rough; vibrato %.3g smooth, "
         "%.3g rough\n", glide[0], glide[1], vibrato[0], vibrato[1]);
-    test_assert(glide[0] < 0.5 * glide[1]);
-    test_assert(vibrato[0] < 0.5 * vibrato[1]);
+    test_assert(glide[0] < 0.4 * glide[1]);
+    test_assert(vibrato[0] < 0.05 * vibrato[1]);
 }
 
 /** A string whose pitch does not move renders bit identical under an LFO without a pitch

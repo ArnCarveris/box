@@ -576,13 +576,17 @@ end.
   seconds (0.01 to 60) and the harmonics faster, the more so the darker the string; it is at most
   0.99999, so every string decays, and a high, bright, long string rings shorter than its
   `decay`. The string follows the frequency of its layer: the pitch of the voice, sweeps, glides
-  and legato notes and the vibrato of an LFO retune it while it moves (two sines and an `exp2`
-  every `BOX_AUDIO_SYNTH_STRING_RETUNE`, 8, frames, the control block of the LFOs), without a new
-  pluck, and a steady pitch never retunes. When a retune moves the delay line by whole frames,
+  and legato notes and the vibrato of an LFO retune it while it moves, without a new pluck: every
+  frame cheaply (the period from the last one by a series, the sines of the allpass coefficient
+  from two terms of their series, within a few millionths, and one division) and exactly, with
+  the gain, every `BOX_AUDIO_SYNTH_STRING_RETUNE`, 8, frames, the control block of the LFOs, and
+  every frame under a period of 16 frames; a steady pitch never retunes. When a retune moves the
+  delay line by whole frames,
   which a vibrato does all the time, the allpass fraction jumps from one end of its range to the
   other and the read point by a frame: the old read point and its allpass play on and crossfade
   into the new one over `BOX_AUDIO_SYNTH_STRING_FADE` (8) frames, and the new allpass starts from
-  4 frames of the past of the line, so the crossing does not click. A string that does not move
+  4 frames of the past of the line, so the crossing does not click; a crossing during a
+  crossfade ends it and starts the next from the read point that was new. A string that does not move
   pays one compare per frame for it. Its period is 4 frames at the shortest, a quarter of the rate,
   and at the longest the rate over `BOX_AUDIO_SYNTH_PLUCK_MIN` (40 Hz) and 2046 frames, which
   limits the lowest note to the rate over 2046 above 81.8 kHz. Once the peak of a period is under
@@ -681,8 +685,8 @@ end.
   costs a read and a write of its line, 6 multiplies and its peak per frame while it rings, and
   a pluck writes its line of 2048 floats once. A patch with LFOs adds three adds and two
   multiplies per oscillator per frame and the control block every 8 frames, and a string with a
-  vibrato tunes itself again every 8 frames and, for 8 frames after each crossing of a whole
-  frame, runs a second read point through its lowpass and allpass; a patch without LFOs takes the loops it
+  vibrato retunes cheaply every frame and exactly every 8 frames and, for 8 frames after each
+  crossing of a whole frame, runs a second read point through its lowpass and allpass; a patch without LFOs takes the loops it
   took before and renders bit identical, and a square at a width of 0.5 costs a compare.
   `bench/audio` has a `Synth` suite of 64 voices in ns per sample, with a filter envelope, with a
   24 dB filter, `voices_64_lfo`, two LFOs on the pitch, the level, the cutoff and the pulse
@@ -700,7 +704,10 @@ end.
   level, so a patch that is curved all the time costs more. Before the linear step was split
   out, the test of curved in every step made linear patches 8 to 10 % slower than without
   curves (`voices_64` 590 / 702 against 546 / 634, `voices_64_filter_envelope` 886 / 1080
-  against 830 / 993); now they are back at 546 / 617 and 778 / 898.
+  against 830 / 993); now they are back at 546 / 617 and 778 / 898. On the same machine a
+  quantum of `voices_32_pluck` takes about 35 µs (9 ns per string and frame) and of
+  `voices_32_pluck_vibrato` about 80 µs (20 ns), of which some 60 µs is the LFO path without
+  any retuning; an exact retune every frame, as strings did before, took about 145 µs.
 
 The core needs no libm: the exponential sweeps, the filter envelope and the LFOs use series for
 `log2` and `exp2` in `synth.c`.
@@ -1103,8 +1110,8 @@ one plays at 40 Hz with one warning. A core rings 32 strings at once; a play tha
 is ignored. The string follows the pitch of its voice: a change of `AudioSource.pitch`, a sweep,
 a `SynthGlide`, legato notes and the `pitch` of a `SynthLfo` bend the ringing string without a
 new pluck, so a pitch LFO gives a string its vibrato, as the guitar below has on a held note.
-Glides and vibrato stay clean: while the pitch moves the string retunes once per control block,
-and when its delay line moves by a whole frame it crossfades from the old read point to the new
+Glides and vibrato stay clean: while the pitch moves the string retunes cheaply every frame and
+exactly once per control block, and when its delay line moves by a whole frame it crossfades from the old read point to the new
 one. A string plays as one voice: a `SynthUnison` on a `SynthPluck` layer is ignored, so there is
 no ensemble of detuned strings in one layer; several `SynthPluck` layers a few cents apart make a
 chorus, as the 12 string guitar has.
