@@ -574,6 +574,8 @@ end.
   patch adds a phase offset and a wrap per layer; during a glide a multiply per oscillator.
   `bench/audio` has a `Synth` suite of 64 voices in ns per sample, with a filter envelope, with a
   24 dB filter, and `voices_64_fm`, two FM pairs per voice, which measures the modulated path.
+  `voices_64_curved` is `voices_64` with a curve of 4 and an attack curve of 1.5 on the patch
+  envelope and on the envelope of the square; a patch without curves takes the linear step only.
 
 The core needs no libm: the exponential sweeps and the filter envelope use series for `log2` and
 `exp2` in `synth.c`.
