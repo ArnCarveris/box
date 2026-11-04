@@ -485,7 +485,8 @@ voices that play keep theirs, and a release frees the id at once with `SOUND_FRE
   for all) and a depth per destination: `pitch` in cents (up to 2400 either way), `amplitude`
   (0..1), `cutoff` in octaves (up to 10) and `pulse_width` (a share of the period, up to 0.49).
   Every wave starts at 0 rising at phase 0, the square at its top. It is at depth 0 during its
-  delay, then its phase runs from its start and its depth rises linearly over the fade. The
+  delay, then its phase runs from its start and its depth rises linearly over the fade (at
+  least 5 ms after a delay, so it does not jump in). The
   pitch is multiplied by `2^(cents x v / 1200)` for the value `v` of the wave times the fade
   (the sum of both LFOs when both move it); the level dips from 1 at the top of the wave to
   `1 - amplitude` at its bottom, `1 - amplitude x fade x (1 - v) / 2`, so an LFO in its delay
@@ -921,7 +922,8 @@ from `test/assets/audio/synth_glide.flecs`), LFOs (a vibrato that moves the pitc
 at its rate only after its delay, a tremolo that moves the envelope at its rate by its depth,
 a cutoff and a pulse width that move the spectrum at the rate, a pulse band limited at every
 width, a seeded random phase the same for the same seed and count of plays, a square at a
-width of 0.5 and a patch without LFOs bit identical, smooth square LFOs, the examples of
+width of 0.5 and a patch without LFOs bit identical, also in a voice slot that played a
+cutoff LFO, smooth square LFOs, a delay without a fade that does not click, the examples of
 [LFOs](#lfos) from `test/assets/audio/synth_lfo.flecs`) and errors; `NoAlloc` renders 64
 synth voices. The browser check is `test/integration/web/audio_synth.mjs`.
 

@@ -315,6 +315,8 @@
                     "pulse_width_harmonics",
                     "alias_pulse",
                     "lfo_zero_identical",
+                    "lfo_slot_reuse",
+                    "lfo_delay_no_fade",
                     "lfo_random_phase_seeded",
                     "docs_lfo_examples",
                     "script_lfo"

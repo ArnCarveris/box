@@ -59,6 +59,9 @@
 /** Seconds over which an LFO wave that jumps, square, saw or random, moves to its new value */
 #define BOX_AUDIO_SYNTH_LFO_SMOOTH 0.002
 
+/** Shortest fade in seconds of an LFO with a delay, so its depth does not jump in at once */
+#define BOX_AUDIO_SYNTH_LFO_FADE_MIN 0.005f
+
 /** Turns per radian */
 #define BOX_AUDIO_SYNTH_TURNS (1.0 / 6.28318530717958647692)
 
@@ -736,7 +739,7 @@ static void box_audio_synth_lfo_pass(
     float rate)
 {
     const box_audio_synth_patch_t *p = &src->patch;
-    int32_t k, n;
+    int32_t k, n, least = box_audio_synth_frames(BOX_AUDIO_SYNTH_LFO_FADE_MIN, rate);
     for (k = 0; k < src->lfos; k ++) {
         const box_audio_synth_lfo_t *d = &p->lfo[k];
         box_audio_synth_mod_t *m = &src->lfo[k];
@@ -745,6 +748,7 @@ static void box_audio_synth_lfo_pass(
         m->phase = m->start;
         m->delay = box_audio_synth_frames(d->delay, rate);
         n = box_audio_synth_frames(d->fade, rate);
+        n = m->delay > 0 && n < least ? least : n;
         m->fade_step = n > BOX_AUDIO_SYNTH_CONTROL ?
             (float)BOX_AUDIO_SYNTH_CONTROL / (float)n : 1.0f;
         m->gain = m->delay <= 0 && m->fade_step >= 1 ? 1.0f : 0.0f;
@@ -870,7 +874,6 @@ static void box_audio_synth_lfo_start(
     src->lfo_rng = box_audio_synth_hash(p->seed ^ 0x4C464F21u, plays);
     src->lfo_smooth = (float)(1 - box_audio_synth_exp2(-(double)BOX_AUDIO_SYNTH_CONTROL /
         (BOX_AUDIO_SYNTH_LFO_SMOOTH * (double)core->sample_rate * BOX_AUDIO_SYNTH_LN2)));
-    src->lfo_cutoff = false;
     for (k = 0; k < src->lfos; k ++) {
         const box_audio_synth_lfo_t *d = &p->lfo[k];
         src->lfo[k].start = d->random_phase ?
@@ -917,6 +920,8 @@ void box_audio_source_synth(
     }
 
     src->lfos = (int32_t)src->patch.lfos;
+    src->lfo_cutoff = false;
+    src->lfo_octaves = 0;
     if (src->lfos) {
         box_audio_synth_lfo_start(core, src, slot->plays);
     }

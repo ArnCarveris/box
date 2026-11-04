@@ -2622,6 +2622,75 @@ void Synth_lfo_zero_identical(void) {
     box_audio_core_free(core);
 }
 
+/** Render a saw through a filter envelope without LFOs, in a core whose voice slot first
+ * played a patch with a cutoff LFO to its end, or in a new core.
+ *
+ * @param before Whether the slot plays the patch with the LFO first
+ * @param out Receives 16000 samples
+ */
+static void synth_lfo_reuse(
+    bool before,
+    float *out)
+{
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_lfo_patch(BOX_AUDIO_SYNTH_SAW, 220, 0.3f, 0.1f, 3);
+    p.filter = BOX_AUDIO_SYNTH_LOWPASS;
+    p.cutoff = 300;
+    p.lfo[0].cutoff = 1;
+    if (before) {
+        synth_define(core, 2, &p);
+        audio_play(core, 2, 2, 0, 1, 0, 1, 0);
+        audio_render(core, 0, 16000);
+        test_int(box_audio_core_voice_count(core), 0);
+    }
+
+    p = synth_steady(BOX_AUDIO_SYNTH_SAW, 220, 0.3f, 0.2f);
+    p.filter = BOX_AUDIO_SYNTH_LOWPASS;
+    p.cutoff = 300;
+    p.filter_amount = 4;
+    p.filter_envelope = (box_audio_synth_envelope_t){ .attack = 0.05f, .decay = 0.2f };
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 16000);
+    test_int(box_audio_core_voice_count(core), 0);
+    memcpy(out, audio_l, 16000 * sizeof(float));
+    box_audio_core_free(core);
+}
+
+/** A voice slot that played a cutoff LFO keeps nothing of it: a filter envelope without LFOs
+ * in it renders bit identical to the one of a new core. */
+void Synth_lfo_slot_reuse(void) {
+    // audio/synth
+    synth_lfo_reuse(false, audio_sound_a);
+    synth_lfo_reuse(true, audio_sound_b);
+    test_assert(memcmp(audio_sound_a, audio_sound_b, 16000 * sizeof(float)) == 0);
+}
+
+/** An LFO with a delay and no fade still comes in over a few ms: a full tremolo that starts
+ * at its bottom does not step the level. */
+void Synth_lfo_delay_no_fade(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_lfo_patch(BOX_AUDIO_SYNTH_SQUARE, 1, 0.5f, 0.6f, 0.5f);
+    float step, worst = 0;
+    int32_t i;
+    p.lfo[0].amplitude = 1;
+    p.lfo[0].delay = 0.1f;
+    p.lfo[0].phase = 0.75f;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 24000);
+    for (i = 100; i < 23000; i ++) {
+        step = fabsf(audio_l[i + 1] - audio_l[i]);
+        worst = step > worst ? step : worst;
+    }
+
+    printf("delay without fade: %.5f largest step\n", (double)worst);
+    test_assert(worst < 0.005f);
+    test_assert(audio_l[4800 + 480] < 0.01f);
+    box_audio_core_free(core);
+}
+
 /** Render a vibrato at a random phase per play of a seed in a new core, the plays before it
  * rendered and dropped.
  *
