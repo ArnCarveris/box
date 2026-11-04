@@ -382,7 +382,8 @@ static bool box_audio_effect_silent(
 }
 
 /** Run an effect over a block of its bus, in place, or skip it when it decayed and nothing
- * comes in. While it blends, its output is mixed with its input by the blend.
+ * comes in. While it blends, its output is mixed with its input by the blend; a frame at a
+ * blend of 1 is its output exactly, so the output does not depend on where a block ends.
  *
  * @param core The core
  * @param slot Slot of the effect
@@ -431,8 +432,10 @@ static void box_audio_effect_run(
 
         for (i = 0; blend && i < frames; i ++) {
             float g = box_audio_ramp_next(&fx->blend);
-            l[i] = core->effect_l[i] + (l[i] - core->effect_l[i]) * g;
-            r[i] = core->effect_r[i] + (r[i] - core->effect_r[i]) * g;
+            if (g != 1.0f) {
+                l[i] = core->effect_l[i] + (l[i] - core->effect_l[i]) * g;
+                r[i] = core->effect_r[i] + (r[i] - core->effect_r[i]) * g;
+            }
         }
     }
 

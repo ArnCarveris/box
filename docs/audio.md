@@ -1043,6 +1043,9 @@ component is `Chorus`.
 - **Cost.** Per frame and voice two interpolated reads and four multiply-adds; every 8 frames a
   sine per voice.
 
+`bench/audio` has a `Modulation` suite in ns per frame: a phaser of 12 stages, a chorus of 4
+voices, and a chorus whose input is silent.
+
 A wide chorus of 3 voices on a pad:
 
 ```

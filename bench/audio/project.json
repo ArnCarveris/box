@@ -2,7 +2,7 @@
     "id": "bench_audio",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the audio core: voices mixed through buses, a reverb, a delay and synth voices, in ns per frame, the spatial sources of box.audio, in ns per source, and its tracks, in ns per frame",
+        "description": "Benchmarks for the audio core: voices mixed through buses, a reverb, a delay, a phaser, a chorus and synth voices, in ns per frame, the spatial sources of box.audio, in ns per source, and its tracks, in ns per frame",
         "public": false,
         "use": [
             "box"
@@ -47,6 +47,14 @@
                 "benchcases": [
                     "one_delay",
                     "one_delay_ping_pong",
+                    "silent_tail"
+                ]
+            },
+            {
+                "id": "Modulation",
+                "benchcases": [
+                    "phaser_12",
+                    "chorus_4",
                     "silent_tail"
                 ]
             },

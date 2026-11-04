@@ -422,7 +422,9 @@ void Modulation_phaser_notch_moves(void) {
             double turns = t * rate + (c ? 0.25 : 0.0);
             double fc = center * pow(2, 2 * depth * sin(2 * AUDIO_PI * turns));
             double expect = md_first_notch(fc);
-            double got = md_notch(c ? md_b_r : md_b_l, c ? md_r : md_l, from, 80, 900);
+
+            // Up to the break frequency, which lies between the first notch and the second
+            double got = md_notch(c ? md_b_r : md_b_l, c ? md_r : md_l, from, 80, fc);
             double octaves = log2(got / expect);
             if (windows % 8 == 0) {
                 printf("%.3f s %s: notch at %.0f Hz, %.0f Hz expected\n", t,
@@ -556,16 +558,18 @@ void Modulation_phaser_feedback_stable(void) {
     }
 }
 
-/** Fill md_sound with a click train: a sample of 1 every MD_CLICKS frames from MD_CLICKS / 2.
+/** Fill md_sound with a click train: a sample of 1 every spacing frames from spacing / 2.
  *
  * @param frames Frames
+ * @param spacing Frames between two clicks
  */
 static void md_click_train(
-    int32_t frames)
+    int32_t frames,
+    int32_t spacing)
 {
     int32_t i;
     memset(md_sound, 0, sizeof(float) * (size_t)frames);
-    for (i = MD_CLICKS / 2; i < frames; i += MD_CLICKS) {
+    for (i = spacing / 2; i < frames; i += spacing) {
         md_sound[i] = 1;
     }
 }
@@ -575,6 +579,7 @@ static void md_click_train(
  * read.
  *
  * @param p Parameters of the chorus
+ * @param spacing Frames between two clicks, longer than the longest echo
  * @param delays Receives the delay of each click in milliseconds
  * @param lo Receives the earliest frame of any sound after a click, in frames
  * @param hi Receives the latest
@@ -582,22 +587,23 @@ static void md_click_train(
  */
 static int32_t md_echoes(
     box_audio_chorus_params_t p,
+    int32_t spacing,
     double *delays,
     int32_t *lo,
     int32_t *hi)
 {
     md_t md;
     int32_t frames = AUDIO_RATE * 2, click, i, count = 0;
-    md_click_train(frames);
+    md_click_train(frames, spacing);
     md_open(&md, BOX_AUDIO_EFFECT_CHORUS, frames, false, true);
     md_chorus_command(md.core, p);
     md_render(md.core, md_l, md_r, 0, frames, BOX_AUDIO_CORE_QUANTUM);
     md_close(&md);
-    *lo = MD_CLICKS;
+    *lo = spacing;
     *hi = 0;
-    for (click = MD_CLICKS / 2; click + MD_CLICKS <= frames; click += MD_CLICKS) {
+    for (click = spacing / 2; click + spacing <= frames; click += spacing) {
         double sum = 0, moment = 0;
-        for (i = 1; i < MD_CLICKS; i ++) {
+        for (i = 1; i < spacing; i ++) {
             double a = fabs((double)md_l[click + i]) + fabs((double)md_r[click + i]);
             sum += a;
             moment += a * i;
@@ -619,7 +625,7 @@ void Modulation_chorus_delay_range(void) {
     double delays[AUDIO_RATE * 2 / MD_CLICKS], lowest = 1e30, highest = 0;
     float depth = 3, delay = 12, rate = 1;
     int32_t count, i, lo, hi, voices;
-    count = md_echoes(md_chorus(1, rate, depth, delay, 1, 0), delays, &lo, &hi);
+    count = md_echoes(md_chorus(1, rate, depth, delay, 1, 0), MD_CLICKS, delays, &lo, &hi);
     test_assert(count > 40);
     for (i = 0; i < count; i ++) {
         // The LFO starts at phase 0 at the first frame and reads an echo when it arrives
@@ -643,17 +649,18 @@ void Modulation_chorus_delay_range(void) {
 
     // Every voice reads within the delay and the depth
     for (voices = 2; voices <= BOX_AUDIO_CHORUS_VOICES_MAX; voices ++) {
-        md_echoes(md_chorus((float)voices, rate, depth, delay, 1, 1), delays, &lo, &hi);
+        md_echoes(md_chorus((float)voices, rate, depth, delay, 1, 1), MD_CLICKS,
+            delays, &lo, &hi);
         printf("%d voices: sound from %d to %d frames after a click\n", voices, lo, hi);
         test_assert(lo >= (int32_t)((delay - depth) * AUDIO_RATE / 1000) - 1);
         test_assert(hi <= (int32_t)((delay + depth) * AUDIO_RATE / 1000) + 2);
     }
 
     // A read never goes further back than 50 ms, nor nearer than a frame
-    md_echoes(md_chorus(1, 0, 25, 100, 1, 0), delays, &lo, &hi);
+    md_echoes(md_chorus(1, 0, 25, 100, 1, 0), MD_CLICKS * 4, delays, &lo, &hi);
     test_int(lo, (int32_t)(BOX_AUDIO_CHORUS_MAX * AUDIO_RATE / 1000));
     test_int(hi, lo);
-    md_echoes(md_chorus(NAN, NAN, NAN, NAN, 1, NAN), delays, &lo, &hi);
+    md_echoes(md_chorus(NAN, NAN, NAN, NAN, 1, NAN), MD_CLICKS, delays, &lo, &hi);
     test_int(lo, 1);
     test_int(hi, 1);
 }
@@ -890,6 +897,7 @@ static uint64_t md_sized(
     float *memory = malloc((size_t)floats * sizeof(float));
     box_audio_core_t *core = box_audio_core_new(&desc);
     test_assert(core != NULL && memory != NULL);
+    audio_fill(memory, floats, 0.75f);
     test_assert(box_audio_core_effect_memory(core, 1, memory, floats));
     audio_order(core, routes, 3);
     md_noise(AUDIO_RATE / 2, 7);
