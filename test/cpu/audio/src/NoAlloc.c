@@ -191,6 +191,57 @@ void NoAlloc_scheduled(void) {
     test_int(noalloc_frees, 1);
 }
 
+/* Gated synth voices and sampler voices with the attack flag, their scheduled releases and
+ * legato notes that follow them, without a call of the allocator. */
+void NoAlloc_gated(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    static uint8_t bytes[64 * 1024];
+    box_audio_synth_patch_t p = {0};
+    box_audio_writer_t w;
+    uint32_t i;
+    p.layers = 2;
+    p.envelope = (box_audio_synth_envelope_t){
+        .attack = 0.01f, .decay = 0.05f, .sustain = 0.5f, .hold = 0.01f, .release = 0.05f,
+        .curve = 3 };
+    p.filter = BOX_AUDIO_SYNTH_LOWPASS;
+    p.cutoff = 400;
+    p.filter_amount = 3;
+    p.filter_envelope = (box_audio_synth_envelope_t){
+        .attack = 0.02f, .sustain = 0.7f, .hold = 0.01f, .release = 0.08f };
+    p.glide = 0.02f;
+    p.layer[0] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_SAW, .frequency = 220,
+        .level = 0.2f };
+    p.layer[1] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_SINE, .frequency = 110,
+        .level = 0.2f, .has_envelope = 1, .envelope = { .attack = 0.005f, .sustain = 1,
+        .release = 0.02f } };
+    audio_fill(audio_sound_a, 4000, 0.25f);
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, 4000, 1, AUDIO_RATE));
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_synth(&w, 2, &p));
+    for (i = 1; i <= 200; i ++) {
+        uint64_t at = 1 + (uint64_t)(i * 97 % 20000);
+        test_assert(box_audio_write_play(&w, i, i % 3 ? 2 : 1, 0, 0.05f, 0, 1,
+            i % 3 ? BOX_AUDIO_PLAY_GATE : BOX_AUDIO_PLAY_ATTACK, at));
+        test_assert(box_audio_write_voice_release(&w, i, 0.02f, at + 3000));
+        if (i % 5 == 0) {
+            test_assert(box_audio_write_legato_at(&w, 1000 + i, i, 2, 0, 0.05f, 0, 1.5f,
+                BOX_AUDIO_PLAY_GATE, at + 3000));
+            test_assert(box_audio_write_voice_release(&w, 1000 + i, 0.02f, at + 6000));
+        }
+    }
+
+    box_audio_core_apply(core, w.data, w.size);
+    test_assert(box_audio_core_scheduled(core) > 0);
+    audio_render(core, 0, AUDIO_FRAMES);
+    test_int(box_audio_core_scheduled(core), 0);
+    audio_events(core, 0, NULL);
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+}
+
 /* Effects in the insert slots of buses: reverbs on several buses, a change of their
  * parameters, moves between buses and slots, a removal whose tail fades on a live bus and one
  * whose bus left the order, and memory that grows, without a call of the allocator. */

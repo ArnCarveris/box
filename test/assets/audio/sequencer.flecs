@@ -1,0 +1,35 @@
+// Clips and tracks the Sequencer suite of test/cpu/audio plays: one riff, a prefab clip, on a
+// track twice, looped from beat 0 and transposed up an octave from beat 4, under a transport
+// at 132 bpm that loops from beat 0 to 6.
+using box.audio
+
+// A triangle at 440 Hz that sustains while a note holds and releases over 50 ms
+prefab pluck_tone {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.005, decay: 0.05, sustain: 0.6, hold: 0.05, release: 0.05}
+  SynthOscillator: {wave: SynthTriangle, frequency: 440, level: 0.4}
+}
+
+pluck { Instrument: {sound: pluck_tone} }
+
+// Two beats: A3 at velocity 0.8, C4 at the default velocity of 1, E4 panned to the left
+prefab riff {
+  NoteClip: {length: 2, notes: [
+    {start: 0, duration: 0.5, pitch: 57, velocity: 0.8},
+    {start: 0.5, duration: 0.25, pitch: 60},
+    {start: 1, duration: 0.75, pitch: 64, pan: -0.5}
+  ]}
+}
+
+bass {
+  Track: {instrument: pluck}
+  AudioBus: {volume: 0.8}
+
+  // Twice through the riff
+  intro { ClipPlacement: {clip: riff, start: 0, duration: 4, loop: true} }
+
+  // The second half of the riff an octave up, at half the gain
+  answer { ClipPlacement: {clip: riff, start: 4, offset: 1, transpose: 12, gain: 0.5} }
+}
+
+$ { Transport: {tempo: 132, loop: true, loop_start: 0, loop_end: 6, playing: true} }

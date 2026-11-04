@@ -200,16 +200,20 @@ static int32_t box_audio_synth_frames(
 
 /** Start an envelope: its segments in frames, a pass at most BOX_AUDIO_SYNTH_LENGTH_MAX long,
  * and every segment that changes the level at least BOX_AUDIO_SYNTH_EDGE long, so it neither
- * clicks nor runs forever. With a sustain of 0 the envelope ends after its decay.
+ * clicks nor runs forever.
+ *
+ * With a sustain of 0 the envelope ends after its decay, gated or not.
  *
  * @param e The envelope of the voice
  * @param d The envelope of the patch
  * @param rate Frames per second
+ * @param gate Whether it sustains in its hold until a release
  */
 static void box_audio_synth_env_init(
     box_audio_synth_env_t *e,
     const box_audio_synth_envelope_t *d,
-    float rate)
+    float rate,
+    bool gate)
 {
     int32_t edge = box_audio_synth_frames(BOX_AUDIO_SYNTH_EDGE, rate);
     int32_t max = box_audio_synth_frames(BOX_AUDIO_SYNTH_LENGTH_MAX, rate);
@@ -229,6 +233,7 @@ static void box_audio_synth_env_init(
         excess -= cut;
     }
 
+    e->release = n[BOX_AUDIO_SYNTH_RELEASE] > edge ? n[BOX_AUDIO_SYNTH_RELEASE] : edge;
     if (n[BOX_AUDIO_SYNTH_ATTACK] < edge) {
         n[BOX_AUDIO_SYNTH_ATTACK] = edge;
     }
@@ -254,6 +259,7 @@ static void box_audio_synth_env_init(
     e->curve[BOX_AUDIO_SYNTH_RELEASE] = d->curve;
     e->curved = false;
     e->sustain = d->sustain;
+    e->gate = gate;
     e->segment = -1;
     e->left = 0;
     e->value = 0;
@@ -263,6 +269,9 @@ static void box_audio_synth_env_init(
 
 /** Enter a segment of an envelope; one without frames takes its level at once, which the
  * edge of BOX_AUDIO_SYNTH_EDGE keeps to segments that do not change it.
+ *
+ * The hold of a gated envelope with a sustain lasts until a release: box_audio_synth_env_step
+ * renews its frames.
  *
  * A linear segment adds a step per frame. A curved one of curve c over n frames follows
  * v(k) = a + (v0 - a) r^k with r = exp(-c / n), whose asymptote a lies past the target so
@@ -290,6 +299,10 @@ static void box_audio_synth_env_enter(
     e->target = segment == BOX_AUDIO_SYNTH_ATTACK ? 1.0f :
         (segment == BOX_AUDIO_SYNTH_RELEASE ? 0.0f : e->sustain);
     n = e->frames[segment];
+    if (segment == BOX_AUDIO_SYNTH_HOLD && e->gate && e->sustain > 0) {
+        n = INT32_MAX;
+    }
+
     e->curved = false;
     if (n <= 0) {
         e->value = e->target;
@@ -322,6 +335,10 @@ done:
 static float box_audio_synth_env_step(
     box_audio_synth_env_t *e)
 {
+    if (e->gate && e->left == 1 && e->segment == BOX_AUDIO_SYNTH_HOLD) {
+        e->left = INT32_MAX;
+    }
+
     while (!e->left && e->segment < BOX_AUDIO_SYNTH_DONE) {
         box_audio_synth_env_enter(e, e->segment + 1);
     }
@@ -902,7 +919,7 @@ static void box_audio_synth_pass(
         }
 
         if (layer->has_envelope) {
-            box_audio_synth_env_init(&part->env, &layer->envelope, rate);
+            box_audio_synth_env_init(&part->env, &layer->envelope, rate, src->gate);
         }
 
         lo = (double)layer->frequency * (double)src->pitch;
@@ -941,7 +958,7 @@ static void box_audio_synth_pass(
     }
 
     if (src->envs & 1u) {
-        box_audio_synth_env_init(&src->env, &src->envelope, rate);
+        box_audio_synth_env_init(&src->env, &src->envelope, rate, src->gate);
     }
 
     top = BOX_AUDIO_SYNTH_CUTOFF_NYQUIST * (double)rate;
@@ -950,7 +967,7 @@ static void box_audio_synth_pass(
     src->cutoff_top = top;
     src->control = BOX_AUDIO_SYNTH_CONTROL;
     if (src->amount != 0) {
-        box_audio_synth_env_init(&src->fenv, &src->filter_envelope, rate);
+        box_audio_synth_env_init(&src->fenv, &src->filter_envelope, rate, src->gate);
     }
 
     if (src->lfos) {
@@ -994,7 +1011,8 @@ void box_audio_source_synth(
     box_audio_source_t *source,
     uint32_t sound,
     float pitch,
-    bool loop)
+    bool loop,
+    bool gate)
 {
     box_audio_synth_slot_t *slot = &core->synths[core->sounds[sound].synth - 1];
     const box_audio_synth_patch_t *p = &slot->patch;
@@ -1040,6 +1058,7 @@ void box_audio_source_synth(
     src->amp = src->amp > 0 ? src->amp : 0.0f;
     src->pitch = pitch * src->variance;
     src->loop = loop;
+    src->gate = gate;
     src->filter = (int32_t)p->filter;
     src->amount = src->filter ? p->filter_amount : 0.0f;
     src->glide_frames = box_audio_synth_frames(p->glide, core->sample_rate);
@@ -1181,14 +1200,14 @@ bool box_audio_synth_legato(
     for (e = 0; e <= src->layers; e ++) {
         box_audio_synth_env_t *env = box_audio_synth_env_of(src, e);
         if ((src->envs & (1u << e)) && env->segment == BOX_AUDIO_SYNTH_HOLD &&
-            env->frames[BOX_AUDIO_SYNTH_HOLD] > 0)
+            env->frames[BOX_AUDIO_SYNTH_HOLD] > 0 && !env->gate)
         {
             env->left = env->frames[BOX_AUDIO_SYNTH_HOLD];
         }
     }
 
     if (src->amount != 0 && src->fenv.segment == BOX_AUDIO_SYNTH_HOLD &&
-        src->fenv.frames[BOX_AUDIO_SYNTH_HOLD] > 0)
+        src->fenv.frames[BOX_AUDIO_SYNTH_HOLD] > 0 && !src->fenv.gate)
     {
         src->fenv.left = src->fenv.frames[BOX_AUDIO_SYNTH_HOLD];
     }
@@ -1230,6 +1249,76 @@ bool box_audio_synth_legato(
     result = true;
 done:
     return result;
+}
+
+/** Gate or ungate an envelope that has not reached its release.
+ *
+ * @param e The envelope
+ * @param gate Whether to gate it
+ */
+static void box_audio_synth_env_gate(
+    box_audio_synth_env_t *e,
+    bool gate)
+{
+    if (e->gate != gate && e->segment < BOX_AUDIO_SYNTH_RELEASE) {
+        e->gate = gate;
+        if (e->segment == BOX_AUDIO_SYNTH_HOLD && e->sustain > 0) {
+            e->left = gate ? INT32_MAX : e->frames[BOX_AUDIO_SYNTH_HOLD];
+        }
+    }
+}
+
+void box_audio_synth_gate(
+    box_audio_synth_source_t *src,
+    bool gate)
+{
+    int32_t e;
+    src->gate = gate;
+    for (e = 0; e <= src->layers; e ++) {
+        if (src->envs & (1u << e)) {
+            box_audio_synth_env_gate(box_audio_synth_env_of(src, e), gate);
+        }
+    }
+
+    if (src->amount != 0) {
+        box_audio_synth_env_gate(&src->fenv, gate);
+    }
+}
+
+/** Move an envelope that has not reached its release into it, from its current level over the
+ * release of a note, with its curve.
+ *
+ * @param e The envelope
+ */
+static void box_audio_synth_env_release(
+    box_audio_synth_env_t *e)
+{
+    if (e->segment < BOX_AUDIO_SYNTH_RELEASE) {
+        e->gate = false;
+        e->frames[BOX_AUDIO_SYNTH_RELEASE] = e->release;
+        if (e->curved) {
+            e->value = (float)e->level;
+        }
+
+        box_audio_synth_env_enter(e, BOX_AUDIO_SYNTH_RELEASE);
+    }
+}
+
+void box_audio_synth_release(
+    box_audio_synth_source_t *src)
+{
+    int32_t e;
+    src->loop = false;
+    src->gate = false;
+    for (e = 0; e <= src->layers; e ++) {
+        if (src->envs & (1u << e)) {
+            box_audio_synth_env_release(box_audio_synth_env_of(src, e));
+        }
+    }
+
+    if (src->amount != 0) {
+        box_audio_synth_env_release(&src->fenv);
+    }
 }
 
 /** Advance the glide of a source by a frame: every oscillator moves by its factor, and the end

@@ -534,6 +534,83 @@ ECS_STRUCT(Transport, {
                             *   bar, default false */
 });
 
+/** An instrument: a synth or a sampler that plays notes with a pitch, a velocity, a pan and a
+ * duration, ad hoc with box_audio_play_note, on the bus of its AudioOutput, else of its sound.
+ *
+ * A note plays at the ratio 2^((pitch - root) / 12), clamped to 1/64..16 with one warning, at
+ * the gain velocity^velocity_curve. A sampler starts without the 5 ms ramp of a play, so a drum
+ * keeps its transient.
+ *
+ * With a gate the duration ends a note: a synth sustains, its holds ignored, and releases with
+ * its envelopes, a sampler fades out over release. A gated note of a legato synth glides into
+ * the voice of its channel while it holds, so overlapping notes are one phrase.
+ */
+ECS_STRUCT(Instrument, {
+    ecs_entity_t sound;    /**< The sound that plays: SynthSound for a synth, AudioPcm or
+                            *   SoundFile for a sampler */
+    float root;            /**< MIDI note at which the sound plays as authored, default 69
+                            *   (A4, 440 Hz) */
+    float velocity_curve;  /**< Exponent of the velocity in the gain, default 2 */
+    bool gate;             /**< The duration of a note ends it, default true; false plays the
+                            *   sound as authored, like a drum hit */
+    float release;         /**< Seconds a sampler note fades out over after its end, default
+                            *   0.05; a synth uses the release of its envelopes */
+});
+
+/** A note of a NoteClip, in beats from the start of the clip */
+ECS_STRUCT(Note, {
+    float start;           /**< Beats from the start of the clip */
+    float duration;        /**< Beats */
+    float pitch;           /**< MIDI note number, a float so microtones work */
+    float velocity;        /**< 0..1, default 1 */
+    float pan;             /**< Pan of the voice, -1 left to 1 right */
+});
+
+/** A clip of notes, reusable: usually a prefab or a plain entity that any number of
+ * ClipPlacement on any tracks name.
+ *
+ * box.audio keeps its own copy of the notes sorted by start, rebuilt when the clip is set, so
+ * a window finds its notes without a scan of the clip. A change applies to what has not been
+ * scheduled yet. Notes that start at or past length play only in a placement that does not
+ * loop.
+ */
+ECS_STRUCT(NoteClip, {
+    float length;          /**< Beats, default 4: the length of a pass when a placement loops
+                            *   the clip, and of a placement of duration 0 */
+    ecs_vec(Note) notes;   /**< The notes, in any order */
+});
+
+/** A track of the timeline: a mixer channel whose notes play on an instrument. It brings an
+ * AudioBus (the With trait), so it has a volume, a pan, a mute, an output and sends, and its
+ * notes play on its own bus.
+ *
+ * Its ClipPlacement children place clips on the timeline. While the Transport plays, every
+ * enabled track and placement schedules the notes that start in the lookahead window, each a
+ * note of the instrument with the frame of its start. A Disabled or deleted track releases its
+ * notes and schedules nothing more; a track whose instrument sound is not ready drops its
+ * notes and logs once. See Clips and tracks in docs/audio.md.
+ */
+ECS_STRUCT(Track, {
+    ecs_entity_t instrument; /**< The entity with Instrument that plays the notes */
+});
+
+/** A clip on the timeline, on a child of a Track.
+ *
+ * A note ends at the earliest of its own end, the end of its pass of the clip, the end of the
+ * placement and the loop_end of a Transport that loops. A Disabled or deleted placement
+ * releases its notes.
+ */
+ECS_STRUCT(ClipPlacement, {
+    ecs_entity_t clip;     /**< The entity with NoteClip */
+    double start;          /**< Beats on the timeline where the placement starts */
+    double duration;       /**< Beats, 0 for the length of the clip minus the offset */
+    bool loop;             /**< Repeat the clip every length beats until the duration ends */
+    double offset;         /**< Beats into the clip at which the placement starts; with a loop
+                            *   the passes go on from there and wrap at length */
+    float gain;            /**< Linear gain, default 1, times the gain of the velocity */
+    float transpose;       /**< Semitones added to every pitch */
+});
+
 /** Where box_audio_play_quantized starts a play on the grid of the Transport */
 ECS_ENUM(AudioQuantize, {
     AudioQuantizeNone = 0,  /**< At once, as box_audio_play */
@@ -596,6 +673,30 @@ bool box_audio_play_quantized(
     ecs_entity_t sound,
     float volume,
     AudioQuantize quantize);
+
+/** Play a note of an Instrument, without an entity per note.
+ *
+ * The note starts at the clock of the output, so it applies at the next block as a play does,
+ * and with a gate ends duration beats later at the tempo of the Transport (120 without one),
+ * also while the transport is stopped, which does not affect the note.
+ *
+ * It plays on the bus of the AudioOutput of the instrument, else of its sound, else the
+ * master. The rules of box_audio_play apply. Scripts call it as
+ * box.audio.play_note(instrument, pitch, velocity, duration).
+ *
+ * @param world The world
+ * @param instrument The entity with Instrument
+ * @param pitch MIDI note number, a float so microtones work
+ * @param velocity Velocity, 0..1
+ * @param duration Beats
+ * @return Whether the note was queued
+ */
+bool box_audio_play_note(
+    ecs_world_t *world,
+    ecs_entity_t instrument,
+    float pitch,
+    float velocity,
+    float duration);
 
 /** Play a sound once at a place in the world, heard from the listener as an AudioSpatial
  * source that stays where it started.

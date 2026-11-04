@@ -239,6 +239,9 @@ typedef struct box_audio_synth_env_t {
     double level;         /**< Current level of a curved segment */
     double mul;           /**< Factor per frame of a curved segment */
     double add;           /**< Term per frame of a curved segment */
+    bool gate;            /**< Sustains in its hold until a release, BOX_AUDIO_PLAY_GATE */
+    int32_t release;      /**< Frames of the release a note release starts, at least the edge,
+                           * also when a sustain of 0 skips the release of a pass */
 } box_audio_synth_env_t;
 
 /** An oscillator of a synth voice */
@@ -366,6 +369,7 @@ typedef struct box_audio_synth_source_t {
     float variance;       /**< Factor of the pitch that the variance of the play picked */
     float amp;            /**< Gain of the amp, the level variance of the play included */
     bool loop;            /**< Whether it starts over at the end of its envelopes */
+    bool gate;            /**< Whether its envelopes sustain until a release */
     int32_t filter;       /**< A box_audio_synth_filter_t */
     int32_t stages;       /**< Stages of the filter: 1 for 12 dB per octave, 2 for 24 */
     box_audio_synth_svf_t svf[2]; /**< The resonant stage, then the stage before it at 24 dB */
@@ -482,12 +486,14 @@ typedef struct box_audio_synth_slot_t {
     bool used;          /**< Whether a sound has the slot */
 } box_audio_synth_slot_t;
 
-/** A command that takes effect on a frame: PLAY, STOP, VOICE_SET or BUS_SET */
+/** A command that takes effect on a frame: PLAY, STOP, VOICE_SET, BUS_SET, RELEASE or LEGATO */
 typedef union box_audio_timed_cmd_t {
     box_audio_cmd_header_t header;  /**< The header, first in each of them */
     box_audio_cmd_play_t play;      /**< BOX_AUDIO_CMD_PLAY */
     box_audio_cmd_stop_t stop;      /**< BOX_AUDIO_CMD_STOP */
     box_audio_cmd_set_t set;        /**< BOX_AUDIO_CMD_VOICE_SET or BOX_AUDIO_CMD_BUS_SET */
+    box_audio_cmd_voice_release_t release; /**< BOX_AUDIO_CMD_RELEASE */
+    box_audio_cmd_legato_t legato;  /**< BOX_AUDIO_CMD_LEGATO */
 } box_audio_timed_cmd_t;
 
 /** A command that waits in the schedule for its frame */
@@ -798,13 +804,35 @@ void box_audio_synth_end(
  * @param sound Id of a ready synth sound
  * @param pitch Pitch ratio
  * @param loop Whether it starts over at the end of its envelopes
+ * @param gate Whether its envelopes sustain until a release, BOX_AUDIO_PLAY_GATE
  */
 void box_audio_source_synth(
     box_audio_core_t *core,
     box_audio_source_t *source,
     uint32_t sound,
     float pitch,
-    bool loop);
+    bool loop,
+    bool gate);
+
+/** Gate or ungate the envelopes of a synth source that have not reached their release: a
+ * gated one sustains in its hold until a release, an ungated one in its hold holds for the
+ * hold of its envelope from now. An envelope that already has the gate stays as it is.
+ *
+ * @param src The source
+ * @param gate Whether to gate them
+ */
+void box_audio_synth_gate(
+    box_audio_synth_source_t *src,
+    bool gate);
+
+/** End the note of a synth source: every envelope it has, the filter envelope included, that
+ * has not reached its release moves into it from its current level, curves included, and the
+ * source stops looping.
+ *
+ * @param src The source
+ */
+void box_audio_synth_release(
+    box_audio_synth_source_t *src);
 
 /** Render a block of a synth source into core->src_l, and core->src_r when it is stereo
  * (box_audio_synth_source_t.stereo).

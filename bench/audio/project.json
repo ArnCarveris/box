@@ -2,7 +2,7 @@
     "id": "bench_audio",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the audio core: voices mixed through buses, a reverb and synth voices, in ns per frame, and the spatial sources of box.audio, in ns per source",
+        "description": "Benchmarks for the audio core: voices mixed through buses, a reverb and synth voices, in ns per frame, the spatial sources of box.audio, in ns per source, and its tracks, in ns per frame",
         "public": false,
         "use": [
             "box"
@@ -54,6 +54,14 @@
                     "voices_32_pluck",
                     "voices_32_pluck_vibrato",
                     "voices_8_pluck_unison"
+                ]
+            },
+            {
+                "id": "Sequencer",
+                "benchcases": [
+                    "tracks_16_playing",
+                    "tracks_16_stopped",
+                    "tracks_0"
                 ]
             }
         ]

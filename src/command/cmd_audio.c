@@ -1,8 +1,9 @@
 /**
  * @file command/cmd_audio.c
  * @brief The audio command: the status of the audio, its transport, its buses and their insert
- * slots, the master volume and mute, play, stop, seek and tempo, and captures of the master
- * output to a WAV resource.
+ * slots, its instruments, its tracks with their placements and sounding notes, the master
+ * volume and mute, play, stop, seek and tempo, and captures of the master output to a WAV
+ * resource.
  *
  * The actions only write AudioSettings or Transport, which box.audio sends to the core at the
  * end of the frame, as for a change from a script or the REST API. A capture taps the core, so
@@ -13,6 +14,9 @@
 #include "../audio/module.h"
 #include <stdlib.h>
 #include <math.h>
+
+/** Sounding notes listed per track at most */
+#define BOX_AUDIO_SEQ_LIST_MAX 16
 
 /** Folder of the captures in the file system of the page */
 #define BOX_CMD_AUDIO_WEB_DIR "/tmp"
@@ -326,6 +330,155 @@ static char* box_cmd_audio_transport_set(
     return result;
 }
 
+/** Append the lines of the instruments: synth or sampler, the sound, the root, the velocity
+ * curve and the gate with its release.
+ *
+ * @param world The world
+ * @param buf The output
+ */
+static void box_cmd_audio_instruments(
+    ecs_world_t *world,
+    ecs_strbuf_t *buf)
+{
+    int32_t i;
+    ecs_iter_t it = ecs_each(world, Instrument);
+    while (ecs_each_next(&it)) {
+        const Instrument *inst = ecs_field(&it, Instrument, 0);
+        for (i = 0; i < it.count; i ++) {
+            ecs_entity_t sound = inst[i].sound;
+            bool alive = sound && ecs_is_alive(world, sound);
+            bool synth = alive && ecs_has(world, sound, SynthSound);
+            char *path = ecs_get_path(world, it.entities[i]);
+            char *name = alive ? ecs_get_path(world, sound) : NULL;
+            ecs_strbuf_append(buf, "\n  instrument %s: %s %s, root %.2f, velocity curve %.2f",
+                path, synth ? "synth" : (alive ? "sampler" : "no sound"), name ? name : "",
+                (double)inst[i].root, (double)inst[i].velocity_curve);
+            if (!inst[i].gate) {
+                ecs_strbuf_appendstr(buf, ", no gate");
+            } else if (synth) {
+                ecs_strbuf_appendstr(buf, ", gate, envelope release");
+            } else {
+                ecs_strbuf_append(buf, ", gate, release %.3f s", (double)inst[i].release);
+            }
+
+            ecs_os_free(name);
+            ecs_os_free(path);
+        }
+    }
+}
+
+/** Append the placements of a track, each with its clip, start, duration, loop, offset, gain
+ * and transpose.
+ *
+ * @param world The world
+ * @param buf The output
+ * @param track The track
+ */
+static void box_cmd_audio_placements(
+    ecs_world_t *world,
+    ecs_strbuf_t *buf,
+    ecs_entity_t track)
+{
+    int32_t i;
+    ecs_iter_t it = ecs_children(world, track);
+    while (ecs_children_next(&it)) {
+        for (i = 0; i < it.count; i ++) {
+            const ClipPlacement *p = ecs_get(world, it.entities[i], ClipPlacement);
+            const NoteClip *clip;
+            char *path, *name;
+            if (!p) {
+                continue;
+            }
+
+            clip = p->clip && ecs_is_alive(world, p->clip) ?
+                ecs_get(world, p->clip, NoteClip) : NULL;
+            path = ecs_get_path(world, it.entities[i]);
+            name = clip ? ecs_get_path(world, p->clip) : NULL;
+            ecs_strbuf_append(buf, "\n    placement %s: clip %s", path, name ? name : "none");
+            if (clip) {
+                ecs_strbuf_append(buf, " (%d notes, %.3f beats)",
+                    ecs_vec_count(&clip->notes), (double)clip->length);
+            }
+
+            ecs_strbuf_append(buf, ", start %.3f", p->start);
+            if (p->duration > 0) {
+                ecs_strbuf_append(buf, ", duration %.3f", p->duration);
+            } else {
+                ecs_strbuf_appendstr(buf, ", duration of the clip");
+            }
+
+            if (p->loop) {
+                ecs_strbuf_appendstr(buf, ", loop");
+            }
+
+            if (p->offset != 0) {
+                ecs_strbuf_append(buf, ", offset %.3f", p->offset);
+            }
+
+            ecs_strbuf_append(buf, ", gain %.2f, transpose %.2f%s", (double)p->gain,
+                (double)p->transpose, ecs_has_id(world, it.entities[i], EcsDisabled) ?
+                    ", disabled" : "");
+            ecs_os_free(name);
+            ecs_os_free(path);
+        }
+    }
+}
+
+/** Append the lines of the tracks: the instrument, the placements and the notes that sound.
+ *
+ * @param world The world
+ * @param buf The output
+ */
+static void box_cmd_audio_tracks(
+    ecs_world_t *world,
+    ecs_strbuf_t *buf)
+{
+    box_audio_module_t *state = box_audio_module_get(world);
+    const box_audio_sounding_t *sounding = ecs_vec_first(&state->sequencer.sounding);
+    int32_t i, k, count = ecs_vec_count(&state->sequencer.sounding), listed, total;
+    ecs_query_t *q = ecs_query(world, {
+        .terms = {{ .id = ecs_id(Track), .inout = EcsIn, .src.id = EcsSelf }},
+        .flags = EcsQueryMatchDisabled
+    });
+    ecs_iter_t it = ecs_query_iter(world, q);
+    while (ecs_query_next(&it)) {
+        const Track *tk = ecs_field(&it, Track, 0);
+        for (i = 0; i < it.count; i ++) {
+            ecs_entity_t inst = tk[i].instrument;
+            bool alive = inst && ecs_is_alive(world, inst);
+            char *path = ecs_get_path(world, it.entities[i]);
+            char *name = alive ? ecs_get_path(world, inst) : NULL;
+            ecs_strbuf_append(buf, "\n  track %s: instrument %s%s%s", path,
+                name ? name : "none", alive && !ecs_has(world, inst, Instrument) ?
+                    " (no Instrument)" : "",
+                ecs_has_id(world, it.entities[i], EcsDisabled) ? ", disabled" : "");
+            box_cmd_audio_placements(world, buf, it.entities[i]);
+            for (k = 0, listed = 0, total = 0; k < count; k ++) {
+                if (sounding[k].track != it.entities[i]) {
+                    continue;
+                }
+
+                total ++;
+                if (listed < BOX_AUDIO_SEQ_LIST_MAX) {
+                    ecs_strbuf_append(buf, "\n    sounding: pitch %.2f until beat %.3f%s",
+                        (double)sounding[k].pitch, sounding[k].end,
+                        sounding[k].release ? ", released" : "");
+                    listed ++;
+                }
+            }
+
+            if (total > listed) {
+                ecs_strbuf_append(buf, "\n    %d more sounding", total - listed);
+            }
+
+            ecs_os_free(name);
+            ecs_os_free(path);
+        }
+    }
+
+    ecs_query_fini(q);
+}
+
 /** Print the status of the audio and the buses in processing order.
  *
  * @param world The world
@@ -372,6 +525,9 @@ static char* box_cmd_audio_print(
             }
         }
     }
+
+    box_cmd_audio_instruments(world, &buf);
+    box_cmd_audio_tracks(world, &buf);
 
     return ecs_strbuf_get(&buf);
 }
@@ -541,8 +697,8 @@ void box_cmd_audio_init(
 {
     ECS_IMPORT(world, BoxAudio);
     box_command_register(world,
-        "Print the audio status, transport and buses, set the volume or mute, play, stop, "
-        "seek or set the tempo, or capture a WAV",
+        "Print the audio status, transport, buses, instruments and tracks, set the volume or mute, "
+        "play, stop, seek or set the tempo, or capture a WAV",
         (ecs_function_desc_t){
             .name = "audio",
             .return_type = ecs_id(ecs_string_t),

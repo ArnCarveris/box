@@ -106,14 +106,73 @@
                 ]
             },
             {
+                "id": "Instrument",
+                "testcases": [
+                    "defaults",
+                    "synth_pitch",
+                    "sampler_rate",
+                    "velocity_gain",
+                    "gate_sustains_linear",
+                    "gate_sustains_curved",
+                    "release_in_attack",
+                    "gate_filter_envelope",
+                    "gate_sustain_zero",
+                    "release_exact_frame",
+                    "release_fade_clamped",
+                    "attack_flag",
+                    "sampler_release",
+                    "no_gate_authored",
+                    "synth_duration",
+                    "pitch_clamped",
+                    "bus",
+                    "pan",
+                    "script_play_note",
+                    "tempo",
+                    "legato_notes",
+                    "legato_after_release",
+                    "legato_cancels_release",
+                    "stop_cancels_release"
+                ]
+            },
+            {
+                "id": "Sequencer",
+                "testcases": [
+                    "defaults",
+                    "start_frames",
+                    "release_frames",
+                    "transpose_gain_pan",
+                    "loop_offset",
+                    "duration_cuts",
+                    "two_placements",
+                    "transport_loop",
+                    "stop",
+                    "seek",
+                    "tempo_moves_release",
+                    "edit_clip",
+                    "delete_track",
+                    "disable_placement",
+                    "oneshots_survive_stop",
+                    "not_ready",
+                    "cost",
+                    "script",
+                    "bit_identical",
+                    "command"
+                ]
+            },
+            {
                 "id": "NoAlloc",
                 "testcases": [
                     "render",
                     "events_and_release",
                     "synth_voices",
                     "scheduled",
+<<<<<<< HEAD
                     "effects",
                     "meters"
+=======
+                    "gated",
+                    "effects"
+>>>>>>> cccb2fc44334f2fc219d2bf423d9329204e2fe08
                 ]
             },
             {

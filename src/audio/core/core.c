@@ -497,7 +497,8 @@ static void box_audio_voice_reclaim(
 }
 
 /** Apply a play command. A synth voice starts at its gains, without the ramp: its envelope
- * starts from 0 itself, so an attack shorter than the ramp keeps its time.
+ * starts from 0 itself, so an attack shorter than the ramp keeps its time. A sample voice with
+ * BOX_AUDIO_PLAY_ATTACK starts at its gains too.
  *
  * @param core The core
  * @param cmd The command
@@ -550,8 +551,13 @@ static void box_audio_cmd_play(
         box_audio_ramp_set(&v->left, v->left.target);
         box_audio_ramp_set(&v->right, v->right.target);
         box_audio_source_synth(core, &v->source, cmd->sound, v->pitch,
-            (cmd->flags & BOX_AUDIO_PLAY_LOOP) != 0);
+            (cmd->flags & BOX_AUDIO_PLAY_LOOP) != 0, (cmd->flags & BOX_AUDIO_PLAY_GATE) != 0);
     } else {
+        if (cmd->flags & BOX_AUDIO_PLAY_ATTACK) {
+            box_audio_ramp_set(&v->left, v->left.target);
+            box_audio_ramp_set(&v->right, v->right.target);
+        }
+
         box_audio_source_sample(core, &v->source, cmd->sound, v->pitch,
             (cmd->flags & BOX_AUDIO_PLAY_LOOP) != 0);
     }
@@ -566,7 +572,9 @@ done:
  * take the handle from that voice and start a new one. A synth voice that lost its handle
  * stops looping, rings out its release and reports its end with handle 0; any other fades out.
  *
- * A command of a sound that is not ready leaves the voice as it is, with the new handle.
+ * A command of a sound that is not ready leaves the voice as it is, with the new handle. A
+ * retargeted voice takes the BOX_AUDIO_PLAY_GATE of the command: with it the voice sustains
+ * until a release, without it the voice holds for the hold of its envelopes.
  *
  * @param core The core
  * @param cmd The command
@@ -596,6 +604,7 @@ static void box_audio_cmd_legato(
         v->pan = box_audio_clamp(cmd->pan, -1, 1);
         v->pitch = pitch;
         box_audio_voice_gains(core, v);
+        box_audio_synth_gate(&v->source.data.synth, (cmd->flags & BOX_AUDIO_PLAY_GATE) != 0);
     } else {
         if (v && v->source.kind == BOX_AUDIO_SOURCE_SYNTH) {
             v->source.data.synth.loop = false;
@@ -609,6 +618,34 @@ static void box_audio_cmd_legato(
 
         box_audio_cmd_play(core, &play);
     }
+}
+
+/** Apply a release command: a synth voice releases its envelopes, a sample or stream voice
+ * fades out over the fade of the command and ends. A voice that ended is not found.
+ *
+ * @param core The core
+ * @param cmd The command
+ */
+static void box_audio_cmd_voice_release(
+    box_audio_core_t *core,
+    const box_audio_cmd_voice_release_t *cmd)
+{
+    box_audio_voice_t *v = box_audio_voice_find(core, cmd->voice);
+    float fade;
+    if (!v) {
+        goto done;
+    }
+
+    if (v->source.kind == BOX_AUDIO_SOURCE_SYNTH) {
+        box_audio_synth_release(&v->source.data.synth);
+    } else {
+        fade = box_audio_clamp(cmd->fade, BOX_AUDIO_RELEASE_FADE_MIN,
+            BOX_AUDIO_RELEASE_FADE_MAX);
+        box_audio_voice_fade(core, v, (int32_t)(fade * core->sample_rate + 0.5f));
+    }
+
+done:
+    return;
 }
 
 /** Apply a stream command: open the stream and start a voice that reads it.
@@ -896,13 +933,18 @@ static void box_audio_cmd_timed(
         }
     } else if (cmd->header.type == BOX_AUDIO_CMD_VOICE_SET) {
         box_audio_cmd_voice_set(core, &cmd->set);
+    } else if (cmd->header.type == BOX_AUDIO_CMD_RELEASE) {
+        box_audio_cmd_voice_release(core, &cmd->release);
+    } else if (cmd->header.type == BOX_AUDIO_CMD_LEGATO) {
+        box_audio_cmd_legato(core, &cmd->legato);
     } else {
         box_audio_cmd_bus_set(core, &cmd->set);
     }
 }
 
 /** Whether a command of the schedule comes before another: an earlier frame, or the same
- * frame and an earlier arrival.
+ * frame and an earlier arrival. Of one frame the releases come last, so a legato note on the
+ * frame where the note it follows ends glides on instead of starting after the release.
  *
  * @param a A command
  * @param b Another command
@@ -912,7 +954,10 @@ static bool box_audio_schedule_before(
     const box_audio_scheduled_t *a,
     const box_audio_scheduled_t *b)
 {
-    return a->when < b->when || (a->when == b->when && a->order < b->order);
+    bool ra = a->cmd.header.type == BOX_AUDIO_CMD_RELEASE;
+    bool rb = b->cmd.header.type == BOX_AUDIO_CMD_RELEASE;
+
+    return a->when < b->when || (a->when == b->when && (ra != rb ? rb : a->order < b->order));
 }
 
 /** Move a command of the schedule down the heap to its place.
@@ -995,7 +1040,8 @@ static void box_audio_schedule_run(
     }
 }
 
-/** Drop the commands of the schedule for a voice handle: its plays, stops and sets.
+/** Drop the commands of the schedule for a voice handle: its plays, stops, sets, releases and
+ * the legato notes that would give it the handle.
  *
  * @param core The core
  * @param voice The handle
@@ -1010,7 +1056,9 @@ static void box_audio_schedule_cancel(
         uint16_t type = cmd->header.type;
         bool drop = (type == BOX_AUDIO_CMD_PLAY && cmd->play.voice == voice) ||
             (type == BOX_AUDIO_CMD_STOP && cmd->stop.voice == voice) ||
-            (type == BOX_AUDIO_CMD_VOICE_SET && cmd->set.target == voice);
+            (type == BOX_AUDIO_CMD_VOICE_SET && cmd->set.target == voice) ||
+            (type == BOX_AUDIO_CMD_RELEASE && cmd->release.voice == voice) ||
+            (type == BOX_AUDIO_CMD_LEGATO && cmd->legato.voice == voice);
         if (!drop) {
             if (kept != i) {
                 core->schedule[kept] = core->schedule[i];
@@ -1072,7 +1120,6 @@ static void box_audio_cmd(
     uint16_t type,
     int32_t size)
 {
-    box_audio_cmd_legato_t legato;
     box_audio_cmd_release_t release;
     box_audio_cmd_stream_t stream;
     box_audio_cmd_effect_t effect;
@@ -1080,9 +1127,12 @@ static void box_audio_cmd(
     uint32_t layers;
     if (type == BOX_AUDIO_CMD_PLAY && size >= (int32_t)sizeof(box_audio_cmd_play_t)) {
         box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_play_t));
-    } else if (type == BOX_AUDIO_CMD_LEGATO && size >= (int32_t)sizeof(legato)) {
-        box_audio_copy(&legato, bytes, (int32_t)sizeof(legato));
-        box_audio_cmd_legato(core, &legato);
+    } else if (type == BOX_AUDIO_CMD_LEGATO && size >= (int32_t)sizeof(box_audio_cmd_legato_t)) {
+        box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_legato_t));
+    } else if (type == BOX_AUDIO_CMD_RELEASE &&
+        size >= (int32_t)sizeof(box_audio_cmd_voice_release_t))
+    {
+        box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_voice_release_t));
     } else if (type == BOX_AUDIO_CMD_STOP && size >= (int32_t)sizeof(box_audio_cmd_stop_t)) {
         box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_stop_t));
     } else if ((type == BOX_AUDIO_CMD_VOICE_SET || type == BOX_AUDIO_CMD_BUS_SET) &&
