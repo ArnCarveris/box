@@ -1,20 +1,18 @@
 # Spatial index and picking
 
-`box.spatial` keeps a bounding volume hierarchy per scene over the world bounds of shapes and of
-UI elements without a shape. Picking (`box.picking`), the move controllers, design mode and the
-change regions of a light bake all read it. A static shape is placed again only when it changes.
-A shape with `DynamicTransform` is refit in every frame that the index is queried, and picking
-queries it in every frame that a cursor is known. So every moving shape in the index costs
-`SpatialUpdate` time in every frame, whether or not any query can use it.
+`box.spatial` maintains a bounding volume hierarchy per scene over shapes and
+shapeless UI elements with `WorldTransform`. Picking, move controllers, design
+mode and light-bake change regions query it. Without Position, Rotation or Scale,
+an entity has no world transform and cannot be drawn or picked.
 
-Only entities with a `WorldTransform` are indexed. An entity without Position, Rotation or Scale
-has no place in the world: it is not drawn, and it is not indexed, so it cannot be picked.
+Static shapes update when changed. `DynamicTransform` shapes refit every frame
+the index is queried, regardless of whether a query can use them. Picking queries
+every frame while a cursor is known.
 
 ## SpatialIgnore
 
-`SpatialIgnore` (a tag in `box.spatial`) keeps an entity and all of its descendants out of the
-index. Such an entity has no item and no `SpatialPose`, so it costs the index nothing per
-frame. The index's per frame work does not grow with the number of these shapes.
+`SpatialIgnore` excludes an entity and all its `ChildOf` descendants from the index.
+Excluded shapes have no index item or `SpatialPose` and add no per-frame index work.
 
 ```flecs
 using box.spatial
@@ -25,36 +23,23 @@ prefab Critter {
     Position: {0, 0, 0}
     Box: {1, 1, 1}
   }
-  head {
-    Position: {0, 1, 0}
-    Box: {0.5, 0.5, 0.5}
-  }
 }
 ```
 
-In C, a game can put it on every entity of one kind with
+In C, make it automatic for a component/tag with
 `ecs_add_pair(world, ecs_id(MyEnemy), EcsWith, SpatialIgnore)`.
+Adding or removing the tag on an entity or ancestor takes effect in the next
+`SpatialUpdate`, excluding or rebuilding the subtree at its current position.
 
-The rule is explicit and has no exceptions: what the index does not hold, no query finds.
+Exclusion applies to every query:
 
-- Picking: the entities are never hit. They get no `Hovered`, `Pressed` or pointer events, are
-  never `PickStatus.hit`, and they no longer block the pick ray, so a pick goes through them to
-  what is behind. This also holds for an `Interactive` entity, or one with an `ActionTrigger`,
-  under `SpatialIgnore`.
+- Picking passes through the shapes. They receive no hover, press or pointer
+  events, even with `Interactive` or `ActionTrigger`, and never become `PickStatus.hit`.
 - Move controllers neither collide with them nor stand on them.
-- `box_spatial_bounds`, design mode framing and the change regions of a light bake do not see
-  them. Keep the tag off static shapes that are baked.
+- `box_spatial_bounds`, design framing and light-bake change regions do not see them.
+  Keep the tag off static shapes that are baked.
 
-The tag can be on the entity or on any `ChildOf` ancestor. Adding or removing it (on the entity
-or an ancestor) takes effect in the next `SpatialUpdate`. The subtree is then indexed again at
-its current place, or taken out.
-
-## When to use it
-
-Put it on actors that move every frame and that nothing picks, collides with or queries, such
-as the enemies, projectiles, corpses and drones of a game (Ore Else does this). Leave it off
-anything the player clicks or hovers, anything a move controller must collide with, and anything
-that should hide what is behind it from a pick.
-
-Without the tag, moving shapes behave as before: they are refit while they move, they are
-picked at their current place, and they block picks of what is behind them.
+Use it for moving actors that nothing needs to pick, collide with or query, such
+as projectiles, corpses or drones. Leave it off clickable objects, collision
+surfaces and shapes that must block picks. Untagged moving shapes remain indexed
+at their current positions.

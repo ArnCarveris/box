@@ -1,14 +1,12 @@
 # Curves
 
-`box.curve` is one keyed curve, linear, Catmull-Rom or Bezier, that particles, lights, emission,
-keyframe animation and, through the same cubic math, geometry paths and transitions use. This
-guide is for writing curves in `.flecs` scripts without a curve editor: the format, every field
-that takes a curve, how each kind behaves, recipes, how to check the result, what is not
-supported and what it costs.
+`box.curve` defines scalar keyed curves for particles, lights, emission and
+[keyframe animation](animation.md). Geometry paths and transitions share cubic
+math but use different formats. This guide covers authoring and practical limits;
+[curve.h](../include/box/curve.h) defines the evaluator API.
 
-The recipes are files in `test/assets/curves/`, loaded by the `CurveRecipes` suite of
-`test/cpu/particle`, which fails when one of them logs a warning or an error. Copy them. Whole
-effects built from them are in [Showcase](#showcase).
+Working recipes are in [test/assets/curves](../test/assets/curves/), checked by
+`CurveRecipes` in `test/cpu/particle`.
 
 ## The format
 
@@ -27,8 +25,6 @@ smoke {
   }
 }
 ```
-
-(`test/assets/curves/format.flecs`)
 
 A `Curve` is `{kind, keys}` (`include/box/curve.h`):
 
@@ -89,14 +85,14 @@ kind, blended in linear light; a channel above 255 is a script error. Without ke
 "Life" is the normalized age of a particle, 0 at birth and 1 at death. The GPU curves are baked
 to 64 samples; the CPU curves are evaluated exactly at their time. `ParticleCurves` sits on the
 emitter entity, `ParticleMotion` and `ParticleTimeline` too; `ParticleLight` needs a
-`PointLight` or `SpotLight` on the emitter entity. See `docs/animation.md` for tracks.
+`PointLight` or `SpotLight` on the emitter entity. See [Animation](animation.md) for tracks.
 
 Two neighbours use the same cubic math without a `Curve`:
 
 - `Path2D` and `Path3D` segments of kind `CatmullRom` (`include/box/geometry.h`) are uniform
   Catmull-Rom curves through their anchors, for profiles, lathes and sweeps.
 - `TransitionSpec` with `timing_function: CubicBezier` and `bezier: {x1, y1, x2, y2}` is a CSS
-  `cubic-bezier()` ease of a transition (`docs/transitions.md`).
+  `cubic-bezier()` ease of a transition (see [Transitions](transitions.md)).
 
 ## Choosing a kind
 
@@ -162,32 +158,9 @@ tracks are exact and keep a sharp change sharp.
 
 ## Recipes
 
-Each recipe is a whole file. The particle recipes leave `ParticleEmitter.color` white or set it
-to the base color, since `color` multiplies it.
-
-### Fade in and out
-
-Each particle appears over the first fifth of its life, stays and fades out over the last half,
-so the stream has no hard edge where particles are born or die.
-
-```flecs
-using box.curve
-using box.particle
-using box.transform
-
-fade {
-  Position: {0, 0, 0}
-  ParticleEmitter: {
-    rate: 30, spread: 20, speed: {0.5, 1}, lifetime: {2, 2.5}, size: {0.2, 0.2}, seed: 1
-  }
-  ParticleForces: {gravity: {0, 0, 0}}
-  ParticleCurves: {
-    opacity: {keys: [{0, 0}, {0.2, 1}, {0.5, 1}, {1, 0}]}
-  }
-}
-```
-
-(`test/assets/curves/fade.flecs`)
+These examples show growth, explicit slopes, looping clocks and per-particle
+randomness. Keep emitter color white or set it to the desired base: gradients
+multiply it.
 
 ### Puff that grows and fades
 
@@ -243,101 +216,6 @@ spark {
 
 (`test/assets/curves/spark.flecs`)
 
-### Flame from white through orange to dark smoke
-
-Particles are born white hot, turn yellow and orange as they rise, darken to red and end as grey
-smoke that grows and fades. They are alpha blended, the default without `ParticleAppearance`,
-because additive particles can only brighten and smoke must darken what is behind it.
-
-```flecs
-using box.curve
-using box.particle
-using box.transform
-
-flame {
-  Position: {0, 0, 0}
-  ParticleEmitter: {
-    max: 600, rate: 120, shape: EmitterDisc, radius: 0.15, spread: 10,
-    speed: {0.8, 1.2}, lifetime: {1.2, 1.8}, size: {0.25, 0.35}, seed: 4
-  }
-  ParticleForces: {gravity: {0, 0.6, 0}, turbulence: 1.5}
-  ParticleCurves: {
-    color: {keys: [
-      {0, {255, 255, 230}}, {0.15, {255, 210, 90}}, {0.35, {250, 120, 30}},
-      {0.55, {120, 40, 20}}, {0.7, {60, 55, 55}}, {1, {45, 45, 45}}
-    ]}
-    size: {kind: CurveCatmullRom, keys: [{0, 0.6}, {0.4, 1}, {1, 2.5}]}
-    opacity: {keys: [{0, 0}, {0.05, 1}, {0.6, 0.8}, {1, 0}]}
-  }
-}
-```
-
-(`test/assets/curves/flame.flecs`)
-
-For a brighter fire, add a second emitter with `ParticleAppearance: {blend: ParticleAdditive}`
-for the hot part only, and keep this one for the smoke.
-
-### Burst that slows down and rises
-
-Every 1.5 s a ball of particles flies out, stops dead at about a third of its life when the drag
-curve comes on, then floats up as the velocity curve lifts it. Constant forces cannot do this.
-
-```flecs
-using box.curve
-using box.particle
-using box.transform
-
-burst {
-  Position: {0, 0, 0}
-  ParticleEmitter: {
-    max: 400, rate: 0, shape: EmitterSphere, radius: 0.05, spread: 180,
-    speed: {4, 6}, lifetime: {1.4, 1.4}, size: {0.08, 0.12}, color: {255, 190, 90}, seed: 5
-  }
-  ParticleBurst: {count: 150, at: 1.5, repeat: -1}
-  ParticleForces: {gravity: {0, 0, 0}, drag: 12}
-  ParticleAppearance: {blend: ParticleAdditive}
-  ParticleMotion: {
-    drag: {keys: [{0, 0}, {0.25, 0}, {0.35, 1}]}
-    velocity_y: {keys: [{0, 0}, {0.4, 0}, {0.7, 1.5}]}
-  }
-  ParticleCurves: {
-    opacity: {keys: [{0, 1}, {0.7, 1}, {1, 0}]}
-  }
-}
-```
-
-(`test/assets/curves/burst.flecs`)
-
-The drag curve multiplies the drag of 12 of `ParticleForces`. The velocity curve moves the
-particles without entering their velocity, so the drag does not fight it.
-
-### Pulsing emission
-
-The emitter breathes once a second, from nothing to 200 particles a second and back, and the
-particles of the peak leave twice as fast as those of the quiet part, so each pulse is a shell.
-
-```flecs
-using box.curve
-using box.particle
-using box.transform
-
-pulse {
-  Position: {0, 0, 0}
-  ParticleEmitter: {
-    max: 1000, rate: 200, spread: 180, speed: {1, 1}, lifetime: {1, 1},
-    size: {0.05, 0.05}, color: {120, 220, 255}, seed: 6
-  }
-  ParticleForces: {gravity: {0, 0, 0}}
-  ParticleTimeline: {
-    period: 1, loop: true,
-    rate: {kind: CurveCatmullRom, keys: [{0, 0}, {0.5, 1}, {1, 0}]}
-    speed: {kind: CurveCatmullRom, keys: [{0, 0.5}, {0.5, 1}, {1, 0.5}]}
-  }
-}
-```
-
-(`test/assets/curves/pulse.flecs`)
-
 ### Flicker on a light
 
 The point light of a small fire wavers irregularly between 70% and 120% of its intensity,
@@ -389,10 +267,7 @@ of a curve that does not loop. A loop whose last value differs from its first st
 wrap, so end on the starting value. `CurveLinear` and `CurveBezier` are the
 same with or without `loop`; for a Bezier loop give the first key an `out` equal to the `in` of the
 last. Curves of `ParticleCurves`, animation tracks and all other fields have no loop and keep the
-end neighbours of [Choosing a kind](#choosing-a-kind). This refines the end rule of the Curves epic
-design ("at the first and last key the neighbour is the key itself") for the looping clock curves
-of `ParticleLight` and `ParticleTimeline` only (`box_curve_loop_span_controls`,
-`include/box/curve.h`).
+end neighbours of [Choosing a kind](#choosing-a-kind).
 
 ### Random size curves
 
@@ -425,110 +300,22 @@ bubbles {
 The two lists need not have the same number of keys or the same times. The blend is the same
 for the whole life of a particle, so a particle never jumps between the two.
 
-### Catmull-Rom paths for geometry
+### More examples
 
-A vase lathed from a profile that starts with a line, so its foot is flat, and runs through four
-anchors with a smooth belly and lip; and a tube swept along a smooth route, with a round section
-made from the four anchors of a closed path.
+| Recipe | File | Main idea |
+| --- | --- | --- |
+| Fade in/out | [fade.flecs](../test/assets/curves/fade.flecs) | Linear opacity with equal-valued keys for a hold |
+| Flame and smoke | [flame.flecs](../test/assets/curves/flame.flecs) | Color gradient and growth; alpha blending lets smoke darken the background |
+| Burst that stops and rises | [burst.flecs](../test/assets/curves/burst.flecs) | Drag multiplies `ParticleForces.drag`; velocity curves add movement without changing stored velocity |
+| Pulsing emission | [pulse.flecs](../test/assets/curves/pulse.flecs) | Rate and spawn speed over the emitter clock |
+| Lathe and sweep | [path.flecs](../test/assets/curves/path.flecs) | Catmull-Rom geometry paths |
+| Custom UI ease | [ease.flecs](../test/assets/curves/ease.flecs) | Transition `CubicBezier` handles |
 
-```flecs
-using box.transform
-using box.geometry
-using box.material
-
-vase_outer {
-  Path2D: {
-    start: {0, 0},
-    segments: [
-      {kind: Line, end: {0.4, 0}},
-      {kind: CatmullRom, end: {0.75, 0.6}},
-      {kind: CatmullRom, end: {0.35, 1.4}},
-      {kind: CatmullRom, end: {0.3, 1.8}},
-      {kind: CatmullRom, end: {0.5, 2.1}}
-    ],
-    closed: false
-  }
-}
-
-vase {
-  Position: {2, 0, 0}
-  Lathe: {profile: vase_outer, cap_start: true, cap_end: true}
-  Rgb: {70, 165, 205}
-}
-
-tube_profile {
-  Path2D: {
-    start: {0.25, 0},
-    segments: [
-      {kind: CatmullRom, end: {0, 0.25}},
-      {kind: CatmullRom, end: {-0.25, 0}},
-      {kind: CatmullRom, end: {0, -0.25}}
-    ],
-    closed: true
-  }
-}
-
-tube_section { Profile2D: {outer: tube_profile} }
-
-tube_route {
-  Path3D: {
-    start: {-1.5, 0.3, 0},
-    segments: [
-      {kind: CatmullRom, end: {-0.5, 2, 0.5}},
-      {kind: CatmullRom, end: {0.5, 0.6, -0.5}},
-      {kind: CatmullRom, end: {1.5, 2.2, 0}}
-    ]
-  }
-}
-
-tube {
-  Position: {-2, 0, 0}
-  Sweep: {path: tube_route, profile: tube_section, scale: {1, 1}, rings: 96}
-  Rgb: {230, 155, 65}
-}
-```
-
-(`test/assets/curves/path.flecs`)
-
-Path segments are `PathSegmentKind`, so here the kind is `CatmullRom`, not `CurveCatmullRom`.
-A segment takes its tangents from the anchors of the segments next to it, whatever their kind,
-and a closed path whose last segment is Catmull-Rom closes with a Catmull-Rom segment, so four
-anchors make a round section. Profiles sample a curved segment in 16 steps.
-
-A Sweep maps its texture by arc length: u runs around the profile and v along the path by
-distance, so the anchors need not be evenly spaced for an even texture. With
-`TextureMapping: {mode: MappingObject, size: 2}` the texture repeats every 2 units along and
-across the swept surface whatever the length of the path. Along a horizontal path the profile y
-points down (-Y), so a road profile puts its top at negative y.
-
-### A custom ease for UI
-
-A panel that springs to a new scale with a small overshoot, a CSS "back" ease, and fades with a
-fast start and a long soft landing.
-
-```flecs
-using box.transform
-using box.geometry
-using box.material
-using box.transition
-
-panel {
-  Scale: {1, 1, 1}
-  Rect: {240, 120}
-  Rgb: {40, 44, 56}
-  Opacity: {1}
-  Transition: [
-    Scale: {duration: 0.25, timing_function: CubicBezier, bezier: {0.34, 1.56, 0.64, 1}},
-    Opacity: {duration: 0.3, timing_function: CubicBezier, bezier: {0.2, 0, 0, 1}}
-  ]
-}
-```
-
-(`test/assets/curves/ease.flecs`)
-
-`x1` and `x2` must lie in 0..1; `y1` and `y2` are free, and above 1 the value overshoots its
-target before it settles. Only a new value animates, so the panel moves when a script, the
-shell or C sets its `Scale` or `Opacity` later. `docs/transitions.md` has the details.
+Path segments use `CatmullRom`, not `CurveCatmullRom`. Tangents use neighboring
+anchors regardless of segment kind. Closed Catmull-Rom paths join across the wrap;
+profiles sample curved segments in 16 steps. Sweep UVs follow arc length. On a
+horizontal path, profile y points down (-Y), so road profiles put their top at
+negative y.
 
 ## Showcase
 
@@ -542,98 +329,49 @@ root entity, and shown together by `test/integration/visual/curves_showcase.flec
 | `orb.flecs` | Glowing ball, halo, motes | Motes that stream along a double helix from Bezier velocity curves; the light and the halo emission pulse together |
 | `chimney.flecs` | Stack and puffing smoke | Two puffs a period of different strength (`ParticleTimeline.rate`), faster starts (`speed`), smoke that shoots up before the wind takes it (`ParticleMotion.drag`) |
 
-What they needed beyond the recipes:
+Common authoring traps:
 
-- **A spin you can see.** `rotation` and `spin` turn a particle around the view axis, which a
-  `ParticleCircle`, the default shape, does not show. Draw the particles as a
-  `ParticleSprite` with a texture, or as a `ParticleBillboard` of the mesh of another entity:
-  `ParticleAppearance: {shape: ParticleBillboard, mesh: chunk, lit: 0.8}`. The mesh entity is
-  drawn itself, so put it out of view, `chunk { Position: {0, -1000, 0}, Box: {1, 0.7, 0.5} }`.
-- **Particles that fall.** Gravity is a field of `ParticleForces`, and without any
-  `ParticleForces` (on the emitter, on the entity its `forces` names or as a singleton) particles
-  feel no force at all. Debris thrown up without it flies off for good: give the emitter
-  `ParticleForces: {}` for the default gravity of -9.81.
-- **Shapes in space from velocity curves.** A velocity curve is in world units per second, but
-  its time is the life, so the same keys trace a different path for every lifetime. Give a
-  particle that must trace a shape a fixed `lifetime: {L, L}`. A circle of radius `r` turned
-  `N` times over the life is `cos` on one axis and `sin` on the other with an amplitude
-  `A = 2 pi N r / L`: keys at every quarter turn, `CurveBezier`, slope 0 at the peaks and
-  `+-2 pi N A` at the zero crossings (`orb.flecs`). The circle starts at the spawn point, so
-  its centre is `r` to the side of it, not at the emitter: particles spawned over a sphere make
-  a cloud of small circles, not an orbit. To circle an axis, spawn at one point `r` from the
-  axis (`EmitterPoint`) and give the emitter a speed along the axis: every particle then rides
-  the same path, and the particles of all ages draw a helix that stands still while they
-  stream along it. A second emitter on the other side of the axis with the curves negated
-  draws a second strand. `max_keys` with another amplitude gives each particle its own
-  radius, as the three velocity axes share one draw, but the circles all touch at the spawn
-  point, so it fans out from there rather than making rings around the axis.
-- **A darker or lighter color, not another hue.** `color_variance` draws each channel on its
-  own, so `{30, 25, 20}` on brown debris gives green and red chunks. Vary the brightness with a
-  constant `color` gradient between white and grey instead, `color: {keys: [{0, {255, 255,
-  255}}], max_keys: [{0, {130, 130, 130}}]}` (`shockwave.flecs`).
-- **Billboards that lie on the ground.** `ParticleCollision` stops the center of a particle at
-  `height`, so a resting billboard sinks half into the ground; raise `height` by half the
-  drawn size.
-- **A light in step with a burst.** A `ParticleBurst` with `at: 2.5, repeat: -1` goes off at
-  2.5, 5, 7.5 s, and a `ParticleLight` with `period: 2.5, loop: true` starts its curve at 0, 2.5,
-  5 s, so a flash at the start of the curve meets every burst. The light also flashes once at
-  0 s, before the first burst.
-- **Moving an included effect.** `include` makes the entities of the file where it puts them.
-  Open the root again after the include to place it, `campfire { Position: {-2.6, 0, 0.5} }`;
-  its emitters, lights and meshes are its children and move with it. Shared helpers such as
-  a billboard mesh stay at the root of the file, with a name that does not collide.
+- Spin is invisible on the default circle. Use a sprite or billboard mesh.
+- Without `ParticleForces`, particles feel no gravity. `ParticleForces: {}`
+  supplies the default -9.81 gravity.
+- Velocity-curve times use normalized life, but values are units per second.
+  Use a fixed lifetime to make every particle trace the same shape.
+- `color_variance` varies channels separately. For brightness variation without
+  hue changes, blend constant white and grey gradients with `max_keys`.
+- Ground collision stops the particle center. Raise collision height by half
+  the drawn size to keep a resting billboard above the ground.
+- A burst at one period meets a looping light's flash, but that light also
+  flashes at time zero before the first burst.
+
+## Emitter clock
+
+`ParticleTimeline.period` is seconds of `ParticlePlayback.time`. Curve times are
+0..1 over that period. Loop repeats; otherwise curves hold their final values.
+A frame spawns the base rate times the area of the nonnegative rate curve over
+that frame, including wraps, so counts do not depend on frame rate. Speed is
+sampled at the frame's ending clock and affects only particles spawned that frame.
+Bursts are not scaled. Pause holds the clock, stop emits nothing, reset restarts it.
+Lights and timelines reject `max_keys` because they have no per-particle draw.
 
 ## Checking the result
 
-### Errors
+A bad curve logs an error identifying the component, entity, field, list and key.
+It retains its authored keys but uses the field default until fixed. Check for:
 
-A bad particle curve logs one error when its component is set, naming the component, the entity,
-the field, the list and the key, and draws as the default of its field. The files of
-`test/assets/curves/mistakes/` give these:
+- Nonfinite times, values or slopes, duplicate/decreasing times, or particle
+  times outside 0..1.
+- A light or timeline with keys but a nonpositive period.
+- `max_keys` on a light or timeline.
+- Short kind names such as `Linear`, a gradient channel above 255, a scalar
+  where a color is required, or a misspelled member.
 
-```
-invalid ParticleCurves on late: size key 2: time 1.5 is outside of 0 to 1, drawn as the default of size
-invalid ParticleCurves on unordered: opacity key 2: time 0.5 is not after time 0.6 of key 1, drawn as the default of opacity
-invalid ParticleCurves on jump: spin max_keys key 1: time 0 is not after time 0 of key 0, drawn as the default of spin
-invalid ParticleLight on lamp: curve max_keys is not allowed, a light has no random draw to blend two curves by, drawn as the default of curve
-invalid ParticleLight on still: curve has keys but period is 0, set the seconds it spans with a period above 0, drawn as the default of curve
-invalid ParticleTimeline on seconds: rate key 1: time 2 is outside of 0 to 1, drawn as the default of rate
-```
+Script errors stop evaluation; fix the first error and rerun to expose later
+ones. `in` and `out` on non-Bezier curves are valid but ignored. A valid curve
+whose baked samples overflow also falls back to the field default.
+See [mistakes](../test/assets/curves/mistakes/) for failing examples.
 
-`ParticleTimeline` logs the same as `still` for a `rate` or `speed` with keys and no `period`.
-
-The other problems of a key are `time is not finite`, `value is not finite`, `in is not finite`
-and `out is not finite`, and of a curve `kind 3 is not CurveLinear, CurveCatmullRom or
-CurveBezier`. An `AnimationTrack` logs `AnimationTrack 'height' of clip 'bounce': curve: key 2:
-...` (`docs/animation.md`), and a `Transition` entry with a handle outside 0..1 logs an error
-naming the entity and the component (`docs/transitions.md`).
-
-Script errors stop the script, so the entities after them are not made:
-
-- `unresolved reference 'Linear'`: a short kind name, see [The format](#the-format).
-- `value 300 is out of bounds for type U8`: a gradient channel above 255.
-- `invalid cast from flecs.meta.i64 to box.types.rgb`: a number where `color` wants a color,
-  `{0, 1}` instead of `{0, {255, 255, 255}}`.
-- `cannot open scope for type 'box.curve.CurveKey'`: a color, `{0, {255, 0, 0}}`, where a
-  curve wants a number.
-- `unknown member 'velocty_x' for type 'box.particle.ParticleMotion'`: a misspelled field.
-
-These name the line of the script, not the field: look for the curve on that line.
-
-Some mistakes log nothing, as they are valid:
-
-- `in` and `out` on a curve that is not `CurveBezier` are ignored, so a curve that should
-  start steep is a straight line. Give it `kind: CurveBezier`.
-- Particles without any `ParticleForces` do not fall, see [Showcase](#showcase).
-
-A script reports only its first error, curve errors included: with two bad curves in one file
-the second is logged only once the first is fixed (`test/assets/curves/mistakes/two.flecs`).
-Fix and run again until it is quiet.
-
-### Looking at frames
-
-The CPU tests cannot see the shaders. To see an effect, write a scene with a camera and a view
-that includes the effect, here `/tmp/fx/puff.flecs`:
+CPU tests cannot inspect shader output. To render a recipe, put it in a scene
+with a camera and view, for example `/tmp/fx/puff.flecs`:
 
 ```flecs
 include test/assets/curves/puff
@@ -646,160 +384,45 @@ camera {
   Position: {0, 1, 6}
   Camera: {fov: 60}
 }
-
 main_view {
   View: {camera: camera, clear: {enabled: true, color: {16, 18, 28, 255}}}
 }
 ```
 
-and render it headless with the visual harness of `tools/integration.py`:
-
 ```sh
 python3 tools/integration.py visual --dir /tmp/fx --out /tmp/fx/out --frames 60 puff
 ```
 
-It renders the scene with a fixed delta of 1/60 s, so 60 frames are one second, writes the last
-frame to `/tmp/fx/out/puff.png` and a page of every render to `/tmp/fx/out/index.html`, and
-reports a failure for the missing baseline; the image is there all the same. `include` names a
-file from the repository root without `.flecs`, as the harness links `etc`, `apps` and
-`test/assets` next to the scene it renders; an effect of your own can also be written into the
-scene itself. Render again with other `--frames` to see other times, for example 6, 30 and 90
-for the start, the middle and a steady state, and look at the PNGs. A scene of
-`test/integration/visual` runs 3 frames unless it has a line `// frames: n`, as
-`curves_showcase.flecs` does to show its effects seconds in; `--frames` overrides both. A run of the app,
-`bake3 run apps/boxrun --local-env -- /tmp/fx/puff.flecs`, plays it live, and its `capture`
-shell command writes a PNG of a frame (README).
+The harness uses a fixed 1/60-second delta, writes `puff.png` and `index.html`,
+and reports a missing baseline even though it produced the image. Compare several
+frame counts to inspect birth, growth and steady state. Run the scene live with
+`bake3 run apps/boxrun --local-env -- /tmp/fx/puff.flecs`.
+`ParticleStats` counts live and spawned particles when checking rate curves.
 
-To see a curve rather than an effect, plot it: burst one still particle per emitter, with a
-lifetime that puts it at a chosen age when the frame is captured, as
-`test/integration/visual/particles_curve_kinds.flecs` does for 16 ages of each kind. The
-`particles_*.flecs` scenes of that folder are tested examples of every curve component.
+## Limits and cost
 
-`ParticleStats` (`get ParticleStats` in the shell) counts the live and spawned particles, which
-shows a rate curve at work without an image.
+There is no step kind, per-key kind, curve editor or free time-axis Bezier handle.
+For a hold, repeat a value; for a near jump, use close keys, subject to GPU sampling.
+ParticleTimeline only changes rate and start speed: other spawn ranges are redrawn
+from the seed for live particles, so changing them would affect existing particles.
+Per-axis size, trails and sub-emitters are not supported by these curves.
 
-## Not supported
+GPU curves bake to 64 samples on change. Rows are shared by baked content, and
+flat samples become constants that need no table read. `max_keys` needs rows for
+both curves unless both are the same constant. Each keyed field normally reads
+two samples per particle per frame; spin also reads its integral, color reads
+four-channel samples, and `max_keys` doubles the reads. Motion reads in integration;
+appearance reads in drawing. CPU light, timeline and track curves evaluate exactly
+and use no GPU row.
 
-- **Start size, lifetime, rotation or opacity over the emitter duration.** A `Particle` stores
-  only its position, velocity, remaining life and index; its lifetime, size, rotation, spin and
-  opacity are drawn again from its seed every frame from the current ranges of the emitter. A
-  curve over the emitter clock that changed those ranges would change the live particles too,
-  so `ParticleTimeline` has only `rate` and `speed`, which act once at spawn (the speed is kept
-  in the velocity). Growing `Particle` to store them is a decision for later. For a size that
-  changes with the emitter clock, use two emitters or a `ParticleCurves` over the life.
-- **`max_keys` on lights and timelines.** They have no per particle random draw to blend by.
-- **A step kind, and per key kinds.** For a jump use two keys close together, which on the GPU
-  ramps over 1/63 of the life; for a hold, two keys of the same value. A curve that must be
-  straight in one part and smooth in another is a `CurveBezier` with the straight-line slopes
-  there.
-- **Centripetal Catmull-Rom.** Catmull-Rom is uniform in its parameter, spaced by key time.
-- **Free Bezier handles in time.** A key's handles sit a third of the span along, so time stays
-  linear in the parameter. Only the CSS `cubic-bezier()` of transitions solves for x.
-- **Per axis size, trails, sub-emitters, and curves on MSDF text outlines.** Text outlines keep
-  their own double precision curves.
-- **A curve editor.** Curves are text for now; the components keep what was authored so an
-  editor can read and write them later.
+A keyed color curve can cost more through sorting than through sampling:
+alpha-blended particles without `ParticleAppearance` normally draw unsorted, but
+keyed color or nonzero color variance enables back-to-front sorting. With
+`ParticleAppearance`, alpha particles always sort and additive particles never do.
+Bezier gradients have no authored slopes and ease at every key; colors blend in
+linear light both along the gradient and between its two random bounds.
 
-## The cost
-
-What curves cost, from the `Particle` cases of `bench/render` (`Particle.c`). Run them with
-`bake3 run --cfg release bench/render --local-env -- Particle`.
-
-Where it goes:
-
-- **Nothing without curves.** An emitter without `ParticleCurves` or `ParticleMotion` reads no
-  row; the shaders check the row of each curve and skip it.
-- **A constant reads nothing.** A curve with no keys, one key, or 64 equal samples is a value in
-  the uniform block of the emitter, not a row.
-- **A keyed curve reads two samples** of the curve table per particle per frame, `spin` four
-  (its values and their area), `color` two samples of four floats, and `max_keys` doubles that.
-  A `ParticleMotion` reads its rows in the integrate pass, the others in the draw.
-- **A keyed `color` sorts.** Alpha blended particles without `ParticleAppearance` are drawn
-  unsorted; a color curve makes them sort back to front every frame, which costs more than all
-  the curve reads together. A nonzero `color_variance` on `ParticleEmitter` sorts them too. With
-  `ParticleAppearance` alpha particles always sort, and additive ones never do.
-- **Baking is on change only.** A curve is baked when its component changes, and a key list the
-  table has seen is not sampled again. Rows are shared by content, so instances of an effect
-  template and the plays of `box_particle_burst_at` share the rows of their template.
-- **Lights, timelines and tracks** are evaluated on the CPU once per entity per frame, exactly,
-  and take no row.
-
-The extract cases run 4096 emitters of up to 8 particles into the null backend, per frame, in a
-release build on an arm64 Linux VM with one core:
-
-| Case                                 | Frame (ms) | Rows | Bakes per frame | Note                        |
-|--------------------------------------|-----------:|-----:|----------------:|-----------------------------|
-| `extract_4k_no_curves`               |      0.329 |    0 |               0 | baseline                    |
-| `extract_4k_constant_curves`         |      0.363 |    0 |               0 | one key per curve           |
-| `extract_4k_curves`                  |      0.473 | 4104 |               0 | keyed, the size differs per emitter |
-| `extract_4k_curves_max`              |      0.550 | 8208 |               0 | the same with `max_keys`    |
-| `extract_4k_curves_change_one`       |      0.433 | 4105 |               1 | one curve rewritten per frame |
-| `effect_plays_1k`                    |      0.352 |    - |               0 | 1000 plays a second, no curves |
-| `effect_plays_1k_curves`             |      0.391 |    8 |               0 | the same effect with keyed curves |
-
-So a constant curve costs about 8 ns per emitter per frame, keyed curves about 35 ns and
-`max_keys` another 20 ns, with no bake in a steady frame. Rewriting one curve a frame bakes
-it once a frame and stays within the noise of the steady keyed case. The 1000 plays a
-second of an effect share 8 entries of rows between all their instances.
-
-The draw cases render a million particles. On this machine they ran on a software Vulkan device,
-so only their ratios mean something: constant curves (`draw_1m_constant_curves`, 0.78 s a frame)
-cost the same as none (`draw_1m`, 0.78 s), the row reads of flat two key curves
-(`draw_1m_flat_curves`) add 2.5%, and the keyed curves with a color curve (`draw_1m_curves`, 3.7
-s) take 4.7 times as long, nearly all of it the sort the color curve turns on: `max_keys`
-(`draw_1m_curves_max`) adds 0.4% to that, and keyed and `max_keys` `ParticleMotion`
-(`draw_1m_curves_max_motion`) another 10%. Measure on a GPU before relying on absolute numbers.
-
-## Refinements of the design
-
-The Curves epic was designed up front; these are the places where the code settled a detail,
-written down so that this guide and the code agree.
-
-- **Catmull-Rom ends.** The missing neighbour of the first or last key has the value of the key
-  and lies one span further out (`box_curve_catmull_rom_slope`, `src/curve/curve.c`), so evenly
-  spaced keys give the uniform controls `p1 + (p2 - p0) / 6` and the end slope is half that of
-  the end span.
-- **Rotation adds turns.** `ParticleCurves.rotation` is in turns, times 360 degrees, added to the
-  rotation a particle spawned with; every other particle curve multiplies.
-- **Particle times are 0 to 1.** A particle, light or timeline curve with a time outside 0 to 1
-  is an error, not clamped (`box_particle_curve_check`, `src/particle/curves.c`).
-- **Errors log, curves keep their keys.** The validate hooks always accept the component and log
-  the first problem of each bad curve; the extract and the CPU evaluators treat a bad curve as
-  the default of its field.
-- **`CurveBezier` gradients have flat slopes.** `ParticleGradient` keys have no `in` or `out`, so
-  a Bezier gradient eases in and out of every key (`box_particle_gradient_bake`,
-  `src/particle/simulate.h`).
-- **Rows are shared by baked content.** Curve table rows are found by the hash of their samples,
-  not of their keys, so two different key lists that bake to the same samples share a row
-  (`box_particle_rows_acquire`, `src/render/particle_rows.c`).
-- **A flat curve is a constant.** A curve whose 64 samples are all equal takes no row and reads
-  nothing on the GPU (`box_particle_rows_curve`, `box_particle_rows_gradient`). With `max_keys`
-  both curves take rows unless both are the same constant.
-- **Samples that are not finite fall back.** A valid curve whose baked samples are not finite,
-  from slopes large enough to overflow, draws as the default of its field like a curve that
-  fails validation.
-- **A light curve is exact and has no `max_keys`.** `ParticleLight.curve` is evaluated by
-  `box_curve_value` on the CPU, not baked, and `max_keys` on it is an error.
-- **Motion axes share a draw.** The three velocity curves of `ParticleMotion` blend toward their
-  `max_keys` by one draw, as do the three force curves, so a direction stays a direction; speed
-  and drag have their own.
-- **Colors blend in linear light,** both along a gradient and between a gradient and its
-  `max_keys`.
-- **Color differences sort alpha particles.** Alpha blended particles without `ParticleAppearance`
-  are drawn unsorted, since particles of one color blend the same in any order; a keyed color
-  curve or a nonzero `color_variance` on `ParticleEmitter`, which gives each particle its own
-  color, makes them sort back to front (`box_particles_block_look`, `src/render/particles.c`).
-- **The emitter clock** (`ParticleTimeline`, `src/particle/timeline.c`):
-  - `period` is in seconds of `ParticlePlayback.time`, and curve times run from 0 to 1 over it.
-    A period of 0, no keys or a bad curve is 1.
-  - `loop` repeats the curves every period; without it the curves hold their last key after the
-    period. A looping Catmull-Rom curve from 0 to 1 takes its end neighbours across the wrap, so
-    it joins smoothly.
-  - A frame spawns `rate` times the area of the rate curve above 0 over its part of the clock,
-    across the wrap of a loop too, so the count does not depend on the frame rate. A negative
-    rate value counts as 0.
-  - `speed` is the value at the clock after the frame. It multiplies the start speed of the
-    particles spawned in that frame only and is not clamped. Live particles keep their velocity.
-  - Paused holds the clock, stopped emits nothing, a reset restarts the clock, and bursts are not
-    scaled.
-  - `max_keys` is an error on both curves, as on a light (`box_particle_timeline_curve_check`).
+Run `bake3 run --cfg release bench/render --local-env -- Particle` for extraction
+and drawing costs. Historical CPU measurements used a one-core arm64 Linux VM;
+draw measurements used software Vulkan. Measure on the target GPU before relying
+on absolute timings.

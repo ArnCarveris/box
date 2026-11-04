@@ -1,20 +1,14 @@
 # Transitions
 
-`box.transition` animates the rendered value of a component when the application changes it,
-like CSS transitions. The component itself holds the new value at once: transitions exist only
-in the rendered pixels.
+`box.transition` animates the rendered value of a component when the application
+changes it, like CSS transitions. The component holds its target immediately.
+Game logic, queries, picking, collision and `WorldTransform` all see that target;
+the intermediate value exists only on the render thread.
 
-The feature is complete: transitions of `Position`, `Rotation` and `Scale` render for the entity and
-its descendants (see [Transform transitions](#transform-transitions)), transitions of `Rgb`,
-`AlphaCutoff`, `PbrMaterial`, `Emissive`, `TextureTransform`, `Transmission`, `ClearCoat`,
-`SpecularAnisotropy`, `Sheen` and `DiffuseTransmission` for mesh shapes, 2D shapes and texts (see [Material transitions](#material-transitions)), and
-transitions of `Tint` and `Opacity` composed down the hierarchy (see [Tint and opacity
-transitions](#tint-and-opacity-transitions)), and transitions of `BoxShadow`, the offset, blur,
-spread and color of the shadow of a 2D shape (see [Box shadows](#box-shadows)). It works on the render thread, in main thread mode
-(the browser) and with the null backend. What it does not do is listed in
-[Limitations](#limitations), and what it costs in [The fast path](#the-fast-path).
+Use [keyframe animation](animation.md) when the application needs to read the
+animated value or animate an arbitrary reflected numeric member.
 
-## What the application sees
+## Authoring
 
 ```flecs
 using box.transform
@@ -31,643 +25,125 @@ e {
 }
 ```
 
-`Transition` is a map from a component to a `TransitionSpec`:
+`Transition` maps component names to `TransitionSpec` values:
 
-| Field             | Type             | Default  | Meaning                                       |
-|-------------------|------------------|----------|-----------------------------------------------|
-| `duration`        | `float`          | 0        | Seconds from the start to the target value    |
-| `delay`           | `float`          | 0        | Seconds the rendered value holds still first  |
-| `timing_function` | `TimingFunction` | `Linear` | `Linear`, `EaseIn`, `EaseOut`, `EaseInOut` or `CubicBezier` |
-| `bezier`          | `TransitionBezier` | 0      | Handles `{x1, y1, x2, y2}` of `CubicBezier`, ignored by the others |
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `duration` | 0 | Seconds to reach the target after the delay |
+| `delay` | 0 | Seconds to hold the rendered value before moving |
+| `timing_function` | `Linear` | `Linear`, `EaseIn`, `EaseOut`, `EaseInOut` or `CubicBezier` |
+| `bezier` | 0 | `{x1, y1, x2, y2}` handles, used only by `CubicBezier` |
 
-`EaseIn`, `EaseOut` and `EaseInOut` are the CSS cubic Beziers (0.42, 0, 1, 1), (0, 0, 0.58, 1)
-and (0.42, 0, 0.58, 1). `box_transition_ease(fn, t)` evaluates them; it is pure and allocates
-nothing, so the render thread can call it.
+The first value does not animate. A later script, shell or C write starts the
+transition. For example, after the entity above has rendered, setting its position
+with `set e box.transform.Position {x: 4, y: 1, z: 0}` moves its pixels over
+half a second; `get` returns the new position immediately.
 
-### Custom easing
+`Transition` is inherited over `IsA`. A prefab can declare the map for its instances;
+an instance that sets its own map replaces the whole inherited map.
 
-`CubicBezier` is a CSS `cubic-bezier(x1, y1, x2, y2)`: a curve from (0, 0) to (1, 1) with its
-handles at (x1, y1) and (x2, y2), mapping the linear progress on x to the eased progress on y.
-
-```flecs
-using box.material
-using box.transition
-
-panel {
-  Opacity: {1}
-  Transition: [Opacity: {duration: 0.3, timing_function: CubicBezier, bezier: {0.2, 0, 0, 1}}]
-}
-```
-
-For keyed curves of particles, lights, emission and animation tracks, and a recipe of a UI ease,
-see [Curves](curves.md).
-
-`box_transition_ease_bezier(fn, &bezier, t)` evaluates it, solving x for the curve parameter
-(`box_curve_ease`), and gives `box_transition_ease(fn, t)` for the presets. Handles equal to a
-preset, `{0.42, 0, 0.58, 1}` for `EaseInOut`, give the values of the preset.
-
-- `x1` and `x2` must lie in 0..1, as in CSS, so that x increases and every progress has one y.
-  A handle outside, or one that is not finite, logs an error naming the entity and the
-  component, and the entry is ignored like one with a negative `duration`
-  (`box_transition_bezier_valid()`, `box_transition_valid()`).
-- `y1` and `y2` are free. Outside 0..1 the eased progress leaves 0..1 between the ends, and
-  the rendered value overshoots past its target or, before it, back past its start, as a CSS
-  `back` easing does. Float fields extrapolate; `uint8_t` fields (`Rgb`, `Tint`, the colors of
-  `Emissive`, `Transmission`, `Sheen`, `DiffuseTransmission` and `BoxShadow`) are clamped to 0..255 when
-  they are rounded. The encodings clamp what has a range: `Opacity`, `AlphaCutoff`,
-  `PbrMaterial`, `ClearCoat`, `SpecularAnisotropy.strength`, the factor and roughness of
-  `Sheen` and `DiffuseTransmission` to 0..1, a negative `Emissive.strength` and
-  `Transmission.thickness_factor` and the thickness and blur of `DiffuseTransmission` to 0; the
-  shader keeps `Transmission.ior` and `attenuation_distance` above 0.001. `Position`,
-  `Rotation`, `TextureTransform` and `Scale` are free, so a `Scale` that overshoots past 0
-  mirrors, as in CSS.
-- The handles travel to the render thread in the start record with the timing function. A
-  record and a node value are 16 bytes larger; the presets pay nothing else, they never touch
-  the handles.
-
-### Authoring from script
-
-`Transition` is written like any component, as a map of component names to specs, after
-`using box.transition`. A prefab can declare it for all its instances:
-
-```flecs
-using box.transform
-using box.material
-using box.transition
-
-prefab Crate {
-  Box: {1, 1, 1}
-  Rgb: {200, 150, 80}
-  Transition: [Rgb: {duration: 0.3}, Position: {duration: 0.2, timing_function: EaseOut}]
-}
-
-crate : Crate {
-  Position: {0, 0.5, 0}
-}
-```
-
-Then any later write animates, from script, the shell or C, however it is written:
-
-```flecs
-crate { Position: {3, 0.5, 0} }   // moves over 0.2 s
-Crate { Rgb: {40, 80, 230} }       // every instance that inherits Rgb fades to blue over 0.3 s
-```
-
-From the shell, `set crate box.transform.Position {x: 3, y: 0.5, z: 0}` does the same, and the
-next `get crate box.transform.Position` returns `{x: 3, y: 0.5, z: 0}`, the target.
-
-### Authoring from C
+### From C
 
 ```c
-#include <box.h>
-
-ecs_entity_t e = ecs_entity(world, { .name = "e" });
 ecs_set(world, e, Position, {0, 1, 0});
-ecs_set(world, e, Rgb, {255, 0, 0});
 box_transition_set(world, e, ecs_id(Position), &(TransitionSpec){
     .duration = 0.5f, .timing_function = EaseInOut });
-box_transition_set(world, e, ecs_id(Rgb), &(TransitionSpec){
-    .duration = 1.0f, .delay = 0.25f });
-
-// Later: the component holds the target at once, the pixels follow
-ecs_set(world, e, Position, {4, 1, 0});
 ```
 
-`box_transition_set(world, e, ecs_id(Position), &spec)` adds or replaces one entry (an instance
-gets its own copy of an inherited map first), `box_transition_remove(world, e, ecs_id(Position))`
-removes one (the same way, leaving the prefab unchanged), and `box_transition_get()` reads one,
-owned or inherited. `box_transition_remove` frees the entry and emits OnSet. Removing the last
-entry leaves `Transition` with an empty map; use `ecs_remove(world, e, Transition)` to remove the
-component. Removing an entry the entity does not have does nothing: it does not add `Transition`
-or copy an inherited map. Both work deferred, on a stage (`it->stage` in a system, or
-`ecs_get_stage(world, 0)` until `ecs_merge`); several calls on one entity before the merge edit
-the same map. Deferred, `box_transition_remove` also removes an entry that `box_transition_set`
-added on the same stage before the merge, also on an entity that did not own `Transition` yet; an
-entity without an entry, owned, inherited or pending, still gets nothing. Calls on the world
-pointer, also `it->world` in an immediate system or in an observer that runs during a merge, are
-never deferred by flecs: they apply at once, so a remove after a set always sees the entry and
-nothing is tracked. One limit: on an entity without `Transition`, a `box_transition_set`, an
-`ecs_remove` of `Transition` (or `ecs_clear`, `ecs_delete`) and a `box_transition_remove` on one
-stage leave an empty `Transition` after the merge, because flecs dropped the pending value. The
-storage is a flecs map (`ecs_map_t`) keyed by the component entity whose values are allocated
-`TransitionSpec`s, so `ecs_map_get_deref(map, TransitionSpec, ecs_id(Position))` also reads one.
+`box_transition_set` adds or replaces one entry; `box_transition_remove` removes
+one; `box_transition_get` reads an owned or inherited entry. Editing an inherited
+map first copies it to the instance. Removing an absent entry does nothing;
+removing the last entry leaves an empty map. Use `ecs_remove(world, e, Transition)`
+to remove the component itself.
 
-### Rules
+These helpers also work on a deferred stage: multiple edits before the merge edit
+the same pending map. One edge case: setting an entry on an entity without
+`Transition`, removing the component (or clearing/deleting the entity), then removing
+an entry on the same stage can leave an empty `Transition` after the merge.
+See [transition.h](../include/box/transition.h) for the API.
 
-- The application sets a component as always (`ecs_set`, script, a query writing a field). The
-  component holds that value immediately and keeps holding it. `ecs_get`, the shell `get`, REST,
-  queries, picking, `box.spatial`, collision, `WorldTransform` and every other game thread reader
-  see the target only.
-- There is no API, component, stat or query that returns the in-progress value. It exists only
-  on the render thread. Only rendered pixels show it.
-- Transitionable: `Position`, `Rotation`, `Scale`, `Rgb`, `Opacity`, `AlphaCutoff`, `Tint`,
-  `PbrMaterial`, `Emissive`, `TextureTransform`, `Transmission`, `ClearCoat`,
-  `SpecularAnisotropy`, `Sheen`, `DiffuseTransmission` and `BoxShadow`
-  (`box_transition_supported()`). Others are rejected: `PbrTextures` holds handles that are part of
-  the batch key, `WorldTransform` and `MaterialId` are computed by the engine, and enums and tags
-  have nothing to interpolate.
-- A key that is not transitionable, an entry with a negative `duration` or `delay`, or a
-  `CubicBezier` whose `x1` or `x2` is outside 0..1 or whose handles are not finite, logs an
-  error naming the component when `Transition` is set, and the entry is ignored
-  (`box_transition_valid()`). The rest of the map works; nothing asserts.
+### Easing
 
-## Semantics
+The presets use the CSS cubic Beziers:
 
-- The clock is `packet->time`, the world time. Pausing or scaling world time pauses or scales
-  transitions, and the game and render threads agree on when a transition ends.
-- The first value of an entity does not animate. Spawning an entity, or adding `Transition` to
-  an existing one, records the current value as the start without a transition. Only later
-  changes animate.
-- A value change starts a transition from the value currently rendered to the new target, with
-  the full `delay` and `duration`. Interrupting a transition therefore never jumps. During
-  `delay` the rendered value holds still.
-- A change is any change of the bytes of the component, however it was written. A value that
-  changes every frame (for example through `Velocity`) restarts the transition every frame,
-  which renders as smoothing. Writing an equal value does nothing.
-- Removing `Transition`, or removing the transitioned component, snaps to the target. Deleting
-  the entity drops its transition.
-- Disabling an entity (`ecs_enable(world, e, false)`, which adds `EcsDisabled`) drops its
-  transition state like CSS `display: none`: a running transition is cancelled and the entity
-  renders nothing while disabled. Enabling it again is a first value that does not animate, so
-  it shows its current target, including a value written while it was disabled. Later changes
-  animate again from that target with the full `delay` and `duration`.
-- An entry removed from the `Transition` map (with `box_transition_remove`, or by a new map
-  without it: a script reload, or an instance that sets its own map over the prefab's) snaps
-  that component to its target, like removing `Transition`. So does an entry that becomes
-  invalid. An entry whose spec changes keeps a running transition until the next value change,
-  which uses the new spec.
-- `duration: 0` with `delay: 0` is no transition. `duration: 0` with a delay switches after the
-  delay.
-- `Rotation` interpolates per Euler axis without wrapping. `Rgb`, `Tint`, emissive color and
-  the color of `BoxShadow` (with its alpha) interpolate per channel in the authored (display)
-  values, and the existing encoding runs on
-  the result. All other fields are linear per field after the timing function.
-- `Transition` is inherited over `IsA` (`(OnInstantiate, Inherit)`), so a prefab can declare it
-  for its instances. An instance that sets its own `Transition` replaces the whole map. A
-  transition of an inherited material value belongs to the entity that owns the value, so one
-  prefab change animates its one material table slot.
-- Draw order from `Position` z, batch membership by target value, picking and bakes use
-  targets.
+| Preset | Handles |
+| --- | --- |
+| `EaseIn` | `{0.42, 0, 1, 1}` |
+| `EaseOut` | `{0, 0, 0.58, 1}` |
+| `EaseInOut` | `{0.42, 0, 0.58, 1}` |
 
-## Limitations
+For custom easing:
 
-In short, what a transition does not animate, each explained below or in its section:
+```flecs
+panel {
+  Opacity: {1}
+  Transition: [Opacity: {
+    duration: 0.3,
+    timing_function: CubicBezier,
+    bezier: {0.2, 0, 0, 1}
+  }]
+}
+```
 
-- An entity with `ManualTransform` (`SurfaceAttachment`) under a transitioning ancestor, and its
-  descendants, render at their targets ([manual transforms](#limitation-manual-transforms)).
-- Lights and cameras stay at their target place, and a light at its target color
-  ([lights and cameras](#limitation-lights-and-cameras), [light color](#limitation-light-color)).
-- Light and reflection bakes and probe captures that run during a transition see the rendered
-  value of their frame ([bakes and captures](#limitation-bakes-and-captures)).
-- Draw order of blended shapes, picking, `box.spatial`, collision and bakes use targets.
-- `Rotation` takes the short or the long way as its Euler angles say: no wrapping.
-- A glyph in a colored `TextSpans` span keeps the color of the span through an `Rgb`
-  transition, and `SurfaceMaterial`, `Border`, `AmbientLight` and other colors outside
-  `src/material` do not transition ([material transitions](#material-transitions)).
-- A value written every frame restarts its transition every frame: it renders smoothed, never
-  reaching a moving target before it stops.
+The curve maps linear progress on x to eased progress on y. All handles must be
+finite; x handles must be in 0..1. Y handles may leave that range to overshoot.
+Float fields extrapolate; byte colors round and clamp to 0..255. Encoded material
+values retain their normal range clamps. Transforms remain free, so scale can
+overshoot through zero and mirror.
 
-### Limitation: manual transforms
+`box_transition_ease(fn, t)` evaluates presets;
+`box_transition_ease_bezier(fn, &bezier, t)` also handles custom curves. Both are
+pure and allocate nothing. Keyed curves use a different format; see [Curves](curves.md).
 
-An entity with `ManualTransform` (`SurfaceAttachment`) is not corrected by a transition of an
-ancestor and renders at its target: its world matrix is not derived from its parent's, so the
-render thread has no chain to recompute it through. Its descendants render at their targets
-too, and so does an entity with `ManualTransform` that has a transform transition of its own.
+## Playback rules
 
-### Limitation: lights and cameras
+- Transitions use world time (`packet->time`), so pausing or scaling world time
+  pauses or scales them.
+- Spawning an entity, adding `Transition`, or first owning a formerly inherited
+  value records the current value without animating. Only subsequent changes animate.
+- A change starts from the value currently rendered, with the full delay and
+  duration. Interruptions do not jump. Equal writes do nothing.
+- Changes are detected by comparing component values, including writes that emit
+  no `OnSet`. A component changed every frame restarts every frame and appears smoothed.
+- Zero duration and delay means no transition. Zero duration with a delay switches
+  after that delay.
+- Removing the component, its map entry or `Transition` snaps to target. Invalidating
+  an entry also snaps. Changing a spec leaves a running transition alone until
+  the next value change.
+- Disabling an entity cancels its transition and hides it. Re-enabling shows its
+  current target as a first value; later changes animate again. Deletion drops state.
+- Rotation interpolates Euler axes without wrapping or choosing a shortest path.
+  Byte colors interpolate per channel in authored display encoding. Other fields
+  interpolate linearly after easing.
 
-Lights and cameras are not drawn from instance streams: the light extract
-(`src/render/lights.c`) and the views (`src/render/render.c`) read `WorldTransform`, which is
-the target. A transition of `Position` or `Rotation` on an entity that is only a light or a
-camera does not show, and neither does a light or camera below a transitioning entity: they
-stay at their target. A shape on the same entity or below it moves; the light does not.
+Unsupported components, negative duration/delay and invalid Bezier handles log an
+error naming the entity/component and ignore that entry. Other entries still work.
 
-### Limitation: light color
+## Supported components
 
-Lights take their color from `Rgb` (`src/render/lights.c`), which does not go through the
-material table or a shading record. A light renders with its target color at once; a shape on
-the same entity shows the transition, the light does not.
+| Category | Components | Scope |
+| --- | --- | --- |
+| Transform | `Position`, `Rotation`, `Scale` | Shape, text and shadow slots on the entity and descendants |
+| Material | `Rgb`, `Emissive`, `TextureTransform` | Meshes, 2D shapes and text where the field is rendered |
+| Mesh material | `AlphaCutoff`, `PbrMaterial`, `Transmission`, `ClearCoat`, `SpecularAnisotropy`, `Sheen`, `DiffuseTransmission` | Mesh material table |
+| Hierarchy | `Tint`, `Opacity` | Composed down `ChildOf` and `Parent` |
+| 2D shadow | `BoxShadow` | Shadow offset, blur, spread and color |
 
-### Limitation: bakes and captures
+Material values transition on the entity that owns them. A prefab change therefore
+animates its material and the instances inheriting it; an overridden value has its
+own state. A slot can combine its own transitioning color with inherited emission.
 
-Light and reflection bakes, and probe captures, use the material table and shading as the
-frame they run in has them. A change of a material component invalidates bakes on the game
-thread as without a transition, so a capture that runs while the transition does sees the
-value it renders at then, not the target. `Tint` is the exception: captures ignore it, so it
-never invalidates a bake and a capture sees the color without it, whether it transitions or not.
+`Tint` composes in hierarchy order and `Opacity` multiplies. During an opacity
+transition, affected shapes are treated as blended unless `BlendMode` overrides
+that choice. They cast no opaque shadow until they return to an opaque target;
+alpha-tested casters update their shadow tiles as alpha changes.
 
-## Architecture
+`SpecularAnisotropy.rotation` also interpolates without wrapping; it wraps only when
+packed for rendering. Adding or removing material components is structural and
+snaps. Texture handles (`PbrTextures`), computed components (`WorldTransform`,
+`MaterialId`), enums and tags cannot transition.
 
-The render thread has no access to the world, and a packet holds only encoded GPU bytes
-(`box_render_packet_t`, `src/render/render_packet.h`): the world matrix of an instance is
-computed on the game thread, in `transformSingle`, `src/transform/transform.c`. So the game
-thread tells the render thread what changed, and the render thread computes the values and
-patches them into the packet before the backend sees it.
-
-### Game thread, in `RenderExtract`
-
-- One cached query over entities that have `Transition`, matching prefabs too, compares each
-  transitioned component to the last target it sent, kept in private per entity state.
-  Comparing catches writes that emit no OnSet (`Velocity`, projection). Nothing is added to the
-  observers, queries or extraction of entities without `Transition`.
-- It allocates a node id per entity with `Transition` and adds records to the packet: node
-  created or destroyed, and a transition started (node, component, target value, `delay`,
-  `duration`, timing function and its handles, start time). Never a `from` value.
-- It knows when a transition ends, from the start time and the packet clock. While a node is
-  active, it sends one record per affected instance or material slot with the byte offset of the
-  record in the packet data, so the resolver can patch it. After the last active frame the
-  normal stream holds the target, so the render thread needs no end logic.
-
-Implemented in `src/render/transitions.c`, a system of `RenderExtract`:
-
-- The query is `Transition(self|up IsA)` with `EcsQueryMatchPrefab`. An entity that owns
-  `Transition`, a prefab or an instance with its own map, is a node with its own state. Only
-  owned values are compared: an inherited value transitions on the prefab that owns it. So an
-  instance that inherits `Transition` is a node only when it owns one of the values the map
-  lists with a valid entry. The map of an inherited `Transition` is the same for the whole
-  table, so its entries are looked up and validated once per table, and a table of instances
-  that own none of them is skipped: its entities are no nodes and nothing is compared. An
-  instance that later sets a listed value (an override) moves to a table that owns it and
-  becomes a node then; that first owned value sets without a transition, as for any new node,
-  and later changes animate. Removing the override destroys the node again.
-- Values are compared and sent field by field in the layout of the component, with the padding
-  zeroed, so an equal write never starts a transition.
-- Node ids start at 1 and are reused, after the frame that destroyed them, without carrying any
-  state over: the create record resets the node on the render thread.
-- Records (`box_render_transition_record_t`, in `box_render_packet_t.transitions`):
-  `CREATE` and `DESTROY` of a node, and `START` of a component with its target, `delay`,
-  `duration`, timing function, the `bezier` handles of a `CubicBezier` (zero for the others) and
-  start time (`packet->time`). A first value, and a snap
-  (an entry or a component removed), is a `START` with a `delay` and `duration` of 0, which sets
-  the value without a transition. After a snap the component is not tracked until it has a
-  valid entry and a value again; that value is then a first value and does not animate.
-  Removing `Transition` and deleting the entity both send
-  `DESTROY`: the normal stream already holds the target.
-- `box_render_transitions_active()` says whether a node and component is active at the packet
-  time. It and the resolver both decide with `box_render_transition_running()`, from the same
-  start time, `delay` and `duration`, so they agree on the last active packet.
-
-### Render thread, `src/render/transition.c`
-
-Called from `box_render_consume` in `src/render/ring.c` before `backend.render`, so it works on
-the render thread, in main thread mode (`RenderSettings.main_thread`, the browser), and with the
-null backend.
-
-- It keeps a table indexed by node id with the from, current and target value and the curve per
-  component. It applies the packet's records, evaluates each active node, and patches the packet
-  bytes.
-- The table is not backend state, so it survives device loss. The records of a packet that
-  the ring drops because it was built for an older backend generation still apply, as they are
-  not sent again.
-- Values are stored as raw bytes in the layout of their component, with a table of fields per
-  component (offset and kind, `float` or `uint8_t`), so a new transitionable component is a
-  table entry. `uint8_t` fields interpolate in float and round.
-- A start transitions from the value of the running curve at the start time of the new record,
-  so an interrupt never jumps, whatever the number of packets in flight.
-- It allocates only when a create record grows the table; the active list is sized with it.
-- Tests read the value of a node with `box_render_transition_test_value()`, declared in
-  `src/render/render_packet.h` next to the null backend, after `box_render_sync`. It exists so
-  that tests can check values without a GPU and is not reachable from a public header, a
-  component, a stat or the shell.
-
-### Hierarchy
-
-Without any matrix inverse, because a target scale of 0 must work: a transitioning entity's
-rendered world matrix is `W_r(E) = W_r(parent node) * rel(E) * L_r(E)`, where `rel(E)` is the
-chain of target locals from the nearest ancestor node (the target world matrix of the parent, if
-there is none), and `L_r(E)` is built from the rendered position, rotation and scale. Each
-affected slot gets `W_r(slot) = W_r(node) * rel(slot)`, with `rel(slot)` being the target chain
-from the node including the instance scale. The game thread computes the `rel` matrices each
-active frame, walking both `ChildOf` and `Parent`.
-
-### Batches
-
-An entity under an active transition renders from a batch keyed as dynamic for the stream
-involved (`dynamic_transform`, `dynamic_material` in `box_draw_key_t`, `src/render/draw.c`).
-That reuses per frame run uploads, keeps it out of bakes (`key->bake`) and static shadow
-caching, and gives each slot a single byte location to patch. A private tag on the entity and
-its affected descendants drives this and is removed at the end, which rekeys the slots back. The
-tag is checked only where the key is computed, which is not per frame.
-
-## Transform transitions
-
-Implemented in `src/render/transitions.c` (game thread) and `src/render/transition.c` (render
-thread).
-
-- A node *moves* in a frame when `Position`, `Rotation` or `Scale` is active at the packet time
-  (`box_render_transitions_active`), and it is not a prefab, has a `Position` and no
-  `ManualTransform`.
-- The extract walks from every moving node without a moving ancestor down its subtree, through
-  `ChildOf` and `Parent` (`ecs_get_parent`, `ecs_children`). Each descendant belongs to its
-  nearest moving ancestor; a moving descendant is a node of its own whose parent node is that
-  ancestor, so nodes come parent first. The walk skips prefabs and stops at an entity whose
-  world matrix is not derived from its parent's (`ManualTransform`, or a `WorldTransform`
-  without `Position`). The walk is made again every frame, so a new parent, slot or batch
-  during a transition is followed.
-- The drawn entities of the walk (with a `DrawSlot` or `TextSlots`) carry the private tag
-  `TransitionTransform` (`box.render.TransitionTransform`, `(OnInstantiate, DontInherit)`).
-  `box_draws_key` and the glyph key make it `dynamic_transform`, and not `bake`; the observer
-  `DrawsOnTransitionTransform` rekeys the slot when the tag is added or removed. The extract
-  system runs `immediate`, so the tag is added before `RenderExtractDraws` of the same frame
-  and removed in the first frame the node no longer moves. `box_transform_dynamic`, the
-  transform systems and `DynamicTransform` are unchanged: the entities keep their target
-  `WorldTransform`, and their slots hold the target, written on change as for a static shape.
-- A dynamic_transform batch uploads its transform run every frame; the batch remembers the
-  packet data offset of that upload (`transform_frame`, `transform_data`).
-- A second system, `RenderExtractTransitionSlots`, runs after `RenderExtractDraws` and before
-  the lights. For each moving node it sends a `POSE` record, and for each transform it moves
-  (its own shape, the shapes and glyphs of its descendants) a `SLOT` record with the byte
-  offset of the `box_render_transform_t` in the packet data. Both point at matrices in the
-  packet data:
-  - `POSE`: `box_render_transition_pose_t`, `rel` being the target locals from the parent node
-    down to the parent of the node, or the target world matrix of the parent without a parent
-    node, and the target `Position`, `Rotation` and `Scale` of the node.
-  - `SLOT`: the target locals from the node down to the entity, times the instance matrix of
-    the slot: the instance scale `box_draws_transform` folds in for 3D, 2D and surface shapes,
-    or the glyph quad (width, height, x, y) for text.
-- The resolver, after it evaluated the values of the packet, computes
-  `W_r(node) = W_r(parent node) * rel * L_r` per pose record in order, where `L_r` is
-  `box_transform_local` (shared with `transformSingle`, `Ry * Rx * Rz`, scale, translate) of the
-  rendered value of each component with an active transition and the target of the others,
-  and writes the three rows of `W_r(node) * rel(slot)` into each slot. No matrix is inverted,
-  so a scale of 0 works.
-- The frame after the last active frame sends no records: the tag is removed, the slot rekeys
-  to its static batch and holds its target, byte for byte as without a transition.
-- Cull, shadows and the forward passes read the patched transform stream. Draw order of
-  blended instances, picking, `box.spatial` and bakes use the target.
-
-Refinement of the design: the pose record carries the target values of the transform
-components of the node, so the resolver builds `L_r` also from components that have no
-transition of their own (an entity that transitions only `Position` and has a `Rotation`).
-
-### Shadows and Hi-Z
-
-- The shadow atlas caches spot and point light tiles and renders a tile again when a caster
-  region reaches it (`box_render_shadow_touched`). The game thread does not know where the
-  resolver puts a moving caster, but it knows a range of every value it can render: values
-  interpolate per field with timing functions that do not overshoot (`box_transition_ease`),
-  and a transition starts from the value rendered at that time, so each rendered field lies
-  between the minimum and maximum of the targets the component had since it was last idle.
-  A `CubicBezier` whose y handles leave 0..1 can overshoot: its start widens the range on both
-  sides by its width times `max(max(y1, y2) - 1, -min(y1, y2))`, the most the hull of the
-  handles lets the eased progress leave 0..1 (`box_render_transition_widen`).
-  The private per entity state keeps that range per field for `Position`, `Rotation` and
-  `Scale` (`lo` and `hi` of `box_transition_slot_t`): a start of a component whose transition
-  no longer runs resets it to the last target, any other start widens it with the new target.
-- Each frame a caster slot moves, the slot system records a region of its scene that holds
-  every pose the resolver can render it at in that frame, instead of the whole scene, so the
-  tiles of the other lights stay cached. It carries the world matrix of each node as a range,
-  element by element (`box_draw_transition_range_t`, `src/render/transition_bounds.c`), through
-  the products the resolver computes: the range of the parent node, or the target world matrix
-  of the parent, times the target chain, times the range of the local matrix, which
-  `box_draws_range_local` builds from the ranges of the fields as `box_transform_local` does
-  (Ry * Rx * Rz from the ranges of the sines and cosines, every rotation element kept within
-  -1 to 1, the columns scaled, the position). A child under a moving parent gets the range of
-  its node, so it sweeps with its parent, through `ChildOf` and `Parent` alike. A translation
-  alone gives the bounds at the start and the target pose and every pose between them; a
-  rotation or scale gives a box around its sweep.
-- The region of a slot is `box_draws_shadow_bounds` (`src/render/batch.c`) of the range times
-  the target chain of the slot: the region math of `box_draws_shadow_region`, shared, with the
-  local bounds of the mesh or, for a surface instance, of its surface record, through every
-  transform between the minimum and maximum of each element. Without the mesh of the batch the
-  slot records a region over the whole scene.
-- The regions of a frame are recorded again in the next one, so the tiles a caster was in
-  during its last moving frame render again when it stops and no shadow stays behind. A slot
-  that rekeys at the start or the end records the region of the slot it leaves
-  (`box_draws_slot_remove`) and of the slot it gets. None of this runs while no scene keeps
-  shadow tiles (`shadow_record`), and an entity without `Transition` records what it did
-  before.
-- The range math runs only where a region reads it. Before the walk, `box_transition_casting`
-  marks the walk items with a caster slot at or below them, and the others carry no range. A
-  product with a single matrix on one side (`box_draws_range_mul`) takes two products per
-  term, or one on both sides. A rotation axis that does not run takes its sine and cosine
-  directly. The region multiplies only the three rows it reads, and `box_draws_shadow_bounds`
-  sums the least and largest term of each coordinate instead of transforming 8 corners. Each
-  gives the same bits as the full interval math.
-- A slot that rekeys moves to another page slot, whose Hi-Z history word is that of the
-  instance that had it before, as for any key change. The history only decides what the early
-  phase draws (`etc/shaders/cull.wgsl`): the late phase tests every instance in the frustum
-  against the pyramid of this frame at its patched transform and draws it when the early phase
-  did not, then writes its history. A stale word costs at most one extra early draw and never
-  leaves the instance out. A moving instance writes its history at its rendered position.
-
-## Material transitions
-
-Implemented in `src/render/transitions.c` (game thread), `src/render/transition.c` (render
-thread) and the encoding in `src/render/batch.c` and `src/render/materials.c`.
-
-- A node runs a *material transition* in a frame when `Rgb`, `AlphaCutoff`, `PbrMaterial`,
-  `Emissive`, `TextureTransform`, `Transmission`, `ClearCoat`, `SpecularAnisotropy`, `Sheen` or
-  `DiffuseTransmission` is active at the packet time
-  (`box_render_transitions_active`).
-- The value of a component that a record reads comes from the entity that owns it: the entity
-  itself or the `IsA` base that has it (`ecs_get_target_for_id(world, e, EcsIsA, id)`). The
-  record reads the rendered value of the node of that owner, so one prefab change animates its
-  material table slot and every instance that inherits it, and an instance that owns the value
-  has a transition of its own. A record keeps the node of each of its components
-  (`box_draw_transition_material_t.nodes`), so a slot can read a transition of its own `Rgb`
-  and one of an inherited `Emissive`.
-- **Mesh shapes** read the shared material table (`box_render_material_t`). In a frame with a
-  material transition, before the batches are sent, the extract walks the entity of each node
-  with an active material transition and its `IsA` instances, down every level. A slot reads
-  its value from its owner or an `IsA` base of it, so this reaches every affected slot, and
-  since `Transition` is inherited over `IsA` it visits only entities with `Transition`. The
-  instances are checked per table: a table whose entities own no slot (no `MaterialId` of their
-  own) and have no 2D or text shading is skipped, except for those of its entities that are
-  `IsA` bases themselves, so a prefab with 10,000 mesh instances that inherit its `Rgb` visits
-  the prefab alone. Each visited entity that owns a slot (`box_draw_materials_t.owned`) and
-  reads an active node marks its slot to upload in the frame; the slots of other owners are not
-  visited. The send records where each run of the table went in the packet data
-  (`box_draw_materials_t.uploaded`); after the batches, one `MATERIAL` record per slot carries
-  the byte offset of the record and its target material. Mesh slots are not rekeyed: their
-  instance streams do not change, only the table record does. A slot of the last frame uploads
-  once more, so the frame after the end holds the target.
-- **2D shapes and texts** carry their material inline (`box_render_shading_t`). The same
-  walk gives each drawn 2D shape or text that reads an active value the private tag
-  `TransitionMaterial` (`(OnInstantiate, DontInherit)`). `box_draws_key` and the glyph key
-  make it `dynamic_material`; `DrawsOnTransitionMaterial` rekeys the slot when the tag is
-  added or removed. A dynamic_material batch uploads its shading run every frame and
-  remembers its packet data offset (`shading_frame`, `shading_data`); one `SHADING` record per
-  shape slot and per glyph carries the offset of its `box_render_shading_t`. The tag is
-  removed in the first frame without an active value, which rekeys the slot to its static
-  batch with its target, byte for byte.
-- **Shared encoding.** The game thread encodes records from component values with
-  `box_draws_material_pack` (table) and `box_draws_material` (2D shading), over a
-  `box_draw_material_t` of component pointers. The record data
-  (`box_draw_transition_material_t`) holds the target value of every component the record is
-  encoded from, the tints and fade of a 2D shading and the `Shape2D`. The resolver copies it,
-  replaces the value of each component with a node by the value the node renders and calls
-  `box_draws_transition_encode`, which runs the same functions: display bytes for the table
-  color, linear emission times strength, clamped metallic, roughness and cutoff, tints mixed in
-  display encoding before linearization. A component at its target gives the bytes of the
-  record without a transition.
-- A 2D shading record writes the color, emission and UV words; a glyph record the color and
-  emission. The other words (the shape in `material` and `emissive.w`, the clip, the rank, the
-  atlas area of a glyph) do not depend on a transitioned component and stay as written.
-  A glyph in a colored `TextSpans` span renders with the color of the span, which an `Rgb`
-  transition does not change.
-- `AlphaCutoff` is part of the batch key only through `box_draws_cutout`, whether a cutoff is
-  set, so a transition of its value keeps the batch: the shape has its cutout batch as long as
-  its target has a cutoff, and removing `AlphaCutoff` rekeys it at once.
-- `Transmission` patches the material table only: 2D shapes and texts do not render it. Its four
-  floats interpolate linearly and `attenuation_color` per channel, like `Rgb` and
-  `Emissive.color`. The batch key holds only whether a shape has `Transmission`
-  (`transmissive`), so a factor that transitions to or from 0 keeps the shape in its
-  transmissive batch; adding or removing `Transmission` rekeys it at once and does not animate.
-  Its value is 20 bytes and 7 fields, which set `BOX_RENDER_TRANSITION_VALUE` to 20 and
-  `BOX_RENDER_TRANSITION_FIELDS` to 7: on 64 bit targets `box_render_transition_record_t` grew
-  from 64 to 72 bytes and a `box_render_transition_value_t` of a node from 72 to 88, a cost only
-  entities with `Transition` pay.
-- `ClearCoat` patches the material table only, like `Transmission`: 2D shapes and texts ignore
-  the coat. Its `strength` and `roughness` interpolate linearly and the slot is packed again
-  from the rendered values into its `clear_coat` word (two unorm16). The coat has no batch key
-  bit, so a strength that transitions to or from 0 keeps the batch, and a strength of 0 packs
-  the word of no coat (0). Adding or removing `ClearCoat` is a structural change and does not
-  animate. Its value is 8 bytes and 2 fields, within `BOX_RENDER_TRANSITION_VALUE` and
-  `BOX_RENDER_TRANSITION_FIELDS`.
-- `SpecularAnisotropy`, `Sheen` and `DiffuseTransmission` patch the material table only, like
-  `ClearCoat`: 2D shapes and texts ignore them, and none of them has a batch key bit, so a shape
-  keeps its batch while any of them moves. The slot is packed again from the rendered values
-  with the functions of `box_draws_material_pack`:
-  - `SpecularAnisotropy.strength` and `rotation` interpolate linearly. The rotation takes no
-    shortest path and does not wrap while it moves: from 0 to 4 pi it turns twice. It wraps to
-    0..2 pi only when packed into the `anisotropy` word (two unorm16), and a strength of 0 packs
-    the word of no anisotropy (0). 8 bytes and 2 fields.
-  - `Sheen.color` interpolates per channel like `Rgb` and `roughness` linearly, packed into the
-    `sheen` word; a color through black packs the word of no sheen (0). 8 bytes and 4 fields.
-  - `DiffuseTransmission.factor`, `thickness` and `blur` interpolate linearly and `color` per
-    channel like `Rgb`, packed into the `diffuse_transmission`, `thickness` and `diffuse_blur`
-    words. 16 bytes and 6 fields.
-  All three are within `BOX_RENDER_TRANSITION_VALUE` and `BOX_RENDER_TRANSITION_FIELDS`. Adding
-  or removing one is a structural change and does not animate.
-- While recording shadow regions, a slot whose `AlphaCutoff` or `TextureTransform` runs (and
-  the frame after) goes to `shadow_materials`, so alpha tested casters render their tiles again.
-- Anything that reads `Rgb` into a material or shading record transitions: mesh shapes, 2D
-  shapes and the glyphs of texts. `SurfaceMaterial`, `Border`, `AmbientLight` and other color
-  fields outside `src/material`, and light color, do not.
-
-Refinements of the design:
-
-- For a 2D shape, `PbrMaterial` and `AlphaCutoff` change nothing in its shading (its material
-  words hold the shape, and 2D shapes are not alpha tested), so they do not tag or patch it.
-- `box_render_transitions_get` reads the state from the `RenderTransitionState` singleton, set in
-  `box_render_transitions_init`, instead of a lookup of the system by name. The extract keeps
-  the batch state it found the first time (`box_draws_state` still looks it up by name).
-
-## Tint and opacity transitions
-
-Implemented in `src/render/transitions.c` (game thread), `src/render/transition.c` (render
-thread) and the encoding in `src/render/batch.c`.
-
-- `Tint` composes down `ChildOf` and `Parent`, and `Opacity` multiplies down the hierarchy
-  (`box_draws_fade`). A node *fades* in a frame when its `Tint` or `Opacity` is active at the
-  packet time and it is not a prefab. Neither is inherited over `IsA`, so the node is the entity
-  itself.
-- Before the batches are sent, the extract walks from every fading node without a fading
-  ancestor down its subtree, through `ChildOf` and `Parent`, skipping prefabs. It does not stop
-  at `ManualTransform`: tints and opacity do not depend on the transform. Each descendant
-  belongs to its nearest fading ancestor; a fading descendant is a node of its own whose parent
-  is that ancestor, so nodes come parent first.
-- Every drawn entity of the walk (mesh, 2D shape or text) carries `TransitionMaterial`, so its
-  slot is `dynamic_material`, its shading run uploads every frame and its shading has one byte
-  location to patch. A mesh under a `Tint` transition stays in the bakes, which ignore `Tint`;
-  `TransitionOpacity` below keeps one under an `Opacity` transition out of them. A 2D shape or text that a material transition did not
-  list joins the shadings to patch.
-- Every drawn entity at or below a node with an active `Opacity` transition also carries the
-  private tag `TransitionOpacity` (`(OnInstantiate, DontInherit)`). `box_draws_key` and the
-  glyph key compute the blend of a tagged shape as if its alpha were below 1, unless its
-  `BlendMode` says otherwise (`box_draws_blend`): a shape from opacity 0 to 1 has target 1 but
-  renders below 1, so it draws blended during the transition and casts no shadow. The tag is
-  removed in the first frame the transition no longer runs, `DrawsOnTransitionOpacity` rekeys the
-  slot, and it is back in the batch of its target, casting shadows again when it is opaque. The
-  tag is only checked where the key is computed; the per instance alpha check of the dynamic
-  shading path (`box_draws_fill_material`) is unchanged.
-- **No division.** A composed tint is an affine map of the display encoded color, `c * keep +
-  add`, and composing two is ordered, so the value of a node cannot be taken out of a composed
-  value (and an opacity of 0 cannot be divided out). After the batches, the extract sends per
-  fading node, parent first, a `FADE` record (`box_render_transition_fade_t`): the composed tint
-  and alpha of the entities strictly between its parent node and it (of every ancestor without
-  a parent node, `box_draws_fade`), and its target `Tint` and `Opacity`. The resolver composes
-  the rendered value of the parent node, that chain and the rendered value of the node, and
-  keeps both what is above the node and what it passes down.
-- Per drawn entity the shading record (`SHADING`) carries the nearest fading node
-  (`box_draw_transition_material_t.fade_node`) and the composed tint and alpha of the entities
-  strictly between the node and the entity (`fade_rel`, `fade_alpha`). The resolver replaces the
-  inherited tints and fade of the record by the node's composed value followed by that chain;
-  when the entity is the node itself (`fade_self`) it inherits what the node renders above it,
-  and its own `Tint` and `Opacity` are the rendered values of the node. The record then encodes
-  with the functions of the game thread: `box_draws_mesh_shading` for the tint and alpha of a
-  mesh shading (`BOX_DRAW_TRANSITION_MESH`, the material slot word is kept), and
-  `box_draws_material` for a 2D shape (color, emission, material and UV words, so the tinted
-  border color follows) and a glyph (color and emission).
-- A glyph of a colored `TextSpans` span renders with the alpha of the span times the rendered
-  `Opacity` of its text (`opacity_scale`).
-- A record whose node did not get a `FADE` record in the packet leaves the bytes as written: the
-  target.
-- `Opacity` and `Tint` on a light or another entity without a shape have no render effect
-  except through descendants: the entity gets no tag and no shading record, only its `FADE`
-  record, which its descendants read.
-- An alpha tested shadow caster (a mesh with `AlphaCutoff`, which keeps its opaque batch) under
-  a fading node records its region every frame of the transition, as its shadow reads the alpha.
-- The frame after the last active frame sends no records: the tags are removed, the slot rekeys
-  to its static batch and holds its target, byte for byte as without a transition.
-
-Refinements of the design:
-
-- The design asked for one record per slot with every ancestor node's own value left out, and
-  the resolver multiplying in the rendered values while walking the parent nodes. Tints compose
-  in order, not by multiplication, so the values left out must be put back at their place in the
-  chain: the game thread sends the chain between two nodes once per node (`FADE`, like `POSE`
-  for transforms) and the chain between the node and the entity per slot, and the resolver
-  composes them parent node first. Opacity, which commutes, goes the same way.
-- A `DynamicMaterial` shape under an active `Opacity` transition has its blend checked against
-  its target alpha by the dynamic shading path every frame, which marks it to rekey; the key it
-  gets is the blended one it has, so it stays in its slot. This costs a rekey check per frame
-  for such shapes only, and keeps the per instance branch out of that path.
-
-## Box shadows
-
-The shadow of a 2D shape (`BoxShadow`, `src/render/box_shadow.c`) is a second slot of its entity
-(`BoxShadowSlot`), so the transitions that patch the slot of the shape patch the shadow slot too,
-the way they reach the glyph slots of a text (`TextSlots`).
-
-- **Batch key.** The shadow slot copies the key of the batch of its shape with the `AlphaBlend`
-  blend mode, no textures and `box_shadow`, so it draws with its own `fs_shadow` pipeline
-  (`box_draws_box_shadow_update`, which the rekey of a tag reruns): it
-  is `dynamic_transform` and `dynamic_material` whenever its shape is, and already blended while
-  an `Opacity` transition keeps its shape blended (`TransitionOpacity`).
-- **Transforms.** `box_transition_send_slots` sends a `SLOT` record for the shadow slot of every
-  shape a node moves: the target chain from the node times the instance matrix of the shadow,
-  `box_draws_box_shadow_instance`, which is the matrix `box_shadow_transform` multiplies the
-  world matrix with: the quad of the shape stretched as `ShapeMesh.scale` stretches it, moved
-  by the offset and scaled to the quad of the shadow. The resolver multiplies it with the world
-  matrix it renders the node at, so the shadow keeps its offset and blur relative to its shape
-  through a `Position`, `Rotation` or `Scale` transition of the shape or an ancestor.
-  `box_draws_entity_casts` checks the shadow slot too, so the range math of
-  `transition_bounds.c` holds it; a shadow is blended and casts no light shadow, so it records
-  no region.
-- **Tint and opacity.** For a shape an active `Tint` or `Opacity` transition reaches,
-  `box_transition_send_box_shadow` sends a `SHADING` record of the kind
-  `BOX_DRAW_TRANSITION_BOX_SHADOW` for its shadow slot, with the fade node and chain of its shape
-  (`box_transition_fade_target`), the color of the shadow and the alpha the shape covers it with
-  at an opacity of 1 (`shadow_cover`, 0 for a blend mode that covers nothing). The resolver
-  encodes it with `box_draws_box_shadow_encode`, which writes the two words the update writes
-  from the opacity: `color` (the shadow color tinted as the border is, its alpha times the
-  rendered opacity and fade) and `material.w` (the cover alpha of `box_shadow_cover_alpha`), so
-  the shadow is cut out under its shape by the alpha the shape renders at and no seam shows
-  along its edge. The other words, the shadow box and the cut out box, do not depend on a
-  transitioned component. No existing kind writes `material.w` without the shape words.
-- **Rgb.** A transition of `Rgb` or another material component of a shape sends no shadow
-  record: the shadow does not read them. A transition of `BoxShadow` itself does, below.
-- **Cost.** A shape without `BoxShadow` pays one lookup of `BoxShadowSlot` per moving or fading
-  slot; the records are only sent for a shadow with a batch. A shape that lost its `BoxShadow`
-  keeps a `BoxShadowSlot` without a batch, which sends nothing, so a transition never patches
-  the freed slot.
-
-### BoxShadow transitions
-
-`BoxShadow` is transitionable like `Rgb` or `Tint`, so a card can lift on hover by growing and
-softening its shadow:
+### Box shadows
 
 ```flecs
 using box.geometry
@@ -680,197 +156,102 @@ card {
   BoxShadow: {offset_y: -2, blur: 4, color: {0, 0, 0, 120}}
   Transition: [BoxShadow: {duration: 0.15, timing_function: EaseOut}]
 }
-
-// On hover, from a system or the shell:
-card { BoxShadow: {offset_y: -12, blur: 24, spread: 2, color: {0, 0, 0, 160}} }
 ```
 
-- **Values.** Its record is 20 bytes and 8 fields: `offset_x`, `offset_y`, `blur` and `spread`
-  interpolate linearly, and the four channels of `color` (alpha included) per channel in display
-  encoding, as `Rgb` does. It sets `BOX_RENDER_TRANSITION_FIELDS` to 8; `BOX_RENDER_TRANSITION_VALUE`
-  stays 20, so the size of a record and of a value of a node do not change, and
-  `BOX_RENDER_TRANSITION_COMPONENTS` is 16, the bits of `box_draw_transition_material_t.present`.
-  `BoxShadow` is copied into an `IsA` instance (`(OnInstantiate, Override)`), so every instance
-  owns its value: an instance of a prefab that declares the transition is a node of its own and
-  lifts alone when its copy changes.
-- **Tag and batches.** A node *lifts* in a frame when its `BoxShadow` is active at the packet
-  time. Before the batches are sent, the extract gives the entity of each such node that draws a
-  shadow the private tag `TransitionBoxShadow` (`(OnInstantiate, DontInherit)`).
-  `box_draws_box_shadow_update` keys the shadow slot of a tagged entity as `dynamic_transform`
-  and `dynamic_material`, so both its streams upload every frame and have one byte location to
-  patch; the slot of the shape keeps its key. `DrawsOnTransitionBoxShadow`
-  rekeys the shadow when the tag is added or removed, and the frame after the last active frame
-  puts it back in its static batch with its target, byte for byte.
-- **Records.** The shadow box (`box_shadow_resolve`: size, sigma, corner radius, offset) shapes
-  both the instance matrix and most words of the shading, so a `BoxShadow` transition patches the
-  whole of both. After the poses, the slot system sends one `SHADOW_BOX` record per lifting
-  entity (`box_draw_transition_box_shadow_t`): the target material of the shadow record of
-  [Tint and opacity](#tint-and-opacity-transitions) with its fade node and chain
-  (`box_transition_fade_target`), the resolved `Rect`, the target `BoxShadow`, the mesh scale of
-  the shape, its target world matrix, and the offsets of the transform and the shading. The
-  resolver takes the `BoxShadow` its node renders and calls `box_draws_box_shadow_patch`, which
-  runs the functions of the game thread (`box_shadow_resolve`, `box_shadow_transform`,
-  `box_shadow_color`, `box_shadow_shading`), pure, on the render thread.
-- **With the other transitions.** When a transform transition moves the shape in the same frame,
-  the shadow gets no `SLOT` record: the record carries the node that moves the shape (in
-  `parent`) and the target chain from it, and the resolver builds the shadow on `W_r(node) *
-  rel`, the matrix the shape renders at. A `Tint` or `Opacity` transition of the shape or an
-  ancestor is read through the fade node of the record, and no separate shadow `SHADING` record
-  is sent for it. So a shadow can lift while its card moves, turns, fades or is tinted.
-- **No area.** A shadow box that has no area (`box_shadow_resolve` returns false, such as a
-  negative spread past half the smaller side of the shape) draws an instance of no size and no
-  color. While the tag is on, the update keeps the slot of a target without an area, so a shadow
-  that grows out of nothing or shrinks into nothing animates; when the transition ends the
-  update frees the slot. Adding or removing `BoxShadow` is not a transition and snaps. A removed
-  `BoxShadow` frees the slot at once and ends the transition (its start snaps, the node no longer
-  lifts), and the record looks the slot up after the batches, so it never patches a freed or
-  reused slot.
-- **Bounds.** The range of a `BoxShadow` keeps its four floats, as for `Position`, `Rotation` and
-  `Scale` (`lo` and `hi`, widened by an overshooting `CubicBezier`). When a moving node holds a
-  lifting shadow in a caster batch, its region is that of `box_draws_box_shadow_bound`: the
-  quad of the widest blur and spread, grown by half the range of the offset. A shadow is
-  blended and casts no light shadow, so this records nothing today.
-- **Cost.** A frame without an active `BoxShadow` transition checks one component per node and
-  walks nothing. An entity without `Transition` pays nothing; a moving shape whose shadow does
-  not lift pays one lookup in an empty map. No shader field is added.
+A later change to `{offset_y: -12, blur: 24, spread: 2, color: {0, 0, 0, 160}}`
+lifts and softens the shadow. Shadows follow transform, tint and opacity transitions
+of their shape or ancestors at the same time. A shadow that shrinks to no area can
+animate through that boundary; adding or removing `BoxShadow` snaps.
+`BoxShadow` copies into prefab instances, so each instance lifts independently.
 
-## The fast path
+## Limitations
 
-An application without transitions, and every entity without `Transition` in an application
-that has them, pays nothing per entity:
+- `ManualTransform`, including `SurfaceAttachment`, breaks transform propagation.
+  Such an entity and its descendants render at their target transforms, even under
+  a transitioning ancestor. Tint and opacity still propagate through them.
+- Lights and cameras read target `WorldTransform`. Their positions, rotations and
+  light colors do not transition. A shape on the same entity can still animate.
+- Colored `TextSpans` retain their span colors during an `Rgb` transition, though
+  text opacity still affects their alpha. `SurfaceMaterial`, `Border`, `AmbientLight`
+  and other colors outside `src/material` do not transition.
+- Draw order and batch membership follow targets. Picking and collision can therefore
+  disagree with the visible intermediate position.
+- Bake invalidation uses game-thread changes. Light/reflection bakes and probe captures
+  use the rendered material and shading values of the frame when they run. Tint is
+  ignored by captures and never invalidates a bake.
 
-- No per instance branch in extraction, and no new field in `box_render_transform_t`,
-  `box_render_mesh_shading_t`, `box_render_shading_t` or `box_render_material_t`. No shader
-  changes. No new OnSet observers on the transform or material components.
-- The resolver starts with one check on the packet and the active count and returns. The packet
-  gains one empty vector.
-- The extract query has no matched tables when `Transition` is not used.
+## How rendering works
 
-The only observers the module adds are the OnSet validation of `Transition` itself,
-`DrawsOnTransitionTransform`, `DrawsOnTransitionMaterial`, `DrawsOnTransitionOpacity` and
-`DrawsOnTransitionBoxShadow`, on the private tags, which only entities a transition patches ever get. A frame without an active
-`Tint` or `Opacity` transition walks no entity for them. The material table records the runs it
-uploads, one entry per run. A frame without an active material transition walks no slot or
-entity, and a frame with one visits only the entities of its nodes and those of their `IsA`
-instances that own a slot, have 2D or text shading or are bases themselves, never the other
-owners of the material table.
+The render thread cannot access the ECS world. The extract sends node lifecycle
+and transition-start records, plus offsets of GPU records to patch. A start carries
+a target and timing, never a `from`: the resolver evaluates the previous curve at
+the start time to preserve continuity across packets in flight.
 
-The slot system (`RenderExtractTransitionSlots`) stores the state of the batches when it is
-registered, so no frame looks it up by name, and a world without `Transition` returns from both
-transition systems after checking a few counts. The sizes of the four packet records are
-`_Static_assert`ed in `src/render/batch.c` and checked by `Transition_record_sizes` of
-`test/cpu/render`.
+| File | Responsibility |
+| --- | --- |
+| [src/render/transitions.c](../src/render/transitions.c) | Compare targets, track nodes, walk affected hierarchies and emit records |
+| [src/render/transition.c](../src/render/transition.c) | Evaluate curves and patch packet bytes before the backend renders |
+| [src/render/transition_bounds.c](../src/render/transition_bounds.c) | Bound moving shadow casters conservatively |
+| [src/render/render_packet.h](../src/render/render_packet.h) | Packet record formats |
+| [src/render/batch.c](../src/render/batch.c), [materials.c](../src/render/materials.c) | Shared material/shading encoders |
 
-### Measuring it
+The resolver runs before `backend.render`, on the render thread or in main-thread
+mode, and also works with the null backend. Node state survives device loss;
+transition records still apply when a packet's backend generation is stale.
 
-`bench/render` (`Transition.c`) has the cases that measure it, each against the same scene of
-100k static and 10k dynamic shapes:
+### Transforms and shadows
 
-- `Transition_none_static` and `Transition_none_dynamic`: no `Transition`, without and with 1%
-  of the static shapes moved per frame.
-- `Transition_one_idle` and `Transition_one_active`: the same scene with `Transition` on one
-  shape, idle or restarted every frame, to show that the other shapes don't pay.
-- `Transition_idle_1000` and `Transition_active_1000`: 1000 shapes with `Transition`, idle and
-  active, the cost to users of the feature.
-- `Transition_prefab_rgb_idle` and `Transition_prefab_rgb_active`: one prefab with `Rgb` and
-  `Transition` and 10,000 mesh instances, the cost of the walk of `IsA` instances, with the
-  `material_visited` counter.
-- `Transition_casters_*` and `Transition_shadeless_move_1000_shadows`: the range math of the
-  shadow regions. They use their own scene, a lit view, a floor and 16 spot lights over 1000
-  boxes, and restart the targets every frame. The cases are 1000 moving casters with shadow
-  tiles on and off (`move_1000_shadows`, `move_1000_no_shadows`), 1000 casters turning and
-  scaling (`turn_1000_shadows`), one turning box with 1000 plain caster children
-  (`parent_1000_shadows`), and 1000 moving boxes with `NoShadow` (`shadeless`), which carry no
-  range. The `shadow_record` counter is 1 while the shadow tiles are on.
+The extract sends target-local chains between transition nodes and from nodes to
+slots. The resolver builds rendered matrices parent first:
 
-Each scene case reports `transitions_ms`, the time per frame in the two transition systems of
-the extract, which a world without `Transition` keeps at the noise level, and
-`Transition_resolve_empty` times the resolver on a packet without records. The instances of the
-prefab cases inherit `Transition` over `IsA` but own only `Position`, none of the values it
-lists, so their tables are skipped and they are no nodes: the extract checks each table once,
-not each instance, and the prefab is the one node.
+`W_render(node) = W_render(parent_node) * relative_chain * L_render(node)`
 
-### The cost
+`W_render(slot) = W_render(node) * relative_chain(slot)`
 
-The numbers of the cases above, from `bench/render` in a release build on Apple silicon (an
-arm64 Linux VM with 4 cores), per frame. Run them with
-`bake3 run --cfg release bench/render --local-env -- Transition` and update this table when the
-extract or the resolver change. The frame is the `ns/iter` of the case; `transitions_ms` is the
-counter of the same name (its total, a time per frame measured over separate frames with system
-time measurement on, so it is not a part of the frame column and can even exceed it).
+No matrix inverse is needed, so zero scale works. Hierarchy walks follow both
+`ChildOf` and `Parent`, stop at manual transforms and skip prefabs. Active slots
+use dynamic-transform batches; after completion they rekey to their target batches.
+Cull, shadow and forward passes all read the patched transform stream.
 
-| Case                          | Frame (ms) | `transitions_ms` | Note                          |
-|-------------------------------|-----------:|-----------------:|-------------------------------|
-| `Transition_none_static`      |      0.076 |          0.00013 | baseline, no `Transition`     |
-| `Transition_none_dynamic`     |      0.338 |          0.00016 | baseline, 1% moved per frame  |
-| `Transition_one_idle`         |      0.076 |          0.00021 | one shape with `Transition`   |
-| `Transition_one_active`       |      0.078 |          0.00046 | one shape restarted per frame |
-| `Transition_idle_1000`        |      0.127 |            0.053 | 1000 idle nodes               |
-| `Transition_active_1000`      |      0.612 |            0.198 | 1000 active nodes             |
-| `Transition_prefab_rgb_idle`  |      0.014 |          0.00024 | 10,000 inheriting instances   |
-| `Transition_prefab_rgb_active`|      0.017 |          0.00039 | the same, prefab `Rgb` active |
-| `Transition_resolve_empty`    |   0.000001 |                - | resolver on an empty packet   |
+Shadow-cache invalidation uses a conservative range of possible rendered poses,
+including interrupted transitions, nested transforms and Bezier overshoot. Only
+light tiles touched by caster regions are refreshed, including the frame after
+movement ends. Range math runs only for caster subtrees while shadow tiles are cached.
+Hi-Z's late pass retests instances at their rendered positions, so stale slot
+history after a rekey cannot hide a moving instance.
 
-What to read from them: the frame of `Transition_one_*` equals that of `Transition_none_static`
-within noise (0.076 to 0.078 ms), so the 110,000 other shapes do not pay for one shape with
-`Transition`, and a world without it spends 0.13 µs per frame in the two transition systems. An
-idle node costs one compare per transitioned component per frame, about 50 ns (0.053 ms for
-1000). An active node adds its records and its patches, and an active transform node the walk of
-its subtree: 1000 active nodes take 0.198 ms in the extract and rekey their slots to dynamic
-batches, which makes their frame 0.612 ms. Declaring `Transition` on a prefab costs nearly
-nothing for instances that own none of its listed values: they are no nodes, so 10,000 of them
-idle at the level of `Transition_none_static` (0.00024 ms in the transition systems and a
-0.014 ms frame, against 0.30 ms and 0.368 ms when every instance was a node), and while the
-prefab's `Rgb` runs the walk visits the prefab alone (`material_visited` 1). The resolver returns
-from a packet without records in 1.5 ns.
+### Materials and hierarchy fades
 
-The caster cases, from a release build on the same machine, are the medians of 5 runs
-alternated with a build without the range math, on a busy machine (about 10% noise). The
-range math is the `transitions_ms` of `casters_move_1000_shadows` minus that of
-`casters_move_1000_no_shadows`. Plain products for single matrices, sines of fixed axes, three
-row regions and the per term bounds took it from 0.12 ms (21% of the frame) to 0.045 ms (10%).
-With the caster check, 1000 boxes with `NoShadow` pay only that check (a 0.35 ms frame, 0.41
-ms without it).
+Mesh material transitions patch table records; 2D shapes and glyphs patch inline
+shading in dynamic-material batches. Encoders are shared with normal extraction,
+so completed transitions produce the same bytes as static targets. Hierarchical
+tints send the chains between nodes in order; opacity uses the same traversal.
+Neither requires dividing out a target value, so zero opacity works.
 
-| Case (`Transition_`)            | Frame (ms) | `transitions_ms` | No range math (ms) |
-|---------------------------------|-----------:|-----------------:|-------------------:|
-| `casters_move_1000_shadows`     |      0.446 |            0.158 |              0.445 |
-| `casters_move_1000_no_shadows`  |      0.342 |            0.113 |              0.347 |
-| `casters_turn_1000_shadows`     |      0.595 |            0.229 |              0.566 |
-| `casters_parent_1000_shadows`   |      0.213 |            0.055 |              0.271 |
-| `shadeless_move_1000_shadows`   |      0.319 |            0.122 |                  - |
+Box shadows have separate slots. A `BoxShadow` transition patches the whole shadow
+transform and shading; combined transforms and fades are resolved in that same
+record so they remain aligned with the shape.
 
-## Tests
+## Cost and verification
 
-- `test/cpu/core` (`Transition`): the component, its validation and the timing functions.
-- `test/cpu/render` (`Transition`, `TransitionMaterial`, `TransitionTintOpacity`,
-  `TransitionShadow`, `TransitionBoxShadow`): the records of the game thread and the values of
-  the resolver with the null backend, the shadow regions of moving casters, interrupted and
-  nested, and the shadow slots a `BoxShadow` transition patches, compared with static worlds.
-- `test/gpu/render`: the rendered transforms, materials, tints and opacity on a GPU, the box
-  shadows that follow them and the transitions of `BoxShadow` itself (`TransitionBoxShadow`), and
-  in
-  `ShadowCache` (`transition_*`) that a caster that transitions renders the tile of its light
-  only, also on the frame it ends in, and the tiles of the other lights stay cached.
-- `test/integration/visual/transitions_*.flecs`: renders frozen in the middle of a transition,
-  compared with their baselines: a transform transition with children
-  (`transitions_transform`), a shadow caster mid move (`transitions_shadow`), material color and
-  emissive transitions with a delayed one and a prefab (`transitions_material`), tint and opacity
-  on parents with children (`transitions_tint_opacity`) and a 2D shape, a shadowed card, a card
-  frozen mid hover lift and UI elements (`transitions_2d_ui`). A scene cannot change a value after its first frame by itself, and the
-  first value never animates, so each changes its values with `SetAt` (`box.app`) at frame 1,
-  at the start of the second frame: an entity with `SetAt: {frame: 1, entity: ball}` and the
-  new values, which it copies to `ball` then. `SetAt` is written first in each body: written
-  after a component that another adds with `With` and that holds its constructed value
-  (`Position: {0, 0, 0}` before `Rotation`), `SetAt` cannot tell it was written, does not copy
-  it and logs a warning. The harness runs three frames at the fixed delta of
-  1/60 s, and every transition is linear over 0.05 s, so the rendered frame is one frame, a third
-  of the way, into every transition, at a world time of 3/60 s. No scene reads the wall clock.
-- `test/integration/e2e/transitions.py`: through the shell of `apps/boxrun`, a `set` of
-  `Position` or `Rgb` is returned by `get` in the next command, while a `capture` of the same
-  frames shows the square in between, and the target after the transition. The app runs capped
-  at 60 fps (`--fps 60`), since uncapped a headless app runs past a transition of 1 s between
-  two commands.
-- `test/integration/web/transitions.mjs`: the browser build, which renders on the main thread,
-  with a scene that moves, recolors, fades and lights at once; the square passes in between and
-  ends at its target, with no error.
+Entities without `Transition` have no per-entity transition work or extra GPU fields.
+An unused extract query matches no tables, and an empty resolver returns after
+checking counts. Idle nodes compare their listed components each frame. Instances
+inheriting a map but owning none of its values are skipped per table.
+
+Active nodes add records, uploads and patches. Transform and fade transitions walk
+affected descendants; material transitions visit affected owners and `IsA` instances,
+skipping tables that need no patch. Work grows with the affected slots and glyphs.
+No shader transition logic is added.
+
+Run `bake3 run --cfg release bench/render --local-env -- Transition` to compare
+unused, idle, active, prefab and shadow-caster cases. Historical release measurements
+on an arm64 Linux VM put 1,000 idle nodes at about 0.053 ms of extract time and
+1,000 active nodes at 0.198 ms; these are workload-specific, not GPU timings.
+
+Tests cover validation/easing in `test/cpu/core`, packet/resolver behavior in
+`test/cpu/render`, and pixels/shadow caching in `test/gpu/render`.
+The `transitions_*.flecs` visual scenes, end-to-end `transitions.py` and browser
+`transitions.mjs` exercise the same behavior through apps. Visual examples use
+`SetAt` to change values after the first frame; declare `SetAt` before the values
+it copies so implicitly constructed components are distinguished from authored ones.

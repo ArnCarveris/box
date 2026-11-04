@@ -38,14 +38,12 @@ sides in the target's geometry coordinates. `Stretch` is the default.
 The resulting uniform ratio applies to selected axes only; unselected axes keep
 their authored dimensions.
 
-Fit compares lengths along corresponding object axes, including inherited scale.
-Rotating a target does not turn its X dimension into its Z dimension. Parent
-rotation under nonuniform scale is accounted for through transformed axis lengths.
-Fit changes geometry size without changing the authored transform scale. Built-in
-Box geometry already uses a shared unit mesh with dimension parameters; Fit writes
-those resolved dimensions to that same geometry representation. Other registered
-shapes use their actual mesh or procedural surface bounds and geometry instance
-scale. Fit requires geometry on the fitted entity. A target may also be a group.
+Fit compares corresponding object axes, including inherited scale and transformed
+axis lengths under nonuniform parent scale. Target rotation does not exchange its
+X and Z dimensions. It changes resolved geometry size, preserving authored scale.
+The fitted entity needs geometry; the target may be a group. Box uses its shared
+unit mesh and resolved dimensions; other shapes use their mesh/procedural bounds
+and geometry instance scale.
 
 ## Align
 
@@ -65,33 +63,11 @@ Each bounding-box coordinate defaults to `Center`. `Keep`, the default rotation
 mode, preserves authored orientation. `Match` matches anchor orientation. The
 oriented faces are `Front` (+Z), `Back` (-Z), `Top` (+Y), `Bottom` (-Y), `Right`
 (+X), and `Left` (-X). They can be supplied directly or as `{face: Front}`.
-Matched faces point toward each other. For example:
-
-```flecs
-wall {
-    Box: {8, 3, 0.3}
-    Rotation: {0, 0.5235988, 0}
-}
-window {
-    Box: {2, 1.5, 0.1}
-    Align: {
-        target: wall,
-        self: Back,
-        other: Front,
-        rotation: Match,
-        offset: {0, 0, 0.05},
-        rotation_offset: {0, 0, 1.5707963}
-    }
-}
-```
-
-All rotations use Box's existing radians and Y-X-Z Euler convention. The example
-uses a 30-degree wall rotation and a 90-degree rotation around the attachment
-normal. Rotation offsets are applied in the matched target frame; in `Keep` mode
-they are applied after the authored orientation. Offsets use the target anchor's
-orthonormal frame: X is its tangent, Y its up direction, Z its outward normal.
-Their magnitudes are world lengths, so a gap stays constant under scaling.
-Nonuniform scales use the inverse transpose for surface normals.
+Matched faces point toward each other. Rotations use radians and Y-X-Z Euler
+order. `rotation_offset` applies in the matched target frame, or after authored
+orientation in `Keep` mode. Offsets use the target anchor's orthonormal frame:
+X tangent, Y up, Z outward normal. They are world lengths, so gaps stay constant
+under scaling. Surface normals use the inverse transpose for nonuniform scales.
 
 Named frames are direct child entities with `AttachmentFrame`:
 
@@ -184,14 +160,11 @@ Applications should edit authored components, rather than computed components.
 An existing application-owned `ManualTransform` or `SurfaceAttachment` cannot
 also be driven by spatial placement.
 
-Evaluation follows a directed dependency graph with separate geometry-bounds, orientation,
-pose, and distribution steps. Each step is evaluated once per pass. Results are kept between
-frames: a frame only solves and publishes again the entities whose inputs changed (layout
-rules, transforms, geometry, parents, prefabs, names) and the entities that depend on them,
-and only arrays that contain a change sync their instances. Entities that follow a
-`DynamicTransform` are solved every frame, so direct dynamic-transform writes are picked up.
-A frame in which nothing changed does no layout work. Unchanged results do not emit change
-events. Scenes without spatial rules skip array processing.
+A directed dependency graph evaluates bounds, orientation, pose and distribution
+once per pass. Only changed inputs and their dependents solve again; only changed
+arrays synchronize instances. Changes include rules, transforms, geometry, parents,
+prefabs and names. DynamicTransform dependencies solve every frame. Unchanged
+results emit no change events, and unchanged frames do no layout work.
 
 An entity with geometry uses its own shape as its reference bounds, excluding
 children. An entity without geometry aggregates its children. This prevents
@@ -208,5 +181,4 @@ restore authored output, and diagnostics clear after the cause is corrected.
 Independent layouts continue to resolve.
 
 The C component corresponding to script `box.spatial.Align` is `SpatialAlign`,
-which avoids a collision with the existing UI `Align` enum. Existing scripts
-that do not use spatial rules keep their existing behavior.
+which avoids a collision with the existing UI `Align` enum.
