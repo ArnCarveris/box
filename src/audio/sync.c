@@ -11,6 +11,9 @@
 #include "module.h"
 #include <math.h>
 
+_Static_assert(sizeof(box_audio_cmd_synth_t) <= BOX_AUDIO_COMMAND_RESERVE,
+    "the reserve of a command batch holds a synth patch");
+
 bool box_audio_reserve(
     box_audio_module_t *state)
 {

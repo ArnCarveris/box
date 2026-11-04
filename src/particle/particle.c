@@ -123,7 +123,6 @@ void BoxParticleImport(
     ecs_set_hooks(world, ParticleCollision, { .ctor = box_particle_collision_ctor });
     ECS_META_COMPONENT(world, ParticleEmitter);
     ecs_set_hooks(world, ParticleEmitter, { .ctor = box_particle_emitter_ctor });
-    ecs_add_pair(world, ecs_id(ParticleEmitter), EcsWith, ecs_id(Position));
     ECS_META_COMPONENT(world, PlaybackState);
     ECS_META_COMPONENT(world, ParticlePlayback);
     ECS_META_COMPONENT(world, ParticleBurst);

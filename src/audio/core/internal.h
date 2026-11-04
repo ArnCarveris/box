@@ -19,6 +19,15 @@
  * find a part for each of its layers is ignored */
 #define BOX_AUDIO_SYNTH_PARTS (BOX_AUDIO_VOICE_SLOTS * 4)
 
+/** Lowest frequency of an oscillator in Hz */
+#define BOX_AUDIO_SYNTH_FREQUENCY_MIN 1.0f
+
+/** Lowest cutoff in Hz */
+#define BOX_AUDIO_SYNTH_CUTOFF_MIN 10.0f
+
+/** Highest frequency or cutoff a patch keeps in Hz, before the clamp to the rate */
+#define BOX_AUDIO_SYNTH_HZ_MAX 1000000.0f
+
 /** Smallest magnitude a sample keeps; smaller ones are flushed to 0, so no denormal forms */
 #define BOX_AUDIO_TINY 1e-30f
 
@@ -201,7 +210,28 @@ typedef struct box_audio_synth_osc_t {
                            * against the frequency; ring: depth */
     float feedback;       /**< Turns of its phase per unit of its own output */
     float fb1, fb2;       /**< Its last two outputs, for the feedback */
+    double width;         /**< Square: share of the period it is high */
+    double width_base;    /**< Square: the pulse width of its layer, without the LFOs */
+    double width_step;    /**< Change of width per frame from the LFOs */
+    double vibrato;       /**< Factor of inc from the LFOs, 1 without */
+    double vibrato_step;  /**< Change of vibrato per frame */
+    float tremolo;        /**< Factor of its level from the LFOs, 1 without */
+    float tremolo_step;   /**< Change of tremolo per frame */
 } box_audio_synth_osc_t;
+
+/** An LFO of a synth voice, advanced per control block of BOX_AUDIO_SYNTH_CONTROL frames */
+typedef struct box_audio_synth_mod_t {
+    int32_t wave;         /**< A box_audio_synth_lfo_wave_t */
+    double phase;         /**< Phase in turns, 0..1 */
+    double inc;           /**< Turns per control block */
+    double start;         /**< Phase at the start of a pass, random per play or fixed */
+    int32_t delay;        /**< Frames left of its delay */
+    float gain;           /**< Level of its fade in, 0..1 */
+    float fade_step;      /**< Change of gain per control block */
+    float value;          /**< Its wave, -1..1, smoothed for the waves that jump */
+    float held;           /**< Value the random wave holds */
+    bool smooth;          /**< Whether its wave jumps and is smoothed */
+} box_audio_synth_mod_t;
 
 /** A stage of the filter of a synth voice: a trapezoidal state variable filter */
 typedef struct box_audio_synth_svf_t {
@@ -210,6 +240,17 @@ typedef struct box_audio_synth_svf_t {
     float ic1, ic2;       /**< State */
 } box_audio_synth_svf_t;
 
+/** The unison voices of a layer of a synth voice: copies of its oscillator, each at its own
+ * phase, at a factor of the turns per frame of the oscillator and with a gain per channel. The
+ * oscillator keeps the sweep and the glide they all follow */
+typedef struct box_audio_synth_unison_t {
+    int32_t voices;       /**< Voices, 1 for a layer without unison, which renders the
+                           * oscillator alone */
+    double phase[BOX_AUDIO_SYNTH_UNISON_MAX];  /**< Phase of each voice in turns, 0..1 */
+    double detune[BOX_AUDIO_SYNTH_UNISON_MAX]; /**< Factor of inc of each voice */
+    float left[BOX_AUDIO_SYNTH_UNISON_MAX];    /**< Gain of each voice on the left channel */
+    float right[BOX_AUDIO_SYNTH_UNISON_MAX];   /**< Gain of each voice on the right channel */
+} box_audio_synth_unison_t;
 /** A pluck string of a synth voice: a Karplus-Strong loop of a delay line, a symmetric lowpass
  * of one frame of delay and a first order allpass of the fraction of a frame left, with a gain
  * that sets its decay */
@@ -237,6 +278,7 @@ typedef struct box_audio_synth_part_t {
     box_audio_synth_layer_t layer;  /**< The layer of the patch, clamped */
     box_audio_synth_osc_t osc;      /**< The oscillator */
     box_audio_synth_env_t env;      /**< Its own envelope, when the layer has one */
+    box_audio_synth_unison_t unison; /**< Its unison voices */
     box_audio_synth_string_t *string; /**< Its string, a BOX_AUDIO_SYNTH_PLUCK layer, or NULL */
 } box_audio_synth_part_t;
 
@@ -261,6 +303,11 @@ typedef struct box_audio_synth_source_t {
     int32_t filter;       /**< A box_audio_synth_filter_t */
     int32_t stages;       /**< Stages of the filter: 1 for 12 dB per octave, 2 for 24 */
     box_audio_synth_svf_t svf[2]; /**< The resonant stage, then the stage before it at 24 dB */
+    box_audio_synth_svf_t svf_r[2]; /**< The stages of the right channel, when stereo */
+    bool unison;          /**< Whether a layer has unison voices, which renders through
+                           * box_audio_synth_render_wide */
+    bool stereo;          /**< Whether a layer with unison voices has width, so the source
+                           * renders a right channel too */
     double cutoff;        /**< Cutoff in Hz */
     double cutoff_base;   /**< Cutoff of the patch, clamped, in Hz */
     double cutoff_top;    /**< Highest cutoff in Hz, under Nyquist */
@@ -269,6 +316,16 @@ typedef struct box_audio_synth_source_t {
     int32_t control;      /**< Frames until the filter takes the cutoff of the envelope */
     int32_t glide_frames; /**< Frames of a glide of the patch, 0 when a pitch jumps */
     int32_t glide_left;   /**< Frames left of the glide that runs, 0 for none */
+    int32_t lfos;         /**< LFOs that run, 0 without, which renders as before */
+    box_audio_synth_lfo_t lfo_patch[BOX_AUDIO_SYNTH_LFOS]; /**< The LFOs of the patch */
+    box_audio_synth_mod_t lfo[BOX_AUDIO_SYNTH_LFOS]; /**< The LFOs */
+    uint32_t lfo_rng;     /**< State of the random phases and waves of the LFOs, never 0 */
+    float lfo_smooth;     /**< Share of the way a jumping wave moves per control block */
+    int32_t lfo_control;  /**< Frames until the next control block of the LFOs */
+    bool lfo_cutoff;      /**< Whether an LFO moves the cutoff */
+    double lfo_octaves;   /**< Octaves the LFOs move the cutoff by, 0 without */
+    float tremolo;        /**< Factor of the output from the LFOs of every layer, 1 without */
+    float tremolo_step;   /**< Change of tremolo per frame */
     int32_t strings;      /**< Pluck layers, each with a string, 0 for none */
     int32_t ringing;      /**< Strings that are still over the silence */
     int32_t ringing_free; /**< Strings of layers without an envelope still over the silence */
@@ -553,7 +610,8 @@ void box_audio_source_synth(
     float pitch,
     bool loop);
 
-/** Render a block of a synth source into core->src_l.
+/** Render a block of a synth source into core->src_l, and core->src_r when it is stereo
+ * (box_audio_synth_source_t.stereo).
  *
  * @param core The core
  * @param src The source
