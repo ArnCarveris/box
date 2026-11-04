@@ -318,8 +318,10 @@ bool box_audio_delay_render(
 
 void box_audio_delay_rest(
     box_audio_core_t *core,
-    box_audio_effect_t *fx)
+    box_audio_effect_t *fx,
+    int32_t frames)
 {
+    (void)frames;
     box_audio_delay_t *dl = &fx->data.delay;
     if (dl->crossfade || dl->pending != dl->to.time) {
         box_audio_delay_settle(core, dl);

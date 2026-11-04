@@ -385,7 +385,9 @@ typedef enum box_audio_effect_kind_t {
                                    *   the key bus of its command */
     BOX_AUDIO_EFFECT_GATE = 5,    /**< A gate, box_audio_gate_params_t */
     BOX_AUDIO_EFFECT_DELAY = 6,   /**< A delay, box_audio_delay_params_t */
-    BOX_AUDIO_EFFECT_KINDS = 7    /**< Number of kinds, NONE included */
+    BOX_AUDIO_EFFECT_PHASER = 7,  /**< A phaser, box_audio_phaser_params_t */
+    BOX_AUDIO_EFFECT_CHORUS = 8,  /**< A chorus, box_audio_chorus_params_t */
+    BOX_AUDIO_EFFECT_KINDS = 9    /**< Number of kinds, NONE included */
 } box_audio_effect_kind_t;
 
 /** The parameters of a reverb, the first floats of the params of its effect command */
@@ -561,6 +563,78 @@ typedef struct box_audio_delay_params_t {
                        *   the input into the left; 0 keeps each channel to itself */
     float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
 } box_audio_delay_params_t;
+
+/** Fastest LFO of a phaser or a chorus in Hz */
+#define BOX_AUDIO_MODULATION_RATE_MAX 20.0f
+
+/** Seconds of a change of the depth, the center, the feedback, the mix or the stereo offset of
+ * a phaser, of the depth, the delay, the mix or the spread of a chorus, and of each half of the
+ * fade of the wet signal around a change of the stages of a phaser or the voices of a chorus */
+#define BOX_AUDIO_MODULATION_RAMP 0.02f
+
+/** Frames between two updates of the coefficients of a phaser and of the read positions of a
+ * chorus, which a chorus moves to linearly frame by frame */
+#define BOX_AUDIO_MODULATION_CONTROL 8
+
+/** Fewest and most allpass stages of a phaser; the count is even */
+#define BOX_AUDIO_PHASER_STAGES_MIN 2
+#define BOX_AUDIO_PHASER_STAGES_MAX 12
+
+/** Lowest and highest center of a phaser in Hz; a swept frequency stays within 10 Hz and 0.45
+ * of the rate */
+#define BOX_AUDIO_PHASER_CENTER_MIN 20.0f
+#define BOX_AUDIO_PHASER_CENTER_MAX 20000.0f
+
+/** Octaves a phaser sweeps either way of its center at a depth of 1 */
+#define BOX_AUDIO_PHASER_OCTAVES 2.0f
+
+/** Largest feedback of a phaser, either way */
+#define BOX_AUDIO_PHASER_FEEDBACK_MAX 0.9f
+
+/** The parameters of a phaser, the first floats of the params of its effect command: a chain
+ * of first order allpasses per channel whose break frequency a sine LFO sweeps exponentially
+ * around the center, the output of the chain fed back into its input and mixed with the dry
+ * signal. Stages allpasses give stages / 2 notches. The LFO starts at phase 0 when the effect
+ * is put on and its phase stays continuous through a change of the rate */
+typedef struct box_audio_phaser_params_t {
+    float stages;     /**< Allpasses per channel, BOX_AUDIO_PHASER_STAGES_MIN..MAX, rounded to
+                       *   an even count */
+    float rate;       /**< Hz of the LFO, 0..BOX_AUDIO_MODULATION_RATE_MAX */
+    float depth;      /**< 0..1: the sweep reaches BOX_AUDIO_PHASER_OCTAVES times depth octaves
+                       *   either way of the center */
+    float center;     /**< Break frequency of the allpasses at the middle of the sweep in Hz,
+                       *   BOX_AUDIO_PHASER_CENTER_MIN..MAX */
+    float feedback;   /**< Share of the output of the chain fed back into its input,
+                       *   -BOX_AUDIO_PHASER_FEEDBACK_MAX..BOX_AUDIO_PHASER_FEEDBACK_MAX */
+    float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix. 0.5 gives the
+                       *   deepest notches */
+    float stereo;     /**< Phase offset of the LFO of the right channel in half turns, 0..1 */
+} box_audio_phaser_params_t;
+
+/** Most voices of a chorus */
+#define BOX_AUDIO_CHORUS_VOICES_MAX 4
+
+/** Longest read of a chorus in milliseconds, which sizes its memory */
+#define BOX_AUDIO_CHORUS_MAX 50.0f
+
+/** Largest depth of a chorus in milliseconds */
+#define BOX_AUDIO_CHORUS_DEPTH_MAX 25.0f
+
+/** The parameters of a chorus, the first floats of the params of its effect command: voices
+ * taps of a stereo line on the memory of its slot, each read with linear interpolation at
+ * delay plus depth times a sine LFO, the LFOs of the voices spread evenly in phase and the
+ * voices panned across the stereo field by the spread. A read never goes further back than
+ * BOX_AUDIO_CHORUS_MAX nor nearer than a frame. The LFO starts at phase 0 when the effect is
+ * put on and its phase stays continuous through a change of the rate */
+typedef struct box_audio_chorus_params_t {
+    float voices;     /**< Taps, 1..BOX_AUDIO_CHORUS_VOICES_MAX, rounded */
+    float rate;       /**< Hz of the LFOs, 0..BOX_AUDIO_MODULATION_RATE_MAX */
+    float depth;      /**< Milliseconds the taps move either way, 0..BOX_AUDIO_CHORUS_DEPTH_MAX */
+    float delay;      /**< Milliseconds of the taps at the middle, 0..BOX_AUDIO_CHORUS_MAX */
+    float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+    float spread;     /**< 0 keeps every voice in the center, so a mono input stays mono; 1 pans
+                       *   the first voice left and the last right */
+} box_audio_chorus_params_t;
 
 /** Put an effect into an insert slot of a bus, change its parameters, move it or take it off.
  *
@@ -990,7 +1064,8 @@ int32_t box_audio_core_effect_meters(
 
 /** Get the floats of memory an effect of a kind needs at a sample rate; for the reverb its
  * delay lines at the largest size and its longest predelay, for the delay
- * BOX_AUDIO_DELAY_MAX seconds of both channels.
+ * BOX_AUDIO_DELAY_MAX seconds of both channels, for the chorus BOX_AUDIO_CHORUS_MAX
+ * milliseconds of both channels.
  *
  * @param kind A box_audio_effect_kind_t
  * @param sample_rate Frames per second of the core

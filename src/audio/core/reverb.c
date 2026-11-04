@@ -483,8 +483,10 @@ bool box_audio_reverb_render(
 
 void box_audio_reverb_rest(
     box_audio_core_t *core,
-    box_audio_effect_t *fx)
+    box_audio_effect_t *fx,
+    int32_t frames)
 {
+    (void)frames;
     box_audio_reverb_t *rv = &fx->data.reverb;
     if (rv->swap) {
         box_audio_reverb_apply(core, fx);

@@ -4,7 +4,8 @@
  * their slots of the pool of the core, their memory and their commands.
  *
  * An effect entity is any entity with an effect component: Reverb, Equalizer, AudioFilter,
- * Compressor, Gate or Delay, the first of them in that order when it has several. A compressor
+ * Compressor, Gate, Delay, Phaser or Chorus, the first of them in that order when it has
+ * several. A compressor
  * gets the key bus that the order compile accepted for its insert slot.
  *
  * The module sends an EFFECT command when the kind, the channel, the slot or a parameter of an
@@ -81,6 +82,8 @@ uint32_t box_audio_module_effect_kind(
     const Compressor *comp = NULL;
     const Gate *gate = NULL;
     const Delay *delay = NULL;
+    const Phaser *phaser = NULL;
+    const Chorus *chorus = NULL;
     uint32_t result = BOX_AUDIO_EFFECT_NONE;
     int32_t i;
     for (i = 0; params && i < BOX_AUDIO_EFFECT_PARAMS; i ++) {
@@ -171,6 +174,37 @@ uint32_t box_audio_module_effect_kind(
             params[2] = delay->damping;
             params[3] = delay->ping_pong ? 1.0f : 0.0f;
             params[4] = delay->mix;
+        }
+
+        goto done;
+    }
+
+    phaser = ecs_get(world, e, Phaser);
+    if (phaser) {
+        result = BOX_AUDIO_EFFECT_PHASER;
+        if (params) {
+            params[0] = (float)phaser->stages;
+            params[1] = phaser->rate;
+            params[2] = phaser->depth;
+            params[3] = phaser->center;
+            params[4] = phaser->feedback;
+            params[5] = phaser->mix;
+            params[6] = phaser->stereo;
+        }
+
+        goto done;
+    }
+
+    chorus = ecs_get(world, e, Chorus);
+    if (chorus) {
+        result = BOX_AUDIO_EFFECT_CHORUS;
+        if (params) {
+            params[0] = (float)chorus->voices;
+            params[1] = chorus->rate;
+            params[2] = chorus->depth;
+            params[3] = chorus->delay;
+            params[4] = chorus->mix;
+            params[5] = chorus->spread;
         }
     }
 

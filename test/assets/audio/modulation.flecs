@@ -1,0 +1,14 @@
+// A phaser and a chorus, for the Modulation suite of test/cpu/audio: a phaser of 6 stages with
+// feedback in the first insert slot of the bus keys, and a chorus of 3 voices spread across the
+// stereo field in the first insert slot of the bus pad.
+using box.audio
+
+keys {
+  AudioBus: {output: master, effects: [keys]}
+  Phaser: {stages: 6, rate: 0.3, feedback: 0.5}
+}
+
+pad {
+  AudioBus: {output: master, effects: [pad]}
+  Chorus: {voices: 3, spread: 1, mix: 0.4}
+}

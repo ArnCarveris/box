@@ -213,6 +213,48 @@ static void box_audio_delay_ctor(
     }
 }
 
+/** Construct Phaser values: 4 stages swept at 0.5 Hz by a depth of 0.7 around 800 Hz,
+ * without feedback, at a mix of 0.5 and the right channel half a half turn later.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_phaser_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Phaser *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Phaser){ .stages = 4, .rate = 0.5f, .depth = 0.7f, .center = 800.0f,
+            .feedback = 0, .mix = 0.5f, .stereo = 0.5f };
+    }
+}
+
+/** Construct Chorus values: 2 voices at 0.8 Hz, 12 ms moved by 3 ms, a mix of 0.5 and a
+ * spread of 0.5.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_chorus_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Chorus *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Chorus){ .voices = 2, .rate = 0.8f, .depth = 3.0f, .delay = 12.0f,
+            .mix = 0.5f, .spread = 0.5f };
+    }
+}
+
 /** Construct Gate values: -50 dB, an attack of 1 ms, a hold of 50 ms, a release of 100 ms
  * and a range of -80 dB.
  *
@@ -1081,6 +1123,10 @@ void BoxAudioImport(
     ecs_set_hooks(world, Gate, { .ctor = box_audio_gate_ctor });
     ECS_META_COMPONENT(world, Delay);
     ecs_set_hooks(world, Delay, { .ctor = box_audio_delay_ctor });
+    ECS_META_COMPONENT(world, Phaser);
+    ecs_set_hooks(world, Phaser, { .ctor = box_audio_phaser_ctor });
+    ECS_META_COMPONENT(world, Chorus);
+    ecs_set_hooks(world, Chorus, { .ctor = box_audio_chorus_ctor });
     ECS_META_COMPONENT(world, SynthFilterEnvelope);
     ECS_META_COMPONENT(world, SynthGlide);
     ECS_META_COMPONENT(world, SynthLfoWave);
@@ -1134,6 +1180,8 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(Compressor), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(Gate), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(Delay), EcsWith, ecs_id(AudioEffectState));
+    ecs_add_pair(world, ecs_id(Phaser), EcsWith, ecs_id(AudioEffectState));
+    ecs_add_pair(world, ecs_id(Chorus), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(SoundFile), EcsWith, ecs_id(AudioSample));
     ecs_add_pair(world, ecs_id(AudioStream), EcsWith, ecs_id(AudioMusic));
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSoundId));

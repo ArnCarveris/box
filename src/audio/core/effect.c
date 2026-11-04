@@ -56,6 +56,21 @@ static const box_audio_effect_def_t box_audio_effect_kinds[BOX_AUDIO_EFFECT_KIND
         .command = box_audio_delay_command,
         .render = box_audio_delay_render,
         .rest = box_audio_delay_rest
+    },
+    [BOX_AUDIO_EFFECT_PHASER] = {
+        .tail = true,
+        .start = box_audio_phaser_start,
+        .command = box_audio_phaser_command,
+        .render = box_audio_phaser_render,
+        .rest = box_audio_phaser_rest
+    },
+    [BOX_AUDIO_EFFECT_CHORUS] = {
+        .tail = true,
+        .floats = box_audio_chorus_floats,
+        .start = box_audio_chorus_start,
+        .command = box_audio_chorus_command,
+        .render = box_audio_chorus_render,
+        .rest = box_audio_chorus_rest
     }
 };
 
@@ -400,7 +415,7 @@ static void box_audio_effect_run(
 
     blend = fx->blend.left > 0 || fx->blend.value != 1.0f;
     if (fx->idle && silent) {
-        k->rest(core, fx);
+        k->rest(core, fx, frames);
         box_audio_ramp_skip(&fx->blend, frames);
     } else {
         fx->idle = false;

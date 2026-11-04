@@ -24,8 +24,8 @@ core**, a small mixer in plain C that renders on its own thread, once per frame 
   pan, a stereo width, a mute, a solo, a kind (group, return or SFX), an output and up to 4
   sends, pre or post fader. Bus 0 is the master, `box.audio.master` in script; every other bus
   ends there. Each bus has 4 insert slots that run **effects**, entities such as a `Reverb`,
-  an `Equalizer`, an `AudioFilter`, a `Compressor`, a `Gate` or a `Delay`, in order on its
-  signal; a bus with a reverb or a delay in a slot is a return, which other buses reach through
+  an `Equalizer`, an `AudioFilter`, a `Compressor`, a `Gate`, a `Delay`, a `Phaser` or a
+  `Chorus`, in order on its signal; a bus with a reverb or a delay in a slot is a return, which other buses reach through
   a send. A compressor may key on another bus, to duck one channel under another, and a delay
   may follow the tempo of the `Transport`.
 - **Space**: a source with `AudioSpatial` gets its volume and pan every frame from its distance
@@ -48,6 +48,8 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 | `Compressor` | An effect: a compressor with a soft knee, keyed on its own input or on another channel (`sidechain`) to duck music under dialog or explosions, see [Compressor](#compressor) |
 | `Gate` | An effect: a gate with a hold, a range and hysteresis, see [Gate](#gate) |
 | `Delay` | An effect: echoes with feedback, damping and ping pong, in seconds or synced to the tempo in beats, such as a dotted eighth on a return, see [Delay](#delay) |
+| `Phaser` | An effect: allpass stages swept by a stereo LFO, with feedback, for moving notches on keys or a pad, see [Phaser](#phaser) |
+| `Chorus` | An effect: up to 4 modulated delay taps spread across the stereo field, to thicken and widen a pad or a guitar, see [Chorus](#chorus) |
 | `AudioOutput` | The bus a source, a stream or a sound plays on (the master without one) |
 | `AudioPcm` | A sound from samples, from script or C |
 | `SoundFile` | A short sound from a WAV or FLAC file, decoded into memory, see [Sound files](#sound-files) |
@@ -244,12 +246,16 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
 - **Space**: distance and pan only. No Doppler, no distance filter, no occlusion, no HRTF, and
   front and back sound alike.
 - **Effects**: `BOX_AUDIO_EFFECT_MAX` (64) effects at once in all channels together, 4 insert
-  slots per channel, and six kinds: an algorithmic reverb, an equalizer of 4 bands, a filter, a
-  compressor, a gate and a delay; one more effect logs one error and does nothing. No reverb
-  zones and no rooms from geometry. A delay is at most 4 seconds (`BOX_AUDIO_DELAY_MAX`), with
-  one read position per channel (no multitap), no modulation of its time (no chorus or tape
-  wow) and a lowpass in its feedback but no highpass; its sync is a number of beats, not a grid,
-  and a tempo ramp is a series of crossfades, one per frame of a change. An equalizer has 4 bands of 12 dB per octave at most (no
+  slots per channel, and eight kinds: an algorithmic reverb, an equalizer of 4 bands, a filter,
+  a compressor, a gate, a delay, a phaser and a chorus; one more effect logs one error and does
+  nothing. No reverb zones and no rooms from geometry. A delay is at most 4 seconds
+  (`BOX_AUDIO_DELAY_MAX`), with one read position per channel (no multitap), no modulation of
+  its time (the chorus is the modulated delay) and a lowpass in its feedback but no highpass;
+  its sync is a number of beats, not a grid, and a tempo ramp is a series of crossfades, one per
+  frame of a change. The LFOs of the phaser and the chorus are sines that run free, not synced
+  to the tempo; the phaser has 2 to 12 first order stages that share one break frequency, the
+  chorus up to 4 voices that read at most 50 ms back with linear interpolation, without
+  feedback. An equalizer has 4 bands of 12 dB per octave at most (no
   steeper cuts, no linear phase, no dynamic EQ); a filter is one SVF of 12 or 24 dB, with no
   envelope follower or LFO of its own: a script moves its cutoff. The compressor is a single band
   peak compressor without lookahead, RMS detection or a filter on its key; one channel is its
@@ -579,13 +585,15 @@ its kind.
   place) and `rest` (a block it skips). The kinds are the reverb, `BOX_AUDIO_EFFECT_REVERB`,
   the [equalizer](#equalizer), `BOX_AUDIO_EFFECT_EQ`, the [filter](#filter-effect),
   `BOX_AUDIO_EFFECT_FILTER`, the [compressor](#compressor), `BOX_AUDIO_EFFECT_COMPRESSOR`, the
-  [gate](#gate), `BOX_AUDIO_EFFECT_GATE`, and the [delay](#delay), `BOX_AUDIO_EFFECT_DELAY`; the
-  parameters of a command are 16 floats (`BOX_AUDIO_EFFECT_PARAMS`) that each kind reads in its
+  [gate](#gate), `BOX_AUDIO_EFFECT_GATE`, the [delay](#delay), `BOX_AUDIO_EFFECT_DELAY`, the
+  [phaser](#phaser), `BOX_AUDIO_EFFECT_PHASER`, and the [chorus](#chorus),
+  `BOX_AUDIO_EFFECT_CHORUS`; the parameters of a command are 16 floats (`BOX_AUDIO_EFFECT_PARAMS`) that each kind reads in its
   own way, the reverb its first five (`box_audio_reverb_params_t`), the equalizer all 16 (4
   `box_audio_eq_band_t`), the filter its first five (`box_audio_filter_params_t`), the
   compressor its first seven (`box_audio_compressor_params_t`), the gate its first five
-  (`box_audio_gate_params_t`) and the delay its first five (`box_audio_delay_params_t`). The
-  core clamps them, a NaN to the low end.
+  (`box_audio_gate_params_t`), the delay its first five (`box_audio_delay_params_t`), the
+  phaser its first seven (`box_audio_phaser_params_t`) and the chorus its first six
+  (`box_audio_chorus_params_t`). The core clamps them, a NaN to the low end.
 - **Key.** The `key` of the command is a sidechain bus, `BOX_AUDIO_BUS_NONE` for none; only the
   compressor reads it. Since the inserts of a bus run in the order of the slots, the order of a
   compressor and an equalizer matters: a compressor before a boost of 12 dB hears the signal
@@ -604,7 +612,7 @@ its kind.
   reverb bus does not cut it.
 - **Memory.** The memory of an effect belongs to the side that runs the core, like sound memory:
   `box_audio_effect_floats(kind, rate)` floats, 0 for a kind that needs none (about 200 KB for
-  a reverb and 1.5 MB for a delay at 48 kHz). `box_audio_core_effect_memory(core, slot, data, floats)` gives a slot its
+  a reverb, 1.5 MB for a delay and 19 KB for a chorus at 48 kHz). `box_audio_core_effect_memory(core, slot, data, floats)` gives a slot its
   memory once, or larger memory for a kind that needs more, on which the effect starts over; the
   render path never allocates. An effect whose kind needs memory runs once its slot has enough,
   another at once. The transports allocate it on the `effect_memory` call of the transport
@@ -622,8 +630,8 @@ its kind.
 
 The tests are the `Effect` suite of `test/cpu/audio` (several reverbs at once, an empty slot,
 the fades of a removal, a move and a disabled effect, the pool of 64, a channel without effects,
-an entity in two slots), the `Equalizer`, `EffectFilter`, `Dynamics` and `Delay` suites and the
-`effects`, `eq_filter`, `dynamics` and `delay` cases of `NoAlloc`.
+an entity in two slots), the `Equalizer`, `EffectFilter`, `Dynamics`, `Delay` and `Modulation`
+suites and the `effects`, `eq_filter`, `dynamics`, `delay` and `modulation` cases of `NoAlloc`.
 
 ## Reverb
 
@@ -935,6 +943,126 @@ fractional, the repeats at the feedback and darker with damping, ping pong, a sy
 that crossfades without a glide, the clamp of the time, a tail that stops when silent, a mix of
 0 that is dry, render sizes, the component and `test/assets/audio/delay.flecs`; and the
 `delay` case of `NoAlloc`.
+
+## Phaser
+
+`src/audio/core/phaser.c` is the phaser kind of effect, `BOX_AUDIO_EFFECT_PHASER`: a chain of
+first order allpasses per channel whose break frequency a sine LFO sweeps, mixed with the dry
+signal. Its parameters are a `box_audio_phaser_params_t` of `stages`, `rate`, `depth`, `center`,
+`feedback`, `mix` and `stereo`; the component is `Phaser`. It needs no memory.
+
+- **Notches.** Each allpass passes every frequency at unity gain and turns its phase from 0 at
+  DC to half a turn at Nyquist, a quarter turn at its break frequency. A chain of `stages` turns
+  it by up to `stages` half turns, so mixed with the dry signal it cancels wherever the phase is
+  an odd number of half turns: `stages / 2` notches, the deepest at a mix of 0.5. Every stage of
+  a channel shares one break frequency.
+- **Sweep.** The break frequency is `center * 2^(2 * depth * sin(phase))`: exponential, up to
+  two octaves either way of the center at a depth of 1 (`BOX_AUDIO_PHASER_OCTAVES`), and kept
+  within 10 Hz and 0.45 of the rate. The coefficients follow the LFO every 8 frames
+  (`BOX_AUDIO_MODULATION_CONTROL`). The right channel runs the LFO `stereo` half turns later:
+  0 moves both channels together, 0.5 (the default) a quarter of a period apart, 1 opposite.
+- **Feedback.** The output of the chain of the frame before goes back into its input at
+  `feedback`, which sharpens the peaks between the notches (positive) or moves them (negative).
+  Since the allpasses have unity gain, a feedback of at most 0.9 (`BOX_AUDIO_PHASER_FEEDBACK_MAX`)
+  keeps the loop stable at any sweep; the peaks rise by up to `1 / (1 - |feedback|)`, 20 dB at
+  0.9.
+- **Ranges.** `stages` 2..12, rounded to an even count, `rate` 0..20 Hz
+  (`BOX_AUDIO_MODULATION_RATE_MAX`), `depth` 0..1, `center` 20..20000 Hz, `feedback` -0.9..0.9,
+  `mix` and `stereo` 0..1, a NaN to the low end. At a mix of 0 it passes its input bit for bit.
+  The defaults of the component are 4 stages, 0.5 Hz, a depth of 0.7, 800 Hz, no feedback, a mix
+  of 0.5 and a stereo offset of 0.5.
+- **The LFO.** It starts at phase 0 when the phaser is put on a bus and advances per frame by a
+  fixed point step, so the output is deterministic and bit identical whatever the render sizes.
+  A change of `rate` changes the step and keeps the phase, so the sweep does not jump. `depth`,
+  `center` (in octaves), `feedback`, `mix` and `stereo` ramp over 20 ms
+  (`BOX_AUDIO_MODULATION_RAMP`); a change of `stages` fades the phased signal out over 20 ms,
+  applies the stages on clear allpasses and fades it back in.
+- **Silence costs nothing.** The phaser has a tail and follows the silence rule of the effects:
+  once its input is silent and its allpasses and feedback hold less than -140 dB, it clears
+  them and stops. Its LFO runs on while it is stopped, so it comes back at the phase it would
+  have had.
+- **Cost.** Per frame and channel `stages` multiply-adds of two products and a mix; every 8
+  frames two sines of the LFO and, per channel, an exponential and a tangent.
+
+A slow phaser of 6 stages with feedback on an electric piano:
+
+```
+using box.audio
+
+keys {
+  AudioBus: {output: master, effects: [keys]}
+  Phaser: {stages: 6, rate: 0.3, depth: 0.8, center: 600, feedback: 0.5}
+}
+```
+
+Fewer stages give a gentle sweep of one or two notches; 8 to 12 a denser, more vocal one. A
+`rate` of 0.1 to 0.5 Hz suits pads and keys, 2 to 6 Hz a fast swirl.
+
+The tests are the `Modulation` suite of `test/cpu/audio`: the first notch of white noise in
+windows of 85 ms that follows the sweep at the rate on both channels, a quarter of a period
+apart, the count of notches for every stage count, stability at full feedback either way,
+rate changes without a click, a dry mix, the silence rule, bit identical renders, the components
+and `test/assets/audio/modulation.flecs`; and the `modulation` case of `NoAlloc`.
+
+## Chorus
+
+`src/audio/core/chorus.c` is the chorus kind of effect, `BOX_AUDIO_EFFECT_CHORUS`: a stereo line
+on the memory of its slot read by up to 4 taps, each moved by a sine LFO. Its parameters are a
+`box_audio_chorus_params_t` of `voices`, `rate`, `depth`, `delay`, `mix` and `spread`; the
+component is `Chorus`.
+
+- **Voices.** Each voice reads the line `delay + depth * sin(phase + v / voices)` milliseconds
+  back, so the LFOs of the voices are spread evenly in phase and the taps never move together.
+  The reads use linear interpolation, and each voice plays at `1 / sqrt(voices)`. The changing
+  delay shifts the pitch of a voice a little up and down, which against the dry signal gives the
+  chorus its shimmer.
+- **Spread.** Voice `v` of `n` sits at `spread * (2 v / (n - 1) - 1)`, from left to right: a
+  voice off the center moves the other channel of its tap toward its side, so the sum of both
+  channels stays. At a spread of 0 every voice is in the center and a mono input stays mono, bit
+  for bit; at 1 the first voice is hard left and the last hard right, and the channels
+  decorrelate.
+- **Read positions.** Every 8 frames (`BOX_AUDIO_MODULATION_CONTROL`) the chorus computes where
+  each tap reads at the next control block and moves it there linearly, frame by frame. A read
+  never goes further back than 50 ms (`BOX_AUDIO_CHORUS_MAX`, which sizes the memory) nor nearer
+  than a frame.
+- **Ranges.** `voices` 1..4, rounded, `rate` 0..20 Hz, `depth` 0..25 ms
+  (`BOX_AUDIO_CHORUS_DEPTH_MAX`), `delay` 0..50 ms, `mix` and `spread` 0..1, a NaN to the low
+  end. At a mix of 0 it passes its input bit for bit. The defaults of the component are 2
+  voices, 0.8 Hz, a depth of 3 ms, a delay of 12 ms, a mix of 0.5 and a spread of 0.5.
+- **The LFOs.** They start at phase 0 when the chorus is put on a bus and advance per frame by a
+  fixed point step, so the output is deterministic and bit identical whatever the render sizes.
+  A change of `rate` keeps the phase. `depth`, `delay`, `mix` and `spread` ramp over 20 ms; a
+  change of `voices` fades the wet signal out over 20 ms, places the taps of the new count and
+  fades it back in.
+- **Silence costs nothing.** The chorus has a tail and follows the silence rule: once its input
+  has been silent for the length of its line it stops; while it is stopped and no signal comes
+  in, a block costs a scan of its input, and its LFOs run on. Like the delay it never clears its
+  memory but reads the frames it did not write since it was silent as silence.
+- **Memory.** `box_audio_effect_floats(BOX_AUDIO_EFFECT_CHORUS, rate)` floats per slot, 50 ms and
+  two frames of both channels (about 19 KB at 48 kHz).
+- **Cost.** Per frame and voice two interpolated reads and four multiply-adds; every 8 frames a
+  sine per voice.
+
+A wide chorus of 3 voices on a pad:
+
+```
+using box.audio
+
+pad {
+  AudioBus: {output: master, effects: [pad]}
+  Chorus: {voices: 3, rate: 0.6, depth: 4, delay: 15, spread: 1, mix: 0.4}
+}
+```
+
+A `delay` of 10 to 25 ms with a `depth` of 2 to 5 ms is a chorus; 1 to 5 ms with a depth of 1 to
+2 ms and a `mix` of 0.5 is closer to a flanger without feedback, and a fast `rate` of 4 to 8 Hz
+with a small depth a vibrato at a `mix` of 1.
+
+The tests are the `Modulation` suite of `test/cpu/audio`: the echo of a click train that stays
+within `delay ± depth` and follows the LFO, for one to four voices, the clamp of the reads, the
+correlation of the channels at a spread of 0, 0.5 and 1, rate changes without a click, a dry mix,
+the silence rule, bit identical renders, the components and
+`test/assets/audio/modulation.flecs`; and the `modulation` case of `NoAlloc`.
 
 ## Synth
 
@@ -2095,6 +2223,8 @@ frame, the same on every platform.
 | `Compressor` | An effect, a compressor in the insert slot of a bus that names its entity: `threshold` (-18 dB, -80..0), `ratio` (4, 1..20), `attack` (0.01 s), `release` (0.15 s), `knee` (6 dB, 0..24), `makeup` (0 dB, 0..24), `mix` (1) and `sidechain` (0 for its own input, or the channel it ducks under); see [Compressor](#compressor) |
 | `Gate` | An effect, a gate in the insert slot of a bus that names its entity: `threshold` (-50 dB, -100..0), `attack` (0.001 s), `hold` (0.05 s, 0..5), `release` (0.1 s) and `range` (-80 dB, -100..0, the gain when closed); see [Gate](#gate) |
 | `Delay` | An effect, a delay in the insert slot of a bus that names its entity: `time` (0.25 s, 0..4), `sync` (0 beats; when positive the time is `sync * 60 / tempo` of the `Transport`), `feedback` (0.35, 0..0.95), `mix` (0.3), `ping_pong` (false) and `damping` (6000 Hz); see [Delay](#delay) |
+| `Phaser` | An effect, a phaser in the insert slot of a bus that names its entity: `stages` (4, 2..12, even), `rate` (0.5 Hz, 0..20), `depth` (0.7, 0..1, up to 2 octaves either way), `center` (800 Hz, 20..20000), `feedback` (0, -0.9..0.9), `mix` (0.5) and `stereo` (0.5, the phase offset of the right LFO in half turns, 0..1); see [Phaser](#phaser) |
+| `Chorus` | An effect, a chorus in the insert slot of a bus that names its entity: `voices` (2, 1..4), `rate` (0.8 Hz, 0..20), `depth` (3 ms, 0..25), `delay` (12 ms, 0..50), `mix` (0.5) and `spread` (0.5, 0..1); see [Chorus](#chorus) |
 | `AudioOutput` | The bus a source, or a sound by default, plays on |
 | `AudioSource` | A sound that plays while the entity exists: `sound`, `volume` (1), `pitch` (1), `loop`, `playing` (true) |
 | `AudioStream` | Music: an Ogg Vorbis file (`path`) that streams, `volume` (1), `loop` (true), `playing` (true), see [Music](#music) |
@@ -2203,7 +2333,7 @@ A width of 1 and unused sends add no work per frame, and a world without a solo 
 of a mask.
 
 **Effects.** An effect is an entity with an effect component: `Reverb`, `Equalizer`,
-`AudioFilter`, `Compressor`, `Gate` or `Delay` (the first of them in that order when it has several). It runs in an insert slot
+`AudioFilter`, `Compressor`, `Gate`, `Delay`, `Phaser` or `Chorus` (the first of them in that order when it has several). It runs in an insert slot
 of a channel that names it in `effects`, an array of 4 entities that run in order; an empty slot
 (0) is skipped. An effect that no slot names does nothing. The channel may name
 itself, which is the usual reverb return, and unloading the scene deletes it, which fades its
@@ -2244,7 +2374,7 @@ effects too, which run before the limiter.
   A change of the sidechain recompiles the order. Without a `Compressor` the module pays one
   count of its component per frame.
 
-Reverb zones, rooms from geometry and a delay are later work.
+Reverb zones and rooms from geometry are later work.
 
 #### Meters
 
@@ -2863,7 +2993,9 @@ pre-fader one) and its insert slots, each as `insert <index> <entity>:` with its
 q 1.20] [off] [off]`, `filter lowpass 24 dB cutoff 400 resonance 0.30 mix 1.00`,
 `compressor threshold -30.0 dB ratio 8.0 ... sidechain sfx`, `gate threshold -45.0 dB ...`, the
 two dynamics kinds with `reduction <dB>` of the last frame, `delay sync 0.750 beats feedback 0.40
-damping 4000 Hz mix 1.00 ping pong`, or `delay time 0.250 ...` without sync) and whether it
+damping 4000 Hz mix 1.00 ping pong`, or `delay time 0.250 ...` without sync, `phaser stages 6
+rate 0.30 Hz depth 0.70 center 800 Hz feedback 0.50 mix 0.50 stereo 0.50`, `chorus voices 3 rate
+0.80 Hz depth 3.0 ms delay 12.0 ms mix 0.40 spread 1.00`) and whether it
 runs: `(runs)`, `(bypassed)` for a Disabled effect, or `(does not run: ...)` with
 the reason (no output, in another slot, every effect of the pool taken, waits for its memory);
 the master lists its own after its `AudioBus`. Each channel in the order ends with its levels of

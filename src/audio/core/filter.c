@@ -218,8 +218,10 @@ bool box_audio_filter_render(
 
 void box_audio_filter_rest(
     box_audio_core_t *core,
-    box_audio_effect_t *fx)
+    box_audio_effect_t *fx,
+    int32_t frames)
 {
+    (void)frames;
     (void)core;
     (void)fx;
 }

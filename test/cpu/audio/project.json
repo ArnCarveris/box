@@ -195,7 +195,8 @@
                     "meters",
                     "eq_filter",
                     "dynamics",
-                    "delay"
+                    "delay",
+                    "modulation"
                 ]
             },
             {
@@ -444,6 +445,22 @@
                     "mix_dry",
                     "render_sizes",
                     "component",
+                    "script"
+                ]
+            },
+            {
+                "id": "Modulation",
+                "testcases": [
+                    "phaser_notch_moves",
+                    "phaser_stages_notches",
+                    "phaser_feedback_stable",
+                    "chorus_delay_range",
+                    "chorus_spread",
+                    "rate_change_no_click",
+                    "mix_dry",
+                    "silent_after_tail",
+                    "render_identical",
+                    "components",
                     "script"
                 ]
             },

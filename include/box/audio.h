@@ -523,6 +523,60 @@ ECS_STRUCT(Delay, {
                             *   repeats stay bright */
 });
 
+/** A phaser, an effect in an insert slot of an AudioBus, as a Reverb is: a chain of first
+ * order allpasses whose break frequency a sine LFO sweeps around a center, mixed with the dry
+ * signal, so its notches move up and down at the rate:
+ * keys { AudioBus: {effects: [keys]}; Phaser: {stages: 6, rate: 0.3, feedback: 0.5} }.
+ *
+ * The LFO starts when the phaser is put on a channel and runs on through a change of the rate
+ * without a jump; the right channel runs it stereo half turns later. Depth, center, feedback,
+ * mix and stereo move over 20 ms; a change of the stages fades the phased signal out and back
+ * in over 40 ms. Once its input is silent and its allpasses decayed it stops until its input
+ * sounds again.
+ */
+ECS_STRUCT(Phaser, {
+    int32_t stages;        /**< Allpass stages, 2 to 12 and even, default 4: stages / 2
+                            *   notches */
+    float rate;            /**< Hz of the LFO, default 0.5, 0 to 20 */
+    float depth;           /**< 0 to 1, default 0.7: the sweep reaches 2 * depth octaves either
+                            *   way of the center */
+    float center;          /**< Hz at the middle of the sweep, default 800, 20 to 20000 */
+    float feedback;        /**< Share of the phased signal fed back into the chain, -0.9 to 0.9,
+                            *   default 0; more sharpens the peaks between the notches */
+    float mix;             /**< Wet level, 0 to 1, default 0.5, which gives the deepest notches;
+                            *   the dry signal passes at 1 - mix */
+    float stereo;          /**< Phase offset of the LFO of the right channel in half turns, 0
+                            *   to 1, default 0.5 (a quarter of a period) */
+});
+
+/** Longest read of a Chorus in milliseconds, delay and depth together, which sizes its
+ * memory */
+#define BOX_AUDIO_CHORUS_MAX 50.0f
+
+/** A chorus, an effect in an insert slot of an AudioBus, as a Reverb is: up to 4 voices, each a
+ * tap of a delay line that a sine LFO moves around delay by depth, their LFOs spread evenly in
+ * phase and the voices panned across the stereo field by spread:
+ * pad { AudioBus: {effects: [pad]}; Chorus: {voices: 3, spread: 1, mix: 0.4} }.
+ *
+ * Every chorus runs with its own memory of BOX_AUDIO_CHORUS_MAX milliseconds. The LFOs start
+ * when the chorus is put on a channel and run on through a change of the rate without a jump.
+ * Depth, delay, mix and spread move over 20 ms; a change of the voices fades the wet signal out
+ * and back in over 40 ms. Once its input was silent for 50 ms it stops until its input sounds
+ * again.
+ */
+ECS_STRUCT(Chorus, {
+    int32_t voices;        /**< Taps, 1 to 4, default 2 */
+    float rate;            /**< Hz of the LFOs, default 0.8, 0 to 20 */
+    float depth;           /**< Milliseconds the taps move either way, default 3, 0 to 25 */
+    float delay;           /**< Milliseconds of the taps at the middle, default 12, 0 to 50;
+                            *   a tap reads at most 50 ms and at least a frame back */
+    float mix;             /**< Wet level, 0 to 1, default 0.5; the dry signal passes at
+                            *   1 - mix */
+    float spread;          /**< 0 to 1, default 0.5: 0 keeps the voices in the center, so a mono
+                            *   input stays mono, 1 pans the first voice left and the last
+                            *   right */
+});
+
 /** An envelope of the cutoff of the SynthFilter of the same root, with the segments of a
  * SynthEnvelope: the cutoff is cutoff times 2 to the amount times the level of the envelope,
  * so it rises over the attack, settles at the sustain and returns over the release.

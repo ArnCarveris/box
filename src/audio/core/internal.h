@@ -245,6 +245,60 @@ typedef struct box_audio_delay_t {
     box_audio_ramp_t feed;    /**< Fade in of the input after a move */
 } box_audio_delay_t;
 
+/** A phaser: a chain of first order allpasses per channel, each a single state, swept by a
+ * sine LFO whose phase is a fixed point count of turns */
+typedef struct box_audio_phaser_t {
+    box_audio_phaser_params_t target; /**< Parameters of the last command, clamped */
+    int32_t stages;           /**< Allpasses per channel that run */
+    float state[2][BOX_AUDIO_PHASER_STAGES_MAX]; /**< State of each allpass per channel */
+    float last[2];            /**< Output of the chain of each channel in the frame before, which
+                               * feeds back */
+    float coef[2];            /**< Coefficient of the allpasses of each channel */
+    uint32_t phase;           /**< Phase of the LFO in 2^-32 turns */
+    uint32_t step;            /**< Phase it advances per frame */
+    int32_t control;          /**< Frames until the next update of the coefficients */
+    bool stale;               /**< Skipped blocks left the coefficients behind the phase */
+    bool swap;                /**< Waits for the fade to reach 0 to apply the stages */
+    box_audio_ramp_t depth;   /**< Depth, per control block */
+    box_audio_ramp_t octave;  /**< log2 of the center, per control block */
+    box_audio_ramp_t stereo;  /**< Phase offset of the right channel in turns, per control
+                               * block */
+    box_audio_ramp_t feedback; /**< Feedback gain */
+    box_audio_ramp_t mix;     /**< Wet level */
+    box_audio_ramp_t fade;    /**< Fade of the wet signal around a change of the stages */
+} box_audio_phaser_t;
+
+/** A chorus: a line per channel on the memory of its effect slot, read by up to
+ * BOX_AUDIO_CHORUS_VOICES_MAX taps that a sine LFO each moves */
+typedef struct box_audio_chorus_t {
+    box_audio_chorus_params_t target; /**< Parameters of the last command, clamped */
+    float *line[2];           /**< The lines of the left and the right channel in memory */
+    int32_t length;           /**< Frames of each line */
+    int32_t pos;              /**< Frame the next input is written to */
+    int32_t valid;            /**< Frames written since the line was last silent; older frames
+                               * read as silence, so the memory needs no clearing */
+    int32_t voices;           /**< Taps that run */
+    float gain;               /**< Gain of each tap, 1 / sqrt(voices) */
+    double tap[BOX_AUDIO_CHORUS_VOICES_MAX];  /**< Frames back of each tap in this frame */
+    double slope[BOX_AUDIO_CHORUS_VOICES_MAX]; /**< Change of each tap per frame up to the next
+                               * control block */
+    double next[BOX_AUDIO_CHORUS_VOICES_MAX]; /**< Frames back of each tap at the next control
+                               * block */
+    float pan[BOX_AUDIO_CHORUS_VOICES_MAX][4]; /**< Gains of each tap: left into left, right
+                               * into left, left into right and right into right */
+    uint32_t phase;           /**< Phase of the LFO of the first voice in 2^-32 turns */
+    uint32_t step;            /**< Phase it advances per frame */
+    int32_t control;          /**< Frames until the next control block */
+    bool stale;               /**< Skipped blocks left the taps behind the phase */
+    bool swap;                /**< Waits for the fade to reach 0 to apply the voices */
+    box_audio_ramp_t depth;   /**< Depth in frames, per control block */
+    box_audio_ramp_t delay;   /**< Delay in frames, per control block */
+    box_audio_ramp_t spread;  /**< Spread, per control block */
+    box_audio_ramp_t mix;     /**< Wet level */
+    box_audio_ramp_t fade;    /**< Fade of the wet signal around a change of the voices */
+    box_audio_ramp_t feed;    /**< Fade in of the input after a move */
+} box_audio_chorus_t;
+
 /** State of the kinds of effects */
 typedef union box_audio_effect_data_t {
     box_audio_reverb_t reverb;  /**< BOX_AUDIO_EFFECT_REVERB */
@@ -253,6 +307,8 @@ typedef union box_audio_effect_data_t {
     box_audio_compressor_t compressor; /**< BOX_AUDIO_EFFECT_COMPRESSOR */
     box_audio_gate_t gate;      /**< BOX_AUDIO_EFFECT_GATE */
     box_audio_delay_t delay;    /**< BOX_AUDIO_EFFECT_DELAY */
+    box_audio_phaser_t phaser;  /**< BOX_AUDIO_EFFECT_PHASER */
+    box_audio_chorus_t chorus;  /**< BOX_AUDIO_EFFECT_CHORUS */
 } box_audio_effect_data_t;
 
 /** An effect instance of the pool of the core: a kind in an insert slot of a bus, on the
@@ -299,8 +355,9 @@ typedef struct box_audio_effect_def_t {
                               /**< Process a block in place; silent tells that the input is
                                * silent. Returns whether a kind with a tail decayed: it cleared
                                * itself and is idle */
-    void (*rest)(box_audio_core_t *core, box_audio_effect_t *fx);
-                              /**< A block skipped while idle and the input is silent */
+    void (*rest)(box_audio_core_t *core, box_audio_effect_t *fx, int32_t frames);
+                              /**< A block of frames skipped while idle and the input is
+                               * silent */
 } box_audio_effect_def_t;
 
 /** Kinds of sources a voice plays */
@@ -826,7 +883,8 @@ bool box_audio_reverb_render(
 /** The reverb kind: a block skipped while idle */
 void box_audio_reverb_rest(
     box_audio_core_t *core,
-    box_audio_effect_t *fx);
+    box_audio_effect_t *fx,
+    int32_t frames);
 
 /** The delay kind, in delay.c: floats of its memory at a rate */
 int32_t box_audio_delay_floats(
@@ -855,7 +913,64 @@ bool box_audio_delay_render(
 /** The delay kind: a block skipped while idle */
 void box_audio_delay_rest(
     box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    int32_t frames);
+
+/** The phaser kind, in phaser.c: start at the params of fx */
+void box_audio_phaser_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The phaser kind: new parameters while it runs */
+void box_audio_phaser_command(
+    box_audio_core_t *core,
     box_audio_effect_t *fx);
+
+/** The phaser kind: process a block */
+bool box_audio_phaser_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The phaser kind: a block skipped while idle */
+void box_audio_phaser_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    int32_t frames);
+
+/** The chorus kind, in chorus.c: floats of its memory at a rate */
+int32_t box_audio_chorus_floats(
+    float sample_rate);
+
+/** The chorus kind: start on its memory */
+void box_audio_chorus_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The chorus kind: new parameters while it runs */
+void box_audio_chorus_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The chorus kind: process a block */
+bool box_audio_chorus_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The chorus kind: a block skipped while idle */
+void box_audio_chorus_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    int32_t frames);
 
 /** The equalizer kind, in eq.c: start at the params of fx */
 void box_audio_eq_start(
@@ -880,7 +995,8 @@ bool box_audio_eq_render(
 /** The equalizer kind: a block skipped while idle, which it never is */
 void box_audio_eq_rest(
     box_audio_core_t *core,
-    box_audio_effect_t *fx);
+    box_audio_effect_t *fx,
+    int32_t frames);
 
 /** The filter kind, in filter.c: start at the params of fx */
 void box_audio_filter_start(
@@ -905,7 +1021,8 @@ bool box_audio_filter_render(
 /** The filter kind: a block skipped while idle, which it never is */
 void box_audio_filter_rest(
     box_audio_core_t *core,
-    box_audio_effect_t *fx);
+    box_audio_effect_t *fx,
+    int32_t frames);
 
 /** The compressor kind, in dynamics.c: start at the params of fx */
 void box_audio_compressor_start(
@@ -951,7 +1068,8 @@ bool box_audio_gate_render(
 /** The compressor and the gate: a block skipped while idle, which they never are */
 void box_audio_dynamics_rest(
     box_audio_core_t *core,
-    box_audio_effect_t *fx);
+    box_audio_effect_t *fx,
+    int32_t frames);
 
 /** Base 2 logarithm without libm, in synth.c, from the exponent of the double and the series
  * of atanh.

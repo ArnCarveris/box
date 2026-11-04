@@ -172,6 +172,8 @@ static void box_cmd_audio_effects(
         const Compressor *comp;
         const Gate *gate;
         const Delay *delay;
+        const Phaser *phaser;
+        const Chorus *chorus;
         const box_audio_module_t *state = box_audio_module_get(world);
         char *path;
         int32_t b, slot;
@@ -235,6 +237,16 @@ static void box_cmd_audio_effects(
             ecs_strbuf_append(buf, " feedback %.2f damping %.0f Hz mix %.2f%s",
                 (double)delay->feedback, (double)delay->damping, (double)delay->mix,
                 delay->ping_pong ? " ping pong" : "");
+        } else if ((phaser = ecs_get(world, e, Phaser))) {
+            ecs_strbuf_append(buf, "phaser stages %d rate %.2f Hz depth %.2f center %.0f Hz "
+                "feedback %.2f mix %.2f stereo %.2f", phaser->stages, (double)phaser->rate,
+                (double)phaser->depth, (double)phaser->center, (double)phaser->feedback,
+                (double)phaser->mix, (double)phaser->stereo);
+        } else if ((chorus = ecs_get(world, e, Chorus))) {
+            ecs_strbuf_append(buf, "chorus voices %d rate %.2f Hz depth %.1f ms delay %.1f ms "
+                "mix %.2f spread %.2f", chorus->voices, (double)chorus->rate,
+                (double)chorus->depth, (double)chorus->delay, (double)chorus->mix,
+                (double)chorus->spread);
         }
 
         slot = box_audio_module_effect_slot(world, e);
