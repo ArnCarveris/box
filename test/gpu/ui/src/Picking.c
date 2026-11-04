@@ -4,6 +4,7 @@
  */
 
 #include <box.h>
+#include <math.h>
 #include <bake_test.h>
 
 void Picking_screen_ui_over_3d(void) {
@@ -503,6 +504,257 @@ void Picking_render_to_texture_mapped(void) {
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, button, mut))->clicks, 1);
     test_uint(ecs_singleton_get(world, PickStatus)->target, button);
+
+    ecs_fini(world);
+}
+
+void Picking_render_to_texture_sweep_mapped(void) {
+    // ui/picking
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    // A square section swept along x from -3 over two lines of 1 and 5 units, its front wall at
+    // z 0 (the profile x turns to -z), 62.5 window points per unit. The texture v runs along the
+    // path: with MappingObject size 0.5 it is the distance along the path over 0.5, so the
+    // surface repeats every half unit, where the fractions of the mesh would stretch it once
+    // over the 6 units. The button covers the surface y 30..70.
+    test_assert(ecs_script(world, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.material\n"
+        "using box.camera\n"
+        "using box.view\n"
+        "using box.surface\n"
+        "using box.picking\n"
+        "template Probe {\n"
+        "  mut clicks: i32 = 0\n"
+        "  mut x: f32 = 0\n"
+        "  mut y: f32 = 0\n"
+        "  async {\n"
+        "    while true {\n"
+        "      const e = await on.click(this)\n"
+        "      clicks = clicks + 1\n"
+        "      x = e.local_x\n"
+        "      y = e.local_y\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "screen_texture {}\n"
+        "screen_ui {\n"
+        "  Scene: {}\n"
+        "  camera {\n"
+        "    Position: {0, 0, 100}\n"
+        "    Camera: {ortho: true, ortho_scale: 1}\n"
+        "  }\n"
+        "  button {\n"
+        "    Position: {0, 0, 0}\n"
+        "    Rect: {100, 40}\n"
+        "    Interactive\n"
+        "    Probe: {}\n"
+        "  }\n"
+        "}\n"
+        "screen_views {\n"
+        "  view {\n"
+        "    View: {camera: screen_ui.camera}\n"
+        "  }\n"
+        "}\n"
+        "screen_surface {\n"
+        "  Surface: {width: 100, height: 100, texture: screen_texture, view_root: screen_views}\n"
+        "}\n"
+        "camera {\n"
+        "  Position: {0, 0, 10}\n"
+        "  Camera: {}\n"
+        "}\n"
+        "main_view {\n"
+        "  View: {camera: camera}\n"
+        "}\n"
+        "section_outline {\n"
+        "  Path2D: {\n"
+        "    start: {-0.5, -0.5},\n"
+        "    segments: [\n"
+        "      {kind: Line, end: {0.5, -0.5}},\n"
+        "      {kind: Line, end: {0.5, 0.5}},\n"
+        "      {kind: Line, end: {-0.5, 0.5}}\n"
+        "    ],\n"
+        "    closed: true\n"
+        "  }\n"
+        "}\n"
+        "section { Profile2D: {outer: section_outline} }\n"
+        "route {\n"
+        "  Path3D: {\n"
+        "    start: {-3, 0, -0.5},\n"
+        "    segments: [\n"
+        "      {kind: Line, end: {-2, 0, -0.5}},\n"
+        "      {kind: Line, end: {3, 0, -0.5}}\n"
+        "    ]\n"
+        "  }\n"
+        "}\n"
+        "road {\n"
+        "  Sweep: {path: route, profile: section, scale: {1, 1}, rings: 48}\n"
+        "  PbrTextures: {albedo: screen_texture}\n"
+        "  TextureMapping: {mode: MappingObject, size: 0.5}\n"
+        "}\n" }) != 0);
+
+    typedef struct { int32_t clicks; float x; float y; } Mut;
+    ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
+    ecs_entity_t button = ecs_lookup(world, "screen_ui.button");
+    ecs_progress(world, 0);
+
+    // x 0, 3 units along the path: v 6 lands on the edge of the repeat, off the button, where
+    // the fraction 0.5 of the mesh would land on its middle
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_click left [640, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(((const Mut*)ecs_get_id(world, button, mut))->clicks, 0);
+    test_uint(ecs_singleton_get(world, PickStatus)->hit, ecs_lookup(world, "road"));
+
+    // x -1.744, 1.256 units along the path on the second line: v 2.512, the middle of the
+    // button, where the fraction 0.209 of the mesh would miss it
+    ecs_os_free(box_command_run(world, s, "mouse_click left [531, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    const Mut *m = ecs_get_id(world, button, mut);
+    test_int(m->clicks, 1);
+    test_assert(fabsf(m->y) < 3.0f);
+    test_uint(ecs_singleton_get(world, PickStatus)->target, button);
+
+    // x -1.68, 1.32 units along the path: v 2.64, 14 points off the middle of the button
+    ecs_os_free(box_command_run(world, s, "mouse_click left [535, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    m = ecs_get_id(world, button, mut);
+    test_int(m->clicks, 2);
+    test_assert(fabsf(fabsf(m->y) - 14.0f) < 3.0f);
+
+    // x -2.752, 0.248 units along the path on the first line: v 0.496, the middle again
+    ecs_os_free(box_command_run(world, s, "mouse_click left [468, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    m = ecs_get_id(world, button, mut);
+    test_int(m->clicks, 3);
+    test_assert(fabsf(m->y) < 3.0f);
+
+    ecs_fini(world);
+}
+
+void Picking_render_to_texture_sweep_mapped_cap(void) {
+    // ui/picking
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    // A square section of 1 unit scaled by 2 swept along +z from z -1 to 0, its end cap at z 0
+    // facing the camera, 62.5 window points per unit. The cap maps the profile x and y; with
+    // MappingObject size 0.5 its texture u is the profile x times the scale over 0.5, twice the
+    // world x, where the mesh would map half of it. The button covers the surface x 30..70.
+    test_assert(ecs_script(world, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.material\n"
+        "using box.camera\n"
+        "using box.view\n"
+        "using box.surface\n"
+        "using box.picking\n"
+        "template Probe {\n"
+        "  mut clicks: i32 = 0\n"
+        "  mut x: f32 = 0\n"
+        "  mut y: f32 = 0\n"
+        "  async {\n"
+        "    while true {\n"
+        "      const e = await on.click(this)\n"
+        "      clicks = clicks + 1\n"
+        "      x = e.local_x\n"
+        "      y = e.local_y\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "screen_texture {}\n"
+        "screen_ui {\n"
+        "  Scene: {}\n"
+        "  camera {\n"
+        "    Position: {0, 0, 100}\n"
+        "    Camera: {ortho: true, ortho_scale: 1}\n"
+        "  }\n"
+        "  button {\n"
+        "    Position: {0, 0, 0}\n"
+        "    Rect: {40, 100}\n"
+        "    Interactive\n"
+        "    Probe: {}\n"
+        "  }\n"
+        "}\n"
+        "screen_views {\n"
+        "  view {\n"
+        "    View: {camera: screen_ui.camera}\n"
+        "  }\n"
+        "}\n"
+        "screen_surface {\n"
+        "  Surface: {width: 100, height: 100, texture: screen_texture, view_root: screen_views}\n"
+        "}\n"
+        "camera {\n"
+        "  Position: {0, 0, 10}\n"
+        "  Camera: {}\n"
+        "}\n"
+        "main_view {\n"
+        "  View: {camera: camera}\n"
+        "}\n"
+        "section_outline {\n"
+        "  Path2D: {\n"
+        "    start: {-0.5, -0.5},\n"
+        "    segments: [\n"
+        "      {kind: Line, end: {0.5, -0.5}},\n"
+        "      {kind: Line, end: {0.5, 0.5}},\n"
+        "      {kind: Line, end: {-0.5, 0.5}}\n"
+        "    ],\n"
+        "    closed: true\n"
+        "  }\n"
+        "}\n"
+        "section { Profile2D: {outer: section_outline} }\n"
+        "route {\n"
+        "  Path3D: {\n"
+        "    start: {0, 0, -1},\n"
+        "    segments: [\n"
+        "      {kind: Line, end: {0, 0, -0.5}},\n"
+        "      {kind: Line, end: {0, 0, 0}}\n"
+        "    ]\n"
+        "  }\n"
+        "}\n"
+        "post {\n"
+        "  Sweep: {path: route, profile: section, scale: {2, 2}}\n"
+        "  PbrTextures: {albedo: screen_texture}\n"
+        "  TextureMapping: {mode: MappingObject, size: 0.5}\n"
+        "}\n" }) != 0);
+
+    typedef struct { int32_t clicks; float x; float y; } Mut;
+    ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
+    ecs_entity_t button = ecs_lookup(world, "screen_ui.button");
+    ecs_progress(world, 0);
+
+    // x 0.496: u 0.992, on the edge of the repeat, off the button
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_click left [671, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(((const Mut*)ecs_get_id(world, button, mut))->clicks, 0);
+    test_uint(ecs_singleton_get(world, PickStatus)->hit, ecs_lookup(world, "post"));
+
+    // x 0.256: u 0.512, the middle of the button, where the mesh would map 0.128 and miss it
+    ecs_os_free(box_command_run(world, s, "mouse_click left [656, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    const Mut *m = ecs_get_id(world, button, mut);
+    test_int(m->clicks, 1);
+    test_assert(fabsf(m->x) < 3.0f);
+    test_uint(ecs_singleton_get(world, PickStatus)->target, button);
+
+    // x 0.32: u 0.64, 14 points off the middle of the button
+    ecs_os_free(box_command_run(world, s, "mouse_click left [660, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    m = ecs_get_id(world, button, mut);
+    test_int(m->clicks, 2);
+    test_assert(fabsf(fabsf(m->x) - 14.0f) < 3.0f);
 
     ecs_fini(world);
 }

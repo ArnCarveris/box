@@ -304,6 +304,8 @@
                     "fm_index_zero_identical",
                     "fm_index_follows_envelope",
                     "fm_index_limited",
+                    "fm_alias_saw",
+                    "fm_alias_square",
                     "ring_sum_difference",
                     "modulator_audible",
                     "feedback_harmonics",

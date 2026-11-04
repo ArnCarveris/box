@@ -210,6 +210,8 @@ typedef struct box_audio_synth_osc_t {
                            * against the frequency; ring: depth */
     float feedback;       /**< Turns of its phase per unit of its own output */
     float fb1, fb2;       /**< Its last two outputs, for the feedback */
+    double shift;         /**< Turns its modulation and feedback moved its phase by in the
+                           * last frame, for the speed of its edges */
     double width;         /**< Square: share of the period it is high */
     double width_base;    /**< Square: the pulse width of its layer, without the LFOs */
     double width_step;    /**< Change of width per frame from the LFOs */

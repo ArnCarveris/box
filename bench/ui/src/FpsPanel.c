@@ -4,10 +4,11 @@
  *
  * Every case runs a headless frame of an empty world with a full window of held frame samples.
  * The cases differ by the cost of the panel: closed, open with fixed samples, and open with a new
- * sample every frame, which moves every bar one slot left.
+ * sample every frame, which rotates the bars and moves their parent one slot left.
  *
- * In open_new_sample the samples differ, so nearly every bar and the summary change; in
- * open_steady_sample they are all as long, so no bar changes and the script evaluates none.
+ * In open_new_sample the samples differ: a frame evaluates the new bar, the parent and the
+ * summary, and all bars every BOX_FPS_BARS frames; the bars' transforms follow the parent.
+ * In open_steady_sample they are all as long, so no bar changes and the script evaluates none.
  */
 
 #include <box.h>
@@ -43,8 +44,9 @@ static ecs_world_t* bench_fps_world(
     return world;
 }
 
-/** Run frames that each add a sample, so the bars of an open panel each show the sample of the
- * bar right of them. The sample is notified with ecs_singleton_modified, as the engine does.
+/** Run frames that each add a sample, so the bars of an open panel rotate one slot left and the
+ * bar of the oldest sample shows the new one. The sample is notified with
+ * ecs_singleton_modified, as the engine does.
  *
  * @param b The bench
  * @param open Whether the panel is open
