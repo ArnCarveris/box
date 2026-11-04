@@ -1,0 +1,213 @@
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.input
+using box.picking
+
+window {
+  Surface: {width: 1280, height: 720, vsync: true}
+}
+
+bloom {
+  Bloom: {intensity: 0.18, threshold: 1}
+}
+
+tonemap {
+  Tonemap: {}
+}
+
+smaa {
+  Smaa: {}
+}
+
+camera {
+  Position: {0.9, 1.25, 3.4}
+  Rotation: {-0.1, 0.22, 0}
+  Camera: {fov: 50}
+  CameraController: {}
+}
+
+main_view {
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {14, 10, 18, 255}},
+    shadows: {enabled: true},
+    effects: [{effect: bloom}, {effect: tonemap}, {effect: smaa}]
+  }
+}
+
+$ {
+  AmbientLight: {sky: {60, 50, 80}, ground: {30, 20, 18}, intensity: 0.35}
+}
+
+const R = SONG_R[song]
+const G = SONG_G[song]
+const B = SONG_B[song]
+
+ceiling_lamp {
+  Position: {0, 3.4, 1.2}
+  Rotation: {-1.2, 0, 0}
+  SpotLight: {intensity: 45 * PI, range: 9, inner_angle: 24, outer_angle: 40}
+  Rgb: {255, 220, 180}
+}
+
+floor {
+  Position: {0, -0.05, 0}
+  Box: {12, 0.1, 12}
+  Rgb: {72, 46, 34}
+  PbrMaterial: {roughness: 0.55}
+}
+
+back_wall {
+  Position: {0, 2.5, -1.2}
+  Box: {12, 5, 0.2}
+  Rgb: {58, 40, 66}
+  PbrMaterial: {roughness: 0.9}
+}
+
+jukebox {
+  Position: {0, 0, 0}
+
+  plinth {
+    Position: {0, 0.06, 0}
+    RoundedBox: {x: 1.32, y: 0.12, z: 0.78, radius: 0.03}
+    Rgb: {205, 205, 215}
+    PbrMaterial: {metallic: 0.9, roughness: 0.25}
+  }
+
+  cabinet {
+    Position: {0, 0.745, 0}
+    RoundedBox: {x: 1.2, y: 1.25, z: 0.7, radius: 0.06}
+    Rgb: {120, 62, 34}
+    PbrMaterial: {roughness: 0.4}
+  }
+
+  crown {
+    Position: {0, 1.37, 0}
+    Rotation: {1.5708, 0, 0}
+    Cylinder: {segments: 48, smooth: true, radius: 0.6, length: 0.7}
+    Rgb: {120, 62, 34}
+    PbrMaterial: {roughness: 0.4}
+  }
+
+  arch {
+    Position: {0, 1.37, 0.36}
+    Rotation: {1.5708, 0, 0}
+    Torus: {segments: 64, rings: 12, smooth: true, radius: 0.58, tube: 0.03}
+    Rgb: {R, G, B}
+    Emissive: {strength: 0.6 + 1.6 * glow, color: {R, G, B}}
+  }
+
+  glass {
+    Position: {0, 1.37, 0.36}
+    Rotation: {1.5708, 0, 0}
+    Cylinder: {segments: 48, smooth: true, radius: 0.46, length: 0.02}
+    Rgb: {16, 14, 20}
+    PbrMaterial: {metallic: 0.2, roughness: 0.08}
+  }
+
+  turntable {
+    Position: {0, 1.37, 0.38}
+    Rotation: {1.5708, 0, 0}
+
+    record {
+      Rotation: {0, -beat * PI / 2, 0}
+      Cylinder: {segments: 48, smooth: true, radius: 0.3, length: 0.012}
+      Rgb: {18, 18, 20}
+      PbrMaterial: {roughness: 0.2}
+
+      label {
+        Position: {0, 0.008, 0}
+        Cylinder: {segments: 32, smooth: true, radius: 0.1, length: 0.006}
+        Rgb: {R, G, B}
+      }
+
+      sheen {
+        Position: {0.19, 0.008, 0}
+        Box: {0.16, 0.004, 0.02}
+        Rgb: {120, 120, 130}
+        PbrMaterial: {metallic: 0.6, roughness: 0.2}
+      }
+    }
+  }
+
+  left_tube {
+    Position: {-0.56, 0.72, 0.33}
+    Cylinder: {segments: 16, smooth: true, radius: 0.04, length: 1.1}
+    Rgb: {R, G, B}
+    Emissive: {strength: 0.4 + 1.8 * master_l, color: {R, G, B}}
+  }
+
+  right_tube {
+    Position: {0.56, 0.72, 0.33}
+    Cylinder: {segments: 16, smooth: true, radius: 0.04, length: 1.1}
+    Rgb: {R, G, B}
+    Emissive: {strength: 0.4 + 1.8 * master_r, color: {R, G, B}}
+  }
+
+  selector {
+    Position: {0, 0.86, 0.36}
+    Box: {0.8, 0.12, 0.04}
+    Rgb: {205, 205, 215}
+    PbrMaterial: {metallic: 0.9, roughness: 0.25}
+
+    harbor_key {
+      Position: {-0.24, 0, 0.03}
+      Box: {0.18, 0.07, 0.03}
+      Rgb: {SONG_R[0], SONG_G[0], SONG_B[0]}
+      ActionTrigger: {action: jukebox_actions.pick_harbor}
+      if song == 0 {
+        Emissive: {strength: 1.2, color: {SONG_R[0], SONG_G[0], SONG_B[0]}}
+      }
+    }
+
+    neon_key {
+      Position: {0, 0, 0.03}
+      Box: {0.18, 0.07, 0.03}
+      Rgb: {SONG_R[1], SONG_G[1], SONG_B[1]}
+      ActionTrigger: {action: jukebox_actions.pick_neon}
+      if song == 1 {
+        Emissive: {strength: 1.2, color: {SONG_R[1], SONG_G[1], SONG_B[1]}}
+      }
+    }
+
+    lantern_key {
+      Position: {0.24, 0, 0.03}
+      Box: {0.18, 0.07, 0.03}
+      Rgb: {SONG_R[2], SONG_G[2], SONG_B[2]}
+      ActionTrigger: {action: jukebox_actions.pick_lantern}
+      if song == 2 {
+        Emissive: {strength: 1.2, color: {SONG_R[2], SONG_G[2], SONG_B[2]}}
+      }
+    }
+  }
+
+  grille {
+    Position: {0, 0.45, 0.355}
+    Box: {0.9, 0.5, 0.02}
+    Rgb: {34, 24, 26}
+    PbrMaterial: {roughness: 0.95}
+
+    for i in 0..6 {
+      "slat_{i}" {
+        Position: {0, -0.2 + i * 0.08, 0.02}
+        Box: {0.92, 0.015, 0.015}
+        Rgb: {205, 205, 215}
+        PbrMaterial: {metallic: 0.9, roughness: 0.25}
+      }
+    }
+  }
+
+  glow_light {
+    Position: {0, 1.1, 0.9}
+    PointLight: {intensity: (0.4 + 2.5 * glow) * PI, range: 4}
+    Rgb: {R, G, B}
+  }
+}
