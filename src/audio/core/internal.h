@@ -196,7 +196,28 @@ typedef struct box_audio_synth_osc_t {
                            * against the frequency; ring: depth */
     float feedback;       /**< Turns of its phase per unit of its own output */
     float fb1, fb2;       /**< Its last two outputs, for the feedback */
+    double width;         /**< Square: share of the period it is high */
+    double width_base;    /**< Square: the pulse width of its layer, without the LFOs */
+    double width_step;    /**< Change of width per frame from the LFOs */
+    double vibrato;       /**< Factor of inc from the LFOs, 1 without */
+    double vibrato_step;  /**< Change of vibrato per frame */
+    float tremolo;        /**< Factor of its level from the LFOs, 1 without */
+    float tremolo_step;   /**< Change of tremolo per frame */
 } box_audio_synth_osc_t;
+
+/** An LFO of a synth voice, advanced per control block of BOX_AUDIO_SYNTH_CONTROL frames */
+typedef struct box_audio_synth_mod_t {
+    int32_t wave;         /**< A box_audio_synth_lfo_wave_t */
+    double phase;         /**< Phase in turns, 0..1 */
+    double inc;           /**< Turns per control block */
+    double start;         /**< Phase at the start of a pass, random per play or fixed */
+    int32_t delay;        /**< Frames left of its delay */
+    float gain;           /**< Level of its fade in, 0..1 */
+    float fade_step;      /**< Change of gain per control block */
+    float value;          /**< Its wave, -1..1, smoothed for the waves that jump */
+    float held;           /**< Value the random wave holds */
+    bool smooth;          /**< Whether its wave jumps and is smoothed */
+} box_audio_synth_mod_t;
 
 /** A stage of the filter of a synth voice: a trapezoidal state variable filter */
 typedef struct box_audio_synth_svf_t {
@@ -231,6 +252,15 @@ typedef struct box_audio_synth_source_t {
     int32_t control;      /**< Frames until the filter takes the cutoff of the envelope */
     int32_t glide_frames; /**< Frames of a glide of the patch, 0 when a pitch jumps */
     int32_t glide_left;   /**< Frames left of the glide that runs, 0 for none */
+    int32_t lfos;         /**< LFOs that run, 0 without, which renders as before */
+    box_audio_synth_mod_t lfo[BOX_AUDIO_SYNTH_LFOS]; /**< The LFOs */
+    uint32_t lfo_rng;     /**< State of the random phases and waves of the LFOs, never 0 */
+    float lfo_smooth;     /**< Share of the way a jumping wave moves per control block */
+    int32_t lfo_control;  /**< Frames until the next control block of the LFOs */
+    bool lfo_cutoff;      /**< Whether an LFO moves the cutoff */
+    double lfo_octaves;   /**< Octaves the LFOs move the cutoff by, 0 without */
+    float tremolo;        /**< Factor of the output from the LFOs of every layer, 1 without */
+    float tremolo_step;   /**< Change of tremolo per frame */
 } box_audio_synth_source_t;
 
 /** State of the kinds of sources */

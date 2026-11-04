@@ -4,7 +4,8 @@
  * marks it for a new compile when one of its components changes.
  *
  * The layers are the root and its children with a SynthOscillator, as particle effect layers
- * are, and the children of layers with one, the modulators of their parent.
+ * are, and the children of layers with one, the modulators of their parent. The LFOs are the
+ * SynthLfo of the root, of the layers and of the other children of the root.
  *
  * The sync system sends the patch with a SYNTH command when it changed; the core plays every
  * voice from a copy of it, so a play allocates nothing.
@@ -55,14 +56,15 @@ void box_audio_synth_init(
 {
     ecs_entity_t ids[] = {
         ecs_id(SynthSound), ecs_id(SynthOscillator), ecs_id(SynthEnvelope), ecs_id(SynthFilter),
-        ecs_id(SynthFilterEnvelope), ecs_id(SynthGlide)
+        ecs_id(SynthFilterEnvelope), ecs_id(SynthGlide), ecs_id(SynthLfo)
     };
     const char *names[] = {
         "AudioSynthSoundDirty", "AudioSynthOscillatorDirty", "AudioSynthEnvelopeDirty",
-        "AudioSynthFilterDirty", "AudioSynthFilterEnvelopeDirty", "AudioSynthGlideDirty"
+        "AudioSynthFilterDirty", "AudioSynthFilterEnvelopeDirty", "AudioSynthGlideDirty",
+        "AudioSynthLfoDirty"
     };
     int32_t i;
-    for (i = 0; i < 6; i ++) {
+    for (i = 0; i < 7; i ++) {
         ecs_observer(world, {
             .entity = ecs_entity(world, { .name = names[i] }),
             .query.flags = EcsQueryMatchPrefab,
@@ -135,6 +137,38 @@ static void box_audio_synth_layer(
     }
 
     l->feedback = osc->feedback;
+    l->pulse_width = osc->pulse_width;
+}
+
+/** Add an LFO to a patch, or count it when the patch has BOX_AUDIO_SYNTH_LFOS.
+ *
+ * @param p The patch
+ * @param lfo The LFO, NULL for none
+ * @param layer 1 + the layer it moves, 0 for every layer
+ * @param extra Counts the LFOs past BOX_AUDIO_SYNTH_LFOS
+ */
+static void box_audio_synth_lfo(
+    box_audio_synth_patch_t *p,
+    const SynthLfo *lfo,
+    uint32_t layer,
+    int32_t *extra)
+{
+    if (!lfo) {
+        goto done;
+    }
+
+    if (p->lfos >= BOX_AUDIO_SYNTH_LFOS) {
+        (*extra) ++;
+        goto done;
+    }
+
+    p->lfo[p->lfos ++] = (box_audio_synth_lfo_t){
+        .wave = (uint32_t)lfo->wave, .rate = lfo->rate, .delay = lfo->delay,
+        .fade = lfo->fade, .phase = lfo->phase, .random_phase = lfo->random_phase,
+        .layer = layer, .pitch = lfo->pitch, .amplitude = lfo->amplitude,
+        .cutoff = lfo->cutoff, .pulse_width = lfo->pulse_width };
+done:
+    return;
 }
 
 /** Count the layers of an entity and its descendants that are left out of a full patch.
@@ -169,6 +203,7 @@ static int32_t box_audio_synth_count(
  * @param carrier 1 + the layer the entity is, 0 when it is not one
  * @param extra Counts the layers past BOX_AUDIO_SYNTH_LAYERS
  * @param orphans Counts the modulators whose parent is not a layer
+ * @param lfos Counts the LFOs past BOX_AUDIO_SYNTH_LFOS
  */
 static void box_audio_synth_children(
     ecs_world_t *world,
@@ -176,7 +211,8 @@ static void box_audio_synth_children(
     ecs_entity_t parent,
     uint32_t carrier,
     int32_t *extra,
-    int32_t *orphans)
+    int32_t *orphans,
+    int32_t *lfos)
 {
     int32_t i;
     ecs_iter_t it = ecs_children(world, parent);
@@ -192,7 +228,8 @@ static void box_audio_synth_children(
                 (*orphans) ++;
             } else if (p->layers < BOX_AUDIO_SYNTH_LAYERS) {
                 box_audio_synth_layer(p, osc, ecs_get(world, child, SynthEnvelope), carrier);
-                box_audio_synth_children(world, p, child, p->layers, extra, orphans);
+                box_audio_synth_lfo(p, ecs_get(world, child, SynthLfo), p->layers, lfos);
+                box_audio_synth_children(world, p, child, p->layers, extra, orphans, lfos);
             } else {
                 *extra += box_audio_synth_count(world, child);
             }
@@ -213,7 +250,8 @@ bool box_audio_synth_compile(
     const SynthFilterEnvelope *fenv = ecs_get(world, e, SynthFilterEnvelope);
     const SynthOscillator *osc = ecs_get(world, e, SynthOscillator);
     const SynthGlide *glide = ecs_get(world, e, SynthGlide);
-    int32_t extra = 0, orphans = 0, i;
+    int32_t extra = 0, orphans = 0, lfos = 0, i;
+    ecs_iter_t it;
     bool endless = false, fits = true, result;
     if (sound) {
         p.seed = sound->seed;
@@ -252,7 +290,16 @@ bool box_audio_synth_compile(
         box_audio_synth_layer(&p, osc, NULL, 0);
     }
 
-    box_audio_synth_children(world, &p, e, p.layers, &extra, &orphans);
+    box_audio_synth_lfo(&p, ecs_get(world, e, SynthLfo), 0, &lfos);
+    box_audio_synth_children(world, &p, e, p.layers, &extra, &orphans, &lfos);
+    it = ecs_children(world, e);
+    while (ecs_children_next(&it)) {
+        for (i = 0; i < it.count; i ++) {
+            if (!ecs_has(world, it.entities[i], SynthOscillator)) {
+                box_audio_synth_lfo(&p, ecs_get(world, it.entities[i], SynthLfo), 0, &lfos);
+            }
+        }
+    }
 
     for (i = 0; i < (int32_t)p.layers; i ++) {
         if (p.layer[i].has_envelope) {
@@ -262,11 +309,16 @@ bool box_audio_synth_compile(
         }
     }
 
-    if (extra || endless || !fits || orphans) {
+    if (extra || endless || !fits || orphans || lfos) {
         char *path = ecs_get_path(world, e);
         if (extra) {
             ecs_err("box.audio: synth '%s' has %d layers, more than %d, the rest are left out",
                 path, (int)p.layers + extra, BOX_AUDIO_SYNTH_LAYERS);
+        }
+
+        if (lfos) {
+            ecs_err("box.audio: synth '%s' has %d LFOs, more than %d, the rest are left out",
+                path, (int)p.lfos + lfos, BOX_AUDIO_SYNTH_LFOS);
         }
 
         if (orphans) {

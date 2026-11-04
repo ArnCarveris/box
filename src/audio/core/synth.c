@@ -4,7 +4,9 @@
  * curved envelope, mixed into a state variable filter of one or two stages, whose cutoff an
  * envelope may move, and an amp, rendered per frame from a copy of the patch. A change of the
  * pitch glides exponentially in frequency over the glide of the patch, and a legato play
- * retargets the layers of a voice without a restart of its envelopes.
+ * retargets the layers of a voice without a restart of its envelopes. Up to two LFOs move the
+ * pitch, the level, the cutoff and the pulse width of squares, per control block of frames and
+ * interpolated per frame in between.
  *
  * Every voice holds its own copy of the patch, so a play allocates nothing and a new patch for
  * the same sound reaches the next play while the voices that play keep theirs.
@@ -53,6 +55,9 @@
 
 /** Smallest pitch factor of a play, which the pitch variance cannot go under */
 #define BOX_AUDIO_SYNTH_VARIANCE_MIN 0.01f
+
+/** Seconds over which an LFO wave that jumps, square, saw or random, moves to its new value */
+#define BOX_AUDIO_SYNTH_LFO_SMOOTH 0.002
 
 /** Turns per radian */
 #define BOX_AUDIO_SYNTH_TURNS (1.0 / 6.28318530717958647692)
@@ -110,6 +115,31 @@ static void box_audio_synth_envelope_clamp(
     e->hold = box_audio_synth_clamp(e->hold, 0, BOX_AUDIO_SYNTH_LENGTH_MAX);
     e->curve = box_audio_synth_curve_clamp(e->curve);
     e->attack_curve = box_audio_synth_curve_clamp(e->attack_curve);
+}
+
+/** Clamp a depth of an LFO, either way; NaN is 0.
+ *
+ * @param v The depth
+ * @param max Largest depth
+ * @return The clamped depth
+ */
+static float box_audio_synth_depth_clamp(
+    float v,
+    float max)
+{
+    return v == v ? box_audio_synth_clamp(v, -max, max) : 0.0f;
+}
+
+/** Clamp a pulse width; NaN and widths that are not positive are the default.
+ *
+ * @param v The width
+ * @return The width, BOX_AUDIO_SYNTH_PULSE_MIN..1 minus it
+ */
+static float box_audio_synth_width_clamp(
+    float v)
+{
+    return v > 0 ? box_audio_synth_clamp(v, BOX_AUDIO_SYNTH_PULSE_MIN,
+        1 - BOX_AUDIO_SYNTH_PULSE_MIN) : BOX_AUDIO_SYNTH_PULSE_DEFAULT;
 }
 
 /** Clamp a frequency a sweep ends at; NaN and values that are not positive mean no sweep.
@@ -177,6 +207,31 @@ static void box_audio_synth_patch_clamp(
             1.0f : BOX_AUDIO_SYNTH_INDEX_MAX);
         l->feedback = box_audio_synth_clamp(l->feedback, 0, BOX_AUDIO_SYNTH_FEEDBACK_MAX);
         l->audible = l->audible != 0;
+        l->pulse_width = box_audio_synth_width_clamp(l->pulse_width);
+    }
+
+    if (p->lfos > BOX_AUDIO_SYNTH_LFOS) {
+        p->lfos = BOX_AUDIO_SYNTH_LFOS;
+    }
+
+    for (i = 0; i < BOX_AUDIO_SYNTH_LFOS; i ++) {
+        box_audio_synth_lfo_t *lfo = &p->lfo[i];
+        if (lfo->wave > BOX_AUDIO_SYNTH_LFO_RANDOM) {
+            lfo->wave = BOX_AUDIO_SYNTH_LFO_SINE;
+        }
+
+        lfo->rate = box_audio_synth_clamp(lfo->rate, 0, BOX_AUDIO_SYNTH_LFO_RATE_MAX);
+        lfo->delay = box_audio_synth_clamp(lfo->delay, 0, BOX_AUDIO_SYNTH_LENGTH_MAX);
+        lfo->fade = box_audio_synth_clamp(lfo->fade, 0, BOX_AUDIO_SYNTH_LENGTH_MAX);
+        lfo->phase = box_audio_synth_clamp(lfo->phase, 0, 1);
+        lfo->phase = lfo->phase < 1 ? lfo->phase : 0.0f;
+        lfo->random_phase = lfo->random_phase != 0;
+        lfo->layer = lfo->layer <= BOX_AUDIO_SYNTH_LAYERS ? lfo->layer : 0;
+        lfo->pitch = box_audio_synth_depth_clamp(lfo->pitch, BOX_AUDIO_SYNTH_CENTS_MAX);
+        lfo->amplitude = box_audio_synth_clamp(lfo->amplitude, 0, 1);
+        lfo->cutoff = box_audio_synth_depth_clamp(lfo->cutoff, BOX_AUDIO_SYNTH_OCTAVES_MAX);
+        lfo->pulse_width = box_audio_synth_depth_clamp(lfo->pulse_width,
+            0.5f - BOX_AUDIO_SYNTH_PULSE_MIN);
     }
 }
 
@@ -514,7 +569,8 @@ static void box_audio_synth_limits(
 }
 
 /** Move the cutoff by the level of the filter envelope, exponentially in frequency: the cutoff
- * of the patch times 2 to the amount times the level, clamped to the range of a cutoff.
+ * of the patch times 2 to the amount times the level, and to the octaves of the LFOs, clamped
+ * to the range of a cutoff.
  *
  * @param src The source
  * @param level Level of the filter envelope, 0..1
@@ -525,10 +581,182 @@ static void box_audio_synth_cutoff(
     float level,
     float rate)
 {
-    double cut = src->cutoff_base * box_audio_synth_exp2((double)src->amount * (double)level);
+    double octaves = (double)src->amount * (double)level, cut;
+    if (src->lfo_cutoff) {
+        octaves += src->lfo_octaves;
+    }
+
+    cut = src->cutoff_base * box_audio_synth_exp2(octaves);
     cut = cut < src->cutoff_top ? cut : src->cutoff_top;
     src->cutoff = cut > BOX_AUDIO_SYNTH_CUTOFF_MIN ? cut : BOX_AUDIO_SYNTH_CUTOFF_MIN;
     box_audio_synth_coefs(src, rate);
+}
+
+/** Hash the seed of a patch with the count of its plays into the state of a play.
+ *
+ * @param seed The seed
+ * @param plays The count
+ * @return The state, never 0
+ */
+static uint32_t box_audio_synth_hash(
+    uint32_t seed,
+    uint32_t plays)
+{
+    uint32_t x = seed ^ (plays * 0x9E3779B9u);
+    x ^= x >> 16;
+    x *= 0x85EBCA6Bu;
+    x ^= x >> 13;
+    x *= 0xC2B2AE35u;
+    x ^= x >> 16;
+
+    return x ? x : 0x6D2B79F5u;
+}
+
+/** Next value of the white noise of a source, xorshift32.
+ *
+ * @param state The state, never 0
+ * @return A value in -1..1
+ */
+static inline float box_audio_synth_noise(
+    uint32_t *state)
+{
+    uint32_t x = *state;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    *state = x;
+
+    return (float)(int32_t)x * (1.0f / 2147483648.0f);
+}
+
+/** Aim every destination of the LFOs of a source at their values: the factors of the pitch,
+ * the level and the pulse width of each oscillator, which move there linearly over a control
+ * block or take them at once, and the cutoff, which takes them at once.
+ *
+ * The pitch takes 2 to the cents over 1200, one exp2 per pitched oscillator. The level dips
+ * from 1 at the top of the wave to 1 - amplitude at its bottom, so an LFO in its delay leaves
+ * it at 1.
+ *
+ * @param src The source
+ * @param rate Frames per second
+ * @param now Whether the destinations take their values at once, at the start of a pass
+ */
+static void box_audio_synth_lfo_aim(
+    box_audio_synth_source_t *src,
+    float rate,
+    bool now)
+{
+    const box_audio_synth_patch_t *p = &src->patch;
+    double cents[1 + BOX_AUDIO_SYNTH_LAYERS] = {0}, width[1 + BOX_AUDIO_SYNTH_LAYERS] = {0};
+    double octaves = 0, c, w;
+    float dip[1 + BOX_AUDIO_SYNTH_LAYERS], v;
+    int32_t k, l;
+    for (l = 0; l <= BOX_AUDIO_SYNTH_LAYERS; l ++) {
+        dip[l] = 1;
+    }
+
+    for (k = 0; k < src->lfos; k ++) {
+        const box_audio_synth_lfo_t *d = &p->lfo[k];
+        const box_audio_synth_mod_t *m = &src->lfo[k];
+        v = m->value * m->gain;
+        cents[d->layer] += (double)(d->pitch * v);
+        width[d->layer] += (double)(d->pulse_width * v);
+        dip[d->layer] *= 1 - d->amplitude * m->gain * 0.5f * (1 - m->value);
+        octaves += (double)(d->cutoff * v);
+    }
+
+    for (l = 0; l < (int32_t)p->layers; l ++) {
+        box_audio_synth_osc_t *o = &src->osc[l];
+        c = cents[0] + cents[l + 1];
+        c = c != 0 ? box_audio_synth_exp2(c * (1.0 / 1200)) : 1.0;
+        w = o->width_base + width[0] + width[l + 1];
+        w = w > BOX_AUDIO_SYNTH_PULSE_MIN ? (w < 1 - BOX_AUDIO_SYNTH_PULSE_MIN ? w :
+            1 - BOX_AUDIO_SYNTH_PULSE_MIN) : BOX_AUDIO_SYNTH_PULSE_MIN;
+        if (now) {
+            o->vibrato = c;
+            o->width = w;
+            o->tremolo = dip[l + 1];
+        }
+
+        o->vibrato_step = (c - o->vibrato) * (1.0 / BOX_AUDIO_SYNTH_CONTROL);
+        o->width_step = (w - o->width) * (1.0 / BOX_AUDIO_SYNTH_CONTROL);
+        o->tremolo_step = (dip[l + 1] - o->tremolo) * (1.0f / BOX_AUDIO_SYNTH_CONTROL);
+    }
+
+    if (now) {
+        src->tremolo = dip[0];
+    }
+
+    src->tremolo_step = (dip[0] - src->tremolo) * (1.0f / BOX_AUDIO_SYNTH_CONTROL);
+    if (src->lfo_cutoff) {
+        src->lfo_octaves = octaves;
+        box_audio_synth_cutoff(src, src->amount != 0 ? src->fenv.value : 0.0f, rate);
+    }
+}
+
+/** Value of the wave of an LFO at its phase, before its smoothing and its fade.
+ *
+ * @param m The LFO
+ * @return The value, -1..1
+ */
+static float box_audio_synth_lfo_wave(
+    const box_audio_synth_mod_t *m)
+{
+    double t = m->phase;
+    float x;
+    switch (m->wave) {
+    case BOX_AUDIO_SYNTH_LFO_TRIANGLE:
+        x = (float)(t < 0.25 ? 4 * t : (t < 0.75 ? 2 - 4 * t : 4 * t - 4));
+        break;
+    case BOX_AUDIO_SYNTH_LFO_SQUARE:
+        x = t < 0.5 ? 1.0f : -1.0f;
+        break;
+    case BOX_AUDIO_SYNTH_LFO_SAW:
+        x = (float)(t < 0.5 ? 2 * t : 2 * t - 2);
+        break;
+    case BOX_AUDIO_SYNTH_LFO_RANDOM:
+        x = m->held;
+        break;
+    default:
+        x = box_audio_core_sin(t);
+        break;
+    }
+
+    return x;
+}
+
+/** Start the LFOs of a pass: each from its start phase, before its delay and faded out, but
+ * one without either at its full depth. The pass then sets the destinations to their values.
+ *
+ * @param src The source
+ * @param rate Frames per second
+ */
+static void box_audio_synth_lfo_pass(
+    box_audio_synth_source_t *src,
+    float rate)
+{
+    const box_audio_synth_patch_t *p = &src->patch;
+    int32_t k, n;
+    for (k = 0; k < src->lfos; k ++) {
+        const box_audio_synth_lfo_t *d = &p->lfo[k];
+        box_audio_synth_mod_t *m = &src->lfo[k];
+        m->wave = (int32_t)d->wave;
+        m->inc = (double)d->rate * BOX_AUDIO_SYNTH_CONTROL / (double)rate;
+        m->phase = m->start;
+        m->delay = box_audio_synth_frames(d->delay, rate);
+        n = box_audio_synth_frames(d->fade, rate);
+        m->fade_step = n > BOX_AUDIO_SYNTH_CONTROL ?
+            (float)BOX_AUDIO_SYNTH_CONTROL / (float)n : 1.0f;
+        m->gain = m->delay <= 0 && m->fade_step >= 1 ? 1.0f : 0.0f;
+        m->smooth = m->wave == BOX_AUDIO_SYNTH_LFO_SQUARE || m->wave == BOX_AUDIO_SYNTH_LFO_SAW ||
+            m->wave == BOX_AUDIO_SYNTH_LFO_RANDOM;
+        m->held = m->wave == BOX_AUDIO_SYNTH_LFO_RANDOM ?
+            box_audio_synth_noise(&src->lfo_rng) : 0.0f;
+        m->value = box_audio_synth_lfo_wave(m);
+    }
+
+    src->lfo_control = 1;
+    src->lfo_octaves = 0;
 }
 
 /** Start a pass of the envelopes, the oscillators and the filter envelope, at the start of a
@@ -566,6 +794,13 @@ static void box_audio_synth_pass(
         o->audible = layer->audible != 0;
         o->fb1 = 0;
         o->fb2 = 0;
+        o->width_base = (double)layer->pulse_width;
+        o->width = o->width_base;
+        o->width_step = 0;
+        o->vibrato = 1;
+        o->vibrato_step = 0;
+        o->tremolo = 1;
+        o->tremolo_step = 0;
         src->modulated = src->modulated || o->target >= 0 || layer->feedback > 0;
         src->envs |= 1u << o->env;
         if (layer->has_envelope) {
@@ -609,44 +844,39 @@ static void box_audio_synth_pass(
         box_audio_synth_env_init(&src->fenv, &p->filter_envelope, rate);
     }
 
+    if (src->lfos) {
+        box_audio_synth_lfo_pass(src, rate);
+        box_audio_synth_lfo_aim(src, rate, true);
+    }
+
     box_audio_synth_coefs(src, rate);
 }
 
-/** Hash the seed of a patch with the count of its plays into the state of a play.
+/** Start the LFOs of a play: their own generator, seeded from the seed of the patch and the
+ * count of its plays apart from the noise, so the noise and the variances stay as without
+ * LFOs, and the start phase of each.
  *
- * @param seed The seed
- * @param plays The count
- * @return The state, never 0
+ * @param core The core
+ * @param src The source
+ * @param plays Count of the plays of the patch
  */
-static uint32_t box_audio_synth_hash(
-    uint32_t seed,
+static void box_audio_synth_lfo_start(
+    const box_audio_core_t *core,
+    box_audio_synth_source_t *src,
     uint32_t plays)
 {
-    uint32_t x = seed ^ (plays * 0x9E3779B9u);
-    x ^= x >> 16;
-    x *= 0x85EBCA6Bu;
-    x ^= x >> 13;
-    x *= 0xC2B2AE35u;
-    x ^= x >> 16;
-
-    return x ? x : 0x6D2B79F5u;
-}
-
-/** Next value of the white noise of a source, xorshift32.
- *
- * @param state The state, never 0
- * @return A value in -1..1
- */
-static inline float box_audio_synth_noise(
-    uint32_t *state)
-{
-    uint32_t x = *state;
-    x ^= x << 13;
-    x ^= x >> 17;
-    x ^= x << 5;
-    *state = x;
-
-    return (float)(int32_t)x * (1.0f / 2147483648.0f);
+    const box_audio_synth_patch_t *p = &src->patch;
+    int32_t k;
+    src->lfo_rng = box_audio_synth_hash(p->seed ^ 0x4C464F21u, plays);
+    src->lfo_smooth = (float)(1 - box_audio_synth_exp2(-(double)BOX_AUDIO_SYNTH_CONTROL /
+        (BOX_AUDIO_SYNTH_LFO_SMOOTH * (double)core->sample_rate * BOX_AUDIO_SYNTH_LN2)));
+    src->lfo_cutoff = false;
+    for (k = 0; k < src->lfos; k ++) {
+        const box_audio_synth_lfo_t *d = &p->lfo[k];
+        src->lfo[k].start = d->random_phase ?
+            0.5 * (1.0 + (double)box_audio_synth_noise(&src->lfo_rng)) : (double)d->phase;
+        src->lfo_cutoff = src->lfo_cutoff || (src->filter && d->cutoff != 0);
+    }
 }
 
 void box_audio_source_synth(
@@ -684,6 +914,11 @@ void box_audio_source_synth(
         src->svf[0].k = (float)(BOX_AUDIO_SYNTH_SQRT2 -
             (BOX_AUDIO_SYNTH_SQRT2 - BOX_AUDIO_SYNTH_DAMPING_MIN) *
             (double)src->patch.resonance);
+    }
+
+    src->lfos = (int32_t)src->patch.lfos;
+    if (src->lfos) {
+        box_audio_synth_lfo_start(core, src, slot->plays);
     }
 
     box_audio_synth_pass(core, src);
@@ -861,6 +1096,69 @@ static void box_audio_synth_glide_next(
     }
 }
 
+/** Advance the LFOs of a source by a control block, through their delays, fades and phases,
+ * and aim every destination at their values at the end of the block.
+ *
+ * @param src The source
+ * @param rate Frames per second
+ */
+static void box_audio_synth_lfo_block(
+    box_audio_synth_source_t *src,
+    float rate)
+{
+    float raw;
+    double t;
+    int32_t k;
+    for (k = 0; k < src->lfos; k ++) {
+        box_audio_synth_mod_t *m = &src->lfo[k];
+        if (m->delay > 0) {
+            m->delay -= BOX_AUDIO_SYNTH_CONTROL;
+        } else {
+            m->gain = m->gain + m->fade_step < 1 ? m->gain + m->fade_step : 1.0f;
+            t = m->phase + m->inc;
+            if (t >= 1) {
+                t -= (double)(int64_t)t;
+                if (m->wave == BOX_AUDIO_SYNTH_LFO_RANDOM) {
+                    m->held = box_audio_synth_noise(&src->lfo_rng);
+                }
+            }
+
+            m->phase = t;
+        }
+
+        raw = box_audio_synth_lfo_wave(m);
+        m->value = m->smooth ? m->value + (raw - m->value) * src->lfo_smooth : raw;
+    }
+
+    box_audio_synth_lfo_aim(src, rate, false);
+}
+
+/** Advance the LFOs of a source by a frame: a control block every BOX_AUDIO_SYNTH_CONTROL
+ * frames, and a step of each destination toward its aim in between.
+ *
+ * @param src The source
+ * @param rate Frames per second
+ */
+static inline void box_audio_synth_lfo_next(
+    box_audio_synth_source_t *src,
+    float rate)
+{
+    int32_t l;
+    if (-- src->lfo_control <= 0) {
+        src->lfo_control = BOX_AUDIO_SYNTH_CONTROL;
+        box_audio_synth_lfo_block(src, rate);
+    }
+
+    for (l = 0; l < (int32_t)src->patch.layers; l ++) {
+        box_audio_synth_osc_t *o = &src->osc[l];
+        o->vibrato += o->vibrato_step;
+        o->width += o->width_step;
+        o->tremolo += o->tremolo_step;
+    }
+
+    src->tremolo += src->tremolo_step;
+}
+
 /** Advance the envelopes a source uses by a frame.
  *
  * @param src The source
@@ -928,18 +1226,41 @@ static inline float box_audio_synth_blamp(
     return result;
 }
 
+/** Render a frame of a pulse, a square that is high for a share of its period other than half,
+ * without its DC: a step up at phase 0 and one down at the width, each with its polyBLEP. The
+ * width keeps a frame from either end, so the two steps never fall in one frame.
+ *
+ * @param t Phase in turns, 0..1
+ * @param dt Turns per frame
+ * @param w Share of the period it is high
+ * @return The sample, 2 w - 2..2 w
+ */
+static inline float box_audio_synth_pulse(
+    double t,
+    double dt,
+    double w)
+{
+    double lo = dt < 0.5 ? dt : 0.5;
+    w = w > lo ? (w < 1 - lo ? w : 1 - lo) : lo;
+
+    return (float)((t < w ? 1.0 : -1.0) - (2 * w - 1)) + box_audio_synth_blep(t, dt) -
+        box_audio_synth_blep(t < w ? t + 1 - w : t - w, dt);
+}
+
 /** Render a frame of a wave at a phase.
  *
  * @param wave A box_audio_synth_wave_t
  * @param t Phase in turns, 0..1
  * @param dt Turns per frame
+ * @param width Square: share of the period it is high
  * @param rng State of the noise
- * @return The sample, -1..1
+ * @return The sample, -1..1, a pulse 2 width - 2..2 width
  */
 static inline float box_audio_synth_wave(
     int32_t wave,
     double t,
     double dt,
+    double width,
     uint32_t *rng)
 {
     float x;
@@ -948,8 +1269,13 @@ static inline float box_audio_synth_wave(
         x = (float)(2 * t - 1) - box_audio_synth_blep(t, dt);
         break;
     case BOX_AUDIO_SYNTH_SQUARE:
-        x = (t < 0.5 ? 1.0f : -1.0f) + box_audio_synth_blep(t, dt) -
-            box_audio_synth_blep(t < 0.5 ? t + 0.5 : t - 0.5, dt);
+        if (width != 0.5) {
+            x = box_audio_synth_pulse(t, dt, width);
+        } else {
+            x = (t < 0.5 ? 1.0f : -1.0f) + box_audio_synth_blep(t, dt) -
+                box_audio_synth_blep(t < 0.5 ? t + 0.5 : t - 0.5, dt);
+        }
+
         break;
     case BOX_AUDIO_SYNTH_TRIANGLE:
         x = (float)(t < 0.5 ? 4 * t - 1 : 3 - 4 * t) + (float)(4 * dt) *
@@ -970,11 +1296,13 @@ static inline float box_audio_synth_wave(
 /** Advance the phase and the sweep of an oscillator by a frame.
  *
  * @param o The oscillator
+ * @param inc Turns of the frame: its inc, or its inc times the vibrato of the LFOs
  */
 static inline void box_audio_synth_osc_advance(
-    box_audio_synth_osc_t *o)
+    box_audio_synth_osc_t *o,
+    double inc)
 {
-    double t = o->phase + o->inc;
+    double t = o->phase + inc;
     o->phase = t >= 1 ? t - 1 : t;
     if (o->sweep > 0) {
         o->sweep --;
@@ -992,24 +1320,65 @@ static inline float box_audio_synth_osc_next(
     box_audio_synth_osc_t *o,
     uint32_t *rng)
 {
-    float x = box_audio_synth_wave(o->wave, o->phase, o->inc, rng);
-    box_audio_synth_osc_advance(o);
+    float x = box_audio_synth_wave(o->wave, o->phase, o->inc, o->width, rng);
+    box_audio_synth_osc_advance(o, o->inc);
 
     return x;
 }
 
-/** Render a frame of the layers of a source in which a layer modulates another or itself.
+/** Turns per frame of an oscillator with the vibrato of the LFOs, under the top.
  *
- * Modulators come after their carriers, so the layers render from the last: each adds its wave
- * times its envelope, scaled by its index, to the phase of its target, or multiplies it.
+ * @param src The source
+ * @param o The oscillator
+ * @return The turns
+ */
+static inline double box_audio_synth_osc_inc(
+    const box_audio_synth_source_t *src,
+    const box_audio_synth_osc_t *o)
+{
+    double inc = o->inc * o->vibrato;
+
+    return inc < src->inc_max ? inc : src->inc_max;
+}
+
+/** Render a frame of the layers of a source with LFOs in which no layer modulates another.
  *
  * @param src The source
  * @param levels The level of each envelope for the frame
  * @return The mix of the layers
  */
-static inline float box_audio_synth_modulate(
+static inline float box_audio_synth_layers_lfo(
     box_audio_synth_source_t *src,
     const float *levels)
+{
+    float mix = 0, x;
+    int32_t l;
+    for (l = 0; l < (int32_t)src->patch.layers; l ++) {
+        box_audio_synth_osc_t *o = &src->osc[l];
+        double inc = box_audio_synth_osc_inc(src, o);
+        x = box_audio_synth_wave(o->wave, o->phase, inc, o->width, &src->rng);
+        box_audio_synth_osc_advance(o, inc);
+        mix += x * o->level * o->tremolo * levels[o->env];
+    }
+
+    return mix;
+}
+
+/** Render a frame of the layers of a source in which a layer modulates another or itself.
+ *
+ * Modulators come after their carriers, so the layers render from the last: each adds its wave
+ * times its envelope, scaled by its index, to the phase of its target, or multiplies it. With
+ * LFOs each also takes its vibrato and its tremolo, the signal of a modulator included.
+ *
+ * @param src The source
+ * @param levels The level of each envelope for the frame
+ * @param lfo Whether the source has LFOs, a constant of each call
+ * @return The mix of the layers
+ */
+static inline float box_audio_synth_modulate(
+    box_audio_synth_source_t *src,
+    const float *levels,
+    bool lfo)
 {
     double offset[BOX_AUDIO_SYNTH_LAYERS] = {0}, t;
     float ring[BOX_AUDIO_SYNTH_LAYERS], mix = 0, x, signal;
@@ -1020,7 +1389,8 @@ static inline float box_audio_synth_modulate(
 
     for (l = (int32_t)src->patch.layers - 1; l >= 0; l --) {
         box_audio_synth_osc_t *o = &src->osc[l];
-        float level = levels[o->env];
+        float level = lfo ? levels[o->env] * o->tremolo : levels[o->env];
+        double inc = lfo ? box_audio_synth_osc_inc(src, o) : o->inc;
         t = o->phase + offset[l] + (double)(o->feedback * 0.5f * (o->fb1 + o->fb2));
         if (t < 0 || t >= 1) {
             t -= (double)(int64_t)t;
@@ -1028,8 +1398,8 @@ static inline float box_audio_synth_modulate(
             t = t >= 1 ? t - 1 : t;
         }
 
-        x = box_audio_synth_wave(o->wave, t, o->inc, &src->rng);
-        box_audio_synth_osc_advance(o);
+        x = box_audio_synth_wave(o->wave, t, inc, o->width, &src->rng);
+        box_audio_synth_osc_advance(o, inc);
         o->fb2 = o->fb1;
         o->fb1 = x;
         x *= ring[l];
@@ -1105,8 +1475,15 @@ int32_t box_audio_synth_render(
             box_audio_synth_glide_next(src);
         }
 
+        if (src->lfos) {
+            box_audio_synth_lfo_next(src, rate);
+        }
+
         if (src->modulated) {
-            mix = box_audio_synth_modulate(src, levels);
+            mix = src->lfos ? box_audio_synth_modulate(src, levels, true) :
+                box_audio_synth_modulate(src, levels, false);
+        } else if (src->lfos) {
+            mix = box_audio_synth_layers_lfo(src, levels);
         } else {
             for (l = 0; l < layers; l ++) {
                 box_audio_synth_osc_t *o = &src->osc[l];
@@ -1117,7 +1494,9 @@ int32_t box_audio_synth_render(
         if (src->filter) {
             if (src->amount != 0 && src->fenv.segment < BOX_AUDIO_SYNTH_DONE) {
                 float level = box_audio_synth_env_next(&src->fenv);
-                if (-- src->control <= 0 || src->fenv.segment >= BOX_AUDIO_SYNTH_DONE) {
+                if (!src->lfo_cutoff && (-- src->control <= 0 ||
+                    src->fenv.segment >= BOX_AUDIO_SYNTH_DONE))
+                {
                     src->control = BOX_AUDIO_SYNTH_CONTROL;
                     box_audio_synth_cutoff(src, level, rate);
                 }
@@ -1133,7 +1512,13 @@ int32_t box_audio_synth_render(
             y = mix;
         }
 
-        out[i] = box_audio_clean(y * src->amp);
+        if (src->lfos) {
+            y = y * src->amp * src->tremolo;
+        } else {
+            y = y * src->amp;
+        }
+
+        out[i] = box_audio_clean(y);
     }
 
     return i;

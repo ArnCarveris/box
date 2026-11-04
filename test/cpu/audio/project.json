@@ -303,7 +303,21 @@
                     "script_legato",
                     "script_legato_source",
                     "docs_glide_example",
-                    "script_modulators"
+                    "script_modulators",
+                    "lfo_vibrato",
+                    "lfo_tremolo",
+                    "lfo_layer",
+                    "lfo_delay_fade",
+                    "lfo_smooth",
+                    "lfo_square_no_click",
+                    "lfo_cutoff",
+                    "lfo_pulse_width",
+                    "pulse_width_harmonics",
+                    "alias_pulse",
+                    "lfo_zero_identical",
+                    "lfo_random_phase_seeded",
+                    "docs_lfo_examples",
+                    "script_lfo"
                 ]
             },
             {

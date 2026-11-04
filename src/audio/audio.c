@@ -125,7 +125,7 @@ static void box_audio_reverb_ctor(
 }
 
 /** Construct SynthOscillator values: a sine at 440 Hz at unity level, without a sweep, heard,
- * with an index of 1 for when it modulates.
+ * with an index of 1 for when it modulates and a pulse width of 0.5 for when it is a square.
  *
  * @param ptr The components
  * @param count Number of components
@@ -141,7 +141,8 @@ static void box_audio_synth_oscillator_ctor(
     (void)ti;
     for (i = 0; i < count; i ++) {
         values[i] = (SynthOscillator){
-            .wave = SynthSine, .frequency = 440.0f, .level = 1.0f, .index = 1.0f };
+            .wave = SynthSine, .frequency = 440.0f, .level = 1.0f, .index = 1.0f,
+            .pulse_width = 0.5f };
     }
 }
 
@@ -162,6 +163,26 @@ static void box_audio_synth_filter_ctor(
     (void)ti;
     for (i = 0; i < count; i ++) {
         values[i] = (SynthFilter){ .kind = SynthLowPass, .cutoff = 1000.0f };
+    }
+}
+
+/** Construct SynthLfo values: a sine at 5 Hz from phase 0 without a delay, at depth 0 on
+ * every destination.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_synth_lfo_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    SynthLfo *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (SynthLfo){ .wave = SynthLfoSine, .rate = 5.0f };
     }
 }
 
@@ -677,6 +698,9 @@ void BoxAudioImport(
     ecs_set_hooks(world, SynthFilter, { .ctor = box_audio_synth_filter_ctor });
     ECS_META_COMPONENT(world, SynthFilterEnvelope);
     ECS_META_COMPONENT(world, SynthGlide);
+    ECS_META_COMPONENT(world, SynthLfoWave);
+    ECS_META_COMPONENT(world, SynthLfo);
+    ecs_set_hooks(world, SynthLfo, { .ctor = box_audio_synth_lfo_ctor });
     ECS_META_COMPONENT(world, SynthSound);
     ECS_META_COMPONENT(world, AudioSettings);
     ecs_set_hooks(world, AudioSettings, { .ctor = box_audio_settings_ctor });
