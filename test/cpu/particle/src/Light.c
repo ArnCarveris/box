@@ -439,6 +439,7 @@ void Light_prefab_instance_own_light(void) {
     ecs_set(world, base, ParticleLight, { .intensity = 3 });
     ecs_add(world, base, ParticleEmitter);
     ecs_entity_t e = ecs_new_w_pair(world, EcsIsA, base);
+    ecs_set(world, e, Position, {0, 0, 0});
     test_bool(ecs_owns(world, e, PointLight), true);
 
     frame(world);

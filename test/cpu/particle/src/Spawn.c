@@ -318,6 +318,7 @@ void Spawn_same_seed_same_accounting(void) {
         p->lifetime = (ParticleRange){0.1f, 0.4f};
         p->seed = 11;
         ecs_modified(world[w], e, ParticleEmitter);
+        ecs_set(world[w], e, Position, {0, 0, 0});
         for (i = 0; i < 40; i ++) {
             live[w][i] = frame(world[w], DELTA).particles;
         }

@@ -352,6 +352,7 @@ static ecs_world_t* trans_coat_world(
     ecs_set(world, sun, DirectionalLight, {.intensity = 0});
 
     ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, Quad, {4, 4});
     ecs_set(world, e, Rgb, {40, 40, 40});
     ecs_set(world, e, PbrMaterial, {.metallic = 0, .roughness = 1});

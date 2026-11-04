@@ -689,6 +689,7 @@ void Drift_slides_on_ground(void) {
     ecs_modified(world, e[0], ParticleEmitter);
     ecs_set(world, e[0], ParticleForces, {.gravity = {0, -9.81f, 0}, .drift = {2, 0, 0}});
     ecs_add(world, e[0], ParticleCollision);
+    ecs_set(world, e[0], Position, {0, 0, 0});
     replay_t *r[1] = { ecs_os_calloc_t(replay_t) };
     int32_t i;
     for (i = 0; i < 61; i ++) {

@@ -712,6 +712,8 @@ static void box_layout_place(
     if (main == -1) {
         for (i = 0; i < n->count; i ++) {
             box_layout_node_t *c = &nodes[n->first + i];
+            /* A child without a LayoutItem keeps its Position; one without either is put at
+             * the origin of the element, as an entity without a Position is not drawn */
             c->placed = c->has_item || !c->has_pos;
             if (c->has_item) {
                 c->at[0] = box_layout_align(lo[0], hi[0], c->size[0], c->item.h, 0) + c->item.x;

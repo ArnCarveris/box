@@ -467,6 +467,7 @@ void SpatialLayout_array_after_indexed(void) {
     ecs_world_t *world = setup();
     ecs_entity_t owner = ecs_new(world), prototype = shape(world, 1, 1, 1);
     ecs_add_pair(world, prototype, EcsChildOf, owner);
+    ecs_set(world, prototype, Position, {0, 0, 0});
     ecs_progress(world, 0);
     vec3 min, max;
     test_assert(box_spatial_bounds(world, prototype, NULL, min, max));

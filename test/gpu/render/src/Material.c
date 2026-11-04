@@ -637,6 +637,7 @@ void Material_change_uploads_only_changed(void) {
     int32_t i;
     for (i = 0; i < 100; i ++) {
         shapes[i] = ecs_new(world);
+        ecs_set(world, shapes[i], Position, {0, 0, 0});
         ecs_set(world, shapes[i], Box, {1, 1, 1});
     }
 

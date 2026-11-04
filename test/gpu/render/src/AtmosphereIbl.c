@@ -102,6 +102,7 @@ static ecs_entity_t sphere_new(
     ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, dark, DirectionalLight, {.intensity = 0});
     ecs_entity_t sphere = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, sphere, Position, {0, 0, 0});
     ecs_set(world, sphere, Sphere, {.segments = 48, .smooth = true, .radius = 1});
     ecs_set(world, sphere, Rgb, {255, 255, 255});
     ecs_set(world, sphere, PbrMaterial, {.metallic = 0, .roughness = 1});

@@ -375,14 +375,17 @@ void ImageSlice_no_texture_is_plain(void) {
  * ImageSlice and its instance */
 #define SLICE_SCENE \
     "using box.geometry\n" \
+    "using box.transform\n" \
     "frame {}\n" \
     "panel {\n" \
+    "  Position: {0, 0, 0}\n" \
     "  Rect: {200, 100}\n" \
     "  Image: {texture: frame}\n" \
     "  ImageSlice: {left: 16, top: 16, right: 16, bottom: 16, scale: 2, edges: SliceTile, " \
     "hollow: true}\n" \
     "}\n" \
     "disc {\n" \
+    "  Position: {0, 0, 0}\n" \
     "  Circle: {40}\n" \
     "  Image: {texture: frame}\n" \
     "  ImageSlice: {left: 16, top: 16, right: 16, bottom: 16}\n" \
@@ -392,7 +395,9 @@ void ImageSlice_no_texture_is_plain(void) {
     "  Image: {texture: frame}\n" \
     "  ImageSlice: {left: 8, top: 8, right: 8, bottom: 8, center: SliceTile}\n" \
     "}\n" \
-    "framed : Framed {}\n"
+    "framed : Framed {\n" \
+    "  Position: {0, 0, 0}\n" \
+    "}\n"
 
 /** Create a world that runs the slice scene.
  *

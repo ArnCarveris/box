@@ -540,6 +540,7 @@ void MaterialIds_tinted_instance_keeps_prefab_id(void) {
     ecs_set(world, parent, Tint, {0, 0, 255, 128});
     ecs_entity_t child = ecs_new_w_pair(world, EcsIsA, prefab);
     ecs_add_pair(world, child, EcsChildOf, parent);
+    ecs_set(world, child, Position, {0, 0, 0});
     box_render_draws_stats_t stats = frame(world);
     uint32_t id = id_of(world, prefab);
     test_int(stats.materials, 2);
