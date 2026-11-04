@@ -16,8 +16,9 @@ the bus music and a click that box.audio.play plays at load.
 check expects AudioStatus.state AudioWaitingForGesture before a gesture, then starts the audio
 with a trusted click: the tone has to reach the worklet at 440 Hz and a peak of 0.25 with one
 voice, the click dropped. A script that sets AudioBus.volume to 0.5 (script_write) has to halve
-the level. A hidden page
-has to fade out and suspend the context (AudioSuspended) and a visible one resume it. A capture
+the level. With AudioMeter on the bus the worklet has to post meters messages and the
+meter has to read the peak and the RMS of the tone. A hidden page has to fade out and suspend
+the context (AudioSuspended), its meter read silence, and a visible one resume it. A capture
 of one second (audio capture 1) has to land as a WAV in the file system of the page with the
 tone, and a 500 ms busy loop on the main thread has to leave the loop playing. The commands run
 through Module.cwrap('box_command_web_run'), the shell of the page. The log has no error and no
@@ -304,6 +305,35 @@ async function main() {
       `${half.tail.toFixed(4)}`);
     expect(Math.abs(half.tail - LEVEL * VOLUME) < 0.01, 'the volume of the bus did not apply');
 
+    // The meters: the worklet posts them while a bus plays, and AudioMeter of the bus reads
+    // the tone at its output, after the volume
+    const audioMeter = async () => {
+      const out = await evaluate(shell('get music box.audio.AudioMeter'));
+      try {
+        return JSON.parse(out).AudioMeter;
+      } catch {
+        return null;
+      }
+    };
+    const meterCode = `using box.audio\nmusic {\n  AudioBus: {volume: ${VOLUME}}\n` +
+      `  AudioMeter: {}\n}\n`;
+    await evaluate(shell(`script_write mixer ${JSON.stringify(meterCode)}`));
+    await sleep(1000);
+    const posted = await evaluate(`(() => {
+      const a = Module.boxAudio, m = a.lastMeters;
+      return { received: a.metersReceived,
+        frames: m ? Math.max.apply(null, Array.from(m.frames)) : 0 };
+    })()`);
+    const meter = await audioMeter();
+    console.log(`meters: ${posted.received} messages, ${posted.frames} frames in the last, ` +
+      `AudioMeter ${JSON.stringify(meter)}`);
+    expect(posted.received > 0 && posted.frames >= 4 * 128, 'the worklet posts no meters');
+    expect(meter && Math.abs(meter.peak_left - LEVEL * VOLUME) < 0.01 &&
+      Math.abs(meter.peak_right - LEVEL * VOLUME) < 0.01, 'the peak of the meter is not ' +
+      'the level of the tone');
+    expect(meter && Math.abs(meter.rms_left - LEVEL * VOLUME / Math.SQRT2) < 0.01,
+      'the RMS of the meter is not the RMS of the tone');
+
     // A hidden page fades out and suspends, a visible one resumes
     await evaluate(visibility('hidden'));
     const suspended = await waitFor('Module.boxAudio.ctx.state === "suspended"', 3000);
@@ -312,6 +342,11 @@ async function main() {
       `AudioStatus.state ${hiddenState}, suspends ${await evaluate('Module.boxAudio.suspends')}`);
     expect(suspended, 'the hidden page did not suspend its audio');
     expect(hiddenState === '"AudioSuspended"', 'AudioStatus is not AudioSuspended when hidden');
+    await sleep(300);
+    const hiddenMeter = await audioMeter();
+    console.log(`hidden: AudioMeter ${JSON.stringify(hiddenMeter)}`);
+    expect(hiddenMeter && hiddenMeter.peak_left === 0 && hiddenMeter.rms_left === 0,
+      'the meter of a suspended page does not read silence');
     await evaluate(visibility('visible'));
     const resumed = await waitFor('Module.boxAudio.ctx.state === "running"', 3000);
     await sleep(500);

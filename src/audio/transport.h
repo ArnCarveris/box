@@ -107,6 +107,15 @@ struct box_audio_transport_t {
      * @return Number of events written */
     int32_t (*read_events)(box_audio_transport_t *t, box_audio_event_t *events, int32_t max);
 
+    /** Take the levels of the buses and the values of the effects the core measured since
+     * the last call, which start over: buses receives BOX_AUDIO_BUS_MAX meters by bus index,
+     * effects BOX_AUDIO_EFFECT_MAX by slot, zero for what did not render. The null transport
+     * reads the core, the native one the atomic words its audio thread publishes after each
+     * callback, the web one the meters messages of the worklet. They follow the clock of the
+     * output: what does not render, such as a suspended page, reports nothing */
+    void (*meters)(box_audio_transport_t *t, box_audio_meter_t *buses,
+        box_audio_effect_meter_t *effects);
+
     /** Report the state of the output */
     box_audio_state_t (*state)(box_audio_transport_t *t);
 

@@ -36,9 +36,12 @@ static const char *box_audio_web_reasons[] = {
  * @param core Bytes of the wasm of the core
  * @param size Size of the wasm in bytes
  * @param quantum Frames the core renders per call at most
+ * @param buses BOX_AUDIO_BUS_MAX, the meters of buses the core reports
+ * @param effects BOX_AUDIO_EFFECT_MAX, the meters of effects the core reports
  * @return 0 when the load started, else the reason code of the failure
  */
-EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quantum), {
+EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quantum, int buses,
+    int effects), {
     var worklet = function() {
         var EVENTS = 64;
         var SOUND_FREE = 3;
@@ -46,6 +49,7 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
         var CLOCK_QUANTA = 16;
         var STREAMS = 2;
         var STREAM_FIELDS = ['voice', 'open', 'ended', 'consumed', 'at', 'underruns', 'starved'];
+        var METER_QUANTA = 4;
         class BoxAudioProcessor extends AudioWorkletProcessor {
             constructor(options) {
                 super();
@@ -63,6 +67,12 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                 this.batches = 0;
                 this.capture = null;
                 this.voices = -1;
+                this.buses = o.buses;
+                this.effectCount = o.effects;
+                // Frames of silence of every bus since a meter last showed a signal; the meters
+                // go out while it is under the window of the module, so its RMS falls to 0
+                this.meterHold = 0.35 * o.sampleRate;
+                this.meterSilent = this.meterHold;
                 // Chunks of each stream in the heap, oldest first, and what was posted of it
                 this.chunks = [];
                 this.chunksFreed = [];
@@ -264,6 +274,40 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                 }
             }
 
+            // The meters of the core every few quanta, read and started over each time, posted
+            // while any bus is active: it had a signal within the hold
+            meters() {
+                var at = this.core.box_audio_core_wasm_meters();
+                var fx = this.core.box_audio_core_wasm_effect_meters();
+                this.views();
+                var words = new Uint32Array(this.buffer, at, this.buses * 8);
+                var floats = new Float32Array(this.buffer, at, this.buses * 8);
+                var doubles = new Float64Array(this.buffer, at, this.buses * 4);
+                var reduction = new Float32Array(this.buffer, fx, this.effectCount).slice();
+                var peaks = new Float32Array(this.buses * 2);
+                var squares = new Float64Array(this.buses * 2);
+                var frames = new Uint32Array(this.buses);
+                var signal = false, most = 0;
+                for (var i = 0; i < this.buses; i++) {
+                    peaks[i * 2] = floats[i * 8];
+                    peaks[i * 2 + 1] = floats[i * 8 + 1];
+                    squares[i * 2] = doubles[i * 4 + 1];
+                    squares[i * 2 + 1] = doubles[i * 4 + 2];
+                    frames[i] = words[i * 8 + 6];
+                    most = Math.max(most, frames[i]);
+                    signal = signal || peaks[i * 2] > 0 || peaks[i * 2 + 1] > 0;
+                }
+                for (var k = 0; k < this.effectCount; k++) {
+                    signal = signal || reduction[k] > 0;
+                }
+                this.meterSilent = signal ? 0 : this.meterSilent + most;
+                if (this.meterSilent <= this.meterHold) {
+                    this.port.postMessage({ type: 'meters', peaks: peaks, squares: squares,
+                        frames: frames, reduction: reduction },
+                        [peaks.buffer, squares.buffer, frames.buffer, reduction.buffer]);
+                }
+            }
+
             // The voices go to the main module every few quanta, when they changed
             status() {
                 var voices = this.core.box_audio_core_wasm_voices();
@@ -297,6 +341,9 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                         frame: currentFrame + frames });
                 }
                 this.quanta++;
+                if (this.quanta % METER_QUANTA === 0) {
+                    this.meters();
+                }
                 if (this.quanta % STATUS_QUANTA === 0) {
                     this.status();
                 }
@@ -326,7 +373,9 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
         failed: 0, coreSize: size, events: [], queue: [], onevents: null, gestures: 0,
         resumes: 0, voices: 0, gain: null, hidden: false, wasRunning: false, suspends: 0,
         visibilityResumes: 0, capturing: false, captured: null, streams: [], chunksSent: 0,
-        clockCore: 0, clockFrame: -1, clockLast: 0 };
+        clockCore: 0, clockFrame: -1, clockLast: 0, metersReceived: 0,
+        meters: { peaks: new Float32Array(buses * 2), squares: new Float64Array(buses * 2),
+            frames: new Uint32Array(buses), reduction: new Float32Array(effects) } };
     audio.post = function(m, transfer) {
         if (audio.node) {
             audio.node.port.postMessage(m, transfer || []);
@@ -420,6 +469,21 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
             audio.clockFrame = m.frame;
         } else if (m.type === 'stream') {
             audio.streams[m.status.stream] = m.status;
+        } else if (m.type === 'meters') {
+            // Accumulated until the transport of the main module takes them (transport.c)
+            var acc = audio.meters;
+            for (var i = 0; i < m.frames.length && i < acc.frames.length; i++) {
+                acc.peaks[i * 2] = Math.max(acc.peaks[i * 2], m.peaks[i * 2]);
+                acc.peaks[i * 2 + 1] = Math.max(acc.peaks[i * 2 + 1], m.peaks[i * 2 + 1]);
+                acc.squares[i * 2] += m.squares[i * 2];
+                acc.squares[i * 2 + 1] += m.squares[i * 2 + 1];
+                acc.frames[i] += m.frames[i];
+            }
+            for (var k = 0; k < m.reduction.length && k < acc.reduction.length; k++) {
+                acc.reduction[k] = Math.max(acc.reduction[k], m.reduction[k]);
+            }
+            audio.metersReceived++;
+            audio.lastMeters = m;
         } else if (m.type === 'capture') {
             audio.captured = new Float32Array(m.data);
         } else if (m.type === 'events') {
@@ -493,7 +557,8 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
             numberOfInputs: 0,
             numberOfOutputs: 1,
             outputChannelCount: [2],
-            processorOptions: { core: bytes, sampleRate: ctx.sampleRate, quantum: quantum }
+            processorOptions: { core: bytes, sampleRate: ctx.sampleRate, quantum: quantum,
+                buses: buses, effects: effects }
         });
         node.onprocessorerror = function() { fail(4); };
         node.port.onmessage = function(e) { receive(e.data); };
@@ -763,7 +828,7 @@ void box_audio_web_start(void)
 
     box_audio_web_started = true;
     reason = box_audio_web_create(box_audio_core_wasm, (int)sizeof(box_audio_core_wasm),
-        BOX_AUDIO_CORE_QUANTUM);
+        BOX_AUDIO_CORE_QUANTUM, BOX_AUDIO_BUS_MAX, BOX_AUDIO_EFFECT_MAX);
     if (reason) {
         box_audio_web_failed(reason);
     }

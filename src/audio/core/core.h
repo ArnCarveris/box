@@ -517,6 +517,24 @@ typedef struct box_audio_cmd_synth_t {
     ((int32_t)(offsetof(box_audio_cmd_synth_t, patch.layer) + \
     (size_t)(layers) * sizeof(box_audio_synth_layer_t)))
 
+/** The levels of a bus since the last box_audio_core_meters, measured at its output: after
+ * its inserts, width, pan, volume and mute, what it sends on. The master is measured before the
+ * limiter */
+typedef struct box_audio_meter_t {
+    float peak_left;      /**< Largest absolute sample of the left channel */
+    float peak_right;     /**< Largest absolute sample of the right channel */
+    double square_left;   /**< Sum of the squares of the left samples */
+    double square_right;  /**< Sum of the squares of the right samples */
+    uint32_t frames;      /**< Frames the sums hold, 0 for a bus that did not render */
+    uint32_t unused;      /**< Padding, 0 */
+} box_audio_meter_t;
+
+/** The values of an effect since the last box_audio_core_effect_meters, which the kinds that
+ * have them fill */
+typedef struct box_audio_effect_meter_t {
+    float reduction;      /**< Largest gain reduction in dB, 0 for none or a kind without */
+} box_audio_effect_meter_t;
+
 /** Events the core reports to its transport */
 typedef enum box_audio_event_type_t {
     BOX_AUDIO_EVENT_VOICE_END = 1,      /**< A voice ended, id is its handle */
@@ -712,6 +730,33 @@ int32_t box_audio_core_events_lost(
  */
 int32_t box_audio_core_voice_count(
     const box_audio_core_t *core);
+
+/** Take the levels of the buses since the last call and start them over. Every bus in the
+ * order is measured per block at its output, a compare and a multiply-add per sample and
+ * channel. Does not allocate.
+ *
+ * @param core The core
+ * @param meters Receives the levels of buses 0 to max - 1, by index
+ * @param max Room in meters, at most BOX_AUDIO_BUS_MAX are written
+ * @return Number of meters written
+ */
+int32_t box_audio_core_meters(
+    box_audio_core_t *core,
+    box_audio_meter_t *meters,
+    int32_t max);
+
+/** Take the values of the effects since the last call and start them over. Does not
+ * allocate.
+ *
+ * @param core The core
+ * @param meters Receives the values of effect slots 0 to max - 1
+ * @param max Room in meters, at most BOX_AUDIO_EFFECT_MAX are written
+ * @return Number of meters written
+ */
+int32_t box_audio_core_effect_meters(
+    box_audio_core_t *core,
+    box_audio_effect_meter_t *meters,
+    int32_t max);
 
 /** Get the floats of memory an effect of a kind needs at a sample rate; for the reverb its
  * delay lines at the largest size and its longest predelay.

@@ -771,6 +771,7 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, AudioBus);
     box_owned_hooks(world, AudioBus, BOX_OWNED_VEC(AudioBus, sends, AudioSend));
     ecs_set_hooks(world, AudioBus, { .ctor = box_audio_bus_ctor });
+    ECS_META_COMPONENT(world, AudioMeter);
     ECS_META_COMPONENT(world, AudioOutput);
     ECS_META_COMPONENT(world, AudioPcm);
     box_owned_hooks(world, AudioPcm, BOX_OWNED_VEC(AudioPcm, samples, float));

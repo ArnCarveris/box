@@ -55,6 +55,7 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 | `AudioStreamStatus` | Read only: the state, position, buffer, underruns and decode time of a stream |
 | `AudioSettings` | Singleton: the master volume and mute |
 | `AudioStatus` | Singleton, read only: the state of the output, its rate, the voices, steals, load and the clock of its core |
+| `AudioMeter` | Read only, opt-in: the peak and the RMS of each channel of a mixer channel, the master included, and the gain reduction of an effect, see [Meters](#meters) |
 | `Transport` | Singleton: the timeline in beats, its tempo, time signature, position, play and stop, loop and metronome, see [Transport](#transport) |
 | `AudioQuantize` | Enum of `box.audio.play_quantized`: `AudioQuantizeNone`, `AudioQuantizeBeat`, `AudioQuantizeBar`, see [Quantized plays](#quantized-plays) |
 
@@ -247,6 +248,10 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   fades over 5 ms, there is no crossfade).
 - **Mixer**: 63 buses besides the master and 4 sends per channel; more buses are silent and
   more sends are ignored, both with one error.
+- **Meters**: a peak and an RMS per channel and the gain reduction of an effect, no other
+  measure (no LUFS, no true peak between samples, no spectrum). The RMS is over the last 300 ms
+  of output, from the frames of the last 64 frames of the app at most, so above 200 frames per
+  second its window is shorter.
 - **Tools**: no mixer UI, and the UI theme of box has no sounds; a scene adds them in its own
   widgets, as the dust merchant does.
 - **Web**: no shared memory, decoding on the main thread, and no load measurement in the
@@ -267,8 +272,8 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
 The audio a box app plays can be inspected without listening:
 
 - `audio` prints the state, the rate, the voices, the steals, the load, the clock of the core
-  (frames and seconds), the transport and every bus with its kind, width, solo, routing, sends
-  and the effects of its insert slots, with whether each runs; `audio volume <v>` and
+  (frames and seconds), the transport and every bus with its kind, width, solo, routing, sends,
+  the effects of its insert slots, with whether each runs, and its peak and RMS in dB; `audio volume <v>` and
   `audio mute` set the master, `audio play`, `audio stop`, `audio seek <beats>` and
   `audio tempo <bpm>` drive the [transport](#transport).
 - `audio capture <seconds>` records the master to a 16 bit stereo WAV resource of the shell
@@ -468,6 +473,28 @@ argument, a `uint64_t`.
 `box_audio_core_scheduled(core)` returns the commands that wait. On the main thread, the
 `clock` function of a transport tells the frame of the core that renders now, see
 [Transports](#transports).
+
+### Meters of the core
+
+Every bus in the order is measured per block at its output, after its inserts, width, pan,
+volume and mute, the signal it sends on: the largest absolute sample of each channel and the
+sum of the squares of each with the frames they hold. That is a compare and a multiply-add per
+sample and channel of a bus in the order; a bus out of the order costs nothing. The master is
+measured after its volume and before the limiter, so its meter reads over 1 while the limiter
+reduces the gain, and shows how far the mix is over.
+
+```c
+box_audio_meter_t meters[BOX_AUDIO_BUS_MAX];       // peak_left, peak_right, square_left,
+box_audio_core_meters(core, meters, BOX_AUDIO_BUS_MAX); // square_right, frames, by bus index
+box_audio_effect_meter_t fx[BOX_AUDIO_EFFECT_MAX]; // reduction in dB, by effect slot
+box_audio_core_effect_meters(core, fx, BOX_AUDIO_EFFECT_MAX);
+```
+
+Each read returns the values since the last read and starts them over; a bus that did not
+render reads 0 frames. The per effect values are filled by the kinds that have them with
+`box_audio_effect_reduction` (`internal.h`), the largest gain reduction since the last read; the
+reverb has none and reads 0. The meters do not change the output, which stays bit identical
+whatever the render sizes; the frames and peaks are the same too, the sums round differently.
 
 The tests are `test/cpu/audio`, which render offline; `bench/audio` mixes 64 voices through 8
 buses and reports the time per frame.
@@ -1362,6 +1389,7 @@ bool sound(t, id, data, frames, channels, rate);   // hand over a sound, copied
 bool stream_chunk(t, stream, voice, data, frames, channels, last); // a chunk, copied
 void stream_status(t, stream, status);             // a stream's status, frees consumed chunks
 int32_t read_events(t, events, max);               // the events of the core, oldest first
+void meters(t, buses, effects);                    // the meters since the last call
 box_audio_state_t state(t);                        // what the output does
 void update(t, delta);                             // once per frame
 void stats(t, stats);                              // voices and load of the core
@@ -1390,6 +1418,22 @@ over the time it renders, smoothed; the native audio thread and the null transpo
 the worklet does not (it has no clock finer than a millisecond) and reports 0. Every transport frees the frames of
 a sound itself after `SOUND_FREE`; the main thread keeps the last 4096 events until
 `read_events`.
+
+**Meters** travel back from where the core renders without a lock, and each call of `meters`
+takes what was measured since the last one (see [Meters of the core](#meters-of-the-core)):
+
+- null: the main thread reads the core directly;
+- native: after each callback the audio thread reads the meters of its core and adds them to
+  atomic words per bus, the peaks raised with a compare and swap of their bits, the sums of
+  squares added the same way and the frames counted up; the main thread swaps each word with 0.
+  Every value is consistent on its own, and nothing is lost between two reads;
+- web: every 4 quanta the worklet reads the meters of its core and, while any bus had a signal
+  within the last 350 ms, posts `{ type: 'meters', peaks, squares, frames, reduction }`; the page
+  accumulates them in `Module.boxAudio.meters` until the transport takes them, and counts them in
+  `Module.boxAudio.metersReceived`.
+
+They follow the clock of the output: what does not render reports nothing, and `box.audio`
+shows silence while the page waits for a gesture, is suspended or failed.
 
 **The clock** of a transport is the frame of the core that is being rendered now, as far as the
 main thread can tell, the frame a command with a `when` is scheduled against:
@@ -1699,6 +1743,7 @@ frame, the same on every platform.
 | `AudioListener` | Tag of the entity whose `WorldTransform` hears the spatial sources |
 | `AudioSettings` | Singleton: `master_volume` (1) and `mute` |
 | `AudioStatus` | Singleton, read only: `state`, `sample_rate`, `voices`, `voices_stolen`, `load`, `buses`, `clock` (the frame of the core that renders now) |
+| `AudioMeter` | Read only, opt-in, on a channel, the master or an effect: `peak_left` and `peak_right` (linear, the largest absolute sample since the last frame), `rms_left` and `rms_right` (linear, over the last 300 ms of output) and `reduction` (dB, the gain reduction of a dynamics effect, 0 for others); see [Meters](#meters) |
 | `Transport` | Singleton: `tempo` (120, 20..999), `beats_per_bar` (4), `beat_unit` (4), `position` (beats, written while it plays, clamped to ±2^31 like `loop_start` and `loop_end`), `playing` (false), `loop` (false), `loop_start`, `loop_end`, `lookahead` (0.15 s, 0.05..0.5), `metronome` (false), see [Transport](#transport) |
 | `AudioQuantize` | Enum of the `quantize` of `box.audio.play_quantized`: `AudioQuantizeNone` (at once), `AudioQuantizeBeat`, `AudioQuantizeBar`; `None`, `Beat` and `Bar` in a script, see [Quantized plays](#quantized-plays) |
 
@@ -1815,6 +1860,37 @@ effects too, which run before the limiter.
   of the pool is free.
 
 Reverb zones, rooms from geometry and the other kinds of effects are later work.
+
+#### Meters
+
+A mix is seen as well as heard: a channel with `AudioMeter` gets its levels every frame, for a
+mixer UI, a test or an agent that checks a scene without listening.
+
+```
+using box.audio
+
+music { AudioBus: {volume: 0.5}; AudioMeter: {} }
+box { audio { master { AudioMeter: {} } } }
+```
+
+- `peak_left` and `peak_right` are the largest absolute samples since the last frame, linear;
+  `rms_left` and `rms_right` the RMS over the last `BOX_AUDIO_METER_WINDOW` (0.3) seconds of
+  output, which the module computes from the sums of squares of the core. A sine of peak 0.5
+  reads a peak of 0.5 and an RMS of 0.354.
+- A channel is measured at its output, after its inserts, width, pan, volume and mute: what it
+  sends on to its output. A group reads the sum of its inputs. A muted channel reads 0 once its
+  ramp ends, and its RMS 300 ms later.
+- The master reads its signal after its volume (`AudioSettings.master_volume` times the volume
+  of its `AudioBus`) and **before the limiter**, so it reads over 1 when the mix is too loud,
+  while the output stays under 0.95.
+- An effect entity with `AudioMeter` gets `reduction`, the largest gain reduction in dB since
+  the last frame, of the dynamics effects; the reverb reads 0. A channel that names itself as an
+  effect gets both.
+- Metering is opt-in: the module reads the meters of the transport every frame, but writes the
+  component only on the entities that have it, so a scene that never looks pays no component
+  writes and no change detection fires. `audio` prints the levels of every channel anyway.
+- The levels follow the clock of the output: a page that waits for a gesture, is suspended or
+  failed reads silence, as does a world without output.
 
 **Sources** start a voice when `playing` is true and their sound is known, and stop it when
 `playing` goes false, the sound or `loop` changes or the entity is deleted, which fades it out
@@ -2165,7 +2241,9 @@ with its kind, volume, pan, width, `solo`, `muted`, its output, its sends (`send
 pre-fader one) and its insert slots, each as `insert <index> <entity>:` with its kind and values
 and whether it runs: `(runs)`, `(bypassed)` for a Disabled effect, or `(does not run: ...)` with
 the reason (no output, in another slot, every effect of the pool taken, waits for its memory);
-the master lists its own after its `AudioBus`. `audio volume <v>` and `audio mute [on|off]` write
+the master lists its own after its `AudioBus`. Each channel in the order ends with its levels of
+the last frame, `peak <left>/<right> dB, rms <left>/<right> dB` (`-inf` for silence), the master
+before the limiter. `audio volume <v>` and `audio mute [on|off]` write
 `AudioSettings`; `audio play`, `audio stop`, `audio seek <beats>` and `audio tempo <bpm>` (20 to
 999) write `Transport`. `audio capture <seconds>` records the master output
 to a 16 bit stereo WAV resource of the session, fetched like a `capture` PNG with
@@ -2176,13 +2254,14 @@ Headless with a fixed `--delta-time`, two runs write identical captures, which i
 tests inspect audio and how a render can be listened to. `box.perf` reports the largest load of
 a run as `PerfStatus.audio_load` and `audio_load` in its report.
 
-The tests are `Module`, `Mixer`, `Effect`, `Source`, `Script`, `Capture` and `Spatial` in
+The tests are `Module`, `Mixer`, `Meter`, `Effect`, `Source`, `Script`, `Capture` and `Spatial` in
 `test/cpu/audio`,
 through the null transport; `test/integration/e2e/audio.py` drives the command on a headless
 app, `test/integration/web/audio_spatial.mjs` moves a source from the left of the listener to
 its right in Chrome and measures both channels with `test/integration/web/audio_spatial.flecs`,
 and
-`test/integration/web/audio_module.mjs` checks the gesture, the levels, a hidden page, a capture
+`test/integration/web/audio_module.mjs` checks the gesture, the levels, the meters messages and
+`AudioMeter`, a hidden page, a capture
 and a stall in Chrome with `test/integration/web/audio_module.flecs`. The `all_features` case of
 `audio.py` and `test/integration/web/audio_all_features.mjs` run
 `test/assets/audio/all_features.flecs`, which uses every part together: levels on both channels,

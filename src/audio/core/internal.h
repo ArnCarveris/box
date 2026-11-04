@@ -550,6 +550,9 @@ struct box_audio_core_t {
     float effect_r[BOX_AUDIO_CORE_BLOCK]; /**< Right input or output */
     float reverb_smooth;  /**< Share of the way to their targets a decay and a damping move
                            * per block */
+    box_audio_meter_t meters[BOX_AUDIO_BUS_MAX]; /**< Levels of each bus since the last read */
+    box_audio_effect_meter_t effect_meters[BOX_AUDIO_EFFECT_MAX]; /**< Values of each effect
+                           * since the last read */
     float limiter_gain;   /**< Current gain of the limiter, 0..1 */
     float limiter_step;   /**< Largest rise of the gain of the limiter per frame */
     box_audio_synth_slot_t synths[BOX_AUDIO_SYNTH_MAX]; /**< Patches of synth sounds */
@@ -612,6 +615,24 @@ static inline void box_audio_ramp_skip(
     int32_t i;
     for (i = 0; i < frames && ramp->left > 0; i ++) {
         box_audio_ramp_next(ramp);
+    }
+}
+
+/** Report the gain reduction of an effect in a block, for its meter: the largest since the
+ * last read is kept.
+ *
+ * @param core The core
+ * @param fx The effect, in core->effects
+ * @param db Reduction in dB, positive; anything else counts as none
+ */
+static inline void box_audio_effect_reduction(
+    box_audio_core_t *core,
+    const box_audio_effect_t *fx,
+    float db)
+{
+    box_audio_effect_meter_t *m = &core->effect_meters[fx - core->effects];
+    if (db > m->reduction && db <= BOX_AUDIO_HUGE) {
+        m->reduction = db;
     }
 }
 

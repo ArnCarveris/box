@@ -160,8 +160,54 @@ static void box_cmd_audio_effects(
     }
 }
 
-/** Append the line of a bus: its kind, its parameters, its output, its sends and its insert
- * slots.
+/** Append a linear level in dB, -inf for silence.
+ *
+ * @param buf The output
+ * @param level The level
+ */
+static void box_cmd_audio_db(
+    ecs_strbuf_t *buf,
+    float level)
+{
+    if (level > 1e-10f) {
+        ecs_strbuf_append(buf, "%.1f", 20.0 * log10((double)level));
+    } else {
+        ecs_strbuf_appendstr(buf, "-inf");
+    }
+}
+
+/** Append the levels the module measured for a channel in the last frame: the peak and the
+ * RMS of each channel in dB, left/right.
+ *
+ * @param world The world
+ * @param buf The output
+ * @param e The master or a bus entity
+ */
+static void box_cmd_audio_meter(
+    ecs_world_t *world,
+    ecs_strbuf_t *buf,
+    ecs_entity_t e)
+{
+    AudioMeter m;
+    if (!box_audio_module_meter(world, e, &m)) {
+        goto done;
+    }
+
+    ecs_strbuf_appendstr(buf, ", peak ");
+    box_cmd_audio_db(buf, m.peak_left);
+    ecs_strbuf_appendstr(buf, "/");
+    box_cmd_audio_db(buf, m.peak_right);
+    ecs_strbuf_appendstr(buf, " dB, rms ");
+    box_cmd_audio_db(buf, m.rms_left);
+    ecs_strbuf_appendstr(buf, "/");
+    box_cmd_audio_db(buf, m.rms_right);
+    ecs_strbuf_appendstr(buf, " dB");
+done:
+    return;
+}
+
+/** Append the line of a bus: its kind, its parameters, its output, its sends, its insert
+ * slots and its levels.
  *
  * @param world The world
  * @param buf The output
@@ -197,6 +243,9 @@ static void box_cmd_audio_bus(
     }
 
     box_cmd_audio_effects(world, buf, e, bus);
+    if (in_order) {
+        box_cmd_audio_meter(world, buf, e);
+    }
 
     if (!in_order) {
         ecs_strbuf_appendstr(buf, " (not in the order, silent)");
@@ -307,6 +356,8 @@ static char* box_cmd_audio_print(
             (double)mb->pan, (double)mb->width, mb->mute ? " muted" : "");
         box_cmd_audio_effects(world, &buf, master, mb);
     }
+
+    box_cmd_audio_meter(world, &buf, master);
 
     for (i = 0; i < count; i ++) {
         box_cmd_audio_bus(world, &buf, order[i], true);
