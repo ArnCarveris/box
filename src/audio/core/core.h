@@ -87,7 +87,7 @@
 #define BOX_AUDIO_REVERB_FADE 0.1f
 
 /** Oscillators of a synth patch, each with an envelope, mixed into one filter and an amp */
-#define BOX_AUDIO_SYNTH_LAYERS 4
+#define BOX_AUDIO_SYNTH_LAYERS 8
 
 /** Synth patches a core holds at once */
 #define BOX_AUDIO_SYNTH_MAX 256
@@ -118,6 +118,9 @@
 /** Largest amount of the filter envelope in octaves, up or down */
 #define BOX_AUDIO_SYNTH_OCTAVES_MAX 10.0f
 
+/** Longest glide of a synth patch in seconds */
+#define BOX_AUDIO_SYNTH_GLIDE_MAX 10.0f
+
 /** Commands of the byte stream. Each starts with a box_audio_cmd_header_t */
 typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_PLAY = 1,          /**< box_audio_cmd_play_t */
@@ -128,7 +131,8 @@ typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_SOUND_RELEASE = 6, /**< box_audio_cmd_release_t */
     BOX_AUDIO_CMD_REVERB = 7,        /**< box_audio_cmd_reverb_t */
     BOX_AUDIO_CMD_SYNTH = 8,         /**< box_audio_cmd_synth_t */
-    BOX_AUDIO_CMD_STREAM = 9         /**< box_audio_cmd_stream_t */
+    BOX_AUDIO_CMD_STREAM = 9,        /**< box_audio_cmd_stream_t */
+    BOX_AUDIO_CMD_LEGATO = 10        /**< box_audio_cmd_legato_t */
 } box_audio_cmd_type_t;
 
 /** Parameters of BOX_AUDIO_CMD_VOICE_SET and BOX_AUDIO_CMD_BUS_SET */
@@ -163,6 +167,21 @@ typedef struct box_audio_cmd_play_t {
     float pitch;                    /**< Pitch ratio, 1 plays the sound as is */
     uint32_t flags;                 /**< BOX_AUDIO_PLAY_ flags */
 } box_audio_cmd_play_t;
+
+/** Play a note of a mono voice: retarget the synth voice of a handle that has not reached its
+ * release to a synth sound without a restart of its envelopes and give it a new handle, or
+ * else start a new voice with the new handle (docs/audio.md, Synth) */
+typedef struct box_audio_cmd_legato_t {
+    box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_LEGATO */
+    uint32_t voice;                 /**< New handle of the voice, picked by the sender */
+    uint32_t from;                  /**< Handle of the voice the note follows */
+    uint32_t sound;                 /**< Id of the sound */
+    uint32_t bus;                   /**< Bus the voice plays into */
+    float volume;                   /**< Volume */
+    float pan;                      /**< Pan, -1..1 */
+    float pitch;                    /**< Pitch ratio, 1 plays the sound as is */
+    uint32_t flags;                 /**< BOX_AUDIO_PLAY_ flags of a new voice */
+} box_audio_cmd_legato_t;
 
 /** Stop a voice: it fades out and ends */
 typedef struct box_audio_cmd_stop_t {
@@ -327,16 +346,27 @@ typedef struct box_audio_synth_patch_t {
                                            * its level 1, negative closes it; 0 for none */
     box_audio_synth_envelope_t filter_envelope; /**< Envelope of the cutoff, which does not
                                            * keep the voice playing */
+    float glide;                          /**< Seconds a change of the pitch of a voice takes,
+                                           * exponential in frequency, 0 jumps at once */
     box_audio_synth_layer_t layer[BOX_AUDIO_SYNTH_LAYERS]; /**< The oscillators */
 } box_audio_synth_patch_t;
 
 /** Make a sound id a synth patch, or replace the patch of a synth sound. Voices that play it
- * keep the patch they started with; the next play takes the new one */
+ * keep the patch they started with; the next play takes the new one.
+ *
+ * The command ends after the layers of its patch: it is BOX_AUDIO_CMD_SYNTH_SIZE(layers)
+ * bytes, so a patch of 2 layers does not send the room of BOX_AUDIO_SYNTH_LAYERS */
 typedef struct box_audio_cmd_synth_t {
     box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_SYNTH */
     uint32_t sound;                 /**< Id of the sound, free or a synth */
-    box_audio_synth_patch_t patch;  /**< The patch, clamped by the core */
+    box_audio_synth_patch_t patch;  /**< The patch, clamped by the core, up to its layers */
 } box_audio_cmd_synth_t;
+
+/** Bytes of a synth command whose patch has a number of layers, at most
+ * BOX_AUDIO_SYNTH_LAYERS */
+#define BOX_AUDIO_CMD_SYNTH_SIZE(layers) \
+    ((int32_t)(offsetof(box_audio_cmd_synth_t, patch.layer) + \
+    (size_t)(layers) * sizeof(box_audio_synth_layer_t)))
 
 /** Events the core reports to its transport */
 typedef enum box_audio_event_type_t {
@@ -580,6 +610,30 @@ bool box_audio_write_play(
     float pitch,
     uint32_t flags);
 
+/** Write a legato command: a note that follows the voice of a handle.
+ *
+ * @param writer The writer
+ * @param voice New handle of the voice
+ * @param from Handle of the voice the note follows
+ * @param sound Id of the sound
+ * @param bus Bus of the voice
+ * @param volume Volume
+ * @param pan Pan, -1..1
+ * @param pitch Pitch ratio
+ * @param flags BOX_AUDIO_PLAY_ flags of a new voice
+ * @return Whether the command fit
+ */
+bool box_audio_write_legato(
+    box_audio_writer_t *writer,
+    uint32_t voice,
+    uint32_t from,
+    uint32_t sound,
+    uint32_t bus,
+    float volume,
+    float pan,
+    float pitch,
+    uint32_t flags);
+
 /** Write a stop command.
  *
  * @param writer The writer
@@ -674,7 +728,8 @@ bool box_audio_write_reverb(
     uint32_t bus,
     const box_audio_reverb_params_t *params);
 
-/** Write a command that makes a sound id a synth patch or replaces its patch.
+/** Write a command that makes a sound id a synth patch or replaces its patch, of
+ * BOX_AUDIO_CMD_SYNTH_SIZE bytes for the layers of the patch.
  *
  * @param writer The writer
  * @param sound Id of the sound

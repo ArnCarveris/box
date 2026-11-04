@@ -193,3 +193,22 @@ void audio_log_stop(void) {
     ecs_log_set_level(audio_log_level);
     ecs_log_enable_colors(audio_log_colors);
 }
+
+char* audio_read(
+    const char *file)
+{
+    char *path = box_app_locate(file);
+    test_assert(path != NULL);
+    FILE *f = fopen(path, "rb");
+    test_assert(f != NULL);
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char *result = ecs_os_malloc((ecs_size_t)size + 1);
+    test_assert(fread(result, 1, (size_t)size, f) == (size_t)size);
+    result[size] = '\0';
+    fclose(f);
+    ecs_os_free(path);
+
+    return result;
+}

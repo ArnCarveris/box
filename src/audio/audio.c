@@ -676,6 +676,7 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, SynthFilter);
     ecs_set_hooks(world, SynthFilter, { .ctor = box_audio_synth_filter_ctor });
     ECS_META_COMPONENT(world, SynthFilterEnvelope);
+    ECS_META_COMPONENT(world, SynthGlide);
     ECS_META_COMPONENT(world, SynthSound);
     ECS_META_COMPONENT(world, AudioSettings);
     ecs_set_hooks(world, AudioSettings, { .ctor = box_audio_settings_ctor });

@@ -55,14 +55,14 @@ void box_audio_synth_init(
 {
     ecs_entity_t ids[] = {
         ecs_id(SynthSound), ecs_id(SynthOscillator), ecs_id(SynthEnvelope), ecs_id(SynthFilter),
-        ecs_id(SynthFilterEnvelope)
+        ecs_id(SynthFilterEnvelope), ecs_id(SynthGlide)
     };
     const char *names[] = {
         "AudioSynthSoundDirty", "AudioSynthOscillatorDirty", "AudioSynthEnvelopeDirty",
-        "AudioSynthFilterDirty", "AudioSynthFilterEnvelopeDirty"
+        "AudioSynthFilterDirty", "AudioSynthFilterEnvelopeDirty", "AudioSynthGlideDirty"
     };
     int32_t i;
-    for (i = 0; i < 5; i ++) {
+    for (i = 0; i < 6; i ++) {
         ecs_observer(world, {
             .entity = ecs_entity(world, { .name = names[i] }),
             .query.flags = EcsQueryMatchPrefab,
@@ -212,12 +212,17 @@ bool box_audio_synth_compile(
     const SynthFilter *filter = ecs_get(world, e, SynthFilter);
     const SynthFilterEnvelope *fenv = ecs_get(world, e, SynthFilterEnvelope);
     const SynthOscillator *osc = ecs_get(world, e, SynthOscillator);
+    const SynthGlide *glide = ecs_get(world, e, SynthGlide);
     int32_t extra = 0, orphans = 0, i;
     bool endless = false, fits = true, result;
     if (sound) {
         p.seed = sound->seed;
         p.pitch_variance = sound->pitch_variance;
         p.level_variance = sound->level_variance;
+    }
+
+    if (glide) {
+        p.glide = glide->time;
     }
 
     if (env) {
