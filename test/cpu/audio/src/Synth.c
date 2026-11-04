@@ -2416,7 +2416,6 @@ void Synth_script_modulators(void) {
     ecs_fini(world);
 }
 
-<<<<<<< HEAD
 /** Seconds of the renders of the unison cases that measure levels and correlations */
 #define SYNTH_UNISON_SECONDS 4
 
@@ -2444,33 +2443,10 @@ static box_audio_synth_patch_t synth_unison(
     p.layer[0].voices = voices;
     p.layer[0].detune = detune;
     p.layer[0].width = width;
-=======
-/** A patch of one pluck string without any envelope, which rings out on its own.
- *
- * @param frequency Hz
- * @param decay Seconds of the fundamental to -60 dB
- * @param brightness Brightness of the loop, 0..1
- * @param seed Seed of the noise of the pluck
- * @return The patch
- */
-static box_audio_synth_patch_t synth_pluck(
-    float frequency,
-    float decay,
-    float brightness,
-    uint32_t seed)
-{
-    box_audio_synth_patch_t p = {0};
-    p.layers = 1;
-    p.seed = seed;
-    p.layer[0] = (box_audio_synth_layer_t){
-        .wave = BOX_AUDIO_SYNTH_PLUCK, .frequency = frequency, .level = 0.5f,
-        .decay = decay, .brightness = brightness, .hardness = 0.5f, .rings_free = 1 };
->>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
 
     return p;
 }
 
-<<<<<<< HEAD
 /** Power of the component of a range at a frequency, through a Hann window, so that a peak
  * leaks little into frequencies a few Hz away.
  *
@@ -2916,7 +2892,35 @@ void Synth_script_unison(void) {
 
     test_assert(diff > 0.05f);
     audio_run(world, 40);
-=======
+    audio_log_stop();
+    test_int(audio_log_errors, 0);
+    ecs_fini(world);
+}
+
+/** A patch of one pluck string without any envelope, which rings out on its own.
+ *
+ * @param frequency Hz
+ * @param decay Seconds of the fundamental to -60 dB
+ * @param brightness Brightness of the loop, 0..1
+ * @param seed Seed of the noise of the pluck
+ * @return The patch
+ */
+static box_audio_synth_patch_t synth_pluck(
+    float frequency,
+    float decay,
+    float brightness,
+    uint32_t seed)
+{
+    box_audio_synth_patch_t p = {0};
+    p.layers = 1;
+    p.seed = seed;
+    p.layer[0] = (box_audio_synth_layer_t){
+        .wave = BOX_AUDIO_SYNTH_PLUCK, .frequency = frequency, .level = 0.5f,
+        .decay = decay, .brightness = brightness, .hardness = 0.5f, .rings_free = 1 };
+
+    return p;
+}
+
 /** Component of a range at a frequency over a Hann window, the phase relative to frame 0.
  *
  * @param x Samples
@@ -3108,6 +3112,58 @@ void Synth_pluck_seed(void) {
     test_assert(hash[0] != hash[2]);
 }
 
+/** A string plays as one voice: unison on a pluck layer renders bit identical to none, and a
+ * string next to a wide unison layer rings in the center of the stereo voice and ends it. */
+void Synth_pluck_unison(void) {
+    // audio/synth
+    box_audio_core_t *core;
+    box_audio_synth_patch_t p;
+    uint64_t hash[2];
+    int32_t i;
+    float diff = 0;
+    for (i = 0; i < 2; i ++) {
+        core = synth_core(AUDIO_RATE);
+        p = synth_pluck(330, 1, 0.5f, 3);
+        if (i == 1) {
+            p.layer[0].voices = 5;
+            p.layer[0].detune = 30;
+            p.layer[0].width = 1;
+        }
+
+        synth_define(core, 1, &p);
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, 9600);
+        test_assert(memcmp(audio_l, audio_r, 9600 * sizeof(float)) == 0);
+        hash[i] = audio_hash(audio_l, 9600);
+        box_audio_core_free(core);
+    }
+
+    test_assert(hash[0] == hash[1]);
+
+    core = synth_core(AUDIO_RATE);
+    p = synth_pluck(220, 0.1f, 0.5f, 3);
+    p.layers = 2;
+    p.layer[1] = (box_audio_synth_layer_t){
+        .wave = BOX_AUDIO_SYNTH_SAW, .frequency = 110, .level = 0.2f, .has_envelope = 1,
+        .envelope = { .attack = 0.001f, .sustain = 1, .hold = 0.05f, .release = 0.05f },
+        .voices = 3, .detune = 20, .width = 1 };
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES);
+    test_assert(synth_finite(audio_l, 0, AUDIO_FRAMES));
+    test_assert(synth_finite(audio_r, 0, AUDIO_FRAMES));
+    test_assert(audio_peak(audio_l, 0, 4800) > 0.1f);
+    for (i = 0; i < 4800; i ++) {
+        float d = fabsf(audio_l[i] - audio_r[i]);
+        diff = d > diff ? d : diff;
+    }
+
+    test_assert(diff > 0.01f);
+    test_assert(synth_last(audio_l, 0, AUDIO_FRAMES) < (int32_t)(0.5 * AUDIO_RATE));
+    test_int(box_audio_core_voice_count(core), 0);
+    box_audio_core_free(core);
+}
+
 /** A string ends its voice once it is silent: without an envelope, and with an envelope that
  * would hold for seconds. */
 void Synth_pluck_ends(void) {
@@ -3278,7 +3334,6 @@ void Synth_docs_pluck_examples(void) {
     test_assert(synth_finite(audio_tap_l, start, audio_tap_count));
     test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
     test_flt(audio_peak(audio_tap_l, audio_tap_count - AUDIO_FRAME, audio_tap_count), 0);
->>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
     audio_log_stop();
     test_int(audio_log_errors, 0);
     ecs_fini(world);

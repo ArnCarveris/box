@@ -309,7 +309,6 @@
                     "script_legato_source",
                     "docs_glide_example",
                     "script_modulators",
-<<<<<<< HEAD
                     "unison_detune_peaks",
                     "unison_width_zero_mono",
                     "unison_width_correlation",
@@ -317,18 +316,17 @@
                     "unison_seed_identical",
                     "unison_one_voice_identical",
                     "unison_stereo_chain",
-                    "script_unison"
-=======
+                    "script_unison",
                     "pluck_pitch",
                     "pluck_decay",
                     "pluck_brightness",
                     "pluck_seed",
+                    "pluck_unison",
                     "pluck_ends",
                     "pluck_glide",
                     "pluck_pool",
                     "script_pluck",
                     "docs_pluck_examples"
->>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
                 ]
             },
             {

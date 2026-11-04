@@ -210,7 +210,6 @@ typedef struct box_audio_synth_svf_t {
     float ic1, ic2;       /**< State */
 } box_audio_synth_svf_t;
 
-<<<<<<< HEAD
 /** The unison voices of a layer of a synth voice: copies of its oscillator, each at its own
  * phase, at a factor of the turns per frame of the oscillator and with a gain per channel. The
  * oscillator keeps the sweep and the glide they all follow */
@@ -222,7 +221,6 @@ typedef struct box_audio_synth_unison_t {
     float left[BOX_AUDIO_SYNTH_UNISON_MAX];    /**< Gain of each voice on the left channel */
     float right[BOX_AUDIO_SYNTH_UNISON_MAX];   /**< Gain of each voice on the right channel */
 } box_audio_synth_unison_t;
-=======
 /** A pluck string of a synth voice: a Karplus-Strong loop of a delay line, a symmetric lowpass
  * of one frame of delay and a first order allpass of the fraction of a frame left, with a gain
  * that sets its decay */
@@ -242,7 +240,6 @@ typedef struct box_audio_synth_string_t {
     int32_t window;       /**< Frames left of the window, a period */
     bool ringing;         /**< Whether it is still over the silence */
 } box_audio_synth_string_t;
->>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
 
 /** A layer of a synth voice: its layer of the patch, its oscillator and its own envelope. The
  * core holds BOX_AUDIO_SYNTH_PARTS of them for all its voices, so a voice holds only the layers
@@ -251,11 +248,8 @@ typedef struct box_audio_synth_part_t {
     box_audio_synth_layer_t layer;  /**< The layer of the patch, clamped */
     box_audio_synth_osc_t osc;      /**< The oscillator */
     box_audio_synth_env_t env;      /**< Its own envelope, when the layer has one */
-<<<<<<< HEAD
     box_audio_synth_unison_t unison; /**< Its unison voices */
-=======
     box_audio_synth_string_t *string; /**< Its string, a BOX_AUDIO_SYNTH_PLUCK layer, or NULL */
->>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
 } box_audio_synth_part_t;
 
 /** A source that plays a synth patch, a copy of it, so it never allocates: the patch without

@@ -145,39 +145,42 @@ static void box_audio_synth_oscillator_ctor(
     }
 }
 
-<<<<<<< HEAD
 /** Construct SynthUnison values: 3 voices over 10 cents, in the center.
-=======
-/** Construct SynthString values: a decay of 2 seconds, a brightness of 0.5 and a hardness of
- * 0.8.
->>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
  *
  * @param ptr The components
  * @param count Number of components
  * @param ti Type info
  */
-<<<<<<< HEAD
 static void box_audio_synth_unison_ctor(
-=======
-static void box_audio_synth_string_ctor(
->>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
     void *ptr,
     int32_t count,
     const ecs_type_info_t *ti)
 {
-<<<<<<< HEAD
     SynthUnison *values = ptr;
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
         values[i] = (SynthUnison){ .voices = 3, .detune = 10.0f, .width = 0.0f };
-=======
+    }
+}
+
+/** Construct SynthString values: a decay of 2 seconds, a brightness of 0.5 and a hardness of
+ * 0.8.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_synth_string_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
     SynthString *values = ptr;
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
         values[i] = (SynthString){ .decay = 2.0f, .brightness = 0.5f, .hardness = 0.8f };
->>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
     }
 }
 
@@ -708,13 +711,10 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, SynthModulation);
     ECS_META_COMPONENT(world, SynthOscillator);
     ecs_set_hooks(world, SynthOscillator, { .ctor = box_audio_synth_oscillator_ctor });
-<<<<<<< HEAD
     ECS_META_COMPONENT(world, SynthUnison);
     ecs_set_hooks(world, SynthUnison, { .ctor = box_audio_synth_unison_ctor });
-=======
     ECS_META_COMPONENT(world, SynthString);
     ecs_set_hooks(world, SynthString, { .ctor = box_audio_synth_string_ctor });
->>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
     ECS_META_COMPONENT(world, SynthEnvelope);
     ECS_META_COMPONENT(world, SynthFilter);
     ecs_set_hooks(world, SynthFilter, { .ctor = box_audio_synth_filter_ctor });

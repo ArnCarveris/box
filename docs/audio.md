@@ -225,19 +225,13 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   EQ, compressor or delay on a bus.
 - **Voices**: 64, with the quietest stolen; no priorities. A one shot cannot be controlled after
   it started.
-<<<<<<< HEAD
 - **Synth**: up to 8 oscillators and one filter per sound, up to 7 unison voices per oscillator,
-  linear or curved envelopes, no LFO and no node graph; an oscillator may phase or ring modulate another, but FM is not band
-  limited. Legato is mono per channel and has no note off: a held note lasts its hold after the
-  last note. A looping synth sound starts a new pass of its envelopes and oscillators at the end
-=======
-- **Synth**: up to 8 oscillators and one filter per sound, linear or curved envelopes, no LFO,
-  no unison and no node graph; an oscillator may phase or ring modulate another, but FM is not
-  band limited. Plucked strings go down to 40 Hz, and 32 of them ring at once. Legato is mono
-  per channel and has no note off: a held note lasts its hold after the last note. A looping synth sound starts a new pass of its envelopes and oscillators at the end
->>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
-  of the last, at most every 60 seconds; a drone keeps that gap short with edges of a few ms, as
-  the dust merchant's engine does with 2 ms.
+  linear or curved envelopes, no LFO and no node graph; an oscillator may phase or ring modulate
+  another, but FM is not band limited. Plucked strings go down to 40 Hz, 32 of them ring at once,
+  and each plays as one voice. Legato is mono per channel and has no note off: a held note lasts
+  its hold after the last note. A looping synth sound starts a new pass of its envelopes and
+  oscillators at the end of the last, at most every 60 seconds; a drone keeps that gap short with
+  edges of a few ms, as the dust merchant's engine does with 2 ms.
 - **Files**: WAV and FLAC for sounds, Ogg Vorbis for music, one stream at once (a change of path
   fades over 5 ms, there is no crossfade).
 - **Tools**: no mixer UI, and the UI theme of box has no sounds; a scene adds them in its own
@@ -478,28 +472,18 @@ voice, so a play allocates nothing, a new patch for the same id reaches the next
 voices that play keep theirs, and a release frees the id at once with `SOUND_FREE`.
 
 A patch costs only the layers it has. The `SYNTH` command ends after its last layer,
-<<<<<<< HEAD
-`BOX_AUDIO_CMD_SYNTH_SIZE(layers)` bytes: 104 bytes and 84 per layer, 272 for 2 layers, 776 for 8;
+`BOX_AUDIO_CMD_SYNTH_SIZE(layers)` bytes: 104 bytes and 100 per layer, 304 for 2 layers, 904 for 8;
 a shorter one than its layers need is ignored. A voice holds the patch without its layers and
 takes, for each layer, a part from a pool the core allocates with itself: the layer, its oscillator,
-its own envelope and the state of its unison voices, 440 bytes. The pool has 4 parts per voice slot
+its own envelope and the state of its unison voices, 464 bytes. The pool has 4 parts per voice slot
 (320), so patches of up to 4 layers never run out of them and a voice of 8 takes the room of two of
 4; a play that finds too few free parts is ignored like one without a voice slot. A voice renders
-and advances only its parts and gives them back when it ends. The 80 voice slots (560 bytes each)
-and the pool take 181 KB. The 256 patches the core keeps are full size, 768 bytes each. The core clamps every value of a patch, a NaN to the low
-=======
-`BOX_AUDIO_CMD_SYNTH_SIZE(layers)` bytes: 104 bytes and 88 per layer, 280 for 2 layers, 808 for 8;
-a shorter one than its layers need is ignored. A voice holds the patch without its layers and
-takes, for each layer, a part from a pool the core allocates with itself: the layer, its oscillator
-and its own envelope, 272 bytes. The pool has 4 parts per voice slot (320), so patches of up to 4
-layers never run out of them and a voice of 8 takes the room of two of 4; a play that finds too few
-free parts is ignored like one without a voice slot. A voice renders and advances only its parts
-and gives them back when it ends. The 80 voice slots (520 bytes each) and the pool take 126 KB.
-The pluck strings are a second pool of `BOX_AUDIO_SYNTH_STRINGS` (32), each with a delay line of
-`BOX_AUDIO_SYNTH_STRING_FRAMES` (2048) floats, 8 KB, 259 KB in all; a voice takes one for each
-pluck layer, and a play that finds too few free is ignored the same way. The 256 patches the core
-keeps are full size, 800 bytes each. The core clamps every value of a patch, a NaN to the low
->>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
+and advances only its parts and gives them back when it ends. The 80 voice slots (568 bytes each)
+and the pool take 189 KB. The pluck strings are a second pool of `BOX_AUDIO_SYNTH_STRINGS` (32),
+each with a delay line of `BOX_AUDIO_SYNTH_STRING_FRAMES` (2048) floats, 8 KB, 259 KB in all; a
+voice takes one for each pluck layer, and a play that finds too few free is ignored the same way.
+The 256 patches the core keeps are full size, 896 bytes each. The core clamps every value of a
+patch, a NaN to the low
 end.
 
 - **Oscillators.** Sine (`box_audio_core_sin`), saw, square, triangle and white noise. Saw and
@@ -614,7 +598,8 @@ end.
   layers is rendered on two channels, a layer without unison the same on both, through two sets
   of the stages of the filter with the same coefficients, and the voice reaches its bus as a
   stereo sample does. A unison layer that modulates or feeds back does so with the mean of its
-  two channels; a modulator of a unison layer moves the phase of each of its voices.
+  two channels; a modulator of a unison layer moves the phase of each of its voices. A pluck
+  layer always plays as one voice, its string in the center.
 - **Glide.** The `glide` of a patch, 0 to `BOX_AUDIO_SYNTH_GLIDE_MAX` (10) seconds, makes a
   change of the pitch of a voice (`VOICE_SET` `PITCH`) move exponentially in frequency, linear
   in cents, over that time: each oscillator multiplies its turns per frame by
@@ -642,14 +627,11 @@ end.
 - **Cost.** Render work only: per frame of a voice an envelope step per envelope (a multiply
   and an add when curved), an oscillator per layer and the filter, one stage or two; a modulated
   patch adds a phase offset and a wrap per layer; during a glide a multiply per oscillator. A
-<<<<<<< HEAD
   unison layer costs an oscillator per voice; a stereo patch runs its filter twice. A patch
   in which no layer has more than one voice takes the loop it took before, bit identical, and
-  costs one compare per block; a layer of one voice with a width is such a layer.
-=======
-  string costs a read and a write of its line, 6 multiplies and its peak per frame while it
-  rings, and a pluck writes its line of 2048 floats once.
->>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
+  costs one compare per block; a layer of one voice with a width is such a layer. A string
+  costs a read and a write of its line, 6 multiplies and its peak per frame while it rings, and
+  a pluck writes its line of 2048 floats once.
   `bench/audio` has a `Synth` suite of 64 voices in ns per sample, with a filter envelope, with a
   24 dB filter, `voices_64_fm`, two FM pairs per voice, which measures the modulated path,
   and `voices_32_pluck`, 32 ringing strings, one per voice.
@@ -979,8 +961,9 @@ fixed run renders bit identical. The lowest note is `BOX_AUDIO_SYNTH_PLUCK_LOWES
 one plays at 40 Hz with one warning. A core rings 32 strings at once; a play that finds none free
 is ignored. The string follows the pitch of its voice: a change of `AudioSource.pitch`, a sweep,
 a `SynthGlide` and legato notes bend the ringing string without a new pluck. The synth has no
-LFO and no unison, so there is no vibrato of a string and no ensemble of detuned strings in one
-layer; several `SynthPluck` layers a few cents apart make a chorus, as the 12 string guitar has.
+LFO, and a string plays as one voice: a `SynthUnison` on a `SynthPluck` layer is ignored, so
+there is no vibrato of a string and no ensemble of detuned strings in one layer; several
+`SynthPluck` layers a few cents apart make a chorus, as the 12 string guitar has.
 A string may ring modulate or be ring modulated, but it ignores phase modulation and feedback.
 
 ```
@@ -1038,20 +1021,17 @@ above from `test/assets/audio/synth_examples.flecs`, glides (the frequency halfw
 at the geometric mean, a glide of 0 bit identical to the jump, the pitch of a source) and legato
 notes (no new attack, a held sustain that holds again, a new voice after the release, also of a
 looping voice that then ends, and after the end, from script and from a source, the lead above
-<<<<<<< HEAD
 from `test/assets/audio/synth_glide.flecs`), unison (peaks at the detuned frequencies, width 0
 identical on both channels, the correlation of the channels at width 1 and 0.5, the level as the
 count of voices changes, one voice bit identical to a layer without unison, the same seed bit
 identical, a wide voice through the pan of the voice and of its bus and a send, and the pad above
-from `test/assets/audio/synth_unison.flecs` from script, panned in space) and errors; `NoAlloc` renders 64 synth voices. The
-=======
-from `test/assets/audio/synth_glide.flecs`), pluck strings (the pitch within 2 cents from 80 Hz
-to 2 kHz at 44.1 and 48 kHz, a -60 dB time that scales with the decay, more upper harmonics when
-brighter, bit identical for a seed and different for another, the end of a voice once its string
-is silent with and without an envelope, a jump and a glide of the pitch, the pool of strings,
-the defaults and the warning of a low note, and the guitar, the koto and the Mossvale harp from
+from `test/assets/audio/synth_unison.flecs` from script, panned in space), pluck strings (the
+pitch within 2 cents from 80 Hz to 2 kHz at 44.1 and 48 kHz, a -60 dB time that scales with the
+decay, more upper harmonics when brighter, bit identical for a seed and different for another,
+the end of a voice once its string is silent with and without an envelope, a jump and a glide of
+the pitch, the pool of strings, a string with unison as one voice and next to a wide layer, the
+defaults and the warning of a low note, and the guitar, the koto and the Mossvale harp from
 `test/assets/audio/synth_pluck.flecs`) and errors; `NoAlloc` renders 64 synth voices. The
->>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
 browser check is `test/integration/web/audio_synth.mjs`.
 
 ## Transports

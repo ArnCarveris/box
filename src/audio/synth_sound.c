@@ -60,23 +60,16 @@ void box_audio_synth_init(
 {
     ecs_entity_t ids[] = {
         ecs_id(SynthSound), ecs_id(SynthOscillator), ecs_id(SynthEnvelope), ecs_id(SynthFilter),
-<<<<<<< HEAD
-        ecs_id(SynthFilterEnvelope), ecs_id(SynthGlide), ecs_id(SynthUnison)
-=======
-        ecs_id(SynthFilterEnvelope), ecs_id(SynthGlide), ecs_id(SynthString)
->>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
+        ecs_id(SynthFilterEnvelope), ecs_id(SynthGlide), ecs_id(SynthUnison),
+        ecs_id(SynthString)
     };
     const char *names[] = {
         "AudioSynthSoundDirty", "AudioSynthOscillatorDirty", "AudioSynthEnvelopeDirty",
         "AudioSynthFilterDirty", "AudioSynthFilterEnvelopeDirty", "AudioSynthGlideDirty",
-<<<<<<< HEAD
-        "AudioSynthUnisonDirty"
-=======
-        "AudioSynthStringDirty"
->>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
+        "AudioSynthUnisonDirty", "AudioSynthStringDirty"
     };
     int32_t i;
-    for (i = 0; i < 7; i ++) {
+    for (i = 0; i < 8; i ++) {
         ecs_observer(world, {
             .entity = ecs_entity(world, { .name = names[i] }),
             .query.flags = EcsQueryMatchPrefab,
@@ -121,22 +114,16 @@ static bool box_audio_synth_envelope_fits(
  * @param p The patch
  * @param osc The oscillator
  * @param env Its own envelope, NULL for the one of the root
-<<<<<<< HEAD
  * @param unison Its unison, NULL for one voice
-=======
  * @param string Its string, NULL for the defaults; used by SynthPluck only
->>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
  * @param carrier 1 + the layer its parent is, 0 when its parent is not a layer
  */
 static void box_audio_synth_layer(
     box_audio_synth_patch_t *p,
     const SynthOscillator *osc,
     const SynthEnvelope *env,
-<<<<<<< HEAD
     const SynthUnison *unison,
-=======
     const SynthString *string,
->>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
     uint32_t carrier)
 {
     box_audio_synth_layer_t *l = &p->layer[p->layers ++];
@@ -159,19 +146,18 @@ static void box_audio_synth_layer(
     }
 
     l->feedback = osc->feedback;
-<<<<<<< HEAD
     l->voices = 1;
     if (unison) {
         l->voices = unison->voices > 1 ? (uint32_t)unison->voices : 1;
         l->detune = unison->detune;
         l->width = unison->width;
-=======
+    }
+
     if (osc->wave == SynthPluck) {
         string = string ? string : &box_audio_synth_string_default;
         l->decay = string->decay;
         l->brightness = string->brightness;
         l->hardness = string->hardness;
->>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
     }
 }
 
@@ -230,11 +216,8 @@ static void box_audio_synth_children(
                 (*orphans) ++;
             } else if (p->layers < BOX_AUDIO_SYNTH_LAYERS) {
                 box_audio_synth_layer(p, osc, ecs_get(world, child, SynthEnvelope),
-<<<<<<< HEAD
-                    ecs_get(world, child, SynthUnison), carrier);
-=======
-                    ecs_get(world, child, SynthString), carrier);
->>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
+                    ecs_get(world, child, SynthUnison), ecs_get(world, child, SynthString),
+                    carrier);
                 box_audio_synth_children(world, p, child, p->layers, extra, orphans);
             } else {
                 *extra += box_audio_synth_count(world, child);
@@ -292,11 +275,8 @@ bool box_audio_synth_compile(
     if (osc && osc->modulation != SynthMix) {
         orphans ++;
     } else if (osc) {
-<<<<<<< HEAD
-        box_audio_synth_layer(&p, osc, NULL, ecs_get(world, e, SynthUnison), 0);
-=======
-        box_audio_synth_layer(&p, osc, NULL, ecs_get(world, e, SynthString), 0);
->>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
+        box_audio_synth_layer(&p, osc, NULL, ecs_get(world, e, SynthUnison),
+            ecs_get(world, e, SynthString), 0);
     }
 
     box_audio_synth_children(world, &p, e, p.layers, &extra, &orphans);
