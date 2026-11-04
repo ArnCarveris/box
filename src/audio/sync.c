@@ -115,6 +115,7 @@ static void box_audio_reset(
     state->settings_sent = false;
     state->order_dirty = true;
     state->voices_stolen = 0;
+    state->voices_refused = 0;
     box_audio_music_reset(state);
     state->spatial_dirty = true;
     ecs_os_memset_n(state->meters, 0, box_audio_meter_window_t, BOX_AUDIO_BUS_MAX);
@@ -175,6 +176,10 @@ static void box_audio_events(
             } else if (e->type == BOX_AUDIO_EVENT_VOICE_STOLEN) {
                 state->voices_stolen = e->value;
             } else if (e->type == BOX_AUDIO_EVENT_VOICE_END) {
+                if (e->value > 0) {
+                    state->voices_refused = e->value;
+                }
+
                 ecs_map_val_t *v = ecs_map_get(&state->voices, e->id);
                 ecs_entity_t src = v ? (ecs_entity_t)v[0] : 0;
                 box_audio_oneshot_t *shots = ecs_vec_first(&state->oneshots);
@@ -1458,6 +1463,7 @@ static void box_audio_status(
         status.sample_rate = (int32_t)t->sample_rate;
         status.voices = stats.voices;
         status.voices_stolen = state->voices_stolen;
+        status.voices_refused = state->voices_refused;
         status.load = stats.load;
         status.clock = (int64_t)t->clock(t);
     }

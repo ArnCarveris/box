@@ -502,6 +502,8 @@ ECS_STRUCT(AudioStatus, {
     int32_t sample_rate;   /**< Frames per second of the output, 0 while not known */
     int32_t voices;        /**< Voices that play, without the ones that fade out */
     int64_t voices_stolen; /**< Voices the voice cap of 64 stopped so far */
+    int64_t voices_refused; /**< Plays refused so far at the voice cap because every voice
+                            *   that played had a higher priority */
     float load;            /**< Share of real time the render takes, 0 where it is not
                             *   measured (the web) */
     int32_t buses;         /**< Buses in the processing order, the master included */
@@ -607,6 +609,10 @@ ECS_STRUCT(AudioClip, {
 ECS_STRUCT(Track, {
     ecs_entity_t instrument; /**< The entity with Instrument that plays the notes of its note
                               *   clips; a track of only audio clips needs none */
+    int32_t priority;        /**< Priority of the voices of its notes and audio clips, 0..255,
+                              *   default 1: at the voice cap of 64 a play steals only a
+                              *   voice of at most its priority, so one shots (0) cannot steal
+                              *   the voices of a track; streams play at 255 */
 });
 
 /** A clip on the timeline, on a child of a Track: a NoteClip or an AudioClip.

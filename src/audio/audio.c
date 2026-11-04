@@ -345,6 +345,25 @@ static void box_audio_audio_clip_ctor(
     }
 }
 
+/** Construct Track values: no instrument, at priority 1, above the one shots.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_track_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Track *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Track){ .priority = BOX_AUDIO_TRACK_PRIORITY };
+    }
+}
+
 /** Construct ClipPlacement values: no clip at beat 0, as long as the clip, at unity gain.
  *
  * @param ptr The components
@@ -964,6 +983,7 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, AudioClip);
     ecs_set_hooks(world, AudioClip, { .ctor = box_audio_audio_clip_ctor });
     ECS_META_COMPONENT(world, Track);
+    ecs_set_hooks(world, Track, { .ctor = box_audio_track_ctor });
     ECS_META_COMPONENT(world, ClipPlacement);
     ecs_set_hooks(world, ClipPlacement, { .ctor = box_audio_placement_ctor });
 

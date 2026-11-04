@@ -720,7 +720,7 @@ static void box_audio_music_voice(
     m->bus = bus;
     m->stopping = false;
     box_audio_write_stream(&state->writer, m->voice, (uint32_t)slot, bus, volume,
-        (uint32_t)m->channels, m->sample_rate);
+        (uint32_t)m->channels, m->sample_rate, BOX_AUDIO_STREAM_PRIORITY);
     state->stats.music_starts ++;
 done:
     return;

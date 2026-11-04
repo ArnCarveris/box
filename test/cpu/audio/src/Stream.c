@@ -256,7 +256,7 @@ static void stream_open(
     uint8_t bytes[64];
     box_audio_writer_t w;
     box_audio_writer_init(&w, bytes, sizeof(bytes));
-    test_assert(box_audio_write_stream(&w, 1, 0, 0, 1.0f, 1, AUDIO_RATE));
+    test_assert(box_audio_write_stream(&w, 1, 0, 0, 1.0f, 1, AUDIO_RATE, 0));
     box_audio_core_apply(core, w.data, w.size);
 }
 
@@ -562,7 +562,7 @@ void Stream_no_alloc(void) {
         box_audio_writer_t w;
         box_audio_writer_init(&w, bytes, sizeof(bytes));
         test_assert(box_audio_write_stream(&w, (uint32_t)(10 + i), (uint32_t)i, 0, 1.0f,
-            1, i ? 44100.0f : AUDIO_RATE));
+            1, i ? 44100.0f : AUDIO_RATE, 0));
         box_audio_core_apply(core, w.data, w.size);
         audio_render(core, 0, 1000);
         test_assert(box_audio_core_stream_chunk(core, (uint32_t)i, stream_chunks[0], c, false));
