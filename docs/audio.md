@@ -479,7 +479,8 @@ argument, a `uint64_t`.
 Every bus in the order is measured per block at its output, after its inserts, width, pan,
 volume and mute, the signal it sends on: the largest absolute sample of each channel and the
 sum of the squares of each with the frames they hold. That is a compare and a multiply-add per
-sample and channel of a bus in the order; a bus out of the order costs nothing. The master is
+sample and channel of a bus in the order, about 5% of `bench/audio` `Mix` with 64 voices
+through 8 buses; a bus out of the order costs nothing. The master is
 measured after its volume and before the limiter, so its meter reads over 1 while the limiter
 reduces the gain, and shows how far the mix is over.
 
@@ -1890,7 +1891,9 @@ box { audio { master { AudioMeter: {} } } }
   component only on the entities that have it, so a scene that never looks pays no component
   writes and no change detection fires. `audio` prints the levels of every channel anyway.
 - The levels follow the clock of the output: a page that waits for a gesture, is suspended or
-  failed reads silence, as does a world without output.
+  failed reads silence, as does a world without output. The sync reads what rendered before it,
+  so the levels lag the commands of a frame: with the null transport, which renders after the
+  sync, a change shows in the meter two frames later.
 
 **Sources** start a voice when `playing` is true and their sound is known, and stop it when
 `playing` goes false, the sound or `loop` changes or the entity is deleted, which fades it out

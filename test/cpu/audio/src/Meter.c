@@ -62,7 +62,8 @@ static void meter_expect(
     test_assert(fabsf(m->rms_right - rms_right) <= tolerance);
 }
 
-/** Iterate a query to its end, which takes its changes.
+/** Iterate a query to its end, which takes its changes. The first check creates the monitors
+ * of flecs, which report a change until the query is iterated.
  *
  * @param world The world
  * @param q The query
@@ -71,7 +72,9 @@ static void meter_drain(
     ecs_world_t *world,
     ecs_query_t *q)
 {
-    ecs_iter_t it = ecs_query_iter(world, q);
+    ecs_iter_t it;
+    ecs_query_changed(q);
+    it = ecs_query_iter(world, q);
     while (ecs_query_next(&it)) { }
 }
 
@@ -125,7 +128,9 @@ void Meter_mute(void) {
 
     ecs_ensure(world, bus, AudioBus)->mute = true;
     ecs_modified(world, bus, AudioBus);
-    audio_run(world, 2);
+    /* The sync reads the meters of the previous render: the first frame renders the ramp, the
+     * second reads it, the third reads silence */
+    audio_run(world, 3);
     test_assert(meter_of(world, bus)->peak_left == 0);
     test_assert(meter_of(world, bus)->peak_right == 0);
     test_assert(meter_of(world, bus)->rms_left > 0);
@@ -197,7 +202,7 @@ void Meter_opt_in(void) {
         .flags = EcsQueryDetectChanges | EcsQueryMatchDisabled,
         .cache_kind = EcsQueryCacheAuto
     });
-    audio_run(world, 2);
+    audio_run(world, 25);
     meter_drain(world, buses);
     meter_drain(world, meters);
     audio_run(world, 5);
