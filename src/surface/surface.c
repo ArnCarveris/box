@@ -656,6 +656,40 @@ void box_surface_point_size(
     }
 }
 
+bool box_surface_texture_size(
+    const ecs_world_t *world,
+    ecs_entity_t texture,
+    int32_t *width,
+    int32_t *height)
+{
+    bool found = false;
+    *width = *height = 0;
+    if (!texture || !ecs_id(Surface) || !ecs_id(SurfaceStatus)) {
+        goto done;
+    }
+
+    ecs_iter_t it = ecs_each(world, Surface);
+    while (!found && ecs_each_next(&it)) {
+        const Surface *s = ecs_field(&it, Surface, 0);
+        int32_t i;
+        for (i = 0; i < it.count && !found; i ++) {
+            if (s[i].texture == texture) {
+                const SurfaceStatus *status = ecs_get(world, it.entities[i], SurfaceStatus);
+                *width = status ? status->width : 0;
+                *height = status ? status->height : 0;
+                found = true;
+            }
+        }
+    }
+
+    if (found) {
+        ecs_iter_fini(&it);
+    }
+
+done:
+    return *width > 0 && *height > 0;
+}
+
 ecs_entity_t box_surface_of_view(
     ecs_world_t *world,
     ecs_query_t *surfaces,

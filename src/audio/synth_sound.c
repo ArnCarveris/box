@@ -54,14 +54,15 @@ void box_audio_synth_init(
     ecs_world_t *world)
 {
     ecs_entity_t ids[] = {
-        ecs_id(SynthSound), ecs_id(SynthOscillator), ecs_id(SynthEnvelope), ecs_id(SynthFilter)
+        ecs_id(SynthSound), ecs_id(SynthOscillator), ecs_id(SynthEnvelope), ecs_id(SynthFilter),
+        ecs_id(SynthFilterEnvelope)
     };
     const char *names[] = {
         "AudioSynthSoundDirty", "AudioSynthOscillatorDirty", "AudioSynthEnvelopeDirty",
-        "AudioSynthFilterDirty"
+        "AudioSynthFilterDirty", "AudioSynthFilterEnvelopeDirty"
     };
     int32_t i;
-    for (i = 0; i < 4; i ++) {
+    for (i = 0; i < 5; i ++) {
         ecs_observer(world, {
             .entity = ecs_entity(world, { .name = names[i] }),
             .query.flags = EcsQueryMatchPrefab,
@@ -82,7 +83,8 @@ static box_audio_synth_envelope_t box_audio_synth_envelope(
 {
     return (box_audio_synth_envelope_t){
         .attack = env->attack, .decay = env->decay, .sustain = env->sustain,
-        .release = env->release, .hold = env->hold };
+        .release = env->release, .hold = env->hold, .curve = env->curve,
+        .attack_curve = env->attack_curve };
 }
 
 /** Check whether an envelope fits in a pass of the core; NaN, infinite and negative times do
@@ -208,6 +210,7 @@ bool box_audio_synth_compile(
     const SynthSound *sound = ecs_get(world, e, SynthSound);
     const SynthEnvelope *env = ecs_get(world, e, SynthEnvelope);
     const SynthFilter *filter = ecs_get(world, e, SynthFilter);
+    const SynthFilterEnvelope *fenv = ecs_get(world, e, SynthFilterEnvelope);
     const SynthOscillator *osc = ecs_get(world, e, SynthOscillator);
     int32_t extra = 0, orphans = 0, i;
     bool endless = false, fits = true, result;
@@ -225,9 +228,17 @@ bool box_audio_synth_compile(
     if (filter) {
         p.filter = (uint32_t)filter->kind + 1;
         p.cutoff = filter->cutoff;
-        p.cutoff_end = filter->cutoff_end;
-        p.cutoff_sweep = filter->sweep;
         p.resonance = filter->resonance;
+        p.slope = (uint32_t)filter->slope;
+    }
+
+    if (filter && fenv && fenv->amount != 0) {
+        p.filter_amount = fenv->amount;
+        p.filter_envelope = (box_audio_synth_envelope_t){
+            .attack = fenv->attack, .decay = fenv->decay, .sustain = fenv->sustain,
+            .release = fenv->release, .hold = fenv->hold, .curve = fenv->curve,
+            .attack_curve = fenv->attack_curve };
+        fits = fits && box_audio_synth_envelope_fits(&p.filter_envelope);
     }
 
     if (osc && osc->modulation != SynthMix) {

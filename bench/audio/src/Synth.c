@@ -16,6 +16,7 @@
 /** Create a core with 64 looping voices of a patch of three layers: a saw that sweeps up, a
  * square with its own envelope and noise, into a lowpass.
  *
+<<<<<<< HEAD
  * With fm the patch is four sines instead: two carriers, each phase modulated by a modulator
  * with its own envelope, one of them with feedback.
  *
@@ -26,6 +27,15 @@
 static box_audio_core_t* bench_synth_core(
     bool sweep,
     bool fm)
+=======
+ * @param envelope Whether a filter envelope moves the cutoff during the whole envelope
+ * @param slope A box_audio_synth_slope_t
+ * @return The core
+ */
+static box_audio_core_t* bench_synth_core(
+    bool envelope,
+    uint32_t slope)
+>>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
 {
     static uint8_t bytes[8192];
     box_audio_core_desc_t desc = { .sample_rate = BENCH_RATE };
@@ -39,9 +49,11 @@ static box_audio_core_t* bench_synth_core(
         .attack = 0.01f, .decay = 0.1f, .sustain = 0.6f, .hold = 2.0f, .release = 0.2f };
     p.filter = BOX_AUDIO_SYNTH_LOWPASS;
     p.cutoff = 400;
-    p.cutoff_end = sweep ? 9000 : 0;
-    p.cutoff_sweep = sweep ? 2.3f : 0;
     p.resonance = 0.6f;
+    p.slope = slope;
+    p.filter_amount = envelope ? 4.5f : 0;
+    p.filter_envelope = (box_audio_synth_envelope_t){
+        .attack = 1.0f, .decay = 0.5f, .sustain = 0.7f, .hold = 0.6f, .release = 0.2f };
     p.layer[0] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_SAW, .frequency = 110,
         .frequency_end = 220, .sweep = 2.0f, .level = 0.4f };
     p.layer[1] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_SQUARE, .frequency = 330,
@@ -102,25 +114,41 @@ void Synth_voices_64(
     bench_t *b)
 {
     // audio/synth
+<<<<<<< HEAD
     box_audio_core_t *core = bench_synth_core(false, false);
+=======
+    box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12);
+>>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
 
-void Synth_voices_64_filter_sweep(
+void Synth_voices_64_filter_envelope(
     bench_t *b)
 {
     // audio/synth
+<<<<<<< HEAD
     box_audio_core_t *core = bench_synth_core(true, false);
+=======
+    box_audio_core_t *core = bench_synth_core(true, BOX_AUDIO_SYNTH_SLOPE_12);
+>>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
 
+<<<<<<< HEAD
 void Synth_voices_64_fm(
     bench_t *b)
 {
     // audio/synth
     box_audio_core_t *core = bench_synth_core(false, true);
+=======
+void Synth_voices_64_filter_24(
+    bench_t *b)
+{
+    // audio/synth
+    box_audio_core_t *core = bench_synth_core(true, BOX_AUDIO_SYNTH_SLOPE_24);
+>>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }

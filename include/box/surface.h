@@ -102,6 +102,27 @@ void box_surface_point_size(
     float *width,
     float *height);
 
+/** Get the size in texels of the texture a surface renders into.
+ *
+ * The texture entity (Surface.texture) has no Texture: it samples the image of the target,
+ * SurfaceStatus.width by height pixels, the point size times pixel_ratio, which the views render
+ * into at render_width by render_height, after resolution_scale, and are scaled up to.
+ *
+ * The status is written when the target is configured, so the size is 0 until the surface
+ * rendered once and follows a resize at the next render extract.
+ *
+ * @param world The world
+ * @param texture The texture entity
+ * @param width Out: the width in texels, 0 when no surface renders into the texture
+ * @param height Out: the height in texels, 0 when no surface renders into the texture
+ * @return Whether a surface with a size renders into the texture
+ */
+bool box_surface_texture_size(
+    const ecs_world_t *world,
+    ecs_entity_t texture,
+    int32_t *width,
+    int32_t *height);
+
 /** Find the surface a view renders to.
  *
  * The surface whose view_root is the parent of the view counts, else the first surface without

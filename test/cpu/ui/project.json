@@ -200,7 +200,8 @@
             {
                 "id": "PickTexture",
                 "testcases": [
-                    "blend_mask_coordinates"
+                    "blend_mask_coordinates",
+                    "image_slice_corner"
                 ]
             },
             {
@@ -651,7 +652,8 @@
                     "prefab",
                     "template",
                     "record_waits_for_texture",
-                    "record_lifecycle"
+                    "record_lifecycle",
+                    "record_surface_texture"
                 ]
             }
         ]
