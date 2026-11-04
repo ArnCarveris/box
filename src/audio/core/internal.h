@@ -255,11 +255,9 @@ typedef struct box_audio_synth_unison_t {
 } box_audio_synth_unison_t;
 /** A pluck string of a synth voice: a Karplus-Strong loop of a delay line, a symmetric lowpass
  * of one frame of delay and a first order allpass of the fraction of a frame left, with a gain
-<<<<<<< HEAD
- * that sets its decay, and the old read point that crossfades into the new one at a crossing */
-=======
- * that sets its decay. A pluck layer has one for each of its unison voices, chained by next */
->>>>>>> a71c45859c86821c76644f0038d8faa6b52b2a41
+ * that sets its decay, and the old read point that crossfades into the new one at a crossing.
+ *
+ * A pluck layer has one for each of its unison voices, chained by next */
 typedef struct box_audio_synth_string_t {
     float line[BOX_AUDIO_SYNTH_STRING_FRAMES]; /**< The delay line, a ring */
     int32_t write;        /**< Index the next frame is written to */

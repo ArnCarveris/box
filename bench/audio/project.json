@@ -52,11 +52,8 @@
                     "voices_64_fm",
                     "voices_64_curved",
                     "voices_32_pluck",
-<<<<<<< HEAD
-                    "voices_32_pluck_vibrato"
-=======
+                    "voices_32_pluck_vibrato",
                     "voices_8_pluck_unison"
->>>>>>> a71c45859c86821c76644f0038d8faa6b52b2a41
                 ]
             }
         ]

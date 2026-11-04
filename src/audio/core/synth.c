@@ -1499,17 +1499,9 @@ static inline float box_audio_synth_osc_next(
 
 /** Render a frame of a string that rings and advance it.
  *
-<<<<<<< HEAD
- * A string follows the turns per frame of its oscillator, its glides, sweeps and vibrato
- * included, tuned cheaply every frame and exactly every BOX_AUDIO_SYNTH_STRING_RETUNE frames
- * while it moves; a steady pitch never retunes.
- *
- * A period under BOX_AUDIO_SYNTH_STRING_SILENCE silences it for good.
-=======
- * A string follows the turns per frame it is given, its glides, sweeps and vibrato included,
- * with a new tuning at each change. Once the peak of a period is under
- * BOX_AUDIO_SYNTH_STRING_SILENCE it is silent, leaves src->ringing and costs nothing more.
->>>>>>> a71c45859c86821c76644f0038d8faa6b52b2a41
+ * A string follows the turns per frame it is given, glides, sweeps and vibrato included: tuned
+ * cheaply every frame and exactly every BOX_AUDIO_SYNTH_STRING_RETUNE frames while it moves,
+ * never at a steady pitch. A period under BOX_AUDIO_SYNTH_STRING_SILENCE leaves src->ringing.
  *
  * Per frame the frame out of the delay line goes through the lowpass (b0, b1, b0), the
  * allpass and the gain of the loop back into it; during the crossfade of a crossing the old

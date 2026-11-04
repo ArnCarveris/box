@@ -7,7 +7,6 @@
 
 #include "world.h"
 #include "../../../../src/jobs/jobs.h"
-#include "../../../../src/audio/core/internal.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -4639,20 +4638,6 @@ static double synth_high(
     return sum;
 }
 
-/** Make every string of a core jump at a crossing of a whole frame, without the crossfade, as
- * strings did before it.
- *
- * @param core The core
- */
-static void synth_rough(
-    box_audio_core_t *core)
-{
-    int32_t k;
-    for (k = 0; k < BOX_AUDIO_SYNTH_STRINGS; k ++) {
-        core->synth_strings[k].rough = true;
-    }
-}
-
 /** A vibrato moves a pluck string by its depth at its rate: the cents of the string over
  * windows of 30 ms swing at the rate of the LFO, more than at any other rate, and by the swing
  * of a sine oscillator under the same LFO measured the same way, within 10 %. */
@@ -4716,7 +4701,7 @@ void Synth_pluck_crossing_smooth(void) {
         p.glide = 0.02f;
         synth_define(core, 1, &p);
         if (r) {
-            synth_rough(core);
+            audio_strings_rough(core);
         }
 
         audio_play(core, 1, 1, 0, 1, 0, 1, 0);
@@ -4734,7 +4719,7 @@ void Synth_pluck_crossing_smooth(void) {
             .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 8, .pitch = 100 };
         synth_define(core, 1, &p);
         if (r) {
-            synth_rough(core);
+            audio_strings_rough(core);
         }
 
         audio_play(core, 1, 1, 0, 1, 0, 1, 0);
@@ -4770,7 +4755,7 @@ void Synth_pluck_steady_identical(void) {
 
         synth_define(core, 1, &p);
         if (k == 3) {
-            synth_rough(core);
+            audio_strings_rough(core);
         }
 
         audio_play(core, 1, 1, 0, 1, 0, 1, 0);

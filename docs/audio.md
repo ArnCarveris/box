@@ -232,21 +232,12 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
 - **Synth**: up to 8 oscillators, one filter and two LFOs per sound, up to 7 unison voices per
   oscillator, linear or curved envelopes and no node graph; an LFO has fixed destinations (pitch,
   level, cutoff, pulse width) and no LFO modulates another; an oscillator may phase or ring
-<<<<<<< HEAD
-  modulate another, but FM is not band limited. Plucked strings go down to 40 Hz, 32 of them ring
-  at once, and each plays as one voice; a pitch LFO gives them vibrato. Legato is mono per
-  channel and has no note off: a held note lasts its hold after the last note. A looping synth
-  sound starts a new pass of its envelopes and oscillators at the end of the last, at most every
-  60 seconds; a drone keeps that gap short with edges of a few ms, as the dust merchant's engine
-  does with 2 ms.
-=======
   modulate another, but FM is not band limited. Plucked strings go down to 40 Hz and 32 of them ring
-  at once; a unison pluck takes one per voice, so a chord of 6 notes of 4 voices takes 24. Legato
-  is mono per channel and has no note off: a held note lasts its hold after the last note. A
-  looping synth sound starts a new pass of its envelopes and oscillators at the end of the last, at
-  most every 60 seconds; a drone keeps that gap short with edges of a few ms, as the dust
-  merchant's engine does with 2 ms.
->>>>>>> a71c45859c86821c76644f0038d8faa6b52b2a41
+  at once; a unison pluck takes one per voice, so a chord of 6 notes of 4 voices takes 24; a pitch
+  LFO gives them vibrato. Legato is mono per channel and has no note off: a held note lasts its
+  hold after the last note. A looping synth sound starts a new pass of its envelopes and
+  oscillators at the end of the last, at most every 60 seconds; a drone keeps that gap short with
+  edges of a few ms, as the dust merchant's engine does with 2 ms.
 - **Files**: WAV and FLAC for sounds, Ogg Vorbis for music, one stream at once (a change of path
   fades over 5 ms, there is no crossfade).
 - **Mixer**: 63 buses besides the master and 4 sends per channel; more buses are silent and
@@ -759,31 +750,20 @@ end.
   in which no layer has more than one voice takes the loop it took before, bit identical, and
   costs one compare per block; a layer of one voice with a width is such a layer. A string
   costs a read and a write of its line, 6 multiplies and its peak per frame while it rings, and
-<<<<<<< HEAD
-  a pluck writes its line of 2048 floats once. A patch with LFOs adds three adds and two
-  multiplies per oscillator per frame and the control block every 8 frames, and a string with a
-  vibrato retunes cheaply every frame and exactly every 8 frames and, for 8 frames after each
-  crossing of a whole frame, runs a second read point through its lowpass and allpass; a patch without LFOs takes the loops it
-=======
   a pluck writes its line of 2048 floats once; a unison pluck layer costs that per voice. A
   patch with LFOs adds three adds and two multiplies per oscillator per frame and the control
-  block every 8 frames, and a string with a
-  vibrato tunes itself again every frame, as in a glide; a patch without LFOs takes the loops it
->>>>>>> a71c45859c86821c76644f0038d8faa6b52b2a41
+  block every 8 frames, and a string with a vibrato retunes cheaply every frame and exactly
+  every 8 frames and, for 8 frames after each crossing of a whole frame, runs a second read
+  point through its lowpass and allpass; a patch without LFOs takes the loops it
   took before and renders bit identical, and a square at a width of 0.5 costs a compare.
   `bench/audio` has a `Synth` suite of 64 voices in ns per sample, with a filter envelope, with a
   24 dB filter, `voices_64_lfo`, two LFOs on the pitch, the level, the cutoff and the pulse
   width (about twice the plain patch, most of it the coefficients of the moving cutoff, as with
   a filter envelope), `voices_64_fm`, two FM pairs per voice, which measures the modulated
-<<<<<<< HEAD
   path, `voices_32_pluck`, 32 ringing strings, one per voice, `voices_32_pluck_vibrato`, the
-  same strings under a vibrato of 25 cents, and `voices_64_curved`, which is
-=======
-  path, `voices_32_pluck`, 32 ringing strings, one per voice, `voices_8_pluck_unison`, the same
-  32 strings as 8 voices of a 4 voice unison in stereo (about half the time of
-  `voices_32_pluck`: a voice, its filter and its mix cost more than a string), and
-  `voices_64_curved`, which is
->>>>>>> a71c45859c86821c76644f0038d8faa6b52b2a41
+  same strings under a vibrato of 25 cents, `voices_8_pluck_unison`, the same 32 strings as 8
+  voices of a 4 voice unison in stereo (about half the time of `voices_32_pluck`: a voice, its
+  filter and its mix cost more than a string), and `voices_64_curved`, which is
   `voices_64` with a curve of 4 and an attack curve of 1.5 on the patch envelope and on the
   envelope of the square. A frame inside a linear segment is an inlined add behind one test;
   entering a segment, the last frame of one and a curved frame take an out of line step, so a
@@ -1196,22 +1176,13 @@ The `frequency`, `frequency_end`, `sweep` and `level` of the `SynthOscillator` a
 layer; `index` and `feedback` do not. Every play plucks with other noise, from the `seed` of the
 `SynthSound` and the count of plays, so repeated notes differ a little, as on a real string, and a
 fixed run renders bit identical. The lowest note is `BOX_AUDIO_SYNTH_PLUCK_LOWEST`, 40 Hz: a lower
-<<<<<<< HEAD
-one plays at 40 Hz with one warning. A core rings 32 strings at once; a play that finds none free
-is ignored. The string follows the pitch of its voice: a change of `AudioSource.pitch`, a sweep,
-a `SynthGlide`, legato notes and the `pitch` of a `SynthLfo` bend the ringing string without a
-new pluck, so a pitch LFO gives a string its vibrato, as the guitar below has on a held note.
-Glides and vibrato stay clean: while the pitch moves the string retunes cheaply every frame and
-exactly once per control block, and when its delay line moves by a whole frame it crossfades from the old read point to the new
-one. A string plays as one voice: a `SynthUnison` on a `SynthPluck` layer is ignored, so there is
-no ensemble of detuned strings in one layer; several `SynthPluck` layers a few cents apart make a
-chorus, as the 12 string guitar has.
-A string may ring modulate or be ring modulated, but it ignores phase modulation and feedback.
-=======
 one plays at 40 Hz with one warning. The string follows the pitch of its voice: a change of
-`AudioSource.pitch`, a sweep, a `SynthGlide`, legato notes and the vibrato of a `SynthLfo` bend
-the ringing string without a new pluck. A string may ring modulate or be ring modulated, but it
-ignores phase modulation and feedback.
+`AudioSource.pitch`, a sweep, a `SynthGlide`, legato notes and the `pitch` of a `SynthLfo` bend
+the ringing string without a new pluck, so a pitch LFO gives a string its vibrato, as the guitar
+below has on a held note. Glides and vibrato stay clean: while the pitch moves the string
+retunes cheaply every frame and exactly once per control block, and when its delay line moves by
+a whole frame it crossfades from the old read point to the new one. A string may ring modulate
+or be ring modulated, but it ignores phase modulation and feedback.
 
 A `SynthUnison` on a `SynthPluck` layer rings a string for each of its `voices`, each detuned and
 panned as the voices of an oscillator (see [Unison and width](#unison-and-width)) and plucked with
@@ -1226,7 +1197,6 @@ second chord while the first rings finds too few. A play that does not find a st
 voice is ignored, as one without a voice slot, and its strings come back when its voice ends.
 Keep the unison of a pluck at 2 or 3 voices for parts of many ringing notes; a long `decay` keeps
 the strings of a note taken for longer.
->>>>>>> a71c45859c86821c76644f0038d8faa6b52b2a41
 
 ```
 using box.audio
