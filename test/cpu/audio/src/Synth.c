@@ -1407,3 +1407,328 @@ void Synth_deleted_releases(void) {
     test_int(box_audio_module_sounds(world), sounds - 1);
     ecs_fini(world);
 }
+
+/** Frequency of a range at a frame, from the period between each two upward zero crossings,
+ * placed at their middle and interpolated in cents between the two periods around the frame.
+ *
+ * @param x Samples
+ * @param from First frame
+ * @param to End frame
+ * @param at The frame
+ * @return Frequency in Hz, 0 when the range has no periods around the frame
+ */
+static double synth_frequency_at(
+    const float *x,
+    int32_t from,
+    int32_t to,
+    double at)
+{
+    double prev = -1, mid0 = -1, f0 = 0, result = 0;
+    int32_t i;
+    for (i = from + 1; i < to && result == 0; i ++) {
+        if (x[i - 1] < 0 && x[i] >= 0) {
+            double c = i - 1 + x[i - 1] / (double)(x[i - 1] - x[i]);
+            if (prev >= 0) {
+                double mid = (prev + c) / 2, f = AUDIO_RATE / (c - prev);
+                if (mid0 >= 0 && mid0 <= at && mid >= at) {
+                    double k = (at - mid0) / (mid - mid0);
+                    result = f0 * pow(f / f0, k);
+                }
+
+                mid0 = mid;
+                f0 = f;
+            }
+
+            prev = c;
+        }
+    }
+
+    return result;
+}
+
+/** A sine at a steady level for a second, whose pitch glides over a time.
+ *
+ * @param frequency Hz
+ * @param glide Seconds of a glide
+ * @return The patch
+ */
+static box_audio_synth_patch_t synth_glide_patch(
+    float frequency,
+    float glide)
+{
+    box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SINE, frequency, 0.5f, 1.0f);
+    p.glide = glide;
+
+    return p;
+}
+
+/** A pitch change of an octave over 0.2 s: the frequency is the geometric mean halfway, a
+ * quarter of an octave up at a quarter, and lands on the octave without a step. */
+void Synth_glide_geometric_mean(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_glide_patch(300, 0.2f);
+    double mid = 300 * sqrt(2.0), quarter = 300 * pow(2.0, 0.25), f;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 4864);
+    test_assert(fabs(audio_frequency(audio_l, 480, 4864) - 300) < 0.3);
+    audio_voice_set(core, 1, BOX_AUDIO_PARAM_PITCH, 2);
+    audio_render(core, 0, 19200);
+
+    f = synth_frequency_at(audio_l, 0, 19200, 4800);
+    printf("halfway: %f Hz, geometric mean %f Hz\n", f, mid);
+    test_assert(fabs(f - mid) < 0.003 * mid);
+    f = synth_frequency_at(audio_l, 0, 19200, 2400);
+    printf("a quarter: %f Hz, expected %f Hz\n", f, quarter);
+    test_assert(fabs(f - quarter) < 0.003 * quarter);
+    f = synth_frequency_at(audio_l, 0, 19200, 200);
+    test_assert(f > 300 && f < 308);
+    test_assert(fabs(audio_frequency(audio_l, 9600 + 480, 19200) - 600) < 0.6);
+    test_assert(audio_max_step(audio_l, 1, 19200) < 0.05f);
+    test_int(box_audio_core_voice_count(core), 1);
+    box_audio_core_free(core);
+}
+
+/** A glide of 0 keeps the jump of today, bit identical: a sine at 0.5 after its attack is the
+ * old phase recurrence, its turns per frame multiplied by the new pitch at the block of the
+ * change. */
+void Synth_glide_zero_identical(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_glide_patch(300, 0);
+    double t = 0, dt = (double)300.0f * (double)1.0f / (double)AUDIO_RATE;
+    int32_t edge = (int32_t)(BOX_AUDIO_SYNTH_EDGE * AUDIO_RATE + 0.5f), i;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 4864);
+    audio_voice_set(core, 1, BOX_AUDIO_PARAM_PITCH, 1.5f);
+    audio_render(core, 4864, 4864);
+    for (i = 0; i < 9728; i ++) {
+        if (i == 4864) {
+            dt = dt * ((double)1.5f / (double)1.0f);
+        }
+
+        if (i >= edge) {
+            test_assert(audio_l[i] == box_audio_core_sin(t) * 0.5f);
+        }
+
+        t += dt;
+        t = t >= 1 ? t - 1 : t;
+    }
+
+    test_assert(fabs(audio_frequency(audio_l, 4864 + 10, 9728) - 450) < 0.5);
+    box_audio_core_free(core);
+}
+
+/** A legato play of the same handle glides the voice to the new note without a new attack:
+ * the level stays at the sustain, which holds for its hold again, and one voice plays. */
+void Synth_legato_no_retrigger(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t a = synth_glide_patch(300, 0.05f), b = a;
+    double amp, low = 1, high = 0;
+    int32_t i, at;
+    a.legato = 1;
+    a.envelope = (box_audio_synth_envelope_t){
+        .attack = 0.05f, .decay = 0.05f, .sustain = 0.5f, .hold = 0.5f, .release = 0.05f };
+    b = a;
+    b.layer[0].frequency = 450;
+    synth_define(core, 1, &a);
+    synth_define(core, 2, &b);
+    audio_play(core, 7, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 9600);
+    test_assert(fabs(synth_amplitude(audio_l, 6000, 9600) - 0.25) < 0.01);
+
+    audio_play(core, 7, 2, 0, 1, 0, 1, BOX_AUDIO_PLAY_LEGATO);
+    audio_render(core, 0, 24000);
+    test_int(box_audio_core_voice_count(core), 1);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_VOICE_END, NULL), 0);
+    for (at = 0; at + 960 <= 24000; at += 960) {
+        amp = synth_amplitude(audio_l, at, at + 960);
+        low = amp < low ? amp : low;
+        high = amp > high ? amp : high;
+    }
+
+    printf("legato level: %f to %f\n", low, high);
+    test_assert(low > 0.24 && high < 0.26);
+    test_assert(audio_max_step(audio_l, 1, 24000) < 0.05f);
+    test_assert(fabs(audio_frequency(audio_l, 2400 + 480, 24000) - 450) < 0.5);
+
+    audio_render(core, 24000, 24000);
+    i = synth_last(audio_l, 0, AUDIO_FRAMES);
+    printf("last sample at %d, release ends at 26400\n", i);
+    test_assert(abs(i - 26400) <= SYNTH_MS);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_VOICE_END, NULL), 1);
+    box_audio_core_free(core);
+}
+
+/** A legato play of a voice that releases starts a new voice with the handle: the old one
+ * releases on its own and reports its end with handle 0. */
+void Synth_legato_after_release(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t a = synth_glide_patch(300, 0.05f), b;
+    box_audio_event_t e;
+    a.legato = 1;
+    a.envelope = (box_audio_synth_envelope_t){
+        .attack = 0.01f, .sustain = 0.5f, .hold = 0.05f, .release = 0.2f };
+    b = a;
+    b.layer[0].frequency = 450;
+    synth_define(core, 1, &a);
+    synth_define(core, 2, &b);
+    audio_play(core, 7, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 4800);
+    audio_play(core, 7, 2, 0, 1, 0, 1, BOX_AUDIO_PLAY_LEGATO);
+    audio_render(core, 0, 480);
+    test_int(box_audio_core_voice_count(core), 2);
+    audio_render(core, 0, 9600);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_VOICE_END, &e), 1);
+    test_int(e.id, 0);
+    test_int(box_audio_core_voice_count(core), 1);
+    test_assert(fabs(audio_frequency(audio_l, 8000, 9600) - 450) < 0.5);
+    audio_render(core, 0, AUDIO_FRAMES);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_VOICE_END, &e), 1);
+    test_int(e.id, 7);
+    box_audio_core_free(core);
+}
+
+/** Create a world and run test/assets/audio/synth_glide.flecs in it.
+ *
+ * @return The world
+ */
+static ecs_world_t* synth_glide_world(void)
+{
+    ecs_world_t *world = audio_world();
+    char *code = synth_read("test/assets/audio/synth_glide.flecs");
+    test_assert(ecs_script_run(world, "glide", code, NULL) == 0);
+    ecs_os_free(code);
+
+    return world;
+}
+
+/** A change of the pitch of a playing AudioSource glides: two frames into a glide of 0.2 s
+ * the frequency is between the two, at the end on the new one. */
+void Synth_glide_source_pitch(void) {
+    // audio/synth
+    ecs_world_t *world = synth_glide_world();
+    ecs_entity_t slide = ecs_lookup(world, "Slide");
+    ecs_entity_t src;
+    double f;
+    test_assert(slide != 0);
+    audio_run(world, 1);
+    test_flt(ecs_get(world, slide, AudioSynth)->patch.glide, 0.2f);
+    test_int(ecs_get(world, slide, AudioSynth)->patch.legato, 0);
+    src = audio_source(world, slide, 1.0f, false, 0);
+    audio_run(world, 10);
+    test_assert(fabs(audio_frequency(audio_tap_l, audio_tap_count - 1600, audio_tap_count)
+        - 300) < 1);
+    ecs_set(world, src, AudioSource, { .sound = slide, .volume = 1, .pitch = 2,
+        .playing = true });
+    audio_run(world, 3);
+    f = audio_frequency(audio_tap_l, audio_tap_count - AUDIO_FRAME, audio_tap_count);
+    printf("during the glide: %f Hz\n", f);
+    test_assert(f > 310 && f < 590);
+    audio_run(world, 20);
+    test_assert(fabs(audio_frequency(audio_tap_l, audio_tap_count - 1600, audio_tap_count)
+        - 600) < 2);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 1);
+    ecs_fini(world);
+}
+
+/** box.audio.play of a legato note while the last note of its channel holds glides that
+ * voice: one voice plays, it moves through the frequencies between and ends on the new note. */
+void Synth_script_legato(void) {
+    // audio/synth
+    ecs_world_t *world = synth_glide_world();
+    ecs_entity_t low = ecs_lookup(world, "glide_low");
+    double f;
+    test_assert(low != 0);
+    audio_run(world, 1);
+    test_flt(ecs_get(world, low, AudioSynth)->patch.glide, 0.1f);
+    test_int(ecs_get(world, low, AudioSynth)->patch.legato, 1);
+    test_assert(box_audio_play(world, low, 1.0f));
+    audio_run(world, 10);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 1);
+    test_assert(fabs(audio_frequency(audio_tap_l, audio_tap_count - 1600, audio_tap_count)
+        - 300) < 1);
+    test_assert(ecs_script_run(world, "play",
+        "using box.audio\n"
+        "const played: bool = box.audio.play(glide_high, 1.0)\n", NULL) == 0);
+    audio_run(world, 2);
+    f = audio_frequency(audio_tap_l, audio_tap_count - AUDIO_FRAME, audio_tap_count);
+    printf("during the legato glide: %f Hz\n", f);
+    test_assert(f > 305 && f < 445);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 1);
+    audio_run(world, 10);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 1);
+    test_assert(fabs(audio_frequency(audio_tap_l, audio_tap_count - 1600, audio_tap_count)
+        - 450) < 1.5);
+    test_assert(fabs(synth_amplitude(audio_tap_l, audio_tap_count - 1600, audio_tap_count)
+        - 0.4) < 0.02);
+    test_assert(audio_max_step(audio_tap_l, audio_tap_count - AUDIO_FRAME * 22,
+        audio_tap_count) < 0.05f);
+    audio_run(world, 80);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+    ecs_fini(world);
+}
+
+/** A new legato sound of an AudioSource that plays glides its voice instead of starting one. */
+void Synth_script_legato_source(void) {
+    // audio/synth
+    ecs_world_t *world = synth_glide_world();
+    ecs_entity_t low = ecs_lookup(world, "glide_low");
+    ecs_entity_t high = ecs_lookup(world, "glide_high");
+    ecs_entity_t src;
+    test_assert(low != 0);
+    test_assert(high != 0);
+    audio_run(world, 1);
+    src = audio_source(world, low, 1.0f, false, 0);
+    audio_run(world, 10);
+    test_assert(fabs(synth_amplitude(audio_tap_l, audio_tap_count - 1600, audio_tap_count)
+        - 0.4) < 0.02);
+    ecs_set(world, src, AudioSource, { .sound = high, .volume = 1, .pitch = 1,
+        .playing = true });
+    audio_run(world, 12);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 1);
+    test_bool(ecs_get(world, src, AudioSource)->playing, true);
+    test_assert(fabs(audio_frequency(audio_tap_l, audio_tap_count - 1600, audio_tap_count)
+        - 450) < 1.5);
+    test_assert(audio_max_step(audio_tap_l, audio_tap_count - AUDIO_FRAME * 14,
+        audio_tap_count) < 0.05f);
+    audio_run(world, 80);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+    test_bool(ecs_get(world, src, AudioSource)->playing, false);
+    ecs_fini(world);
+}
+
+/** The lead of docs/audio.md compiles without errors; three notes a few frames apart play as
+ * one voice that ends after the last. */
+void Synth_docs_glide_example(void) {
+    // audio/synth
+    ecs_world_t *world;
+    const char *names[] = { "lead_a3", "lead_c4", "lead_e4" };
+    int32_t i, start;
+    world = synth_glide_world();
+    audio_log_start();
+    audio_run(world, 1);
+    start = audio_tap_count;
+    for (i = 0; i < 3; i ++) {
+        ecs_entity_t sound = ecs_lookup(world, names[i]);
+        test_assert(sound != 0);
+        test_assert(ecs_get(world, sound, AudioSynth)->compiled);
+        test_int(ecs_get(world, sound, AudioSynth)->patch.legato, 1);
+        test_assert(box_audio_play(world, sound, 1.0f));
+        audio_run(world, 8);
+        test_int(ecs_singleton_get(world, AudioStatus)->voices, 1);
+    }
+
+    test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.05f);
+    test_assert(synth_finite(audio_tap_l, start, audio_tap_count));
+    audio_run(world, 60);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+    test_flt(audio_peak(audio_tap_l, audio_tap_count - AUDIO_FRAME, audio_tap_count), 0);
+    audio_log_stop();
+    test_int(audio_log_errors, 0);
+    ecs_fini(world);
+}

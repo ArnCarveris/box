@@ -372,6 +372,42 @@ static box_audio_voice_t* box_audio_voice_slot(
     return result;
 }
 
+/** Apply the legato of a play: retarget the synth voice of its handle, or take the handle
+ * from the voice that plays with it, so the play starts a new one. A synth voice that lost its
+ * handle releases on its own and reports its end with handle 0; any other fades out.
+ *
+ * @param core The core
+ * @param cmd The command, of a ready sound
+ * @return Whether it retargeted the voice, which the play then leaves at that
+ */
+static bool box_audio_cmd_legato(
+    box_audio_core_t *core,
+    const box_audio_cmd_play_t *cmd)
+{
+    box_audio_voice_t *v = box_audio_voice_find(core, cmd->voice);
+    float pitch = box_audio_clamp(cmd->pitch, BOX_AUDIO_PITCH_MIN, BOX_AUDIO_PITCH_MAX);
+    bool synth = v && v->source.kind == BOX_AUDIO_SOURCE_SYNTH &&
+        core->sounds[cmd->sound].synth, result = false;
+    if (!v) {
+        goto done;
+    }
+
+    if (synth && box_audio_synth_legato(core, &v->source.data.synth, cmd->sound, pitch)) {
+        v->bus = cmd->bus;
+        v->volume = box_audio_clamp(cmd->volume, 0, BOX_AUDIO_VOLUME_MAX);
+        v->pan = box_audio_clamp(cmd->pan, -1, 1);
+        v->pitch = pitch;
+        box_audio_voice_gains(core, v);
+        result = true;
+    } else if (!synth) {
+        box_audio_voice_fade(core, v, core->ramp_frames);
+    }
+
+    v->handle = result ? v->handle : 0;
+done:
+    return result;
+}
+
 /** Apply a play command. A synth voice starts at its gains, without the ramp: its envelope
  * starts from 0 itself, so an attack shorter than the ramp keeps its time.
  *
@@ -387,6 +423,10 @@ static void box_audio_cmd_play(
         core->sounds[cmd->sound].state != BOX_AUDIO_SOUND_READY)
     {
         box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_PLAY, 0);
+        goto done;
+    }
+
+    if ((cmd->flags & BOX_AUDIO_PLAY_LEGATO) && box_audio_cmd_legato(core, cmd)) {
         goto done;
     }
 

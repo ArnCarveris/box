@@ -111,6 +111,9 @@
 /** Largest amount of the filter envelope in octaves, up or down */
 #define BOX_AUDIO_SYNTH_OCTAVES_MAX 10.0f
 
+/** Longest glide of a synth patch in seconds */
+#define BOX_AUDIO_SYNTH_GLIDE_MAX 10.0f
+
 /** Commands of the byte stream. Each starts with a box_audio_cmd_header_t */
 typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_PLAY = 1,          /**< box_audio_cmd_play_t */
@@ -138,6 +141,11 @@ typedef enum box_audio_param_t {
 
 /** Flags of BOX_AUDIO_CMD_PLAY */
 #define BOX_AUDIO_PLAY_LOOP (1u << 0)
+
+/** A play of a synth sound that retargets the synth voice of its handle, when one plays and has
+ * not reached its release, to the frequencies of the new sound without a restart of its
+ * envelopes; otherwise it starts a new voice with the handle (docs/audio.md, Synth) */
+#define BOX_AUDIO_PLAY_LEGATO (1u << 1)
 
 /** Header of every command: its type and its size in bytes, header included */
 typedef struct box_audio_cmd_header_t {
@@ -306,6 +314,11 @@ typedef struct box_audio_synth_patch_t {
                                            * its level 1, negative closes it; 0 for none */
     box_audio_synth_envelope_t filter_envelope; /**< Envelope of the cutoff, which does not
                                            * keep the voice playing */
+    float glide;                          /**< Seconds a change of the pitch of a voice takes,
+                                           * exponential in frequency, 0 jumps at once */
+    uint32_t legato;                      /**< 1 when a play with BOX_AUDIO_PLAY_LEGATO may
+                                           * retarget a voice; for the sender, the core reads
+                                           * the flag of the play */
     box_audio_synth_layer_t layer[BOX_AUDIO_SYNTH_LAYERS]; /**< The oscillators */
 } box_audio_synth_patch_t;
 

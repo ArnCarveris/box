@@ -42,6 +42,7 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 | `SoundFile` | A short sound from a WAV or FLAC file, decoded into memory, see [Sound files](#sound-files) |
 | `SoundStatus` | Read only: whether a `SoundFile` loads, is ready or failed |
 | `SynthSound` | A sound made by the synth from layers of `SynthOscillator`, `SynthEnvelope`, `SynthFilter` and `SynthFilterEnvelope`, see [Synth sounds](#synth-sounds) |
+| `SynthGlide` | Portamento and mono legato of a synth sound, see [Glide and legato](#glide-and-legato) |
 | `AudioSource` | A sound that plays while its entity exists, once or in a loop, with a volume and a pitch |
 | `AudioSpatial` | Places a source in the world: `min_distance`, `max_distance`, `rolloff`, see [Spatial audio](#spatial-audio) |
 | `AudioListener` | The entity that hears the spatial sources, the camera without one |
@@ -224,7 +225,9 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
 - **Voices**: 64, with the quietest stolen; no priorities. A one shot cannot be controlled after
   it started.
 - **Synth**: up to 4 oscillators and one filter per sound, linear or curved envelopes, no LFO and no node
-  graph. A looping synth sound starts a new pass of its envelopes and oscillators at the end of
+  graph. Legato is mono per channel and has no note off: a held note lasts its hold after the
+  last note. A legato play sent before the module read the end of the voice starts a new
+  voice that the module then loses track of, so its next note starts another one. A looping synth sound starts a new pass of its envelopes and oscillators at the end of
   the last, at most every 60 seconds; a drone keeps that gap short with edges of a few ms, as
   the dust merchant's engine does with 2 ms.
 - **Files**: WAV and FLAC for sounds, Ogg Vorbis for music, one stream at once (a change of path
@@ -303,7 +306,7 @@ start of the next render block. They are:
 
 | Command | Fields |
 |---------|--------|
-| `PLAY` | voice handle, sound, bus, volume, pan, pitch, flags (`BOX_AUDIO_PLAY_LOOP`) |
+| `PLAY` | voice handle, sound, bus, volume, pan, pitch, flags (`BOX_AUDIO_PLAY_LOOP`, `BOX_AUDIO_PLAY_LEGATO`, see [Synth](#synth)) |
 | `STOP` | voice handle: the voice fades out over the ramp and ends |
 | `VOICE_SET` | voice handle, `VOLUME`, `PAN`, `PITCH`, `BUS` or `POSITION`, value |
 | `BUS_SET` | bus, `VOLUME`, `PAN`, `MUTE` or `SEND` (the send level), value |
@@ -506,8 +509,29 @@ with `SOUND_FREE`. The core clamps every value of a patch, a NaN to the low end.
   playing, and a looping voice restarts it with its pass. A patch with an amount of 0 runs no
   envelope and computes no coefficients per frame, and a 12 dB filter runs one stage, so a
   patch that uses neither costs what it did before.
+- **Glide.** The `glide` of a patch, 0 to `BOX_AUDIO_SYNTH_GLIDE_MAX` (10) seconds, makes a
+  change of the pitch of a voice (`VOICE_SET` `PITCH`) move exponentially in frequency, linear
+  in cents, over that time: each oscillator multiplies its turns per frame by
+  `(to / from)^(1 / frames)` per frame, so halfway the frequency is the geometric mean of the two.
+  A change during a glide starts a new glide from where the pitch stands. A running sweep
+  moves with the glide. A loop that starts a new pass during a glide starts at the new pitch.
+  A glide of 0 jumps as before, bit identical, and a voice that does not glide costs one
+  compare per frame.
+- **Legato.** A `PLAY` with `BOX_AUDIO_PLAY_LEGATO` of a synth sound looks for the synth voice
+  of its handle. While one of the envelopes of that voice has not reached its release, the play
+  retargets it instead of starting a voice: layer i glides from its frequency to the frequency
+  of layer i of the new patch times the pitch of the play, over the glide of the new patch (a
+  glide of 0 jumps), and stops its sweep. Its envelopes go on without a restart; one in its
+  hold starts the hold over, so a held note lasts while notes follow. The voice keeps its
+  waves, levels, envelopes, filter and variances, takes the volume, pan and bus of the play
+  with the ramp, and a loop restarts on the new note. Layers past the count of the new patch
+  follow the pitch. When every envelope of the voice releases or ended, or the voice is not a
+  synth, the play takes the handle from it and starts a new voice: a synth voice releases on
+  its own and reports its `VOICE_END` with handle 0, any other fades out as after a `STOP`.
+  Without a voice of the handle it is a plain play. A retarget allocates nothing.
 - **Cost.** Render work only: per frame of a voice an envelope step per envelope (a multiply
-  and an add when curved), an oscillator per layer and the filter, one stage or two. `bench/audio` has a `Synth` suite of 64 voices in
+  and an add when curved), an oscillator per layer and the filter, one stage or two; during a
+  glide a multiply per oscillator. `bench/audio` has a `Synth` suite of 64 voices in
   ns per sample, with a filter envelope and with a 24 dB filter.
 
 The core needs no libm: the exponential sweeps and the filter envelope use series for `log2` and
@@ -518,7 +542,8 @@ The core needs no libm: the exponential sweeps and the filter envelope use serie
 A sound effect is a prefab in script, with no file. `SynthSound` marks the root; the layers are
 the root and its children that have a `SynthOscillator`, as particle effect layers are. The
 `SynthEnvelope`, the `SynthFilter` and the `SynthFilterEnvelope` of the root apply to the mix of
-the layers; a layer may have its own `SynthEnvelope`, and one without uses the root's.
+the layers; a layer may have its own `SynthEnvelope`, and one without uses the root's. A
+`SynthGlide` on the root makes notes slide, see [Glide and legato](#glide-and-legato).
 
 | Component | What it is |
 |-----------|------------|
@@ -527,6 +552,7 @@ the layers; a layer may have its own `SynthEnvelope`, and one without uses the r
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `release`, `hold`: seconds and a sustain level, all 0 by default; `curve` (decay and release) and `attack_curve`: 0 linear (default), positive fast at first, -16..16 |
 | `SynthFilter` | `kind` (`SynthLowPass`, `SynthHighPass`, `SynthBandPass`), `cutoff` (1000), `resonance` (0), `slope` (`SynthSlope12`, `SynthSlope24`) |
 | `SynthFilterEnvelope` | The envelope of the cutoff: `attack`, `decay`, `sustain`, `release`, `hold`, `curve` and `attack_curve` as in `SynthEnvelope`, and `amount`, the octaves the cutoff moves at level 1 (0, negative closes the filter); nothing without a `SynthFilter` |
+| `SynthGlide` | On the root: `time` of a glide (s, 0 jumps), `legato` (false) and `channel` (0), see [Glide and legato](#glide-and-legato) |
 
 The module (`src/audio/synth_sound.c`) compiles a sound once, and again when a component of it
 or of a layer changes, into a patch that the sync system sends with a `SYNTH` command before the
@@ -541,6 +567,63 @@ with `loop: true` starts it over at the end of its envelopes. A play allocates n
   that closes with the note takes the same attack, decay, hold and release. One that should stay
   open while the sound plays takes a sustain of 1 and a hold that lasts the sound.
 - Deleting the sound releases it and fades its one shots, as for `AudioPcm`.
+
+#### Glide and legato
+
+Leads and basses slide between notes with a `SynthGlide` on the root:
+
+| Field | What it is |
+|-------|------------|
+| `time` | Seconds a change of pitch takes, exponential in frequency (linear in cents), 0 to 10; 0 (default) jumps as without the component |
+| `legato` | Play the sound as a note of a mono voice (false) |
+| `channel` | The mono voice of the one shots of legato sounds (0): legato sounds of the same channel share one voice |
+
+How a note follows the previous one:
+
+- **Pitch.** With a `time`, a change of `AudioSource.pitch` while the source plays glides from
+  the pitch that sounds to the new one over the time. Halfway the frequency is the geometric
+  mean of the two.
+- **Notes from script.** Each note is its own sound, as in the Mossvale score. A
+  `box.audio.play` (or `play_at`) of a legato sound while the last one shot of its `channel`
+  still holds does not start a voice: that voice glides to the frequencies of the new sound
+  over the `time` of the new sound, without a new attack, and takes the volume and the bus of
+  the new play. A note that comes while the voice holds its sustain holds it for its `hold`
+  again, so a phrase of quick notes is one held voice that releases after the last note. A
+  note after the voice reached its release, or after it ended, starts a new voice with its
+  attack; the voice that released rings out.
+- **Notes on a source.** A new `sound` on an `AudioSource` that plays a legato sound does the
+  same with the voice of the source, when `loop` does not change; the source keeps playing and
+  ends with the voice.
+- The voice keeps the waves, levels, envelopes, filter and variances of the sound that
+  started it; the following notes give it only their frequencies, layer by layer, and their
+  glide time. Notes of a legato voice share its layers in order, so they should come from one
+  template, as in the example. A sound without `legato` always starts its own voice, and its
+  `time` only glides changes of the pitch of its source.
+
+```
+using box.audio
+
+music { AudioBus: {volume: 1} }
+
+// A lead: a mono saw an octave over a sine whose notes slide into each other over 80 ms
+template Lead {
+  prop f: f32 = 220
+  AudioOutput: {bus: music}
+  SynthSound: {}
+  SynthGlide: {time: 0.08, legato: true, channel: 1}
+  SynthEnvelope: {attack: 0.01, decay: 0.2, sustain: 0.6, hold: 0.3, release: 0.25, curve: 2}
+  SynthFilter: {kind: SynthLowPass, cutoff: 1800, resonance: 0.2}
+  saw { SynthOscillator: {wave: SynthSaw, frequency: f, level: 0.3} }
+  sub { SynthOscillator: {wave: SynthSine, frequency: f * 0.5, level: 0.2} }
+}
+
+Lead lead_a3(f: 220)
+Lead lead_c4(f: 261.63)
+Lead lead_e4(f: 329.63)
+```
+
+`box.audio.play(lead_a3, 0.8)`, then `lead_c4` and `lead_e4` a few frames apart, play one voice
+that slides up a minor third and a major third and releases 0.3 s after the last note.
 
 Which curves to use: plucks, the harp, mallets and drums want a `curve` of 4 to 6 so they fall
 off fast at first and ring out softly; pads, strings and winds want 2 to 3 on the decay and the
@@ -623,7 +706,10 @@ voice on time), the end of a voice, the filter one octave past its cutoff at bot
 cutoff following a filter envelope up and down, stability under fast filter envelopes at full
 resonance and at Nyquist for both slopes and extreme values, layers, scripts from
 `test/assets/audio/synth.flecs`, the five examples above from
-`test/assets/audio/synth_examples.flecs` and errors; `NoAlloc` renders 64 synth voices. The browser
+`test/assets/audio/synth_examples.flecs`, glides (the frequency halfway through a glide at the
+geometric mean, a glide of 0 bit identical to the jump, the pitch of a source) and legato notes
+(no new attack, a held sustain that holds again, a new voice after the release, from script and
+from a source, the lead above from `test/assets/audio/synth_glide.flecs`) and errors; `NoAlloc` renders 64 synth voices. The browser
 check is `test/integration/web/audio_synth.mjs`.
 
 ## Transports
@@ -939,6 +1025,7 @@ frame, the same on every platform.
 | `AudioStream` | Music: an Ogg Vorbis file (`path`) that streams, `volume` (1), `loop` (true), `playing` (true), see [Music](#music) |
 | `AudioStreamStatus` | Read only: `state` (`AudioStreamLoading`, `AudioStreamPlaying`, `AudioStreamStopped`, `AudioStreamEnded`, `AudioStreamFailed`), `frames`, `channels`, `sample_rate`, `position`, `buffered`, `underruns`, `decode_ms`, `decode_max_ms` and `error` |
 | `SynthSound` | A sound made by the synth from its layers, see [Synth sounds](#synth-sounds) |
+| `SynthGlide` | Portamento and mono legato of a synth sound, see [Glide and legato](#glide-and-legato) |
 | `AudioSpatial` | Places a source in the world: `min_distance` (1), `max_distance` (50), `rolloff` (1), see [Spatial audio](#spatial-audio) |
 | `AudioListener` | Tag of the entity whose `WorldTransform` hears the spatial sources |
 | `AudioSettings` | Singleton: `master_volume` (1) and `mute` |

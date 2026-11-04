@@ -250,6 +250,8 @@ typedef struct box_audio_oneshot_t {
     float volume;           /**< Volume of the play, before the distance */
     float sent_volume;      /**< Volume sent */
     float sent_pan;         /**< Pan sent */
+    bool legato;            /**< The mono voice of a legato synth sound */
+    int32_t channel;        /**< SynthGlide.channel of a legato voice */
 } box_audio_oneshot_t;
 
 /** A play of box_audio_play, sent with the next batch */

@@ -188,6 +188,7 @@ typedef struct box_audio_synth_osc_t {
     double ratio;         /**< Factor of inc per frame during the sweep */
     double inc_end;       /**< Turns per frame at the end of the sweep */
     int32_t sweep;        /**< Frames left of the sweep */
+    double glide;         /**< Factor of inc per frame during a glide */
 } box_audio_synth_osc_t;
 
 /** A stage of the filter of a synth voice: a trapezoidal state variable filter */
@@ -219,6 +220,8 @@ typedef struct box_audio_synth_source_t {
     float amount;         /**< Octaves of the filter envelope, 0 without one */
     box_audio_synth_env_t fenv; /**< The filter envelope, when amount is not 0 */
     int32_t control;      /**< Frames until the filter takes the cutoff of the envelope */
+    int32_t glide_frames; /**< Frames of a glide of the patch, 0 when a pitch jumps */
+    int32_t glide_left;   /**< Frames left of the glide that runs, 0 for none */
 } box_audio_synth_source_t;
 
 /** State of the kinds of sources */
@@ -478,13 +481,30 @@ int32_t box_audio_synth_render(
     box_audio_synth_source_t *src,
     int32_t frames);
 
-/** Set the pitch ratio of a synth source.
+/** Set the pitch ratio of a synth source: at once, or exponentially in frequency over the
+ * glide of its patch, from where a glide that runs stands.
  *
  * @param src The source
  * @param pitch Pitch ratio
  */
 void box_audio_synth_pitch(
     box_audio_synth_source_t *src,
+    float pitch);
+
+/** Retarget a synth source to the layers of another synth sound, a legato note: each layer
+ * glides to the frequency of the same layer of the sound at a pitch, over its glide, without a
+ * restart of the envelopes; one in its hold starts it over. Takes no use of the sound.
+ *
+ * @param core The core
+ * @param src The source
+ * @param sound Id of a ready synth sound
+ * @param pitch Pitch ratio
+ * @return Whether it retargeted; false when every envelope of the source releases or ended
+ */
+bool box_audio_synth_legato(
+    box_audio_core_t *core,
+    box_audio_synth_source_t *src,
+    uint32_t sound,
     float pitch);
 
 /** Set the pitch ratio of a source, for kinds that have one.
