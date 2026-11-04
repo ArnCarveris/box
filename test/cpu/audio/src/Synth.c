@@ -1679,8 +1679,8 @@ void Synth_layers_steal_quietest(void) {
     test_int(box_audio_core_voice_count(core), fit);
 
     box_audio_writer_init(&w, bytes, sizeof(bytes));
-    test_assert(box_audio_write_stop(&w, 110));
-    test_assert(box_audio_write_stop(&w, 111));
+    test_assert(box_audio_write_stop(&w, 110, 0));
+    test_assert(box_audio_write_stop(&w, 111, 0));
     box_audio_core_apply(core, w.data, w.size);
     test_int(box_audio_core_voice_count(core), fit - 2);
 
