@@ -26,6 +26,9 @@
  * inside int64 and below 2^53, where doubles still count whole beats */
 #define BOX_AUDIO_BEAT_MAX 2147483648.0
 
+/** Loop wraps a quantized play looks past the window for a boundary before it gives up */
+#define BOX_AUDIO_QUANTIZE_WRAPS 4
+
 /** Volume and pitch of the click of the metronome on the first beat of a bar */
 #define BOX_AUDIO_CLICK_ACCENT_VOLUME 0.8f
 #define BOX_AUDIO_CLICK_ACCENT_PITCH 1.5f
@@ -573,6 +576,102 @@ uint32_t box_audio_timeline_play(
     }
 
     return result;
+}
+
+/** Get the frame a quantized play starts at: the first beat or bar boundary of the timeline at
+ * or after the clock, through the pieces of the window and the loop wraps after it. A loop
+ * without a boundary starts it at its first wrap.
+ *
+ * @param state The state, its timeline updated in this frame
+ * @param tr The transport, NULL for none
+ * @param quantize The grid
+ * @return The frame, 0 to start at once: no transport, a stopped one or AudioQuantizeNone
+ */
+static uint64_t box_audio_timeline_quantize(
+    const box_audio_module_t *state,
+    const Transport *tr,
+    AudioQuantize quantize)
+{
+    const box_audio_timeline_t *tl = &state->timeline;
+    const box_audio_anchor_t *anchors = ecs_vec_first(&tl->anchors);
+    int32_t i = 0, k, wraps = 0, count = ecs_vec_count(&tl->anchors);
+    box_audio_anchor_t a;
+    uint64_t result = 0, from = tl->clock, end, first_wrap = 0;
+    int64_t f, w;
+    double unit, n;
+    bool last, wrap;
+    if (quantize == AudioQuantizeNone || !tr || !tl->playing || !count) {
+        goto done;
+    }
+
+    unit = quantize == AudioQuantizeBar ? box_audio_bar_beats(tr) : 1.0;
+    while (i < count - 1 && anchors[i + 1].frame <= from) {
+        i ++;
+    }
+
+    a = anchors[i];
+    while (wraps <= BOX_AUDIO_QUANTIZE_WRAPS) {
+        last = i >= count - 1;
+        end = UINT64_MAX;
+        wrap = false;
+        if (!last) {
+            end = anchors[i + 1].frame;
+        } else if (box_audio_wraps(tl, &a)) {
+            w = box_audio_anchor_frame(&a, tl->loop_end);
+            w = w < (int64_t)from ? (int64_t)from : w;
+            if (w > (int64_t)a.frame || a.beat != tl->loop_start) {
+                end = (uint64_t)w;
+                wrap = true;
+            }
+        }
+
+        n = floor(box_audio_anchor_beat(&a, from) / unit) * unit;
+        f = box_audio_anchor_frame(&a, n);
+        for (k = 0; k < 3 && f < (int64_t)from; k ++) {
+            n += unit;
+            f = box_audio_anchor_frame(&a, n);
+        }
+
+        if (f >= (int64_t)from && (uint64_t)f < end && (!wrap || n < tl->loop_end)) {
+            result = (uint64_t)f;
+            goto done;
+        }
+
+        if (!last) {
+            a = anchors[++ i];
+        } else if (wrap) {
+            a = (box_audio_anchor_t){ .frame = end, .beat = tl->loop_start,
+                .frames_per_beat = a.frames_per_beat };
+            first_wrap = first_wrap ? first_wrap : end;
+            wraps ++;
+        } else {
+            break;
+        }
+
+        from = end;
+    }
+
+    result = first_wrap;
+done:
+    return result;
+}
+
+void box_audio_timeline_quantized(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    bool waiting)
+{
+    box_audio_play_t *plays = ecs_vec_first(&state->plays);
+    const Transport *tr = ecs_singleton_get(world, Transport);
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&state->plays); i ++) {
+        if (plays[i].quantize != AudioQuantizeNone) {
+            box_audio_play_send(world, state, &plays[i], waiting,
+                box_audio_timeline_quantize(state, tr, plays[i].quantize));
+        }
+    }
+
+    ecs_vec_clear(&state->plays);
 }
 
 bool box_audio_timeline_hook(

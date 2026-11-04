@@ -489,6 +489,13 @@ ECS_STRUCT(Transport, {
                             *   bar, default false */
 });
 
+/** Where box_audio_play_quantized starts a play on the grid of the Transport */
+ECS_ENUM(AudioQuantize, {
+    AudioQuantizeNone = 0,  /**< At once, as box_audio_play */
+    AudioQuantizeBeat = 1,  /**< On the next beat, a quarter note */
+    AudioQuantizeBar = 2    /**< On the next bar of the time signature of the transport */
+});
+
 /** Give an entity the samples of a sound, to play with AudioSource or box_audio_play.
  *
  * @param world The world
@@ -522,6 +529,28 @@ bool box_audio_play(
     ecs_world_t *world,
     ecs_entity_t sound,
     float volume);
+
+/** Play a sound once on the bus of its AudioOutput, starting on the next beat or bar of the
+ * Transport.
+ *
+ * It starts sample accurately on the first boundary at or after the clock of the output, after
+ * a loop wrap on the timeline from loop_start on. With the transport stopped, without a
+ * Transport or with AudioQuantizeNone it starts at once, as box_audio_play.
+ *
+ * The transport never stops or moves it once queued. The rules of box_audio_play apply.
+ * Scripts call it as box.audio.play_quantized(sound, volume, quantize).
+ *
+ * @param world The world
+ * @param sound The sound, an entity with AudioPcm, SoundFile or SynthSound
+ * @param volume Linear gain
+ * @param quantize Where it starts
+ * @return Whether the play was queued
+ */
+bool box_audio_play_quantized(
+    ecs_world_t *world,
+    ecs_entity_t sound,
+    float volume,
+    AudioQuantize quantize);
 
 /** Play a sound once at a place in the world, heard from the listener as an AudioSpatial
  * source that stays where it started.

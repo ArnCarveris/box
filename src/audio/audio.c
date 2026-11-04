@@ -439,6 +439,27 @@ done:
     return result;
 }
 
+bool box_audio_play_quantized(
+    ecs_world_t *world,
+    ecs_entity_t sound,
+    float volume,
+    AudioQuantize quantize)
+{
+    box_audio_module_t *state = box_audio_module_get(world);
+    bool result = false;
+    if (!state || !box_audio_is_sound(world, sound)) {
+        goto done;
+    }
+
+    box_audio_play_t *play = ecs_vec_append_t(NULL, &state->plays, box_audio_play_t);
+    *play = (box_audio_play_t){ .sound = sound, .volume = volume,
+        .quantize = quantize == AudioQuantizeBeat || quantize == AudioQuantizeBar ?
+            quantize : AudioQuantizeNone };
+    result = true;
+done:
+    return result;
+}
+
 bool box_audio_play_at(
     ecs_world_t *world,
     ecs_entity_t sound,
@@ -617,6 +638,26 @@ static void box_audio_play_function(
     *(bool*)result->ptr = box_audio_play(ctx->world, sound, volume);
 }
 
+/** The box.audio.play_quantized script function.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The sound, the volume and the grid
+ * @param result Receives whether the play was queued
+ */
+static void box_audio_play_quantized_function(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    ecs_entity_t sound = *(ecs_entity_t*)argv[0].ptr;
+    float volume = *(float*)argv[1].ptr;
+    AudioQuantize quantize = *(AudioQuantize*)argv[2].ptr;
+    (void)argc;
+    *(bool*)result->ptr = box_audio_play_quantized(ctx->world, sound, volume, quantize);
+}
+
 /** The box.audio.play_at script function.
  *
  * @param ctx The call context
@@ -697,6 +738,18 @@ static void box_audio_functions_init(
             { .name = "volume", .type = ecs_id(ecs_f32_t) }
         },
         .callback = box_audio_play_function
+    });
+
+    ecs_function(world, {
+        .name = "play_quantized",
+        .parent = ecs_get_scope(world),
+        .return_type = ecs_id(ecs_bool_t),
+        .params = {
+            { .name = "sound", .type = ecs_id(ecs_entity_t) },
+            { .name = "volume", .type = ecs_id(ecs_f32_t) },
+            { .name = "quantize", .type = ecs_id(AudioQuantize) }
+        },
+        .callback = box_audio_play_quantized_function
     });
 
     ecs_function(world, {
@@ -782,6 +835,7 @@ void BoxAudioImport(
     ecs_set_hooks(world, AudioSettings, { .ctor = box_audio_settings_ctor });
     ECS_META_COMPONENT(world, AudioStatus);
     ECS_META_COMPONENT(world, Transport);
+    ECS_META_COMPONENT(world, AudioQuantize);
     ecs_set_hooks(world, Transport, { .ctor = box_audio_transport_ctor });
 
     ECS_COMPONENT_DEFINE(world, AudioSoundId);

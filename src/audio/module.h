@@ -265,6 +265,7 @@ typedef struct box_audio_play_t {
     float volume;           /**< The volume */
     bool spatial;           /**< A play of box_audio_play_at */
     float position[3];      /**< World position of a spatial play */
+    AudioQuantize quantize; /**< Grid of a play of box_audio_play_quantized */
 } box_audio_play_t;
 
 /** Where a spatial source is heard from the listener */
@@ -897,6 +898,38 @@ double box_audio_timeline_beat(
 int64_t box_audio_timeline_frame(
     const ecs_world_t *world,
     double beat);
+
+/** Send the plays of box_audio_play_quantized, after the timeline followed the Transport of
+ * the frame, each with the frame of its boundary as its when, then clear the plays. The
+ * timeline does not remember them, so a stop or a seek of the transport leaves them be.
+ *
+ * A play starts on the first beat or bar boundary at or after the clock, through the pieces of
+ * the window and the loop wraps after it; a loop without a boundary starts it at its first
+ * wrap. Without a transport, or a stopped one, it starts at once.
+ *
+ * @param world The world
+ * @param state The state
+ * @param waiting Whether the page waits for a gesture
+ */
+void box_audio_timeline_quantized(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    bool waiting);
+
+/** Send a play of box_audio_play, box_audio_play_at or box_audio_play_quantized as a one shot.
+ *
+ * @param world The world
+ * @param state The state
+ * @param play The play
+ * @param waiting Whether the page waits for a gesture, which drops it
+ * @param when Frame of its first sample, 0 for now; a later play does not glide a legato voice
+ */
+void box_audio_play_send(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    const box_audio_play_t *play,
+    bool waiting,
+    uint64_t when);
 
 /** Write a PLAY at a frame and remember its handle, so that a stop, a seek or a new output
  * cancels it while it has not started.

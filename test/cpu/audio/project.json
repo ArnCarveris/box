@@ -154,6 +154,25 @@
                 ]
             },
             {
+                "id": "Quantize",
+                "testcases": [
+                    "beat_bar_120_4_4",
+                    "beat_bar_97_4_4",
+                    "beat_bar_120_7_8",
+                    "beat_bar_97_7_8",
+                    "on_boundary",
+                    "loop_wrap_beat",
+                    "loop_wrap_bar",
+                    "stopped",
+                    "none_at_once",
+                    "stop_keeps",
+                    "seek_keeps",
+                    "play_through_stop",
+                    "on_bus",
+                    "script"
+                ]
+            },
+            {
                 "id": "Ring",
                 "setup": true,
                 "testcases": [

@@ -55,10 +55,12 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 | `AudioSettings` | Singleton: the master volume and mute |
 | `AudioStatus` | Singleton, read only: the state of the output, its rate, the voices, steals, load and the clock of its core |
 | `Transport` | Singleton: the timeline in beats, its tempo, time signature, position, play and stop, loop and metronome, see [Transport](#transport) |
+| `AudioQuantize` | Enum of `box.audio.play_quantized`: `AudioQuantizeNone`, `AudioQuantizeBeat`, `AudioQuantizeBar`, see [Quantized plays](#quantized-plays) |
 
 The functions are `box.audio.play(sound, volume)`, `box.audio.play_at(sound, {x, y, z},
-volume)` and `box.audio.capture(seconds, path)`, the same as `box_audio_play`,
-`box_audio_play_at` and `box_audio_capture` in C. The members and their defaults are in the
+volume)`, `box.audio.play_quantized(sound, volume, quantize)` and
+`box.audio.capture(seconds, path)`, the same as `box_audio_play`, `box_audio_play_at`,
+`box_audio_play_quantized` and `box_audio_capture` in C. The members and their defaults are in the
 table of [The box.audio module](#the-boxaudio-module).
 
 ## A worked example: the dust merchant
@@ -253,6 +255,9 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   time signatures up to 64/64 that only accent the metronome, one loop, and a lookahead of 0.05
   to 0.5 seconds. On native the first beat after a start or a seek plays as soon as the batch
   arrives, a few ms late; the beats after it are exact. The metronome click is fixed.
+- **Quantized plays**: a beat or a bar, no other grid (no eighths, no triplets) and no offset.
+  A quantized play of a legato synth sound starts a new voice instead of gliding the one that
+  holds. On native a play whose boundary is the clock itself plays when its batch arrives.
 
 ## Captures and the audio command
 
@@ -1620,6 +1625,7 @@ frame, the same on every platform.
 | `AudioSettings` | Singleton: `master_volume` (1) and `mute` |
 | `AudioStatus` | Singleton, read only: `state`, `sample_rate`, `voices`, `voices_stolen`, `load`, `buses`, `clock` (the frame of the core that renders now) |
 | `Transport` | Singleton: `tempo` (120, 20..999), `beats_per_bar` (4), `beat_unit` (4), `position` (beats, written while it plays, clamped to ±2^31 like `loop_start` and `loop_end`), `playing` (false), `loop` (false), `loop_start`, `loop_end`, `lookahead` (0.15 s, 0.05..0.5), `metronome` (false), see [Transport](#transport) |
+| `AudioQuantize` | Enum of the `quantize` of `box.audio.play_quantized`: `AudioQuantizeNone` (at once), `AudioQuantizeBeat`, `AudioQuantizeBar`, see [Quantized plays](#quantized-plays) |
 
 Constructors give the defaults in parentheses, so `AudioSource: {sound: click}` in a script plays
 at unity volume and pitch. From C, `ecs_set` writes every member; use `ecs_ensure` to keep the
@@ -1636,7 +1642,11 @@ const played: bool = box.audio.play(click, 0.8)
 sound once on the bus of its `AudioOutput`, without an entity per play; there is no control of a
 voice after it started. `box_audio_play_at(world, sound, position, volume)`, in scripts
 `box.audio.play_at(sound, {x, y, z}, volume)`, plays any of them once at a place in the world
-(see [Spatial audio](#spatial-audio)). `box_audio_capture(world, seconds, path)`, in scripts
+(see [Spatial audio](#spatial-audio)). `box_audio_play_quantized(world, sound, volume,
+quantize)`, in scripts `box.audio.play_quantized(sound, volume, quantize)`, plays it once on the
+next beat or bar of the transport (see [Quantized plays](#quantized-plays)). No ad-hoc play,
+quantized or not, is affected by the transport: a stop or a seek never stops or moves a one shot
+that started or is scheduled. `box_audio_capture(world, seconds, path)`, in scripts
 `box.audio.capture(seconds, path)`, records the master output to a WAV file.
 
 **One batch per frame.** The system `AudioSync` runs in `PreStore`, after the transforms and
@@ -1645,7 +1655,8 @@ what differs, all into one batch, and sends nothing in a frame without changes. 
 the events of the output (ended voices, steals, freed sounds), the listener, the buses, the
 order, the master settings, new sounds, the sources, the spatial sources and the one shots of
 `play_at` when the listener moved, then the plays, the stops of deleted sources and the
-releases of sounds, and last the [transport](#transport): its window and the metronome. A world without audio components pays the empty queries.
+releases of sounds, then the [transport](#transport): its window and the metronome, and last
+the quantized plays, which need the timeline of the frame. A world without audio components pays the empty queries.
 
 **Buses** get an index of the core, up to 63 besides the master; more log one error and are
 silent. The order is compiled whenever a bus appears, disappears or changes its output or sends:
@@ -2002,6 +2013,46 @@ tests are the `Timeline` suite of `test/cpu/audio`, with the null transport at a
 the position, seeks, the loop, tempo changes, the coverage of the window, the frames and
 accents of the clicks in 4/4, 6/8 and a loop, the cancel on a stop, a new output, a script
 (`test/assets/audio/transport.flecs`), the command and two runs that capture identical audio.
+
+### Quantized plays
+
+A game often wants a stinger or a hit to land on the grid of the music.
+`box.audio.play_quantized(sound, volume, quantize)` (`box_audio_play_quantized` in C) plays a
+sound once, as `box.audio.play` does, on the bus of its `AudioOutput`, but starts it on the
+next beat (`AudioQuantizeBeat`) or the next bar (`AudioQuantizeBar`) of the transport:
+
+```
+using box.audio
+const hit: bool = box.audio.play_quantized(stinger, 0.9, AudioQuantizeBar)
+```
+
+The play starts on the first boundary at or after the clock of the output, the frame the core
+renders now, and goes out as a `PLAY` with the frame of that boundary as its `when`, so its first
+sample is exact. Bars follow the time signature of the transport, `beats_per_bar * 4 /
+beat_unit` beats counted from beat 0, so a bar of 7/8 is 3.5 beats. The boundary is found on the
+pieces of the timeline and goes on past the window along the last one, through the loop: a
+boundary at or past `loop_end` is not played, the next one after the wrap is, counted on the
+timeline from `loop_start`. A loop with no boundary in it starts the play at its next wrap. A
+boundary further away than the lookahead, a bar at a slow tempo, is sent at once with its frame
+and waits in the schedule of the core.
+
+With the transport stopped, or without a `Transport`, a quantized play starts at once, as
+`box.audio.play`, and `AudioQuantizeNone` is `box.audio.play`. The rules of `box.audio.play`
+apply: a play before the gesture is dropped, and so is a play of a sound file that still loads.
+
+**The transport does not own ad-hoc plays.** `box.audio.play`, `box.audio.play_at` and
+`box.audio.play_quantized` are one shots of the game, not parts of the timeline. The module
+does not remember a quantized play among what the timeline scheduled, so a stop or a seek of the
+transport neither cancels it before it starts nor moves it, and no transport change stops a one
+shot that plays. They play on any bus their `AudioOutput` names: a group, a return, an SFX bus
+or the bus of a track.
+
+The quantized plays of a frame are sent after the timeline followed the transport, so a play
+in the frame the transport starts lands on the grid of that start. A scene without quantized
+plays pays a loop over an empty vector. The tests are the `Quantize` suite of `test/cpu/audio`:
+beats and bars at 120 and 97 bpm in 4/4 and 7/8, a play on a boundary, a boundary past
+`loop_end`, a stopped transport, a stop and a seek after a play was queued, a `box.audio.play`
+through a stop, and a script (`test/assets/audio/quantize.flecs`).
 
 ### Before the gesture
 
