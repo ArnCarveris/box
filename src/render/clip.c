@@ -5,9 +5,9 @@
  * Every clip has an index into the clip buffer that the 2D instances below it hold; its area is
  * computed every frame from the element and uploaded when one changed.
  *
- * The slice records of the Rects with an ImageSlice take two clip records each, so the 2D shape
- * shader reads them without a binding of their own. They are computed when the shape changed or
- * the Texture of its image changed size, as when it finished loading.
+ * Slice records (Rects with an ImageSlice) take two clip records and polygon records (Polygon2D)
+ * a header and one per three edges, so the 2D shape shader reads them without a binding of its
+ * own; a polygon that outgrows its run of records moves to a free run that it fits.
  */
 
 #include "draw.h"
@@ -18,6 +18,12 @@
 
 _Static_assert(sizeof(box_render_slice_t) == 2 * sizeof(box_render_clip_t),
     "a slice record takes two clip records, as fs_slice of shape2d.wgsl reads it");
+
+_Static_assert(sizeof(box_render_polygon_t) == sizeof(box_render_clip_t),
+    "the header of a polygon record takes one clip record, as fs_polygon of shape2d.wgsl reads it");
+
+_Static_assert(sizeof(box_render_clip_t) == 3 * sizeof(vec4),
+    "a clip record holds three edges of a polygon");
 
 /** Most ancestors a walk up the hierarchy visits looking for clips */
 #define BOX_DRAWS_CLIP_WALK (256)
@@ -239,6 +245,32 @@ static bool box_draws_clip_misses(
         hi[0] <= -c->area[0] || lo[1] >= c->area[1] || hi[1] <= -c->area[1];
 }
 
+/** Get the box of an entity a clip hides it by: its bounds (box_draws_clip_bounds), or the bounds
+ * of the outline of a polygon, which need not be centered on its origin.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param center Receives the center of the box
+ * @param half Receives half its width and half its height
+ */
+static void box_draws_clip_extent(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    float center[2],
+    float half[2])
+{
+    const Shape2D *shape = ecs_get(world, e, Shape2D);
+    center[0] = center[1] = 0;
+    if (shape && shape->kind == BOX_SHAPE2D_POLYGON && !ecs_has(world, e, LayoutBounds)) {
+        center[0] = shape->center[0];
+        center[1] = shape->center[1];
+        half[0] = glm_max(shape->size[0] * 0.5f, 0.0f);
+        half[1] = glm_max(shape->size[1] * 0.5f, 0.0f);
+    } else {
+        box_draws_clip_bounds(world, e, half);
+    }
+}
+
 /** Check whether the ClipChildren ancestors of an entity clip all of it away, or it is inside a
  * hide_clipped float that hides.
  *
@@ -257,13 +289,14 @@ static bool box_draws_clip_hides(
     const WorldTransform *t = ecs_get(world, e, WorldTransform);
     box_render_clip_t clip;
     vec3 corners[4];
-    float half[2];
+    float half[2], center[2];
     ecs_entity_t top = e, cur = box_draws_clip_up(world, e);
     int32_t i, depth = 0, clips = 0;
     bool result = false;
-    box_draws_clip_bounds(world, e, half);
+    box_draws_clip_extent(world, e, center, half);
     for (i = 0; i < 4; i ++) {
-        vec3 local = { (i & 1) ? half[0] : -half[0], (i & 2) ? half[1] : -half[1], 0 };
+        vec3 local = { center[0] + ((i & 1) ? half[0] : -half[0]),
+            center[1] + ((i & 2) ? half[1] : -half[1]), 0 };
         if (t) {
             glm_mat4_mulv3(ECS_CONST_CAST(vec4*, t->m), local, 1.0f, corners[i]);
         } else {
@@ -344,6 +377,10 @@ void box_draws_clips_init(
     ecs_map_init(&c->slices, NULL);
     ecs_vec_init_t(NULL, &c->slice_entries, box_draw_slice_t, 0);
     ecs_vec_init_t(NULL, &c->slice_free, int32_t, 0);
+    ecs_map_init(&c->polygons, NULL);
+    ecs_vec_init_t(NULL, &c->polygon_entries, box_draw_polygon_t, 0);
+    ecs_vec_init_t(NULL, &c->polygon_free, box_draw_polygon_run_t, 0);
+    ecs_vec_init_t(NULL, &c->polygon_edges, vec4, 0);
     *ecs_vec_append_t(NULL, &c->entities, ecs_entity_t) = 0;
     ecs_os_zeromem(ecs_vec_append_t(NULL, &c->records, box_render_clip_t));
 }
@@ -360,6 +397,10 @@ void box_draws_clips_fini(
     ecs_map_fini(&c->slices);
     ecs_vec_fini_t(NULL, &c->slice_entries, box_draw_slice_t);
     ecs_vec_fini_t(NULL, &c->slice_free, int32_t);
+    ecs_map_fini(&c->polygons);
+    ecs_vec_fini_t(NULL, &c->polygon_entries, box_draw_polygon_t);
+    ecs_vec_fini_t(NULL, &c->polygon_free, box_draw_polygon_run_t);
+    ecs_vec_fini_t(NULL, &c->polygon_edges, vec4);
 }
 
 /** Get the clip index of an element, giving it one when it has none.
@@ -596,6 +637,193 @@ static void box_draws_slices_update(
     }
 }
 
+/** Take a run of consecutive clip records for a polygon record: the first free run it fits,
+ * else new records at the end of the buffer.
+ *
+ * @param c The clips
+ * @param count Clip records
+ * @return The first clip index of the run
+ */
+static int32_t box_draws_polygon_alloc(
+    box_draw_clips_t *c,
+    int32_t count)
+{
+    box_draw_polygon_run_t *runs = ecs_vec_first(&c->polygon_free);
+    int32_t i, result = -1, runs_count = ecs_vec_count(&c->polygon_free);
+    for (i = 0; i < runs_count; i ++) {
+        if (runs[i].count >= count) {
+            result = runs[i].index;
+            runs[i].index += count;
+            runs[i].count -= count;
+            if (!runs[i].count) {
+                runs[i] = runs[runs_count - 1];
+                ecs_vec_remove_last(&c->polygon_free);
+            }
+
+            break;
+        }
+    }
+
+    if (result < 0) {
+        result = ecs_vec_count(&c->entities);
+        for (i = 0; i < count; i ++) {
+            *ecs_vec_append_t(NULL, &c->entities, ecs_entity_t) = 0;
+            ecs_os_zeromem(ecs_vec_append_t(NULL, &c->records, box_render_clip_t));
+        }
+    }
+
+    return result;
+}
+
+/** Leave the run of a polygon entry to the polygons that fit it.
+ *
+ * @param c The clips
+ * @param entry The entry
+ */
+static void box_draws_polygon_free(
+    box_draw_clips_t *c,
+    box_draw_polygon_t *entry)
+{
+    if (entry->count) {
+        *ecs_vec_append_t(NULL, &c->polygon_free, box_draw_polygon_run_t) =
+            (box_draw_polygon_run_t){ .index = entry->index, .count = entry->count };
+    }
+
+    entry->index = 0;
+    entry->count = 0;
+}
+
+int32_t box_draws_polygon_of(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e)
+{
+    box_draw_clips_t *c = &d->clips;
+    const Shape2D *shape = ecs_get(world, e, Shape2D);
+    int32_t edges = shape ? glm_clamp(shape->edges, 0, BOX_POLYGON2D_MAX_EDGES) : 0;
+    int32_t need = BOX_RENDER_POLYGON_RECORDS(edges);
+    uint64_t *found = ecs_map_get(&c->polygons, e);
+    box_draw_polygon_t *entry;
+    if (found) {
+        entry = ecs_vec_get_t(&c->polygon_entries, box_draw_polygon_t, (int32_t)*found);
+    } else {
+        ecs_map_insert(&c->polygons, e, (uint64_t)ecs_vec_count(&c->polygon_entries));
+        entry = ecs_vec_append_t(NULL, &c->polygon_entries, box_draw_polygon_t);
+        ecs_os_zeromem(entry);
+        entry->entity = e;
+    }
+
+    if (entry->count < need) {
+        box_draws_polygon_free(c, entry);
+        entry->index = box_draws_polygon_alloc(c, need);
+        entry->count = need;
+    }
+
+    entry->dirty = true;
+
+    return entry->index;
+}
+
+void box_draws_polygon_release(
+    box_render_draws_t *d,
+    ecs_entity_t e)
+{
+    box_draw_clips_t *c = &d->clips;
+    uint64_t *found = ecs_map_get(&c->polygons, e);
+    if (found) {
+        int32_t pos = (int32_t)*found, last = ecs_vec_count(&c->polygon_entries) - 1;
+        box_draw_polygon_t *entries = ecs_vec_first(&c->polygon_entries);
+        box_draws_polygon_free(c, &entries[pos]);
+        ecs_map_remove(&c->polygons, e);
+        if (pos != last) {
+            entries[pos] = entries[last];
+            ecs_map_insert(&c->polygons, entries[pos].entity, (uint64_t)pos);
+        }
+
+        ecs_vec_remove_last(&c->polygon_entries);
+    }
+}
+
+/** Compute the polygon record of a polygon into its run: the bounds of its outline and as many
+ * of its edges as the run holds. A shape that is no longer a polygon gets no edges.
+ *
+ * @param world The world
+ * @param c The clips
+ * @param entry The entry
+ */
+static void box_draws_polygon_record(
+    const ecs_world_t *world,
+    box_draw_clips_t *c,
+    const box_draw_polygon_t *entry)
+{
+    const Shape2D *shape = ecs_get(world, entry->entity, Shape2D);
+    const Polygon2D *polygon = shape && shape->kind == BOX_SHAPE2D_POLYGON
+        ? ecs_get(world, entry->entity, Polygon2D) : NULL;
+    box_render_clip_t *records = ecs_vec_get_t(&c->records, box_render_clip_t, entry->index);
+    box_render_polygon_t header = {0};
+    int32_t i, count = 0, capacity = (entry->count - 1) * 3;
+    bool open = false;
+    ecs_vec_clear(&c->polygon_edges);
+    if (polygon && box_shape2d_polygon_edges(world, polygon, &c->polygon_edges, &open)) {
+        count = glm_min(ecs_vec_count(&c->polygon_edges), capacity);
+        header.bounds[0] = shape->center[0];
+        header.bounds[1] = shape->center[1];
+        header.bounds[2] = shape->size[0] * 0.5f;
+        header.bounds[3] = shape->size[1] * 0.5f;
+        header.shape[1] = open ? shape->width * 0.5f : 0.0f;
+    }
+
+    header.shape[0] = (float)count;
+    if (ecs_os_memcmp(&records[0], &header, ECS_SIZEOF(header))) {
+        ecs_os_memcpy(&records[0], &header, ECS_SIZEOF(header));
+        c->dirty = true;
+    }
+
+    const vec4 *edges = ecs_vec_first(&c->polygon_edges);
+    for (i = 0; i < entry->count - 1; i ++) {
+        box_render_clip_t record = {0};
+        float *dst = (float*)&record;
+        int32_t k;
+        for (k = 0; k < 3; k ++) {
+            int32_t edge = i * 3 + k;
+            if (edge < count) {
+                ecs_os_memcpy(&dst[k * 4], edges[edge], ECS_SIZEOF(vec4));
+            }
+        }
+
+        if (ecs_os_memcmp_t(&records[i + 1], &record, box_render_clip_t)) {
+            records[i + 1] = record;
+            c->dirty = true;
+        }
+    }
+}
+
+/** Compute the polygon records of the polygons that changed and free those of the polygons that
+ * are gone.
+ *
+ * @param world The world
+ * @param d The state
+ */
+static void box_draws_polygons_update(
+    const ecs_world_t *world,
+    box_render_draws_t *d)
+{
+    box_draw_clips_t *c = &d->clips;
+    int32_t i;
+    for (i = ecs_vec_count(&c->polygon_entries) - 1; i >= 0; i --) {
+        box_draw_polygon_t *entry = ecs_vec_get_t(&c->polygon_entries, box_draw_polygon_t, i);
+        if (!ecs_is_alive(world, entry->entity)) {
+            box_draws_polygon_release(d, entry->entity);
+            continue;
+        }
+
+        if (entry->dirty) {
+            entry->dirty = false;
+            box_draws_polygon_record(world, c, entry);
+        }
+    }
+}
+
 /** Compute the record of the clip of a hide_clipped float, which its draws and those of its
  * descendants nest in: an empty area while its anchor is clipped out, else one that contains
  * every position.
@@ -654,6 +882,7 @@ void box_draws_clips_send(
     }
 
     box_draws_slices_update(world, d);
+    box_draws_polygons_update(world, d);
     d->stats.clips = (int32_t)ecs_map_count(&c->index);
     uint32_t count = (uint32_t)ecs_vec_count(&c->records);
     if (count > 1 && count > c->capacity) {

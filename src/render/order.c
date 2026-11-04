@@ -581,6 +581,7 @@ void box_draws_send_ordered(
             out->shadow = false;
             out->box_shadow = b->key.box_shadow;
             out->slice = b->key.slice;
+            out->polygon = b->key.polygon;
             out->mesh = b->key.mesh;
             box_draws_batch_textures(d, b, out);
             out->instances = box_draws_store_handle(box_draws_batch_store(d, b), b->page,

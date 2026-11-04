@@ -490,8 +490,9 @@ typedef void (*box_shape_surface_fn)(
 
 /** Filled rectangle in the XY plane, centered on the origin and facing +Z.
  *
- * The 2D shapes (Rect, Circle, Line) are quads shaded with an analytic signed distance, so
- * their edges stay crisp at any scale, distance and angle; they share one instanced batch.
+ * The 2D shapes (Rect, Circle, Line, Polygon2D) are quads shaded with an analytic signed
+ * distance, so their edges stay crisp at any scale, distance and angle; Rect, Circle and Line
+ * share one instanced batch, the polygons another.
  *
  * They are unlit: the color is the Rgb times the albedo texture plus the emission. Overlapping
  * 2D shapes at the same depth draw over each other in the order of their batch.
@@ -515,10 +516,58 @@ ECS_STRUCT(Line, {
     float width; /**< Width across the segment, default 1 */
 });
 
-/** Rounded corners and an inner border of the Rect or Circle of the entity.
+/** Filled 2D polygon in the XY plane from a Path2D outline, in the local space of the entity.
+ *
+ * The path entity holds a closed Path2D, its outline, or a Profile2D, its outline with holes, the
+ * same assets a ProfileExtrusion extrudes, so one outline drives a shape in the world and a
+ * polygon on a map. Its points are sampled as the profiles sample them (a cubic Bezier or
+ * Catmull-Rom segment in 16 steps), times the scale plus the offset: a map that shows the world
+ * from above at a size of s per meter maps a profile with a scale of {s, -s}, as the profile y
+ * runs along the world Z. The fill follows the even-odd rule, so holes cut through whatever the
+ * winding of their paths and a self intersecting outline leaves its doubly covered parts open.
+ *
+ * An open Path2D draws a stroke of the width centered on it instead, with round joins and ends,
+ * for map roads and graphs. The path entity may also hold a Path3D, which is seen from above,
+ * its x and z as the x and y of the polygon, so a map draws the road a Sweep follows: with a
+ * scale of {s, -s} north (-Z) is up.
+ *
+ * Like Rect, Circle and Line it is shaded with an analytic signed distance (to the edges of the
+ * outline), anti-aliased at any scale, distance and angle, with a Border inside its edge, an
+ * Image over its bounds, a BoxShadow of its outline, ClipChildren, Opacity, Rgb, Tint, the
+ * transitions and picking of the other 2D shapes. Its cost per pixel grows with the number of
+ * edges, so outlines of up to a few hundred edges suit it; one of more than
+ * BOX_POLYGON2D_MAX_EDGES is not drawn. A Rect, Circle or Line of the same entity draws instead.
+ *
+ *     plaza_outline {
+ *       Path2D: {start: {-6, -4}, closed: true, segments: [
+ *         {kind: Line, end: {6, -4}},
+ *         {kind: CatmullRom, end: {7, 3}},
+ *         {kind: CatmullRom, end: {0, 6}},
+ *         {kind: Line, end: {-6, 3}}
+ *       ]}
+ *     }
+ *
+ *     map_plaza {
+ *       Polygon2D: {path: plaza_outline, scale: {4, -4}}
+ *       Rgb: {200, 190, 160}
+ *       Border: {width: 1.5, color: {90, 80, 60, 255}}
+ *     }
+ */
+ECS_STRUCT(Polygon2D, {
+    ecs_entity_t path; /**< Entity with a Path2D, a Profile2D or a Path3D */
+    vec2 scale;        /**< Scale of the path x and y, default 1, 1 */
+    vec2 offset;       /**< Offset added to the scaled points */
+    float width;       /**< Width of the stroke of an open path, default 1 */
+});
+
+/** Most edges a Polygon2D draws with, its outline and holes together */
+#define BOX_POLYGON2D_MAX_EDGES (4096)
+
+/** Rounded corners and an inner border of the Rect, Circle or Polygon2D of the entity.
  *
  * The border lies inside the edge of the shape and the fill (the Rgb of the entity) inside the
- * border. The radius rounds the corners of a Rect and is clamped to half its smaller side.
+ * border. The radius rounds the corners of a Rect and is clamped to half its smaller side; a
+ * Polygon2D keeps its corners.
  */
 ECS_STRUCT(Border, {
     float width;  /**< Width of the border, 0 for none */
@@ -526,7 +575,7 @@ ECS_STRUCT(Border, {
     rgba color;   /**< Color of the border, default opaque black */
 });
 
-/** Soft shadow drawn behind the Rect or Circle of the entity, like a CSS box-shadow.
+/** Soft shadow drawn behind the Rect, Circle or Polygon2D of the entity, like a CSS box-shadow.
  *
  * Lengths are in the units of the shape. The shadow box is the shape moved by the offset and
  * grown by the spread on each side with its corner radius; a negative spread shrinks it, down to
@@ -534,8 +583,9 @@ ECS_STRUCT(Border, {
  *
  * The alpha is that of the color times the opacity of the entity. As in CSS it is not drawn under
  * the Rect or Circle, so it does not show through a translucent one. It follows the outline of a
- * Rect or Circle, not the alpha of an Image, and draws nothing on a Line or Text. Picking and
- * layout ignore it.
+ * Rect, Circle or Polygon2D (the outline moved by the offset and grown by the spread, which
+ * rounds its outer corners), not the alpha of an Image, and draws nothing on a Line, a stroked
+ * open Polygon2D or Text. Picking and layout ignore it.
  */
 ECS_STRUCT(BoxShadow, {
     float offset_x; /**< Horizontal offset of the shadow */
@@ -545,9 +595,10 @@ ECS_STRUCT(BoxShadow, {
     rgba color;     /**< Color of the shadow, display encoded, default opaque black */
 });
 
-/** Area of a texture shown on the Rect or Circle of the entity.
+/** Area of a texture shown on the Rect, Circle or Polygon2D of the entity.
  *
- * The area is u0, v0 to u1, v1 in texture coordinates, with v 0 at the top of the image; a
+ * The area is u0, v0 to u1, v1 in texture coordinates, with v 0 at the top of the image, over
+ * the shape, or over the bounds of the outline of a Polygon2D; a
  * constructed Image shows the whole texture. The texture is multiplied
  * with the Rgb of the entity, which defaults to white for an Image.
  */

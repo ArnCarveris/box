@@ -10,6 +10,7 @@
 #include "../render/render.h"
 #include "../spatial/spatial.h"
 #include "../geometry/mesh_cache.h"
+#include "../geometry/shape2d.h"
 #include "../jobs/jobs.h"
 #include <math.h>
 #include <stdlib.h>
@@ -109,6 +110,29 @@ static bool box_pick_ui_size(
         size[1] = tb->height;
     } else {
         result = false;
+    }
+
+    return result;
+}
+
+/** Get whether an entity is a Polygon2D, which is hit inside its outline (or its stroke) rather
+ * than its bounds, and the size of the area centered on its origin that holds its outline.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param size Receives width and height of the area
+ * @return Whether the entity is a polygon
+ */
+static bool box_pick_polygon_size(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    vec2 size)
+{
+    const Shape2D *shape = ecs_get(world, e, Shape2D);
+    bool result = shape && shape->kind == BOX_SHAPE2D_POLYGON;
+    if (result) {
+        size[0] = 2.0f * (fabsf(shape->center[0]) + shape->size[0] * 0.5f);
+        size[1] = 2.0f * (fabsf(shape->center[1]) + shape->size[1] * 0.5f);
     }
 
     return result;
@@ -590,7 +614,8 @@ static void box_pick_candidate(
     c->ui = ui;
 }
 
-/** Narrow phase of the spatial ray: the area of a UI element or the triangles of a shape.
+/** Narrow phase of the spatial ray: the area of a UI element, the outline of a polygon or the
+ * triangles of a shape.
  *
  * A hit on a UI element or a 2D shape outside the area of a ClipChildren ancestor is no hit, as
  * it is not drawn there, and an element with PickThrough is never hit. Neither is a disabled
@@ -615,7 +640,8 @@ static bool box_pick_filter(
     bool circle = false;
     float t = 0;
     bool alive = ecs_is_alive(cast->world, e);
-    bool ui = alive && box_pick_ui_size(cast->world, e, size, &circle);
+    bool polygon = alive && box_pick_polygon_size(cast->world, e, size);
+    bool ui = polygon || (alive && box_pick_ui_size(cast->world, e, size, &circle));
     bool result;
     if (!alive || ecs_has_id(cast->world, e, PickThrough) ||
         ecs_has_id(cast->world, e, EcsDisabled))
@@ -625,6 +651,8 @@ static bool box_pick_filter(
         mat4 m;
         box_pick_transform(cast->world, e, m);
         result = box_pick_plane(m, size, circle, ray->origin, ray->dir, &t, local);
+        result = result &&
+            (!polygon || box_shape2d_polygon_contains(cast->world, e, local[0], local[1]));
     } else {
         result = box_pick_mesh(cast->world, cast->st, e, ray->origin, ray->dir, &t, local,
             NULL);

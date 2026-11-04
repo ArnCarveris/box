@@ -147,7 +147,7 @@ void box_gpu_draw_init(
         },
         {
             .binding = 11,
-            .visibility = WGPUShaderStage_Fragment,
+            .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
             .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
         },
         {
@@ -956,6 +956,10 @@ static void box_gpu_blend_state(
  * @param texture_blend Whether the fragments blend the layers of a TextureBlend: the fs_blend
  * entry point of the mesh shader with the blend group (blend_mesh_layout), alpha tested,
  * blended or transmissive as the other arguments say; ignored by the 2D shape shader
+ * @param polygon Whether the instances are polygons (Polygon2D): the polygon variant of the
+ * vertex stage of the 2D shape shader (its polygon constant) with the fs_polygon entry point,
+ * or for shadows the plain vertex stage with fs_shadow_polygon; ignored by the mesh shader and
+ * for sliced shapes
  * @return The pipeline
  */
 static WGPURenderPipeline box_gpu_forward_create(
@@ -970,14 +974,16 @@ static WGPURenderPipeline box_gpu_forward_create(
     bool equal,
     bool box_shadow,
     bool slice,
-    bool texture_blend)
+    bool texture_blend,
+    bool polygon)
 {
     bool shape2d = handle == BOX_RENDER_SHADER_SHAPE2D;
     box_shadow = box_shadow && shape2d;
     slice = slice && shape2d && !box_shadow;
+    polygon = polygon && shape2d && !slice;
     texture_blend = texture_blend && !shape2d;
-    const char *entry = box_shadow ? "fs_shadow" : slice ? "fs_slice" :
-        texture_blend ? "fs_blend" : "fs";
+    const char *entry = box_shadow ? (polygon ? "fs_shadow_polygon" : "fs_shadow") :
+        polygon ? "fs_polygon" : slice ? "fs_slice" : texture_blend ? "fs_blend" : "fs";
     transmissive = transmissive && !shape2d;
     cutout = cutout && !shape2d && !equal && !transmissive;
     equal = equal && !transmissive;
@@ -1036,6 +1042,10 @@ static WGPURenderPipeline box_gpu_forward_create(
         };
     }
 
+    WGPUConstantEntry vertex_constant = {
+        .key = { .data = "polygon", .length = WGPU_STRLEN },
+        .value = polygon && !box_shadow ? 1.0 : 0.0
+    };
     WGPUFragmentState fragment = {
         .module = shader,
         .entryPoint = { .data = entry, .length = WGPU_STRLEN },
@@ -1057,6 +1067,8 @@ static WGPURenderPipeline box_gpu_forward_create(
         .vertex = {
             .module = shader,
             .entryPoint = { .data = "vs", .length = WGPU_STRLEN },
+            .constantCount = shape2d ? 1 : 0,
+            .constants = shape2d ? &vertex_constant : NULL,
             .bufferCount = 2,
             .buffers = buffers
         },
@@ -1250,20 +1262,24 @@ char* box_gpu_forward_check(
 
     wgpuDevicePushErrorScope(gpu->device, WGPUErrorFilter_Validation);
     pipeline = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm, Opaque,
-        BackFaceCull, false, false, false, false, false, false);
+        BackFaceCull, false, false, false, false, false, false, false);
     if (handle == BOX_RENDER_SHADER_MESH) {
         others[0] = box_gpu_prepass_create(gpu, shader, BackFaceCull, false, false);
         others[1] = box_gpu_prepass_create(gpu, shader, BackFaceCull, true, false);
         others[2] = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm,
-            Opaque, BackFaceCull, false, false, false, false, false, true);
+            Opaque, BackFaceCull, false, false, false, false, false, true, false);
         others[3] = box_gpu_prepass_create(gpu, shader, BackFaceCull, true, true);
         others[4] = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm,
-            Opaque, BackFaceCull, true, false, false, false, false, true);
+            Opaque, BackFaceCull, true, false, false, false, false, true, false);
     } else if (handle == BOX_RENDER_SHADER_SHAPE2D) {
         others[0] = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm,
-            AlphaBlend, BackFaceCull, false, false, false, true, false, false);
+            AlphaBlend, BackFaceCull, false, false, false, true, false, false, false);
         others[2] = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm,
-            Opaque, BackFaceCull, false, false, false, false, true, false);
+            Opaque, BackFaceCull, false, false, false, false, true, false, false);
+        others[3] = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm,
+            Opaque, BackFaceCull, false, false, false, false, false, false, true);
+        others[4] = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm,
+            AlphaBlend, BackFaceCull, false, false, false, true, false, false, true);
     }
 
     wgpuDevicePopErrorScope(gpu->device, (WGPUPopErrorScopeCallbackInfo){
@@ -1308,7 +1324,8 @@ typedef enum box_gpu_depth_mode_t {
  * alpha test, whether they are shadows (box_shadow)
  * @param transmissive Whether the fragments sample the opaque snapshot (Transmission), for the
  * 2D shape shader, which is never transmissive, whether they are sliced (slice)
- * @param texture_blend Whether the fragments blend the layers of a TextureBlend (fs_blend)
+ * @param texture_blend Whether the fragments blend the layers of a TextureBlend (fs_blend), for
+ * the 2D shape shader, which never blends layers, whether they are polygons (polygon)
  * @param depth Depth state of the pipeline
  * @return The key, distinct for every distinct pipeline
  */
@@ -1367,7 +1384,8 @@ WGPURenderPipeline box_gpu_forward_pipeline(
     texture_blend = box_gpu_texture_blends(b);
     key = box_gpu_forward_key(b->pipeline, format, b->blend, b->back_face,
         b->pipeline == BOX_RENDER_SHADER_SHAPE2D ? b->box_shadow : b->cutout,
-        b->pipeline == BOX_RENDER_SHADER_SHAPE2D ? b->slice : b->transmissive, texture_blend,
+        b->pipeline == BOX_RENDER_SHADER_SHAPE2D ? b->slice : b->transmissive,
+        b->pipeline == BOX_RENDER_SHADER_SHAPE2D ? b->polygon : texture_blend,
         equal ? BOX_GPU_DEPTH_EQUAL : BOX_GPU_DEPTH_GREATER);
     cached = ecs_map_get(&gpu->forward, key);
     if (cached) {
@@ -1376,7 +1394,7 @@ WGPURenderPipeline box_gpu_forward_pipeline(
     }
 
     result = box_gpu_forward_create(gpu, b->pipeline, shader, format, b->blend, b->back_face,
-        b->cutout, b->transmissive, equal, b->box_shadow, b->slice, texture_blend);
+        b->cutout, b->transmissive, equal, b->box_shadow, b->slice, texture_blend, b->polygon);
     ecs_map_insert_ptr(&gpu->forward, key, result);
 done:
     return result;

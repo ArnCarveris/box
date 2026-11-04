@@ -384,21 +384,14 @@ template MapMarker {
   }
 }
 
+// A street of the map: the Path3D the Sweep of the street follows in the world, seen from above
+// as one stroke with round joins and ends, along the same curves.
 template MapStreet {
   prop path: entity = 0
   prop w: f32 = 3
   prop color: Rgb = {220, 210, 190}
-  const p = path[Path3D]
-  const n = p.segments.count()
-  const lw = max(w * MAP_K, 1.4)
-  start_ { Position: {p.start.x * MAP_K, 0 - p.start.z * MAP_K, 0}; Circle: {lw / 2}; Rgb: color }
-  first { Position: {0, 0, 0}; Line: {x1: p.start.x * MAP_K, y1: 0 - p.start.z * MAP_K, x2: p.segments[0].end.x * MAP_K, y2: 0 - p.segments[0].end.z * MAP_K, width: lw}; Rgb: color }
-  for (j, g) in p.segments {
-    "j_{j}" { Position: {g.end.x * MAP_K, 0 - g.end.z * MAP_K, 0}; Circle: {lw / 2}; Rgb: color }
-  }
-  for j in 1..n {
-    "l_{j}" { Position: {0, 0, 0}; Line: {x1: p.segments[j - 1].end.x * MAP_K, y1: 0 - p.segments[j - 1].end.z * MAP_K, x2: p.segments[j].end.x * MAP_K, y2: 0 - p.segments[j].end.z * MAP_K, width: lw}; Rgb: color }
-  }
+  Polygon2D: {path: path, scale: {MAP_K, 0 - MAP_K}, width: max(w * MAP_K, 1.4)}
+  Rgb: color
 }
 
 template MapLand {

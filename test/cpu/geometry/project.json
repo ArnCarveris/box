@@ -401,6 +401,31 @@
                     "script",
                     "invalid_kind"
                 ]
+            },
+            {
+                "id": "Polygon2D",
+                "testcases": [
+                    "concave_bounds",
+                    "concave_distance",
+                    "hole_even_odd",
+                    "hole_winding_ignored",
+                    "curved_samples",
+                    "catmull_rom_closed",
+                    "scale_offset",
+                    "open_stroke",
+                    "open_without_width_not_drawn",
+                    "default_values",
+                    "invalid_not_drawn",
+                    "too_many_edges_not_drawn",
+                    "rect_wins",
+                    "remove",
+                    "border_and_image",
+                    "path_change_updates",
+                    "profile_hole_change_updates",
+                    "prefab_instance",
+                    "script",
+                    "path3_from_above"
+                ]
             }
         ]
     }
