@@ -1554,33 +1554,10 @@ void Synth_layers_pool(void) {
     box_audio_core_free(core);
 }
 
-/** FNV-1a hash of the bits of samples.
- *
- * @param x Samples
- * @param n Number of samples
- * @return The hash
- */
-static uint64_t synth_hash(
-    const float *x,
-    int32_t n)
-{
-    uint64_t h = 0xCBF29CE484222325ull;
-    uint32_t bits;
-    int32_t i, b;
-    for (i = 0; i < n; i ++) {
-        memcpy(&bits, &x[i], sizeof(bits));
-        for (b = 0; b < 4; b ++) {
-            h ^= (bits >> (8 * b)) & 0xFF;
-            h *= 0x100000001B3ull;
-        }
-    }
-
-    return h;
-}
-
 /** Hashes of the renders of Synth_layers_identical by the synth of 4 layers, before the layers
  * became parts of the core */
-static const uint64_t synth_golden[4] = { 0, 0, 0, 0 };
+static const uint64_t synth_golden[4] = {
+    0x4AB6B4E9EDAAF5FBull, 0xF7B3C67CDCB84F45ull, 0x175A67CDC80CB361ull, 0x2B0607BF5C923D76ull };
 
 /** Patches of up to 4 layers render bit identical to the synth of 4 layers: filters with an
  * envelope at both slopes, sweeps, noise with variances, own envelopes, phase and ring
@@ -1652,35 +1629,11 @@ void Synth_layers_identical(void) {
         audio_render(core, 0, AUDIO_FRAMES / 2);
         audio_voice_set(core, 1, BOX_AUDIO_PARAM_PITCH, 1.2f);
         audio_render(core, AUDIO_FRAMES / 2, AUDIO_FRAMES / 2);
-        hash = synth_hash(audio_l, AUDIO_FRAMES) ^ (synth_hash(audio_r, AUDIO_FRAMES) << 1);
+        hash = audio_hash(audio_l, AUDIO_FRAMES) ^ (audio_hash(audio_r, AUDIO_FRAMES) << 1);
         printf("patch %d: 0x%016llXull\n", (int)i, (unsigned long long)hash);
         test_assert(hash == synth_golden[i]);
         box_audio_core_free(core);
     }
-}
-
-/** Read a file of the repository.
- *
- * @param file Path from the root of the repository
- * @return The contents, which the caller frees
- */
-static char* synth_read(
-    const char *file)
-{
-    char *path = box_app_locate(file);
-    test_assert(path != NULL);
-    FILE *f = fopen(path, "rb");
-    test_assert(f != NULL);
-    fseek(f, 0, SEEK_END);
-    long size = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    char *result = ecs_os_malloc((ecs_size_t)size + 1);
-    test_assert(fread(result, 1, (size_t)size, f) == (size_t)size);
-    result[size] = '\0';
-    fclose(f);
-    ecs_os_free(path);
-
-    return result;
 }
 
 /** Create a world and run test/assets/audio/synth.flecs in it.
@@ -1690,7 +1643,7 @@ static char* synth_read(
 static ecs_world_t* synth_world(void)
 {
     ecs_world_t *world = audio_world();
-    char *code = synth_read("test/assets/audio/synth.flecs");
+    char *code = audio_read("test/assets/audio/synth.flecs");
     test_assert(ecs_script_run(world, "synth", code, NULL) == 0);
     ecs_os_free(code);
 
@@ -1801,7 +1754,7 @@ void Synth_script_loop_source(void) {
 void Synth_docs_examples(void) {
     // audio/synth
     ecs_world_t *world = audio_world();
-    char *code = synth_read("test/assets/audio/synth_examples.flecs");
+    char *code = audio_read("test/assets/audio/synth_examples.flecs");
     const char *names[] = {
         "UiClick", "UiBlip", "Whoosh", "Bell", "ElectricPiano", "MetalHit", "Pluck", "Ring",
         "Strings" };
@@ -1837,7 +1790,7 @@ void Synth_docs_examples(void) {
 void Synth_script_filter_envelope(void) {
     // audio/synth
     ecs_world_t *world = audio_world();
-    char *code = synth_read("test/assets/audio/synth_examples.flecs");
+    char *code = audio_read("test/assets/audio/synth_examples.flecs");
     ecs_entity_t pluck, whoosh;
     const AudioSynth *synth;
     test_assert(ecs_script_run(world, "examples", code, NULL) == 0);
@@ -1890,7 +1843,7 @@ void Synth_script_filter_envelope(void) {
 void Synth_too_many_layers(void) {
     // audio/synth
     ecs_world_t *world = audio_world();
-    char *code = synth_read("test/assets/audio/synth_layers.flecs");
+    char *code = audio_read("test/assets/audio/synth_layers.flecs");
     const box_audio_synth_patch_t *p;
     ecs_entity_t octet, wide;
     float sum = 0;
@@ -1981,7 +1934,7 @@ void Synth_deleted_releases(void) {
 void Synth_script_modulators(void) {
     // audio/synth
     ecs_world_t *world = audio_world();
-    char *code = synth_read("test/assets/audio/synth_fm.flecs");
+    char *code = audio_read("test/assets/audio/synth_fm.flecs");
     ecs_entity_t bell, orphan, deep;
     const box_audio_synth_patch_t *p;
     int32_t i, bright = -1, ring = -1, tone = -1, start;

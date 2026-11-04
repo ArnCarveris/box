@@ -463,15 +463,16 @@ voice, so a play allocates nothing, a new patch for the same id reaches the next
 voices that play keep theirs, and a release frees the id at once with `SOUND_FREE`.
 
 A patch costs only the layers it has. The `SYNTH` command ends after its last layer,
-`BOX_AUDIO_CMD_SYNTH_SIZE(layers)` bytes: 100 bytes and 72 per layer, 244 for 2 layers, 676 for
-8; a shorter one than its layers need is ignored. A voice holds the patch without its layers
-and takes, for each layer, a part from a pool the core allocates with itself: the layer, its
-oscillator and its own envelope, 240 bytes. The pool has 4 parts per voice slot (320), so
-patches of up to 4 layers never run out of them and a voice of 8 takes the room of two of 4; a
-play that finds too few free parts is ignored like one without a voice slot. A voice renders
-and advances only its parts and gives them back when it ends. The 80 voice slots (504 bytes
-each) and the pool take 118 KB, against 115 KB for 80 voices of 4 fixed layers and 191 KB for 8
-fixed layers. The 256 patches the core keeps are full size, 668 bytes each. The core clamps every value of a patch, a NaN to the low end.
+`BOX_AUDIO_CMD_SYNTH_SIZE(layers)` bytes: 100 bytes and 72 per layer, 244 for 2 layers, 676 for 8;
+a shorter one than its layers need is ignored. A voice holds the patch without its layers and
+takes, for each layer, a part from a pool the core allocates with itself: the layer, its oscillator
+and its own envelope, 240 bytes. The pool has 4 parts per voice slot (320), so patches of up to 4
+layers never run out of them and a voice of 8 takes the room of two of 4; a play that finds too few
+free parts is ignored like one without a voice slot. A voice renders and advances only its parts
+and gives them back when it ends. The 80 voice slots (504 bytes each) and the pool take 118 KB,
+against 115 KB for 80 voices of 4 fixed layers and 191 KB for 8 fixed layers. The 256 patches the
+core keeps are full size, 668 bytes each. The core clamps every value of a patch, a NaN to the low
+end.
 
 - **Oscillators.** Sine (`box_audio_core_sin`), saw, square, triangle and white noise. Saw and
   square are band limited with polyBLEP, the corners of the triangle with polyBLAMP. Frequencies are clamped to 20 kHz and to 0.48 of the
@@ -733,21 +734,21 @@ it rises, and a decay of that time from the higher cutoff to the lower one, the 
 it falls: `SynthFilter: {cutoff: 300}` with `SynthFilterEnvelope: {decay: 0.2, amount: 3}`
 falls from 2400 Hz to 300 Hz in 0.2 s.
 
-The tests are the `Synth` suite of `test/cpu/audio`, on offline renders: frequencies of every
-wave at 44.1 and 48 kHz, sweeps, aliasing of a 5 kHz saw, square and triangle, flat and seeded noise, the
-times and edges of envelopes, curved envelopes (a linear one bit identical to the linear
-recurrence, a curved decay at its midpoint and on its sustain, a curved release that ends the
-voice on time), the end of a voice, the filter one octave past its cutoff at both slopes, the
-cutoff following a filter envelope up and down, stability under fast filter envelopes at full
-resonance and at Nyquist for both slopes and extreme values, layers, phase modulation at 1:1
-and 6:1 against Bessel amplitudes and without drift, an index that follows the envelope of its
-modulator and fades the high sidebands, the limit of the index, ring modulation at the sum and
-difference alone, audible modulators, feedback, 8 layers each found at its own frequency with a Goertzel
-filter, a 9th left out, the size of the command, the pool of parts, renders of patches of 4
-layers bit identical to the synth of fixed layers, scripts from `test/assets/audio/synth.flecs`
-and `test/assets/audio/synth_fm.flecs` and `test/assets/audio/synth_layers.flecs`, the nine examples above from
-`test/assets/audio/synth_examples.flecs` and errors; `NoAlloc` renders 64 synth voices. The browser
-check is `test/integration/web/audio_synth.mjs`.
+The tests are the `Synth` suite of `test/cpu/audio`, on offline renders: frequencies of every wave
+at 44.1 and 48 kHz, sweeps, aliasing of a 5 kHz saw, square and triangle, flat and seeded noise,
+the times and edges of envelopes, curved envelopes (a linear one bit identical to the linear
+recurrence, a curved decay at its midpoint and on its sustain, a curved release that ends the voice
+on time), the end of a voice, the filter one octave past its cutoff at both slopes, the cutoff
+following a filter envelope up and down, stability under fast filter envelopes at full resonance
+and at Nyquist for both slopes and extreme values, layers, phase modulation at 1:1 and 6:1 against
+Bessel amplitudes and without drift, an index that follows the envelope of its modulator and fades
+the high sidebands, the limit of the index, ring modulation at the sum and difference alone,
+audible modulators, feedback, 8 layers each found at its own frequency with a Goertzel filter, a
+9th left out, the size of the command, the pool of parts, renders of patches of 4 layers bit
+identical to the synth of fixed layers, scripts from `test/assets/audio/synth.flecs` and
+`test/assets/audio/synth_fm.flecs` and `test/assets/audio/synth_layers.flecs`, the nine examples
+above from `test/assets/audio/synth_examples.flecs` and errors; `NoAlloc` renders 64 synth voices.
+The browser check is `test/integration/web/audio_synth.mjs`.
 
 ## Transports
 
