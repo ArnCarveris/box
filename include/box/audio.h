@@ -533,6 +533,60 @@ ECS_STRUCT(Instrument, {
                             *   0.05; a synth uses the release of its envelopes */
 });
 
+/** A note of a NoteClip, in beats from the start of the clip */
+ECS_STRUCT(Note, {
+    float start;           /**< Beats from the start of the clip */
+    float duration;        /**< Beats */
+    float pitch;           /**< MIDI note number, a float so microtones work */
+    float velocity;        /**< 0..1, default 1 */
+    float pan;             /**< Pan of the voice, -1 left to 1 right */
+});
+
+/** A clip of notes, reusable: usually a prefab or a plain entity that any number of
+ * ClipPlacement on any tracks name.
+ *
+ * box.audio keeps its own copy of the notes sorted by start, rebuilt when the clip is set, so
+ * a window finds its notes without a scan of the clip. A change applies to what has not been
+ * scheduled yet. Notes that start at or past length play only in a placement that does not
+ * loop.
+ */
+ECS_STRUCT(NoteClip, {
+    float length;          /**< Beats, default 4: the length of a pass when a placement loops
+                            *   the clip, and of a placement of duration 0 */
+    ecs_vec(Note) notes;   /**< The notes, in any order */
+});
+
+/** A track of the timeline: a mixer channel whose notes play on an instrument. It brings an
+ * AudioBus (the With trait), so it has a volume, a pan, a mute, an output and sends, and its
+ * notes play on its own bus.
+ *
+ * Its ClipPlacement children place clips on the timeline. While the Transport plays, every
+ * enabled track and placement schedules the notes that start in the lookahead window, each a
+ * note of the instrument with the frame of its start. A Disabled or deleted track releases its
+ * notes and schedules nothing more; a track whose instrument sound is not ready drops its
+ * notes and logs once. See Clips and tracks in docs/audio.md.
+ */
+ECS_STRUCT(Track, {
+    ecs_entity_t instrument; /**< The entity with Instrument that plays the notes */
+});
+
+/** A clip on the timeline, on a child of a Track.
+ *
+ * A note ends at the earliest of its own end, the end of its pass of the clip, the end of the
+ * placement and the loop_end of a Transport that loops. A Disabled or deleted placement
+ * releases its notes.
+ */
+ECS_STRUCT(ClipPlacement, {
+    ecs_entity_t clip;     /**< The entity with NoteClip */
+    double start;          /**< Beats on the timeline where the placement starts */
+    double duration;       /**< Beats, 0 for the length of the clip minus the offset */
+    bool loop;             /**< Repeat the clip every length beats until the duration ends */
+    double offset;         /**< Beats into the clip at which the placement starts; with a loop
+                            *   the passes go on from there and wrap at length */
+    float gain;            /**< Linear gain, default 1, times the gain of the velocity */
+    float transpose;       /**< Semitones added to every pitch */
+});
+
 /** Where box_audio_play_quantized starts a play on the grid of the Transport */
 ECS_ENUM(AudioQuantize, {
     AudioQuantizeNone = 0,  /**< At once, as box_audio_play */

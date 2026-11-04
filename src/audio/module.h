@@ -89,7 +89,13 @@ typedef struct AudioInstrumentState {
     bool clamped;           /**< The warning of a pitch past the limits of the core was logged */
 } AudioInstrumentState;
 
+/** What box.audio did with a Track */
+typedef struct AudioTrackState {
+    bool warned;            /**< The warning of an instrument that cannot play was logged */
+} AudioTrackState;
+
 extern ECS_COMPONENT_DECLARE(AudioSoundId);
+extern ECS_COMPONENT_DECLARE(AudioTrackState);
 extern ECS_COMPONENT_DECLARE(AudioSynth);
 extern ECS_COMPONENT_DECLARE(AudioInstrumentState);
 extern ECS_COMPONENT_DECLARE(AudioBusState);
@@ -422,6 +428,61 @@ typedef struct box_audio_timeline_t {
     box_audio_timeline_stats_t stats; /**< Counters */
 } box_audio_timeline_t;
 
+/** Shortest pass of a looping placement in beats; a shorter clip loops at this length */
+#define BOX_AUDIO_CLIP_LENGTH_MIN (1.0 / 64.0)
+
+/** The notes of a NoteClip sorted by start, rebuilt when the clip changes */
+typedef struct box_audio_clip_t {
+    ecs_entity_t entity;    /**< The clip */
+    uint32_t generation;    /**< Generation of the clips it was built at */
+    double length;          /**< NoteClip.length, 0 when not finite or not positive */
+    ecs_vec_t notes;        /**< Note, sorted by start, with finite values */
+} box_audio_clip_t;
+
+/** A placement in the index of the sequencer */
+typedef struct box_audio_placement_t {
+    ecs_entity_t entity;    /**< The entity with ClipPlacement */
+    ecs_entity_t track;     /**< Its parent with Track */
+    double start;           /**< First beat on the timeline */
+    double end;             /**< Beat after its last one */
+    double reach;           /**< Largest end of this and the placements before it */
+} box_audio_placement_t;
+
+/** A note that the sequencer scheduled and that has not ended */
+typedef struct box_audio_sounding_t {
+    uint32_t handle;        /**< Voice handle */
+    uint32_t serial;        /**< Serial of the output it plays on */
+    uint64_t start;         /**< Frame it starts at */
+    uint64_t release;       /**< Frame of the RELEASE sent, 0 while none was sent */
+    double end;             /**< Beat at which its release starts */
+    float fade;             /**< Seconds of the fade of a sampler */
+    float pitch;            /**< MIDI note number played, the transpose included */
+    ecs_entity_t track;     /**< The track */
+    ecs_entity_t placement; /**< The placement */
+} box_audio_sounding_t;
+
+/** Counters of the sequencer, for the tests */
+typedef struct box_audio_sequencer_stats_t {
+    int64_t notes;          /**< Notes scheduled */
+    int64_t releases;       /**< RELEASE commands written */
+    int64_t dropped;        /**< Notes dropped: an instrument that cannot play or a full batch */
+    int64_t visits;         /**< Placements visited by the windows */
+    int64_t rebuilds;       /**< Rebuilds of the index of the placements */
+    int64_t clips;          /**< Rebuilds of the sorted notes of a clip */
+} box_audio_sequencer_stats_t;
+
+/** The clips, tracks and placements of the timeline, in sequencer.c */
+typedef struct box_audio_sequencer_t {
+    ecs_query_t *placements; /**< ClipPlacement, disabled ones included, uncached */
+    ecs_vec_t index;        /**< box_audio_placement_t, sorted by start */
+    bool dirty;             /**< The index needs a rebuild */
+    ecs_map_t clips;        /**< Clip entity to box_audio_clip_t* */
+    uint32_t generation;    /**< Changes with every change of a NoteClip */
+    ecs_vec_t sounding;     /**< box_audio_sounding_t */
+    double expect;          /**< Beat the next segment starts at, NAN after a reset */
+    box_audio_sequencer_stats_t stats; /**< Counters */
+} box_audio_sequencer_t;
+
 /** The state of the module in a world */
 typedef struct box_audio_module_t {
     ecs_query_t *buses;           /**< AudioBus, disabled ones included */
@@ -477,6 +538,7 @@ typedef struct box_audio_module_t {
     box_audio_capture_job_t capture; /**< The capture that waits */
     box_audio_listener_t listener;   /**< The listener of the last frame */
     box_audio_timeline_t timeline;   /**< The timeline of the Transport */
+    box_audio_sequencer_t sequencer; /**< The tracks of the timeline */
     bool listener_warned;         /**< The warning of several listeners was logged */
     bool spatial_dirty;           /**< Update every spatial source, not only changed ones */
     bool waiting;                 /**< The page waited for a gesture in the last frame */
@@ -1077,6 +1139,53 @@ uint32_t box_audio_instrument_note(
     uint64_t end,
     uint8_t bus,
     uint32_t handle);
+
+/** Write a note of an Instrument as box_audio_instrument_note does, with a gain on the gain
+ * of the velocity and, when release is false, without the RELEASE, which the caller sends.
+ *
+ * @param world The world
+ * @param state The state
+ * @param instrument The entity with Instrument
+ * @param pitch MIDI note number
+ * @param velocity Velocity, 0..1
+ * @param gain Linear gain times the gain of the velocity
+ * @param pan Pan of the voice, -1..1
+ * @param start Frame of the core clock the note starts at
+ * @param end Frame its release starts at, ignored without a gate or a release
+ * @param bus Bus index of the voice
+ * @param handle Handle of the voice, 0 to pick a new one
+ * @param release Whether a gated note writes its RELEASE at end
+ * @return The handle, 0 when the note did not go out
+ */
+uint32_t box_audio_instrument_voice(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    ecs_entity_t instrument,
+    float pitch,
+    float velocity,
+    float gain,
+    float pan,
+    uint64_t start,
+    uint64_t end,
+    uint8_t bus,
+    uint32_t handle,
+    bool release);
+
+/** Register the observers and the timeline hook of the clips and tracks.
+ *
+ * @param world The world
+ * @param state The state
+ */
+void box_audio_sequencer_init(
+    ecs_world_t *world,
+    box_audio_module_t *state);
+
+/** Free the clips and tracks of the module.
+ *
+ * @param state The state
+ */
+void box_audio_sequencer_fini(
+    box_audio_module_t *state);
 
 /** Send the notes of box_audio_play_note, each at the clock of the output with its release
  * its duration later, on the bus of the AudioOutput of the instrument, else of its sound,

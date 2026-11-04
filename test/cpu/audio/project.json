@@ -135,6 +135,31 @@
                 ]
             },
             {
+                "id": "Sequencer",
+                "testcases": [
+                    "defaults",
+                    "start_frames",
+                    "release_frames",
+                    "transpose_gain_pan",
+                    "loop_offset",
+                    "duration_cuts",
+                    "two_placements",
+                    "transport_loop",
+                    "stop",
+                    "seek",
+                    "tempo_moves_release",
+                    "edit_clip",
+                    "delete_track",
+                    "disable_placement",
+                    "oneshots_survive_stop",
+                    "not_ready",
+                    "cost",
+                    "script",
+                    "bit_identical",
+                    "command"
+                ]
+            },
+            {
                 "id": "NoAlloc",
                 "testcases": [
                     "render",

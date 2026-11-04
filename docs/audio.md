@@ -58,6 +58,9 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 | `Transport` | Singleton: the timeline in beats, its tempo, time signature, position, play and stop, loop and metronome, see [Transport](#transport) |
 | `AudioQuantize` | Enum of `box.audio.play_quantized`: `AudioQuantizeNone`, `AudioQuantizeBeat`, `AudioQuantizeBar`, see [Quantized plays](#quantized-plays) |
 | `Instrument` | A synth or a sampler that plays notes with a pitch, a velocity and a duration: `sound`, `root`, `velocity_curve`, `gate`, `release`, see [Instruments](#instruments) |
+| `NoteClip` | A reusable clip of notes: `length` and `notes`, a vector of `Note` (`start`, `duration`, `pitch`, `velocity`, `pan`), see [Clips and tracks](#clips-and-tracks) |
+| `Track` | A mixer channel of the timeline whose notes play on an `instrument`; it brings an `AudioBus`, see [Clips and tracks](#clips-and-tracks) |
+| `ClipPlacement` | On a child of a track, a clip on the timeline: `clip`, `start`, `duration`, `loop`, `offset`, `gain`, `transpose`, see [Clips and tracks](#clips-and-tracks) |
 
 The functions are `box.audio.play(sound, volume)`, `box.audio.play_at(sound, {x, y, z},
 volume)`, `box.audio.play_quantized(sound, volume, quantize)`,
@@ -265,6 +268,13 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   time signatures up to 64/64 that only accent the metronome, one loop, and a lookahead of 0.05
   to 0.5 seconds. On native the first beat after a start or a seek plays as soon as the batch
   arrives, a few ms late; the beats after it are exact. The metronome click is fixed.
+- **Tracks**: note clips only (audio clips come later); a placement plays its clip at one gain
+  and transpose, without automation, swing or quantize. A note is scheduled when its start falls
+  in the lookahead window, so a change applies to what is not scheduled yet, up to the lookahead
+  later. A looping placement repeats at least every 1/64 beat. Only gated notes are tracked to
+  their end: a note of an instrument without a gate plays as authored and a stop does not
+  release it once it started. A note whose start the window skipped after a stall longer than
+  the lookahead does not play.
 - **Quantized plays**: a beat or a bar, no other grid (no eighths, no triplets) and no offset.
   A quantized play of a legato synth sound starts a new voice instead of gliding the one that
   holds. On native a play whose boundary is the clock itself plays when its batch arrives.
@@ -275,7 +285,8 @@ The audio a box app plays can be inspected without listening:
 
 - `audio` prints the state, the rate, the voices, the steals, the load, the clock of the core
   (frames and seconds), the transport and every bus with its kind, width, solo, routing, sends
-  and the effects of its insert slots, with whether each runs; `audio volume <v>` and
+  and the effects of its insert slots, with whether each runs, the instruments and the
+  [tracks](#clips-and-tracks) with their placements and sounding notes; `audio volume <v>` and
   `audio mute` set the master, `audio play`, `audio stop`, `audio seek <beats>` and
   `audio tempo <bpm>` drive the [transport](#transport).
 - `audio capture <seconds>` records the master to a 16 bit stereo WAV resource of the shell
@@ -1739,6 +1750,10 @@ frame, the same on every platform.
 | `Transport` | Singleton: `tempo` (120, 20..999), `beats_per_bar` (4), `beat_unit` (4), `position` (beats, written while it plays, clamped to ±2^31 like `loop_start` and `loop_end`), `playing` (false), `loop` (false), `loop_start`, `loop_end`, `lookahead` (0.15 s, 0.05..0.5), `metronome` (false), see [Transport](#transport) |
 | `AudioQuantize` | Enum of the `quantize` of `box.audio.play_quantized`: `AudioQuantizeNone` (at once), `AudioQuantizeBeat`, `AudioQuantizeBar`; `None`, `Beat` and `Bar` in a script, see [Quantized plays](#quantized-plays) |
 | `Instrument` | A synth or a sampler that plays notes: `sound`, `root` (69, A4), `velocity_curve` (2), `gate` (true), `release` (0.05 s, a sampler's fade), see [Instruments](#instruments) |
+| `Note` | A note of a `NoteClip`: `start` (beats from the start of the clip), `duration` (beats), `pitch` (a MIDI note number), `velocity` (1, 0..1), `pan` (0, -1..1) |
+| `NoteClip` | A reusable clip: `length` (4 beats, the length of a pass of a loop), `notes` (a vector of `Note`, in any order), see [Clips and tracks](#clips-and-tracks) |
+| `Track` | A track: `instrument` (the entity with `Instrument`); brings an `AudioBus` with the `With` trait, so it has a volume, a pan, a mute, an output and sends |
+| `ClipPlacement` | On a child of a `Track`: `clip`, `start` (beats on the timeline), `duration` (0, the length of the clip minus the offset), `loop` (false), `offset` (beats into the clip), `gain` (1), `transpose` (0 semitones) |
 
 Constructors give the defaults in parentheses, so `AudioSource: {sound: click}` in a script plays
 at unity volume and pitch. From C, `ecs_set` writes every member; use `ecs_ensure` to keep the
@@ -2244,14 +2259,118 @@ start frame plus the duration. It plays on the bus of the `AudioOutput` of the i
 of its sound, else the master. The transport does not affect it, like the other ad-hoc plays,
 and it is dropped before the gesture and while its sound file loads, as `box.audio.play` is.
 
-Later parts of box.audio, the tracks, play their notes through the same function,
+Later parts of box.audio play their notes through the same function,
 `box_audio_instrument_note` of `src/audio/instrument.c`: an instrument, a pitch, a velocity, a
-pan, a start frame, an end frame, a bus and a voice handle. A note costs a `PLAY` and a
+pan, a start frame, an end frame, a bus and a voice handle. The [tracks](#clips-and-tracks) use
+`box_audio_instrument_voice`, the same with a gain and without the `RELEASE`, which they send
+once the end of the note falls in a window. A note costs a `PLAY` and a
 `RELEASE` in the batch of its frame, and a scene without instruments pays a loop over an empty
 vector. The tests are the `Instrument` suite of `test/cpu/audio`: the pitch of a synth and a
 sampler, the gain of a velocity, the sustain and the release of a gated synth (linear, curved and
 its filter envelope), the fade of a sampler, a note without a gate, the exact frame of a
 release, a script (`test/assets/audio/instrument.flecs`) and legato notes.
+
+### Clips and tracks
+
+An `Instrument` plays a note when the game asks for it. A score is notes on the timeline of the
+[transport](#transport): `src/audio/sequencer.c` plays clips of notes that tracks place on it.
+
+- **A clip** is a `NoteClip`: its `length` in beats (4) and its `notes`, each a `Note` with a
+  `start` in beats from the start of the clip, a `duration` in beats, a `pitch` (a MIDI note
+  number, a float), a `velocity` (1) and a `pan`. A clip is reusable, usually a prefab or a
+  plain entity: any number of placements on any tracks name it.
+- **A track** is a `Track` with the `instrument` its notes play on. `Track` brings an `AudioBus`
+  with the `With` trait, so a track is a mixer channel with a volume, a pan, a mute, an output,
+  sends and inserts, and its notes play on its own bus.
+- **A placement** is a `ClipPlacement` on a child of a track, so placements are added and removed
+  as entities, like the layers of a synth sound: the `clip`, its `start` on the timeline in
+  beats, its `duration` (0 for the length of the clip minus the offset), `loop` to repeat the clip
+  every `length` beats until the duration ends, an `offset` into the clip at which it starts (with
+  a loop the passes go on from there and wrap at `length`), a linear `gain` (1) that multiplies the
+  gain of the velocity, and a `transpose` in semitones added to every pitch.
+
+```
+using box.audio
+
+music { AudioBus: {volume: 0.8} }
+
+prefab bass_tone {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.005, decay: 0.1, sustain: 0.7, release: 0.08, curve: 3}
+  SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.3}
+}
+
+bass_synth { Instrument: {sound: bass_tone} }
+
+// One bar: A2, then C3 and E3 an eighth each, then G2 for the last two beats
+prefab bass_line {
+  NoteClip: {length: 4, notes: [
+    {start: 0, duration: 1, pitch: 45, velocity: 0.9},
+    {start: 1, duration: 0.5, pitch: 48},
+    {start: 1.5, duration: 0.5, pitch: 52, pan: 0.2},
+    {start: 2, duration: 2, pitch: 43, velocity: 0.7}
+  ]}
+}
+
+bass {
+  Track: {instrument: bass_synth}
+  AudioBus: {volume: 0.9, output: music}
+
+  // Four bars of the line, then the second half of it a fourth up and softer
+  verse { ClipPlacement: {clip: bass_line, start: 0, duration: 16, loop: true} }
+  turn { ClipPlacement: {clip: bass_line, start: 16, offset: 2, transpose: 5, gain: 0.6} }
+}
+
+$ { Transport: {tempo: 110, loop: true, loop_start: 0, loop_end: 18, playing: true} }
+```
+
+**Scheduling.** Each frame the transport plays, for every segment of the lookahead window, every
+enabled track and placement schedules the notes whose start falls in the segment: a note of the
+instrument of the track, a `PLAY` with the frame of its start as its `when`, on the bus of the
+track, at the pitch plus the transpose, the gain `velocity ^ velocity_curve` times the gain of the
+placement and the pan of the note. A loop of the transport wraps the notes on the frame of the
+wrap, as it does the metronome. The module keeps its own copy of the notes of each clip sorted by
+start, rebuilt when the clip is set, so a window finds its notes with a binary search, and an
+index of the placements sorted by start, rebuilt when a placement, a track or a clip changes, so
+a window visits only the placements that overlap it.
+
+**Ends.** The module keeps the notes that sound with the beat at which each ends, and sends their
+`RELEASE` when that beat falls in a window, mapped to a frame on the piece of that window. A tempo
+change therefore moves the end of a long note. A note ends at the earliest of its own end, the end
+of its pass of the clip (with a loop), the end of its placement and, while the transport loops,
+`loop_end`. A note of an instrument without a gate plays as authored and is not tracked.
+
+**Stop, seek and a new output.** A stop of the transport releases the notes that sound at once
+and cancels the notes that were scheduled but have not started, with an immediate `STOP` of their
+handles. A seek does the same and goes on at the new position, so a note that started before the
+new position does not start in the middle; a new output does the same as a seek.
+
+**Changes while playing.** A change of a clip, a placement, a track or an instrument applies to
+what has not been scheduled yet, so to the notes that start more than the lookahead later.
+Deleting or disabling a track or a placement releases its notes, cancels the ones that have not
+started and schedules nothing more for it. A track whose instrument has no `Instrument`, or whose
+sound the output does not have yet (a sound file that loads), drops its notes and logs one warning
+until it plays again.
+
+**What the transport does not touch.** The transport only drives tracks. `AudioSource`,
+`AudioStream`, `box.audio.play`, `box.audio.play_at`, `box.audio.play_quantized` and
+`box.audio.play_note` are never stopped or moved by it.
+
+**Cost.** A world whose transport does not play pays nothing for its tracks: the hooks of the
+timeline do not run, and the observers only mark the index for a rebuild. A playing transport
+visits the placements that overlap its window and the notes that sound. The `Sequencer` suite of
+`bench/audio` runs 16 tracks of 4 placements of 64 notes, playing and stopped, and a playing
+transport without tracks.
+
+The `audio` command lists every track with its instrument, each placement with its clip (its
+notes and length), start, duration, loop, offset, gain and transpose, and the notes that sound,
+each with its pitch and the beat it ends at (`released` once its `RELEASE` went out). The tests
+are the `Sequencer` suite of `test/cpu/audio`: the start frames at two tempos, the release frames,
+the transpose, gain and pan, a loop with an offset, durations that cut a clip, two placements of a
+clip, a loop of the transport, a stop, a seek, a tempo change in a note, an edit of a clip, the
+delete of a track, a disabled placement, one shots through a stop, an instrument that cannot
+play, the cost, a script (`test/assets/audio/sequencer.flecs`), two runs that capture identical
+audio and the command.
 
 ### Before the gesture
 
@@ -2272,7 +2391,9 @@ with its kind, volume, pan, width, `solo`, `muted`, its output, its sends (`send
 pre-fader one) and its insert slots, each as `insert <index> <entity>:` with its kind and values
 and whether it runs: `(runs)`, `(bypassed)` for a Disabled effect, or `(does not run: ...)` with
 the reason (no output, in another slot, every effect of the pool taken, waits for its memory);
-the master lists its own after its `AudioBus`. `audio volume <v>` and `audio mute [on|off]` write
+the master lists its own after its `AudioBus`. The instruments follow, then the tracks, each as
+`track <entity>: instrument <entity>` with its placements and sounding notes (see
+[Clips and tracks](#clips-and-tracks)). `audio volume <v>` and `audio mute [on|off]` write
 `AudioSettings`; `audio play`, `audio stop`, `audio seek <beats>` and `audio tempo <bpm>` (20 to
 999) write `Transport`. `audio capture <seconds>` records the master output
 to a 16 bit stereo WAV resource of the session, fetched like a `capture` PNG with

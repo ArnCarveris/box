@@ -78,17 +78,19 @@ static float box_audio_note_gain(
     return v > 0 ? powf(v, curve) : 0.0f;
 }
 
-uint32_t box_audio_instrument_note(
+uint32_t box_audio_instrument_voice(
     ecs_world_t *world,
     box_audio_module_t *state,
     ecs_entity_t instrument,
     float pitch,
     float velocity,
+    float gain_scale,
     float pan,
     uint64_t start,
     uint64_t end,
     uint8_t bus,
-    uint32_t handle)
+    uint32_t handle,
+    bool release)
 {
     const Instrument *inst = instrument && ecs_is_alive(world, instrument) ?
         ecs_get(world, instrument, Instrument) : NULL;
@@ -106,7 +108,9 @@ uint32_t box_audio_instrument_note(
     }
 
     ratio = box_audio_note_ratio(world, instrument, inst, pitch);
-    gain = box_audio_note_gain(inst, velocity);
+    gain_scale = gain_scale > 0 ? (gain_scale < BOX_AUDIO_VOLUME_MAX ? gain_scale :
+        BOX_AUDIO_VOLUME_MAX) : 0.0f;
+    gain = box_audio_note_gain(inst, velocity) * gain_scale;
     pan = pan > -1 ? (pan < 1 ? pan : 1.0f) : (pan <= -1 ? -1.0f : 0.0f);
     synth = ecs_has(world, inst->sound, SynthSound);
     flags = synth ? (inst->gate ? BOX_AUDIO_PLAY_GATE : 0) : BOX_AUDIO_PLAY_ATTACK;
@@ -147,7 +151,7 @@ uint32_t box_audio_instrument_note(
             start);
     }
 
-    if (inst->gate && box_audio_reserve(state)) {
+    if (inst->gate && release && box_audio_reserve(state)) {
         box_audio_write_voice_release(&state->writer, handle, inst->release,
             end > start ? end : start);
     }
@@ -155,6 +159,22 @@ uint32_t box_audio_instrument_note(
     result = handle;
 done:
     return result;
+}
+
+uint32_t box_audio_instrument_note(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    ecs_entity_t instrument,
+    float pitch,
+    float velocity,
+    float pan,
+    uint64_t start,
+    uint64_t end,
+    uint8_t bus,
+    uint32_t handle)
+{
+    return box_audio_instrument_voice(world, state, instrument, pitch, velocity, 1.0f, pan,
+        start, end, bus, handle, true);
 }
 
 void box_audio_notes_send(
