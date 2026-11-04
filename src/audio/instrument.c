@@ -90,7 +90,8 @@ uint32_t box_audio_instrument_voice(
     uint64_t end,
     uint8_t bus,
     uint32_t handle,
-    bool release)
+    bool release,
+    uint8_t priority)
 {
     const Instrument *inst = instrument && ecs_is_alive(world, instrument) ?
         ecs_get(world, instrument, Instrument) : NULL;
@@ -138,8 +139,8 @@ uint32_t box_audio_instrument_voice(
     if (legato && k >= 0) {
         held = shots[k].handle;
         shots[k] = next;
-        box_audio_write_legato_at(&state->writer, handle, held, sound, bus, gain, pan, ratio,
-            flags, start);
+        box_audio_write_legato_priority(&state->writer, handle, held, sound, bus, gain, pan,
+            ratio, flags, priority, start);
     } else {
         if (ecs_vec_count(&state->oneshots) >= BOX_AUDIO_ONESHOT_MAX) {
             ecs_vec_remove_ordered_t(&state->oneshots, box_audio_oneshot_t, 0);
@@ -147,8 +148,8 @@ uint32_t box_audio_instrument_voice(
 
         shot = ecs_vec_append_t(NULL, &state->oneshots, box_audio_oneshot_t);
         *shot = next;
-        box_audio_write_play(&state->writer, handle, sound, bus, gain, pan, ratio, flags,
-            start);
+        box_audio_write_play_priority(&state->writer, handle, sound, bus, gain, pan, ratio,
+            flags, priority, start);
     }
 
     if (inst->gate && release && box_audio_reserve(state)) {
@@ -174,7 +175,7 @@ uint32_t box_audio_instrument_note(
     uint32_t handle)
 {
     return box_audio_instrument_voice(world, state, instrument, pitch, velocity, 1.0f, pan,
-        start, end, bus, handle, true);
+        start, end, bus, handle, true, 0);
 }
 
 void box_audio_notes_send(

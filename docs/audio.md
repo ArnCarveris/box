@@ -17,8 +17,9 @@ core**, a small mixer in plain C that renders on its own thread, once per frame 
   (`SoundFile`), or a synth patch made in script (`SynthSound`). A sound plays once with
   `box.audio.play` or `box.audio.play_at`, or for as long as an entity with an `AudioSource`
   exists. Music is not a sound: an `AudioStream` streams one Ogg Vorbis file.
-- **Voices** play the sounds, 64 at once; a play past that steals the quietest. A voice has a
-  volume, a pan and a pitch, and plays on a bus.
+- **Voices** play the sounds, 64 at once; a play past that steals the quietest voice of at most
+  its priority: one shots rank lowest, the notes and clips of a track above them and music
+  highest. A voice has a volume, a pan and a pitch, and plays on a bus.
 - **Buses** are the channels of the mixer and mix voices and other buses: each has a volume, a
   pan, a stereo width, a mute, a solo, a kind (group, return or SFX), an output and up to 4
   sends, pre or post fader. Bus 0 is the master, `box.audio.master` in script; every other bus
@@ -59,14 +60,14 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 | `AudioStream` | Music: one Ogg Vorbis file that streams, see [Music](#music) |
 | `AudioStreamStatus` | Read only: the state, position, buffer, underruns and decode time of a stream |
 | `AudioSettings` | Singleton: the master volume and mute |
-| `AudioStatus` | Singleton, read only: the state of the output, its rate, the voices, steals, load and the clock of its core |
+| `AudioStatus` | Singleton, read only: the state of the output, its rate, the voices, steals, refused plays, load and the clock of its core |
 | `AudioMeter` | Read only, opt-in: the peak and the RMS of each channel of a mixer channel, the master included, and the gain reduction of an effect, see [Meters](#meters) |
 | `Transport` | Singleton: the timeline in beats, its tempo, time signature, position, play and stop, loop and metronome, see [Transport](#transport) |
 | `AudioQuantize` | Enum of `box.audio.play_quantized`: `AudioQuantizeNone`, `AudioQuantizeBeat`, `AudioQuantizeBar`, see [Quantized plays](#quantized-plays) |
 | `Instrument` | A synth or a sampler that plays notes with a pitch, a velocity and a duration: `sound`, `root`, `velocity_curve`, `gate`, `release`, see [Instruments](#instruments) |
 | `NoteClip` | A reusable clip of notes: `length` and `notes`, a vector of `Note` (`start`, `duration`, `pitch`, `velocity`, `pan`), see [Clips and tracks](#clips-and-tracks) |
 | `AudioClip` | A reusable clip of recorded audio: `sound`, `offset` (seconds into it) and `length` (beats), see [Audio clips](#audio-clips) |
-| `Track` | A mixer channel of the timeline whose notes play on an `instrument` and whose audio clips play on its bus; it brings an `AudioBus`, see [Clips and tracks](#clips-and-tracks) |
+| `Track` | A mixer channel of the timeline whose notes play on an `instrument` and whose audio clips play on its bus, at a voice `priority` (1) above the one shots; it brings an `AudioBus`, see [Clips and tracks](#clips-and-tracks) |
 | `ClipPlacement` | On a child of a track, a note or audio clip on the timeline: `clip`, `start`, `duration`, `loop`, `offset`, `gain`, `transpose`, see [Clips and tracks](#clips-and-tracks) |
 
 The functions are `box.audio.play(sound, volume)`, `box.audio.play_at(sound, {x, y, z},
@@ -241,6 +242,7 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
 - **Space**: distance and pan only. No Doppler, no distance filter, no occlusion, no HRTF, and
   front and back sound alike.
 - **Effects**: `BOX_AUDIO_EFFECT_MAX` (64) effects at once in all channels together, 4 insert
+<<<<<<< HEAD
   slots per channel, and five kinds: an algorithmic reverb, an equalizer of 4 bands, a filter, a
   compressor and a gate; one more effect logs one error and does nothing. No reverb zones, no
   rooms from geometry and no delay yet. An equalizer has 4 bands of 12 dB per octave at most (no
@@ -250,6 +252,18 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   key, not a sum of several. The gate keys on its own input only.
 - **Voices**: 64, with the quietest stolen; no priorities. A one shot cannot be controlled after
   it started.
+=======
+  slots per channel, and three kinds: an algorithmic reverb, an equalizer of 4 bands and a
+  filter; one more effect logs one error and does nothing. No reverb zones, no rooms from
+  geometry, no compressor or delay yet, and no sidechain. An equalizer has 4 bands of 12 dB per
+  octave at most (no steeper cuts, no linear phase, no dynamic EQ); a filter is one SVF of 12 or
+  24 dB, with no envelope follower or LFO of its own: a script moves its cutoff.
+- **Voices**: 64. A play past that steals the quietest voice of equal or lower priority and is
+  refused when every voice ranks higher; one shots, `play_note`, quantized plays and
+  `AudioSource` play at 0, the notes and audio clips of a `Track` at its `priority` (1), streams
+  at 255. There is no reserved voice count, and a priority does not change within a voice. A one
+  shot cannot be controlled after it started.
+>>>>>>> 56555fabd02a3f75837099daa894b105177e2fa4
 - **Synth**: up to 8 oscillators, one filter and two LFOs per sound, up to 7 unison voices per
   oscillator, linear or curved envelopes and no node graph; an LFO has fixed destinations (pitch,
   level, cutoff, pulse width) and no LFO modulates another; an oscillator may phase or ring
@@ -301,7 +315,7 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
 
 The audio a box app plays can be inspected without listening:
 
-- `audio` prints the state, the rate, the voices, the steals, the load, the clock of the core
+- `audio` prints the state, the rate, the voices, the steals, the refused plays, the load, the clock of the core
   (frames and seconds), the transport and every bus with its kind, width, solo, routing, sends,
   the effects of its insert slots, with whether each runs, and its peak and RMS in dB, the
   instruments and the [tracks](#clips-and-tracks) with their placements and sounding notes;
@@ -373,7 +387,7 @@ start of the next render block, but those with a `when` in the future (see
 
 | Command | Fields |
 |---------|--------|
-| `PLAY` | when, voice handle, sound, bus, volume, pan, pitch, flags (`BOX_AUDIO_PLAY_LOOP`, `BOX_AUDIO_PLAY_GATE`, `BOX_AUDIO_PLAY_ATTACK`): the first sample of the voice is at `when` |
+| `PLAY` | when, voice handle, sound, bus, volume, pan, pitch, flags (`BOX_AUDIO_PLAY_LOOP`, `BOX_AUDIO_PLAY_GATE`, `BOX_AUDIO_PLAY_ATTACK`), priority (0..255): the first sample of the voice is at `when` |
 | `LEGATO` (12) | when, new voice handle, handle of the voice it follows, then the fields of `PLAY` but `when`: a note of a mono voice at `when`, see [Synth](#synth) |
 | `RELEASE` (10) | when, voice handle, fade (seconds): the end of a note at `when`; a synth voice moves every envelope into its release from its level, a sample voice fades out linearly over the fade (0.005..10 s) and ends; a voice that ended is ignored |
 | `STOP` | when, voice handle: the voice fades out over the ramp from `when` and ends; one that applies now also drops the scheduled commands of its handle |
@@ -381,7 +395,7 @@ start of the next render block, but those with a `when` in the future (see
 | `BUS_SET` | when, bus, `VOLUME`, `PAN`, `MUTE`, `WIDTH` (7), `SEND` (5, the level of send 0) or `SEND_1..3` (8..10, the levels of sends 1 to 3), value: the ramp starts at `when` |
 | `ORDER` | count, then per bus in processing order: bus, output, the buses of its 4 sends (or none) and a mask of the pre-fader ones |
 | `SOUND_RELEASE` | sound: freed once no voice plays it |
-| `STREAM` | voice handle, stream, bus, volume, channels, sample rate: opens a stream and starts a voice that reads it |
+| `STREAM` | voice handle, stream, bus, volume, channels, sample rate, priority: opens a stream and starts a voice that reads it |
 | `EFFECT` (11) | slot, kind (`BOX_AUDIO_EFFECT_NONE` takes it off), bus (or none), index (0..3 within the bus), key (a sidechain bus, none for now), 16 params the kind reads: see [Effects](#effects) |
 | `SYNTH` | sound, then a patch up to its last layer: makes a free sound id a synth or replaces its patch, see [Synth](#synth) |
 
@@ -408,7 +422,7 @@ into the heap of its core. After a release, `BOX_AUDIO_EVENT_SOUND_FREE` tells t
 when no voice uses the sound any more, so the side that owns it frees it, never the render path.
 
 **Events** are `{ type, id, value }`: `VOICE_END` (id the handle, for an end, a stop or a
-steal), `VOICE_STOLEN` (id the handle, value the steals so far), `SOUND_FREE`,
+steal, value 0; for a play that the priorities refused, value the refusals so far), `VOICE_STOLEN` (id the handle, value the steals so far), `SOUND_FREE`,
 `ORDER_REFUSED`, `IGNORED` (id the command type), `LOST` (value the events lost) and `LATE`
 (id the type of a command that found the schedule full and applied at once). The core
 holds `BOX_AUDIO_EVENT_MAX` (256) until `read_events`. The last slot is kept for `LOST`: when
@@ -442,8 +456,16 @@ buffer, mono or stereo, looped or not, read with linear interpolation, or a synt
 [Synth](#synth)); it is a tagged union in `internal.h` with its functions in `source.c`, so the
 music source adds a kind there.
 A play when 64 voices play steals the one with the lowest level, the larger of its two gain
-targets (the first of equals), with a fade of 2 ms. This is the voice cap: there is no
-priority system.
+targets (the first of equals), of those whose priority is at most its own, with a fade of 2 ms.
+This is the voice cap. The priority is a field of `PLAY`, `LEGATO` and `STREAM`, 0..255
+(`BOX_AUDIO_PRIORITY_MAX`, a larger value is clamped), and stays with the voice; a legato that
+retargets a voice gives it the priority of the note. When every playing voice has a higher
+priority the play is refused: the core reports `VOICE_END` for its handle with the refusals so
+far as value, so the sender forgets the handle, and `box_audio_core_refused` counts them. A synth
+play that needs parts takes them only from fading voices and voices of at most its priority, and
+is refused when only higher ones hold them. Plays of priority 0 everywhere, or of any one equal
+priority everywhere, render bit identically to the cap without priorities. A priority protects
+the music without leaving voices idle while it is quiet, which a reserved voice count would.
 
 **Buses** are a fixed pool of `BOX_AUDIO_BUS_MAX` (64); bus 0 is the master. A bus that is not
 in the order costs nothing. Each has a volume, a pan, a width, a mute, an output and
@@ -492,7 +514,8 @@ The core counts the frames it rendered since it was created in 64 bits:
 clock at which they take effect, as two 32 bit words `when_lo` and `when_hi`, so that every
 field stays 32 bits. The writers `box_audio_write_play`, `_stop`, `_voice_set`, `_bus_set`,
 `_voice_release` and `_legato_at` take it as their last argument, a `uint64_t`;
-`box_audio_write_legato` writes a `LEGATO` for now.
+`box_audio_write_legato` writes a `LEGATO` for now. `box_audio_write_play_priority` and
+`box_audio_write_legato_priority` take a priority before it; the others write priority 0.
 
 - A `when` of 0, or of a frame that was already rendered, applies at the start of the next
   block, as a command without a `when` would.
@@ -2013,7 +2036,7 @@ frame, the same on every platform.
 | `AudioSpatial` | Places a source in the world: `min_distance` (1), `max_distance` (50), `rolloff` (1), see [Spatial audio](#spatial-audio) |
 | `AudioListener` | Tag of the entity whose `WorldTransform` hears the spatial sources |
 | `AudioSettings` | Singleton: `master_volume` (1) and `mute` |
-| `AudioStatus` | Singleton, read only: `state`, `sample_rate`, `voices`, `voices_stolen`, `load`, `buses`, `clock` (the frame of the core that renders now) |
+| `AudioStatus` | Singleton, read only: `state`, `sample_rate`, `voices`, `voices_stolen`, `voices_refused` (plays the voice cap refused because every voice ranked higher), `load`, `buses`, `clock` (the frame of the core that renders now) |
 | `AudioMeter` | Read only, opt-in, on a channel, the master or an effect: `peak_left` and `peak_right` (linear, the largest absolute sample since the last frame), `rms_left` and `rms_right` (linear, over the last 300 ms of output) and `reduction` (dB, the gain reduction of a dynamics effect, 0 for others); see [Meters](#meters) |
 | `Transport` | Singleton: `tempo` (120, 20..999), `beats_per_bar` (4), `beat_unit` (4), `position` (beats, written while it plays, clamped to ±2^31 like `loop_start` and `loop_end`), `playing` (false), `loop` (false), `loop_start`, `loop_end`, `lookahead` (0.15 s, 0.05..0.5), `metronome` (false), see [Transport](#transport) |
 | `AudioQuantize` | Enum of the `quantize` of `box.audio.play_quantized`: `AudioQuantizeNone` (at once), `AudioQuantizeBeat`, `AudioQuantizeBar`; `None`, `Beat` and `Bar` in a script, see [Quantized plays](#quantized-plays) |
@@ -2021,7 +2044,7 @@ frame, the same on every platform.
 | `Note` | A note of a `NoteClip`: `start` (beats from the start of the clip), `duration` (beats), `pitch` (a MIDI note number), `velocity` (1, 0..1), `pan` (0, -1..1) |
 | `NoteClip` | A reusable clip: `length` (4 beats, the length of a pass of a loop), `notes` (a vector of `Note`, in any order), see [Clips and tracks](#clips-and-tracks) |
 | `AudioClip` | A reusable clip of audio: `sound` (an entity with `AudioPcm` or `SoundFile`), `offset` (0 seconds into the sound), `length` (4 beats, the length of a pass), see [Audio clips](#audio-clips) |
-| `Track` | A track: `instrument` (the entity with `Instrument` of its note clips, none for a track of audio clips); brings an `AudioBus` with the `With` trait, so it has a volume, a pan, a mute, an output and sends |
+| `Track` | A track: `instrument` (the entity with `Instrument` of its note clips, none for a track of audio clips), `priority` (1, 0..255: the priority of the voices of its notes and audio clips at the voice cap, see [Clips and tracks](#clips-and-tracks)); brings an `AudioBus` with the `With` trait, so it has a volume, a pan, a mute, an output and sends |
 | `ClipPlacement` | On a child of a `Track`: `clip` (a `NoteClip` or an `AudioClip`), `start` (beats on the timeline), `duration` (0, the length of the clip minus the offset), `loop` (false), `offset` (beats into the clip), `gain` (1), `transpose` (0 semitones; the pitch ratio `2^(transpose / 12)` of an audio clip) |
 
 Constructors give the defaults in parentheses, so `AudioSource: {sound: click}` in a script plays
@@ -2351,7 +2374,8 @@ they are; more channels mix down to stereo as for sound files, by the channel or
 - **Into the core.** The sync system starts the stream with a `STREAM` command once half a
   second is decoded (or the whole of a shorter file) and hands the chunks over with
   `stream_chunk` after the batch of the frame: on native a copy whose pointer goes to the audio
-  thread over the command ring, on the web a transferred `ArrayBuffer`. The core reads them from
+  thread over the command ring, on the web a transferred `ArrayBuffer`. The voice of a stream
+  plays at priority 255, so no play steals the music. The core reads them from
   the ring of the stream. The transport frees a chunk when the status of the stream says the
   core consumed it; the native audio thread publishes that status after each render in one
   atomic word (voice, open, ended, consumed), so the main thread frees by a consistent view.
@@ -2595,7 +2619,11 @@ An `Instrument` plays a note when the game asks for it. A score is notes on the 
   plain entity: any number of placements on any tracks name it.
 - **A track** is a `Track` with the `instrument` its notes play on. `Track` brings an `AudioBus`
   with the `With` trait, so a track is a mixer channel with a volume, a pan, a mute, an output,
-  sends and inserts, and its notes play on its own bus.
+  sends and inserts, and its notes play on its own bus. Its notes and audio clips play at its
+  `priority` (1), above the one shots, `play_note`, quantized plays and `AudioSource` at 0: at
+  the voice cap of 64 a burst of one shots steals only one shots, and a note of a track steals
+  the quietest voice of at most its priority. When every voice ranks higher a play is refused
+  and counted in `AudioStatus.voices_refused`. A track of priority 0 ranks with the one shots.
 - **A placement** is a `ClipPlacement` on a child of a track, so placements are added and removed
   as entities, like the layers of a synth sound: the `clip`, its `start` on the timeline in
   beats, its `duration` (0 for the length of the clip minus the offset), `loop` to repeat the clip
@@ -2756,7 +2784,7 @@ nothing.
 ### The audio command and captures
 
 The shell command `audio` (`src/command/cmd_audio.c`) prints the state, the rate, the voices, the
-steals and the load, the clock, the transport (`transport: 120.0 bpm 4/4, position 2.1 (4.250
+steals, the refused plays and the load, the clock, the transport (`transport: 120.0 bpm 4/4, position 2.1 (4.250
 beats), playing, loop off`, the position as bar.beat counted from 1), then the master (with the
 volume, pan and width of its `AudioBus` when it has one) and the buses in processing order, each
 with its kind, volume, pan, width, `solo`, `muted`, its output, its sends (`send pre` for a
@@ -2770,7 +2798,7 @@ the reason (no output, in another slot, every effect of the pool taken, waits fo
 the master lists its own after its `AudioBus`. Each channel in the order ends with its levels of
 the last frame, `peak <left>/<right> dB, rms <left>/<right> dB` (`-inf` for silence), the master
 before the limiter. The instruments follow, then the tracks, each as
-`track <entity>: instrument <entity>` with its placements and sounding notes (see
+`track <entity>: instrument <entity>, priority <n>` with its placements and sounding notes (see
 [Clips and tracks](#clips-and-tracks)). `audio volume <v>` and `audio mute [on|off]` write
 `AudioSettings`; `audio play`, `audio stop`, `audio seek <beats>` and `audio tempo <bpm>` (20 to
 999) write `Transport`. `audio capture <seconds>` records the master output

@@ -12,6 +12,12 @@
 /** One shot voices the module keeps track of at most, the oldest are forgotten beyond this */
 #define BOX_AUDIO_ONESHOT_MAX (1024)
 
+/** Priority of the voices of a Track by default, above the one shots at 0 */
+#define BOX_AUDIO_TRACK_PRIORITY (1)
+
+/** Priority of the voice of an AudioStream, the highest, so a play never steals the music */
+#define BOX_AUDIO_STREAM_PRIORITY (255)
+
 /** Bytes the module reserves in its batch before it writes a command, room for the largest,
  * a synth patch of BOX_AUDIO_SYNTH_LAYERS layers and its LFOs */
 #define BOX_AUDIO_COMMAND_RESERVE (2048)
@@ -600,6 +606,7 @@ typedef struct box_audio_module_t {
     bool settings_sent;           /**< settings holds what the output has */
     AudioBus master_bus;          /**< AudioBus of the master sent, its sends left empty */
     int64_t voices_stolen;        /**< Steals the core reported */
+    int64_t voices_refused;       /**< Refusals the core reported */
     box_audio_capture_job_t capture; /**< The capture that waits */
     box_audio_listener_t listener;   /**< The listener of the last frame */
     box_audio_timeline_t timeline;   /**< The timeline of the Transport */
@@ -1268,6 +1275,8 @@ uint32_t box_audio_instrument_note(
  * @param bus Bus index of the voice
  * @param handle Handle of the voice, 0 to pick a new one
  * @param release Whether a gated note writes its RELEASE at end
+ * @param priority Priority of the voice, 0 for a one shot, the priority of a Track for its
+ *     notes
  * @return The handle, 0 when the note did not go out
  */
 uint32_t box_audio_instrument_voice(
@@ -1282,7 +1291,8 @@ uint32_t box_audio_instrument_voice(
     uint64_t end,
     uint8_t bus,
     uint32_t handle,
-    bool release);
+    bool release,
+    uint8_t priority);
 
 /** Register the observers and the timeline hook of the clips and tracks.
  *

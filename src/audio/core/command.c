@@ -60,6 +60,22 @@ bool box_audio_write_play(
     uint32_t flags,
     uint64_t when)
 {
+    return box_audio_write_play_priority(writer, voice, sound, bus, volume, pan, pitch, flags,
+        0, when);
+}
+
+bool box_audio_write_play_priority(
+    box_audio_writer_t *writer,
+    uint32_t voice,
+    uint32_t sound,
+    uint32_t bus,
+    float volume,
+    float pan,
+    float pitch,
+    uint32_t flags,
+    uint32_t priority,
+    uint64_t when)
+{
     box_audio_cmd_play_t cmd;
     box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_PLAY, sizeof(cmd));
     cmd.when_lo = (uint32_t)when;
@@ -71,6 +87,7 @@ bool box_audio_write_play(
     cmd.pan = pan;
     cmd.pitch = pitch;
     cmd.flags = flags;
+    cmd.priority = priority;
 
     return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
 }
@@ -102,6 +119,23 @@ bool box_audio_write_legato_at(
     uint32_t flags,
     uint64_t when)
 {
+    return box_audio_write_legato_priority(writer, voice, from, sound, bus, volume, pan, pitch,
+        flags, 0, when);
+}
+
+bool box_audio_write_legato_priority(
+    box_audio_writer_t *writer,
+    uint32_t voice,
+    uint32_t from,
+    uint32_t sound,
+    uint32_t bus,
+    float volume,
+    float pan,
+    float pitch,
+    uint32_t flags,
+    uint32_t priority,
+    uint64_t when)
+{
     box_audio_cmd_legato_t cmd;
     box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_LEGATO, sizeof(cmd));
     cmd.when_lo = (uint32_t)when;
@@ -114,6 +148,7 @@ bool box_audio_write_legato_at(
     cmd.pan = pan;
     cmd.pitch = pitch;
     cmd.flags = flags;
+    cmd.priority = priority;
 
     return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
 }
@@ -227,7 +262,8 @@ bool box_audio_write_stream(
     uint32_t bus,
     float volume,
     uint32_t channels,
-    float sample_rate)
+    float sample_rate,
+    uint32_t priority)
 {
     box_audio_cmd_stream_t cmd;
     box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_STREAM, sizeof(cmd));
@@ -237,6 +273,7 @@ bool box_audio_write_stream(
     cmd.volume = volume;
     cmd.channels = channels;
     cmd.sample_rate = sample_rate;
+    cmd.priority = priority;
 
     return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
 }

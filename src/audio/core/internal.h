@@ -519,6 +519,8 @@ typedef struct box_audio_voice_t {
     float volume;             /**< Volume */
     float pan;                /**< Pan, -1..1 */
     float pitch;              /**< Pitch ratio */
+    uint32_t priority;        /**< Priority, 0..BOX_AUDIO_PRIORITY_MAX: only a play of at
+                               * least this priority steals it */
     box_audio_ramp_t left;    /**< Gain of the left channel: volume, pan and fades */
     box_audio_ramp_t right;   /**< Gain of the right channel */
     box_audio_source_t source; /**< What it plays */
@@ -622,6 +624,8 @@ struct box_audio_core_t {
     box_audio_voice_t voices[BOX_AUDIO_VOICE_SLOTS];  /**< Voice slots */
     int32_t playing;      /**< Voices in BOX_AUDIO_VOICE_PLAYING */
     int32_t steals;       /**< Voices the cap stole so far */
+    int32_t refused;      /**< Plays refused so far because every playing voice ranked
+                           * higher */
     box_audio_bus_t buses[BOX_AUDIO_BUS_MAX];       /**< Buses, 0 is the master */
     box_audio_route_t order[BOX_AUDIO_BUS_MAX];     /**< Processing order, the master last */
     int32_t order_count;  /**< Routes in order */

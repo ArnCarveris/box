@@ -528,6 +528,22 @@ static void box_audio_seq_stops(
     }
 }
 
+/** Get the priority of the voices of a track, clamped to 0..255.
+ *
+ * @param world The world
+ * @param track The track
+ * @return The priority
+ */
+static uint8_t box_audio_track_priority(
+    ecs_world_t *world,
+    ecs_entity_t track)
+{
+    const Track *tk = ecs_get(world, track, Track);
+    int32_t priority = tk ? tk->priority : BOX_AUDIO_TRACK_PRIORITY;
+
+    return (uint8_t)(priority > 0 ? (priority < 255 ? priority : 255) : 0);
+}
+
 /** What a placement plays in a segment, gathered once per visit */
 typedef struct box_audio_seq_visit_t {
     ecs_entity_t track;     /**< The track */
@@ -543,6 +559,7 @@ typedef struct box_audio_seq_visit_t {
     double end;             /**< End of the placement */
     double loop_end;        /**< loop_end of a transport that wraps, INFINITY otherwise */
     uint8_t bus;            /**< Bus index of the track */
+    uint8_t priority;       /**< Priority of the voices of the track */
     bool jump;              /**< The segment does not follow the one before: a pass that
                              *   covers its start starts in its middle */
 } box_audio_seq_visit_t;
@@ -597,7 +614,7 @@ static void box_audio_seq_pass(
         end = end < v->end ? end : v->end;
         end = beat < v->loop_end && end > v->loop_end ? v->loop_end : end;
         handle = box_audio_instrument_voice(world, state, v->instrument, n->pitch + transpose,
-            n->velocity, v->p->gain, n->pan, when, 0, v->bus, 0, false);
+            n->velocity, v->p->gain, n->pan, when, 0, v->bus, 0, false, v->priority);
         if (!handle) {
             seq->stats.dropped ++;
             continue;
@@ -781,8 +798,8 @@ static void box_audio_seq_audio_pass(
     }
 
     handle = box_audio_new_voice(state);
-    box_audio_write_play(&state->writer, handle, sound, v->bus, v->p->gain, 0.0f,
-        (float)ratio, BOX_AUDIO_PLAY_ATTACK, when);
+    box_audio_write_play_priority(&state->writer, handle, sound, v->bus, v->p->gain, 0.0f,
+        (float)ratio, BOX_AUDIO_PLAY_ATTACK, v->priority, when);
     if (position > 0) {
         box_audio_write_voice_set(&state->writer, handle, BOX_AUDIO_PARAM_POSITION,
             (float)position, when);
@@ -887,6 +904,7 @@ static void box_audio_seq_visit(
     v.end = pl->end;
     v.loop_end = tl->loop && tl->loop_end > tl->loop_start ? tl->loop_end : INFINITY;
     v.bus = box_audio_bus_of(world, state, pl->track);
+    v.priority = box_audio_track_priority(world, pl->track);
     if (!(v.lo < v.hi)) {
         goto done;
     }

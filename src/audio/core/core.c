@@ -336,38 +336,43 @@ static float box_audio_voice_victim_level(
 }
 
 /** Whether a voice can give up what a play needs: any voice for a slot, a synth voice with
- * parts for parts.
+ * parts for parts, and of a playing voice only one of at most the priority of the play.
  *
  * @param v The voice
  * @param parts Whether the play needs synth parts
+ * @param priority Priority of the play
  * @return Whether it can be the victim
  */
 static bool box_audio_voice_victim_fits(
     const box_audio_voice_t *v,
-    bool parts)
+    bool parts,
+    uint32_t priority)
 {
-    return !parts ||
-        (v->source.kind == BOX_AUDIO_SOURCE_SYNTH && v->source.data.synth.layers > 0);
+    return (v->state != BOX_AUDIO_VOICE_PLAYING || v->priority <= priority) && (!parts ||
+        (v->source.kind == BOX_AUDIO_SOURCE_SYNTH && v->source.data.synth.layers > 0));
 }
 
 /** Pick the voice to take from for a new play: the quietest voice of a state, the first of
- * equals. Every steal, of a slot, of the cap or of synth parts, picks here.
+ * equals, of the playing voices only those of at most the priority of the play. Every steal,
+ * of a slot, of the cap or of synth parts, picks here.
  *
  * @param core The core
  * @param state BOX_AUDIO_VOICE_PLAYING or BOX_AUDIO_VOICE_STOPPING
  * @param parts Whether only synth voices that hold parts qualify
+ * @param priority Priority of the play
  * @return The voice, NULL when none qualifies
  */
 static box_audio_voice_t* box_audio_voice_victim(
     box_audio_core_t *core,
     int32_t state,
-    bool parts)
+    bool parts,
+    uint32_t priority)
 {
     box_audio_voice_t *quietest = NULL;
     int32_t i;
     for (i = 0; i < BOX_AUDIO_VOICE_SLOTS; i ++) {
         box_audio_voice_t *v = &core->voices[i];
-        if (v->state == state && box_audio_voice_victim_fits(v, parts) && (!quietest ||
+        if (v->state == state && box_audio_voice_victim_fits(v, parts, priority) && (!quietest ||
             box_audio_voice_victim_level(v) < box_audio_voice_victim_level(quietest)))
         {
             quietest = v;
@@ -390,14 +395,18 @@ static void box_audio_voice_stolen(
     box_audio_core_event(core, BOX_AUDIO_EVENT_VOICE_STOLEN, v->handle, core->steals);
 }
 
-/** Steal the playing voice with the lowest level, the first of equals, with a short fade.
+/** Steal the playing voice with the lowest level of at most a priority, the first of equals,
+ * with a short fade.
  *
  * @param core The core
+ * @param priority Priority of the play
  */
 static void box_audio_voice_steal(
-    box_audio_core_t *core)
+    box_audio_core_t *core,
+    uint32_t priority)
 {
-    box_audio_voice_t *quietest = box_audio_voice_victim(core, BOX_AUDIO_VOICE_PLAYING, false);
+    box_audio_voice_t *quietest = box_audio_voice_victim(core, BOX_AUDIO_VOICE_PLAYING, false,
+        priority);
     if (quietest) {
         box_audio_voice_stolen(core, quietest);
         box_audio_voice_fade(core, quietest, core->steal_frames);
@@ -421,7 +430,7 @@ static box_audio_voice_t* box_audio_voice_slot(
     }
 
     if (!result) {
-        result = box_audio_voice_victim(core, BOX_AUDIO_VOICE_STOPPING, false);
+        result = box_audio_voice_victim(core, BOX_AUDIO_VOICE_STOPPING, false, 0);
         if (result) {
             box_audio_voice_end(core, result);
         }
@@ -449,20 +458,25 @@ static bool box_audio_voice_slot_fits(
     return result;
 }
 
-/** Whether the parts of the synth voices, free and held, hold the layers of a synth sound.
+/** Whether the parts of the synth voices, free and held by voices that a play of a priority
+ * can take from, hold the layers of a synth sound.
  *
  * @param core The core
  * @param sound Id of a ready synth sound
+ * @param priority Priority of the play, BOX_AUDIO_PRIORITY_MAX for every voice
  * @return Whether box_audio_voice_reclaim frees enough
  */
 static bool box_audio_voice_reclaim_fits(
     const box_audio_core_t *core,
-    uint32_t sound)
+    uint32_t sound,
+    uint32_t priority)
 {
     int32_t parts = core->synth_free_count, i;
     for (i = 0; i < BOX_AUDIO_VOICE_SLOTS; i ++) {
         const box_audio_voice_t *v = &core->voices[i];
-        if (v->state != BOX_AUDIO_VOICE_FREE && v->source.kind == BOX_AUDIO_SOURCE_SYNTH) {
+        if (v->state != BOX_AUDIO_VOICE_FREE && v->source.kind == BOX_AUDIO_SOURCE_SYNTH &&
+            (v->state != BOX_AUDIO_VOICE_PLAYING || v->priority <= priority))
+        {
             parts += v->source.data.synth.layers;
         }
     }
@@ -471,20 +485,22 @@ static bool box_audio_voice_reclaim_fits(
 }
 
 /** End synth voices until the free parts hold the layers of a synth sound: the quietest fading
- * ones first, then the quietest playing ones, which report a steal.
+ * ones first, then the quietest playing ones of at most a priority, which report a steal.
  *
  * @param core The core
  * @param sound Id of a ready synth sound, which box_audio_voice_reclaim_fits found
+ * @param priority Priority of the play
  */
 static void box_audio_voice_reclaim(
     box_audio_core_t *core,
-    uint32_t sound)
+    uint32_t sound,
+    uint32_t priority)
 {
     int32_t need = box_audio_synth_parts(core, sound);
     while (core->synth_free_count < need) {
-        box_audio_voice_t *v = box_audio_voice_victim(core, BOX_AUDIO_VOICE_STOPPING, true);
+        box_audio_voice_t *v = box_audio_voice_victim(core, BOX_AUDIO_VOICE_STOPPING, true, 0);
         if (!v) {
-            v = box_audio_voice_victim(core, BOX_AUDIO_VOICE_PLAYING, true);
+            v = box_audio_voice_victim(core, BOX_AUDIO_VOICE_PLAYING, true, priority);
             if (!v) {
                 break;
             }
@@ -496,9 +512,52 @@ static void box_audio_voice_reclaim(
     }
 }
 
+/** Clamp the priority of a command.
+ *
+ * @param priority The priority of the command
+ * @return The priority, at most BOX_AUDIO_PRIORITY_MAX
+ */
+static uint32_t box_audio_priority(
+    uint32_t priority)
+{
+    return priority < BOX_AUDIO_PRIORITY_MAX ? priority : BOX_AUDIO_PRIORITY_MAX;
+}
+
+/** Refuse a new voice because every playing voice ranks higher: count it and report the end
+ * of its handle, so the sender forgets it.
+ *
+ * @param core The core
+ * @param handle Handle of the voice
+ */
+static void box_audio_voice_refuse(
+    box_audio_core_t *core,
+    uint32_t handle)
+{
+    core->refused ++;
+    box_audio_core_event(core, BOX_AUDIO_EVENT_VOICE_END, handle, core->refused);
+}
+
+/** Whether a play of a priority finds a voice under the cap: one plays below it, or the
+ * steal of the cap finds a voice of at most the priority.
+ *
+ * @param core The core
+ * @param priority Priority of the play
+ * @return Whether the play is not refused
+ */
+static bool box_audio_voice_priority_fits(
+    box_audio_core_t *core,
+    uint32_t priority)
+{
+    return core->playing < BOX_AUDIO_VOICE_MAX ||
+        box_audio_voice_victim(core, BOX_AUDIO_VOICE_PLAYING, false, priority) != NULL;
+}
+
 /** Apply a play command. A synth voice starts at its gains, without the ramp: its envelope
  * starts from 0 itself, so an attack shorter than the ramp keeps its time. A sample voice with
  * BOX_AUDIO_PLAY_ATTACK starts at its gains too.
+ *
+ * A play that every playing voice outranks at the cap, or whose synth parts only voices of a
+ * higher priority hold, is refused.
  *
  * @param core The core
  * @param cmd The command
@@ -508,6 +567,7 @@ static void box_audio_cmd_play(
     const box_audio_cmd_play_t *cmd)
 {
     box_audio_voice_t *v = NULL;
+    uint32_t priority = box_audio_priority(cmd->priority);
     bool synth;
     if (cmd->sound >= BOX_AUDIO_SOUND_MAX || cmd->bus >= BOX_AUDIO_BUS_MAX ||
         core->sounds[cmd->sound].state != BOX_AUDIO_SOUND_READY)
@@ -518,18 +578,26 @@ static void box_audio_cmd_play(
 
     synth = core->sounds[cmd->sound].synth != 0;
     if (!box_audio_voice_slot_fits(core) || (synth && (!box_audio_synth_strings_fit(core,
-        cmd->sound) || !box_audio_voice_reclaim_fits(core, cmd->sound))))
+        cmd->sound) || !box_audio_voice_reclaim_fits(core, cmd->sound,
+            BOX_AUDIO_PRIORITY_MAX))))
     {
         box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_PLAY, 0);
         goto done;
     }
 
+    if (!box_audio_voice_priority_fits(core, priority) ||
+        (synth && !box_audio_voice_reclaim_fits(core, cmd->sound, priority)))
+    {
+        box_audio_voice_refuse(core, cmd->voice);
+        goto done;
+    }
+
     if (synth) {
-        box_audio_voice_reclaim(core, cmd->sound);
+        box_audio_voice_reclaim(core, cmd->sound, priority);
     }
 
     if (core->playing >= BOX_AUDIO_VOICE_MAX) {
-        box_audio_voice_steal(core);
+        box_audio_voice_steal(core, priority);
     }
 
     v = box_audio_voice_slot(core);
@@ -544,6 +612,7 @@ static void box_audio_cmd_play(
     v->volume = box_audio_clamp(cmd->volume, 0, BOX_AUDIO_VOLUME_MAX);
     v->pan = box_audio_clamp(cmd->pan, -1, 1);
     v->pitch = box_audio_clamp(cmd->pitch, BOX_AUDIO_PITCH_MIN, BOX_AUDIO_PITCH_MAX);
+    v->priority = priority;
     box_audio_ramp_set(&v->left, 0);
     box_audio_ramp_set(&v->right, 0);
     box_audio_voice_gains(core, v);
@@ -585,7 +654,8 @@ static void box_audio_cmd_legato(
 {
     box_audio_cmd_play_t play = {
         .voice = cmd->voice, .sound = cmd->sound, .bus = cmd->bus, .volume = cmd->volume,
-        .pan = cmd->pan, .pitch = cmd->pitch, .flags = cmd->flags };
+        .pan = cmd->pan, .pitch = cmd->pitch, .flags = cmd->flags,
+        .priority = cmd->priority };
     box_audio_voice_t *v = box_audio_voice_find(core, cmd->from);
     float pitch = box_audio_clamp(cmd->pitch, BOX_AUDIO_PITCH_MIN, BOX_AUDIO_PITCH_MAX);
     bool ready = cmd->sound < BOX_AUDIO_SOUND_MAX && cmd->bus < BOX_AUDIO_BUS_MAX &&
@@ -603,6 +673,7 @@ static void box_audio_cmd_legato(
         v->volume = box_audio_clamp(cmd->volume, 0, BOX_AUDIO_VOLUME_MAX);
         v->pan = box_audio_clamp(cmd->pan, -1, 1);
         v->pitch = pitch;
+        v->priority = box_audio_priority(cmd->priority);
         box_audio_voice_gains(core, v);
         box_audio_synth_gate(&v->source.data.synth, (cmd->flags & BOX_AUDIO_PLAY_GATE) != 0);
     } else {
@@ -659,6 +730,7 @@ static void box_audio_cmd_stream(
 {
     box_audio_voice_t *v = NULL;
     box_audio_stream_t *s;
+    uint32_t priority = box_audio_priority(cmd->priority);
     int32_t i;
     if (cmd->stream >= BOX_AUDIO_STREAM_MAX || cmd->bus >= BOX_AUDIO_BUS_MAX ||
         (cmd->channels != 1 && cmd->channels != 2) || core->streams[cmd->stream].open)
@@ -667,8 +739,13 @@ static void box_audio_cmd_stream(
         goto done;
     }
 
+    if (!box_audio_voice_priority_fits(core, priority)) {
+        box_audio_voice_refuse(core, cmd->voice);
+        goto done;
+    }
+
     if (core->playing >= BOX_AUDIO_VOICE_MAX) {
-        box_audio_voice_steal(core);
+        box_audio_voice_steal(core, priority);
     }
 
     v = box_audio_voice_slot(core);
@@ -704,6 +781,7 @@ static void box_audio_cmd_stream(
     v->volume = box_audio_clamp(cmd->volume, 0, BOX_AUDIO_VOLUME_MAX);
     v->pan = 0;
     v->pitch = 1;
+    v->priority = priority;
     box_audio_ramp_set(&v->left, 0);
     box_audio_ramp_set(&v->right, 0);
     box_audio_voice_gains(core, v);
@@ -1278,6 +1356,12 @@ int32_t box_audio_core_voice_count(
     const box_audio_core_t *core)
 {
     return core->playing;
+}
+
+int32_t box_audio_core_refused(
+    const box_audio_core_t *core)
+{
+    return core->refused;
 }
 
 bool box_audio_core_sound(

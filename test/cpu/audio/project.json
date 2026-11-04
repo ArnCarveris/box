@@ -33,7 +33,16 @@
                     "cap_steals_quietest",
                     "steal_no_click",
                     "many_plays",
-                    "play_unknown_sound"
+                    "play_unknown_sound",
+                    "oneshots_spare_track",
+                    "track_steals_quietest_oneshot",
+                    "equal_priority_steals_quietest",
+                    "refused",
+                    "priority_zero_identical",
+                    "stream_never_stolen",
+                    "track_outranks_oneshots",
+                    "refused_forgotten",
+                    "stream_outranks_oneshots"
                 ]
             },
             {

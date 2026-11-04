@@ -534,9 +534,9 @@ static void box_cmd_audio_tracks(
             bool alive = inst && ecs_is_alive(world, inst);
             char *path = ecs_get_path(world, it.entities[i]);
             char *name = alive ? ecs_get_path(world, inst) : NULL;
-            ecs_strbuf_append(buf, "\n  track %s: instrument %s%s%s", path,
+            ecs_strbuf_append(buf, "\n  track %s: instrument %s%s, priority %d%s", path,
                 name ? name : "none", alive && !ecs_has(world, inst, Instrument) ?
-                    " (no Instrument)" : "",
+                    " (no Instrument)" : "", tk[i].priority,
                 ecs_has_id(world, it.entities[i], EcsDisabled) ? ", disabled" : "");
             box_cmd_audio_placements(world, buf, it.entities[i]);
             for (k = 0, listed = 0, total = 0; k < count; k ++) {
@@ -596,9 +596,9 @@ static char* box_cmd_audio_print(
     ecs_strbuf_t buf = ECS_STRBUF_INIT;
     int32_t i, k, count = box_audio_module_order(world, order, BOX_AUDIO_BUS_MAX);
     AudioStatus s = status ? *status : (AudioStatus){0};
-    ecs_strbuf_append(&buf, "%s, %d Hz, %d voices, %lld stolen, load %.1f%%",
+    ecs_strbuf_append(&buf, "%s, %d Hz, %d voices, %lld stolen, %lld refused, load %.1f%%",
         box_cmd_audio_state(s.state), s.sample_rate, s.voices, (long long)s.voices_stolen,
-        (double)(s.load * 100.0f));
+        (long long)s.voices_refused, (double)(s.load * 100.0f));
     ecs_strbuf_append(&buf, "\nclock: %lld frames (%.3f s)", (long long)s.clock,
         s.sample_rate > 0 ? (double)s.clock / (double)s.sample_rate : 0.0);
     box_cmd_audio_transport(world, &buf);

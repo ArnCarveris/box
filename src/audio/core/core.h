@@ -223,6 +223,13 @@ typedef enum box_audio_param_t {
  * Synth voices start at their gain anyway */
 #define BOX_AUDIO_PLAY_ATTACK (1u << 2)
 
+/** Highest priority of a voice. A play, a legato or a stream that finds the voice cap full
+ * steals the quietest playing voice of at most its priority, the first of equals; when every
+ * playing voice ranks higher it is refused: the core reports BOX_AUDIO_EVENT_VOICE_END for its
+ * handle with the refusals so far as value, and box_audio_core_refused counts it. Larger
+ * values are clamped */
+#define BOX_AUDIO_PRIORITY_MAX 255u
+
 /** Shortest and longest fade of a BOX_AUDIO_CMD_RELEASE of a sample voice in seconds */
 #define BOX_AUDIO_RELEASE_FADE_MIN 0.005f
 #define BOX_AUDIO_RELEASE_FADE_MAX 10.0f
@@ -253,6 +260,9 @@ typedef struct box_audio_cmd_play_t {
     float pan;                      /**< Pan, -1..1 */
     float pitch;                    /**< Pitch ratio, 1 plays the sound as is */
     uint32_t flags;                 /**< BOX_AUDIO_PLAY_ flags */
+    uint32_t priority;              /**< Priority of the voice, 0..BOX_AUDIO_PRIORITY_MAX:
+                                     * at the voice cap the play steals only a voice of at
+                                     * most this priority, else it is refused */
 } box_audio_cmd_play_t;
 
 /** Play a note of a mono voice: retarget the synth voice of a handle that has not reached its
@@ -273,6 +283,7 @@ typedef struct box_audio_cmd_legato_t {
     float pan;                      /**< Pan, -1..1 */
     float pitch;                    /**< Pitch ratio, 1 plays the sound as is */
     uint32_t flags;                 /**< BOX_AUDIO_PLAY_ flags of a new voice */
+    uint32_t priority;              /**< Priority of the voice, as of a play */
 } box_audio_cmd_legato_t;
 
 /** Stop a voice: it fades out and ends. A stop that applies now, with a when of 0 or in the
@@ -348,6 +359,7 @@ typedef struct box_audio_cmd_stream_t {
     uint32_t channels;              /**< 1 or 2, interleaved in the chunks */
     float sample_rate;              /**< Frames per second of the chunks, the rate of the core
                                      * when not positive */
+    uint32_t priority;              /**< Priority of the voice, as of a play */
 } box_audio_cmd_stream_t;
 
 /** What a stream does, for the side that owns its chunks */
@@ -713,7 +725,9 @@ typedef struct box_audio_effect_meter_t {
 
 /** Events the core reports to its transport */
 typedef enum box_audio_event_type_t {
-    BOX_AUDIO_EVENT_VOICE_END = 1,      /**< A voice ended, id is its handle */
+    BOX_AUDIO_EVENT_VOICE_END = 1,      /**< A voice ended, id is its handle; value is 0, or
+                                         * the refusals so far for a play the priorities
+                                         * refused */
     BOX_AUDIO_EVENT_VOICE_STOLEN = 2,   /**< The cap or a play short of synth parts stole
                                          * a voice, id is its handle, value the steals so
                                          * far */
@@ -907,6 +921,14 @@ int32_t box_audio_core_events_lost(
 int32_t box_audio_core_voice_count(
     const box_audio_core_t *core);
 
+/** Get the number of plays refused so far because every playing voice had a higher priority.
+ *
+ * @param core The core
+ * @return Number of plays, legatos and streams
+ */
+int32_t box_audio_core_refused(
+    const box_audio_core_t *core);
+
 /** Take the levels of the buses since the last call and start them over. Every bus in the
  * order is measured per block at its output, a compare and a multiply-add per sample and
  * channel. Does not allocate.
@@ -1011,6 +1033,32 @@ bool box_audio_write_play(
     uint32_t flags,
     uint64_t when);
 
+/** Write a play command with a priority.
+ *
+ * @param writer The writer
+ * @param voice Handle of the new voice
+ * @param sound Id of the sound
+ * @param bus Bus of the voice
+ * @param volume Volume
+ * @param pan Pan, -1..1
+ * @param pitch Pitch ratio
+ * @param flags BOX_AUDIO_PLAY_ flags
+ * @param priority Priority of the voice, 0..BOX_AUDIO_PRIORITY_MAX
+ * @param when Frame of the core clock of its first sample, 0 for now
+ * @return Whether the command fit
+ */
+bool box_audio_write_play_priority(
+    box_audio_writer_t *writer,
+    uint32_t voice,
+    uint32_t sound,
+    uint32_t bus,
+    float volume,
+    float pan,
+    float pitch,
+    uint32_t flags,
+    uint32_t priority,
+    uint64_t when);
+
 /** Write a legato command: a note that follows the voice of a handle.
  *
  * @param writer The writer
@@ -1059,6 +1107,34 @@ bool box_audio_write_legato_at(
     float pan,
     float pitch,
     uint32_t flags,
+    uint64_t when);
+
+/** Write a legato command at a frame with a priority.
+ *
+ * @param writer The writer
+ * @param voice New handle of the voice
+ * @param from Handle of the voice the note follows
+ * @param sound Id of the sound
+ * @param bus Bus of the voice
+ * @param volume Volume
+ * @param pan Pan, -1..1
+ * @param pitch Pitch ratio
+ * @param flags BOX_AUDIO_PLAY_ flags
+ * @param priority Priority of the voice, 0..BOX_AUDIO_PRIORITY_MAX
+ * @param when Frame of the core clock of the note, 0 for now
+ * @return Whether the command fit
+ */
+bool box_audio_write_legato_priority(
+    box_audio_writer_t *writer,
+    uint32_t voice,
+    uint32_t from,
+    uint32_t sound,
+    uint32_t bus,
+    float volume,
+    float pan,
+    float pitch,
+    uint32_t flags,
+    uint32_t priority,
     uint64_t when);
 
 /** Write a release command, the end of the note of a voice.
@@ -1141,6 +1217,7 @@ bool box_audio_write_order(
  * @param volume Volume
  * @param channels 1 or 2
  * @param sample_rate Frames per second of the chunks
+ * @param priority Priority of the voice, 0..BOX_AUDIO_PRIORITY_MAX
  * @return Whether the command fit
  */
 bool box_audio_write_stream(
@@ -1150,7 +1227,8 @@ bool box_audio_write_stream(
     uint32_t bus,
     float volume,
     uint32_t channels,
-    float sample_rate);
+    float sample_rate,
+    uint32_t priority);
 
 /** Write a command that releases a sound.
  *
