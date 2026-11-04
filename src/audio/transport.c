@@ -547,6 +547,17 @@ static void box_audio_null_stats(
     stats->chunks = n->host.chunks;
 }
 
+/** Report the frames the core rendered so far.
+ *
+ * @param t The transport
+ * @return Frames of the core clock
+ */
+static uint64_t box_audio_null_clock(
+    box_audio_transport_t *t)
+{
+    return box_audio_core_clock(((box_audio_null_t*)t)->core);
+}
+
 /** Start to record the frames of the next renders.
  *
  * @param t The transport
@@ -641,6 +652,7 @@ box_audio_transport_t* box_audio_transport_null_new(
         .update = box_audio_null_update,
         .free = box_audio_null_free,
         .stats = box_audio_null_stats,
+        .clock = box_audio_null_clock,
         .capture = box_audio_null_capture,
         .capture_take = box_audio_null_capture_take
     };
@@ -692,6 +704,15 @@ EM_JS(float, box_audio_web_rate, (void), {
 EM_JS(int, box_audio_web_voices, (void), {
     var audio = Module.boxAudio;
     return audio && audio.voices ? audio.voices : 0;
+});
+
+/** Read the clock of the core of the worklet, extrapolated from the last report.
+ *
+ * @return Frames of the core clock, 0 when the page has no audio
+ */
+EM_JS(double, box_audio_web_clock, (void), {
+    var audio = Module.boxAudio;
+    return audio && audio.clock ? audio.clock() : 0;
 });
 
 /** Ask the worklet to record the frames of its next quanta.
@@ -948,6 +969,20 @@ static void box_audio_webt_stats(
     stats->load = 0;
 }
 
+/** Report the clock of the core of the worklet, as the page extrapolates it.
+ *
+ * @param t The transport
+ * @return Frames of the core clock
+ */
+static uint64_t box_audio_webt_clock(
+    box_audio_transport_t *t)
+{
+    double clock = box_audio_web_clock();
+    (void)t;
+
+    return clock > 0 ? (uint64_t)clock : 0;
+}
+
 /** Ask the worklet to record its next frames.
  *
  * @param t The transport
@@ -1015,6 +1050,7 @@ box_audio_transport_t* box_audio_transport_web_new(void)
             .update = box_audio_webt_update,
             .free = box_audio_webt_free,
             .stats = box_audio_webt_stats,
+            .clock = box_audio_webt_clock,
             .capture = box_audio_webt_capture,
             .capture_take = box_audio_webt_capture_take
         };

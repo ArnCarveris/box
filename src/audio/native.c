@@ -141,6 +141,7 @@ typedef struct box_audio_native_t {
     atomic_int captured;            /**< Set by the audio thread when the capture is complete */
     atomic_int voices;              /**< Voices of the core after the last render */
     atomic_uint load;               /**< Bits of the smoothed load of the renders, a float */
+    atomic_uint_least64_t clock;    /**< Clock of the core after the last render */
     box_audio_native_stream_t streams[BOX_AUDIO_STREAM_MAX]; /**< Status of the streams */
     float load_audio;               /**< The smoothed load, audio thread */
     uint8_t message[BOX_AUDIO_TRANSPORT_CHUNK];   /**< A message the audio thread took */
@@ -263,6 +264,7 @@ static void box_audio_native_process(
     memcpy(&bits, &n->load_audio, sizeof(bits));
     atomic_store(&n->load, bits);
     atomic_store(&n->voices, box_audio_core_voice_count(n->core));
+    atomic_store(&n->clock, box_audio_core_clock(n->core));
     for (i = 0; i < BOX_AUDIO_STREAM_MAX; i ++) {
         box_audio_stream_status_t status;
         box_audio_native_stream_t *ns = &n->streams[i];
@@ -756,6 +758,17 @@ static void box_audio_native_stats(
     stats->chunks = n->host.chunks;
 }
 
+/** Report the clock of the core the audio thread published after its last render.
+ *
+ * @param t The transport
+ * @return Frames of the core clock
+ */
+static uint64_t box_audio_native_clock(
+    box_audio_transport_t *t)
+{
+    return (uint64_t)atomic_load(&((box_audio_native_t*)t)->clock);
+}
+
 /** Hand the audio thread a buffer to record its next frames into; it stays with the main
  * thread, which takes it back once the audio thread reports it complete.
  *
@@ -859,6 +872,7 @@ box_audio_transport_t* box_audio_transport_native_new(
     atomic_init(&n->captured, 0);
     atomic_init(&n->voices, 0);
     atomic_init(&n->load, 0);
+    atomic_init(&n->clock, 0);
     for (int32_t i = 0; i < BOX_AUDIO_STREAM_MAX; i ++) {
         atomic_init(&n->streams[i].head, 0);
         atomic_init(&n->streams[i].at, 0);
@@ -901,6 +915,7 @@ box_audio_transport_t* box_audio_transport_native_new(
         .update = box_audio_native_update,
         .free = box_audio_native_free,
         .stats = box_audio_native_stats,
+        .clock = box_audio_native_clock,
         .capture = box_audio_native_capture,
         .capture_take = box_audio_native_capture_take
     };

@@ -57,10 +57,13 @@ bool box_audio_write_play(
     float volume,
     float pan,
     float pitch,
-    uint32_t flags)
+    uint32_t flags,
+    uint64_t when)
 {
     box_audio_cmd_play_t cmd;
     box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_PLAY, sizeof(cmd));
+    cmd.when_lo = (uint32_t)when;
+    cmd.when_hi = (uint32_t)(when >> 32);
     cmd.voice = voice;
     cmd.sound = sound;
     cmd.bus = bus;
@@ -99,10 +102,13 @@ bool box_audio_write_legato(
 
 bool box_audio_write_stop(
     box_audio_writer_t *writer,
-    uint32_t voice)
+    uint32_t voice,
+    uint64_t when)
 {
     box_audio_cmd_stop_t cmd;
     box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_STOP, sizeof(cmd));
+    cmd.when_lo = (uint32_t)when;
+    cmd.when_hi = (uint32_t)(when >> 32);
     cmd.voice = voice;
 
     return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
@@ -115,6 +121,7 @@ bool box_audio_write_stop(
  * @param target Handle of the voice or index of the bus
  * @param param A box_audio_param_t
  * @param value The value
+ * @param when Frame of the core clock it applies at, 0 for now
  * @return Whether the command fit
  */
 static bool box_audio_write_set(
@@ -122,10 +129,13 @@ static bool box_audio_write_set(
     box_audio_cmd_type_t type,
     uint32_t target,
     box_audio_param_t param,
-    float value)
+    float value,
+    uint64_t when)
 {
     box_audio_cmd_set_t cmd;
     box_audio_write_header(&cmd.header, type, sizeof(cmd));
+    cmd.when_lo = (uint32_t)when;
+    cmd.when_hi = (uint32_t)(when >> 32);
     cmd.target = target;
     cmd.param = (uint32_t)param;
     cmd.value = value;
@@ -137,18 +147,20 @@ bool box_audio_write_voice_set(
     box_audio_writer_t *writer,
     uint32_t voice,
     box_audio_param_t param,
-    float value)
+    float value,
+    uint64_t when)
 {
-    return box_audio_write_set(writer, BOX_AUDIO_CMD_VOICE_SET, voice, param, value);
+    return box_audio_write_set(writer, BOX_AUDIO_CMD_VOICE_SET, voice, param, value, when);
 }
 
 bool box_audio_write_bus_set(
     box_audio_writer_t *writer,
     uint32_t bus,
     box_audio_param_t param,
-    float value)
+    float value,
+    uint64_t when)
 {
-    return box_audio_write_set(writer, BOX_AUDIO_CMD_BUS_SET, bus, param, value);
+    return box_audio_write_set(writer, BOX_AUDIO_CMD_BUS_SET, bus, param, value, when);
 }
 
 bool box_audio_write_order(

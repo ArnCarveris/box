@@ -145,19 +145,94 @@ static ecs_entity_t fps_check_view(
     return view;
 }
 
-/** Get a bar of the chart.
+/** Get the parent of the bars.
  *
  * @param world The world
- * @param i The bar, 0 for the oldest sample, BOX_FPS_BARS - 1 for the newest
+ * @return The parent
+ */
+static ecs_entity_t fps_bars(
+    ecs_world_t *world)
+{
+    ecs_entity_t result = ecs_lookup(world, BOX_FPS_CHART_BARS);
+    test_assert(result != 0);
+
+    return result;
+}
+
+/** Get a bar by its name, which it keeps while the bars rotate.
+ *
+ * @param world The world
+ * @param i The index in its name bar_i
  * @return The bar
  */
-static ecs_entity_t fps_bar(
+static ecs_entity_t fps_bar_named(
     ecs_world_t *world,
     int32_t i)
 {
     char path[128];
-    snprintf(path, sizeof(path), "%s.bar_%d", BOX_FPS_CHART, i);
+    snprintf(path, sizeof(path), "%s.bar_%d", BOX_FPS_CHART_BARS, i);
     ecs_entity_t result = ecs_lookup(world, path);
+    test_assert(result != 0);
+
+    return result;
+}
+
+/** Get the x in the chart of the center of the bar in a slot.
+ *
+ * @param slot The slot, 0 at the left
+ * @return The x in points
+ */
+static float fps_slot_x(
+    int32_t slot)
+{
+    return -BOX_FPS_CHART_WIDTH * 0.5f + (float)(slot + 1) * BOX_FPS_BAR_SLOT -
+        BOX_FPS_BAR_WIDTH * 0.5f;
+}
+
+/** Get the x in the chart of the center of a bar: its x in the parent of the bars and the x of
+ * that parent in the chart.
+ *
+ * @param world The world
+ * @param bar The bar
+ * @return The x in points
+ */
+static float fps_chart_x(
+    ecs_world_t *world,
+    ecs_entity_t bar)
+{
+    const Position *p = ecs_get(world, bar, Position);
+    const Position *parent = ecs_get(world, fps_bars(world), Position);
+    test_assert(p != NULL);
+    test_assert(parent != NULL);
+
+    return p->x + parent->x;
+}
+
+/** Get the bar in a slot of the chart, found by its place in the chart since the bars rotate.
+ * Exactly one bar must be in the slot.
+ *
+ * @param world The world
+ * @param slot The slot, 0 for the oldest sample, BOX_FPS_BARS - 1 for the newest
+ * @return The bar
+ */
+static ecs_entity_t fps_bar(
+    ecs_world_t *world,
+    int32_t slot)
+{
+    ecs_entity_t result = 0;
+    int32_t found = 0, i;
+    float x = fps_slot_x(slot);
+    ecs_iter_t it = ecs_children(world, fps_bars(world));
+    while (ecs_children_next(&it)) {
+        for (i = 0; i < it.count; i ++) {
+            if (fps_chart_x(world, it.entities[i]) == x) {
+                result = it.entities[i];
+                found ++;
+            }
+        }
+    }
+
+    test_int(found, 1);
     test_assert(result != 0);
 
     return result;
@@ -200,20 +275,20 @@ static void fps_check_color(
     test_int(c->b, color.b);
 }
 
-/** Check a bar: its place in the chart, its height for a frame time and its color.
+/** Check the bar in a slot: its place in the chart, its height for a frame time and its color.
  *
  * @param world The world
- * @param i The bar
+ * @param slot The slot, 0 for the oldest sample, BOX_FPS_BARS - 1 for the newest
  * @param ms The frame time it draws, 0 for no sample
  * @param color The color it must have
  */
 static void fps_check_bar(
     ecs_world_t *world,
-    int32_t i,
+    int32_t slot,
     double ms,
     rgb color)
 {
-    ecs_entity_t bar = fps_bar(world, i);
+    ecs_entity_t bar = fps_bar(world, slot);
     float h = fps_height(ms);
     const Rect *r = ecs_get(world, bar, Rect);
     const Position *p = ecs_get(world, bar, Position);
@@ -221,10 +296,38 @@ static void fps_check_bar(
     test_assert(p != NULL);
     test_flt(r->width, BOX_FPS_BAR_WIDTH);
     test_flt(r->height, h);
-    test_flt(p->x, -BOX_FPS_CHART_WIDTH * 0.5f + (float)(i + 1) * BOX_FPS_BAR_SLOT -
-        BOX_FPS_BAR_WIDTH * 0.5f);
+    test_flt(fps_chart_x(world, bar), fps_slot_x(slot));
     test_flt(p->y, -BOX_FPS_CHART_HEIGHT * 0.5f + h * 0.5f);
     fps_check_color(world, bar, color);
+}
+
+/** Get the color of the bar of a frame time.
+ *
+ * @param ms The frame time in milliseconds
+ * @return The color
+ */
+static rgb fps_color(
+    double ms)
+{
+    return ms > BOX_FPS_SLOW_MS ? BOX_FPS_RED
+        : (ms > BOX_FPS_FAST_MS ? BOX_FPS_YELLOW : BOX_FPS_GREEN);
+}
+
+/** Check that every slot of the chart shows its sample of the frame samples: the newest on the
+ * right, at whole points, in its height and color.
+ *
+ * @param world The world
+ */
+static void fps_check_samples(
+    ecs_world_t *world)
+{
+    const FrameSamples *samples = ecs_singleton_get(world, FrameSamples);
+    for (int32_t slot = 0; slot < BOX_FPS_BARS; slot ++) {
+        double ms = box_frame_sample(samples, BOX_FPS_BARS - 1 - slot);
+        fps_check_bar(world, slot, ms, fps_color(ms));
+        float left = fps_chart_x(world, fps_bar(world, slot)) - BOX_FPS_BAR_WIDTH * 0.5f;
+        test_flt(left, floorf(left));
+    }
 }
 
 /** Get the Text of an element of the panel.
@@ -538,9 +641,12 @@ void FpsPanel_bars_count_and_order(void) {
     fps_open(world, true);
 
     ecs_entity_t chart = ecs_lookup(world, BOX_FPS_CHART);
-    test_int(fps_children(world, chart), BOX_FPS_BARS + 2);
+    ecs_entity_t parent = fps_bars(world);
+    test_assert(ecs_get_parent(world, parent) == chart);
+    test_int(fps_children(world, chart), 3);
+    test_int(fps_children(world, parent), BOX_FPS_BARS);
     char path[128];
-    snprintf(path, sizeof(path), "%s.bar_%d", BOX_FPS_CHART, BOX_FPS_BARS);
+    snprintf(path, sizeof(path), "%s.bar_%d", BOX_FPS_CHART_BARS, BOX_FPS_BARS);
     test_assert(ecs_lookup(world, path) == 0);
 
     const LayoutBounds *b = ecs_get(world, chart, LayoutBounds);
@@ -549,23 +655,25 @@ void FpsPanel_bars_count_and_order(void) {
     test_flt(b->height, BOX_FPS_CHART_HEIGHT);
 
     ecs_entity_t bar_tmpl = ecs_lookup(world, BOX_FPS_BAR);
+    ecs_entity_t bars_tmpl = ecs_lookup(world, BOX_FPS_BARS_TEMPLATE);
     test_assert(bar_tmpl != 0);
+    test_assert(bars_tmpl != 0);
+    test_assert(ecs_has_id(world, parent, bars_tmpl));
     float prev = -BOX_FPS_CHART_WIDTH;
     for (int32_t i = 0; i < BOX_FPS_BARS; i ++) {
-        test_assert(ecs_has_id(world, fps_bar(world, i), bar_tmpl));
-        const Position *p = ecs_get(world, fps_bar(world, i), Position);
-        test_assert(p != NULL);
+        test_assert(ecs_has_id(world, fps_bar_named(world, i), bar_tmpl));
+        float x = fps_chart_x(world, fps_bar(world, i));
         if (i) {
-            test_flt(p->x - prev, BOX_FPS_BAR_SLOT);
+            test_flt(x - prev, BOX_FPS_BAR_SLOT);
         }
 
-        prev = p->x;
+        prev = x;
     }
 
-    const Position *newest = ecs_get(world, fps_bar(world, BOX_FPS_BARS - 1), Position);
-    test_flt(newest->x + BOX_FPS_BAR_WIDTH * 0.5f, BOX_FPS_CHART_WIDTH * 0.5f);
-    const Position *oldest = ecs_get(world, fps_bar(world, 0), Position);
-    test_flt(oldest->x - BOX_FPS_BAR_WIDTH * 0.5f,
+    float newest = fps_chart_x(world, fps_bar(world, BOX_FPS_BARS - 1));
+    test_flt(newest + BOX_FPS_BAR_WIDTH * 0.5f, BOX_FPS_CHART_WIDTH * 0.5f);
+    float oldest = fps_chart_x(world, fps_bar(world, 0));
+    test_flt(oldest - BOX_FPS_BAR_WIDTH * 0.5f,
         -BOX_FPS_CHART_WIDTH * 0.5f + BOX_FPS_BAR_SLOT - BOX_FPS_BAR_WIDTH);
 
     ecs_fini(world);
@@ -646,9 +754,7 @@ void FpsPanel_bars_full_window(void) {
     fps_samples(world, values, BOX_FRAME_WINDOW);
     for (int32_t i = 0; i < BOX_FPS_BARS; i ++) {
         double ms = values[BOX_FRAME_WINDOW - BOX_FPS_BARS + i];
-        rgb c = ms > BOX_FPS_SLOW_MS ? BOX_FPS_RED
-            : (ms > BOX_FPS_FAST_MS ? BOX_FPS_YELLOW : BOX_FPS_GREEN);
-        fps_check_bar(world, i, ms, c);
+        fps_check_bar(world, i, ms, fps_color(ms));
     }
 
     ecs_fini(world);
@@ -661,9 +767,10 @@ void FpsPanel_bars_follow_new_sample(void) {
     fps_samples_all(world, 10.0, BOX_FRAME_WINDOW);
 
     ecs_entity_t chart = ecs_lookup(world, BOX_FPS_CHART);
+    ecs_entity_t parent = fps_bars(world);
     ecs_entity_t bars[BOX_FPS_BARS];
     for (int32_t i = 0; i < BOX_FPS_BARS; i ++) {
-        bars[i] = fps_bar(world, i);
+        bars[i] = fps_bar_named(world, i);
     }
 
     for (int32_t f = 0; f < 10; f ++) {
@@ -675,14 +782,17 @@ void FpsPanel_bars_follow_new_sample(void) {
 
     ecs_progress(world, 0);
     for (int32_t i = 0; i < BOX_FPS_BARS; i ++) {
-        test_uint(fps_bar(world, i), bars[i]);
+        test_uint(fps_bar_named(world, i), bars[i]);
     }
 
     fps_check_bar(world, BOX_FPS_BARS - 1, 12.0, BOX_FPS_GREEN);
     fps_check_bar(world, BOX_FPS_BARS - 2, 45.0, BOX_FPS_RED);
     fps_check_bar(world, BOX_FPS_BARS - 10, 45.0, BOX_FPS_RED);
     fps_check_bar(world, BOX_FPS_BARS - 11, 10.0, BOX_FPS_GREEN);
-    test_int(fps_children(world, chart), BOX_FPS_BARS + 2);
+    fps_check_samples(world);
+    test_uint(fps_bars(world), parent);
+    test_int(fps_children(world, chart), 3);
+    test_int(fps_children(world, parent), BOX_FPS_BARS);
 
     ecs_fini(world);
 }
@@ -693,8 +803,12 @@ void FpsPanel_bars_not_laid_out(void) {
     fps_open(world, true);
 
     ecs_entity_t chart = ecs_lookup(world, BOX_FPS_CHART);
+    ecs_entity_t parent = fps_bars(world);
     test_assert(!ecs_has(world, chart, Layout));
     test_assert(ecs_has(world, chart, LayoutItem));
+    test_assert(!ecs_has(world, parent, Layout));
+    test_assert(!ecs_has(world, parent, LayoutItem));
+    test_assert(!ecs_has(world, parent, LayoutBounds));
     for (int32_t i = 0; i < BOX_FPS_BARS; i ++) {
         ecs_entity_t bar = fps_bar(world, i);
         test_assert(!ecs_has(world, bar, Layout));
@@ -705,95 +819,70 @@ void FpsPanel_bars_not_laid_out(void) {
     ecs_fini(world);
 }
 
-/** Count the bars of the chart whose Rect was set in the int32_t of the observer context.
+/** Count the bars whose component was set in the int32_t of the observer context.
  *
  * @param it Iterator of the observer
  */
-static void fps_rect_on_set(
+static void fps_bar_on_set(
     ecs_iter_t *it)
 {
     int32_t *fired = it->ctx;
-    ecs_entity_t chart = ecs_lookup(it->world, BOX_FPS_CHART);
+    ecs_entity_t parent = ecs_lookup(it->world, BOX_FPS_CHART_BARS);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
-        if (ecs_get_parent(it->world, it->entities[i]) == chart) {
+        if (ecs_get_parent(it->world, it->entities[i]) == parent) {
             (*fired) ++;
         }
     }
 }
 
-void FpsPanel_bars_set_when_changed(void) {
-    // fps/panel
-    ecs_world_t *world = fps_world();
-    fps_open(world, true);
-    fps_samples_all(world, 10.0, BOX_FRAME_WINDOW);
-
-    int32_t fired = 0;
-    ecs_observer(world, {
-        .query.terms = {{ .id = ecs_id(Rect) }},
-        .events = { EcsOnSet },
-        .callback = fps_rect_on_set,
-        .ctx = &fired
-    });
-
-    FrameSamples *samples = ecs_singleton_get_mut(world, FrameSamples);
-    box_frame_samples_add(samples, 10.0);
-    ecs_singleton_modified(world, FrameSamples);
-    ecs_progress(world, 0);
-    test_int(fired, 0);
-
-    samples = ecs_singleton_get_mut(world, FrameSamples);
-    box_frame_samples_add(samples, 10.2);
-    ecs_singleton_modified(world, FrameSamples);
-    ecs_progress(world, 0);
-    test_int(fired, 0);
-
-    samples = ecs_singleton_get_mut(world, FrameSamples);
-    box_frame_samples_add(samples, 45.0);
-    ecs_singleton_modified(world, FrameSamples);
-    ecs_progress(world, 0);
-    test_int(fired, 1);
-    fps_check_bar(world, BOX_FPS_BARS - 1, 45.0, BOX_FPS_RED);
-
-    fired = 0;
-    samples = ecs_singleton_get_mut(world, FrameSamples);
-    box_frame_samples_add(samples, 10.0);
-    ecs_singleton_modified(world, FrameSamples);
-    ecs_progress(world, 0);
-    test_int(fired, 2);
-    fps_check_bar(world, BOX_FPS_BARS - 2, 45.0, BOX_FPS_RED);
-    fps_check_bar(world, BOX_FPS_BARS - 1, 10.0, BOX_FPS_GREEN);
-
-    ecs_fini(world);
-}
-
-/** Count the bars of the chart whose mut variables were set in the int32_t of the observer
- * context.
+/** Count the entities whose component was set in the int32_t of the observer context.
  *
  * @param it Iterator of the observer
  */
-static void fps_bar_mut_on_set(
+static void fps_count_on_set(
     ecs_iter_t *it)
 {
-    fps_rect_on_set(it);
+    int32_t *fired = it->ctx;
+    (*fired) += it->count;
 }
 
-/** Get the frame time box.fps wrote to a bar.
+/** Observe OnSet of a component of the bars.
  *
  * @param world The world
- * @param mut The mut variables of the bar template
- * @param i The bar
- * @return The ms of the bar
+ * @param id The component
+ * @param fired The counter of bars it was set on
  */
-static double fps_bar_ms(
+static void fps_observe_bars(
     ecs_world_t *world,
-    ecs_entity_t mut,
-    int32_t i)
+    ecs_id_t id,
+    int32_t *fired)
 {
-    const void *ptr = ecs_get_id(world, fps_bar(world, i), mut);
-    test_assert(ptr != NULL);
+    ecs_observer(world, {
+        .query.terms = {{ .id = id }},
+        .events = { EcsOnSet },
+        .callback = fps_bar_on_set,
+        .ctx = fired
+    });
+}
 
-    return *(const double*)ptr;
+/** Observe OnSet of the mut variables of the parent of the bars.
+ *
+ * @param world The world
+ * @param fired The counter of the times they were set
+ */
+static void fps_observe_parent(
+    ecs_world_t *world,
+    int32_t *fired)
+{
+    ecs_entity_t mut = ecs_lookup(world, BOX_FPS_BARS_MUT);
+    test_assert(mut != 0);
+    ecs_observer(world, {
+        .query.terms = {{ .id = mut }},
+        .events = { EcsOnSet },
+        .callback = fps_count_on_set,
+        .ctx = fired
+    });
 }
 
 /** Add a sample to the frame samples and notify them, as the engine does.
@@ -811,9 +900,112 @@ static void fps_sample_add(
     ecs_progress(world, 0);
 }
 
-/* A steady sample sets the mut of no bar, a new sample the newest bar only, and when it moves
- * left the bar it left and the bar it moved to. Fixed samples and a closed panel set none, and
- * the panel evaluated again for a new theme keeps the samples of the bars. */
+/** Fill the frame samples with a full window of samples that vary, as in a real app.
+ *
+ * @param world The world
+ */
+static void fps_samples_varying(
+    ecs_world_t *world)
+{
+    double values[BOX_FRAME_WINDOW];
+    for (int32_t i = 0; i < BOX_FRAME_WINDOW; i ++) {
+        values[i] = 10.0 + (double)(i % 31);
+    }
+
+    fps_samples(world, values, BOX_FRAME_WINDOW);
+}
+
+/* A height that stays sets no Rect: a steady sample sets none, a sample of another height only
+ * the Rect of the bar that takes it, and a sample of the height of the bar of the oldest sample
+ * none, since that bar only moves. */
+void FpsPanel_bars_set_when_changed(void) {
+    // fps/panel
+    ecs_world_t *world = fps_world();
+    fps_open(world, true);
+    fps_samples_all(world, 10.0, BOX_FRAME_WINDOW);
+
+    int32_t fired = 0, moved = 0;
+    fps_observe_bars(world, ecs_id(Rect), &fired);
+    fps_observe_bars(world, ecs_id(Position), &moved);
+
+    fps_sample_add(world, 10.0);
+    test_int(fired, 0);
+    test_int(moved, 0);
+
+    fps_sample_add(world, 10.2);
+    test_int(fired, 0);
+    test_int(moved, 1);
+    fps_check_bar(world, BOX_FPS_BARS - 1, 10.2, BOX_FPS_GREEN);
+
+    moved = 0;
+    fps_sample_add(world, 45.0);
+    test_int(fired, 1);
+    test_int(moved, 1);
+    fps_check_bar(world, BOX_FPS_BARS - 1, 45.0, BOX_FPS_RED);
+
+    fired = 0;
+    moved = 0;
+    fps_sample_add(world, 10.0);
+    test_int(fired, 0);
+    test_int(moved, 1);
+    fps_check_bar(world, BOX_FPS_BARS - 2, 45.0, BOX_FPS_RED);
+    fps_check_bar(world, BOX_FPS_BARS - 1, 10.0, BOX_FPS_GREEN);
+    fps_check_samples(world);
+
+    ecs_fini(world);
+}
+
+/** Get a member of the mut variables of a template.
+ *
+ * @param world The world
+ * @param mut The mut variables
+ * @param name Name of the member
+ * @return The member
+ */
+static const ecs_member_t* fps_member(
+    ecs_world_t *world,
+    ecs_entity_t mut,
+    const char *name)
+{
+    const EcsStruct *st = ecs_get(world, mut, EcsStruct);
+    const ecs_member_t *result = NULL;
+    test_assert(st != NULL);
+    for (int32_t i = 0; i < ecs_vec_count(&st->members); i ++) {
+        const ecs_member_t *m = ecs_vec_get_t(&st->members, ecs_member_t, i);
+        if (!strcmp(m->name, name)) {
+            result = m;
+        }
+    }
+
+    test_assert(result != NULL);
+
+    return result;
+}
+
+/** Get the frame time box.fps wrote to the bar in a slot.
+ *
+ * @param world The world
+ * @param mut The mut variables of the bar template
+ * @param slot The slot, 0 for the oldest sample, BOX_FPS_BARS - 1 for the newest
+ * @return The ms of the bar
+ */
+static double fps_bar_ms(
+    ecs_world_t *world,
+    ecs_entity_t mut,
+    int32_t slot)
+{
+    const char *ptr = ecs_get_id(world, fps_bar(world, slot), mut);
+    test_assert(ptr != NULL);
+    double result;
+    memcpy(&result, ptr + fps_member(world, mut, "ms")->offset, sizeof(double));
+
+    return result;
+}
+
+/* A steady sample sets the mut of no bar; a new sample, steady or not, the mut of the bar of
+ * the oldest sample only, and the mut of the parent of the bars. Fixed samples and a closed panel
+ * set none, and the panel evaluated again for a new theme keeps the samples and places of the
+ * bars. */
 void FpsPanel_bars_sample_when_changed(void) {
     // fps/panel
     ecs_world_t *world = fps_world();
@@ -823,41 +1015,50 @@ void FpsPanel_bars_sample_when_changed(void) {
     ecs_entity_t mut = ecs_lookup(world, BOX_FPS_BAR_MUT);
     test_assert(mut != 0);
     test_assert(ecs_get_type_info(world, mut) != NULL);
-    test_int(ecs_get_type_info(world, mut)->size, sizeof(double));
+    test_uint(fps_member(world, mut, "ms")->type, ecs_id(ecs_f64_t));
+    test_uint(fps_member(world, mut, "col")->type, ecs_id(ecs_i32_t));
+    test_int(ecs_vec_count(&ecs_get(world, mut, EcsStruct)->members), 2);
+    ecs_entity_t parent_mut = ecs_lookup(world, BOX_FPS_BARS_MUT);
+    test_assert(parent_mut != 0);
+    test_uint(fps_member(world, parent_mut, "first")->type, ecs_id(ecs_i32_t));
+    test_int(ecs_vec_count(&ecs_get(world, parent_mut, EcsStruct)->members), 1);
     for (int32_t i = 0; i < BOX_FPS_BARS; i ++) {
         test_flt(fps_bar_ms(world, mut, i), 10.0);
     }
 
-    int32_t fired = 0;
-    ecs_observer(world, {
-        .query.terms = {{ .id = mut }},
-        .events = { EcsOnSet },
-        .callback = fps_bar_mut_on_set,
-        .ctx = &fired
-    });
+    int32_t fired = 0, moved = 0;
+    fps_observe_bars(world, mut, &fired);
+    fps_observe_parent(world, &moved);
 
     fps_sample_add(world, 10.0);
     test_int(fired, 0);
+    test_int(moved, 0);
 
     fps_sample_add(world, 45.0);
     test_int(fired, 1);
+    test_int(moved, 1);
     test_flt(fps_bar_ms(world, mut, BOX_FPS_BARS - 1), 45.0);
     test_flt(fps_bar_ms(world, mut, BOX_FPS_BARS - 2), 10.0);
 
     fired = 0;
+    moved = 0;
+    fps_sample_add(world, 10.0);
+    test_int(fired, 1);
+    test_int(moved, 1);
     fps_sample_add(world, 10.0);
     test_int(fired, 2);
-    fps_sample_add(world, 10.0);
-    test_int(fired, 4);
+    test_int(moved, 2);
     test_flt(fps_bar_ms(world, mut, BOX_FPS_BARS - 3), 45.0);
     test_flt(fps_bar_ms(world, mut, BOX_FPS_BARS - 2), 10.0);
     test_flt(fps_bar_ms(world, mut, BOX_FPS_BARS - 1), 10.0);
     fps_check_bar(world, BOX_FPS_BARS - 3, 45.0, BOX_FPS_RED);
 
     fired = 0;
+    moved = 0;
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(fired, 0);
+    test_int(moved, 0);
 
     UiTheme *t = ecs_get_mut(world, ecs_lookup(world, "box.ui.theme"), UiTheme);
     t->padding += 1;
@@ -867,11 +1068,175 @@ void FpsPanel_bars_sample_when_changed(void) {
     test_flt(fps_bar_ms(world, mut, BOX_FPS_BARS - 3), 45.0);
     test_flt(fps_bar_ms(world, mut, BOX_FPS_BARS - 1), 10.0);
     fps_check_bar(world, BOX_FPS_BARS - 3, 45.0, BOX_FPS_RED);
+    fps_check_samples(world);
 
     fps_open(world, false);
     fired = 0;
+    moved = 0;
     fps_sample_add(world, 30.0);
     test_int(fired, 0);
+    test_int(moved, 0);
+
+    ecs_fini(world);
+}
+
+/* With samples that all differ, a new sample sets the mut of one bar, the bar of the oldest
+ * sample, which moves to the right end, and the mut of the parent of the bars, which moves one
+ * slot left. Every other bar keeps its sample and its place in the parent. */
+void FpsPanel_bars_rotate_one(void) {
+    // fps/panel
+    ecs_world_t *world = fps_world();
+    fps_open(world, true);
+    fps_samples_varying(world);
+    fps_check_samples(world);
+
+    ecs_entity_t mut = ecs_lookup(world, BOX_FPS_BAR_MUT);
+    ecs_entity_t parent = fps_bars(world);
+    ecs_entity_t bars[BOX_FPS_BARS];
+    for (int32_t i = 0; i < BOX_FPS_BARS; i ++) {
+        bars[i] = fps_bar_named(world, i);
+    }
+
+    int32_t fired = 0, moved = 0, rects = 0;
+    fps_observe_bars(world, mut, &fired);
+    fps_observe_parent(world, &moved);
+    fps_observe_bars(world, ecs_id(Rect), &rects);
+
+    for (int32_t f = 0; f < 20; f ++) {
+        ecs_entity_t oldest = fps_bar(world, 0);
+        float parent_x = ecs_get(world, parent, Position)->x;
+        fired = 0;
+        moved = 0;
+        rects = 0;
+        fps_sample_add(world, 3.0 + (double)(f % 7) * 9.0);
+        test_int(fired, 1);
+        test_int(moved, 1);
+        test_assert(rects <= 1);
+        test_uint(fps_bar(world, BOX_FPS_BARS - 1), oldest);
+        test_flt(ecs_get(world, parent, Position)->x, parent_x - BOX_FPS_BAR_SLOT);
+        fps_check_samples(world);
+    }
+
+    for (int32_t i = 0; i < BOX_FPS_BARS; i ++) {
+        test_uint(fps_bar_named(world, i), bars[i]);
+    }
+
+    test_uint(fps_bars(world), parent);
+    test_int(fps_children(world, ecs_lookup(world, BOX_FPS_CHART)), 3);
+    test_int(fps_children(world, parent), BOX_FPS_BARS);
+
+    ecs_fini(world);
+}
+
+/* The columns start over every BOX_FPS_BARS samples: BOX_FPS_BARS - 1 new samples rotate the
+ * bars, the next one writes bar_i the sample of age BOX_FPS_BARS - 1 - i in column i and moves
+ * the parent back, and the one after it rotates again. The bars stay on whole points and show
+ * the same samples throughout. */
+void FpsPanel_bars_rebase(void) {
+    // fps/panel
+    ecs_world_t *world = fps_world();
+    fps_open(world, true);
+    fps_samples_varying(world);
+
+    ecs_entity_t mut = ecs_lookup(world, BOX_FPS_BAR_MUT);
+    ecs_entity_t parent = fps_bars(world);
+    test_flt(ecs_get(world, parent, Position)->x, 0);
+    int32_t fired = 0, moved = 0;
+    fps_observe_bars(world, mut, &fired);
+    fps_observe_parent(world, &moved);
+
+    int32_t f;
+    for (f = 0; f < BOX_FPS_BARS - 1; f ++) {
+        fired = 0;
+        moved = 0;
+        fps_sample_add(world, 10.0 + (double)(f % 29));
+        test_int(fired, 1);
+        test_int(moved, 1);
+    }
+
+    test_flt(ecs_get(world, parent, Position)->x, -(BOX_FPS_BARS - 1) * BOX_FPS_BAR_SLOT);
+    fps_check_samples(world);
+
+    fired = 0;
+    moved = 0;
+    fps_sample_add(world, 10.0 + (double)(f % 29));
+    test_int(fired, BOX_FPS_BARS);
+    test_int(moved, 1);
+    test_flt(ecs_get(world, parent, Position)->x, 0);
+    fps_check_samples(world);
+    const FrameSamples *samples = ecs_singleton_get(world, FrameSamples);
+    for (int32_t i = 0; i < BOX_FPS_BARS; i ++) {
+        ecs_entity_t bar = fps_bar_named(world, i);
+        test_uint(fps_bar(world, i), bar);
+        test_flt(ecs_get(world, bar, Rect)->height,
+            fps_height(box_frame_sample(samples, BOX_FPS_BARS - 1 - i)));
+    }
+
+    fired = 0;
+    moved = 0;
+    fps_sample_add(world, 44.0);
+    test_int(fired, 1);
+    test_int(moved, 1);
+    test_flt(ecs_get(world, parent, Position)->x, -BOX_FPS_BAR_SLOT);
+    test_uint(fps_bar(world, BOX_FPS_BARS - 1), fps_bar_named(world, 0));
+    fps_check_bar(world, BOX_FPS_BARS - 1, 44.0, BOX_FPS_RED);
+    fps_check_samples(world);
+    test_int(fps_children(world, parent), BOX_FPS_BARS);
+
+    ecs_fini(world);
+}
+
+/* A sample added while FrameSamples.hold is set, as tests and captures do, rotates the bars
+ * like one the engine adds. Samples written otherwise while hold is set, several samples at once
+ * and a window that is not full show their samples as well. */
+void FpsPanel_bars_sample_while_hold(void) {
+    // fps/panel
+    ecs_world_t *world = fps_world();
+    fps_open(world, true);
+    fps_samples_varying(world);
+    test_bool(ecs_singleton_get(world, FrameSamples)->hold, true);
+
+    ecs_entity_t mut = ecs_lookup(world, BOX_FPS_BAR_MUT);
+    int32_t fired = 0, moved = 0;
+    fps_observe_bars(world, mut, &fired);
+    fps_observe_parent(world, &moved);
+
+    fps_sample_add(world, 33.0);
+    test_bool(ecs_singleton_get(world, FrameSamples)->hold, true);
+    test_int(fired, 1);
+    test_int(moved, 1);
+    fps_check_bar(world, BOX_FPS_BARS - 1, 33.0, BOX_FPS_YELLOW);
+    fps_check_samples(world);
+
+    FrameSamples *samples = ecs_singleton_get_mut(world, FrameSamples);
+    box_frame_samples_add(samples, 5.0);
+    box_frame_samples_add(samples, 48.0);
+    box_frame_samples_add(samples, 20.0);
+    ecs_singleton_modified(world, FrameSamples);
+    ecs_progress(world, 0);
+    fps_check_bar(world, BOX_FPS_BARS - 3, 5.0, BOX_FPS_GREEN);
+    fps_check_bar(world, BOX_FPS_BARS - 2, 48.0, BOX_FPS_RED);
+    fps_check_bar(world, BOX_FPS_BARS - 1, 20.0, BOX_FPS_YELLOW);
+    fps_check_samples(world);
+
+    fps_sample_add(world, 7.0);
+    fps_check_bar(world, BOX_FPS_BARS - 1, 7.0, BOX_FPS_GREEN);
+    fps_check_samples(world);
+
+    double values[] = { 12.0, 30.0 };
+    fps_samples(world, values, 2);
+    fps_check_samples(world);
+    fps_check_bar(world, BOX_FPS_BARS - 1, 30.0, BOX_FPS_YELLOW);
+    fps_check_bar(world, BOX_FPS_BARS - 3, 0, BOX_FPS_GREEN);
+
+    for (int32_t f = 0; f < 5; f ++) {
+        fired = 0;
+        moved = 0;
+        fps_sample_add(world, 15.0 + (double)f * 7.0);
+        test_int(fired, 1);
+        test_int(moved, 1);
+        fps_check_samples(world);
+    }
 
     ecs_fini(world);
 }

@@ -135,15 +135,15 @@ static int32_t transport_run(
         if (frame % 10 == 0) {
             box_audio_write_play(&writer, (uint32_t)frame, 1 + (uint32_t)(frame / 10) % 2, 0,
                 0.4f, 0.2f * (float)(frame % 5) - 0.4f, 1.0f + 0.05f * (float)(frame % 7),
-                frame % 20 == 0 ? BOX_AUDIO_PLAY_LOOP : 0);
+                frame % 20 == 0 ? BOX_AUDIO_PLAY_LOOP : 0, 0);
         }
 
         if (frame % 25 == 5) {
-            box_audio_write_stop(&writer, (uint32_t)(frame - 5));
+            box_audio_write_stop(&writer, (uint32_t)(frame - 5), 0);
         }
 
         if (frame == 50) {
-            box_audio_write_bus_set(&writer, 0, BOX_AUDIO_PARAM_VOLUME, 0.5f);
+            box_audio_write_bus_set(&writer, 0, BOX_AUDIO_PARAM_VOLUME, 0.5f, 0);
         }
 
         if (writer.size) {
@@ -185,7 +185,7 @@ void Transport_null_sound_free(void) {
 
     audio_fill(audio_sound_a, 480, 0);
     box_audio_writer_init(&writer, bytes, sizeof(bytes));
-    box_audio_write_play(&writer, 3, 7, 0, 1, 0, 1, 0);
+    box_audio_write_play(&writer, 3, 7, 0, 1, 0, 1, 0, 0);
     box_audio_write_release(&writer, 7);
     test_bool(t->commands(t, writer.data, writer.size), true);
     for (frame = 0; frame < 10; frame ++) {
@@ -220,7 +220,7 @@ void Transport_null_sound_free_after_burst(void) {
 
     box_audio_writer_init(&writer, bytes, sizeof(bytes));
     for (i = 0; i < 300; i ++) {
-        test_bool(box_audio_write_play(&writer, (uint32_t)i, 1, 0, 0.5f, 0, 1, 0), true);
+        test_bool(box_audio_write_play(&writer, (uint32_t)i, 1, 0, 0.5f, 0, 1, 0, 0), true);
     }
 
     box_audio_write_release(&writer, 7);
@@ -265,7 +265,7 @@ void Transport_command_before_render(void) {
     audio_fill(audio_sound_a, 4800, 0.5f);
     test_bool(t->sound(t, 1, audio_sound_a, 4800, 1, AUDIO_RATE), true);
     box_audio_writer_init(&writer, bytes, sizeof(bytes));
-    box_audio_write_play(&writer, 1, 1, 0, 1, 0, 1, 0);
+    box_audio_write_play(&writer, 1, 1, 0, 1, 0, 1, 0, 0);
     test_bool(t->commands(t, writer.data, writer.size), true);
     t->update(t, 0.0125f);
 

@@ -1344,6 +1344,60 @@ void Synth_fm_index_limited(void) {
     }
 }
 
+/** Share of the energy of a 2 kHz carrier, phase modulated by a 500 Hz sine with an index of
+ * 2, at 44100 Hz outside the harmonics of 500 Hz and DC: the aliases of its edges.
+ *
+ * @param wave A box_audio_synth_wave_t of the carrier
+ * @return The share, 0..1
+ */
+static double synth_alias_fm(
+    uint32_t wave)
+{
+    box_audio_core_t *core = synth_core(SYNTH_ALIAS_RATE);
+    box_audio_synth_patch_t p = synth_pair(2000, 500, BOX_AUDIO_SYNTH_PHASE, 2);
+    const float *x = audio_l + 2048;
+    double total = 0, mean = 0, harmonics = 0;
+    int32_t i, k;
+    p.layer[0].wave = wave;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 2048 + SYNTH_ALIAS_FRAMES);
+    for (i = 0; i < SYNTH_ALIAS_FRAMES; i ++) {
+        total += (double)x[i] * x[i];
+        mean += x[i];
+    }
+
+    mean /= SYNTH_ALIAS_FRAMES;
+    for (k = 1; k * 500 < SYNTH_ALIAS_RATE / 2; k ++) {
+        harmonics += synth_bin_energy(x, SYNTH_ALIAS_FRAMES, k * 500.0, SYNTH_ALIAS_RATE);
+    }
+
+    box_audio_core_free(core);
+
+    return (total - harmonics - mean * mean * SYNTH_ALIAS_FRAMES) / total;
+}
+
+/** A saw carrier under phase modulation smooths its edges with the speed of its modulated
+ * phase, so it aliases about as little as a plain saw: 0.0014, where the polyBLEP of its
+ * unmodulated rate left 0.0039. */
+void Synth_fm_alias_saw(void) {
+    // audio/synth
+    double alias = synth_alias_fm(BOX_AUDIO_SYNTH_SAW);
+    printf("saw at 2 kHz by 500 Hz: %.2f dB outside its harmonics\n", 10 * log10(alias));
+    test_assert(alias >= 0);
+    test_assert(alias < 0.002);
+}
+
+/** A square carrier under phase modulation, as Synth_fm_alias_saw: 0.0010, where the
+ * unmodulated rate left 0.0023. */
+void Synth_fm_alias_square(void) {
+    // audio/synth
+    double alias = synth_alias_fm(BOX_AUDIO_SYNTH_SQUARE);
+    printf("square at 2 kHz by 500 Hz: %.2f dB outside its harmonics\n", 10 * log10(alias));
+    test_assert(alias >= 0);
+    test_assert(alias < 0.0015);
+}
+
 /** Ring modulation of a 1 kHz sine by a 300 Hz sine: energy at 700 and 1300 Hz only, and none
  * at either of them. */
 void Synth_ring_sum_difference(void) {
@@ -2296,7 +2350,7 @@ void Synth_legato_after_release_loop(void) {
     test_int(box_audio_core_voice_count(core), 1);
 
     box_audio_writer_init(&w, bytes, sizeof(bytes));
-    test_assert(box_audio_write_stop(&w, 8));
+    test_assert(box_audio_write_stop(&w, 8, 0));
     box_audio_core_apply(core, w.data, w.size);
     audio_render(core, 0, AUDIO_FRAMES);
     test_int(box_audio_core_voice_count(core), 0);

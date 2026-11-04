@@ -389,6 +389,15 @@ int32_t box_audio_module_bus_index(
     const ecs_world_t *world,
     ecs_entity_t bus);
 
+/** Get the clock of the output of a world: the frame of its core that renders now, as far as
+ * the main thread can tell, which commands with a when are scheduled against.
+ *
+ * @param world The world
+ * @return Frames of the core clock, 0 when the world has no output
+ */
+uint64_t box_audio_module_clock(
+    const ecs_world_t *world);
+
 /** Find the listener of the frame: the first AudioListener, else the camera of the first
  * enabled View that has one.
  *

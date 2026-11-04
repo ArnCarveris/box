@@ -64,7 +64,7 @@ void Limiter_recovers(void) {
     test_assert(audio_peak(audio_l, 0, 2048) <= BOX_AUDIO_LIMITER_THRESHOLD + 1e-6f);
     test_assert(audio_peak(audio_l, 0, 2048) > 0.9f);
     box_audio_writer_init(&w, bytes, sizeof(bytes));
-    test_assert(box_audio_write_stop(&w, 2));
+    test_assert(box_audio_write_stop(&w, 2, 0));
     box_audio_core_apply(core, w.data, w.size);
     audio_render(core, 2048, AUDIO_FRAMES - 2048);
     for (i = quiet; i < AUDIO_FRAMES; i ++) {

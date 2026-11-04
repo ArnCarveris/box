@@ -351,6 +351,14 @@ done:
     return result;
 }
 
+uint64_t box_audio_module_clock(
+    const ecs_world_t *world)
+{
+    box_audio_transport_t *t = box_audio_output_transport(world);
+
+    return t ? t->clock(t) : 0;
+}
+
 ecs_entity_t box_audio_sound_from_pcm(
     ecs_world_t *world,
     ecs_entity_t sound,
