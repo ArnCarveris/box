@@ -226,8 +226,7 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   it started.
 - **Synth**: up to 4 oscillators and one filter per sound, linear or curved envelopes, no LFO and no node
   graph. Legato is mono per channel and has no note off: a held note lasts its hold after the
-  last note. A legato play sent before the module read the end of the voice starts a new
-  voice that the module then loses track of, so its next note starts another one. A looping synth sound starts a new pass of its envelopes and oscillators at the end of
+  last note. A looping synth sound starts a new pass of its envelopes and oscillators at the end of
   the last, at most every 60 seconds; a drone keeps that gap short with edges of a few ms, as
   the dust merchant's engine does with 2 ms.
 - **Files**: WAV and FLAC for sounds, Ogg Vorbis for music, one stream at once (a change of path
@@ -306,7 +305,8 @@ start of the next render block. They are:
 
 | Command | Fields |
 |---------|--------|
-| `PLAY` | voice handle, sound, bus, volume, pan, pitch, flags (`BOX_AUDIO_PLAY_LOOP`, `BOX_AUDIO_PLAY_LEGATO`, see [Synth](#synth)) |
+| `PLAY` | voice handle, sound, bus, volume, pan, pitch, flags (`BOX_AUDIO_PLAY_LOOP`) |
+| `LEGATO` | new voice handle, handle of the voice it follows, then the fields of `PLAY`: a note of a mono voice, see [Synth](#synth) |
 | `STOP` | voice handle: the voice fades out over the ramp and ends |
 | `VOICE_SET` | voice handle, `VOLUME`, `PAN`, `PITCH`, `BUS` or `POSITION`, value |
 | `BUS_SET` | bus, `VOLUME`, `PAN`, `MUTE` or `SEND` (the send level), value |
@@ -517,18 +517,21 @@ with `SOUND_FREE`. The core clamps every value of a patch, a NaN to the low end.
   moves with the glide. A loop that starts a new pass during a glide starts at the new pitch.
   A glide of 0 jumps as before, bit identical, and a voice that does not glide costs one
   compare per frame.
-- **Legato.** A `PLAY` with `BOX_AUDIO_PLAY_LEGATO` of a synth sound looks for the synth voice
-  of its handle. While one of the envelopes of that voice has not reached its release, the play
-  retargets it instead of starting a voice: layer i glides from its frequency to the frequency
+- **Legato.** A `LEGATO` command of a synth sound looks for the synth voice of the handle it
+  follows. While one of the envelopes of that voice has not reached its release, it retargets
+  the voice and gives it the new handle instead of starting a voice: layer i glides from its frequency to the frequency
   of layer i of the new patch times the pitch of the play, over the glide of the new patch (a
   glide of 0 jumps), and stops its sweep. Its envelopes go on without a restart; one in its
   hold starts the hold over, so a held note lasts while notes follow. The voice keeps its
   waves, levels, envelopes, filter and variances, takes the volume, pan and bus of the play
   with the ramp, and a loop restarts on the new note. Layers past the count of the new patch
   follow the pitch. When every envelope of the voice releases or ended, or the voice is not a
-  synth, the play takes the handle from it and starts a new voice: a synth voice releases on
-  its own and reports its `VOICE_END` with handle 0, any other fades out as after a `STOP`.
-  Without a voice of the handle it is a plain play. A retarget allocates nothing.
+  synth, the command takes the handle from it and starts a new voice with the new handle: a
+  synth voice releases on its own and reports its `VOICE_END` with handle 0, any other fades
+  out as after a `STOP`. Without a voice of the handle it follows it is a plain `PLAY` of the
+  new handle. Since every note has a new handle, the `VOICE_END` of a voice that ended before
+  the sender saw it never names the voice of the next note. A sound that is not ready leaves
+  the voice as it was, with the new handle. A retarget allocates nothing.
 - **Cost.** Render work only: per frame of a voice an envelope step per envelope (a multiply
   and an add when curved), an oscillator per layer and the filter, one stage or two; during a
   glide a multiply per oscillator. `bench/audio` has a `Synth` suite of 64 voices in
@@ -708,9 +711,10 @@ resonance and at Nyquist for both slopes and extreme values, layers, scripts fro
 `test/assets/audio/synth.flecs`, the five examples above from
 `test/assets/audio/synth_examples.flecs`, glides (the frequency halfway through a glide at the
 geometric mean, a glide of 0 bit identical to the jump, the pitch of a source) and legato notes
-(no new attack, a held sustain that holds again, a new voice after the release, from script and
-from a source, the lead above from `test/assets/audio/synth_glide.flecs`) and errors; `NoAlloc` renders 64 synth voices. The browser
-check is `test/integration/web/audio_synth.mjs`.
+(no new attack, a held sustain that holds again, a new voice after the release and after the
+end, from script and from a source, the lead above from `test/assets/audio/synth_glide.flecs`)
+and errors; `NoAlloc` renders 64 synth voices. The browser check is
+`test/integration/web/audio_synth.mjs`.
 
 ## Transports
 

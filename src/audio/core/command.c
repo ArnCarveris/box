@@ -72,6 +72,31 @@ bool box_audio_write_play(
     return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
 }
 
+bool box_audio_write_legato(
+    box_audio_writer_t *writer,
+    uint32_t voice,
+    uint32_t from,
+    uint32_t sound,
+    uint32_t bus,
+    float volume,
+    float pan,
+    float pitch,
+    uint32_t flags)
+{
+    box_audio_cmd_legato_t cmd;
+    box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_LEGATO, sizeof(cmd));
+    cmd.voice = voice;
+    cmd.from = from;
+    cmd.sound = sound;
+    cmd.bus = bus;
+    cmd.volume = volume;
+    cmd.pan = pan;
+    cmd.pitch = pitch;
+    cmd.flags = flags;
+
+    return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
+}
+
 bool box_audio_write_stop(
     box_audio_writer_t *writer,
     uint32_t voice)

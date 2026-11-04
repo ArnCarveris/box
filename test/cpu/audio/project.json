@@ -289,6 +289,7 @@
                     "glide_zero_identical",
                     "legato_no_retrigger",
                     "legato_after_release",
+                    "legato_after_end",
                     "glide_source_pitch",
                     "script_legato",
                     "script_legato_source",

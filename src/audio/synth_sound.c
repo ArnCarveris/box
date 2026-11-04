@@ -145,7 +145,6 @@ bool box_audio_synth_compile(
 
     if (glide) {
         p.glide = glide->time;
-        p.legato = glide->legato;
     }
 
     if (env) {

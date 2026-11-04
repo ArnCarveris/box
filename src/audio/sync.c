@@ -873,7 +873,8 @@ static bool box_audio_legato_of(
  * out of range gives its voice back while the time of its sound runs on, and starts at that
  * place when it comes back; one that does not loop does not start out of range.
  *
- * A new legato synth sound retargets the voice that plays with a legato play of its handle.
+ * A new legato synth sound follows the voice that plays with a legato command, which moves the
+ * voice to a new handle, so an end of the old voice that is still on its way does not end it.
  *
  * @param world The world
  * @param state The state
@@ -900,6 +901,7 @@ static void box_audio_source(
     float volume = muted ? 0.0f : src->volume * (place ? place->gain : 1.0f);
     float pan = place ? place->pan : 0.0f;
     bool away = place && !(place->gain > 0), resume;
+    uint32_t handle;
     uint8_t bus;
     if (v->serial != state->serial) {
         *v = (AudioVoice){ .serial = state->serial };
@@ -910,11 +912,15 @@ static void box_audio_source(
     {
         bus = out ? box_audio_bus_of(world, state, out->bus) :
             box_audio_sound_bus(world, state, src->sound);
+        handle = box_audio_new_voice(state);
         if (box_audio_reserve(state)) {
-            box_audio_write_play(&state->writer, v->handle, sound, bus, volume, pan,
-                src->pitch, BOX_AUDIO_PLAY_LEGATO | (src->loop ? BOX_AUDIO_PLAY_LOOP : 0));
+            box_audio_write_legato(&state->writer, handle, v->handle, sound, bus, volume, pan,
+                src->pitch, src->loop ? BOX_AUDIO_PLAY_LOOP : 0);
         }
 
+        ecs_map_remove(&state->voices, v->handle);
+        ecs_map_insert(&state->voices, handle, e);
+        v->handle = handle;
         v->sound = sound;
         v->volume = volume;
         v->pan = pan;
@@ -1194,6 +1200,7 @@ static void box_audio_queued(
     uint32_t *stops = ecs_vec_first(&state->stops);
     uint32_t *releases = ecs_vec_first(&state->releases);
     uint32_t *fades = ecs_vec_first(&state->fades);
+    uint32_t handle;
     int32_t i, k, channel;
     bool legato;
     for (i = 0; state->bus_freed && i < ecs_vec_count(&state->oneshots); i ++) {
@@ -1252,10 +1259,13 @@ static void box_audio_queued(
             shot->volume = plays[i].volume;
             shot->sent_volume = plays[i].volume * gain;
             shot->sent_pan = pan;
+            handle = box_audio_new_voice(state);
             if (box_audio_reserve(state)) {
-                box_audio_write_play(&state->writer, shot->handle, sound, shot->bus,
-                    shot->sent_volume, pan, 1.0f, BOX_AUDIO_PLAY_LEGATO);
+                box_audio_write_legato(&state->writer, handle, shot->handle, sound, shot->bus,
+                    shot->sent_volume, pan, 1.0f, 0);
             }
+
+            shot->handle = handle;
 
             continue;
         }

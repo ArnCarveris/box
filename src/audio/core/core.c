@@ -372,42 +372,6 @@ static box_audio_voice_t* box_audio_voice_slot(
     return result;
 }
 
-/** Apply the legato of a play: retarget the synth voice of its handle, or take the handle
- * from the voice that plays with it, so the play starts a new one. A synth voice that lost its
- * handle releases on its own and reports its end with handle 0; any other fades out.
- *
- * @param core The core
- * @param cmd The command, of a ready sound
- * @return Whether it retargeted the voice, which the play then leaves at that
- */
-static bool box_audio_cmd_legato(
-    box_audio_core_t *core,
-    const box_audio_cmd_play_t *cmd)
-{
-    box_audio_voice_t *v = box_audio_voice_find(core, cmd->voice);
-    float pitch = box_audio_clamp(cmd->pitch, BOX_AUDIO_PITCH_MIN, BOX_AUDIO_PITCH_MAX);
-    bool synth = v && v->source.kind == BOX_AUDIO_SOURCE_SYNTH &&
-        core->sounds[cmd->sound].synth, result = false;
-    if (!v) {
-        goto done;
-    }
-
-    if (synth && box_audio_synth_legato(core, &v->source.data.synth, cmd->sound, pitch)) {
-        v->bus = cmd->bus;
-        v->volume = box_audio_clamp(cmd->volume, 0, BOX_AUDIO_VOLUME_MAX);
-        v->pan = box_audio_clamp(cmd->pan, -1, 1);
-        v->pitch = pitch;
-        box_audio_voice_gains(core, v);
-        result = true;
-    } else if (!synth) {
-        box_audio_voice_fade(core, v, core->ramp_frames);
-    }
-
-    v->handle = result ? v->handle : 0;
-done:
-    return result;
-}
-
 /** Apply a play command. A synth voice starts at its gains, without the ramp: its envelope
  * starts from 0 itself, so an attack shorter than the ramp keeps its time.
  *
@@ -423,10 +387,6 @@ static void box_audio_cmd_play(
         core->sounds[cmd->sound].state != BOX_AUDIO_SOUND_READY)
     {
         box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_PLAY, 0);
-        goto done;
-    }
-
-    if ((cmd->flags & BOX_AUDIO_PLAY_LEGATO) && box_audio_cmd_legato(core, cmd)) {
         goto done;
     }
 
@@ -463,6 +423,53 @@ static void box_audio_cmd_play(
 
 done:
     return;
+}
+
+/** Apply a legato command: retarget the synth voice it follows and give it the new handle, or
+ * take the handle from that voice and start a new one. A synth voice that lost its handle
+ * releases on its own and reports its end with handle 0; any other fades out.
+ *
+ * A command of a sound that is not ready leaves the voice as it is, with the new handle.
+ *
+ * @param core The core
+ * @param cmd The command
+ */
+static void box_audio_cmd_legato(
+    box_audio_core_t *core,
+    const box_audio_cmd_legato_t *cmd)
+{
+    box_audio_cmd_play_t play = {
+        .voice = cmd->voice, .sound = cmd->sound, .bus = cmd->bus, .volume = cmd->volume,
+        .pan = cmd->pan, .pitch = cmd->pitch, .flags = cmd->flags };
+    box_audio_voice_t *v = box_audio_voice_find(core, cmd->from);
+    float pitch = box_audio_clamp(cmd->pitch, BOX_AUDIO_PITCH_MIN, BOX_AUDIO_PITCH_MAX);
+    bool ready = cmd->sound < BOX_AUDIO_SOUND_MAX && cmd->bus < BOX_AUDIO_BUS_MAX &&
+        core->sounds[cmd->sound].state == BOX_AUDIO_SOUND_READY;
+    bool synth = ready && v && v->source.kind == BOX_AUDIO_SOURCE_SYNTH &&
+        core->sounds[cmd->sound].synth;
+    if (!ready) {
+        box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_LEGATO, 0);
+        if (v) {
+            v->handle = cmd->voice;
+        }
+    } else if (synth && box_audio_synth_legato(core, &v->source.data.synth, cmd->sound, pitch)) {
+        v->handle = cmd->voice;
+        v->bus = cmd->bus;
+        v->volume = box_audio_clamp(cmd->volume, 0, BOX_AUDIO_VOLUME_MAX);
+        v->pan = box_audio_clamp(cmd->pan, -1, 1);
+        v->pitch = pitch;
+        box_audio_voice_gains(core, v);
+    } else {
+        if (v && !synth) {
+            box_audio_voice_fade(core, v, core->ramp_frames);
+        }
+
+        if (v) {
+            v->handle = 0;
+        }
+
+        box_audio_cmd_play(core, &play);
+    }
 }
 
 /** Apply a stream command: open the stream and start a voice that reads it.
@@ -716,6 +723,7 @@ static void box_audio_cmd(
     int32_t size)
 {
     box_audio_cmd_play_t play;
+    box_audio_cmd_legato_t legato;
     box_audio_cmd_stop_t stop;
     box_audio_cmd_set_t set;
     box_audio_cmd_release_t release;
@@ -726,6 +734,9 @@ static void box_audio_cmd(
     if (type == BOX_AUDIO_CMD_PLAY && size >= (int32_t)sizeof(play)) {
         box_audio_copy(&play, bytes, (int32_t)sizeof(play));
         box_audio_cmd_play(core, &play);
+    } else if (type == BOX_AUDIO_CMD_LEGATO && size >= (int32_t)sizeof(legato)) {
+        box_audio_copy(&legato, bytes, (int32_t)sizeof(legato));
+        box_audio_cmd_legato(core, &legato);
     } else if (type == BOX_AUDIO_CMD_STOP && size >= (int32_t)sizeof(stop)) {
         box_audio_copy(&stop, bytes, (int32_t)sizeof(stop));
         v = box_audio_voice_find(core, stop.voice);

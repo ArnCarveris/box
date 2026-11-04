@@ -1462,6 +1462,26 @@ static box_audio_synth_patch_t synth_glide_patch(
     return p;
 }
 
+/** Send a legato command of a note that follows the voice of a handle.
+ *
+ * @param core The core
+ * @param voice New handle of the voice
+ * @param from Handle of the voice the note follows
+ * @param sound Sound id
+ */
+static void synth_legato(
+    box_audio_core_t *core,
+    uint32_t voice,
+    uint32_t from,
+    uint32_t sound)
+{
+    uint8_t bytes[64];
+    box_audio_writer_t w;
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_legato(&w, voice, from, sound, 0, 1, 0, 1, 0));
+    box_audio_core_apply(core, w.data, w.size);
+}
+
 /** A pitch change of an octave over 0.2 s: the frequency is the geometric mean halfway, a
  * quarter of an octave up at a quarter, and lands on the octave without a step. */
 void Synth_glide_geometric_mean(void) {
@@ -1521,15 +1541,16 @@ void Synth_glide_zero_identical(void) {
     box_audio_core_free(core);
 }
 
-/** A legato play of the same handle glides the voice to the new note without a new attack:
- * the level stays at the sustain, which holds for its hold again, and one voice plays. */
+/** A legato note glides the voice it follows to the new note without a new attack: the level
+ * stays at the sustain, which holds for its hold again, one voice plays and it ends with the
+ * new handle. */
 void Synth_legato_no_retrigger(void) {
     // audio/synth
     box_audio_core_t *core = synth_core(AUDIO_RATE);
     box_audio_synth_patch_t a = synth_glide_patch(300, 0.05f), b = a;
+    box_audio_event_t e;
     double amp, low = 1, high = 0;
     int32_t i, at;
-    a.legato = 1;
     a.envelope = (box_audio_synth_envelope_t){
         .attack = 0.05f, .decay = 0.05f, .sustain = 0.5f, .hold = 0.5f, .release = 0.05f };
     b = a;
@@ -1540,7 +1561,7 @@ void Synth_legato_no_retrigger(void) {
     audio_render(core, 0, 9600);
     test_assert(fabs(synth_amplitude(audio_l, 6000, 9600) - 0.25) < 0.01);
 
-    audio_play(core, 7, 2, 0, 1, 0, 1, BOX_AUDIO_PLAY_LEGATO);
+    synth_legato(core, 8, 7, 2);
     audio_render(core, 0, 24000);
     test_int(box_audio_core_voice_count(core), 1);
     test_int(audio_events(core, BOX_AUDIO_EVENT_VOICE_END, NULL), 0);
@@ -1559,18 +1580,18 @@ void Synth_legato_no_retrigger(void) {
     i = synth_last(audio_l, 0, AUDIO_FRAMES);
     printf("last sample at %d, release ends at 26400\n", i);
     test_assert(abs(i - 26400) <= SYNTH_MS);
-    test_int(audio_events(core, BOX_AUDIO_EVENT_VOICE_END, NULL), 1);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_VOICE_END, &e), 1);
+    test_int(e.id, 8);
     box_audio_core_free(core);
 }
 
-/** A legato play of a voice that releases starts a new voice with the handle: the old one
+/** A legato note of a voice that releases starts a new voice with the new handle: the old one
  * releases on its own and reports its end with handle 0. */
 void Synth_legato_after_release(void) {
     // audio/synth
     box_audio_core_t *core = synth_core(AUDIO_RATE);
     box_audio_synth_patch_t a = synth_glide_patch(300, 0.05f), b;
     box_audio_event_t e;
-    a.legato = 1;
     a.envelope = (box_audio_synth_envelope_t){
         .attack = 0.01f, .sustain = 0.5f, .hold = 0.05f, .release = 0.2f };
     b = a;
@@ -1579,7 +1600,7 @@ void Synth_legato_after_release(void) {
     synth_define(core, 2, &b);
     audio_play(core, 7, 1, 0, 1, 0, 1, 0);
     audio_render(core, 0, 4800);
-    audio_play(core, 7, 2, 0, 1, 0, 1, BOX_AUDIO_PLAY_LEGATO);
+    synth_legato(core, 8, 7, 2);
     audio_render(core, 0, 480);
     test_int(box_audio_core_voice_count(core), 2);
     audio_render(core, 0, 9600);
@@ -1589,7 +1610,36 @@ void Synth_legato_after_release(void) {
     test_assert(fabs(audio_frequency(audio_l, 8000, 9600) - 450) < 0.5);
     audio_render(core, 0, AUDIO_FRAMES);
     test_int(audio_events(core, BOX_AUDIO_EVENT_VOICE_END, &e), 1);
+    test_int(e.id, 8);
+    box_audio_core_free(core);
+}
+
+/** A legato note that follows a voice that already ended, before its sender read the end,
+ * starts a new voice with the new handle, so the end of the old one does not name it. */
+void Synth_legato_after_end(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t a = synth_glide_patch(300, 0.05f), b;
+    box_audio_event_t e;
+    a.envelope = (box_audio_synth_envelope_t){
+        .attack = 0.01f, .sustain = 0.5f, .hold = 0.05f, .release = 0.05f };
+    b = a;
+    b.layer[0].frequency = 450;
+    synth_define(core, 1, &a);
+    synth_define(core, 2, &b);
+    audio_play(core, 7, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 9600);
+    test_int(box_audio_core_voice_count(core), 0);
+    synth_legato(core, 8, 7, 2);
+    audio_render(core, 0, 4800);
+    test_int(box_audio_core_voice_count(core), 1);
+    test_assert(fabs(synth_amplitude(audio_l, 960, 2400) - 0.25) < 0.01);
+    test_assert(fabs(audio_frequency(audio_l, 480, 2400) - 450) < 0.5);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_VOICE_END, &e), 1);
     test_int(e.id, 7);
+    audio_render(core, 0, AUDIO_FRAMES);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_VOICE_END, &e), 1);
+    test_int(e.id, 8);
     box_audio_core_free(core);
 }
 
@@ -1618,7 +1668,7 @@ void Synth_glide_source_pitch(void) {
     test_assert(slide != 0);
     audio_run(world, 1);
     test_flt(ecs_get(world, slide, AudioSynth)->patch.glide, 0.2f);
-    test_int(ecs_get(world, slide, AudioSynth)->patch.legato, 0);
+    test_bool(ecs_get(world, slide, SynthGlide)->legato, false);
     src = audio_source(world, slide, 1.0f, false, 0);
     audio_run(world, 10);
     test_assert(fabs(audio_frequency(audio_tap_l, audio_tap_count - 1600, audio_tap_count)
@@ -1646,7 +1696,7 @@ void Synth_script_legato(void) {
     test_assert(low != 0);
     audio_run(world, 1);
     test_flt(ecs_get(world, low, AudioSynth)->patch.glide, 0.1f);
-    test_int(ecs_get(world, low, AudioSynth)->patch.legato, 1);
+    test_bool(ecs_get(world, low, SynthGlide)->legato, true);
     test_assert(box_audio_play(world, low, 1.0f));
     audio_run(world, 10);
     test_int(ecs_singleton_get(world, AudioStatus)->voices, 1);
@@ -1717,7 +1767,7 @@ void Synth_docs_glide_example(void) {
         ecs_entity_t sound = ecs_lookup(world, names[i]);
         test_assert(sound != 0);
         test_assert(ecs_get(world, sound, AudioSynth)->compiled);
-        test_int(ecs_get(world, sound, AudioSynth)->patch.legato, 1);
+        test_bool(ecs_get(world, sound, SynthGlide)->legato, true);
         test_assert(box_audio_play(world, sound, 1.0f));
         audio_run(world, 8);
         test_int(ecs_singleton_get(world, AudioStatus)->voices, 1);
