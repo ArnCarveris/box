@@ -92,6 +92,8 @@ typedef struct AudioInstrumentState {
 /** What box.audio did with a Track */
 typedef struct AudioTrackState {
     bool warned;            /**< The warning of an instrument that cannot play was logged */
+    bool audio_warned;      /**< The warning of an audio clip whose sound is not ready was
+                             *   logged */
 } AudioTrackState;
 
 extern ECS_COMPONENT_DECLARE(AudioSoundId);
@@ -456,12 +458,16 @@ typedef struct box_audio_meter_window_t {
 /** Shortest pass of a looping placement in beats; a shorter clip loops at this length */
 #define BOX_AUDIO_CLIP_LENGTH_MIN (1.0 / 64.0)
 
-/** The notes of a NoteClip sorted by start, rebuilt when the clip changes */
+/** The notes of a NoteClip sorted by start, or the sound of an AudioClip, rebuilt when the
+ * clip changes */
 typedef struct box_audio_clip_t {
     ecs_entity_t entity;    /**< The clip */
     uint32_t generation;    /**< Generation of the clips it was built at */
-    double length;          /**< NoteClip.length, 0 when not finite or not positive */
+    double length;          /**< NoteClip.length, else AudioClip.length, 0 when not finite or
+                             *   not positive */
     ecs_vec_t notes;        /**< Note, sorted by start, with finite values */
+    ecs_entity_t sound;     /**< AudioClip.sound, 0 for a clip without AudioClip */
+    double offset;          /**< AudioClip.offset in seconds, at least 0 */
 } box_audio_clip_t;
 
 /** A placement in the index of the sequencer */
@@ -486,6 +492,19 @@ typedef struct box_audio_sounding_t {
     ecs_entity_t placement; /**< The placement */
 } box_audio_sounding_t;
 
+/** A voice of an audio clip that the sequencer scheduled and that has not stopped */
+typedef struct box_audio_clip_voice_t {
+    uint32_t handle;        /**< Voice handle */
+    uint32_t serial;        /**< Serial of the output it plays on */
+    uint64_t start;         /**< Frame it starts at */
+    uint64_t sound_end;     /**< Frame at which its sound ends */
+    uint64_t stop;          /**< Frame of the STOP sent, 0 while none was sent */
+    double end;             /**< Beat at which it stops: the end of its pass, of the placement
+                             *   or loop_end */
+    ecs_entity_t track;     /**< The track */
+    ecs_entity_t placement; /**< The placement */
+} box_audio_clip_voice_t;
+
 /** Counters of the sequencer, for the tests */
 typedef struct box_audio_sequencer_stats_t {
     int64_t notes;          /**< Notes scheduled */
@@ -494,6 +513,12 @@ typedef struct box_audio_sequencer_stats_t {
     int64_t visits;         /**< Placements visited by the windows */
     int64_t rebuilds;       /**< Rebuilds of the index of the placements */
     int64_t clips;          /**< Rebuilds of the sorted notes of a clip */
+    int64_t passes;         /**< Passes of audio clips started */
+    int64_t seeks;          /**< Passes among them that started in the middle, with a
+                             *   POSITION */
+    int64_t stops;          /**< STOP commands of audio clip voices written */
+    int64_t skipped;        /**< Passes of audio clips skipped: a sound that is not ready or a
+                             *   full batch */
 } box_audio_sequencer_stats_t;
 
 /** The clips, tracks and placements of the timeline, in sequencer.c */
@@ -504,6 +529,7 @@ typedef struct box_audio_sequencer_t {
     ecs_map_t clips;        /**< Clip entity to box_audio_clip_t* */
     uint32_t generation;    /**< Changes with every change of a NoteClip */
     ecs_vec_t sounding;     /**< box_audio_sounding_t */
+    ecs_vec_t voices;       /**< box_audio_clip_voice_t, the voices of audio clips */
     double expect;          /**< Beat the next segment starts at, NAN after a reset */
     box_audio_sequencer_stats_t stats; /**< Counters */
 } box_audio_sequencer_t;

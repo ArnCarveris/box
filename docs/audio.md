@@ -62,8 +62,9 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 | `AudioQuantize` | Enum of `box.audio.play_quantized`: `AudioQuantizeNone`, `AudioQuantizeBeat`, `AudioQuantizeBar`, see [Quantized plays](#quantized-plays) |
 | `Instrument` | A synth or a sampler that plays notes with a pitch, a velocity and a duration: `sound`, `root`, `velocity_curve`, `gate`, `release`, see [Instruments](#instruments) |
 | `NoteClip` | A reusable clip of notes: `length` and `notes`, a vector of `Note` (`start`, `duration`, `pitch`, `velocity`, `pan`), see [Clips and tracks](#clips-and-tracks) |
-| `Track` | A mixer channel of the timeline whose notes play on an `instrument`; it brings an `AudioBus`, see [Clips and tracks](#clips-and-tracks) |
-| `ClipPlacement` | On a child of a track, a clip on the timeline: `clip`, `start`, `duration`, `loop`, `offset`, `gain`, `transpose`, see [Clips and tracks](#clips-and-tracks) |
+| `AudioClip` | A reusable clip of recorded audio: `sound`, `offset` (seconds into it) and `length` (beats), see [Audio clips](#audio-clips) |
+| `Track` | A mixer channel of the timeline whose notes play on an `instrument` and whose audio clips play on its bus; it brings an `AudioBus`, see [Clips and tracks](#clips-and-tracks) |
+| `ClipPlacement` | On a child of a track, a note or audio clip on the timeline: `clip`, `start`, `duration`, `loop`, `offset`, `gain`, `transpose`, see [Clips and tracks](#clips-and-tracks) |
 
 The functions are `box.audio.play(sound, volume)`, `box.audio.play_at(sound, {x, y, z},
 volume)`, `box.audio.play_quantized(sound, volume, quantize)`,
@@ -277,8 +278,11 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   time signatures up to 64/64 that only accent the metronome, one loop, and a lookahead of 0.05
   to 0.5 seconds. On native the first beat after a start or a seek plays as soon as the batch
   arrives, a few ms late; the beats after it are exact. The metronome click is fixed.
-- **Tracks**: note clips only (audio clips come later); a placement plays its clip at one gain
-  and transpose, without automation, swing or quantize. A note is scheduled when its start falls
+- **Tracks**: a placement plays its clip at one gain and transpose, without automation, swing
+  or quantize. An audio clip does not stretch with the tempo: its transpose changes its pitch and
+  speed together, as a sampler does, and a tempo change moves where its passes start and stop, not
+  how fast its sound plays. Its passes cut with the 5 ms fade of a `STOP`, so the seam of a loop
+  is a short crossfade, not a splice; a pass that a stall skipped does not play. A note is scheduled when its start falls
   in the lookahead window, so a change applies to what is not scheduled yet, up to the lookahead
   later. A looping placement repeats at least every 1/64 beat. Only gated notes are tracked to
   their end: a note of an instrument without a gate plays as authored and a stop does not
@@ -1915,8 +1919,9 @@ frame, the same on every platform.
 | `Instrument` | A synth or a sampler that plays notes: `sound`, `root` (69, A4), `velocity_curve` (2), `gate` (true), `release` (0.05 s, a sampler's fade), see [Instruments](#instruments) |
 | `Note` | A note of a `NoteClip`: `start` (beats from the start of the clip), `duration` (beats), `pitch` (a MIDI note number), `velocity` (1, 0..1), `pan` (0, -1..1) |
 | `NoteClip` | A reusable clip: `length` (4 beats, the length of a pass of a loop), `notes` (a vector of `Note`, in any order), see [Clips and tracks](#clips-and-tracks) |
-| `Track` | A track: `instrument` (the entity with `Instrument`); brings an `AudioBus` with the `With` trait, so it has a volume, a pan, a mute, an output and sends |
-| `ClipPlacement` | On a child of a `Track`: `clip`, `start` (beats on the timeline), `duration` (0, the length of the clip minus the offset), `loop` (false), `offset` (beats into the clip), `gain` (1), `transpose` (0 semitones) |
+| `AudioClip` | A reusable clip of audio: `sound` (an entity with `AudioPcm` or `SoundFile`), `offset` (0 seconds into the sound), `length` (4 beats, the length of a pass), see [Audio clips](#audio-clips) |
+| `Track` | A track: `instrument` (the entity with `Instrument` of its note clips, none for a track of audio clips); brings an `AudioBus` with the `With` trait, so it has a volume, a pan, a mute, an output and sends |
+| `ClipPlacement` | On a child of a `Track`: `clip` (a `NoteClip` or an `AudioClip`), `start` (beats on the timeline), `duration` (0, the length of the clip minus the offset), `loop` (false), `offset` (beats into the clip), `gain` (1), `transpose` (0 semitones; the pitch ratio `2^(transpose / 12)` of an audio clip) |
 
 Constructors give the defaults in parentheses, so `AudioSource: {sound: click}` in a script plays
 at unity volume and pitch. From C, `ecs_set` writes every member; use `ecs_ensure` to keep the
@@ -2560,14 +2565,72 @@ visits the placements that overlap its window and the notes that sound. The `Seq
 transport without tracks.
 
 The `audio` command lists every track with its instrument, each placement with its clip (its
-notes and length), start, duration, loop, offset, gain and transpose, and the notes that sound,
-each with its pitch and the beat it ends at (`released` once its `RELEASE` went out). The tests
+notes and length, or `audio <sound> from <offset> s, <length> beats` for an audio clip), start,
+duration, loop, offset, gain and transpose, the notes that sound, each with its pitch and the
+beat it ends at (`released` once its `RELEASE` went out), and the voices of audio clips that
+play (`playing: audio until beat <end>`, `stopped` once its `STOP` went out). The tests
 are the `Sequencer` suite of `test/cpu/audio`: the start frames at two tempos, the release frames,
 the transpose, gain and pan, a loop with an offset, durations that cut a clip, two placements of a
 clip, a loop of the transport, a stop, a seek, a tempo change in a note, an edit of a clip, the
 delete of a track, a disabled placement, one shots through a stop, an instrument that cannot
 play, the cost, a script (`test/assets/audio/sequencer.flecs`), two runs that capture identical
-audio and the command.
+audio and the command; the `audio_` cases play audio clips, see [Audio clips](#audio-clips).
+
+#### Audio clips
+
+Tracks also play recorded audio in time with the notes: a vocal, a loop or a stem. An `AudioClip`
+is a part of a sound that a `ClipPlacement` names like a `NoteClip`:
+
+- `sound`: an entity with `AudioPcm` or `SoundFile`;
+- `offset`: seconds into the sound at which the clip starts;
+- `length`: beats (4), the length of a pass, and of a placement of duration 0.
+
+The offset is in seconds, not beats: a sound does not stretch with the tempo, so an offset in
+beats would land on another sample after a tempo change. Every other time of the timeline is in
+beats. One track may hold note and audio placements; its `instrument` only plays the note clips,
+so a track of audio clips needs none.
+
+```
+using box.audio
+
+vocal { SoundFile: {path: "etc/sounds/vocal.wav"} }
+
+// The chorus of the take: from 12.5 seconds in, 8 beats long
+chorus { AudioClip: {sound: vocal, offset: 12.5, length: 8} }
+
+vox {
+  Track: {}
+  AudioBus: {volume: 0.9}
+  first { ClipPlacement: {clip: chorus, start: 16} }
+  // The second half of the chorus twice, a whole tone up
+  again { ClipPlacement: {clip: chorus, start: 32, duration: 8, offset: 4, loop: true, transpose: 2} }
+}
+```
+
+An audio placement plays its sound on the bus of its track, at its `gain`, with the pitch ratio
+`2^(transpose / 12)`, which changes the speed too, as a sampler does. Each pass of the clip starts
+with a `PLAY` scheduled on its frame, at its gain at once (without the 5 ms ramp of a play), so it
+starts on its exact sample. A pass that starts in the middle, with the `offset` of the placement
+or after a seek, gets a `POSITION` scheduled on the same frame as its play: the offset of the clip
+plus the beats of the pass before its start, converted at the tempo and the pitch ratio.
+
+A pass ends at the earliest of the end of its pass (`length` beats), the end of the sound, the end
+of its placement and, while the transport loops, `loop_end`, with a `STOP` on that frame. The end
+beat is mapped to a frame once it falls in a window, as the release of a note is, so a tempo
+change moves it. A looping placement starts a new voice at the offset of the clip on every pass,
+on the frame where the voice before stops.
+
+A stop of the transport stops the voices at once and cancels the passes that have not started. A
+seek, a loop wrap and a start in the middle of a placement go on in the middle of the pass that
+covers the new beat, at its sample. Deleting or disabling the placement or the track stops its
+voices. A sound that is not ready when a pass starts (a sound file that still loads, an entity
+without samples) skips that pass and logs one warning per track until a pass plays again.
+
+The tests are the `audio_` cases of the `Sequencer` suite of `test/cpu/audio`, which play ramp
+sounds whose every frame tells its position: a start on its frame from the offset of the clip, a
+placement offset at two tempos, a loop without a gap, the end of a pass and of a sound, a seek, a
+loop of the transport, a transpose of 12, the gain, a track of notes and audio, a stop, a delete
+and a disable, a sound that is not ready, two runs that capture identical audio and the command.
 
 ### Before the gesture
 

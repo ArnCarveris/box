@@ -156,7 +156,22 @@
                     "cost",
                     "script",
                     "bit_identical",
-                    "command"
+                    "command",
+                    "audio_defaults",
+                    "audio_start",
+                    "audio_placement_offset",
+                    "audio_loop",
+                    "audio_pass_end",
+                    "audio_seek",
+                    "audio_transport_loop",
+                    "audio_transpose",
+                    "audio_gain",
+                    "audio_with_notes",
+                    "audio_stop",
+                    "audio_delete_disable",
+                    "audio_not_ready",
+                    "audio_bit_identical",
+                    "audio_command"
                 ]
             },
             {
