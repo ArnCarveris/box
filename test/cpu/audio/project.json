@@ -103,7 +103,24 @@
                 "testcases": [
                     "render",
                     "events_and_release",
-                    "synth_voices"
+                    "synth_voices",
+                    "scheduled"
+                ]
+            },
+            {
+                "id": "Schedule",
+                "setup": true,
+                "testcases": [
+                    "play_at_frame",
+                    "stop_at_frame",
+                    "set_at_frame",
+                    "past_when",
+                    "same_frame_order",
+                    "full_late",
+                    "stop_cancels",
+                    "bit_identical",
+                    "null_clock",
+                    "status_clock"
                 ]
             },
             {

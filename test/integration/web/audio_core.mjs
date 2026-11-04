@@ -49,28 +49,29 @@ const INSTRUMENT = `(() => {
 })();`;
 
 // Commands of src/audio/core/core.h, encoded as the core reads them: a header of a 16 bit
-// type and a 16 bit size, then 32 bit fields, little endian
+// type and a 16 bit size, then 32 bit fields, little endian. PLAY, STOP and the sets have the
+// two words of their when after the header, 0 here: they apply now
 const ENCODE = `(() => {
   const header = (view, at, type, size) => { view.setUint16(at, type, true);
     view.setUint16(at + 2, size, true); };
   window.boxCommands = {
     play: (voice, sound, bus, volume, pan, pitch, flags) => {
-      const v = new DataView(new ArrayBuffer(32));
-      header(v, 0, 1, 32);
-      v.setUint32(4, voice, true); v.setUint32(8, sound, true); v.setUint32(12, bus, true);
-      v.setFloat32(16, volume, true); v.setFloat32(20, pan, true);
-      v.setFloat32(24, pitch, true); v.setUint32(28, flags, true);
+      const v = new DataView(new ArrayBuffer(40));
+      header(v, 0, 1, 40);
+      v.setUint32(12, voice, true); v.setUint32(16, sound, true); v.setUint32(20, bus, true);
+      v.setFloat32(24, volume, true); v.setFloat32(28, pan, true);
+      v.setFloat32(32, pitch, true); v.setUint32(36, flags, true);
       return new Uint8Array(v.buffer);
     },
     stop: (voice) => {
-      const v = new DataView(new ArrayBuffer(8));
-      header(v, 0, 2, 8); v.setUint32(4, voice, true);
+      const v = new DataView(new ArrayBuffer(16));
+      header(v, 0, 2, 16); v.setUint32(12, voice, true);
       return new Uint8Array(v.buffer);
     },
     voiceSet: (voice, param, value) => {
-      const v = new DataView(new ArrayBuffer(16));
-      header(v, 0, 3, 16); v.setUint32(4, voice, true); v.setUint32(8, param, true);
-      v.setFloat32(12, value, true);
+      const v = new DataView(new ArrayBuffer(24));
+      header(v, 0, 3, 24); v.setUint32(12, voice, true); v.setUint32(16, param, true);
+      v.setFloat32(20, value, true);
       return new Uint8Array(v.buffer);
     },
     order: (routes) => {

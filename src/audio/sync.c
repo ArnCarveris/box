@@ -49,7 +49,7 @@ static void box_audio_bus_set(
     float value)
 {
     if (box_audio_reserve(state)) {
-        box_audio_write_bus_set(&state->writer, bus, param, value);
+        box_audio_write_bus_set(&state->writer, bus, param, value, 0);
     }
 }
 
@@ -67,7 +67,7 @@ static void box_audio_voice_set(
     float value)
 {
     if (box_audio_reserve(state)) {
-        box_audio_write_voice_set(&state->writer, voice, param, value);
+        box_audio_write_voice_set(&state->writer, voice, param, value, 0);
     }
 }
 
@@ -81,7 +81,7 @@ static void box_audio_stop(
     uint32_t voice)
 {
     if (box_audio_reserve(state)) {
-        box_audio_write_stop(&state->writer, voice);
+        box_audio_write_stop(&state->writer, voice, 0);
     }
 }
 
@@ -1010,7 +1010,7 @@ static void box_audio_source(
         ecs_map_insert(&state->voices, v->handle, e);
         if (box_audio_reserve(state)) {
             box_audio_write_play(&state->writer, v->handle, sound, bus, volume, pan,
-                src->pitch, src->loop ? BOX_AUDIO_PLAY_LOOP : 0);
+                src->pitch, src->loop ? BOX_AUDIO_PLAY_LOOP : 0, 0);
         }
 
         if (resume) {
@@ -1296,7 +1296,7 @@ static void box_audio_queued(
 
         if (box_audio_reserve(state)) {
             box_audio_write_play(&state->writer, shot->handle, sound, shot->bus,
-                shot->sent_volume, pan, 1.0f, 0);
+                shot->sent_volume, pan, 1.0f, 0, 0);
         }
     }
 
@@ -1393,6 +1393,7 @@ static void box_audio_status(
         status.voices = stats.voices;
         status.voices_stolen = state->voices_stolen;
         status.load = stats.load;
+        status.clock = (int64_t)t->clock(t);
     }
 
     status.buses = t ? state->order_count : 0;

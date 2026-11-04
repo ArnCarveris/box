@@ -415,6 +415,21 @@ typedef struct box_audio_synth_slot_t {
     bool used;          /**< Whether a sound has the slot */
 } box_audio_synth_slot_t;
 
+/** A command that takes effect on a frame: PLAY, STOP, VOICE_SET or BUS_SET */
+typedef union box_audio_timed_cmd_t {
+    box_audio_cmd_header_t header;  /**< The header, first in each of them */
+    box_audio_cmd_play_t play;      /**< BOX_AUDIO_CMD_PLAY */
+    box_audio_cmd_stop_t stop;      /**< BOX_AUDIO_CMD_STOP */
+    box_audio_cmd_set_t set;        /**< BOX_AUDIO_CMD_VOICE_SET or BOX_AUDIO_CMD_BUS_SET */
+} box_audio_timed_cmd_t;
+
+/** A command that waits in the schedule for its frame */
+typedef struct box_audio_scheduled_t {
+    uint64_t when;              /**< Frame of the core clock it applies at */
+    uint64_t order;             /**< Arrival count, which keeps commands of a frame in order */
+    box_audio_timed_cmd_t cmd;  /**< The command */
+} box_audio_scheduled_t;
+
 /** A bus: a volume, a pan, a mute, an output and one send, with a block of samples */
 typedef struct box_audio_bus_t {
     float volume;            /**< Volume */
@@ -466,6 +481,11 @@ struct box_audio_core_t {
     box_audio_synth_string_t synth_strings[BOX_AUDIO_SYNTH_STRINGS]; /**< Pluck strings */
     uint16_t string_free[BOX_AUDIO_SYNTH_STRINGS]; /**< Indexes of the free strings, a stack */
     int32_t string_free_count; /**< Free strings */
+    uint64_t clock;       /**< Frames rendered since the core was created */
+    int32_t schedule_count; /**< Commands in schedule */
+    uint64_t schedule_order; /**< Commands that entered the schedule so far */
+    box_audio_scheduled_t schedule[BOX_AUDIO_SCHEDULE_MAX]; /**< Commands that wait for their
+                           * frame, a binary heap ordered by frame, then by arrival */
 };
 
 /** Flush a sample: NaN, infinities, huge values and denormals become 0.

@@ -119,6 +119,12 @@ struct box_audio_transport_t {
     /** Report the voices and the load of the core */
     void (*stats)(box_audio_transport_t *t, box_audio_transport_stats_t *stats);
 
+    /** Report the clock of the core: the frame it renders now, as far as the main thread can
+     * tell, which a PLAY, STOP or set with a when is scheduled against. It stops while the
+     * output does not run and starts at 0 with a new core.
+     * @return Frames of the core clock */
+    uint64_t (*clock)(box_audio_transport_t *t);
+
     /** Start to record the next frames the core renders, into a buffer the transport owns.
      * @return Whether the capture started; false while another one records */
     bool (*capture)(box_audio_transport_t *t, int32_t frames);

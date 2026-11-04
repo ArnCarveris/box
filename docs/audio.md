@@ -51,7 +51,7 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 | `AudioStream` | Music: one Ogg Vorbis file that streams, see [Music](#music) |
 | `AudioStreamStatus` | Read only: the state, position, buffer, underruns and decode time of a stream |
 | `AudioSettings` | Singleton: the master volume and mute |
-| `AudioStatus` | Singleton, read only: the state of the output, its rate, the voices, steals and load |
+| `AudioStatus` | Singleton, read only: the state of the output, its rate, the voices, steals, load and the clock of its core |
 
 The functions are `box.audio.play(sound, volume)`, `box.audio.play_at(sound, {x, y, z},
 volume)` and `box.audio.capture(seconds, path)`, the same as `box_audio_play`,
@@ -240,13 +240,16 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   widgets, as the dust merchant does.
 - **Web**: no shared memory, decoding on the main thread, and no load measurement in the
   worklet (it reports 0).
+- **Scheduling**: `BOX_AUDIO_SCHEDULE_MAX` (4096) commands wait in the core for their frame at
+  once; one more applies at once and reports `BOX_AUDIO_EVENT_LATE`. Only `PLAY`, `STOP`,
+  `VOICE_SET` and `BUS_SET` have a `when`.
 
 ## Captures and the audio command
 
 The audio a box app plays can be inspected without listening:
 
-- `audio` prints the state, the rate, the voices, the steals, the load and every bus with its
-  routing and reverb; `audio volume <v>` and `audio mute` set the master.
+- `audio` prints the state, the rate, the voices, the steals, the load, the clock of the core
+  (frames and seconds) and every bus with its routing and reverb; `audio volume <v>` and `audio mute` set the master.
 - `audio capture <seconds>` records the master to a 16 bit stereo WAV resource of the shell
   session, `box.audio.capture(seconds, path)` to a file from a script, at load if it should
   start with the scene. In the browser `audio capture` writes `/tmp/audio_capture_<n>.wav` in
@@ -293,6 +296,7 @@ bool box_audio_core_sound(box_audio_core_t *core, uint32_t id, const float *data
 void box_audio_core_apply(box_audio_core_t *core, const void *commands, int32_t size);
 void box_audio_core_render(box_audio_core_t *core, float *left, float *right, int32_t frames);
 int32_t box_audio_core_read_events(box_audio_core_t *core, box_audio_event_t *events, int32_t max);
+uint64_t box_audio_core_clock(const box_audio_core_t *core);
 ```
 
 `box_audio_core_new` is the only allocation, through the `alloc` and `free` hooks of the desc
@@ -306,15 +310,16 @@ fields in the byte order of the target (little endian everywhere box runs): the 
 `box_audio_cmd_*_t` of `core.h`. The `box_audio_write_*` functions write them into a buffer.
 A command of an unknown type is skipped by its size and a too short one is ignored, both with
 `BOX_AUDIO_EVENT_IGNORED`; a size that runs past the batch ends it. Commands take effect at the
-start of the next render block. They are:
+start of the next render block, but those with a `when` in the future (see
+[The clock and the schedule](#the-clock-and-the-schedule)). They are:
 
 | Command | Fields |
 |---------|--------|
-| `PLAY` | voice handle, sound, bus, volume, pan, pitch, flags (`BOX_AUDIO_PLAY_LOOP`) |
-| `LEGATO` | new voice handle, handle of the voice it follows, then the fields of `PLAY`: a note of a mono voice, see [Synth](#synth) |
-| `STOP` | voice handle: the voice fades out over the ramp and ends |
-| `VOICE_SET` | voice handle, `VOLUME`, `PAN`, `PITCH`, `BUS` or `POSITION`, value |
-| `BUS_SET` | bus, `VOLUME`, `PAN`, `MUTE` or `SEND` (the send level), value |
+| `PLAY` | when, voice handle, sound, bus, volume, pan, pitch, flags (`BOX_AUDIO_PLAY_LOOP`): the first sample of the voice is at `when` |
+| `LEGATO` | new voice handle, handle of the voice it follows, then the fields of `PLAY` but `when`: a note of a mono voice, see [Synth](#synth) |
+| `STOP` | when, voice handle: the voice fades out over the ramp from `when` and ends; one that applies now also drops the scheduled commands of its handle |
+| `VOICE_SET` | when, voice handle, `VOLUME`, `PAN`, `PITCH`, `BUS` or `POSITION`, value: the ramp starts at `when` |
+| `BUS_SET` | when, bus, `VOLUME`, `PAN`, `MUTE` or `SEND` (the send level), value: the ramp starts at `when` |
 | `ORDER` | count, then per bus in processing order: bus, output, send |
 | `SOUND_RELEASE` | sound: freed once no voice plays it |
 | `STREAM` | voice handle, stream, bus, volume, channels, sample rate: opens a stream and starts a voice that reads it |
@@ -337,7 +342,8 @@ when no voice uses the sound any more, so the side that owns it frees it, never 
 
 **Events** are `{ type, id, value }`: `VOICE_END` (id the handle, for an end, a stop or a
 steal), `VOICE_STOLEN` (id the handle, value the steals so far), `SOUND_FREE`,
-`ORDER_REFUSED`, `IGNORED` (id the command type) and `LOST` (value the events lost). The core
+`ORDER_REFUSED`, `IGNORED` (id the command type), `LOST` (value the events lost) and `LATE`
+(id the type of a command that found the schedule full and applied at once). The core
 holds `BOX_AUDIO_EVENT_MAX` (256) until `read_events`. The last slot is kept for `LOST`: when
 the other 255 are full a newer event is dropped and counted in a single `LOST` event in that
 slot, whose value grows with each further loss until it is read; reading it resets the count,
@@ -403,6 +409,36 @@ reaches the output or stays in a bus, and a silent tail costs no more than sound
 **Determinism.** The ramps and the limiter advance per frame and the sums run in a fixed order,
 so the same commands at the same block boundaries give bit identical output on the same build,
 whether the frames are rendered one at a time or in one large block.
+
+### The clock and the schedule
+
+The core counts the frames it rendered since it was created in 64 bits:
+`box_audio_core_clock(core)` returns the count, 0 for a new core. `PLAY`, `STOP`, `VOICE_SET`
+and `BUS_SET` carry a `when` right after their header, the frame of that clock at which they
+take effect, as two 32 bit words `when_lo` and `when_hi`, so that every field stays 32 bits.
+The writers `box_audio_write_play`, `_stop`, `_voice_set` and `_bus_set` take it as their last
+argument, a `uint64_t`.
+
+- A `when` of 0, or of a frame that was already rendered, applies at the start of the next
+  block, as a command without a `when` would.
+- A later `when` waits in the schedule of the core, a fixed heap of `BOX_AUDIO_SCHEDULE_MAX`
+  (4096) commands ordered by frame; commands for the same frame keep the order in which they
+  arrived. The render splits its block at the frame of the next due command, so the command
+  takes effect on exactly its frame: the first sample of a play is at `when`, the ramp of a set
+  starts at `when` and the fade of a stop starts at `when`. The output stays bit identical
+  whether the core renders one frame at a time, blocks of 128 or one large block. The schedule
+  does not allocate, and an empty one costs a test of its count per block.
+- A command that finds the schedule full applies at once and the core reports
+  `BOX_AUDIO_EVENT_LATE` (7), the command type as its id: a late command is better than a lost
+  one, since a lost release would leave a note hanging.
+- A `STOP` that applies now (a `when` of 0 or in the past) also drops every scheduled `PLAY`,
+  `STOP` and `VOICE_SET` of its voice handle, so a scheduled play that has not started never
+  starts. A `STOP` with a future `when` only stops. This is how a sender cancels what it
+  scheduled ahead, on a transport stop or a seek.
+
+`box_audio_core_scheduled(core)` returns the commands that wait. On the main thread, the
+`clock` function of a transport tells the frame of the core that renders now, see
+[Transports](#transports).
 
 The tests are `test/cpu/audio`, which render offline; `bench/audio` mixes 64 voices through 8
 buses and reports the time per frame.
@@ -1186,6 +1222,7 @@ int32_t read_events(t, events, max);               // the events of the core, ol
 box_audio_state_t state(t);                        // what the output does
 void update(t, delta);                             // once per frame
 void stats(t, stats);                              // voices and load of the core
+uint64_t clock(t);                                 // the frame of the core that renders now
 bool capture(t, frames);                           // record the next frames the core renders
 float* capture_take(t, &frames);                   // a finished capture, NULL while it records
 ```
@@ -1210,6 +1247,23 @@ over the time it renders, smoothed; the native audio thread and the null transpo
 the worklet does not (it has no clock finer than a millisecond) and reports 0. Every transport frees the frames of
 a sound itself after `SOUND_FREE`; the main thread keeps the last 4096 events until
 `read_events`.
+
+**The clock** of a transport is the frame of the core that is being rendered now, as far as the
+main thread can tell, the frame a command with a `when` is scheduled against:
+
+- null: the frames rendered so far, `box_audio_core_clock` of its core;
+- native: a 64 bit count that the audio thread publishes atomically after each callback (and
+  the main thread while the device is lost);
+- web: every 16 quanta the worklet posts the clock of its core with the `currentFrame` of its
+  global scope after the quantum, and the page extrapolates it from `AudioContext.currentTime`,
+  at most 32 quanta ahead of the report and never backward, so that it moves between messages.
+  `Module.boxAudio.clock()` returns it, and the `stats` of the worklet include `clock`.
+
+The clock stops while the output does not run: waiting for a gesture, suspended or off. A new
+output (a new serial) has a new core, whose clock starts at 0; on the web the core of the
+worklet lives as long as the page, so a second world of the same page starts at its clock.
+`AudioStatus.clock` holds it once per frame, and `box_audio_module_clock` (`module.h`) reads it
+for the parts of `box.audio` that schedule ahead.
 
 **Where the output opens.** A world that imports box opens nothing: thousands of tests import
 it and must not touch audio hardware. `box_app_run` opens the output of its world
@@ -1441,12 +1495,17 @@ developer console, a sound and a play command make a 440 Hz tone:
 const a = Module.boxAudio, rate = a.ctx.sampleRate, s = new Float32Array(rate);
 for (let i = 0; i < rate; i++) s[i] = 0.25 * Math.sin(2 * Math.PI * 440 * i / rate);
 await a.sound(1, s, 1, rate);
-const v = new DataView(new ArrayBuffer(32));
-v.setUint16(0, 1, true); v.setUint16(2, 32, true); v.setUint32(4, 1, true);
-v.setUint32(8, 1, true); v.setFloat32(16, 1, true); v.setFloat32(24, 1, true);
-v.setUint32(28, 1, true);
+const v = new DataView(new ArrayBuffer(40));
+v.setUint16(0, 1, true); v.setUint16(2, 40, true); v.setUint32(12, 1, true);
+v.setUint32(16, 1, true); v.setFloat32(24, 1, true); v.setFloat32(32, 1, true);
+v.setUint32(36, 1, true);
 a.commands(v.buffer);
 ```
+
+The bytes are a `PLAY`: the header at 0, `when_lo` and `when_hi` at 4 and 8 (0, so it plays
+now), the voice at 12, the sound at 16, the bus at 20, the volume at 24, the pan at 28, the
+pitch at 32 and the flags at 36 (looping). `a.clock()` is the frame of the core that renders
+now; a `when` of `a.clock() + rate` in the two words starts the tone a second later.
 
 The automated check of Chrome is `test/integration/web/audio_core.mjs`, and of Safari
 `test/integration/web/audio_core_safari.mjs`, which drives real Safari through `safaridriver`
@@ -1491,7 +1550,7 @@ frame, the same on every platform.
 | `AudioSpatial` | Places a source in the world: `min_distance` (1), `max_distance` (50), `rolloff` (1), see [Spatial audio](#spatial-audio) |
 | `AudioListener` | Tag of the entity whose `WorldTransform` hears the spatial sources |
 | `AudioSettings` | Singleton: `master_volume` (1) and `mute` |
-| `AudioStatus` | Singleton, read only: `state`, `sample_rate`, `voices`, `voices_stolen`, `load`, `buses` |
+| `AudioStatus` | Singleton, read only: `state`, `sample_rate`, `voices`, `voices_stolen`, `load`, `buses`, `clock` (the frame of the core that renders now) |
 
 Constructors give the defaults in parentheses, so `AudioSource: {sound: click}` in a script plays
 at unity volume and pitch. From C, `ecs_set` writes every member; use `ecs_ensure` to keep the

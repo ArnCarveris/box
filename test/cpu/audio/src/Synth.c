@@ -2169,7 +2169,7 @@ void Synth_legato_after_release_loop(void) {
     test_int(box_audio_core_voice_count(core), 1);
 
     box_audio_writer_init(&w, bytes, sizeof(bytes));
-    test_assert(box_audio_write_stop(&w, 8));
+    test_assert(box_audio_write_stop(&w, 8, 0));
     box_audio_core_apply(core, w.data, w.size);
     audio_render(core, 0, AUDIO_FRAMES);
     test_int(box_audio_core_voice_count(core), 0);

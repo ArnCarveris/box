@@ -88,20 +88,20 @@ const PLAY = `(async () => {
   const samples = new Float32Array(rate);
   for (let i = 0; i < rate; i++) samples[i] = ${LEVEL} * Math.sin(2 * Math.PI * ${TONE} * i / rate);
   const ok = await audio.sound(1, samples, 1, rate);
-  const v = new DataView(new ArrayBuffer(32));
-  v.setUint16(0, 1, true); v.setUint16(2, 32, true);
-  v.setUint32(4, 1, true); v.setUint32(8, 1, true); v.setUint32(12, 0, true);
-  v.setFloat32(16, 1, true); v.setFloat32(20, 0, true); v.setFloat32(24, 1, true);
-  v.setUint32(28, 1, true);
+  const v = new DataView(new ArrayBuffer(40));
+  v.setUint16(0, 1, true); v.setUint16(2, 40, true);
+  v.setUint32(12, 1, true); v.setUint32(16, 1, true); v.setUint32(20, 0, true);
+  v.setFloat32(24, 1, true); v.setFloat32(28, 0, true); v.setFloat32(32, 1, true);
+  v.setUint32(36, 1, true);
   audio.commands(v.buffer);
   return ok;
 })()`;
 
 // Sets the pitch ratio of the voice (BOX_AUDIO_CMD_VOICE_SET, BOX_AUDIO_PARAM_PITCH)
 const PITCH_COMMAND = `(() => {
-  const v = new DataView(new ArrayBuffer(16));
-  v.setUint16(0, 3, true); v.setUint16(2, 16, true);
-  v.setUint32(4, 1, true); v.setUint32(8, 2, true); v.setFloat32(12, ${PITCH}, true);
+  const v = new DataView(new ArrayBuffer(24));
+  v.setUint16(0, 3, true); v.setUint16(2, 24, true);
+  v.setUint32(12, 1, true); v.setUint32(16, 2, true); v.setFloat32(20, ${PITCH}, true);
   Module.boxAudio.commands(v.buffer);
   return true;
 })()`;
