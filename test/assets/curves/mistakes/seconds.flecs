@@ -1,8 +1,10 @@
 // Times in seconds on a timeline, whose curves run from 0 to 1 of the period
 using box.curve
 using box.particle
+using box.transform
 
 seconds {
+  Position: {0, 0, 0}
   ParticleEmitter: {rate: 10}
   ParticleTimeline: {period: 2, rate: {keys: [{0, 0}, {2, 1}]}}
 }

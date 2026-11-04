@@ -4,13 +4,15 @@
  * without Position (or Rotation or Scale) has no WorldTransform and is not extracted, and is
  * drawn once it gets a Position.
  *
- * Every case renders with the null backend and reads the batches and the lights of the extract.
+ * Every case renders with the null backend and reads the batches and the lights of the extract,
+ * or the spatial index.
  */
 
 #include <box.h>
 #include <bake_test.h>
 #include "render.h"
 #include "draw.h"
+#include "spatial.h"
 
 /** Create a world that renders headless with a null backend and has a view.
  *
@@ -153,6 +155,73 @@ void DrawPosition_text_without_position(void) {
 
     ecs_set(world, e, Position, {0, 1, 0});
     test_int(frame_instances(world), 7);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void DrawPosition_layout_children_drawn(void) {
+    // ui/layout
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t row = ecs_new(world);
+    ecs_set(world, row, Position, {0, 0, 0});
+    ecs_set(world, row, Layout, {.direction = DirectionRow, .spacing = 2});
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, row);
+    ecs_set(world, a, Rect, {10, 10});
+    ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, row);
+    ecs_set(world, b, Rect, {10, 10});
+    test_int(frame_instances(world), 2);
+    test_bool(ecs_has(world, a, WorldTransform), true);
+    test_bool(ecs_has(world, b, WorldTransform), true);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void DrawPosition_layout_direction_none_child_drawn(void) {
+    // ui/layout
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t stack = ecs_new(world);
+    ecs_set(world, stack, Position, {5, 0, 0});
+    ecs_set(world, stack, Layout, {.direction = DirectionNone});
+    ecs_set(world, stack, Rect, {40, 40});
+    ecs_entity_t loose = ecs_new_w_pair(world, EcsChildOf, stack);
+    ecs_set(world, loose, Rect, {10, 10});
+    ecs_entity_t placed = ecs_new_w_pair(world, EcsChildOf, stack);
+    ecs_set(world, placed, Position, {3, 4, 0});
+    ecs_set(world, placed, Rect, {10, 10});
+    test_int(frame_instances(world), 3);
+
+    const Position *p = ecs_get(world, loose, Position);
+    test_assert(p != NULL);
+    test_flt(p->x, 0);
+    test_flt(p->y, 0);
+    p = ecs_get(world, placed, Position);
+    test_assert(p != NULL);
+    test_flt(p->x, 3);
+    test_flt(p->y, 4);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void DrawPosition_shape_without_position_not_indexed(void) {
+    // spatial
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Box, {1, 1, 1});
+    vec3 min, max;
+    frame_instances(world);
+    test_bool(box_spatial_bounds(world, e, NULL, min, max), false);
+
+    ecs_set(world, e, Position, {4, 0, 0});
+    frame_instances(world);
+    test_bool(box_spatial_bounds(world, e, NULL, min, max), true);
+    test_flt(min[0], 3.5f);
+    test_flt(max[0], 4.5f);
 
     ecs_fini(world);
     box_render_null_free(null);

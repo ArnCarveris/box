@@ -56,6 +56,7 @@ static ecs_entity_t emitter_new(
 {
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, ParticleEmitter);
+    ecs_set(world, e, Position, {0, 0, 0});
     ParticleEmitter *p = ecs_get_mut(world, e, ParticleEmitter);
     p->rate = 20;
     p->lifetime = (ParticleRange){1, 1};
@@ -391,6 +392,7 @@ void Light_spot_light(void) {
     ecs_world_t *world = world_new(&null);
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, ParticleEmitter);
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, SpotLight, { .intensity = 1, .range = 10, .outer_angle = 30 });
     ecs_set(world, e, ParticleLight, { .intensity = 6, .fade = 0.2f });
 

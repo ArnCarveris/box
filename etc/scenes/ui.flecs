@@ -131,6 +131,7 @@ screen_ui {
   }
 
   dashboard {
+    Position: {0, 0, 0}
     Layout: {direction: Column, spacing: 10, padding: {16, 16, 20, 20}}
     LayoutItem: {width: {mode: Fixed, value: 512}, height: {mode: Fixed, value: 160}}
     Rect: {1, 1}

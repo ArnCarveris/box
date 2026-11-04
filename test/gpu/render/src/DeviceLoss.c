@@ -63,6 +63,7 @@ void DeviceLoss_pipeline_error_keeps_previous(void) {
         .color = {0, 0, 0, 255}}});
     ecs_entity_t cube = ecs_new(world);
     ecs_set(world, cube, Box, {1, 1, 1});
+    ecs_set(world, cube, Position, {0, 0, 0});
     ecs_set(world, cube, Rgb, {255, 0, 0});
     ecs_entity_t s = ecs_new(world);
     ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "pipeline.png",

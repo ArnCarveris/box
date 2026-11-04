@@ -535,6 +535,7 @@ void AtmosphereIbl_reflection_capture_sees_environment(void) {
     ecs_set(world, dark, DirectionalLight, {.intensity = 0});
     ecs_entity_t marker = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, marker, Box, {0.2f, 0.2f, 0.2f});
+    ecs_set(world, marker, Position, {0, 0, 0});
     ecs_add(world, marker, NoBake);
     ecs_set(world, scene, ReflectionBake, {.resolution = 16, .budget_ms = 1,
         .scene_probe = true, .scene_probe_height = 2, .environment = sky});

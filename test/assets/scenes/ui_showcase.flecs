@@ -512,6 +512,7 @@ template Showcase {
     }
 
     dashboard {
+      Position: {0, 0, 0}
       Layout: {direction: Column, spacing: 24, padding: {18, 18, 20, 20}, v: Middle}
       LayoutItem: {width: {mode: Fixed, value: 512}, height: {mode: Fixed, value: 160}}
       Rect: {1, 1}

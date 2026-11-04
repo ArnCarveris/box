@@ -501,6 +501,7 @@ void Frames_fly_moves_camera(void) {
         .phase = EcsOnUpdate, .run = fake_work });
     ecs_entity_t box = ecs_new(world);
     ecs_set(world, box, Box, { .x = 1, .y = 1, .z = 1 });
+    ecs_set(world, box, Position, {0, 0, 0});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, { 0, 2, 50 });
     ecs_set(world, camera, Rotation, { 0, 0, 0 });

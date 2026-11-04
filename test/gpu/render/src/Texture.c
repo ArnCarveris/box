@@ -650,6 +650,7 @@ void Texture_gpu_emissive_layer(void) {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t quad = ecs_new(world);
     ecs_set(world, quad, Quad, {12, 6});
+    ecs_set(world, quad, Position, {0, 0, 0});
     ecs_set(world, quad, Rgb, {0, 0, 0});
     ecs_set(world, quad, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, quad, Emissive, {.strength = 1, .color = {255, 255, 255}});
@@ -785,6 +786,7 @@ void Texture_gpu_wrap_repeat(void) {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t quad = ecs_new(world);
     ecs_set(world, quad, Quad, {12, 6});
+    ecs_set(world, quad, Position, {0, 0, 0});
     ecs_set(world, quad, Rgb, {0, 0, 0});
     ecs_set(world, quad, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, quad, Emissive, {.strength = 1, .color = {255, 255, 255}});
@@ -845,6 +847,7 @@ void Texture_gpu_wrap_clamp(void) {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t quad = ecs_new(world);
     ecs_set(world, quad, Quad, {12, 6});
+    ecs_set(world, quad, Position, {0, 0, 0});
     ecs_set(world, quad, Rgb, {0, 0, 0});
     ecs_set(world, quad, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, quad, Emissive, {.strength = 1, .color = {255, 255, 255}});
@@ -905,6 +908,7 @@ void Texture_gpu_wrap_mirror(void) {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t quad = ecs_new(world);
     ecs_set(world, quad, Quad, {12, 6});
+    ecs_set(world, quad, Position, {0, 0, 0});
     ecs_set(world, quad, Rgb, {0, 0, 0});
     ecs_set(world, quad, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, quad, Emissive, {.strength = 1, .color = {255, 255, 255}});
@@ -1203,6 +1207,7 @@ void Texture_gpu_reload_changes_image(void) {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t quad = ecs_new(world);
     ecs_set(world, quad, Quad, {12, 6});
+    ecs_set(world, quad, Position, {0, 0, 0});
     ecs_set(world, quad, Rgb, {0, 0, 0});
     ecs_set(world, quad, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, quad, Emissive, {.strength = 1, .color = {255, 255, 255}});
@@ -1273,6 +1278,7 @@ void Texture_gpu_deleted_texture_unbinds(void) {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t quad = ecs_new(world);
     ecs_set(world, quad, Quad, {12, 6});
+    ecs_set(world, quad, Position, {0, 0, 0});
     ecs_set(world, quad, Rgb, {0, 0, 0});
     ecs_set(world, quad, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, quad, Emissive, {.strength = 1, .color = {255, 255, 255}});
@@ -1347,6 +1353,7 @@ void Texture_gpu_inherited_from_prefab(void) {
     ecs_set(world, prefab, PbrTextures, {.emissive = red_tex});
     ecs_entity_t quad = ecs_new_w_pair(world, EcsIsA, prefab);
     ecs_set(world, quad, Quad, {12, 6});
+    ecs_set(world, quad, Position, {0, 0, 0});
     ecs_set(world, quad, Rgb, {0, 0, 0});
     ecs_set(world, quad, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, quad, Emissive, {.strength = 1, .color = {255, 255, 255}});
@@ -1407,6 +1414,7 @@ void Texture_gpu_svg_colors(void) {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t quad = ecs_new(world);
     ecs_set(world, quad, Quad, {12, 6});
+    ecs_set(world, quad, Position, {0, 0, 0});
     ecs_set(world, quad, Rgb, {0, 0, 0});
     ecs_set(world, quad, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, quad, Emissive, {.strength = 1, .color = {255, 255, 255}});

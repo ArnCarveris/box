@@ -323,6 +323,7 @@ void LightBake_projected_anchor_not_baked(void) {
 
     ecs_entity_t plain = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, plain, Box, {0.5f, 0.5f, 0.5f});
+    ecs_set(world, plain, Position, {0, 0, 0});
     ecs_progress(world, 0);
     status = ecs_get(world, scene, LightBakeStatus);
     test_bool(status->converged, false);

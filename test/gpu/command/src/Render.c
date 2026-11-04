@@ -31,6 +31,7 @@ void Render_capture_active_camera(void) {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t box = ecs_new(world);
     ecs_set(world, box, Box, {2, 2, 2});
+    ecs_set(world, box, Position, {0, 0, 0});
     ecs_set(world, box, Rgb, {0, 0, 0});
     ecs_set(world, box, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, box, Emissive, {.strength = 1, .color = {255, 0, 0}});
@@ -77,6 +78,7 @@ void Render_capture_named_camera(void) {
         .camera = main_camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t blue = ecs_new(world);
     ecs_set(world, blue, Box, {2, 2, 2});
+    ecs_set(world, blue, Position, {0, 0, 0});
     ecs_set(world, blue, Rgb, {0, 0, 0});
     ecs_set(world, blue, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, blue, Emissive, {.strength = 1, .color = {0, 0, 255}});
@@ -84,6 +86,7 @@ void Render_capture_named_camera(void) {
     ecs_set(world, scene, Scene, {0});
     ecs_entity_t red = ecs_entity(world, { .name = "level.crate" });
     ecs_set(world, red, Box, {2, 2, 2});
+    ecs_set(world, red, Position, {0, 0, 0});
     ecs_set(world, red, Rgb, {0, 0, 0});
     ecs_set(world, red, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, red, Emissive, {.strength = 1, .color = {255, 0, 0}});
@@ -587,6 +590,7 @@ void Render_render_entity_copy(void) {
     ecs_set(world, wheel, Sphere, {.radius = 0.3f});
     ecs_entity_t other = ecs_new(world);
     ecs_set(world, other, Box, {1, 1, 1});
+    ecs_set(world, other, Position, {0, 0, 0});
     ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_progress(world, 0);
 

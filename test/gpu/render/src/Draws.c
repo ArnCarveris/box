@@ -89,6 +89,7 @@ void Draws_replaced_shape_renders_new_mesh(void) {
         .resolution_scale = 1});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Box, {2, 2, 2});
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, Rgb, {0, 0, 0});
     ecs_set(world, e, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, e, Emissive, {.strength = 1, .color = {255, 0, 0}});
@@ -106,6 +107,7 @@ void Draws_replaced_shape_renders_new_mesh(void) {
     ecs_progress(world, 0);
     ecs_entity_t s = ecs_new(world);
     ecs_set(world, s, Sphere, {.segments = 24, .smooth = true, .radius = 1});
+    ecs_set(world, s, Position, {0, 0, 0});
     ecs_set(world, s, Rgb, {0, 0, 0});
     ecs_set(world, s, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, s, Emissive, {.strength = 1, .color = {255, 0, 0}});

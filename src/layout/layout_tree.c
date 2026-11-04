@@ -712,9 +712,14 @@ static void box_layout_place(
     if (main == -1) {
         for (i = 0; i < n->count; i ++) {
             box_layout_node_t *c = &nodes[n->first + i];
-            c->placed = c->has_item;
-            c->at[0] = box_layout_align(lo[0], hi[0], c->size[0], c->item.h, 0) + c->item.x;
-            c->at[1] = box_layout_align(lo[1], hi[1], c->size[1], c->item.v, 1) + c->item.y;
+            c->placed = c->has_item || !c->has_pos;
+            if (c->has_item) {
+                c->at[0] = box_layout_align(lo[0], hi[0], c->size[0], c->item.h, 0) + c->item.x;
+                c->at[1] = box_layout_align(lo[1], hi[1], c->size[1], c->item.v, 1) + c->item.y;
+            } else {
+                c->at[0] = 0;
+                c->at[1] = 0;
+            }
         }
 
         goto done;

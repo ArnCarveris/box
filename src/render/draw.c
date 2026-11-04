@@ -713,12 +713,12 @@ static void box_draws_update_shape(
 {
     box_draw_key_t key;
     box_draw_batch_t *b;
-    const WorldTransform *transform;
     box_draw_material_t material;
     box_render_transform_t was_transform;
     box_render_surface_t was_surface;
     const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
-    bool drawn = shape && shape->mesh && !ecs_has_id(world, e, EcsPrefab) &&
+    const WorldTransform *transform = ecs_get(world, e, WorldTransform);
+    bool drawn = shape && shape->mesh && transform && !ecs_has_id(world, e, EcsPrefab) &&
         !ecs_has_id(world, e, EcsDisabled);
     bool kept = false, recorded = false, surfaced = false;
     s->dirty = false;
@@ -794,7 +794,6 @@ write:
 
     if (kinds & BOX_DRAW_TRANSFORM) {
         box_render_transform_t *out = box_draws_slot_transform(b, s->slot);
-        transform = ecs_get(world, e, WorldTransform);
         box_draws_transform(out, transform, shape);
     }
 
@@ -1060,6 +1059,9 @@ static void box_draws_observers(
     box_draws_observer(world, d, "DrawsOnWorldTransform", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(WorldTransform) }},
         .events = { EcsOnSet } }, BoxDrawsOnStaticWorld);
+    box_draws_observer(world, d, "DrawsOnWorldTransformAdd", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(WorldTransform) }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
     box_draws_observer(world, d, "DrawsOnDynamicMaterial", (ecs_observer_desc_t){
         .query.terms = {{ .id = DynamicMaterial }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnMove);
@@ -1141,7 +1143,7 @@ static void box_draws_queries(
         .terms = {
             { .id = ecs_id(ShapeMesh), .inout = EcsIn },
             { .id = ecs_id(DrawSlot), .inout = EcsIn },
-            { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional },
+            { .id = ecs_id(WorldTransform), .inout = EcsIn },
             { .id = ecs_id(Rgb), .inout = EcsIn, .oper = EcsOptional },
             { .id = ecs_id(Opacity), .inout = EcsIn, .oper = EcsOptional },
             { .id = ecs_id(PbrMaterial), .inout = EcsIn, .oper = EcsOptional },
@@ -1167,7 +1169,7 @@ static void box_draws_queries(
         .terms = {
             { .id = ecs_id(ShapeMesh), .inout = EcsIn },
             { .id = ecs_id(DrawSlot), .inout = EcsIn },
-            { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional },
+            { .id = ecs_id(WorldTransform), .inout = EcsIn },
             { .id = ecs_id(Rgb), .inout = EcsIn, .oper = EcsOptional },
             { .id = ecs_id(Opacity), .inout = EcsIn, .oper = EcsOptional },
             { .id = ecs_id(PbrMaterial), .inout = EcsIn, .oper = EcsOptional },

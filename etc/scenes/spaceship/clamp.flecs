@@ -51,7 +51,7 @@ template DockClamp {
   hose_path { Path3D: {start: {0, -5, reach - 3}, segments: [{kind: CubicBezier, control1: {0, -14, reach - 10}, control2: {0, -15, 14}, end: {0, -7, 7}}]} }
   hose_profile { Path2D: {start: {0.3, 0}, segments: [{kind: Line, end: {0.21, 0.21}}, {kind: Line, end: {0, 0.3}}, {kind: Line, end: {-0.21, 0.21}}, {kind: Line, end: {-0.3, 0}}, {kind: Line, end: {-0.21, -0.21}}, {kind: Line, end: {0, -0.3}}, {kind: Line, end: {0.21, -0.21}}], closed: true} }
   hose_section { Profile2D: {outer: hose_profile} }
-  hose : RecessMetal { Sweep: {path: hose_path, profile: hose_section, scale: {1, 1}, taper: 1, cap_start: true, cap_end: true, segments: 8, rings: 32} }
+  hose : RecessMetal { Position: {0, 0, 0}; Sweep: {path: hose_path, profile: hose_section, scale: {1, 1}, taper: 1, cap_start: true, cap_end: true, segments: 8, rings: 32} }
   shoe_lugs { Position: {-2.8, 3.85, 0}; Array: {axis: X, count: 8, spacing: 0.8}; tooth : DarkArmor { Position: {}; Box: {0.45, 0.5, 2.4} } }
 
   back_panel : DockYellow { Position: {0, -5, reach + 2.1}; Box: {10.5, 8, 0.35} }

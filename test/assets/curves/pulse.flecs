@@ -2,8 +2,10 @@
 // and back, and the particles of the peak leave twice as fast as those of the quiet part.
 using box.curve
 using box.particle
+using box.transform
 
 pulse {
+  Position: {0, 0, 0}
   ParticleEmitter: {
     max: 1000, rate: 200, spread: 180, speed: {1, 1}, lifetime: {1, 1},
     size: {0.05, 0.05}, color: {120, 220, 255}, seed: 6

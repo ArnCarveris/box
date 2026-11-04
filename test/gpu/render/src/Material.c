@@ -40,6 +40,7 @@ void Material_default_material(void) {
     ecs_set(world, wall, Emissive, {.strength = 1, .color = {255, 0, 0}});
     ecs_entity_t plain = ecs_new(world);
     ecs_set(world, plain, Box, {2, 2, 2});
+    ecs_set(world, plain, Position, {0, 0, 0});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "default.png",
         .resolution_scale = 1});
@@ -78,6 +79,7 @@ void Material_base_color(void) {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t box = ecs_new(world);
     ecs_set(world, box, Box, {2, 2, 2});
+    ecs_set(world, box, Position, {0, 0, 0});
     ecs_set(world, box, Rgb, {255, 0, 128});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "base.png",
@@ -301,6 +303,7 @@ void Material_parent_opacity_updates_children(void) {
     ecs_entity_t root = ecs_new(world);
     ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, root);
     ecs_set(world, child, Box, {2, 2, 0.1f});
+    ecs_set(world, child, Position, {0, 0, 0});
     ecs_set(world, child, Rgb, {0, 0, 0});
     ecs_set(world, child, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, child, Emissive, {.strength = 1, .color = {0, 0, 255}});
@@ -362,6 +365,7 @@ void Material_blend_mode_change(void) {
     ecs_set(world, wall, Emissive, {.strength = 1, .color = {255, 0, 0}});
     ecs_entity_t glow = ecs_new(world);
     ecs_set(world, glow, Box, {2, 2, 0.1f});
+    ecs_set(world, glow, Position, {0, 0, 0});
     ecs_set(world, glow, Rgb, {0, 0, 0});
     ecs_set(world, glow, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, glow, Emissive, {.strength = 1, .color = {0, 255, 0}});
@@ -672,6 +676,7 @@ void Material_dynamic_material_per_frame(void) {
     ecs_entity_t box = ecs_new(world);
     ecs_add(world, box, DynamicMaterial);
     ecs_set(world, box, Box, {2, 2, 0.1f});
+    ecs_set(world, box, Position, {0, 0, 0});
     ecs_set(world, box, Rgb, {0, 0, 0});
     ecs_set(world, box, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, box, Emissive, {.strength = 0, .color = {255, 255, 255}});
@@ -787,6 +792,7 @@ void Material_dynamic_opacity_blends(void) {
     ecs_set(world, parent, Opacity, {1});
     ecs_entity_t pane = ecs_new_w_pair(world, EcsChildOf, parent);
     ecs_set(world, pane, Box, {2, 2, 0.1f});
+    ecs_set(world, pane, Position, {0, 0, 0});
     ecs_set(world, pane, Rgb, {0, 0, 0});
     ecs_set(world, pane, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, pane, Emissive, {.strength = 1, .color = {0, 0, 255}});
@@ -1236,6 +1242,7 @@ static ecs_entity_t cutout_quad(
 {
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Quad, {4, 4});
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, Rgb, {0, 0, 0});
     ecs_set(world, e, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, e, Emissive, {.strength = 1, .color = {0, 255, 0}});

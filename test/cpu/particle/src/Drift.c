@@ -108,6 +108,7 @@ static ecs_entity_t emitter_new(
 {
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, ParticleEmitter);
+    ecs_set(world, e, Position, {0, 0, 0});
     ParticleEmitter *p = ecs_get_mut(world, e, ParticleEmitter);
     p->rate = 60;
     p->spread = 40;

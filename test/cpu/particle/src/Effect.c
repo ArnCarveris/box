@@ -524,6 +524,7 @@ void Effect_without_emitter_returns_zero(void) {
     test_assert(box_particle_burst_at(world, 0, origin, 1) == 0);
     ecs_entity_t plain = ecs_new(world);
     ecs_set(world, plain, ParticleEmitter, {.max = 10});
+    ecs_set(world, plain, Position, {0, 0, 0});
     test_assert(box_particle_burst_at(world, plain, origin, 1) == 0);
     test_int(instances_of(world, "Empty"), 0);
 
