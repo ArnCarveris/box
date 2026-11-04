@@ -447,8 +447,13 @@ void Effect_disabled_bypassed(void) {
     // Bypassed, the bus passes the sine as it did without the effect
     test_assert(fabsf(audio_peak(audio_tap_l, audio_tap_count - AUDIO_FRAME * 4,
         audio_tap_count) - peak) < 0.001f);
+    // Enabled again, it fades back in from the dry signal
+    at = audio_tap_count;
     ecs_enable(world, verb, true);
     audio_run(world, 30);
+    after = audio_max_step(audio_tap_l, at, audio_tap_count);
+    printf("largest step: %.4f after the effect was enabled\n", (double)after);
+    test_assert(after < before + dry + 0.01f);
     test_int(box_audio_module_effect_slot(world, verb), 0);
     ecs_fini(world);
 }

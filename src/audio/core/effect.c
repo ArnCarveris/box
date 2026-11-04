@@ -120,7 +120,7 @@ static void box_audio_effect_apply(
     fx->idle = k->tail;
     fx->attached = fx->kind != BOX_AUDIO_EFFECT_NONE && fx->bus != BOX_AUDIO_BUS_NONE &&
         box_audio_effect_ready(core, fx, fx->kind);
-    if (fx->attached) {
+    if (fx->attached && !fx->entering) {
         k->start(core, fx, fade_in);
     }
 
@@ -143,6 +143,24 @@ static void box_audio_effect_arrive(
     if (fx->attached) {
         box_audio_ramp_to(&fx->blend, 1, core->effect_fade);
     }
+}
+
+/** Put an effect that is not attached on its bus. Its kind starts at its first block: when
+ * that is silent it starts at once, since its output would be silent either way. Otherwise it
+ * fades in from the dry signal as after a move, so that enabling it does not click.
+ *
+ * @param core The core
+ * @param slot Slot of the effect
+ */
+static void box_audio_effect_enter(
+    box_audio_core_t *core,
+    uint32_t slot)
+{
+    box_audio_effect_t *fx = &core->effects[slot];
+    fx->entering = true;
+    box_audio_effect_apply(core, slot, false);
+    fx->entering = fx->attached;
+    box_audio_ramp_set(&fx->blend, 1);
 }
 
 void box_audio_effects_init(
@@ -185,8 +203,7 @@ bool box_audio_core_effect_memory(
     fx->memory = data;
     fx->floats = floats;
     if (fx->target_kind && box_audio_effect_ready(core, fx, fx->target_kind)) {
-        box_audio_effect_apply(core, slot, false);
-        box_audio_ramp_set(&fx->blend, 1);
+        box_audio_effect_enter(core, slot);
     } else if (fx->attached && box_audio_effect_floats(fx->kind, core->sample_rate)) {
         fx->attached = false;
         box_audio_effect_place(core, slot);
@@ -237,10 +254,12 @@ void box_audio_effect_command(
         goto done;
     }
 
-    if (!fx->attached) {
+    if (!fx->attached || fx->entering) {
         if (fx->target_kind) {
+            box_audio_effect_enter(core, cmd->slot);
+        } else if (fx->entering) {
+            fx->entering = false;
             box_audio_effect_apply(core, cmd->slot, false);
-            box_audio_ramp_set(&fx->blend, 1);
         }
 
         goto done;
@@ -333,9 +352,21 @@ static void box_audio_effect_run(
 {
     box_audio_effect_t *fx = &core->effects[slot];
     const box_audio_effect_def_t *k = box_audio_effect_kind(fx->kind);
-    bool silent = k->tail && box_audio_effect_silent(l, r, frames);
-    bool blend = fx->blend.left > 0 || fx->blend.value != 1.0f;
+    bool silent = (k->tail || fx->entering) && box_audio_effect_silent(l, r, frames);
+    bool blend;
     int32_t i;
+    if (fx->entering) {
+        fx->entering = false;
+        k->start(core, fx, !silent);
+        if (!silent) {
+            box_audio_ramp_set(&fx->blend, 0);
+            box_audio_ramp_to(&fx->blend, 1, core->effect_fade);
+        }
+
+        silent = silent && k->tail;
+    }
+
+    blend = fx->blend.left > 0 || fx->blend.value != 1.0f;
     if (fx->idle && silent) {
         k->rest(core, fx);
         box_audio_ramp_skip(&fx->blend, frames);

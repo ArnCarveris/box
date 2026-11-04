@@ -327,7 +327,6 @@ typedef struct box_audio_module_t {
                                    *   core holds and got */
     uint32_t effect_frame;        /**< Frames of the module, which tell the insert slots of
                                    *   this frame from older ones */
-    bool effect_overflow;         /**< An effect found the pool full this frame */
     uint32_t serial;              /**< Serial of the output the state was sent to */
     box_audio_writer_t writer;    /**< The batch of the frame, grown as needed */
     uint32_t next_voice;          /**< Next voice handle */

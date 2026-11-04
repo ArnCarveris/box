@@ -483,6 +483,9 @@ its kind.
   blends the effect out of its bus over 50 ms, so the bus passes its dry signal, applies the new
   place on clear memory and blends it into the new one over 50 ms (`BOX_AUDIO_EFFECT_FADE`,
   100 ms in all); a reverb also fades its input into its clear lines over the second half.
+  An effect put on a bus from off, such as an enabled one or one put live into a slot, starts
+  at its first block: it blends in from the dry signal over 50 ms the same way, unless that
+  block is silent, when it starts at once since its output would be silent either way.
 - **Taking it off.** Kind `BOX_AUDIO_EFFECT_NONE` (or bus `BOX_AUDIO_BUS_NONE`) takes the effect
   off: on a bus that stays in the order it blends out to the dry signal over 50 ms, so its tail
   fades out where it was; when its bus left the order, as a deleted bus does in the same batch,

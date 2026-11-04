@@ -146,6 +146,8 @@ typedef struct box_audio_effect_t {
     bool attached;            /**< Whether it renders: on a bus, or its tail fades out */
     bool idle;                /**< A kind with a tail decayed to silence and is clear */
     bool moving;              /**< Fades out of its place to apply the target */
+    bool entering;            /**< Blends in from the dry signal after it was put on a bus,
+                               * unless its first block is silent */
     int32_t quiet;            /**< Frames of silent input in a row */
     box_audio_ramp_t blend;   /**< Share of its output in its bus, the rest is its input; the
                                * gain of a tail that fades out into the master */

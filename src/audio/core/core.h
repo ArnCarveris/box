@@ -85,9 +85,7 @@
 #endif
 
 /** Insert slots of a bus; its effects run in the order of their index */
-#ifndef BOX_AUDIO_EFFECT_SLOTS
 #define BOX_AUDIO_EFFECT_SLOTS 4
-#endif
 
 /** Parameters of an effect command, read by each kind in its own way */
 #define BOX_AUDIO_EFFECT_PARAMS 16

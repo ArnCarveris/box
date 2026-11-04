@@ -59,9 +59,7 @@ ECS_ENUM(AudioState, {
 #endif
 
 /** Insert slots of a mixer channel, AudioBus.effects */
-#ifndef BOX_AUDIO_EFFECT_SLOTS
 #define BOX_AUDIO_EFFECT_SLOTS 4
-#endif
 
 /** Effect instances that run at once, in every channel together; more log one error that
  * names the effect */
