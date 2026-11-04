@@ -9,6 +9,7 @@
 #include "../../../../src/jobs/jobs.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 /** Rate of the aliasing check, at which 5 kHz has an exact bin every 441 frames */
 #define SYNTH_ALIAS_RATE 44100
@@ -4576,4 +4577,231 @@ void Synth_lfo_pluck(void) {
     test_assert(synth_finite(audio_l, 0, AUDIO_FRAMES));
     test_int(box_audio_core_voice_count(core), 0);
     box_audio_core_free(core);
+}
+
+/** Swing of a series of cents measured a step of frames apart from a frame on, at a rate: the
+ * amplitude of its component at the rate, its mean left out.
+ *
+ * @param cents The series
+ * @param count Points of the series
+ * @param from Frame of the first point
+ * @param step Frames between the points
+ * @param rate Hz
+ * @return Cents either way
+ */
+static double synth_swing(
+    const double *cents,
+    int32_t count,
+    int32_t from,
+    int32_t step,
+    double rate)
+{
+    double mean = 0, re = 0, im = 0, ph;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        mean += cents[i];
+    }
+
+    mean /= count;
+    for (i = 0; i < count; i ++) {
+        ph = 2 * AUDIO_PI * rate * (double)(from + i * step) / AUDIO_RATE;
+        re += (cents[i] - mean) * cos(ph);
+        im += (cents[i] - mean) * sin(ph);
+    }
+
+    return 2 * sqrt(re * re + im * im) / count;
+}
+
+/** Energy of a range above 8 kHz: the components from 8 kHz to the Nyquist frequency every
+ * 100 Hz over Hann windows of 20 ms, half a window apart.
+ *
+ * @param x Samples
+ * @param from First frame
+ * @param frames Frames of the range, at least a window
+ * @return The energy
+ */
+static double synth_high(
+    const float *x,
+    int32_t from,
+    int32_t frames)
+{
+    const int32_t window = AUDIO_RATE / 50;
+    double sum = 0, re, im, f;
+    int32_t at;
+    for (at = from; at + window <= from + frames; at += window / 2) {
+        for (f = 8000; f < AUDIO_RATE / 2; f += 100) {
+            synth_component(x, at, window, f, AUDIO_RATE, &re, &im);
+            sum += re * re + im * im;
+        }
+    }
+
+    return sum;
+}
+
+/** A vibrato moves a pluck string by its depth at its rate: the cents of the string over
+ * windows of 30 ms swing at the rate of the LFO, more than at any other rate, and by the swing
+ * of a sine oscillator under the same LFO measured the same way, within 10 %. */
+void Synth_pluck_vibrato_rate(void) {
+    // audio/synth
+    enum { POINTS = 161, STEP = 240, FROM = 4800 };
+    static double cents[2][POINTS];
+    double depth[2], top = 0, top_rate = 0, swing, r;
+    int32_t k, i;
+    for (k = 0; k < 2; k ++) {
+        box_audio_core_t *core = synth_core(AUDIO_RATE);
+        box_audio_synth_patch_t p;
+        if (k) {
+            p = synth_lfo_patch(BOX_AUDIO_SYNTH_SINE, 220, 0.5f, 1.2f, 5);
+        } else {
+            p = synth_pluck(220, 4, 0.3f, 1);
+            p.lfos = 1;
+            p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 5 };
+        }
+
+        p.lfo[0].pitch = 30;
+        synth_define(core, 1, &p);
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, AUDIO_FRAMES);
+        test_assert(synth_finite(audio_l, 0, AUDIO_FRAMES));
+        for (i = 0; i < POINTS; i ++) {
+            cents[k][i] = synth_cents_at(audio_l, FROM + i * STEP, 220);
+        }
+
+        depth[k] = synth_swing(cents[k], POINTS, FROM, STEP, 5);
+        box_audio_core_free(core);
+    }
+
+    for (r = 2; r <= 10; r += 0.5) {
+        swing = synth_swing(cents[0], POINTS, FROM, STEP, r);
+        if (swing > top) {
+            top = swing;
+            top_rate = r;
+        }
+    }
+
+    printf("pluck vibrato: %.2f cents at 5 Hz, the sine %.2f, the largest swing at %.1f Hz\n",
+        depth[0], depth[1], top_rate);
+    test_assert(fabs(top_rate - 5) < 0.01);
+    test_assert(depth[1] > 0.8 * 30 && depth[1] < 1.05 * 30);
+    test_assert(fabs(depth[0] - depth[1]) < 0.1 * depth[1]);
+}
+
+/** A string crosses whole frames of its delay line smoothly: a glide of an octave over 20 ms
+ * has under 0.4 and a vibrato of a semitone at 8 Hz under 0.05 of the energy above 8 kHz of
+ * the same renders in which the read point jumps at each crossing.
+ *
+ * The glide keeps some, as its allpass sweeps its whole range every 9 frames. */
+void Synth_pluck_crossing_smooth(void) {
+    // audio/synth
+    double glide[2], vibrato[2];
+    int32_t r;
+    for (r = 0; r < 2; r ++) {
+        box_audio_core_t *core = synth_core(AUDIO_RATE);
+        box_audio_synth_patch_t p = synth_pluck(220, 4, 0.3f, 1);
+        p.glide = 0.02f;
+        synth_define(core, 1, &p);
+        if (r) {
+            audio_strings_rough(core);
+        }
+
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, 4800);
+        audio_voice_set(core, 1, BOX_AUDIO_PARAM_PITCH, 2);
+        audio_render(core, 4800, 4800);
+        test_assert(synth_finite(audio_l, 0, 9600));
+        glide[r] = synth_high(audio_l, 4320, 2400);
+        box_audio_core_free(core);
+
+        core = synth_core(AUDIO_RATE);
+        p = synth_pluck(220, 4, 0.3f, 1);
+        p.lfos = 1;
+        p.lfo[0] = (box_audio_synth_lfo_t){
+            .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 8, .pitch = 100 };
+        synth_define(core, 1, &p);
+        if (r) {
+            audio_strings_rough(core);
+        }
+
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, AUDIO_FRAMES);
+        test_assert(synth_finite(audio_l, 0, AUDIO_FRAMES));
+        vibrato[r] = synth_high(audio_l, 4800, 38400);
+        box_audio_core_free(core);
+    }
+
+    printf("pluck crossings above 8 kHz: glide %.3g smooth, %.3g rough; vibrato %.3g smooth, "
+        "%.3g rough\n", glide[0], glide[1], vibrato[0], vibrato[1]);
+    test_assert(glide[0] < 0.4 * glide[1]);
+    test_assert(vibrato[0] < 0.05 * vibrato[1]);
+}
+
+/** A string whose pitch does not move renders bit identical under an LFO without a pitch
+ * depth, under a pitch LFO before its delay, and with the crossfade switched off. */
+void Synth_pluck_steady_identical(void) {
+    // audio/synth
+    static float plain[AUDIO_FRAMES];
+    int32_t k;
+    for (k = 0; k < 4; k ++) {
+        box_audio_core_t *core = synth_core(AUDIO_RATE);
+        box_audio_synth_patch_t p = synth_pluck(330, 2, 0.5f, 7);
+        if (k == 1) {
+            p.lfos = 1;
+            p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 5 };
+        } else if (k == 2) {
+            p.lfos = 1;
+            p.lfo[0] = (box_audio_synth_lfo_t){
+                .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 5, .pitch = 20, .delay = 0.5f };
+        }
+
+        synth_define(core, 1, &p);
+        if (k == 3) {
+            audio_strings_rough(core);
+        }
+
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, AUDIO_FRAMES);
+        test_assert(synth_finite(audio_l, 0, AUDIO_FRAMES));
+        if (k == 0) {
+            memcpy(plain, audio_l, sizeof(plain));
+        } else {
+            int32_t n = k == 2 ? AUDIO_FRAMES / 2 - 100 : AUDIO_FRAMES;
+            test_assert(memcmp(plain, audio_l, sizeof(float) * (size_t)n) == 0);
+        }
+
+        box_audio_core_free(core);
+    }
+}
+
+/** The cost of 32 strings, one per voice, under a vibrato against the same strings without
+ * one, in ns per string per frame. It prints the cost; the strings all ring. */
+void Synth_pluck_vibrato_cost(void) {
+    // audio/synth
+    double ns[2];
+    int32_t k, i;
+    for (k = 0; k < 2; k ++) {
+        box_audio_core_t *core = synth_core(AUDIO_RATE);
+        box_audio_synth_patch_t p = synth_pluck(110, 4, 0.5f, 1);
+        clock_t start;
+        if (k) {
+            p.lfos = 1;
+            p.lfo[0] = (box_audio_synth_lfo_t){
+                .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 5.5f, .pitch = 25 };
+        }
+
+        synth_define(core, 1, &p);
+        for (i = 0; i < BOX_AUDIO_SYNTH_STRINGS; i ++) {
+            audio_play(core, 1 + (uint32_t)i, 1, 0, 0.02f, 0, 1 + 0.07f * (float)i, 0);
+        }
+
+        test_int(box_audio_core_voice_count(core), BOX_AUDIO_SYNTH_STRINGS);
+        start = clock();
+        audio_render(core, 0, AUDIO_FRAMES);
+        ns[k] = (double)(clock() - start) / CLOCKS_PER_SEC * 1e9 /
+            ((double)AUDIO_FRAMES * BOX_AUDIO_SYNTH_STRINGS);
+        test_assert(synth_finite(audio_l, 0, AUDIO_FRAMES));
+        test_int(box_audio_core_voice_count(core), BOX_AUDIO_SYNTH_STRINGS);
+        box_audio_core_free(core);
+    }
+
+    printf("32 strings: %.1f ns per string and frame steady, %.1f under vibrato\n", ns[0], ns[1]);
 }

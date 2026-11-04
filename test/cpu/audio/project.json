@@ -432,7 +432,11 @@
                     "script_pluck",
                     "docs_pluck_examples",
                     "lfo_unison",
-                    "lfo_pluck"
+                    "lfo_pluck",
+                    "pluck_vibrato_rate",
+                    "pluck_crossing_smooth",
+                    "pluck_steady_identical",
+                    "pluck_vibrato_cost"
                 ]
             },
             {
