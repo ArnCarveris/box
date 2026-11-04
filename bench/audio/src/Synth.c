@@ -93,7 +93,7 @@ static box_audio_core_t* bench_synth_core(
     box_audio_write_synth(&w, 1, &p);
     for (i = 0; i < BOX_AUDIO_VOICE_MAX; i ++) {
         box_audio_write_play(&w, i, 1, 0, 0.02f, -0.9f + 0.03f * (float)i,
-            0.75f + 0.01f * (float)i, BOX_AUDIO_PLAY_LOOP);
+            0.75f + 0.01f * (float)i, BOX_AUDIO_PLAY_LOOP, 0);
     }
 
     box_audio_core_apply(core, w.data, w.size);
@@ -124,7 +124,7 @@ static box_audio_core_t* bench_pluck_core(void)
     box_audio_write_synth(&w, 1, &p);
     for (i = 0; i < BOX_AUDIO_SYNTH_STRINGS; i ++) {
         box_audio_write_play(&w, i, 1, 0, 0.02f, -0.9f + 0.05f * (float)i,
-            0.75f + 0.05f * (float)i, BOX_AUDIO_PLAY_LOOP);
+            0.75f + 0.05f * (float)i, BOX_AUDIO_PLAY_LOOP, 0);
     }
 
     box_audio_core_apply(core, w.data, w.size);

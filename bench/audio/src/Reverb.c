@@ -55,11 +55,11 @@ static box_audio_core_t* bench_reverb_core(
 
     box_audio_writer_init(&w, bytes, sizeof(bytes));
     box_audio_write_order(&w, routes, 3);
-    box_audio_write_bus_set(&w, 2, BOX_AUDIO_PARAM_SEND, 0.3f);
+    box_audio_write_bus_set(&w, 2, BOX_AUDIO_PARAM_SEND, 0.3f, 0);
     box_audio_write_reverb(&w, 0, 1, &params);
     for (i = 0; i < voices; i ++) {
         box_audio_write_play(&w, i, 1, 2, 0.02f, -0.9f + 0.05f * (float)i,
-            0.75f + 0.01f * (float)i, BOX_AUDIO_PLAY_LOOP);
+            0.75f + 0.01f * (float)i, BOX_AUDIO_PLAY_LOOP, 0);
     }
 
     box_audio_core_apply(core, w.data, w.size);

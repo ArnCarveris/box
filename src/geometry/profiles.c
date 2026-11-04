@@ -635,6 +635,42 @@ static void box_asset_generate(const ecs_world_t *world, const void *value, int 
     }
     int count = (int)d.p[5][1], outer = (int)d.p[5][2];
     int rows = kind == 7 ? 1 : key->i[1];
+    /* A Sweep puts a ring on each corner of its path, the other rings at even lengths between */
+    float *row_v = NULL, *row_p = NULL;
+    if (kind == 1 && d.p[4][1] >= 2) {
+        int segments = (int)d.p[4][1];
+        float *corner_p = ecs_os_malloc_n(float, segments * 2);
+        int corners = corner_p ?
+            box_surface_sweep_corners(&d, corner_p, corner_p + segments) : 0;
+        if (corners) {
+            rows = rows > corners + 1 ? rows : corners + 1;
+            row_v = ecs_os_malloc_n(float, (rows + 1) * 2);
+        }
+        if (row_v) {
+            row_p = row_v + rows + 1;
+            const float *corner_v = corner_p + segments;
+            int anchor = 0;
+            row_v[0] = 0;
+            row_p[0] = -1;
+            for (int c = 0; c <= corners; c ++) {
+                int j = rows;
+                float v = 1;
+                if (c < corners) {
+                    v = corner_v[c];
+                    j = (int)roundf(v * rows);
+                    j = (int)glm_clamp(j, anchor + 1, rows - corners + c);
+                }
+                for (int k = anchor + 1; k < j; k ++) {
+                    row_v[k] = row_v[anchor] + (v - row_v[anchor]) * (k - anchor) / (j - anchor);
+                    row_p[k] = -1;
+                }
+                row_v[j] = v;
+                row_p[j] = c < corners ? corner_p[c] : -1;
+                anchor = j;
+            }
+        }
+        ecs_os_free(corner_p);
+    }
     int edges = kind == 3 ? key->i[0] : count;
     int regions = (int)d.p[3][3];
     int64_t vertices = (int64_t)edges * (rows + 1) * 2 * (kind == 3 ? 4 : 1) + count * 2;
@@ -643,6 +679,7 @@ static void box_asset_generate(const ecs_world_t *world, const void *value, int 
         indices > INT_MAX / (int)sizeof(uint32_t))
     {
         ecs_err("surface mesh capacity exceeded");
+        ecs_os_free(row_v);
         ecs_os_free(d.assets);
         return;
     }
@@ -650,6 +687,7 @@ static void box_asset_generate(const ecs_world_t *world, const void *value, int 
         (uint64_t)indices * sizeof(uint32_t) + (uint64_t)d.asset_count * sizeof(vec4);
     if (total_size > INT_MAX) {
         ecs_err("surface mesh allocation exceeds capacity");
+        ecs_os_free(row_v);
         ecs_os_free(d.assets);
         return;
     }
@@ -657,6 +695,7 @@ static void box_asset_generate(const ecs_world_t *world, const void *value, int 
     mesh->indices = ecs_os_malloc_n(uint32_t, indices);
     if (!mesh->vertices || !mesh->indices) {
         ecs_err("surface mesh allocation failed");
+        ecs_os_free(row_v);
         ecs_os_free(d.assets);
         box_mesh_fini(mesh);
         return;
@@ -697,7 +736,13 @@ static void box_asset_generate(const ecs_world_t *world, const void *value, int 
                 for (int side = 0; side < 2; side ++) {
                     float u = side ? u1 : u0, v = (float)j / nrows;
                     float tu = side ? t1 : t0;
+                    if (row_v && nrows == rows) {
+                        v = row_v[j];
+                    }
                     float pv = kind == 1 ? box_surface_sweep_parameter(&d, v) : v;
+                    if (row_v && nrows == rows && row_p[j] >= 0) {
+                        pv = row_p[j];
+                    }
                     vec3 position = {u, pv, kind == 3 ? region : inner};
                     vec3 normal = {0};
                     if (kind == 7) {
@@ -743,6 +788,7 @@ static void box_asset_generate(const ecs_world_t *world, const void *value, int 
             }
         }
     }
+    ecs_os_free(row_v);
     mesh->surface_assets = d.assets;
     mesh->surface_asset_count = d.asset_count;
 }

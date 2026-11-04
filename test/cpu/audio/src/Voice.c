@@ -218,7 +218,7 @@ void Voice_stop_no_click(void) {
     audio_play(core, 9, 1, 0, 1, 0, 1, 0);
     audio_render(core, 0, 1000);
     box_audio_writer_init(&w, bytes, sizeof(bytes));
-    test_assert(box_audio_write_stop(&w, 9));
+    test_assert(box_audio_write_stop(&w, 9, 0));
     box_audio_core_apply(core, w.data, w.size);
     test_int(box_audio_core_voice_count(core), 0);
     audio_render(core, 1000, 2000);

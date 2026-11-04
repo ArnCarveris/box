@@ -366,7 +366,9 @@
                     "open_contour",
                     "mesh_uvs",
                     "evaluate",
-                    "scale_ratio_key"
+                    "scale_ratio_key",
+                    "corner_ring",
+                    "smooth_rows"
                 ]
             },
             {

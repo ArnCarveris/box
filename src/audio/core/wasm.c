@@ -376,6 +376,16 @@ int32_t box_audio_core_wasm_voices(void)
     return box_audio_core_wasm ? box_audio_core_voice_count(box_audio_core_wasm) : 0;
 }
 
+/** Get the clock of the core, the frames it rendered, as a double, which holds every frame
+ * count exactly for millennia and needs no BigInt in the worklet.
+ *
+ * @return Frames of the core clock
+ */
+double box_audio_core_wasm_clock(void)
+{
+    return box_audio_core_wasm ? (double)box_audio_core_clock(box_audio_core_wasm) : 0;
+}
+
 /** Get the left channel buffer.
  *
  * @return Its address in the memory of the core
