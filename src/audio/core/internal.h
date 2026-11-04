@@ -14,6 +14,11 @@
 /** Voice slots: the cap plus the slots of voices that fade out */
 #define BOX_AUDIO_VOICE_SLOTS (BOX_AUDIO_VOICE_MAX + BOX_AUDIO_VOICE_TAIL_MAX)
 
+/** Synth layers the voices of a core play at once: 4 for every voice slot, so patches of up to
+ * 4 layers never run out, and a voice of more takes the room fewer leave. A play that does not
+ * find a part for each of its layers is ignored */
+#define BOX_AUDIO_SYNTH_PARTS (BOX_AUDIO_VOICE_SLOTS * 4)
+
 /** Smallest magnitude a sample keeps; smaller ones are flushed to 0, so no denormal forms */
 #define BOX_AUDIO_TINY 1e-30f
 
@@ -204,13 +209,25 @@ typedef struct box_audio_synth_svf_t {
     float ic1, ic2;       /**< State */
 } box_audio_synth_svf_t;
 
-/** A source that plays a synth patch, a copy of it, so it never allocates */
+/** A layer of a synth voice: its layer of the patch, its oscillator and its own envelope. The
+ * core holds BOX_AUDIO_SYNTH_PARTS of them for all its voices, so a voice holds only the layers
+ * its patch has */
+typedef struct box_audio_synth_part_t {
+    box_audio_synth_layer_t layer;  /**< The layer of the patch, clamped */
+    box_audio_synth_osc_t osc;      /**< The oscillator */
+    box_audio_synth_env_t env;      /**< Its own envelope, when the layer has one */
+} box_audio_synth_part_t;
+
+/** A source that plays a synth patch, a copy of it, so it never allocates: the patch without
+ * its layers, and a part of the core for each of its layers */
 typedef struct box_audio_synth_source_t {
-    box_audio_synth_patch_t patch;  /**< The patch, clamped, for the restart of a loop */
-    box_audio_synth_osc_t osc[BOX_AUDIO_SYNTH_LAYERS];  /**< The oscillators */
-    box_audio_synth_env_t env[1 + BOX_AUDIO_SYNTH_LAYERS]; /**< The envelope of the patch,
-                                     * then the own envelope of each layer */
-    uint32_t envs;        /**< Bit of each envelope a layer uses */
+    int32_t layers;       /**< Layers of the patch, 0..BOX_AUDIO_SYNTH_LAYERS */
+    box_audio_synth_part_t *part[BOX_AUDIO_SYNTH_LAYERS]; /**< The part of each layer */
+    box_audio_synth_envelope_t envelope; /**< Envelope of the patch, for the restart of a loop */
+    box_audio_synth_envelope_t filter_envelope; /**< Filter envelope of the patch */
+    box_audio_synth_env_t env;  /**< The envelope of the patch, envelope 0 */
+    uint32_t envs;        /**< Bit of each envelope a layer uses: 0 the one of the patch, 1 +
+                           * layer its own */
     bool modulated;       /**< Whether a layer modulates another or itself, which renders
                            * through box_audio_synth_modulate */
     double inc_max;       /**< Largest turns per frame of an oscillator */
@@ -358,6 +375,9 @@ struct box_audio_core_t {
     float limiter_gain;   /**< Current gain of the limiter, 0..1 */
     float limiter_step;   /**< Largest rise of the gain of the limiter per frame */
     box_audio_synth_slot_t synths[BOX_AUDIO_SYNTH_MAX]; /**< Patches of synth sounds */
+    box_audio_synth_part_t synth_parts[BOX_AUDIO_SYNTH_PARTS]; /**< Layers of synth voices */
+    uint16_t synth_free[BOX_AUDIO_SYNTH_PARTS]; /**< Indexes of the free parts, a stack */
+    int32_t synth_free_count; /**< Free parts */
 };
 
 /** Flush a sample: NaN, infinities, huge values and denormals become 0.
@@ -459,8 +479,35 @@ void box_audio_synth_command(
     box_audio_core_t *core,
     const box_audio_cmd_synth_t *cmd);
 
-/** Start a synth source on the patch of a synth sound. Takes no use of the sound: the source
- * plays a copy of the patch.
+/** Set the parts of the synth layers of a new core free.
+ *
+ * @param core The core, zeroed
+ */
+void box_audio_synth_parts_init(
+    box_audio_core_t *core);
+
+/** Whether the free parts of a core hold the layers of the patch of a synth sound.
+ *
+ * @param core The core
+ * @param sound Id of a ready synth sound
+ * @return Whether a voice can play it
+ */
+bool box_audio_synth_fits(
+    const box_audio_core_t *core,
+    uint32_t sound);
+
+/** Give the parts of a synth source back to its core.
+ *
+ * @param core The core
+ * @param src The source
+ */
+void box_audio_synth_end(
+    box_audio_core_t *core,
+    box_audio_synth_source_t *src);
+
+/** Start a synth source on the patch of a synth sound, with a part of the core for each of its
+ * layers, which box_audio_synth_fits found. Takes no use of the sound: the source plays a
+ * copy of the patch.
  *
  * @param core The core
  * @param source The source

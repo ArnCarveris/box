@@ -87,7 +87,7 @@
 #define BOX_AUDIO_REVERB_FADE 0.1f
 
 /** Oscillators of a synth patch, each with an envelope, mixed into one filter and an amp */
-#define BOX_AUDIO_SYNTH_LAYERS 4
+#define BOX_AUDIO_SYNTH_LAYERS 8
 
 /** Synth patches a core holds at once */
 #define BOX_AUDIO_SYNTH_MAX 256
@@ -331,12 +331,21 @@ typedef struct box_audio_synth_patch_t {
 } box_audio_synth_patch_t;
 
 /** Make a sound id a synth patch, or replace the patch of a synth sound. Voices that play it
- * keep the patch they started with; the next play takes the new one */
+ * keep the patch they started with; the next play takes the new one.
+ *
+ * The command ends after the layers of its patch: it is BOX_AUDIO_CMD_SYNTH_SIZE(layers)
+ * bytes, so a patch of 2 layers does not send the room of BOX_AUDIO_SYNTH_LAYERS */
 typedef struct box_audio_cmd_synth_t {
     box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_SYNTH */
     uint32_t sound;                 /**< Id of the sound, free or a synth */
-    box_audio_synth_patch_t patch;  /**< The patch, clamped by the core */
+    box_audio_synth_patch_t patch;  /**< The patch, clamped by the core, up to its layers */
 } box_audio_cmd_synth_t;
+
+/** Bytes of a synth command whose patch has a number of layers, at most
+ * BOX_AUDIO_SYNTH_LAYERS */
+#define BOX_AUDIO_CMD_SYNTH_SIZE(layers) \
+    ((int32_t)(offsetof(box_audio_cmd_synth_t, patch.layer) + \
+    (size_t)(layers) * sizeof(box_audio_synth_layer_t)))
 
 /** Events the core reports to its transport */
 typedef enum box_audio_event_type_t {
@@ -674,7 +683,8 @@ bool box_audio_write_reverb(
     uint32_t bus,
     const box_audio_reverb_params_t *params);
 
-/** Write a command that makes a sound id a synth patch or replaces its patch.
+/** Write a command that makes a sound id a synth patch or replaces its patch, of
+ * BOX_AUDIO_CMD_SYNTH_SIZE bytes for the layers of the patch.
  *
  * @param writer The writer
  * @param sound Id of the sound

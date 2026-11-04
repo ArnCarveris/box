@@ -223,7 +223,7 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   EQ, compressor or delay on a bus.
 - **Voices**: 64, with the quietest stolen; no priorities. A one shot cannot be controlled after
   it started.
-- **Synth**: up to 4 oscillators and one filter per sound, linear or curved envelopes, no LFO
+- **Synth**: up to 8 oscillators and one filter per sound, linear or curved envelopes, no LFO
   and no node graph; an oscillator may phase or ring modulate another, but FM is not band
   limited. A looping synth sound starts a new pass of its envelopes and oscillators at the end
   of the last, at most every 60 seconds; a drone keeps that gap short with edges of a few ms, as
@@ -312,7 +312,7 @@ start of the next render block. They are:
 | `SOUND_RELEASE` | sound: freed once no voice plays it |
 | `STREAM` | voice handle, stream, bus, volume, channels, sample rate: opens a stream and starts a voice that reads it |
 | `REVERB` | slot, bus (or none), decay, damping, predelay, size, mix: see [Reverb](#reverb) |
-| `SYNTH` | sound, then a patch: makes a free sound id a synth or replaces its patch, see [Synth](#synth) |
+| `SYNTH` | sound, then a patch up to its last layer: makes a free sound id a synth or replaces its patch, see [Synth](#synth) |
 
 The sender picks the voice handles, so it addresses a voice without waiting for a reply. Values
 are clamped (volumes and send levels to 0..4, pans to -1..1, pitches to 1/64..16) and a NaN
@@ -456,11 +456,22 @@ allocation. `bench/audio` has a `Reverb` suite in ns per frame, and
 synth voices share the pool, the cap, the buses, the ramps and the limiter. A sound id becomes a
 synth with a `SYNTH` command, whose patch (`box_audio_synth_patch_t` of `core.h`) is plain
 values in seconds and Hz, the same at every rate: a fixed topology of up to
-`BOX_AUDIO_SYNTH_LAYERS` (4) oscillators, each with an envelope, summed into one filter and an
+`BOX_AUDIO_SYNTH_LAYERS` (8) oscillators, each with an envelope, summed into one filter and an
 amp; an oscillator may modulate an earlier one instead of being heard. There is no node graph.
 The core keeps up to `BOX_AUDIO_SYNTH_MAX` (256) patches; a play copies the patch into its
 voice, so a play allocates nothing, a new patch for the same id reaches the next play while the
-voices that play keep theirs, and a release frees the id at once with `SOUND_FREE`. The core clamps every value of a patch, a NaN to the low end.
+voices that play keep theirs, and a release frees the id at once with `SOUND_FREE`.
+
+A patch costs only the layers it has. The `SYNTH` command ends after its last layer,
+`BOX_AUDIO_CMD_SYNTH_SIZE(layers)` bytes: 100 bytes and 72 per layer, 244 for 2 layers, 676 for
+8; a shorter one than its layers need is ignored. A voice holds the patch without its layers
+and takes, for each layer, a part from a pool the core allocates with itself: the layer, its
+oscillator and its own envelope, 240 bytes. The pool has 4 parts per voice slot (320), so
+patches of up to 4 layers never run out of them and a voice of 8 takes the room of two of 4; a
+play that finds too few free parts is ignored like one without a voice slot. A voice renders
+and advances only its parts and gives them back when it ends. The 80 voice slots (504 bytes
+each) and the pool take 118 KB, against 115 KB for 80 voices of 4 fixed layers and 191 KB for 8
+fixed layers. The 256 patches the core keeps are full size, 668 bytes each. The core clamps every value of a patch, a NaN to the low end.
 
 - **Oscillators.** Sine (`box_audio_core_sin`), saw, square, triangle and white noise. Saw and
   square are band limited with polyBLEP, the corners of the triangle with polyBLAMP. Frequencies are clamped to 20 kHz and to 0.48 of the
@@ -567,8 +578,8 @@ or of a layer changes, into a patch that the sync system sends with a `SYNTH` co
 plays of the frame. `box.audio.play(UiClick, 0.8)` plays it like any sound, and an `AudioSource`
 with `loop: true` starts it over at the end of its envelopes. A play allocates nothing.
 
-- More than 4 layers log one error that names the sound; the first 4 play. A layer that is left
-  out takes its modulators with it.
+- More than 8 layers log one error that names the sound and their count; the first 8 play. A
+  layer that is left out takes its modulators with it.
 - A modulator whose parent is not a layer, such as a child of a root without a
   `SynthOscillator`, logs one error that names the sound and is left out.
 - A layer without any envelope (no `SynthEnvelope` on it or on the root) would never end: it
@@ -585,7 +596,7 @@ release, and an `attack_curve` of 1 to 2 for a swell that settles. A sound that 
 linear envelope (curves of 0) renders exactly as before. A curve makes a segment quieter
 sooner, so a pluck usually wants a longer decay than its linear version.
 
-Eight examples, five that are plain layers and three that modulate:
+Nine examples, six that are plain layers and three that modulate:
 
 ```
 using box.audio
@@ -692,7 +703,29 @@ prefab Ring {
   string { SynthOscillator: {wave: SynthTriangle, frequency: 330, level: 0.4} }
   body { SynthOscillator: {wave: SynthSine, frequency: 330, level: 0.3} }
 }
+
+// Strings: an ensemble of five saws detuned around 220 Hz and one an octave up, a sine an
+// octave down and a breath of noise, eight layers, through a 24 dB lowpass that opens with the
+// bow and swells in, 1.6 s
+prefab Strings {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.3, decay: 0.2, sustain: 0.7, hold: 0.5, release: 0.6, curve: 2.5, attack_curve: 1.5}
+  SynthFilter: {kind: SynthLowPass, cutoff: 900, resonance: 0.15, slope: SynthSlope24}
+  SynthFilterEnvelope: {attack: 0.4, sustain: 1, hold: 0.7, release: 0.5, amount: 1.5}
+  SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.08}
+  a { SynthOscillator: {wave: SynthSaw, frequency: 219.2, level: 0.08} }
+  b { SynthOscillator: {wave: SynthSaw, frequency: 220.9, level: 0.08} }
+  c { SynthOscillator: {wave: SynthSaw, frequency: 218.5, level: 0.07} }
+  d { SynthOscillator: {wave: SynthSaw, frequency: 221.6, level: 0.07} }
+  e { SynthOscillator: {wave: SynthSaw, frequency: 440.6, level: 0.04} }
+  sub { SynthOscillator: {wave: SynthSine, frequency: 110, level: 0.12} }
+  air { SynthOscillator: {wave: SynthNoise, level: 0.01} }
+}
 ```
+
+The strings use all 8 layers: the detuned saws beat slowly against each other, the chorus of
+an ensemble, which takes more oscillators than a lead does. A sound of 8 layers costs twice the
+render work of one of 4 and nothing more; the other sounds keep their cost.
 
 The whoosh opens from 300 Hz to `300 * 2^3.737`, 4 kHz, over half a second and stays there. A
 sweep from one cutoff to another over a time is an attack of that time with a sustain of 1 when
@@ -709,8 +742,10 @@ cutoff following a filter envelope up and down, stability under fast filter enve
 resonance and at Nyquist for both slopes and extreme values, layers, phase modulation at 1:1
 and 6:1 against Bessel amplitudes and without drift, an index that follows the envelope of its
 modulator and fades the high sidebands, the limit of the index, ring modulation at the sum and
-difference alone, audible modulators, feedback, scripts from `test/assets/audio/synth.flecs`
-and `test/assets/audio/synth_fm.flecs`, the eight examples above from
+difference alone, audible modulators, feedback, 8 layers each found at its own frequency with a Goertzel
+filter, a 9th left out, the size of the command, the pool of parts, renders of patches of 4
+layers bit identical to the synth of fixed layers, scripts from `test/assets/audio/synth.flecs`
+and `test/assets/audio/synth_fm.flecs` and `test/assets/audio/synth_layers.flecs`, the nine examples above from
 `test/assets/audio/synth_examples.flecs` and errors; `NoAlloc` renders 64 synth voices. The browser
 check is `test/integration/web/audio_synth.mjs`.
 

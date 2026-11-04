@@ -26,8 +26,9 @@ extern "C" {
 /** Longest capture in seconds */
 #define BOX_AUDIO_CAPTURE_MAX (60.0f)
 
-/** Oscillators of a synth sound: the root and its children with a SynthOscillator */
-#define BOX_AUDIO_SYNTH_LAYERS 4
+/** Oscillators of a synth sound: the root and its children with a SynthOscillator. A voice
+ * renders and stores only the layers its sound has */
+#define BOX_AUDIO_SYNTH_LAYERS 8
 
 /** Seconds a synth sound plays when it would never end, a layer without any envelope */
 #define BOX_AUDIO_SYNTH_ENDLESS (10.0f)

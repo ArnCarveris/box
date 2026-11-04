@@ -2,7 +2,7 @@
  * @file Synth.c
  * @brief The synth of the audio core and synth sounds of box.audio, measured on offline
  * renders: frequencies, aliasing, noise, envelopes, the filter, layers, phase and ring
- * modulation, feedback and scripts.
+ * modulation, feedback, eight layers and scripts.
  */
 
 #include "world.h"
@@ -44,7 +44,7 @@ static void synth_define(
     uint32_t sound,
     const box_audio_synth_patch_t *p)
 {
-    uint8_t bytes[512];
+    uint8_t bytes[1024];
     box_audio_writer_t w;
     box_audio_writer_init(&w, bytes, sizeof(bytes));
     test_assert(box_audio_write_synth(&w, sound, p));
@@ -1412,6 +1412,253 @@ void Synth_feedback_harmonics(void) {
     test_assert(fabs(audio_frequency(audio_l, FROM, FROM + N) - 500) < 0.5);
 }
 
+/** A patch of BOX_AUDIO_SYNTH_LAYERS sines, each at its own frequency and level.
+ *
+ * @param hold Seconds at the level
+ * @return The patch
+ */
+static box_audio_synth_patch_t synth_octet(
+    float hold)
+{
+    static const float frequencies[BOX_AUDIO_SYNTH_LAYERS] = {
+        300, 500, 700, 1100, 1300, 1700, 1900, 2300 };
+    box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SINE, frequencies[0], 0.04f, hold);
+    int32_t k;
+    p.layers = BOX_AUDIO_SYNTH_LAYERS;
+    for (k = 0; k < BOX_AUDIO_SYNTH_LAYERS; k ++) {
+        p.layer[k] = (box_audio_synth_layer_t){
+            .wave = BOX_AUDIO_SYNTH_SINE, .frequency = frequencies[k],
+            .level = 0.04f + 0.01f * (float)k };
+    }
+
+    return p;
+}
+
+/** A patch of BOX_AUDIO_SYNTH_LAYERS layers renders every one: a Goertzel filter finds each at
+ * its own frequency and level, and nothing between them. */
+void Synth_eight_layers(void) {
+    // audio/synth
+    enum { FROM = 2400, N = 24000 };
+    box_audio_synth_patch_t p = synth_octet(1.0f);
+    const float *x = audio_l + FROM;
+    double amplitude, between;
+    int32_t k;
+    test_int(BOX_AUDIO_SYNTH_LAYERS, 8);
+    synth_render_patch(&p);
+    for (k = 0; k < BOX_AUDIO_SYNTH_LAYERS; k ++) {
+        amplitude = synth_bin_amplitude(x, N, p.layer[k].frequency, AUDIO_RATE);
+        printf("layer %d at %.0f Hz: %.5f, level %.2f\n", (int)k,
+            (double)p.layer[k].frequency, amplitude, (double)p.layer[k].level);
+        test_assert(fabs(amplitude - p.layer[k].level) < 0.002);
+    }
+
+    between = synth_bin_amplitude(x, N, 900, AUDIO_RATE) +
+        synth_bin_amplitude(x, N, 1500, AUDIO_RATE) + synth_bin_amplitude(x, N, 2100, AUDIO_RATE);
+    test_assert(between < 0.001);
+}
+
+/** A patch with more than BOX_AUDIO_SYNTH_LAYERS layers plays the first 8 of them. */
+void Synth_layers_clamped(void) {
+    // audio/synth
+    enum { FROM = 2400, N = 24000 };
+    box_audio_synth_patch_t p = synth_octet(1.0f);
+    const float *x = audio_l + FROM;
+    double amplitude;
+    int32_t k;
+    p.layers = BOX_AUDIO_SYNTH_LAYERS + 1;
+    synth_render_patch(&p);
+    for (k = 0; k < BOX_AUDIO_SYNTH_LAYERS; k ++) {
+        amplitude = synth_bin_amplitude(x, N, p.layer[k].frequency, AUDIO_RATE);
+        test_assert(fabs(amplitude - p.layer[k].level) < 0.002);
+    }
+}
+
+/** A synth command ends after the layers of its patch, and one cut short of them is ignored. */
+void Synth_layers_command_size(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SINE, 440, 0.5f, 0.2f);
+    box_audio_cmd_header_t header;
+    box_audio_event_t e;
+    uint8_t bytes[1024];
+    box_audio_writer_t w;
+    p.layers = 2;
+    p.layer[1] = (box_audio_synth_layer_t){ .frequency = 660, .level = 0.2f };
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_synth(&w, 1, &p));
+    printf("synth command: %d bytes for 2 layers, %d for %d\n", (int)w.size,
+        (int)BOX_AUDIO_CMD_SYNTH_SIZE(BOX_AUDIO_SYNTH_LAYERS), (int)BOX_AUDIO_SYNTH_LAYERS);
+    test_int(w.size, BOX_AUDIO_CMD_SYNTH_SIZE(2));
+    test_assert(w.size < (int32_t)sizeof(box_audio_cmd_synth_t));
+    box_audio_core_apply(core, w.data, w.size);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 4800);
+    test_assert(audio_peak(audio_l, 0, 4800) > 0.5f);
+
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_synth(&w, 2, &p));
+    memcpy(&header, bytes, sizeof(header));
+    header.size = (uint16_t)BOX_AUDIO_CMD_SYNTH_SIZE(1);
+    memcpy(bytes, &header, sizeof(header));
+    box_audio_core_apply(core, bytes, BOX_AUDIO_CMD_SYNTH_SIZE(1));
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, &e), 1);
+    test_int(e.id, BOX_AUDIO_CMD_SYNTH);
+    box_audio_core_free(core);
+}
+
+/** Voices take the state of only the layers their patch has, from a pool of 4 per voice slot:
+ * every slot plays 4 layers, a play of 8 layers that finds no room is ignored, and the layers
+ * come back when the voices end. */
+void Synth_layers_pool(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t wide = synth_octet(0.05f);
+    box_audio_synth_patch_t four = synth_octet(0.05f);
+    const int32_t slots = BOX_AUDIO_VOICE_MAX + BOX_AUDIO_VOICE_TAIL_MAX;
+    const int32_t fit = 4 * slots / BOX_AUDIO_SYNTH_LAYERS;
+    int32_t i;
+    four.layers = 4;
+    synth_define(core, 1, &wide);
+    synth_define(core, 2, &four);
+    for (i = 0; i < BOX_AUDIO_VOICE_MAX; i ++) {
+        audio_play(core, (uint32_t)i, 2, 0, 0.01f, 0, 1, 0);
+    }
+
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
+    test_int(box_audio_core_voice_count(core), BOX_AUDIO_VOICE_MAX);
+    audio_render(core, 0, 9600);
+    test_int(box_audio_core_voice_count(core), 0);
+    audio_events(core, 0, NULL);
+
+    for (i = 0; i < fit; i ++) {
+        audio_play(core, 100 + (uint32_t)i, 1, 0, 0.01f, 0, 1, 0);
+    }
+
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
+    test_int(box_audio_core_voice_count(core), fit);
+    audio_play(core, 1000, 1, 0, 0.01f, 0, 1, 0);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 1);
+    test_int(box_audio_core_voice_count(core), fit);
+    audio_render(core, 0, 9600);
+    test_assert(synth_finite(audio_l, 0, 9600));
+    test_int(box_audio_core_voice_count(core), 0);
+    audio_events(core, 0, NULL);
+
+    for (i = 0; i < fit; i ++) {
+        audio_play(core, 2000 + (uint32_t)i, 1, 0, 0.01f, 0, 1, 0);
+    }
+
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
+    test_int(box_audio_core_voice_count(core), fit);
+    box_audio_core_free(core);
+}
+
+/** FNV-1a hash of the bits of samples.
+ *
+ * @param x Samples
+ * @param n Number of samples
+ * @return The hash
+ */
+static uint64_t synth_hash(
+    const float *x,
+    int32_t n)
+{
+    uint64_t h = 0xCBF29CE484222325ull;
+    uint32_t bits;
+    int32_t i, b;
+    for (i = 0; i < n; i ++) {
+        memcpy(&bits, &x[i], sizeof(bits));
+        for (b = 0; b < 4; b ++) {
+            h ^= (bits >> (8 * b)) & 0xFF;
+            h *= 0x100000001B3ull;
+        }
+    }
+
+    return h;
+}
+
+/** Hashes of the renders of Synth_layers_identical by the synth of 4 layers, before the layers
+ * became parts of the core */
+static const uint64_t synth_golden[4] = { 0, 0, 0, 0 };
+
+/** Patches of up to 4 layers render bit identical to the synth of 4 layers: filters with an
+ * envelope at both slopes, sweeps, noise with variances, own envelopes, phase and ring
+ * modulation with feedback, a change of pitch and the restarts of a loop. */
+void Synth_layers_identical(void) {
+    // audio/synth
+    box_audio_synth_envelope_t decay = {
+        .attack = 0.002f, .decay = 0.5f, .sustain = 0.2f, .hold = 0.3f, .release = 0.1f };
+    box_audio_synth_patch_t p[4] = {{0}};
+    uint64_t hash;
+    int32_t i;
+    p[0].layers = 3;
+    p[0].seed = 5;
+    p[0].pitch_variance = 0.1f;
+    p[0].level_variance = 0.2f;
+    p[0].envelope = (box_audio_synth_envelope_t){
+        .attack = 0.01f, .decay = 0.05f, .sustain = 0.5f, .hold = 0.3f, .release = 0.05f,
+        .curve = 4, .attack_curve = 1 };
+    p[0].filter = BOX_AUDIO_SYNTH_LOWPASS;
+    p[0].cutoff = 300;
+    p[0].slope = BOX_AUDIO_SYNTH_SLOPE_24;
+    p[0].filter_amount = 4.7f;
+    p[0].filter_envelope = (box_audio_synth_envelope_t){
+        .attack = 0.15f, .sustain = 1, .hold = 0.05f, .release = 0.05f };
+    p[0].resonance = 0.7f;
+    p[0].layer[0] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_SAW, .frequency = 110,
+        .frequency_end = 440, .sweep = 0.1f, .level = 0.3f };
+    p[0].layer[1] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_NOISE, .level = 0.2f };
+    p[0].layer[2] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_SQUARE, .frequency = 220,
+        .level = 0.2f, .has_envelope = 1, .envelope = { .attack = 0.001f, .decay = 0.02f } };
+
+    p[1].layers = 4;
+    p[1].seed = 3;
+    p[1].envelope = decay;
+    p[1].filter = BOX_AUDIO_SYNTH_BANDPASS;
+    p[1].cutoff = 900;
+    p[1].resonance = 0.4f;
+    p[1].layer[0] = (box_audio_synth_layer_t){ .frequency = 220, .level = 0.4f };
+    p[1].layer[1] = (box_audio_synth_layer_t){ .frequency = 308, .level = 1,
+        .modulates = 1, .index = 3, .has_envelope = 1, .envelope = decay };
+    p[1].layer[2] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_TRIANGLE,
+        .frequency = 440, .level = 0.2f };
+    p[1].layer[3] = (box_audio_synth_layer_t){ .frequency = 440, .level = 0.3f,
+        .modulates = 3, .modulation = BOX_AUDIO_SYNTH_RING, .index = 0.7f, .feedback = 0.8f,
+        .audible = 1 };
+
+    p[2] = synth_steady(BOX_AUDIO_SYNTH_SINE, 1000, 0.5f, 0.5f);
+    p[2].layers = 2;
+    p[2].layer[0].feedback = 0.6f;
+    p[2].layer[1] = (box_audio_synth_layer_t){ .frequency = 6000, .level = 1,
+        .modulates = 1, .index = 2, .frequency_end = 3000, .sweep = 0.4f };
+
+    p[3].layers = 2;
+    p[3].seed = 11;
+    p[3].level_variance = 0.3f;
+    p[3].envelope = (box_audio_synth_envelope_t){
+        .attack = 0.01f, .decay = 0.05f, .sustain = 0.6f, .hold = 0.05f, .release = 0.05f };
+    p[3].filter = BOX_AUDIO_SYNTH_HIGHPASS;
+    p[3].cutoff = 200;
+    p[3].layer[0] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_SAW, .frequency = 330,
+        .level = 0.4f };
+    p[3].layer[1] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_NOISE, .level = 0.1f,
+        .has_envelope = 1, .envelope = { .attack = 0.001f, .decay = 0.03f } };
+
+    for (i = 0; i < 4; i ++) {
+        box_audio_core_t *core = synth_core(AUDIO_RATE);
+        synth_define(core, 1, &p[i]);
+        audio_play(core, 1, 1, 0, 1, 0, 0.9f, i == 3 ? BOX_AUDIO_PLAY_LOOP : 0);
+        audio_render(core, 0, AUDIO_FRAMES / 2);
+        audio_voice_set(core, 1, BOX_AUDIO_PARAM_PITCH, 1.2f);
+        audio_render(core, AUDIO_FRAMES / 2, AUDIO_FRAMES / 2);
+        hash = synth_hash(audio_l, AUDIO_FRAMES) ^ (synth_hash(audio_r, AUDIO_FRAMES) << 1);
+        printf("patch %d: 0x%016llXull\n", (int)i, (unsigned long long)hash);
+        test_assert(hash == synth_golden[i]);
+        box_audio_core_free(core);
+    }
+}
+
 /** Read a file of the repository.
  *
  * @param file Path from the root of the repository
@@ -1556,15 +1803,18 @@ void Synth_docs_examples(void) {
     ecs_world_t *world = audio_world();
     char *code = synth_read("test/assets/audio/synth_examples.flecs");
     const char *names[] = {
-        "UiClick", "UiBlip", "Whoosh", "Bell", "ElectricPiano", "MetalHit", "Pluck", "Ring" };
-    const int32_t frames[] = { 3, 12, 70, 155, 100, 40, 48, 40 };
+        "UiClick", "UiBlip", "Whoosh", "Bell", "ElectricPiano", "MetalHit", "Pluck", "Ring",
+        "Strings" };
+    const int32_t frames[] = { 3, 12, 70, 155, 100, 40, 48, 40, 110 };
     int32_t i, start;
     audio_log_start();
     test_assert(ecs_script_run(world, "examples", code, NULL) == 0);
     ecs_os_free(code);
     audio_run(world, 1);
     test_flt(ecs_get(world, ecs_lookup(world, "Ring"), AudioSynth)->patch.envelope.curve, 5);
-    for (i = 0; i < 8; i ++) {
+    test_int(ecs_get(world, ecs_lookup(world, "Strings"), AudioSynth)->patch.layers,
+        BOX_AUDIO_SYNTH_LAYERS);
+    for (i = 0; i < 9; i ++) {
         ecs_entity_t sound = ecs_lookup(world, names[i]);
         test_assert(sound != 0);
         test_assert(ecs_get(world, sound, AudioSynth)->compiled);
@@ -1635,31 +1885,51 @@ void Synth_script_filter_envelope(void) {
     ecs_fini(world);
 }
 
+/** A sound of test/assets/audio/synth_layers.flecs with 8 layers compiles them all without an
+ * error, and one with a ninth logs one error and leaves it out. */
 void Synth_too_many_layers(void) {
     // audio/synth
     ecs_world_t *world = audio_world();
-    ecs_entity_t wide;
+    char *code = synth_read("test/assets/audio/synth_layers.flecs");
+    const box_audio_synth_patch_t *p;
+    ecs_entity_t octet, wide;
+    float sum = 0;
+    int32_t i, start;
     audio_log_start();
-    test_assert(ecs_script_run(world, "wide",
-        "using box.audio\n"
-        "prefab Wide {\n"
-        "  SynthSound: {}\n"
-        "  SynthEnvelope: {attack: 0.01, decay: 0.1}\n"
-        "  a { SynthOscillator: {frequency: 100, level: 0.1} }\n"
-        "  b { SynthOscillator: {frequency: 200, level: 0.1} }\n"
-        "  c { SynthOscillator: {frequency: 300, level: 0.1} }\n"
-        "  d { SynthOscillator: {frequency: 400, level: 0.1} }\n"
-        "  e { SynthOscillator: {frequency: 500, level: 0.1} }\n"
-        "}\n", NULL) == 0);
+    test_assert(ecs_script_run(world, "layers", code, NULL) == 0);
+    ecs_os_free(code);
     audio_run(world, 3);
     audio_log_stop();
     test_int(audio_log_errors, 1);
     test_assert(strstr(audio_log_last, "Wide") != NULL);
+    test_assert(strstr(audio_log_last, "9 layers") != NULL);
+
+    octet = ecs_lookup(world, "Octet");
+    p = &ecs_get(world, octet, AudioSynth)->patch;
+    test_int(p->layers, BOX_AUDIO_SYNTH_LAYERS);
+    for (i = 0; i < BOX_AUDIO_SYNTH_LAYERS; i ++) {
+        sum += p->layer[i].frequency;
+    }
+
+    test_flt(sum, 3600);
+
     wide = ecs_lookup(world, "Wide");
-    test_int(ecs_get(world, wide, AudioSynth)->patch.layers, BOX_AUDIO_SYNTH_LAYERS);
+    p = &ecs_get(world, wide, AudioSynth)->patch;
+    test_int(p->layers, BOX_AUDIO_SYNTH_LAYERS);
+    sum = 0;
+    for (i = 0; i < BOX_AUDIO_SYNTH_LAYERS; i ++) {
+        test_assert(p->layer[i].frequency >= 100 && p->layer[i].frequency <= 900);
+        sum += p->layer[i].frequency;
+    }
+
+    test_assert(sum >= 3600 && sum <= 4400);
+    start = audio_tap_count;
+    test_assert(box_audio_play(world, octet, 1.0f));
     test_assert(box_audio_play(world, wide, 1.0f));
     audio_run(world, 2);
-    test_assert(audio_peak(audio_tap_l, audio_tap_count - AUDIO_FRAME, audio_tap_count) > 0.1f);
+    test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.1f);
+    audio_run(world, 30);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
     ecs_fini(world);
 }
 

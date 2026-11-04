@@ -395,7 +395,7 @@ static void box_audio_cmd_play(
     }
 
     v = box_audio_voice_slot(core);
-    if (!v) {
+    if (!v || (core->sounds[cmd->sound].synth && !box_audio_synth_fits(core, cmd->sound))) {
         box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_PLAY, 0);
         goto done;
     }
@@ -683,6 +683,7 @@ static void box_audio_cmd(
     box_audio_cmd_reverb_t reverb;
     box_audio_cmd_synth_t synth;
     box_audio_voice_t *v;
+    uint32_t layers;
     if (type == BOX_AUDIO_CMD_PLAY && size >= (int32_t)sizeof(play)) {
         box_audio_copy(&play, bytes, (int32_t)sizeof(play));
         box_audio_cmd_play(core, &play);
@@ -709,9 +710,17 @@ static void box_audio_cmd(
     } else if (type == BOX_AUDIO_CMD_REVERB && size >= (int32_t)sizeof(reverb)) {
         box_audio_copy(&reverb, bytes, (int32_t)sizeof(reverb));
         box_audio_reverb_command(core, &reverb);
-    } else if (type == BOX_AUDIO_CMD_SYNTH && size >= (int32_t)sizeof(synth)) {
-        box_audio_copy(&synth, bytes, (int32_t)sizeof(synth));
-        box_audio_synth_command(core, &synth);
+    } else if (type == BOX_AUDIO_CMD_SYNTH && size >= BOX_AUDIO_CMD_SYNTH_SIZE(0)) {
+        box_audio_copy(&synth, bytes, BOX_AUDIO_CMD_SYNTH_SIZE(0));
+        layers = synth.patch.layers < BOX_AUDIO_SYNTH_LAYERS ? synth.patch.layers :
+            BOX_AUDIO_SYNTH_LAYERS;
+        if (size >= BOX_AUDIO_CMD_SYNTH_SIZE(layers)) {
+            box_audio_copy(synth.patch.layer, bytes + BOX_AUDIO_CMD_SYNTH_SIZE(0),
+                BOX_AUDIO_CMD_SYNTH_SIZE(layers) - BOX_AUDIO_CMD_SYNTH_SIZE(0));
+            box_audio_synth_command(core, &synth);
+        } else {
+            box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, type, size);
+        }
     } else {
         box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, type, size);
     }
@@ -797,6 +806,7 @@ box_audio_core_t* box_audio_core_new(
     core->bus_active[0] = true;
     core->event_lost_at = -1;
     box_audio_reverbs_init(core);
+    box_audio_synth_parts_init(core);
 
 done:
     return core;
