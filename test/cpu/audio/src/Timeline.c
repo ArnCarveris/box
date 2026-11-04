@@ -74,7 +74,9 @@ static int64_t timeline_onset(
     return result;
 }
 
-/** Check that the clicks of beats start on their frame, silent before, and measure them.
+/** Check that the clicks of beats start on their frame, silent before, and measure them. The
+ * sine of the click starts at phase 0 and its envelope at 0, so the first sample of a click is 0
+ * and the one after it is not: a click that starts a frame early or late fails.
  *
  * @param start Frame of the first beat
  * @param count Beats
@@ -94,8 +96,7 @@ static void timeline_clicks(
         int64_t onset = timeline_onset(f, f + 100);
         test_assert(f + 1440 < audio_tap_count);
         test_int(timeline_onset(quiet, f), -1);
-        test_assert(onset >= f);
-        test_assert(onset <= f + 3);
+        test_int(onset, f + 1);
         peaks[b] = audio_peak(audio_tap_l, (int32_t)f, (int32_t)f + 1440);
         test_assert(peaks[b] > 0.05f);
     }
