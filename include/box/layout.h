@@ -199,8 +199,8 @@ ECS_STRUCT(LayoutFill, {
     ecs_entity_t surface; /**< Surface whose size in points the element takes */
 });
 
-/** Clips the Rect, Circle, Line, Border, Image and Text of the descendants of an element to its
- * area, like CSS overflow: hidden; the element itself is not clipped.
+/** Clips the Rect, Circle, Line, Polygon2D, Border, Image and Text of the descendants of an
+ * element to its area, like CSS overflow: hidden; the element itself is not clipped.
  *
  * The area is its LayoutBounds, else its Rect, centered in its local XY plane, inside its Border:
  * shrunk by Border.width on each side and rounded by Border.radius less the width, both at least

@@ -2,7 +2,7 @@
     "id": "bench_render",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the packet data, the extract of the instanced batches and lights, the shadow pass, the frustum and occlusion cull passes, the effect passes, the fragment cost of the texture mappings, the fog volumes, the baked lighting, prefab instantiation, the atmosphere extract, the particle passes, the transitions and a scene with parametric surfaces of box.render",
+        "description": "Benchmarks for the packet data, the extract of the instanced batches and lights, the shadow pass, the frustum and occlusion cull passes, the effect passes, the fragment cost of the texture mappings, the fog volumes, the baked lighting, prefab instantiation, the atmosphere extract, the particle passes, the transitions, the GPU cost of Polygon2D next to the other 2D shapes and a scene with parametric surfaces of box.render",
         "public": false,
         "use": [
             "box"
@@ -90,6 +90,15 @@
                     "ui_tree_shadows_add_remove",
                     "ui_tree_shadows_toggle",
                     "clipped_1000_moving_clips"
+                ]
+            },
+            {
+                "id": "Polygon2D",
+                "benchcases": [
+                    "shapes_10k",
+                    "polygons_10k",
+                    "rects_large",
+                    "rings_large"
                 ]
             },
             {

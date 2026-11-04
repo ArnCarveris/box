@@ -265,6 +265,14 @@
                 ]
             },
             {
+                "id": "Polygon",
+                "testcases": [
+                    "picked_inside_outline",
+                    "picked_on_stroke",
+                    "picked_inside_clip"
+                ]
+            },
+            {
                 "id": "Clip",
                 "testcases": [
                     "child_outside_parent_hidden",
