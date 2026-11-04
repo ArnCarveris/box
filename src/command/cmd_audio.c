@@ -1,14 +1,8 @@
 /**
  * @file command/cmd_audio.c
-<<<<<<< HEAD
- * @brief The audio command: the status of the audio, its transport, its buses and its
- * instruments, the master volume and mute, play, stop, seek and tempo, and captures of the
- * master output to a WAV.
-=======
  * @brief The audio command: the status of the audio, its transport, its buses and their insert
- * slots, the master volume and mute, play, stop, seek and tempo, and captures of the master
- * output to a WAV resource.
->>>>>>> c21b46b92f471bd6aba722293015e82a9632c704
+ * slots, its instruments, the master volume and mute, play, stop, seek and tempo, and captures
+ * of the master output to a WAV resource.
  *
  * The actions only write AudioSettings or Transport, which box.audio sends to the core at the
  * end of the frame, as for a change from a script or the REST API. A capture taps the core, so

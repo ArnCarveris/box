@@ -141,11 +141,8 @@
                     "events_and_release",
                     "synth_voices",
                     "scheduled",
-<<<<<<< HEAD
-                    "gated"
-=======
+                    "gated",
                     "effects"
->>>>>>> c21b46b92f471bd6aba722293015e82a9632c704
                 ]
             },
             {

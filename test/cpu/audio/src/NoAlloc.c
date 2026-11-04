@@ -191,7 +191,6 @@ void NoAlloc_scheduled(void) {
     test_int(noalloc_frees, 1);
 }
 
-<<<<<<< HEAD
 /* Gated synth voices and sampler voices with the attack flag, their scheduled releases and
  * legato notes that follow them, without a call of the allocator. */
 void NoAlloc_gated(void) {
@@ -237,7 +236,12 @@ void NoAlloc_gated(void) {
     audio_render(core, 0, AUDIO_FRAMES);
     test_int(box_audio_core_scheduled(core), 0);
     audio_events(core, 0, NULL);
-=======
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+}
+
 /* Effects in the insert slots of buses: reverbs on several buses, a change of their
  * parameters, moves between buses and slots, a removal whose tail fades on a live bus and one
  * whose bus left the order, and memory that grows, without a call of the allocator. */
@@ -295,17 +299,13 @@ void NoAlloc_effects(void) {
         test_assert(!box_audio_core_effect_running(core, i));
     }
 
->>>>>>> c21b46b92f471bd6aba722293015e82a9632c704
     test_int(noalloc_allocs, 1);
     test_int(noalloc_frees, 0);
     box_audio_core_free(core);
     test_int(noalloc_frees, 1);
-<<<<<<< HEAD
-=======
     for (i = 0; i < 4; i ++) {
         free(memory[i]);
     }
 
     free(larger);
->>>>>>> c21b46b92f471bd6aba722293015e82a9632c704
 }

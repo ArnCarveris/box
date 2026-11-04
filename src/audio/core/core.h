@@ -188,14 +188,10 @@ typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_SOUND_RELEASE = 6, /**< box_audio_cmd_release_t */
     BOX_AUDIO_CMD_SYNTH = 8,         /**< box_audio_cmd_synth_t */
     BOX_AUDIO_CMD_STREAM = 9,        /**< box_audio_cmd_stream_t */
-<<<<<<< HEAD
     BOX_AUDIO_CMD_RELEASE = 10,      /**< box_audio_cmd_voice_release_t */
-    BOX_AUDIO_CMD_LEGATO = 12        /**< box_audio_cmd_legato_t */
-=======
-    BOX_AUDIO_CMD_LEGATO = 10,       /**< box_audio_cmd_legato_t */
-    BOX_AUDIO_CMD_EFFECT = 11        /**< box_audio_cmd_effect_t; 7, the reverb command of
+    BOX_AUDIO_CMD_EFFECT = 11,       /**< box_audio_cmd_effect_t; 7, the reverb command of
                                       *   before, is skipped as an unknown type */
->>>>>>> c21b46b92f471bd6aba722293015e82a9632c704
+    BOX_AUDIO_CMD_LEGATO = 12        /**< box_audio_cmd_legato_t */
 } box_audio_cmd_type_t;
 
 /** Parameters of BOX_AUDIO_CMD_VOICE_SET and BOX_AUDIO_CMD_BUS_SET */
