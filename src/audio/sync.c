@@ -176,13 +176,13 @@ static void box_audio_events(
             } else if (e->type == BOX_AUDIO_EVENT_VOICE_STOLEN) {
                 state->voices_stolen = e->value;
             } else if (e->type == BOX_AUDIO_EVENT_VOICE_END) {
+                ecs_map_val_t *v = ecs_map_get(&state->voices, e->id);
+                ecs_entity_t src = v ? (ecs_entity_t)v[0] : 0;
+                box_audio_oneshot_t *shots = ecs_vec_first(&state->oneshots);
                 if (e->value > 0) {
                     state->voices_refused = e->value;
                 }
 
-                ecs_map_val_t *v = ecs_map_get(&state->voices, e->id);
-                ecs_entity_t src = v ? (ecs_entity_t)v[0] : 0;
-                box_audio_oneshot_t *shots = ecs_vec_first(&state->oneshots);
                 for (k = 0; k < ecs_vec_count(&state->oneshots); k ++) {
                     if (shots[k].handle == e->id) {
                         ecs_vec_remove_t(&state->oneshots, box_audio_oneshot_t, k);

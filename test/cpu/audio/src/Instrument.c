@@ -727,7 +727,7 @@ void Instrument_legato_cancels_release(void) {
     // audio/instrument
     box_audio_core_t *core = audio_new();
     box_audio_synth_patch_t p = instrument_probe(0);
-    uint8_t bytes[128];
+    uint8_t bytes[256];
     box_audio_writer_t w;
     box_audio_event_t e;
     int32_t last;

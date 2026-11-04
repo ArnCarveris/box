@@ -403,7 +403,7 @@ into the heap of its core. After a release, `BOX_AUDIO_EVENT_SOUND_FREE` tells t
 when no voice uses the sound any more, so the side that owns it frees it, never the render path.
 
 **Events** are `{ type, id, value }`: `VOICE_END` (id the handle, for an end, a stop or a
-steal, value 0; for a play the priorities refused, value the refusals so far), `VOICE_STOLEN` (id the handle, value the steals so far), `SOUND_FREE`,
+steal, value 0; for a play that the priorities refused, value the refusals so far), `VOICE_STOLEN` (id the handle, value the steals so far), `SOUND_FREE`,
 `ORDER_REFUSED`, `IGNORED` (id the command type), `LOST` (value the events lost) and `LATE`
 (id the type of a command that found the schedule full and applied at once). The core
 holds `BOX_AUDIO_EVENT_MAX` (256) until `read_events`. The last slot is kept for `LOST`: when
