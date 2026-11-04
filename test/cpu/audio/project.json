@@ -293,7 +293,6 @@
                     "too_many_layers",
                     "endless_logs_error",
                     "deleted_releases",
-<<<<<<< HEAD
                     "glide_geometric_mean",
                     "glide_zero_identical",
                     "legato_no_retrigger",
@@ -303,10 +302,8 @@
                     "glide_source_pitch",
                     "script_legato",
                     "script_legato_source",
-                    "docs_glide_example"
-=======
+                    "docs_glide_example",
                     "script_modulators"
->>>>>>> 7b035d324f2579872072ca1f9f27b296c8d31845
                 ]
             },
             {

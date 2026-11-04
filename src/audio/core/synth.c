@@ -552,11 +552,8 @@ static void box_audio_synth_pass(
 
     src->inc_max = top / (double)rate;
     src->envs = 0;
-<<<<<<< HEAD
     src->glide_left = 0;
-=======
     src->modulated = false;
->>>>>>> 7b035d324f2579872072ca1f9f27b296c8d31845
     for (l = 0; l < p->layers; l ++) {
         const box_audio_synth_layer_t *layer = &p->layer[l];
         box_audio_synth_osc_t *o = &src->osc[l];
@@ -831,6 +828,10 @@ bool box_audio_synth_legato(
     src->glide_frames = n;
     src->glide_left = n;
     src->pitch = p;
+    if (src->modulated) {
+        box_audio_synth_limits(src);
+    }
+
     result = true;
 done:
     return result;
@@ -855,7 +856,9 @@ static void box_audio_synth_glide_next(
         }
     }
 
-    src->glide_left --;
+    if (-- src->glide_left == 0 && src->modulated) {
+        box_audio_synth_limits(src);
+    }
 }
 
 /** Advance the envelopes a source uses by a frame.
@@ -1098,15 +1101,10 @@ int32_t box_audio_synth_render(
             box_audio_synth_envs_next(src, levels);
         }
 
-<<<<<<< HEAD
         if (src->glide_left > 0) {
             box_audio_synth_glide_next(src);
         }
 
-        for (l = 0; l < layers; l ++) {
-            box_audio_synth_osc_t *o = &src->osc[l];
-            mix += box_audio_synth_osc_next(o, &src->rng) * o->level * levels[o->env];
-=======
         if (src->modulated) {
             mix = box_audio_synth_modulate(src, levels);
         } else {
@@ -1114,7 +1112,6 @@ int32_t box_audio_synth_render(
                 box_audio_synth_osc_t *o = &src->osc[l];
                 mix += box_audio_synth_osc_next(o, &src->rng) * o->level * levels[o->env];
             }
->>>>>>> 7b035d324f2579872072ca1f9f27b296c8d31845
         }
 
         if (src->filter) {

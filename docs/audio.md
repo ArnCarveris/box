@@ -41,12 +41,8 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 | `AudioPcm` | A sound from samples, from script or C |
 | `SoundFile` | A short sound from a WAV or FLAC file, decoded into memory, see [Sound files](#sound-files) |
 | `SoundStatus` | Read only: whether a `SoundFile` loads, is ready or failed |
-<<<<<<< HEAD
-| `SynthSound` | A sound made by the synth from layers of `SynthOscillator`, `SynthEnvelope`, `SynthFilter` and `SynthFilterEnvelope`, see [Synth sounds](#synth-sounds) |
-| `SynthGlide` | Portamento and mono legato of a synth sound, see [Glide and legato](#glide-and-legato) |
-=======
 | `SynthSound` | A sound made by the synth from layers of `SynthOscillator`, `SynthEnvelope`, `SynthFilter` and `SynthFilterEnvelope`, layers that may modulate each other, see [Synth sounds](#synth-sounds) |
->>>>>>> 7b035d324f2579872072ca1f9f27b296c8d31845
+| `SynthGlide` | Portamento and mono legato of a synth sound, see [Glide and legato](#glide-and-legato) |
 | `AudioSource` | A sound that plays while its entity exists, once or in a loop, with a volume and a pitch |
 | `AudioSpatial` | Places a source in the world: `min_distance`, `max_distance`, `rolloff`, see [Spatial audio](#spatial-audio) |
 | `AudioListener` | The entity that hears the spatial sources, the camera without one |
@@ -228,17 +224,11 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   EQ, compressor or delay on a bus.
 - **Voices**: 64, with the quietest stolen; no priorities. A one shot cannot be controlled after
   it started.
-<<<<<<< HEAD
-- **Synth**: up to 4 oscillators and one filter per sound, linear or curved envelopes, no LFO and no node
-  graph. Legato is mono per channel and has no note off: a held note lasts its hold after the
-  last note. A looping synth sound starts a new pass of its envelopes and oscillators at the end of
-  the last, at most every 60 seconds; a drone keeps that gap short with edges of a few ms, as
-=======
 - **Synth**: up to 4 oscillators and one filter per sound, linear or curved envelopes, no LFO
   and no node graph; an oscillator may phase or ring modulate another, but FM is not band
-  limited. A looping synth sound starts a new pass of its envelopes and oscillators at the end
+  limited. Legato is mono per channel and has no note off: a held note lasts its hold after the
+  last note. A looping synth sound starts a new pass of its envelopes and oscillators at the end
   of the last, at most every 60 seconds; a drone keeps that gap short with edges of a few ms, as
->>>>>>> 7b035d324f2579872072ca1f9f27b296c8d31845
   the dust merchant's engine does with 2 ms.
 - **Files**: WAV and FLAC for sounds, Ogg Vorbis for music, one stream at once (a change of path
   fades over 5 ms, there is no crossfade).
@@ -568,16 +558,10 @@ voices that play keep theirs, and a release frees the id at once with `SOUND_FRE
   the sender saw it never names the voice of the next note. A sound that is not ready leaves
   the voice as it was, with the new handle. A retarget allocates nothing.
 - **Cost.** Render work only: per frame of a voice an envelope step per envelope (a multiply
-<<<<<<< HEAD
-  and an add when curved), an oscillator per layer and the filter, one stage or two; during a
-  glide a multiply per oscillator. `bench/audio` has a `Synth` suite of 64 voices in
-  ns per sample, with a filter envelope and with a 24 dB filter.
-=======
   and an add when curved), an oscillator per layer and the filter, one stage or two; a modulated
-  patch adds a phase offset and a wrap per layer. `bench/audio` has a `Synth` suite of 64 voices
-  in ns per sample, with a filter envelope, with a 24 dB filter, and `voices_64_fm`, two FM
-  pairs per voice, which measures the modulated path.
->>>>>>> 7b035d324f2579872072ca1f9f27b296c8d31845
+  patch adds a phase offset and a wrap per layer; during a glide a multiply per oscillator.
+  `bench/audio` has a `Synth` suite of 64 voices in ns per sample, with a filter envelope, with a
+  24 dB filter, and `voices_64_fm`, two FM pairs per voice, which measures the modulated path.
 
 The core needs no libm: the exponential sweeps and the filter envelope use series for `log2` and
 `exp2` in `synth.c`.
@@ -585,16 +569,11 @@ The core needs no libm: the exponential sweeps and the filter envelope use serie
 ### Synth sounds
 
 A sound effect is a prefab in script, with no file. `SynthSound` marks the root; the layers are
-<<<<<<< HEAD
-the root and its children that have a `SynthOscillator`, as particle effect layers are. The
-`SynthEnvelope`, the `SynthFilter` and the `SynthFilterEnvelope` of the root apply to the mix of
-the layers; a layer may have its own `SynthEnvelope`, and one without uses the root's. A
-`SynthGlide` on the root makes notes slide, see [Glide and legato](#glide-and-legato).
-=======
 the root and its children that have a `SynthOscillator`, as particle effect layers are, and the
 children of layers that have one, each after its parent. The `SynthEnvelope`, the `SynthFilter`
 and the `SynthFilterEnvelope` of the root apply to the mix of the layers; a layer may have its
-own `SynthEnvelope`, and one without uses the root's.
+own `SynthEnvelope`, and one without uses the root's. A `SynthGlide` on the root makes notes
+slide, see [Glide and legato](#glide-and-legato).
 
 A layer with the `modulation` `SynthPhase` or `SynthRing` is a modulator of its parent layer
 (see [Synth](#synth)): its wave times its envelope moves the phase of its parent by `index`
@@ -602,7 +581,6 @@ radians, or multiplies it at a depth of `index`. Give a modulator its own, short
 `SynthEnvelope` and the brightness of the sound decays with it. A modulator is not heard unless
 it is `audible`; its `level` is the level it is heard at. `frequency` sets the ratio: the same
 as the carrier for a harmonic spectrum, a ratio such as 3.5 or 1.41 for an inharmonic one.
->>>>>>> 7b035d324f2579872072ca1f9f27b296c8d31845
 
 | Component | What it is |
 |-----------|------------|
@@ -814,24 +792,17 @@ times and edges of envelopes, curved envelopes (a linear one bit identical to th
 recurrence, a curved decay at its midpoint and on its sustain, a curved release that ends the
 voice on time), the end of a voice, the filter one octave past its cutoff at both slopes, the
 cutoff following a filter envelope up and down, stability under fast filter envelopes at full
-<<<<<<< HEAD
-resonance and at Nyquist for both slopes and extreme values, layers, scripts from
-`test/assets/audio/synth.flecs`, the five examples above from
-`test/assets/audio/synth_examples.flecs`, glides (the frequency halfway through a glide at the
-geometric mean, a glide of 0 bit identical to the jump, the pitch of a source) and legato notes
-(no new attack, a held sustain that holds again, a new voice after the release, also of a
-looping voice that then ends, and after the end, from script and from a source, the lead above from `test/assets/audio/synth_glide.flecs`)
-and errors; `NoAlloc` renders 64 synth voices. The browser check is
-`test/integration/web/audio_synth.mjs`.
-=======
 resonance and at Nyquist for both slopes and extreme values, layers, phase modulation at 1:1
 and 6:1 against Bessel amplitudes and without drift, an index that follows the envelope of its
 modulator and fades the high sidebands, the limit of the index, ring modulation at the sum and
 difference alone, audible modulators, feedback, scripts from `test/assets/audio/synth.flecs`
 and `test/assets/audio/synth_fm.flecs`, the eight examples above from
-`test/assets/audio/synth_examples.flecs` and errors; `NoAlloc` renders 64 synth voices. The browser
-check is `test/integration/web/audio_synth.mjs`.
->>>>>>> 7b035d324f2579872072ca1f9f27b296c8d31845
+`test/assets/audio/synth_examples.flecs`, glides (the frequency halfway through a glide at the
+geometric mean, a glide of 0 bit identical to the jump, the pitch of a source) and legato notes
+(no new attack, a held sustain that holds again, a new voice after the release, also of a
+looping voice that then ends, and after the end, from script and from a source, the lead above
+from `test/assets/audio/synth_glide.flecs`) and errors; `NoAlloc` renders 64 synth voices. The
+browser check is `test/integration/web/audio_synth.mjs`.
 
 ## Transports
 

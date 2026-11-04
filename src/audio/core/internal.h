@@ -188,9 +188,7 @@ typedef struct box_audio_synth_osc_t {
     double ratio;         /**< Factor of inc per frame during the sweep */
     double inc_end;       /**< Turns per frame at the end of the sweep */
     int32_t sweep;        /**< Frames left of the sweep */
-<<<<<<< HEAD
     double glide;         /**< Factor of inc per frame during a glide */
-=======
     int32_t target;       /**< Layer it modulates, -1 for none */
     bool ring;            /**< Whether it multiplies its target instead of moving its phase */
     bool audible;         /**< Whether a modulator is heard as well */
@@ -198,7 +196,6 @@ typedef struct box_audio_synth_osc_t {
                            * against the frequency; ring: depth */
     float feedback;       /**< Turns of its phase per unit of its own output */
     float fb1, fb2;       /**< Its last two outputs, for the feedback */
->>>>>>> 7b035d324f2579872072ca1f9f27b296c8d31845
 } box_audio_synth_osc_t;
 
 /** A stage of the filter of a synth voice: a trapezoidal state variable filter */

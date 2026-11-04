@@ -1705,7 +1705,6 @@ void Synth_deleted_releases(void) {
     ecs_fini(world);
 }
 
-<<<<<<< HEAD
 /** Frequency of a range at a frame, from the period between each two upward zero crossings,
  * placed at their middle and interpolated in cents between the two periods around the frame.
  *
@@ -2116,7 +2115,9 @@ void Synth_docs_glide_example(void) {
     test_flt(audio_peak(audio_tap_l, audio_tap_count - AUDIO_FRAME, audio_tap_count), 0);
     audio_log_stop();
     test_int(audio_log_errors, 0);
-=======
+    ecs_fini(world);
+}
+
 /** Modulators from test/assets/audio/synth_fm.flecs: a child of a layer modulates it, a
  * grandchild modulates the child, a change of the grandchild compiles the sound again, and a
  * modulator whose parent is not a layer logs one error and is left out. */
@@ -2183,6 +2184,5 @@ void Synth_script_modulators(void) {
     test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.1f);
     test_assert(synth_finite(audio_tap_l, start, audio_tap_count));
     test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
->>>>>>> 7b035d324f2579872072ca1f9f27b296c8d31845
     ecs_fini(world);
 }

@@ -212,12 +212,8 @@ bool box_audio_synth_compile(
     const SynthFilter *filter = ecs_get(world, e, SynthFilter);
     const SynthFilterEnvelope *fenv = ecs_get(world, e, SynthFilterEnvelope);
     const SynthOscillator *osc = ecs_get(world, e, SynthOscillator);
-<<<<<<< HEAD
     const SynthGlide *glide = ecs_get(world, e, SynthGlide);
-    int32_t extra = 0, i;
-=======
     int32_t extra = 0, orphans = 0, i;
->>>>>>> 7b035d324f2579872072ca1f9f27b296c8d31845
     bool endless = false, fits = true, result;
     if (sound) {
         p.seed = sound->seed;
