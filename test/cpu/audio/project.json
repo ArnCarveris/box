@@ -132,6 +132,48 @@
                 ]
             },
             {
+                "id": "Timeline",
+                "testcases": [
+                    "defaults",
+                    "advances",
+                    "stopped_holds",
+                    "seek",
+                    "seek_stopped",
+                    "loop_wraps",
+                    "loop_past_end",
+                    "tempo_continuous",
+                    "window_coverage",
+                    "metronome_4_4",
+                    "metronome_6_8",
+                    "metronome_loop",
+                    "stop_cancels",
+                    "bit_identical",
+                    "new_output",
+                    "script",
+                    "command",
+                    "huge_beats"
+                ]
+            },
+            {
+                "id": "Quantize",
+                "testcases": [
+                    "beat_bar_120_4_4",
+                    "beat_bar_97_4_4",
+                    "beat_bar_120_7_8",
+                    "beat_bar_97_7_8",
+                    "on_boundary",
+                    "loop_wrap_beat",
+                    "loop_wrap_bar",
+                    "stopped",
+                    "none_at_once",
+                    "stop_keeps",
+                    "seek_keeps",
+                    "play_through_stop",
+                    "on_bus",
+                    "script"
+                ]
+            },
+            {
                 "id": "Ring",
                 "setup": true,
                 "testcases": [
@@ -406,7 +448,11 @@
                     "script_pluck",
                     "docs_pluck_examples",
                     "lfo_unison",
-                    "lfo_pluck"
+                    "lfo_pluck",
+                    "pluck_vibrato_rate",
+                    "pluck_crossing_smooth",
+                    "pluck_steady_identical",
+                    "pluck_vibrato_cost"
                 ]
             },
             {

@@ -215,4 +215,12 @@ uint64_t audio_hash(
     const float *x,
     int32_t n);
 
+/** Make every string of a core jump at a crossing of a whole frame, without the crossfade, as
+ * strings did before it.
+ *
+ * @param core The core
+ */
+void audio_strings_rough(
+    box_audio_core_t *core);
+
 #endif

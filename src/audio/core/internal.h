@@ -304,7 +304,9 @@ typedef struct box_audio_synth_unison_t {
 } box_audio_synth_unison_t;
 /** A pluck string of a synth voice: a Karplus-Strong loop of a delay line, a symmetric lowpass
  * of one frame of delay and a first order allpass of the fraction of a frame left, with a gain
- * that sets its decay. A pluck layer has one for each of its unison voices, chained by next */
+ * that sets its decay, and the old read point that crossfades into the new one at a crossing.
+ *
+ * A pluck layer has one for each of its unison voices, chained by next */
 typedef struct box_audio_synth_string_t {
     float line[BOX_AUDIO_SYNTH_STRING_FRAMES]; /**< The delay line, a ring */
     int32_t write;        /**< Index the next frame is written to */
@@ -315,6 +317,15 @@ typedef struct box_audio_synth_string_t {
     float x1, x2;         /**< The last two frames out of the delay line */
     float f1, a1;         /**< The last input and output of the allpass */
     double inc;           /**< Turns per frame it is tuned to */
+    double period;        /**< Frames of the period it is tuned to */
+    int32_t retune;       /**< Frames of a moving pitch until its next exact tuning */
+    int32_t fade;         /**< Frames left of the crossfade from the old read point, 0 for none */
+    int32_t delay_old;    /**< Frames of the delay line of the old read point */
+    float c_old;          /**< Coefficient of the allpass of the old read point */
+    float x1_old, x2_old; /**< The last two frames out of the old read point */
+    float f1_old, a1_old; /**< The last input and output of the allpass of the old read point */
+    bool rough;           /**< Whether a crossing of a whole frame jumps without the crossfade,
+                           * as before it, a switch for tests that a pluck keeps */
     double decay_frames;  /**< Frames of its decay to -60 dB */
     double period_max;    /**< Longest period in frames, at BOX_AUDIO_SYNTH_PLUCK_MIN */
     float peak;           /**< Largest magnitude of the window that runs */

@@ -244,6 +244,27 @@ static void box_audio_settings_ctor(
     }
 }
 
+/** Construct Transport values: 120 quarter notes per minute in 4/4, stopped at beat 0,
+ * without a loop or a metronome, 0.15 seconds of lookahead.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_transport_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Transport *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Transport){
+            .tempo = 120.0f, .beats_per_bar = 4, .beat_unit = 4, .lookahead = 0.15f };
+    }
+}
+
 /** Copy what box.audio sent for an entity: a copy starts with nothing sent. A prefab
  * instance or a clone gets a sound, a bus or a voice of its own this way.
  *
@@ -393,6 +414,27 @@ bool box_audio_play(
 
     box_audio_play_t *play = ecs_vec_append_t(NULL, &state->plays, box_audio_play_t);
     *play = (box_audio_play_t){ .sound = sound, .volume = volume };
+    result = true;
+done:
+    return result;
+}
+
+bool box_audio_play_quantized(
+    ecs_world_t *world,
+    ecs_entity_t sound,
+    float volume,
+    AudioQuantize quantize)
+{
+    box_audio_module_t *state = box_audio_module_get(world);
+    bool result = false;
+    if (!state || !box_audio_is_sound(world, sound)) {
+        goto done;
+    }
+
+    box_audio_play_t *play = ecs_vec_append_t(NULL, &state->plays, box_audio_play_t);
+    *play = (box_audio_play_t){ .sound = sound, .volume = volume,
+        .quantize = quantize == AudioQuantizeBeat || quantize == AudioQuantizeBar ?
+            quantize : AudioQuantizeNone };
     result = true;
 done:
     return result;
@@ -576,6 +618,26 @@ static void box_audio_play_function(
     *(bool*)result->ptr = box_audio_play(ctx->world, sound, volume);
 }
 
+/** The box.audio.play_quantized script function.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The sound, the volume and the grid
+ * @param result Receives whether the play was queued
+ */
+static void box_audio_play_quantized_function(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    ecs_entity_t sound = *(ecs_entity_t*)argv[0].ptr;
+    float volume = *(float*)argv[1].ptr;
+    AudioQuantize quantize = *(AudioQuantize*)argv[2].ptr;
+    (void)argc;
+    *(bool*)result->ptr = box_audio_play_quantized(ctx->world, sound, volume, quantize);
+}
+
 /** The box.audio.play_at script function.
  *
  * @param ctx The call context
@@ -635,6 +697,7 @@ static void box_audio_module_free(
     box_audio_music_fini(state);
     ecs_vec_fini_t(NULL, &state->moved, ecs_entity_t);
     box_audio_sample_fini(state);
+    box_audio_timeline_fini(state);
     ecs_os_free(state->capture.path);
     ecs_os_free(state);
 }
@@ -655,6 +718,18 @@ static void box_audio_functions_init(
             { .name = "volume", .type = ecs_id(ecs_f32_t) }
         },
         .callback = box_audio_play_function
+    });
+
+    ecs_function(world, {
+        .name = "play_quantized",
+        .parent = ecs_get_scope(world),
+        .return_type = ecs_id(ecs_bool_t),
+        .params = {
+            { .name = "sound", .type = ecs_id(ecs_entity_t) },
+            { .name = "volume", .type = ecs_id(ecs_f32_t) },
+            { .name = "quantize", .type = ecs_id(AudioQuantize) }
+        },
+        .callback = box_audio_play_quantized_function
     });
 
     ecs_function(world, {
@@ -739,6 +814,9 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, AudioSettings);
     ecs_set_hooks(world, AudioSettings, { .ctor = box_audio_settings_ctor });
     ECS_META_COMPONENT(world, AudioStatus);
+    ECS_META_COMPONENT(world, Transport);
+    ECS_META_COMPONENT(world, AudioQuantize);
+    ecs_set_hooks(world, Transport, { .ctor = box_audio_transport_ctor });
 
     ECS_COMPONENT_DEFINE(world, AudioSoundId);
     ECS_COMPONENT_DEFINE(world, AudioBusState);
@@ -766,6 +844,7 @@ void BoxAudioImport(
     ecs_entity_t master = ecs_entity(world, { .name = "master" });
     ecs_singleton_add(world, AudioSettings);
     ecs_singleton_set(world, AudioStatus, {0});
+    ecs_singleton_add(world, Transport);
 
     box_audio_module_t *state = ecs_os_calloc_t(box_audio_module_t);
     state->next_voice = 1;
@@ -776,6 +855,7 @@ void BoxAudioImport(
     ecs_vec_init_t(NULL, &state->stops, uint32_t, 0);
     ecs_vec_init_t(NULL, &state->releases, uint32_t, 0);
     ecs_vec_init_t(NULL, &state->moved, ecs_entity_t, 0);
+    box_audio_timeline_init(state);
     ECS_COMPONENT_DEFINE(world, AudioModuleState);
     ecs_singleton_set(world, AudioModuleState, { .state = state });
     ecs_atfini(world, box_audio_module_free, state);

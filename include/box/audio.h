@@ -486,6 +486,37 @@ ECS_STRUCT(AudioStatus, {
                             *   output */
 });
 
+/** The transport of the timeline in beats, a singleton: the tempo, the time signature, the
+ * position, play and stop, the loop and the metronome. A beat is a quarter note in every time
+ * signature, so a bar is beats_per_bar * 4 / beat_unit beats.
+ *
+ * While it plays, box.audio writes position every frame from the clock of the output, the
+ * beat the core renders now. A write of another position is a seek. See Transport in
+ * docs/audio.md.
+ */
+ECS_STRUCT(Transport, {
+    float tempo;           /**< Quarter notes per minute, 20..999, default 120 */
+    int32_t beats_per_bar; /**< Top of the time signature, 1..64, default 4 */
+    int32_t beat_unit;     /**< Bottom of the time signature, 1..64, default 4 */
+    double position;       /**< Beats; written by box.audio while it plays, a write seeks */
+    bool playing;          /**< Whether the timeline plays, default false: false stops at the
+                            *   position, true plays on from it */
+    bool loop;             /**< Wrap from loop_end to loop_start, default false */
+    double loop_start;     /**< First beat of the loop */
+    double loop_end;       /**< Beat the loop wraps at, after loop_start */
+    float lookahead;       /**< Seconds scheduled ahead of the clock, 0.05..0.5, default
+                            *   0.15 */
+    bool metronome;        /**< Click on every beat while playing, accented on the first of a
+                            *   bar, default false */
+});
+
+/** Where box_audio_play_quantized starts a play on the grid of the Transport */
+ECS_ENUM(AudioQuantize, {
+    AudioQuantizeNone = 0,  /**< At once, as box_audio_play */
+    AudioQuantizeBeat = 1,  /**< On the next beat, a quarter note */
+    AudioQuantizeBar = 2    /**< On the next bar of the time signature of the transport */
+});
+
 /** Give an entity the samples of a sound, to play with AudioSource or box_audio_play.
  *
  * @param world The world
@@ -519,6 +550,28 @@ bool box_audio_play(
     ecs_world_t *world,
     ecs_entity_t sound,
     float volume);
+
+/** Play a sound once on the bus of its AudioOutput, starting on the next beat or bar of the
+ * Transport.
+ *
+ * It starts sample accurately on the first boundary at or after the clock of the output, after
+ * a loop wrap on the timeline from loop_start on. With the transport stopped, without a
+ * Transport or with AudioQuantizeNone it starts at once, as box_audio_play.
+ *
+ * The transport never stops or moves it once queued. The rules of box_audio_play apply.
+ * Scripts call it as box.audio.play_quantized(sound, volume, quantize).
+ *
+ * @param world The world
+ * @param sound The sound, an entity with AudioPcm, SoundFile or SynthSound
+ * @param volume Linear gain
+ * @param quantize Where it starts
+ * @return Whether the play was queued
+ */
+bool box_audio_play_quantized(
+    ecs_world_t *world,
+    ecs_entity_t sound,
+    float volume,
+    AudioQuantize quantize);
 
 /** Play a sound once at a place in the world, heard from the listener as an AudioSpatial
  * source that stays where it started.

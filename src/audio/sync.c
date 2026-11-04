@@ -651,12 +651,151 @@ done:
     state->order_dirty = false;
 }
 
+<<<<<<< HEAD
 /** Pick a free sound id of the core, or log once that every id is taken.
  *
  * @param state The state
  * @return The id, 0 when every id is taken
  */
 static uint32_t box_audio_sound_id(
+=======
+/** Write a reverb command and remember what it sent.
+ *
+ * @param state The state
+ * @param slot Slot of the reverb
+ * @param bus Bus index, BOX_AUDIO_BUS_NONE to take the reverb off
+ * @param params The parameters
+ */
+static void box_audio_reverb_send(
+    box_audio_module_t *state,
+    uint32_t slot,
+    uint32_t bus,
+    const box_audio_reverb_params_t *params)
+{
+    box_audio_reverb_sent_t *sent = &state->reverb_sent[slot];
+    if (box_audio_reserve(state)) {
+        box_audio_write_reverb(&state->writer, slot, bus, params);
+        state->stats.reverbs ++;
+    }
+
+    sent->serial = state->serial;
+    sent->bus = bus;
+    sent->params = *params;
+}
+
+/** Free the reverb slots whose entity was deleted or lost its Reverb or its bus; their tails
+ * fade out.
+ *
+ * @param world The world
+ * @param state The state
+ */
+static void box_audio_reverbs_free(
+    ecs_world_t *world,
+    box_audio_module_t *state)
+{
+    uint32_t i;
+    for (i = 0; i < BOX_AUDIO_REVERB_MAX; i ++) {
+        ecs_entity_t e = state->reverb_entity[i];
+        const AudioReverbState *rs = e && ecs_is_alive(world, e) ?
+            ecs_get(world, e, AudioReverbState) : NULL;
+        box_audio_reverb_sent_t *sent = &state->reverb_sent[i];
+        if (!e || (rs && rs->slot == i + 1 && ecs_has(world, e, Reverb) &&
+            ecs_has(world, e, AudioBus)))
+        {
+            continue;
+        }
+
+        if (state->serial && sent->serial == state->serial && sent->bus != BOX_AUDIO_BUS_NONE) {
+            box_audio_reverb_send(state, i, BOX_AUDIO_BUS_NONE, &sent->params);
+        }
+
+        state->reverb_entity[i] = 0;
+    }
+}
+
+/** Give a reverb a free slot, or log once that every slot is taken.
+ *
+ * @param world The world
+ * @param state The state
+ * @param e The entity
+ * @param rs What was done for it
+ * @return The slot, -1 when it stays dry
+ */
+static int32_t box_audio_reverb_alloc(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    ecs_entity_t e,
+    AudioReverbState *rs)
+{
+    int32_t i, result = -1;
+    for (i = 0; i < BOX_AUDIO_REVERB_MAX && result < 0; i ++) {
+        if (!state->reverb_entity[i]) {
+            state->reverb_entity[i] = e;
+            state->reverb_sent[i].serial = 0;
+            rs->slot = (uint8_t)(i + 1);
+            rs->refused = false;
+            result = i;
+        }
+    }
+
+    if (result < 0 && !rs->refused) {
+        char *path = ecs_get_path(world, e);
+        ecs_err("box.audio: more than %d reverb, '%s' stays dry", BOX_AUDIO_REVERB_MAX, path);
+        ecs_os_free(path);
+        rs->refused = true;
+        rs->slot = 0;
+    }
+
+    return result;
+}
+
+/** Give reverbs their slots and delay memory and send their parameters when they changed.
+ *
+ * @param world The world
+ * @param state The state
+ * @param t The transport
+ */
+static void box_audio_reverbs(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    box_audio_transport_t *t)
+{
+    ecs_iter_t it = ecs_query_iter(world, state->reverbs);
+    int32_t i, slot;
+    box_audio_reverbs_free(world, state);
+    while (ecs_query_next(&it)) {
+        const Reverb *reverb = ecs_field(&it, Reverb, 0);
+        AudioReverbState *rs = ecs_field(&it, AudioReverbState, 1);
+        for (i = 0; i < it.count; i ++) {
+            ecs_entity_t e = it.entities[i];
+            uint8_t index = box_audio_bus_of(world, state, e);
+            uint32_t bus = index ? index : BOX_AUDIO_BUS_NONE;
+            box_audio_reverb_params_t params = {
+                .decay = reverb[i].decay, .damping = reverb[i].damping,
+                .predelay = reverb[i].predelay, .size = reverb[i].size, .mix = reverb[i].mix };
+            box_audio_reverb_sent_t *sent;
+            slot = rs[i].slot && state->reverb_entity[rs[i].slot - 1] == e ? rs[i].slot - 1 :
+                box_audio_reverb_alloc(world, state, e, &rs[i]);
+            if (slot < 0) {
+                continue;
+            }
+
+            sent = &state->reverb_sent[slot];
+            if (sent->memory != state->serial && t->reverb(t, (uint32_t)slot)) {
+                sent->memory = state->serial;
+            }
+
+            if (sent->serial != state->serial || sent->bus != bus ||
+                ecs_os_memcmp_t(&sent->params, &params, box_audio_reverb_params_t))
+            {
+                box_audio_reverb_send(state, (uint32_t)slot, bus, &params);
+            }
+        }
+    }
+}
+
+uint32_t box_audio_sound_id(
+>>>>>>> 58db0f88561a6a93fa04df5c5bb60914947cdba3
     box_audio_module_t *state)
 {
     uint32_t id;
@@ -1232,8 +1371,95 @@ static void box_audio_spatial_oneshots(
     }
 }
 
-/** Send the plays of box_audio_play, the stops of deleted sources and the releases of
- * sounds, and reroute the one shots of deleted buses to the master.
+void box_audio_play_send(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    const box_audio_play_t *play,
+    bool waiting,
+    uint64_t when)
+{
+    box_audio_oneshot_t *shots, *shot, next;
+    uint32_t sound = box_audio_sound_of(world, state, play->sound), held;
+    const AudioSpatial *spatial = NULL;
+    float gain = 1.0f, pan = 0;
+    int32_t k, channel;
+    bool legato;
+    if (!sound) {
+        state->stats.not_ready += box_audio_sound_loading(world, play->sound);
+        goto done;
+    }
+
+    if (waiting) {
+        state->stats.dropped ++;
+        goto done;
+    }
+
+    if (play->spatial) {
+        spatial = ecs_get(world, play->sound, AudioSpatial);
+        state->stats.spatial_updates ++;
+        if (state->listener.entity) {
+            gain = box_audio_spatial_gain(spatial, (vec4*)state->listener.m,
+                play->position, &pan);
+        }
+
+        if (!(gain > 0)) {
+            state->stats.out_of_range ++;
+            goto done;
+        }
+    }
+
+    legato = box_audio_legato_of(world, play->sound, &channel);
+    shots = ecs_vec_first(&state->oneshots);
+    for (k = ecs_vec_count(&state->oneshots) - 1; legato && !when && k >= 0; k --) {
+        if (shots[k].legato && shots[k].channel == channel) {
+            break;
+        }
+    }
+
+    next = (box_audio_oneshot_t){
+        .legato = legato,
+        .channel = channel,
+        .handle = box_audio_new_voice(state),
+        .sound = sound,
+        .bus = box_audio_sound_bus(world, state, play->sound),
+        .spatial = play->spatial,
+        .position = { play->position[0], play->position[1], play->position[2] },
+        .distances = spatial ? *spatial :
+            (AudioSpatial){ .min_distance = 1.0f, .max_distance = 50.0f, .rolloff = 1.0f },
+        .volume = play->volume,
+        .sent_volume = play->volume * gain,
+        .sent_pan = pan
+    };
+
+    if (legato && !when && k >= 0) {
+        held = shots[k].handle;
+        shots[k] = next;
+        if (box_audio_reserve(state)) {
+            box_audio_write_legato(&state->writer, next.handle, held, sound, next.bus,
+                next.sent_volume, pan, 1.0f, 0);
+        }
+
+        goto done;
+    }
+
+    if (ecs_vec_count(&state->oneshots) >= BOX_AUDIO_ONESHOT_MAX) {
+        ecs_vec_remove_ordered_t(&state->oneshots, box_audio_oneshot_t, 0);
+    }
+
+    shot = ecs_vec_append_t(NULL, &state->oneshots, box_audio_oneshot_t);
+    *shot = next;
+    if (box_audio_reserve(state)) {
+        box_audio_write_play(&state->writer, shot->handle, sound, shot->bus,
+            shot->sent_volume, pan, 1.0f, 0, when);
+    }
+
+done:
+    return;
+}
+
+/** Send the plays of box_audio_play and box_audio_play_at, the stops of deleted sources and
+ * the releases of sounds, and reroute the one shots of deleted buses to the master. The plays
+ * of box_audio_play_quantized wait for box_audio_timeline_quantized.
  *
  * @param world The world
  * @param state The state
@@ -1249,9 +1475,7 @@ static void box_audio_queued(
     uint32_t *stops = ecs_vec_first(&state->stops);
     uint32_t *releases = ecs_vec_first(&state->releases);
     uint32_t *fades = ecs_vec_first(&state->fades);
-    uint32_t handle;
-    int32_t i, k, channel;
-    bool legato;
+    int32_t i, k;
     for (i = 0; state->bus_freed && i < ecs_vec_count(&state->oneshots); i ++) {
         if (shots[i].bus && (state->bus_freed & ((uint64_t)1 << shots[i].bus))) {
             box_audio_voice_set(state, shots[i].handle, BOX_AUDIO_PARAM_BUS, 0.0f);
@@ -1260,89 +1484,8 @@ static void box_audio_queued(
     }
 
     for (i = 0; i < ecs_vec_count(&state->plays); i ++) {
-        uint32_t sound = box_audio_sound_of(world, state, plays[i].sound);
-        const AudioSpatial *spatial = NULL;
-        float gain = 1.0f, pan = 0;
-        if (!sound) {
-            state->stats.not_ready += box_audio_sound_loading(world, plays[i].sound);
-            continue;
-        }
-
-        if (waiting) {
-            state->stats.dropped ++;
-            continue;
-        }
-
-        if (plays[i].spatial) {
-            spatial = ecs_get(world, plays[i].sound, AudioSpatial);
-            state->stats.spatial_updates ++;
-            if (state->listener.entity) {
-                gain = box_audio_spatial_gain(spatial, (vec4*)state->listener.m,
-                    plays[i].position, &pan);
-            }
-
-            if (!(gain > 0)) {
-                state->stats.out_of_range ++;
-                continue;
-            }
-        }
-
-        legato = box_audio_legato_of(world, plays[i].sound, &channel);
-        shots = ecs_vec_first(&state->oneshots);
-        for (k = ecs_vec_count(&state->oneshots) - 1; legato && k >= 0; k --) {
-            if (shots[k].legato && shots[k].channel == channel) {
-                break;
-            }
-        }
-
-        if (legato && k >= 0) {
-            box_audio_oneshot_t *shot = &shots[k];
-            shot->sound = sound;
-            shot->bus = box_audio_sound_bus(world, state, plays[i].sound);
-            shot->spatial = plays[i].spatial;
-            shot->position[0] = plays[i].position[0];
-            shot->position[1] = plays[i].position[1];
-            shot->position[2] = plays[i].position[2];
-            shot->distances = spatial ? *spatial :
-                (AudioSpatial){ .min_distance = 1.0f, .max_distance = 50.0f, .rolloff = 1.0f };
-            shot->volume = plays[i].volume;
-            shot->sent_volume = plays[i].volume * gain;
-            shot->sent_pan = pan;
-            handle = box_audio_new_voice(state);
-            if (box_audio_reserve(state)) {
-                box_audio_write_legato(&state->writer, handle, shot->handle, sound, shot->bus,
-                    shot->sent_volume, pan, 1.0f, 0);
-            }
-
-            shot->handle = handle;
-
-            continue;
-        }
-
-        if (ecs_vec_count(&state->oneshots) >= BOX_AUDIO_ONESHOT_MAX) {
-            ecs_vec_remove_ordered_t(&state->oneshots, box_audio_oneshot_t, 0);
-        }
-
-        box_audio_oneshot_t *shot = ecs_vec_append_t(NULL, &state->oneshots,
-            box_audio_oneshot_t);
-        *shot = (box_audio_oneshot_t){
-            .legato = legato,
-            .channel = channel,
-            .handle = box_audio_new_voice(state),
-            .sound = sound,
-            .bus = box_audio_sound_bus(world, state, plays[i].sound),
-            .spatial = plays[i].spatial,
-            .position = { plays[i].position[0], plays[i].position[1], plays[i].position[2] },
-            .distances = spatial ? *spatial :
-                (AudioSpatial){ .min_distance = 1.0f, .max_distance = 50.0f, .rolloff = 1.0f },
-            .volume = plays[i].volume,
-            .sent_volume = plays[i].volume * gain,
-            .sent_pan = pan
-        };
-
-        if (box_audio_reserve(state)) {
-            box_audio_write_play(&state->writer, shot->handle, sound, shot->bus,
-                shot->sent_volume, pan, 1.0f, 0, 0);
+        if (plays[i].quantize == AudioQuantizeNone) {
+            box_audio_play_send(world, state, &plays[i], waiting, 0);
         }
     }
 
@@ -1366,7 +1509,6 @@ static void box_audio_queued(
         }
     }
 
-    ecs_vec_clear(&state->plays);
     ecs_vec_clear(&state->stops);
     ecs_vec_clear(&state->releases);
     ecs_vec_clear(&state->fades);
@@ -1596,6 +1738,8 @@ static void BoxAudioSync(
         }
 
         box_audio_queued(world, state, waiting);
+        box_audio_timeline_update(world, state, t, waiting);
+        box_audio_timeline_quantized(world, state, waiting);
         state->spatial_dirty = false;
     } else {
         box_audio_music_update(world, state, NULL, false);

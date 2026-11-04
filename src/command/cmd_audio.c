@@ -1,16 +1,22 @@
 /**
  * @file command/cmd_audio.c
+<<<<<<< HEAD
  * @brief The audio command: the status of the audio, its buses and their insert slots, the
  * master volume and mute, and captures of the master output to a WAV resource.
+=======
+ * @brief The audio command: the status of the audio, its transport and its buses, the master
+ * volume and mute, play, stop, seek and tempo, and captures of the master output to a WAV.
+>>>>>>> 58db0f88561a6a93fa04df5c5bb60914947cdba3
  *
- * volume and mute only write AudioSettings, which box.audio sends to the core at the end of
- * the frame, as for a change from a script or the REST API. A capture taps the core, so it
- * works with every output; in the browser it is written to the file system of the page.
+ * The actions only write AudioSettings or Transport, which box.audio sends to the core at the
+ * end of the frame, as for a change from a script or the REST API. A capture taps the core, so
+ * it works with every output; in the browser it is written to the file system of the page.
  */
 
 #include "command.h"
 #include "../audio/module.h"
 #include <stdlib.h>
+#include <math.h>
 
 /** Folder of the captures in the file system of the page */
 #define BOX_CMD_AUDIO_WEB_DIR "/tmp"
@@ -203,6 +209,78 @@ static void box_cmd_audio_bus(
     ecs_os_free(path);
 }
 
+/** Append the line of the transport: tempo, signature, position as bar.beat, playing, loop.
+ *
+ * @param world The world
+ * @param buf The output
+ */
+static void box_cmd_audio_transport(
+    ecs_world_t *world,
+    ecs_strbuf_t *buf)
+{
+    const Transport *tr = ecs_singleton_get(world, Transport);
+    Transport t = tr ? *tr : (Transport){ .tempo = 120, .beats_per_bar = 4, .beat_unit = 4 };
+    int32_t top = t.beats_per_bar > 0 ? t.beats_per_bar : 1;
+    int32_t unit = t.beat_unit > 0 ? t.beat_unit : 1;
+    double bar = (double)top * 4.0 / (double)unit;
+    double position = isfinite(t.position) ? t.position : 0.0;
+    double bars = floor(position / bar);
+    double beat = floor(position - bars * bar);
+    ecs_strbuf_append(buf, "\ntransport: %.1f bpm %d/%d, position %.0f.%.0f (%.3f beats), %s",
+        (double)t.tempo, top, unit, bars + 1.0, beat + 1.0, position,
+        t.playing ? "playing" : "stopped");
+    if (t.loop) {
+        ecs_strbuf_append(buf, ", loop %.3f to %.3f", t.loop_start, t.loop_end);
+    } else {
+        ecs_strbuf_appendstr(buf, ", loop off");
+    }
+
+    if (t.metronome) {
+        ecs_strbuf_appendstr(buf, ", metronome");
+    }
+}
+
+/** Play, stop, seek or set the tempo of the transport.
+ *
+ * @param world The world
+ * @param action play, stop, seek or tempo
+ * @param value Beats of a seek, quarter notes per minute of a tempo
+ * @return The text, which the caller frees, NULL on an error
+ */
+static char* box_cmd_audio_transport_set(
+    ecs_world_t *world,
+    const char *action,
+    const char *value)
+{
+    char *end = NULL, *result = NULL;
+    double number = value ? strtod(value, &end) : 0;
+    bool valid = value && value[0] && end && !end[0] && isfinite(number);
+    Transport *tr = ecs_singleton_ensure(world, Transport);
+    if (!ecs_os_strcmp(action, "play")) {
+        tr->playing = true;
+        result = flecs_asprintf("playing from %.3f", tr->position);
+    } else if (!ecs_os_strcmp(action, "stop")) {
+        tr->playing = false;
+        result = ecs_os_strdup("stopped");
+    } else if (!ecs_os_strcmp(action, "seek") && valid) {
+        tr->position = number;
+        result = flecs_asprintf("position %.3f", number);
+    } else if (!ecs_os_strcmp(action, "tempo") && valid && number >= 20 && number <= 999) {
+        tr->tempo = (float)number;
+        result = flecs_asprintf("tempo %.1f", number);
+    } else if (!ecs_os_strcmp(action, "seek")) {
+        ecs_err("invalid position '%s', expected beats", value ? value : "");
+    } else {
+        ecs_err("invalid tempo '%s', expected 20 to 999", value ? value : "");
+    }
+
+    if (result) {
+        ecs_singleton_modified(world, Transport);
+    }
+
+    return result;
+}
+
 /** Print the status of the audio and the buses in processing order.
  *
  * @param world The world
@@ -222,6 +300,7 @@ static char* box_cmd_audio_print(
         (double)(s.load * 100.0f));
     ecs_strbuf_append(&buf, "\nclock: %lld frames (%.3f s)", (long long)s.clock,
         s.sample_rate > 0 ? (double)s.clock / (double)s.sample_rate : 0.0);
+    box_cmd_audio_transport(world, &buf);
     ecs_entity_t master = ecs_lookup(world, "box.audio.master");
     const AudioBus *mb = master ? ecs_get(world, master, AudioBus) : NULL;
     ecs_strbuf_append(&buf, "\nmaster: volume %.2f%s",
@@ -365,7 +444,8 @@ done:
     return result;
 }
 
-/** The audio command: print the status, or set the volume or the mute, or start a capture.
+/** The audio command: print the status, set the volume or the mute, drive the transport or
+ * start a capture.
  *
  * @param ctx The call context
  * @param argc Number of arguments
@@ -395,8 +475,13 @@ static void box_cmd_audio(
         out = box_cmd_audio_mute(world, value);
     } else if (!ecs_os_strcmp(action, "capture")) {
         out = box_cmd_audio_capture(world, value);
+    } else if (!ecs_os_strcmp(action, "play") || !ecs_os_strcmp(action, "stop") ||
+        !ecs_os_strcmp(action, "seek") || !ecs_os_strcmp(action, "tempo"))
+    {
+        out = box_cmd_audio_transport_set(world, action, value);
     } else {
-        ecs_err("unknown action '%s', expected volume, mute or capture", action);
+        ecs_err("unknown action '%s', expected volume, mute, capture, play, stop, seek or "
+            "tempo", action);
     }
 
     *(char**)result->ptr = out;
@@ -409,15 +494,18 @@ void box_cmd_audio_init(
 {
     ECS_IMPORT(world, BoxAudio);
     box_command_register(world,
-        "Print the audio status and buses, set the volume or mute, or capture a WAV",
+        "Print the audio status, transport and buses, set the volume or mute, play, stop, "
+        "seek or set the tempo, or capture a WAV",
         (ecs_function_desc_t){
             .name = "audio",
             .return_type = ecs_id(ecs_string_t),
             .params = {
                 { .name = "action", .type = ecs_id(ecs_string_t), .optional = true,
-                  .brief = "volume, mute or capture (default: print the status)" },
+                  .brief = "volume, mute, capture, play, stop, seek or tempo (default: print "
+                    "the status)" },
                 { .name = "value", .type = ecs_id(ecs_string_t), .optional = true,
-                  .brief = "volume 0 to 4, mute on or off (default: toggle), capture seconds" }
+                  .brief = "volume 0 to 4, mute on or off (default: toggle), capture seconds, "
+                    "seek beats, tempo 20 to 999" }
             },
             .callback = box_cmd_audio
         });

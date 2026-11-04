@@ -4,6 +4,7 @@
  */
 
 #include "util.h"
+#include "../../../../src/audio/core/internal.h"
 
 float audio_l[AUDIO_FRAMES];
 float audio_r[AUDIO_FRAMES];
@@ -258,4 +259,13 @@ uint64_t audio_hash(
     }
 
     return h;
+}
+
+void audio_strings_rough(
+    box_audio_core_t *core)
+{
+    int32_t k;
+    for (k = 0; k < BOX_AUDIO_SYNTH_STRINGS; k ++) {
+        core->synth_strings[k].rough = true;
+    }
 }
