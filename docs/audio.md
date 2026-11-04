@@ -519,15 +519,6 @@ carries them. A voice holds the patch without its layers and
 takes, for each layer, a part from a pool the core allocates with itself: the layer, its oscillator,
 its own envelope and the state of its unison voices, 512 bytes. The pool has 4 parts per voice slot
 (320), so patches of up to 4 layers never run out of them and a voice of 8 takes the room of two of
-<<<<<<< HEAD
-4; a play that finds too few free parts is ignored like one without a voice slot. A voice renders
-and advances only its parts and gives them back when it ends. The 80 voice slots (808 bytes each)
-and the pool take 223 KB. The pluck strings are a second pool of `BOX_AUDIO_SYNTH_STRINGS` (32),
-each with a delay line of `BOX_AUDIO_SYNTH_STRING_FRAMES` (2048) floats, 8 KB, 259 KB in all; a
-voice takes one for each unison voice of each pluck layer, and a play that finds too few free is
-ignored the same way. A pluck layer still takes one part: its strings hang off it in a chain, so
-a part does not grow for the layers that are not plucks.
-=======
 4. A play that finds too few free parts takes them like one at the voice cap takes a voice: the core
 ends the quietest synth voices that fade out, then the quietest that play, which it reports as
 `VOICE_STOLEN` and counts as steals, until the parts are free, and only then starts the play. It
@@ -535,9 +526,10 @@ first checks that the play can start at all, so a play that is ignored fades or 
 voice renders and advances only its parts and gives them back when it ends. The 80 voice slots
 (808 bytes each) and the pool take 223 KB. The pluck strings are a second pool of
 `BOX_AUDIO_SYNTH_STRINGS` (32), each with a delay line of `BOX_AUDIO_SYNTH_STRING_FRAMES` (2048)
-floats, 8 KB, 259 KB in all; a voice takes one for each pluck layer, and a play that finds too
-few free is ignored, without fading or ending a voice.
->>>>>>> 34c2510bb4bf6c6918741fc251f8c96883229c41
+floats, 8 KB, 259 KB in all; a voice takes one for each unison voice of each pluck layer, and a
+play that finds too few free is ignored, without fading or ending a voice. A pluck layer still
+takes one part: its strings hang off it in a chain, so a part does not grow for the layers that
+are not plucks.
 The 256 patches the core keeps are full size, 1020 bytes each. The core clamps every value of a
 patch, a NaN to the low
 end.

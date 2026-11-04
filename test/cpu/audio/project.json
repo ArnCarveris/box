@@ -362,14 +362,11 @@
                     "pluck_ends",
                     "pluck_glide",
                     "pluck_pool",
-<<<<<<< HEAD
                     "pluck_unison_peaks",
                     "pluck_unison_width",
                     "pluck_unison_pool",
                     "pluck_unison_seed",
-=======
                     "pluck_pool_cap",
->>>>>>> 34c2510bb4bf6c6918741fc251f8c96883229c41
                     "script_pluck",
                     "docs_pluck_examples",
                     "lfo_unison",

@@ -4103,7 +4103,6 @@ void Synth_pluck_pool(void) {
     box_audio_core_free(core);
 }
 
-<<<<<<< HEAD
 /** A pluck patch of one layer with unison voices.
  *
  * @param frequency Hz
@@ -4294,7 +4293,8 @@ void Synth_pluck_unison_seed(void) {
     test_assert(a2 == b2);
     test_assert(a != a2);
     test_assert(a != c);
-=======
+}
+
 /** Fill a core to the voice cap with pluck voices that take every string and sine voices.
  *
  * @param core The core
@@ -4358,7 +4358,6 @@ void Synth_pluck_pool_cap(void) {
     test_int(box_audio_core_voice_count(core), box_audio_core_voice_count(ref));
     box_audio_core_free(core);
     box_audio_core_free(ref);
->>>>>>> 34c2510bb4bf6c6918741fc251f8c96883229c41
 }
 
 /** A SynthPluck layer takes its SynthString, or the defaults without one, needs no envelope,
