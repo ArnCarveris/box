@@ -259,13 +259,9 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
 The audio a box app plays can be inspected without listening:
 
 - `audio` prints the state, the rate, the voices, the steals, the load, the clock of the core
-<<<<<<< HEAD
-  (frames and seconds), the transport and every bus with its routing and reverb; `audio volume
-  <v>` and `audio mute` set the master, `audio play`, `audio stop`, `audio seek <beats>` and
-  `audio tempo <bpm>` drive the [transport](#transport).
-=======
-  (frames and seconds) and every bus with its kind, width, solo, routing, sends and reverb; `audio volume <v>` and `audio mute` set the master.
->>>>>>> 46742d201aa669a5a77ab35e5648487b376e5881
+  (frames and seconds), the transport and every bus with its kind, width, solo, routing, sends
+  and reverb; `audio volume <v>` and `audio mute` set the master, `audio play`, `audio stop`,
+  `audio seek <beats>` and `audio tempo <bpm>` drive the [transport](#transport).
 - `audio capture <seconds>` records the master to a 16 bit stereo WAV resource of the shell
   session, `box.audio.capture(seconds, path)` to a file from a script, at load if it should
   start with the scene. In the browser `audio capture` writes `/tmp/audio_capture_<n>.wav` in
@@ -2019,20 +2015,14 @@ nothing.
 ### The audio command and captures
 
 The shell command `audio` (`src/command/cmd_audio.c`) prints the state, the rate, the voices, the
-<<<<<<< HEAD
 steals and the load, the clock, the transport (`transport: 120.0 bpm 4/4, position 2.1 (4.250
-beats), playing, loop off`, the position as bar.beat counted from 1), then the master and the
-buses in processing order, with the values of the
-reverb of a bus and `(dry, every slot taken)` for a reverb that has no slot. `audio volume <v>` and
-`audio mute [on|off]` write `AudioSettings`; `audio play`, `audio stop`, `audio seek <beats>`
-and `audio tempo <bpm>` (20 to 999) write `Transport`. `audio capture <seconds>` records the master output
-=======
-steals and the load, then the master (with the volume, pan and width of its `AudioBus` when it
-has one) and the buses in processing order, each with its kind, volume, pan, width, `solo`,
-`muted`, its output, its sends (`send pre` for a pre-fader one) and the values of its reverb, and
-`(dry, every slot taken)` for a reverb that has no slot. `audio volume <v>` and
-`audio mute [on|off]` write `AudioSettings`. `audio capture <seconds>` records the master output
->>>>>>> 46742d201aa669a5a77ab35e5648487b376e5881
+beats), playing, loop off`, the position as bar.beat counted from 1), then the master (with the
+volume, pan and width of its `AudioBus` when it has one) and the buses in processing order, each
+with its kind, volume, pan, width, `solo`, `muted`, its output, its sends (`send pre` for a
+pre-fader one) and the values of its reverb, and `(dry, every slot taken)` for a reverb that has
+no slot. `audio volume <v>` and `audio mute [on|off]` write `AudioSettings`; `audio play`,
+`audio stop`, `audio seek <beats>` and `audio tempo <bpm>` (20 to 999) write `Transport`.
+`audio capture <seconds>` records the master output
 to a 16 bit stereo WAV resource of the session, fetched like a `capture` PNG with
 `GET /shell/session/<id>/resource/<name>`, empty until the file is written in one rename. In the
 browser it writes `/tmp/audio_capture_<n>.wav` in the file system of the page and returns the
