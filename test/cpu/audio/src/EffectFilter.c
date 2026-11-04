@@ -22,6 +22,9 @@ static float fl_tone[AUDIO_RATE];
 /** A noise of the stability case */
 static float fl_noise[AUDIO_RATE];
 
+/** The frame of silence that a core renders before its sine plays */
+static float fl_silence[2];
+
 /** Output of the renders that compare two cores */
 static float fl_a_l[AUDIO_FRAMES], fl_a_r[AUDIO_FRAMES];
 static float fl_b_l[AUDIO_FRAMES], fl_b_r[AUDIO_FRAMES];
@@ -90,6 +93,9 @@ static box_audio_core_t* fl_open(
         fl_command(core, 0, 1, *p);
     }
 
+    /* A frame of silence lets the effect enter at once, as an effect in place before its bus
+     * plays does, so that the output does not depend on the size of the first render */
+    box_audio_core_render(core, fl_silence, fl_silence + 1, 1);
     audio_sine(fl_tone, AUDIO_RATE, frequency, level);
     test_assert(box_audio_core_sound(core, 1, fl_tone, AUDIO_RATE, 1, AUDIO_RATE));
     audio_play(core, 1, 1, 1, 1, 0, 1, loop ? BOX_AUDIO_PLAY_LOOP : 0);

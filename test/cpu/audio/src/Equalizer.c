@@ -22,6 +22,9 @@ static float eq_tone[AUDIO_RATE];
 /** A noise of the stability case */
 static float eq_noise[AUDIO_RATE];
 
+/** The frame of silence that a core renders before its sine plays */
+static float eq_silence[2];
+
 /** Output of the renders that compare two cores */
 static float eq_a_l[AUDIO_FRAMES], eq_a_r[AUDIO_FRAMES];
 static float eq_b_l[AUDIO_FRAMES], eq_b_r[AUDIO_FRAMES];
@@ -92,6 +95,9 @@ static box_audio_core_t* eq_open(
         eq_command(core, 0, 1, params);
     }
 
+    /* A frame of silence lets the effect enter at once, as an effect in place before its bus
+     * plays does, so that the output does not depend on the size of the first render */
+    box_audio_core_render(core, eq_silence, eq_silence + 1, 1);
     audio_sine(eq_tone, AUDIO_RATE, frequency, level);
     test_assert(box_audio_core_sound(core, 1, eq_tone, AUDIO_RATE, 1, AUDIO_RATE));
     audio_play(core, 1, 1, 1, 1, 0, 1, loop ? BOX_AUDIO_PLAY_LOOP : 0);
@@ -281,7 +287,7 @@ void Equalizer_stable(void) {
 
     audio_order(core, routes, 2);
     test_assert(box_audio_core_sound(core, 2, eq_noise, AUDIO_RATE, 1, AUDIO_RATE));
-    audio_bus_set(core, 1, BOX_AUDIO_PARAM_VOLUME, 1e-5f);
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_VOLUME, 1e-7f);
     audio_play(core, 2, 2, 1, 1, 0, 1, BOX_AUDIO_PLAY_LOOP);
     for (block = 0; block < 36; block ++) {
         eq_command(core, 0, 1, extremes[block % 6]);
@@ -305,6 +311,26 @@ void Equalizer_stable(void) {
     printf("peak of 11 seconds of noise at extreme values: %.4f\n", (double)peak);
     test_assert(peak > 0);
     test_assert(peak < BOX_AUDIO_LIMITER_THRESHOLD);
+
+    /* Gains of over 100 dB are loud but stable: with the bands off again the states decay and
+     * the bus passes the noise as it came in */
+    for (b = 0; b < BOX_AUDIO_EFFECT_PARAMS; b ++) {
+        extremes[0][b] = 0;
+    }
+
+    eq_command(core, 0, 1, extremes[0]);
+    for (block = 0; block < 8; block ++) {
+        audio_render(core, 0, frames);
+    }
+
+    peak = 0;
+    for (i = 0; i < frames; i ++) {
+        peak = fabsf(audio_l[i]) > peak ? fabsf(audio_l[i]) : peak;
+    }
+
+    printf("peak of the noise with the bands off again: %.4g\n", (double)peak);
+    test_assert(peak > 0);
+    test_assert(peak <= 1.0001e-7f);
     box_audio_core_free(core);
 }
 

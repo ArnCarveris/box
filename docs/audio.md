@@ -702,7 +702,7 @@ cascade of two stages, each stable on its own. Its parameters are a
   cutoff and -12 or -24 dB an octave past it, and at `SynthSlope24` the resonance applies to the
   second stage only, as in the synth.
 - **Ranges.** `cutoff` is clamped to 10 Hz..0.49 of the rate, `resonance` and `mix` to 0..1, a
-  NaN to the low end; an unknown kind is a lowpass.
+  NaN to the low end, and `kind` to the four kinds.
 - **Mix.** The bus outputs its signal at `1 - mix` and the filter at `mix`; 1 is the default.
   A mix of 0 passes the input bit for bit.
 - **Changes.** The cutoff moves exponentially in frequency toward a new value, and the
