@@ -1199,7 +1199,7 @@ void Sequencer_audio_with_notes(void) {
     c0 = seq_play(world, true);
     seq_run_to(world, c0 + 3 * SEQ_BEAT);
     test_flt(audio_tap_l[c0], SEQ_LEVEL + 0.25f);
-    test_int(seq_edge(c0, c0 + SEQ_BEAT, SEQ_LEVEL + 0.25f), c0 + SEQ_BEAT);
+    test_int(seq_edge(c0, c0 + SEQ_BEAT + 1, SEQ_LEVEL + 0.25f), c0 + SEQ_BEAT);
     test_int(seq_edge(c0 + SEQ_BEAT + SEQ_FADE, c0 + 2 * SEQ_BEAT, 0.25f), -1);
     test_int(seq_onset(c0 + 2 * SEQ_BEAT + SEQ_FADE, c0 + 3 * SEQ_BEAT), -1);
     test_int(state->sequencer.stats.notes, 1);
