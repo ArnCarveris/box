@@ -2,7 +2,8 @@
  * @file Synth.c
  * @brief Benchmarks for the synth of the audio core: 64 looping synth voices on the master,
  * one item per sample of the output, with the patch of three layers, the same with two LFOs or
- * one of FM or with curved envelopes, and 32 voices of a pluck string.
+ * one of FM or with curved envelopes, and 32 voices of a pluck string, steady or under a
+ * vibrato.
  *
  * Each iteration renders one quantum of 128 stereo frames, so the time per item is the time
  * per sample of the whole mix of 64 voices.
@@ -104,9 +105,13 @@ static box_audio_core_t* bench_synth_core(
 /** Create a core with BOX_AUDIO_SYNTH_STRINGS looping voices of a pluck string through a
  * lowpass, which ring for 4 seconds, each at its own pitch.
  *
+ * With vibrato a sine LFO of 25 cents at 5.5 Hz moves the pitch of every string.
+ *
+ * @param vibrato Whether an LFO moves the pitch of the strings
  * @return The core
  */
-static box_audio_core_t* bench_pluck_core(void)
+static box_audio_core_t* bench_pluck_core(
+    bool vibrato)
 {
     static uint8_t bytes[8192];
     box_audio_core_desc_t desc = { .sample_rate = BENCH_RATE };
@@ -120,6 +125,12 @@ static box_audio_core_t* bench_pluck_core(void)
     p.cutoff = 3500;
     p.layer[0] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_PLUCK, .frequency = 110,
         .level = 0.4f, .decay = 4.0f, .brightness = 0.5f, .hardness = 0.8f, .rings_free = 1 };
+    if (vibrato) {
+        p.lfos = 1;
+        p.lfo[0] = (box_audio_synth_lfo_t){
+            .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 5.5f, .pitch = 25 };
+    }
+
     box_audio_writer_init(&w, bytes, sizeof(bytes));
     box_audio_write_synth(&w, 1, &p);
     for (i = 0; i < BOX_AUDIO_SYNTH_STRINGS; i ++) {
@@ -214,7 +225,16 @@ void Synth_voices_32_pluck(
     bench_t *b)
 {
     // audio/synth
-    box_audio_core_t *core = bench_pluck_core();
+    box_audio_core_t *core = bench_pluck_core(false);
+    bench_synth_render(b, core);
+    box_audio_core_free(core);
+}
+
+void Synth_voices_32_pluck_vibrato(
+    bench_t *b)
+{
+    // audio/synth
+    box_audio_core_t *core = bench_pluck_core(true);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
