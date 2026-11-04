@@ -1657,6 +1657,22 @@ done:
     return;
 }
 
+/** Keep the master out of the scripts that set its AudioBus: a script owns the entities it
+ * declares and deletes them when it reloads, which would delete the master.
+ *
+ * @param world The world
+ * @param state The state
+ */
+static void box_audio_master_unown(
+    ecs_world_t *world,
+    const box_audio_module_t *state)
+{
+    if (ecs_has_pair(world, state->master, ecs_id(EcsScript), EcsWildcard)) {
+        ecs_remove_pair(world, state->master, ecs_id(EcsScript),
+            ecs_get_target(world, state->master, ecs_id(EcsScript), 0));
+    }
+}
+
 /** The sync system: once per frame, at the end of the frame, one batch of what changed.
  *
  * @param it The iterator of the system
@@ -1693,6 +1709,7 @@ static void BoxAudioSync(
         listener_moved = true;
     }
 
+    box_audio_master_unown(world, state);
     box_audio_buses(world, state);
     if (state->order_dirty) {
         box_audio_compile(world, state);

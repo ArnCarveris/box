@@ -1607,12 +1607,14 @@ moved to the master and the index is reused a frame later. A Disabled bus is mut
 a track and the master. `kind` tells the solo what a channel is: `AudioChannelGroup` (the
 default) for groups and other buses, `AudioChannelReturn` for returns such as a reverb bus and
 `AudioChannelSfx` for the buses of the game sounds. A track is identified by its `Track` and the
-master by `box.audio.master`.
+master by `box.audio.master`. A script cannot declare an entity by a path, so it sets the master's
+`AudioBus` in the scopes `box { audio { master { ... } } }`. The module keeps the master out of
+the script, so a reload of the scene does not delete it.
 
 ```
 using box.audio
 
-box.audio.master { AudioBus: {width: 0.9} }
+box { audio { master { AudioBus: {width: 0.9} } } }
 hall { AudioBus: {output: master, kind: AudioChannelReturn}; Reverb: {decay: 2} }
 sfx { AudioBus: {output: master, kind: AudioChannelSfx} }
 band { AudioBus: {output: master, volume: 0.6} }

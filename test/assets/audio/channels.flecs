@@ -4,7 +4,7 @@
 // its pre-fader send are silent while band, hall and sfx play.
 using box.audio
 
-box.audio.master { AudioBus: {volume: 0.8, width: 0.5} }
+box { audio { master { AudioBus: {volume: 0.8, width: 0.5} } } }
 
 hall { AudioBus: {output: master, kind: AudioChannelReturn} }
 sfx { AudioBus: {output: master, kind: AudioChannelSfx} }

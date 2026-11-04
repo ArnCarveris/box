@@ -365,5 +365,11 @@ void Mixer_scene_script(void) {
     test_bool(mixer_muted(world, sfx), false);
     test_assert(fabsf(audio_level(AUDIO_FRAME) - 0.8f * (0.05f + 0.025f + 0.4f)) < 1e-5f);
     test_assert(fabsf(audio_level(AUDIO_FRAME) - audio_level_right(AUDIO_FRAME)) < 1e-6f);
+
+    test_assert(!ecs_has_pair(world, master, ecs_id(EcsScript), EcsWildcard));
+    ecs_script_clear(world, script, 0);
+    test_assert(ecs_is_alive(world, master));
+    test_assert(!ecs_is_alive(world, lead));
+    test_assert(ecs_lookup(world, "box.audio.master") == master);
     ecs_fini(world);
 }
