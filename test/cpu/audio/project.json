@@ -277,6 +277,14 @@
                     "voice_pitch",
                     "loop_restarts",
                     "release_patch",
+                    "fm_bessel",
+                    "fm_sidebands",
+                    "fm_index_zero_identical",
+                    "fm_index_follows_envelope",
+                    "fm_index_limited",
+                    "ring_sum_difference",
+                    "modulator_audible",
+                    "feedback_harmonics",
                     "script_parses",
                     "script_renders",
                     "script_change_next_play",
@@ -285,6 +293,7 @@
                     "too_many_layers",
                     "endless_logs_error",
                     "deleted_releases",
+<<<<<<< HEAD
                     "glide_geometric_mean",
                     "glide_zero_identical",
                     "legato_no_retrigger",
@@ -295,6 +304,9 @@
                     "script_legato",
                     "script_legato_source",
                     "docs_glide_example"
+=======
+                    "script_modulators"
+>>>>>>> 7b035d324f2579872072ca1f9f27b296c8d31845
                 ]
             },
             {
