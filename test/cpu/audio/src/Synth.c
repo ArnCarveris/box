@@ -1378,22 +1378,24 @@ static double synth_alias_fm(
 }
 
 /** A saw carrier under phase modulation smooths its edges with the speed of its modulated
- * phase, so it aliases about as little as a plain saw. */
+ * phase, so it aliases about as little as a plain saw: 0.0014, where the polyBLEP of its
+ * unmodulated rate left 0.0039. */
 void Synth_fm_alias_saw(void) {
     // audio/synth
     double alias = synth_alias_fm(BOX_AUDIO_SYNTH_SAW);
     printf("saw at 2 kHz by 500 Hz: %.2f dB outside its harmonics\n", 10 * log10(alias));
     test_assert(alias >= 0);
-    test_assert(alias < 0.005);
+    test_assert(alias < 0.002);
 }
 
-/** A square carrier under phase modulation, as Synth_fm_alias_saw. */
+/** A square carrier under phase modulation, as Synth_fm_alias_saw: 0.0010, where the
+ * unmodulated rate left 0.0023. */
 void Synth_fm_alias_square(void) {
     // audio/synth
     double alias = synth_alias_fm(BOX_AUDIO_SYNTH_SQUARE);
     printf("square at 2 kHz by 500 Hz: %.2f dB outside its harmonics\n", 10 * log10(alias));
     test_assert(alias >= 0);
-    test_assert(alias < 0.005);
+    test_assert(alias < 0.0015);
 }
 
 /** Ring modulation of a 1 kHz sine by a 300 Hz sine: energy at 700 and 1300 Hz only, and none

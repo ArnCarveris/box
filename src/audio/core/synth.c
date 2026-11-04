@@ -1272,12 +1272,12 @@ static inline float box_audio_synth_pulse(
 
 /** Render a frame of a wave at a phase.
  *
- * @param wave A box_audio_synth_wave_t
- * A phase that moves backwards takes the magnitude of its speed as dt: the polyBLEP of a step
- * is odd in time and the step changes sign with the direction, the polyBLAMP of a corner is
- * even in time and the change of slope keeps its sign, so both corrections stay the same
- * function of the phase.
  *
+ * A phase that moves backwards takes the magnitude of its speed as dt: the polyBLEP is odd in
+ * time and the step changes sign with the direction, the polyBLAMP is even in time and the
+ * change of slope keeps its sign, so both corrections stay the same function of the phase.
+ *
+ * @param wave A box_audio_synth_wave_t
  * @param t Phase in turns, 0..1
  * @param dt Turns per frame, the magnitude of the speed of the phase
  * @param width Square: share of the period it is high
@@ -1475,10 +1475,11 @@ static inline float box_audio_synth_layers_lfo(
     return mix;
 }
 
-/** Turns per frame an oscillator moves at under modulation, for its polyBLEP and polyBLAMP:
- * the change of its modulated phase since the last frame, wrapped into -0.5..0.5 so that a
+/** Turns per frame an oscillator moves at under modulation, for its polyBLEP and polyBLAMP.
+ *
+ * The change of its modulated phase since the last frame, wrapped into -0.5..0.5 so that a
  * phase moving backwards is a negative speed and not nearly a turn, as a magnitude under the
- * top. A speed of 0 leaves the edges without a correction rather than dividing by it.
+ * top. A speed of 0 takes neither correction, so nothing divides by it.
  *
  * @param src The source
  * @param d Change of the phase in turns, its inc plus the change of its modulation
@@ -1499,10 +1500,11 @@ static inline double box_audio_synth_speed(
  *
  * Modulators come after their carriers, so the layers render from the last: each adds its wave
  * times its envelope, scaled by its index, to the phase of its target, or multiplies it. With
- * LFOs each also takes its vibrato and its tremolo, the signal of a modulator included. The
- * edges of a saw, square or triangle are smoothed with the speed of its modulated phase, its
- * inc plus the change of its modulation and feedback since the last frame; a frame in which
- * they did not change keeps its inc, bit identical to the unmodulated wave.
+ * LFOs each also takes its vibrato and its tremolo, the signal of a modulator included.
+ *
+ * The edges of a saw, square or triangle are smoothed with the speed of its modulated phase:
+ * its inc plus the change of its modulation and feedback since the last frame. A frame in
+ * which they did not change keeps its inc, bit identical to the unmodulated wave.
  *
  * @param src The source
  * @param levels The level of each envelope for the frame
