@@ -117,6 +117,7 @@ static void box_audio_reset(
     state->voices_stolen = 0;
     box_audio_music_reset(state);
     state->spatial_dirty = true;
+    ecs_os_memset_n(state->meters, 0, box_audio_meter_window_t, BOX_AUDIO_BUS_MAX);
     if (state->capture.path && state->capture.serial) {
         ecs_err("box.audio: the output changed, the capture of '%s' is dropped",
             state->capture.path);
@@ -1617,6 +1618,7 @@ static void BoxAudioSync(
     state->writer.size = 0;
     state->bus_freed = 0;
     box_audio_music_send(world, state, t);
+    box_audio_meters_update(world, state, t);
     box_audio_status(world, state, t);
     box_audio_capture_update(state, t);
     state->time += (double)it->delta_time;
@@ -1806,6 +1808,19 @@ void box_audio_sync_init(
             { .id = ecs_id(AudioSoundId), .src.id = EcsSelf }
         },
         .flags = EcsQueryMatchPrefab,
+        .cache_kind = EcsQueryCacheAuto
+    });
+
+    state->meter_query = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "AudioMeters" }),
+        .terms = {
+            { .id = ecs_id(AudioMeter), .inout = EcsOut, .src.id = EcsSelf },
+            { .id = ecs_id(AudioBusState), .inout = EcsIn, .src.id = EcsSelf,
+                .oper = EcsOptional },
+            { .id = ecs_id(AudioEffectState), .inout = EcsIn, .src.id = EcsSelf,
+                .oper = EcsOptional }
+        },
+        .flags = EcsQueryMatchDisabled,
         .cache_kind = EcsQueryCacheAuto
     });
 

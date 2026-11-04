@@ -520,6 +520,22 @@ static int32_t box_audio_null_read_events(
     return box_audio_host_read(&((box_audio_null_t*)t)->host, events, max);
 }
 
+/** Read the meters of the core on the main thread.
+ *
+ * @param t The transport
+ * @param buses Receives BOX_AUDIO_BUS_MAX meters
+ * @param effects Receives BOX_AUDIO_EFFECT_MAX meters
+ */
+static void box_audio_null_meters(
+    box_audio_transport_t *t,
+    box_audio_meter_t *buses,
+    box_audio_effect_meter_t *effects)
+{
+    box_audio_null_t *n = (box_audio_null_t*)t;
+    box_audio_core_meters(n->core, buses, BOX_AUDIO_BUS_MAX);
+    box_audio_core_effect_meters(n->core, effects, BOX_AUDIO_EFFECT_MAX);
+}
+
 /** Report that there is no device.
  *
  * @param t The transport
@@ -688,6 +704,7 @@ box_audio_transport_t* box_audio_transport_null_new(
         .stream_status = box_audio_null_stream_status,
         .effect_memory = box_audio_null_effect_memory,
         .read_events = box_audio_null_read_events,
+        .meters = box_audio_null_meters,
         .state = box_audio_null_state,
         .update = box_audio_null_update,
         .free = box_audio_null_free,
@@ -826,6 +843,39 @@ EM_JS(int, box_audio_web_events, (int32_t *events, int max), {
     return n;
 });
 
+_Static_assert(sizeof(box_audio_meter_t) == 32, "the page writes meters of 32 bytes");
+
+/** Take the meters the worklet posted since the last call, accumulated by the page.
+ *
+ * @param buses Receives BOX_AUDIO_BUS_MAX box_audio_meter_t of 32 bytes each
+ * @param effects Receives BOX_AUDIO_EFFECT_MAX floats of reduction
+ * @param bus_max BOX_AUDIO_BUS_MAX
+ * @param effect_max BOX_AUDIO_EFFECT_MAX
+ */
+EM_JS(void, box_audio_web_meters, (box_audio_meter_t *buses, float *effects, int bus_max,
+    int effect_max), {
+    var audio = Module.boxAudio;
+    var m = audio && audio.meters;
+    for (var i = 0; i < bus_max; i++) {
+        var w = (buses >> 2) + i * 8, d = (buses >> 3) + i * 4;
+        HEAPF32[w] = m ? m.peaks[i * 2] : 0;
+        HEAPF32[w + 1] = m ? m.peaks[i * 2 + 1] : 0;
+        HEAPF64[d + 1] = m ? m.squares[i * 2] : 0;
+        HEAPF64[d + 2] = m ? m.squares[i * 2 + 1] : 0;
+        HEAPU32[w + 6] = m ? m.frames[i] : 0;
+        HEAPU32[w + 7] = 0;
+    }
+    for (var k = 0; k < effect_max; k++) {
+        HEAPF32[(effects >> 2) + k] = m ? m.reduction[k] : 0;
+    }
+    if (m) {
+        m.peaks.fill(0);
+        m.squares.fill(0);
+        m.frames.fill(0);
+        m.reduction.fill(0);
+    }
+});
+
 /** The web transport: the worklet renders, the main module waits for its captures */
 typedef struct box_audio_webt_t {
     box_audio_transport_t base;  /**< The interface, first */
@@ -961,6 +1011,21 @@ static int32_t box_audio_webt_read_events(
     return max > 0 ? box_audio_web_events((int32_t*)events, max) : 0;
 }
 
+/** Take the meters the worklet posted since the last call.
+ *
+ * @param t The transport
+ * @param buses Receives BOX_AUDIO_BUS_MAX meters
+ * @param effects Receives BOX_AUDIO_EFFECT_MAX meters
+ */
+static void box_audio_webt_meters(
+    box_audio_transport_t *t,
+    box_audio_meter_t *buses,
+    box_audio_effect_meter_t *effects)
+{
+    (void)t;
+    box_audio_web_meters(buses, (float*)effects, BOX_AUDIO_BUS_MAX, BOX_AUDIO_EFFECT_MAX);
+}
+
 /** Report the state of the audio of the page.
  *
  * @param t The transport
@@ -1088,6 +1153,7 @@ box_audio_transport_t* box_audio_transport_web_new(void)
             .stream_status = box_audio_webt_stream_status,
             .effect_memory = box_audio_webt_effect_memory,
             .read_events = box_audio_webt_read_events,
+            .meters = box_audio_webt_meters,
             .state = box_audio_webt_state,
             .update = box_audio_webt_update,
             .free = box_audio_webt_free,

@@ -109,6 +109,19 @@ typedef struct box_audio_native_stream_t {
     atomic_int underruns;        /**< Underruns since the stream opened */
     atomic_int starved;          /**< 1 while it plays silence */
 } box_audio_native_stream_t;
+/** The levels of a bus as the audio thread publishes them after each callback, accumulated
+ * until the main thread takes them.
+ *
+ * Each word is consistent on its own: a peak is raised to the largest, a sum of squares added
+ * to and the frames counted up, and the main thread swaps each with 0 */
+typedef struct box_audio_native_meter_t {
+    atomic_uint peak_left;                 /**< Bits of the left peak, a float */
+    atomic_uint peak_right;                /**< Bits of the right peak, a float */
+    atomic_uint_least64_t square_left;     /**< Bits of the left sum of squares, a double */
+    atomic_uint_least64_t square_right;    /**< Bits of the right sum of squares, a double */
+    atomic_uint frames;                    /**< Frames of the sums */
+} box_audio_native_meter_t;
+
 /** The memory of an effect slot handed to the audio thread; it stays with the main thread */
 typedef struct box_audio_msg_effect_t {
     float *data;         /**< The memory, cleared */
@@ -142,6 +155,13 @@ typedef struct box_audio_native_t {
     atomic_uint load;               /**< Bits of the smoothed load of the renders, a float */
     atomic_uint_least64_t clock;    /**< Clock of the core after the last render */
     box_audio_native_stream_t streams[BOX_AUDIO_STREAM_MAX]; /**< Status of the streams */
+    box_audio_native_meter_t meters[BOX_AUDIO_BUS_MAX]; /**< Levels of the buses */
+    atomic_uint reduction[BOX_AUDIO_EFFECT_MAX]; /**< Bits of the largest reduction of each
+                                    *   effect, a float */
+    box_audio_meter_t meter_audio[BOX_AUDIO_BUS_MAX]; /**< Meters read from the core, audio
+                                    *   thread */
+    box_audio_effect_meter_t effect_audio[BOX_AUDIO_EFFECT_MAX]; /**< Effect meters read from
+                                    *   the core, audio thread */
     float load_audio;               /**< The smoothed load, audio thread */
     uint8_t message[BOX_AUDIO_TRANSPORT_CHUNK];   /**< A message the audio thread took */
     float left[BOX_AUDIO_TRANSPORT_FRAMES];       /**< Rendered left channel */
@@ -218,6 +238,70 @@ static void box_audio_native_send_events(
     } while (count && count == max);
 }
 
+/** Raise a word that holds the bits of a float that is not negative, whose bits order as the
+ * values do, to a value. Does not lock.
+ *
+ * @param word The word
+ * @param value The value, not negative
+ */
+static void box_audio_native_raise(
+    atomic_uint *word,
+    float value)
+{
+    unsigned int old = atomic_load(word), bits;
+    memcpy(&bits, &value, sizeof(bits));
+    while (bits > old && !atomic_compare_exchange_weak(word, &old, bits)) { }
+}
+
+/** Add a value to a word that holds the bits of a double. Does not lock.
+ *
+ * @param word The word
+ * @param value The value
+ */
+static void box_audio_native_add(
+    atomic_uint_least64_t *word,
+    double value)
+{
+    uint_least64_t old = atomic_load(word), bits;
+    double sum;
+    do {
+        memcpy(&sum, &old, sizeof(sum));
+        sum += value;
+        memcpy(&bits, &sum, sizeof(bits));
+    } while (!atomic_compare_exchange_weak(word, &old, bits));
+}
+
+/** Take the meters of the core and add them to the words the main thread takes them from.
+ *
+ * @param n The transport
+ */
+static void box_audio_native_publish(
+    box_audio_native_t *n)
+{
+    int32_t i;
+    box_audio_core_meters(n->core, n->meter_audio, BOX_AUDIO_BUS_MAX);
+    box_audio_core_effect_meters(n->core, n->effect_audio, BOX_AUDIO_EFFECT_MAX);
+    for (i = 0; i < BOX_AUDIO_BUS_MAX; i ++) {
+        const box_audio_meter_t *m = &n->meter_audio[i];
+        box_audio_native_meter_t *nm = &n->meters[i];
+        if (!m->frames) {
+            continue;
+        }
+
+        box_audio_native_raise(&nm->peak_left, m->peak_left);
+        box_audio_native_raise(&nm->peak_right, m->peak_right);
+        box_audio_native_add(&nm->square_left, m->square_left);
+        box_audio_native_add(&nm->square_right, m->square_right);
+        atomic_fetch_add(&nm->frames, m->frames);
+    }
+
+    for (i = 0; i < BOX_AUDIO_EFFECT_MAX; i ++) {
+        if (n->effect_audio[i].reduction > 0) {
+            box_audio_native_raise(&n->reduction[i], n->effect_audio[i].reduction);
+        }
+    }
+}
+
 /** Apply the commands, render frames and send the events: the work of the device callback,
  * and of the main thread while the device is lost. Does not allocate, lock, log or wait.
  *
@@ -258,6 +342,7 @@ static void box_audio_native_process(
     }
 
     box_audio_native_send_events(n);
+    box_audio_native_publish(n);
     n->load_audio = box_audio_load_update(n->load_audio, ecs_time_measure(&start),
         (int32_t)frames, box_audio_core_sample_rate(n->core));
     memcpy(&bits, &n->load_audio, sizeof(bits));
@@ -677,6 +762,41 @@ static int32_t box_audio_native_read_events(
     return box_audio_host_read(&n->host, events, max);
 }
 
+/** Take the meters the audio thread published since the last call, a swap of each word
+ * with 0.
+ *
+ * @param t The transport
+ * @param buses Receives BOX_AUDIO_BUS_MAX meters
+ * @param effects Receives BOX_AUDIO_EFFECT_MAX meters
+ */
+static void box_audio_native_meters(
+    box_audio_transport_t *t,
+    box_audio_meter_t *buses,
+    box_audio_effect_meter_t *effects)
+{
+    box_audio_native_t *n = (box_audio_native_t*)t;
+    int32_t i;
+    for (i = 0; i < BOX_AUDIO_BUS_MAX; i ++) {
+        box_audio_native_meter_t *nm = &n->meters[i];
+        box_audio_meter_t *m = &buses[i];
+        unsigned int l = atomic_exchange(&nm->peak_left, 0u);
+        unsigned int r = atomic_exchange(&nm->peak_right, 0u);
+        uint_least64_t sl = atomic_exchange(&nm->square_left, (uint_least64_t)0);
+        uint_least64_t sr = atomic_exchange(&nm->square_right, (uint_least64_t)0);
+        *m = (box_audio_meter_t){0};
+        memcpy(&m->peak_left, &l, sizeof(l));
+        memcpy(&m->peak_right, &r, sizeof(r));
+        memcpy(&m->square_left, &sl, sizeof(sl));
+        memcpy(&m->square_right, &sr, sizeof(sr));
+        m->frames = atomic_exchange(&nm->frames, 0u);
+    }
+
+    for (i = 0; i < BOX_AUDIO_EFFECT_MAX; i ++) {
+        unsigned int bits = atomic_exchange(&n->reduction[i], 0u);
+        memcpy(&effects[i].reduction, &bits, sizeof(bits));
+    }
+}
+
 /** Report RUNNING, or LOST from the moment the device stopped.
  *
  * @param t The transport
@@ -880,6 +1000,18 @@ box_audio_transport_t* box_audio_transport_native_new(
         atomic_init(&n->streams[i].starved, 0);
     }
 
+    for (int32_t i = 0; i < BOX_AUDIO_BUS_MAX; i ++) {
+        atomic_init(&n->meters[i].peak_left, 0u);
+        atomic_init(&n->meters[i].peak_right, 0u);
+        atomic_init(&n->meters[i].square_left, (uint_least64_t)0);
+        atomic_init(&n->meters[i].square_right, (uint_least64_t)0);
+        atomic_init(&n->meters[i].frames, 0u);
+    }
+
+    for (int32_t i = 0; i < BOX_AUDIO_EFFECT_MAX; i ++) {
+        atomic_init(&n->reduction[i], 0u);
+    }
+
     if (box_audio_host_init(&n->host) ||
         box_audio_ring_init(&n->commands, BOX_AUDIO_TRANSPORT_COMMAND_RING) ||
         box_audio_ring_init(&n->events,
@@ -911,6 +1043,7 @@ box_audio_transport_t* box_audio_transport_native_new(
         .stream_status = box_audio_native_stream_status,
         .effect_memory = box_audio_native_effect_memory,
         .read_events = box_audio_native_read_events,
+        .meters = box_audio_native_meters,
         .state = box_audio_native_state,
         .update = box_audio_native_update,
         .free = box_audio_native_free,

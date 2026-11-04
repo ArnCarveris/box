@@ -137,6 +137,30 @@ ECS_STRUCT(Reverb, {
                             *   passes at 1 - mix */
 });
 
+/** Seconds of output the RMS of an AudioMeter is measured over */
+#define BOX_AUDIO_METER_WINDOW (0.3f)
+
+/** The levels of a mixer channel, read only: box.audio writes it each frame on every channel
+ * entity that has it, the master (box.audio.master) included, and on effect entities.
+ *
+ * Metering is opt-in: a mixer UI, a test or an agent adds the component, and an entity without
+ * it is not written.
+ *
+ * A channel is measured at its output, after its inserts, width, pan, volume and mute: what it
+ * sends on. The master is measured after its volume and before the limiter, so it reads over 1
+ * when the limiter reduces the gain. The levels follow the clock of the output: a suspended
+ * page, a page that waits for a gesture and a world without output read silence.
+ */
+ECS_STRUCT(AudioMeter, {
+    float peak_left;       /**< Linear, the largest absolute left sample since the last frame */
+    float peak_right;      /**< Linear, the largest absolute right sample since the last frame */
+    float rms_left;        /**< Linear, the RMS of the left channel over the last
+                            *   BOX_AUDIO_METER_WINDOW seconds of output */
+    float rms_right;       /**< Linear, the RMS of the right channel over the window */
+    float reduction;       /**< dB, on an effect entity: the largest gain reduction since the
+                            *   last frame, for dynamics effects; 0 for others */
+});
+
 /** The bus a sound or a source plays on. On a source it wins over the one of its sound */
 ECS_STRUCT(AudioOutput, {
     ecs_entity_t bus;      /**< Bus entity, 0 for the master */

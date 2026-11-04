@@ -50,6 +50,14 @@ static float box_audio_core_wasm_r[BOX_AUDIO_CORE_QUANTUM];
 /** Events of the last read */
 static box_audio_event_t box_audio_core_wasm_ev[BOX_AUDIO_WASM_EVENTS];
 
+_Static_assert(sizeof(box_audio_meter_t) == 32, "the worklet reads meters of 32 bytes");
+
+/** Levels of the buses of the last read of the meters */
+static box_audio_meter_t box_audio_core_wasm_mt[BOX_AUDIO_BUS_MAX];
+
+/** Values of the effects of the last read of the meters */
+static box_audio_effect_meter_t box_audio_core_wasm_fx[BOX_AUDIO_EFFECT_MAX];
+
 /** Status of the last stream asked for */
 static box_audio_stream_status_t box_audio_core_wasm_st;
 
@@ -374,6 +382,31 @@ int32_t box_audio_core_wasm_voices(void)
 double box_audio_core_wasm_clock(void)
 {
     return box_audio_core_wasm ? (double)box_audio_core_clock(box_audio_core_wasm) : 0;
+}
+
+/** Take the meters of the buses and the effects since the last read into their buffers,
+ * BOX_AUDIO_BUS_MAX box_audio_meter_t of 32 bytes each: the peaks as 2 floats, the sums of
+ * squares as 2 doubles and the frames as a word.
+ *
+ * @return Address of the meters of the buses in the memory of the core
+ */
+box_audio_meter_t* box_audio_core_wasm_meters(void)
+{
+    box_audio_core_meters(box_audio_core_wasm, box_audio_core_wasm_mt, BOX_AUDIO_BUS_MAX);
+    box_audio_core_effect_meters(box_audio_core_wasm, box_audio_core_wasm_fx,
+        BOX_AUDIO_EFFECT_MAX);
+
+    return box_audio_core_wasm_mt;
+}
+
+/** Get the values of the effects of the last read of the meters, a float of reduction per
+ * slot.
+ *
+ * @return Their address in the memory of the core
+ */
+box_audio_effect_meter_t* box_audio_core_wasm_effect_meters(void)
+{
+    return box_audio_core_wasm_fx;
 }
 
 /** Get the left channel buffer.

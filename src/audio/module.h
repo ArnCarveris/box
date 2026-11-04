@@ -430,6 +430,31 @@ typedef struct box_audio_timeline_t {
     box_audio_timeline_stats_t stats; /**< Counters */
 } box_audio_timeline_t;
 
+/** Slices of output the window of a meter keeps, one per frame that rendered: at 60 frames
+ * per second over a second, so the window of BOX_AUDIO_METER_WINDOW is full up to 200 */
+#define BOX_AUDIO_METER_SLICES 64
+
+/** The sums of squares of a bus over the frames of one frame of the module */
+typedef struct box_audio_meter_slice_t {
+    double square_left;     /**< Sum of the squares of the left samples */
+    double square_right;    /**< Sum of the squares of the right samples */
+    uint32_t frames;        /**< Frames of the sums */
+} box_audio_meter_slice_t;
+
+/** The levels of a bus index, which the module keeps for every bus and writes into the
+ * AudioMeter of its entity when it has one */
+typedef struct box_audio_meter_window_t {
+    ecs_entity_t entity;    /**< Bus entity of the index the window measures; another one
+                             *   starts it over */
+    box_audio_meter_slice_t slices[BOX_AUDIO_METER_SLICES]; /**< Newest at head */
+    int32_t head;           /**< Slice written last */
+    int32_t count;          /**< Slices that hold frames */
+    float peak_left;        /**< Left peak of the last frame */
+    float peak_right;       /**< Right peak of the last frame */
+    float rms_left;         /**< Left RMS over the window */
+    float rms_right;        /**< Right RMS over the window */
+} box_audio_meter_window_t;
+
 /** Shortest pass of a looping placement in beats; a shorter clip loops at this length */
 #define BOX_AUDIO_CLIP_LENGTH_MIN (1.0 / 64.0)
 
@@ -518,6 +543,10 @@ typedef struct box_audio_module_t {
     ecs_query_t *views;           /**< Enabled views, for a camera that listens */
     ecs_query_t *sounds;          /**< AudioPcm */
     ecs_query_t *synths;          /**< SynthSound, prefabs included */
+    ecs_query_t *meter_query;     /**< AudioMeter, disabled entities included */
+    box_audio_meter_window_t meters[BOX_AUDIO_BUS_MAX]; /**< Levels of each bus index */
+    float reduction[BOX_AUDIO_EFFECT_MAX]; /**< Gain reduction of each effect slot in the last
+                                   *   frame, dB */
     box_audio_effect_sent_t effects[BOX_AUDIO_EFFECT_MAX]; /**< What each effect slot of the
                                    *   core holds and got */
     uint32_t effect_frame;        /**< Frames of the module, which tell the insert slots of
@@ -667,6 +696,31 @@ void box_audio_effects_sync(
     ecs_world_t *world,
     box_audio_module_t *state,
     box_audio_transport_t *t);
+
+/** Take the meters of the output, update the levels of every bus and write them into each
+ * entity with AudioMeter: the master, a channel with a bus index, an effect with a slot.
+ *
+ * @param world The world
+ * @param state The state, whose bus indices and effect slots are current
+ * @param t The transport, NULL for none
+ */
+void box_audio_meters_update(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    box_audio_transport_t *t);
+
+/** Get the levels of a channel the module measured in the last frame, with or without an
+ * AudioMeter.
+ *
+ * @param world The world
+ * @param channel The master or a bus entity
+ * @param meter Receives the levels, zero for an entity that is no channel
+ * @return Whether the entity is a channel with a bus index
+ */
+bool box_audio_module_meter(
+    const ecs_world_t *world,
+    ecs_entity_t channel,
+    AudioMeter *meter);
 
 /** Register the sync system and the observers of the module.
  *

@@ -309,3 +309,30 @@ void NoAlloc_effects(void) {
 
     free(larger);
 }
+
+void NoAlloc_meters(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_meter_t meters[BOX_AUDIO_BUS_MAX];
+    box_audio_effect_meter_t effects[BOX_AUDIO_EFFECT_MAX];
+    box_audio_route_t routes[] = { AUDIO_OUT(1, 0), AUDIO_MASTER };
+    int32_t i;
+    audio_fill(audio_sound_a, 500, 0.1f);
+    test_assert(box_audio_core_sound(core, 5, audio_sound_a, 500, 1, AUDIO_RATE));
+    audio_order(core, routes, 2);
+    audio_play(core, 100000, 5, 1, 1, 0, 1, BOX_AUDIO_PLAY_LOOP);
+    for (i = 0; i < 100; i ++) {
+        audio_render(core, 0, 512);
+        test_int(box_audio_core_meters(core, meters, BOX_AUDIO_BUS_MAX), BOX_AUDIO_BUS_MAX);
+        test_int(box_audio_core_effect_meters(core, effects, BOX_AUDIO_EFFECT_MAX),
+            BOX_AUDIO_EFFECT_MAX);
+        test_int(meters[1].frames, 512);
+    }
+
+    audio_workload(core, audio_l, audio_r, AUDIO_FRAMES);
+    box_audio_core_meters(core, meters, BOX_AUDIO_BUS_MAX);
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+}

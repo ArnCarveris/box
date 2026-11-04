@@ -182,7 +182,8 @@
                     "synth_voices",
                     "scheduled",
                     "gated",
-                    "effects"
+                    "effects",
+                    "meters"
                 ]
             },
             {
@@ -296,6 +297,30 @@
                     "one_batch_per_frame",
                     "import_opens_no_device",
                     "new_output_resends"
+                ]
+            },
+            {
+                "id": "MeterCore",
+                "testcases": [
+                    "sine",
+                    "read_resets",
+                    "not_in_order",
+                    "effect_meters",
+                    "render_sizes"
+                ]
+            },
+            {
+                "id": "Meter",
+                "testcases": [
+                    "sine",
+                    "left_right",
+                    "mute",
+                    "group_sums",
+                    "master_before_limiter",
+                    "opt_in",
+                    "effect",
+                    "bus_deleted",
+                    "command"
                 ]
             },
             {

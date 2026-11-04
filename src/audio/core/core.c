@@ -1418,6 +1418,46 @@ int32_t box_audio_core_scheduled(
     return core ? core->schedule_count : 0;
 }
 
+int32_t box_audio_core_meters(
+    box_audio_core_t *core,
+    box_audio_meter_t *meters,
+    int32_t max)
+{
+    int32_t i, result = 0;
+    if (!core || !meters || max <= 0) {
+        goto done;
+    }
+
+    result = max < BOX_AUDIO_BUS_MAX ? max : BOX_AUDIO_BUS_MAX;
+    for (i = 0; i < result; i ++) {
+        meters[i] = core->meters[i];
+        core->meters[i] = (box_audio_meter_t){0};
+    }
+
+done:
+    return result;
+}
+
+int32_t box_audio_core_effect_meters(
+    box_audio_core_t *core,
+    box_audio_effect_meter_t *meters,
+    int32_t max)
+{
+    int32_t i, result = 0;
+    if (!core || !meters || max <= 0) {
+        goto done;
+    }
+
+    result = max < BOX_AUDIO_EFFECT_MAX ? max : BOX_AUDIO_EFFECT_MAX;
+    for (i = 0; i < result; i ++) {
+        meters[i] = core->effect_meters[i];
+        core->effect_meters[i] = (box_audio_effect_meter_t){0};
+    }
+
+done:
+    return result;
+}
+
 /** Render a block of a voice into its bus, and end it when its source ends or its fade does.
  *
  * @param core The core
@@ -1550,8 +1590,8 @@ static void box_audio_bus_sends(
     }
 }
 
-/** Run the buses of the order over a block: inserts, width, pre-fader sends, gains, output and
- * post-fader sends, the master last.
+/** Run the buses of the order over a block: inserts, width, pre-fader sends, gains, meter,
+ * output and post-fader sends, the master last.
  *
  * @param core The core
  * @param frames Frames of the block
@@ -1566,6 +1606,8 @@ static void box_audio_buses_render(
         box_audio_bus_t *b = &core->buses[route->bus];
         box_audio_bus_t *out = route->output != BOX_AUDIO_BUS_NONE ?
             &core->buses[route->output] : NULL;
+        box_audio_meter_t *m = &core->meters[route->bus];
+        float peak_l = m->peak_left, peak_r = m->peak_right, square_l = 0, square_r = 0;
         if (core->bus_effects[route->bus] || (!route->bus && core->effect_tails)) {
             box_audio_effects_render(core, route->bus, b->l, b->r, frames);
         }
@@ -1578,13 +1620,24 @@ static void box_audio_buses_render(
         for (i = 0; i < frames; i ++) {
             float l = box_audio_clean(b->l[i] * box_audio_ramp_next(&b->left));
             float r = box_audio_clean(b->r[i] * box_audio_ramp_next(&b->right));
+            float al = l < 0 ? -l : l, ar = r < 0 ? -r : r;
             b->l[i] = l;
             b->r[i] = r;
+            peak_l = al > peak_l ? al : peak_l;
+            peak_r = ar > peak_r ? ar : peak_r;
+            square_l += l * l;
+            square_r += r * r;
             if (out) {
                 out->l[i] += l;
                 out->r[i] += r;
             }
         }
+
+        m->peak_left = peak_l;
+        m->peak_right = peak_r;
+        m->square_left += (double)square_l;
+        m->square_right += (double)square_r;
+        m->frames += (uint32_t)frames;
 
         box_audio_bus_sends(core, route, b, false, frames);
     }
