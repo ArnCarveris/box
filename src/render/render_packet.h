@@ -1079,7 +1079,7 @@ typedef struct box_render_target_t {
  * The backend blits the textures of each map into a texture array with a slice per layer, shared
  * by every batch with the same sources, and binds it with the mask, the emissive layer of the
  * batch (textures[1]) and the transforms in the texture_blend variant of the mesh pipeline. The
- * heights make a fourth array only with a contrast above 0. */
+ * heights make a fourth array only with a contrast above 0 and a height on at least one layer. */
 typedef struct box_render_texture_blend_t {
     uint32_t mask;      /**< Texture handle of the mask, 0 while it is not loaded */
     uint32_t layers[BOX_RENDER_BLEND_LAYERS][BOX_RENDER_BLEND_SOURCES]; /**< Texture handles
