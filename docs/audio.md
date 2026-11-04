@@ -552,8 +552,11 @@ end.
   ends of their sweeps counted: a 1 kHz pair at 48 kHz keeps up to 18, a 7 kHz pair 0.86. The
   sidebands past that rule are weak but not 0, so a high index on a high carrier still aliases
   a little; a modulator that is itself modulated, feedback and several modulators of one
-  carrier widen the spectrum past what the limit counts. Saw, square and triangle carriers keep
-  the polyBLEP of their unmodulated rate, so a sine carrier is the clean one.
+  carrier widen the spectrum past what the limit counts. Saw, square and triangle carriers
+  smooth their edges, the polyBLEP and polyBLAMP, with the speed their modulated phase moves at
+  in each frame, how far it moved since the last one, wrapped so that a phase running backwards
+  counts as a negative speed, and under the top; so FM on them is about as clean as the plain
+  waves. Unison layers keep the speed of their unmodulated rate.
 - **Noise** is xorshift32, seeded per play from the seed of the patch and the count of its
   plays, so a fixed run gives bit identical output and every play differs. The same generator
   picks the pitch and level variances of the play, and plucks the strings.
