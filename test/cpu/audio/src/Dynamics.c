@@ -510,7 +510,8 @@ void Dynamics_slot_order(void) {
     test_assert(fabs(second + 17) < 0.3);
 }
 
-/** Render a scene of a keyed compressor and a gate in pieces of a size.
+/** Render a scene of a keyed compressor and a gate in pieces of a size, after a frame of
+ * silence in which the effects enter.
  *
  * @param left Receives the left channel
  * @param right Receives the right channel
@@ -528,6 +529,7 @@ static void dy_sizes(
     audio_order(core, routes, 3);
     dy_compressor(core, 0, 1, 2, dy_comp(-30, 6, 0.003f, 0.08f, 6, 4, 0.8f));
     dy_effect(core, 1, BOX_AUDIO_EFFECT_GATE, 2, 0, BOX_AUDIO_BUS_NONE, &g, sizeof(g));
+    box_audio_core_render(core, dy_silence, dy_silence + 1, 1);
     audio_sine(dy_sound, AUDIO_RATE, 220, 0.3f);
     audio_sine(dy_key, AUDIO_RATE / 3, 90, 0.6f);
     test_assert(box_audio_core_sound(core, 1, dy_sound, AUDIO_RATE, 1, AUDIO_RATE));
@@ -635,10 +637,10 @@ void Dynamics_world_duck(void) {
     test_assert(fabs(ecs_get(world, duck, AudioMeter)->reduction + dy_db(ducked / dry)) <
         0.3);
 
-    audio_run(world, 40);
+    audio_run(world, 60);
     back = ecs_get(world, music, AudioMeter)->peak_left;
     test_assert(fabs(dy_db(back / dry)) < 0.05);
-    test_flt(ecs_get(world, duck, AudioMeter)->reduction, 0);
+    test_assert(ecs_get(world, duck, AudioMeter)->reduction < 0.01f);
 
     /* A deleted key falls back to the own input, without an error */
     audio_log_start();

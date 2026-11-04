@@ -190,9 +190,9 @@ typedef struct box_audio_peak_t {
 typedef struct box_audio_compressor_t {
     box_audio_compressor_params_t target; /**< Parameters of the last command, clamped */
     box_audio_peak_t peak;    /**< Detector */
-    float level;              /**< Detected level in dB, smoothed by attack and release */
-    float attack;             /**< Share of the level that stays per frame on the way up */
-    float release;            /**< Share of the level that stays per frame on the way down */
+    double level;             /**< Detected level in dB from the start of the knee up, smoothed */
+    double attack;            /**< Share of the distance that stays per frame on the way up */
+    double release;           /**< Share of the distance that stays per frame on the way down */
     box_audio_ramp_t threshold; /**< Threshold in dB */
     box_audio_ramp_t knee;    /**< Knee in dB */
     box_audio_ramp_t slope;   /**< 1 / ratio - 1, the gain per dB over the threshold */
@@ -207,12 +207,12 @@ typedef struct box_audio_gate_t {
     float open_level;         /**< Linear level at which it opens */
     float close_level;        /**< Linear level under which an open gate starts its hold */
     float floor;              /**< Linear gain when closed, the range */
-    float attack;             /**< Share of the distance to open that stays per frame */
-    float release;            /**< Share of the distance to closed that stays per frame */
+    double attack;            /**< Share of the distance to open that stays per frame */
+    double release;           /**< Share of the distance to closed that stays per frame */
     int32_t hold_frames;      /**< Frames of the hold */
     int32_t hold;             /**< Frames left of the hold of an open gate under close_level */
     bool open;                /**< Whether it is open */
-    float gain;               /**< Linear gain that runs */
+    double gain;              /**< Linear gain that runs */
 } box_audio_gate_t;
 
 /** State of the kinds of effects */

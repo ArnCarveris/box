@@ -768,7 +768,10 @@ Its parameters are a `box_audio_compressor_params_t`; the component is `Compress
   without ripple; a drop of the input reaches the detector 5 to 10 ms later. Silence reads -120
   dB (`BOX_AUDIO_DYNAMICS_FLOOR`).
 - **Ballistics.** The detected level is smoothed in dB: it moves 63% of the way up in `attack`
-  seconds and 63% of the way down in `release` seconds, exponentially.
+  seconds and 63% of the way down in `release` seconds, exponentially. It counts from the start
+  of the knee up, where the reduction begins, so after a loud key that falls silent the
+  reduction goes 63% of the way back to none in `release`, not in a few milliseconds toward
+  the silence floor.
 - **Gain computer.** Over the threshold `T` by `x` dB the level is reduced to `T + x / ratio`;
   with a `knee` of `W` dB the curve bends smoothly from `T - W/2` to `T + W/2` (a quadratic,
   `(1/ratio - 1) (x + W/2)^2 / 2W`), a hard knee at 0. A -10 dBFS sine at a threshold of -20,
@@ -795,16 +798,17 @@ to about 15 dB and the music comes back over 300 ms after it:
 
 ```
 sfx { AudioBus: {output: master, kind: AudioChannelSfx} }
-music {
-  AudioBus: {output: master, effects: [music_duck]}
-}
 music_duck {
   Compressor: {threshold: -30, ratio: 8, attack: 0.005, release: 0.3, sidechain: sfx}
   AudioMeter: {}
 }
+music {
+  AudioBus: {output: master, effects: [music_duck]}
+}
 ```
 
-`music_duck` is an entity of its own, so its `AudioMeter` reads the reduction of the
+A script resolves a name when it reads it, so `sfx` and `music_duck` come before the entities
+that name them. `music_duck` is an entity of its own, so its `AudioMeter` reads the reduction of the
 compressor (`reduction`, in dB) for a ducking UI, while an `AudioMeter` on `music` reads its
 levels.
 
@@ -829,8 +833,8 @@ threshold, such as the noise of a dialog bus between lines. Its parameters are a
   memory.
 
 ```
-dialog { AudioBus: {output: master, effects: [dialog_gate]} }
 dialog_gate { Gate: {threshold: -45, hold: 0.08} }
+dialog { AudioBus: {output: master, effects: [dialog_gate]} }
 ```
 
 The tests are the `Dynamics` suite of `test/cpu/audio`: the static curve, the knee, the attack

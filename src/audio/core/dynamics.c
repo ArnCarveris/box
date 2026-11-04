@@ -21,6 +21,9 @@
 /** Lowest level the compressor detects, BOX_AUDIO_DYNAMICS_FLOOR in linear */
 #define BOX_AUDIO_DYNAMICS_TINY 1e-6f
 
+/** dB from its target at which the smoothed level of the compressor snaps to it */
+#define BOX_AUDIO_DYNAMICS_SNAP 1e-6
+
 /** A gain this close to its target snaps to it */
 #define BOX_AUDIO_GATE_SNAP 1e-7f
 
@@ -110,11 +113,11 @@ static inline float box_audio_dynamics_exp2(
  * @param seconds The time
  * @return The share
  */
-static float box_audio_dynamics_coef(
+static double box_audio_dynamics_coef(
     const box_audio_core_t *core,
     float seconds)
 {
-    return (float)box_audio_synth_exp2(-BOX_AUDIO_DYNAMICS_LOG2E /
+    return box_audio_synth_exp2(-BOX_AUDIO_DYNAMICS_LOG2E /
         ((double)seconds * (double)core->sample_rate));
 }
 
@@ -283,9 +286,14 @@ bool box_audio_compressor_render(
         float slope = box_audio_ramp_next(&c->slope);
         float makeup = box_audio_ramp_next(&c->makeup);
         float mix = box_audio_ramp_next(&c->mix);
-        float change, gain;
-        c->level = db + (c->level - db) * (db > c->level ? c->attack : c->release);
-        change = box_audio_compressor_curve(c->level, threshold, knee, slope);
+        float lo = threshold - 0.5f * knee, change, gain;
+        double to = db > lo ? db : lo, d;
+        c->level = c->level > lo ? c->level : lo;
+        d = c->level - to;
+        d *= d > 0 ? c->release : c->attack;
+        c->level = d < BOX_AUDIO_DYNAMICS_SNAP && d > -BOX_AUDIO_DYNAMICS_SNAP ? to : to + d;
+        change = c->level > lo ?
+            box_audio_compressor_curve((float)c->level, threshold, knee, slope) : 0;
         most = -change > most ? -change : most;
         change += makeup;
         gain = change == 0 ? 1.0f :
@@ -361,7 +369,8 @@ bool box_audio_gate_render(
     int32_t i;
     (void)silent;
     for (i = 0; i < frames; i ++) {
-        float x = box_audio_peak_next(&g->peak, l[i], r[i]), to, d;
+        float x = box_audio_peak_next(&g->peak, l[i], r[i]), gain;
+        double to, d;
         if (x >= (g->open ? g->close_level : g->open_level)) {
             g->open = true;
             g->hold = g->hold_frames;
@@ -371,7 +380,7 @@ bool box_audio_gate_render(
             g->open = false;
         }
 
-        to = g->open ? 1.0f : g->floor;
+        to = g->open ? 1.0 : (double)g->floor;
         if (g->gain != to) {
             g->gain = to + (g->gain - to) * (to > g->gain ? g->attack : g->release);
             d = g->gain - to;
@@ -380,9 +389,10 @@ bool box_audio_gate_render(
             }
         }
 
-        least = g->gain < least ? g->gain : least;
-        l[i] *= g->gain;
-        r[i] *= g->gain;
+        gain = (float)g->gain;
+        least = gain < least ? gain : least;
+        l[i] *= gain;
+        r[i] *= gain;
     }
 
     if (least < 1) {
