@@ -1,31 +1,29 @@
 export mut song: i32 = 0
-export mut playing = true
-export mut metronome = false
-export mut muffled = false
-export mut muffle_cutoff: f32 = 20000
+export mut playing = false
+export mut stops: i32 = 0
+export mut low_pass_cutoff: f32 = 20000
+export mut high_pass_cutoff: f32 = 20
+export mut reverb_level: f32 = 100
 export mut sweep: f32 = 300
 export mut beat: f32 = 0
-export mut bar_n: i32 = 1
-export mut beat_n: i32 = 1
 export mut levels: f32[6] = {}
 export mut master_l: f32 = 0
 export mut master_r: f32 = 0
 export mut glow: f32 = 0
-export mut duck: f32 = 0
 
-export const SONG_TITLE: string[] = ["Harbor Lights", "Neon Run", "Lantern Waltz"]
-export const SONG_STYLE: string[] = ["Lo-fi jazz in F major", "Synthwave in A minor", "Folk waltz in E minor"]
-export const SONG_START: f32[] = [0, 1000, 2000]
-export const SONG_BEATS: f32[] = [64, 64, 96]
-export const SONG_TEMPO: f32[] = [84, 108, 138]
-export const SONG_BPB: i32[] = [4, 4, 3]
-export const SONG_R: f32[] = [255, 255, 90]
-export const SONG_G: f32[] = [165, 60, 230]
-export const SONG_B: f32[] = [70, 200, 180]
+export const SONG_TITLE: string[] = ["Distant Orbit", "Neon Run", "Harbor Lights", "Lantern Waltz"]
+export const SONG_START: f32[] = [3000, 1000, 0, 2000]
+export const SONG_BEATS: f32[] = [128, 64, 64, 96]
+export const SONG_TEMPO: f32[] = [60, 108, 84, 138]
+export const SONG_BPB: i32[] = [4, 4, 4, 3]
+export const SONG_R: f32[] = [130, 255, 255, 90]
+export const SONG_G: f32[] = [160, 60, 165, 230]
+export const SONG_B: f32[] = [255, 200, 70, 180]
 
-export const LANE_COUNT: i32[] = [4, 5, 6]
+export const LANE_COUNT: i32[] = [4, 5, 4, 6]
 export const LANE_NAME: string[] = [
-  "Kit", "Bass", "Keys", "Vibes", "", "",
+  "Pad", "Bass", "Bells", "Voice", "", "",
   "Kit", "Bass", "Pad", "Arp", "Lead", "",
+  "Kit", "Bass", "Keys", "Vibes", "", "",
   "Perc", "Bass", "Harp", "Strings", "Flute", "Glock"
 ]

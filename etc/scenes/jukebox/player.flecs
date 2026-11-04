@@ -4,30 +4,12 @@ using box.audio
 using box.input
 
 jukebox_actions {
-  pick_harbor { Action: {description: "Play Harbor Lights"}; Binding: {key: Num1} }
+  pick_harbor { Action: {description: "Play Harbor Lights"}; Binding: {key: Num3} }
   pick_neon { Action: {description: "Play Neon Run"}; Binding: {key: Num2} }
-  pick_lantern { Action: {description: "Play Lantern Waltz"}; Binding: {key: Num3} }
+  pick_lantern { Action: {description: "Play Lantern Waltz"}; Binding: {key: Num4} }
+  pick_orbit { Action: {description: "Play Distant Orbit"}; Binding: {key: Num1} }
   play { Action: {description: "Play or pause"}; Binding: {key: Space} }
   crash { Action: {description: "Crash on the next bar"}; Binding: {key: C} }
-  click { Action: {description: "Toggle the metronome"}; Binding: {key: M} }
-  muffle { Action: {description: "Muffle the jukebox"}; Binding: {key: F} }
-}
-
-prefab jb_clunk {
-  AudioOutput: {bus: sfx}
-  SynthSound: {seed: 41, pitch_variance: 0.04}
-  SynthEnvelope: {attack: 0.001, decay: 0.12, curve: 4}
-  SynthFilter: {kind: SynthLowPass, cutoff: 2400}
-  latch {
-    SynthOscillator: {wave: SynthNoise, level: 0.4}
-    SynthEnvelope: {attack: 0.0005, decay: 0.02}
-  }
-  arm { SynthOscillator: {wave: SynthTriangle, frequency: 180, frequency_end: 95, sweep: 0.06, level: 0.5} }
-  spring {
-    SynthOscillator: {frequency: 1320, level: 0.08}
-    SynthEnvelope: {attack: 0.001, decay: 0.3, curve: 5}
-    rattle { SynthOscillator: {frequency: 410, modulation: SynthRing, index: 0.7} }
-  }
 }
 
 prefab jb_crash {
@@ -43,14 +25,18 @@ prefab jb_crash {
   }
 }
 
-muffle_filter {
-  AudioFilter: {cutoff: muffle_cutoff, resonance: 0.3, slope: SynthSlope24}
+low_pass_filter {
+  AudioFilter: {kind: SynthLowPass, cutoff: low_pass_cutoff, slope: SynthSlope24}
+}
+
+high_pass_filter {
+  AudioFilter: {kind: SynthHighPass, cutoff: high_pass_cutoff, slope: SynthSlope24}
 }
 
 box {
   audio {
     master {
-      AudioBus: {effects: [muffle_filter]}
+      AudioBus: {effects: [high_pass_filter, low_pass_filter]}
       AudioMeter: {}
     }
   }
@@ -63,32 +49,36 @@ $ {
     loop_start: SONG_START[song], loop_end: SONG_START[song] + SONG_BEATS[song]
   }
   Transport = {playing: playing}
-  Transport = {metronome: metronome}
+  Transport = {position: SONG_START[song] + stops * 0}
 }
 
 const LANES = [
-  harbor_kit, hl_bass, hl_keys, hl_vibes, harbor, harbor,
+  orbit_pad, orbit_bass, orbit_bells, orbit_melody, orbit, orbit,
   neon_kit, nr_bass, nr_pad, nr_arp, nr_lead, neon,
+  harbor_kit, hl_bass, hl_keys, hl_vibes, harbor, harbor,
   lantern_kit, lw_bass, lw_harp, lw_strings, lw_flute, lw_glock
 ]
 
 proc pick(n: i32) {
-  song = n
-  playing = true
+  if playing && song == n {
+    playing = false
+    stops += 1
+  } else {
+    song = n
+    playing = true
+  }
 }
 
 async {
   while true {
     await on.pressed(jukebox_actions.pick_harbor)
-    const c = box.audio.play(jb_clunk, 0.8)
-    pick(0)
+    pick(2)
   }
 }
 
 async {
   while true {
     await on.pressed(jukebox_actions.pick_neon)
-    const c = box.audio.play(jb_clunk, 0.8)
     pick(1)
   }
 }
@@ -96,8 +86,7 @@ async {
 async {
   while true {
     await on.pressed(jukebox_actions.pick_lantern)
-    const c = box.audio.play(jb_clunk, 0.8)
-    pick(2)
+    pick(3)
   }
 }
 
@@ -117,32 +106,9 @@ async {
 
 async {
   while true {
-    await on.pressed(jukebox_actions.click)
-    metronome = !metronome
-  }
-}
-
-async {
-  while true {
-    await on.pressed(jukebox_actions.muffle)
-    muffled = !muffled
-  }
-}
-
-async {
-  while true {
     const t = Transport[Transport]
     const b = t.position - SONG_START[song]
-    const bpb = SONG_BPB[song]
     beat = b
-    const bar_now = floor(b / bpb) + 1
-    const beat_now = floor(b - (bar_now - 1) * bpb) + 1
-    if bar_now != bar_n {
-      bar_n = bar_now
-    }
-    if beat_now != beat_n {
-      beat_n = beat_now
-    }
 
     for i in 0..6 {
       const e = LANES[song * 6 + i]
@@ -155,18 +121,19 @@ async {
     master_l = clamp((20 * log10(max(mm.rms_left, 0.00001)) + 48) / 48, 0, 1)
     master_r = clamp((20 * log10(max(mm.rms_right, 0.00001)) + 48) / 48, 0, 1)
     glow = clamp((20 * log10(max(max(mm.peak_left, mm.peak_right), 0.00001)) + 30) / 30, 0, 1)
-    duck = nr_duck[AudioMeter].reduction
 
     const open = 300 * pow(2, 5 * clamp(b / 16, 0, 1))
     if abs(open - sweep) > sweep * 0.01 {
       sweep = open
     }
 
-    const target = match muffled { true: 500; _: 20000 }
-    if abs(target - muffle_cutoff) > target * 0.005 {
-      muffle_cutoff = muffle_cutoff * pow(target / muffle_cutoff, 0.08)
-    }
-
     await next_frame()
+  }
+}
+
+async {
+  while true {
+    await on.pressed(jukebox_actions.pick_orbit)
+    pick(0)
   }
 }

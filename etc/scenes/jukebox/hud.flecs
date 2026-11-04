@@ -9,6 +9,8 @@ using box.layout
 using box.text
 using box.input
 using box.picking
+using box.ui
+using box.widgets
 
 const PANEL_W: f32 = 320
 const METER_H: f32 = 110
@@ -18,7 +20,7 @@ template SongButton {
   prop action: entity = 0
   mut hover = false
 
-  const selected = song == index
+  const selected = playing && song == index
   const r = SONG_R[index]
   const g = SONG_G[index]
   const b = SONG_B[index]
@@ -71,7 +73,14 @@ template SongButton {
 const R = SONG_R[song]
 const G = SONG_G[song]
 const B = SONG_B[song]
-const BPB = SONG_BPB[song]
+
+box {
+  ui {
+    theme {
+      UiTheme = {accent: {R, G, B}, text: {240, 240, 245}, text_muted: {170, 175, 195}, font_size: 13}
+    }
+  }
+}
 
 hud {
   Scene: {}
@@ -84,6 +93,7 @@ hud {
   screen {
     LayoutFill: {surface: window}
     Layout: {}
+    FocusScope
 
     panel {
       InputBlocker
@@ -99,16 +109,20 @@ hud {
         Rgb: {R, G, B}
       }
 
-      harbor_button {
-        SongButton: {index: 0, action: jukebox_actions.pick_harbor}
+      orbit_button {
+        SongButton: {index: 0, action: jukebox_actions.pick_orbit}
       }
 
       neon_button {
         SongButton: {index: 1, action: jukebox_actions.pick_neon}
       }
 
+      harbor_button {
+        SongButton: {index: 2, action: jukebox_actions.pick_harbor}
+      }
+
       lantern_button {
-        SongButton: {index: 2, action: jukebox_actions.pick_lantern}
+        SongButton: {index: 3, action: jukebox_actions.pick_lantern}
       }
 
       now {
@@ -128,16 +142,6 @@ hud {
         song_title {
           Text: {value: SONG_TITLE[song], size: 20}
           Rgb: {245, 245, 250}
-        }
-
-        style {
-          Text: {value: "{SONG_STYLE[song]}, {SONG_TEMPO[song]:.0} bpm in {BPB}/4", size: 13}
-          Rgb: {170, 175, 195}
-        }
-
-        where {
-          Text: {value: "Bar {bar_n} of {SONG_BEATS[song] / BPB:.0}, beat {beat_n}", size: 13}
-          Rgb: {170, 175, 195}
         }
 
         progress {
@@ -253,40 +257,12 @@ hud {
       }
 
       fx {
-        Layout: {direction: Column, spacing: 3, padding: {4, 0, 0, 0}}
+        Layout: {direction: Column, spacing: 8, padding: {4, 0, 0, 0}}
         LayoutItem: {width: {mode: Grow}}
 
-        if song == 1 {
-          duck_line {
-            Text: {value: "Pad ducks under the kick: {duck:.1} dB", size: 13}
-            Rgb: {R, G, B}
-          }
-        }
-
-        click_line {
-          if metronome {
-            Text: {value: "Metronome on", size: 13}
-            Rgb: {245, 245, 250}
-          } else {
-            Text: {value: "Metronome off", size: 13}
-            Rgb: {120, 125, 145}
-          }
-        }
-
-        muffle_line {
-          if muffled {
-            Text: {value: "Muffled through the wall", size: 13}
-            Rgb: {245, 245, 250}
-          } else {
-            Text: {value: "Open", size: 13}
-            Rgb: {120, 125, 145}
-          }
-        }
-      }
-
-      hint {
-        Text: {value: "1 2 3 pick a song, Space plays or pauses, C crashes on the next bar, M toggles the metronome, F muffles", size: 12, width: PANEL_W - 32}
-        Rgb: {130, 135, 155}
+        Slider low_pass(label: "Low-pass", width: PANEL_W - 32, min: 20, max: 20000, step: 0, value: low_pass_cutoff, unit: " Hz")
+        Slider high_pass(label: "High-pass", width: PANEL_W - 32, min: 20, max: 20000, step: 0, value: high_pass_cutoff, unit: " Hz")
+        Slider reverb(label: "Reverb", width: PANEL_W - 32, min: 0, max: 200, step: 1, value: reverb_level, unit: "%")
       }
     }
   }
@@ -294,4 +270,13 @@ hud {
 
 hud_view {
   View: {camera: hud.camera, lighting: {enabled: false}, culling: {enabled: false}}
+}
+
+async {
+  while true {
+    await on.change(hud.screen.panel.fx)
+    low_pass_cutoff = hud.screen.panel.fx.low_pass[Slider.mut].current
+    high_pass_cutoff = hud.screen.panel.fx.high_pass[Slider.mut].current
+    reverb_level = hud.screen.panel.fx.reverb[Slider.mut].current
+  }
 }
