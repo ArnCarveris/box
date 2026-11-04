@@ -41,11 +41,7 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 | `AudioPcm` | A sound from samples, from script or C |
 | `SoundFile` | A short sound from a WAV or FLAC file, decoded into memory, see [Sound files](#sound-files) |
 | `SoundStatus` | Read only: whether a `SoundFile` loads, is ready or failed |
-<<<<<<< HEAD
-| `SynthSound` | A sound made by the synth from layers of `SynthOscillator`, `SynthEnvelope` and `SynthFilter`, layers that may modulate each other, see [Synth sounds](#synth-sounds) |
-=======
-| `SynthSound` | A sound made by the synth from layers of `SynthOscillator`, `SynthEnvelope`, `SynthFilter` and `SynthFilterEnvelope`, see [Synth sounds](#synth-sounds) |
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
+| `SynthSound` | A sound made by the synth from layers of `SynthOscillator`, `SynthEnvelope`, `SynthFilter` and `SynthFilterEnvelope`, layers that may modulate each other, see [Synth sounds](#synth-sounds) |
 | `AudioSource` | A sound that plays while its entity exists, once or in a loop, with a volume and a pitch |
 | `AudioSpatial` | Places a source in the world: `min_distance`, `max_distance`, `rolloff`, see [Spatial audio](#spatial-audio) |
 | `AudioListener` | The entity that hears the spatial sources, the camera without one |
@@ -227,18 +223,11 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   EQ, compressor or delay on a bus.
 - **Voices**: 64, with the quietest stolen; no priorities. A one shot cannot be controlled after
   it started.
-<<<<<<< HEAD
-- **Synth**: up to 4 oscillators and one filter per sound, linear envelopes, no LFO and no node
-  graph; an oscillator may phase or ring modulate another, but FM is not band limited. A
-  looping synth sound starts a new pass of its envelopes and oscillators at the end of the last,
-  at most every 60 seconds; a drone keeps that gap short with edges of a few ms, as the dust
-  merchant's engine does with 2 ms.
-=======
-- **Synth**: up to 4 oscillators and one filter per sound, linear or curved envelopes, no LFO and no node
-  graph. A looping synth sound starts a new pass of its envelopes and oscillators at the end of
-  the last, at most every 60 seconds; a drone keeps that gap short with edges of a few ms, as
+- **Synth**: up to 4 oscillators and one filter per sound, linear or curved envelopes, no LFO
+  and no node graph; an oscillator may phase or ring modulate another, but FM is not band
+  limited. A looping synth sound starts a new pass of its envelopes and oscillators at the end
+  of the last, at most every 60 seconds; a drone keeps that gap short with edges of a few ms, as
   the dust merchant's engine does with 2 ms.
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
 - **Files**: WAV and FLAC for sounds, Ogg Vorbis for music, one stream at once (a change of path
   fades over 5 ms, there is no crossfade).
 - **Tools**: no mixer UI, and the UI theme of box has no sounds; a scene adds them in its own
@@ -523,18 +512,6 @@ voices that play keep theirs, and a release frees the id at once with `SOUND_FRE
   uses reached silence; a looping voice starts a new pass instead, with the state of its
   filter. Synth voices start at their gain, without the ramp of the core, since the envelope
   starts at 0: an attack of 1 ms takes 1 ms.
-<<<<<<< HEAD
-- **The filter** is the trapezoidal state variable filter (Simper): lowpass and highpass at 12
-  dB per octave and a bandpass with unity gain at the cutoff. Resonance 0 is a Butterworth
-  response (Q 0.707), 1 a Q of 50. Its coefficients come from `tan(pi cutoff / rate)` with the
-  cutoff clamped to 0.49 of the rate, so it stays stable at every cutoff and resonance, a cutoff
-  at Nyquist and a fast sweep included; a sweep updates them every 8 frames. Its state is
-  flushed like a bus sample.
-- **Cost.** Render work only: per frame of a voice an envelope step per envelope, an oscillator
-  per layer and the filter; a modulated patch adds a phase offset and a wrap per layer.
-  `bench/audio` has a `Synth` suite of 64 voices in ns per sample; `voices_64_fm`, two FM pairs
-  per voice, measures the modulated path.
-=======
 - **The filter** is the trapezoidal state variable filter (Simper): lowpass, highpass and a
   bandpass with unity gain at the cutoff. At a slope of 12 dB per octave it is one stage:
   resonance 0 is a Butterworth response (Q 0.707), 1 a Q of 50. At 24 dB per octave it is two
@@ -554,9 +531,10 @@ voices that play keep theirs, and a release frees the id at once with `SOUND_FRE
   envelope and computes no coefficients per frame, and a 12 dB filter runs one stage, so a
   patch that uses neither costs what it did before.
 - **Cost.** Render work only: per frame of a voice an envelope step per envelope (a multiply
-  and an add when curved), an oscillator per layer and the filter, one stage or two. `bench/audio` has a `Synth` suite of 64 voices in
-  ns per sample, with a filter envelope and with a 24 dB filter.
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
+  and an add when curved), an oscillator per layer and the filter, one stage or two; a modulated
+  patch adds a phase offset and a wrap per layer. `bench/audio` has a `Synth` suite of 64 voices
+  in ns per sample, with a filter envelope, with a 24 dB filter, and `voices_64_fm`, two FM
+  pairs per voice, which measures the modulated path.
 
 The core needs no libm: the exponential sweeps and the filter envelope use series for `log2` and
 `exp2` in `synth.c`.
@@ -564,11 +542,10 @@ The core needs no libm: the exponential sweeps and the filter envelope use serie
 ### Synth sounds
 
 A sound effect is a prefab in script, with no file. `SynthSound` marks the root; the layers are
-<<<<<<< HEAD
 the root and its children that have a `SynthOscillator`, as particle effect layers are, and the
-children of layers that have one, each after its parent. The `SynthEnvelope` and the
-`SynthFilter` of the root apply to the mix of the layers; a layer may have its own
-`SynthEnvelope`, and one without uses the root's.
+children of layers that have one, each after its parent. The `SynthEnvelope`, the `SynthFilter`
+and the `SynthFilterEnvelope` of the root apply to the mix of the layers; a layer may have its
+own `SynthEnvelope`, and one without uses the root's.
 
 A layer with the `modulation` `SynthPhase` or `SynthRing` is a modulator of its parent layer
 (see [Synth](#synth)): its wave times its envelope moves the phase of its parent by `index`
@@ -576,25 +553,14 @@ radians, or multiplies it at a depth of `index`. Give a modulator its own, short
 `SynthEnvelope` and the brightness of the sound decays with it. A modulator is not heard unless
 it is `audible`; its `level` is the level it is heard at. `frequency` sets the ratio: the same
 as the carrier for a harmonic spectrum, a ratio such as 3.5 or 1.41 for an inharmonic one.
-=======
-the root and its children that have a `SynthOscillator`, as particle effect layers are. The
-`SynthEnvelope`, the `SynthFilter` and the `SynthFilterEnvelope` of the root apply to the mix of
-the layers; a layer may have its own `SynthEnvelope`, and one without uses the root's.
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
 
 | Component | What it is |
 |-----------|------------|
 | `SynthSound` | The root: `seed`, `pitch_variance` and `level_variance` (random shares per play, 0) |
-<<<<<<< HEAD
 | `SynthOscillator` | A layer: `wave` (`SynthSine`, `SynthSaw`, `SynthSquare`, `SynthTriangle`, `SynthNoise`), `frequency` (440), `frequency_end` (0, no sweep), `sweep` (s), `level` (1), `modulation` (`SynthMix`, heard; `SynthPhase` or `SynthRing`, modulates its parent), `index` (1: radians for `SynthPhase` up to 32, limited against the frequency; a depth of 0..1 for `SynthRing`), `feedback` (0, radians on its own phase up to 1.5), `audible` (false: whether a modulator is heard as well) |
-| `SynthEnvelope` | `attack`, `decay`, `sustain`, `release`, `hold`: seconds and a sustain level, all 0 by default |
-| `SynthFilter` | `kind` (`SynthLowPass`, `SynthHighPass`, `SynthBandPass`), `cutoff` (1000), `cutoff_end`, `sweep`, `resonance` |
-=======
-| `SynthOscillator` | A layer: `wave` (`SynthSine`, `SynthSaw`, `SynthSquare`, `SynthTriangle`, `SynthNoise`), `frequency` (440), `frequency_end` (0, no sweep), `sweep` (s), `level` (1) |
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `release`, `hold`: seconds and a sustain level, all 0 by default; `curve` (decay and release) and `attack_curve`: 0 linear (default), positive fast at first, -16..16 |
 | `SynthFilter` | `kind` (`SynthLowPass`, `SynthHighPass`, `SynthBandPass`), `cutoff` (1000), `resonance` (0), `slope` (`SynthSlope12`, `SynthSlope24`) |
 | `SynthFilterEnvelope` | The envelope of the cutoff: `attack`, `decay`, `sustain`, `release`, `hold`, `curve` and `attack_curve` as in `SynthEnvelope`, and `amount`, the octaves the cutoff moves at level 1 (0, negative closes the filter); nothing without a `SynthFilter` |
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
 
 The module (`src/audio/synth_sound.c`) compiles a sound once, and again when a component of it
 or of a layer changes, into a patch that the sync system sends with a `SYNTH` command before the
@@ -613,17 +579,13 @@ with `loop: true` starts it over at the end of its envelopes. A play allocates n
   open while the sound plays takes a sustain of 1 and a hold that lasts the sound.
 - Deleting the sound releases it and fades its one shots, as for `AudioPcm`.
 
-<<<<<<< HEAD
-Six examples, three that are plain layers and three that modulate:
-=======
 Which curves to use: plucks, the harp, mallets and drums want a `curve` of 4 to 6 so they fall
 off fast at first and ring out softly; pads, strings and winds want 2 to 3 on the decay and the
 release, and an `attack_curve` of 1 to 2 for a swell that settles. A sound that keeps its
 linear envelope (curves of 0) renders exactly as before. A curve makes a segment quieter
 sooner, so a pluck usually wants a longer decay than its linear version.
 
-Five examples:
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
+Eight examples, five that are plain layers and three that modulate:
 
 ```
 using box.audio
@@ -661,7 +623,6 @@ prefab Whoosh {
   SynthOscillator: {wave: SynthNoise, level: 0.8}
 }
 
-<<<<<<< HEAD
 // A bell: a modulator at 3.5 times the pitch makes an inharmonic spectrum, and its envelope
 // is shorter than the carrier's, so the bell starts bright and rings out pure, 2.5 s
 prefab Bell {
@@ -708,7 +669,8 @@ prefab MetalHit {
     SynthOscillator: {frequency: 1960, modulation: SynthPhase, index: 3}
     SynthEnvelope: {attack: 0.001, decay: 0.15}
   }
-=======
+}
+
 // A pluck: a saw through a 24 dB lowpass that its filter envelope opens 4 octaves on the attack
 // and closes with the note
 prefab Pluck {
@@ -729,7 +691,6 @@ prefab Ring {
   SynthFilterEnvelope: {decay: 0.3, amount: 1.737}
   string { SynthOscillator: {wave: SynthTriangle, frequency: 330, level: 0.4} }
   body { SynthOscillator: {wave: SynthSine, frequency: 330, level: 0.3} }
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
 }
 ```
 
@@ -741,21 +702,15 @@ falls from 2400 Hz to 300 Hz in 0.2 s.
 
 The tests are the `Synth` suite of `test/cpu/audio`, on offline renders: frequencies of every
 wave at 44.1 and 48 kHz, sweeps, aliasing of a 5 kHz saw, square and triangle, flat and seeded noise, the
-<<<<<<< HEAD
-times and edges of envelopes, the end of a voice, the filter one octave past its cutoff and
-under sweeps at full resonance and extreme values, layers, phase modulation at 1:1 and 6:1
-against Bessel amplitudes and without drift, an index that follows the envelope of its
-modulator and fades the high sidebands, the limit of the index, ring modulation at the sum and
-difference alone, audible modulators, feedback, scripts from `test/assets/audio/synth.flecs`
-and `test/assets/audio/synth_fm.flecs`, the six examples above from
-=======
 times and edges of envelopes, curved envelopes (a linear one bit identical to the linear
 recurrence, a curved decay at its midpoint and on its sustain, a curved release that ends the
 voice on time), the end of a voice, the filter one octave past its cutoff at both slopes, the
 cutoff following a filter envelope up and down, stability under fast filter envelopes at full
-resonance and at Nyquist for both slopes and extreme values, layers, scripts from
-`test/assets/audio/synth.flecs`, the five examples above from
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
+resonance and at Nyquist for both slopes and extreme values, layers, phase modulation at 1:1
+and 6:1 against Bessel amplitudes and without drift, an index that follows the envelope of its
+modulator and fades the high sidebands, the limit of the index, ring modulation at the sum and
+difference alone, audible modulators, feedback, scripts from `test/assets/audio/synth.flecs`
+and `test/assets/audio/synth_fm.flecs`, the eight examples above from
 `test/assets/audio/synth_examples.flecs` and errors; `NoAlloc` renders 64 synth voices. The browser
 check is `test/integration/web/audio_synth.mjs`.
 

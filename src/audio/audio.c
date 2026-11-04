@@ -668,11 +668,8 @@ void BoxAudioImport(
     ecs_set_hooks(world, Reverb, { .ctor = box_audio_reverb_ctor });
     ECS_META_COMPONENT(world, SynthWave);
     ECS_META_COMPONENT(world, SynthFilterKind);
-<<<<<<< HEAD
-    ECS_META_COMPONENT(world, SynthModulation);
-=======
     ECS_META_COMPONENT(world, SynthFilterSlope);
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
+    ECS_META_COMPONENT(world, SynthModulation);
     ECS_META_COMPONENT(world, SynthOscillator);
     ecs_set_hooks(world, SynthOscillator, { .ctor = box_audio_synth_oscillator_ctor });
     ECS_META_COMPONENT(world, SynthEnvelope);

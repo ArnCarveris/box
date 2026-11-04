@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-// The six synth sounds of docs/audio.md, kept the same: the Synth suite of test/cpu/audio
-=======
-// The five synth sounds of docs/audio.md, kept the same: the Synth suite of test/cpu/audio
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
+// The eight synth sounds of docs/audio.md, kept the same: the Synth suite of test/cpu/audio
 // checks that they parse, compile without errors, play and end.
 using box.audio
 
@@ -39,7 +35,6 @@ prefab Whoosh {
   SynthOscillator: {wave: SynthNoise, level: 0.8}
 }
 
-<<<<<<< HEAD
 // A bell: a modulator at 3.5 times the pitch makes an inharmonic spectrum, and its envelope
 // is shorter than the carrier's, so the bell starts bright and rings out pure, 2.5 s
 prefab Bell {
@@ -86,7 +81,8 @@ prefab MetalHit {
     SynthOscillator: {frequency: 1960, modulation: SynthPhase, index: 3}
     SynthEnvelope: {attack: 0.001, decay: 0.15}
   }
-=======
+}
+
 // A pluck: a saw through a 24 dB lowpass that its filter envelope opens 4 octaves on the attack
 // and closes with the note
 prefab Pluck {
@@ -107,5 +103,4 @@ prefab Ring {
   SynthFilterEnvelope: {decay: 0.3, amount: 1.737}
   string { SynthOscillator: {wave: SynthTriangle, frequency: 330, level: 0.4} }
   body { SynthOscillator: {wave: SynthSine, frequency: 330, level: 0.3} }
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
 }

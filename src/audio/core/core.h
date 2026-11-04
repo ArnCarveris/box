@@ -108,17 +108,15 @@
 /** Highest frequency of an oscillator in Hz, the top of the audible range */
 #define BOX_AUDIO_SYNTH_FREQUENCY_MAX 20000.0f
 
-<<<<<<< HEAD
 /** Largest index of phase modulation in radians, before the limit against the frequency */
 #define BOX_AUDIO_SYNTH_INDEX_MAX 32.0f
 
 /** Largest feedback of an oscillator onto its own phase in radians, under the point where the
  * tone turns to noise */
 #define BOX_AUDIO_SYNTH_FEEDBACK_MAX 1.5f
-=======
+
 /** Largest amount of the filter envelope in octaves, up or down */
 #define BOX_AUDIO_SYNTH_OCTAVES_MAX 10.0f
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
 
 /** Commands of the byte stream. Each starts with a box_audio_cmd_header_t */
 typedef enum box_audio_cmd_type_t {
@@ -268,25 +266,20 @@ typedef enum box_audio_synth_filter_t {
     BOX_AUDIO_SYNTH_BANDPASS = 3      /**< Bandpass, unity at the cutoff */
 } box_audio_synth_filter_t;
 
-<<<<<<< HEAD
-/** How a synth oscillator that modulates another one changes it */
-typedef enum box_audio_synth_modulation_t {
-    BOX_AUDIO_SYNTH_PHASE = 0,  /**< Adds to the phase of the carrier, FM as DX synths do it */
-    BOX_AUDIO_SYNTH_RING = 1    /**< Multiplies the carrier */
-} box_audio_synth_modulation_t;
-
-/** An envelope of a synth patch: a linear attack to 1, a decay to the sustain level, a hold
- * there and a release to 0 */
-=======
 /** Slopes of the filter of a synth patch */
 typedef enum box_audio_synth_slope_t {
     BOX_AUDIO_SYNTH_SLOPE_12 = 0,  /**< 12 dB per octave, one stage */
     BOX_AUDIO_SYNTH_SLOPE_24 = 1   /**< 24 dB per octave, two cascaded stages */
 } box_audio_synth_slope_t;
 
+/** How a synth oscillator that modulates another one changes it */
+typedef enum box_audio_synth_modulation_t {
+    BOX_AUDIO_SYNTH_PHASE = 0,  /**< Adds to the phase of the carrier, FM as DX synths do it */
+    BOX_AUDIO_SYNTH_RING = 1    /**< Multiplies the carrier */
+} box_audio_synth_modulation_t;
+
 /** An envelope of a synth patch: an attack to 1, a decay to the sustain level, a hold there
  * and a release to 0, each linear or curved and ending on time */
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
 typedef struct box_audio_synth_envelope_t {
     float attack;        /**< Seconds from 0 to 1 */
     float decay;         /**< Seconds from 1 to the sustain level */

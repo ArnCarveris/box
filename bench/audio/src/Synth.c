@@ -16,26 +16,18 @@
 /** Create a core with 64 looping voices of a patch of three layers: a saw that sweeps up, a
  * square with its own envelope and noise, into a lowpass.
  *
-<<<<<<< HEAD
  * With fm the patch is four sines instead: two carriers, each phase modulated by a modulator
  * with its own envelope, one of them with feedback.
  *
- * @param sweep Whether the cutoff of the filter sweeps during the whole envelope
+ * @param envelope Whether a filter envelope moves the cutoff during the whole envelope
+ * @param slope A box_audio_synth_slope_t
  * @param fm Whether the patch is the one of phase modulation
  * @return The core
  */
 static box_audio_core_t* bench_synth_core(
-    bool sweep,
-    bool fm)
-=======
- * @param envelope Whether a filter envelope moves the cutoff during the whole envelope
- * @param slope A box_audio_synth_slope_t
- * @return The core
- */
-static box_audio_core_t* bench_synth_core(
     bool envelope,
-    uint32_t slope)
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
+    uint32_t slope,
+    bool fm)
 {
     static uint8_t bytes[8192];
     box_audio_core_desc_t desc = { .sample_rate = BENCH_RATE };
@@ -114,11 +106,7 @@ void Synth_voices_64(
     bench_t *b)
 {
     // audio/synth
-<<<<<<< HEAD
-    box_audio_core_t *core = bench_synth_core(false, false);
-=======
-    box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12);
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
+    box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
@@ -127,28 +115,25 @@ void Synth_voices_64_filter_envelope(
     bench_t *b)
 {
     // audio/synth
-<<<<<<< HEAD
-    box_audio_core_t *core = bench_synth_core(true, false);
-=======
-    box_audio_core_t *core = bench_synth_core(true, BOX_AUDIO_SYNTH_SLOPE_12);
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
+    box_audio_core_t *core = bench_synth_core(true, BOX_AUDIO_SYNTH_SLOPE_12, false);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
 
-<<<<<<< HEAD
-void Synth_voices_64_fm(
-    bench_t *b)
-{
-    // audio/synth
-    box_audio_core_t *core = bench_synth_core(false, true);
-=======
 void Synth_voices_64_filter_24(
     bench_t *b)
 {
     // audio/synth
-    box_audio_core_t *core = bench_synth_core(true, BOX_AUDIO_SYNTH_SLOPE_24);
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
+    box_audio_core_t *core = bench_synth_core(true, BOX_AUDIO_SYNTH_SLOPE_24, false);
+    bench_synth_render(b, core);
+    box_audio_core_free(core);
+}
+
+void Synth_voices_64_fm(
+    bench_t *b)
+{
+    // audio/synth
+    box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, true);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }

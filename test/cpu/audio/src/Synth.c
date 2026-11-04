@@ -1549,36 +1549,22 @@ void Synth_script_loop_source(void) {
 }
 
 /** The examples of docs/audio.md compile without errors, play and end: the click within 3
-<<<<<<< HEAD
  * frames of AUDIO_DT, the blip within 12, the whoosh within 70, the bell within 155, the
- * electric piano within 100 and the metallic hit within 40. */
-=======
- * frames of AUDIO_DT, the blip within 12, the whoosh within 70, the pluck within 48 and the ring
- * within 40. */
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
+ * electric piano within 100, the metallic hit and the ring within 40 and the pluck within 48. */
 void Synth_docs_examples(void) {
     // audio/synth
     ecs_world_t *world = audio_world();
     char *code = synth_read("test/assets/audio/synth_examples.flecs");
-<<<<<<< HEAD
     const char *names[] = {
-        "UiClick", "UiBlip", "Whoosh", "Bell", "ElectricPiano", "MetalHit" };
-    const int32_t frames[] = { 3, 12, 70, 155, 100, 40 };
-=======
-    const char *names[] = { "UiClick", "UiBlip", "Whoosh", "Pluck", "Ring" };
-    const int32_t frames[] = { 3, 12, 70, 48, 40 };
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
+        "UiClick", "UiBlip", "Whoosh", "Bell", "ElectricPiano", "MetalHit", "Pluck", "Ring" };
+    const int32_t frames[] = { 3, 12, 70, 155, 100, 40, 48, 40 };
     int32_t i, start;
     audio_log_start();
     test_assert(ecs_script_run(world, "examples", code, NULL) == 0);
     ecs_os_free(code);
     audio_run(world, 1);
-<<<<<<< HEAD
-    for (i = 0; i < 6; i ++) {
-=======
     test_flt(ecs_get(world, ecs_lookup(world, "Ring"), AudioSynth)->patch.envelope.curve, 5);
-    for (i = 0; i < 5; i ++) {
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
+    for (i = 0; i < 8; i ++) {
         ecs_entity_t sound = ecs_lookup(world, names[i]);
         test_assert(sound != 0);
         test_assert(ecs_get(world, sound, AudioSynth)->compiled);

@@ -185,7 +185,12 @@ ECS_ENUM(SynthFilterKind, {
     SynthBandPass          /**< Bandpass, unity at the cutoff */
 });
 
-<<<<<<< HEAD
+/** Slope of the filter of a synth sound */
+ECS_ENUM(SynthFilterSlope, {
+    SynthSlope12,          /**< 12 dB per octave, one stage */
+    SynthSlope24           /**< 24 dB per octave, two cascaded stages */
+});
+
 /** What a synth oscillator does with its signal */
 ECS_ENUM(SynthModulation, {
     SynthMix,              /**< It is heard, added to the mix of the layers */
@@ -195,15 +200,6 @@ ECS_ENUM(SynthModulation, {
 
 /** An oscillator of a synth sound, a layer: on the root of the sound, on a child of it, or on
  * a child of a layer.
-=======
-/** Slope of the filter of a synth sound */
-ECS_ENUM(SynthFilterSlope, {
-    SynthSlope12,          /**< 12 dB per octave, one stage */
-    SynthSlope24           /**< 24 dB per octave, two cascaded stages */
-});
-
-/** An oscillator of a synth sound, a layer: on the root of the sound or on a child of it.
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
  *
  * Up to BOX_AUDIO_SYNTH_LAYERS layers, the root first, then each layer before its children;
  * more log one error and are left out.

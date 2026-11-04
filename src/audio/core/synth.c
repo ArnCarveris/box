@@ -477,7 +477,6 @@ static void box_audio_synth_coefs(
     }
 }
 
-<<<<<<< HEAD
 /** Set the indexes and the feedback of the oscillators from the patch.
  *
  * FM is not band limited, so the index of phase modulation is limited: by Carson's rule the
@@ -511,9 +510,6 @@ static void box_audio_synth_limits(
     }
 }
 
-/** Start a pass of the envelopes, the oscillators and the cutoff sweep, at the start of a play
- * and at each restart of a loop. The state of the filter goes on.
-=======
 /** Move the cutoff by the level of the filter envelope, exponentially in frequency: the cutoff
  * of the patch times 2 to the amount times the level, clamped to the range of a cutoff.
  *
@@ -534,7 +530,6 @@ static void box_audio_synth_cutoff(
 
 /** Start a pass of the envelopes, the oscillators and the filter envelope, at the start of a
  * play and at each restart of a loop. The state of the filter goes on.
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
  *
  * @param core The core
  * @param src The source
@@ -845,7 +840,6 @@ static inline float box_audio_synth_osc_next(
     return x;
 }
 
-<<<<<<< HEAD
 /** Render a frame of the layers of a source in which a layer modulates another or itself.
  *
  * Modulators come after their carriers, so the layers render from the last: each adds its wave
@@ -899,7 +893,8 @@ static inline float box_audio_synth_modulate(
     }
 
     return mix;
-=======
+}
+
 /** Filter a frame through a stage of the filter.
  *
  * @param f The stage
@@ -927,7 +922,6 @@ static inline float box_audio_synth_svf_next(
     }
 
     return y;
->>>>>>> 09bd828073f11b6deeccd18b4c459d2be4929638
 }
 
 int32_t box_audio_synth_render(
