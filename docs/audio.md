@@ -226,8 +226,8 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   it started.
 - **Synth**: up to 8 oscillators and one filter per sound, linear or curved envelopes, no LFO,
   no unison and no node graph; an oscillator may phase or ring modulate another, but FM is not
-  band limited. Plucked strings go down to 40 Hz, and 32 of them ring at once. Legato is mono per channel and has no note off: a held note lasts its hold after the
-  last note. A looping synth sound starts a new pass of its envelopes and oscillators at the end
+  band limited. Plucked strings go down to 40 Hz, and 32 of them ring at once. Legato is mono
+  per channel and has no note off: a held note lasts its hold after the last note. A looping synth sound starts a new pass of its envelopes and oscillators at the end
   of the last, at most every 60 seconds; a drone keeps that gap short with edges of a few ms, as
   the dust merchant's engine does with 2 ms.
 - **Files**: WAV and FLAC for sounds, Ogg Vorbis for music, one stream at once (a change of path
@@ -466,17 +466,17 @@ voice, so a play allocates nothing, a new patch for the same id reaches the next
 voices that play keep theirs, and a release frees the id at once with `SOUND_FREE`.
 
 A patch costs only the layers it has. The `SYNTH` command ends after its last layer,
-`BOX_AUDIO_CMD_SYNTH_SIZE(layers)` bytes: 100 bytes and 88 per layer, 276 for 2 layers, 804 for 8;
+`BOX_AUDIO_CMD_SYNTH_SIZE(layers)` bytes: 104 bytes and 88 per layer, 280 for 2 layers, 808 for 8;
 a shorter one than its layers need is ignored. A voice holds the patch without its layers and
 takes, for each layer, a part from a pool the core allocates with itself: the layer, its oscillator
-and its own envelope, 264 bytes. The pool has 4 parts per voice slot (320), so patches of up to 4
+and its own envelope, 272 bytes. The pool has 4 parts per voice slot (320), so patches of up to 4
 layers never run out of them and a voice of 8 takes the room of two of 4; a play that finds too few
 free parts is ignored like one without a voice slot. A voice renders and advances only its parts
-and gives them back when it ends. The 80 voice slots (520 bytes each) and the pool take 123 KB.
+and gives them back when it ends. The 80 voice slots (520 bytes each) and the pool take 126 KB.
 The pluck strings are a second pool of `BOX_AUDIO_SYNTH_STRINGS` (32), each with a delay line of
-`BOX_AUDIO_SYNTH_STRING_FRAMES` (2048) floats, 8 KB, 260 KB in all; a voice takes one for each
+`BOX_AUDIO_SYNTH_STRING_FRAMES` (2048) floats, 8 KB, 259 KB in all; a voice takes one for each
 pluck layer, and a play that finds too few free is ignored the same way. The 256 patches the core
-keeps are full size, 796 bytes each. The core clamps every value of a patch, a NaN to the low
+keeps are full size, 800 bytes each. The core clamps every value of a patch, a NaN to the low
 end.
 
 - **Oscillators.** Sine (`box_audio_core_sin`), saw, square, triangle and white noise. Saw and
@@ -513,7 +513,8 @@ end.
 - **Pluck strings.** A layer of the wave `BOX_AUDIO_SYNTH_PLUCK` is a Karplus-Strong string
   instead of an oscillator. At the start of a pass the string takes a burst of the noise of the
   play, one period long, through a one pole lowpass of its `hardness` (0 a soft finger, 1 a
-  pick), without its mean so it carries no DC, scaled to a peak of 1, into its delay line. Per
+  pick) and one of its `brightness` (a coefficient of 0.1 at 0 to 1, no filter, at 1), without
+  its mean so it carries no DC, scaled to a peak of 1, into its delay line. Per
   frame the frame out of the line goes through a lowpass `(b, 1 - 2b, b)` with `b` from 0.25 at
   `brightness` 0 to 0.01 at 1, a first order allpass and the gain of the loop back into it; the
   frame out of the line is the sample. The lowpass is symmetric, a delay of exactly 1 frame at
@@ -603,7 +604,8 @@ end.
   string costs a read and a write of its line, 6 multiplies and its peak per frame while it
   rings, and a pluck writes its line of 2048 floats once.
   `bench/audio` has a `Synth` suite of 64 voices in ns per sample, with a filter envelope, with a
-  24 dB filter, and `voices_64_fm`, two FM pairs per voice, which measures the modulated path.
+  24 dB filter, `voices_64_fm`, two FM pairs per voice, which measures the modulated path,
+  and `voices_32_pluck`, 32 ringing strings, one per voice.
 
 The core needs no libm: the exponential sweeps and the filter envelope use series for `log2` and
 `exp2` in `synth.c`.
@@ -628,7 +630,7 @@ as the carrier for a harmonic spectrum, a ratio such as 3.5 or 1.41 for an inhar
 |-----------|------------|
 | `SynthSound` | The root: `seed`, `pitch_variance` and `level_variance` (random shares per play, 0) |
 | `SynthOscillator` | A layer: `wave` (`SynthSine`, `SynthSaw`, `SynthSquare`, `SynthTriangle`, `SynthNoise`, `SynthPluck`), `frequency` (440), `frequency_end` (0, no sweep), `sweep` (s), `level` (1), `modulation` (`SynthMix`, heard; `SynthPhase` or `SynthRing`, modulates its parent), `index` (1: radians for `SynthPhase` up to 32, limited against the frequency; a depth of 0..1 for `SynthRing`), `feedback` (0, radians on its own phase up to 1.5), `audible` (false: whether a modulator is heard as well) |
-| `SynthString` | On a `SynthPluck` layer: `decay` (2, seconds of the fundamental to -60 dB, 0.01..60), `brightness` (0.5, the lowpass in the loop: 0 dark, 1 metallic) and `hardness` (0.8, the lowpass of the pluck: 0 a soft finger, 1 a hard pick); a `SynthPluck` layer without one takes these defaults |
+| `SynthString` | On a `SynthPluck` layer: `decay` (2, seconds of the fundamental to -60 dB, 0.01..60), `brightness` (0.5, the lowpass of the pluck and in the loop: 0 dark, 1 metallic) and `hardness` (0.8, the lowpass of the pluck: 0 a soft finger, 1 a hard pick); a `SynthPluck` layer without one takes these defaults |
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `release`, `hold`: seconds and a sustain level, all 0 by default; `curve` (decay and release) and `attack_curve`: 0 linear (default), positive fast at first, -16..16 |
 | `SynthFilter` | `kind` (`SynthLowPass`, `SynthHighPass`, `SynthBandPass`), `cutoff` (1000), `resonance` (0), `slope` (`SynthSlope12`, `SynthSlope24`) |
 | `SynthFilterEnvelope` | The envelope of the cutoff: `attack`, `decay`, `sustain`, `release`, `hold`, `curve` and `attack_curve` as in `SynthEnvelope`, and `amount`, the octaves the cutoff moves at level 1 (0, negative closes the filter); nothing without a `SynthFilter` |
@@ -866,7 +868,7 @@ it:
 | Field | What it is |
 |-------|------------|
 | `decay` | Seconds the fundamental takes to fall by 60 dB, 0.01 to 60 (2); the harmonics fall faster |
-| `brightness` | The lowpass in the loop, 0 to 1 (0.5): 0 a dark gut or nylon string whose harmonics die in a moment, 1 a bright, metallic ring |
+| `brightness` | The lowpass of the pluck and in the loop, 0 to 1 (0.5): 0 a dark gut or nylon string that starts soft and whose harmonics die in a moment, 1 a bright, metallic ring |
 | `hardness` | The lowpass of the noise that plucks it, 0 to 1 (0.8): 0 a soft finger, round from the start, 1 a hard pick with a sharp attack |
 
 The `frequency`, `frequency_end`, `sweep` and `level` of the `SynthOscillator` apply as to any

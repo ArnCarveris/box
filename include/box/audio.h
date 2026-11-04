@@ -214,9 +214,6 @@ ECS_ENUM(SynthModulation, {
  *
  * A layer with the modulation SynthPhase or SynthRing modulates its parent layer by its wave
  * times its own envelope, so the index follows that envelope. It is heard only when audible.
- *
- * A SynthPluck layer is a string, see SynthString: frequency, frequency_end, sweep and level
- * apply to it, phase modulation and feedback do not.
  */
 ECS_STRUCT(SynthOscillator, {
     SynthWave wave;        /**< The wave, default SynthSine */
@@ -236,13 +233,15 @@ ECS_STRUCT(SynthOscillator, {
  * burst of seeded noise, whose loop damps it. Without one a SynthPluck layer takes the defaults.
  *
  * The fundamental falls by 60 dB over decay seconds; the harmonics fall faster the darker the
- * string. The pitch is tuned to a fraction of a frame, so it is exact at high notes too.
+ * string. The pitch is tuned to a fraction of a frame, so it is exact at high notes too. The
+ * frequency, frequency_end, sweep and level of the layer apply; phase modulation does not.
  */
 ECS_STRUCT(SynthString, {
     float decay;           /**< Seconds the fundamental takes to fall by 60 dB, 0.01..60,
                             *   default 2 */
-    float brightness;      /**< Lowpass in the loop: 0 dark, the harmonics die fast, to 1
-                            *   bright, a metallic ring; default 0.5 */
+    float brightness;      /**< Lowpass of the pluck and in the loop: 0 dark, the harmonics
+                            *   start soft and die fast, to 1 bright, a metallic ring;
+                            *   default 0.5 */
     float hardness;        /**< Lowpass of the noise that plucks: 0 a soft finger, 1 a hard
                             *   pick; default 0.8 */
 });

@@ -686,8 +686,8 @@ static void box_audio_synth_string_tune(
 }
 
 /** Pluck a string: tune it and fill its delay line with a burst of seeded noise of a period,
- * through a one pole lowpass of its hardness, without its mean so the string carries no DC,
- * and scaled to a peak of 1.
+ * through a one pole lowpass of its hardness and one of its brightness, without its mean so
+ * the string carries no DC, and scaled to a peak of 1.
  *
  * @param s The string
  * @param layer Its layer, clamped
@@ -705,7 +705,7 @@ static void box_audio_synth_string_pluck(
     const int32_t mask = BOX_AUDIO_SYNTH_STRING_FRAMES - 1;
     double sum = 0, top = (double)rate / BOX_AUDIO_SYNTH_PLUCK_MIN;
     float y = 0, mean, peak = 0, a = 0.5f - 0.48f * layer->brightness;
-    float h = 0.05f + 0.95f * layer->hardness;
+    float h = 0.05f + 0.95f * layer->hardness, b = 0.1f + 0.9f * layer->brightness, z = 0;
     int32_t i, n;
     s->decay_frames = (double)layer->decay * (double)rate;
     s->period_max = top < BOX_AUDIO_SYNTH_STRING_PERIOD_MAX ? top :
@@ -720,8 +720,9 @@ static void box_audio_synth_string_pluck(
     n = s->delay;
     for (i = 0; i < n; i ++) {
         y += h * (box_audio_synth_noise(rng) - y);
-        s->line[(BOX_AUDIO_SYNTH_STRING_FRAMES + i - n) & mask] = y;
-        sum += (double)y;
+        z += b * (y - z);
+        s->line[(BOX_AUDIO_SYNTH_STRING_FRAMES + i - n) & mask] = z;
+        sum += (double)z;
     }
 
     mean = (float)(sum / (double)n);

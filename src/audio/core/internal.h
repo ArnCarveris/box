@@ -537,8 +537,8 @@ void box_audio_synth_end(
     box_audio_synth_source_t *src);
 
 /** Start a synth source on the patch of a synth sound, with a part of the core for each of its
- * layers and a string for each pluck layer, which box_audio_synth_fits found. Takes no use of the sound: the source plays a
- * copy of the patch.
+ * layers and a string for each pluck layer, which box_audio_synth_fits found. Takes no use of
+ * the sound: the source plays a copy of the patch.
  *
  * @param core The core
  * @param source The source
