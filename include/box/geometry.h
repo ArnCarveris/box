@@ -574,18 +574,20 @@ ECS_ENUM(SliceFill, {
  * and cut at the far end. When the corners do not fit, because the element is smaller than the
  * insets, they scale down together until they meet, edges and tiles with them, as CSS does.
  *
- * The insets are in texels of the loaded Texture of the image, so the slicing waits for its
- * size: until the texture entity has a Texture (for instance while it loads, or for the texture
- * of a Surface, which has none) the element draws as with the plain Image. Insets are clamped to
- * the area, the left one first, so left plus right never exceed its width; a scale that is not
- * above 0 or not finite draws at 1.
+ * The insets are in texels of the texture of the image: its loaded Texture, or for the texture
+ * of a Surface, which has no Texture, the image the surface renders (box_surface_texture_size,
+ * SurfaceStatus.width by height, its point size times pixel_ratio). The slicing waits for that
+ * size: while the texture loads, or before its surface rendered once, the element draws as with
+ * the plain Image, and it slices again when the size changes, as when a surface resizes. Insets
+ * are clamped to the area, the left one first, so left plus right never exceed its width; a
+ * scale that is not above 0 or not finite draws at 1.
  *
  * The Rgb and Opacity tint the sliced image, a Border draws over it, the corner radius of the
  * Border rounds it and ClipChildren cuts it, as for a plain Image. The TextureTransform of the
  * entity does not apply to it. A Circle with an ImageSlice is not sliced, it shows the plain
  * Image. Picking onto the texture of a Surface shown by an Image maps the hit through the same
- * parts as the drawing (box_image_slice_map); as a Surface texture has no Texture, that is
- * the plain Image until it has one.
+ * parts as the drawing (box_image_slice_map), so a hit in a corner lands in the corner of the
+ * surface.
  *
  * The castle WoodPanel as one entity: a 64 by 64 frame texture holds the dark edge and the iron
  * corners in its 20 texel insets and wood in its center, whose grain tiles at its own scale on

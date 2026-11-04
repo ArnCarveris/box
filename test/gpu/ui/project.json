@@ -134,7 +134,8 @@
                     "capture_cleared_after_release",
                     "capture_cleared_when_deleted",
                     "focused_surface_views",
-                    "focus_click_without_move"
+                    "focus_click_without_move",
+                    "image_slice_surface_corner"
                 ]
             },
             {
@@ -323,7 +324,8 @@
                     "corners_keep_size",
                     "edges_stretch",
                     "edges_tile",
-                    "hollow_center"
+                    "hollow_center",
+                    "surface_corners_keep_size"
                 ]
             }
         ]

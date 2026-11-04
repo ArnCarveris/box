@@ -599,3 +599,80 @@ void ImageSlice_record_lifecycle(void) {
     test_int(ecs_map_count(&d->clips.slices), 1);
     ecs_fini(world);
 }
+
+void ImageSlice_record_surface_texture(void) {
+    // ui/image_slice
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    test_assert(ecs_script_run(world, "slice", SLICE_SCENE, NULL) == 0);
+    ecs_entity_t frame = ecs_lookup(world, "frame");
+    ecs_entity_t panel = ecs_lookup(world, "panel");
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 100});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+
+    /* An offscreen surface of 24 points at 2 pixels per point renders into the frame: an image
+     * of 48 pixels, the size the insets count in, not the 24 points */
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 24, .height = 24, .pixel_ratio = 2,
+        .resolution_scale = 1, .texture = frame});
+    int32_t i, size[2];
+    for (i = 0; i < 3; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    test_assert(!ecs_has(world, frame, Texture));
+    test_bool(box_surface_texture_size(world, frame, &size[0], &size[1]), true);
+    test_int(size[0], 48);
+    test_int(size[1], 48);
+    test_bool(box_surface_texture_size(world, panel, &size[0], &size[1]), false);
+    test_int(size[0], 0);
+    test_int(size[1], 0);
+
+    /* The corners are 16 texels of 48 at a scale of 2, 32 units of 200 by 100 */
+    box_render_slice_t record;
+    test_bool(box_draws_slice_record(world, panel, &record), true);
+    slice_near(record.x[1], 32.0f / 200.0f);
+    slice_near(record.y[1], 32.0f / 100.0f);
+    slice_near(record.u[1], 1.0f / 3.0f);
+    slice_near(record.v[2], 2.0f / 3.0f);
+
+    /* The record in the clip buffer follows a resize of the surface without a change of the
+     * panel: 96 pixels make the insets a sixth of the image */
+    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    test_assert(system != 0);
+    box_render_draws_t *d = ecs_system_get(world, system)->ctx;
+    slice_near(slice_record_of(world, d, panel)->u[1], 1.0f / 3.0f);
+    ecs_set(world, surface, Surface, {.width = 48, .height = 48, .pixel_ratio = 2,
+        .resolution_scale = 1, .texture = frame});
+    for (i = 0; i < 3; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    test_bool(box_surface_texture_size(world, frame, &size[0], &size[1]), true);
+    test_int(size[0], 96);
+    slice_near(slice_record_of(world, d, panel)->x[1], 32.0f / 200.0f);
+    slice_near(slice_record_of(world, d, panel)->u[1], 1.0f / 6.0f);
+    slice_near(slice_record_of(world, d, panel)->v[2], 5.0f / 6.0f);
+
+    /* resolution_scale only changes the size the views render at, not the image */
+    ecs_set(world, surface, Surface, {.width = 48, .height = 48, .pixel_ratio = 2,
+        .resolution_scale = 2, .texture = frame});
+    for (i = 0; i < 3; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    test_bool(box_surface_texture_size(world, frame, &size[0], &size[1]), true);
+    test_int(size[0], 96);
+    test_int(size[1], 96);
+    test_int(ecs_get(world, surface, SurfaceStatus)->render_width, 48);
+    slice_near(slice_record_of(world, d, panel)->u[1], 1.0f / 6.0f);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
