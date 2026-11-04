@@ -58,7 +58,7 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                 this.quantum = o.quantum;
                 this.buffer = null;
                 this.sounds = new Map();
-                this.reverbs = new Map();
+                this.effects = new Map();
                 this.quanta = 0;
                 this.batches = 0;
                 this.capture = null;
@@ -135,18 +135,28 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                     } else if (at) {
                         core.box_audio_core_wasm_free(at);
                     }
-                } else if (m.type === 'reverb') {
-                    var floats = core.box_audio_core_wasm_reverb_floats();
-                    at = this.reverbs.has(m.slot) ? 0 :
-                        core.box_audio_core_wasm_alloc(floats * 4);
-                    ok = !!at && !!core.box_audio_core_wasm_reverb(m.slot, at, floats);
+                } else if (m.type === 'effect') {
+                    // The memory of an effect slot; a slot that needs more gets new memory and
+                    // the core lets go of the old one at once, so it is freed here
+                    var had = this.effects.get(m.slot);
+                    at = had && had.floats >= m.floats ? 0 :
+                        core.box_audio_core_wasm_alloc(m.floats * 4);
+                    if (at) {
+                        this.views();
+                        new Float32Array(this.buffer, at, m.floats).fill(0);
+                    }
+                    ok = !!at && !!core.box_audio_core_wasm_effect(m.slot, at, m.floats);
                     if (ok) {
-                        this.reverbs.set(m.slot, at);
+                        if (had) {
+                            core.box_audio_core_wasm_free(had.at);
+                        }
+                        this.effects.set(m.slot, { at: at, floats: m.floats });
                     } else if (at) {
                         core.box_audio_core_wasm_free(at);
                     }
+                    ok = ok || (!!had && had.floats >= m.floats);
                     this.views();
-                    this.port.postMessage({ type: 'reverb', slot: m.slot, ok: ok });
+                    this.port.postMessage({ type: 'effect', slot: m.slot, ok: ok });
                 } else if (m.type === 'bench') {
                     // Renders quanta back to back on the live core: their time over the time
                     // they hold is the load, measured over enough quanta for a coarse clock
@@ -166,7 +176,7 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                         frame: currentFrame, time: currentTime, sampleRate: sampleRate,
                         voices: core.box_audio_core_wasm_voices(), batches: this.batches,
                         clock: core.box_audio_core_wasm_clock(),
-                        sounds: this.sounds.size, reverbs: this.reverbs.size,
+                        sounds: this.sounds.size, effects: this.effects.size,
                         memory: this.buffer.byteLength,
                         lost: core.box_audio_core_wasm_events_lost(),
                         chunks: this.chunks.reduce(function(n, c) { return n + c.length; }, 0),
@@ -351,9 +361,9 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
             audio.post({ type: 'bench', id: id, quanta: quanta });
         });
     };
-    // The delay memory of a reverb slot, allocated in the heap of the core of the worklet
-    audio.reverb = function(slot) {
-        audio.post({ type: 'reverb', slot: slot });
+    // The memory of an effect slot, allocated in the heap of the core of the worklet
+    audio.effect = function(slot, floats) {
+        audio.post({ type: 'effect', slot: slot, floats: floats });
     };
     // A batch of commands of the core, an ArrayBuffer that is transferred or a typed array
     // that is copied
@@ -400,9 +410,9 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
             resolve = audio.sounds[m.id];
             delete audio.sounds[m.id];
             m = m.ok;
-        } else if (m.type === 'reverb') {
-            audio.reverbs = audio.reverbs || {};
-            audio.reverbs[m.slot] = m.ok;
+        } else if (m.type === 'effect') {
+            audio.effects = audio.effects || {};
+            audio.effects[m.slot] = m.ok;
         } else if (m.type === 'status') {
             audio.voices = m.voices;
         } else if (m.type === 'clock') {
@@ -644,14 +654,15 @@ EM_JS(void, box_audio_web_fetch_forget, (int id), {
     }
 });
 
-/** Post a request for the delay memory of a reverb slot to the worklet.
+/** Post a request for the memory of an effect slot to the worklet.
  *
- * @param slot Slot of the reverb
+ * @param slot Slot of the effect
+ * @param floats Floats the slot needs
  */
-EM_JS(void, box_audio_web_post_reverb, (unsigned slot), {
+EM_JS(void, box_audio_web_post_effect, (unsigned slot, int floats), {
     var audio = Module.boxAudio;
     if (audio && !audio.failed) {
-        audio.reverb(slot >>> 0);
+        audio.effect(slot >>> 0, floats);
     }
 });
 
@@ -734,11 +745,12 @@ void box_audio_web_fetch_cancel(
     box_audio_web_fetch_forget(id);
 }
 
-EMSCRIPTEN_KEEPALIVE void box_audio_web_reverb(
-    uint32_t slot)
+EMSCRIPTEN_KEEPALIVE void box_audio_web_effect(
+    uint32_t slot,
+    int32_t floats)
 {
     if (box_audio_web_started) {
-        box_audio_web_post_reverb(slot);
+        box_audio_web_post_effect(slot, floats);
     }
 }
 
@@ -847,10 +859,12 @@ void box_audio_web_fetch_cancel(
     (void)id;
 }
 
-void box_audio_web_reverb(
-    uint32_t slot)
+void box_audio_web_effect(
+    uint32_t slot,
+    int32_t floats)
 {
     (void)slot;
+    (void)floats;
 }
 
 #endif

@@ -1,7 +1,8 @@
 /**
  * @file Reverb.c
- * @brief The reverb of a bus, from an impulse in an offline render: its decay, damping,
- * predelay, stereo image, density and stability, its silence, its changes and its routing.
+ * @brief The reverb kind of effect in an insert slot of a bus, from an impulse in an offline
+ * render: its decay, damping, predelay, stereo image, density and stability, its silence, its
+ * changes and its routing.
  */
 
 #include "world.h"
@@ -82,11 +83,11 @@ static box_audio_reverb_params_t rv_params(
     return (box_audio_reverb_params_t){ decay, damping, predelay, size, mix };
 }
 
-/** Send a reverb command.
+/** Send an effect command of a reverb in insert slot 0 of a bus.
  *
  * @param core The core
  * @param slot Slot
- * @param bus Bus
+ * @param bus Bus, BOX_AUDIO_BUS_NONE to take the reverb off
  * @param p Parameters
  */
 static void rv_command(
@@ -95,10 +96,13 @@ static void rv_command(
     uint32_t bus,
     box_audio_reverb_params_t p)
 {
-    uint8_t bytes[64];
+    uint8_t bytes[128];
+    float params[BOX_AUDIO_EFFECT_PARAMS] = {0};
     box_audio_writer_t w;
+    memcpy(params, &p, sizeof(p));
     box_audio_writer_init(&w, bytes, sizeof(bytes));
-    test_assert(box_audio_write_reverb(&w, slot, bus, &p));
+    test_assert(box_audio_write_effect(&w, slot, BOX_AUDIO_EFFECT_REVERB, bus, 0,
+        BOX_AUDIO_BUS_NONE, params));
     box_audio_core_apply(core, w.data, w.size);
 }
 
@@ -119,7 +123,7 @@ static void rv_open(
     box_audio_route_t routes[] = {
         AUDIO_OUT(1, 0), AUDIO_MASTER
     };
-    int32_t floats = box_audio_reverb_floats(rate);
+    int32_t floats = box_audio_effect_floats(BOX_AUDIO_EFFECT_REVERB, rate);
     if (counted) {
         desc.alloc = rv_alloc;
         desc.free = rv_free;
@@ -131,8 +135,8 @@ static void rv_open(
     test_assert(rv->core != NULL);
     rv->memory = calloc((size_t)floats, sizeof(float));
     test_assert(rv->memory != NULL);
-    test_assert(box_audio_core_reverb_memory(rv->core, 0, rv->memory, floats));
-    test_assert(!box_audio_core_reverb_memory(rv->core, 0, rv->memory, floats));
+    test_assert(box_audio_core_effect_memory(rv->core, 0, rv->memory, floats));
+    test_assert(!box_audio_core_effect_memory(rv->core, 0, rv->memory, floats));
     audio_order(rv->core, routes, 2);
     rv_command(rv->core, 0, 1, p);
     memset(rv_click, 0, sizeof(rv_click));
@@ -454,16 +458,16 @@ void Reverb_silent_after_tail(void) {
     rv_t rv;
     int32_t i, second;
     rv_open(&rv, AUDIO_RATE, rv_params(0.5f, 0.5f, 0.02f, 0.5f, 1), false);
-    test_assert(!box_audio_core_reverb_running(rv.core, 0));
+    test_assert(!box_audio_core_effect_running(rv.core, 0));
     audio_play(rv.core, 1, 1, 1, 1, 0, 1, 0);
     rv_render(rv.core, 0, AUDIO_RATE / 2);
-    test_assert(box_audio_core_reverb_running(rv.core, 0));
+    test_assert(box_audio_core_effect_running(rv.core, 0));
     test_assert(audio_peak(rv_l, 0, AUDIO_RATE / 2) > 0.001f);
     for (second = 0; second < 4; second ++) {
         rv_render(rv.core, 0, AUDIO_RATE);
     }
 
-    test_assert(!box_audio_core_reverb_running(rv.core, 0));
+    test_assert(!box_audio_core_effect_running(rv.core, 0));
     for (i = 0; i < AUDIO_RATE; i ++) {
         test_flt(rv_l[i], 0);
         test_flt(rv_r[i], 0);
@@ -471,7 +475,7 @@ void Reverb_silent_after_tail(void) {
 
     audio_play(rv.core, 2, 1, 1, 1, 0, 1, 0);
     rv_render(rv.core, 0, AUDIO_RATE / 2);
-    test_assert(box_audio_core_reverb_running(rv.core, 0));
+    test_assert(box_audio_core_effect_running(rv.core, 0));
     test_assert(audio_peak(rv_l, 0, AUDIO_RATE / 2) > 0.001f);
     rv_close(&rv);
 }
@@ -557,9 +561,10 @@ static double rv_send(
     int32_t i, start;
     ecs_set(world, hall, Reverb, { .decay = 1, .damping = 0.5f, .predelay = 0.02f,
         .size = 0.5f, .mix = 1 });
+    audio_insert(world, hall, 0, hall);
     audio_send(world, dry, hall, level, false);
     audio_run(world, 2);
-    test_int(box_audio_module_reverb_slot(world, hall), 0);
+    test_int(box_audio_module_effect_slot(world, hall), 0);
     memset(rv_click, 0, sizeof(rv_click));
     rv_click[RV_CLICK] = 0.5f;
     click = box_audio_sound_from_pcm(world, 0, rv_click, RV_CLICK + 1, 1, AUDIO_RATE);
@@ -584,27 +589,23 @@ void Reverb_send_routing(void) {
     test_assert(fabs(high / low - 4) < 0.01);
 }
 
-void Reverb_second_reverb_errors(void) {
+void Reverb_second_reverb_runs(void) {
     // audio/reverb
     ecs_world_t *world = audio_world();
     ecs_entity_t first = audio_bus(world, "first_room", 0, 1);
     ecs_entity_t second = audio_bus(world, "second_room", 0, 1);
     ecs_entity_t click;
-    int32_t i, start;
+    int32_t start;
     ecs_add(world, first, Reverb);
     ecs_add(world, second, Reverb);
-    audio_log_start();
-    audio_run(world, 5);
-    audio_log_stop();
-    test_int(audio_log_errors, 1);
-    test_assert(strstr(audio_log_last, "second_room") != NULL);
-    test_int(box_audio_module_reverb_slot(world, first), 0);
-    test_int(box_audio_module_reverb_slot(world, second), -1);
-
+    audio_insert(world, first, 0, first);
+    audio_insert(world, second, 0, second);
     audio_log_start();
     audio_run(world, 5);
     audio_log_stop();
     test_int(audio_log_errors, 0);
+    test_int(box_audio_module_effect_slot(world, first), 0);
+    test_int(box_audio_module_effect_slot(world, second), 1);
 
     memset(rv_click, 0, sizeof(rv_click));
     rv_click[RV_CLICK] = 0.5f;
@@ -612,14 +613,11 @@ void Reverb_second_reverb_errors(void) {
     start = audio_tap_count;
     audio_source(world, click, 1, false, second);
     audio_run(world, 20);
-    test_flt(audio_tap_l[start + RV_CLICK], 0.5f);
-    for (i = start + RV_CLICK + 1; i < audio_tap_count; i ++) {
-        test_flt(audio_tap_l[i], 0);
-    }
+    test_assert(audio_peak(audio_tap_l, start + RV_CLICK + 1, audio_tap_count) > 0.0001f);
 
     ecs_delete(world, first);
     audio_run(world, 2);
-    test_int(box_audio_module_reverb_slot(world, second), 0);
+    test_int(box_audio_module_effect_slot(world, second), 1);
     ecs_fini(world);
 }
 
@@ -632,6 +630,7 @@ void Reverb_delete_fades(void) {
     float before, after;
     ecs_set(world, hall, Reverb, { .decay = 3, .damping = 0.3f, .predelay = 0.01f,
         .size = 0.7f, .mix = 1 });
+    audio_insert(world, hall, 0, hall);
     audio_run(world, 1);
     audio_source(world, tone, 1, false, hall);
     audio_run(world, 30);
@@ -673,7 +672,7 @@ void Reverb_no_alloc(void) {
 
     rv_command(rv.core, 0, BOX_AUDIO_BUS_NONE, rv_params(1, 0.5f, 0.02f, 0.5f, 1));
     rv_render(rv.core, 0, AUDIO_RATE);
-    test_assert(!box_audio_core_reverb_running(rv.core, 0));
+    test_assert(!box_audio_core_effect_running(rv.core, 0));
     test_int(rv_allocs, 1);
     rv_close(&rv);
 }

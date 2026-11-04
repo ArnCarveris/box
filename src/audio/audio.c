@@ -21,7 +21,7 @@ ECS_TAG_DECLARE(AudioListener);
 ECS_COMPONENT_DECLARE(AudioSoundId);
 ECS_COMPONENT_DECLARE(AudioBusState);
 ECS_COMPONENT_DECLARE(AudioVoice);
-ECS_COMPONENT_DECLARE(AudioReverbState);
+ECS_COMPONENT_DECLARE(AudioEffectState);
 ECS_COMPONENT_DECLARE(AudioSample);
 ECS_COMPONENT_DECLARE(AudioMusic);
 ECS_COMPONENT_DECLARE(AudioSynth);
@@ -296,26 +296,6 @@ int32_t box_audio_module_order(
         }
     }
 
-    return result;
-}
-
-int32_t box_audio_module_reverb_slot(
-    const ecs_world_t *world,
-    ecs_entity_t e)
-{
-    box_audio_module_t *state = box_audio_module_get(world);
-    const AudioReverbState *s = NULL;
-    int32_t result = -1;
-    if (!state || !e || !ecs_is_alive(world, e)) {
-        goto done;
-    }
-
-    s = ecs_get(world, e, AudioReverbState);
-    if (s && s->slot && state->reverb_entity[s->slot - 1] == e) {
-        result = s->slot - 1;
-    }
-
-done:
     return result;
 }
 
@@ -763,7 +743,7 @@ void BoxAudioImport(
     ECS_COMPONENT_DEFINE(world, AudioSoundId);
     ECS_COMPONENT_DEFINE(world, AudioBusState);
     ECS_COMPONENT_DEFINE(world, AudioVoice);
-    ECS_COMPONENT_DEFINE(world, AudioReverbState);
+    ECS_COMPONENT_DEFINE(world, AudioEffectState);
     ECS_COMPONENT_DEFINE(world, AudioSample);
     ECS_COMPONENT_DEFINE(world, AudioMusic);
     ECS_COMPONENT_DEFINE(world, AudioSynth);
@@ -771,13 +751,13 @@ void BoxAudioImport(
     ecs_set_hooks(world, AudioSynth, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioBusState, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioVoice, { .copy = box_audio_track_copy });
-    ecs_set_hooks(world, AudioReverbState, { .copy = box_audio_track_copy });
+    ecs_set_hooks(world, AudioEffectState, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioSample, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioMusic, { .copy = box_audio_track_copy });
     ecs_add_pair(world, ecs_id(AudioPcm), EcsWith, ecs_id(AudioSoundId));
     ecs_add_pair(world, ecs_id(AudioBus), EcsWith, ecs_id(AudioBusState));
     ecs_add_pair(world, ecs_id(AudioSource), EcsWith, ecs_id(AudioVoice));
-    ecs_add_pair(world, ecs_id(Reverb), EcsWith, ecs_id(AudioReverbState));
+    ecs_add_pair(world, ecs_id(Reverb), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(SoundFile), EcsWith, ecs_id(AudioSample));
     ecs_add_pair(world, ecs_id(AudioStream), EcsWith, ecs_id(AudioMusic));
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSoundId));

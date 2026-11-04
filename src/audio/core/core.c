@@ -818,6 +818,8 @@ static void box_audio_cmd_order(
         core->bus_active[i] = position[i] >= 0;
     }
 
+    box_audio_effects_order(core);
+
     for (i = 0; i < count; i ++) {
         box_audio_bus_t *b = &core->buses[routes[i].bus];
         uint8_t pre = 0;
@@ -1073,7 +1075,7 @@ static void box_audio_cmd(
     box_audio_cmd_legato_t legato;
     box_audio_cmd_release_t release;
     box_audio_cmd_stream_t stream;
-    box_audio_cmd_reverb_t reverb;
+    box_audio_cmd_effect_t effect;
     box_audio_cmd_synth_t synth;
     uint32_t layers;
     if (type == BOX_AUDIO_CMD_PLAY && size >= (int32_t)sizeof(box_audio_cmd_play_t)) {
@@ -1095,9 +1097,9 @@ static void box_audio_cmd(
     } else if (type == BOX_AUDIO_CMD_STREAM && size >= (int32_t)sizeof(stream)) {
         box_audio_copy(&stream, bytes, (int32_t)sizeof(stream));
         box_audio_cmd_stream(core, &stream);
-    } else if (type == BOX_AUDIO_CMD_REVERB && size >= (int32_t)sizeof(reverb)) {
-        box_audio_copy(&reverb, bytes, (int32_t)sizeof(reverb));
-        box_audio_reverb_command(core, &reverb);
+    } else if (type == BOX_AUDIO_CMD_EFFECT && size >= (int32_t)sizeof(effect)) {
+        box_audio_copy(&effect, bytes, (int32_t)sizeof(effect));
+        box_audio_effect_command(core, &effect);
     } else if (type == BOX_AUDIO_CMD_SYNTH && size >= BOX_AUDIO_CMD_SYNTH_SIZE(0)) {
         box_audio_copy(&synth, bytes, BOX_AUDIO_CMD_SYNTH_SIZE(0));
         layers = synth.patch.layers < BOX_AUDIO_SYNTH_LAYERS ? synth.patch.layers :
@@ -1200,7 +1202,7 @@ box_audio_core_t* box_audio_core_new(
     core->order_count = 1;
     core->bus_active[0] = true;
     core->event_lost_at = -1;
-    box_audio_reverbs_init(core);
+    box_audio_effects_init(core);
     box_audio_synth_parts_init(core);
 
 done:
@@ -1435,22 +1437,6 @@ static void box_audio_limit(
     core->limiter_gain = gain;
 }
 
-/** Advance a ramp by the frames of a block without using its values, frame by frame so that
- * it ends the same whatever the render sizes; nothing once it reached its target.
- *
- * @param ramp The ramp
- * @param frames Frames of the block
- */
-static void box_audio_ramp_skip(
-    box_audio_ramp_t *ramp,
-    int32_t frames)
-{
-    int32_t i;
-    for (i = 0; i < frames && ramp->left > 0; i ++) {
-        box_audio_ramp_next(ramp);
-    }
-}
-
 /** Apply the width of a bus to a block: a gain of its side signal, nothing at a width of 1.
  *
  * @param b The bus
@@ -1514,7 +1500,7 @@ static void box_audio_bus_sends(
     }
 }
 
-/** Run the buses of the order over a block: reverb, width, pre-fader sends, gains, output and
+/** Run the buses of the order over a block: inserts, width, pre-fader sends, gains, output and
  * post-fader sends, the master last.
  *
  * @param core The core
@@ -1530,7 +1516,10 @@ static void box_audio_buses_render(
         box_audio_bus_t *b = &core->buses[route->bus];
         box_audio_bus_t *out = route->output != BOX_AUDIO_BUS_NONE ?
             &core->buses[route->output] : NULL;
-        box_audio_reverbs_render(core, route->bus, b->l, b->r, frames);
+        if (core->bus_effects[route->bus] || (!route->bus && core->effect_tails)) {
+            box_audio_effects_render(core, route->bus, b->l, b->r, frames);
+        }
+
         box_audio_bus_width(b, frames);
         if (b->pre_fader) {
             box_audio_bus_sends(core, route, b, true, frames);

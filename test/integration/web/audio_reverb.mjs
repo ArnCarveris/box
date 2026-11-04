@@ -214,7 +214,7 @@ async function main() {
     const running = await waitFor('Module.boxAudio.ctx.state === "running"', 5000);
     expect(running, 'the gesture did not start the audio');
     await sleep(500);
-    const reverbs = await evaluate('JSON.stringify(Module.boxAudio.reverbs || {})');
+    const reverbs = await evaluate('JSON.stringify(Module.boxAudio.effects || {})');
     console.log(`after the gesture: context ${await evaluate('Module.boxAudio.ctx.state')}, ` +
       `rate ${await evaluate('Module.boxAudio.ctx.sampleRate')}, reverb memory ${reverbs}`);
     expect(reverbs === '{"0":true}', 'the worklet did not take the memory of the reverb');

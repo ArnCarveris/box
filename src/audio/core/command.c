@@ -218,17 +218,26 @@ bool box_audio_write_release(
     return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
 }
 
-bool box_audio_write_reverb(
+bool box_audio_write_effect(
     box_audio_writer_t *writer,
     uint32_t slot,
+    uint32_t kind,
     uint32_t bus,
-    const box_audio_reverb_params_t *params)
+    uint32_t index,
+    uint32_t key,
+    const float *params)
 {
-    box_audio_cmd_reverb_t cmd;
-    box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_REVERB, sizeof(cmd));
+    box_audio_cmd_effect_t cmd;
+    int32_t i;
+    box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_EFFECT, sizeof(cmd));
     cmd.slot = slot;
+    cmd.kind = kind;
     cmd.bus = bus;
-    cmd.params = *params;
+    cmd.index = index;
+    cmd.key = key;
+    for (i = 0; i < BOX_AUDIO_EFFECT_PARAMS; i ++) {
+        cmd.params[i] = params ? params[i] : 0.0f;
+    }
 
     return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
 }

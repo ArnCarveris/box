@@ -94,16 +94,13 @@ static inline float box_audio_ramp_next(
     return ramp->value;
 }
 
-/** A reverb: a feedback delay network of BOX_AUDIO_REVERB_LINES lines on the memory the
- * transport gave its slot, with a predelay line in front of it */
+/** Input under this magnitude counts as silence for the effects with a tail */
+#define BOX_AUDIO_EFFECT_FLOOR 1e-9f
+
+/** A reverb: a feedback delay network of BOX_AUDIO_REVERB_LINES lines on the memory of its
+ * effect slot, with a predelay line in front of it */
 typedef struct box_audio_reverb_t {
-    float *memory;            /**< Delay memory of the slot, NULL until it arrives */
-    int32_t floats;           /**< Floats of memory */
-    bool attached;            /**< Whether it renders: on a bus, or its tail fades out */
-    bool idle;                /**< The tail decayed to silence and the lines are clear */
     bool swap;                /**< Waits for the fade to reach 0 to apply the target */
-    uint32_t bus;             /**< Bus it processes, BUS_NONE while its tail fades out */
-    uint32_t target_bus;      /**< Bus of the last command */
     box_audio_reverb_params_t target;  /**< Parameters of the last command, clamped */
     float size;               /**< Size the lines have */
     float predelay;           /**< Predelay the predelay line has */
@@ -118,13 +115,63 @@ typedef struct box_audio_reverb_t {
     float *pre;               /**< The predelay line in memory */
     int32_t pre_length;       /**< Delay of the predelay line in frames, 0 for none */
     int32_t pre_pos;          /**< Position of the predelay line */
-    int32_t quiet;            /**< Frames of silent input in a row */
     int32_t still;            /**< Frames in a row in which the lines summed under silence */
     box_audio_ramp_t mix;     /**< Wet level */
     box_audio_ramp_t fade;    /**< Fade of the wet signal around a swap */
     box_audio_ramp_t feed;    /**< Fade in of the input after a swap, so it enters the clear
                                * lines without a step */
 } box_audio_reverb_t;
+
+/** State of the kinds of effects */
+typedef union box_audio_effect_data_t {
+    box_audio_reverb_t reverb;  /**< BOX_AUDIO_EFFECT_REVERB */
+} box_audio_effect_data_t;
+
+/** An effect instance of the pool of the core: a kind in an insert slot of a bus, on the
+ * memory the transport gave its slot */
+typedef struct box_audio_effect_t {
+    uint32_t kind;            /**< Kind that runs, a box_audio_effect_kind_t */
+    uint32_t bus;             /**< Bus it processes, BUS_NONE while its tail fades out into the
+                               * master */
+    uint32_t index;           /**< Insert slot within its bus */
+    uint32_t key;             /**< Sidechain bus, BUS_NONE for none */
+    uint32_t target_kind;     /**< Kind of the last command, NONE when it took the effect off */
+    uint32_t target_bus;      /**< Bus of the last command, BUS_NONE when off */
+    uint32_t target_index;    /**< Index of the last command */
+    uint32_t target_key;      /**< Sidechain bus of the last command */
+    float params[BOX_AUDIO_EFFECT_PARAMS]; /**< Parameters of the last command that put it on,
+                               * as sent; the kind clamps them */
+    float *memory;            /**< Memory of the slot, NULL until it arrives */
+    int32_t floats;           /**< Floats of memory */
+    bool attached;            /**< Whether it renders: on a bus, or its tail fades out */
+    bool idle;                /**< A kind with a tail decayed to silence and is clear */
+    bool moving;              /**< Fades out of its place to apply the target */
+    int32_t quiet;            /**< Frames of silent input in a row */
+    box_audio_ramp_t blend;   /**< Share of its output in its bus, the rest is its input; the
+                               * gain of a tail that fades out into the master */
+    box_audio_effect_data_t data; /**< State of its kind */
+} box_audio_effect_t;
+
+/** A kind of effect: a row of the table of effect.c */
+typedef struct box_audio_effect_def_t {
+    bool tail;                /**< It rings on after its input stopped. Such a kind gets the
+                               * silence rule: a block of silent input after it decayed is not
+                               * rendered, which costs a scan of the input */
+    int32_t (*floats)(float sample_rate);  /**< Floats of memory it needs, NULL for none */
+    void (*init)(box_audio_core_t *core);  /**< Constants of a new core, NULL for none */
+    void (*start)(box_audio_core_t *core, box_audio_effect_t *fx, bool fade_in);
+                              /**< Start on clear memory at the params of fx, fading its input
+                               * in when fade_in, as after a move */
+    void (*command)(box_audio_core_t *core, box_audio_effect_t *fx);
+                              /**< New params of fx while it runs: clamp and smooth them */
+    bool (*render)(box_audio_core_t *core, box_audio_effect_t *fx, float *l, float *r,
+        int32_t frames, bool silent);
+                              /**< Process a block in place; silent tells that the input is
+                               * silent. Returns whether a kind with a tail decayed: it cleared
+                               * itself and is idle */
+    void (*rest)(box_audio_core_t *core, box_audio_effect_t *fx);
+                              /**< A block skipped while idle and the input is silent */
+} box_audio_effect_def_t;
 
 /** Kinds of sources a voice plays */
 typedef enum box_audio_source_kind_t {
@@ -481,7 +528,13 @@ struct box_audio_core_t {
     box_audio_stream_t streams[BOX_AUDIO_STREAM_MAX]; /**< Streams by index */
     float src_l[BOX_AUDIO_CORE_BLOCK];  /**< Left or mono output of a source */
     float src_r[BOX_AUDIO_CORE_BLOCK];  /**< Right output of a stereo source */
-    box_audio_reverb_t reverbs[BOX_AUDIO_REVERB_MAX]; /**< Reverbs by slot */
+    box_audio_effect_t effects[BOX_AUDIO_EFFECT_MAX]; /**< Effects by slot */
+    uint64_t bus_effects[BOX_AUDIO_BUS_MAX]; /**< Effects that run on each bus, a bit per slot */
+    uint64_t effect_tails; /**< Effects whose tail fades out into the master, a bit per slot */
+    int32_t effect_fade;  /**< Frames of half the fade of a move */
+    float effect_l[BOX_AUDIO_CORE_BLOCK]; /**< Left input of an effect that blends, or output of
+                           * a tail */
+    float effect_r[BOX_AUDIO_CORE_BLOCK]; /**< Right input or output */
     float reverb_smooth;  /**< Share of the way to their targets a decay and a damping move
                            * per block */
     float limiter_gain;   /**< Current gain of the limiter, 0..1 */
@@ -533,24 +586,48 @@ void box_audio_core_event(
     uint32_t id,
     int32_t value);
 
-/** Set the reverbs of a new core to no bus and no memory.
+/** Advance a ramp by the frames of a block without using its values, frame by frame so that
+ * it ends the same whatever the render sizes; nothing once it reached its target.
+ *
+ * @param ramp The ramp
+ * @param frames Frames of the block
+ */
+static inline void box_audio_ramp_skip(
+    box_audio_ramp_t *ramp,
+    int32_t frames)
+{
+    int32_t i;
+    for (i = 0; i < frames && ramp->left > 0; i ++) {
+        box_audio_ramp_next(ramp);
+    }
+}
+
+/** Set the effects of a new core to no kind and no memory, and the constants of the kinds.
  *
  * @param core The core, zeroed
  */
-void box_audio_reverbs_init(
+void box_audio_effects_init(
     box_audio_core_t *core);
 
-/** Apply a reverb command.
+/** Apply an effect command.
  *
  * @param core The core
  * @param cmd The command
  */
-void box_audio_reverb_command(
+void box_audio_effect_command(
     box_audio_core_t *core,
-    const box_audio_cmd_reverb_t *cmd);
+    const box_audio_cmd_effect_t *cmd);
 
-/** Run the reverbs of a bus over a block of it, in place: the dry signal at 1 - mix and the
- * wet one at mix. On the master it also adds the tails that fade out after their bus went.
+/** Let the effects that fade out of a bus that left the order fade out into the master
+ * instead, after an ORDER command. An effect that stays on such a bus waits with it.
+ *
+ * @param core The core
+ */
+void box_audio_effects_order(
+    box_audio_core_t *core);
+
+/** Run the inserts of a bus over a block of it, in place, in the order of their index. On the
+ * master it also adds the tails that fade out after their bus went.
  *
  * @param core The core
  * @param bus Index of the bus
@@ -558,12 +635,45 @@ void box_audio_reverb_command(
  * @param r Right samples of the bus
  * @param frames Frames of the block
  */
-void box_audio_reverbs_render(
+void box_audio_effects_render(
     box_audio_core_t *core,
     uint32_t bus,
     float *l,
     float *r,
     int32_t frames);
+
+/** The reverb kind, in reverb.c: floats of its memory at a rate */
+int32_t box_audio_reverb_floats(
+    float sample_rate);
+
+/** The reverb kind: the smoothing of a core */
+void box_audio_reverb_init(
+    box_audio_core_t *core);
+
+/** The reverb kind: start on clear memory */
+void box_audio_reverb_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The reverb kind: new parameters while it runs */
+void box_audio_reverb_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The reverb kind: process a block */
+bool box_audio_reverb_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The reverb kind: a block skipped while idle */
+void box_audio_reverb_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
 
 /** Start a sample source on a sound and take a use of it.
  *

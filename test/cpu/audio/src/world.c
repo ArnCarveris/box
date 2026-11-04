@@ -133,6 +133,17 @@ void audio_send(
     ecs_modified(world, bus, AudioBus);
 }
 
+void audio_insert(
+    ecs_world_t *world,
+    ecs_entity_t bus,
+    int32_t index,
+    ecs_entity_t effect)
+{
+    AudioBus *b = ecs_ensure(world, bus, AudioBus);
+    b->effects[index] = effect;
+    ecs_modified(world, bus, AudioBus);
+}
+
 float audio_level(
     int32_t frames)
 {

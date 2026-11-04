@@ -190,3 +190,71 @@ void NoAlloc_scheduled(void) {
     box_audio_core_free(core);
     test_int(noalloc_frees, 1);
 }
+
+/* Effects in the insert slots of buses: reverbs on several buses, a change of their
+ * parameters, moves between buses and slots, a removal whose tail fades on a live bus and one
+ * whose bus left the order, and memory that grows, without a call of the allocator. */
+void NoAlloc_effects(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_route_t routes[] = { AUDIO_OUT(1, 0), AUDIO_OUT(2, 0), AUDIO_MASTER };
+    box_audio_route_t fewer[] = { AUDIO_OUT(1, 0), AUDIO_MASTER };
+    int32_t floats = box_audio_effect_floats(BOX_AUDIO_EFFECT_REVERB, AUDIO_RATE);
+    float *memory[4], *larger, params[BOX_AUDIO_EFFECT_PARAMS] = {0};
+    uint8_t bytes[1024];
+    box_audio_writer_t w;
+    uint32_t i, k;
+    audio_order(core, routes, 3);
+    audio_sine(audio_sound_a, AUDIO_FRAMES, 330, 0.25f);
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_FRAMES, 1, AUDIO_RATE));
+    for (i = 0; i < 4; i ++) {
+        memory[i] = calloc((size_t)floats, sizeof(float));
+        test_assert(box_audio_core_effect_memory(core, i, memory[i], floats));
+    }
+
+    larger = calloc((size_t)floats * 2, sizeof(float));
+    audio_play(core, 1, 1, 1, 0.5f, 0, 1, BOX_AUDIO_PLAY_LOOP);
+    audio_play(core, 2, 1, 2, 0.5f, 0, 1.5f, BOX_AUDIO_PLAY_LOOP);
+    for (k = 0; k < 8; k ++) {
+        box_audio_writer_init(&w, bytes, sizeof(bytes));
+        for (i = 0; i < 4; i ++) {
+            params[0] = 0.5f + (float)(k + i) * 0.3f;
+            params[1] = 0.1f * (float)k;
+            params[2] = 0.01f * (float)(k % 3);
+            params[3] = 0.1f * (float)((k + i) % 10);
+            params[4] = 0.5f;
+            test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_REVERB,
+                1 + (i + k) % 2, (i + k) % BOX_AUDIO_EFFECT_SLOTS, BOX_AUDIO_BUS_NONE,
+                params));
+        }
+
+        box_audio_core_apply(core, w.data, w.size);
+        audio_render(core, 0, AUDIO_FRAMES / 8);
+        audio_events(core, 0, NULL);
+    }
+
+    test_assert(box_audio_core_effect_memory(core, 3, larger, floats * 2));
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_effect(&w, 0, BOX_AUDIO_EFFECT_NONE, BOX_AUDIO_BUS_NONE, 0,
+        BOX_AUDIO_BUS_NONE, NULL));
+    test_assert(box_audio_write_order(&w, fewer, 2));
+    test_assert(box_audio_write_effect(&w, 1, BOX_AUDIO_EFFECT_NONE, BOX_AUDIO_BUS_NONE, 0,
+        BOX_AUDIO_BUS_NONE, NULL));
+    test_assert(box_audio_write_effect(&w, 2, BOX_AUDIO_EFFECT_NONE, BOX_AUDIO_BUS_NONE, 0,
+        BOX_AUDIO_BUS_NONE, NULL));
+    box_audio_core_apply(core, w.data, w.size);
+    audio_render(core, 0, AUDIO_FRAMES);
+    for (i = 0; i < 3; i ++) {
+        test_assert(!box_audio_core_effect_running(core, i));
+    }
+
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+    for (i = 0; i < 4; i ++) {
+        free(memory[i]);
+    }
+
+    free(larger);
+}

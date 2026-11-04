@@ -79,8 +79,22 @@
 
 /** Seconds of the fade of a stream that runs out of chunks, and of its recovery */
 #define BOX_AUDIO_STREAM_FADE 0.005f
-/** Reverbs that run at once; a reverb is addressed by a slot below this */
-#define BOX_AUDIO_REVERB_MAX 1
+/** Effect instances a core holds; an effect is addressed by a slot below this */
+#ifndef BOX_AUDIO_EFFECT_MAX
+#define BOX_AUDIO_EFFECT_MAX 64
+#endif
+
+/** Insert slots of a bus; its effects run in the order of their index */
+#ifndef BOX_AUDIO_EFFECT_SLOTS
+#define BOX_AUDIO_EFFECT_SLOTS 4
+#endif
+
+/** Parameters of an effect command, read by each kind in its own way */
+#define BOX_AUDIO_EFFECT_PARAMS 16
+
+/** Seconds of the fade of the wet signal around a change of the kind, bus or index of an
+ * effect, out and in, and of the tail of an effect taken off */
+#define BOX_AUDIO_EFFECT_FADE 0.1f
 
 /** Delay lines of the feedback delay network of a reverb */
 #define BOX_AUDIO_REVERB_LINES 8
@@ -93,7 +107,7 @@
 #define BOX_AUDIO_REVERB_DECAY_MAX 60.0f
 
 /** Seconds of the fade of the wet signal around a change of size or predelay, out and in */
-#define BOX_AUDIO_REVERB_FADE 0.1f
+#define BOX_AUDIO_REVERB_FADE BOX_AUDIO_EFFECT_FADE
 
 /** Oscillators of a synth patch, each with an envelope, mixed into one filter and an amp */
 #define BOX_AUDIO_SYNTH_LAYERS 8
@@ -174,10 +188,11 @@ typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_BUS_SET = 4,       /**< box_audio_cmd_set_t on a bus */
     BOX_AUDIO_CMD_ORDER = 5,         /**< box_audio_cmd_order_t and its routes */
     BOX_AUDIO_CMD_SOUND_RELEASE = 6, /**< box_audio_cmd_release_t */
-    BOX_AUDIO_CMD_REVERB = 7,        /**< box_audio_cmd_reverb_t */
     BOX_AUDIO_CMD_SYNTH = 8,         /**< box_audio_cmd_synth_t */
     BOX_AUDIO_CMD_STREAM = 9,        /**< box_audio_cmd_stream_t */
-    BOX_AUDIO_CMD_LEGATO = 10        /**< box_audio_cmd_legato_t */
+    BOX_AUDIO_CMD_LEGATO = 10,       /**< box_audio_cmd_legato_t */
+    BOX_AUDIO_CMD_EFFECT = 11        /**< box_audio_cmd_effect_t; 7, the reverb command of
+                                      *   before, is skipped as an unknown type */
 } box_audio_cmd_type_t;
 
 /** Parameters of BOX_AUDIO_CMD_VOICE_SET and BOX_AUDIO_CMD_BUS_SET */
@@ -264,7 +279,7 @@ typedef struct box_audio_cmd_set_t {
  *
  * Send j of a bus has the level of BOX_AUDIO_PARAM_SEND (j 0) or BOX_AUDIO_PARAM_SEND_1 + j - 1.
  * A post-fader send taps the bus after its volume and pan; a pre-fader send taps it before them,
- * after its reverb and width, and follows its mute */
+ * after its inserts and width, and follows its mute */
 typedef struct box_audio_route_t {
     uint8_t bus;     /**< Index of the bus */
     uint8_t output;  /**< Bus the bus outputs to, BOX_AUDIO_BUS_NONE for the master */
@@ -314,7 +329,15 @@ typedef struct box_audio_stream_status_t {
     int32_t underruns;   /**< Times the stream ran out of chunks since it opened */
     int32_t starved;     /**< 1 while it plays silence for want of chunks */
 } box_audio_stream_status_t;
-/** The parameters of a reverb */
+/** Kinds of effects. A kind is one file of src/audio/core and one row of the table of
+ * effect.c */
+typedef enum box_audio_effect_kind_t {
+    BOX_AUDIO_EFFECT_NONE = 0,    /**< No effect: takes an effect off, its tail fades out */
+    BOX_AUDIO_EFFECT_REVERB = 1,  /**< A reverb, box_audio_reverb_params_t */
+    BOX_AUDIO_EFFECT_KINDS = 2    /**< Number of kinds, NONE included */
+} box_audio_effect_kind_t;
+
+/** The parameters of a reverb, the first floats of the params of its effect command */
 typedef struct box_audio_reverb_params_t {
     float decay;     /**< Seconds until -60 dB, BOX_AUDIO_REVERB_DECAY_MIN..MAX */
     float damping;   /**< High frequency loss, 0..1 */
@@ -323,18 +346,28 @@ typedef struct box_audio_reverb_params_t {
     float mix;       /**< Wet level, 0..1; the dry signal passes at 1 - mix */
 } box_audio_reverb_params_t;
 
-/** Put a reverb on a bus, change its parameters or take it off.
+/** Put an effect into an insert slot of a bus, change its parameters, move it or take it off.
  *
- * Decay, damping and mix change smoothly. A change of size, predelay or bus fades the wet
- * signal out, swaps and fades it in. Bus BOX_AUDIO_BUS_NONE takes the reverb off: its tail
- * fades out into the master. A reverb runs once the memory of its slot arrived.
+ * The inserts of a bus run in the order of their index on its block, before its width, pan and
+ * volume; those of the master run before the limiter. A change of the parameters is smoothed by
+ * the kind. A change of kind, bus or index fades the effect out of its bus, so the bus passes
+ * its dry signal, and into its new place. Kind BOX_AUDIO_EFFECT_NONE, or bus
+ * BOX_AUDIO_BUS_NONE, takes the effect off the same way; when its bus left the order, as a
+ * deleted bus does, its tail fades out into the master instead. An effect whose kind needs
+ * memory runs once the memory of its slot arrived (box_audio_core_effect_memory), another at
+ * once.
  */
-typedef struct box_audio_cmd_reverb_t {
-    box_audio_cmd_header_t header;     /**< BOX_AUDIO_CMD_REVERB */
-    uint32_t slot;                     /**< Slot of the reverb, below BOX_AUDIO_REVERB_MAX */
-    uint32_t bus;                      /**< Bus whose signal it processes, or BUS_NONE */
-    box_audio_reverb_params_t params;  /**< The parameters, clamped by the core */
-} box_audio_cmd_reverb_t;
+typedef struct box_audio_cmd_effect_t {
+    box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_EFFECT */
+    uint32_t slot;                  /**< Slot of the effect, below BOX_AUDIO_EFFECT_MAX */
+    uint32_t kind;                  /**< A box_audio_effect_kind_t */
+    uint32_t bus;                   /**< Bus whose signal it processes, or BOX_AUDIO_BUS_NONE */
+    uint32_t index;                 /**< Insert slot within the bus, below
+                                     *   BOX_AUDIO_EFFECT_SLOTS */
+    uint32_t key;                   /**< Sidechain bus, BOX_AUDIO_BUS_NONE for none */
+    float params[BOX_AUDIO_EFFECT_PARAMS]; /**< The parameters of the kind, clamped by it, the
+                                     *   ones it does not read 0 */
+} box_audio_cmd_effect_t;
 
 /** Waves of a synth oscillator */
 typedef enum box_audio_synth_wave_t {
@@ -682,40 +715,45 @@ int32_t box_audio_core_events_lost(
 int32_t box_audio_core_voice_count(
     const box_audio_core_t *core);
 
-/** Get the floats of delay memory a reverb needs at a sample rate: its delay lines at the
- * largest size and its longest predelay.
+/** Get the floats of memory an effect of a kind needs at a sample rate; for the reverb its
+ * delay lines at the largest size and its longest predelay.
  *
+ * @param kind A box_audio_effect_kind_t
  * @param sample_rate Frames per second of the core
- * @return Number of floats
+ * @return Number of floats, 0 for a kind that needs none
  */
-int32_t box_audio_reverb_floats(
+int32_t box_audio_effect_floats(
+    uint32_t kind,
     float sample_rate);
 
-/** Give a reverb slot its delay memory, on the thread that renders, between renders.
+/** Give an effect slot its memory, on the thread that renders, between renders.
  *
  * The memory is in the address space of the core and stays with the side that runs the core,
- * which frees it after the core. The core clears it. A slot takes memory once.
+ * which frees it after the core. The core clears it. A slot takes memory when it has none, or
+ * larger memory than it has for a kind that needs more; the effect then starts over on it and
+ * the side that runs the core keeps the old memory until the core is freed.
  *
  * @param core The core
- * @param slot Slot of the reverb, below BOX_AUDIO_REVERB_MAX
+ * @param slot Slot of the effect, below BOX_AUDIO_EFFECT_MAX
  * @param data The memory
- * @param floats Floats of the memory, at least box_audio_reverb_floats of the rate
+ * @param floats Floats of the memory
  * @return Whether the core took the memory
  */
-bool box_audio_core_reverb_memory(
+bool box_audio_core_effect_memory(
     box_audio_core_t *core,
     uint32_t slot,
     float *data,
     int32_t floats);
 
-/** Check whether a reverb renders: it has memory, a bus or a tail that fades, and a tail that
- * has not decayed to silence or a signal that comes in.
+/** Check whether an effect renders: it has a kind, the memory of its kind, a bus or a tail
+ * that fades, and, for a kind with a tail, a tail that has not decayed to silence or a signal
+ * that comes in.
  *
  * @param core The core
- * @param slot Slot of the reverb
+ * @param slot Slot of the effect
  * @return Whether it renders
  */
-bool box_audio_core_reverb_running(
+bool box_audio_core_effect_running(
     const box_audio_core_t *core,
     uint32_t slot);
 
@@ -865,19 +903,26 @@ bool box_audio_write_release(
     box_audio_writer_t *writer,
     uint32_t sound);
 
-/** Write a command that puts a reverb on a bus, changes it or takes it off.
+/** Write a command that puts an effect into an insert slot, changes it, moves it or takes it
+ * off.
  *
  * @param writer The writer
- * @param slot Slot of the reverb
- * @param bus Bus of the reverb, BOX_AUDIO_BUS_NONE to take it off
- * @param params The parameters
+ * @param slot Slot of the effect
+ * @param kind A box_audio_effect_kind_t, BOX_AUDIO_EFFECT_NONE to take it off
+ * @param bus Bus of the effect, BOX_AUDIO_BUS_NONE to take it off
+ * @param index Insert slot within the bus
+ * @param key Sidechain bus, BOX_AUDIO_BUS_NONE for none
+ * @param params BOX_AUDIO_EFFECT_PARAMS parameters, NULL for all 0
  * @return Whether the command fit
  */
-bool box_audio_write_reverb(
+bool box_audio_write_effect(
     box_audio_writer_t *writer,
     uint32_t slot,
+    uint32_t kind,
     uint32_t bus,
-    const box_audio_reverb_params_t *params);
+    uint32_t index,
+    uint32_t key,
+    const float *params);
 
 /** Write a command that makes a sound id a synth patch or replaces its patch, of
  * BOX_AUDIO_CMD_SYNTH_SIZE bytes for the layers of the patch.

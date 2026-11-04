@@ -96,11 +96,12 @@ struct box_audio_transport_t {
     void (*stream_status)(box_audio_transport_t *t, uint32_t stream,
         box_audio_stream_status_t *status);
 
-    /** Give the core the delay memory of a reverb slot, before its first reverb command. The
-     * transport allocates it where the core runs and frees it after the core; a slot gets it
-     * once per transport, and a later call returns true.
+    /** Give the core at least floats of memory for an effect slot, before the effect command
+     * of a kind that needs it. The transport allocates it where the core runs and frees it
+     * after the core; a slot that has as many floats keeps its memory and the call returns
+     * true, a slot that needs more gets new memory.
      * @return Whether the memory went out */
-    bool (*reverb)(box_audio_transport_t *t, uint32_t slot);
+    bool (*effect_memory)(box_audio_transport_t *t, uint32_t slot, int32_t floats);
 
     /** Take the events of the core, oldest first.
      * @return Number of events written */
