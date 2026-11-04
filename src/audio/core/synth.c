@@ -905,10 +905,11 @@ static inline float box_audio_synth_modulate(
     box_audio_synth_source_t *src,
     const float *levels)
 {
-    double offset[BOX_AUDIO_SYNTH_LAYERS] = {0}, t;
+    double offset[BOX_AUDIO_SYNTH_LAYERS], t;
     float ring[BOX_AUDIO_SYNTH_LAYERS], mix = 0, x, signal;
     int32_t l;
     for (l = 0; l < src->layers; l ++) {
+        offset[l] = 0;
         ring[l] = 1;
     }
 

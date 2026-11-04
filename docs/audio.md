@@ -745,7 +745,7 @@ Bessel amplitudes and without drift, an index that follows the envelope of its m
 the high sidebands, the limit of the index, ring modulation at the sum and difference alone,
 audible modulators, feedback, 8 layers each found at its own frequency with a Goertzel filter, a
 9th left out, the size of the command, the pool of parts, renders of patches of 4 layers bit
-identical to the synth of fixed layers, scripts from `test/assets/audio/synth.flecs` and
+identical whatever the unused layers hold, scripts from `test/assets/audio/synth.flecs` and
 `test/assets/audio/synth_fm.flecs` and `test/assets/audio/synth_layers.flecs`, the nine examples
 above from `test/assets/audio/synth_examples.flecs` and errors; `NoAlloc` renders 64 synth voices.
 The browser check is `test/integration/web/audio_synth.mjs`.

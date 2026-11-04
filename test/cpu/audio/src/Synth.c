@@ -1554,21 +1554,16 @@ void Synth_layers_pool(void) {
     box_audio_core_free(core);
 }
 
-/** Hashes of the renders of Synth_layers_identical by the synth of 4 layers, before the layers
- * became parts of the core */
-static const uint64_t synth_golden[4] = {
-    0x4AB6B4E9EDAAF5FBull, 0xF7B3C67CDCB84F45ull, 0x175A67CDC80CB361ull, 0x2B0607BF5C923D76ull };
-
-/** Patches of up to 4 layers render bit identical to the synth of 4 layers: filters with an
- * envelope at both slopes, sweeps, noise with variances, own envelopes, phase and ring
- * modulation with feedback, a change of pitch and the restarts of a loop. */
+/** Patches of up to 4 layers (filters, sweeps, noise, envelopes, FM, ring, a loop) render bit
+ * identical whatever the layers past their count hold. The hashes depend on the compiler. */
 void Synth_layers_identical(void) {
     // audio/synth
     box_audio_synth_envelope_t decay = {
         .attack = 0.002f, .decay = 0.5f, .sustain = 0.2f, .hold = 0.3f, .release = 0.1f };
+    box_audio_synth_layer_t junk = { .frequency = 500, .level = 1, .modulates = 1, .index = 2 };
     box_audio_synth_patch_t p[4] = {{0}};
-    uint64_t hash;
-    int32_t i;
+    uint64_t h[2];
+    int32_t i, run, l;
     p[0].layers = 3;
     p[0].seed = 5;
     p[0].pitch_variance = 0.1f;
@@ -1623,16 +1618,23 @@ void Synth_layers_identical(void) {
         .has_envelope = 1, .envelope = { .attack = 0.001f, .decay = 0.03f } };
 
     for (i = 0; i < 4; i ++) {
-        box_audio_core_t *core = synth_core(AUDIO_RATE);
-        synth_define(core, 1, &p[i]);
-        audio_play(core, 1, 1, 0, 1, 0, 0.9f, i == 3 ? BOX_AUDIO_PLAY_LOOP : 0);
-        audio_render(core, 0, AUDIO_FRAMES / 2);
-        audio_voice_set(core, 1, BOX_AUDIO_PARAM_PITCH, 1.2f);
-        audio_render(core, AUDIO_FRAMES / 2, AUDIO_FRAMES / 2);
-        hash = audio_hash(audio_l, AUDIO_FRAMES) ^ (audio_hash(audio_r, AUDIO_FRAMES) << 1);
-        printf("patch %d: 0x%016llXull\n", (int)i, (unsigned long long)hash);
-        test_assert(hash == synth_golden[i]);
-        box_audio_core_free(core);
+        for (run = 0; run < 2; run ++) {
+            box_audio_core_t *core = synth_core(AUDIO_RATE);
+            for (l = p[i].layers; run && l < BOX_AUDIO_SYNTH_LAYERS; l ++) {
+                p[i].layer[l] = junk;
+            }
+
+            synth_define(core, 1, &p[i]);
+            audio_play(core, 1, 1, 0, 1, 0, 0.9f, i == 3 ? BOX_AUDIO_PLAY_LOOP : 0);
+            audio_render(core, 0, AUDIO_FRAMES / 2);
+            audio_voice_set(core, 1, BOX_AUDIO_PARAM_PITCH, 1.2f);
+            audio_render(core, AUDIO_FRAMES / 2, AUDIO_FRAMES / 2);
+            h[run] = audio_hash(audio_l, AUDIO_FRAMES) ^ (audio_hash(audio_r, AUDIO_FRAMES) << 1);
+            box_audio_core_free(core);
+        }
+
+        printf("patch %d: 0x%016llXull\n", (int)i, (unsigned long long)h[0]);
+        test_assert(h[0] == h[1]);
     }
 }
 
