@@ -954,16 +954,10 @@ int box_surface_sweep_corners(
     int steps = (int)sf(d, 8, 1);
     int first = (int)sf(d, 4, 0);
     int count = 0;
-    if (segments < 2 || steps <= 0 || steps % segments) {
-        return 0;
-    }
-
-    /* The cumulative length is sampled as box_surface_build_lengths() samples it, so that a
-     * corner is at the length fraction the table puts it */
-    int per = steps / segments;
+    int per = segments >= 2 && steps > 0 && steps % segments == 0 ? steps / segments : 0;
     box_sv previous = surface_curve(d, 0.0f);
     float total = 0.0f;
-    for (int i = 1; i <= steps; i ++) {
+    for (int i = 1; per && i <= steps; i ++) {
         box_sv point = surface_curve(d, (float)i / steps);
         box_sv delta = sv_sub(point, previous);
         total += sqrtf(sv_dot(delta, delta));
@@ -975,8 +969,6 @@ int box_surface_sweep_corners(
 
         box_sv a = surface_segment_direction(d, first + (k - 1) * 4, true);
         box_sv b = surface_segment_direction(d, first + k * 4, false);
-        /* Joins within about half a degree, such as those of Catmull-Rom and smooth Bezier
-         * paths, are not corners */
         if (sv_dot(a, a) > 0.0f && sv_dot(b, b) > 0.0f && sv_dot(a, b) < 0.99996f) {
             parameters[count] = (float)k / segments;
             fractions[count] = total;

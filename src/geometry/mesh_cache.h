@@ -259,7 +259,8 @@ void box_surface_build_lengths(const box_surface_data_t *data, vec4 *frames, int
 float box_surface_sweep_parameter(const box_surface_data_t *data, float s);
 
 /** Find the segment boundaries of a Sweep path where its direction jumps, so that a ring can be
- * put on each.
+ * put on each. Joins within about half a degree, such as those of Catmull-Rom and smooth Bezier
+ * paths, are not corners. The length is sampled as box_surface_build_lengths() samples it.
  *
  * @param data The surface data
  * @param parameters Receives the path parameter of each corner, room for the segment count
