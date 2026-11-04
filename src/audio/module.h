@@ -74,6 +74,7 @@ typedef struct box_audio_effect_sent_t {
     uint32_t kind;          /**< Kind sent, BOX_AUDIO_EFFECT_NONE when off or bypassed */
     uint32_t bus;           /**< Bus index sent */
     uint32_t index;         /**< Insert slot sent */
+    uint32_t key;           /**< Sidechain bus sent, BOX_AUDIO_BUS_NONE for none */
     float params[BOX_AUDIO_EFFECT_PARAMS]; /**< Parameters sent */
 } box_audio_effect_sent_t;
 
@@ -562,6 +563,15 @@ typedef struct box_audio_module_t {
                                    *   cycles included, 0 for the master */
     uint8_t route_sends[BOX_AUDIO_BUS_MAX][BOX_AUDIO_SENDS]; /**< Sends of each bus index at
                                    *   the last compile, BOX_AUDIO_BUS_NONE for none */
+    ecs_entity_t sidechains[BOX_AUDIO_BUS_MAX][BOX_AUDIO_EFFECT_SLOTS]; /**< Sidechain of the
+                                   *   Compressor in each insert slot of each bus index at the
+                                   *   last compile, 0 for none */
+    ecs_entity_t sidechain_refused[BOX_AUDIO_BUS_MAX][BOX_AUDIO_EFFECT_SLOTS]; /**< Sidechain
+                                   *   whose cycle was logged for each insert slot, 0 for none */
+    uint8_t keys[BOX_AUDIO_BUS_MAX][BOX_AUDIO_EFFECT_SLOTS]; /**< Key bus of the compressor in
+                                   *   each insert slot of each bus index, BOX_AUDIO_BUS_NONE
+                                   *   for its own input */
+    int32_t sidechain_count;      /**< Insert slots with a sidechain at the last compile */
     uint64_t solo;                /**< Bus indices soloed this frame */
     uint64_t solo_safe;           /**< Bus indices of returns and SFX buses this frame */
     uint64_t audible;             /**< Bus indices the solo keeps, all when none is soloed */
@@ -1125,6 +1135,29 @@ void box_audio_play_send(
     const box_audio_play_t *play,
     bool waiting,
     uint64_t when);
+
+/** Mark the order dirty when the sidechain of a Compressor in an insert slot changed since
+ * the last compile. Costs nothing while no Compressor exists and none had a sidechain.
+ *
+ * @param world The world
+ * @param state The state
+ */
+void box_audio_sidechains_check(
+    ecs_world_t *world,
+    box_audio_module_t *state);
+
+/** Find the sidechains of the compressors in the insert slots, after the routes of the compile
+ * are known: an edge from each key to the bus it ducks, so the key runs first. A sidechain that
+ * would form a cycle, or that is the master, logs one error and keys on the own input.
+ *
+ * @param world The world
+ * @param state The state, with route_out and route_sends of this compile
+ * @param keyed Receives the buses each bus index is the sidechain of, a bit each
+ */
+void box_audio_sidechains_compile(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    uint64_t *keyed);
 
 /** Get the bus index of a bus entity.
  *

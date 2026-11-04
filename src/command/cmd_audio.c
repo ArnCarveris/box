@@ -169,8 +169,11 @@ static void box_cmd_audio_effects(
         const Reverb *reverb;
         const Equalizer *eq;
         const AudioFilter *filter;
+        const Compressor *comp;
+        const Gate *gate;
+        const box_audio_module_t *state = box_audio_module_get(world);
         char *path;
-        int32_t b;
+        int32_t b, slot;
         if (!e) {
             continue;
         }
@@ -206,6 +209,26 @@ static void box_cmd_audio_effects(
                 box_cmd_audio_filter_kind(filter->kind),
                 filter->slope == SynthSlope24 ? 24 : 12, (double)filter->cutoff,
                 (double)filter->resonance, (double)filter->mix);
+        } else if ((comp = ecs_get(world, e, Compressor))) {
+            ecs_strbuf_append(buf, "compressor threshold %.1f dB ratio %.1f attack %.3f "
+                "release %.3f knee %.1f dB makeup %.1f dB mix %.2f", (double)comp->threshold,
+                (double)comp->ratio, (double)comp->attack, (double)comp->release,
+                (double)comp->knee, (double)comp->makeup, (double)comp->mix);
+            if (comp->sidechain) {
+                char *key = ecs_is_alive(world, comp->sidechain) ?
+                    ecs_get_path(world, comp->sidechain) : NULL;
+                ecs_strbuf_append(buf, " sidechain %s", key ? key : "(deleted)");
+                ecs_os_free(key);
+            }
+        } else if ((gate = ecs_get(world, e, Gate))) {
+            ecs_strbuf_append(buf, "gate threshold %.1f dB attack %.4f hold %.3f release %.3f "
+                "range %.1f dB", (double)gate->threshold, (double)gate->attack,
+                (double)gate->hold, (double)gate->release, (double)gate->range);
+        }
+
+        slot = box_audio_module_effect_slot(world, e);
+        if ((ecs_has(world, e, Compressor) || ecs_has(world, e, Gate)) && state && slot >= 0) {
+            ecs_strbuf_append(buf, " reduction %.1f dB", (double)state->reduction[slot]);
         }
 
         ecs_strbuf_append(buf, " (%s)", box_cmd_audio_effect_state(world, channel, j, e));

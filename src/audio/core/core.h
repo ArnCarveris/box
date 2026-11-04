@@ -369,7 +369,10 @@ typedef enum box_audio_effect_kind_t {
     BOX_AUDIO_EFFECT_REVERB = 1,  /**< A reverb, box_audio_reverb_params_t */
     BOX_AUDIO_EFFECT_EQ = 2,      /**< An equalizer, BOX_AUDIO_EQ_BANDS box_audio_eq_band_t */
     BOX_AUDIO_EFFECT_FILTER = 3,  /**< A filter, box_audio_filter_params_t */
-    BOX_AUDIO_EFFECT_KINDS = 4    /**< Number of kinds, NONE included */
+    BOX_AUDIO_EFFECT_COMPRESSOR = 4, /**< A compressor, box_audio_compressor_params_t, keyed on
+                                   *   the key bus of its command */
+    BOX_AUDIO_EFFECT_GATE = 5,    /**< A gate, box_audio_gate_params_t */
+    BOX_AUDIO_EFFECT_KINDS = 6    /**< Number of kinds, NONE included */
 } box_audio_effect_kind_t;
 
 /** The parameters of a reverb, the first floats of the params of its effect command */
@@ -440,6 +443,81 @@ typedef struct box_audio_filter_params_t {
     float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
 } box_audio_filter_params_t;
 
+/** Seconds of the windows of the peak detector of the compressor and the gate: the detector
+ * holds the largest sample of the current and the last window, so that it reads the peak of a
+ * sine of 100 Hz or more without ripple. A drop of the input reaches the detector after one to
+ * two windows */
+#define BOX_AUDIO_DYNAMICS_WINDOW 0.005f
+
+/** Lowest level the compressor detects in dB; silence reads as this */
+#define BOX_AUDIO_DYNAMICS_FLOOR (-120.0f)
+
+/** Seconds of a change of the threshold, ratio, knee, makeup or mix of a compressor */
+#define BOX_AUDIO_COMPRESSOR_RAMP 0.02f
+
+/** Lowest threshold of a compressor in dB; the highest is 0 */
+#define BOX_AUDIO_COMPRESSOR_THRESHOLD_MIN (-80.0f)
+
+/** Largest ratio of a compressor; the smallest is 1, no compression */
+#define BOX_AUDIO_COMPRESSOR_RATIO_MAX 20.0f
+
+/** Widest knee of a compressor in dB */
+#define BOX_AUDIO_COMPRESSOR_KNEE_MAX 24.0f
+
+/** Largest makeup gain of a compressor in dB */
+#define BOX_AUDIO_COMPRESSOR_MAKEUP_MAX 24.0f
+
+/** Shortest and longest attack of a compressor or a gate in seconds */
+#define BOX_AUDIO_DYNAMICS_ATTACK_MIN 0.0001f
+#define BOX_AUDIO_DYNAMICS_ATTACK_MAX 1.0f
+
+/** Shortest and longest release of a compressor or a gate in seconds */
+#define BOX_AUDIO_DYNAMICS_RELEASE_MIN 0.001f
+#define BOX_AUDIO_DYNAMICS_RELEASE_MAX 5.0f
+
+/** dB under its threshold that the level of an open gate falls before it closes, so that a
+ * signal at the threshold does not open and close it over and over */
+#define BOX_AUDIO_GATE_HYSTERESIS 4.0f
+
+/** Lowest threshold and range of a gate in dB; the highest are 0 */
+#define BOX_AUDIO_GATE_MIN (-100.0f)
+
+/** Longest hold of a gate in seconds */
+#define BOX_AUDIO_GATE_HOLD_MAX 5.0f
+
+/** The parameters of a compressor, the first floats of the params of its effect command: a
+ * feed-forward, stereo linked compressor whose detector reads the peak of the louder channel,
+ * of its own input or of the output of the key bus of its command in the same block. The key
+ * bus must come before the bus of the compressor in the order; otherwise, or while it is not
+ * in the order, the compressor keys on its own input */
+typedef struct box_audio_compressor_params_t {
+    float threshold;  /**< dB, BOX_AUDIO_COMPRESSOR_THRESHOLD_MIN..0 */
+    float ratio;      /**< 1..BOX_AUDIO_COMPRESSOR_RATIO_MAX */
+    float attack;     /**< Seconds in which the detected level rises 63% of a step up,
+                       *   BOX_AUDIO_DYNAMICS_ATTACK_MIN..MAX */
+    float release;    /**< Seconds in which it falls 63% of a step down,
+                       *   BOX_AUDIO_DYNAMICS_RELEASE_MIN..MAX */
+    float knee;       /**< Width of the soft knee around the threshold in dB, 0 for a hard
+                       *   knee, 0..BOX_AUDIO_COMPRESSOR_KNEE_MAX */
+    float makeup;     /**< Gain after the compression in dB, 0..BOX_AUDIO_COMPRESSOR_MAKEUP_MAX */
+    float mix;        /**< Wet level, 0..1, for parallel compression; the dry signal passes at
+                       *   1 - mix */
+} box_audio_compressor_params_t;
+
+/** The parameters of a gate, the first floats of the params of its effect command: it opens
+ * when the peak of the louder channel reaches its threshold, stays open while it is above the
+ * threshold less BOX_AUDIO_GATE_HYSTERESIS and for hold seconds after, and then closes to its
+ * range */
+typedef struct box_audio_gate_params_t {
+    float threshold;  /**< dB, BOX_AUDIO_GATE_MIN..0 */
+    float attack;     /**< Seconds in which the gain rises 63% of the way to open,
+                       *   BOX_AUDIO_DYNAMICS_ATTACK_MIN..MAX */
+    float hold;       /**< Seconds it stays open after the level fell, 0..BOX_AUDIO_GATE_HOLD_MAX */
+    float release;    /**< Seconds in which the gain falls 63% of the way to closed,
+                       *   BOX_AUDIO_DYNAMICS_RELEASE_MIN..MAX */
+    float range;      /**< Gain when closed in dB, BOX_AUDIO_GATE_MIN..0 */
+} box_audio_gate_params_t;
+
 /** Put an effect into an insert slot of a bus, change its parameters, move it or take it off.
  *
  * The inserts of a bus run in the order of their index on its block, before its width, pan and
@@ -458,7 +536,8 @@ typedef struct box_audio_cmd_effect_t {
     uint32_t bus;                   /**< Bus whose signal it processes, or BOX_AUDIO_BUS_NONE */
     uint32_t index;                 /**< Insert slot within the bus, below
                                      *   BOX_AUDIO_EFFECT_SLOTS */
-    uint32_t key;                   /**< Sidechain bus, BOX_AUDIO_BUS_NONE for none */
+    uint32_t key;                   /**< Sidechain bus, BOX_AUDIO_BUS_NONE for none: a
+                                     *   compressor keys on its output in the same block */
     float params[BOX_AUDIO_EFFECT_PARAMS]; /**< The parameters of the kind, clamped by it, the
                                      *   ones it does not read 0 */
 } box_audio_cmd_effect_t;

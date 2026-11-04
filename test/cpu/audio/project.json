@@ -184,7 +184,8 @@
                     "gated",
                     "effects",
                     "meters",
-                    "eq_filter"
+                    "eq_filter",
+                    "dynamics"
                 ]
             },
             {
@@ -467,6 +468,25 @@
                     "mix",
                     "render_sizes",
                     "component"
+                ]
+            },
+            {
+                "id": "Dynamics",
+                "testcases": [
+                    "static_curve",
+                    "knee_smooth",
+                    "attack_release",
+                    "sidechain_duck",
+                    "key_after_own_input",
+                    "gate_closes_opens",
+                    "gate_no_chatter",
+                    "reduction",
+                    "slot_order",
+                    "render_sizes",
+                    "component",
+                    "world_duck",
+                    "sidechain_cycle",
+                    "script"
                 ]
             },
             {

@@ -853,6 +853,7 @@ static void box_audio_cmd_order(
 
     for (i = 0; i < BOX_AUDIO_BUS_MAX; i ++) {
         core->bus_active[i] = position[i] >= 0;
+        core->bus_position[i] = (uint8_t)(position[i] >= 0 ? position[i] : 0);
     }
 
     box_audio_effects_order(core);

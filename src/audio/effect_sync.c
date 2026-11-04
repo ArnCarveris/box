@@ -3,8 +3,9 @@
  * @brief The effects of the module: the entities that the insert slots of the channels name,
  * their slots of the pool of the core, their memory and their commands.
  *
- * An effect entity is any entity with an effect component: Reverb, Equalizer or AudioFilter,
- * the first of them in that order when it has several.
+ * An effect entity is any entity with an effect component: Reverb, Equalizer, AudioFilter,
+ * Compressor or Gate, the first of them in that order when it has several. A compressor gets
+ * the key bus that the order compile accepted for its insert slot.
  *
  * The module sends an EFFECT command when the kind, the channel, the slot or a parameter of an
  * effect changes, and takes it off when no insert slot names it any more.
@@ -40,6 +41,8 @@ uint32_t box_audio_module_effect_kind(
     const Reverb *reverb = NULL;
     const Equalizer *eq = NULL;
     const AudioFilter *filter = NULL;
+    const Compressor *comp = NULL;
+    const Gate *gate = NULL;
     uint32_t result = BOX_AUDIO_EFFECT_NONE;
     int32_t i;
     for (i = 0; params && i < BOX_AUDIO_EFFECT_PARAMS; i ++) {
@@ -87,6 +90,36 @@ uint32_t box_audio_module_effect_kind(
             params[3] = (float)filter->slope;
             params[4] = filter->mix;
         }
+
+        goto done;
+    }
+
+    comp = ecs_get(world, e, Compressor);
+    if (comp) {
+        result = BOX_AUDIO_EFFECT_COMPRESSOR;
+        if (params) {
+            params[0] = comp->threshold;
+            params[1] = comp->ratio;
+            params[2] = comp->attack;
+            params[3] = comp->release;
+            params[4] = comp->knee;
+            params[5] = comp->makeup;
+            params[6] = comp->mix;
+        }
+
+        goto done;
+    }
+
+    gate = ecs_get(world, e, Gate);
+    if (gate) {
+        result = BOX_AUDIO_EFFECT_GATE;
+        if (params) {
+            params[0] = gate->threshold;
+            params[1] = gate->attack;
+            params[2] = gate->hold;
+            params[3] = gate->release;
+            params[4] = gate->range;
+        }
     }
 
 done:
@@ -100,6 +133,7 @@ done:
  * @param kind Kind, BOX_AUDIO_EFFECT_NONE to take the effect off
  * @param bus Bus index
  * @param index Insert slot within the bus
+ * @param key Sidechain bus, BOX_AUDIO_BUS_NONE for none
  * @param params The parameters
  */
 static void box_audio_effect_send(
@@ -108,12 +142,13 @@ static void box_audio_effect_send(
     uint32_t kind,
     uint32_t bus,
     uint32_t index,
+    uint32_t key,
     const float *params)
 {
     box_audio_effect_sent_t *sent = &state->effects[slot];
     if (box_audio_reserve(state)) {
         box_audio_write_effect(&state->writer, slot, kind,
-            kind ? bus : BOX_AUDIO_BUS_NONE, index, BOX_AUDIO_BUS_NONE, params);
+            kind ? bus : BOX_AUDIO_BUS_NONE, index, key, params);
         state->stats.effects ++;
     }
 
@@ -121,6 +156,7 @@ static void box_audio_effect_send(
     sent->kind = kind;
     sent->bus = bus;
     sent->index = index;
+    sent->key = key;
     ecs_os_memcpy_n(sent->params, params, float, BOX_AUDIO_EFFECT_PARAMS);
 }
 
@@ -215,7 +251,7 @@ static uint64_t box_audio_effects_free(
             sent->kind != BOX_AUDIO_EFFECT_NONE)
         {
             box_audio_effect_send(state, i, BOX_AUDIO_EFFECT_NONE, sent->bus, sent->index,
-                sent->params);
+                BOX_AUDIO_BUS_NONE, sent->params);
         }
 
         if (es && es->slot == i + 1) {
@@ -316,7 +352,7 @@ void box_audio_effects_sync(
         ecs_entity_t e = claimed[i];
         AudioEffectState *es = ecs_get_mut(world, e, AudioEffectState);
         float params[BOX_AUDIO_EFFECT_PARAMS];
-        uint32_t kind = box_audio_module_effect_kind(world, e, params), send;
+        uint32_t kind = box_audio_module_effect_kind(world, e, params), send, key;
         int32_t slot, need = box_audio_effect_floats(kind, t->sample_rate);
         box_audio_effect_sent_t *sent;
         if (es->twice_frame != state->effect_frame) {
@@ -338,11 +374,14 @@ void box_audio_effects_sync(
         }
 
         send = ecs_has_id(world, e, EcsDisabled) ? BOX_AUDIO_EFFECT_NONE : kind;
+        key = send == BOX_AUDIO_EFFECT_COMPRESSOR ? state->keys[es->bus][es->index] :
+            BOX_AUDIO_BUS_NONE;
         if (sent->serial != state->serial || sent->kind != send || sent->bus != es->bus ||
-            sent->index != es->index ||
+            sent->index != es->index || sent->key != key ||
             ecs_os_memcmp(sent->params, params, ECS_SIZEOF(float) * BOX_AUDIO_EFFECT_PARAMS))
         {
-            box_audio_effect_send(state, (uint32_t)slot, send, es->bus, es->index, params);
+            box_audio_effect_send(state, (uint32_t)slot, send, es->bus, es->index, key,
+                params);
         }
     }
 }

@@ -452,6 +452,46 @@ ECS_STRUCT(AudioFilter, {
                             *   1 - mix */
 });
 
+/** A compressor, an effect in an insert slot of an AudioBus, as a Reverb is: feed-forward and
+ * stereo linked, it detects the peak of the louder channel, smooths it with its attack and
+ * release in dB and reduces the gain over its threshold by its ratio, with a soft knee.
+ *
+ * With a sidechain it keys on the output of that channel instead of its own input, to duck
+ * one channel under another, such as music under dialog:
+ * music { AudioBus: {effects: [music]}; Compressor: {threshold: -30, ratio: 8, sidechain: sfx} }.
+ * The order of the channels runs the sidechain first; a sidechain that would form a cycle logs
+ * one error that names the channels, and the compressor keys on its own input, as it does
+ * when its sidechain is deleted. An AudioMeter on its entity reads its gain reduction.
+ */
+ECS_STRUCT(Compressor, {
+    float threshold;       /**< dB, default -18, -80 to 0 */
+    float ratio;           /**< 1 to 20, default 4 */
+    float attack;          /**< Seconds in which the detected level rises 63% of a step,
+                            *   default 0.01, 0.0001 to 1 */
+    float release;         /**< Seconds in which it falls 63% of a step, default 0.15, 0.001 to
+                            *   5 */
+    float knee;            /**< Width of the soft knee in dB, default 6, 0 to 24 */
+    float makeup;          /**< Gain after the compression in dB, default 0, 0 to 24 */
+    float mix;             /**< Wet level, 0 to 1, default 1; lower for parallel compression */
+    ecs_entity_t sidechain; /**< Channel (an AudioBus) whose output is the key, 0 for its own
+                            *   input */
+});
+
+/** A gate, an effect in an insert slot of an AudioBus, as a Reverb is: it opens when the peak
+ * of the louder channel reaches its threshold, stays open while the level is above the
+ * threshold less 4 dB of hysteresis and for its hold after, and then closes to its range.
+ * drums { AudioBus: {effects: [drums]}; Gate: {threshold: -40, hold: 0.02} }.
+ * An AudioMeter on its entity reads its gain reduction.
+ */
+ECS_STRUCT(Gate, {
+    float threshold;       /**< dB, default -50, -100 to 0 */
+    float attack;          /**< Seconds in which it opens 63% of the way, default 0.001 */
+    float hold;            /**< Seconds it stays open after the level fell, default 0.05, 0
+                            *   to 5 */
+    float release;         /**< Seconds in which it closes 63% of the way, default 0.1 */
+    float range;           /**< Gain when closed in dB, default -80, -100 to 0 */
+});
+
 /** An envelope of the cutoff of the SynthFilter of the same root, with the segments of a
  * SynthEnvelope: the cutoff is cutoff times 2 to the amount times the level of the envelope,
  * so it rises over the attack, settles at the sustain and returns over the release.

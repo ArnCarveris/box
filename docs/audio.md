@@ -23,8 +23,9 @@ core**, a small mixer in plain C that renders on its own thread, once per frame 
   pan, a stereo width, a mute, a solo, a kind (group, return or SFX), an output and up to 4
   sends, pre or post fader. Bus 0 is the master, `box.audio.master` in script; every other bus
   ends there. Each bus has 4 insert slots that run **effects**, entities such as a `Reverb`,
-  an `Equalizer` or an `AudioFilter`, in order on its signal; a bus with a reverb in a slot is a reverb bus, a return, which other
-  buses reach through a send.
+  an `Equalizer`, an `AudioFilter`, a `Compressor` or a `Gate`, in order on its signal; a bus
+  with a reverb in a slot is a reverb bus, a return, which other buses reach through a send. A
+  compressor may key on another bus, to duck one channel under another.
 - **Space**: a source with `AudioSpatial` gets its volume and pan every frame from its distance
   to the listener and its direction, the camera of the main view or the entity with
   `AudioListener`.
@@ -42,6 +43,8 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 | `Reverb` | An effect: the reverb of a room, which runs in the insert slot of a bus that names its entity, see [Effects](#effects) and [Reverb](#reverb) |
 | `Equalizer` | An effect: 4 bands of peaks, shelves and cuts, such as a low cut on a vocal or SFX bus, see [Equalizer](#equalizer) |
 | `AudioFilter` | An effect: the synth's filter on a bus, a lowpass, highpass, bandpass or notch of 12 or 24 dB, such as a filter sweep on a music group, see [Filter effect](#filter-effect) |
+| `Compressor` | An effect: a compressor with a soft knee, keyed on its own input or on another channel (`sidechain`) to duck music under dialog or explosions, see [Compressor](#compressor) |
+| `Gate` | An effect: a gate with a hold, a range and hysteresis, see [Gate](#gate) |
 | `AudioOutput` | The bus a source, a stream or a sound plays on (the master without one) |
 | `AudioPcm` | A sound from samples, from script or C |
 | `SoundFile` | A short sound from a WAV or FLAC file, decoded into memory, see [Sound files](#sound-files) |
@@ -238,11 +241,13 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
 - **Space**: distance and pan only. No Doppler, no distance filter, no occlusion, no HRTF, and
   front and back sound alike.
 - **Effects**: `BOX_AUDIO_EFFECT_MAX` (64) effects at once in all channels together, 4 insert
-  slots per channel, and three kinds: an algorithmic reverb, an equalizer of 4 bands and a
-  filter; one more effect logs one error and does nothing. No reverb zones, no rooms from
-  geometry, no compressor or delay yet, and no sidechain. An equalizer has 4 bands of 12 dB per
-  octave at most (no steeper cuts, no linear phase, no dynamic EQ); a filter is one SVF of 12 or
-  24 dB, with no envelope follower or LFO of its own: a script moves its cutoff.
+  slots per channel, and five kinds: an algorithmic reverb, an equalizer of 4 bands, a filter, a
+  compressor and a gate; one more effect logs one error and does nothing. No reverb zones, no
+  rooms from geometry and no delay yet. An equalizer has 4 bands of 12 dB per octave at most (no
+  steeper cuts, no linear phase, no dynamic EQ); a filter is one SVF of 12 or 24 dB, with no
+  envelope follower or LFO of its own: a script moves its cutoff. The compressor is a single band
+  peak compressor without lookahead, RMS detection or a filter on its key; one channel is its
+  key, not a sum of several. The gate keys on its own input only.
 - **Voices**: 64, with the quietest stolen; no priorities. A one shot cannot be controlled after
   it started.
 - **Synth**: up to 8 oscillators, one filter and two LFOs per sound, up to 7 unison voices per
@@ -554,11 +559,18 @@ its kind.
   `floats` (the memory it needs at a rate), `init` (constants of a new core), `start` (on clear
   memory at its parameters), `command` (new parameters while it runs), `render` (a block in
   place) and `rest` (a block it skips). The kinds are the reverb, `BOX_AUDIO_EFFECT_REVERB`,
-  the [equalizer](#equalizer), `BOX_AUDIO_EFFECT_EQ`, and the [filter](#filter-effect),
-  `BOX_AUDIO_EFFECT_FILTER`; the parameters of a command are 16 floats
+  the [equalizer](#equalizer), `BOX_AUDIO_EFFECT_EQ`, the [filter](#filter-effect),
+  `BOX_AUDIO_EFFECT_FILTER`, the [compressor](#compressor), `BOX_AUDIO_EFFECT_COMPRESSOR`, and
+  the [gate](#gate), `BOX_AUDIO_EFFECT_GATE`; the parameters of a command are 16 floats
   (`BOX_AUDIO_EFFECT_PARAMS`) that each kind reads in its own way, the reverb its first five
-  (`box_audio_reverb_params_t`), the equalizer all 16 (4 `box_audio_eq_band_t`) and the filter
-  its first five (`box_audio_filter_params_t`). The core clamps them, a NaN to the low end.
+  (`box_audio_reverb_params_t`), the equalizer all 16 (4 `box_audio_eq_band_t`), the filter
+  its first five (`box_audio_filter_params_t`), the compressor its first seven
+  (`box_audio_compressor_params_t`) and the gate its first five (`box_audio_gate_params_t`). The
+  core clamps them, a NaN to the low end.
+- **Key.** The `key` of the command is a sidechain bus, `BOX_AUDIO_BUS_NONE` for none; only the
+  compressor reads it. Since the inserts of a bus run in the order of the slots, the order of a
+  compressor and an equalizer matters: a compressor before a boost of 12 dB hears the signal
+  without it.
 - **Changes.** A change of the parameters is smoothed by the kind. A change of kind, bus or index
   blends the effect out of its bus over 50 ms, so the bus passes its dry signal, applies the new
   place on clear memory and blends it into the new one over 50 ms (`BOX_AUDIO_EFFECT_FADE`,
@@ -591,8 +603,8 @@ its kind.
 
 The tests are the `Effect` suite of `test/cpu/audio` (several reverbs at once, an empty slot,
 the fades of a removal, a move and a disabled effect, the pool of 64, a channel without effects,
-an entity in two slots), the `Equalizer` and `EffectFilter` suites and the `effects` and
-`eq_filter` cases of `NoAlloc`.
+an entity in two slots), the `Equalizer`, `EffectFilter` and `Dynamics` suites and the
+`effects`, `eq_filter` and `dynamics` cases of `NoAlloc`.
 
 ## Reverb
 
@@ -744,6 +756,89 @@ renders: the lowpass and the highpass at both slopes at their cutoff and an octa
 bandpass, the depth of the notch, stability at extreme values and at Nyquist, a step of the
 cutoff, a sweep every frame and a change of kind without a click, the mix, render sizes and the
 component in a world; and the `eq_filter` cases of `NoAlloc` and `Script`.
+
+## Compressor
+
+`src/audio/core/dynamics.c` holds the dynamics kinds of effect. The compressor,
+`BOX_AUDIO_EFFECT_COMPRESSOR`, is feed-forward and stereo linked: one gain for both channels.
+Its parameters are a `box_audio_compressor_params_t`; the component is `Compressor`.
+
+- **Detector.** It reads the peak of the louder channel, held over the current and the last
+  window of 5 ms (`BOX_AUDIO_DYNAMICS_WINDOW`), so a sine of 100 Hz or more reads its peak
+  without ripple; a drop of the input reaches the detector 5 to 10 ms later. Silence reads -120
+  dB (`BOX_AUDIO_DYNAMICS_FLOOR`).
+- **Ballistics.** The detected level is smoothed in dB: it moves 63% of the way up in `attack`
+  seconds and 63% of the way down in `release` seconds, exponentially.
+- **Gain computer.** Over the threshold `T` by `x` dB the level is reduced to `T + x / ratio`;
+  with a `knee` of `W` dB the curve bends smoothly from `T - W/2` to `T + W/2` (a quadratic,
+  `(1/ratio - 1) (x + W/2)^2 / 2W`), a hard knee at 0. A -10 dBFS sine at a threshold of -20,
+  ratio 4 and no knee comes out at -17.5 dB. Then `makeup` dB are added and the output is
+  `mix` of the compressed signal and `1 - mix` of the input, for parallel compression.
+- **Ranges.** `threshold` -80..0 dB, `ratio` 1..20, `attack` 0.0001..1 s, `release` 0.001..5 s,
+  `knee` 0..24 dB, `makeup` 0..24 dB and `mix` 0..1, a NaN to the low end. The defaults of the
+  component are -18 dB, 4, 0.01, 0.15, 6 dB, 0 and 1.
+- **Changes.** The threshold, ratio, knee, makeup and mix ramp over 20 ms
+  (`BOX_AUDIO_COMPRESSOR_RAMP`); the attack and release apply at once.
+- **Sidechain.** With a key bus the detector reads the output of that bus in the same block,
+  after its inserts, volume and pan, instead of the input of the compressor. The key bus must
+  run first: the core keys on the own input when the key comes after the bus of the compressor
+  in the order, is the bus itself or is not in the order, as a deleted bus is not. The module
+  adds an edge from the key to the compressed channel when it compiles the order, so the key
+  runs first (see [Mixer channels](#mixer-channels)).
+- **Reduction.** It reports its largest gain reduction in each block, without the makeup,
+  through the meters of the effects, so an `AudioMeter` on its entity reads it.
+- **Cost.** A logarithm and a power of 2 of a few multiplies each per frame, for both channels
+  together. It has no tail and needs no memory.
+
+Ducking: the music group ducks under the SFX bus, so an explosion pushes the music down by up
+to about 15 dB and the music comes back over 300 ms after it:
+
+```
+sfx { AudioBus: {output: master, kind: AudioChannelSfx} }
+music {
+  AudioBus: {output: master, effects: [music_duck]}
+}
+music_duck {
+  Compressor: {threshold: -30, ratio: 8, attack: 0.005, release: 0.3, sidechain: sfx}
+  AudioMeter: {}
+}
+```
+
+`music_duck` is an entity of its own, so its `AudioMeter` reads the reduction of the
+compressor (`reduction`, in dB) for a ducking UI, while an `AudioMeter` on `music` reads its
+levels.
+
+## Gate
+
+The gate, `BOX_AUDIO_EFFECT_GATE` in `src/audio/core/dynamics.c`, silences a channel under its
+threshold, such as the noise of a dialog bus between lines. Its parameters are a
+`box_audio_gate_params_t`; the component is `Gate`.
+
+- **Open and closed.** It reads the peak of the louder channel with the detector of the
+  compressor. It opens when the peak reaches `threshold`, and stays open while the peak stays
+  over the threshold less 4 dB (`BOX_AUDIO_GATE_HYSTERESIS`) and for `hold` seconds after, so
+  a signal that wanders around its threshold does not open and close it over and over. Then it
+  closes.
+- **Gain.** Its linear gain moves to 1 63% of the way in `attack` seconds when it opens, and to
+  `range` dB 63% of the way in `release` seconds when it closes; a range of 0 never reduces.
+- **Ranges.** `threshold` -100..0 dB, `attack` 0.0001..1 s, `hold` 0..5 s, `release`
+  0.001..5 s and `range` -100..0 dB, a NaN to the low end. The defaults of the component are
+  -50 dB, 0.001, 0.05, 0.1 and -80 dB.
+- **Reduction.** It reports its largest gain reduction in each block, like the compressor.
+- **Cost.** A comparison and a multiply per frame, no logarithm. It has no tail and needs no
+  memory.
+
+```
+dialog { AudioBus: {output: master, effects: [dialog_gate]} }
+dialog_gate { Gate: {threshold: -45, hold: 0.08} }
+```
+
+The tests are the `Dynamics` suite of `test/cpu/audio`: the static curve, the knee, the attack
+and release times, a key burst that ducks a music bus and its release, a key after the bus and
+a key that left the order, the gate closing after its hold and release and opening on its
+attack, a signal at the threshold of the gate without chatter, the reduction, the order of a
+compressor and an equalizer in the slots, render sizes, the components, ducking in a world, a
+sidechain cycle and `test/assets/audio/dynamics.flecs`; and the `dynamics` case of `NoAlloc`.
 
 ## Synth
 
@@ -1780,7 +1875,7 @@ compiles, on every build of box. For a target other than Emscripten the script d
 clang --target=wasm32-unknown-unknown -O2 -msimd128 -std=c11 -ffreestanding -nostdlib \
     -DBOX_AUDIO_CORE_WASM -Wl,--no-entry -Wl,-z,stack-size=65536 \
     -Wl,--initial-memory=1048576 -Wl,--max-memory=268435456 -Wl,--strip-all \
-    -Wl,--export=box_audio_core_wasm_init ... command.c core.c effect.c eq.c filter.c reverb.c source.c synth.c synth_patch.c wasm.c \
+    -Wl,--export=box_audio_core_wasm_init ... command.c core.c dynamics.c effect.c eq.c filter.c reverb.c source.c synth.c synth_patch.c wasm.c \
     -o box_audio_core.wasm
 ```
 
@@ -1901,6 +1996,8 @@ frame, the same on every platform.
 | `Reverb` | An effect, a reverb in the insert slot of a bus that names its entity: `decay` (1.5 s), `damping` (0.5), `predelay` (0.02 s), `size` (0.5), `mix` (1) |
 | `Equalizer` | An effect, an equalizer in the insert slot of a bus that names its entity: `bands`, 4 `AudioEqBand` of `kind` (`AudioEqOff`, `AudioEqPeak`, `AudioEqLowShelf`, `AudioEqHighShelf`, `AudioEqLowCut`, `AudioEqHighCut`; off), `frequency` (100, 400, 2000 and 8000 Hz; 10 Hz..0.49 of the rate), `gain` (0 dB, -24..24) and `q` (0.7071, 0.1..18); see [Equalizer](#equalizer) |
 | `AudioFilter` | An effect, a filter in the insert slot of a bus that names its entity: `kind` (`SynthLowPass`, `SynthHighPass`, `SynthBandPass`, `SynthNotch`), `cutoff` (1000 Hz, 10 Hz..0.49 of the rate), `resonance` (0, 0..1), `slope` (`SynthSlope12`, `SynthSlope24`) and `mix` (1); see [Filter effect](#filter-effect) |
+| `Compressor` | An effect, a compressor in the insert slot of a bus that names its entity: `threshold` (-18 dB, -80..0), `ratio` (4, 1..20), `attack` (0.01 s), `release` (0.15 s), `knee` (6 dB, 0..24), `makeup` (0 dB, 0..24), `mix` (1) and `sidechain` (0 for its own input, or the channel it ducks under); see [Compressor](#compressor) |
+| `Gate` | An effect, a gate in the insert slot of a bus that names its entity: `threshold` (-50 dB, -100..0), `attack` (0.001 s), `hold` (0.05 s, 0..5), `release` (0.1 s) and `range` (-80 dB, -100..0, the gain when closed); see [Gate](#gate) |
 | `AudioOutput` | The bus a source, or a sound by default, plays on |
 | `AudioSource` | A sound that plays while the entity exists: `sound`, `volume` (1), `pitch` (1), `loop`, `playing` (true) |
 | `AudioStream` | Music: an Ogg Vorbis file (`path`) that streams, `volume` (1), `loop` (true), `playing` (true), see [Music](#music) |
@@ -2008,8 +2105,8 @@ pad {
 A width of 1 and unused sends add no work per frame, and a world without a solo pays one check
 of a mask.
 
-**Effects.** An effect is an entity with an effect component: `Reverb`, `Equalizer` or
-`AudioFilter` (the first of them in that order when it has several). It runs in an insert slot
+**Effects.** An effect is an entity with an effect component: `Reverb`, `Equalizer`,
+`AudioFilter`, `Compressor` or `Gate` (the first of them in that order when it has several). It runs in an insert slot
 of a channel that names it in `effects`, an array of 4 entities that run in order; an empty slot
 (0) is skipped. An effect that no slot names does nothing. The channel may name
 itself, which is the usual reverb return, and unloading the scene deletes it, which fades its
@@ -2039,7 +2136,18 @@ effects too, which run before the limiter.
   effect (`box.audio: more than 64 effects, '...' does nothing`), which does nothing until a slot
   of the pool is free.
 
-Reverb zones, rooms from geometry, a compressor and a delay are later work.
+- A `Compressor` with a `sidechain` keys on the output of that channel. When the module compiles
+  the order it adds an edge from the sidechain to the compressed channel, so the sidechain runs
+  first even where its depth alone would put it later. A sidechain that would form a cycle, such
+  as a channel that outputs into its own sidechain, logs one error that names the compressor,
+  its channel and the sidechain (`box.audio: the compressor '...' on '...' has the sidechain
+  '...', which runs after '...', a cycle: '...' keys on its own input`); that sidechain is
+  ignored and the compressor keys on its own input. So does a compressor whose sidechain is the
+  master, a deleted channel or an entity that is no channel, the latter two without an error.
+  A change of the sidechain recompiles the order. Without a `Compressor` the module pays one
+  count of its component per frame.
+
+Reverb zones, rooms from geometry and a delay are later work.
 
 #### Meters
 
@@ -2064,8 +2172,8 @@ box { audio { master { AudioMeter: {} } } }
   of its `AudioBus`) and **before the limiter**, so it reads over 1 when the mix is too loud,
   while the output stays under 0.95.
 - An effect entity with `AudioMeter` gets `reduction`, the largest gain reduction in dB since
-  the last frame, of the dynamics effects; the reverb reads 0. A channel that names itself as an
-  effect gets both.
+  the last frame, of the dynamics effects (`Compressor` and `Gate`); the other kinds read 0. A
+  channel that names itself as an effect gets both.
 - Metering is opt-in: the module reads the meters of the transport every frame, but writes the
   component only on the entities that have it, so a scene that never looks pays no component
   writes and no change detection fires. `audio` prints the levels of every channel anyway.
@@ -2650,7 +2758,9 @@ volume, pan and width of its `AudioBus` when it has one) and the buses in proces
 with its kind, volume, pan, width, `solo`, `muted`, its output, its sends (`send pre` for a
 pre-fader one) and its insert slots, each as `insert <index> <entity>:` with its kind and values
 (`reverb decay 2.40 damping 0.40 ...`, `eq [low cut 120 Hz 0.0 dB q 0.71] [peak 3000 Hz 3.0 dB
-q 1.20] [off] [off]`, `filter lowpass 24 dB cutoff 400 resonance 0.30 mix 1.00`) and whether it
+q 1.20] [off] [off]`, `filter lowpass 24 dB cutoff 400 resonance 0.30 mix 1.00`,
+`compressor threshold -30.0 dB ratio 8.0 ... sidechain sfx`, `gate threshold -45.0 dB ...`, the
+two dynamics kinds with `reduction <dB>` of the last frame) and whether it
 runs: `(runs)`, `(bypassed)` for a Disabled effect, or `(does not run: ...)` with
 the reason (no output, in another slot, every effect of the pool taken, waits for its memory);
 the master lists its own after its `AudioBus`. Each channel in the order ends with its levels of

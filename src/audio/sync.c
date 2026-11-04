@@ -514,6 +514,7 @@ static void box_audio_cycle_error(
  *
  * @param out Output of each bus index
  * @param sends BOX_AUDIO_SENDS sends of each bus index in a row, BOX_AUDIO_BUS_NONE for none
+ * @param keyed Buses each bus index is the sidechain of, a bit each, NULL for none
  * @param color 0 unseen, 1 on the walk, 2 done
  * @param depth Receives the depth of each finished bus
  * @param stack The walk
@@ -525,6 +526,7 @@ static void box_audio_cycle_error(
 static bool box_audio_walk(
     const uint8_t *out,
     const uint8_t *sends,
+    const uint64_t *keyed,
     uint8_t *color,
     int32_t *depth,
     uint8_t *stack,
@@ -532,16 +534,23 @@ static bool box_audio_walk(
     uint8_t bus,
     int32_t *cycle)
 {
-    uint8_t next[1 + BOX_AUDIO_SENDS] = { out[bus] };
-    int32_t i, k, d = 0;
+    uint8_t next[1 + BOX_AUDIO_SENDS + BOX_AUDIO_BUS_MAX] = { out[bus] };
+    int32_t i, k, d = 0, count = 1 + BOX_AUDIO_SENDS;
+    uint64_t mask = keyed ? keyed[bus] : 0;
     bool result = false;
     for (i = 0; i < BOX_AUDIO_SENDS; i ++) {
         next[1 + i] = sends[bus * BOX_AUDIO_SENDS + i];
     }
 
+    for (i = 0; mask && i < BOX_AUDIO_BUS_MAX; i ++) {
+        if (mask & ((uint64_t)1 << i)) {
+            next[count ++] = (uint8_t)i;
+        }
+    }
+
     color[bus] = 1;
     stack[(*top) ++] = bus;
-    for (i = 0; i < 1 + BOX_AUDIO_SENDS && !result; i ++) {
+    for (i = 0; i < count && !result; i ++) {
         uint8_t n = next[i];
         if (n == 0 || n == BOX_AUDIO_BUS_NONE) {
             d = d > 1 ? d : 1;
@@ -558,7 +567,8 @@ static bool box_audio_walk(
             result = true;
         } else {
             if (!color[n]) {
-                result = box_audio_walk(out, sends, color, depth, stack, top, n, cycle);
+                result = box_audio_walk(out, sends, keyed, color, depth, stack, top, n,
+                    cycle);
             }
 
             d = depth[n] + 1 > d ? depth[n] + 1 : d;
@@ -588,6 +598,7 @@ static void box_audio_compile(
     uint8_t color[BOX_AUDIO_BUS_MAX] = {0}, pre[BOX_AUDIO_BUS_MAX] = {0};
     uint8_t stack[BOX_AUDIO_BUS_MAX], order[BOX_AUDIO_BUS_MAX];
     int32_t depth[BOX_AUDIO_BUS_MAX] = {0}, count = 0, top = 0, cycle = -1, i, j, k;
+    uint64_t keyed[BOX_AUDIO_BUS_MAX];
     box_audio_route_t routes[BOX_AUDIO_BUS_MAX];
     for (i = 0; i < BOX_AUDIO_BUS_MAX; i ++) {
         ecs_entity_t e = state->bus_entity[i];
@@ -603,14 +614,30 @@ static void box_audio_compile(
         }
     }
 
+    box_audio_sidechains_compile(world, state, keyed);
     for (i = 1; i < BOX_AUDIO_BUS_MAX; i ++) {
         if (state->bus_entity[i] && !color[i] &&
-            box_audio_walk(out, state->route_sends[0], color, depth, stack, &top, (uint8_t)i,
-                &cycle))
+            box_audio_walk(out, state->route_sends[0], NULL, color, depth, stack, &top,
+                (uint8_t)i, &cycle))
         {
             box_audio_cycle_error(world, state, stack, top, cycle);
             state->stats.cycles ++;
             goto done;
+        }
+    }
+
+    if (state->sidechain_count) {
+        for (i = 0; i < BOX_AUDIO_BUS_MAX; i ++) {
+            color[i] = 0;
+            depth[i] = 0;
+        }
+
+        for (i = 1; i < BOX_AUDIO_BUS_MAX; i ++) {
+            top = 0;
+            if (state->bus_entity[i] && !color[i]) {
+                box_audio_walk(out, state->route_sends[0], keyed, color, depth, stack, &top,
+                    (uint8_t)i, &cycle);
+            }
         }
     }
 
@@ -1575,6 +1602,7 @@ static void BoxAudioSync(
 
     box_audio_master_unown(world, state);
     box_audio_buses(world, state);
+    box_audio_sidechains_check(world, state);
     if (state->order_dirty) {
         box_audio_compile(world, state);
     }

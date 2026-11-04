@@ -171,6 +171,48 @@ static void box_audio_filter_ctor(
     }
 }
 
+/** Construct Compressor values: -18 dB at 4:1 with a knee of 6 dB, an attack of 10 ms and a
+ * release of 150 ms, fully wet, keyed on its own input.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_compressor_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Compressor *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Compressor){ .threshold = -18.0f, .ratio = 4.0f, .attack = 0.01f,
+            .release = 0.15f, .knee = 6.0f, .makeup = 0, .mix = 1.0f, .sidechain = 0 };
+    }
+}
+
+/** Construct Gate values: -50 dB, an attack of 1 ms, a hold of 50 ms, a release of 100 ms
+ * and a range of -80 dB.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_gate_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Gate *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Gate){ .threshold = -50.0f, .attack = 0.001f, .hold = 0.05f,
+            .release = 0.1f, .range = -80.0f };
+    }
+}
+
 /** Construct SynthOscillator values: a sine at 440 Hz at unity level, without a sweep, heard,
  * with an index of 1 for when it modulates and a pulse width of 0.5 for when it is a square.
  *
@@ -993,6 +1035,10 @@ void BoxAudioImport(
     ecs_set_hooks(world, SynthFilter, { .ctor = box_audio_synth_filter_ctor });
     ECS_META_COMPONENT(world, AudioFilter);
     ecs_set_hooks(world, AudioFilter, { .ctor = box_audio_filter_ctor });
+    ECS_META_COMPONENT(world, Compressor);
+    ecs_set_hooks(world, Compressor, { .ctor = box_audio_compressor_ctor });
+    ECS_META_COMPONENT(world, Gate);
+    ecs_set_hooks(world, Gate, { .ctor = box_audio_gate_ctor });
     ECS_META_COMPONENT(world, SynthFilterEnvelope);
     ECS_META_COMPONENT(world, SynthGlide);
     ECS_META_COMPONENT(world, SynthLfoWave);
@@ -1042,6 +1088,8 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(Reverb), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(Equalizer), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(AudioFilter), EcsWith, ecs_id(AudioEffectState));
+    ecs_add_pair(world, ecs_id(Compressor), EcsWith, ecs_id(AudioEffectState));
+    ecs_add_pair(world, ecs_id(Gate), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(SoundFile), EcsWith, ecs_id(AudioSample));
     ecs_add_pair(world, ecs_id(AudioStream), EcsWith, ecs_id(AudioMusic));
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSoundId));
@@ -1058,6 +1106,7 @@ void BoxAudioImport(
     box_audio_module_t *state = ecs_os_calloc_t(box_audio_module_t);
     state->next_voice = 1;
     state->master = master;
+    ecs_os_memset(state->keys, BOX_AUDIO_BUS_NONE, ECS_SIZEOF(state->keys));
     ecs_map_init(&state->voices, NULL);
     ecs_vec_init_t(NULL, &state->oneshots, box_audio_oneshot_t, 0);
     ecs_vec_init_t(NULL, &state->plays, box_audio_play_t, 0);

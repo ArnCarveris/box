@@ -177,11 +177,51 @@ typedef struct box_audio_filter_t {
     box_audio_ramp_t fade;    /**< Fade of the wet signal around a swap */
 } box_audio_filter_t;
 
+/** The peak detector of the dynamics: the largest absolute sample of the louder channel over
+ * the current window of BOX_AUDIO_DYNAMICS_WINDOW and the one before */
+typedef struct box_audio_peak_t {
+    float current;            /**< Largest sample of the current window */
+    float last;               /**< Largest sample of the window before */
+    int32_t left;             /**< Frames left of the current window */
+    int32_t frames;           /**< Frames of a window */
+} box_audio_peak_t;
+
+/** A compressor: the peak detector, its level smoothed in dB and a soft knee gain computer */
+typedef struct box_audio_compressor_t {
+    box_audio_compressor_params_t target; /**< Parameters of the last command, clamped */
+    box_audio_peak_t peak;    /**< Detector */
+    float level;              /**< Detected level in dB, smoothed by attack and release */
+    float attack;             /**< Share of the level that stays per frame on the way up */
+    float release;            /**< Share of the level that stays per frame on the way down */
+    box_audio_ramp_t threshold; /**< Threshold in dB */
+    box_audio_ramp_t knee;    /**< Knee in dB */
+    box_audio_ramp_t slope;   /**< 1 / ratio - 1, the gain per dB over the threshold */
+    box_audio_ramp_t makeup;  /**< Makeup in dB */
+    box_audio_ramp_t mix;     /**< Wet level */
+} box_audio_compressor_t;
+
+/** A gate: the peak detector against two thresholds and a gain that moves to open or closed */
+typedef struct box_audio_gate_t {
+    box_audio_gate_params_t target; /**< Parameters of the last command, clamped */
+    box_audio_peak_t peak;    /**< Detector */
+    float open_level;         /**< Linear level at which it opens */
+    float close_level;        /**< Linear level under which an open gate starts its hold */
+    float floor;              /**< Linear gain when closed, the range */
+    float attack;             /**< Share of the distance to open that stays per frame */
+    float release;            /**< Share of the distance to closed that stays per frame */
+    int32_t hold_frames;      /**< Frames of the hold */
+    int32_t hold;             /**< Frames left of the hold of an open gate under close_level */
+    bool open;                /**< Whether it is open */
+    float gain;               /**< Linear gain that runs */
+} box_audio_gate_t;
+
 /** State of the kinds of effects */
 typedef union box_audio_effect_data_t {
     box_audio_reverb_t reverb;  /**< BOX_AUDIO_EFFECT_REVERB */
     box_audio_eq_t eq;          /**< BOX_AUDIO_EFFECT_EQ */
     box_audio_filter_t filter;  /**< BOX_AUDIO_EFFECT_FILTER */
+    box_audio_compressor_t compressor; /**< BOX_AUDIO_EFFECT_COMPRESSOR */
+    box_audio_gate_t gate;      /**< BOX_AUDIO_EFFECT_GATE */
 } box_audio_effect_data_t;
 
 /** An effect instance of the pool of the core: a kind in an insert slot of a bus, on the
@@ -586,6 +626,7 @@ struct box_audio_core_t {
     box_audio_route_t order[BOX_AUDIO_BUS_MAX];     /**< Processing order, the master last */
     int32_t order_count;  /**< Routes in order */
     bool bus_active[BOX_AUDIO_BUS_MAX];             /**< Whether a bus is in the order */
+    uint8_t bus_position[BOX_AUDIO_BUS_MAX];        /**< Position of each bus in the order */
     box_audio_sound_t sounds[BOX_AUDIO_SOUND_MAX];  /**< Sounds by id */
     box_audio_event_t events[BOX_AUDIO_EVENT_MAX];  /**< Ring of events */
     int32_t event_head;   /**< Index of the oldest event */
@@ -799,6 +840,52 @@ bool box_audio_filter_render(
 
 /** The filter kind: a block skipped while idle, which it never is */
 void box_audio_filter_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The compressor kind, in dynamics.c: start at the params of fx */
+void box_audio_compressor_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The compressor kind: new parameters while it runs */
+void box_audio_compressor_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The compressor kind: process a block, keyed on the output of its key bus when that came
+ * before its bus in the order */
+bool box_audio_compressor_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The gate kind, in dynamics.c: start at the params of fx */
+void box_audio_gate_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The gate kind: new parameters while it runs */
+void box_audio_gate_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The gate kind: process a block */
+bool box_audio_gate_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The compressor and the gate: a block skipped while idle, which they never are */
+void box_audio_dynamics_rest(
     box_audio_core_t *core,
     box_audio_effect_t *fx);
 
