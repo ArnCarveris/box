@@ -225,8 +225,8 @@ the timeline instead. `test/assets/audio/song.flecs` builds a short song step by
 A minor at 120 bpm, Am Am Dm Em, on two synths, a sampled kick and a recorded shaker, mixed
 through a group with a reverb and a delay, and ducked under the game's sounds. The `Song` suite
 of `test/cpu/audio` plays 8 bars of it headless and checks that every channel reads signal on its
-meter and that two runs capture bit identical audio. `kick.wav` and `shaker.wav` next to it are
-written by `make_sounds.py`.
+meter, and that two runs capture bit identical audio of the first 4 bars. `kick.wav` and
+`shaker.wav` next to it are written by `make_sounds.py`.
 
 **1. The timeline.** The `Transport` singleton holds the tempo, the time signature (4/4 by
 default) and the loop, in beats, a beat being a quarter note: 4 bars are 16 beats.

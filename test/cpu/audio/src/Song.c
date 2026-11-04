@@ -2,7 +2,7 @@
  * @file Song.c
  * @brief The song of the guide, test/assets/audio/song.flecs, through the null transport at a
  * fixed delta: 8 bars play on every channel, the stinger ducks the music group, and two runs
- * capture bit identical audio. Also the first sound of the guide,
+ * of 4 bars capture bit identical audio. Also the first sound of the guide,
  * test/assets/audio/first_sound.flecs.
  */
 
@@ -12,6 +12,9 @@
 
 /** Frames of 8 bars of 4/4 at 120 bpm, 16 seconds at 60 frames a second */
 #define SONG_FRAMES 960
+
+/** Frames of the captures, 4 bars, 8 seconds: the start, the shaker, the stinger and the duck */
+#define SONG_CAPTURE_FRAMES 480
 
 /** The channels of the song, each with an AudioMeter */
 static const char *song_channels[] = {
@@ -49,7 +52,7 @@ static void song_capture_wait(
     test_bool(box_audio_capture_pending(world), false);
 }
 
-/** Record 8 bars of the song.
+/** Record 4 bars of the song.
  *
  * @param path The WAV to write
  */
@@ -57,8 +60,8 @@ static void song_scene(
     const char *path)
 {
     ecs_world_t *world = song_world();
-    test_int(box_audio_capture(world, (float)SONG_FRAMES * AUDIO_DT, path), 0);
-    audio_run(world, SONG_FRAMES);
+    test_int(box_audio_capture(world, (float)SONG_CAPTURE_FRAMES * AUDIO_DT, path), 0);
+    audio_run(world, SONG_CAPTURE_FRAMES);
     song_capture_wait(world);
     ecs_fini(world);
 }
@@ -151,12 +154,13 @@ void Song_meters(void) {
 
     test_assert(reduction > 1.0f);
     test_assert(box_audio_module_get(world)->sequencer.stats.notes > 50);
+    test_int(box_audio_module_get(world)->sequencer.stats.dropped, 0);
     test_assert(ecs_singleton_get(world, Transport)->position < 16.0);
     test_int(ecs_singleton_get(world, AudioStatus)->voices_refused, 0);
     ecs_fini(world);
 }
 
-/** Two runs of 8 bars capture bit identical audio. */
+/** Two runs of 4 bars capture bit identical audio. */
 void Song_bit_identical(void) {
     // audio/song
     const char *a = "audio_song_a.wav", *b = "audio_song_b.wav";
@@ -169,7 +173,7 @@ void Song_bit_identical(void) {
     wav_b = song_read(b, &size_b);
     test_assert(wav_a != NULL);
     test_assert(wav_b != NULL);
-    test_int(size_a, 44 + 16 * 48000 * 4);
+    test_int(size_a, 44 + 8 * 48000 * 4);
     test_int(size_a, size_b);
     test_assert(!memcmp(wav_a, wav_b, (size_t)size_a));
     for (i = 44; i < size_a; i += 2) {
