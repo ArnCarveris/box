@@ -44,8 +44,6 @@ typedef struct box_fps_t {
     ecs_entity_t bars[BOX_FPS_BARS];    /**< Bars of the chart, oldest first */
     double bar_ms[BOX_FPS_BARS];        /**< Frame time last written to each bar */
     ecs_entity_t bar_mut;       /**< Mut variables of the bar template, BOX_FPS_BAR_MUT */
-    ecs_size_t bar_size;        /**< Size of bar_mut */
-    int32_t bar_offset;         /**< Offset of ms in bar_mut */
     bool bars_ready;            /**< bars, bar_mut and bar_ms are of the current content */
 } box_fps_t;
 
@@ -91,6 +89,9 @@ static void box_fps_summary_sync(
 
 /** Find the bars of the chart and the mut variables of the bar template that hold their ms.
  *
+ * The mut variables must be ms alone, an f64, since C sets them as a whole: a mut has an
+ * on_replace hook, so it cannot be changed in place.
+ *
  * @param world The world
  * @param fps The panel state
  * @return Whether the script created the bars, which have the mut variables
@@ -102,22 +103,14 @@ static bool box_fps_bars_resolve(
     ecs_entity_t mut = ecs_lookup(world, BOX_FPS_BAR_MUT);
     ecs_entity_t chart = ecs_lookup(world, BOX_FPS_CHART);
     const EcsStruct *st = mut ? ecs_get(world, mut, EcsStruct) : NULL;
-    const ecs_type_info_t *ti = mut ? ecs_get_type_info(world, mut) : NULL;
+    const ecs_member_t *member = st && ecs_vec_count(&st->members) == 1 ?
+        ecs_vec_first_t(&st->members, ecs_member_t) : NULL;
     bool result = false;
     char name[32];
-    int32_t i, offset = -1;
-    if (!st || !ti || !chart) {
-        goto done;
-    }
-
-    const ecs_member_t *members = ecs_vec_first_t(&st->members, ecs_member_t);
-    for (i = 0; i < ecs_vec_count(&st->members); i ++) {
-        if (!ecs_os_strcmp(members[i].name, "ms") && members[i].type == ecs_id(ecs_f64_t)) {
-            offset = members[i].offset;
-        }
-    }
-
-    if (offset < 0) {
+    int32_t i;
+    if (!member || !chart || ecs_os_strcmp(member->name, "ms") ||
+        member->type != ecs_id(ecs_f64_t))
+    {
         goto done;
     }
 
@@ -130,8 +123,6 @@ static bool box_fps_bars_resolve(
     }
 
     fps->bar_mut = mut;
-    fps->bar_size = ti->size;
-    fps->bar_offset = offset;
     result = true;
 
 done:
@@ -177,10 +168,7 @@ static void box_fps_bars_sync(
     for (i = 0; i < BOX_FPS_BARS; i ++) {
         double ms = samples ? box_frame_sample(samples, BOX_FPS_BARS - 1 - i) : 0;
         if (all || ms != fps->bar_ms[i]) {
-            void *ptr = ecs_ensure_id(world, fps->bars[i], fps->bar_mut,
-                (size_t)fps->bar_size);
-            *(double*)ECS_OFFSET(ptr, fps->bar_offset) = ms;
-            ecs_modified_id(world, fps->bars[i], fps->bar_mut);
+            ecs_set_id(world, fps->bars[i], fps->bar_mut, sizeof(double), &ms);
             fps->bar_ms[i] = ms;
         }
     }

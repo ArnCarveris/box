@@ -812,7 +812,8 @@ static void fps_sample_add(
 }
 
 /* A steady sample sets the mut of no bar, a new sample the newest bar only, and when it moves
- * left the bar it left and the bar it moved to. Fixed samples and a closed panel set none. */
+ * left the bar it left and the bar it moved to. Fixed samples and a closed panel set none, and
+ * the panel evaluated again for a new theme keeps the samples of the bars. */
 void FpsPanel_bars_sample_when_changed(void) {
     // fps/panel
     ecs_world_t *world = fps_world();
@@ -857,6 +858,15 @@ void FpsPanel_bars_sample_when_changed(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(fired, 0);
+
+    UiTheme *t = ecs_get_mut(world, ecs_lookup(world, "box.ui.theme"), UiTheme);
+    t->padding += 1;
+    ecs_modified(world, ecs_lookup(world, "box.ui.theme"), UiTheme);
+    ecs_progress(world, 0);
+    test_flt(ecs_get(world, ecs_lookup(world, BOX_FPS_PANEL), Layout)->padding.left, t->padding);
+    test_flt(fps_bar_ms(world, mut, BOX_FPS_BARS - 3), 45.0);
+    test_flt(fps_bar_ms(world, mut, BOX_FPS_BARS - 1), 10.0);
+    fps_check_bar(world, BOX_FPS_BARS - 3, 45.0, BOX_FPS_RED);
 
     fps_open(world, false);
     fired = 0;

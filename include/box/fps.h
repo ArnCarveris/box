@@ -68,7 +68,7 @@ extern "C" {
 /** Path of the template of the script that every bar of the chart instantiates */
 #define BOX_FPS_BAR "box.fps.FpsBar"
 
-/** Path of the mut variables of BOX_FPS_BAR. Its member ms, an f64, is the frame time in
+/** Path of the mut variables of BOX_FPS_BAR. Its only member ms, an f64, is the frame time in
  * milliseconds of the sample the bar shows, 0 without a sample, from which the script draws it.
  *
  * box.fps writes it while the panel is open, only to the bars whose sample changed, so a new
