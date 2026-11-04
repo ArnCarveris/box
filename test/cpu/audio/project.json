@@ -308,7 +308,16 @@
                     "script_legato",
                     "script_legato_source",
                     "docs_glide_example",
-                    "script_modulators"
+                    "script_modulators",
+                    "pluck_pitch",
+                    "pluck_decay",
+                    "pluck_brightness",
+                    "pluck_seed",
+                    "pluck_ends",
+                    "pluck_glide",
+                    "pluck_pool",
+                    "script_pluck",
+                    "docs_pluck_examples"
                 ]
             },
             {

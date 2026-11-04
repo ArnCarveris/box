@@ -1,0 +1,45 @@
+// The pluck examples of docs/audio.md, kept the same, and the harp of the Mossvale score: the
+// Synth suite of test/cpu/audio checks that they parse, compile without errors, play and end.
+using box.audio
+
+music { AudioBus: {volume: 1} }
+
+// A guitar: a steel string on G3 plucked with a pick, through the lowpass of its body, 3 s
+prefab Guitar {
+  AudioOutput: {bus: music}
+  SynthSound: {level_variance: 0.05}
+  SynthFilter: {kind: SynthLowPass, cutoff: 4500}
+  string {
+    SynthOscillator: {wave: SynthPluck, frequency: 196, level: 0.6}
+    SynthString: {decay: 3, brightness: 0.6, hardness: 0.9}
+  }
+}
+
+// A koto: a bright silk string on D4 plucked with a hard pick, pressed up a semitone after
+// the pluck, and a quieter string an octave up that dies sooner, 1.5 s
+prefab Koto {
+  AudioOutput: {bus: music}
+  SynthSound: {}
+  string {
+    SynthOscillator: {wave: SynthPluck, frequency: 293.66, frequency_end: 311.13, sweep: 0.25, level: 0.5}
+    SynthString: {decay: 1.5, brightness: 0.8, hardness: 1}
+  }
+  octave {
+    SynthOscillator: {wave: SynthPluck, frequency: 587.33, frequency_end: 622.25, sweep: 0.25, level: 0.12}
+    SynthString: {decay: 0.6, brightness: 0.7, hardness: 1}
+  }
+}
+
+// The harp of the Mossvale score (etc/scenes/mossvale/music.flecs): a gut string plucked with
+// a finger, which rings out on its own, over a soft sine for the body of the soundboard
+template Harp {
+  prop f: f32 = 220
+  AudioOutput: {bus: music}
+  SynthSound: {level_variance: 0.1}
+  SynthFilter: {kind: SynthLowPass, cutoff: 3500, resonance: 0.05}
+  pluck { SynthOscillator: {wave: SynthPluck, frequency: f, level: 0.45}; SynthString: {decay: 2.2, brightness: 0.35, hardness: 0.45} }
+  body { SynthOscillator: {wave: SynthSine, frequency: f, level: 0.12}; SynthEnvelope: {attack: 0.004, decay: 1.2, curve: 4.5} }
+}
+
+Harp hp_c3(f: 130.81)
+Harp hp_a4(f: 440)

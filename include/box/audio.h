@@ -33,6 +33,10 @@ extern "C" {
 /** Seconds a synth sound plays when it would never end, a layer without any envelope */
 #define BOX_AUDIO_SYNTH_ENDLESS (10.0f)
 
+/** Lowest frequency of a SynthPluck layer in Hz; a lower one, its frequency_end included, is
+ * clamped with one warning */
+#define BOX_AUDIO_SYNTH_PLUCK_LOWEST (40.0f)
+
 /** What the audio output does */
 ECS_ENUM(AudioState, {
     AudioOff = 0,               /**< No output: a world that runs no app, or --no-audio */
@@ -176,7 +180,10 @@ ECS_ENUM(SynthWave, {
     SynthSaw,              /**< Saw, band limited */
     SynthSquare,           /**< Square, band limited */
     SynthTriangle,         /**< Triangle */
-    SynthNoise             /**< White noise, seeded per play from SynthSound.seed */
+    SynthNoise,            /**< White noise, seeded per play from SynthSound.seed */
+    SynthPluck             /**< A plucked string (Karplus-Strong), set by the SynthString of
+                            *   the layer; it rings out on its own and ends the sound when it
+                            *   is silent, so it needs no envelope */
 });
 
 /** Kind of the filter of a synth sound */
@@ -207,6 +214,9 @@ ECS_ENUM(SynthModulation, {
  *
  * A layer with the modulation SynthPhase or SynthRing modulates its parent layer by its wave
  * times its own envelope, so the index follows that envelope. It is heard only when audible.
+ *
+ * A SynthPluck layer is a string, see SynthString: frequency, frequency_end, sweep and level
+ * apply to it, phase modulation and feedback do not.
  */
 ECS_STRUCT(SynthOscillator, {
     SynthWave wave;        /**< The wave, default SynthSine */
@@ -220,6 +230,21 @@ ECS_STRUCT(SynthOscillator, {
                             *   SynthRing: depth 0..1. Default 1 */
     float feedback;        /**< Radians of its own output on its phase, 0..1.5, a sawlike tone */
     bool audible;          /**< Whether a modulator is heard as well, at its level */
+});
+
+/** The string of a SynthPluck layer, on the layer: a delay line a period long, plucked with a
+ * burst of seeded noise, whose loop damps it. Without one a SynthPluck layer takes the defaults.
+ *
+ * The fundamental falls by 60 dB over decay seconds; the harmonics fall faster the darker the
+ * string. The pitch is tuned to a fraction of a frame, so it is exact at high notes too.
+ */
+ECS_STRUCT(SynthString, {
+    float decay;           /**< Seconds the fundamental takes to fall by 60 dB, 0.01..60,
+                            *   default 2 */
+    float brightness;      /**< Lowpass in the loop: 0 dark, the harmonics die fast, to 1
+                            *   bright, a metallic ring; default 0.5 */
+    float hardness;        /**< Lowpass of the noise that plucks: 0 a soft finger, 1 a hard
+                            *   pick; default 0.8 */
 });
 
 /** An envelope: from 0 to 1 over attack, to sustain over decay, hold seconds there, then to

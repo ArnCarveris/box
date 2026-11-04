@@ -210,6 +210,26 @@ typedef struct box_audio_synth_svf_t {
     float ic1, ic2;       /**< State */
 } box_audio_synth_svf_t;
 
+/** A pluck string of a synth voice: a Karplus-Strong loop of a delay line, a symmetric lowpass
+ * of one frame of delay and a first order allpass of the fraction of a frame left, with a gain
+ * that sets its decay */
+typedef struct box_audio_synth_string_t {
+    float line[BOX_AUDIO_SYNTH_STRING_FRAMES]; /**< The delay line, a ring */
+    int32_t write;        /**< Index the next frame is written to */
+    int32_t delay;        /**< Frames of the delay line in the loop, at least 2 */
+    float c;              /**< Coefficient of the allpass */
+    float gain;           /**< Gain of the loop */
+    float b0, b1;         /**< Taps of the lowpass: b0 on the outer frames, b1 on the middle */
+    float x1, x2;         /**< The last two frames out of the delay line */
+    float f1, a1;         /**< The last input and output of the allpass */
+    double inc;           /**< Turns per frame it is tuned to */
+    double decay_frames;  /**< Frames of its decay to -60 dB */
+    double period_max;    /**< Longest period in frames, at BOX_AUDIO_SYNTH_PLUCK_MIN */
+    float peak;           /**< Largest magnitude of the window that runs */
+    int32_t window;       /**< Frames left of the window, a period */
+    bool ringing;         /**< Whether it is still over the silence */
+} box_audio_synth_string_t;
+
 /** A layer of a synth voice: its layer of the patch, its oscillator and its own envelope. The
  * core holds BOX_AUDIO_SYNTH_PARTS of them for all its voices, so a voice holds only the layers
  * its patch has */
@@ -217,6 +237,7 @@ typedef struct box_audio_synth_part_t {
     box_audio_synth_layer_t layer;  /**< The layer of the patch, clamped */
     box_audio_synth_osc_t osc;      /**< The oscillator */
     box_audio_synth_env_t env;      /**< Its own envelope, when the layer has one */
+    box_audio_synth_string_t *string; /**< Its string, a BOX_AUDIO_SYNTH_PLUCK layer, or NULL */
 } box_audio_synth_part_t;
 
 /** A source that plays a synth patch, a copy of it, so it never allocates: the patch without
@@ -248,6 +269,9 @@ typedef struct box_audio_synth_source_t {
     int32_t control;      /**< Frames until the filter takes the cutoff of the envelope */
     int32_t glide_frames; /**< Frames of a glide of the patch, 0 when a pitch jumps */
     int32_t glide_left;   /**< Frames left of the glide that runs, 0 for none */
+    int32_t strings;      /**< Pluck layers, each with a string, 0 for none */
+    int32_t ringing;      /**< Strings that are still over the silence */
+    int32_t ringing_free; /**< Strings of layers without an envelope still over the silence */
 } box_audio_synth_source_t;
 
 /** State of the kinds of sources */
@@ -330,6 +354,7 @@ typedef struct box_audio_stream_t {
 typedef struct box_audio_synth_slot_t {
     box_audio_synth_patch_t patch;  /**< The patch, clamped */
     uint32_t plays;     /**< Plays so far, which seed the noise and the variances */
+    int32_t strings;    /**< Pluck layers of the patch */
     bool used;          /**< Whether a sound has the slot */
 } box_audio_synth_slot_t;
 
@@ -381,6 +406,9 @@ struct box_audio_core_t {
     box_audio_synth_part_t synth_parts[BOX_AUDIO_SYNTH_PARTS]; /**< Layers of synth voices */
     uint16_t synth_free[BOX_AUDIO_SYNTH_PARTS]; /**< Indexes of the free parts, a stack */
     int32_t synth_free_count; /**< Free parts */
+    box_audio_synth_string_t synth_strings[BOX_AUDIO_SYNTH_STRINGS]; /**< Pluck strings */
+    uint16_t string_free[BOX_AUDIO_SYNTH_STRINGS]; /**< Indexes of the free strings, a stack */
+    int32_t string_free_count; /**< Free strings */
 };
 
 /** Flush a sample: NaN, infinities, huge values and denormals become 0.
@@ -482,14 +510,14 @@ void box_audio_synth_command(
     box_audio_core_t *core,
     const box_audio_cmd_synth_t *cmd);
 
-/** Set the parts of the synth layers of a new core free.
+/** Set the parts of the synth layers and the pluck strings of a new core free.
  *
  * @param core The core, zeroed
  */
 void box_audio_synth_parts_init(
     box_audio_core_t *core);
 
-/** Whether the free parts of a core hold the layers of the patch of a synth sound.
+/** Whether the free parts and strings of a core hold the layers of the patch of a synth sound.
  *
  * @param core The core
  * @param sound Id of a ready synth sound
@@ -499,7 +527,7 @@ bool box_audio_synth_fits(
     const box_audio_core_t *core,
     uint32_t sound);
 
-/** Give the parts of a synth source back to its core.
+/** Give the parts and the strings of a synth source back to its core.
  *
  * @param core The core
  * @param src The source
@@ -509,7 +537,7 @@ void box_audio_synth_end(
     box_audio_synth_source_t *src);
 
 /** Start a synth source on the patch of a synth sound, with a part of the core for each of its
- * layers, which box_audio_synth_fits found. Takes no use of the sound: the source plays a
+ * layers and a string for each pluck layer, which box_audio_synth_fits found. Takes no use of the sound: the source plays a
  * copy of the patch.
  *
  * @param core The core

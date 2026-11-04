@@ -4,7 +4,8 @@
  * marks it for a new compile when one of its components changes.
  *
  * The layers are the root and its children with a SynthOscillator, as particle effect layers
- * are, and the children of layers with one, the modulators of their parent.
+ * are, and the children of layers with one, the modulators of their parent. A SynthPluck layer
+ * takes the values of its SynthString.
  *
  * The sync system sends the patch with a SYNTH command when it changed; the core plays every
  * voice from a copy of it, so a play allocates nothing.
@@ -14,6 +15,10 @@
 
 /** Seconds of the release of a sound that would never end, after BOX_AUDIO_SYNTH_ENDLESS */
 #define BOX_AUDIO_SYNTH_ENDLESS_RELEASE (0.01f)
+
+/** The string of a SynthPluck layer without a SynthString */
+static const SynthString box_audio_synth_string_default = {
+    .decay = 2.0f, .brightness = 0.5f, .hardness = 0.8f };
 
 /** Mark the synth sound of an entity, itself or its nearest ancestor with one, for a new
  * compile.
@@ -55,14 +60,15 @@ void box_audio_synth_init(
 {
     ecs_entity_t ids[] = {
         ecs_id(SynthSound), ecs_id(SynthOscillator), ecs_id(SynthEnvelope), ecs_id(SynthFilter),
-        ecs_id(SynthFilterEnvelope), ecs_id(SynthGlide)
+        ecs_id(SynthFilterEnvelope), ecs_id(SynthGlide), ecs_id(SynthString)
     };
     const char *names[] = {
         "AudioSynthSoundDirty", "AudioSynthOscillatorDirty", "AudioSynthEnvelopeDirty",
-        "AudioSynthFilterDirty", "AudioSynthFilterEnvelopeDirty", "AudioSynthGlideDirty"
+        "AudioSynthFilterDirty", "AudioSynthFilterEnvelopeDirty", "AudioSynthGlideDirty",
+        "AudioSynthStringDirty"
     };
     int32_t i;
-    for (i = 0; i < 6; i ++) {
+    for (i = 0; i < 7; i ++) {
         ecs_observer(world, {
             .entity = ecs_entity(world, { .name = names[i] }),
             .query.flags = EcsQueryMatchPrefab,
@@ -107,12 +113,14 @@ static bool box_audio_synth_envelope_fits(
  * @param p The patch
  * @param osc The oscillator
  * @param env Its own envelope, NULL for the one of the root
+ * @param string Its string, NULL for the defaults; used by SynthPluck only
  * @param carrier 1 + the layer its parent is, 0 when its parent is not a layer
  */
 static void box_audio_synth_layer(
     box_audio_synth_patch_t *p,
     const SynthOscillator *osc,
     const SynthEnvelope *env,
+    const SynthString *string,
     uint32_t carrier)
 {
     box_audio_synth_layer_t *l = &p->layer[p->layers ++];
@@ -135,6 +143,12 @@ static void box_audio_synth_layer(
     }
 
     l->feedback = osc->feedback;
+    if (osc->wave == SynthPluck) {
+        string = string ? string : &box_audio_synth_string_default;
+        l->decay = string->decay;
+        l->brightness = string->brightness;
+        l->hardness = string->hardness;
+    }
 }
 
 /** Count the layers of an entity and its descendants that are left out of a full patch.
@@ -191,7 +205,8 @@ static void box_audio_synth_children(
             if (osc->modulation != SynthMix && !carrier) {
                 (*orphans) ++;
             } else if (p->layers < BOX_AUDIO_SYNTH_LAYERS) {
-                box_audio_synth_layer(p, osc, ecs_get(world, child, SynthEnvelope), carrier);
+                box_audio_synth_layer(p, osc, ecs_get(world, child, SynthEnvelope),
+                    ecs_get(world, child, SynthString), carrier);
                 box_audio_synth_children(world, p, child, p->layers, extra, orphans);
             } else {
                 *extra += box_audio_synth_count(world, child);
@@ -213,7 +228,7 @@ bool box_audio_synth_compile(
     const SynthFilterEnvelope *fenv = ecs_get(world, e, SynthFilterEnvelope);
     const SynthOscillator *osc = ecs_get(world, e, SynthOscillator);
     const SynthGlide *glide = ecs_get(world, e, SynthGlide);
-    int32_t extra = 0, orphans = 0, i;
+    int32_t extra = 0, orphans = 0, low = 0, i;
     bool endless = false, fits = true, result;
     if (sound) {
         p.seed = sound->seed;
@@ -249,17 +264,39 @@ bool box_audio_synth_compile(
     if (osc && osc->modulation != SynthMix) {
         orphans ++;
     } else if (osc) {
-        box_audio_synth_layer(&p, osc, NULL, 0);
+        box_audio_synth_layer(&p, osc, NULL, ecs_get(world, e, SynthString), 0);
     }
 
     box_audio_synth_children(world, &p, e, p.layers, &extra, &orphans);
 
     for (i = 0; i < (int32_t)p.layers; i ++) {
-        if (p.layer[i].has_envelope) {
-            fits = fits && box_audio_synth_envelope_fits(&p.layer[i].envelope);
+        box_audio_synth_layer_t *l = &p.layer[i];
+        if (l->wave == BOX_AUDIO_SYNTH_PLUCK) {
+            if (!(l->frequency >= BOX_AUDIO_SYNTH_PLUCK_LOWEST)) {
+                l->frequency = BOX_AUDIO_SYNTH_PLUCK_LOWEST;
+                low ++;
+            }
+
+            if (l->frequency_end > 0 && l->frequency_end < BOX_AUDIO_SYNTH_PLUCK_LOWEST) {
+                l->frequency_end = BOX_AUDIO_SYNTH_PLUCK_LOWEST;
+                low ++;
+            }
+        }
+
+        if (l->has_envelope) {
+            fits = fits && box_audio_synth_envelope_fits(&l->envelope);
+        } else if (!env && l->wave == BOX_AUDIO_SYNTH_PLUCK) {
+            l->rings_free = 1;
         } else if (!env) {
             endless = true;
         }
+    }
+
+    if (low) {
+        char *path = ecs_get_path(world, e);
+        ecs_warn("box.audio: synth '%s' plucks a string under %.0f Hz, it plays at %.0f Hz",
+            path, (double)BOX_AUDIO_SYNTH_PLUCK_LOWEST, (double)BOX_AUDIO_SYNTH_PLUCK_LOWEST);
+        ecs_os_free(path);
     }
 
     if (extra || endless || !fits || orphans) {

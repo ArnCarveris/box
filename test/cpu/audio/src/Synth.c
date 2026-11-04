@@ -2411,3 +2411,393 @@ void Synth_script_modulators(void) {
     test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
     ecs_fini(world);
 }
+
+/** A patch of one pluck string without any envelope, which rings out on its own.
+ *
+ * @param frequency Hz
+ * @param decay Seconds of the fundamental to -60 dB
+ * @param brightness Brightness of the loop, 0..1
+ * @param seed Seed of the noise of the pluck
+ * @return The patch
+ */
+static box_audio_synth_patch_t synth_pluck(
+    float frequency,
+    float decay,
+    float brightness,
+    uint32_t seed)
+{
+    box_audio_synth_patch_t p = {0};
+    p.layers = 1;
+    p.seed = seed;
+    p.layer[0] = (box_audio_synth_layer_t){
+        .wave = BOX_AUDIO_SYNTH_PLUCK, .frequency = frequency, .level = 0.5f,
+        .decay = decay, .brightness = brightness, .hardness = 0.5f, .rings_free = 1 };
+
+    return p;
+}
+
+/** Component of a range at a frequency over a Hann window, the phase relative to frame 0.
+ *
+ * @param x Samples
+ * @param from First frame of the window
+ * @param window Frames of the window
+ * @param frequency Hz
+ * @param rate Frames per second
+ * @param re Receives the real part
+ * @param im Receives the imaginary part
+ */
+static void synth_component(
+    const float *x,
+    int32_t from,
+    int32_t window,
+    double frequency,
+    double rate,
+    double *re,
+    double *im)
+{
+    double r = 0, m = 0, w, ph;
+    int32_t i;
+    for (i = 0; i < window; i ++) {
+        w = 0.5 - 0.5 * cos(2 * AUDIO_PI * i / window);
+        ph = 2 * AUDIO_PI * frequency * (double)(from + i) / rate;
+        r += w * x[from + i] * cos(ph);
+        m -= w * x[from + i] * sin(ph);
+    }
+
+    *re = r;
+    *im = m;
+}
+
+/** Frequency of the fundamental of a range near a guess, from the advance of its phase between
+ * two Hann windows a gap apart: exact to a small share of a cent, harmonics or not, as long as
+ * the guess is within rate / (2 gap) of it.
+ *
+ * @param x Samples
+ * @param from First frame of the first window
+ * @param gap Frames between the windows
+ * @param window Frames of a window
+ * @param guess Hz
+ * @param rate Frames per second
+ * @return Frequency in Hz
+ */
+static double synth_pitch(
+    const float *x,
+    int32_t from,
+    int32_t gap,
+    int32_t window,
+    double guess,
+    double rate)
+{
+    double r0, i0, r1, i1, phase;
+    synth_component(x, from, window, guess, rate, &r0, &i0);
+    synth_component(x, from + gap, window, guess, rate, &r1, &i1);
+    phase = atan2(i1 * r0 - r1 * i0, r1 * r0 + i1 * i0);
+
+    return guess + phase * rate / (2 * AUDIO_PI * gap);
+}
+
+/** Time until a render first falls 60 dB under its loudest window, in windows of 10 ms.
+ *
+ * @param x Samples
+ * @param frames Frames of the render
+ * @param rate Frames per second
+ * @return Seconds, -1 when it never does
+ */
+static double synth_t60(
+    const float *x,
+    int32_t frames,
+    double rate)
+{
+    int32_t window = (int32_t)(rate / 100), i, w, count = frames / window;
+    double top = 0, result = -1;
+    for (w = 0; w < count; w ++) {
+        double sum = 0;
+        for (i = 0; i < window; i ++) {
+            sum += (double)x[w * window + i] * x[w * window + i];
+        }
+
+        sum = sqrt(sum / window);
+        if (sum > top) {
+            top = sum;
+        } else if (result < 0 && sum < top * 1e-3) {
+            result = (double)(w * window) / rate;
+        }
+    }
+
+    return result;
+}
+
+/** A pluck string plays its pitch within 2 cents from 80 Hz to 2 kHz at 44.1 and 48 kHz: the
+ * allpass tunes the fraction of a frame, which a delay line of whole frames would miss by up
+ * to 70 cents at 2 kHz. */
+void Synth_pluck_pitch(void) {
+    // audio/synth
+    const float rates[] = { 44100, 48000 };
+    const float frequencies[] = { 80, 110, 146.83f, 220, 330, 440, 659.25f, 987.77f, 1500, 2000 };
+    int32_t r, i;
+    for (r = 0; r < 2; r ++) {
+        for (i = 0; i < 10; i ++) {
+            box_audio_core_t *core = synth_core(rates[r]);
+            box_audio_synth_patch_t p = synth_pluck(frequencies[i], 4, 0.3f, 1);
+            int32_t from = (int32_t)(rates[r] * 0.05f), gap = (int32_t)(rates[r] * 0.05f);
+            int32_t window = (int32_t)(rates[r] * 0.1f);
+            double f, cents;
+            synth_define(core, 1, &p);
+            audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+            audio_render(core, 0, from + gap + window);
+            test_assert(synth_finite(audio_l, 0, from + gap + window));
+            f = synth_pitch(audio_l, from, gap, window, frequencies[i], rates[r]);
+            cents = 1200 * log2(f / frequencies[i]);
+            printf("pluck %.2f Hz at %.0f: %.4f Hz, %.3f cents\n", (double)frequencies[i],
+                (double)rates[r], f, cents);
+            test_assert(fabs(cents) < 2);
+            box_audio_core_free(core);
+        }
+    }
+}
+
+/** The -60 dB time of a pluck string follows its decay: twice the decay rings twice as long. */
+void Synth_pluck_decay(void) {
+    // audio/synth
+    const float decays[] = { 0.15f, 0.3f };
+    double t[2];
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        box_audio_core_t *core = synth_core(AUDIO_RATE);
+        box_audio_synth_patch_t p = synth_pluck(220, decays[i], 0.5f, 1);
+        synth_define(core, 1, &p);
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, AUDIO_FRAMES);
+        t[i] = synth_t60(audio_l, AUDIO_FRAMES, AUDIO_RATE);
+        printf("pluck decay %.2f s: -60 dB after %.3f s\n", (double)decays[i], t[i]);
+        test_assert(t[i] > 0.5 * decays[i] && t[i] < 1.2 * decays[i]);
+        box_audio_core_free(core);
+    }
+
+    test_assert(t[1] / t[0] > 1.7 && t[1] / t[0] < 2.3);
+}
+
+/** A brighter string keeps more energy in its upper harmonics than a dark one: the share of
+ * harmonics 5 to 12 of 220 Hz against the fundamental, 0.1 s after the pluck. */
+void Synth_pluck_brightness(void) {
+    // audio/synth
+    const float brightness[] = { 0.1f, 0.9f };
+    double share[2];
+    int32_t i, k;
+    for (i = 0; i < 2; i ++) {
+        box_audio_core_t *core = synth_core(AUDIO_RATE);
+        box_audio_synth_patch_t p = synth_pluck(220, 2, brightness[i], 1);
+        double high = 0, low;
+        p.layer[0].hardness = 1;
+        synth_define(core, 1, &p);
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, 14400);
+        low = synth_bin_energy(audio_l + 4800, 9600, 220, AUDIO_RATE);
+        for (k = 5; k <= 12; k ++) {
+            high += synth_bin_energy(audio_l + 4800, 9600, 220.0 * k, AUDIO_RATE);
+        }
+
+        share[i] = high / low;
+        printf("pluck brightness %.1f: harmonics 5..12 at %.4f of the fundamental\n",
+            (double)brightness[i], share[i]);
+        box_audio_core_free(core);
+    }
+
+    test_assert(share[1] > 4 * share[0]);
+}
+
+/** The same seed plucks bit identical strings, another seed another one. */
+void Synth_pluck_seed(void) {
+    // audio/synth
+    const uint32_t seeds[] = { 3, 3, 4 };
+    uint64_t hash[3];
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        box_audio_core_t *core = synth_core(AUDIO_RATE);
+        box_audio_synth_patch_t p = synth_pluck(330, 1, 0.5f, seeds[i]);
+        synth_define(core, 1, &p);
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, 9600);
+        test_assert(audio_peak(audio_l, 0, 9600) > 0.1f);
+        hash[i] = audio_hash(audio_l, 9600);
+        box_audio_core_free(core);
+    }
+
+    test_assert(hash[0] == hash[1]);
+    test_assert(hash[0] != hash[2]);
+}
+
+/** A string ends its voice once it is silent: without an envelope, and with an envelope that
+ * would hold for seconds. */
+void Synth_pluck_ends(void) {
+    // audio/synth
+    int32_t i, last;
+    for (i = 0; i < 2; i ++) {
+        box_audio_core_t *core = synth_core(AUDIO_RATE);
+        box_audio_synth_patch_t p = synth_pluck(440, 0.1f, 0.5f, 1);
+        if (i == 1) {
+            p.layer[0].rings_free = 0;
+            p.envelope = (box_audio_synth_envelope_t){
+                .attack = 0.001f, .sustain = 1, .hold = 5, .release = 0.1f };
+        }
+
+        synth_define(core, 1, &p);
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, AUDIO_FRAMES);
+        last = synth_last(audio_l, 0, AUDIO_FRAMES);
+        printf("pluck %d: last sound at %.3f s\n", (int)i, (double)last / AUDIO_RATE);
+        test_assert(last > (int32_t)(0.08 * AUDIO_RATE));
+        test_assert(last < (int32_t)(0.3 * AUDIO_RATE));
+        test_int(box_audio_core_voice_count(core), 0);
+        box_audio_core_free(core);
+    }
+}
+
+/** A string follows the pitch of its voice: a glide moves it to the new pitch, and a jump
+ * lands it there within 2 cents. */
+void Synth_pluck_glide(void) {
+    // audio/synth
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        box_audio_core_t *core = synth_core(AUDIO_RATE);
+        box_audio_synth_patch_t p = synth_pluck(220, 4, 0.3f, 1);
+        double f, cents;
+        p.glide = i ? 0.05f : 0;
+        synth_define(core, 1, &p);
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, 4800);
+        audio_voice_set(core, 1, BOX_AUDIO_PARAM_PITCH, 1.5f);
+        audio_render(core, 0, 4800 + 2400 + 4800);
+        test_assert(synth_finite(audio_l, 0, 12000));
+        f = synth_pitch(audio_l, 4800, 2400, 4800, 330, AUDIO_RATE);
+        cents = 1200 * log2(f / 330);
+        printf("pluck glide %d: %.4f Hz, %.3f cents from 330\n", (int)i, f, cents);
+        test_assert(fabs(cents) < 2);
+        test_int(box_audio_core_voice_count(core), 1);
+        box_audio_core_free(core);
+    }
+}
+
+/** Strings come from a pool of BOX_AUDIO_SYNTH_STRINGS: a play that finds none free is
+ * ignored, and the strings come back when the voices end. */
+void Synth_pluck_pool(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_pluck(440, 0.05f, 0.5f, 1);
+    int32_t i;
+    synth_define(core, 1, &p);
+    for (i = 0; i < BOX_AUDIO_SYNTH_STRINGS; i ++) {
+        audio_play(core, (uint32_t)i, 1, 0, 0.01f, 0, 1, 0);
+    }
+
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
+    test_int(box_audio_core_voice_count(core), BOX_AUDIO_SYNTH_STRINGS);
+    audio_play(core, 1000, 1, 0, 0.01f, 0, 1, 0);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 1);
+    audio_render(core, 0, AUDIO_FRAMES);
+    test_int(box_audio_core_voice_count(core), 0);
+    audio_events(core, 0, NULL);
+    for (i = 0; i < BOX_AUDIO_SYNTH_STRINGS; i ++) {
+        audio_play(core, 2000 + (uint32_t)i, 1, 0, 0.01f, 0, 1, 0);
+    }
+
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
+    test_int(box_audio_core_voice_count(core), BOX_AUDIO_SYNTH_STRINGS);
+    box_audio_core_free(core);
+}
+
+/** A SynthPluck layer takes its SynthString, or the defaults without one, needs no envelope,
+ * and a frequency under BOX_AUDIO_SYNTH_PLUCK_LOWEST is clamped with one warning. */
+void Synth_script_pluck(void) {
+    // audio/synth
+    ecs_world_t *world = audio_world();
+    const box_audio_synth_patch_t *p;
+    ecs_entity_t low;
+    int32_t start;
+    audio_log_start();
+    test_assert(ecs_script_run(world, "pluck",
+        "using box.audio\n"
+        "prefab Plain {\n"
+        "  SynthSound: {}\n"
+        "  SynthOscillator: {wave: SynthPluck, frequency: 220, level: 0.5}\n"
+        "}\n"
+        "prefab Low {\n"
+        "  SynthSound: {}\n"
+        "  SynthOscillator: {wave: SynthPluck, frequency: 30, level: 0.5}\n"
+        "  SynthString: {decay: 0.2, brightness: 0.25, hardness: 0.3}\n"
+        "}\n", NULL) == 0);
+    audio_run(world, 2);
+    audio_log_stop();
+    test_int(audio_log_errors, 0);
+    test_int(audio_log_warnings, 1);
+
+    p = &ecs_get(world, ecs_lookup(world, "Plain"), AudioSynth)->patch;
+    test_int(p->layers, 1);
+    test_int(p->layer[0].wave, BOX_AUDIO_SYNTH_PLUCK);
+    test_int(p->layer[0].rings_free, 1);
+    test_flt(p->layer[0].decay, 2);
+    test_flt(p->layer[0].brightness, 0.5f);
+    test_flt(p->layer[0].hardness, 0.8f);
+
+    low = ecs_lookup(world, "Low");
+    p = &ecs_get(world, low, AudioSynth)->patch;
+    test_flt(p->layer[0].frequency, BOX_AUDIO_SYNTH_PLUCK_LOWEST);
+    test_flt(p->layer[0].decay, 0.2f);
+    test_flt(p->layer[0].brightness, 0.25f);
+    test_flt(p->layer[0].hardness, 0.3f);
+
+    ecs_set(world, low, SynthString, { .decay = 0.1f, .brightness = 0.5f, .hardness = 1 });
+    audio_run(world, 1);
+    test_flt(ecs_get(world, low, AudioSynth)->patch.layer[0].decay, 0.1f);
+
+    start = audio_tap_count;
+    test_assert(box_audio_play(world, low, 1.0f));
+    audio_run(world, 30);
+    test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.1f);
+    test_assert(synth_finite(audio_tap_l, start, audio_tap_count));
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+    ecs_fini(world);
+}
+
+/** The guitar and the koto of docs/audio.md and the harp of the Mossvale score compile without
+ * errors, play and end on their own: the guitar within 280 frames of AUDIO_DT, the koto and two
+ * notes of the harp within 230. */
+void Synth_docs_pluck_examples(void) {
+    // audio/synth
+    ecs_world_t *world = audio_world();
+    char *code = audio_read("test/assets/audio/synth_pluck.flecs");
+    const char *names[] = { "Guitar", "Koto", "hp_c3", "hp_a4" };
+    int32_t i, start;
+    audio_log_start();
+    test_assert(ecs_script_run(world, "pluck", code, NULL) == 0);
+    ecs_os_free(code);
+    audio_run(world, 1);
+    for (i = 0; i < 4; i ++) {
+        ecs_entity_t sound = ecs_lookup(world, names[i]);
+        test_assert(sound != 0);
+        test_assert(ecs_get(world, sound, AudioSynth)->compiled);
+    }
+
+    start = audio_tap_count;
+    test_assert(box_audio_play(world, ecs_lookup(world, "Guitar"), 1.0f));
+    audio_run(world, 280);
+    test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.05f);
+    test_assert(synth_finite(audio_tap_l, start, audio_tap_count));
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+
+    start = audio_tap_count;
+    for (i = 1; i < 4; i ++) {
+        test_assert(box_audio_play(world, ecs_lookup(world, names[i]), 1.0f));
+    }
+
+    audio_run(world, 2);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 3);
+    audio_run(world, 228);
+    test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.05f);
+    test_assert(synth_finite(audio_tap_l, start, audio_tap_count));
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+    test_flt(audio_peak(audio_tap_l, audio_tap_count - AUDIO_FRAME, audio_tap_count), 0);
+    audio_log_stop();
+    test_int(audio_log_errors, 0);
+    ecs_fini(world);
+}

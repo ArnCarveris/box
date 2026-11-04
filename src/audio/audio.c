@@ -145,6 +145,26 @@ static void box_audio_synth_oscillator_ctor(
     }
 }
 
+/** Construct SynthString values: a decay of 2 seconds, a brightness of 0.5 and a hardness of
+ * 0.8.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_synth_string_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    SynthString *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (SynthString){ .decay = 2.0f, .brightness = 0.5f, .hardness = 0.8f };
+    }
+}
+
 /** Construct SynthFilter values: a lowpass at 1000 Hz and 12 dB per octave without
  * resonance.
  *
@@ -672,6 +692,8 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, SynthModulation);
     ECS_META_COMPONENT(world, SynthOscillator);
     ecs_set_hooks(world, SynthOscillator, { .ctor = box_audio_synth_oscillator_ctor });
+    ECS_META_COMPONENT(world, SynthString);
+    ecs_set_hooks(world, SynthString, { .ctor = box_audio_synth_string_ctor });
     ECS_META_COMPONENT(world, SynthEnvelope);
     ECS_META_COMPONENT(world, SynthFilter);
     ecs_set_hooks(world, SynthFilter, { .ctor = box_audio_synth_filter_ctor });
