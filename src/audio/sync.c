@@ -845,11 +845,36 @@ static float box_audio_resume_position(
     return (float)result;
 }
 
+/** Check whether a sound is a legato synth sound.
+ *
+ * @param world The world
+ * @param sound The sound entity
+ * @param channel Receives its SynthGlide.channel, may be NULL
+ * @return Whether it has SynthSound and a SynthGlide with legato
+ */
+static bool box_audio_legato_of(
+    ecs_world_t *world,
+    ecs_entity_t sound,
+    int32_t *channel)
+{
+    const SynthGlide *glide = sound && ecs_is_alive(world, sound) &&
+        ecs_has(world, sound, SynthSound) ? ecs_get(world, sound, SynthGlide) : NULL;
+    bool result = glide && glide->legato;
+    if (channel) {
+        *channel = result ? glide->channel : 0;
+    }
+
+    return result;
+}
+
 /** Start, stop and update the voice of a source.
  *
  * A new pitch moves the origin so the source keeps its place in time. A looping spatial source
  * out of range gives its voice back while the time of its sound runs on, and starts at that
  * place when it comes back; one that does not loop does not start out of range.
+ *
+ * A new legato synth sound follows the voice that plays with a legato command, which moves the
+ * voice to a new handle, so an end of the old voice that is still on its way does not end it.
  *
  * @param world The world
  * @param state The state
@@ -876,9 +901,33 @@ static void box_audio_source(
     float volume = muted ? 0.0f : src->volume * (place ? place->gain : 1.0f);
     float pan = place ? place->pan : 0.0f;
     bool away = place && !(place->gain > 0), resume;
+    uint32_t handle;
     uint8_t bus;
     if (v->serial != state->serial) {
         *v = (AudioVoice){ .serial = state->serial };
+    }
+
+    if (v->handle && sound && v->sound != sound && v->loop == src->loop && !away &&
+        box_audio_legato_of(world, src->sound, NULL))
+    {
+        bus = out ? box_audio_bus_of(world, state, out->bus) :
+            box_audio_sound_bus(world, state, src->sound);
+        handle = box_audio_new_voice(state);
+        if (box_audio_reserve(state)) {
+            box_audio_write_legato(&state->writer, handle, v->handle, sound, bus, volume, pan,
+                src->pitch, src->loop ? BOX_AUDIO_PLAY_LOOP : 0);
+        }
+
+        ecs_map_remove(&state->voices, v->handle);
+        ecs_map_insert(&state->voices, handle, e);
+        v->handle = handle;
+        v->sound = sound;
+        v->volume = volume;
+        v->pan = pan;
+        v->pitch = src->pitch;
+        v->bus = bus;
+        v->origin = state->time;
+        goto done;
     }
 
     if ((v->handle || v->parked) && (!sound || v->sound != sound || v->loop != src->loop)) {
@@ -1151,7 +1200,9 @@ static void box_audio_queued(
     uint32_t *stops = ecs_vec_first(&state->stops);
     uint32_t *releases = ecs_vec_first(&state->releases);
     uint32_t *fades = ecs_vec_first(&state->fades);
-    int32_t i, k;
+    uint32_t handle;
+    int32_t i, k, channel;
+    bool legato;
     for (i = 0; state->bus_freed && i < ecs_vec_count(&state->oneshots); i ++) {
         if (shots[i].bus && (state->bus_freed & (1u << shots[i].bus))) {
             box_audio_voice_set(state, shots[i].handle, BOX_AUDIO_PARAM_BUS, 0.0f);
@@ -1187,6 +1238,38 @@ static void box_audio_queued(
             }
         }
 
+        legato = box_audio_legato_of(world, plays[i].sound, &channel);
+        shots = ecs_vec_first(&state->oneshots);
+        for (k = ecs_vec_count(&state->oneshots) - 1; legato && k >= 0; k --) {
+            if (shots[k].legato && shots[k].channel == channel) {
+                break;
+            }
+        }
+
+        if (legato && k >= 0) {
+            box_audio_oneshot_t *shot = &shots[k];
+            shot->sound = sound;
+            shot->bus = box_audio_sound_bus(world, state, plays[i].sound);
+            shot->spatial = plays[i].spatial;
+            shot->position[0] = plays[i].position[0];
+            shot->position[1] = plays[i].position[1];
+            shot->position[2] = plays[i].position[2];
+            shot->distances = spatial ? *spatial :
+                (AudioSpatial){ .min_distance = 1.0f, .max_distance = 50.0f, .rolloff = 1.0f };
+            shot->volume = plays[i].volume;
+            shot->sent_volume = plays[i].volume * gain;
+            shot->sent_pan = pan;
+            handle = box_audio_new_voice(state);
+            if (box_audio_reserve(state)) {
+                box_audio_write_legato(&state->writer, handle, shot->handle, sound, shot->bus,
+                    shot->sent_volume, pan, 1.0f, 0);
+            }
+
+            shot->handle = handle;
+
+            continue;
+        }
+
         if (ecs_vec_count(&state->oneshots) >= BOX_AUDIO_ONESHOT_MAX) {
             ecs_vec_remove_ordered_t(&state->oneshots, box_audio_oneshot_t, 0);
         }
@@ -1194,6 +1277,8 @@ static void box_audio_queued(
         box_audio_oneshot_t *shot = ecs_vec_append_t(NULL, &state->oneshots,
             box_audio_oneshot_t);
         *shot = (box_audio_oneshot_t){
+            .legato = legato,
+            .channel = channel,
             .handle = box_audio_new_voice(state),
             .sound = sound,
             .bus = box_audio_sound_bus(world, state, plays[i].sound),

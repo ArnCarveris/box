@@ -194,4 +194,14 @@ void audio_workload(
     float *right,
     int32_t frames);
 
+/** FNV-1a hash of the bits of samples.
+ *
+ * @param x Samples
+ * @param n Number of samples
+ * @return The hash
+ */
+uint64_t audio_hash(
+    const float *x,
+    int32_t n);
+
 #endif

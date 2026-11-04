@@ -46,7 +46,9 @@
                 "id": "Synth",
                 "benchcases": [
                     "voices_64",
-                    "voices_64_filter_sweep"
+                    "voices_64_filter_envelope",
+                    "voices_64_filter_24",
+                    "voices_64_fm"
                 ]
             }
         ]

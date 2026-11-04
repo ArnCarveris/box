@@ -12,8 +12,9 @@
 /** One shot voices the module keeps track of at most, the oldest are forgotten beyond this */
 #define BOX_AUDIO_ONESHOT_MAX (1024)
 
-/** Bytes the module reserves in its batch before it writes a command */
-#define BOX_AUDIO_COMMAND_RESERVE (256)
+/** Bytes the module reserves in its batch before it writes a command, room for the largest,
+ * a synth patch of BOX_AUDIO_SYNTH_LAYERS layers */
+#define BOX_AUDIO_COMMAND_RESERVE (1024)
 
 /** The sound id of a sound entity in the core of the current output */
 typedef struct AudioSoundId {
@@ -250,6 +251,8 @@ typedef struct box_audio_oneshot_t {
     float volume;           /**< Volume of the play, before the distance */
     float sent_volume;      /**< Volume sent */
     float sent_pan;         /**< Pan sent */
+    bool legato;            /**< The mono voice of a legato synth sound */
+    int32_t channel;        /**< SynthGlide.channel of a legato voice */
 } box_audio_oneshot_t;
 
 /** A play of box_audio_play, sent with the next batch */

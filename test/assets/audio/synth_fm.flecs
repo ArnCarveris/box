@@ -1,0 +1,24 @@
+// Modulators for the Synth suite of test/cpu/audio: a carrier on the root with a modulator
+// child that has its own envelope and a ring modulator of its own, a layer with feedback, and
+// a modulator whose parent is not a layer.
+using box.audio
+
+prefab FmBell {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.001, decay: 0.5}
+  SynthOscillator: {frequency: 500, level: 0.5}
+  bright {
+    SynthOscillator: {frequency: 700, modulation: SynthPhase, index: 2}
+    SynthEnvelope: {attack: 0.001, decay: 0.3}
+    deep { SynthOscillator: {frequency: 300, modulation: SynthRing, index: 0.5} }
+  }
+  tone { SynthOscillator: {frequency: 1000, level: 0.2, feedback: 0.5} }
+}
+
+// The root has no oscillator, so its modulator has no carrier
+prefab Orphan {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.001, decay: 0.1}
+  m { SynthOscillator: {frequency: 400, modulation: SynthPhase} }
+  c { SynthOscillator: {frequency: 200, level: 0.3} }
+}

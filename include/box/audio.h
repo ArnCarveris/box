@@ -26,8 +26,9 @@ extern "C" {
 /** Longest capture in seconds */
 #define BOX_AUDIO_CAPTURE_MAX (60.0f)
 
-/** Oscillators of a synth sound: the root and its children with a SynthOscillator */
-#define BOX_AUDIO_SYNTH_LAYERS 4
+/** Oscillators of a synth sound: the root and its children with a SynthOscillator. A voice
+ * renders and stores only the layers its sound has */
+#define BOX_AUDIO_SYNTH_LAYERS 8
 
 /** Seconds a synth sound plays when it would never end, a layer without any envelope */
 #define BOX_AUDIO_SYNTH_ENDLESS (10.0f)
@@ -180,14 +181,32 @@ ECS_ENUM(SynthWave, {
 
 /** Kind of the filter of a synth sound */
 ECS_ENUM(SynthFilterKind, {
-    SynthLowPass,          /**< Lowpass, 12 dB per octave */
-    SynthHighPass,         /**< Highpass, 12 dB per octave */
+    SynthLowPass,          /**< Lowpass */
+    SynthHighPass,         /**< Highpass */
     SynthBandPass          /**< Bandpass, unity at the cutoff */
 });
 
-/** An oscillator of a synth sound, a layer: on the root of the sound or on a child of it.
+/** Slope of the filter of a synth sound */
+ECS_ENUM(SynthFilterSlope, {
+    SynthSlope12,          /**< 12 dB per octave, one stage */
+    SynthSlope24           /**< 24 dB per octave, two cascaded stages */
+});
+
+/** What a synth oscillator does with its signal */
+ECS_ENUM(SynthModulation, {
+    SynthMix,              /**< It is heard, added to the mix of the layers */
+    SynthPhase,            /**< It modulates the phase of its parent layer (FM), not heard */
+    SynthRing              /**< It multiplies its parent layer (ring modulation), not heard */
+});
+
+/** An oscillator of a synth sound, a layer: on the root of the sound, on a child of it, or on
+ * a child of a layer.
  *
- * Up to BOX_AUDIO_SYNTH_LAYERS layers, the root first; more log one error and are left out.
+ * Up to BOX_AUDIO_SYNTH_LAYERS layers, the root first, then each layer before its children;
+ * more log one error and are left out.
+ *
+ * A layer with the modulation SynthPhase or SynthRing modulates its parent layer by its wave
+ * times its own envelope, so the index follows that envelope. It is heard only when audible.
  */
 ECS_STRUCT(SynthOscillator, {
     SynthWave wave;        /**< The wave, default SynthSine */
@@ -195,6 +214,12 @@ ECS_STRUCT(SynthOscillator, {
     float frequency_end;   /**< Hz the pitch sweeps to, 0 for no sweep */
     float sweep;           /**< Seconds of the sweep, exponential in frequency */
     float level;           /**< Linear gain, default 1 */
+    SynthModulation modulation; /**< What it does with its signal, default SynthMix */
+    float index;           /**< SynthPhase: peak index in radians at the top of its envelope,
+                            *   0..32, limited against the frequency so FM aliases little;
+                            *   SynthRing: depth 0..1. Default 1 */
+    float feedback;        /**< Radians of its own output on its phase, 0..1.5, a sawlike tone */
+    bool audible;          /**< Whether a modulator is heard as well, at its level */
 });
 
 /** An envelope: from 0 to 1 over attack, to sustain over decay, hold seconds there, then to
@@ -226,13 +251,51 @@ ECS_STRUCT(SynthEnvelope, {
 ECS_STRUCT(SynthFilter, {
     SynthFilterKind kind;  /**< The kind, default SynthLowPass */
     float cutoff;          /**< Hz, default 1000, clamped under Nyquist */
-    float cutoff_end;      /**< Hz the cutoff sweeps to, 0 for no sweep */
-    float sweep;           /**< Seconds of the sweep, exponential in frequency */
     float resonance;       /**< 0 (a Butterworth response) to 1 (rings the longest) */
+    SynthFilterSlope slope; /**< Steepness, default SynthSlope12; at SynthSlope24 the resonance
+                            *   applies to the second stage only */
+});
+
+/** An envelope of the cutoff of the SynthFilter of the same root, with the segments of a
+ * SynthEnvelope: the cutoff is cutoff times 2 to the amount times the level of the envelope,
+ * so it rises over the attack, settles at the sustain and returns over the release.
+ *
+ * It does not keep a sound playing: the sound ends with its SynthEnvelope. Without a
+ * SynthFilter it does nothing.
+ */
+ECS_STRUCT(SynthFilterEnvelope, {
+    float attack;          /**< Seconds from 0 to 1, at least 0.5 ms */
+    float decay;           /**< Seconds from 1 to the sustain level */
+    float sustain;         /**< Level after the decay, 0..1, default 0 */
+    float release;         /**< Seconds from the sustain level to 0 */
+    float hold;            /**< Seconds at the sustain level before the release */
+    float curve;           /**< Curve of the decay and the release, 0 linear (default),
+                            *   -16..16 */
+    float attack_curve;    /**< Curve of the attack, 0 linear (default), -16..16 */
+    float amount;          /**< Octaves the cutoff moves at level 1, -10..10, negative closes
+                            *   the filter, default 0 */
+});
+
+/** Portamento and mono legato of a synth sound, on its root.
+ *
+ * With a time, a change of the pitch of a voice, as a change of AudioSource.pitch, glides
+ * exponentially in frequency, linear in cents, over that time instead of jumping; a time of 0
+ * jumps as without the component.
+ *
+ * With legato, a play of the sound while the last one shot of its channel holds, or a new
+ * sound of an AudioSource that plays one, glides that voice to the new frequencies without a
+ * restart of its envelopes. After its release a note starts a new voice. See docs/audio.md.
+ */
+ECS_STRUCT(SynthGlide, {
+    float time;            /**< Seconds of a glide, 0 to 10, default 0 */
+    bool legato;           /**< Play as a note of a mono voice, default false */
+    int32_t channel;       /**< Mono voice of the one shots of legato sounds, default 0:
+                            *   legato sounds of the same channel share one voice */
 });
 
 /** A sound made by the synth from the components of this entity and its children, without a
- * file: SynthOscillator layers, a SynthEnvelope and a SynthFilter. Usually a prefab.
+ * file: SynthOscillator layers, a SynthEnvelope, a SynthFilter, a SynthFilterEnvelope and a
+ * SynthGlide. Usually a prefab.
  *
  * It is compiled once, and again when one of its components changes, into a patch the core
  * holds; box_audio_play and AudioSource play it like any sound, with no allocation per play.

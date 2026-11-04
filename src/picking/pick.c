@@ -1108,11 +1108,12 @@ static bool box_pick_blend_surface(
 /** Map a hit on an entity that shows the texture of a surface to a cursor on that surface.
  *
  * An Image maps the area of the element to its texture area, through the nine parts of its
- * ImageSlice as the renderer draws it, PbrTextures map the UV of the mesh, or the projection of
- * a MappingObject or MappingWorld TextureMapping, through TextureTransform and TextureWrap.
+ * ImageSlice as the renderer draws it, in texels of the image of the surface
+ * (box_surface_texture_size), the plain area until the surface has a size.
  *
- * A TextureBlend maps them the same way when a surface renders its mask, a layer albedo or its
- * emissive (box_pick_blend_surface): the coordinates of the mask, without a layer transform.
+ * PbrTextures map the UV of the mesh, or the projection of a MappingObject or MappingWorld
+ * TextureMapping, through TextureTransform and TextureWrap; a TextureBlend whose mask, layer
+ * albedo or emissive a surface renders (box_pick_blend_surface) maps the mask coordinates.
  *
  * @param world The world
  * @param st The module state
@@ -1146,14 +1147,17 @@ static bool box_pick_texture(
             float u = local[0] / size[0] + 0.5f, v = 0.5f - local[1] / size[1];
             const ImageSlice *slice = ecs_has(world, e, Rect)
                 ? ecs_get(world, e, ImageSlice) : NULL;
-            const Texture *tex = slice && ecs_is_alive(world, img->texture)
-                ? ecs_get(world, img->texture, Texture) : NULL;
             box_image_slice_t parts;
+            int32_t texels[2] = {0};
             uv[0] = img->u0 + u * (img->u1 - img->u0);
             uv[1] = img->v0 + v * (img->v1 - img->v0);
             result = true;
-            if (tex && box_image_slice_resolve(img, slice, (float)tex->width,
-                (float)tex->height, size[0], size[1], &parts))
+            if (slice) {
+                box_surface_texture_size(world, img->texture, &texels[0], &texels[1]);
+            }
+
+            if (texels[0] > 0 && texels[1] > 0 && box_image_slice_resolve(img, slice,
+                (float)texels[0], (float)texels[1], size[0], size[1], &parts))
             {
                 result = box_image_slice_map(&parts, glm_clamp(u, 0.0f, 1.0f) * size[0],
                     glm_clamp(v, 0.0f, 1.0f) * size[1], uv);

@@ -41,7 +41,8 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 | `AudioPcm` | A sound from samples, from script or C |
 | `SoundFile` | A short sound from a WAV or FLAC file, decoded into memory, see [Sound files](#sound-files) |
 | `SoundStatus` | Read only: whether a `SoundFile` loads, is ready or failed |
-| `SynthSound` | A sound made by the synth from layers of `SynthOscillator`, `SynthEnvelope` and `SynthFilter`, see [Synth sounds](#synth-sounds) |
+| `SynthSound` | A sound made by the synth from layers of `SynthOscillator`, `SynthEnvelope`, `SynthFilter` and `SynthFilterEnvelope`, layers that may modulate each other, see [Synth sounds](#synth-sounds) |
+| `SynthGlide` | Portamento and mono legato of a synth sound, see [Glide and legato](#glide-and-legato) |
 | `AudioSource` | A sound that plays while its entity exists, once or in a loop, with a volume and a pitch |
 | `AudioSpatial` | Places a source in the world: `min_distance`, `max_distance`, `rolloff`, see [Spatial audio](#spatial-audio) |
 | `AudioListener` | The entity that hears the spatial sources, the camera without one |
@@ -223,9 +224,11 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   EQ, compressor or delay on a bus.
 - **Voices**: 64, with the quietest stolen; no priorities. A one shot cannot be controlled after
   it started.
-- **Synth**: up to 4 oscillators and one filter per sound, linear or curved envelopes, no LFO and no node
-  graph. A looping synth sound starts a new pass of its envelopes and oscillators at the end of
-  the last, at most every 60 seconds; a drone keeps that gap short with edges of a few ms, as
+- **Synth**: up to 8 oscillators and one filter per sound, linear or curved envelopes, no LFO
+  and no node graph; an oscillator may phase or ring modulate another, but FM is not band
+  limited. Legato is mono per channel and has no note off: a held note lasts its hold after the
+  last note. A looping synth sound starts a new pass of its envelopes and oscillators at the end
+  of the last, at most every 60 seconds; a drone keeps that gap short with edges of a few ms, as
   the dust merchant's engine does with 2 ms.
 - **Files**: WAV and FLAC for sounds, Ogg Vorbis for music, one stream at once (a change of path
   fades over 5 ms, there is no crossfade).
@@ -304,6 +307,7 @@ start of the next render block. They are:
 | Command | Fields |
 |---------|--------|
 | `PLAY` | voice handle, sound, bus, volume, pan, pitch, flags (`BOX_AUDIO_PLAY_LOOP`) |
+| `LEGATO` | new voice handle, handle of the voice it follows, then the fields of `PLAY`: a note of a mono voice, see [Synth](#synth) |
 | `STOP` | voice handle: the voice fades out over the ramp and ends |
 | `VOICE_SET` | voice handle, `VOLUME`, `PAN`, `PITCH`, `BUS` or `POSITION`, value |
 | `BUS_SET` | bus, `VOLUME`, `PAN`, `MUTE` or `SEND` (the send level), value |
@@ -311,7 +315,7 @@ start of the next render block. They are:
 | `SOUND_RELEASE` | sound: freed once no voice plays it |
 | `STREAM` | voice handle, stream, bus, volume, channels, sample rate: opens a stream and starts a voice that reads it |
 | `REVERB` | slot, bus (or none), decay, damping, predelay, size, mix: see [Reverb](#reverb) |
-| `SYNTH` | sound, then a patch: makes a free sound id a synth or replaces its patch, see [Synth](#synth) |
+| `SYNTH` | sound, then a patch up to its last layer: makes a free sound id a synth or replaces its patch, see [Synth](#synth) |
 
 The sender picks the voice handles, so it addresses a voice without waiting for a reply. Values
 are clamped (volumes and send levels to 0..4, pans to -1..1, pitches to 1/64..16) and a NaN
@@ -455,17 +459,52 @@ allocation. `bench/audio` has a `Reverb` suite in ns per frame, and
 synth voices share the pool, the cap, the buses, the ramps and the limiter. A sound id becomes a
 synth with a `SYNTH` command, whose patch (`box_audio_synth_patch_t` of `core.h`) is plain
 values in seconds and Hz, the same at every rate: a fixed topology of up to
-`BOX_AUDIO_SYNTH_LAYERS` (4) oscillators, each with an envelope, summed into one filter and an
-amp. There is no node graph. The core keeps up to `BOX_AUDIO_SYNTH_MAX` (256) patches; a play
-copies the patch into its voice, so a play allocates nothing, a new patch for the same id
-reaches the next play while the voices that play keep theirs, and a release frees the id at once
-with `SOUND_FREE`. The core clamps every value of a patch, a NaN to the low end.
+`BOX_AUDIO_SYNTH_LAYERS` (8) oscillators, each with an envelope, summed into one filter and an
+amp; an oscillator may modulate an earlier one instead of being heard. There is no node graph.
+The core keeps up to `BOX_AUDIO_SYNTH_MAX` (256) patches; a play copies the patch into its
+voice, so a play allocates nothing, a new patch for the same id reaches the next play while the
+voices that play keep theirs, and a release frees the id at once with `SOUND_FREE`.
+
+A patch costs only the layers it has. The `SYNTH` command ends after its last layer,
+`BOX_AUDIO_CMD_SYNTH_SIZE(layers)` bytes: 100 bytes and 72 per layer, 244 for 2 layers, 676 for 8;
+a shorter one than its layers need is ignored. A voice holds the patch without its layers and
+takes, for each layer, a part from a pool the core allocates with itself: the layer, its oscillator
+and its own envelope, 240 bytes. The pool has 4 parts per voice slot (320), so patches of up to 4
+layers never run out of them and a voice of 8 takes the room of two of 4; a play that finds too few
+free parts is ignored like one without a voice slot. A voice renders and advances only its parts
+and gives them back when it ends. The 80 voice slots (504 bytes each) and the pool take 118 KB,
+against 115 KB for 80 voices of 4 fixed layers and 191 KB for 8 fixed layers. The 256 patches the
+core keeps are full size, 668 bytes each. The core clamps every value of a patch, a NaN to the low
+end.
 
 - **Oscillators.** Sine (`box_audio_core_sin`), saw, square, triangle and white noise. Saw and
   square are band limited with polyBLEP, the corners of the triangle with polyBLAMP. Frequencies are clamped to 20 kHz and to 0.48 of the
   rate, so the top of the audible range plays at 44.1 and 48 kHz. A sweep moves the frequency
   exponentially to its end over its time, and lands on it exactly. The pitch of the voice, the
   play's and a `VOICE_SET`, multiplies every frequency but noise.
+- **Modulation.** A layer whose `modulates` is 1 + an earlier layer is a modulator: its wave
+  times its own envelope, its signal, changes that carrier and is not heard unless `audible`.
+  `BOX_AUDIO_SYNTH_PHASE` adds the signal times `index` (radians, at most
+  `BOX_AUDIO_SYNTH_INDEX_MAX`, 32) to the phase of the carrier, phase modulation as DX synths
+  do their FM, so the index follows the envelope of the modulator and the pitch of the carrier
+  never drifts; a sine carrier at fc with a sine at fm makes sidebands at fc ± k fm with
+  amplitudes J_k(index). `BOX_AUDIO_SYNTH_RING` multiplies the carrier by `1 - index + index x
+  signal` (`index` a depth of 0..1; at 1 two sines give their sum and difference alone). Several
+  modulators of one carrier add their phases and multiply their rings; a modulator may have
+  modulators of its own, after it. `feedback` (radians, at most `BOX_AUDIO_SYNTH_FEEDBACK_MAX`,
+  1.5) adds the mean of the last two outputs of an oscillator to its own phase, which turns a
+  sine sawlike; it works on carriers and modulators alike. The layers of a modulated patch
+  render from the last, so every modulator is ready before its carrier; a patch in which no
+  layer modulates or feeds back takes the plain loop and renders as before, at no cost.
+- **Aliasing of FM.** Phase modulation is not band limited: its sidebands go on past Nyquist and
+  fold back as inharmonic aliases. The core limits each index at the start of a pass and at a
+  change of pitch so that, by Carson's rule, the carrier plus (index + 1) times the modulator
+  stays under the top frequency of the oscillators (20 kHz, or 0.48 of the rate), the higher
+  ends of their sweeps counted: a 1 kHz pair at 48 kHz keeps up to 18, a 7 kHz pair 0.86. The
+  sidebands past that rule are weak but not 0, so a high index on a high carrier still aliases
+  a little; a modulator that is itself modulated, feedback and several modulators of one
+  carrier widen the spectrum past what the limit counts. Saw, square and triangle carriers keep
+  the polyBLEP of their unmodulated rate, so a sine carrier is the clean one.
 - **Noise** is xorshift32, seeded per play from the seed of the patch and the count of its
   plays, so a fixed run gives bit identical output and every play differs. The same generator
   picks the pitch and level variances of the play.
@@ -488,42 +527,155 @@ with `SOUND_FREE`. The core clamps every value of a patch, a NaN to the low end.
   uses reached silence; a looping voice starts a new pass instead, with the state of its
   filter. Synth voices start at their gain, without the ramp of the core, since the envelope
   starts at 0: an attack of 1 ms takes 1 ms.
-- **The filter** is the trapezoidal state variable filter (Simper): lowpass and highpass at 12
-  dB per octave and a bandpass with unity gain at the cutoff. Resonance 0 is a Butterworth
-  response (Q 0.707), 1 a Q of 50. Its coefficients come from `tan(pi cutoff / rate)` with the
-  cutoff clamped to 0.49 of the rate, so it stays stable at every cutoff and resonance, a cutoff
-  at Nyquist and a fast sweep included; a sweep updates them every 8 frames. Its state is
-  flushed like a bus sample.
+- **The filter** is the trapezoidal state variable filter (Simper): lowpass, highpass and a
+  bandpass with unity gain at the cutoff. At a slope of 12 dB per octave it is one stage:
+  resonance 0 is a Butterworth response (Q 0.707), 1 a Q of 50. At 24 dB per octave it is two
+  cascaded stages of the same kind and cutoff: the first at a fixed Q of 0.54, the second
+  resonant from Q 1.31 at resonance 0, so that resonance 0 is a fourth order Butterworth
+  response (-3 dB at the cutoff, -24 dB an octave past it), to a Q of 50 at 1. Its
+  coefficients come from
+  `tan(pi cutoff / rate)` with the cutoff clamped to 10 Hz..0.49 of the rate, and every stage
+  is stable on its own for any coefficient, so the cascade stays stable at every cutoff and
+  resonance, a cutoff at and above Nyquist and a fast envelope included. Its state is flushed
+  like a bus sample.
+- **The filter envelope** has the segments of the other envelopes and an amount in octaves,
+  -10..10. The cutoff is `cutoff * 2^(amount * level)`: exponential in frequency, so a linear
+  segment of the envelope moves the cutoff by the same musical interval per second. It updates
+  the coefficients every 8 frames while it runs and once at its end; it does not keep the voice
+  playing, and a looping voice restarts it with its pass. A patch with an amount of 0 runs no
+  envelope and computes no coefficients per frame, and a 12 dB filter runs one stage, so a
+  patch that uses neither costs what it did before.
+- **Glide.** The `glide` of a patch, 0 to `BOX_AUDIO_SYNTH_GLIDE_MAX` (10) seconds, makes a
+  change of the pitch of a voice (`VOICE_SET` `PITCH`) move exponentially in frequency, linear
+  in cents, over that time: each oscillator multiplies its turns per frame by
+  `(to / from)^(1 / frames)` per frame, so halfway the frequency is the geometric mean of the two.
+  A change during a glide starts a new glide from where the pitch stands. A running sweep
+  moves with the glide. A loop that starts a new pass during a glide starts at the new pitch.
+  A glide of 0 jumps as before, bit identical, and a voice that does not glide costs one
+  compare per frame.
+- **Legato.** A `LEGATO` command of a synth sound looks for the synth voice of the handle it
+  follows. While one of the envelopes of that voice has not reached its release, it retargets
+  the voice and gives it the new handle instead of starting a voice: layer i glides from its frequency to the frequency
+  of layer i of the new patch times the pitch of the play, over the glide of the new patch (a
+  glide of 0 jumps), and stops its sweep. Its envelopes go on without a restart; one in its
+  hold starts the hold over, so a held note lasts while notes follow. The voice keeps its
+  waves, levels, envelopes, filter and variances, takes the volume, pan and bus of the play
+  with the ramp, and a loop restarts on the new note. Layers past the count of the new patch
+  follow the pitch. When every envelope of the voice releases or ended, or the voice is not a
+  synth, the command takes the handle from it and starts a new voice with the new handle: a
+  synth voice stops looping, rings out its release and reports its `VOICE_END` with handle 0
+  (so a looping voice does not start another pass without a handle), any other fades
+  out as after a `STOP`. Without a voice of the handle it follows it is a plain `PLAY` of the
+  new handle. Since every note has a new handle, the `VOICE_END` of a voice that ended before
+  the sender saw it never names the voice of the next note. A sound that is not ready leaves
+  the voice as it was, with the new handle. A retarget allocates nothing.
 - **Cost.** Render work only: per frame of a voice an envelope step per envelope (a multiply
-  and an add when curved), an oscillator
-  per layer and the filter. `bench/audio` has a `Synth` suite of 64 voices in ns per sample.
+  and an add when curved), an oscillator per layer and the filter, one stage or two; a modulated
+  patch adds a phase offset and a wrap per layer; during a glide a multiply per oscillator.
+  `bench/audio` has a `Synth` suite of 64 voices in ns per sample, with a filter envelope, with a
+  24 dB filter, and `voices_64_fm`, two FM pairs per voice, which measures the modulated path.
 
-The core needs no libm: the exponential sweeps use series for `log2` and `exp2` in `synth.c`.
+The core needs no libm: the exponential sweeps and the filter envelope use series for `log2` and
+`exp2` in `synth.c`.
 
 ### Synth sounds
 
 A sound effect is a prefab in script, with no file. `SynthSound` marks the root; the layers are
-the root and its children that have a `SynthOscillator`, as particle effect layers are. The
-`SynthEnvelope` and the `SynthFilter` of the root apply to the mix of the layers; a layer may
-have its own `SynthEnvelope`, and one without uses the root's.
+the root and its children that have a `SynthOscillator`, as particle effect layers are, and the
+children of layers that have one, each after its parent. The `SynthEnvelope`, the `SynthFilter`
+and the `SynthFilterEnvelope` of the root apply to the mix of the layers; a layer may have its
+own `SynthEnvelope`, and one without uses the root's. A `SynthGlide` on the root makes notes
+slide, see [Glide and legato](#glide-and-legato).
+
+A layer with the `modulation` `SynthPhase` or `SynthRing` is a modulator of its parent layer
+(see [Synth](#synth)): its wave times its envelope moves the phase of its parent by `index`
+radians, or multiplies it at a depth of `index`. Give a modulator its own, shorter
+`SynthEnvelope` and the brightness of the sound decays with it. A modulator is not heard unless
+it is `audible`; its `level` is the level it is heard at. `frequency` sets the ratio: the same
+as the carrier for a harmonic spectrum, a ratio such as 3.5 or 1.41 for an inharmonic one.
 
 | Component | What it is |
 |-----------|------------|
 | `SynthSound` | The root: `seed`, `pitch_variance` and `level_variance` (random shares per play, 0) |
-| `SynthOscillator` | A layer: `wave` (`SynthSine`, `SynthSaw`, `SynthSquare`, `SynthTriangle`, `SynthNoise`), `frequency` (440), `frequency_end` (0, no sweep), `sweep` (s), `level` (1) |
+| `SynthOscillator` | A layer: `wave` (`SynthSine`, `SynthSaw`, `SynthSquare`, `SynthTriangle`, `SynthNoise`), `frequency` (440), `frequency_end` (0, no sweep), `sweep` (s), `level` (1), `modulation` (`SynthMix`, heard; `SynthPhase` or `SynthRing`, modulates its parent), `index` (1: radians for `SynthPhase` up to 32, limited against the frequency; a depth of 0..1 for `SynthRing`), `feedback` (0, radians on its own phase up to 1.5), `audible` (false: whether a modulator is heard as well) |
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `release`, `hold`: seconds and a sustain level, all 0 by default; `curve` (decay and release) and `attack_curve`: 0 linear (default), positive fast at first, -16..16 |
-| `SynthFilter` | `kind` (`SynthLowPass`, `SynthHighPass`, `SynthBandPass`), `cutoff` (1000), `cutoff_end`, `sweep`, `resonance` |
+| `SynthFilter` | `kind` (`SynthLowPass`, `SynthHighPass`, `SynthBandPass`), `cutoff` (1000), `resonance` (0), `slope` (`SynthSlope12`, `SynthSlope24`) |
+| `SynthFilterEnvelope` | The envelope of the cutoff: `attack`, `decay`, `sustain`, `release`, `hold`, `curve` and `attack_curve` as in `SynthEnvelope`, and `amount`, the octaves the cutoff moves at level 1 (0, negative closes the filter); nothing without a `SynthFilter` |
+| `SynthGlide` | On the root: `time` of a glide (s, 0 jumps), `legato` (false) and `channel` (0), see [Glide and legato](#glide-and-legato) |
 
 The module (`src/audio/synth_sound.c`) compiles a sound once, and again when a component of it
 or of a layer changes, into a patch that the sync system sends with a `SYNTH` command before the
 plays of the frame. `box.audio.play(UiClick, 0.8)` plays it like any sound, and an `AudioSource`
 with `loop: true` starts it over at the end of its envelopes. A play allocates nothing.
 
-- More than 4 layers log one error that names the sound; the first 4 play.
+- More than 8 layers log one error that names the sound and their count; the first 8 play. A
+  layer that is left out takes its modulators with it.
+- A modulator whose parent is not a layer, such as a child of a root without a
+  `SynthOscillator`, logs one error that names the sound and is left out.
 - A layer without any envelope (no `SynthEnvelope` on it or on the root) would never end: it
   logs one error and the sound plays for `BOX_AUDIO_SYNTH_ENDLESS` (10) seconds.
 - An envelope that is not a time of 0 to 60 seconds logs one error and is cut.
+- The filter envelope has its own times: it does not follow the `SynthEnvelope`, so a cutoff
+  that closes with the note takes the same attack, decay, hold and release. One that should stay
+  open while the sound plays takes a sustain of 1 and a hold that lasts the sound.
 - Deleting the sound releases it and fades its one shots, as for `AudioPcm`.
+
+#### Glide and legato
+
+Leads and basses slide between notes with a `SynthGlide` on the root:
+
+| Field | What it is |
+|-------|------------|
+| `time` | Seconds a change of pitch takes, exponential in frequency (linear in cents), 0 to 10; 0 (default) jumps as without the component |
+| `legato` | Play the sound as a note of a mono voice (false) |
+| `channel` | The mono voice of the one shots of legato sounds (0): legato sounds of the same channel share one voice |
+
+How a note follows the previous one:
+
+- **Pitch.** With a `time`, a change of `AudioSource.pitch` while the source plays glides from
+  the pitch that sounds to the new one over the time. Halfway the frequency is the geometric
+  mean of the two.
+- **Notes from script.** Each note is its own sound, as in the Mossvale score. A
+  `box.audio.play` (or `play_at`) of a legato sound while the last one shot of its `channel`
+  still holds does not start a voice: that voice glides to the frequencies of the new sound
+  over the `time` of the new sound, without a new attack, and takes the volume and the bus of
+  the new play. A note that comes while the voice holds its sustain holds it for its `hold`
+  again, so a phrase of quick notes is one held voice that releases after the last note. A
+  note after the voice reached its release, or after it ended, starts a new voice with its
+  attack; the voice that released rings out, and a looping one stops looping and ends.
+- **Notes on a source.** A new legato `sound` on an `AudioSource` does the same with the voice
+  of the source, when `loop` does not change (the voice it follows may be of any synth sound); the source keeps playing and
+  ends with the voice.
+- The voice keeps the waves, levels, envelopes, filter and variances of the sound that
+  started it; the following notes give it only their frequencies, layer by layer, and their
+  glide time. Notes of a legato voice share its layers in order, so they should come from one
+  template, as in the example. A sound without `legato` always starts its own voice, and its
+  `time` only glides changes of the pitch of its source.
+
+```
+using box.audio
+
+music { AudioBus: {volume: 1} }
+
+// A lead: a mono saw an octave over a sine whose notes slide into each other over 80 ms
+template Lead {
+  prop f: f32 = 220
+  AudioOutput: {bus: music}
+  SynthSound: {}
+  SynthGlide: {time: 0.08, legato: true, channel: 1}
+  SynthEnvelope: {attack: 0.01, decay: 0.2, sustain: 0.6, hold: 0.3, release: 0.25, curve: 2}
+  SynthFilter: {kind: SynthLowPass, cutoff: 1800, resonance: 0.2}
+  saw { SynthOscillator: {wave: SynthSaw, frequency: f, level: 0.3} }
+  sub { SynthOscillator: {wave: SynthSine, frequency: f * 0.5, level: 0.2} }
+}
+
+Lead lead_a3(f: 220)
+Lead lead_c4(f: 261.63)
+Lead lead_e4(f: 329.63)
+```
+
+`box.audio.play(lead_a3, 0.8)`, then `lead_c4` and `lead_e4` a few frames apart, play one voice
+that slides up a minor third and a major third and releases 0.3 s after the last note.
 
 Which curves to use: plucks, the harp, mallets and drums want a `curve` of 4 to 6 so they fall
 off fast at first and ring out softly; pads, strings and winds want 2 to 3 on the decay and the
@@ -531,7 +683,7 @@ release, and an `attack_curve` of 1 to 2 for a swell that settles. A sound that 
 linear envelope (curves of 0) renders exactly as before. A curve makes a segment quieter
 sooner, so a pluck usually wants a longer decay than its linear version.
 
-Four examples:
+Nine examples, six that are plain layers and three that modulate:
 
 ```
 using box.audio
@@ -560,34 +712,133 @@ prefab UiBlip {
   }
 }
 
-// A whoosh: noise through a resonant bandpass that sweeps up and fades
+// A whoosh: noise through a resonant bandpass that a filter envelope opens as it fades in
 prefab Whoosh {
   SynthSound: {seed: 7, level_variance: 0.1}
   SynthEnvelope: {attack: 0.15, decay: 0.25, sustain: 0.3, hold: 0.1, release: 0.3}
-  SynthFilter: {kind: SynthBandPass, cutoff: 300, cutoff_end: 4000, sweep: 0.5, resonance: 0.6}
+  SynthFilter: {kind: SynthBandPass, cutoff: 300, resonance: 0.6}
+  SynthFilterEnvelope: {attack: 0.5, sustain: 1, hold: 0.31, amount: 3.737}
   SynthOscillator: {wave: SynthNoise, level: 0.8}
 }
 
-// A pluck: a curved decay that falls fast and rings out, no sustain
+// A bell: a modulator at 3.5 times the pitch makes an inharmonic spectrum, and its envelope
+// is shorter than the carrier's, so the bell starts bright and rings out pure, 2.5 s
+prefab Bell {
+  SynthSound: {level_variance: 0.05}
+  SynthEnvelope: {attack: 0.002, decay: 2.5}
+  SynthOscillator: {frequency: 660, level: 0.4}
+  bright {
+    SynthOscillator: {frequency: 2310, modulation: SynthPhase, index: 4}
+    SynthEnvelope: {attack: 0.001, decay: 1.2}
+  }
+}
+
+// An electric piano: a 1:1 pair for the body and a short tine, a modulator at 14 times the
+// pitch that fades in 80 ms, 1.6 s
+prefab ElectricPiano {
+  SynthSound: {}
+  body {
+    SynthOscillator: {frequency: 220, level: 0.35}
+    SynthEnvelope: {attack: 0.002, decay: 1.6}
+    warmth {
+      SynthOscillator: {frequency: 220, modulation: SynthPhase, index: 1.8}
+      SynthEnvelope: {attack: 0.002, decay: 0.6}
+    }
+  }
+  tine {
+    SynthOscillator: {frequency: 220, level: 0.12}
+    SynthEnvelope: {attack: 0.001, decay: 0.3}
+    strike {
+      SynthOscillator: {frequency: 3080, modulation: SynthPhase, index: 2.5}
+      SynthEnvelope: {attack: 0.001, decay: 0.08}
+    }
+  }
+}
+
+// A metallic hit: two partials that do not share harmonics, ring modulated, the modulator
+// gritty with feedback, and a short clang of FM on top, through a highpass, 0.6 s
+prefab MetalHit {
+  SynthSound: {pitch_variance: 0.03}
+  SynthEnvelope: {attack: 0.001, decay: 0.6}
+  SynthFilter: {kind: SynthHighPass, cutoff: 400}
+  SynthOscillator: {frequency: 587, level: 0.4}
+  ring { SynthOscillator: {frequency: 1371, modulation: SynthRing, index: 1, feedback: 0.6} }
+  clang {
+    SynthOscillator: {frequency: 1960, modulation: SynthPhase, index: 3}
+    SynthEnvelope: {attack: 0.001, decay: 0.15}
+  }
+}
+
+// A pluck: a saw through a 24 dB lowpass that its filter envelope opens 4 octaves on the attack
+// and closes with the note
 prefab Pluck {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.002, decay: 0.4, sustain: 0.3, hold: 0.1, release: 0.2}
+  SynthFilter: {kind: SynthLowPass, cutoff: 300, resonance: 0.3, slope: SynthSlope24}
+  SynthFilterEnvelope: {attack: 0.002, decay: 0.25, sustain: 0.2, hold: 0.25, release: 0.2, amount: 4}
+  SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.5}
+}
+
+// A ring: a curved decay that falls fast and rings out, no sustain, its lowpass closing from
+// 4 kHz to 1.2 kHz over 0.3 s
+prefab Ring {
   AudioOutput: {bus: ui}
   SynthSound: {level_variance: 0.1}
   SynthEnvelope: {attack: 0.002, decay: 0.6, curve: 5}
-  SynthFilter: {kind: SynthLowPass, cutoff: 4000, cutoff_end: 1200, sweep: 0.3, resonance: 0.1}
+  SynthFilter: {kind: SynthLowPass, cutoff: 1200, resonance: 0.1}
+  SynthFilterEnvelope: {decay: 0.3, amount: 1.737}
   string { SynthOscillator: {wave: SynthTriangle, frequency: 330, level: 0.4} }
   body { SynthOscillator: {wave: SynthSine, frequency: 330, level: 0.3} }
 }
+
+// Strings: an ensemble of five saws detuned around 220 Hz and one an octave up, a sine an
+// octave down and a breath of noise, eight layers, through a 24 dB lowpass that opens with the
+// bow and swells in, 1.6 s
+prefab Strings {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.3, decay: 0.2, sustain: 0.7, hold: 0.5, release: 0.6, curve: 2.5, attack_curve: 1.5}
+  SynthFilter: {kind: SynthLowPass, cutoff: 900, resonance: 0.15, slope: SynthSlope24}
+  SynthFilterEnvelope: {attack: 0.4, sustain: 1, hold: 0.7, release: 0.5, amount: 1.5}
+  SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.08}
+  a { SynthOscillator: {wave: SynthSaw, frequency: 219.2, level: 0.08} }
+  b { SynthOscillator: {wave: SynthSaw, frequency: 220.9, level: 0.08} }
+  c { SynthOscillator: {wave: SynthSaw, frequency: 218.5, level: 0.07} }
+  d { SynthOscillator: {wave: SynthSaw, frequency: 221.6, level: 0.07} }
+  e { SynthOscillator: {wave: SynthSaw, frequency: 440.6, level: 0.04} }
+  sub { SynthOscillator: {wave: SynthSine, frequency: 110, level: 0.12} }
+  air { SynthOscillator: {wave: SynthNoise, level: 0.01} }
+}
 ```
 
-The tests are the `Synth` suite of `test/cpu/audio`, on offline renders: frequencies of every
-wave at 44.1 and 48 kHz, sweeps, aliasing of a 5 kHz saw, square and triangle, flat and seeded noise, the
-times and edges of envelopes, curved envelopes (a linear one bit identical to the linear
-recurrence, a curved decay at its midpoint and on its sustain, a curved release that ends the
-voice on time), the end of a voice, the filter one octave past its cutoff and
-under sweeps at full resonance and extreme values, layers, scripts from
-`test/assets/audio/synth.flecs`, the four examples above from
-`test/assets/audio/synth_examples.flecs` and errors; `NoAlloc` renders 64 synth voices. The browser
-check is `test/integration/web/audio_synth.mjs`.
+The strings use all 8 layers: the detuned saws beat slowly against each other, the chorus of
+an ensemble, which takes more oscillators than a lead does. A sound of 8 layers costs twice the
+render work of one of 4 and nothing more; the other sounds keep their cost.
+
+The whoosh opens from 300 Hz to `300 * 2^3.737`, 4 kHz, over half a second and stays there. A
+sweep from one cutoff to another over a time is an attack of that time with a sustain of 1 when
+it rises, and a decay of that time from the higher cutoff to the lower one, the `cutoff`, when
+it falls: `SynthFilter: {cutoff: 300}` with `SynthFilterEnvelope: {decay: 0.2, amount: 3}`
+falls from 2400 Hz to 300 Hz in 0.2 s.
+
+The tests are the `Synth` suite of `test/cpu/audio`, on offline renders: frequencies of every wave
+at 44.1 and 48 kHz, sweeps, aliasing of a 5 kHz saw, square and triangle, flat and seeded noise,
+the times and edges of envelopes, curved envelopes (a linear one bit identical to the linear
+recurrence, a curved decay at its midpoint and on its sustain, a curved release that ends the voice
+on time), the end of a voice, the filter one octave past its cutoff at both slopes, the cutoff
+following a filter envelope up and down, stability under fast filter envelopes at full resonance
+and at Nyquist for both slopes and extreme values, layers, phase modulation at 1:1 and 6:1 against
+Bessel amplitudes and without drift, an index that follows the envelope of its modulator and fades
+the high sidebands, the limit of the index, ring modulation at the sum and difference alone,
+audible modulators, feedback, 8 layers each found at its own frequency with a Goertzel filter, a
+9th left out, the size of the command, the pool of parts, renders of patches of 4 layers bit
+identical whatever the unused layers hold, scripts from `test/assets/audio/synth.flecs` and
+`test/assets/audio/synth_fm.flecs` and `test/assets/audio/synth_layers.flecs`, the nine examples
+above from `test/assets/audio/synth_examples.flecs`, glides (the frequency halfway through a glide
+at the geometric mean, a glide of 0 bit identical to the jump, the pitch of a source) and legato
+notes (no new attack, a held sustain that holds again, a new voice after the release, also of a
+looping voice that then ends, and after the end, from script and from a source, the lead above
+from `test/assets/audio/synth_glide.flecs`) and errors; `NoAlloc` renders 64 synth voices. The
+browser check is `test/integration/web/audio_synth.mjs`.
 
 ## Transports
 
@@ -902,6 +1153,7 @@ frame, the same on every platform.
 | `AudioStream` | Music: an Ogg Vorbis file (`path`) that streams, `volume` (1), `loop` (true), `playing` (true), see [Music](#music) |
 | `AudioStreamStatus` | Read only: `state` (`AudioStreamLoading`, `AudioStreamPlaying`, `AudioStreamStopped`, `AudioStreamEnded`, `AudioStreamFailed`), `frames`, `channels`, `sample_rate`, `position`, `buffered`, `underruns`, `decode_ms`, `decode_max_ms` and `error` |
 | `SynthSound` | A sound made by the synth from its layers, see [Synth sounds](#synth-sounds) |
+| `SynthGlide` | Portamento and mono legato of a synth sound, see [Glide and legato](#glide-and-legato) |
 | `AudioSpatial` | Places a source in the world: `min_distance` (1), `max_distance` (50), `rolloff` (1), see [Spatial audio](#spatial-audio) |
 | `AudioListener` | Tag of the entity whose `WorldTransform` hears the spatial sources |
 | `AudioSettings` | Singleton: `master_volume` (1) and `mute` |

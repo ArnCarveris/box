@@ -5,8 +5,10 @@
  * own whose panel is an instance of the template of etc/fps/fps.flecs.
  *
  * The script draws everything the panel shows. C creates the scene, camera and view, places the
- * panel at the top right of the surface, loads the script and loads it again when it changes,
- * writes FpsSummary and exports the colors and limits of the bars to the script.
+ * panel at the top right of the surface, loads the script and loads it again when it changes.
+ *
+ * C provides the data: FpsSummary, the frame time of the sample of every bar, written only when
+ * it changed, and the colors and limits of the bars.
  */
 
 #define BOX_FPS_IMPL
@@ -39,6 +41,10 @@ typedef struct box_fps_t {
     float width;                /**< Surface width in points the screen was sized for */
     float height;               /**< Surface height in points the screen was sized for */
     ecs_query_t *surfaces;      /**< Entities with a Surface */
+    ecs_entity_t bars[BOX_FPS_BARS];    /**< Bars of the chart, oldest first */
+    double bar_ms[BOX_FPS_BARS];        /**< Frame time last written to each bar */
+    ecs_entity_t bar_mut;       /**< Mut variables of the bar template, BOX_FPS_BAR_MUT */
+    bool bars_ready;            /**< bars, bar_mut and bar_ms are of the current content */
 } box_fps_t;
 
 void box_fps_summarize(
@@ -81,7 +87,98 @@ static void box_fps_summary_sync(
     }
 }
 
-/** FrameSamples was set or notified: summarize them again while the panel is open.
+/** Find the bars of the chart and the mut variables of the bar template that hold their ms.
+ *
+ * The mut variables must be ms alone, an f64, since C sets them as a whole: a mut has an
+ * on_replace hook, so it cannot be changed in place.
+ *
+ * @param world The world
+ * @param fps The panel state
+ * @return Whether the script created the bars, which have the mut variables
+ */
+static bool box_fps_bars_resolve(
+    ecs_world_t *world,
+    box_fps_t *fps)
+{
+    ecs_entity_t mut = ecs_lookup(world, BOX_FPS_BAR_MUT);
+    ecs_entity_t chart = ecs_lookup(world, BOX_FPS_CHART);
+    const EcsStruct *st = mut ? ecs_get(world, mut, EcsStruct) : NULL;
+    const ecs_member_t *member = st && ecs_vec_count(&st->members) == 1 ?
+        ecs_vec_first_t(&st->members, ecs_member_t) : NULL;
+    bool result = false;
+    char name[32];
+    int32_t i;
+    if (!member || !chart || ecs_os_strcmp(member->name, "ms") ||
+        member->type != ecs_id(ecs_f64_t))
+    {
+        goto done;
+    }
+
+    for (i = 0; i < BOX_FPS_BARS; i ++) {
+        ecs_os_snprintf(name, sizeof(name), "bar_%d", i);
+        fps->bars[i] = ecs_lookup_child(world, chart, name);
+        if (!fps->bars[i] || !ecs_has_id(world, fps->bars[i], mut)) {
+            goto done;
+        }
+    }
+
+    fps->bar_mut = mut;
+    result = true;
+
+done:
+    return result;
+}
+
+/** Whether the bars that were found are still those of the content.
+ *
+ * @param world The world
+ * @param fps The panel state
+ * @return Whether the bars and the mut variables of the bar template are alive
+ */
+static bool box_fps_bars_valid(
+    const ecs_world_t *world,
+    const box_fps_t *fps)
+{
+    return fps->bars_ready && ecs_is_alive(world, fps->bar_mut) &&
+        ecs_is_alive(world, fps->bars[0]) && ecs_is_alive(world, fps->bars[BOX_FPS_BARS - 1]);
+}
+
+/** Write the frame time of its sample to the mut ms of every bar whose sample changed, so a new
+ * sample evaluates only the bars that show another sample. Bars found again get all of them.
+ *
+ * @param world The world
+ * @param fps The panel state
+ */
+static void box_fps_bars_sync(
+    ecs_world_t *world,
+    box_fps_t *fps)
+{
+    const FrameSamples *samples = ecs_singleton_get(world, FrameSamples);
+    bool all = false;
+    int32_t i;
+    if (!box_fps_bars_valid(world, fps)) {
+        fps->bars_ready = box_fps_bars_resolve(world, fps);
+        all = true;
+    }
+
+    if (!fps->bars_ready) {
+        goto done;
+    }
+
+    for (i = 0; i < BOX_FPS_BARS; i ++) {
+        double ms = samples ? box_frame_sample(samples, BOX_FPS_BARS - 1 - i) : 0;
+        if (all || ms != fps->bar_ms[i]) {
+            ecs_set_id(world, fps->bars[i], fps->bar_mut, sizeof(double), &ms);
+            fps->bar_ms[i] = ms;
+        }
+    }
+
+done:
+    return;
+}
+
+/** FrameSamples was set or notified: summarize them again and write the samples of the bars
+ * that changed while the panel is open.
  *
  * @param it Iterator of the observer
  */
@@ -91,6 +188,7 @@ static void box_fps_samples_on_set(
     box_fps_t *fps = it->ctx;
     if (fps->shown) {
         box_fps_summary_sync(it->world);
+        box_fps_bars_sync(it->world, fps);
     }
 }
 
@@ -213,9 +311,11 @@ static void box_fps_script_sync(
 
         fps->script = 0;
         fps->reload = false;
+        fps->bars_ready = false;
         box_fps_script_load(world, fps);
     } else if (fps->reload) {
         fps->reload = false;
+        fps->bars_ready = false;
         box_fps_script_reload(world, fps);
     }
 
@@ -412,6 +512,7 @@ static void box_fps_hide(
     fps->root = 0;
     fps->panel = 0;
     fps->shown = false;
+    fps->bars_ready = false;
 }
 
 /** Open and close the panel from the FpsPanel singleton, keep its script loaded and place it.
@@ -445,6 +546,10 @@ static void BoxFpsUpdate(
 
     box_fps_script_sync(world, fps);
     box_fps_template(world, fps);
+    if (!box_fps_bars_valid(world, fps)) {
+        box_fps_bars_sync(world, fps);
+    }
+
     box_fps_measure(world, fps);
     if (fps->relayout) {
         box_fps_layout(world, fps);

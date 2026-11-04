@@ -1961,3 +1961,116 @@ void Picking_focus_click_without_move(void) {
 
     ecs_fini(world);
 }
+
+void Picking_image_slice_surface_corner(void) {
+    // ui/picking
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    /* A surface of 200 x 100 points at 2 pixels per point with a 10 x 10 button in its top left
+     * and bottom right corners, shown by an 800 x 400 HUD panel sliced with insets of 40 texels,
+     * 20 points of the surface */
+    test_assert(ecs_script(world, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.camera\n"
+        "using box.view\n"
+        "using box.surface\n"
+        "using box.picking\n"
+        "template Probe {\n"
+        "  mut clicks: i32 = 0\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.click(this)\n"
+        "      clicks = clicks + 1\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "screen_texture {}\n"
+        "screen_ui {\n"
+        "  Scene: {}\n"
+        "  camera {\n"
+        "    Position: {0, 0, 100}\n"
+        "    Camera: {ortho: true, ortho_scale: 1}\n"
+        "  }\n"
+        "  top_left {\n"
+        "    Position: {-85, 35, 0}\n"
+        "    Rect: {10, 10}\n"
+        "    Interactive\n"
+        "    Probe: {}\n"
+        "  }\n"
+        "  bottom_right {\n"
+        "    Position: {85, -35, 0}\n"
+        "    Rect: {10, 10}\n"
+        "    Interactive\n"
+        "    Probe: {}\n"
+        "  }\n"
+        "}\n"
+        "screen_views {\n"
+        "  view {\n"
+        "    View: {camera: screen_ui.camera}\n"
+        "  }\n"
+        "}\n"
+        "screen_surface {\n"
+        "  Surface: {width: 200, height: 100, pixel_ratio: 2, texture: screen_texture,\n"
+        "    view_root: screen_views}\n"
+        "}\n"
+        "hud {\n"
+        "  Scene: {}\n"
+        "  camera {\n"
+        "    Position: {0, 0, 100}\n"
+        "    Camera: {ortho: true, ortho_scale: 1}\n"
+        "  }\n"
+        "  panel {\n"
+        "    Position: {0, 0, 0}\n"
+        "    Rect: {800, 400}\n"
+        "    Image: {texture: screen_texture}\n"
+        "    ImageSlice: {left: 40, top: 40, right: 40, bottom: 40}\n"
+        "  }\n"
+        "}\n"
+        "hud_view {\n"
+        "  View: {camera: hud.camera}\n"
+        "}\n" }) != 0);
+
+    typedef struct { int32_t clicks; } Mut;
+    ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
+    ecs_entity_t top_left = ecs_lookup(world, "screen_ui.top_left");
+    ecs_entity_t bottom_right = ecs_lookup(world, "screen_ui.bottom_right");
+    ecs_entity_t panel = ecs_lookup(world, "hud.panel");
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    const SurfaceStatus *st = ecs_get(world, ecs_lookup(world, "screen_surface"), SurfaceStatus);
+    test_assert(st != NULL);
+    test_int(st->width, 400);
+    test_int(st->height, 200);
+
+    /* 30, 30 points into the panel is 3 / 4 into its 40 point corner: surface point 15, 15, on
+     * the top left button. Stretched it would be 7.5, 7.5 and with the insets in points 30, 30 */
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_click left [270, 190]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_uint(ecs_singleton_get(world, PickStatus)->hit, panel);
+    test_int(((const Mut*)ecs_get_id(world, top_left, mut))->clicks, 1);
+
+    /* The bottom right corner maps the same way to surface point 185, 85 */
+    ecs_os_free(box_command_run(world, s, "mouse_click left [1010, 530]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(((const Mut*)ecs_get_id(world, bottom_right, mut))->clicks, 1);
+
+    /* Without the ImageSlice the panel stretches the surface and the click misses the button */
+    ecs_remove(world, panel, ImageSlice);
+    ecs_progress(world, 0);
+    ecs_os_free(box_command_run(world, s, "mouse_click left [270, 190]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_uint(ecs_singleton_get(world, PickStatus)->hit, panel);
+    test_int(((const Mut*)ecs_get_id(world, top_left, mut))->clicks, 1);
+
+    ecs_fini(world);
+}

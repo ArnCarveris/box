@@ -5,9 +5,15 @@
  * Every clip has an index into the clip buffer that the 2D instances below it hold; its area is
  * computed every frame from the element and uploaded when one changed.
  *
+<<<<<<< HEAD
  * Slice records (Rects with an ImageSlice) take two clip records and polygon records (Polygon2D)
  * a header and chunks of five per 14 edges, so the 2D shape shader reads them without a binding
  * of its own; a polygon that outgrows its run of records moves to a free run that it fits.
+=======
+ * The slice records of the Rects with an ImageSlice take two clip records each, so the 2D shape
+ * shader reads them without a binding of their own. They are computed when the shape changed or
+ * the texture of its image changed size, as when it finished loading or its Surface resized.
+>>>>>>> 97d810b441ddafca67d1b540a835256eb63d9107
  */
 
 #include "draw.h"
@@ -534,6 +540,27 @@ void box_draws_slice_release(
     }
 }
 
+/** Get the size in texels of the image of a sliced 2D shape: its Texture, or the image of the
+ * Surface that renders into it (box_surface_texture_size).
+ *
+ * @param world The world
+ * @param texture The texture entity of the Image, 0 for none
+ * @param size Receives the width and height, 0 while the texture has no size
+ */
+static void box_draws_slice_texture(
+    const ecs_world_t *world,
+    ecs_entity_t texture,
+    int32_t size[2])
+{
+    const Texture *t = texture && ecs_is_alive(world, texture)
+        ? ecs_get(world, texture, Texture) : NULL;
+    size[0] = t ? t->width : 0;
+    size[1] = t ? t->height : 0;
+    if (!t && texture && ecs_is_alive(world, texture)) {
+        box_surface_texture_size(world, texture, &size[0], &size[1]);
+    }
+}
+
 bool box_draws_slice_record(
     const ecs_world_t *world,
     ecs_entity_t e,
@@ -542,10 +569,8 @@ bool box_draws_slice_record(
     const Shape2D *shape = ecs_get(world, e, Shape2D);
     const Image *image = shape && shape->sliced ? ecs_get(world, e, Image) : NULL;
     const ImageSlice *slice = image ? ecs_get(world, e, ImageSlice) : NULL;
-    const Texture *texture = slice && image->texture && ecs_is_alive(world, image->texture)
-        ? ecs_get(world, image->texture, Texture) : NULL;
     box_image_slice_t parts;
-    int32_t i;
+    int32_t i, size[2];
     bool result = slice != NULL;
     ecs_os_zeromem(out);
     if (!result) {
@@ -553,8 +578,8 @@ bool box_draws_slice_record(
     }
 
     float w = shape->size[0], h = shape->size[1];
-    box_image_slice_resolve(image, slice, texture ? (float)texture->width : 0.0f,
-        texture ? (float)texture->height : 0.0f, w, h, &parts);
+    box_draws_slice_texture(world, image->texture, size);
+    box_image_slice_resolve(image, slice, (float)size[0], (float)size[1], w, h, &parts);
     w = w > 0.0f ? w : 1.0f;
     h = h > 0.0f ? h : 1.0f;
     for (i = 0; i < 4; i ++) {
@@ -571,23 +596,6 @@ bool box_draws_slice_record(
     out->flags[0] = parts.hollow ? 1.0f : 0.0f;
 done:
     return result;
-}
-
-/** Get the Texture of the image of a sliced 2D shape.
- *
- * @param world The world
- * @param texture The texture entity of the Image, 0 for none
- * @param size Receives the width and height, 0 without a Texture
- */
-static void box_draws_slice_texture(
-    const ecs_world_t *world,
-    ecs_entity_t texture,
-    int32_t size[2])
-{
-    const Texture *t = texture && ecs_is_alive(world, texture)
-        ? ecs_get(world, texture, Texture) : NULL;
-    size[0] = t ? t->width : 0;
-    size[1] = t ? t->height : 0;
 }
 
 /** Compute the slice records of the shapes that changed and of those whose texture changed

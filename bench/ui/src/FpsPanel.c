@@ -7,7 +7,7 @@
  * sample every frame, which moves every bar one slot left.
  *
  * In open_new_sample the samples differ, so nearly every bar and the summary change; in
- * open_steady_sample they are all as long, so the script evaluates every bar and sets none.
+ * open_steady_sample they are all as long, so no bar changes and the script evaluates none.
  */
 
 #include <box.h>

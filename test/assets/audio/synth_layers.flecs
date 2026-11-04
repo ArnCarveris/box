@@ -1,0 +1,30 @@
+// Layers for the Synth suite of test/cpu/audio: a sound with BOX_AUDIO_SYNTH_LAYERS (8) layers,
+// the root and seven children, and one with a ninth, which logs one error and is left out.
+using box.audio
+
+prefab Octet {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.01, decay: 0.2}
+  SynthOscillator: {frequency: 100, level: 0.05}
+  b { SynthOscillator: {frequency: 200, level: 0.05} }
+  c { SynthOscillator: {frequency: 300, level: 0.05} }
+  d { SynthOscillator: {frequency: 400, level: 0.05} }
+  e { SynthOscillator: {frequency: 500, level: 0.05} }
+  f { SynthOscillator: {frequency: 600, level: 0.05} }
+  g { SynthOscillator: {frequency: 700, level: 0.05} }
+  h { SynthOscillator: {frequency: 800, level: 0.05} }
+}
+
+prefab Wide {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.01, decay: 0.1}
+  a { SynthOscillator: {frequency: 100, level: 0.05} }
+  b { SynthOscillator: {frequency: 200, level: 0.05} }
+  c { SynthOscillator: {frequency: 300, level: 0.05} }
+  d { SynthOscillator: {frequency: 400, level: 0.05} }
+  e { SynthOscillator: {frequency: 500, level: 0.05} }
+  f { SynthOscillator: {frequency: 600, level: 0.05} }
+  g { SynthOscillator: {frequency: 700, level: 0.05} }
+  h { SynthOscillator: {frequency: 800, level: 0.05} }
+  i { SynthOscillator: {frequency: 900, level: 0.05} }
+}

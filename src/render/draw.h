@@ -1933,7 +1933,8 @@ void box_draws_clip_removed(
  * mark the record to be computed again in the next send.
  *
  * A slice record takes two consecutive records of the clip buffer, computed in a send with the
- * clips from the Shape2D, Image, ImageSlice and the Texture of the image of the shape.
+ * clips from the Shape2D, Image, ImageSlice and the size of the texture of the image of the
+ * shape.
  *
  * @param d The state
  * @param e The shape, which changed
@@ -1953,7 +1954,8 @@ void box_draws_slice_release(
     ecs_entity_t e);
 
 /** Compute the slice record of a sliced 2D shape: the nine parts of its Image, as fractions of
- * the element, or the plain Image while the texture has no Texture.
+ * the element, or the plain Image while the texture has no size: no Texture and no Surface
+ * that renders into it (box_surface_texture_size).
  *
  * @param world The world
  * @param e The shape

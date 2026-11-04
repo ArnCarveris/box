@@ -200,7 +200,8 @@
             {
                 "id": "PickTexture",
                 "testcases": [
-                    "blend_mask_coordinates"
+                    "blend_mask_coordinates",
+                    "image_slice_corner"
                 ]
             },
             {
@@ -595,6 +596,7 @@
                     "bars_follow_new_sample",
                     "bars_not_laid_out",
                     "bars_set_when_changed",
+                    "bars_sample_when_changed",
                     "reference_lines",
                     "summary_text",
                     "summary_colors",
@@ -651,7 +653,8 @@
                     "prefab",
                     "template",
                     "record_waits_for_texture",
-                    "record_lifecycle"
+                    "record_lifecycle",
+                    "record_surface_texture"
                 ]
             }
         ]
