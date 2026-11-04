@@ -317,3 +317,49 @@ void Draws_deleted_while_disabled(void) {
 
     ecs_fini(world);
 }
+
+void Draws_shape_without_position_not_drawn(void) {
+    // renderer/views
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "nopos.png",
+        .resolution_scale = 1});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Box, {2, 2, 2});
+    ecs_set(world, e, Rgb, {0, 0, 0});
+    ecs_set(world, e, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, e, Emissive, {.strength = 1, .color = {255, 0, 0}});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/nopos.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_assert(px[(16 * 32 + 16) * 4] < 40);
+    stbi_image_free(px);
+
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_assert(px[(16 * 32 + 16) * 4] > 200);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
