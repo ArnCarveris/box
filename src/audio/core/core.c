@@ -296,7 +296,8 @@ static void box_audio_voice_fade(
  *
  * @param core The core
  * @param handle The handle
- * @return The voice, NULL when none plays with the handle
+ * @return The voice, NULL when none plays with the handle and for handle 0, which orphaned
+ *     voices have
  */
 static box_audio_voice_t* box_audio_voice_find(
     box_audio_core_t *core,
@@ -306,7 +307,7 @@ static box_audio_voice_t* box_audio_voice_find(
     int32_t i;
     for (i = 0; i < BOX_AUDIO_VOICE_SLOTS && !result; i ++) {
         box_audio_voice_t *v = &core->voices[i];
-        if (v->state == BOX_AUDIO_VOICE_PLAYING && v->handle == handle) {
+        if (handle && v->state == BOX_AUDIO_VOICE_PLAYING && v->handle == handle) {
             result = v;
         }
     }
@@ -427,7 +428,7 @@ done:
 
 /** Apply a legato command: retarget the synth voice it follows and give it the new handle, or
  * take the handle from that voice and start a new one. A synth voice that lost its handle
- * releases on its own and reports its end with handle 0; any other fades out.
+ * stops looping, rings out its release and reports its end with handle 0; any other fades out.
  *
  * A command of a sound that is not ready leaves the voice as it is, with the new handle.
  *
@@ -460,7 +461,9 @@ static void box_audio_cmd_legato(
         v->pitch = pitch;
         box_audio_voice_gains(core, v);
     } else {
-        if (v && !synth) {
+        if (v && v->source.kind == BOX_AUDIO_SOURCE_SYNTH) {
+            v->source.data.synth.loop = false;
+        } else if (v) {
             box_audio_voice_fade(core, v, core->ramp_frames);
         }
 

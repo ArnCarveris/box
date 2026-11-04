@@ -1586,7 +1586,7 @@ void Synth_legato_no_retrigger(void) {
 }
 
 /** A legato note of a voice that releases starts a new voice with the new handle: the old one
- * releases on its own and reports its end with handle 0. */
+ * releases, ends and reports its end with handle 0. */
 void Synth_legato_after_release(void) {
     // audio/synth
     box_audio_core_t *core = synth_core(AUDIO_RATE);
@@ -1609,6 +1609,44 @@ void Synth_legato_after_release(void) {
     test_int(box_audio_core_voice_count(core), 1);
     test_assert(fabs(audio_frequency(audio_l, 8000, 9600) - 450) < 0.5);
     audio_render(core, 0, AUDIO_FRAMES);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_VOICE_END, &e), 1);
+    test_int(e.id, 8);
+    box_audio_core_free(core);
+}
+
+/** A legato note of a looping voice in the release of its pass starts a new voice: the old one
+ * stops looping, rings out its release and ends with handle 0, while the new one loops, and a
+ * stop of the new handle leaves nothing playing. */
+void Synth_legato_after_release_loop(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t a = synth_glide_patch(300, 0.05f), b;
+    box_audio_writer_t w;
+    uint8_t bytes[64];
+    box_audio_event_t e;
+    a.envelope = (box_audio_synth_envelope_t){
+        .attack = 0.01f, .sustain = 0.5f, .hold = 0.05f, .release = 0.2f };
+    b = a;
+    b.layer[0].frequency = 450;
+    synth_define(core, 1, &a);
+    synth_define(core, 2, &b);
+    audio_play(core, 7, 1, 0, 1, 0, 1, BOX_AUDIO_PLAY_LOOP);
+    audio_render(core, 0, 4800);
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_legato(&w, 8, 7, 2, 0, 1, 0, 1, BOX_AUDIO_PLAY_LOOP));
+    box_audio_core_apply(core, w.data, w.size);
+    audio_render(core, 0, 480);
+    test_int(box_audio_core_voice_count(core), 2);
+    audio_render(core, 0, 19200);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_VOICE_END, &e), 1);
+    test_int(e.id, 0);
+    test_int(box_audio_core_voice_count(core), 1);
+
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_stop(&w, 8));
+    box_audio_core_apply(core, w.data, w.size);
+    audio_render(core, 0, AUDIO_FRAMES);
+    test_int(box_audio_core_voice_count(core), 0);
     test_int(audio_events(core, BOX_AUDIO_EVENT_VOICE_END, &e), 1);
     test_int(e.id, 8);
     box_audio_core_free(core);

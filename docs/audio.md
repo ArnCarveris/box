@@ -527,7 +527,8 @@ with `SOUND_FREE`. The core clamps every value of a patch, a NaN to the low end.
   with the ramp, and a loop restarts on the new note. Layers past the count of the new patch
   follow the pitch. When every envelope of the voice releases or ended, or the voice is not a
   synth, the command takes the handle from it and starts a new voice with the new handle: a
-  synth voice releases on its own and reports its `VOICE_END` with handle 0, any other fades
+  synth voice stops looping, rings out its release and reports its `VOICE_END` with handle 0
+  (so a looping voice does not start another pass without a handle), any other fades
   out as after a `STOP`. Without a voice of the handle it follows it is a plain `PLAY` of the
   new handle. Since every note has a new handle, the `VOICE_END` of a voice that ended before
   the sender saw it never names the voice of the next note. A sound that is not ready leaves
@@ -593,9 +594,9 @@ How a note follows the previous one:
   the new play. A note that comes while the voice holds its sustain holds it for its `hold`
   again, so a phrase of quick notes is one held voice that releases after the last note. A
   note after the voice reached its release, or after it ended, starts a new voice with its
-  attack; the voice that released rings out.
-- **Notes on a source.** A new `sound` on an `AudioSource` that plays a legato sound does the
-  same with the voice of the source, when `loop` does not change; the source keeps playing and
+  attack; the voice that released rings out, and a looping one stops looping and ends.
+- **Notes on a source.** A new legato `sound` on an `AudioSource` does the same with the voice
+  of the source, when `loop` does not change (the voice it follows may be of any synth sound); the source keeps playing and
   ends with the voice.
 - The voice keeps the waves, levels, envelopes, filter and variances of the sound that
   started it; the following notes give it only their frequencies, layer by layer, and their
@@ -711,8 +712,8 @@ resonance and at Nyquist for both slopes and extreme values, layers, scripts fro
 `test/assets/audio/synth.flecs`, the five examples above from
 `test/assets/audio/synth_examples.flecs`, glides (the frequency halfway through a glide at the
 geometric mean, a glide of 0 bit identical to the jump, the pitch of a source) and legato notes
-(no new attack, a held sustain that holds again, a new voice after the release and after the
-end, from script and from a source, the lead above from `test/assets/audio/synth_glide.flecs`)
+(no new attack, a held sustain that holds again, a new voice after the release, also of a
+looping voice that then ends, and after the end, from script and from a source, the lead above from `test/assets/audio/synth_glide.flecs`)
 and errors; `NoAlloc` renders 64 synth voices. The browser check is
 `test/integration/web/audio_synth.mjs`.
 
