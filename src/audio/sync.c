@@ -132,7 +132,7 @@ static void box_audio_reset(
  * @param bus The entity
  * @return The index, 0 when the entity is not a live bus with an index
  */
-static uint8_t box_audio_bus_of(
+uint8_t box_audio_bus_of(
     ecs_world_t *world,
     const box_audio_module_t *state,
     ecs_entity_t bus)
@@ -930,7 +930,7 @@ static void box_audio_sounds(
  * @param sound The sound entity
  * @return The id, 0 when the output does not have the sound
  */
-static uint32_t box_audio_sound_of(
+uint32_t box_audio_sound_of(
     ecs_world_t *world,
     const box_audio_module_t *state,
     ecs_entity_t sound)
@@ -954,7 +954,7 @@ static uint32_t box_audio_sound_of(
  * @param sound The sound entity
  * @return Whether its sample is loading
  */
-static bool box_audio_sound_loading(
+bool box_audio_sound_loading(
     ecs_world_t *world,
     ecs_entity_t sound)
 {
@@ -970,7 +970,7 @@ static bool box_audio_sound_loading(
  * @param sound The sound entity
  * @return The bus index, 0 for the master
  */
-static uint8_t box_audio_sound_bus(
+uint8_t box_audio_sound_bus(
     ecs_world_t *world,
     const box_audio_module_t *state,
     ecs_entity_t sound)
@@ -1031,7 +1031,7 @@ static float box_audio_resume_position(
  * @param channel Receives its SynthGlide.channel, may be NULL
  * @return Whether it has SynthSound and a SynthGlide with legato
  */
-static bool box_audio_legato_of(
+bool box_audio_legato_of(
     ecs_world_t *world,
     ecs_entity_t sound,
     int32_t *channel)
@@ -1729,6 +1729,7 @@ static void BoxAudioSync(
         }
 
         box_audio_queued(world, state, waiting);
+        box_audio_notes_send(world, state, waiting);
         box_audio_timeline_update(world, state, t, waiting);
         box_audio_timeline_quantized(world, state, waiting);
         state->spatial_dirty = false;
@@ -1736,6 +1737,7 @@ static void BoxAudioSync(
         box_audio_music_update(world, state, NULL, false);
         ecs_vec_clear(&state->moved);
         ecs_vec_clear(&state->plays);
+        ecs_vec_clear(&state->notes);
         ecs_vec_clear(&state->stops);
         ecs_vec_clear(&state->releases);
         ecs_vec_clear(&state->fades);

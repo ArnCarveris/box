@@ -489,6 +489,29 @@ ECS_STRUCT(Transport, {
                             *   bar, default false */
 });
 
+/** An instrument: a synth or a sampler that plays notes with a pitch, a velocity, a pan and a
+ * duration, ad hoc with box_audio_play_note, on the bus of its AudioOutput, else of its sound.
+ *
+ * A note plays at the ratio 2^((pitch - root) / 12), clamped to 1/64..16 with one warning, at
+ * the gain velocity^velocity_curve. A sampler starts without the 5 ms ramp of a play, so a drum
+ * keeps its transient.
+ *
+ * With a gate the duration ends a note: a synth sustains, its holds ignored, and releases with
+ * its envelopes, a sampler fades out over release. A gated note of a legato synth glides into
+ * the voice of its channel while it holds, so overlapping notes are one phrase.
+ */
+ECS_STRUCT(Instrument, {
+    ecs_entity_t sound;    /**< The sound that plays: SynthSound for a synth, AudioPcm or
+                            *   SoundFile for a sampler */
+    float root;            /**< MIDI note at which the sound plays as authored, default 69
+                            *   (A4, 440 Hz) */
+    float velocity_curve;  /**< Exponent of the velocity in the gain, default 2 */
+    bool gate;             /**< The duration of a note ends it, default true; false plays the
+                            *   sound as authored, like a drum hit */
+    float release;         /**< Seconds a sampler note fades out over after its end, default
+                            *   0.05; a synth uses the release of its envelopes */
+});
+
 /** Where box_audio_play_quantized starts a play on the grid of the Transport */
 ECS_ENUM(AudioQuantize, {
     AudioQuantizeNone = 0,  /**< At once, as box_audio_play */
@@ -551,6 +574,30 @@ bool box_audio_play_quantized(
     ecs_entity_t sound,
     float volume,
     AudioQuantize quantize);
+
+/** Play a note of an Instrument, without an entity per note.
+ *
+ * The note starts at the clock of the output, so it applies at the next block as a play does,
+ * and with a gate ends duration beats later at the tempo of the Transport (120 without one),
+ * also while the transport is stopped, which does not affect the note.
+ *
+ * It plays on the bus of the AudioOutput of the instrument, else of its sound, else the
+ * master. The rules of box_audio_play apply. Scripts call it as
+ * box.audio.play_note(instrument, pitch, velocity, duration).
+ *
+ * @param world The world
+ * @param instrument The entity with Instrument
+ * @param pitch MIDI note number, a float so microtones work
+ * @param velocity Velocity, 0..1
+ * @param duration Beats
+ * @return Whether the note was queued
+ */
+bool box_audio_play_note(
+    ecs_world_t *world,
+    ecs_entity_t instrument,
+    float pitch,
+    float velocity,
+    float duration);
 
 /** Play a sound once at a place in the world, heard from the listener as an AudioSpatial
  * source that stays where it started.

@@ -106,12 +106,42 @@
                 ]
             },
             {
+                "id": "Instrument",
+                "testcases": [
+                    "defaults",
+                    "synth_pitch",
+                    "sampler_rate",
+                    "velocity_gain",
+                    "gate_sustains_linear",
+                    "gate_sustains_curved",
+                    "release_in_attack",
+                    "gate_filter_envelope",
+                    "gate_sustain_zero",
+                    "release_exact_frame",
+                    "release_fade_clamped",
+                    "attack_flag",
+                    "sampler_release",
+                    "no_gate_authored",
+                    "synth_duration",
+                    "pitch_clamped",
+                    "bus",
+                    "pan",
+                    "script_play_note",
+                    "tempo",
+                    "legato_notes",
+                    "legato_after_release",
+                    "legato_cancels_release",
+                    "stop_cancels_release"
+                ]
+            },
+            {
                 "id": "NoAlloc",
                 "testcases": [
                     "render",
                     "events_and_release",
                     "synth_voices",
-                    "scheduled"
+                    "scheduled",
+                    "gated"
                 ]
             },
             {

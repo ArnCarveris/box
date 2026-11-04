@@ -177,7 +177,8 @@ typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_REVERB = 7,        /**< box_audio_cmd_reverb_t */
     BOX_AUDIO_CMD_SYNTH = 8,         /**< box_audio_cmd_synth_t */
     BOX_AUDIO_CMD_STREAM = 9,        /**< box_audio_cmd_stream_t */
-    BOX_AUDIO_CMD_LEGATO = 10        /**< box_audio_cmd_legato_t */
+    BOX_AUDIO_CMD_RELEASE = 10,      /**< box_audio_cmd_voice_release_t */
+    BOX_AUDIO_CMD_LEGATO = 12        /**< box_audio_cmd_legato_t */
 } box_audio_cmd_type_t;
 
 /** Parameters of BOX_AUDIO_CMD_VOICE_SET and BOX_AUDIO_CMD_BUS_SET */
@@ -200,12 +201,28 @@ typedef enum box_audio_param_t {
 /** Flags of BOX_AUDIO_CMD_PLAY */
 #define BOX_AUDIO_PLAY_LOOP (1u << 0)
 
+/** A synth voice sustains at the sustain level of its envelopes until a BOX_AUDIO_CMD_RELEASE,
+ * the hold of its envelopes ignored; an envelope with a sustain of 0 still ends after its
+ * decay. Sample voices ignore it */
+#define BOX_AUDIO_PLAY_GATE (1u << 1)
+
+/** A sample voice starts at its gain, without the ramp, so a sampled hit keeps its transient.
+ * Synth voices start at their gain anyway */
+#define BOX_AUDIO_PLAY_ATTACK (1u << 2)
+
+/** Shortest and longest fade of a BOX_AUDIO_CMD_RELEASE of a sample voice in seconds */
+#define BOX_AUDIO_RELEASE_FADE_MIN 0.005f
+#define BOX_AUDIO_RELEASE_FADE_MAX 10.0f
+
 /** Header of every command: its type and its size in bytes, header included.
  *
- * PLAY, STOP, VOICE_SET and BUS_SET follow it with when_lo and when_hi, the frame of the core
- * clock (box_audio_core_clock) at which the command takes effect, 64 bits in two words so that
- * every field stays 32 bits. A when of 0, or of a frame that was already rendered, applies at
- * the start of the next block; a later one waits in the schedule of the core for its frame */
+ * PLAY, STOP, VOICE_SET, BUS_SET, RELEASE and LEGATO follow it with when_lo and when_hi, the
+ * frame of the core clock (box_audio_core_clock) at which the command takes effect, 64 bits in
+ * two words so that every field stays 32 bits.
+ *
+ * A when of 0, or of a frame that was already rendered, applies at the start of the next
+ * block; a later one waits in the schedule of the core for its frame. Of the commands of one
+ * frame, the releases apply last */
 typedef struct box_audio_cmd_header_t {
     uint16_t type;  /**< A box_audio_cmd_type_t; an unknown type is skipped */
     uint16_t size;  /**< Bytes of the command, a multiple of 4, at least 4 */
@@ -227,9 +244,14 @@ typedef struct box_audio_cmd_play_t {
 
 /** Play a note of a mono voice: retarget the synth voice of a handle that has not reached its
  * release to a synth sound without a restart of its envelopes and give it a new handle, or
- * else start a new voice with the new handle (docs/audio.md, Synth) */
+ * else start a new voice with the new handle (docs/audio.md, Synth).
+ *
+ * With BOX_AUDIO_PLAY_GATE in its flags the voice it retargets sustains until a release,
+ * without it the voice holds for the hold of its envelopes again */
 typedef struct box_audio_cmd_legato_t {
     box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_LEGATO */
+    uint32_t when_lo;               /**< Low word of the frame of the note, 0 for now */
+    uint32_t when_hi;               /**< High word of the frame */
     uint32_t voice;                 /**< New handle of the voice, picked by the sender */
     uint32_t from;                  /**< Handle of the voice the note follows */
     uint32_t sound;                 /**< Id of the sound */
@@ -249,6 +271,19 @@ typedef struct box_audio_cmd_stop_t {
     uint32_t when_hi;               /**< High word of the frame */
     uint32_t voice;                 /**< Handle of the voice */
 } box_audio_cmd_stop_t;
+
+/** End the note of a voice: a synth voice moves every envelope it has into its release from
+ * its current level, a sample voice fades out linearly over fade and ends. A release of a voice
+ * that ended, or of an unknown handle, is ignored */
+typedef struct box_audio_cmd_voice_release_t {
+    box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_RELEASE */
+    uint32_t when_lo;               /**< Low word of the frame of the release, 0 for now */
+    uint32_t when_hi;               /**< High word of the frame */
+    uint32_t voice;                 /**< Handle of the voice */
+    float fade;                     /**< Seconds of the fade of a sample voice, clamped to
+                                     * BOX_AUDIO_RELEASE_FADE_MIN..MAX; synth voices use the
+                                     * release of their envelopes */
+} box_audio_cmd_voice_release_t;
 
 /** Set a parameter of a voice or a bus */
 typedef struct box_audio_cmd_set_t {
@@ -604,8 +639,8 @@ void box_audio_core_stream_status(
     box_audio_stream_status_t *status);
 
 /** Apply a batch of commands. They take effect at the start of the next render block, but
- * a PLAY, STOP, VOICE_SET or BUS_SET with a future when, which waits in the schedule and takes
- * effect on exactly its frame: the render splits its block there.
+ * a PLAY, STOP, VOICE_SET, BUS_SET, RELEASE or LEGATO with a future when, which waits in the
+ * schedule and takes effect on exactly its frame: the render splits its block there.
  *
  * Commands of an unknown type are skipped by their size; a truncated command ends the batch.
  * Does not allocate.
@@ -777,6 +812,46 @@ bool box_audio_write_legato(
     float pan,
     float pitch,
     uint32_t flags);
+
+/** Write a legato command at a frame: a note that follows the voice of a handle.
+ *
+ * @param writer The writer
+ * @param voice New handle of the voice
+ * @param from Handle of the voice the note follows
+ * @param sound Id of the sound
+ * @param bus Bus of the voice
+ * @param volume Volume
+ * @param pan Pan, -1..1
+ * @param pitch Pitch ratio
+ * @param flags BOX_AUDIO_PLAY_ flags
+ * @param when Frame of the core clock of the note, 0 for now
+ * @return Whether the command fit
+ */
+bool box_audio_write_legato_at(
+    box_audio_writer_t *writer,
+    uint32_t voice,
+    uint32_t from,
+    uint32_t sound,
+    uint32_t bus,
+    float volume,
+    float pan,
+    float pitch,
+    uint32_t flags,
+    uint64_t when);
+
+/** Write a release command, the end of the note of a voice.
+ *
+ * @param writer The writer
+ * @param voice Handle of the voice
+ * @param fade Seconds of the fade of a sample voice
+ * @param when Frame of the core clock of the release, 0 for now
+ * @return Whether the command fit
+ */
+bool box_audio_write_voice_release(
+    box_audio_writer_t *writer,
+    uint32_t voice,
+    float fade,
+    uint64_t when);
 
 /** Write a stop command.
  *

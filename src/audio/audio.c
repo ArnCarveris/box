@@ -25,6 +25,7 @@ ECS_COMPONENT_DECLARE(AudioReverbState);
 ECS_COMPONENT_DECLARE(AudioSample);
 ECS_COMPONENT_DECLARE(AudioMusic);
 ECS_COMPONENT_DECLARE(AudioSynth);
+ECS_COMPONENT_DECLARE(AudioInstrumentState);
 
 /** Construct AudioBus values: unity volume and width to the master, centered, no sends.
  *
@@ -262,6 +263,27 @@ static void box_audio_transport_ctor(
     for (i = 0; i < count; i ++) {
         values[i] = (Transport){
             .tempo = 120.0f, .beats_per_bar = 4, .beat_unit = 4, .lookahead = 0.15f };
+    }
+}
+
+/** Construct Instrument values: no sound, a root of A4, a velocity curve of 2, a gate and a
+ * release of 50 ms.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_instrument_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Instrument *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Instrument){
+            .root = 69.0f, .velocity_curve = 2.0f, .gate = true, .release = 0.05f };
     }
 }
 
@@ -658,6 +680,28 @@ static void box_audio_play_quantized_function(
     *(bool*)result->ptr = box_audio_play_quantized(ctx->world, sound, volume, quantize);
 }
 
+/** The box.audio.play_note script function.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The instrument, the pitch, the velocity and the duration
+ * @param result Receives whether the note was queued
+ */
+static void box_audio_play_note_function(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    ecs_entity_t instrument = *(ecs_entity_t*)argv[0].ptr;
+    float pitch = *(float*)argv[1].ptr;
+    float velocity = *(float*)argv[2].ptr;
+    float duration = *(float*)argv[3].ptr;
+    (void)argc;
+    *(bool*)result->ptr = box_audio_play_note(ctx->world, instrument, pitch, velocity,
+        duration);
+}
+
 /** The box.audio.play_at script function.
  *
  * @param ctx The call context
@@ -712,6 +756,7 @@ static void box_audio_module_free(
     ecs_map_fini(&state->voices);
     ecs_vec_fini_t(NULL, &state->oneshots, box_audio_oneshot_t);
     ecs_vec_fini_t(NULL, &state->plays, box_audio_play_t);
+    ecs_vec_fini_t(NULL, &state->notes, box_audio_note_t);
     ecs_vec_fini_t(NULL, &state->stops, uint32_t);
     ecs_vec_fini_t(NULL, &state->releases, uint32_t);
     box_audio_music_fini(state);
@@ -750,6 +795,19 @@ static void box_audio_functions_init(
             { .name = "quantize", .type = ecs_id(AudioQuantize) }
         },
         .callback = box_audio_play_quantized_function
+    });
+
+    ecs_function(world, {
+        .name = "play_note",
+        .parent = ecs_get_scope(world),
+        .return_type = ecs_id(ecs_bool_t),
+        .params = {
+            { .name = "instrument", .type = ecs_id(ecs_entity_t) },
+            { .name = "pitch", .type = ecs_id(ecs_f32_t) },
+            { .name = "velocity", .type = ecs_id(ecs_f32_t) },
+            { .name = "duration", .type = ecs_id(ecs_f32_t) }
+        },
+        .callback = box_audio_play_note_function
     });
 
     ecs_function(world, {
@@ -837,6 +895,8 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, Transport);
     ECS_META_COMPONENT(world, AudioQuantize);
     ecs_set_hooks(world, Transport, { .ctor = box_audio_transport_ctor });
+    ECS_META_COMPONENT(world, Instrument);
+    ecs_set_hooks(world, Instrument, { .ctor = box_audio_instrument_ctor });
 
     ECS_COMPONENT_DEFINE(world, AudioSoundId);
     ECS_COMPONENT_DEFINE(world, AudioBusState);
@@ -845,7 +905,9 @@ void BoxAudioImport(
     ECS_COMPONENT_DEFINE(world, AudioSample);
     ECS_COMPONENT_DEFINE(world, AudioMusic);
     ECS_COMPONENT_DEFINE(world, AudioSynth);
+    ECS_COMPONENT_DEFINE(world, AudioInstrumentState);
     ecs_set_hooks(world, AudioSoundId, { .copy = box_audio_track_copy });
+    ecs_set_hooks(world, AudioInstrumentState, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioSynth, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioBusState, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioVoice, { .copy = box_audio_track_copy });
@@ -860,6 +922,7 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(AudioStream), EcsWith, ecs_id(AudioMusic));
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSoundId));
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSynth));
+    ecs_add_pair(world, ecs_id(Instrument), EcsWith, ecs_id(AudioInstrumentState));
 
     ecs_entity_t master = ecs_entity(world, { .name = "master" });
     ecs_singleton_add(world, AudioSettings);
@@ -872,6 +935,7 @@ void BoxAudioImport(
     ecs_map_init(&state->voices, NULL);
     ecs_vec_init_t(NULL, &state->oneshots, box_audio_oneshot_t, 0);
     ecs_vec_init_t(NULL, &state->plays, box_audio_play_t, 0);
+    ecs_vec_init_t(NULL, &state->notes, box_audio_note_t, 0);
     ecs_vec_init_t(NULL, &state->stops, uint32_t, 0);
     ecs_vec_init_t(NULL, &state->releases, uint32_t, 0);
     ecs_vec_init_t(NULL, &state->moved, ecs_entity_t, 0);

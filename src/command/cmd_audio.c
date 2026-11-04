@@ -1,7 +1,8 @@
 /**
  * @file command/cmd_audio.c
- * @brief The audio command: the status of the audio, its transport and its buses, the master
- * volume and mute, play, stop, seek and tempo, and captures of the master output to a WAV.
+ * @brief The audio command: the status of the audio, its transport, its buses and its
+ * instruments, the master volume and mute, play, stop, seek and tempo, and captures of the
+ * master output to a WAV.
  *
  * The actions only write AudioSettings or Transport, which box.audio sends to the core at the
  * end of the frame, as for a change from a script or the REST API. A capture taps the core, so
@@ -195,6 +196,43 @@ static char* box_cmd_audio_transport_set(
     return result;
 }
 
+/** Append the lines of the instruments: synth or sampler, the sound, the root, the velocity
+ * curve and the gate with its release.
+ *
+ * @param world The world
+ * @param buf The output
+ */
+static void box_cmd_audio_instruments(
+    ecs_world_t *world,
+    ecs_strbuf_t *buf)
+{
+    int32_t i;
+    ecs_iter_t it = ecs_each(world, Instrument);
+    while (ecs_each_next(&it)) {
+        const Instrument *inst = ecs_field(&it, Instrument, 0);
+        for (i = 0; i < it.count; i ++) {
+            ecs_entity_t sound = inst[i].sound;
+            bool alive = sound && ecs_is_alive(world, sound);
+            bool synth = alive && ecs_has(world, sound, SynthSound);
+            char *path = ecs_get_path(world, it.entities[i]);
+            char *name = alive ? ecs_get_path(world, sound) : NULL;
+            ecs_strbuf_append(buf, "\n  instrument %s: %s %s, root %.2f, velocity curve %.2f",
+                path, synth ? "synth" : (alive ? "sampler" : "no sound"), name ? name : "",
+                (double)inst[i].root, (double)inst[i].velocity_curve);
+            if (!inst[i].gate) {
+                ecs_strbuf_appendstr(buf, ", no gate");
+            } else if (synth) {
+                ecs_strbuf_appendstr(buf, ", gate, envelope release");
+            } else {
+                ecs_strbuf_append(buf, ", gate, release %.3f s", (double)inst[i].release);
+            }
+
+            ecs_os_free(name);
+            ecs_os_free(path);
+        }
+    }
+}
+
 /** Print the status of the audio and the buses in processing order.
  *
  * @param world The world
@@ -238,6 +276,8 @@ static char* box_cmd_audio_print(
             }
         }
     }
+
+    box_cmd_audio_instruments(world, &buf);
 
     return ecs_strbuf_get(&buf);
 }
@@ -407,8 +447,8 @@ void box_cmd_audio_init(
 {
     ECS_IMPORT(world, BoxAudio);
     box_command_register(world,
-        "Print the audio status, transport and buses, set the volume or mute, play, stop, "
-        "seek or set the tempo, or capture a WAV",
+        "Print the audio status, transport, buses and instruments, set the volume or mute, "
+        "play, stop, seek or set the tempo, or capture a WAV",
         (ecs_function_desc_t){
             .name = "audio",
             .return_type = ecs_id(ecs_string_t),

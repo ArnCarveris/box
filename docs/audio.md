@@ -56,11 +56,13 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 | `AudioStatus` | Singleton, read only: the state of the output, its rate, the voices, steals, load and the clock of its core |
 | `Transport` | Singleton: the timeline in beats, its tempo, time signature, position, play and stop, loop and metronome, see [Transport](#transport) |
 | `AudioQuantize` | Enum of `box.audio.play_quantized`: `AudioQuantizeNone`, `AudioQuantizeBeat`, `AudioQuantizeBar`, see [Quantized plays](#quantized-plays) |
+| `Instrument` | A synth or a sampler that plays notes with a pitch, a velocity and a duration: `sound`, `root`, `velocity_curve`, `gate`, `release`, see [Instruments](#instruments) |
 
 The functions are `box.audio.play(sound, volume)`, `box.audio.play_at(sound, {x, y, z},
-volume)`, `box.audio.play_quantized(sound, volume, quantize)` and
+volume)`, `box.audio.play_quantized(sound, volume, quantize)`,
+`box.audio.play_note(instrument, pitch, velocity, duration)` and
 `box.audio.capture(seconds, path)`, the same as `box_audio_play`, `box_audio_play_at`,
-`box_audio_play_quantized` and `box_audio_capture` in C. The members and their defaults are in the
+`box_audio_play_quantized`, `box_audio_play_note` and `box_audio_capture` in C. The members and their defaults are in the
 table of [The box.audio module](#the-boxaudio-module).
 
 ## A worked example: the dust merchant
@@ -236,8 +238,9 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   level, cutoff, pulse width) and no LFO modulates another; an oscillator may phase or ring
   modulate another, but FM is not band limited. Plucked strings go down to 40 Hz and 32 of them ring
   at once; a unison pluck takes one per voice, so a chord of 6 notes of 4 voices takes 24; a pitch
-  LFO gives them vibrato. Legato is mono per channel and has no note off: a held note lasts its
-  hold after the last note. A looping synth sound starts a new pass of its envelopes and
+  LFO gives them vibrato. Legato is mono per channel; a note of an
+  [instrument](#instruments) ends it with its gate, a `box.audio.play` of a legato sound lasts
+  its hold after the last note. A looping synth sound starts a new pass of its envelopes and
   oscillators at the end of the last, at most every 60 seconds; a drone keeps that gap short with
   edges of a few ms, as the dust merchant's engine does with 2 ms.
 - **Files**: WAV and FLAC for sounds, Ogg Vorbis for music, one stream at once (a change of path
@@ -250,7 +253,11 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   worklet (it reports 0).
 - **Scheduling**: `BOX_AUDIO_SCHEDULE_MAX` (4096) commands wait in the core for their frame at
   once; one more applies at once and reports `BOX_AUDIO_EVENT_LATE`. Only `PLAY`, `STOP`,
-  `VOICE_SET` and `BUS_SET` have a `when`.
+  `VOICE_SET`, `BUS_SET`, `RELEASE` and `LEGATO` have a `when`.
+- **Instruments**: one sound per instrument at every pitch, so a sampler has no key zones and no
+  velocity layers and plays faster for higher notes; a pitch is fixed for the note (no bend or
+  aftertouch); a sampler note of a sound that does not loop ends at the end of the sound even
+  while its gate holds. `box.audio.play_note` notes have the pan 0.
 - **Transport**: one timeline per world, a tempo of 20 to 999 that changes in steps (no ramps),
   time signatures up to 64/64 that only accent the metronome, one loop, and a lookahead of 0.05
   to 0.5 seconds. On native the first beat after a start or a seek plays as soon as the batch
@@ -332,8 +339,9 @@ start of the next render block, but those with a `when` in the future (see
 
 | Command | Fields |
 |---------|--------|
-| `PLAY` | when, voice handle, sound, bus, volume, pan, pitch, flags (`BOX_AUDIO_PLAY_LOOP`): the first sample of the voice is at `when` |
-| `LEGATO` | new voice handle, handle of the voice it follows, then the fields of `PLAY` but `when`: a note of a mono voice, see [Synth](#synth) |
+| `PLAY` | when, voice handle, sound, bus, volume, pan, pitch, flags (`BOX_AUDIO_PLAY_LOOP`, `BOX_AUDIO_PLAY_GATE`, `BOX_AUDIO_PLAY_ATTACK`): the first sample of the voice is at `when` |
+| `LEGATO` (12) | when, new voice handle, handle of the voice it follows, then the fields of `PLAY` but `when`: a note of a mono voice at `when`, see [Synth](#synth) |
+| `RELEASE` (10) | when, voice handle, fade (seconds): the end of a note at `when`; a synth voice moves every envelope into its release from its level, a sample voice fades out linearly over the fade (0.005..10 s) and ends; a voice that ended is ignored |
 | `STOP` | when, voice handle: the voice fades out over the ramp from `when` and ends; one that applies now also drops the scheduled commands of its handle |
 | `VOICE_SET` | when, voice handle, `VOLUME`, `PAN`, `PITCH`, `BUS` or `POSITION`, value: the ramp starts at `when` |
 | `BUS_SET` | when, bus, `VOLUME`, `PAN`, `MUTE`, `WIDTH` (7), `SEND` (5, the level of send 0) or `SEND_1..3` (8..10, the levels of sends 1 to 3), value: the ramp starts at `when` |
@@ -342,6 +350,13 @@ start of the next render block, but those with a `when` in the future (see
 | `STREAM` | voice handle, stream, bus, volume, channels, sample rate: opens a stream and starts a voice that reads it |
 | `REVERB` | slot, bus (or none), decay, damping, predelay, size, mix: see [Reverb](#reverb) |
 | `SYNTH` | sound, then a patch up to its last layer: makes a free sound id a synth or replaces its patch, see [Synth](#synth) |
+
+The flags of a `PLAY`: `BOX_AUDIO_PLAY_LOOP` (1) loops the sound; `BOX_AUDIO_PLAY_GATE`
+(1 << 1) makes a synth voice sustain at the sustain level of its envelopes, their hold ignored,
+until a `RELEASE` (an envelope with a sustain of 0 still ends after its decay; sample voices
+ignore it); `BOX_AUDIO_PLAY_ATTACK` (1 << 2) starts a sample voice at its gain instead of the
+ramp of 5 ms, so a sampled drum keeps its transient (synth voices start at their gain anyway).
+A play without the gate and the attack renders as before, bit identical.
 
 The sender picks the voice handles, so it addresses a voice without waiting for a reply. Values
 are clamped (volumes and send levels to 0..4, pans to -1..1, widths to 0..2, pitches to
@@ -438,17 +453,19 @@ whether the frames are rendered one at a time or in one large block.
 ### The clock and the schedule
 
 The core counts the frames it rendered since it was created in 64 bits:
-`box_audio_core_clock(core)` returns the count, 0 for a new core. `PLAY`, `STOP`, `VOICE_SET`
-and `BUS_SET` carry a `when` right after their header, the frame of that clock at which they
-take effect, as two 32 bit words `when_lo` and `when_hi`, so that every field stays 32 bits.
-The writers `box_audio_write_play`, `_stop`, `_voice_set` and `_bus_set` take it as their last
-argument, a `uint64_t`.
+`box_audio_core_clock(core)` returns the count, 0 for a new core. `PLAY`, `STOP`, `VOICE_SET`,
+`BUS_SET`, `RELEASE` and `LEGATO` carry a `when` right after their header, the frame of that
+clock at which they take effect, as two 32 bit words `when_lo` and `when_hi`, so that every
+field stays 32 bits. The writers `box_audio_write_play`, `_stop`, `_voice_set`, `_bus_set`,
+`_voice_release` and `_legato_at` take it as their last argument, a `uint64_t`;
+`box_audio_write_legato` writes a `LEGATO` for now.
 
 - A `when` of 0, or of a frame that was already rendered, applies at the start of the next
   block, as a command without a `when` would.
 - A later `when` waits in the schedule of the core, a fixed heap of `BOX_AUDIO_SCHEDULE_MAX`
   (4096) commands ordered by frame; commands for the same frame keep the order in which they
-  arrived. The render splits its block at the frame of the next due command, so the command
+  arrived, but the releases of a frame apply after its other commands, so a legato note on the
+  frame where the note it follows ends glides on. The render splits its block at the frame of the next due command, so the command
   takes effect on exactly its frame: the first sample of a play is at `when`, the ramp of a set
   starts at `when` and the fade of a stop starts at `when`. The output stays bit identical
   whether the core renders one frame at a time, blocks of 128 or one large block. The schedule
@@ -457,7 +474,8 @@ argument, a `uint64_t`.
   `BOX_AUDIO_EVENT_LATE` (7), the command type as its id: a late command is better than a lost
   one, since a lost release would leave a note hanging.
 - A `STOP` that applies now (a `when` of 0 or in the past) also drops every scheduled `PLAY`,
-  `STOP` and `VOICE_SET` of its voice handle, so a scheduled play that has not started never
+  `STOP`, `VOICE_SET`, `RELEASE` and `LEGATO` (that would give the voice the handle) of its
+  voice handle, so a scheduled play that has not started never
   starts. A `STOP` with a future `when` only stops. This is how a sender cancels what it
   scheduled ahead, on a transport stop or a seek.
 
@@ -747,7 +765,19 @@ end.
   out as after a `STOP`. Without a voice of the handle it follows it is a plain `PLAY` of the
   new handle. Since every note has a new handle, the `VOICE_END` of a voice that ended before
   the sender saw it never names the voice of the next note. A sound that is not ready leaves
-  the voice as it was, with the new handle. A retarget allocates nothing.
+  the voice as it was, with the new handle. A retarget allocates nothing. A `LEGATO` has a
+  `when` and waits in the schedule like a `PLAY`. With `BOX_AUDIO_PLAY_GATE` in its flags the
+  voice it retargets sustains until a `RELEASE`, its hold ignored; without it a gated voice
+  holds for the hold of its envelopes from there, as a voice of `box.audio.play` does.
+- **Gate and release.** A voice played with `BOX_AUDIO_PLAY_GATE` enters its hold after the
+  decay and stays there, at the sustain level of each envelope, until a `RELEASE`, which moves
+  every envelope the voice has, the amp, the own envelopes of its layers and the filter
+  envelope, into its release from the level where it stands: the release starts from that
+  level and takes the release time of the envelope with its curve, so it neither jumps nor
+  lasts longer. A release during the attack or the decay releases from there, and an envelope
+  with a sustain of 0 that is in its decay releases over its release time too. A released voice
+  stops looping. A gated voice costs a test per segment change and per curved frame, and a
+  voice without the gate renders bit identical.
 - **Cost.** Render work only: per frame of a voice an envelope step per envelope (a multiply
   and an add when curved), an oscillator per layer and the filter, one stage or two; a modulated
   patch adds a phase offset and a wrap per layer; during a glide a multiply per oscillator. A
@@ -985,6 +1015,13 @@ How a note follows the previous one:
   again, so a phrase of quick notes is one held voice that releases after the last note. A
   note after the voice reached its release, or after it ended, starts a new voice with its
   attack; the voice that released rings out, and a looping one stops looping and ends.
+- **Notes of an instrument.** An [instrument](#instruments) is the note off of a legato
+  voice. A gated note of a legato sound follows the voice of its `channel` as `box.audio.play`
+  does, with its gate: the voice sustains, its hold ignored, until the release at the end of
+  the note. A note that follows before that release glides into the voice and cancels the
+  release, so overlapping notes and notes back to back (a release and the next note on the same
+  frame) are one held phrase; the release of the last note releases the voice with its
+  envelopes. A note after the voice released starts a new voice with its attack.
 - **Notes on a source.** A new legato `sound` on an `AudioSource` does the same with the voice
   of the source, when `loop` does not change (the voice it follows may be of any synth sound); the source keeps playing and
   ends with the voice.
@@ -1648,6 +1685,7 @@ frame, the same on every platform.
 | `AudioStatus` | Singleton, read only: `state`, `sample_rate`, `voices`, `voices_stolen`, `load`, `buses`, `clock` (the frame of the core that renders now) |
 | `Transport` | Singleton: `tempo` (120, 20..999), `beats_per_bar` (4), `beat_unit` (4), `position` (beats, written while it plays, clamped to ±2^31 like `loop_start` and `loop_end`), `playing` (false), `loop` (false), `loop_start`, `loop_end`, `lookahead` (0.15 s, 0.05..0.5), `metronome` (false), see [Transport](#transport) |
 | `AudioQuantize` | Enum of the `quantize` of `box.audio.play_quantized`: `AudioQuantizeNone` (at once), `AudioQuantizeBeat`, `AudioQuantizeBar`; `None`, `Beat` and `Bar` in a script, see [Quantized plays](#quantized-plays) |
+| `Instrument` | A synth or a sampler that plays notes: `sound`, `root` (69, A4), `velocity_curve` (2), `gate` (true), `release` (0.05 s, a sampler's fade), see [Instruments](#instruments) |
 
 Constructors give the defaults in parentheses, so `AudioSource: {sound: click}` in a script plays
 at unity volume and pitch. From C, `ecs_set` writes every member; use `ecs_ensure` to keep the
@@ -1666,8 +1704,11 @@ voice after it started. `box_audio_play_at(world, sound, position, volume)`, in 
 `box.audio.play_at(sound, {x, y, z}, volume)`, plays any of them once at a place in the world
 (see [Spatial audio](#spatial-audio)). `box_audio_play_quantized(world, sound, volume,
 quantize)`, in scripts `box.audio.play_quantized(sound, volume, quantize)`, plays it once on the
-next beat or bar of the transport (see [Quantized plays](#quantized-plays)). No ad-hoc play,
-quantized or not, is affected by the transport: a stop or a seek never stops or moves a one shot
+next beat or bar of the transport (see [Quantized plays](#quantized-plays)).
+`box_audio_play_note(world, instrument, pitch, velocity, duration)`, in scripts
+`box.audio.play_note(instrument, pitch, velocity, duration)`, plays a note of an
+[instrument](#instruments). No ad-hoc play, quantized or not, nor note is affected by the
+transport: a stop or a seek never stops or moves a one shot
 that started or is scheduled. `box_audio_capture(world, seconds, path)`, in scripts
 `box.audio.capture(seconds, path)`, records the master output to a WAV file.
 
@@ -1677,7 +1718,7 @@ what differs, all into one batch, and sends nothing in a frame without changes. 
 the events of the output (ended voices, steals, freed sounds), the listener, the buses, the
 order, the master settings, new sounds, the sources, the spatial sources and the one shots of
 `play_at` when the listener moved, then the plays, the stops of deleted sources and the
-releases of sounds, then the [transport](#transport): its window and the metronome, and last
+releases of sounds, the notes of `play_note`, then the [transport](#transport): its window and the metronome, and last
 the quantized plays, which need the timeline of the frame. A world without audio components pays the empty queries.
 
 **Buses** get an index of the core, up to 63 besides the master; more log one error and are
@@ -2076,6 +2117,72 @@ plays pays a loop over an empty vector. The tests are the `Quantize` suite of `t
 beats and bars at 120 and 97 bpm in 4/4 and 7/8, a play on a boundary, a boundary past
 `loop_end`, a stopped transport, a stop and a seek after a play was queued, a `box.audio.play`
 through a stop, and a script (`test/assets/audio/quantize.flecs`).
+
+### Instruments
+
+Without an instrument, a note of a score is a sound of its own whose pitch is baked into its
+patch, one template per pitch, and it cannot last a duration. An `Instrument` plays one sound at
+any pitch, with a velocity, a pan and a duration, a pitch being a MIDI note number:
+
+| Field | What it is |
+|-------|------------|
+| `sound` | The sound that plays: with `SynthSound` the instrument is a synth, with `AudioPcm` or `SoundFile` a sampler |
+| `root` | The pitch at which the sound plays as authored (69, A4 at 440 Hz), so a synth whose oscillators are at 440 Hz plays in tune |
+| `velocity_curve` | The gain of a note is `velocity ^ velocity_curve` (2) |
+| `gate` | The duration of a note ends it (true); false plays the sound as authored, like a drum hit |
+| `release` | Seconds a sampler note fades out over after its end (0.05); a synth uses the release of its envelopes |
+
+```
+using box.audio
+
+music { AudioBus: {volume: 1} }
+
+prefab piano_tone {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.005, decay: 0.4, sustain: 0.5, release: 0.3, curve: 4}
+  SynthOscillator: {wave: SynthTriangle, frequency: 440, level: 0.4}
+}
+
+piano { Instrument: {sound: piano_tone}  AudioOutput: {bus: music} }
+
+// C4 for a beat, then a quarter tone over E4 for half a beat
+const c: bool = box.audio.play_note(piano, 60, 0.8, 1)
+const q: bool = box.audio.play_note(piano, 64.5, 0.5, 0.5)
+```
+
+- **Pitch.** A pitch is a float, so microtones work: the voice plays at the ratio
+  `2^((pitch - root) / 12)`. A pitch past the limits of the core (a ratio of 1/64..16, six
+  octaves down and four up) is clamped, with one warning per instrument. A synth moves every
+  oscillator by the ratio, a sampler reads its frames at the ratio.
+- **Velocity and pan.** The velocity is 0..1 and the gain `velocity ^ velocity_curve`, so 0.5
+  plays at 0.25 at the default curve; a curve of 1 is linear. The pan of a note, -1..1, is the
+  pan of its voice; `play_note` plays at 0.
+- **Gate.** With `gate`, a synth note is a `PLAY` with `BOX_AUDIO_PLAY_GATE` and a `RELEASE` at
+  its end: the voice sustains at the sustain level of its envelopes, their hold ignored, and
+  releases over the release of its envelopes from where they stand (see
+  [Synth](#synth), Gate and release). A sampler note fades out linearly over `release` from its
+  end. Without `gate` the note plays the sound as authored, whatever its duration.
+- **Attack.** A sampler note plays with `BOX_AUDIO_PLAY_ATTACK`: it starts at its gain, without
+  the 5 ms ramp of a play, so a sampled drum keeps its transient.
+- **Legato.** A gated note of a legato synth sound follows the voice of its channel, see
+  [Glide and legato](#glide-and-legato).
+
+`box.audio.play_note(instrument, pitch, velocity, duration)` (`box_audio_play_note` in C) plays
+a note ad hoc. It starts at the clock of the output, so it applies at the next block as a play
+does, and its duration is in beats at the tempo of the `Transport` (120 without one), also while
+the transport is stopped: with a gate, its `RELEASE` waits in the schedule of the core for the
+start frame plus the duration. It plays on the bus of the `AudioOutput` of the instrument, else
+of its sound, else the master. The transport does not affect it, like the other ad-hoc plays,
+and it is dropped before the gesture and while its sound file loads, as `box.audio.play` is.
+
+Later parts of box.audio, the tracks, play their notes through the same function,
+`box_audio_instrument_note` of `src/audio/instrument.c`: an instrument, a pitch, a velocity, a
+pan, a start frame, an end frame, a bus and a voice handle. A note costs a `PLAY` and a
+`RELEASE` in the batch of its frame, and a scene without instruments pays a loop over an empty
+vector. The tests are the `Instrument` suite of `test/cpu/audio`: the pitch of a synth and a
+sampler, the gain of a velocity, the sustain and the release of a gated synth (linear, curved and
+its filter envelope), the fade of a sampler, a note without a gate, the exact frame of a
+release, a script (`test/assets/audio/instrument.flecs`) and legato notes.
 
 ### Before the gesture
 
