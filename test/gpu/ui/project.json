@@ -119,6 +119,8 @@
                     "world_panel_occluded",
                     "render_to_texture",
                     "render_to_texture_mapped",
+                    "render_to_texture_sweep_mapped",
+                    "render_to_texture_sweep_mapped_cap",
                     "nameplate",
                     "bubbling",
                     "hover_enter_leave",

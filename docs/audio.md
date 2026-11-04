@@ -679,7 +679,18 @@ end.
   24 dB filter, `voices_64_lfo`, two LFOs on the pitch, the level, the cutoff and the pulse
   width (about twice the plain patch, most of it the coefficients of the moving cutoff, as with
   a filter envelope), `voices_64_fm`, two FM pairs per voice, which measures the modulated
-  path, and `voices_32_pluck`, 32 ringing strings, one per voice.
+  path, `voices_32_pluck`, 32 ringing strings, one per voice, and `voices_64_curved`, which is
+  `voices_64` with a curve of 4 and an attack curve of 1.5 on the patch envelope and on the
+  envelope of the square. A frame inside a linear segment is an inlined add behind one test;
+  entering a segment, the last frame of one and a curved frame take an out of line step, so a
+  patch without curves pays nothing for them. Measured on a shared 4 core arm64
+  machine, release build, one core, 12 interleaved runs (min / median in ns per sample):
+  `voices_64` 546 / 617, `voices_64_curved` 551 / 656, about 1 to 6 % more, near the noise.
+  The curved segments are some 15 % of a pass of these voices, which hold for 2 s at a flat
+  level, so a patch that is curved all the time costs more. Before the linear step was split
+  out, the test of curved in every step made linear patches 8 to 10 % slower than without
+  curves (`voices_64` 590 / 702 against 546 / 634, `voices_64_filter_envelope` 886 / 1080
+  against 830 / 993); now they are back at 546 / 617 and 778 / 898.
 
 The core needs no libm: the exponential sweeps, the filter envelope and the LFOs use series for
 `log2` and `exp2` in `synth.c`.

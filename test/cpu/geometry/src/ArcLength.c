@@ -206,3 +206,90 @@ void ArcLength_scale_ratio_key(void) {
     test_assert(fabsf(sb->surface.p[9][0] - 30) < 0.001f);
     ecs_fini(world);
 }
+
+void ArcLength_corner_ring(void) {
+    ecs_world_t *world = arc_world();
+    /* An L of two lines, 1 along +X and 1.5 along +Z, so the corner is at path parameter 0.5 and
+     * at 0.4 of the length, between the rings 9 and 10 of 24 */
+    Path3D path = {0};
+    *ecs_vec_append_t(NULL, &path.segments, PathSegment3D) =
+        (PathSegment3D){.kind = PathLine, .end = {1, 0, 0}};
+    *ecs_vec_append_t(NULL, &path.segments, PathSegment3D) =
+        (PathSegment3D){.kind = PathLine, .end = {1, 0, 1.5f}};
+    ecs_entity_t route = ecs_new(world);
+    ecs_set_ptr(world, route, Path3D, &path);
+    ecs_vec_fini_t(NULL, &path.segments, PathSegment3D);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Sweep, {.path = route, .profile = test_circle(world, 0),
+        .scale = {0.1f, 0.1f}, .taper = 1, .cap_start = true, .cap_end = true, .rings = 24});
+    const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
+    test_assert(shape != NULL);
+    float parameters[2], fractions[2];
+    test_int(box_surface_sweep_corners(&shape->surface, parameters, fractions), 1);
+    test_flt(parameters[0], 0.5f);
+    test_assert(fabsf(fractions[0] - 0.4f) < 0.0001f);
+    const box_mesh_t *mesh = box_mesh_cache_get(box_mesh_cache_of(world), shape->mesh);
+    test_assert(mesh != NULL);
+    int corner = 0, walls = 0;
+    float previous[2] = {-1, -1};
+    for (int i = 0; i < mesh->vertex_count; i ++) {
+        const box_vertex_t *vertex = &mesh->vertices[i];
+        if (vertex->position[2] >= 2) {
+            continue;
+        }
+        walls ++;
+        int side = walls % 2;
+        if (vertex->position[1] == 0.5f) {
+            corner ++;
+            test_assert(fabsf(vertex->uv[1] - 0.4f) < 0.0001f);
+        }
+        /* The rows of each edge go along the path, the ring after the first of an edge
+         * starting over */
+        if (vertex->uv[1] == 0) {
+            previous[side] = -1;
+        }
+        test_assert(vertex->uv[1] > previous[side]);
+        previous[side] = vertex->uv[1];
+    }
+    /* 25 rows, so one row of each of the 64 edges, both sides, is on the corner */
+    test_int(walls, 64 * 25 * 2);
+    test_int(corner, 64 * 2);
+    ecs_fini(world);
+}
+
+void ArcLength_smooth_rows(void) {
+    ecs_world_t *world = arc_world();
+    /* A Catmull-Rom path joins its segments smoothly, so its rings stay at even lengths */
+    Path3D path = {0};
+    float xs[] = {0.5f, 1, 4, 4.5f, 9};
+    for (int i = 0; i < 5; i ++) {
+        *ecs_vec_append_t(NULL, &path.segments, PathSegment3D) =
+            (PathSegment3D){.kind = PathCatmullRom, .end = {xs[i], 0, i % 2 ? 1.0f : 0.0f}};
+    }
+    ecs_entity_t route = ecs_new(world);
+    ecs_set_ptr(world, route, Path3D, &path);
+    ecs_vec_fini_t(NULL, &path.segments, PathSegment3D);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Sweep, {.path = route, .profile = arc_rectangle(world),
+        .scale = {0.1f, 0.1f}, .taper = 1, .cap_start = true, .cap_end = true, .rings = 24});
+    const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
+    test_assert(shape != NULL);
+    float parameters[8], fractions[8];
+    test_int(box_surface_sweep_corners(&shape->surface, parameters, fractions), 0);
+    const box_mesh_t *mesh = box_mesh_cache_get(box_mesh_cache_of(world), shape->mesh);
+    test_assert(mesh != NULL);
+    int walls = 0;
+    for (int i = 0; i < mesh->vertex_count; i ++) {
+        const box_vertex_t *vertex = &mesh->vertices[i];
+        if (vertex->position[2] >= 2) {
+            continue;
+        }
+        int ring = (walls / 2) % 25;
+        walls ++;
+        test_flt(vertex->uv[1], (float)ring / 24);
+        test_flt(vertex->position[1],
+            box_surface_sweep_parameter(&shape->surface, (float)ring / 24));
+    }
+    test_int(walls, 4 * 25 * 2);
+    ecs_fini(world);
+}
