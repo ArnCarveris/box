@@ -309,6 +309,22 @@
                     "script_legato_source",
                     "docs_glide_example",
                     "script_modulators",
+                    "lfo_vibrato",
+                    "lfo_tremolo",
+                    "lfo_layer",
+                    "lfo_delay_fade",
+                    "lfo_smooth",
+                    "lfo_square_no_click",
+                    "lfo_cutoff",
+                    "lfo_pulse_width",
+                    "pulse_width_harmonics",
+                    "alias_pulse",
+                    "lfo_zero_identical",
+                    "lfo_slot_reuse",
+                    "lfo_delay_no_fade",
+                    "lfo_random_phase_seeded",
+                    "docs_lfo_examples",
+                    "script_lfo",
                     "unison_detune_peaks",
                     "unison_width_zero_mono",
                     "unison_width_correlation",
@@ -326,7 +342,9 @@
                     "pluck_glide",
                     "pluck_pool",
                     "script_pluck",
-                    "docs_pluck_examples"
+                    "docs_pluck_examples",
+                    "lfo_unison",
+                    "lfo_pluck"
                 ]
             },
             {

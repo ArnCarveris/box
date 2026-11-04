@@ -48,7 +48,9 @@
                     "voices_64",
                     "voices_64_filter_envelope",
                     "voices_64_filter_24",
+                    "voices_64_lfo",
                     "voices_64_fm",
+                    "voices_64_curved",
                     "voices_32_pluck"
                 ]
             }
