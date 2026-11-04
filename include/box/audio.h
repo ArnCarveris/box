@@ -428,6 +428,30 @@ ECS_STRUCT(AudioStatus, {
                             *   output */
 });
 
+/** The transport of the timeline in beats, a singleton: the tempo, the time signature, the
+ * position, play and stop, the loop and the metronome. A beat is a quarter note in every time
+ * signature, so a bar is beats_per_bar * 4 / beat_unit beats.
+ *
+ * While it plays, box.audio writes position every frame from the clock of the output, the
+ * beat the core renders now. A write of another position is a seek. See Transport in
+ * docs/audio.md.
+ */
+ECS_STRUCT(Transport, {
+    float tempo;           /**< Quarter notes per minute, 20..999, default 120 */
+    int32_t beats_per_bar; /**< Top of the time signature, 1..64, default 4 */
+    int32_t beat_unit;     /**< Bottom of the time signature, 1..64, default 4 */
+    double position;       /**< Beats; written by box.audio while it plays, a write seeks */
+    bool playing;          /**< Whether the timeline plays, default false: false stops at the
+                            *   position, true plays on from it */
+    bool loop;             /**< Wrap from loop_end to loop_start, default false */
+    double loop_start;     /**< First beat of the loop */
+    double loop_end;       /**< Beat the loop wraps at, after loop_start */
+    float lookahead;       /**< Seconds scheduled ahead of the clock, 0.05..0.5, default
+                            *   0.15 */
+    bool metronome;        /**< Click on every beat while playing, accented on the first of a
+                            *   bar, default false */
+});
+
 /** Give an entity the samples of a sound, to play with AudioSource or box_audio_play.
  *
  * @param world The world

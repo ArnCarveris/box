@@ -300,6 +300,98 @@ typedef struct box_audio_capture_job_t {
     uint32_t serial;        /**< Serial of the output that records, 0 before it started */
 } box_audio_capture_job_t;
 
+/** Hooks of the timeline at most */
+#define BOX_AUDIO_TIMELINE_HOOKS 8
+
+/** Why the timeline cancels what it scheduled ahead */
+typedef enum box_audio_timeline_reset_t {
+    BOX_AUDIO_TIMELINE_STOP = 1,    /**< The transport stopped */
+    BOX_AUDIO_TIMELINE_SEEK = 2,    /**< The application wrote another position */
+    BOX_AUDIO_TIMELINE_OUTPUT = 3   /**< A new output, whose core knows none of the handles */
+} box_audio_timeline_reset_t;
+
+/** A linear piece of the timeline: from its frame on, the beats advance at one tempo. The
+ * timeline anchors one when it starts, on a seek, a new output, a tempo or loop change and at
+ * every loop wrap */
+typedef struct box_audio_anchor_t {
+    uint64_t frame;         /**< Frame of the core clock the piece starts at */
+    double beat;            /**< Beat at that frame */
+    double frames_per_beat; /**< rate * 60 / tempo */
+} box_audio_anchor_t;
+
+/** A part of the lookahead window on one piece of the timeline. The window of a frame is a
+ * list of them, split at a loop wrap and a change of tempo; consecutive segments and windows
+ * follow each other without a gap or an overlap, in frames and in beats */
+typedef struct box_audio_segment_t {
+    double start;           /**< Beat at frame */
+    double end;             /**< Beat at frame_end, loop_end for a segment that wraps */
+    uint64_t frame;         /**< First frame of the segment */
+    uint64_t frame_end;     /**< Frame after its last one */
+    box_audio_anchor_t anchor; /**< The piece, which box_audio_anchor_frame maps its beats with */
+} box_audio_segment_t;
+
+struct box_audio_module_t;
+
+/** Called every frame the transport plays with the segments of the window, after the
+ * metronome; an event belongs to the segment whose beat range [start, end) holds it */
+typedef void (*box_audio_timeline_window_t)(
+    ecs_world_t *world,
+    struct box_audio_module_t *state,
+    const box_audio_segment_t *segments,
+    int32_t count,
+    void *ctx);
+
+/** Called on a stop, a seek and a new output, after the module cancelled its plays */
+typedef void (*box_audio_timeline_reset_cb_t)(
+    ecs_world_t *world,
+    struct box_audio_module_t *state,
+    box_audio_timeline_reset_t why,
+    void *ctx);
+
+/** A user of the timeline, a later part of box.audio that schedules into its window */
+typedef struct box_audio_timeline_hook_t {
+    box_audio_timeline_window_t window;   /**< Gets the window, NULL for none */
+    box_audio_timeline_reset_cb_t reset;  /**< Gets the stops, seeks and new outputs */
+    void *ctx;              /**< Context of the callbacks */
+} box_audio_timeline_hook_t;
+
+/** A play the timeline scheduled ahead, which a stop or a seek cancels */
+typedef struct box_audio_scheduled_t {
+    uint32_t handle;        /**< Voice handle */
+    uint64_t when;          /**< Frame it starts at */
+} box_audio_scheduled_t;
+
+/** Counters of the timeline, for the tests */
+typedef struct box_audio_timeline_stats_t {
+    int64_t clicks;         /**< Clicks of the metronome scheduled */
+    int64_t accents;        /**< Accented clicks among them */
+    int64_t cancels;        /**< Plays cancelled with a STOP */
+    int64_t anchors;        /**< Anchors set, wraps included */
+} box_audio_timeline_stats_t;
+
+/** The timeline of the Transport singleton, in tempo.c */
+typedef struct box_audio_timeline_t {
+    bool playing;           /**< Whether it played in the last frame */
+    uint32_t serial;        /**< Serial of the output it is anchored to */
+    double written;         /**< Position the module wrote last, a different one is a seek */
+    float tempo;            /**< Tempo applied, clamped */
+    bool loop;              /**< Loop applied */
+    double loop_start;      /**< Loop start applied */
+    double loop_end;        /**< Loop end applied */
+    float rate;             /**< Frames per second of the output */
+    uint64_t clock;         /**< Clock of the output in the last update */
+    ecs_vec_t anchors;      /**< box_audio_anchor_t, oldest first: the one of the clock and
+                             *   the later ones up to window_end */
+    uint64_t window_end;    /**< Frame the next window starts at */
+    ecs_vec_t segments;     /**< box_audio_segment_t, the window of the frame */
+    ecs_vec_t scheduled;    /**< box_audio_scheduled_t, plays that may not have started */
+    box_audio_timeline_hook_t hooks[BOX_AUDIO_TIMELINE_HOOKS]; /**< Users of the window */
+    int32_t hook_count;     /**< Hooks in hooks */
+    uint32_t click;         /**< Sound id of the click of the metronome, 0 before it is sent */
+    uint32_t click_serial;  /**< Serial of the output the click was sent to */
+    box_audio_timeline_stats_t stats; /**< Counters */
+} box_audio_timeline_t;
+
 /** The state of the module in a world */
 typedef struct box_audio_module_t {
     ecs_query_t *buses;           /**< AudioBus, disabled ones included */
@@ -343,6 +435,7 @@ typedef struct box_audio_module_t {
     int64_t voices_stolen;        /**< Steals the core reported */
     box_audio_capture_job_t capture; /**< The capture that waits */
     box_audio_listener_t listener;   /**< The listener of the last frame */
+    box_audio_timeline_t timeline;   /**< The timeline of the Transport */
     bool listener_warned;         /**< The warning of several listeners was logged */
     bool spatial_dirty;           /**< Update every spatial source, not only changed ones */
     bool waiting;                 /**< The page waited for a gesture in the last frame */
@@ -519,6 +612,15 @@ int32_t box_audio_module_sounds(
 bool box_audio_reserve(
     box_audio_module_t *state);
 
+/** Pick a free sound id of the core, or log once that every id is taken. The caller marks
+ * it in sound_used.
+ *
+ * @param state The state
+ * @return The id, 0 when every id is taken
+ */
+uint32_t box_audio_sound_id(
+    box_audio_module_t *state);
+
 /** Pick the handle of a new voice.
  *
  * @param state The state
@@ -690,5 +792,116 @@ int box_audio_wav_write(
     const float *data,
     int32_t frames,
     int32_t sample_rate);
+
+/** Set up the timeline of the module.
+ *
+ * @param state The state
+ */
+void box_audio_timeline_init(
+    box_audio_module_t *state);
+
+/** Free the timeline of the module.
+ *
+ * @param state The state
+ */
+void box_audio_timeline_fini(
+    box_audio_module_t *state);
+
+/** Once per frame, into the batch of the frame: follow the Transport (start, stop, seek,
+ * tempo and loop changes), compute the lookahead window, schedule the metronome, call the
+ * hooks and write the position from the clock.
+ *
+ * @param world The world
+ * @param state The state
+ * @param t The transport
+ * @param waiting Whether the page waits for a gesture, which schedules nothing
+ */
+void box_audio_timeline_update(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    box_audio_transport_t *t,
+    bool waiting);
+
+/** Add a user of the timeline.
+ *
+ * @param state The state
+ * @param hook The callbacks, copied
+ * @return Whether there was room, BOX_AUDIO_TIMELINE_HOOKS
+ */
+bool box_audio_timeline_hook(
+    box_audio_module_t *state,
+    const box_audio_timeline_hook_t *hook);
+
+/** Get the lookahead window of the last frame.
+ *
+ * @param world The world
+ * @param count Receives the number of segments
+ * @return The segments, NULL when there are none
+ */
+const box_audio_segment_t* box_audio_timeline_window(
+    const ecs_world_t *world,
+    int32_t *count);
+
+/** Get the frame of a beat on the line of a piece: anchor frame + round((beat - anchor beat)
+ * * frames_per_beat).
+ *
+ * @param anchor The piece
+ * @param beat The beat
+ * @return The frame, negative before the clock started
+ */
+int64_t box_audio_anchor_frame(
+    const box_audio_anchor_t *anchor,
+    double beat);
+
+/** Get the beat at a frame on the line of a piece.
+ *
+ * @param anchor The piece
+ * @param frame The frame
+ * @return The beat
+ */
+double box_audio_anchor_beat(
+    const box_audio_anchor_t *anchor,
+    uint64_t frame);
+
+/** Convert a frame of the core clock to a beat of the timeline, through the pieces up to the
+ * end of the window, loop wraps included; a later frame goes on along the last piece.
+ *
+ * @param world The world
+ * @param frame The frame
+ * @return The beat, the position while the transport is stopped
+ */
+double box_audio_timeline_beat(
+    const ecs_world_t *world,
+    uint64_t frame);
+
+/** Convert a beat of the timeline to a frame of the core clock: the first piece that plays the
+ * beat at or after the clock, else the first that played it, else the line of the last piece.
+ *
+ * @param world The world
+ * @param beat The beat
+ * @return The frame, -1 while the transport is stopped
+ */
+int64_t box_audio_timeline_frame(
+    const ecs_world_t *world,
+    double beat);
+
+/** Write a PLAY at a frame and remember its handle, so that a stop, a seek or a new output
+ * cancels it while it has not started.
+ *
+ * @param state The state
+ * @param sound Id of the sound
+ * @param bus Bus of the voice
+ * @param volume Volume
+ * @param pitch Pitch ratio
+ * @param when Frame of its first sample
+ * @return The handle, 0 when the batch had no room
+ */
+uint32_t box_audio_timeline_play(
+    box_audio_module_t *state,
+    uint32_t sound,
+    uint32_t bus,
+    float volume,
+    float pitch,
+    uint64_t when);
 
 #endif

@@ -52,6 +52,7 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 | `AudioStreamStatus` | Read only: the state, position, buffer, underruns and decode time of a stream |
 | `AudioSettings` | Singleton: the master volume and mute |
 | `AudioStatus` | Singleton, read only: the state of the output, its rate, the voices, steals, load and the clock of its core |
+| `Transport` | Singleton: the timeline in beats, its tempo, time signature, position, play and stop, loop and metronome, see [Transport](#transport) |
 
 The functions are `box.audio.play(sound, volume)`, `box.audio.play_at(sound, {x, y, z},
 volume)` and `box.audio.capture(seconds, path)`, the same as `box_audio_play`,
@@ -243,13 +244,19 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
 - **Scheduling**: `BOX_AUDIO_SCHEDULE_MAX` (4096) commands wait in the core for their frame at
   once; one more applies at once and reports `BOX_AUDIO_EVENT_LATE`. Only `PLAY`, `STOP`,
   `VOICE_SET` and `BUS_SET` have a `when`.
+- **Transport**: one timeline per world, a tempo of 20 to 999 that changes in steps (no ramps),
+  time signatures up to 64/64 that only accent the metronome, one loop, and a lookahead of 0.05
+  to 0.5 seconds. On native the first beat after a start or a seek plays as soon as the batch
+  arrives, a few ms late; the beats after it are exact. The metronome click is fixed.
 
 ## Captures and the audio command
 
 The audio a box app plays can be inspected without listening:
 
 - `audio` prints the state, the rate, the voices, the steals, the load, the clock of the core
-  (frames and seconds) and every bus with its routing and reverb; `audio volume <v>` and `audio mute` set the master.
+  (frames and seconds), the transport and every bus with its routing and reverb; `audio volume
+  <v>` and `audio mute` set the master, `audio play`, `audio stop`, `audio seek <beats>` and
+  `audio tempo <bpm>` drive the [transport](#transport).
 - `audio capture <seconds>` records the master to a 16 bit stereo WAV resource of the shell
   session, `box.audio.capture(seconds, path)` to a file from a script, at load if it should
   start with the scene. In the browser `audio capture` writes `/tmp/audio_capture_<n>.wav` in
@@ -1554,6 +1561,7 @@ frame, the same on every platform.
 | `AudioListener` | Tag of the entity whose `WorldTransform` hears the spatial sources |
 | `AudioSettings` | Singleton: `master_volume` (1) and `mute` |
 | `AudioStatus` | Singleton, read only: `state`, `sample_rate`, `voices`, `voices_stolen`, `load`, `buses`, `clock` (the frame of the core that renders now) |
+| `Transport` | Singleton: `tempo` (120, 20..999), `beats_per_bar` (4), `beat_unit` (4), `position` (beats, written while it plays), `playing` (false), `loop` (false), `loop_start`, `loop_end`, `lookahead` (0.15 s, 0.05..0.5), `metronome` (false), see [Transport](#transport) |
 
 Constructors give the defaults in parentheses, so `AudioSource: {sound: click}` in a script plays
 at unity volume and pitch. From C, `ecs_set` writes every member; use `ecs_ensure` to keep the
@@ -1579,7 +1587,7 @@ what differs, all into one batch, and sends nothing in a frame without changes. 
 the events of the output (ended voices, steals, freed sounds), the listener, the buses, the
 order, the master settings, new sounds, the sources, the spatial sources and the one shots of
 `play_at` when the listener moved, then the plays, the stops of deleted sources and the
-releases of sounds. A world without audio components pays the empty queries.
+releases of sounds, and last the [transport](#transport): its window and the metronome. A world without audio components pays the empty queries.
 
 **Buses** get an index of the core, up to 31 besides the master; more log one error and are
 silent. The order is compiled whenever a bus appears, disappears or changes its output or send:
@@ -1828,6 +1836,71 @@ node test/integration/web/audio_stream.mjs \
     "$(tools/integration.py local-env --env audio)/wasm32-Emscripten/debug/bin"
 ```
 
+### Transport
+
+`src/audio/tempo.c` keeps one timeline in beats for the world, which the metronome, and later
+tracks, quantized plays and tempo synced delays, schedule against. The `Transport` singleton
+holds it:
+
+```
+using box.audio
+$ { Transport: {tempo: 96, beats_per_bar: 6, beat_unit: 8, playing: true, metronome: true} }
+```
+
+**Beats.** A beat is a quarter note in every time signature, and every time of the timeline is
+in these beats. A bar is `beats_per_bar * 4 / beat_unit` beats: 4 in 4/4, 3 in 6/8, 3.5 in 7/8.
+Bars start at beat 0. `tempo` is quarter notes per minute, clamped to 20..999 (a NaN to 20).
+
+**Position.** While `playing` is true the module writes `position` every frame from the clock
+of the output: the beat that the core renders now. It follows the audio, not the frame delta,
+so it stops while a page is suspended and while the output waits for its device. A write of
+`position` by the application is a seek: the module notices a value that differs from the one
+it wrote last, so a seek works from a script, the REST API and the `set` command alike.
+`playing: false` stops at the position and `playing: true` plays on from it; a position written
+while stopped is where the next start begins.
+
+**Beats to frames.** The timeline is a list of anchors, each a frame of the core clock and the
+beat at that frame. A beat lasts `rate * 60 / tempo` frames, and the frame of a beat on an
+anchor is `anchor frame + round((beat - anchor beat) * rate * 60 / tempo)`. An anchor is set
+when the transport starts, on a seek, on a new output and on a change of the tempo or the loop.
+A change is anchored at the end of what was scheduled already, at the current position on that
+line: the position does not jump, and the new tempo applies to what has not been scheduled.
+`box_audio_timeline_beat` and `box_audio_timeline_frame` in `src/audio/module.h` convert both
+ways; `box_audio_anchor_frame` and `box_audio_anchor_beat` do it on one anchor.
+
+**Loop.** With `loop` on and `loop_end > loop_start`, the timeline wraps from `loop_end` to
+`loop_start` on the frame of `loop_end`, `anchor frame + round((loop_end - anchor beat) * rate *
+60 / tempo)`, where a new anchor starts at `loop_start`. A position before `loop_start` plays
+into the loop; a position at or past `loop_end` plays on without wrapping until a seek. A loop
+shorter than a frame does not wrap.
+
+**The lookahead window.** Each frame the module covers the frames from the end of the last
+window to `clock + lookahead`. The window is a list of segments, each with a beat range
+`[start, end)`, its frames `[frame, frame_end)` and its anchor, split at a loop wrap. The frames
+and the beats of consecutive segments and windows follow each other without a gap or an
+overlap, so an event whose beat is in a segment is scheduled once, as a command with the frame
+of its beat as its `when`. When the clock overtook the window, after a stall longer than the
+lookahead, the window starts at the clock and the beats in between are skipped rather than
+played late. The internal API in `src/audio/module.h` is for the parts that schedule:
+`box_audio_timeline_hook` adds a hook whose `window` callback gets the segments every frame the
+transport plays, and whose `reset` callback runs on a stop, a seek and a new output;
+`box_audio_timeline_play` writes a `PLAY` with a `when` and remembers its handle. On a stop and a
+seek the module cancels what it scheduled ahead that has not started with an immediate `STOP` of
+each handle, which also drops its scheduled play in the core; a new output has none of them.
+
+**Metronome.** With `metronome: true` and the transport playing, a click plays on the master on
+every beat counted from the start of each bar, accented on the first beat of a bar: volume 0.8
+and pitch 1.5 against 0.4 and 1. The click is a synth patch built in code, a 1600 Hz sine that
+decays in 30 ms, sent once to the output when the metronome first plays. Each click is a
+scheduled `PLAY` with its exact frame, so its first sample is at
+`round(beat * rate * 60 / tempo)` frames from the start, whatever the frame rate.
+
+A transport that does not play costs a read of the singleton per frame and sends nothing. The
+tests are the `Timeline` suite of `test/cpu/audio`, with the null transport at a fixed delta:
+the position, seeks, the loop, tempo changes, the coverage of the window, the frames and
+accents of the clicks in 4/4, 6/8 and a loop, the cancel on a stop, a new output, a script
+(`test/assets/audio/transport.flecs`), the command and two runs that capture identical audio.
+
 ### Before the gesture
 
 A scene plays the same on native, on the web and headless. On the web, plays requested while the
@@ -1840,9 +1913,12 @@ nothing.
 ### The audio command and captures
 
 The shell command `audio` (`src/command/cmd_audio.c`) prints the state, the rate, the voices, the
-steals and the load, then the master and the buses in processing order, with the values of the
+steals and the load, the clock, the transport (`transport: 120.0 bpm 4/4, position 2.1 (4.250
+beats), playing, loop off`, the position as bar.beat counted from 1), then the master and the
+buses in processing order, with the values of the
 reverb of a bus and `(dry, every slot taken)` for a reverb that has no slot. `audio volume <v>` and
-`audio mute [on|off]` write `AudioSettings`. `audio capture <seconds>` records the master output
+`audio mute [on|off]` write `AudioSettings`; `audio play`, `audio stop`, `audio seek <beats>`
+and `audio tempo <bpm>` (20 to 999) write `Transport`. `audio capture <seconds>` records the master output
 to a 16 bit stereo WAV resource of the session, fetched like a `capture` PNG with
 `GET /shell/session/<id>/resource/<name>`, empty until the file is written in one rename. In the
 browser it writes `/tmp/audio_capture_<n>.wav` in the file system of the page and returns the

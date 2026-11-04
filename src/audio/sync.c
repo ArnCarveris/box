@@ -605,12 +605,7 @@ static void box_audio_reverbs(
     }
 }
 
-/** Pick a free sound id of the core, or log once that every id is taken.
- *
- * @param state The state
- * @return The id, 0 when every id is taken
- */
-static uint32_t box_audio_sound_id(
+uint32_t box_audio_sound_id(
     box_audio_module_t *state)
 {
     uint32_t id;
@@ -1509,6 +1504,7 @@ static void BoxAudioSync(
         }
 
         box_audio_queued(world, state, waiting);
+        box_audio_timeline_update(world, state, t, waiting);
         state->spatial_dirty = false;
     } else {
         box_audio_music_update(world, state, NULL, false);

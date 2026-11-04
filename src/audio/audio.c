@@ -244,6 +244,27 @@ static void box_audio_settings_ctor(
     }
 }
 
+/** Construct Transport values: 120 quarter notes per minute in 4/4, stopped at beat 0,
+ * without a loop or a metronome, 0.15 seconds of lookahead.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_transport_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Transport *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Transport){
+            .tempo = 120.0f, .beats_per_bar = 4, .beat_unit = 4, .lookahead = 0.15f };
+    }
+}
+
 /** Copy what box.audio sent for an entity: a copy starts with nothing sent. A prefab
  * instance or a clone gets a sound, a bus or a voice of its own this way.
  *
@@ -655,6 +676,7 @@ static void box_audio_module_free(
     box_audio_music_fini(state);
     ecs_vec_fini_t(NULL, &state->moved, ecs_entity_t);
     box_audio_sample_fini(state);
+    box_audio_timeline_fini(state);
     ecs_os_free(state->capture.path);
     ecs_os_free(state);
 }
@@ -756,6 +778,8 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, AudioSettings);
     ecs_set_hooks(world, AudioSettings, { .ctor = box_audio_settings_ctor });
     ECS_META_COMPONENT(world, AudioStatus);
+    ECS_META_COMPONENT(world, Transport);
+    ecs_set_hooks(world, Transport, { .ctor = box_audio_transport_ctor });
 
     ECS_COMPONENT_DEFINE(world, AudioSoundId);
     ECS_COMPONENT_DEFINE(world, AudioBusState);
@@ -783,6 +807,7 @@ void BoxAudioImport(
     ecs_entity(world, { .name = "master" });
     ecs_singleton_add(world, AudioSettings);
     ecs_singleton_set(world, AudioStatus, {0});
+    ecs_singleton_add(world, Transport);
 
     box_audio_module_t *state = ecs_os_calloc_t(box_audio_module_t);
     state->next_voice = 1;
@@ -792,6 +817,7 @@ void BoxAudioImport(
     ecs_vec_init_t(NULL, &state->stops, uint32_t, 0);
     ecs_vec_init_t(NULL, &state->releases, uint32_t, 0);
     ecs_vec_init_t(NULL, &state->moved, ecs_entity_t, 0);
+    box_audio_timeline_init(state);
     ECS_COMPONENT_DEFINE(world, AudioModuleState);
     ecs_singleton_set(world, AudioModuleState, { .state = state });
     ecs_atfini(world, box_audio_module_free, state);

@@ -124,6 +124,28 @@
                 ]
             },
             {
+                "id": "Timeline",
+                "testcases": [
+                    "defaults",
+                    "advances",
+                    "stopped_holds",
+                    "seek",
+                    "seek_stopped",
+                    "loop_wraps",
+                    "loop_past_end",
+                    "tempo_continuous",
+                    "window_coverage",
+                    "metronome_4_4",
+                    "metronome_6_8",
+                    "metronome_loop",
+                    "stop_cancels",
+                    "bit_identical",
+                    "new_output",
+                    "script",
+                    "command"
+                ]
+            },
+            {
                 "id": "Ring",
                 "setup": true,
                 "testcases": [
