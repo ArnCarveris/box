@@ -311,14 +311,8 @@ ECS_STRUCT(SynthGlide, {
  * the pulse width of the sound, each by its own depth, after a delay and a fade in.
  *
  * On the root, or on a child of the root without a SynthOscillator, it moves every layer; on
- * a layer it moves that layer, the cutoff of the sound aside, which is one for all layers.
- * Up to BOX_AUDIO_SYNTH_LFOS per sound, the root's first, then those of the layers in their
- * order, then the other children; more log one error and are left out.
- *
- * The pitch moves by pitch cents up and down, the level dips from 1 at the top of the wave to
- * 1 - amplitude at its bottom, the cutoff moves by cutoff octaves and the pulse width of
- * squares by pulse_width. It restarts with the envelopes of a looping sound and goes on over
- * legato notes.
+ * a layer that layer, the cutoff aside. Up to BOX_AUDIO_SYNTH_LFOS per sound, see LFOs in
+ * docs/audio.md for their order, the depths and the restart of a looping sound.
  */
 ECS_STRUCT(SynthLfo, {
     SynthLfoWave wave;     /**< The wave, default SynthLfoSine */

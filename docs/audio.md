@@ -600,7 +600,10 @@ voices that play keep theirs, and a release frees the id at once with `SOUND_FRE
   block every 8 frames; a patch without LFOs takes the loops it took before and renders bit
   identical, and a square at a width of 0.5 costs a compare.
   `bench/audio` has a `Synth` suite of 64 voices in ns per sample, with a filter envelope, with a
-  24 dB filter, and `voices_64_fm`, two FM pairs per voice, which measures the modulated path.
+  24 dB filter, `voices_64_lfo`, two LFOs on the pitch, the level, the cutoff and the pulse
+  width (about twice the plain patch, most of it the coefficients of the moving cutoff, as with
+  a filter envelope), and `voices_64_fm`, two FM pairs per voice, which measures the modulated
+  path.
 
 The core needs no libm: the exponential sweeps, the filter envelope and the LFOs use series for
 `log2` and `exp2` in `synth.c`.
