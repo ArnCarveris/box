@@ -6,7 +6,7 @@ and WebGPU.
 ## Prerequisites
 
 - [bake3](https://github.com/SanderMertens/bake3)
-- flecs checked out at `../../flecs` and built once with `bake3 ../../flecs`
+- [flecs](https://github.com/SanderMertens/flecs)
 - A Rust toolchain
 
 ## Build
