@@ -1625,7 +1625,7 @@ frame, the same on every platform.
 | `AudioSettings` | Singleton: `master_volume` (1) and `mute` |
 | `AudioStatus` | Singleton, read only: `state`, `sample_rate`, `voices`, `voices_stolen`, `load`, `buses`, `clock` (the frame of the core that renders now) |
 | `Transport` | Singleton: `tempo` (120, 20..999), `beats_per_bar` (4), `beat_unit` (4), `position` (beats, written while it plays, clamped to ±2^31 like `loop_start` and `loop_end`), `playing` (false), `loop` (false), `loop_start`, `loop_end`, `lookahead` (0.15 s, 0.05..0.5), `metronome` (false), see [Transport](#transport) |
-| `AudioQuantize` | Enum of the `quantize` of `box.audio.play_quantized`: `AudioQuantizeNone` (at once), `AudioQuantizeBeat`, `AudioQuantizeBar`, see [Quantized plays](#quantized-plays) |
+| `AudioQuantize` | Enum of the `quantize` of `box.audio.play_quantized`: `AudioQuantizeNone` (at once), `AudioQuantizeBeat`, `AudioQuantizeBar`; `None`, `Beat` and `Bar` in a script, see [Quantized plays](#quantized-plays) |
 
 Constructors give the defaults in parentheses, so `AudioSource: {sound: click}` in a script plays
 at unity volume and pitch. From C, `ecs_set` writes every member; use `ecs_ensure` to keep the
@@ -2019,11 +2019,12 @@ accents of the clicks in 4/4, 6/8 and a loop, the cancel on a stop, a new output
 A game often wants a stinger or a hit to land on the grid of the music.
 `box.audio.play_quantized(sound, volume, quantize)` (`box_audio_play_quantized` in C) plays a
 sound once, as `box.audio.play` does, on the bus of its `AudioOutput`, but starts it on the
-next beat (`AudioQuantizeBeat`) or the next bar (`AudioQuantizeBar`) of the transport:
+next beat (`AudioQuantizeBeat`) or the next bar (`AudioQuantizeBar`) of the transport. A
+script names the constants without the prefix of the enum, `None`, `Beat` and `Bar`:
 
 ```
 using box.audio
-const hit: bool = box.audio.play_quantized(stinger, 0.9, AudioQuantizeBar)
+const hit: bool = box.audio.play_quantized(stinger, 0.9, Bar)
 ```
 
 The play starts on the first boundary at or after the clock of the output, the frame the core
