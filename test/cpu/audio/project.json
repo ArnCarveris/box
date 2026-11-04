@@ -50,7 +50,14 @@
                     "cycle_refused",
                     "order_one_block",
                     "not_in_order_silent",
-                    "voice_bus_change"
+                    "voice_bus_change",
+                    "width_mono",
+                    "width_double",
+                    "width_one_identical",
+                    "four_sends",
+                    "pre_fader_send",
+                    "send_earlier_refused",
+                    "buses_64"
                 ]
             },
             {
@@ -176,6 +183,19 @@
                     "one_batch_per_frame",
                     "import_opens_no_device",
                     "new_output_resends"
+                ]
+            },
+            {
+                "id": "Mixer",
+                "testcases": [
+                    "solo_track",
+                    "solo_group",
+                    "mute_beats_solo",
+                    "cycle_third_send",
+                    "sends_over_max",
+                    "pre_fader_send",
+                    "master_bus",
+                    "scene_script"
                 ]
             },
             {

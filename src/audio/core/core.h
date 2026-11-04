@@ -32,8 +32,13 @@
 /** Extra voice slots for voices that fade out after a stop or a steal */
 #define BOX_AUDIO_VOICE_TAIL_MAX 16
 
-/** Buses of a core; bus 0 is the master */
-#define BOX_AUDIO_BUS_MAX 32
+/** Buses of a core; bus 0 is the master. A bus that is not in the order costs nothing */
+#define BOX_AUDIO_BUS_MAX 64
+
+/** Sends of a bus */
+#ifndef BOX_AUDIO_SENDS
+#define BOX_AUDIO_SENDS 4
+#endif
 
 /** Sounds a core knows at once; a sound id is below this */
 #define BOX_AUDIO_SOUND_MAX 1024
@@ -181,9 +186,14 @@ typedef enum box_audio_param_t {
     BOX_AUDIO_PARAM_PITCH = 2,   /**< Pitch ratio of a voice */
     BOX_AUDIO_PARAM_BUS = 3,     /**< Bus a voice plays into */
     BOX_AUDIO_PARAM_MUTE = 4,    /**< Mute of a bus, nonzero mutes, ramped */
-    BOX_AUDIO_PARAM_SEND = 5,    /**< Level of the send of a bus, 0..BOX_AUDIO_VOLUME_MAX */
-    BOX_AUDIO_PARAM_POSITION = 6 /**< Read position of a voice in frames of its sound, wrapped
+    BOX_AUDIO_PARAM_SEND = 5,    /**< Level of send 0 of a bus, 0..BOX_AUDIO_VOLUME_MAX, ramped */
+    BOX_AUDIO_PARAM_POSITION = 6, /**< Read position of a voice in frames of its sound, wrapped
                                   *   into a looping sound, at once */
+    BOX_AUDIO_PARAM_WIDTH = 7,   /**< Stereo width of a bus, 0 mono .. 1 as is .. 2 double
+                                  *   side, a mid/side gain before the volume and pan, ramped */
+    BOX_AUDIO_PARAM_SEND_1 = 8,  /**< Level of send 1 of a bus */
+    BOX_AUDIO_PARAM_SEND_2 = 9,  /**< Level of send 2 of a bus */
+    BOX_AUDIO_PARAM_SEND_3 = 10  /**< Level of send 3 of a bus */
 } box_audio_param_t;
 
 /** Flags of BOX_AUDIO_CMD_PLAY */
@@ -249,18 +259,23 @@ typedef struct box_audio_cmd_set_t {
     float value;                    /**< The new value */
 } box_audio_cmd_set_t;
 
-/** A bus in the processing order, where it outputs and where it sends */
+/** A bus in the processing order, where it outputs and where it sends.
+ *
+ * Send j of a bus has the level of BOX_AUDIO_PARAM_SEND (j 0) or BOX_AUDIO_PARAM_SEND_1 + j - 1.
+ * A post-fader send taps the bus after its volume and pan; a pre-fader send taps it before them,
+ * after its reverb and width, and follows its mute */
 typedef struct box_audio_route_t {
     uint8_t bus;     /**< Index of the bus */
     uint8_t output;  /**< Bus the bus outputs to, BOX_AUDIO_BUS_NONE for the master */
-    uint8_t send;    /**< Bus of the send, BOX_AUDIO_BUS_NONE for none */
+    uint8_t sends[BOX_AUDIO_SENDS]; /**< Bus of each send, BOX_AUDIO_BUS_NONE for none */
+    uint8_t pre_fader; /**< Bit j set: send j is pre-fader */
     uint8_t unused;  /**< Padding, 0 */
 } box_audio_route_t;
 
 /** Replace the processing order, followed by count box_audio_route_t.
  *
- * The master comes last and outputs nowhere; every other bus outputs and sends only to buses
- * after it, so the routes have no cycle. A bus not in the order is silent.
+ * The master comes last and outputs and sends nowhere; every other bus outputs and sends only
+ * to buses after it, so the routes have no cycle. A bus not in the order is silent.
  */
 typedef struct box_audio_cmd_order_t {
     box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_ORDER */

@@ -26,7 +26,7 @@ ECS_COMPONENT_DECLARE(AudioSample);
 ECS_COMPONENT_DECLARE(AudioMusic);
 ECS_COMPONENT_DECLARE(AudioSynth);
 
-/** Construct AudioBus values: unity volume to the master, centered, no send.
+/** Construct AudioBus values: unity volume and width to the master, centered, no sends.
  *
  * @param ptr The components
  * @param count Number of components
@@ -41,7 +41,7 @@ static void box_audio_bus_ctor(
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
-        values[i] = (AudioBus){ .volume = 1.0f };
+        values[i] = (AudioBus){ .volume = 1.0f, .width = 1.0f };
     }
 }
 
@@ -711,7 +711,10 @@ void BoxAudioImport(
     ECS_IMPORT(world, BoxJobs);
 
     ECS_META_COMPONENT(world, AudioState);
+    ECS_META_COMPONENT(world, AudioChannelKind);
+    ECS_META_COMPONENT(world, AudioSend);
     ECS_META_COMPONENT(world, AudioBus);
+    box_owned_hooks(world, AudioBus, BOX_OWNED_VEC(AudioBus, sends, AudioSend));
     ecs_set_hooks(world, AudioBus, { .ctor = box_audio_bus_ctor });
     ECS_META_COMPONENT(world, AudioOutput);
     ECS_META_COMPONENT(world, AudioPcm);
@@ -780,12 +783,13 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSoundId));
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSynth));
 
-    ecs_entity(world, { .name = "master" });
+    ecs_entity_t master = ecs_entity(world, { .name = "master" });
     ecs_singleton_add(world, AudioSettings);
     ecs_singleton_set(world, AudioStatus, {0});
 
     box_audio_module_t *state = ecs_os_calloc_t(box_audio_module_t);
     state->next_voice = 1;
+    state->master = master;
     ecs_map_init(&state->voices, NULL);
     ecs_vec_init_t(NULL, &state->oneshots, box_audio_oneshot_t, 0);
     ecs_vec_init_t(NULL, &state->plays, box_audio_play_t, 0);

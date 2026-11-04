@@ -53,22 +53,55 @@ ECS_ENUM(AudioState, {
     AudioSuspended = 6          /**< The page is hidden: its audio faded out and suspended */
 });
 
-/** A mixer bus. Sources and plays mix into a bus, a bus into its output, the master last.
+/** Sends of a mixer channel; more log one error that names the channel and the first play */
+#ifndef BOX_AUDIO_SENDS
+#define BOX_AUDIO_SENDS 4
+#endif
+
+/** What a mixer channel is, for the solo. A track is identified by Track and the master by
+ * box.audio.master; both keep the default */
+ECS_ENUM(AudioChannelKind, {
+    AudioChannelGroup = 0,      /**< A group or any other bus, the default */
+    AudioChannelReturn = 1,     /**< A return, such as a reverb bus: solo safe, so the reverb
+                                 *   of a soloed channel is heard */
+    AudioChannelSfx = 2         /**< A bus of the game sounds: a solo never silences it */
+});
+
+/** A send of a mixer channel to another bus */
+ECS_STRUCT(AudioSend, {
+    ecs_entity_t bus;      /**< Bus that receives the send, 0 (or a deleted bus) for none */
+    float level;           /**< Linear gain of the send, 0 to 4 */
+    bool pre_fader;        /**< Tap before the volume and pan of the channel instead of after
+                            *   them; the mute and the solo still silence it */
+});
+
+/** A mixer bus, the component of a mixer channel: a group, a return, an SFX bus, the bus of a
+ * track and the master. Sources and plays mix into a bus, a bus into its output, the master
+ * last.
  *
- * Up to 31 buses besides the master, which scripts can name master (box.audio.master), an
- * entity without components. A cycle through outputs and sends logs one error that names the
- * buses and keeps the last valid order. A Disabled bus is silent.
+ * Up to 63 buses besides the master, which scripts can name master (box.audio.master). The
+ * master may have an AudioBus of its own for its pan and width; its volume multiplies
+ * AudioSettings.master_volume and its output, sends, solo and kind are ignored. A cycle through
+ * outputs and sends logs one error that names the buses and keeps the last valid order. A
+ * Disabled bus is silent.
+ *
+ * When any channel is soloed, a channel is heard when it is soloed, on the output path of a
+ * soloed channel, feeds a soloed channel, is a return or an SFX bus, or is downstream of one of
+ * these. mute always wins.
  */
 ECS_STRUCT(AudioBus, {
     ecs_entity_t output;   /**< Bus it feeds, 0 (or a deleted bus) for the master */
     float volume;          /**< Linear gain, default 1 */
     float pan;             /**< -1 left to 1 right, default 0 */
+    float width;           /**< Stereo width, 0 mono, 1 as is (default), 2 doubles the side; a
+                            *   mid/side gain after the reverb and before the pan */
     bool mute;             /**< Silence the bus, default false */
-    ecs_entity_t send;     /**< Bus that also receives the output, after the volume, 0 for none */
-    float send_level;      /**< Linear gain of the send, default 0 */
+    bool solo;             /**< Solo the channel, default false */
+    AudioChannelKind kind; /**< What the channel is, default AudioChannelGroup */
+    ecs_vec(AudioSend) sends; /**< Up to BOX_AUDIO_SENDS sends to other buses */
 });
 
-/** A reverb on the bus of the same entity, which sources reach through the send of their bus.
+/** A reverb on the bus of the same entity, which sources reach through a send of their bus.
  *
  * One reverb runs at once (BOX_AUDIO_REVERB_MAX of the core); another logs one error and its
  * bus stays dry. Decay, damping and mix change smoothly; a change of size or predelay fades the

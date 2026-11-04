@@ -3460,9 +3460,9 @@ static void synth_unison_chain(
 void Synth_unison_stereo_chain(void) {
     // audio/synth
     static float ref_l[AUDIO_FRAMES / 2], ref_r[AUDIO_FRAMES / 2];
-    const box_audio_route_t plain[] = { { 1, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 } };
+    const box_audio_route_t plain[] = { AUDIO_OUT(1, 0), AUDIO_MASTER };
     const box_audio_route_t sent[] = {
-        { 1, 0, 2 }, { 2, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 } };
+        AUDIO_ROUTE(1, 0, 2), AUDIO_OUT(2, 0), AUDIO_MASTER };
     const int32_t from = 2 * AUDIO_RAMP, to = AUDIO_FRAMES / 2;
     double ms_l = 0, ms_r = 0, ms = 0, lr = 0;
     float err = 0;

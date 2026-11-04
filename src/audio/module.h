@@ -27,11 +27,15 @@ typedef struct AudioBusState {
     uint8_t index;          /**< Index of the bus in the core, 0 when it has none */
     uint32_t serial;        /**< Serial of the output the parameters were sent to */
     ecs_entity_t output;    /**< AudioBus.output the order was compiled with */
-    ecs_entity_t send;      /**< AudioBus.send the order was compiled with */
+    ecs_entity_t sends[BOX_AUDIO_SENDS]; /**< Bus of each AudioBus.sends the order was
+                             *   compiled with, 0 for none */
+    uint8_t pre_fader;      /**< Pre-fader sends the order was compiled with, bit j for send j */
     float volume;           /**< Volume sent */
     float pan;              /**< Pan sent */
-    bool mute;              /**< Mute sent, a Disabled bus included */
-    float send_level;       /**< Send level sent */
+    float width;            /**< Width sent */
+    bool mute;              /**< Mute sent, a Disabled bus and the solo included */
+    float send_level[BOX_AUDIO_SENDS]; /**< Send levels sent */
+    bool sends_refused;     /**< The error of too many sends was logged */
 } AudioBusState;
 
 /** What box.audio sent for a source */
@@ -317,7 +321,15 @@ typedef struct box_audio_module_t {
     uint32_t next_voice;          /**< Next voice handle */
     uint8_t sound_used[BOX_AUDIO_SOUND_MAX];   /**< Sound ids in use in the core */
     ecs_entity_t bus_entity[BOX_AUDIO_BUS_MAX]; /**< Entity of each bus index, 0 for free */
-    uint32_t bus_freed;           /**< Bus indices freed this frame, not reused before next */
+    uint64_t bus_freed;           /**< Bus indices freed this frame, not reused before next */
+    ecs_entity_t master;          /**< box.audio.master, whose AudioBus sets bus 0 */
+    uint8_t route_out[BOX_AUDIO_BUS_MAX]; /**< Output of each bus index at the last compile,
+                                   *   cycles included, 0 for the master */
+    uint8_t route_sends[BOX_AUDIO_BUS_MAX][BOX_AUDIO_SENDS]; /**< Sends of each bus index at
+                                   *   the last compile, BOX_AUDIO_BUS_NONE for none */
+    uint64_t solo;                /**< Bus indices soloed this frame */
+    uint64_t solo_safe;           /**< Bus indices of returns and SFX buses this frame */
+    uint64_t audible;             /**< Bus indices the solo keeps, all when none is soloed */
     bool order_dirty;             /**< The buses or their routes changed */
     bool bus_overflow;            /**< The error of too many buses was logged */
     bool sound_overflow;          /**< The error of too many sounds was logged */
@@ -340,6 +352,7 @@ typedef struct box_audio_module_t {
     box_audio_music_t *music_active; /**< The stream of an entity, the one that may play */
     AudioSettings settings;       /**< Settings sent */
     bool settings_sent;           /**< settings holds what the output has */
+    AudioBus master_bus;          /**< AudioBus of the master sent, its sends left empty */
     int64_t voices_stolen;        /**< Steals the core reported */
     box_audio_capture_job_t capture; /**< The capture that waits */
     box_audio_listener_t listener;   /**< The listener of the last frame */

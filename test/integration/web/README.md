@@ -223,7 +223,8 @@ node test/integration/web/audio_spatial.mjs \
 ```
 
 `audio_reverb.mjs` checks the reverb with `test/integration/web/audio_reverb.flecs`, a bus
-`world` that sends to the bus `hall` with `Reverb: {decay: 2.4}`. After a trusted click it
+`world` that sends to the bus `hall` with `Reverb: {decay: 2.4}`, through
+`sends: [{bus: hall, level: 0.5}]`. After a trusted click it
 records `audio capture 4` while `box.audio.play` sends a click to the reverb, and measures the
 decay of the tail after the click at the rate of the context. It then starts 32 looping voices
 through the reverb and prints the load of the worklet, which `Module.boxAudio.bench` measures by
@@ -279,7 +280,8 @@ node test/integration/web/audio_stream.mjs \
 ```
 
 `audio_all_features.mjs` checks every part of `box.audio` together with
-`test/assets/audio/all_features.flecs`: buses with a reverb send, synth clicks with a pitch
+`test/assets/audio/all_features.flecs`: buses with a post-fader send to the reverb return
+`room` and an SFX bus `world`, synth clicks with a pitch
 variance, a looping spatial synth drone on the left, music streamed from `tone.ogg`,
 `sine_16.wav` played with `play_at` on the right and a capture at load. The page preloads the
 scene and both files with `?preload=`. It expects the page to wait for a gesture, then after a

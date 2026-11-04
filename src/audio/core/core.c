@@ -226,7 +226,8 @@ static void box_audio_voice_gains(
     box_audio_ramp_to(&v->right, v->volume * r, core->ramp_frames);
 }
 
-/** Set the gain targets of a bus from its volume, pan, mute and send level.
+/** Set the gain targets of a bus from its volume, pan, width, mute and send levels. A
+ * pre-fader send follows the mute, a post-fader one gets it through the gains of the bus.
  *
  * @param core The core
  * @param b The bus
@@ -236,10 +237,15 @@ static void box_audio_bus_gains(
     box_audio_bus_t *b)
 {
     float l, r, volume = b->mute ? 0.0f : b->volume;
+    int32_t j;
     box_audio_pan(b->pan, &l, &r);
     box_audio_ramp_to(&b->left, volume * l, core->ramp_frames);
     box_audio_ramp_to(&b->right, volume * r, core->ramp_frames);
-    box_audio_ramp_to(&b->send, b->send_level, core->ramp_frames);
+    box_audio_ramp_to(&b->side, b->width, core->ramp_frames);
+    for (j = 0; j < BOX_AUDIO_SENDS; j ++) {
+        bool muted = b->mute && (b->pre_fader & (1u << j));
+        box_audio_ramp_to(&b->send[j], muted ? 0.0f : b->send_level[j], core->ramp_frames);
+    }
 }
 
 /** The level of a voice for the cap: the larger of its gain targets.
@@ -602,7 +608,12 @@ static void box_audio_cmd_bus_set(
     } else if (cmd->param == BOX_AUDIO_PARAM_MUTE) {
         b->mute = value != 0 && value == value;
     } else if (cmd->param == BOX_AUDIO_PARAM_SEND) {
-        b->send_level = box_audio_clamp(value, 0, BOX_AUDIO_VOLUME_MAX);
+        b->send_level[0] = box_audio_clamp(value, 0, BOX_AUDIO_VOLUME_MAX);
+    } else if (cmd->param >= BOX_AUDIO_PARAM_SEND_1 && cmd->param <= BOX_AUDIO_PARAM_SEND_3) {
+        b->send_level[cmd->param - BOX_AUDIO_PARAM_SEND_1 + 1] =
+            box_audio_clamp(value, 0, BOX_AUDIO_VOLUME_MAX);
+    } else if (cmd->param == BOX_AUDIO_PARAM_WIDTH) {
+        b->width = box_audio_clamp(value, 0, 2);
     } else {
         known = false;
         box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_BUS_SET, 0);
@@ -630,7 +641,7 @@ static void box_audio_cmd_order(
     box_audio_cmd_order_t cmd;
     box_audio_route_t routes[BOX_AUDIO_BUS_MAX];
     int32_t position[BOX_AUDIO_BUS_MAX];
-    int32_t i, count;
+    int32_t i, j, count;
     bool valid = true;
     box_audio_copy(&cmd, bytes, (int32_t)sizeof(cmd));
     count = cmd.count > BOX_AUDIO_BUS_MAX ? -1 : (int32_t)cmd.count;
@@ -653,12 +664,19 @@ static void box_audio_cmd_order(
     }
 
     valid = valid && routes[count - 1].bus == 0 &&
-        routes[count - 1].output == BOX_AUDIO_BUS_NONE &&
-        routes[count - 1].send == BOX_AUDIO_BUS_NONE;
+        routes[count - 1].output == BOX_AUDIO_BUS_NONE;
+    for (j = 0; j < BOX_AUDIO_SENDS && valid; j ++) {
+        valid = routes[count - 1].sends[j] == BOX_AUDIO_BUS_NONE;
+    }
+
     for (i = 0; i < count - 1 && valid; i ++) {
-        uint8_t out = routes[i].output, send = routes[i].send;
-        valid = out < BOX_AUDIO_BUS_MAX && position[out] > i &&
-            (send == BOX_AUDIO_BUS_NONE || (send < BOX_AUDIO_BUS_MAX && position[send] > i));
+        uint8_t out = routes[i].output;
+        valid = out < BOX_AUDIO_BUS_MAX && position[out] > i;
+        for (j = 0; j < BOX_AUDIO_SENDS && valid; j ++) {
+            uint8_t send = routes[i].sends[j];
+            valid = send == BOX_AUDIO_BUS_NONE ||
+                (send < BOX_AUDIO_BUS_MAX && position[send] > i);
+        }
     }
 
     if (!valid) {
@@ -668,6 +686,21 @@ static void box_audio_cmd_order(
 
     for (i = 0; i < BOX_AUDIO_BUS_MAX; i ++) {
         core->bus_active[i] = position[i] >= 0;
+    }
+
+    for (i = 0; i < count; i ++) {
+        box_audio_bus_t *b = &core->buses[routes[i].bus];
+        uint8_t pre = 0;
+        for (j = 0; j < BOX_AUDIO_SENDS; j ++) {
+            if (routes[i].sends[j] != BOX_AUDIO_BUS_NONE && (routes[i].pre_fader & (1u << j))) {
+                pre |= (uint8_t)(1u << j);
+            }
+        }
+
+        if (b->pre_fader != pre) {
+            b->pre_fader = pre;
+            box_audio_bus_gains(core, b);
+        }
     }
 
     box_audio_copy(core->order, routes, count * (int32_t)sizeof(box_audio_route_t));
@@ -985,7 +1018,7 @@ box_audio_core_t* box_audio_core_new(
     void* (*alloc)(size_t, void*) = desc ? desc->alloc : NULL;
     void (*release)(void*, void*) = desc ? desc->free : NULL;
     float sample_rate = desc ? desc->sample_rate : 0;
-    int32_t i;
+    int32_t i, k;
 #ifndef BOX_AUDIO_CORE_WASM
     if (!alloc || !release) {
         alloc = box_audio_core_malloc;
@@ -1019,14 +1052,21 @@ box_audio_core_t* box_audio_core_new(
     for (i = 0; i < BOX_AUDIO_BUS_MAX; i ++) {
         box_audio_bus_t *b = &core->buses[i];
         b->volume = 1;
+        b->width = 1;
         box_audio_ramp_set(&b->left, 1);
         box_audio_ramp_set(&b->right, 1);
-        box_audio_ramp_set(&b->send, 0);
+        box_audio_ramp_set(&b->side, 1);
+        for (k = 0; k < BOX_AUDIO_SENDS; k ++) {
+            box_audio_ramp_set(&b->send[k], 0);
+        }
     }
 
     core->order[0].bus = 0;
     core->order[0].output = BOX_AUDIO_BUS_NONE;
-    core->order[0].send = BOX_AUDIO_BUS_NONE;
+    for (k = 0; k < BOX_AUDIO_SENDS; k ++) {
+        core->order[0].sends[k] = BOX_AUDIO_BUS_NONE;
+    }
+
     core->order_count = 1;
     core->bus_active[0] = true;
     core->event_lost_at = -1;
@@ -1265,7 +1305,87 @@ static void box_audio_limit(
     core->limiter_gain = gain;
 }
 
-/** Run the buses of the order over a block: gains, then output and send, the master last.
+/** Advance a ramp by the frames of a block without using its values, frame by frame so that
+ * it ends the same whatever the render sizes; nothing once it reached its target.
+ *
+ * @param ramp The ramp
+ * @param frames Frames of the block
+ */
+static void box_audio_ramp_skip(
+    box_audio_ramp_t *ramp,
+    int32_t frames)
+{
+    int32_t i;
+    for (i = 0; i < frames && ramp->left > 0; i ++) {
+        box_audio_ramp_next(ramp);
+    }
+}
+
+/** Apply the width of a bus to a block: a gain of its side signal, nothing at a width of 1.
+ *
+ * @param b The bus
+ * @param frames Frames of the block
+ */
+static void box_audio_bus_width(
+    box_audio_bus_t *b,
+    int32_t frames)
+{
+    int32_t i;
+    if (b->side.left == 0 && b->side.value == 1.0f) {
+        goto done;
+    }
+
+    for (i = 0; i < frames; i ++) {
+        float w = box_audio_ramp_next(&b->side);
+        float mid = 0.5f * (b->l[i] + b->r[i]), side = 0.5f * (b->l[i] - b->r[i]) * w;
+        b->l[i] = mid + side;
+        b->r[i] = mid - side;
+    }
+
+done:
+    return;
+}
+
+/** Add the sends of a bus of one kind, pre-fader or post-fader, to their buses. A send
+ * without a bus only advances its ramp.
+ *
+ * @param core The core
+ * @param route The route of the bus
+ * @param b The bus, with the samples the sends tap
+ * @param pre Whether to add the pre-fader sends, else the post-fader ones
+ * @param frames Frames of the block
+ */
+static void box_audio_bus_sends(
+    box_audio_core_t *core,
+    const box_audio_route_t *route,
+    box_audio_bus_t *b,
+    bool pre,
+    int32_t frames)
+{
+    int32_t i, j;
+    for (j = 0; j < BOX_AUDIO_SENDS; j ++) {
+        box_audio_ramp_t *ramp = &b->send[j];
+        box_audio_bus_t *send;
+        if (((b->pre_fader & (1u << j)) != 0) != pre) {
+            continue;
+        }
+
+        if (route->sends[j] == BOX_AUDIO_BUS_NONE) {
+            box_audio_ramp_skip(ramp, frames);
+            continue;
+        }
+
+        send = &core->buses[route->sends[j]];
+        for (i = 0; i < frames; i ++) {
+            float s = box_audio_ramp_next(ramp);
+            send->l[i] += b->l[i] * s;
+            send->r[i] += b->r[i] * s;
+        }
+    }
+}
+
+/** Run the buses of the order over a block: reverb, width, pre-fader sends, gains, output and
+ * post-fader sends, the master last.
  *
  * @param core The core
  * @param frames Frames of the block
@@ -1280,25 +1400,24 @@ static void box_audio_buses_render(
         box_audio_bus_t *b = &core->buses[route->bus];
         box_audio_bus_t *out = route->output != BOX_AUDIO_BUS_NONE ?
             &core->buses[route->output] : NULL;
-        box_audio_bus_t *send = route->send != BOX_AUDIO_BUS_NONE ?
-            &core->buses[route->send] : NULL;
         box_audio_reverbs_render(core, route->bus, b->l, b->r, frames);
+        box_audio_bus_width(b, frames);
+        if (b->pre_fader) {
+            box_audio_bus_sends(core, route, b, true, frames);
+        }
+
         for (i = 0; i < frames; i ++) {
             float l = box_audio_clean(b->l[i] * box_audio_ramp_next(&b->left));
             float r = box_audio_clean(b->r[i] * box_audio_ramp_next(&b->right));
-            float s = box_audio_ramp_next(&b->send);
             b->l[i] = l;
             b->r[i] = r;
             if (out) {
                 out->l[i] += l;
                 out->r[i] += r;
             }
-
-            if (send) {
-                send->l[i] += l * s;
-                send->r[i] += r * s;
-            }
         }
+
+        box_audio_bus_sends(core, route, b, false, frames);
     }
 }
 

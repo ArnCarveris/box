@@ -530,9 +530,9 @@ void Shell_audio_command(void) {
     test_bool(error, false);
     test_assert(strncmp(out, "off, 0 Hz, 0 voices", 19) == 0);
     test_assert(strstr(out, "\nmaster: volume 1.00") != NULL);
-    test_assert(strstr(out, "music: volume 0.50 pan 0.00 -> master") != NULL);
-    test_assert(strstr(out, "hall: volume 1.00 pan 0.00 -> master, reverb decay 2.40 "
-        "damping 0.40 predelay 0.020 size 0.50 mix 1.00") != NULL);
+    test_assert(strstr(out, "music: group volume 0.50 pan 0.00 width 1.00 -> master") != NULL);
+    test_assert(strstr(out, "hall: group volume 1.00 pan 0.00 width 1.00 -> master, "
+        "reverb decay 2.40 damping 0.40 predelay 0.020 size 0.50 mix 1.00") != NULL);
     ecs_os_free(out);
 
     out = box_command_run(world, s, "audio volume 0.25", &error);

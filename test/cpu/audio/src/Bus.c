@@ -52,7 +52,7 @@ void Bus_master_default(void) {
 
 void Bus_volume(void) {
     // audio/bus
-    box_audio_route_t routes[] = { { 1, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 } };
+    box_audio_route_t routes[] = { AUDIO_OUT(1, 0), AUDIO_MASTER };
     box_audio_core_t *core = bus_core(1);
     float l, r;
     audio_order(core, routes, 2);
@@ -68,7 +68,7 @@ void Bus_volume(void) {
 
 void Bus_mute(void) {
     // audio/bus
-    box_audio_route_t routes[] = { { 1, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 } };
+    box_audio_route_t routes[] = { AUDIO_OUT(1, 0), AUDIO_MASTER };
     box_audio_core_t *core = bus_core(1);
     float l, r;
     audio_order(core, routes, 2);
@@ -85,7 +85,7 @@ void Bus_mute(void) {
 
 void Bus_pan(void) {
     // audio/bus
-    box_audio_route_t routes[] = { { 1, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 } };
+    box_audio_route_t routes[] = { AUDIO_OUT(1, 0), AUDIO_MASTER };
     box_audio_core_t *core = bus_core(1);
     float pans[] = { -1, -0.5f, 0, 0.5f, 1 };
     float l[5], r[5], power = 2 * BUS_LEVEL * BUS_LEVEL;
@@ -131,8 +131,8 @@ void Bus_voice_pan(void) {
 void Bus_chain(void) {
     // audio/bus
     box_audio_route_t routes[] = {
-        { 3, 2, BOX_AUDIO_BUS_NONE }, { 2, 1, BOX_AUDIO_BUS_NONE },
-        { 1, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 }
+        AUDIO_OUT(3, 2), AUDIO_OUT(2, 1),
+        AUDIO_OUT(1, 0), AUDIO_MASTER
     };
     box_audio_core_t *core = bus_core(3);
     float l, r;
@@ -150,7 +150,7 @@ void Bus_chain(void) {
 void Bus_send(void) {
     // audio/bus
     box_audio_route_t routes[] = {
-        { 1, 0, 2 }, { 2, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 }
+        AUDIO_ROUTE(1, 0, 2), AUDIO_OUT(2, 0), AUDIO_MASTER
     };
     box_audio_core_t *core = bus_core(1);
     float l, r;
@@ -168,9 +168,9 @@ void Bus_send(void) {
 void Bus_send_zero(void) {
     // audio/bus
     static float l[4096], r[4096];
-    box_audio_route_t plain[] = { { 1, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 } };
+    box_audio_route_t plain[] = { AUDIO_OUT(1, 0), AUDIO_MASTER };
     box_audio_route_t sent[] = {
-        { 1, 0, 2 }, { 2, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 }
+        AUDIO_ROUTE(1, 0, 2), AUDIO_OUT(2, 0), AUDIO_MASTER
     };
     box_audio_core_t *core = bus_core(1);
     audio_sine(audio_sound_b, 4096, 300, 0.5f);
@@ -195,20 +195,20 @@ void Bus_send_zero(void) {
 
 void Bus_cycle_refused(void) {
     // audio/bus
-    box_audio_route_t good[] = { { 1, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 } };
+    box_audio_route_t good[] = { AUDIO_OUT(1, 0), AUDIO_MASTER };
     box_audio_route_t cycle[] = {
-        { 1, 2, BOX_AUDIO_BUS_NONE }, { 2, 1, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 }
+        AUDIO_OUT(1, 2), AUDIO_OUT(2, 1), AUDIO_MASTER
     };
-    box_audio_route_t self_send[] = { { 1, 0, 1 }, { 0, 255, 255 } };
+    box_audio_route_t self_send[] = { AUDIO_ROUTE(1, 0, 1), AUDIO_MASTER };
     box_audio_route_t back_send[] = {
-        { 1, 2, BOX_AUDIO_BUS_NONE }, { 2, 0, 1 }, { 0, 255, 255 }
+        AUDIO_OUT(1, 2), AUDIO_ROUTE(2, 0, 1), AUDIO_MASTER
     };
-    box_audio_route_t master_first[] = { { 0, 255, 255 }, { 1, 0, BOX_AUDIO_BUS_NONE } };
+    box_audio_route_t master_first[] = { AUDIO_MASTER, AUDIO_OUT(1, 0) };
     box_audio_route_t twice[] = {
-        { 1, 0, BOX_AUDIO_BUS_NONE }, { 1, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 }
+        AUDIO_OUT(1, 0), AUDIO_OUT(1, 0), AUDIO_MASTER
     };
-    box_audio_route_t master_out[] = { { 1, 0, BOX_AUDIO_BUS_NONE }, { 0, 1, 255 } };
-    box_audio_route_t far[] = { { 40, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 } };
+    box_audio_route_t master_out[] = { AUDIO_OUT(1, 0), AUDIO_OUT(0, 1) };
+    box_audio_route_t far[] = { AUDIO_OUT(200, 0), AUDIO_MASTER };
     box_audio_core_t *core = bus_core(1);
     float l, r;
     audio_order(core, good, 2);
@@ -235,10 +235,10 @@ void Bus_cycle_refused(void) {
 void Bus_order_one_block(void) {
     // audio/bus
     box_audio_route_t direct[] = {
-        { 1, 0, BOX_AUDIO_BUS_NONE }, { 2, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 }
+        AUDIO_OUT(1, 0), AUDIO_OUT(2, 0), AUDIO_MASTER
     };
     box_audio_route_t through[] = {
-        { 1, 2, BOX_AUDIO_BUS_NONE }, { 2, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 }
+        AUDIO_OUT(1, 2), AUDIO_OUT(2, 0), AUDIO_MASTER
     };
     box_audio_core_t *core = bus_core(1);
     int32_t i;
@@ -277,7 +277,7 @@ void Bus_not_in_order_silent(void) {
 
 void Bus_voice_bus_change(void) {
     // audio/bus
-    box_audio_route_t routes[] = { { 1, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 } };
+    box_audio_route_t routes[] = { AUDIO_OUT(1, 0), AUDIO_MASTER };
     box_audio_core_t *core = bus_core(0);
     float l, r;
     audio_order(core, routes, 2);
@@ -287,5 +287,221 @@ void Bus_voice_bus_change(void) {
     audio_voice_set(core, 1, BOX_AUDIO_PARAM_BUS, 1);
     bus_settle(core, &l, &r);
     test_assert(fabsf(l - BUS_LEVEL * 0.5f) < 1e-6f);
+    box_audio_core_free(core);
+}
+
+/** Left and right level of the looped stereo sound of the width tests */
+#define BUS_STEREO_L 0.4f
+#define BUS_STEREO_R 0.1f
+
+/** Create a core with a looped stereo sound 1 of constant channels that plays on bus 1 as
+ * voice 1, bus 1 into the master.
+ *
+ * @return The core
+ */
+static box_audio_core_t* bus_stereo_core(void)
+{
+    box_audio_route_t routes[] = { AUDIO_OUT(1, 0), AUDIO_MASTER };
+    box_audio_core_t *core = audio_new();
+    int32_t i;
+    for (i = 0; i < 1024; i ++) {
+        audio_sound_b[i * 2] = BUS_STEREO_L;
+        audio_sound_b[i * 2 + 1] = BUS_STEREO_R;
+    }
+
+    test_assert(box_audio_core_sound(core, 1, audio_sound_b, 1024, 2, AUDIO_RATE));
+    audio_order(core, routes, 2);
+    audio_play(core, 1, 1, 1, 1, 0, 1, BOX_AUDIO_PLAY_LOOP);
+
+    return core;
+}
+
+void Bus_width_mono(void) {
+    // audio/bus
+    box_audio_core_t *core = bus_stereo_core();
+    float l, r, mid = 0.5f * (BUS_STEREO_L + BUS_STEREO_R);
+    bus_settle(core, &l, &r);
+    test_assert(fabsf(l - BUS_STEREO_L) < 1e-6f);
+    test_assert(fabsf(r - BUS_STEREO_R) < 1e-6f);
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_WIDTH, 0);
+    bus_settle(core, &l, &r);
+    test_assert(l == r);
+    test_assert(fabsf(l - mid) < 1e-6f);
+    box_audio_core_free(core);
+}
+
+void Bus_width_double(void) {
+    // audio/bus
+    box_audio_core_t *core = bus_stereo_core();
+    float l, r, mid = 0.5f * (BUS_STEREO_L + BUS_STEREO_R);
+    float side = 0.5f * (BUS_STEREO_L - BUS_STEREO_R);
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_WIDTH, 2);
+    bus_settle(core, &l, &r);
+    test_assert(fabsf(l - (mid + 2 * side)) < 1e-6f);
+    test_assert(fabsf(r - (mid - 2 * side)) < 1e-6f);
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_WIDTH, 5);
+    bus_settle(core, &l, &r);
+    test_assert(fabsf(l - (mid + 2 * side)) < 1e-6f);
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_WIDTH, NAN);
+    bus_settle(core, &l, &r);
+    test_assert(l == r);
+    box_audio_core_free(core);
+}
+
+void Bus_width_one_identical(void) {
+    // audio/bus
+    static float l[4096], r[4096];
+    box_audio_core_t *core = bus_stereo_core();
+    audio_sine(audio_sound_a, 4096, 300, 0.5f);
+    test_assert(box_audio_core_sound(core, 2, audio_sound_a, 4096, 1, AUDIO_RATE));
+    audio_play(core, 2, 2, 1, 1, 0.3f, 1, 0);
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_PAN, -0.4f);
+    audio_render(core, 0, 4096);
+    memcpy(l, audio_l, sizeof(l));
+    memcpy(r, audio_r, sizeof(r));
+    box_audio_core_free(core);
+
+    core = bus_stereo_core();
+    test_assert(box_audio_core_sound(core, 2, audio_sound_a, 4096, 1, AUDIO_RATE));
+    audio_play(core, 2, 2, 1, 1, 0.3f, 1, 0);
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_PAN, -0.4f);
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_WIDTH, 1);
+    audio_bus_set(core, 0, BOX_AUDIO_PARAM_WIDTH, 1);
+    audio_render(core, 0, 4096);
+    test_assert(memcmp(l, audio_l, sizeof(l)) == 0);
+    test_assert(memcmp(r, audio_r, sizeof(r)) == 0);
+    box_audio_core_free(core);
+}
+
+void Bus_four_sends(void) {
+    // audio/bus
+    box_audio_route_t routes[] = {
+        { 1, 6, { 2, 3, 4, 5 }, 0, 0 }, AUDIO_OUT(2, 0), AUDIO_OUT(3, 0), AUDIO_OUT(4, 0),
+        AUDIO_OUT(5, 0), AUDIO_OUT(6, 0), AUDIO_MASTER
+    };
+    float levels[] = { 0.1f, 0.2f, 0.3f, 0.4f };
+    box_audio_core_t *core = bus_core(1);
+    float l, r;
+    int32_t j, k;
+    audio_order(core, routes, 7);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_ORDER_REFUSED, NULL), 0);
+    audio_bus_set(core, 6, BOX_AUDIO_PARAM_MUTE, 1);
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_SEND, levels[0]);
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_SEND_1, levels[1]);
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_SEND_2, levels[2]);
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_SEND_3, levels[3]);
+    bus_settle(core, &l, &r);
+    test_assert(fabsf(l - BUS_LEVEL * 1.0f) < 1e-5f);
+    test_assert(fabsf(r - BUS_LEVEL * 1.0f) < 1e-5f);
+    for (j = 0; j < 4; j ++) {
+        for (k = 0; k < 4; k ++) {
+            audio_bus_set(core, (uint32_t)(2 + k), BOX_AUDIO_PARAM_MUTE, k != j);
+        }
+
+        bus_settle(core, &l, &r);
+        test_assert(fabsf(l - BUS_LEVEL * levels[j]) < 1e-6f);
+        test_assert(fabsf(r - BUS_LEVEL * levels[j]) < 1e-6f);
+    }
+
+    box_audio_core_free(core);
+}
+
+void Bus_pre_fader_send(void) {
+    // audio/bus
+    box_audio_route_t pre[] = {
+        { 1, 0, { 2, BOX_AUDIO_BUS_NONE, BOX_AUDIO_BUS_NONE, BOX_AUDIO_BUS_NONE }, 1, 0 },
+        AUDIO_OUT(2, 0), AUDIO_MASTER
+    };
+    box_audio_route_t post[] = { AUDIO_ROUTE(1, 0, 2), AUDIO_OUT(2, 0), AUDIO_MASTER };
+    box_audio_core_t *core = bus_core(1);
+    float l, r;
+    audio_order(core, pre, 3);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_ORDER_REFUSED, NULL), 0);
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_VOLUME, 0.25f);
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_PAN, 1);
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_SEND, 0.5f);
+    bus_settle(core, &l, &r);
+    test_assert(fabsf(l - BUS_LEVEL * 0.5f) < 1e-6f);
+    test_assert(fabsf(r - BUS_LEVEL * (0.5f + 0.25f * 1.41421356f)) < 1e-5f);
+
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_VOLUME, 1);
+    bus_settle(core, &l, &r);
+    test_assert(fabsf(l - BUS_LEVEL * 0.5f) < 1e-6f);
+
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_MUTE, 1);
+    bus_settle(core, &l, &r);
+    test_flt(audio_peak(audio_l, AUDIO_RAMP, 2048), 0);
+    test_flt(audio_peak(audio_r, AUDIO_RAMP, 2048), 0);
+
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_MUTE, 0);
+    audio_order(core, post, 3);
+    bus_settle(core, &l, &r);
+    test_assert(fabsf(l) < 1e-6f);
+    test_assert(fabsf(r - BUS_LEVEL * 1.41421356f * 1.5f) < 1e-5f);
+    box_audio_core_free(core);
+}
+
+void Bus_send_earlier_refused(void) {
+    // audio/bus
+    box_audio_route_t good[] = { AUDIO_OUT(1, 0), AUDIO_OUT(2, 0), AUDIO_MASTER };
+    box_audio_route_t earlier[] = {
+        AUDIO_OUT(2, 0),
+        { 1, 0, { BOX_AUDIO_BUS_NONE, BOX_AUDIO_BUS_NONE, 2, BOX_AUDIO_BUS_NONE }, 0, 0 },
+        AUDIO_MASTER
+    };
+    box_audio_route_t master_send[] = {
+        AUDIO_OUT(1, 0), { 0, BOX_AUDIO_BUS_NONE, { BOX_AUDIO_BUS_NONE, 1, BOX_AUDIO_BUS_NONE,
+            BOX_AUDIO_BUS_NONE }, 0, 0 }
+    };
+    box_audio_route_t far[] = {
+        { 1, 0, { BOX_AUDIO_BUS_NONE, BOX_AUDIO_BUS_NONE, BOX_AUDIO_BUS_NONE, 200 }, 0, 0 },
+        AUDIO_MASTER
+    };
+    box_audio_core_t *core = bus_core(1);
+    float l, r;
+    audio_order(core, good, 3);
+    audio_bus_set(core, 1, BOX_AUDIO_PARAM_VOLUME, 0.5f);
+    bus_settle(core, &l, &r);
+    test_assert(fabsf(l - BUS_LEVEL * 0.5f) < 1e-6f);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_ORDER_REFUSED, NULL), 0);
+
+    audio_order(core, earlier, 3);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_ORDER_REFUSED, NULL), 1);
+    audio_order(core, master_send, 2);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_ORDER_REFUSED, NULL), 1);
+    audio_order(core, far, 2);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_ORDER_REFUSED, NULL), 1);
+    bus_settle(core, &l, &r);
+    test_assert(fabsf(l - BUS_LEVEL * 0.5f) < 1e-6f);
+    box_audio_core_free(core);
+}
+
+void Bus_buses_64(void) {
+    // audio/bus
+    box_audio_route_t routes[BOX_AUDIO_BUS_MAX];
+    box_audio_core_t *core;
+    float l, r;
+    int32_t i;
+    test_int(BOX_AUDIO_BUS_MAX, 64);
+    for (i = 0; i < BOX_AUDIO_BUS_MAX; i ++) {
+        uint8_t bus = (uint8_t)(BOX_AUDIO_BUS_MAX - 1 - i);
+        box_audio_route_t route = AUDIO_OUT(bus, (uint8_t)(bus ? bus - 1 : BOX_AUDIO_BUS_NONE));
+        routes[i] = route;
+    }
+
+    core = bus_core(BOX_AUDIO_BUS_MAX - 1);
+    audio_order(core, routes, BOX_AUDIO_BUS_MAX);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_ORDER_REFUSED, NULL), 0);
+    bus_settle(core, &l, &r);
+    test_assert(l == BUS_LEVEL);
+    test_assert(r == BUS_LEVEL);
+
+    audio_bus_set(core, BOX_AUDIO_BUS_MAX - 1, BOX_AUDIO_PARAM_VOLUME, 0.5f);
+    audio_bus_set(core, 32, BOX_AUDIO_PARAM_VOLUME, 0.5f);
+    bus_settle(core, &l, &r);
+    test_assert(fabsf(l - BUS_LEVEL * 0.25f) < 1e-6f);
+
+    audio_play(core, 2, 1, BOX_AUDIO_BUS_MAX, 1, 0, 1, BOX_AUDIO_PLAY_LOOP);
+    test_int(box_audio_core_voice_count(core), 1);
     box_audio_core_free(core);
 }

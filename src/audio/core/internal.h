@@ -432,15 +432,20 @@ typedef struct box_audio_scheduled_t {
     box_audio_timed_cmd_t cmd;  /**< The command */
 } box_audio_scheduled_t;
 
-/** A bus: a volume, a pan, a mute, an output and one send, with a block of samples */
+/** A bus: a volume, a pan, a width, a mute, an output and up to BOX_AUDIO_SENDS sends, with a
+ * block of samples */
 typedef struct box_audio_bus_t {
     float volume;            /**< Volume */
     float pan;               /**< Pan, -1..1 */
+    float width;             /**< Stereo width, 0..2 */
     bool mute;               /**< Whether it is muted */
-    float send_level;        /**< Level of the send */
+    uint8_t pre_fader;       /**< Pre-fader sends of its route, bit j for send j */
+    float send_level[BOX_AUDIO_SENDS]; /**< Level of each send */
     box_audio_ramp_t left;   /**< Gain of the left channel: volume, pan and mute */
     box_audio_ramp_t right;  /**< Gain of the right channel */
-    box_audio_ramp_t send;   /**< Gain of the send */
+    box_audio_ramp_t side;   /**< Gain of the side signal, the width */
+    box_audio_ramp_t send[BOX_AUDIO_SENDS]; /**< Gain of each send, with the mute on a
+                              *   pre-fader one */
     float l[BOX_AUDIO_CORE_BLOCK];  /**< Left samples of the block */
     float r[BOX_AUDIO_CORE_BLOCK];  /**< Right samples of the block */
 } box_audio_bus_t;

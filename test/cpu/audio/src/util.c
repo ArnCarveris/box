@@ -101,7 +101,7 @@ void audio_order(
     const box_audio_route_t *routes,
     int32_t count)
 {
-    uint8_t bytes[256];
+    uint8_t bytes[1024];
     box_audio_writer_t w;
     box_audio_writer_init(&w, bytes, sizeof(bytes));
     test_assert(box_audio_write_order(&w, routes, count));
@@ -195,8 +195,8 @@ void audio_workload(
 {
     static uint8_t bytes[4096];
     box_audio_route_t routes[] = {
-        { 3, 1, 2 }, { 4, 2, BOX_AUDIO_BUS_NONE }, { 1, 0, 2 }, { 2, 0, BOX_AUDIO_BUS_NONE },
-        { 0, 255, 255 }
+        AUDIO_ROUTE(3, 1, 2), AUDIO_OUT(4, 2), AUDIO_ROUTE(1, 0, 2), AUDIO_OUT(2, 0),
+        AUDIO_MASTER
     };
     box_audio_event_t events[64];
     box_audio_writer_t w;

@@ -19,9 +19,11 @@ core**, a small mixer in plain C that renders on its own thread, once per frame 
   exists. Music is not a sound: an `AudioStream` streams one Ogg Vorbis file.
 - **Voices** play the sounds, 64 at once; a play past that steals the quietest. A voice has a
   volume, a pan and a pitch, and plays on a bus.
-- **Buses** mix voices and other buses: each has a volume, a pan, a mute, an output and one send
-  with a level. Bus 0 is the master, `box.audio.master` in script; every other bus ends there.
-  A bus with a `Reverb` is a reverb bus, which other buses reach through their send.
+- **Buses** are the channels of the mixer and mix voices and other buses: each has a volume, a
+  pan, a stereo width, a mute, a solo, a kind (group, return or SFX), an output and up to 4
+  sends, pre or post fader. Bus 0 is the master, `box.audio.master` in script; every other bus
+  ends there. A bus with a `Reverb` is a reverb bus, a return, which other buses reach through
+  a send.
 - **Space**: a source with `AudioSpatial` gets its volume and pan every frame from its distance
   to the listener and its direction, the camera of the main view or the entity with
   `AudioListener`.
@@ -35,7 +37,7 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 
 | Component | Use it for |
 |-----------|------------|
-| `AudioBus` | A bus of the mixer: `output`, `volume`, `pan`, `mute`, `send`, `send_level` |
+| `AudioBus` | A channel of the mixer: `output`, `volume`, `pan`, `width`, `mute`, `solo`, `kind` and up to 4 `sends`, see [Mixer channels](#mixer-channels) |
 | `Reverb` | The reverb of a room on the bus of its entity, see [Reverb](#reverb) |
 | `AudioOutput` | The bus a source, a stream or a sound plays on (the master without one) |
 | `AudioPcm` | A sound from samples, from script or C |
@@ -69,7 +71,7 @@ cabin_verb {
   AudioBus: {output: master}
   Reverb: {decay: 0.75, damping: 0.6, predelay: 0.008, size: 0.25}
 }
-world { AudioBus: {output: master, send: cabin_verb, send_level: 0.28} }
+world { AudioBus: {output: master, sends: [{bus: cabin_verb, level: 0.28}]} }
 ui { AudioBus: {output: master, volume: 0.55} }
 music { AudioBus: {output: master, volume: 0.45} }
 ```
@@ -236,6 +238,8 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   gap short with edges of a few ms, as the dust merchant's engine does with 2 ms.
 - **Files**: WAV and FLAC for sounds, Ogg Vorbis for music, one stream at once (a change of path
   fades over 5 ms, there is no crossfade).
+- **Mixer**: 63 buses besides the master and 4 sends per channel; more buses are silent and
+  more sends are ignored, both with one error.
 - **Tools**: no mixer UI, and the UI theme of box has no sounds; a scene adds them in its own
   widgets, as the dust merchant does.
 - **Web**: no shared memory, decoding on the main thread, and no load measurement in the
@@ -249,7 +253,7 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
 The audio a box app plays can be inspected without listening:
 
 - `audio` prints the state, the rate, the voices, the steals, the load, the clock of the core
-  (frames and seconds) and every bus with its routing and reverb; `audio volume <v>` and `audio mute` set the master.
+  (frames and seconds) and every bus with its kind, width, solo, routing, sends and reverb; `audio volume <v>` and `audio mute` set the master.
 - `audio capture <seconds>` records the master to a 16 bit stereo WAV resource of the shell
   session, `box.audio.capture(seconds, path)` to a file from a script, at load if it should
   start with the scene. In the browser `audio capture` writes `/tmp/audio_capture_<n>.wav` in
@@ -319,15 +323,16 @@ start of the next render block, but those with a `when` in the future (see
 | `LEGATO` | new voice handle, handle of the voice it follows, then the fields of `PLAY` but `when`: a note of a mono voice, see [Synth](#synth) |
 | `STOP` | when, voice handle: the voice fades out over the ramp from `when` and ends; one that applies now also drops the scheduled commands of its handle |
 | `VOICE_SET` | when, voice handle, `VOLUME`, `PAN`, `PITCH`, `BUS` or `POSITION`, value: the ramp starts at `when` |
-| `BUS_SET` | when, bus, `VOLUME`, `PAN`, `MUTE` or `SEND` (the send level), value: the ramp starts at `when` |
-| `ORDER` | count, then per bus in processing order: bus, output, send |
+| `BUS_SET` | when, bus, `VOLUME`, `PAN`, `MUTE`, `WIDTH` (7), `SEND` (5, the level of send 0) or `SEND_1..3` (8..10, the levels of sends 1 to 3), value: the ramp starts at `when` |
+| `ORDER` | count, then per bus in processing order: bus, output, the buses of its 4 sends (or none) and a mask of the pre-fader ones |
 | `SOUND_RELEASE` | sound: freed once no voice plays it |
 | `STREAM` | voice handle, stream, bus, volume, channels, sample rate: opens a stream and starts a voice that reads it |
 | `REVERB` | slot, bus (or none), decay, damping, predelay, size, mix: see [Reverb](#reverb) |
 | `SYNTH` | sound, then a patch up to its last layer: makes a free sound id a synth or replaces its patch, see [Synth](#synth) |
 
 The sender picks the voice handles, so it addresses a voice without waiting for a reply. Values
-are clamped (volumes and send levels to 0..4, pans to -1..1, pitches to 1/64..16) and a NaN
+are clamped (volumes and send levels to 0..4, pans to -1..1, widths to 0..2, pitches to
+1/64..16) and a NaN
 becomes the low end. `POSITION` moves the read position of a voice at once, in frames of its
 sound: a looping sound wraps it and one that does not loop clamps it to its end, and a NaN, a
 negative or a huge position is 0. Sent in the batch of the `PLAY`, it starts the voice there,
@@ -378,13 +383,20 @@ A play when 64 voices play steals the one with the lowest level, the larger of i
 targets (the first of equals), with a fade of 2 ms. This is the voice cap: there is no
 priority system.
 
-**Buses** are a fixed pool of `BOX_AUDIO_BUS_MAX` (32); bus 0 is the master. Each has a volume,
-a pan, a mute, an output and one send with a level, taken after its volume. An `ORDER` command
-replaces the processing order and the routing as a whole. The core checks it: the master comes
-last and outputs nowhere, every other bus outputs, and sends, only to buses after it, and no bus
-appears twice. An invalid order is ignored with `ORDER_REFUSED`, so a cycle cannot hang the
-render. A bus not in the order is silent and its ramps wait. The order starts as the master
-alone.
+**Buses** are a fixed pool of `BOX_AUDIO_BUS_MAX` (64); bus 0 is the master. A bus that is not
+in the order costs nothing. Each has a volume, a pan, a width, a mute, an output and
+`BOX_AUDIO_SENDS` (4) sends with a level each. A bus renders its block in this order: its
+reverb, its width, its pre-fader sends, its volume, pan and mute, its output, then its
+post-fader sends. The width is a gain of the side signal: with `mid = (l + r) / 2` and
+`side = (l - r) / 2`, the bus plays `mid + width side` on the left and `mid - width side` on the
+right, so 0 is mono, 1 passes as is and 2 doubles the side; at 1 the bus skips it, bit
+identical. A post-fader send taps the bus after its volume and pan; a pre-fader send taps it
+before them, and its gain follows the mute so that a muted bus sends nothing. A send without a
+bus does no work. An `ORDER` command replaces the processing order and the routing as a whole,
+the pre-fader sends included. The core checks it: the master comes last and outputs and sends
+nowhere, every other bus outputs, and sends, only to buses after it, and no bus appears twice.
+An invalid order is ignored with `ORDER_REFUSED`, so a cycle cannot hang the render. A bus not in
+the order is silent and its ramps wait. The order starts as the master alone.
 
 **Ramps.** A voice and a bus each hold a gain per channel that combines volume, pan, mute and
 fades; every change moves it linearly over `BOX_AUDIO_CORE_RAMP` (5 ms), and a voice starts at
@@ -395,7 +407,7 @@ its samples as they are. A stereo voice, a stereo sample or a wide synth, takes 
 gains on its two channels, so its pan, and the pan of a bus, is a balance: at the center both
 channels pass as they are, toward a side the far channel fades and the near one rises by up to
 3 dB. For two channels that are not correlated, a wide synth, the power stays the same at every
-pan; a send takes both channels of its bus, after its volume and pan.
+pan; a post-fader send takes both channels of its bus, after its volume and pan.
 
 **The limiter** on the master keeps the peak at `BOX_AUDIO_LIMITER_THRESHOLD` (0.95): its gain,
 one for both channels so the image does not shift, drops at once to the threshold over the peak
@@ -447,7 +459,7 @@ buses and reports the time per frame.
 
 `src/audio/core/reverb.c` is an algorithmic reverb that runs on a bus: a feedback delay network
 of `BOX_AUDIO_REVERB_LINES` (8) delay lines. A send bus with a reverb is the usual setup, so
-sources reach it through the send of their bus.
+sources reach it through a send of their bus.
 
 - **The network.** The input, the mean of both channels, goes through a predelay line, then into
   every line with a sign pattern that is no row of the matrix, so the first reflection already
@@ -1540,7 +1552,7 @@ frame, the same on every platform.
 | `AudioPcm` | The samples of a sound (`samples`, `channels`, `sample_rate`, 0 for the output rate); `box_audio_sound_from_pcm` sets it from C |
 | `SoundFile` | A sound decoded from a WAV or FLAC file (`path`), see [Sound files](#sound-files) |
 | `SoundStatus` | Read only: `state` (`SoundLoading`, `SoundReady`, `SoundFailed`), `frames`, `channels`, `sample_rate` and `error` of a `SoundFile` |
-| `AudioBus` | A mixer bus: `output` (0 or `master` for the master), `volume` (1), `pan`, `mute`, `send` and `send_level` |
+| `AudioBus` | A mixer channel: `output` (0 or `master` for the master), `volume` (1), `pan`, `width` (1), `mute`, `solo`, `kind` (`AudioChannelGroup`, `AudioChannelReturn` or `AudioChannelSfx`) and `sends`, up to 4 `AudioSend` of `bus`, `level` and `pre_fader`; see [Mixer channels](#mixer-channels) |
 | `Reverb` | A reverb on the bus of the entity: `decay` (1.5 s), `damping` (0.5), `predelay` (0.02 s), `size` (0.5), `mix` (1) |
 | `AudioOutput` | The bus a source, or a sound by default, plays on |
 | `AudioSource` | A sound that plays while the entity exists: `sound`, `volume` (1), `pitch` (1), `loop`, `playing` (true) |
@@ -1581,20 +1593,61 @@ order, the master settings, new sounds, the sources, the spatial sources and the
 `play_at` when the listener moved, then the plays, the stops of deleted sources and the
 releases of sounds. A world without audio components pays the empty queries.
 
-**Buses** get an index of the core, up to 31 besides the master; more log one error and are
-silent. The order is compiled whenever a bus appears, disappears or changes its output or send:
+**Buses** get an index of the core, up to 63 besides the master; more log one error and are
+silent. The order is compiled whenever a bus appears, disappears or changes its output or sends:
 a depth first walk computes the longest path of each bus to the master and finds cycles; the
 deepest buses come first, the master last. A cycle through outputs and sends logs one error that
 names the buses on it and keeps the last valid order, which the core keeps playing. A deleted
 bus, or an output or send that names no bus, routes to the master: its sources and one shots are
 moved to the master and the index is reused a frame later. A Disabled bus is muted.
 
+### Mixer channels
+
+`AudioBus` is the component of every channel of a mix: a group, a return, an SFX bus, the bus of
+a track and the master. `kind` tells the solo what a channel is: `AudioChannelGroup` (the
+default) for groups and other buses, `AudioChannelReturn` for returns such as a reverb bus and
+`AudioChannelSfx` for the buses of the game sounds. A track is identified by its `Track` and the
+master by `box.audio.master`.
+
+```
+using box.audio
+
+box.audio.master { AudioBus: {width: 0.9} }
+hall { AudioBus: {output: master, kind: AudioChannelReturn}; Reverb: {decay: 2} }
+sfx { AudioBus: {output: master, kind: AudioChannelSfx} }
+band { AudioBus: {output: master, volume: 0.6} }
+lead { AudioBus: {output: band, solo: true, sends: [{bus: hall, level: 0.3}]} }
+pad {
+  AudioBus: {output: band, width: 1.5, sends: [{bus: hall, level: 0.5, pre_fader: true}]}
+}
+```
+
+- **Width** (0..2, default 1) is a mid/side gain after the reverb of the channel and before its
+  pan: 0 is mono, 1 as is, 2 doubles the side.
+- **Sends**: up to `BOX_AUDIO_SENDS` (4) per channel, each with a `bus`, a `level` (0..4) and
+  `pre_fader`. A post-fader send taps after the volume and pan, a pre-fader one before them; the
+  mute and the solo silence both. More than 4 log one error that names the channel and the first
+  4 play. A send to no bus, or to a deleted one, does nothing, and a cycle through any send logs
+  the error of a cycle through outputs.
+- **Solo** is computed by the module and sent as part of the mute, so it ramps. When any channel
+  is soloed, a channel is heard when it is soloed, is on the output path of a soloed channel,
+  feeds a soloed channel (the tracks of a soloed group), is a return (solo safe, so the reverb of
+  a soloed track is heard), is an SFX bus (solo is a tool of the music mix and never silences the
+  game), or is downstream of one of these. `mute` always wins, and a Disabled channel is muted
+  and does not solo.
+- **The master** may have an `AudioBus` for its pan and width. Its volume multiplies
+  `AudioSettings.master_volume` and its mute adds to `AudioSettings.mute`; its output, sends,
+  solo and kind are ignored.
+
+A width of 1 and unused sends add no work per frame, and a world without a solo pays one check
+of a mask.
+
 **Reverbs.** A scene sets its reverb by having an entity with `AudioBus` and `Reverb`, and
 unloading the scene deletes it, which fades its tail out:
 
 ```
 hall { AudioBus: {output: master}; Reverb: {decay: 2.4, damping: 0.4, predelay: 0.02} }
-world { AudioBus: {output: master, send: hall, send_level: 0.3} }
+world { AudioBus: {output: master, sends: [{bus: hall, level: 0.3}]} }
 ```
 
 Components on one line are separated by `;` (or a newline): flecs script does not take a comma
@@ -1840,8 +1893,10 @@ nothing.
 ### The audio command and captures
 
 The shell command `audio` (`src/command/cmd_audio.c`) prints the state, the rate, the voices, the
-steals and the load, then the master and the buses in processing order, with the values of the
-reverb of a bus and `(dry, every slot taken)` for a reverb that has no slot. `audio volume <v>` and
+steals and the load, then the master (with the volume, pan and width of its `AudioBus` when it
+has one) and the buses in processing order, each with its kind, volume, pan, width, `solo`,
+`muted`, its output, its sends (`send pre` for a pre-fader one) and the values of its reverb, and
+`(dry, every slot taken)` for a reverb that has no slot. `audio volume <v>` and
 `audio mute [on|off]` write `AudioSettings`. `audio capture <seconds>` records the master output
 to a 16 bit stereo WAV resource of the session, fetched like a `capture` PNG with
 `GET /shell/session/<id>/resource/<name>`, empty until the file is written in one rename. In the
@@ -1851,7 +1906,7 @@ Headless with a fixed `--delta-time`, two runs write identical captures, which i
 tests inspect audio and how a render can be listened to. `box.perf` reports the largest load of
 a run as `PerfStatus.audio_load` and `audio_load` in its report.
 
-The tests are `Module`, `Source`, `Script`, `Capture` and `Spatial` in `test/cpu/audio`,
+The tests are `Module`, `Mixer`, `Source`, `Script`, `Capture` and `Spatial` in `test/cpu/audio`,
 through the null transport; `test/integration/e2e/audio.py` drives the command on a headless
 app, `test/integration/web/audio_spatial.mjs` moves a source from the left of the listener to
 its right in Chrome and measures both channels with `test/integration/web/audio_spatial.flecs`,
