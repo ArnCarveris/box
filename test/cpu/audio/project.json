@@ -194,7 +194,8 @@
                     "effects",
                     "meters",
                     "eq_filter",
-                    "dynamics"
+                    "dynamics",
+                    "delay"
                 ]
             },
             {
@@ -427,6 +428,23 @@
                     "second_reverb_runs",
                     "delete_fades",
                     "no_alloc"
+                ]
+            },
+            {
+                "id": "Delay",
+                "testcases": [
+                    "echo_time",
+                    "feedback_damping",
+                    "ping_pong",
+                    "sync_eighth",
+                    "tempo_change",
+                    "time_change_crossfade",
+                    "time_clamped",
+                    "silent_after_tail",
+                    "mix_dry",
+                    "render_sizes",
+                    "component",
+                    "script"
                 ]
             },
             {

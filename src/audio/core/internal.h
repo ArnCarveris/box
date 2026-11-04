@@ -215,6 +215,36 @@ typedef struct box_audio_gate_t {
     double gain;              /**< Linear gain that runs */
 } box_audio_gate_t;
 
+/** A read position of a delay: whole frames back and the fraction toward the frame before */
+typedef struct box_audio_delay_tap_t {
+    float time;               /**< Seconds it was set for */
+    int32_t frames;           /**< Whole frames back, at least 1 */
+    float frac;               /**< Share of the frame before it, 0..1 */
+} box_audio_delay_tap_t;
+
+/** A delay: a line per channel on the memory of its effect slot, read at one position, or at
+ * two while a change of the time crossfades */
+typedef struct box_audio_delay_t {
+    box_audio_delay_params_t target; /**< Parameters of the last command, clamped */
+    float *line[2];           /**< The lines of the left and the right channel in memory */
+    int32_t length;           /**< Frames of each line */
+    int32_t pos;              /**< Frame the next input is written to */
+    int32_t valid;            /**< Frames written since the line was last silent; older frames
+                               * read as silence, so the memory needs no clearing */
+    box_audio_delay_tap_t from; /**< Read position a crossfade leaves */
+    box_audio_delay_tap_t to; /**< Read position that runs, or a crossfade reaches */
+    float pending;            /**< Time the next crossfade goes to, when it differs from to */
+    bool crossfade;           /**< Whether it crossfades from from to to */
+    box_audio_ramp_t xfade;   /**< Share of to in the output of a crossfade */
+    float lp[2];              /**< State of the damping filter of each channel */
+    float damp;               /**< Coefficient of the damping filters, 1 for none */
+    int32_t still;            /**< Frames in a row in which it read under silence */
+    box_audio_ramp_t feedback; /**< Feedback gain */
+    box_audio_ramp_t pong;    /**< Share of the ping pong routing of the feedback, 0..1 */
+    box_audio_ramp_t mix;     /**< Wet level */
+    box_audio_ramp_t feed;    /**< Fade in of the input after a move */
+} box_audio_delay_t;
+
 /** State of the kinds of effects */
 typedef union box_audio_effect_data_t {
     box_audio_reverb_t reverb;  /**< BOX_AUDIO_EFFECT_REVERB */
@@ -222,6 +252,7 @@ typedef union box_audio_effect_data_t {
     box_audio_filter_t filter;  /**< BOX_AUDIO_EFFECT_FILTER */
     box_audio_compressor_t compressor; /**< BOX_AUDIO_EFFECT_COMPRESSOR */
     box_audio_gate_t gate;      /**< BOX_AUDIO_EFFECT_GATE */
+    box_audio_delay_t delay;    /**< BOX_AUDIO_EFFECT_DELAY */
 } box_audio_effect_data_t;
 
 /** An effect instance of the pool of the core: a kind in an insert slot of a bus, on the
@@ -794,6 +825,35 @@ bool box_audio_reverb_render(
 
 /** The reverb kind: a block skipped while idle */
 void box_audio_reverb_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The delay kind, in delay.c: floats of its memory at a rate */
+int32_t box_audio_delay_floats(
+    float sample_rate);
+
+/** The delay kind: start on its memory */
+void box_audio_delay_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The delay kind: new parameters while it runs */
+void box_audio_delay_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The delay kind: process a block */
+bool box_audio_delay_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The delay kind: a block skipped while idle */
+void box_audio_delay_rest(
     box_audio_core_t *core,
     box_audio_effect_t *fx);
 

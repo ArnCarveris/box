@@ -171,6 +171,7 @@ static void box_cmd_audio_effects(
         const AudioFilter *filter;
         const Compressor *comp;
         const Gate *gate;
+        const Delay *delay;
         const box_audio_module_t *state = box_audio_module_get(world);
         char *path;
         int32_t b, slot;
@@ -224,6 +225,16 @@ static void box_cmd_audio_effects(
             ecs_strbuf_append(buf, "gate threshold %.1f dB attack %.4f hold %.3f release %.3f "
                 "range %.1f dB", (double)gate->threshold, (double)gate->attack,
                 (double)gate->hold, (double)gate->release, (double)gate->range);
+        } else if ((delay = ecs_get(world, e, Delay))) {
+            if (delay->sync > 0) {
+                ecs_strbuf_append(buf, "delay sync %.3f beats", (double)delay->sync);
+            } else {
+                ecs_strbuf_append(buf, "delay time %.3f", (double)delay->time);
+            }
+
+            ecs_strbuf_append(buf, " feedback %.2f damping %.0f Hz mix %.2f%s",
+                (double)delay->feedback, (double)delay->damping, (double)delay->mix,
+                delay->ping_pong ? " ping pong" : "");
         }
 
         slot = box_audio_module_effect_slot(world, e);

@@ -492,6 +492,37 @@ ECS_STRUCT(Gate, {
     float range;           /**< Gain when closed in dB, default -80, -100 to 0 */
 });
 
+/** Longest time of a Delay in seconds, which sizes its memory */
+#define BOX_AUDIO_DELAY_MAX 4.0f
+
+/** A delay, an effect in an insert slot of an AudioBus, as a Reverb is: echoes of its input
+ * every time seconds, each feedback times the last and darker by a lowpass at damping Hz in
+ * the feedback path. With sync it follows the tempo of the Transport, for a dotted eighth on a
+ * return: echo { AudioBus: {kind: AudioChannelReturn, effects: [echo]};
+ * Delay: {sync: 0.75, feedback: 0.4, mix: 1} }.
+ *
+ * Every delay runs with its own memory of BOX_AUDIO_DELAY_MAX seconds. A change of the time,
+ * as a change of the tempo of a synced delay, crossfades from the old to the new echo over 50
+ * ms without a glide of the pitch; feedback, mix and ping pong move over 20 ms. Once its
+ * repeats decayed under -140 dB it stops until its input sounds again.
+ */
+ECS_STRUCT(Delay, {
+    float time;            /**< Seconds between the repeats, default 0.25, 0 to
+                            *   BOX_AUDIO_DELAY_MAX (4) */
+    float sync;            /**< Beats between the repeats, 0 (the default) to use time; when
+                            *   positive it wins over time, which becomes sync * 60 / tempo at
+                            *   the tempo of the Transport (120 without one): 0.5 is an eighth,
+                            *   0.75 a dotted eighth */
+    float feedback;        /**< Share of a repeat in the next, 0 to 0.95, default 0.35 */
+    float mix;             /**< Wet level, 0 to 1, default 0.3; the dry signal passes at
+                            *   1 - mix */
+    bool ping_pong;        /**< Bounce the repeats between left and right, default false: the
+                            *   input, summed to mono, repeats on the left first */
+    float damping;         /**< Cutoff in Hz of a one pole lowpass in the feedback path, default
+                            *   6000, at least 20; at 0.49 of the sample rate or above the
+                            *   repeats stay bright */
+});
+
 /** An envelope of the cutoff of the SynthFilter of the same root, with the segments of a
  * SynthEnvelope: the cutoff is cutoff times 2 to the amount times the level of the envelope,
  * so it rises over the attack, settles at the sustain and returns over the release.

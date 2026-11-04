@@ -493,3 +493,74 @@ void NoAlloc_dynamics(void) {
     box_audio_core_free(core);
     test_int(noalloc_frees, 1);
 }
+
+/* Delays in the insert slots of buses: an echo that rings, changes of the time that
+ * crossfade, again while a crossfade runs, ping pong, feedback, damping and mix, a move to
+ * another bus, a tail that decays to silence and starts again, and a removal, without a call
+ * of the allocator. */
+void NoAlloc_delay(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_route_t routes[] = { AUDIO_OUT(1, 0), AUDIO_OUT(2, 0), AUDIO_MASTER };
+    int32_t floats = box_audio_effect_floats(BOX_AUDIO_EFFECT_DELAY, AUDIO_RATE);
+    float *memory[2], params[BOX_AUDIO_EFFECT_PARAMS] = {0};
+    uint8_t bytes[1024];
+    box_audio_writer_t w;
+    uint32_t i, k;
+    test_assert(floats > 0);
+    audio_order(core, routes, 3);
+    audio_sine(audio_sound_a, AUDIO_FRAMES / 4, 330, 0.25f);
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_FRAMES / 4, 1, AUDIO_RATE));
+    for (i = 0; i < 2; i ++) {
+        memory[i] = calloc((size_t)floats, sizeof(float));
+        test_assert(box_audio_core_effect_memory(core, i, memory[i], floats));
+    }
+
+    audio_play(core, 1, 1, 1, 0.5f, 0, 1, BOX_AUDIO_PLAY_LOOP);
+    audio_play(core, 2, 1, 2, 0.5f, 0, 1.5f, 0);
+    for (k = 0; k < 12; k ++) {
+        box_audio_writer_init(&w, bytes, sizeof(bytes));
+        for (i = 0; i < 2; i ++) {
+            params[0] = 0.05f + (float)((k + i) % 5) * 0.11f;
+            params[1] = 0.1f * (float)(k % 9);
+            params[2] = 500.0f + 2000.0f * (float)(k % 4);
+            params[3] = (float)((k + i) % 2);
+            params[4] = 0.25f * (float)(k % 5);
+            test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_DELAY,
+                1 + (i + k / 4) % 2, i, BOX_AUDIO_BUS_NONE, params));
+        }
+
+        box_audio_core_apply(core, w.data, w.size);
+        audio_render(core, 0, k % 3 ? AUDIO_FRAMES / 40 : AUDIO_FRAMES / 4);
+        audio_events(core, 0, NULL);
+    }
+
+    // The voices stop and the tails decay to silence, then a voice starts them again
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_stop(&w, 1, 0));
+    box_audio_core_apply(core, w.data, w.size);
+    for (k = 0; k < 8; k ++) {
+        audio_render(core, 0, AUDIO_FRAMES);
+    }
+
+    test_assert(!box_audio_core_effect_running(core, 0));
+    test_assert(!box_audio_core_effect_running(core, 1));
+    audio_play(core, 3, 1, 1, 0.5f, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES / 4);
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_effect(&w, 0, BOX_AUDIO_EFFECT_NONE, BOX_AUDIO_BUS_NONE, 0,
+        BOX_AUDIO_BUS_NONE, NULL));
+    test_assert(box_audio_write_effect(&w, 1, BOX_AUDIO_EFFECT_NONE, BOX_AUDIO_BUS_NONE, 0,
+        BOX_AUDIO_BUS_NONE, NULL));
+    box_audio_core_apply(core, w.data, w.size);
+    audio_render(core, 0, AUDIO_FRAMES);
+    test_assert(!box_audio_core_effect_running(core, 0));
+    test_assert(!box_audio_core_effect_running(core, 1));
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+    for (i = 0; i < 2; i ++) {
+        free(memory[i]);
+    }
+}

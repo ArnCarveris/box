@@ -24,9 +24,10 @@ core**, a small mixer in plain C that renders on its own thread, once per frame 
   pan, a stereo width, a mute, a solo, a kind (group, return or SFX), an output and up to 4
   sends, pre or post fader. Bus 0 is the master, `box.audio.master` in script; every other bus
   ends there. Each bus has 4 insert slots that run **effects**, entities such as a `Reverb`,
-  an `Equalizer`, an `AudioFilter`, a `Compressor` or a `Gate`, in order on its signal; a bus
-  with a reverb in a slot is a reverb bus, a return, which other buses reach through a send. A
-  compressor may key on another bus, to duck one channel under another.
+  an `Equalizer`, an `AudioFilter`, a `Compressor`, a `Gate` or a `Delay`, in order on its
+  signal; a bus with a reverb or a delay in a slot is a return, which other buses reach through
+  a send. A compressor may key on another bus, to duck one channel under another, and a delay
+  may follow the tempo of the `Transport`.
 - **Space**: a source with `AudioSpatial` gets its volume and pan every frame from its distance
   to the listener and its direction, the camera of the main view or the entity with
   `AudioListener`.
@@ -46,6 +47,7 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 | `AudioFilter` | An effect: the synth's filter on a bus, a lowpass, highpass, bandpass or notch of 12 or 24 dB, such as a filter sweep on a music group, see [Filter effect](#filter-effect) |
 | `Compressor` | An effect: a compressor with a soft knee, keyed on its own input or on another channel (`sidechain`) to duck music under dialog or explosions, see [Compressor](#compressor) |
 | `Gate` | An effect: a gate with a hold, a range and hysteresis, see [Gate](#gate) |
+| `Delay` | An effect: echoes with feedback, damping and ping pong, in seconds or synced to the tempo in beats, such as a dotted eighth on a return, see [Delay](#delay) |
 | `AudioOutput` | The bus a source, a stream or a sound plays on (the master without one) |
 | `AudioPcm` | A sound from samples, from script or C |
 | `SoundFile` | A short sound from a WAV or FLAC file, decoded into memory, see [Sound files](#sound-files) |
@@ -242,9 +244,12 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
 - **Space**: distance and pan only. No Doppler, no distance filter, no occlusion, no HRTF, and
   front and back sound alike.
 - **Effects**: `BOX_AUDIO_EFFECT_MAX` (64) effects at once in all channels together, 4 insert
-  slots per channel, and five kinds: an algorithmic reverb, an equalizer of 4 bands, a filter, a
-  compressor and a gate; one more effect logs one error and does nothing. No reverb zones, no
-  rooms from geometry and no delay yet. An equalizer has 4 bands of 12 dB per octave at most (no
+  slots per channel, and six kinds: an algorithmic reverb, an equalizer of 4 bands, a filter, a
+  compressor, a gate and a delay; one more effect logs one error and does nothing. No reverb
+  zones and no rooms from geometry. A delay is at most 4 seconds (`BOX_AUDIO_DELAY_MAX`), with
+  one read position per channel (no multitap), no modulation of its time (no chorus or tape
+  wow) and a lowpass in its feedback but no highpass; its sync is a number of beats, not a grid,
+  and a tempo ramp is a series of crossfades, one per frame of a change. An equalizer has 4 bands of 12 dB per octave at most (no
   steeper cuts, no linear phase, no dynamic EQ); a filter is one SVF of 12 or 24 dB, with no
   envelope follower or LFO of its own: a script moves its cutoff. The compressor is a single band
   peak compressor without lookahead, RMS detection or a filter on its key; one channel is its
@@ -573,12 +578,13 @@ its kind.
   memory at its parameters), `command` (new parameters while it runs), `render` (a block in
   place) and `rest` (a block it skips). The kinds are the reverb, `BOX_AUDIO_EFFECT_REVERB`,
   the [equalizer](#equalizer), `BOX_AUDIO_EFFECT_EQ`, the [filter](#filter-effect),
-  `BOX_AUDIO_EFFECT_FILTER`, the [compressor](#compressor), `BOX_AUDIO_EFFECT_COMPRESSOR`, and
-  the [gate](#gate), `BOX_AUDIO_EFFECT_GATE`; the parameters of a command are 16 floats
-  (`BOX_AUDIO_EFFECT_PARAMS`) that each kind reads in its own way, the reverb its first five
-  (`box_audio_reverb_params_t`), the equalizer all 16 (4 `box_audio_eq_band_t`), the filter
-  its first five (`box_audio_filter_params_t`), the compressor its first seven
-  (`box_audio_compressor_params_t`) and the gate its first five (`box_audio_gate_params_t`). The
+  `BOX_AUDIO_EFFECT_FILTER`, the [compressor](#compressor), `BOX_AUDIO_EFFECT_COMPRESSOR`, the
+  [gate](#gate), `BOX_AUDIO_EFFECT_GATE`, and the [delay](#delay), `BOX_AUDIO_EFFECT_DELAY`; the
+  parameters of a command are 16 floats (`BOX_AUDIO_EFFECT_PARAMS`) that each kind reads in its
+  own way, the reverb its first five (`box_audio_reverb_params_t`), the equalizer all 16 (4
+  `box_audio_eq_band_t`), the filter its first five (`box_audio_filter_params_t`), the
+  compressor its first seven (`box_audio_compressor_params_t`), the gate its first five
+  (`box_audio_gate_params_t`) and the delay its first five (`box_audio_delay_params_t`). The
   core clamps them, a NaN to the low end.
 - **Key.** The `key` of the command is a sidechain bus, `BOX_AUDIO_BUS_NONE` for none; only the
   compressor reads it. Since the inserts of a bus run in the order of the slots, the order of a
@@ -598,7 +604,7 @@ its kind.
   reverb bus does not cut it.
 - **Memory.** The memory of an effect belongs to the side that runs the core, like sound memory:
   `box_audio_effect_floats(kind, rate)` floats, 0 for a kind that needs none (about 200 KB for
-  a reverb at 48 kHz). `box_audio_core_effect_memory(core, slot, data, floats)` gives a slot its
+  a reverb and 1.5 MB for a delay at 48 kHz). `box_audio_core_effect_memory(core, slot, data, floats)` gives a slot its
   memory once, or larger memory for a kind that needs more, on which the effect starts over; the
   render path never allocates. An effect whose kind needs memory runs once its slot has enough,
   another at once. The transports allocate it on the `effect_memory` call of the transport
@@ -616,8 +622,8 @@ its kind.
 
 The tests are the `Effect` suite of `test/cpu/audio` (several reverbs at once, an empty slot,
 the fades of a removal, a move and a disabled effect, the pool of 64, a channel without effects,
-an entity in two slots), the `Equalizer`, `EffectFilter` and `Dynamics` suites and the
-`effects`, `eq_filter` and `dynamics` cases of `NoAlloc`.
+an entity in two slots), the `Equalizer`, `EffectFilter`, `Dynamics` and `Delay` suites and the
+`effects`, `eq_filter`, `dynamics` and `delay` cases of `NoAlloc`.
 
 ## Reverb
 
@@ -856,6 +862,74 @@ a key that left the order, the gate closing after its hold and release and openi
 attack, a signal at the threshold of the gate without chatter, the reduction, the order of a
 compressor and an equalizer in the slots, render sizes, the components, ducking in a world, a
 sidechain cycle and `test/assets/audio/dynamics.flecs`; and the `dynamics` case of `NoAlloc`.
+
+## Delay
+
+`src/audio/core/delay.c` is the delay kind of effect, `BOX_AUDIO_EFFECT_DELAY`: a line per
+channel on the memory of its slot, read `time` seconds back. Its parameters are a
+`box_audio_delay_params_t` of `time`, `feedback`, `damping`, `ping_pong` and `mix`; the component
+is `Delay`.
+
+- **Echo.** The output of the line is the echo; the input plus `feedback` times the echo goes
+  back into the line, so each repeat is `feedback` times the last. A time of `time * rate`
+  frames that is not whole is read with linear interpolation between the two frames around it,
+  so an impulse echoes exactly `time * rate` frames later.
+- **Damping.** A one pole lowpass at `damping` Hz sits in the feedback path, so every repeat is
+  darker than the last while the sum of its samples is still `feedback` times the last; the
+  first echo is not filtered. At 0.49 of the rate or above it is off.
+- **Ping pong.** With `ping_pong` the input, summed to mono, enters the left line, and the
+  feedback of each channel enters the other: the first echo is on the left, the second on the
+  right, and so on. A change of `ping_pong` blends the two routings over 20 ms.
+- **Ranges.** `time` 0..`BOX_AUDIO_DELAY_MAX` (4 s, which sizes the memory) and at least a
+  frame, `feedback` 0..0.95 (`BOX_AUDIO_DELAY_FEEDBACK_MAX`), `damping` from 20 Hz, `mix` 0..1
+  and `ping_pong` 0 or 1, a NaN to the low end. The bus outputs its signal at `1 - mix` and the
+  echoes at `mix`, so at a mix of 0 it passes its input bit for bit. The defaults of the
+  component are 0.25 s, 0.35, a mix of 0.3, no ping pong and 6000 Hz.
+- **Time changes.** A new time does not move the read position, which would glide the pitch:
+  the delay reads at the old and the new position at once and crossfades from the one to the
+  other over 50 ms (`BOX_AUDIO_DELAY_CROSSFADE`), so nothing clicks. A time that arrives while a
+  crossfade runs waits for it, and the next crossfade goes to the last time that arrived. The
+  feedback, the mix and the ping pong ramp over 20 ms (`BOX_AUDIO_DELAY_RAMP`), the damping
+  applies at once.
+- **Tempo sync.** `sync`, in beats of the `Transport` (a quarter note), wins over `time` when it
+  is positive: the module sends `sync * 60 / tempo` seconds at the tempo of the `Transport`, 120
+  without one, clamped to 4 s. 0.25 is a sixteenth, 0.5 an eighth, 0.75 a dotted eighth and 1/3
+  an eighth triplet. A change of the tempo changes the time the module sends, so the echo moves
+  with the crossfade of any time change, on the next frame.
+- **Silence costs nothing.** The delay has a tail and follows the silence rule of the effects:
+  once its input has been silent for the time and its echoes have read under -140 dB for the
+  time, so nothing louder is left in the line, it stops; while it is stopped and no signal comes
+  in, a block costs a scan of its input. It never clears its memory: it counts the frames it
+  wrote since its line was last silent and reads the older ones as silence, so neither a start
+  nor a stop costs more than a few stores.
+- **Memory.** `box_audio_effect_floats(BOX_AUDIO_EFFECT_DELAY, rate)` floats per slot, 4 seconds
+  and two frames of both channels (about 1.5 MB at 48 kHz).
+- **Cost.** One or, while a crossfade runs, two interpolated reads per channel, the lowpass and
+  a write per frame.
+
+A synced dotted eighth on a return, which the world bus reaches through a send:
+
+```
+using box.audio
+
+$ { Transport: {tempo: 100} }
+echo {
+  AudioBus: {output: master, kind: AudioChannelReturn, effects: [echo]}
+  Delay: {sync: 0.75, feedback: 0.4, mix: 1, damping: 4000, ping_pong: true}
+}
+world { AudioBus: {output: master, sends: [{bus: echo, level: 0.3}]} }
+```
+
+At 100 bpm its echo comes 0.45 s after the sound, and a change of the tempo moves it. On a
+return the delay is fully wet (`mix: 1`), and the send sets how much of the bus it hears; as an
+insert on the bus itself, a mix of 0.2 to 0.4 leaves the dry signal in front.
+
+The tests are the `Delay` suite of `test/cpu/audio`: the frame of the echo, whole and
+fractional, the repeats at the feedback and darker with damping, ping pong, a synced eighth at
+120 bpm, a tempo change of the `Transport` that moves the echo without a click, a time change
+that crossfades without a glide, the clamp of the time, a tail that stops when silent, a mix of
+0 that is dry, render sizes, the component and `test/assets/audio/delay.flecs`; and the
+`delay` case of `NoAlloc`.
 
 ## Synth
 
@@ -2015,6 +2089,7 @@ frame, the same on every platform.
 | `AudioFilter` | An effect, a filter in the insert slot of a bus that names its entity: `kind` (`SynthLowPass`, `SynthHighPass`, `SynthBandPass`, `SynthNotch`), `cutoff` (1000 Hz, 10 Hz..0.49 of the rate), `resonance` (0, 0..1), `slope` (`SynthSlope12`, `SynthSlope24`) and `mix` (1); see [Filter effect](#filter-effect) |
 | `Compressor` | An effect, a compressor in the insert slot of a bus that names its entity: `threshold` (-18 dB, -80..0), `ratio` (4, 1..20), `attack` (0.01 s), `release` (0.15 s), `knee` (6 dB, 0..24), `makeup` (0 dB, 0..24), `mix` (1) and `sidechain` (0 for its own input, or the channel it ducks under); see [Compressor](#compressor) |
 | `Gate` | An effect, a gate in the insert slot of a bus that names its entity: `threshold` (-50 dB, -100..0), `attack` (0.001 s), `hold` (0.05 s, 0..5), `release` (0.1 s) and `range` (-80 dB, -100..0, the gain when closed); see [Gate](#gate) |
+| `Delay` | An effect, a delay in the insert slot of a bus that names its entity: `time` (0.25 s, 0..4), `sync` (0 beats; when positive the time is `sync * 60 / tempo` of the `Transport`), `feedback` (0.35, 0..0.95), `mix` (0.3), `ping_pong` (false) and `damping` (6000 Hz); see [Delay](#delay) |
 | `AudioOutput` | The bus a source, or a sound by default, plays on |
 | `AudioSource` | A sound that plays while the entity exists: `sound`, `volume` (1), `pitch` (1), `loop`, `playing` (true) |
 | `AudioStream` | Music: an Ogg Vorbis file (`path`) that streams, `volume` (1), `loop` (true), `playing` (true), see [Music](#music) |
@@ -2123,7 +2198,7 @@ A width of 1 and unused sends add no work per frame, and a world without a solo 
 of a mask.
 
 **Effects.** An effect is an entity with an effect component: `Reverb`, `Equalizer`,
-`AudioFilter`, `Compressor` or `Gate` (the first of them in that order when it has several). It runs in an insert slot
+`AudioFilter`, `Compressor`, `Gate` or `Delay` (the first of them in that order when it has several). It runs in an insert slot
 of a channel that names it in `effects`, an array of 4 entities that run in order; an empty slot
 (0) is skipped. An effect that no slot names does nothing. The channel may name
 itself, which is the usual reverb return, and unloading the scene deletes it, which fades its
@@ -2782,7 +2857,8 @@ pre-fader one) and its insert slots, each as `insert <index> <entity>:` with its
 (`reverb decay 2.40 damping 0.40 ...`, `eq [low cut 120 Hz 0.0 dB q 0.71] [peak 3000 Hz 3.0 dB
 q 1.20] [off] [off]`, `filter lowpass 24 dB cutoff 400 resonance 0.30 mix 1.00`,
 `compressor threshold -30.0 dB ratio 8.0 ... sidechain sfx`, `gate threshold -45.0 dB ...`, the
-two dynamics kinds with `reduction <dB>` of the last frame) and whether it
+two dynamics kinds with `reduction <dB>` of the last frame, `delay sync 0.750 beats feedback 0.40
+damping 4000 Hz mix 1.00 ping pong`, or `delay time 0.250 ...` without sync) and whether it
 runs: `(runs)`, `(bypassed)` for a Disabled effect, or `(does not run: ...)` with
 the reason (no output, in another slot, every effect of the pool taken, waits for its memory);
 the master lists its own after its `AudioBus`. Each channel in the order ends with its levels of

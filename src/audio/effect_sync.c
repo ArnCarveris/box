@@ -4,14 +4,51 @@
  * their slots of the pool of the core, their memory and their commands.
  *
  * An effect entity is any entity with an effect component: Reverb, Equalizer, AudioFilter,
- * Compressor or Gate, the first of them in that order when it has several. A compressor gets
- * the key bus that the order compile accepted for its insert slot.
+ * Compressor, Gate or Delay, the first of them in that order when it has several. A compressor
+ * gets the key bus that the order compile accepted for its insert slot.
  *
  * The module sends an EFFECT command when the kind, the channel, the slot or a parameter of an
  * effect changes, and takes it off when no insert slot names it any more.
  */
 
 #include "module.h"
+
+/** Tempo of a synced delay without a Transport, in quarter notes per minute */
+#define BOX_AUDIO_DELAY_TEMPO 120.0f
+
+/** Slowest and fastest tempo of a synced delay, those of the timeline */
+#define BOX_AUDIO_DELAY_TEMPO_MIN 20.0f
+#define BOX_AUDIO_DELAY_TEMPO_MAX 999.0f
+
+/** Get the time of a delay in seconds: sync beats at the tempo of the Transport when sync is
+ * positive, else time. A change of the tempo changes this parameter, which sends a new time.
+ *
+ * @param world The world
+ * @param delay The delay
+ * @return Seconds, clamped to 0..BOX_AUDIO_DELAY_MAX
+ */
+static float box_audio_delay_time(
+    const ecs_world_t *world,
+    const Delay *delay)
+{
+    const Transport *tr = NULL;
+    float tempo = BOX_AUDIO_DELAY_TEMPO, result = delay->time;
+    if (delay->sync > 0) {
+        tr = ecs_singleton_get(world, Transport);
+        tempo = tr ? tr->tempo : BOX_AUDIO_DELAY_TEMPO;
+        tempo = tempo >= BOX_AUDIO_DELAY_TEMPO_MIN ? (tempo < BOX_AUDIO_DELAY_TEMPO_MAX ?
+            tempo : BOX_AUDIO_DELAY_TEMPO_MAX) : BOX_AUDIO_DELAY_TEMPO_MIN;
+        result = delay->sync * 60.0f / tempo;
+    }
+
+    if (!(result >= 0)) {
+        result = 0;
+    } else if (result > BOX_AUDIO_DELAY_MAX) {
+        result = BOX_AUDIO_DELAY_MAX;
+    }
+
+    return result;
+}
 
 int32_t box_audio_module_effect_slot(
     const ecs_world_t *world,
@@ -43,6 +80,7 @@ uint32_t box_audio_module_effect_kind(
     const AudioFilter *filter = NULL;
     const Compressor *comp = NULL;
     const Gate *gate = NULL;
+    const Delay *delay = NULL;
     uint32_t result = BOX_AUDIO_EFFECT_NONE;
     int32_t i;
     for (i = 0; params && i < BOX_AUDIO_EFFECT_PARAMS; i ++) {
@@ -119,6 +157,20 @@ uint32_t box_audio_module_effect_kind(
             params[2] = gate->hold;
             params[3] = gate->release;
             params[4] = gate->range;
+        }
+
+        goto done;
+    }
+
+    delay = ecs_get(world, e, Delay);
+    if (delay) {
+        result = BOX_AUDIO_EFFECT_DELAY;
+        if (params) {
+            params[0] = box_audio_delay_time(world, delay);
+            params[1] = delay->feedback;
+            params[2] = delay->damping;
+            params[3] = delay->ping_pong ? 1.0f : 0.0f;
+            params[4] = delay->mix;
         }
     }
 

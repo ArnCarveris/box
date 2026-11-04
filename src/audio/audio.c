@@ -192,6 +192,27 @@ static void box_audio_compressor_ctor(
     }
 }
 
+/** Construct Delay values: a quarter of a second, not synced, a feedback of 0.35, a mix of
+ * 0.3, no ping pong, damped at 6000 Hz.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_delay_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Delay *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Delay){ .time = 0.25f, .feedback = 0.35f, .mix = 0.3f,
+            .damping = 6000.0f };
+    }
+}
+
 /** Construct Gate values: -50 dB, an attack of 1 ms, a hold of 50 ms, a release of 100 ms
  * and a range of -80 dB.
  *
@@ -1058,6 +1079,8 @@ void BoxAudioImport(
     ecs_set_hooks(world, Compressor, { .ctor = box_audio_compressor_ctor });
     ECS_META_COMPONENT(world, Gate);
     ecs_set_hooks(world, Gate, { .ctor = box_audio_gate_ctor });
+    ECS_META_COMPONENT(world, Delay);
+    ecs_set_hooks(world, Delay, { .ctor = box_audio_delay_ctor });
     ECS_META_COMPONENT(world, SynthFilterEnvelope);
     ECS_META_COMPONENT(world, SynthGlide);
     ECS_META_COMPONENT(world, SynthLfoWave);
@@ -1110,6 +1133,7 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(AudioFilter), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(Compressor), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(Gate), EcsWith, ecs_id(AudioEffectState));
+    ecs_add_pair(world, ecs_id(Delay), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(SoundFile), EcsWith, ecs_id(AudioSample));
     ecs_add_pair(world, ecs_id(AudioStream), EcsWith, ecs_id(AudioMusic));
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSoundId));

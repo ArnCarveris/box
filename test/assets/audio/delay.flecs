@@ -1,0 +1,11 @@
+// A synced delay on a return, for the Delay suite of test/cpu/audio: a dotted eighth that
+// bounces between left and right in the first insert slot of its own bus, which the bus world
+// reaches through its send at 0.4.
+using box.audio
+
+echo {
+  AudioBus: {output: master, kind: AudioChannelReturn, effects: [echo]}
+  Delay: {sync: 0.75, feedback: 0.4, mix: 1, ping_pong: true, damping: 4000}
+}
+
+world { AudioBus: {output: master, sends: [{bus: echo, level: 0.4}]} }

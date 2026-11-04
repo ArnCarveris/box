@@ -48,6 +48,14 @@ static const box_audio_effect_def_t box_audio_effect_kinds[BOX_AUDIO_EFFECT_KIND
         .command = box_audio_gate_command,
         .render = box_audio_gate_render,
         .rest = box_audio_dynamics_rest
+    },
+    [BOX_AUDIO_EFFECT_DELAY] = {
+        .tail = true,
+        .floats = box_audio_delay_floats,
+        .start = box_audio_delay_start,
+        .command = box_audio_delay_command,
+        .render = box_audio_delay_render,
+        .rest = box_audio_delay_rest
     }
 };
 

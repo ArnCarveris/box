@@ -384,7 +384,8 @@ typedef enum box_audio_effect_kind_t {
     BOX_AUDIO_EFFECT_COMPRESSOR = 4, /**< A compressor, box_audio_compressor_params_t, keyed on
                                    *   the key bus of its command */
     BOX_AUDIO_EFFECT_GATE = 5,    /**< A gate, box_audio_gate_params_t */
-    BOX_AUDIO_EFFECT_KINDS = 6    /**< Number of kinds, NONE included */
+    BOX_AUDIO_EFFECT_DELAY = 6,   /**< A delay, box_audio_delay_params_t */
+    BOX_AUDIO_EFFECT_KINDS = 7    /**< Number of kinds, NONE included */
 } box_audio_effect_kind_t;
 
 /** The parameters of a reverb, the first floats of the params of its effect command */
@@ -529,6 +530,37 @@ typedef struct box_audio_gate_params_t {
                        *   BOX_AUDIO_DYNAMICS_RELEASE_MIN..MAX */
     float range;      /**< Gain when closed in dB, BOX_AUDIO_GATE_MIN..0 */
 } box_audio_gate_params_t;
+
+/** Longest time of a delay in seconds, which sizes its memory */
+#define BOX_AUDIO_DELAY_MAX 4.0f
+
+/** Largest feedback of a delay */
+#define BOX_AUDIO_DELAY_FEEDBACK_MAX 0.95f
+
+/** Lowest damping of a delay in Hz; a damping at 0.49 of the rate or above leaves the repeats
+ * undamped */
+#define BOX_AUDIO_DELAY_DAMPING_MIN 20.0f
+
+/** Seconds of the crossfade from the old to the new read position of a change of the time of
+ * a delay */
+#define BOX_AUDIO_DELAY_CROSSFADE 0.05f
+
+/** Seconds of a change of the feedback, the mix or the ping pong of a delay */
+#define BOX_AUDIO_DELAY_RAMP 0.02f
+
+/** The parameters of a delay, the first floats of the params of its effect command: a stereo
+ * delay line read with linear interpolation, a one pole lowpass in its feedback path. A change
+ * of the time crossfades from the old to the new read position over
+ * BOX_AUDIO_DELAY_CROSSFADE, without a glide of the pitch */
+typedef struct box_audio_delay_params_t {
+    float time;       /**< Seconds, 0..BOX_AUDIO_DELAY_MAX; at least a frame */
+    float feedback;   /**< Share of a repeat in the next, 0..BOX_AUDIO_DELAY_FEEDBACK_MAX */
+    float damping;    /**< Cutoff of the lowpass in the feedback path in Hz,
+                       *   BOX_AUDIO_DELAY_DAMPING_MIN and up */
+    float ping_pong;  /**< 1 bounces the repeats between left and right, from a mono sum of
+                       *   the input into the left; 0 keeps each channel to itself */
+    float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+} box_audio_delay_params_t;
 
 /** Put an effect into an insert slot of a bus, change its parameters, move it or take it off.
  *
@@ -957,7 +989,8 @@ int32_t box_audio_core_effect_meters(
     int32_t max);
 
 /** Get the floats of memory an effect of a kind needs at a sample rate; for the reverb its
- * delay lines at the largest size and its longest predelay.
+ * delay lines at the largest size and its longest predelay, for the delay
+ * BOX_AUDIO_DELAY_MAX seconds of both channels.
  *
  * @param kind A box_audio_effect_kind_t
  * @param sample_rate Frames per second of the core
