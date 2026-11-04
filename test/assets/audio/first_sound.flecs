@@ -1,0 +1,14 @@
+// The first sound of docs/audio.md, which the Song suite of test/cpu/audio plays: a synth beep
+// played once on an SFX bus.
+using box.audio
+
+sfx { AudioBus: {output: master, kind: AudioChannelSfx} }
+
+prefab Beep {
+  AudioOutput: {bus: sfx}
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.002, decay: 0.25}
+  SynthOscillator: {wave: SynthSine, frequency: 660, level: 0.5}
+}
+
+const played: bool = box.audio.play(Beep, 0.8)

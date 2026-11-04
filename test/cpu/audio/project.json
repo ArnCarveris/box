@@ -184,6 +184,15 @@
                 ]
             },
             {
+                "id": "Song",
+                "testcases": [
+                    "first_sound",
+                    "script",
+                    "meters",
+                    "bit_identical"
+                ]
+            },
+            {
                 "id": "NoAlloc",
                 "testcases": [
                     "render",

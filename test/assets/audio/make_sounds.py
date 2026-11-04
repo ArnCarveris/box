@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Writes the sound files of the Sample tests (test/cpu/audio) and of the browser check
-test/integration/web/audio_sample.mjs into this folder.
+test/integration/web/audio_sample.mjs, and the drum and the shaker of song.flecs, into this folder.
 
 Usage: python3 test/assets/audio/make_sounds.py
 
@@ -22,6 +22,28 @@ def sine(frequency, rate, frames, level, phase=0.0):
 
 def s16(x):
     return max(-32768, min(32767, int(round(x * 32767))))
+
+
+def kick(rate, frames):
+    """A kick drum: a sine that sweeps from 150 to 45 Hz over 0.1 s and decays."""
+    out, phase = [], 0.0
+    for i in range(frames):
+        t = i / rate
+        phase += 2 * math.pi * (45 + 105 * math.exp(-t / 0.03)) / rate
+        out.append(0.8 * math.exp(-t / 0.12) * math.sin(phase))
+    return out
+
+
+def shaker(rate, frames, steps):
+    """A shaker: bursts of noise on steps of equal length, every other one softer. The noise
+    is a linear congruential generator, so every run writes the same samples."""
+    out, seed, step = [], 1, frames // steps
+    for i in range(frames):
+        seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF
+        t = (i % step) / rate
+        level = 0.5 if (i // step) % 2 == 0 else 0.25
+        out.append(level * math.exp(-t / 0.025) * (seed / 0x3FFFFFFF - 1))
+    return out
 
 
 def interleave(channels):
@@ -171,6 +193,10 @@ def main():
     long_stereo = [sine(440, 48000, 96000, 0.25), sine(660, 48000, 96000, 0.25)]
     wav("long_stereo.wav", 48000, long_stereo)
     flac("long_stereo.flac", 48000, long_stereo)
+    # The sampled drum and the audio clip of song.flecs, the song of the guide: a kick of 0.4 s
+    # and a shaker of 8 sixteenths, 2 beats at 120 bpm
+    wav("kick.wav", 48000, [kick(48000, 19200)])
+    wav("shaker.wav", 48000, [shaker(48000, 48000, 8)])
 
 
 if __name__ == "__main__":

@@ -1,17 +1,18 @@
 # Audio
 
-This page is the guide to audio in box: how sound is put together, the components a scene uses, a
-worked example, the rules of the web, notes for native apps, the limits of this version and how
-to capture and inspect what an app plays. After the guide comes the [reference](#reference): the
-audio core, the effects and the reverb, the synth, the transports, the native and the web outputs and the
-`box.audio` module in detail.
+This page is the guide to audio in box: how sound is put together, the components a scene uses,
+a first sound, a worked example, a song made on the timeline and mixed, the rules of the web,
+notes for native apps, the limits of this version and how to capture and inspect what an app
+plays. After the guide comes the [reference](#reference): the audio core, the effects and the
+reverb, the synth, the transports, the native and the web outputs and the `box.audio` module in
+detail.
 
 ## The model
 
 A scene makes sound with components, from a script, the REST API or C; nothing needs to be
 written in C to play a sound. The `box.audio` module turns them into commands of the **audio
 core**, a small mixer in plain C that renders on its own thread, once per frame and in one batch
-(see [The box.audio module](#the-boxaudio-module)):
+(see [The box.audio module](#the-boxaudio-module)). Four parts make up a scene's sound:
 
 - **Sounds** are what can play: samples in memory (`AudioPcm`), a WAV or FLAC file
   (`SoundFile`), or a synth patch made in script (`SynthSound`). A sound plays once with
@@ -20,14 +21,25 @@ core**, a small mixer in plain C that renders on its own thread, once per frame 
 - **Voices** play the sounds, 64 at once; a play past that steals the quietest voice of at most
   its priority: one shots rank lowest, the notes and clips of a track above them and music
   highest. A voice has a volume, a pan and a pitch, and plays on a bus.
-- **Buses** are the channels of the mixer and mix voices and other buses: each has a volume, a
-  pan, a stereo width, a mute, a solo, a kind (group, return or SFX), an output and up to 4
-  sends, pre or post fader. Bus 0 is the master, `box.audio.master` in script; every other bus
-  ends there. Each bus has 4 insert slots that run **effects**, entities such as a `Reverb`,
-  an `Equalizer`, an `AudioFilter`, a `Compressor`, a `Gate`, a `Delay`, a `Phaser` or a
-  `Chorus`, in order on its signal; a bus with a reverb or a delay in a slot is a return, which other buses reach through
-  a send. A compressor may key on another bus, to duck one channel under another, and a delay
-  may follow the tempo of the `Transport`.
+- **The timeline** plays music in time. The `Transport` singleton holds its tempo, time
+  signature, position and loop, in beats. An `Instrument` plays a sound at any pitch, for a
+  duration: a synth or a sampler. A `NoteClip` is a reusable bar or phrase of notes, an
+  `AudioClip` a part of a recorded sound; a `Track` places clips on the timeline with
+  `ClipPlacement` children, each at its start, with a loop, a gain and a transpose. The module
+  schedules every note on its exact sample, a little ahead of the clock. A game plays on the
+  same grid with `box.audio.play_quantized`, on the next beat or bar.
+- **The mixer** is made of buses, its channels: each has a volume, a pan, a stereo width, a
+  mute, a solo, a kind (group, return or SFX), an output and up to 4 sends, pre or post fader.
+  A track is a channel too. Bus 0 is the master, `box.audio.master` in script; every other bus
+  ends there, directly or through groups. Each bus has 4 insert slots that run **effects**,
+  entities such as a `Reverb`, an `Equalizer`, an `AudioFilter`, a `Compressor`, a `Gate`, a
+  `Delay`, a `Phaser` or a `Chorus`, in order on its signal; a bus with a reverb or a delay in a
+  slot is a return, which other buses reach through a send. A compressor may key on another bus,
+  to duck one channel under another, and a delay may follow the tempo of the `Transport`. An
+  `AudioMeter` on a channel or an effect reads its levels every frame.
+
+Two more parts place and finish the sound:
+
 - **Space**: a source with `AudioSpatial` gets its volume and pan every frame from its distance
   to the listener and its direction, the camera of the main view or the entity with
   `AudioListener`.
@@ -35,7 +47,8 @@ core**, a small mixer in plain C that renders on its own thread, once per frame 
   and mute.
 
 The core never waits for the main thread: a slow frame delays the next commands, never the
-sound that plays. Everything ramps over 5 ms, so nothing clicks.
+sound that plays, and the timeline is scheduled ahead of it. Everything ramps over 5 ms, so
+nothing clicks.
 
 ## Components
 
@@ -80,6 +93,33 @@ volume)`, `box.audio.play_quantized(sound, volume, quantize)`,
 `box.audio.capture(seconds, path)`, the same as `box_audio_play`, `box_audio_play_at`,
 `box_audio_play_quantized`, `box_audio_play_note` and `box_audio_capture` in C. The members and their defaults are in the
 table of [The box.audio module](#the-boxaudio-module).
+
+## A first sound
+
+A sound needs no file and no C. `test/assets/audio/first_sound.flecs` makes a beep with the synth
+and plays it once on a bus of the game's sounds:
+
+```
+using box.audio
+
+sfx { AudioBus: {output: master, kind: AudioChannelSfx} }
+
+prefab Beep {
+  AudioOutput: {bus: sfx}
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.002, decay: 0.25}
+  SynthOscillator: {wave: SynthSine, frequency: 660, level: 0.5}
+}
+
+const played: bool = box.audio.play(Beep, 0.8)
+```
+
+`Beep` is a prefab, so it is a sound that plays without an entity that sounds all the time; its
+`AudioOutput` puts its plays on `sfx`. `box.audio.play` returns whether the play was queued. A
+game calls it where the event happens, in the async block of a control or a system; a sound
+that lasts as long as an entity, an engine or a fire, is an `AudioSource`. The rest of the guide
+builds on this: a scene with spatial sounds and a rendered loop, then a song on the timeline,
+mixed.
 
 ## A worked example: the dust merchant
 
@@ -177,9 +217,260 @@ It is made in this repository with the synth of box, see
 [Making music with the synth](#making-music-with-the-synth). A track from elsewhere replaces it by
 taking its path.
 
+## Making music
+
+The dust merchant plays a loop rendered ahead of time. A game whose music answers the game, a
+part that comes in when a fight starts or a stinger on the beat of a pickup, plays it live on
+the timeline instead. `test/assets/audio/song.flecs` builds a short song step by step: 4 bars in
+A minor at 120 bpm, Am Am Dm Em, on two synths, a sampled kick and a recorded shaker, mixed
+through a group with a reverb and a delay, and ducked under the game's sounds. The `Song` suite
+of `test/cpu/audio` plays 8 bars of it headless and checks that every channel reads signal on its
+meter and that two runs capture bit identical audio. `kick.wav` and `shaker.wav` next to it are
+written by `make_sounds.py`.
+
+**1. The timeline.** The `Transport` singleton holds the tempo, the time signature (4/4 by
+default) and the loop, in beats, a beat being a quarter note: 4 bars are 16 beats.
+
+```
+using flecs.script
+using box.app
+using box.audio
+
+$ { Transport: {tempo: 120, loop: true, loop_start: 0, loop_end: 16} }
+```
+
+It does not play yet: a track drops the notes of a sound file that still decodes, so the kick on
+the first beat would be lost. The game sets `playing: true` once its sounds are ready, after a
+loading screen or, in this script, at frame 3 (step 7). Anything that writes the component
+drives it: a script, the REST API, the `set` command or `audio play`.
+
+**2. The mixer.** A channel is an `AudioBus`. The song has an SFX bus for the game's sounds, a
+music group that every track and both returns feed, and a compressor on the group that keys on
+the SFX bus. An effect entity and a sidechain come before the bus that names them:
+
+```
+sfx {
+  AudioBus: {output: master, kind: AudioChannelSfx}
+  AudioMeter: {}
+}
+
+music_duck {
+  Compressor: {threshold: -24, ratio: 4, attack: 0.005, release: 0.3, sidechain: sfx}
+  AudioMeter: {}
+}
+
+music {
+  AudioBus: {output: master, volume: 0.6, effects: [music_duck]}
+  AudioMeter: {}
+}
+```
+
+The returns are buses that run their own effect in their first insert slot. `echo` repeats every
+dotted eighth (`sync: 0.75` beats), so it follows the tempo, and bounces between left and right.
+Both output into the music group, so the duck takes their tails too:
+
+```
+hall {
+  AudioBus: {output: music, kind: AudioChannelReturn, effects: [hall]}
+  Reverb: {decay: 1.8, damping: 0.5, predelay: 0.02, size: 0.6}
+  AudioMeter: {}
+}
+
+echo {
+  AudioBus: {output: music, kind: AudioChannelReturn, effects: [echo]}
+  Delay: {sync: 0.75, feedback: 0.35, mix: 1, ping_pong: true, damping: 4000}
+  AudioMeter: {}
+}
+```
+
+The kinds tell the solo what a channel is: soloing a track while mixing keeps the returns and
+the SFX bus heard (see [Mixer channels](#mixer-channels)). Every channel has an `AudioMeter`, so a
+test or an agent sees what each one plays without listening.
+
+**3. The instruments.** An `Instrument` plays one sound at any pitch, a MIDI note number. A synth
+whose oscillators are at 440 Hz is in tune at the default `root` of 69 (A4). The kick is a
+sampler: it plays as recorded at its `root`, 36 (C1), and without a `gate` it ignores the
+duration of a note, as a drum hit should:
+
+```
+prefab bass_tone {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.004, decay: 0.2, sustain: 0.6, release: 0.08, curve: 3}
+  SynthFilter: {kind: SynthLowPass, cutoff: 600, resonance: 0.2}
+  body { SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.35} }
+  sub { SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.45} }
+}
+
+kick_sample { SoundFile: {path: "test/assets/audio/kick.wav"} }
+
+bass_synth { Instrument: {sound: bass_tone} }
+keys_synth { Instrument: {sound: keys_tone} }
+kick_drum { Instrument: {sound: kick_sample, root: 36, gate: false} }
+```
+
+`keys_tone` is a softer triangle with a little saw and a longer release. A gated synth note
+sustains at the sustain level of its envelopes until its end, then releases (see
+[Instruments](#instruments)).
+
+**4. The clips.** A `NoteClip` is a reusable bar of notes, each with a `start` and a `duration` in
+beats from the start of the clip, a `pitch`, a `velocity` (1) and a `pan` (0). Each part is one
+bar in A, which the placements move to D and E:
+
+```
+prefab bass_line {
+  NoteClip: {length: 4, notes: [
+    {start: 0, duration: 1.5, pitch: 33, velocity: 0.9},
+    {start: 1.5, duration: 0.5, pitch: 45, velocity: 0.6},
+    {start: 2, duration: 1, pitch: 33, velocity: 0.8},
+    {start: 3, duration: 0.5, pitch: 40, velocity: 0.7},
+    {start: 3.5, duration: 0.5, pitch: 43, velocity: 0.7}
+  ]}
+}
+
+prefab minor_chord {
+  NoteClip: {length: 4, notes: [
+    {start: 0, duration: 3.5, pitch: 57, velocity: 0.7, pan: -0.3},
+    {start: 0, duration: 3.5, pitch: 60, velocity: 0.6},
+    {start: 0, duration: 3.5, pitch: 64, velocity: 0.6, pan: 0.3},
+    {start: 2.5, duration: 1, pitch: 69, velocity: 0.5}
+  ]}
+}
+```
+
+`four_on_the_floor` is a bar of kicks at pitch 36. An `AudioClip` is a part of a recorded sound:
+its `offset` is in seconds, its `length` in beats. The shaker is 1 second, 2 beats at 120 bpm:
+
+```
+shaker_sample { SoundFile: {path: "test/assets/audio/shaker.wav"} }
+shaker { AudioClip: {sound: shaker_sample, length: 2} }
+```
+
+**5. The tracks.** A `Track` is a mixer channel whose notes play on its `instrument`; it brings an
+`AudioBus`, here set to output into the group. Its children place clips on the timeline, each a
+`ClipPlacement` with a `start` in beats. The same clip plays the whole progression: looped for
+the two bars of Am, then once a fourth up (`transpose: 5`, Dm) and once a fifth up
+(`transpose: 7`, Em):
+
+```
+bass {
+  Track: {instrument: bass_synth}
+  AudioBus: {output: music, volume: 0.8}
+  AudioMeter: {}
+  one { ClipPlacement: {clip: bass_line, start: 0, duration: 8, loop: true} }
+  four { ClipPlacement: {clip: bass_line, start: 8, transpose: 5} }
+  five { ClipPlacement: {clip: bass_line, start: 12, transpose: 7} }
+}
+
+keys {
+  Track: {instrument: keys_synth}
+  AudioBus: {output: music, volume: 0.5, width: 1.4, sends: [{bus: hall, level: 0.4}, {bus: echo, level: 0.25}]}
+  AudioMeter: {}
+  one { ClipPlacement: {clip: minor_chord, start: 0, duration: 8, loop: true} }
+  four { ClipPlacement: {clip: minor_chord, start: 8, transpose: 5} }
+  five { ClipPlacement: {clip: minor_chord, start: 12, transpose: 7, gain: 0.8} }
+}
+```
+
+The keys are wider than recorded (`width: 1.4`) and send to both returns. `drums` loops
+`four_on_the_floor` over all 16 beats with a little of the hall. A track of audio clips needs no
+instrument; the shaker comes in at bar 3, panned a little to the right:
+
+```
+perc {
+  Track: {}
+  AudioBus: {output: music, volume: 0.6, pan: 0.3, sends: [{bus: echo, level: 0.2}]}
+  AudioMeter: {}
+  groove { ClipPlacement: {clip: shaker, start: 8, duration: 8, loop: true} }
+}
+
+box { audio { master { AudioMeter: {} } } }
+```
+
+The last line meters the master, which a script reaches through its scopes.
+
+**6. A stinger from the game.** A pickup plays a chord on the SFX bus on the next bar, so it lands
+on the music; the SFX bus keys the compressor, so the music ducks under it and comes back with
+its release of 0.3 s:
+
+```
+prefab Stinger {
+  AudioOutput: {bus: sfx}
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.002, decay: 0.8, curve: 3}
+  root { SynthOscillator: {wave: SynthTriangle, frequency: 880, level: 0.4} }
+  fifth { SynthOscillator: {wave: SynthSine, frequency: 1318.5, level: 0.3} }
+}
+
+template Pickup {
+  prop count: i32 = 0
+  async {
+    if count > 0 && !this.has(SetAt) {
+      const hit = box.audio.play_quantized(Stinger, 0.7, Bar)
+    }
+  }
+}
+
+pickup { Pickup: {} }
+```
+
+The game raises `count` of `pickup` by one per pickup, from a script, the REST API, the `set`
+command or C, and the async block of the template runs again with the new value;
+`!this.has(SetAt)` skips the copy that step 7 keeps on its `SetAt` entity. A stinger plays
+at once while the transport is stopped, and a stop or a seek of the transport never cancels one
+that waits for its bar (see [Quantized plays](#quantized-plays)).
+
+**7. Playing it.** The end of the script stands in for the game, at known frames of the fixed
+delta of the test (`SetAt` of box.app): it starts the transport at frame 3, once the sound files
+decoded, and picks something up at frame 300, near beat 10, so the stinger plays on beat 12, the
+first beat of bar 4. `SetAt` writes the whole component, so `at_start` repeats the tempo and the
+loop:
+
+```
+at_start {
+  SetAt: {frame: 3, entity: Transport}
+  Transport: {tempo: 120, loop: true, loop_start: 0, loop_end: 16, playing: true}
+}
+
+at_pickup { SetAt: {frame: 300, entity: pickup}; Pickup: {count: 1} }
+```
+
+Run it headless and listen to a capture of 8 bars, 16 seconds, which `audio capture 16` records
+over the REST port as in [Captures and the audio command](#captures-and-the-audio-command):
+
+```sh
+boxrun --headless --delta-time 0.016666667 --timeout 60 --port 8000 test/assets/audio/song.flecs
+```
+
+While it plays, `audio` prints the transport, every channel with its sends, inserts and levels,
+the duck's gain reduction, and every track with its placements and the notes that sound. To mix,
+change a value and play again: the volume and the sends of a channel, the threshold of the duck,
+the `transpose` and `gain` of a placement. A change while the transport plays applies to the
+notes that start more than the lookahead (0.15 s) later.
+
+**Reading the meters.** In the test, every channel peaks over 0.01 during the 8 bars, and the
+compressor's `AudioMeter` reads a gain reduction over 1 dB once the stinger plays. A track that
+reads 0 has no instrument that can play or no placement that overlaps the loop; a return that
+reads 0 gets no send. The master reads before its limiter, so a peak over 1 there means the mix
+is too hot and the limiter works on it: lower the group.
+
 ## Making music with the synth
 
-`etc/scenes/dust_merchant/assets/music_score.flecs` is a score: synth instruments as templates
+The same synth renders music ahead of time into an Ogg loop that an `AudioStream` plays. Choose
+by what the music has to do:
+
+- **Sequence it live**, as in [Making music](#making-music), when the music answers the game:
+  parts that come in, mute or change with the action, stingers and hits on the beat, a tempo or a
+  loop that the game moves, a mix that ducks under dialog. It costs the voices of its notes (at
+  the priority of its tracks, above the one shots) and their render, every frame, and its sound
+  files load with the scene.
+- **Render a loop** when the music is a bed that plays the same whatever happens, as the dust
+  merchant's does: it costs one stream voice, which no play steals, and the decode of Vorbis,
+  with no notes or effects to render. A loop cannot change its arrangement, its tempo or its
+  key, and only one `AudioStream` plays at once. A rendered part that the game turns on and off,
+  a WAV or FLAC loop, plays in time with the rest as an [audio clip](#audio-clips) of a track.
+
+The dust merchant's loop is rendered from
+`etc/scenes/dust_merchant/assets/music_score.flecs`, a score: synth instruments as templates
 (a pad, a bass, a lead) and prefabs (a kick, a rim, a hat), and one async block that plays 16
 bars at 120 bpm, a step of an eighth note every 15 frames. `make_music.py` next to it renders and
 encodes it:
@@ -193,7 +484,8 @@ render is the same in every run, adds the tail after the 32 seconds (the release
 notes and the reverb) to the start, which makes a seamless loop, normalizes it and encodes it
 with `tools/ogg_vorbis.py`, a small mono Vorbis encoder of this repository, at the finest
 quantizer that keeps the file under 1 MB. The track is checked in; run the script again after a
-change of the score.
+change of the score. A song on the timeline renders the same way: headless at a fixed delta,
+with `box.audio.capture` at load or `audio capture`, so two runs capture the same audio.
 
 ## The web rules
 
@@ -283,8 +575,16 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   measure (no LUFS, no true peak between samples, no spectrum). The RMS is over the last 300 ms
   of output, from the frames of the last 64 frames of the app at most, so above 200 frames per
   second its window is shorter.
-- **Tools**: no mixer UI, and the UI theme of box has no sounds; a scene adds them in its own
-  widgets, as the dust merchant does.
+- **Music**: the sequencer and the mixer are driven by components, and leave the rest to a
+  script or to other tools. No tempo automation: a tempo changes in steps, which a script
+  writes. No swing, groove or humanize, no time stretching (an audio clip plays at the speed of
+  its pitch), no MIDI files in or out, no MIDI devices and no recording. No automation lanes: a
+  script writes the values of a channel or an effect, which apply once per frame with the 5 ms
+  ramp. No plugins. The notes of a sound file that still loads are dropped, so a scene starts its
+  transport once its sounds are ready, as [Making music](#making-music) does.
+- **Tools**: no mixer UI, no piano roll and no view of the timeline: the `audio` command and
+  `AudioMeter` show the mix as text and values. The UI theme of box has no sounds; a scene adds
+  them in its own widgets, as the dust merchant does.
 - **Web**: no shared memory, decoding on the main thread, and no load measurement in the
   worklet (it reports 0).
 - **Scheduling**: `BOX_AUDIO_SCHEDULE_MAX` (4096) commands wait in the core for their frame at

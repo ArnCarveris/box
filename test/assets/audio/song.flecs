@@ -1,0 +1,175 @@
+// The song of "Making music" in docs/audio.md, which the Song suite of test/cpu/audio plays: a
+// loop of 4 bars in A minor at 120 bpm, Am Am Dm Em, on a timeline of tracks and clips, mixed
+// through a music group with two returns and ducked under the SFX bus by a stinger that a game
+// event plays on the next bar.
+//
+// kick.wav and shaker.wav are written by make_sounds.py next to this file. Every channel has an
+// AudioMeter, so a test or an agent sees what each one plays.
+using flecs.script
+using box.app
+using box.audio
+
+// 1. The timeline: 120 quarter notes per minute, 4/4, a loop of 4 bars (16 beats), stopped
+// until the game starts it, once the sound files are ready
+$ { Transport: {tempo: 120, loop: true, loop_start: 0, loop_end: 16} }
+
+// 2. The mixer. An effect entity and a sidechain come before the bus that names them.
+//
+// The SFX bus of the game, dry, straight into the master
+sfx {
+  AudioBus: {output: master, kind: AudioChannelSfx}
+  AudioMeter: {}
+}
+
+// The compressor of the music group: it keys on sfx and ducks the music while the game plays
+music_duck {
+  Compressor: {threshold: -24, ratio: 4, attack: 0.005, release: 0.3, sidechain: sfx}
+  AudioMeter: {}
+}
+
+// The music group: every track and both returns end here
+music {
+  AudioBus: {output: master, volume: 0.6, effects: [music_duck]}
+  AudioMeter: {}
+}
+
+// Two returns in the group, so the duck takes their tails too: a hall and a dotted eighth
+// that follows the tempo and bounces between left and right
+hall {
+  AudioBus: {output: music, kind: AudioChannelReturn, effects: [hall]}
+  Reverb: {decay: 1.8, damping: 0.5, predelay: 0.02, size: 0.6}
+  AudioMeter: {}
+}
+
+echo {
+  AudioBus: {output: music, kind: AudioChannelReturn, effects: [echo]}
+  Delay: {sync: 0.75, feedback: 0.35, mix: 1, ping_pong: true, damping: 4000}
+  AudioMeter: {}
+}
+
+// 3. The instruments: two synths whose oscillators are at 440 Hz, in tune at the default root
+// of 69 (A4), and a sampled kick that plays as recorded at C1 (36) and ignores durations
+prefab bass_tone {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.004, decay: 0.2, sustain: 0.6, release: 0.08, curve: 3}
+  SynthFilter: {kind: SynthLowPass, cutoff: 600, resonance: 0.2}
+  body { SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.35} }
+  sub { SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.45} }
+}
+
+prefab keys_tone {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.01, decay: 0.3, sustain: 0.6, release: 0.4, curve: 3}
+  SynthFilter: {kind: SynthLowPass, cutoff: 2400, resonance: 0.1}
+  body { SynthOscillator: {wave: SynthTriangle, frequency: 440, level: 0.3} }
+  air { SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.08} }
+}
+
+kick_sample { SoundFile: {path: "test/assets/audio/kick.wav"} }
+
+bass_synth { Instrument: {sound: bass_tone} }
+keys_synth { Instrument: {sound: keys_tone} }
+kick_drum { Instrument: {sound: kick_sample, root: 36, gate: false} }
+
+// 4. The clips: a bar of each part in A, which the placements move to D and E
+prefab bass_line {
+  NoteClip: {length: 4, notes: [
+    {start: 0, duration: 1.5, pitch: 33, velocity: 0.9},
+    {start: 1.5, duration: 0.5, pitch: 45, velocity: 0.6},
+    {start: 2, duration: 1, pitch: 33, velocity: 0.8},
+    {start: 3, duration: 0.5, pitch: 40, velocity: 0.7},
+    {start: 3.5, duration: 0.5, pitch: 43, velocity: 0.7}
+  ]}
+}
+
+prefab minor_chord {
+  NoteClip: {length: 4, notes: [
+    {start: 0, duration: 3.5, pitch: 57, velocity: 0.7, pan: -0.3},
+    {start: 0, duration: 3.5, pitch: 60, velocity: 0.6},
+    {start: 0, duration: 3.5, pitch: 64, velocity: 0.6, pan: 0.3},
+    {start: 2.5, duration: 1, pitch: 69, velocity: 0.5}
+  ]}
+}
+
+prefab four_on_the_floor {
+  NoteClip: {length: 4, notes: [
+    {start: 0, duration: 1, pitch: 36},
+    {start: 1, duration: 1, pitch: 36, velocity: 0.7},
+    {start: 2, duration: 1, pitch: 36, velocity: 0.9},
+    {start: 3, duration: 1, pitch: 36, velocity: 0.7},
+    {start: 3.5, duration: 0.5, pitch: 36, velocity: 0.5}
+  ]}
+}
+
+// An audio clip: the whole shaker, 2 beats long
+shaker_sample { SoundFile: {path: "test/assets/audio/shaker.wav"} }
+shaker { AudioClip: {sound: shaker_sample, length: 2} }
+
+// 5. The tracks, mixer channels in the music group. One clip per part, placed again a fourth
+// (5) and a fifth (7) up: Am for two bars, then Dm, then Em.
+bass {
+  Track: {instrument: bass_synth}
+  AudioBus: {output: music, volume: 0.8}
+  AudioMeter: {}
+  one { ClipPlacement: {clip: bass_line, start: 0, duration: 8, loop: true} }
+  four { ClipPlacement: {clip: bass_line, start: 8, transpose: 5} }
+  five { ClipPlacement: {clip: bass_line, start: 12, transpose: 7} }
+}
+
+keys {
+  Track: {instrument: keys_synth}
+  AudioBus: {output: music, volume: 0.5, width: 1.4, sends: [{bus: hall, level: 0.4}, {bus: echo, level: 0.25}]}
+  AudioMeter: {}
+  one { ClipPlacement: {clip: minor_chord, start: 0, duration: 8, loop: true} }
+  four { ClipPlacement: {clip: minor_chord, start: 8, transpose: 5} }
+  five { ClipPlacement: {clip: minor_chord, start: 12, transpose: 7, gain: 0.8} }
+}
+
+drums {
+  Track: {instrument: kick_drum}
+  AudioBus: {output: music, volume: 0.7, sends: [{bus: hall, level: 0.1}]}
+  AudioMeter: {}
+  beat { ClipPlacement: {clip: four_on_the_floor, start: 0, duration: 16, loop: true} }
+}
+
+// A track of audio clips needs no instrument; the shaker comes in at bar 3
+perc {
+  Track: {}
+  AudioBus: {output: music, volume: 0.6, pan: 0.3, sends: [{bus: echo, level: 0.2}]}
+  AudioMeter: {}
+  groove { ClipPlacement: {clip: shaker, start: 8, duration: 8, loop: true} }
+}
+
+box { audio { master { AudioMeter: {} } } }
+
+// 6. A stinger on the SFX bus, on the next bar after a pickup in the game
+prefab Stinger {
+  AudioOutput: {bus: sfx}
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.002, decay: 0.8, curve: 3}
+  root { SynthOscillator: {wave: SynthTriangle, frequency: 880, level: 0.4} }
+  fifth { SynthOscillator: {wave: SynthSine, frequency: 1318.5, level: 0.3} }
+}
+
+// The game event: the game raises count by one per pickup (a script, the REST API, the set
+// command or C), and the async block of the template runs again with the new value
+template Pickup {
+  prop count: i32 = 0
+  async {
+    if count > 0 && !this.has(SetAt) {
+      const hit = box.audio.play_quantized(Stinger, 0.7, Bar)
+    }
+  }
+}
+
+pickup { Pickup: {} }
+
+// 7. Stands in for the game, at known frames of the fixed delta of 1/60 s: the music starts at
+// frame 3, once kick.wav and shaker.wav decoded, and a pickup at frame 300, near beat 10, plays
+// the stinger on beat 12, the first beat of bar 4
+at_start {
+  SetAt: {frame: 3, entity: Transport}
+  Transport: {tempo: 120, loop: true, loop_start: 0, loop_end: 16, playing: true}
+}
+
+at_pickup { SetAt: {frame: 300, entity: pickup}; Pickup: {count: 1} }
