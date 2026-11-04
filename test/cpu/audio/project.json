@@ -166,13 +166,9 @@
                     "events_and_release",
                     "synth_voices",
                     "scheduled",
-<<<<<<< HEAD
+                    "gated",
                     "effects",
                     "meters"
-=======
-                    "gated",
-                    "effects"
->>>>>>> cccb2fc44334f2fc219d2bf423d9329204e2fe08
                 ]
             },
             {

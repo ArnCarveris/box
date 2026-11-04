@@ -289,14 +289,10 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
 The audio a box app plays can be inspected without listening:
 
 - `audio` prints the state, the rate, the voices, the steals, the load, the clock of the core
-<<<<<<< HEAD
   (frames and seconds), the transport and every bus with its kind, width, solo, routing, sends,
-  the effects of its insert slots, with whether each runs, and its peak and RMS in dB; `audio volume <v>` and
-=======
-  (frames and seconds), the transport and every bus with its kind, width, solo, routing, sends
-  and the effects of its insert slots, with whether each runs, the instruments and the
-  [tracks](#clips-and-tracks) with their placements and sounding notes; `audio volume <v>` and
->>>>>>> cccb2fc44334f2fc219d2bf423d9329204e2fe08
+  the effects of its insert slots, with whether each runs, and its peak and RMS in dB, the
+  instruments and the [tracks](#clips-and-tracks) with their placements and sounding notes;
+  `audio volume <v>` and
   `audio mute` set the master, `audio play`, `audio stop`, `audio seek <beats>` and
   `audio tempo <bpm>` drive the [transport](#transport).
 - `audio capture <seconds>` records the master to a 16 bit stereo WAV resource of the shell
@@ -2475,15 +2471,11 @@ with its kind, volume, pan, width, `solo`, `muted`, its output, its sends (`send
 pre-fader one) and its insert slots, each as `insert <index> <entity>:` with its kind and values
 and whether it runs: `(runs)`, `(bypassed)` for a Disabled effect, or `(does not run: ...)` with
 the reason (no output, in another slot, every effect of the pool taken, waits for its memory);
-<<<<<<< HEAD
 the master lists its own after its `AudioBus`. Each channel in the order ends with its levels of
 the last frame, `peak <left>/<right> dB, rms <left>/<right> dB` (`-inf` for silence), the master
-before the limiter. `audio volume <v>` and `audio mute [on|off]` write
-=======
-the master lists its own after its `AudioBus`. The instruments follow, then the tracks, each as
+before the limiter. The instruments follow, then the tracks, each as
 `track <entity>: instrument <entity>` with its placements and sounding notes (see
 [Clips and tracks](#clips-and-tracks)). `audio volume <v>` and `audio mute [on|off]` write
->>>>>>> cccb2fc44334f2fc219d2bf423d9329204e2fe08
 `AudioSettings`; `audio play`, `audio stop`, `audio seek <beats>` and `audio tempo <bpm>` (20 to
 999) write `Transport`. `audio capture <seconds>` records the master output
 to a 16 bit stereo WAV resource of the session, fetched like a `capture` PNG with

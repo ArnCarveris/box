@@ -428,7 +428,6 @@ typedef struct box_audio_timeline_t {
     box_audio_timeline_stats_t stats; /**< Counters */
 } box_audio_timeline_t;
 
-<<<<<<< HEAD
 /** Slices of output the window of a meter keeps, one per frame that rendered: at 60 frames
  * per second over a second, so the window of BOX_AUDIO_METER_WINDOW is full up to 200 */
 #define BOX_AUDIO_METER_SLICES 64
@@ -453,7 +452,7 @@ typedef struct box_audio_meter_window_t {
     float rms_left;         /**< Left RMS over the window */
     float rms_right;        /**< Right RMS over the window */
 } box_audio_meter_window_t;
-=======
+
 /** Shortest pass of a looping placement in beats; a shorter clip loops at this length */
 #define BOX_AUDIO_CLIP_LENGTH_MIN (1.0 / 64.0)
 
@@ -508,7 +507,6 @@ typedef struct box_audio_sequencer_t {
     double expect;          /**< Beat the next segment starts at, NAN after a reset */
     box_audio_sequencer_stats_t stats; /**< Counters */
 } box_audio_sequencer_t;
->>>>>>> cccb2fc44334f2fc219d2bf423d9329204e2fe08
 
 /** The state of the module in a world */
 typedef struct box_audio_module_t {
