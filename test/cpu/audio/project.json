@@ -298,6 +298,16 @@
                     "too_many_layers",
                     "endless_logs_error",
                     "deleted_releases",
+                    "glide_geometric_mean",
+                    "glide_zero_identical",
+                    "legato_no_retrigger",
+                    "legato_after_release",
+                    "legato_after_release_loop",
+                    "legato_after_end",
+                    "glide_source_pitch",
+                    "script_legato",
+                    "script_legato_source",
+                    "docs_glide_example",
                     "script_modulators"
                 ]
             },

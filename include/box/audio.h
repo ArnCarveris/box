@@ -276,9 +276,26 @@ ECS_STRUCT(SynthFilterEnvelope, {
                             *   the filter, default 0 */
 });
 
+/** Portamento and mono legato of a synth sound, on its root.
+ *
+ * With a time, a change of the pitch of a voice, as a change of AudioSource.pitch, glides
+ * exponentially in frequency, linear in cents, over that time instead of jumping; a time of 0
+ * jumps as without the component.
+ *
+ * With legato, a play of the sound while the last one shot of its channel holds, or a new
+ * sound of an AudioSource that plays one, glides that voice to the new frequencies without a
+ * restart of its envelopes. After its release a note starts a new voice. See docs/audio.md.
+ */
+ECS_STRUCT(SynthGlide, {
+    float time;            /**< Seconds of a glide, 0 to 10, default 0 */
+    bool legato;           /**< Play as a note of a mono voice, default false */
+    int32_t channel;       /**< Mono voice of the one shots of legato sounds, default 0:
+                            *   legato sounds of the same channel share one voice */
+});
+
 /** A sound made by the synth from the components of this entity and its children, without a
- * file: SynthOscillator layers, a SynthEnvelope, a SynthFilter and a SynthFilterEnvelope.
- * Usually a prefab.
+ * file: SynthOscillator layers, a SynthEnvelope, a SynthFilter, a SynthFilterEnvelope and a
+ * SynthGlide. Usually a prefab.
  *
  * It is compiled once, and again when one of its components changes, into a patch the core
  * holds; box_audio_play and AudioSource play it like any sound, with no allocation per play.
