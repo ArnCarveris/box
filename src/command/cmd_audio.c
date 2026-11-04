@@ -121,6 +121,34 @@ static const char* box_cmd_audio_effect_state(
     return result;
 }
 
+/** Name a kind of a band of an equalizer.
+ *
+ * @param kind The kind
+ * @return Its name
+ */
+static const char* box_cmd_audio_eq_kind(
+    AudioEqKind kind)
+{
+    static const char *names[] = {
+        "off", "peak", "low shelf", "high shelf", "low cut", "high cut"
+    };
+
+    return (uint32_t)kind < 6 ? names[kind] : "?";
+}
+
+/** Name a kind of a filter.
+ *
+ * @param kind The kind
+ * @return Its name
+ */
+static const char* box_cmd_audio_filter_kind(
+    SynthFilterKind kind)
+{
+    static const char *names[] = { "lowpass", "highpass", "bandpass", "notch" };
+
+    return (uint32_t)kind < 4 ? names[kind] : "?";
+}
+
 /** Append the insert slots of a bus: each effect with its kind, its parameters and whether it
  * runs.
  *
@@ -139,7 +167,10 @@ static void box_cmd_audio_effects(
     for (j = 0; j < BOX_AUDIO_EFFECT_SLOTS; j ++) {
         ecs_entity_t e = bus->effects[j];
         const Reverb *reverb;
+        const Equalizer *eq;
+        const AudioFilter *filter;
         char *path;
+        int32_t b;
         if (!e) {
             continue;
         }
@@ -158,6 +189,23 @@ static void box_cmd_audio_effects(
             ecs_strbuf_append(buf, "reverb decay %.2f damping %.2f predelay %.3f size %.2f "
                 "mix %.2f", (double)reverb->decay, (double)reverb->damping,
                 (double)reverb->predelay, (double)reverb->size, (double)reverb->mix);
+        } else if ((eq = ecs_get(world, e, Equalizer))) {
+            ecs_strbuf_appendstr(buf, "eq");
+            for (b = 0; b < BOX_AUDIO_EQ_BANDS; b ++) {
+                const AudioEqBand *band = &eq->bands[b];
+                if (band->kind == AudioEqOff) {
+                    ecs_strbuf_appendstr(buf, " [off]");
+                } else {
+                    ecs_strbuf_append(buf, " [%s %.0f Hz %.1f dB q %.2f]",
+                        box_cmd_audio_eq_kind(band->kind), (double)band->frequency,
+                        (double)band->gain, (double)band->q);
+                }
+            }
+        } else if ((filter = ecs_get(world, e, AudioFilter))) {
+            ecs_strbuf_append(buf, "filter %s %d dB cutoff %.0f resonance %.2f mix %.2f",
+                box_cmd_audio_filter_kind(filter->kind),
+                filter->slope == SynthSlope24 ? 24 : 12, (double)filter->cutoff,
+                (double)filter->resonance, (double)filter->mix);
         }
 
         ecs_strbuf_append(buf, " (%s)", box_cmd_audio_effect_state(world, channel, j, e));

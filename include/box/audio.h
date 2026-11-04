@@ -137,6 +137,44 @@ ECS_STRUCT(Reverb, {
                             *   passes at 1 - mix */
 });
 
+/** Bands of an Equalizer */
+#define BOX_AUDIO_EQ_BANDS 4
+
+/** Kind of a band of an Equalizer */
+ECS_ENUM(AudioEqKind, {
+    AudioEqOff,            /**< Off, the default: the band passes its input and costs nothing */
+    AudioEqPeak,           /**< A peak or a dip of gain around frequency, as wide as q */
+    AudioEqLowShelf,       /**< gain under frequency */
+    AudioEqHighShelf,      /**< gain above frequency */
+    AudioEqLowCut,         /**< A highpass of 12 dB per octave from frequency, -3 dB there at a
+                            *   q of 0.7071; gain is unused */
+    AudioEqHighCut         /**< A lowpass of 12 dB per octave from frequency */
+});
+
+/** A band of an Equalizer: an RBJ cookbook biquad */
+ECS_STRUCT(AudioEqBand, {
+    AudioEqKind kind;      /**< What the band does, default AudioEqOff */
+    float frequency;       /**< Hz, the center of a peak or the corner of a shelf or a cut, 10
+                            *   to 0.49 of the sample rate */
+    float gain;            /**< dB, -24 to 24, of a peak or a shelf, default 0; a peak or a
+                            *   shelf at 0 dB is flat and costs nothing */
+    float q;               /**< 0.1 to 18, default 0.7071: the width of a peak (higher is
+                            *   narrower), the resonance of a shelf or a cut at its corner */
+});
+
+/** An equalizer, an effect in an insert slot of an AudioBus, as a Reverb is: up to
+ * BOX_AUDIO_EQ_BANDS bands in a row. By default every band is off, at 100, 400, 2000 and 8000
+ * Hz, and the equalizer passes its input bit for bit.
+ * vocals { AudioBus: {effects: [vocals]}; Equalizer: {bands: [{kind: AudioEqLowCut,
+ * frequency: 120}]} }.
+ *
+ * A change of a band moves it over 20 ms, so a script may automate it every frame without
+ * zipper noise or clicks.
+ */
+ECS_STRUCT(Equalizer, {
+    AudioEqBand bands[4];  /**< The BOX_AUDIO_EQ_BANDS bands, in the order they run */
+});
+
 /** Seconds of output the RMS of an AudioMeter is measured over */
 #define BOX_AUDIO_METER_WINDOW (0.3f)
 
@@ -271,7 +309,8 @@ ECS_ENUM(SynthWave, {
 ECS_ENUM(SynthFilterKind, {
     SynthLowPass,          /**< Lowpass */
     SynthHighPass,         /**< Highpass */
-    SynthBandPass          /**< Bandpass, unity at the cutoff */
+    SynthBandPass,         /**< Bandpass, unity at the cutoff */
+    SynthNotch             /**< Notch, silent at the cutoff */
 });
 
 /** Slope of the filter of a synth sound */
@@ -391,6 +430,26 @@ ECS_STRUCT(SynthFilter, {
     float resonance;       /**< 0 (a Butterworth response) to 1 (rings the longest) */
     SynthFilterSlope slope; /**< Steepness, default SynthSlope12; at SynthSlope24 the resonance
                             *   applies to the second stage only */
+});
+
+/** A filter, an effect in an insert slot of an AudioBus, as a Reverb is: the state variable
+ * filter of SynthFilter on the signal of a bus, for a sweep on a music group, a muffled SFX
+ * bus or a telephone voice.
+ * music { AudioBus: {effects: [music]}; AudioFilter: {cutoff: 400, resonance: 0.3} }.
+ *
+ * The cutoff and the resonance move exponentially toward a new value over about 10 ms, so a
+ * sweep driven from a script every frame is smooth; the mix moves over 20 ms. A change of the
+ * kind or the slope fades the filtered signal out and back in over 40 ms.
+ */
+ECS_STRUCT(AudioFilter, {
+    SynthFilterKind kind;  /**< The kind, default SynthLowPass; SynthNotch for a notch */
+    float cutoff;          /**< Hz, default 1000, 10 to 0.49 of the sample rate */
+    float resonance;       /**< 0 (a Butterworth response, the default) to 1 (rings the
+                            *   longest) */
+    SynthFilterSlope slope; /**< Steepness, default SynthSlope12; at SynthSlope24 the resonance
+                            *   applies to the second stage only */
+    float mix;             /**< Wet level, 0 to 1, default 1; the dry signal passes at
+                            *   1 - mix */
 });
 
 /** An envelope of the cutoff of the SynthFilter of the same root, with the segments of a

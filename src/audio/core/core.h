@@ -379,7 +379,9 @@ typedef struct box_audio_stream_status_t {
 typedef enum box_audio_effect_kind_t {
     BOX_AUDIO_EFFECT_NONE = 0,    /**< No effect: takes an effect off, its tail fades out */
     BOX_AUDIO_EFFECT_REVERB = 1,  /**< A reverb, box_audio_reverb_params_t */
-    BOX_AUDIO_EFFECT_KINDS = 2    /**< Number of kinds, NONE included */
+    BOX_AUDIO_EFFECT_EQ = 2,      /**< An equalizer, BOX_AUDIO_EQ_BANDS box_audio_eq_band_t */
+    BOX_AUDIO_EFFECT_FILTER = 3,  /**< A filter, box_audio_filter_params_t */
+    BOX_AUDIO_EFFECT_KINDS = 4    /**< Number of kinds, NONE included */
 } box_audio_effect_kind_t;
 
 /** The parameters of a reverb, the first floats of the params of its effect command */
@@ -390,6 +392,65 @@ typedef struct box_audio_reverb_params_t {
     float size;      /**< Room scale, 0..1, which sets the lengths of the delay lines */
     float mix;       /**< Wet level, 0..1; the dry signal passes at 1 - mix */
 } box_audio_reverb_params_t;
+
+/** Bands of an equalizer; each takes 4 floats of the params of its effect command */
+#define BOX_AUDIO_EQ_BANDS 4
+
+/** Lowest frequency of a band of an equalizer in Hz; the highest is 0.49 of the rate */
+#define BOX_AUDIO_EQ_FREQUENCY_MIN 10.0f
+
+/** Largest gain of a band of an equalizer in dB, either way */
+#define BOX_AUDIO_EQ_GAIN_MAX 24.0f
+
+/** Lowest and highest Q of a band of an equalizer */
+#define BOX_AUDIO_EQ_Q_MIN 0.1f
+#define BOX_AUDIO_EQ_Q_MAX 18.0f
+
+/** Seconds over which the coefficients of a band of an equalizer move to a change */
+#define BOX_AUDIO_EQ_RAMP 0.02f
+
+/** Kinds of a band of an equalizer, each an RBJ cookbook biquad */
+typedef enum box_audio_eq_kind_t {
+    BOX_AUDIO_EQ_OFF = 0,         /**< Off, passes its input */
+    BOX_AUDIO_EQ_PEAK = 1,        /**< A peak or a dip around its frequency, as wide as its q */
+    BOX_AUDIO_EQ_LOW_SHELF = 2,   /**< The gain under its frequency */
+    BOX_AUDIO_EQ_HIGH_SHELF = 3,  /**< The gain above its frequency */
+    BOX_AUDIO_EQ_LOW_CUT = 4,     /**< A highpass of 12 dB per octave, -3 dB at its frequency
+                                   *   at a q of 0.7071 */
+    BOX_AUDIO_EQ_HIGH_CUT = 5     /**< A lowpass of 12 dB per octave */
+} box_audio_eq_kind_t;
+
+/** A band of an equalizer, 4 floats of the params of its effect command, band after band */
+typedef struct box_audio_eq_band_t {
+    float kind;       /**< A box_audio_eq_kind_t; an unknown one is off */
+    float frequency;  /**< Center or corner in Hz, BOX_AUDIO_EQ_FREQUENCY_MIN..0.49 of the rate */
+    float gain;       /**< dB, -BOX_AUDIO_EQ_GAIN_MAX..BOX_AUDIO_EQ_GAIN_MAX, for a peak and the
+                       *   shelves; a peak or a shelf at 0 dB is flat and costs nothing */
+    float q;          /**< BOX_AUDIO_EQ_Q_MIN..BOX_AUDIO_EQ_Q_MAX: the width of a peak, the
+                       *   resonance of a shelf or a cut at its corner */
+} box_audio_eq_band_t;
+
+/** Lowest cutoff of a filter effect in Hz; the highest is 0.49 of the rate */
+#define BOX_AUDIO_FILTER_CUTOFF_MIN 10.0f
+
+/** Seconds in which the cutoff and the resonance of a filter effect move most of the way to a
+ * new value, exponentially in frequency */
+#define BOX_AUDIO_FILTER_SMOOTH 0.01f
+
+/** Seconds of a change of the mix of a filter effect, and of each half of the crossfade
+ * through the dry signal of a change of its kind or slope */
+#define BOX_AUDIO_FILTER_RAMP 0.02f
+
+/** The parameters of a filter effect, the first floats of the params of its effect command:
+ * the state variable filter of the synth */
+typedef struct box_audio_filter_params_t {
+    float kind;       /**< A box_audio_synth_filter_t, LOWPASS..NOTCH; NONE or an unknown one is
+                       *   a lowpass */
+    float cutoff;     /**< Hz, BOX_AUDIO_FILTER_CUTOFF_MIN..0.49 of the rate */
+    float resonance;  /**< 0 (a Butterworth response) to 1 (rings the longest) */
+    float slope;      /**< A box_audio_synth_slope_t: 0 for 12 dB per octave, 1 for 24 */
+    float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+} box_audio_filter_params_t;
 
 /** Put an effect into an insert slot of a bus, change its parameters, move it or take it off.
  *
@@ -429,7 +490,8 @@ typedef enum box_audio_synth_filter_t {
     BOX_AUDIO_SYNTH_FILTER_NONE = 0,  /**< No filter */
     BOX_AUDIO_SYNTH_LOWPASS = 1,      /**< Lowpass, 12 dB per octave */
     BOX_AUDIO_SYNTH_HIGHPASS = 2,     /**< Highpass, 12 dB per octave */
-    BOX_AUDIO_SYNTH_BANDPASS = 3      /**< Bandpass, unity at the cutoff */
+    BOX_AUDIO_SYNTH_BANDPASS = 3,     /**< Bandpass, unity at the cutoff */
+    BOX_AUDIO_SYNTH_NOTCH = 4         /**< Notch, silent at the cutoff */
 } box_audio_synth_filter_t;
 
 /** Slopes of the filter of a synth patch */

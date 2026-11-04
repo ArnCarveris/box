@@ -149,3 +149,40 @@ void Script_reverb_hall(void) {
     test_flt(audio_peak(audio_tap_l, audio_tap_count - AUDIO_FRAME * 2, audio_tap_count), 0);
     ecs_fini(world);
 }
+
+void Script_eq_filter(void) {
+    // audio/script
+    ecs_world_t *world = audio_world();
+    char *code = script_read("test/assets/audio/eq_filter.flecs");
+    test_assert(ecs_script_run(world, "eq_filter", code, NULL) == 0);
+    ecs_os_free(code);
+
+    ecs_entity_t vocals = ecs_lookup(world, "vocals");
+    ecs_entity_t music = ecs_lookup(world, "music");
+    test_assert(vocals != 0);
+    test_assert(music != 0);
+    const Equalizer *eq = ecs_get(world, vocals, Equalizer);
+    test_assert(eq != NULL);
+    test_int(eq->bands[0].kind, AudioEqLowCut);
+    test_flt(eq->bands[0].frequency, 120);
+    test_flt(eq->bands[0].q, 0.7071f);
+    test_int(eq->bands[1].kind, AudioEqPeak);
+    test_flt(eq->bands[1].frequency, 3000);
+    test_flt(eq->bands[1].gain, 3);
+    test_flt(eq->bands[1].q, 1.2f);
+    test_int(eq->bands[2].kind, AudioEqOff);
+    test_flt(eq->bands[3].frequency, 8000);
+    const AudioFilter *filter = ecs_get(world, music, AudioFilter);
+    test_assert(filter != NULL);
+    test_int(filter->kind, SynthLowPass);
+    test_flt(filter->cutoff, 400);
+    test_flt(filter->resonance, 0.3f);
+    test_int(filter->slope, SynthSlope24);
+    test_flt(filter->mix, 1);
+
+    audio_run(world, 2);
+    test_assert(box_audio_module_effect_slot(world, vocals) >= 0);
+    test_assert(box_audio_module_effect_slot(world, music) >= 0);
+    test_assert(ecs_get(world, vocals, AudioEffectState)->slot != 0);
+    ecs_fini(world);
+}

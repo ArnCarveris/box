@@ -24,6 +24,18 @@ static const box_audio_effect_def_t box_audio_effect_kinds[BOX_AUDIO_EFFECT_KIND
         .command = box_audio_reverb_command,
         .render = box_audio_reverb_render,
         .rest = box_audio_reverb_rest
+    },
+    [BOX_AUDIO_EFFECT_EQ] = {
+        .start = box_audio_eq_start,
+        .command = box_audio_eq_command,
+        .render = box_audio_eq_render,
+        .rest = box_audio_eq_rest
+    },
+    [BOX_AUDIO_EFFECT_FILTER] = {
+        .start = box_audio_filter_start,
+        .command = box_audio_filter_command,
+        .render = box_audio_filter_render,
+        .rest = box_audio_filter_rest
     }
 };
 

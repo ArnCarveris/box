@@ -126,6 +126,51 @@ static void box_audio_reverb_ctor(
     }
 }
 
+/** Construct Equalizer values: every band off, at 100, 400, 2000 and 8000 Hz, flat, at a q
+ * of 0.7071.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_equalizer_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    static const float frequencies[BOX_AUDIO_EQ_BANDS] = { 100, 400, 2000, 8000 };
+    Equalizer *values = ptr;
+    int32_t i, b;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        for (b = 0; b < BOX_AUDIO_EQ_BANDS; b ++) {
+            values[i].bands[b] = (AudioEqBand){
+                .kind = AudioEqOff, .frequency = frequencies[b], .gain = 0, .q = 0.7071f };
+        }
+    }
+}
+
+/** Construct AudioFilter values: a lowpass at 1000 Hz and 12 dB per octave without
+ * resonance, fully wet.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_filter_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    AudioFilter *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (AudioFilter){
+            .kind = SynthLowPass, .cutoff = 1000.0f, .slope = SynthSlope12, .mix = 1.0f };
+    }
+}
+
 /** Construct SynthOscillator values: a sine at 440 Hz at unity level, without a sweep, heard,
  * with an index of 1 for when it modulates and a pulse width of 0.5 for when it is a square.
  *
@@ -948,6 +993,10 @@ void BoxAudioImport(
     ecs_set_hooks(world, AudioSpatial, { .ctor = box_audio_spatial_ctor });
     ECS_META_COMPONENT(world, Reverb);
     ecs_set_hooks(world, Reverb, { .ctor = box_audio_reverb_ctor });
+    ECS_META_COMPONENT(world, AudioEqKind);
+    ECS_META_COMPONENT(world, AudioEqBand);
+    ECS_META_COMPONENT(world, Equalizer);
+    ecs_set_hooks(world, Equalizer, { .ctor = box_audio_equalizer_ctor });
     ECS_META_COMPONENT(world, SynthWave);
     ECS_META_COMPONENT(world, SynthFilterKind);
     ECS_META_COMPONENT(world, SynthFilterSlope);
@@ -961,6 +1010,8 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, SynthEnvelope);
     ECS_META_COMPONENT(world, SynthFilter);
     ecs_set_hooks(world, SynthFilter, { .ctor = box_audio_synth_filter_ctor });
+    ECS_META_COMPONENT(world, AudioFilter);
+    ecs_set_hooks(world, AudioFilter, { .ctor = box_audio_filter_ctor });
     ECS_META_COMPONENT(world, SynthFilterEnvelope);
     ECS_META_COMPONENT(world, SynthGlide);
     ECS_META_COMPONENT(world, SynthLfoWave);
@@ -1009,6 +1060,8 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(AudioBus), EcsWith, ecs_id(AudioBusState));
     ecs_add_pair(world, ecs_id(AudioSource), EcsWith, ecs_id(AudioVoice));
     ecs_add_pair(world, ecs_id(Reverb), EcsWith, ecs_id(AudioEffectState));
+    ecs_add_pair(world, ecs_id(Equalizer), EcsWith, ecs_id(AudioEffectState));
+    ecs_add_pair(world, ecs_id(AudioFilter), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(SoundFile), EcsWith, ecs_id(AudioSample));
     ecs_add_pair(world, ecs_id(AudioStream), EcsWith, ecs_id(AudioMusic));
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSoundId));
