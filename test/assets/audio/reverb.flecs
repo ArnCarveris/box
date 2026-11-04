@@ -1,7 +1,6 @@
 // A reverb bus set by a scene, for the Script suite of test/cpu/audio: the hall reverb in the
 // first insert slot of its own bus, which the bus world reaches through its send at 0.3, and a
-// click on world. Flecs script
-// separates components on one line with ';', not with the ',' of the task's example.
+// click on world.
 using box.audio
 
 hall { AudioBus: {output: master, effects: [hall]}; Reverb: {decay: 2.4, damping: 0.4, predelay: 0.02} }
