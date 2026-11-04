@@ -97,13 +97,13 @@ canal_lock {
 
   landscape { CanalLandscape: {} }
 
-  CanalWaterFace low_water(x0: -21, x1: -6.5, z0: -3, z1: 3) { Position: {-13.75, -2.25, 0} }
-  CanalWaterFace low_neck(x0: -6.5, x1: -5.37, z0: -1.6, z1: 1.6) { Position: {-5.935, -2.25, 0} }
-  CanalWaterFace high_water(x0: 6.5, x1: 21, z0: -3, z1: 3) { Position: {13.75, -0.45, 0} }
-  CanalWaterFace high_neck(x0: 6, x1: 6.5, z0: -1.6, z1: 1.6) { Position: {6.25, -0.45, 0} }
+  CanalWaterFace low_water(x0: -21, x1: -6.5, z0: -3, z1: 3) { Position = {-13.75, -2.25, 0} }
+  CanalWaterFace low_neck(x0: -6.5, x1: -5.37, z0: -1.6, z1: 1.6) { Position = {-5.935, -2.25, 0} }
+  CanalWaterFace high_water(x0: 6.5, x1: 21, z0: -3, z1: 3) { Position = {13.75, -0.45, 0} }
+  CanalWaterFace high_neck(x0: 6, x1: 6.5, z0: -1.6, z1: 1.6) { Position = {6.25, -0.45, 0} }
 
   CanalChamberLevel chamber_water() {
-    CanalWaterFace surface(x0: -5.37, x1: 6, z0: -1.6, z1: 1.6) { Position: {0.315, 0, 0} }
+    CanalWaterFace surface(x0: -5.37, x1: 6, z0: -1.6, z1: 1.6) { Position = {0.315, 0, 0} }
   }
 
   LockGateLeaf top_gate_n(side: 1, top: true, bottom: -1.05, enabled: lock_high) { Position: {5.7, 0, -1.45} }

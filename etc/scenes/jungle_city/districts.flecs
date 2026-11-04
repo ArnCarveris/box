@@ -20,7 +20,7 @@ template CanopyUnderstory {
     const clear = !(z > 1.5 && ((x > -1.9 && x < 1.9) || (x > gate - 3.2 && x < gate + 2)))
     if clear {
       if kind < 4 {
-        CanopyTuft(size: size * 0.8, yaw: g.f(3)) { Position: {x, 0, z} }
+        CanopyTuft(size: size * 0.8, yaw: g.f(3)) { Position = {x, 0, z} }
       } else if kind < 7 {
         CanopyFern(size: size) { Position: {x, 0, z} }
       } else if kind < 9 {
