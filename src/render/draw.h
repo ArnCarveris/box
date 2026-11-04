@@ -454,6 +454,9 @@ typedef struct box_draw_clips_t {
     uint32_t capacity;      /**< Clips the clip buffer holds, 0 before it is created */
     int32_t tagged;         /**< Entities with ClipChildren, so a world without any skips the
                              *   walk up the hierarchy */
+    int32_t changed_first;  /**< First record of the polygon records that changed since the
+                             *   last upload, uploaded alone when no other record changed */
+    int32_t changed_end;    /**< End of the changed polygon records, changed_first for none */
     bool dirty;             /**< A record changed since the last upload */
 } box_draw_clips_t;
 
@@ -1963,7 +1966,8 @@ bool box_draws_slice_record(
     box_render_slice_t *out);
 
 /** Get the index of the polygon record of a polygon, giving it one when it has none or when its
- * record no longer holds its edges, and mark it to be computed in the next send.
+ * record no longer holds its edges, and mark it to be computed in the next send when it is new,
+ * moved or its shape changed.
  *
  * The record takes BOX_RENDER_POLYGON_RECORDS(edges) consecutive records of the clip buffer,
  * which the edges of its Shape2D size; its index changes only when they no longer fit.
@@ -1971,12 +1975,15 @@ bool box_draws_slice_record(
  * @param world The world
  * @param d The state
  * @param e The shape, with a polygon Shape2D
+ * @param changed Whether its shape may have changed, a write of its shading; a move alone
+ * keeps the record
  * @return The index of the first clip record of its record
  */
 int32_t box_draws_polygon_of(
     const ecs_world_t *world,
     box_render_draws_t *d,
-    ecs_entity_t e);
+    ecs_entity_t e,
+    bool changed);
 
 /** Free the polygon record of a 2D shape that is removed or no longer a polygon, if it has one.
  *

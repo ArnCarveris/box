@@ -6,8 +6,8 @@
  * computed every frame from the element and uploaded when one changed.
  *
  * Slice records (Rects with an ImageSlice) take two clip records and polygon records (Polygon2D)
- * a header and one per three edges, so the 2D shape shader reads them without a binding of its
- * own; a polygon that outgrows its run of records moves to a free run that it fits.
+ * a header and chunks of five per 14 edges, so the 2D shape shader reads them without a binding
+ * of its own; a polygon that outgrows its run of records moves to a free run that it fits.
  */
 
 #include "draw.h"
@@ -23,7 +23,7 @@ _Static_assert(sizeof(box_render_polygon_t) == sizeof(box_render_clip_t),
     "the header of a polygon record takes one clip record, as fs_polygon of shape2d.wgsl reads it");
 
 _Static_assert(sizeof(box_render_clip_t) == 3 * sizeof(vec4),
-    "a clip record holds three edges of a polygon");
+    "a clip record holds three edges of a polygon, or the bounds of a chunk and two edges");
 
 /** Most ancestors a walk up the hierarchy visits looking for clips */
 #define BOX_DRAWS_CLIP_WALK (256)
@@ -696,7 +696,8 @@ static void box_draws_polygon_free(
 int32_t box_draws_polygon_of(
     const ecs_world_t *world,
     box_render_draws_t *d,
-    ecs_entity_t e)
+    ecs_entity_t e,
+    bool changed)
 {
     box_draw_clips_t *c = &d->clips;
     const Shape2D *shape = ecs_get(world, e, Shape2D);
@@ -711,15 +712,17 @@ int32_t box_draws_polygon_of(
         entry = ecs_vec_append_t(NULL, &c->polygon_entries, box_draw_polygon_t);
         ecs_os_zeromem(entry);
         entry->entity = e;
+        changed = true;
     }
 
     if (entry->count < need) {
         box_draws_polygon_free(c, entry);
         entry->index = box_draws_polygon_alloc(c, need);
         entry->count = need;
+        changed = true;
     }
 
-    entry->dirty = true;
+    entry->dirty |= changed;
 
     return entry->index;
 }
@@ -737,15 +740,42 @@ void box_draws_polygon_release(
         ecs_map_remove(&c->polygons, e);
         if (pos != last) {
             entries[pos] = entries[last];
-            ecs_map_insert(&c->polygons, entries[pos].entity, (uint64_t)pos);
+            *ecs_map_ensure(&c->polygons, entries[pos].entity) = (uint64_t)pos;
         }
 
         ecs_vec_remove_last(&c->polygon_entries);
     }
 }
 
+/** Compute the bounds of the edges of a chunk of a polygon record.
+ *
+ * @param edges The edges of the polygon
+ * @param first First edge of the chunk
+ * @param count Edges of the polygon
+ * @param out Receives min x, y and max x, y, zero for a chunk without edges
+ */
+static void box_draws_polygon_chunk(
+    const vec4 *edges,
+    int32_t first,
+    int32_t count,
+    vec4 out)
+{
+    int32_t i, last = glm_min(first + BOX_RENDER_POLYGON_CHUNK_EDGES, count);
+    glm_vec4_zero(out);
+    for (i = first; i < last; i ++) {
+        const float *e = edges[i];
+        float lo[2] = { glm_min(e[0], e[2]), glm_min(e[1], e[3]) };
+        float hi[2] = { glm_max(e[0], e[2]), glm_max(e[1], e[3]) };
+        out[0] = i == first ? lo[0] : glm_min(out[0], lo[0]);
+        out[1] = i == first ? lo[1] : glm_min(out[1], lo[1]);
+        out[2] = i == first ? hi[0] : glm_max(out[2], hi[0]);
+        out[3] = i == first ? hi[1] : glm_max(out[3], hi[1]);
+    }
+}
+
 /** Compute the polygon record of a polygon into its run: the bounds of its outline and as many
- * of its edges as the run holds. A shape that is no longer a polygon gets no edges.
+ * of its edges as the run holds, in chunks that start with their bounds. A shape that is no
+ * longer a polygon gets no edges.
  *
  * @param world The world
  * @param c The clips
@@ -761,7 +791,8 @@ static void box_draws_polygon_record(
         ? ecs_get(world, entry->entity, Polygon2D) : NULL;
     box_render_clip_t *records = ecs_vec_get_t(&c->records, box_render_clip_t, entry->index);
     box_render_polygon_t header = {0};
-    int32_t i, count = 0, capacity = (entry->count - 1) * 3;
+    int32_t i, count = 0, capacity = (entry->count - 1) / BOX_RENDER_POLYGON_CHUNK_RECORDS *
+        BOX_RENDER_POLYGON_CHUNK_EDGES;
     bool open = false;
     ecs_vec_clear(&c->polygon_edges);
     if (polygon && box_shape2d_polygon_edges(world, polygon, &c->polygon_edges, &open)) {
@@ -774,27 +805,38 @@ static void box_draws_polygon_record(
     }
 
     header.shape[0] = (float)count;
-    if (ecs_os_memcmp(&records[0], &header, ECS_SIZEOF(header))) {
-        ecs_os_memcpy(&records[0], &header, ECS_SIZEOF(header));
-        c->dirty = true;
-    }
+    bool changed = ecs_os_memcmp(&records[0], &header, ECS_SIZEOF(header)) != 0;
+    ecs_os_memcpy(&records[0], &header, ECS_SIZEOF(header));
 
     const vec4 *edges = ecs_vec_first(&c->polygon_edges);
     for (i = 0; i < entry->count - 1; i ++) {
         box_render_clip_t record = {0};
-        float *dst = (float*)&record;
+        vec4 *dst = (vec4*)&record;
         int32_t k;
         for (k = 0; k < 3; k ++) {
-            int32_t edge = i * 3 + k;
-            if (edge < count) {
-                ecs_os_memcpy(&dst[k * 4], edges[edge], ECS_SIZEOF(vec4));
+            int32_t slot = i * 3 + k;
+            int32_t chunk = slot / (BOX_RENDER_POLYGON_CHUNK_EDGES + 1);
+            int32_t at = slot % (BOX_RENDER_POLYGON_CHUNK_EDGES + 1);
+            int32_t edge = chunk * BOX_RENDER_POLYGON_CHUNK_EDGES + at - 1;
+            if (!at) {
+                box_draws_polygon_chunk(edges, edge + 1, count, dst[k]);
+            } else if (edge < count) {
+                glm_vec4_copy(ECS_CONST_CAST(float*, edges[edge]), dst[k]);
             }
         }
 
         if (ecs_os_memcmp_t(&records[i + 1], &record, box_render_clip_t)) {
             records[i + 1] = record;
-            c->dirty = true;
+            changed = true;
         }
+    }
+
+    if (changed && c->changed_end > c->changed_first) {
+        c->changed_first = glm_min(c->changed_first, entry->index);
+        c->changed_end = glm_max(c->changed_end, entry->index + entry->count);
+    } else if (changed) {
+        c->changed_first = entry->index;
+        c->changed_end = entry->index + entry->count;
     }
 }
 
@@ -899,13 +941,26 @@ void box_draws_clips_send(
         c->dirty = true;
     }
 
-    if (c->dirty && c->capacity) {
-        uint32_t size = count * (uint32_t)sizeof(box_render_clip_t);
-        void *dst = box_render_packet_upload(p, BOX_RENDER_BUFFER_CLIPS, 0, size);
-        ecs_os_memcpy(dst, ecs_vec_first(&c->records), (ecs_size_t)size);
+    uint32_t first = 0;
+    bool upload = c->dirty;
+    if (!upload && c->changed_end > c->changed_first) {
+        first = (uint32_t)c->changed_first;
+        count = (uint32_t)c->changed_end;
+        upload = true;
+    }
+
+    if (upload && c->capacity) {
+        uint32_t stride = (uint32_t)sizeof(box_render_clip_t);
+        uint32_t size = (count - first) * stride;
+        void *dst = box_render_packet_upload(p, BOX_RENDER_BUFFER_CLIPS, first * stride, size);
+        ecs_os_memcpy(dst, ecs_vec_get_t(&c->records, box_render_clip_t, (int32_t)first),
+            (ecs_size_t)size);
         d->stats.clip_bytes = size;
         c->dirty = false;
     }
+
+    c->changed_first = 0;
+    c->changed_end = 0;
 }
 
 void box_draws_clips_reset(

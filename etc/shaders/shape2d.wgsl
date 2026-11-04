@@ -56,8 +56,9 @@
 // turns the vertex stage to it and fs_polygon shades it. emissive.w of its shading is the index of
 // its polygon record in the clip buffer (box_render_polygon_t), which needs no binding of its own:
 // a header with the center and half extents of the bounds of its outline, its edge count and half
-// the width of a stroke (0 for a filled polygon), then its edges, three to a record, each the start
-// and the end of a segment in the local units of the polygon. The vertex stage places the quad on
+// the width of a stroke (0 for a filled polygon), then its edges in chunks of 5 records: the bounds
+// of the edges of the chunk and 14 edges, each the start and the end of a segment in the local
+// units of the polygon. The vertex stage places the quad on
 // the bounds (the instance scale is that of a line, bounds centered on the origin), so local is
 // the position in the local units of the polygon. The fragment takes the signed distance to the
 // nearest edge, negative where a ray crosses the edges an odd number of times (the even-odd rule,
@@ -65,8 +66,10 @@
 // of a stroke, and anti-aliases it over the footprint of the pixel along its gradient, which
 // comes from the nearest edge; a stroke thinner than a pixel is widened to one and faded, as a
 // line is. shape.y is the border width in local units and shape.zw its color, as for a rectangle.
-// The cost per fragment is linear in the edges, a few operations each, which suits outlines of up
-// to a few hundred edges; the edges are read three per record so each fetch serves three.
+// The cost per fragment is linear in the edges a fragment cannot skip, a few operations each: a
+// chunk whose bounds lie farther than the nearest edge found and that the ray of the even-odd
+// rule does not cross costs one test, so a pixel pays for the chunks near it and those its ray
+// crosses, and a stroke only for those near it.
 //
 // The shadow of a polygon (fs_shadow_polygon) is a shadow quad of the plain vertex stage: the
 // bounds of the outline moved by the offset and grown by the spread and 3 standard deviations.
@@ -503,9 +506,34 @@ fn polygon_edge(p: vec2f, e: vec4f) -> vec4f {
     return vec4f(dot(v, v), v, select(0.0, 1.0, crosses));
 }
 
+// The nearest edge of a polygon so far: x its squared distance, yz the vector from it to the
+// point, w the edges a ray from the point toward +x crossed.
+struct PolygonNearest {
+    best: f32,
+    dir: vec2f,
+    crossings: f32,
+};
+
+// Take one edge of a polygon into the nearest edge so far, when it is one of its edges.
+fn polygon_step(p: vec2f, e: vec4f, valid: bool, n: ptr<function, PolygonNearest>) {
+    if (valid) {
+        let d = polygon_edge(p, e);
+        (*n).crossings += d.w;
+        if (d.x < (*n).best) {
+            (*n).best = d.x;
+            (*n).dir = d.yz;
+        }
+    }
+}
+
 // Distance of a point to the polygon of a polygon record: x the signed distance to the outline of
 // a filled polygon (negative inside by the even-odd rule) or the distance to the polyline of a
 // stroke, yz the unit direction it grows in, w half the width of a stroke, 0 for a filled one.
+// The edges come in chunks of 5 records, 14 edges after the bounds of the chunk: a chunk whose
+// bounds are farther than the nearest edge so far and that the ray toward +x cannot cross (any
+// chunk of a stroke, which counts no crossings) is skipped. The nearest distance starts at the
+// least distance to the farthest corner of the bounds of a chunk, within which that chunk has an
+// edge, so the first chunks are skipped too when they are far.
 // The loop is not uniform, so it takes no derivatives; its callers take them before it.
 fn polygon_distance(index: u32, p: vec2f) -> vec4f {
     let count = arrayLength(&clips);
@@ -515,46 +543,48 @@ fn polygon_distance(index: u32, p: vec2f) -> vec4f {
     }
 
     let edges = u32(max(head.x, 0.0));
-    var best = 1e30;
-    var dir = vec2f(0.0, 1.0);
-    var crossings = 0.0;
-    for (var i = 0u; i < edges; i += 3u) {
-        let r = index + 1u + i / 3u;
-        if (r >= count) {
+    let filled = head.y <= 0.0;
+    var bound = 1e30;
+    for (var first = 0u; first < edges; first += 14u) {
+        let r = index + 1u + first / 14u * 5u;
+        if (r + 4u >= count) {
+            break;
+        }
+
+        let b = clips[r].x;
+        let far = max(abs(b.xy - p), abs(b.zw - p));
+        bound = min(bound, dot(far, far));
+    }
+
+    var n = PolygonNearest(bound * 1.0001 + 1e-12, vec2f(0.0, 1.0), 0.0);
+    for (var first = 0u; first < edges; first += 14u) {
+        let r = index + 1u + first / 14u * 5u;
+        if (r + 4u >= count) {
             break;
         }
 
         let c = clips[r];
-        var e = polygon_edge(p, c.x);
-        crossings += e.w;
-        if (e.x < best) {
-            best = e.x;
-            dir = e.yz;
+        let outside = max(max(c.x.xy - p, p - c.x.zw), vec2f(0.0));
+        let crossed = filled && p.y >= c.x.y && p.y < c.x.w && p.x < c.x.z;
+        if (dot(outside, outside) >= n.best && !crossed) {
+            continue;
         }
 
-        if (i + 1u < edges) {
-            e = polygon_edge(p, c.y);
-            crossings += e.w;
-            if (e.x < best) {
-                best = e.x;
-                dir = e.yz;
-            }
-        }
-
-        if (i + 2u < edges) {
-            e = polygon_edge(p, c.area);
-            crossings += e.w;
-            if (e.x < best) {
-                best = e.x;
-                dir = e.yz;
-            }
+        let left = edges - first;
+        polygon_step(p, c.y, true, &n);
+        polygon_step(p, c.area, left > 1u, &n);
+        for (var k = 1u; k < 5u; k += 1u) {
+            let e = clips[r + k];
+            polygon_step(p, e.x, left > k * 3u - 1u, &n);
+            polygon_step(p, e.y, left > k * 3u, &n);
+            polygon_step(p, e.area, left > k * 3u + 1u, &n);
         }
     }
 
-    let d = sqrt(best);
-    let n = select(vec2f(0.0, 1.0), dir / d, d > 1e-20);
-    let inside = head.y <= 0.0 && fract(crossings * 0.5) > 0.25;
-    return select(vec4f(d, n, head.y), vec4f(-d, -n, 0.0), inside);
+    let d = sqrt(n.best);
+    let dir = select(vec2f(0.0, 1.0), n.dir / d, d > 1e-20);
+    let inside = filled && fract(n.crossings * 0.5) > 0.25;
+    return select(vec4f(d, dir, head.y), vec4f(-d, -dir, 0.0), inside);
 }
 
 // Polygon2D shapes: the signed distance to the edges of the polygon record anti-aliased over the
@@ -574,7 +604,7 @@ fn polygon_distance(index: u32, p: vec2f) -> vec4f {
     var thin = 1.0;
     if (s.w > 0.0) {
         let stroke = max(s.w, px * 0.5);
-        d = s.x + s.w - stroke;
+        d = s.x - stroke;
         thin = s.w / stroke;
     }
 

@@ -18,6 +18,7 @@
     "using box.geometry\n" \
     "using box.camera\n" \
     "using box.view\n" \
+    "using box.layout\n" \
     "using box.picking\n" \
     "template Probe {\n" \
     "  mut clicks: i32 = 0\n" \

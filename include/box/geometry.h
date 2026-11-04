@@ -534,9 +534,10 @@ ECS_STRUCT(Line, {
  * Like Rect, Circle and Line it is shaded with an analytic signed distance (to the edges of the
  * outline), anti-aliased at any scale, distance and angle, with a Border inside its edge, an
  * Image over its bounds, a BoxShadow of its outline, ClipChildren, Opacity, Rgb, Tint, the
- * transitions and picking of the other 2D shapes. Its cost per pixel grows with the number of
- * edges, so outlines of up to a few hundred edges suit it; one of more than
- * BOX_POLYGON2D_MAX_EDGES is not drawn. A Rect, Circle or Line of the same entity draws instead.
+ * transitions and picking of the other 2D shapes. Its cost per pixel grows with the edges near
+ * the pixel and those in its row, so outlines of up to a few hundred edges suit it; one of more
+ * than BOX_POLYGON2D_MAX_EDGES is not drawn. A Rect, Circle or Line of the same entity draws
+ * instead.
  *
  *     plaza_outline {
  *       Path2D: {start: {-6, -4}, closed: true, segments: [

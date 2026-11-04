@@ -27,7 +27,8 @@
     "using box.transform\n" \
     "using box.geometry\n" \
     "using box.material\n" \
-    "using box.texture\n"
+    "using box.texture\n" \
+    "using box.layout\n"
 
 /** An L shaped concave outline in a 4 by 4 square without its top right quarter; scaled by 10
  * and offset by -20 it covers -20..20 on both axes but the quarter x 0..20, y 0..20 */
@@ -612,6 +613,130 @@ void Polygon2D_box_shadow_blur_and_spread(void) {
     ecs_fini(world);
 }
 
+/** Render the white L of POLY_L_SHAPE over a white clear with a shadow, without a transition.
+ *
+ * @param file The file of the surface
+ * @param shadow The shadow
+ * @return The pixels, RGBA, free with stbi_image_free
+ */
+static unsigned char* poly_shadow_reference(
+    const char *file,
+    const BoxShadow *shadow)
+{
+    ecs_world_t *world = poly_world_clear(file, (rgba){255, 255, 255, 255}, POLY_L_SHAPE);
+    ecs_entity_t e = ecs_lookup(world, "l_shape");
+    ecs_set(world, e, Rgb, {120, 160, 255});
+    ecs_set_ptr(world, e, BoxShadow, shadow);
+    unsigned char *px = poly_render(world, file, 2);
+    poly_no_errors(world);
+    ecs_fini(world);
+
+    return px;
+}
+
+/** Get the largest difference of a channel between two images.
+ *
+ * @param a The first image
+ * @param b The second image
+ * @return The difference
+ */
+static int32_t poly_diff(
+    const unsigned char *a,
+    const unsigned char *b)
+{
+    int32_t i, result = 0;
+    for (i = 0; i < 64 * 64 * 4; i ++) {
+        if (i % 4 != 3) {
+            int32_t d = abs((int32_t)a[i] - (int32_t)b[i]);
+            result = d > result ? d : result;
+        }
+    }
+
+    return result;
+}
+
+/** A transition of the BoxShadow of a polygon lifts its shadow: halfway through it is the shadow
+ * of a polygon set up at the halfway offset, blur and spread, following the outline, and at the
+ * end that of the target.
+ */
+void Polygon2D_box_shadow_transition(void) {
+    // ui/polygon_2d
+    BoxShadow rest = {.offset_x = 2, .offset_y = -2, .blur = 2, .color = {0, 0, 0, 200}};
+    BoxShadow lifted = {.offset_x = 8, .offset_y = -8, .blur = 10, .spread = 2,
+        .color = {0, 0, 0, 200}};
+    BoxShadow halfway = {.offset_x = 5, .offset_y = -5, .blur = 6, .spread = 1,
+        .color = {0, 0, 0, 200}};
+    ecs_world_t *world = poly_world_clear("polygon_shadow_lift.png", (rgba){255, 255, 255, 255},
+        POLY_L_SHAPE);
+    ecs_entity_t e = ecs_lookup(world, "l_shape");
+    ecs_set(world, e, Rgb, {120, 160, 255});
+    ecs_set_ptr(world, e, BoxShadow, &rest);
+    box_transition_set(world, e, ecs_id(BoxShadow), &(TransitionSpec){ .duration = 1.0f });
+    stbi_image_free(poly_render_delta(world, "polygon_shadow_lift.png", 1, 0.25f));
+    ecs_set_ptr(world, e, BoxShadow, &lifted);
+    unsigned char *mid = poly_render_delta(world, "polygon_shadow_lift.png", 3, 0.25f);
+    unsigned char *end = poly_render_delta(world, "polygon_shadow_lift.png", 2, 0.25f);
+    poly_no_errors(world);
+    ecs_fini(world);
+
+    unsigned char *at_mid = poly_shadow_reference("polygon_shadow_mid.png", &halfway);
+    unsigned char *at_end = poly_shadow_reference("polygon_shadow_end.png", &lifted);
+    test_assert(poly_diff(mid, at_end) > 20);
+    test_assert(poly_diff(mid, at_mid) <= 4);
+    test_int(poly_diff(end, at_end), 0);
+    test_assert(poly_white(mid, 10.5f, 10.5f));
+    stbi_image_free(mid);
+    stbi_image_free(end);
+    stbi_image_free(at_mid);
+    stbi_image_free(at_end);
+}
+
+/** A polygon in a UI rendered to a texture: the L shows through an Image of the texture at twice
+ * its size, its notch the clear color of the texture.
+ */
+void Polygon2D_render_to_texture(void) {
+    // ui/polygon_2d
+    ecs_world_t *world = poly_world("polygon_texture.png", POLY_L);
+    ecs_entity_t texture = ecs_new(world);
+    ecs_entity_t image = ecs_new(world);
+    ecs_set(world, image, Position, {0, 0, 0});
+    ecs_set(world, image, Rect, {64, 64});
+    ecs_set(world, image, Image, {.texture = texture, .u1 = 1, .v1 = 1});
+
+    ecs_entity_t ui = ecs_new(world);
+    ecs_set(world, ui, Scene, {0});
+    ecs_entity_t ui_camera = ecs_new_w_pair(world, EcsChildOf, ui);
+    ecs_set(world, ui_camera, Position, {0, 0, 100});
+    ecs_set(world, ui_camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f,
+        .far_ = 1000});
+    ecs_entity_t l = ecs_new_w_pair(world, EcsChildOf, ui);
+    ecs_set(world, l, Position, {0, 0, 0});
+    ecs_set(world, l, Polygon2D, {.path = ecs_lookup(world, "l_path"), .scale = {3, 3},
+        .offset = {-6, -6}, .width = 1});
+    ecs_set(world, l, Rgb, {0, 255, 0});
+    ecs_entity_t root = ecs_new(world);
+    ecs_entity_t ui_view = ecs_new_w_pair(world, EcsChildOf, root);
+    ecs_set(world, ui_view, View, {.camera = ui_camera,
+        .clear = {.enabled = true, .color = {0, 0, 255, 255}}});
+    ecs_entity_t screen = ecs_new(world);
+    ecs_set(world, screen, Surface, {.width = 32, .height = 32, .texture = texture,
+        .view_root = root, .resolution_scale = 1});
+    unsigned char *px = poly_render(world, "polygon_texture.png", 3);
+    const unsigned char *c = poly_at(px, -6.5f, -6.5f);
+    test_assert(c[1] > 245 && c[0] < 10 && c[2] < 10);
+    c = poly_at(px, 6.5f, -6.5f);
+    test_assert(c[1] > 245 && c[0] < 10 && c[2] < 10);
+    c = poly_at(px, -6.5f, 6.5f);
+    test_assert(c[1] > 245 && c[0] < 10 && c[2] < 10);
+    c = poly_at(px, 6.5f, 6.5f);
+    test_assert(c[2] > 245 && c[0] < 10 && c[1] < 10);
+    c = poly_at(px, 20.5f, -20.5f);
+    test_assert(c[2] > 245 && c[0] < 10 && c[1] < 10);
+    stbi_image_free(px);
+    poly_no_errors(world);
+    ecs_fini(world);
+}
+
 /** An Rgb transition renders the polygon in between, and the record index of the polygon survives
  * it: the notch stays open.
  */
@@ -712,6 +837,45 @@ void Polygon2D_records_reused(void) {
     test_assert(poly_white(px, 11.5f, -18.5f));
     test_assert(poly_black(px, 17.5f, -12.5f));
     test_assert(poly_black(px, -12.5f, 17.5f));
+    stbi_image_free(px);
+    poly_no_errors(world);
+    ecs_fini(world);
+}
+
+/** A polygon that moves keeps its record and uploads nothing to the clip buffer; one whose path
+ * changes uploads its own records, not those of the other polygons. */
+void Polygon2D_records_upload_changed(void) {
+    // ui/polygon_2d
+    ecs_world_t *world = poly_world("polygon_upload.png", POLY_L POLY_CIRCLE);
+    ecs_entity_t l_path = ecs_lookup(world, "l_path");
+    ecs_entity_t circle = ecs_lookup(world, "circle_path");
+    ecs_entity_t a = ecs_new(world), b = ecs_new(world);
+    ecs_set(world, a, Position, {0, 0, 0});
+    ecs_set(world, a, Polygon2D, {.path = circle, .scale = {0.5f, 0.5f}, .width = 1});
+    ecs_set(world, a, Rgb, {255, 255, 255});
+    ecs_set(world, b, Position, {0, 0, 0});
+    ecs_set(world, b, Polygon2D, {.path = l_path, .scale = {2, 2}, .offset = {10, -20},
+        .width = 1});
+    ecs_set(world, b, Rgb, {255, 255, 255});
+    stbi_image_free(poly_render(world, "polygon_upload.png", 2));
+
+    box_render_draws_stats_t stats = {0};
+    ecs_set(world, a, Position, {-12, 12, 0});
+    unsigned char *px = poly_render(world, "polygon_upload.png", 1);
+    box_render_draws_stats(world, &stats);
+    test_int(stats.clip_bytes, 0);
+    test_assert(poly_white(px, -12.5f, 12.5f));
+    test_assert(poly_black(px, 0.5f, 0.5f));
+    stbi_image_free(px);
+
+    ecs_set(world, b, Polygon2D, {.path = l_path, .scale = {2, 2}, .offset = {10, -10},
+        .width = 1});
+    px = poly_render(world, "polygon_upload.png", 1);
+    box_render_draws_stats(world, &stats);
+    test_int(stats.clip_bytes, BOX_RENDER_POLYGON_RECORDS(6) *
+        (int64_t)sizeof(box_render_clip_t));
+    test_assert(poly_white(px, 11.5f, -8.5f));
+    test_assert(poly_white(px, -12.5f, 12.5f));
     stbi_image_free(px);
     poly_no_errors(world);
     ecs_fini(world);

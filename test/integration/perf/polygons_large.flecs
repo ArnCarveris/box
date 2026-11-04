@@ -6,9 +6,9 @@ using box.view
 using box.perf
 
 // The worst case of Polygon2D: 12 overlapping polygons of 512 curved edges each, a ring with a
-// hole, each covering most of the view, so every pixel measures its distance to 6,000 edges
-// (a quarter of them blended over others). It bounds the edges and the screen area a map can
-// spend on polygons.
+// hole, each covering most of the view, so every pixel lies over 6,000 edges (a quarter of them
+// blended over others), of which it tests the chunks of 14 near it and those its ray crosses. It
+// bounds the edges and the screen area a map can spend on polygons.
 camera {
   Camera: {fov: 50}
 }

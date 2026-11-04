@@ -875,9 +875,12 @@ typedef struct box_render_clip_t {
 } box_render_clip_t;
 
 /** The header of the polygon record of a Polygon2D, which fs_polygon of shape2d.wgsl reads from
- * the clip buffer, followed by its edges, three by clip record: each a vec4 of its start x, y and
- * end x, y in the local units of the polygon, the records after the header holding
- * ceil(edges / 3) records (BOX_RENDER_POLYGON_RECORDS).
+ * the clip buffer, followed by its edges in chunks of BOX_RENDER_POLYGON_CHUNK_RECORDS records.
+ *
+ * Every vec4 of a chunk after its first is an edge, its start x, y and end x, y in the local
+ * units of the polygon; the first vec4 is the bounds of the edges of the chunk (min x, y, max x,
+ * y), which lets a fragment skip the chunks that are too far to be nearest and that its ray
+ * does not cross. The chunks hold BOX_RENDER_POLYGON_CHUNK_EDGES edges, the last fewer.
  */
 typedef struct box_render_polygon_t {
     float bounds[4];        /**< Center x, y and half width, half height of the bounds */
@@ -886,8 +889,15 @@ typedef struct box_render_polygon_t {
     float unused[4];        /**< 0 */
 } box_render_polygon_t;
 
+/** Clip records of a chunk of the edges of a polygon record */
+#define BOX_RENDER_POLYGON_CHUNK_RECORDS (5)
+
+/** Edges of a chunk of a polygon record: three per clip record, but for its bounds */
+#define BOX_RENDER_POLYGON_CHUNK_EDGES (3 * BOX_RENDER_POLYGON_CHUNK_RECORDS - 1)
+
 /** Clip records a polygon record of a number of edges takes, its header included */
-#define BOX_RENDER_POLYGON_RECORDS(edges) (1 + ((edges) + 2) / 3)
+#define BOX_RENDER_POLYGON_RECORDS(edges) (1 + BOX_RENDER_POLYGON_CHUNK_RECORDS * \
+    (((edges) + BOX_RENDER_POLYGON_CHUNK_EDGES - 1) / BOX_RENDER_POLYGON_CHUNK_EDGES))
 
 /** The nine parts of a sliced Image (ImageSlice) as fs_slice of shape2d.wgsl reads them from
  * two consecutive records of the clip buffer, the index of the first in uv.x of the shading.

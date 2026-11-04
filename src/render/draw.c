@@ -775,7 +775,7 @@ write:
         material.rank = s->rank;
         bool polygon = material.shape2d->kind == BOX_SHAPE2D_POLYGON;
         int32_t slice = material.shape2d->sliced ? box_draws_slice_of(d, e) :
-            polygon ? box_draws_polygon_of(world, d, e) : 0;
+            polygon ? box_draws_polygon_of(world, d, e, kinds & BOX_DRAW_SHADING) : 0;
         if (slice != s->slice) {
             kinds |= BOX_DRAW_SHADING;
         }
