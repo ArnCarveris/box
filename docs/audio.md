@@ -1561,7 +1561,7 @@ frame, the same on every platform.
 | `AudioListener` | Tag of the entity whose `WorldTransform` hears the spatial sources |
 | `AudioSettings` | Singleton: `master_volume` (1) and `mute` |
 | `AudioStatus` | Singleton, read only: `state`, `sample_rate`, `voices`, `voices_stolen`, `load`, `buses`, `clock` (the frame of the core that renders now) |
-| `Transport` | Singleton: `tempo` (120, 20..999), `beats_per_bar` (4), `beat_unit` (4), `position` (beats, written while it plays), `playing` (false), `loop` (false), `loop_start`, `loop_end`, `lookahead` (0.15 s, 0.05..0.5), `metronome` (false), see [Transport](#transport) |
+| `Transport` | Singleton: `tempo` (120, 20..999), `beats_per_bar` (4), `beat_unit` (4), `position` (beats, written while it plays, clamped to ±2^31 like `loop_start` and `loop_end`), `playing` (false), `loop` (false), `loop_start`, `loop_end`, `lookahead` (0.15 s, 0.05..0.5), `metronome` (false), see [Transport](#transport) |
 
 Constructors give the defaults in parentheses, so `AudioSource: {sound: click}` in a script plays
 at unity volume and pitch. From C, `ecs_set` writes every member; use `ecs_ensure` to keep the
@@ -1857,7 +1857,8 @@ so it stops while a page is suspended and while the output waits for its device.
 `position` by the application is a seek: the module notices a value that differs from the one
 it wrote last, so a seek works from a script, the REST API and the `set` command alike.
 `playing: false` stops at the position and `playing: true` plays on from it; a position written
-while stopped is where the next start begins.
+while stopped is where the next start begins. `position`, `loop_start` and `loop_end` are
+clamped to -2^31..2^31 beats (a NaN to 0), so a bad value cannot overflow the frames.
 
 **Beats to frames.** The timeline is a list of anchors, each a frame of the core clock and the
 beat at that frame. A beat lasts `rate * 60 / tempo` frames, and the frame of a beat on an

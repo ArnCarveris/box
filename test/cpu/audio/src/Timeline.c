@@ -657,3 +657,50 @@ void Timeline_command(void) {
     test_flt(ecs_singleton_get(world, Transport)->tempo, 90.0f);
     ecs_fini(world);
 }
+
+void Timeline_huge_beats(void) {
+    // audio/timeline
+    ecs_world_t *world = audio_world();
+    box_audio_module_t *state = box_audio_module_get(world);
+    audio_run(world, 10);
+    Transport *tr = timeline_edit(world);
+    tr->loop = true;
+    tr->loop_start = 0.0;
+    tr->loop_end = 1e15;
+    tr->playing = true;
+    timeline_done(world);
+    audio_run(world, 10);
+    test_assert(timeline_position(world) > 0.0);
+    test_assert(timeline_position(world) < 10.0);
+
+    tr = timeline_edit(world);
+    tr->loop = false;
+    tr->metronome = true;
+    tr->position = 1e17;
+    timeline_done(world);
+    audio_run(world, 10);
+    test_assert(timeline_position(world) >= 2147483648.0);
+    test_assert(timeline_position(world) < 2147483648.0 + 1.0);
+    test_assert(state->timeline.stats.clicks > 0);
+    test_assert(state->timeline.stats.clicks < 10);
+
+    tr = timeline_edit(world);
+    tr->position = -1e17;
+    tr->loop = true;
+    tr->loop_start = -1e300;
+    tr->loop_end = 1e300;
+    timeline_done(world);
+    audio_run(world, 10);
+    test_assert(timeline_position(world) >= -2147483648.0);
+    test_assert(timeline_position(world) < -2147483648.0 + 1.0);
+
+    tr = timeline_edit(world);
+    tr->position = INFINITY;
+    tr->loop_start = NAN;
+    tr->loop_end = -INFINITY;
+    timeline_done(world);
+    audio_run(world, 10);
+    test_assert(timeline_position(world) >= 2147483648.0);
+    test_assert(timeline_position(world) < 2147483648.0 + 1.0);
+    ecs_fini(world);
+}

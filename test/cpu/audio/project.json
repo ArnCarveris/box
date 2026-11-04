@@ -142,7 +142,8 @@
                     "bit_identical",
                     "new_output",
                     "script",
-                    "command"
+                    "command",
+                    "huge_beats"
                 ]
             },
             {

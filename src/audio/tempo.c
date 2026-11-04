@@ -22,6 +22,10 @@
 /** Largest top and bottom of a time signature */
 #define BOX_AUDIO_SIGNATURE_MAX 64
 
+/** Largest beat of the position and the loop, so beats times frames per beat stays well
+ * inside int64 and below 2^53, where doubles still count whole beats */
+#define BOX_AUDIO_BEAT_MAX 2147483648.0
+
 /** Volume and pitch of the click of the metronome on the first beat of a bar */
 #define BOX_AUDIO_CLICK_ACCENT_VOLUME 0.8f
 #define BOX_AUDIO_CLICK_ACCENT_PITCH 1.5f
@@ -51,15 +55,16 @@ static double box_audio_tempo_clamp(
     return result;
 }
 
-/** Get a beat of a component as a finite value.
+/** Get a beat of a component as a finite value in -2^31..2^31.
  *
  * @param beat The beat
- * @return The beat, 0 when it is not finite
+ * @return The clamped beat, 0 when it is NaN
  */
 static double box_audio_beat_finite(
     double beat)
 {
-    return isfinite(beat) ? beat : 0.0;
+    return isnan(beat) ? 0.0 :
+        box_audio_tempo_clamp(beat, -BOX_AUDIO_BEAT_MAX, BOX_AUDIO_BEAT_MAX);
 }
 
 /** Get the beats of a bar of a time signature: beats_per_bar * 4 / beat_unit.
@@ -225,7 +230,8 @@ static void box_audio_segment_add(
 }
 
 /** Extend the pieces from the end of the window to a frame, with a piece at every loop wrap,
- * and add the segments from a frame on to the window.
+ * and add the segments from a frame on to the window. A piece that starts at the loop start
+ * does not wrap on its own first frame, so the window always moves forward.
  *
  * @param tl The timeline
  * @param to The new end of the window
@@ -247,7 +253,9 @@ static void box_audio_timeline_advance(
         if (box_audio_wraps(tl, &a)) {
             w = box_audio_anchor_frame(&a, tl->loop_end);
             w = w < (int64_t)f ? (int64_t)f : w;
-            if ((uint64_t)w <= to) {
+            if ((uint64_t)w <= to &&
+                (w > (int64_t)a.frame || a.beat != tl->loop_start))
+            {
                 end = (uint64_t)w;
                 wrap = true;
             }
