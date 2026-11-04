@@ -6,8 +6,8 @@
  * The cases differ by the cost of the panel: closed, open with fixed samples, and open with a new
  * sample every frame, which rotates the bars and moves their parent one slot left.
  *
- * In open_new_sample the samples differ, so a frame evaluates the bar of the new sample, the
- * parent and the summary, and every BOX_FPS_BARS frames all bars as their columns start over.
+ * In open_new_sample the samples differ: a frame evaluates the new bar, the parent and the
+ * summary, and all bars every BOX_FPS_BARS frames; the bars' transforms follow the parent.
  * In open_steady_sample they are all as long, so no bar changes and the script evaluates none.
  */
 
