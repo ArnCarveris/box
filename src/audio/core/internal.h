@@ -16,7 +16,7 @@
 
 /** Synth layers the voices of a core play at once: 4 for every voice slot, so patches of up to
  * 4 layers never run out, and a voice of more takes the room fewer leave. A play that does not
- * find a part for each of its layers is ignored */
+ * find a part for each of its layers ends the quietest synth voices until it does */
 #define BOX_AUDIO_SYNTH_PARTS (BOX_AUDIO_VOICE_SLOTS * 4)
 
 /** Lowest frequency of an oscillator in Hz */
@@ -581,6 +581,26 @@ void box_audio_synth_parts_init(
  * @return Whether a voice can play it
  */
 bool box_audio_synth_fits(
+    const box_audio_core_t *core,
+    uint32_t sound);
+
+/** The parts of the core a voice of a synth sound takes.
+ *
+ * @param core The core
+ * @param sound Id of a ready synth sound
+ * @return Number of parts
+ */
+int32_t box_audio_synth_parts(
+    const box_audio_core_t *core,
+    uint32_t sound);
+
+/** Whether the free strings of a core hold the pluck layers of a synth sound.
+ *
+ * @param core The core
+ * @param sound Id of a ready synth sound
+ * @return Whether they do
+ */
+bool box_audio_synth_strings_fit(
     const box_audio_core_t *core,
     uint32_t sound);
 

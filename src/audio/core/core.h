@@ -456,8 +456,9 @@ typedef struct box_audio_cmd_synth_t {
 /** Events the core reports to its transport */
 typedef enum box_audio_event_type_t {
     BOX_AUDIO_EVENT_VOICE_END = 1,      /**< A voice ended, id is its handle */
-    BOX_AUDIO_EVENT_VOICE_STOLEN = 2,   /**< The cap stole a voice, id is its handle, value
-                                         * the steals so far */
+    BOX_AUDIO_EVENT_VOICE_STOLEN = 2,   /**< The cap or a play short of synth parts stole
+                                         * a voice, id is its handle, value the steals so
+                                         * far */
     BOX_AUDIO_EVENT_SOUND_FREE = 3,     /**< No voice uses a released sound, id is the sound */
     BOX_AUDIO_EVENT_ORDER_REFUSED = 4,  /**< An invalid order was ignored, value its count */
     BOX_AUDIO_EVENT_IGNORED = 5,        /**< A command was ignored, id is its type */

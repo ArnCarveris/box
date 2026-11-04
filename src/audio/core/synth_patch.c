@@ -214,10 +214,22 @@ bool box_audio_synth_fits(
     const box_audio_core_t *core,
     uint32_t sound)
 {
-    const box_audio_synth_slot_t *slot = &core->synths[core->sounds[sound].synth - 1];
+    return box_audio_synth_parts(core, sound) <= core->synth_free_count &&
+        box_audio_synth_strings_fit(core, sound);
+}
 
-    return (int32_t)slot->patch.layers <= core->synth_free_count &&
-        slot->strings <= core->string_free_count;
+int32_t box_audio_synth_parts(
+    const box_audio_core_t *core,
+    uint32_t sound)
+{
+    return (int32_t)core->synths[core->sounds[sound].synth - 1].patch.layers;
+}
+
+bool box_audio_synth_strings_fit(
+    const box_audio_core_t *core,
+    uint32_t sound)
+{
+    return core->synths[core->sounds[sound].synth - 1].strings <= core->string_free_count;
 }
 
 void box_audio_synth_end(

@@ -1511,9 +1511,37 @@ void Synth_layers_command_size(void) {
     box_audio_core_free(core);
 }
 
+/** Read every event of a core and count them by type.
+ *
+ * @param core The core
+ * @param counts Receives the count of each type, BOX_AUDIO_EVENT_LOST + 1 of them
+ * @param stolen Receives the last VOICE_STOLEN, id 0 without one
+ */
+static void synth_pool_events(
+    box_audio_core_t *core,
+    int32_t *counts,
+    box_audio_event_t *stolen)
+{
+    box_audio_event_t events[64];
+    int32_t n, i;
+    memset(counts, 0, sizeof(int32_t) * (BOX_AUDIO_EVENT_LOST + 1));
+    memset(stolen, 0, sizeof(*stolen));
+    while ((n = box_audio_core_read_events(core, events, 64)) > 0) {
+        for (i = 0; i < n; i ++) {
+            if (events[i].type >= 0 && events[i].type <= BOX_AUDIO_EVENT_LOST) {
+                counts[events[i].type] ++;
+            }
+
+            if (events[i].type == BOX_AUDIO_EVENT_VOICE_STOLEN) {
+                *stolen = events[i];
+            }
+        }
+    }
+}
+
 /** Voices take the state of only the layers their patch has, from a pool of 4 per voice slot:
- * every slot plays 4 layers, a play of 8 layers that finds no room is ignored, and the layers
- * come back when the voices end. */
+ * every slot plays 4 layers, a play of 8 layers that finds no room steals the quietest voice,
+ * the first of equals, and the layers come back when the voices end. */
 void Synth_layers_pool(void) {
     // audio/synth
     box_audio_core_t *core = synth_core(AUDIO_RATE);
@@ -1521,6 +1549,8 @@ void Synth_layers_pool(void) {
     box_audio_synth_patch_t four = synth_octet(0.05f);
     const int32_t slots = BOX_AUDIO_VOICE_MAX + BOX_AUDIO_VOICE_TAIL_MAX;
     const int32_t fit = 4 * slots / BOX_AUDIO_SYNTH_LAYERS;
+    int32_t counts[BOX_AUDIO_EVENT_LOST + 1];
+    box_audio_event_t stolen;
     int32_t i;
     four.layers = 4;
     synth_define(core, 1, &wide);
@@ -1542,8 +1572,14 @@ void Synth_layers_pool(void) {
     test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
     test_int(box_audio_core_voice_count(core), fit);
     audio_play(core, 1000, 1, 0, 0.01f, 0, 1, 0);
-    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 1);
+    synth_pool_events(core, counts, &stolen);
+    test_int(counts[BOX_AUDIO_EVENT_IGNORED], 0);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_STOLEN], 1);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_END], 1);
+    test_uint(stolen.id, 100);
+    test_int(stolen.value, 1);
     test_int(box_audio_core_voice_count(core), fit);
+    test_assert(box_audio_core_voice_count(core) <= BOX_AUDIO_VOICE_MAX);
     audio_render(core, 0, 9600);
     test_assert(synth_finite(audio_l, 0, 9600));
     test_int(box_audio_core_voice_count(core), 0);
@@ -1555,6 +1591,97 @@ void Synth_layers_pool(void) {
 
     test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
     test_int(box_audio_core_voice_count(core), fit);
+    box_audio_core_free(core);
+}
+
+/** A play of 8 layers that finds the pool full steals the quietest playing voice of 8 layers,
+ * and ends voices that fade out before it steals one that plays, the first of equals. */
+void Synth_layers_steal_quietest(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t wide = synth_octet(0.05f);
+    const int32_t slots = BOX_AUDIO_VOICE_MAX + BOX_AUDIO_VOICE_TAIL_MAX;
+    const int32_t fit = 4 * slots / BOX_AUDIO_SYNTH_LAYERS;
+    int32_t counts[BOX_AUDIO_EVENT_LOST + 1];
+    box_audio_event_t stolen, e;
+    uint8_t bytes[64];
+    box_audio_writer_t w;
+    int32_t i;
+    synth_define(core, 1, &wide);
+    for (i = 0; i < fit; i ++) {
+        audio_play(core, 100 + (uint32_t)i, 1, 0, i == 7 ? 0.005f : 0.02f, 0, 1, 0);
+    }
+
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
+    test_int(box_audio_core_voice_count(core), fit);
+
+    audio_play(core, 1000, 1, 0, 0.02f, 0, 1, 0);
+    synth_pool_events(core, counts, &stolen);
+    test_int(counts[BOX_AUDIO_EVENT_IGNORED], 0);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_STOLEN], 1);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_END], 1);
+    test_uint(stolen.id, 107);
+    test_int(stolen.value, 1);
+    test_int(box_audio_core_voice_count(core), fit);
+
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_stop(&w, 110));
+    test_assert(box_audio_write_stop(&w, 111));
+    box_audio_core_apply(core, w.data, w.size);
+    test_int(box_audio_core_voice_count(core), fit - 2);
+
+    audio_play(core, 1001, 1, 0, 0.02f, 0, 1, 0);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_VOICE_END, &e), 1);
+    test_uint(e.id, 110);
+    test_int(box_audio_core_voice_count(core), fit - 1);
+
+    audio_play(core, 1002, 1, 0, 0.02f, 0, 1, 0);
+    synth_pool_events(core, counts, &stolen);
+    test_int(counts[BOX_AUDIO_EVENT_IGNORED], 0);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_STOLEN], 0);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_END], 1);
+    test_int(box_audio_core_voice_count(core), fit);
+
+    audio_render(core, 0, 9600);
+    test_assert(synth_finite(audio_l, 0, 9600));
+    test_int(box_audio_core_voice_count(core), 0);
+    box_audio_core_free(core);
+}
+
+/** At the voice cap with the pool full, a play of 8 layers steals one voice for its parts and
+ * the cap steals no other: the voice it ends leaves room under the cap. */
+void Synth_layers_steal_cap(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t wide = synth_octet(0.05f);
+    box_audio_synth_patch_t two = synth_octet(0.05f);
+    const int32_t eights = (BOX_AUDIO_VOICE_MAX + BOX_AUDIO_VOICE_TAIL_MAX) * 4 / 8 - 8;
+    const int32_t twos = BOX_AUDIO_VOICE_MAX - eights;
+    int32_t counts[BOX_AUDIO_EVENT_LOST + 1];
+    box_audio_event_t stolen;
+    int32_t i;
+    two.layers = 2;
+    synth_define(core, 1, &wide);
+    synth_define(core, 2, &two);
+    test_int(eights * 8 + twos * 2, (BOX_AUDIO_VOICE_MAX + BOX_AUDIO_VOICE_TAIL_MAX) * 4);
+    for (i = 0; i < twos; i ++) {
+        audio_play(core, 100 + (uint32_t)i, 2, 0, 0.02f, 0, 1, 0);
+    }
+
+    for (i = 0; i < eights; i ++) {
+        audio_play(core, 200 + (uint32_t)i, 1, 0, 0.01f, 0, 1, 0);
+    }
+
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
+    test_int(box_audio_core_voice_count(core), BOX_AUDIO_VOICE_MAX);
+
+    audio_play(core, 1000, 1, 0, 0.02f, 0, 1, 0);
+    synth_pool_events(core, counts, &stolen);
+    test_int(counts[BOX_AUDIO_EVENT_IGNORED], 0);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_STOLEN], 1);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_END], 1);
+    test_uint(stolen.id, 200);
+    test_int(box_audio_core_voice_count(core), BOX_AUDIO_VOICE_MAX);
     box_audio_core_free(core);
 }
 
@@ -3916,6 +4043,47 @@ void Synth_pluck_pool(void) {
 
     test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
     test_int(box_audio_core_voice_count(core), BOX_AUDIO_SYNTH_STRINGS);
+    box_audio_core_free(core);
+}
+
+/** A pluck play rejected for its strings at the voice cap leaves every voice as it was: the cap
+ * steals no voice for it and no voice ends. A play that fits still steals at the cap. */
+void Synth_pluck_pool_cap(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t pluck = synth_pluck(440, 0.5f, 0.5f, 1);
+    box_audio_synth_patch_t sine = synth_steady(BOX_AUDIO_SYNTH_SINE, 440, 0.5f, 0.5f);
+    int32_t counts[BOX_AUDIO_EVENT_LOST + 1];
+    box_audio_event_t stolen;
+    int32_t i;
+    synth_define(core, 1, &pluck);
+    synth_define(core, 2, &sine);
+    for (i = 0; i < BOX_AUDIO_SYNTH_STRINGS; i ++) {
+        audio_play(core, 100 + (uint32_t)i, 1, 0, 0.01f, 0, 1, 0);
+    }
+
+    for (i = BOX_AUDIO_SYNTH_STRINGS; i < BOX_AUDIO_VOICE_MAX; i ++) {
+        audio_play(core, 100 + (uint32_t)i, 2, 0, 0.02f, 0, 1, 0);
+    }
+
+    synth_pool_events(core, counts, &stolen);
+    test_int(counts[BOX_AUDIO_EVENT_IGNORED], 0);
+    test_int(box_audio_core_voice_count(core), BOX_AUDIO_VOICE_MAX);
+
+    audio_play(core, 1000, 1, 0, 0.01f, 0, 1, 0);
+    synth_pool_events(core, counts, &stolen);
+    test_int(counts[BOX_AUDIO_EVENT_IGNORED], 1);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_STOLEN], 0);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_END], 0);
+    test_int(box_audio_core_voice_count(core), BOX_AUDIO_VOICE_MAX);
+
+    audio_play(core, 1001, 2, 0, 0.02f, 0, 1, 0);
+    synth_pool_events(core, counts, &stolen);
+    test_int(counts[BOX_AUDIO_EVENT_IGNORED], 0);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_STOLEN], 1);
+    test_uint(stolen.id, 100);
+    test_int(stolen.value, 1);
+    test_int(box_audio_core_voice_count(core), BOX_AUDIO_VOICE_MAX);
     box_audio_core_free(core);
 }
 
