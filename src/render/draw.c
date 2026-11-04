@@ -380,6 +380,7 @@ static void BoxDrawsOnRemove(
         box_draws_material_release(it->world, d, it->entities[i]);
         box_draws_box_shadow_remove(it->world, d, it->entities[i]);
         box_draws_slice_release(d, it->entities[i]);
+        box_draws_polygon_release(d, it->entities[i]);
     }
 
 done:
@@ -612,6 +613,8 @@ static void box_draws_key(
         key->slice = shape2d->sliced;
     }
 
+    key->polygon = shape2d && shape2d->kind == BOX_SHAPE2D_POLYGON;
+
     key->dynamic_transform = box_transform_dynamic(world, ecs_get_table(world, e)) ||
         ecs_has_id(world, e, TransitionTransform);
     key->dynamic_material = ecs_has_id(world, e, DynamicMaterial) ||
@@ -770,13 +773,19 @@ write:
         s->clip = clip;
         material.clip = clip;
         material.rank = s->rank;
-        int32_t slice = material.shape2d->sliced ? box_draws_slice_of(d, e) : 0;
+        bool polygon = material.shape2d->kind == BOX_SHAPE2D_POLYGON;
+        int32_t slice = material.shape2d->sliced ? box_draws_slice_of(d, e) :
+            polygon ? box_draws_polygon_of(world, d, e, kinds & BOX_DRAW_SHADING) : 0;
         if (slice != s->slice) {
             kinds |= BOX_DRAW_SHADING;
         }
 
-        if (!slice && s->slice) {
+        if (s->slice && !material.shape2d->sliced) {
             box_draws_slice_release(d, e);
+        }
+
+        if (s->slice && !polygon) {
+            box_draws_polygon_release(d, e);
         }
 
         s->slice = slice;

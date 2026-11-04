@@ -4,13 +4,19 @@
  * curved envelope, mixed into a state variable filter of one or two stages, whose cutoff an
  * envelope may move, and an amp, rendered per frame from a copy of the patch. A change of the
  * pitch glides exponentially in frequency over the glide of the patch, and a legato play
+<<<<<<< HEAD
  * retargets the layers of a voice without a restart of its envelopes. A layer may play as
  * unison voices, detuned and spread in stereo, which render through
  * box_audio_synth_render_wide, so a patch without them renders as before at the same cost.
+=======
+ * retargets the layers of a voice without a restart of its envelopes. A pluck layer is a
+ * Karplus-Strong string instead of an oscillator, tuned with an allpass for the fraction of a
+ * frame, which follows the pitch of its oscillator and ends the voice once it is silent.
+>>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
  *
- * Every voice holds its own copy of the patch, so a play allocates nothing and a new patch for
- * the same sound reaches the next play while the voices that play keep theirs. Its layers are
- * parts of the core, one per layer it has (box_audio_synth_part_t).
+ * Every voice holds its own copy of the patch, so a play allocates nothing. Its layers are parts
+ * of the core, one per layer it has (box_audio_synth_part_t), and each pluck layer takes a
+ * string of the core with its delay line (box_audio_synth_string_t).
  *
  * Like the rest of the core it uses no libm: the sine is box_audio_core_sin and the exponential
  * sweeps and the filter envelope use the series of box_audio_synth_log2 and
@@ -60,10 +66,31 @@
 /** Turns per radian */
 #define BOX_AUDIO_SYNTH_TURNS (1.0 / 6.28318530717958647692)
 
+<<<<<<< HEAD
 /** Gain of each of n unison voices, 1 / sqrt(n), so their power sums to that of one */
 static const double box_audio_synth_unison_gain[BOX_AUDIO_SYNTH_UNISON_MAX + 1] = {
     1.0, 1.0, 0.70710678118654752440, 0.57735026918962576451, 0.5, 0.44721359549995793928,
     0.40824829046386301637, 0.37796447300922722721 };
+=======
+/** Base 2 exponent of a fall of 60 dB, 3 log2(10) */
+#define BOX_AUDIO_SYNTH_DB60 9.96578428466208704361
+
+/** Shortest period of a string in frames: a delay line of 2 frames, the lowpass and the
+ * allpass */
+#define BOX_AUDIO_SYNTH_STRING_PERIOD_MIN 4.0
+
+/** Longest period of a string in frames, within its delay line */
+#define BOX_AUDIO_SYNTH_STRING_PERIOD_MAX ((double)(BOX_AUDIO_SYNTH_STRING_FRAMES - 2))
+
+/** Largest gain of the loop of a string, under 1 so that every string decays */
+#define BOX_AUDIO_SYNTH_STRING_GAIN_MAX 0.99999
+
+/** Peak of a period of a string under which it is silent, -80 dB of its pluck */
+#define BOX_AUDIO_SYNTH_STRING_SILENCE 1e-4f
+
+/** Envelope of the layers of strings without one, a level of 1 that never ends */
+#define BOX_AUDIO_SYNTH_ENV_FREE (BOX_AUDIO_SYNTH_LAYERS + 1)
+>>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
 
 /** Clamp a value of a patch; NaN becomes the low end.
  *
@@ -170,15 +197,16 @@ static void box_audio_synth_patch_clamp(
 
     for (i = 0; i < p->layers; i ++) {
         box_audio_synth_layer_t *l = &p->layer[i];
-        if (l->wave > BOX_AUDIO_SYNTH_NOISE) {
+        float lo;
+        if (l->wave > BOX_AUDIO_SYNTH_PLUCK) {
             l->wave = BOX_AUDIO_SYNTH_SINE;
         }
 
+        lo = l->wave == BOX_AUDIO_SYNTH_PLUCK ? BOX_AUDIO_SYNTH_PLUCK_MIN :
+            BOX_AUDIO_SYNTH_FREQUENCY_MIN;
         l->has_envelope = l->has_envelope != 0;
-        l->frequency = box_audio_synth_clamp(l->frequency, BOX_AUDIO_SYNTH_FREQUENCY_MIN,
-            BOX_AUDIO_SYNTH_HZ_MAX);
-        l->frequency_end = box_audio_synth_end_clamp(l->frequency_end,
-            BOX_AUDIO_SYNTH_FREQUENCY_MIN);
+        l->frequency = box_audio_synth_clamp(l->frequency, lo, BOX_AUDIO_SYNTH_HZ_MAX);
+        l->frequency_end = box_audio_synth_end_clamp(l->frequency_end, lo);
         l->sweep = box_audio_synth_clamp(l->sweep, 0, BOX_AUDIO_SYNTH_LENGTH_MAX);
         l->level = box_audio_synth_clamp(l->level, 0, BOX_AUDIO_VOLUME_MAX);
         box_audio_synth_envelope_clamp(&l->envelope);
@@ -189,10 +217,18 @@ static void box_audio_synth_patch_clamp(
             1.0f : BOX_AUDIO_SYNTH_INDEX_MAX);
         l->feedback = box_audio_synth_clamp(l->feedback, 0, BOX_AUDIO_SYNTH_FEEDBACK_MAX);
         l->audible = l->audible != 0;
+<<<<<<< HEAD
         l->voices = l->voices < 1 ? 1 : (l->voices > BOX_AUDIO_SYNTH_UNISON_MAX ?
             BOX_AUDIO_SYNTH_UNISON_MAX : l->voices);
         l->detune = box_audio_synth_clamp(l->detune, 0, BOX_AUDIO_SYNTH_DETUNE_MAX);
         l->width = box_audio_synth_clamp(l->width, 0, 1);
+=======
+        l->decay = box_audio_synth_clamp(l->decay, BOX_AUDIO_SYNTH_PLUCK_DECAY_MIN,
+            BOX_AUDIO_SYNTH_PLUCK_DECAY_MAX);
+        l->brightness = box_audio_synth_clamp(l->brightness, 0, 1);
+        l->hardness = box_audio_synth_clamp(l->hardness, 0, 1);
+        l->rings_free = l->rings_free && l->wave == BOX_AUDIO_SYNTH_PLUCK && !l->has_envelope;
+>>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
     }
 }
 
@@ -205,6 +241,11 @@ void box_audio_synth_parts_init(
     }
 
     core->synth_free_count = BOX_AUDIO_SYNTH_PARTS;
+    for (i = 0; i < BOX_AUDIO_SYNTH_STRINGS; i ++) {
+        core->string_free[i] = (uint16_t)(BOX_AUDIO_SYNTH_STRINGS - 1 - i);
+    }
+
+    core->string_free_count = BOX_AUDIO_SYNTH_STRINGS;
 }
 
 bool box_audio_synth_fits(
@@ -213,7 +254,8 @@ bool box_audio_synth_fits(
 {
     const box_audio_synth_slot_t *slot = &core->synths[core->sounds[sound].synth - 1];
 
-    return (int32_t)slot->patch.layers <= core->synth_free_count;
+    return (int32_t)slot->patch.layers <= core->synth_free_count &&
+        slot->strings <= core->string_free_count;
 }
 
 void box_audio_synth_end(
@@ -222,12 +264,19 @@ void box_audio_synth_end(
 {
     int32_t l;
     for (l = src->layers - 1; l >= 0; l --) {
+        if (src->part[l]->string) {
+            core->string_free[core->string_free_count ++] =
+                (uint16_t)(src->part[l]->string - core->synth_strings);
+            src->part[l]->string = NULL;
+        }
+
         core->synth_free[core->synth_free_count ++] =
             (uint16_t)(src->part[l] - core->synth_parts);
         src->part[l] = NULL;
     }
 
     src->layers = 0;
+    src->strings = 0;
 }
 
 void box_audio_synth_command(
@@ -269,6 +318,13 @@ void box_audio_synth_command(
 
     core->synths[slot].patch = cmd->patch;
     box_audio_synth_patch_clamp(&core->synths[slot].patch);
+    core->synths[slot].strings = 0;
+    for (i = 0; i < (int32_t)core->synths[slot].patch.layers; i ++) {
+        if (core->synths[slot].patch.layer[i].wave == BOX_AUDIO_SYNTH_PLUCK) {
+            core->synths[slot].strings ++;
+        }
+    }
+
     goto done;
 ignored:
     box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_SYNTH, 0);
@@ -585,6 +641,7 @@ static void box_audio_synth_cutoff(
     box_audio_synth_coefs(src, rate);
 }
 
+<<<<<<< HEAD
 /** Next value of the white noise of a source, xorshift32.
  *
  * @param state The state, never 0
@@ -686,6 +743,8 @@ static void box_audio_synth_pass(
     box_audio_synth_coefs(src, rate);
 }
 
+=======
+>>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
 /** Hash the seed of a patch with the count of its plays into the state of a play.
  *
  * @param seed The seed
@@ -737,6 +796,192 @@ done:
     return;
 }
 
+/** Tune a string to a frequency: a period of n frames is its delay line of d frames, the
+ * lowpass of one frame and an allpass of the fraction f = n - 1 - d, 0.5 to 1.5 frames.
+ *
+ * The coefficient c = sin(w (1 - f) / 2) / sin(w (1 + f) / 2) gives the allpass a phase delay
+ * of exactly f at the fundamental w, so the pitch is exact at high notes too.
+ *
+ * The gain of the loop makes the fundamental fall 60 dB over the decay, the loss of the
+ * lowpass at it included.
+ *
+ * @param s The string
+ * @param inc Turns per frame of its oscillator
+ */
+static void box_audio_synth_string_tune(
+    box_audio_synth_string_t *s,
+    double inc)
+{
+    double n = 1.0 / inc, f, w, h, g;
+    int32_t d;
+    n = n < s->period_max ? n : s->period_max;
+    n = n > BOX_AUDIO_SYNTH_STRING_PERIOD_MIN ? n : BOX_AUDIO_SYNTH_STRING_PERIOD_MIN;
+    d = (int32_t)(n - 1.5);
+    f = n - 1 - (double)d;
+    w = 1.0 / n;
+    s->inc = inc;
+    s->delay = d;
+    s->c = (float)((double)box_audio_core_sin(w * (1 - f) * 0.5) /
+        (double)box_audio_core_sin(w * (1 + f) * 0.5));
+    h = (double)s->b1 + 2 * (double)s->b0 * (double)box_audio_core_sin(w + 0.25);
+    g = box_audio_synth_exp2(-BOX_AUDIO_SYNTH_DB60 * n / s->decay_frames) / h;
+    s->gain = (float)(g < BOX_AUDIO_SYNTH_STRING_GAIN_MAX ? g : BOX_AUDIO_SYNTH_STRING_GAIN_MAX);
+}
+
+/** Pluck a string: tune it and fill its delay line with a burst of seeded noise of a period,
+ * through a one pole lowpass of its hardness and one of its brightness, without its mean so
+ * the string carries no DC, and scaled to a peak of 1.
+ *
+ * @param s The string
+ * @param layer Its layer, clamped
+ * @param inc Turns per frame of its oscillator
+ * @param rate Frames per second
+ * @param rng State of the noise of the source
+ */
+static void box_audio_synth_string_pluck(
+    box_audio_synth_string_t *s,
+    const box_audio_synth_layer_t *layer,
+    double inc,
+    float rate,
+    uint32_t *rng)
+{
+    const int32_t mask = BOX_AUDIO_SYNTH_STRING_FRAMES - 1;
+    double sum = 0, top = (double)rate / BOX_AUDIO_SYNTH_PLUCK_MIN;
+    float y = 0, mean, peak = 0, a = 0.5f - 0.48f * layer->brightness;
+    float h = 0.05f + 0.95f * layer->hardness, b = 0.1f + 0.9f * layer->brightness, z = 0;
+    int32_t i, n;
+    s->decay_frames = (double)layer->decay * (double)rate;
+    s->period_max = top < BOX_AUDIO_SYNTH_STRING_PERIOD_MAX ? top :
+        BOX_AUDIO_SYNTH_STRING_PERIOD_MAX;
+    s->b0 = 0.5f * a;
+    s->b1 = 1 - a;
+    box_audio_synth_string_tune(s, inc);
+    for (i = 0; i < BOX_AUDIO_SYNTH_STRING_FRAMES; i ++) {
+        s->line[i] = 0;
+    }
+
+    n = s->delay;
+    for (i = 0; i < n; i ++) {
+        y += h * (box_audio_synth_noise(rng) - y);
+        z += b * (y - z);
+        s->line[(BOX_AUDIO_SYNTH_STRING_FRAMES + i - n) & mask] = z;
+        sum += (double)z;
+    }
+
+    mean = (float)(sum / (double)n);
+    for (i = 0; i < n; i ++) {
+        float v = s->line[(BOX_AUDIO_SYNTH_STRING_FRAMES + i - n) & mask] - mean;
+        float m = v < 0 ? -v : v;
+        s->line[(BOX_AUDIO_SYNTH_STRING_FRAMES + i - n) & mask] = v;
+        peak = m > peak ? m : peak;
+    }
+
+    if (peak > 0) {
+        for (i = 0; i < n; i ++) {
+            s->line[(BOX_AUDIO_SYNTH_STRING_FRAMES + i - n) & mask] /= peak;
+        }
+    }
+
+    s->write = 0;
+    s->x1 = 0;
+    s->x2 = 0;
+    s->f1 = 0;
+    s->a1 = 0;
+    s->peak = 0;
+    s->window = n + 2;
+    s->ringing = true;
+}
+
+/** Start a pass of the envelopes, the oscillators and the filter envelope, at the start of a
+ * play and at each restart of a loop, and pluck the strings. The state of the filter goes on.
+ *
+ * @param core The core
+ * @param src The source
+ */
+static void box_audio_synth_pass(
+    box_audio_core_t *core,
+    box_audio_synth_source_t *src)
+{
+    float rate = core->sample_rate;
+    double top = BOX_AUDIO_SYNTH_NYQUIST * (double)rate, lo, hi, cut;
+    int32_t l, n;
+    if (top > BOX_AUDIO_SYNTH_FREQUENCY_MAX) {
+        top = BOX_AUDIO_SYNTH_FREQUENCY_MAX;
+    }
+
+    src->inc_max = top / (double)rate;
+    src->envs = 0;
+    src->glide_left = 0;
+    src->modulated = false;
+    src->ringing = 0;
+    src->ringing_free = 0;
+    for (l = 0; l < src->layers; l ++) {
+        box_audio_synth_part_t *part = src->part[l];
+        const box_audio_synth_layer_t *layer = &part->layer;
+        box_audio_synth_osc_t *o = &part->osc;
+        o->wave = (int32_t)layer->wave;
+        o->level = layer->level;
+        o->env = layer->has_envelope ? l + 1 : (layer->rings_free ? BOX_AUDIO_SYNTH_ENV_FREE : 0);
+        o->phase = 0;
+        o->target = (int32_t)layer->modulates - 1;
+        o->ring = layer->modulation == BOX_AUDIO_SYNTH_RING;
+        o->audible = layer->audible != 0;
+        o->fb1 = 0;
+        o->fb2 = 0;
+        src->modulated = src->modulated || o->target >= 0 || layer->feedback > 0;
+        if (o->env != BOX_AUDIO_SYNTH_ENV_FREE) {
+            src->envs |= 1u << o->env;
+        }
+
+        if (layer->has_envelope) {
+            box_audio_synth_env_init(&part->env, &layer->envelope, rate);
+        }
+
+        lo = (double)layer->frequency * (double)src->pitch;
+        lo = lo < top ? (lo > BOX_AUDIO_SYNTH_FREQUENCY_MIN ? lo : BOX_AUDIO_SYNTH_FREQUENCY_MIN) :
+            top;
+        o->inc = lo / (double)rate;
+        o->inc_end = o->inc;
+        o->ratio = 1;
+        o->sweep = 0;
+        o->glide = 1;
+        n = box_audio_synth_frames(layer->sweep, rate);
+        if (layer->frequency_end > 0 && n > 0) {
+            hi = (double)layer->frequency_end * (double)src->pitch;
+            hi = hi < top ? (hi > BOX_AUDIO_SYNTH_FREQUENCY_MIN ? hi :
+                BOX_AUDIO_SYNTH_FREQUENCY_MIN) : top;
+            o->inc_end = hi / (double)rate;
+            o->ratio = box_audio_synth_ratio(lo, hi, n);
+            o->sweep = n;
+        }
+
+        if (part->string) {
+            box_audio_synth_string_pluck(part->string, layer, o->inc, rate, &src->rng);
+            src->ringing ++;
+            src->ringing_free += o->env == BOX_AUDIO_SYNTH_ENV_FREE;
+        }
+    }
+
+    if (src->modulated) {
+        box_audio_synth_limits(src);
+    }
+
+    if (src->envs & 1u) {
+        box_audio_synth_env_init(&src->env, &src->envelope, rate);
+    }
+
+    top = BOX_AUDIO_SYNTH_CUTOFF_NYQUIST * (double)rate;
+    cut = src->cutoff_base < top ? src->cutoff_base : top;
+    src->cutoff = cut;
+    src->cutoff_top = top;
+    src->control = BOX_AUDIO_SYNTH_CONTROL;
+    if (src->amount != 0) {
+        box_audio_synth_env_init(&src->fenv, &src->filter_envelope, rate);
+    }
+
+    box_audio_synth_coefs(src, rate);
+}
+
 void box_audio_source_synth(
     box_audio_core_t *core,
     box_audio_source_t *source,
@@ -750,6 +995,7 @@ void box_audio_source_synth(
     int32_t l;
     source->kind = BOX_AUDIO_SOURCE_SYNTH;
     src->layers = (int32_t)p->layers;
+<<<<<<< HEAD
     src->unison = false;
     src->stereo = false;
     for (l = 0; l < src->layers; l ++) {
@@ -759,6 +1005,17 @@ void box_audio_source_synth(
         if (src->part[l]->unison.voices > 1) {
             src->unison = true;
             src->stereo = src->stereo || p->layer[l].width > 0;
+=======
+    src->strings = 0;
+    for (l = 0; l < src->layers; l ++) {
+        src->part[l] = &core->synth_parts[core->synth_free[-- core->synth_free_count]];
+        src->part[l]->layer = p->layer[l];
+        src->part[l]->string = NULL;
+        if (p->layer[l].wave == BOX_AUDIO_SYNTH_PLUCK) {
+            src->part[l]->string =
+                &core->synth_strings[core->string_free[-- core->string_free_count]];
+            src->strings ++;
+>>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
         }
     }
 
@@ -1125,6 +1382,81 @@ static inline float box_audio_synth_osc_next(
     return x;
 }
 
+/** Render a frame of a string and advance it and its oscillator.
+ *
+ * A string follows the turns per frame of its oscillator, its glides and sweeps included, with
+ * a new tuning at each change. Once the peak of a period is under
+ * BOX_AUDIO_SYNTH_STRING_SILENCE it is silent and costs nothing more.
+ *
+ * Per frame the frame out of the delay line goes through the lowpass (b0, b1, b0), the
+ * allpass and the gain of the loop back into it.
+ *
+ * @param src The source
+ * @param part The part of the string
+ * @return The sample, the frame out of the delay line
+ */
+static inline float box_audio_synth_string_next(
+    box_audio_synth_source_t *src,
+    box_audio_synth_part_t *part)
+{
+    const int32_t mask = BOX_AUDIO_SYNTH_STRING_FRAMES - 1;
+    box_audio_synth_string_t *s = part->string;
+    box_audio_synth_osc_t *o = &part->osc;
+    float x = 0, f, a, m;
+    if (!s->ringing) {
+        goto done;
+    }
+
+    if (o->inc != s->inc) {
+        box_audio_synth_string_tune(s, o->inc);
+    }
+
+    x = s->line[(s->write - s->delay) & mask];
+    f = s->b0 * (x + s->x2) + s->b1 * s->x1;
+    a = box_audio_clean(s->c * (f - s->a1) + s->f1);
+    s->x2 = s->x1;
+    s->x1 = x;
+    s->f1 = f;
+    s->a1 = a;
+    s->line[s->write] = box_audio_clean(s->gain * a);
+    s->write = (s->write + 1) & mask;
+    box_audio_synth_osc_advance(o);
+    m = x < 0 ? -x : x;
+    s->peak = m > s->peak ? m : s->peak;
+    if (-- s->window <= 0) {
+        if (s->peak < BOX_AUDIO_SYNTH_STRING_SILENCE) {
+            s->ringing = false;
+            src->ringing --;
+            src->ringing_free -= o->env == BOX_AUDIO_SYNTH_ENV_FREE;
+        }
+
+        s->peak = 0;
+        s->window = s->delay + 2;
+    }
+
+done:
+    return x;
+}
+
+/** Whether a source with strings plays on: while one of its envelopes plays, unless every
+ * layer is a string and all of them are silent, and while a string without an envelope rings.
+ *
+ * @param src The source, with strings
+ * @param envs Whether one of its envelopes plays
+ * @return Whether it plays on
+ */
+static inline bool box_audio_synth_strings_play(
+    const box_audio_synth_source_t *src,
+    bool envs)
+{
+    bool result = envs || src->ringing_free > 0;
+    if (src->strings == src->layers && !src->ringing) {
+        result = false;
+    }
+
+    return result;
+}
+
 /** Render a frame of the layers of a source in which a layer modulates another or itself.
  *
  * Modulators come after their carriers, so the layers render from the last: each adds its wave
@@ -1156,8 +1488,13 @@ static inline float box_audio_synth_modulate(
             t = t >= 1 ? t - 1 : t;
         }
 
-        x = box_audio_synth_wave(o->wave, t, o->inc, &src->rng);
-        box_audio_synth_osc_advance(o);
+        if (o->wave == BOX_AUDIO_SYNTH_PLUCK) {
+            x = box_audio_synth_string_next(src, src->part[l]);
+        } else {
+            x = box_audio_synth_wave(o->wave, t, o->inc, &src->rng);
+            box_audio_synth_osc_advance(o);
+        }
+
         o->fb2 = o->fb1;
         o->fb1 = x;
         x *= ring[l];
@@ -1412,17 +1749,26 @@ int32_t box_audio_synth_render(
     int32_t frames)
 {
     float *out = core->src_l, rate = core->sample_rate;
-    float levels[1 + BOX_AUDIO_SYNTH_LAYERS] = {0};
+    float levels[2 + BOX_AUDIO_SYNTH_LAYERS] = {0};
     int32_t layers = src->layers, i, l;
+<<<<<<< HEAD
     if (src->unison) {
         i = box_audio_synth_render_wide(core, src, frames);
         goto done;
     }
 
+=======
+    levels[BOX_AUDIO_SYNTH_ENV_FREE] = 1;
+>>>>>>> 378399f2abb31bbe7d0ad663a39867b162e2d11a
     for (i = 0; i < frames; i ++) {
         float mix = 0, y;
-        if (!box_audio_synth_envs_next(src, levels)) {
-            if (!src->loop || !src->envs) {
+        bool playing = box_audio_synth_envs_next(src, levels);
+        if (src->strings) {
+            playing = box_audio_synth_strings_play(src, playing);
+        }
+
+        if (!playing) {
+            if (!src->loop || (!src->envs && !src->strings)) {
                 break;
             }
 
@@ -1436,6 +1782,14 @@ int32_t box_audio_synth_render(
 
         if (src->modulated) {
             mix = box_audio_synth_modulate(src, levels);
+        } else if (src->strings) {
+            for (l = 0; l < layers; l ++) {
+                box_audio_synth_osc_t *o = &src->part[l]->osc;
+                float x = o->wave == BOX_AUDIO_SYNTH_PLUCK ?
+                    box_audio_synth_string_next(src, src->part[l]) :
+                    box_audio_synth_osc_next(o, &src->rng);
+                mix += x * o->level * levels[o->env];
+            }
         } else {
             for (l = 0; l < layers; l ++) {
                 box_audio_synth_osc_t *o = &src->part[l]->osc;

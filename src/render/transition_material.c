@@ -186,8 +186,11 @@ void box_draws_transition_encode(
     ecs_os_memcpy(ECS_OFFSET(dst, offsetof(box_render_shading_t, emissive)), shading.emissive,
         ECS_SIZEOF(float) * 3);
     if (material->kind == BOX_DRAW_TRANSITION_SHAPE) {
-        ecs_os_memcpy(ECS_OFFSET(dst, offsetof(box_render_shading_t, emissive)),
-            shading.emissive, ECS_SIZEOF(vec4));
+        if (material->shape2d.kind != BOX_SHAPE2D_POLYGON) {
+            ecs_os_memcpy(ECS_OFFSET(dst, offsetof(box_render_shading_t, emissive)),
+                shading.emissive, ECS_SIZEOF(vec4));
+        }
+
         ecs_os_memcpy(ECS_OFFSET(dst, offsetof(box_render_shading_t, material)),
             shading.material, ECS_SIZEOF(vec4));
         if (!material->shape2d.sliced) {

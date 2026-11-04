@@ -550,8 +550,8 @@ void box_gpu_forward_reset(
  * whether the module fits the pipeline layout before it replaces the module that renders. A
  * mesh module also creates the depth prepass and the texture_blend pipelines (fs_blend and
  * fs_depth_cutout_blend) and a
- * 2D shape module the shadow and the slice pipelines (fs_shadow, fs_slice), so they need their
- * entry points.
+ * 2D shape module the shadow, slice and polygon pipelines (fs_shadow, fs_slice, fs_polygon,
+ * fs_shadow_polygon and the polygon override constant), so they need their entry points.
  *
  * wgpu-native reports the scope at once; the browser reports it later, so there the check
  * passes and an invalid pipeline shows as a device error.

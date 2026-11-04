@@ -16,16 +16,15 @@ template Flute {
   octave { SynthOscillator: {wave: SynthSine, frequency: f * 2, level: 0.05} }
 }
 
+// A harp: a gut string plucked with a finger, which rings out on its own, over a soft sine
+// for the body of the soundboard
 template Harp {
   prop f: f32 = 220
   AudioOutput: {bus: mv_music}
   SynthSound: {level_variance: 0.1}
-  SynthEnvelope: {attack: 0.003, decay: 1.8, curve: 4.5}
-  SynthFilter: {kind: SynthLowPass, cutoff: 900, resonance: 0.1}
-  SynthFilterEnvelope: {decay: 0.8, amount: 1.918}
-  pluck { SynthOscillator: {wave: SynthTriangle, frequency: f, level: 0.32} }
-  body { SynthOscillator: {wave: SynthSine, frequency: f, level: 0.3} }
-  ring { SynthOscillator: {wave: SynthSine, frequency: f * 2, level: 0.08}; SynthEnvelope: {attack: 0.002, decay: 0.6, curve: 5} }
+  SynthFilter: {kind: SynthLowPass, cutoff: 3500, resonance: 0.05}
+  pluck { SynthOscillator: {wave: SynthPluck, frequency: f, level: 0.45}; SynthString: {decay: 2.2, brightness: 0.35, hardness: 0.45} }
+  body { SynthOscillator: {wave: SynthSine, frequency: f, level: 0.12}; SynthEnvelope: {attack: 0.004, decay: 1.2, curve: 4.5} }
 }
 
 template Strings {

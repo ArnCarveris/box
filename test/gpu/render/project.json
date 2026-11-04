@@ -663,6 +663,32 @@
                 ]
             },
             {
+                "id": "Polygon2D",
+                "testcases": [
+                    "concave",
+                    "edges_antialiased",
+                    "hole",
+                    "curved",
+                    "border",
+                    "stroke",
+                    "thin_stroke_stays_continuous",
+                    "clipped",
+                    "image",
+                    "opacity_and_tint",
+                    "box_shadow_follows_outline",
+                    "box_shadow_blur_and_spread",
+                    "box_shadow_transition",
+                    "render_to_texture",
+                    "rgb_transition",
+                    "path_change_updates",
+                    "records_reused",
+                    "records_upload_changed",
+                    "many_polygons",
+                    "one_batch",
+                    "perspective"
+                ]
+            },
+            {
                 "id": "Shapes2D",
                 "testcases": [
                     "rect_size",

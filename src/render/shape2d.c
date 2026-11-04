@@ -114,6 +114,33 @@ static void box_shape2d_line(
     out->emissive[3] = -s->width;
 }
 
+/** Write the polygon record index and border of a polygon.
+ *
+ * The border width is in the local units of the polygon, the units its edges are in.
+ *
+ * @param out The shading
+ * @param s The shape
+ * @param material Material components of the entity, slice the index of its polygon record
+ * @param border Linear border color, NULL for the color of the shape
+ */
+static void box_shape2d_polygon(
+    box_render_shading_t *out,
+    const Shape2D *s,
+    const box_draw_material_t *material,
+    const float *border)
+{
+    const rgba *c = &s->border_color;
+    float width = s->border;
+    uint32_t r = border ? box_shape2d_half(border[0]) : box_shape2d_linear(c->r);
+    uint32_t g = border ? box_shape2d_half(border[1]) : box_shape2d_linear(c->g);
+    uint32_t b = border ? box_shape2d_half(border[2]) : box_shape2d_linear(c->b);
+    out->material[0] = 0.0f;
+    out->material[1] = width;
+    box_shape2d_pack(&out->material[2], r, g);
+    box_shape2d_pack(&out->material[3], b, box_shape2d_half((float)c->a / 255.0f));
+    out->emissive[3] = (float)(material->slice > 0 ? material->slice : 0);
+}
+
 void box_draws_shape2d(
     box_render_shading_t *out,
     const box_draw_material_t *material,
@@ -122,6 +149,8 @@ void box_draws_shape2d(
     const Shape2D *s = material->shape2d;
     if (s->kind == BOX_SHAPE2D_LINE) {
         box_shape2d_line(out, s);
+    } else if (s->kind == BOX_SHAPE2D_POLYGON) {
+        box_shape2d_polygon(out, s, material, border);
     } else {
         box_shape2d_rect(out, s, border);
     }
