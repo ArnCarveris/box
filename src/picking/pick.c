@@ -439,6 +439,9 @@ typedef struct box_pick_mesh_hit_t {
     vec3 position;  /**< The position times the ShapeMesh scale */
     vec3 normal;    /**< The normal of the unit mesh, interpolated */
     bool plain;     /**< The hit is on a triangle of a mesh without a parametric surface */
+    int32_t region; /**< The region of the hit triangle of a parametric surface, from the
+                     *   position.z of its first vertex: 0 and 1 the walls of a Sweep, 8 and 9
+                     *   its caps */
 } box_pick_mesh_hit_t;
 
 /** Intersect a ray with the triangles of the mesh of a shape, through the triangle hierarchy of
@@ -521,6 +524,7 @@ found:
 
         if (point) {
             point->plain = !shape->surface.p[0][0];
+            point->region = (int32_t)mesh->vertices[i0].position[2];
             for (k = 0; k < 3; k ++) {
                 point->position[k] = (w0 * mesh->vertices[i0].position[k] +
                     best[1] * mesh->vertices[i1].position[k] +
@@ -1071,6 +1075,39 @@ static void box_pick_mapping_uv(
     uv[1] += 0.5f;
 }
 
+/** Texture coordinates of a hit on a Sweep with a MappingObject TextureMapping, before the
+ * TextureTransform, as surface_sweep_lengths of material.wgsl makes them.
+ *
+ * The UV of the mesh turns into the distance along the path and around the profile (the
+ * lengths of the walls in p[9], the profile scale of the caps in p[2]) over the mapping size.
+ *
+ * @param surface The surface of the Sweep
+ * @param mapping The mapping
+ * @param region The region of the hit triangle
+ * @param uv The interpolated UV of the mesh, receives the texture coordinates
+ */
+static void box_pick_sweep_uv(
+    const box_surface_data_t *surface,
+    const TextureMapping *mapping,
+    int32_t region,
+    vec2 uv)
+{
+    float size = isfinite(mapping->size) && mapping->size > 0.0f ? mapping->size : 1.0f;
+    if (region == 0) {
+        uv[0] *= surface->p[9][0];
+        uv[1] *= surface->p[9][2];
+    } else if (region == 1) {
+        uv[0] = (uv[0] - 2.0f) * surface->p[9][1];
+        uv[1] *= surface->p[9][2];
+    } else {
+        uv[0] *= surface->p[2][0];
+        uv[1] *= surface->p[2][1];
+    }
+
+    uv[0] /= size;
+    uv[1] /= size;
+}
+
 /** Find the surface that renders a texture a shape with a TextureBlend shows: its mask, the
  * albedo of a layer or the emissive of its own PbrTextures, not its own albedo, which the blend
  * replaces.
@@ -1111,9 +1148,9 @@ static bool box_pick_blend_surface(
  * ImageSlice as the renderer draws it, in texels of the image of the surface
  * (box_surface_texture_size), the plain area until the surface has a size.
  *
- * PbrTextures map the UV of the mesh, or the projection of a MappingObject or MappingWorld
- * TextureMapping, through TextureTransform and TextureWrap; a TextureBlend whose mask, layer
- * albedo or emissive a surface renders (box_pick_blend_surface) maps the mask coordinates.
+ * PbrTextures map the UV of the mesh, the projection of a MappingObject or MappingWorld, or on
+ * a Sweep the lengths of a MappingObject (box_pick_sweep_uv), through TextureTransform and
+ * TextureWrap; a TextureBlend maps the coordinates of its mask (box_pick_blend_surface).
  *
  * @param world The world
  * @param st The module state
@@ -1178,6 +1215,11 @@ static bool box_pick_texture(
             mat4 m;
             box_pick_transform(world, e, m);
             box_pick_mapping_uv(m, mapping, &hit, uv);
+        } else if (result && !hit.plain && mapping && mapping->mode == MappingObject) {
+            const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
+            if (shape && shape->surface.p[0][0] == 1) {
+                box_pick_sweep_uv(&shape->surface, mapping, hit.region, uv);
+            }
         }
 
         if (tt) {
