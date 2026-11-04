@@ -230,10 +230,11 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
   oscillator, linear or curved envelopes and no node graph; an LFO has fixed destinations (pitch,
   level, cutoff, pulse width) and no LFO modulates another; an oscillator may phase or ring
   modulate another, but FM is not band limited. Plucked strings go down to 40 Hz and 32 of them ring
-  at once; a unison pluck takes one per voice, so a chord of 6 notes of 4 voices takes 24. Legato is mono per channel and has no note off: a held
-  note lasts its hold after the last note. A looping synth sound starts a new pass of its
-  envelopes and oscillators at the end of the last, at most every 60 seconds; a drone keeps that
-  gap short with edges of a few ms, as the dust merchant's engine does with 2 ms.
+  at once; a unison pluck takes one per voice, so a chord of 6 notes of 4 voices takes 24. Legato
+  is mono per channel and has no note off: a held note lasts its hold after the last note. A
+  looping synth sound starts a new pass of its envelopes and oscillators at the end of the last, at
+  most every 60 seconds; a drone keeps that gap short with edges of a few ms, as the dust
+  merchant's engine does with 2 ms.
 - **Files**: WAV and FLAC for sounds, Ogg Vorbis for music, one stream at once (a change of path
   fades over 5 ms, there is no crossfade).
 - **Tools**: no mixer UI, and the UI theme of box has no sounds; a scene adds them in its own
@@ -685,7 +686,10 @@ end.
   24 dB filter, `voices_64_lfo`, two LFOs on the pitch, the level, the cutoff and the pulse
   width (about twice the plain patch, most of it the coefficients of the moving cutoff, as with
   a filter envelope), `voices_64_fm`, two FM pairs per voice, which measures the modulated
-  path, `voices_32_pluck`, 32 ringing strings, one per voice, and `voices_64_curved`, which is
+  path, `voices_32_pluck`, 32 ringing strings, one per voice, `voices_8_pluck_unison`, the same
+  32 strings as 8 voices of a 4 voice unison in stereo (about half the time of
+  `voices_32_pluck`: a voice, its filter and its mix cost more than a string), and
+  `voices_64_curved`, which is
   `voices_64` with a curve of 4 and an attack curve of 1.5 on the patch envelope and on the
   envelope of the square. A frame inside a linear segment is an inlined add behind one test;
   entering a segment, the last frame of one and a curved frame take an out of line step, so a
