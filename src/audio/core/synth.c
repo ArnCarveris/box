@@ -28,18 +28,8 @@
 /** Natural logarithm of 2 */
 #define BOX_AUDIO_SYNTH_LN2 0.69314718055994530942
 
-/** Square root of 2: the damping of the filter at resonance 0, a Butterworth response */
+/** Square root of 2 */
 #define BOX_AUDIO_SYNTH_SQRT2 1.41421356237309504880
-
-/** Damping of the filter at resonance 1, a Q of 100 that rings without blowing up */
-#define BOX_AUDIO_SYNTH_DAMPING_MIN 0.02
-
-/** Damping of the first stage of the 24 dB filter, 2 cos(pi / 8): with the second stage at
- * resonance 0 the two make a fourth order Butterworth response */
-#define BOX_AUDIO_SYNTH_BUTTERWORTH_1 1.84775906502257351225
-
-/** Damping of the second, resonant stage of the 24 dB filter at resonance 0, 2 cos(3 pi / 8) */
-#define BOX_AUDIO_SYNTH_BUTTERWORTH_2 0.76536686473017954346
 
 /** Frames between two updates of the coefficients of a filter whose cutoff an envelope moves */
 #define BOX_AUDIO_SYNTH_CONTROL 8
@@ -113,7 +103,7 @@ static const double box_audio_synth_unison_gain[BOX_AUDIO_SYNTH_UNISON_MAX + 1] 
  * @param x A positive finite value
  * @return The logarithm, within 1e-12
  */
-static double box_audio_synth_log2(
+double box_audio_synth_log2(
     double x)
 {
     union { double d; uint64_t u; } v;
@@ -141,7 +131,7 @@ static double box_audio_synth_log2(
  * @param y The exponent, clamped to -1000..1000
  * @return 2 to the y
  */
-static double box_audio_synth_exp2(
+double box_audio_synth_exp2(
     double y)
 {
     union { double d; uint64_t u; } v;
@@ -391,14 +381,11 @@ static void box_audio_synth_coefs(
     box_audio_synth_source_t *src,
     float rate)
 {
-    double turns = src->cutoff / (2.0 * (double)rate);
-    float g = box_audio_core_sin(turns) / box_audio_core_sin(turns + 0.25);
+    float g = box_audio_svf_g(src->cutoff, rate);
     int32_t s;
     for (s = 0; s < src->stages; s ++) {
-        box_audio_synth_svf_t *f = &src->svf[s];
-        f->a1 = 1.0f / (1.0f + g * (g + f->k));
-        f->a2 = g * f->a1;
-        f->a3 = g * f->a2;
+        box_audio_svf_t *f = &src->svf[s];
+        box_audio_svf_coefs(f, g);
         if (src->stereo) {
             src->svf_r[s].a1 = f->a1;
             src->svf_r[s].a2 = f->a2;
@@ -1062,20 +1049,7 @@ void box_audio_source_synth(
     src->filter = (int32_t)p->filter;
     src->amount = src->filter ? p->filter_amount : 0.0f;
     src->glide_frames = box_audio_synth_frames(p->glide, core->sample_rate);
-    src->svf[0] = (box_audio_synth_svf_t){0};
-    src->svf[1] = (box_audio_synth_svf_t){ .k = (float)BOX_AUDIO_SYNTH_BUTTERWORTH_1 };
-    if (p->slope == BOX_AUDIO_SYNTH_SLOPE_24) {
-        src->stages = 2;
-        src->svf[0].k = (float)(BOX_AUDIO_SYNTH_BUTTERWORTH_2 -
-            (BOX_AUDIO_SYNTH_BUTTERWORTH_2 - BOX_AUDIO_SYNTH_DAMPING_MIN) *
-            (double)p->resonance);
-    } else {
-        src->stages = 1;
-        src->svf[0].k = (float)(BOX_AUDIO_SYNTH_SQRT2 -
-            (BOX_AUDIO_SYNTH_SQRT2 - BOX_AUDIO_SYNTH_DAMPING_MIN) *
-            (double)p->resonance);
-    }
-
+    src->stages = box_audio_svf_init(src->svf, p->slope, p->resonance);
     src->svf_r[0] = src->svf[0];
     src->svf_r[1] = src->svf[1];
 
@@ -1838,35 +1812,6 @@ static inline float box_audio_synth_modulate(
     return mix;
 }
 
-/** Filter a frame through a stage of the filter.
- *
- * @param f The stage
- * @param filter A box_audio_synth_filter_t, not BOX_AUDIO_SYNTH_FILTER_NONE
- * @param x The input
- * @return The output
- */
-static inline float box_audio_synth_svf_next(
-    box_audio_synth_svf_t *f,
-    int32_t filter,
-    float x)
-{
-    float v1, v2, v3, y;
-    v3 = x - f->ic2;
-    v1 = f->a1 * f->ic1 + f->a2 * v3;
-    v2 = f->ic2 + f->a2 * f->ic1 + f->a3 * v3;
-    f->ic1 = box_audio_clean(2 * v1 - f->ic1);
-    f->ic2 = box_audio_clean(2 * v2 - f->ic2);
-    if (filter == BOX_AUDIO_SYNTH_LOWPASS) {
-        y = v2;
-    } else if (filter == BOX_AUDIO_SYNTH_HIGHPASS) {
-        y = x - f->k * v1 - v2;
-    } else {
-        y = f->k * v1;
-    }
-
-    return y;
-}
-
 /** Wrap a phase into 0..1.
  *
  * @param t Phase in turns
@@ -2116,15 +2061,15 @@ static int32_t box_audio_synth_render_wide(
         if (src->filter) {
             box_audio_synth_control(src, rate);
             if (src->stages > 1) {
-                l = box_audio_synth_svf_next(&src->svf[1], src->filter, l);
+                l = box_audio_svf_next(&src->svf[1], src->filter, l);
                 if (stereo) {
-                    r = box_audio_synth_svf_next(&src->svf_r[1], src->filter, r);
+                    r = box_audio_svf_next(&src->svf_r[1], src->filter, r);
                 }
             }
 
-            l = box_audio_synth_svf_next(&src->svf[0], src->filter, l);
+            l = box_audio_svf_next(&src->svf[0], src->filter, l);
             if (stereo) {
-                r = box_audio_synth_svf_next(&src->svf_r[0], src->filter, r);
+                r = box_audio_svf_next(&src->svf_r[0], src->filter, r);
             }
         }
 
@@ -2209,10 +2154,10 @@ int32_t box_audio_synth_render(
 
             y = mix;
             if (src->stages > 1) {
-                y = box_audio_synth_svf_next(&src->svf[1], src->filter, y);
+                y = box_audio_svf_next(&src->svf[1], src->filter, y);
             }
 
-            y = box_audio_synth_svf_next(&src->svf[0], src->filter, y);
+            y = box_audio_svf_next(&src->svf[0], src->filter, y);
         } else {
             y = mix;
         }

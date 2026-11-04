@@ -1,0 +1,17 @@
+// An equalizer and a filter set by a scene, for the Script suite of test/cpu/audio: a low cut
+// and a presence peak on the vocals bus, the first two bands of its Equalizer, and a 24 dB
+// lowpass on the music group, which a game sweeps by writing its cutoff.
+using box.audio
+
+vocals {
+  AudioBus: {output: master, effects: [vocals]}
+  Equalizer: {bands: [
+    {kind: AudioEqLowCut, frequency: 120},
+    {kind: AudioEqPeak, frequency: 3000, gain: 3, q: 1.2}
+  ]}
+}
+
+music {
+  AudioBus: {output: master, effects: [music]}
+  AudioFilter: {cutoff: 400, resonance: 0.3, slope: SynthSlope24}
+}

@@ -117,7 +117,7 @@ static void box_audio_synth_patch_clamp(
     p->level_variance = box_audio_synth_clamp(p->level_variance, 0, 1);
     p->glide = box_audio_synth_clamp(p->glide, 0, BOX_AUDIO_SYNTH_GLIDE_MAX);
     box_audio_synth_envelope_clamp(&p->envelope);
-    if (p->filter > BOX_AUDIO_SYNTH_BANDPASS) {
+    if (p->filter > BOX_AUDIO_SYNTH_NOTCH) {
         p->filter = BOX_AUDIO_SYNTH_FILTER_NONE;
     }
 

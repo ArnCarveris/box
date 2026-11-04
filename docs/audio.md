@@ -23,7 +23,7 @@ core**, a small mixer in plain C that renders on its own thread, once per frame 
   pan, a stereo width, a mute, a solo, a kind (group, return or SFX), an output and up to 4
   sends, pre or post fader. Bus 0 is the master, `box.audio.master` in script; every other bus
   ends there. Each bus has 4 insert slots that run **effects**, entities such as a `Reverb`,
-  in order on its signal; a bus with a reverb in a slot is a reverb bus, a return, which other
+  an `Equalizer` or an `AudioFilter`, in order on its signal; a bus with a reverb in a slot is a reverb bus, a return, which other
   buses reach through a send.
 - **Space**: a source with `AudioSpatial` gets its volume and pan every frame from its distance
   to the listener and its direction, the camera of the main view or the entity with
@@ -40,6 +40,8 @@ sound that plays. Everything ramps over 5 ms, so nothing clicks.
 |-----------|------------|
 | `AudioBus` | A channel of the mixer: `output`, `volume`, `pan`, `width`, `mute`, `solo`, `kind`, up to 4 `sends` and 4 insert slots, `effects`, see [Mixer channels](#mixer-channels) |
 | `Reverb` | An effect: the reverb of a room, which runs in the insert slot of a bus that names its entity, see [Effects](#effects) and [Reverb](#reverb) |
+| `Equalizer` | An effect: 4 bands of peaks, shelves and cuts, such as a low cut on a vocal or SFX bus, see [Equalizer](#equalizer) |
+| `AudioFilter` | An effect: the synth's filter on a bus, a lowpass, highpass, bandpass or notch of 12 or 24 dB, such as a filter sweep on a music group, see [Filter effect](#filter-effect) |
 | `AudioOutput` | The bus a source, a stream or a sound plays on (the master without one) |
 | `AudioPcm` | A sound from samples, from script or C |
 | `SoundFile` | A short sound from a WAV or FLAC file, decoded into memory, see [Sound files](#sound-files) |
@@ -235,9 +237,11 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
 - **Space**: distance and pan only. No Doppler, no distance filter, no occlusion, no HRTF, and
   front and back sound alike.
 - **Effects**: `BOX_AUDIO_EFFECT_MAX` (64) effects at once in all channels together, 4 insert
-  slots per channel, and the reverb as the only kind, an algorithmic one; one more effect logs
-  one error and does nothing. No reverb zones, no rooms from geometry, no EQ, compressor or delay
-  yet, and no sidechain.
+  slots per channel, and three kinds: an algorithmic reverb, an equalizer of 4 bands and a
+  filter; one more effect logs one error and does nothing. No reverb zones, no rooms from
+  geometry, no compressor or delay yet, and no sidechain. An equalizer has 4 bands of 12 dB per
+  octave at most (no steeper cuts, no linear phase, no dynamic EQ); a filter is one SVF of 12 or
+  24 dB, with no envelope follower or LFO of its own: a script moves its cutoff.
 - **Voices**: 64, with the quietest stolen; no priorities. A one shot cannot be controlled after
   it started.
 - **Synth**: up to 8 oscillators, one filter and two LFOs per sound, up to 7 unison voices per
@@ -545,10 +549,12 @@ its kind.
 - **Kinds.** A kind is one file of `src/audio/core` and one row of the table of `effect.c`:
   `floats` (the memory it needs at a rate), `init` (constants of a new core), `start` (on clear
   memory at its parameters), `command` (new parameters while it runs), `render` (a block in
-  place) and `rest` (a block it skips). The reverb is the first kind,
-  `BOX_AUDIO_EFFECT_REVERB`; the parameters of a command are 16 floats
+  place) and `rest` (a block it skips). The kinds are the reverb, `BOX_AUDIO_EFFECT_REVERB`,
+  the [equalizer](#equalizer), `BOX_AUDIO_EFFECT_EQ`, and the [filter](#filter-effect),
+  `BOX_AUDIO_EFFECT_FILTER`; the parameters of a command are 16 floats
   (`BOX_AUDIO_EFFECT_PARAMS`) that each kind reads in its own way, the reverb its first five
-  (`box_audio_reverb_params_t`). The core clamps them, a NaN to the low end.
+  (`box_audio_reverb_params_t`), the equalizer all 16 (4 `box_audio_eq_band_t`) and the filter
+  its first five (`box_audio_filter_params_t`). The core clamps them, a NaN to the low end.
 - **Changes.** A change of the parameters is smoothed by the kind. A change of kind, bus or index
   blends the effect out of its bus over 50 ms, so the bus passes its dry signal, applies the new
   place on clear memory and blends it into the new one over 50 ms (`BOX_AUDIO_EFFECT_FADE`,
@@ -581,7 +587,8 @@ its kind.
 
 The tests are the `Effect` suite of `test/cpu/audio` (several reverbs at once, an empty slot,
 the fades of a removal, a move and a disabled effect, the pool of 64, a channel without effects,
-an entity in two slots) and the `effects` case of `NoAlloc`.
+an entity in two slots), the `Equalizer` and `EffectFilter` suites and the `effects` and
+`eq_filter` cases of `NoAlloc`.
 
 ## Reverb
 
@@ -627,6 +634,112 @@ the decay time at 44.1 and 48 kHz, damping, predelay, stereo correlation, densit
 extreme values, silence, changes without clicks, sends, a second reverb that runs, a delete and
 no allocation. `bench/audio` has a `Reverb` suite in ns per frame, and
 `test/integration/web/audio_reverb.mjs` measures a tail and the load of the worklet in Chrome.
+
+## Equalizer
+
+`src/audio/core/eq.c` is the equalizer kind of effect, `BOX_AUDIO_EFFECT_EQ`: 4 bands
+(`BOX_AUDIO_EQ_BANDS`) in a row, each an RBJ cookbook biquad in transposed direct form II, one
+per channel. Its parameters are the 16 floats of the command, 4 `box_audio_eq_band_t` of `kind`,
+`frequency`, `gain` and `q`; the component is `Equalizer`, whose `bands` are 4 `AudioEqBand`.
+
+- **Bands.** `AudioEqOff` (the default) passes its input. `AudioEqPeak` boosts or cuts `gain`
+  dB around `frequency`; `q` sets its width, so the frequencies where it has half its gain in dB
+  are `f / w` and `f w` with `w - 1/w = 1/q` (0.7071 is about two octaves wide, 4 about a third
+  of an octave), and its gain at the center is `gain`. `AudioEqLowShelf` and `AudioEqHighShelf`
+  apply `gain` under or above their corner `frequency`, half of it at the corner; a `q` over
+  0.7071 makes the shelf overshoot near its corner. `AudioEqLowCut` and `AudioEqHighCut` are a
+  highpass and a lowpass of 12 dB per octave: at a `q` of 0.7071, the default, they are -3 dB at
+  `frequency` and -12 dB an octave past it, and a higher `q` gives a resonant bump at the corner.
+  The cuts ignore `gain`.
+- **Ranges.** `frequency` is clamped to 10 Hz..0.49 of the rate, `gain` to -24..24 dB and `q`
+  to 0.1..18, a NaN to the low end; an unknown kind is off.
+- **Changes.** A change of a band moves its coefficients linearly to the new ones over 20 ms
+  (`BOX_AUDIO_EQ_RAMP`), frame by frame, so a script may automate a band every frame without
+  zipper noise or clicks. A biquad is stable when its `a1` and `a2` lie in the triangle
+  `|a2| < 1`, `|a1| < 1 + a2`, which is convex, so every set of coefficients on the way between
+  two stable ones is stable too.
+- **Flat costs nothing.** A band that is off, or a peak or a shelf at 0 dB, has the
+  coefficients of a wire, and once its state drained (two frames) it is skipped: an equalizer
+  whose bands are all off or flat renders bit identical to none, and each band that does work
+  costs about 5 multiplies per sample and channel. It has no tail and needs no memory.
+
+A low cut on a vocal bus, which removes the rumble under 120 Hz, with a small presence peak:
+
+```
+vocals {
+  AudioBus: {output: master, effects: [vocals]}
+  Equalizer: {bands: [
+    {kind: AudioEqLowCut, frequency: 120},
+    {kind: AudioEqPeak, frequency: 3000, gain: 3, q: 1.2}
+  ]}
+}
+```
+
+The bands a script does not give keep their defaults: off, at 100, 400, 2000 and 8000 Hz, 0 dB
+and a `q` of 0.7071. On an SFX bus the same low cut keeps footsteps and impacts from muddying
+the music: `sfx { AudioBus: {kind: AudioChannelSfx, effects: [sfx]}; Equalizer: {bands:
+[{kind: AudioEqLowCut, frequency: 80}]} }`.
+
+The tests are the `Equalizer` suite of `test/cpu/audio`, which measures sines in offline
+renders: the gain of a peak at its center within 0.1 dB and its half gain frequencies for 3
+`q`, the shelves well past their corner, the cuts at their corner and an octave past it, two
+bands in a row, stability at extreme values and at Nyquist, a step of gain and automation every
+frame without a click, flat bands and a band back to flat bit identical to no equalizer, render
+sizes and the component in a world; and the `eq_filter` cases of `NoAlloc` and `Script`.
+
+## Filter effect
+
+`src/audio/core/filter.c` is the filter kind of effect, `BOX_AUDIO_EFFECT_FILTER`: the
+trapezoidal state variable filter of the [synth](#synth) on both channels of a bus. Both share
+it through `src/audio/core/svf.h`, so the stability argument holds for both: each stage is
+stable at any cutoff and resonance and while they move, and the 24 dB filter is the synth's
+cascade of two stages, each stable on its own. Its parameters are a
+`box_audio_filter_params_t`; the component is `AudioFilter`.
+
+- **Kinds.** `kind` is a `SynthFilterKind`: `SynthLowPass` (the default), `SynthHighPass`,
+  `SynthBandPass`, unity at the cutoff, and `SynthNotch`, silent at the cutoff. `slope` is
+  `SynthSlope12` or `SynthSlope24`: at resonance 0 the filter is a Butterworth one, -3 dB at its
+  cutoff and -12 or -24 dB an octave past it, and at `SynthSlope24` the resonance applies to the
+  second stage only, as in the synth.
+- **Ranges.** `cutoff` is clamped to 10 Hz..0.49 of the rate, `resonance` and `mix` to 0..1, a
+  NaN to the low end; an unknown kind is a lowpass.
+- **Mix.** The bus outputs its signal at `1 - mix` and the filter at `mix`; 1 is the default.
+  A mix of 0 passes the input bit for bit.
+- **Changes.** The cutoff moves exponentially in frequency toward a new value, and the
+  resonance toward its own, about 63% of the way in 10 ms (`BOX_AUDIO_FILTER_SMOOTH`), with new
+  coefficients every 8 frames as the filter envelope of the synth does, so a sweep driven from a
+  script is smooth; the mix ramps over 20 ms. A change of the kind or the slope fades the
+  filtered signal out to the dry one over 20 ms, swaps, and fades it back in over 20 ms.
+- **Cost.** About 10 multiplies per sample and channel at 12 dB, twice that at 24, plus the
+  coefficients every 8 frames while the cutoff moves. It has no tail and needs no memory.
+
+A filter sweep on a music group: the music bus closes to 400 Hz when the player is underwater,
+and a system moves its cutoff every frame:
+
+```
+music {
+  AudioBus: {output: master, effects: [music]}
+  AudioFilter: {cutoff: 400, resonance: 0.3, slope: SynthSlope24}
+}
+```
+
+```c
+void Underwater(ecs_iter_t *it) {
+    AudioFilter *f = ecs_get_mut(it->world, music, AudioFilter);
+    float target = player_underwater ? 400.0f : 20000.0f;
+    f->cutoff += (target - f->cutoff) * 0.1f;  // a slow sweep; the core smooths each step
+    ecs_modified(it->world, music, AudioFilter);
+}
+```
+
+A `SynthHighPass` at 300 Hz with `SynthSlope24` and a `SynthLowPass` at 3 kHz in two slots of
+one bus make a telephone voice.
+
+The tests are the `EffectFilter` suite of `test/cpu/audio`, which measures sines in offline
+renders: the lowpass and the highpass at both slopes at their cutoff and an octave past it, the
+bandpass, the depth of the notch, stability at extreme values and at Nyquist, a step of the
+cutoff, a sweep every frame and a change of kind without a click, the mix, render sizes and the
+component in a world; and the `eq_filter` cases of `NoAlloc` and `Script`.
 
 ## Synth
 
@@ -791,8 +904,9 @@ end.
   uses reached silence; a looping voice starts a new pass instead, with the state of its
   filter. Synth voices start at their gain, without the ramp of the core, since the envelope
   starts at 0: an attack of 1 ms takes 1 ms.
-- **The filter** is the trapezoidal state variable filter (Simper): lowpass, highpass and a
-  bandpass with unity gain at the cutoff. At a slope of 12 dB per octave it is one stage:
+- **The filter** is the trapezoidal state variable filter (Simper) of `src/audio/core/svf.h`,
+  which the [filter effect](#filter-effect) shares: lowpass, highpass, a bandpass with unity
+  gain at the cutoff and a notch. At a slope of 12 dB per octave it is one stage:
   resonance 0 is a Butterworth response (Q 0.707), 1 a Q of 50. At 24 dB per octave it is two
   cascaded stages of the same kind and cutoff: the first at a fixed Q of 0.54, the second
   resonant from Q 1.31 at resonance 0, so that resonance 0 is a fourth order Butterworth
@@ -928,7 +1042,7 @@ as the carrier for a harmonic spectrum, a ratio such as 3.5 or 1.41 for an inhar
 | `SynthOscillator` | A layer: `wave` (`SynthSine`, `SynthSaw`, `SynthSquare`, `SynthTriangle`, `SynthNoise`, `SynthPluck`), `frequency` (440), `frequency_end` (0, no sweep), `sweep` (s), `level` (1), `modulation` (`SynthMix`, heard; `SynthPhase` or `SynthRing`, modulates its parent), `index` (1: radians for `SynthPhase` up to 32, limited against the frequency; a depth of 0..1 for `SynthRing`), `feedback` (0, radians on its own phase up to 1.5), `audible` (false: whether a modulator is heard as well), `pulse_width` (0.5: the share of the period a `SynthSquare` is high, 0.01..0.99) |
 | `SynthString` | On a `SynthPluck` layer: `decay` (2, seconds of the fundamental to -60 dB, 0.01..60), `brightness` (0.5, the lowpass of the pluck and in the loop: 0 dark, 1 metallic) and `hardness` (0.8, the lowpass of the pluck: 0 a soft finger, 1 a hard pick); a `SynthPluck` layer without one takes these defaults |
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `release`, `hold`: seconds and a sustain level, all 0 by default; `curve` (decay and release) and `attack_curve`: 0 linear (default), positive fast at first, -16..16 |
-| `SynthFilter` | `kind` (`SynthLowPass`, `SynthHighPass`, `SynthBandPass`), `cutoff` (1000), `resonance` (0), `slope` (`SynthSlope12`, `SynthSlope24`) |
+| `SynthFilter` | `kind` (`SynthLowPass`, `SynthHighPass`, `SynthBandPass`, `SynthNotch`), `cutoff` (1000), `resonance` (0), `slope` (`SynthSlope12`, `SynthSlope24`) |
 | `SynthFilterEnvelope` | The envelope of the cutoff: `attack`, `decay`, `sustain`, `release`, `hold`, `curve` and `attack_curve` as in `SynthEnvelope`, and `amount`, the octaves the cutoff moves at level 1 (0, negative closes the filter); nothing without a `SynthFilter` |
 | `SynthUnison` | On a layer: `voices` (3, 1 to 7), `detune` (10 cents from the lowest voice to the highest, 0 to 100) and `width` (0 mono to 1, from left to right), see [Unison and width](#unison-and-width) |
 | `SynthGlide` | On the root: `time` of a glide (s, 0 jumps), `legato` (false) and `channel` (0), see [Glide and legato](#glide-and-legato) |
@@ -1662,7 +1776,7 @@ compiles, on every build of box. For a target other than Emscripten the script d
 clang --target=wasm32-unknown-unknown -O2 -msimd128 -std=c11 -ffreestanding -nostdlib \
     -DBOX_AUDIO_CORE_WASM -Wl,--no-entry -Wl,-z,stack-size=65536 \
     -Wl,--initial-memory=1048576 -Wl,--max-memory=268435456 -Wl,--strip-all \
-    -Wl,--export=box_audio_core_wasm_init ... command.c core.c effect.c reverb.c source.c synth.c synth_patch.c wasm.c \
+    -Wl,--export=box_audio_core_wasm_init ... command.c core.c effect.c eq.c filter.c reverb.c source.c synth.c synth_patch.c wasm.c \
     -o box_audio_core.wasm
 ```
 
@@ -1781,6 +1895,8 @@ frame, the same on every platform.
 | `SoundStatus` | Read only: `state` (`SoundLoading`, `SoundReady`, `SoundFailed`), `frames`, `channels`, `sample_rate` and `error` of a `SoundFile` |
 | `AudioBus` | A mixer channel: `output` (0 or `master` for the master), `volume` (1), `pan`, `width` (1), `mute`, `solo`, `kind` (`AudioChannelGroup`, `AudioChannelReturn` or `AudioChannelSfx`), `sends`, up to 4 `AudioSend` of `bus`, `level` and `pre_fader`, and `effects`, the effect entities of its 4 insert slots (0 for empty); see [Mixer channels](#mixer-channels) |
 | `Reverb` | An effect, a reverb in the insert slot of a bus that names its entity: `decay` (1.5 s), `damping` (0.5), `predelay` (0.02 s), `size` (0.5), `mix` (1) |
+| `Equalizer` | An effect, an equalizer in the insert slot of a bus that names its entity: `bands`, 4 `AudioEqBand` of `kind` (`AudioEqOff`, `AudioEqPeak`, `AudioEqLowShelf`, `AudioEqHighShelf`, `AudioEqLowCut`, `AudioEqHighCut`; off), `frequency` (100, 400, 2000 and 8000 Hz; 10 Hz..0.49 of the rate), `gain` (0 dB, -24..24) and `q` (0.7071, 0.1..18); see [Equalizer](#equalizer) |
+| `AudioFilter` | An effect, a filter in the insert slot of a bus that names its entity: `kind` (`SynthLowPass`, `SynthHighPass`, `SynthBandPass`, `SynthNotch`), `cutoff` (1000 Hz, 10 Hz..0.49 of the rate), `resonance` (0, 0..1), `slope` (`SynthSlope12`, `SynthSlope24`) and `mix` (1); see [Filter effect](#filter-effect) |
 | `AudioOutput` | The bus a source, or a sound by default, plays on |
 | `AudioSource` | A sound that plays while the entity exists: `sound`, `volume` (1), `pitch` (1), `loop`, `playing` (true) |
 | `AudioStream` | Music: an Ogg Vorbis file (`path`) that streams, `volume` (1), `loop` (true), `playing` (true), see [Music](#music) |
@@ -1887,9 +2003,10 @@ pad {
 A width of 1 and unused sends add no work per frame, and a world without a solo pays one check
 of a mask.
 
-**Effects.** An effect is an entity with an effect component, for now `Reverb`. It runs in an
-insert slot of a channel that names it in `effects`, an array of 4 entities that run in order;
-an empty slot (0) is skipped. A `Reverb` that no slot names does nothing. The channel may name
+**Effects.** An effect is an entity with an effect component: `Reverb`, `Equalizer` or
+`AudioFilter` (the first of them in that order when it has several). It runs in an insert slot
+of a channel that names it in `effects`, an array of 4 entities that run in order; an empty slot
+(0) is skipped. An effect that no slot names does nothing. The channel may name
 itself, which is the usual reverb return, and unloading the scene deletes it, which fades its
 tail out:
 
@@ -1917,7 +2034,7 @@ effects too, which run before the limiter.
   effect (`box.audio: more than 64 effects, '...' does nothing`), which does nothing until a slot
   of the pool is free.
 
-Reverb zones, rooms from geometry and the other kinds of effects are later work.
+Reverb zones, rooms from geometry, a compressor and a delay are later work.
 
 #### Meters
 
@@ -2469,7 +2586,9 @@ beats), playing, loop off`, the position as bar.beat counted from 1), then the m
 volume, pan and width of its `AudioBus` when it has one) and the buses in processing order, each
 with its kind, volume, pan, width, `solo`, `muted`, its output, its sends (`send pre` for a
 pre-fader one) and its insert slots, each as `insert <index> <entity>:` with its kind and values
-and whether it runs: `(runs)`, `(bypassed)` for a Disabled effect, or `(does not run: ...)` with
+(`reverb decay 2.40 damping 0.40 ...`, `eq [low cut 120 Hz 0.0 dB q 0.71] [peak 3000 Hz 3.0 dB
+q 1.20] [off] [off]`, `filter lowpass 24 dB cutoff 400 resonance 0.30 mix 1.00`) and whether it
+runs: `(runs)`, `(bypassed)` for a Disabled effect, or `(does not run: ...)` with
 the reason (no output, in another slot, every effect of the pool taken, waits for its memory);
 the master lists its own after its `AudioBus`. Each channel in the order ends with its levels of
 the last frame, `peak <left>/<right> dB, rms <left>/<right> dB` (`-inf` for silence), the master

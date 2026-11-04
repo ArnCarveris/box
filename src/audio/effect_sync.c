@@ -3,9 +3,11 @@
  * @brief The effects of the module: the entities that the insert slots of the channels name,
  * their slots of the pool of the core, their memory and their commands.
  *
- * An effect entity is any entity with an effect component, for now Reverb. The module sends an
- * EFFECT command when the kind, the channel, the slot or a parameter of an effect changes, and
- * takes it off when no insert slot names it any more.
+ * An effect entity is any entity with an effect component: Reverb, Equalizer or AudioFilter,
+ * the first of them in that order when it has several.
+ *
+ * The module sends an EFFECT command when the kind, the channel, the slot or a parameter of an
+ * effect changes, and takes it off when no insert slot names it any more.
  */
 
 #include "module.h"
@@ -36,6 +38,8 @@ uint32_t box_audio_module_effect_kind(
     float *params)
 {
     const Reverb *reverb = NULL;
+    const Equalizer *eq = NULL;
+    const AudioFilter *filter = NULL;
     uint32_t result = BOX_AUDIO_EFFECT_NONE;
     int32_t i;
     for (i = 0; params && i < BOX_AUDIO_EFFECT_PARAMS; i ++) {
@@ -55,6 +59,33 @@ uint32_t box_audio_module_effect_kind(
             params[2] = reverb->predelay;
             params[3] = reverb->size;
             params[4] = reverb->mix;
+        }
+
+        goto done;
+    }
+
+    eq = ecs_get(world, e, Equalizer);
+    if (eq) {
+        result = BOX_AUDIO_EFFECT_EQ;
+        for (i = 0; params && i < BOX_AUDIO_EQ_BANDS; i ++) {
+            params[i * 4] = (float)eq->bands[i].kind;
+            params[i * 4 + 1] = eq->bands[i].frequency;
+            params[i * 4 + 2] = eq->bands[i].gain;
+            params[i * 4 + 3] = eq->bands[i].q;
+        }
+
+        goto done;
+    }
+
+    filter = ecs_get(world, e, AudioFilter);
+    if (filter) {
+        result = BOX_AUDIO_EFFECT_FILTER;
+        if (params) {
+            params[0] = (float)((uint32_t)filter->kind + 1);
+            params[1] = filter->cutoff;
+            params[2] = filter->resonance;
+            params[3] = (float)filter->slope;
+            params[4] = filter->mix;
         }
     }
 

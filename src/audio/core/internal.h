@@ -34,6 +34,21 @@
 /** Largest magnitude a sample keeps; larger ones, infinities and NaNs become 0 */
 #define BOX_AUDIO_HUGE 1e30f
 
+/** Flush a sample: NaN, infinities, huge values and denormals become 0.
+ *
+ * @param x The sample
+ * @return The sample, or 0
+ */
+static inline float box_audio_clean(
+    float x)
+{
+    float a = x < 0 ? -x : x;
+
+    return a >= BOX_AUDIO_TINY && a <= BOX_AUDIO_HUGE ? x : 0.0f;
+}
+
+#include "svf.h"
+
 /** A value that moves linearly to its target over a number of frames */
 typedef struct box_audio_ramp_t {
     float value;   /**< Current value */
@@ -122,9 +137,51 @@ typedef struct box_audio_reverb_t {
                                * lines without a step */
 } box_audio_reverb_t;
 
+/** Coefficients of a biquad: b0, b1, b2, a1 and a2, normalized by a0 */
+#define BOX_AUDIO_EQ_COEFS 5
+
+/** A band of an equalizer: a biquad in transposed direct form II per channel, whose
+ * coefficients move linearly to those of the last command */
+typedef struct box_audio_eq_filter_t {
+    float c[BOX_AUDIO_EQ_COEFS];     /**< Coefficients that run */
+    float to[BOX_AUDIO_EQ_COEFS];    /**< Coefficients of the last command */
+    float step[BOX_AUDIO_EQ_COEFS];  /**< Change of each coefficient per frame */
+    int32_t left;             /**< Frames left of the move */
+    float s[2][2];            /**< The two states of the left and the right channel */
+    bool active;              /**< Whether it runs: it is not flat, moves or its state did not
+                               * drain yet */
+} box_audio_eq_filter_t;
+
+/** An equalizer: BOX_AUDIO_EQ_BANDS biquads in a row */
+typedef struct box_audio_eq_t {
+    box_audio_eq_filter_t band[BOX_AUDIO_EQ_BANDS]; /**< The bands */
+} box_audio_eq_t;
+
+/** A filter effect: the state variable filter of the synth on both channels, its cutoff and
+ * resonance smoothed per control block */
+typedef struct box_audio_filter_t {
+    box_audio_filter_params_t target; /**< Parameters of the last command, clamped */
+    int32_t kind;             /**< A box_audio_synth_filter_t that runs */
+    uint32_t slope;           /**< A box_audio_synth_slope_t that runs */
+    int32_t stages;           /**< Stages that run, 1 or 2 */
+    box_audio_svf_t svf[2];   /**< Stages of the left channel */
+    box_audio_svf_t svf_r[2]; /**< Stages of the right channel */
+    double octave;            /**< log2 of the cutoff that runs */
+    double octave_target;     /**< log2 of the cutoff of the target */
+    float resonance;          /**< Resonance that runs */
+    float smooth;             /**< Share of the way to the target a control block moves */
+    int32_t control;          /**< Frames until the next control block */
+    bool moving;              /**< Whether the cutoff or the resonance moves */
+    bool swap;                /**< Waits for the fade to reach 0 to apply a kind or a slope */
+    box_audio_ramp_t mix;     /**< Wet level */
+    box_audio_ramp_t fade;    /**< Fade of the wet signal around a swap */
+} box_audio_filter_t;
+
 /** State of the kinds of effects */
 typedef union box_audio_effect_data_t {
     box_audio_reverb_t reverb;  /**< BOX_AUDIO_EFFECT_REVERB */
+    box_audio_eq_t eq;          /**< BOX_AUDIO_EFFECT_EQ */
+    box_audio_filter_t filter;  /**< BOX_AUDIO_EFFECT_FILTER */
 } box_audio_effect_data_t;
 
 /** An effect instance of the pool of the core: a kind in an insert slot of a bus, on the
@@ -287,13 +344,6 @@ typedef struct box_audio_synth_mod_t {
     bool smooth;          /**< Whether its wave jumps and is smoothed */
 } box_audio_synth_mod_t;
 
-/** A stage of the filter of a synth voice: a trapezoidal state variable filter */
-typedef struct box_audio_synth_svf_t {
-    float k;              /**< Damping, 2 / Q */
-    float a1, a2, a3;     /**< Coefficients */
-    float ic1, ic2;       /**< State */
-} box_audio_synth_svf_t;
-
 /** The unison voices of a layer of a synth voice: copies of its oscillator, each at its own
  * phase, at a factor of the turns per frame of the oscillator and with a gain per channel. The
  * oscillator keeps the sweep and the glide they all follow */
@@ -372,8 +422,8 @@ typedef struct box_audio_synth_source_t {
     bool gate;            /**< Whether its envelopes sustain until a release */
     int32_t filter;       /**< A box_audio_synth_filter_t */
     int32_t stages;       /**< Stages of the filter: 1 for 12 dB per octave, 2 for 24 */
-    box_audio_synth_svf_t svf[2]; /**< The resonant stage, then the stage before it at 24 dB */
-    box_audio_synth_svf_t svf_r[2]; /**< The stages of the right channel, when stereo */
+    box_audio_svf_t svf[2]; /**< The resonant stage, then the stage before it at 24 dB */
+    box_audio_svf_t svf_r[2]; /**< The stages of the right channel, when stereo */
     bool unison;          /**< Whether a layer has unison voices, which renders through
                            * box_audio_synth_render_wide */
     bool stereo;          /**< Whether a layer with unison voices has width, so the source
@@ -575,19 +625,6 @@ struct box_audio_core_t {
                            * frame, a binary heap ordered by frame, then by arrival */
 };
 
-/** Flush a sample: NaN, infinities, huge values and denormals become 0.
- *
- * @param x The sample
- * @return The sample, or 0
- */
-static inline float box_audio_clean(
-    float x)
-{
-    float a = x < 0 ? -x : x;
-
-    return a >= BOX_AUDIO_TINY && a <= BOX_AUDIO_HUGE ? x : 0.0f;
-}
-
 /** Push an event, or count it as lost when the ring is full. Does not allocate.
  *
  * Ordinary events take the slots but the last, which is kept for BOX_AUDIO_EVENT_LOST. When
@@ -714,6 +751,73 @@ bool box_audio_reverb_render(
 void box_audio_reverb_rest(
     box_audio_core_t *core,
     box_audio_effect_t *fx);
+
+/** The equalizer kind, in eq.c: start at the params of fx */
+void box_audio_eq_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The equalizer kind: new parameters while it runs */
+void box_audio_eq_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The equalizer kind: process a block */
+bool box_audio_eq_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The equalizer kind: a block skipped while idle, which it never is */
+void box_audio_eq_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The filter kind, in filter.c: start at the params of fx */
+void box_audio_filter_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The filter kind: new parameters while it runs */
+void box_audio_filter_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The filter kind: process a block */
+bool box_audio_filter_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The filter kind: a block skipped while idle, which it never is */
+void box_audio_filter_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** Base 2 logarithm without libm, in synth.c, from the exponent of the double and the series
+ * of atanh.
+ *
+ * @param x A positive finite value
+ * @return The logarithm, within 1e-12
+ */
+double box_audio_synth_log2(
+    double x);
+
+/** Power of 2 without libm, in synth.c.
+ *
+ * @param y The exponent, clamped to -1000..1000
+ * @return 2 to the y
+ */
+double box_audio_synth_exp2(
+    double y);
 
 /** Start a sample source on a sound and take a use of it.
  *

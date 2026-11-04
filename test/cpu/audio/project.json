@@ -168,7 +168,8 @@
                     "scheduled",
                     "gated",
                     "effects",
-                    "meters"
+                    "meters",
+                    "eq_filter"
                 ]
             },
             {
@@ -381,7 +382,8 @@
                     "level_change",
                     "play_function",
                     "spatial_scene",
-                    "reverb_hall"
+                    "reverb_hall",
+                    "eq_filter"
                 ]
             },
             {
@@ -415,6 +417,41 @@
                     "self_slot_script",
                     "unnamed_does_nothing",
                     "disabled_bypassed"
+                ]
+            },
+            {
+                "id": "Equalizer",
+                "testcases": [
+                    "peak_center",
+                    "peak_bandwidth",
+                    "shelves",
+                    "cuts",
+                    "bands_in_a_row",
+                    "stable",
+                    "gain_step_no_click",
+                    "automation_no_click",
+                    "flat_identical",
+                    "back_to_flat_identical",
+                    "render_sizes",
+                    "component"
+                ]
+            },
+            {
+                "id": "EffectFilter",
+                "testcases": [
+                    "lowpass_12",
+                    "lowpass_24",
+                    "highpass_12",
+                    "highpass_24",
+                    "bandpass",
+                    "notch",
+                    "stable",
+                    "cutoff_step_no_click",
+                    "sweep_no_click",
+                    "kind_change_no_click",
+                    "mix",
+                    "render_sizes",
+                    "component"
                 ]
             },
             {
