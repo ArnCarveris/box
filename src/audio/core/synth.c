@@ -9,12 +9,14 @@
  * box_audio_synth_render_wide, so a patch without them renders as before at the same cost. A
  * pluck layer is a Karplus-Strong string instead of an oscillator, tuned with an allpass for the
  * fraction of a frame, which follows the pitch of its oscillator and ends the voice once it is
- * silent; it plays as one voice. Up to two LFOs move the pitch, the level, the cutoff and the
- * pulse width of squares, per control block of frames and interpolated per frame in between.
+ * silent; with unison it rings a string per voice, detuned and panned as the voices of an
+ * oscillator, each plucked with its own noise. Up to two LFOs move the pitch, the level, the
+ * cutoff and the pulse width of squares, per control block of frames and interpolated per frame
+ * in between.
  *
  * Every voice holds its own copy of the patch, so a play allocates nothing. Its layers are parts
- * of the core, one per layer it has (box_audio_synth_part_t), and each pluck layer takes a
- * string of the core with its delay line (box_audio_synth_string_t).
+ * of the core, one per layer (box_audio_synth_part_t), and each pluck layer takes a string of
+ * the core with its delay line (box_audio_synth_string_t) for each of its unison voices.
  *
  * Like the rest of the core it uses no libm: the sine is box_audio_core_sin and the exponential
  * sweeps and the filter envelope use the series of box_audio_synth_log2 and
@@ -727,7 +729,8 @@ static void box_audio_synth_pass(
     box_audio_synth_source_t *src)
 {
     float rate = core->sample_rate;
-    double top = BOX_AUDIO_SYNTH_NYQUIST * (double)rate, lo, hi, cut;
+    double top = BOX_AUDIO_SYNTH_NYQUIST * (double)rate, lo, hi, cut, inc;
+    box_audio_synth_string_t *s;
     int32_t l, n;
     if (top > BOX_AUDIO_SYNTH_FREQUENCY_MAX) {
         top = BOX_AUDIO_SYNTH_FREQUENCY_MAX;
@@ -760,7 +763,7 @@ static void box_audio_synth_pass(
         o->vibrato_step = 0;
         o->tremolo = 1;
         o->tremolo_step = 0;
-        for (n = 0; n < part->unison.voices && part->unison.voices > 1; n ++) {
+        for (n = 0; n < part->unison.voices && part->unison.voices > 1 && !part->string; n ++) {
             box_audio_synth_noise(&src->rng);
             part->unison.phase[n] = (double)(src->rng >> 11) * (1.0 / 2097152.0);
         }
@@ -792,8 +795,14 @@ static void box_audio_synth_pass(
             o->sweep = n;
         }
 
-        if (part->string) {
-            box_audio_synth_string_pluck(part->string, layer, o->inc, rate, &src->rng);
+        for (s = part->string, n = 0; s; s = s->next, n ++) {
+            inc = o->inc;
+            if (part->unison.voices > 1) {
+                inc *= part->unison.detune[n];
+                inc = inc < src->inc_max ? inc : src->inc_max;
+            }
+
+            box_audio_synth_string_pluck(s, layer, inc, rate, &src->rng);
             src->ringing ++;
             src->ringing_free += o->env == BOX_AUDIO_SYNTH_ENV_FREE;
         }
@@ -862,7 +871,8 @@ void box_audio_source_synth(
     box_audio_synth_slot_t *slot = &core->synths[core->sounds[sound].synth - 1];
     const box_audio_synth_patch_t *p = &slot->patch;
     box_audio_synth_source_t *src = &source->data.synth;
-    int32_t l;
+    box_audio_synth_string_t **at;
+    int32_t l, k;
     source->kind = BOX_AUDIO_SOURCE_SYNTH;
     src->layers = (int32_t)p->layers;
     src->unison = false;
@@ -879,8 +889,13 @@ void box_audio_source_synth(
         }
 
         if (p->layer[l].wave == BOX_AUDIO_SYNTH_PLUCK) {
-            src->part[l]->string =
-                &core->synth_strings[core->string_free[-- core->string_free_count]];
+            at = &src->part[l]->string;
+            for (k = 0; k < (int32_t)p->layer[l].voices; k ++) {
+                *at = &core->synth_strings[core->string_free[-- core->string_free_count]];
+                at = &(*at)->next;
+            }
+
+            *at = NULL;
             src->strings ++;
         }
     }
@@ -1354,33 +1369,29 @@ static inline float box_audio_synth_osc_next(
     return x;
 }
 
-/** Render a frame of a string and advance it and its oscillator.
+/** Render a frame of a string that rings and advance it.
  *
- * A string follows the turns per frame of its oscillator, its glides, sweeps and vibrato
- * included, with a new tuning at each change. Once the peak of a period is under
- * BOX_AUDIO_SYNTH_STRING_SILENCE it is silent and costs nothing more.
+ * A string follows the turns per frame it is given, its glides, sweeps and vibrato included,
+ * with a new tuning at each change. Once the peak of a period is under
+ * BOX_AUDIO_SYNTH_STRING_SILENCE it is silent, leaves src->ringing and costs nothing more.
  *
  * Per frame the frame out of the delay line goes through the lowpass (b0, b1, b0), the
  * allpass and the gain of the loop back into it.
  *
  * @param src The source
- * @param part The part of the string
- * @param inc Turns of the frame: the inc of its oscillator, or that times its vibrato
+ * @param s The string, ringing
+ * @param rings_free Whether its layer has no envelope, so it counts in ringing_free
+ * @param inc Turns of the frame
  * @return The sample, the frame out of the delay line
  */
-static inline float box_audio_synth_string_next(
+static inline float box_audio_synth_string_ring(
     box_audio_synth_source_t *src,
-    box_audio_synth_part_t *part,
+    box_audio_synth_string_t *s,
+    bool rings_free,
     double inc)
 {
     const int32_t mask = BOX_AUDIO_SYNTH_STRING_FRAMES - 1;
-    box_audio_synth_string_t *s = part->string;
-    box_audio_synth_osc_t *o = &part->osc;
-    float x = 0, f, a, m;
-    if (!s->ringing) {
-        goto done;
-    }
-
+    float x, f, a, m;
     if (inc != s->inc) {
         box_audio_synth_string_tune(s, inc);
     }
@@ -1394,26 +1405,49 @@ static inline float box_audio_synth_string_next(
     s->a1 = a;
     s->line[s->write] = box_audio_clean(s->gain * a);
     s->write = (s->write + 1) & mask;
-    box_audio_synth_osc_advance(o, inc);
     m = x < 0 ? -x : x;
     s->peak = m > s->peak ? m : s->peak;
     if (-- s->window <= 0) {
         if (s->peak < BOX_AUDIO_SYNTH_STRING_SILENCE) {
             s->ringing = false;
             src->ringing --;
-            src->ringing_free -= o->env == BOX_AUDIO_SYNTH_ENV_FREE;
+            src->ringing_free -= rings_free;
         }
 
         s->peak = 0;
         s->window = s->delay + 2;
     }
 
-done:
+    return x;
+}
+
+/** Render a frame of the string of a pluck layer of one voice and advance it and its
+ * oscillator, while it rings.
+ *
+ * @param src The source
+ * @param part The part of the string
+ * @param inc Turns of the frame: the inc of its oscillator, or that times its vibrato
+ * @return The sample, 0 once the string is silent
+ */
+static inline float box_audio_synth_string_next(
+    box_audio_synth_source_t *src,
+    box_audio_synth_part_t *part,
+    double inc)
+{
+    box_audio_synth_string_t *s = part->string;
+    box_audio_synth_osc_t *o = &part->osc;
+    float x = 0;
+    if (s->ringing) {
+        x = box_audio_synth_string_ring(src, s, o->env == BOX_AUDIO_SYNTH_ENV_FREE, inc);
+        box_audio_synth_osc_advance(o, inc);
+    }
+
     return x;
 }
 
 /** Whether a source with strings plays on: while one of its envelopes plays, unless every
- * layer is a string and all of them are silent, and while a string without an envelope rings.
+ * layer is a string and all of them, those of every unison voice, are silent, and while a
+ * string without an envelope rings.
  *
  * @param src The source, with strings
  * @param envs Whether one of its envelopes plays
@@ -1657,11 +1691,55 @@ static inline void box_audio_synth_unison_next(
     *right = r;
 }
 
+/** Render a frame of the strings of the unison voices of a pluck layer and advance them, each
+ * at the detune of its voice and with its gains, and its oscillator while one rings.
+ *
+ * @param src The source
+ * @param part The part of the layer, with more than one voice
+ * @param inc Turns of the frame of its oscillator: its inc, or that times its vibrato
+ * @param left Receives the left sample
+ * @param right Receives the right sample
+ */
+static inline void box_audio_synth_strings_next(
+    box_audio_synth_source_t *src,
+    box_audio_synth_part_t *part,
+    double inc,
+    float *left,
+    float *right)
+{
+    box_audio_synth_osc_t *o = &part->osc;
+    box_audio_synth_unison_t *u = &part->unison;
+    box_audio_synth_string_t *s;
+    bool rings_free = o->env == BOX_AUDIO_SYNTH_ENV_FREE, rang = false;
+    float l = 0, r = 0, x;
+    double dt;
+    int32_t k;
+    for (s = part->string, k = 0; s; s = s->next, k ++) {
+        if (s->ringing) {
+            dt = inc * u->detune[k];
+            dt = dt < src->inc_max ? dt : src->inc_max;
+            x = box_audio_synth_string_ring(src, s, rings_free, dt);
+            l += x * u->left[k];
+            r += x * u->right[k];
+            rang = true;
+        }
+    }
+
+    if (rang) {
+        box_audio_synth_osc_advance(o, inc);
+    }
+
+    *left = l;
+    *right = r;
+}
+
 /** Render a frame of the layers of a source in which a layer has unison voices, in stereo.
  *
  * As box_audio_synth_modulate, the layers render from the last. A layer without unison is the
  * same on both channels. A unison layer that modulates, or feeds back, does so with the mean
  * of its channels, and a modulation of a unison layer moves the phase of each of its voices.
+ *
+ * A pluck layer with unison voices rings a string for each, which phase modulation leaves.
  *
  * @param src The source
  * @param levels The level of each envelope for the frame
@@ -1695,7 +1773,12 @@ static inline void box_audio_synth_mix_wide(
         }
 
         if (part->unison.voices > 1) {
-            box_audio_synth_unison_next(src, part, shift, inc, &xl, &xr);
+            if (part->string) {
+                box_audio_synth_strings_next(src, part, inc, &xl, &xr);
+            } else {
+                box_audio_synth_unison_next(src, part, shift, inc, &xl, &xr);
+            }
+
             x = 0.5f * (xl + xr);
         } else {
             if (o->wave == BOX_AUDIO_SYNTH_PLUCK) {

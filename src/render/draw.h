@@ -786,7 +786,7 @@ box_render_surface_t* box_draws_slot_surface(
 /** Write the transform of a shape: the rows of its model matrix with the instance scale.
  *
  * @param out The transform
- * @param transform World transform of the entity, NULL for the identity
+ * @param transform World transform of the entity
  * @param shape Mesh and instance scale of the entity
  */
 void box_draws_transform(

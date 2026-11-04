@@ -18,11 +18,13 @@ using box.transform
 using box.audio
 
 cabin_verb {
-  AudioBus: {output: master}
+  AudioBus: {output: master, kind: AudioChannelReturn}
   Reverb: {decay: 0.75, damping: 0.6, predelay: 0.008, size: 0.25}
 }
-world { AudioBus: {output: master, send: cabin_verb, send_level: 0.28} }
-ui { AudioBus: {output: master, volume: 0.55} }
+world {
+  AudioBus: {output: master, kind: AudioChannelSfx, sends: [{bus: cabin_verb, level: 0.28}]}
+}
+ui { AudioBus: {output: master, kind: AudioChannelSfx, volume: 0.55} }
 music { AudioBus: {output: master, volume: 0.45} }
 
 // A toggle switch: a hard snap of noise over a falling tick and the knock of its body

@@ -69,9 +69,8 @@ static void capture_scene(
     ecs_world_t *world = audio_world();
     ecs_entity_t music = audio_bus(world, "music", 0, 0.8f);
     ecs_entity_t echo = audio_bus(world, "echo", 0, 0.5f);
+    audio_send(world, music, echo, 0.3f, false);
     AudioBus *bus = ecs_ensure(world, music, AudioBus);
-    bus->send = echo;
-    bus->send_level = 0.3f;
     bus->pan = -0.25f;
     ecs_modified(world, music, AudioBus);
     ecs_entity_t tone = audio_tone(world, "tone", 440, 0.3f, AUDIO_RATE);

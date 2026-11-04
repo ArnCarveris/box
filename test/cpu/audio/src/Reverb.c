@@ -117,7 +117,7 @@ static void rv_open(
 {
     box_audio_core_desc_t desc = { .sample_rate = rate };
     box_audio_route_t routes[] = {
-        { 1, 0, BOX_AUDIO_BUS_NONE }, { 0, BOX_AUDIO_BUS_NONE, BOX_AUDIO_BUS_NONE }
+        AUDIO_OUT(1, 0), AUDIO_MASTER
     };
     int32_t floats = box_audio_reverb_floats(rate);
     if (counted) {
@@ -557,9 +557,7 @@ static double rv_send(
     int32_t i, start;
     ecs_set(world, hall, Reverb, { .decay = 1, .damping = 0.5f, .predelay = 0.02f,
         .size = 0.5f, .mix = 1 });
-    ecs_get_mut(world, dry, AudioBus)->send = hall;
-    ecs_get_mut(world, dry, AudioBus)->send_level = level;
-    ecs_modified(world, dry, AudioBus);
+    audio_send(world, dry, hall, level, false);
     audio_run(world, 2);
     test_int(box_audio_module_reverb_slot(world, hall), 0);
     memset(rv_click, 0, sizeof(rv_click));

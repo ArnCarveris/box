@@ -330,6 +330,7 @@ void Radial_c_default(void) {
 
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, ParticleEmitter);
+    ecs_set(world, e, Position, {0, 0, 0});
     const ParticleEmitter *p = ecs_get(world, e, ParticleEmitter);
     test_flt(p->radial.min, 0);
     test_flt(p->radial.max, 0);
@@ -515,6 +516,7 @@ void Radial_torus_mesh_ring(void) {
 
     ecs_entity_t source = ecs_new(world);
     ecs_set(world, source, Torus, {.segments = 32, .rings = 8, .radius = 1, .tube = 0.1f});
+    ecs_set(world, source, Position, {0, 0, 0});
     ecs_entity_t e = emitter_new(world, EmitterMesh, (ParticleRange){3, 3}, 200);
     ParticleEmitter *p = ecs_get_mut(world, e, ParticleEmitter);
     p->source = source;

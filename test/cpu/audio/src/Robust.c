@@ -73,7 +73,7 @@ void Robust_nan_stereo(void) {
 
 void Robust_nan_commands(void) {
     // audio/robust
-    box_audio_route_t routes[] = { { 1, 0, 0 }, { 0, 255, 255 } };
+    box_audio_route_t routes[] = { AUDIO_ROUTE(1, 0, 0), AUDIO_MASTER };
     box_audio_core_t *core = audio_new();
     audio_sine(audio_sound_a, 4000, 200, 0.5f);
     test_assert(box_audio_core_sound(core, 1, audio_sound_a, 4000, 1, NAN));
@@ -114,8 +114,10 @@ void Robust_huge_chain(void) {
         routes[i].bus = (uint8_t)(BOX_AUDIO_BUS_MAX - 1 - i);
         routes[i].output = (uint8_t)(i < BOX_AUDIO_BUS_MAX - 1 ? BOX_AUDIO_BUS_MAX - 2 - i :
             BOX_AUDIO_BUS_NONE);
-        routes[i].send = (uint8_t)(i < BOX_AUDIO_BUS_MAX - 2 ? BOX_AUDIO_BUS_MAX - 2 - i :
+        routes[i].sends[0] = (uint8_t)(i < BOX_AUDIO_BUS_MAX - 2 ? BOX_AUDIO_BUS_MAX - 2 - i :
             BOX_AUDIO_BUS_NONE);
+        routes[i].sends[1] = routes[i].sends[2] = routes[i].sends[3] = BOX_AUDIO_BUS_NONE;
+        routes[i].pre_fader = 0;
         routes[i].unused = 0;
         audio_bus_set(core, (uint32_t)i, BOX_AUDIO_PARAM_VOLUME, BOX_AUDIO_VOLUME_MAX);
         audio_bus_set(core, (uint32_t)i, BOX_AUDIO_PARAM_SEND, BOX_AUDIO_VOLUME_MAX);
@@ -186,7 +188,7 @@ void Robust_odd_frames(void) {
 
 void Robust_one_frame_at_a_time(void) {
     // audio/robust
-    box_audio_route_t routes[] = { { 1, 0, 2 }, { 2, 0, 255 }, { 0, 255, 255 } };
+    box_audio_route_t routes[] = { AUDIO_ROUTE(1, 0, 2), AUDIO_OUT(2, 0), AUDIO_MASTER };
     box_audio_core_t *core;
     int32_t pass, i;
     audio_sine(audio_sound_a, 4800, 220, 0.6f);

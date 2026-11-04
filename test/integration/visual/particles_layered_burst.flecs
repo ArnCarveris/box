@@ -18,6 +18,7 @@ main_view {
 
 prefab Blast {
   flash {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 200, rate: 0, shape: EmitterSphere, radius: 0.1, spread: 180,
       speed: {1, 3}, lifetime: {1, 1}, size: {0.1, 0.2}, opacity: {0.6, 0.9},
@@ -38,6 +39,7 @@ prefab Blast {
   }
 
   debris {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 300, rate: 0, shape: EmitterPoint, spread: 70,
       speed: {15, 25}, lifetime: {2, 2}, size: {0.08, 0.12}, opacity: {1, 1},

@@ -11,6 +11,17 @@
 #include <math.h>
 #include <stdlib.h>
 
+/** A route of a bus to an output with send 0 to a bus, the other sends unused */
+#define BENCH_ROUTE(bus, output, send)\
+    { (bus), (output), { (send), BOX_AUDIO_BUS_NONE, BOX_AUDIO_BUS_NONE, BOX_AUDIO_BUS_NONE },\
+        0, 0 }
+
+/** A route of a bus to an output without sends */
+#define BENCH_OUT(bus, output) BENCH_ROUTE(bus, output, BOX_AUDIO_BUS_NONE)
+
+/** The route of the master, last in an order */
+#define BENCH_MASTER BENCH_OUT(0, BOX_AUDIO_BUS_NONE)
+
 /** Sample rate of the benchmarks */
 #define BENCH_RATE 48000
 
@@ -35,7 +46,7 @@ static box_audio_core_t* bench_reverb_core(
 {
     static uint8_t bytes[8192];
     box_audio_route_t routes[] = {
-        { 2, 0, 1 }, { 1, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 }
+        BENCH_ROUTE(2, 0, 1), BENCH_OUT(1, 0), BENCH_MASTER
     };
     box_audio_reverb_params_t params = { 2.4f, 0.4f, 0.02f, 0.7f, 1 };
     box_audio_core_desc_t desc = { .sample_rate = BENCH_RATE };

@@ -59,6 +59,7 @@ green_layer {
 white_layer {}
 
 blended {
+  Position: {0, 0, 0}
   Quad: {4, 4}
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 1}

@@ -219,7 +219,7 @@ static uint8_t box_audio_bus_alloc(
     uint8_t result = 0;
     int32_t i;
     for (i = 1; i < BOX_AUDIO_BUS_MAX; i ++) {
-        if (!state->bus_entity[i] && !(state->bus_freed & (1u << i))) {
+        if (!state->bus_entity[i] && !(state->bus_freed & ((uint64_t)1 << i))) {
             state->bus_entity[i] = e;
             result = (uint8_t)i;
             break;
@@ -236,6 +236,17 @@ static uint8_t box_audio_bus_alloc(
     return result;
 }
 
+/** Get the BUS_SET parameter of the level of a send.
+ *
+ * @param j Index of the send
+ * @return BOX_AUDIO_PARAM_SEND or BOX_AUDIO_PARAM_SEND_1..3
+ */
+static box_audio_param_t box_audio_send_param(
+    int32_t j)
+{
+    return j ? (box_audio_param_t)(BOX_AUDIO_PARAM_SEND_1 + j - 1) : BOX_AUDIO_PARAM_SEND;
+}
+
 /** Send the parameters of a bus that changed, all of them to a new output or a new index.
  *
  * @param state The state
@@ -249,7 +260,10 @@ static void box_audio_bus_params(
     AudioBusState *s,
     bool disabled)
 {
-    bool all = s->serial != state->serial, mute = bus->mute || disabled;
+    bool all = s->serial != state->serial, mute = bus->mute || disabled ||
+        !(state->audible & ((uint64_t)1 << s->index));
+    const AudioSend *sends = ecs_vec_first(&bus->sends);
+    int32_t j, count = ecs_vec_count(&bus->sends);
     if (!state->serial) {
         goto done;
     }
@@ -262,24 +276,76 @@ static void box_audio_bus_params(
         box_audio_bus_set(state, s->index, BOX_AUDIO_PARAM_PAN, bus->pan);
     }
 
+    if (all || s->width != bus->width) {
+        box_audio_bus_set(state, s->index, BOX_AUDIO_PARAM_WIDTH, bus->width);
+    }
+
     if (all || s->mute != mute) {
         box_audio_bus_set(state, s->index, BOX_AUDIO_PARAM_MUTE, mute ? 1.0f : 0.0f);
     }
 
-    if (all || s->send_level != bus->send_level) {
-        box_audio_bus_set(state, s->index, BOX_AUDIO_PARAM_SEND, bus->send_level);
+    for (j = 0; j < BOX_AUDIO_SENDS; j ++) {
+        float level = j < count ? sends[j].level : 0.0f;
+        if (all || s->send_level[j] != level) {
+            box_audio_bus_set(state, s->index, box_audio_send_param(j), level);
+        }
+
+        s->send_level[j] = level;
     }
 
     s->serial = state->serial;
     s->volume = bus->volume;
     s->pan = bus->pan;
+    s->width = bus->width;
     s->mute = mute;
-    s->send_level = bus->send_level;
 done:
     return;
 }
 
-/** Give buses their indices, send their parameters and notice route changes.
+/** Note the sends of a bus: the buses of the first BOX_AUDIO_SENDS and which are pre-fader,
+ * with one error when it has more.
+ *
+ * @param world The world
+ * @param e The bus entity
+ * @param bus The bus
+ * @param s What was sent for it
+ * @return Whether its sends changed
+ */
+static bool box_audio_bus_sends(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const AudioBus *bus,
+    AudioBusState *s)
+{
+    const AudioSend *sends = ecs_vec_first(&bus->sends);
+    int32_t j, count = ecs_vec_count(&bus->sends);
+    uint8_t pre = 0;
+    bool changed = false;
+    if (count > BOX_AUDIO_SENDS && !s->sends_refused) {
+        char *path = ecs_get_path(world, e);
+        ecs_err("box.audio: '%s' has %d sends, more than %d, the first %d play", path, count,
+            BOX_AUDIO_SENDS, BOX_AUDIO_SENDS);
+        ecs_os_free(path);
+    }
+
+    s->sends_refused = count > BOX_AUDIO_SENDS;
+    for (j = 0; j < BOX_AUDIO_SENDS; j ++) {
+        ecs_entity_t to = j < count ? sends[j].bus : 0;
+        if (j < count && sends[j].pre_fader) {
+            pre |= (uint8_t)(1u << j);
+        }
+
+        changed |= s->sends[j] != to;
+        s->sends[j] = to;
+    }
+
+    changed |= s->pre_fader != pre;
+    s->pre_fader = pre;
+
+    return changed;
+}
+
+/** Give buses their indices, notice route changes and note the solos and the solo safe buses.
  *
  * @param world The world
  * @param state The state
@@ -290,11 +356,18 @@ static void box_audio_buses(
 {
     ecs_iter_t it = ecs_query_iter(world, state->buses);
     int32_t i;
+    state->solo = 0;
+    state->solo_safe = 0;
     while (ecs_query_next(&it)) {
         const AudioBus *bus = ecs_field(&it, AudioBus, 0);
         AudioBusState *s = ecs_field(&it, AudioBusState, 1);
         bool disabled = ecs_table_has_id(world, it.table, EcsDisabled);
         for (i = 0; i < it.count; i ++) {
+            uint64_t bit;
+            if (it.entities[i] == state->master) {
+                continue;
+            }
+
             if (!s[i].index || state->bus_entity[s[i].index] != it.entities[i]) {
                 s[i].index = box_audio_bus_alloc(world, state, it.entities[i]);
                 s[i].serial = 0;
@@ -304,18 +377,105 @@ static void box_audio_buses(
                 }
             }
 
-            if (s[i].output != bus[i].output || s[i].send != bus[i].send) {
+            if (box_audio_bus_sends(world, it.entities[i], &bus[i], &s[i]) ||
+                s[i].output != bus[i].output)
+            {
                 s[i].output = bus[i].output;
-                s[i].send = bus[i].send;
                 state->order_dirty = true;
             }
 
-            box_audio_bus_params(state, &bus[i], &s[i], disabled);
+            bit = (uint64_t)1 << s[i].index;
+            if (bus[i].solo && !disabled) {
+                state->solo |= bit;
+            }
+
+            if (bus[i].kind == AudioChannelReturn || bus[i].kind == AudioChannelSfx) {
+                state->solo_safe |= bit;
+            }
         }
     }
 
     if (state->bus_freed) {
         state->order_dirty = true;
+    }
+}
+
+/** Compute the buses the solo keeps: without a solo all of them, else the soloed buses, the
+ * buses that feed them, the returns and SFX buses, and every bus downstream of these. Walks the
+ * routes of the last compile until nothing changes, so a cycle ends too.
+ *
+ * @param state The state
+ */
+static void box_audio_solo(
+    box_audio_module_t *state)
+{
+    uint64_t targets[BOX_AUDIO_BUS_MAX] = {0}, audible = state->solo, prev;
+    int32_t i, j;
+    if (!state->solo) {
+        state->audible = ~(uint64_t)0;
+        goto done;
+    }
+
+    for (i = 1; i < BOX_AUDIO_BUS_MAX; i ++) {
+        if (!state->bus_entity[i]) {
+            continue;
+        }
+
+        targets[i] = (uint64_t)1 << state->route_out[i];
+        for (j = 0; j < BOX_AUDIO_SENDS; j ++) {
+            uint8_t n = state->route_sends[i][j];
+            if (n && n != BOX_AUDIO_BUS_NONE) {
+                targets[i] |= (uint64_t)1 << n;
+            }
+        }
+    }
+
+    do {
+        prev = audible;
+        for (i = 1; i < BOX_AUDIO_BUS_MAX; i ++) {
+            if (targets[i] & audible & ~(uint64_t)1) {
+                audible |= (uint64_t)1 << i;
+            }
+        }
+    } while (audible != prev);
+
+    audible |= state->solo_safe;
+    do {
+        prev = audible;
+        for (i = 1; i < BOX_AUDIO_BUS_MAX; i ++) {
+            if (audible & ((uint64_t)1 << i)) {
+                audible |= targets[i];
+            }
+        }
+    } while (audible != prev);
+
+    state->audible = audible | 1;
+done:
+    return;
+}
+
+/** Send the parameters of the buses that changed, the solo in their mute.
+ *
+ * @param world The world
+ * @param state The state
+ */
+static void box_audio_buses_send(
+    ecs_world_t *world,
+    box_audio_module_t *state)
+{
+    ecs_iter_t it = ecs_query_iter(world, state->buses);
+    int32_t i;
+    while (ecs_query_next(&it)) {
+        const AudioBus *bus = ecs_field(&it, AudioBus, 0);
+        AudioBusState *s = ecs_field(&it, AudioBusState, 1);
+        bool disabled = ecs_table_has_id(world, it.table, EcsDisabled);
+        for (i = 0; i < it.count; i ++) {
+            if (it.entities[i] != state->master && s[i].index &&
+                state->bus_entity[s[i].index] == it.entities[i])
+            {
+                box_audio_bus_params(state, &bus[i], &s[i], disabled);
+            }
+        }
     }
 }
 
@@ -352,7 +512,7 @@ static void box_audio_cycle_error(
  * and find a cycle.
  *
  * @param out Output of each bus index
- * @param send Send of each bus index, BOX_AUDIO_BUS_NONE for none
+ * @param sends BOX_AUDIO_SENDS sends of each bus index in a row, BOX_AUDIO_BUS_NONE for none
  * @param color 0 unseen, 1 on the walk, 2 done
  * @param depth Receives the depth of each finished bus
  * @param stack The walk
@@ -363,7 +523,7 @@ static void box_audio_cycle_error(
  */
 static bool box_audio_walk(
     const uint8_t *out,
-    const uint8_t *send,
+    const uint8_t *sends,
     uint8_t *color,
     int32_t *depth,
     uint8_t *stack,
@@ -371,12 +531,16 @@ static bool box_audio_walk(
     uint8_t bus,
     int32_t *cycle)
 {
-    uint8_t next[2] = { out[bus], send[bus] };
+    uint8_t next[1 + BOX_AUDIO_SENDS] = { out[bus] };
     int32_t i, k, d = 0;
     bool result = false;
+    for (i = 0; i < BOX_AUDIO_SENDS; i ++) {
+        next[1 + i] = sends[bus * BOX_AUDIO_SENDS + i];
+    }
+
     color[bus] = 1;
     stack[(*top) ++] = bus;
-    for (i = 0; i < 2 && !result; i ++) {
+    for (i = 0; i < 1 + BOX_AUDIO_SENDS && !result; i ++) {
         uint8_t n = next[i];
         if (n == 0 || n == BOX_AUDIO_BUS_NONE) {
             d = d > 1 ? d : 1;
@@ -393,7 +557,7 @@ static bool box_audio_walk(
             result = true;
         } else {
             if (!color[n]) {
-                result = box_audio_walk(out, send, color, depth, stack, top, n, cycle);
+                result = box_audio_walk(out, sends, color, depth, stack, top, n, cycle);
             }
 
             d = depth[n] + 1 > d ? depth[n] + 1 : d;
@@ -409,7 +573,7 @@ static bool box_audio_walk(
     return result;
 }
 
-/** Compile the buses into a processing order: every bus before its output and its send, the
+/** Compile the buses into a processing order: every bus before its output and its sends, the
  * deepest first, the master last. A cycle logs an error and keeps the last valid order.
  *
  * @param world The world
@@ -419,21 +583,29 @@ static void box_audio_compile(
     ecs_world_t *world,
     box_audio_module_t *state)
 {
-    uint8_t out[BOX_AUDIO_BUS_MAX], send[BOX_AUDIO_BUS_MAX], color[BOX_AUDIO_BUS_MAX] = {0};
+    uint8_t *out = state->route_out, (*sends)[BOX_AUDIO_SENDS] = state->route_sends;
+    uint8_t color[BOX_AUDIO_BUS_MAX] = {0}, pre[BOX_AUDIO_BUS_MAX] = {0};
     uint8_t stack[BOX_AUDIO_BUS_MAX], order[BOX_AUDIO_BUS_MAX];
-    int32_t depth[BOX_AUDIO_BUS_MAX] = {0}, count = 0, top = 0, cycle = -1, i, k;
+    int32_t depth[BOX_AUDIO_BUS_MAX] = {0}, count = 0, top = 0, cycle = -1, i, j, k;
     box_audio_route_t routes[BOX_AUDIO_BUS_MAX];
     for (i = 0; i < BOX_AUDIO_BUS_MAX; i ++) {
         ecs_entity_t e = state->bus_entity[i];
         const AudioBus *bus = i && e ? ecs_get(world, e, AudioBus) : NULL;
+        const AudioBusState *bs = bus ? ecs_get(world, e, AudioBusState) : NULL;
         out[i] = bus ? box_audio_bus_of(world, state, bus->output) : 0;
-        send[i] = bus ? box_audio_bus_of(world, state, bus->send) : 0;
-        send[i] = send[i] ? send[i] : BOX_AUDIO_BUS_NONE;
+        for (j = 0; j < BOX_AUDIO_SENDS; j ++) {
+            uint8_t n = bs ? box_audio_bus_of(world, state, bs->sends[j]) : 0;
+            sends[i][j] = n ? n : BOX_AUDIO_BUS_NONE;
+            if (n && (bs->pre_fader & (1u << j))) {
+                pre[i] |= (uint8_t)(1u << j);
+            }
+        }
     }
 
     for (i = 1; i < BOX_AUDIO_BUS_MAX; i ++) {
         if (state->bus_entity[i] && !color[i] &&
-            box_audio_walk(out, send, color, depth, stack, &top, (uint8_t)i, &cycle))
+            box_audio_walk(out, state->route_sends[0], color, depth, stack, &top, (uint8_t)i,
+                &cycle))
         {
             box_audio_cycle_error(world, state, stack, top, cycle);
             state->stats.cycles ++;
@@ -453,12 +625,21 @@ static void box_audio_compile(
     }
 
     for (i = 0; i < count; i ++) {
-        routes[i] = (box_audio_route_t){ order[i], out[order[i]], send[order[i]], 0 };
+        routes[i] = (box_audio_route_t){ .bus = order[i], .output = out[order[i]],
+            .pre_fader = pre[order[i]] };
+        for (j = 0; j < BOX_AUDIO_SENDS; j ++) {
+            routes[i].sends[j] = sends[order[i]][j];
+        }
+
         state->order[i] = order[i];
     }
 
     state->spatial_dirty = true;
-    routes[count] = (box_audio_route_t){ 0, BOX_AUDIO_BUS_NONE, BOX_AUDIO_BUS_NONE, 0 };
+    routes[count] = (box_audio_route_t){ .bus = 0, .output = BOX_AUDIO_BUS_NONE };
+    for (j = 0; j < BOX_AUDIO_SENDS; j ++) {
+        routes[count].sends[j] = BOX_AUDIO_BUS_NONE;
+    }
+
     state->order[count] = 0;
     state->order_count = count + 1;
     if (state->serial && box_audio_reserve(state)) {
@@ -1202,7 +1383,7 @@ static void box_audio_queued(
     int32_t i, k, channel;
     bool legato;
     for (i = 0; state->bus_freed && i < ecs_vec_count(&state->oneshots); i ++) {
-        if (shots[i].bus && (state->bus_freed & (1u << shots[i].bus))) {
+        if (shots[i].bus && (state->bus_freed & ((uint64_t)1 << shots[i].bus))) {
             box_audio_voice_set(state, shots[i].handle, BOX_AUDIO_PARAM_BUS, 0.0f);
             shots[i].bus = 0;
         }
@@ -1321,7 +1502,9 @@ static void box_audio_queued(
     ecs_vec_clear(&state->fades);
 }
 
-/** Send the master volume and mute of AudioSettings when they changed.
+/** Send the master volume and mute of AudioSettings, and the volume, mute, pan and width of
+ * the AudioBus of the master, when they changed. The two volumes multiply and either mute
+ * mutes; the output, sends, solo and kind of the master are ignored.
  *
  * @param world The world
  * @param state The state
@@ -1331,15 +1514,34 @@ static void box_audio_settings(
     box_audio_module_t *state)
 {
     const AudioSettings *s = ecs_singleton_get(world, AudioSettings);
+    const AudioBus *mb = state->master && ecs_is_alive(world, state->master) &&
+        !ecs_has_id(world, state->master, EcsDisabled) ?
+            ecs_get(world, state->master, AudioBus) : NULL;
     AudioSettings settings = s ? *s : (AudioSettings){ .master_volume = 1.0f };
-    if (!state->settings_sent || settings.master_volume != state->settings.master_volume) {
-        box_audio_bus_set(state, 0, BOX_AUDIO_PARAM_VOLUME, settings.master_volume);
+    AudioBus bus = { .volume = mb ? mb->volume : 1.0f, .pan = mb ? mb->pan : 0.0f,
+        .width = mb ? mb->width : 1.0f, .mute = mb ? mb->mute : false };
+    const AudioBus *sent = &state->master_bus;
+    bool all = !state->settings_sent;
+    if (all || settings.master_volume != state->settings.master_volume ||
+        bus.volume != sent->volume)
+    {
+        box_audio_bus_set(state, 0, BOX_AUDIO_PARAM_VOLUME, settings.master_volume * bus.volume);
     }
 
-    if (!state->settings_sent || settings.mute != state->settings.mute) {
-        box_audio_bus_set(state, 0, BOX_AUDIO_PARAM_MUTE, settings.mute ? 1.0f : 0.0f);
+    if (all || settings.mute != state->settings.mute || bus.mute != sent->mute) {
+        box_audio_bus_set(state, 0, BOX_AUDIO_PARAM_MUTE,
+            settings.mute || bus.mute ? 1.0f : 0.0f);
     }
 
+    if (all || bus.pan != sent->pan) {
+        box_audio_bus_set(state, 0, BOX_AUDIO_PARAM_PAN, bus.pan);
+    }
+
+    if (all || bus.width != sent->width) {
+        box_audio_bus_set(state, 0, BOX_AUDIO_PARAM_WIDTH, bus.width);
+    }
+
+    state->master_bus = bus;
     state->settings = settings;
     state->settings_sent = true;
 }
@@ -1450,6 +1652,22 @@ done:
     return;
 }
 
+/** Keep the master out of the scripts that set its AudioBus: a script owns the entities it
+ * declares and deletes them when it reloads, which would delete the master.
+ *
+ * @param world The world
+ * @param state The state
+ */
+static void box_audio_master_unown(
+    ecs_world_t *world,
+    const box_audio_module_t *state)
+{
+    if (ecs_has_pair(world, state->master, ecs_id(EcsScript), EcsWildcard)) {
+        ecs_remove_pair(world, state->master, ecs_id(EcsScript),
+            ecs_get_target(world, state->master, ecs_id(EcsScript), 0));
+    }
+}
+
 /** The sync system: once per frame, at the end of the frame, one batch of what changed.
  *
  * @param it The iterator of the system
@@ -1486,10 +1704,14 @@ static void BoxAudioSync(
         listener_moved = true;
     }
 
+    box_audio_master_unown(world, state);
     box_audio_buses(world, state);
     if (state->order_dirty) {
         box_audio_compile(world, state);
     }
+
+    box_audio_solo(state);
+    box_audio_buses_send(world, state);
 
     if (t) {
         box_audio_settings(world, state);
@@ -1546,7 +1768,7 @@ static void BoxAudioBusRemove(
         const AudioBusState *s = ecs_get(it->world, it->entities[i], AudioBusState);
         if (s && s->index && state->bus_entity[s->index] == it->entities[i]) {
             state->bus_entity[s->index] = 0;
-            state->bus_freed |= 1u << s->index;
+            state->bus_freed |= (uint64_t)1 << s->index;
             state->order_dirty = true;
         }
     }

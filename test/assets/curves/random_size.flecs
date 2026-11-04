@@ -2,8 +2,10 @@
 // while others swell to twice their size halfway and then collapse.
 using box.curve
 using box.particle
+using box.transform
 
 bubbles {
+  Position: {0, 0, 0}
   ParticleEmitter: {
     rate: 40, spread: 30, speed: {0.5, 1}, lifetime: {2, 2}, size: {0.2, 0.2}, seed: 8
   }

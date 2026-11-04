@@ -113,6 +113,7 @@ prefab CombustBurst {
   // {1.8, 1.6, 1.8}, radial 7, living 0.58 +- 0.22 s, sized 0.17 +- 0.07 stretched 2, colored
   // {138, 226, 118} through {104, 190, 88, 240} at 0.45 to {62, 122, 54, 130}
   ichor {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 16,
       rate: 0,
@@ -155,6 +156,7 @@ prefab CombustBurst {
   // stretched 1.5, colored {186, 255, 110} through {126, 196, 40, 245} at 0.3 to
   // {50, 60, 26, 150}
   licks {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 18,
       rate: 0,
@@ -197,6 +199,7 @@ prefab CombustBurst {
   // {2.5, 2.2, 2.5}, radial 5.6, living 1.5 +- 0.5 s, sized 0.21 +- 0.09, colored {78, 94, 46}
   // through {58, 68, 36} at 0.5 to {40, 44, 28}
   chunks {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 10,
       rate: 0,
@@ -356,6 +359,7 @@ prefab CombustBurst {
   // and fades linearly to 0 over 1 / 7 s. ore_combust sets the peak of a play to
   // cfg.combustPeak * sqrt(r) and its range to cfg.combustRange + cfg.combustRangeRadius * r
   light {
+    Position: {0, 0, 0}
     Rgb: {212, 255, 180}
     PointLight: {intensity: 4.5, range: 7}
     EffectFlash: {intensity: 4.5, seconds: 0.143}

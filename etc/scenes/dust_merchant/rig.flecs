@@ -38,6 +38,7 @@ flash_ui {
   Scene: {}
   camera { Position: {0, 0, 100}; Camera: {ortho: true, ortho_scale: 1} }
   sheet {
+    Position: {0, 0, 0}
     Rect: {6000, 6000}
     Rgb: {214, 232, 255}
     BlendMode: Additive

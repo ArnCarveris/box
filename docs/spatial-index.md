@@ -7,6 +7,9 @@ A shape with `DynamicTransform` is refit in every frame that the index is querie
 queries it in every frame that a cursor is known. So every moving shape in the index costs
 `SpatialUpdate` time in every frame, whether or not any query can use it.
 
+Only entities with a `WorldTransform` are indexed. An entity without Position, Rotation or Scale
+has no place in the world: it is not drawn, and it is not indexed, so it cannot be picked.
+
 ## SpatialIgnore
 
 `SpatialIgnore` (a tag in `box.spatial`) keeps an entity and all of its descendants out of the
@@ -19,6 +22,7 @@ using box.spatial
 prefab Critter {
   SpatialIgnore
   body {
+    Position: {0, 0, 0}
     Box: {1, 1, 1}
   }
   head {

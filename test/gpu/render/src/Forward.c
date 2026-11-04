@@ -303,6 +303,7 @@ void Forward_shape_added_and_removed(void) {
 
     ecs_entity_t box = ecs_new(world);
     ecs_set(world, box, Box, {2, 2, 2});
+    ecs_set(world, box, Position, {0, 0, 0});
     ecs_set(world, box, Rgb, {255, 255, 255});
     ecs_progress(world, 0);
     box_render_sync(world);

@@ -50,7 +50,14 @@
                     "cycle_refused",
                     "order_one_block",
                     "not_in_order_silent",
-                    "voice_bus_change"
+                    "voice_bus_change",
+                    "width_mono",
+                    "width_double",
+                    "width_one_identical",
+                    "four_sends",
+                    "pre_fader_send",
+                    "send_earlier_refused",
+                    "buses_64"
                 ]
             },
             {
@@ -202,6 +209,19 @@
                 ]
             },
             {
+                "id": "Mixer",
+                "testcases": [
+                    "solo_track",
+                    "solo_group",
+                    "mute_beats_solo",
+                    "cycle_third_send",
+                    "sends_over_max",
+                    "pre_fader_send",
+                    "master_bus",
+                    "scene_script"
+                ]
+            },
+            {
                 "id": "Source",
                 "testcases": [
                     "play_stop",
@@ -317,6 +337,8 @@
                     "layers_clamped",
                     "layers_command_size",
                     "layers_pool",
+                    "layers_steal_quietest",
+                    "layers_steal_cap",
                     "layers_identical",
                     "pitch_variance",
                     "voice_pitch",
@@ -383,6 +405,11 @@
                     "pluck_ends",
                     "pluck_glide",
                     "pluck_pool",
+                    "pluck_unison_peaks",
+                    "pluck_unison_width",
+                    "pluck_unison_pool",
+                    "pluck_unison_seed",
+                    "pluck_pool_cap",
                     "script_pluck",
                     "docs_pluck_examples",
                     "lfo_unison",

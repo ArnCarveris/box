@@ -58,7 +58,9 @@ void Particle_playback_states(void) {
 
     test_assert(ecs_script_run(world, "fx",
         "using box.particle\n"
+        "using box.transform\n"
         "fx {\n"
+        "  Position: {0, 0, 0}\n"
         "  ParticleEmitter: {rate: 8, lifetime: {0.75, 0.75}}\n"
         "  ParticlePlayback: {}\n"
         "}\n", NULL) == 0);

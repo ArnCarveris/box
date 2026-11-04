@@ -632,6 +632,7 @@ void Material_transmission_dynamic_material_keeps_batch(void) {
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Box, {1, 1, 1});
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_add(world, e, DynamicMaterial);
     ecs_set(world, e, Opacity, {0.5f});
     ecs_set(world, e, AlphaCutoff, {0.25f});
@@ -2180,7 +2181,6 @@ void Material_texture_blend_every_shape(void) {
     ecs_set(world, cut, TextureBlend, {.layers = {layer}});
     ecs_set(world, cut, AlphaCutoff, {0.5f});
     ecs_entity_t blended = cutout_shape(world, 10);
-    ecs_set(world, blended, Position, {0, 0, 0});
     ecs_set(world, blended, TextureBlend, {.layers = {layer}});
     ecs_set(world, blended, BlendMode, {AlphaBlend});
     ecs_entity_t faded = cutout_shape(world, 11);

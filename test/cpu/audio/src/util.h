@@ -20,6 +20,17 @@
 /** Frames of a ramp at AUDIO_RATE */
 #define AUDIO_RAMP ((int32_t)(BOX_AUDIO_CORE_RAMP * AUDIO_RATE))
 
+/** A route of a bus to an output with send 0 to a bus, the other sends unused */
+#define AUDIO_ROUTE(bus, output, send)\
+    { (bus), (output), { (send), BOX_AUDIO_BUS_NONE, BOX_AUDIO_BUS_NONE, BOX_AUDIO_BUS_NONE },\
+        0, 0 }
+
+/** A route of a bus to an output without sends */
+#define AUDIO_OUT(bus, output) AUDIO_ROUTE(bus, output, BOX_AUDIO_BUS_NONE)
+
+/** The route of the master, last in an order */
+#define AUDIO_MASTER AUDIO_OUT(0, BOX_AUDIO_BUS_NONE)
+
 /** Pi, which math.h of a strict C11 build does not define */
 #define AUDIO_PI 3.14159265358979323846
 

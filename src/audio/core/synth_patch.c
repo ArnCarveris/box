@@ -157,7 +157,7 @@ static void box_audio_synth_patch_clamp(
             1.0f : BOX_AUDIO_SYNTH_INDEX_MAX);
         l->feedback = box_audio_synth_clamp(l->feedback, 0, BOX_AUDIO_SYNTH_FEEDBACK_MAX);
         l->audible = l->audible != 0;
-        l->voices = l->voices < 1 || l->wave == BOX_AUDIO_SYNTH_PLUCK ? 1 :
+        l->voices = l->voices < 1 ? 1 :
             (l->voices > BOX_AUDIO_SYNTH_UNISON_MAX ? BOX_AUDIO_SYNTH_UNISON_MAX : l->voices);
         l->detune = box_audio_synth_clamp(l->detune, 0, BOX_AUDIO_SYNTH_DETUNE_MAX);
         l->width = box_audio_synth_clamp(l->width, 0, 1);
@@ -214,23 +214,38 @@ bool box_audio_synth_fits(
     const box_audio_core_t *core,
     uint32_t sound)
 {
-    const box_audio_synth_slot_t *slot = &core->synths[core->sounds[sound].synth - 1];
+    return box_audio_synth_parts(core, sound) <= core->synth_free_count &&
+        box_audio_synth_strings_fit(core, sound);
+}
 
-    return (int32_t)slot->patch.layers <= core->synth_free_count &&
-        slot->strings <= core->string_free_count;
+int32_t box_audio_synth_parts(
+    const box_audio_core_t *core,
+    uint32_t sound)
+{
+    return (int32_t)core->synths[core->sounds[sound].synth - 1].patch.layers;
+}
+
+bool box_audio_synth_strings_fit(
+    const box_audio_core_t *core,
+    uint32_t sound)
+{
+    return core->synths[core->sounds[sound].synth - 1].strings <= core->string_free_count;
 }
 
 void box_audio_synth_end(
     box_audio_core_t *core,
     box_audio_synth_source_t *src)
 {
+    box_audio_synth_string_t *s, *next;
     int32_t l;
     for (l = src->layers - 1; l >= 0; l --) {
-        if (src->part[l]->string) {
-            core->string_free[core->string_free_count ++] =
-                (uint16_t)(src->part[l]->string - core->synth_strings);
-            src->part[l]->string = NULL;
+        for (s = src->part[l]->string; s; s = next) {
+            next = s->next;
+            s->next = NULL;
+            core->string_free[core->string_free_count ++] = (uint16_t)(s - core->synth_strings);
         }
+
+        src->part[l]->string = NULL;
 
         core->synth_free[core->synth_free_count ++] =
             (uint16_t)(src->part[l] - core->synth_parts);
@@ -283,7 +298,7 @@ void box_audio_synth_command(
     core->synths[slot].strings = 0;
     for (i = 0; i < (int32_t)core->synths[slot].patch.layers; i ++) {
         if (core->synths[slot].patch.layer[i].wave == BOX_AUDIO_SYNTH_PLUCK) {
-            core->synths[slot].strings ++;
+            core->synths[slot].strings += (int32_t)core->synths[slot].patch.layer[i].voices;
         }
     }
 

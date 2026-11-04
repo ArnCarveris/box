@@ -43,6 +43,7 @@ static ecs_entity_t emitter_new(
 {
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, ParticleEmitter);
+    ecs_set(world, e, Position, {0, 0, 0});
     ParticleEmitter *p = ecs_get_mut(world, e, ParticleEmitter);
     p->rate = 20;
     p->max = 100;
@@ -150,6 +151,7 @@ void Linger_c_default(void) {
     ecs_world_t *world = world_new(&null);
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, ParticleEmitter);
+    ecs_set(world, e, Position, {0, 0, 0});
     test_bool(ecs_get(world, e, ParticleEmitter)->linger, false);
 
     test_assert(ecs_script_run(world, "linger",

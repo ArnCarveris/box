@@ -54,7 +54,25 @@ static void box_cmd_audio_bus_name(
     ecs_os_free(path);
 }
 
-/** Append the line of a bus: its parameters, its output and its send.
+/** Get the name of a channel kind as the audio command prints it.
+ *
+ * @param kind The kind
+ * @return The name
+ */
+static const char* box_cmd_audio_kind(
+    AudioChannelKind kind)
+{
+    const char *result = "group";
+    switch (kind) {
+    case AudioChannelGroup: result = "group"; break;
+    case AudioChannelReturn: result = "return"; break;
+    case AudioChannelSfx: result = "sfx"; break;
+    }
+
+    return result;
+}
+
+/** Append the line of a bus: its kind, its parameters, its output and its sends.
  *
  * @param world The world
  * @param buf The output
@@ -69,13 +87,24 @@ static void box_cmd_audio_bus(
 {
     const AudioBus *bus = ecs_get(world, e, AudioBus);
     char *path = ecs_get_path(world, e);
-    ecs_strbuf_append(buf, "\n  %s: volume %.2f pan %.2f%s%s -> ", path, (double)bus->volume,
-        (double)bus->pan, bus->mute ? " muted" : "",
+    const AudioSend *sends = ecs_vec_first(&bus->sends);
+    int32_t j, count = ecs_vec_count(&bus->sends);
+    ecs_strbuf_append(buf, "\n  %s: %s volume %.2f pan %.2f width %.2f%s%s%s -> ", path,
+        box_cmd_audio_kind(bus->kind), (double)bus->volume, (double)bus->pan,
+        (double)bus->width, bus->solo ? " solo" : "", bus->mute ? " muted" : "",
         ecs_has_id(world, e, EcsDisabled) ? " disabled" : "");
     box_cmd_audio_bus_name(world, buf, bus->output);
-    if (bus->send && box_audio_module_bus_index(world, bus->send)) {
-        ecs_strbuf_append(buf, ", send %.2f -> ", (double)bus->send_level);
-        box_cmd_audio_bus_name(world, buf, bus->send);
+    for (j = 0; j < count; j ++) {
+        if (j >= BOX_AUDIO_SENDS) {
+            ecs_strbuf_append(buf, ", %d more sends ignored", count - BOX_AUDIO_SENDS);
+            break;
+        }
+
+        if (sends[j].bus && box_audio_module_bus_index(world, sends[j].bus)) {
+            ecs_strbuf_append(buf, ", send%s %.2f -> ", sends[j].pre_fader ? " pre" : "",
+                (double)sends[j].level);
+            box_cmd_audio_bus_name(world, buf, sends[j].bus);
+        }
     }
 
     const Reverb *reverb = ecs_get(world, e, Reverb);
@@ -185,10 +214,20 @@ static char* box_cmd_audio_print(
         (double)(s.load * 100.0f));
     ecs_strbuf_append(&buf, "\nclock: %lld frames (%.3f s)", (long long)s.clock,
         s.sample_rate > 0 ? (double)s.clock / (double)s.sample_rate : 0.0);
+<<<<<<< HEAD
     box_cmd_audio_transport(world, &buf);
+=======
+    ecs_entity_t master = ecs_lookup(world, "box.audio.master");
+    const AudioBus *mb = master ? ecs_get(world, master, AudioBus) : NULL;
+>>>>>>> 46742d201aa669a5a77ab35e5648487b376e5881
     ecs_strbuf_append(&buf, "\nmaster: volume %.2f%s",
         settings ? (double)settings->master_volume : 1.0, settings && settings->mute ?
             " muted" : "");
+    if (mb) {
+        ecs_strbuf_append(&buf, ", bus volume %.2f pan %.2f width %.2f%s", (double)mb->volume,
+            (double)mb->pan, (double)mb->width, mb->mute ? " muted" : "");
+    }
+
     for (i = 0; i < count; i ++) {
         box_cmd_audio_bus(world, &buf, order[i], true);
     }
@@ -197,7 +236,7 @@ static char* box_cmd_audio_print(
     while (ecs_each_next(&it)) {
         for (i = 0; i < it.count; i ++) {
             for (k = 0; k < count && order[k] != it.entities[i]; k ++) { }
-            if (k == count) {
+            if (k == count && it.entities[i] != master) {
                 box_cmd_audio_bus(world, &buf, it.entities[i], false);
             }
         }

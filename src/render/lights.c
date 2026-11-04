@@ -390,7 +390,8 @@ static void box_lights_axis(
 
 /** Write a light with a position, a range and no cone.
  *
- * @param transform World transform of the light, NULL for the origin
+ * @param transform World transform of the light, NULL for a directional light,
+ * which has no position
  * @param rgb Color of the light, NULL for white
  * @param intensity Irradiance scale
  * @param range Distance at which the light reaches zero
@@ -406,8 +407,6 @@ static void box_lights_point(
     ecs_os_memset_t(out, 0, box_render_light_t);
     if (transform) {
         glm_vec3_copy(ECS_CONST_CAST(float*, transform->m[3]), out->position);
-    } else {
-        glm_vec3_zero(out->position);
     }
 
     out->shadow = BOX_RENDER_SHADOW_NONE;
@@ -1665,21 +1664,31 @@ static ecs_query_t* box_lights_scene_query(
 
 /** Create the query of one kind of light.
  *
+ * A point or spot light without a WorldTransform has no place in the world and is not
+ * extracted. A directional light has a direction and no place: without a WorldTransform it
+ * takes the direction of the identity transform.
+ *
  * @param world The world
  * @param light The light component
  * @param name The name of the query entity
+ * @param placed Whether the light needs a WorldTransform
  * @return The query, with the light, WorldTransform, Rgb and Scene(self|up)
  */
 static ecs_query_t* box_lights_query(
     ecs_world_t *world,
     ecs_entity_t light,
-    const char *name)
+    const char *name,
+    bool placed)
 {
     return ecs_query(world, {
         .entity = ecs_entity(world, { .name = name }),
         .terms = {
             { .id = light, .inout = EcsIn },
-            { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional },
+            {
+                .id = ecs_id(WorldTransform),
+                .inout = EcsIn,
+                .oper = placed ? EcsAnd : EcsOptional
+            },
             { .id = ecs_id(Rgb), .inout = EcsIn, .oper = EcsOptional },
             {
                 .id = ecs_id(Scene),
@@ -1708,9 +1717,10 @@ void box_render_lights_init(
     ecs_map_init(&l->lookup, NULL);
     l->next_buffer = BOX_LIGHTS_DEFAULT_BUFFER + 1;
     l->next_atlas = BOX_RENDER_BUFFER_SHADOW_FIRST;
-    l->directional = box_lights_query(world, ecs_id(DirectionalLight), "RenderDirectionalLights");
-    l->point = box_lights_query(world, ecs_id(PointLight), "RenderPointLights");
-    l->spot = box_lights_query(world, ecs_id(SpotLight), "RenderSpotLights");
+    l->directional = box_lights_query(world, ecs_id(DirectionalLight), "RenderDirectionalLights",
+        false);
+    l->point = box_lights_query(world, ecs_id(PointLight), "RenderPointLights", true);
+    l->spot = box_lights_query(world, ecs_id(SpotLight), "RenderSpotLights", true);
     l->ambient = box_lights_scene_query(world, ecs_id(AmbientLight), "RenderAmbientLights");
     l->bakes = box_lights_scene_query(world, ecs_id(LightBake), "RenderLightBakes");
     l->atlases = box_lights_scene_query(world, ecs_id(ShadowAtlas), "RenderShadowAtlases");

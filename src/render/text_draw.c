@@ -198,7 +198,7 @@ static void box_draws_text_key(
  *
  * @param transform_out The transform of the glyph, NULL to leave it
  * @param shading_out The shading of the glyph, NULL to leave it
- * @param transform World transform of the text, NULL for the identity
+ * @param transform World transform of the text
  * @param g The glyph
  * @param material Material components of the text
  */
@@ -211,12 +211,7 @@ static void box_draws_glyph(
 {
     mat4 m;
     int32_t r;
-    if (transform) {
-        glm_mat4_copy(ECS_CONST_CAST(vec4*, transform->m), m);
-    } else {
-        glm_mat4_identity(m);
-    }
-
+    glm_mat4_copy(ECS_CONST_CAST(vec4*, transform->m), m);
     for (r = 0; transform_out && r < 3; r ++) {
         transform_out->rows[r][0] = m[0][r] * g->width;
         transform_out->rows[r][1] = g->shear != 0.0f
@@ -294,7 +289,7 @@ static float box_draws_text_spans_alpha(
  *
  * @param transform_out The transform of the glyph, NULL to leave it
  * @param shading_out The shading of the glyph, NULL to leave it
- * @param transform World transform of the text, NULL for the identity
+ * @param transform World transform of the text
  * @param g The glyph
  * @param material Material components of the text
  * @param color Display encoded color of the span, NULL for the color of the entity
@@ -361,8 +356,9 @@ void box_draws_text_update(
     uint8_t kinds)
 {
     const TextGlyphs *tg = ecs_get(world, e, TextGlyphs);
-    bool drawn = tg && ecs_has(world, e, Text) && !ecs_has_id(world, e, EcsPrefab) &&
-        !ecs_has_id(world, e, EcsDisabled);
+    const WorldTransform *transform = ecs_get(world, e, WorldTransform);
+    bool drawn = tg && transform && ecs_has(world, e, Text) &&
+        !ecs_has_id(world, e, EcsPrefab) && !ecs_has_id(world, e, EcsDisabled);
     int32_t i, count = drawn ? ecs_vec_count(&tg->glyphs) : 0;
     const box_text_glyph_t *glyphs = drawn ? ecs_vec_first(&tg->glyphs) : NULL;
     box_draw_tint_t tint = { .keep = 1.0f };
@@ -403,7 +399,6 @@ void box_draws_text_update(
         }
     }
 
-    const WorldTransform *transform = ecs_get(world, e, WorldTransform);
     material.clip = count ? box_draws_clip_of(world, d, e) : 0;
     material.rank = ts ? ts->rank : 0;
     for (i = 0; i < count; i ++) {
@@ -557,6 +552,7 @@ void box_draws_text_init(
         .terms = {
             { .id = ecs_id(Text), .inout = EcsInOutNone },
             { .id = ecs_id(TextSlots), .inout = EcsInOutNone },
+            { .id = ecs_id(WorldTransform), .inout = EcsInOutNone },
             { .id = DynamicTransform, .inout = EcsInOutNone }
         },
         .cache_kind = EcsQueryCacheAuto
@@ -566,6 +562,7 @@ void box_draws_text_init(
         .terms = {
             { .id = ecs_id(Text), .inout = EcsInOutNone },
             { .id = ecs_id(TextSlots), .inout = EcsInOutNone },
+            { .id = ecs_id(WorldTransform), .inout = EcsInOutNone },
             {
                 .id = DynamicMaterial,
                 .src.id = EcsSelf | EcsUp,

@@ -119,9 +119,9 @@ template NavPage {
       "gy_{i}" { Stroke: {x1: -420, y1: (i - 3) * 80, x2: 420, y2: (i - 3) * 80, w: 1, hue: NAV_FAINT} }
     }
 
-    RingLine r1(r: 90, w: 1, hue: NAV_FAINT)
-    RingLine r2(r: 180, w: 1, hue: NAV_DIM)
-    RingLine r3(r: 270, w: 1, hue: NAV_FAINT)
+    RingLine r1(r: 90, w: 1, hue: NAV_FAINT) { Position: {0, 0, 0} }
+    RingLine r2(r: 180, w: 1, hue: NAV_DIM) { Position: {0, 0, 0} }
+    RingLine r3(r: 270, w: 1, hue: NAV_FAINT) { Position: {0, 0, 0} }
 
     beam {
       Rotation: {0, 0, sweep}
@@ -297,7 +297,7 @@ template ComPage {
 
   head {
     Position: {0, 208, 20}
-    bar { Rect: {640, 56}; Rgb: {30, 16, 4} }
+    bar { Position: {0, 0, 0}; Rect: {640, 56}; Rgb: {30, 16, 4} }
     Ink title(text: "VOX-LINK  {freq:.1} MHZ", size: 36, hue: AMB_INK) { Position: {-100, 0, 1} }
     Ink rx(text: match locked { true: "RX LOCK"; _: "SCAN" }, size: 32, hue: match locked { true: {255, 230, 170}; _: AMB_DIM }) { Position: {240, 0, 1} }
   }

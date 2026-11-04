@@ -14,7 +14,7 @@ static box_audio_core_t* ramp_core(
     float level)
 {
     box_audio_route_t routes[] = {
-        { 1, 0, 2 }, { 2, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 }
+        AUDIO_ROUTE(1, 0, 2), AUDIO_OUT(2, 0), AUDIO_MASTER
     };
     box_audio_core_t *core = audio_new();
     audio_fill(audio_sound_a, 1024, level);

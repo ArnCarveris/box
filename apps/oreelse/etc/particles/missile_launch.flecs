@@ -11,6 +11,7 @@ prefab MissileLaunch {
   // {0.4, 0.3, 0.5}, living 0.17 +- 0.05 s, sized 0.58 +- 0.18 growing 1.2 a second, colored
   // {255, 246, 224} through {255, 208, 132} at 0.45 to {255, 138, 62, 190}
   flash {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 4,
       rate: 0,
@@ -51,6 +52,7 @@ prefab MissileLaunch {
   // {0.7, 0.5, 1.3}, radial 1.4, living 0.32 +- 0.12 s, sized 0.42 +- 0.14 growing 0.9 a second,
   // colored {255, 226, 176} through {255, 152, 66, 235} at 0.38 to {148, 70, 40, 120}
   exhaust {
+    Position: {0, 0, 0}
     ParticleEmitter: {
       max: 10,
       rate: 0,

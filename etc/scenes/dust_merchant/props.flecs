@@ -248,7 +248,7 @@ template CoffeeMachine {
   Stamp tag_a(text: "PROPERTY OF", size: 10) { Position: {-0.014, 0.153, 0.04} }
   Stamp tag_b(text: "TOLL STN ORO", size: 15, ink: {90, 6, 4}, font: font_stencil) { Position: {-0.014, 0.135, 0.04} }
   Steam plume(on: brewing, rate: 14, seed: 21) { Position: {0.118, 0.07, 0.074} }
-  Cable cord(a: {-0.1, 0.05, -0.07}, b: {-0.28, 0.0, 0.1}, sag: 0.02, thick: 0.008, tone: {120, 100, 40})
+  Cable cord(a: {-0.1, 0.05, -0.07}, b: {-0.28, 0.0, 0.1}, sag: 0.02, thick: 0.008, tone: {120, 100, 40}) { Position: {0, 0, 0} }
 }
 
 template Manifest {
@@ -301,10 +301,10 @@ template WireRun {
   prop b: P3 = {0, 0, 1}
   prop sag: f32 = 0.1
 
-  Cable w_a(a: a, b: b, sag: sag, thick: 0.013, tone: {24, 24, 26})
-  Cable w_b(a: {a.x + 0.016, a.y, a.z}, b: {b.x + 0.018, b.y, b.z}, sag: sag + 0.012, thick: 0.009, tone: {120, 24, 16})
-  Cable w_c(a: {a.x - 0.014, a.y, a.z}, b: {b.x - 0.02, b.y, b.z}, sag: sag + 0.02, thick: 0.009, tone: {150, 118, 28})
-  Cable w_d(a: {a.x + 0.003, a.y + 0.014, a.z}, b: {b.x + 0.004, b.y + 0.016, b.z}, sag: sag - 0.01, thick: 0.007, tone: {24, 62, 110})
+  Cable w_a(a: a, b: b, sag: sag, thick: 0.013, tone: {24, 24, 26}) { Position: {0, 0, 0} }
+  Cable w_b(a: {a.x + 0.016, a.y, a.z}, b: {b.x + 0.018, b.y, b.z}, sag: sag + 0.012, thick: 0.009, tone: {120, 24, 16}) { Position: {0, 0, 0} }
+  Cable w_c(a: {a.x - 0.014, a.y, a.z}, b: {b.x - 0.02, b.y, b.z}, sag: sag + 0.02, thick: 0.009, tone: {150, 118, 28}) { Position: {0, 0, 0} }
+  Cable w_d(a: {a.x + 0.003, a.y + 0.014, a.z}, b: {b.x + 0.004, b.y + 0.016, b.z}, sag: sag - 0.01, thick: 0.007, tone: {24, 62, 110}) { Position: {0, 0, 0} }
   clamp_a : Canvas { Position: {lerp(a.x, b.x, 0.33), lerp(a.y, b.y, 0.33) - sag * 0.68, lerp(a.z, b.z, 0.33)}; Scale: {1, 1, 1}; Sphere: {radius: 0.03, segments: 10, smooth: true}; Rgb: {30, 30, 30} }
   clamp_b : Canvas { Position: {lerp(a.x, b.x, 0.66), lerp(a.y, b.y, 0.66) - sag * 0.72, lerp(a.z, b.z, 0.66)}; Scale: {1, 1, 1}; Sphere: {radius: 0.03, segments: 10, smooth: true}; Rgb: {30, 30, 30} }
 }
@@ -378,7 +378,7 @@ template MapLamp {
   const at: P3 = {-1.14, 1.21, -0.5}
   const aim: P3 = {-1.1, 0.7, -0.66}
 
-  Cable neck(a: {-1.32, 1.03, -0.56}, b: {at.x, at.y, at.z}, sag: -0.07, thick: 0.009, tone: {130, 128, 120})
+  Cable neck(a: {-1.32, 1.03, -0.56}, b: {at.x, at.y, at.z}, sag: -0.07, thick: 0.009, tone: {130, 128, 120}) { Position: {0, 0, 0} }
   foot : BlackAnod { Position: {-1.32, 1.04, -0.56}; Cylinder: {radius: 0.026, length: 0.012, segments: 14, smooth: true}; SpatialIgnore }
   head {
     Position: {at.x, at.y, at.z}

@@ -129,8 +129,11 @@ void Script_reverb_hall(void) {
     test_flt(reverb->predelay, 0.02f);
     test_flt(reverb->size, 0.5f);
     test_flt(reverb->mix, 1.0f);
-    test_assert(ecs_get(world, room, AudioBus)->send == hall);
-    test_flt(ecs_get(world, room, AudioBus)->send_level, 0.3f);
+    const AudioBus *room_bus = ecs_get(world, room, AudioBus);
+    test_int(ecs_vec_count(&room_bus->sends), 1);
+    test_assert(ecs_vec_first_t(&room_bus->sends, AudioSend)[0].bus == hall);
+    test_flt(ecs_vec_first_t(&room_bus->sends, AudioSend)[0].level, 0.3f);
+    test_bool(ecs_vec_first_t(&room_bus->sends, AudioSend)[0].pre_fader, false);
     test_int(ecs_get(world, hall, AudioBus)->output, ecs_lookup(world, "box.audio.master"));
 
     audio_run(world, 30);

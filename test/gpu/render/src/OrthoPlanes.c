@@ -32,6 +32,7 @@ void OrthoPlanes_inverted_planes_draw_nothing(void) {
         .color = {0, 0, 0, 255}}});
     ecs_entity_t cube = ecs_new(world);
     ecs_set(world, cube, Box, {8, 8, 1});
+    ecs_set(world, cube, Position, {0, 0, 0});
     ecs_set(world, cube, Rgb, {255, 255, 255});
     ecs_entity_t s = ecs_new(world);
     ecs_set(world, s, Surface, {.width = 16, .height = 16, .resolution_scale = 1,
@@ -85,6 +86,7 @@ void OrthoPlanes_valid_planes_after_invalid_draw(void) {
         .color = {0, 0, 0, 255}}});
     ecs_entity_t cube = ecs_new(world);
     ecs_set(world, cube, Box, {8, 8, 1});
+    ecs_set(world, cube, Position, {0, 0, 0});
     ecs_set(world, cube, Rgb, {255, 255, 255});
     ecs_entity_t s = ecs_new(world);
     ecs_set(world, s, Surface, {.width = 16, .height = 16, .resolution_scale = 1,
@@ -128,6 +130,7 @@ void OrthoPlanes_perspective_bad_planes_draw_nothing(void) {
             .color = {0, 0, 0, 255}}});
         ecs_entity_t cube = ecs_new(world);
         ecs_set(world, cube, Box, {2, 2, 2});
+        ecs_set(world, cube, Position, {0, 0, 0});
         ecs_set(world, cube, Rgb, {255, 255, 255});
         ecs_entity_t s = ecs_new(world);
         ecs_set(world, s, Surface, {.width = 16, .height = 16, .resolution_scale = 1,
@@ -167,6 +170,7 @@ void OrthoPlanes_empty_depth_view_draws_no_instances(void) {
         .color = {0, 0, 0, 255}}});
     ecs_entity_t cube = ecs_new(world);
     ecs_set(world, cube, Box, {8, 8, 1});
+    ecs_set(world, cube, Position, {0, 0, 0});
     ecs_entity_t s = ecs_new(world);
     ecs_set(world, s, Surface, {.width = 16, .height = 16, .resolution_scale = 1});
     uint32_t word = 0;

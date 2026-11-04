@@ -361,7 +361,7 @@ void Schedule_stop_cancels(void) {
 static void schedule_workload(
     box_audio_core_t *core)
 {
-    box_audio_route_t routes[] = { { 1, 0, 255 }, { 0, 255, 255 } };
+    box_audio_route_t routes[] = { AUDIO_OUT(1, 0), AUDIO_MASTER };
     box_audio_writer_t w;
     uint32_t i;
     audio_sine(audio_sound_a, 4000, 220, 0.4f);

@@ -334,7 +334,9 @@ static void scene_init(
     snprintf(code, sizeof(code),
         "using box.curve\n"
         "using box.particle\n"
+        "using box.transform\n"
         "jet {\n"
+        "  Position: {0, 0, 0}\n"
         "  ParticleEmitter: {rate: 20, lifetime: {1, 1}, seed: %u}\n"
         "  %s\n"
         "}\n", SEED, components);

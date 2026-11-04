@@ -10,6 +10,17 @@
 #include <bake_bench.h>
 #include <math.h>
 
+/** A route of a bus to an output with send 0 to a bus, the other sends unused */
+#define BENCH_ROUTE(bus, output, send)\
+    { (bus), (output), { (send), BOX_AUDIO_BUS_NONE, BOX_AUDIO_BUS_NONE, BOX_AUDIO_BUS_NONE },\
+        0, 0 }
+
+/** A route of a bus to an output without sends */
+#define BENCH_OUT(bus, output) BENCH_ROUTE(bus, output, BOX_AUDIO_BUS_NONE)
+
+/** The route of the master, last in an order */
+#define BENCH_MASTER BENCH_OUT(0, BOX_AUDIO_BUS_NONE)
+
 /** Sample rate of the benchmarks */
 #define BENCH_RATE 48000
 
@@ -50,9 +61,9 @@ static box_audio_core_t* bench_core(
 {
     static uint8_t bytes[8192];
     box_audio_route_t routes[] = {
-        { 7, 1, 6 }, { 6, 2, BOX_AUDIO_BUS_NONE }, { 5, 1, 4 }, { 4, 1, BOX_AUDIO_BUS_NONE },
-        { 3, 2, BOX_AUDIO_BUS_NONE }, { 2, 1, BOX_AUDIO_BUS_NONE },
-        { 1, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 }
+        BENCH_ROUTE(7, 1, 6), BENCH_OUT(6, 2), BENCH_ROUTE(5, 1, 4), BENCH_OUT(4, 1),
+        BENCH_OUT(3, 2), BENCH_OUT(2, 1),
+        BENCH_OUT(1, 0), BENCH_MASTER
     };
     box_audio_core_desc_t desc = { .sample_rate = BENCH_RATE };
     box_audio_core_t *core = box_audio_core_new(&desc);

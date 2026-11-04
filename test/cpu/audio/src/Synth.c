@@ -1565,9 +1565,37 @@ void Synth_layers_command_size(void) {
     box_audio_core_free(core);
 }
 
+/** Read every event of a core and count them by type.
+ *
+ * @param core The core
+ * @param counts Receives the count of each type, BOX_AUDIO_EVENT_LOST + 1 of them
+ * @param stolen Receives the last VOICE_STOLEN, id 0 without one
+ */
+static void synth_pool_events(
+    box_audio_core_t *core,
+    int32_t *counts,
+    box_audio_event_t *stolen)
+{
+    box_audio_event_t events[64];
+    int32_t n, i;
+    memset(counts, 0, sizeof(int32_t) * (BOX_AUDIO_EVENT_LOST + 1));
+    memset(stolen, 0, sizeof(*stolen));
+    while ((n = box_audio_core_read_events(core, events, 64)) > 0) {
+        for (i = 0; i < n; i ++) {
+            if (events[i].type >= 0 && events[i].type <= BOX_AUDIO_EVENT_LOST) {
+                counts[events[i].type] ++;
+            }
+
+            if (events[i].type == BOX_AUDIO_EVENT_VOICE_STOLEN) {
+                *stolen = events[i];
+            }
+        }
+    }
+}
+
 /** Voices take the state of only the layers their patch has, from a pool of 4 per voice slot:
- * every slot plays 4 layers, a play of 8 layers that finds no room is ignored, and the layers
- * come back when the voices end. */
+ * every slot plays 4 layers, a play of 8 layers that finds no room steals the quietest voice,
+ * the first of equals, and the layers come back when the voices end. */
 void Synth_layers_pool(void) {
     // audio/synth
     box_audio_core_t *core = synth_core(AUDIO_RATE);
@@ -1575,6 +1603,8 @@ void Synth_layers_pool(void) {
     box_audio_synth_patch_t four = synth_octet(0.05f);
     const int32_t slots = BOX_AUDIO_VOICE_MAX + BOX_AUDIO_VOICE_TAIL_MAX;
     const int32_t fit = 4 * slots / BOX_AUDIO_SYNTH_LAYERS;
+    int32_t counts[BOX_AUDIO_EVENT_LOST + 1];
+    box_audio_event_t stolen;
     int32_t i;
     four.layers = 4;
     synth_define(core, 1, &wide);
@@ -1596,8 +1626,14 @@ void Synth_layers_pool(void) {
     test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
     test_int(box_audio_core_voice_count(core), fit);
     audio_play(core, 1000, 1, 0, 0.01f, 0, 1, 0);
-    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 1);
+    synth_pool_events(core, counts, &stolen);
+    test_int(counts[BOX_AUDIO_EVENT_IGNORED], 0);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_STOLEN], 1);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_END], 1);
+    test_uint(stolen.id, 100);
+    test_int(stolen.value, 1);
     test_int(box_audio_core_voice_count(core), fit);
+    test_assert(box_audio_core_voice_count(core) <= BOX_AUDIO_VOICE_MAX);
     audio_render(core, 0, 9600);
     test_assert(synth_finite(audio_l, 0, 9600));
     test_int(box_audio_core_voice_count(core), 0);
@@ -1609,6 +1645,97 @@ void Synth_layers_pool(void) {
 
     test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
     test_int(box_audio_core_voice_count(core), fit);
+    box_audio_core_free(core);
+}
+
+/** A play of 8 layers that finds the pool full steals the quietest playing voice of 8 layers,
+ * and ends voices that fade out before it steals one that plays, the first of equals. */
+void Synth_layers_steal_quietest(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t wide = synth_octet(0.05f);
+    const int32_t slots = BOX_AUDIO_VOICE_MAX + BOX_AUDIO_VOICE_TAIL_MAX;
+    const int32_t fit = 4 * slots / BOX_AUDIO_SYNTH_LAYERS;
+    int32_t counts[BOX_AUDIO_EVENT_LOST + 1];
+    box_audio_event_t stolen, e;
+    uint8_t bytes[64];
+    box_audio_writer_t w;
+    int32_t i;
+    synth_define(core, 1, &wide);
+    for (i = 0; i < fit; i ++) {
+        audio_play(core, 100 + (uint32_t)i, 1, 0, i == 7 ? 0.005f : 0.02f, 0, 1, 0);
+    }
+
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
+    test_int(box_audio_core_voice_count(core), fit);
+
+    audio_play(core, 1000, 1, 0, 0.02f, 0, 1, 0);
+    synth_pool_events(core, counts, &stolen);
+    test_int(counts[BOX_AUDIO_EVENT_IGNORED], 0);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_STOLEN], 1);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_END], 1);
+    test_uint(stolen.id, 107);
+    test_int(stolen.value, 1);
+    test_int(box_audio_core_voice_count(core), fit);
+
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_stop(&w, 110, 0));
+    test_assert(box_audio_write_stop(&w, 111, 0));
+    box_audio_core_apply(core, w.data, w.size);
+    test_int(box_audio_core_voice_count(core), fit - 2);
+
+    audio_play(core, 1001, 1, 0, 0.02f, 0, 1, 0);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_VOICE_END, &e), 1);
+    test_uint(e.id, 110);
+    test_int(box_audio_core_voice_count(core), fit - 1);
+
+    audio_play(core, 1002, 1, 0, 0.02f, 0, 1, 0);
+    synth_pool_events(core, counts, &stolen);
+    test_int(counts[BOX_AUDIO_EVENT_IGNORED], 0);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_STOLEN], 0);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_END], 1);
+    test_int(box_audio_core_voice_count(core), fit);
+
+    audio_render(core, 0, 9600);
+    test_assert(synth_finite(audio_l, 0, 9600));
+    test_int(box_audio_core_voice_count(core), 0);
+    box_audio_core_free(core);
+}
+
+/** At the voice cap with the pool full, a play of 8 layers steals one voice for its parts and
+ * the cap steals no other: the voice it ends leaves room under the cap. */
+void Synth_layers_steal_cap(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t wide = synth_octet(0.05f);
+    box_audio_synth_patch_t two = synth_octet(0.05f);
+    const int32_t eights = (BOX_AUDIO_VOICE_MAX + BOX_AUDIO_VOICE_TAIL_MAX) * 4 / 8 - 8;
+    const int32_t twos = BOX_AUDIO_VOICE_MAX - eights;
+    int32_t counts[BOX_AUDIO_EVENT_LOST + 1];
+    box_audio_event_t stolen;
+    int32_t i;
+    two.layers = 2;
+    synth_define(core, 1, &wide);
+    synth_define(core, 2, &two);
+    test_int(eights * 8 + twos * 2, (BOX_AUDIO_VOICE_MAX + BOX_AUDIO_VOICE_TAIL_MAX) * 4);
+    for (i = 0; i < twos; i ++) {
+        audio_play(core, 100 + (uint32_t)i, 2, 0, 0.02f, 0, 1, 0);
+    }
+
+    for (i = 0; i < eights; i ++) {
+        audio_play(core, 200 + (uint32_t)i, 1, 0, 0.01f, 0, 1, 0);
+    }
+
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
+    test_int(box_audio_core_voice_count(core), BOX_AUDIO_VOICE_MAX);
+
+    audio_play(core, 1000, 1, 0, 0.02f, 0, 1, 0);
+    synth_pool_events(core, counts, &stolen);
+    test_int(counts[BOX_AUDIO_EVENT_IGNORED], 0);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_STOLEN], 1);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_END], 1);
+    test_uint(stolen.id, 200);
+    test_int(box_audio_core_voice_count(core), BOX_AUDIO_VOICE_MAX);
     box_audio_core_free(core);
 }
 
@@ -3460,9 +3587,9 @@ static void synth_unison_chain(
 void Synth_unison_stereo_chain(void) {
     // audio/synth
     static float ref_l[AUDIO_FRAMES / 2], ref_r[AUDIO_FRAMES / 2];
-    const box_audio_route_t plain[] = { { 1, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 } };
+    const box_audio_route_t plain[] = { AUDIO_OUT(1, 0), AUDIO_MASTER };
     const box_audio_route_t sent[] = {
-        { 1, 0, 2 }, { 2, 0, BOX_AUDIO_BUS_NONE }, { 0, 255, 255 } };
+        AUDIO_ROUTE(1, 0, 2), AUDIO_OUT(2, 0), AUDIO_MASTER };
     const int32_t from = 2 * AUDIO_RAMP, to = AUDIO_FRAMES / 2;
     double ms_l = 0, ms_r = 0, ms = 0, lr = 0;
     float err = 0;
@@ -3842,20 +3969,21 @@ void Synth_pluck_seed(void) {
     test_assert(hash[0] != hash[2]);
 }
 
-/** A string plays as one voice: unison on a pluck layer renders bit identical to none, and a
- * string next to a wide unison layer rings in the center of the stereo voice and ends it. */
+/** A pluck layer of one unison voice, or none, renders bit identical to one without unison,
+ * whatever its detune and width, and stays mono; a string next to a wide unison layer rings in
+ * the center of the stereo voice and ends it. */
 void Synth_pluck_unison(void) {
     // audio/synth
     box_audio_core_t *core;
     box_audio_synth_patch_t p;
-    uint64_t hash[2];
+    uint64_t hash[3];
     int32_t i;
     float diff = 0;
-    for (i = 0; i < 2; i ++) {
+    for (i = 0; i < 3; i ++) {
         core = synth_core(AUDIO_RATE);
         p = synth_pluck(330, 1, 0.5f, 3);
-        if (i == 1) {
-            p.layer[0].voices = 5;
+        if (i > 0) {
+            p.layer[0].voices = (uint32_t)(i - 1);
             p.layer[0].detune = 30;
             p.layer[0].width = 1;
         }
@@ -3863,12 +3991,14 @@ void Synth_pluck_unison(void) {
         synth_define(core, 1, &p);
         audio_play(core, 1, 1, 0, 1, 0, 1, 0);
         audio_render(core, 0, 9600);
+        test_assert(audio_peak(audio_l, 0, 9600) > 0.1f);
         test_assert(memcmp(audio_l, audio_r, 9600 * sizeof(float)) == 0);
         hash[i] = audio_hash(audio_l, 9600);
         box_audio_core_free(core);
     }
 
     test_assert(hash[0] == hash[1]);
+    test_assert(hash[0] == hash[2]);
 
     core = synth_core(AUDIO_RATE);
     p = synth_pluck(220, 0.1f, 0.5f, 3);
@@ -3973,6 +4103,263 @@ void Synth_pluck_pool(void) {
     box_audio_core_free(core);
 }
 
+/** A pluck patch of one layer with unison voices.
+ *
+ * @param frequency Hz
+ * @param decay Seconds of the fundamental to -60 dB
+ * @param voices Unison voices, a string each
+ * @param detune Cents from the lowest string to the highest
+ * @param width Stereo width, 0..1
+ * @param seed Seed of the noise of the plucks
+ * @return The patch
+ */
+static box_audio_synth_patch_t synth_pluck_unison(
+    float frequency,
+    float decay,
+    uint32_t voices,
+    float detune,
+    float width,
+    uint32_t seed)
+{
+    box_audio_synth_patch_t p = synth_pluck(frequency, decay, 0.3f, seed);
+    p.layer[0].voices = voices;
+    p.layer[0].detune = detune;
+    p.layer[0].width = width;
+
+    return p;
+}
+
+/** The strings of a unison pluck ring at the detuned frequencies: the spectrum has a peak at
+ * each, against little between them, where a single string has none. */
+void Synth_pluck_unison_peaks(void) {
+    // audio/synth
+    const uint32_t voices[] = { 3, 5 };
+    const int32_t from = 2400, n = AUDIO_FRAMES - 2400;
+    int32_t c, k;
+    for (c = 0; c < 2; c ++) {
+        box_audio_core_t *core = synth_core(AUDIO_RATE);
+        box_audio_synth_patch_t p = synth_pluck_unison(440, 4, voices[c], 100, 0, 7);
+        double f[BOX_AUDIO_SYNTH_UNISON_MAX], lo = 1e300, hi = 0, between = 0, power, single;
+        synth_define(core, 1, &p);
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, AUDIO_FRAMES);
+        box_audio_core_free(core);
+        test_assert(synth_finite(audio_l, 0, AUDIO_FRAMES));
+        for (k = 0; k < (int32_t)voices[c]; k ++) {
+            double cents = 100 * ((double)k / (voices[c] - 1) - 0.5);
+            f[k] = 440 * pow(2, cents / 1200);
+            power = synth_hann_power(audio_l + from, n, f[k], AUDIO_RATE);
+            printf("%u strings over 100 cents: %.2f Hz at %g\n", voices[c], f[k], power);
+            lo = power < lo ? power : lo;
+            hi = power > hi ? power : hi;
+        }
+
+        for (k = 0; k + 1 < (int32_t)voices[c]; k ++) {
+            power = synth_hann_power(audio_l + from, n, 0.5 * (f[k] + f[k + 1]), AUDIO_RATE);
+            between = power > between ? power : between;
+        }
+
+        printf("between the peaks: %g\n", between);
+        test_assert(hi / lo < 20);
+        test_assert(lo > 20 * between);
+
+        core = synth_core(AUDIO_RATE);
+        p = synth_pluck_unison(440, 4, 1, 100, 0, 7);
+        synth_define(core, 1, &p);
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, AUDIO_FRAMES);
+        box_audio_core_free(core);
+        single = synth_hann_power(audio_l + from, n, f[0], AUDIO_RATE);
+        printf("a single string at %.2f Hz: %g\n", f[0], single);
+        test_assert(lo > 20 * single);
+    }
+}
+
+/** A unison pluck at width 0 renders the same samples on both channels; at width 1 the two
+ * strings of 2 voices sit one on each channel and decorrelate them, and each is plucked with
+ * its own noise, so two strings of the same pitch differ too. */
+void Synth_pluck_unison_width(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_pluck_unison(330, 2, 4, 30, 0, 5);
+    double ll = 0, rr = 0, lr = 0, corr;
+    int32_t i;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES);
+    box_audio_core_free(core);
+    test_assert(audio_peak(audio_l, 0, AUDIO_FRAMES) > 0.05f);
+    test_assert(memcmp(audio_l, audio_r, AUDIO_FRAMES * sizeof(float)) == 0);
+
+    core = synth_core(AUDIO_RATE);
+    p = synth_pluck_unison(330, 2, 2, 50, 1, 5);
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES);
+    box_audio_core_free(core);
+    test_assert(synth_finite(audio_l, 0, AUDIO_FRAMES));
+    test_assert(synth_finite(audio_r, 0, AUDIO_FRAMES));
+    for (i = AUDIO_RATE / 100; i < AUDIO_FRAMES; i ++) {
+        ll += (double)audio_l[i] * audio_l[i];
+        rr += (double)audio_r[i] * audio_r[i];
+        lr += (double)audio_l[i] * audio_r[i];
+    }
+
+    corr = lr / sqrt(ll * rr);
+    printf("2 strings at width 1: correlation %.3f, levels %.4f %.4f\n", corr, sqrt(ll),
+        sqrt(rr));
+    test_assert(ll > 0 && rr > 0);
+    test_assert(fabs(corr) < 0.2);
+
+    core = synth_core(AUDIO_RATE);
+    p = synth_pluck_unison(330, 2, 2, 0, 1, 5);
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 9600);
+    box_audio_core_free(core);
+    test_assert(audio_peak(audio_l, 0, 9600) > 0.05f);
+    test_assert(audio_peak(audio_r, 0, 9600) > 0.05f);
+    test_assert(memcmp(audio_l, audio_r, 9600 * sizeof(float)) != 0);
+}
+
+/** A unison pluck takes a string of the pool for each voice: 8 plays of 4 voices take all
+ * BOX_AUDIO_SYNTH_STRINGS, so a play of 4 voices and one of a single string are ignored.
+ *
+ * With 28 taken one of 5 voices is ignored and one of 4 fits. The strings come back when the
+ * voices end, the last of their strings silent, so the same plays fit again. */
+void Synth_pluck_unison_pool(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t four = synth_pluck_unison(440, 0.05f, 4, 20, 1, 1);
+    box_audio_synth_patch_t five = synth_pluck_unison(440, 0.05f, 5, 20, 1, 1);
+    box_audio_synth_patch_t one = synth_pluck(440, 0.05f, 0.5f, 1);
+    int32_t i, plays = BOX_AUDIO_SYNTH_STRINGS / 4;
+    synth_define(core, 1, &four);
+    synth_define(core, 2, &five);
+    synth_define(core, 3, &one);
+    for (i = 0; i < plays; i ++) {
+        audio_play(core, (uint32_t)i, 1, 0, 0.01f, 0, 1, 0);
+    }
+
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
+    test_int(box_audio_core_voice_count(core), plays);
+    audio_play(core, 1000, 1, 0, 0.01f, 0, 1, 0);
+    audio_play(core, 1001, 3, 0, 0.01f, 0, 1, 0);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 2);
+    test_int(box_audio_core_voice_count(core), plays);
+    audio_render(core, 0, AUDIO_FRAMES);
+    test_assert(synth_finite(audio_l, 0, AUDIO_FRAMES));
+    test_assert(synth_finite(audio_r, 0, AUDIO_FRAMES));
+    test_int(box_audio_core_voice_count(core), 0);
+    audio_events(core, 0, NULL);
+
+    for (i = 0; i < plays - 1; i ++) {
+        audio_play(core, 2000 + (uint32_t)i, 1, 0, 0.01f, 0, 1, 0);
+    }
+
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
+    audio_play(core, 3000, 2, 0, 0.01f, 0, 1, 0);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 1);
+    audio_play(core, 3001, 1, 0, 0.01f, 0, 1, 0);
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
+    test_int(box_audio_core_voice_count(core), plays);
+    audio_render(core, 0, AUDIO_FRAMES);
+    test_int(box_audio_core_voice_count(core), 0);
+    audio_events(core, 0, NULL);
+
+    for (i = 0; i < plays; i ++) {
+        audio_play(core, 4000 + (uint32_t)i, 1, 0, 0.01f, 0, 1, 0);
+    }
+
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
+    test_int(box_audio_core_voice_count(core), plays);
+    box_audio_core_free(core);
+}
+
+/** The same seed renders a wide unison pluck bit identical; another seed, and the next play of
+ * the same patch, pluck the strings with other noise. */
+void Synth_pluck_unison_seed(void) {
+    // audio/synth
+    box_audio_synth_patch_t p = synth_pluck_unison(262, 1, 3, 20, 0.8f, 9);
+    uint64_t a, b, c, a2, b2, c2;
+    p.filter = BOX_AUDIO_SYNTH_LOWPASS;
+    p.cutoff = 3000;
+    a = synth_unison_hash(&p, &a2);
+    b = synth_unison_hash(&p, &b2);
+    p.seed = 10;
+    c = synth_unison_hash(&p, &c2);
+    printf("pluck unison seed 9: 0x%016llXull\n", (unsigned long long)a);
+    test_assert(a == b);
+    test_assert(a2 == b2);
+    test_assert(a != a2);
+    test_assert(a != c);
+}
+
+/** Fill a core to the voice cap with pluck voices that take every string and sine voices.
+ *
+ * @param core The core
+ */
+static void synth_pluck_cap_fill(
+    box_audio_core_t *core)
+{
+    box_audio_synth_patch_t pluck = synth_pluck(440, 0.5f, 0.5f, 1);
+    box_audio_synth_patch_t sine = synth_steady(BOX_AUDIO_SYNTH_SINE, 440, 0.5f, 0.5f);
+    int32_t i;
+    synth_define(core, 1, &pluck);
+    synth_define(core, 2, &sine);
+    for (i = 0; i < BOX_AUDIO_SYNTH_STRINGS; i ++) {
+        audio_play(core, 100 + (uint32_t)i, 1, 0, 0.01f, 0, 1, 0);
+    }
+
+    for (i = BOX_AUDIO_SYNTH_STRINGS; i < BOX_AUDIO_VOICE_MAX; i ++) {
+        audio_play(core, 100 + (uint32_t)i, 2, 0, 0.02f, 0, 1, 0);
+    }
+}
+
+/** A pluck play rejected for its strings at the voice cap leaves every voice as it was: the cap
+ * steals no voice for it, no voice ends, and the core renders bit identical to one that never
+ * got the play. A play that fits still steals at the cap.
+ *
+ * With 8 layers at most and every synth voice reclaimable, no synth play is rejected for parts,
+ * so this is the rejection that remains. */
+void Synth_pluck_pool_cap(void) {
+    // audio/synth
+    static float expect[4800];
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_core_t *ref = synth_core(AUDIO_RATE);
+    int32_t counts[BOX_AUDIO_EVENT_LOST + 1];
+    box_audio_event_t stolen;
+    synth_pluck_cap_fill(core);
+    synth_pluck_cap_fill(ref);
+    synth_pool_events(core, counts, &stolen);
+    test_int(counts[BOX_AUDIO_EVENT_IGNORED], 0);
+    test_int(box_audio_core_voice_count(core), BOX_AUDIO_VOICE_MAX);
+
+    audio_play(core, 1000, 1, 0, 0.01f, 0, 1, 0);
+    synth_pool_events(core, counts, &stolen);
+    test_int(counts[BOX_AUDIO_EVENT_IGNORED], 1);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_STOLEN], 0);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_END], 0);
+    test_int(box_audio_core_voice_count(core), BOX_AUDIO_VOICE_MAX);
+
+    audio_play(core, 1001, 2, 0, 0.02f, 0, 1, 0);
+    synth_pool_events(core, counts, &stolen);
+    test_int(counts[BOX_AUDIO_EVENT_IGNORED], 0);
+    test_int(counts[BOX_AUDIO_EVENT_VOICE_STOLEN], 1);
+    test_uint(stolen.id, 100);
+    test_int(stolen.value, 1);
+    test_int(box_audio_core_voice_count(core), BOX_AUDIO_VOICE_MAX);
+
+    audio_play(ref, 1001, 2, 0, 0.02f, 0, 1, 0);
+    audio_render(ref, 0, 4800);
+    memcpy(expect, audio_l, sizeof(expect));
+    audio_render(core, 0, 4800);
+    test_assert(memcmp(expect, audio_l, sizeof(expect)) == 0);
+    test_int(box_audio_core_voice_count(core), box_audio_core_voice_count(ref));
+    box_audio_core_free(core);
+    box_audio_core_free(ref);
+}
+
 /** A SynthPluck layer takes its SynthString, or the defaults without one, needs no envelope,
  * and a frequency under BOX_AUDIO_SYNTH_PLUCK_LOWEST is clamped with one warning. */
 void Synth_script_pluck(void) {
@@ -4026,34 +4413,49 @@ void Synth_script_pluck(void) {
     ecs_fini(world);
 }
 
-/** The guitar and the koto of docs/audio.md and the harp of the Mossvale score compile without
- * errors, play and end on their own: the guitar within 280 frames of AUDIO_DT, the koto and two
- * notes of the harp within 230. */
+/** The guitar, the 12 string guitar and the koto of docs/audio.md and the harp of the Mossvale
+ * score compile without errors, play and end on their own.
+ *
+ * The guitars, the 12 string with a pair of strings in unison, end within 280 frames of
+ * AUDIO_DT, the koto and two notes of the harp within 230. */
 void Synth_docs_pluck_examples(void) {
     // audio/synth
     ecs_world_t *world = audio_world();
     char *code = audio_read("test/assets/audio/synth_pluck.flecs");
-    const char *names[] = { "Guitar", "Koto", "hp_c3", "hp_a4" };
+    const char *names[] = { "Koto", "hp_c3", "hp_a4", "Guitar", "TwelveString" };
+    const box_audio_synth_patch_t *p;
     int32_t i, start;
     audio_log_start();
     test_assert(ecs_script_run(world, "pluck", code, NULL) == 0);
     ecs_os_free(code);
     audio_run(world, 1);
-    for (i = 0; i < 4; i ++) {
+    for (i = 0; i < 5; i ++) {
         ecs_entity_t sound = ecs_lookup(world, names[i]);
         test_assert(sound != 0);
         test_assert(ecs_get(world, sound, AudioSynth)->compiled);
     }
 
+    p = &ecs_get(world, ecs_lookup(world, "TwelveString"), AudioSynth)->patch;
+    test_int(p->layers, 2);
+    test_int(p->layer[0].wave, BOX_AUDIO_SYNTH_PLUCK);
+    test_int(p->layer[0].voices, 2);
+    test_flt(p->layer[0].detune, 6);
+    test_flt(p->layer[0].width, 0.5f);
+    test_int(p->layer[1].voices, 1);
+
     start = audio_tap_count;
     test_assert(box_audio_play(world, ecs_lookup(world, "Guitar"), 1.0f));
-    audio_run(world, 280);
+    test_assert(box_audio_play(world, ecs_lookup(world, "TwelveString"), 1.0f));
+    audio_run(world, 2);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 2);
+    audio_run(world, 278);
+    test_assert(audio_peak(audio_tap_r, start, audio_tap_count) > 0.05f);
     test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.05f);
     test_assert(synth_finite(audio_tap_l, start, audio_tap_count));
     test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
 
     start = audio_tap_count;
-    for (i = 1; i < 4; i ++) {
+    for (i = 0; i < 3; i ++) {
         test_assert(box_audio_play(world, ecs_lookup(world, names[i]), 1.0f));
     }
 

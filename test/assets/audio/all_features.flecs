@@ -60,10 +60,10 @@ ears {
 }
 
 room {
-  AudioBus: {output: master}
+  AudioBus: {output: master, kind: AudioChannelReturn}
   Reverb: {decay: 1.2, damping: 0.5, predelay: 0.01, size: 0.4}
 }
-world { AudioBus: {output: master, send: room, send_level: 0.5} }
+world { AudioBus: {output: master, kind: AudioChannelSfx, sends: [{bus: room, level: 0.5}]} }
 ui { AudioBus: {output: master, volume: 0.8} }
 music { AudioBus: {output: master, volume: 0.3} }
 

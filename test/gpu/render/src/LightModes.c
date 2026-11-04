@@ -39,6 +39,7 @@ void LightModes_defaults_to_mixed(void) {
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, PointLight, {.intensity = 2 * GLM_PIf, .range = 5});
+    ecs_set(world, e, Position, {0, 0, 0});
     test_int(ecs_get(world, e, PointLight)->bake, LightBakeModeMixed);
     ecs_add(world, e, SpotLight);
     test_int(ecs_get(world, e, SpotLight)->bake, LightBakeModeMixed);
