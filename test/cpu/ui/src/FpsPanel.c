@@ -767,6 +767,105 @@ void FpsPanel_bars_set_when_changed(void) {
     ecs_fini(world);
 }
 
+/** Count the bars of the chart whose mut variables were set in the int32_t of the observer
+ * context.
+ *
+ * @param it Iterator of the observer
+ */
+static void fps_bar_mut_on_set(
+    ecs_iter_t *it)
+{
+    fps_rect_on_set(it);
+}
+
+/** Get the frame time box.fps wrote to a bar.
+ *
+ * @param world The world
+ * @param mut The mut variables of the bar template
+ * @param i The bar
+ * @return The ms of the bar
+ */
+static double fps_bar_ms(
+    ecs_world_t *world,
+    ecs_entity_t mut,
+    int32_t i)
+{
+    const void *ptr = ecs_get_id(world, fps_bar(world, i), mut);
+    test_assert(ptr != NULL);
+
+    return *(const double*)ptr;
+}
+
+/** Add a sample to the frame samples and notify them, as the engine does.
+ *
+ * @param world The world
+ * @param ms The interval in milliseconds
+ */
+static void fps_sample_add(
+    ecs_world_t *world,
+    double ms)
+{
+    FrameSamples *samples = ecs_singleton_get_mut(world, FrameSamples);
+    box_frame_samples_add(samples, ms);
+    ecs_singleton_modified(world, FrameSamples);
+    ecs_progress(world, 0);
+}
+
+/* A steady sample sets the mut of no bar, a new sample the newest bar only, and when it moves
+ * left the bar it left and the bar it moved to. Fixed samples and a closed panel set none. */
+void FpsPanel_bars_sample_when_changed(void) {
+    // fps/panel
+    ecs_world_t *world = fps_world();
+    fps_open(world, true);
+    fps_samples_all(world, 10.0, BOX_FRAME_WINDOW);
+
+    ecs_entity_t mut = ecs_lookup(world, BOX_FPS_BAR_MUT);
+    test_assert(mut != 0);
+    test_assert(ecs_get_type_info(world, mut) != NULL);
+    test_int(ecs_get_type_info(world, mut)->size, sizeof(double));
+    for (int32_t i = 0; i < BOX_FPS_BARS; i ++) {
+        test_flt(fps_bar_ms(world, mut, i), 10.0);
+    }
+
+    int32_t fired = 0;
+    ecs_observer(world, {
+        .query.terms = {{ .id = mut }},
+        .events = { EcsOnSet },
+        .callback = fps_bar_mut_on_set,
+        .ctx = &fired
+    });
+
+    fps_sample_add(world, 10.0);
+    test_int(fired, 0);
+
+    fps_sample_add(world, 45.0);
+    test_int(fired, 1);
+    test_flt(fps_bar_ms(world, mut, BOX_FPS_BARS - 1), 45.0);
+    test_flt(fps_bar_ms(world, mut, BOX_FPS_BARS - 2), 10.0);
+
+    fired = 0;
+    fps_sample_add(world, 10.0);
+    test_int(fired, 2);
+    fps_sample_add(world, 10.0);
+    test_int(fired, 4);
+    test_flt(fps_bar_ms(world, mut, BOX_FPS_BARS - 3), 45.0);
+    test_flt(fps_bar_ms(world, mut, BOX_FPS_BARS - 2), 10.0);
+    test_flt(fps_bar_ms(world, mut, BOX_FPS_BARS - 1), 10.0);
+    fps_check_bar(world, BOX_FPS_BARS - 3, 45.0, BOX_FPS_RED);
+
+    fired = 0;
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(fired, 0);
+
+    fps_open(world, false);
+    fired = 0;
+    fps_sample_add(world, 30.0);
+    test_int(fired, 0);
+
+    ecs_fini(world);
+}
+
 void FpsPanel_reference_lines(void) {
     // fps/panel
     ecs_world_t *world = fps_world();

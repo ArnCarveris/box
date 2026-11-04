@@ -7,9 +7,9 @@
  * BOX_FPS_UI drawn by BOX_FPS_VIEW at BOX_VIEW_ORDER_FPS, over the editor and under the console,
  * holds a panel at the top right of the surface; closing deletes the view and the content.
  *
- * The panel is the template BOX_FPS_TEMPLATE of BOX_FPS_SCRIPT_PATH, reloaded when it changes,
- * which reads FrameSamples, FpsSummary and the colors and limits below that box.fps exports to it
- * as box.fps.green, yellow, red, fast_ms and slow_ms.
+ * The panel is the template BOX_FPS_TEMPLATE of BOX_FPS_SCRIPT_PATH, reloaded when it changes.
+ * It reads FpsSummary, the frame time box.fps writes to the BOX_FPS_BAR_MUT of every bar, and the
+ * colors and limits below, exported as box.fps.green, yellow, red, fast_ms and slow_ms.
  */
 
 #ifndef BOX_FPS_H
@@ -68,6 +68,13 @@ extern "C" {
 /** Path of the template of the script that every bar of the chart instantiates */
 #define BOX_FPS_BAR "box.fps.FpsBar"
 
+/** Path of the mut variables of BOX_FPS_BAR. Its member ms, an f64, is the frame time in
+ * milliseconds of the sample the bar shows, 0 without a sample, from which the script draws it.
+ *
+ * box.fps writes it while the panel is open, only to the bars whose sample changed, so a new
+ * sample evaluates only those bars again. */
+#define BOX_FPS_BAR_MUT BOX_FPS_BAR ".mut"
+
 /** Points between the panel and the top and right edges of the surface */
 #define BOX_FPS_MARGIN (10.0f)
 
@@ -114,7 +121,7 @@ extern "C" {
 
 /** The fps panel singleton: whether it is shown.
  *
- * A change applies in the next frame. The panel reads FrameSamples (box/app.h), takes neither
+ * A change applies in the next frame. The panel shows FrameSamples (box/app.h), takes neither
  * the pointer nor the keyboard and takes its background, text and border from UiTheme.
  */
 ECS_STRUCT(FpsPanel, {
