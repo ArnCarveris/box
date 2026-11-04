@@ -130,8 +130,9 @@
  * delay line of BOX_AUDIO_SYNTH_STRING_FRAMES limits it further, to the rate over 2046 */
 #define BOX_AUDIO_SYNTH_PLUCK_MIN 40.0f
 
-/** Pluck strings the voices of a core play at once, each with its delay line. A play that
- * does not find a string for each of its pluck layers is ignored */
+/** Pluck strings the voices of a core play at once, each with its delay line. A pluck layer
+ * takes one for each of its unison voices; a play that does not find a string for each is
+ * ignored */
 #define BOX_AUDIO_SYNTH_STRINGS 32
 
 /** Frames of the delay line of a pluck string, a power of 2: a period of up to 2046 frames,

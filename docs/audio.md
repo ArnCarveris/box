@@ -229,8 +229,8 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
 - **Synth**: up to 8 oscillators, one filter and two LFOs per sound, up to 7 unison voices per
   oscillator, linear or curved envelopes and no node graph; an LFO has fixed destinations (pitch,
   level, cutoff, pulse width) and no LFO modulates another; an oscillator may phase or ring
-  modulate another, but FM is not band limited. Plucked strings go down to 40 Hz, 32 of them ring
-  at once, and each plays as one voice. Legato is mono per channel and has no note off: a held
+  modulate another, but FM is not band limited. Plucked strings go down to 40 Hz and 32 of them ring
+  at once; a unison pluck takes one per voice, so a chord of 6 notes of 4 voices takes 24. Legato is mono per channel and has no note off: a held
   note lasts its hold after the last note. A looping synth sound starts a new pass of its
   envelopes and oscillators at the end of the last, at most every 60 seconds; a drone keeps that
   gap short with edges of a few ms, as the dust merchant's engine does with 2 ms.
@@ -486,7 +486,9 @@ its own envelope and the state of its unison voices, 512 bytes. The pool has 4 p
 and advances only its parts and gives them back when it ends. The 80 voice slots (808 bytes each)
 and the pool take 223 KB. The pluck strings are a second pool of `BOX_AUDIO_SYNTH_STRINGS` (32),
 each with a delay line of `BOX_AUDIO_SYNTH_STRING_FRAMES` (2048) floats, 8 KB, 259 KB in all; a
-voice takes one for each pluck layer, and a play that finds too few free is ignored the same way.
+voice takes one for each unison voice of each pluck layer, and a play that finds too few free is
+ignored the same way. A pluck layer still takes one part: its strings hang off it in a chain, so
+a part does not grow for the layers that are not plucks.
 The 256 patches the core keeps are full size, 1020 bytes each. The core clamps every value of a
 patch, a NaN to the low
 end.
@@ -558,11 +560,12 @@ end.
   plays, so a fixed run gives bit identical output and every play differs. The same generator
   picks the pitch and level variances of the play, and plucks the strings.
 - **Pluck strings.** A layer of the wave `BOX_AUDIO_SYNTH_PLUCK` is a Karplus-Strong string
-  instead of an oscillator. At the start of a pass the string takes a burst of the noise of the
-  play, one period long, through a one pole lowpass of its `hardness` (0 a soft finger, 1 a
-  pick) and one of its `brightness` (a coefficient of 0.1 at 0 to 1, no filter, at 1), without
-  its mean so it carries no DC, scaled to a peak of 1, into its delay line. Per
-  frame the frame out of the line goes through a lowpass `(b, 1 - 2b, b)` with `b` from 0.25 at
+  instead of an oscillator, one for each of its unison voices. At the start of a pass each string
+  takes its own burst of the noise of the play, one after the other, so a fixed run is bit
+  identical and the strings of a unison do not sound alike. The burst is one period long,
+  through a one pole lowpass of its `hardness` (0 a soft finger, 1 a pick) and one of its
+  `brightness` (a coefficient of 0.1 at 0 to 1, no filter, at 1), without its mean so it carries
+  no DC, scaled to a peak of 1, into its delay line. Per frame the frame out of the line goes through a lowpass `(b, 1 - 2b, b)` with `b` from 0.25 at
   `brightness` 0 to 0.01 at 1, a first order allpass and the gain of the loop back into it; the
   frame out of the line is the sample. The lowpass is symmetric, a delay of exactly 1 frame at
   every frequency, so a period of n frames is a line of `d = floor(n - 1.5)` frames, the lowpass
@@ -580,8 +583,8 @@ end.
   limits the lowest note to the rate over 2046 above 81.8 kHz. Once the peak of a period is under
   -80 dB of the pluck it is silent and costs nothing more. A layer that uses no envelope at all
   (`rings_free`) plays at level 1 and the voice plays on while such a string rings; a voice of
-  only strings ends when they are all silent, envelopes or not; a looping voice plucks again. A
-  string ignores the phase modulation and the feedback of its layer, it may ring modulate or be
+  only strings ends when they are all silent, those of every unison voice, envelopes or not; a
+  looping voice plucks again. A string ignores the phase modulation and the feedback of its layer, it may ring modulate or be
   ring modulated, and a patch without strings renders as before, bit identical, and costs one
   compare per frame.
 - **Envelopes** are sample accurate: attack from 0 to 1, decay to the sustain level, hold,
@@ -639,7 +642,9 @@ end.
   of the stages of the filter with the same coefficients, and the voice reaches its bus as a
   stereo sample does. A unison layer that modulates or feeds back does so with the mean of its
   two channels; a modulator of a unison layer moves the phase of each of its voices. A pluck
-  layer always plays as one voice, its string in the center.
+  layer with unison rings a string per voice, each at the detune and the pan of its voice, and
+  takes no random phases; a pluck layer of one voice is its string in the center, bit identical
+  to a pluck without unison.
 - **Glide.** The `glide` of a patch, 0 to `BOX_AUDIO_SYNTH_GLIDE_MAX` (10) seconds, makes a
   change of the pitch of a voice (`VOICE_SET` `PITCH`) move exponentially in frequency, linear
   in cents, over that time: each oscillator multiplies its turns per frame by
@@ -671,8 +676,9 @@ end.
   in which no layer has more than one voice takes the loop it took before, bit identical, and
   costs one compare per block; a layer of one voice with a width is such a layer. A string
   costs a read and a write of its line, 6 multiplies and its peak per frame while it rings, and
-  a pluck writes its line of 2048 floats once. A patch with LFOs adds three adds and two
-  multiplies per oscillator per frame and the control block every 8 frames, and a string with a
+  a pluck writes its line of 2048 floats once; a unison pluck layer costs that per voice. A
+  patch with LFOs adds three adds and two multiplies per oscillator per frame and the control
+  block every 8 frames, and a string with a
   vibrato tunes itself again every frame, as in a glide; a patch without LFOs takes the loops it
   took before and renders bit identical, and a square at a width of 0.5 costs a compare.
   `bench/audio` has a `Synth` suite of 64 voices in ns per sample, with a filter envelope, with a
@@ -824,7 +830,7 @@ A delay and a fade bring a vibrato in after the attack, as players do; a fade on
 it swell from the start. The LFO restarts with every note and with each pass of a looping
 sound; a legato note keeps it running. The level only dips, so a tremolo never makes a sound
 louder than it is without it. A vibrato moves every unison voice of a layer and the pitch of a
-`SynthPluck` string with it.
+`SynthPluck` string with it, each string of a unison pluck.
 
 ```
 using box.audio
@@ -1089,13 +1095,24 @@ The `frequency`, `frequency_end`, `sweep` and `level` of the `SynthOscillator` a
 layer; `index` and `feedback` do not. Every play plucks with other noise, from the `seed` of the
 `SynthSound` and the count of plays, so repeated notes differ a little, as on a real string, and a
 fixed run renders bit identical. The lowest note is `BOX_AUDIO_SYNTH_PLUCK_LOWEST`, 40 Hz: a lower
-one plays at 40 Hz with one warning. A core rings 32 strings at once; a play that finds none free
-is ignored. The string follows the pitch of its voice: a change of `AudioSource.pitch`, a sweep,
-a `SynthGlide` and legato notes bend the ringing string without a new pluck. The synth has no
-LFO, and a string plays as one voice: a `SynthUnison` on a `SynthPluck` layer is ignored, so
-there is no vibrato of a string and no ensemble of detuned strings in one layer; several
-`SynthPluck` layers a few cents apart make a chorus, as the 12 string guitar has.
-A string may ring modulate or be ring modulated, but it ignores phase modulation and feedback.
+one plays at 40 Hz with one warning. The string follows the pitch of its voice: a change of
+`AudioSource.pitch`, a sweep, a `SynthGlide`, legato notes and the vibrato of a `SynthLfo` bend
+the ringing string without a new pluck. A string may ring modulate or be ring modulated, but it
+ignores phase modulation and feedback.
+
+A `SynthUnison` on a `SynthPluck` layer rings a string for each of its `voices`, each detuned and
+panned as the voices of an oscillator (see [Unison and width](#unison-and-width)) and plucked with
+its own noise, so the strings beat against each other and do not sound alike: the pairs of a 12
+string guitar, or a harp ensemble, in one layer and wide. The strings share the level of the
+layer at `1 / sqrt(voices)` each, and the sound ends once the last of them is silent.
+
+A core rings 32 strings at once (`BOX_AUDIO_SYNTH_STRINGS`), each with its delay line of 8 KB,
+and a pluck takes one string per unison voice: a single string takes 1, the 12 string guitar
+below 3 per note, a 4 voice unison 4, so a chord of 6 notes of a 4 voice unison takes 24 and a
+second chord while the first rings finds too few. A play that does not find a string for each
+voice is ignored, as one without a voice slot, and its strings come back when its voice ends.
+Keep the unison of a pluck at 2 or 3 voices for parts of many ringing notes; a long `decay` keeps
+the strings of a note taken for longer.
 
 ```
 using box.audio
@@ -1110,6 +1127,23 @@ prefab Guitar {
   string {
     SynthOscillator: {wave: SynthPluck, frequency: 196, level: 0.6}
     SynthString: {decay: 3, brightness: 0.6, hardness: 0.9}
+  }
+}
+
+// A 12 string guitar: G3 strung as a pair of steel strings 6 cents apart across half of the
+// stereo field, with a quieter octave string in the center, 3 strings, 3 s
+prefab TwelveString {
+  AudioOutput: {bus: music}
+  SynthSound: {level_variance: 0.05}
+  SynthFilter: {kind: SynthLowPass, cutoff: 5000}
+  string {
+    SynthOscillator: {wave: SynthPluck, frequency: 196, level: 0.6}
+    SynthUnison: {voices: 2, detune: 6, width: 0.5}
+    SynthString: {decay: 3, brightness: 0.6, hardness: 0.9}
+  }
+  octave {
+    SynthOscillator: {wave: SynthPluck, frequency: 392, level: 0.2}
+    SynthString: {decay: 2, brightness: 0.7, hardness: 0.9}
   }
 }
 
@@ -1130,7 +1164,8 @@ prefab Koto {
 ```
 
 The guitar wants a `brightness` around 0.6 and a long `decay`, a nylon string 0.3 and a softer
-`hardness`; the koto rings bright and short. The harp of the Mossvale score
+`hardness`; the 12 string guitar is the same string as a detuned pair, which shimmers as the two
+beat, with its octave; the koto rings bright and short. The harp of the Mossvale score
 (`etc/scenes/mossvale/music.flecs`) is a gut string, `SynthString: {decay: 2.2, brightness: 0.35,
 hardness: 0.45}`, over a soft sine with its own short envelope for the body; its notes ring out
 over each other as a harp's do, and each ends when its string is silent.
@@ -1160,8 +1195,11 @@ from `test/assets/audio/synth_unison.flecs` from script, panned in space), pluck
 pitch within 2 cents from 80 Hz to 2 kHz at 44.1 and 48 kHz, a -60 dB time that scales with the
 decay, more upper harmonics when brighter, bit identical for a seed and different for another,
 the end of a voice once its string is silent with and without an envelope, a jump and a glide of
-the pitch, the pool of strings, a string with unison as one voice and next to a wide layer, the
-defaults and the warning of a low note, and the guitar, the koto and the Mossvale harp from
+the pitch, the pool of strings, a string of one voice bit identical to one without unison and
+next to a wide layer, unison plucks (peaks at the detuned frequencies, width 0 identical on both
+channels and width 1 decorrelated, one string per voice from the pool, given back when the voice
+ends, and the same seed bit identical), the defaults and the warning of a low note, and the
+guitar, the 12 string guitar, the koto and the Mossvale harp from
 `test/assets/audio/synth_pluck.flecs`), LFOs (a vibrato that moves the pitch by its cents at its
 rate only after its delay, a tremolo that moves the envelope at its rate by its depth, a cutoff
 and a pulse width that move the spectrum at the rate, a pulse band limited at every width, a

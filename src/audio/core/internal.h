@@ -253,7 +253,7 @@ typedef struct box_audio_synth_unison_t {
 } box_audio_synth_unison_t;
 /** A pluck string of a synth voice: a Karplus-Strong loop of a delay line, a symmetric lowpass
  * of one frame of delay and a first order allpass of the fraction of a frame left, with a gain
- * that sets its decay */
+ * that sets its decay. A pluck layer has one for each of its unison voices, chained by next */
 typedef struct box_audio_synth_string_t {
     float line[BOX_AUDIO_SYNTH_STRING_FRAMES]; /**< The delay line, a ring */
     int32_t write;        /**< Index the next frame is written to */
@@ -269,6 +269,8 @@ typedef struct box_audio_synth_string_t {
     float peak;           /**< Largest magnitude of the window that runs */
     int32_t window;       /**< Frames left of the window, a period */
     bool ringing;         /**< Whether it is still over the silence */
+    struct box_audio_synth_string_t *next; /**< String of the next unison voice of its layer,
+                                            * NULL for the last */
 } box_audio_synth_string_t;
 
 /** A layer of a synth voice: its layer of the patch, its oscillator and its own envelope. The
@@ -279,7 +281,9 @@ typedef struct box_audio_synth_part_t {
     box_audio_synth_osc_t osc;      /**< The oscillator */
     box_audio_synth_env_t env;      /**< Its own envelope, when the layer has one */
     box_audio_synth_unison_t unison; /**< Its unison voices */
-    box_audio_synth_string_t *string; /**< Its string, a BOX_AUDIO_SYNTH_PLUCK layer, or NULL */
+    box_audio_synth_string_t *string; /**< The string of its first unison voice, the others
+                                       * chained after it, for a BOX_AUDIO_SYNTH_PLUCK layer;
+                                       * NULL for another */
 } box_audio_synth_part_t;
 
 /** A source that plays a synth patch, a copy of it, so it never allocates: the patch without
@@ -326,8 +330,8 @@ typedef struct box_audio_synth_source_t {
     double lfo_octaves;   /**< Octaves the LFOs move the cutoff by, 0 without */
     float tremolo;        /**< Factor of the output from the LFOs of every layer, 1 without */
     float tremolo_step;   /**< Change of tremolo per frame */
-    int32_t strings;      /**< Pluck layers, each with a string, 0 for none */
-    int32_t ringing;      /**< Strings that are still over the silence */
+    int32_t strings;      /**< Pluck layers, each with a string per unison voice, 0 for none */
+    int32_t ringing;      /**< Strings that are still over the silence, of every unison voice */
     int32_t ringing_free; /**< Strings of layers without an envelope still over the silence */
 } box_audio_synth_source_t;
 
@@ -411,7 +415,8 @@ typedef struct box_audio_stream_t {
 typedef struct box_audio_synth_slot_t {
     box_audio_synth_patch_t patch;  /**< The patch, clamped */
     uint32_t plays;     /**< Plays so far, which seed the noise and the variances */
-    int32_t strings;    /**< Pluck layers of the patch */
+    int32_t strings;    /**< Strings a play of the patch takes: one for each unison voice of
+                         * each of its pluck layers */
     bool used;          /**< Whether a sound has the slot */
 } box_audio_synth_slot_t;
 
@@ -594,8 +599,8 @@ void box_audio_synth_end(
     box_audio_synth_source_t *src);
 
 /** Start a synth source on the patch of a synth sound, with a part of the core for each of its
- * layers and a string for each pluck layer, which box_audio_synth_fits found. Takes no use of
- * the sound: the source plays a copy of the patch.
+ * layers and a string for each unison voice of each pluck layer, which box_audio_synth_fits
+ * found. Takes no use of the sound: the source plays a copy of the patch.
  *
  * @param core The core
  * @param source The source
