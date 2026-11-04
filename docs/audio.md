@@ -924,6 +924,11 @@ At 100 bpm its echo comes 0.45 s after the sound, and a change of the tempo move
 return the delay is fully wet (`mix: 1`), and the send sets how much of the bus it hears; as an
 insert on the bus itself, a mix of 0.2 to 0.4 leaves the dry signal in front.
 
+The tests are the `Delay` suite of `test/cpu/audio`, from an impulse in an offline render: the
+echo time, feedback and damping, ping pong, tempo sync and tempo changes without clicks, the
+clamp, silence, a dry mix and bit identical renders of any size; `NoAlloc` covers it as well.
+`bench/audio` has a `Delay` suite in ns per frame.
+
 The tests are the `Delay` suite of `test/cpu/audio`: the frame of the echo, whole and
 fractional, the repeats at the feedback and darker with damping, ping pong, a synced eighth at
 120 bpm, a tempo change of the `Transport` that moves the echo without a click, a time change

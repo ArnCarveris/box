@@ -537,8 +537,10 @@ void Delay_silent_after_tail(void) {
     // It starts again on the next sound, with nothing of the old tail in its echo
     dl_command(dl.core, 1, dl_params(0.1f, 0, 6000, 0, 0.5f));
     audio_play(dl.core, 2, 1, 1, 1, 0, 1, 0);
-    dl_render(dl.core, 0, AUDIO_RATE / 2);
+    dl_render(dl.core, 0, AUDIO_RATE / 20);
     test_assert(box_audio_core_effect_running(dl.core, 0));
+    dl_render(dl.core, AUDIO_RATE / 20, AUDIO_RATE / 2 - AUDIO_RATE / 20);
+    test_assert(!box_audio_core_effect_running(dl.core, 0));
     click = dl_first(dl_l, 0, AUDIO_RATE / 2);
     echo = dl_first(dl_l, click + 2, AUDIO_RATE / 2);
     test_int(echo - click, AUDIO_RATE / 10);
