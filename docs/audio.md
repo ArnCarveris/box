@@ -239,24 +239,16 @@ then `http://localhost:8080/boxrun.html#/etc/scenes/dust_merchant.flecs` in Chro
 - **Space**: distance and pan only. No Doppler, no distance filter, no occlusion, no HRTF, and
   front and back sound alike.
 - **Effects**: `BOX_AUDIO_EFFECT_MAX` (64) effects at once in all channels together, 4 insert
-<<<<<<< HEAD
-  slots per channel, and the reverb as the only kind, an algorithmic one; one more effect logs
-  one error and does nothing. No reverb zones, no rooms from geometry, no EQ, compressor or delay
-  yet, and no sidechain.
-- **Voices**: 64. A play past that steals the quietest voice of equal or lower priority and is
-  refused when every voice ranks higher; one shots, `play_note`, quantized plays and
-  `AudioSource` play at 0, the notes and audio clips of a `Track` at its `priority` (1), streams
-  at 255. There is no reserved voice count, and a priority does not change within a voice. A one
-  shot cannot be controlled after it started.
-=======
   slots per channel, and three kinds: an algorithmic reverb, an equalizer of 4 bands and a
   filter; one more effect logs one error and does nothing. No reverb zones, no rooms from
   geometry, no compressor or delay yet, and no sidechain. An equalizer has 4 bands of 12 dB per
   octave at most (no steeper cuts, no linear phase, no dynamic EQ); a filter is one SVF of 12 or
   24 dB, with no envelope follower or LFO of its own: a script moves its cutoff.
-- **Voices**: 64, with the quietest stolen; no priorities. A one shot cannot be controlled after
-  it started.
->>>>>>> e39fc989a861a58f3c3b3cf26be467cf9af18997
+- **Voices**: 64. A play past that steals the quietest voice of equal or lower priority and is
+  refused when every voice ranks higher; one shots, `play_note`, quantized plays and
+  `AudioSource` play at 0, the notes and audio clips of a `Track` at its `priority` (1), streams
+  at 255. There is no reserved voice count, and a priority does not change within a voice. A one
+  shot cannot be controlled after it started.
 - **Synth**: up to 8 oscillators, one filter and two LFOs per sound, up to 7 unison voices per
   oscillator, linear or curved envelopes and no node graph; an LFO has fixed destinations (pitch,
   level, cutoff, pulse width) and no LFO modulates another; an oscillator may phase or ring
