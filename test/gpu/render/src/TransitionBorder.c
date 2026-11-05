@@ -205,8 +205,9 @@ static void tbo_case(
     const char *name,
     const BoxShadow *shadow)
 {
-    char *file = flecs_asprintf("%s.png", name);
-    char *ref = flecs_asprintf("%s_ref.png", name);
+    char file[64], ref[64];
+    snprintf(file, sizeof(file), "%s.png", name);
+    snprintf(ref, sizeof(ref), "%s_ref.png", name);
     ecs_world_t *world = tbo_world();
     ecs_entity_t e = tbo_rect(world, &tbo_from);
     if (shadow) {
@@ -233,8 +234,6 @@ static void tbo_case(
     stbi_image_free(end);
     stbi_image_free(at_mid);
     stbi_image_free(at_end);
-    ecs_os_free(file);
-    ecs_os_free(ref);
 }
 
 /** A bordered rect grows its border and turns it from grey to blue: halfway through it is the
