@@ -1,16 +1,17 @@
 /**
  * @file Dynamics.c
- * @brief The compressor and the gate, measured with constant levels and sines in offline
- * renders: the static curve, the knee, the ballistics, ducking under a sidechain, the gate and
- * its hysteresis, the gain reduction, the order of the slots and the components in a world.
+ * @brief The compressor, the gate and the transient shaper, measured with constant levels,
+ * sines and a synthetic drum in offline renders: the static curve, the knee, the ballistics,
+ * ducking under a sidechain, the gate and its hysteresis, the gain reduction, the order of the
+ * slots, the attack and sustain of the shaper and the components in a world.
  */
 
 #include "world.h"
 #include <stdio.h>
 #include <stdlib.h>
 
-/** Frames of the longest render of a case, two seconds */
-#define DY_FRAMES (AUDIO_RATE * 2)
+/** Frames of the longest render of a case, seven seconds */
+#define DY_FRAMES (AUDIO_RATE * 7)
 
 /** Output of the last render */
 static float dy_l[DY_FRAMES], dy_r[DY_FRAMES];
@@ -723,5 +724,344 @@ void Dynamics_script(void) {
         (double)ecs_get(world, duck, AudioMeter)->reduction);
     test_assert(fabs(ecs_get(world, duck, AudioMeter)->reduction -
         (1 - 1.0 / 8) * (dy_db(0.3) + 30)) < 0.5);
+    ecs_fini(world);
+}
+
+/** Frames between two hits of the synthetic drum, 300 ms */
+#define DY_HIT (AUDIO_RATE * 3 / 10)
+
+/** Hits of the synthetic drum */
+#define DY_HITS 4
+
+/** Fill dy_sound with a synthetic drum: DY_HITS hits DY_HIT frames apart, each a sine of
+ * 150 Hz that starts at its peak level and decays with a time constant of 50 ms.
+ *
+ * @param level Peak level of a hit in dB
+ */
+static void dy_drum(
+    double level)
+{
+    double peak = pow(10.0, level / 20.0);
+    int32_t i;
+    for (i = 0; i < DY_HIT * DY_HITS; i ++) {
+        double t = (double)(i % DY_HIT) / AUDIO_RATE;
+        dy_sound[i] = (float)(peak * exp(-t / 0.05) * sin(2 * AUDIO_PI * 150 * t + 0.3));
+    }
+}
+
+/** Put a transient shaper into insert slot 0 of a bus.
+ *
+ * @param core The core
+ * @param slot Slot of the effect
+ * @param bus Bus
+ * @param attack Attack
+ * @param sustain Sustain
+ */
+static void dy_shaper(
+    box_audio_core_t *core,
+    uint32_t slot,
+    uint32_t bus,
+    float attack,
+    float sustain)
+{
+    box_audio_transient_shaper_params_t p = { attack, sustain };
+    dy_effect(core, slot, BOX_AUDIO_EFFECT_TRANSIENT_SHAPER, bus, 0, BOX_AUDIO_BUS_NONE, &p,
+        sizeof(p));
+}
+
+/** Render the synthetic drum in dy_sound on bus 1 into dy_l and dy_r, through a transient
+ * shaper unless shaped is false.
+ *
+ * @param shaped Whether a shaper runs
+ * @param attack Attack
+ * @param sustain Sustain
+ */
+static void dy_shape(
+    bool shaped,
+    float attack,
+    float sustain)
+{
+    box_audio_core_t *core = dy_core();
+    if (shaped) {
+        dy_shaper(core, 0, 1, attack, sustain);
+    }
+
+    dy_play(core, DY_HIT * DY_HITS, false);
+    dy_render(core, 0, DY_HIT * DY_HITS);
+    box_audio_core_free(core);
+}
+
+/** Peak of the first 5 ms of the second hit over the peak of its tail, 100 to 120 ms in, in
+ * dB.
+ *
+ * @param x Samples
+ * @return The ratio in dB
+ */
+static double dy_punch(
+    const float *x)
+{
+    int32_t at = DY_HIT;
+
+    return dy_db(audio_peak(x, at, at + AUDIO_RATE / 200)) -
+        dy_db(audio_peak(x, at + AUDIO_RATE / 10, at + AUDIO_RATE * 12 / 100));
+}
+
+/** Level 100 ms into the second hit, the peak of 95 to 105 ms, over its peak of the first 5 ms,
+ * in dB.
+ *
+ * @param x Samples
+ * @return The level in dB
+ */
+static double dy_tail(
+    const float *x)
+{
+    int32_t at = DY_HIT;
+
+    return dy_db(audio_peak(x, at + AUDIO_RATE * 95 / 1000, at + AUDIO_RATE * 105 / 1000)) -
+        dy_db(audio_peak(x, at, at + AUDIO_RATE / 200));
+}
+
+void Dynamics_transient_attack(void) {
+    // audio/dynamics
+    double dry, up, down;
+    dy_drum(-20);
+    dy_shape(false, 0, 0);
+    dry = dy_punch(dy_l);
+    dy_shape(true, 1, 0);
+    up = dy_punch(dy_l);
+    dy_shape(true, -1, 0);
+    down = dy_punch(dy_l);
+    printf("first 5 ms over the tail: %.2f dB dry, %.2f dB at attack 1, %.2f dB at attack -1\n",
+        dry, up, down);
+    test_assert(up > dry + 3);
+    test_assert(down < dry - 3);
+    test_assert(up < dry + 12.5);
+    test_assert(down > dry - 12.5);
+}
+
+void Dynamics_transient_sustain(void) {
+    // audio/dynamics
+    double dry, shorter, longer;
+    dy_drum(-20);
+    dy_shape(false, 0, 0);
+    dry = dy_tail(dy_l);
+    dy_shape(true, 0, -1);
+    shorter = dy_tail(dy_l);
+    dy_shape(true, 0, 1);
+    longer = dy_tail(dy_l);
+    printf("level 100 ms in: %.2f dB dry, %.2f dB at sustain -1, %.2f dB at sustain 1\n",
+        dry, shorter, longer);
+    test_assert(shorter < dry - 3);
+    test_assert(longer > dry + 3);
+    test_assert(shorter > dry - 12.5);
+    test_assert(longer < dry + 12.5);
+}
+
+void Dynamics_transient_level(void) {
+    // audio/dynamics
+    const float settings[][2] = { { -1, -1 }, { -1, 0 }, { 0, -1 }, { 0.25f, -0.5f } };
+    double most = 0;
+    int32_t s, i;
+    for (s = 0; s < 4; s ++) {
+        double gain[2][60];
+        int32_t pass;
+        for (pass = 0; pass < 2; pass ++) {
+            dy_drum(pass ? -6 : -30);
+            dy_shape(true, settings[s][0], settings[s][1]);
+            for (i = 0; i < 60; i ++) {
+                int32_t at = DY_HIT + i * AUDIO_RATE / 200, to = at + AUDIO_RATE / 200;
+                gain[pass][i] = dy_db(audio_peak(dy_l, at, to)) -
+                    dy_db(audio_peak(dy_sound, at, to));
+            }
+        }
+
+        for (i = 0; i < 60; i ++) {
+            double d = fabs(gain[0][i] - gain[1][i]);
+            most = d > most ? d : most;
+        }
+    }
+
+    printf("largest difference of the gain at -30 and -6 dBFS: %.4f dB\n", most);
+    test_assert(most < 1);
+}
+
+void Dynamics_transient_neutral(void) {
+    // audio/dynamics
+    dy_drum(-6);
+    dy_shape(false, 0, 0);
+    memcpy(dy_b_l, dy_l, sizeof(float) * DY_HIT * DY_HITS);
+    memcpy(dy_b_r, dy_r, sizeof(float) * DY_HIT * DY_HITS);
+    dy_shape(true, 0, 0);
+    test_assert(audio_hash(dy_l, DY_HIT * DY_HITS) == audio_hash(dy_b_l, DY_HIT * DY_HITS));
+    test_assert(audio_hash(dy_r, DY_HIT * DY_HITS) == audio_hash(dy_b_r, DY_HIT * DY_HITS));
+    test_assert(audio_peak(dy_l, 0, DY_HIT) > 0.25f);
+}
+
+/** Render the synthetic drum panned left and a steady sine of 400 Hz panned right on bus 1,
+ * through a transient shaper unless shaped is false.
+ *
+ * @param shaped Whether a shaper runs
+ */
+static void dy_stereo(
+    bool shaped)
+{
+    box_audio_core_t *core = dy_core();
+    if (shaped) {
+        dy_shaper(core, 0, 1, 1, -1);
+    }
+
+    box_audio_core_render(core, dy_silence, dy_silence + 1, 1);
+    test_assert(box_audio_core_sound(core, 1, dy_sound, DY_HIT * DY_HITS, 1, AUDIO_RATE));
+    test_assert(box_audio_core_sound(core, 2, dy_key, DY_HIT * DY_HITS, 1, AUDIO_RATE));
+    audio_play(core, 1, 1, 1, 1, -1, 1, 0);
+    audio_play(core, 2, 2, 1, 1, 1, 1, 0);
+    dy_render(core, 0, DY_HIT * DY_HITS);
+    box_audio_core_free(core);
+}
+
+void Dynamics_transient_linked(void) {
+    // audio/dynamics
+    double most = 0, moved = 0;
+    int32_t i, n = 0;
+    dy_drum(-24);
+    audio_sine(dy_key, DY_HIT * DY_HITS, 400, dy_linear(-30));
+    dy_stereo(false);
+    memcpy(dy_b_l, dy_l, sizeof(float) * DY_HIT * DY_HITS);
+    memcpy(dy_b_r, dy_r, sizeof(float) * DY_HIT * DY_HITS);
+    test_assert(fabs(dy_b_l[DY_HIT + 10]) > 1e-3f);
+    test_assert(fabs(dy_b_r[DY_HIT + 10]) > 1e-3f);
+    dy_stereo(true);
+    for (i = 0; i < DY_HIT * DY_HITS; i ++) {
+        if (fabs(dy_b_l[i]) > 1e-3f && fabs(dy_b_r[i]) > 1e-3f) {
+            double gl = dy_l[i] / dy_b_l[i], gr = dy_r[i] / dy_b_r[i];
+            double d = fabs(gl - gr) / gr;
+            most = d > most ? d : most;
+            moved = fabs(dy_db(gl)) > moved ? fabs(dy_db(gl)) : moved;
+            n ++;
+        }
+    }
+
+    printf("both channels: largest relative difference of the gain %.2e over %d frames, the "
+        "gain moves by up to %.2f dB\n", most, n, moved);
+    test_assert(n > AUDIO_RATE / 10);
+    test_assert(most < 1e-5);
+    test_assert(moved > 3);
+}
+
+void Dynamics_transient_no_click(void) {
+    // audio/dynamics
+    const int32_t change = DY_HIT + AUDIO_RATE * 15 / 100, window = AUDIO_RATE * 4 / 100;
+    float in, out;
+    box_audio_core_t *core = dy_core();
+    dy_drum(-18);
+    dy_shaper(core, 0, 1, 0, 0);
+    dy_play(core, DY_HIT * DY_HITS, false);
+    dy_render(core, 0, change);
+    dy_shaper(core, 0, 1, 1, -1);
+    dy_render(core, change, DY_HIT * DY_HITS - change);
+    box_audio_core_free(core);
+    in = audio_max_step(dy_sound, change - window, change + window);
+    out = audio_max_step(dy_l, change - window, change + window);
+    printf("largest step around a change to attack 1 sustain -1 in the tail: %.5f, %.5f in the "
+        "input\n", (double)out, (double)in);
+    test_assert(out <= in * 1.05f);
+    test_assert(dy_db(audio_peak(dy_l, change + window, DY_HIT * 2) /
+        audio_peak(dy_sound, change + window, DY_HIT * 2)) < -3);
+}
+
+/** Render the synthetic drum, a gap of silence long enough for the shaper to stop and the drum
+ * again, through a transient shaper on bus 1, in pieces of a size.
+ *
+ * @param left Receives the left channel
+ * @param right Receives the right channel
+ * @param size Frames of each render, 0 for sizes that vary
+ * @param idle Receives whether the shaper stopped in the gap
+ */
+static void dy_shaper_sizes(
+    float *left,
+    float *right,
+    int32_t size,
+    bool *idle)
+{
+    box_audio_core_t *core = dy_core();
+    int32_t at = 0, k = 0, gap = DY_FRAMES - AUDIO_RATE * 3 / 2;
+    dy_shaper(core, 0, 1, 0.7f, -0.6f);
+    dy_play(core, DY_HIT * DY_HITS, false);
+    *idle = false;
+    while (at < DY_FRAMES) {
+        int32_t n = size ? size : 1 + (k * 97) % 613;
+        n = n < DY_FRAMES - at ? n : DY_FRAMES - at;
+        if (at < gap && at + n > gap) {
+            n = gap - at;
+        }
+
+        if (at == gap) {
+            *idle = !box_audio_core_effect_running(core, 0);
+            audio_play(core, 2, 1, 1, 1, 0, 1, 0);
+        }
+
+        box_audio_core_render(core, left + at, right + at, n);
+        at += n;
+        k ++;
+    }
+
+    box_audio_core_free(core);
+}
+
+void Dynamics_transient_render_sizes(void) {
+    // audio/dynamics
+    bool idle_a, idle_b;
+    dy_drum(-12);
+    dy_shaper_sizes(dy_l, dy_r, BOX_AUDIO_CORE_QUANTUM, &idle_a);
+    dy_shaper_sizes(dy_b_l, dy_b_r, 0, &idle_b);
+    test_assert(idle_a && idle_b);
+    test_assert(audio_hash(dy_l, DY_FRAMES) == audio_hash(dy_b_l, DY_FRAMES));
+    test_assert(audio_hash(dy_r, DY_FRAMES) == audio_hash(dy_b_r, DY_FRAMES));
+    test_assert(audio_peak(dy_l, DY_FRAMES - AUDIO_RATE * 3 / 2,
+        DY_FRAMES - AUDIO_RATE * 3 / 2 + DY_HIT) > 0.05f);
+}
+
+void Dynamics_transient_component(void) {
+    // audio/dynamics
+    ecs_world_t *world = audio_world();
+    ecs_entity_t e = ecs_new(world);
+    float params[BOX_AUDIO_EFFECT_PARAMS];
+    const TransientShaper *t;
+    ecs_add(world, e, TransientShaper);
+    t = ecs_get(world, e, TransientShaper);
+    test_flt(t->attack, 0);
+    test_flt(t->sustain, 0);
+    test_assert(ecs_has(world, e, AudioEffectState));
+    ecs_set(world, e, TransientShaper, { .attack = 0.4f, .sustain = -0.7f });
+    test_int(box_audio_module_effect_kind(world, e, params),
+        BOX_AUDIO_EFFECT_TRANSIENT_SHAPER);
+    test_flt(params[0], 0.4f);
+    test_flt(params[1], -0.7f);
+    test_int(box_audio_effect_floats(BOX_AUDIO_EFFECT_TRANSIENT_SHAPER, AUDIO_RATE), 0);
+    ecs_fini(world);
+}
+
+void Dynamics_transient_script(void) {
+    // audio/dynamics
+    ecs_world_t *world = audio_world();
+    char *code = audio_read("test/assets/audio/transient_shaper.flecs");
+    ecs_entity_t drums, punch;
+    const TransientShaper *t;
+    test_assert(ecs_script_run(world, "transient_shaper", code, NULL) == 0);
+    ecs_os_free(code);
+    drums = ecs_lookup(world, "drums");
+    punch = ecs_lookup(world, "drum_punch");
+    test_assert(drums && punch);
+    t = ecs_get(world, punch, TransientShaper);
+    test_assert(t != NULL);
+    test_flt(t->attack, 0.6f);
+    test_flt(t->sustain, -0.4f);
+
+    audio_source(world, audio_tone(world, NULL, 200, 0.25f, AUDIO_RATE), 1, true, drums);
+    audio_run(world, 20);
+    test_assert(box_audio_module_effect_slot(world, punch) >= 0);
+    test_assert(audio_tap_count > AUDIO_RATE / 10);
+    test_assert(audio_peak(audio_tap_l, audio_tap_count - AUDIO_RATE / 10, audio_tap_count) >
+        0.05f);
     ecs_fini(world);
 }

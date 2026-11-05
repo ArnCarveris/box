@@ -321,6 +321,21 @@ typedef struct box_audio_saturator_t {
     box_audio_ramp_t mix;     /**< Wet level */
 } box_audio_saturator_t;
 
+/** A transient shaper: the peak detector of the dynamics, a fast and a slow envelope of it and
+ * the gain in dB that their difference gives, smoothed */
+typedef struct box_audio_transient_shaper_t {
+    box_audio_transient_shaper_params_t target; /**< Parameters of the last command, clamped */
+    box_audio_peak_t peak;    /**< Detector */
+    double fast;              /**< Linear level of the fast envelope */
+    double slow;              /**< Linear level of the slow envelope */
+    double coef[4];           /**< Share of the distance that stays per frame: fast attack,
+                               * fast release, slow attack, slow release */
+    double smooth;            /**< Share of the distance that stays per frame of the gain */
+    double gain;              /**< Gain in dB that runs, smoothed */
+    box_audio_ramp_t attack;  /**< Attack */
+    box_audio_ramp_t sustain; /**< Sustain */
+} box_audio_transient_shaper_t;
+
 /** State of the kinds of effects */
 typedef union box_audio_effect_data_t {
     box_audio_reverb_t reverb;  /**< BOX_AUDIO_EFFECT_REVERB */
@@ -332,6 +347,7 @@ typedef union box_audio_effect_data_t {
     box_audio_phaser_t phaser;  /**< BOX_AUDIO_EFFECT_PHASER */
     box_audio_chorus_t chorus;  /**< BOX_AUDIO_EFFECT_CHORUS */
     box_audio_saturator_t saturator; /**< BOX_AUDIO_EFFECT_SATURATOR */
+    box_audio_transient_shaper_t transient_shaper; /**< BOX_AUDIO_EFFECT_TRANSIENT_SHAPER */
 } box_audio_effect_data_t;
 
 /** An effect instance of the pool of the core: a kind in an insert slot of a bus, on the
@@ -1123,6 +1139,33 @@ bool box_audio_saturator_render(
 
 /** The saturator kind: a block skipped while idle */
 void box_audio_saturator_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    int32_t frames);
+
+/** The transient shaper kind, in dynamics.c: start at the params of fx */
+void box_audio_transient_shaper_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The transient shaper kind: new parameters while it runs */
+void box_audio_transient_shaper_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The transient shaper kind: process a block; true once a silent block left its envelopes
+ * and its gain at rest */
+bool box_audio_transient_shaper_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The transient shaper kind: a block skipped while idle */
+void box_audio_transient_shaper_rest(
     box_audio_core_t *core,
     box_audio_effect_t *fx,
     int32_t frames);

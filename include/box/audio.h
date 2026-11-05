@@ -625,6 +625,21 @@ ECS_STRUCT(Saturator, {
                             *   1 - mix */
 });
 
+/** A transient shaper, an effect in an insert slot of an AudioBus, as a Reverb is: more or
+ * less punch and tail on drums and plucks, without a threshold, at most 12 dB either way:
+ * drums { AudioBus: {effects: [drums]}; TransientShaper: {attack: 0.6, sustain: -0.4} }.
+ *
+ * Stereo linked as a Compressor, it compares a fast envelope (1 ms up, 20 ms down) of the
+ * louder channel with a slow one (20 ms up, 200 ms down) in dB. 0 and 0 pass the signal
+ * unchanged; changes move over 20 ms. It has no meter and stops while its input is silent.
+ */
+ECS_STRUCT(TransientShaper, {
+    float attack;          /**< -1 to 1, default 0: above 0 boosts the transients, below 0
+                            *   softens them */
+    float sustain;         /**< -1 to 1, default 0: above 0 boosts the tail, below 0 shortens
+                            *   it */
+});
+
 /** An envelope of the cutoff of the SynthFilter of the same root, with the segments of a
  * SynthEnvelope: the cutoff is cutoff times 2 to the amount times the level of the envelope,
  * so it rises over the attack, settles at the sustain and returns over the release.

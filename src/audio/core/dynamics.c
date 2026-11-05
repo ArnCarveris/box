@@ -1,10 +1,12 @@
 /**
  * @file audio/core/dynamics.c
  * @brief The dynamics kinds of effect: a compressor that may key on another bus, for ducking,
- * and a gate, both stereo linked on a peak detector, both reporting their gain reduction.
+ * a gate and a transient shaper, all stereo linked on a peak detector; the compressor and the
+ * gate report their gain reduction.
  *
  * The compressor is feed-forward and smooths the level in dB; a soft knee turns it into a gain.
- * The gate has a hold and BOX_AUDIO_GATE_HYSTERESIS; see core.h for both.
+ * The gate has a hold and BOX_AUDIO_GATE_HYSTERESIS. The transient shaper compares a fast and
+ * a slow envelope of the peak in dB, without a threshold; see core.h for all three.
  */
 
 #include "internal.h"
@@ -26,6 +28,13 @@
 
 /** A gain this close to its target snaps to it */
 #define BOX_AUDIO_GATE_SNAP 1e-7f
+
+/** An envelope of a transient shaper under this level with nothing coming in falls to 0;
+ * under it, BOX_AUDIO_DYNAMICS_TINY, the gain reads it as that level anyway */
+#define BOX_AUDIO_TRANSIENT_SNAP 1e-6
+
+/** Gain of a transient shaper in dB this close to its target snaps to it */
+#define BOX_AUDIO_TRANSIENT_GAIN_SNAP 1e-6
 
 /** Clamp a parameter; NaN becomes the low end.
  *
@@ -401,6 +410,136 @@ bool box_audio_gate_render(
     }
 
     return false;
+}
+
+/** Clamp the params of an effect into the target of its transient shaper.
+ *
+ * @param fx The effect
+ */
+static void box_audio_transient_shaper_target(
+    box_audio_effect_t *fx)
+{
+    box_audio_transient_shaper_t *t = &fx->data.transient_shaper;
+    const float *p = fx->params;
+    t->target.attack = box_audio_dynamics_clamp(p[0], -1, 1);
+    t->target.sustain = box_audio_dynamics_clamp(p[1], -1, 1);
+}
+
+void box_audio_transient_shaper_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in)
+{
+    box_audio_transient_shaper_t *t = &fx->data.transient_shaper;
+    (void)fade_in;
+    box_audio_transient_shaper_target(fx);
+    box_audio_peak_start(core, &t->peak);
+    t->fast = 0;
+    t->slow = 0;
+    t->gain = 0;
+    t->coef[0] = box_audio_dynamics_coef(core, BOX_AUDIO_TRANSIENT_FAST_ATTACK);
+    t->coef[1] = box_audio_dynamics_coef(core, BOX_AUDIO_TRANSIENT_FAST_RELEASE);
+    t->coef[2] = box_audio_dynamics_coef(core, BOX_AUDIO_TRANSIENT_SLOW_ATTACK);
+    t->coef[3] = box_audio_dynamics_coef(core, BOX_AUDIO_TRANSIENT_SLOW_RELEASE);
+    t->smooth = box_audio_dynamics_coef(core, BOX_AUDIO_TRANSIENT_SMOOTH);
+    box_audio_ramp_set(&t->attack, t->target.attack);
+    box_audio_ramp_set(&t->sustain, t->target.sustain);
+}
+
+void box_audio_transient_shaper_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx)
+{
+    box_audio_transient_shaper_t *t = &fx->data.transient_shaper;
+    int32_t ramp = (int32_t)(BOX_AUDIO_TRANSIENT_RAMP * core->sample_rate);
+    box_audio_transient_shaper_target(fx);
+    box_audio_ramp_to(&t->attack, t->target.attack, ramp);
+    box_audio_ramp_to(&t->sustain, t->target.sustain, ramp);
+}
+
+/** Move an envelope one frame toward a level, falling to 0 once it is under
+ * BOX_AUDIO_TRANSIENT_SNAP with nothing coming in.
+ *
+ * @param env The envelope
+ * @param x The level
+ * @param attack Share of the distance that stays on the way up
+ * @param release Share of the distance that stays on the way down
+ * @return The new envelope
+ */
+static inline double box_audio_transient_follow(
+    double env,
+    double x,
+    double attack,
+    double release)
+{
+    env = x + (env - x) * (x > env ? attack : release);
+    if (x == 0 && env < BOX_AUDIO_TRANSIENT_SNAP) {
+        env = 0;
+    }
+
+    return env;
+}
+
+bool box_audio_transient_shaper_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent)
+{
+    box_audio_transient_shaper_t *t = &fx->data.transient_shaper;
+    int32_t i;
+    (void)core;
+    for (i = 0; i < frames; i ++) {
+        float x = box_audio_peak_next(&t->peak, l[i], r[i]);
+        float attack = box_audio_ramp_next(&t->attack);
+        float sustain = box_audio_ramp_next(&t->sustain);
+        float fast, slow, diff, up, down, gain;
+        double to, d;
+        x = x >= BOX_AUDIO_EFFECT_FLOOR ? x : 0;
+        t->fast = box_audio_transient_follow(t->fast, x, t->coef[0], t->coef[1]);
+        t->slow = box_audio_transient_follow(t->slow, x, t->coef[2], t->coef[3]);
+        fast = (float)t->fast > BOX_AUDIO_DYNAMICS_TINY ? (float)t->fast :
+            BOX_AUDIO_DYNAMICS_TINY;
+        slow = (float)t->slow > BOX_AUDIO_DYNAMICS_TINY ? (float)t->slow :
+            BOX_AUDIO_DYNAMICS_TINY;
+        diff = fast == slow ? 0 : BOX_AUDIO_DYNAMICS_DB *
+            (box_audio_dynamics_log2(fast) - box_audio_dynamics_log2(slow));
+        up = diff > 0 ? (diff < BOX_AUDIO_TRANSIENT_RANGE ? diff : BOX_AUDIO_TRANSIENT_RANGE) : 0;
+        down = diff < 0 ? (-diff < BOX_AUDIO_TRANSIENT_RANGE ? -diff : BOX_AUDIO_TRANSIENT_RANGE) :
+            0;
+        to = (double)(attack * up + sustain * down);
+        if (t->gain != to) {
+            t->gain = to + (t->gain - to) * t->smooth;
+            d = t->gain - to;
+            if (d < BOX_AUDIO_TRANSIENT_GAIN_SNAP && d > -BOX_AUDIO_TRANSIENT_GAIN_SNAP) {
+                t->gain = to;
+            }
+        }
+
+        if (t->gain != 0) {
+            gain = box_audio_dynamics_exp2((float)t->gain * BOX_AUDIO_DYNAMICS_OCTAVES);
+            l[i] *= gain;
+            r[i] *= gain;
+        }
+    }
+
+    return silent && t->fast == 0 && t->slow == 0 && t->gain == 0 &&
+        t->peak.current < BOX_AUDIO_EFFECT_FLOOR && t->peak.last < BOX_AUDIO_EFFECT_FLOOR;
+}
+
+void box_audio_transient_shaper_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    int32_t frames)
+{
+    box_audio_transient_shaper_t *t = &fx->data.transient_shaper;
+    box_audio_peak_t *p = &t->peak;
+    (void)core;
+    p->left = p->frames - (int32_t)(((int64_t)(p->frames - p->left) + frames) % p->frames);
+    box_audio_ramp_set(&t->attack, t->attack.target);
+    box_audio_ramp_set(&t->sustain, t->sustain.target);
 }
 
 void box_audio_dynamics_rest(

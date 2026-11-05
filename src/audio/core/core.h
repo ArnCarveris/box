@@ -394,7 +394,9 @@ typedef enum box_audio_effect_kind_t {
     BOX_AUDIO_EFFECT_PHASER = 7,  /**< A phaser, box_audio_phaser_params_t */
     BOX_AUDIO_EFFECT_CHORUS = 8,  /**< A chorus, box_audio_chorus_params_t */
     BOX_AUDIO_EFFECT_SATURATOR = 9, /**< A saturator, box_audio_saturator_params_t */
-    BOX_AUDIO_EFFECT_KINDS = 10   /**< Number of kinds, NONE included */
+    BOX_AUDIO_EFFECT_TRANSIENT_SHAPER = 10, /**< A transient shaper,
+                                  *   box_audio_transient_shaper_params_t */
+    BOX_AUDIO_EFFECT_KINDS = 11   /**< Number of kinds, NONE included */
 } box_audio_effect_kind_t;
 
 /** The parameters of a reverb, the first floats of the params of its effect command */
@@ -678,6 +680,35 @@ typedef struct box_audio_saturator_params_t {
                        *   BOX_AUDIO_SATURATOR_BITS_MAX it is not rounded */
     float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
 } box_audio_saturator_params_t;
+
+/** Attack and release in seconds of the fast envelope of a transient shaper */
+#define BOX_AUDIO_TRANSIENT_FAST_ATTACK 0.001f
+#define BOX_AUDIO_TRANSIENT_FAST_RELEASE 0.02f
+
+/** Attack and release in seconds of the slow envelope of a transient shaper */
+#define BOX_AUDIO_TRANSIENT_SLOW_ATTACK 0.02f
+#define BOX_AUDIO_TRANSIENT_SLOW_RELEASE 0.2f
+
+/** Largest gain of a transient shaper either way in dB, at an attack or sustain of 1 or -1 */
+#define BOX_AUDIO_TRANSIENT_RANGE 12.0f
+
+/** Seconds of the one pole that smooths the gain of a transient shaper in dB */
+#define BOX_AUDIO_TRANSIENT_SMOOTH 0.002f
+
+/** Seconds of a change of the attack or the sustain of a transient shaper */
+#define BOX_AUDIO_TRANSIENT_RAMP 0.02f
+
+/** The parameters of a transient shaper, the first floats of the params of its effect
+ * command: stereo linked, it follows the peak of the louder channel with a fast and a slow
+ * envelope (BOX_AUDIO_TRANSIENT_FAST_ATTACK and so on), the same gain on both channels.
+ *
+ * The fast one over the slow one in dB is a transient, else sustain. The gain in dB is
+ * attack times the first plus sustain times the second, each at most
+ * BOX_AUDIO_TRANSIENT_RANGE and smoothed; 0 and 0 pass the signal unchanged */
+typedef struct box_audio_transient_shaper_params_t {
+    float attack;     /**< -1..1: above 0 boosts transients, below 0 softens them */
+    float sustain;    /**< -1..1: above 0 boosts the tail, below 0 shortens it */
+} box_audio_transient_shaper_params_t;
 
 /** Put an effect into an insert slot of a bus, change its parameters, move it or take it off.
  *

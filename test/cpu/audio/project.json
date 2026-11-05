@@ -222,6 +222,7 @@
                     "delay",
                     "modulation",
                     "saturator",
+                    "transient_shaper",
                     "synth_sub"
                 ]
             },
@@ -564,7 +565,16 @@
                     "component",
                     "world_duck",
                     "sidechain_cycle",
-                    "script"
+                    "script",
+                    "transient_attack",
+                    "transient_sustain",
+                    "transient_level",
+                    "transient_neutral",
+                    "transient_linked",
+                    "transient_no_click",
+                    "transient_render_sizes",
+                    "transient_component",
+                    "transient_script"
                 ]
             },
             {

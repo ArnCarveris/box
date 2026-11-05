@@ -176,6 +176,7 @@ their tails end.
 | `Phaser` | `stages: 4`, `rate: 0.5` Hz, `depth: 0.7`, `center: 800` Hz, `feedback: 0`, `mix: 0.5`, `stereo: 0.5` |
 | `Chorus` | `voices: 2`, `rate: 0.8` Hz, `depth: 3` ms, `delay: 12` ms, `mix: 0.5`, `spread: 0.5` |
 | `Saturator` | `drive: 0.3`, `asymmetry: 0`, `bits: 16`, `mix: 1` |
+| `TransientShaper` | `attack: 0`, `sustain: 0` |
 
 Equalizer bands use `AudioEqOff`, `AudioEqPeak`, `AudioEqLowShelf`,
 `AudioEqHighShelf`, `AudioEqLowCut` or `AudioEqHighCut`. Defaults are 100, 400,
@@ -197,6 +198,16 @@ harmonics, and the DC it creates is filtered out. Below 16, `bits` runs a bit cr
 after the saturation: 4 bits gives 16 levels. Oversampling delays the bus by 15
 frames, and the dry signal is delayed the same amount, so `mix` does not comb.
 An `AudioMeter` on the saturator reads how hard the clipper squashes, in dB.
+
+A transient shaper gives drums and plucks more or less punch and more or less tail,
+without a threshold. Stereo linked like a compressor, it follows the peak of the
+louder channel with a fast envelope (1 ms attack, 20 ms release) and a slow one
+(20 ms attack, 200 ms release). Where the fast one is above the slow one the signal
+is a transient, otherwise it is sustain. The gain follows their difference in dB, so
+it works the same at any level. `attack` from -1 to 1 softens or boosts transients,
+`sustain` from -1 to 1 shortens or boosts the tail, each by up to 12 dB. The gain is
+smoothed so it does not distort low notes, is the same on both channels, and 0 and 0
+pass the signal unchanged. It has no meter.
 
 For ducking, key a compressor on another channel:
 
