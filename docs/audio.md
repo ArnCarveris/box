@@ -699,13 +699,72 @@ since its envelopes do not restart. Quantized legato plays start new voices.
 The expression of a note (`Note.bend`, `mod` and `pressure`, see Music on the timeline)
 reaches its synth voice only. The bend multiplies the pitch of the voice by
 `2^(bend / 12)` on the same path as its pitch and glide, so oscillators, sweeps, pluck
-strings and key tracking follow it, and a glide that runs keeps going. Until a mod matrix
-exists, `mod` scales the pitch depth of the LFOs, the vibrato (1 without a curve, so a
+strings and key tracking follow it, and a glide that runs keeps going. Hardwired,
+`mod` scales the pitch depth of the LFOs, the vibrato (1 without a curve, so a
 sound keeps its vibrato), and `pressure` moves the cutoff up by `pressure * 2` octaves
-(`BOX_AUDIO_SYNTH_PRESSURE_OCTAVES`, 0 without a curve); a formant filter ignores it. A
+(`BOX_AUDIO_SYNTH_PRESSURE_OCTAVES`, 0 without a curve); a formant filter ignores it.
+A sound with a `SynthModRoute` from `SynthSourceMod` turns the hardwired vibrato depth
+off, and one from `SynthSourcePressure` the hardwired cutoff, so the route alone decides
+what they do (see the modulation matrix below). A
 retargeted legato voice takes the expression of the new note. The voice takes the values
 of the ramps every 8 frames while they move; a note without expression renders exactly
 as before.
+
+### Modulation matrix
+
+The fixed routes above (the depths of `SynthLfo`, `SynthFilterEnvelope.amount`, the
+`velocity` and `keytrack` fields) cover the usual patches. A `SynthModRoute` adds a free
+route on top of them: the value of a `source` times an `amount` moves a `target`. Each
+route is an entity of its own, a child of the root, where it moves every layer, or a child
+of a layer, where it moves that layer and takes the amp envelope of that layer as its
+source. The cutoff, resonance and pan are of the sound either way. A sound has up to
+`BOX_AUDIO_SYNTH_ROUTES` (8) routes: the children of the root first, then those of each
+layer in the order of the layers; more log one error that names the sound and are left
+out. Routes run once per control block, every 8 frames like the LFOs, and add to what the
+fixed routes give; the pan and the level ramp over the block so a step does not click.
+
+```
+lead {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.01, sustain: 1, release: 0.3}
+  SynthFilter: {kind: SynthLowPass, cutoff: 400}
+  SynthModEnvelope: {attack: 0.2, decay: 0.5, sustain: 0.2, release: 0.3}
+  SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.4}
+  SynthLfo: {rate: 0.3}
+  wobble { SynthLfo: {rate: 6} }   // a child of the root: the second LFO
+  sweep { SynthModRoute: {source: SynthSourceModEnvelope, target: SynthTargetCutoff, amount: 4} }
+  drift { SynthModRoute: {source: SynthSourceLfo1, target: SynthTargetPan, amount: 0.6} }
+}
+```
+
+| Source | Value |
+|---|---|
+| `SynthSourceAmpEnvelope` | The amp envelope, 0..1: of the layer for a route on a layer, else the `SynthEnvelope` of the root (of the first layer when the root has none) |
+| `SynthSourceFilterEnvelope` | The `SynthFilterEnvelope`, 0..1; it runs for the route even without a `SynthFilter` |
+| `SynthSourceModEnvelope` | The `SynthModEnvelope` of the root, 0..1 |
+| `SynthSourceLfo1`, `SynthSourceLfo2` | The first and second LFO of the patch, -1..1, after their delay and fade, in the order of the LFOs above: the root, the layers, the other children |
+| `SynthSourceVelocity` | The velocity of the note, 0..1, 1 for a play that is not a note |
+| `SynthSourceKey` | The key of the note in octaves from the root, the key of `keytrack` / 12 |
+| `SynthSourceRandom` | A random value per note, -1..1, seeded from `SynthSound.seed` and the count of plays |
+| `SynthSourceMod`, `SynthSourcePressure` | `Note.mod` (1 without a curve) and `Note.pressure` (0 without), 0..1; a route from either turns its hardwiring off |
+
+| Target | Amount at a source value of 1 |
+|---|---|
+| `SynthTargetCutoff` | Octaves of the cutoff, -10..10; nothing on a `SynthFormant` filter |
+| `SynthTargetResonance` | Share of the resonance, -1..1, the result clamped to 0..1; nothing on a `SynthComb` |
+| `SynthTargetIndex` | Radians of the index of a `SynthPhase` modulator, -32..32, or the depth of a `SynthRing` one, clamped as `index`; nothing on a layer that does not modulate |
+| `SynthTargetPitch` | Semitones, -48..48 |
+| `SynthTargetPan` | Pan of the voice, -2..2, on top of its own, the result clamped to -1..1 and smoothed; a sound with a route to the pan renders in stereo |
+| `SynthTargetDetune` | Cents of the unison detune, -100..100, the result clamped to 0..100 |
+| `SynthTargetPulseWidth` | Share of the period of the pulse width of squares, -0.49..0.49 |
+| `SynthTargetLevel` | Share of the level of the layer, -4..4: the level is times `1 + amount * value`, clamped at 0, and smoothed |
+
+`SynthModEnvelope` is a third envelope on the root with the fields of `SynthEnvelope`.
+It runs only when a route uses it and does not keep the voice playing, as the filter
+envelope. A sound without routes renders exactly as before, whatever its
+`SynthModEnvelope` holds. In the `Synth` bench (`voices_64_routes`, 64 voices, 48 kHz,
+the patch of `voices_64_lfo` with 8 routes of every target but the index and the detune
+and the mod envelope) the matrix costs about TBD ns per sample over `voices_64_lfo`.
 
 Working examples include [synth_examples.flecs](../test/assets/audio/synth_examples.flecs),
 [synth_unison.flecs](../test/assets/audio/synth_unison.flecs),
@@ -716,8 +775,9 @@ Working examples include [synth_examples.flecs](../test/assets/audio/synth_examp
 [synth_sync.flecs](../test/assets/audio/synth_sync.flecs),
 [synth_wavetable.flecs](../test/assets/audio/synth_wavetable.flecs),
 [synth_drive.flecs](../test/assets/audio/synth_drive.flecs),
-[synth_drift.flecs](../test/assets/audio/synth_drift.flecs) and
-[synth_pitch.flecs](../test/assets/audio/synth_pitch.flecs).
+[synth_drift.flecs](../test/assets/audio/synth_drift.flecs),
+[synth_pitch.flecs](../test/assets/audio/synth_pitch.flecs) and
+[synth_mod_matrix.flecs](../test/assets/audio/synth_mod_matrix.flecs).
 
 ## Music on the timeline
 

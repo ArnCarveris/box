@@ -538,6 +538,8 @@ typedef struct box_audio_synth_osc_t {
     double position_lfo;  /**< Wavetable: frames the LFOs move it by */
     double position_step; /**< Wavetable: change of position_lfo per frame */
     float position_env;   /**< Wavetable: frames it moves at level 1 of its envelope */
+    float index_route;    /**< Radians the routes add to the index of a modulator, or to the
+                           * depth of a ring modulator; 0 without */
 } box_audio_synth_osc_t;
 
 /** An LFO of a synth voice, advanced per control block of BOX_AUDIO_SYNTH_CONTROL frames */
@@ -579,6 +581,8 @@ typedef struct box_audio_synth_unison_t {
     double drift[BOX_AUDIO_SYNTH_UNISON_MAX];  /**< Factor of the pitch of each voice from its
                                                 * drift, with drift */
     double drift_step[BOX_AUDIO_SYNTH_UNISON_MAX]; /**< Change of drift per frame */
+    double spread;        /**< Cents from the lowest voice to the highest that detune holds,
+                           * the routes included */
 } box_audio_synth_unison_t;
 /** Most sections of the filter that colors noise */
 #define BOX_AUDIO_SYNTH_COLOR_SECTIONS 10
@@ -770,6 +774,26 @@ typedef struct box_audio_synth_source_t {
     int32_t comb_window;  /**< Frames left of the window over which the comb rings on once
                            * the envelopes have ended, a period */
     bool comb_ringing;    /**< Whether the comb is still over the silence */
+    int32_t routes;       /**< Routes of the modulation matrix that run, 0 without, which
+                           * renders as before */
+    box_audio_synth_route_t route[BOX_AUDIO_SYNTH_ROUTES]; /**< The routes of the patch */
+    uint32_t route_sources; /**< Bit of each box_audio_synth_source_kind_t a route uses */
+    uint32_t route_targets; /**< Bit of each box_audio_synth_target_t a route moves */
+    float route_random;   /**< The random source of the play, -1..1 */
+    box_audio_synth_envelope_t mod_envelope; /**< Mod envelope of the patch */
+    box_audio_synth_env_t menv; /**< The mod envelope, when menv_on */
+    bool menv_on;         /**< Whether a route uses the mod envelope, which then runs */
+    bool fenv_routed;     /**< Whether the filter envelope runs for the routes alone, and so
+                           * advances with the mod envelope instead of in the filter */
+    uint32_t slope;       /**< A box_audio_synth_slope_t of the filter */
+    float resonance_base; /**< Resonance of the patch, clamped */
+    float resonance;      /**< Resonance the filter holds, the routes included */
+    bool panned;          /**< Whether a route moves the pan, so the source renders a right
+                           * channel too */
+    float pan_l;          /**< Gain of the left channel from the pan of the routes */
+    float pan_r;          /**< Gain of the right channel */
+    float pan_l_step;     /**< Change of pan_l per frame */
+    float pan_r_step;     /**< Change of pan_r per frame */
 } box_audio_synth_source_t;
 
 /** State of the kinds of sources */

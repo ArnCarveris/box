@@ -119,6 +119,76 @@ static float box_audio_synth_end_clamp(
     return v > 0 ? box_audio_synth_clamp(v, lo, BOX_AUDIO_SYNTH_HZ_MAX) : 0.0f;
 }
 
+/** Clamp the amount of a route to the range of its target; NaN is 0.
+ *
+ * @param target A box_audio_synth_target_t
+ * @param v The amount
+ * @return The clamped amount
+ */
+static float box_audio_synth_amount_clamp(
+    uint32_t target,
+    float v)
+{
+    float max;
+    switch (target) {
+    case BOX_AUDIO_SYNTH_TO_CUTOFF:
+        max = BOX_AUDIO_SYNTH_OCTAVES_MAX;
+        break;
+    case BOX_AUDIO_SYNTH_TO_INDEX:
+        max = BOX_AUDIO_SYNTH_INDEX_MAX;
+        break;
+    case BOX_AUDIO_SYNTH_TO_PITCH:
+        max = BOX_AUDIO_SYNTH_PITCH_SEMITONES;
+        break;
+    case BOX_AUDIO_SYNTH_TO_PAN:
+        max = 2.0f;
+        break;
+    case BOX_AUDIO_SYNTH_TO_DETUNE:
+        max = BOX_AUDIO_SYNTH_DETUNE_MAX;
+        break;
+    case BOX_AUDIO_SYNTH_TO_PULSE_WIDTH:
+        max = 0.5f - BOX_AUDIO_SYNTH_PULSE_MIN;
+        break;
+    case BOX_AUDIO_SYNTH_TO_LEVEL:
+        max = BOX_AUDIO_SYNTH_ROUTE_LEVEL_MAX;
+        break;
+    default:
+        max = 1.0f;
+        break;
+    }
+
+    return box_audio_synth_depth_clamp(v, max);
+}
+
+/** Clamp the routes of a patch: an unknown source or target, or a layer past those of the
+ * patch, leaves the route at an amount of 0, and the room past the routes is cleared.
+ *
+ * @param p The patch, its layers clamped
+ */
+static void box_audio_synth_routes_clamp(
+    box_audio_synth_patch_t *p)
+{
+    uint32_t i;
+    if (p->routes > BOX_AUDIO_SYNTH_ROUTES) {
+        p->routes = BOX_AUDIO_SYNTH_ROUTES;
+    }
+
+    for (i = 0; i < BOX_AUDIO_SYNTH_ROUTES; i ++) {
+        box_audio_synth_route_t *r = &p->route[i];
+        if (i >= p->routes) {
+            *r = (box_audio_synth_route_t){0};
+        } else if (r->source >= BOX_AUDIO_SYNTH_SOURCES || r->target >= BOX_AUDIO_SYNTH_TARGETS ||
+            r->layer > p->layers)
+        {
+            *r = (box_audio_synth_route_t){0};
+        } else {
+            r->amount = box_audio_synth_amount_clamp(r->target, r->amount);
+        }
+    }
+
+    box_audio_synth_envelope_clamp(&p->mod_envelope);
+}
+
 /** Clamp every value of a patch, so a voice never sees NaN, a negative time or an unknown
  * kind.
  *
@@ -256,6 +326,8 @@ static void box_audio_synth_patch_clamp(
         lfo->position = box_audio_synth_depth_clamp(lfo->position,
             (float)BOX_AUDIO_TABLE_FRAMES_MAX);
     }
+
+    box_audio_synth_routes_clamp(p);
 }
 
 void box_audio_synth_drive_curve(

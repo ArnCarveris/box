@@ -34,6 +34,10 @@ extern "C" {
 /** LFOs of a synth sound: the SynthLfo of the root, of its layers and of its other children */
 #define BOX_AUDIO_SYNTH_LFOS 2
 
+/** Routes of the modulation matrix of a synth sound: its SynthModRoute children and those of
+ * its layers. More log one error and are left out */
+#define BOX_AUDIO_SYNTH_ROUTES 8
+
 /** Seconds a synth sound plays when it would never end, a layer without any envelope */
 #define BOX_AUDIO_SYNTH_ENDLESS (10.0f)
 
@@ -362,6 +366,50 @@ ECS_ENUM(SynthLfoWave, {
     SynthLfoSaw,           /**< Rising saw, from 0, its drop smoothed over 2 ms */
     SynthLfoRandom         /**< Sample and hold: a random value each period, seeded per play
                             *   from SynthSound.seed, its steps smoothed over 2 ms */
+});
+
+/** Source of a SynthModRoute, see the modulation matrix in docs/audio.md */
+ECS_ENUM(SynthModSource, {
+    SynthSourceAmpEnvelope,    /**< The amp envelope, 0..1: of the layer for a route on a
+                                *   layer, else the SynthEnvelope of the root, or of the first
+                                *   layer when the root has none */
+    SynthSourceFilterEnvelope, /**< The SynthFilterEnvelope, 0..1; it runs for the route
+                                *   without a SynthFilter too */
+    SynthSourceModEnvelope,    /**< The SynthModEnvelope of the root, 0..1 */
+    SynthSourceLfo1,           /**< The first LFO of the patch, -1..1, after its delay and
+                                *   fade; see LFOs in docs/audio.md for their order */
+    SynthSourceLfo2,           /**< The second LFO of the patch, -1..1 */
+    SynthSourceVelocity,       /**< The velocity of the note, 0..1, 1 for a play */
+    SynthSourceKey,            /**< The key of the note in octaves from the root, the key of
+                                *   SynthFilter.keytrack over 12 */
+    SynthSourceRandom,         /**< A random value per note, -1..1, seeded from
+                                *   SynthSound.seed and the count of plays */
+    SynthSourceMod,            /**< Note.mod, 0..1, 1 without expression; a route from it turns
+                                *   off the vibrato depth that mod scales */
+    SynthSourcePressure        /**< Note.pressure, 0..1; a route from it turns off the
+                                *   BOX_AUDIO_SYNTH_PRESSURE_OCTAVES of the cutoff */
+});
+
+/** Target of a SynthModRoute, with the unit of its amount at a source value of 1 */
+ECS_ENUM(SynthModTarget, {
+    SynthTargetCutoff,         /**< Octaves of the cutoff of the SynthFilter, -10..10; nothing
+                                *   on a SynthFormant filter */
+    SynthTargetResonance,      /**< Share of the resonance of the SynthFilter, -1..1; the moved
+                                *   resonance is clamped to 0..1. Nothing on a SynthComb */
+    SynthTargetIndex,          /**< Radians of the index of a SynthPhase modulator, -32..32, or
+                                *   the depth of a SynthRing one; the moved index is clamped as
+                                *   SynthOscillator.index. Nothing on a layer that does not
+                                *   modulate */
+    SynthTargetPitch,          /**< Semitones of the pitch, -48..48 */
+    SynthTargetPan,            /**< Pan of the voice, -2..2, on top of its own; the moved pan
+                                *   is clamped to -1..1 and smoothed, and a sound with a route to
+                                *   it renders in stereo */
+    SynthTargetDetune,         /**< Cents of SynthUnison.detune, -100..100; the moved detune is
+                                *   clamped to 0..100. Nothing on a layer without unison */
+    SynthTargetPulseWidth,     /**< Share of the period of the pulse width of squares,
+                                *   -0.49..0.49 */
+    SynthTargetLevel           /**< Share of the level of the layer, -4..4: the level is times
+                                *   1 + amount value, clamped at 0, and smoothed */
 });
 
 /** What a synth oscillator does with its signal */
@@ -918,10 +966,43 @@ ECS_STRUCT(SynthLfo, {
                             *   stay in seconds; SynthLfoRandom steps once per cycle */
 });
 
+/** A route of the modulation matrix of a synth sound, on an entity of its own: the value of a
+ * source times an amount moves a target, on top of the fixed routes (the depths of SynthLfo,
+ * SynthFilterEnvelope.amount, the velocity and keytrack fields), once per control block of
+ * the LFOs.
+ *
+ * A child of the root moves every layer; a child of a layer moves that layer, and takes its
+ * amp envelope as SynthSourceAmpEnvelope. The cutoff, resonance and pan are of the sound
+ * either way. Up to BOX_AUDIO_SYNTH_ROUTES per sound, see the modulation matrix in
+ * docs/audio.md.
+ */
+ECS_STRUCT(SynthModRoute, {
+    SynthModSource source; /**< The source, default SynthSourceAmpEnvelope */
+    SynthModTarget target; /**< The target, default SynthTargetCutoff */
+    float amount;          /**< Amount at a source value of 1, in the unit of the target,
+                            *   default 0 */
+});
+
+/** A third envelope of a synth sound, on its root, with the segments of a SynthEnvelope: a
+ * source of SynthModRoute, SynthSourceModEnvelope. It runs only when a route uses it, and does
+ * not keep a sound playing: the sound ends with its SynthEnvelope.
+ */
+ECS_STRUCT(SynthModEnvelope, {
+    float attack;          /**< Seconds from 0 to 1, at least 0.5 ms */
+    float decay;           /**< Seconds from 1 to the sustain level */
+    float sustain;         /**< Level after the decay, 0..1, default 0 */
+    float release;         /**< Seconds from the sustain level to 0 */
+    float hold;            /**< Seconds at the sustain level before the release */
+    float curve;           /**< Curve of the decay and the release, 0 linear (default),
+                            *   -16..16 */
+    float attack_curve;    /**< Curve of the attack, 0 linear (default), -16..16 */
+    float key_scale;       /**< Key scaling 0..1, default 0, as SynthEnvelope.key_scale */
+});
+
 /** A sound made by the synth from the components of this entity and its children, without a
  * file: SynthOscillator layers, each with an optional SynthUnison, a SynthTable, a
  * SynthEnvelope, a SynthDrive, a SynthFilter, a SynthFilterEnvelope, a SynthPitchEnvelope,
- * a SynthGlide and SynthLfo. Usually a prefab.
+ * a SynthGlide, SynthLfo, a SynthModEnvelope and SynthModRoute children. Usually a prefab.
  *
  * It is compiled once, and again when one of its components changes, into a patch the core
  * holds; box_audio_play and AudioSource play it like any sound, with no allocation per play.

@@ -276,6 +276,25 @@
                 ]
             },
             {
+                "id": "SynthModMatrix",
+                "testcases": [
+                    "mod_envelope_cutoff",
+                    "lfo2_pan",
+                    "lfo1_pulse_width",
+                    "velocity_pitch",
+                    "random_per_note",
+                    "pressure_resonance",
+                    "mod_level",
+                    "filter_envelope_pitch",
+                    "amp_index",
+                    "key_detune",
+                    "layer_route",
+                    "no_routes_identical",
+                    "ninth_route",
+                    "script"
+                ]
+            },
+            {
                 "id": "SynthLfoSync",
                 "testcases": [
                     "period",
@@ -387,7 +406,8 @@
                     "synth_formant",
                     "synth_wavetable",
                     "expression",
-                    "synth_comb"
+                    "synth_comb",
+                    "synth_routes"
                 ]
             },
             {

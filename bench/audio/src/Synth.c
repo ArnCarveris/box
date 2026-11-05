@@ -55,6 +55,12 @@
  * benchmark, so it renders in pieces of BOX_AUDIO_EXPRESS_FRAMES */
 #define BENCH_EXPRESS 128u
 
+/** Extra of bench_synth_core: 8 routes of the modulation matrix, with the mod envelope, on top
+ * of the two LFOs of lfo: from the mod and filter envelopes to the cutoff, LFO 2 to the pan,
+ * velocity and the random value to the pitch, the amp envelope and LFO 1 of the square to its
+ * level and its pulse width, and the key to the resonance */
+#define BENCH_ROUTES 256u
+
 /** Create a core with 64 looping voices of a patch of three layers: a saw that sweeps up, a
  * square with its own envelope and noise, into a lowpass.
  *
@@ -71,7 +77,7 @@
  * @param curved Whether the patch envelope and the envelope of the square are curved
  * @param drive Drive of the filter, 0..1
  * @param extra BENCH_SUB, BENCH_SYNC, BENCH_PITCH, BENCH_PINK, BENCH_LADDER, BENCH_FORMANT,
- *   BENCH_DRIFT and BENCH_EXPRESS, or 0
+ *   BENCH_DRIFT, BENCH_EXPRESS and BENCH_ROUTES, or 0
  * @param pre Drive of the mix of the layers before the filter, 0..1, negative for none; its
  *   asymmetry is 0.3
  * @return The core
@@ -194,6 +200,28 @@ static box_audio_core_t* bench_synth_core(
             .delay = 0.1f, .fade = 0.2f, .pitch = 15, .amplitude = 0.1f };
         p.lfo[1] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_TRIANGLE, .rate = 0.3f,
             .random_phase = 1, .cutoff = 1.5f, .pulse_width = 0.3f };
+    }
+
+    if (extra & BENCH_ROUTES) {
+        p.mod_envelope = (box_audio_synth_envelope_t){
+            .attack = 0.5f, .decay = 1.0f, .sustain = 0.3f, .hold = 1.0f, .release = 0.2f };
+        p.routes = 8;
+        p.route[0] = (box_audio_synth_route_t){ .source = BOX_AUDIO_SYNTH_FROM_MOD_ENV,
+            .target = BOX_AUDIO_SYNTH_TO_CUTOFF, .amount = 2 };
+        p.route[1] = (box_audio_synth_route_t){ .source = BOX_AUDIO_SYNTH_FROM_LFO2,
+            .target = BOX_AUDIO_SYNTH_TO_PAN, .amount = 0.5f };
+        p.route[2] = (box_audio_synth_route_t){ .source = BOX_AUDIO_SYNTH_FROM_VELOCITY,
+            .target = BOX_AUDIO_SYNTH_TO_PITCH, .amount = 0.1f };
+        p.route[3] = (box_audio_synth_route_t){ .source = BOX_AUDIO_SYNTH_FROM_RANDOM,
+            .target = BOX_AUDIO_SYNTH_TO_PITCH, .amount = 0.05f };
+        p.route[4] = (box_audio_synth_route_t){ .source = BOX_AUDIO_SYNTH_FROM_AMP,
+            .target = BOX_AUDIO_SYNTH_TO_LEVEL, .layer = 2, .amount = -0.3f };
+        p.route[5] = (box_audio_synth_route_t){ .source = BOX_AUDIO_SYNTH_FROM_LFO1,
+            .target = BOX_AUDIO_SYNTH_TO_PULSE_WIDTH, .layer = 2, .amount = 0.2f };
+        p.route[6] = (box_audio_synth_route_t){ .source = BOX_AUDIO_SYNTH_FROM_KEY,
+            .target = BOX_AUDIO_SYNTH_TO_RESONANCE, .amount = 0.1f };
+        p.route[7] = (box_audio_synth_route_t){ .source = BOX_AUDIO_SYNTH_FROM_FILTER,
+            .target = BOX_AUDIO_SYNTH_TO_CUTOFF, .amount = 1 };
     }
 
     box_audio_writer_init(&w, bytes, sizeof(bytes));
@@ -467,6 +495,16 @@ void Synth_voices_64_express(
     // audio/synth
     box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
         0, BENCH_EXPRESS, -1);
+    bench_synth_render(b, core);
+    box_audio_core_free(core);
+}
+
+void Synth_voices_64_routes(
+    bench_t *b)
+{
+    // audio/synth
+    box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, true, false,
+        0, BENCH_ROUTES, -1);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }

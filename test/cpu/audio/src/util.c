@@ -295,6 +295,40 @@ bool audio_synth_cutoff(
     return result;
 }
 
+bool audio_synth_probe(
+    box_audio_core_t *core,
+    uint32_t handle,
+    audio_synth_probe_t *out)
+{
+    bool result = false;
+    int32_t i, l, k;
+    *out = (audio_synth_probe_t){0};
+    for (i = 0; i < BOX_AUDIO_VOICE_SLOTS && !result; i ++) {
+        box_audio_voice_t *v = &core->voices[i];
+        if (v->state == BOX_AUDIO_VOICE_PLAYING && v->handle == handle &&
+            v->source.kind == BOX_AUDIO_SOURCE_SYNTH)
+        {
+            const box_audio_synth_source_t *src = &v->source.data.synth;
+            out->route_random = src->route_random;
+            out->resonance = src->resonance;
+            out->menv_on = src->menv_on;
+            for (l = 0; l < src->layers; l ++) {
+                const box_audio_synth_part_t *part = src->part[l];
+                out->width[l] = part->osc.width;
+                out->index_route[l] = part->osc.index_route;
+                out->spread[l] = part->unison.spread;
+                for (k = 0; k < part->unison.voices && k < BOX_AUDIO_SYNTH_UNISON_MAX; k ++) {
+                    out->detune[l][k] = part->unison.detune[k];
+                }
+            }
+
+            result = true;
+        }
+    }
+
+    return result;
+}
+
 int32_t audio_table_frames(
     const float *data,
     int32_t frames,

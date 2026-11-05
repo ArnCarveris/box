@@ -244,6 +244,12 @@
  * vowels of an LFO or the filter envelope on it */
 #define BOX_AUDIO_SYNTH_VOWEL_MAX 4.0f
 
+/** Routes of the modulation matrix of a synth patch */
+#define BOX_AUDIO_SYNTH_ROUTES 8
+
+/** Largest amount of a route to the level of a synth layer, a share of its level either way */
+#define BOX_AUDIO_SYNTH_ROUTE_LEVEL_MAX 4.0f
+
 /** Most frames of a wavetable; a table takes a sound id of the core, so a core holds at most
  * BOX_AUDIO_SOUND_MAX - 1 sounds, tables and synth patches together */
 #define BOX_AUDIO_TABLE_FRAMES_MAX 256
@@ -980,6 +986,46 @@ typedef enum box_audio_synth_lfo_wave_t {
                                         * its steps smoothed over 2 ms */
 } box_audio_synth_lfo_wave_t;
 
+/** Sources of a route of the modulation matrix of a synth patch, in the order of the
+ * SynthModSource enum of box/audio.h */
+typedef enum box_audio_synth_source_kind_t {
+    BOX_AUDIO_SYNTH_FROM_AMP = 0,       /**< The amp envelope: of the layer of a layer route,
+                                         * else of the patch, 0..1 */
+    BOX_AUDIO_SYNTH_FROM_FILTER = 1,    /**< The filter envelope, 0..1, which runs for the route
+                                         * without a filter too */
+    BOX_AUDIO_SYNTH_FROM_MOD_ENV = 2,   /**< The mod envelope of the patch, 0..1 */
+    BOX_AUDIO_SYNTH_FROM_LFO1 = 3,      /**< The first LFO, -1..1, after its delay and fade */
+    BOX_AUDIO_SYNTH_FROM_LFO2 = 4,      /**< The second LFO, the same way */
+    BOX_AUDIO_SYNTH_FROM_VELOCITY = 5,  /**< Velocity of the note, 0..1 */
+    BOX_AUDIO_SYNTH_FROM_KEY = 6,       /**< Key of the voice in octaves from the root */
+    BOX_AUDIO_SYNTH_FROM_RANDOM = 7,    /**< A random value per note, -1..1, seeded */
+    BOX_AUDIO_SYNTH_FROM_MOD = 8,       /**< Mod of the voice, 0..1 */
+    BOX_AUDIO_SYNTH_FROM_PRESSURE = 9   /**< Pressure of the voice, 0..1 */
+} box_audio_synth_source_kind_t;
+
+/** Sources of a route of a synth patch, one past the last */
+#define BOX_AUDIO_SYNTH_SOURCES 10
+
+/** Targets of a route of the modulation matrix of a synth patch, in the order of the
+ * SynthModTarget enum of box/audio.h, with the unit of the amount at source value 1. A new
+ * target takes the next value, a case in box_audio_synth_routes of synth.c and its clamp in
+ * synth_patch.c */
+typedef enum box_audio_synth_target_t {
+    BOX_AUDIO_SYNTH_TO_CUTOFF = 0,      /**< Octaves of the cutoff */
+    BOX_AUDIO_SYNTH_TO_RESONANCE = 1,   /**< Share of the resonance, clamped 0..1 */
+    BOX_AUDIO_SYNTH_TO_INDEX = 2,       /**< Radians of the index of a modulator layer, or the
+                                         * depth of a ring modulator */
+    BOX_AUDIO_SYNTH_TO_PITCH = 3,       /**< Semitones of the pitch */
+    BOX_AUDIO_SYNTH_TO_PAN = 4,         /**< Pan of the voice, -1..1, smoothed */
+    BOX_AUDIO_SYNTH_TO_DETUNE = 5,      /**< Cents of the unison detune */
+    BOX_AUDIO_SYNTH_TO_PULSE_WIDTH = 6, /**< Share of the period of the pulse width */
+    BOX_AUDIO_SYNTH_TO_LEVEL = 7        /**< Share of the level of a layer, clamped at 0,
+                                         * smoothed */
+} box_audio_synth_target_t;
+
+/** Targets of a route of a synth patch, one past the last */
+#define BOX_AUDIO_SYNTH_TARGETS 8
+
 /** How a synth oscillator that modulates another one changes it */
 typedef enum box_audio_synth_modulation_t {
     BOX_AUDIO_SYNTH_PHASE = 0,  /**< Adds to the phase of the carrier, FM as DX synths do it */
@@ -1109,6 +1155,17 @@ typedef struct box_audio_synth_lfo_t {
                              * starts at phase + fract(beat / sync) of the play */
 } box_audio_synth_lfo_t;
 
+/** A route of the modulation matrix of a synth patch: the value of a source times an amount,
+ * added to a target on top of the fixed routes */
+typedef struct box_audio_synth_route_t {
+    uint32_t source;        /**< A box_audio_synth_source_kind_t */
+    uint32_t target;        /**< A box_audio_synth_target_t */
+    uint32_t layer;         /**< 1 + the layer it moves, and whose amp envelope is its source,
+                             * 0 for every layer; the cutoff, resonance and pan are of the patch
+                             * either way */
+    float amount;           /**< Amount at source value 1, in the unit of the target */
+} box_audio_synth_route_t;
+
 /** A synth patch: up to BOX_AUDIO_SYNTH_LAYERS oscillators with envelopes, then one filter,
  * then an amp, and up to BOX_AUDIO_SYNTH_LFOS LFOs that move them. Plain values in seconds
  * and Hz, the same at every sample rate */
@@ -1173,6 +1230,12 @@ typedef struct box_audio_synth_patch_t {
     float tune;                           /**< BOX_AUDIO_SYNTH_COMB: ratio of the frequency of
                                            * the comb to the note,
                                            * BOX_AUDIO_SYNTH_TUNE_MIN..MAX; 0 counts as 1 */
+    box_audio_synth_envelope_t mod_envelope; /**< The mod envelope, a source of routes, which
+                                           * runs when a route uses it and does not keep the
+                                           * voice playing */
+    uint32_t routes;                      /**< Routes that run, 0..BOX_AUDIO_SYNTH_ROUTES */
+    box_audio_synth_route_t route[BOX_AUDIO_SYNTH_ROUTES]; /**< The routes of the modulation
+                                           * matrix, which add to the fixed ones */
     box_audio_synth_layer_t layer[BOX_AUDIO_SYNTH_LAYERS]; /**< The oscillators, last: a
                                            * command sends only the layers of its patch */
 } box_audio_synth_patch_t;

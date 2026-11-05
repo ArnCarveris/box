@@ -244,6 +244,30 @@ bool audio_synth_cutoff(
  * @param channels 1 or 2
  * @return Frames of the table, 0 when it is not one
  */
+/** State of a synth voice that the tests of the modulation matrix read */
+typedef struct audio_synth_probe_t {
+    float route_random;     /**< The random source of the play */
+    float resonance;        /**< Resonance the filter holds */
+    bool menv_on;           /**< Whether the mod envelope runs */
+    double width[BOX_AUDIO_SYNTH_LAYERS];       /**< Pulse width of each layer */
+    float index_route[BOX_AUDIO_SYNTH_LAYERS];  /**< Radians the routes add to each index */
+    double spread[BOX_AUDIO_SYNTH_LAYERS];      /**< Unison spread of each layer in cents */
+    double detune[BOX_AUDIO_SYNTH_LAYERS][BOX_AUDIO_SYNTH_UNISON_MAX]; /**< Factor of each
+                             * unison voice of each layer */
+} audio_synth_probe_t;
+
+/** Read the state of the synth voice of a handle that plays.
+ *
+ * @param core The core
+ * @param handle Handle of the voice
+ * @param out Receives the state
+ * @return Whether a synth voice of the handle plays
+ */
+bool audio_synth_probe(
+    box_audio_core_t *core,
+    uint32_t handle,
+    audio_synth_probe_t *out);
+
 int32_t audio_table_frames(
     const float *data,
     int32_t frames,

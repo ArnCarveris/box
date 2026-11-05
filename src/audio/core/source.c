@@ -337,7 +337,7 @@ int32_t box_audio_source_render(
         done = box_audio_stream_render(core, &source->data.stream, frames, stereo);
     } else if (source->kind == BOX_AUDIO_SOURCE_SYNTH) {
         done = box_audio_synth_render(core, &source->data.synth, frames);
-        *stereo = source->data.synth.stereo;
+        *stereo = source->data.synth.stereo || source->data.synth.panned;
     }
 
     for (i = done; i < frames; i ++) {

@@ -525,7 +525,7 @@ done:
     return;
 }
 
-/** Set the indexes and the feedback of the oscillators from the patch.
+/** Set the indexes and the feedback of the oscillators from the patch and the routes.
  *
  * FM is not band limited, so the index of phase modulation is limited: by Carson's rule the
  * carrier plus (index + 1) times the modulator, the higher ends of sweeps, stays under the top.
@@ -544,22 +544,36 @@ static void box_audio_synth_limits(
         if (o->target < 0) {
             o->index = 0;
         } else if (o->ring) {
-            o->index = layer->index;
+            index = (double)layer->index;
+            if (o->index_route != 0) {
+                index += (double)o->index_route;
+                index = index > 0 ? (index < 1 ? index : 1.0) : 0.0;
+            }
+
+            o->index = (float)index;
         } else {
             const box_audio_synth_osc_t *c = &src->part[o->target]->osc;
             fc = c->inc > c->inc_end ? c->inc : c->inc_end;
             fm = o->inc > o->inc_end ? o->inc : o->inc_end;
             limit = (src->inc_max - fc) / fm - 1;
             limit = limit > 0 ? limit : 0;
-            index = (double)layer->index < limit ? (double)layer->index : limit;
+            index = (double)layer->index;
+            if (o->index_route != 0) {
+                index += (double)o->index_route;
+                index = index > 0 ? (index < BOX_AUDIO_SYNTH_INDEX_MAX ? index :
+                    (double)BOX_AUDIO_SYNTH_INDEX_MAX) : 0.0;
+            }
+
+            index = index < limit ? index : limit;
             o->index = (float)(index * BOX_AUDIO_SYNTH_TURNS);
         }
     }
 }
 
 /** Move the cutoff by the level of the filter envelope, exponentially in frequency: the cutoff
- * of the patch times 2 to the amount times the level, to the octaves of the LFOs and to the
- * keytrack times the key, clamped to the range of a cutoff.
+ * of the patch times 2 to the amount times the level, to the octaves of the LFOs and the routes,
+ * to the keytrack times the key and to the pressure, unless a route takes the pressure, clamped
+ * to the range of a cutoff.
  *
  * @param src The source
  * @param level Level of the filter envelope, 0..1
@@ -579,7 +593,7 @@ static void box_audio_synth_cutoff(
         octaves += (double)src->keytrack * src->key;
     }
 
-    if (src->pressure != 0) {
+    if (src->pressure != 0 && !(src->route_sources & (1u << BOX_AUDIO_SYNTH_FROM_PRESSURE))) {
         octaves += (double)src->pressure * (double)BOX_AUDIO_SYNTH_PRESSURE_OCTAVES;
     }
 
@@ -776,11 +790,264 @@ static inline float box_audio_synth_color_next(
     return x * f->gain;
 }
 
+/** Equal power gains of a pan, as those of a voice in the core: 1 for both channels at the
+ * center and sqrt 2 at a side.
+ *
+ * @param pan Pan, -1..1
+ * @param left Receives the gain of the left channel
+ * @param right Receives the gain of the right channel
+ */
+static void box_audio_synth_pan(
+    double pan,
+    float *left,
+    float *right)
+{
+    double turns;
+    if (pan == 0) {
+        *left = 1;
+        *right = 1;
+    } else if (pan <= -1) {
+        *left = (float)BOX_AUDIO_SYNTH_SQRT2;
+        *right = 0;
+    } else if (pan >= 1) {
+        *left = 0;
+        *right = (float)BOX_AUDIO_SYNTH_SQRT2;
+    } else {
+        turns = (pan + 1) * 0.125;
+        *left = (float)(BOX_AUDIO_SYNTH_SQRT2 * box_audio_core_sin(turns + 0.25));
+        *right = (float)(BOX_AUDIO_SYNTH_SQRT2 * box_audio_core_sin(turns));
+    }
+}
+
+/** Value of the source of a route, at the control block that runs.
+ *
+ * @param src The source
+ * @param r The route
+ * @return The value: 0..1 for the envelopes, the velocity, mod and pressure, -1..1 for the
+ * LFOs and the random value, octaves for the key
+ */
+static float box_audio_synth_route_value(
+    const box_audio_synth_source_t *src,
+    const box_audio_synth_route_t *r)
+{
+    float result = 0;
+    int32_t e, k;
+    switch (r->source) {
+    case BOX_AUDIO_SYNTH_FROM_AMP:
+        e = 0;
+        if (r->layer > 0) {
+            e = src->part[r->layer - 1]->osc.env;
+        } else if (!(src->envs & 1u) && src->layers > 0) {
+            e = src->part[0]->osc.env;
+        }
+
+        if (e == BOX_AUDIO_SYNTH_ENV_FREE) {
+            result = 1;
+        } else if (e > 0) {
+            result = src->part[e - 1]->env.value;
+        } else if (src->envs & 1u) {
+            result = src->env.value;
+        }
+        break;
+    case BOX_AUDIO_SYNTH_FROM_FILTER:
+        result = src->fenv_on ? src->fenv.value : 0.0f;
+        break;
+    case BOX_AUDIO_SYNTH_FROM_MOD_ENV:
+        result = src->menv_on ? src->menv.value : 0.0f;
+        break;
+    case BOX_AUDIO_SYNTH_FROM_LFO1:
+    case BOX_AUDIO_SYNTH_FROM_LFO2:
+        k = (int32_t)r->source - BOX_AUDIO_SYNTH_FROM_LFO1;
+        result = k < src->lfos ? src->lfo[k].value * src->lfo[k].gain : 0.0f;
+        break;
+    case BOX_AUDIO_SYNTH_FROM_VELOCITY:
+        result = src->velocity;
+        break;
+    case BOX_AUDIO_SYNTH_FROM_KEY:
+        result = (float)src->key;
+        break;
+    case BOX_AUDIO_SYNTH_FROM_RANDOM:
+        result = src->route_random;
+        break;
+    case BOX_AUDIO_SYNTH_FROM_MOD:
+        result = (float)src->mod;
+        break;
+    default:
+        result = src->pressure;
+        break;
+    }
+
+    return result;
+}
+
+/** Set the filter of a source to the resonance it holds, without touching its state: the
+ * damping of the SVF, the feedback of the ladder or the widths of the formants. A comb takes
+ * no resonance.
+ *
+ * @param src The source, with a filter
+ * @param rate Frames per second
+ */
+static void box_audio_synth_resonance(
+    box_audio_synth_source_t *src,
+    float rate)
+{
+    if (src->filter == BOX_AUDIO_SYNTH_FORMANT) {
+        src->formant.narrow = (float)(1.0 - (1.0 - BOX_AUDIO_FORMANT_NARROW) *
+            (double)src->resonance);
+        src->formant.vowel = -1;
+        if (!src->lfo_vowel) {
+            box_audio_synth_vowel(src, src->vowel_amount != 0 ? src->fenv.value : 0.0f, rate);
+        }
+    } else if (src->filter == BOX_AUDIO_SYNTH_COMB) {
+        goto done;
+    } else if (src->model == BOX_AUDIO_SYNTH_LADDER) {
+        box_audio_ladder_resonance(&src->ladder_coefs, src->filter, src->resonance);
+    } else {
+        box_audio_svf_damping(src->svf, src->slope, src->resonance);
+        src->svf_r[0].k = src->svf[0].k;
+        src->svf_r[1].k = src->svf[1].k;
+        if (!src->lfo_cutoff) {
+            box_audio_synth_coefs(src, rate);
+        }
+    }
+
+done:
+    return;
+}
+
+/** Run the routes of the modulation matrix of a source for a control block: each adds the
+ * value of its source times its amount to its target, on top of the fixed routes. The pitch,
+ * the pulse width and the level add to those of the LFOs, which aim them; the cutoff adds to
+ * the octaves of the LFOs; the index, the detune, the resonance and the pan take their values
+ * here, the pan over the control block.
+ *
+ * A route of a layer moves that layer, one of the patch every layer: index 0 of the arrays
+ * is every layer, 1 + layer a layer.
+ *
+ * @param src The source, with routes
+ * @param rate Frames per second
+ * @param now Whether the pan takes its value at once, at the start of a pass
+ * @param cents Cents of the pitch of each layer, which it adds to
+ * @param width Pulse width of each layer, which it adds to
+ * @param dip Factor of the level of each layer, which it multiplies
+ * @param octaves Octaves of the cutoff, which it adds to
+ */
+static void box_audio_synth_routes(
+    box_audio_synth_source_t *src,
+    float rate,
+    bool now,
+    double *cents,
+    double *width,
+    float *dip,
+    double *octaves)
+{
+    double index[1 + BOX_AUDIO_SYNTH_LAYERS] = {0}, detune[1 + BOX_AUDIO_SYNTH_LAYERS] = {0};
+    double level[1 + BOX_AUDIO_SYNTH_LAYERS] = {0};
+    double pan = 0, resonance = 0, x, at;
+    float f, gl, gr;
+    bool limits = false;
+    int32_t k, l;
+    for (k = 0; k < src->routes; k ++) {
+        const box_audio_synth_route_t *r = &src->route[k];
+        x = (double)r->amount * (double)box_audio_synth_route_value(src, r);
+        switch (r->target) {
+        case BOX_AUDIO_SYNTH_TO_CUTOFF:
+            *octaves += x;
+            break;
+        case BOX_AUDIO_SYNTH_TO_RESONANCE:
+            resonance += x;
+            break;
+        case BOX_AUDIO_SYNTH_TO_INDEX:
+            index[r->layer] += x;
+            break;
+        case BOX_AUDIO_SYNTH_TO_PITCH:
+            cents[r->layer] += 100 * x;
+            break;
+        case BOX_AUDIO_SYNTH_TO_PAN:
+            pan += x;
+            break;
+        case BOX_AUDIO_SYNTH_TO_DETUNE:
+            detune[r->layer] += x;
+            break;
+        case BOX_AUDIO_SYNTH_TO_PULSE_WIDTH:
+            width[r->layer] += x;
+            break;
+        default:
+            level[r->layer] += x;
+            break;
+        }
+    }
+
+    if (src->route_targets & (1u << BOX_AUDIO_SYNTH_TO_LEVEL)) {
+        dip[0] *= (float)(1 + level[0] > 0 ? 1 + level[0] : 0.0);
+        for (l = 0; l < src->layers; l ++) {
+            dip[l + 1] *= (float)(1 + level[l + 1] > 0 ? 1 + level[l + 1] : 0.0);
+        }
+    }
+
+    if (src->route_targets & (1u << BOX_AUDIO_SYNTH_TO_INDEX)) {
+        for (l = 0; l < src->layers; l ++) {
+            box_audio_synth_osc_t *o = &src->part[l]->osc;
+            f = (float)(index[0] + index[l + 1]);
+            if (o->target >= 0 && f != o->index_route) {
+                o->index_route = f;
+                limits = true;
+            }
+        }
+
+        if (limits) {
+            box_audio_synth_limits(src);
+        }
+    }
+
+    if (src->route_targets & (1u << BOX_AUDIO_SYNTH_TO_DETUNE)) {
+        for (l = 0; l < src->layers; l ++) {
+            box_audio_synth_part_t *part = src->part[l];
+            box_audio_synth_unison_t *u = &part->unison;
+            if (u->voices <= 1) {
+                continue;
+            }
+
+            x = (double)part->layer.detune + detune[0] + detune[l + 1];
+            x = x > 0 ? (x < BOX_AUDIO_SYNTH_DETUNE_MAX ? x : BOX_AUDIO_SYNTH_DETUNE_MAX) : 0.0;
+            if (x != u->spread) {
+                u->spread = x;
+                for (k = 0; k < u->voices; k ++) {
+                    at = (double)k / (double)(u->voices - 1);
+                    u->detune[k] = box_audio_synth_exp2(x * (at - 0.5) / 1200.0);
+                }
+            }
+        }
+    }
+
+    if ((src->route_targets & (1u << BOX_AUDIO_SYNTH_TO_RESONANCE)) && src->filter) {
+        x = (double)src->resonance_base + resonance;
+        f = (float)(x > 0 ? (x < 1 ? x : 1.0) : 0.0);
+        if (f != src->resonance) {
+            src->resonance = f;
+            box_audio_synth_resonance(src, rate);
+        }
+    }
+
+    if (src->panned) {
+        box_audio_synth_pan(pan, &gl, &gr);
+        if (now) {
+            src->pan_l = gl;
+            src->pan_r = gr;
+        }
+
+        src->pan_l_step = (gl - src->pan_l) * (1.0f / BOX_AUDIO_SYNTH_CONTROL);
+        src->pan_r_step = (gr - src->pan_r) * (1.0f / BOX_AUDIO_SYNTH_CONTROL);
+    }
+}
+
 /** Aim every destination of the LFOs of a source at their values: the factors of the pitch,
  * the level and the pulse width of each oscillator, which move there linearly over a control
  * block or take them at once, and the cutoff, which takes them at once.
  *
- * The pitch envelope of a layer adds to its pitch and to its ratio of hard sync.
+ * The pitch envelope of a layer adds to its pitch and to its ratio of hard sync, and the routes
+ * of the modulation matrix to the destinations they share with the LFOs. A route from mod turns
+ * off the depth of the vibrato that mod scales.
  *
  * The pitch takes 2 to the cents over 1200, one exp2 per pitched oscillator. The level dips
  * from 1 at the top of the wave to 1 - amplitude at its bottom, so an LFO in its delay leaves
@@ -799,6 +1066,7 @@ static void box_audio_synth_lfo_aim(
     double semitones[1 + BOX_AUDIO_SYNTH_LAYERS] = {0};
     double frames[1 + BOX_AUDIO_SYNTH_LAYERS] = {0};
     double octaves = 0, vowels = 0, c, w, r;
+    double mod = src->route_sources & (1u << BOX_AUDIO_SYNTH_FROM_MOD) ? 1.0 : src->mod;
     float dip[1 + BOX_AUDIO_SYNTH_LAYERS], v;
     int32_t k, l;
     for (l = 0; l <= BOX_AUDIO_SYNTH_LAYERS; l ++) {
@@ -809,13 +1077,17 @@ static void box_audio_synth_lfo_aim(
         const box_audio_synth_lfo_t *d = &src->lfo_patch[k];
         const box_audio_synth_mod_t *m = &src->lfo[k];
         v = m->value * m->gain;
-        cents[d->layer] += (double)(d->pitch * v) * src->mod;
+        cents[d->layer] += (double)(d->pitch * v) * mod;
         width[d->layer] += (double)(d->pulse_width * v);
         semitones[d->layer] += (double)(d->hard_sync * v);
         frames[d->layer] += (double)(d->position * v);
         dip[d->layer] *= 1 - d->amplitude * m->gain * 0.5f * (1 - m->value);
         octaves += (double)(d->cutoff * v);
         vowels += (double)(d->vowel * v);
+    }
+
+    if (src->routes) {
+        box_audio_synth_routes(src, rate, now, cents, width, dip, &octaves);
     }
 
     for (l = 0; l < src->layers; l ++) {
@@ -1203,6 +1475,7 @@ static void box_audio_synth_unison_init(
     double gain, at, turns;
     int32_t k;
     u->voices = (int32_t)layer->voices;
+    u->spread = (double)layer->detune;
     if (u->voices <= 1) {
         goto done;
     }
@@ -1527,6 +1800,7 @@ static void box_audio_synth_pass(
         o->sync_base = (double)layer->sync > 1 ? (double)layer->sync : 1.0;
         o->sync = o->sync_base;
         o->sync_step = 0;
+        o->index_route = 0;
         o->synced = o->sync_base > 1;
         for (n = 0; n < src->lfos; n ++) {
             o->synced = o->synced || (src->lfo_patch[n].layer == (uint32_t)l + 1 &&
@@ -1606,7 +1880,9 @@ static void box_audio_synth_pass(
         cut = cut > BOX_AUDIO_SYNTH_CUTOFF_MIN ? cut : BOX_AUDIO_SYNTH_CUTOFF_MIN;
     }
 
-    if (src->pressure != 0 && src->filter && src->filter != BOX_AUDIO_SYNTH_FORMANT) {
+    if (src->pressure != 0 && src->filter && src->filter != BOX_AUDIO_SYNTH_FORMANT &&
+        !(src->route_sources & (1u << BOX_AUDIO_SYNTH_FROM_PRESSURE)))
+    {
         cut *= box_audio_synth_exp2((double)src->pressure *
             (double)BOX_AUDIO_SYNTH_PRESSURE_OCTAVES);
     }
@@ -1617,6 +1893,10 @@ static void box_audio_synth_pass(
     src->control = BOX_AUDIO_SYNTH_CONTROL;
     if (src->fenv_on) {
         box_audio_synth_env_init(&src->fenv, &src->filter_envelope, rate, src->gate);
+    }
+
+    if (src->menv_on) {
+        box_audio_synth_env_init(&src->menv, &src->mod_envelope, rate, src->gate);
     }
 
     if (src->mods) {
@@ -1846,6 +2126,56 @@ static inline float box_audio_synth_drive_next(
     return y;
 }
 
+/** Start the routes of the modulation matrix of a play: a copy of those of the patch, the
+ * sources and targets they use, the random value of the play, seeded from the seed of the patch
+ * and the count of its plays apart from the noise and the LFOs, the mod envelope and the filter
+ * envelope when a route uses them, and the pan at the center. After the filter and the LFOs.
+ *
+ * @param src The source
+ * @param p The patch, clamped
+ * @param plays Count of the plays of the patch
+ */
+static void box_audio_synth_routes_start(
+    box_audio_synth_source_t *src,
+    const box_audio_synth_patch_t *p,
+    uint32_t plays)
+{
+    uint32_t rng;
+    int32_t k;
+    src->routes = (int32_t)p->routes;
+    src->route_sources = 0;
+    src->route_targets = 0;
+    for (k = 0; k < src->routes; k ++) {
+        src->route[k] = p->route[k];
+        src->route_sources |= 1u << p->route[k].source;
+        src->route_targets |= 1u << p->route[k].target;
+    }
+
+    src->route_random = 0;
+    if (src->route_sources & (1u << BOX_AUDIO_SYNTH_FROM_RANDOM)) {
+        rng = box_audio_synth_hash(p->seed ^ 0x524F5554u, plays);
+        src->route_random = box_audio_synth_noise(&rng);
+    }
+
+    src->menv_on = (src->route_sources & (1u << BOX_AUDIO_SYNTH_FROM_MOD_ENV)) != 0;
+    src->mod_envelope = p->mod_envelope;
+    box_audio_synth_key_scale(&src->mod_envelope, src->key);
+    src->fenv_routed = !src->fenv_on &&
+        (src->route_sources & (1u << BOX_AUDIO_SYNTH_FROM_FILTER)) != 0;
+    src->fenv_on = src->fenv_on || src->fenv_routed;
+    if ((src->route_targets & (1u << BOX_AUDIO_SYNTH_TO_CUTOFF)) && src->filter &&
+        src->filter != BOX_AUDIO_SYNTH_FORMANT)
+    {
+        src->lfo_cutoff = true;
+    }
+
+    src->panned = (src->route_targets & (1u << BOX_AUDIO_SYNTH_TO_PAN)) != 0;
+    src->pan_l = 1;
+    src->pan_r = 1;
+    src->pan_l_step = 0;
+    src->pan_r_step = 0;
+}
+
 void box_audio_source_synth(
     box_audio_core_t *core,
     box_audio_source_t *source,
@@ -1968,6 +2298,9 @@ void box_audio_source_synth(
     }
 
     src->glide_frames = box_audio_synth_frames(p->glide, core->sample_rate);
+    src->slope = p->slope;
+    src->resonance_base = p->resonance;
+    src->resonance = p->resonance;
     src->stages = box_audio_svf_init(src->svf, p->slope, p->resonance);
     src->drive = p->drive;
     src->svf_r[0] = src->svf[0];
@@ -1997,6 +2330,8 @@ void box_audio_source_synth(
         box_audio_synth_lfo_start(core, src, p, slot->plays, beat, tempo);
     }
 
+    box_audio_synth_routes_start(src, p, slot->plays);
+
     src->drift = (double)p->drift;
     src->drifts = p->drift > 0;
     box_audio_synth_drift_start(core, src, p, slot->plays);
@@ -2013,7 +2348,7 @@ void box_audio_source_synth(
         src->bends = src->bends || src->part[l]->bend.on;
     }
 
-    src->mods = src->lfos > 0 || src->bends || src->drifts;
+    src->mods = src->lfos > 0 || src->bends || src->drifts || src->routes > 0;
     src->bend = 1;
     src->mod = 1;
     src->pressure = 0;
@@ -2189,6 +2524,12 @@ bool box_audio_synth_legato(
         src->fenv.left = src->fenv.frames[BOX_AUDIO_SYNTH_HOLD];
     }
 
+    if (src->menv_on && src->menv.segment == BOX_AUDIO_SYNTH_HOLD &&
+        src->menv.frames[BOX_AUDIO_SYNTH_HOLD] > 0 && !src->menv.gate)
+    {
+        src->menv.left = src->menv.frames[BOX_AUDIO_SYNTH_HOLD];
+    }
+
     for (l = 0; l < src->layers; l ++) {
         box_audio_synth_osc_t *o = &src->part[l]->osc;
         if (l < (int32_t)np->layers) {
@@ -2261,6 +2602,10 @@ void box_audio_synth_gate(
     if (src->fenv_on) {
         box_audio_synth_env_gate(&src->fenv, gate);
     }
+
+    if (src->menv_on) {
+        box_audio_synth_env_gate(&src->menv, gate);
+    }
 }
 
 /** Move an envelope that has not reached its release into it, from its current level over the
@@ -2296,6 +2641,10 @@ void box_audio_synth_release(
 
     if (src->fenv_on) {
         box_audio_synth_env_release(&src->fenv);
+    }
+
+    if (src->menv_on) {
+        box_audio_synth_env_release(&src->menv);
     }
 }
 
@@ -2403,6 +2752,10 @@ static inline void box_audio_synth_lfo_next(
     }
 
     src->tremolo += src->tremolo_step;
+    if (src->panned) {
+        src->pan_l += src->pan_l_step;
+        src->pan_r += src->pan_r_step;
+    }
 }
 
 /** Move the position of every wavetable layer of a source for a frame: its position, plus
@@ -2428,6 +2781,23 @@ static inline void box_audio_synth_tables_next(
         p = o->position_base + o->position_lfo + (double)(o->position_env * levels[o->env]);
         top = (double)(o->table_frames - 1);
         o->position = p > 0 ? (p < top ? p : top) : 0.0;
+    }
+}
+
+/** Advance the envelopes that only the routes of a source use by a frame: the mod envelope,
+ * and the filter envelope when the filter does not advance it.
+ *
+ * @param src The source, with routes
+ */
+static inline void box_audio_synth_route_envs_next(
+    box_audio_synth_source_t *src)
+{
+    if (src->menv_on) {
+        box_audio_synth_env_next(&src->menv);
+    }
+
+    if (src->fenv_routed) {
+        box_audio_synth_env_next(&src->fenv);
     }
 }
 
@@ -3582,6 +3952,10 @@ static int32_t box_audio_synth_render_wide(
             box_audio_synth_key_next(src, rate);
         }
 
+        if (src->routes) {
+            box_audio_synth_route_envs_next(src);
+        }
+
         if (src->mods) {
             box_audio_synth_lfo_next(src, rate);
             if (src->tables) {
@@ -3644,9 +4018,14 @@ static int32_t box_audio_synth_render_wide(
         }
 
         gain = src->mods ? src->amp * src->tremolo : src->amp;
-        out_l[i] = box_audio_clean(l * gain);
-        if (stereo) {
-            out_r[i] = box_audio_clean(r * gain);
+        if (src->panned) {
+            out_l[i] = box_audio_clean(l * gain * src->pan_l);
+            out_r[i] = box_audio_clean((stereo ? r : l) * gain * src->pan_r);
+        } else {
+            out_l[i] = box_audio_clean(l * gain);
+            if (stereo) {
+                out_r[i] = box_audio_clean(r * gain);
+            }
         }
     }
 
@@ -3695,6 +4074,10 @@ int32_t box_audio_synth_render(
 
         if (src->key_left > 0) {
             box_audio_synth_key_next(src, rate);
+        }
+
+        if (src->routes) {
+            box_audio_synth_route_envs_next(src);
         }
 
         if (src->mods) {
@@ -3766,6 +4149,11 @@ int32_t box_audio_synth_render(
             y = y * src->amp * src->tremolo;
         } else {
             y = y * src->amp;
+        }
+
+        if (src->panned) {
+            core->src_r[i] = box_audio_clean(y * src->pan_r);
+            y = y * src->pan_l;
         }
 
         out[i] = box_audio_clean(y);

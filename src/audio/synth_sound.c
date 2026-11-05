@@ -7,7 +7,8 @@
  * with one, the modulators of their parent; a SynthPluck layer takes its SynthString, a
  * SynthWavetable layer its SynthTable, whose table the patch names by the sound id of its
  * Wavetable in the current output. The LFOs are the SynthLfo of the root, of the layers and of
- * the other children of the root.
+ * the other children of the root. The routes of the modulation matrix are the SynthModRoute
+ * children of the root, for every layer, then those of each layer, for that layer.
  *
  * The sync system sends the patch with a SYNTH command when it changed; the core plays every
  * voice from a copy of it, so a play allocates nothing.
@@ -64,16 +65,17 @@ void box_audio_synth_init(
         ecs_id(SynthSound), ecs_id(SynthOscillator), ecs_id(SynthEnvelope), ecs_id(SynthFilter),
         ecs_id(SynthFilterEnvelope), ecs_id(SynthGlide), ecs_id(SynthUnison),
         ecs_id(SynthString), ecs_id(SynthLfo), ecs_id(SynthPitchEnvelope), ecs_id(SynthDrive),
-        ecs_id(SynthTable)
+        ecs_id(SynthTable), ecs_id(SynthModRoute), ecs_id(SynthModEnvelope)
     };
     const char *names[] = {
         "AudioSynthSoundDirty", "AudioSynthOscillatorDirty", "AudioSynthEnvelopeDirty",
         "AudioSynthFilterDirty", "AudioSynthFilterEnvelopeDirty", "AudioSynthGlideDirty",
         "AudioSynthUnisonDirty", "AudioSynthStringDirty", "AudioSynthLfoDirty",
-        "AudioSynthPitchEnvelopeDirty", "AudioSynthDriveDirty", "AudioSynthTableDirty"
+        "AudioSynthPitchEnvelopeDirty", "AudioSynthDriveDirty", "AudioSynthTableDirty",
+        "AudioSynthModRouteDirty", "AudioSynthModEnvelopeDirty"
     };
     int32_t i;
-    for (i = 0; i < 12; i ++) {
+    for (i = 0; i < 14; i ++) {
         ecs_observer(world, {
             .entity = ecs_entity(world, { .name = names[i] }),
             .query.flags = EcsQueryMatchPrefab,
@@ -237,6 +239,47 @@ done:
     return;
 }
 
+/** Add the routes among the children of an entity to a patch, or count them when the patch
+ * has BOX_AUDIO_SYNTH_ROUTES. A child with a SynthOscillator is a layer, not a route.
+ *
+ * @param world The world
+ * @param p The patch
+ * @param parent The entity, the root or a layer
+ * @param layer 1 + the layer the routes move, 0 for every layer
+ * @param extra Counts the routes past BOX_AUDIO_SYNTH_ROUTES
+ */
+static void box_audio_synth_routes(
+    ecs_world_t *world,
+    box_audio_synth_patch_t *p,
+    ecs_entity_t parent,
+    uint32_t layer,
+    int32_t *extra)
+{
+    int32_t i;
+    ecs_iter_t it = ecs_children(world, parent);
+    while (ecs_children_next(&it)) {
+        for (i = 0; i < it.count; i ++) {
+            const SynthModRoute *r;
+            if (ecs_has(world, it.entities[i], SynthOscillator)) {
+                continue;
+            }
+
+            r = ecs_get(world, it.entities[i], SynthModRoute);
+            if (!r) {
+                continue;
+            }
+
+            if (p->routes >= BOX_AUDIO_SYNTH_ROUTES) {
+                (*extra) ++;
+            } else {
+                p->route[p->routes ++] = (box_audio_synth_route_t){
+                    .source = (uint32_t)r->source, .target = (uint32_t)r->target,
+                    .layer = layer, .amount = r->amount };
+            }
+        }
+    }
+}
+
 /** Count the layers of an entity and its descendants that are left out of a full patch.
  *
  * @param world The world
@@ -270,6 +313,7 @@ static int32_t box_audio_synth_count(
  * @param extra Counts the layers past BOX_AUDIO_SYNTH_LAYERS
  * @param orphans Counts the modulators whose parent is not a layer
  * @param lfos Counts the LFOs past BOX_AUDIO_SYNTH_LFOS
+ * @param routes Counts the routes past BOX_AUDIO_SYNTH_ROUTES
  * @param tables Receives SynthTable.table of each layer by its index
  */
 static void box_audio_synth_children(
@@ -280,7 +324,8 @@ static void box_audio_synth_children(
     uint32_t carrier,
     int32_t *extra,
     int32_t *orphans,
-    int32_t *lfos)
+    int32_t *lfos,
+    int32_t *routes)
 {
     int32_t i;
     ecs_iter_t it = ecs_children(world, parent);
@@ -300,8 +345,9 @@ static void box_audio_synth_children(
                     ecs_get(world, child, SynthUnison), ecs_get(world, child, SynthString),
                     ecs_get(world, child, SynthTable), tables, carrier);
                 box_audio_synth_lfo(p, ecs_get(world, child, SynthLfo), p->layers, lfos);
+                box_audio_synth_routes(world, p, child, p->layers, routes);
                 box_audio_synth_children(world, p, tables, child, p->layers, extra, orphans,
-                    lfos);
+                    lfos, routes);
             } else {
                 *extra += box_audio_synth_count(world, child);
             }
@@ -356,7 +402,9 @@ bool box_audio_synth_compile(
     const SynthGlide *glide = ecs_get(world, e, SynthGlide);
     const SynthPitchEnvelope *bend = ecs_get(world, e, SynthPitchEnvelope);
     const SynthDrive *drive = ecs_get(world, e, SynthDrive);
-    int32_t extra = 0, orphans = 0, low = 0, lfos = 0, i;
+    const SynthModEnvelope *menv = ecs_get(world, e, SynthModEnvelope);
+    int32_t extra = 0, orphans = 0, low = 0, lfos = 0, routes = 0, i;
+    uint32_t sources = 0;
     ecs_iter_t it;
     bool endless = false, fits = true, formant, result;
     if (sound) {
@@ -402,8 +450,36 @@ bool box_audio_synth_compile(
         }
     }
 
+    if (osc && osc->modulation != SynthMix) {
+        orphans ++;
+    } else if (osc) {
+        box_audio_synth_layer(&p, osc, NULL, NULL, ecs_get(world, e, SynthUnison),
+            ecs_get(world, e, SynthString), ecs_get(world, e, SynthTable), tables, 0);
+    }
+
+    box_audio_synth_lfo(&p, ecs_get(world, e, SynthLfo), 0, &lfos);
+    box_audio_synth_routes(world, &p, e, 0, &routes);
+    box_audio_synth_children(world, &p, tables, e, p.layers, &extra, &orphans, &lfos,
+        &routes);
+    it = ecs_children(world, e);
+    while (ecs_children_next(&it)) {
+        for (i = 0; i < it.count; i ++) {
+            if (!ecs_has(world, it.entities[i], SynthOscillator)) {
+                box_audio_synth_lfo(&p, ecs_get(world, it.entities[i], SynthLfo), 0, &lfos);
+            }
+        }
+    }
+
+    for (i = 0; i < (int32_t)p.routes; i ++) {
+        if (p.route[i].source < BOX_AUDIO_SYNTH_SOURCES) {
+            sources |= 1u << p.route[i].source;
+        }
+    }
+
     formant = filter && filter->kind == SynthFormant;
-    if (filter && fenv && (fenv->amount != 0 || (formant && fenv->vowel != 0))) {
+    if (fenv && ((filter && (fenv->amount != 0 || (formant && fenv->vowel != 0))) ||
+        (sources & (1u << SynthSourceFilterEnvelope))))
+    {
         p.filter_amount = formant ? 0.0f : fenv->amount;
         p.filter_vowel = formant ? fenv->vowel : 0.0f;
         p.filter_envelope_velocity = fenv->velocity;
@@ -414,22 +490,12 @@ bool box_audio_synth_compile(
         fits = fits && box_audio_synth_envelope_fits(&p.filter_envelope);
     }
 
-    if (osc && osc->modulation != SynthMix) {
-        orphans ++;
-    } else if (osc) {
-        box_audio_synth_layer(&p, osc, NULL, NULL, ecs_get(world, e, SynthUnison),
-            ecs_get(world, e, SynthString), ecs_get(world, e, SynthTable), tables, 0);
-    }
-
-    box_audio_synth_lfo(&p, ecs_get(world, e, SynthLfo), 0, &lfos);
-    box_audio_synth_children(world, &p, tables, e, p.layers, &extra, &orphans, &lfos);
-    it = ecs_children(world, e);
-    while (ecs_children_next(&it)) {
-        for (i = 0; i < it.count; i ++) {
-            if (!ecs_has(world, it.entities[i], SynthOscillator)) {
-                box_audio_synth_lfo(&p, ecs_get(world, it.entities[i], SynthLfo), 0, &lfos);
-            }
-        }
+    if (menv && (sources & (1u << SynthSourceModEnvelope))) {
+        p.mod_envelope = (box_audio_synth_envelope_t){
+            .attack = menv->attack, .decay = menv->decay, .sustain = menv->sustain,
+            .release = menv->release, .hold = menv->hold, .curve = menv->curve,
+            .attack_curve = menv->attack_curve, .key_scale = menv->key_scale };
+        fits = fits && box_audio_synth_envelope_fits(&p.mod_envelope);
     }
 
     for (i = 0; i < (int32_t)p.layers; i ++) {
@@ -468,7 +534,7 @@ bool box_audio_synth_compile(
         ecs_os_free(path);
     }
 
-    if (extra || endless || !fits || orphans || lfos || untabled) {
+    if (extra || endless || !fits || orphans || lfos || untabled || routes) {
         char *path = ecs_get_path(world, e);
         if (extra) {
             ecs_err("box.audio: synth '%s' has %d layers, more than %d, the rest are left out",
@@ -478,6 +544,11 @@ bool box_audio_synth_compile(
         if (lfos) {
             ecs_err("box.audio: synth '%s' has %d LFOs, more than %d, the rest are left out",
                 path, (int)p.lfos + lfos, BOX_AUDIO_SYNTH_LFOS);
+        }
+
+        if (routes) {
+            ecs_err("box.audio: synth '%s' has %d SynthModRoute, more than %d, the rest are "
+                "left out", path, (int)p.routes + routes, BOX_AUDIO_SYNTH_ROUTES);
         }
 
         if (orphans) {

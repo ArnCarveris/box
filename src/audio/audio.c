@@ -1394,6 +1394,10 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, SynthLfoWave);
     ECS_META_COMPONENT(world, SynthLfo);
     ecs_set_hooks(world, SynthLfo, { .ctor = box_audio_synth_lfo_ctor });
+    ECS_META_COMPONENT(world, SynthModSource);
+    ECS_META_COMPONENT(world, SynthModTarget);
+    ECS_META_COMPONENT(world, SynthModRoute);
+    ECS_META_COMPONENT(world, SynthModEnvelope);
     ECS_META_COMPONENT(world, SynthSound);
     ECS_META_COMPONENT(world, AudioSettings);
     ecs_set_hooks(world, AudioSettings, { .ctor = box_audio_settings_ctor });

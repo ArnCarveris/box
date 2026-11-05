@@ -73,6 +73,22 @@ typedef struct box_audio_ladder_t {
     float x1;             /**< Last input, for the estimate of the nonlinearity of the loop */
 } box_audio_ladder_t;
 
+/** Set the feedback of a ladder for a resonance, without touching its state or its g.
+ *
+ * @param c The coefficients
+ * @param filter A box_audio_synth_filter_t, not BOX_AUDIO_SYNTH_FILTER_NONE
+ * @param resonance 0..1
+ */
+static inline void box_audio_ladder_resonance(
+    box_audio_ladder_coefs_t *c,
+    int32_t filter,
+    float resonance)
+{
+    float r2 = resonance * resonance, r4 = r2 * r2, r8 = r4 * r4;
+    c->k = BOX_AUDIO_LADDER_K * resonance + BOX_AUDIO_LADDER_EXCESS * r8 * r8;
+    c->comp = filter == BOX_AUDIO_SYNTH_LOWPASS ? 1 + BOX_AUDIO_LADDER_BASS * c->k : 1;
+}
+
 /** Set the coefficients of a ladder but its g, and clear the state of its channels.
  *
  * @param c The coefficients
