@@ -328,7 +328,22 @@
                     "tube",
                     "frustum",
                     "rounded_box",
-                    "bevel"
+                    "bevel",
+                    "profile_extrusion"
+                ]
+            },
+            {
+                "id": "SmoothExtrusion",
+                "testcases": [
+                    "circle",
+                    "rectangle",
+                    "arc_joints",
+                    "holes",
+                    "mesh_key",
+                    "default_flat",
+                    "caps_flat",
+                    "evaluation",
+                    "attachment"
                 ]
             },
             {

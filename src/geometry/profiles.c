@@ -38,8 +38,34 @@ static bool box_asset_append(
     return result;
 }
 
+/** Flag the samples of a closed Path2D that are anchors between a Line and a curve segment.
+ *
+ * @param path The path, sampled by box_path2_sample
+ * @param count Number of samples of the path
+ * @param flags Receives 1 for each corner sample, 0 otherwise
+ */
+static void box_path2_corners(
+    const Path2D *path,
+    int count,
+    int *flags)
+{
+    int total = box_path2_count(path), index = 0;
+    vec3 cubic[4];
+    ecs_os_memset_n(flags, 0, int, count);
+    PathSegmentKind previous = box_path2_cubic(path, total - 1, cubic);
+    for (int i = 0; i < total && index < count; i ++) {
+        PathSegmentKind kind = box_path2_cubic(path, i, cubic);
+        if ((kind == PathLine) != (previous == PathLine)) {
+            flags[index] = 1;
+        }
+
+        index += kind == PathLine ? 1 : 16;
+        previous = kind;
+    }
+}
+
 static bool box_profile_resolve(const ecs_world_t *world, ecs_entity_t entity,
-    ecs_entity_t contour, ecs_vec_t *data, int *outer)
+    ecs_entity_t contour, ecs_vec_t *data, int *outer, ecs_vec_t *corners)
 {
     const Profile2D *profile = entity && ecs_is_alive(world, entity) ?
         ecs_get(world, entity, Profile2D) : NULL;
@@ -79,14 +105,30 @@ static bool box_profile_resolve(const ecs_world_t *world, ecs_entity_t entity,
             return false;
         }
         bool reverse = profile && ((area > 0) != (ring == 0));
+        int *flags = NULL;
+        if (corners) {
+            flags = ecs_os_calloc_n(int, count);
+            if (!flags) {
+                ecs_vec_fini_t(NULL, &samples, vec2);
+                return false;
+            }
+            if (profile) {
+                box_path2_corners(path, count, flags);
+            }
+        }
         for (int i = 0; i < count; i ++) {
             int index = reverse ? count - 1 - i : i;
             int next = i + 1 == count ? (profile ? first : first + i) : first + i + 1;
             if (!box_asset_append(data, (vec4){points[index][0], points[index][1], ring, next})) {
+                ecs_os_free(flags);
                 ecs_vec_fini_t(NULL, &samples, vec2);
                 return false;
             }
+            if (corners) {
+                *ecs_vec_append_t(NULL, corners, int) = flags[index];
+            }
         }
+        ecs_os_free(flags);
         if (!ring) {
             *outer = count;
         }
@@ -309,6 +351,87 @@ error:
     return success;
 }
 
+/** Normal of the side wall over the profile edge from a to b, in the XZ plane.
+ *
+ * @param a The start point of the edge
+ * @param b The end point of the edge
+ * @param out Receives the unit normal, zero for an edge of zero length
+ */
+static void box_profile_edge_normal(
+    const float *a,
+    const float *b,
+    vec2 out)
+{
+    out[0] = b[1] - a[1];
+    out[1] = a[0] - b[0];
+    float length = hypotf(out[0], out[1]);
+    if (length > 0) {
+        out[0] /= length;
+        out[1] /= length;
+    } else {
+        out[0] = out[1] = 0;
+    }
+}
+
+/** Cosine of the crease angle, 30 degrees, above which a smooth extrusion keeps a corner */
+#define BOX_PROFILE_CREASE 0.8660254f
+
+/** Append the smooth side normals of a profile, one vector per point.
+ *
+ * Each vector holds the normal for the edge that ends at the point in xy and for the edge that
+ * starts at it in zw: one blended normal where the profile is smooth, the edge normals at a
+ * flagged corner or where the outline turns by more than the crease angle.
+ *
+ * @param points The profile points, as box_profile_resolve() packs them
+ * @param corners The corner flag of each point
+ * @param count Number of points
+ * @param data The asset buffer to append to
+ * @return False if the asset capacity is exceeded
+ */
+static bool box_profile_normals(
+    const vec4 *points,
+    const int *corners,
+    int count,
+    ecs_vec_t *data)
+{
+    int *previous = ecs_os_malloc_n(int, count);
+    bool result = previous != NULL;
+    for (int i = 0; result && i < count; i ++) {
+        previous[i] = i;
+    }
+
+    for (int i = 0; result && i < count; i ++) {
+        int next = (int)points[i][3];
+        if (next >= 0 && next < count && next != i) {
+            previous[next] = i;
+        }
+    }
+
+    for (int i = 0; result && i < count; i ++) {
+        vec2 in, out;
+        box_profile_edge_normal(points[previous[i]], points[i], in);
+        box_profile_edge_normal(points[i], points[(int)points[i][3]], out);
+        if (in[0] == 0 && in[1] == 0) {
+            glm_vec2_copy(out, in);
+        } else if (out[0] == 0 && out[1] == 0) {
+            glm_vec2_copy(in, out);
+        }
+
+        if (!corners[i] && glm_vec2_dot(in, out) >= BOX_PROFILE_CREASE) {
+            vec2 n = {in[0] + out[0], in[1] + out[1]};
+            glm_vec2_normalize(n);
+            glm_vec2_copy(n, in);
+            glm_vec2_copy(n, out);
+        }
+
+        result = box_asset_append(data, (vec4){in[0], in[1], out[0], out[1]});
+    }
+
+    ecs_os_free(previous);
+
+    return result;
+}
+
 static bool box_path_pack(const ecs_world_t *world, ecs_entity_t entity, bool three,
     ecs_vec_t *data, int *offset, int *count)
 {
@@ -360,7 +483,7 @@ static bool box_finite(
 static bool box_resolve(const ecs_world_t *world, const void *value, int kind,
     box_surface_data_t *d, vec3 min, vec3 max)
 {
-    ecs_vec_t data = {0}, profile = {0};
+    ecs_vec_t data = {0}, profile = {0}, corners = {0};
     int outer = 0, count = 0, offset = 0, segments = 0;
     bool start = false, end = false, ok = false;
     glm_vec3_broadcast(INFINITY, min);
@@ -454,7 +577,7 @@ static bool box_resolve(const ecs_world_t *world, const void *value, int kind,
             start = s->cap_start;
             end = s->cap_end;
         }
-        if (!box_profile_resolve(world, entity, contour, &profile, &outer)) {
+        if (!box_profile_resolve(world, entity, contour, &profile, &outer, &corners)) {
             goto done;
         }
         count = ecs_vec_count(&profile);
@@ -493,7 +616,7 @@ static bool box_resolve(const ecs_world_t *world, const void *value, int kind,
                 const LoftSection *s = &sections[section];
                 if (!box_finite(s->offset, 3) || !box_finite(s->rotation, 3) ||
                     !box_finite(s->scale, 2) ||
-                    !box_profile_resolve(world, s->profile, 0, &next, &next_outer))
+                    !box_profile_resolve(world, s->profile, 0, &next, &next_outer, NULL))
                 {
                     ecs_vec_fini_t(NULL, &next, vec4);
                     goto done;
@@ -528,6 +651,13 @@ static bool box_resolve(const ecs_world_t *world, const void *value, int kind,
             min[0] = d->p[6][0]; max[0] = d->p[6][1];
             min[2] = d->p[6][2]; max[2] = d->p[6][3];
             min[1] = -d->p[1][1] * 0.5f; max[1] = -min[1];
+            if (((const ProfileExtrusion*)value)->smooth) {
+                d->p[8][0] = 24 + ecs_vec_count(&data);
+                if (!box_profile_normals(points, ecs_vec_first(&corners), count, &data))
+                {
+                    goto done;
+                }
+            }
         }
     }
     if (kind != 3 && (start || end)) {
@@ -563,6 +693,7 @@ static bool box_resolve(const ecs_world_t *world, const void *value, int kind,
 done:
     ecs_vec_fini_t(NULL, &data, vec4);
     ecs_vec_fini_t(NULL, &profile, vec4);
+    ecs_vec_fini_t(NULL, &corners, int);
     if (!ok) {
         *d = (box_surface_data_t){0};
         glm_vec3_zero(min);
@@ -751,6 +882,11 @@ static void box_asset_generate(const ecs_world_t *world, const void *value, int 
                         glm_vec3_copy((vec3){points[next][1] - points[i][1], 0,
                             points[i][0] - points[next][0]}, normal);
                         glm_vec3_normalize(normal);
+                        if (d.p[8][0] > 0) {
+                            const vec4 *smooth = d.assets + (int)d.p[8][0] - 24;
+                            glm_vec3_copy(side ? (vec3){smooth[next][0], 0, smooth[next][1]} :
+                                (vec3){smooth[i][2], 0, smooth[i][3]}, normal);
+                        }
                     }
                     box_mesh_vertex(mesh, position, normal, tu + (inner ? 2 : 0), v);
                 }
