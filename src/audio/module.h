@@ -1350,6 +1350,23 @@ double box_audio_timeline_beat(
     const ecs_world_t *world,
     uint64_t frame);
 
+/** Get the beat and the tempo of a play at a frame, which synced synth LFOs lock to: through
+ * the pieces of the timeline while the Transport plays, its position and tempo while it is
+ * stopped, beat 0 at 120 bpm without one.
+ *
+ * @param world The world
+ * @param state The state
+ * @param when Frame of the play, 0 or a past one for the clock
+ * @param beat Receives the beat, wrapped into 0..BOX_AUDIO_BEAT_WRAP
+ * @param tempo Receives the beats per second
+ */
+void box_audio_timeline_grid(
+    const ecs_world_t *world,
+    const box_audio_module_t *state,
+    uint64_t when,
+    float *beat,
+    float *tempo);
+
 /** Convert a beat of the timeline to a frame of the core clock: the first piece that plays the
  * beat at or after the clock, else the first that played it, else the line of the last piece.
  *

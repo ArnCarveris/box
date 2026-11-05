@@ -231,7 +231,8 @@ static void box_audio_synth_lfo(
         .fade = lfo->fade, .phase = lfo->phase, .random_phase = lfo->random_phase,
         .layer = layer, .pitch = lfo->pitch, .amplitude = lfo->amplitude,
         .cutoff = lfo->cutoff, .pulse_width = lfo->pulse_width,
-        .sync = lfo->sync, .position = lfo->position };
+        .hard_sync = lfo->hard_sync, .sync = lfo->sync, .vowel = lfo->vowel,
+        .position = lfo->position };
 done:
     return;
 }
@@ -357,7 +358,7 @@ bool box_audio_synth_compile(
     const SynthDrive *drive = ecs_get(world, e, SynthDrive);
     int32_t extra = 0, orphans = 0, low = 0, lfos = 0, i;
     ecs_iter_t it;
-    bool endless = false, fits = true, result;
+    bool endless = false, fits = true, formant, result;
     if (sound) {
         p.seed = sound->seed;
         p.pitch_variance = sound->pitch_variance;
@@ -394,10 +395,13 @@ bool box_audio_synth_compile(
         p.filter_velocity = filter->velocity;
         p.keytrack = filter->keytrack;
         p.model = (uint32_t)filter->model;
+        p.vowel = filter->vowel;
     }
 
-    if (filter && fenv && fenv->amount != 0) {
-        p.filter_amount = fenv->amount;
+    formant = filter && filter->kind == SynthFormant;
+    if (filter && fenv && (fenv->amount != 0 || (formant && fenv->vowel != 0))) {
+        p.filter_amount = formant ? 0.0f : fenv->amount;
+        p.filter_vowel = formant ? fenv->vowel : 0.0f;
         p.filter_envelope_velocity = fenv->velocity;
         p.filter_envelope = (box_audio_synth_envelope_t){
             .attack = fenv->attack, .decay = fenv->decay, .sustain = fenv->sustain,

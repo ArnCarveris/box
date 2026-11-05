@@ -6,7 +6,7 @@ prefab SyncLead {
   SynthSound: {}
   SynthEnvelope: {attack: 0.005, decay: 0.1, sustain: 0.7, hold: 0.3, release: 0.1}
   SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.3, sync: 2.5}
-  SynthLfo: {wave: SynthLfoTriangle, rate: 2, sync: 12}
+  SynthLfo: {wave: SynthLfoTriangle, rate: 2, hard_sync: 12}
 }
 
 // The defaults: no sync

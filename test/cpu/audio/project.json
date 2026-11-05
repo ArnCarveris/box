@@ -276,6 +276,24 @@
                 ]
             },
             {
+                "id": "SynthLfoSync",
+                "testcases": [
+                    "period",
+                    "rate",
+                    "phase",
+                    "wide",
+                    "random",
+                    "zero_identical",
+                    "clamped",
+                    "legato_new",
+                    "script",
+                    "timeline",
+                    "no_transport",
+                    "tempo_next_note",
+                    "stopped_position"
+                ]
+            },
+            {
                 "id": "Sequencer",
                 "testcases": [
                     "defaults",
@@ -366,6 +384,7 @@
                     "synth_sub",
                     "synth_sync",
                     "synth_drive",
+                    "synth_formant",
                     "synth_wavetable"
                 ]
             },
@@ -768,6 +787,33 @@
                 "id": "SynthLadderWorld",
                 "testcases": [
                     "component"
+                ]
+            },
+            {
+                "id": "SynthFormant",
+                "testcases": [
+                    "vowel_a",
+                    "vowel_i",
+                    "vowel_between",
+                    "lfo",
+                    "envelope",
+                    "cutoff_fixed",
+                    "level",
+                    "bandpasses",
+                    "wide_bandpasses",
+                    "resonance_drive",
+                    "wide",
+                    "wide_lfo",
+                    "clamped",
+                    "others_identical",
+                    "deterministic"
+                ]
+            },
+            {
+                "id": "SynthFormantWorld",
+                "testcases": [
+                    "component",
+                    "envelope_off"
                 ]
             },
             {

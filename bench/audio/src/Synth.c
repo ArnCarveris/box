@@ -2,10 +2,11 @@
  * @file Synth.c
  * @brief Benchmarks for the synth of the audio core: 64 looping synth voices on the master,
  * one item per sample of the output, with the patch of three layers, the same with two LFOs or
- * one of FM, with curved envelopes, with a driven filter or the ladder filter, with subs, hard
- * synced under an LFO, with pink noise, with drift or with the drive of the mix before the
- * filter, 32 voices of a pluck string, steady or under a vibrato, 8 of a unison pluck of 4, and
- * 64 of a patch of wavetables whose positions an LFO and the envelope move.
+ * one of FM, with curved envelopes, with a driven filter, the ladder filter or the formant
+ * filter with its vowel under an LFO and the filter envelope, with subs, hard synced under an
+ * LFO, with pink noise, with drift or with the drive of the mix before the filter, 32 voices of
+ * a pluck string, steady or under a vibrato, 8 of a unison pluck of 4, and 64 of a patch of
+ * wavetables whose positions an LFO and the envelope move.
  *
  * Each iteration renders one quantum of 128 stereo frames, so the time per item is the time
  * per sample of the whole mix of 64 voices.
@@ -35,6 +36,10 @@
 /** Extra of bench_synth_core: the filter is the transistor ladder */
 #define BENCH_LADDER 16u
 
+/** Extra of bench_synth_core: the filter is the formant filter, its vowel moved by the filter
+ * envelope and by an LFO */
+#define BENCH_FORMANT 64u
+
 /** Extra of bench_synth_core: a drift of 15 cents moves the pitch of every layer and the
  * cutoff, and the oscillators start at free phases */
 #define BENCH_DRIFT 32u
@@ -54,8 +59,8 @@
  * @param lfo Whether two LFOs move the patch
  * @param curved Whether the patch envelope and the envelope of the square are curved
  * @param drive Drive of the filter, 0..1
- * @param extra BENCH_SUB, BENCH_SYNC, BENCH_PITCH, BENCH_PINK, BENCH_LADDER and BENCH_DRIFT,
- *   or 0
+ * @param extra BENCH_SUB, BENCH_SYNC, BENCH_PITCH, BENCH_PINK, BENCH_LADDER, BENCH_FORMANT
+ *   and BENCH_DRIFT, or 0
  * @param pre Drive of the mix of the layers before the filter, 0..1, negative for none; its
  *   asymmetry is 0.3
  * @return The core
@@ -112,6 +117,15 @@ static box_audio_core_t* bench_synth_core(
         p.model = BOX_AUDIO_SYNTH_LADDER;
     }
 
+    if (extra & BENCH_FORMANT) {
+        p.filter = BOX_AUDIO_SYNTH_FORMANT;
+        p.vowel = 1;
+        p.filter_vowel = envelope ? 2 : 0;
+        p.lfos = 1;
+        p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 3,
+            .vowel = 1 };
+    }
+
     if (extra & BENCH_SUB) {
         p.layer[0].sub = 0.6f;
         p.layer[0].sub_octave = 1;
@@ -124,7 +138,7 @@ static box_audio_core_t* bench_synth_core(
         p.layer[1].sync = 3.2f;
         p.lfos = 1;
         p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_TRIANGLE, .rate = 0.5f,
-            .sync = 12 };
+            .hard_sync = 12 };
     }
 
     if (extra & BENCH_PITCH) {
@@ -279,6 +293,16 @@ void Synth_voices_64_ladder(
     // audio/synth
     box_audio_core_t *core = bench_synth_core(true, BOX_AUDIO_SYNTH_SLOPE_24, false, false, false,
         0, BENCH_LADDER, -1);
+    bench_synth_render(b, core);
+    box_audio_core_free(core);
+}
+
+void Synth_voices_64_formant(
+    bench_t *b)
+{
+    // audio/synth
+    box_audio_core_t *core = bench_synth_core(true, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
+        0, BENCH_FORMANT, -1);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }

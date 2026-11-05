@@ -185,7 +185,9 @@ Filters also support `SynthHighPass`, `SynthBandPass`, `SynthNotch` and
 `SynthSlope24`; cutoff is clamped below Nyquist.
 
 A positive delay `sync` overrides time: `sync * 60 / tempo` seconds, capped at
-4 seconds. An eighth is 0.5 beats, a dotted eighth 0.75. Time changes crossfade
+4 seconds. An eighth is 0.5 beats, a dotted eighth 0.75. A synth LFO `sync` counts
+the same beats at the same tempo, phase locked to the Transport (see Synth sounds).
+Time changes crossfade
 between read positions instead of gliding pitch. Use `mix: 1` on a return.
 Phaser stages range from 2 to 12, even; chorus supports up to four voices.
 
@@ -293,12 +295,12 @@ voices on play, so edits affect subsequent plays.
 | `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), `sync` (0, off, 1..16), `color` (`SynthNoiseWhite`), modulation controls, `velocity` (0) |
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`, `key_scale`; all zero by default |
 | `SynthDrive` | Root: `drive` (0.3, 0..1), `asymmetry` (0, 0..1) |
-| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves), `keytrack` (0), `model` (`SynthFilterSvf` or `SynthFilterLadder`) |
-| `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves and `velocity` (0); requires a filter |
+| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves), `keytrack` (0), `model` (`SynthFilterSvf` or `SynthFilterLadder`), `vowel` (0, 0..4, `SynthFormant`) |
+| `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves, `velocity` (0) and `vowel` (0, -4..4, `SynthFormant`); requires a filter |
 | `SynthPitchEnvelope` | `amount` (0 semitones, -48..48), `decay` seconds, `curve` (0, -16..16), `release_amount` (0 semitones, -48..48), `sync` (0 semitones, -48..48) |
 | `SynthUnison` | Per layer: `voices` (3, 1..7), `detune` (10 cents, 0..100), `width` (0, 0..1) |
 | `SynthGlide` | Root: `time` seconds (0, up to 10), `legato` (false), `channel` (0) |
-| `SynthLfo` | `wave`, `rate` (5 Hz), `delay`, `fade`, `phase`, `random_phase`, destination depths |
+| `SynthLfo` | `wave`, `rate` (5 Hz), `sync` (0 beats, off, 0..256), `delay`, `fade`, `phase`, `random_phase`, destination depths |
 | `SynthString` | Pluck layer: `decay` (2 s to -60 dB), `brightness` (0.5), `hardness` (0.8), `velocity` (0) |
 | `SynthTable` | Wavetable layer: `table` (an entity with `Wavetable`), `position` (0 frames), `envelope` (0 frames) |
 | `Wavetable` | On an entity of its own, usually a prefab: `kind` (`WavetableBasic`), `sound` (0, an entity with `AudioPcm` or `SoundFile` that wins over `kind`), `frame_size` (2048 samples, 64..4096) |
@@ -485,6 +487,45 @@ prefab Acid {
 }
 ```
 
+`kind: SynthFormant` runs three resonant bandpasses of the state variable filter in
+parallel, at the first three formants of a vowel, each at its own level: vowels,
+talking pads and wah-like movement. `vowel` picks it, 0 a, 1 e, 2 i, 3 o and 4 u; a
+fraction interpolates the frequencies, the levels and the widths of the two nearest
+vowels, so 0.5 sits between a and e. The formants are the tenor table of the Csound
+manual (Appendix, "Formant Values"):
+
+| Vowel | Frequencies (Hz) | Levels (dB) | Widths (Hz) |
+| --- | --- | --- | --- |
+| 0 a | 650, 1080, 2650 | 0, -6, -7 | 80, 90, 120 |
+| 1 e | 400, 1700, 2600 | 0, -14, -12 | 70, 80, 100 |
+| 2 i | 290, 1870, 2800 | 0, -15, -18 | 40, 90, 100 |
+| 3 o | 400, 800, 2600 | 0, -10, -12 | 40, 80, 100 |
+| 4 u | 350, 600, 2700 | 0, -20, -17 | 40, 60, 100 |
+
+The formant frequencies are fixed: `cutoff`, `slope`, `model`, `velocity` and
+`keytrack` do nothing, and neither the filter envelope `amount` nor `SynthLfo.cutoff`
+moves them. `resonance` narrows the widths, from those of the table at 0 to a tenth of
+them at 1, and `drive` applies to each bandpass. The vowel is the modulation target
+instead: `SynthLfo.vowel` moves it by that many vowels at the top of the wave and
+`SynthFilterEnvelope.vowel` at level 1 of the envelope, both -4..4, and the moved
+vowel is clamped to 0..4. The filter envelope runs on a formant filter whenever its
+`vowel` is not 0, whatever its `amount`; its `velocity` scales the vowel depth.
+
+The level is normalized for a saw at 110 Hz, which comes out within about 3 dB of its
+level without a filter on every vowel; a higher note puts more of its power into the
+formants and comes out louder. On the stereo path both channels run the same filter.
+`AudioFilter` has no formant kind and takes `SynthFormant` as a lowpass.
+
+```
+prefab Talk {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.05, sustain: 1, hold: 1, release: 0.3}
+  SynthFilter: {kind: SynthFormant, vowel: 1, resonance: 0.3}
+  SynthLfo: {rate: 1.5, vowel: 1}
+  SynthOscillator: {wave: SynthSaw, frequency: 110, level: 0.6}
+}
+```
+
 `SynthDrive` on the root drives the mix of the layers of each voice through a tanh
 soft clipper before the filter, or before the amp without a filter: the stage where
 analog synths get most of their thickness. Since it works on the mix, plucks, unison
@@ -574,13 +615,25 @@ pan balances their channels rather than narrowing them with distance.
 
 A sound supports two LFOs, on the root, a layer or another root child. Waves include
 sine, triangle, square, rising saw and sample-and-hold. Destinations are `pitch`
-(cents), `amplitude` (0..1), `cutoff` (octaves), `pulse_width`, `sync`, the
+(cents), `amplitude` (0..1), `cutoff` (octaves), `vowel` (vowels of a `SynthFormant`
+filter, -4..4), `pulse_width`, `hard_sync`, the
 semitones (-48..48) the ratio of hard sync moves at the top of the wave, clamped to
 1..16, and `position`, the frames (-256..256) the position of wavetable layers moves.
-On a layer `sync` syncs that layer, from a ratio of 1 when it has none; on the root
-it moves every layer whose `sync` is over 1.
+On a layer `hard_sync` syncs that layer, from a ratio of 1 when it has none; on the root
+it moves every layer whose oscillator `sync` is over 1.
 Delay and fade bring modulation in gradually. Random phase and noise are seeded,
 so the same sequence of plays is reproducible.
+
+A positive LFO `sync` locks it to the tempo, like a delay `sync`: the cycle is `sync`
+beats of the Transport, a beat a quarter note, at 120 bpm without one, and it wins over
+`rate`. A sixteenth is 0.25, a dotted quarter 1.5, a bar of 4/4 is 4. Each voice starts
+the LFO at `phase + fract(beat / sync)`, where beat is the position of the Transport at
+the start frame of the voice: of the timeline for notes it schedules, else its position
+while stopped and the beat of the play's frame while playing. So every note sees the
+same phase of the grid, and wobbles, tremolos and filter pulses stay on the beat. A
+voice keeps the tempo it started at: a tempo change while it holds does not reach it,
+only the next notes. Delay and fade stay in seconds, and the random wave steps once per
+cycle. A retargeted legato voice keeps its LFOs.
 
 `SynthSound.drift` adds analog drift, so digital patches are never perfectly in tune.
 The pitch of each layer of a voice, and of each unison copy, wanders on its own smooth

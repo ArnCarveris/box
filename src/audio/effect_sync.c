@@ -109,7 +109,8 @@ uint32_t box_audio_module_effect_params(
         const AudioFilter *filter = ptr;
         result = BOX_AUDIO_EFFECT_FILTER;
         if (params && ptr) {
-            params[0] = (float)((uint32_t)filter->kind + 1);
+            params[0] = filter->kind == SynthFormant ? (float)BOX_AUDIO_SYNTH_LOWPASS :
+                (float)((uint32_t)filter->kind + 1);
             params[1] = filter->cutoff;
             params[2] = filter->resonance;
             params[3] = (float)filter->slope;

@@ -325,7 +325,11 @@ ECS_ENUM(SynthFilterKind, {
     SynthLowPass,          /**< Lowpass */
     SynthHighPass,         /**< Highpass */
     SynthBandPass,         /**< Bandpass, unity at the cutoff */
-    SynthNotch             /**< Notch, silent at the cutoff */
+    SynthNotch,            /**< Notch, silent at the cutoff */
+    SynthFormant           /**< Three resonant bandpasses in parallel at the first three
+                            *   formants of SynthFilter.vowel, from the tenor table of the
+                            *   Csound manual: vowels, talking pads, wah. A SynthFilter only;
+                            *   an AudioFilter takes it as SynthLowPass */
 });
 
 /** Slope of the filter of a synth sound */
@@ -400,7 +404,7 @@ ECS_STRUCT(SynthOscillator, {
                             *   voice included, is the master: the wave runs at the master
                             *   times the ratio and restarts at phase 0 on every cycle of the
                             *   master, band limited at the restart, for sync leads and, with
-                            *   SynthLfo.sync, sync sweeps. Each unison voice syncs to its own
+                            *   SynthLfo.hard_sync, sync sweeps. Each unison voice syncs to its own
                             *   master; the sub stays at the master and phase modulation adds
                             *   to the synced phase. Ignored by SynthNoise and SynthPluck */
     SynthNoiseColor color; /**< SynthNoise: color of the noise, default SynthNoiseWhite. The
@@ -534,6 +538,13 @@ ECS_STRUCT(SynthUnison, {
 /** The filter of a synth sound, on its root: a state variable filter on the mix of the layers,
  * stable at any cutoff and resonance.
  *
+ * SynthFormant is three resonant bandpasses of the SVF in parallel at the fixed formants of a
+ * vowel, see SynthFormant in docs/audio.md: resonance 0 has the widths of the table and 1 a
+ * tenth of them, drive applies to each bandpass, and the cutoff, slope, model, velocity and
+ * keytrack do nothing; the filter envelope and SynthLfo.cutoff do not move it either, only
+ * their vowel depths do. The level is normalized so a saw at 110 Hz is about as loud as
+ * without the filter.
+ *
  * The key of a voice, which keytrack and SynthEnvelope.key_scale follow, is 12 log2 of the
  * pitch ratio of its play in semitones, without the pitch variance of SynthSound: relative to
  * Instrument.root for a note of an instrument, to a ratio of 1 for any other play, as the
@@ -561,6 +572,10 @@ ECS_STRUCT(SynthFilter, {
                             *   at 1 as a near sine at the cutoff, its lowpass keeps its
                             *   passband within 2 dB as the resonance rises, and drive is the
                             *   gain into it, from -6 dB to +12 dB, the output scaled back */
+    float vowel;           /**< SynthFormant: the vowel, 0 a, 1 e, 2 i, 3 o, 4 u, default 0;
+                            *   a fraction interpolates the frequencies, levels and widths of
+                            *   the formants of the two nearest vowels. SynthLfo.vowel and
+                            *   SynthFilterEnvelope.vowel move it, clamped to 0..4 */
 });
 
 /** A filter, an effect in an insert slot of an AudioBus, as a Reverb is: the state variable
@@ -755,6 +770,9 @@ ECS_STRUCT(TransientShaper, {
  *
  * It does not keep a sound playing: the sound ends with its SynthEnvelope. Without a
  * SynthFilter it does nothing.
+ *
+ * On a SynthFormant filter the amount does not move the formants, which are fixed; the
+ * envelope moves the vowel by its vowel depth instead, and runs whenever that is not 0.
  */
 ECS_STRUCT(SynthFilterEnvelope, {
     float attack;          /**< Seconds from 0 to 1, at least 0.5 ms */
@@ -768,7 +786,9 @@ ECS_STRUCT(SynthFilterEnvelope, {
     float amount;          /**< Octaves the cutoff moves at level 1, -10..10, negative closes
                             *   the filter, default 0 */
     float velocity;        /**< Share 0..1 of the amount that the velocity of a note scales,
-                            *   amount (1 - share + share v), default 0 */
+                            *   amount (1 - share + share v), default 0; it scales vowel too */
+    float vowel;           /**< SynthFormant: vowels the vowel moves by at level 1, -4..4,
+                            *   default 0; the moved vowel is clamped to 0..4 */
 });
 
 /** A pitch envelope of a synth sound, relative to the note so it fits every pitch: the pitch
@@ -845,17 +865,29 @@ ECS_STRUCT(SynthLfo, {
     float amplitude;       /**< Tremolo: share of the level it takes at the bottom of the
                             *   wave, 0..1 */
     float cutoff;          /**< Octaves of the cutoff of the SynthFilter at the top of the
-                            *   wave, -10..10 */
+                            *   wave, -10..10; nothing on a SynthFormant filter */
     float pulse_width;     /**< Share of the period the pulse width of squares moves by at the
                             *   top of the wave, -0.49..0.49 */
-    float sync;            /**< Semitones the ratio of SynthOscillator.sync moves by at the
+    float hard_sync;       /**< Semitones the ratio of SynthOscillator.sync moves by at the
                             *   top of the wave, -48..48, default 0; the moved ratio is clamped
                             *   to 1..16. On a layer it syncs that layer, from a ratio of 1
                             *   when it has none; on the root it moves every layer with a
                             *   ratio over 1 */
+    float vowel;           /**< Vowels of the SynthFormant filter at the top of the wave,
+                            *   -4..4, default 0; the moved vowel is clamped to 0..4. Of the
+                            *   sound on a layer too, as the cutoff */
     float position;        /**< Frames the position of SynthWavetable layers moves by at the
                             *   top of the wave, -256..256, default 0; the moved position is
                             *   clamped to the frames of the table */
+    float sync;            /**< Cycle in beats of the Transport, 0..256, default 0 for rate.
+                            *   When positive it wins over rate, like Delay.sync: a beat is a
+                            *   quarter note at the tempo of the Transport, 120 without one,
+                            *   so 0.25 is a sixteenth and 1.5 a dotted quarter. The LFO
+                            *   starts at phase + fract(beat / sync), beat being the position
+                            *   of the Transport at the start of the note, so every note sees
+                            *   the same phase of the grid. A voice keeps the tempo it started
+                            *   at: a tempo change applies to the next notes. Delay and fade
+                            *   stay in seconds; SynthLfoRandom steps once per cycle */
 });
 
 /** A sound made by the synth from the components of this entity and its children, without a

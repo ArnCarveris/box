@@ -77,6 +77,25 @@ bool box_audio_write_play_priority(
     uint32_t priority,
     uint64_t when)
 {
+    return box_audio_write_play_note(writer, voice, sound, bus, volume, pan, pitch, velocity,
+        0.0f, 0.0f, flags, priority, when);
+}
+
+bool box_audio_write_play_note(
+    box_audio_writer_t *writer,
+    uint32_t voice,
+    uint32_t sound,
+    uint32_t bus,
+    float volume,
+    float pan,
+    float pitch,
+    float velocity,
+    float beat,
+    float tempo,
+    uint32_t flags,
+    uint32_t priority,
+    uint64_t when)
+{
     box_audio_cmd_play_t cmd;
     box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_PLAY, sizeof(cmd));
     cmd.when_lo = (uint32_t)when;
@@ -90,6 +109,8 @@ bool box_audio_write_play_priority(
     cmd.flags = flags;
     cmd.priority = priority;
     cmd.velocity = velocity;
+    cmd.beat = beat;
+    cmd.tempo = tempo;
 
     return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
 }
@@ -139,6 +160,26 @@ bool box_audio_write_legato_priority(
     uint32_t priority,
     uint64_t when)
 {
+    return box_audio_write_legato_note(writer, voice, from, sound, bus, volume, pan, pitch,
+        velocity, 0.0f, 0.0f, flags, priority, when);
+}
+
+bool box_audio_write_legato_note(
+    box_audio_writer_t *writer,
+    uint32_t voice,
+    uint32_t from,
+    uint32_t sound,
+    uint32_t bus,
+    float volume,
+    float pan,
+    float pitch,
+    float velocity,
+    float beat,
+    float tempo,
+    uint32_t flags,
+    uint32_t priority,
+    uint64_t when)
+{
     box_audio_cmd_legato_t cmd;
     box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_LEGATO, sizeof(cmd));
     cmd.when_lo = (uint32_t)when;
@@ -153,6 +194,8 @@ bool box_audio_write_legato_priority(
     cmd.flags = flags;
     cmd.priority = priority;
     cmd.velocity = velocity;
+    cmd.beat = beat;
+    cmd.tempo = tempo;
 
     return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
 }
