@@ -335,7 +335,6 @@ sized by the jump, and a polyBLAMP for the slope of triangles and sines. Each un
 voice syncs to its own detuned master, the sub stays at the master, and phase
 modulation adds to the synced phase. `SynthNoise` and `SynthPluck` ignore it.
 
-<<<<<<< HEAD
 `SynthWavetable` plays the frames of a wavetable, single periods that the layer morphs
 through by a position. The `SynthTable` of the layer names the entity with the
 `Wavetable`, which is shared by every sound that names it. The built-in kinds are
@@ -377,7 +376,7 @@ has at most 256 frames; tables take sound ids of the core, which holds 1023 soun
 tables and synth patches together. In the `Synth` bench (`voices_64_wavetable`, 64 voices
 of two `WavetableHarmonics` layers into a lowpass, 48 kHz) the voices take about 2100 ns
 per sample (268 µs per 128-frame quantum), where `voices_64` takes about 780.
-=======
+
 `SynthPitchEnvelope` bends the pitch relative to the note, so one patch fits every
 pitch of an instrument, where `frequency_end` sweeps to one absolute frequency: the
 drop of a kick or a tom, the blip of a zap, the scoop of brass. A note starts `amount`
@@ -391,12 +390,10 @@ every layer; on a layer it moves that layer in place of the root's. It adds to g
 sweeps and pitch LFOs, moves `SynthPluck` strings as vibrato does, runs at the control
 rate of the LFOs, does not keep a voice playing and is not restarted by a legato
 retarget.
->>>>>>> 4fef54b0995552551c5771b535d73f41b5fd74e9
 
 ```flecs
 using box.audio
 
-<<<<<<< HEAD
 prefab Harmonics {
   Wavetable: {kind: WavetableHarmonics}
 }
@@ -407,13 +404,13 @@ prefab Morph {
   SynthOscillator: {wave: SynthWavetable, frequency: 220, level: 0.3}
   SynthTable: {table: Harmonics, position: 2, envelope: 20}
   SynthLfo: {wave: SynthLfoTriangle, rate: 0.5, position: 6}
-=======
+}
+
 prefab Kick {
   SynthSound: {}
   SynthEnvelope: {attack: 0.001, decay: 0.35, sustain: 0, release: 0.05, curve: 4}
   SynthPitchEnvelope: {amount: 36, decay: 0.08, curve: 6}
   SynthOscillator: {frequency: 50, level: 0.8}
->>>>>>> 4fef54b0995552551c5771b535d73f41b5fd74e9
 }
 ```
 
@@ -579,14 +576,10 @@ Working examples include [synth_examples.flecs](../test/assets/audio/synth_examp
 [synth_pluck.flecs](../test/assets/audio/synth_pluck.flecs),
 [synth_sub.flecs](../test/assets/audio/synth_sub.flecs),
 [synth_sync.flecs](../test/assets/audio/synth_sync.flecs),
-<<<<<<< HEAD
-[synth_wavetable.flecs](../test/assets/audio/synth_wavetable.flecs) and
-[synth_drive.flecs](../test/assets/audio/synth_drive.flecs).
-=======
+[synth_wavetable.flecs](../test/assets/audio/synth_wavetable.flecs),
 [synth_drive.flecs](../test/assets/audio/synth_drive.flecs),
 [synth_drift.flecs](../test/assets/audio/synth_drift.flecs) and
 [synth_pitch.flecs](../test/assets/audio/synth_pitch.flecs).
->>>>>>> 4fef54b0995552551c5771b535d73f41b5fd74e9
 
 ## Music on the timeline
 
@@ -892,17 +885,10 @@ retained even when other events overflow. See [core.h](../src/audio/core/core.h)
 and [transport.h](../src/audio/transport.h) for the low-level APIs.
 
 The main limits are 64 voices, 64 buses, 64 effects, four inserts and sends per
-<<<<<<< HEAD
 bus, eight synth layers, two synth LFOs, seven unison copies per layer,
 32 pluck strings and 256 frames per wavetable, whose tables share the 1023 sound ids. Effects are algorithmic: no convolution or geometry-derived rooms.
-There is one transport and one music stream per world. There are no automation
-lanes, tempo ramps, time stretching, MIDI I/O, plugins, mixer UI or piano roll.
-=======
-bus, eight synth layers, two synth LFOs, seven unison copies per layer and
-32 pluck strings. Effects are algorithmic: no convolution or geometry-derived rooms.
 There is one transport and one music stream per world. There are no tempo ramps,
 time stretching, MIDI I/O, plugins, mixer UI or piano roll.
->>>>>>> 4fef54b0995552551c5771b535d73f41b5fd74e9
 Scripts can change channel and effect values each frame.
 
 Offline coverage lives in [test/cpu/audio](../test/cpu/audio/); browser and end-to-end

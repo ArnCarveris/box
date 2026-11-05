@@ -63,24 +63,17 @@ void box_audio_synth_init(
     ecs_entity_t ids[] = {
         ecs_id(SynthSound), ecs_id(SynthOscillator), ecs_id(SynthEnvelope), ecs_id(SynthFilter),
         ecs_id(SynthFilterEnvelope), ecs_id(SynthGlide), ecs_id(SynthUnison),
-<<<<<<< HEAD
-        ecs_id(SynthString), ecs_id(SynthLfo), ecs_id(SynthDrive), ecs_id(SynthTable)
-=======
-        ecs_id(SynthString), ecs_id(SynthLfo), ecs_id(SynthPitchEnvelope), ecs_id(SynthDrive)
->>>>>>> 4fef54b0995552551c5771b535d73f41b5fd74e9
+        ecs_id(SynthString), ecs_id(SynthLfo), ecs_id(SynthPitchEnvelope), ecs_id(SynthDrive),
+        ecs_id(SynthTable)
     };
     const char *names[] = {
         "AudioSynthSoundDirty", "AudioSynthOscillatorDirty", "AudioSynthEnvelopeDirty",
         "AudioSynthFilterDirty", "AudioSynthFilterEnvelopeDirty", "AudioSynthGlideDirty",
         "AudioSynthUnisonDirty", "AudioSynthStringDirty", "AudioSynthLfoDirty",
-<<<<<<< HEAD
-        "AudioSynthDriveDirty", "AudioSynthTableDirty"
-=======
-        "AudioSynthPitchEnvelopeDirty", "AudioSynthDriveDirty"
->>>>>>> 4fef54b0995552551c5771b535d73f41b5fd74e9
+        "AudioSynthPitchEnvelopeDirty", "AudioSynthDriveDirty", "AudioSynthTableDirty"
     };
     int32_t i;
-    for (i = 0; i < 11; i ++) {
+    for (i = 0; i < 12; i ++) {
         ecs_observer(world, {
             .entity = ecs_entity(world, { .name = names[i] }),
             .query.flags = EcsQueryMatchPrefab,
@@ -416,13 +409,8 @@ bool box_audio_synth_compile(
     if (osc && osc->modulation != SynthMix) {
         orphans ++;
     } else if (osc) {
-<<<<<<< HEAD
-        box_audio_synth_layer(&p, osc, NULL, ecs_get(world, e, SynthUnison),
-            ecs_get(world, e, SynthString), ecs_get(world, e, SynthTable), tables, 0);
-=======
         box_audio_synth_layer(&p, osc, NULL, NULL, ecs_get(world, e, SynthUnison),
-            ecs_get(world, e, SynthString), 0);
->>>>>>> 4fef54b0995552551c5771b535d73f41b5fd74e9
+            ecs_get(world, e, SynthString), ecs_get(world, e, SynthTable), tables, 0);
     }
 
     box_audio_synth_lfo(&p, ecs_get(world, e, SynthLfo), 0, &lfos);

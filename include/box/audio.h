@@ -845,14 +845,9 @@ ECS_STRUCT(SynthLfo, {
 });
 
 /** A sound made by the synth from the components of this entity and its children, without a
-<<<<<<< HEAD
  * file: SynthOscillator layers, each with an optional SynthUnison, a SynthTable, a
- * SynthEnvelope, a SynthDrive, a SynthFilter, a SynthFilterEnvelope, a SynthGlide and
-=======
- * file: SynthOscillator layers, each with an optional SynthUnison, a SynthEnvelope, a
- * SynthDrive, a SynthFilter, a SynthFilterEnvelope, a SynthPitchEnvelope, a SynthGlide and
->>>>>>> 4fef54b0995552551c5771b535d73f41b5fd74e9
- * SynthLfo. Usually a prefab.
+ * SynthEnvelope, a SynthDrive, a SynthFilter, a SynthFilterEnvelope, a SynthPitchEnvelope,
+ * a SynthGlide and SynthLfo. Usually a prefab.
  *
  * It is compiled once, and again when one of its components changes, into a patch the core
  * holds; box_audio_play and AudioSource play it like any sound, with no allocation per play.

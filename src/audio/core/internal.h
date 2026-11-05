@@ -1262,7 +1262,6 @@ void box_audio_saturator_rest(
     box_audio_effect_t *fx,
     int32_t frames);
 
-<<<<<<< HEAD
 /** Frames of the wavetable a sound holds, in synth_patch.c: the frames of a mono sound that
  * starts with the header of a wavetable and has the floats of its frames.
  *
@@ -1288,7 +1287,7 @@ void box_audio_synth_table_take(
     box_audio_core_t *core,
     box_audio_synth_osc_t *o,
     uint32_t sound);
-=======
+
 /** The transient shaper kind, in dynamics.c: start at the params of fx */
 void box_audio_transient_shaper_start(
     box_audio_core_t *core,
@@ -1315,7 +1314,6 @@ void box_audio_transient_shaper_rest(
     box_audio_core_t *core,
     box_audio_effect_t *fx,
     int32_t frames);
->>>>>>> 4fef54b0995552551c5771b535d73f41b5fd74e9
 
 /** Base 2 logarithm without libm, in synth.c, from the exponent of the double and the series
  * of atanh.

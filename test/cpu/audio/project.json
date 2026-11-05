@@ -190,7 +190,6 @@
                 ]
             },
             {
-<<<<<<< HEAD
                 "id": "SynthWavetable",
                 "setup": true,
                 "testcases": [
@@ -211,7 +210,10 @@
                     "script",
                     "missing_table",
                     "delete_while_playing"
-=======
+
+                ]
+            },
+            {
                 "id": "SynthPitch",
                 "testcases": [
                     "start_returns",
@@ -229,7 +231,6 @@
                     "none_identical",
                     "clamped",
                     "script"
->>>>>>> 4fef54b0995552551c5771b535d73f41b5fd74e9
                 ]
             },
             {
