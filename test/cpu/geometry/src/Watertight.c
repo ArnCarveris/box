@@ -1187,10 +1187,34 @@ void Watertight_rounded_box(void) {
  * @param label Description of the shape printed when the check fails
  * @return True when the mesh is watertight
  */
+static bool watertight_closed(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const char *label,
+    bool outward);
+
 static bool watertight_check(
     ecs_world_t *world,
     ecs_entity_t e,
     const char *label)
+{
+    return watertight_closed(world, e, label, true);
+}
+
+/** Check that the mesh of an entity is closed, without degenerate triangles.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param label Description of the shape printed when the check fails
+ * @param outward True to also require every face to point away from the center of the bounds,
+ *   which only holds for convex shapes
+ * @return True when the mesh is watertight
+ */
+static bool watertight_closed(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const char *label,
+    bool outward)
 {
     box_mesh_cache_t *cache = box_mesh_cache_of(world);
     const ShapeMesh *sm = ecs_get(world, e, ShapeMesh);
@@ -1253,7 +1277,7 @@ static bool watertight_check(
         glm_vec3_add(mid, (float*)c, mid);
         glm_vec3_scale(mid, 1.0f / 3.0f, mid);
         glm_vec3_sub(mid, center, out);
-        if (glm_vec3_dot(face, out) <= 0.0f) {
+        if (outward && glm_vec3_dot(face, out) <= 0.0f) {
             inward ++;
         }
     }
@@ -1435,6 +1459,228 @@ void Watertight_profile_extrusion(void) {
                 .depth = 0.76f, .cap_start = true, .cap_end = true, .smooth = smooth });
             snprintf(label, sizeof(label), "extrusion %s smooth %d", profiles[p], smooth);
             failures += !watertight_check(world, e, label);
+        }
+    }
+
+    test_int(failures, 0);
+    ecs_fini(world);
+}
+
+/** Rim radii the bevel cases sweep: sharp, small and clamped */
+static const float watertight_rims[3] = { 0.0f, 0.05f, 5.0f };
+
+/** Sweep the top and bottom rims and two segment counts of a Bevel on an entity whose host is
+ * set, checking that every mesh is closed.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param name Description of the host
+ * @param outward True to require every face to point away from the center of the bounds
+ * @return The number of failures
+ */
+static int32_t watertight_rims_sweep(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const char *name,
+    bool outward)
+{
+    static const int32_t steps[2] = { 1, 4 };
+    char label[160];
+    int32_t failures = 0;
+    for (int32_t t = 0; t < 3; t ++) {
+        for (int32_t b = 0; b < 3; b ++) {
+            for (int32_t s = 0; s < 2; s ++) {
+                ecs_set(world, e, Bevel, { .top = watertight_rims[t],
+                    .bottom = watertight_rims[b], .segments = steps[s] });
+                snprintf(label, sizeof(label), "%s top %g bottom %g segments %d",
+                    name, (double)watertight_rims[t], (double)watertight_rims[b], steps[s]);
+                failures += !watertight_closed(world, e, label, outward);
+            }
+        }
+    }
+
+    return failures;
+}
+
+void Watertight_bevel_cylinder(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    ecs_entity_t e = ecs_new(world);
+    static const int32_t segments[2] = { 8, 24 };
+    char name[96];
+    int32_t failures = 0;
+    for (int32_t s = 0; s < 2; s ++) {
+        for (int32_t smooth = 0; smooth < 2; smooth ++) {
+            ecs_set(world, e, Cylinder, { .segments = segments[s], .smooth = smooth,
+                .length = 1, .radius = 0.5f });
+            snprintf(name, sizeof(name), "bevel cylinder segments %d smooth %d",
+                segments[s], smooth);
+            failures += watertight_rims_sweep(world, e, name, true);
+        }
+    }
+
+    test_int(failures, 0);
+    ecs_fini(world);
+}
+
+void Watertight_bevel_frustum(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    ecs_entity_t e = ecs_new(world);
+    static const float shapes[4][3] = {
+        { 1, 0.5f, 0.3f }, { 1, 0.5f, 0 }, { 1, 0, 0.4f }, { 0.2f, 1, 0.1f }
+    };
+    static const int32_t segments[2] = { 8, 24 };
+    char name[96];
+    int32_t failures = 0;
+    for (int32_t f = 0; f < 4; f ++) {
+        for (int32_t s = 0; s < 2; s ++) {
+            for (int32_t smooth = 0; smooth < 2; smooth ++) {
+                ecs_set(world, e, Frustum, { .segments = segments[s], .smooth = smooth,
+                    .length = shapes[f][0], .radius_bottom = shapes[f][1],
+                    .radius_top = shapes[f][2] });
+                snprintf(name, sizeof(name), "bevel frustum %d segments %d smooth %d",
+                    f, segments[s], smooth);
+                failures += watertight_rims_sweep(world, e, name, true);
+            }
+        }
+    }
+
+    test_int(failures, 0);
+    ecs_fini(world);
+}
+
+void Watertight_bevel_cone(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    ecs_entity_t e = ecs_new(world);
+    static const int32_t segments[2] = { 8, 24 };
+    static const float lengths[2] = { 1, 0.2f };
+    char name[96];
+    int32_t failures = 0;
+    for (int32_t l = 0; l < 2; l ++) {
+        for (int32_t s = 0; s < 2; s ++) {
+            for (int32_t smooth = 0; smooth < 2; smooth ++) {
+                ecs_set(world, e, Cone, { .segments = segments[s], .smooth = smooth,
+                    .length = lengths[l], .radius = 0.5f });
+                snprintf(name, sizeof(name), "bevel cone length %g segments %d smooth %d",
+                    (double)lengths[l], segments[s], smooth);
+                failures += watertight_rims_sweep(world, e, name, true);
+            }
+        }
+    }
+
+    test_int(failures, 0);
+    ecs_fini(world);
+}
+
+void Watertight_bevel_tube(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    ecs_entity_t e = ecs_new(world);
+    static const float arcs[3] = { 0, 1.5707964f, 3 };
+    static const float walls[3] = { 0.2f, 0.04f, 0.6f };
+    static const int32_t segments[2] = { 8, 24 };
+    char name[128];
+    int32_t failures = 0;
+    for (int32_t a = 0; a < 3; a ++) {
+        for (int32_t w = 0; w < 3; w ++) {
+            for (int32_t s = 0; s < 2; s ++) {
+                for (int32_t smooth = 0; smooth < 2; smooth ++) {
+                    ecs_set(world, e, Tube, { .segments = segments[s], .smooth = smooth,
+                        .length = 1, .radius = 0.5f, .thickness = walls[w], .arc = arcs[a] });
+                    snprintf(name, sizeof(name),
+                        "bevel tube arc %g wall %g segments %d smooth %d",
+                        (double)arcs[a], (double)walls[w], segments[s], smooth);
+                    failures += watertight_rims_sweep(world, e, name, false);
+                }
+            }
+        }
+    }
+
+    test_int(failures, 0);
+    ecs_fini(world);
+}
+
+void Watertight_bevel_prism(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    ecs_entity_t e = ecs_new(world);
+    static const float sizes[3][3] = { { 1, 1, 1 }, { 2, 0.5f, 0.3f }, { 0.4f, 1.5f, 2 } };
+    static const int32_t steps[2] = { 1, 4 };
+    char label[128];
+    int32_t failures = 0;
+    for (int32_t right = 0; right < 2; right ++) {
+        for (int32_t z = 0; z < 3; z ++) {
+            for (int32_t r = 0; r < 3; r ++) {
+                for (int32_t s = 0; s < 2; s ++) {
+                    if (right) {
+                        ecs_set(world, e, RightTrianglePrism,
+                            { sizes[z][0], sizes[z][1], sizes[z][2] });
+                    } else {
+                        ecs_set(world, e, TrianglePrism,
+                            { sizes[z][0], sizes[z][1], sizes[z][2] });
+                    }
+
+                    ecs_set(world, e, Bevel, { .radius = watertight_rims[r],
+                        .segments = steps[s] });
+                    snprintf(label, sizeof(label),
+                        "bevel prism right %d size %d radius %g segments %d", right, z,
+                        (double)watertight_rims[r], steps[s]);
+                    failures += !watertight_closed(world, e, label, false);
+                }
+            }
+        }
+
+        ecs_remove(world, e, TrianglePrism);
+        ecs_remove(world, e, RightTrianglePrism);
+    }
+
+    test_int(failures, 0);
+    ecs_fini(world);
+}
+
+void Watertight_bevel_profile_extrusion(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    test_int(ecs_script_run(world, "profiles",
+        "using box.geometry\n"
+        "frame_outline { Path2D: {start: {-1, -0.5}, segments: ["
+        "{kind: Line, end: {1, -0.5}}, {kind: Line, end: {1, 0.5}},"
+        " {kind: Line, end: {-1, 0.5}}], closed: true}}\n"
+        "frame_opening { Path2D: {start: {-0.3, -0.2}, segments: ["
+        "{kind: Line, end: {0.3, -0.2}}, {kind: Line, end: {0.3, 0.2}},"
+        " {kind: Line, end: {-0.3, 0.2}}], closed: true}}\n"
+        "frame { Profile2D: {outer: frame_outline, holes: [frame_opening]}}\n"
+        "l_outline { Path2D: {start: {0, 0}, segments: ["
+        "{kind: Line, end: {2, 0}}, {kind: Line, end: {2, 1}}, {kind: Line, end: {1, 1}},"
+        " {kind: Line, end: {1, 2}}, {kind: Line, end: {0, 2}}], closed: true}}\n"
+        "l_shape { Profile2D: {outer: l_outline}}\n"
+        "round_outline { Path2D: {start: {1, 0}, segments: ["
+        "{kind: CubicBezier, end: {0, 1}, control1: {1, 0.5523}, control2: {0.5523, 1}},"
+        "{kind: CubicBezier, end: {-1, 0}, control1: {-0.5523, 1}, control2: {-1, 0.5523}},"
+        "{kind: CubicBezier, end: {0, -1}, control1: {-1, -0.5523}, control2: {-0.5523, -1}},"
+        "{kind: CubicBezier, end: {1, 0}, control1: {0.5523, -1}, control2: {1, -0.5523}}"
+        "], closed: true}}\n"
+        "round_opening { Path2D: {start: {0.4, 0}, segments: ["
+        "{kind: CubicBezier, end: {0, 0.4}, control1: {0.4, 0.2209}, control2: {0.2209, 0.4}},"
+        "{kind: CubicBezier, end: {-0.4, 0}, control1: {-0.2209, 0.4},"
+        " control2: {-0.4, 0.2209}},"
+        "{kind: CubicBezier, end: {0, -0.4}, control1: {-0.4, -0.2209},"
+        " control2: {-0.2209, -0.4}},"
+        "{kind: CubicBezier, end: {0.4, 0}, control1: {0.2209, -0.4},"
+        " control2: {0.4, -0.2209}}], closed: true}}\n"
+        "ring { Profile2D: {outer: round_outline, holes: [round_opening]}}\n", NULL), 0);
+    const char *profiles[3] = { "frame", "l_shape", "ring" };
+    ecs_entity_t e = ecs_new(world);
+    char name[96];
+    int32_t failures = 0;
+    for (int32_t p = 0; p < 3; p ++) {
+        for (int32_t smooth = 0; smooth < 2; smooth ++) {
+            ecs_set(world, e, ProfileExtrusion, { .profile = ecs_lookup(world, profiles[p]),
+                .depth = 0.5f, .cap_start = true, .cap_end = true, .smooth = smooth });
+            snprintf(name, sizeof(name), "bevel extrusion %s smooth %d", profiles[p], smooth);
+            failures += watertight_rims_sweep(world, e, name, false);
         }
     }
 

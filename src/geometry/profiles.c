@@ -6,7 +6,9 @@
  */
 
 #include "paths.h"
+#include "mesh_gen.h"
 #include <limits.h>
+#include <stddef.h>
 #include <math.h>
 
 /** Append a finite vec4 to a surface asset buffer.
@@ -749,8 +751,15 @@ static int box_steps(
     return value <= 0 ? fallback : (int)glm_clamp(value, 3, 256);
 }
 
+/** Rims of a beveled ProfileExtrusion, quantized */
+typedef struct box_profile_bevel_t {
+    float bottom;  /**< Radius of the edges of cap_start, 0 for none */
+    float top;     /**< Radius of the edges of cap_end, 0 for none */
+    int32_t steps; /**< Steps per rim */
+} box_profile_bevel_t;
+
 static void box_asset_key(const ecs_world_t *world, const void *value, int kind,
-    box_shape_key_t *key)
+    const box_profile_bevel_t *bevel, box_shape_key_t *key)
 {
     box_surface_data_t d = {0};
     vec3 min, max;
@@ -781,6 +790,14 @@ static void box_asset_key(const ecs_world_t *world, const void *value, int kind,
         float ratio = sx > sy ? (sx ? sy / sx : 0) : (sy ? 2 - sx / sy : 0);
         bytes = (const uint8_t*)&ratio;
         for (size_t i = 0; i < sizeof(ratio); i ++) {
+            hash = (hash ^ bytes[i]) * 1099511628211ull;
+        }
+    }
+    if (bevel) {
+        /* Only the bevel variant hashes its rims, so that plain extrusions keep their keys */
+        float rims[3] = {bevel->bottom, bevel->top, (float)bevel->steps};
+        bytes = (const uint8_t*)rims;
+        for (size_t i = 0; i < sizeof(rims); i ++) {
             hash = (hash ^ bytes[i]) * 1099511628211ull;
         }
     }
@@ -966,7 +983,7 @@ static void box_asset_generate(const ecs_world_t *world, const void *value, int 
 #define BOX_ASSET_SHAPE(NAME, KIND) \
 static void box_##NAME##_key(const ecs_world_t *world, const void *value, box_shape_key_t *key) \
 { \
-    box_asset_key(world, value, KIND, key); \
+    box_asset_key(world, value, KIND, NULL, key); \
 } \
 static void box_##NAME##_generate(const ecs_world_t *world, const void *value, \
     const box_shape_key_t *key, box_mesh_t *mesh) \
@@ -983,6 +1000,390 @@ BOX_ASSET_SHAPE(sweep, 1)
 BOX_ASSET_SHAPE(loft, 2)
 BOX_ASSET_SHAPE(lathe, 3)
 BOX_ASSET_SHAPE(profile, 7)
+
+/** Get the rims of the Bevel of a ProfileExtrusion: radius or bottom for the edges of
+ * cap_start and radius or top for those of cap_end, none for an end without a cap.
+ *
+ * @param value The ProfileExtrusion and the Bevel
+ * @param out The rims
+ */
+static void box_profile_bevel_of(
+    const box_bevel_extrusion_t *value,
+    box_profile_bevel_t *out)
+{
+    const Bevel *bevel = &value->bevel;
+    out->bottom = value->host.cap_start ?
+        glm_max(box_shape_quantize(box_bevel_rim(bevel, bevel->bottom)), 0.0f) : 0.0f;
+    out->top = value->host.cap_end ?
+        glm_max(box_shape_quantize(box_bevel_rim(bevel, bevel->top)), 0.0f) : 0.0f;
+    out->steps = box_bevel_segments(bevel);
+}
+
+/** Key of a beveled ProfileExtrusion: the key of the extrusion with its rims hashed in.
+ *
+ * @param world The world
+ * @param value The ProfileExtrusion and the Bevel
+ * @param key The key
+ */
+static void box_profile_bevel_key(
+    const ecs_world_t *world,
+    const void *value,
+    box_shape_key_t *key)
+{
+    box_profile_bevel_t bevel;
+    box_profile_bevel_of(value, &bevel);
+    box_asset_key(world, value, 7, &bevel, key);
+}
+
+/** Surface of a beveled ProfileExtrusion: the surface of the extrusion without the bevel, with
+ * the rim radii in p[2] so that picking hits the rounded caps through their triangles.
+ *
+ * @param world The world
+ * @param value The ProfileExtrusion and the Bevel
+ * @param d The surface parameters to fill
+ * @param min The minimum corner of the bounds to fill
+ * @param max The maximum corner of the bounds to fill
+ */
+static void box_profile_bevel_surface(
+    const ecs_world_t *world,
+    const void *value,
+    box_surface_data_t *d,
+    vec3 min,
+    vec3 max)
+{
+    if (box_resolve(world, value, 7, d, min, max)) {
+        box_profile_bevel_t bevel;
+        box_profile_bevel_of(value, &bevel);
+        d->p[2][0] = bevel.bottom;
+        d->p[2][1] = bevel.top;
+    }
+}
+
+/** Check whether the Bevel of a ProfileExtrusion rounds no cap edge.
+ *
+ * @param value The ProfileExtrusion and the Bevel
+ * @return True when the extrusion resolves as a plain extrusion
+ */
+static bool box_profile_bevel_flat(
+    const void *value)
+{
+    const box_bevel_extrusion_t *v = value;
+    box_profile_bevel_t bevel;
+    box_profile_bevel_of(v, &bevel);
+
+    return (bevel.bottom == 0.0f && bevel.top == 0.0f) || !isfinite(v->host.depth) ||
+        v->host.depth == 0.0f;
+}
+
+/** Test whether any two edges of the rings of a profile that share no point cross.
+ *
+ * @param ring The points of the rings, linked by the next index in w
+ * @param count Number of points
+ * @return True when two edges cross
+ */
+static bool box_profile_crosses(
+    const vec4 *ring,
+    int count)
+{
+    bool result = false;
+    for (int i = 0; !result && i < count; i ++) {
+        int a = (int)ring[i][3];
+        for (int j = i + 1; !result && j < count; j ++) {
+            int b = (int)ring[j][3];
+            if (a == j || b == i || a == i || b == j) {
+                continue;
+            }
+
+            result = box_intersects(ring[i], ring[a], ring[j], ring[b]);
+        }
+    }
+
+    return result;
+}
+
+/** Inset the points of a profile by a distance along their offset directions.
+ *
+ * @param points The profile points, as box_profile_resolve() packs them
+ * @param offsets The inset direction of each point
+ * @param count Number of points
+ * @param inset The distance
+ * @param out The inset points, with the ring and the next index of the profile
+ */
+static void box_profile_inset(
+    const vec4 *points,
+    const vec2 *offsets,
+    int count,
+    float inset,
+    vec4 *out)
+{
+    for (int i = 0; i < count; i ++) {
+        out[i][0] = points[i][0] + offsets[i][0] * inset;
+        out[i][1] = points[i][1] + offsets[i][1] * inset;
+        out[i][2] = points[i][2];
+        out[i][3] = points[i][3];
+    }
+}
+
+/** Clamp the rim radius of a capped end of a beveled extrusion.
+ *
+ * The bound is deterministic: 0.9 times the smallest inset at which an edge of the profile
+ * shrinks to zero length, then halved, up to 12 times and else 0, while any two edges of the
+ * innermost ring cross, holes against the outer ring included.
+ *
+ * @param points The profile points
+ * @param offsets The inset direction of each point
+ * @param count Number of points
+ * @param limit The inset at which an edge shrinks to zero length
+ * @param radius The authored radius
+ * @param ring Scratch room for count points
+ * @return The radius
+ */
+static float box_profile_bevel_clamp(
+    const vec4 *points,
+    const vec2 *offsets,
+    int count,
+    float limit,
+    float radius,
+    vec4 *ring)
+{
+    float result = glm_min(radius, 0.9f * limit);
+    int tries = 0;
+    for (; result > 0.0f && tries < 12; tries ++) {
+        box_profile_inset(points, offsets, count, result, ring);
+        if (!box_profile_crosses(ring, count)) {
+            break;
+        }
+
+        result *= 0.5f;
+    }
+
+    return tries < 12 ? result : 0.0f;
+}
+
+/** Append the cap of an end of an extrusion, triangulated on its innermost ring.
+ *
+ * @param mesh The mesh
+ * @param ring The points of the ring
+ * @param count Number of points
+ * @param outer Number of points of the outer ring
+ * @param side 0 for the bottom, 1 for the top
+ */
+static void box_profile_bevel_cap(
+    box_mesh_t *mesh,
+    const vec4 *ring,
+    int count,
+    int outer,
+    int side)
+{
+    ecs_vec_t triangles = {0};
+    if (box_triangulate(ring, count, outer, &triangles)) {
+        int base = mesh->vertex_count;
+        for (int i = 0; i < count; i ++) {
+            box_mesh_vertex(mesh, (vec3){ring[i][0], (float)side - 0.5f, ring[i][1]},
+                (vec3){0, side ? 1.0f : -1.0f, 0}, ring[i][0], ring[i][1]);
+        }
+
+        const int *indices = ecs_vec_first(&triangles);
+        for (int i = 0; i + 2 < ecs_vec_count(&triangles); i += 3) {
+            box_mesh_triangle(mesh, base + indices[i], base + indices[i + 1],
+                base + indices[i + 2]);
+        }
+    }
+
+    ecs_vec_fini_t(NULL, &triangles, int);
+}
+
+/** Generate the mesh of a beveled ProfileExtrusion.
+ *
+ * The bevel takes the place of the outer steps of each capped end: step k at angle phi insets
+ * the profile by r * (1 - cos(phi)) and lowers the end by r * (1 - sin(phi)), each point
+ * against its smooth normal, or along the mitre of its two edge normals at a corner.
+ *
+ * The rims belong to the wall of their contour. Their normals blend from the wall normal to the
+ * cap normal and keep a small horizontal part at the cap, which only caps lack.
+ *
+ * @param world The world
+ * @param value The ProfileExtrusion and the Bevel
+ * @param key The key
+ * @param mesh The mesh
+ */
+static void box_profile_bevel_generate(
+    const ecs_world_t *world,
+    const void *value,
+    const box_shape_key_t *key,
+    box_mesh_t *mesh)
+{
+    const box_bevel_extrusion_t *v = value;
+    box_profile_bevel_t bevel;
+    box_surface_data_t d = {0};
+    ecs_vec_t profile = {0}, corners = {0}, normals = {0};
+    vec2 *offsets = NULL;
+    vec4 *rings = NULL;
+    int outer = 0;
+    vec3 min, max;
+    box_profile_bevel_of(v, &bevel);
+    if (!key->i[2] || !box_resolve(world, value, 7, &d, min, max)) {
+        goto done;
+    }
+
+    int count = (int)d.p[5][1];
+    const vec4 *points = d.assets + (int)d.p[5][0] - 24;
+    const vec4 *smooth = d.p[8][0] > 0 ? d.assets + (int)d.p[8][0] - 24 : NULL;
+    float depth = d.p[1][1];
+    int regions = (int)d.p[3][3];
+    int steps = bevel.steps;
+    if (!box_profile_resolve(world, v->host.profile, 0, &profile, &outer, &corners) ||
+        ecs_vec_count(&profile) != count || outer != (int)d.p[5][2] ||
+        !box_profile_normals(ecs_vec_first(&profile), ecs_vec_first(&corners), count, &normals))
+    {
+        goto done;
+    }
+
+    const vec4 *n = ecs_vec_first(&normals);
+    offsets = ecs_os_malloc_n(vec2, count);
+    rings = ecs_os_malloc_n(vec4, (size_t)count * (size_t)(2 * (steps + 1) + 1));
+    float limit = INFINITY;
+    for (int i = 0; i < count; i ++) {
+        if (n[i][0] == n[i][2] && n[i][1] == n[i][3]) {
+            offsets[i][0] = -n[i][0];
+            offsets[i][1] = -n[i][1];
+        } else {
+            float den = glm_max(1.0f + n[i][0] * n[i][2] + n[i][1] * n[i][3], 0.05f);
+            offsets[i][0] = -(n[i][0] + n[i][2]) / den;
+            offsets[i][1] = -(n[i][1] + n[i][3]) / den;
+        }
+    }
+
+    for (int i = 0; i < count; i ++) {
+        int next = (int)points[i][3];
+        float ex = points[next][0] - points[i][0], ey = points[next][1] - points[i][1];
+        float shrink = -((offsets[next][0] - offsets[i][0]) * ex +
+            (offsets[next][1] - offsets[i][1]) * ey);
+        if (next != i && shrink > 0.0f) {
+            limit = glm_min(limit, (ex * ex + ey * ey) / shrink);
+        }
+    }
+
+    vec4 *scratch = rings + (size_t)count * (size_t)(2 * (steps + 1));
+    float radii[2] = {
+        box_profile_bevel_clamp(points, offsets, count, limit, bevel.bottom, scratch),
+        box_profile_bevel_clamp(points, offsets, count, limit, bevel.top, scratch)
+    };
+    if (radii[0] + radii[1] > depth) {
+        float scale = depth / (radii[0] + radii[1]);
+        radii[0] *= scale;
+        radii[1] *= scale;
+    }
+
+    float ends[2] = {-0.5f * depth + radii[0], 0.5f * depth - radii[1]};
+    for (int side = 0; side < 2; side ++) {
+        for (int k = 0; k <= steps; k ++) {
+            float phi = 0.5f * BOX_PI * (float)k / (float)steps;
+            float inset = k == steps ? radii[side] : radii[side] * (1.0f - cosf(phi));
+            box_profile_inset(points, offsets, count, k ? inset : 0.0f,
+                rings + (size_t)count * (size_t)(side * (steps + 1) + k));
+        }
+    }
+
+    float wall_v[2] = {ends[0] / depth + 0.5f, ends[1] / depth + 0.5f};
+    for (int i = 0; i < count; i ++) {
+        int next = (int)points[i][3];
+        if (next == i) {
+            continue;
+        }
+
+        int inner = i >= outer;
+        int first = inner ? outer : 0;
+        int m = inner ? count - outer : outer;
+        float us[2] = {(float)(i - first) / m + (inner ? 2 : 0),
+            (float)(next - first) / m + (inner ? 2 : 0)};
+        vec3 wall[2];
+        for (int side = 0; side < 2; side ++) {
+            glm_vec3_copy((vec3){points[next][1] - points[i][1], 0,
+                points[i][0] - points[next][0]}, wall[side]);
+            glm_vec3_normalize(wall[side]);
+            if (smooth) {
+                glm_vec3_copy(side ? (vec3){smooth[next][0], 0, smooth[next][1]} :
+                    (vec3){smooth[i][2], 0, smooth[i][3]}, wall[side]);
+            }
+        }
+
+        if (ends[1] - ends[0] > 1e-6f * depth) {
+            int base = mesh->vertex_count;
+            for (int j = 0; j < 2; j ++) {
+                for (int side = 0; side < 2; side ++) {
+                    const float *p = points[side ? next : i];
+                    box_mesh_vertex(mesh, (vec3){p[0], ends[j] / depth, p[1]}, wall[side],
+                        us[side], wall_v[j]);
+                }
+            }
+
+            box_mesh_triangle(mesh, base, base + 2, base + 1);
+            box_mesh_triangle(mesh, base + 1, base + 2, base + 3);
+        }
+
+        for (int end = 0; end < 2; end ++) {
+            float r = radii[end], sign = end ? 1.0f : -1.0f;
+            if (r <= 0.0f || !(regions & (4 << end))) {
+                continue;
+            }
+
+            int base = mesh->vertex_count;
+            for (int k = 0; k <= steps; k ++) {
+                float phi = 0.5f * BOX_PI * (float)k / (float)steps;
+                float c = k == steps ? 1e-3f : cosf(phi);
+                float sn = k == 0 ? 0.0f : (k == steps ? 1.0f : sinf(phi));
+                float y = k == 0 ? ends[end] :
+                    sign * (k == steps ? 0.5f * depth : 0.5f * depth - r * (1.0f - sn));
+                const vec4 *ring = rings + (size_t)count * (size_t)(end * (steps + 1) + k);
+                float tv = wall_v[end] + sign * r * phi / depth;
+                for (int side = 0; side < 2; side ++) {
+                    const float *p = ring[side ? next : i];
+                    vec3 normal = {wall[side][0] * c, sn * sign, wall[side][2] * c};
+                    glm_vec3_normalize(normal);
+                    box_mesh_vertex(mesh, (vec3){p[0], y / depth, p[1]}, normal, us[side], tv);
+                }
+            }
+
+            for (int k = 0; k < steps; k ++) {
+                int a = base + k * 2, b = a + 2;
+                box_mesh_triangle(mesh, a, b, a + 1);
+                box_mesh_triangle(mesh, a + 1, b, b + 1);
+            }
+        }
+    }
+
+    for (int end = 0; end < 2; end ++) {
+        if (regions & (4 << end)) {
+            const vec4 *ring = rings + (size_t)count * (size_t)(end * (steps + 1) +
+                (radii[end] > 0.0f ? steps : 0));
+            box_profile_bevel_cap(mesh, ring, count, outer, end);
+        }
+    }
+
+    mesh->surface_assets = d.assets;
+    mesh->surface_asset_count = d.asset_count;
+    d.assets = NULL;
+done:
+    ecs_os_free(d.assets);
+    ecs_os_free(offsets);
+    ecs_os_free(rings);
+    ecs_vec_fini_t(NULL, &profile, vec4);
+    ecs_vec_fini_t(NULL, &corners, int);
+    ecs_vec_fini_t(NULL, &normals, vec4);
+}
+
+int32_t box_profile_region(
+    const box_vertex_t *vertex)
+{
+    const float *n = vertex->normal;
+    int32_t result = vertex->uv[0] >= 2.0f ? SurfaceInner : SurfaceOuter;
+    if (n[0] == 0.0f && n[2] == 0.0f && n[1] != 0.0f) {
+        result = n[1] > 0.0f ? SurfaceEnd : SurfaceStart;
+    }
+
+    return result;
+}
 
 bool box_profile_contains(
     const box_surface_data_t *d,
@@ -1160,7 +1561,12 @@ void box_geometry_profiles_init(
         .surface_world = box_lathe_surface});
     box_shape_register(world, &(box_shape_desc_t){.component = ecs_id(ProfileExtrusion),
         .key_world = box_profile_key, .generate_world = box_profile_generate,
-        .surface_world = box_profile_surface});
+        .surface_world = box_profile_surface, .exclude = ecs_id(Bevel)});
+    box_geometry_bevel_host(world, &(box_shape_desc_t){.key_world = box_profile_bevel_key,
+        .generate_world = box_profile_bevel_generate, .surface_world = box_profile_bevel_surface},
+        ecs_id(ProfileExtrusion), ECS_SIZEOF(ProfileExtrusion),
+        (ecs_size_t)offsetof(box_bevel_extrusion_t, bevel), ECS_SIZEOF(box_bevel_extrusion_t),
+        box_profile_bevel_flat);
     ecs_entity_t assets[] = {ecs_id(Path2D), ecs_id(Path3D), ecs_id(Profile2D)};
     for (int i = 0; i < 3; i ++) {
         ecs_observer(world, {.query.terms = {{.id = assets[i]}},
