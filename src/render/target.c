@@ -50,7 +50,7 @@ WGPURenderPipeline box_gpu_blit_pipeline(
         .multisample = { .count = 1, .mask = 0xFFFFFFFF },
         .fragment = &fragment
     };
-    result = wgpuDeviceCreateRenderPipeline(gpu->device, &desc);
+    result = box_gpu_render_pipeline(gpu, &desc);
     gpu->blits[gpu->blit_count].format = format;
     gpu->blits[gpu->blit_count].pipeline = result;
     gpu->blit_count ++;

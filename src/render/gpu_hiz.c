@@ -217,7 +217,7 @@ void box_gpu_hiz_pipelines(
     box_gpu_cull_t *c = &gpu->cull;
     box_gpu_hiz_pipeline_release(&c->hiz_first);
     box_gpu_hiz_pipeline_release(&c->hiz_reduce);
-    c->hiz_first = wgpuDeviceCreateComputePipeline(gpu->device,
+    c->hiz_first = box_gpu_compute_pipeline(gpu,
         &(WGPUComputePipelineDescriptor){
             .layout = c->hiz_first_pipeline_layout,
             .compute = {
@@ -225,7 +225,7 @@ void box_gpu_hiz_pipelines(
                 .entryPoint = { .data = "hiz_first", .length = WGPU_STRLEN }
             }
         });
-    c->hiz_reduce = wgpuDeviceCreateComputePipeline(gpu->device,
+    c->hiz_reduce = box_gpu_compute_pipeline(gpu,
         &(WGPUComputePipelineDescriptor){
             .layout = c->hiz_reduce_pipeline_layout,
             .compute = {

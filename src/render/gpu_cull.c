@@ -192,7 +192,7 @@ static WGPUComputePipeline box_gpu_cull_pipeline(
     WGPUShaderModule module,
     const char *entry)
 {
-    return wgpuDeviceCreateComputePipeline(gpu->device, &(WGPUComputePipelineDescriptor){
+    return box_gpu_compute_pipeline(gpu, &(WGPUComputePipelineDescriptor){
         .layout = gpu->cull.pipeline_layout,
         .compute = {
             .module = module,

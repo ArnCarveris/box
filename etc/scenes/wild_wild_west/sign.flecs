@@ -7,7 +7,6 @@ using box.light
 using box.text
 
 
-@tree Parent
 template WestSign {
   prop label: string = "DRY CREEK"
   prop width: f32 = 4

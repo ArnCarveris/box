@@ -1149,6 +1149,9 @@ typedef struct box_render_batch_t {
                                  *   whose pipeline does not blend nor write depth and samples
                                  *   the snapshot of the opaque image of the view */
     bool shadow;                /**< The instances cast shadows, false for NoShadow */
+    bool fixture;               /**< The instances are LightFixture shapes: the cull keeps them
+                                 *   out of the tile of a light inside their world bounds. Only
+                                 *   set with shadow */
     bool bake;                  /**< Static 3D instances without NoBake of a scene with LightBake or
                                  *   ReflectionBake, drawn by the captures */
     bool box_shadow;            /**< The instances are the shadows of 2D shapes (BoxShadow),
@@ -1199,6 +1202,7 @@ typedef enum box_render_transition_component_t {
     BOX_RENDER_TRANSITION_SHEEN,            /**< Sheen */
     BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION, /**< DiffuseTransmission */
     BOX_RENDER_TRANSITION_BOX_SHADOW,       /**< BoxShadow */
+    BOX_RENDER_TRANSITION_BORDER,           /**< Border */
     BOX_RENDER_TRANSITION_COMPONENTS        /**< Number of transitionable components */
 } box_render_transition_component_t;
 

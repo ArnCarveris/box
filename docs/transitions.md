@@ -33,6 +33,8 @@ e {
 | `delay` | 0 | Seconds to hold the rendered value before moving |
 | `timing_function` | `Linear` | `Linear`, `EaseIn`, `EaseOut`, `EaseInOut` or `CubicBezier` |
 | `bezier` | 0 | `{x1, y1, x2, y2}` handles, used only by `CubicBezier` |
+| `on_add` | false | Adding the component animates from its neutral value |
+| `on_remove` | false | Removing the component animates to its neutral value |
 
 The first value does not animate. A later script, shell or C write starts the
 transition. For example, after the entity above has rendered, setting its position
@@ -41,6 +43,60 @@ half a second; `get` returns the new position immediately.
 
 `Transition` is inherited over `IsA`. A prefab can declare the map for its instances;
 an instance that sets its own map replaces the whole inherited map.
+
+### Adding and removing
+
+Adding or removing a transitioned component snaps unless its entry opts in. With
+`on_add`, a component added to an entity that had no value, owned or inherited,
+animates from its neutral value, the value that renders like not having it. With
+`on_remove`, a removed component without an inherited value left animates to its
+neutral value, then the entity renders without it. Both use the entry's delay,
+duration and curve.
+
+```flecs
+glow {
+  Rect: {40, 40}
+  Transition: [
+    Emissive: {duration: 0.3, on_add: true, on_remove: true},
+    Tint: {duration: 0.15, timing_function: EaseOut, on_add: true, on_remove: true}
+  ]
+}
+```
+
+A scene no longer needs to keep a `Tint` at alpha 0 or an `Emissive` at strength 0
+on an entity just so it can fade. Game logic sees the component as added or removed
+at once; only the pixels animate. Adding the component again while it animates out,
+or removing it while it animates in, starts from the rendered value without a jump.
+
+| Component | Neutral value |
+| --- | --- |
+| `Rotation` | `{0, 0, 0}` |
+| `Scale` | `{1, 1, 1}` |
+| `Opacity` | `{1}`, blended for the whole animation |
+| `Tint` | The target color with alpha 0 |
+| `Emissive` | Strength 0, the target color |
+| `PbrMaterial` | The metallic and roughness used without one |
+| `TextureTransform` | `{1, 1, 0, 0}` |
+| `ClearCoat` | Strength 0, the target roughness |
+| `SpecularAnisotropy` | Strength 0, the target rotation |
+| `Sheen` | Black, the target roughness |
+| `DiffuseTransmission` | Factor, thickness and blur 0, the target color |
+| `BoxShadow` (add only) | The target offsets, blur and spread, color alpha 0 |
+
+`Position`, `Rgb`, `AlphaCutoff` and `Transmission` have no neutral value: an entity
+without a `Position` is not placed by its parent, a shape without `Rgb` renders a
+default grey, and the other two change the batch of a shape. Removing `BoxShadow`
+frees its shadow at once. `on_add` or `on_remove` on one of them logs an error and is
+ignored; the rest of the entry still works.
+
+Deleting an entity, removing its shape (`Rect`, `Box`, ...) or disabling it is not
+animated: the renderer keeps no instances of its own and only patches what the game
+thread draws in that frame, so a shape that is no longer drawn has nothing left to
+animate. Spawning an entity, or adding `Transition`, does not animate its first
+values either.
+
+An instance that inherits a `Transition` with `on_add` or `on_remove` entries gets
+transition state of its own, so it can animate a component it adds or removes.
 
 ### From C
 
@@ -107,9 +163,12 @@ pure and allocate nothing. Keyed curves use a different format; see [Curves](cur
   no `OnSet`. A component changed every frame restarts every frame and appears smoothed.
 - Zero duration and delay means no transition. Zero duration with a delay switches
   after that delay.
-- Removing the component, its map entry or `Transition` snaps to target. Invalidating
-  an entry also snaps. Changing a spec leaves a running transition alone until
-  the next value change.
+- Removing the component snaps unless its entry has `on_remove` (see
+  [Adding and removing](#adding-and-removing)); a removed value that leaves an
+  inherited one always snaps to it. Adding a component snaps unless its entry has
+  `on_add`. Removing the map entry or `Transition` snaps to target, also during an
+  `on_remove` animation. Invalidating an entry also snaps. Changing a spec leaves a
+  running transition alone until the next value change.
 - Disabling an entity cancels its transition and hides it. Re-enabling shows its
   current target as a first value; later changes animate again. Deletion drops state.
 - Rotation interpolates Euler axes without wrapping or choosing a shortest path.
@@ -128,6 +187,7 @@ error naming the entity/component and ignore that entry. Other entries still wor
 | Mesh material | `AlphaCutoff`, `PbrMaterial`, `Transmission`, `ClearCoat`, `SpecularAnisotropy`, `Sheen`, `DiffuseTransmission` | Mesh material table |
 | Hierarchy | `Tint`, `Opacity` | Composed down `ChildOf` and `Parent` |
 | 2D shadow | `BoxShadow` | Shadow offset, blur, spread and color |
+| 2D shape | `Border` | Border width, radius and color of a `Rect`, `Circle` or `Polygon2D` |
 
 Material values transition on the entity that owns them. A prefab change therefore
 animates its material and the instances inheriting it; an overridden value has its
@@ -139,9 +199,11 @@ that choice. They cast no opaque shadow until they return to an opaque target;
 alpha-tested casters update their shadow tiles as alpha changes.
 
 `SpecularAnisotropy.rotation` also interpolates without wrapping; it wraps only when
-packed for rendering. Adding or removing material components is structural and
-snaps. Texture handles (`PbrTextures`), computed components (`WorldTransform`,
-`MaterialId`), enums and tags cannot transition.
+packed for rendering. Adding or removing material components snaps, unless the
+entry has `on_add` or `on_remove` and the component has a neutral value; adding or
+removing `AlphaCutoff` or `Transmission` changes the batch and always snaps. Texture
+handles (`PbrTextures`), computed components (`WorldTransform`, `MaterialId`), enums
+and tags cannot transition.
 
 ### Box shadows
 
@@ -161,8 +223,36 @@ card {
 A later change to `{offset_y: -12, blur: 24, spread: 2, color: {0, 0, 0, 160}}`
 lifts and softens the shadow. Shadows follow transform, tint and opacity transitions
 of their shape or ancestors at the same time. A shadow that shrinks to no area can
-animate through that boundary; adding or removing `BoxShadow` snaps.
+animate through that boundary. Adding `BoxShadow` fades it in from alpha 0 with
+`on_add`, else it snaps; removing it always snaps.
 `BoxShadow` copies into prefab instances, so each instance lifts independently.
+
+### Borders
+
+```flecs
+using box.geometry
+using box.material
+using box.transition
+
+field {
+  Rect: {240, 32}
+  Rgb: {255, 255, 255}
+  Border: {width: 1, radius: 4, color: {160, 160, 160}}
+  Transition: [Border: {duration: 0.12, timing_function: EaseOut}]
+}
+```
+
+Setting `Border: {width: 2, radius: 4, color: {40, 110, 240}}` on focus grows the
+ring and changes its color. Width and radius interpolate linearly by the timing
+function, the color per channel in display encoding; a width or radius that an
+overshooting curve takes below 0 draws as 0. A `BoxShadow` of the shape follows
+the rendered border: its cutout radius and the alpha it is covered with. Tint and
+opacity transitions of the shape or its ancestors apply to the border color at the
+same time. A `Line` draws no border, so a `Border` transition on it does nothing.
+`Border` copies into prefab instances, so each instance animates independently.
+Picking, layout and `ClipChildren` use the target border: clipped children keep
+the target corner radius and inset during a radius or width transition. Adding or
+removing `Border` snaps.
 
 ## Limitations
 
@@ -172,7 +262,7 @@ animate through that boundary; adding or removing `BoxShadow` snaps.
 - Lights and cameras read target `WorldTransform`. Their positions, rotations and
   light colors do not transition. A shape on the same entity can still animate.
 - Colored `TextSpans` retain their span colors during an `Rgb` transition, though
-  text opacity still affects their alpha. `SurfaceMaterial`, `Border`, `AmbientLight`
+  text opacity still affects their alpha. `SurfaceMaterial`, `AmbientLight`
   and other colors outside `src/material` do not transition.
 - Draw order and batch membership follow targets. Picking and collision can therefore
   disagree with the visible intermediate position.
@@ -230,7 +320,9 @@ Neither requires dividing out a target value, so zero opacity works.
 
 Box shadows have separate slots. A `BoxShadow` transition patches the whole shadow
 transform and shading; combined transforms and fades are resolved in that same
-record so they remain aligned with the shape.
+record so they remain aligned with the shape. A `Border` transition patches the
+material words of the 2D shading of its shape, and the shadow of the shape gets a
+box shadow record that applies the rendered border to its cutout.
 
 ## Cost and verification
 

@@ -334,6 +334,17 @@ static bool box_shape2d_geometry(
     return result;
 }
 
+void box_shape2d_border(
+    Shape2D *shape,
+    const Border *border)
+{
+    shape->border = border->width > 0.0f ? border->width : 0.0f;
+    shape->border_color = border->color;
+    if (shape->kind == BOX_SHAPE2D_RECT && shape->radius == 0.0f) {
+        shape->radius = border->radius > 0.0f ? border->radius : 0.0f;
+    }
+}
+
 /** Resolve the Border and Image of an entity into its shape.
  *
  * @param world The world
@@ -353,11 +364,7 @@ static void box_shape2d_fill(
     out->uv[0] = 1.0f;
     out->uv[1] = 1.0f;
     if (border) {
-        out->border = border->width > 0.0f ? border->width : 0.0f;
-        out->border_color = border->color;
-        if (out->kind == BOX_SHAPE2D_RECT && out->radius == 0.0f) {
-            out->radius = border->radius > 0.0f ? border->radius : 0.0f;
-        }
+        box_shape2d_border(out, border);
     }
 
     if (image) {

@@ -7,7 +7,8 @@ using box.transform
 using bunnyhopper
 
 // A component with named members keeps the members it does not name, so every member is named.
-// The lives are set before the state, so the HUD never sees a new run with no lives
+// The bunny template follows the Bunny the systems write and blinks while the bunny is
+// invulnerable
 player {
   Position: {-7, cfg.groundY, 0}
   Rotation: {0, 0, 0}
@@ -15,6 +16,11 @@ player {
   BunnyPlayer: {run_phase: 0}
   BunnyJump: {v: 0, jumps: 0}
   BunnyLives: {lives_left: cfg.maxLives}
+  BunnyModel: {
+    speed: player[Bunny].speed,
+    dead: player[Bunny].dead,
+    hurt: player?[BunnyInvulnerable]
+  }
 }
 
 // Parent of the spawned carrots

@@ -1,5 +1,7 @@
 using box.particle
 using box.transform
+using box.light
+using box.material
 
 effect_drift {
   ParticleForces: {gravity: {0, 0, 0}}
@@ -30,32 +32,14 @@ prefab LanternSparkle {
     ParticleForces: {gravity: {0, -1, 0}, drag: 1.5}
     ParticleAppearance: {blend: ParticleAdditive}
     ParticleCurves: {
-      opacity: {keys: [{0, 0.8}, {0.33333334, 1.1}, {0.6666667, 0.8}, {1, 0}]}
+      opacity: {keys: [{0, 1.4}, {0.33333334, 2}, {0.6666667, 1.4}, {1, 0}]}
     }
-  }
-
-  glow {
-    Position: {0, 0, 0}
-    ParticleEmitter: {
-      max: 40,
-      rate: 0,
-      shape: EmitterBox,
-      extents: {0.3, 0.4, 0.3},
-      direction: {0, 1, 0},
-      spread: 75,
-      speed: {1.5, 5},
-      lifetime: {0.5, 0.9},
-      size: {0.14, 0.34},
-      opacity: {0.5, 0.5},
-      color: {255, 140, 60},
-      forces: effect_drift,
-      seed: 201
-    }
-    ParticleBurst: {count: 30}
-    ParticleForces: {gravity: {0, -1, 0}, drag: 1.5}
-    ParticleAppearance: {blend: ParticleAdditive}
-    ParticleCurves: {
-      opacity: {keys: [{0, 0.8}, {0.33333334, 1.1}, {0.6666667, 0.8}, {1, 0}]}
+    PointLight: {intensity: 4, range: 5}
+    Rgb: {255, 170, 80}
+    ParticleLight: {
+      intensity: 4,
+      curve: {keys: [{0, 1}, {0.4, 0.5}, {1, 0}]},
+      period: 0.9
     }
   }
 }
@@ -76,6 +60,7 @@ prefab StringCut {
       color: {246, 240, 225},
       seed: 202
     }
+    ParticleAppearance: {lit: 1}
     ParticleBurst: {count: 32}
     ParticleForces: {gravity: {0, -6, 0}, drag: 2}
     ParticleCurves: {

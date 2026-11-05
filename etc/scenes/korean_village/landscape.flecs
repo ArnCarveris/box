@@ -4,24 +4,30 @@ using flecs.script
 using box.transform
 using box.geometry
 using box.material
+using box.texture
 
-@tree Parent
+korean_ground {
+  tone { TextureGen: {width: 256, seed: 5, layers: [{kind: GenNoise, frequency: 16, octaves: 3}]} }
+  patches_height { TextureGen: {width: 256, seed: 9, layers: [{kind: GenNoise, frequency: 4, octaves: 2}, {kind: GenNoise, frequency: 8, octaves: 2, amount: 0.35, seed: 3}]} }
+  patches { TextureGen: {source: patches_height, output: GenAlbedo, colors: [{0, {255, 0, 0}}, {0.48, {255, 0, 0}}, {0.6, {0, 255, 0}}, {1, {0, 255, 0}}]} }
+  dirt_a_tex { TextureGen: {source: tone, output: GenAlbedo, colors: [{0, {160, 143, 106}}, {1, {174, 157, 117}}]} }
+  dirt_b_tex { TextureGen: {source: tone, output: GenAlbedo, colors: [{0, {154, 139, 103}}, {1, {170, 155, 116}}]} }
+  yard_a_tex { TextureGen: {source: tone, output: GenAlbedo, colors: [{0, {181, 167, 133}}, {1, {192, 178, 143}}]} }
+  yard_b_tex { TextureGen: {source: tone, output: GenAlbedo, colors: [{0, {176, 162, 128}}, {1, {190, 176, 141}}]} }
+  grass_a_tex { TextureGen: {source: tone, output: GenAlbedo, colors: [{0, {100, 120, 70}}, {1, {116, 136, 82}}]} }
+  grass_b_tex { TextureGen: {source: tone, output: GenAlbedo, colors: [{0, {86, 114, 60}}, {1, {122, 146, 80}}]} }
+  dirt_a { PbrTextures: {albedo: korean_ground.dirt_a_tex}; TextureTransform: {4, 4, 0, 0} }
+  dirt_b { PbrTextures: {albedo: korean_ground.dirt_b_tex}; TextureTransform: {4, 4, 0, 0} }
+  yard_a { PbrTextures: {albedo: korean_ground.yard_a_tex}; TextureTransform: {4, 4, 0, 0} }
+  yard_b { PbrTextures: {albedo: korean_ground.yard_b_tex}; TextureTransform: {4, 4, 0, 0} }
+  grass_a { PbrTextures: {albedo: korean_ground.grass_a_tex}; TextureTransform: {4, 4, 0, 0} }
+  grass_b { PbrTextures: {albedo: korean_ground.grass_b_tex}; TextureTransform: {4, 4, 0, 0} }
+}
+
 template KoreanLandscape {
   { Position: {0, -0.6, 0}; RoundedBox: {32, 1.15, 28, 0.45}; Rgb: {94, 105, 94}; PbrMaterial: {roughness: 1} }
-  { Position: {0, -0.035, 0}; RoundedBox: {31.8, 0.18, 27.8, 0.42}; Rgb: {167, 150, 112}; PbrMaterial: {roughness: 1} }
-  { Position: {0, 0.065, -0.2}; RoundedBox: {11.6, 0.12, 14, 0.16}; Rgb: {186, 172, 138}; PbrMaterial: {roughness: 1} }
-  for i in 0..56 {
-    const x = (i * 71 % 280) * 0.1 - 14
-    const z = (i * 43 % 240) * 0.1 - 12
-    const tone = i % 4
-    { Position: {x, 0.058 + i * 0.0003, z}; Rotation: {0, i * 0.7, 0}; Scale: {1, 1, 0.62}; Cylinder: {radius: 0.55 + i % 5 * 0.24, length: 0.004, segments: 28}; Rgb: {160 + tone * 4, 144 + tone * 4, 107 + tone * 3}; PbrMaterial: {roughness: 1} }
-  }
-  for i in 0..34 {
-    const x = (i * 37 % 92) * 0.1 - 4.6
-    const z = (i * 53 % 116) * 0.1 - 6
-    const tone = i % 4
-    { Position: {x, 0.126 + i * 0.0003, z}; Rotation: {0, i * 0.9, 0}; Scale: {1, 1, 0.7}; Cylinder: {radius: 0.35 + i % 4 * 0.22, length: 0.003, segments: 28}; Rgb: {180 + tone * 3, 166 + tone * 3, 132 + tone * 3}; PbrMaterial: {roughness: 1} }
-  }
+  { Position: {0, -0.035, 0}; RoundedBox: {31.8, 0.18, 27.8, 0.42}; Rgb: {255, 255, 255}; PbrMaterial: {roughness: 1}; TextureBlend: {mask: korean_ground.patches, layers: [korean_ground.dirt_a, korean_ground.dirt_b]}; TextureMapping: {mode: MappingWorld, size: 8} }
+  { Position: {0, 0.065, -0.2}; RoundedBox: {11.6, 0.12, 14, 0.16}; Rgb: {255, 255, 255}; PbrMaterial: {roughness: 1}; TextureBlend: {mask: korean_ground.patches, layers: [korean_ground.yard_a, korean_ground.yard_b]}; TextureMapping: {mode: MappingWorld, size: 5} }
   for i in 0..360 {
     const x = (i * 97 % 310) * 0.1 - 15.5
     const z = (i * 59 % 270) * 0.1 - 13.5
@@ -44,14 +50,9 @@ template KoreanLandscape {
     }
   }
   for side in 0..2 {
-    { Position: {(side - 0.5) * 26, 0.07, -1}; RoundedBox: {4.5, 0.12, 23, 0.7}; Rgb: {108, 128, 76}; PbrMaterial: {roughness: 1} }
+    { Position: {(side - 0.5) * 26, 0.07, -1}; RoundedBox: {4.5, 0.12, 23, 0.7}; Rgb: {255, 255, 255}; PbrMaterial: {roughness: 1}; TextureBlend: {mask: korean_ground.patches, layers: [korean_ground.grass_a, korean_ground.grass_b]}; TextureMapping: {mode: MappingWorld, size: 6} }
     for i in 0..23 {
       { Position: {(side - 0.5) * 25 + math.sin(i * 2.4) * 0.8, 0.18, -11.5 + i}; Scale: {0.5 + i % 3 * 0.13, 0.25, 0.4}; IcoSphere: {radius: 1, segments: 1}; Rgb: {132 + i % 3 * 9, 140 + i % 3 * 8, 120 + i % 3 * 7} }
-    }
-    for i in 0..26 {
-      const x = (side - 0.5) * 26 + (i * 37 % 24) * 0.1 - 1.2
-      const z = -11 + (i * 53 % 200) * 0.1
-      { Position: {x, 0.135, z}; Rotation: {0, i * 0.8, 0}; Scale: {1, 1, 0.7}; Cylinder: {radius: 0.4 + i % 4 * 0.2, length: 0.004, segments: 24}; Rgb: {88 + i % 4 * 12, 116 + i % 4 * 10, 62 + i % 4 * 6}; PbrMaterial: {roughness: 1} }
     }
     for i in 0..120 {
       const x = (side - 0.5) * 26 + (i * 41 % 42) * 0.1 - 2.1
@@ -66,6 +67,7 @@ template KoreanLandscape {
       { Position: {(side - 0.5) * 14, 0.12, -5 + i * 0.9}; Rotation: {0, i * 0.31, 0}; Cylinder: {radius: 0.39, length: 0.14, segments: 7}; Rgb: {168, 170, 153} }
     }
   }
+  { Position: {0, 0.056, 12.45}; Box: {30.6, 0.004, 1.36}; Rgb: {84, 96, 82}; PbrMaterial: {roughness: 1} }
   { (IsA, KoreanWater); Position: {0, 0.08, 12.45}; Box: {30.6, 0.05, 1.36} }
   for side in 0..2 {
     const z = 12.45 + (side - 0.5) * 1.5

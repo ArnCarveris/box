@@ -5,7 +5,6 @@ using box.geometry
 using box.material
 using box.light
 
-@tree Parent
 template KoreanLantern {
   { (IsA, KoreanStone); Position: {0, 0.1, 0}; RoundedBox: {0.7, 0.2, 0.7, 0.04} }
   { (IsA, KoreanStone); Position: {0, 0.24, 0}; Frustum: {radius_bottom: 0.3, radius_top: 0.2, length: 0.09, segments: 8} }
@@ -32,6 +31,6 @@ template KoreanLantern {
   { (IsA, KoreanStone); Position: {0, 1.76, 0}; Cylinder: {radius: 0.1, length: 0.08, segments: 8} }
   { (IsA, KoreanStone); Position: {0, 1.86, 0}; Sphere: {radius: 0.12, segments: 16, smooth: true} }
   { (IsA, KoreanStone); Position: {0, 1.99, 0}; Cone: {radius: 0.06, length: 0.12, segments: 8} }
-  { Position: {0, 1.32, 0.26}; PointLight: {intensity: 1.6, range: 5}; Rgb: {255, 170, 90} }
-  { Position: {0, 1.32, -0.26}; PointLight: {intensity: 0.8, range: 3.5}; Rgb: {255, 170, 90} }
+  { Position: {0, 1.32, 0.26}; PointLight: {intensity: 1.6, range: 5, shadows: true, shadow_resolution: 512}; Rgb: {255, 170, 90} }
+  { Position: {0, 1.32, -0.26}; PointLight: {intensity: 0.8, range: 3.5, shadows: true, shadow_resolution: 256}; Rgb: {255, 170, 90} }
 }

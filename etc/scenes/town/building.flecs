@@ -13,7 +13,6 @@ using box.geometry
 using box.material
 
 assets {
-  @tree Parent
   template Building {
     prop facade: template Facade = TimberFacade
     prop floors: i32 = 2

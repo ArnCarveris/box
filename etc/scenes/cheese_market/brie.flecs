@@ -10,7 +10,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template Brie {
   prop radius: f32 = 0.27
 
@@ -19,6 +18,7 @@ template Brie {
     Cylinder: {radius: radius, length: 0.14, segments: 28, smooth: true}
     Rgb: {246, 238, 208}
     PbrMaterial: {roughness: 0.95}
+    Sheen: {color: {255, 252, 240}, roughness: 0.55}
   }
   for i in 0..6 {
     {
