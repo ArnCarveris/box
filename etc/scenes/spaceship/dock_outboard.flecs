@@ -7,41 +7,32 @@ using box.material
 using box.texture
 using box.light
 
-@tree Parent
 template DockOutboard {
   prop station: i32 = 0
   platform : DarkArmor { Position: {0, 5.7, 0}; Box: {24, 1, 16} }
   for side in 0..2 {
-    {
-      sill : DockYellow { Position: {0, 6.3, (side - 0.5) * 15.6}; Box: {24, 0.3, 0.25} }
-      rail : Titanium { Position: {0, 8, (side - 0.5) * 15.6}; Box: {24, 0.1, 0.1} }
-      for post in 0..9 {
-        {
-          upright : Titanium { Position: {-11.5 + post * 2.875, 7.1, (side - 0.5) * 15.6}; Box: {0.1, 1.8, 0.1} }
-        }
-      }
+    "sill_{side}" : DockYellow { Position: {0, 6.3, (side - 0.5) * 15.6}; Box: {24, 0.3, 0.25} }
+    "rail_{side}" : Titanium { Position: {0, 8, (side - 0.5) * 15.6}; Box: {24, 0.1, 0.1} }
+    for post in 0..9 {
+      "upright_{side}_{post}" : Titanium { Position: {-11.5 + post * 2.875, 7.1, (side - 0.5) * 15.6}; Box: {0.1, 1.8, 0.1} }
     }
   }
   if station == 0 {
     habitat : PaleArmor { Position: {0, 10, 0}; BeveledPrism: {footprint: [{-9, -5}, {9, -5}, {9, 5}, {-9, 5}], depth: 7, inset: 1, bevel: 0.7} }
     band : ServiceTeal { Position: {0, 10, 5.05}; Box: {16, 1.8, 0.15} }
     for i in 0..6 {
-      {
-        window : IceLight { Position: {-6.5 + i * 2.6, 10.1, 5.16}; Box: {1.6, 0.9, 0.1}; Emissive: {strength: 0.5, color: {78, 207, 255}} }
-      }
+      "window_{i}" : IceLight { Position: {-6.5 + i * 2.6, 10.1, 5.16}; Box: {1.6, 0.9, 0.1}; Emissive: {strength: 0.5, color: {78, 207, 255}} }
     }
     roof : DarkArmor { Position: {0, 13.8, 0}; Box: {13, 0.4, 7} }
     radiator { FrigateRadiator: {width: 7, length: 9}; Position: {0, 14.05, 0}; Rotation: {0, 1.5707963, 0} }
     airlock : Titanium { Position: {-9.3, 8.5, 0}; Rotation: {0, 0, 1.5707963}; Tube: {radius: 1.6, thickness: 0.3, length: 1.4, segments: 16} }
     hatch : DarkArmor { Position: {-10.1, 8.5, 0}; Rotation: {0, 0, 1.5707963}; Cylinder: {radius: 1.3, length: 0.15, segments: 16} }
     aerial : Titanium { Position: {6, 17, -3}; Cylinder: {radius: 0.12, length: 7, segments: 8} }
-    beacon : AmberLight { Position: {6, 20.6, -3}; Sphere: {radius: 0.25, segments: 12} }
+    beacon : BeaconLight { Position: {6, 20.6, -3}; Sphere: {radius: 0.25, segments: 12} }
   }
   if station == 1 {
     for tank in 0..3 {
-      {
-        vessel { DockTank: {}; Position: {-7 + tank * 7, 6.3, 0} }
-      }
+      "vessel_{tank}" { DockTank: {}; Position: {-7 + tank * 7, 6.3, 0} }
     }
     header : ServiceTeal { Position: {0, 7.7, 6.5}; Rotation: {0, 0, 1.5707963}; Cylinder: {radius: 0.45, length: 22, segments: 12} }
   }
