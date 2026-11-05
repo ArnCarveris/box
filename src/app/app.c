@@ -588,14 +588,15 @@ static bool box_app_set_at_implied(
 }
 
 /** Copy the components written to a SetAt entity to its target entity: the ones set since it
- * has SetAt, the ones it had before, except those the engine added, and the other ones that no
+ * has SetAt, the ones it had before, except those the engine added, and the low id ones that no
  * longer hold their constructed value.
  *
  * A stage merge sets a low id component without OnSet when it had no OnSet hook or observer as
  * the stage queued the set (a light), with SetAt or in a later batch: such an unrecorded write
  * is copied when it differs from the constructed value.
  *
- * Pairs, tags, SetAt and the components only added are not copied.
+ * Pairs, tags, SetAt and the components only added are not copied. A high id component only
+ * added may hold uninitialized memory, so it is not compared: it emits OnSet when written.
  *
  * @param world The world
  * @param from The entity with SetAt
@@ -619,7 +620,7 @@ static void box_app_set_at_copy(
         const void *value = ti ? ecs_get_id(world, from, id) : NULL;
         if (value && (written ||
             (before && !box_app_set_at_implied(world, type, id, ti, value)) ||
-            (!before && !box_app_set_at_constructed(ti, value))))
+            (!before && id < FLECS_HI_COMPONENT_ID && !box_app_set_at_constructed(ti, value))))
         {
             ecs_set_id(world, to, id, (size_t)ti->size, value);
         }
