@@ -995,6 +995,7 @@ void Transition_deferred_remove_pending_no_leak(void) {
     box_transition_set(world, prefab, ecs_id(Rgb), &(TransitionSpec){ .duration = 2.0f });
 
     transition_pending_churn(world, prefab);
+    transition_pending_churn(world, prefab);
     int64_t before = transition_live_allocs();
     int32_t i;
     for (i = 0; i < 4; i ++) {
