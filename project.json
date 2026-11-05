@@ -10,10 +10,6 @@
             ]
         }]
     },
-    "rules": [{
-        "ext": "src/audio/core/core.c",
-        "command": "python3 {project}/tools/audio_core.py {input} {out_dir} {project}"
-    }],
     "lint": {
         "command": "python3 tools/lint.py",
         "action": "log"
@@ -147,6 +143,10 @@
         }
     },
     "${os Emscripten}": {
+        "rules": [{
+            "ext": "src/audio/core/core.c",
+            "command": "python3 {project}/tools/audio_core.py {input} {out_dir} {project}"
+        }],
         "bundle": {
             "miniaudio": {
                 "repository": "https://github.com/mackron/miniaudio.git",
