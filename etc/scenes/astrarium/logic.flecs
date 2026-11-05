@@ -1,22 +1,6 @@
 using flecs.script
 using flecs.script.math
 using box.app
-using box.surface
-
-async {
-  while true {
-    if window.has(SurfaceStatus) {
-      const s = window[SurfaceStatus]
-      if s.point_width > 0 && s.point_height > 0 {
-        if s.point_width != screen_w || s.point_height != screen_h {
-          screen_w = s.point_width
-          screen_h = s.point_height
-        }
-      }
-    }
-    await next_frame()
-  }
-}
 
 async {
   await delay(0.6)
