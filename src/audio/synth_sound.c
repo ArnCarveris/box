@@ -142,11 +142,14 @@ static void box_audio_synth_layer(
         l->modulation = osc->modulation == SynthRing ? BOX_AUDIO_SYNTH_RING :
             BOX_AUDIO_SYNTH_PHASE;
         l->index = osc->index;
+        l->index_velocity = osc->velocity;
         l->audible = osc->audible;
     }
 
     l->feedback = osc->feedback;
     l->pulse_width = osc->pulse_width;
+    l->sub = osc->sub;
+    l->sub_octave = osc->sub_octave >= 2 ? 2 : 1;
     l->voices = 1;
     if (unison) {
         l->voices = unison->voices > 1 ? (uint32_t)unison->voices : 1;
@@ -159,6 +162,7 @@ static void box_audio_synth_layer(
         l->decay = string->decay;
         l->brightness = string->brightness;
         l->hardness = string->hardness;
+        l->hardness_velocity = string->velocity;
     }
 }
 
@@ -297,11 +301,16 @@ bool box_audio_synth_compile(
         p.cutoff = filter->cutoff;
         p.resonance = filter->resonance;
         p.slope = (uint32_t)filter->slope;
+<<<<<<< HEAD
         p.drive = filter->drive;
+=======
+        p.filter_velocity = filter->velocity;
+>>>>>>> ae9e64879a2f6242c7e589da1089cfd4bcef853c
     }
 
     if (filter && fenv && fenv->amount != 0) {
         p.filter_amount = fenv->amount;
+        p.filter_envelope_velocity = fenv->velocity;
         p.filter_envelope = (box_audio_synth_envelope_t){
             .attack = fenv->attack, .decay = fenv->decay, .sustain = fenv->sustain,
             .release = fenv->release, .hold = fenv->hold, .curve = fenv->curve,
