@@ -78,6 +78,13 @@ static const box_audio_effect_def_t box_audio_effect_kinds[BOX_AUDIO_EFFECT_KIND
         .command = box_audio_saturator_command,
         .render = box_audio_saturator_render,
         .rest = box_audio_saturator_rest
+    },
+    [BOX_AUDIO_EFFECT_TRANSIENT_SHAPER] = {
+        .tail = true,
+        .start = box_audio_transient_shaper_start,
+        .command = box_audio_transient_shaper_command,
+        .render = box_audio_transient_shaper_render,
+        .rest = box_audio_transient_shaper_rest
     }
 };
 

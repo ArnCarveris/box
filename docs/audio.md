@@ -176,6 +176,7 @@ their tails end.
 | `Phaser` | `stages: 4`, `rate: 0.5` Hz, `depth: 0.7`, `center: 800` Hz, `feedback: 0`, `mix: 0.5`, `stereo: 0.5` |
 | `Chorus` | `voices: 2`, `rate: 0.8` Hz, `depth: 3` ms, `delay: 12` ms, `mix: 0.5`, `spread: 0.5` |
 | `Saturator` | `drive: 0.3`, `asymmetry: 0`, `bits: 16`, `mix: 1` |
+| `TransientShaper` | `attack: 0`, `sustain: 0` |
 
 Equalizer bands use `AudioEqOff`, `AudioEqPeak`, `AudioEqLowShelf`,
 `AudioEqHighShelf`, `AudioEqLowCut` or `AudioEqHighCut`. Defaults are 100, 400,
@@ -197,6 +198,17 @@ harmonics, and the DC it creates is filtered out. Below 16, `bits` runs a bit cr
 after the saturation: 4 bits gives 16 levels. Oversampling delays the bus by 15
 frames, and the dry signal is delayed the same amount, so `mix` does not comb.
 An `AudioMeter` on the saturator reads how hard the clipper squashes, in dB.
+
+A transient shaper gives drums and plucks more or less punch and more or less tail,
+without a threshold. Stereo linked like a compressor, it follows the peak of the
+louder channel with a fast envelope (1 ms attack, 20 ms release) and a slow one
+(20 ms attack, 200 ms release). Where the fast one is above the slow one the signal
+is a transient, otherwise it is sustain, which ends as soon as the next hit comes
+up. The gain follows their difference in dB, so
+it works the same at any level. `attack` from -1 to 1 softens or boosts transients,
+`sustain` from -1 to 1 shortens or boosts the tail, each by up to 12 dB. The gain is
+smoothed so it does not distort low notes, is the same on both channels, and 0 and 0
+pass the signal unchanged. It has no meter.
 
 For ducking, key a compressor on another channel:
 
@@ -278,10 +290,12 @@ voices on play, so edits affect subsequent plays.
 | Component | Authoring controls |
 | --- | --- |
 | `SynthSound` | `seed`, `pitch_variance`, `level_variance`; variances default to zero |
-| `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), modulation controls, `velocity` (0) |
-| `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`; all zero by default |
-| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves) |
+| `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), `sync` (0, off, 1..16), `color` (`SynthNoiseWhite`), modulation controls, `velocity` (0) |
+| `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`, `key_scale`; all zero by default |
+| `SynthDrive` | Root: `drive` (0.3, 0..1), `asymmetry` (0, 0..1) |
+| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves), `keytrack` (0) |
 | `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves and `velocity` (0); requires a filter |
+| `SynthPitchEnvelope` | `amount` (0 semitones, -48..48), `decay` seconds, `curve` (0, -16..16), `release_amount` (0 semitones, -48..48), `sync` (0 semitones, -48..48) |
 | `SynthUnison` | Per layer: `voices` (3, 1..7), `detune` (10 cents, 0..100), `width` (0, 0..1) |
 | `SynthGlide` | Root: `time` seconds (0, up to 10), `legato` (false), `channel` (0) |
 | `SynthLfo` | `wave`, `rate` (5 Hz), `delay`, `fade`, `phase`, `random_phase`, destination depths |
@@ -300,6 +314,50 @@ phase: it follows sweeps, glides, legato, pitch LFOs and every unison voice, but
 not phase modulation or feedback. A modulator modulates with its sub included.
 `SynthNoise` and `SynthPluck` ignore it.
 
+`color` sets the color of a `SynthNoise` layer, for wind, surf, hiss and softer
+percussion than white noise: `SynthNoiseWhite` (the default), `SynthNoisePink`, which
+falls by 3 dB per octave, or `SynthNoiseBrown`, which falls by 6 dB per octave. Pink
+filters the white noise through a cascade of poles and zeros two octaves apart, brown
+through a leaky integrator and a highpass that removes its DC. The filters are set in
+Hz from the sample rate, flat under 5 Hz (pink) or 10 Hz (brown), so the slope holds
+at every rate. Each color is at about the RMS level of white noise at the same `level`.
+The noise stays seeded per play from `SynthSound.seed`, so colored noise is as
+deterministic as white, and each unison voice colors its own noise. Other waves ignore it.
+
+`sync` hard syncs a layer, for sync leads and sync sweeps. The layer's note frequency,
+with its sweep, glide, pitch LFOs, unison detune and the voice pitch, is the master;
+the wave plays at the master times `sync`, a ratio from 1 to 16, and restarts at
+phase 0 on every master cycle, so the sound keeps the master's pitch while the ratio
+shapes its timbre. A ratio of 0 or 1 is off. The restart is band limited by a polyBLEP
+sized by the jump, and a polyBLAMP for the slope of triangles and sines. Each unison
+voice syncs to its own detuned master, the sub stays at the master, and phase
+modulation adds to the synced phase. `SynthNoise` and `SynthPluck` ignore it.
+
+`SynthPitchEnvelope` bends the pitch relative to the note, so one patch fits every
+pitch of an instrument, where `frequency_end` sweeps to one absolute frequency: the
+drop of a kick or a tom, the blip of a zap, the scoop of brass. A note starts `amount`
+semitones off and returns to the note over `decay`, with a `curve` that bends that
+return as `SynthEnvelope.curve` bends a decay. From the start of the release the offset
+moves from where it is to `release_amount` semitones, over the release of the layer's
+amplitude envelope, its own or the root's, with the same curve. `sync` is the semitones
+the ratio of hard sync starts off by, returning to the layer's `sync` with the decay:
+the classic sync sweep, on layers whose `sync` is over 1 only. On the root it moves
+every layer; on a layer it moves that layer in place of the root's. It adds to glides,
+sweeps and pitch LFOs, moves `SynthPluck` strings as vibrato does, runs at the control
+rate of the LFOs, does not keep a voice playing and is not restarted by a legato
+retarget.
+
+```flecs
+using box.audio
+
+prefab Kick {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.001, decay: 0.35, sustain: 0, release: 0.05, curve: 4}
+  SynthPitchEnvelope: {amount: 36, decay: 0.08, curve: 6}
+  SynthOscillator: {frequency: 50, level: 0.8}
+}
+```
+
 A filter envelope uses `cutoff * 2^(amount * envelope_level)`. For example,
 cutoff 300 and amount 3 open to 2400 Hz. Its timing is independent of the amplitude
 envelope; author both when they should move together.
@@ -313,6 +371,26 @@ In the `Synth` bench of [bench/audio](../bench/audio/) (64 voices, 48 kHz, one
 128-frame quantum), drive raises a 12 dB filter from about 75 to 115 µs and a 24 dB
 filter with an envelope from about 125 to 170 µs: roughly 4 ns per stage and frame of
 a voice.
+
+`SynthDrive` on the root drives the mix of the layers of each voice through a tanh
+soft clipper before the filter, or before the amp without a filter: the stage where
+analog synths get most of their thickness. Since it works on the mix, plucks, unison
+voices and FM pass through it, and layers that play together intermodulate. `drive`
+is a gain of -6 to +24 dB before the clipper; the level is compensated so that drive
+changes the tone more than the loudness: a sine at level 1 keeps its RMS at every
+drive, and a layer at its usual level stays within about 1.5 dB from 0.1 to 1. Quieter
+mixes are driven less and get louder with drive; louder ones squash. `asymmetry` adds
+an offset before the clipper for even harmonics, and a 5 Hz DC blocker after it takes
+off the DC the offset makes. The clipper is the one of `Saturator` (shared in
+[saturate.h](../src/audio/core/saturate.h)), run at twice the rate so high, loud
+notes alias little; the driven mix is 15 frames (0.3 ms) late. On the stereo path of
+unison with width, both channels drive with the same settings and their own state.
+Without the component there is no drive and the sound renders as before.
+In the `Synth` bench (`voices_64_pre_drive`, 64 voices, 48 kHz, drive 0.6 with an
+asymmetry of 0.3) the drive raises the 64 voices from about 610 to 1200 ns per sample
+(78 to 154 µs per 128-frame quantum): about 9 ns per voice and frame, which roughly
+doubles the cost of a plain voice. The 2x oversampler is most of it and is costly per
+voice; it is kept because a clipper at the base rate aliases audibly on high notes.
 
 ```flecs
 using box.audio
@@ -349,6 +427,24 @@ the voice as well as its gain, so harder notes can be brighter, not only louder.
 Plays that are not notes, such as `AudioSource`, `box_audio_play`, quantized plays and
 streams, play at velocity 1. Sample voices ignore velocity beyond its gain.
 
+The pitch of a note reaches the voice too, as key tracking on analog synths. The key of
+a voice is `12 * log2(ratio)` semitones, where the ratio is the pitch of its play without
+the `pitch_variance` of `SynthSound`. For an `Instrument` note the ratio is
+`2^((pitch - root) / 12)`, so the key is relative to `Instrument.root`; for any other play
+it is relative to a ratio of 1, the pitch of an `AudioSource` or of `box_audio_play`. Both
+fields default to 0, which leaves the sound as it was:
+
+- `SynthFilter.keytrack`, 0..1, multiplies the cutoff by `ratio^keytrack`, so 1 moves the
+  cutoff 1:1 with the pitch and 0.5 half an octave per octave. It follows the current pitch
+  of the voice: a glide, a change of `AudioSource.pitch` or a legato retarget moves the
+  cutoff along, at the control rate of the LFOs. It adds to the filter envelope, the
+  velocity and the LFOs.
+- `SynthEnvelope.key_scale`, 0..1, multiplies the decay and the release by
+  `2^(-key_scale * key / 12)`, fixed at the start of the note, so at 1 they halve per
+  octave above the root and double per octave below. It applies to the root envelope and
+  to the envelopes of layers, clamped to the limits of an envelope; the filter envelope
+  has no key scaling.
+
 ### Modulation, unison and glide
 
 A child oscillator with `modulation: SynthPhase` or `SynthRing` modulates its
@@ -365,7 +461,10 @@ pan balances their channels rather than narrowing them with distance.
 
 A sound supports two LFOs, on the root, a layer or another root child. Waves include
 sine, triangle, square, rising saw and sample-and-hold. Destinations are `pitch`
-(cents), `amplitude` (0..1), `cutoff` (octaves) and `pulse_width`.
+(cents), `amplitude` (0..1), `cutoff` (octaves), `pulse_width` and `sync`, the
+semitones (-48..48) the ratio of hard sync moves at the top of the wave, clamped to
+1..16. On a layer it syncs that layer, from a ratio of 1 when it has none; on the root
+it moves every layer whose `sync` is over 1.
 Delay and fade bring modulation in gradually. Random phase and noise are seeded,
 so the same sequence of plays is reproducible.
 
@@ -381,8 +480,11 @@ Working examples include [synth_examples.flecs](../test/assets/audio/synth_examp
 [synth_unison.flecs](../test/assets/audio/synth_unison.flecs),
 [synth_lfo.flecs](../test/assets/audio/synth_lfo.flecs),
 [synth_glide.flecs](../test/assets/audio/synth_glide.flecs),
-[synth_pluck.flecs](../test/assets/audio/synth_pluck.flecs) and
-[synth_sub.flecs](../test/assets/audio/synth_sub.flecs).
+[synth_pluck.flecs](../test/assets/audio/synth_pluck.flecs),
+[synth_sub.flecs](../test/assets/audio/synth_sub.flecs),
+[synth_sync.flecs](../test/assets/audio/synth_sync.flecs),
+[synth_drive.flecs](../test/assets/audio/synth_drive.flecs) and
+[synth_pitch.flecs](../test/assets/audio/synth_pitch.flecs).
 
 ## Music on the timeline
 

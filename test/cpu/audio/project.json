@@ -144,6 +144,82 @@
                 ]
             },
             {
+                "id": "SynthKey",
+                "testcases": [
+                    "keytrack_octave",
+                    "keytrack_half",
+                    "keytrack_off",
+                    "keytrack_glide",
+                    "keytrack_glide_wide",
+                    "keytrack_jump",
+                    "keytrack_legato",
+                    "keytrack_envelope",
+                    "key_scale_decay",
+                    "key_scale_layer",
+                    "key_scale_half",
+                    "key_scale_off",
+                    "key_scale_release",
+                    "defaults_identical",
+                    "clamped",
+                    "script"
+                ]
+            },
+            {
+                "id": "SynthSync",
+                "testcases": [
+                    "period_master",
+                    "ratio_one_identical",
+                    "alias_48000",
+                    "alias_44100",
+                    "lfo_spectrum",
+                    "lfo_layer_syncs",
+                    "unison_own_master",
+                    "unison_stereo",
+                    "fm_adds",
+                    "ignored_noise_pluck",
+                    "clamped",
+                    "script"
+                ]
+            },
+            {
+                "id": "SynthPitch",
+                "testcases": [
+                    "start_returns",
+                    "negative_amount",
+                    "curve",
+                    "release_amount",
+                    "release_from_decay",
+                    "release_own_envelope",
+                    "legato_keeps",
+                    "layer",
+                    "sync_sweep",
+                    "pluck",
+                    "wide",
+                    "adds",
+                    "none_identical",
+                    "clamped",
+                    "script"
+                ]
+            },
+            {
+                "id": "SynthNoise",
+                "testcases": [
+                    "pink_slope_48000",
+                    "pink_slope_96000",
+                    "brown_slope_48000",
+                    "brown_slope_96000",
+                    "white_flat",
+                    "rms_matches_white",
+                    "seed_identical",
+                    "seed_plays",
+                    "white_unchanged",
+                    "unison",
+                    "paths",
+                    "clamped",
+                    "script"
+                ]
+            },
+            {
                 "id": "SynthVelocity",
                 "testcases": [
                     "filter_cutoff",
@@ -245,7 +321,10 @@
                     "delay",
                     "modulation",
                     "saturator",
-                    "synth_sub"
+                    "transient_shaper",
+                    "synth_sub",
+                    "synth_sync",
+                    "synth_drive"
                 ]
             },
             {
@@ -589,7 +668,17 @@
                     "component",
                     "world_duck",
                     "sidechain_cycle",
-                    "script"
+                    "script",
+                    "transient_attack",
+                    "transient_sustain",
+                    "transient_level",
+                    "transient_low",
+                    "transient_neutral",
+                    "transient_linked",
+                    "transient_no_click",
+                    "transient_render_sizes",
+                    "transient_component",
+                    "transient_script"
                 ]
             },
             {
@@ -617,6 +706,25 @@
                     "harmonics",
                     "slope_24",
                     "wide"
+                ]
+            },
+            {
+                "id": "SynthPreDrive",
+                "testcases": [
+                    "harmonics",
+                    "level_across_drive",
+                    "alias_oversampled",
+                    "before_filter",
+                    "wide",
+                    "without_identical",
+                    "layers_pass",
+                    "clamped"
+                ]
+            },
+            {
+                "id": "SynthPreDriveWorld",
+                "testcases": [
+                    "component"
                 ]
             },
             {

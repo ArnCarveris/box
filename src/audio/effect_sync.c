@@ -4,8 +4,8 @@
  * their slots of the pool of the core, their memory and their commands.
  *
  * An effect entity is any entity with an effect component: Reverb, Equalizer, AudioFilter,
- * Compressor, Gate, Delay, Phaser, Chorus or Saturator, the first of them in that order. A
- * compressor gets the key bus that the order compile accepted for its insert slot.
+ * Compressor, Gate, Delay, Phaser, Chorus, Saturator or TransientShaper, the first of them in
+ * that order. A compressor gets the key bus that the order compile accepted for its insert.
  *
  * The module sends an EFFECT command when the kind, the channel, the slot or a parameter of an
  * effect changes, and takes it off when no insert slot names it any more.
@@ -76,6 +76,19 @@ uint32_t box_audio_module_effect_params(
     const void *ptr,
     float *params)
 {
+<<<<<<< HEAD
+=======
+    const Reverb *reverb = NULL;
+    const Equalizer *eq = NULL;
+    const AudioFilter *filter = NULL;
+    const Compressor *comp = NULL;
+    const Gate *gate = NULL;
+    const Delay *delay = NULL;
+    const Phaser *phaser = NULL;
+    const Chorus *chorus = NULL;
+    const Saturator *saturator = NULL;
+    const TransientShaper *shaper = NULL;
+>>>>>>> 19189ed83f4818a8f45c1931ead40a6fb444f3f9
     uint32_t result = BOX_AUDIO_EFFECT_NONE;
     int32_t i;
     for (i = 0; params && i < BOX_AUDIO_EFFECT_PARAMS; i ++) {
@@ -179,6 +192,17 @@ uint32_t box_audio_module_effect_params(
             params[1] = saturator->asymmetry;
             params[2] = saturator->bits;
             params[3] = saturator->mix;
+        }
+
+        goto done;
+    }
+
+    shaper = ecs_get(world, e, TransientShaper);
+    if (shaper) {
+        result = BOX_AUDIO_EFFECT_TRANSIENT_SHAPER;
+        if (params) {
+            params[0] = shaper->attack;
+            params[1] = shaper->sustain;
         }
     }
 

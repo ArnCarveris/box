@@ -37,6 +37,9 @@
 #define BOX_AUDIO_SATURATE_H6 1.760299718e-03f
 #define BOX_AUDIO_SATURATE_H7 (-3.943973965e-04f)
 
+/** Points of a period of the sine whose RMS box_audio_saturate_curve_sine keeps */
+#define BOX_AUDIO_SATURATE_SINE_POINTS 64
+
 /** Smallest magnitude the state of the DC blocker keeps, so that no denormal forms */
 #define BOX_AUDIO_SATURATE_TINY 1e-30f
 
@@ -197,6 +200,73 @@ static inline float box_audio_oversample_down(
     os->pos = p + 1;
 
     return result;
+}
+
+/** Set the constants of the clipper for a gain and a bias, with a level compensation that
+ * keeps the RMS of a sine of a peak: the RMS of the sine over the RMS of the clipped sine
+ * without its mean, which a DC blocker after the clipper takes off.
+ *
+ * The RMS is taken over BOX_AUDIO_SATURATE_SINE_POINTS points at the middles of the steps of
+ * a period, turned by a rotation, and its square root by Newton, without libm. The call is
+ * slower than box_audio_saturate_curve and belongs where the gain changes seldom.
+ *
+ * @param curve Receives the constants
+ * @param gain Linear gain before the clipper, positive
+ * @param bias Offset added to the driven input
+ * @param peak Peak of the sine whose RMS the clipper keeps, positive
+ */
+static inline void box_audio_saturate_curve_sine(
+    box_audio_saturate_curve_t *curve,
+    float gain,
+    float bias,
+    float peak)
+{
+    const double c = 0.99518472667219688, s = 0.098017140329560602;
+    double x = 0.99879545620517239, y = 0.049067674327418015, t, sum = 0, square = 0;
+    double power, target, root;
+    int32_t i;
+    box_audio_saturate_curve(curve, gain, bias);
+    for (i = 0; i < BOX_AUDIO_SATURATE_SINE_POINTS; i ++) {
+        double v = (double)box_audio_saturate_clip(curve, peak * (float)y);
+        sum += v;
+        square += v * v;
+        t = x * c - y * s;
+        y = x * s + y * c;
+        x = t;
+    }
+
+    sum /= BOX_AUDIO_SATURATE_SINE_POINTS;
+    power = square / BOX_AUDIO_SATURATE_SINE_POINTS - sum * sum;
+    if (power > 0) {
+        target = 2 * power;
+        root = target > 1 ? target : 1;
+        for (i = 0; i < 40; i ++) {
+            root = 0.5 * (root + target / root);
+        }
+
+        curve->comp = (float)((double)peak / root);
+    }
+}
+
+/** Run a sample of a channel through the clipper at twice the rate and its level
+ * compensation.
+ *
+ * @param os The oversampler of the channel
+ * @param curve The constants
+ * @param x The input
+ * @return The clipped output, BOX_AUDIO_SATURATE_LATENCY frames after its input
+ */
+static inline float box_audio_saturate_next(
+    box_audio_oversample_t *os,
+    const box_audio_saturate_curve_t *curve,
+    float x)
+{
+    float a, b;
+    box_audio_oversample_up(os, x, &a, &b);
+    a = box_audio_saturate_clip(curve, a);
+    b = box_audio_saturate_clip(curve, b);
+
+    return box_audio_oversample_down(os, a, b) * curve->comp;
 }
 
 /** Sum of the magnitudes of the state of an oversampler, 0 once its input was silent for

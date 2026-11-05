@@ -301,10 +301,21 @@ ECS_ENUM(SynthWave, {
     SynthSaw,              /**< Saw, band limited */
     SynthSquare,           /**< Square, band limited */
     SynthTriangle,         /**< Triangle */
-    SynthNoise,            /**< White noise, seeded per play from SynthSound.seed */
+    SynthNoise,            /**< Noise, seeded per play from SynthSound.seed, white or of the
+                            *   SynthOscillator.color */
     SynthPluck             /**< A plucked string (Karplus-Strong), set by the SynthString of
                             *   the layer; it rings out on its own and ends the sound when it
                             *   is silent, so it needs no envelope */
+});
+
+/** Color of the noise of a SynthNoise layer. Each is at about the RMS level of white noise at
+ * the same level, and keeps its slope at every sample rate */
+ECS_ENUM(SynthNoiseColor, {
+    SynthNoiseWhite,       /**< White, flat, the same power in every Hz */
+    SynthNoisePink,        /**< Pink, falls by 3 dB per octave, the same power in every
+                            *   octave: wind, surf, rain */
+    SynthNoiseBrown        /**< Brown, falls by 6 dB per octave, a leaky integral of white
+                            *   noise without DC: rumble, distant surf, soft hits */
 });
 
 /** Kind of the filter of a synth sound */
@@ -373,6 +384,19 @@ ECS_STRUCT(SynthOscillator, {
     float velocity;        /**< SynthPhase, SynthRing: share 0..1 of the index that the
                             *   velocity of a note scales, index (1 - share + share v), so
                             *   soft notes have fewer sidebands; default 0 */
+    float sync;            /**< Hard sync: ratio 1..16 of the wave heard to the note, default
+                            *   0, which counts as 1 (off). The note frequency of the layer,
+                            *   its sweep, glide, vibrato, unison detune and the pitch of the
+                            *   voice included, is the master: the wave runs at the master
+                            *   times the ratio and restarts at phase 0 on every cycle of the
+                            *   master, band limited at the restart, for sync leads and, with
+                            *   SynthLfo.sync, sync sweeps. Each unison voice syncs to its own
+                            *   master; the sub stays at the master and phase modulation adds
+                            *   to the synced phase. Ignored by SynthNoise and SynthPluck */
+    SynthNoiseColor color; /**< SynthNoise: color of the noise, default SynthNoiseWhite. The
+                            *   white noise it filters is seeded as white noise is, so a
+                            *   colored layer is as deterministic; each unison voice filters
+                            *   its own. Ignored by the other waves */
 });
 
 /** The string of a SynthPluck layer, on the layer: a delay line a period long, plucked with a
@@ -417,6 +441,11 @@ ECS_STRUCT(SynthEnvelope, {
     float curve;           /**< Curve of the decay and the release, 0 linear (default),
                             *   -16..16 */
     float attack_curve;    /**< Curve of the attack, 0 linear (default), -16..16 */
+    float key_scale;       /**< Key scaling 0..1, default 0: the decay and the release are
+                            *   times 2^(-key_scale key / 12) at the key of the note (see
+                            *   SynthFilter), fixed at its start, so at 1 they halve per
+                            *   octave above the root and double per octave below; clamped
+                            *   to the times of an envelope */
 });
 
 /** Unison of a synth layer, on the entity of its SynthOscillator: the layer plays as several
@@ -440,7 +469,13 @@ ECS_STRUCT(SynthUnison, {
 });
 
 /** The filter of a synth sound, on its root: a state variable filter on the mix of the layers,
- * stable at any cutoff and resonance */
+ * stable at any cutoff and resonance.
+ *
+ * The key of a voice, which keytrack and SynthEnvelope.key_scale follow, is 12 log2 of the
+ * pitch ratio of its play in semitones, without the pitch variance of SynthSound: relative to
+ * Instrument.root for a note of an instrument, to a ratio of 1 for any other play, as the
+ * pitch of an AudioSource or of box_audio_play.
+ */
 ECS_STRUCT(SynthFilter, {
     SynthFilterKind kind;  /**< The kind, default SynthLowPass */
     float cutoff;          /**< Hz, default 1000, clamped under Nyquist */
@@ -453,6 +488,9 @@ ECS_STRUCT(SynthFilter, {
     float velocity;        /**< Octaves of the cutoff at velocity 1 over velocity 0, -10..10,
                             *   default 0: the cutoff applies as authored at velocity 1 and is
                             *   cutoff * 2^(velocity (v - 1)) at the velocity v of a note */
+    float keytrack;        /**< Key tracking 0..1, default 0: the cutoff is times the pitch
+                            *   ratio of the voice to the keytrack, so 1 moves it 1:1 with the
+                            *   pitch; it follows the pitch of the voice, glides included */
 });
 
 /** A filter, an effect in an insert slot of an AudioBus, as a Reverb is: the state variable
@@ -626,6 +664,21 @@ ECS_STRUCT(Saturator, {
                             *   1 - mix */
 });
 
+/** A transient shaper, an effect in an insert slot of an AudioBus, as a Reverb is: more or
+ * less punch and tail on drums and plucks, without a threshold, at most 12 dB either way:
+ * drums { AudioBus: {effects: [drums]}; TransientShaper: {attack: 0.6, sustain: -0.4} }.
+ *
+ * Stereo linked as a Compressor, it compares a fast envelope (1 ms up, 20 ms down) of the
+ * louder channel with a slow one (20 ms up, 200 ms down) in dB. 0 and 0 pass the signal
+ * unchanged; changes move over 20 ms. It has no meter and stops while its input is silent.
+ */
+ECS_STRUCT(TransientShaper, {
+    float attack;          /**< -1 to 1, default 0: above 0 boosts the transients, below 0
+                            *   softens them */
+    float sustain;         /**< -1 to 1, default 0: above 0 boosts the tail, below 0 shortens
+                            *   it */
+});
+
 /** An envelope of the cutoff of the SynthFilter of the same root, with the segments of a
  * SynthEnvelope: the cutoff is cutoff times 2 to the amount times the level of the envelope,
  * so it rises over the attack, settles at the sustain and returns over the release.
@@ -648,6 +701,43 @@ ECS_STRUCT(SynthFilterEnvelope, {
                             *   amount (1 - share + share v), default 0 */
 });
 
+/** A pitch envelope of a synth sound, relative to the note so it fits every pitch: the pitch
+ * starts amount semitones off the note and returns to it over the decay with a curve, the
+ * drop of a kick or a tom, the blip of a zap or the scoop of brass. Over the release of the
+ * amplitude envelope of the layer, its own or the one of the root, the offset moves from where
+ * it is to release_amount. It adds to the glide, the LFO pitch and the sweep of
+ * SynthOscillator, and moves SynthPluck strings as vibrato does.
+ *
+ * On the root it moves every layer; on a layer that layer, in place of the one of the root.
+ * It does not keep a sound playing, and a legato note does not restart it.
+ */
+ECS_STRUCT(SynthPitchEnvelope, {
+    float amount;          /**< Semitones at the start of a note, -48..48, default 0 */
+    float decay;           /**< Seconds back to the note, default 0 */
+    float curve;           /**< Curve of the decay and the release, 0 linear (default),
+                            *   -16..16, as SynthEnvelope.curve: positive moves fast at first */
+    float release_amount;  /**< Semitones the pitch moves to over the release, -48..48,
+                            *   default 0 */
+    float sync;            /**< Semitones the ratio of SynthOscillator.sync moves by at the start
+                            *   of a note, -48..48, default 0, returning to 0 with the decay: the
+                            *   sweep of a sync lead. Only on layers with a ratio over 1; the
+                            *   moved ratio is clamped to 1..16 */
+});
+
+/** A drive stage of a synth sound, on its root: the mix of the layers of each voice runs
+ * through a tanh soft clipper before the SynthFilter, or before the amp without one, where an
+ * analog synth gets most of its thickness. Plucks, unison and FM pass through it as they mix.
+ *
+ * The clipper runs at twice the rate and is level compensated: a sine at level 1 keeps its
+ * RMS at every drive. The driven mix is 15 frames late; with width both channels drive alike.
+ * Without the component there is no drive. See docs/audio.md.
+ */
+ECS_STRUCT(SynthDrive, {
+    float drive;           /**< 0..1, default 0.3: a gain of -6 to +24 dB before the clipper */
+    float asymmetry;       /**< 0..1, default 0: an offset before the clipper that adds even
+                            *   harmonics; its DC is blocked */
+});
+
 /** Portamento and mono legato of a synth sound, on its root.
  *
  * With a time, a change of the pitch of a voice, as a change of AudioSource.pitch, glides
@@ -665,8 +755,8 @@ ECS_STRUCT(SynthGlide, {
                             *   legato sounds of the same channel share one voice */
 });
 
-/** An LFO of a synth sound: a wave at a rate that moves the pitch, the level, the cutoff and
- * the pulse width of the sound, each by its own depth, after a delay and a fade in.
+/** An LFO of a synth sound: a wave at a rate that moves the pitch, the level, the cutoff, the
+ * pulse width of squares and the ratio of hard sync of the sound, each by its own depth, after a delay and a fade in.
  *
  * On the root, or on a child of the root without a SynthOscillator, it moves every layer; on
  * a layer that layer, the cutoff aside. Up to BOX_AUDIO_SYNTH_LFOS per sound, see LFOs in
@@ -687,11 +777,17 @@ ECS_STRUCT(SynthLfo, {
                             *   wave, -10..10 */
     float pulse_width;     /**< Share of the period the pulse width of squares moves by at the
                             *   top of the wave, -0.49..0.49 */
+    float sync;            /**< Semitones the ratio of SynthOscillator.sync moves by at the
+                            *   top of the wave, -48..48, default 0; the moved ratio is clamped
+                            *   to 1..16. On a layer it syncs that layer, from a ratio of 1
+                            *   when it has none; on the root it moves every layer with a
+                            *   ratio over 1 */
 });
 
 /** A sound made by the synth from the components of this entity and its children, without a
  * file: SynthOscillator layers, each with an optional SynthUnison, a SynthEnvelope, a
- * SynthFilter, a SynthFilterEnvelope, a SynthGlide and SynthLfo. Usually a prefab.
+ * SynthDrive, a SynthFilter, a SynthFilterEnvelope, a SynthPitchEnvelope, a SynthGlide and
+ * SynthLfo. Usually a prefab.
  *
  * It is compiled once, and again when one of its components changes, into a patch the core
  * holds; box_audio_play and AudioSource play it like any sound, with no allocation per play.

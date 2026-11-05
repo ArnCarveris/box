@@ -405,6 +405,7 @@ ECS_STRUCT(ProfileExtrusion, {
     float depth;          /**< Height along Y */
     bool cap_start;       /**< Close the bottom */
     bool cap_end;         /**< Close the top */
+    bool smooth;          /**< Smooth shading, corners of the profile stay sharp */
 });
 
 /** Color and material of a region of a parametric surface */

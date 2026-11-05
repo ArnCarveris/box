@@ -223,4 +223,18 @@ uint64_t audio_hash(
 void audio_strings_rough(
     box_audio_core_t *core);
 
+/** The state of the synth voice of a handle that plays, for a test that looks at its filter.
+ *
+ * @param core The core
+ * @param handle Handle of the voice
+ * @param cutoff Receives the cutoff of its filter in Hz
+ * @param unison Receives whether it renders on the path of unison, or NULL
+ * @return Whether a synth voice of the handle plays
+ */
+bool audio_synth_cutoff(
+    box_audio_core_t *core,
+    uint32_t handle,
+    double *cutoff,
+    bool *unison);
+
 #endif

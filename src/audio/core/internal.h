@@ -321,6 +321,21 @@ typedef struct box_audio_saturator_t {
     box_audio_ramp_t mix;     /**< Wet level */
 } box_audio_saturator_t;
 
+/** A transient shaper: the peak detector of the dynamics, a fast and a slow envelope of it and
+ * the gain in dB that their difference gives, smoothed */
+typedef struct box_audio_transient_shaper_t {
+    box_audio_transient_shaper_params_t target; /**< Parameters of the last command, clamped */
+    box_audio_peak_t peak;    /**< Detector */
+    double fast;              /**< Linear level of the fast envelope */
+    double slow;              /**< Linear level of the slow envelope */
+    double coef[4];           /**< Share of the distance that stays per frame: fast attack,
+                               * fast release, slow attack, slow release */
+    double smooth;            /**< Share of the distance that stays per frame of the gain */
+    double gain;              /**< Gain in dB that runs, smoothed */
+    box_audio_ramp_t attack;  /**< Attack */
+    box_audio_ramp_t sustain; /**< Sustain */
+} box_audio_transient_shaper_t;
+
 /** State of the kinds of effects */
 typedef union box_audio_effect_data_t {
     box_audio_reverb_t reverb;  /**< BOX_AUDIO_EFFECT_REVERB */
@@ -332,6 +347,7 @@ typedef union box_audio_effect_data_t {
     box_audio_phaser_t phaser;  /**< BOX_AUDIO_EFFECT_PHASER */
     box_audio_chorus_t chorus;  /**< BOX_AUDIO_EFFECT_CHORUS */
     box_audio_saturator_t saturator; /**< BOX_AUDIO_EFFECT_SATURATOR */
+    box_audio_transient_shaper_t transient_shaper; /**< BOX_AUDIO_EFFECT_TRANSIENT_SHAPER */
 } box_audio_effect_data_t;
 
 /** An effect instance of the pool of the core: a kind in an insert slot of a bus, on the
@@ -452,6 +468,27 @@ typedef struct box_audio_synth_env_t {
                            * also when a sustain of 0 skips the release of a pass */
 } box_audio_synth_env_t;
 
+/** A curve from one value to another over a number of steps, linear or curved as a segment of
+ * an envelope, the last step taking the target */
+typedef struct box_audio_synth_curve_t {
+    double level;         /**< Current value */
+    double target;        /**< Value at the end */
+    double mul;           /**< Factor per step, 1 for a linear curve */
+    double add;           /**< Term per step */
+    int32_t left;         /**< Steps left, 0 once it is at its target */
+} box_audio_synth_curve_t;
+
+/** The pitch envelope of a layer of a synth voice, advanced per control block of
+ * BOX_AUDIO_SYNTH_CONTROL frames with the LFOs */
+typedef struct box_audio_synth_bend_t {
+    bool on;              /**< Whether the layer has a pitch envelope that moves something */
+    box_audio_synth_curve_t decay;   /**< Share of amount and sync left, from 1 to 0 */
+    box_audio_synth_curve_t release; /**< Share of the way left to release_amount, from 1 to
+                                      * 0, once released */
+    bool released;        /**< Whether the amplitude envelope of the layer reached its release */
+    double from;          /**< Semitones of the offset at the start of the release */
+} box_audio_synth_bend_t;
+
 /** An oscillator of a synth voice */
 typedef struct box_audio_synth_osc_t {
     int32_t wave;         /**< A box_audio_synth_wave_t */
@@ -482,6 +519,12 @@ typedef struct box_audio_synth_osc_t {
     float sub;            /**< Level of its sub oscillator, 0 for none */
     int32_t sub_octave;   /**< Octaves the sub is under it, 1 or 2 */
     uint32_t wraps;       /**< Times its phase wrapped, the phase of the sub above its own */
+    bool synced;          /**< Whether its wave is hard synced to its phase, the master: a
+                           * ratio over 1 or an LFO of its own on the ratio */
+    double sync;          /**< Ratio of its wave to its phase, 1..BOX_AUDIO_SYNTH_SYNC_MAX */
+    double sync_base;     /**< The ratio of its layer, without the LFOs; what moves the ratio
+                           * per control block aims from it */
+    double sync_step;     /**< Change of sync per frame from the LFOs */
 } box_audio_synth_osc_t;
 
 /** An LFO of a synth voice, advanced per control block of BOX_AUDIO_SYNTH_CONTROL frames */
@@ -511,6 +554,24 @@ typedef struct box_audio_synth_unison_t {
     uint32_t wraps[BOX_AUDIO_SYNTH_UNISON_MAX]; /**< Times the phase of each voice wrapped,
                                                 * for its sub */
 } box_audio_synth_unison_t;
+/** Most sections of the filter that colors noise */
+#define BOX_AUDIO_SYNTH_COLOR_SECTIONS 10
+
+/** The filter that colors the noise of a layer of a synth voice, pink or brown: a cascade of
+ * first order sections y = x - zero x1 + pole y1, their poles and zeros at frequencies in Hz
+ * mapped to the rate, times a gain that brings its RMS level to that of the white noise. Each
+ * unison voice filters its own noise with its own state; a layer without unison uses that of
+ * the first */
+typedef struct box_audio_synth_color_filter_t {
+    int32_t sections;     /**< Sections, 0 for white noise, which it leaves alone */
+    float zero[BOX_AUDIO_SYNTH_COLOR_SECTIONS]; /**< Zero of each section */
+    float pole[BOX_AUDIO_SYNTH_COLOR_SECTIONS]; /**< Pole of each section */
+    float gain;           /**< Gain of the output, 1 over the RMS gain of the sections */
+    float state[BOX_AUDIO_SYNTH_UNISON_MAX][BOX_AUDIO_SYNTH_COLOR_SECTIONS + 1]; /**< Per
+                           * unison voice: its last noise, then the last output of each
+                           * section, the last input of the next */
+} box_audio_synth_color_filter_t;
+
 /** A pluck string of a synth voice: a Karplus-Strong loop of a delay line, a symmetric lowpass
  * of one frame of delay and a first order allpass of the fraction of a frame left, with a gain
  * that sets its decay, and the old read point that crossfades into the new one at a crossing.
@@ -551,10 +612,12 @@ typedef struct box_audio_synth_part_t {
     box_audio_synth_layer_t layer;  /**< The layer of the patch, clamped */
     box_audio_synth_osc_t osc;      /**< The oscillator */
     box_audio_synth_env_t env;      /**< Its own envelope, when the layer has one */
+    box_audio_synth_bend_t bend;    /**< Its pitch envelope, its own or that of the patch */
     box_audio_synth_unison_t unison; /**< Its unison voices */
     box_audio_synth_string_t *string; /**< The string of its first unison voice, the others
                                        * chained after it, for a BOX_AUDIO_SYNTH_PLUCK layer;
                                        * NULL for another */
+    box_audio_synth_color_filter_t color; /**< The filter that colors its noise */
 } box_audio_synth_part_t;
 
 /** A source that plays a synth patch, a copy of it, so it never allocates: the patch without
@@ -582,6 +645,13 @@ typedef struct box_audio_synth_source_t {
     box_audio_svf_t svf[2]; /**< The resonant stage, then the stage before it at 24 dB */
     box_audio_svf_t svf_r[2]; /**< The stages of the right channel, when stereo */
     float drive;          /**< Saturation of the filter, 0 (linear) to 1 */
+    bool has_drive;       /**< Whether the mix of the layers runs through the drive before the
+                           * filter */
+    bool drive_dc;        /**< Whether the drive has an asymmetry, so a DC blocker follows it */
+    float drive_dc_coef;  /**< Pole of the DC blocker of the drive */
+    box_audio_saturate_curve_t drive_curve; /**< Clipper of the drive */
+    box_audio_oversample_t drive_os[2]; /**< Oversampler of the drive, left then right */
+    box_audio_dc_t drive_blocker[2]; /**< DC blocker of the drive, left then right */
     bool unison;          /**< Whether a layer has unison voices, which renders through
                            * box_audio_synth_render_wide */
     bool stereo;          /**< Whether a layer with unison voices has width, so the source
@@ -602,6 +672,19 @@ typedef struct box_audio_synth_source_t {
     int32_t lfo_control;  /**< Frames until the next control block of the LFOs */
     bool lfo_cutoff;      /**< Whether an LFO moves the cutoff */
     double lfo_octaves;   /**< Octaves the LFOs move the cutoff by, 0 without */
+    bool bends;           /**< Whether a layer has a pitch envelope, which runs with the LFOs */
+    bool mods;            /**< Whether LFOs or pitch envelopes run their control blocks and
+                           * move the vibrato and tremolo of each layer; false renders as
+                           * without both */
+    float keytrack;       /**< Share 0..1 of the key in octaves the cutoff follows, 0 without a
+                           * filter */
+    double key;           /**< Key of the voice in octaves, log2 of its pitch ratio without the
+                           * variance, moving with a glide */
+    double key_target;    /**< Key the voice moves to */
+    double key_step;      /**< Change of key per frame while it moves */
+    int32_t key_left;     /**< Frames left until key reaches key_target, 0 when it stands or
+                           * keytrack is 0 */
+    int32_t key_control;  /**< Frames until the filter takes the key while it moves */
     float tremolo;        /**< Factor of the output from the LFOs of every layer, 1 without */
     float tremolo_step;   /**< Change of tremolo per frame */
     int32_t strings;      /**< Pluck layers, each with a string per unison voice, 0 for none */
@@ -694,6 +777,7 @@ typedef struct box_audio_synth_slot_t {
     int32_t strings;    /**< Strings a play of the patch takes: one for each unison voice of
                          * each of its pluck layers */
     bool used;          /**< Whether a sound has the slot */
+    box_audio_saturate_curve_t drive; /**< Clipper of the drive of the patch, when it has one */
 } box_audio_synth_slot_t;
 
 /** A command that takes effect on a frame: PLAY, STOP, VOICE_SET, BUS_SET, RELEASE or LEGATO */
@@ -1138,6 +1222,33 @@ void box_audio_saturator_rest(
     box_audio_effect_t *fx,
     int32_t frames);
 
+/** The transient shaper kind, in dynamics.c: start at the params of fx */
+void box_audio_transient_shaper_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The transient shaper kind: new parameters while it runs */
+void box_audio_transient_shaper_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The transient shaper kind: process a block; true once a silent block left its envelopes
+ * and its gain at rest */
+bool box_audio_transient_shaper_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The transient shaper kind: a block skipped while idle */
+void box_audio_transient_shaper_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    int32_t frames);
+
 /** Base 2 logarithm without libm, in synth.c, from the exponent of the double and the series
  * of atanh.
  *
@@ -1188,6 +1299,19 @@ void box_audio_source_stream(
 void box_audio_synth_command(
     box_audio_core_t *core,
     const box_audio_cmd_synth_t *cmd);
+
+/** Set the clipper of the drive of a synth patch: a gain of BOX_AUDIO_SYNTH_DRIVE_DB_MIN to
+ * _MAX dB, an offset of up to BOX_AUDIO_SYNTH_DRIVE_BIAS, and a level compensation that keeps
+ * the RMS of a sine at BOX_AUDIO_SYNTH_DRIVE_REFERENCE.
+ *
+ * @param curve Receives the clipper
+ * @param drive 0..1
+ * @param asymmetry 0..1
+ */
+void box_audio_synth_drive_curve(
+    box_audio_saturate_curve_t *curve,
+    float drive,
+    float asymmetry);
 
 /** Set the parts of the synth layers and the pluck strings of a new core free.
  *
