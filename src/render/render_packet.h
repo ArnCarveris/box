@@ -209,8 +209,9 @@
 #define BOX_RENDER_BUFFER_REFLECT_FIRST (0x30000000u)
 
 /** First handle of the shadow atlases of scenes: a BOX_RENDER_SHADOW_ATLAS and the uniform
- * BOX_RENDER_BUFFER of its tile records share the handle */
-#define BOX_RENDER_BUFFER_SHADOW_FIRST (0x50000000u)
+ * BOX_RENDER_BUFFER of its tile records share the handle. The range must not overlap the
+ * particle buffers at 0x50000000-0x5FFFFFFF, or the tile buffer replaces a particle page. */
+#define BOX_RENDER_BUFFER_SHADOW_FIRST (0x60000000u)
 
 /** First target handle of captures, the handles below belong to surfaces */
 #define BOX_RENDER_CAPTURE_TARGET_FIRST (0x40000000u)
