@@ -3,6 +3,7 @@ include beam
 include door
 using flecs.script
 using box.transform
+using box.movement
 using box.geometry
 using box.material
 using box.camera
@@ -13,7 +14,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template IslandWindmill {
   tower { Position: {0, 2, 0}; Frustum: {radius_bottom: 1.35, radius_top: 1.05, length: 4, segments: 40, smooth: true}; Rgb: IslandPlaster }
   base { Position: {0, 0.14, 0}; Cylinder: {radius: 1.45, length: 0.28, segments: 40, smooth: true}; Rgb: IslandChalk }
@@ -26,6 +26,8 @@ template IslandWindmill {
   rotor {
     Position: {0, 3.8, 1.45}
     Rotation: {0, 0, 0.18}
+    AngularVelocity: {0, 0, -0.55}
+    DynamicTransform
     hub { Position: {}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.18, length: 0.55, segments: 16}; Rgb: IslandWood }
     for i in 0..8 {
       const a = i * math.PI / 4
@@ -36,6 +38,8 @@ template IslandWindmill {
         RightTrianglePrism: {0.96, 2.08, 0.025}
         Rgb: {251, 237, 204}
         PbrMaterial: {roughness: 0.95}
+        Sheen: IslandLinen
+        DiffuseTransmission: IslandCloth
       }
       IslandBeam(ax: math.sin(a) * 2.9, ay: math.cos(a) * 2.9, az: 0.12, bx: math.sin(a + math.PI / 4) * 2.9, by: math.cos(a + math.PI / 4) * 2.9, bz: 0.12, radius: 0.012, tint: {190, 170, 133}) {}
     }

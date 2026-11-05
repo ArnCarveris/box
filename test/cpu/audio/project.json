@@ -78,7 +78,8 @@
                     "pan_step",
                     "mute_step",
                     "send_step",
-                    "restart_midway"
+                    "restart_midway",
+                    "cutoff_step"
                 ]
             },
             {
@@ -389,6 +390,27 @@
                 ]
             },
             {
+                "id": "Modulators",
+                "testcases": [
+                    "lfo_filter_seek",
+                    "lfo_filter_loop",
+                    "tremolo",
+                    "auto_pan",
+                    "steps_hold",
+                    "follower",
+                    "with_automation",
+                    "remove_no_click",
+                    "limits",
+                    "errors",
+                    "deterministic",
+                    "none_no_beats",
+                    "render_sizes",
+                    "beats_identical",
+                    "release",
+                    "no_zipper"
+                ]
+            },
+            {
                 "id": "Song",
                 "testcases": [
                     "first_sound",
@@ -411,9 +433,14 @@
                     "dynamics",
                     "delay",
                     "modulation",
+                    "pitch_shifter",
                     "saturator",
                     "transient_shaper",
+<<<<<<< HEAD
                     "rotary",
+=======
+                    "frequency_shifter",
+>>>>>>> 92613e388c93051ebe97a2eb0b9ec4a7b900a756
                     "synth_sub",
                     "synth_sync",
                     "synth_drive",
@@ -421,7 +448,9 @@
                     "synth_wavetable",
                     "expression",
                     "synth_comb",
-                    "synth_routes"
+                    "synth_routes",
+                    "modulators",
+                    "pattern_gate"
                 ]
             },
             {
@@ -660,6 +689,7 @@
                     "level_change",
                     "play_function",
                     "spatial_scene",
+                    "spatial_cutoff_scene",
                     "reverb_hall",
                     "eq_filter"
                 ]
@@ -700,6 +730,40 @@
                 ]
             },
             {
+                "id": "PatternGate",
+                "testcases": [
+                    "pattern",
+                    "edges",
+                    "accent",
+                    "seek",
+                    "loop_wrap",
+                    "swing",
+                    "floor_dips",
+                    "automate_step",
+                    "no_click",
+                    "reduction",
+                    "rest",
+                    "render_sizes",
+                    "component",
+                    "script"
+                ]
+            },
+            {
+                "id": "PitchShifter",
+                "testcases": [
+                    "octave_up",
+                    "octave_down",
+                    "stereo_detune",
+                    "feedback_bounded",
+                    "shimmer_octave",
+                    "shimmer_bounded",
+                    "shimmer_zero_identical",
+                    "render_identical",
+                    "silent_after_tail",
+                    "component"
+                ]
+            },
+            {
                 "id": "Modulation",
                 "testcases": [
                     "phaser_notch_moves",
@@ -707,6 +771,10 @@
                     "phaser_feedback_stable",
                     "chorus_delay_range",
                     "chorus_spread",
+                    "chorus_feedback_comb",
+                    "chorus_feedback_stable",
+                    "chorus_feedback_tail",
+                    "chorus_feedback_zero_identical",
                     "rate_change_no_click",
                     "mix_dry",
                     "silent_after_tail",
@@ -829,6 +897,37 @@
                     "reduction",
                     "drive_no_click",
                     "render_sizes",
+                    "silent_after_tail",
+                    "component",
+                    "script",
+                    "mode_harmonics",
+                    "mode_level",
+                    "mode_alias",
+                    "low_cut",
+                    "high_cut",
+                    "tone",
+                    "rate",
+                    "tanh_identical",
+                    "mode_render_sizes",
+                    "mode_silent_after_tail",
+                    "mode_reduction"
+                ]
+            },
+            {
+                "id": "FrequencyShifter",
+                "testcases": [
+                    "shift_up",
+                    "shift_down",
+                    "image_across_band",
+                    "ring",
+                    "stereo_opposite",
+                    "feedback_bounded",
+                    "zero_passes",
+                    "mix_dry",
+                    "change_no_click",
+                    "mode_no_click",
+                    "render_sizes",
+                    "deterministic",
                     "silent_after_tail",
                     "component",
                     "script"
@@ -1105,7 +1204,43 @@
                     "teleport_no_click",
                     "disabled_silent",
                     "core_position",
-                    "cost_changed_only"
+                    "cost_changed_only",
+                    "cutoff_curve",
+                    "cutoff_zero_unchanged",
+                    "cutoff_moving_no_click",
+                    "cutoff_teleport_no_click",
+                    "cutoff_play_at",
+                    "cutoff_stereo",
+                    "cutoff_synth",
+                    "cutoff_extreme_values",
+                    "cutoff_first_frame"
+                ]
+            },
+            {
+                "id": "Emitter",
+                "testcases": [
+                    "interval_range",
+                    "first_play_delayed",
+                    "sub_frame_interval",
+                    "shape_point",
+                    "shape_disc",
+                    "shape_sphere",
+                    "shape_hemisphere",
+                    "shape_box",
+                    "shape_transform",
+                    "shape_degenerate",
+                    "volume_pitch_ranges",
+                    "deterministic",
+                    "out_of_range_skipped",
+                    "max_active",
+                    "playing_false",
+                    "disable_delete",
+                    "sound_not_ready",
+                    "output_override",
+                    "invalid_values",
+                    "nonspatial",
+                    "script",
+                    "audio_command"
                 ]
             }
         ]

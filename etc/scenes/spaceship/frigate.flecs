@@ -12,7 +12,6 @@ using box.material
 using box.texture
 using box.light
 
-@tree Parent
 template Frigate {
   hull {
     FrigateHull: {}

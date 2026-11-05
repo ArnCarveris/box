@@ -86,6 +86,7 @@ static const box_audio_effect_def_t box_audio_effect_kinds[BOX_AUDIO_EFFECT_KIND
         .render = box_audio_transient_shaper_render,
         .rest = box_audio_transient_shaper_rest
     },
+<<<<<<< HEAD
     [BOX_AUDIO_EFFECT_ROTARY] = {
         .tail = true,
         .floats = box_audio_rotary_floats,
@@ -93,6 +94,29 @@ static const box_audio_effect_def_t box_audio_effect_kinds[BOX_AUDIO_EFFECT_KIND
         .command = box_audio_rotary_command,
         .render = box_audio_rotary_render,
         .rest = box_audio_rotary_rest
+=======
+    [BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER] = {
+        .tail = true,
+        .start = box_audio_frequency_shifter_start,
+        .command = box_audio_frequency_shifter_command,
+        .render = box_audio_frequency_shifter_render,
+        .rest = box_audio_frequency_shifter_rest
+    },
+    [BOX_AUDIO_EFFECT_PITCH_SHIFTER] = {
+        .tail = true,
+        .floats = box_audio_pitch_shifter_floats,
+        .start = box_audio_pitch_shifter_start,
+        .command = box_audio_pitch_shifter_command,
+        .render = box_audio_pitch_shifter_render,
+        .rest = box_audio_pitch_shifter_rest
+    },
+    [BOX_AUDIO_EFFECT_PATTERN_GATE] = {
+        .tail = true,
+        .start = box_audio_pattern_gate_start,
+        .command = box_audio_pattern_gate_command,
+        .render = box_audio_pattern_gate_render,
+        .rest = box_audio_pattern_gate_rest
+>>>>>>> 92613e388c93051ebe97a2eb0b9ec4a7b900a756
     }
 };
 
@@ -317,6 +341,11 @@ void box_audio_effect_command(
     fx->target_key = cmd->key;
     for (i = 0; !off && i < BOX_AUDIO_EFFECT_PARAMS; i ++) {
         fx->params[i] = cmd->params[i];
+        fx->base[i] = cmd->params[i];
+    }
+
+    if (!off) {
+        box_audio_mods_changed(core, (int32_t)cmd->slot, -1);
     }
 
     if (fx->target_kind && !box_audio_effect_ready(core, fx, fx->target_kind)) {
@@ -383,16 +412,26 @@ void box_audio_effect_params_command(
 
     for (i = 0; i < BOX_AUDIO_EFFECT_PARAMS; i ++) {
         fx->params[i] = cmd->params[i];
+        fx->base[i] = cmd->params[i];
     }
 
-    if (fx->attached && !fx->entering && fx->target_kind == fx->kind &&
-        fx->bus != BOX_AUDIO_BUS_NONE)
-    {
-        box_audio_effect_kind(fx->kind)->command(core, fx);
-    }
+    box_audio_effect_changed(core, cmd->slot);
+    box_audio_mods_changed(core, (int32_t)cmd->slot, -1);
 
 done:
     return;
+}
+
+void box_audio_effect_changed(
+    box_audio_core_t *core,
+    uint32_t slot)
+{
+    box_audio_effect_t *fx = &core->effects[slot];
+    if (fx->attached && !fx->entering && fx->target_kind == fx->kind &&
+        fx->kind != BOX_AUDIO_EFFECT_NONE && fx->bus != BOX_AUDIO_BUS_NONE)
+    {
+        box_audio_effect_kind(fx->kind)->command(core, fx);
+    }
 }
 
 void box_audio_effects_order(

@@ -12,6 +12,7 @@ using box.view
 using box.layout
 using box.text
 using box.texture
+using box.transition
 using bunnyhopper
 
 // Opacity of the icon of a lost life
@@ -22,7 +23,8 @@ life_icon {
   TexturePath: {path: "apps/bunnyhopper/etc/icons/bunny_life.svg", width: 128, height: 128}
 }
 
-// One life in the row of lives, index from the left: the icon fitted in a size by size square
+// One life in the row of lives, index from the left: the icon fitted in a size by size square,
+// fading when the life is lost
 template LifeIcon {
   prop index: i32 = 0
   prop size: f32 = 46
@@ -32,6 +34,7 @@ template LifeIcon {
   Rect: {size, size}
   Image: {texture: life_icon, u1: 1, v1: 1}
   Opacity: {alpha}
+  Transition: [Opacity: {duration: 0.4, timing_function: EaseOut}]
 }
 
 // The HUD of the game. The scene instantiates it after its world view, so the HUD view draws
@@ -43,15 +46,8 @@ template BunnyHud {
   const carrotCount = game.carrots
   const maxLives = game.max_lives
 
-  // The player by name: an entity in a variable (game.player) is watched from the instance on,
-  // and would miss lives the scene sets right after it includes the game
-  const lives = player[BunnyLives].lives_left
-
-  // A script sees a pair added to the state singleton, but not removed: it evaluates again
-  // before the pair is gone. A run ends with no lives left and run.flecs, which restart()
-  // reloads, gives the lives back before it changes the state, so with the lives the HUD sees
-  // both changes.
-  const over = BunnyGameState?[(BunnyGameState, Over)] && lives == 0
+  const lives = game.player[BunnyLives].lives_left
+  const over = BunnyGameState?[(BunnyGameState, Over)]
 
   // Screen space UI: an orthographic camera at ortho_scale 1, so one logical pixel is one point
   ui {
@@ -78,11 +74,7 @@ template BunnyHud {
 
         for i in 0..maxLives {
           "life_{i}" {
-            if i < lives {
-              LifeIcon: {index: i, size: 46, alpha: 1}
-            } else {
-              LifeIcon: {index: i, size: 46, alpha: lostAlpha}
-            }
+            LifeIcon: {index: i, size: 46, alpha: i < lives ? 1 : lostAlpha}
           }
         }
       }
@@ -110,6 +102,7 @@ template BunnyHud {
             Rgb: {20, 30, 20}
             Opacity: {170.0 / 255.0}
             Border: {radius: 8}
+            BoxShadow: {offset_y: -6, blur: 24, spread: 2, color: {0, 0, 0, 140}}
           }
 
           title {

@@ -11,7 +11,54 @@ const plaster: Rgb = {236, 226, 204}
 const changhoji: Rgb = {248, 238, 214}
 const stone: Rgb = {150, 145, 135}
 
-prefab Hanok {
+hanok_roof_outline {
+  Path2D: {
+    start: {-0.55, -3.4},
+    segments: [
+      {kind: CubicBezier, end: {0.85, 0}, control1: {-0.85, -2.5}, control2: {0.55, -0.7}},
+      {kind: CubicBezier, end: {-0.55, 3.4}, control1: {0.55, 0.7}, control2: {-0.85, 2.5}},
+      {kind: Line, end: {-0.75, 3.35}},
+      {kind: Line, end: {-0.85, 1.9}},
+      {kind: Line, end: {-0.85, -1.9}},
+      {kind: Line, end: {-0.75, -3.35}}
+    ],
+    closed: true
+  }
+}
+
+hanok_roof_profile {
+  Profile2D: {outer: hanok_roof_outline}
+}
+
+pine_trunk_path {
+  Path3D: {
+    start: {0, -0.2, 0},
+    segments: [
+      {kind: CatmullRom, end: {0.45, 1.3, 0}},
+      {kind: CatmullRom, end: {0.2, 2.7, 0.1}},
+      {kind: CatmullRom, end: {0.75, 4.1, 0}}
+    ]
+  }
+}
+
+pine_trunk_outline {
+  Path2D: {
+    start: {0.24, 0},
+    segments: [
+      {kind: CubicBezier, end: {0, 0.24}, control1: {0.24, 0.1325}, control2: {0.1325, 0.24}},
+      {kind: CubicBezier, end: {-0.24, 0}, control1: {-0.1325, 0.24}, control2: {-0.24, 0.1325}},
+      {kind: CubicBezier, end: {0, -0.24}, control1: {-0.24, -0.1325}, control2: {-0.1325, -0.24}},
+      {kind: CubicBezier, end: {0.24, 0}, control1: {0.1325, -0.24}, control2: {0.24, -0.1325}}
+    ],
+    closed: true
+  }
+}
+
+pine_trunk_profile {
+  Profile2D: {outer: pine_trunk_outline}
+}
+
+template Hanok {
   YeonScenery: {parallax: 1, wrap_min: -44, wrap_span: 88}
 
   base {
@@ -74,69 +121,37 @@ prefab Hanok {
 
   roof {
     Position: {0, 3.45, 0}
-    Rotation: {0, PI / 2, 0}
-    TrianglePrism: {6.2, 1.7, 8.6}
+    Rotation: {0, 0, PI / 2}
+    ProfileExtrusion: {profile: hanok_roof_profile, depth: 8.6, cap_start: true, cap_end: true}
     Rgb: giwa
   }
 
   ridge {
     Position: {0, 4.32, 0}
     Box: {7.6, 0.32, 0.4}
-    Rgb: giwaDark
-  }
-
-  ridge_end_left {
-    Position: {-3.95, 4.5, 0}
-    Rotation: {0, 0, -0.55}
-    Box: {0.9, 0.3, 0.42}
-    Rgb: giwaDark
-  }
-
-  ridge_end_right {
-    Position: {3.95, 4.5, 0}
-    Rotation: {0, 0, 0.55}
-    Box: {0.9, 0.3, 0.42}
-    Rgb: giwaDark
-  }
-
-  eave_front {
-    Position: {0, 2.62, 3.05}
-    Box: {7.4, 0.16, 0.3}
-    Rgb: giwaDark
-  }
-
-  eave_back {
-    Position: {0, 2.62, -3.05}
-    Box: {7.4, 0.16, 0.3}
+    Bevel: {radius: 0.08}
     Rgb: giwaDark
   }
 
   for i in 0..2 {
     const side = 2 * i - 1
 
-    "eave_tip_front_{i}" {
-      Position: {side * 4.15, 2.85, 3.05}
-      Rotation: {0, 0, side * 0.45}
-      Box: {1.2, 0.16, 0.3}
-      Rgb: giwaDark
-    }
-
-    "eave_tip_back_{i}" {
-      Position: {side * 4.15, 2.85, -3.05}
-      Rotation: {0, 0, side * 0.45}
-      Box: {1.2, 0.16, 0.3}
+    "ridge_end_{i}" {
+      Position: {side * 3.95, 4.5, 0}
+      Rotation: {0, 0, side * 0.55}
+      Box: {0.9, 0.3, 0.42}
+      Bevel: {radius: 0.08}
       Rgb: giwaDark
     }
   }
 }
 
-prefab Pine {
+template Pine {
   YeonScenery: {parallax: 1, wrap_min: -48, wrap_span: 96}
 
   trunk {
-    Position: {0.3, 2.0, 0}
-    Rotation: {0, 0, -0.18}
-    Cylinder: {segments: 10, smooth: true, length: 4.2, radius: 0.22}
+    Position: {0, 0, 0}
+    Sweep: {path: pine_trunk_path, profile: pine_trunk_profile, taper: 0.55, rings: 24}
     Rgb: {120, 70, 50}
   }
 
@@ -216,7 +231,7 @@ prefab Peak {
 prefab FarPeak {
   YeonScenery: {parallax: 0.12, wrap_min: -220, wrap_span: 440}
   Cone: {segments: 6, smooth: false, length: 1, radius: 1}
-  Rgb: {95, 120, 140}
+  Rgb: {84, 112, 112}
 }
 
 prefab Cloud {

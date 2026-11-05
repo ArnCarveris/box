@@ -10,7 +10,6 @@ using box.surface
 using box.controllers
 using box.movement
 
-@tree Parent
 template SakuraFlower {
   prop tint: Rgb = {255, 210, 220}
 
@@ -40,6 +39,7 @@ template SakuraFlower {
   Rgb: tint
   BackFaceMode: {BackFacePlain}
   PbrMaterial: {roughness: 0.95}
+  DiffuseTransmission: {factor: 0.4, color: {255, 214, 226}}
 
   heart {
     Position: {0, 0.014, 0}

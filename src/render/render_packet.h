@@ -209,8 +209,9 @@
 #define BOX_RENDER_BUFFER_REFLECT_FIRST (0x30000000u)
 
 /** First handle of the shadow atlases of scenes: a BOX_RENDER_SHADOW_ATLAS and the uniform
- * BOX_RENDER_BUFFER of its tile records share the handle */
-#define BOX_RENDER_BUFFER_SHADOW_FIRST (0x50000000u)
+ * BOX_RENDER_BUFFER of its tile records share the handle. The range must not overlap the
+ * particle buffers at 0x50000000-0x5FFFFFFF, or the tile buffer replaces a particle page. */
+#define BOX_RENDER_BUFFER_SHADOW_FIRST (0x60000000u)
 
 /** First target handle of captures, the handles below belong to surfaces */
 #define BOX_RENDER_CAPTURE_TARGET_FIRST (0x40000000u)
@@ -1149,6 +1150,9 @@ typedef struct box_render_batch_t {
                                  *   whose pipeline does not blend nor write depth and samples
                                  *   the snapshot of the opaque image of the view */
     bool shadow;                /**< The instances cast shadows, false for NoShadow */
+    bool fixture;               /**< The instances are LightFixture shapes: the cull keeps them
+                                 *   out of the tile of a light inside their world bounds. Only
+                                 *   set with shadow */
     bool bake;                  /**< Static 3D instances without NoBake of a scene with LightBake or
                                  *   ReflectionBake, drawn by the captures */
     bool box_shadow;            /**< The instances are the shadows of 2D shapes (BoxShadow),
@@ -1199,6 +1203,7 @@ typedef enum box_render_transition_component_t {
     BOX_RENDER_TRANSITION_SHEEN,            /**< Sheen */
     BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION, /**< DiffuseTransmission */
     BOX_RENDER_TRANSITION_BOX_SHADOW,       /**< BoxShadow */
+    BOX_RENDER_TRANSITION_BORDER,           /**< Border */
     BOX_RENDER_TRANSITION_COMPONENTS        /**< Number of transitionable components */
 } box_render_transition_component_t;
 

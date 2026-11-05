@@ -306,7 +306,7 @@ void AtmosphereEnvironment_light_bake_environment_default(void) {
     test_uint(ecs_get(world, e, LightBake)->environment, 0);
 
     ecs_entity_t source = ecs_new(world);
-    ecs_set(world, e, LightBake, {.environment = source});
+    ecs_set(world, e, LightBake, {.environment = source, .compute = true});
     test_uint(ecs_get(world, e, LightBake)->environment, source);
 
     ecs_fini(world);
@@ -581,7 +581,7 @@ void AtmosphereEnvironment_bake_fills_with_environment(void) {
     ecs_entity_t sun = light_new(world, scene, 60, 1);
     ecs_set(world, scene, LightBake, {
         .probe_spacing = 2, .bounces = 1, .capture_size = 8, .budget_ms = 1,
-        .bounds_padding = 1, .environment = scene
+        .bounds_padding = 1, .environment = scene, .compute = true
     });
     ecs_entity_t shape = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, shape, Box, {1, 1, 1});
@@ -626,7 +626,7 @@ void AtmosphereEnvironment_bake_without_environment_uses_hemisphere(void) {
     ecs_entity_t sun = light_new(world, scene, 60, 1);
     ecs_set(world, scene, LightBake, {
         .probe_spacing = 2, .bounces = 1, .capture_size = 8, .budget_ms = 1,
-        .bounds_padding = 1
+        .bounds_padding = 1, .compute = true
     });
     ecs_entity_t shape = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, shape, Box, {1, 1, 1});

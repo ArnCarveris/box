@@ -11,7 +11,6 @@ using box.surface
 using box.controllers
 using box.movement
 
-@tree Parent
 template FlowerBush {
   prop tint: Rgb = {193, 164, 222}
 

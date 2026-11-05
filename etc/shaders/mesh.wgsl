@@ -40,7 +40,8 @@
 // A lit view draws its opaque meshes depth only first (vs_depth, vs_depth_cutout and
 // fs_depth_cutout), then shades them with depth compare Equal and without the alpha test.
 // A transmissive pipeline (transmissive, Transmission) draws in the sorted blended stream
-// without blending: it refracts the opaque snapshot of the view (opaque_snapshot), reduced by
+// without blending: it refracts the snapshot of the view taken right before it (opaque_snapshot,
+// everything drawn before it back to front, at most 4 snapshots a view and frame), reduced by
 // its Fresnel reflection, absorbed over its volume and tinted by its albedo, and adds its own
 // specular light and emission on top.
 // A clear coated material (ClearCoat) has a dielectric layer of f0 0.04 over its base, on the
@@ -149,13 +150,19 @@ const MIN_ROUGHNESS: f32 = 0.045;
 // view without Gtao, and the probe and reflection captures, bind a 1x1 white image.
 @group(0) @binding(14) var gtao_image: texture_2d<f32>;
 
-// Opaque snapshot of the view for transmission (gpu_transmission.c): its image before the
-// blended draws and a blur pyramid, mip k + 1 downsampled from mip k. A view without
-// transmissive draws, and the captures, bind a 1x1 white image.
+// Snapshot of the view for transmission (gpu_transmission.c): its image right before a
+// transmissive draw, with everything drawn before it back to front (opaque meshes, sky, fog
+// volumes, particles, 2D shapes and the blended and transmissive meshes behind it), and a blur
+// pyramid, mip k + 1 downsampled from mip k. A view takes one before its first transmissive draw
+// and one before each later one that follows other draws, at most 4 a frame, into this same
+// texture; beyond that later glass samples the last one. A view without transmissive draws, and
+// the captures, bind a 1x1 white image.
 @group(0) @binding(19) var opaque_snapshot: texture_2d<f32>;
 
-// Depth of the target copied with the opaque snapshot (gpu_transmission.c), reversed Z with 0 for
-// the sky, which the blur of a DiffuseTransmission reads with textureLoad. A view without
+// Depth of the target copied with the first snapshot of the view (gpu_transmission.c), reversed
+// Z with 0 for the sky, which the blur of a DiffuseTransmission reads with textureLoad. Blended
+// and transmissive draws write no depth, so a blended shape in the snapshot blurs like whatever
+// lies behind it. A view without
 // transmissive draws, and the captures, bind a 1x1 placeholder.
 @group(0) @binding(20) var opaque_snapshot_depth: texture_depth_2d;
 
@@ -279,8 +286,10 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Plac
     if (surface_data.p[0].x != 0.0) {
         var region = i32(v.position.z);
         if (surface_data.p[0].x == 7.0) {
+            // The caps are the only vertices with a vertical normal without a horizontal
+            // part: the rims of a Bevel keep one up to the cap (box_profile_region)
             region = select(0, 1, v.uv.x >= 2.0);
-            if (abs(v.normal.y) > 0.5) {
+            if (v.normal.x == 0.0 && v.normal.z == 0.0 && v.normal.y != 0.0) {
                 region = 2;
             } else if (region == 1) {
                 o.uv.x -= 2.0 * material.uv.x;

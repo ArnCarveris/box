@@ -414,7 +414,7 @@ void AtmosphereIbl_bake_open_probe_matches_environment(void) {
     ecs_set(world, marker, Box, {0.2f, 0.2f, 0.2f});
     ecs_add(world, marker, NoBake);
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounces = 1, .capture_size = 16,
-        .budget_ms = 2, .bounds_padding = 1, .environment = sky});
+        .budget_ms = 2, .bounds_padding = 1, .environment = sky, .compute = true});
     int32_t frame;
     for (frame = 0; frame < WAIT_FRAMES; frame ++) {
         ibl_frame(world);

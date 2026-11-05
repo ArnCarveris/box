@@ -16,7 +16,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template BlueChapel {
   prop size: f32 = 1
   Scale: {size, size, size}

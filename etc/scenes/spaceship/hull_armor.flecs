@@ -4,7 +4,6 @@ using box.transform
 using box.geometry
 using box.material
 
-@tree Parent
 template HullArmorSections {
   course_0_0_port : CeramicArmor { Position: {0, 5.970, -72.250}; Rotation: {-0.156602, 0, 0}; BeveledPrism: {footprint: [{-0.300, 4.568}, {-10.935, 4.568}, {-9.225, -4.568}, {-0.300, -4.568}], depth: 0.32, inset: 0.08, bevel: 0.07}
     latch : Titanium { Position: {-6.998, 0.21, -3.868}; Box: {0.6, 0.12, 0.22} }

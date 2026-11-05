@@ -4,9 +4,22 @@ using box.geometry
 using box.material
 using box.light
 using box.text
+using box.texture
 
-prefab WestTimber { Rgb: {103, 64, 38}; PbrMaterial: {roughness: 0.92} }
-prefab WestPlank { Rgb: {161, 114, 65}; PbrMaterial: {roughness: 0.86} }
+west_grain_height {
+  TextureGen: {
+    width: 256, height: 256, seed: 7,
+    layers: [
+      {kind: GenCells, count: 24, squash: 0.08, distance: GenEdge, edge: 0.6, amount: 0.5, id_amount: 0.25},
+      {kind: GenNoise, frequency: 16, octaves: 3, amount: 0.25}
+    ]
+  }
+}
+west_grain { TextureGen: {source: west_grain_height, output: GenAlbedo, colors: [{0, {196, 190, 184}}, {0.6, {238, 234, 228}}, {1, {255, 255, 255}}]} }
+west_grain_normal { TextureGen: {source: west_grain_height, output: GenNormal, strength: 1.2} }
+
+prefab WestTimber { Rgb: {103, 64, 38}; PbrMaterial: {roughness: 0.92}; PbrTextures: {albedo: west_grain, normal: west_grain_normal}; TextureMapping: {mode: MappingObject, size: 1.2} }
+prefab WestPlank { Rgb: {161, 114, 65}; PbrMaterial: {roughness: 0.86}; PbrTextures: {albedo: west_grain, normal: west_grain_normal}; TextureMapping: {mode: MappingObject, size: 1.2} }
 prefab WestCream { Rgb: {232, 207, 155}; PbrMaterial: {roughness: 0.8} }
 prefab WestRed { Rgb: {139, 52, 38}; PbrMaterial: {roughness: 0.85} }
 prefab WestTeal { Rgb: {62, 105, 101}; PbrMaterial: {roughness: 0.82} }
@@ -14,8 +27,25 @@ prefab WestIron { Rgb: {49, 51, 48}; PbrMaterial: {metallic: 0.72, roughness: 0.
 prefab WestSteel { Rgb: {140, 150, 144}; PbrMaterial: {metallic: 0.8, roughness: 0.4} }
 prefab WestBrass { Rgb: {190, 140, 58}; PbrMaterial: {metallic: 0.75, roughness: 0.34} }
 prefab WestGlass { Rgb: {44, 74, 76}; PbrMaterial: {metallic: 0.28, roughness: 0.18}; ClearCoat: {strength: 0.8, roughness: 0.12} }
-prefab WestCanvas { Rgb: {223, 204, 160}; PbrMaterial: {roughness: 0.98} }
+prefab WestCanvas { Rgb: {223, 204, 160}; PbrMaterial: {roughness: 0.98}; Sheen: {color: {120, 110, 90}, roughness: 0.6}; DiffuseTransmission: {factor: 0.35, color: {255, 226, 170}} }
 prefab WestSand { Rgb: {197, 151, 92}; PbrMaterial: {roughness: 1} }
 prefab WestStone { Rgb: {163, 86, 51}; PbrMaterial: {roughness: 0.97} }
+
+prefab WestCloth { PbrMaterial: {roughness: 0.95}; Sheen: {color: {90, 84, 76}, roughness: 0.5} }
+
+prefab WestRoundShape {
+  Path2D: {
+    start: {1, 0},
+    segments: [
+      {kind: CatmullRom, end: {0, 1}},
+      {kind: CatmullRom, end: {-1, 0}},
+      {kind: CatmullRom, end: {0, -1}}
+    ],
+    closed: true
+  }
+}
+prefab WestRoundProfile { Profile2D: {outer: WestRoundShape} }
+prefab WestFlatShape { Path2D: {start: {-0.5, -0.5}, segments: [{kind: Line, end: {0.5, -0.5}}, {kind: Line, end: {0.5, 0.5}}, {kind: Line, end: {-0.5, 0.5}}], closed: true} }
+prefab WestFlatProfile { Profile2D: {outer: WestFlatShape} }
 
 WestFont { Font: {path: "etc/scenes/wild_wild_west/fonts/Rye-Regular.ttf"} }

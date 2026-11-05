@@ -4,7 +4,6 @@ using box.transform
 using box.geometry
 using box.material
 
-@tree Parent
 template KoreanShrub {
   prop bloom: Rgb = {214, 96, 132}
   for leaf in 0..11 {
@@ -19,7 +18,6 @@ template KoreanShrub {
   }
 }
 
-@tree Parent
 template KoreanRock {
   prop size: f32 = 1
   Scale: {size, size, size}

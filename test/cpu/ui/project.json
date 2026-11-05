@@ -194,7 +194,8 @@
                     "no_ray",
                     "disabled_shape_not_picked",
                     "deleted_disabled_shape",
-                    "deleted_disabled_element"
+                    "deleted_disabled_element",
+                    "beveled_extrusion_rim"
                 ]
             },
             {
@@ -420,7 +421,11 @@
                     "scroll_thumb_hover_look",
                     "panel_title_in_column",
                     "list_keeps_width",
-                    "scroll_content_added_after_bars"
+                    "scroll_content_added_after_bars",
+                    "shell_click_taps_button_action",
+                    "shell_click_changes_button",
+                    "shell_press_release_button",
+                    "shell_click_disabled_button"
                 ]
             },
             {
@@ -614,6 +619,22 @@
                     "engine_records_samples",
                     "engine_notifies_samples",
                     "engine_hold_no_notify"
+                ]
+            },
+            {
+                "id": "StartupOverlay",
+                "testcases": [
+                    "closed_by_default",
+                    "opens_while_blocking",
+                    "not_for_non_blocking",
+                    "lists_tasks",
+                    "closes_when_none_blocks",
+                    "does_not_reopen",
+                    "no_task_in_first_frames",
+                    "disabled",
+                    "app_run_with_window",
+                    "headless_never_opens",
+                    "script_from_test_folder"
                 ]
             },
             {

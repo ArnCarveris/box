@@ -7,7 +7,6 @@ using box.light
 using box.text
 
 
-@tree Parent
 template WestMesa {
   prop height: f32 = 5
   prop width: f32 = 4

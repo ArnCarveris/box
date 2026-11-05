@@ -71,7 +71,7 @@ static void dl_command(
     uint32_t bus,
     box_audio_delay_params_t p)
 {
-    uint8_t bytes[128];
+    uint8_t bytes[256];
     float params[BOX_AUDIO_EFFECT_PARAMS] = {0};
     box_audio_writer_t w;
     memcpy(params, &p, sizeof(p));

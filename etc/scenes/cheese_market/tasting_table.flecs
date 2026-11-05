@@ -15,7 +15,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template TastingTable {
   top {
     Position: {0, 1.04, 0}

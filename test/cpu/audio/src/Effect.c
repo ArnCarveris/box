@@ -68,7 +68,7 @@ static void fx_command(
     uint32_t index,
     const float *params)
 {
-    uint8_t bytes[128];
+    uint8_t bytes[256];
     box_audio_writer_t w;
     box_audio_writer_init(&w, bytes, sizeof(bytes));
     test_assert(box_audio_write_effect(&w, slot, kind, bus, index, BOX_AUDIO_BUS_NONE,

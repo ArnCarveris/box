@@ -7,7 +7,6 @@ using box.light
 using box.text
 
 
-@tree Parent
 template WestFence {
   prop length: f32 = 6
   prop bays: i32 = 3

@@ -688,3 +688,40 @@ void Particle_motion_force_curve_moves(void) {
     stbi_image_free(px);
     ecs_fini(world);
 }
+
+void Particle_pool_grows_with_point_shadow(void) {
+    // particle/pages
+    ecs_world_t *world = world_new("pool_shadow.png");
+    lighting_enable(world);
+    ecs_iter_t it = ecs_each(world, View);
+    ecs_entity_t view = ecs_each_next(&it) ? it.entities[0] : 0;
+    ecs_iter_fini(&it);
+    test_assert(view != 0);
+    ecs_get_mut(world, view, View)->shadows.enabled = true;
+    ecs_modified(world, view, View);
+    ecs_entity_t wall = ecs_new(world);
+    ecs_set(world, wall, Position, {0, 0, -1});
+    ecs_set(world, wall, Box, {20, 20, 0.1f});
+    ecs_set(world, wall, Rgb, {0, 0, 0});
+    ecs_entity_t light = ecs_new(world);
+    ecs_set(world, light, Position, {0, 0, 2});
+    ecs_set(world, light, PointLight, {.intensity = 1, .range = 10, .shadows = true,
+        .shadow_resolution = 256});
+    ecs_entity_t e = emitter_new(world, 0, 400, 1000);
+    unsigned char *px = run(world, "pool_shadow.png", 30);
+    stbi_image_free(px);
+
+    ParticleEmitter *p = ecs_get_mut(world, e, ParticleEmitter);
+    p->max = 3000;
+    ecs_modified(world, e, ParticleEmitter);
+    px = run(world, "pool_shadow.png", 30);
+
+    box_render_gpu_stats_t stats;
+    test_assert(box_render_gpu_stats(world, &stats));
+    test_int(stats.errors, 0);
+    test_assert(green_at(px, 0, 0.25f) > 128);
+    test_assert(ecs_singleton_get(world, ParticleStats)->particles > 100);
+
+    stbi_image_free(px);
+    ecs_fini(world);
+}

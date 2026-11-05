@@ -1,7 +1,8 @@
 /**
  * @file audio/spatial.c
- * @brief The spatial model of box.audio: the listener, distance attenuation and equal power
- * panning, computed on the main thread and sent as the volume and pan of a voice.
+ * @brief The spatial model of box.audio: the listener, distance attenuation, equal power
+ * panning and the distance filter, computed on the main thread and sent as the volume, pan
+ * and cutoff of a voice.
  */
 
 #include "module.h"
@@ -25,11 +26,50 @@ static float box_audio_inverse(
     return d <= min ? 1.0f : min / (min + rolloff * (d - min));
 }
 
+float box_audio_spatial_cutoff(
+    const AudioSpatial *spatial,
+    float distance)
+{
+    float min, max, cutoff, t, result = 0;
+    if (!spatial || !(spatial->cutoff > 0) || !(spatial->cutoff < BOX_AUDIO_SPATIAL_OPEN)) {
+        goto done;
+    }
+
+    min = spatial->min_distance > BOX_AUDIO_SPATIAL_MIN ?
+        spatial->min_distance : BOX_AUDIO_SPATIAL_MIN;
+    max = spatial->max_distance;
+    cutoff = spatial->cutoff > BOX_AUDIO_SPATIAL_CUTOFF_MIN ?
+        spatial->cutoff : BOX_AUDIO_SPATIAL_CUTOFF_MIN;
+    if (!(distance > min)) {
+        goto done;
+    }
+
+    t = max > min ? (distance - min) / (max - min) : 1.0f;
+    result = t < 1.0f ? BOX_AUDIO_SPATIAL_OPEN * powf(cutoff / BOX_AUDIO_SPATIAL_OPEN, t) :
+        cutoff;
+    if (!(result > 0) || !(result < BOX_AUDIO_SPATIAL_OPEN)) {
+        result = 0;
+    }
+
+done:
+    return result;
+}
+
 float box_audio_spatial_gain(
     const AudioSpatial *spatial,
     const mat4 listener,
     const vec3 position,
     float *pan)
+{
+    return box_audio_spatial_place(spatial, listener, position, pan, NULL);
+}
+
+float box_audio_spatial_place(
+    const AudioSpatial *spatial,
+    const mat4 listener,
+    const vec3 position,
+    float *pan,
+    float *cutoff)
 {
     AudioSpatial s = spatial ? *spatial :
         (AudioSpatial){ .min_distance = 1.0f, .max_distance = 50.0f, .rolloff = 1.0f };
@@ -63,6 +103,10 @@ float box_audio_spatial_gain(
 
     if (pan) {
         *pan = p;
+    }
+
+    if (cutoff) {
+        *cutoff = spatial && spatial->cutoff > 0 ? box_audio_spatial_cutoff(spatial, d) : 0;
     }
 
     return result;

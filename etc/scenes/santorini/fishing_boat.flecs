@@ -12,7 +12,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template FishingBoat {
   prop tint: Rgb = {27, 86, 171}
   hull {
@@ -48,7 +47,7 @@ template FishingBoat {
   flag {
     Position: {0, 2.65, 0.4}
     for i in 0..9 {
-      { Position: {0.24, 0.23 - i * 0.05, 0}; Box: {0.48, 0.05, 0.012}; if i % 2 == 0 { Rgb: IslandCobalt } else { Rgb: IslandChalk } }
+      { Position: {0.24, 0.23 - i * 0.05, 0}; Box: {0.48, 0.05, 0.012}; Rgb: i % 2 == 0 ? IslandCobalt : IslandChalk }
     }
   }
   rope_coil { Position: {0.3, 0.54, -0.9}; Torus: {radius: 0.13, tube: 0.035, segments: 20, rings: 6}; Rgb: {196, 168, 119} }

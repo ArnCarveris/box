@@ -883,7 +883,8 @@ done:
 
 /** Check the settings of a run and load its scene. ecs_script returns the entity of a managed
  * script also when it fails to parse or evaluate; both leave EcsScript without a script and
- * set its error, which tell whether the scene loaded.
+ * set its error. A scene that fails to load is logged and the world still runs, so a scene
+ * that waits for something that does not exist yet evaluates again once it does.
  *
  * The audio output opens here and nowhere else, so a world that imports box opens no device.
  *
@@ -925,7 +926,6 @@ static int box_app_start(
         ecs_os_free(scene);
         if (!loaded || !loaded->script || loaded->error) {
             ecs_err("failed to load scene '%s'", app->scene);
-            goto done;
         }
     }
 

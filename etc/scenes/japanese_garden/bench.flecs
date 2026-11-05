@@ -11,7 +11,6 @@ using box.surface
 using box.controllers
 using box.movement
 
-@tree Parent
 template GardenBench {
   for i in 0..4 {
     {
