@@ -839,6 +839,9 @@ void box_draws_shape_material(
         .fade = s->fade
     };
     if (out->shape2d) {
+        out->border = ecs_get(world, e, Border);
+        out->border_radius = out->border && out->shape2d->kind == BOX_SHAPE2D_RECT &&
+            ecs_has(world, e, Rect);
         out->clip = s->clip;
         out->slice = s->slice;
         out->rank = s->rank;

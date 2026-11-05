@@ -55,7 +55,8 @@ ECS_STRUCT(TexturePath, {
 /** Pattern of a layer of a TextureGen */
 ECS_ENUM(TextureGenPattern, {
     GenNoise = 0,  /**< Periodic fbm gradient (Perlin) noise, 0..1 around 0.5 */
-    GenBlocks = 1, /**< Courses of blocks or planks: 1 on a face, 0 in the gaps, beveled */
+    GenBlocks = 1, /**< Courses of blocks or planks: 1 on a face, 0 in the gaps, beveled; each
+                    *   block has a random id and a tone in the order of tone_order */
     GenCells = 2   /**< Periodic Voronoi cells, by the distance to the nearest point or edge */
 });
 
@@ -73,10 +74,21 @@ ECS_ENUM(TextureGenDistance, {
                      *   0 on the border between two cells, through a smoothstep over edge */
 });
 
+/** Order of the tones of the blocks of a GenBlocks layer, see TextureGenLayer.tones */
+ECS_ENUM(TextureGenToneOrder, {
+    GenToneRandom = 0,  /**< A random tone per block, independent of its random id, the
+                         *   default */
+    GenToneChecker = 1, /**< Tone (course + block) % tones: a checker for two tones */
+    GenToneCourses = 2, /**< Tone course % tones: alternating courses */
+    GenToneColumns = 3  /**< Tone block % tones: alternating blocks along each course, the same in
+                         *   every course */
+});
+
 /** What a TextureGen stores */
 ECS_ENUM(TextureGenOutput, {
     GenHeight = 0, /**< The height field as a single channel texture (R8Unorm), the default */
-    GenAlbedo = 1, /**< The height field mapped through the color ramp, RGBA8, opaque */
+    GenAlbedo = 1, /**< The height field mapped through the color ramp, RGBA8, opaque; with a
+                    *   palette the ramp color times the palette color of the tone */
     GenNormal = 2  /**< Tangent space normal map of the height field, green up the image, stored */
 });
 
@@ -91,11 +103,21 @@ ECS_ENUM(TextureGenOutput, {
 ECS_STRUCT(TextureGenLayer, {
     TextureGenPattern kind; /**< Pattern, default GenNoise */
     TextureGenOp op;        /**< How the layer combines with the layers before it, default GenAdd */
-    float amount;           /**< Weight of the pattern; a layer with neither amount nor id_amount
-                             *   weighs 1. May be negative */
+    float amount;           /**< Weight of the pattern; a layer with neither amount, id_amount
+                             *   nor tone_amount weighs 1. May be negative */
     float id_amount;        /**< Weight of the random per block or per cell id in 0..1, which
-                             *   varies the stones; GenNoise has no id */
+                             *   varies the stones on top of their tone; GenNoise has no id */
     int32_t seed;           /**< Mixed with TextureGen.seed for the randomness of the layer */
+    int32_t tones;          /**< GenBlocks and GenCells: number of tones a block or cell takes,
+                             *   which pick the TextureGen.palette color; 0 for none. The
+                             *   checker and courses repeat over the texture when courses is a
+                             *   multiple of tones, the checker and columns when per_course is,
+                             *   otherwise they have a seam at the wrap */
+    TextureGenToneOrder tone_order; /**< GenBlocks: order of the tones, default GenToneRandom;
+                                     *   GenCells take every order as GenToneRandom */
+    float tone_amount;      /**< Weight of the tone level tone / (tones - 1) in the height, 0
+                             *   for one tone; the default 0 keeps the tone out of the height,
+                             *   so a palette colors blocks without changing the normal map */
     float frequency;        /**< GenNoise: lattice cells across the width in the first octave,
                              *   rounded to a whole number so it tiles, default 4; down the
                              *   height as many per pixel */
@@ -182,6 +204,26 @@ ECS_STRUCT(TextureGenKey, {
  * }
  * cobble_n { TextureGen: {source: cobble_height, output: GenNormal, strength: 3.6} }
  * @endcode
+ * @par Two-tone checker floor: the tone of each tile picks its palette color, a ramp near white
+ * darkens the joints, and the random id and the noise vary the tiles of one tone.
+ * @code
+ * floor_height {
+ *   TextureGen: {
+ *     width: 512, height: 512, seed: 5
+ *     layers: [
+ *       {kind: GenBlocks, courses: 2, per_course: 2, gap: 0.004, softness: 0.006,
+ *        tones: 2, tone_order: GenToneChecker, amount: 0.9, id_amount: 0.05}
+ *       {kind: GenNoise, frequency: 16, octaves: 3, amount: 0.05}
+ *     ]
+ *   }
+ * }
+ * floor {
+ *   TextureGen: {source: floor_height, output: GenAlbedo,
+ *                palette: [{92, 103, 101}, {39, 53, 55}],
+ *                colors: [{0, {120, 120, 120}}, {0.6, {235, 235, 235}}, {1, {255, 255, 255}}]}
+ * }
+ * floor_n { TextureGen: {source: floor_height, output: GenNormal, strength: 2} }
+ * @endcode
  */
 ECS_STRUCT(TextureGen, {
     int32_t width;                  /**< Width in pixels, 0 for 512; ignored with a source */
@@ -191,7 +233,16 @@ ECS_STRUCT(TextureGen, {
     ecs_entity_t source;            /**< Generator whose height field this one derives from, 0
                                      *   to use its own layers */
     TextureGenOutput output;        /**< What is stored, default GenHeight */
-    ecs_vec(TextureGenKey) colors;  /**< Color ramp of GenAlbedo by height; gray without keys */
+    ecs_vec(TextureGenKey) colors;  /**< Color ramp of GenAlbedo by height; gray without keys,
+                                     *   white with a palette */
+    ecs_vec(rgb) palette;           /**< GenAlbedo: display encoded color per tone of the layer
+                                     *   palette_layer, palette[tone % count], multiplied by the
+                                     *   ramp color per channel (a * b / 255); ignored by the
+                                     *   other outputs. A layer without tones takes one per
+                                     *   color */
+    int32_t palette_layer;          /**< Layer of the height field (of the source with one)
+                                     *   whose tone picks the palette color, default 0; it must
+                                     *   exist and not be GenNoise */
     float strength;                 /**< Steepness of GenNormal, default 1: the slope is strength
                                      *   times the change of height per pixel of a 512 pixel wide
                                      *   texture, whatever its size */

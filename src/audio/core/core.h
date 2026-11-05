@@ -562,17 +562,30 @@ typedef enum box_audio_effect_kind_t {
                                   *   box_audio_transient_shaper_params_t */
     BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER = 11, /**< A frequency shifter,
                                   *   box_audio_frequency_shifter_params_t */
-    BOX_AUDIO_EFFECT_KINDS = 12   /**< Number of kinds, NONE included */
+    BOX_AUDIO_EFFECT_PITCH_SHIFTER = 12, /**< A pitch shifter, box_audio_pitch_shifter_params_t */
+    BOX_AUDIO_EFFECT_KINDS = 13   /**< Number of kinds, NONE included */
 } box_audio_effect_kind_t;
 
-/** The parameters of a reverb, the first floats of the params of its effect command */
+/** The parameters of a reverb, the first floats of the params of its effect command. Shimmer
+ * pitch shifts a share of the feedback of the network (shift.h) by shimmer_pitch semitones on
+ * each pass, so the tail rises by the interval; at a shimmer of 0 the reverb runs as it did
+ * without one, bit for bit */
 typedef struct box_audio_reverb_params_t {
     float decay;     /**< Seconds until -60 dB, BOX_AUDIO_REVERB_DECAY_MIN..MAX */
     float damping;   /**< High frequency loss, 0..1 */
     float predelay;  /**< Seconds before the first reflection, 0..BOX_AUDIO_REVERB_PREDELAY_MAX */
     float size;      /**< Room scale, 0..1, which sets the lengths of the delay lines */
     float mix;       /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+    float shimmer;   /**< Share of the feedback that is pitch shifted, 0..1 */
+    float shimmer_pitch; /**< Semitones of the shift of the shimmer,
+                      *   -BOX_AUDIO_PITCH_SHIFTER_SEMITONES..BOX_AUDIO_PITCH_SHIFTER_SEMITONES */
 } box_audio_reverb_params_t;
+
+/** Window of the shifter of the shimmer of a reverb in seconds */
+#define BOX_AUDIO_REVERB_SHIMMER_WINDOW 0.06f
+
+/** Seconds of a change of the shimmer or its pitch */
+#define BOX_AUDIO_REVERB_SHIMMER_RAMP 0.05f
 
 /** Bands of an equalizer; each takes 4 floats of the params of its effect command */
 #define BOX_AUDIO_EQ_BANDS 4
@@ -823,6 +836,39 @@ typedef struct box_audio_chorus_params_t {
                        *   -BOX_AUDIO_CHORUS_FEEDBACK_MAX..BOX_AUDIO_CHORUS_FEEDBACK_MAX; NaN
                        *   is 0 */
 } box_audio_chorus_params_t;
+
+/** Largest shift of a pitch shifter in semitones, either way */
+#define BOX_AUDIO_PITCH_SHIFTER_SEMITONES 24.0f
+
+/** Largest detune of a pitch shifter in cents, either way */
+#define BOX_AUDIO_PITCH_SHIFTER_CENTS 100.0f
+
+/** Shortest and longest window of a pitch shifter in milliseconds; the longest sizes its
+ * memory */
+#define BOX_AUDIO_PITCH_SHIFTER_WINDOW_MIN 10.0f
+#define BOX_AUDIO_PITCH_SHIFTER_WINDOW_MAX 100.0f
+
+/** Largest feedback of a pitch shifter */
+#define BOX_AUDIO_PITCH_SHIFTER_FEEDBACK_MAX 0.9f
+
+/** Seconds of a change of the pitch, the window, the feedback or the mix of a pitch shifter */
+#define BOX_AUDIO_PITCH_SHIFTER_RAMP 0.02f
+
+/** The parameters of a pitch shifter, the first floats of the params of its effect command: a
+ * delay line pitch shifter per channel (shift.h), BOX_AUDIO_SHIFT_TAPS taps crossfaded with
+ * constant power windows. The left channel shifts by semitones plus cents, the right by
+ * semitones plus cents times 1 - 2 stereo, so a stereo of 1 mirrors its cents. Feedback sends
+ * the shifted signal, soft clipped, back into the line, so each pass shifts again. The wet
+ * signal comes up to a window late; the dry signal is not delayed */
+typedef struct box_audio_pitch_shifter_params_t {
+    float semitones;  /**< -BOX_AUDIO_PITCH_SHIFTER_SEMITONES..BOX_AUDIO_PITCH_SHIFTER_SEMITONES */
+    float cents;      /**< -BOX_AUDIO_PITCH_SHIFTER_CENTS..BOX_AUDIO_PITCH_SHIFTER_CENTS */
+    float stereo;     /**< 0..1: the cents of the right channel go from cents to -cents */
+    float window;     /**< Milliseconds of the window, BOX_AUDIO_PITCH_SHIFTER_WINDOW_MIN..MAX */
+    float feedback;   /**< Share of the shifted signal fed back into the line,
+                       *   0..BOX_AUDIO_PITCH_SHIFTER_FEEDBACK_MAX */
+    float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+} box_audio_pitch_shifter_params_t;
 
 /** Gain before the clipper of a saturator at a drive of 1 in dB; a drive of 0 is 0 dB */
 #define BOX_AUDIO_SATURATOR_DRIVE_DB 30.0f
@@ -1776,8 +1822,9 @@ int32_t box_audio_core_effect_meters(
     int32_t max);
 
 /** Get the floats of memory an effect of a kind needs at a sample rate; for the reverb its
- * delay lines at the largest size and its longest predelay, for the delay
- * BOX_AUDIO_DELAY_MAX seconds of both channels, for the chorus BOX_AUDIO_CHORUS_MAX
+ * delay lines at the largest size, its longest predelay and the line of its shimmer, for the
+ * delay BOX_AUDIO_DELAY_MAX seconds of both channels, for the chorus BOX_AUDIO_CHORUS_MAX
+ * milliseconds of both channels, for the pitch shifter BOX_AUDIO_PITCH_SHIFTER_WINDOW_MAX
  * milliseconds of both channels.
  *
  * @param kind A box_audio_effect_kind_t

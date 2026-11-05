@@ -1,0 +1,92 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+// Generated textures with tones (TextureGen): a large box floor with a two-tone checker of the
+// jukebox tile colors and its normal map, tiled 4 x 4, and behind it a wall of bricks whose
+// courses alternate two colors. Each tile and brick still varies by its random id and noise, and
+// a low sun from the left makes the joints of the normal maps cast highlights.
+
+camera {
+  Position: {0, 3.2, 8}
+  Rotation: {-0.3, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {30, 34, 42, 255}}}
+}
+
+$ {
+  AmbientLight: {sky: {110, 120, 140}, ground: {60, 56, 50}, intensity: 0.5}
+}
+
+sun {
+  Rotation: {0.5, 2.2, 0}
+  DirectionalLight: {intensity: 1.3 * flecs.script.math.PI}
+  Rgb: {255, 242, 224}
+}
+
+floor_height {
+  TextureGen: {
+    width: 256, height: 256, seed: 5
+    layers: [
+      {kind: GenBlocks, courses: 2, per_course: 2, gap: 0.008, softness: 0.012,
+       tones: 2, tone_order: GenToneChecker, amount: 0.9, id_amount: 0.05}
+      {kind: GenNoise, frequency: 16, octaves: 3, amount: 0.05}
+    ]
+  }
+}
+
+floor_albedo {
+  TextureGen: {source: floor_height, output: GenAlbedo,
+               palette: [{92, 103, 101}, {39, 53, 55}],
+               colors: [{0, {120, 120, 120}}, {0.6, {235, 235, 235}}, {1, {255, 255, 255}}]}
+}
+
+floor_n {
+  TextureGen: {source: floor_height, output: GenNormal, strength: 2}
+}
+
+bricks_height {
+  TextureGen: {
+    width: 256, height: 256, seed: 21
+    layers: [
+      {kind: GenBlocks, courses: 8, per_course: 4, gap: 0.012, jitter: 0.1, stagger: 0.5,
+       tones: 2, tone_order: GenToneCourses, amount: 0.8, id_amount: 0.15}
+      {kind: GenNoise, frequency: 16, octaves: 4, amount: 0.15}
+    ]
+  }
+}
+
+bricks {
+  TextureGen: {source: bricks_height, output: GenAlbedo,
+               palette: [{170, 82, 58}, {214, 170, 120}],
+               colors: [{0, {110, 110, 110}}, {0.5, {225, 225, 225}}, {1, {255, 255, 255}}]}
+}
+
+bricks_n {
+  TextureGen: {source: bricks_height, output: GenNormal, strength: 3}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {12, 0.2, 12}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.6}
+  PbrTextures: {albedo: floor_albedo, normal: floor_n}
+  TextureTransform: {scale_x: 4, scale_y: 4}
+}
+
+wall {
+  Position: {0, 3, -4}
+  Quad: {10, 6}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.85}
+  PbrTextures: {albedo: bricks, normal: bricks_n}
+  TextureTransform: {scale_x: 2, scale_y: 1.2}
+}

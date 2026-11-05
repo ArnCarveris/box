@@ -15,7 +15,7 @@ ENGINE_APP = "apps/boxweb"
 ENGINE_NAME = "boxweb"
 ENGINE_DIR = "box"
 EMBEDDED = ("etc/shaders/", "etc/fonts/", "etc/luts/", "etc/environments/",
-            "etc/assets/", "etc/fps/", "etc/editor/")
+            "etc/assets/", "etc/fps/", "etc/startup/", "etc/editor/")
 SKIP_EXT = (".py", ".pyc")
 
 INCLUDE_RE = re.compile(r"^\s*include\s+([\w./-]+)", re.M)

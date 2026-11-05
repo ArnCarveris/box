@@ -1,0 +1,106 @@
+// The startup overlay of box, the script module box.startup. box.startup loads it when the
+// overlay first opens and loads it again when the file changes on disk.
+//
+// C creates the scene of the overlay (startup.ui), its camera and view, and the panel
+// (startup.ui.screen.panel), which it places in the middle of the surface and makes an instance
+// of StartupWidget. Everything the panel shows is defined here, in the colors of the theme.
+//
+// The panel is a heading over a row per task of InProgressTask, which box.task writes at the
+// end of every frame: the blocking tasks first, in the text color, then the others, muted. A
+// row shows the name of the task, its progress in its units when its total is known, and a bar
+// of that progress under them.
+
+module box.startup
+
+using flecs.script.math
+using box.task
+using box.ui
+using box.layout
+using box.geometry
+using box.material
+using box.text
+using box.transform
+
+// Width of the rows and height of the progress bars in points
+const row_w: f32 = 320
+const bar_h: f32 = 3
+
+// The startup panel: the heading and a row per task
+template StartupWidget {
+  prop title: string = "Starting"
+
+  const t = box.ui.theme[UiTheme]
+  const tasks = InProgressTask[InProgressTask]
+
+  // Rows of the heading and the tasks, whole points so the bars stay on the pixel grid
+  const heading_h: f32 = ceil(t.font_size * 1.4)
+  const row_h: f32 = ceil(t.small_font_size * 1.4)
+
+  Layout: {
+    direction: Column,
+    padding: {t.padding, t.padding, t.padding, t.padding},
+    spacing: t.spacing / 2
+  }
+  Rect: {1, 1}
+  Rgb: t.surface
+  Border: {width: 1, radius: t.radius, color: {t.border.r, t.border.g, t.border.b, 255}}
+
+  heading {
+    LayoutItem: {width: {mode: Fixed, value: row_w}, height: {mode: Fixed, value: heading_h}}
+    Text: {value: title, size: t.font_size, line_height: heading_h}
+    Rgb: t.text
+  }
+
+  for i in 0..tasks.count {
+    "task_{i}" {
+      const task = tasks.tasks[i]
+      const known: bool = task.total > 0
+      const frac: f32 = match known {
+        true: min(task.done / max(task.total, 1), 1)
+        _: 0
+      }
+
+      Layout: {direction: Column, spacing: 2}
+
+      label {
+        Layout: {direction: Row}
+        LayoutItem: {width: {mode: Fixed, value: row_w}, height: {mode: Fixed, value: row_h}}
+
+        name {
+          LayoutItem: {width: {mode: Grow}}
+          Text: {value: task.name, size: t.small_font_size, line_height: row_h}
+          Rgb: match task.blocking { true: t.text; _: t.text_muted }
+        }
+
+        if known {
+          progress {
+            Text: {
+              value: "{task.done} / {task.total}",
+              size: t.small_font_size,
+              line_height: row_h,
+              align: Right
+            }
+            Rgb: t.text_muted
+          }
+        }
+      }
+
+      // The bar: the track in the border color and the part done over it from the left
+      bar {
+        Layout: {direction: Row}
+        LayoutItem: {width: {mode: Fixed, value: row_w}, height: {mode: Fixed, value: bar_h}}
+        Rect: {1, 1}
+        Rgb: t.border
+
+        done {
+          LayoutItem: {
+            width: {mode: Fixed, value: round(row_w * frac)},
+            height: {mode: Fixed, value: bar_h}
+          }
+          Rect: {1, 1}
+          Rgb: t.accent
+        }
+      }
+    }
+  }
+}
