@@ -144,6 +144,21 @@
                 ]
             },
             {
+                "id": "SynthVelocity",
+                "testcases": [
+                    "filter_cutoff",
+                    "filter_default",
+                    "filter_envelope",
+                    "fm_index",
+                    "pluck_hardness",
+                    "plain_play",
+                    "clamped",
+                    "legato_keeps",
+                    "wide",
+                    "script"
+                ]
+            },
+            {
                 "id": "Sequencer",
                 "testcases": [
                     "defaults",

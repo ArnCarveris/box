@@ -60,8 +60,8 @@ bool box_audio_write_play(
     uint32_t flags,
     uint64_t when)
 {
-    return box_audio_write_play_priority(writer, voice, sound, bus, volume, pan, pitch, flags,
-        0, when);
+    return box_audio_write_play_priority(writer, voice, sound, bus, volume, pan, pitch, 1.0f,
+        flags, 0, when);
 }
 
 bool box_audio_write_play_priority(
@@ -72,6 +72,7 @@ bool box_audio_write_play_priority(
     float volume,
     float pan,
     float pitch,
+    float velocity,
     uint32_t flags,
     uint32_t priority,
     uint64_t when)
@@ -88,6 +89,7 @@ bool box_audio_write_play_priority(
     cmd.pitch = pitch;
     cmd.flags = flags;
     cmd.priority = priority;
+    cmd.velocity = velocity;
 
     return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
 }
@@ -120,7 +122,7 @@ bool box_audio_write_legato_at(
     uint64_t when)
 {
     return box_audio_write_legato_priority(writer, voice, from, sound, bus, volume, pan, pitch,
-        flags, 0, when);
+        1.0f, flags, 0, when);
 }
 
 bool box_audio_write_legato_priority(
@@ -132,6 +134,7 @@ bool box_audio_write_legato_priority(
     float volume,
     float pan,
     float pitch,
+    float velocity,
     uint32_t flags,
     uint32_t priority,
     uint64_t when)
@@ -149,6 +152,7 @@ bool box_audio_write_legato_priority(
     cmd.pitch = pitch;
     cmd.flags = flags;
     cmd.priority = priority;
+    cmd.velocity = velocity;
 
     return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
 }

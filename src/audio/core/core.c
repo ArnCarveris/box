@@ -620,7 +620,8 @@ static void box_audio_cmd_play(
         box_audio_ramp_set(&v->left, v->left.target);
         box_audio_ramp_set(&v->right, v->right.target);
         box_audio_source_synth(core, &v->source, cmd->sound, v->pitch,
-            (cmd->flags & BOX_AUDIO_PLAY_LOOP) != 0, (cmd->flags & BOX_AUDIO_PLAY_GATE) != 0);
+            box_audio_clamp(cmd->velocity, 0, 1), (cmd->flags & BOX_AUDIO_PLAY_LOOP) != 0,
+            (cmd->flags & BOX_AUDIO_PLAY_GATE) != 0);
     } else {
         if (cmd->flags & BOX_AUDIO_PLAY_ATTACK) {
             box_audio_ramp_set(&v->left, v->left.target);
@@ -645,6 +646,9 @@ done:
  * retargeted voice takes the BOX_AUDIO_PLAY_GATE of the command: with it the voice sustains
  * until a release, without it the voice holds for the hold of its envelopes.
  *
+ * A retargeted voice keeps the velocity of the note that started it, since its envelopes do
+ * not restart.
+ *
  * @param core The core
  * @param cmd The command
  */
@@ -655,7 +659,7 @@ static void box_audio_cmd_legato(
     box_audio_cmd_play_t play = {
         .voice = cmd->voice, .sound = cmd->sound, .bus = cmd->bus, .volume = cmd->volume,
         .pan = cmd->pan, .pitch = cmd->pitch, .flags = cmd->flags,
-        .priority = cmd->priority };
+        .priority = cmd->priority, .velocity = cmd->velocity };
     box_audio_voice_t *v = box_audio_voice_find(core, cmd->from);
     float pitch = box_audio_clamp(cmd->pitch, BOX_AUDIO_PITCH_MIN, BOX_AUDIO_PITCH_MAX);
     bool ready = cmd->sound < BOX_AUDIO_SOUND_MAX && cmd->bus < BOX_AUDIO_BUS_MAX &&

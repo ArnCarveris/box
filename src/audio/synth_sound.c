@@ -142,6 +142,7 @@ static void box_audio_synth_layer(
         l->modulation = osc->modulation == SynthRing ? BOX_AUDIO_SYNTH_RING :
             BOX_AUDIO_SYNTH_PHASE;
         l->index = osc->index;
+        l->index_velocity = osc->velocity;
         l->audible = osc->audible;
     }
 
@@ -161,6 +162,7 @@ static void box_audio_synth_layer(
         l->decay = string->decay;
         l->brightness = string->brightness;
         l->hardness = string->hardness;
+        l->hardness_velocity = string->velocity;
     }
 }
 
@@ -299,10 +301,12 @@ bool box_audio_synth_compile(
         p.cutoff = filter->cutoff;
         p.resonance = filter->resonance;
         p.slope = (uint32_t)filter->slope;
+        p.filter_velocity = filter->velocity;
     }
 
     if (filter && fenv && fenv->amount != 0) {
         p.filter_amount = fenv->amount;
+        p.filter_envelope_velocity = fenv->velocity;
         p.filter_envelope = (box_audio_synth_envelope_t){
             .attack = fenv->attack, .decay = fenv->decay, .sustain = fenv->sustain,
             .release = fenv->release, .hold = fenv->hold, .curve = fenv->curve,

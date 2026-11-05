@@ -551,6 +551,7 @@ typedef struct box_audio_synth_source_t {
     float pitch;          /**< Pitch ratio of the voice, the variance of the play included */
     float variance;       /**< Factor of the pitch that the variance of the play picked */
     float amp;            /**< Gain of the amp, the level variance of the play included */
+    float velocity;       /**< Velocity of the note that started it, 0..1; a legato keeps it */
     bool loop;            /**< Whether it starts over at the end of its envelopes */
     bool gate;            /**< Whether its envelopes sustain until a release */
     int32_t filter;       /**< A box_audio_synth_filter_t */
@@ -1181,6 +1182,7 @@ void box_audio_synth_end(
  * @param source The source
  * @param sound Id of a ready synth sound
  * @param pitch Pitch ratio
+ * @param velocity Velocity of the note, 0..1, for the velocity fields of the patch
  * @param loop Whether it starts over at the end of its envelopes
  * @param gate Whether its envelopes sustain until a release, BOX_AUDIO_PLAY_GATE
  */
@@ -1189,6 +1191,7 @@ void box_audio_source_synth(
     box_audio_source_t *source,
     uint32_t sound,
     float pitch,
+    float velocity,
     bool loop,
     bool gate);
 

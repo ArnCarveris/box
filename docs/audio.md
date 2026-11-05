@@ -266,14 +266,18 @@ voices on play, so edits affect subsequent plays.
 | Component | Authoring controls |
 | --- | --- |
 | `SynthSound` | `seed`, `pitch_variance`, `level_variance`; variances default to zero |
+<<<<<<< HEAD
 | `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), modulation controls |
+=======
+| `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), modulation controls, `velocity` (0) |
+>>>>>>> d8b9c939605d96299bb379dd3a4963981c567e04
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`; all zero by default |
-| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`) |
-| `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves; requires a filter |
+| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `velocity` (0 octaves) |
+| `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves and `velocity` (0); requires a filter |
 | `SynthUnison` | Per layer: `voices` (3, 1..7), `detune` (10 cents, 0..100), `width` (0, 0..1) |
 | `SynthGlide` | Root: `time` seconds (0, up to 10), `legato` (false), `channel` (0) |
 | `SynthLfo` | `wave`, `rate` (5 Hz), `delay`, `fade`, `phase`, `random_phase`, destination depths |
-| `SynthString` | Pluck layer: `decay` (2 s to -60 dB), `brightness` (0.5), `hardness` (0.8) |
+| `SynthString` | Pluck layer: `decay` (2 s to -60 dB), `brightness` (0.5), `hardness` (0.8), `velocity` (0) |
 
 Waves are `SynthSine`, `SynthSaw`, `SynthSquare`, `SynthTriangle`, `SynthNoise`
 and `SynthPluck`. Frequency sweeps are exponential. Positive envelope curves make
@@ -310,6 +314,23 @@ controls how quickly harmonics fade; hardness controls the attack. Frequencies b
 40 Hz warn and clamp. There are 32 strings total, one per pluck unison voice; long
 ringing chords can exhaust them and cause plays to be ignored.
 
+The velocity of a note (an `Instrument` play or a `NoteClip`, clamped to 0..1) reaches
+the voice as well as its gain, so harder notes can be brighter, not only louder. Each
+`velocity` field defaults to 0, which leaves the sound as it was:
+
+- `SynthFilter.velocity` is the octaves of cutoff at velocity 1 over velocity 0, -10..10.
+  The authored cutoff applies at velocity 1; at velocity `v` it is
+  `cutoff * 2^(velocity * (v - 1))`.
+- `SynthFilterEnvelope.velocity`, a share 0..1, scales the envelope amount:
+  `amount * (1 - share + share * v)`.
+- `SynthOscillator.velocity` scales the index of a phase or ring modulator the same way,
+  so soft notes have fewer sidebands.
+- `SynthString.velocity` scales the hardness of a pluck the same way, so soft notes are
+  plucked softer.
+
+Plays that are not notes, such as `AudioSource`, `box_audio_play`, quantized plays and
+streams, play at velocity 1. Sample voices ignore velocity beyond its gain.
+
 ### Modulation, unison and glide
 
 A child oscillator with `modulation: SynthPhase` or `SynthRing` modulates its
@@ -335,7 +356,8 @@ notes on the same channel retarget a held voice without restarting its envelopes
 They keep the original waves, levels, filters and variances; use patches from the
 same template so layer order agrees. A note after release starts a new voice.
 Instrument gates end a legato phrase; one shots instead hold for the authored hold
-after the last note. Quantized legato plays start new voices.
+after the last note. A retargeted voice keeps the velocity of the note that started it,
+since its envelopes do not restart. Quantized legato plays start new voices.
 
 Working examples include [synth_examples.flecs](../test/assets/audio/synth_examples.flecs),
 [synth_unison.flecs](../test/assets/audio/synth_unison.flecs),
@@ -541,6 +563,11 @@ Native uses command/event rings; web uses a separate core wasm instance and
 transferred messages over an AudioWorklet port. There is no shared memory or
 COOP/COEP requirement. [audio_core.py](../tools/audio_core.py) builds the wasm and
 embeds it in the main module during Emscripten builds; no extra deployment file is needed.
+
+Play and legato commands carry the velocity of a note, 0..1, after their priority;
+`box_audio_write_play_priority` and `box_audio_write_legato_priority` take it, and the
+other writers send 1. The velocity makes a play command 48 bytes and a legato command 52, so
+a writer buffer of a given size holds fewer of them than before.
 
 The core owns a 64-bit rendered-frame clock. Scheduled play, stop, voice/bus set,
 release and legato commands carry a frame time. Future commands wait in a fixed
