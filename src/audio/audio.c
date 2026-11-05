@@ -323,28 +323,18 @@ static void box_audio_transient_shaper_ctor(
     }
 }
 
-<<<<<<< HEAD
 /** Construct Vocoder values: 16 bands from 100 to 8000 Hz that cross at -3 dB, envelopes of
  * 5 ms up and 50 ms down, no shift, no noise, fully wet, without a modulator.
-=======
-/** Construct FrequencyShifter values: no shift in the shift mode, no stereo, no feedback and a
- * mix of 1.
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
  *
  * @param ptr The components
  * @param count Number of components
  * @param ti Type info
  */
-<<<<<<< HEAD
 static void box_audio_vocoder_ctor(
-=======
-static void box_audio_frequency_shifter_ctor(
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
     void *ptr,
     int32_t count,
     const ecs_type_info_t *ti)
 {
-<<<<<<< HEAD
     Vocoder *values = ptr;
     int32_t i;
     (void)ti;
@@ -352,7 +342,21 @@ static void box_audio_frequency_shifter_ctor(
         values[i] = (Vocoder){ .modulator = 0, .bands = BOX_AUDIO_VOCODER_BANDS,
             .low = 100.0f, .high = 8000.0f, .q = 1.0f, .attack = 0.005f, .release = 0.05f,
             .shift = 0, .unvoiced = 0, .mix = 1.0f };
-=======
+    }
+}
+
+/** Construct FrequencyShifter values: no shift in the shift mode, no stereo, no feedback and a
+ * mix of 1.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_frequency_shifter_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
     FrequencyShifter *values = ptr;
     int32_t i;
     (void)ti;
@@ -469,7 +473,6 @@ static void box_audio_tape_stop_ctor(
     for (i = 0; i < count; i ++) {
         values[i] = (TapeStop){ .active = 0, .stop_time = 0.5f, .start_time = 0.2f,
             .curve = 0 };
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
     }
 }
 
@@ -1629,10 +1632,8 @@ void BoxAudioImport(
     ecs_set_hooks(world, Saturator, { .ctor = box_audio_saturator_ctor });
     ECS_META_COMPONENT(world, TransientShaper);
     ecs_set_hooks(world, TransientShaper, { .ctor = box_audio_transient_shaper_ctor });
-<<<<<<< HEAD
     ECS_META_COMPONENT(world, Vocoder);
     ecs_set_hooks(world, Vocoder, { .ctor = box_audio_vocoder_ctor });
-=======
     ECS_META_COMPONENT(world, FrequencyShifterMode);
     ECS_META_COMPONENT(world, FrequencyShifter);
     ecs_set_hooks(world, FrequencyShifter, { .ctor = box_audio_frequency_shifter_ctor });
@@ -1646,7 +1647,6 @@ void BoxAudioImport(
     ecs_set_hooks(world, BeatRepeat, { .ctor = box_audio_beat_repeat_ctor });
     ECS_META_COMPONENT(world, TapeStop);
     ecs_set_hooks(world, TapeStop, { .ctor = box_audio_tape_stop_ctor });
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
     ECS_META_COMPONENT(world, SynthFilterEnvelope);
     ECS_META_COMPONENT(world, SynthPitchEnvelope);
     ECS_META_COMPONENT(world, SynthGlide);
@@ -1738,9 +1738,7 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(Chorus), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(Saturator), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(TransientShaper), EcsWith, ecs_id(AudioEffectState));
-<<<<<<< HEAD
     ecs_add_pair(world, ecs_id(Vocoder), EcsWith, ecs_id(AudioEffectState));
-=======
     ecs_add_pair(world, ecs_id(FrequencyShifter), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(AudioModulator), EcsWith, ecs_id(AudioModulatorState));
     ecs_add_pair(world, ecs_id(PitchShifter), EcsWith, ecs_id(AudioEffectState));
@@ -1748,7 +1746,6 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(Rotary), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(BeatRepeat), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(TapeStop), EcsWith, ecs_id(AudioEffectState));
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
     ecs_add_pair(world, ecs_id(SoundFile), EcsWith, ecs_id(AudioSample));
     ecs_add_pair(world, ecs_id(AudioStream), EcsWith, ecs_id(AudioMusic));
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSoundId));

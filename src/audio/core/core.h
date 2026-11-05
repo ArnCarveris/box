@@ -583,11 +583,6 @@ typedef enum box_audio_effect_kind_t {
     BOX_AUDIO_EFFECT_SATURATOR = 9, /**< A saturator, box_audio_saturator_params_t */
     BOX_AUDIO_EFFECT_TRANSIENT_SHAPER = 10, /**< A transient shaper,
                                   *   box_audio_transient_shaper_params_t */
-<<<<<<< HEAD
-    BOX_AUDIO_EFFECT_VOCODER = 11, /**< A vocoder, box_audio_vocoder_params_t, its modulator
-                                  *   the key bus of its command */
-    BOX_AUDIO_EFFECT_KINDS = 12   /**< Number of kinds, NONE included */
-=======
     BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER = 11, /**< A frequency shifter,
                                   *   box_audio_frequency_shifter_params_t */
     BOX_AUDIO_EFFECT_PITCH_SHIFTER = 12, /**< A pitch shifter, box_audio_pitch_shifter_params_t */
@@ -595,8 +590,9 @@ typedef enum box_audio_effect_kind_t {
     BOX_AUDIO_EFFECT_ROTARY = 14, /**< A rotating speaker, box_audio_rotary_params_t */
     BOX_AUDIO_EFFECT_BEAT_REPEAT = 15, /**< A beat repeat, box_audio_beat_repeat_params_t */
     BOX_AUDIO_EFFECT_TAPE_STOP = 16, /**< A tape stop, box_audio_tape_stop_params_t */
-    BOX_AUDIO_EFFECT_KINDS = 17   /**< Number of kinds, NONE included */
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
+    BOX_AUDIO_EFFECT_VOCODER = 17, /**< A vocoder, box_audio_vocoder_params_t, its modulator
+                                  *   the key bus of its command */
+    BOX_AUDIO_EFFECT_KINDS = 18   /**< Number of kinds, NONE included */
 } box_audio_effect_kind_t;
 
 /** The parameters of a reverb, the first floats of the params of its effect command. Shimmer
@@ -1007,7 +1003,6 @@ typedef struct box_audio_transient_shaper_params_t {
     float sustain;    /**< -1..1: above 0 boosts the tail, below 0 shortens it */
 } box_audio_transient_shaper_params_t;
 
-<<<<<<< HEAD
 /** Fewest, most and default bands of a vocoder */
 #define BOX_AUDIO_VOCODER_BANDS_MIN 8
 #define BOX_AUDIO_VOCODER_BANDS_MAX 32
@@ -1076,7 +1071,6 @@ typedef struct box_audio_vocoder_params_t {
                        *   to the carrier of the high bands, so consonants come through */
     float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
 } box_audio_vocoder_params_t;
-=======
 /** Largest shift of a frequency shifter in Hz, either way */
 #define BOX_AUDIO_FREQUENCY_SHIFTER_MAX 5000.0f
 
@@ -1339,7 +1333,6 @@ typedef struct box_audio_tape_stop_params_t {
     float start_time; /**< Seconds of the start, BOX_AUDIO_TAPE_STOP_TIME_MIN..MAX */
     float curve;      /**< Shape of the ramps, -1..1 */
 } box_audio_tape_stop_params_t;
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
 
 /** Put an effect into an insert slot of a bus, change its parameters, move it or take it off.
  *

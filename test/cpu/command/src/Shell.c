@@ -544,14 +544,12 @@ void Shell_audio_command(void) {
     ecs_ensure(world, punch, AudioBus)->effects[0] = punch;
     ecs_modified(world, punch, AudioBus);
     ecs_set(world, punch, TransientShaper, { .attack = 0.5f, .sustain = -0.25f });
-<<<<<<< HEAD
     ecs_entity_t talk = ecs_entity(world, { .name = "talk" });
     ecs_ensure(world, talk, AudioBus)->effects[0] = talk;
     ecs_modified(world, talk, AudioBus);
     ecs_set(world, talk, Vocoder, { .modulator = punch, .bands = 24, .low = 120,
         .high = 7000, .q = 1.5f, .attack = 0.004f, .release = 0.06f, .shift = -0.25f,
         .unvoiced = 0.3f, .mix = 0.8f });
-=======
     ecs_entity_t lift = ecs_entity(world, { .name = "lift" });
     ecs_ensure(world, lift, AudioBus)->effects[0] = lift;
     ecs_modified(world, lift, AudioBus);
@@ -589,7 +587,6 @@ void Shell_audio_command(void) {
     ecs_modified(world, drop, AudioBus);
     ecs_set(world, drop, TapeStop, { .active = 1, .stop_time = 1, .start_time = 0.25f,
         .curve = 0.5f });
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
     ecs_progress(world, 0.016f);
 
     bool error = true;
@@ -611,11 +608,10 @@ void Shell_audio_command(void) {
     test_assert(strstr(out, "punch: group volume 1.00 pan 0.00 width 1.00 -> master, "
         "insert 0 punch: transient shaper attack 0.50 sustain -0.25 "
         "(does not run: no output)") != NULL);
-<<<<<<< HEAD
     test_assert(strstr(out, "talk: group volume 1.00 pan 0.00 width 1.00 -> master, "
         "insert 0 talk: vocoder modulator punch bands 24 low 120 Hz high 7000 Hz q 1.50 "
         "attack 0.0040 release 0.060 shift -0.25 unvoiced 0.30 mix 0.80 "
-=======
+        "(does not run: no output)") != NULL);
     test_assert(strstr(out, "lift: group volume 1.00 pan 0.00 width 1.00 -> master, "
         "insert 0 lift: pitch shifter semitones +12.0 cents -8.0 stereo 1.00 window 30.0 ms "
         "feedback 0.20 mix 0.40 (does not run: no output)") != NULL);
@@ -636,7 +632,6 @@ void Shell_audio_command(void) {
         "pitch -2.0 gate 0.50 mix 1.00 reverse (does not run: no output)") != NULL);
     test_assert(strstr(out, "drop: group volume 1.00 pan 0.00 width 1.00 -> master, "
         "insert 0 drop: tape stop active stop 1.000 s start 0.250 s curve +0.50 "
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
         "(does not run: no output)") != NULL);
     ecs_os_free(out);
 

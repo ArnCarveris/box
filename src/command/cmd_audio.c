@@ -244,16 +244,13 @@ static void box_cmd_audio_effects(
         const Chorus *chorus;
         const Saturator *saturator;
         const TransientShaper *shaper;
-<<<<<<< HEAD
-        const Vocoder *vocoder;
-=======
         const FrequencyShifter *shifter;
         const PitchShifter *pitch;
         const PatternGate *pattern;
         const Rotary *rotary;
         const BeatRepeat *repeat;
         const TapeStop *stop;
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
+        const Vocoder *vocoder;
         const box_audio_module_t *state = box_audio_module_get(world);
         char *path;
         int32_t b, slot;
@@ -368,18 +365,6 @@ static void box_cmd_audio_effects(
         } else if ((shaper = ecs_get(world, e, TransientShaper))) {
             ecs_strbuf_append(buf, "transient shaper attack %.2f sustain %.2f",
                 (double)shaper->attack, (double)shaper->sustain);
-<<<<<<< HEAD
-        } else if ((vocoder = ecs_get(world, e, Vocoder))) {
-            char *key = vocoder->modulator && ecs_is_alive(world, vocoder->modulator) ?
-                ecs_get_path(world, vocoder->modulator) : NULL;
-            ecs_strbuf_append(buf, "vocoder modulator %s bands %d low %.0f Hz high %.0f Hz "
-                "q %.2f attack %.4f release %.3f shift %.2f unvoiced %.2f mix %.2f",
-                key ? key : (vocoder->modulator ? "(deleted)" : "(none)"), vocoder->bands,
-                (double)vocoder->low, (double)vocoder->high, (double)vocoder->q,
-                (double)vocoder->attack, (double)vocoder->release, (double)vocoder->shift,
-                (double)vocoder->unvoiced, (double)vocoder->mix);
-            ecs_os_free(key);
-=======
         } else if ((shifter = ecs_get(world, e, FrequencyShifter))) {
             ecs_strbuf_append(buf, "frequency shifter %s %+.1f Hz stereo %.2f feedback %.2f "
                 "mix %.2f", shifter->mode == FrequencyRing ? "ring" : "shift",
@@ -425,7 +410,16 @@ static void box_cmd_audio_effects(
             ecs_strbuf_append(buf, "tape stop %s stop %.3f s start %.3f s curve %+.2f",
                 stop->active >= 0.5f ? "active" : "inactive", (double)stop->stop_time,
                 (double)stop->start_time, (double)stop->curve);
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
+        } else if ((vocoder = ecs_get(world, e, Vocoder))) {
+            char *key = vocoder->modulator && ecs_is_alive(world, vocoder->modulator) ?
+                ecs_get_path(world, vocoder->modulator) : NULL;
+            ecs_strbuf_append(buf, "vocoder modulator %s bands %d low %.0f Hz high %.0f Hz "
+                "q %.2f attack %.4f release %.3f shift %.2f unvoiced %.2f mix %.2f",
+                key ? key : (vocoder->modulator ? "(deleted)" : "(none)"), vocoder->bands,
+                (double)vocoder->low, (double)vocoder->high, (double)vocoder->q,
+                (double)vocoder->attack, (double)vocoder->release, (double)vocoder->shift,
+                (double)vocoder->unvoiced, (double)vocoder->mix);
+            ecs_os_free(key);
         }
 
         slot = box_audio_module_effect_slot(world, e);

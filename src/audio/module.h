@@ -1010,12 +1010,12 @@ uint32_t box_audio_module_effect_kind(
     float *params);
 
 /** Largest number of effect components */
-#define BOX_AUDIO_EFFECT_COMPONENTS (16)
+#define BOX_AUDIO_EFFECT_COMPONENTS (17)
 
 /** Get the effect components: Reverb, Equalizer, AudioFilter, Compressor, Gate, Delay, Phaser,
  * Chorus, Saturator, TransientShaper, FrequencyShifter, PitchShifter, PatternGate, Rotary,
- * BeatRepeat and TapeStop, in the order an entity that has several takes the first of. A new
- * effect is added here and to box_audio_module_effect_params.
+ * BeatRepeat, TapeStop and Vocoder, in the order an entity that has several takes the first of.
+ * A new effect is added here and to box_audio_module_effect_params.
  *
  * @param out Receives up to BOX_AUDIO_EFFECT_COMPONENTS components
  * @return Number of components

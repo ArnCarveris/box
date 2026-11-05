@@ -146,7 +146,6 @@ void Modulation_silent_tail(
     bench_modulation_free(core);
 }
 
-<<<<<<< HEAD
 /** Create a core with a vocoder on bus 1, keyed on bus 2, which runs first: a looping voice
  * on each, the one on bus 2 an octave up.
  *
@@ -178,7 +177,11 @@ static box_audio_core_t* bench_vocoder_core(
     box_audio_write_effect(&w, 0, BOX_AUDIO_EFFECT_VOCODER, 1, 0, 2, fx);
     box_audio_write_play(&w, 0, 1, 1, 0.5f, 0, 1, BOX_AUDIO_PLAY_LOOP, 0);
     box_audio_write_play(&w, 1, 1, 2, 0.5f, 0, 2, BOX_AUDIO_PLAY_LOOP, 0);
-=======
+    box_audio_core_apply(core, w.data, w.size);
+
+    return core;
+}
+
 /** Create a core with a lowpass on bus 1 and its voice, and a number of modulators of every
  * source on its cutoff, its resonance and the volume and pan of the bus, four of each, with
  * the beat clock at 128 bpm.
@@ -227,42 +230,43 @@ static box_audio_core_t* bench_modulators_core(
         box_audio_write_modulator(&w, &m);
     }
 
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
     box_audio_core_apply(core, w.data, w.size);
 
     return core;
 }
 
-<<<<<<< HEAD
 void Modulation_vocoder_16(
     bench_t *b)
 {
     // audio/vocoder
     box_audio_core_t *core = bench_vocoder_core(16);
-=======
+    bench_modulation_render(b, core);
+    bench_modulation_free(core);
+}
+
 void Modulation_filter_16_modulators(
     bench_t *b)
 {
     // audio/modulators
     box_audio_core_t *core = bench_modulators_core(16);
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
     bench_modulation_render(b, core);
     bench_modulation_free(core);
 }
 
-<<<<<<< HEAD
 void Modulation_vocoder_32(
     bench_t *b)
 {
     // audio/vocoder
     box_audio_core_t *core = bench_vocoder_core(32);
-=======
+    bench_modulation_render(b, core);
+    bench_modulation_free(core);
+}
+
 void Modulation_filter_no_modulators(
     bench_t *b)
 {
     // audio/modulators
     box_audio_core_t *core = bench_modulators_core(0);
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
     bench_modulation_render(b, core);
     bench_modulation_free(core);
 }

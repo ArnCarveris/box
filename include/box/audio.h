@@ -918,7 +918,6 @@ ECS_STRUCT(TransientShaper, {
                             *   it */
 });
 
-<<<<<<< HEAD
 /** A vocoder, an effect in an insert slot of an AudioBus, as a Reverb is: the spectrum of
  * its modulator, a channel keyed as the sidechain of a Compressor, shapes the input of its own
  * channel, the carrier. Talking synths and robot voices take a voice as the modulator and a
@@ -955,7 +954,10 @@ ECS_STRUCT(Vocoder, {
                             *   or down against the modulator bands, for a formant shift */
     float unvoiced;        /**< 0 to 1, default 0: white noise added to the carrier of the high
                             *   bands, so consonants come through */
-=======
+    float mix;             /**< Wet level, 0 to 1, default 1; the dry signal passes at
+                            *   1 - mix */
+});
+
 /** Mode of a FrequencyShifter */
 ECS_ENUM(FrequencyShifterMode, {
     FrequencyShift,        /**< Every partial moves up or down by the shift in Hz */
@@ -987,13 +989,10 @@ ECS_STRUCT(FrequencyShifter, {
                             *   1 - 2 stereo, so at 1 the opposite way of the left */
     float feedback;        /**< Share of the shifted signal fed back into the input, -0.95 to
                             *   0.95, default 0 */
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
     float mix;             /**< Wet level, 0 to 1, default 1; the dry signal passes at
                             *   1 - mix */
 });
 
-<<<<<<< HEAD
-=======
 /** Longest window of a PitchShifter in milliseconds, which sizes its memory */
 #define BOX_AUDIO_PITCH_SHIFTER_WINDOW_MAX 100.0f
 
@@ -1175,7 +1174,6 @@ ECS_STRUCT(TapeStop, {
     float curve;           /**< Shape of the ramps, -1 to 1, default 0 (linear) */
 });
 
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
 /** An envelope of the cutoff of the SynthFilter of the same root, with the segments of a
  * SynthEnvelope: the cutoff is cutoff times 2 to the amount times the level of the envelope,
  * so it rises over the attack, settles at the sustain and returns over the release.

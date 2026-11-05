@@ -405,7 +405,6 @@ typedef struct box_audio_transient_shaper_t {
     box_audio_ramp_t sustain; /**< Sustain */
 } box_audio_transient_shaper_t;
 
-<<<<<<< HEAD
 /** A band of a vocoder on the memory of its slot, floats only: the two cascaded state
  * variable bandpasses of the modulator and the carrier per channel, the envelope of the
  * modulator per channel and the coefficients of both */
@@ -440,7 +439,6 @@ typedef struct box_audio_vocoder_t {
     box_audio_ramp_t mix;     /**< Wet level */
     box_audio_ramp_t fade;    /**< Fade of the wet signal around a change of the bands */
 } box_audio_vocoder_t;
-=======
 /** Sections of the Hilbert transformer of a frequency shifter in each of its two paths */
 #define BOX_AUDIO_FREQUENCY_SHIFTER_SECTIONS (BOX_AUDIO_FREQUENCY_SHIFTER_ALLPASSES / 2)
 
@@ -620,7 +618,6 @@ typedef struct box_audio_tape_stop_t {
     bool crossfade;           /**< Crossfades from the read at from to the one at lag */
     box_audio_ramp_t xfade;   /**< Share of the read at lag in the crossfade */
 } box_audio_tape_stop_t;
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
 
 /** State of the kinds of effects */
 typedef union box_audio_effect_data_t {
@@ -634,16 +631,13 @@ typedef union box_audio_effect_data_t {
     box_audio_chorus_t chorus;  /**< BOX_AUDIO_EFFECT_CHORUS */
     box_audio_saturator_t saturator; /**< BOX_AUDIO_EFFECT_SATURATOR */
     box_audio_transient_shaper_t transient_shaper; /**< BOX_AUDIO_EFFECT_TRANSIENT_SHAPER */
-<<<<<<< HEAD
     box_audio_vocoder_t vocoder; /**< BOX_AUDIO_EFFECT_VOCODER */
-=======
     box_audio_frequency_shifter_t frequency_shifter; /**< BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER */
     box_audio_pitch_shifter_t pitch_shifter; /**< BOX_AUDIO_EFFECT_PITCH_SHIFTER */
     box_audio_pattern_gate_t pattern_gate; /**< BOX_AUDIO_EFFECT_PATTERN_GATE */
     box_audio_rotary_t rotary;  /**< BOX_AUDIO_EFFECT_ROTARY */
     box_audio_beat_repeat_t beat_repeat; /**< BOX_AUDIO_EFFECT_BEAT_REPEAT */
     box_audio_tape_stop_t tape_stop; /**< BOX_AUDIO_EFFECT_TAPE_STOP */
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
 } box_audio_effect_data_t;
 
 /** An effect instance of the pool of the core: a kind in an insert slot of a bus, on the
@@ -2003,22 +1997,16 @@ void box_audio_transient_shaper_rest(
     box_audio_effect_t *fx,
     int32_t frames);
 
-<<<<<<< HEAD
 /** The vocoder kind: floats of memory, its bands */
 int32_t box_audio_vocoder_floats(
     float sample_rate);
 
 /** The vocoder kind: start on the memory of its slot */
 void box_audio_vocoder_start(
-=======
-/** The frequency shifter kind, in frequency_shifter.c: start at the params of fx */
-void box_audio_frequency_shifter_start(
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
     box_audio_core_t *core,
     box_audio_effect_t *fx,
     bool fade_in);
 
-<<<<<<< HEAD
 /** The vocoder kind: new parameters while it runs */
 void box_audio_vocoder_command(
     box_audio_core_t *core,
@@ -2026,7 +2014,25 @@ void box_audio_vocoder_command(
 
 /** The vocoder kind: process a block on the output of its key bus */
 bool box_audio_vocoder_render(
-=======
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The vocoder kind: a block skipped while idle */
+void box_audio_vocoder_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    int32_t frames);
+
+/** The frequency shifter kind, in frequency_shifter.c: start at the params of fx */
+void box_audio_frequency_shifter_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
 /** The frequency shifter kind: new parameters while it runs */
 void box_audio_frequency_shifter_command(
     box_audio_core_t *core,
@@ -2035,7 +2041,6 @@ void box_audio_frequency_shifter_command(
 /** The frequency shifter kind: process a block; true once a silent block left its allpasses
  * and its feedback decayed */
 bool box_audio_frequency_shifter_render(
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
     box_audio_core_t *core,
     box_audio_effect_t *fx,
     float *l,
@@ -2043,10 +2048,6 @@ bool box_audio_frequency_shifter_render(
     int32_t frames,
     bool silent);
 
-<<<<<<< HEAD
-/** The vocoder kind: a block skipped while idle */
-void box_audio_vocoder_rest(
-=======
 /** The frequency shifter kind: a block skipped while idle */
 void box_audio_frequency_shifter_rest(
     box_audio_core_t *core,
@@ -2078,7 +2079,6 @@ bool box_audio_pattern_gate_render(
 /** The pattern gate kind: a block skipped while idle, over which its gain moves on as it
  * would have rendered */
 void box_audio_pattern_gate_rest(
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
     box_audio_core_t *core,
     box_audio_effect_t *fx,
     int32_t frames);

@@ -461,12 +461,9 @@
                     "beat_repeat",
                     "saturator",
                     "transient_shaper",
-<<<<<<< HEAD
                     "vocoder",
-=======
                     "frequency_shifter",
                     "rotary",
->>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
                     "synth_sub",
                     "synth_sync",
                     "synth_drive",
