@@ -1164,6 +1164,33 @@
                     "core_position",
                     "cost_changed_only"
                 ]
+            },
+            {
+                "id": "Emitter",
+                "testcases": [
+                    "interval_range",
+                    "first_play_delayed",
+                    "sub_frame_interval",
+                    "shape_point",
+                    "shape_disc",
+                    "shape_sphere",
+                    "shape_hemisphere",
+                    "shape_box",
+                    "shape_transform",
+                    "shape_degenerate",
+                    "volume_pitch_ranges",
+                    "deterministic",
+                    "out_of_range_skipped",
+                    "max_active",
+                    "playing_false",
+                    "disable_delete",
+                    "sound_not_ready",
+                    "output_override",
+                    "invalid_values",
+                    "nonspatial",
+                    "script",
+                    "audio_command"
+                ]
             }
         ]
     }

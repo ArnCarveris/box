@@ -1,11 +1,16 @@
 /**
  * @file Spatial.c
  * @brief Benchmarks for the spatial sources of box.audio: 1000 looping sources, most of them
- * beyond max_distance, through the null output, one item per source per frame.
+ * beyond max_distance, through the null output, one item per source per frame; and 300
+ * emitters, one item per emitter per frame.
  *
  * Each iteration runs one frame of a world with box. The frames are short (a microsecond), so
  * the null output renders next to nothing and the time is the time of the frame, the
  * AudioSync of the module included; sources_0 is the same world without sources.
+ *
+ * emitters_300_idle runs emitters that are never due. emitters_300_playing runs frames of 1/60
+ * s in which a few play a short silent sound; minus emitters_0_playing, the same world without
+ * emitters, it is the cost of an emitter on the main thread.
  */
 
 #include <box.h>
@@ -131,4 +136,95 @@ void Spatial_sources_0(
     }
 
     ecs_fini(world);
+}
+
+/** Emitters of the benchmarks */
+#define BENCH_EMITTERS 300
+
+/** Create a world with a listener, a short silent sound and emitters on spheres around it.
+ *
+ * @param count Emitters to create
+ * @param min interval_min
+ * @param max interval_max
+ * @return The world
+ */
+static ecs_world_t* bench_emitter_world(
+    int32_t count,
+    float min,
+    float max)
+{
+    static float silence[48];
+    ecs_world_t *world = ecs_init();
+    int32_t i;
+    ECS_IMPORT(world, Box);
+    box_audio_output_open(world, &(box_audio_output_desc_t){ .headless = true });
+    ecs_entity_t sound = box_audio_sound_from_pcm(world, 0, silence, 48, 1, 48000);
+    ecs_entity_t listener = ecs_entity(world, { .name = "listener" });
+    ecs_set(world, listener, Position, {0, 0, 0});
+    ecs_add(world, listener, AudioListener);
+    for (i = 0; i < count; i ++) {
+        ecs_entity_t e = ecs_new(world);
+        float d = 2.0f + (float)(i % 40);
+        ecs_set(world, e, Position, {d * 0.6f, 0, -d * 0.8f});
+        AudioEmitter *em = ecs_ensure(world, e, AudioEmitter);
+        em->sound = sound;
+        em->interval_min = min;
+        em->interval_max = max;
+        em->shape = AudioEmitterSphere;
+        em->radius = 3;
+        em->volume_min = 0.5f;
+        em->pitch_min = 0.9f;
+        em->pitch_max = 1.1f;
+        em->max_active = 2;
+        ecs_modified(world, e, AudioEmitter);
+    }
+
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, BENCH_DT);
+    }
+
+    return world;
+}
+
+/** Run frames of a world with emitters.
+ *
+ * @param b The benchmark
+ * @param count Emitters to create
+ * @param dt Delta of a frame
+ */
+static void bench_emitters(
+    bench_t *b,
+    int32_t count,
+    float dt)
+{
+    ecs_world_t *world = bench_emitter_world(count, dt > BENCH_DT ? 0.5f : 1.0f,
+        dt > BENCH_DT ? 2.0f : 4.0f);
+    bench_set_items(b, BENCH_EMITTERS);
+    while (bench_iter(b)) {
+        ecs_progress(world, dt);
+        bench_keep(world);
+    }
+
+    ecs_fini(world);
+}
+
+void Spatial_emitters_300_idle(
+    bench_t *b)
+{
+    // audio/emitter
+    bench_emitters(b, BENCH_EMITTERS, BENCH_DT);
+}
+
+void Spatial_emitters_300_playing(
+    bench_t *b)
+{
+    // audio/emitter
+    bench_emitters(b, BENCH_EMITTERS, 1.0f / 60.0f);
+}
+
+void Spatial_emitters_0_playing(
+    bench_t *b)
+{
+    // audio/emitter
+    bench_emitters(b, 0, 1.0f / 60.0f);
 }

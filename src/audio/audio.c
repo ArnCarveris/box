@@ -107,6 +107,28 @@ static void box_audio_spatial_ctor(
     }
 }
 
+/** Construct AudioEmitter values: a play every 1 to 4 seconds at the origin, at unity volume
+ * and pitch, without a limit, playing.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_emitter_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    AudioEmitter *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (AudioEmitter){ .interval_min = 1.0f, .interval_max = 4.0f,
+            .volume_min = 1.0f, .volume_max = 1.0f, .pitch_min = 1.0f, .pitch_max = 1.0f,
+            .playing = true };
+    }
+}
+
 /** Construct Reverb values: a decay of 1.5 seconds, half damped, 20 ms of predelay, a middle
  * size, fully wet, no shimmer, whose pitch is an octave up.
  *
@@ -1412,6 +1434,9 @@ void BoxAudioImport(
     ECS_TAG_DEFINE(world, AudioListener);
     ECS_META_COMPONENT(world, AudioSpatial);
     ecs_set_hooks(world, AudioSpatial, { .ctor = box_audio_spatial_ctor });
+    ECS_META_COMPONENT(world, AudioEmitterShape);
+    ECS_META_COMPONENT(world, AudioEmitter);
+    ecs_set_hooks(world, AudioEmitter, { .ctor = box_audio_emitter_ctor });
     ECS_META_COMPONENT(world, Reverb);
     ecs_set_hooks(world, Reverb, { .ctor = box_audio_reverb_ctor });
     ECS_META_COMPONENT(world, AudioEqKind);
@@ -1523,6 +1548,8 @@ void BoxAudioImport(
     ECS_COMPONENT_DEFINE(world, AudioWavetable);
     ECS_COMPONENT_DEFINE(world, AudioInstrumentState);
     ECS_COMPONENT_DEFINE(world, AudioTrackState);
+    ECS_COMPONENT_DEFINE(world, AudioEmitterState);
+    ecs_set_hooks(world, AudioEmitterState, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioTrackState, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioSoundId, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioInstrumentState, { .copy = box_audio_track_copy });
@@ -1537,6 +1564,7 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(AudioPcm), EcsWith, ecs_id(AudioSoundId));
     ecs_add_pair(world, ecs_id(AudioBus), EcsWith, ecs_id(AudioBusState));
     ecs_add_pair(world, ecs_id(AudioSource), EcsWith, ecs_id(AudioVoice));
+    ecs_add_pair(world, ecs_id(AudioEmitter), EcsWith, ecs_id(AudioEmitterState));
     ecs_add_pair(world, ecs_id(Reverb), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(Equalizer), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(AudioFilter), EcsWith, ecs_id(AudioEffectState));
@@ -1582,6 +1610,7 @@ void BoxAudioImport(
     ecs_atfini(world, box_audio_module_free, state);
 
     box_audio_sync_init(world, state);
+    box_audio_emitter_init(world, state);
     box_audio_sample_init(world, state);
     box_audio_music_init(world, state);
     box_audio_instrument_init(world, state);
