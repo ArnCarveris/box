@@ -2,7 +2,7 @@
  * @file Synth.c
  * @brief The synth of the audio core and synth sounds of box.audio, measured on offline
  * renders: frequencies, aliasing, noise, envelopes, the filter, layers, phase and ring
- * modulation, feedback, eight layers, unison and stereo width, and scripts.
+ * modulation, feedback, eight layers, unison and stereo width, sub oscillators, and scripts.
  */
 
 #include "world.h"
@@ -4804,4 +4804,342 @@ void Synth_pluck_vibrato_cost(void) {
     }
 
     printf("32 strings: %.1f ns per string and frame steady, %.1f under vibrato\n", ns[0], ns[1]);
+}
+
+/** SynthFilter has a drive of 0 by default. */
+void Synth_filter_drive_default(void) {
+    // audio/synth
+    ecs_world_t *world = audio_world();
+    ecs_entity_t e = ecs_new(world);
+    const SynthFilter *f;
+    ecs_add(world, e, SynthFilter);
+    f = ecs_get(world, e, SynthFilter);
+    test_assert(f != NULL);
+    test_flt(f->drive, 0);
+    test_flt(f->cutoff, 1000);
+    ecs_fini(world);
+}
+
+/** A steady sine at 0.4 with a sub, so that a sub of 1 keeps it under the limiter.
+ *
+ * @param frequency Hz
+ * @param sub Level of the sub
+ * @param octave Octaves the sub is under it
+ * @return The patch
+ */
+static box_audio_synth_patch_t synth_sub(
+    float frequency,
+    float sub,
+    uint32_t octave)
+{
+    box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SINE, frequency, 0.4f, 1.0f);
+    p.layer[0].sub = sub;
+    p.layer[0].sub_octave = octave;
+
+    return p;
+}
+
+/** A sine at 440 Hz with a sub one octave under has a strong component at 220 Hz and none at
+ * 110 Hz; two octaves under at 110 Hz, with its odd harmonics and none at 220 Hz. */
+void Synth_sub_octaves(void) {
+    // audio/synth
+    const int32_t from = 4800, n = AUDIO_FRAMES - 4800;
+    box_audio_synth_patch_t p = synth_sub(440, 1, 1);
+    double e110, e220, e330, e440, plain;
+    synth_render_patch(&p);
+    e110 = synth_bin_energy(audio_l + from, n, 110, AUDIO_RATE);
+    e220 = synth_bin_energy(audio_l + from, n, 220, AUDIO_RATE);
+    e440 = synth_bin_energy(audio_l + from, n, 440, AUDIO_RATE);
+    printf("sub an octave under: 110 Hz %g, 220 Hz %g, 440 Hz %g\n", e110, e220, e440);
+    test_assert(e220 > 0.5 * e440);
+    test_assert(e110 < 1e-4 * e220);
+
+    p = synth_sub(440, 1, 2);
+    synth_render_patch(&p);
+    e110 = synth_bin_energy(audio_l + from, n, 110, AUDIO_RATE);
+    e220 = synth_bin_energy(audio_l + from, n, 220, AUDIO_RATE);
+    e330 = synth_bin_energy(audio_l + from, n, 330, AUDIO_RATE);
+    e440 = synth_bin_energy(audio_l + from, n, 440, AUDIO_RATE);
+    printf("sub two octaves under: 110 Hz %g, 220 Hz %g, 330 Hz %g, 440 Hz %g\n",
+        e110, e220, e330, e440);
+    test_assert(e110 > 0.5 * e440);
+    test_assert(e220 < 1e-4 * e110);
+    test_assert(e330 > 0.05 * e110 && e330 < 0.2 * e110);
+
+    p = synth_steady(BOX_AUDIO_SYNTH_SINE, 440, 0.5f, 1.0f);
+    synth_render_patch(&p);
+    plain = synth_bin_energy(audio_l + from, n, 220, AUDIO_RATE);
+    test_assert(plain < 1e-6 * e440);
+}
+
+/** A sub of 0 renders bit identical to a layer without one, whatever its octave, on the mono
+ * path, the wide path of unison and with phase modulation; the sine is the old phase
+ * recurrence. */
+void Synth_sub_zero_identical(void) {
+    // audio/synth
+    static float plain[AUDIO_FRAMES], plain_r[AUDIO_FRAMES];
+    box_audio_synth_patch_t p[3], q;
+    double t = 0, dt = (double)440.0f * (double)1.0f / (double)AUDIO_RATE;
+    int32_t edge = (int32_t)(BOX_AUDIO_SYNTH_EDGE * AUDIO_RATE + 0.5f), i, c;
+    p[0] = synth_steady(BOX_AUDIO_SYNTH_SINE, 440, 0.5f, 1.0f);
+    p[1] = synth_unison(BOX_AUDIO_SYNTH_SAW, 220, 0.3f, 3, 20, 1, 1.0f);
+    p[2] = synth_pair(1000, 300, BOX_AUDIO_SYNTH_PHASE, 1);
+    p[2].layer[0].feedback = 0.3f;
+    p[2].layer[0].wave = BOX_AUDIO_SYNTH_SQUARE;
+    for (c = 0; c < 3; c ++) {
+        synth_render_patch(&p[c]);
+        memcpy(plain, audio_l, sizeof(plain));
+        memcpy(plain_r, audio_r, sizeof(plain_r));
+        if (c == 0) {
+            for (i = 0; i < AUDIO_FRAMES; i ++) {
+                if (i >= edge && i < 47000) {
+                    test_assert(plain[i] == box_audio_core_sin(t) * 0.5f);
+                }
+
+                t += dt;
+                t = t >= 1 ? t - 1 : t;
+            }
+        }
+
+        q = p[c];
+        q.layer[0].sub = 0;
+        q.layer[0].sub_octave = 2;
+        q.layer[1].sub_octave = 2;
+        synth_render_patch(&q);
+        test_assert(memcmp(plain, audio_l, sizeof(plain)) == 0);
+        if (c == 1) {
+            test_assert(memcmp(plain_r, audio_r, sizeof(plain_r)) == 0);
+        }
+    }
+}
+
+/** The sub is phase locked to its layer: away from its edges every frame is the sine of the
+ * old phase recurrence plus a square that flips on every wrap of it, or every second. */
+void Synth_sub_phase_locked(void) {
+    // audio/synth
+    int32_t edge = (int32_t)(BOX_AUDIO_SYNTH_EDGE * AUDIO_RATE + 0.5f), i, octave, checked;
+    for (octave = 1; octave <= 2; octave ++) {
+        box_audio_synth_patch_t p = synth_sub(440, 1, (uint32_t)octave);
+        double t = 0, dt = (double)440.0f * (double)1.0f / (double)AUDIO_RATE, s, d;
+        double scale = octave > 1 ? 0.25 : 0.5;
+        uint32_t wraps = 0, mask = octave > 1 ? 3u : 1u;
+        float expected;
+        synth_render_patch(&p);
+        checked = 0;
+        for (i = 0; i < 47000; i ++) {
+            s = (t + (double)(wraps & mask)) * scale;
+            d = dt * scale;
+            if (i >= edge && s >= d && s <= 1 - d && fabs(s - 0.5) > d) {
+                expected = (box_audio_core_sin(t) + (s < 0.5 ? 1.0f : -1.0f)) * 0.4f;
+                test_assert(fabsf(audio_l[i] - expected) < 1e-6f);
+                checked ++;
+            }
+
+            t += dt;
+            wraps += t >= 1;
+            t = t >= 1 ? t - 1 : t;
+        }
+
+        test_assert(checked > 40000);
+    }
+}
+
+/** The level and octave of the sub are clamped by the core: above 1 as 1, an octave of 0 as
+ * 1 and above 2 as 2; noise ignores it. */
+void Synth_sub_clamped(void) {
+    // audio/synth
+    static float ref[AUDIO_FRAMES];
+    box_audio_synth_patch_t p;
+    p = synth_sub(300, 1, 1);
+    synth_render_patch(&p);
+    memcpy(ref, audio_l, sizeof(ref));
+    p = synth_sub(300, 5, 0);
+    synth_render_patch(&p);
+    test_assert(memcmp(ref, audio_l, sizeof(ref)) == 0);
+
+    p = synth_sub(300, 0.5f, 2);
+    synth_render_patch(&p);
+    memcpy(ref, audio_l, sizeof(ref));
+    p = synth_sub(300, 0.5f, 9);
+    synth_render_patch(&p);
+    test_assert(memcmp(ref, audio_l, sizeof(ref)) == 0);
+
+    p = synth_steady(BOX_AUDIO_SYNTH_NOISE, 300, 0.5f, 1.0f);
+    p.seed = 7;
+    synth_render_patch(&p);
+    memcpy(ref, audio_l, sizeof(ref));
+    p.layer[0].sub = 1;
+    synth_render_patch(&p);
+    test_assert(memcmp(ref, audio_l, sizeof(ref)) == 0);
+
+    p = synth_sub(300, -1, 1);
+    synth_render_patch(&p);
+    memcpy(ref, audio_l, sizeof(ref));
+    p = synth_steady(BOX_AUDIO_SYNTH_SINE, 300, 0.4f, 1.0f);
+    synth_render_patch(&p);
+    test_assert(memcmp(ref, audio_l, sizeof(ref)) == 0);
+}
+
+/** Each unison voice of a wide layer has a sub of its own: the spectrum of both channels of a
+ * layer at 880 Hz over 100 cents has a peak at half of each voice, and little between them. */
+void Synth_sub_unison(void) {
+    // audio/synth
+    const int32_t from = 2400, n = AUDIO_FRAMES - 2400;
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_unison(BOX_AUDIO_SYNTH_SINE, 880, 0.5f, 3, 100, 1, 1.5f);
+    float *mono = audio_sound_a;
+    double f[3], power, lo = 1e300, between = 0;
+    int32_t i, k;
+    p.layer[0].sub = 1;
+    p.layer[0].sub_octave = 1;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES);
+    box_audio_core_free(core);
+    test_assert(memcmp(audio_l, audio_r, AUDIO_FRAMES * sizeof(float)) != 0);
+    for (i = 0; i < AUDIO_FRAMES; i ++) {
+        mono[i] = audio_l[i] + audio_r[i];
+    }
+
+    for (k = 0; k < 3; k ++) {
+        f[k] = 440 * pow(2, 100 * (k * 0.5 - 0.5) / 1200);
+        power = synth_hann_power(mono + from, n, f[k], AUDIO_RATE);
+        printf("sub of voice %d at %.2f Hz: %g\n", k, f[k], power);
+        lo = power < lo ? power : lo;
+    }
+
+    for (k = 0; k < 2; k ++) {
+        power = synth_hann_power(mono + from, n, 0.5 * (f[k] + f[k + 1]), AUDIO_RATE);
+        between = power > between ? power : between;
+    }
+
+    power = synth_hann_power(mono + from, n, 880, AUDIO_RATE);
+    printf("between the subs: %g, at the middle voice %g\n", between, power);
+    test_assert(lo > 100 * between);
+    test_assert(lo > 0.1 * power);
+}
+
+/** The sub follows a glide of its layer: an octave up over 0.2 s, from 150 Hz under 300 Hz to
+ * 300 Hz under 600 Hz, and halfway it is half of the geometric mean. */
+void Synth_sub_glide(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(AUDIO_RATE);
+    box_audio_synth_patch_t p = synth_glide_patch(300, 0.2f);
+    double before, before_off, after, after_old, after_off, mid, mid_off;
+    p.layer[0].sub = 1;
+    p.layer[0].sub_octave = 1;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 4864);
+    before = synth_hann_power(audio_l + 480, 4864 - 480, 150, AUDIO_RATE);
+    before_off = synth_hann_power(audio_l + 480, 4864 - 480, 225, AUDIO_RATE);
+    test_assert(before > 100 * before_off);
+
+    audio_voice_set(core, 1, BOX_AUDIO_PARAM_PITCH, 2);
+    audio_render(core, 0, 19200);
+    after = synth_hann_power(audio_l + 9600 + 480, 9600 - 480, 300, AUDIO_RATE);
+    after_old = synth_hann_power(audio_l + 9600 + 480, 9600 - 480, 150, AUDIO_RATE);
+    after_off = synth_hann_power(audio_l + 9600 + 480, 9600 - 480, 450, AUDIO_RATE);
+    printf("after the glide: 300 Hz %g, 150 Hz %g, 450 Hz %g\n", after, after_old, after_off);
+    test_assert(after > 100 * after_old);
+    test_assert(after > 100 * after_off);
+
+    mid = synth_hann_power(audio_l + 4800 - 480, 960, 150 * sqrt(2.0), AUDIO_RATE);
+    mid_off = synth_hann_power(audio_l + 4800 - 480, 960, 150, AUDIO_RATE);
+    printf("halfway: %g at %.1f Hz, %g at 150 Hz\n", mid, 150 * sqrt(2.0), mid_off);
+    test_assert(mid > mid_off);
+    box_audio_core_free(core);
+}
+
+/** The sub aliases little: a sine at 4 kHz with a sub at 2 kHz at 44100 Hz, where 2 kHz has
+ * an exact bin every 441 frames and its aliases fall between its harmonics, has little energy
+ * outside the harmonics of 2 kHz and DC: 0.0003, where the plain square at 5 kHz has 0.004. */
+void Synth_sub_alias(void) {
+    // audio/synth
+    box_audio_core_t *core = synth_core(SYNTH_ALIAS_RATE);
+    box_audio_synth_patch_t p = synth_sub(4000, 1, 1);
+    const float *x = audio_l + 2048;
+    double total = 0, mean = 0, harmonics = 0, alias;
+    int32_t i, k;
+    synth_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    audio_render(core, 0, 2048 + SYNTH_ALIAS_FRAMES);
+    box_audio_core_free(core);
+    for (i = 0; i < SYNTH_ALIAS_FRAMES; i ++) {
+        total += (double)x[i] * x[i];
+        mean += x[i];
+    }
+
+    mean /= SYNTH_ALIAS_FRAMES;
+    for (k = 1; k * 2000 < SYNTH_ALIAS_RATE / 2; k ++) {
+        harmonics += synth_bin_energy(x, SYNTH_ALIAS_FRAMES, k * 2000.0, SYNTH_ALIAS_RATE);
+    }
+
+    alias = (total - harmonics - mean * mean * SYNTH_ALIAS_FRAMES) / total;
+    printf("sub at 2 kHz: %.2f dB outside its harmonics\n", 10 * log10(alias));
+    test_assert(alias >= 0);
+    test_assert(alias < 0.001);
+}
+
+/** A modulator with a sub modulates with it: a sine at 200 Hz with a sub at 100 Hz moving the
+ * phase of a carrier at 1 kHz puts sidebands at 1 kHz plus and minus 100 Hz, which the
+ * modulator alone does not. */
+void Synth_sub_modulator(void) {
+    // audio/synth
+    const int32_t from = 4800, n = AUDIO_FRAMES - 4800;
+    box_audio_synth_patch_t p = synth_pair(1000, 200, BOX_AUDIO_SYNTH_PHASE, 1);
+    double plain, with, sub;
+    synth_render_patch(&p);
+    plain = synth_bin_energy(audio_l + from, n, 1100, AUDIO_RATE);
+    p.layer[1].sub = 1;
+    p.layer[1].sub_octave = 1;
+    synth_render_patch(&p);
+    with = synth_bin_energy(audio_l + from, n, 1100, AUDIO_RATE);
+    sub = synth_bin_energy(audio_l + from, n, 100, AUDIO_RATE);
+    printf("sideband at 1100 Hz: %g without the sub, %g with it; 100 Hz %g\n",
+        plain, with, sub);
+    test_assert(with > 1000 * plain);
+    test_assert(synth_finite(audio_l, 0, AUDIO_FRAMES));
+}
+
+/** test/assets/audio/synth_sub.flecs compiles the sub of each layer, the default octave is 1,
+ * and the sound plays. */
+void Synth_script_sub(void) {
+    // audio/synth
+    ecs_world_t *world = audio_world();
+    char *code = audio_read("test/assets/audio/synth_sub.flecs");
+    ecs_entity_t bass, plain, low;
+    const box_audio_synth_patch_t *p;
+    int32_t start;
+    test_assert(ecs_script_run(world, "sub", code, NULL) == 0);
+    ecs_os_free(code);
+    audio_run(world, 1);
+
+    bass = ecs_lookup(world, "SubBass");
+    plain = ecs_lookup(world, "Plain");
+    low = ecs_lookup(world, "SubBass.low");
+    test_assert(bass != 0 && plain != 0 && low != 0);
+    test_flt(ecs_get(world, plain, SynthOscillator)->sub, 0);
+    test_int(ecs_get(world, plain, SynthOscillator)->sub_octave, 1);
+    test_flt(ecs_get(world, bass, SynthOscillator)->sub, 0.6f);
+    test_int(ecs_get(world, bass, SynthOscillator)->sub_octave, 1);
+    test_flt(ecs_get(world, low, SynthOscillator)->sub, 0.4f);
+    test_int(ecs_get(world, low, SynthOscillator)->sub_octave, 2);
+    p = &ecs_get(world, bass, AudioSynth)->patch;
+    test_int(p->layers, 2);
+    test_flt(p->layer[0].sub, 0.6f);
+    test_int(p->layer[0].sub_octave, 1);
+    test_flt(p->layer[1].sub, 0.4f);
+    test_int(p->layer[1].sub_octave, 2);
+    p = &ecs_get(world, plain, AudioSynth)->patch;
+    test_flt(p->layer[0].sub, 0);
+    test_int(p->layer[0].sub_octave, 1);
+
+    audio_run(world, 1);
+    start = audio_tap_count;
+    test_assert(box_audio_play(world, bass, 1.0f));
+    audio_run(world, 4);
+    test_assert(audio_peak(audio_tap_l, start, audio_tap_count) > 0.05f);
+    test_assert(synth_finite(audio_tap_l, start, audio_tap_count));
+    ecs_fini(world);
 }

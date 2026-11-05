@@ -941,7 +941,7 @@ static void box_audio_seq_audio_pass(
 
     handle = box_audio_new_voice(state);
     box_audio_write_play_priority(&state->writer, handle, sound, v->bus, v->p->gain, 0.0f,
-        (float)ratio, BOX_AUDIO_PLAY_ATTACK, v->priority, when);
+        (float)ratio, 1.0f, BOX_AUDIO_PLAY_ATTACK, v->priority, when);
     if (position > 0) {
         box_audio_write_voice_set(&state->writer, handle, BOX_AUDIO_PARAM_POSITION,
             (float)position, when);

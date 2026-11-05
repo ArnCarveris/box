@@ -144,6 +144,21 @@
                 ]
             },
             {
+                "id": "SynthVelocity",
+                "testcases": [
+                    "filter_cutoff",
+                    "filter_default",
+                    "filter_envelope",
+                    "fm_index",
+                    "pluck_hardness",
+                    "plain_play",
+                    "clamped",
+                    "legato_keeps",
+                    "wide",
+                    "script"
+                ]
+            },
+            {
                 "id": "Sequencer",
                 "testcases": [
                     "defaults",
@@ -214,7 +229,9 @@
                     "eq_filter",
                     "dynamics",
                     "delay",
-                    "modulation"
+                    "modulation",
+                    "saturator",
+                    "synth_sub"
                 ]
             },
             {
@@ -529,7 +546,15 @@
                     "kind_change_no_click",
                     "mix",
                     "render_sizes",
-                    "component"
+                    "component",
+                    "drive_ramp_no_click"
+                ]
+            },
+            {
+                "id": "EffectFilterDrive",
+                "testcases": [
+                    "zero_identical",
+                    "bounded"
                 ]
             },
             {
@@ -549,6 +574,33 @@
                     "world_duck",
                     "sidechain_cycle",
                     "script"
+                ]
+            },
+            {
+                "id": "Saturator",
+                "testcases": [
+                    "harmonics",
+                    "level_across_drive",
+                    "alias_oversampled",
+                    "bits",
+                    "mix_dry",
+                    "reduction",
+                    "drive_no_click",
+                    "render_sizes",
+                    "silent_after_tail",
+                    "component",
+                    "script"
+                ]
+            },
+            {
+                "id": "SynthDrive",
+                "testcases": [
+                    "resonance_bounded",
+                    "sweep_stable",
+                    "zero_identical",
+                    "harmonics",
+                    "slope_24",
+                    "wide"
                 ]
             },
             {
@@ -580,6 +632,7 @@
                     "filter_slope_24",
                     "script_filter_envelope",
                     "filter_extreme",
+                    "filter_drive_default",
                     "layers_sum",
                     "layer_own_envelope",
                     "eight_layers",
@@ -666,7 +719,16 @@
                     "pluck_vibrato_rate",
                     "pluck_crossing_smooth",
                     "pluck_steady_identical",
-                    "pluck_vibrato_cost"
+                    "pluck_vibrato_cost",
+                    "sub_octaves",
+                    "sub_zero_identical",
+                    "sub_phase_locked",
+                    "sub_clamped",
+                    "sub_unison",
+                    "sub_glide",
+                    "sub_alias",
+                    "sub_modulator",
+                    "script_sub"
                 ]
             },
             {
