@@ -1,0 +1,47 @@
+// Automation lanes for the Automation suite of test/cpu/audio: a lowpass sweep of the synth
+// bus from 200 to 5000 Hz over 4 beats, a fade of the lead track and a send of fx to the room
+// that opens over a beat and stays open for another. The tracks of the lanes have no
+// instrument; the suite plays its sounds on the buses and starts the transport at 120 bpm.
+using box.audio
+
+synth {
+  AudioBus: {effects: [synth]}
+  AudioFilter: {cutoff: 1000}
+}
+
+// A return that only the send of fx reaches: fx itself is silent and its send taps before
+// its volume
+room { AudioBus: {kind: AudioChannelReturn} }
+
+fx { AudioBus: {volume: 0, sends: [{bus: room, level: 0, pre_fader: true}]} }
+
+// A track that fades itself, with its lane below
+lead { Track: {} }
+
+prefab sweep {
+  AutomationClip: {target: synth, component: AudioFilter, member: "cutoff", length: 4,
+    curve: {keys: [{0, 200}, {4, 5000}]}}
+}
+
+prefab fade {
+  AutomationClip: {target: lead, component: AudioBus, member: "volume", length: 4,
+    curve: {keys: [{0, 1}, {4, 0}]}}
+}
+
+prefab open {
+  AutomationClip: {target: fx, component: AudioBus, member: "sends[0].level", length: 2,
+    curve: {keys: [{0, 0}, {1, 1}, {2, 1}]}}
+}
+
+// A track that only automates
+lanes {
+  Track: {}
+  sweep_lane { ClipPlacement: {clip: sweep, start: 0} }
+  open_lane { ClipPlacement: {clip: open, start: 0} }
+}
+
+lead {
+  fade_lane { ClipPlacement: {clip: fade, start: 0} }
+}
+
+$ { Transport: {tempo: 120} }

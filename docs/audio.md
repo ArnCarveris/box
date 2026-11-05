@@ -423,7 +423,7 @@ A `NoteClip` has a `length` (4 beats) and notes with `start`, `duration`, `pitch
 
 | Placement field | Meaning and default |
 | --- | --- |
-| `clip` | Reusable `NoteClip` or `AudioClip` |
+| `clip` | Reusable `NoteClip`, `AudioClip` or `AutomationClip` |
 | `start` | Beat on the timeline |
 | `duration` | 0 uses clip length minus placement offset |
 | `loop` | False; true repeats passes until duration ends |
@@ -491,6 +491,70 @@ placements. Placement offsets remain in beats; transpose changes pitch and speed
 together. Audio is not stretched to tempo. Each looping pass starts a new voice;
 its seam uses the 5 ms stop fade. A seek or start within an audio placement resumes
 inside the relevant pass, unlike note clips.
+
+### Automation
+
+An `AutomationClip` moves one float member of a bus or an effect over beats: a
+filter sweep, a send that opens for a chorus, the fade of a track. It is placed
+with a `ClipPlacement` on a `Track` like any clip; `start`, `duration`, `offset`
+and `loop` work the same, `gain` and `transpose` are ignored, and a track of only
+automation needs no instrument.
+
+| Field | Meaning and default |
+| --- | --- |
+| `target` | The entity with the `AudioBus` or the effect component |
+| `component` | `AudioBus` or an effect component, such as `AudioFilter` |
+| `member` | Path of a float member: `cutoff`, `volume`, `sends[1].level`, `bands[2].gain` |
+| `length` | Beats of a pass, 4 |
+| `curve` | A [Curve](curves.md): time in beats from the clip start, value in member units |
+
+```flecs
+using box.audio
+
+synth {
+  AudioBus: {effects: [synth]}
+  AudioFilter: {cutoff: 1000}
+}
+
+prefab sweep {
+  AutomationClip: {target: synth, component: AudioFilter, member: "cutoff",
+    curve: {kind: CurveCatmullRom, keys: [{0, 200}, {2, 1200}, {4, 5000}]}}
+}
+
+lanes {
+  Track: {}
+  rise { ClipPlacement: {clip: sweep, start: 16, duration: 16, loop: true} }
+}
+```
+
+An `AudioBus` automates `volume`, `pan`, `width` and the `level` of its sends; the
+master automates its `volume`, `pan` and `width`. An effect automates every float
+member of its effect component: Reverb, Equalizer bands, AudioFilter, Compressor,
+Gate, Delay, Phaser, Chorus, Saturator and later effects. Kinds, slopes, stages,
+voices, entities and bools are not continuous and not automatable. A clip whose
+target, component or member is unknown or not automatable logs one error that
+names it and does nothing until it changes.
+
+While the transport plays, each lane samples its curve within the lookahead window
+every 10 ms of output and at its keys, and schedules every value at its frame. A
+bus ramps to each value as it does to any set. An effect gets a copy of its
+component with the automated members written, through the same parameter builder as
+any change of the component, and smooths the step over its usual 10 to 20 ms.
+Several lanes may move members of one effect; on one bus parameter the lane that
+starts last wins. At a loop wrap the lanes go on from `loop_start`. A seek, a stop
+and a change of the clip, the placement, the track or the component of the target
+cancel what was scheduled ahead and schedule again.
+
+The automation owns what the output hears, never the component. Game code reads
+and writes the authored value, which the automation does not change. Where no lane
+covers a target, and while the transport is stopped, the output has the value of
+the component: the end of a placement and a stop send it again. A write of the
+component while a lane runs applies at once and holds until the next value of the
+lane, at most 10 ms later. Scheduled values travel as `BUS_SET` and
+`EFFECT_PARAMS` commands with a frame, and a `CANCEL` command drops them; see
+[core.h](../src/audio/core/core.h).
+[automation.flecs](../test/assets/audio/automation.flecs) sweeps a filter, fades a
+track and opens a send.
 
 For a complete mixed song with samples, returns, ducking and a quantized game
 stinger, see [song.flecs](../test/assets/audio/song.flecs). Wait for its sound files
@@ -606,7 +670,7 @@ other writers send 1. The velocity makes a play command 48 bytes and a legato co
 a writer buffer of a given size holds fewer of them than before.
 
 The core owns a 64-bit rendered-frame clock. Scheduled play, stop, voice/bus set,
-release and legato commands carry a frame time. Future commands wait in a fixed
+release, legato and effect params commands carry a frame time. Future commands wait in a fixed
 4096-entry schedule; a full schedule applies the command immediately and reports
 `BOX_AUDIO_EVENT_LATE`. Immediate stops also cancel scheduled commands for their
 voice handle. Sound memory is freed by its owner after `SOUND_FREE`, which is
@@ -616,8 +680,8 @@ and [transport.h](../src/audio/transport.h) for the low-level APIs.
 The main limits are 64 voices, 64 buses, 64 effects, four inserts and sends per
 bus, eight synth layers, two synth LFOs, seven unison copies per layer and
 32 pluck strings. Effects are algorithmic: no convolution or geometry-derived rooms.
-There is one transport and one music stream per world. There are no automation
-lanes, tempo ramps, time stretching, MIDI I/O, plugins, mixer UI or piano roll.
+There is one transport and one music stream per world. There are no tempo ramps,
+time stretching, MIDI I/O, plugins, mixer UI or piano roll.
 Scripts can change channel and effect values each frame.
 
 Offline coverage lives in [test/cpu/audio](../test/cpu/audio/); browser and end-to-end

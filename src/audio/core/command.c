@@ -317,6 +317,42 @@ bool box_audio_write_effect(
     return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
 }
 
+bool box_audio_write_effect_params(
+    box_audio_writer_t *writer,
+    uint32_t slot,
+    uint32_t kind,
+    const float *params,
+    uint64_t when)
+{
+    box_audio_cmd_effect_params_t cmd;
+    int32_t i;
+    box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_EFFECT_PARAMS, sizeof(cmd));
+    cmd.when_lo = (uint32_t)when;
+    cmd.when_hi = (uint32_t)(when >> 32);
+    cmd.slot = slot;
+    cmd.kind = kind;
+    for (i = 0; i < BOX_AUDIO_EFFECT_PARAMS; i ++) {
+        cmd.params[i] = params ? params[i] : 0.0f;
+    }
+
+    return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
+}
+
+bool box_audio_write_cancel(
+    box_audio_writer_t *writer,
+    uint32_t type,
+    uint32_t target,
+    uint32_t param)
+{
+    box_audio_cmd_cancel_t cmd;
+    box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_CANCEL, sizeof(cmd));
+    cmd.type = type;
+    cmd.target = target;
+    cmd.param = param;
+
+    return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
+}
+
 bool box_audio_write_synth(
     box_audio_writer_t *writer,
     uint32_t sound,

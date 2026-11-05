@@ -208,6 +208,19 @@
                 ]
             },
             {
+                "id": "Automation",
+                "testcases": [
+                    "filter_sweep",
+                    "volume_fade",
+                    "send_level",
+                    "loop",
+                    "stop",
+                    "seek",
+                    "unknown_member",
+                    "deterministic"
+                ]
+            },
+            {
                 "id": "Song",
                 "testcases": [
                     "first_sound",
@@ -247,7 +260,9 @@
                     "stop_cancels",
                     "bit_identical",
                     "null_clock",
-                    "status_clock"
+                    "status_clock",
+                    "cancel_bus_set",
+                    "effect_params_at_frame"
                 ]
             },
             {

@@ -191,7 +191,9 @@ typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_RELEASE = 10,      /**< box_audio_cmd_voice_release_t */
     BOX_AUDIO_CMD_EFFECT = 11,       /**< box_audio_cmd_effect_t; 7, the reverb command of
                                       *   before, is skipped as an unknown type */
-    BOX_AUDIO_CMD_LEGATO = 12        /**< box_audio_cmd_legato_t */
+    BOX_AUDIO_CMD_LEGATO = 12,       /**< box_audio_cmd_legato_t */
+    BOX_AUDIO_CMD_EFFECT_PARAMS = 13, /**< box_audio_cmd_effect_params_t */
+    BOX_AUDIO_CMD_CANCEL = 14        /**< box_audio_cmd_cancel_t */
 } box_audio_cmd_type_t;
 
 /** Parameters of BOX_AUDIO_CMD_VOICE_SET and BOX_AUDIO_CMD_BUS_SET */
@@ -236,9 +238,9 @@ typedef enum box_audio_param_t {
 
 /** Header of every command: its type and its size in bytes, header included.
  *
- * PLAY, STOP, VOICE_SET, BUS_SET, RELEASE and LEGATO follow it with when_lo and when_hi, the
- * frame of the core clock (box_audio_core_clock) at which the command takes effect, 64 bits in
- * two words so that every field stays 32 bits.
+ * PLAY, STOP, VOICE_SET, BUS_SET, RELEASE, LEGATO and EFFECT_PARAMS follow it with when_lo and
+ * when_hi, the frame of the core clock (box_audio_core_clock) at which the command takes
+ * effect, 64 bits in two words so that every field stays 32 bits.
  *
  * A when of 0, or of a frame that was already rendered, applies at the start of the next
  * block; a later one waits in the schedule of the core for its frame. Of the commands of one
@@ -703,6 +705,31 @@ typedef struct box_audio_cmd_effect_t {
                                      *   ones it does not read 0 */
 } box_audio_cmd_effect_t;
 
+/** Replace the parameters of the effect in a slot at a frame, as an EFFECT command that keeps
+ * its kind, bus, index and key; the kind smooths the change as it does any other. Ignored
+ * when the slot does not hold an effect of the kind by then. The automation of the timeline
+ * schedules one per value it samples */
+typedef struct box_audio_cmd_effect_params_t {
+    box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_EFFECT_PARAMS */
+    uint32_t when_lo;               /**< Low word of the frame it applies at, 0 for now */
+    uint32_t when_hi;               /**< High word of the frame */
+    uint32_t slot;                  /**< Slot of the effect, below BOX_AUDIO_EFFECT_MAX */
+    uint32_t kind;                  /**< The box_audio_effect_kind_t the slot must hold */
+    float params[BOX_AUDIO_EFFECT_PARAMS]; /**< The parameters of the kind */
+} box_audio_cmd_effect_params_t;
+
+/** Drop the commands of the schedule that set a parameter of a bus or the parameters of an
+ * effect slot, at once: the BUS_SET commands of a bus and a parameter, or every
+ * EFFECT_PARAMS command of a slot. The automation of the timeline cancels what it scheduled
+ * ahead with it on a stop, a seek and a change */
+typedef struct box_audio_cmd_cancel_t {
+    box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_CANCEL */
+    uint32_t type;                  /**< BOX_AUDIO_CMD_BUS_SET or BOX_AUDIO_CMD_EFFECT_PARAMS */
+    uint32_t target;                /**< Index of the bus or slot of the effect */
+    uint32_t param;                 /**< The box_audio_param_t of a BUS_SET, unused for an
+                                     *   effect */
+} box_audio_cmd_cancel_t;
+
 /** Waves of a synth oscillator */
 typedef enum box_audio_synth_wave_t {
     BOX_AUDIO_SYNTH_SINE = 0,      /**< Sine */
@@ -1007,8 +1034,9 @@ void box_audio_core_stream_status(
     box_audio_stream_status_t *status);
 
 /** Apply a batch of commands. They take effect at the start of the next render block, but
- * a PLAY, STOP, VOICE_SET, BUS_SET, RELEASE or LEGATO with a future when, which waits in the
- * schedule and takes effect on exactly its frame: the render splits its block there.
+ * a PLAY, STOP, VOICE_SET, BUS_SET, RELEASE, LEGATO or EFFECT_PARAMS with a future when, which
+ * waits in the schedule and takes effect on exactly its frame: the render splits its block
+ * there.
  *
  * Commands of an unknown type are skipped by their size; a truncated command ends the batch.
  * Does not allocate.
@@ -1431,6 +1459,37 @@ bool box_audio_write_effect(
     uint32_t index,
     uint32_t key,
     const float *params);
+
+/** Write a command that replaces the parameters of the effect in a slot at a frame.
+ *
+ * @param writer The writer
+ * @param slot Slot of the effect
+ * @param kind The kind the slot must hold
+ * @param params BOX_AUDIO_EFFECT_PARAMS parameters
+ * @param when Frame of the core clock it applies at, 0 for now
+ * @return Whether the command fit
+ */
+bool box_audio_write_effect_params(
+    box_audio_writer_t *writer,
+    uint32_t slot,
+    uint32_t kind,
+    const float *params,
+    uint64_t when);
+
+/** Write a command that drops the scheduled sets of a parameter of a bus or of the
+ * parameters of an effect slot.
+ *
+ * @param writer The writer
+ * @param type BOX_AUDIO_CMD_BUS_SET or BOX_AUDIO_CMD_EFFECT_PARAMS
+ * @param target Index of the bus or slot of the effect
+ * @param param The box_audio_param_t of a bus, unused for an effect
+ * @return Whether the command fit
+ */
+bool box_audio_write_cancel(
+    box_audio_writer_t *writer,
+    uint32_t type,
+    uint32_t target,
+    uint32_t param);
 
 /** Write a command that makes a sound id a synth patch or replaces its patch, of
  * BOX_AUDIO_CMD_SYNTH_SIZE bytes for the layers of the patch.
