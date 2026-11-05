@@ -434,7 +434,8 @@
                     "compute_off_records_changes",
                     "compute_off_still_applied",
                     "compute_off_view_unbaked",
-                    "compute_change_no_rebuild"
+                    "compute_change_no_rebuild",
+                    "compute_follows_checkbox"
                 ]
             },
             {

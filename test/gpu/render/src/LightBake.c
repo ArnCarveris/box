@@ -564,6 +564,7 @@ void LightBake_compute_on_resumes(void) {
 
     for (i = 0; i < 2; i ++) {
         s[i] = lb_scene(false, 0.001f, 1, true, NULL);
+        ecs_singleton_set(s[i].world, RenderSettings, {.in_flight = 2, .main_thread = true});
         if (i == 1) {
             int32_t frame;
             for (frame = 0; frame < 5000 && lb_status(&s[i])->baked < 3; frame ++) {
@@ -747,4 +748,109 @@ void LightBake_compute_change_no_rebuild(void) {
     }
 
     ecs_fini(s.world);
+}
+
+/* Set Checkbox.mut current of the checkbox opts.baked as the scenes see a click of it */
+static void lb_set_checkbox(
+    ecs_world_t *world,
+    bool value)
+{
+    ecs_entity_t session = ecs_shell_session_init(world, NULL);
+    char *line = flecs_asprintf("set opts.baked box.widgets.Checkbox.mut {current: %s}",
+        value ? "true" : "false");
+    bool error = true;
+    char *out = box_command_run(world, session, line, &error);
+    if (error) {
+        printf("command '%s' failed: %s\n", line, out);
+    }
+
+    test_bool(error, false);
+    ecs_os_free(out);
+    ecs_os_free(line);
+}
+
+void LightBake_compute_follows_checkbox(void) {
+    // baked_lighting/bake_settings
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    char *widgets = box_app_locate("test/assets/ui/widgets.flecs");
+    test_assert(ecs_script(world, {
+        .entity = ecs_entity(world, { .name = "box.ui.widgets" }),
+        .filename = widgets
+    }) != 0);
+    ecs_os_free(widgets);
+
+    test_assert(ecs_script(world, {
+        .entity = ecs_entity(world, { .name = "follows" }),
+        .code =
+        "using box.widgets\n"
+        "using box.light\n"
+        "using box.view\n"
+        "using box.camera\n"
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.material\n"
+        "using box.surface\n"
+        "opts {\n Checkbox baked(label: \"Baked lighting\", value: true)\n}\n"
+        "scene {\n"
+        " Scene: {}\n"
+        " LightBake: {probe_spacing: 2, bounds_padding: 1, capture_size: 8, bounces: 0, "
+        "budget_ms: 2, compute: opts.baked[Checkbox.mut].current}\n"
+        " camera { Position: {0, 4, 10}\n Camera: {fov: 60, near_: 0.1} }\n"
+        " floor { Position: {0, -0.1, 0}\n Box: {16, 0.2, 4} }\n"
+        " lamp { Position: {-2, 0.5, 0}\n Box: {1, 1, 1}\n "
+        "Emissive: {strength: 2, color: {255, 200, 100}} }\n"
+        "}\n"
+        "view {\n View: {camera: scene.camera, lighting: {enabled: true, "
+        "baked: opts.baked[Checkbox.mut].current}}\n}\n"
+        "window {\n Surface: {width: 64, height: 48, resolution_scale: 1}\n}\n"
+    }) != 0);
+
+    ecs_entity_t scene = ecs_lookup(world, "scene");
+    ecs_entity_t view = ecs_lookup(world, "view");
+    test_assert(scene != 0);
+    test_assert(view != 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_bool(ecs_get(world, scene, LightBake)->compute, true);
+    test_bool(ecs_get(world, view, View)->lighting.baked, true);
+
+    int32_t frame;
+    for (frame = 0; frame < 5000 && !ecs_get(world, scene, LightBakeStatus)->converged;
+        frame ++)
+    {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+    }
+
+    test_bool(ecs_get(world, scene, LightBakeStatus)->converged, true);
+    const box_bake_volume_t *v = box_bake_find(box_bake_state(world), scene);
+    test_assert(v != NULL);
+    uint32_t handle = v->handle, generation = v->generation;
+    int32_t probes = v->probes;
+
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        bool value = i % 2 != 0;
+        lb_set_checkbox(world, value);
+        for (frame = 0; frame < 3; frame ++) {
+            ecs_progress(world, 0);
+            box_render_sync(world);
+        }
+
+        test_bool(ecs_get(world, view, View)->lighting.baked, value);
+        test_bool(ecs_get(world, scene, LightBake)->compute, value);
+        v = box_bake_find(box_bake_state(world), scene);
+        test_assert(v != NULL);
+        test_assert(v->handle == handle);
+        test_assert(v->generation == generation);
+        test_int(v->probes, probes);
+        test_int(ecs_vec_count(&v->dirty), 0);
+        test_bool(ecs_get(world, scene, LightBakeStatus)->converged, true);
+    }
+
+    ecs_fini(world);
 }
