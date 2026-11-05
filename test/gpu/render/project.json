@@ -1002,7 +1002,8 @@
                     "radial_ring_in_plane",
                     "radial_burst_scaled",
                     "motion_velocity_curve_moves",
-                    "motion_force_curve_moves"
+                    "motion_force_curve_moves",
+                    "pool_grows_with_point_shadow"
                 ]
             },
             {
