@@ -402,9 +402,10 @@ template Showcase {
 
     PointLight: {intensity: lamp ? 12 * PI : 0, range: 8, shadows: true}
 
+    // The post reaches into the bulb so the light is inside its bounds, not on their edge
     post {
-      Position: {0, -0.9, 0}
-      Cylinder: {segments: 16, smooth: true, radius: 0.06, length: 1.8}
+      Position: {0, -0.88, 0}
+      Cylinder: {segments: 16, smooth: true, radius: 0.06, length: 1.84}
       Rgb: {60, 64, 72}
       PbrMaterial: {metallic: 0.8, roughness: 0.4}
       LightFixture

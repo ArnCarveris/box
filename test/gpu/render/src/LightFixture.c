@@ -662,14 +662,14 @@ static void fixture_renders_none(
 }
 
 /* A point light at the origin with a range of 4, tile 0, and a spot light at x = 5, tile 1,
- * as in ShadowCache, where tiles of point lights come first; the slab 1 unit up is in the range
- * of the point light only */
+ * as in ShadowCache, where tiles of point lights come first; the slab 2 units up is in the range
+ * of the point light and above the spot light, out of what its tile holds */
 void LightFixture_tag_change_renders_tile(void) {
     // lighting/shadows
     ecs_world_t *world = fixture_world();
     fixture_point(world, (vec3){0, FIXTURE_HEIGHT, 0}, 4, 4 * GLM_PIf);
     fixture_spot(world, (vec3){5, FIXTURE_HEIGHT, 0});
-    ecs_entity_t slab = fixture_box(world, (vec3){0.5f, 1, 0.5f}, (vec3){0.4f, 0.1f, 0.4f},
+    ecs_entity_t slab = fixture_box(world, (vec3){0.5f, 2, 0.5f}, (vec3){0.4f, 0.1f, 0.4f},
         false);
     stbi_image_free(fixture_render(world, "fixture_tag_change.png"));
     test_int(ecs_singleton_get(world, RenderStatus)->shadow_tiles, 2);
