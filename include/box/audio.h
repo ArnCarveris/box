@@ -811,28 +811,70 @@ ECS_STRUCT(Chorus, {
                             *   right */
 });
 
+/** Curve of the clipper of a Saturator */
+ECS_ENUM(SaturatorMode, {
+    SaturatorTanh,         /**< tanh soft clipper, symmetric: warmth on a bus, smooth grit when
+                            *   driven. asymmetry biases it for even harmonics */
+    SaturatorTube,         /**< A softer asymmetric tanh whose positive half clips earlier than
+                            *   its negative half, so its bias grows with the level: even
+                            *   harmonics even at asymmetry 0, warmer than SaturatorTanh */
+    SaturatorHard,         /**< Hard clip with a slightly rounded corner: fuzz, a square wave
+                            *   at full drive. Anti-aliased (ADAA) on top of the oversampling */
+    SaturatorFold,         /**< Sine wavefolder: the driven signal wraps over and back, the more
+                            *   the drive, the more folds and the brighter. Anti-aliased (ADAA)
+                            *   on top of the oversampling */
+    SaturatorRectify       /**< A tanh rectifier: asymmetry blends from half wave at 0 to full
+                            *   wave at 1, octave up grit; the DC it makes is taken out */
+});
+
 /** A saturator, an effect in an insert slot of an AudioBus, as a Reverb is: warmth, grit or
- * lo-fi for a drum bus, a synth bus or the master. Each channel runs through a tanh soft
- * clipper at twice the sample rate, its level compensated so that the drive mostly changes
- * the tone and not the loudness: a sine around -14 dBFS keeps its RMS within about 1 dB at any
- * drive. The asymmetry biases the clipper for even harmonics, with the DC taken out after it,
- * and below 16 bits a bit crusher rounds the saturated signal:
+ * lo-fi for a drum bus, a synth bus or the master. Each channel runs through the clipper of
+ * the mode at twice the sample rate, its level compensated so that the drive mostly changes
+ * the tone and not the loudness: a sine around -14 dBFS keeps its RMS within about 1.5 dB at
+ * any drive in every mode. The asymmetry biases the clipper for even harmonics, with the DC
+ * taken out after it, and below 16 bits a bit crusher rounds the saturated signal:
  * drums { AudioBus: {effects: [drums]}; Saturator: {drive: 0.6, asymmetry: 0.2} }.
  *
+ * Around the clipper, low_cut takes the bass out before it so that the bass stays clean (with
+ * a mix under 1) and does not muddy the distortion, and tone tilts the input around 1 kHz
+ * with the inverse tilt after the clipper, so it sets which band distorts most and leaves a
+ * clean signal as it was. After it, high_cut tames the fizz and rate holds each sample for
+ * 1 / rate seconds, the aliasing of an old sampler that bits alone does not give. Recipes:
+ * - Tape warmth on a bus: {mode: SaturatorTanh, drive: 0.3}
+ * - Tube on a synth or vocal: {mode: SaturatorTube, drive: 0.5, high_cut: 9000}
+ * - Fuzz on a guitar or bass: {mode: SaturatorHard, drive: 0.8, low_cut: 150,
+ *   high_cut: 5000}
+ * - Wavefolded lead: {mode: SaturatorFold, drive: 0.6, tone: 0.3, high_cut: 8000}
+ * - Octave up grit: {mode: SaturatorRectify, drive: 0.4, asymmetry: 1, mix: 0.5}
+ * - Lo-fi drums: {drive: 0.4, bits: 8, rate: 8000, high_cut: 6000}
+ *
  * The oversampling delays the channel by 15 frames, its dry signal too, so that a mix in
- * between does not comb. Drive, asymmetry, bits and mix move over 20 ms. An AudioMeter on its
- * entity reads how hard the clipper squashes as its reduction: the largest drop in dB of the
- * clipped peak against the driven peak, 0 while the clipper is all but linear. Once its input
- * is silent and its state decayed it stops until its input sounds again.
+ * between does not comb. Drive, asymmetry, bits, mix, the cuts, tone and rate move over 20 ms;
+ * a change of the mode is at once. An AudioMeter on its entity reads how hard the clipper
+ * squashes as its reduction: the largest drop in dB of the clipped peak against the driven
+ * peak, 0 while the clipper is all but linear. Once its input is silent and its state decayed
+ * it stops until its input sounds again.
  */
 ECS_STRUCT(Saturator, {
     float drive;           /**< 0 to 1, default 0.3: a gain of 0 to +30 dB into the clipper */
     float asymmetry;       /**< 0 to 1, default 0: a bias before the clipper, shared by both
-                            *   channels, that adds even harmonics */
+                            *   channels, that adds even harmonics; in SaturatorRectify the
+                            *   blend from half wave (0) to full wave (1) */
     float bits;            /**< Bits of the bit crusher, 1 to 16, default 16, which is off;
                             *   bits b round the output to 2^b levels */
     float mix;             /**< Wet level, 0 to 1, default 1; the dry signal passes at
                             *   1 - mix */
+    SaturatorMode mode;    /**< Curve of the clipper, default SaturatorTanh */
+    float low_cut;         /**< Hz of a 12 dB highpass before the clipper, 0 to 20000, default
+                            *   0, which is off */
+    float high_cut;        /**< Hz of a 12 dB lowpass after the clipper, 0 to 20000, default
+                            *   0, which is off; held under 0.45 times the sample rate */
+    float tone;            /**< -1 to 1, default 0: a tilt of up to 9 dB either way at the
+                            *   ends of the spectrum around 1 kHz before the clipper, the
+                            *   inverse after it; above 0 the highs distort most, below 0 the
+                            *   lows */
+    float rate;            /**< Hz of a sample and hold after the clipper, 0 or 100 to the
+                            *   sample rate, default 0, which is off */
 });
 
 /** A transient shaper, an effect in an insert slot of an AudioBus, as a Reverb is: more or

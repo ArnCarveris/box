@@ -256,8 +256,8 @@ static void box_audio_chorus_ctor(
     }
 }
 
-/** Construct Saturator values: a drive of 0.3, symmetric, without the bit crusher, fully
- * wet.
+/** Construct Saturator values: the tanh clipper at a drive of 0.3, symmetric, without the
+ * filters, the sample and hold and the bit crusher, fully wet.
  *
  * @param ptr The components
  * @param count Number of components
@@ -272,7 +272,8 @@ static void box_audio_saturator_ctor(
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
-        values[i] = (Saturator){ .drive = 0.3f, .asymmetry = 0, .bits = 16.0f, .mix = 1.0f };
+        values[i] = (Saturator){ .drive = 0.3f, .asymmetry = 0, .bits = 16.0f, .mix = 1.0f,
+            .mode = SaturatorTanh, .low_cut = 0, .high_cut = 0, .tone = 0, .rate = 0 };
     }
 }
 
@@ -1382,6 +1383,7 @@ void BoxAudioImport(
     ecs_set_hooks(world, Phaser, { .ctor = box_audio_phaser_ctor });
     ECS_META_COMPONENT(world, Chorus);
     ecs_set_hooks(world, Chorus, { .ctor = box_audio_chorus_ctor });
+    ECS_META_COMPONENT(world, SaturatorMode);
     ECS_META_COMPONENT(world, Saturator);
     ecs_set_hooks(world, Saturator, { .ctor = box_audio_saturator_ctor });
     ECS_META_COMPONENT(world, TransientShaper);

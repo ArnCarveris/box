@@ -655,8 +655,8 @@ void NoAlloc_modulation(void) {
     }
 }
 
-/* Saturators in the insert slots of buses: changes of the drive, the asymmetry, the bits and
- * the mix while they run, moves to another bus and slot, the reduction read, tails that decay
+/* Saturators in the insert slots of buses: changes of the drive, the asymmetry, the bits, the
+ * mix, the mode, the cuts, the tone and the rate while they run, moves to another bus and slot, the reduction read, tails that decay
  * to silence and start again, and a removal, without a call of the allocator. */
 void NoAlloc_saturator(void) {
     // audio/noalloc
@@ -680,6 +680,11 @@ void NoAlloc_saturator(void) {
             params[1] = 0.25f * (float)((k + 2 * i) % 5);
             params[2] = 16.0f - 1.5f * (float)((k + i) % 11);
             params[3] = 1 - 0.2f * (float)(k % 6);
+            params[4] = (float)((k + i) % BOX_AUDIO_SATURATOR_MODES);
+            params[5] = 100.0f * (float)(k % 3);
+            params[6] = 6000.0f * (float)((k + i) % 2);
+            params[7] = -1 + 0.5f * (float)((k + 2 * i) % 5);
+            params[8] = 3000.0f * (float)(k % 4);
             test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_SATURATOR,
                 1 + (i + k / 4) % 2, (i + k) % BOX_AUDIO_EFFECT_SLOTS, BOX_AUDIO_BUS_NONE,
                 params));

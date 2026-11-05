@@ -814,7 +814,18 @@
                     "render_sizes",
                     "silent_after_tail",
                     "component",
-                    "script"
+                    "script",
+                    "mode_harmonics",
+                    "mode_level",
+                    "mode_alias",
+                    "low_cut",
+                    "high_cut",
+                    "tone",
+                    "rate",
+                    "tanh_identical",
+                    "mode_render_sizes",
+                    "mode_silent_after_tail",
+                    "mode_reduction"
                 ]
             },
             {

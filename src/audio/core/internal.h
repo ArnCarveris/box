@@ -303,8 +303,9 @@ typedef struct box_audio_chorus_t {
     box_audio_ramp_t feed;    /**< Fade in of the input after a move */
 } box_audio_chorus_t;
 
-/** A saturator: the oversampled clipper of each channel, its DC blocker and the line that
- * delays the dry signal as much as the oversampler delays the wet one */
+/** A saturator: the filters before the clipper of each channel, the oversampled clipper, its
+ * DC blocker, the filters and the sample and hold after it, and the line that delays the dry
+ * signal as much as the oversampler delays the wet one */
 typedef struct box_audio_saturator_t {
     box_audio_saturator_params_t target; /**< Parameters of the last command, clamped */
     box_audio_oversample_t os[2]; /**< Oversampler of each channel */
@@ -314,6 +315,28 @@ typedef struct box_audio_saturator_t {
     float dc_coef;            /**< Pole of the DC blockers */
     box_audio_saturate_curve_t curve; /**< Clipper at the drive and asymmetry of curve_at */
     float curve_at[2];        /**< Drive and asymmetry the curve is for */
+    int32_t mode;             /**< The box_audio_saturator_mode_t that runs */
+    box_audio_saturate_shape_t shape; /**< Clipper of the other modes at the drive and
+                               * asymmetry of shape_at */
+    float shape_at[2];        /**< Drive and asymmetry the shape is for */
+    double adaa[2];           /**< Driven input of the last sample at the doubled rate of each
+                               * channel, for the ADAA of the hard clipper and the folder */
+    box_audio_svf_t low[2];   /**< Highpass of the low cut of each channel */
+    box_audio_svf_t high[2];  /**< Lowpass of the high cut of each channel */
+    box_audio_saturate_tilt_t pre[2]; /**< Tone tilt before the clipper of each channel */
+    box_audio_saturate_tilt_t post[2]; /**< Inverse tilt after it */
+    float tilt[6];            /**< Coefficients of the tilt before and of the one after */
+    float low_at;             /**< Low cut the highpass is for, 0 while it is off */
+    float high_at;            /**< High cut the lowpass is for, high_off while it is off */
+    float tone_at;            /**< Tone the tilts are for, 0 while they are off */
+    float high_off;           /**< High cut that counts as off,
+                               * BOX_AUDIO_SATURATOR_CUT_NYQUIST times the rate */
+    float rate_off;           /**< Rate of the sample and hold that counts as off, the rate */
+    float rate_at;            /**< Rate the step of the sample and hold is for */
+    double rate_step;         /**< Turns of the sample and hold per frame */
+    double phase;             /**< Turns of the sample and hold; it takes a sample each time it
+                               * passes 1 */
+    float hold[2];            /**< Sample each channel holds */
     float scale;              /**< Steps of each sign of the bit crusher, 2^(bits - 1); 0 when
                                * it is off */
     float scale_at;           /**< Bits the scale is for */
@@ -321,6 +344,10 @@ typedef struct box_audio_saturator_t {
     box_audio_ramp_t asymmetry; /**< Asymmetry */
     box_audio_ramp_t bits;    /**< Bits */
     box_audio_ramp_t mix;     /**< Wet level */
+    box_audio_ramp_t low_cut; /**< Low cut in Hz, 0 when off */
+    box_audio_ramp_t high_cut; /**< High cut in Hz, high_off when off */
+    box_audio_ramp_t tone;    /**< Tone */
+    box_audio_ramp_t rate;    /**< Rate of the sample and hold in Hz, rate_off when off */
 } box_audio_saturator_t;
 
 /** A transient shaper: the peak detector of the dynamics, a fast and a slow envelope of it and

@@ -822,13 +822,41 @@ typedef struct box_audio_chorus_params_t {
 /** Cutoff of the DC blocker after the clipper of a saturator in Hz */
 #define BOX_AUDIO_SATURATOR_DC 5.0f
 
-/** Seconds of a change of the drive, the asymmetry, the bits or the mix of a saturator */
+/** Seconds of a change of the drive, the asymmetry, the bits, the mix, the cuts, the tone or
+ * the rate of a saturator */
 #define BOX_AUDIO_SATURATOR_RAMP 0.02f
 
+/** Highest low cut and high cut of a saturator in Hz; a high cut is also held under
+ * BOX_AUDIO_SATURATOR_CUT_NYQUIST times the rate */
+#define BOX_AUDIO_SATURATOR_CUT_MAX 20000.0f
+
+/** Share of the rate under which the high cut of a saturator stays, where it counts as off */
+#define BOX_AUDIO_SATURATOR_CUT_NYQUIST 0.45f
+
+/** Pivot of the tone tilt of a saturator in Hz */
+#define BOX_AUDIO_SATURATOR_TONE_HZ 1000.0f
+
+/** dB the tone tilt of a saturator at a tone of 1 raises the highs and lowers the lows */
+#define BOX_AUDIO_SATURATOR_TONE_DB 9.0f
+
+/** Lowest rate of the sample and hold of a saturator in Hz, when it is on */
+#define BOX_AUDIO_SATURATOR_RATE_MIN 100.0f
+
+/** Curve of the clipper of a saturator */
+typedef enum box_audio_saturator_mode_t {
+    BOX_AUDIO_SATURATOR_TANH = 0,    /**< tanh(g x + b) - tanh(b) */
+    BOX_AUDIO_SATURATOR_TUBE = 1,    /**< tanh of the driven input with a level dependent
+                                      *   offset, box_audio_saturate_tube */
+    BOX_AUDIO_SATURATOR_HARD = 2,    /**< Hard clip with a rounded corner, with ADAA */
+    BOX_AUDIO_SATURATOR_FOLD = 3,    /**< Sine wavefolder, with ADAA */
+    BOX_AUDIO_SATURATOR_RECTIFY = 4, /**< tanh, then half to full wave rectified */
+    BOX_AUDIO_SATURATOR_MODES = 5    /**< Number of modes */
+} box_audio_saturator_mode_t;
+
 /** The parameters of a saturator, the first floats of the params of its effect command: each
- * channel runs through a tanh soft clipper at twice the rate (saturate.h), its level
- * compensated so that the drive mostly changes the tone, then a DC blocker and a bit crusher at
- * the base rate. The wet signal comes BOX_AUDIO_SATURATE_LATENCY frames late and the dry
+ * channel runs through a highpass, a tone tilt, the clipper of its mode at twice the rate
+ * (saturate.h), its level compensated so that the drive mostly changes the tone, then a DC
+ * blocker, the inverse tilt, a lowpass, a sample and hold and a bit crusher at the base rate. The wet signal comes BOX_AUDIO_SATURATE_LATENCY frames late and the dry
  * signal is delayed as much, so that a mix in between does not comb. Its reduction is the
  * largest drop in dB of the peak of the clipped signal against the peak of the driven input,
  * the slope of the clipper at silence taken out */
@@ -841,6 +869,17 @@ typedef struct box_audio_saturator_params_t {
                        *   2^bits levels over -1..1, 2^(bits - 1) steps of each sign; at
                        *   BOX_AUDIO_SATURATOR_BITS_MAX it is not rounded */
     float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+    float mode;       /**< A box_audio_saturator_mode_t, rounded; others are
+                       *   BOX_AUDIO_SATURATOR_TANH */
+    float low_cut;    /**< Hz of a 12 dB Butterworth highpass before the clipper,
+                       *   0..BOX_AUDIO_SATURATOR_CUT_MAX, 0 is off */
+    float high_cut;   /**< Hz of a 12 dB Butterworth lowpass after the DC blocker,
+                       *   0..BOX_AUDIO_SATURATOR_CUT_MAX, 0 is off */
+    float tone;       /**< -1..1: a first order tilt around BOX_AUDIO_SATURATOR_TONE_HZ of
+                       *   up to BOX_AUDIO_SATURATOR_TONE_DB at the ends before the clipper,
+                       *   its exact inverse after it; 0 is off */
+    float rate;       /**< Hz of a sample and hold after the high cut, 0 is off, otherwise
+                       *   BOX_AUDIO_SATURATOR_RATE_MIN up to the rate, where it is off */
 } box_audio_saturator_params_t;
 
 /** Attack and release in seconds of the fast envelope of a transient shaper */

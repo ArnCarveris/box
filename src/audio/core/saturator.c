@@ -1,12 +1,15 @@
 /**
  * @file audio/core/saturator.c
- * @brief The saturator kind of effect: the oversampled tanh soft clipper of saturate.h on each
- * channel, its level compensated, with a bias for asymmetry, a DC blocker, a bit crusher and a
+ * @brief The saturator kind of effect: on each channel a highpass and a tone tilt, the
+ * oversampled clipper of its mode from saturate.h, its level compensated, with a bias for
+ * asymmetry, a DC blocker, the inverse tilt, a lowpass, a sample and hold, a bit crusher and a
  * mix, reporting how hard the clipper squashes as its reduction.
  *
  * The wet signal leaves the oversampler BOX_AUDIO_SATURATE_LATENCY frames late, so the dry
  * signal runs through a line as long. The constants of the clipper change only while the drive
- * or the asymmetry move. Its params are a box_audio_saturator_params_t.
+ * or the asymmetry move, and those of the filters only while their cutoff or the tone move.
+ * The tanh mode without the filters and the hold runs as the saturator always did, sample for
+ * sample. Its params are a box_audio_saturator_params_t.
  */
 
 #include "internal.h"
@@ -22,6 +25,11 @@
 
 /** A reduction under this many dB counts as none: the clipper is all but linear */
 #define BOX_AUDIO_SATURATOR_REDUCTION_MIN 0.01f
+
+/** Turns from which the sample and hold takes a sample: a hair under 1, so that a rate that
+ * divides the rate of the core holds each sample for the same frames despite the rounding of
+ * its step */
+#define BOX_AUDIO_SATURATOR_HOLD_EDGE (1.0 - 1e-9)
 
 /** Peak of the driven input under which the clipper counts as linear */
 #define BOX_AUDIO_SATURATOR_PEAK_MIN 1e-6f
@@ -47,6 +55,17 @@ static float box_audio_saturator_clamp(
     return v;
 }
 
+/** Magnitude of a value.
+ *
+ * @param v The value
+ * @return |v|
+ */
+static inline float box_audio_saturator_abs(
+    float v)
+{
+    return v < 0 ? -v : v;
+}
+
 /** Clamp the params of an effect into the target of its saturator.
  *
  * @param fx The effect
@@ -61,6 +80,36 @@ static void box_audio_saturator_target(
     s->target.bits = box_audio_saturator_clamp(p[2], BOX_AUDIO_SATURATOR_BITS_MIN,
         BOX_AUDIO_SATURATOR_BITS_MAX);
     s->target.mix = box_audio_saturator_clamp(p[3], 0, 1);
+    s->target.mode = p[4] >= 0 && p[4] < (float)BOX_AUDIO_SATURATOR_MODES - 0.5f ?
+        (float)(int32_t)(p[4] + 0.5f) : (float)BOX_AUDIO_SATURATOR_TANH;
+    s->target.low_cut = box_audio_saturator_clamp(p[5], 0, BOX_AUDIO_SATURATOR_CUT_MAX);
+    s->target.high_cut = box_audio_saturator_clamp(p[6], 0, BOX_AUDIO_SATURATOR_CUT_MAX);
+    s->target.tone = box_audio_saturator_clamp(p[7], -1, 1);
+    s->target.rate = box_audio_saturator_clamp(p[8], 0, 1e6f);
+    if (s->target.rate > 0 && s->target.rate < BOX_AUDIO_SATURATOR_RATE_MIN) {
+        s->target.rate = BOX_AUDIO_SATURATOR_RATE_MIN;
+    }
+}
+
+/** The values the ramps of the filters and the hold move to for the target: the low cut
+ * under the high cut that counts as off, the high cut at it when it is off, and the rate at
+ * the rate of the core when it is off or above it.
+ *
+ * @param s The saturator
+ * @param low Receives the low cut
+ * @param high Receives the high cut
+ * @param rate Receives the rate
+ */
+static void box_audio_saturator_filters(
+    const box_audio_saturator_t *s,
+    float *low,
+    float *high,
+    float *rate)
+{
+    float h = s->target.high_cut;
+    *low = s->target.low_cut < s->high_off ? s->target.low_cut : s->high_off;
+    *high = h > 0 && h < s->high_off ? h : s->high_off;
+    *rate = s->target.rate > 0 && s->target.rate < s->rate_off ? s->target.rate : s->rate_off;
 }
 
 /** Set the clipper for a drive and an asymmetry.
@@ -81,6 +130,115 @@ static void box_audio_saturator_curve(
     s->curve_at[1] = asymmetry;
 }
 
+/** Set the shape of a mode other than tanh for a drive and an asymmetry.
+ *
+ * @param s The saturator
+ * @param drive 0..1
+ * @param asymmetry 0..1
+ */
+static void box_audio_saturator_shape(
+    box_audio_saturator_t *s,
+    float drive,
+    float asymmetry)
+{
+    float gain = (float)box_audio_synth_exp2((double)(drive * BOX_AUDIO_SATURATOR_DRIVE_DB) *
+        BOX_AUDIO_SATURATOR_OCTAVES);
+    box_audio_saturate_shape(&s->shape, s->mode, gain,
+        s->mode == BOX_AUDIO_SATURATOR_RECTIFY ? asymmetry : asymmetry * BOX_AUDIO_SATURATOR_BIAS,
+        BOX_AUDIO_SATURATE_REFERENCE);
+    s->shape_at[0] = drive;
+    s->shape_at[1] = asymmetry;
+}
+
+/** Set the coefficients of the tilts for a tone: the bilinear transform of
+ * (a s + w) / (s + a w) for the pivot w of BOX_AUDIO_SATURATOR_TONE_HZ before the clipper, a
+ * gain of 1 at the pivot, a at the highs and 1 / a at the lows, and its exact inverse after
+ * it, which is stable as the tilt has its zero inside the unit circle.
+ *
+ * @param s The saturator
+ * @param rate Frames per second
+ * @param tone -1..1, not 0
+ */
+static void box_audio_saturator_tilt(
+    box_audio_saturator_t *s,
+    float rate,
+    float tone)
+{
+    double k = (double)box_audio_svf_g(BOX_AUDIO_SATURATOR_TONE_HZ, rate);
+    double a = box_audio_synth_exp2((double)(tone * BOX_AUDIO_SATURATOR_TONE_DB) *
+        BOX_AUDIO_SATURATOR_OCTAVES);
+    double b0 = (a + k) / (1 + a * k), b1 = (k - a) / (1 + a * k);
+    double a1 = (a * k - 1) / (1 + a * k);
+    s->tilt[0] = (float)b0;
+    s->tilt[1] = (float)b1;
+    s->tilt[2] = (float)a1;
+    s->tilt[3] = (float)(1.0 / b0);
+    s->tilt[4] = (float)(a1 / b0);
+    s->tilt[5] = (float)(b1 / b0);
+    s->tone_at = tone;
+}
+
+/** Clear the highpasses of the low cut.
+ *
+ * @param s The saturator
+ */
+static void box_audio_saturator_low_clear(
+    box_audio_saturator_t *s)
+{
+    int32_t c;
+    for (c = 0; c < 2; c ++) {
+        s->low[c].ic1 = 0;
+        s->low[c].ic2 = 0;
+    }
+
+    s->low_at = 0;
+}
+
+/** Clear the lowpasses of the high cut.
+ *
+ * @param s The saturator
+ */
+static void box_audio_saturator_high_clear(
+    box_audio_saturator_t *s)
+{
+    int32_t c;
+    for (c = 0; c < 2; c ++) {
+        s->high[c].ic1 = 0;
+        s->high[c].ic2 = 0;
+    }
+
+    s->high_at = s->high_off;
+}
+
+/** Clear the tilts.
+ *
+ * @param s The saturator
+ */
+static void box_audio_saturator_tilt_clear(
+    box_audio_saturator_t *s)
+{
+    int32_t c;
+    for (c = 0; c < 2; c ++) {
+        s->pre[c] = (box_audio_saturate_tilt_t){0};
+        s->post[c] = (box_audio_saturate_tilt_t){0};
+    }
+
+    s->tone_at = 0;
+}
+
+/** Clear the sample and hold, so that it takes the next sample.
+ *
+ * @param s The saturator
+ */
+static void box_audio_saturator_hold_clear(
+    box_audio_saturator_t *s)
+{
+    s->hold[0] = 0;
+    s->hold[1] = 0;
+    s->phase = 1;
+    s->rate_at = s->rate_off;
+}
+
 /** Set the steps of the bit crusher for its bits.
  *
  * @param s The saturator
@@ -95,7 +253,8 @@ static void box_audio_saturator_scale(
     s->scale_at = bits;
 }
 
-/** Clear the oversamplers, the DC blockers and the dry lines.
+/** Clear the oversamplers, the DC blockers, the filters, the hold and the dry lines; the
+ * ADAA starts from the driven input of silence.
  *
  * @param s The saturator
  */
@@ -107,11 +266,16 @@ static void box_audio_saturator_clear(
         box_audio_oversample_clear(&s->os[c]);
         s->dc[c].x1 = 0;
         s->dc[c].y1 = 0;
+        s->adaa[c] = (double)s->shape.bias;
         for (i = 0; i < 16; i ++) {
             s->dry[c][i] = 0;
         }
     }
 
+    box_audio_saturator_low_clear(s);
+    box_audio_saturator_high_clear(s);
+    box_audio_saturator_tilt_clear(s);
+    box_audio_saturator_hold_clear(s);
     s->pos = 0;
 }
 
@@ -121,15 +285,35 @@ void box_audio_saturator_start(
     bool fade_in)
 {
     box_audio_saturator_t *s = &fx->data.saturator;
+    float low, high, rate;
+    int32_t c;
     (void)fade_in;
     box_audio_saturator_target(fx);
+    s->high_off = BOX_AUDIO_SATURATOR_CUT_NYQUIST * core->sample_rate;
+    s->rate_off = core->sample_rate;
+    s->mode = (int32_t)s->target.mode;
+    for (c = 0; c < 2; c ++) {
+        s->low[c].k = (float)BOX_AUDIO_SVF_SQRT2;
+        s->high[c].k = (float)BOX_AUDIO_SVF_SQRT2;
+    }
+
+    s->shape = (box_audio_saturate_shape_t){0};
+    if (s->mode != BOX_AUDIO_SATURATOR_TANH) {
+        box_audio_saturator_shape(s, s->target.drive, s->target.asymmetry);
+    }
+
     box_audio_saturator_clear(s);
     s->dc_coef = (float)(1.0 - 2.0 * 3.14159265358979323846 *
         (double)BOX_AUDIO_SATURATOR_DC / (double)core->sample_rate);
+    box_audio_saturator_filters(s, &low, &high, &rate);
     box_audio_ramp_set(&s->drive, s->target.drive);
     box_audio_ramp_set(&s->asymmetry, s->target.asymmetry);
     box_audio_ramp_set(&s->bits, s->target.bits);
     box_audio_ramp_set(&s->mix, s->target.mix);
+    box_audio_ramp_set(&s->low_cut, low);
+    box_audio_ramp_set(&s->high_cut, high);
+    box_audio_ramp_set(&s->tone, s->target.tone);
+    box_audio_ramp_set(&s->rate, rate);
     box_audio_saturator_curve(s, s->target.drive, s->target.asymmetry);
     box_audio_saturator_scale(s, s->target.bits);
 }
@@ -140,11 +324,24 @@ void box_audio_saturator_command(
 {
     box_audio_saturator_t *s = &fx->data.saturator;
     int32_t ramp = (int32_t)(BOX_AUDIO_SATURATOR_RAMP * core->sample_rate);
+    float low, high, rate;
     box_audio_saturator_target(fx);
+    box_audio_saturator_filters(s, &low, &high, &rate);
+    if ((int32_t)s->target.mode != s->mode) {
+        s->mode = (int32_t)s->target.mode;
+        if (s->mode != BOX_AUDIO_SATURATOR_TANH) {
+            box_audio_saturator_shape(s, s->drive.value, s->asymmetry.value);
+        }
+    }
+
     box_audio_ramp_to(&s->drive, s->target.drive, ramp);
     box_audio_ramp_to(&s->asymmetry, s->target.asymmetry, ramp);
     box_audio_ramp_to(&s->bits, s->target.bits, ramp);
     box_audio_ramp_to(&s->mix, s->target.mix, ramp);
+    box_audio_ramp_to(&s->low_cut, low, ramp);
+    box_audio_ramp_to(&s->high_cut, high, ramp);
+    box_audio_ramp_to(&s->tone, s->target.tone, ramp);
+    box_audio_ramp_to(&s->rate, rate, ramp);
 }
 
 /** Round a sample to the steps of the bit crusher: scale steps of each sign, the highest
@@ -175,7 +372,8 @@ bool box_audio_saturator_render(
 {
     box_audio_saturator_t *s = &fx->data.saturator;
     float *io[2] = { l, r };
-    float driven = 0, clipped = 0, sum = 0;
+    float driven = 0, clipped = 0, sum = 0, gain, slope;
+    float rate_hz = core->sample_rate;
     bool result = false;
     int32_t i, c;
     for (i = 0; i < frames; i ++) {
@@ -183,20 +381,99 @@ bool box_audio_saturator_render(
         float asymmetry = box_audio_ramp_next(&s->asymmetry);
         float bits = box_audio_ramp_next(&s->bits);
         float mix = box_audio_ramp_next(&s->mix);
+        float low = box_audio_ramp_next(&s->low_cut);
+        float high = box_audio_ramp_next(&s->high_cut);
+        float tone = box_audio_ramp_next(&s->tone);
+        float rate = box_audio_ramp_next(&s->rate);
+        float comp;
         uint32_t at = s->pos & 15, from = (s->pos + 1) & 15;
-        if (drive != s->curve_at[0] || asymmetry != s->curve_at[1]) {
-            box_audio_saturator_curve(s, drive, asymmetry);
+        int32_t mode = s->mode;
+        bool hold = rate < s->rate_off, take = true;
+        if (mode == BOX_AUDIO_SATURATOR_TANH) {
+            if (drive != s->curve_at[0] || asymmetry != s->curve_at[1]) {
+                box_audio_saturator_curve(s, drive, asymmetry);
+            }
+
+            comp = s->curve.comp;
+        } else {
+            if (drive != s->shape_at[0] || asymmetry != s->shape_at[1]) {
+                box_audio_saturator_shape(s, drive, asymmetry);
+            }
+
+            comp = s->shape.comp;
         }
 
         if (bits != s->scale_at) {
             box_audio_saturator_scale(s, bits);
         }
 
+        if (low > 0) {
+            if (low != s->low_at) {
+                float g = box_audio_svf_g((double)low, rate_hz);
+                box_audio_svf_coefs(&s->low[0], g);
+                box_audio_svf_coefs(&s->low[1], g);
+                s->low_at = low;
+            }
+        } else if (s->low_at != 0) {
+            box_audio_saturator_low_clear(s);
+        }
+
+        if (high < s->high_off) {
+            if (high != s->high_at) {
+                float g = box_audio_svf_g((double)high, rate_hz);
+                box_audio_svf_coefs(&s->high[0], g);
+                box_audio_svf_coefs(&s->high[1], g);
+                s->high_at = high;
+            }
+        } else if (s->high_at != s->high_off) {
+            box_audio_saturator_high_clear(s);
+        }
+
+        if (tone != 0) {
+            if (tone != s->tone_at) {
+                box_audio_saturator_tilt(s, rate_hz, tone);
+            }
+        } else if (s->tone_at != 0) {
+            box_audio_saturator_tilt_clear(s);
+        }
+
+        if (hold) {
+            if (rate != s->rate_at) {
+                s->rate_step = (double)rate / (double)rate_hz;
+                s->rate_at = rate;
+            }
+
+            s->phase += s->rate_step;
+            take = s->phase >= BOX_AUDIO_SATURATOR_HOLD_EDGE;
+            if (take) {
+                s->phase -= 1;
+            }
+        } else if (s->rate_at != s->rate_off) {
+            box_audio_saturator_hold_clear(s);
+        }
+
         for (c = 0; c < 2; c ++) {
-            float x = io[c][i], a, b, ca, cb, y, d, m;
-            box_audio_oversample_up(&s->os[c], x, &a, &b);
-            ca = box_audio_saturate_clip(&s->curve, a);
-            cb = box_audio_saturate_clip(&s->curve, b);
+            float x = io[c][i], in = x, a, b, ca, cb, y, d, m;
+            if (low > 0) {
+                in = box_audio_svf_next(&s->low[c], BOX_AUDIO_SYNTH_HIGHPASS, in);
+            }
+
+            if (tone != 0) {
+                in = box_audio_saturate_tilt_next(&s->pre[c], s->tilt, in);
+            }
+
+            box_audio_oversample_up(&s->os[c], in, &a, &b);
+            if (mode == BOX_AUDIO_SATURATOR_TANH) {
+                ca = box_audio_saturate_clip(&s->curve, a);
+                cb = box_audio_saturate_clip(&s->curve, b);
+            } else if (mode == BOX_AUDIO_SATURATOR_HARD || mode == BOX_AUDIO_SATURATOR_FOLD) {
+                ca = box_audio_saturate_adaa(&s->shape, &s->adaa[c], a);
+                cb = box_audio_saturate_adaa(&s->shape, &s->adaa[c], b);
+            } else {
+                ca = box_audio_saturate_shape_clip(&s->shape, a);
+                cb = box_audio_saturate_shape_clip(&s->shape, b);
+            }
+
             a = a < 0 ? -a : a;
             b = b < 0 ? -b : b;
             m = a > b ? a : b;
@@ -205,8 +482,24 @@ bool box_audio_saturator_render(
             b = cb < 0 ? -cb : cb;
             m = a > b ? a : b;
             clipped = m > clipped ? m : clipped;
-            y = box_audio_oversample_down(&s->os[c], ca, cb) * s->curve.comp;
+            y = box_audio_oversample_down(&s->os[c], ca, cb) * comp;
             y = box_audio_clean(box_audio_dc_next(&s->dc[c], y, s->dc_coef));
+            if (tone != 0) {
+                y = box_audio_saturate_tilt_next(&s->post[c], s->tilt + 3, y);
+            }
+
+            if (high < s->high_off) {
+                y = box_audio_svf_next(&s->high[c], BOX_AUDIO_SYNTH_LOWPASS, y);
+            }
+
+            if (hold) {
+                if (take) {
+                    s->hold[c] = y;
+                }
+
+                y = s->hold[c];
+            }
+
             if (s->scale > 0) {
                 y = box_audio_saturator_crush(y, s->scale);
             }
@@ -219,10 +512,18 @@ bool box_audio_saturator_render(
         s->pos ++;
     }
 
-    driven *= s->curve.gain;
+    if (s->mode == BOX_AUDIO_SATURATOR_TANH) {
+        gain = s->curve.gain;
+        slope = s->curve.slope;
+    } else {
+        gain = s->shape.gain;
+        slope = s->shape.slope;
+    }
+
+    driven *= gain;
     if (driven > BOX_AUDIO_SATURATOR_PEAK_MIN && clipped > 0) {
         float db = (float)(BOX_AUDIO_SATURATOR_DB * box_audio_synth_log2(
-            (double)driven / ((double)clipped * (double)s->curve.slope)));
+            (double)driven / ((double)clipped * (double)slope)));
         if (db >= BOX_AUDIO_SATURATOR_REDUCTION_MIN) {
             box_audio_effect_reduction(core, fx, db);
         }
@@ -233,6 +534,12 @@ bool box_audio_saturator_render(
             sum += box_audio_oversample_level(&s->os[c]);
             sum += (s->dc[c].x1 < 0 ? -s->dc[c].x1 : s->dc[c].x1) +
                 (s->dc[c].y1 < 0 ? -s->dc[c].y1 : s->dc[c].y1);
+            sum += box_audio_saturator_abs(s->low[c].ic1) + box_audio_saturator_abs(s->low[c].ic2) +
+                box_audio_saturator_abs(s->high[c].ic1) +
+                box_audio_saturator_abs(s->high[c].ic2) +
+                box_audio_saturator_abs(s->pre[c].x1) + box_audio_saturator_abs(s->pre[c].y1) +
+                box_audio_saturator_abs(s->post[c].x1) + box_audio_saturator_abs(s->post[c].y1) +
+                box_audio_saturator_abs(s->hold[c]);
             for (i = 0; i < 16; i ++) {
                 sum += s->dry[c][i] < 0 ? -s->dry[c][i] : s->dry[c][i];
             }
@@ -259,4 +566,8 @@ void box_audio_saturator_rest(
     box_audio_ramp_set(&s->asymmetry, s->asymmetry.target);
     box_audio_ramp_set(&s->bits, s->bits.target);
     box_audio_ramp_set(&s->mix, s->mix.target);
+    box_audio_ramp_set(&s->low_cut, s->low_cut.target);
+    box_audio_ramp_set(&s->high_cut, s->high_cut.target);
+    box_audio_ramp_set(&s->tone, s->tone.target);
+    box_audio_ramp_set(&s->rate, s->rate.target);
 }

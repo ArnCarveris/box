@@ -3,13 +3,32 @@
  * @brief The saturator, measured with sines in offline renders: its harmonics and DC, its level
  * across the drive, its aliasing against a clipper at the base rate, the bit crusher, the dry
  * mix, the reduction, changes of the drive, render sizes, its rest after a tail and the
- * component in a world.
+ * component in a world; then its modes, their harmonics, level and aliasing, the low and the
+ * high cut, the tone, the sample and hold, and the tanh mode against the saturator as it was.
  */
 
 #include "world.h"
 #include <saturate.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+/** Exponent of 2 of the core, which sets the gain of the drive; private to the core, so
+ * declared here as internal.h declares it */
+double box_audio_synth_exp2(
+    double x);
+
+/** Flush a sample as the core does: NaN, infinities, huge values and denormals become 0.
+ *
+ * @param x The sample
+ * @return The sample, or 0
+ */
+static float sa_clean(
+    float x)
+{
+    float a = x < 0 ? -x : x;
+
+    return a >= 1e-30f && a <= 1e30f ? x : 0.0f;
+}
 
 /** Frames of the longest render of a case, two seconds */
 #define SA_FRAMES (AUDIO_RATE * 2)
@@ -516,7 +535,29 @@ void Saturator_component(void) {
     test_flt(params[2], 8);
     test_flt(params[3], 0.5f);
     test_flt(params[4], 0);
+    test_flt(params[5], 0);
+    test_flt(params[6], 0);
+    test_flt(params[7], 0);
+    test_flt(params[8], 0);
+    test_flt(params[9], 0);
+    test_int(s->mode, SaturatorTanh);
+    test_flt(s->low_cut, 0);
+    test_flt(s->high_cut, 0);
+    test_flt(s->tone, 0);
+    test_flt(s->rate, 0);
     test_int(box_audio_effect_floats(BOX_AUDIO_EFFECT_SATURATOR, AUDIO_RATE), 0);
+
+    ecs_set(world, e, Saturator, { .drive = 0.7f, .bits = 16, .mix = 1,
+        .mode = SaturatorFold, .low_cut = 120, .high_cut = 7000, .tone = -0.5f, .rate = 9000 });
+    test_int(box_audio_module_effect_kind(world, e, params), BOX_AUDIO_EFFECT_SATURATOR);
+    test_flt(params[4], (float)BOX_AUDIO_SATURATOR_FOLD);
+    test_flt(params[5], 120);
+    test_flt(params[6], 7000);
+    test_flt(params[7], -0.5f);
+    test_flt(params[8], 9000);
+    test_assert(SaturatorTube == BOX_AUDIO_SATURATOR_TUBE);
+    test_assert(SaturatorHard == BOX_AUDIO_SATURATOR_HARD);
+    test_assert(SaturatorRectify == BOX_AUDIO_SATURATOR_RECTIFY);
     ecs_fini(world);
 }
 
@@ -548,4 +589,505 @@ void Saturator_script(void) {
     test_assert(audio_peak(audio_tap_l, audio_tap_count - AUDIO_RATE / 10, audio_tap_count) >
         0.05f);
     ecs_fini(world);
+}
+
+/** The parameters of a saturator in a mode, without the bit crusher, the filters and the hold,
+ * fully wet.
+ *
+ * @param mode A box_audio_saturator_mode_t
+ * @param drive 0..1
+ * @param asymmetry 0..1
+ * @return The parameters
+ */
+static box_audio_saturator_params_t sa_mode(
+    int32_t mode,
+    float drive,
+    float asymmetry)
+{
+    box_audio_saturator_params_t p = sa_params(drive, asymmetry, 16, 1);
+    p.mode = (float)mode;
+
+    return p;
+}
+
+/** Name of a mode.
+ *
+ * @param mode A box_audio_saturator_mode_t
+ * @return The name
+ */
+static const char* sa_mode_name(
+    int32_t mode)
+{
+    static const char *names[] = { "tanh", "tube", "hard", "fold", "rectify" };
+
+    return mode >= 0 && mode < BOX_AUDIO_SATURATOR_MODES ? names[mode] : "?";
+}
+
+/** Amplitudes of the harmonics 1 to count of a sine of 1 kHz in a range of sa_l.
+ *
+ * @param h Receives the amplitudes, h[k] of harmonic k; h[0] is the mean
+ * @param count Harmonics
+ */
+static void sa_harmonics(
+    double *h,
+    int32_t count)
+{
+    const int32_t from = AUDIO_RATE / 2, frames = AUDIO_RATE / 2;
+    int32_t k;
+    h[0] = sa_mean(sa_l, from, frames);
+    for (k = 1; k <= count; k ++) {
+        h[k] = sa_amplitude(sa_l, from, frames, 1000.0 * k);
+    }
+}
+
+/** Share of the power of harmonics 5 to 15 in the power of harmonics 1 to 15.
+ *
+ * @param h Amplitudes from sa_harmonics, 15 harmonics
+ * @return The share
+ */
+static double sa_high_share(
+    const double *h)
+{
+    double high = 0, all = 0;
+    int32_t k;
+    for (k = 1; k <= 15; k ++) {
+        all += h[k] * h[k];
+        if (k >= 5) {
+            high += h[k] * h[k];
+        }
+    }
+
+    return all > 0 ? high / all : 0;
+}
+
+void Saturator_mode_harmonics(void) {
+    // audio/saturator
+    box_audio_saturator_params_t p;
+    double h[16], lo, hi;
+
+    /* The tube curve makes even harmonics without a bias */
+    p = sa_mode(BOX_AUDIO_SATURATOR_TUBE, 0.5f, 0);
+    sa_tone(&p, 1000, sa_linear(-6), AUDIO_RATE);
+    sa_harmonics(h, 15);
+    printf("tube, drive 0.5: 2nd %.1f dB, 3rd %.1f dB, 4th %.1f dB under the fundamental, "
+        "DC %.2e\n", sa_db(h[2] / h[1]), sa_db(h[3] / h[1]), sa_db(h[4] / h[1]), h[0]);
+    test_assert(h[2] / h[1] > 0.02);
+    test_assert(h[4] / h[1] > 0.002);
+    test_assert(fabs(h[0]) < 1e-4);
+
+    /* The hard clipper makes a square wave of odd harmonics */
+    p = sa_mode(BOX_AUDIO_SATURATOR_HARD, 0.8f, 0);
+    sa_tone(&p, 1000, sa_linear(-6), AUDIO_RATE);
+    sa_harmonics(h, 15);
+    printf("hard, drive 0.8: 2nd %.1f dB, 3rd %.1f dB, 5th %.1f dB, 7th %.1f dB under the "
+        "fundamental\n", sa_db(h[2] / h[1]), sa_db(h[3] / h[1]), sa_db(h[5] / h[1]),
+        sa_db(h[7] / h[1]));
+    test_assert(h[3] / h[1] > 0.2);
+    test_assert(h[5] / h[1] > 0.1);
+    test_assert(h[7] / h[1] > 0.05);
+    test_assert(h[2] / h[1] < 1e-3);
+    test_assert(fabs(h[0]) < 1e-4);
+
+    /* The folder moves the power to high harmonics, more with more drive */
+    p = sa_mode(BOX_AUDIO_SATURATOR_FOLD, 0.5f, 0);
+    sa_tone(&p, 1000, sa_linear(-6), AUDIO_RATE);
+    sa_harmonics(h, 15);
+    lo = sa_high_share(h);
+    p = sa_mode(BOX_AUDIO_SATURATOR_FOLD, 0.9f, 0);
+    sa_tone(&p, 1000, sa_linear(-6), AUDIO_RATE);
+    sa_harmonics(h, 15);
+    hi = sa_high_share(h);
+    printf("fold: %.1f%% of the power above the 4th harmonic at drive 0.5, %.1f%% at 0.9, "
+        "2nd %.1f dB\n", 100 * lo, 100 * hi, sa_db(h[2] / h[1]));
+    test_assert(hi > 0.3);
+    test_assert(hi > 3 * lo);
+    test_assert(h[2] / h[1] < 1e-3);
+
+    /* The half wave rectifier makes a strong 2nd harmonic, its DC taken out */
+    p = sa_mode(BOX_AUDIO_SATURATOR_RECTIFY, 0.3f, 0);
+    sa_tone(&p, 1000, sa_linear(-6), AUDIO_RATE);
+    sa_harmonics(h, 15);
+    printf("rectify half wave, drive 0.3: 2nd %.1f dB, 4th %.1f dB under the fundamental, "
+        "DC %.2e\n", sa_db(h[2] / h[1]), sa_db(h[4] / h[1]), h[0]);
+    test_assert(h[2] / h[1] > 0.25);
+    test_assert(fabs(h[0]) < 1e-4);
+
+    /* The full wave rectifier is all octave up */
+    p = sa_mode(BOX_AUDIO_SATURATOR_RECTIFY, 0.3f, 1);
+    sa_tone(&p, 1000, sa_linear(-6), AUDIO_RATE);
+    sa_harmonics(h, 15);
+    printf("rectify full wave, drive 0.3: fundamental %.1f dB under the 2nd, DC %.2e\n",
+        sa_db(h[1] / h[2]), h[0]);
+    test_assert(h[2] > 10 * h[1]);
+    test_assert(fabs(h[0]) < 1e-4);
+}
+
+void Saturator_mode_level(void) {
+    // audio/saturator
+    const int32_t from = AUDIO_RATE / 2, count = AUDIO_RATE / 5;
+    float level = BOX_AUDIO_SATURATE_REFERENCE;
+    double dry = level / sqrt(2.0);
+    int32_t m, d;
+    for (m = 0; m <= BOX_AUDIO_SATURATOR_MODES; m ++) {
+        /* The last round is the full wave rectifier */
+        int32_t mode = m < BOX_AUDIO_SATURATOR_MODES ? m : BOX_AUDIO_SATURATOR_RECTIFY;
+        float asymmetry = m < BOX_AUDIO_SATURATOR_MODES ? 0.0f : 1.0f;
+        double lo = 1e9, hi = -1e9;
+        for (d = 0; d <= 10; d ++) {
+            box_audio_saturator_params_t p = sa_mode(mode, 0.1f * (float)d, asymmetry);
+            double change;
+            sa_tone(&p, 1000, level, from + count);
+            change = sa_db(sa_rms(sa_l, from, count) / dry);
+            test_assert(fabs(change) < 1.5);
+            lo = change < lo ? change : lo;
+            hi = change > hi ? change : hi;
+        }
+
+        printf("%s, asymmetry %.0f: a -14 dBFS sine keeps its RMS from %+.3f dB to %+.3f dB "
+            "over the drive\n", sa_mode_name(mode), (double)asymmetry, lo, hi);
+    }
+}
+
+/** Aliases of a 5 kHz sine at -6 dBFS through a mode: through the saturator, through the
+ * same curve at twice the rate without ADAA and through the same curve at the base rate.
+ *
+ * @param mode A box_audio_saturator_mode_t
+ * @param drive 0..1
+ * @param over Receives the aliases of the saturator, a power against the fundamental
+ * @param plain Receives the aliases at twice the rate without ADAA
+ * @param base Receives the aliases at the base rate
+ */
+static void sa_mode_aliases(
+    int32_t mode,
+    float drive,
+    double *over,
+    double *plain,
+    double *base)
+{
+    const int32_t from = AUDIO_RATE / 5, count = AUDIO_RATE / 5;
+    box_audio_saturator_params_t p = sa_mode(mode, drive, 0);
+    box_audio_saturate_shape_t shape;
+    box_audio_oversample_t os;
+    float level = sa_linear(-6);
+    int32_t i;
+    sa_tone(&p, 5000, level, from + count);
+    *over = sa_aliases(sa_l, from, count);
+
+    box_audio_saturate_shape(&shape, mode, (float)pow(10.0, drive * 30 / 20), 0,
+        BOX_AUDIO_SATURATE_REFERENCE);
+    audio_sine(sa_sound, from + count, 5000, level);
+    box_audio_oversample_clear(&os);
+    for (i = 0; i < from + count; i ++) {
+        float a, b;
+        box_audio_oversample_up(&os, sa_sound[i], &a, &b);
+        a = box_audio_saturate_shape_clip(&shape, a);
+        b = box_audio_saturate_shape_clip(&shape, b);
+        sa_b_l[i] = box_audio_oversample_down(&os, a, b) * shape.comp;
+        sa_b_r[i] = box_audio_saturate_shape_clip(&shape, sa_sound[i]) * shape.comp;
+    }
+
+    *plain = sa_aliases(sa_b_l, from, count);
+    *base = sa_aliases(sa_b_r, from, count);
+}
+
+void Saturator_mode_alias(void) {
+    // audio/saturator
+    double over, plain, base;
+    sa_mode_aliases(BOX_AUDIO_SATURATOR_HARD, 0.8f, &over, &plain, &base);
+    printf("hard, aliases of a -6 dBFS 5 kHz sine at drive 0.8: %.1f dB with ADAA at twice "
+        "the rate, %.1f dB at twice the rate, %.1f dB at the base rate\n", 10 * log10(over),
+        10 * log10(plain), 10 * log10(base));
+    test_assert(over < plain * 0.5);
+    test_assert(over < base * 0.25);
+    test_assert(10 * log10(over) < -20);
+
+    sa_mode_aliases(BOX_AUDIO_SATURATOR_FOLD, 0.5f, &over, &plain, &base);
+    printf("fold, aliases of a -6 dBFS 5 kHz sine at drive 0.5: %.1f dB with ADAA at twice "
+        "the rate, %.1f dB at twice the rate, %.1f dB at the base rate\n", 10 * log10(over),
+        10 * log10(plain), 10 * log10(base));
+    test_assert(over < plain * 0.5);
+    test_assert(over < base * 0.25);
+    test_assert(10 * log10(over) < -20);
+}
+
+void Saturator_low_cut(void) {
+    // audio/saturator
+    const int32_t from = AUDIO_RATE / 2, count = AUDIO_RATE / 2;
+    box_audio_saturator_params_t p = sa_params(0, 0, 16, 1);
+    double off, on, h1, h3, h3_cut;
+
+    /* The bass leaves before the clipper, the highs pass */
+    sa_tone(&p, 100, sa_linear(-12), AUDIO_RATE);
+    off = sa_rms(sa_l, from, count);
+    p.low_cut = 800;
+    sa_tone(&p, 100, sa_linear(-12), AUDIO_RATE);
+    on = sa_rms(sa_l, from, count);
+    printf("low cut 800 Hz: a 100 Hz sine %.1f dB", sa_db(on / off));
+    test_assert(on < off * 0.1);
+    p.low_cut = 0;
+    sa_tone(&p, 5000, sa_linear(-12), AUDIO_RATE);
+    off = sa_rms(sa_l, from, count);
+    p.low_cut = 800;
+    sa_tone(&p, 5000, sa_linear(-12), AUDIO_RATE);
+    on = sa_rms(sa_l, from, count);
+    printf(", a 5 kHz sine %+.2f dB\n", sa_db(on / off));
+    test_assert(fabs(sa_db(on / off)) < 0.5);
+
+    /* Driven, a bass that is cut before the clipper distorts much less */
+    p = sa_params(0.8f, 0, 16, 1);
+    sa_tone(&p, 100, sa_linear(-6), AUDIO_RATE);
+    h1 = sa_amplitude(sa_l, from, count, 100);
+    h3 = sa_amplitude(sa_l, from, count, 300) / h1;
+    p.low_cut = 400;
+    sa_tone(&p, 100, sa_linear(-6), AUDIO_RATE);
+    h1 = sa_amplitude(sa_l, from, count, 100);
+    h3_cut = sa_amplitude(sa_l, from, count, 300) / h1;
+    printf("drive 0.8, a 100 Hz sine: 3rd %.1f dB under the fundamental, %.1f dB with a low "
+        "cut of 400 Hz\n", sa_db(h3), sa_db(h3_cut));
+    test_assert(h3_cut < h3 * 0.5);
+}
+
+void Saturator_high_cut(void) {
+    // audio/saturator
+    const int32_t from = AUDIO_RATE / 2, count = AUDIO_RATE / 2;
+    box_audio_saturator_params_t p = sa_params(0.8f, 0, 16, 1);
+    double h1, h5, h1_cut, h5_cut;
+    sa_tone(&p, 1000, sa_linear(-6), AUDIO_RATE);
+    h1 = sa_amplitude(sa_l, from, count, 1000);
+    h5 = sa_amplitude(sa_l, from, count, 5000);
+    p.high_cut = 2000;
+    sa_tone(&p, 1000, sa_linear(-6), AUDIO_RATE);
+    h1_cut = sa_amplitude(sa_l, from, count, 1000);
+    h5_cut = sa_amplitude(sa_l, from, count, 5000);
+    printf("high cut 2000 Hz after the clipper: fundamental %+.2f dB, 5th harmonic %+.1f dB\n",
+        sa_db(h1_cut / h1), sa_db(h5_cut / h5));
+    test_assert(fabs(sa_db(h1_cut / h1)) < 1.5);
+    test_assert(h5_cut < h5 * 0.1);
+
+    /* A high cut above the Nyquist share of the rate is off */
+    p.high_cut = 0;
+    sa_tone(&p, 1000, sa_linear(-6), AUDIO_RATE);
+    memcpy(sa_b_l, sa_l, sizeof(float) * AUDIO_RATE);
+    p.high_cut = BOX_AUDIO_SATURATOR_CUT_MAX;
+    sa_tone(&p, 1000, sa_linear(-6), AUDIO_RATE);
+    test_assert(audio_hash(sa_l, AUDIO_RATE) == audio_hash(sa_b_l, AUDIO_RATE));
+}
+
+/** Third harmonic of a 2 kHz sine at -14 dBFS against its fundamental through a saturator at
+ * drive 0.4 and a tone.
+ *
+ * @param tone -1..1
+ * @return The ratio
+ */
+static double sa_tone_third(
+    float tone)
+{
+    const int32_t from = AUDIO_RATE / 2, count = AUDIO_RATE / 2;
+    box_audio_saturator_params_t p = sa_params(0.4f, 0, 16, 1);
+    p.tone = tone;
+    sa_tone(&p, 2000, BOX_AUDIO_SATURATE_REFERENCE, AUDIO_RATE);
+
+    return sa_amplitude(sa_l, from, count, 6000) / sa_amplitude(sa_l, from, count, 2000);
+}
+
+void Saturator_tone(void) {
+    // audio/saturator
+    const int32_t from = AUDIO_RATE / 2, count = AUDIO_RATE / 2;
+    const double frequencies[] = { 100, 1000, 5000 };
+    box_audio_saturator_params_t p = sa_params(0, 0, 16, 1);
+    double down = sa_tone_third(-1), flat = sa_tone_third(0), up = sa_tone_third(1);
+    int32_t i;
+    printf("a 2 kHz sine at drive 0.4: 3rd %.1f dB under the fundamental at tone -1, %.1f dB "
+        "at 0, %.1f dB at 1\n", sa_db(down), sa_db(flat), sa_db(up));
+    test_assert(up > flat * 1.4);
+    test_assert(flat > down * 1.4);
+
+    /* A quiet signal that the clipper leaves linear passes the tilt and its inverse as it
+     * was */
+    for (i = 0; i < 3; i ++) {
+        double a, b;
+        p.tone = 0;
+        sa_tone(&p, frequencies[i], sa_linear(-40), AUDIO_RATE);
+        a = sa_amplitude(sa_l, from, count, frequencies[i]);
+        p.tone = 1;
+        sa_tone(&p, frequencies[i], sa_linear(-40), AUDIO_RATE);
+        b = sa_amplitude(sa_l, from, count, frequencies[i]);
+        printf("tone 1 on a quiet %.0f Hz sine: %+.3f dB\n", frequencies[i], sa_db(b / a));
+        test_assert(fabs(sa_db(b / a)) < 0.1);
+    }
+}
+
+void Saturator_rate(void) {
+    // audio/saturator
+    const int32_t from = AUDIO_RATE / 2, count = AUDIO_RATE / 2;
+    box_audio_saturator_params_t p = sa_params(0, 0, 16, 1);
+    double h, image, image2;
+    sa_tone(&p, 1300, sa_linear(-12), AUDIO_RATE);
+    h = sa_amplitude(sa_l, from, count, 1300);
+    image = sa_amplitude(sa_l, from, count, 2700);
+    printf("no rate: %.1f dB at 2700 Hz", sa_db(image / h));
+    test_assert(image < h * 1e-3);
+    p.rate = 4000;
+    sa_tone(&p, 1300, sa_linear(-12), AUDIO_RATE);
+    h = sa_amplitude(sa_l, from, count, 1300);
+    image = sa_amplitude(sa_l, from, count, 2700);
+    image2 = sa_amplitude(sa_l, from, count, 5300);
+    printf(", rate 4000 Hz: images %.1f dB at 2700 Hz and %.1f dB at 5300 Hz under the "
+        "fundamental\n", sa_db(image / h), sa_db(image2 / h));
+    test_assert(image > h * 0.2);
+    test_assert(image2 > h * 0.1);
+
+    /* Each held sample spans 12 frames */
+    {
+        int32_t i, changes = 0;
+        for (i = from + 1; i < from + 1200; i ++) {
+            changes += sa_l[i] != sa_l[i - 1];
+        }
+
+        test_assert(changes >= 99 && changes <= 100);
+    }
+}
+
+void Saturator_tanh_identical(void) {
+    // audio/saturator
+    const int32_t frames = AUDIO_RATE / 2;
+    const float drives[] = { 0.3f, 0.6f, 1.0f }, asymmetries[] = { 0, 0.3f, 1.0f };
+    float coef = (float)(1.0 - 2.0 * 3.14159265358979323846 *
+        (double)BOX_AUDIO_SATURATOR_DC / (double)AUDIO_RATE);
+    int32_t k, c, i;
+    sa_tone(NULL, 440, 0.5f, frames);
+    memcpy(sa_b_l, sa_l, sizeof(float) * frames);
+    memcpy(sa_b_r, sa_r, sizeof(float) * frames);
+    for (k = 0; k < 3; k ++) {
+        box_audio_saturator_params_t p = sa_params(drives[k], asymmetries[k], 16, 1);
+        float gain = (float)box_audio_synth_exp2((double)(drives[k] *
+            BOX_AUDIO_SATURATOR_DRIVE_DB) * 0.16609640474436813);
+        int32_t mismatch = 0;
+        sa_tone(&p, 440, 0.5f, frames);
+
+        /* The saturator as it was before its modes */
+        for (c = 0; c < 2; c ++) {
+            const float *in = c ? sa_b_r : sa_b_l, *out = c ? sa_r : sa_l;
+            box_audio_saturate_curve_t curve;
+            box_audio_oversample_t os;
+            box_audio_dc_t dc = {0};
+            box_audio_oversample_clear(&os);
+            box_audio_saturate_curve(&curve, gain, asymmetries[k] * BOX_AUDIO_SATURATOR_BIAS);
+            for (i = 0; i < frames; i ++) {
+                float a, b, y;
+                box_audio_oversample_up(&os, in[i], &a, &b);
+                a = box_audio_saturate_clip(&curve, a);
+                b = box_audio_saturate_clip(&curve, b);
+                y = box_audio_oversample_down(&os, a, b) * curve.comp;
+                y = sa_clean(box_audio_dc_next(&dc, y, coef));
+                mismatch += out[i] != y;
+            }
+        }
+
+        printf("drive %.1f, asymmetry %.1f: %d samples differ from the saturator before its "
+            "modes\n", (double)drives[k], (double)asymmetries[k], mismatch);
+        test_int(mismatch, 0);
+    }
+}
+
+/** Render a saturator in a mode with all its filters and the hold on a looping sine in pieces
+ * of a size, with a change of its params halfway.
+ *
+ * @param left Receives the left channel
+ * @param right Receives the right channel
+ * @param size Frames of each render, 0 for sizes that vary
+ */
+static void sa_mode_sizes(
+    float *left,
+    float *right,
+    int32_t size)
+{
+    box_audio_core_t *core = sa_core();
+    box_audio_saturator_params_t p = sa_mode(BOX_AUDIO_SATURATOR_FOLD, 0.6f, 0.2f);
+    int32_t at = 0, k = 0;
+    p.low_cut = 80;
+    p.high_cut = 9000;
+    p.tone = 0.4f;
+    p.rate = 12000;
+    p.mix = 0.8f;
+    sa_command(core, p);
+    audio_sine(sa_sound, AUDIO_RATE, 220, 0.4f);
+    sa_play(core, AUDIO_RATE, true);
+    while (at < AUDIO_RATE) {
+        int32_t n = size ? size : 1 + (k * 97) % 613;
+        int32_t half = AUDIO_RATE / 2;
+        n = n < AUDIO_RATE - at ? n : AUDIO_RATE - at;
+        if (at < half && at + n > half) {
+            n = half - at;
+        }
+
+        box_audio_core_render(core, left + at, right + at, n);
+        at += n;
+        k ++;
+        if (at == half) {
+            p = sa_mode(BOX_AUDIO_SATURATOR_HARD, 0.9f, 0.5f);
+            p.low_cut = 300;
+            p.high_cut = 0;
+            p.tone = -0.6f;
+            p.rate = 6000;
+            sa_command(core, p);
+        }
+    }
+
+    box_audio_core_free(core);
+}
+
+void Saturator_mode_render_sizes(void) {
+    // audio/saturator
+    sa_mode_sizes(sa_l, sa_r, BOX_AUDIO_CORE_QUANTUM);
+    sa_mode_sizes(sa_b_l, sa_b_r, 0);
+    test_assert(audio_hash(sa_l, AUDIO_RATE) == audio_hash(sa_b_l, AUDIO_RATE));
+    test_assert(audio_hash(sa_r, AUDIO_RATE) == audio_hash(sa_b_r, AUDIO_RATE));
+    test_assert(audio_peak(sa_l, 0, AUDIO_RATE) > 0.01f);
+    test_assert(audio_peak(sa_l, 0, AUDIO_RATE) < 2);
+}
+
+void Saturator_mode_silent_after_tail(void) {
+    // audio/saturator
+    int32_t m;
+    for (m = 1; m < BOX_AUDIO_SATURATOR_MODES; m ++) {
+        box_audio_core_t *core = sa_core();
+        box_audio_saturator_params_t p = sa_mode(m, 0.6f, 0.4f);
+        p.low_cut = 100;
+        p.high_cut = 6000;
+        p.tone = 0.5f;
+        p.rate = 8000;
+        sa_command(core, p);
+        audio_sine(sa_sound, AUDIO_RATE / 4, 330, 0.5f);
+        box_audio_core_render(core, sa_silence, sa_silence + 1, 1);
+        test_assert(box_audio_core_sound(core, 1, sa_sound, AUDIO_RATE / 4, 1, AUDIO_RATE));
+        audio_play(core, 1, 1, 1, 1, 0, 1, 0);
+        sa_render(core, sa_l, sa_r, 0, AUDIO_RATE / 8);
+        test_assert(box_audio_core_effect_running(core, 0));
+        test_assert(audio_peak(sa_l, 0, AUDIO_RATE / 8) > 0.01f);
+        sa_render(core, sa_l, sa_r, 0, AUDIO_RATE);
+        sa_render(core, sa_l, sa_r, 0, AUDIO_RATE);
+        printf("%s: stops after its tail\n", sa_mode_name(m));
+        test_assert(!box_audio_core_effect_running(core, 0));
+        test_flt(audio_peak(sa_l, AUDIO_RATE / 2, AUDIO_RATE), 0);
+        box_audio_core_free(core);
+    }
+}
+
+void Saturator_mode_reduction(void) {
+    // audio/saturator
+    box_audio_effect_meter_t meters[BOX_AUDIO_EFFECT_MAX];
+    int32_t m;
+    for (m = 1; m < BOX_AUDIO_SATURATOR_MODES; m ++) {
+        box_audio_core_t *core = sa_core();
+        sa_command(core, sa_mode(m, 1, 0));
+        audio_sine(sa_sound, AUDIO_RATE, 1000, sa_linear(-6));
+        sa_play(core, AUDIO_RATE, true);
+        sa_render(core, sa_l, sa_r, 0, AUDIO_RATE / 10);
+        box_audio_core_effect_meters(core, meters, BOX_AUDIO_EFFECT_MAX);
+        printf("%s, reduction of a -6 dBFS sine at drive 1: %.2f dB\n", sa_mode_name(m),
+            (double)meters[0].reduction);
+        test_assert(meters[0].reduction > 10);
+        box_audio_core_free(core);
+    }
 }
