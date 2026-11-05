@@ -729,6 +729,7 @@ typedef struct box_audio_module_t {
     ecs_vec_t samples;            /**< box_audio_sample_t*, the decoded sound files */
     uint64_t next_sample;         /**< Key of the next sample */
     box_audio_sample_sync_t *sample_sync; /**< Decodes in flight */
+    box_task_track_t sample_task; /**< Report of the decodes in flight */
     ecs_query_t *sample_users;    /**< AudioSample, to update the status of its entities */
     ecs_query_t *music_query;     /**< AudioStream with AudioMusic, disabled ones included */
     ecs_vec_t music;              /**< box_audio_music_t*, the streams, retired ones included */

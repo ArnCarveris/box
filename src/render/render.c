@@ -309,6 +309,7 @@ void BoxRenderImport(
     ecs_world_t *world)
 {
     ECS_MODULE(world, BoxRender);
+    ECS_IMPORT(world, BoxTask);
     ECS_IMPORT(world, BoxTransform);
     ECS_IMPORT(world, BoxGeometry);
     ECS_IMPORT(world, BoxCamera);

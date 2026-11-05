@@ -60,6 +60,10 @@ typedef struct box_textures_t {
     int32_t watch;              /**< Kind of the textures in the file watch */
     ecs_entity_t removed;       /**< Source whose TextureGen is being removed, which the
                                  *   textures derived from it see as gone */
+    int32_t loads;              /**< File decodes submitted whose completion did not run */
+    int32_t gens;               /**< Generations submitted whose completion did not run */
+    box_task_track_t load_task; /**< Report of loads */
+    box_task_track_t gen_task;  /**< Report of gens */
 } box_textures_t;
 
 /** Singleton that holds the registry of a world */
@@ -104,6 +108,8 @@ typedef struct box_texture_job_t {
     int32_t width;              /**< Width of the result */
     int32_t height;             /**< Height of the result */
     char *error;                /**< Why the decode failed, NULL on success */
+    bool generated;             /**< The job generates, it counts among the gens of the
+                                 *   registry instead of its loads */
 } box_texture_job_t;
 
 /** Create what the decodes of every world share, once per process on the main thread.

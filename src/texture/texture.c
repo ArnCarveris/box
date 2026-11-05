@@ -224,6 +224,24 @@ static void box_texture_work(
     ecs_os_mutex_unlock(job->sync->lock);
 }
 
+/** Count a job among the loads or gens in flight of the registry.
+ *
+ * @param t The registry
+ * @param job The job
+ * @param delta 1 when it is submitted, -1 when it completed
+ */
+static void box_textures_count(
+    box_textures_t *t,
+    const box_texture_job_t *job,
+    int32_t delta)
+{
+    if (job->generated) {
+        t->gens += delta;
+    } else {
+        t->loads += delta;
+    }
+}
+
 /** Hand the result of a decode to its texture, unless a newer load was requested since.
  *
  * @param world The world
@@ -238,6 +256,10 @@ static void box_texture_complete(
     box_texture_t *tex = t
         ? ecs_map_get_deref(&t->textures, box_texture_t, job->entity)
         : NULL;
+    if (t) {
+        box_textures_count(t, job, -1);
+    }
+
     if (!tex || tex->generation != job->generation || !ecs_is_alive(world, job->entity)) {
         goto done;
     }
@@ -349,6 +371,7 @@ static void box_texture_submit(
     job->sync = t->sync;
     job->entity = e;
     job->generation = ++ tex->generation;
+    job->generated = job->gen != NULL;
     tex->waiting = false;
     ecs_os_free(tex->source_name);
     tex->source_name = NULL;
@@ -357,12 +380,14 @@ static void box_texture_submit(
     t->sync->working ++;
     ecs_os_mutex_unlock(t->sync->lock);
     box_texture_status(world, e, TextureLoading, revision, NULL);
+    box_textures_count(t, job, 1);
     if (box_job_submit(world, &(box_job_desc_t){
         .work = box_texture_work,
         .complete = box_texture_complete,
         .ctx_free = box_texture_job_free,
         .ctx = job
     })) {
+        box_textures_count(t, job, -1);
         ecs_os_mutex_lock(t->sync->lock);
         t->sync->working --;
         ecs_os_mutex_unlock(t->sync->lock);
@@ -791,9 +816,11 @@ static void box_textures_fail_waiting(
     ecs_vec_fini_t(NULL, &waiting, ecs_entity_t);
 }
 
-/** Fail the textures whose source got no TextureGen since the last frame, load the textures
- * again when the texture quality of the surfaces changed and, in a headless run, wait for the
- * decodes in flight so a frame always sees the same images, and warn when the wait gives up.
+/** Report the loads and generations in flight and fail the textures whose source got no
+ * TextureGen since the last frame.
+ *
+ * Load the textures again when the texture quality of the surfaces changed and, in a headless
+ * run, wait for the decodes in flight so a frame sees the same images, warning on a timeout.
  *
  * @param it The iterator of the system
  */
@@ -807,6 +834,8 @@ static void BoxTextureFrame(
         goto done;
     }
 
+    box_task_remaining(it->world, &t->load_task, BOX_TASK_TEXTURES, true, t->loads);
+    box_task_remaining(it->world, &t->gen_task, BOX_TASK_TEXTURE_GEN, true, t->gens);
     box_textures_fail_waiting(it->world, t);
     int32_t quality = box_textures_quality(it->world, t);
     if (t->quality && quality != t->quality) {
@@ -838,6 +867,7 @@ void BoxTextureImport(
     ecs_world_t *world)
 {
     ECS_MODULE(world, BoxTexture);
+    ECS_IMPORT(world, BoxTask);
     ECS_IMPORT(world, BoxTypes);
     ECS_IMPORT(world, BoxSurface);
     ECS_IMPORT(world, BoxApp);

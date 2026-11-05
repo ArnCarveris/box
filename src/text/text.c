@@ -334,9 +334,9 @@ static int32_t box_text_working(
 /** Loading fonts a timed out headless wait names in its warning */
 #define BOX_TEXT_WARN_NAMES (4)
 
-/** In a headless run, wait for the font and glyph jobs in flight so a frame always sees the
- * same atlas, and warn when the wait gives up, naming the font loads not applied yet while
- * font or glyph jobs are in flight.
+/** Report the font and glyph jobs in flight as BOX_TASK_FONTS and, in a headless run, wait
+ * for them so a frame always sees the same atlas, and warn when the wait gives up, naming the
+ * font loads not applied yet while font or glyph jobs are in flight.
  *
  * @param it The iterator of the system
  */
@@ -347,6 +347,11 @@ static void BoxTextFrame(
     const App *app = ecs_singleton_get(it->world, App);
     ecs_time_t start = {0};
     double waited = 0;
+    if (s) {
+        box_task_remaining(it->world, &s->task, BOX_TASK_FONTS, true,
+            box_text_working(s->sync));
+    }
+
     if (!s || !app || !app->headless) {
         goto done;
     }
@@ -620,6 +625,7 @@ void BoxTextImport(
     ecs_world_t *world)
 {
     ECS_MODULE(world, BoxText);
+    ECS_IMPORT(world, BoxTask);
     ECS_IMPORT(world, BoxLayout);
     ECS_IMPORT(world, BoxApp);
     ECS_IMPORT(world, BoxJobs);

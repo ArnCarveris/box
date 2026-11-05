@@ -525,7 +525,7 @@ static WGPUComputePipeline box_gpu_particle_compute(
         }
     };
 
-    return wgpuDeviceCreateComputePipeline(gpu->device, &desc);
+    return box_gpu_compute_pipeline(gpu, &desc);
 }
 
 /** Make the compute pipelines match the simulation shader.
@@ -631,7 +631,7 @@ static WGPURenderPipeline box_gpu_particle_draw_create(
         .fragment = &fragment
     };
 
-    return wgpuDeviceCreateRenderPipeline(gpu->device, &desc);
+    return box_gpu_render_pipeline(gpu, &desc);
 }
 
 /** Get the draw pipeline of a color format and a blend, created on first use and again after

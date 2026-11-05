@@ -818,6 +818,14 @@
                 ]
             },
             {
+                "id": "InProgressTask",
+                "testcases": [
+                    "first_frame_compiles",
+                    "held_compile_blocks",
+                    "bake_reports_probes"
+                ]
+            },
+            {
                 "id": "PipelineCache",
                 "testcases": [
                     "every_state_combination_draws",

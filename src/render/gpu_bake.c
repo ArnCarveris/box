@@ -447,7 +447,7 @@ static void box_gpu_bake_compute(
         wgpuComputePipelineRelease(*pipeline);
     }
 
-    *pipeline = wgpuDeviceCreateComputePipeline(gpu->device, &(WGPUComputePipelineDescriptor){
+    *pipeline = box_gpu_compute_pipeline(gpu, &(WGPUComputePipelineDescriptor){
         .layout = layout,
         .compute = {
             .module = module,

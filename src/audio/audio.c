@@ -1314,6 +1314,7 @@ void BoxAudioImport(
 {
     ECS_MODULE(world, BoxAudio);
     ECS_IMPORT(world, BoxTypes);
+    ECS_IMPORT(world, BoxTask);
     ECS_IMPORT(world, BoxTransform);
     ECS_IMPORT(world, BoxView);
     ECS_IMPORT(world, BoxJobs);
