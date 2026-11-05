@@ -919,6 +919,7 @@ static int box_app_start(
 
     if (app->scene && app->scene[0]) {
         char *scene = box_app_locate(app->scene);
+        ecs_trace("loading scene '%s'", app->scene);
         ecs_entity_t script = ecs_script(world, {
             .entity = ecs_new_from_path_w_sep(world, 0, app->scene, "/", "/"),
             .filename = scene
@@ -927,19 +928,31 @@ static int box_app_start(
         ecs_os_free(scene);
         if (!loaded || !loaded->script || loaded->error) {
             ecs_err("failed to load scene '%s'", app->scene);
+        } else {
+            ecs_trace("loaded scene '%s'", app->scene);
         }
+    } else {
+        ecs_trace("no scene specified");
     }
 
+    ecs_trace("creating views%s", app->headless ? " (headless)" : "");
     if (box_app_views(world)) {
         goto done;
     }
 
     app = ecs_singleton_get(world, App);
     if (app->port > 0) {
+        ecs_trace("serving REST API on port %d", app->port);
         box_app_serve(world, app->port);
     }
 
     box_app_target_fps(world, app);
+
+    if (app->no_audio) {
+        ecs_trace("audio disabled");
+    } else {
+        ecs_trace("opening audio output%s", app->headless ? " (headless)" : "");
+    }
 
     box_audio_output_open(world, &(box_audio_output_desc_t){
         .headless = app->headless,
@@ -982,10 +995,12 @@ int box_app_run(
     status->running = true;
     box_app_clock_t *clock = box_app_clock(world);
     clock->world = world;
+    ecs_trace("running");
 #ifdef __EMSCRIPTEN__
     emscripten_set_main_loop_arg(box_app_web_frame, clock, 0, true);
 #else
     while (ecs_progress(world, box_app_frame_delta(world))) { }
+    ecs_trace("stopped after %d frames", (int32_t)ecs_get_world_info(world)->frame_count_total);
 #endif
 
     status = ecs_singleton_get_mut(world, AppStatus);

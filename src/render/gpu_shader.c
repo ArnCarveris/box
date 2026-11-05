@@ -18,6 +18,7 @@ typedef struct box_gpu_shader_slot_t {
     box_gpu_shader_t shader;        /**< Module and revision, read as box_gpu_shader_t */
     box_gpu_compile_t *pending;     /**< Compiles waiting for their outcome, oldest first */
     int32_t requested;              /**< Code revision of the newest compile started */
+    char *label;                    /**< Label of the installed module, NULL when none */
 } box_gpu_shader_slot_t;
 
 /** A module whose compile outcome is awaited, owned by the callback once it waits */
@@ -116,6 +117,7 @@ static void box_gpu_shader_slot_free(
         box_gpu_count(gpu, BOX_GPU_STAT_SHADER_DESTROYED);
     }
 
+    ecs_os_free(slot->label);
     ecs_os_free(slot);
 }
 
@@ -124,11 +126,13 @@ static void box_gpu_shader_slot_free(
  * @param gpu The backend
  * @param handle Handle of the shader
  * @param module The module
+ * @param label Label of the module
  */
 static void box_gpu_shader_install(
     box_gpu_t *gpu,
     uint32_t handle,
-    WGPUShaderModule module)
+    WGPUShaderModule module,
+    const char *label)
 {
     box_gpu_shader_slot_t *slot = box_gpu_shader_slot(gpu, handle);
     if (slot->shader.module) {
@@ -139,6 +143,8 @@ static void box_gpu_shader_install(
 
     slot->shader.module = module;
     slot->shader.revision ++;
+    ecs_os_free(slot->label);
+    slot->label = ecs_os_strdup(label);
     if (handle == BOX_RENDER_SHADER_BLIT) {
         box_gpu_blit_reset(gpu);
     } else if (handle == BOX_RENDER_SHADER_MESH || handle == BOX_RENDER_SHADER_SHAPE2D) {
@@ -174,7 +180,11 @@ static void box_gpu_compile_finish(
         (compile->handle == BOX_RENDER_SHADER_MESH ||
             compile->handle == BOX_RENDER_SHADER_SHAPE2D))
     {
+        gpu->checking = compile->module;
+        gpu->checking_label = compile->label;
         invalid = box_gpu_forward_check(gpu, compile->handle, compile->module);
+        gpu->checking = NULL;
+        gpu->checking_label = NULL;
     }
 
     if (compile->failed || !compile->module || invalid) {
@@ -188,13 +198,14 @@ static void box_gpu_compile_finish(
         box_gpu_count(gpu, BOX_GPU_STAT_COMPILED);
         box_gpu_shader_report(gpu, compile->handle, compile->revision, NULL, compile->label);
         if (compile->revision == slot->requested) {
-            box_gpu_shader_install(gpu, compile->handle, compile->module);
+            box_gpu_shader_install(gpu, compile->handle, compile->module, compile->label);
             compile->module = NULL;
         }
     }
 
     if (slot && !slot->shader.module && !slot->pending) {
         ecs_map_remove(&gpu->shaders, compile->handle);
+        ecs_os_free(slot->label);
         ecs_os_free(slot);
     }
 
@@ -531,6 +542,29 @@ WGPUShaderModule box_gpu_shader_get(
     box_gpu_shader_t *s = ecs_map_get_deref(&gpu->shaders, box_gpu_shader_t, handle);
 
     return s ? s->module : NULL;
+}
+
+const char* box_gpu_shader_label(
+    box_gpu_t *gpu,
+    WGPUShaderModule module)
+{
+    const char *result = NULL;
+    if (module && module == gpu->checking) {
+        result = gpu->checking_label;
+        goto done;
+    }
+
+    ecs_map_iter_t it = ecs_map_iter(&gpu->shaders);
+    while (module && ecs_map_next(&it)) {
+        box_gpu_shader_slot_t *slot = ecs_map_ptr(&it);
+        if (slot->shader.module == module) {
+            result = slot->label;
+            break;
+        }
+    }
+
+done:
+    return result;
 }
 
 void box_gpu_shader_fini(
