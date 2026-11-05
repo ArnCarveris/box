@@ -33,6 +33,7 @@ void box_audio_voice_cutoff(
 {
     float rate = core->sample_rate, max = BOX_AUDIO_CUTOFF_MAX_RATIO * rate;
     float open = box_audio_svf_g(BOX_AUDIO_CUTOFF_OPEN_RATIO * (double)rate, rate), g;
+    int32_t frames = (int32_t)(BOX_AUDIO_CUTOFF_RAMP * rate);
     bool closed = value > 0 && value < BOX_AUDIO_CUTOFF_OPEN;
     v->cutoff = 0;
     if (closed) {
@@ -51,14 +52,17 @@ void box_audio_voice_cutoff(
             box_audio_ramp_set(&v->lowpass, open);
             v->lp[0].ic1 = v->lp[0].ic2 = v->lp[1].ic1 = v->lp[1].ic2 = 0;
             v->prime = true;
-            box_audio_ramp_to(&v->lowpass, g, core->ramp_frames);
+            box_audio_ramp_to(&v->lowpass, g, frames > 0 ? frames : 1);
             v->filtered = true;
         }
     } else {
-        box_audio_ramp_to(&v->lowpass, g, core->ramp_frames);
+        box_audio_ramp_to(&v->lowpass, g, frames > 0 ? frames : 1);
     }
 
     box_audio_svf_coefs(&v->lp[0], (float)box_audio_synth_exp2(v->lowpass.value));
+    v->lp[1].a1 = v->lp[0].a1;
+    v->lp[1].a2 = v->lp[0].a2;
+    v->lp[1].a3 = v->lp[0].a3;
 }
 
 void box_audio_voice_filter(
@@ -67,36 +71,37 @@ void box_audio_voice_filter(
     bool stereo,
     int32_t frames)
 {
-    box_audio_svf_t *a = &v->lp[0], *b = &v->lp[1];
+    box_audio_svf_t a = v->lp[0], b = v->lp[1];
     float *l = core->src_l, *r = core->src_r;
+    bool open = !(v->cutoff > 0);
     int32_t i;
     if (v->prime && frames > 0) {
-        a->ic2 = l[0];
-        b->ic2 = stereo ? r[0] : l[0];
+        a.ic2 = l[0];
+        b.ic2 = stereo ? r[0] : l[0];
         v->prime = false;
     }
 
-    for (i = 0; i < frames; i ++) {
+    for (i = 0; i < frames && v->filtered; i ++) {
         if (v->lowpass.left > 0) {
-            box_audio_svf_coefs(a,
+            box_audio_svf_coefs(&a,
                 (float)box_audio_synth_exp2(box_audio_ramp_next(&v->lowpass)));
+            b.a1 = a.a1;
+            b.a2 = a.a2;
+            b.a3 = a.a3;
+            v->filtered = !open || v->lowpass.left > 0;
         }
 
-        l[i] = box_audio_svf_next(a, BOX_AUDIO_SYNTH_LOWPASS, l[i]);
+        l[i] = box_audio_svf_next(&a, BOX_AUDIO_SYNTH_LOWPASS, l[i]);
         if (stereo) {
-            b->a1 = a->a1;
-            b->a2 = a->a2;
-            b->a3 = a->a3;
-            r[i] = box_audio_svf_next(b, BOX_AUDIO_SYNTH_LOWPASS, r[i]);
+            r[i] = box_audio_svf_next(&b, BOX_AUDIO_SYNTH_LOWPASS, r[i]);
         }
     }
 
     if (!stereo) {
-        b->ic1 = a->ic1;
-        b->ic2 = a->ic2;
+        b.ic1 = a.ic1;
+        b.ic2 = a.ic2;
     }
 
-    if (!(v->cutoff > 0) && v->lowpass.left == 0) {
-        v->filtered = false;
-    }
+    v->lp[0] = a;
+    v->lp[1] = b;
 }

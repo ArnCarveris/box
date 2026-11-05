@@ -471,8 +471,8 @@ equal steps in brightness: `f(d) = 20000 * (cutoff / 20000)^t` with
 `t = (d - min) / (max - min)`. A `cutoff` of 0, the default, a negative one or one
 of 20000 Hz or more filters nothing and costs nothing; others are clamped to at
 least 10 Hz. The filter applies to sources and `play_at` one shots, each channel of
-a stereo sound, after the voice's sound and before its volume and pan, and moves
-with the core's 5 ms ramps, so a fast source or a teleporting listener does not
+a stereo sound, after the voice's sound and before its volume and pan, and glides
+to a new cutoff over 50 ms, so a fast source or a teleporting listener does not
 click. A voice starts at its cutoff. There is no Doppler, occlusion or HRTF.
 
 Out-of-range looping sources release their voices but keep time on the game thread;

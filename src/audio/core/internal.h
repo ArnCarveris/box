@@ -1914,7 +1914,7 @@ void box_audio_voice_filter_reset(
     box_audio_voice_t *v);
 
 /** Move the low-pass of a voice to a cutoff of BOX_AUDIO_PARAM_CUTOFF. The log2 of its g
- * ramps linearly over the ramp of the core, in octaves at low cutoffs, and the stages stay
+ * ramps linearly over BOX_AUDIO_CUTOFF_RAMP, in octaves at low cutoffs, and the stages stay
  * stable while it moves; an open target ramps to near the Nyquist and stops the filter there.
  *
  * A voice that has not rendered takes the cutoff at once. A filter that starts on a playing

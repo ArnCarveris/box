@@ -45,8 +45,8 @@ float box_audio_spatial_cutoff(
     }
 
     t = max > min ? (distance - min) / (max - min) : 1.0f;
-    t = t < 1.0f ? t : 1.0f;
-    result = BOX_AUDIO_SPATIAL_OPEN * powf(cutoff / BOX_AUDIO_SPATIAL_OPEN, t);
+    result = t < 1.0f ? BOX_AUDIO_SPATIAL_OPEN * powf(cutoff / BOX_AUDIO_SPATIAL_OPEN, t) :
+        cutoff;
     if (!(result > 0) || !(result < BOX_AUDIO_SPATIAL_OPEN)) {
         result = 0;
     }

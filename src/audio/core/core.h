@@ -337,7 +337,8 @@ typedef enum box_audio_param_t {
     BOX_AUDIO_PARAM_PRESSURE = 13, /**< Pressure of a synth voice, 0..1, default 0: moves its
                                   *   cutoff up by pressure * BOX_AUDIO_SYNTH_PRESSURE_OCTAVES */
     BOX_AUDIO_PARAM_CUTOFF = 14  /**< Cutoff in Hz of the 12 dB per octave low-pass of a voice,
-                                  *   after its source and before its volume and pan, ramped.
+                                  *   after its source and before its volume and pan, ramped
+                                  *   over BOX_AUDIO_CUTOFF_RAMP.
                                   *   0 (the default), a negative value or one of at least
                                   *   BOX_AUDIO_CUTOFF_OPEN opens the filter, which the voice
                                   *   then skips; others are clamped to BOX_AUDIO_CUTOFF_MIN..
@@ -350,6 +351,10 @@ typedef enum box_audio_param_t {
 
 /** Lowest cutoff of BOX_AUDIO_PARAM_CUTOFF in Hz */
 #define BOX_AUDIO_CUTOFF_MIN 10.0f
+
+/** Seconds a cutoff of BOX_AUDIO_PARAM_CUTOFF ramps over, longer than the ramp of the gains:
+ * a jump of octaves sweeps the phase of what passes, which clicks when it is too fast */
+#define BOX_AUDIO_CUTOFF_RAMP 0.05f
 
 /** Largest pitch bend of a voice in semitones, either way */
 #define BOX_AUDIO_BEND_MAX 48.0f

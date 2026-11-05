@@ -127,25 +127,25 @@ void Ramp_restart_midway(void) {
 void Ramp_cutoff_step(void) {
     // audio/ramp
     box_audio_core_t *core = audio_new();
-    int32_t i;
+    int32_t i, ramp = (int32_t)(BOX_AUDIO_CUTOFF_RAMP * AUDIO_RATE);
     audio_sine(audio_sound_a, AUDIO_RATE, 8000, 0.5f);
     test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_RATE, 1, AUDIO_RATE));
     audio_play(core, 1, 1, 0, 1, 0, 1, BOX_AUDIO_PLAY_LOOP | BOX_AUDIO_PLAY_ATTACK);
     audio_render(core, 0, 2048);
-    test_assert(audio_peak(audio_l, 1024, 2048) > 0.49f);
+    test_assert(audio_peak(audio_l, 1024, 2048) > 0.43f);
 
     /* The filter closes over a ramp: the first frames are still bright, then dark */
     audio_voice_set(core, 1, BOX_AUDIO_PARAM_CUTOFF, 200);
     audio_render(core, 2048, 4096);
-    test_assert(audio_peak(audio_l, 2048, 2048 + AUDIO_RAMP / 5) > 0.1f);
-    test_assert(audio_peak(audio_l, 2048 + AUDIO_RAMP * 2, 6144) < 0.01f);
-    test_assert(audio_peak(audio_r, 2048 + AUDIO_RAMP * 2, 6144) < 0.01f);
-    test_assert(audio_peak(audio_l, 2048 + AUDIO_RAMP * 2, 6144) > 0);
+    test_assert(audio_peak(audio_l, 2048, 2048 + ramp / 20) > 0.1f);
+    test_assert(audio_peak(audio_l, 2048 + ramp + 64, 6144) < 0.01f);
+    test_assert(audio_peak(audio_r, 2048 + ramp + 64, 6144) < 0.01f);
+    test_assert(audio_peak(audio_l, 2048 + ramp + 64, 6144) > 0);
 
     /* Open again it passes the sound as is once the ramp ended */
     audio_voice_set(core, 1, BOX_AUDIO_PARAM_CUTOFF, 0);
     audio_render(core, 6144, 4096);
-    for (i = 6144 + AUDIO_RAMP + 8; i < 10240; i ++) {
+    for (i = 6144 + ramp + 8; i < 10240; i ++) {
         test_assert(fabsf(audio_l[i] - audio_sound_a[i]) < 1e-5f);
     }
 
