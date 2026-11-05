@@ -221,10 +221,12 @@ void SynthDrive_zero_identical(void) {
             audio_play(core, 1, 1, 0, 1, 0, 1, 0);
             audio_render(core, 0, 24000);
             memcpy(sd_ref, audio_l, 24000 * sizeof(float));
+            box_audio_core_free(core);
+            core = sd_core(AUDIO_RATE);
             p.filter = kind;
             p.slope = slope;
-            sd_define(core, 2, &p);
-            audio_play(core, 2, 2, 0, 1, 0, 1, 0);
+            sd_define(core, 1, &p);
+            audio_play(core, 1, 1, 0, 1, 0, 1, 0);
             audio_render(core, 0, 24000);
             box_audio_core_free(core);
 

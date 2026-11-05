@@ -155,7 +155,7 @@ static inline float box_audio_svf_next(
 
 /** Soft clip a value: tanh(a v) / a, from the rational approximation
  * z (27 + z^2) / (27 + 9 z^2) of tanh(z), which reaches 1 with a flat slope at z = 3 and
- * holds there. Never larger than |v|.
+ * holds there. Never larger than |v|. Without branches, so it stays cheap in the loop.
  *
  * @param v The value
  * @param a Gain, above 0
@@ -165,17 +165,12 @@ static inline float box_audio_svf_clip(
     float v,
     float a)
 {
-    float z = a * v, zz, result;
-    if (z >= 3.0f) {
-        result = 1.0f / a;
-    } else if (z <= -3.0f) {
-        result = -1.0f / a;
-    } else {
-        zz = z * z;
-        result = v * (27.0f + zz) / (27.0f + 9.0f * zz);
-    }
+    float z = a * v, zz;
+    z = z < 3.0f ? z : 3.0f;
+    z = z > -3.0f ? z : -3.0f;
+    zz = z * z;
 
-    return result;
+    return z * (27.0f + zz) / (a * (27.0f + 9.0f * zz));
 }
 
 /** Filter a frame through a stage with drive: the input and the bandpass state go through

@@ -290,6 +290,10 @@ both stages at `SynthSlope24`. Quiet signals pass almost unchanged and loud ones
 compress and gain harmonics; a high resonance settles at a bounded level and growls
 instead of whistling. Zero is linear and costs nothing; 1 drives the filter hard.
 `AudioFilter.drive` does the same on a bus and moves over 20 ms like `mix`.
+In the `Synth` bench of [bench/audio](../bench/audio/) (64 voices, 48 kHz, one
+128-frame quantum), drive raises a 12 dB filter from about 75 to 115 µs and a 24 dB
+filter with an envelope from about 125 to 170 µs: roughly 4 ns per stage and frame of
+a voice.
 
 ```flecs
 using box.audio
