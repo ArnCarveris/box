@@ -12,7 +12,10 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
+fn sag(t: f32) -> f32 {
+  -math.sin(t * math.PI) * 0.85
+}
+
 template MarketBunting {
   prop length: f32 = 12
   prop flags: i32 = 20
@@ -21,18 +24,37 @@ template MarketBunting {
   const gold: Rgb = {230, 173, 66}
   const colors = [MarketCream, MarketSage, brick, gold]
 
+  cord {
+    Position: {}
+    route {
+      Path3D: {
+        start: {-0.5 * length, 0, 0},
+        segments: [
+          {kind: CatmullRom, end: {-0.375 * length, sag(1 / 8.0), 0}},
+          {kind: CatmullRom, end: {-0.25 * length, sag(2 / 8.0), 0}},
+          {kind: CatmullRom, end: {-0.125 * length, sag(3 / 8.0), 0}},
+          {kind: CatmullRom, end: {0, sag(4 / 8.0), 0}},
+          {kind: CatmullRom, end: {0.125 * length, sag(5 / 8.0), 0}},
+          {kind: CatmullRom, end: {0.25 * length, sag(6 / 8.0), 0}},
+          {kind: CatmullRom, end: {0.375 * length, sag(7 / 8.0), 0}},
+          {kind: CatmullRom, end: {0.5 * length, sag(8 / 8.0), 0}}
+        ]
+      }
+    }
+    Sweep: {path: route, profile: MarketRoundProfile, scale: {0.014, 0.014}, rings: 64}
+    Rgb: MarketIron
+  }
   for i in 0..flags {
     const t = i * 1.0 / flags
-    const next = (i + 1.0) / flags
-    const y = -math.sin(t * math.PI) * 0.85
-    const next_y = -math.sin(next * math.PI) * 0.85
-    MarketBeam(ax: (t - 0.5) * length, ay: y, bx: (next - 0.5) * length, by: next_y, radius: 0.014);
+    const y = sag(t)
+    const next_y = sag((i + 1.0) / flags)
     {
       Position: {(t - 0.5) * length + length / flags * 0.5, (y + next_y) / 2 - 0.2, 0}
       Rotation: {0.1 * math.sin(i), 0, math.PI}
       Triangle: {length / flags * 0.74, 0.4}
       Rgb: colors[i % 4]
       BackFaceMode: {BackFacePlain}
+      DiffuseTransmission: {factor: 0.45, thickness: 0.01}
     }
   }
 }

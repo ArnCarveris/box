@@ -1,0 +1,12 @@
+// A frequency shifter set by a scene, for the FrequencyShifter suite of test/cpu/audio: a ring
+// modulator bell on the pad bus, its right channel half mirrored, with a little negative
+// feedback, mixed in parallel. An effect entity comes before the bus that names it.
+using box.audio
+
+pad_bell {
+  FrequencyShifter: {shift: 437, mode: FrequencyRing, stereo: 0.5, feedback: -0.3, mix: 0.8}
+}
+
+pad {
+  AudioBus: {output: master, effects: [pad_bell]}
+}

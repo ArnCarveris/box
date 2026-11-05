@@ -10,7 +10,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template MarketBeam {
   prop ax: f32 = 0
   prop ay: f32 = 0
@@ -30,3 +29,20 @@ template MarketBeam {
   Cylinder: {radius: radius, length: length, segments: 8}
   Rgb: tint
 }
+
+prefab MarketRoundShape {
+  Path2D: {
+    start: {1, 0},
+    segments: [
+      {kind: CatmullRom, end: {0.7071, 0.7071}},
+      {kind: CatmullRom, end: {0, 1}},
+      {kind: CatmullRom, end: {-0.7071, 0.7071}},
+      {kind: CatmullRom, end: {-1, 0}},
+      {kind: CatmullRom, end: {-0.7071, -0.7071}},
+      {kind: CatmullRom, end: {0, -1}},
+      {kind: CatmullRom, end: {0.7071, -0.7071}}
+    ],
+    closed: true
+  }
+}
+prefab MarketRoundProfile { Profile2D: {outer: MarketRoundShape} }

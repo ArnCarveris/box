@@ -2,92 +2,143 @@ using flecs.script.math
 using box.transform
 using box.geometry
 using box.material
+using box.animation
+using box.curve
 using yeon
 
 const hanji: Rgb = {246, 240, 225}
 const bamboo: Rgb = {125, 88, 48}
 const thread: Rgb = {235, 230, 215}
+const holeRadius: f32 = 0.3
+const holeHandle: f32 = holeRadius * 0.5523
 
-prefab PlayerKite {
+kite_outline {
+  Path2D: {
+    start: {-0.75, -1},
+    segments: [
+      {kind: Line, end: {0.75, -1}},
+      {kind: Line, end: {0.75, 1}},
+      {kind: Line, end: {-0.75, 1}}
+    ],
+    closed: true
+  }
+}
+
+kite_hole {
+  Path2D: {
+    start: {holeRadius, 0},
+    segments: [
+      {kind: CubicBezier, end: {0, holeRadius},
+        control1: {holeRadius, holeHandle}, control2: {holeHandle, holeRadius}},
+      {kind: CubicBezier, end: {-holeRadius, 0},
+        control1: {-holeHandle, holeRadius}, control2: {-holeRadius, holeHandle}},
+      {kind: CubicBezier, end: {0, -holeRadius},
+        control1: {-holeRadius, -holeHandle}, control2: {-holeHandle, -holeRadius}},
+      {kind: CubicBezier, end: {holeRadius, 0},
+        control1: {holeHandle, -holeRadius}, control2: {holeRadius, -holeHandle}}
+    ],
+    closed: true
+  }
+}
+
+kite_face {
+  Profile2D: {outer: kite_outline, holes: [kite_hole]}
+}
+
+kite_sway {
+  AnimationClip: {duration: 7.2}
+
+  roll {
+    AnimationTrack: {component: Rotation, member: "z", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0}, {0.9, 0.07}, {1.8, 0}, {2.7, -0.07}, {3.6, 0}, {4.5, 0.07}, {5.4, 0}, {6.3, -0.07},
+      {7.2, 0}
+    ]}}
+  }
+
+  pitch {
+    AnimationTrack: {component: Rotation, member: "x", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0}, {0.6, 0.04}, {1.2, 0}, {1.8, -0.04}, {2.4, 0}, {3.0, 0.04}, {3.6, 0}, {4.2, -0.04},
+      {4.8, 0}, {5.4, 0.04}, {6.0, 0}, {6.6, -0.04}, {7.2, 0}
+    ]}}
+  }
+}
+
+kite_hurt_blink {
+  AnimationClip: {duration: 0.2}
+
+  strength {
+    AnimationTrack: {component: Tint, member: "a", curve: {keys: [{0, 0}, {0.1, 170}, {0.2, 0}]}}
+  }
+}
+
+template PlayerKite {
+  prop hurt: bool = false
+
   body {
     YeonBody: {roll_scale: 1}
     Position: {0, 0, 0}
     Scale: {1.3, 1.3, 1.3}
+    Tint: {255, 70, 50, 0}
+    Animator: {clip: kite_hurt_blink, time: 0, speed: 1, mode: AnimationLoop, paused: !hurt}
 
-    face_left {
-      Position: {-0.525, 0, 0}
-      Box: {0.45, 2.0, 0.04}
-      Rgb: hanji
-    }
+    sway {
+      Rotation: {0, 0, 0}
+      Animator: {clip: kite_sway}
 
-    face_right {
-      Position: {0.525, 0, 0}
-      Box: {0.45, 2.0, 0.04}
-      Rgb: hanji
-    }
+      face {
+        Rotation: {-PI / 2, 0, 0}
+        ProfileExtrusion: {profile: kite_face, depth: 0.04, cap_start: true, cap_end: true}
+        Rgb: hanji
+        DiffuseTransmission: {factor: 0.3, color: {255, 236, 200}}
+      }
 
-    face_top {
-      Position: {0, 0.65, 0}
-      Box: {0.6, 0.7, 0.04}
-      Rgb: hanji
-    }
+      kkokji {
+        Position: {0, 0.62, 0.03}
+        Rotation: {PI / 2, 0, 0}
+        Cylinder: {segments: 32, smooth: true, length: 0.02, radius: 0.27}
+        Rgb: {205, 45, 45}
+        DiffuseTransmission: {factor: 0.3, color: {255, 120, 100}}
+      }
 
-    face_bottom {
-      Position: {0, -0.65, 0}
-      Box: {0.6, 0.7, 0.04}
-      Rgb: hanji
-    }
+      band {
+        Position: {0, -0.86, 0.025}
+        Box: {1.5, 0.28, 0.02}
+        Rgb: {30, 75, 145}
+      }
 
-    kkokji {
-      Position: {0, 0.62, 0.03}
-      Rotation: {PI / 2, 0, 0}
-      Cylinder: {segments: 32, smooth: true, length: 0.02, radius: 0.27}
-      Rgb: {205, 45, 45}
-    }
+      hole_rim {
+        Position: {0, 0, 0.02}
+        Rotation: {PI / 2, 0, 0}
+        Torus: {segments: 32, rings: 8, smooth: true, radius: holeRadius, tube: 0.03}
+        Rgb: bamboo
+      }
 
-    band {
-      Position: {0, -0.86, 0.025}
-      Box: {1.5, 0.28, 0.02}
-      Rgb: {30, 75, 145}
-    }
+      stick_mid {
+        Position: {0, 0, 0.045}
+        Box: {0.05, 2.0, 0.04}
+        Rgb: bamboo
+      }
 
-    hole_rim {
-      Position: {0, 0, 0.02}
-      Rotation: {PI / 2, 0, 0}
-      Torus: {segments: 32, rings: 8, smooth: true, radius: 0.3, tube: 0.03}
-      Rgb: bamboo
-    }
+      stick_top {
+        Position: {0, 0.97, 0.045}
+        Box: {1.5, 0.05, 0.04}
+        Rgb: bamboo
+      }
 
-    stick_mid {
-      Position: {0, 0, 0.045}
-      Box: {0.05, 2.0, 0.04}
-      Rgb: bamboo
-    }
+      stick_cross {
+        Position: {0, 0, 0.045}
+        Box: {1.5, 0.05, 0.04}
+        Rgb: bamboo
+      }
 
-    stick_top {
-      Position: {0, 0.97, 0.045}
-      Box: {1.5, 0.05, 0.04}
-      Rgb: bamboo
-    }
-
-    stick_cross {
-      Position: {0, 0, 0.045}
-      Box: {1.5, 0.05, 0.04}
-      Rgb: bamboo
-    }
-
-    stick_diag_a {
-      Position: {0, 0, 0.05}
-      Rotation: {0, 0, atan2(2.0, 1.5)}
-      Box: {2.5, 0.04, 0.03}
-      Rgb: bamboo
-    }
-
-    stick_diag_b {
-      Position: {0, 0, 0.05}
-      Rotation: {0, 0, -atan2(2.0, 1.5)}
-      Box: {2.5, 0.04, 0.03}
-      Rgb: bamboo
+      for i in 0..2 {
+        "stick_diag_{i}" {
+          Position: {0, 0, 0.05}
+          Rotation: {0, 0, (2 * i - 1) * atan2(2.0, 1.5)}
+          Box: {2.5, 0.04, 0.03}
+          Rgb: bamboo
+        }
+      }
     }
   }
 
@@ -113,6 +164,7 @@ template RivalKiteModel {
       Rotation: {0, 0, PI / 4}
       Box: {1.2, 1.2, 0.04}
       Rgb: color
+      DiffuseTransmission: {factor: 0.35}
     }
 
     stripe_h {
@@ -139,11 +191,8 @@ template RivalKiteModel {
         Position: {0.08 * (i % 2) - 0.04, -1.05 - 0.38 * i, 0}
         Rotation: {0, 0, 0.3 * (i % 2) - 0.15}
         Box: {0.26, 0.2, 0.02}
-        if i % 2 == 0 {
-          Rgb: accent
-        } else {
-          Rgb: color
-        }
+        Rgb: i % 2 == 0 ? accent : color
+        DiffuseTransmission: {factor: 0.35}
       }
     }
   }
@@ -170,28 +219,36 @@ prefab YellowKite {
   RivalKiteModel: {color: {240, 195, 40}, accent: {30, 30, 30}}
 }
 
+lantern_swing {
+  AnimationClip: {duration: 2.4}
+
+  swing {
+    AnimationTrack: {component: Rotation, member: "z", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0}, {0.6, 0.1}, {1.2, 0}, {1.8, -0.1}, {2.4, 0}
+    ]}}
+  }
+}
+
 prefab Lantern {
   Scale: {1.4, 1.4, 1.4}
+  Rotation: {0, 0, 0}
+  Animator: {clip: lantern_swing}
 
   body {
     Position: {0, 0, 0}
     Cylinder: {segments: 24, smooth: true, length: 0.7, radius: 0.34}
     Rgb: {205, 40, 40}
     Emissive: {strength: 1.2, color: {255, 90, 40}}
+    DiffuseTransmission: {factor: 0.25, color: {255, 150, 90}}
   }
 
-  band_top {
-    Position: {0, 0.43, 0}
-    Cylinder: {segments: 24, smooth: true, length: 0.18, radius: 0.37}
-    Rgb: {30, 60, 145}
-    Emissive: {strength: 0.15, color: {60, 100, 220}}
-  }
-
-  band_bottom {
-    Position: {0, -0.43, 0}
-    Cylinder: {segments: 24, smooth: true, length: 0.18, radius: 0.37}
-    Rgb: {30, 60, 145}
-    Emissive: {strength: 0.15, color: {60, 100, 220}}
+  for i in 0..2 {
+    "band_{i}" {
+      Position: {0, 0.86 * i - 0.43, 0}
+      Cylinder: {segments: 24, smooth: true, length: 0.18, radius: 0.37}
+      Rgb: {30, 60, 145}
+      Emissive: {strength: 0.15, color: {60, 100, 220}}
+    }
   }
 
   cap {

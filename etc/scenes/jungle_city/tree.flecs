@@ -3,7 +3,73 @@ using box.transform
 using box.geometry
 using box.material
 
-@tree Parent
+prefab CanopyRoundShape {
+  Path2D: {
+    start: {1, 0},
+    segments: [
+      {kind: CatmullRom, end: {0.7071, 0.7071}},
+      {kind: CatmullRom, end: {0, 1}},
+      {kind: CatmullRom, end: {-0.7071, 0.7071}},
+      {kind: CatmullRom, end: {-1, 0}},
+      {kind: CatmullRom, end: {-0.7071, -0.7071}},
+      {kind: CatmullRom, end: {0, -1}},
+      {kind: CatmullRom, end: {0.7071, -0.7071}}
+    ],
+    closed: true
+  }
+}
+prefab CanopyRoundProfile { Profile2D: {outer: CanopyRoundShape} }
+prefab CanopyPalmPath0 {
+  Path3D: {
+    start: {0, 0, 0},
+    segments: [
+      {kind: CatmullRom, end: {-0.004, 0.3, 0}},
+      {kind: CatmullRom, end: {-0.018, 0.62, 0}},
+      {kind: CatmullRom, end: {-0.04, 0.92, 0}}
+    ]
+  }
+}
+prefab CanopyPalmPath1 {
+  Path3D: {
+    start: {0, 0, 0},
+    segments: [
+      {kind: CatmullRom, end: {-0.002, 0.3, 0}},
+      {kind: CatmullRom, end: {-0.009, 0.62, 0}},
+      {kind: CatmullRom, end: {-0.02, 0.92, 0}}
+    ]
+  }
+}
+prefab CanopyPalmPath2 {
+  Path3D: {
+    start: {0, 0, 0},
+    segments: [
+      {kind: CatmullRom, end: {0, 0.3, 0}},
+      {kind: CatmullRom, end: {0, 0.62, 0}},
+      {kind: CatmullRom, end: {0, 0.92, 0}}
+    ]
+  }
+}
+prefab CanopyPalmPath3 {
+  Path3D: {
+    start: {0, 0, 0},
+    segments: [
+      {kind: CatmullRom, end: {0.002, 0.3, 0}},
+      {kind: CatmullRom, end: {0.009, 0.62, 0}},
+      {kind: CatmullRom, end: {0.02, 0.92, 0}}
+    ]
+  }
+}
+prefab CanopyPalmPath4 {
+  Path3D: {
+    start: {0, 0, 0},
+    segments: [
+      {kind: CatmullRom, end: {0.004, 0.3, 0}},
+      {kind: CatmullRom, end: {0.018, 0.62, 0}},
+      {kind: CatmullRom, end: {0.04, 0.92, 0}}
+    ]
+  }
+}
+
 template CanopyCrownLobe {
   prop rx: f32 = 1
   prop ry: f32 = 0.8
@@ -28,19 +94,28 @@ template CanopyCrownLobe {
   }
 }
 
-@tree Parent
 template CanopyTree {
   prop height: f32 = 9
   prop variant: i32 = 0
   prop species: i32 = -1
   const rng: math.Rng = {seed: variant + 3217}
   const draw: i32 = rng.u(8)
-  const kind: i32 = match species < 0 { true: draw; _: species }
-  const lean = rng.f(0.9) - 0.45
+  const kind: i32 = species < 0 ? draw : species
+  const raw_lean = rng.f(0.9) - 0.45
   const girth = height * 0.03
   if kind < 2 {
-    CanopyBranch(ay: 0, bx: lean * 0.4, by: height * 0.5, radius: girth * 0.82) {}
-    CanopyBranch(ax: lean * 0.4, ay: height * 0.5, bx: lean, by: height * 0.92, radius: girth * 0.56) {}
+    const bucket: i32 = math.clamp(math.round(raw_lean / height / 0.02) + 2, 0, 4)
+    const lean = (bucket - 2) * 0.02 * height
+    trunk : CanopyBark {
+      Position: {0, 0, 0}
+      Scale: {height, height, height}
+      Sweep: {
+        path: match bucket { 0: CanopyPalmPath0; 1: CanopyPalmPath1; 2: CanopyPalmPath2; 3: CanopyPalmPath3; _: CanopyPalmPath4 },
+        profile: CanopyRoundProfile, scale: {0.0246, 0.0246}, taper: 0.38, rings: 20
+      }
+      TextureMapping: {mode: MappingUv}
+      TextureTransform: {scale_x: 1, scale_y: 5}
+    }
     for i in 0..4 {
       const a = i * math.PI / 2 + rng.f(0.6)
       CanopyBranch(ax: math.sin(a) * girth * 2.4, ay: 0, az: math.cos(a) * girth * 2.4, by: height * 0.05, radius: girth * 0.45) {}
@@ -60,6 +135,7 @@ template CanopyTree {
       { (IsA, CanopyBark); Position: {lean + math.sin(i * 2.1) * girth * 0.8, height * 0.89, math.cos(i * 2.1) * girth * 0.8}; IcoSphere: {radius: girth * 0.5, segments: 1}; Rgb: {96, 72, 40} }
     }
   } else {
+    const lean = raw_lean
     const deep: Rgb = {58, 112, 50}
     const fresh: Rgb = {76, 128, 56}
     const lime: Rgb = {100, 142, 58}
@@ -68,8 +144,8 @@ template CanopyTree {
     const tint: Rgb = tints[rng.u(4)]
     const flowering = kind == 7
     const flat = kind == 6
-    const squash = match flat { true: 0.62; _: 1.0 }
-    const spread = match flat { true: 0.36; _: 0.25 }
+    const squash = flat ? 0.62 : 1.0
+    const spread = flat ? 0.36 : 0.25
     CanopyBranch(ay: 0, bx: lean, by: height * 0.62, radius: girth) {}
     for i in 0..5 {
       const a = i * 1.2566 + rng.f(0.6)
