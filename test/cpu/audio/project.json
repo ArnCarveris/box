@@ -144,7 +144,6 @@
                 ]
             },
             {
-<<<<<<< HEAD
                 "id": "SynthKey",
                 "testcases": [
                     "keytrack_octave",
@@ -161,7 +160,11 @@
                     "key_scale_off",
                     "key_scale_release",
                     "defaults_identical",
-=======
+                    "clamped",
+                    "script"
+                ]
+            },
+            {
                 "id": "SynthSync",
                 "testcases": [
                     "period_master",
@@ -174,7 +177,6 @@
                     "unison_stereo",
                     "fm_adds",
                     "ignored_noise_pluck",
->>>>>>> f025647e140f393c91349ccb79fd748eaefe3674
                     "clamped",
                     "script"
                 ]
