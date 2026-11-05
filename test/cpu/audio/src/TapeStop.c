@@ -74,7 +74,7 @@ static void ts_run(
     int32_t floats = box_audio_effect_floats(BOX_AUDIO_EFFECT_TAPE_STOP, AUDIO_RATE), i;
     float params[BOX_AUDIO_EFFECT_PARAMS] = {0}, *memory;
     box_audio_core_t *core = box_audio_core_new(&desc);
-    uint8_t bytes[1024];
+    uint8_t bytes[2048];
     box_audio_writer_t w;
     test_assert(core != NULL);
     test_assert(floats > 0);

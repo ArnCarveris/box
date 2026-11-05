@@ -101,21 +101,6 @@ static const box_audio_effect_def_t box_audio_effect_kinds[BOX_AUDIO_EFFECT_KIND
         .render = box_audio_pitch_shifter_render,
         .rest = box_audio_pitch_shifter_rest
     },
-<<<<<<< HEAD
-    [BOX_AUDIO_EFFECT_BEAT_REPEAT] = {
-        .floats = box_audio_beat_repeat_floats,
-        .start = box_audio_beat_repeat_start,
-        .command = box_audio_beat_repeat_command,
-        .render = box_audio_beat_repeat_render,
-        .rest = box_audio_beat_repeat_rest
-    },
-    [BOX_AUDIO_EFFECT_TAPE_STOP] = {
-        .floats = box_audio_tape_stop_floats,
-        .start = box_audio_tape_stop_start,
-        .command = box_audio_tape_stop_command,
-        .render = box_audio_tape_stop_render,
-        .rest = box_audio_tape_stop_rest
-=======
     [BOX_AUDIO_EFFECT_PATTERN_GATE] = {
         .tail = true,
         .start = box_audio_pattern_gate_start,
@@ -130,7 +115,20 @@ static const box_audio_effect_def_t box_audio_effect_kinds[BOX_AUDIO_EFFECT_KIND
         .command = box_audio_rotary_command,
         .render = box_audio_rotary_render,
         .rest = box_audio_rotary_rest
->>>>>>> eddb532cfbb80a6555459db9537f6b0b9e691868
+    },
+    [BOX_AUDIO_EFFECT_BEAT_REPEAT] = {
+        .floats = box_audio_beat_repeat_floats,
+        .start = box_audio_beat_repeat_start,
+        .command = box_audio_beat_repeat_command,
+        .render = box_audio_beat_repeat_render,
+        .rest = box_audio_beat_repeat_rest
+    },
+    [BOX_AUDIO_EFFECT_TAPE_STOP] = {
+        .floats = box_audio_tape_stop_floats,
+        .start = box_audio_tape_stop_start,
+        .command = box_audio_tape_stop_command,
+        .render = box_audio_tape_stop_render,
+        .rest = box_audio_tape_stop_rest
     }
 };
 

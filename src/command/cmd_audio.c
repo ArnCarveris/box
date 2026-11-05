@@ -246,13 +246,10 @@ static void box_cmd_audio_effects(
         const TransientShaper *shaper;
         const FrequencyShifter *shifter;
         const PitchShifter *pitch;
-<<<<<<< HEAD
-        const BeatRepeat *repeat;
-        const TapeStop *stop;
-=======
         const PatternGate *pattern;
         const Rotary *rotary;
->>>>>>> eddb532cfbb80a6555459db9537f6b0b9e691868
+        const BeatRepeat *repeat;
+        const TapeStop *stop;
         const box_audio_module_t *state = box_audio_module_get(world);
         char *path;
         int32_t b, slot;
@@ -377,24 +374,6 @@ static void box_cmd_audio_effects(
                 "window %.1f ms feedback %.2f mix %.2f", (double)pitch->semitones,
                 (double)pitch->cents, (double)pitch->stereo, (double)pitch->window,
                 (double)pitch->feedback, (double)pitch->mix);
-<<<<<<< HEAD
-        } else if ((repeat = ecs_get(world, e, BeatRepeat))) {
-            ecs_strbuf_append(buf, "beat repeat %s slice %.4g beats", repeat->active >= 0.5f ?
-                "active" : "inactive", (double)repeat->slice);
-            if (repeat->grid < 0) {
-                ecs_strbuf_appendstr(buf, " grid slice");
-            } else {
-                ecs_strbuf_append(buf, " grid %.4g", (double)repeat->grid);
-            }
-
-            ecs_strbuf_append(buf, " decay %.2f pitch %+.1f gate %.2f mix %.2f%s",
-                (double)repeat->decay, (double)repeat->pitch, (double)repeat->gate,
-                (double)repeat->mix, repeat->reverse >= 0.5f ? " reverse" : "");
-        } else if ((stop = ecs_get(world, e, TapeStop))) {
-            ecs_strbuf_append(buf, "tape stop %s stop %.3f s start %.3f s curve %+.2f",
-                stop->active >= 0.5f ? "active" : "inactive", (double)stop->stop_time,
-                (double)stop->start_time, (double)stop->curve);
-=======
         } else if ((pattern = ecs_get(world, e, PatternGate))) {
             int32_t length = pattern->length < 1 ? 1 : (pattern->length > 16 ? 16 :
                 pattern->length);
@@ -414,7 +393,22 @@ static void box_cmd_audio_effects(
                 (double)rotary->drum_slow, (double)rotary->drum_fast,
                 (double)rotary->acceleration, (double)rotary->balance,
                 (double)rotary->spread, (double)rotary->drive, (double)rotary->mix);
->>>>>>> eddb532cfbb80a6555459db9537f6b0b9e691868
+        } else if ((repeat = ecs_get(world, e, BeatRepeat))) {
+            ecs_strbuf_append(buf, "beat repeat %s slice %.4g beats", repeat->active >= 0.5f ?
+                "active" : "inactive", (double)repeat->slice);
+            if (repeat->grid < 0) {
+                ecs_strbuf_appendstr(buf, " grid slice");
+            } else {
+                ecs_strbuf_append(buf, " grid %.4g", (double)repeat->grid);
+            }
+
+            ecs_strbuf_append(buf, " decay %.2f pitch %+.1f gate %.2f mix %.2f%s",
+                (double)repeat->decay, (double)repeat->pitch, (double)repeat->gate,
+                (double)repeat->mix, repeat->reverse >= 0.5f ? " reverse" : "");
+        } else if ((stop = ecs_get(world, e, TapeStop))) {
+            ecs_strbuf_append(buf, "tape stop %s stop %.3f s start %.3f s curve %+.2f",
+                stop->active >= 0.5f ? "active" : "inactive", (double)stop->stop_time,
+                (double)stop->start_time, (double)stop->curve);
         }
 
         slot = box_audio_module_effect_slot(world, e);

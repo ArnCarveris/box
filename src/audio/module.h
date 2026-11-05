@@ -773,7 +773,7 @@ typedef struct box_audio_module_t {
     uint32_t effect_frame;        /**< Frames of the module, which tell the insert slots of
                                    *   this frame from older ones */
     bool effect_beat;             /**< An effect of this frame reads the beat clock of the
-                                   *   core: a pattern gate */
+                                   *   core: a pattern gate or a beat repeat */
     uint32_t serial;              /**< Serial of the output the state was sent to */
     box_audio_writer_t writer;    /**< The batch of the frame, grown as needed */
     uint32_t next_voice;          /**< Next voice handle */
@@ -925,15 +925,9 @@ uint32_t box_audio_module_effect_kind(
 #define BOX_AUDIO_EFFECT_COMPONENTS (16)
 
 /** Get the effect components: Reverb, Equalizer, AudioFilter, Compressor, Gate, Delay, Phaser,
-<<<<<<< HEAD
- * Chorus, Saturator, TransientShaper, FrequencyShifter, PitchShifter, BeatRepeat and TapeStop,
- * in the order an entity
- * that has several takes the first of. A new effect is added here and to
-=======
- * Chorus, Saturator, TransientShaper, FrequencyShifter, PitchShifter, PatternGate and Rotary,
- * in the order an entity that has several takes the first of. A new effect is added here and to
->>>>>>> eddb532cfbb80a6555459db9537f6b0b9e691868
- * box_audio_module_effect_params.
+ * Chorus, Saturator, TransientShaper, FrequencyShifter, PitchShifter, PatternGate, Rotary,
+ * BeatRepeat and TapeStop, in the order an entity that has several takes the first of. A new
+ * effect is added here and to box_audio_module_effect_params.
  *
  * @param out Receives up to BOX_AUDIO_EFFECT_COMPONENTS components
  * @return Number of components

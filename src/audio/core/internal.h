@@ -446,7 +446,75 @@ typedef struct box_audio_pitch_shifter_t {
     box_audio_ramp_t feed;    /**< Fade in of the input after a move */
 } box_audio_pitch_shifter_t;
 
-<<<<<<< HEAD
+/** A pattern gate: the openness that follows the steps of its pattern on the beat clock,
+ * and its floor and mix */
+typedef struct box_audio_pattern_gate_t {
+    box_audio_pattern_gate_params_t target; /**< Parameters of the last command, clamped */
+    int32_t length;           /**< Steps that play */
+    double rate;              /**< Beats per step */
+    double swing;             /**< Swing */
+    float up;                 /**< Openness the gain gains per frame on the way up */
+    float down;               /**< Openness the gain loses per frame on the way down */
+    float open;               /**< Openness that runs, 0..1 */
+    box_audio_ramp_t floor;   /**< Linear gain when closed */
+    box_audio_ramp_t mix;     /**< Wet level */
+} box_audio_pattern_gate_t;
+
+/** A virtual mic of a rotor of a rotary: where it reads the line of the rotor, its gain and
+ * how dull its tone is, each moved linearly from control block to control block */
+typedef struct box_audio_rotary_mic_t {
+    double tap;               /**< Frames back of the read in this frame */
+    double tap_slope;         /**< Change of the read per frame */
+    double tap_next;          /**< Frames back of the read at the next control block */
+    float gain;               /**< Gain in this frame */
+    float gain_slope;         /**< Change of the gain per frame */
+    float gain_next;          /**< Gain at the next control block */
+    float dull;               /**< Share of the lowpass in this frame */
+    float dull_slope;         /**< Change of the share per frame */
+    float dull_next;          /**< Share at the next control block */
+    float lp;                 /**< State of the lowpass */
+} box_audio_rotary_mic_t;
+
+/** A rotor of a rotary: its phase and its rate, which moves to its target with inertia */
+typedef struct box_audio_rotary_rotor_t {
+    double phase;             /**< Turns at the next control block, 0..1 */
+    double rate;              /**< Hz it turns at */
+    double target;            /**< Hz it moves to */
+    double coef;              /**< Share of the way to the target it moves per control block */
+} box_audio_rotary_rotor_t;
+
+/** A rotary: a tube preamp, a crossover, and a drum and a horn, each a line on the memory of
+ * its effect slot that two mics read */
+typedef struct box_audio_rotary_t {
+    box_audio_rotary_params_t target; /**< Parameters of the last command, clamped */
+    float *line[2];           /**< The lines of the drum and the horn in memory */
+    int32_t length;           /**< Frames of each line */
+    int32_t pos;              /**< Frame the next input is written to */
+    int32_t valid;            /**< Frames written since the lines were last silent */
+    box_audio_rotary_rotor_t rotor[2]; /**< The drum and the horn */
+    box_audio_rotary_mic_t mic[2][2]; /**< The left and the right mic of each rotor */
+    float center[2];          /**< Frames back of the read of each rotor at the middle */
+    float depth[2];           /**< Frames the read of each rotor moves either way */
+    float tone[2];            /**< Coefficient of the lowpass of the mics of each rotor */
+    box_audio_svf_t low[2];   /**< Lowpass stages of the crossover */
+    box_audio_svf_t high[2];  /**< Highpass stages of the crossover */
+    box_audio_oversample_t os; /**< Oversampler of the preamp */
+    box_audio_dc_t dc;        /**< DC blocker after the clipper */
+    float dc_coef;            /**< Pole of the DC blocker */
+    float dry[16];            /**< Input of the preamp, a ring as late as its oversampler */
+    uint32_t dry_pos;         /**< Write position of the dry ring */
+    box_audio_saturate_curve_t curve; /**< Clipper at the drive of curve_at */
+    float curve_at;           /**< Drive the curve is for */
+    int32_t control;          /**< Frames until the next control block */
+    bool stale;               /**< Skipped blocks left the mics behind the rotors */
+    box_audio_ramp_t drive;   /**< Drive */
+    box_audio_ramp_t spread;  /**< Spread, per control block */
+    box_audio_ramp_t drum;    /**< Gain of the drum from the balance */
+    box_audio_ramp_t horn;    /**< Gain of the horn from the balance */
+    box_audio_ramp_t mix;     /**< Wet level */
+    box_audio_ramp_t feed;    /**< Fade in of the input after a move */
+} box_audio_rotary_t;
+
 /** A repeat of a beat repeat: how it reads the slice */
 typedef struct box_audio_beat_repeat_pass_t {
     double ratio;             /**< Frames of the slice per frame of output */
@@ -516,76 +584,6 @@ typedef struct box_audio_tape_stop_t {
     bool crossfade;           /**< Crossfades from the read at from to the one at lag */
     box_audio_ramp_t xfade;   /**< Share of the read at lag in the crossfade */
 } box_audio_tape_stop_t;
-=======
-/** A pattern gate: the openness that follows the steps of its pattern on the beat clock,
- * and its floor and mix */
-typedef struct box_audio_pattern_gate_t {
-    box_audio_pattern_gate_params_t target; /**< Parameters of the last command, clamped */
-    int32_t length;           /**< Steps that play */
-    double rate;              /**< Beats per step */
-    double swing;             /**< Swing */
-    float up;                 /**< Openness the gain gains per frame on the way up */
-    float down;               /**< Openness the gain loses per frame on the way down */
-    float open;               /**< Openness that runs, 0..1 */
-    box_audio_ramp_t floor;   /**< Linear gain when closed */
-    box_audio_ramp_t mix;     /**< Wet level */
-} box_audio_pattern_gate_t;
-
-/** A virtual mic of a rotor of a rotary: where it reads the line of the rotor, its gain and
- * how dull its tone is, each moved linearly from control block to control block */
-typedef struct box_audio_rotary_mic_t {
-    double tap;               /**< Frames back of the read in this frame */
-    double tap_slope;         /**< Change of the read per frame */
-    double tap_next;          /**< Frames back of the read at the next control block */
-    float gain;               /**< Gain in this frame */
-    float gain_slope;         /**< Change of the gain per frame */
-    float gain_next;          /**< Gain at the next control block */
-    float dull;               /**< Share of the lowpass in this frame */
-    float dull_slope;         /**< Change of the share per frame */
-    float dull_next;          /**< Share at the next control block */
-    float lp;                 /**< State of the lowpass */
-} box_audio_rotary_mic_t;
-
-/** A rotor of a rotary: its phase and its rate, which moves to its target with inertia */
-typedef struct box_audio_rotary_rotor_t {
-    double phase;             /**< Turns at the next control block, 0..1 */
-    double rate;              /**< Hz it turns at */
-    double target;            /**< Hz it moves to */
-    double coef;              /**< Share of the way to the target it moves per control block */
-} box_audio_rotary_rotor_t;
-
-/** A rotary: a tube preamp, a crossover, and a drum and a horn, each a line on the memory of
- * its effect slot that two mics read */
-typedef struct box_audio_rotary_t {
-    box_audio_rotary_params_t target; /**< Parameters of the last command, clamped */
-    float *line[2];           /**< The lines of the drum and the horn in memory */
-    int32_t length;           /**< Frames of each line */
-    int32_t pos;              /**< Frame the next input is written to */
-    int32_t valid;            /**< Frames written since the lines were last silent */
-    box_audio_rotary_rotor_t rotor[2]; /**< The drum and the horn */
-    box_audio_rotary_mic_t mic[2][2]; /**< The left and the right mic of each rotor */
-    float center[2];          /**< Frames back of the read of each rotor at the middle */
-    float depth[2];           /**< Frames the read of each rotor moves either way */
-    float tone[2];            /**< Coefficient of the lowpass of the mics of each rotor */
-    box_audio_svf_t low[2];   /**< Lowpass stages of the crossover */
-    box_audio_svf_t high[2];  /**< Highpass stages of the crossover */
-    box_audio_oversample_t os; /**< Oversampler of the preamp */
-    box_audio_dc_t dc;        /**< DC blocker after the clipper */
-    float dc_coef;            /**< Pole of the DC blocker */
-    float dry[16];            /**< Input of the preamp, a ring as late as its oversampler */
-    uint32_t dry_pos;         /**< Write position of the dry ring */
-    box_audio_saturate_curve_t curve; /**< Clipper at the drive of curve_at */
-    float curve_at;           /**< Drive the curve is for */
-    int32_t control;          /**< Frames until the next control block */
-    bool stale;               /**< Skipped blocks left the mics behind the rotors */
-    box_audio_ramp_t drive;   /**< Drive */
-    box_audio_ramp_t spread;  /**< Spread, per control block */
-    box_audio_ramp_t drum;    /**< Gain of the drum from the balance */
-    box_audio_ramp_t horn;    /**< Gain of the horn from the balance */
-    box_audio_ramp_t mix;     /**< Wet level */
-    box_audio_ramp_t feed;    /**< Fade in of the input after a move */
-} box_audio_rotary_t;
->>>>>>> eddb532cfbb80a6555459db9537f6b0b9e691868
 
 /** State of the kinds of effects */
 typedef union box_audio_effect_data_t {
@@ -601,13 +599,10 @@ typedef union box_audio_effect_data_t {
     box_audio_transient_shaper_t transient_shaper; /**< BOX_AUDIO_EFFECT_TRANSIENT_SHAPER */
     box_audio_frequency_shifter_t frequency_shifter; /**< BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER */
     box_audio_pitch_shifter_t pitch_shifter; /**< BOX_AUDIO_EFFECT_PITCH_SHIFTER */
-<<<<<<< HEAD
-    box_audio_beat_repeat_t beat_repeat; /**< BOX_AUDIO_EFFECT_BEAT_REPEAT */
-    box_audio_tape_stop_t tape_stop; /**< BOX_AUDIO_EFFECT_TAPE_STOP */
-=======
     box_audio_pattern_gate_t pattern_gate; /**< BOX_AUDIO_EFFECT_PATTERN_GATE */
     box_audio_rotary_t rotary;  /**< BOX_AUDIO_EFFECT_ROTARY */
->>>>>>> eddb532cfbb80a6555459db9537f6b0b9e691868
+    box_audio_beat_repeat_t beat_repeat; /**< BOX_AUDIO_EFFECT_BEAT_REPEAT */
+    box_audio_tape_stop_t tape_stop; /**< BOX_AUDIO_EFFECT_TAPE_STOP */
 } box_audio_effect_data_t;
 
 /** An effect instance of the pool of the core: a kind in an insert slot of a bus, on the
@@ -1652,34 +1647,16 @@ void box_audio_pitch_shifter_rest(
     box_audio_effect_t *fx,
     int32_t frames);
 
-<<<<<<< HEAD
-/** The beat repeat kind, in beat_repeat.c: floats of its memory at a rate */
-int32_t box_audio_beat_repeat_floats(
-    float sample_rate);
-
-/** The beat repeat kind: start on its memory */
-void box_audio_beat_repeat_start(
-=======
 /** The rotary kind, in rotary.c: floats of its memory at a rate */
 int32_t box_audio_rotary_floats(
     float sample_rate);
 
 /** The rotary kind: start on its memory */
 void box_audio_rotary_start(
->>>>>>> eddb532cfbb80a6555459db9537f6b0b9e691868
     box_audio_core_t *core,
     box_audio_effect_t *fx,
     bool fade_in);
 
-<<<<<<< HEAD
-/** The beat repeat kind: new parameters while it runs */
-void box_audio_beat_repeat_command(
-    box_audio_core_t *core,
-    box_audio_effect_t *fx);
-
-/** The beat repeat kind: process a block */
-bool box_audio_beat_repeat_render(
-=======
 /** The rotary kind: new parameters while it runs */
 void box_audio_rotary_command(
     box_audio_core_t *core,
@@ -1687,7 +1664,6 @@ void box_audio_rotary_command(
 
 /** The rotary kind: process a block */
 bool box_audio_rotary_render(
->>>>>>> eddb532cfbb80a6555459db9537f6b0b9e691868
     box_audio_core_t *core,
     box_audio_effect_t *fx,
     float *l,
@@ -1695,7 +1671,36 @@ bool box_audio_rotary_render(
     int32_t frames,
     bool silent);
 
-<<<<<<< HEAD
+/** The rotary kind: a block skipped while idle */
+void box_audio_rotary_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    int32_t frames);
+
+/** The beat repeat kind, in beat_repeat.c: floats of its memory at a rate */
+int32_t box_audio_beat_repeat_floats(
+    float sample_rate);
+
+/** The beat repeat kind: start on its memory */
+void box_audio_beat_repeat_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The beat repeat kind: new parameters while it runs */
+void box_audio_beat_repeat_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The beat repeat kind: process a block */
+bool box_audio_beat_repeat_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
 /** The beat repeat kind: a block skipped while idle */
 void box_audio_beat_repeat_rest(
     box_audio_core_t *core,
@@ -1728,10 +1733,6 @@ bool box_audio_tape_stop_render(
 
 /** The tape stop kind: a block skipped while idle */
 void box_audio_tape_stop_rest(
-=======
-/** The rotary kind: a block skipped while idle */
-void box_audio_rotary_rest(
->>>>>>> eddb532cfbb80a6555459db9537f6b0b9e691868
     box_audio_core_t *core,
     box_audio_effect_t *fx,
     int32_t frames);

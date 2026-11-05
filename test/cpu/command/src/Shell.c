@@ -559,18 +559,6 @@ void Shell_audio_command(void) {
     ecs_modified(world, bell, AudioBus);
     ecs_set(world, bell, FrequencyShifter, { .shift = 437, .mode = FrequencyRing,
         .stereo = 0.5f, .feedback = -0.3f, .mix = 0.8f });
-<<<<<<< HEAD
-    ecs_entity_t fill = ecs_entity(world, { .name = "fill" });
-    ecs_ensure(world, fill, AudioBus)->effects[0] = fill;
-    ecs_modified(world, fill, AudioBus);
-    ecs_set(world, fill, BeatRepeat, { .slice = 0.125f, .grid = -1, .decay = 0.8f,
-        .pitch = -2, .reverse = 1, .gate = 0.5f, .mix = 1 });
-    ecs_entity_t drop = ecs_entity(world, { .name = "drop" });
-    ecs_ensure(world, drop, AudioBus)->effects[0] = drop;
-    ecs_modified(world, drop, AudioBus);
-    ecs_set(world, drop, TapeStop, { .active = 1, .stop_time = 1, .start_time = 0.25f,
-        .curve = 0.5f });
-=======
     ecs_entity_t chop = ecs_entity(world, { .name = "chop" });
     ecs_ensure(world, chop, AudioBus)->effects[0] = chop;
     ecs_modified(world, chop, AudioBus);
@@ -583,7 +571,16 @@ void Shell_audio_command(void) {
     ecs_set(world, organ, Rotary, { .speed = 1, .horn_slow = 0.8f, .horn_fast = 6.7f,
         .drum_slow = 0.7f, .drum_fast = 5.9f, .acceleration = 1, .balance = 0.2f,
         .spread = 1, .drive = 0.3f, .mix = 1 });
->>>>>>> eddb532cfbb80a6555459db9537f6b0b9e691868
+    ecs_entity_t fill = ecs_entity(world, { .name = "fill" });
+    ecs_ensure(world, fill, AudioBus)->effects[0] = fill;
+    ecs_modified(world, fill, AudioBus);
+    ecs_set(world, fill, BeatRepeat, { .slice = 0.125f, .grid = -1, .decay = 0.8f,
+        .pitch = -2, .reverse = 1, .gate = 0.5f, .mix = 1 });
+    ecs_entity_t drop = ecs_entity(world, { .name = "drop" });
+    ecs_ensure(world, drop, AudioBus)->effects[0] = drop;
+    ecs_modified(world, drop, AudioBus);
+    ecs_set(world, drop, TapeStop, { .active = 1, .stop_time = 1, .start_time = 0.25f,
+        .curve = 0.5f });
     ecs_progress(world, 0.016f);
 
     bool error = true;
@@ -614,21 +611,18 @@ void Shell_audio_command(void) {
     test_assert(strstr(out, "bell: group volume 1.00 pan 0.00 width 1.00 -> master, "
         "insert 0 bell: frequency shifter ring +437.0 Hz stereo 0.50 feedback -0.30 mix 0.80 "
         "(does not run: no output)") != NULL);
-<<<<<<< HEAD
-    test_assert(strstr(out, "fill: group volume 1.00 pan 0.00 width 1.00 -> master, "
-        "insert 0 fill: beat repeat inactive slice 0.125 beats grid slice decay 0.80 "
-        "pitch -2.0 gate 0.50 mix 1.00 reverse (does not run: no output)") != NULL);
-    test_assert(strstr(out, "drop: group volume 1.00 pan 0.00 width 1.00 -> master, "
-        "insert 0 drop: tape stop active stop 1.000 s start 0.250 s curve +0.50 "
-        "(does not run: no output)") != NULL);
-=======
     test_assert(strstr(out, "chop: group volume 1.00 pan 0.00 width 1.00 -> master, "
         "insert 0 chop: pattern gate steps [1 0 0.5 1] rate 0.250 beats swing 0.10 gate 0.50 "
         "attack 0.0020 release 0.030 floor -80.0 dB mix 1.00") != NULL);
     test_assert(strstr(out, "organ: group volume 1.00 pan 0.00 width 1.00 -> master, "
         "insert 0 organ: rotary speed 1.00 horn 0.80-6.70 Hz drum 0.70-5.90 Hz "
         "acceleration 1.00 s balance 0.20 spread 1.00 drive 0.30 mix 1.00") != NULL);
->>>>>>> eddb532cfbb80a6555459db9537f6b0b9e691868
+    test_assert(strstr(out, "fill: group volume 1.00 pan 0.00 width 1.00 -> master, "
+        "insert 0 fill: beat repeat inactive slice 0.125 beats grid slice decay 0.80 "
+        "pitch -2.0 gate 0.50 mix 1.00 reverse (does not run: no output)") != NULL);
+    test_assert(strstr(out, "drop: group volume 1.00 pan 0.00 width 1.00 -> master, "
+        "insert 0 drop: tape stop active stop 1.000 s start 0.250 s curve +0.50 "
+        "(does not run: no output)") != NULL);
     ecs_os_free(out);
 
     out = box_command_run(world, s, "audio volume 0.25", &error);
