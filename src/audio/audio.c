@@ -1035,6 +1035,21 @@ static void box_audio_module_free(
     ecs_os_free(state);
 }
 
+/** Give SynthWavetable its full name. The reflection of a C enum strips the name of the enum
+ * from its constants, which would leave it as "table" in scripts.
+ *
+ * @param world The world
+ */
+static void box_audio_synth_wave_names(
+    ecs_world_t *world)
+{
+    ecs_entity_t c = ecs_lookup_child(world, ecs_id(SynthWave), "table");
+    ecs_assert(c != 0, ECS_INTERNAL_ERROR, NULL);
+    ecs_set_name(world, c, "SynthWavetable");
+    /* Setting the value again stores the new name in the constants of the enum */
+    ecs_set_pair_second(world, c, EcsConstant, ecs_i32_t, {SynthWavetable});
+}
+
 /** Register the script functions of the module.
  *
  * @param world The world
@@ -1144,6 +1159,7 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, Equalizer);
     ecs_set_hooks(world, Equalizer, { .ctor = box_audio_equalizer_ctor });
     ECS_META_COMPONENT(world, SynthWave);
+    box_audio_synth_wave_names(world);
     ECS_META_COMPONENT(world, SynthFilterKind);
     ECS_META_COMPONENT(world, SynthFilterSlope);
     ECS_META_COMPONENT(world, SynthModulation);

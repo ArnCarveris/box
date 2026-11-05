@@ -281,6 +281,12 @@ static int32_t wt_harmonics(
 }
 
 /** Position 0 of WavetableBasic is the sine of a SynthSine layer of the same note. */
+/* The cases without a world call no flecs function that would set up the OS API the tables
+ * are built with. */
+void SynthWavetable_setup(void) {
+    ecs_os_set_api_defaults();
+}
+
 void SynthWavetable_sine_frame(void) {
     // audio/synth
     box_audio_synth_patch_t p = wt_patch(440, 0);

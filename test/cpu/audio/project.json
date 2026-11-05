@@ -183,6 +183,7 @@
             },
             {
                 "id": "SynthWavetable",
+                "setup": true,
                 "testcases": [
                     "sine_frame",
                     "saw_harmonics",

@@ -877,13 +877,17 @@ void NoAlloc_synth_sync(void) {
  * table is built before, on the main thread. */
 void NoAlloc_synth_wavetable(void) {
     // audio/noalloc
-    box_audio_core_t *core = noalloc_core();
+    box_audio_core_t *core;
     box_audio_synth_patch_t p = {0};
     uint8_t bytes[sizeof(box_audio_cmd_synth_t)];
     box_audio_writer_t w;
     int32_t floats = 0;
-    float *table = box_audio_wavetable_kind(WavetableHarmonics, &floats);
+    float *table;
     uint32_t i;
+    ecs_os_set_api_defaults();
+    table = box_audio_wavetable_kind(WavetableHarmonics, &floats);
+    core = noalloc_core();
+    test_assert(table != NULL);
     test_assert(box_audio_core_sound(core, 2, table, floats, 1, 0));
     p.layers = 4;
     p.seed = 3;

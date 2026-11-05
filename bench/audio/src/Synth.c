@@ -382,6 +382,7 @@ static box_audio_core_t* bench_wavetable_core(
     box_audio_writer_t w;
     int32_t floats = 0;
     uint32_t i;
+    ecs_os_set_api_defaults();
     *table = box_audio_wavetable_kind(WavetableHarmonics, &floats);
     box_audio_core_sound(core, 2, *table, floats, 1, 0);
     p.layers = 2;

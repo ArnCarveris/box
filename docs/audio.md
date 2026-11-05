@@ -360,7 +360,9 @@ that changes or is deleted is released: voices that play it keep it until they e
 new plays take the new table, or a sine. A frame takes 4160 floats over its levels,
 16.6 KB: a table of 64 frames takes about 1 MB, `WavetableHarmonics` 0.53 MB. A table
 has at most 256 frames; tables take sound ids of the core, which holds 1023 sounds,
-tables and synth patches together.
+tables and synth patches together. In the `Synth` bench (`voices_64_wavetable`, 64 voices
+of two `WavetableHarmonics` layers into a lowpass, 48 kHz) the voices take about 2100 ns
+per sample (268 µs per 128-frame quantum), where `voices_64` takes about 780.
 
 ```flecs
 using box.audio
