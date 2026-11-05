@@ -294,3 +294,11 @@ bool audio_synth_cutoff(
 
     return result;
 }
+
+int32_t audio_table_frames(
+    const float *data,
+    int32_t frames,
+    int32_t channels)
+{
+    return box_audio_table_frames(data, frames, channels);
+}

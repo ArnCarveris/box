@@ -750,6 +750,10 @@ static void box_audio_synths(
                 synth[i].pending = true;
             }
 
+            if (synth[i].table_layers && box_audio_synth_tables(world, state, &synth[i])) {
+                synth[i].pending = true;
+            }
+
             if (s[i].id && s[i].serial == state->serial && !synth[i].pending) {
                 continue;
             }
@@ -773,7 +777,39 @@ static void box_audio_synths(
     }
 }
 
-/** Send the sounds the output does not have yet: AudioPcm, decoded files and synth patches.
+/** Build the wavetables the output does not have yet and hand them over as sounds; the copy
+ * the transport takes is the only one, so a new output builds them again.
+ *
+ * @param world The world
+ * @param state The state
+ * @param t The transport
+ */
+static void box_audio_wavetables(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    box_audio_transport_t *t)
+{
+    ecs_iter_t it = ecs_query_iter(world, state->wavetables);
+    int32_t i, floats;
+    while (ecs_query_next(&it)) {
+        const Wavetable *table = ecs_field(&it, Wavetable, 0);
+        AudioWavetable *w = ecs_field(&it, AudioWavetable, 1);
+        for (i = 0; i < it.count; i ++) {
+            float *data;
+            if (w[i].serial == state->serial) {
+                continue;
+            }
+
+            data = box_audio_wavetable_kind((int32_t)table[i].kind, &floats);
+            w[i].id = data ? box_audio_sound_send(state, t, data, floats, 1, 0) : 0;
+            w[i].serial = state->serial;
+            ecs_os_free(data);
+        }
+    }
+}
+
+/** Send the sounds the output does not have yet: AudioPcm, decoded files, wavetables and synth
+ * patches.
  *
  * @param world The world
  * @param state The state
@@ -818,6 +854,7 @@ static void box_audio_sounds(
         state->spatial_dirty |= sample->id != 0;
     }
 
+    box_audio_wavetables(world, state, t);
     box_audio_synths(world, state);
 }
 
@@ -1744,6 +1781,36 @@ done:
     return;
 }
 
+/** Release the sound of a changed or removed Wavetable, which voices that play it keep until
+ * they end; a changed one is built again, and the synth sounds that name it take the new id.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxAudioWavetableChange(
+    ecs_iter_t *it)
+{
+    box_audio_module_t *state = it->ctx;
+    int32_t i;
+    if (ecs_is_fini(it->world)) {
+        goto done;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        AudioWavetable *w = ecs_get_mut(it->world, it->entities[i], AudioWavetable);
+        if (w && w->id && w->serial == state->serial && state->serial) {
+            ecs_vec_append_t(NULL, &state->releases, uint32_t)[0] = w->id;
+        }
+
+        if (w) {
+            w->id = 0;
+            w->serial = 0;
+        }
+    }
+
+done:
+    return;
+}
+
 /** Remember the spatial sources whose static transform moved, a box_transform_moved_t.
  *
  * @param world The world
@@ -1845,6 +1912,16 @@ void box_audio_sync_init(
         .cache_kind = EcsQueryCacheAuto
     });
 
+    state->wavetables = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "AudioWavetables" }),
+        .terms = {
+            { .id = ecs_id(Wavetable), .inout = EcsIn, .src.id = EcsSelf },
+            { .id = ecs_id(AudioWavetable), .src.id = EcsSelf }
+        },
+        .flags = EcsQueryMatchPrefab,
+        .cache_kind = EcsQueryCacheAuto
+    });
+
     state->meter_query = ecs_query(world, {
         .entity = ecs_entity(world, { .name = "AudioMeters" }),
         .terms = {
@@ -1889,6 +1966,15 @@ void box_audio_sync_init(
         .query.terms = {{ .id = ecs_id(AudioPcm), .src.id = EcsSelf }},
         .events = { EcsOnSet, EcsOnRemove },
         .callback = BoxAudioPcmChange,
+        .ctx = state
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "AudioWavetableChange" }),
+        .query.flags = EcsQueryMatchPrefab,
+        .query.terms = {{ .id = ecs_id(Wavetable), .src.id = EcsSelf }},
+        .events = { EcsOnSet, EcsOnRemove },
+        .callback = BoxAudioWavetableChange,
         .ctx = state
     });
 

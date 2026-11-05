@@ -1438,6 +1438,7 @@ bool box_audio_core_sound(
     s->users = 0;
     s->state = BOX_AUDIO_SOUND_READY;
     s->synth = 0;
+    s->table = box_audio_table_frames(data, frames, channels);
     result = true;
 
 done:

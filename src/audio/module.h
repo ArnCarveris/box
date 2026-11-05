@@ -86,10 +86,21 @@ typedef struct box_audio_effect_sent_t {
 
 /** What box.audio compiled for a SynthSound */
 typedef struct AudioSynth {
-    box_audio_synth_patch_t patch;  /**< The patch of the last compile */
+    box_audio_synth_patch_t patch;  /**< The patch of the last compile, the sound ids of its
+                                     *   wavetables those of the current output */
     bool compiled;          /**< The patch holds the components; false once one changed */
     bool pending;           /**< The patch changed since it was last sent */
+    uint32_t table_layers;  /**< Bit of each SynthWavetable layer of the patch */
+    ecs_entity_t tables[BOX_AUDIO_SYNTH_LAYERS]; /**< SynthTable.table of each wavetable
+                                     *   layer, 0 for none */
 } AudioSynth;
+
+/** What box.audio sent for a Wavetable */
+typedef struct AudioWavetable {
+    uint32_t id;            /**< Sound id of the table in the core, 0 when not sent */
+    uint32_t serial;        /**< Serial of the output the table was built for, 0 to build it
+                             *   again */
+} AudioWavetable;
 
 /** What box.audio did with an Instrument */
 typedef struct AudioInstrumentState {
@@ -106,6 +117,7 @@ typedef struct AudioTrackState {
 extern ECS_COMPONENT_DECLARE(AudioSoundId);
 extern ECS_COMPONENT_DECLARE(AudioTrackState);
 extern ECS_COMPONENT_DECLARE(AudioSynth);
+extern ECS_COMPONENT_DECLARE(AudioWavetable);
 extern ECS_COMPONENT_DECLARE(AudioInstrumentState);
 extern ECS_COMPONENT_DECLARE(AudioBusState);
 extern ECS_COMPONENT_DECLARE(AudioVoice);
@@ -628,6 +640,7 @@ typedef struct box_audio_module_t {
     ecs_query_t *views;           /**< Enabled views, for a camera that listens */
     ecs_query_t *sounds;          /**< AudioPcm */
     ecs_query_t *synths;          /**< SynthSound, prefabs included */
+    ecs_query_t *wavetables;      /**< Wavetable, prefabs included */
     ecs_query_t *meter_query;     /**< AudioMeter, disabled entities included */
     box_audio_meter_window_t meters[BOX_AUDIO_BUS_MAX]; /**< Levels of each bus index */
     float reduction[BOX_AUDIO_EFFECT_MAX]; /**< Gain reduction of each effect slot in the last
@@ -891,6 +904,52 @@ bool box_audio_synth_compile(
     box_audio_module_t *state,
     ecs_entity_t e,
     AudioSynth *synth);
+
+/** Look up the sound ids of the wavetables of the layers of a compiled synth sound in the
+ * current output: the id of the Wavetable of each SynthTable.table, 0 while it has none.
+ *
+ * @param world The world
+ * @param state The state
+ * @param synth What was compiled for the sound, whose patch takes the ids
+ * @return Whether an id of the patch changed
+ */
+bool box_audio_synth_tables(
+    ecs_world_t *world,
+    const box_audio_module_t *state,
+    AudioSynth *synth);
+
+/** Frames of a built-in wavetable.
+ *
+ * @param kind A WavetableKind
+ * @return Frames, 1..BOX_AUDIO_TABLE_FRAMES_MAX
+ */
+int32_t box_audio_wavetable_frames(
+    int32_t kind);
+
+/** Build the mip levels of wavetable frames from their harmonics, in the layout the core reads
+ * (BOX_AUDIO_TABLE_FLOATS): level k of each frame keeps the harmonics up to
+ * BOX_AUDIO_TABLE_HARMONICS >> k, without DC, so a loaded table fits as well as a built-in one.
+ *
+ * @param frames Frames of the table, 1..BOX_AUDIO_TABLE_FRAMES_MAX
+ * @param cosines Amplitude of the cosine of harmonic n of frame j at
+ *        j (BOX_AUDIO_TABLE_HARMONICS + 1) + n, n 1..BOX_AUDIO_TABLE_HARMONICS
+ * @param sines Amplitude of the sine of each harmonic, the same way
+ * @return The floats, freed with ecs_os_free, NULL for an invalid count of frames
+ */
+float* box_audio_wavetable_build(
+    int32_t frames,
+    const double *cosines,
+    const double *sines);
+
+/** Build a built-in wavetable by additive synthesis.
+ *
+ * @param kind A WavetableKind
+ * @param floats Receives the floats of the table, BOX_AUDIO_TABLE_FLOATS of its frames
+ * @return The floats, freed with ecs_os_free
+ */
+float* box_audio_wavetable_kind(
+    int32_t kind,
+    int32_t *floats);
 
 /** Register the sound file components' observers and the headless wait of their decodes.
  *

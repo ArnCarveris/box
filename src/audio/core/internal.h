@@ -527,6 +527,16 @@ typedef struct box_audio_synth_osc_t {
     double sync_base;     /**< The ratio of its layer, without the LFOs; what moves the ratio
                            * per control block aims from it */
     double sync_step;     /**< Change of sync per frame from the LFOs */
+    const float *table;   /**< Wavetable: the levels of its table after the header, NULL for
+                           * none, which renders a sine */
+    int32_t table_frames; /**< Wavetable: frames of its table */
+    uint32_t table_sound; /**< Wavetable: id of the sound of its table, whose users it counts,
+                           * 0 for none */
+    double position;      /**< Wavetable: frame it reads at in this frame, 0..frames - 1 */
+    double position_base; /**< Wavetable: position of its layer, clamped */
+    double position_lfo;  /**< Wavetable: frames the LFOs move it by */
+    double position_step; /**< Wavetable: change of position_lfo per frame */
+    float position_env;   /**< Wavetable: frames it moves at level 1 of its envelope */
 } box_audio_synth_osc_t;
 
 /** An LFO of a synth voice, advanced per control block of BOX_AUDIO_SYNTH_CONTROL frames */
@@ -543,6 +553,15 @@ typedef struct box_audio_synth_mod_t {
     bool smooth;          /**< Whether its wave jumps and is smoothed */
 } box_audio_synth_mod_t;
 
+/** A smooth random walk of the analog drift of a synth voice, -1..1: a random target held
+ * for a random 0.2 to 2 seconds, which two one pole lowpasses follow per control block */
+typedef struct box_audio_synth_walk_t {
+    float target;         /**< Value it moves toward, -1..1 */
+    float a;              /**< Output of the first lowpass */
+    float value;          /**< Output of the second, the value, -1..1 */
+    int32_t left;         /**< Control blocks until the next target */
+} box_audio_synth_walk_t;
+
 /** The unison voices of a layer of a synth voice: copies of its oscillator, each at its own
  * phase, at a factor of the turns per frame of the oscillator and with a gain per channel. The
  * oscillator keeps the sweep and the glide they all follow */
@@ -555,6 +574,10 @@ typedef struct box_audio_synth_unison_t {
     float right[BOX_AUDIO_SYNTH_UNISON_MAX];   /**< Gain of each voice on the right channel */
     uint32_t wraps[BOX_AUDIO_SYNTH_UNISON_MAX]; /**< Times the phase of each voice wrapped,
                                                 * for its sub */
+    box_audio_synth_walk_t walk[BOX_AUDIO_SYNTH_UNISON_MAX]; /**< Drift of each voice */
+    double drift[BOX_AUDIO_SYNTH_UNISON_MAX];  /**< Factor of the pitch of each voice from its
+                                                * drift, with drift */
+    double drift_step[BOX_AUDIO_SYNTH_UNISON_MAX]; /**< Change of drift per frame */
 } box_audio_synth_unison_t;
 /** Most sections of the filter that colors noise */
 #define BOX_AUDIO_SYNTH_COLOR_SECTIONS 10
@@ -620,6 +643,9 @@ typedef struct box_audio_synth_part_t {
                                        * chained after it, for a BOX_AUDIO_SYNTH_PLUCK layer;
                                        * NULL for another */
     box_audio_synth_color_filter_t color; /**< The filter that colors its noise */
+    box_audio_synth_walk_t walk;    /**< Drift of its pitch, without unison voices */
+    double start;                   /**< Phase its oscillator starts at in turns, 0 without
+                                     * free_phase */
 } box_audio_synth_part_t;
 
 /** A source that plays a synth patch, a copy of it, so it never allocates: the patch without
@@ -686,9 +712,15 @@ typedef struct box_audio_synth_source_t {
     bool lfo_cutoff;      /**< Whether an LFO moves the cutoff */
     double lfo_octaves;   /**< Octaves the LFOs move the cutoff by, 0 without */
     bool bends;           /**< Whether a layer has a pitch envelope, which runs with the LFOs */
-    bool mods;            /**< Whether LFOs or pitch envelopes run their control blocks and
-                           * move the vibrato and tremolo of each layer; false renders as
-                           * without both */
+    bool mods;            /**< Whether LFOs, pitch envelopes or drift run their control
+                           * blocks and move the vibrato and tremolo of each layer; false
+                           * renders as without them */
+    double drift;         /**< Cents of the drift of the pitch, 0 without, which renders as
+                           * before */
+    bool drifts;          /**< Whether drift is over 0, so unison voices take their own */
+    uint32_t drift_rng;   /**< State of the drift and the free phases, never 0 */
+    float drift_coef;     /**< Share of the way each lowpass of a walk moves per control block */
+    box_audio_synth_walk_t drift_cutoff; /**< Drift of the cutoff, a quarter of the pitch */
     float keytrack;       /**< Share 0..1 of the key in octaves the cutoff follows, 0 without a
                            * filter */
     double key;           /**< Key of the voice in octaves, log2 of its pitch ratio without the
@@ -703,6 +735,8 @@ typedef struct box_audio_synth_source_t {
     int32_t strings;      /**< Pluck layers, each with a string per unison voice, 0 for none */
     int32_t ringing;      /**< Strings that are still over the silence, of every unison voice */
     int32_t ringing_free; /**< Strings of layers without an envelope still over the silence */
+    bool tables;          /**< Whether a layer plays a wavetable, whose position moves per
+                           * frame */
 } box_audio_synth_source_t;
 
 /** State of the kinds of sources */
@@ -758,6 +792,8 @@ typedef struct box_audio_sound_t {
     int32_t users;      /**< Voices that play it */
     int32_t state;      /**< A box_audio_sound_state_t */
     int32_t synth;      /**< Slot of its patch plus 1 for a synth, 0 for frames */
+    int32_t table;      /**< Frames of the wavetable its frames hold, 0 when they are not
+                         * one */
 } box_audio_sound_t;
 
 /** A chunk of a stream: frames in the memory of the side that runs the core */
@@ -1234,6 +1270,32 @@ void box_audio_saturator_rest(
     box_audio_core_t *core,
     box_audio_effect_t *fx,
     int32_t frames);
+
+/** Frames of the wavetable a sound holds, in synth_patch.c: the frames of a mono sound that
+ * starts with the header of a wavetable and has the floats of its frames.
+ *
+ * @param data Frames of the sound
+ * @param frames Number of frames
+ * @param channels 1 or 2
+ * @return Frames of the table, 1..BOX_AUDIO_TABLE_FRAMES_MAX, 0 when it is not one
+ */
+int32_t box_audio_table_frames(
+    const float *data,
+    int32_t frames,
+    int32_t channels);
+
+/** Take the wavetable of a sound for an oscillator: a ready sound that holds one gains a
+ * user, which box_audio_synth_end gives back. Any other id leaves the oscillator without a
+ * table, a sine.
+ *
+ * @param core The core
+ * @param o The oscillator
+ * @param sound Id of the sound of the table, 0 for none
+ */
+void box_audio_synth_table_take(
+    box_audio_core_t *core,
+    box_audio_synth_osc_t *o,
+    uint32_t sound);
 
 /** The transient shaper kind, in dynamics.c: start at the params of fx */
 void box_audio_transient_shaper_start(

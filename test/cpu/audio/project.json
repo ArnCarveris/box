@@ -190,6 +190,30 @@
                 ]
             },
             {
+                "id": "SynthWavetable",
+                "setup": true,
+                "testcases": [
+                    "sine_frame",
+                    "saw_harmonics",
+                    "position_mix",
+                    "alias_steady",
+                    "alias_sweep",
+                    "lfo_position",
+                    "envelope_position",
+                    "unison_stereo",
+                    "fm_sync_sub",
+                    "no_table_sine",
+                    "clamped",
+                    "release_while_playing",
+                    "deterministic",
+                    "layout",
+                    "script",
+                    "missing_table",
+                    "delete_while_playing"
+
+                ]
+            },
+            {
                 "id": "SynthPitch",
                 "testcases": [
                     "start_returns",
@@ -333,7 +357,11 @@
                     "synth_sub",
                     "synth_sync",
                     "synth_drive",
+<<<<<<< HEAD
                     "synth_formant"
+=======
+                    "synth_wavetable"
+>>>>>>> ca12711fa10dfec69633b25a39d88c3e0fa070a8
                 ]
             },
             {
@@ -775,6 +803,21 @@
                     "without_identical",
                     "layers_pass",
                     "clamped"
+                ]
+            },
+            {
+                "id": "SynthDrift",
+                "testcases": [
+                    "pitch_bounded",
+                    "pitch_bounded_filter",
+                    "unison_differ",
+                    "renders_identical",
+                    "plays_differ",
+                    "free_phase",
+                    "defaults_identical",
+                    "clamped",
+                    "pluck_follows",
+                    "script"
                 ]
             },
             {
