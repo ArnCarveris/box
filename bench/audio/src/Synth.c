@@ -6,7 +6,8 @@
  * filter with its vowel under an LFO and the filter envelope, with subs, hard synced under an
  * LFO, with pink noise, with drift or with the drive of the mix before the filter, 32 voices of
  * a pluck string, steady or under a vibrato, 8 of a unison pluck of 4, and 64 of a patch of
- * wavetables whose positions an LFO and the envelope move.
+ * wavetables whose positions an LFO and the envelope move, and 64 voices whose bend and pressure
+ * ramp, the expression of notes.
  *
  * Each iteration renders one quantum of 128 stereo frames, so the time per item is the time
  * per sample of the whole mix of 64 voices.
@@ -44,6 +45,10 @@
  * cutoff, and the oscillators start at free phases */
 #define BENCH_DRIFT 32u
 
+/** Extra of bench_synth_core: every voice ramps its bend and its pressure for the whole
+ * benchmark, so it renders in pieces of BOX_AUDIO_EXPRESS_FRAMES */
+#define BENCH_EXPRESS 128u
+
 /** Create a core with 64 looping voices of a patch of three layers: a saw that sweeps up, a
  * square with its own envelope and noise, into a lowpass.
  *
@@ -59,8 +64,8 @@
  * @param lfo Whether two LFOs move the patch
  * @param curved Whether the patch envelope and the envelope of the square are curved
  * @param drive Drive of the filter, 0..1
- * @param extra BENCH_SUB, BENCH_SYNC, BENCH_PITCH, BENCH_PINK, BENCH_LADDER, BENCH_FORMANT
- *   and BENCH_DRIFT, or 0
+ * @param extra BENCH_SUB, BENCH_SYNC, BENCH_PITCH, BENCH_PINK, BENCH_LADDER, BENCH_FORMANT,
+ *   BENCH_DRIFT and BENCH_EXPRESS, or 0
  * @param pre Drive of the mix of the layers before the filter, 0..1, negative for none; its
  *   asymmetry is 0.3
  * @return The core
@@ -75,7 +80,7 @@ static box_audio_core_t* bench_synth_core(
     uint32_t extra,
     float pre)
 {
-    static uint8_t bytes[8192];
+    static uint8_t bytes[16384];
     box_audio_core_desc_t desc = { .sample_rate = BENCH_RATE };
     box_audio_core_t *core = box_audio_core_new(&desc);
     box_audio_synth_patch_t p = {0};
@@ -181,6 +186,10 @@ static box_audio_core_t* bench_synth_core(
     for (i = 0; i < BOX_AUDIO_VOICE_MAX; i ++) {
         box_audio_write_play(&w, i, 1, 0, 0.02f, -0.9f + 0.03f * (float)i,
             0.75f + 0.01f * (float)i, BOX_AUDIO_PLAY_LOOP, 0);
+        if (extra & BENCH_EXPRESS) {
+            box_audio_write_voice_ramp(&w, i, BOX_AUDIO_PARAM_BEND, 7, BENCH_RATE * 3600, 0);
+            box_audio_write_voice_ramp(&w, i, BOX_AUDIO_PARAM_PRESSURE, 1, BENCH_RATE * 3600, 0);
+        }
     }
 
     box_audio_core_apply(core, w.data, w.size);
@@ -423,6 +432,16 @@ void Synth_voices_64_pitch_sync(
     // audio/synth
     box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
         0, BENCH_SYNC | BENCH_PITCH, -1);
+    bench_synth_render(b, core);
+    box_audio_core_free(core);
+}
+
+void Synth_voices_64_express(
+    bench_t *b)
+{
+    // audio/synth
+    box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
+        0, BENCH_EXPRESS, -1);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }

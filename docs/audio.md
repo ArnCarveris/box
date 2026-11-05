@@ -689,8 +689,8 @@ the sum is clamped to -1..1. `spread_mode` picks the offset:
 | `InstrumentSpreadAlternate` | `+spread` and `-spread` on successive notes |
 
 A `NoteClip` has a `length` (4 beats) and notes with `start`, `duration`, `pitch`,
-`velocity` (1), `pan` (0) and the expression curves `bend`, `mod` and `pressure` (none). A `Track` supplies the instrument and brings an
-`AudioBus`. Its child `ClipPlacement` entities arrange clips:
+`velocity` (1), `pan` (0) and the expression curves `bend`, `mod` and `pressure` (none).
+A `Track` supplies the instrument and brings an `AudioBus`. Its child `ClipPlacement` entities arrange clips:
 
 | Placement field | Meaning and default |
 | --- | --- |

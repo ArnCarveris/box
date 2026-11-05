@@ -95,6 +95,59 @@ static void expr_near(
     test_assert(fabs(measured - expected) <= expected * share);
 }
 
+/** One component of a Hann window of a render at a frequency.
+ *
+ * @param x Samples
+ * @param from First frame
+ * @param window Frames of the window
+ * @param frequency Hz
+ * @param re Receives the real part
+ * @param im Receives the imaginary part
+ */
+static void expr_component(
+    const float *x,
+    int32_t from,
+    int32_t window,
+    double frequency,
+    double *re,
+    double *im)
+{
+    double r = 0, m = 0, w, ph;
+    int32_t i;
+    for (i = 0; i < window; i ++) {
+        w = 0.5 - 0.5 * cos(2 * AUDIO_PI * i / window);
+        ph = 2 * AUDIO_PI * frequency * (double)(from + i) / AUDIO_RATE;
+        r += w * x[from + i] * cos(ph);
+        m -= w * x[from + i] * sin(ph);
+    }
+
+    *re = r;
+    *im = m;
+}
+
+/** Fundamental of a render around a frame, from the advance of its phase between two Hann
+ * windows near a guess, which a pluck needs: its harmonics cross zero more than once a period.
+ *
+ * @param x Samples
+ * @param center Frame at the middle of the measure
+ * @param guess Hz near the fundamental, within 50 Hz
+ * @return Hz
+ */
+static double expr_fundamental(
+    const float *x,
+    int32_t center,
+    double guess)
+{
+    int32_t gap = AUDIO_RATE / 100, window = AUDIO_RATE / 50, from;
+    double r0, i0, r1, i1, phase;
+    from = center - (gap + window) / 2;
+    expr_component(x, from, window, guess, &r0, &i0);
+    expr_component(x, from + gap, window, guess, &r1, &i1);
+    phase = atan2(i1 * r0 - r1 * i0, r1 * r0 + i1 * i0);
+
+    return guess + phase * AUDIO_RATE / (2 * AUDIO_PI * gap);
+}
+
 /** Ratio of the highest to the lowest frequency of windows of a render.
  *
  * @param x Samples
@@ -243,8 +296,9 @@ void NoteExpression_bend_pluck(void) {
     audio_play(core, 1, 1, 0, 1, 0, 1, 0);
     expr_ramp(core, 1, BOX_AUDIO_PARAM_BEND, 12, 0, AUDIO_RATE / 5);
     audio_render(core, 0, AUDIO_FRAMES / 2);
-    expr_near(audio_frequency(audio_l, 2400, AUDIO_RATE / 5), 220, 0.01);
-    expr_near(audio_frequency(audio_l, AUDIO_RATE / 4, AUDIO_FRAMES / 2), 440, 0.01);
+    expr_near(expr_fundamental(audio_l, AUDIO_RATE / 10, 220), 220, 0.005);
+    expr_near(expr_fundamental(audio_l, AUDIO_RATE * 3 / 10, 440), 440, 0.005);
+    expr_near(expr_fundamental(audio_l, AUDIO_RATE * 9 / 20, 440), 440, 0.005);
     box_audio_core_free(core);
 }
 
@@ -445,7 +499,8 @@ static ecs_entity_t expr_place(
     ecs_entity_t e;
     ecs_set(world, track, Track, { .instrument = instrument });
     e = ecs_new_w_pair(world, EcsChildOf, track);
-    ecs_set(world, e, ClipPlacement, { .clip = clip });
+    ecs_ensure(world, e, ClipPlacement)->clip = clip;
+    ecs_modified(world, e, ClipPlacement);
 
     return e;
 }
@@ -489,13 +544,10 @@ static int64_t expr_onset(
     int64_t from)
 {
     int64_t i;
-    for (i = from; i < audio_tap_count; i ++) {
-        if (audio_tap_l[i] != 0.0f) {
-            return i;
-        }
+    for (i = from; i < audio_tap_count && audio_tap_l[i] == 0.0f; i ++) {
     }
 
-    return -1;
+    return i < audio_tap_count ? i : -1;
 }
 
 /** A note whose bend goes from 0 to 12 over its length ends an octave up, and its frequency

@@ -70,7 +70,11 @@ void box_audio_voice_ramp(
     int32_t n = frames < (uint32_t)INT32_MAX ? (int32_t)frames : INT32_MAX;
     float lo = param == BOX_AUDIO_PARAM_BEND ? -BOX_AUDIO_BEND_MAX : 0.0f;
     float hi = param == BOX_AUDIO_PARAM_BEND ? BOX_AUDIO_BEND_MAX : 1.0f;
-    value = !(value >= lo) ? lo : (value > hi ? hi : value);
+    if (value != value) {
+        value = param == BOX_AUDIO_PARAM_MOD ? 1.0f : 0.0f;
+    }
+
+    value = value < lo ? lo : (value > hi ? hi : value);
     if (n > 0) {
         box_audio_ramp_to(r, value, n);
     } else {

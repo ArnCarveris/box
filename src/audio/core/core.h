@@ -452,7 +452,8 @@ typedef struct box_audio_cmd_ramp_t {
     uint32_t when_hi;               /**< High word of the frame */
     uint32_t voice;                 /**< Handle of the voice */
     uint32_t param;                 /**< A box_audio_param_t */
-    float value;                    /**< Value at the end of the ramp */
+    float value;                    /**< Value at the end of the ramp, clamped to the range
+                                     *   of the parameter, NaN for its default */
     uint32_t frames;                /**< Frames of the ramp, 0 to jump */
 } box_audio_cmd_ramp_t;
 
