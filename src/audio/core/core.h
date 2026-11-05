@@ -1588,6 +1588,9 @@ int32_t box_audio_core_read_events(
  * last BEAT command that applied, moved on at its tempo. A frame before that command reads the
  * same line backwards.
  *
+ * Frames are multiplied by the tempo before the division by the rate, so a beat on a whole
+ * frame comes out exact and the edges of a step fall on the same frames every time.
+ *
  * @param core The core
  * @param frame A frame of the core clock
  * @return The beat

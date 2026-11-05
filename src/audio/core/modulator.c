@@ -4,16 +4,12 @@
  * and the effect slots on their own: LFOs, step sequences and envelope followers.
  *
  * The beat clock is a line of (frame, beat, tempo) that each BEAT command restarts at its
- * frame. The transport schedules one at a start, a seek, a stop, a tempo change and each loop
- * wrap, so the beat of any frame is known in the core, and a synced source reads its phase
- * from it: phase + fract(beat / sync).
+ * frame, so a synced source reads its phase at any frame: phase + fract(beat / sync). The
+ * modulators update every BOX_AUDIO_MOD_CONTROL frames, at hard edges and after commands.
  *
- * The modulators update at the end of each control block of BOX_AUDIO_MOD_CONTROL frames of the
- * core clock, at the edges of their hard waves and steps, and after a command that changes
- * what they add to. An update computes the value of each modulator for the last frame before
- * the next update, sums the values of each parameter and ramps the gains of a bus to them
- * across the block, or gives an effect its new params, which its kind smooths. The render
- * splits its blocks at the updates, so the output does not depend on the render sizes.
+ * An update computes the value of each modulator for the last frame before the next update and
+ * ramps a bus to it, or gives an effect new params that its kind smooths. The render splits its
+ * blocks at the updates, so the output does not depend on render sizes.
  */
 
 #include "internal.h"
@@ -71,8 +67,6 @@ double box_audio_core_beat(
     const box_audio_core_t *core,
     uint64_t frame)
 {
-    /* Frames times the tempo, divided by the rate last, so that a beat on a whole frame comes
-     * out exact and the edges of a step fall on the same frames every time */
     return core->beat_at + (double)(int64_t)(frame - core->beat_frame) * core->beat_tempo /
         (double)core->sample_rate;
 }

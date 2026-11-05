@@ -4,11 +4,12 @@
  * their slots of the modulators of the core, the commands that start, change and release them,
  * and the beat clock of the core they need.
  *
- * The module sends a modulator once, and again only when what it sends changes: the member
- * becomes a parameter of a bus or the index of a parameter of an effect slot, found by writing
- * two marks into a copy of the effect component and looking for them in the params its builder
- * makes, so every member that reaches the core maps without a table. The core runs the
- * modulator from there on.
+ * The module sends a modulator once, and again only when what it sends changes. The core runs
+ * the modulator from there on.
+ *
+ * The member becomes a parameter of a bus or the index of a parameter of an effect slot. That
+ * index is found by writing two marks into a copy of the effect component and looking for them
+ * in the params its builder makes, so every member that reaches the core maps without a table.
  */
 
 #include "module.h"
