@@ -203,7 +203,8 @@ A transient shaper gives drums and plucks more or less punch and more or less ta
 without a threshold. Stereo linked like a compressor, it follows the peak of the
 louder channel with a fast envelope (1 ms attack, 20 ms release) and a slow one
 (20 ms attack, 200 ms release). Where the fast one is above the slow one the signal
-is a transient, otherwise it is sustain. The gain follows their difference in dB, so
+is a transient, otherwise it is sustain, which ends as soon as the next hit comes
+up. The gain follows their difference in dB, so
 it works the same at any level. `attack` from -1 to 1 softens or boosts transients,
 `sustain` from -1 to 1 shortens or boosts the tail, each by up to 12 dB. The gain is
 smoothed so it does not distort low notes, is the same on both channels, and 0 and 0

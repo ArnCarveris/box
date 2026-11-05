@@ -495,7 +495,7 @@ bool box_audio_transient_shaper_render(
         float x = box_audio_peak_next(&t->peak, l[i], r[i]);
         float attack = box_audio_ramp_next(&t->attack);
         float sustain = box_audio_ramp_next(&t->sustain);
-        float fast, slow, diff, up, down, gain;
+        float fast, slow, held, diff, up, down, gain;
         double to, d;
         x = x >= BOX_AUDIO_EFFECT_FLOOR ? x : 0;
         t->fast = box_audio_transient_follow(t->fast, x, t->coef[0], t->coef[1]);
@@ -504,11 +504,13 @@ bool box_audio_transient_shaper_render(
             BOX_AUDIO_DYNAMICS_TINY;
         slow = (float)t->slow > BOX_AUDIO_DYNAMICS_TINY ? (float)t->slow :
             BOX_AUDIO_DYNAMICS_TINY;
+        held = x > fast ? x : fast;
         diff = fast == slow ? 0 : BOX_AUDIO_DYNAMICS_DB *
             (box_audio_dynamics_log2(fast) - box_audio_dynamics_log2(slow));
         up = diff > 0 ? (diff < BOX_AUDIO_TRANSIENT_RANGE ? diff : BOX_AUDIO_TRANSIENT_RANGE) : 0;
-        down = diff < 0 ? (-diff < BOX_AUDIO_TRANSIENT_RANGE ? -diff : BOX_AUDIO_TRANSIENT_RANGE) :
-            0;
+        diff = held >= slow ? 0 : BOX_AUDIO_DYNAMICS_DB *
+            (box_audio_dynamics_log2(slow) - box_audio_dynamics_log2(held));
+        down = diff < BOX_AUDIO_TRANSIENT_RANGE ? diff : BOX_AUDIO_TRANSIENT_RANGE;
         to = (double)(attack * up + sustain * down);
         if (t->gain != to) {
             t->gain = to + (t->gain - to) * t->smooth;

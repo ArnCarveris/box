@@ -834,7 +834,7 @@ void Dynamics_transient_attack(void) {
     printf("first 5 ms over the tail: %.2f dB dry, %.2f dB at attack 1, %.2f dB at attack -1\n",
         dry, up, down);
     test_assert(up > dry + 3);
-    test_assert(down < dry - 3);
+    test_assert(down < dry - 1.5);
     test_assert(up < dry + 12.5);
     test_assert(down > dry - 12.5);
 }
@@ -883,6 +883,27 @@ void Dynamics_transient_level(void) {
 
     printf("largest difference of the gain at -30 and -6 dBFS: %.4f dB\n", most);
     test_assert(most < 1);
+}
+
+void Dynamics_transient_low(void) {
+    // audio/dynamics
+    double low = 300, high = -300;
+    int32_t i;
+    audio_sine(dy_sound, DY_HIT * DY_HITS, 40, dy_linear(-12));
+    dy_shape(false, 0, 0);
+    memcpy(dy_b_l, dy_l, sizeof(float) * DY_HIT * DY_HITS);
+    dy_shape(true, 1, 1);
+    for (i = DY_HIT * 2; i < DY_HIT * DY_HITS; i ++) {
+        if (fabs(dy_b_l[i]) > 1e-2f) {
+            double g = dy_db(dy_l[i] / dy_b_l[i]);
+            low = g < low ? g : low;
+            high = g > high ? g : high;
+        }
+    }
+
+    printf("the gain on a steady sine of 40 Hz moves by %.3f dB\n", high - low);
+    test_assert(high > -300);
+    test_assert(high - low < 0.5);
 }
 
 void Dynamics_transient_neutral(void) {

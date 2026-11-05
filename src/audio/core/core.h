@@ -692,8 +692,9 @@ typedef struct box_audio_saturator_params_t {
 /** Largest gain of a transient shaper either way in dB, at an attack or sustain of 1 or -1 */
 #define BOX_AUDIO_TRANSIENT_RANGE 12.0f
 
-/** Seconds of the one pole that smooths the gain of a transient shaper in dB */
-#define BOX_AUDIO_TRANSIENT_SMOOTH 0.002f
+/** Seconds of the one pole that smooths the gain of a transient shaper in dB; the peak
+ * detector and the envelopes already keep it from following the cycles of a low tone */
+#define BOX_AUDIO_TRANSIENT_SMOOTH 0.0005f
 
 /** Seconds of a change of the attack or the sustain of a transient shaper */
 #define BOX_AUDIO_TRANSIENT_RAMP 0.02f
@@ -702,7 +703,9 @@ typedef struct box_audio_saturator_params_t {
  * command: stereo linked, it follows the peak of the louder channel with a fast and a slow
  * envelope (BOX_AUDIO_TRANSIENT_FAST_ATTACK and so on), the same gain on both channels.
  *
- * The fast one over the slow one in dB is a transient, else sustain. The gain in dB is
+ * The fast one over the slow one in dB is a transient. The slow one over the fast one, or
+ * over the peak when that is higher, is sustain: it ends as soon as the next hit comes up,
+ * before the fast envelope catches up. The gain in dB is
  * attack times the first plus sustain times the second, each at most
  * BOX_AUDIO_TRANSIENT_RANGE and smoothed; 0 and 0 pass the signal unchanged */
 typedef struct box_audio_transient_shaper_params_t {
