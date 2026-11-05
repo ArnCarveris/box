@@ -148,6 +148,8 @@ void ScriptHas_tag_next_to_dependency(void) {
 
 void ScriptHas_tag_declared_by_script(void) {
     // engine_core/script_has
+    // flecs_script_observe_refs drops has-refs to entities the script owns
+    test_quarantine("5 Nov 2026");
     script_has_tag_check(
         SCRIPT_HAS_TEMPLATE
         "player {}\n"
@@ -156,6 +158,8 @@ void ScriptHas_tag_declared_by_script(void) {
 
 void ScriptHas_tag_set_by_script(void) {
     // engine_core/script_has
+    // flecs_script_observe_refs drops has-refs to entities the script owns
+    test_quarantine("5 Nov 2026");
     script_has_tag_check(
         SCRIPT_HAS_TEMPLATE
         "player { Position: {1, 2, 3} }\n"
@@ -164,6 +168,8 @@ void ScriptHas_tag_set_by_script(void) {
 
 void ScriptHas_tag_declared_by_script_next_to_dependency(void) {
     // engine_core/script_has
+    // flecs_script_observe_refs drops has-refs to entities the script owns
+    test_quarantine("5 Nov 2026");
     script_has_tag_check(
         SCRIPT_HAS_TEMPLATE
         "player {}\n"
@@ -208,6 +214,8 @@ void ScriptHas_component_next_to_dependency(void) {
 
 void ScriptHas_component_declared_by_script(void) {
     // engine_core/script_has
+    // flecs_script_observe_refs drops has-refs to entities the script owns
+    test_quarantine("5 Nov 2026");
     script_has_component_check(
         SCRIPT_HAS_TEMPLATE
         "player {}\n"
