@@ -265,7 +265,7 @@ static void box_cmd_audio_effects(
                 (double)shaper->attack, (double)shaper->sustain);
         } else if ((rotary = ecs_get(world, e, Rotary))) {
             ecs_strbuf_append(buf, "rotary speed %.2f horn %.2f-%.2f Hz drum %.2f-%.2f Hz "
-                "acceleration %.2f balance %.2f spread %.2f drive %.2f mix %.2f",
+                "acceleration %.2f s balance %.2f spread %.2f drive %.2f mix %.2f",
                 (double)rotary->speed, (double)rotary->horn_slow, (double)rotary->horn_fast,
                 (double)rotary->drum_slow, (double)rotary->drum_fast,
                 (double)rotary->acceleration, (double)rotary->balance,

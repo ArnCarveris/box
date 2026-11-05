@@ -538,6 +538,12 @@ void Shell_audio_command(void) {
     ecs_ensure(world, punch, AudioBus)->effects[0] = punch;
     ecs_modified(world, punch, AudioBus);
     ecs_set(world, punch, TransientShaper, { .attack = 0.5f, .sustain = -0.25f });
+    ecs_entity_t organ = ecs_entity(world, { .name = "organ" });
+    ecs_ensure(world, organ, AudioBus)->effects[0] = organ;
+    ecs_modified(world, organ, AudioBus);
+    ecs_set(world, organ, Rotary, { .speed = 1, .horn_slow = 0.8f, .horn_fast = 6.7f,
+        .drum_slow = 0.7f, .drum_fast = 5.9f, .acceleration = 1, .balance = 0.2f,
+        .spread = 1, .drive = 0.3f, .mix = 1 });
     ecs_progress(world, 0.016f);
 
     bool error = true;
@@ -557,6 +563,9 @@ void Shell_audio_command(void) {
     test_assert(strstr(out, "punch: group volume 1.00 pan 0.00 width 1.00 -> master, "
         "insert 0 punch: transient shaper attack 0.50 sustain -0.25 "
         "(does not run: no output)") != NULL);
+    test_assert(strstr(out, "organ: group volume 1.00 pan 0.00 width 1.00 -> master, "
+        "insert 0 organ: rotary speed 1.00 horn 0.80-6.70 Hz drum 0.70-5.90 Hz "
+        "acceleration 1.00 s balance 0.20 spread 1.00 drive 0.30 mix 1.00") != NULL);
     ecs_os_free(out);
 
     out = box_command_run(world, s, "audio volume 0.25", &error);
