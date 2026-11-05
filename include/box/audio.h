@@ -448,9 +448,23 @@ ECS_ENUM(WavetableKind, {
  * octave, 2048 samples at level 0, and hands it to the core, as the frames of a sound. A table
  * of up to 256 frames takes 16.6 KB per frame, a table of 64 frames about 1 MB. Voices that
  * play a table that changes or is deleted play the old one until they end.
+ *
+ * A table loaded from a sound, a WAV or FLAC of single cycle frames, is cut into
+ * floor(frames / frame_size) frames, at most 256, stereo summed to mono, each frame without
+ * its DC, the table normalized to a peak of 1 over all frames. Each frame keeps the harmonics
+ * under the Nyquist of its frame_size, at most 512, so a frame of other than 2048 samples is
+ * resampled to the frames of the table. Until the sound is ready the table has no frames and
+ * its layers play a sine; when the sound becomes ready or changes the table is built again,
+ * and the next play of the synth sounds that name it takes it. A sound that fails to load,
+ * that is not an entity with AudioPcm or SoundFile, or that is shorter than one frame logs
+ * one error that names the Wavetable; a sound of more than 256 frames logs one warning.
  */
 ECS_STRUCT(Wavetable, {
-    WavetableKind kind;    /**< The table, default WavetableBasic */
+    WavetableKind kind;    /**< The table, default WavetableBasic; ignored with a sound */
+    ecs_entity_t sound;    /**< An entity with AudioPcm or SoundFile whose frames make the
+                            *   table in place of kind, 0 for none, the default */
+    int32_t frame_size;    /**< Samples per frame of the sound, 64..4096, default 2048; 0 is
+                            *   the default */
 });
 
 /** The wavetable of a SynthWavetable layer, on the entity of its SynthOscillator.

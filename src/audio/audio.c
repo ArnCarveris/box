@@ -379,6 +379,26 @@ static void box_audio_synth_string_ctor(
     }
 }
 
+/** Construct Wavetable values: WavetableBasic, without a sound, frames of 2048 samples.
+ *
+ * @param ptr The values
+ * @param count Number of values
+ * @param ti Type info
+ */
+static void box_audio_wavetable_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Wavetable *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Wavetable){ .kind = WavetableBasic,
+            .frame_size = BOX_AUDIO_WAVETABLE_FRAME_SIZE };
+    }
+}
+
 /** Construct SynthFilter values: a lowpass at 1000 Hz and 12 dB per octave without
  * resonance.
  *
@@ -1215,6 +1235,7 @@ void BoxAudioImport(
     ecs_set_hooks(world, SynthString, { .ctor = box_audio_synth_string_ctor });
     ECS_META_COMPONENT(world, WavetableKind);
     ECS_META_COMPONENT(world, Wavetable);
+    ecs_set_hooks(world, Wavetable, { .ctor = box_audio_wavetable_ctor });
     ECS_META_COMPONENT(world, SynthTable);
     ECS_META_COMPONENT(world, SynthEnvelope);
     ECS_META_COMPONENT(world, SynthFilter);

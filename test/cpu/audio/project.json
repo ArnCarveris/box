@@ -214,6 +214,15 @@
                 ]
             },
             {
+                "id": "SynthWavetableAsset",
+                "testcases": [
+                    "saw_to_square",
+                    "frame_size",
+                    "not_ready_fallback",
+                    "too_short"
+                ]
+            },
+            {
                 "id": "SynthPitch",
                 "testcases": [
                     "start_returns",
