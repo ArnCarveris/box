@@ -226,21 +226,24 @@ static double sync_bin_energy(
 }
 
 /** Energy of a synced oscillator at a master of 1 kHz and a ratio of 3.7 outside the
- * harmonics of the master and DC, over the energy of its fundamental.
+ * harmonics of the master and DC, over the energy of its fundamental or of its strongest
+ * harmonic. A harmonic at the Nyquist frequency counts half its bin, the energy it has.
  *
  * @param wave A box_audio_synth_wave_t
  * @param rate Frames per second
  * @param n Frames measured, a whole number of periods of 1 kHz
+ * @param strongest Whether over the strongest harmonic instead of the fundamental
  * @return The ratio in dB
  */
 static double sync_alias(
     uint32_t wave,
     float rate,
-    int32_t n)
+    int32_t n,
+    bool strongest)
 {
     box_audio_synth_patch_t p = sync_patch(wave, 1000, 3.7f);
     const float *x = audio_l + SYNC_SKIP;
-    double total = 0, mean = 0, harmonics = 0, fundamental, alias;
+    double total = 0, mean = 0, harmonics = 0, top = 0, alias, e;
     int32_t i, k;
     sync_render(&p, rate, SYNC_SKIP + n);
     for (i = 0; i < n; i ++) {
@@ -249,15 +252,17 @@ static double sync_alias(
     }
 
     mean /= n;
-    for (k = 1; k * 1000 < (int32_t)rate / 2; k ++) {
-        harmonics += sync_bin_energy(x, n, k * 1000.0, rate);
+    for (k = 1; k * 1000 <= (int32_t)rate / 2; k ++) {
+        e = sync_bin_energy(x, n, k * 1000.0, rate);
+        e = k * 2000 == (int32_t)rate ? e / 2 : e;
+        harmonics += e;
+        top = k == 1 || (strongest && e > top) ? e : top;
     }
 
-    fundamental = sync_bin_energy(x, n, 1000.0, rate);
     alias = total - harmonics - mean * mean * n;
     alias = alias > 1e-30 ? alias : 1e-30;
 
-    return 10 * log10(alias / fundamental);
+    return 10 * log10(alias / top);
 }
 
 /** Spectral centroid of a window of a render, in harmonics of a master of 200 Hz.
@@ -365,7 +370,8 @@ void SynthSync_ratio_one_identical(void) {
 
 /** At a master of 1 kHz and a ratio of 3.7 at 48 kHz the energy off the harmonics of the
  * master is at least 40 dB under the fundamental: the master has a whole number of frames,
- * 48, so the aliases fold onto its harmonics and only an error of the period would show. */
+ * 48, so the aliases fold onto its harmonics and only an error of the period would show,
+ * such as a restart off the wrap of the master. alias_44100 measures the aliases. */
 void SynthSync_alias_48000(void) {
     // audio/synth
     const uint32_t waves[] = { BOX_AUDIO_SYNTH_SAW, BOX_AUDIO_SYNTH_SQUARE,
@@ -373,7 +379,7 @@ void SynthSync_alias_48000(void) {
     double alias;
     int32_t i;
     for (i = 0; i < 4; i ++) {
-        alias = sync_alias(waves[i], 48000, SYNC_ALIAS_48000);
+        alias = sync_alias(waves[i], 48000, SYNC_ALIAS_48000, false);
         printf("wave %u synced 3.7 at 1 kHz at 48 kHz: %.2f dB off its harmonics\n",
             waves[i], alias);
         test_assert(alias < -40);
@@ -381,19 +387,24 @@ void SynthSync_alias_48000(void) {
 }
 
 /** At a master of 1 kHz and a ratio of 3.7 at 44.1 kHz, where the master is 44.1 frames and
- * the aliases fall between its harmonics, the energy off them is at least 30 dB under the
- * fundamental for every wave: the margin the polyBLEP of the restart meets. */
+ * the aliases fall between its harmonics, the energy off them is under the strongest harmonic
+ * (near the ratio, the fundamental of a sync is weak) by the margins the polyBLEP and polyBLAMP
+ * of the restart meet: 20 dB for the saw and the square, 30 dB for the triangle, 35 dB for the
+ * sine. The aliases of a polyBLEP saw alone at 3.7 kHz are about 22 dB under it; without the
+ * correction of the restart the synced saw is about 6 dB under its strongest harmonic, the
+ * sine about 22 dB. */
 void SynthSync_alias_44100(void) {
     // audio/synth
     const uint32_t waves[] = { BOX_AUDIO_SYNTH_SAW, BOX_AUDIO_SYNTH_SQUARE,
         BOX_AUDIO_SYNTH_TRIANGLE, BOX_AUDIO_SYNTH_SINE };
+    const double margins[] = { -20, -20, -30, -35 };
     double alias;
     int32_t i;
     for (i = 0; i < 4; i ++) {
-        alias = sync_alias(waves[i], 44100, SYNC_ALIAS_44100);
+        alias = sync_alias(waves[i], 44100, SYNC_ALIAS_44100, true);
         printf("wave %u synced 3.7 at 1 kHz at 44.1 kHz: %.2f dB off its harmonics\n",
             waves[i], alias);
-        test_assert(alias < -30);
+        test_assert(alias < margins[i]);
     }
 }
 

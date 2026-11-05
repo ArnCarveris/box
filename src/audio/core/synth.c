@@ -1677,16 +1677,63 @@ static inline double box_audio_synth_slope(
         2 * BOX_AUDIO_SYNTH_PI * (double)box_audio_core_sin(t + 0.25);
 }
 
+/** Corrections of the edges of a wave that fall at unwrapped phases e, lo < e <= hi, seen from
+ * an unwrapped phase s: the polyBLEP of each step of a saw or a square, the polyBLAMP of each
+ * corner of a triangle, as box_audio_synth_wave adds them.
+ *
+ * A synced wave restarts, so an edge near the restart counts only on the side of it that the
+ * wave crossed it on.
+ *
+ * @param wave A box_audio_synth_wave_t, not noise
+ * @param width Square: share of the period it is high, clamped as box_audio_synth_pulse does
+ * @param s Phase in turns, unwrapped
+ * @param ds Turns per frame, at most a half
+ * @param lo Edges after this phase
+ * @param hi Edges up to this phase, at most a turn and ds after lo
+ * @return The correction
+ */
+static inline double box_audio_synth_edges(
+    int32_t wave,
+    double width,
+    double s,
+    double ds,
+    double lo,
+    double hi)
+{
+    double at[2] = { 0, 0.5 }, step[2] = { 8, -8 }, result = 0, e, d;
+    int32_t i, n = 2;
+    if (wave == BOX_AUDIO_SYNTH_SAW) {
+        n = 1;
+        step[0] = -2;
+    } else if (wave == BOX_AUDIO_SYNTH_SQUARE) {
+        at[1] = width;
+        step[0] = 2;
+        step[1] = -2;
+    } else if (wave != BOX_AUDIO_SYNTH_TRIANGLE) {
+        n = 0;
+    }
+
+    for (i = 0; i < n; i ++) {
+        for (e = lo - box_audio_synth_wrap(lo - at[i]) + 1; e <= hi; e += 1) {
+            d = s - e;
+            if (d > -ds && d < ds) {
+                d = d < 0 ? d + 1 : d;
+                result += wave == BOX_AUDIO_SYNTH_TRIANGLE ?
+                    0.5 * step[i] * ds * (double)box_audio_synth_blamp(d, ds) :
+                    0.5 * step[i] * (double)box_audio_synth_blep(d, ds);
+            }
+        }
+    }
+
+    return result;
+}
+
 /** Render a frame of a hard synced oscillator: its wave at the phase of the master times the
  * ratio, so it restarts at phase 0 on every wrap of the master, plus a shift.
  *
- * The wave keeps the corrections of its own edges, at the speed of the synced phase. The
- * restart jumps from the wave at the ratio (the end of a cycle of the master) to the wave at
- * 0, both with the shift.
- *
- * A polyBLEP on the phase of the master, which places the wrap at its fraction of a frame,
- * corrects that jump by its size; a polyBLAMP the change of the slope of a triangle or a sine.
- * A ratio whose cycle ends on a whole turn jumps by nothing: its own edge corrects it alone.
+ * Near a wrap each edge of the wave is corrected on the side of the restart it falls on, and
+ * a polyBLEP on the master phase, at the wrap's fraction of a frame, corrects the jump of the
+ * restart by its size; a polyBLAMP the change of slope of a triangle or a sine.
  *
  * @param o The oscillator, synced
  * @param t Phase of the master in turns, 0..1
@@ -1704,8 +1751,8 @@ static inline float box_audio_synth_sync(
     double moved,
     uint32_t *rng)
 {
-    double ratio = o->sync, ds = dt * ratio + moved, start, end, jump, bend;
-    float x;
+    double ratio = o->sync, ds = dt * ratio + moved, u = t * ratio + shift, end = ratio + shift;
+    double width = o->width, start, x, lo;
     if (moved != 0) {
         ds -= (double)(int64_t)ds;
         ds = ds >= 0.5 ? ds - 1 : (ds < -0.5 ? ds + 1 : ds);
@@ -1713,22 +1760,34 @@ static inline float box_audio_synth_sync(
     }
 
     ds = ds < BOX_AUDIO_SYNTH_NYQUIST ? ds : BOX_AUDIO_SYNTH_NYQUIST;
-    x = box_audio_synth_wave(o->wave, box_audio_synth_wrap(t * ratio + shift), ds, o->width,
-        rng);
-    if (t < dt || t > 1 - dt) {
-        start = shift != 0 ? box_audio_synth_wrap(shift) : 0.0;
-        end = box_audio_synth_wrap(ratio + shift);
-        jump = box_audio_synth_naive(o->wave, start, o->width) -
-            box_audio_synth_naive(o->wave, end, o->width);
-        x += (float)(0.5 * jump) * box_audio_synth_blep(t, dt);
+    if (t >= dt && t <= 1 - dt) {
+        x = box_audio_synth_wave(o->wave, box_audio_synth_wrap(u), ds, width, rng);
+    } else {
+        if (o->wave == BOX_AUDIO_SYNTH_SQUARE && width != 0.5) {
+            lo = ds < 0.5 ? ds : 0.5;
+            width = width > lo ? (width < 1 - lo ? width : 1 - lo) : lo;
+        }
+
+        start = box_audio_synth_wrap(shift);
+        x = box_audio_synth_naive(o->wave, box_audio_synth_wrap(u), width);
+        if (t > 1 - dt) {
+            x += box_audio_synth_edges(o->wave, width, u, ds, u - ds, end) +
+                box_audio_synth_edges(o->wave, width, u - ratio, ds, shift, u - ratio + ds);
+        } else {
+            x += box_audio_synth_edges(o->wave, width, u, ds, shift, u + ds) +
+                box_audio_synth_edges(o->wave, width, u + ratio, ds, u + ratio - ds, end);
+        }
+
+        end = box_audio_synth_wrap(end);
+        x += 0.5 * (box_audio_synth_naive(o->wave, start, width) -
+            box_audio_synth_naive(o->wave, end, width)) * (double)box_audio_synth_blep(t, dt);
         if (o->wave == BOX_AUDIO_SYNTH_TRIANGLE || o->wave == BOX_AUDIO_SYNTH_SINE) {
-            bend = ratio * (box_audio_synth_slope(o->wave, start) -
-                box_audio_synth_slope(o->wave, end));
-            x += (float)(0.5 * bend * dt) * box_audio_synth_blamp(t, dt);
+            x += 0.5 * ratio * (box_audio_synth_slope(o->wave, start) -
+                box_audio_synth_slope(o->wave, end)) * dt * (double)box_audio_synth_blamp(t, dt);
         }
     }
 
-    return x;
+    return (float)x;
 }
 
 /** Render a frame of the sub oscillator of a layer: a square sub_octave octaves under it at
