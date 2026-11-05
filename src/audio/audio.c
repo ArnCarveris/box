@@ -518,6 +518,135 @@ static void box_audio_note_ctor(
     }
 }
 
+/** Give a curve a copy of its keys of its own, after a copy bit for bit.
+ *
+ * @param curve The curve
+ */
+static void box_audio_curve_dup(
+    Curve *curve)
+{
+    if (curve->keys.array) {
+        curve->keys = ecs_vec_copy_t(NULL, &curve->keys, CurveKey);
+    } else {
+        ecs_os_memset_t(&curve->keys, 0, ecs_vec_t);
+    }
+}
+
+void box_audio_note_dup(
+    Note *note)
+{
+    box_audio_curve_dup(&note->bend);
+    box_audio_curve_dup(&note->mod);
+    box_audio_curve_dup(&note->pressure);
+}
+
+void box_audio_note_fini(
+    Note *note)
+{
+    ecs_vec_fini_t(NULL, &note->bend.keys, CurveKey);
+    ecs_vec_fini_t(NULL, &note->mod.keys, CurveKey);
+    ecs_vec_fini_t(NULL, &note->pressure.keys, CurveKey);
+}
+
+/** Free the notes of a clip and the keys of their curves.
+ *
+ * @param clip The clip
+ */
+static void box_audio_note_clip_free(
+    NoteClip *clip)
+{
+    Note *notes = ecs_vec_first(&clip->notes);
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&clip->notes); i ++) {
+        box_audio_note_fini(&notes[i]);
+    }
+
+    ecs_vec_fini_t(NULL, &clip->notes, Note);
+}
+
+/** Free NoteClip values, their notes and the keys of their curves.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_note_clip_dtor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    NoteClip *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        box_audio_note_clip_free(&values[i]);
+    }
+}
+
+/** Copy NoteClip values: the destination gets copies of the notes and of the keys of their
+ * curves.
+ *
+ * @param dst_ptr The destination components
+ * @param src_ptr The source components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_note_clip_copy(
+    void *dst_ptr,
+    const void *src_ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    NoteClip *dst = dst_ptr;
+    const NoteClip *src = src_ptr;
+    Note *notes;
+    int32_t i, k;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        if (&dst[i] == &src[i]) {
+            continue;
+        }
+
+        box_audio_note_clip_free(&dst[i]);
+        dst[i] = src[i];
+        if (src[i].notes.array) {
+            dst[i].notes = ecs_vec_copy_t(NULL, &src[i].notes, Note);
+        } else {
+            ecs_os_memset_t(&dst[i].notes, 0, ecs_vec_t);
+        }
+
+        notes = ecs_vec_first(&dst[i].notes);
+        for (k = 0; k < ecs_vec_count(&dst[i].notes); k ++) {
+            box_audio_note_dup(&notes[k]);
+        }
+    }
+}
+
+/** Move NoteClip values: the destination takes the notes of the source.
+ *
+ * @param dst_ptr The destination components
+ * @param src_ptr The source components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_note_clip_move(
+    void *dst_ptr,
+    void *src_ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    NoteClip *dst = dst_ptr, *src = src_ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        if (&dst[i] != &src[i]) {
+            box_audio_note_clip_free(&dst[i]);
+            dst[i] = src[i];
+            ecs_os_memset_t(&src[i].notes, 0, ecs_vec_t);
+        }
+    }
+}
+
 /** Construct NoteClip values: 4 beats long, without notes.
  *
  * @param ptr The components
@@ -1254,10 +1383,16 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, Instrument);
     ecs_set_hooks(world, Instrument, { .ctor = box_audio_instrument_ctor });
     ECS_META_COMPONENT(world, Note);
+    box_owned_hooks(world, Note, BOX_OWNED_CURVE(Note, bend), BOX_OWNED_CURVE(Note, mod),
+        BOX_OWNED_CURVE(Note, pressure));
     ecs_set_hooks(world, Note, { .ctor = box_audio_note_ctor });
     ECS_META_COMPONENT(world, NoteClip);
-    box_owned_hooks(world, NoteClip, BOX_OWNED_VEC(NoteClip, notes, Note));
-    ecs_set_hooks(world, NoteClip, { .ctor = box_audio_note_clip_ctor });
+    ecs_set_hooks(world, NoteClip, {
+        .ctor = box_audio_note_clip_ctor,
+        .dtor = box_audio_note_clip_dtor,
+        .copy = box_audio_note_clip_copy,
+        .move = box_audio_note_clip_move
+    });
     ECS_META_COMPONENT(world, AudioClip);
     ecs_set_hooks(world, AudioClip, { .ctor = box_audio_audio_clip_ctor });
     ECS_META_COMPONENT(world, AutomationClip);

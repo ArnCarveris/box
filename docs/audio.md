@@ -622,6 +622,17 @@ Instrument gates end a legato phrase; one shots instead hold for the authored ho
 after the last note. A retargeted voice keeps the velocity of the note that started it,
 since its envelopes do not restart. Quantized legato plays start new voices.
 
+The expression of a note (`Note.bend`, `mod` and `pressure`, see Music on the timeline)
+reaches its synth voice only. The bend multiplies the pitch of the voice by
+`2^(bend / 12)` on the same path as its pitch and glide, so oscillators, sweeps, pluck
+strings and key tracking follow it, and a glide that runs keeps going. Until a mod matrix
+exists, `mod` scales the pitch depth of the LFOs, the vibrato (1 without a curve, so a
+sound keeps its vibrato), and `pressure` moves the cutoff up by `pressure * 2` octaves
+(`BOX_AUDIO_SYNTH_PRESSURE_OCTAVES`, 0 without a curve); a formant filter ignores it. A
+retargeted legato voice takes the expression of the new note. The voice takes the values
+of the ramps every 8 frames while they move; a note without expression renders exactly
+as before.
+
 Working examples include [synth_examples.flecs](../test/assets/audio/synth_examples.flecs),
 [synth_unison.flecs](../test/assets/audio/synth_unison.flecs),
 [synth_lfo.flecs](../test/assets/audio/synth_lfo.flecs),
@@ -678,7 +689,7 @@ the sum is clamped to -1..1. `spread_mode` picks the offset:
 | `InstrumentSpreadAlternate` | `+spread` and `-spread` on successive notes |
 
 A `NoteClip` has a `length` (4 beats) and notes with `start`, `duration`, `pitch`,
-`velocity` (1) and `pan` (0). A `Track` supplies the instrument and brings an
+`velocity` (1), `pan` (0) and the expression curves `bend`, `mod` and `pressure` (none). A `Track` supplies the instrument and brings an
 `AudioBus`. Its child `ClipPlacement` entities arrange clips:
 
 | Placement field | Meaning and default |
@@ -726,6 +737,30 @@ Stopping or seeking releases sounding gated notes and cancels scheduled starts.
 Seeking does not restart a note that began before the new position. Ungated hits
 already playing ring out. Deleting or disabling tracks or placements releases their
 tracked notes and cancels future starts.
+
+A note carries expression in the style of MPE, sent to its voice only: `bend` in
+semitones (-48..48), `mod` and `pressure` (0..1), each a `Curve` whose key times are in
+beats from the start of the note. A curve without keys is no expression on that channel.
+The voice starts at the value of each curve at the start of the note, then follows it
+with timed ramps: one per linear span, and linear ramps of at most 10 ms for each span of
+a Catmull-Rom or Bezier curve, up to the end of the note; past its last key a curve holds.
+The ramps are scheduled in the lookahead window like the notes, at the beat at which each
+starts, and a stop, a seek, a jump and the deletion of a track or placement cancel them
+with the notes. A bend also plays on a sampler; `mod` and `pressure` reach synth voices
+only (see Synth sounds). A legato note gives its expression to the voice it shares, and a
+note without expression resets it.
+
+```flecs
+riff {
+  NoteClip: {length: 4, notes: [
+    // a slide up a fifth over the first beat, then a held note
+    {start: 0, duration: 2, pitch: 57, bend: {keys: [{0, -7}, {1, 0}]}},
+    // a vibrato that swells in over the note, and pressure that brightens it
+    {start: 2, duration: 2, pitch: 60, mod: {keys: [{0, 0}, {2, 1}]},
+      pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {1, 0.8}, {2, 0.3}]}}
+  ]}
+}
+```
 
 A `Track` can groove its notes instead of playing them quantized. `swing` (0..0.75,
 default 0) works on `swing_grid`: `TrackSwing8` (default, eighths, a step of 0.5

@@ -376,7 +376,32 @@
                     "synth_sync",
                     "synth_drive",
                     "synth_formant",
-                    "synth_wavetable"
+                    "synth_wavetable",
+                    "expression"
+                ]
+            },
+            {
+                "id": "NoteExpression",
+                "testcases": [
+                    "bend_octave",
+                    "bend_shape",
+                    "ramp_after_play",
+                    "bend_sample",
+                    "bend_pluck",
+                    "mod_vibrato",
+                    "pressure_brightens",
+                    "defaults_identical",
+                    "cancel",
+                    "legato",
+                    "note_bend",
+                    "note_curve",
+                    "note_sample",
+                    "no_expression_identical",
+                    "stop_cancels",
+                    "seek_cancels",
+                    "delete_placement",
+                    "clip_copies",
+                    "script"
                 ]
             },
             {

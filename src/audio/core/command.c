@@ -381,6 +381,26 @@ bool box_audio_write_effect_params(
     return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
 }
 
+bool box_audio_write_voice_ramp(
+    box_audio_writer_t *writer,
+    uint32_t voice,
+    box_audio_param_t param,
+    float value,
+    uint32_t frames,
+    uint64_t when)
+{
+    box_audio_cmd_ramp_t cmd;
+    box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_VOICE_RAMP, sizeof(cmd));
+    cmd.when_lo = (uint32_t)when;
+    cmd.when_hi = (uint32_t)(when >> 32);
+    cmd.voice = voice;
+    cmd.param = (uint32_t)param;
+    cmd.value = value;
+    cmd.frames = frames;
+
+    return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
+}
+
 bool box_audio_write_cancel(
     box_audio_writer_t *writer,
     uint32_t type,

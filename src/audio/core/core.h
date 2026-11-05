@@ -281,7 +281,8 @@ typedef enum box_audio_cmd_type_t {
                                       *   before, is skipped as an unknown type */
     BOX_AUDIO_CMD_LEGATO = 12,       /**< box_audio_cmd_legato_t */
     BOX_AUDIO_CMD_EFFECT_PARAMS = 13, /**< box_audio_cmd_effect_params_t */
-    BOX_AUDIO_CMD_CANCEL = 14        /**< box_audio_cmd_cancel_t */
+    BOX_AUDIO_CMD_CANCEL = 14,       /**< box_audio_cmd_cancel_t */
+    BOX_AUDIO_CMD_VOICE_RAMP = 15    /**< box_audio_cmd_ramp_t */
 } box_audio_cmd_type_t;
 
 /** Parameters of BOX_AUDIO_CMD_VOICE_SET and BOX_AUDIO_CMD_BUS_SET */
@@ -298,8 +299,22 @@ typedef enum box_audio_param_t {
                                   *   side, a mid/side gain before the volume and pan, ramped */
     BOX_AUDIO_PARAM_SEND_1 = 8,  /**< Level of send 1 of a bus */
     BOX_AUDIO_PARAM_SEND_2 = 9,  /**< Level of send 2 of a bus */
-    BOX_AUDIO_PARAM_SEND_3 = 10  /**< Level of send 3 of a bus */
+    BOX_AUDIO_PARAM_SEND_3 = 10, /**< Level of send 3 of a bus */
+    BOX_AUDIO_PARAM_BEND = 11,   /**< Pitch bend of a voice in semitones,
+                                  *   -BOX_AUDIO_BEND_MAX..BOX_AUDIO_BEND_MAX, default 0: the
+                                  *   pitch of the voice times 2^(bend / 12), its glide and
+                                  *   everything that follows its pitch included */
+    BOX_AUDIO_PARAM_MOD = 12,    /**< Mod of a synth voice, 0..1, default 1: scales the depth
+                                  *   of the pitch of its LFOs, its vibrato */
+    BOX_AUDIO_PARAM_PRESSURE = 13 /**< Pressure of a synth voice, 0..1, default 0: moves its
+                                  *   cutoff up by pressure * BOX_AUDIO_SYNTH_PRESSURE_OCTAVES */
 } box_audio_param_t;
+
+/** Largest pitch bend of a voice in semitones, either way */
+#define BOX_AUDIO_BEND_MAX 48.0f
+
+/** Octaves the cutoff of a synth voice moves up by at pressure 1 */
+#define BOX_AUDIO_SYNTH_PRESSURE_OCTAVES 2.0f
 
 /** Flags of BOX_AUDIO_CMD_PLAY */
 #define BOX_AUDIO_PLAY_LOOP (1u << 0)
@@ -326,13 +341,14 @@ typedef enum box_audio_param_t {
 
 /** Header of every command: its type and its size in bytes, header included.
  *
- * PLAY, STOP, VOICE_SET, BUS_SET, RELEASE, LEGATO and EFFECT_PARAMS follow it with when_lo and
- * when_hi, the frame of the core clock (box_audio_core_clock) at which the command takes
- * effect, 64 bits in two words so that every field stays 32 bits.
+ * PLAY, STOP, VOICE_SET, BUS_SET, RELEASE, LEGATO, EFFECT_PARAMS and VOICE_RAMP follow it
+ * with when_lo and when_hi, the frame of the core clock (box_audio_core_clock) at which the
+ * command takes effect, 64 bits in two words so that every field stays 32 bits.
  *
  * A when of 0, or of a frame that was already rendered, applies at the start of the next
  * block; a later one waits in the schedule of the core for its frame. Of the commands of one
- * frame, the releases apply last */
+ * frame, the ramps apply after the others, so a ramp at the frame of a play or a legato
+ * applies to the voice it starts, and the releases apply last */
 typedef struct box_audio_cmd_header_t {
     uint16_t type;  /**< A box_audio_cmd_type_t; an unknown type is skipped */
     uint16_t size;  /**< Bytes of the command, a multiple of 4, at least 4 */
@@ -424,6 +440,25 @@ typedef struct box_audio_cmd_set_t {
     uint32_t param;                 /**< A box_audio_param_t */
     float value;                    /**< The new value */
 } box_audio_cmd_set_t;
+
+/** Move a parameter of a voice linearly from its current value to a value over a number of
+ * frames, from the frame of the command: BOX_AUDIO_PARAM_BEND, BOX_AUDIO_PARAM_MOD or
+ * BOX_AUDIO_PARAM_PRESSURE, the expression of a note. A ramp replaces the one of its parameter
+ * that runs. The voice takes the value of a ramp every BOX_AUDIO_EXPRESS_FRAMES frames; a
+ * PLAY resets them to their defaults, and so does a LEGATO that retargets a voice */
+typedef struct box_audio_cmd_ramp_t {
+    box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_VOICE_RAMP */
+    uint32_t when_lo;               /**< Low word of the frame the ramp starts at, 0 for now */
+    uint32_t when_hi;               /**< High word of the frame */
+    uint32_t voice;                 /**< Handle of the voice */
+    uint32_t param;                 /**< A box_audio_param_t */
+    float value;                    /**< Value at the end of the ramp */
+    uint32_t frames;                /**< Frames of the ramp, 0 to jump */
+} box_audio_cmd_ramp_t;
+
+/** Frames of the blocks in which a voice with a ramp that runs takes the values of its
+ * ramps, the control block of a synth voice */
+#define BOX_AUDIO_EXPRESS_FRAMES 8
 
 /** A bus in the processing order, where it outputs and where it sends.
  *
@@ -851,15 +886,18 @@ typedef struct box_audio_cmd_effect_params_t {
 } box_audio_cmd_effect_params_t;
 
 /** Drop the commands of the schedule that set a parameter of a bus or the parameters of an
- * effect slot, at once: the BUS_SET commands of a bus and a parameter, or every
- * EFFECT_PARAMS command of a slot. The automation of the timeline cancels what it scheduled
- * ahead with it on a stop, a seek and a change */
+ * effect slot, or the ramps of a voice, at once: the BUS_SET commands of a bus and a
+ * parameter, every EFFECT_PARAMS command of a slot, or every VOICE_RAMP command of a voice
+ * handle. The automation of the timeline cancels what it scheduled ahead with it on a stop, a
+ * seek and a change, and the sequencer the expression of its notes */
 typedef struct box_audio_cmd_cancel_t {
     box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_CANCEL */
-    uint32_t type;                  /**< BOX_AUDIO_CMD_BUS_SET or BOX_AUDIO_CMD_EFFECT_PARAMS */
-    uint32_t target;                /**< Index of the bus or slot of the effect */
+    uint32_t type;                  /**< BOX_AUDIO_CMD_BUS_SET, BOX_AUDIO_CMD_EFFECT_PARAMS or
+                                     *   BOX_AUDIO_CMD_VOICE_RAMP */
+    uint32_t target;                /**< Index of the bus or slot of the effect, or handle of
+                                     *   the voice */
     uint32_t param;                 /**< The box_audio_param_t of a BUS_SET, unused for an
-                                     *   effect */
+                                     *   effect and a voice */
 } box_audio_cmd_cancel_t;
 
 /** Waves of a synth oscillator */
@@ -1267,7 +1305,8 @@ void box_audio_core_stream_status(
     box_audio_stream_status_t *status);
 
 /** Apply a batch of commands. They take effect at the start of the next render block, but
- * a PLAY, STOP, VOICE_SET, BUS_SET, RELEASE, LEGATO or EFFECT_PARAMS with a future when, which
+ * a PLAY, STOP, VOICE_SET, BUS_SET, RELEASE, LEGATO, EFFECT_PARAMS or VOICE_RAMP with a future
+ * when, which
  * waits in the schedule and takes effect on exactly its frame: the render splits its block
  * there.
  *
@@ -1777,12 +1816,30 @@ bool box_audio_write_effect_params(
     const float *params,
     uint64_t when);
 
-/** Write a command that drops the scheduled sets of a parameter of a bus or of the
- * parameters of an effect slot.
+/** Write a command that moves a parameter of a voice to a value over a number of frames.
  *
  * @param writer The writer
- * @param type BOX_AUDIO_CMD_BUS_SET or BOX_AUDIO_CMD_EFFECT_PARAMS
- * @param target Index of the bus or slot of the effect
+ * @param voice Handle of the voice
+ * @param param BOX_AUDIO_PARAM_BEND, BOX_AUDIO_PARAM_MOD or BOX_AUDIO_PARAM_PRESSURE
+ * @param value Value at the end of the ramp
+ * @param frames Frames of the ramp, 0 to jump
+ * @param when Frame of the core clock the ramp starts at, 0 for now
+ * @return Whether the command fit
+ */
+bool box_audio_write_voice_ramp(
+    box_audio_writer_t *writer,
+    uint32_t voice,
+    box_audio_param_t param,
+    float value,
+    uint32_t frames,
+    uint64_t when);
+
+/** Write a command that drops the scheduled sets of a parameter of a bus, the parameters of
+ * an effect slot or the ramps of a voice.
+ *
+ * @param writer The writer
+ * @param type BOX_AUDIO_CMD_BUS_SET, BOX_AUDIO_CMD_EFFECT_PARAMS or BOX_AUDIO_CMD_VOICE_RAMP
+ * @param target Index of the bus or slot of the effect, or handle of the voice
  * @param param The box_audio_param_t of a bus, unused for an effect
  * @return Whether the command fit
  */

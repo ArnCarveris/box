@@ -513,6 +513,30 @@ typedef struct box_audio_sounding_t {
     ecs_entity_t placement; /**< The placement */
 } box_audio_sounding_t;
 
+/** A ramp of the expression of a note that the sequencer scheduled, which it sends once the
+ * beat at which it starts falls in a window */
+typedef struct box_audio_seq_ramp_t {
+    uint32_t handle;        /**< Voice handle of the note */
+    uint32_t serial;        /**< Serial of the output it plays on */
+    uint32_t param;         /**< BOX_AUDIO_PARAM_BEND, _MOD or _PRESSURE */
+    float value;            /**< Value at its end */
+    double beat;            /**< Beat of the timeline at which it starts */
+    double end;             /**< Beat at which it ends */
+    uint64_t first;         /**< Frame of the start of the note, the earliest of the ramp */
+    ecs_entity_t track;     /**< The track */
+    ecs_entity_t placement; /**< The placement */
+} box_audio_seq_ramp_t;
+
+/** A note with expression whose ramps the sequencer sent ahead, which a stop, a seek or the
+ * end of its placement cancels in the core */
+typedef struct box_audio_seq_expressed_t {
+    uint32_t handle;        /**< Voice handle of the note */
+    uint32_t serial;        /**< Serial of the output it plays on */
+    uint64_t last;          /**< Frame of the last ramp sent */
+    ecs_entity_t track;     /**< The track */
+    ecs_entity_t placement; /**< The placement */
+} box_audio_seq_expressed_t;
+
 /** A voice of an audio clip that the sequencer scheduled and that has not stopped */
 typedef struct box_audio_clip_voice_t {
     uint32_t handle;        /**< Voice handle */
@@ -540,6 +564,11 @@ typedef struct box_audio_sequencer_stats_t {
     int64_t stops;          /**< STOP commands of audio clip voices written */
     int64_t skipped;        /**< Passes of audio clips skipped: a sound that is not ready or a
                              *   full batch */
+    int64_t ramps;          /**< VOICE_RAMP commands of the expression of notes written, the
+                             *   initial values included */
+    int64_t ramps_dropped;  /**< Ramps dropped before they were sent: a stop, a seek, a jump
+                             *   or the end of their placement */
+    int64_t ramp_cancels;   /**< CANCEL commands of the ramps of a voice written */
 } box_audio_sequencer_stats_t;
 
 /** The clips, tracks and placements of the timeline, in sequencer.c */
@@ -553,6 +582,9 @@ typedef struct box_audio_sequencer_t {
     uint32_t generation;    /**< Changes with every change of a NoteClip */
     ecs_vec_t sounding;     /**< box_audio_sounding_t */
     ecs_vec_t voices;       /**< box_audio_clip_voice_t, the voices of audio clips */
+    ecs_vec_t ramps;        /**< box_audio_seq_ramp_t, the ramps of the expression of notes
+                             *   still to send */
+    ecs_vec_t expressed;    /**< box_audio_seq_expressed_t, the notes whose ramps were sent */
     double expect;          /**< Beat the next segment starts at, NAN after a reset */
     box_audio_sequencer_stats_t stats; /**< Counters */
 } box_audio_sequencer_t;
@@ -1498,6 +1530,23 @@ uint32_t box_audio_instrument_voice(
 void box_audio_instrument_init(
     ecs_world_t *world,
     box_audio_module_t *state);
+
+/** Seconds of the longest ramp of a curved span of the expression of a note */
+#define BOX_AUDIO_EXPRESS_STEP (0.01)
+
+/** Give the curves of a note copies of their keys of its own, after a copy bit for bit.
+ *
+ * @param note The note
+ */
+void box_audio_note_dup(
+    Note *note);
+
+/** Free the keys of the curves of a note.
+ *
+ * @param note The note
+ */
+void box_audio_note_fini(
+    Note *note);
 
 /** Register the observers and the timeline hook of the clips and tracks.
  *

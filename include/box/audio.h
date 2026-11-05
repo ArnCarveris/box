@@ -41,6 +41,10 @@ extern "C" {
  * clamped with one warning */
 #define BOX_AUDIO_SYNTH_PLUCK_LOWEST (40.0f)
 
+/** Octaves the pressure of a Note moves the cutoff of a synth voice up by at pressure 1, the
+ * same in the core */
+#define BOX_AUDIO_SYNTH_PRESSURE_OCTAVES 2.0f
+
 /** What the audio output does */
 ECS_ENUM(AudioState, {
     AudioOff = 0,               /**< No output: a world that runs no app, or --no-audio */
@@ -1006,13 +1010,34 @@ ECS_STRUCT(Instrument, {
                             *   InstrumentSpreadPitch */
 });
 
-/** A note of a NoteClip, in beats from the start of the clip */
+/** A note of a NoteClip, in beats from the start of the clip.
+ *
+ * Its expression, in the style of MPE, is three curves whose key times are in beats from the
+ * start of the note, sent to its voice only: a pitch bend, a slide or a fall in bend, a
+ * vibrato swell in mod and a swell of brightness in pressure. A curve without keys is no
+ * expression on its channel. The voice starts at the value of each curve at the start of the
+ * note and follows it with timed ramps: one for each linear span, and ramps of at most 10 ms
+ * for a curved span, until the end of the note; past its last key a curve holds. A legato
+ * note gives its expression to the voice it shares, and a note without expression resets it.
+ *
+ * In script: {start: 0, duration: 2, pitch: 60, bend: {keys: [{0, 0}, {2, 12}]}}.
+ */
 ECS_STRUCT(Note, {
     float start;           /**< Beats from the start of the clip */
     float duration;        /**< Beats */
     float pitch;           /**< MIDI note number, a float so microtones work */
     float velocity;        /**< 0..1, default 1 */
     float pan;             /**< Pan of the voice, -1 left to 1 right */
+    Curve bend;            /**< Pitch bend in semitones, -48..48, over beats of the note: the
+                            *   pitch of the voice times 2^(bend / 12), its glide, oscillators,
+                            *   pluck strings and key tracking included; synth and sample
+                            *   voices. Without keys 0 */
+    Curve mod;             /**< 0..1 over beats of the note: scales the vibrato of a synth
+                            *   voice, the pitch depth of its LFOs. Without keys 1, so a sound
+                            *   keeps its vibrato */
+    Curve pressure;        /**< 0..1 over beats of the note: moves the cutoff of a synth voice
+                            *   up by pressure times 2 octaves
+                            *   (BOX_AUDIO_SYNTH_PRESSURE_OCTAVES). Without keys 0 */
 });
 
 /** A clip of notes, reusable: usually a prefab or a plain entity that any number of
@@ -1026,7 +1051,8 @@ ECS_STRUCT(Note, {
 ECS_STRUCT(NoteClip, {
     float length;          /**< Beats, default 4: the length of a pass when a placement loops
                             *   the clip, and of a placement of duration 0 */
-    ecs_vec(Note) notes;   /**< The notes, in any order */
+    ecs_vec(Note) notes;   /**< The notes, in any order; the clip owns the keys of their
+                            *   curves, copying the clip copies them */
 });
 
 /** A clip of recorded audio, reusable as a NoteClip is: a part of a sound that a ClipPlacement

@@ -615,6 +615,7 @@ static void box_audio_cmd_play(
     v->priority = priority;
     box_audio_ramp_set(&v->left, 0);
     box_audio_ramp_set(&v->right, 0);
+    box_audio_voice_express_reset(core, v, false);
     box_audio_voice_gains(core, v);
     if (core->sounds[cmd->sound].synth) {
         box_audio_ramp_set(&v->left, v->left.target);
@@ -682,6 +683,7 @@ static void box_audio_cmd_legato(
         v->priority = box_audio_priority(cmd->priority);
         box_audio_voice_gains(core, v);
         box_audio_synth_gate(&v->source.data.synth, (cmd->flags & BOX_AUDIO_PLAY_GATE) != 0);
+        box_audio_voice_express_reset(core, v, true);
     } else {
         if (v && v->source.kind == BOX_AUDIO_SOURCE_SYNTH) {
             v->source.data.synth.loop = false;
@@ -790,9 +792,36 @@ static void box_audio_cmd_stream(
     v->priority = priority;
     box_audio_ramp_set(&v->left, 0);
     box_audio_ramp_set(&v->right, 0);
+    box_audio_voice_express_reset(core, v, false);
     box_audio_voice_gains(core, v);
     box_audio_source_stream(core, &v->source, cmd->stream);
     core->playing ++;
+
+done:
+    return;
+}
+
+/** Apply a ramp command of a voice.
+ *
+ * @param core The core
+ * @param cmd The command
+ */
+static void box_audio_cmd_voice_ramp(
+    box_audio_core_t *core,
+    const box_audio_cmd_ramp_t *cmd)
+{
+    box_audio_voice_t *v = box_audio_voice_find(core, cmd->voice);
+    if (!v) {
+        goto done;
+    }
+
+    if (cmd->param == BOX_AUDIO_PARAM_BEND || cmd->param == BOX_AUDIO_PARAM_MOD ||
+        cmd->param == BOX_AUDIO_PARAM_PRESSURE)
+    {
+        box_audio_voice_ramp(core, v, cmd->param, cmd->value, cmd->frames);
+    } else {
+        box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_VOICE_RAMP, 0);
+    }
 
 done:
     return;
@@ -822,6 +851,10 @@ static void box_audio_cmd_voice_set(
     } else if (cmd->param == BOX_AUDIO_PARAM_PITCH) {
         v->pitch = box_audio_clamp(value, BOX_AUDIO_PITCH_MIN, BOX_AUDIO_PITCH_MAX);
         box_audio_source_pitch(&v->source, v->pitch);
+    } else if (cmd->param == BOX_AUDIO_PARAM_BEND || cmd->param == BOX_AUDIO_PARAM_MOD ||
+        cmd->param == BOX_AUDIO_PARAM_PRESSURE)
+    {
+        box_audio_voice_ramp(core, v, cmd->param, value, 0);
     } else if (cmd->param == BOX_AUDIO_PARAM_BUS && value >= 0 && value < BOX_AUDIO_BUS_MAX) {
         v->bus = (uint32_t)value;
     } else if (cmd->param == BOX_AUDIO_PARAM_POSITION) {
@@ -1024,14 +1057,28 @@ static void box_audio_cmd_timed(
         box_audio_cmd_legato(core, &cmd->legato);
     } else if (cmd->header.type == BOX_AUDIO_CMD_EFFECT_PARAMS) {
         box_audio_effect_params_command(core, &cmd->effect);
+    } else if (cmd->header.type == BOX_AUDIO_CMD_VOICE_RAMP) {
+        box_audio_cmd_voice_ramp(core, &cmd->ramp);
     } else {
         box_audio_cmd_bus_set(core, &cmd->set);
     }
 }
 
+/** Rank of a command among the commands of its frame: the ramps after the others, so a ramp
+ * at the frame of a play applies to the voice it starts, and the releases last.
+ *
+ * @param type The type of the command
+ * @return The rank, lower first
+ */
+static int32_t box_audio_schedule_rank(
+    uint16_t type)
+{
+    return type == BOX_AUDIO_CMD_RELEASE ? 2 : (type == BOX_AUDIO_CMD_VOICE_RAMP ? 1 : 0);
+}
+
 /** Whether a command of the schedule comes before another: an earlier frame, or the same
- * frame and an earlier arrival. Of one frame the releases come last, so a legato note on the
- * frame where the note it follows ends glides on instead of starting after the release.
+ * frame and a lower rank, or the same rank and an earlier arrival. The releases come last, so a
+ * legato note on the frame where the note it follows ends glides on instead of restarting.
  *
  * @param a A command
  * @param b Another command
@@ -1041,10 +1088,11 @@ static bool box_audio_schedule_before(
     const box_audio_scheduled_t *a,
     const box_audio_scheduled_t *b)
 {
-    bool ra = a->cmd.header.type == BOX_AUDIO_CMD_RELEASE;
-    bool rb = b->cmd.header.type == BOX_AUDIO_CMD_RELEASE;
+    int32_t ra = box_audio_schedule_rank(a->cmd.header.type);
+    int32_t rb = box_audio_schedule_rank(b->cmd.header.type);
 
-    return a->when < b->when || (a->when == b->when && (ra != rb ? rb : a->order < b->order));
+    return a->when < b->when || (a->when == b->when && (ra != rb ? ra < rb :
+        a->order < b->order));
 }
 
 /** Move a command of the schedule down the heap to its place.
@@ -1145,7 +1193,8 @@ static void box_audio_schedule_cancel(
             (type == BOX_AUDIO_CMD_STOP && cmd->stop.voice == voice) ||
             (type == BOX_AUDIO_CMD_VOICE_SET && cmd->set.target == voice) ||
             (type == BOX_AUDIO_CMD_RELEASE && cmd->release.voice == voice) ||
-            (type == BOX_AUDIO_CMD_LEGATO && cmd->legato.voice == voice);
+            (type == BOX_AUDIO_CMD_LEGATO && cmd->legato.voice == voice) ||
+            (type == BOX_AUDIO_CMD_VOICE_RAMP && cmd->ramp.voice == voice);
         if (!drop) {
             if (kept != i) {
                 core->schedule[kept] = core->schedule[i];
@@ -1180,7 +1229,9 @@ static void box_audio_schedule_cancel_sets(
         bool drop = (cmd->type == BOX_AUDIO_CMD_BUS_SET && type == BOX_AUDIO_CMD_BUS_SET &&
             c->set.target == cmd->target && c->set.param == cmd->param) ||
             (cmd->type == BOX_AUDIO_CMD_EFFECT_PARAMS && type == BOX_AUDIO_CMD_EFFECT_PARAMS &&
-            c->effect.slot == cmd->target);
+            c->effect.slot == cmd->target) ||
+            (cmd->type == BOX_AUDIO_CMD_VOICE_RAMP && type == BOX_AUDIO_CMD_VOICE_RAMP &&
+            c->ramp.voice == cmd->target);
         if (!drop) {
             if (kept != i) {
                 core->schedule[kept] = core->schedule[i];
@@ -1266,6 +1317,10 @@ static void box_audio_cmd(
         size >= (int32_t)sizeof(box_audio_cmd_effect_params_t))
     {
         box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_effect_params_t));
+    } else if (type == BOX_AUDIO_CMD_VOICE_RAMP &&
+        size >= (int32_t)sizeof(box_audio_cmd_ramp_t))
+    {
+        box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_ramp_t));
     } else if (type == BOX_AUDIO_CMD_CANCEL && size >= (int32_t)sizeof(cancel)) {
         box_audio_copy(&cancel, bytes, (int32_t)sizeof(cancel));
         box_audio_schedule_cancel_sets(core, &cancel);
@@ -1595,7 +1650,42 @@ done:
     return result;
 }
 
+/** Render frames of the source of a voice into its bus from a frame of the block.
+ *
+ * @param core The core
+ * @param v The voice
+ * @param b The bus
+ * @param active Whether the bus is active, else the frames only advance the gains
+ * @param at First frame of the block
+ * @param frames Frames to render
+ * @return Frames the source rendered
+ */
+static int32_t box_audio_voice_mix(
+    box_audio_core_t *core,
+    box_audio_voice_t *v,
+    box_audio_bus_t *b,
+    bool active,
+    int32_t at,
+    int32_t frames)
+{
+    bool stereo;
+    int32_t done = box_audio_source_render(core, &v->source, frames, &stereo), i;
+    const float *sl = core->src_l, *sr = stereo ? core->src_r : core->src_l;
+    for (i = 0; i < frames; i ++) {
+        float gl = box_audio_ramp_next(&v->left);
+        float gr = box_audio_ramp_next(&v->right);
+        if (active) {
+            b->l[at + i] += sl[i] * gl;
+            b->r[at + i] += sr[i] * gr;
+        }
+    }
+
+    return done;
+}
+
 /** Render a block of a voice into its bus, and end it when its source ends or its fade does.
+ * While a ramp of its expression runs, the source renders in pieces of
+ * BOX_AUDIO_EXPRESS_FRAMES and takes the values of the ramps after each.
  *
  * @param core The core
  * @param v The voice
@@ -1606,16 +1696,23 @@ static void box_audio_voice_render(
     box_audio_voice_t *v,
     int32_t frames)
 {
-    bool stereo, active = v->bus < BOX_AUDIO_BUS_MAX && core->bus_active[v->bus];
-    int32_t done = box_audio_source_render(core, &v->source, frames, &stereo), i;
-    const float *sl = core->src_l, *sr = stereo ? core->src_r : core->src_l;
+    bool active = v->bus < BOX_AUDIO_BUS_MAX && core->bus_active[v->bus];
     box_audio_bus_t *b = &core->buses[active ? v->bus : 0];
-    for (i = 0; i < frames; i ++) {
-        float gl = box_audio_ramp_next(&v->left);
-        float gr = box_audio_ramp_next(&v->right);
-        if (active) {
-            b->l[i] += sl[i] * gl;
-            b->r[i] += sr[i] * gr;
+    int32_t done, at, n, k;
+    if (!v->expressive) {
+        done = box_audio_voice_mix(core, v, b, active, 0, frames);
+    } else {
+        for (at = 0, done = 0; at < frames; at += n) {
+            n = frames - at < BOX_AUDIO_EXPRESS_FRAMES ? frames - at : BOX_AUDIO_EXPRESS_FRAMES;
+            k = box_audio_voice_mix(core, v, b, active, at, n);
+            done += k;
+            if (v->expressive) {
+                box_audio_voice_express_next(core, v, n);
+            }
+
+            if (k < n) {
+                break;
+            }
         }
     }
 

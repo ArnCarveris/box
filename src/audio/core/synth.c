@@ -554,6 +554,10 @@ static void box_audio_synth_cutoff(
         octaves += (double)src->keytrack * src->key;
     }
 
+    if (src->pressure != 0) {
+        octaves += (double)src->pressure * (double)BOX_AUDIO_SYNTH_PRESSURE_OCTAVES;
+    }
+
     cut = src->cutoff_base * box_audio_synth_exp2(octaves);
     cut = cut < src->cutoff_top ? cut : src->cutoff_top;
     src->cutoff = cut > BOX_AUDIO_SYNTH_CUTOFF_MIN ? cut : BOX_AUDIO_SYNTH_CUTOFF_MIN;
@@ -780,7 +784,7 @@ static void box_audio_synth_lfo_aim(
         const box_audio_synth_lfo_t *d = &src->lfo_patch[k];
         const box_audio_synth_mod_t *m = &src->lfo[k];
         v = m->value * m->gain;
-        cents[d->layer] += (double)(d->pitch * v);
+        cents[d->layer] += (double)(d->pitch * v) * src->mod;
         width[d->layer] += (double)(d->pulse_width * v);
         semitones[d->layer] += (double)(d->hard_sync * v);
         frames[d->layer] += (double)(d->position * v);
@@ -1469,7 +1473,7 @@ static void box_audio_synth_pass(
             box_audio_synth_env_init(&part->env, &layer->envelope, rate, src->gate);
         }
 
-        lo = (double)layer->frequency * (double)src->pitch;
+        lo = (double)layer->frequency * (double)src->pitch * src->bend;
         lo = lo < top ? (lo > BOX_AUDIO_SYNTH_FREQUENCY_MIN ? lo : BOX_AUDIO_SYNTH_FREQUENCY_MIN) :
             top;
         o->inc = lo / (double)rate;
@@ -1479,7 +1483,7 @@ static void box_audio_synth_pass(
         o->glide = 1;
         n = box_audio_synth_frames(layer->sweep, rate);
         if (layer->frequency_end > 0 && n > 0) {
-            hi = (double)layer->frequency_end * (double)src->pitch;
+            hi = (double)layer->frequency_end * (double)src->pitch * src->bend;
             hi = hi < top ? (hi > BOX_AUDIO_SYNTH_FREQUENCY_MIN ? hi :
                 BOX_AUDIO_SYNTH_FREQUENCY_MIN) : top;
             o->inc_end = hi / (double)rate;
@@ -1513,6 +1517,11 @@ static void box_audio_synth_pass(
     if (src->keytrack != 0) {
         cut *= box_audio_synth_exp2((double)src->keytrack * src->key);
         cut = cut > BOX_AUDIO_SYNTH_CUTOFF_MIN ? cut : BOX_AUDIO_SYNTH_CUTOFF_MIN;
+    }
+
+    if (src->pressure != 0 && src->filter && src->filter != BOX_AUDIO_SYNTH_FORMANT) {
+        cut *= box_audio_synth_exp2((double)src->pressure *
+            (double)BOX_AUDIO_SYNTH_PRESSURE_OCTAVES);
     }
 
     cut = cut < top ? cut : top;
@@ -1626,6 +1635,10 @@ static void box_audio_synth_key_aim(
 {
     if (src->keytrack != 0) {
         src->key_target = box_audio_synth_log2((double)pitch);
+        if (src->bend != 1) {
+            src->key_target += box_audio_synth_log2(src->bend);
+        }
+
         src->key_left = frames > 0 ? frames : 1;
         src->key_step = (src->key_target - src->key) / (double)src->key_left;
         src->key_control = 1;
@@ -1886,6 +1899,9 @@ void box_audio_source_synth(
     }
 
     src->mods = src->lfos > 0 || src->bends || src->drifts;
+    src->bend = 1;
+    src->mod = 1;
+    src->pressure = 0;
     box_audio_synth_pass(core, src);
 }
 
@@ -1958,6 +1974,50 @@ void box_audio_synth_pitch(
     src->pitch = p;
 }
 
+void box_audio_synth_express(
+    box_audio_synth_source_t *src,
+    double bend,
+    float mod,
+    float pressure,
+    float rate)
+{
+    double f = bend / src->bend, d;
+    bool cut = false;
+    int32_t l;
+    if (f != 1) {
+        for (l = 0; l < src->layers; l ++) {
+            box_audio_synth_osc_t *o = &src->part[l]->osc;
+            o->inc = o->inc * f < src->inc_max ? o->inc * f : src->inc_max;
+            o->inc_end = o->inc_end * f < src->inc_max ? o->inc_end * f : src->inc_max;
+        }
+
+        if (src->keytrack != 0) {
+            d = box_audio_synth_log2(f);
+            src->key += d;
+            src->key_target += d;
+            cut = true;
+        }
+
+        if (src->modulated) {
+            box_audio_synth_limits(src);
+        }
+
+        src->bend = bend;
+    }
+
+    src->mod = (double)mod;
+    if (pressure != src->pressure) {
+        src->pressure = pressure;
+        cut = true;
+    }
+
+    if (cut && src->filter && src->filter != BOX_AUDIO_SYNTH_FORMANT && !src->lfo_cutoff &&
+        (src->amount == 0 || src->fenv.segment >= BOX_AUDIO_SYNTH_DONE))
+    {
+        box_audio_synth_cutoff(src, 0.0f, rate);
+    }
+}
+
 /** An envelope of a source.
  *
  * @param src The source
@@ -2022,7 +2082,7 @@ bool box_audio_synth_legato(
             layer->frequency = next->frequency;
             layer->frequency_end = next->frequency_end;
             layer->sweep = next->sweep;
-            hi = (double)next->frequency * (double)p;
+            hi = (double)next->frequency * (double)p * src->bend;
             hi = hi < top ? (hi > BOX_AUDIO_SYNTH_FREQUENCY_MIN ? hi :
                 BOX_AUDIO_SYNTH_FREQUENCY_MIN) : top;
             hi /= (double)rate;

@@ -10,9 +10,9 @@
  * RELEASE once that beat falls in a window, so a tempo change moves the end of a long note; a
  * voice of an audio clip gets its STOP the same way, or on the frame where its sound ends.
  *
- * A stop, a seek and a new output release the notes and stop the voices, and cancel the
- * unstarted ones; a jump starts the passes of audio clips that cover the new beat in their
- * middle. The placements are kept in an index sorted by start, rebuilt on a change.
+ * A stop, a seek and a new output release the notes, stop the voices and cancel the unstarted
+ * ones and the ramps of the expression of notes; a jump starts the passes of audio clips that
+ * cover the new beat in their middle. The placements are in an index sorted by start.
  */
 
 #include "module.h"
@@ -119,10 +119,16 @@ static void box_audio_clip_build(
         qsort(sorted, (size_t)kept, sizeof(box_audio_seq_sort_t), box_audio_seq_compare);
     }
 
+    dst = ecs_vec_first(&clip->notes);
+    for (i = 0; i < ecs_vec_count(&clip->notes); i ++) {
+        box_audio_note_fini(&dst[i]);
+    }
+
     ecs_vec_set_count_t(NULL, &clip->notes, Note, kept);
     dst = ecs_vec_first(&clip->notes);
     for (i = 0; i < kept; i ++) {
         dst[i] = sorted[i].note;
+        box_audio_note_dup(&dst[i]);
     }
 
     ecs_os_free(sorted);
@@ -170,6 +176,12 @@ done:
 static void box_audio_clip_free(
     box_audio_clip_t *clip)
 {
+    Note *notes = ecs_vec_first(&clip->notes);
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&clip->notes); i ++) {
+        box_audio_note_fini(&notes[i]);
+    }
+
     ecs_vec_fini_t(NULL, &clip->notes, Note);
     ecs_os_free(clip);
 }
@@ -346,6 +358,177 @@ static bool box_audio_seq_live(
         ecs_get_parent(world, placement) == track;
 }
 
+/** Remember that a ramp of the expression of a note was sent, up to its frame.
+ *
+ * @param state The state
+ * @param r The ramp
+ * @param when Frame it was sent for
+ */
+static void box_audio_seq_expressed(
+    box_audio_module_t *state,
+    const box_audio_seq_ramp_t *r,
+    uint64_t when)
+{
+    box_audio_sequencer_t *seq = &state->sequencer;
+    box_audio_seq_expressed_t *e = ecs_vec_first(&seq->expressed);
+    int32_t i;
+    for (i = ecs_vec_count(&seq->expressed) - 1; i >= 0; i --) {
+        if (e[i].handle == r->handle && e[i].serial == r->serial) {
+            e[i].last = when > e[i].last ? when : e[i].last;
+            goto done;
+        }
+    }
+
+    e = ecs_vec_append_t(NULL, &seq->expressed, box_audio_seq_expressed_t);
+    *e = (box_audio_seq_expressed_t){ .handle = r->handle, .serial = r->serial, .last = when,
+        .track = r->track, .placement = r->placement };
+
+done:
+    return;
+}
+
+/** Write a VOICE_RAMP of the expression of a note.
+ *
+ * @param state The state
+ * @param handle The voice
+ * @param param The parameter
+ * @param value Value at the end of the ramp
+ * @param frames Frames of the ramp, 0 to jump
+ * @param when Frame it starts at
+ * @return Whether it was written
+ */
+static bool box_audio_seq_ramp(
+    box_audio_module_t *state,
+    uint32_t handle,
+    uint32_t param,
+    float value,
+    uint32_t frames,
+    uint64_t when)
+{
+    bool result = false;
+    if (box_audio_reserve(state)) {
+        box_audio_write_voice_ramp(&state->writer, handle, (box_audio_param_t)param, value,
+            frames, when);
+        state->sequencer.stats.ramps ++;
+        result = true;
+    }
+
+    return result;
+}
+
+/** Write the CANCEL of the ramps of a voice that the core holds for later frames.
+ *
+ * @param state The state
+ * @param handle The voice
+ */
+static void box_audio_seq_ramp_cancel(
+    box_audio_module_t *state,
+    uint32_t handle)
+{
+    if (box_audio_reserve(state)) {
+        box_audio_write_cancel(&state->writer, BOX_AUDIO_CMD_VOICE_RAMP, handle, 0);
+        state->sequencer.stats.ramp_cancels ++;
+    }
+}
+
+/** Drop the ramps of the expression of notes that were not sent yet.
+ *
+ * @param state The state
+ */
+static void box_audio_seq_ramps_drop(
+    box_audio_module_t *state)
+{
+    box_audio_sequencer_t *seq = &state->sequencer;
+    seq->stats.ramps_dropped += ecs_vec_count(&seq->ramps);
+    ecs_vec_clear(&seq->ramps);
+}
+
+/** Forget the ramps of the notes of an old output, drop those of the tracks and placements
+ * that were deleted or disabled and cancel the ones the core holds for them, and forget the
+ * notes whose ramps all applied.
+ *
+ * @param world The world
+ * @param state The state
+ */
+static void box_audio_seq_prune_ramps(
+    ecs_world_t *world,
+    box_audio_module_t *state)
+{
+    box_audio_sequencer_t *seq = &state->sequencer;
+    box_audio_seq_ramp_t *r = ecs_vec_first(&seq->ramps);
+    box_audio_seq_expressed_t *e;
+    ecs_entity_t track = 0, placement = 0;
+    uint64_t clock = state->timeline.clock;
+    int32_t i, kept = 0, count = ecs_vec_count(&seq->ramps);
+    bool live = false;
+    for (i = 0; i < count; i ++) {
+        if (r[i].track != track || r[i].placement != placement) {
+            track = r[i].track;
+            placement = r[i].placement;
+            live = box_audio_seq_live(world, track, placement);
+        }
+
+        if (r[i].serial == state->serial && live) {
+            r[kept ++] = r[i];
+        }
+    }
+
+    seq->stats.ramps_dropped += count - kept;
+    ecs_vec_set_count_t(NULL, &seq->ramps, box_audio_seq_ramp_t, kept);
+
+    e = ecs_vec_first(&seq->expressed);
+    for (i = ecs_vec_count(&seq->expressed) - 1; i >= 0; i --) {
+        bool remove = e[i].serial != state->serial || e[i].last < clock;
+        if (!remove && !box_audio_seq_live(world, e[i].track, e[i].placement)) {
+            box_audio_seq_ramp_cancel(state, e[i].handle);
+            remove = true;
+        }
+
+        if (remove) {
+            ecs_vec_remove_t(&seq->expressed, box_audio_seq_expressed_t, i);
+        }
+    }
+}
+
+/** Send the ramps of the expression of notes that start in a segment, at the frame of their
+ * beat on the piece of the segment, no earlier than the start of their note.
+ *
+ * @param state The state
+ * @param seg The segment
+ */
+static void box_audio_seq_ramps(
+    box_audio_module_t *state,
+    const box_audio_segment_t *seg)
+{
+    box_audio_sequencer_t *seq = &state->sequencer;
+    box_audio_seq_ramp_t *r = ecs_vec_first(&seq->ramps);
+    int32_t i, kept = 0, count = ecs_vec_count(&seq->ramps);
+    double frames;
+    uint64_t when;
+    int64_t f;
+    for (i = 0; i < count; i ++) {
+        if (r[i].beat >= seg->end) {
+            r[kept ++] = r[i];
+            continue;
+        }
+
+        f = box_audio_anchor_frame(&seg->anchor, r[i].beat);
+        when = f > (int64_t)seg->frame ? (uint64_t)f : seg->frame;
+        when = when > r[i].first ? when : r[i].first;
+        frames = round((r[i].end - r[i].beat) * seg->anchor.frames_per_beat);
+        frames = frames > 0 ? (frames < (double)INT32_MAX ? frames : (double)INT32_MAX) : 0.0;
+        if (box_audio_seq_ramp(state, r[i].handle, r[i].param, r[i].value, (uint32_t)frames,
+            when))
+        {
+            box_audio_seq_expressed(state, &r[i], when + (uint64_t)frames);
+        } else {
+            seq->stats.ramps_dropped ++;
+        }
+    }
+
+    ecs_vec_set_count_t(NULL, &seq->ramps, box_audio_seq_ramp_t, kept);
+}
+
 /** Write the RELEASE of a sounding note.
  *
  * @param state The state
@@ -471,6 +654,7 @@ static void box_audio_seq_prune(
     }
 
     box_audio_seq_prune_voices(world, state);
+    box_audio_seq_prune_ramps(world, state);
 }
 
 /** Release every sounding note without a release and stop every voice of an audio clip
@@ -670,6 +854,88 @@ typedef struct box_audio_seq_visit_t {
                              *   covers its start starts in its middle */
 } box_audio_seq_visit_t;
 
+/** Most ramps of one curved span of the expression of a note */
+#define BOX_AUDIO_SEQ_RAMPS_MAX 65536
+
+/** Start the expression of a note that was scheduled: write the values of its curves at the
+ * start of the note, and keep a ramp for each linear span and ramps of at most
+ * BOX_AUDIO_EXPRESS_STEP for each curved span within the note, to send in their windows.
+ *
+ * @param state The state
+ * @param v The visit
+ * @param n The note
+ * @param handle Its voice
+ * @param when Frame of its start
+ * @param at Beat of the timeline at which it starts, with swing and humanize
+ * @param end Beat at which it ends
+ */
+static void box_audio_seq_express(
+    box_audio_module_t *state,
+    const box_audio_seq_visit_t *v,
+    const Note *n,
+    uint32_t handle,
+    uint64_t when,
+    double at,
+    double end)
+{
+    box_audio_sequencer_t *seq = &state->sequencer;
+    const Curve *curves[3] = { &n->bend, &n->mod, &n->pressure };
+    const uint32_t params[3] = {
+        BOX_AUDIO_PARAM_BEND, BOX_AUDIO_PARAM_MOD, BOX_AUDIO_PARAM_PRESSURE };
+    const float defaults[3] = { 0.0f, 1.0f, 0.0f };
+    double length = end - at, step, a, b, t0, t1;
+    box_audio_seq_ramp_t *r;
+    int32_t c, k, p, count, pieces;
+    float value;
+    length = length < (double)n->duration ? length : (double)n->duration;
+    step = BOX_AUDIO_EXPRESS_STEP * (double)state->timeline.rate /
+        v->seg->anchor.frames_per_beat;
+    for (c = 0; c < 3; c ++) {
+        const Curve *curve = curves[c];
+        const CurveKey *keys = ecs_vec_first(&curve->keys);
+        count = ecs_vec_count(&curve->keys);
+        if (!count) {
+            continue;
+        }
+
+        value = box_curve_value(curve, 0.0f, defaults[c]);
+        box_audio_seq_ramp(state, handle, params[c], isfinite(value) ? value : defaults[c], 0,
+            when);
+        for (k = 0; k + 1 < count; k ++) {
+            a = (double)keys[k].time > 0 ? (double)keys[k].time : 0.0;
+            b = (double)keys[k + 1].time < length ? (double)keys[k + 1].time : length;
+            if (!(b > a)) {
+                continue;
+            }
+
+            pieces = 1;
+            if (curve->kind != CurveLinear && step > 0) {
+                t0 = ceil((b - a) / step);
+                pieces = t0 > 1 ? (t0 < BOX_AUDIO_SEQ_RAMPS_MAX ? (int32_t)t0 :
+                    BOX_AUDIO_SEQ_RAMPS_MAX) : 1;
+            }
+
+            for (p = 0; p < pieces; p ++) {
+                t0 = a + (b - a) * (double)p / (double)pieces;
+                t1 = p + 1 < pieces ? a + (b - a) * (double)(p + 1) / (double)pieces : b;
+                value = box_curve_value(curve, (float)t1, defaults[c]);
+                r = ecs_vec_append_t(NULL, &seq->ramps, box_audio_seq_ramp_t);
+                *r = (box_audio_seq_ramp_t){
+                    .handle = handle,
+                    .serial = state->serial,
+                    .param = params[c],
+                    .value = isfinite(value) ? value : defaults[c],
+                    .beat = at + t0,
+                    .end = at + t1,
+                    .first = when,
+                    .track = v->track,
+                    .placement = v->placement
+                };
+            }
+        }
+    }
+}
+
 /** Schedule the notes of one pass of a clip that start in [lo, hi) of a visit.
  *
  * @param world The world
@@ -765,6 +1031,12 @@ static void box_audio_seq_pass(
         seq->stats.notes ++;
         sch = ecs_vec_append_t(NULL, &state->timeline.scheduled, box_audio_scheduled_t);
         *sch = (box_audio_scheduled_t){ .handle = handle, .when = when };
+        if (ecs_vec_count(&n->bend.keys) || ecs_vec_count(&n->mod.keys) ||
+            ecs_vec_count(&n->pressure.keys))
+        {
+            box_audio_seq_express(state, v, n, handle, when, at, end);
+        }
+
         if (v->inst->gate) {
             s = ecs_vec_append_t(NULL, &seq->sounding, box_audio_sounding_t);
             *s = (box_audio_sounding_t){
@@ -1124,7 +1396,9 @@ static void box_audio_sequencer_window(
     box_audio_seq_prune(world, state);
     index = ecs_vec_first(&seq->index);
     n = ecs_vec_count(&seq->index);
-    if (!n && !ecs_vec_count(&seq->sounding) && !ecs_vec_count(&seq->voices)) {
+    if (!n && !ecs_vec_count(&seq->sounding) && !ecs_vec_count(&seq->voices) &&
+        !ecs_vec_count(&seq->ramps))
+    {
         seq->expect = segments[count - 1].end;
         goto done;
     }
@@ -1134,6 +1408,7 @@ static void box_audio_sequencer_window(
         jump = isnan(seq->expect) || fabs(seg->start - seq->expect) > BOX_AUDIO_SEQ_SEAM;
         if (jump && !isnan(seq->expect)) {
             box_audio_seq_release_all(state, seg->frame);
+            box_audio_seq_ramps_drop(state);
         }
 
         for (k = 0; jump && k < n; k ++) {
@@ -1163,6 +1438,7 @@ static void box_audio_sequencer_window(
             }
         }
 
+        box_audio_seq_ramps(state, seg);
         box_audio_seq_releases(state, seg);
         box_audio_seq_stops(state, seg);
         seq->expect = seg->end;
@@ -1172,9 +1448,9 @@ done:
     return;
 }
 
-/** The reset hook of the timeline: on a stop and a seek release the notes that sound and stop
- * the voices of audio clips that play at once; the timeline stopped the ones that have not
- * started. A new output knows none of them.
+/** The reset hook of the timeline: on a stop and a seek release the notes that sound, stop the
+ * voices of audio clips and cancel the ramps the core holds for later; the timeline stopped
+ * what has not started. The ramps not sent are dropped. A new output knows none of them.
  *
  * @param world The world
  * @param state The state
@@ -1190,10 +1466,17 @@ static void box_audio_sequencer_reset(
     box_audio_sequencer_t *seq = &state->sequencer;
     box_audio_sounding_t *s = ecs_vec_first(&seq->sounding);
     box_audio_clip_voice_t *cv = ecs_vec_first(&seq->voices);
+    box_audio_seq_expressed_t *e = ecs_vec_first(&seq->expressed);
     uint64_t clock = state->timeline.clock;
     int32_t i;
     (void)world;
     (void)ctx;
+    for (i = 0; why != BOX_AUDIO_TIMELINE_OUTPUT && i < ecs_vec_count(&seq->expressed); i ++) {
+        if (e[i].serial == state->serial && e[i].last >= clock) {
+            box_audio_seq_ramp_cancel(state, e[i].handle);
+        }
+    }
+
     for (i = 0; why != BOX_AUDIO_TIMELINE_OUTPUT && i < ecs_vec_count(&seq->sounding); i ++) {
         if (s[i].serial == state->serial && s[i].start < clock &&
             (!s[i].release || s[i].release > clock))
@@ -1212,6 +1495,8 @@ static void box_audio_sequencer_reset(
 
     ecs_vec_clear(&seq->sounding);
     ecs_vec_clear(&seq->voices);
+    ecs_vec_clear(&seq->expressed);
+    box_audio_seq_ramps_drop(state);
     seq->expect = NAN;
 }
 
@@ -1271,6 +1556,8 @@ void box_audio_sequencer_init(
     ecs_vec_init_t(NULL, &seq->scans, box_audio_placement_t, 0);
     ecs_vec_init_t(NULL, &seq->sounding, box_audio_sounding_t, 0);
     ecs_vec_init_t(NULL, &seq->voices, box_audio_clip_voice_t, 0);
+    ecs_vec_init_t(NULL, &seq->ramps, box_audio_seq_ramp_t, 0);
+    ecs_vec_init_t(NULL, &seq->expressed, box_audio_seq_expressed_t, 0);
     ecs_map_init(&seq->clips, NULL);
     seq->dirty = true;
     seq->expect = NAN;
@@ -1333,4 +1620,6 @@ void box_audio_sequencer_fini(
     ecs_vec_fini_t(NULL, &seq->scans, box_audio_placement_t);
     ecs_vec_fini_t(NULL, &seq->sounding, box_audio_sounding_t);
     ecs_vec_fini_t(NULL, &seq->voices, box_audio_clip_voice_t);
+    ecs_vec_fini_t(NULL, &seq->ramps, box_audio_seq_ramp_t);
+    ecs_vec_fini_t(NULL, &seq->expressed, box_audio_seq_expressed_t);
 }

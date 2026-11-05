@@ -415,6 +415,7 @@ typedef struct box_audio_sample_source_t {
     double position;   /**< Position in frames of the sound */
     double rate;       /**< Frames of the sound per frame of the core at pitch 1 */
     double step;       /**< Frames of the sound per frame of the core */
+    double bend;       /**< Factor of the pitch from the bend of the voice, 1 without */
     bool loop;         /**< Whether it starts over at its end */
 } box_audio_sample_source_t;
 
@@ -737,6 +738,12 @@ typedef struct box_audio_synth_source_t {
     int32_t ringing_free; /**< Strings of layers without an envelope still over the silence */
     bool tables;          /**< Whether a layer plays a wavetable, whose position moves per
                            * frame */
+    double bend;          /**< Factor of the pitch from the bend of the voice, 1 without; the
+                           * turns of the oscillators and the key carry it */
+    double mod;           /**< Factor of the depth of the pitch of the LFOs from the mod of the
+                           * voice, 1 without */
+    float pressure;       /**< Pressure of the voice, 0..1, 0 without: the cutoff moves up by
+                           * BOX_AUDIO_SYNTH_PRESSURE_OCTAVES times it */
 } box_audio_synth_source_t;
 
 /** State of the kinds of sources */
@@ -771,6 +778,11 @@ typedef struct box_audio_voice_t {
                                * least this priority steals it */
     box_audio_ramp_t left;    /**< Gain of the left channel: volume, pan and fades */
     box_audio_ramp_t right;   /**< Gain of the right channel */
+    box_audio_ramp_t bend;    /**< Pitch bend in semitones, BOX_AUDIO_PARAM_BEND */
+    box_audio_ramp_t mod;     /**< Mod, BOX_AUDIO_PARAM_MOD, 1 without */
+    box_audio_ramp_t pressure; /**< Pressure, BOX_AUDIO_PARAM_PRESSURE */
+    bool expressive;          /**< Whether a ramp of its expression runs, which renders it in
+                               * blocks of BOX_AUDIO_EXPRESS_FRAMES; false renders as before */
     box_audio_source_t source; /**< What it plays */
 } box_audio_voice_t;
 
@@ -838,6 +850,7 @@ typedef union box_audio_timed_cmd_t {
     box_audio_cmd_voice_release_t release; /**< BOX_AUDIO_CMD_RELEASE */
     box_audio_cmd_legato_t legato;  /**< BOX_AUDIO_CMD_LEGATO */
     box_audio_cmd_effect_params_t effect; /**< BOX_AUDIO_CMD_EFFECT_PARAMS */
+    box_audio_cmd_ramp_t ramp;      /**< BOX_AUDIO_CMD_VOICE_RAMP */
 } box_audio_timed_cmd_t;
 
 /** A command that waits in the schedule for its frame */
@@ -1519,6 +1532,24 @@ bool box_audio_synth_legato(
     uint32_t sound,
     float pitch);
 
+/** Set the expression of a synth source: the factor of its pitch from a bend, which moves
+ * its oscillators, strings and key at once from where they stand and so keeps a glide that
+ * runs, the factor of the vibrato of its LFOs from the mod and the pressure that opens its
+ * cutoff.
+ *
+ * @param src The source
+ * @param bend Factor of the pitch, 1 without a bend
+ * @param mod Factor of the pitch depth of the LFOs, 1 without
+ * @param pressure Pressure, 0..1
+ * @param rate Frames per second
+ */
+void box_audio_synth_express(
+    box_audio_synth_source_t *src,
+    double bend,
+    float mod,
+    float pressure,
+    float rate);
+
 /** Set the pitch ratio of a source, for kinds that have one.
  *
  * @param source The source
@@ -1527,6 +1558,61 @@ bool box_audio_synth_legato(
 void box_audio_source_pitch(
     box_audio_source_t *source,
     float pitch);
+
+/** Reset the expression of a voice to its defaults: no bend, mod 1, no pressure.
+ *
+ * @param core The core
+ * @param v The voice
+ * @param apply Whether the source takes it, for a voice whose expression may have moved
+ */
+void box_audio_voice_express_reset(
+    box_audio_core_t *core,
+    box_audio_voice_t *v,
+    bool apply);
+
+/** Advance the ramps of the expression of a voice by a number of frames and give their
+ * values to its source; once none runs the voice renders in one piece again.
+ *
+ * @param core The core
+ * @param v The voice
+ * @param frames The frames
+ */
+void box_audio_voice_express_next(
+    box_audio_core_t *core,
+    box_audio_voice_t *v,
+    int32_t frames);
+
+/** Move a parameter of the expression of a voice to a value over a number of frames, from
+ * where its ramp stands. A ramp of 0 frames jumps, and the source takes it at once.
+ *
+ * @param core The core
+ * @param v The voice
+ * @param param BOX_AUDIO_PARAM_BEND, BOX_AUDIO_PARAM_MOD or BOX_AUDIO_PARAM_PRESSURE
+ * @param value The value, clamped
+ * @param frames Frames of the ramp
+ */
+void box_audio_voice_ramp(
+    box_audio_core_t *core,
+    box_audio_voice_t *v,
+    uint32_t param,
+    float value,
+    uint32_t frames);
+
+/** Set the expression of a source, for kinds that have one: the factor of the pitch from a
+ * bend of a sample or a synth source, and the mod and the pressure of a synth source.
+ *
+ * @param core The core
+ * @param source The source
+ * @param bend Factor of the pitch, 1 without a bend
+ * @param mod Mod, 0..1, 1 without
+ * @param pressure Pressure, 0..1
+ */
+void box_audio_source_express(
+    box_audio_core_t *core,
+    box_audio_source_t *source,
+    double bend,
+    float mod,
+    float pressure);
 
 /** Move the read position of a source, for kinds that have one. A looping sound wraps the
  * position, one that does not loop clamps it to its end; a NaN or a negative position is 0.

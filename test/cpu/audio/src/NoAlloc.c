@@ -1057,3 +1057,75 @@ void NoAlloc_synth_wavetable(void) {
     test_int(noalloc_frees, 1);
     ecs_os_free(table);
 }
+
+/* The expression of voices without a call of the allocator: ramps of the bend, the mod and the
+ * pressure of synth voices on the mono path and on the stereo path of unison, of a pluck string
+ * and of a sample voice, scheduled ramps, ramps at the frame of their play, a cancel and a
+ * legato note that resets them. */
+void NoAlloc_expression(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_synth_patch_t p = {0}, q = {0};
+    static uint8_t bytes[64 * 1024];
+    box_audio_writer_t w;
+    uint32_t i;
+    p.layers = 2;
+    p.seed = 5;
+    p.envelope = (box_audio_synth_envelope_t){ .sustain = 1, .hold = 1, .release = 0.05f };
+    p.filter = BOX_AUDIO_SYNTH_LOWPASS;
+    p.cutoff = 400;
+    p.keytrack = 1;
+    p.glide = 0.05f;
+    p.layer[0] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_SAW, .frequency = 110,
+        .level = 0.3f, .voices = 3, .detune = 20, .width = 0.5f };
+    p.layer[1] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_SINE, .frequency = 220,
+        .level = 0.3f, .modulates = 1, .index = 1 };
+    p.lfos = 1;
+    p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 5,
+        .pitch = 30, .cutoff = 0.5f };
+    q.layers = 1;
+    q.seed = 3;
+    q.layer[0] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_PLUCK, .frequency = 220,
+        .level = 0.5f, .decay = 2, .brightness = 0.5f, .hardness = 0.5f, .rings_free = 1 };
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_synth(&w, 1, &p));
+    box_audio_core_apply(core, w.data, w.size);
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_synth(&w, 2, &q));
+    box_audio_core_apply(core, w.data, w.size);
+    audio_sine(audio_sound_a, 4800, 1000, 0.5f);
+    test_assert(box_audio_core_sound(core, 3, audio_sound_a, 4800, 1, AUDIO_RATE));
+
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    for (i = 0; i < 12; i ++) {
+        uint64_t at = 1 + (uint64_t)i * 1000;
+        uint32_t sound = 1 + i % 3;
+        test_assert(box_audio_write_voice_ramp(&w, 1 + i, BOX_AUDIO_PARAM_BEND, -3, 0, at));
+        test_assert(box_audio_write_play(&w, 1 + i, sound, 0, 0.1f, 0, 1,
+            sound == 3 ? BOX_AUDIO_PLAY_LOOP : BOX_AUDIO_PLAY_GATE, at));
+        test_assert(box_audio_write_voice_ramp(&w, 1 + i, BOX_AUDIO_PARAM_BEND, 12, 4000,
+            at + 100));
+        test_assert(box_audio_write_voice_ramp(&w, 1 + i, BOX_AUDIO_PARAM_MOD, 0, 2000,
+            at + 200));
+        test_assert(box_audio_write_voice_ramp(&w, 1 + i, BOX_AUDIO_PARAM_PRESSURE, 1, 3000,
+            at + 300));
+        test_assert(box_audio_write_voice_set(&w, 1 + i, BOX_AUDIO_PARAM_PITCH, 1.5f,
+            at + 2500));
+    }
+
+    test_assert(box_audio_write_voice_ramp(&w, 4, BOX_AUDIO_PARAM_BEND, 48, 100, 20000));
+    test_assert(box_audio_write_cancel(&w, BOX_AUDIO_CMD_VOICE_RAMP, 4, 0));
+    box_audio_core_apply(core, w.data, w.size);
+    audio_render(core, 0, AUDIO_FRAMES / 2);
+
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_legato_note(&w, 100, 1, 1, 0, 0.1f, 0, 1.2f, 1, 0, 0,
+        BOX_AUDIO_PLAY_GATE, 0, 0));
+    test_assert(box_audio_write_voice_ramp(&w, 100, BOX_AUDIO_PARAM_BEND, 5, 4800, 0));
+    box_audio_core_apply(core, w.data, w.size);
+    audio_render(core, AUDIO_FRAMES / 2, AUDIO_FRAMES / 2);
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+}

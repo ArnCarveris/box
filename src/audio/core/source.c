@@ -19,6 +19,7 @@ void box_audio_source_sample(
     source->data.sample.position = 0;
     source->data.sample.rate = s->rate;
     source->data.sample.step = s->rate * (double)pitch;
+    source->data.sample.bend = 1;
     source->data.sample.loop = loop;
     s->users ++;
 }
@@ -29,8 +30,27 @@ void box_audio_source_pitch(
 {
     if (source->kind == BOX_AUDIO_SOURCE_SAMPLE) {
         source->data.sample.step = source->data.sample.rate * (double)pitch;
+        if (source->data.sample.bend != 1) {
+            source->data.sample.step *= source->data.sample.bend;
+        }
     } else if (source->kind == BOX_AUDIO_SOURCE_SYNTH) {
         box_audio_synth_pitch(&source->data.synth, pitch);
+    }
+}
+
+void box_audio_source_express(
+    box_audio_core_t *core,
+    box_audio_source_t *source,
+    double bend,
+    float mod,
+    float pressure)
+{
+    box_audio_sample_source_t *s = &source->data.sample;
+    if (source->kind == BOX_AUDIO_SOURCE_SAMPLE && bend != s->bend) {
+        s->step = s->step / s->bend * bend;
+        s->bend = bend;
+    } else if (source->kind == BOX_AUDIO_SOURCE_SYNTH) {
+        box_audio_synth_express(&source->data.synth, bend, mod, pressure, core->sample_rate);
     }
 }
 

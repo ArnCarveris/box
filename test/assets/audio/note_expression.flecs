@@ -1,0 +1,22 @@
+// The sounds and the clip of the NoteExpression suite of test/cpu/audio: a sine that holds
+// while its note does, its instrument at A3 so note 57 plays 220 Hz, and a clip whose notes
+// bend, swell their vibrato and press.
+using box.audio
+
+expr_sine {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.005, sustain: 1, hold: 4, release: 0.02}
+  SynthOscillator: {wave: SynthSine, frequency: 220, level: 0.5}
+}
+
+expr_sine_inst { Instrument: {sound: expr_sine, root: 57} }
+
+expr_clip {
+  NoteClip: {length: 4, notes: [
+    {start: 0, duration: 2, pitch: 57, velocity: 1, bend: {keys: [{0, 0}, {2, 12}]}},
+    {start: 2, duration: 1, pitch: 57, velocity: 0.5,
+      mod: {kind: CurveCatmullRom, keys: [{0, 0}, {0.5, 1}, {1, 0}]},
+      pressure: {keys: [{0, 0.5}]}},
+    {start: 3, duration: 1, pitch: 60}
+  ]}
+}
