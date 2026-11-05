@@ -330,6 +330,12 @@ static int box_gpu_create(
         goto done;
     }
 
+    WGPUAdapterInfo info = WGPU_ADAPTER_INFO_INIT;
+    if (wgpuAdapterGetInfo(gpu->adapter, &info) == WGPUStatus_Success) {
+        ecs_trace("using gpu adapter '%.*s'", (int)info.device.length, info.device.data);
+        wgpuAdapterInfoFreeMembers(info);
+    }
+
     box_gpu_device_init(gpu);
     if (gpu->device) {
         result = 0;
@@ -629,13 +635,49 @@ static void box_gpu_pipeline_count(
     ecs_os_mutex_unlock(gpu->lock);
 }
 
+/** Log the creation of a pipeline with its shader, entry points and duration.
+ *
+ * @param gpu The backend
+ * @param kind Kind of pipeline
+ * @param module Module of the first stage
+ * @param first Entry point of the first stage
+ * @param second Entry point of the fragment stage, NULL when there is none
+ * @param seconds Time the creation took
+ */
+static void box_gpu_pipeline_log(
+    box_gpu_t *gpu,
+    const char *kind,
+    WGPUShaderModule module,
+    WGPUStringView first,
+    const WGPUStringView *second,
+    double seconds)
+{
+    const char *label = box_gpu_shader_label(gpu, module);
+    int first_len = first.length == WGPU_STRLEN ? (int)strlen(first.data) : (int)first.length;
+    int second_len = 0;
+    const char *second_data = "";
+    if (second && second->data) {
+        second_data = second->data;
+        second_len = second->length == WGPU_STRLEN ?
+            (int)strlen(second->data) : (int)second->length;
+    }
+
+    ecs_trace("created %s pipeline '%s' (%.*s%s%.*s) in %.2f ms", kind,
+        label ? label : "unknown", first_len, first.data ? first.data : "",
+        second_len ? ", " : "", second_len, second_data, seconds * 1000.0);
+}
+
 WGPURenderPipeline box_gpu_render_pipeline(
     box_gpu_t *gpu,
     const WGPURenderPipelineDescriptor *desc)
 {
+    ecs_time_t start = {0};
+    ecs_time_measure(&start);
     box_gpu_pipeline_count(gpu, true);
     WGPURenderPipeline result = wgpuDeviceCreateRenderPipeline(gpu->device, desc);
     box_gpu_pipeline_count(gpu, false);
+    box_gpu_pipeline_log(gpu, "render", desc->vertex.module, desc->vertex.entryPoint,
+        desc->fragment ? &desc->fragment->entryPoint : NULL, ecs_time_measure(&start));
 
     return result;
 }
@@ -644,9 +686,13 @@ WGPUComputePipeline box_gpu_compute_pipeline(
     box_gpu_t *gpu,
     const WGPUComputePipelineDescriptor *desc)
 {
+    ecs_time_t start = {0};
+    ecs_time_measure(&start);
     box_gpu_pipeline_count(gpu, true);
     WGPUComputePipeline result = wgpuDeviceCreateComputePipeline(gpu->device, desc);
     box_gpu_pipeline_count(gpu, false);
+    box_gpu_pipeline_log(gpu, "compute", desc->compute.module, desc->compute.entryPoint, NULL,
+        ecs_time_measure(&start));
 
     return result;
 }

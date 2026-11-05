@@ -884,6 +884,8 @@ typedef struct box_gpu_t {
     ecs_vec_t copy_modes;           /**< box_gpu_copy_mode_t by copy, scratch of box_gpu_copy */
     ecs_map_t targets;              /**< Handle to box_gpu_target_t */
     ecs_map_t shaders;              /**< Handle to box_gpu_shader_t */
+    WGPUShaderModule checking;      /**< Module the forward check builds pipelines with */
+    const char *checking_label;     /**< Label of the module the forward check builds with */
     ecs_vec_t results;              /**< box_render_shader_result_t not yet taken */
     ecs_os_mutex_t lock;            /**< Protects the counters and the results */
     box_render_compile_delivery_t delivery; /**< When compile outcomes apply, under the lock */

@@ -138,6 +138,16 @@ WGPUShaderModule box_gpu_shader_get(
     box_gpu_t *gpu,
     uint32_t handle);
 
+/** Get the label of a shader module.
+ *
+ * @param gpu The backend
+ * @param module The module
+ * @return The label, NULL when the module is not the module of a shader
+ */
+const char* box_gpu_shader_label(
+    box_gpu_t *gpu,
+    WGPUShaderModule module);
+
 /** Finish the compiles whose outcome box_render_gpu_compile_delivery held.
  *
  * @param gpu The backend
