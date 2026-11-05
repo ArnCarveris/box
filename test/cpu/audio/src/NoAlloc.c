@@ -107,6 +107,8 @@ void NoAlloc_synth_voices(void) {
     p.layers = 3;
     p.seed = 5;
     p.pitch_variance = 0.1f;
+    p.drift = 15;
+    p.free_phase = 1;
     p.envelope = (box_audio_synth_envelope_t){
         .attack = 0.01f, .decay = 0.05f, .sustain = 0.5f, .hold = 0.1f, .release = 0.05f,
         .curve = 4, .attack_curve = 1 };
@@ -726,6 +728,86 @@ void NoAlloc_saturator(void) {
     for (i = 0; i < 3; i ++) {
         test_assert(!box_audio_core_effect_running(core, i));
     }
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+}
+
+/* Transient shapers in the insert slots of buses: changes of the attack and the sustain while
+ * they run, moves to another bus and slot, envelopes that fall to silence and start again, and
+ * a removal, without a call of the allocator. */
+void NoAlloc_transient_shaper(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_route_t routes[] = { AUDIO_OUT(1, 0), AUDIO_OUT(2, 0), AUDIO_MASTER };
+    float params[BOX_AUDIO_EFFECT_PARAMS] = {0};
+    uint8_t bytes[1024];
+    box_audio_writer_t w;
+    uint32_t i, k;
+    test_int(box_audio_effect_floats(BOX_AUDIO_EFFECT_TRANSIENT_SHAPER, AUDIO_RATE), 0);
+    audio_order(core, routes, 3);
+    for (i = 0; i < AUDIO_FRAMES / 4; i ++) {
+        double t = (double)(i % (AUDIO_FRAMES / 16)) / AUDIO_RATE;
+        audio_sound_a[i] = (float)(0.5 * exp(-t / 0.03) * sin(2 * AUDIO_PI * 180 * t));
+    }
+
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_FRAMES / 4, 1, AUDIO_RATE));
+    audio_play(core, 1, 1, 1, 0.8f, 0, 1, BOX_AUDIO_PLAY_LOOP);
+    audio_play(core, 2, 1, 2, 0.5f, 0, 1.5f, BOX_AUDIO_PLAY_LOOP);
+    for (k = 0; k < 12; k ++) {
+        box_audio_writer_init(&w, bytes, sizeof(bytes));
+        for (i = 0; i < 3; i ++) {
+            params[0] = -1 + 0.2f * (float)((k + i) % 11);
+            params[1] = 1 - 0.5f * (float)((k + 2 * i) % 5);
+            test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_TRANSIENT_SHAPER,
+                1 + (i + k / 4) % 2, (i + k) % BOX_AUDIO_EFFECT_SLOTS, BOX_AUDIO_BUS_NONE,
+                params));
+        }
+
+        box_audio_core_apply(core, w.data, w.size);
+        audio_render(core, 0, k % 3 ? AUDIO_FRAMES / 40 : AUDIO_FRAMES / 4);
+        audio_events(core, 0, NULL);
+    }
+
+    // A shaper that arrived in its new slot during the last block runs from the next one
+    audio_render(core, 0, AUDIO_FRAMES / 40);
+    for (i = 0; i < 3; i ++) {
+        test_assert(box_audio_core_effect_running(core, i));
+    }
+
+    // The voices stop and the envelopes fall to silence, then a voice starts them again
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_stop(&w, 1, 0));
+    test_assert(box_audio_write_stop(&w, 2, 0));
+    box_audio_core_apply(core, w.data, w.size);
+    for (k = 0; k < 4; k ++) {
+        audio_render(core, 0, AUDIO_FRAMES);
+    }
+
+    for (i = 0; i < 3; i ++) {
+        test_assert(!box_audio_core_effect_running(core, i));
+    }
+
+    audio_play(core, 3, 1, 1, 0.5f, 0, 1, 0);
+    audio_play(core, 4, 1, 2, 0.5f, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES / 8);
+    for (i = 0; i < 3; i ++) {
+        test_assert(box_audio_core_effect_running(core, i));
+    }
+
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    for (i = 0; i < 3; i ++) {
+        test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_NONE, BOX_AUDIO_BUS_NONE,
+            0, BOX_AUDIO_BUS_NONE, NULL));
+    }
+
+    box_audio_core_apply(core, w.data, w.size);
+    audio_render(core, 0, AUDIO_FRAMES);
+    for (i = 0; i < 3; i ++) {
+        test_assert(!box_audio_core_effect_running(core, i));
+    }
+
     test_int(noalloc_allocs, 1);
     test_int(noalloc_frees, 0);
     box_audio_core_free(core);

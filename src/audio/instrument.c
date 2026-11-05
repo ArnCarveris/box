@@ -78,6 +78,55 @@ static float box_audio_note_gain(
     return v > 0 ? powf(v, curve) : 0.0f;
 }
 
+/** Semitones from the root at which the pitch spread is full */
+#define BOX_AUDIO_SPREAD_RANGE 24.0f
+
+/** The pan offset of the spread of a note, and the count of the notes of the instrument one
+ * on.
+ *
+ * @param state The state of the module
+ * @param instrument The entity with Instrument
+ * @param inst Its Instrument
+ * @param pitch MIDI note number
+ * @return The offset, -1..1
+ */
+static float box_audio_note_spread(
+    box_audio_module_t *state,
+    ecs_entity_t instrument,
+    const Instrument *inst,
+    float pitch)
+{
+    float spread = inst->spread > 0 ? (inst->spread < 1 ? inst->spread : 1.0f) : 0.0f;
+    float result = 0, x;
+    uint64_t *count = ecs_map_ensure(&state->spread_notes, instrument), n = *count, h;
+    (*count) ++;
+    if (spread <= 0) {
+        goto done;
+    }
+
+    switch (inst->spread_mode) {
+    case InstrumentSpreadRandom:
+        h = (uint64_t)instrument * 0x9E3779B97F4A7C15ull + n + 1;
+        h = (h ^ (h >> 30)) * 0xBF58476D1CE4E5B9ull;
+        h = (h ^ (h >> 27)) * 0x94D049BB133111EBull;
+        h ^= h >> 31;
+        x = (float)((double)(h >> 11) / 9007199254740992.0 * 2.0 - 1.0);
+        break;
+    case InstrumentSpreadAlternate:
+        x = n & 1 ? -1.0f : 1.0f;
+        break;
+    case InstrumentSpreadPitch:
+    default:
+        x = (pitch - inst->root) / BOX_AUDIO_SPREAD_RANGE;
+        x = x > -1 ? (x < 1 ? x : 1.0f) : (x <= -1 ? -1.0f : 0.0f);
+        break;
+    }
+
+    result = spread * x;
+done:
+    return result;
+}
+
 uint32_t box_audio_instrument_voice(
     ecs_world_t *world,
     box_audio_module_t *state,
@@ -97,7 +146,7 @@ uint32_t box_audio_instrument_voice(
         ecs_get(world, instrument, Instrument) : NULL;
     box_audio_oneshot_t *shots, *shot, next;
     uint32_t sound = 0, flags, result = 0, held;
-    float ratio, gain, v;
+    float ratio, gain, v, spread;
     int32_t k = -1, channel = 0;
     bool synth, legato;
     if (inst) {
@@ -113,6 +162,9 @@ uint32_t box_audio_instrument_voice(
         BOX_AUDIO_VOLUME_MAX) : 0.0f;
     gain = box_audio_note_gain(inst, velocity) * gain_scale;
     v = velocity > 0 ? (velocity < 1 ? velocity : 1.0f) : 0.0f;
+    spread = box_audio_note_spread(state, instrument, inst, pitch);
+    pan = spread != 0 ? pan + spread : pan;
+
     pan = pan > -1 ? (pan < 1 ? pan : 1.0f) : (pan <= -1 ? -1.0f : 0.0f);
     synth = ecs_has(world, inst->sound, SynthSound);
     flags = synth ? (inst->gate ? BOX_AUDIO_PLAY_GATE : 0) : BOX_AUDIO_PLAY_ATTACK;
@@ -248,4 +300,38 @@ bool box_audio_play_note(
     result = true;
 done:
     return result;
+}
+
+/** Drop the spread note count of the instruments that lose their Instrument.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxAudioInstrumentRemove(
+    ecs_iter_t *it)
+{
+    box_audio_module_t *state = it->ctx;
+    int32_t i;
+    if (ecs_is_fini(it->world)) {
+        goto done;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        ecs_map_remove(&state->spread_notes, it->entities[i]);
+    }
+done:
+    return;
+}
+
+void box_audio_instrument_init(
+    ecs_world_t *world,
+    box_audio_module_t *state)
+{
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "InstrumentRemove" }),
+        .query.terms = {{ .id = ecs_id(Instrument), .src.id = EcsSelf }},
+        .query.flags = EcsQueryMatchDisabled,
+        .events = { EcsOnRemove },
+        .callback = BoxAudioInstrumentRemove,
+        .ctx = state
+    });
 }

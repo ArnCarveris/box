@@ -79,6 +79,21 @@ static float box_audio_synth_depth_clamp(
     return v == v ? box_audio_synth_clamp(v, -max, max) : 0.0f;
 }
 
+/** Clamp the amounts, the decay and the curve of a pitch envelope.
+ *
+ * @param e The pitch envelope
+ */
+static void box_audio_synth_pitch_envelope_clamp(
+    box_audio_synth_pitch_envelope_t *e)
+{
+    e->amount = box_audio_synth_depth_clamp(e->amount, BOX_AUDIO_SYNTH_PITCH_SEMITONES);
+    e->decay = box_audio_synth_clamp(e->decay, 0, BOX_AUDIO_SYNTH_LENGTH_MAX);
+    e->curve = box_audio_synth_curve_clamp(e->curve);
+    e->release_amount = box_audio_synth_depth_clamp(e->release_amount,
+        BOX_AUDIO_SYNTH_PITCH_SEMITONES);
+    e->sync = box_audio_synth_depth_clamp(e->sync, BOX_AUDIO_SYNTH_PITCH_SEMITONES);
+}
+
 /** Clamp a pulse width; NaN and widths that are not positive are the default.
  *
  * @param v The width
@@ -119,6 +134,8 @@ static void box_audio_synth_patch_clamp(
 
     p->pitch_variance = box_audio_synth_clamp(p->pitch_variance, 0, 1);
     p->level_variance = box_audio_synth_clamp(p->level_variance, 0, 1);
+    p->drift = box_audio_synth_clamp(p->drift, 0, BOX_AUDIO_SYNTH_DRIFT_MAX);
+    p->free_phase = p->free_phase != 0;
     p->glide = box_audio_synth_clamp(p->glide, 0, BOX_AUDIO_SYNTH_GLIDE_MAX);
     box_audio_synth_envelope_clamp(&p->envelope);
     if (p->filter > BOX_AUDIO_SYNTH_NOTCH) {
@@ -136,6 +153,10 @@ static void box_audio_synth_patch_clamp(
         p->slope = BOX_AUDIO_SYNTH_SLOPE_12;
     }
 
+    if (p->model > BOX_AUDIO_SYNTH_LADDER) {
+        p->model = BOX_AUDIO_SYNTH_SVF;
+    }
+
     p->filter_amount = p->filter_amount == p->filter_amount ? box_audio_synth_clamp(
         p->filter_amount, -BOX_AUDIO_SYNTH_OCTAVES_MAX, BOX_AUDIO_SYNTH_OCTAVES_MAX) : 0.0f;
     box_audio_synth_envelope_clamp(&p->filter_envelope);
@@ -144,6 +165,7 @@ static void box_audio_synth_patch_clamp(
         BOX_AUDIO_SYNTH_OCTAVES_MAX);
     p->filter_envelope_velocity = box_audio_synth_clamp(p->filter_envelope_velocity, 0, 1);
     p->keytrack = box_audio_synth_clamp(p->keytrack, 0, 1);
+    box_audio_synth_pitch_envelope_clamp(&p->pitch_envelope);
     for (i = p->layers; i < BOX_AUDIO_SYNTH_LAYERS; i ++) {
         p->layer[i] = (box_audio_synth_layer_t){0};
     }
@@ -188,6 +210,8 @@ static void box_audio_synth_patch_clamp(
         l->sub_octave = l->sub_octave >= 2 ? 2 : 1;
         l->sync = l->wave == BOX_AUDIO_SYNTH_NOISE || l->wave == BOX_AUDIO_SYNTH_PLUCK ? 1.0f :
             box_audio_synth_clamp(l->sync, 1, BOX_AUDIO_SYNTH_SYNC_MAX);
+        l->has_pitch_envelope = l->has_pitch_envelope != 0;
+        box_audio_synth_pitch_envelope_clamp(&l->pitch_envelope);
         l->color = l->wave == BOX_AUDIO_SYNTH_NOISE && l->color <= BOX_AUDIO_SYNTH_BROWN ?
             l->color : BOX_AUDIO_SYNTH_WHITE;
         table = l->wave == BOX_AUDIO_SYNTH_WAVETABLE;

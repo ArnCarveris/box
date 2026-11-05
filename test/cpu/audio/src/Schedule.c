@@ -457,3 +457,56 @@ void Schedule_status_clock(void) {
     test_assert(status->clock > 0);
     ecs_fini(world);
 }
+
+/** A CANCEL drops the scheduled sets of one parameter of a bus and nothing else: the volume
+ * set at frame m never applies, the pan set at frame n does. */
+void Schedule_cancel_bus_set(void) {
+    // audio/schedule
+    box_audio_core_t *core = schedule_core();
+    box_audio_writer_t w;
+    int32_t n = 1500, m = 3333;
+    schedule_play(core, 1, 1, 1, BOX_AUDIO_PLAY_LOOP, 0);
+    box_audio_writer_init(&w, schedule_bytes, sizeof(schedule_bytes));
+    test_assert(box_audio_write_bus_set(&w, 0, BOX_AUDIO_PARAM_VOLUME, 0, (uint64_t)m));
+    test_assert(box_audio_write_bus_set(&w, 0, BOX_AUDIO_PARAM_PAN, -1, (uint64_t)n));
+    test_assert(box_audio_write_cancel(&w, BOX_AUDIO_CMD_BUS_SET, 0, BOX_AUDIO_PARAM_VOLUME));
+    box_audio_core_apply(core, w.data, w.size);
+    test_int(box_audio_core_scheduled(core), 1);
+    schedule_render(core, audio_l, audio_r, 5000, 128);
+    test_assert(audio_r[n - 1] == 0.5f);
+    test_flt(audio_r[n + AUDIO_RAMP], 0);
+    test_assert(audio_l[m + AUDIO_RAMP] > 0.6f);
+    box_audio_core_free(core);
+}
+
+/** An EFFECT_PARAMS at a frame changes the parameters of the effect in its slot on exactly
+ * that frame, and one of another kind than the slot holds is ignored: a highpass at 5 kHz with
+ * a mix of 0 passes the level of the sound until the mix of 1 at frame m takes it out. */
+void Schedule_effect_params_at_frame(void) {
+    // audio/schedule
+    box_audio_core_t *core = schedule_core();
+    box_audio_route_t routes[] = { AUDIO_OUT(1, 0), AUDIO_MASTER };
+    float params[BOX_AUDIO_EFFECT_PARAMS] = {0};
+    box_audio_writer_t w;
+    int32_t m = 3000;
+    params[0] = 2.0f;
+    params[1] = 5000.0f;
+    params[4] = 0.0f;
+    box_audio_writer_init(&w, schedule_bytes, sizeof(schedule_bytes));
+    test_assert(box_audio_write_order(&w, routes, 2));
+    test_assert(box_audio_write_effect(&w, 0, BOX_AUDIO_EFFECT_FILTER, 1, 0,
+        BOX_AUDIO_BUS_NONE, params));
+    test_assert(box_audio_write_play(&w, 1, 1, 1, 1, 0, 1, BOX_AUDIO_PLAY_LOOP, 0));
+    params[4] = 1.0f;
+    test_assert(box_audio_write_effect_params(&w, 0, BOX_AUDIO_EFFECT_REVERB, params, 100));
+    test_assert(box_audio_write_effect_params(&w, 0, BOX_AUDIO_EFFECT_FILTER, params,
+        (uint64_t)m));
+    box_audio_core_apply(core, w.data, w.size);
+    test_int(box_audio_core_scheduled(core), 2);
+    schedule_render(core, audio_l, audio_r, 8000, 128);
+    test_int(box_audio_core_scheduled(core), 0);
+    test_flt(audio_l[m - 1], 0.5f);
+    test_assert(audio_l[m + 4] < 0.5f);
+    test_assert(fabsf(audio_l[7999]) < 0.01f);
+    box_audio_core_free(core);
+}

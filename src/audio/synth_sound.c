@@ -63,13 +63,21 @@ void box_audio_synth_init(
     ecs_entity_t ids[] = {
         ecs_id(SynthSound), ecs_id(SynthOscillator), ecs_id(SynthEnvelope), ecs_id(SynthFilter),
         ecs_id(SynthFilterEnvelope), ecs_id(SynthGlide), ecs_id(SynthUnison),
+<<<<<<< HEAD
         ecs_id(SynthString), ecs_id(SynthLfo), ecs_id(SynthDrive), ecs_id(SynthTable)
+=======
+        ecs_id(SynthString), ecs_id(SynthLfo), ecs_id(SynthPitchEnvelope), ecs_id(SynthDrive)
+>>>>>>> 4fef54b0995552551c5771b535d73f41b5fd74e9
     };
     const char *names[] = {
         "AudioSynthSoundDirty", "AudioSynthOscillatorDirty", "AudioSynthEnvelopeDirty",
         "AudioSynthFilterDirty", "AudioSynthFilterEnvelopeDirty", "AudioSynthGlideDirty",
         "AudioSynthUnisonDirty", "AudioSynthStringDirty", "AudioSynthLfoDirty",
+<<<<<<< HEAD
         "AudioSynthDriveDirty", "AudioSynthTableDirty"
+=======
+        "AudioSynthPitchEnvelopeDirty", "AudioSynthDriveDirty"
+>>>>>>> 4fef54b0995552551c5771b535d73f41b5fd74e9
     };
     int32_t i;
     for (i = 0; i < 11; i ++) {
@@ -97,6 +105,19 @@ static box_audio_synth_envelope_t box_audio_synth_envelope(
         .attack_curve = env->attack_curve, .key_scale = env->key_scale };
 }
 
+/** Copy a pitch envelope of the components into a patch.
+ *
+ * @param env The component
+ * @return The pitch envelope of the patch
+ */
+static box_audio_synth_pitch_envelope_t box_audio_synth_pitch_envelope(
+    const SynthPitchEnvelope *env)
+{
+    return (box_audio_synth_pitch_envelope_t){
+        .amount = env->amount, .decay = env->decay, .curve = env->curve,
+        .release_amount = env->release_amount, .sync = env->sync };
+}
+
 /** Check whether an envelope fits in a pass of the core; NaN, infinite and negative times do
  * not.
  *
@@ -117,6 +138,7 @@ static bool box_audio_synth_envelope_fits(
  * @param p The patch
  * @param osc The oscillator
  * @param env Its own envelope, NULL for the one of the root
+ * @param bend Its own pitch envelope, NULL for the one of the root
  * @param unison Its unison, NULL for one voice
  * @param string Its string, NULL for the defaults; used by SynthPluck only
  * @param table Its table, NULL for none; used by SynthWavetable only
@@ -127,6 +149,7 @@ static void box_audio_synth_layer(
     box_audio_synth_patch_t *p,
     const SynthOscillator *osc,
     const SynthEnvelope *env,
+    const SynthPitchEnvelope *bend,
     const SynthUnison *unison,
     const SynthString *string,
     const SynthTable *table,
@@ -143,6 +166,11 @@ static void box_audio_synth_layer(
     l->has_envelope = env != NULL;
     if (env) {
         l->envelope = box_audio_synth_envelope(env);
+    }
+
+    l->has_pitch_envelope = bend != NULL;
+    if (bend) {
+        l->pitch_envelope = box_audio_synth_pitch_envelope(bend);
     }
 
     if (osc->modulation != SynthMix) {
@@ -274,6 +302,7 @@ static void box_audio_synth_children(
                 (*orphans) ++;
             } else if (p->layers < BOX_AUDIO_SYNTH_LAYERS) {
                 box_audio_synth_layer(p, osc, ecs_get(world, child, SynthEnvelope),
+                    ecs_get(world, child, SynthPitchEnvelope),
                     ecs_get(world, child, SynthUnison), ecs_get(world, child, SynthString),
                     ecs_get(world, child, SynthTable), tables, carrier);
                 box_audio_synth_lfo(p, ecs_get(world, child, SynthLfo), p->layers, lfos);
@@ -331,6 +360,7 @@ bool box_audio_synth_compile(
     const SynthFilterEnvelope *fenv = ecs_get(world, e, SynthFilterEnvelope);
     const SynthOscillator *osc = ecs_get(world, e, SynthOscillator);
     const SynthGlide *glide = ecs_get(world, e, SynthGlide);
+    const SynthPitchEnvelope *bend = ecs_get(world, e, SynthPitchEnvelope);
     const SynthDrive *drive = ecs_get(world, e, SynthDrive);
     int32_t extra = 0, orphans = 0, low = 0, lfos = 0, i;
     ecs_iter_t it;
@@ -339,10 +369,16 @@ bool box_audio_synth_compile(
         p.seed = sound->seed;
         p.pitch_variance = sound->pitch_variance;
         p.level_variance = sound->level_variance;
+        p.drift = sound->drift;
+        p.free_phase = sound->free_phase;
     }
 
     if (glide) {
         p.glide = glide->time;
+    }
+
+    if (bend) {
+        p.pitch_envelope = box_audio_synth_pitch_envelope(bend);
     }
 
     if (drive) {
@@ -364,6 +400,7 @@ bool box_audio_synth_compile(
         p.drive = filter->drive;
         p.filter_velocity = filter->velocity;
         p.keytrack = filter->keytrack;
+        p.model = (uint32_t)filter->model;
     }
 
     if (filter && fenv && fenv->amount != 0) {
@@ -379,8 +416,13 @@ bool box_audio_synth_compile(
     if (osc && osc->modulation != SynthMix) {
         orphans ++;
     } else if (osc) {
+<<<<<<< HEAD
         box_audio_synth_layer(&p, osc, NULL, ecs_get(world, e, SynthUnison),
             ecs_get(world, e, SynthString), ecs_get(world, e, SynthTable), tables, 0);
+=======
+        box_audio_synth_layer(&p, osc, NULL, NULL, ecs_get(world, e, SynthUnison),
+            ecs_get(world, e, SynthString), 0);
+>>>>>>> 4fef54b0995552551c5771b535d73f41b5fd74e9
     }
 
     box_audio_synth_lfo(&p, ecs_get(world, e, SynthLfo), 0, &lfos);

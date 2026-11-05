@@ -1,0 +1,26 @@
+// Synth sounds with analog drift for the SynthDrift suite of test/cpu/audio.
+using box.audio
+
+// A pad of three detuned saws that drift apart, through a lowpass whose cutoff drifts too,
+// each play starting its oscillators at random phases
+prefab DriftPad {
+  SynthSound: {seed: 5, drift: 12, free_phase: true}
+  SynthEnvelope: {attack: 0.05, sustain: 1, hold: 0.5, release: 0.2}
+  SynthFilter: {kind: SynthLowPass, cutoff: 1200, resonance: 0.2}
+  SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.4}
+  SynthUnison: {voices: 3, detune: 8, width: 0.6}
+}
+
+// A plucked string that drifts as it rings
+prefab DriftPluck {
+  SynthSound: {seed: 3, drift: 8}
+  SynthOscillator: {wave: SynthPluck, frequency: 196, level: 0.6}
+  SynthString: {decay: 1}
+}
+
+// The defaults: no drift, every play from phase 0
+prefab Steady {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.005, sustain: 1, hold: 0.1, release: 0.05}
+  SynthOscillator: {frequency: 440, level: 0.5}
+}

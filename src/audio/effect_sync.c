@@ -4,8 +4,8 @@
  * their slots of the pool of the core, their memory and their commands.
  *
  * An effect entity is any entity with an effect component: Reverb, Equalizer, AudioFilter,
- * Compressor, Gate, Delay, Phaser, Chorus or Saturator, the first of them in that order. A
- * compressor gets the key bus that the order compile accepted for its insert slot.
+ * Compressor, Gate, Delay, Phaser, Chorus, Saturator or TransientShaper, the first of them in
+ * that order. A compressor gets the key bus that the order compile accepted for its insert.
  *
  * The module sends an EFFECT command when the kind, the channel, the slot or a parameter of an
  * effect changes, and takes it off when no insert slot names it any more.
@@ -70,61 +70,45 @@ done:
     return result;
 }
 
-uint32_t box_audio_module_effect_kind(
+uint32_t box_audio_module_effect_params(
     const ecs_world_t *world,
-    ecs_entity_t e,
+    ecs_entity_t component,
+    const void *ptr,
     float *params)
 {
-    const Reverb *reverb = NULL;
-    const Equalizer *eq = NULL;
-    const AudioFilter *filter = NULL;
-    const Compressor *comp = NULL;
-    const Gate *gate = NULL;
-    const Delay *delay = NULL;
-    const Phaser *phaser = NULL;
-    const Chorus *chorus = NULL;
-    const Saturator *saturator = NULL;
     uint32_t result = BOX_AUDIO_EFFECT_NONE;
     int32_t i;
     for (i = 0; params && i < BOX_AUDIO_EFFECT_PARAMS; i ++) {
         params[i] = 0;
     }
 
-    if (!e || !ecs_is_alive(world, e)) {
+    if (!component) {
         goto done;
     }
 
-    reverb = ecs_get(world, e, Reverb);
-    if (reverb) {
+    if (component == ecs_id(Reverb)) {
+        const Reverb *reverb = ptr;
         result = BOX_AUDIO_EFFECT_REVERB;
-        if (params) {
+        if (params && ptr) {
             params[0] = reverb->decay;
             params[1] = reverb->damping;
             params[2] = reverb->predelay;
             params[3] = reverb->size;
             params[4] = reverb->mix;
         }
-
-        goto done;
-    }
-
-    eq = ecs_get(world, e, Equalizer);
-    if (eq) {
+    } else if (component == ecs_id(Equalizer)) {
+        const Equalizer *eq = ptr;
         result = BOX_AUDIO_EFFECT_EQ;
-        for (i = 0; params && i < BOX_AUDIO_EQ_BANDS; i ++) {
+        for (i = 0; params && ptr && i < BOX_AUDIO_EQ_BANDS; i ++) {
             params[i * 4] = (float)eq->bands[i].kind;
             params[i * 4 + 1] = eq->bands[i].frequency;
             params[i * 4 + 2] = eq->bands[i].gain;
             params[i * 4 + 3] = eq->bands[i].q;
         }
-
-        goto done;
-    }
-
-    filter = ecs_get(world, e, AudioFilter);
-    if (filter) {
+    } else if (component == ecs_id(AudioFilter)) {
+        const AudioFilter *filter = ptr;
         result = BOX_AUDIO_EFFECT_FILTER;
-        if (params) {
+        if (params && ptr) {
             params[0] = (float)((uint32_t)filter->kind + 1);
             params[1] = filter->cutoff;
             params[2] = filter->resonance;
@@ -132,14 +116,10 @@ uint32_t box_audio_module_effect_kind(
             params[4] = filter->mix;
             params[5] = filter->drive;
         }
-
-        goto done;
-    }
-
-    comp = ecs_get(world, e, Compressor);
-    if (comp) {
+    } else if (component == ecs_id(Compressor)) {
+        const Compressor *comp = ptr;
         result = BOX_AUDIO_EFFECT_COMPRESSOR;
-        if (params) {
+        if (params && ptr) {
             params[0] = comp->threshold;
             params[1] = comp->ratio;
             params[2] = comp->attack;
@@ -148,42 +128,30 @@ uint32_t box_audio_module_effect_kind(
             params[5] = comp->makeup;
             params[6] = comp->mix;
         }
-
-        goto done;
-    }
-
-    gate = ecs_get(world, e, Gate);
-    if (gate) {
+    } else if (component == ecs_id(Gate)) {
+        const Gate *gate = ptr;
         result = BOX_AUDIO_EFFECT_GATE;
-        if (params) {
+        if (params && ptr) {
             params[0] = gate->threshold;
             params[1] = gate->attack;
             params[2] = gate->hold;
             params[3] = gate->release;
             params[4] = gate->range;
         }
-
-        goto done;
-    }
-
-    delay = ecs_get(world, e, Delay);
-    if (delay) {
+    } else if (component == ecs_id(Delay)) {
+        const Delay *delay = ptr;
         result = BOX_AUDIO_EFFECT_DELAY;
-        if (params) {
+        if (params && ptr) {
             params[0] = box_audio_delay_time(world, delay);
             params[1] = delay->feedback;
             params[2] = delay->damping;
             params[3] = delay->ping_pong ? 1.0f : 0.0f;
             params[4] = delay->mix;
         }
-
-        goto done;
-    }
-
-    phaser = ecs_get(world, e, Phaser);
-    if (phaser) {
+    } else if (component == ecs_id(Phaser)) {
+        const Phaser *phaser = ptr;
         result = BOX_AUDIO_EFFECT_PHASER;
-        if (params) {
+        if (params && ptr) {
             params[0] = (float)phaser->stages;
             params[1] = phaser->rate;
             params[2] = phaser->depth;
@@ -192,14 +160,10 @@ uint32_t box_audio_module_effect_kind(
             params[5] = phaser->mix;
             params[6] = phaser->stereo;
         }
-
-        goto done;
-    }
-
-    chorus = ecs_get(world, e, Chorus);
-    if (chorus) {
+    } else if (component == ecs_id(Chorus)) {
+        const Chorus *chorus = ptr;
         result = BOX_AUDIO_EFFECT_CHORUS;
-        if (params) {
+        if (params && ptr) {
             params[0] = (float)chorus->voices;
             params[1] = chorus->rate;
             params[2] = chorus->depth;
@@ -207,23 +171,75 @@ uint32_t box_audio_module_effect_kind(
             params[4] = chorus->mix;
             params[5] = chorus->spread;
         }
-
-        goto done;
-    }
-
-    saturator = ecs_get(world, e, Saturator);
-    if (saturator) {
+    } else if (component == ecs_id(Saturator)) {
+        const Saturator *saturator = ptr;
         result = BOX_AUDIO_EFFECT_SATURATOR;
-        if (params) {
+        if (params && ptr) {
             params[0] = saturator->drive;
             params[1] = saturator->asymmetry;
             params[2] = saturator->bits;
             params[3] = saturator->mix;
         }
+    } else if (component == ecs_id(TransientShaper)) {
+        const TransientShaper *shaper = ptr;
+        result = BOX_AUDIO_EFFECT_TRANSIENT_SHAPER;
+        if (params && ptr) {
+            params[0] = shaper->attack;
+            params[1] = shaper->sustain;
+        }
     }
 
 done:
     return result;
+}
+
+int32_t box_audio_module_effect_components(
+    ecs_entity_t *out)
+{
+    const ecs_entity_t components[] = {
+        ecs_id(Reverb), ecs_id(Equalizer), ecs_id(AudioFilter), ecs_id(Compressor),
+        ecs_id(Gate), ecs_id(Delay), ecs_id(Phaser), ecs_id(Chorus), ecs_id(Saturator),
+        ecs_id(TransientShaper)
+    };
+    int32_t i, count = (int32_t)(sizeof(components) / sizeof(components[0]));
+    count = count < BOX_AUDIO_EFFECT_COMPONENTS ? count : BOX_AUDIO_EFFECT_COMPONENTS;
+    for (i = 0; i < count; i ++) {
+        out[i] = components[i];
+    }
+
+    return count;
+}
+
+ecs_entity_t box_audio_module_effect_component(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    ecs_entity_t components[BOX_AUDIO_EFFECT_COMPONENTS], result = 0;
+    int32_t i, count;
+    if (!e || !ecs_is_alive(world, e)) {
+        goto done;
+    }
+
+    count = box_audio_module_effect_components(components);
+    for (i = 0; i < count && !result; i ++) {
+        if (ecs_has_id(world, e, components[i])) {
+            result = components[i];
+        }
+    }
+
+done:
+    return result;
+}
+
+uint32_t box_audio_module_effect_kind(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    float *params)
+{
+    ecs_entity_t component = box_audio_module_effect_component(world, e);
+
+    return box_audio_module_effect_params(world, component,
+        component ? ecs_get_id(world, e, component) : NULL, params);
 }
 
 /** Write an effect command and remember what it sent.

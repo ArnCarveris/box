@@ -2,7 +2,7 @@
  * @file audio/core/synth.c
  * @brief The synth source: band limited oscillators and seeded noise, each with a linear or
  * curved envelope, mixed, optionally driven through the oversampled soft clipper of saturate.h,
- * into a state variable filter of one or two stages, whose cutoff an
+ * into a state variable filter of one or two stages or a transistor ladder, whose cutoff an
  * envelope may move, and an amp, rendered per frame from a copy of the patch. A change of the
  * pitch glides exponentially in frequency over the glide of the patch, and a legato play
  * retargets the layers of a voice without a restart of its envelopes. A layer may play as
@@ -50,6 +50,18 @@
 
 /** Seconds over which an LFO wave that jumps, square, saw or random, moves to its new value */
 #define BOX_AUDIO_SYNTH_LFO_SMOOTH 0.002
+
+/** Seconds each of the two lowpasses of a drift walk takes to move 1 - 1/e of the way to its
+ * target. A jump of the target from -1 to 1 moves the value, -1..1, by at most
+ * 2 / (e * this) per second, so a drift of 20 cents moves about 1.2 cents per 50 ms */
+#define BOX_AUDIO_SYNTH_DRIFT_SMOOTH 0.6
+
+/** Shortest and longest seconds a drift walk holds a target */
+#define BOX_AUDIO_SYNTH_DRIFT_HOLD_MIN 0.2
+#define BOX_AUDIO_SYNTH_DRIFT_HOLD_MAX 2.0
+
+/** Share of the drift of the pitch the cutoff drifts by, in cents */
+#define BOX_AUDIO_SYNTH_DRIFT_CUTOFF 0.25
 
 /** Shortest fade in seconds of an LFO with a delay, so its depth does not jump in at once */
 #define BOX_AUDIO_SYNTH_LFO_FADE_MIN 0.005f
@@ -205,6 +217,82 @@ static int32_t box_audio_synth_frames(
     return (int32_t)((double)seconds * (double)rate + 0.5);
 }
 
+/** The factor and the term per step of a curve of c from one value to another over n steps:
+ * v(k) = a + (v0 - a) r^k with r = exp(-c / n), whose asymptote a lies past the target so that
+ * v(n) is the target.
+ *
+ * @param from Value at the start
+ * @param to Value at the end, not from
+ * @param n Steps, at least 1
+ * @param c The curve, not 0
+ * @param mul Receives the factor per step, r
+ * @param add Receives the term per step, a (1 - r)
+ */
+static void box_audio_synth_curve_coefs(
+    double from,
+    double to,
+    int32_t n,
+    double c,
+    double *mul,
+    double *add)
+{
+    double r = box_audio_synth_exp2(-c / ((double)n * BOX_AUDIO_SYNTH_LN2));
+    double end = box_audio_synth_exp2(-c / BOX_AUDIO_SYNTH_LN2);
+    double a = (to - from * end) / (1 - end);
+    *mul = r;
+    *add = a * (1 - r);
+}
+
+/** Start a curve from one value to another over steps, with the math of the curved segments
+ * of an envelope, or linear for a curve of 0.
+ *
+ * @param k The curve
+ * @param from Value at the start
+ * @param to Value at the end
+ * @param n Steps, 0 to take the end at once
+ * @param c The curve, 0 linear, positive fast at first
+ */
+static void box_audio_synth_curve_start(
+    box_audio_synth_curve_t *k,
+    double from,
+    double to,
+    int32_t n,
+    double c)
+{
+    k->target = to;
+    if (n <= 0) {
+        k->level = to;
+        k->left = 0;
+        k->mul = 1;
+        k->add = 0;
+    } else {
+        k->level = from;
+        k->left = n;
+        if (c != 0 && to != from) {
+            box_audio_synth_curve_coefs(from, to, n, c, &k->mul, &k->add);
+        } else {
+            k->mul = 1;
+            k->add = (to - from) / (double)n;
+        }
+    }
+}
+
+/** Advance a curve by a step; its last step takes the target.
+ *
+ * @param k The curve
+ * @return Its value after the step
+ */
+static double box_audio_synth_curve_next(
+    box_audio_synth_curve_t *k)
+{
+    if (k->left > 0) {
+        k->left --;
+        k->level = k->left ? k->level * k->mul + k->add : k->target;
+    }
+
+    return k->level;
+}
+
 /** Start an envelope: its segments in frames, a pass at most BOX_AUDIO_SYNTH_LENGTH_MAX long,
  * and every segment that changes the level at least BOX_AUDIO_SYNTH_EDGE long, so it neither
  * clicks nor runs forever.
@@ -281,8 +369,7 @@ static void box_audio_synth_env_init(
  * renews its frames.
  *
  * A linear segment adds a step per frame. A curved one of curve c over n frames follows
- * v(k) = a + (v0 - a) r^k with r = exp(-c / n), whose asymptote a lies past the target so
- * that v(n) is the target: one multiply and one add per frame, exp only here, and the last
+ * box_audio_synth_curve_coefs: one multiply and one add per frame, exp only here, and the last
  * frame takes the target, so the segment ends on time.
  *
  * @param e The envelope
@@ -319,13 +406,10 @@ static void box_audio_synth_env_enter(
         e->step = (e->target - e->value) / (float)n;
         c = e->curve[segment];
         if (c != 0 && e->target != e->value) {
-            double r = box_audio_synth_exp2(-c / ((double)n * BOX_AUDIO_SYNTH_LN2));
-            double end = box_audio_synth_exp2(-c / BOX_AUDIO_SYNTH_LN2);
-            double a = ((double)e->target - (double)e->value * end) / (1 - end);
             e->curved = true;
             e->level = e->value;
-            e->mul = r;
-            e->add = a * (1 - r);
+            box_audio_synth_curve_coefs((double)e->value, (double)e->target, n, c, &e->mul,
+                &e->add);
         }
     }
 
@@ -388,8 +472,8 @@ static inline float box_audio_synth_env_next(
 }
 
 /** Set the coefficients of the stages of the filter from its cutoff: g = tan(pi cutoff / rate)
- * of the trapezoidal state variable filter, which stays stable at any cutoff and while it
- * moves. Each stage is stable on its own, so their cascade is too.
+ * of the trapezoidal state variable filter, or of the ladder, which stay stable at any cutoff
+ * and while it moves. Each stage is stable on its own, so their cascade is too.
  *
  * @param src The source
  * @param rate Frames per second
@@ -400,13 +484,17 @@ static void box_audio_synth_coefs(
 {
     float g = box_audio_svf_g(src->cutoff, rate);
     int32_t s;
-    for (s = 0; s < src->stages; s ++) {
-        box_audio_svf_t *f = &src->svf[s];
-        box_audio_svf_coefs(f, g);
-        if (src->stereo) {
-            src->svf_r[s].a1 = f->a1;
-            src->svf_r[s].a2 = f->a2;
-            src->svf_r[s].a3 = f->a3;
+    if (src->model == BOX_AUDIO_SYNTH_LADDER) {
+        src->ladder_coefs.g = g;
+    } else {
+        for (s = 0; s < src->stages; s ++) {
+            box_audio_svf_t *f = &src->svf[s];
+            box_audio_svf_coefs(f, g);
+            if (src->stereo) {
+                src->svf_r[s].a1 = f->a1;
+                src->svf_r[s].a2 = f->a2;
+                src->svf_r[s].a3 = f->a3;
+            }
         }
     }
 }
@@ -506,6 +594,23 @@ static inline float box_audio_synth_noise(
     *state = x;
 
     return (float)(int32_t)x * (1.0f / 2147483648.0f);
+}
+
+/** Semitones the pitch envelope of a layer moves its pitch by: amount times the share of its
+ * decay left, or after the release from the offset at its start toward release_amount.
+ *
+ * @param part The part of the layer, with a pitch envelope
+ * @return The semitones
+ */
+static double box_audio_synth_bend_offset(
+    const box_audio_synth_part_t *part)
+{
+    const box_audio_synth_pitch_envelope_t *d = &part->layer.pitch_envelope;
+    const box_audio_synth_bend_t *b = &part->bend;
+    double to = (double)d->release_amount;
+
+    return b->released ? to + (b->from - to) * b->release.level :
+        (double)d->amount * b->decay.level;
 }
 
 /** Pole or zero of a first order section at a frequency, exp(-2 pi f / rate), the matched z
@@ -623,6 +728,8 @@ static inline float box_audio_synth_color_next(
  * the level and the pulse width of each oscillator, which move there linearly over a control
  * block or take them at once, and the cutoff, which takes them at once.
  *
+ * The pitch envelope of a layer adds to its pitch and to its ratio of hard sync.
+ *
  * The pitch takes 2 to the cents over 1200, one exp2 per pitched oscillator. The level dips
  * from 1 at the top of the wave to 1 - amplitude at its bottom, so an LFO in its delay leaves
  * it at 1.
@@ -659,8 +766,31 @@ static void box_audio_synth_lfo_aim(
     }
 
     for (l = 0; l < src->layers; l ++) {
-        box_audio_synth_osc_t *o = &src->part[l]->osc;
+        box_audio_synth_part_t *part = src->part[l];
+        box_audio_synth_osc_t *o = &part->osc;
+        bool bend = src->bends && part->bend.on;
         c = cents[0] + cents[l + 1];
+        if (bend) {
+            c += 100 * box_audio_synth_bend_offset(part);
+        }
+
+        if (src->drifts) {
+            box_audio_synth_unison_t *u = &part->unison;
+            if (u->voices > 1) {
+                for (k = 0; k < u->voices; k ++) {
+                    r = box_audio_synth_exp2(src->drift * (double)u->walk[k].value *
+                        (1.0 / 1200));
+                    if (now) {
+                        u->drift[k] = r;
+                    }
+
+                    u->drift_step[k] = (r - u->drift[k]) * (1.0 / BOX_AUDIO_SYNTH_CONTROL);
+                }
+            } else {
+                c += src->drift * (double)part->walk.value;
+            }
+        }
+
         c = c != 0 ? box_audio_synth_exp2(c * (1.0 / 1200)) : 1.0;
         w = o->width_base + width[0] + width[l + 1];
         w = w > BOX_AUDIO_SYNTH_PULSE_MIN ? (w < 1 - BOX_AUDIO_SYNTH_PULSE_MIN ? w :
@@ -676,6 +806,10 @@ static void box_audio_synth_lfo_aim(
         o->tremolo_step = (dip[l + 1] - o->tremolo) * (1.0f / BOX_AUDIO_SYNTH_CONTROL);
         if (o->synced) {
             r = semitones[0] + semitones[l + 1];
+            if (bend) {
+                r += (double)part->layer.pitch_envelope.sync * part->bend.decay.level;
+            }
+
             r = r != 0 ? o->sync_base * box_audio_synth_exp2(r * (1.0 / 12)) : o->sync_base;
             r = r > 1 ? (r < BOX_AUDIO_SYNTH_SYNC_MAX ? r : BOX_AUDIO_SYNTH_SYNC_MAX) : 1.0;
             if (now) {
@@ -700,6 +834,11 @@ static void box_audio_synth_lfo_aim(
     }
 
     src->tremolo_step = (dip[0] - src->tremolo) * (1.0f / BOX_AUDIO_SYNTH_CONTROL);
+    if (src->drifts) {
+        octaves += src->drift * BOX_AUDIO_SYNTH_DRIFT_CUTOFF *
+            (double)src->drift_cutoff.value * (1.0 / 1200);
+    }
+
     if (src->lfo_cutoff) {
         src->lfo_octaves = octaves;
         box_audio_synth_cutoff(src, src->amount != 0 ? src->fenv.value : 0.0f, rate);
@@ -769,6 +908,217 @@ static void box_audio_synth_lfo_pass(
 
     src->lfo_control = 1;
     src->lfo_octaves = 0;
+}
+
+/** Control blocks of a number of frames, rounded up, at least 1.
+ *
+ * @param frames The frames, 0 or more
+ * @return The blocks
+ */
+static int32_t box_audio_synth_blocks(
+    int32_t frames)
+{
+    int32_t n = (frames + BOX_AUDIO_SYNTH_CONTROL - 1) / BOX_AUDIO_SYNTH_CONTROL;
+
+    return n > 0 ? n : 1;
+}
+
+/** Control blocks a drift walk holds its next target for, a random
+ * BOX_AUDIO_SYNTH_DRIFT_HOLD_MIN to _MAX seconds.
+ *
+ * @param rng The generator of the drift
+ * @param rate Frames per second
+ * @return The blocks
+ */
+static int32_t box_audio_synth_walk_hold(
+    uint32_t *rng,
+    float rate)
+{
+    double t = BOX_AUDIO_SYNTH_DRIFT_HOLD_MIN + (BOX_AUDIO_SYNTH_DRIFT_HOLD_MAX -
+        BOX_AUDIO_SYNTH_DRIFT_HOLD_MIN) * 0.5 * (1.0 + (double)box_audio_synth_noise(rng));
+
+    return box_audio_synth_blocks((int32_t)(t * (double)rate));
+}
+
+/** Start a drift walk at a random value, settled there, toward a random target.
+ *
+ * @param w The walk
+ * @param rng The generator of the drift
+ * @param rate Frames per second
+ */
+static void box_audio_synth_walk_start(
+    box_audio_synth_walk_t *w,
+    uint32_t *rng,
+    float rate)
+{
+    w->value = box_audio_synth_noise(rng);
+    w->a = w->value;
+    w->target = box_audio_synth_noise(rng);
+    w->left = box_audio_synth_walk_hold(rng, rate);
+}
+
+/** Advance a drift walk by a control block: a new target once it held the last for its
+ * time, and both lowpasses toward it. Each output is a mix of values in -1..1, so the value
+ * stays in -1..1.
+ *
+ * @param w The walk
+ * @param rng The generator of the drift
+ * @param coef Share of the way each lowpass moves per control block
+ * @param rate Frames per second
+ */
+static void box_audio_synth_walk_next(
+    box_audio_synth_walk_t *w,
+    uint32_t *rng,
+    float coef,
+    float rate)
+{
+    if (-- w->left <= 0) {
+        w->target = box_audio_synth_noise(rng);
+        w->left = box_audio_synth_walk_hold(rng, rate);
+    }
+
+    w->a += (w->target - w->a) * coef;
+    w->value += (w->a - w->value) * coef;
+}
+
+/** Start the drift of a play: its own generator, seeded from the seed of the patch and the
+ * count of its plays apart from the noise and the LFOs, so they stay as without drift.
+ *
+ * It picks the start phase of each oscillator with free_phase, and with drift a walk for each
+ * layer, each of its unison voices and the cutoff.
+ *
+ * @param core The core
+ * @param src The source, its layers set
+ * @param p The patch, clamped
+ * @param plays Count of the plays of the patch
+ */
+static void box_audio_synth_drift_start(
+    const box_audio_core_t *core,
+    box_audio_synth_source_t *src,
+    const box_audio_synth_patch_t *p,
+    uint32_t plays)
+{
+    float rate = core->sample_rate;
+    int32_t l, k;
+    src->drift_rng = box_audio_synth_hash(p->seed ^ 0x44524654u, plays);
+    for (l = 0; l < src->layers; l ++) {
+        box_audio_synth_part_t *part = src->part[l];
+        part->start = p->free_phase ?
+            0.5 * (1.0 + (double)box_audio_synth_noise(&src->drift_rng)) : 0.0;
+        part->start = part->start < 1 ? part->start : 0.0;
+    }
+
+    if (!src->drifts) {
+        goto done;
+    }
+
+    src->drift_coef = (float)(1 - box_audio_synth_exp2(-(double)BOX_AUDIO_SYNTH_CONTROL /
+        (BOX_AUDIO_SYNTH_DRIFT_SMOOTH * (double)rate * BOX_AUDIO_SYNTH_LN2)));
+    for (l = 0; l < src->layers; l ++) {
+        box_audio_synth_part_t *part = src->part[l];
+        box_audio_synth_walk_start(&part->walk, &src->drift_rng, rate);
+        for (k = 0; k < part->unison.voices && part->unison.voices > 1; k ++) {
+            box_audio_synth_walk_start(&part->unison.walk[k], &src->drift_rng, rate);
+            part->unison.drift[k] = 1;
+            part->unison.drift_step[k] = 0;
+        }
+    }
+
+    box_audio_synth_walk_start(&src->drift_cutoff, &src->drift_rng, rate);
+    src->lfo_cutoff = src->lfo_cutoff || src->filter;
+
+done:
+    return;
+}
+
+/** Advance the drift of a source by a control block: the walk of each layer, each of its
+ * unison voices and the cutoff.
+ *
+ * @param src The source, with drift
+ * @param rate Frames per second
+ */
+static void box_audio_synth_drift_block(
+    box_audio_synth_source_t *src,
+    float rate)
+{
+    float coef = src->drift_coef;
+    int32_t l, k;
+    for (l = 0; l < src->layers; l ++) {
+        box_audio_synth_part_t *part = src->part[l];
+        if (part->unison.voices > 1) {
+            for (k = 0; k < part->unison.voices; k ++) {
+                box_audio_synth_walk_next(&part->unison.walk[k], &src->drift_rng, coef, rate);
+            }
+        } else {
+            box_audio_synth_walk_next(&part->walk, &src->drift_rng, coef, rate);
+        }
+    }
+
+    if (src->filter) {
+        box_audio_synth_walk_next(&src->drift_cutoff, &src->drift_rng, coef, rate);
+    }
+}
+
+/** Start the pitch envelopes of a pass: each at its amount, which decays to 0 over its decay
+ * in control blocks, not released.
+ *
+ * @param src The source
+ * @param rate Frames per second
+ */
+static void box_audio_synth_bend_pass(
+    box_audio_synth_source_t *src,
+    float rate)
+{
+    int32_t l, n;
+    for (l = 0; l < src->layers; l ++) {
+        box_audio_synth_part_t *part = src->part[l];
+        const box_audio_synth_pitch_envelope_t *d = &part->layer.pitch_envelope;
+        if (part->bend.on) {
+            n = box_audio_synth_frames(d->decay, rate);
+            n = n > 0 ? box_audio_synth_blocks(n) : 0;
+            box_audio_synth_curve_start(&part->bend.decay, 1.0, 0.0, n, (double)d->curve);
+            box_audio_synth_curve_start(&part->bend.release, 1.0, 1.0, 0, 0.0);
+            part->bend.released = false;
+            part->bend.from = 0;
+        }
+    }
+}
+
+/** Advance the pitch envelopes of a source by a control block. One whose layer has an
+ * amplitude envelope, its own or that of the patch, starts its release once that envelope
+ * reached its release, over the frames left of it, from its offset toward release_amount.
+ *
+ * @param src The source
+ */
+static void box_audio_synth_bend_block(
+    box_audio_synth_source_t *src)
+{
+    int32_t l, n;
+    for (l = 0; l < src->layers; l ++) {
+        box_audio_synth_part_t *part = src->part[l];
+        box_audio_synth_bend_t *b = &part->bend;
+        int32_t env = part->osc.env;
+        if (!b->on) {
+            continue;
+        }
+
+        if (!b->released && env != BOX_AUDIO_SYNTH_ENV_FREE) {
+            const box_audio_synth_env_t *e = env == 0 ? &src->env : &part->env;
+            if (e->segment >= BOX_AUDIO_SYNTH_RELEASE) {
+                n = e->segment == BOX_AUDIO_SYNTH_RELEASE ? e->left : 0;
+                b->from = box_audio_synth_bend_offset(part);
+                b->released = true;
+                box_audio_synth_curve_start(&b->release, 1.0, 0.0,
+                    n > 0 ? box_audio_synth_blocks(n) : 0,
+                    (double)part->layer.pitch_envelope.curve);
+            }
+        }
+
+        box_audio_synth_curve_next(&b->decay);
+        if (b->released) {
+            box_audio_synth_curve_next(&b->release);
+        }
+    }
 }
 
 /** Set the unison voices of a part from its layer: the detune of each voice, evenly from half
@@ -1036,7 +1386,7 @@ static void box_audio_synth_pass(
         o->wave = (int32_t)layer->wave;
         o->level = layer->level;
         o->env = layer->has_envelope ? l + 1 : (layer->rings_free ? BOX_AUDIO_SYNTH_ENV_FREE : 0);
-        o->phase = 0;
+        o->phase = part->start;
         o->target = (int32_t)layer->modulates - 1;
         o->ring = layer->modulation == BOX_AUDIO_SYNTH_RING;
         o->audible = layer->audible != 0;
@@ -1143,8 +1493,17 @@ static void box_audio_synth_pass(
         box_audio_synth_env_init(&src->fenv, &src->filter_envelope, rate, src->gate);
     }
 
-    if (src->lfos) {
-        box_audio_synth_lfo_pass(src, rate);
+    if (src->mods) {
+        if (src->lfos) {
+            box_audio_synth_lfo_pass(src, rate);
+        } else {
+            src->lfo_control = 1;
+        }
+
+        if (src->bends) {
+            box_audio_synth_bend_pass(src, rate);
+        }
+
         box_audio_synth_lfo_aim(src, rate, true);
     }
 
@@ -1420,6 +1779,13 @@ void box_audio_source_synth(
     src->drive = p->drive;
     src->svf_r[0] = src->svf[0];
     src->svf_r[1] = src->svf[1];
+    src->model = src->filter && src->filter <= BOX_AUDIO_SYNTH_NOTCH ?
+        (int32_t)p->model : BOX_AUDIO_SYNTH_SVF;
+    if (src->model == BOX_AUDIO_SYNTH_LADDER) {
+        box_audio_ladder_init(&src->ladder_coefs, src->ladder, src->filter, p->slope,
+            p->resonance, p->drive);
+    }
+
     src->has_drive = p->has_drive != 0;
     if (src->has_drive) {
         box_audio_synth_drive_start(src, &slot->drive, p->pre_asymmetry > 0, core->sample_rate);
@@ -1432,6 +1798,23 @@ void box_audio_source_synth(
         box_audio_synth_lfo_start(core, src, p, slot->plays);
     }
 
+    src->drift = (double)p->drift;
+    src->drifts = p->drift > 0;
+    box_audio_synth_drift_start(core, src, p, slot->plays);
+    src->bends = false;
+    for (l = 0; l < src->layers; l ++) {
+        box_audio_synth_layer_t *layer = &src->part[l]->layer;
+        const box_audio_synth_pitch_envelope_t *d;
+        if (!layer->has_pitch_envelope) {
+            layer->pitch_envelope = p->pitch_envelope;
+        }
+
+        d = &layer->pitch_envelope;
+        src->part[l]->bend.on = d->amount != 0 || d->release_amount != 0 || d->sync != 0;
+        src->bends = src->bends || src->part[l]->bend.on;
+    }
+
+    src->mods = src->lfos > 0 || src->bends || src->drifts;
     box_audio_synth_pass(core, src);
 }
 
@@ -1695,7 +2078,8 @@ static void box_audio_synth_glide_next(
 }
 
 /** Advance the LFOs of a source by a control block, through their delays, fades and phases,
- * and aim every destination at their values at the end of the block.
+ * and its pitch envelopes, and aim every destination at their values at the end of the
+ * block.
  *
  * @param src The source
  * @param rate Frames per second
@@ -1728,6 +2112,14 @@ static void box_audio_synth_lfo_block(
         m->value = m->smooth ? m->value + (raw - m->value) * src->lfo_smooth : raw;
     }
 
+    if (src->bends) {
+        box_audio_synth_bend_block(src);
+    }
+
+    if (src->drifts) {
+        box_audio_synth_drift_block(src, rate);
+    }
+
     box_audio_synth_lfo_aim(src, rate, false);
 }
 
@@ -1741,7 +2133,7 @@ static inline void box_audio_synth_lfo_next(
     box_audio_synth_source_t *src,
     float rate)
 {
-    int32_t l;
+    int32_t l, k;
     if (-- src->lfo_control <= 0) {
         src->lfo_control = BOX_AUDIO_SYNTH_CONTROL;
         box_audio_synth_lfo_block(src, rate);
@@ -1749,6 +2141,13 @@ static inline void box_audio_synth_lfo_next(
 
     for (l = 0; l < src->layers; l ++) {
         box_audio_synth_osc_t *o = &src->part[l]->osc;
+        if (src->drifts) {
+            box_audio_synth_unison_t *u = &src->part[l]->unison;
+            for (k = 0; k < u->voices && u->voices > 1; k ++) {
+                u->drift[k] += u->drift_step[k];
+            }
+        }
+
         o->vibrato += o->vibrato_step;
         o->width += o->width_step;
         o->tremolo += o->tremolo_step;
@@ -2584,6 +2983,10 @@ static inline void box_audio_synth_unison_next(
     int32_t k;
     for (k = 0; k < u->voices; k ++) {
         dt = inc * u->detune[k];
+        if (src->drifts) {
+            dt *= u->drift[k];
+        }
+
         dt = dt < src->inc_max ? dt : src->inc_max;
         if (o->synced) {
             x = box_audio_synth_sync(o, u->phase[k], dt, shift, 0, &src->rng);
@@ -2646,6 +3049,10 @@ static inline void box_audio_synth_strings_next(
     for (s = part->string, k = 0; s; s = s->next, k ++) {
         if (s->ringing) {
             dt = inc * u->detune[k];
+            if (src->drifts) {
+                dt *= u->drift[k];
+            }
+
             dt = dt < src->inc_max ? dt : src->inc_max;
             x = box_audio_synth_string_ring(src, s, rings_free, dt);
             l += x * u->left[k];
@@ -2823,7 +3230,7 @@ static int32_t box_audio_synth_render_wide(
             box_audio_synth_key_next(src, rate);
         }
 
-        if (src->lfos) {
+        if (src->mods) {
             box_audio_synth_lfo_next(src, rate);
             if (src->tables) {
                 box_audio_synth_tables_next(src, levels);
@@ -2845,7 +3252,13 @@ static int32_t box_audio_synth_render_wide(
             }
         }
 
-        if (src->filter) {
+        if (src->filter && src->model == BOX_AUDIO_SYNTH_LADDER) {
+            box_audio_synth_control(src, rate);
+            l = box_audio_ladder_next(&src->ladder[0], &src->ladder_coefs, l);
+            if (stereo) {
+                r = box_audio_ladder_next(&src->ladder[1], &src->ladder_coefs, r);
+            }
+        } else if (src->filter) {
             box_audio_synth_control(src, rate);
             if (src->stages > 1) {
                 l = box_audio_svf_drive(&src->svf[1], src->filter, l, src->drive);
@@ -2860,7 +3273,7 @@ static int32_t box_audio_synth_render_wide(
             }
         }
 
-        gain = src->lfos ? src->amp * src->tremolo : src->amp;
+        gain = src->mods ? src->amp * src->tremolo : src->amp;
         out_l[i] = box_audio_clean(l * gain);
         if (stereo) {
             out_r[i] = box_audio_clean(r * gain);
@@ -2908,7 +3321,7 @@ int32_t box_audio_synth_render(
             box_audio_synth_key_next(src, rate);
         }
 
-        if (src->lfos) {
+        if (src->mods) {
             box_audio_synth_lfo_next(src, rate);
         }
 
@@ -2917,9 +3330,9 @@ int32_t box_audio_synth_render(
         }
 
         if (src->modulated) {
-            mix = src->lfos ? box_audio_synth_modulate(src, levels, true) :
+            mix = src->mods ? box_audio_synth_modulate(src, levels, true) :
                 box_audio_synth_modulate(src, levels, false);
-        } else if (src->lfos) {
+        } else if (src->mods) {
             mix = box_audio_synth_layers_lfo(src, levels);
         } else if (src->strings) {
             for (l = 0; l < layers; l ++) {
@@ -2952,17 +3365,21 @@ int32_t box_audio_synth_render(
                 }
             }
 
-            y = mix;
-            if (src->stages > 1) {
-                y = box_audio_svf_drive(&src->svf[1], src->filter, y, src->drive);
-            }
+            if (src->model == BOX_AUDIO_SYNTH_LADDER) {
+                y = box_audio_ladder_next(&src->ladder[0], &src->ladder_coefs, mix);
+            } else {
+                y = mix;
+                if (src->stages > 1) {
+                    y = box_audio_svf_drive(&src->svf[1], src->filter, y, src->drive);
+                }
 
-            y = box_audio_svf_drive(&src->svf[0], src->filter, y, src->drive);
+                y = box_audio_svf_drive(&src->svf[0], src->filter, y, src->drive);
+            }
         } else {
             y = mix;
         }
 
-        if (src->lfos) {
+        if (src->mods) {
             y = y * src->amp * src->tremolo;
         } else {
             y = y * src->amp;

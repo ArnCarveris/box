@@ -140,7 +140,15 @@
                     "legato_notes",
                     "legato_after_release",
                     "legato_cancels_release",
-                    "stop_cancels_release"
+                    "stop_cancels_release",
+                    "spread_defaults",
+                    "spread_pitch",
+                    "spread_pitch_render",
+                    "spread_alternate",
+                    "spread_random",
+                    "spread_zero",
+                    "spread_clamped",
+                    "spread_removed"
                 ]
             },
             {
@@ -182,6 +190,7 @@
                 ]
             },
             {
+<<<<<<< HEAD
                 "id": "SynthWavetable",
                 "setup": true,
                 "testcases": [
@@ -202,6 +211,25 @@
                     "script",
                     "missing_table",
                     "delete_while_playing"
+=======
+                "id": "SynthPitch",
+                "testcases": [
+                    "start_returns",
+                    "negative_amount",
+                    "curve",
+                    "release_amount",
+                    "release_from_decay",
+                    "release_own_envelope",
+                    "legato_keeps",
+                    "layer",
+                    "sync_sweep",
+                    "pluck",
+                    "wide",
+                    "adds",
+                    "none_identical",
+                    "clamped",
+                    "script"
+>>>>>>> 4fef54b0995552551c5771b535d73f41b5fd74e9
                 ]
             },
             {
@@ -287,6 +315,20 @@
                 ]
             },
             {
+                "id": "Automation",
+                "testcases": [
+                    "filter_sweep",
+                    "volume_fade",
+                    "send_level",
+                    "eq_band",
+                    "loop",
+                    "stop",
+                    "seek",
+                    "unknown_member",
+                    "deterministic"
+                ]
+            },
+            {
                 "id": "Song",
                 "testcases": [
                     "first_sound",
@@ -310,6 +352,7 @@
                     "delay",
                     "modulation",
                     "saturator",
+                    "transient_shaper",
                     "synth_sub",
                     "synth_sync",
                     "synth_drive",
@@ -329,7 +372,9 @@
                     "stop_cancels",
                     "bit_identical",
                     "null_clock",
-                    "status_clock"
+                    "status_clock",
+                    "cancel_bus_set",
+                    "effect_params_at_frame"
                 ]
             },
             {
@@ -655,7 +700,17 @@
                     "component",
                     "world_duck",
                     "sidechain_cycle",
-                    "script"
+                    "script",
+                    "transient_attack",
+                    "transient_sustain",
+                    "transient_level",
+                    "transient_low",
+                    "transient_neutral",
+                    "transient_linked",
+                    "transient_no_click",
+                    "transient_render_sizes",
+                    "transient_component",
+                    "transient_script"
                 ]
             },
             {
@@ -686,6 +741,26 @@
                 ]
             },
             {
+                "id": "SynthLadder",
+                "testcases": [
+                    "self_oscillation",
+                    "rings_out",
+                    "slope_24",
+                    "bass",
+                    "kinds",
+                    "sweep_bounded",
+                    "wide",
+                    "svf_identical",
+                    "deterministic"
+                ]
+            },
+            {
+                "id": "SynthLadderWorld",
+                "testcases": [
+                    "component"
+                ]
+            },
+            {
                 "id": "SynthPreDrive",
                 "testcases": [
                     "harmonics",
@@ -696,6 +771,21 @@
                     "without_identical",
                     "layers_pass",
                     "clamped"
+                ]
+            },
+            {
+                "id": "SynthDrift",
+                "testcases": [
+                    "pitch_bounded",
+                    "pitch_bounded_filter",
+                    "unison_differ",
+                    "renders_identical",
+                    "plays_differ",
+                    "free_phase",
+                    "defaults_identical",
+                    "clamped",
+                    "pluck_follows",
+                    "script"
                 ]
             },
             {

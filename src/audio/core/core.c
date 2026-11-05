@@ -1020,6 +1020,8 @@ static void box_audio_cmd_timed(
         box_audio_cmd_voice_release(core, &cmd->release);
     } else if (cmd->header.type == BOX_AUDIO_CMD_LEGATO) {
         box_audio_cmd_legato(core, &cmd->legato);
+    } else if (cmd->header.type == BOX_AUDIO_CMD_EFFECT_PARAMS) {
+        box_audio_effect_params_command(core, &cmd->effect);
     } else {
         box_audio_cmd_bus_set(core, &cmd->set);
     }
@@ -1159,6 +1161,41 @@ static void box_audio_schedule_cancel(
     }
 }
 
+/** Drop the commands of the schedule that a cancel command names: the sets of a parameter of
+ * a bus, or the parameters of an effect slot.
+ *
+ * @param core The core
+ * @param cmd The cancel command
+ */
+static void box_audio_schedule_cancel_sets(
+    box_audio_core_t *core,
+    const box_audio_cmd_cancel_t *cmd)
+{
+    int32_t i, kept = 0;
+    for (i = 0; i < core->schedule_count; i ++) {
+        const box_audio_timed_cmd_t *c = &core->schedule[i].cmd;
+        uint16_t type = c->header.type;
+        bool drop = (cmd->type == BOX_AUDIO_CMD_BUS_SET && type == BOX_AUDIO_CMD_BUS_SET &&
+            c->set.target == cmd->target && c->set.param == cmd->param) ||
+            (cmd->type == BOX_AUDIO_CMD_EFFECT_PARAMS && type == BOX_AUDIO_CMD_EFFECT_PARAMS &&
+            c->effect.slot == cmd->target);
+        if (!drop) {
+            if (kept != i) {
+                core->schedule[kept] = core->schedule[i];
+            }
+
+            kept ++;
+        }
+    }
+
+    if (kept != core->schedule_count) {
+        core->schedule_count = kept;
+        for (i = kept / 2 - 1; i >= 0; i --) {
+            box_audio_schedule_down(core, i);
+        }
+    }
+}
+
 /** Take a command that takes effect on a frame: into the schedule when its frame is to come,
  * else at once. A stop that applies at once drops the scheduled commands of its handle first.
  * A full schedule applies the command at once and reports it late.
@@ -1206,6 +1243,7 @@ static void box_audio_cmd(
     box_audio_cmd_release_t release;
     box_audio_cmd_stream_t stream;
     box_audio_cmd_effect_t effect;
+    box_audio_cmd_cancel_t cancel;
     box_audio_cmd_synth_t synth;
     uint32_t layers;
     if (type == BOX_AUDIO_CMD_PLAY && size >= (int32_t)sizeof(box_audio_cmd_play_t)) {
@@ -1222,6 +1260,13 @@ static void box_audio_cmd(
         size >= (int32_t)sizeof(box_audio_cmd_set_t))
     {
         box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_set_t));
+    } else if (type == BOX_AUDIO_CMD_EFFECT_PARAMS &&
+        size >= (int32_t)sizeof(box_audio_cmd_effect_params_t))
+    {
+        box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_effect_params_t));
+    } else if (type == BOX_AUDIO_CMD_CANCEL && size >= (int32_t)sizeof(cancel)) {
+        box_audio_copy(&cancel, bytes, (int32_t)sizeof(cancel));
+        box_audio_schedule_cancel_sets(core, &cancel);
     } else if (type == BOX_AUDIO_CMD_ORDER && size >= (int32_t)sizeof(box_audio_cmd_order_t)) {
         box_audio_cmd_order(core, bytes, size);
     } else if (type == BOX_AUDIO_CMD_SOUND_RELEASE && size >= (int32_t)sizeof(release)) {

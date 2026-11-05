@@ -176,6 +176,7 @@ their tails end.
 | `Phaser` | `stages: 4`, `rate: 0.5` Hz, `depth: 0.7`, `center: 800` Hz, `feedback: 0`, `mix: 0.5`, `stereo: 0.5` |
 | `Chorus` | `voices: 2`, `rate: 0.8` Hz, `depth: 3` ms, `delay: 12` ms, `mix: 0.5`, `spread: 0.5` |
 | `Saturator` | `drive: 0.3`, `asymmetry: 0`, `bits: 16`, `mix: 1` |
+| `TransientShaper` | `attack: 0`, `sustain: 0` |
 
 Equalizer bands use `AudioEqOff`, `AudioEqPeak`, `AudioEqLowShelf`,
 `AudioEqHighShelf`, `AudioEqLowCut` or `AudioEqHighCut`. Defaults are 100, 400,
@@ -197,6 +198,17 @@ harmonics, and the DC it creates is filtered out. Below 16, `bits` runs a bit cr
 after the saturation: 4 bits gives 16 levels. Oversampling delays the bus by 15
 frames, and the dry signal is delayed the same amount, so `mix` does not comb.
 An `AudioMeter` on the saturator reads how hard the clipper squashes, in dB.
+
+A transient shaper gives drums and plucks more or less punch and more or less tail,
+without a threshold. Stereo linked like a compressor, it follows the peak of the
+louder channel with a fast envelope (1 ms attack, 20 ms release) and a slow one
+(20 ms attack, 200 ms release). Where the fast one is above the slow one the signal
+is a transient, otherwise it is sustain, which ends as soon as the next hit comes
+up. The gain follows their difference in dB, so
+it works the same at any level. `attack` from -1 to 1 softens or boosts transients,
+`sustain` from -1 to 1 shortens or boosts the tail, each by up to 12 dB. The gain is
+smoothed so it does not distort low notes, is the same on both channels, and 0 and 0
+pass the signal unchanged. It has no meter.
 
 For ducking, key a compressor on another channel:
 
@@ -277,12 +289,13 @@ voices on play, so edits affect subsequent plays.
 
 | Component | Authoring controls |
 | --- | --- |
-| `SynthSound` | `seed`, `pitch_variance`, `level_variance`; variances default to zero |
+| `SynthSound` | `seed`, `pitch_variance`, `level_variance`, `drift` (0 cents, 0..50), `free_phase` (false); variances default to zero |
 | `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), `sync` (0, off, 1..16), `color` (`SynthNoiseWhite`), modulation controls, `velocity` (0) |
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`, `key_scale`; all zero by default |
 | `SynthDrive` | Root: `drive` (0.3, 0..1), `asymmetry` (0, 0..1) |
-| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves), `keytrack` (0) |
+| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves), `keytrack` (0), `model` (`SynthFilterSvf` or `SynthFilterLadder`) |
 | `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves and `velocity` (0); requires a filter |
+| `SynthPitchEnvelope` | `amount` (0 semitones, -48..48), `decay` seconds, `curve` (0, -16..16), `release_amount` (0 semitones, -48..48), `sync` (0 semitones, -48..48) |
 | `SynthUnison` | Per layer: `voices` (3, 1..7), `detune` (10 cents, 0..100), `width` (0, 0..1) |
 | `SynthGlide` | Root: `time` seconds (0, up to 10), `legato` (false), `channel` (0) |
 | `SynthLfo` | `wave`, `rate` (5 Hz), `delay`, `fade`, `phase`, `random_phase`, destination depths |
@@ -322,6 +335,7 @@ sized by the jump, and a polyBLAMP for the slope of triangles and sines. Each un
 voice syncs to its own detuned master, the sub stays at the master, and phase
 modulation adds to the synced phase. `SynthNoise` and `SynthPluck` ignore it.
 
+<<<<<<< HEAD
 `SynthWavetable` plays the frames of a wavetable, single periods that the layer morphs
 through by a position. The `SynthTable` of the layer names the entity with the
 `Wavetable`, which is shared by every sound that names it. The built-in kinds are
@@ -363,10 +377,26 @@ has at most 256 frames; tables take sound ids of the core, which holds 1023 soun
 tables and synth patches together. In the `Synth` bench (`voices_64_wavetable`, 64 voices
 of two `WavetableHarmonics` layers into a lowpass, 48 kHz) the voices take about 2100 ns
 per sample (268 µs per 128-frame quantum), where `voices_64` takes about 780.
+=======
+`SynthPitchEnvelope` bends the pitch relative to the note, so one patch fits every
+pitch of an instrument, where `frequency_end` sweeps to one absolute frequency: the
+drop of a kick or a tom, the blip of a zap, the scoop of brass. A note starts `amount`
+semitones off and returns to the note over `decay`, with a `curve` that bends that
+return as `SynthEnvelope.curve` bends a decay. From the start of the release the offset
+moves from where it is to `release_amount` semitones, over the release of the layer's
+amplitude envelope, its own or the root's, with the same curve. `sync` is the semitones
+the ratio of hard sync starts off by, returning to the layer's `sync` with the decay:
+the classic sync sweep, on layers whose `sync` is over 1 only. On the root it moves
+every layer; on a layer it moves that layer in place of the root's. It adds to glides,
+sweeps and pitch LFOs, moves `SynthPluck` strings as vibrato does, runs at the control
+rate of the LFOs, does not keep a voice playing and is not restarted by a legato
+retarget.
+>>>>>>> 4fef54b0995552551c5771b535d73f41b5fd74e9
 
 ```flecs
 using box.audio
 
+<<<<<<< HEAD
 prefab Harmonics {
   Wavetable: {kind: WavetableHarmonics}
 }
@@ -377,6 +407,13 @@ prefab Morph {
   SynthOscillator: {wave: SynthWavetable, frequency: 220, level: 0.3}
   SynthTable: {table: Harmonics, position: 2, envelope: 20}
   SynthLfo: {wave: SynthLfoTriangle, rate: 0.5, position: 6}
+=======
+prefab Kick {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.001, decay: 0.35, sustain: 0, release: 0.05, curve: 4}
+  SynthPitchEnvelope: {amount: 36, decay: 0.08, curve: 6}
+  SynthOscillator: {frequency: 50, level: 0.8}
+>>>>>>> 4fef54b0995552551c5771b535d73f41b5fd74e9
 }
 ```
 
@@ -393,6 +430,32 @@ In the `Synth` bench of [bench/audio](../bench/audio/) (64 voices, 48 kHz, one
 128-frame quantum), drive raises a 12 dB filter from about 75 to 115 µs and a 24 dB
 filter with an envelope from about 125 to 170 µs: roughly 4 ns per stage and frame of
 a voice.
+
+`model: SynthFilterLadder` swaps the state variable filter for a transistor ladder:
+four one-pole stages with a tanh in each stage and in the feedback loop, solved with
+zero delay feedback, so it stays in tune up to the clamp of the cutoff under Nyquist
+without oversampling. `SynthSlope24` is the fat 4-pole lowpass and `SynthSlope12` its
+2-pole tap; `SynthHighPass`, `SynthBandPass` and `SynthNotch` mix the poles as a
+multimode ladder does. Resonance 1 self-oscillates: with no input, after a pluck, it
+rings as a near sine at the cutoff at a steady level, so the cutoff envelope, the LFOs
+and keytrack can play it as an oscillator. A ladder loses its bass as the resonance
+rises; the lowpass adds a share of its input to the feedback sum, which keeps the
+passband within about 2 dB of resonance 0. `drive` is the gain into the ladder, from
+-6 dB at 0 to +12 dB at 1, the output scaled back, so higher drives saturate the stages
+sooner. On the stereo path both channels run their own ladder.
+In the `Synth` bench (`voices_64_ladder`, 64 voices, 48 kHz, a 24 dB lowpass with an
+envelope) the ladder costs about 245 µs per 128-frame quantum against about 145 µs for
+the 24 dB state variable filter in the same run: about 12 ns more per voice and frame.
+
+```
+prefab Acid {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.002, decay: 0.2, sustain: 0.5, hold: 0.2, release: 0.1}
+  SynthFilter: {cutoff: 400, resonance: 0.85, slope: SynthSlope24, model: SynthFilterLadder}
+  SynthFilterEnvelope: {decay: 0.2, sustain: 0, amount: 3}
+  SynthOscillator: {wave: SynthSaw, frequency: 55, level: 0.6}
+}
+```
 
 `SynthDrive` on the root drives the mix of the layers of each voice through a tanh
 soft clipper before the filter, or before the amp without a filter: the stage where
@@ -491,6 +554,16 @@ it moves every layer whose `sync` is over 1.
 Delay and fade bring modulation in gradually. Random phase and noise are seeded,
 so the same sequence of plays is reproducible.
 
+`SynthSound.drift` adds analog drift, so digital patches are never perfectly in tune.
+The pitch of each layer of a voice, and of each unison copy, wanders on its own smooth
+random walk within ±`drift` cents, moving over roughly 0.2 to 2 seconds; the cutoff of
+the filter drifts per voice by a quarter of it in cents. Pluck strings follow the drift
+as they follow vibrato. It adds to the pitch LFOs and pitch envelopes, at their control
+rate. `SynthSound.free_phase` starts the oscillators of each play, and their subs, at a
+random phase instead of 0; unison copies always start at random phases. Both are seeded
+from `seed` and the count of plays, so the same sequence of plays renders the same; at
+their defaults a sound renders exactly as without them.
+
 `SynthGlide.time` moves pitch exponentially in frequency. With `legato: true`,
 notes on the same channel retarget a held voice without restarting its envelopes.
 They keep the original waves, levels, filters and variances; use patches from the
@@ -506,8 +579,14 @@ Working examples include [synth_examples.flecs](../test/assets/audio/synth_examp
 [synth_pluck.flecs](../test/assets/audio/synth_pluck.flecs),
 [synth_sub.flecs](../test/assets/audio/synth_sub.flecs),
 [synth_sync.flecs](../test/assets/audio/synth_sync.flecs),
+<<<<<<< HEAD
 [synth_wavetable.flecs](../test/assets/audio/synth_wavetable.flecs) and
 [synth_drive.flecs](../test/assets/audio/synth_drive.flecs).
+=======
+[synth_drive.flecs](../test/assets/audio/synth_drive.flecs),
+[synth_drift.flecs](../test/assets/audio/synth_drift.flecs) and
+[synth_pitch.flecs](../test/assets/audio/synth_pitch.flecs).
+>>>>>>> 4fef54b0995552551c5771b535d73f41b5fd74e9
 
 ## Music on the timeline
 
@@ -542,13 +621,23 @@ sampler over `release` seconds (0.05). With gate false, a hit plays as authored,
 regardless of duration. A nonlooping sample can end before its gate. Sampler notes
 start without the usual 5 ms fade to preserve transients.
 
+`spread` (0..1, default 0) spreads the notes of a synth or a sampler over the
+stereo field without a pan per note. Its offset is added to the note's `pan` and
+the sum is clamped to -1..1. `spread_mode` picks the offset:
+
+| Spread mode | Offset |
+| --- | --- |
+| `InstrumentSpreadPitch` (default) | `spread * clamp((pitch - root) / 24, -1, 1)`: low notes left, high notes right, full two octaves from the root |
+| `InstrumentSpreadRandom` | `spread` times a random value in -1..1 per note, seeded from the instrument and its note count, so a song renders the same every time |
+| `InstrumentSpreadAlternate` | `+spread` and `-spread` on successive notes |
+
 A `NoteClip` has a `length` (4 beats) and notes with `start`, `duration`, `pitch`,
 `velocity` (1) and `pan` (0). A `Track` supplies the instrument and brings an
 `AudioBus`. Its child `ClipPlacement` entities arrange clips:
 
 | Placement field | Meaning and default |
 | --- | --- |
-| `clip` | Reusable `NoteClip` or `AudioClip` |
+| `clip` | Reusable `NoteClip`, `AudioClip` or `AutomationClip` |
 | `start` | Beat on the timeline |
 | `duration` | 0 uses clip length minus placement offset |
 | `loop` | False; true repeats passes until duration ends |
@@ -616,6 +705,70 @@ placements. Placement offsets remain in beats; transpose changes pitch and speed
 together. Audio is not stretched to tempo. Each looping pass starts a new voice;
 its seam uses the 5 ms stop fade. A seek or start within an audio placement resumes
 inside the relevant pass, unlike note clips.
+
+### Automation
+
+An `AutomationClip` moves one float member of a bus or an effect over beats: a
+filter sweep, a send that opens for a chorus, the fade of a track. It is placed
+with a `ClipPlacement` on a `Track` like any clip; `start`, `duration`, `offset`
+and `loop` work the same, `gain` and `transpose` are ignored, and a track of only
+automation needs no instrument.
+
+| Field | Meaning and default |
+| --- | --- |
+| `target` | The entity with the `AudioBus` or the effect component |
+| `component` | `AudioBus` or an effect component, such as `AudioFilter` |
+| `member` | Path of a float member: `cutoff`, `volume`, `sends[1].level`, `bands[2].gain` |
+| `length` | Beats of a pass, 4 |
+| `curve` | A [Curve](curves.md): time in beats from the clip start, value in member units |
+
+```flecs
+using box.audio
+
+synth {
+  AudioBus: {effects: [synth]}
+  AudioFilter: {cutoff: 1000}
+}
+
+prefab sweep {
+  AutomationClip: {target: synth, component: AudioFilter, member: "cutoff",
+    curve: {kind: CurveCatmullRom, keys: [{0, 200}, {2, 1200}, {4, 5000}]}}
+}
+
+lanes {
+  Track: {}
+  rise { ClipPlacement: {clip: sweep, start: 16, duration: 16, loop: true} }
+}
+```
+
+An `AudioBus` automates `volume`, `pan`, `width` and the `level` of its sends; the
+master automates its `volume`, `pan` and `width`. An effect automates every float
+member of its effect component: Reverb, Equalizer bands, AudioFilter, Compressor,
+Gate, Delay, Phaser, Chorus, Saturator and later effects. Kinds, slopes, stages,
+voices, entities and bools are not continuous and not automatable. A clip whose
+target, component or member is unknown or not automatable logs one error that
+names it and does nothing until it changes.
+
+While the transport plays, each lane samples its curve within the lookahead window
+every 10 ms of output and at its keys, and schedules every value at its frame. A
+bus ramps to each value as it does to any set. An effect gets a copy of its
+component with the automated members written, through the same parameter builder as
+any change of the component, and smooths the step over its usual 10 to 20 ms.
+Several lanes may move members of one effect; on one bus parameter the lane that
+starts last wins. At a loop wrap the lanes go on from `loop_start`. A seek, a stop
+and a change of the clip, the placement, the track or the component of the target
+cancel what was scheduled ahead and schedule again.
+
+The automation owns what the output hears, never the component. Game code reads
+and writes the authored value, which the automation does not change. Where no lane
+covers a target, and while the transport is stopped, the output has the value of
+the component: the end of a placement and a stop send it again. A write of the
+component while a lane runs applies at once and holds until the next value of the
+lane, at most 10 ms later. Scheduled values travel as `BUS_SET` and
+`EFFECT_PARAMS` commands with a frame, and a `CANCEL` command drops them; see
+[core.h](../src/audio/core/core.h).
+[automation.flecs](../test/assets/audio/automation.flecs) sweeps a filter, fades a
+track and opens a send.
 
 For a complete mixed song with samples, returns, ducking and a quantized game
 stinger, see [song.flecs](../test/assets/audio/song.flecs). Wait for its sound files
@@ -731,7 +884,7 @@ other writers send 1. The velocity makes a play command 48 bytes and a legato co
 a writer buffer of a given size holds fewer of them than before.
 
 The core owns a 64-bit rendered-frame clock. Scheduled play, stop, voice/bus set,
-release and legato commands carry a frame time. Future commands wait in a fixed
+release, legato and effect params commands carry a frame time. Future commands wait in a fixed
 4096-entry schedule; a full schedule applies the command immediately and reports
 `BOX_AUDIO_EVENT_LATE`. Immediate stops also cancel scheduled commands for their
 voice handle. Sound memory is freed by its owner after `SOUND_FREE`, which is
@@ -739,10 +892,17 @@ retained even when other events overflow. See [core.h](../src/audio/core/core.h)
 and [transport.h](../src/audio/transport.h) for the low-level APIs.
 
 The main limits are 64 voices, 64 buses, 64 effects, four inserts and sends per
+<<<<<<< HEAD
 bus, eight synth layers, two synth LFOs, seven unison copies per layer,
 32 pluck strings and 256 frames per wavetable, whose tables share the 1023 sound ids. Effects are algorithmic: no convolution or geometry-derived rooms.
 There is one transport and one music stream per world. There are no automation
 lanes, tempo ramps, time stretching, MIDI I/O, plugins, mixer UI or piano roll.
+=======
+bus, eight synth layers, two synth LFOs, seven unison copies per layer and
+32 pluck strings. Effects are algorithmic: no convolution or geometry-derived rooms.
+There is one transport and one music stream per world. There are no tempo ramps,
+time stretching, MIDI I/O, plugins, mixer UI or piano roll.
+>>>>>>> 4fef54b0995552551c5771b535d73f41b5fd74e9
 Scripts can change channel and effect values each frame.
 
 Offline coverage lives in [test/cpu/audio](../test/cpu/audio/); browser and end-to-end

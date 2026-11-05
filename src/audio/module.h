@@ -557,6 +557,80 @@ typedef struct box_audio_sequencer_t {
     box_audio_sequencer_stats_t stats; /**< Counters */
 } box_audio_sequencer_t;
 
+/** Seconds between the values an automation samples from its curve, besides its keys */
+#define BOX_AUDIO_AUTOMATION_STEP (0.01)
+
+/** Bytes of the largest effect component an automation copies */
+#define BOX_AUDIO_AUTOMATION_COMPONENT (256)
+
+/** What an automation moves in the core */
+typedef enum box_audio_target_kind_t {
+    BOX_AUDIO_TARGET_BUS = 1,       /**< A parameter of a bus, with BUS_SET */
+    BOX_AUDIO_TARGET_EFFECT = 2     /**< The parameters of an effect slot, with EFFECT_PARAMS */
+} box_audio_target_kind_t;
+
+/** A parameter of a bus or an effect entity that automation lanes move, kept across the
+ * frames to cancel and restore what was scheduled for it */
+typedef struct box_audio_target_t {
+    box_audio_target_kind_t kind; /**< What it is */
+    ecs_entity_t entity;    /**< The bus or the effect entity */
+    ecs_entity_t component; /**< AudioBus or the effect component */
+    uint32_t param;         /**< The box_audio_param_t of a bus */
+    int32_t send;           /**< Index of the send of a send level, -1 for another parameter */
+    uint32_t index;         /**< Bus index or effect slot the last value went to */
+    uint32_t effect;        /**< Kind of effect the last value went to */
+    uint32_t serial;        /**< Serial of the output the last value went to, 0 for none */
+    uint64_t ahead;         /**< Frame of the last value scheduled, 0 for none */
+    bool held;              /**< The last value sent is the value of its component */
+    bool live;              /**< Some lane of this rebuild moves it */
+    bool busy;              /**< A lane of the segment moves it, or it is not held */
+} box_audio_target_t;
+
+/** A ClipPlacement of an AutomationClip on a Track, resolved */
+typedef struct box_audio_lane_t {
+    ecs_entity_t placement; /**< The placement */
+    ecs_entity_t track;     /**< Its track */
+    ecs_entity_t clip;      /**< The entity with AutomationClip */
+    double start;           /**< First beat on the timeline */
+    double end;             /**< Beat after the last one */
+    double offset;          /**< Beats into the clip at which the placement starts */
+    double length;          /**< Beats of a pass of a placement that loops, 0 when it does
+                             *   not */
+    int32_t target;         /**< Index of its target */
+    bool on;                /**< Its track and placement play and its clip exists, as of the
+                             *   window */
+} box_audio_lane_t;
+
+/** A frame a segment samples its automation at, with the beat it samples */
+typedef struct box_audio_automation_point_t {
+    uint64_t frame;         /**< Frame of the value */
+    double beat;            /**< Beat of the timeline the value is taken at */
+} box_audio_automation_point_t;
+
+/** Counters of the automation, for the tests */
+typedef struct box_audio_automation_stats_t {
+    int64_t bus_sets;       /**< BUS_SET commands of automated values written */
+    int64_t effect_sets;    /**< EFFECT_PARAMS commands written */
+    int64_t restores;       /**< Values of a component sent after a lane ended */
+    int64_t cancels;        /**< CANCEL commands written */
+    int64_t rebuilds;       /**< Rebuilds of the lanes */
+    int64_t errors;         /**< Clips whose error was logged */
+} box_audio_automation_stats_t;
+
+/** The automation lanes of the timeline, in automation.c */
+typedef struct box_audio_automation_t {
+    ecs_vec_t lanes;        /**< box_audio_lane_t, in the order of the placements */
+    ecs_vec_t targets;      /**< box_audio_target_t */
+    ecs_vec_t past;         /**< box_audio_segment_t of the earlier windows that did not
+                             *   play yet, which a change schedules again */
+    ecs_vec_t points;       /**< box_audio_automation_point_t, what a segment samples */
+    ecs_map_t logged;       /**< Clips whose error was logged, until they change */
+    bool dirty;             /**< The lanes need a rebuild and what they scheduled ahead a
+                             *   new schedule */
+    double expect;          /**< Beat the next segment starts at, NAN after a reset */
+    box_audio_automation_stats_t stats; /**< Counters */
+} box_audio_automation_t;
+
 /** The state of the module in a world */
 typedef struct box_audio_module_t {
     ecs_query_t *buses;           /**< AudioBus, disabled ones included */
@@ -604,6 +678,8 @@ typedef struct box_audio_module_t {
     uint8_t order[BOX_AUDIO_BUS_MAX]; /**< Bus indices of the last valid order, master last */
     int32_t order_count;          /**< Buses in order */
     ecs_map_t voices;             /**< Voice handle to source entity */
+    ecs_map_t spread_notes;       /**< Instrument entity to the count of the notes it played,
+                                   *   for the random and alternate spread */
     ecs_vec_t oneshots;           /**< box_audio_oneshot_t */
     ecs_vec_t plays;              /**< box_audio_play_t */
     ecs_vec_t notes;              /**< box_audio_note_t */
@@ -628,6 +704,7 @@ typedef struct box_audio_module_t {
     box_audio_listener_t listener;   /**< The listener of the last frame */
     box_audio_timeline_t timeline;   /**< The timeline of the Transport */
     box_audio_sequencer_t sequencer; /**< The tracks of the timeline */
+    box_audio_automation_t automation; /**< The automation lanes of the timeline */
     bool listener_warned;         /**< The warning of several listeners was logged */
     bool spatial_dirty;           /**< Update every spatial source, not only changed ones */
     bool waiting;                 /**< The page waited for a gesture in the last frame */
@@ -715,6 +792,45 @@ int32_t box_audio_module_effect_slot(
 uint32_t box_audio_module_effect_kind(
     const ecs_world_t *world,
     ecs_entity_t e,
+    float *params);
+
+/** Largest number of effect components */
+#define BOX_AUDIO_EFFECT_COMPONENTS (16)
+
+/** Get the effect components: Reverb, Equalizer, AudioFilter, Compressor, Gate, Delay, Phaser,
+ * Chorus and Saturator, in the order an entity that has several takes the first of. A new
+ * effect is added here and to box_audio_module_effect_params.
+ *
+ * @param out Receives up to BOX_AUDIO_EFFECT_COMPONENTS components
+ * @return Number of components
+ */
+int32_t box_audio_module_effect_components(
+    ecs_entity_t *out);
+
+/** Get the effect component of an entity: the first of box_audio_module_effect_components it
+ * has, which gives its kind.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The component, 0 for an entity that is no effect
+ */
+ecs_entity_t box_audio_module_effect_component(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Build the parameters of an effect from a value of its component, the builder of the EFFECT
+ * commands; the automation of the timeline runs it on a copy with an automated member.
+ *
+ * @param world The world, for the tempo of a synced Delay
+ * @param component The effect component, such as ecs_id(AudioFilter)
+ * @param ptr The value of the component, NULL for the kind alone
+ * @param params Receives the BOX_AUDIO_EFFECT_PARAMS parameters, may be NULL
+ * @return A box_audio_effect_kind_t, BOX_AUDIO_EFFECT_NONE for a component that is no effect
+ */
+uint32_t box_audio_module_effect_params(
+    const ecs_world_t *world,
+    ecs_entity_t component,
+    const void *ptr,
     float *params);
 
 
@@ -1357,6 +1473,15 @@ uint32_t box_audio_instrument_voice(
     bool release,
     uint8_t priority);
 
+/** Register the observer that drops the spread note count of a removed Instrument.
+ *
+ * @param world The world
+ * @param state The state
+ */
+void box_audio_instrument_init(
+    ecs_world_t *world,
+    box_audio_module_t *state);
+
 /** Register the observers and the timeline hook of the clips and tracks.
  *
  * @param world The world
@@ -1371,6 +1496,23 @@ void box_audio_sequencer_init(
  * @param state The state
  */
 void box_audio_sequencer_fini(
+    box_audio_module_t *state);
+
+/** Register the observers and the timeline hook of the automation clips. After
+ * box_audio_sequencer_init, whose query of the placements it shares.
+ *
+ * @param world The world
+ * @param state The state
+ */
+void box_audio_automation_init(
+    ecs_world_t *world,
+    box_audio_module_t *state);
+
+/** Free the automation lanes of the module.
+ *
+ * @param state The state
+ */
+void box_audio_automation_fini(
     box_audio_module_t *state);
 
 /** Send the notes of box_audio_play_note, each at the clock of the output with its release
