@@ -167,8 +167,8 @@ pure and allocate nothing. Keyed curves use a different format; see [Curves](cur
   [Adding and removing](#adding-and-removing)); a removed value that leaves an
   inherited one always snaps to it. Adding a component snaps unless its entry has
   `on_add`. Removing the map entry or `Transition` snaps to target, also during an
-  `on_remove` animation. Invalidating an entry also snaps. Changing a spec leaves a running transition alone until
-  the next value change.
+  `on_remove` animation. Invalidating an entry also snaps. Changing a spec leaves a
+  running transition alone until the next value change.
 - Disabling an entity cancels its transition and hides it. Re-enabling shows its
   current target as a first value; later changes animate again. Deletion drops state.
 - Rotation interpolates Euler axes without wrapping or choosing a shortest path.
@@ -200,8 +200,9 @@ alpha-tested casters update their shadow tiles as alpha changes.
 `SpecularAnisotropy.rotation` also interpolates without wrapping; it wraps only when
 packed for rendering. Adding or removing material components snaps, unless the
 entry has `on_add` or `on_remove` and the component has a neutral value; adding or
-removing `AlphaCutoff` or `Transmission` changes the batch and always snaps. Texture handles (`PbrTextures`), computed components (`WorldTransform`,
-`MaterialId`), enums and tags cannot transition.
+removing `AlphaCutoff` or `Transmission` changes the batch and always snaps. Texture
+handles (`PbrTextures`), computed components (`WorldTransform`, `MaterialId`), enums
+and tags cannot transition.
 
 ### Box shadows
 

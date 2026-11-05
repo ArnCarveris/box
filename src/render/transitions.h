@@ -164,9 +164,10 @@ bool box_transitions_opts(
  *
  * With on_add a value of a node that had none, owned or inherited, in the last frame sets the
  * neutral value and starts from it in the same packet. With on_remove a removed value without an
- * inherited one starts to the neutral value and the slot leaves until it no longer runs. A
- * transform component and a BoxShadow keep the range of their targets since they were last idle,
- * widened by what the curve overshoots, as the resolver starts from the value it renders.
+ * inherited one starts to the neutral value and the slot leaves until it no longer runs.
+ *
+ * A transform component and a BoxShadow keep the range of their targets since they were last
+ * idle, widened by what the curve overshoots, as the resolver starts from the value it renders.
  *
  * @param world The world
  * @param s The state of the extract

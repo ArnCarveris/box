@@ -68,8 +68,9 @@ ECS_STRUCT(TransitionSpec, {
 
 /** Map from a component id to the TransitionSpec of its changes, inherited by instances that
  * do not set their own. In script: Transition: [Position: {...}]. An invalid entry
- * (box_transition_valid) logs an error and is ignored. A new value animates; adding and removing
- * the component animate only with on_add and on_remove.
+ * (box_transition_valid) logs an error and is ignored.
+ *
+ * A new value animates; adding and removing the component animate only with on_add and on_remove.
  *
  * A flecs map (ecs_map_t) keyed by the component entity, whose values are allocated
  * TransitionSpecs: read one with ecs_map_get_deref(map, TransitionSpec, component), write one
@@ -136,9 +137,10 @@ bool box_transition_supported(
  *
  * Rotation, Scale, Opacity, Tint, Emissive, PbrMaterial, TextureTransform, ClearCoat,
  * SpecularAnisotropy, Sheen and DiffuseTransmission can in both directions, BoxShadow only when
- * added: a removed BoxShadow frees its shadow at once. Position, Rgb, AlphaCutoff, Transmission
- * and every component that cannot transition have no neutral value. on_add or on_remove on one
- * of them logs an error and is ignored, the rest of the entry is used.
+ * added: a removed BoxShadow frees its shadow at once.
+ *
+ * Position, Rgb, AlphaCutoff, Transmission and the components that cannot transition have no
+ * neutral value: on_add or on_remove on one of them logs an error and is ignored.
  *
  * @param world The world
  * @param component The component id
