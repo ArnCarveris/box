@@ -766,7 +766,9 @@ void Widgets_scroll_content_added_after_bars(void) {
  * reports a change, and a probe that counts the on.change of the second, its on.activate events
  * and those ui.activation counts.
  *
- * On screen go is at [440, 260], plain at [840, 260]. */
+ * Two disabled buttons, one with the action, the other watched by a second probe.
+ *
+ * On screen go is at [440, 260], plain at [840, 260], stop at [440, 460], off at [840, 460]. */
 #define WIDGETS_BUTTONS \
     "using flecs.script\n" \
     "using box.widgets\n" \
@@ -814,11 +816,20 @@ void Widgets_scroll_content_added_after_bars(void) {
     "    Position: {200, 100, 1}\n" \
     "    Rect: {100, 40}\n" \
     "  }\n" \
+    "  HeadlessButton stop(action: actions.play, disabled: true) {\n" \
+    "    Position: {-200, -100, 1}\n" \
+    "    Rect: {100, 40}\n" \
+    "  }\n" \
+    "  HeadlessButton off(disabled: true) {\n" \
+    "    Position: {200, -100, 1}\n" \
+    "    Rect: {100, 40}\n" \
+    "  }\n" \
     "}\n" \
     "hud_view {\n" \
     "  View: {camera: hud.camera}\n" \
     "}\n" \
-    "probe { ButtonProbe: {target: hud.plain} }\n"
+    "probe { ButtonProbe: {target: hud.plain} }\n" \
+    "probe_off { ButtonProbe: {target: hud.off} }\n"
 
 /** The muts of ButtonProbe */
 typedef struct {
@@ -858,7 +869,24 @@ static int32_t widgets_run(
     return result;
 }
 
-/** Get the muts of the ButtonProbe.
+/** Get the muts of a ButtonProbe.
+ *
+ * @param world The world
+ * @param name Name of the probe
+ * @return The muts
+ */
+static const widgets_button_t* widgets_probe(
+    ecs_world_t *world,
+    const char *name)
+{
+    const widgets_button_t *result = ecs_get_id(world, ecs_lookup(world, name),
+        ecs_lookup(world, "ButtonProbe.mut"));
+    test_assert(result != NULL);
+
+    return result;
+}
+
+/** Get the muts of the ButtonProbe of plain.
  *
  * @param world The world
  * @return The muts
@@ -866,11 +894,7 @@ static int32_t widgets_run(
 static const widgets_button_t* widgets_button(
     ecs_world_t *world)
 {
-    const widgets_button_t *result = ecs_get_id(world, ecs_lookup(world, "probe"),
-        ecs_lookup(world, "ButtonProbe.mut"));
-    test_assert(result != NULL);
-
-    return result;
+    return widgets_probe(world, "probe");
 }
 
 void Widgets_shell_click_taps_button_action(void) {
@@ -920,6 +944,63 @@ void Widgets_shell_click_changes_button(void) {
     widgets_run(world, s, "click hud.plain right");
     test_int(widgets_button(world)->activations, 3);
     test_int(widgets_button(world)->changes, 3);
+
+    ecs_fini(world);
+}
+
+void Widgets_shell_press_release_button(void) {
+    // ui/widgets
+    ecs_world_t *world = widgets_scene(WIDGETS_BUTTONS);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    widgets_frames(world);
+
+    // release after press on the button activates it as click does
+    widgets_run(world, s, "press hud.plain");
+    test_int(widgets_button(world)->changes, 0);
+    widgets_run(world, s, "release");
+    test_int(widgets_button(world)->raw, 1);
+    test_int(widgets_button(world)->activations, 1);
+    test_int(widgets_button(world)->changes, 1);
+
+    // and taps the action of a button with one
+    test_int(widgets_run(world, s, "press hud.go"), 0);
+    test_int(widgets_run(world, s, "release"), 1);
+
+    // A right press and release does not
+    widgets_run(world, s, "press hud.plain right");
+    widgets_run(world, s, "release");
+    test_int(widgets_button(world)->activations, 1);
+    test_int(widgets_button(world)->changes, 1);
+    widgets_run(world, s, "press hud.go right");
+    test_int(widgets_run(world, s, "release"), 0);
+
+    ecs_fini(world);
+}
+
+void Widgets_shell_click_disabled_button(void) {
+    // ui/widgets
+    ecs_world_t *world = widgets_scene(WIDGETS_BUTTONS);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    widgets_frames(world);
+
+    // A disabled button does not report a change for the click command of the shell
+    widgets_run(world, s, "click hud.off");
+    test_int(widgets_probe(world, "probe_off")->raw, 1);
+    test_int(widgets_probe(world, "probe_off")->activations, 0);
+    test_int(widgets_probe(world, "probe_off")->changes, 0);
+
+    // nor taps its action
+    test_int(widgets_run(world, s, "click hud.stop"), 0);
+
+    // As for a real click
+    test_int(widgets_run(world, s, "mouse_click left [440, 460]"), 0);
+    widgets_run(world, s, "mouse_click left [840, 460]");
+    test_int(widgets_probe(world, "probe_off")->changes, 0);
+
+    // The enabled buttons still activate
+    test_int(widgets_run(world, s, "click hud.go"), 1);
+    widgets_run(world, s, "click hud.plain");
+    test_int(widgets_button(world)->changes, 1);
 
     ecs_fini(world);
 }

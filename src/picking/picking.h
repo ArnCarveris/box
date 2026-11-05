@@ -191,7 +191,8 @@ struct box_pick_state_t {
     box_pick_hold_t holds[BOX_PICK_BUTTONS]; /**< Hold trigger of each button */
     box_pick_hook_t hook;   /**< Follows the delivered events */
     const box_pick_t *sending; /**< Pick of the event being delivered, NULL between events */
-    EcsScriptMouseEvent event; /**< Pointer event being delivered, else the last one delivered */
+    EcsScriptMouseEvent event; /**< Pointer event being delivered, else the last one delivered,
+                                *   its id is the one flecs gave it once it was delivered */
     bool has_event;         /**< A pointer event was delivered, so event is set */
 };
 
@@ -326,6 +327,23 @@ void box_pick_triggers(
     box_pick_state_t *st,
     const EcsScriptMouseEvent *src,
     const box_pick_t *pick,
+    uint32_t pressed,
+    uint32_t released);
+
+/** Drive the triggers from a pointer event that flecs.script.input delivered to an entity
+ * without box.picking, as the press, release and click commands of the shell do.
+ *
+ * The event goes to the Interactive entity on the path of its target, and a release counts over
+ * that target in place of a pick at the cursor.
+ *
+ * @param world The world
+ * @param evt The event, as flecs delivered it
+ * @param pressed The buttons that went down with the event
+ * @param released The buttons that came up with the event
+ */
+void box_pick_triggers_direct(
+    ecs_world_t *world,
+    const EcsScriptMouseEvent *evt,
     uint32_t pressed,
     uint32_t released);
 

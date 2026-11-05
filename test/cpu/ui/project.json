@@ -422,7 +422,9 @@
                     "list_keeps_width",
                     "scroll_content_added_after_bars",
                     "shell_click_taps_button_action",
-                    "shell_click_changes_button"
+                    "shell_click_changes_button",
+                    "shell_press_release_button",
+                    "shell_click_disabled_button"
                 ]
             },
             {
