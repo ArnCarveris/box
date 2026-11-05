@@ -136,8 +136,8 @@ static uint64_t box_draws_hash(
         h = (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull + key->textures[i];
     }
 
-    h ^= ((((((uint64_t)key->shadow * 2 + key->bake) * 2 + key->box_shadow) * 2 + key->slice) *
-        2 + key->texture_blend) * 2 + key->polygon) * 0x94D049BB133111EBull;
+    h ^= (((((((uint64_t)key->shadow * 2 + key->bake) * 2 + key->box_shadow) * 2 + key->slice) *
+        2 + key->texture_blend) * 2 + key->polygon) * 2 + key->fixture) * 0x94D049BB133111EBull;
     h ^= ((uint64_t)key->atlas + 1) * 0xD6E8FEB86659FD93ull;
 
     return h ^ (h >> 29);
@@ -159,7 +159,8 @@ static bool box_draws_key_eq(
         a->dynamic_transform == b->dynamic_transform &&
         a->dynamic_material == b->dynamic_material &&
         a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures, ECS_SIZEOF(a->textures)) &&
-        a->shadow == b->shadow && a->bake == b->bake && a->atlas == b->atlas &&
+        a->shadow == b->shadow && a->fixture == b->fixture && a->bake == b->bake &&
+        a->atlas == b->atlas &&
         a->surface == b->surface && a->box_shadow == b->box_shadow && a->slice == b->slice &&
         a->texture_blend == b->texture_blend && a->polygon == b->polygon;
 }
@@ -1754,6 +1755,7 @@ static void box_draws_send_batch(
     out->cutout = b->key.cutout;
     out->transmissive = b->key.transmissive;
     out->shadow = b->key.shadow;
+    out->fixture = b->key.fixture;
     out->bake = b->key.bake;
     out->mesh = b->key.mesh;
     box_draws_batch_textures(d, b, out);
@@ -1867,6 +1869,7 @@ static void box_draws_send_blended(
             out->cutout = b->key.cutout;
             out->transmissive = b->key.transmissive;
             out->shadow = b->key.shadow;
+            out->fixture = b->key.fixture;
             out->mesh = b->key.mesh;
             box_draws_batch_textures(d, b, out);
             box_draws_batch_blend(p, d, b, out);

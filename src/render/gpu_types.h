@@ -424,7 +424,9 @@ typedef struct box_gpu_cull_job_t {
     float extent[3];                /**< Half size of the mesh bounds */
     uint32_t list;                  /**< 1 when first indexes the slot lists, 0 for a range */
     uint32_t mask;                  /**< Frustums of its group that draw a parallel job */
-    uint32_t pad[3];                /**< Pads the job to the size of Job in cull.wgsl */
+    uint32_t fixture;               /**< 1 for a batch of LightFixture shapes: a frustum with a
+                                     *   light inside the world box of an instance skips it */
+    uint32_t pad[2];                /**< Pads the job to the size of Job in cull.wgsl */
 } box_gpu_cull_job_t;
 
 /** A frustum of a cull group in the uniforms, as in Frustum of cull.wgsl */
@@ -433,6 +435,8 @@ typedef struct box_gpu_cull_frustum_t {
     vec4 clip_w;                    /**< Row of the view projection that gives clip w */
     vec4 size;                      /**< Pixels per unit at w 1, smallest size, w guard, unused */
     uint32_t flags[4];              /**< Index of its counters, its flags, two unused */
+    vec4 light;                     /**< World position of the light of a shadow tile, w 1, w 0
+                                     *   for a frustum without a light */
 } box_gpu_cull_frustum_t;
 
 /** A frustum a cull group is built with */

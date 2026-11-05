@@ -70,7 +70,7 @@ void LightModes_realtime_light_left_out_of_bake(void) {
         ecs_add(world, scene, Scene);
         if (i) {
             ecs_set(world, scene, LightBake, {.probe_spacing = 1.4f, .bounds_padding = -0.4f,
-                .capture_size = 16, .budget_ms = 2, .bounces = 0});
+                .capture_size = 16, .budget_ms = 2, .bounces = 0, .compute = true});
         }
 
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
@@ -173,7 +173,7 @@ void LightModes_baked_light_only_in_probes(void) {
         ecs_entity_t scene = ecs_new(world);
         ecs_add(world, scene, Scene);
         ecs_set(world, scene, LightBake, {.probe_spacing = 1.4f, .bounds_padding = -0.4f,
-            .capture_size = 16, .budget_ms = 2, .bounces = 0});
+            .capture_size = 16, .budget_ms = 2, .bounces = 0, .compute = true});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
         ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
         ecs_set(world, camera, Position, {0, 1.5f, 2.4f});
@@ -335,7 +335,7 @@ void LightModes_mode_change_rebakes_reach(void) {
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
-        .capture_size = 8, .budget_ms = 2, .bounces = 0});
+        .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, camera, Position, {0, 4, 10});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -392,7 +392,7 @@ void LightModes_baked_sun_leaves_shadows_to_next(void) {
         ecs_singleton_modified(world, App);
 
         ecs_singleton_set(world, LightBake, {.probe_spacing = 10, .bounds_padding = 0,
-            .capture_size = 8, .budget_ms = 0, .bounces = 0});
+            .capture_size = 8, .budget_ms = 0, .bounces = 0, .compute = true});
         ecs_entity_t camera = ecs_new(world);
         ecs_set(world, camera, Position, {0, 10, 0});
         ecs_set(world, camera, Rotation, {-(float)GLM_PI_2, 0, 0});
@@ -462,7 +462,7 @@ void LightModes_first_realtime_light_drops_default_sun(void) {
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
-        .capture_size = 8, .budget_ms = 2, .bounces = 0});
+        .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, camera, Position, {0, 4, 10});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -523,7 +523,7 @@ void LightModes_baked_light_lights_probes_like_mixed(void) {
         ecs_entity_t scene = ecs_new(world);
         ecs_add(world, scene, Scene);
         ecs_set(world, scene, LightBake, {.probe_spacing = 1.4f, .bounds_padding = -0.4f,
-            .capture_size = 16, .budget_ms = 2, .bounces = 0});
+            .capture_size = 16, .budget_ms = 2, .bounces = 0, .compute = true});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
         ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
         ecs_set(world, camera, Position, {0, 1.5f, 2.4f});
@@ -604,7 +604,7 @@ void LightModes_captures_follow_first_non_realtime_sun(void) {
         ecs_singleton_modified(world, App);
 
         ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0,
-            .capture_size = 8, .budget_ms = 2, .bounces = 0});
+            .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
         ecs_singleton_set(world, AmbientLight, {.intensity = 0});
         ecs_entity_t camera = ecs_new(world);
         ecs_set(world, camera, Position, {0, 8, 0});

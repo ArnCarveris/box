@@ -437,14 +437,16 @@ static void box_bake_status(
     bool same_error = v->error
         ? status->error && !strcmp(status->error, v->error)
         : !status->error;
+    bool held = !v->compute && !v->converged && !v->error && v->probes;
     if (status->probes != v->probes || status->baked != baked || status->pass != pass ||
-        status->converged != v->converged || !same_error)
+        status->converged != v->converged || status->held != held || !same_error)
     {
         LightBakeStatus value = *status;
         value.probes = v->probes;
         value.baked = baked;
         value.pass = pass;
         value.converged = v->converged;
+        value.held = held;
         value.error = ECS_CONST_CAST(char*, v->error);
         ecs_set_ptr(it->stage, v->entity, LightBakeStatus, &value);
     }
@@ -1494,7 +1496,7 @@ static void box_bake_progress(
         v->switches += v->converged && !converged;
         v->settled |= v->converged;
         v->pending = gpu && v->handle && v->sent && v->viewed && !v->error &&
-            v->budget_ms > 0 && !v->converged;
+            v->budget_ms > 0 && v->compute && !v->converged;
         if (v->pending) {
             box_bake_schedule(b, p, v, app && app->headless, packet);
             int32_t left = box_bake_complete(v);
@@ -1620,6 +1622,7 @@ static void BoxRenderExtractBake(
             v->environment = bakes[row].environment;
             v->capture_size = bakes[row].capture_size;
             v->budget_ms = bakes[row].budget_ms;
+            v->compute = bakes[row].compute;
             v->threshold.light = bakes[row].light_threshold;
             v->threshold.color = bakes[row].color_threshold;
             if (v->bounces != bakes[row].bounces) {

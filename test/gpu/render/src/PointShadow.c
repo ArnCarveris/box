@@ -513,7 +513,7 @@ void PointShadow_baked_light_has_no_tile(void) {
     ecs_entity_t light, slab;
     ecs_world_t *world = point_scene(&light, &slab);
     ecs_singleton_set(world, LightBake, {.probe_spacing = 4, .bounces = 0, .capture_size = 8,
-        .budget_ms = 2, .bounds_padding = 1});
+        .budget_ms = 2, .bounds_padding = 1, .compute = true});
     PointLight *p = ecs_get_mut(world, light, PointLight);
     p->bake = LightBakeModeBaked;
     ecs_modified(world, light, PointLight);

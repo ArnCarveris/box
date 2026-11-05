@@ -164,32 +164,40 @@ ECS_STRUCT(RoundedBox, {
     int32_t segments; /**< Subdivisions per corner rounded up to even, default 4 */
 });
 
-/** Rounded edges of the Box of the entity, with one radius for every edge or one per edge.
+/** Rounded edges of a Box, Cylinder, Frustum, Cone, Tube, TrianglePrism, RightTrianglePrism or
+ * ProfileExtrusion. Radii are in the units of the shape, whatever its size; radii that do not
+ * fit scale down together as in a CSS border-radius.
  *
- * Right is +X, top is +Y and front is +Z, the side facing a camera that looks down its -Z. Radii
- * are in the units of the Box; edge radii that do not fit scale down together as in a CSS
- * border-radius, and each corner blends between the three edges that meet there.
+ * A Box takes radius or its 12 edge radii, a round shape radius or top and bottom for its outer
+ * and inner rims (a Cone has its bottom rim only), a prism radius only, and a ProfileExtrusion
+ * radius or top and bottom for the edges of its caps around the outline and the holes.
  *
- * Without a Box it has no effect, and it does not apply to other shapes such as RoundedBox.
- * Resizing a beveled Box can generate a new mesh when its proportions change, and a non-uniform
- * Scale or a stretched Fit stretches the bevels.
+ * It has no effect on other shapes, which have no edges, are flat or authored, round themselves
+ * (RoundedBox, BeveledPrism) or are out of scope (HemiSphere, Sweep, Loft, Lathe, the shells).
+ * A non-uniform Scale still stretches the rounding, and a clamp wrap smears onto the rims.
  */
 ECS_STRUCT(Bevel, {
-    float radius;       /**< Radius of every edge, clamped to half the smallest size of the Box;
-                         *   when not 0 the edge radii are ignored */
-    float top_front;    /**< Edge between the top and the front, 0 for a sharp edge */
-    float top_back;     /**< Edge between the top and the back */
-    float top_left;     /**< Edge between the top and the left */
-    float top_right;    /**< Edge between the top and the right */
-    float bottom_front; /**< Edge between the bottom and the front */
-    float bottom_back;  /**< Edge between the bottom and the back */
-    float bottom_left;  /**< Edge between the bottom and the left */
-    float bottom_right; /**< Edge between the bottom and the right */
-    float front_left;   /**< Vertical edge between the front and the left */
-    float front_right;  /**< Vertical edge between the front and the right */
-    float back_left;    /**< Vertical edge between the back and the left */
-    float back_right;   /**< Vertical edge between the back and the right */
-    int32_t segments;   /**< Subdivisions per rounded edge rounded up to even, default 4 */
+    float radius;       /**< Radius of every edge, clamped to what fits the shape; when not 0
+                         *   the other radii are ignored */
+    float top_front;    /**< Box edge between the top (+Y) and the front (+Z), 0 for a sharp
+                         *   edge; right is +X */
+    float top_back;     /**< Box edge between the top and the back */
+    float top_left;     /**< Box edge between the top and the left */
+    float top_right;    /**< Box edge between the top and the right */
+    float bottom_front; /**< Box edge between the bottom and the front */
+    float bottom_back;  /**< Box edge between the bottom and the back */
+    float bottom_left;  /**< Box edge between the bottom and the left */
+    float bottom_right; /**< Box edge between the bottom and the right */
+    float front_left;   /**< Vertical Box edge between the front and the left */
+    float front_right;  /**< Vertical Box edge between the front and the right */
+    float back_left;    /**< Vertical Box edge between the back and the left */
+    float back_right;   /**< Vertical Box edge between the back and the right */
+    float top;          /**< Top rims of a round shape, the cap_end edges of a ProfileExtrusion,
+                         *   or the top edges of a Box whose own radius is 0 */
+    float bottom;       /**< Bottom rims of a round shape, the cap_start edges of a
+                         *   ProfileExtrusion, or the bottom edges of a Box whose own radius is 0 */
+    int32_t segments;   /**< Subdivisions per rounded edge, rounded up to even on a Box and a
+                         *   prism, default 4 */
 });
 
 /** Flat star polygon in the XY plane, the worked example of the shape registry */
@@ -399,6 +407,8 @@ ECS_STRUCT(Profile2D, {
 /** Extrudes a Profile2D along Y, centered on the origin, its x on X and its y on Z.
  *
  * The u coordinate runs around the profile and v from the bottom to the top.
+ *
+ * Its parametric surface ignores a Bevel, so an attachment on a cap lands on the unbeveled cap.
  */
 ECS_STRUCT(ProfileExtrusion, {
     ecs_entity_t profile; /**< Entity with the Profile2D */

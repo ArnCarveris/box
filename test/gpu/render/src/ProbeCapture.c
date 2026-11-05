@@ -24,7 +24,7 @@ void ProbeCapture_converges_in_bounded_frames(void) {
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
     ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
-        .capture_size = 8, .budget_ms = 2, .bounces = 1});
+        .capture_size = 8, .budget_ms = 2, .bounces = 1, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, camera, Position, {0, 1, 5});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -78,7 +78,7 @@ void ProbeCapture_zero_budget_never_converges(void) {
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
     ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
-        .capture_size = 8, .budget_ms = 0, .bounces = 1});
+        .capture_size = 8, .budget_ms = 0, .bounces = 1, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, camera, Position, {0, 1, 5});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -127,7 +127,7 @@ void ProbeCapture_dynamic_shape_lit_not_captured(void) {
         ecs_entity_t scene = ecs_new(world);
         ecs_add(world, scene, Scene);
         ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = -0.3f,
-            .capture_size = 16, .budget_ms = 2, .bounces = 0});
+            .capture_size = 16, .budget_ms = 2, .bounces = 0, .compute = true});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
         ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
         ecs_set(world, dark, DirectionalLight, {.intensity = 0});
@@ -225,7 +225,7 @@ void ProbeCapture_no_bake_removes_contribution(void) {
         ecs_entity_t scene = ecs_new(world);
         ecs_add(world, scene, Scene);
         ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = -0.3f,
-            .capture_size = 16, .budget_ms = 2, .bounces = 0});
+            .capture_size = 16, .budget_ms = 2, .bounces = 0, .compute = true});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
         ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
         ecs_set(world, dark, DirectionalLight, {.intensity = 0});
@@ -305,7 +305,7 @@ void ProbeCapture_perf_run_waits_for_convergence(void) {
     ECS_IMPORT(world, Box);
 
     ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
-        .capture_size = 8, .budget_ms = 0.001f, .bounces = 1});
+        .capture_size = 8, .budget_ms = 0.001f, .bounces = 1, .compute = true});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 1, 5});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -358,7 +358,7 @@ void ProbeCapture_budget_spreads_over_frames(void) {
         ECS_IMPORT(world, Box);
 
         ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
-            .capture_size = 8, .budget_ms = budgets[i], .bounces = 0});
+            .capture_size = 8, .budget_ms = budgets[i], .bounces = 0, .compute = true});
         ecs_entity_t camera = ecs_new(world);
         ecs_set(world, camera, Position, {0, 1, 5});
         ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -419,7 +419,7 @@ void ProbeCapture_invalid_capture_size_bakes_nothing(void) {
     ecs_singleton_modified(world, App);
 
     ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
-        .capture_size = 0, .budget_ms = 2, .bounces = 1});
+        .capture_size = 0, .budget_ms = 2, .bounces = 1, .compute = true});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 1, 5});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -444,12 +444,12 @@ void ProbeCapture_invalid_capture_size_bakes_nothing(void) {
     test_assert(status->error != NULL);
 
     ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
-        .capture_size = 257, .budget_ms = 2, .bounces = 1});
+        .capture_size = 257, .budget_ms = 2, .bounces = 1, .compute = true});
     ecs_progress(world, 0);
     test_assert(ecs_get(world, ecs_id(LightBake), LightBakeStatus)->error != NULL);
 
     ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
-        .capture_size = 8, .budget_ms = 20, .bounces = 1});
+        .capture_size = 8, .budget_ms = 20, .bounces = 1, .compute = true});
     for (frame = 0; frame < 5000; frame ++) {
         ecs_progress(world, 0);
         if (ecs_get(world, ecs_id(LightBake), LightBakeStatus)->converged) {
@@ -473,7 +473,7 @@ void ProbeCapture_perf_run_measures_zero_budget(void) {
     ecs_singleton_modified(world, App);
 
     ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
-        .capture_size = 8, .budget_ms = 0, .bounces = 1});
+        .capture_size = 8, .budget_ms = 0, .bounces = 1, .compute = true});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 1, 5});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -509,7 +509,7 @@ void ProbeCapture_perf_run_ignores_unviewed_scene(void) {
     ecs_entity_t level = ecs_new(world);
     ecs_add(world, level, Scene);
     ecs_set(world, level, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
-        .capture_size = 8, .budget_ms = 2, .bounces = 1});
+        .capture_size = 8, .budget_ms = 2, .bounces = 1, .compute = true});
     ecs_entity_t block = ecs_new_w_pair(world, EcsChildOf, level);
     ecs_set(world, block, Position, {0, 0, 0});
     ecs_set(world, block, Box, {3, 0.2f, 3});
@@ -548,7 +548,7 @@ void ProbeCapture_scene_grows_past_chunk_of_atlas(void) {
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 0.5f,
-        .capture_size = 8, .budget_ms = 50, .bounces = 1});
+        .capture_size = 8, .budget_ms = 50, .bounces = 1, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, camera, Position, {0, 1, 5});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -614,7 +614,7 @@ void ProbeCapture_large_far_instance_of_small_block_captured(void) {
         ecs_entity_t scene = ecs_new(world);
         ecs_add(world, scene, Scene);
         ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
-            .capture_size = 16, .budget_ms = 2, .bounces = 0});
+            .capture_size = 16, .budget_ms = 2, .bounces = 0, .compute = true});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
         ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
         ecs_set(world, dark, DirectionalLight, {.intensity = 0});
@@ -688,7 +688,7 @@ void ProbeCapture_small_near_instance_of_far_block_captured(void) {
         ecs_entity_t scene = ecs_new(world);
         ecs_add(world, scene, Scene);
         ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
-            .capture_size = 16, .budget_ms = 2, .bounces = 0});
+            .capture_size = 16, .budget_ms = 2, .bounces = 0, .compute = true});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
         ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
         ecs_set(world, dark, DirectionalLight, {.intensity = 0});

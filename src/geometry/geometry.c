@@ -409,33 +409,34 @@ done:
     return result;
 }
 
-/** Resolve an entity with a Box and a Bevel: the bevel mesh, or the plain Box mesh when the
- * Bevel rounds no edge so that the entity shares the batches of plain boxes.
+/** Resolve an entity with a host shape and a Bevel: the bevel mesh, or the plain host mesh
+ * when the Bevel rounds no edge of the host so that the entity shares the batches of plain
+ * shapes.
  *
  * @param world The world
  * @param stage The stage for structural changes
- * @param bevel The cached shape of the Bevel
+ * @param bevel The Bevel variant of the host
  * @param e The entity
- * @param value The Box and the Bevel of the entity
+ * @param value The host value followed by the Bevel of the entity
  */
 static void box_bevel_resolve(
     ecs_world_t *world,
     ecs_world_t *stage,
     const box_shape_t *bevel,
     ecs_entity_t e,
-    const box_bevel_value_t *value)
+    const void *value)
 {
-    if (box_bevel_flat(&value->bevel)) {
-        const box_shape_t *box = box_mesh_cache_shape(bevel->cache, ecs_id(Box));
-        box_shape_apply(world, stage, box, e, &value->box);
+    if (bevel->flat(value)) {
+        const box_shape_t *host = box_mesh_cache_shape(bevel->cache, bevel->host);
+        box_shape_apply(world, stage, host, e, value);
     } else {
         box_shape_apply(world, stage, bevel, e, value);
     }
 }
 
-/** Resolve the entities with a Box and a Bevel whose Box or Bevel was set.
+/** Resolve the entities with a host shape and a Bevel whose host or Bevel was set.
  *
- * The observer of Box skips entities with a Bevel, so this one owns their ShapeMesh.
+ * The observer of the host skips entities with a Bevel, so this one owns their ShapeMesh.
  *
  * @param it The iterator
  */
@@ -443,31 +444,35 @@ static void box_bevel_on_set(
     ecs_iter_t *it)
 {
     const box_shape_t *bevel = it->ctx;
-    const Box *boxes = ecs_field(it, Box, 0);
+    const void *hosts = ecs_field_w_size(it, (size_t)bevel->host_size, 0);
     const Bevel *bevels = ecs_field(it, Bevel, 1);
-    bool box_self = ecs_field_is_self(it, 0);
+    bool host_self = ecs_field_is_self(it, 0);
     bool bevel_self = ecs_field_is_self(it, 1);
     int32_t count = it->count;
-    box_bevel_value_t *values = ecs_os_malloc_n(box_bevel_value_t, count);
+    ecs_size_t size = bevel->size;
+    uint8_t *values = ecs_os_calloc(size * count);
     ecs_entity_t *entities = ecs_os_memdup_n(it->entities, ecs_entity_t, count);
     for (int32_t i = 0; i < count; i ++) {
-        values[i].box = boxes[box_self ? i : 0];
-        values[i].bevel = bevels[bevel_self ? i : 0];
+        uint8_t *value = values + size * i;
+        ecs_os_memcpy(value, ECS_ELEM(hosts, bevel->host_size, host_self ? i : 0),
+            bevel->host_size);
+        ecs_os_memcpy(value + bevel->bevel_offset, &bevels[bevel_self ? i : 0],
+            ECS_SIZEOF(Bevel));
     }
 
     for (int32_t i = 0; i < count; i ++) {
-        box_bevel_resolve(it->world, it->stage, bevel, entities[i], &values[i]);
+        box_bevel_resolve(it->world, it->stage, bevel, entities[i], values + size * i);
     }
 
     ecs_os_free(values);
     ecs_os_free(entities);
 }
 
-/** Resolve an entity that loses its Bevel and keeps its Box, its own or inherited, back to the
- * plain Box.
+/** Resolve an entity that loses its Bevel and keeps the host, its own or inherited, back to the
+ * plain host.
  *
- * An entity that is deleted resolves nothing, and one that also loses its Box drops its
- * ShapeMesh in the remove observer of the Box.
+ * An entity that is deleted resolves nothing, and one that also loses its host drops its
+ * ShapeMesh in the remove observer of the host.
  *
  * @param it The iterator
  */
@@ -475,38 +480,60 @@ static void box_bevel_on_remove(
     ecs_iter_t *it)
 {
     const box_shape_t *bevel = it->ctx;
-    const box_shape_t *box = box_mesh_cache_shape(bevel->cache, ecs_id(Box));
+    const box_shape_t *host = box_mesh_cache_shape(bevel->cache, bevel->host);
     bool live = it->other_table && ecs_table_get_type(it->other_table)->count &&
-        ecs_search_relation(it->world, it->other_table, 0, ecs_id(Box), EcsIsA,
+        ecs_search_relation(it->world, it->other_table, 0, bevel->host, EcsIsA,
             EcsSelf | EcsUp, NULL, NULL, NULL) != -1;
+    void *copy = live ? ecs_os_malloc(bevel->host_size) : NULL;
     for (int32_t i = 0; live && i < it->count; i ++) {
         ecs_entity_t e = it->entities[i];
-        const Box *value = ecs_get(it->world, e, Box);
+        const void *value = ecs_get_id(it->world, e, bevel->host);
         if (value) {
-            Box copy = *value;
-            box_shape_apply(it->world, it->stage, box, e, &copy);
+            ecs_os_memcpy(copy, value, bevel->host_size);
+            box_shape_apply(it->world, it->stage, host, e, copy);
         }
     }
+
+    ecs_os_free(copy);
 }
 
-void box_geometry_bevel_init(
+box_shape_t* box_geometry_bevel_host(
     ecs_world_t *world,
-    box_shape_t *bevel)
+    const box_shape_desc_t *desc,
+    ecs_entity_t host,
+    ecs_size_t host_size,
+    ecs_size_t offset,
+    ecs_size_t size,
+    box_bevel_flat_fn flat)
 {
-    ecs_observer(world, {
-        .query.terms = {{ .id = ecs_id(Box) }, { .id = ecs_id(Bevel) }},
-        .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
-        .events = { EcsOnSet },
-        .callback = box_bevel_on_set,
-        .ctx = bevel
-    });
-    ecs_observer(world, {
-        .query.terms = {{ .id = ecs_id(Bevel) }},
-        .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
-        .events = { EcsOnRemove },
-        .callback = box_bevel_on_remove,
-        .ctx = bevel
-    });
+    box_shape_desc_t variant = *desc;
+    variant.component = ecs_pair(ecs_id(Bevel), host);
+    variant.exclude = 0;
+    box_shape_t *bevel = box_mesh_cache_add_shape(box_mesh_cache_of(world), &variant);
+    if (bevel) {
+        bevel->size = size;
+        bevel->world = world;
+        bevel->host = host;
+        bevel->host_size = host_size;
+        bevel->bevel_offset = offset;
+        bevel->flat = flat;
+        ecs_observer(world, {
+            .query.terms = {{ .id = host }, { .id = ecs_id(Bevel) }},
+            .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
+            .events = { EcsOnSet },
+            .callback = box_bevel_on_set,
+            .ctx = bevel
+        });
+        ecs_observer(world, {
+            .query.terms = {{ .id = ecs_id(Bevel) }},
+            .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
+            .events = { EcsOnRemove },
+            .callback = box_bevel_on_remove,
+            .ctx = bevel
+        });
+    }
+
+    return bevel;
 }
 
 void BoxGeometryImport(

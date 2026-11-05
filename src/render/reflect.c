@@ -106,7 +106,8 @@ typedef struct box_reflect_scene_t {
     bool bake_known;        /**< bake_handle and bake_switches hold the light bake of a frame */
     uint32_t bake_handle;   /**< Volume handle of the light bake of the scene, 0 for none */
     int32_t bake_switches;  /**< box_bake_volume_t.switches of that light bake */
-    bool bake_settled;      /**< That light bake settled, or the scene has none */
+    bool bake_settled;      /**< That light bake settled or does not compute, or the scene
+                             *   has none */
     box_bake_threshold_t threshold; /**< Thresholds of the ReflectionBake of this frame */
     int32_t landed;         /**< Resident probes with a capture, current or not */
     bool relit;             /**< A directional light, the ambient, the environment or a settled
@@ -1282,7 +1283,7 @@ static void box_reflect_invalidate(
     s->bake_known = true;
     s->bake_handle = handle;
     s->bake_switches = switches;
-    s->bake_settled = !v || v->settled;
+    s->bake_settled = !v || v->settled || !v->compute;
 }
 
 /** Order probes for their captures: the scene probe first, then nearer to the cameras of the

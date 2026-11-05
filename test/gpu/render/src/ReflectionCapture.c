@@ -199,7 +199,7 @@ void ReflectionCapture_converges_with_light_bake(void) {
     ecs_entity_t scene = scene_new(world, &(ReflectionBake){
         .resolution = 16, .budget_ms = 1, .scene_probe = true, .scene_probe_height = 2});
     ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
-        .capture_size = 8, .budget_ms = 2, .bounces = 1});
+        .capture_size = 8, .budget_ms = 2, .bounces = 1, .compute = true});
     probe_new(world, scene, 1);
 
     int32_t frame;
