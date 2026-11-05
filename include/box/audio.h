@@ -993,6 +993,77 @@ ECS_STRUCT(PitchShifter, {
                             *   1 - mix */
 });
 
+/** Longest slice of a BeatRepeat and longest lag of a TapeStop in seconds, which size their
+ * memory: a slice of 4 beats under 60 bpm is held to it */
+#define BOX_AUDIO_BEAT_REPEAT_MAX 4.0f
+#define BOX_AUDIO_TAPE_STOP_MAX 4.0f
+
+/** A beat repeat, an effect in an insert slot of an AudioBus, as a Reverb is: the stutter of
+ * a fill, which captures a slice of the beat and repeats it, each repeat quieter, pitched or
+ * reversed, while active is up. An automation lane or a modulator drives active, as any
+ * float member:
+ * drums { AudioBus: {effects: [drums]}; BeatRepeat: {slice: 0.125, decay: 0.8} }.
+ *
+ * When active rises to 0.5 or above, the capture waits for the next grid point of the
+ * Transport (every grid beats, at once for a grid of 0) and holds slice beats from there at
+ * the tempo of that moment. The first repeat is the input itself as it is captured, then the
+ * slice plays again and again, each repeat decay times the gain and pitch semitones from the
+ * one before it: the slice is resampled like a tape, so a pitch of -12 plays the second
+ * repeat an octave down at half speed, and the third two octaves down. reverse plays the
+ * repeats after the first from the end of the slice, and each repeat sounds for gate of the
+ * slice. A repeat crossfades from the one before it over 2 ms, so they do not click. Decay,
+ * pitch, reverse and gate apply from the next repeat on, slice and grid at the next rise.
+ *
+ * When active falls under 0.5 the dry input returns at once, over a 2 ms crossfade, not at a
+ * grid point, so the lane decides where a fill ends; a fall before the capture started
+ * cancels it. While it repeats the output is the repeats times mix plus the input times 1 -
+ * mix; while it is not active the input passes unchanged. It follows the beat clock of the
+ * Transport through seeks, loops and tempo changes, at 120 bpm while none plays. Every beat
+ * repeat runs with its own memory of BOX_AUDIO_BEAT_REPEAT_MAX seconds per channel. See
+ * Effects in docs/audio.md for a stutter fill.
+ */
+ECS_STRUCT(BeatRepeat, {
+    float active;          /**< 0 to 1, default 0: 0.5 and above repeats */
+    float slice;           /**< Beats of the slice, 1/32 to 4, default 0.25 */
+    float grid;            /**< Beats of the grid the capture waits for, 0 to 4; 0 captures
+                            *   at once; default -1, any negative grid, is the slice */
+    float decay;           /**< Gain of a repeat against the one before it, 0 to 1, default
+                            *   1: 0.5 drops each repeat by 6 dB */
+    float pitch;           /**< Semitones of a repeat against the one before it, -12 to 12,
+                            *   default 0; the repeats add up to at most 48 either way */
+    float reverse;         /**< 0 to 1, default 0: 0.5 and above plays the repeats after the
+                            *   first reversed */
+    float gate;            /**< Share of each repeat that sounds, 0.1 to 1, default 1 */
+    float mix;             /**< Level of the repeats while it repeats, 0 to 1, default 1: the
+                            *   input is replaced; the dry signal passes at 1 - mix */
+});
+
+/** A tape stop, an effect in an insert slot of an AudioBus, as a Reverb is: the drop of a
+ * transition, which slows what plays through it down to a halt, pitch and time together, and
+ * spins it back up. An automation lane or a modulator drives active, as any float member:
+ * master_fx { AudioBus: {effects: [master_fx]}; TapeStop: {stop_time: 1, curve: 0.5} }.
+ *
+ * While active is 0.5 or above the speed falls from 1 to 0 over stop_time seconds; under 0.5
+ * it rises back to 1 over start_time seconds, from wherever it stands. The input is recorded
+ * and read at the speed with cubic interpolation, so halfway through a linear stop a sine
+ * sounds an octave down. curve shapes both ramps: the speed is 1 - p^(4^curve) at a phase p
+ * of the stop; 0 is linear, above 0 the speed holds longer and drops at the end, under 0 it
+ * drops at once and creeps to the halt. A start runs the same curve back.
+ *
+ * Under a tenth of the speed the output fades out, to silence at the halt. What comes in
+ * during the stop is skipped: a start plays the input of its moment, slowed, and once it is up
+ * to speed it crossfades to the input over 20 ms, so the output never catches up on what the
+ * ramps fell behind. At full speed the input passes unchanged. Every tape stop runs with its
+ * own memory of BOX_AUDIO_TAPE_STOP_MAX seconds per channel. See Effects in docs/audio.md for
+ * a tape stop drop.
+ */
+ECS_STRUCT(TapeStop, {
+    float active;          /**< 0 to 1, default 0: 0.5 and above stops, under it starts */
+    float stop_time;       /**< Seconds from full speed to the halt, 0.01 to 4, default 0.5 */
+    float start_time;      /**< Seconds from the halt to full speed, 0.01 to 4, default 0.2 */
+    float curve;           /**< Shape of the ramps, -1 to 1, default 0 (linear) */
+});
+
 /** An envelope of the cutoff of the SynthFilter of the same root, with the segments of a
  * SynthEnvelope: the cutoff is cutoff times 2 to the amount times the level of the envelope,
  * so it rises over the attack, settles at the sustain and returns over the release.

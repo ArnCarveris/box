@@ -341,6 +341,48 @@ static void box_audio_pitch_shifter_ctor(
     }
 }
 
+/** Construct BeatRepeat values: not active, a slice of a sixteenth on a grid of the slice,
+ * no decay, no pitch, forward, a gate of 1 and a mix of 1.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_beat_repeat_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    BeatRepeat *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (BeatRepeat){ .active = 0, .slice = 0.25f, .grid = -1.0f, .decay = 1.0f,
+            .pitch = 0, .reverse = 0, .gate = 1.0f, .mix = 1.0f };
+    }
+}
+
+/** Construct TapeStop values: not active, a stop of half a second, a start of 0.2 seconds
+ * and linear ramps.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_tape_stop_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TapeStop *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (TapeStop){ .active = 0, .stop_time = 0.5f, .start_time = 0.2f,
+            .curve = 0 };
+    }
+}
+
 /** Construct Gate values: -50 dB, an attack of 1 ms, a hold of 50 ms, a release of 100 ms
  * and a range of -80 dB.
  *
@@ -1460,6 +1502,10 @@ void BoxAudioImport(
     ecs_set_hooks(world, FrequencyShifter, { .ctor = box_audio_frequency_shifter_ctor });
     ECS_META_COMPONENT(world, PitchShifter);
     ecs_set_hooks(world, PitchShifter, { .ctor = box_audio_pitch_shifter_ctor });
+    ECS_META_COMPONENT(world, BeatRepeat);
+    ecs_set_hooks(world, BeatRepeat, { .ctor = box_audio_beat_repeat_ctor });
+    ECS_META_COMPONENT(world, TapeStop);
+    ecs_set_hooks(world, TapeStop, { .ctor = box_audio_tape_stop_ctor });
     ECS_META_COMPONENT(world, SynthFilterEnvelope);
     ECS_META_COMPONENT(world, SynthPitchEnvelope);
     ECS_META_COMPONENT(world, SynthGlide);
@@ -1550,6 +1596,8 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(FrequencyShifter), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(AudioModulator), EcsWith, ecs_id(AudioModulatorState));
     ecs_add_pair(world, ecs_id(PitchShifter), EcsWith, ecs_id(AudioEffectState));
+    ecs_add_pair(world, ecs_id(BeatRepeat), EcsWith, ecs_id(AudioEffectState));
+    ecs_add_pair(world, ecs_id(TapeStop), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(SoundFile), EcsWith, ecs_id(AudioSample));
     ecs_add_pair(world, ecs_id(AudioStream), EcsWith, ecs_id(AudioMusic));
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSoundId));

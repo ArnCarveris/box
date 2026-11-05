@@ -418,6 +418,76 @@ typedef struct box_audio_pitch_shifter_t {
     box_audio_ramp_t feed;    /**< Fade in of the input after a move */
 } box_audio_pitch_shifter_t;
 
+/** A repeat of a beat repeat: how it reads the slice */
+typedef struct box_audio_beat_repeat_pass_t {
+    double ratio;             /**< Frames of the slice per frame of output */
+    float gain;               /**< Gain, decay to the number of repeats before it */
+    float semitones;          /**< Pitch against the slice, the pitch of the repeats added up */
+    int32_t sound;            /**< Frames that sound, before the fade out */
+    bool reverse;             /**< Reads the slice from its end */
+    bool fade_in;             /**< Fades in from the repeat before over the fade */
+} box_audio_beat_repeat_pass_t;
+
+/** States of a beat repeat */
+typedef enum box_audio_beat_repeat_state_t {
+    BOX_AUDIO_BEAT_REPEAT_OFF = 0,     /**< Passes the input and records it, until an armed
+                                        *   capture starts */
+    BOX_AUDIO_BEAT_REPEAT_HOLD = 1,    /**< Captures and repeats the slice */
+    BOX_AUDIO_BEAT_REPEAT_RELEASE = 2  /**< Not active any more, crossfades to the input */
+} box_audio_beat_repeat_state_t;
+
+/** A beat repeat: a line per channel on the memory of its effect slot that records the input,
+ * frozen once the capture holds the slice and what its crossfades read past its ends, and the
+ * repeat that plays with the one before it, whose end crossfades */
+typedef struct box_audio_beat_repeat_t {
+    box_audio_beat_repeat_params_t target; /**< Parameters of the last command, clamped */
+    float *line[2];           /**< The lines of the left and the right channel in memory */
+    int32_t length;           /**< Frames of each line */
+    int32_t pos;              /**< Frame the next input is written to */
+    int32_t valid;            /**< Frames written in a row since the line last started to
+                               * record; older frames read as silence, so the memory needs no
+                               * clearing */
+    int32_t room;             /**< Frames the crossfades read past either end of a slice at
+                               * the fastest read */
+    int32_t state;            /**< A box_audio_beat_repeat_state_t */
+    bool on;                  /**< active was 0.5 or above at the last command */
+    bool armed;               /**< A capture waits for its frame */
+    bool frozen;              /**< The line stopped recording; it starts over when it records
+                               * again */
+    uint64_t begin;           /**< Frame of the core clock the armed capture starts at */
+    int32_t slice;            /**< Frames of the slice of the capture */
+    int32_t wait;             /**< Frames of the slice of the armed capture */
+    int32_t fade;             /**< Frames of the crossfades of the capture */
+    int32_t origin;           /**< Frame of the line the slice starts at */
+    int32_t before;           /**< Frames of the line before origin that hold input */
+    int32_t captured;         /**< Frames of the line from origin on that hold input */
+    int32_t at;               /**< Frames into the repeat that plays */
+    box_audio_beat_repeat_pass_t pass; /**< The repeat that plays */
+    box_audio_beat_repeat_pass_t last; /**< The repeat before it, whose end fades out over
+                               * the first frames of this one; its gain is 0 for none */
+    box_audio_ramp_t share;   /**< Share of the repeats in the output, 0 to pass the input */
+    box_audio_ramp_t mix;     /**< Wet level */
+} box_audio_beat_repeat_t;
+
+/** A tape stop: a line per channel on the memory of its effect slot, the phase of its ramp
+ * and the lag of its read behind the input */
+typedef struct box_audio_tape_stop_t {
+    box_audio_tape_stop_params_t target; /**< Parameters of the last command, clamped */
+    float *line[2];           /**< The lines of the left and the right channel in memory */
+    int32_t length;           /**< Frames of each line */
+    int32_t pos;              /**< Frame the next input is written to */
+    int32_t valid;            /**< Frames written since the start; older frames read as
+                               * silence */
+    double phase;             /**< Phase of the ramp, 0 at full speed, 1 at a stop */
+    double down;              /**< Phase per frame of a stop */
+    double up;                /**< Phase per frame of a start */
+    double power;             /**< Exponent of the phase in the speed, 4^curve */
+    double lag;               /**< Frames the read lags behind the last input */
+    double from;              /**< Lag of the read the crossfade leaves */
+    bool crossfade;           /**< Crossfades from the read at from to the one at lag */
+    box_audio_ramp_t xfade;   /**< Share of the read at lag in the crossfade */
+} box_audio_tape_stop_t;
+
 /** State of the kinds of effects */
 typedef union box_audio_effect_data_t {
     box_audio_reverb_t reverb;  /**< BOX_AUDIO_EFFECT_REVERB */
@@ -432,6 +502,8 @@ typedef union box_audio_effect_data_t {
     box_audio_transient_shaper_t transient_shaper; /**< BOX_AUDIO_EFFECT_TRANSIENT_SHAPER */
     box_audio_frequency_shifter_t frequency_shifter; /**< BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER */
     box_audio_pitch_shifter_t pitch_shifter; /**< BOX_AUDIO_EFFECT_PITCH_SHIFTER */
+    box_audio_beat_repeat_t beat_repeat; /**< BOX_AUDIO_EFFECT_BEAT_REPEAT */
+    box_audio_tape_stop_t tape_stop; /**< BOX_AUDIO_EFFECT_TAPE_STOP */
 } box_audio_effect_data_t;
 
 /** An effect instance of the pool of the core: a kind in an insert slot of a bus, on the
@@ -1464,6 +1536,66 @@ bool box_audio_pitch_shifter_render(
 
 /** The pitch shifter kind: a block skipped while idle */
 void box_audio_pitch_shifter_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    int32_t frames);
+
+/** The beat repeat kind, in beat_repeat.c: floats of its memory at a rate */
+int32_t box_audio_beat_repeat_floats(
+    float sample_rate);
+
+/** The beat repeat kind: start on its memory */
+void box_audio_beat_repeat_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The beat repeat kind: new parameters while it runs */
+void box_audio_beat_repeat_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The beat repeat kind: process a block */
+bool box_audio_beat_repeat_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The beat repeat kind: a block skipped while idle */
+void box_audio_beat_repeat_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    int32_t frames);
+
+/** The tape stop kind, in tape_stop.c: floats of its memory at a rate */
+int32_t box_audio_tape_stop_floats(
+    float sample_rate);
+
+/** The tape stop kind: start on its memory */
+void box_audio_tape_stop_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The tape stop kind: new parameters while it runs */
+void box_audio_tape_stop_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The tape stop kind: process a block */
+bool box_audio_tape_stop_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The tape stop kind: a block skipped while idle */
+void box_audio_tape_stop_rest(
     box_audio_core_t *core,
     box_audio_effect_t *fx,
     int32_t frames);

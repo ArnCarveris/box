@@ -179,6 +179,8 @@ their tails end.
 | `TransientShaper` | `attack: 0`, `sustain: 0` |
 | `FrequencyShifter` | `shift: 0` Hz, `mode: FrequencyShift`, `stereo: 0`, `feedback: 0`, `mix: 1` |
 | `PitchShifter` | `semitones: 0`, `cents: 0`, `stereo: 0`, `window: 40` ms, `feedback: 0`, `mix: 0.5` |
+| `BeatRepeat` | `active: 0`, `slice: 0.25` beats, `grid: -1` (the slice), `decay: 1`, `pitch: 0` semitones, `reverse: 0`, `gate: 1`, `mix: 1` |
+| `TapeStop` | `active: 0`, `stop_time: 0.5` s, `start_time: 0.2` s, `curve: 0` |
 
 Equalizer bands use `AudioEqOff`, `AudioEqPeak`, `AudioEqLowShelf`,
 `AudioEqHighShelf`, `AudioEqLowCut` or `AudioEqHighCut`. Defaults are 100, 400,
@@ -331,6 +333,63 @@ pad_rise { FrequencyShifter: {shift: 0.3, feedback: 0.85, mix: 0.5} }
 
 // Ring-mod bell: a clangorous, inharmonic tone from a plain one
 bell { FrequencyShifter: {mode: FrequencyRing, shift: 437, mix: 0.8} }
+```
+
+`BeatRepeat` and `TapeStop` are performance effects for fills and transitions,
+driven by their `active` member from an automation lane or a modulator. Both are
+float members, so a lane can switch them at a beat: `active` counts as on from 0.5.
+
+A beat repeat waits for the next `grid` point of the Transport after `active`
+rises (a negative grid is the slice, 0 captures at once), then repeats the next
+`slice` beats, from 1/32 to 4, held to 4 seconds. The first repeat is the input
+itself; each repeat after it is `decay` times as loud as the one before (0.5 drops
+6 dB a repeat) and `pitch` semitones from it, from -12 to 12, resampled like a
+tape: at -12 the second repeat plays at half speed, the third at a quarter.
+`reverse: 1` plays the repeats after the first backwards, `gate` from 0.1 to 1 is
+the share of each repeat that sounds, and `mix` blends the repeats with the input
+while it repeats. Repeats crossfade over 2 ms. When `active` falls the input
+returns at once, over 2 ms, not at a grid point, so the lane sets the end of the
+fill. Decay, pitch, reverse and gate apply from the next repeat, slice and grid at
+the next rise.
+
+A tape stop slows its input down to a halt over `stop_time` seconds while
+`active` is up, pitch and time together, and spins it back up over `start_time`
+seconds after it falls, both from 0.01 to 4. Halfway through a linear stop a sine
+sounds an octave down. `curve` from -1 to 1 shapes the ramps: above 0 the speed
+holds longer and drops at the end, under 0 it drops at once. The output fades out
+under a tenth of the speed and is silent at the halt; what comes in meanwhile is
+skipped. A start plays the input of its moment and, once up to speed, crossfades
+to the input over 20 ms instead of catching up.
+
+Both follow the beat clock of the Transport, at 120 bpm while none plays, and run
+on 4 seconds of memory of their effect slot.
+
+```flecs
+using box.audio
+
+// A stutter fill: the last beat of a four bar phrase repeats a sixteenth, each
+// repeat a little quieter and a semitone down
+drums { AudioBus: {effects: [drums]}; BeatRepeat: {slice: 0.25, decay: 0.85, pitch: -1} }
+
+prefab fill {
+  AutomationClip: {target: drums, component: BeatRepeat, member: "active", length: 16,
+    curve: {keys: [{0, 0}, {14.999, 0}, {15, 1}, {15.999, 1}, {16, 0}]}}
+}
+
+// A tape stop drop: the music winds down over the last two beats at 120 bpm and
+// spins back up on the downbeat of the next phrase
+music { AudioBus: {effects: [music]}; TapeStop: {stop_time: 1, start_time: 0.15, curve: 0.3} }
+
+prefab drop {
+  AutomationClip: {target: music, component: TapeStop, member: "active", length: 16,
+    curve: {keys: [{0, 0}, {13.999, 0}, {14, 1}, {15.999, 1}, {16, 0}]}}
+}
+
+transitions {
+  Track: {}
+  fill_lane { ClipPlacement: {clip: fill, start: 0} }
+  drop_lane { ClipPlacement: {clip: drop, start: 16} }
+}
 ```
 
 For ducking, key a compressor on another channel:

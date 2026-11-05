@@ -433,6 +433,7 @@
                     "delay",
                     "modulation",
                     "pitch_shifter",
+                    "beat_repeat",
                     "saturator",
                     "transient_shaper",
                     "frequency_shifter",
@@ -869,6 +870,37 @@
                     "mode_render_sizes",
                     "mode_silent_after_tail",
                     "mode_reduction"
+                ]
+            },
+            {
+                "id": "BeatRepeat",
+                "testcases": [
+                    "repeats_slice",
+                    "grid_at_once",
+                    "waits_for_grid",
+                    "tempo",
+                    "reverse",
+                    "pitch_down",
+                    "decay",
+                    "gate",
+                    "mix",
+                    "no_click",
+                    "render_sizes",
+                    "component",
+                    "script",
+                    "automation"
+                ]
+            },
+            {
+                "id": "TapeStop",
+                "testcases": [
+                    "halves_frequency",
+                    "silent_after_stop",
+                    "restart",
+                    "curve",
+                    "no_click",
+                    "render_sizes",
+                    "component"
                 ]
             },
             {

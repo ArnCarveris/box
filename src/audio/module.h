@@ -890,7 +890,8 @@ uint32_t box_audio_module_effect_kind(
 #define BOX_AUDIO_EFFECT_COMPONENTS (16)
 
 /** Get the effect components: Reverb, Equalizer, AudioFilter, Compressor, Gate, Delay, Phaser,
- * Chorus, Saturator, TransientShaper, FrequencyShifter and PitchShifter, in the order an entity
+ * Chorus, Saturator, TransientShaper, FrequencyShifter, PitchShifter, BeatRepeat and TapeStop,
+ * in the order an entity
  * that has several takes the first of. A new effect is added here and to
  * box_audio_module_effect_params.
  *

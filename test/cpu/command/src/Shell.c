@@ -559,6 +559,16 @@ void Shell_audio_command(void) {
     ecs_modified(world, bell, AudioBus);
     ecs_set(world, bell, FrequencyShifter, { .shift = 437, .mode = FrequencyRing,
         .stereo = 0.5f, .feedback = -0.3f, .mix = 0.8f });
+    ecs_entity_t fill = ecs_entity(world, { .name = "fill" });
+    ecs_ensure(world, fill, AudioBus)->effects[0] = fill;
+    ecs_modified(world, fill, AudioBus);
+    ecs_set(world, fill, BeatRepeat, { .slice = 0.125f, .grid = -1, .decay = 0.8f,
+        .pitch = -2, .reverse = 1, .gate = 0.5f, .mix = 1 });
+    ecs_entity_t drop = ecs_entity(world, { .name = "drop" });
+    ecs_ensure(world, drop, AudioBus)->effects[0] = drop;
+    ecs_modified(world, drop, AudioBus);
+    ecs_set(world, drop, TapeStop, { .active = 1, .stop_time = 1, .start_time = 0.25f,
+        .curve = 0.5f });
     ecs_progress(world, 0.016f);
 
     bool error = true;
@@ -588,6 +598,12 @@ void Shell_audio_command(void) {
         "shimmer 0.50 pitch +12.0 (does not run: no output)") != NULL);
     test_assert(strstr(out, "bell: group volume 1.00 pan 0.00 width 1.00 -> master, "
         "insert 0 bell: frequency shifter ring +437.0 Hz stereo 0.50 feedback -0.30 mix 0.80 "
+        "(does not run: no output)") != NULL);
+    test_assert(strstr(out, "fill: group volume 1.00 pan 0.00 width 1.00 -> master, "
+        "insert 0 fill: beat repeat inactive slice 0.125 beats grid slice decay 0.80 "
+        "pitch -2.0 gate 0.50 mix 1.00 reverse (does not run: no output)") != NULL);
+    test_assert(strstr(out, "drop: group volume 1.00 pan 0.00 width 1.00 -> master, "
+        "insert 0 drop: tape stop active stop 1.000 s start 0.250 s curve +0.50 "
         "(does not run: no output)") != NULL);
     ecs_os_free(out);
 

@@ -4,12 +4,12 @@
  * their slots of the pool of the core, their memory and their commands.
  *
  * An effect entity is any entity with an effect component: Reverb, Equalizer, AudioFilter,
- * Compressor, Gate, Delay, Phaser, Chorus, Saturator, TransientShaper, FrequencyShifter or
- * PitchShifter, the first of them in that order. A compressor gets the key bus the order
- * compile accepted.
+ * Compressor, Gate, Delay, Phaser, Chorus, Saturator, TransientShaper, FrequencyShifter,
+ * PitchShifter, BeatRepeat or TapeStop, the first of them in that order.
  *
- * The module sends an EFFECT command when the kind, the channel, the slot or a parameter of an
- * effect changes, and takes it off when no insert slot names it any more.
+ * A compressor gets the key bus the order compile accepted. The module sends an EFFECT command
+ * when the kind, the channel, the slot or a parameter of an effect changes, and takes it off
+ * when no insert slot names it any more.
  */
 
 #include "module.h"
@@ -218,6 +218,28 @@ uint32_t box_audio_module_effect_params(
             params[4] = shifter->feedback;
             params[5] = shifter->mix;
         }
+    } else if (component == ecs_id(BeatRepeat)) {
+        const BeatRepeat *repeat = ptr;
+        result = BOX_AUDIO_EFFECT_BEAT_REPEAT;
+        if (params && ptr) {
+            params[0] = repeat->active;
+            params[1] = repeat->slice;
+            params[2] = repeat->grid;
+            params[3] = repeat->decay;
+            params[4] = repeat->pitch;
+            params[5] = repeat->reverse;
+            params[6] = repeat->gate;
+            params[7] = repeat->mix;
+        }
+    } else if (component == ecs_id(TapeStop)) {
+        const TapeStop *stop = ptr;
+        result = BOX_AUDIO_EFFECT_TAPE_STOP;
+        if (params && ptr) {
+            params[0] = stop->active;
+            params[1] = stop->stop_time;
+            params[2] = stop->start_time;
+            params[3] = stop->curve;
+        }
     }
 
 done:
@@ -230,7 +252,8 @@ int32_t box_audio_module_effect_components(
     const ecs_entity_t components[] = {
         ecs_id(Reverb), ecs_id(Equalizer), ecs_id(AudioFilter), ecs_id(Compressor),
         ecs_id(Gate), ecs_id(Delay), ecs_id(Phaser), ecs_id(Chorus), ecs_id(Saturator),
-        ecs_id(TransientShaper), ecs_id(FrequencyShifter), ecs_id(PitchShifter)
+        ecs_id(TransientShaper), ecs_id(FrequencyShifter), ecs_id(PitchShifter),
+        ecs_id(BeatRepeat), ecs_id(TapeStop)
     };
     int32_t i, count = (int32_t)(sizeof(components) / sizeof(components[0]));
     count = count < BOX_AUDIO_EFFECT_COMPONENTS ? count : BOX_AUDIO_EFFECT_COMPONENTS;
