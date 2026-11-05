@@ -563,7 +563,7 @@ The main limits are 64 voices, 64 buses, 64 effects, four inserts and sends per
 bus, eight synth layers, two synth LFOs, seven unison copies per layer and
 32 pluck strings. Effects are algorithmic: no convolution or geometry-derived rooms.
 There is one transport and one music stream per world. There are no automation
-lanes, tempo ramps, swing, time stretching, MIDI I/O, plugins, mixer UI or piano roll.
+lanes, tempo ramps, time stretching, MIDI I/O, plugins, mixer UI or piano roll.
 Scripts can change channel and effect values each frame.
 
 Offline coverage lives in [test/cpu/audio](../test/cpu/audio/); browser and end-to-end

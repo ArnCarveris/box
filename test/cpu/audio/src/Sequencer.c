@@ -1637,17 +1637,17 @@ static void seq_ungrooved(
  * frames of the beats. */
 void Sequencer_groove_zero(void) {
     // audio/sequencer
-    float *a = ecs_os_malloc_n(float, 4 * SEQ_BEAT);
-    float *b = ecs_os_malloc_n(float, 4 * SEQ_BEAT);
-    float *c = ecs_os_malloc_n(float, 4 * SEQ_BEAT);
+    float *a = malloc(sizeof(float) * 4 * SEQ_BEAT);
+    float *b = malloc(sizeof(float) * 4 * SEQ_BEAT);
+    float *c = malloc(sizeof(float) * 4 * SEQ_BEAT);
     seq_ungrooved(TrackSwing8, false, a);
     seq_ungrooved(TrackSwing8, true, b);
     seq_ungrooved(TrackSwing16, true, c);
     test_assert(!memcmp(a, b, sizeof(float) * 4 * SEQ_BEAT));
     test_assert(!memcmp(a, c, sizeof(float) * 4 * SEQ_BEAT));
-    ecs_os_free(a);
-    ecs_os_free(b);
-    ecs_os_free(c);
+    free(a);
+    free(b);
+    free(c);
 }
 
 /** A transport that loops over 2 beats plays every note of a swung and humanized track once
