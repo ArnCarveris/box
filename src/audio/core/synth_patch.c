@@ -247,12 +247,9 @@ static void box_audio_synth_patch_clamp(
         lfo->pulse_width = box_audio_synth_depth_clamp(lfo->pulse_width,
             0.5f - BOX_AUDIO_SYNTH_PULSE_MIN);
         lfo->sync = box_audio_synth_depth_clamp(lfo->sync, BOX_AUDIO_SYNTH_SYNC_SEMITONES);
-<<<<<<< HEAD
         lfo->vowel = box_audio_synth_depth_clamp(lfo->vowel, BOX_AUDIO_SYNTH_VOWEL_MAX);
-=======
         lfo->position = box_audio_synth_depth_clamp(lfo->position,
             (float)BOX_AUDIO_TABLE_FRAMES_MAX);
->>>>>>> ca12711fa10dfec69633b25a39d88c3e0fa070a8
     }
 }
 

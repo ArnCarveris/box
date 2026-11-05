@@ -357,11 +357,8 @@
                     "synth_sub",
                     "synth_sync",
                     "synth_drive",
-<<<<<<< HEAD
-                    "synth_formant"
-=======
+                    "synth_formant",
                     "synth_wavetable"
->>>>>>> ca12711fa10dfec69633b25a39d88c3e0fa070a8
                 ]
             },
             {

@@ -2,17 +2,11 @@
  * @file Synth.c
  * @brief Benchmarks for the synth of the audio core: 64 looping synth voices on the master,
  * one item per sample of the output, with the patch of three layers, the same with two LFOs or
-<<<<<<< HEAD
  * one of FM, with curved envelopes, with a driven filter, the ladder filter or the formant
- * filter with its vowel under an LFO and the filter envelope, with subs, hard
- * synced under an LFO, with pink noise or with the drive of the mix before the filter, 32
- * voices of a pluck string, steady or under a vibrato, and 8 of a unison pluck of 4.
-=======
- * one of FM, with curved envelopes, with a driven filter or the ladder filter, with subs, hard
- * synced under an LFO, with pink noise, with drift or with the drive of the mix before the
- * filter, 32 voices of a pluck string, steady or under a vibrato, 8 of a unison pluck of 4, and
- * 64 of a patch of wavetables whose positions an LFO and the envelope move.
->>>>>>> ca12711fa10dfec69633b25a39d88c3e0fa070a8
+ * filter with its vowel under an LFO and the filter envelope, with subs, hard synced under an
+ * LFO, with pink noise, with drift or with the drive of the mix before the filter, 32 voices of
+ * a pluck string, steady or under a vibrato, 8 of a unison pluck of 4, and 64 of a patch of
+ * wavetables whose positions an LFO and the envelope move.
  *
  * Each iteration renders one quantum of 128 stereo frames, so the time per item is the time
  * per sample of the whole mix of 64 voices.
@@ -42,15 +36,13 @@
 /** Extra of bench_synth_core: the filter is the transistor ladder */
 #define BENCH_LADDER 16u
 
-<<<<<<< HEAD
 /** Extra of bench_synth_core: the filter is the formant filter, its vowel moved by the filter
  * envelope and by an LFO */
-#define BENCH_FORMANT 32u
-=======
+#define BENCH_FORMANT 64u
+
 /** Extra of bench_synth_core: a drift of 15 cents moves the pitch of every layer and the
  * cutoff, and the oscillators start at free phases */
 #define BENCH_DRIFT 32u
->>>>>>> ca12711fa10dfec69633b25a39d88c3e0fa070a8
 
 /** Create a core with 64 looping voices of a patch of three layers: a saw that sweeps up, a
  * square with its own envelope and noise, into a lowpass.
@@ -67,13 +59,8 @@
  * @param lfo Whether two LFOs move the patch
  * @param curved Whether the patch envelope and the envelope of the square are curved
  * @param drive Drive of the filter, 0..1
-<<<<<<< HEAD
- * @param extra BENCH_SUB, BENCH_SYNC, BENCH_PITCH, BENCH_PINK, BENCH_LADDER and
- *   BENCH_FORMANT, or 0
-=======
- * @param extra BENCH_SUB, BENCH_SYNC, BENCH_PITCH, BENCH_PINK, BENCH_LADDER and BENCH_DRIFT,
- *   or 0
->>>>>>> ca12711fa10dfec69633b25a39d88c3e0fa070a8
+ * @param extra BENCH_SUB, BENCH_SYNC, BENCH_PITCH, BENCH_PINK, BENCH_LADDER, BENCH_FORMANT
+ *   and BENCH_DRIFT, or 0
  * @param pre Drive of the mix of the layers before the filter, 0..1, negative for none; its
  *   asymmetry is 0.3
  * @return The core

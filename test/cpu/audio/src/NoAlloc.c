@@ -953,7 +953,6 @@ void NoAlloc_synth_sync(void) {
     test_int(noalloc_frees, 1);
 }
 
-<<<<<<< HEAD
 /* Voices of a patch through a formant filter with drive, on a mono saw and a wide unison
  * layer, the vowel moved by the filter envelope and an LFO, render without a call of the
  * allocator. */
@@ -989,7 +988,13 @@ void NoAlloc_synth_formant(void) {
     }
 
     audio_render(core, 0, AUDIO_FRAMES);
-=======
+    test_assert(box_audio_core_voice_count(core) > 0);
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+}
+
 /* Voices of a patch of wavetable layers render without a call of the allocator: a mono layer
  * whose position an LFO and its envelope move, a wide unison layer under a glide, a synced
  * layer with a sub and a wavetable modulator, and a release of the table while they play. The
@@ -1045,14 +1050,10 @@ void NoAlloc_synth_wavetable(void) {
     }
 
     audio_render(core, 0, AUDIO_FRAMES / 2);
->>>>>>> ca12711fa10dfec69633b25a39d88c3e0fa070a8
     test_assert(box_audio_core_voice_count(core) > 0);
     test_int(noalloc_allocs, 1);
     test_int(noalloc_frees, 0);
     box_audio_core_free(core);
     test_int(noalloc_frees, 1);
-<<<<<<< HEAD
-=======
     ecs_os_free(table);
->>>>>>> ca12711fa10dfec69633b25a39d88c3e0fa070a8
 }

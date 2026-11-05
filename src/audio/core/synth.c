@@ -14,16 +14,10 @@
  * silent; with unison it rings a string per voice, detuned and panned as the voices of an
  * oscillator, each plucked with its own noise. A layer may be hard synced, its wave restarted
  * on every cycle of its frequency at a ratio of it, the restart band limited by a polyBLEP. Up
-<<<<<<< HEAD
  * to two LFOs move the pitch, the level, the cutoff or the vowel, the pulse width of squares
  * and the ratio of hard sync, per control block of frames and interpolated per frame
- * in between.
-=======
- * to two LFOs move the pitch, the level, the cutoff, the pulse width of squares and the ratio
- * of hard sync, per control block of frames and interpolated per frame
  * in between. A wavetable layer reads the frames of a table the main thread built, at the mip
  * level of its speed and at a position between two frames that its envelope and the LFOs move.
->>>>>>> ca12711fa10dfec69633b25a39d88c3e0fa070a8
  *
  * Every voice holds its own copy of the patch, so a play allocates nothing. Its layers are parts
  * of the core, one per layer (box_audio_synth_part_t), and each pluck layer takes a string of
@@ -774,12 +768,8 @@ static void box_audio_synth_lfo_aim(
 {
     double cents[1 + BOX_AUDIO_SYNTH_LAYERS] = {0}, width[1 + BOX_AUDIO_SYNTH_LAYERS] = {0};
     double semitones[1 + BOX_AUDIO_SYNTH_LAYERS] = {0};
-<<<<<<< HEAD
-    double octaves = 0, vowels = 0, c, w, r;
-=======
     double frames[1 + BOX_AUDIO_SYNTH_LAYERS] = {0};
-    double octaves = 0, c, w, r;
->>>>>>> ca12711fa10dfec69633b25a39d88c3e0fa070a8
+    double octaves = 0, vowels = 0, c, w, r;
     float dip[1 + BOX_AUDIO_SYNTH_LAYERS], v;
     int32_t k, l;
     for (l = 0; l <= BOX_AUDIO_SYNTH_LAYERS; l ++) {
@@ -1064,7 +1054,8 @@ static void box_audio_synth_drift_start(
     }
 
     box_audio_synth_walk_start(&src->drift_cutoff, &src->drift_rng, rate);
-    src->lfo_cutoff = src->lfo_cutoff || src->filter;
+    src->lfo_cutoff = src->lfo_cutoff || (src->filter &&
+        src->filter != BOX_AUDIO_SYNTH_FORMANT);
 
 done:
     return;

@@ -205,11 +205,10 @@
 /** Cutoff of the DC blocker after the drive of a synth voice with asymmetry in Hz */
 #define BOX_AUDIO_SYNTH_DRIVE_DC 5.0f
 
-<<<<<<< HEAD
 /** Highest vowel of a formant filter: 0 a, 1 e, 2 i, 3 o, 4 u; also the largest depth in
  * vowels of an LFO or the filter envelope on it */
 #define BOX_AUDIO_SYNTH_VOWEL_MAX 4.0f
-=======
+
 /** Most frames of a wavetable; a table takes a sound id of the core, so a core holds at most
  * BOX_AUDIO_SOUND_MAX - 1 sounds, tables and synth patches together */
 #define BOX_AUDIO_TABLE_FRAMES_MAX 256
@@ -251,7 +250,6 @@
  * period. A table of 64 frames takes 1064976 bytes, about 1 MB */
 #define BOX_AUDIO_TABLE_FLOATS(frames) \
     (BOX_AUDIO_TABLE_HEADER + (frames) * BOX_AUDIO_TABLE_FRAME_FLOATS)
->>>>>>> ca12711fa10dfec69633b25a39d88c3e0fa070a8
 
 /** Commands of the byte stream. Each starts with a box_audio_cmd_header_t */
 typedef enum box_audio_cmd_type_t {
@@ -1014,14 +1012,11 @@ typedef struct box_audio_synth_lfo_t {
     float sync;             /**< Semitones the ratio of hard sync moves by at the top of the
                              * wave, -BOX_AUDIO_SYNTH_SYNC_SEMITONES..max; on a layer it syncs
                              * it, for every layer only those with a ratio over 1 */
-<<<<<<< HEAD
     float vowel;            /**< Vowels of a formant filter at the top of the wave,
                              * -BOX_AUDIO_SYNTH_VOWEL_MAX..max; of the patch, as the cutoff */
-=======
     float position;         /**< Frames the position of wavetable layers moves by at the top
                              * of the wave, -BOX_AUDIO_TABLE_FRAMES_MAX..max; the moved
                              * position is clamped to the frames of the table */
->>>>>>> ca12711fa10dfec69633b25a39d88c3e0fa070a8
 } box_audio_synth_lfo_t;
 
 /** A synth patch: up to BOX_AUDIO_SYNTH_LAYERS oscillators with envelopes, then one filter,

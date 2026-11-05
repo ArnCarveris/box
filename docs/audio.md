@@ -582,12 +582,8 @@ pan balances their channels rather than narrowing them with distance.
 
 A sound supports two LFOs, on the root, a layer or another root child. Waves include
 sine, triangle, square, rising saw and sample-and-hold. Destinations are `pitch`
-<<<<<<< HEAD
 (cents), `amplitude` (0..1), `cutoff` (octaves), `vowel` (vowels of a `SynthFormant`
-filter, -4..4), `pulse_width` and `sync`, the
-=======
-(cents), `amplitude` (0..1), `cutoff` (octaves), `pulse_width`, `sync`, the
->>>>>>> ca12711fa10dfec69633b25a39d88c3e0fa070a8
+filter, -4..4), `pulse_width`, `sync`, the
 semitones (-48..48) the ratio of hard sync moves at the top of the wave, clamped to
 1..16, and `position`, the frames (-256..256) the position of wavetable layers moves.
 On a layer `sync` syncs that layer, from a ratio of 1 when it has none; on the root
