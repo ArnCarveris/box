@@ -648,10 +648,10 @@ done:
     return s && s->module ? gpu->shadow_point : NULL;
 }
 
-bool box_gpu_shadow_ready(
+void box_gpu_shadow_request(
     box_gpu_t *gpu)
 {
-    return box_gpu_shadow_pipeline(gpu) != NULL;
+    box_gpu_shadow_pipeline(gpu);
 }
 
 /** Make the shadow map hold the cascades of a view at its resolution.
@@ -748,8 +748,10 @@ done:
  * @param point Whether the pass draws the octants of a point light tile
  * @param counted Whether the draws count in the shadow draws of the stats, false for the
  * probe captures
+ * @return Whether every caster drew with its own pipeline, false when an alpha tested caster
+ * with a TextureBlend drew with the plain one while its pipeline is being created
  */
-static void box_gpu_shadow_draw(
+static bool box_gpu_shadow_draw(
     box_gpu_t *gpu,
     WGPURenderPassEncoder pass,
     const box_render_packet_t *packet,
@@ -761,6 +763,7 @@ static void box_gpu_shadow_draw(
 {
     WGPURenderPipeline bound = NULL;
     WGPUBindGroup instances = NULL, material = NULL;
+    bool result = true;
     int32_t i;
     for (i = 0; i < cv->draw_count; i ++) {
         const box_gpu_cull_draw_t *d = ecs_vec_get_t(
@@ -773,6 +776,7 @@ static void box_gpu_shadow_draw(
             pipeline = box_gpu_shadow_blend_pipeline(gpu, point);
             cutout = pipeline != NULL;
             pipeline = cutout ? pipeline : plain;
+            result = result && cutout;
         }
 
         if (pipeline != bound) {
@@ -792,6 +796,8 @@ static void box_gpu_shadow_draw(
             box_gpu_count(gpu, BOX_GPU_STAT_SHADOW_DRAW);
         }
     }
+
+    return result;
 }
 
 void box_gpu_shadow_render(
@@ -1309,11 +1315,11 @@ static void box_gpu_atlas_pass(
             uint32_t offset = (uint32_t)((block + o) * BOX_GPU_CASCADE_STRIDE);
             wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
             if (cv && octahedral) {
-                box_gpu_shadow_draw(gpu, pass, packet, cv, point, gpu->shadow_point_cutout,
-                    true, true);
+                kept = box_gpu_shadow_draw(gpu, pass, packet, cv, point,
+                    gpu->shadow_point_cutout, true, true) && kept;
             } else if (cv) {
-                box_gpu_shadow_draw(gpu, pass, packet, cv, gpu->shadow, gpu->shadow_cutout,
-                    false, true);
+                kept = box_gpu_shadow_draw(gpu, pass, packet, cv, gpu->shadow,
+                    gpu->shadow_cutout, false, true) && kept;
             }
         }
 

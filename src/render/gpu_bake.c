@@ -1444,25 +1444,8 @@ static bool box_gpu_bake_fits(
     return result;
 }
 
-/** Check whether every forward pipeline the faces of a capture draw with exists, so that a
- * capture never misses what a pipeline still being created draws.
- *
- * @param b The capture state, its draws listed
- * @return Whether every draw has its pipeline
- */
-static bool box_gpu_bake_drawable(
-    const box_gpu_bake_t *b)
-{
-    bool result = true;
-    int32_t i;
-    for (i = 0; result && i < ecs_vec_count(&b->draws); i ++) {
-        result = ecs_vec_get_t(&b->draws, box_gpu_bake_draw_t, i)->pipeline != NULL;
-    }
-
-    return result;
-}
-
-/** Capture one chunk of probes of a batch in one command buffer.
+/** Capture one chunk of probes of a batch in one command buffer, unless a pipeline is being
+ * created: the capture could miss what it draws.
  *
  * @param gpu The backend
  * @param b The capture state
@@ -1490,9 +1473,11 @@ static void box_gpu_bake_chunk_capture(
     const box_render_cascade_t *cascade = pass->sun ? &pass->cascade : NULL;
     int32_t i, faces = count * 6;
     bool caster = cascade && !*shadow;
-    if (!pipeline || !box_gpu_bake_fits(pass, probes, count) || !box_gpu_bake_drawable(b) ||
-        (cascade && !box_gpu_shadow_ready(gpu)))
-    {
+    if (cascade) {
+        box_gpu_shadow_request(gpu);
+    }
+
+    if (!pipeline || !box_gpu_bake_fits(pass, probes, count) || box_gpu_pipelines_building(gpu)) {
         goto done;
     }
 

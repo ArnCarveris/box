@@ -98,7 +98,7 @@ static void box_gpu_on_device(
 
 /** Count and log an error no error scope caught, unless the device is lost: releasing what
  * belonged to a lost device reports errors, and the ring recovers from the loss itself. An
- * error of a pipeline creation goes to its pipeline, which reports it when it is delivered.
+ * error of a creation that captures the errors of its thread goes to its capture.
  *
  * @param device The device
  * @param type Kind of error
@@ -116,7 +116,7 @@ static void box_gpu_on_error(
     (void)device;
     (void)type;
     (void)userdata2;
-    if (!box_gpu_pipeline_capture(message) && !((box_gpu_t*)userdata1)->lost) {
+    if (!box_gpu_error_capture_take(message) && !((box_gpu_t*)userdata1)->lost) {
         box_gpu_count(userdata1, BOX_GPU_STAT_ERRORS);
         box_gpu_report("webgpu device error", message);
     }

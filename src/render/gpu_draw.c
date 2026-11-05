@@ -253,6 +253,7 @@ void box_gpu_draw_init(
     ecs_map_init(&gpu->meshes, NULL);
     ecs_map_init(&gpu->buffers, NULL);
     ecs_map_init(&gpu->forward, NULL);
+    ecs_map_init(&gpu->forward_previous, NULL);
     ecs_vec_init_t(NULL, &gpu->view_data, uint8_t, 0);
     box_gpu_copy_init(gpu);
     box_gpu_light_init(gpu);
@@ -562,15 +563,14 @@ static void box_gpu_buffer_free(
     box_gpu_count(gpu, BOX_GPU_STAT_BUFFER_DESTROYED);
 }
 
-void box_gpu_forward_reset(
-    box_gpu_t *gpu)
+/** Release the forward pipelines of a map and empty it.
+ *
+ * @param map The pipelines
+ */
+static void box_gpu_forward_release(
+    ecs_map_t *map)
 {
-    ecs_map_iter_t it;
-    if (!ecs_map_is_init(&gpu->forward)) {
-        goto done;
-    }
-
-    it = ecs_map_iter(&gpu->forward);
+    ecs_map_iter_t it = ecs_map_iter(map);
     while (ecs_map_next(&it)) {
         WGPURenderPipeline pipeline = ecs_map_ptr(&it);
         if (pipeline) {
@@ -578,7 +578,38 @@ void box_gpu_forward_reset(
         }
     }
 
-    ecs_map_clear(&gpu->forward);
+    ecs_map_clear(map);
+}
+
+void box_gpu_forward_reset(
+    box_gpu_t *gpu,
+    bool keep)
+{
+    ecs_map_iter_t it;
+    if (!ecs_map_is_init(&gpu->forward)) {
+        goto done;
+    }
+
+    if (!keep) {
+        box_gpu_forward_release(&gpu->forward_previous);
+    }
+
+    it = ecs_map_iter(&gpu->forward);
+    while (keep && ecs_map_next(&it)) {
+        ecs_map_val_t *previous = ecs_map_ensure(&gpu->forward_previous, ecs_map_key(&it));
+        if (*previous) {
+            wgpuRenderPipelineRelease((WGPURenderPipeline)(uintptr_t)*previous);
+        }
+
+        *previous = ecs_map_value(&it);
+    }
+
+    if (keep) {
+        ecs_map_clear(&gpu->forward);
+    } else {
+        box_gpu_forward_release(&gpu->forward);
+    }
+
 done:
     return;
 }
@@ -600,8 +631,9 @@ void box_gpu_draw_fini(
     ecs_map_fini(&gpu->buffers);
     box_gpu_copy_fini(gpu);
     ecs_vec_fini_t(NULL, &gpu->view_data, uint8_t);
-    box_gpu_forward_reset(gpu);
+    box_gpu_forward_reset(gpu, false);
     ecs_map_fini(&gpu->forward);
+    ecs_map_fini(&gpu->forward_previous);
     box_gpu_light_fini(gpu);
     box_gpu_shadow_fini(gpu);
     box_gpu_cull_fini(gpu);
@@ -1332,6 +1364,35 @@ static bool box_gpu_prepass_draws(
     return b->view == -1 && b->pipeline == BOX_RENDER_SHADER_MESH && b->blend == Opaque;
 }
 
+/** Keep a requested forward pipeline in the cache. Until it exists, a draw of its key uses the
+ * pipeline of the module a recompile replaced, which it then releases.
+ *
+ * @param gpu The backend
+ * @param key Key of the pipeline in the cache
+ * @param pipeline The pipeline the request returned, NULL while it is being created
+ * @return The pipeline, else the previous one of its key, NULL without one
+ */
+static WGPURenderPipeline box_gpu_forward_cache(
+    box_gpu_t *gpu,
+    uint64_t key,
+    WGPURenderPipeline pipeline)
+{
+    ecs_map_val_t *previous = ecs_map_get(&gpu->forward_previous, key);
+    WGPURenderPipeline result = pipeline;
+    if (pipeline) {
+        *ecs_map_ensure(&gpu->forward, key) = (ecs_map_val_t)(uintptr_t)pipeline;
+    } else if (previous) {
+        result = (WGPURenderPipeline)(uintptr_t)*previous;
+    }
+
+    if (pipeline && previous) {
+        wgpuRenderPipelineRelease((WGPURenderPipeline)(uintptr_t)*previous);
+        ecs_map_remove(&gpu->forward_previous, key);
+    }
+
+    return result;
+}
+
 WGPURenderPipeline box_gpu_forward_pipeline(
     box_gpu_t *gpu,
     WGPUTextureFormat format,
@@ -1365,11 +1426,9 @@ WGPURenderPipeline box_gpu_forward_pipeline(
         goto done;
     }
 
-    result = box_gpu_forward_create(gpu, b->pipeline, shader, format, b->blend, b->back_face,
-        b->cutout, b->transmissive, equal, b->box_shadow, b->slice, texture_blend, b->polygon);
-    if (result) {
-        *ecs_map_ensure(&gpu->forward, key) = (ecs_map_val_t)(uintptr_t)result;
-    }
+    result = box_gpu_forward_cache(gpu, key, box_gpu_forward_create(gpu, b->pipeline, shader,
+        format, b->blend, b->back_face, b->cutout, b->transmissive, equal, b->box_shadow,
+        b->slice, texture_blend, b->polygon));
 done:
     return result;
 }
@@ -1403,10 +1462,8 @@ static WGPURenderPipeline box_gpu_prepass_pipeline(
         goto done;
     }
 
-    result = box_gpu_prepass_create(gpu, shader, b->back_face, b->cutout, texture_blend);
-    if (result) {
-        *ecs_map_ensure(&gpu->forward, key) = (ecs_map_val_t)(uintptr_t)result;
-    }
+    result = box_gpu_forward_cache(gpu, key,
+        box_gpu_prepass_create(gpu, shader, b->back_face, b->cutout, texture_blend));
 done:
     return result;
 }

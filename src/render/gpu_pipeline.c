@@ -70,12 +70,12 @@ struct box_gpu_pipelines_t {
     ecs_map_t entries;              /**< Hash to the first box_gpu_pipeline_t of the hash */
     ecs_vec_t scratch;              /**< uint8_t, the key of a request */
     WGPUDevice device;              /**< Device the pipelines are created on */
-    ecs_os_mutex_t lock;            /**< Protects queue, arrived, active and stop */
+    ecs_os_mutex_t lock;            /**< Protects the queues, arrived, active and stop */
     ecs_os_cond_t wake;             /**< Wakes the workers for a queued creation or the stop */
     ecs_os_cond_t done;             /**< Signals an outcome that arrived */
-    box_gpu_pipeline_t *queue;      /**< Creations no worker started, newest first: a later
-                                     *   request, such as the startup overlay, is often the one
-                                     *   that shows progress */
+    box_gpu_pipeline_t *queue[2];   /**< Creations no worker started, newest first: render
+                                     *   pipelines before compute and forward check ones, see
+                                     *   box_gpu_pipeline_start */
     box_gpu_pipeline_t *arrived;    /**< Outcomes that wait for their delivery */
     int32_t active;                 /**< Creations running on the workers */
     int32_t workers;                /**< Worker threads started */
@@ -84,10 +84,11 @@ struct box_gpu_pipelines_t {
     bool hold;                      /**< box_render_gpu_compile_delivery holds the outcomes in
                                      *   this packet */
     int64_t packets;                /**< Packets delivered, the clock of the cache */
+    int32_t building;               /**< Pipelines whose outcome was not delivered */
 };
 
-/** Pipeline whose creation runs on this thread, which device errors are reported to */
-static BOX_GPU_THREAD_LOCAL box_gpu_pipeline_t *box_gpu_pipeline_creating = NULL;
+/** Capture of the creation that runs on this thread, which device errors are reported to */
+static BOX_GPU_THREAD_LOCAL box_gpu_error_capture_t *box_gpu_capturing = NULL;
 
 /** Append bytes to a key.
  *
@@ -611,20 +612,31 @@ char* box_gpu_pipeline_message(
     return ecs_strbuf_get(&buf);
 }
 
-bool box_gpu_pipeline_capture(
+void box_gpu_error_capture_begin(
+    box_gpu_error_capture_t *capture)
+{
+    box_gpu_capturing = capture;
+}
+
+void box_gpu_error_capture_end(void)
+{
+    box_gpu_capturing = NULL;
+}
+
+bool box_gpu_error_capture_take(
     WGPUStringView message)
 {
-    box_gpu_pipeline_t *p = box_gpu_pipeline_creating;
-    if (p && !p->message) {
-        p->message = box_gpu_pipeline_message(message.data,
-            (int32_t)box_gpu_str_len(message));
+    box_gpu_error_capture_t *c = box_gpu_capturing;
+    if (c && !c->message) {
+        c->message = flecs_asprintf("%.*s", (int)box_gpu_str_len(message),
+            message.data ? message.data : "");
     }
 
-    if (p) {
-        p->failed = true;
+    if (c) {
+        c->failed = true;
     }
 
-    return p != NULL;
+    return c != NULL;
 }
 
 /** Create a pipeline of the cache with the synchronous call, on a worker or the render thread;
@@ -637,15 +649,21 @@ static void box_gpu_pipeline_create(
     WGPUDevice device,
     box_gpu_pipeline_t *p)
 {
-    box_gpu_pipeline_creating = p;
+    box_gpu_error_capture_t capture = {0};
+    box_gpu_error_capture_begin(&capture);
     if (p->compute) {
         p->compute_pipeline = wgpuDeviceCreateComputePipeline(device, &p->compute_desc);
     } else {
         p->render_pipeline = wgpuDeviceCreateRenderPipeline(device, &p->render);
     }
 
-    box_gpu_pipeline_creating = NULL;
-    p->failed |= !p->compute_pipeline && !p->render_pipeline;
+    box_gpu_error_capture_end();
+    p->failed = capture.failed || (!p->compute_pipeline && !p->render_pipeline);
+    if (capture.message) {
+        p->message = box_gpu_pipeline_message(capture.message, ecs_os_strlen(capture.message));
+        ecs_os_free(capture.message);
+    }
+
     if (p->failed && p->compute_pipeline) {
         wgpuComputePipelineRelease(p->compute_pipeline);
         p->compute_pipeline = NULL;
@@ -784,13 +802,14 @@ static void* box_gpu_pipeline_worker(
     box_gpu_pipelines_t *c = arg;
     ecs_os_mutex_lock(c->lock);
     while (!c->stop) {
-        box_gpu_pipeline_t *p = c->queue;
+        int32_t level = c->queue[0] ? 0 : 1;
+        box_gpu_pipeline_t *p = c->queue[level];
         if (!p) {
             ecs_os_cond_wait(c->wake, c->lock);
             continue;
         }
 
-        c->queue = p->queued;
+        c->queue[level] = p->queued;
         p->queued = NULL;
         c->active ++;
         ecs_os_mutex_unlock(c->lock);
@@ -810,6 +829,10 @@ static void* box_gpu_pipeline_worker(
 
 /** Queue the creation of a pipeline for the workers, starting them on first use.
  *
+ * The newest request goes first, as the startup overlay draws last in a frame and its pipelines
+ * are the last ones requested. Render pipelines go before compute pipelines and the quiet ones
+ * of the forward check, so draws such as those of the overlay are not held back by them.
+ *
  * @param c The cache
  * @param p The pipeline
  */
@@ -817,13 +840,14 @@ static void box_gpu_pipeline_start(
     box_gpu_pipelines_t *c,
     box_gpu_pipeline_t *p)
 {
+    int32_t level = p->compute || p->quiet;
     while (c->workers < BOX_GPU_PIPELINE_WORKERS) {
         c->threads[c->workers ++] = ecs_os_thread_new(box_gpu_pipeline_worker, c);
     }
 
     ecs_os_mutex_lock(c->lock);
-    p->queued = c->queue;
-    c->queue = p;
+    p->queued = c->queue[level];
+    c->queue[level] = p;
     ecs_os_cond_signal(c->wake);
     ecs_os_mutex_unlock(c->lock);
 }
@@ -886,6 +910,7 @@ static void box_gpu_pipeline_finish(
     const char *label = p->compute ? p->compute_desc.label.data : p->render.label.data;
     p->arrived = false;
     p->state = p->failed ? BOX_GPU_PIPELINE_FAILED : BOX_GPU_PIPELINE_READY;
+    p->cache->building --;
     box_gpu_pipeline_count(gpu, false, !p->failed);
     if (p->failed && !p->quiet) {
         ecs_err("pipeline '%s' failed to create: %s", label ? label : "",
@@ -951,6 +976,7 @@ static box_gpu_pipeline_t* box_gpu_pipeline_request(
     p->next = ecs_map_get_deref(&c->entries, box_gpu_pipeline_t, hash);
     *ecs_map_ensure(&c->entries, hash) = (ecs_map_val_t)(uintptr_t)p;
     box_gpu_pipeline_count(gpu, true, false);
+    c->building ++;
     if (gpu->pipeline_wait && !c->hold) {
         box_gpu_pipeline_create(c->device, p);
         box_gpu_pipeline_finish(gpu, p);
@@ -993,6 +1019,12 @@ WGPUComputePipeline box_gpu_compute_pipeline(
     }
 
     return result;
+}
+
+int32_t box_gpu_pipelines_building(
+    const box_gpu_t *gpu)
+{
+    return gpu->pipelines ? gpu->pipelines->building : 0;
 }
 
 bool box_gpu_render_pipelines_swap(
@@ -1062,6 +1094,7 @@ void box_gpu_compute_pipelines_release(
     }
 }
 
+#ifndef __EMSCRIPTEN__
 /** Check whether a packet captures a target, which waits for its pipelines like a headless run.
  *
  * @param packet The packet
@@ -1078,6 +1111,7 @@ static bool box_gpu_pipelines_captures(
 
     return result;
 }
+#endif
 
 /** Remove the pipelines whose time in the cache is up: created ones not requested for
  * BOX_GPU_PIPELINE_KEEP packets. Failed ones stay, so they are not created and reported again.
@@ -1129,7 +1163,11 @@ void box_gpu_pipelines_deliver(
 {
     box_gpu_pipelines_t *c = gpu->pipelines;
     box_gpu_pipeline_t *arrived = NULL;
+#ifndef __EMSCRIPTEN__
     gpu->pipeline_wait = packet->headless || box_gpu_pipelines_captures(packet);
+#else
+    (void)packet;
+#endif
     if (!c) {
         goto done;
     }
@@ -1141,7 +1179,7 @@ void box_gpu_pipelines_deliver(
     if (!c->hold) {
         ecs_os_mutex_lock(c->lock);
 #ifndef __EMSCRIPTEN__
-        while (gpu->pipeline_wait && (c->queue || c->active)) {
+        while (gpu->pipeline_wait && (c->queue[0] || c->queue[1] || c->active)) {
             ecs_os_cond_wait(c->done, c->lock);
         }
 #endif

@@ -780,6 +780,9 @@ typedef struct box_gpu_t {
                                      *   alpha test, texture blend and depth mode, and the
                                      *   depth prepass pipelines by back face, alpha test and
                                      *   texture blend */
+    ecs_map_t forward_previous;     /**< Forward pipelines of the modules a recompile replaced,
+                                     *   by the same key, drawn with until the pipeline of the
+                                     *   new module of their key exists */
     WGPUBuffer view_buffer;         /**< Uniforms of the views of a target */
     int32_t view_capacity;          /**< Views the view buffer holds */
     WGPUBindGroupLayout cluster_layout; /**< Bind group layout of the cluster pass */
@@ -924,8 +927,8 @@ typedef struct box_gpu_t {
                                      *   background, created by the first request */
     const char *pipeline_error;     /**< Error of the pipeline the last request found failed,
                                      *   NULL when it did not fail, owned by the pipelines */
-    bool pipeline_wait;             /**< Requests of this packet wait for their pipeline: a
-                                     *   headless run or a packet that captures a target */
+    bool pipeline_wait;             /**< Requests of this packet wait for their pipeline:
+                                     *   natively, a headless run or a packet that captures */
     bool pipeline_quiet;            /**< Requests do not report a failure, which the forward
                                      *   check reports as the error of its shader */
     bool lost;                      /**< The device was lost, the ring recreates it */
@@ -934,6 +937,14 @@ typedef struct box_gpu_t {
 
 /** Render and compute pipelines of the backend and the workers that create them */
 typedef struct box_gpu_pipelines_t box_gpu_pipelines_t;
+
+/** The device errors a creation on a thread reports, which box_gpu_on_error hands to it instead
+ * of counting them. Natively error scopes belong to the device, not to a thread, so a scope
+ * cannot tell a creation on the render thread from one on a pipeline worker. */
+typedef struct box_gpu_error_capture_t {
+    char *message;                  /**< The first error, NULL without one */
+    bool failed;                    /**< An error was reported */
+} box_gpu_error_capture_t;
 
 /** Fields of the counters of the backend */
 typedef enum box_gpu_stat_t {

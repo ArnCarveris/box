@@ -53,10 +53,9 @@ WGPUComputePassEncoder box_gpu_compute_begin(
 /** Request a render pipeline, created in the background and counted in the stats while it is
  * created and once it exists.
  *
- * The first request of a descriptor starts the creation; requests with the same descriptor get
- * NULL until its outcome is delivered at the start of a packet, then a reference of the
- * pipeline, and NULL again after it failed. A headless run or a packet that captures creates
- * it during the request, unless box_render_gpu_compile_delivery holds the outcomes.
+ * The first request of a descriptor starts the creation; requests get NULL until the outcome is
+ * delivered at the start of a packet, then a reference, NULL again when it failed. A headless or
+ * capturing packet creates it during the request, unless box_render_gpu_compile_delivery holds.
  *
  * @param gpu The backend
  * @param desc The pipeline
@@ -75,6 +74,14 @@ WGPURenderPipeline box_gpu_render_pipeline(
 WGPUComputePipeline box_gpu_compute_pipeline(
     box_gpu_t *gpu,
     const WGPUComputePipelineDescriptor *desc);
+
+/** Get the pipelines being created: requested, and their outcome not delivered yet.
+ *
+ * @param gpu The backend
+ * @return The pipelines
+ */
+int32_t box_gpu_pipelines_building(
+    const box_gpu_t *gpu);
 
 /** Replace a group of render pipelines once every pipeline that replaces them was created, so
  * the group keeps its previous pipelines until then and when one of them failed.
@@ -129,12 +136,23 @@ void box_gpu_pipelines_deliver(
 void box_gpu_pipelines_fini(
     box_gpu_t *gpu);
 
-/** Take a device error the pipeline creation that runs on this thread reported.
+/** Hand the device errors reported on this thread to a capture until box_gpu_error_capture_end,
+ * instead of the uncaptured error handler counting them.
+ *
+ * @param capture The capture, zeroed by the caller, which frees its message
+ */
+void box_gpu_error_capture_begin(
+    box_gpu_error_capture_t *capture);
+
+/** Stop handing the device errors reported on this thread to a capture. */
+void box_gpu_error_capture_end(void);
+
+/** Take a device error reported on this thread for its capture.
  *
  * @param message Error text
- * @return Whether a pipeline creation runs on this thread and took the error
+ * @return Whether a capture runs on this thread and took the error
  */
-bool box_gpu_pipeline_capture(
+bool box_gpu_error_capture_take(
     WGPUStringView message);
 
 /** Format a wgpu validation error as one line: the causes it lists below its "Caused by:"
@@ -610,13 +628,17 @@ void box_gpu_bake_capture(
  * (box_gpu_texture_blends) gets the texture_blend variant, fs_blend with blend_mesh_layout, in
  * every pass it draws in.
  *
+ * After a recompile a batch draws with the pipeline of the previous module until the pipeline of
+ * the new module exists, or when it failed.
+ *
  * @param gpu The backend
  * @param format The format of the color target
  * @param b The batch
  * @param equal Whether the pipeline draws after a depth prepass: compare Equal without depth
  * writes and, alpha tested, without discarding, for the opaque meshes of a lit view; false for
  * the compare Greater with depth writes of the other draws, unlit views and the captures
- * @return The pipeline, NULL without a shader, for an unknown blend mode or while it is created
+ * @return The pipeline, NULL without a shader, for an unknown blend mode or while the first one
+ * of its key is created
  */
 WGPURenderPipeline box_gpu_forward_pipeline(
     box_gpu_t *gpu,
@@ -645,9 +667,12 @@ void box_gpu_draw_fini(
 /** Release the forward pipelines, which are created again with the current mesh shader.
  *
  * @param gpu The backend
+ * @param keep Whether a recompile replaced the module: its pipelines are drawn with until the
+ * pipelines of the new module exist, else they are released too
  */
 void box_gpu_forward_reset(
-    box_gpu_t *gpu);
+    box_gpu_t *gpu,
+    bool keep);
 
 /** Check whether a mesh or 2D shape module fits the pipeline layout before it replaces the
  * module that renders, by requesting its forward pipelines. A
@@ -1040,12 +1065,12 @@ WGPUTextureView box_gpu_shadow_capture(
     int32_t slot,
     const box_render_cascade_t *cascade);
 
-/** Check whether the shadow pipelines of the cascades exist, created on first use.
+/** Request the shadow pipelines of the cascades, created on first use, so that a capture that
+ * renders the casters can wait for them (box_gpu_pipelines_building).
  *
  * @param gpu The backend
- * @return Whether box_gpu_shadow_capture renders casters
  */
-bool box_gpu_shadow_ready(
+void box_gpu_shadow_request(
     box_gpu_t *gpu);
 
 /** Get the shadow map a view samples.
