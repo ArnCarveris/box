@@ -2,8 +2,13 @@
  * @file Synth.c
  * @brief Benchmarks for the synth of the audio core: 64 looping synth voices on the master,
  * one item per sample of the output, with the patch of three layers, the same with two LFOs or
+<<<<<<< HEAD
  * one of FM, with curved envelopes, with subs or hard synced under an LFO, 32 voices of a pluck string, steady or under
  * a vibrato, and 8 of a unison pluck of 4.
+=======
+ * one of FM, with curved envelopes, with a driven filter or with subs, 32 voices of a pluck
+ * string, steady or under a vibrato, and 8 of a unison pluck of 4.
+>>>>>>> 8e5a942212e108040629386d133bea60a55bdebe
  *
  * Each iteration renders one quantum of 128 stereo frames, so the time per item is the time
  * per sample of the whole mix of 64 voices.
@@ -36,7 +41,12 @@
  * @param fm Whether the patch is the one of phase modulation
  * @param lfo Whether two LFOs move the patch
  * @param curved Whether the patch envelope and the envelope of the square are curved
+<<<<<<< HEAD
  * @param extra BENCH_SUB and BENCH_SYNC, or 0
+=======
+ * @param drive Drive of the filter, 0..1
+ * @param sub Whether the saw has a sub an octave under and the square one two octaves under
+>>>>>>> 8e5a942212e108040629386d133bea60a55bdebe
  * @return The core
  */
 static box_audio_core_t* bench_synth_core(
@@ -45,7 +55,12 @@ static box_audio_core_t* bench_synth_core(
     bool fm,
     bool lfo,
     bool curved,
+<<<<<<< HEAD
     uint32_t extra)
+=======
+    float drive,
+    bool sub)
+>>>>>>> 8e5a942212e108040629386d133bea60a55bdebe
 {
     static uint8_t bytes[8192];
     box_audio_core_desc_t desc = { .sample_rate = BENCH_RATE };
@@ -61,6 +76,7 @@ static box_audio_core_t* bench_synth_core(
     p.cutoff = 400;
     p.resonance = 0.6f;
     p.slope = slope;
+    p.drive = drive;
     p.filter_amount = envelope ? 4.5f : 0;
     p.filter_envelope = (box_audio_synth_envelope_t){
         .attack = 1.0f, .decay = 0.5f, .sustain = 0.7f, .hold = 0.6f, .release = 0.2f };
@@ -200,7 +216,7 @@ void Synth_voices_64(
 {
     // audio/synth
     box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
-        false);
+        0, false);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
@@ -210,7 +226,7 @@ void Synth_voices_64_filter_envelope(
 {
     // audio/synth
     box_audio_core_t *core = bench_synth_core(true, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
-        false);
+        0, false);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
@@ -220,7 +236,27 @@ void Synth_voices_64_filter_24(
 {
     // audio/synth
     box_audio_core_t *core = bench_synth_core(true, BOX_AUDIO_SYNTH_SLOPE_24, false, false, false,
-        false);
+        0, false);
+    bench_synth_render(b, core);
+    box_audio_core_free(core);
+}
+
+void Synth_voices_64_drive(
+    bench_t *b)
+{
+    // audio/synth
+    box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
+        1, false);
+    bench_synth_render(b, core);
+    box_audio_core_free(core);
+}
+
+void Synth_voices_64_filter_24_drive(
+    bench_t *b)
+{
+    // audio/synth
+    box_audio_core_t *core = bench_synth_core(true, BOX_AUDIO_SYNTH_SLOPE_24, false, false, false,
+        1, false);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
@@ -230,7 +266,7 @@ void Synth_voices_64_lfo(
 {
     // audio/synth
     box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, true, false,
-        false);
+        0, false);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
@@ -240,7 +276,7 @@ void Synth_voices_64_fm(
 {
     // audio/synth
     box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, true, false, false,
-        false);
+        0, false);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
@@ -250,7 +286,7 @@ void Synth_voices_64_curved(
 {
     // audio/synth
     box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, false, true,
-        false);
+        0, false);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
@@ -260,7 +296,7 @@ void Synth_voices_64_sub(
 {
     // audio/synth
     box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
-        true);
+        0, true);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }

@@ -399,7 +399,8 @@ typedef enum box_audio_effect_kind_t {
     BOX_AUDIO_EFFECT_DELAY = 6,   /**< A delay, box_audio_delay_params_t */
     BOX_AUDIO_EFFECT_PHASER = 7,  /**< A phaser, box_audio_phaser_params_t */
     BOX_AUDIO_EFFECT_CHORUS = 8,  /**< A chorus, box_audio_chorus_params_t */
-    BOX_AUDIO_EFFECT_KINDS = 9    /**< Number of kinds, NONE included */
+    BOX_AUDIO_EFFECT_SATURATOR = 9, /**< A saturator, box_audio_saturator_params_t */
+    BOX_AUDIO_EFFECT_KINDS = 10   /**< Number of kinds, NONE included */
 } box_audio_effect_kind_t;
 
 /** The parameters of a reverb, the first floats of the params of its effect command */
@@ -455,8 +456,8 @@ typedef struct box_audio_eq_band_t {
  * new value, exponentially in frequency */
 #define BOX_AUDIO_FILTER_SMOOTH 0.01f
 
-/** Seconds of a change of the mix of a filter effect, and of each half of the crossfade
- * through the dry signal of a change of its kind or slope */
+/** Seconds of a change of the mix or the drive of a filter effect, and of each half of the
+ * crossfade through the dry signal of a change of its kind or slope */
 #define BOX_AUDIO_FILTER_RAMP 0.02f
 
 /** The parameters of a filter effect, the first floats of the params of its effect command:
@@ -468,6 +469,8 @@ typedef struct box_audio_filter_params_t {
     float resonance;  /**< 0 (a Butterworth response) to 1 (rings the longest) */
     float slope;      /**< A box_audio_synth_slope_t: 0 for 12 dB per octave, 1 for 24 */
     float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+    float drive;      /**< Saturation of the input and the resonance, 0 (linear) to 1; moves
+                       *   over BOX_AUDIO_FILTER_RAMP */
 } box_audio_filter_params_t;
 
 /** Seconds of the windows of the peak detector of the compressor and the gate: the detector
@@ -648,6 +651,40 @@ typedef struct box_audio_chorus_params_t {
                        *   the first voice left and the last right */
 } box_audio_chorus_params_t;
 
+/** Gain before the clipper of a saturator at a drive of 1 in dB; a drive of 0 is 0 dB */
+#define BOX_AUDIO_SATURATOR_DRIVE_DB 30.0f
+
+/** Offset a saturator at an asymmetry of 1 adds to its driven input before the clipper */
+#define BOX_AUDIO_SATURATOR_BIAS 1.0f
+
+/** Fewest and most bits of the bit crusher of a saturator; at the most it is off */
+#define BOX_AUDIO_SATURATOR_BITS_MIN 1.0f
+#define BOX_AUDIO_SATURATOR_BITS_MAX 16.0f
+
+/** Cutoff of the DC blocker after the clipper of a saturator in Hz */
+#define BOX_AUDIO_SATURATOR_DC 5.0f
+
+/** Seconds of a change of the drive, the asymmetry, the bits or the mix of a saturator */
+#define BOX_AUDIO_SATURATOR_RAMP 0.02f
+
+/** The parameters of a saturator, the first floats of the params of its effect command: each
+ * channel runs through a tanh soft clipper at twice the rate (saturate.h), its level
+ * compensated so that the drive mostly changes the tone, then a DC blocker and a bit crusher at
+ * the base rate. The wet signal comes BOX_AUDIO_SATURATE_LATENCY frames late and the dry
+ * signal is delayed as much, so that a mix in between does not comb. Its reduction is the
+ * largest drop in dB of the peak of the clipped signal against the peak of the driven input,
+ * the slope of the clipper at silence taken out */
+typedef struct box_audio_saturator_params_t {
+    float drive;      /**< 0..1: a gain of 0 to BOX_AUDIO_SATURATOR_DRIVE_DB dB before the
+                       *   clipper */
+    float asymmetry;  /**< 0..1: a bias of up to BOX_AUDIO_SATURATOR_BIAS before the clipper,
+                       *   shared by both channels, for even harmonics */
+    float bits;       /**< BOX_AUDIO_SATURATOR_BITS_MIN..MAX: the wet signal is rounded to
+                       *   2^bits levels over -1..1, 2^(bits - 1) steps of each sign; at
+                       *   BOX_AUDIO_SATURATOR_BITS_MAX it is not rounded */
+    float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+} box_audio_saturator_params_t;
+
 /** Put an effect into an insert slot of a bus, change its parameters, move it or take it off.
  *
  * The inserts of a bus run in the order of their index on its block, before its width, pan and
@@ -810,6 +847,7 @@ typedef struct box_audio_synth_patch_t {
     float cutoff;                         /**< Hz */
     float resonance;                      /**< 0..1, 1 rings the longest */
     uint32_t slope;                       /**< A box_audio_synth_slope_t */
+    float drive;                          /**< Saturation of the filter, 0 (linear) to 1 */
     float filter_amount;                  /**< Octaves the filter envelope moves the cutoff at
                                            * its level 1, negative closes it; 0 for none */
     box_audio_synth_envelope_t filter_envelope; /**< Envelope of the cutoff, which does not

@@ -198,6 +198,15 @@
                     "script",
                     "bit_identical",
                     "command",
+                    "swing_eighths",
+                    "swing_sixteenths",
+                    "humanize_timing",
+                    "humanize_velocity",
+                    "groove_zero",
+                    "groove_transport_loop",
+                    "humanize_launch",
+                    "humanize_tempo",
+                    "humanize_toggle",
                     "audio_defaults",
                     "audio_start",
                     "audio_placement_offset",
@@ -238,8 +247,13 @@
                     "dynamics",
                     "delay",
                     "modulation",
+<<<<<<< HEAD
                     "synth_sub",
                     "synth_sync"
+=======
+                    "saturator",
+                    "synth_sub"
+>>>>>>> 8e5a942212e108040629386d133bea60a55bdebe
                 ]
             },
             {
@@ -554,7 +568,15 @@
                     "kind_change_no_click",
                     "mix",
                     "render_sizes",
-                    "component"
+                    "component",
+                    "drive_ramp_no_click"
+                ]
+            },
+            {
+                "id": "EffectFilterDrive",
+                "testcases": [
+                    "zero_identical",
+                    "bounded"
                 ]
             },
             {
@@ -574,6 +596,33 @@
                     "world_duck",
                     "sidechain_cycle",
                     "script"
+                ]
+            },
+            {
+                "id": "Saturator",
+                "testcases": [
+                    "harmonics",
+                    "level_across_drive",
+                    "alias_oversampled",
+                    "bits",
+                    "mix_dry",
+                    "reduction",
+                    "drive_no_click",
+                    "render_sizes",
+                    "silent_after_tail",
+                    "component",
+                    "script"
+                ]
+            },
+            {
+                "id": "SynthDrive",
+                "testcases": [
+                    "resonance_bounded",
+                    "sweep_stable",
+                    "zero_identical",
+                    "harmonics",
+                    "slope_24",
+                    "wide"
                 ]
             },
             {
@@ -605,6 +654,7 @@
                     "filter_slope_24",
                     "script_filter_envelope",
                     "filter_extreme",
+                    "filter_drive_default",
                     "layers_sum",
                     "layer_own_envelope",
                     "eight_layers",

@@ -484,6 +484,8 @@ typedef struct box_audio_placement_t {
     double start;           /**< First beat on the timeline */
     double end;             /**< Beat after its last one */
     double reach;           /**< Largest end of this and the placements before it */
+    double scanned;         /**< Beat of the timeline up to which its notes were picked,
+                             *   -INFINITY when none since the last jump */
 } box_audio_placement_t;
 
 /** A note that the sequencer scheduled and that has not ended */
@@ -532,6 +534,8 @@ typedef struct box_audio_sequencer_stats_t {
 typedef struct box_audio_sequencer_t {
     ecs_query_t *placements; /**< ClipPlacement, disabled ones included, uncached */
     ecs_vec_t index;        /**< box_audio_placement_t, sorted by start */
+    ecs_vec_t scans;        /**< box_audio_placement_t, the index before a rebuild sorted by
+                             *   entity, which carries scanned over */
     bool dirty;             /**< The index needs a rebuild */
     ecs_map_t clips;        /**< Clip entity to box_audio_clip_t* */
     uint32_t generation;    /**< Changes with every change of a NoteClip */

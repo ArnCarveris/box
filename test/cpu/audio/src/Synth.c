@@ -4806,6 +4806,20 @@ void Synth_pluck_vibrato_cost(void) {
     printf("32 strings: %.1f ns per string and frame steady, %.1f under vibrato\n", ns[0], ns[1]);
 }
 
+/** SynthFilter has a drive of 0 by default. */
+void Synth_filter_drive_default(void) {
+    // audio/synth
+    ecs_world_t *world = audio_world();
+    ecs_entity_t e = ecs_new(world);
+    const SynthFilter *f;
+    ecs_add(world, e, SynthFilter);
+    f = ecs_get(world, e, SynthFilter);
+    test_assert(f != NULL);
+    test_flt(f->drive, 0);
+    test_flt(f->cutoff, 1000);
+    ecs_fini(world);
+}
+
 /** A steady sine at 0.4 with a sub, so that a sub of 1 keeps it under the limiter.
  *
  * @param frequency Hz
