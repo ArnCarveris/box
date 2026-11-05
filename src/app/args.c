@@ -41,6 +41,50 @@ done:
     return result;
 }
 
+/** Parse a delta time written as a decimal number, or as a fraction <a>/<b> of two positive
+ * finite numbers such as 1/60.
+ *
+ * @param text The argument
+ * @param out Receives the delta time in seconds
+ * @return 0 when the argument is a valid delta time, nonzero when it is not
+ */
+static int box_app_delta_time(
+    const char *text,
+    double *out)
+{
+    char *end = NULL;
+    double a = 0, b = 0;
+    int result = -1;
+    if (!text || !text[0]) {
+        goto done;
+    }
+
+    if (!strchr(text, '/')) {
+        if (!box_app_number(text, 0, out) && *out >= 0 && *out <= FLT_MAX) {
+            result = 0;
+        }
+        goto done;
+    }
+
+    a = strtod(text, &end);
+    if (end == text || end[0] != '/' || !isfinite(a) || a <= 0) {
+        goto done;
+    }
+
+    if (box_app_number(end + 1, 0, &b) || b <= 0) {
+        goto done;
+    }
+
+    *out = a / b;
+    if (!isfinite(*out) || *out <= 0 || *out > FLT_MAX) {
+        goto done;
+    }
+
+    result = 0;
+done:
+    return result;
+}
+
 /** Parse a size written as <width>x<height>, both whole numbers from 1 to 8192, the largest
  * size box.surface renders.
  *
@@ -123,7 +167,7 @@ static int box_app_option(
             result = 0;
         }
     } else if (!strcmp(flag, "delta-time")) {
-        if (!box_app_number(value, 0, &v) && v >= 0 && v <= FLT_MAX) {
+        if (!box_app_delta_time(value, &v)) {
             app->delta_time = (float)v;
             result = 0;
         }
