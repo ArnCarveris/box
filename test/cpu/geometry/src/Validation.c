@@ -164,8 +164,28 @@ static const char *Validation_surface_children[] = {
 #define Validation_surface_count \
     ((int32_t)(sizeof(Validation_surface_children) / sizeof(Validation_surface_children[0])))
 
-/* Checks that every child of the instance inherits the surface of the prefab child with the
- * same name and resolves to the mesh of the prefab child, and that nothing was logged. */
+/* Returns the child of an instance spawned from a prefab child. Such a child has no name, only
+ * an IsA pair to the prefab child. */
+static ecs_entity_t Validation_spawned_child(
+    ecs_world_t *world,
+    ecs_entity_t instance,
+    ecs_entity_t base_child)
+{
+    ecs_entity_t result = 0;
+    ecs_iter_t it = ecs_children(world, instance);
+    while (ecs_children_next(&it)) {
+        for (int32_t i = 0; i < it.count; i ++) {
+            if (ecs_has_pair(world, it.entities[i], EcsIsA, base_child)) {
+                result = it.entities[i];
+            }
+        }
+    }
+
+    return result;
+}
+
+/* Checks that every child of the instance inherits the surface of its prefab child and
+ * resolves to the mesh of the prefab child, and that nothing was logged. */
 static void Validation_test_inherited_surfaces(
     ecs_world_t *world,
     ecs_entity_t prefab,
@@ -179,7 +199,7 @@ static void Validation_test_inherited_surfaces(
         test_assert(base_mesh != NULL);
         test_assert(base_mesh->mesh != 0);
 
-        ecs_entity_t child = ecs_lookup_child(world, instance, name);
+        ecs_entity_t child = Validation_spawned_child(world, instance, base);
         test_assert(child != 0);
         const ShapeMesh *mesh = ecs_get(world, child, ShapeMesh);
         test_assert(mesh != NULL);
