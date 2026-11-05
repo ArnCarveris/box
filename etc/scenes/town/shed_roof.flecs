@@ -7,19 +7,15 @@ using box.geometry
 using box.material
 
 assets {
-  @tree Parent
   template ShedRoof : Roof {
     const slope = 0.16
     const length = depth + 0.65
 
-    for i in 0..12 {
-      const z = -depth / 2 + (i + 0.5) * depth / 12
-      const rise = 0.55 + z * slope
-      {
-        Position: {0, rise / 2, z}
-        Box: {width, rise, depth / 12 + 0.015}
-        Rgb: TownCream
-      }
+    {
+      Position: {0, 0, 0}
+      Rotation: {0, 0, math.PI / 2}
+      BeveledPrism: {footprint: [{0, -depth / 2}, {0, depth / 2}, {0.55 + depth / 2 * slope, depth / 2}, {0.55 - depth / 2 * slope, -depth / 2}], depth: width}
+      Rgb: TownCream
     }
     {
       Position: {0, 0.59, 0}

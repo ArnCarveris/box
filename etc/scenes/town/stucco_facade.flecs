@@ -8,7 +8,6 @@ using box.geometry
 using box.material
 
 assets {
-  @tree Parent
   template StuccoFacade : Facade {
     {
       Position: {0, height / 2, 0}

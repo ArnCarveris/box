@@ -6,7 +6,6 @@ using box.transform
 using box.geometry
 using box.material
 
-@tree Parent
 template WestCorral {
   WestFence(length: 8, bays: 4) { Position: {0, 0, 3.2} }
   WestFence(length: 6.4, bays: 3) { Position: {4, 0, 0}; Rotation: {0, math.PI / 2, 0} }
