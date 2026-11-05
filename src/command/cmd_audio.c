@@ -176,6 +176,7 @@ static void box_cmd_audio_effects(
         const Chorus *chorus;
         const Saturator *saturator;
         const TransientShaper *shaper;
+        const Vocoder *vocoder;
         const box_audio_module_t *state = box_audio_module_get(world);
         char *path;
         int32_t b, slot;
@@ -262,6 +263,16 @@ static void box_cmd_audio_effects(
         } else if ((shaper = ecs_get(world, e, TransientShaper))) {
             ecs_strbuf_append(buf, "transient shaper attack %.2f sustain %.2f",
                 (double)shaper->attack, (double)shaper->sustain);
+        } else if ((vocoder = ecs_get(world, e, Vocoder))) {
+            char *key = vocoder->modulator && ecs_is_alive(world, vocoder->modulator) ?
+                ecs_get_path(world, vocoder->modulator) : NULL;
+            ecs_strbuf_append(buf, "vocoder modulator %s bands %d low %.0f Hz high %.0f Hz "
+                "q %.2f attack %.4f release %.3f shift %.2f unvoiced %.2f mix %.2f",
+                key ? key : (vocoder->modulator ? "(deleted)" : "(none)"), vocoder->bands,
+                (double)vocoder->low, (double)vocoder->high, (double)vocoder->q,
+                (double)vocoder->attack, (double)vocoder->release, (double)vocoder->shift,
+                (double)vocoder->unvoiced, (double)vocoder->mix);
+            ecs_os_free(key);
         }
 
         slot = box_audio_module_effect_slot(world, e);

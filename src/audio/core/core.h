@@ -558,7 +558,9 @@ typedef enum box_audio_effect_kind_t {
     BOX_AUDIO_EFFECT_SATURATOR = 9, /**< A saturator, box_audio_saturator_params_t */
     BOX_AUDIO_EFFECT_TRANSIENT_SHAPER = 10, /**< A transient shaper,
                                   *   box_audio_transient_shaper_params_t */
-    BOX_AUDIO_EFFECT_KINDS = 11   /**< Number of kinds, NONE included */
+    BOX_AUDIO_EFFECT_VOCODER = 11, /**< A vocoder, box_audio_vocoder_params_t, its modulator
+                                  *   the key bus of its command */
+    BOX_AUDIO_EFFECT_KINDS = 12   /**< Number of kinds, NONE included */
 } box_audio_effect_kind_t;
 
 /** The parameters of a reverb, the first floats of the params of its effect command */
@@ -875,6 +877,75 @@ typedef struct box_audio_transient_shaper_params_t {
     float sustain;    /**< -1..1: above 0 boosts the tail, below 0 shortens it */
 } box_audio_transient_shaper_params_t;
 
+/** Fewest, most and default bands of a vocoder */
+#define BOX_AUDIO_VOCODER_BANDS_MIN 8
+#define BOX_AUDIO_VOCODER_BANDS_MAX 32
+#define BOX_AUDIO_VOCODER_BANDS 16
+
+/** Lowest band of a vocoder in Hz; the highest stays under 0.45 of the rate */
+#define BOX_AUDIO_VOCODER_FREQUENCY_MIN 20.0f
+
+/** Fewest octaves between the lowest and the highest band of a vocoder */
+#define BOX_AUDIO_VOCODER_SPAN_MIN 1.0f
+
+/** Lowest and highest q of a vocoder */
+#define BOX_AUDIO_VOCODER_Q_MIN 0.25f
+#define BOX_AUDIO_VOCODER_Q_MAX 8.0f
+
+/** Octaves the carrier bands of a vocoder move at a shift of 1, either way */
+#define BOX_AUDIO_VOCODER_SHIFT_OCTAVES 1.0f
+
+/** Hz from which up the carrier bands of a vocoder take its unvoiced noise; the top quarter of
+ * the bands takes it in any case */
+#define BOX_AUDIO_VOCODER_UNVOICED_FROM 3000.0f
+
+/** Peak of the white noise a vocoder adds to its carrier at an unvoiced of 1 */
+#define BOX_AUDIO_VOCODER_NOISE 0.5f
+
+/** RMS level of a full band modulator at which a vocoder gives about the level of its
+ * carrier: that of white noise that fills -1..1 evenly, 1 / sqrt(3) */
+#define BOX_AUDIO_VOCODER_REFERENCE 0.57735026918962576451f
+
+/** Seconds of a change of the low, the high, the q, the shift, the unvoiced or the mix of a
+ * vocoder */
+#define BOX_AUDIO_VOCODER_RAMP 0.02f
+
+/** Frames between two updates of the coefficients of a vocoder while its low, high, q or
+ * shift moves */
+#define BOX_AUDIO_VOCODER_CONTROL 16
+
+/** The parameters of a vocoder, the first floats of the params of its effect command. The
+ * carrier is its own input, the modulator the output of the key bus of its command in the same
+ * block. Both run through bands matched bandpasses, log spaced from low to high, each two
+ * cascaded state variable bandpasses per channel; an envelope follower on each modulator band
+ * scales the carrier band of the same index, and the carrier bands are summed. Each modulator
+ * band is normalized by its width, and the sum by the width of all carrier bands, so that a
+ * full band modulator at BOX_AUDIO_VOCODER_REFERENCE gives about the level of a full band
+ * carrier. The bands and their state live on the memory of its slot.
+ *
+ * The key bus must come before the bus of the vocoder in the order; otherwise, or without a
+ * key, the vocoder passes its input */
+typedef struct box_audio_vocoder_params_t {
+    float bands;      /**< BOX_AUDIO_VOCODER_BANDS_MIN..MAX, rounded; a change fades the wet
+                       *   signal out, restarts the bands from silence and fades it back in
+                       *   over twice BOX_AUDIO_VOCODER_RAMP */
+    float low;        /**< Center of the lowest band in Hz, BOX_AUDIO_VOCODER_FREQUENCY_MIN up
+                       *   to 0.45 of the rate less BOX_AUDIO_VOCODER_SPAN_MIN octaves */
+    float high;       /**< Center of the highest band in Hz, BOX_AUDIO_VOCODER_SPAN_MIN octaves
+                       *   over low up to 0.45 of the rate */
+    float q;          /**< Sharpness of the bands, BOX_AUDIO_VOCODER_Q_MIN..MAX: at 1
+                       *   neighboring bands cross at -3 dB, above 1 they are narrower */
+    float attack;     /**< Seconds in which a band envelope rises 63% of a step,
+                       *   BOX_AUDIO_DYNAMICS_ATTACK_MIN..MAX */
+    float release;    /**< Seconds in which it falls 63% of a step,
+                       *   BOX_AUDIO_DYNAMICS_RELEASE_MIN..MAX */
+    float shift;      /**< -1..1: moves the carrier bands BOX_AUDIO_VOCODER_SHIFT_OCTAVES times
+                       *   shift octaves against the modulator bands, for a formant shift */
+    float unvoiced;   /**< 0..1: white noise of BOX_AUDIO_VOCODER_NOISE times this peak added
+                       *   to the carrier of the high bands, so consonants come through */
+    float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+} box_audio_vocoder_params_t;
+
 /** Put an effect into an insert slot of a bus, change its parameters, move it or take it off.
  *
  * The inserts of a bus run in the order of their index on its block, before its width, pan and
@@ -894,7 +965,8 @@ typedef struct box_audio_cmd_effect_t {
     uint32_t index;                 /**< Insert slot within the bus, below
                                      *   BOX_AUDIO_EFFECT_SLOTS */
     uint32_t key;                   /**< Sidechain bus, BOX_AUDIO_BUS_NONE for none: a
-                                     *   compressor keys on its output in the same block */
+                                     *   compressor keys on its output in the same block, a
+                                     *   vocoder takes it as its modulator */
     float params[BOX_AUDIO_EFFECT_PARAMS]; /**< The parameters of the kind, clamped by it, the
                                      *   ones it does not read 0 */
 } box_audio_cmd_effect_t;

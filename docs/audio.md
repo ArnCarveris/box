@@ -177,6 +177,7 @@ their tails end.
 | `Chorus` | `voices: 2`, `rate: 0.8` Hz, `depth: 3` ms, `delay: 12` ms, `mix: 0.5`, `spread: 0.5` |
 | `Saturator` | `drive: 0.3`, `asymmetry: 0`, `bits: 16`, `mix: 1` |
 | `TransientShaper` | `attack: 0`, `sustain: 0` |
+| `Vocoder` | `modulator: 0`, `bands: 16`, `low: 100` Hz, `high: 8000` Hz, `q: 1`, `attack: 0.005` s, `release: 0.05` s, `shift: 0`, `unvoiced: 0`, `mix: 1` |
 
 Equalizer bands use `AudioEqOff`, `AudioEqPeak`, `AudioEqLowShelf`,
 `AudioEqHighShelf`, `AudioEqLowCut` or `AudioEqHighCut`. Defaults are 100, 400,
@@ -211,6 +212,42 @@ it works the same at any level. `attack` from -1 to 1 softens or boosts transien
 `sustain` from -1 to 1 shortens or boosts the tail, each by up to 12 dB. The gain is
 smoothed so it does not distort low notes, is the same on both channels, and 0 and 0
 pass the signal unchanged. It has no meter.
+
+A vocoder lets the spectrum of one channel, the `modulator`, shape the input of the
+channel it sits on, the carrier: a voice on a saw pad gives a talking synth or a robot
+voice, a drum loop on a pad gives a pad that pumps with the beat. Both run through
+`bands` matched bandpasses (8 to 32, two cascaded state variable filters each), spaced
+logarithmically from `low` to `high`. An envelope follower with `attack` and `release`
+on each modulator band sets the level of the carrier band of the same index. `q` sets
+how sharp the bands are: at 1 neighboring bands cross at -3 dB, higher is narrower and
+more tonal. The level is made up so that a full band modulator around -5 dBFS RMS gives
+about the carrier's level; a silent modulator gives silence. `shift` from -1 to 1 moves
+the carrier bands up to an octave up or down against the modulator bands, which shifts
+the formants. `unvoiced` adds white noise to the carrier of the bands from 3 kHz up, so
+the consonants of a voice come through a carrier without highs.
+
+The modulator is keyed like a sidechain: it runs before the vocoded channel, and its
+output after its fader is the key, so route it into a muted group when only the
+vocoded sound should be heard. Without a modulator, or with one that is deleted, is no
+channel or would form a cycle, the vocoder logs one error and passes its input. Each
+vocoder takes memory for 32 bands. The band count is not automatable; changing it fades
+the vocoded sound out and back in. A drum loop vocodes a saw pad:
+
+```flecs
+drum_key { AudioBus: {output: master, volume: 0} }
+drums { AudioBus: {output: drum_key} }
+pad_vocoder {
+  Vocoder: {modulator: drums, bands: 16, attack: 0.002, release: 0.08, unvoiced: 0.2}
+}
+pad { AudioBus: {output: master, effects: [pad_vocoder]} }
+```
+
+Play the drum loop on `drums` and a saw pad (a synth sound with a `SynthSaw` layer) on
+`pad`; add `drums` to the master too, or give `drum_key` volume, to hear the loop with it.
+
+The cost grows with the bands: each band runs eight bandpass stages per frame. The
+`Modulation` bench of [bench/audio](../bench/audio/) measures it as `vocoder_16` and
+`vocoder_32`.
 
 For ducking, key a compressor on another channel:
 

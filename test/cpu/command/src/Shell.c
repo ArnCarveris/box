@@ -538,6 +538,12 @@ void Shell_audio_command(void) {
     ecs_ensure(world, punch, AudioBus)->effects[0] = punch;
     ecs_modified(world, punch, AudioBus);
     ecs_set(world, punch, TransientShaper, { .attack = 0.5f, .sustain = -0.25f });
+    ecs_entity_t talk = ecs_entity(world, { .name = "talk" });
+    ecs_ensure(world, talk, AudioBus)->effects[0] = talk;
+    ecs_modified(world, talk, AudioBus);
+    ecs_set(world, talk, Vocoder, { .modulator = punch, .bands = 24, .low = 120,
+        .high = 7000, .q = 1.5f, .attack = 0.004f, .release = 0.06f, .shift = -0.25f,
+        .unvoiced = 0.3f, .mix = 0.8f });
     ecs_progress(world, 0.016f);
 
     bool error = true;
@@ -556,6 +562,10 @@ void Shell_audio_command(void) {
         "insert 0 grit: saturator drive 0.60 asymmetry 0.20 bits 8.0 mix 0.50") != NULL);
     test_assert(strstr(out, "punch: group volume 1.00 pan 0.00 width 1.00 -> master, "
         "insert 0 punch: transient shaper attack 0.50 sustain -0.25 "
+        "(does not run: no output)") != NULL);
+    test_assert(strstr(out, "talk: group volume 1.00 pan 0.00 width 1.00 -> master, "
+        "insert 0 talk: vocoder modulator punch bands 24 low 120 Hz high 7000 Hz q 1.50 "
+        "attack 0.0040 release 0.060 shift -0.25 unvoiced 0.30 mix 0.80 "
         "(does not run: no output)") != NULL);
     ecs_os_free(out);
 

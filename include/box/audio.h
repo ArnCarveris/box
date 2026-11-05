@@ -850,6 +850,46 @@ ECS_STRUCT(TransientShaper, {
                             *   it */
 });
 
+/** A vocoder, an effect in an insert slot of an AudioBus, as a Reverb is: the spectrum of
+ * its modulator, a channel keyed as the sidechain of a Compressor, shapes the input of its own
+ * channel, the carrier. Talking synths and robot voices take a voice as the modulator and a
+ * saw pad as the carrier; a drum loop as the modulator makes a pad that follows its rhythm:
+ * pad { AudioBus: {effects: [pad]}; Vocoder: {modulator: drums, bands: 16} }.
+ *
+ * Both run through bands matched bandpasses, log spaced from low to high, each two cascaded
+ * state variable bandpasses per channel; an envelope follower on each modulator band scales
+ * the carrier band of the same index. The bands are made up so that a full band modulator at
+ * about -5 dBFS RMS gives about the level of a full band carrier; a silent modulator gives
+ * silence. Shift moves the carrier bands up or down by up to an octave against the modulator
+ * bands, for a formant shift; unvoiced adds white noise to the carrier of the bands from 3 kHz
+ * up and the top quarter, so the consonants of a voice come through.
+ *
+ * The order of the channels runs the modulator first. Without a modulator, or with one that is
+ * deleted, is no channel or would form a cycle, it logs one error that names it and passes its
+ * input. Every vocoder runs with its own memory for 32 bands. Low, high, q, shift, unvoiced and
+ * mix move over 20 ms; a change of the bands fades the vocoded signal out and back in over 40
+ * ms. The bands are not automatable.
+ */
+ECS_STRUCT(Vocoder, {
+    ecs_entity_t modulator; /**< Channel (an AudioBus) whose output is the modulator, the key */
+    int32_t bands;         /**< Bands, 8 to 32, default 16 */
+    float low;             /**< Center of the lowest band in Hz, default 100, at least 20 */
+    float high;            /**< Center of the highest band in Hz, default 8000, at least an
+                            *   octave over low and under 0.45 of the sample rate */
+    float q;               /**< Sharpness of the bands, 0.25 to 8, default 1: at 1 neighboring
+                            *   bands cross at -3 dB, above 1 they are narrower */
+    float attack;          /**< Seconds in which a band envelope rises 63% of a step, default
+                            *   0.005, 0.0001 to 1 */
+    float release;         /**< Seconds in which it falls 63% of a step, default 0.05, 0.001 to
+                            *   5 */
+    float shift;           /**< -1 to 1, default 0: moves the carrier bands up to an octave up
+                            *   or down against the modulator bands, for a formant shift */
+    float unvoiced;        /**< 0 to 1, default 0: white noise added to the carrier of the high
+                            *   bands, so consonants come through */
+    float mix;             /**< Wet level, 0 to 1, default 1; the dry signal passes at
+                            *   1 - mix */
+});
+
 /** An envelope of the cutoff of the SynthFilter of the same root, with the segments of a
  * SynthEnvelope: the cutoff is cutoff times 2 to the amount times the level of the envelope,
  * so it rises over the attack, settles at the sustain and returns over the release.

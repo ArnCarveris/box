@@ -413,6 +413,7 @@
                     "modulation",
                     "saturator",
                     "transient_shaper",
+                    "vocoder",
                     "synth_sub",
                     "synth_sync",
                     "synth_drive",
@@ -799,6 +800,22 @@
                     "transient_render_sizes",
                     "transient_component",
                     "transient_script"
+                ]
+            },
+            {
+                "id": "Vocoder",
+                "testcases": [
+                    "sine_band",
+                    "level",
+                    "silent_modulator",
+                    "bursts",
+                    "band_count",
+                    "render_sizes",
+                    "no_key_passes",
+                    "component",
+                    "missing_modulator",
+                    "cyclic_modulator",
+                    "script"
                 ]
             },
             {

@@ -814,6 +814,88 @@ void NoAlloc_transient_shaper(void) {
     test_int(noalloc_frees, 1);
 }
 
+/* Vocoders in the insert slots of buses, keyed on another bus: changes of every parameter
+ * and of the band count while they run, a key that goes and comes back, moves to another bus
+ * and slot, and a removal, without a call of the allocator. */
+void NoAlloc_vocoder(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_route_t routes[] = {
+        AUDIO_OUT(3, 0), AUDIO_OUT(1, 0), AUDIO_OUT(2, 0), AUDIO_MASTER };
+    int32_t floats = box_audio_effect_floats(BOX_AUDIO_EFFECT_VOCODER, AUDIO_RATE);
+    float *memory[2], params[BOX_AUDIO_EFFECT_PARAMS] = {0};
+    uint8_t bytes[1024];
+    box_audio_writer_t w;
+    uint32_t i, k, s = 1;
+    test_assert(floats > 0);
+    audio_order(core, routes, 4);
+    for (i = 0; i < AUDIO_FRAMES / 4; i ++) {
+        s ^= s << 13;
+        s ^= s >> 17;
+        s ^= s << 5;
+        audio_sound_a[i] = 0.3f * (float)((double)(int32_t)s / 2147483648.0);
+        audio_sound_b[i] = (i % (AUDIO_FRAMES / 16)) < AUDIO_FRAMES / 64 ?
+            0.5f * (float)sin(2 * AUDIO_PI * 700 * (double)i / AUDIO_RATE) : 0.0f;
+    }
+
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_FRAMES / 4, 1, AUDIO_RATE));
+    test_assert(box_audio_core_sound(core, 2, audio_sound_b, AUDIO_FRAMES / 4, 1, AUDIO_RATE));
+    for (i = 0; i < 2; i ++) {
+        memory[i] = calloc((size_t)floats, sizeof(float));
+        test_assert(box_audio_core_effect_memory(core, i, memory[i], floats));
+    }
+
+    audio_play(core, 1, 1, 1, 0.8f, 0, 1, BOX_AUDIO_PLAY_LOOP);
+    audio_play(core, 2, 1, 2, 0.5f, 0, 1.5f, BOX_AUDIO_PLAY_LOOP);
+    audio_play(core, 3, 2, 3, 1, 0, 1, BOX_AUDIO_PLAY_LOOP);
+    for (k = 0; k < 12; k ++) {
+        box_audio_writer_init(&w, bytes, sizeof(bytes));
+        for (i = 0; i < 2; i ++) {
+            params[0] = (float)(8 + 8 * ((k / 3 + i) % 4));
+            params[1] = 80.0f + 40.0f * (float)(k % 4);
+            params[2] = 4000.0f + 1500.0f * (float)((k + i) % 4);
+            params[3] = 0.5f + 0.75f * (float)(k % 5);
+            params[4] = 0.001f + 0.004f * (float)(k % 3);
+            params[5] = 0.02f + 0.05f * (float)(k % 4);
+            params[6] = -1 + 0.4f * (float)((k + i) % 6);
+            params[7] = 0.25f * (float)(k % 5);
+            params[8] = 1 - 0.2f * (float)(k % 4);
+            test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_VOCODER,
+                1 + (i + k / 4) % 2, (i + k) % BOX_AUDIO_EFFECT_SLOTS,
+                k % 5 == 4 ? BOX_AUDIO_BUS_NONE : 3, params));
+        }
+
+        box_audio_core_apply(core, w.data, w.size);
+        audio_render(core, 0, k % 3 ? AUDIO_FRAMES / 40 : AUDIO_FRAMES / 4);
+        audio_events(core, 0, NULL);
+    }
+
+    audio_render(core, 0, AUDIO_FRAMES / 40);
+    for (i = 0; i < 2; i ++) {
+        test_assert(box_audio_core_effect_running(core, i));
+    }
+
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    for (i = 0; i < 2; i ++) {
+        test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_NONE, BOX_AUDIO_BUS_NONE,
+            0, BOX_AUDIO_BUS_NONE, NULL));
+    }
+
+    box_audio_core_apply(core, w.data, w.size);
+    audio_render(core, 0, AUDIO_FRAMES);
+    for (i = 0; i < 2; i ++) {
+        test_assert(!box_audio_core_effect_running(core, i));
+    }
+
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+    for (i = 0; i < 2; i ++) {
+        free(memory[i]);
+    }
+}
+
 /* Voices of a patch with subs, on a mono layer, a wide unison layer and a modulator with
  * feedback, under a glide and an LFO, render without a call of the allocator. */
 void NoAlloc_synth_sub(void) {

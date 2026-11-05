@@ -69,6 +69,8 @@ typedef struct AudioEffectState {
     ecs_entity_t channel;   /**< Bus entity of the insert slot that names it */
     uint8_t bus;            /**< Index of that bus in the core */
     uint8_t index;          /**< Index of the insert slot within the bus */
+    bool unkeyed;           /**< The error that a vocoder has no modulator was logged */
+    ecs_entity_t modulator; /**< Modulator of the vocoder when that error was logged */
 } AudioEffectState;
 
 /** What box.audio sent for an effect slot of the core */
@@ -700,13 +702,13 @@ typedef struct box_audio_module_t {
     uint8_t route_sends[BOX_AUDIO_BUS_MAX][BOX_AUDIO_SENDS]; /**< Sends of each bus index at
                                    *   the last compile, BOX_AUDIO_BUS_NONE for none */
     ecs_entity_t sidechains[BOX_AUDIO_BUS_MAX][BOX_AUDIO_EFFECT_SLOTS]; /**< Sidechain of the
-                                   *   Compressor in each insert slot of each bus index at the
-                                   *   last compile, 0 for none */
+                                   *   Compressor, or modulator of the Vocoder, in each insert
+                                   *   slot of each bus index at the last compile, 0 for none */
     ecs_entity_t sidechain_refused[BOX_AUDIO_BUS_MAX][BOX_AUDIO_EFFECT_SLOTS]; /**< Sidechain
                                    *   whose cycle was logged for each insert slot, 0 for none */
-    uint8_t keys[BOX_AUDIO_BUS_MAX][BOX_AUDIO_EFFECT_SLOTS]; /**< Key bus of the compressor in
-                                   *   each insert slot of each bus index, BOX_AUDIO_BUS_NONE
-                                   *   for its own input */
+    uint8_t keys[BOX_AUDIO_BUS_MAX][BOX_AUDIO_EFFECT_SLOTS]; /**< Key bus of the compressor or
+                                   *   the vocoder in each insert slot of each bus index,
+                                   *   BOX_AUDIO_BUS_NONE for none */
     int32_t sidechain_count;      /**< Insert slots with a sidechain at the last compile */
     uint64_t solo;                /**< Bus indices soloed this frame */
     uint64_t solo_safe;           /**< Bus indices of returns and SFX buses this frame */
@@ -1442,8 +1444,9 @@ void box_audio_play_send(
     bool waiting,
     uint64_t when);
 
-/** Mark the order dirty when the sidechain of a Compressor in an insert slot changed since
- * the last compile. Costs nothing while no Compressor exists and none had a sidechain.
+/** Mark the order dirty when the sidechain of a Compressor, or the modulator of a Vocoder, in
+ * an insert slot changed since the last compile. Costs nothing while no Compressor and no
+ * Vocoder exists and none had a sidechain.
  *
  * @param world The world
  * @param state The state
@@ -1452,9 +1455,11 @@ void box_audio_sidechains_check(
     ecs_world_t *world,
     box_audio_module_t *state);
 
-/** Find the sidechains of the compressors in the insert slots, after the routes of the compile
- * are known: an edge from each key to the bus it ducks, so the key runs first. A sidechain that
- * would form a cycle, or that is the master, logs one error and keys on the own input.
+/** Find the sidechains of the compressors and the modulators of the vocoders in the insert
+ * slots, after the routes of the compile are known: an edge from each key to the bus it ducks
+ * or vocodes, so the key runs first. A sidechain that would form a cycle, or that is the
+ * master, logs one error and keys on the own input; so does a modulator, or one that is the bus
+ * of its vocoder, and the vocoder passes its input.
  *
  * @param world The world
  * @param state The state, with route_out and route_sends of this compile

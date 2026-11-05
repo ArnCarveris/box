@@ -338,6 +338,41 @@ typedef struct box_audio_transient_shaper_t {
     box_audio_ramp_t sustain; /**< Sustain */
 } box_audio_transient_shaper_t;
 
+/** A band of a vocoder on the memory of its slot, floats only: the two cascaded state
+ * variable bandpasses of the modulator and the carrier per channel, the envelope of the
+ * modulator per channel and the coefficients of both */
+typedef struct box_audio_vocoder_band_t {
+    float mod[2][2][2];       /**< States ic1 and ic2 of each modulator stage per channel */
+    float car[2][2][2];       /**< States ic1 and ic2 of each carrier stage per channel */
+    float env[2];             /**< Envelope of the modulator band per channel */
+    float mod_c[4];           /**< a1, a2, a3 and k of the modulator stages */
+    float car_c[4];           /**< a1, a2, a3 and k of the carrier stages */
+    float gain;               /**< Gain of the band: the normalization of its envelope and of
+                               * the sum */
+    float pad[3];             /**< Fills the band to 32 floats */
+} box_audio_vocoder_band_t;
+
+/** A vocoder: BOX_AUDIO_VOCODER_BANDS_MAX bands on the memory of its slot, the noise of its
+ * unvoiced carrier and the ramps of its parameters */
+typedef struct box_audio_vocoder_t {
+    box_audio_vocoder_params_t target; /**< Parameters of the last command, clamped */
+    box_audio_vocoder_band_t *band; /**< The bands in memory */
+    int32_t bands;            /**< Bands that run */
+    int32_t unvoiced_from;    /**< First band whose carrier takes the noise */
+    uint32_t rng;             /**< State of the noise, xorshift32, never 0 */
+    float attack;             /**< Share of the distance an envelope moves per frame up */
+    float release;            /**< Share of the distance an envelope moves per frame down */
+    int32_t control;          /**< Frames until the next update of the coefficients */
+    bool swap;                /**< Waits for the fade to reach 0 to apply the bands */
+    box_audio_ramp_t low;     /**< log2 of the low band, per control block */
+    box_audio_ramp_t high;    /**< log2 of the high band, per control block */
+    box_audio_ramp_t q;       /**< Sharpness, per control block */
+    box_audio_ramp_t shift;   /**< Shift, per control block */
+    box_audio_ramp_t unvoiced; /**< Level of the noise */
+    box_audio_ramp_t mix;     /**< Wet level */
+    box_audio_ramp_t fade;    /**< Fade of the wet signal around a change of the bands */
+} box_audio_vocoder_t;
+
 /** State of the kinds of effects */
 typedef union box_audio_effect_data_t {
     box_audio_reverb_t reverb;  /**< BOX_AUDIO_EFFECT_REVERB */
@@ -350,6 +385,7 @@ typedef union box_audio_effect_data_t {
     box_audio_chorus_t chorus;  /**< BOX_AUDIO_EFFECT_CHORUS */
     box_audio_saturator_t saturator; /**< BOX_AUDIO_EFFECT_SATURATOR */
     box_audio_transient_shaper_t transient_shaper; /**< BOX_AUDIO_EFFECT_TRANSIENT_SHAPER */
+    box_audio_vocoder_t vocoder; /**< BOX_AUDIO_EFFECT_VOCODER */
 } box_audio_effect_data_t;
 
 /** An effect instance of the pool of the core: a kind in an insert slot of a bus, on the
@@ -1389,6 +1425,36 @@ bool box_audio_transient_shaper_render(
 
 /** The transient shaper kind: a block skipped while idle */
 void box_audio_transient_shaper_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    int32_t frames);
+
+/** The vocoder kind: floats of memory, its bands */
+int32_t box_audio_vocoder_floats(
+    float sample_rate);
+
+/** The vocoder kind: start on the memory of its slot */
+void box_audio_vocoder_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The vocoder kind: new parameters while it runs */
+void box_audio_vocoder_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The vocoder kind: process a block on the output of its key bus */
+bool box_audio_vocoder_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The vocoder kind: a block skipped while idle */
+void box_audio_vocoder_rest(
     box_audio_core_t *core,
     box_audio_effect_t *fx,
     int32_t frames);
