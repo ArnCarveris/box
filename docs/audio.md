@@ -293,8 +293,8 @@ voices on play, so edits affect subsequent plays.
 | `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), `sync` (0, off, 1..16), `color` (`SynthNoiseWhite`), modulation controls, `velocity` (0) |
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`, `key_scale`; all zero by default |
 | `SynthDrive` | Root: `drive` (0.3, 0..1), `asymmetry` (0, 0..1) |
-| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves), `keytrack` (0), `model` (`SynthFilterSvf` or `SynthFilterLadder`) |
-| `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves and `velocity` (0); requires a filter |
+| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves), `keytrack` (0), `model` (`SynthFilterSvf` or `SynthFilterLadder`), `vowel` (0, 0..4, `SynthFormant`) |
+| `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves, `velocity` (0) and `vowel` (0, -4..4, `SynthFormant`); requires a filter |
 | `SynthPitchEnvelope` | `amount` (0 semitones, -48..48), `decay` seconds, `curve` (0, -16..16), `release_amount` (0 semitones, -48..48), `sync` (0 semitones, -48..48) |
 | `SynthUnison` | Per layer: `voices` (3, 1..7), `detune` (10 cents, 0..100), `width` (0, 0..1) |
 | `SynthGlide` | Root: `time` seconds (0, up to 10), `legato` (false), `channel` (0) |
@@ -398,6 +398,45 @@ prefab Acid {
 }
 ```
 
+`kind: SynthFormant` runs three resonant bandpasses of the state variable filter in
+parallel, at the first three formants of a vowel, each at its own level: vowels,
+talking pads and wah-like movement. `vowel` picks it, 0 a, 1 e, 2 i, 3 o and 4 u; a
+fraction interpolates the frequencies, the levels and the widths of the two nearest
+vowels, so 0.5 sits between a and e. The formants are the tenor table of the Csound
+manual (Appendix, "Formant Values"):
+
+| Vowel | Frequencies (Hz) | Levels (dB) | Widths (Hz) |
+| --- | --- | --- | --- |
+| 0 a | 650, 1080, 2650 | 0, -6, -7 | 80, 90, 120 |
+| 1 e | 400, 1700, 2600 | 0, -14, -12 | 70, 80, 100 |
+| 2 i | 290, 1870, 2800 | 0, -15, -18 | 40, 90, 100 |
+| 3 o | 400, 800, 2600 | 0, -10, -12 | 40, 80, 100 |
+| 4 u | 350, 600, 2700 | 0, -20, -17 | 40, 60, 100 |
+
+The formant frequencies are fixed: `cutoff`, `slope`, `model`, `velocity` and
+`keytrack` do nothing, and neither the filter envelope `amount` nor `SynthLfo.cutoff`
+moves them. `resonance` narrows the widths, from those of the table at 0 to a tenth of
+them at 1, and `drive` applies to each bandpass. The vowel is the modulation target
+instead: `SynthLfo.vowel` moves it by that many vowels at the top of the wave and
+`SynthFilterEnvelope.vowel` at level 1 of the envelope, both -4..4, and the moved
+vowel is clamped to 0..4. The filter envelope runs on a formant filter whenever its
+`vowel` is not 0, whatever its `amount`; its `velocity` scales the vowel depth.
+
+The level is normalized for a saw at 110 Hz, which comes out within about 3 dB of its
+level without a filter on every vowel; a higher note puts more of its power into the
+formants and comes out louder. On the stereo path both channels run the same filter.
+`AudioFilter` has no formant kind and takes `SynthFormant` as a lowpass.
+
+```
+prefab Talk {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.05, sustain: 1, hold: 1, release: 0.3}
+  SynthFilter: {kind: SynthFormant, vowel: 1, resonance: 0.3}
+  SynthLfo: {rate: 1.5, vowel: 1}
+  SynthOscillator: {wave: SynthSaw, frequency: 110, level: 0.6}
+}
+```
+
 `SynthDrive` on the root drives the mix of the layers of each voice through a tanh
 soft clipper before the filter, or before the amp without a filter: the stage where
 analog synths get most of their thickness. Since it works on the mix, plucks, unison
@@ -487,7 +526,8 @@ pan balances their channels rather than narrowing them with distance.
 
 A sound supports two LFOs, on the root, a layer or another root child. Waves include
 sine, triangle, square, rising saw and sample-and-hold. Destinations are `pitch`
-(cents), `amplitude` (0..1), `cutoff` (octaves), `pulse_width` and `sync`, the
+(cents), `amplitude` (0..1), `cutoff` (octaves), `vowel` (vowels of a `SynthFormant`
+filter, -4..4), `pulse_width` and `sync`, the
 semitones (-48..48) the ratio of hard sync moves at the top of the wave, clamped to
 1..16. On a layer it syncs that layer, from a ratio of 1 when it has none; on the root
 it moves every layer whose `sync` is over 1.

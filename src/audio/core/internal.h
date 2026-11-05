@@ -48,6 +48,7 @@ static inline float box_audio_clean(
 }
 
 #include "svf.h"
+#include "formant.h"
 #include "ladder.h"
 #include "saturate.h"
 
@@ -643,6 +644,14 @@ typedef struct box_audio_synth_source_t {
     bool gate;            /**< Whether its envelopes sustain until a release */
     int32_t filter;       /**< A box_audio_synth_filter_t */
     int32_t stages;       /**< Stages of the filter: 1 for 12 dB per octave, 2 for 24 */
+    box_audio_formant_t formant; /**< The formant filter, when the filter is
+                           * BOX_AUDIO_SYNTH_FORMANT */
+    float vowel;          /**< Vowel of the patch, of a formant filter */
+    float vowel_amount;   /**< Vowels of the filter envelope at its level 1, 0 without a formant
+                           * filter */
+    bool lfo_vowel;       /**< Whether an LFO moves the vowel of a formant filter */
+    double lfo_vowels;    /**< Vowels the LFOs move the vowel by, 0 without */
+    bool fenv_on;         /**< Whether the filter envelope runs: amount or vowel_amount not 0 */
     box_audio_svf_t svf[2]; /**< The resonant stage, then the stage before it at 24 dB */
     box_audio_svf_t svf_r[2]; /**< The stages of the right channel, when stereo */
     float drive;          /**< Saturation of the filter, 0 (linear) to 1 */
@@ -664,7 +673,7 @@ typedef struct box_audio_synth_source_t {
     double cutoff_base;   /**< Cutoff of the patch, clamped, in Hz */
     double cutoff_top;    /**< Highest cutoff in Hz, under Nyquist */
     float amount;         /**< Octaves of the filter envelope, 0 without one */
-    box_audio_synth_env_t fenv; /**< The filter envelope, when amount is not 0 */
+    box_audio_synth_env_t fenv; /**< The filter envelope, when fenv_on */
     int32_t control;      /**< Frames until the filter takes the cutoff of the envelope */
     int32_t glide_frames; /**< Frames of a glide of the patch, 0 when a pitch jumps */
     int32_t glide_left;   /**< Frames left of the glide that runs, 0 for none */

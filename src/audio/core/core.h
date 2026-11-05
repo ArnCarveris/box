@@ -202,6 +202,10 @@
 /** Cutoff of the DC blocker after the drive of a synth voice with asymmetry in Hz */
 #define BOX_AUDIO_SYNTH_DRIVE_DC 5.0f
 
+/** Highest vowel of a formant filter: 0 a, 1 e, 2 i, 3 o, 4 u; also the largest depth in
+ * vowels of an LFO or the filter envelope on it */
+#define BOX_AUDIO_SYNTH_VOWEL_MAX 4.0f
+
 /** Commands of the byte stream. Each starts with a box_audio_cmd_header_t */
 typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_PLAY = 1,          /**< box_audio_cmd_play_t */
@@ -811,7 +815,10 @@ typedef enum box_audio_synth_filter_t {
     BOX_AUDIO_SYNTH_LOWPASS = 1,      /**< Lowpass, 12 dB per octave */
     BOX_AUDIO_SYNTH_HIGHPASS = 2,     /**< Highpass, 12 dB per octave */
     BOX_AUDIO_SYNTH_BANDPASS = 3,     /**< Bandpass, unity at the cutoff */
-    BOX_AUDIO_SYNTH_NOTCH = 4         /**< Notch, silent at the cutoff */
+    BOX_AUDIO_SYNTH_NOTCH = 4,        /**< Notch, silent at the cutoff */
+    BOX_AUDIO_SYNTH_FORMANT = 5       /**< Three bandpasses in parallel at the formants of a
+                                       * vowel, see formant.h; the cutoff, the slope and the
+                                       * model do nothing */
 } box_audio_synth_filter_t;
 
 /** Slopes of the filter of a synth patch */
@@ -950,6 +957,8 @@ typedef struct box_audio_synth_lfo_t {
     float sync;             /**< Semitones the ratio of hard sync moves by at the top of the
                              * wave, -BOX_AUDIO_SYNTH_SYNC_SEMITONES..max; on a layer it syncs
                              * it, for every layer only those with a ratio over 1 */
+    float vowel;            /**< Vowels of a formant filter at the top of the wave,
+                             * -BOX_AUDIO_SYNTH_VOWEL_MAX..max; of the patch, as the cutoff */
 } box_audio_synth_lfo_t;
 
 /** A synth patch: up to BOX_AUDIO_SYNTH_LAYERS oscillators with envelopes, then one filter,
@@ -978,7 +987,8 @@ typedef struct box_audio_synth_patch_t {
                                            * gain into the ladder */
     uint32_t model;                       /**< A box_audio_synth_model_t, 0 the SVF */
     float filter_amount;                  /**< Octaves the filter envelope moves the cutoff at
-                                           * its level 1, negative closes it; 0 for none */
+                                           * its level 1, negative closes it; 0 for none.
+                                           * Ignored by BOX_AUDIO_SYNTH_FORMANT */
     box_audio_synth_envelope_t filter_envelope; /**< Envelope of the cutoff, which does not
                                            * keep the voice playing */
     float filter_velocity;                /**< Octaves of the cutoff at velocity 1 over velocity
@@ -995,6 +1005,12 @@ typedef struct box_audio_synth_patch_t {
     box_audio_synth_lfo_t lfo[BOX_AUDIO_SYNTH_LFOS]; /**< The LFOs */
     box_audio_synth_pitch_envelope_t pitch_envelope; /**< Pitch envelope of the layers without
                                            * their own, all 0 for none */
+    float vowel;                          /**< BOX_AUDIO_SYNTH_FORMANT: the vowel,
+                                           * 0..BOX_AUDIO_SYNTH_VOWEL_MAX, fractions between */
+    float filter_vowel;                   /**< BOX_AUDIO_SYNTH_FORMANT: vowels the filter
+                                           * envelope moves the vowel by at its level 1,
+                                           * -BOX_AUDIO_SYNTH_VOWEL_MAX..max; 0 for none. The
+                                           * envelope runs when this or filter_amount is not 0 */
     box_audio_synth_layer_t layer[BOX_AUDIO_SYNTH_LAYERS]; /**< The oscillators, last: a
                                            * command sends only the layers of its patch */
 } box_audio_synth_patch_t;

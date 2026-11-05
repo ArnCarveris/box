@@ -136,7 +136,7 @@ static void box_audio_synth_patch_clamp(
     p->level_variance = box_audio_synth_clamp(p->level_variance, 0, 1);
     p->glide = box_audio_synth_clamp(p->glide, 0, BOX_AUDIO_SYNTH_GLIDE_MAX);
     box_audio_synth_envelope_clamp(&p->envelope);
-    if (p->filter > BOX_AUDIO_SYNTH_NOTCH) {
+    if (p->filter > BOX_AUDIO_SYNTH_FORMANT) {
         p->filter = BOX_AUDIO_SYNTH_FILTER_NONE;
     }
 
@@ -163,6 +163,8 @@ static void box_audio_synth_patch_clamp(
         BOX_AUDIO_SYNTH_OCTAVES_MAX);
     p->filter_envelope_velocity = box_audio_synth_clamp(p->filter_envelope_velocity, 0, 1);
     p->keytrack = box_audio_synth_clamp(p->keytrack, 0, 1);
+    p->vowel = box_audio_synth_clamp(p->vowel, 0, BOX_AUDIO_SYNTH_VOWEL_MAX);
+    p->filter_vowel = box_audio_synth_depth_clamp(p->filter_vowel, BOX_AUDIO_SYNTH_VOWEL_MAX);
     box_audio_synth_pitch_envelope_clamp(&p->pitch_envelope);
     for (i = p->layers; i < BOX_AUDIO_SYNTH_LAYERS; i ++) {
         p->layer[i] = (box_audio_synth_layer_t){0};
@@ -236,6 +238,7 @@ static void box_audio_synth_patch_clamp(
         lfo->pulse_width = box_audio_synth_depth_clamp(lfo->pulse_width,
             0.5f - BOX_AUDIO_SYNTH_PULSE_MIN);
         lfo->sync = box_audio_synth_depth_clamp(lfo->sync, BOX_AUDIO_SYNTH_SYNC_SEMITONES);
+        lfo->vowel = box_audio_synth_depth_clamp(lfo->vowel, BOX_AUDIO_SYNTH_VOWEL_MAX);
     }
 }
 
