@@ -267,8 +267,8 @@ voices on play, so edits affect subsequent plays.
 | --- | --- |
 | `SynthSound` | `seed`, `pitch_variance`, `level_variance`; variances default to zero |
 | `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), modulation controls, `velocity` (0) |
-| `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`; all zero by default |
-| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `velocity` (0 octaves) |
+| `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`, `key_scale`; all zero by default |
+| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `velocity` (0 octaves), `keytrack` (0) |
 | `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves and `velocity` (0); requires a filter |
 | `SynthUnison` | Per layer: `voices` (3, 1..7), `detune` (10 cents, 0..100), `width` (0, 0..1) |
 | `SynthGlide` | Root: `time` seconds (0, up to 10), `legato` (false), `channel` (0) |
@@ -319,6 +319,24 @@ the voice as well as its gain, so harder notes can be brighter, not only louder.
 
 Plays that are not notes, such as `AudioSource`, `box_audio_play`, quantized plays and
 streams, play at velocity 1. Sample voices ignore velocity beyond its gain.
+
+The pitch of a note reaches the voice too, as key tracking on analog synths. The key of
+a voice is `12 * log2(ratio)` semitones, where the ratio is the pitch of its play without
+the `pitch_variance` of `SynthSound`. For an `Instrument` note the ratio is
+`2^((pitch - root) / 12)`, so the key is relative to `Instrument.root`; for any other play
+it is relative to a ratio of 1, the pitch of an `AudioSource` or of `box_audio_play`. Both
+fields default to 0, which leaves the sound as it was:
+
+- `SynthFilter.keytrack`, 0..1, multiplies the cutoff by `ratio^keytrack`, so 1 moves the
+  cutoff 1:1 with the pitch and 0.5 half an octave per octave. It follows the current pitch
+  of the voice: a glide, a change of `AudioSource.pitch` or a legato retarget moves the
+  cutoff along, at the control rate of the LFOs. It adds to the filter envelope, the
+  velocity and the LFOs.
+- `SynthEnvelope.key_scale`, 0..1, multiplies the decay and the release by
+  `2^(-key_scale * key / 12)`, fixed at the start of the note, so at 1 they halve per
+  octave above the root and double per octave below. It applies to the root envelope and
+  to the envelopes of layers, clamped to the limits of an envelope; the filter envelope
+  has no key scaling.
 
 ### Modulation, unison and glide
 

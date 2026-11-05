@@ -144,6 +144,27 @@
                 ]
             },
             {
+                "id": "SynthKey",
+                "testcases": [
+                    "keytrack_octave",
+                    "keytrack_half",
+                    "keytrack_off",
+                    "keytrack_glide",
+                    "keytrack_glide_wide",
+                    "keytrack_jump",
+                    "keytrack_legato",
+                    "keytrack_envelope",
+                    "key_scale_decay",
+                    "key_scale_layer",
+                    "key_scale_half",
+                    "key_scale_off",
+                    "key_scale_release",
+                    "defaults_identical",
+                    "clamped",
+                    "script"
+                ]
+            },
+            {
                 "id": "SynthVelocity",
                 "testcases": [
                     "filter_cutoff",

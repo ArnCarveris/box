@@ -406,6 +406,11 @@ ECS_STRUCT(SynthEnvelope, {
     float curve;           /**< Curve of the decay and the release, 0 linear (default),
                             *   -16..16 */
     float attack_curve;    /**< Curve of the attack, 0 linear (default), -16..16 */
+    float key_scale;       /**< Key scaling 0..1, default 0: the decay and the release are
+                            *   times 2^(-key_scale key / 12) at the key of the note (see
+                            *   SynthFilter), fixed at its start, so at 1 they halve per
+                            *   octave above the root and double per octave below; clamped
+                            *   to the times of an envelope */
 });
 
 /** Unison of a synth layer, on the entity of its SynthOscillator: the layer plays as several
@@ -429,7 +434,13 @@ ECS_STRUCT(SynthUnison, {
 });
 
 /** The filter of a synth sound, on its root: a state variable filter on the mix of the layers,
- * stable at any cutoff and resonance */
+ * stable at any cutoff and resonance.
+ *
+ * The key of a voice, which keytrack and SynthEnvelope.key_scale follow, is 12 log2 of the
+ * pitch ratio of its play in semitones, without the pitch variance of SynthSound: relative to
+ * Instrument.root for a note of an instrument, to a ratio of 1 for any other play, as the
+ * pitch of an AudioSource or of box_audio_play.
+ */
 ECS_STRUCT(SynthFilter, {
     SynthFilterKind kind;  /**< The kind, default SynthLowPass */
     float cutoff;          /**< Hz, default 1000, clamped under Nyquist */
@@ -439,6 +450,9 @@ ECS_STRUCT(SynthFilter, {
     float velocity;        /**< Octaves of the cutoff at velocity 1 over velocity 0, -10..10,
                             *   default 0: the cutoff applies as authored at velocity 1 and is
                             *   cutoff * 2^(velocity (v - 1)) at the velocity v of a note */
+    float keytrack;        /**< Key tracking 0..1, default 0: the cutoff is times the pitch
+                            *   ratio of the voice to the keytrack, so 1 moves it 1:1 with the
+                            *   pitch; it follows the pitch of the voice, glides included */
 });
 
 /** A filter, an effect in an insert slot of an AudioBus, as a Reverb is: the state variable

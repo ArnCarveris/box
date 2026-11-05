@@ -427,8 +427,8 @@ static void box_audio_synth_limits(
 }
 
 /** Move the cutoff by the level of the filter envelope, exponentially in frequency: the cutoff
- * of the patch times 2 to the amount times the level, and to the octaves of the LFOs, clamped
- * to the range of a cutoff.
+ * of the patch times 2 to the amount times the level, to the octaves of the LFOs and to the
+ * keytrack times the key, clamped to the range of a cutoff.
  *
  * @param src The source
  * @param level Level of the filter envelope, 0..1
@@ -442,6 +442,10 @@ static void box_audio_synth_cutoff(
     double octaves = (double)src->amount * (double)level, cut;
     if (src->lfo_cutoff) {
         octaves += src->lfo_octaves;
+    }
+
+    if (src->keytrack != 0) {
+        octaves += (double)src->keytrack * src->key;
     }
 
     cut = src->cutoff_base * box_audio_synth_exp2(octaves);
@@ -949,7 +953,13 @@ static void box_audio_synth_pass(
     }
 
     top = BOX_AUDIO_SYNTH_CUTOFF_NYQUIST * (double)rate;
-    cut = src->cutoff_base < top ? src->cutoff_base : top;
+    cut = src->cutoff_base;
+    if (src->keytrack != 0) {
+        cut *= box_audio_synth_exp2((double)src->keytrack * src->key);
+        cut = cut > BOX_AUDIO_SYNTH_CUTOFF_MIN ? cut : BOX_AUDIO_SYNTH_CUTOFF_MIN;
+    }
+
+    cut = cut < top ? cut : top;
     src->cutoff = cut;
     src->cutoff_top = top;
     src->control = BOX_AUDIO_SYNTH_CONTROL;
@@ -990,6 +1000,72 @@ static void box_audio_synth_lfo_start(
         src->lfo[k].start = d->random_phase ?
             0.5 * (1.0 + (double)box_audio_synth_noise(&src->lfo_rng)) : (double)d->phase;
         src->lfo_cutoff = src->lfo_cutoff || (src->filter && d->cutoff != 0);
+    }
+}
+
+/** Scale the decay and the release of an envelope of a play by the key of its note:
+ * 2^(-key_scale key), clamped to the times of an envelope. An envelope without key_scale
+ * stays as it is.
+ *
+ * @param e The envelope of the play
+ * @param key The key in octaves
+ */
+static void box_audio_synth_key_scale(
+    box_audio_synth_envelope_t *e,
+    double key)
+{
+    double f, t;
+    if (e->key_scale > 0) {
+        f = box_audio_synth_exp2(-(double)e->key_scale * key);
+        t = (double)e->decay * f;
+        e->decay = (float)(t < BOX_AUDIO_SYNTH_LENGTH_MAX ? t : BOX_AUDIO_SYNTH_LENGTH_MAX);
+        t = (double)e->release * f;
+        e->release = (float)(t < BOX_AUDIO_SYNTH_LENGTH_MAX ? t : BOX_AUDIO_SYNTH_LENGTH_MAX);
+    }
+}
+
+/** Aim the key of a source at the key of a pitch ratio, over the frames of a glide or at the
+ * next frame, so the cutoff follows it. Without keytrack the key stays.
+ *
+ * @param src The source
+ * @param pitch The pitch ratio, without the variance
+ * @param frames Frames of the glide, 0 to jump
+ */
+static void box_audio_synth_key_aim(
+    box_audio_synth_source_t *src,
+    float pitch,
+    int32_t frames)
+{
+    if (src->keytrack != 0) {
+        src->key_target = box_audio_synth_log2((double)pitch);
+        src->key_left = frames > 0 ? frames : 1;
+        src->key_step = (src->key_target - src->key) / (double)src->key_left;
+        src->key_control = 1;
+    }
+}
+
+/** Advance the key of a source by a frame toward its target, and move the cutoff with it
+ * every BOX_AUDIO_SYNTH_CONTROL frames and at its end. An LFO of the cutoff or a filter
+ * envelope that runs takes the key in its own update of the cutoff instead.
+ *
+ * @param src The source, whose key moves
+ * @param rate Frames per second
+ */
+static void box_audio_synth_key_next(
+    box_audio_synth_source_t *src,
+    float rate)
+{
+    if (-- src->key_left == 0) {
+        src->key = src->key_target;
+    } else {
+        src->key += src->key_step;
+    }
+
+    if (!src->lfo_cutoff && (src->amount == 0 || src->fenv.segment >= BOX_AUDIO_SYNTH_DONE) &&
+        (-- src->key_control <= 0 || src->key_left == 0))
+    {
+        src->key_control = BOX_AUDIO_SYNTH_CONTROL;
+        box_audio_synth_cutoff(src, 0.0f, rate);
     }
 }
 
@@ -1077,7 +1153,17 @@ void box_audio_source_synth(
         box_audio_synth_velocity_layers(src, velocity);
     }
 
+    src->key = box_audio_synth_log2((double)pitch);
+    src->key_target = src->key;
+    src->key_step = 0;
+    src->key_left = 0;
+    src->key_control = 0;
     src->envelope = p->envelope;
+    box_audio_synth_key_scale(&src->envelope, src->key);
+    for (l = 0; l < src->layers; l ++) {
+        box_audio_synth_key_scale(&src->part[l]->layer.envelope, src->key);
+    }
+
     src->filter_envelope = p->filter_envelope;
     src->cutoff_base = (double)p->cutoff;
     if (p->filter_velocity != 0 && velocity < 1) {
@@ -1099,6 +1185,7 @@ void box_audio_source_synth(
     src->gate = gate;
     src->filter = (int32_t)p->filter;
     src->amount = src->filter ? p->filter_amount : 0.0f;
+    src->keytrack = src->filter ? p->keytrack : 0.0f;
     if (p->filter_envelope_velocity > 0 && velocity < 1) {
         src->amount *= box_audio_synth_velocity(p->filter_envelope_velocity, velocity);
     }
@@ -1177,6 +1264,8 @@ void box_audio_synth_pitch(
             o->inc_end = o->inc_end * f < src->inc_max ? o->inc_end * f : src->inc_max;
         }
     }
+
+    box_audio_synth_key_aim(src, pitch, src->glide_frames);
 
     if (src->modulated) {
         box_audio_synth_limits(src);
@@ -1271,6 +1360,7 @@ bool box_audio_synth_legato(
     src->glide_frames = n;
     src->glide_left = n;
     src->pitch = p;
+    box_audio_synth_key_aim(src, pitch, n);
     if (src->modulated) {
         box_audio_synth_limits(src);
     }
@@ -2106,6 +2196,10 @@ static int32_t box_audio_synth_render_wide(
             box_audio_synth_glide_next(src);
         }
 
+        if (src->key_left > 0) {
+            box_audio_synth_key_next(src, rate);
+        }
+
         if (src->lfos) {
             box_audio_synth_lfo_next(src, rate);
             box_audio_synth_mix_wide(src, levels, true, &l, &r);
@@ -2170,6 +2264,10 @@ int32_t box_audio_synth_render(
 
         if (src->glide_left > 0) {
             box_audio_synth_glide_next(src);
+        }
+
+        if (src->key_left > 0) {
+            box_audio_synth_key_next(src, rate);
         }
 
         if (src->lfos) {

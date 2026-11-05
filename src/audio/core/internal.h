@@ -573,6 +573,15 @@ typedef struct box_audio_synth_source_t {
     int32_t lfo_control;  /**< Frames until the next control block of the LFOs */
     bool lfo_cutoff;      /**< Whether an LFO moves the cutoff */
     double lfo_octaves;   /**< Octaves the LFOs move the cutoff by, 0 without */
+    float keytrack;       /**< Share 0..1 of the key in octaves the cutoff follows, 0 without a
+                           * filter */
+    double key;           /**< Key of the voice in octaves, log2 of its pitch ratio without the
+                           * variance, moving with a glide */
+    double key_target;    /**< Key the voice moves to */
+    double key_step;      /**< Change of key per frame while it moves */
+    int32_t key_left;     /**< Frames left until key reaches key_target, 0 when it stands or
+                           * keytrack is 0 */
+    int32_t key_control;  /**< Frames until the filter takes the key while it moves */
     float tremolo;        /**< Factor of the output from the LFOs of every layer, 1 without */
     float tremolo_step;   /**< Change of tremolo per frame */
     int32_t strings;      /**< Pluck layers, each with a string per unison voice, 0 for none */

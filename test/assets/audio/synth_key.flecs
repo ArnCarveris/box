@@ -1,0 +1,16 @@
+// Synth sounds for the SynthKey suite of test/cpu/audio: noise through a resonant lowpass
+// whose cutoff follows the pitch of a note, and an envelope that shortens on higher notes.
+using box.audio
+
+// Noise through a resonant lowpass at 1000 Hz that moves 1:1 with the pitch
+prefab key_noise {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.002, decay: 0.01, sustain: 1, hold: 0.05, release: 0.05, key_scale: 0.5}
+  SynthOscillator: {wave: SynthNoise, level: 0.05}
+  SynthFilter: {kind: SynthLowPass, cutoff: 1000, resonance: 0.9, keytrack: 1}
+}
+
+// The noise, with its root at C4, so C4 plays the cutoff as authored
+key_lead {
+  Instrument: {sound: key_noise, root: 60, velocity_curve: 0, gate: true, release: 0.05}
+}

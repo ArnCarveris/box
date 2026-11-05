@@ -719,6 +719,9 @@ typedef struct box_audio_synth_envelope_t {
     float curve;         /**< Curve of the decay and the release, 0 linear, positive fast at
                           *   first, -BOX_AUDIO_SYNTH_CURVE_MAX..BOX_AUDIO_SYNTH_CURVE_MAX */
     float attack_curve;  /**< Curve of the attack, the same way */
+    float key_scale;     /**< 0..1: the decay and the release are times 2^(-key_scale key / 12)
+                          *   at the key of a note, 12 log2 of its pitch ratio, fixed at its
+                          *   start; 0 for none and always 0 for the filter envelope */
 } box_audio_synth_envelope_t;
 
 /** An oscillator of a synth patch */
@@ -801,6 +804,9 @@ typedef struct box_audio_synth_patch_t {
                                            * is cutoff * 2^(filter_velocity (v - 1)); 0 for none */
     float filter_envelope_velocity;       /**< Share 0..1 of filter_amount that velocity
                                            * scales: amount (1 - share + share v) */
+    float keytrack;                       /**< 0..1: the cutoff is times the current pitch
+                                           * ratio of the voice, without its variance, to the
+                                           * keytrack, at the control rate; 0 for none */
     float glide;                          /**< Seconds a change of the pitch of a voice takes,
                                            * exponential in frequency, 0 jumps at once */
     uint32_t lfos;                        /**< LFOs that run, 0..BOX_AUDIO_SYNTH_LFOS */

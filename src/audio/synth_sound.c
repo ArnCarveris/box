@@ -91,7 +91,7 @@ static box_audio_synth_envelope_t box_audio_synth_envelope(
     return (box_audio_synth_envelope_t){
         .attack = env->attack, .decay = env->decay, .sustain = env->sustain,
         .release = env->release, .hold = env->hold, .curve = env->curve,
-        .attack_curve = env->attack_curve };
+        .attack_curve = env->attack_curve, .key_scale = env->key_scale };
 }
 
 /** Check whether an envelope fits in a pass of the core; NaN, infinite and negative times do
@@ -300,6 +300,7 @@ bool box_audio_synth_compile(
         p.resonance = filter->resonance;
         p.slope = (uint32_t)filter->slope;
         p.filter_velocity = filter->velocity;
+        p.keytrack = filter->keytrack;
     }
 
     if (filter && fenv && fenv->amount != 0) {
