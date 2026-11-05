@@ -3,15 +3,10 @@
  * @brief The effects of the module: the entities that the insert slots of the channels name,
  * their slots of the pool of the core, their memory and their commands.
  *
-<<<<<<< HEAD
- * An effect entity is any entity with an effect component (Reverb, PitchShifter and so on,
- * the first in the order of box_audio_module_effect_components). A compressor gets the key bus
- * that the order compile accepted for its insert.
-=======
  * An effect entity is any entity with an effect component: Reverb, Equalizer, AudioFilter,
- * Compressor, Gate, Delay, Phaser, Chorus, Saturator, TransientShaper or FrequencyShifter, the
- * first of them in that order. A compressor gets the key bus the order compile accepted.
->>>>>>> a4fe46bb42cb0d5a52610e937391d4ca8b68f4eb
+ * Compressor, Gate, Delay, Phaser, Chorus, Saturator, TransientShaper, FrequencyShifter or
+ * PitchShifter, the first of them in that order. A compressor gets the key bus the order
+ * compile accepted.
  *
  * The module sends an EFFECT command when the kind, the channel, the slot or a parameter of an
  * effect changes, and takes it off when no insert slot names it any more.
@@ -202,7 +197,16 @@ uint32_t box_audio_module_effect_params(
             params[0] = shaper->attack;
             params[1] = shaper->sustain;
         }
-<<<<<<< HEAD
+    } else if (component == ecs_id(FrequencyShifter)) {
+        const FrequencyShifter *shifter = ptr;
+        result = BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER;
+        if (params && ptr) {
+            params[0] = shifter->shift;
+            params[1] = shifter->mode == FrequencyRing ? 1.0f : 0.0f;
+            params[2] = shifter->stereo;
+            params[3] = shifter->feedback;
+            params[4] = shifter->mix;
+        }
     } else if (component == ecs_id(PitchShifter)) {
         const PitchShifter *shifter = ptr;
         result = BOX_AUDIO_EFFECT_PITCH_SHIFTER;
@@ -213,17 +217,6 @@ uint32_t box_audio_module_effect_params(
             params[3] = shifter->window;
             params[4] = shifter->feedback;
             params[5] = shifter->mix;
-=======
-    } else if (component == ecs_id(FrequencyShifter)) {
-        const FrequencyShifter *shifter = ptr;
-        result = BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER;
-        if (params && ptr) {
-            params[0] = shifter->shift;
-            params[1] = shifter->mode == FrequencyRing ? 1.0f : 0.0f;
-            params[2] = shifter->stereo;
-            params[3] = shifter->feedback;
-            params[4] = shifter->mix;
->>>>>>> a4fe46bb42cb0d5a52610e937391d4ca8b68f4eb
         }
     }
 
@@ -237,11 +230,7 @@ int32_t box_audio_module_effect_components(
     const ecs_entity_t components[] = {
         ecs_id(Reverb), ecs_id(Equalizer), ecs_id(AudioFilter), ecs_id(Compressor),
         ecs_id(Gate), ecs_id(Delay), ecs_id(Phaser), ecs_id(Chorus), ecs_id(Saturator),
-<<<<<<< HEAD
-        ecs_id(TransientShaper), ecs_id(PitchShifter)
-=======
-        ecs_id(TransientShaper), ecs_id(FrequencyShifter)
->>>>>>> a4fe46bb42cb0d5a52610e937391d4ca8b68f4eb
+        ecs_id(TransientShaper), ecs_id(FrequencyShifter), ecs_id(PitchShifter)
     };
     int32_t i, count = (int32_t)(sizeof(components) / sizeof(components[0]));
     count = count < BOX_AUDIO_EFFECT_COMPONENTS ? count : BOX_AUDIO_EFFECT_COMPONENTS;

@@ -659,7 +659,6 @@ void NoAlloc_modulation(void) {
     }
 }
 
-<<<<<<< HEAD
 /* Pitch shifters in the insert slots of buses and a reverb with a shimmer: changes of the
  * semitones, the cents, the stereo, the window, the feedback, the mix and the shimmer while
  * they run, a move to another bus, tails that decay to silence and start again, and a removal,
@@ -749,14 +748,9 @@ void NoAlloc_pitch_shifter(void) {
     }
 }
 
-/* Saturators in the insert slots of buses: changes of the drive, the asymmetry, the bits and
- * the mix while they run, moves to another bus and slot, the reduction read, tails that decay
- * to silence and start again, and a removal, without a call of the allocator. */
-=======
 /* Saturators in the insert slots of buses: changes of the drive, the asymmetry, the bits, the
  * mix, the mode, the cuts, the tone and the rate while they run, moves, the reduction read,
  * tails that decay to silence and start again, and a removal, without the allocator. */
->>>>>>> a4fe46bb42cb0d5a52610e937391d4ca8b68f4eb
 void NoAlloc_saturator(void) {
     // audio/noalloc
     box_audio_core_t *core = noalloc_core();

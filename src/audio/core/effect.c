@@ -86,7 +86,13 @@ static const box_audio_effect_def_t box_audio_effect_kinds[BOX_AUDIO_EFFECT_KIND
         .render = box_audio_transient_shaper_render,
         .rest = box_audio_transient_shaper_rest
     },
-<<<<<<< HEAD
+    [BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER] = {
+        .tail = true,
+        .start = box_audio_frequency_shifter_start,
+        .command = box_audio_frequency_shifter_command,
+        .render = box_audio_frequency_shifter_render,
+        .rest = box_audio_frequency_shifter_rest
+    },
     [BOX_AUDIO_EFFECT_PITCH_SHIFTER] = {
         .tail = true,
         .floats = box_audio_pitch_shifter_floats,
@@ -94,14 +100,6 @@ static const box_audio_effect_def_t box_audio_effect_kinds[BOX_AUDIO_EFFECT_KIND
         .command = box_audio_pitch_shifter_command,
         .render = box_audio_pitch_shifter_render,
         .rest = box_audio_pitch_shifter_rest
-=======
-    [BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER] = {
-        .tail = true,
-        .start = box_audio_frequency_shifter_start,
-        .command = box_audio_frequency_shifter_command,
-        .render = box_audio_frequency_shifter_render,
-        .rest = box_audio_frequency_shifter_rest
->>>>>>> a4fe46bb42cb0d5a52610e937391d4ca8b68f4eb
     }
 };
 

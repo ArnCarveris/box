@@ -244,11 +244,8 @@ static void box_cmd_audio_effects(
         const Chorus *chorus;
         const Saturator *saturator;
         const TransientShaper *shaper;
-<<<<<<< HEAD
-        const PitchShifter *shifter;
-=======
         const FrequencyShifter *shifter;
->>>>>>> a4fe46bb42cb0d5a52610e937391d4ca8b68f4eb
+        const PitchShifter *pitch;
         const box_audio_module_t *state = box_audio_module_get(world);
         char *path;
         int32_t b, slot;
@@ -363,19 +360,16 @@ static void box_cmd_audio_effects(
         } else if ((shaper = ecs_get(world, e, TransientShaper))) {
             ecs_strbuf_append(buf, "transient shaper attack %.2f sustain %.2f",
                 (double)shaper->attack, (double)shaper->sustain);
-<<<<<<< HEAD
-        } else if ((shifter = ecs_get(world, e, PitchShifter))) {
-            ecs_strbuf_append(buf, "pitch shifter semitones %+.1f cents %+.1f stereo %.2f "
-                "window %.1f ms feedback %.2f mix %.2f", (double)shifter->semitones,
-                (double)shifter->cents, (double)shifter->stereo, (double)shifter->window,
-                (double)shifter->feedback, (double)shifter->mix);
-=======
         } else if ((shifter = ecs_get(world, e, FrequencyShifter))) {
             ecs_strbuf_append(buf, "frequency shifter %s %+.1f Hz stereo %.2f feedback %.2f "
                 "mix %.2f", shifter->mode == FrequencyRing ? "ring" : "shift",
                 (double)shifter->shift, (double)shifter->stereo, (double)shifter->feedback,
                 (double)shifter->mix);
->>>>>>> a4fe46bb42cb0d5a52610e937391d4ca8b68f4eb
+        } else if ((pitch = ecs_get(world, e, PitchShifter))) {
+            ecs_strbuf_append(buf, "pitch shifter semitones %+.1f cents %+.1f stereo %.2f "
+                "window %.1f ms feedback %.2f mix %.2f", (double)pitch->semitones,
+                (double)pitch->cents, (double)pitch->stereo, (double)pitch->window,
+                (double)pitch->feedback, (double)pitch->mix);
         }
 
         slot = box_audio_module_effect_slot(world, e);

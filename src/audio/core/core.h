@@ -560,13 +560,10 @@ typedef enum box_audio_effect_kind_t {
     BOX_AUDIO_EFFECT_SATURATOR = 9, /**< A saturator, box_audio_saturator_params_t */
     BOX_AUDIO_EFFECT_TRANSIENT_SHAPER = 10, /**< A transient shaper,
                                   *   box_audio_transient_shaper_params_t */
-<<<<<<< HEAD
-    BOX_AUDIO_EFFECT_PITCH_SHIFTER = 11, /**< A pitch shifter, box_audio_pitch_shifter_params_t */
-=======
     BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER = 11, /**< A frequency shifter,
                                   *   box_audio_frequency_shifter_params_t */
->>>>>>> a4fe46bb42cb0d5a52610e937391d4ca8b68f4eb
-    BOX_AUDIO_EFFECT_KINDS = 12   /**< Number of kinds, NONE included */
+    BOX_AUDIO_EFFECT_PITCH_SHIFTER = 12, /**< A pitch shifter, box_audio_pitch_shifter_params_t */
+    BOX_AUDIO_EFFECT_KINDS = 13   /**< Number of kinds, NONE included */
 } box_audio_effect_kind_t;
 
 /** The parameters of a reverb, the first floats of the params of its effect command. Shimmer

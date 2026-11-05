@@ -918,7 +918,41 @@ ECS_STRUCT(TransientShaper, {
                             *   it */
 });
 
-<<<<<<< HEAD
+/** Mode of a FrequencyShifter */
+ECS_ENUM(FrequencyShifterMode, {
+    FrequencyShift,        /**< Every partial moves up or down by the shift in Hz */
+    FrequencyRing          /**< Ring modulation by a sine at the magnitude of the shift: each
+                            *   partial splits into one shift above and one below it at half
+                            *   the level, the partial itself gone */
+});
+
+/** A frequency shifter, an effect in an insert slot of an AudioBus, as a Reverb is: every
+ * partial moves by the same number of Hz, so harmonic sounds turn inharmonic. A few Hz thicken
+ * and, with stereo, widen; feedback gives an endlessly rising or falling barber pole sweep;
+ * hundreds of Hz give metallic and bell tones. The ring mode is a classic ring modulator:
+ * pad { AudioBus: {effects: [pad]}; FrequencyShifter: {shift: 2, stereo: 1, mix: 0.5} }.
+ *
+ * It shifts the analytic signal from an allpass pair Hilbert transformer, whose two paths stay 90
+ * degrees apart from 20 Hz to 20 Hz under the Nyquist frequency, with the image of a shift about
+ * 60 dB under it there at 48 kHz. The allpasses turn the phase of the signal but not its level, so
+ * a shift of 0 at a mix of 1 changes the phase only. The oscillators start when the shifter is put
+ * on a channel and run on through a change of the shift without a jump. The feedback runs through a
+ * 20 Hz DC blocker and a soft limit at +12 dB. Changes move over 20 ms; a change of the mode
+ * crossfades. Once its input is silent and its allpasses decayed it stops until its input sounds
+ * again.
+ */
+ECS_STRUCT(FrequencyShifter, {
+    float shift;           /**< Hz, -5000 to 5000, default 0; in the ring mode the frequency of
+                            *   the sine is its magnitude */
+    FrequencyShifterMode mode; /**< FrequencyShift (default) or FrequencyRing */
+    float stereo;          /**< 0 to 1, default 0: the right channel shifts by shift times
+                            *   1 - 2 stereo, so at 1 the opposite way of the left */
+    float feedback;        /**< Share of the shifted signal fed back into the input, -0.95 to
+                            *   0.95, default 0 */
+    float mix;             /**< Wet level, 0 to 1, default 1; the dry signal passes at
+                            *   1 - mix */
+});
+
 /** Longest window of a PitchShifter in milliseconds, which sizes its memory */
 #define BOX_AUDIO_PITCH_SHIFTER_WINDOW_MAX 100.0f
 
@@ -956,40 +990,6 @@ ECS_STRUCT(PitchShifter, {
     float feedback;        /**< Share of the shifted signal fed back into the line, 0 to 0.9,
                             *   default 0 */
     float mix;             /**< Wet level, 0 to 1, default 0.5; the dry signal passes at
-=======
-/** Mode of a FrequencyShifter */
-ECS_ENUM(FrequencyShifterMode, {
-    FrequencyShift,        /**< Every partial moves up or down by the shift in Hz */
-    FrequencyRing          /**< Ring modulation by a sine at the magnitude of the shift: each
-                            *   partial splits into one shift above and one below it at half
-                            *   the level, the partial itself gone */
-});
-
-/** A frequency shifter, an effect in an insert slot of an AudioBus, as a Reverb is: every
- * partial moves by the same number of Hz, so harmonic sounds turn inharmonic. A few Hz thicken
- * and, with stereo, widen; feedback gives an endlessly rising or falling barber pole sweep;
- * hundreds of Hz give metallic and bell tones. The ring mode is a classic ring modulator:
- * pad { AudioBus: {effects: [pad]}; FrequencyShifter: {shift: 2, stereo: 1, mix: 0.5} }.
- *
- * It shifts the analytic signal from an allpass pair Hilbert transformer, whose two paths stay 90
- * degrees apart from 20 Hz to 20 Hz under the Nyquist frequency, with the image of a shift about
- * 60 dB under it there at 48 kHz. The allpasses turn the phase of the signal but not its level, so
- * a shift of 0 at a mix of 1 changes the phase only. The oscillators start when the shifter is put
- * on a channel and run on through a change of the shift without a jump. The feedback runs through a
- * 20 Hz DC blocker and a soft limit at +12 dB. Changes move over 20 ms; a change of the mode
- * crossfades. Once its input is silent and its allpasses decayed it stops until its input sounds
- * again.
- */
-ECS_STRUCT(FrequencyShifter, {
-    float shift;           /**< Hz, -5000 to 5000, default 0; in the ring mode the frequency of
-                            *   the sine is its magnitude */
-    FrequencyShifterMode mode; /**< FrequencyShift (default) or FrequencyRing */
-    float stereo;          /**< 0 to 1, default 0: the right channel shifts by shift times
-                            *   1 - 2 stereo, so at 1 the opposite way of the left */
-    float feedback;        /**< Share of the shifted signal fed back into the input, -0.95 to
-                            *   0.95, default 0 */
-    float mix;             /**< Wet level, 0 to 1, default 1; the dry signal passes at
->>>>>>> a4fe46bb42cb0d5a52610e937391d4ca8b68f4eb
                             *   1 - mix */
 });
 

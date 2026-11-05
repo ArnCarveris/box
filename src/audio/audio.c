@@ -299,42 +299,45 @@ static void box_audio_transient_shaper_ctor(
     }
 }
 
-<<<<<<< HEAD
-/** Construct PitchShifter values: no shift, no stereo detune, a window of 40 ms, no feedback
- * and a mix of 0.5.
-=======
 /** Construct FrequencyShifter values: no shift in the shift mode, no stereo, no feedback and a
  * mix of 1.
->>>>>>> a4fe46bb42cb0d5a52610e937391d4ca8b68f4eb
  *
  * @param ptr The components
  * @param count Number of components
  * @param ti Type info
  */
-<<<<<<< HEAD
-static void box_audio_pitch_shifter_ctor(
-=======
 static void box_audio_frequency_shifter_ctor(
->>>>>>> a4fe46bb42cb0d5a52610e937391d4ca8b68f4eb
     void *ptr,
     int32_t count,
     const ecs_type_info_t *ti)
 {
-<<<<<<< HEAD
-    PitchShifter *values = ptr;
-    int32_t i;
-    (void)ti;
-    for (i = 0; i < count; i ++) {
-        values[i] = (PitchShifter){ .semitones = 0, .cents = 0, .stereo = 0, .window = 40.0f,
-            .feedback = 0, .mix = 0.5f };
-=======
     FrequencyShifter *values = ptr;
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
         values[i] = (FrequencyShifter){ .shift = 0, .mode = FrequencyShift, .stereo = 0,
             .feedback = 0, .mix = 1.0f };
->>>>>>> a4fe46bb42cb0d5a52610e937391d4ca8b68f4eb
+    }
+}
+
+/** Construct PitchShifter values: no shift, no stereo detune, a window of 40 ms, no feedback
+ * and a mix of 0.5.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_pitch_shifter_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    PitchShifter *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (PitchShifter){ .semitones = 0, .cents = 0, .stereo = 0, .window = 40.0f,
+            .feedback = 0, .mix = 0.5f };
     }
 }
 
@@ -1452,14 +1455,11 @@ void BoxAudioImport(
     ecs_set_hooks(world, Saturator, { .ctor = box_audio_saturator_ctor });
     ECS_META_COMPONENT(world, TransientShaper);
     ecs_set_hooks(world, TransientShaper, { .ctor = box_audio_transient_shaper_ctor });
-<<<<<<< HEAD
-    ECS_META_COMPONENT(world, PitchShifter);
-    ecs_set_hooks(world, PitchShifter, { .ctor = box_audio_pitch_shifter_ctor });
-=======
     ECS_META_COMPONENT(world, FrequencyShifterMode);
     ECS_META_COMPONENT(world, FrequencyShifter);
     ecs_set_hooks(world, FrequencyShifter, { .ctor = box_audio_frequency_shifter_ctor });
->>>>>>> a4fe46bb42cb0d5a52610e937391d4ca8b68f4eb
+    ECS_META_COMPONENT(world, PitchShifter);
+    ecs_set_hooks(world, PitchShifter, { .ctor = box_audio_pitch_shifter_ctor });
     ECS_META_COMPONENT(world, SynthFilterEnvelope);
     ECS_META_COMPONENT(world, SynthPitchEnvelope);
     ECS_META_COMPONENT(world, SynthGlide);
@@ -1547,12 +1547,9 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(Chorus), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(Saturator), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(TransientShaper), EcsWith, ecs_id(AudioEffectState));
-<<<<<<< HEAD
-    ecs_add_pair(world, ecs_id(PitchShifter), EcsWith, ecs_id(AudioEffectState));
-=======
     ecs_add_pair(world, ecs_id(FrequencyShifter), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(AudioModulator), EcsWith, ecs_id(AudioModulatorState));
->>>>>>> a4fe46bb42cb0d5a52610e937391d4ca8b68f4eb
+    ecs_add_pair(world, ecs_id(PitchShifter), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(SoundFile), EcsWith, ecs_id(AudioSample));
     ecs_add_pair(world, ecs_id(AudioStream), EcsWith, ecs_id(AudioMusic));
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSoundId));

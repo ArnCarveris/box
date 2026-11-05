@@ -377,21 +377,6 @@ typedef struct box_audio_transient_shaper_t {
     box_audio_ramp_t sustain; /**< Sustain */
 } box_audio_transient_shaper_t;
 
-<<<<<<< HEAD
-/** A pitch shifter: a shifter per channel on the memory of its effect slot, and the last
- * shifted sample of each channel for the feedback */
-typedef struct box_audio_pitch_shifter_t {
-    box_audio_pitch_shifter_params_t target; /**< Parameters of the last command, clamped */
-    box_audio_shift_t shift[2]; /**< Shifter of each channel */
-    float back[2];            /**< Last shifted sample of each channel, soft clipped */
-    int32_t still;            /**< Frames in a row in which the wet signal was silent */
-    box_audio_ramp_t ratio[2]; /**< Pitch ratio of each channel */
-    box_audio_ramp_t window;  /**< Window in frames */
-    box_audio_ramp_t feedback; /**< Feedback gain */
-    box_audio_ramp_t mix;     /**< Wet level */
-    box_audio_ramp_t feed;    /**< Fade in of the input after a move */
-} box_audio_pitch_shifter_t;
-=======
 /** Sections of the Hilbert transformer of a frequency shifter in each of its two paths */
 #define BOX_AUDIO_FREQUENCY_SHIFTER_SECTIONS (BOX_AUDIO_FREQUENCY_SHIFTER_ALLPASSES / 2)
 
@@ -419,7 +404,19 @@ typedef struct box_audio_frequency_shifter_t {
     box_audio_ramp_t feedback; /**< Feedback gain */
     box_audio_ramp_t mix;     /**< Wet level */
 } box_audio_frequency_shifter_t;
->>>>>>> a4fe46bb42cb0d5a52610e937391d4ca8b68f4eb
+/** A pitch shifter: a shifter per channel on the memory of its effect slot, and the last
+ * shifted sample of each channel for the feedback */
+typedef struct box_audio_pitch_shifter_t {
+    box_audio_pitch_shifter_params_t target; /**< Parameters of the last command, clamped */
+    box_audio_shift_t shift[2]; /**< Shifter of each channel */
+    float back[2];            /**< Last shifted sample of each channel, soft clipped */
+    int32_t still;            /**< Frames in a row in which the wet signal was silent */
+    box_audio_ramp_t ratio[2]; /**< Pitch ratio of each channel */
+    box_audio_ramp_t window;  /**< Window in frames */
+    box_audio_ramp_t feedback; /**< Feedback gain */
+    box_audio_ramp_t mix;     /**< Wet level */
+    box_audio_ramp_t feed;    /**< Fade in of the input after a move */
+} box_audio_pitch_shifter_t;
 
 /** State of the kinds of effects */
 typedef union box_audio_effect_data_t {
@@ -433,11 +430,8 @@ typedef union box_audio_effect_data_t {
     box_audio_chorus_t chorus;  /**< BOX_AUDIO_EFFECT_CHORUS */
     box_audio_saturator_t saturator; /**< BOX_AUDIO_EFFECT_SATURATOR */
     box_audio_transient_shaper_t transient_shaper; /**< BOX_AUDIO_EFFECT_TRANSIENT_SHAPER */
-<<<<<<< HEAD
-    box_audio_pitch_shifter_t pitch_shifter; /**< BOX_AUDIO_EFFECT_PITCH_SHIFTER */
-=======
     box_audio_frequency_shifter_t frequency_shifter; /**< BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER */
->>>>>>> a4fe46bb42cb0d5a52610e937391d4ca8b68f4eb
+    box_audio_pitch_shifter_t pitch_shifter; /**< BOX_AUDIO_EFFECT_PITCH_SHIFTER */
 } box_audio_effect_data_t;
 
 /** An effect instance of the pool of the core: a kind in an insert slot of a bus, on the
