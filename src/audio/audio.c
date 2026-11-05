@@ -25,6 +25,7 @@ ECS_COMPONENT_DECLARE(AudioEffectState);
 ECS_COMPONENT_DECLARE(AudioSample);
 ECS_COMPONENT_DECLARE(AudioMusic);
 ECS_COMPONENT_DECLARE(AudioSynth);
+ECS_COMPONENT_DECLARE(AudioWavetable);
 ECS_COMPONENT_DECLARE(AudioInstrumentState);
 ECS_COMPONENT_DECLARE(AudioTrackState);
 
@@ -1075,6 +1076,21 @@ static void box_audio_module_free(
     ecs_os_free(state);
 }
 
+/** Give SynthWavetable its full name. The reflection of a C enum strips the name of the enum
+ * from its constants, which would leave it as "table" in scripts.
+ *
+ * @param world The world
+ */
+static void box_audio_synth_wave_names(
+    ecs_world_t *world)
+{
+    ecs_entity_t c = ecs_lookup_child(world, ecs_id(SynthWave), "table");
+    ecs_assert(c != 0, ECS_INTERNAL_ERROR, NULL);
+    ecs_set_name(world, c, "SynthWavetable");
+    /* Setting the value again stores the new name in the constants of the enum */
+    ecs_set_pair_second(world, c, EcsConstant, ecs_i32_t, {SynthWavetable});
+}
+
 /** Register the script functions of the module.
  *
  * @param world The world
@@ -1185,6 +1201,7 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, Equalizer);
     ecs_set_hooks(world, Equalizer, { .ctor = box_audio_equalizer_ctor });
     ECS_META_COMPONENT(world, SynthWave);
+    box_audio_synth_wave_names(world);
     ECS_META_COMPONENT(world, SynthFilterKind);
     ECS_META_COMPONENT(world, SynthFilterSlope);
     ECS_META_COMPONENT(world, SynthFilterModel);
@@ -1196,6 +1213,9 @@ void BoxAudioImport(
     ecs_set_hooks(world, SynthUnison, { .ctor = box_audio_synth_unison_ctor });
     ECS_META_COMPONENT(world, SynthString);
     ecs_set_hooks(world, SynthString, { .ctor = box_audio_synth_string_ctor });
+    ECS_META_COMPONENT(world, WavetableKind);
+    ECS_META_COMPONENT(world, Wavetable);
+    ECS_META_COMPONENT(world, SynthTable);
     ECS_META_COMPONENT(world, SynthEnvelope);
     ECS_META_COMPONENT(world, SynthFilter);
     ecs_set_hooks(world, SynthFilter, { .ctor = box_audio_synth_filter_ctor });
@@ -1258,12 +1278,14 @@ void BoxAudioImport(
     ECS_COMPONENT_DEFINE(world, AudioSample);
     ECS_COMPONENT_DEFINE(world, AudioMusic);
     ECS_COMPONENT_DEFINE(world, AudioSynth);
+    ECS_COMPONENT_DEFINE(world, AudioWavetable);
     ECS_COMPONENT_DEFINE(world, AudioInstrumentState);
     ECS_COMPONENT_DEFINE(world, AudioTrackState);
     ecs_set_hooks(world, AudioTrackState, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioSoundId, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioInstrumentState, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioSynth, { .copy = box_audio_track_copy });
+    ecs_set_hooks(world, AudioWavetable, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioBusState, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioVoice, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioEffectState, { .copy = box_audio_track_copy });
@@ -1286,6 +1308,7 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(AudioStream), EcsWith, ecs_id(AudioMusic));
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSoundId));
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSynth));
+    ecs_add_pair(world, ecs_id(Wavetable), EcsWith, ecs_id(AudioWavetable));
     ecs_add_pair(world, ecs_id(Instrument), EcsWith, ecs_id(AudioInstrumentState));
     ecs_add_pair(world, ecs_id(Track), EcsWith, ecs_id(AudioBus));
     ecs_add_pair(world, ecs_id(Track), EcsWith, ecs_id(AudioTrackState));

@@ -138,7 +138,7 @@ static void box_audio_synth_patch_clamp(
     p->free_phase = p->free_phase != 0;
     p->glide = box_audio_synth_clamp(p->glide, 0, BOX_AUDIO_SYNTH_GLIDE_MAX);
     box_audio_synth_envelope_clamp(&p->envelope);
-    if (p->filter > BOX_AUDIO_SYNTH_NOTCH) {
+    if (p->filter > BOX_AUDIO_SYNTH_FORMANT) {
         p->filter = BOX_AUDIO_SYNTH_FILTER_NONE;
     }
 
@@ -165,6 +165,8 @@ static void box_audio_synth_patch_clamp(
         BOX_AUDIO_SYNTH_OCTAVES_MAX);
     p->filter_envelope_velocity = box_audio_synth_clamp(p->filter_envelope_velocity, 0, 1);
     p->keytrack = box_audio_synth_clamp(p->keytrack, 0, 1);
+    p->vowel = box_audio_synth_clamp(p->vowel, 0, BOX_AUDIO_SYNTH_VOWEL_MAX);
+    p->filter_vowel = box_audio_synth_depth_clamp(p->filter_vowel, BOX_AUDIO_SYNTH_VOWEL_MAX);
     box_audio_synth_pitch_envelope_clamp(&p->pitch_envelope);
     for (i = p->layers; i < BOX_AUDIO_SYNTH_LAYERS; i ++) {
         p->layer[i] = (box_audio_synth_layer_t){0};
@@ -172,8 +174,9 @@ static void box_audio_synth_patch_clamp(
 
     for (i = 0; i < p->layers; i ++) {
         box_audio_synth_layer_t *l = &p->layer[i];
+        bool table;
         float lo;
-        if (l->wave > BOX_AUDIO_SYNTH_PLUCK) {
+        if (l->wave > BOX_AUDIO_SYNTH_WAVETABLE) {
             l->wave = BOX_AUDIO_SYNTH_SINE;
         }
 
@@ -213,6 +216,12 @@ static void box_audio_synth_patch_clamp(
         box_audio_synth_pitch_envelope_clamp(&l->pitch_envelope);
         l->color = l->wave == BOX_AUDIO_SYNTH_NOISE && l->color <= BOX_AUDIO_SYNTH_BROWN ?
             l->color : BOX_AUDIO_SYNTH_WHITE;
+        table = l->wave == BOX_AUDIO_SYNTH_WAVETABLE;
+        l->table = table && l->table < BOX_AUDIO_SOUND_MAX ? l->table : 0;
+        l->position = table ? box_audio_synth_clamp(l->position, 0,
+            (float)(BOX_AUDIO_TABLE_FRAMES_MAX - 1)) : 0.0f;
+        l->position_envelope = table ? box_audio_synth_depth_clamp(l->position_envelope,
+            (float)BOX_AUDIO_TABLE_FRAMES_MAX) : 0.0f;
     }
 
     if (p->lfos > BOX_AUDIO_SYNTH_LFOS) {
@@ -237,9 +246,16 @@ static void box_audio_synth_patch_clamp(
         lfo->cutoff = box_audio_synth_depth_clamp(lfo->cutoff, BOX_AUDIO_SYNTH_OCTAVES_MAX);
         lfo->pulse_width = box_audio_synth_depth_clamp(lfo->pulse_width,
             0.5f - BOX_AUDIO_SYNTH_PULSE_MIN);
+<<<<<<< HEAD
         lfo->hard_sync = box_audio_synth_depth_clamp(lfo->hard_sync,
             BOX_AUDIO_SYNTH_SYNC_SEMITONES);
         lfo->sync = box_audio_synth_clamp(lfo->sync, 0, BOX_AUDIO_SYNTH_LFO_SYNC_MAX);
+=======
+        lfo->sync = box_audio_synth_depth_clamp(lfo->sync, BOX_AUDIO_SYNTH_SYNC_SEMITONES);
+        lfo->vowel = box_audio_synth_depth_clamp(lfo->vowel, BOX_AUDIO_SYNTH_VOWEL_MAX);
+        lfo->position = box_audio_synth_depth_clamp(lfo->position,
+            (float)BOX_AUDIO_TABLE_FRAMES_MAX);
+>>>>>>> 54ffad9f4be74064a408eb640297be7cf6872114
     }
 }
 
@@ -293,6 +309,79 @@ bool box_audio_synth_strings_fit(
     return core->synths[core->sounds[sound].synth - 1].strings <= core->string_free_count;
 }
 
+int32_t box_audio_table_frames(
+    const float *data,
+    int32_t frames,
+    int32_t channels)
+{
+    int32_t result = 0;
+    float n;
+    if (!data || channels != 1 || frames < BOX_AUDIO_TABLE_FLOATS(1) ||
+        data[0] != BOX_AUDIO_TABLE_MAGIC || data[2] != (float)BOX_AUDIO_TABLE_LEVELS ||
+        data[3] != (float)BOX_AUDIO_TABLE_LENGTH)
+    {
+        goto done;
+    }
+
+    n = data[1];
+    if (n >= 1 && n <= (float)BOX_AUDIO_TABLE_FRAMES_MAX && n == (float)(int32_t)n &&
+        frames == BOX_AUDIO_TABLE_FLOATS((int32_t)n))
+    {
+        result = (int32_t)n;
+    }
+
+done:
+    return result;
+}
+
+/** Let go of the wavetable of an oscillator: the sound of the table loses a user and, released
+ * and without users, is freed.
+ *
+ * @param core The core
+ * @param o The oscillator
+ */
+static void box_audio_synth_table_drop(
+    box_audio_core_t *core,
+    box_audio_synth_osc_t *o)
+{
+    box_audio_sound_t *s;
+    if (!o->table_sound) {
+        goto done;
+    }
+
+    s = &core->sounds[o->table_sound];
+    s->users --;
+    if (s->users <= 0 && s->state == BOX_AUDIO_SOUND_RELEASED) {
+        s->users = 0;
+        s->state = BOX_AUDIO_SOUND_FREE;
+        s->data = NULL;
+        s->table = 0;
+        box_audio_core_event(core, BOX_AUDIO_EVENT_SOUND_FREE, o->table_sound, 0);
+    }
+
+done:
+    o->table = NULL;
+    o->table_sound = 0;
+    o->table_frames = 0;
+}
+
+void box_audio_synth_table_take(
+    box_audio_core_t *core,
+    box_audio_synth_osc_t *o,
+    uint32_t sound)
+{
+    box_audio_sound_t *s = sound && sound < BOX_AUDIO_SOUND_MAX ? &core->sounds[sound] : NULL;
+    o->table = NULL;
+    o->table_sound = 0;
+    o->table_frames = 0;
+    if (s && s->state == BOX_AUDIO_SOUND_READY && !s->synth && s->table > 0 && s->data) {
+        s->users ++;
+        o->table = s->data + BOX_AUDIO_TABLE_HEADER;
+        o->table_sound = sound;
+        o->table_frames = s->table;
+    }
+}
+
 void box_audio_synth_end(
     box_audio_core_t *core,
     box_audio_synth_source_t *src)
@@ -300,6 +389,7 @@ void box_audio_synth_end(
     box_audio_synth_string_t *s, *next;
     int32_t l;
     for (l = src->layers - 1; l >= 0; l --) {
+        box_audio_synth_table_drop(core, &src->part[l]->osc);
         for (s = src->part[l]->string; s; s = next) {
             next = s->next;
             s->next = NULL;
@@ -347,6 +437,7 @@ void box_audio_synth_command(
             s->users = 0;
             s->state = BOX_AUDIO_SOUND_READY;
             s->synth = slot + 1;
+            s->table = 0;
         }
     }
 

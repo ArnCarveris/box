@@ -65,6 +65,7 @@
                     "voices_64_filter_envelope",
                     "voices_64_filter_24",
                     "voices_64_ladder",
+                    "voices_64_formant",
                     "voices_64_drive",
                     "voices_64_pre_drive",
                     "voices_64_filter_24_drive",
@@ -79,7 +80,8 @@
                     "voices_64_pink",
                     "voices_32_pluck",
                     "voices_32_pluck_vibrato",
-                    "voices_8_pluck_unison"
+                    "voices_8_pluck_unison",
+                    "voices_64_wavetable"
                 ]
             },
             {

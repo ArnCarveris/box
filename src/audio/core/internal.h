@@ -48,6 +48,7 @@ static inline float box_audio_clean(
 }
 
 #include "svf.h"
+#include "formant.h"
 #include "ladder.h"
 #include "saturate.h"
 
@@ -526,6 +527,16 @@ typedef struct box_audio_synth_osc_t {
     double sync_base;     /**< The ratio of its layer, without the LFOs; what moves the ratio
                            * per control block aims from it */
     double sync_step;     /**< Change of sync per frame from the LFOs */
+    const float *table;   /**< Wavetable: the levels of its table after the header, NULL for
+                           * none, which renders a sine */
+    int32_t table_frames; /**< Wavetable: frames of its table */
+    uint32_t table_sound; /**< Wavetable: id of the sound of its table, whose users it counts,
+                           * 0 for none */
+    double position;      /**< Wavetable: frame it reads at in this frame, 0..frames - 1 */
+    double position_base; /**< Wavetable: position of its layer, clamped */
+    double position_lfo;  /**< Wavetable: frames the LFOs move it by */
+    double position_step; /**< Wavetable: change of position_lfo per frame */
+    float position_env;   /**< Wavetable: frames it moves at level 1 of its envelope */
 } box_audio_synth_osc_t;
 
 /** An LFO of a synth voice, advanced per control block of BOX_AUDIO_SYNTH_CONTROL frames */
@@ -659,6 +670,14 @@ typedef struct box_audio_synth_source_t {
     bool gate;            /**< Whether its envelopes sustain until a release */
     int32_t filter;       /**< A box_audio_synth_filter_t */
     int32_t stages;       /**< Stages of the filter: 1 for 12 dB per octave, 2 for 24 */
+    box_audio_formant_t formant; /**< The formant filter, when the filter is
+                           * BOX_AUDIO_SYNTH_FORMANT */
+    float vowel;          /**< Vowel of the patch, of a formant filter */
+    float vowel_amount;   /**< Vowels of the filter envelope at its level 1, 0 without a formant
+                           * filter */
+    bool lfo_vowel;       /**< Whether an LFO moves the vowel of a formant filter */
+    double lfo_vowels;    /**< Vowels the LFOs move the vowel by, 0 without */
+    bool fenv_on;         /**< Whether the filter envelope runs: amount or vowel_amount not 0 */
     box_audio_svf_t svf[2]; /**< The resonant stage, then the stage before it at 24 dB */
     box_audio_svf_t svf_r[2]; /**< The stages of the right channel, when stereo */
     float drive;          /**< Saturation of the filter, 0 (linear) to 1 */
@@ -680,7 +699,7 @@ typedef struct box_audio_synth_source_t {
     double cutoff_base;   /**< Cutoff of the patch, clamped, in Hz */
     double cutoff_top;    /**< Highest cutoff in Hz, under Nyquist */
     float amount;         /**< Octaves of the filter envelope, 0 without one */
-    box_audio_synth_env_t fenv; /**< The filter envelope, when amount is not 0 */
+    box_audio_synth_env_t fenv; /**< The filter envelope, when fenv_on */
     int32_t control;      /**< Frames until the filter takes the cutoff of the envelope */
     int32_t glide_frames; /**< Frames of a glide of the patch, 0 when a pitch jumps */
     int32_t glide_left;   /**< Frames left of the glide that runs, 0 for none */
@@ -716,6 +735,8 @@ typedef struct box_audio_synth_source_t {
     int32_t strings;      /**< Pluck layers, each with a string per unison voice, 0 for none */
     int32_t ringing;      /**< Strings that are still over the silence, of every unison voice */
     int32_t ringing_free; /**< Strings of layers without an envelope still over the silence */
+    bool tables;          /**< Whether a layer plays a wavetable, whose position moves per
+                           * frame */
 } box_audio_synth_source_t;
 
 /** State of the kinds of sources */
@@ -771,6 +792,8 @@ typedef struct box_audio_sound_t {
     int32_t users;      /**< Voices that play it */
     int32_t state;      /**< A box_audio_sound_state_t */
     int32_t synth;      /**< Slot of its patch plus 1 for a synth, 0 for frames */
+    int32_t table;      /**< Frames of the wavetable its frames hold, 0 when they are not
+                         * one */
 } box_audio_sound_t;
 
 /** A chunk of a stream: frames in the memory of the side that runs the core */
@@ -1247,6 +1270,32 @@ void box_audio_saturator_rest(
     box_audio_core_t *core,
     box_audio_effect_t *fx,
     int32_t frames);
+
+/** Frames of the wavetable a sound holds, in synth_patch.c: the frames of a mono sound that
+ * starts with the header of a wavetable and has the floats of its frames.
+ *
+ * @param data Frames of the sound
+ * @param frames Number of frames
+ * @param channels 1 or 2
+ * @return Frames of the table, 1..BOX_AUDIO_TABLE_FRAMES_MAX, 0 when it is not one
+ */
+int32_t box_audio_table_frames(
+    const float *data,
+    int32_t frames,
+    int32_t channels);
+
+/** Take the wavetable of a sound for an oscillator: a ready sound that holds one gains a
+ * user, which box_audio_synth_end gives back. Any other id leaves the oscillator without a
+ * table, a sine.
+ *
+ * @param core The core
+ * @param o The oscillator
+ * @param sound Id of the sound of the table, 0 for none
+ */
+void box_audio_synth_table_take(
+    box_audio_core_t *core,
+    box_audio_synth_osc_t *o,
+    uint32_t sound);
 
 /** The transient shaper kind, in dynamics.c: start at the params of fx */
 void box_audio_transient_shaper_start(
