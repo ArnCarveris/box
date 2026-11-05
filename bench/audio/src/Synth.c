@@ -3,8 +3,8 @@
  * @brief Benchmarks for the synth of the audio core: 64 looping synth voices on the master,
  * one item per sample of the output, with the patch of three layers, the same with two LFOs or
  * one of FM, with curved envelopes, with a driven filter, with subs, hard synced under an
- * LFO or with the drive of the mix before the filter, 32 voices of a pluck string, steady or
- * under a vibrato, and 8 of a unison pluck of 4.
+ * LFO, with pink noise or with the drive of the mix before the filter, 32 voices of a pluck
+ * string, steady or under a vibrato, and 8 of a unison pluck of 4.
  *
  * Each iteration renders one quantum of 128 stereo frames, so the time per item is the time
  * per sample of the whole mix of 64 voices.
@@ -41,13 +41,9 @@
  * @param lfo Whether two LFOs move the patch
  * @param curved Whether the patch envelope and the envelope of the square are curved
  * @param drive Drive of the filter, 0..1
-<<<<<<< HEAD
  * @param extra BENCH_SUB, BENCH_SYNC and BENCH_PINK, or 0
-=======
- * @param extra BENCH_SUB and BENCH_SYNC, or 0
  * @param pre Drive of the mix of the layers before the filter, 0..1, negative for none; its
  *   asymmetry is 0.3
->>>>>>> c682ba1f8442f1afd4f3bb3723213220cafdea33
  * @return The core
  */
 static box_audio_core_t* bench_synth_core(
@@ -334,7 +330,7 @@ void Synth_voices_64_pink(
 {
     // audio/synth
     box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
-        0, BENCH_PINK);
+        0, BENCH_PINK, -1);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
