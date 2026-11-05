@@ -144,6 +144,23 @@
                 ]
             },
             {
+                "id": "SynthSync",
+                "testcases": [
+                    "period_master",
+                    "ratio_one_identical",
+                    "alias_48000",
+                    "alias_44100",
+                    "lfo_spectrum",
+                    "lfo_layer_syncs",
+                    "unison_own_master",
+                    "unison_stereo",
+                    "fm_adds",
+                    "ignored_noise_pluck",
+                    "clamped",
+                    "script"
+                ]
+            },
+            {
                 "id": "SynthVelocity",
                 "testcases": [
                     "filter_cutoff",
@@ -221,7 +238,8 @@
                     "dynamics",
                     "delay",
                     "modulation",
-                    "synth_sub"
+                    "synth_sub",
+                    "synth_sync"
                 ]
             },
             {

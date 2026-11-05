@@ -175,6 +175,8 @@ static void box_audio_synth_patch_clamp(
         l->sub = l->wave == BOX_AUDIO_SYNTH_NOISE || l->wave == BOX_AUDIO_SYNTH_PLUCK ? 0.0f :
             box_audio_synth_clamp(l->sub, 0, 1);
         l->sub_octave = l->sub_octave >= 2 ? 2 : 1;
+        l->sync = l->wave == BOX_AUDIO_SYNTH_NOISE || l->wave == BOX_AUDIO_SYNTH_PLUCK ? 1.0f :
+            box_audio_synth_clamp(l->sync, 1, BOX_AUDIO_SYNTH_SYNC_MAX);
     }
 
     if (p->lfos > BOX_AUDIO_SYNTH_LFOS) {
@@ -199,6 +201,7 @@ static void box_audio_synth_patch_clamp(
         lfo->cutoff = box_audio_synth_depth_clamp(lfo->cutoff, BOX_AUDIO_SYNTH_OCTAVES_MAX);
         lfo->pulse_width = box_audio_synth_depth_clamp(lfo->pulse_width,
             0.5f - BOX_AUDIO_SYNTH_PULSE_MIN);
+        lfo->sync = box_audio_synth_depth_clamp(lfo->sync, BOX_AUDIO_SYNTH_SYNC_SEMITONES);
     }
 }
 

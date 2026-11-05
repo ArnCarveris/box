@@ -371,6 +371,15 @@ ECS_STRUCT(SynthOscillator, {
     float velocity;        /**< SynthPhase, SynthRing: share 0..1 of the index that the
                             *   velocity of a note scales, index (1 - share + share v), so
                             *   soft notes have fewer sidebands; default 0 */
+    float sync;            /**< Hard sync: ratio 1..16 of the wave heard to the note, default
+                            *   0, which counts as 1 (off). The note frequency of the layer,
+                            *   its sweep, glide, vibrato, unison detune and the pitch of the
+                            *   voice included, is the master: the wave runs at the master
+                            *   times the ratio and restarts at phase 0 on every cycle of the
+                            *   master, band limited at the restart, for sync leads and, with
+                            *   SynthLfo.sync, sync sweeps. Each unison voice syncs to its own
+                            *   master; the sub stays at the master and phase modulation adds
+                            *   to the synced phase. Ignored by SynthNoise and SynthPluck */
 });
 
 /** The string of a SynthPluck layer, on the layer: a delay line a period long, plucked with a
@@ -634,8 +643,8 @@ ECS_STRUCT(SynthGlide, {
                             *   legato sounds of the same channel share one voice */
 });
 
-/** An LFO of a synth sound: a wave at a rate that moves the pitch, the level, the cutoff and
- * the pulse width of the sound, each by its own depth, after a delay and a fade in.
+/** An LFO of a synth sound: a wave at a rate that moves the pitch, the level, the cutoff, the
+ * pulse width of squares and the ratio of hard sync of the sound, each by its own depth, after a delay and a fade in.
  *
  * On the root, or on a child of the root without a SynthOscillator, it moves every layer; on
  * a layer that layer, the cutoff aside. Up to BOX_AUDIO_SYNTH_LFOS per sound, see LFOs in
@@ -656,6 +665,11 @@ ECS_STRUCT(SynthLfo, {
                             *   wave, -10..10 */
     float pulse_width;     /**< Share of the period the pulse width of squares moves by at the
                             *   top of the wave, -0.49..0.49 */
+    float sync;            /**< Semitones the ratio of SynthOscillator.sync moves by at the
+                            *   top of the wave, -48..48, default 0; the moved ratio is clamped
+                            *   to 1..16. On a layer it syncs that layer, from a ratio of 1
+                            *   when it has none; on the root it moves every layer with a
+                            *   ratio over 1 */
 });
 
 /** A sound made by the synth from the components of this entity and its children, without a

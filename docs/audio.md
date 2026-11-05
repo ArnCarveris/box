@@ -266,7 +266,7 @@ voices on play, so edits affect subsequent plays.
 | Component | Authoring controls |
 | --- | --- |
 | `SynthSound` | `seed`, `pitch_variance`, `level_variance`; variances default to zero |
-| `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), modulation controls, `velocity` (0) |
+| `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), `sync` (0, off, 1..16), modulation controls, `velocity` (0) |
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`; all zero by default |
 | `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `velocity` (0 octaves) |
 | `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves and `velocity` (0); requires a filter |
@@ -287,6 +287,15 @@ layer's level and envelope, so it shares them. It is derived from the layer's
 phase: it follows sweeps, glides, legato, pitch LFOs and every unison voice, but
 not phase modulation or feedback. A modulator modulates with its sub included.
 `SynthNoise` and `SynthPluck` ignore it.
+
+`sync` hard syncs a layer, for sync leads and sync sweeps. The layer's note frequency,
+with its sweep, glide, pitch LFOs, unison detune and the voice pitch, is the master;
+the wave plays at the master times `sync`, a ratio from 1 to 16, and restarts at
+phase 0 on every master cycle, so the sound keeps the master's pitch while the ratio
+shapes its timbre. A ratio of 0 or 1 is off. The restart is band limited by a polyBLEP
+sized by the jump, and a polyBLAMP for the slope of triangles and sines. Each unison
+voice syncs to its own detuned master, the sub stays at the master, and phase
+modulation adds to the synced phase. `SynthNoise` and `SynthPluck` ignore it.
 
 A filter envelope uses `cutoff * 2^(amount * envelope_level)`. For example,
 cutoff 300 and amount 3 open to 2400 Hz. Its timing is independent of the amplitude
@@ -343,7 +352,10 @@ pan balances their channels rather than narrowing them with distance.
 
 A sound supports two LFOs, on the root, a layer or another root child. Waves include
 sine, triangle, square, rising saw and sample-and-hold. Destinations are `pitch`
-(cents), `amplitude` (0..1), `cutoff` (octaves) and `pulse_width`.
+(cents), `amplitude` (0..1), `cutoff` (octaves), `pulse_width` and `sync`, the
+semitones (-48..48) the ratio of hard sync moves at the top of the wave, clamped to
+1..16. On a layer it syncs that layer, from a ratio of 1 when it has none; on the root
+it moves every layer whose `sync` is over 1.
 Delay and fade bring modulation in gradually. Random phase and noise are seeded,
 so the same sequence of plays is reproducible.
 
@@ -359,8 +371,9 @@ Working examples include [synth_examples.flecs](../test/assets/audio/synth_examp
 [synth_unison.flecs](../test/assets/audio/synth_unison.flecs),
 [synth_lfo.flecs](../test/assets/audio/synth_lfo.flecs),
 [synth_glide.flecs](../test/assets/audio/synth_glide.flecs),
-[synth_pluck.flecs](../test/assets/audio/synth_pluck.flecs) and
-[synth_sub.flecs](../test/assets/audio/synth_sub.flecs).
+[synth_pluck.flecs](../test/assets/audio/synth_pluck.flecs),
+[synth_sub.flecs](../test/assets/audio/synth_sub.flecs) and
+[synth_sync.flecs](../test/assets/audio/synth_sync.flecs).
 
 ## Music on the timeline
 

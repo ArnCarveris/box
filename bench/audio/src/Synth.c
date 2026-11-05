@@ -2,7 +2,7 @@
  * @file Synth.c
  * @brief Benchmarks for the synth of the audio core: 64 looping synth voices on the master,
  * one item per sample of the output, with the patch of three layers, the same with two LFOs or
- * one of FM, with curved envelopes or with subs, 32 voices of a pluck string, steady or under
+ * one of FM, with curved envelopes, with subs or hard synced under an LFO, 32 voices of a pluck string, steady or under
  * a vibrato, and 8 of a unison pluck of 4.
  *
  * Each iteration renders one quantum of 128 stereo frames, so the time per item is the time
@@ -14,6 +14,13 @@
 
 /** Sample rate of the benchmarks */
 #define BENCH_RATE 48000
+
+/** Extra of bench_synth_core: the saw has a sub an octave under, the square two octaves */
+#define BENCH_SUB 1u
+
+/** Extra of bench_synth_core: the saw and the square are hard synced, under an LFO of the
+ * ratio */
+#define BENCH_SYNC 2u
 
 /** Create a core with 64 looping voices of a patch of three layers: a saw that sweeps up, a
  * square with its own envelope and noise, into a lowpass.
@@ -29,7 +36,7 @@
  * @param fm Whether the patch is the one of phase modulation
  * @param lfo Whether two LFOs move the patch
  * @param curved Whether the patch envelope and the envelope of the square are curved
- * @param sub Whether the saw has a sub an octave under and the square one two octaves under
+ * @param extra BENCH_SUB and BENCH_SYNC, or 0
  * @return The core
  */
 static box_audio_core_t* bench_synth_core(
@@ -38,7 +45,7 @@ static box_audio_core_t* bench_synth_core(
     bool fm,
     bool lfo,
     bool curved,
-    bool sub)
+    uint32_t extra)
 {
     static uint8_t bytes[8192];
     box_audio_core_desc_t desc = { .sample_rate = BENCH_RATE };
@@ -71,11 +78,19 @@ static box_audio_core_t* bench_synth_core(
         p.layer[1].envelope.attack_curve = 1.5f;
     }
 
-    if (sub) {
+    if (extra & BENCH_SUB) {
         p.layer[0].sub = 0.6f;
         p.layer[0].sub_octave = 1;
         p.layer[1].sub = 0.4f;
         p.layer[1].sub_octave = 2;
+    }
+
+    if (extra & BENCH_SYNC) {
+        p.layer[0].sync = 2.5f;
+        p.layer[1].sync = 3.2f;
+        p.lfos = 1;
+        p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_TRIANGLE, .rate = 0.5f,
+            .sync = 12 };
     }
 
     if (fm) {
@@ -246,6 +261,16 @@ void Synth_voices_64_sub(
     // audio/synth
     box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
         true);
+    bench_synth_render(b, core);
+    box_audio_core_free(core);
+}
+
+void Synth_voices_64_sync(
+    bench_t *b)
+{
+    // audio/synth
+    box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
+        BENCH_SYNC);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }

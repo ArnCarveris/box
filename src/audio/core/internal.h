@@ -459,6 +459,12 @@ typedef struct box_audio_synth_osc_t {
     float sub;            /**< Level of its sub oscillator, 0 for none */
     int32_t sub_octave;   /**< Octaves the sub is under it, 1 or 2 */
     uint32_t wraps;       /**< Times its phase wrapped, the phase of the sub above its own */
+    bool synced;          /**< Whether its wave is hard synced to its phase, the master: a
+                           * ratio over 1 or an LFO of its own on the ratio */
+    double sync;          /**< Ratio of its wave to its phase, 1..BOX_AUDIO_SYNTH_SYNC_MAX */
+    double sync_base;     /**< The ratio of its layer, without the LFOs; what moves the ratio
+                           * per control block aims from it */
+    double sync_step;     /**< Change of sync per frame from the LFOs */
 } box_audio_synth_osc_t;
 
 /** An LFO of a synth voice, advanced per control block of BOX_AUDIO_SYNTH_CONTROL frames */

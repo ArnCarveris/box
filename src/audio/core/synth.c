@@ -10,8 +10,10 @@
  * pluck layer is a Karplus-Strong string instead of an oscillator, tuned with an allpass for the
  * fraction of a frame, which follows the pitch of its oscillator and ends the voice once it is
  * silent; with unison it rings a string per voice, detuned and panned as the voices of an
- * oscillator, each plucked with its own noise. Up to two LFOs move the pitch, the level, the
- * cutoff and the pulse width of squares, per control block of frames and interpolated per frame
+ * oscillator, each plucked with its own noise. A layer may be hard synced, its wave restarted
+ * on every cycle of its frequency at a ratio of it, the restart band limited by a polyBLEP. Up
+ * to two LFOs move the pitch, the level, the cutoff, the pulse width of squares and the ratio
+ * of hard sync, per control block of frames and interpolated per frame
  * in between.
  *
  * Every voice holds its own copy of the patch, so a play allocates nothing. Its layers are parts
@@ -505,7 +507,8 @@ static void box_audio_synth_lfo_aim(
     bool now)
 {
     double cents[1 + BOX_AUDIO_SYNTH_LAYERS] = {0}, width[1 + BOX_AUDIO_SYNTH_LAYERS] = {0};
-    double octaves = 0, c, w;
+    double semitones[1 + BOX_AUDIO_SYNTH_LAYERS] = {0};
+    double octaves = 0, c, w, r;
     float dip[1 + BOX_AUDIO_SYNTH_LAYERS], v;
     int32_t k, l;
     for (l = 0; l <= BOX_AUDIO_SYNTH_LAYERS; l ++) {
@@ -518,6 +521,7 @@ static void box_audio_synth_lfo_aim(
         v = m->value * m->gain;
         cents[d->layer] += (double)(d->pitch * v);
         width[d->layer] += (double)(d->pulse_width * v);
+        semitones[d->layer] += (double)(d->sync * v);
         dip[d->layer] *= 1 - d->amplitude * m->gain * 0.5f * (1 - m->value);
         octaves += (double)(d->cutoff * v);
     }
@@ -538,6 +542,16 @@ static void box_audio_synth_lfo_aim(
         o->vibrato_step = (c - o->vibrato) * (1.0 / BOX_AUDIO_SYNTH_CONTROL);
         o->width_step = (w - o->width) * (1.0 / BOX_AUDIO_SYNTH_CONTROL);
         o->tremolo_step = (dip[l + 1] - o->tremolo) * (1.0f / BOX_AUDIO_SYNTH_CONTROL);
+        if (o->synced) {
+            r = semitones[0] + semitones[l + 1];
+            r = r != 0 ? o->sync_base * box_audio_synth_exp2(r * (1.0 / 12)) : o->sync_base;
+            r = r > 1 ? (r < BOX_AUDIO_SYNTH_SYNC_MAX ? r : BOX_AUDIO_SYNTH_SYNC_MAX) : 1.0;
+            if (now) {
+                o->sync = r;
+            }
+
+            o->sync_step = (r - o->sync) * (1.0 / BOX_AUDIO_SYNTH_CONTROL);
+        }
     }
 
     if (now) {
@@ -898,6 +912,17 @@ static void box_audio_synth_pass(
         o->sub = layer->sub;
         o->sub_octave = layer->sub_octave >= 2 ? 2 : 1;
         o->wraps = 0;
+        o->sync_base = (double)layer->sync > 1 ? (double)layer->sync : 1.0;
+        o->sync = o->sync_base;
+        o->sync_step = 0;
+        o->synced = o->sync_base > 1;
+        for (n = 0; n < src->lfos; n ++) {
+            o->synced = o->synced || (src->lfo_patch[n].layer == (uint32_t)l + 1 &&
+                src->lfo_patch[n].sync != 0);
+        }
+
+        o->synced = o->synced && o->wave != BOX_AUDIO_SYNTH_NOISE &&
+            o->wave != BOX_AUDIO_SYNTH_PLUCK;
         for (n = 0; n < part->unison.voices && part->unison.voices > 1 && !part->string; n ++) {
             box_audio_synth_noise(&src->rng);
             part->unison.phase[n] = (double)(src->rng >> 11) * (1.0 / 2097152.0);
@@ -1436,6 +1461,9 @@ static inline void box_audio_synth_lfo_next(
         o->vibrato += o->vibrato_step;
         o->width += o->width_step;
         o->tremolo += o->tremolo_step;
+        if (o->synced) {
+            o->sync += o->sync_step;
+        }
     }
 
     src->tremolo += src->tremolo_step;
@@ -1586,6 +1614,123 @@ static inline float box_audio_synth_wave(
     return x;
 }
 
+/** Wrap a phase into 0..1.
+ *
+ * @param t Phase in turns
+ * @return The phase, 0..1
+ */
+static inline double box_audio_synth_wrap(
+    double t)
+{
+    if (t < 0 || t >= 1) {
+        t -= (double)(int64_t)t;
+        t = t < 0 ? t + 1 : t;
+        t = t >= 1 ? t - 1 : t;
+    }
+
+    return t;
+}
+
+/** Value of a wave at a phase without its corrections, a pulse without its DC, as
+ * box_audio_synth_wave renders it away from its edges.
+ *
+ * @param wave A box_audio_synth_wave_t, not noise
+ * @param t Phase in turns, 0..1
+ * @param width Square: share of the period it is high
+ * @return The value
+ */
+static inline double box_audio_synth_naive(
+    int32_t wave,
+    double t,
+    double width)
+{
+    double x;
+    switch (wave) {
+    case BOX_AUDIO_SYNTH_SAW:
+        x = 2 * t - 1;
+        break;
+    case BOX_AUDIO_SYNTH_SQUARE:
+        x = (t < width ? 1.0 : -1.0) - (2 * width - 1);
+        break;
+    case BOX_AUDIO_SYNTH_TRIANGLE:
+        x = t < 0.5 ? 4 * t - 1 : 3 - 4 * t;
+        break;
+    default:
+        x = box_audio_core_sin(t);
+        break;
+    }
+
+    return x;
+}
+
+/** Slope of a triangle or a sine at a phase, per turn.
+ *
+ * @param wave BOX_AUDIO_SYNTH_TRIANGLE or BOX_AUDIO_SYNTH_SINE
+ * @param t Phase in turns, 0..1
+ * @return The slope
+ */
+static inline double box_audio_synth_slope(
+    int32_t wave,
+    double t)
+{
+    return wave == BOX_AUDIO_SYNTH_TRIANGLE ? (t < 0.5 ? 4.0 : -4.0) :
+        2 * BOX_AUDIO_SYNTH_PI * (double)box_audio_core_sin(t + 0.25);
+}
+
+/** Render a frame of a hard synced oscillator: its wave at the phase of the master times the
+ * ratio, so it restarts at phase 0 on every wrap of the master, plus a shift.
+ *
+ * The wave keeps the corrections of its own edges, at the speed of the synced phase. The
+ * restart jumps from the wave at the ratio (the end of a cycle of the master) to the wave at
+ * 0, both with the shift.
+ *
+ * A polyBLEP on the phase of the master, which places the wrap at its fraction of a frame,
+ * corrects that jump by its size; a polyBLAMP the change of the slope of a triangle or a sine.
+ * A ratio whose cycle ends on a whole turn jumps by nothing: its own edge corrects it alone.
+ *
+ * @param o The oscillator, synced
+ * @param t Phase of the master in turns, 0..1
+ * @param dt Turns per frame of the master
+ * @param shift Turns added to the synced phase, its modulation and feedback
+ * @param moved Change of the shift since the last frame, for the speed of the edges
+ * @param rng State of the noise
+ * @return The sample
+ */
+static inline float box_audio_synth_sync(
+    const box_audio_synth_osc_t *o,
+    double t,
+    double dt,
+    double shift,
+    double moved,
+    uint32_t *rng)
+{
+    double ratio = o->sync, ds = dt * ratio + moved, start, end, jump, bend;
+    float x;
+    if (moved != 0) {
+        ds -= (double)(int64_t)ds;
+        ds = ds >= 0.5 ? ds - 1 : (ds < -0.5 ? ds + 1 : ds);
+        ds = ds < 0 ? -ds : ds;
+    }
+
+    ds = ds < BOX_AUDIO_SYNTH_NYQUIST ? ds : BOX_AUDIO_SYNTH_NYQUIST;
+    x = box_audio_synth_wave(o->wave, box_audio_synth_wrap(t * ratio + shift), ds, o->width,
+        rng);
+    if (t < dt || t > 1 - dt) {
+        start = shift != 0 ? box_audio_synth_wrap(shift) : 0.0;
+        end = box_audio_synth_wrap(ratio + shift);
+        jump = box_audio_synth_naive(o->wave, start, o->width) -
+            box_audio_synth_naive(o->wave, end, o->width);
+        x += (float)(0.5 * jump) * box_audio_synth_blep(t, dt);
+        if (o->wave == BOX_AUDIO_SYNTH_TRIANGLE || o->wave == BOX_AUDIO_SYNTH_SINE) {
+            bend = ratio * (box_audio_synth_slope(o->wave, start) -
+                box_audio_synth_slope(o->wave, end));
+            x += (float)(0.5 * bend * dt) * box_audio_synth_blamp(t, dt);
+        }
+    }
+
+    return x;
+}
+
 /** Render a frame of the sub oscillator of a layer: a square sub_octave octaves under it at
  * the phase of the layer, with its polyBLEP. Its phase is that of the layer plus the wraps of
  * it, over 2 or 4, so it flips on every wrap of the layer and stays locked to it.
@@ -1638,7 +1783,8 @@ static inline float box_audio_synth_osc_next(
     box_audio_synth_osc_t *o,
     uint32_t *rng)
 {
-    float x = box_audio_synth_wave(o->wave, o->phase, o->inc, o->width, rng);
+    float x = o->synced ? box_audio_synth_sync(o, o->phase, o->inc, 0, 0, rng) :
+        box_audio_synth_wave(o->wave, o->phase, o->inc, o->width, rng);
     if (o->sub != 0) {
         x += o->sub * box_audio_synth_sub(o->phase, o->wraps, o->sub_octave, o->inc);
     }
@@ -1793,7 +1939,8 @@ static inline float box_audio_synth_layers_lfo(
         if (o->wave == BOX_AUDIO_SYNTH_PLUCK) {
             x = box_audio_synth_string_next(src, part, inc);
         } else {
-            x = box_audio_synth_wave(o->wave, o->phase, inc, o->width, &src->rng);
+            x = o->synced ? box_audio_synth_sync(o, o->phase, inc, 0, 0, &src->rng) :
+                box_audio_synth_wave(o->wave, o->phase, inc, o->width, &src->rng);
             if (o->sub != 0) {
                 x += o->sub * box_audio_synth_sub(o->phase, o->wraps, o->sub_octave, inc);
             }
@@ -1848,7 +1995,7 @@ static inline float box_audio_synth_modulate(
     const float *levels,
     bool lfo)
 {
-    double offset[BOX_AUDIO_SYNTH_LAYERS], t, shift;
+    double offset[BOX_AUDIO_SYNTH_LAYERS], t, shift, moved;
     float ring[BOX_AUDIO_SYNTH_LAYERS], mix = 0, x, signal, sub = 0;
     int32_t l;
     for (l = 0; l < src->layers; l ++) {
@@ -1869,6 +2016,7 @@ static inline float box_audio_synth_modulate(
         }
 
         shift = offset[l] + fb;
+        moved = shift - o->shift;
         if (shift != o->shift) {
             dt = box_audio_synth_speed(src, inc + (shift - o->shift));
             o->shift = shift;
@@ -1877,7 +2025,8 @@ static inline float box_audio_synth_modulate(
         if (o->wave == BOX_AUDIO_SYNTH_PLUCK) {
             x = box_audio_synth_string_next(src, src->part[l], inc);
         } else {
-            x = box_audio_synth_wave(o->wave, t, dt, o->width, &src->rng);
+            x = o->synced ? box_audio_synth_sync(o, o->phase, inc, shift, moved, &src->rng) :
+                box_audio_synth_wave(o->wave, t, dt, o->width, &src->rng);
             if (o->sub != 0) {
                 sub = o->sub * box_audio_synth_sub(o->phase, o->wraps, o->sub_octave, inc);
             }
@@ -1912,23 +2061,6 @@ static inline float box_audio_synth_modulate(
     return mix;
 }
 
-/** Wrap a phase into 0..1.
- *
- * @param t Phase in turns
- * @return The phase, 0..1
- */
-static inline double box_audio_synth_wrap(
-    double t)
-{
-    if (t < 0 || t >= 1) {
-        t -= (double)(int64_t)t;
-        t = t < 0 ? t + 1 : t;
-        t = t >= 1 ? t - 1 : t;
-    }
-
-    return t;
-}
-
 /** Render a frame of the unison voices of a layer and advance them, with the sweep of its
  * oscillator.
  *
@@ -1960,8 +2092,13 @@ static inline void box_audio_synth_unison_next(
     for (k = 0; k < u->voices; k ++) {
         dt = inc * u->detune[k];
         dt = dt < src->inc_max ? dt : src->inc_max;
-        t = shift != 0 ? box_audio_synth_wrap(u->phase[k] + shift) : u->phase[k];
-        x = box_audio_synth_wave(o->wave, t, dt, o->width, &src->rng);
+        if (o->synced) {
+            x = box_audio_synth_sync(o, u->phase[k], dt, shift, 0, &src->rng);
+        } else {
+            t = shift != 0 ? box_audio_synth_wrap(u->phase[k] + shift) : u->phase[k];
+            x = box_audio_synth_wave(o->wave, t, dt, o->width, &src->rng);
+        }
+
         l += x * u->left[k];
         r += x * u->right[k];
         if (o->sub != 0) {
@@ -2082,7 +2219,8 @@ static inline void box_audio_synth_mix_wide(
             if (o->wave == BOX_AUDIO_SYNTH_PLUCK) {
                 x = box_audio_synth_string_next(src, part, inc);
             } else {
-                x = box_audio_synth_wave(o->wave, box_audio_synth_wrap(o->phase + shift), inc,
+                x = o->synced ? box_audio_synth_sync(o, o->phase, inc, shift, 0, &src->rng) :
+                    box_audio_synth_wave(o->wave, box_audio_synth_wrap(o->phase + shift), inc,
                     o->width, &src->rng);
                 if (o->sub != 0) {
                     sub = o->sub * box_audio_synth_sub(o->phase, o->wraps, o->sub_octave, inc);

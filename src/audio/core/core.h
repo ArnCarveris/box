@@ -172,6 +172,12 @@
 /** Largest depth of the pitch of a synth LFO in cents, up or down */
 #define BOX_AUDIO_SYNTH_CENTS_MAX 2400.0f
 
+/** Largest ratio of hard sync of a synth layer to its frequency */
+#define BOX_AUDIO_SYNTH_SYNC_MAX 16.0f
+
+/** Largest depth of the ratio of hard sync of a synth LFO in semitones, up or down */
+#define BOX_AUDIO_SYNTH_SYNC_SEMITONES 48.0f
+
 /** Narrowest pulse width of a square, as a share of its period; the widest is 1 minus it */
 #define BOX_AUDIO_SYNTH_PULSE_MIN 0.01f
 
@@ -765,6 +771,10 @@ typedef struct box_audio_synth_layer_t {
                                            * velocity scales: index (1 - share + share v) */
     float hardness_velocity;              /**< BOX_AUDIO_SYNTH_PLUCK: share 0..1 of the
                                            * hardness that velocity scales the same way */
+    float sync;                           /**< Hard sync: ratio of its wave to its frequency,
+                                           * 1..BOX_AUDIO_SYNTH_SYNC_MAX, restarted on every
+                                           * cycle of the frequency; 0 counts as 1, off.
+                                           * Ignored by noise and pluck */
 } box_audio_synth_layer_t;
 
 /** An LFO of a synth patch: a wave at a rate that starts after a delay and fades in, with a
@@ -782,6 +792,9 @@ typedef struct box_audio_synth_lfo_t {
     float amplitude;        /**< Share of the level it takes at the bottom of the wave, 0..1 */
     float cutoff;           /**< Octaves of the cutoff at the top of the wave */
     float pulse_width;      /**< Share of the period the pulse width of squares moves by */
+    float sync;             /**< Semitones the ratio of hard sync moves by at the top of the
+                             * wave, -BOX_AUDIO_SYNTH_SYNC_SEMITONES..max; on a layer it syncs
+                             * it, for every layer only those with a ratio over 1 */
 } box_audio_synth_lfo_t;
 
 /** A synth patch: up to BOX_AUDIO_SYNTH_LAYERS oscillators with envelopes, then one filter,
