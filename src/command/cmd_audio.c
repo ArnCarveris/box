@@ -176,6 +176,7 @@ static void box_cmd_audio_effects(
         const Chorus *chorus;
         const Saturator *saturator;
         const TransientShaper *shaper;
+        const Rotary *rotary;
         const box_audio_module_t *state = box_audio_module_get(world);
         char *path;
         int32_t b, slot;
@@ -262,6 +263,13 @@ static void box_cmd_audio_effects(
         } else if ((shaper = ecs_get(world, e, TransientShaper))) {
             ecs_strbuf_append(buf, "transient shaper attack %.2f sustain %.2f",
                 (double)shaper->attack, (double)shaper->sustain);
+        } else if ((rotary = ecs_get(world, e, Rotary))) {
+            ecs_strbuf_append(buf, "rotary speed %.2f horn %.2f-%.2f Hz drum %.2f-%.2f Hz "
+                "acceleration %.2f balance %.2f spread %.2f drive %.2f mix %.2f",
+                (double)rotary->speed, (double)rotary->horn_slow, (double)rotary->horn_fast,
+                (double)rotary->drum_slow, (double)rotary->drum_fast,
+                (double)rotary->acceleration, (double)rotary->balance,
+                (double)rotary->spread, (double)rotary->drive, (double)rotary->mix);
         }
 
         slot = box_audio_module_effect_slot(world, e);

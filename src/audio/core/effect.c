@@ -85,6 +85,14 @@ static const box_audio_effect_def_t box_audio_effect_kinds[BOX_AUDIO_EFFECT_KIND
         .command = box_audio_transient_shaper_command,
         .render = box_audio_transient_shaper_render,
         .rest = box_audio_transient_shaper_rest
+    },
+    [BOX_AUDIO_EFFECT_ROTARY] = {
+        .tail = true,
+        .floats = box_audio_rotary_floats,
+        .start = box_audio_rotary_start,
+        .command = box_audio_rotary_command,
+        .render = box_audio_rotary_render,
+        .rest = box_audio_rotary_rest
     }
 };
 

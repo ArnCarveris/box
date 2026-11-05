@@ -814,6 +814,88 @@ void NoAlloc_transient_shaper(void) {
     test_int(noalloc_frees, 1);
 }
 
+/* Rotaries in the insert slots of buses: steps of the speed while the rotors accelerate,
+ * changes of the rates, the balance, the spread, the drive and the mix, a move to another bus,
+ * tails that decay to silence while the rotors turn on and start again, and a removal, without
+ * a call of the allocator. */
+void NoAlloc_rotary(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_route_t routes[] = { AUDIO_OUT(1, 0), AUDIO_OUT(2, 0), AUDIO_MASTER };
+    int32_t floats = box_audio_effect_floats(BOX_AUDIO_EFFECT_ROTARY, AUDIO_RATE);
+    float *memory[2], params[BOX_AUDIO_EFFECT_PARAMS] = {0};
+    uint8_t bytes[1024];
+    box_audio_writer_t w;
+    uint32_t i, k;
+    test_assert(floats > 0);
+    audio_order(core, routes, 3);
+    audio_sine(audio_sound_a, AUDIO_FRAMES / 4, 330, 0.25f);
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_FRAMES / 4, 1, AUDIO_RATE));
+    for (i = 0; i < 2; i ++) {
+        memory[i] = calloc((size_t)floats, sizeof(float));
+        test_assert(box_audio_core_effect_memory(core, i, memory[i], floats));
+    }
+
+    audio_play(core, 1, 1, 1, 0.5f, 0, 1, BOX_AUDIO_PLAY_LOOP);
+    audio_play(core, 2, 1, 2, 0.5f, 0, 1.5f, 0);
+    for (k = 0; k < 12; k ++) {
+        box_audio_writer_init(&w, bytes, sizeof(bytes));
+        for (i = 0; i < 2; i ++) {
+            uint32_t bus = 1 + (i + k / 4) % 2;
+            params[0] = (float)((k + i) % 2);
+            params[1] = 0.5f + 0.1f * (float)(k % 5);
+            params[2] = 5.0f + 0.5f * (float)(k % 4);
+            params[3] = 0.4f + 0.1f * (float)(k % 3);
+            params[4] = 4.0f + 0.6f * (float)(k % 5);
+            params[5] = 0.2f + 0.5f * (float)(k % 4);
+            params[6] = -1.0f + 0.4f * (float)(k % 6);
+            params[7] = 0.25f * (float)(k % 5);
+            params[8] = 0.2f * (float)(k % 6);
+            params[9] = 1.0f - 0.25f * (float)(k % 5);
+            test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_ROTARY, bus, i,
+                BOX_AUDIO_BUS_NONE, params));
+        }
+
+        box_audio_core_apply(core, w.data, w.size);
+        audio_render(core, 0, k % 3 ? AUDIO_FRAMES / 40 : AUDIO_FRAMES / 4);
+        audio_events(core, 0, NULL);
+    }
+
+    // The voices stop and the tails decay to silence, then a voice starts them again
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_stop(&w, 1, 0));
+    box_audio_core_apply(core, w.data, w.size);
+    for (k = 0; k < 4; k ++) {
+        audio_render(core, 0, AUDIO_FRAMES);
+    }
+
+    for (i = 0; i < 2; i ++) {
+        test_assert(!box_audio_core_effect_running(core, i));
+    }
+
+    audio_play(core, 3, 1, 1, 0.5f, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES / 4);
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    for (i = 0; i < 2; i ++) {
+        test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_NONE, BOX_AUDIO_BUS_NONE,
+            0, BOX_AUDIO_BUS_NONE, NULL));
+    }
+
+    box_audio_core_apply(core, w.data, w.size);
+    audio_render(core, 0, AUDIO_FRAMES);
+    for (i = 0; i < 2; i ++) {
+        test_assert(!box_audio_core_effect_running(core, i));
+    }
+
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+    for (i = 0; i < 2; i ++) {
+        free(memory[i]);
+    }
+}
+
 /* Voices of a patch with subs, on a mono layer, a wide unison layer and a modulator with
  * feedback, under a glide and an LFO, render without a call of the allocator. */
 void NoAlloc_synth_sub(void) {

@@ -413,6 +413,7 @@
                     "modulation",
                     "saturator",
                     "transient_shaper",
+                    "rotary",
                     "synth_sub",
                     "synth_sync",
                     "synth_drive",
@@ -711,6 +712,21 @@
                     "silent_after_tail",
                     "render_identical",
                     "components",
+                    "script"
+                ]
+            },
+            {
+                "id": "Rotary",
+                "testcases": [
+                    "horn_rate",
+                    "drum_rate",
+                    "acceleration_horn",
+                    "acceleration_drum",
+                    "stereo_phase",
+                    "mix_dry",
+                    "silent_after_tail",
+                    "render_identical",
+                    "component",
                     "script"
                 ]
             },

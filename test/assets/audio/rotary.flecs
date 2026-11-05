@@ -1,0 +1,8 @@
+// A rotary, for the Rotary suite of test/cpu/audio: a fast rotating speaker with some tube
+// drive, leaning toward the horn, in the first insert slot of the bus organ.
+using box.audio
+
+organ {
+  AudioBus: {output: master, effects: [organ]}
+  Rotary: {speed: 1, drive: 0.3, balance: 0.2}
+}

@@ -850,6 +850,40 @@ ECS_STRUCT(TransientShaper, {
                             *   it */
 });
 
+/** A rotary, an effect in an insert slot of an AudioBus, as a Reverb is: a rotating speaker
+ * cabinet, the swirl of an organ, also on guitars, electric pianos and vocals. The sum of both
+ * channels runs through a tube preamp, then a crossover at 800 Hz splits it into a drum below
+ * and a horn above, which turn at their own rates. Two virtual mics hear each rotor, the left
+ * one a quarter turn times spread one way and the right one as far the other way: as a rotor
+ * turns, its pitch moves with the Doppler shift (a few tenths of a millisecond of the horn),
+ * and its level drops and its tone dulls as it faces away from a mic:
+ * organ { AudioBus: {effects: [organ]}; Rotary: {speed: 0, drive: 0.3} }.
+ *
+ * The rotors turn at their slow rates at speed 0 and at their fast rates at speed 1, and in
+ * between at rates in between. They do not jump to a new speed: the horn reaches it within
+ * acceleration seconds and the drum three times slower, so automating speed between 0 and 1
+ * gives the switch of a real cabinet between chorale and tremolo. The rotors start at the rate
+ * of their speed when the rotary is put on a channel. Balance, spread, drive and mix move over
+ * 20 ms. Every rotary runs with its own memory of 4 milliseconds. Once its input was silent for
+ * 50 ms it stops until its input sounds again, its rotors turning on.
+ */
+ECS_STRUCT(Rotary, {
+    float speed;           /**< 0 to 1, default 0: 0 is slow (chorale), 1 fast (tremolo) */
+    float horn_slow;       /**< Hz of the horn at speed 0, default 0.8, 0 to 20 */
+    float horn_fast;       /**< Hz of the horn at speed 1, default 6.7, 0 to 20 */
+    float drum_slow;       /**< Hz of the drum at speed 0, default 0.7, 0 to 20 */
+    float drum_fast;       /**< Hz of the drum at speed 1, default 5.9, 0 to 20 */
+    float acceleration;    /**< Seconds of the horn to a new speed, default 1, 0.01 to 20; the
+                            *   drum takes three times as long */
+    float balance;         /**< -1 to 1, default 0: -1 is the drum alone, 1 the horn alone */
+    float spread;          /**< 0 to 1, default 1: the stereo width of the mics; 0 is mono, 1
+                            *   puts them half a turn apart */
+    float drive;           /**< 0 to 1, default 0: the share of the tube preamp, its gain up to
+                            *   +24 dB */
+    float mix;             /**< Wet level, 0 to 1, default 1; the dry signal passes at
+                            *   1 - mix */
+});
+
 /** An envelope of the cutoff of the SynthFilter of the same root, with the segments of a
  * SynthEnvelope: the cutoff is cutoff times 2 to the amount times the level of the envelope,
  * so it rises over the attack, settles at the sustain and returns over the release.

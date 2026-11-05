@@ -296,6 +296,28 @@ static void box_audio_transient_shaper_ctor(
     }
 }
 
+/** Construct Rotary values: slow, the horn at 0.8 and 6.7 Hz, the drum at 0.7 and 5.9 Hz, an
+ * acceleration of a second, both rotors, the mics half a turn apart, no drive, fully wet.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_rotary_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Rotary *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Rotary){ .speed = 0, .horn_slow = 0.8f, .horn_fast = 6.7f,
+            .drum_slow = 0.7f, .drum_fast = 5.9f, .acceleration = 1.0f, .balance = 0,
+            .spread = 1.0f, .drive = 0, .mix = 1.0f };
+    }
+}
+
 /** Construct Gate values: -50 dB, an attack of 1 ms, a hold of 50 ms, a release of 100 ms
  * and a range of -80 dB.
  *
@@ -1386,6 +1408,8 @@ void BoxAudioImport(
     ecs_set_hooks(world, Saturator, { .ctor = box_audio_saturator_ctor });
     ECS_META_COMPONENT(world, TransientShaper);
     ecs_set_hooks(world, TransientShaper, { .ctor = box_audio_transient_shaper_ctor });
+    ECS_META_COMPONENT(world, Rotary);
+    ecs_set_hooks(world, Rotary, { .ctor = box_audio_rotary_ctor });
     ECS_META_COMPONENT(world, SynthFilterEnvelope);
     ECS_META_COMPONENT(world, SynthPitchEnvelope);
     ECS_META_COMPONENT(world, SynthGlide);
@@ -1465,6 +1489,7 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(Chorus), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(Saturator), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(TransientShaper), EcsWith, ecs_id(AudioEffectState));
+    ecs_add_pair(world, ecs_id(Rotary), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(SoundFile), EcsWith, ecs_id(AudioSample));
     ecs_add_pair(world, ecs_id(AudioStream), EcsWith, ecs_id(AudioMusic));
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSoundId));

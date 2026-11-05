@@ -4,7 +4,8 @@
  * their slots of the pool of the core, their memory and their commands.
  *
  * An effect entity is any entity with an effect component: Reverb, Equalizer, AudioFilter,
- * Compressor, Gate, Delay, Phaser, Chorus, Saturator or TransientShaper, the first of them in
+ * Compressor, Gate, Delay, Phaser, Chorus, Saturator, TransientShaper or Rotary, the first of
+ * them in
  * that order. A compressor gets the key bus that the order compile accepted for its insert.
  *
  * The module sends an EFFECT command when the kind, the channel, the slot or a parameter of an
@@ -188,6 +189,21 @@ uint32_t box_audio_module_effect_params(
             params[0] = shaper->attack;
             params[1] = shaper->sustain;
         }
+    } else if (component == ecs_id(Rotary)) {
+        const Rotary *rotary = ptr;
+        result = BOX_AUDIO_EFFECT_ROTARY;
+        if (params && ptr) {
+            params[0] = rotary->speed;
+            params[1] = rotary->horn_slow;
+            params[2] = rotary->horn_fast;
+            params[3] = rotary->drum_slow;
+            params[4] = rotary->drum_fast;
+            params[5] = rotary->acceleration;
+            params[6] = rotary->balance;
+            params[7] = rotary->spread;
+            params[8] = rotary->drive;
+            params[9] = rotary->mix;
+        }
     }
 
 done:
@@ -200,7 +216,7 @@ int32_t box_audio_module_effect_components(
     const ecs_entity_t components[] = {
         ecs_id(Reverb), ecs_id(Equalizer), ecs_id(AudioFilter), ecs_id(Compressor),
         ecs_id(Gate), ecs_id(Delay), ecs_id(Phaser), ecs_id(Chorus), ecs_id(Saturator),
-        ecs_id(TransientShaper)
+        ecs_id(TransientShaper), ecs_id(Rotary)
     };
     int32_t i, count = (int32_t)(sizeof(components) / sizeof(components[0]));
     count = count < BOX_AUDIO_EFFECT_COMPONENTS ? count : BOX_AUDIO_EFFECT_COMPONENTS;
