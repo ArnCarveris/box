@@ -233,12 +233,14 @@ template OreHazardRule {
   prop width: f32 = 400
   prop height: f32 = 6
   prop alpha: f32 = 1
+  prop h: Align = Left
+  prop v: VAlign = Top
 
   const scale = max(width / 2048.0, height / 12.0)
   const spanU = width / (2048.0 * scale)
   const spanV = height / (12.0 * scale)
 
-  LayoutItem: {width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}}
+  LayoutItem: {h: h, v: v, width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}}
   Rect: {1, 1}
   Rgb: {255, 255, 255}
   Opacity: {alpha}
