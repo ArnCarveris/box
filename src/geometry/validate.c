@@ -1,6 +1,10 @@
 /**
  * @file geometry/validate.c
  * @brief On-validate hooks that report invalid paths, profiles, surfaces, and meshes.
+ *
+ * Flecs calls a hook with a NULL value when a prefab child is instantiated and the instance
+ * child inherits the component instead of owning it. The hooks skip that call: the value is
+ * validated, and reported, on the prefab child that owns it.
  */
 
 #include "paths.h"
@@ -163,6 +167,10 @@ static bool box_validate_path2_hook(
     void *ptr)
 {
     const Path2D *path = ptr;
+    if (!path) {
+        return true;
+    }
+
     box_validate_report(world, entity, "Path2D",
         box_validate_path(world, entity, false, path->closed));
 
@@ -182,6 +190,10 @@ static bool box_validate_path3_hook(
     void *ptr)
 {
     const Path3D *path = ptr;
+    if (!path) {
+        return true;
+    }
+
     box_validate_report(world, entity, "Path3D",
         box_validate_path(world, entity, true, path->closed));
 
@@ -200,8 +212,9 @@ static bool box_validate_profile_hook(
     ecs_entity_t entity,
     void *ptr)
 {
-    (void)ptr;
-    box_validate_report(world, entity, "Profile2D", box_validate_profile(world, entity));
+    if (ptr) {
+        box_validate_report(world, entity, "Profile2D", box_validate_profile(world, entity));
+    }
 
     return true;
 }
@@ -219,6 +232,10 @@ static bool box_validate_sweep_hook(
     void *ptr)
 {
     const Sweep *sweep = ptr;
+    if (!sweep) {
+        return true;
+    }
+
     const char *reason = NULL;
     if (!!sweep->profile == !!sweep->contour) {
         reason = "set exactly one of profile or contour";
@@ -254,6 +271,10 @@ static bool box_validate_loft_hook(
     void *ptr)
 {
     const Loft *loft = ptr;
+    if (!loft) {
+        return true;
+    }
+
     int32_t count = ecs_vec_count(&loft->sections);
     const char *reason = count < 2 ? "at least two sections are required" : NULL;
     const LoftSection *sections = ecs_vec_first(&loft->sections);
@@ -290,6 +311,10 @@ static bool box_validate_lathe_hook(
     void *ptr)
 {
     const Lathe *lathe = ptr;
+    if (!lathe) {
+        return true;
+    }
+
     const char *reason = box_validate_path(world, lathe->profile, false, -1);
     if (!reason && lathe->inner) {
         reason = box_validate_path(world, lathe->inner, false, -1);
@@ -313,6 +338,10 @@ static bool box_validate_extrusion_hook(
     void *ptr)
 {
     const ProfileExtrusion *extrusion = ptr;
+    if (!extrusion) {
+        return true;
+    }
+
     const char *reason = box_validate_profile(world, extrusion->profile);
     if (!reason && !isfinite(extrusion->depth)) {
         reason = "depth must be finite";
@@ -336,6 +365,10 @@ static bool box_validate_prism_hook(
     void *ptr)
 {
     const BeveledPrism *prism = ptr;
+    if (!prism) {
+        return true;
+    }
+
     int32_t count = ecs_vec_count(&prism->footprint);
     const char *reason = NULL;
     if (count != 3 && count != 4) {
@@ -384,6 +417,10 @@ static bool box_validate_bevel_hook(
     void *ptr)
 {
     const Bevel *bevel = ptr;
+    if (!bevel) {
+        return true;
+    }
+
     const float radii[] = {
         bevel->radius,
         bevel->top_front, bevel->top_back, bevel->top_left, bevel->top_right,
@@ -417,6 +454,10 @@ static bool box_validate_mesh_hook(
     void *ptr)
 {
     const ShapeMesh *shape = ptr;
+    if (!shape) {
+        return true;
+    }
+
     const box_mesh_cache_t *cache = box_mesh_cache_of(world);
     const box_mesh_t *mesh = shape->mesh ? box_mesh_cache_get(cache, shape->mesh) : NULL;
     if (!mesh) {
