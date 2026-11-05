@@ -246,8 +246,7 @@ void box_audio_chorus_command(
     }
 }
 
-/** Read a line frames back, with linear interpolation; frames older than the ones written
- * since the line was silent read as silence.
+/** Read a line frames back, as box_audio_line_read.
  *
  * @param ch The chorus
  * @param line The line
@@ -259,14 +258,7 @@ static inline float box_audio_chorus_read(
     const float *line,
     double back)
 {
-    int32_t whole = (int32_t)back, i0 = ch->pos - whole, i1 = i0 - 1;
-    float frac = (float)(back - (double)whole), a, b;
-    i0 += i0 < 0 ? ch->length : 0;
-    i1 += i1 < 0 ? ch->length : 0;
-    a = whole <= ch->valid ? line[i0] : 0.0f;
-    b = whole < ch->valid ? line[i1] : 0.0f;
-
-    return a + frac * (b - a);
+    return box_audio_line_read(line, ch->length, ch->pos, ch->valid, back);
 }
 
 /** Read a line frames back for the feedback, with Catmull-Rom interpolation between the frames

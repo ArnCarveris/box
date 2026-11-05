@@ -1,0 +1,26 @@
+// A trance gate on a pad for the PatternGate suite of test/cpu/audio: sixteenths of a pattern
+// with two accents, open for 90% of each step, on the pad bus, whose AudioMeter reads the gain
+// reduction. An automation lane opens the closed step 2 over the first four beats; the suite
+// plays a constant level on the pad and starts the transport at 120 bpm. The effect entity
+// comes before the bus that names it.
+using box.audio
+
+pad_gate {
+  PatternGate: {steps: [1, 0, 0, 1, 1, 0, 0.5, 1, 1, 0, 1, 0, 1, 1, 0, 1], gate: 0.9,
+    release: 0.02}
+  AudioMeter: {}
+}
+
+pad { AudioBus: {effects: [pad_gate]} }
+
+prefab open_step {
+  AutomationClip: {target: pad_gate, component: PatternGate, member: "steps[2]", length: 4,
+    curve: {keys: [{0, 1}, {4, 1}]}}
+}
+
+lanes {
+  Track: {}
+  open_lane { ClipPlacement: {clip: open_step, start: 0} }
+}
+
+$ { Transport: {tempo: 120} }

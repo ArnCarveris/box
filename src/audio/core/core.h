@@ -87,8 +87,11 @@
 /** Insert slots of a bus; its effects run in the order of their index */
 #define BOX_AUDIO_EFFECT_SLOTS 4
 
-/** Parameters of an effect command, read by each kind in its own way */
-#define BOX_AUDIO_EFFECT_PARAMS 16
+/** Parameters of an effect command, read by each kind in its own way. 32 hold the 16 steps of
+ * a pattern gate and its other parameters as plain floats, so automation and the modulators
+ * reach each step as they reach any other parameter; an EFFECT command is 152 bytes and an
+ * EFFECT_PARAMS command 148, the largest command of the schedule */
+#define BOX_AUDIO_EFFECT_PARAMS 32
 
 /** Seconds of the fade of the wet signal around a change of the kind, bus or index of an
  * effect, out and in, and of the tail of an effect taken off */
@@ -336,9 +339,27 @@ typedef enum box_audio_param_t {
                                   *   everything that follows its pitch included */
     BOX_AUDIO_PARAM_MOD = 12,    /**< Mod of a synth voice, 0..1, default 1: scales the depth
                                   *   of the pitch of its LFOs, its vibrato */
-    BOX_AUDIO_PARAM_PRESSURE = 13 /**< Pressure of a synth voice, 0..1, default 0: moves its
+    BOX_AUDIO_PARAM_PRESSURE = 13, /**< Pressure of a synth voice, 0..1, default 0: moves its
                                   *   cutoff up by pressure * BOX_AUDIO_SYNTH_PRESSURE_OCTAVES */
+    BOX_AUDIO_PARAM_CUTOFF = 14  /**< Cutoff in Hz of the 12 dB per octave low-pass of a voice,
+                                  *   after its source and before its volume and pan, ramped
+                                  *   over BOX_AUDIO_CUTOFF_RAMP.
+                                  *   0 (the default), a negative value or one of at least
+                                  *   BOX_AUDIO_CUTOFF_OPEN opens the filter, which the voice
+                                  *   then skips; others are clamped to BOX_AUDIO_CUTOFF_MIN..
+                                  *   0.45 of the rate. The first cutoff of a voice that has
+                                  *   not rendered applies at once */
 } box_audio_param_t;
+
+/** A cutoff of BOX_AUDIO_PARAM_CUTOFF of at least this many Hz opens the filter of a voice */
+#define BOX_AUDIO_CUTOFF_OPEN 20000.0f
+
+/** Lowest cutoff of BOX_AUDIO_PARAM_CUTOFF in Hz */
+#define BOX_AUDIO_CUTOFF_MIN 10.0f
+
+/** Seconds a cutoff of BOX_AUDIO_PARAM_CUTOFF ramps over, longer than the ramp of the gains:
+ * a jump of octaves sweeps the phase of what passes, which clicks when it is too fast */
+#define BOX_AUDIO_CUTOFF_RAMP 0.05f
 
 /** Largest pitch bend of a voice in semitones, either way */
 #define BOX_AUDIO_BEND_MAX 48.0f
@@ -565,7 +586,11 @@ typedef enum box_audio_effect_kind_t {
     BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER = 11, /**< A frequency shifter,
                                   *   box_audio_frequency_shifter_params_t */
     BOX_AUDIO_EFFECT_PITCH_SHIFTER = 12, /**< A pitch shifter, box_audio_pitch_shifter_params_t */
-    BOX_AUDIO_EFFECT_KINDS = 13   /**< Number of kinds, NONE included */
+    BOX_AUDIO_EFFECT_PATTERN_GATE = 13, /**< A pattern gate, box_audio_pattern_gate_params_t */
+    BOX_AUDIO_EFFECT_ROTARY = 14, /**< A rotating speaker, box_audio_rotary_params_t */
+    BOX_AUDIO_EFFECT_BEAT_REPEAT = 15, /**< A beat repeat, box_audio_beat_repeat_params_t */
+    BOX_AUDIO_EFFECT_TAPE_STOP = 16, /**< A tape stop, box_audio_tape_stop_params_t */
+    BOX_AUDIO_EFFECT_KINDS = 17   /**< Number of kinds, NONE included */
 } box_audio_effect_kind_t;
 
 /** The parameters of a reverb, the first floats of the params of its effect command. Shimmer
@@ -1017,6 +1042,227 @@ typedef struct box_audio_frequency_shifter_params_t {
                        *   -BOX_AUDIO_FREQUENCY_SHIFTER_FEEDBACK_MAX..MAX */
     float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
 } box_audio_frequency_shifter_params_t;
+
+/** Steps of the pattern of a pattern gate */
+#define BOX_AUDIO_PATTERN_GATE_STEPS 16
+
+/** Shortest and longest step of a pattern gate in beats */
+#define BOX_AUDIO_PATTERN_GATE_RATE_MIN (1.0f / 64.0f)
+#define BOX_AUDIO_PATTERN_GATE_RATE_MAX 16.0f
+
+/** Largest swing of a pattern gate, that of Track */
+#define BOX_AUDIO_PATTERN_GATE_SWING_MAX 0.75f
+
+/** Shortest and longest attack or release of a pattern gate in seconds */
+#define BOX_AUDIO_PATTERN_GATE_EDGE_MIN 0.0005f
+#define BOX_AUDIO_PATTERN_GATE_EDGE_MAX 2.0f
+
+/** Smallest share of a step a pattern gate is open */
+#define BOX_AUDIO_PATTERN_GATE_GATE_MIN 0.05f
+
+/** Lowest floor of a pattern gate in dB; the highest is 0 */
+#define BOX_AUDIO_PATTERN_GATE_FLOOR_MIN (-80.0f)
+
+/** Seconds of a change of the floor or the mix of a pattern gate */
+#define BOX_AUDIO_PATTERN_GATE_RAMP 0.02f
+
+/** The parameters of a pattern gate, the floats of the params of its effect command: a level
+ * pattern locked to the beat clock of the core (box_audio_cmd_beat_t), the same gain on both
+ * channels.
+ *
+ * At each frame the step floor(beat / rate) mod length sounds, on a grid from beat 0 that
+ * swing bends as a Track swings its notes: in each pair of steps the first lasts 1 + swing
+ * steps and the second 1 - swing. A step is open for the first gate share of it, at its level,
+ * and closed after, at the floor; a level of 0 is closed all along. The gain is floor + (1 -
+ * floor) times the openness, which moves linearly toward the level of the step while it is
+ * open and toward 0 after: from 0 to 1 in attack seconds, from 1 to 0 in release seconds. So
+ * the edges sit on the grid after a seek, a loop wrap and a tempo change, and a change of a
+ * step or of the timing moves the gain at the speed of the edges, without a click */
+typedef struct box_audio_pattern_gate_params_t {
+    float steps[BOX_AUDIO_PATTERN_GATE_STEPS]; /**< Level of each step, 0..1 */
+    float length;     /**< Steps that play, rounded, 1..BOX_AUDIO_PATTERN_GATE_STEPS */
+    float rate;       /**< Beats per step, BOX_AUDIO_PATTERN_GATE_RATE_MIN..MAX */
+    float swing;      /**< 0..BOX_AUDIO_PATTERN_GATE_SWING_MAX: the second step of each pair
+                       *   starts later by swing steps */
+    float attack;     /**< Seconds of an edge from closed to open,
+                       *   BOX_AUDIO_PATTERN_GATE_EDGE_MIN..MAX */
+    float release;    /**< Seconds of an edge from open to closed,
+                       *   BOX_AUDIO_PATTERN_GATE_EDGE_MIN..MAX */
+    float gate;       /**< Share of each step that is open, BOX_AUDIO_PATTERN_GATE_GATE_MIN..1 */
+    float floor;      /**< Gain when closed in dB, BOX_AUDIO_PATTERN_GATE_FLOOR_MIN..0 */
+    float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+} box_audio_pattern_gate_params_t;
+
+/** Crossover of a rotary between its drum and its horn in Hz */
+#define BOX_AUDIO_ROTARY_CROSSOVER 800.0f
+
+/** Longest read of a rotary in milliseconds, which sizes its memory */
+#define BOX_AUDIO_ROTARY_MAX 4.0f
+
+/** Milliseconds of the read of the horn and of the drum of a rotary at the middle of a turn,
+ * and how far the turn moves it either way: the Doppler shift */
+#define BOX_AUDIO_ROTARY_HORN_DELAY 1.5f
+#define BOX_AUDIO_ROTARY_HORN_DEPTH 0.35f
+#define BOX_AUDIO_ROTARY_DRUM_DELAY 1.5f
+#define BOX_AUDIO_ROTARY_DRUM_DEPTH 0.15f
+
+/** Share of the level the horn and the drum of a rotary lose as they face away from a mic */
+#define BOX_AUDIO_ROTARY_HORN_AM 0.6f
+#define BOX_AUDIO_ROTARY_DRUM_AM 0.4f
+
+/** Cutoff in Hz of the lowpass the horn and the drum of a rotary fade into as they face away
+ * from a mic, and the share of it they reach facing away */
+#define BOX_AUDIO_ROTARY_HORN_TONE 2500.0f
+#define BOX_AUDIO_ROTARY_HORN_DULL 0.6f
+#define BOX_AUDIO_ROTARY_DRUM_TONE 300.0f
+#define BOX_AUDIO_ROTARY_DRUM_DULL 0.3f
+
+/** Inertia of the drum of a rotary against that of the horn */
+#define BOX_AUDIO_ROTARY_DRUM_INERTIA 3.0f
+
+/** Shortest and longest acceleration of the horn of a rotary in seconds */
+#define BOX_AUDIO_ROTARY_ACCELERATION_MIN 0.01f
+#define BOX_AUDIO_ROTARY_ACCELERATION_MAX 20.0f
+
+/** Gain before the clipper of the preamp of a rotary at a drive of 1 in dB */
+#define BOX_AUDIO_ROTARY_DRIVE_DB 24.0f
+
+/** Offset the preamp of a rotary at a drive of 1 adds before its clipper, for the even
+ * harmonics of a tube */
+#define BOX_AUDIO_ROTARY_BIAS 0.2f
+
+/** Seconds of silent input after which a rotary clears itself and idles */
+#define BOX_AUDIO_ROTARY_QUIET 0.05f
+
+/** Level of its preamp, filters and lines below which a rotary that has been quiet idles, so
+ * the tail of its DC blocker does not click when it is cleared */
+#define BOX_AUDIO_ROTARY_SILENCE 1e-6f
+
+/** The parameters of a rotary, the first floats of the params of its effect command: a
+ * rotating speaker cabinet. The sum of both channels runs through a tube preamp, the clipper
+ * of saturate.h at twice the rate blended in by the drive, then a Linkwitz-Riley crossover at
+ * BOX_AUDIO_ROTARY_CROSSOVER splits it into the drum below and the horn above. Each rotor
+ * writes a line on the memory of its slot that two virtual mics read, the left one a quarter
+ * turn times the spread one way and the right one as far the other way. As a rotor turns, the
+ * read of a mic moves with the distance of the rotor (Doppler), and its level drops and its
+ * tone dulls as the rotor faces away. The horn and the drum turn the opposite ways.
+ *
+ * Each rotor turns at its slow rate plus the speed times the way to its fast rate, and moves to
+ * a new rate exponentially: the horn within 5% in the acceleration, the drum
+ * BOX_AUDIO_ROTARY_DRUM_INERTIA times slower. The rotors start at phase 0 and at the rate of
+ * their speed when the effect is put on. */
+typedef struct box_audio_rotary_params_t {
+    float speed;        /**< 0..1: 0 is slow (chorale), 1 fast (tremolo) */
+    float horn_slow;    /**< Hz of the horn at speed 0, 0..BOX_AUDIO_MODULATION_RATE_MAX */
+    float horn_fast;    /**< Hz of the horn at speed 1, 0..BOX_AUDIO_MODULATION_RATE_MAX */
+    float drum_slow;    /**< Hz of the drum at speed 0, 0..BOX_AUDIO_MODULATION_RATE_MAX */
+    float drum_fast;    /**< Hz of the drum at speed 1, 0..BOX_AUDIO_MODULATION_RATE_MAX */
+    float acceleration; /**< Seconds of the horn to a new rate,
+                         *   BOX_AUDIO_ROTARY_ACCELERATION_MIN..MAX */
+    float balance;      /**< -1..1: -1 is the drum alone, 1 the horn alone, 0 both */
+    float spread;       /**< 0..1: 0 puts both mics at the same place, so the output is mono;
+                         *   1 puts them half a turn apart */
+    float drive;        /**< 0..1: the share of the preamp, its gain 0 to
+                         *   BOX_AUDIO_ROTARY_DRIVE_DB dB */
+    float mix;          /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+} box_audio_rotary_params_t;
+
+/** Longest slice of a beat repeat in seconds, which sizes its memory: the longest slice of
+ * BOX_AUDIO_BEAT_REPEAT_SLICE_MAX beats at the slowest tempo is held to it */
+#define BOX_AUDIO_BEAT_REPEAT_MAX 4.0f
+
+/** Shortest and longest slice of a beat repeat in beats; the longest grid is the longest
+ * slice */
+#define BOX_AUDIO_BEAT_REPEAT_SLICE_MIN (1.0f / 32.0f)
+#define BOX_AUDIO_BEAT_REPEAT_SLICE_MAX 4.0f
+
+/** Largest pitch of a beat repeat per repeat in semitones, either way */
+#define BOX_AUDIO_BEAT_REPEAT_PITCH_MAX 12.0f
+
+/** Largest pitch a repeat of a beat repeat reaches in semitones, either way, the pitch of the
+ * repeats added up: the speed of a read stays within 1/16..16 */
+#define BOX_AUDIO_BEAT_REPEAT_PITCH_TOTAL 48.0f
+
+/** Shortest gate of a beat repeat */
+#define BOX_AUDIO_BEAT_REPEAT_GATE_MIN 0.1f
+
+/** Seconds of the crossfades of a beat repeat at the ends of its repeats and of the return
+ * of the dry signal, at most a quarter of the slice */
+#define BOX_AUDIO_BEAT_REPEAT_FADE 0.002f
+
+/** Seconds of a change of the mix of a beat repeat */
+#define BOX_AUDIO_BEAT_REPEAT_RAMP 0.02f
+
+/** The parameters of a beat repeat, the first floats of the params of its effect command: a
+ * stereo line on the memory of its slot that records the input until active rises to 0.5 or
+ * above. The capture then starts at the next grid point of the beat clock of the core
+ * (box_audio_core_beat), or at once on a grid of 0 or within half a frame of a point, and
+ * holds a slice of slice beats at the tempo of the clock at the rise, held to
+ * BOX_AUDIO_BEAT_REPEAT_MAX seconds.
+ *
+ * The first repeat is the input itself as it is captured; each one after it plays the slice
+ * again, from the start of the capture, decay times as loud as the one before it and pitch
+ * semitones from it, resampled with cubic interpolation, so it slows down or speeds up like a
+ * tape; reverse plays it from its end. Each repeat sounds for gate of the slice and less when
+ * a faster read reaches the end of the slice first. A repeat crossfades from the one before
+ * over BOX_AUDIO_BEAT_REPEAT_FADE, which plays on past its end for it. Decay, pitch, reverse
+ * and gate apply from the next repeat on; slice and grid at the next rise.
+ *
+ * When active falls under 0.5 the dry signal returns at once, over a crossfade of
+ * BOX_AUDIO_BEAT_REPEAT_FADE, and the line records again. Before the capture started a fall
+ * cancels it. While it repeats the output is the dry signal times 1 - mix plus the repeats
+ * times mix; while it is not active the input passes unchanged */
+typedef struct box_audio_beat_repeat_params_t {
+    float active;     /**< 0.5 and above repeats, under it passes the input */
+    float slice;      /**< Beats of the slice, BOX_AUDIO_BEAT_REPEAT_SLICE_MIN..MAX */
+    float grid;       /**< Beats of the grid the capture waits for,
+                       *   0..BOX_AUDIO_BEAT_REPEAT_SLICE_MAX; 0 captures at once, a negative
+                       *   grid is the slice */
+    float decay;      /**< Gain of a repeat against the one before it, 0..1 */
+    float pitch;      /**< Semitones of a repeat against the one before it,
+                       *   -BOX_AUDIO_BEAT_REPEAT_PITCH_MAX..BOX_AUDIO_BEAT_REPEAT_PITCH_MAX */
+    float reverse;    /**< 0.5 and above plays the repeats after the first from the end */
+    float gate;       /**< Share of each repeat that sounds, BOX_AUDIO_BEAT_REPEAT_GATE_MIN..1 */
+    float mix;        /**< Level of the repeats while it repeats, 0..1; the dry signal passes
+                       *   at 1 - mix */
+} box_audio_beat_repeat_params_t;
+
+/** Longest lag of a tape stop behind its input in seconds, which sizes its memory */
+#define BOX_AUDIO_TAPE_STOP_MAX 4.0f
+
+/** Shortest and longest stop and start of a tape stop in seconds */
+#define BOX_AUDIO_TAPE_STOP_TIME_MIN 0.01f
+#define BOX_AUDIO_TAPE_STOP_TIME_MAX 4.0f
+
+/** Speed under which the output of a tape stop fades out, linearly to silence at a speed of
+ * 0 */
+#define BOX_AUDIO_TAPE_STOP_FADE 0.1f
+
+/** Seconds of the crossfade of a tape stop from the read that lags behind its input after a
+ * start to the input */
+#define BOX_AUDIO_TAPE_STOP_CROSSFADE 0.02f
+
+/** The parameters of a tape stop, the first floats of the params of its effect command: a
+ * stereo line on the memory of its slot that records the input, read at a speed with cubic
+ * interpolation, so the pitch and the time slow down together.
+ *
+ * While active is 0.5 or above, the speed falls from 1 to 0 over stop_time seconds; while it
+ * is under 0.5 it rises back to 1 over start_time seconds, from where it stands. The speed at a
+ * phase p of the ramp, 0 at a speed of 1 and 1 at a stop, is 1 - p^(4^curve): a curve of 0 is
+ * linear, above 0 the speed holds longer and falls fast at the end, under 0 it falls fast at
+ * first and creeps to the stop; a start runs the same curve back.
+ *
+ * Under a speed of BOX_AUDIO_TAPE_STOP_FADE the output fades out, to silence at a stop. What
+ * comes in while it stands is skipped: a start reads from the input of the moment it starts,
+ * and once it is up to speed it crossfades to the input over BOX_AUDIO_TAPE_STOP_CROSSFADE,
+ * skipping what the start fell behind, so the output never catches up. At full speed the input
+ * passes unchanged */
+typedef struct box_audio_tape_stop_params_t {
+    float active;     /**< 0.5 and above stops, under it starts */
+    float stop_time;  /**< Seconds of the stop, BOX_AUDIO_TAPE_STOP_TIME_MIN..MAX */
+    float start_time; /**< Seconds of the start, BOX_AUDIO_TAPE_STOP_TIME_MIN..MAX */
+    float curve;      /**< Shape of the ramps, -1..1 */
+} box_audio_tape_stop_params_t;
 
 /** Put an effect into an insert slot of a bus, change its parameters, move it or take it off.
  *
@@ -1918,7 +2164,8 @@ int32_t box_audio_core_effect_meters(
  * delay lines at the largest size, its longest predelay and the line of its shimmer, for the
  * delay BOX_AUDIO_DELAY_MAX seconds of both channels, for the chorus BOX_AUDIO_CHORUS_MAX
  * milliseconds of both channels, for the pitch shifter BOX_AUDIO_PITCH_SHIFTER_WINDOW_MAX
- * milliseconds of both channels.
+ * milliseconds of both channels, for the beat repeat and the tape stop BOX_AUDIO_BEAT_REPEAT_MAX
+ * and BOX_AUDIO_TAPE_STOP_MAX seconds of both channels and the frames of their crossfades.
  *
  * @param kind A box_audio_effect_kind_t
  * @param sample_rate Frames per second of the core
