@@ -242,10 +242,10 @@ void TapeStop_no_click(void) {
     for (c = 0; c < 3; c ++) {
         float step;
         ts_run(&cases[c], toggles, 6, ts_l, ts_r, TS_MAX, BOX_AUDIO_CORE_QUANTUM);
-        step = audio_max_step(ts_l, 1, TS_MAX);
+        step = audio_max_step(ts_l, TS_ON / 2, TS_MAX);
         printf("case %d: largest step %.5f, the sine steps %.5f\n", c, (double)step, natural);
         test_assert(step < 1.5 * natural);
-        test_assert(audio_max_step(ts_r, 1, TS_MAX) < 1.5 * natural);
+        test_assert(audio_max_step(ts_r, TS_ON / 2, TS_MAX) < 1.5 * natural);
     }
 }
 

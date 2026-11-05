@@ -23,6 +23,9 @@
 /** Frames around the start of a repeat that its crossfade takes, 2 ms and a margin */
 #define BR_FADE 100
 
+/** A frame after the ramp of the volume of the bus, before any case rises */
+#define BR_ARMED (AUDIO_RATE / 2)
+
 /** Volume of the bus of the effect, so the limiter of the master never acts */
 #define BR_VOLUME 0.1f
 
@@ -250,11 +253,15 @@ static double br_rms(
 void BeatRepeat_repeats_slice(void) {
     // audio/beat_repeat
     box_audio_beat_repeat_params_t p = br_default();
-    int32_t off = BR_BEAT2 + 4 * BR_SLICE + 3000, n;
+    int32_t off = BR_BEAT2 + 4 * BR_SLICE + 3000, n, j, differ = 0;
     br_fill(0);
     br_pair(&p, 47000, off, BR_MAX);
     test_int(br_mismatch(0, 0, -1, BR_BEAT2 + BR_SLICE + 1, 1), 0);
-    test_assert(fabsf(br_dry_l[BR_BEAT2 + BR_SLICE + 500] - br_dry_l[BR_BEAT2 + 500]) > 0.01f);
+    for (j = 0; j < BR_SLICE; j ++) {
+        differ += fabsf(br_dry_l[BR_BEAT2 + BR_SLICE + j] - br_dry_l[BR_BEAT2 + j]) > 0.001f;
+    }
+
+    test_assert(differ > 1000);
     for (n = 1; n < 4; n ++) {
         test_int(br_mismatch(BR_BEAT2 + n * BR_SLICE + BR_FADE, BR_BEAT2 + BR_FADE, -1,
             BR_SLICE - BR_FADE, 1), 0);
@@ -448,10 +455,10 @@ void BeatRepeat_no_click(void) {
         br_edge_t edges[2] = { { 47000, 1 }, { BR_BEAT2 + 5 * BR_SLICE + 2345, 0 } };
         float step;
         br_run(&cases[c], edges, 0, br_l, br_r, BR_MAX, BOX_AUDIO_CORE_QUANTUM);
-        step = audio_max_step(br_l, 1, BR_MAX);
+        step = audio_max_step(br_l, BR_ARMED, BR_MAX);
         printf("case %d: largest step %.5f, the sine steps %.5f\n", c, (double)step, natural);
         test_assert(step < 2 * natural);
-        test_assert(audio_max_step(br_r, 1, BR_MAX) < 2 * natural);
+        test_assert(audio_max_step(br_r, BR_ARMED, BR_MAX) < 2 * natural);
     }
 }
 
