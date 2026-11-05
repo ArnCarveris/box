@@ -168,12 +168,12 @@ static bool box_validate_path2_hook(
 {
     const Path2D *path = ptr;
     if (!path) {
-        return true;
+        goto done;
     }
 
     box_validate_report(world, entity, "Path2D",
         box_validate_path(world, entity, false, path->closed));
-
+done:
     return true;
 }
 
@@ -191,12 +191,12 @@ static bool box_validate_path3_hook(
 {
     const Path3D *path = ptr;
     if (!path) {
-        return true;
+        goto done;
     }
 
     box_validate_report(world, entity, "Path3D",
         box_validate_path(world, entity, true, path->closed));
-
+done:
     return true;
 }
 
@@ -233,7 +233,7 @@ static bool box_validate_sweep_hook(
 {
     const Sweep *sweep = ptr;
     if (!sweep) {
-        return true;
+        goto done;
     }
 
     const char *reason = NULL;
@@ -254,7 +254,7 @@ static bool box_validate_sweep_hook(
     }
 
     box_validate_report(world, entity, "Sweep", reason);
-
+done:
     return true;
 }
 
@@ -272,7 +272,7 @@ static bool box_validate_loft_hook(
 {
     const Loft *loft = ptr;
     if (!loft) {
-        return true;
+        goto done;
     }
 
     int32_t count = ecs_vec_count(&loft->sections);
@@ -294,7 +294,7 @@ static bool box_validate_loft_hook(
     }
 
     box_validate_report(world, entity, "Loft", reason);
-
+done:
     return true;
 }
 
@@ -312,7 +312,7 @@ static bool box_validate_lathe_hook(
 {
     const Lathe *lathe = ptr;
     if (!lathe) {
-        return true;
+        goto done;
     }
 
     const char *reason = box_validate_path(world, lathe->profile, false, -1);
@@ -321,7 +321,7 @@ static bool box_validate_lathe_hook(
     }
 
     box_validate_report(world, entity, "Lathe", reason);
-
+done:
     return true;
 }
 
@@ -339,7 +339,7 @@ static bool box_validate_extrusion_hook(
 {
     const ProfileExtrusion *extrusion = ptr;
     if (!extrusion) {
-        return true;
+        goto done;
     }
 
     const char *reason = box_validate_profile(world, extrusion->profile);
@@ -348,7 +348,7 @@ static bool box_validate_extrusion_hook(
     }
 
     box_validate_report(world, entity, "ProfileExtrusion", reason);
-
+done:
     return true;
 }
 
@@ -366,7 +366,7 @@ static bool box_validate_prism_hook(
 {
     const BeveledPrism *prism = ptr;
     if (!prism) {
-        return true;
+        goto done;
     }
 
     int32_t count = ecs_vec_count(&prism->footprint);
@@ -398,7 +398,7 @@ static bool box_validate_prism_hook(
     }
 
     box_validate_report(world, entity, "BeveledPrism", reason);
-
+done:
     return true;
 }
 
@@ -418,7 +418,7 @@ static bool box_validate_bevel_hook(
 {
     const Bevel *bevel = ptr;
     if (!bevel) {
-        return true;
+        goto done;
     }
 
     const float radii[] = {
@@ -437,7 +437,7 @@ static bool box_validate_bevel_hook(
     }
 
     box_validate_report(world, entity, "Bevel", reason);
-
+done:
     return true;
 }
 
@@ -455,7 +455,7 @@ static bool box_validate_mesh_hook(
 {
     const ShapeMesh *shape = ptr;
     if (!shape) {
-        return true;
+        goto done;
     }
 
     const box_mesh_cache_t *cache = box_mesh_cache_of(world);
