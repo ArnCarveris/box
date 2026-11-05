@@ -64,7 +64,7 @@ static void bench_light(
     ecs_set(world, parent, Position, {0, 0, 0});
     if (modes) {
         ecs_singleton_set(world, LightBake, {.probe_spacing = 2, .bounces = 0,
-            .capture_size = 8, .budget_ms = 0});
+            .capture_size = 8, .budget_ms = 0, .compute = true});
     }
 
     int32_t i;

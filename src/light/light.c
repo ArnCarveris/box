@@ -159,7 +159,8 @@ static void box_light_bake_ctor(
             .bounds_padding = 1.0f,
             .cache = ecs_os_strdup(".box/bake"),
             .light_threshold = 2.0f,
-            .color_threshold = 0.05f
+            .color_threshold = 0.05f,
+            .compute = true
         };
     }
 }

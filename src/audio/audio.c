@@ -363,6 +363,31 @@ static void box_audio_pitch_shifter_ctor(
     }
 }
 
+/** Construct PatternGate values: 16 open sixteenths without swing, an attack of 2 ms, a release
+ * of 30 ms, half of each step open, a floor of -80 dB and a mix of 1.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_pattern_gate_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    PatternGate *values = ptr;
+    int32_t i, j;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (PatternGate){ .length = BOX_AUDIO_PATTERN_GATE_STEPS, .rate = 0.25f,
+            .swing = 0, .attack = 0.002f, .release = 0.03f, .gate = 0.5f, .floor = -80.0f,
+            .mix = 1.0f };
+        for (j = 0; j < BOX_AUDIO_PATTERN_GATE_STEPS; j ++) {
+            values[i].steps[j] = 1.0f;
+        }
+    }
+}
+
 /** Construct Gate values: -50 dB, an attack of 1 ms, a hold of 50 ms, a release of 100 ms
  * and a range of -80 dB.
  *
@@ -1485,6 +1510,8 @@ void BoxAudioImport(
     ecs_set_hooks(world, FrequencyShifter, { .ctor = box_audio_frequency_shifter_ctor });
     ECS_META_COMPONENT(world, PitchShifter);
     ecs_set_hooks(world, PitchShifter, { .ctor = box_audio_pitch_shifter_ctor });
+    ECS_META_COMPONENT(world, PatternGate);
+    ecs_set_hooks(world, PatternGate, { .ctor = box_audio_pattern_gate_ctor });
     ECS_META_COMPONENT(world, SynthFilterEnvelope);
     ECS_META_COMPONENT(world, SynthPitchEnvelope);
     ECS_META_COMPONENT(world, SynthGlide);
@@ -1578,6 +1605,7 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(FrequencyShifter), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(AudioModulator), EcsWith, ecs_id(AudioModulatorState));
     ecs_add_pair(world, ecs_id(PitchShifter), EcsWith, ecs_id(AudioEffectState));
+    ecs_add_pair(world, ecs_id(PatternGate), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(SoundFile), EcsWith, ecs_id(AudioSample));
     ecs_add_pair(world, ecs_id(AudioStream), EcsWith, ecs_id(AudioMusic));
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSoundId));

@@ -559,6 +559,12 @@ void Shell_audio_command(void) {
     ecs_modified(world, bell, AudioBus);
     ecs_set(world, bell, FrequencyShifter, { .shift = 437, .mode = FrequencyRing,
         .stereo = 0.5f, .feedback = -0.3f, .mix = 0.8f });
+    ecs_entity_t chop = ecs_entity(world, { .name = "chop" });
+    ecs_ensure(world, chop, AudioBus)->effects[0] = chop;
+    ecs_modified(world, chop, AudioBus);
+    ecs_set(world, chop, PatternGate, { .steps = { 1, 0, 0.5f, 1 }, .length = 4,
+        .rate = 0.25f, .swing = 0.1f, .attack = 0.002f, .release = 0.03f, .gate = 0.5f,
+        .floor = -80, .mix = 1 });
     ecs_progress(world, 0.016f);
 
     bool error = true;
@@ -589,6 +595,9 @@ void Shell_audio_command(void) {
     test_assert(strstr(out, "bell: group volume 1.00 pan 0.00 width 1.00 -> master, "
         "insert 0 bell: frequency shifter ring +437.0 Hz stereo 0.50 feedback -0.30 mix 0.80 "
         "(does not run: no output)") != NULL);
+    test_assert(strstr(out, "chop: group volume 1.00 pan 0.00 width 1.00 -> master, "
+        "insert 0 chop: pattern gate steps [1 0 0.5 1] rate 0.250 beats swing 0.10 gate 0.50 "
+        "attack 0.0020 release 0.030 floor -80.0 dB mix 1.00") != NULL);
     ecs_os_free(out);
 
     out = box_command_run(world, s, "audio volume 0.25", &error);

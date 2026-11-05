@@ -418,6 +418,20 @@ typedef struct box_audio_pitch_shifter_t {
     box_audio_ramp_t feed;    /**< Fade in of the input after a move */
 } box_audio_pitch_shifter_t;
 
+/** A pattern gate: the openness that follows the steps of its pattern on the beat clock,
+ * and its floor and mix */
+typedef struct box_audio_pattern_gate_t {
+    box_audio_pattern_gate_params_t target; /**< Parameters of the last command, clamped */
+    int32_t length;           /**< Steps that play */
+    double rate;              /**< Beats per step */
+    double swing;             /**< Swing */
+    float up;                 /**< Openness the gain gains per frame on the way up */
+    float down;               /**< Openness the gain loses per frame on the way down */
+    float open;               /**< Openness that runs, 0..1 */
+    box_audio_ramp_t floor;   /**< Linear gain when closed */
+    box_audio_ramp_t mix;     /**< Wet level */
+} box_audio_pattern_gate_t;
+
 /** State of the kinds of effects */
 typedef union box_audio_effect_data_t {
     box_audio_reverb_t reverb;  /**< BOX_AUDIO_EFFECT_REVERB */
@@ -432,6 +446,7 @@ typedef union box_audio_effect_data_t {
     box_audio_transient_shaper_t transient_shaper; /**< BOX_AUDIO_EFFECT_TRANSIENT_SHAPER */
     box_audio_frequency_shifter_t frequency_shifter; /**< BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER */
     box_audio_pitch_shifter_t pitch_shifter; /**< BOX_AUDIO_EFFECT_PITCH_SHIFTER */
+    box_audio_pattern_gate_t pattern_gate; /**< BOX_AUDIO_EFFECT_PATTERN_GATE */
 } box_audio_effect_data_t;
 
 /** An effect instance of the pool of the core: a kind in an insert slot of a bus, on the
@@ -918,6 +933,14 @@ typedef struct box_audio_voice_t {
     box_audio_ramp_t pressure; /**< Pressure, BOX_AUDIO_PARAM_PRESSURE */
     bool expressive;          /**< Whether a ramp of its expression runs, which renders it in
                                * blocks of BOX_AUDIO_EXPRESS_FRAMES; false renders as before */
+    float cutoff;             /**< Cutoff of BOX_AUDIO_PARAM_CUTOFF in Hz, clamped, 0 open */
+    box_audio_ramp_t lowpass; /**< log2 of the g of the low-pass, tan(pi cutoff / rate) */
+    bool filtered;            /**< Whether the low-pass runs; false skips it */
+    bool fresh;               /**< Whether it has not rendered yet, so a cutoff applies at once */
+    bool prime;               /**< Whether the low-pass started on a playing voice and takes the
+                               * next input as its state */
+    box_audio_svf_t lp[2];    /**< Low-pass of the left and right channel, a mono source uses
+                               * the left */
     box_audio_source_t source; /**< What it plays */
 } box_audio_voice_t;
 
@@ -1673,6 +1696,35 @@ void box_audio_frequency_shifter_rest(
     box_audio_effect_t *fx,
     int32_t frames);
 
+/** The pattern gate kind, in pattern_gate.c: start at the params of fx, open as the step of
+ * the frame of the core clock is */
+void box_audio_pattern_gate_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The pattern gate kind: new parameters while it runs */
+void box_audio_pattern_gate_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The pattern gate kind: process a block; true when the block is silent, which the gain
+ * keeps silent */
+bool box_audio_pattern_gate_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The pattern gate kind: a block skipped while idle, over which its gain moves on as it
+ * would have rendered */
+void box_audio_pattern_gate_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    int32_t frames);
+
 /** Base 2 logarithm without libm, in synth.c, from the exponent of the double and the series
  * of atanh.
  *
@@ -1897,6 +1949,43 @@ void box_audio_synth_express(
 void box_audio_source_pitch(
     box_audio_source_t *source,
     float pitch);
+
+/** Open the low-pass of a voice and clear it, for a voice that starts.
+ *
+ * @param v The voice
+ */
+void box_audio_voice_filter_reset(
+    box_audio_voice_t *v);
+
+/** Move the low-pass of a voice to a cutoff of BOX_AUDIO_PARAM_CUTOFF. The log2 of its g
+ * ramps linearly over BOX_AUDIO_CUTOFF_RAMP, in octaves at low cutoffs, and the stages stay
+ * stable while it moves; an open target ramps to near the Nyquist and stops the filter there.
+ *
+ * A voice that has not rendered takes the cutoff at once. A filter that starts on a playing
+ * voice starts open, with its state at the next input, so it does not click.
+ *
+ * @param core The core
+ * @param v The voice
+ * @param value Cutoff in Hz
+ */
+void box_audio_voice_cutoff(
+    box_audio_core_t *core,
+    box_audio_voice_t *v,
+    float value);
+
+/** Run the low-pass of a voice over a block of its source in core->src_l and src_r, in
+ * place, and stop it once it opened.
+ *
+ * @param core The core
+ * @param v The voice, whose filter runs
+ * @param stereo Whether the source rendered both channels
+ * @param frames Frames of the block
+ */
+void box_audio_voice_filter(
+    box_audio_core_t *core,
+    box_audio_voice_t *v,
+    bool stereo,
+    int32_t frames);
 
 /** Reset the expression of a voice to its defaults: no bend, mod 1, no pressure.
  *

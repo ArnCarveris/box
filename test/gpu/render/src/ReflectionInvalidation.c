@@ -137,7 +137,7 @@ void ReflectionInvalidation_light_bake_pass_recaptures_every_probe(void) {
     ecs_entity_t a;
     ecs_entity_t scene = scene_new(world, &a);
     ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
-        .capture_size = 8, .budget_ms = 2, .bounces = 1});
+        .capture_size = 8, .budget_ms = 2, .bounces = 1, .compute = true});
     test_bool(converge(world, scene), true);
     test_int(ecs_get(world, scene, ReflectionBakeStatus)->captured, 2);
 

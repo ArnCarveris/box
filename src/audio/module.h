@@ -52,6 +52,7 @@ typedef struct AudioVoice {
     bool loop;              /**< Whether the voice loops */
     float volume;           /**< Volume sent, 0 for a Disabled source */
     float pan;              /**< Pan sent */
+    float cutoff;           /**< Cutoff of the distance filter sent, 0 open */
     float pitch;            /**< Pitch sent */
     uint8_t bus;            /**< Bus index sent */
     bool parked;            /**< A looping spatial source out of range: no voice, its time
@@ -321,6 +322,7 @@ typedef struct box_audio_oneshot_t {
     float volume;           /**< Volume of the play, before the distance */
     float sent_volume;      /**< Volume sent */
     float sent_pan;         /**< Pan sent */
+    float sent_cutoff;      /**< Cutoff of the distance filter sent, 0 open */
     bool legato;            /**< The mono voice of a legato synth sound */
     int32_t channel;        /**< SynthGlide.channel of a legato voice */
     ecs_entity_t emitter;   /**< AudioEmitter that played it, 0 for none */
@@ -356,6 +358,7 @@ typedef struct box_audio_note_t {
 typedef struct box_audio_place_t {
     float gain;             /**< Gain of the distance, 0 out of range */
     float pan;              /**< Pan, -1 left to 1 right */
+    float cutoff;           /**< Cutoff of the distance filter in Hz, 0 open */
 } box_audio_place_t;
 
 /** The listener the spatial sources are heard from */
@@ -484,7 +487,8 @@ typedef struct box_audio_timeline_t {
     uint32_t click_serial;  /**< Serial of the output the click was sent to */
     bool beat_wanted;       /**< Something in the core reads its beat clock, which the
                              *   timeline then keeps in step with BEAT commands; set each
-                             *   frame before the update, by the modulators */
+                             *   frame before the update, by the modulators and the
+                             *   effects that read it */
     uint32_t beat_serial;   /**< Serial of the output whose beat clock the timeline keeps, 0
                              *   for none */
     box_audio_timeline_stats_t stats; /**< Counters */
@@ -768,6 +772,8 @@ typedef struct box_audio_module_t {
                                    *   core holds and got */
     uint32_t effect_frame;        /**< Frames of the module, which tell the insert slots of
                                    *   this frame from older ones */
+    bool effect_beat;             /**< An effect of this frame reads the beat clock of the
+                                   *   core: a pattern gate */
     uint32_t serial;              /**< Serial of the output the state was sent to */
     box_audio_writer_t writer;    /**< The batch of the frame, grown as needed */
     uint32_t next_voice;          /**< Next voice handle */
@@ -919,8 +925,8 @@ uint32_t box_audio_module_effect_kind(
 #define BOX_AUDIO_EFFECT_COMPONENTS (16)
 
 /** Get the effect components: Reverb, Equalizer, AudioFilter, Compressor, Gate, Delay, Phaser,
- * Chorus, Saturator, TransientShaper, FrequencyShifter and PitchShifter, in the order an entity
- * that has several takes the first of. A new effect is added here and to
+ * Chorus, Saturator, TransientShaper, FrequencyShifter, PitchShifter and PatternGate, in the
+ * order an entity that has several takes the first of. A new effect is added here and to
  * box_audio_module_effect_params.
  *
  * @param out Receives up to BOX_AUDIO_EFFECT_COMPONENTS components

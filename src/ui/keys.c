@@ -498,6 +498,22 @@ static ecs_entity_t box_ui_handler(
     return result ? result : box_ui_up(world, e, InputBlocker);
 }
 
+/** Check whether box.picking sent the pointer event of an on.activate of flecs: it is being
+ * delivered or was the last one box.picking sent.
+ *
+ * @param ps The state of box.picking, NULL when it is not imported
+ * @param evt The event
+ * @return Whether box.picking sent it
+ */
+static bool box_ui_picked(
+    const PickingState *ps,
+    const EcsScriptActivateEvent *evt)
+{
+    const box_pick_state_t *st = ps ? ps->state : NULL;
+
+    return st && (st->sending || (st->has_event && st->event.id == evt->id));
+}
+
 /** Decide whether box.ui counts an on.activate of flecs and for which entity.
  *
  * A key activates the focus unless KeyCapture keeps Enter and Space for it, as a TextEdit does.
@@ -505,6 +521,7 @@ static ecs_entity_t box_ui_handler(
  *
  * flecs activates on the release of any button on the pressed entity, which box.picking makes
  * the release target wherever the cursor is, and reports the hit under the handler, as a label.
+ * A release box.picking did not send, as of the shell click, activates the handler of its target.
  *
  * @param world The world
  * @param evt The event
@@ -518,6 +535,7 @@ static ecs_entity_t box_ui_activated(
         ecs_singleton_get(world, PickingState) : NULL;
     ecs_entity_t e = evt->target, handler, result = 0;
     const EcsScriptMouseEvent *last;
+    EcsScriptMouseEvent direct;
     box_pick_t at;
     if (!e || !ecs_is_alive(world, e)) {
         goto done;
@@ -529,6 +547,12 @@ static ecs_entity_t box_ui_activated(
     }
 
     handler = box_ui_handler(world, e);
+    if (handler && !box_ui_picked(ps, evt)) {
+        ecs_script_get_mouse_state(world, &direct, NULL);
+        result = direct.id == evt->id && direct.button == 0 ? handler : 0;
+        goto done;
+    }
+
     if (!handler || !ps || !ps->state || !ps->state->has_event) {
         goto done;
     }

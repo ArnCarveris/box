@@ -100,6 +100,13 @@ static const box_audio_effect_def_t box_audio_effect_kinds[BOX_AUDIO_EFFECT_KIND
         .command = box_audio_pitch_shifter_command,
         .render = box_audio_pitch_shifter_render,
         .rest = box_audio_pitch_shifter_rest
+    },
+    [BOX_AUDIO_EFFECT_PATTERN_GATE] = {
+        .tail = true,
+        .start = box_audio_pattern_gate_start,
+        .command = box_audio_pattern_gate_command,
+        .render = box_audio_pattern_gate_render,
+        .rest = box_audio_pattern_gate_rest
     }
 };
 

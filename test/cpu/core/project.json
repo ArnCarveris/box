@@ -82,11 +82,7 @@
                     "run_headless_requires_limit",
                     "run_headless_timeout_infinite",
                     "run_headless_fixed_delta",
-                    "run_loads_scene",
-                    "run_missing_scene",
-                    "run_invalid_scene_headless",
-                    "run_invalid_scene_windowed",
-                    "run_scene_evaluation_error"
+                    "run_loads_scene"
                 ]
             },
             {

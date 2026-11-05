@@ -78,7 +78,8 @@
                     "pan_step",
                     "mute_step",
                     "send_step",
-                    "restart_midway"
+                    "restart_midway",
+                    "cutoff_step"
                 ]
             },
             {
@@ -444,7 +445,8 @@
                     "expression",
                     "synth_comb",
                     "synth_routes",
-                    "modulators"
+                    "modulators",
+                    "pattern_gate"
                 ]
             },
             {
@@ -683,6 +685,7 @@
                     "level_change",
                     "play_function",
                     "spatial_scene",
+                    "spatial_cutoff_scene",
                     "reverb_hall",
                     "eq_filter"
                 ]
@@ -717,6 +720,25 @@
                     "time_clamped",
                     "silent_after_tail",
                     "mix_dry",
+                    "render_sizes",
+                    "component",
+                    "script"
+                ]
+            },
+            {
+                "id": "PatternGate",
+                "testcases": [
+                    "pattern",
+                    "edges",
+                    "accent",
+                    "seek",
+                    "loop_wrap",
+                    "swing",
+                    "floor_dips",
+                    "automate_step",
+                    "no_click",
+                    "reduction",
+                    "rest",
                     "render_sizes",
                     "component",
                     "script"
@@ -1162,7 +1184,16 @@
                     "teleport_no_click",
                     "disabled_silent",
                     "core_position",
-                    "cost_changed_only"
+                    "cost_changed_only",
+                    "cutoff_curve",
+                    "cutoff_zero_unchanged",
+                    "cutoff_moving_no_click",
+                    "cutoff_teleport_no_click",
+                    "cutoff_play_at",
+                    "cutoff_stereo",
+                    "cutoff_synth",
+                    "cutoff_extreme_values",
+                    "cutoff_first_frame"
                 ]
             },
             {

@@ -2,8 +2,8 @@
  * @file Spatial.c
  * @brief Spatial audio of box.audio, measured through a null output: the distance curve, the
  * equal power pan, the listener, sources that follow an entity, one shots of
- * box_audio_play_at of every kind of sound, loops out of range and the ramps that keep a jump
- * from clicking.
+ * box_audio_play_at of every kind of sound, loops out of range, the ramps that keep a jump
+ * from clicking and the distance filter.
  */
 
 #include "world.h"
@@ -649,5 +649,502 @@ void Spatial_cost_changed_only(void) {
     before = box_audio_module_stats(world).spatial_updates;
     audio_run(world, 3);
     test_assert(box_audio_module_stats(world).spatial_updates - before <= 3);
+    ecs_fini(world);
+}
+
+/** Frames the levels of a case of the distance filter are measured over, four frames */
+#define SPATIAL_FILTER_MEASURE (AUDIO_FRAME * 4)
+
+/** Create a spatial source with a distance filter at a place in front of the listener.
+ *
+ * @param world The world
+ * @param sound The sound
+ * @param d Distance in front of the listener at the origin
+ * @param min min_distance
+ * @param max max_distance
+ * @param cutoff cutoff
+ * @return The source, which loops and does not fall off with distance
+ */
+static ecs_entity_t spatial_filtered(
+    ecs_world_t *world,
+    ecs_entity_t sound,
+    float d,
+    float min,
+    float max,
+    float cutoff)
+{
+    ecs_entity_t e = audio_source(world, sound, 1.0f, true, 0);
+    ecs_set(world, e, Position, {0, 0, -d});
+    ecs_set(world, e, AudioSpatial, {min, max, 0, cutoff});
+
+    return e;
+}
+
+/** Create a mono sound of white noise from a fixed seed.
+ *
+ * @param world The world
+ * @param level Peak level
+ * @param frames Frames of the sound
+ * @return The sound
+ */
+static ecs_entity_t spatial_noise(
+    ecs_world_t *world,
+    float level,
+    int32_t frames)
+{
+    float *data = ecs_os_malloc_n(float, frames);
+    uint32_t seed = 12345;
+    int32_t i;
+    for (i = 0; i < frames; i ++) {
+        seed = seed * 1664525u + 1013904223u;
+        data[i] = level * ((float)(seed >> 8) / 8388608.0f - 1.0f);
+    }
+
+    ecs_entity_t e = box_audio_sound_from_pcm(world, 0, data, frames, 1, AUDIO_RATE);
+    ecs_os_free(data);
+    test_assert(e != 0);
+
+    return e;
+}
+
+/** Root mean square of a range.
+ *
+ * @param x Samples
+ * @param from First frame
+ * @param to End frame
+ * @return The RMS
+ */
+static float spatial_rms(
+    const float *x,
+    int32_t from,
+    int32_t to)
+{
+    double sum = 0;
+    int32_t i;
+    for (i = from; i < to; i ++) {
+        sum += (double)x[i] * (double)x[i];
+    }
+
+    return to > from ? (float)sqrt(sum / (double)(to - from)) : 0.0f;
+}
+
+/** Gain of the 12 dB per octave low-pass of the core at a frequency: a Butterworth response
+ * through the bilinear transform, prewarped at the cutoff.
+ *
+ * @param f Frequency in Hz
+ * @param fc Cutoff in Hz
+ * @return The gain
+ */
+static double spatial_lowpass(
+    double f,
+    double fc)
+{
+    double w = tan(AUDIO_PI * f / AUDIO_RATE) / tan(AUDIO_PI * fc / AUDIO_RATE);
+
+    return 1.0 / sqrt(1.0 + w * w * w * w);
+}
+
+/** Play a tone from a distance through a filtered source and measure the RMS of the left
+ * channel once it settled. The source is deleted after.
+ *
+ * @param world The world
+ * @param frequency Hz of the tone, a whole number so that it loops
+ * @param d Distance
+ * @param spatial The distances and the cutoff
+ * @return The RMS
+ */
+static float spatial_tone_rms(
+    ecs_world_t *world,
+    double frequency,
+    float d,
+    const AudioSpatial *spatial)
+{
+    ecs_entity_t tone = audio_tone(world, NULL, frequency, 0.5f, AUDIO_RATE);
+    ecs_entity_t src = spatial_filtered(world, tone, d, spatial->min_distance,
+        spatial->max_distance, spatial->cutoff);
+    float result;
+    audio_run(world, 7);
+    result = spatial_rms(audio_tap_l, audio_tap_count - SPATIAL_FILTER_MEASURE,
+        audio_tap_count);
+    ecs_delete(world, src);
+    audio_run(world, 2);
+
+    return result;
+}
+
+/** Check that every sample of the tap since a frame is finite and within a bound.
+ *
+ * @param from First frame
+ * @param bound Largest magnitude
+ */
+static void spatial_bounded(
+    int32_t from,
+    float bound)
+{
+    int32_t i;
+    for (i = from; i < audio_tap_count; i ++) {
+        test_assert(isfinite(audio_tap_l[i]));
+        test_assert(isfinite(audio_tap_r[i]));
+    }
+
+    test_assert(audio_peak(audio_tap_l, from, audio_tap_count) <= bound);
+    test_assert(audio_peak(audio_tap_r, from, audio_tap_count) <= bound);
+}
+
+void Spatial_cutoff_curve(void) {
+    // audio/spatial
+    ecs_world_t *world = audio_world();
+    AudioSpatial s = { .min_distance = 2, .max_distance = 20, .rolloff = 0, .cutoff = 500 };
+    double open = 0.5 / sqrt(2.0), mid, end, expected;
+    float rms;
+    spatial_listener(world, 0, 0, 0);
+
+    test_flt(box_audio_spatial_cutoff(&s, 1), 0);
+    test_flt(box_audio_spatial_cutoff(&s, 2), 0);
+    test_assert(fabsf(box_audio_spatial_cutoff(&s, 20) - 500.0f) < 0.5f);
+    test_assert(fabsf(box_audio_spatial_cutoff(&s, 100) - 500.0f) < 0.5f);
+    mid = sqrt(20000.0 * 500.0);
+    test_assert(fabs(box_audio_spatial_cutoff(&s, 11) - mid) < 1.0);
+    test_assert(box_audio_spatial_cutoff(&s, 5) > box_audio_spatial_cutoff(&s, 11));
+    test_assert(box_audio_spatial_cutoff(&s, 11) > box_audio_spatial_cutoff(&s, 17));
+    test_flt(box_audio_spatial_cutoff(NULL, 30), 0);
+
+    /* Within min_distance the filter is open: a high tone passes as is */
+    rms = spatial_tone_rms(world, 8000, 1, &s);
+    test_assert(fabs(rms - open) < 0.01 * open);
+    rms = spatial_tone_rms(world, 8000, 2, &s);
+    test_assert(fabs(rms - open) < 0.01 * open);
+
+    /* Midway a tone at the cutoff is 3 dB down */
+    mid = box_audio_spatial_cutoff(&s, 11);
+    expected = open * spatial_lowpass(3162, mid);
+    rms = spatial_tone_rms(world, 3162, 11, &s);
+    if (fabs(rms - expected) > 0.03 * expected) {
+        printf("midway %f, expected %f\n", (double)rms, expected);
+    }
+
+    test_assert(fabs(rms - expected) < 0.03 * expected);
+
+    /* Close to max_distance a tone at cutoff is 3 dB down, and an octave above 12 dB down */
+    end = box_audio_spatial_cutoff(&s, 19.9f);
+    test_assert(end > 500 && end < 520);
+    expected = open * spatial_lowpass(500, end);
+    rms = spatial_tone_rms(world, 500, 19.9f, &s);
+    if (fabs(rms - expected) > 0.03 * expected) {
+        printf("end %f, expected %f\n", (double)rms, expected);
+    }
+
+    test_assert(fabs(rms - expected) < 0.03 * expected);
+    expected = open * spatial_lowpass(1000, end);
+    rms = spatial_tone_rms(world, 1000, 19.9f, &s);
+    test_assert(fabs(rms - expected) < 0.03 * expected);
+    test_assert(rms < open * 0.3);
+    ecs_fini(world);
+}
+
+/** Run a moving noise source with a set of distances and keep the tap.
+ *
+ * @param spatial The distances
+ * @param out Receives the left channel, AUDIO_FRAME * 30 frames
+ * @param out_r Receives the right channel
+ */
+static void spatial_noise_run(
+    const AudioSpatial *spatial,
+    float *out,
+    float *out_r)
+{
+    ecs_world_t *world = audio_world();
+    ecs_entity_t noise = spatial_noise(world, 0.5f, AUDIO_RATE);
+    spatial_listener(world, 0, 0, 0);
+    ecs_entity_t src = audio_source(world, noise, 1.0f, true, 0);
+    int32_t i;
+    ecs_set(world, src, Position, {0, 0, -1});
+    ecs_set_ptr(world, src, AudioSpatial, spatial);
+    for (i = 0; i < 30; i ++) {
+        spatial_move(world, src, (float)(i % 7) - 3.0f, -1.0f - (float)i);
+        audio_run(world, 1);
+    }
+
+    test_int(audio_tap_count, AUDIO_FRAME * 30);
+    ecs_os_memcpy_n(out, audio_tap_l, float, audio_tap_count);
+    ecs_os_memcpy_n(out_r, audio_tap_r, float, audio_tap_count);
+    ecs_fini(world);
+}
+
+void Spatial_cutoff_zero_unchanged(void) {
+    // audio/spatial
+    int32_t n = AUDIO_FRAME * 30, k;
+    float *ref, *ref_r, *run, *run_r;
+    AudioSpatial base = { .min_distance = 2, .max_distance = 50, .rolloff = 1 };
+    float cutoffs[] = { 0, -10, -INFINITY, NAN, 20000, 1e9f };
+    ecs_os_set_api_defaults();
+    ref = ecs_os_malloc_n(float, n);
+    ref_r = ecs_os_malloc_n(float, n);
+    run = ecs_os_malloc_n(float, n);
+    run_r = ecs_os_malloc_n(float, n);
+    spatial_noise_run(&base, ref, ref_r);
+    test_assert(audio_peak(ref, 0, n) > 0.05f);
+
+    for (k = 0; k < (int32_t)(sizeof(cutoffs) / sizeof(cutoffs[0])); k ++) {
+        AudioSpatial s = base;
+        s.cutoff = cutoffs[k];
+        spatial_noise_run(&s, run, run_r);
+        test_assert(audio_hash(run, n) == audio_hash(ref, n));
+        test_assert(audio_hash(run_r, n) == audio_hash(ref_r, n));
+    }
+
+    /* A filtered source differs */
+    {
+        AudioSpatial s = base;
+        s.cutoff = 300;
+        spatial_noise_run(&s, run, run_r);
+        test_assert(audio_hash(run, n) != audio_hash(ref, n));
+    }
+
+    ecs_os_free(ref);
+    ecs_os_free(ref_r);
+    ecs_os_free(run);
+    ecs_os_free(run_r);
+}
+
+void Spatial_cutoff_moving_no_click(void) {
+    // audio/spatial
+    ecs_world_t *world = audio_world();
+    ecs_entity_t tone = audio_tone(world, NULL, 100, 0.5f, AUDIO_RATE);
+    spatial_listener(world, 0, 0, 0);
+    ecs_entity_t src = spatial_filtered(world, tone, 1, 1, 50, 120);
+    float bound = 0.5f * 2.0f * (float)AUDIO_PI * 100.0f / AUDIO_RATE * 1.5f;
+    int32_t from, i;
+    audio_run(world, 3);
+
+    from = audio_tap_count;
+    for (i = 0; i < 60; i ++) {
+        float d = (i & 1) ? 1.0f + (float)(i % 13) * 3.5f : 45.0f - (float)(i % 11) * 4.0f;
+        spatial_move(world, src, (float)(i % 5) - 2.0f, -d);
+        audio_run(world, 1);
+    }
+
+    if (audio_max_step(audio_tap_l, from, audio_tap_count) >= bound) {
+        printf("step %f, bound %f\n",
+            (double)audio_max_step(audio_tap_l, from, audio_tap_count), (double)bound);
+    }
+
+    test_assert(audio_max_step(audio_tap_l, from, audio_tap_count) < bound);
+    test_assert(audio_max_step(audio_tap_r, from, audio_tap_count) < bound);
+    spatial_bounded(from, 0.75f);
+    ecs_fini(world);
+}
+
+void Spatial_cutoff_teleport_no_click(void) {
+    // audio/spatial
+    ecs_world_t *world = audio_world();
+    ecs_entity_t tone = audio_tone(world, NULL, 100, 0.5f, AUDIO_RATE);
+    ecs_entity_t listener = spatial_listener(world, 0, 0, 0);
+    ecs_entity_t src = spatial_filtered(world, tone, 0.5f, 1, 50, 60);
+    float bound = 0.5f * 2.0f * (float)AUDIO_PI * 100.0f / AUDIO_RATE * 1.5f;
+    int32_t from;
+    audio_run(world, 3);
+
+    from = audio_tap_count;
+    spatial_move(world, src, 0, -49);
+    audio_run(world, 3);
+    spatial_move(world, src, 0, -0.5f);
+    audio_run(world, 3);
+    test_assert(audio_max_step(audio_tap_l, from, audio_tap_count) < bound);
+    test_assert(audio_max_step(audio_tap_r, from, audio_tap_count) < bound);
+
+    from = audio_tap_count;
+    spatial_move(world, listener, 0, -48);
+    audio_run(world, 3);
+    spatial_move(world, listener, 30, 30);
+    audio_run(world, 3);
+    spatial_move(world, listener, 0, 0);
+    audio_run(world, 3);
+    test_assert(audio_max_step(audio_tap_l, from, audio_tap_count) < bound);
+    test_assert(audio_max_step(audio_tap_r, from, audio_tap_count) < bound);
+    spatial_bounded(from, 0.75f);
+    ecs_fini(world);
+}
+
+void Spatial_cutoff_play_at(void) {
+    // audio/spatial
+    ecs_world_t *world = audio_world();
+    ecs_entity_t tone = audio_tone(world, NULL, 8000, 0.5f, AUDIO_RATE * 3);
+    ecs_set(world, tone, AudioSpatial, {1, 50, 0, 200});
+    ecs_entity_t listener = spatial_listener(world, 0, 0, 0);
+    double open = 0.5 / sqrt(2.0);
+    int32_t from;
+    audio_run(world, 1);
+
+    /* Near, the one shot is bright */
+    from = audio_tap_count;
+    test_bool(box_audio_play_at(world, tone, (vec3){0, 0, -0.5f}, 1.0f), true);
+    audio_run(world, 6);
+    test_assert(fabs(spatial_rms(audio_tap_l, audio_tap_count - SPATIAL_FILTER_MEASURE,
+        audio_tap_count) - open) < 0.01 * open);
+    test_assert(audio_peak(audio_tap_l, from, audio_tap_count) > 0.43f);
+    audio_run(world, 200);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+
+    /* Far, it is dark from its first frame */
+    from = audio_tap_count;
+    test_bool(box_audio_play_at(world, tone, (vec3){0, 0, -49}, 1.0f), true);
+    audio_run(world, 6);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 1);
+    test_assert(audio_peak(audio_tap_l, from, audio_tap_count) < 0.01f);
+    test_assert(audio_peak(audio_tap_r, from, audio_tap_count) < 0.01f);
+
+    /* The listener walks up to it and it opens */
+    spatial_move(world, listener, 0, -48.8f);
+    audio_run(world, 6);
+    test_assert(fabs(spatial_rms(audio_tap_l, audio_tap_count - SPATIAL_FILTER_MEASURE,
+        audio_tap_count) - open) < 0.01 * open);
+    ecs_fini(world);
+}
+
+void Spatial_cutoff_stereo(void) {
+    // audio/spatial
+    ecs_world_t *world = audio_world();
+    float *data = ecs_os_malloc_n(float, AUDIO_RATE * 2);
+    double open = 0.5 / sqrt(2.0);
+    int32_t i;
+    for (i = 0; i < AUDIO_RATE; i ++) {
+        data[i * 2] = 0.5f * (float)sin(2 * AUDIO_PI * 8000.0 * i / AUDIO_RATE);
+        data[i * 2 + 1] = 0.5f * (float)sin(2 * AUDIO_PI * 6000.0 * i / AUDIO_RATE);
+    }
+
+    ecs_entity_t sound = box_audio_sound_from_pcm(world, 0, data, AUDIO_RATE, 2, AUDIO_RATE);
+    ecs_os_free(data);
+    spatial_listener(world, 0, 0, 0);
+    ecs_entity_t src = spatial_filtered(world, sound, 0.5f, 1, 50, 200);
+    float l, r;
+    audio_run(world, 7);
+    l = spatial_rms(audio_tap_l, audio_tap_count - SPATIAL_FILTER_MEASURE, audio_tap_count);
+    r = spatial_rms(audio_tap_r, audio_tap_count - SPATIAL_FILTER_MEASURE, audio_tap_count);
+    test_assert(l > 0.5 * open);
+    test_assert(r > 0.5 * open);
+
+    spatial_move(world, src, 0, -49);
+    audio_run(world, 7);
+    l = spatial_rms(audio_tap_l, audio_tap_count - SPATIAL_FILTER_MEASURE, audio_tap_count);
+    r = spatial_rms(audio_tap_r, audio_tap_count - SPATIAL_FILTER_MEASURE, audio_tap_count);
+    test_assert(l < 0.01 * open);
+    test_assert(r < 0.01 * open);
+    test_assert(l > 0);
+    test_assert(r > 0);
+    ecs_fini(world);
+}
+
+void Spatial_cutoff_synth(void) {
+    // audio/spatial
+    ecs_world_t *world = audio_world();
+    test_assert(ecs_script_run(world, "beep",
+        "using box.audio\n"
+        "prefab Beep {\n"
+        "  SynthSound: {}\n"
+        "  SynthEnvelope: {attack: 0.001, sustain: 1, hold: 1, release: 0.01}\n"
+        "  SynthOscillator: {frequency: 8000, level: 0.5}\n"
+        "  AudioSpatial: {min_distance: 1, max_distance: 50, rolloff: 0, cutoff: 200}\n"
+        "}\n", NULL) == 0);
+    ecs_entity_t beep = ecs_lookup(world, "Beep");
+    float near_, far_;
+    spatial_listener(world, 0, 0, 0);
+    audio_run(world, 2);
+
+    test_bool(box_audio_play_at(world, beep, (vec3){0, 0, -0.5f}, 1.0f), true);
+    audio_run(world, 8);
+    near_ = spatial_rms(audio_tap_l, audio_tap_count - SPATIAL_FILTER_MEASURE, audio_tap_count);
+    audio_run(world, 60);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
+
+    test_bool(box_audio_play_at(world, beep, (vec3){0, 0, -49}, 1.0f), true);
+    audio_run(world, 8);
+    far_ = spatial_rms(audio_tap_l, audio_tap_count - SPATIAL_FILTER_MEASURE, audio_tap_count);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 1);
+    test_assert(near_ > 0.2f);
+    test_assert(far_ > 0);
+    test_assert(far_ < 0.01f * near_);
+    ecs_fini(world);
+}
+
+void Spatial_cutoff_extreme_values(void) {
+    // audio/spatial
+    float values[] = { 0, -1, -1e9f, -INFINITY, NAN, 1e-9f, 1, 23999, 24000, 1e6f,
+        INFINITY, 300 };
+    int32_t k, i;
+
+    /* In the core, every value of the parameter keeps a voice of noise finite and bounded */
+    box_audio_core_t *core = audio_new();
+    uint32_t seed = 7;
+    for (i = 0; i < AUDIO_RATE; i ++) {
+        seed = seed * 1664525u + 1013904223u;
+        audio_sound_a[i] = 0.5f * ((float)(seed >> 8) / 8388608.0f - 1.0f);
+    }
+
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_RATE, 1, AUDIO_RATE));
+    audio_play(core, 1, 1, 0, 1, 0, 1, BOX_AUDIO_PLAY_LOOP);
+    for (k = 0; k < (int32_t)(sizeof(values) / sizeof(values[0])); k ++) {
+        audio_voice_set(core, 1, BOX_AUDIO_PARAM_CUTOFF, values[k]);
+        audio_render(core, 0, 1024);
+        for (i = 0; i < 1024; i ++) {
+            test_assert(isfinite(audio_l[i]));
+            test_assert(isfinite(audio_r[i]));
+            test_assert(fabsf(audio_l[i]) <= 1.0f);
+            test_assert(fabsf(audio_r[i]) <= 1.0f);
+        }
+    }
+
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
+    box_audio_core_free(core);
+
+    /* Through the module, every cutoff of AudioSpatial at every distance */
+    ecs_world_t *world = audio_world();
+    ecs_entity_t noise = spatial_noise(world, 0.5f, AUDIO_RATE);
+    spatial_listener(world, 0, 0, 0);
+    ecs_entity_t src = spatial_filtered(world, noise, 10, 1, 50, 0);
+    int32_t from = audio_tap_count;
+    for (k = 0; k < (int32_t)(sizeof(values) / sizeof(values[0])); k ++) {
+        ecs_set(world, src, AudioSpatial, {1, 50, 0, values[k]});
+        for (i = 0; i < 4; i ++) {
+            spatial_move(world, src, 0, -(float)(i * 16) - 0.5f);
+            audio_run(world, 1);
+        }
+
+        test_assert(isfinite(box_audio_spatial_cutoff(
+            &(AudioSpatial){1, 50, 0, values[k]}, 25)));
+        test_assert(box_audio_spatial_cutoff(&(AudioSpatial){1, 50, 0, values[k]}, 25) >= 0);
+        test_assert(box_audio_spatial_cutoff(&(AudioSpatial){1, 50, 0, values[k]}, 25) <
+            BOX_AUDIO_SPATIAL_OPEN);
+    }
+
+    spatial_bounded(from, 1.0f);
+    ecs_fini(world);
+}
+
+void Spatial_cutoff_first_frame(void) {
+    // audio/spatial
+    ecs_world_t *world = audio_world();
+    ecs_entity_t tone = audio_tone(world, NULL, 8000, 0.5f, AUDIO_RATE);
+    spatial_listener(world, 0, 0, 0);
+    audio_run(world, 1);
+
+    int32_t from = audio_tap_count;
+    spatial_filtered(world, tone, 49, 1, 50, 200);
+    audio_run(world, 3);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 1);
+    test_assert(audio_peak(audio_tap_l, from, audio_tap_count) > 0);
+    test_assert(audio_peak(audio_tap_l, from, audio_tap_count) < 0.01f);
+    test_assert(audio_peak(audio_tap_r, from, audio_tap_count) < 0.01f);
+
+    /* In the core, a voice and its cutoff in one batch: the first frames are dark already */
+    box_audio_core_t *core = audio_new();
+    audio_sine(audio_sound_a, AUDIO_RATE, 8000, 0.5f);
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_RATE, 1, AUDIO_RATE));
+    audio_play(core, 1, 1, 0, 1, 0, 1, BOX_AUDIO_PLAY_LOOP | BOX_AUDIO_PLAY_ATTACK);
+    audio_voice_set(core, 1, BOX_AUDIO_PARAM_CUTOFF, 200);
+    audio_render(core, 0, 2048);
+    test_assert(audio_peak(audio_l, 0, 2048) < 0.01f);
+    test_assert(audio_peak(audio_l, 0, 2048) > 0);
+    box_audio_core_free(core);
     ecs_fini(world);
 }
