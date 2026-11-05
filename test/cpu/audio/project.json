@@ -247,13 +247,9 @@
                     "dynamics",
                     "delay",
                     "modulation",
-<<<<<<< HEAD
+                    "saturator",
                     "synth_sub",
                     "synth_sync"
-=======
-                    "saturator",
-                    "synth_sub"
->>>>>>> 8e5a942212e108040629386d133bea60a55bdebe
                 ]
             },
             {
