@@ -4,7 +4,6 @@ using box.transform
 using box.geometry
 using box.material
 
-@tree Parent
 template KoreanBracket {
   for tier in 0..3 {
     const w = 0.44 + tier * 0.24

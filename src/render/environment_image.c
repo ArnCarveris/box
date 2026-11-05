@@ -29,6 +29,8 @@ typedef struct box_env_image_t {
 typedef struct box_env_images_t {
     ecs_map_t images;       /**< Entity to box_env_image_t* */
     int32_t watch;          /**< Kind of the images in the file watch */
+    int32_t loads;          /**< Loads submitted whose completion did not run */
+    box_task_track_t task;  /**< Report of the loads */
 } box_env_images_t;
 
 /** A decode that runs on a worker: what to load and what came out */
@@ -136,6 +138,10 @@ static void box_env_image_complete(
     box_env_image_t *img = state
         ? ecs_map_get_deref(&state->images, box_env_image_t, job->entity)
         : NULL;
+    if (state) {
+        state->loads --;
+    }
+
     if (!img || img->generation != job->generation || !ecs_is_alive(world, job->entity)) {
         goto done;
     }
@@ -201,12 +207,14 @@ static void box_env_image_request(
     job->entity = e;
     job->generation = ++ img->generation;
     job->path = value->path ? ecs_os_strdup(value->path) : NULL;
+    state->loads ++;
     if (box_job_submit(world, &(box_job_desc_t){
         .work = box_env_image_work,
         .complete = box_env_image_complete,
         .ctx_free = box_env_image_job_free,
         .ctx = job
     })) {
+        state->loads --;
         box_render_environment_error(world, e, "cannot submit the load job");
         box_env_image_job_free(job);
     }
@@ -293,8 +301,9 @@ static void box_env_image_send(
     img->fresh = false;
 }
 
-/** Send every loaded image whose cubemap lacks it: a new image, or a cubemap that was created
- * again empty for a new resolution or a new backend.
+/** Report the loads in flight as BOX_TASK_ENVIRONMENT and send every loaded image whose
+ * cubemap lacks it: a new image, or a cubemap that was created again empty for a new
+ * resolution or a new backend.
  *
  * @param it The iterator of the system
  */
@@ -302,6 +311,7 @@ static void BoxRenderExtractEnvironmentImage(
     ecs_iter_t *it)
 {
     box_env_images_t *state = it->ctx;
+    box_task_remaining(it->world, &state->task, BOX_TASK_ENVIRONMENT, true, state->loads);
     ecs_map_iter_t mit = ecs_map_iter(&state->images);
     while (ecs_map_next(&mit)) {
         box_env_image_t *img = ecs_map_ptr(&mit);

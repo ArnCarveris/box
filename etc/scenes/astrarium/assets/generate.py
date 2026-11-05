@@ -183,13 +183,21 @@ def rays():
 
 
 def corner():
-    b = ('<g fill="none" stroke="#fff" stroke-linecap="round">'
-         '<path d="M2 62 V14 Q2 2 14 2 H62" stroke-width="2"/>'
-         '<path d="M9 44 V19 Q9 9 19 9 H44" stroke-width="1" opacity=".7"/>'
-         '<path d="M15 15 Q27 16 27 27 Q27 34 20 34 Q15 34 15 29" stroke-width="1.3"/>'
-         '<path d="M15 15 Q16 27 27 27 Q34 27 34 20 Q34 15 29 15" stroke-width="1.3"/>'
-         '</g><polygon points="9,2 13,6 9,10 5,6" fill="#fff" transform="translate(-3 -2)"/>')
-    return svg(64, b)
+    return ('<g fill="none" stroke="#fff" stroke-linecap="round">'
+            '<path d="M2 62 V14 Q2 2 14 2 H62" stroke-width="2"/>'
+            '<path d="M9 44 V19 Q9 9 19 9 H44" stroke-width="1" opacity=".7"/>'
+            '<path d="M15 15 Q27 16 27 27 Q27 34 20 34 Q15 34 15 29" stroke-width="1.3"/>'
+            '<path d="M15 15 Q16 27 27 27 Q34 27 34 20 Q34 15 29 15" stroke-width="1.3"/>'
+            '</g><polygon points="9,2 13,6 9,10 5,6" fill="#fff" transform="translate(-3 -2)"/>')
+
+
+def frame():
+    b = ['<rect x=".5" y=".5" width="95" height="95" rx="5" fill="none" stroke="#fff" '
+         'stroke-width="1" opacity=".55"/>']
+    for turn in (0, 90, 180, 270):
+        b.append('<g transform="rotate(%d 48 48) translate(4 4) scale(.46875)">%s</g>' % (turn, corner()))
+    return ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="192" height="192">'
+            '%s</svg>\n' % "".join(b))
 
 
 def divider():
@@ -460,7 +468,7 @@ def main():
     write("astro_inner.svg", astro_inner())
     write("astro_rose.svg", astro_rose())
     write("rays.svg", rays())
-    write("corner.svg", corner())
+    write("frame.svg", frame())
     write("divider.svg", divider())
     write("orb_frame.svg", orb_frame())
     write("orb_gloss.svg", orb_gloss())

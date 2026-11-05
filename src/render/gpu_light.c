@@ -582,7 +582,7 @@ static WGPUComputePipeline box_gpu_cluster_pipeline(
             .entryPoint = { .data = "main", .length = WGPU_STRLEN }
         }
     };
-    gpu->cluster = wgpuDeviceCreateComputePipeline(gpu->device, &desc);
+    gpu->cluster = box_gpu_compute_pipeline(gpu, &desc);
     gpu->cluster_revision = s->revision;
 done:
     return s && s->module ? gpu->cluster : NULL;

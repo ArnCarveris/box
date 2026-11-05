@@ -54,7 +54,7 @@ scenery {
 }
 
 // The bunny runs in place; the world scrolls past it. It is created here, so a reload of
-// run.flecs, which puts it at the start of a run, keeps it. Its look is in player.flecs
+// run.flecs, which puts it at the start of a run, keeps it. Its look is set in run.flecs
 player {
   DynamicTransform
 }

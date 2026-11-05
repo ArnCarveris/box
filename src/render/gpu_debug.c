@@ -423,7 +423,7 @@ static WGPURenderPipeline box_gpu_debug_grid_pipeline(
         .stencilFront = { .compare = WGPUCompareFunction_Always },
         .stencilBack = { .compare = WGPUCompareFunction_Always }
     };
-    result = wgpuDeviceCreateRenderPipeline(gpu->device, &(WGPURenderPipelineDescriptor){
+    result = box_gpu_render_pipeline(gpu, &(WGPURenderPipelineDescriptor){
         .layout = d->pipeline_layout,
         .vertex = {
             .module = shader->module,
@@ -527,7 +527,7 @@ static WGPURenderPipeline box_gpu_debug_wire_pipeline(
         .depthBias = overlay ? BOX_GPU_DEBUG_WIRE_BIAS : 0,
         .depthBiasSlopeScale = overlay ? BOX_GPU_DEBUG_WIRE_SLOPE_BIAS : 0.0f
     };
-    result = wgpuDeviceCreateRenderPipeline(gpu->device, &(WGPURenderPipelineDescriptor){
+    result = box_gpu_render_pipeline(gpu, &(WGPURenderPipelineDescriptor){
         .layout = d->wire_pipeline_layout,
         .vertex = {
             .module = shader->module,
@@ -586,7 +586,7 @@ static WGPURenderPipeline box_gpu_debug_probe_pipeline_new(
         .stencilBack = { .compare = WGPUCompareFunction_Always }
     };
 
-    return wgpuDeviceCreateRenderPipeline(gpu->device, &(WGPURenderPipelineDescriptor){
+    return box_gpu_render_pipeline(gpu, &(WGPURenderPipelineDescriptor){
         .layout = gpu->debug->probe_pipeline_layout,
         .vertex = {
             .module = module,

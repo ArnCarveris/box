@@ -19,7 +19,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template CheeseShop {
   prop label: string = "LA FROMAGERIE"
   prop tint: Rgb = {230, 197, 143}

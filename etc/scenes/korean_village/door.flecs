@@ -4,7 +4,6 @@ using box.transform
 using box.geometry
 using box.material
 
-@tree Parent
 template KoreanDoor {
   { (IsA, KoreanLitPaper); Position: {}; Box: {1.38, 1.68, 0.06} }
   for side in 0..2 {

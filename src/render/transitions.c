@@ -50,10 +50,11 @@ static const box_render_transition_component_t box_transition_material_component
      (1u << BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION))
 
 /** Components the shading of a 2D shape reads: a 2D shape has no alpha test, transmission,
- * coat, anisotropy, sheen nor diffuse transmission and its material words hold its shape */
+ * coat, anisotropy, sheen nor diffuse transmission and its material words hold its shape and
+ * its Border, which a Line does not draw */
 #define BOX_TRANSITION_MASK_SHAPE \
     ((1u << BOX_RENDER_TRANSITION_RGB) | (1u << BOX_RENDER_TRANSITION_EMISSIVE) | \
-     (1u << BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM))
+     (1u << BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM) | (1u << BOX_RENDER_TRANSITION_BORDER))
 
 /** Components the shading of a glyph reads */
 #define BOX_TRANSITION_MASK_GLYPH \
@@ -65,12 +66,7 @@ static const box_render_transition_component_t box_transition_material_component
      (1u << BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM))
 
 
-/** Get the component id of a transitionable component.
- *
- * @param component The component
- * @return The id
- */
-static ecs_entity_t box_transition_id(
+ecs_entity_t box_transitions_id(
     box_render_transition_component_t component)
 {
     ecs_entity_t result = 0;
@@ -91,6 +87,7 @@ static ecs_entity_t box_transition_id(
     case BOX_RENDER_TRANSITION_SHEEN: result = ecs_id(Sheen); break;
     case BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION: result = ecs_id(DiffuseTransmission); break;
     case BOX_RENDER_TRANSITION_BOX_SHADOW: result = ecs_id(BoxShadow); break;
+    case BOX_RENDER_TRANSITION_BORDER: result = ecs_id(Border); break;
     case BOX_RENDER_TRANSITION_COMPONENTS: break;
     }
 
@@ -104,7 +101,7 @@ bool box_render_transition_component(
     bool result = false;
     int32_t c;
     for (c = 0; c < BOX_RENDER_TRANSITION_COMPONENTS && !result; c ++) {
-        if (component && box_transition_id((box_render_transition_component_t)c) == component) {
+        if (component && box_transitions_id((box_render_transition_component_t)c) == component) {
             *out = (box_render_transition_component_t)c;
             result = true;
         }
@@ -161,129 +158,6 @@ static uint32_t box_transition_node_new(
     box_render_packet_transition(p, BOX_RENDER_TRANSITION_CREATE, result);
 
     return result;
-}
-
-/** Send a start record and remember it as the last one of the slot.
- *
- * @param p The packet
- * @param node The node id
- * @param component The component
- * @param slot The slot of the component, whose value is the target
- * @param spec The transition, NULL to set the value without one
- */
-static void box_transition_send(
-    box_render_packet_t *p,
-    uint32_t node,
-    box_render_transition_component_t component,
-    box_transition_slot_t *slot,
-    const TransitionSpec *spec)
-{
-    box_render_transition_record_t *r = box_render_packet_transition(
-        p, BOX_RENDER_TRANSITION_START, node);
-    slot->start = p->time;
-    slot->delay = spec ? spec->delay : 0.0f;
-    slot->duration = spec ? spec->duration : 0.0f;
-    slot->timing_function = spec ? spec->timing_function : Linear;
-    r->component = component;
-    r->timing_function = slot->timing_function;
-    r->bezier = slot->timing_function == CubicBezier ? spec->bezier : (TransitionBezier){0};
-    r->delay = slot->delay;
-    r->duration = slot->duration;
-    r->start = slot->start;
-    ecs_os_memcpy(r->value, slot->value, BOX_RENDER_TRANSITION_VALUE);
-}
-
-/** Set or widen the per field range of the targets of a transform component or a BoxShadow.
- *
- * @param component The component, nothing for one other than Position, Rotation, Scale or
- * BoxShadow
- * @param slot The slot of the component
- * @param value A target, in the layout of the component
- * @param reset Whether the range becomes the target alone
- */
-static void box_transition_range_add(
-    box_render_transition_component_t component,
-    box_transition_slot_t *slot,
-    const uint8_t *value,
-    bool reset)
-{
-    const box_render_transition_layout_t *layout;
-    int32_t i;
-    if (component > BOX_RENDER_TRANSITION_SCALE &&
-        component != BOX_RENDER_TRANSITION_BOX_SHADOW)
-    {
-        goto done;
-    }
-
-    layout = box_render_transition_layout(component);
-    for (i = 0; i < BOX_TRANSITION_RANGE && i < layout->count &&
-        layout->fields[i].kind == BOX_RENDER_TRANSITION_F32; i ++)
-    {
-        float v;
-        ecs_os_memcpy(&v, ECS_OFFSET(value, layout->fields[i].offset), ECS_SIZEOF(float));
-        slot->lo[i] = reset ? v : glm_min(slot->lo[i], v);
-        slot->hi[i] = reset ? v : glm_max(slot->hi[i], v);
-    }
-done:
-    return;
-}
-
-/** Compare a transitioned component of an entity to the last target sent, send what changed.
- *
- * The first value sets without a transition, a changed value starts one with the spec of the
- * entry, and a value whose entry or component is gone snaps to its target.
- *
- * A transform component and a BoxShadow keep the per field range of their targets since they
- * were last idle, widened by what the timing function overshoots: the resolver starts from the
- * value it renders, so every value it renders lies in it without a start value.
- *
- * @param p The packet
- * @param node The node id
- * @param component The component
- * @param slot The slot of the component
- * @param spec The valid entry of the component, NULL when there is none
- * @param value The value the entity owns, NULL when it owns none
- */
-static void box_transition_compare(
-    box_render_packet_t *p,
-    uint32_t node,
-    box_render_transition_component_t component,
-    box_transition_slot_t *slot,
-    const TransitionSpec *spec,
-    const void *value)
-{
-    uint8_t packed[BOX_RENDER_TRANSITION_VALUE];
-    if (value) {
-        box_render_transition_pack(component, value, packed);
-    }
-
-    if (spec && value) {
-        if (!slot->present) {
-            ecs_os_memcpy(slot->value, packed, BOX_RENDER_TRANSITION_VALUE);
-            box_transition_range_add(component, slot, packed, true);
-            slot->present = true;
-            box_transition_send(p, node, component, slot, NULL);
-        } else if (!box_render_transition_equal(component, slot->value, packed)) {
-            if (!box_render_transition_running(
-                slot->start, slot->delay, slot->duration, p->time))
-            {
-                box_transition_range_add(component, slot, slot->value, true);
-            }
-
-            box_transition_range_add(component, slot, packed, false);
-            box_render_transition_widen(component, spec, slot->lo, slot->hi);
-            ecs_os_memcpy(slot->value, packed, BOX_RENDER_TRANSITION_VALUE);
-            box_transition_send(p, node, component, slot, spec);
-        }
-    } else if (slot->present) {
-        if (value) {
-            ecs_os_memcpy(slot->value, packed, BOX_RENDER_TRANSITION_VALUE);
-            box_transition_range_add(component, slot, packed, true);
-        }
-
-        box_transition_send(p, node, component, slot, NULL);
-        slot->present = false;
-    }
 }
 
 /** Check whether a node has an active transition of Position, Rotation or Scale.
@@ -533,9 +407,81 @@ done:
     return;
 }
 
+/** Check whether a node leaves a component (box_transition_slot_t leaving).
+ *
+ * @param s The state of the extract
+ * @param node The node id
+ * @param component The component
+ * @return Whether the slot of the component leaves
+ */
+static bool box_transition_leaving(
+    const box_render_transitions_t *s,
+    uint32_t node,
+    box_render_transition_component_t component)
+{
+    const box_transition_node_t *n = box_transitions_node_state(s, node);
+
+    return n && n->slots[component].present && n->slots[component].leaving;
+}
+
+/** Find the node that leaves a component an entity no longer has, owned or inherited: the
+ * node of the entity itself, or of the nearest IsA base that left it.
+ *
+ * @param world The world
+ * @param s The state of the extract
+ * @param e The entity
+ * @param component The component
+ * @param depth Levels of IsA walked, which bounds the walk
+ * @return The node, 0 for none
+ */
+static uint32_t box_transition_leaving_node(
+    const ecs_world_t *world,
+    const box_render_transitions_t *s,
+    ecs_entity_t e,
+    box_render_transition_component_t component,
+    int32_t depth)
+{
+    uint32_t result = box_render_transitions_node(s, e);
+    ecs_entity_t base;
+    int32_t i;
+    if (result && box_transition_leaving(s, result, component)) {
+        goto done;
+    }
+
+    result = 0;
+    for (i = 0; !result && depth < 32 && (base = ecs_get_target(world, e, EcsIsA, i)); i ++) {
+        result = box_transition_leaving_node(world, s, base, component, depth + 1);
+    }
+done:
+    return result;
+}
+
+/** Find the node of the value of a component an entity renders: the node of the entity or the
+ * IsA base that owns the value, or while no entity owns one, the node that leaves it.
+ *
+ * @param world The world
+ * @param s The state of the extract
+ * @param e The entity
+ * @param component The component
+ * @return The node, 0 for none
+ */
+static uint32_t box_transition_owner(
+    const ecs_world_t *world,
+    const box_render_transitions_t *s,
+    ecs_entity_t e,
+    box_render_transition_component_t component)
+{
+    ecs_entity_t owner = ecs_get_target_for_id(world, e, EcsIsA, box_transitions_id(component));
+    uint32_t result = owner ? box_render_transitions_node(s, owner) : 0;
+    if (!owner && s->leaving) {
+        result = box_transition_leaving_node(world, s, e, component, 0);
+    }
+
+    return result;
+}
+
 /** Find the nodes whose running transitions a record reads: for each material component of
- * a mask, the node of the entity the value comes from, the entity itself or the IsA base that
- * owns it, when the transition of that node runs.
+ * a mask, the node the value comes from (box_transition_owner) when its transition runs.
  *
  * @param world The world
  * @param s The state of the extract
@@ -562,11 +508,18 @@ static uint32_t box_transition_material_nodes(
             continue;
         }
 
-        ecs_entity_t owner = ecs_get_target_for_id(world, e, EcsIsA, box_transition_id(c));
-        uint32_t node = owner ? box_render_transitions_node(s, owner) : 0;
+        uint32_t node = box_transition_owner(world, s, e, c);
         if (node && box_render_transitions_active(s, node, c, time)) {
             out[c] = node;
             result |= 1u << c;
+        }
+    }
+
+    if ((mask & (1u << BOX_RENDER_TRANSITION_BORDER)) && ecs_owns(world, e, Border)) {
+        uint32_t node = box_render_transitions_node(s, e);
+        if (node && box_render_transitions_active(s, node, BOX_RENDER_TRANSITION_BORDER, time)) {
+            out[BOX_RENDER_TRANSITION_BORDER] = node;
+            result |= 1u << BOX_RENDER_TRANSITION_BORDER;
         }
     }
 
@@ -611,8 +564,12 @@ static uint32_t box_transition_shading_mask(
         goto done;
     }
 
-    if (ecs_has(world, e, DrawSlot) && ecs_has(world, e, Shape2D)) {
+    const Shape2D *shape = ecs_has(world, e, DrawSlot) ? ecs_get(world, e, Shape2D) : NULL;
+    if (shape) {
         result |= BOX_TRANSITION_MASK_SHAPE;
+        if (shape->kind == BOX_SHAPE2D_LINE) {
+            result &= ~(1u << BOX_RENDER_TRANSITION_BORDER);
+        }
     }
 
     if (ecs_has(world, e, TextSlots)) {
@@ -641,6 +598,23 @@ static bool box_transition_material_reads(
             NULL, NULL, NULL) != -1 &&
          ecs_search_relation(world, table, 0, ecs_id(Shape2D), EcsIsA, EcsSelf | EcsUp,
             NULL, NULL, NULL) != -1);
+}
+
+/** Check whether an entity is a mesh shape that owns a MaterialId the extract of the batches
+ * has not given a slot yet, as one added with a material component in this frame (With). The
+ * walk takes the slot first, so an added component patches its slot from the first frame.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return Whether it takes its slot in the walk
+ */
+static bool box_transition_material_claims(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    return ecs_owns(world, e, MaterialId) && ecs_has(world, e, DrawSlot) &&
+        ecs_has(world, e, ShapeMesh) && !ecs_has(world, e, Shape2D) &&
+        !ecs_has_id(world, e, EcsPrefab);
 }
 
 /** Add what reads a material value of an entity: the entity and its IsA instances, down
@@ -678,6 +652,10 @@ static void box_transition_material_walk(
         }
 
         ecs_map_insert(&s->visited, cur, 1);
+        if (!box_draws_material_owns(d, cur) && box_transition_material_claims(world, cur)) {
+            box_draws_material_id(world, d, cur, true, false);
+        }
+
         if (box_draws_material_owns(d, cur)) {
             box_transition_material_t owned = { .entity = cur };
             uint32_t found = box_transition_material_nodes(world, s, cur,
@@ -711,6 +689,40 @@ static void box_transition_material_walk(
             }
         }
     }
+}
+
+/** Add the drawn 2D shape of a node with an active Border transition that no walk of a
+ * material transition visited.
+ *
+ * Border is copied into an IsA instance (OnInstantiate, Override), so a shape draws its own
+ * value and no change of a prefab reaches its instances: the entity alone reads it.
+ *
+ * @param world The world
+ * @param s The state of the extract
+ * @param e The entity of the node
+ * @param time World time, the time of the packet
+ */
+static void box_transition_border_add(
+    const ecs_world_t *world,
+    box_render_transitions_t *s,
+    ecs_entity_t e,
+    double time)
+{
+    uint32_t mask = box_transition_shading_mask(world, e);
+    box_transition_material_t item = { .entity = e };
+    if (ecs_map_get(&s->visited, e)) {
+        goto done;
+    }
+
+    ecs_map_insert(&s->visited, e, 1);
+    if ((mask & (1u << BOX_RENDER_TRANSITION_BORDER)) &&
+        box_transition_material_nodes(world, s, e, mask, time, item.nodes))
+    {
+        *ecs_vec_append_t(NULL, &s->shadings, box_transition_material_t) = item;
+        box_transitions_keep(s, &s->tagged_material, e);
+    }
+done:
+    return;
 }
 
 /** Check whether a node has an active transition of Tint or Opacity.
@@ -886,7 +898,8 @@ static void box_transition_materials(
     ecs_vec_clear(&s->material_slots);
     for (i = 1; p && i < count && !any; i ++) {
         const box_transition_node_t *node = ecs_vec_get_t(&s->nodes, box_transition_node_t, i);
-        any = node->entity && box_transition_material_active(s, (uint32_t)i, p->time);
+        any = node->entity && (box_transition_material_active(s, (uint32_t)i, p->time) ||
+            box_render_transitions_active(s, (uint32_t)i, BOX_RENDER_TRANSITION_BORDER, p->time));
     }
 
     if (ecs_map_count(&s->visited)) {
@@ -900,6 +913,16 @@ static void box_transition_materials(
             box_transition_material_active(s, (uint32_t)i, p->time))
         {
             box_transition_material_walk(world, s, d, node->entity, p->time);
+        }
+    }
+
+    for (i = 1; d && i < count; i ++) {
+        const box_transition_node_t *node = ecs_vec_get_t(&s->nodes, box_transition_node_t, i);
+        if (node->entity && box_render_transitions_active(
+                s, (uint32_t)i, BOX_RENDER_TRANSITION_BORDER, p->time) &&
+            ecs_is_alive(world, node->entity))
+        {
+            box_transition_border_add(world, s, node->entity, p->time);
         }
     }
 
@@ -938,6 +961,7 @@ static void BoxRenderExtractTransitions(
     box_render_packet_t *p = NULL;
     int32_t i, c, count;
     s->stamp ++;
+    s->leaving = 0;
     ecs_iter_t qit = ecs_query_iter(world, s->query);
     while (ecs_query_next(&qit)) {
         const Transition *maps = ecs_field(&qit, Transition, 0);
@@ -950,21 +974,24 @@ static void BoxRenderExtractTransitions(
 
         for (c = 0; c < BOX_RENDER_TRANSITION_COMPONENTS; c ++) {
             columns[c] = ecs_table_get_id(world, qit.table,
-                box_transition_id((box_render_transition_component_t)c), qit.offset);
+                box_transitions_id((box_render_transition_component_t)c), qit.offset);
         }
 
         for (i = 0; i < qit.count; i ++) {
             ecs_entity_t e = qit.entities[i];
             bool owns = !shared;
             for (c = 0; (!shared || !i) && c < BOX_RENDER_TRANSITION_COMPONENTS; c ++) {
-                ecs_entity_t cid = box_transition_id((box_render_transition_component_t)c);
+                ecs_entity_t cid = box_transitions_id((box_render_transition_component_t)c);
                 specs[c] = ecs_map_is_init(&maps[i])
                     ? ecs_map_get_deref(&maps[i], TransitionSpec, cid) : NULL;
                 if (specs[c] && !box_transition_valid(world, cid, specs[c])) {
                     specs[c] = NULL;
                 }
 
-                owns |= specs[c] && columns[c];
+                owns |= specs[c] && (columns[c] || box_transitions_opts(world,
+                    (box_render_transition_component_t)c, specs[c], false) ||
+                    box_transitions_opts(world, (box_render_transition_component_t)c, specs[c],
+                        true));
             }
 
             if (!owns && !i) {
@@ -981,7 +1008,8 @@ static void BoxRenderExtractTransitions(
                     (box_render_transition_component_t)c;
                 const void *value = columns[c] ? ECS_ELEM(columns[c],
                     box_render_transition_layout(component)->size, i) : NULL;
-                box_transition_compare(p, id, component, &node->slots[c], specs[c], value);
+                box_transitions_compare(world, s, p, e, id, component, &node->slots[c],
+                    specs[c], value);
             }
         }
     }
@@ -1191,10 +1219,12 @@ static void box_transition_send_slots(
         box_draw_batch_t *b = box_draws_batch(d, bs->batch);
         animated->moving = item->node;
         glm_mat4_copy(rel, animated->rel);
-        if (owner && range && d->shadow_record && b->alive && box_draws_caster(b) &&
-            box_draws_box_shadow_bound(world, item->entity,
-                owner->slots[BOX_RENDER_TRANSITION_BOX_SHADOW].lo,
-                owner->slots[BOX_RENDER_TRANSITION_BOX_SHADOW].hi, instance))
+        const box_transition_slot_t *slot = owner
+            ? &owner->slots[BOX_RENDER_TRANSITION_BOX_SHADOW] : NULL;
+        if (slot && range && d->shadow_record && b->alive && box_draws_caster(b) &&
+            (slot->present
+                ? box_draws_box_shadow_bound(world, item->entity, slot->lo, slot->hi, instance)
+                : box_draws_box_shadow_instance(world, item->entity, instance)))
         {
             glm_mul(rel, instance, m);
             box_draws_range_region(world, b, bs->slot, range, m, ecs_vec_append_t(
@@ -1291,14 +1321,17 @@ static void box_transition_shadows(
 }
 
 /** Send a material or shading record: the target material with the nodes of the components
- * that run, copied into the packet data, and the record it patches.
+ * that run, copied into the packet data, and the record it patches. A component a node leaves
+ * gets its neutral value (box_transitions_leaving_target).
  *
+ * @param s The state of the extract
  * @param p The packet
  * @param op BOX_RENDER_TRANSITION_MATERIAL or BOX_RENDER_TRANSITION_SHADING
  * @param material The target material with its nodes
  * @param offset Packet data offset of the record to patch
  */
 static void box_transition_send_material(
+    const box_render_transitions_t *s,
     box_render_packet_t *p,
     box_render_transition_op_t op,
     const box_draw_transition_material_t *material,
@@ -1308,6 +1341,13 @@ static void box_transition_send_material(
     int32_t c;
     void *dst = box_render_packet_reserve(p, (uint32_t)sizeof(*material), &data);
     ecs_os_memcpy(dst, material, ECS_SIZEOF(*material));
+    if (s->leaving) {
+        box_draw_transition_material_t leaving;
+        ecs_os_memcpy(&leaving, material, ECS_SIZEOF(leaving));
+        box_transitions_leaving_target(s, &leaving);
+        ecs_os_memcpy(dst, &leaving, ECS_SIZEOF(leaving));
+    }
+
     for (c = 0; c < BOX_RENDER_TRANSITION_COMPONENTS && !node; c ++) {
         node = material->nodes[c];
     }
@@ -1319,6 +1359,26 @@ static void box_transition_send_material(
     box_render_transition_record_t *r = box_render_packet_transition(p, op, node);
     r->data = data;
     r->offset = offset;
+}
+
+void box_transitions_leaving_target(
+    const box_render_transitions_t *s,
+    box_draw_transition_material_t *target)
+{
+    int32_t c;
+    for (c = 0; s->leaving && c < BOX_RENDER_TRANSITION_COMPONENTS; c ++) {
+        box_render_transition_component_t component = (box_render_transition_component_t)c;
+        const box_transition_node_t *n = box_transitions_node_state(s, target->nodes[c]);
+        void *value = box_draws_transition_value(target, component);
+        if (!n || !value || (target->present & (1u << c)) ||
+            !box_transition_leaving(s, target->nodes[c], component))
+        {
+            continue;
+        }
+
+        target->present |= 1u << c;
+        ecs_os_memcpy(value, n->slots[c].value, box_render_transition_layout(component)->size);
+    }
 }
 
 bool box_transitions_shading_data(
@@ -1405,7 +1465,7 @@ static void box_transition_send_mesh(
     box_draws_shape_material(world, e, ds, &material);
     box_draws_transition_target(&target, &material, BOX_DRAW_TRANSITION_MESH);
     box_transitions_fade_target(s, e, p->time, &target);
-    box_transition_send_material(p, BOX_RENDER_TRANSITION_SHADING, &target, offset);
+    box_transition_send_material(s, p, BOX_RENDER_TRANSITION_SHADING, &target, offset);
     box_draw_batch_t *b = box_draws_batch(d, ds->batch);
     if (d->shadow_record && b->key.cutout && box_draws_caster(b)) {
         box_draws_shadow_region(world, d, b, box_draws_slot_transform(b, ds->slot),
@@ -1445,8 +1505,24 @@ static void box_transition_send_fades(
         }
 
         if (item->is_node) {
+            const box_transition_node_t *node = box_transitions_node_state(s, item->node);
+            bool tint = box_transition_leaving(s, item->node, BOX_RENDER_TRANSITION_TINT);
+            bool opacity = box_transition_leaving(s, item->node, BOX_RENDER_TRANSITION_OPACITY);
+            Tint leaving_tint = {0};
+            Opacity leaving_opacity = {0};
+            if (tint) {
+                ecs_os_memcpy(&leaving_tint, node->slots[BOX_RENDER_TRANSITION_TINT].value,
+                    ECS_SIZEOF(Tint));
+            }
+
+            if (opacity) {
+                ecs_os_memcpy(&leaving_opacity,
+                    node->slots[BOX_RENDER_TRANSITION_OPACITY].value, ECS_SIZEOF(Opacity));
+            }
+
             box_draws_transition_send_fade(world, p, item->entity, item->node, item->parent,
-                item->parent && up ? &up->tint : NULL, item->parent && up ? up->alpha : 1.0f);
+                item->parent && up ? &up->tint : NULL, item->parent && up ? up->alpha : 1.0f,
+                tint ? &leaving_tint : NULL, opacity ? &leaving_opacity : NULL);
         } else if (up) {
             *rel = *up;
             box_draws_transition_fade_own(world, item->entity, &rel->tint, &rel->alpha);
@@ -1506,7 +1582,7 @@ static void box_transition_send_glyphs(
         }
 
         if (!color) {
-            box_transition_send_material(p, BOX_RENDER_TRANSITION_SHADING, &base, offset);
+            box_transition_send_material(s, p, BOX_RENDER_TRANSITION_SHADING, &base, offset);
             continue;
         }
 
@@ -1516,7 +1592,7 @@ static void box_transition_send_glyphs(
         box_transitions_fade_target(s, item->entity, p->time, &span);
         span.nodes[BOX_RENDER_TRANSITION_RGB] = 0;
         span.opacity_scale = (float)color->a / 255.0f;
-        box_transition_send_material(p, BOX_RENDER_TRANSITION_SHADING, &span, offset);
+        box_transition_send_material(s, p, BOX_RENDER_TRANSITION_SHADING, &span, offset);
     }
 done:
     return;
@@ -1558,7 +1634,7 @@ static void box_transition_send_box_shadow(
 
     box_transitions_fade_target(s, e, p->time, &target);
     if (target.fade_node) {
-        box_transition_send_material(p, BOX_RENDER_TRANSITION_SHADING, &target, offset);
+        box_transition_send_material(s, p, BOX_RENDER_TRANSITION_SHADING, &target, offset);
     }
 done:
     return;
@@ -1595,7 +1671,7 @@ static void box_transition_send_materials(
         box_draws_material_of(world, item->entity, &material);
         box_draws_transition_target(&target, &material, BOX_DRAW_TRANSITION_TABLE);
         ecs_os_memcpy(target.nodes, item->nodes, ECS_SIZEOF(target.nodes));
-        box_transition_send_material(p, BOX_RENDER_TRANSITION_MATERIAL, &target, offset);
+        box_transition_send_material(s, p, BOX_RENDER_TRANSITION_MATERIAL, &target, offset);
     }
 
     for (i = 0; i < ecs_vec_count(&s->shadings); i ++) {
@@ -1613,7 +1689,7 @@ static void box_transition_send_materials(
             box_draws_transition_target(&target, &material, BOX_DRAW_TRANSITION_SHAPE);
             ecs_os_memcpy(target.nodes, item->nodes, ECS_SIZEOF(target.nodes));
             box_transitions_fade_target(s, item->entity, p->time, &target);
-            box_transition_send_material(p, BOX_RENDER_TRANSITION_SHADING, &target, offset);
+            box_transition_send_material(s, p, BOX_RENDER_TRANSITION_SHADING, &target, offset);
             box_transition_send_box_shadow(world, s, d, p, item->entity, ds, &material);
         }
 
