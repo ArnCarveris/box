@@ -5,7 +5,6 @@ using box.geometry
 using box.material
 
 assets {
-  @tree Parent
   template TiledRoof : Roof {
     const span = width + 0.6
     const run = depth + 0.65

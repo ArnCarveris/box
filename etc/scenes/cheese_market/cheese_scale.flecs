@@ -13,7 +13,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template CheeseScale {
   base {
     Position: {0, 0.08, 0}
@@ -26,6 +25,7 @@ template CheeseScale {
     Frustum: {radius_bottom: 0.12, radius_top: 0.07, length: 0.65, segments: 12}
     Rgb: {171, 133, 65}
     PbrMaterial: {metallic: 0.7, roughness: 0.3}
+    SpecularAnisotropy: {strength: 0.6, rotation: 0}
   }
   arm {
     Position: {0, 0.73, 0}
@@ -39,6 +39,7 @@ template CheeseScale {
       Cylinder: {radius: 0.24, length: 0.035, segments: 24}
       Rgb: {196, 161, 90}
       PbrMaterial: {metallic: 0.65, roughness: 0.3}
+      SpecularAnisotropy: {strength: 0.6, rotation: 0}
     }
     for chain in 0..3 {
       const a = chain * math.PI * 2 / 3

@@ -1046,7 +1046,9 @@
                 "id": "TransitionTintOpacity",
                 "testcases": [
                     "tint_mid_transition",
-                    "opacity_mid_transition"
+                    "opacity_mid_transition",
+                    "tint_remove",
+                    "opacity_add"
                 ]
             },
             {

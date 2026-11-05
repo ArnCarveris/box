@@ -356,7 +356,12 @@
                     "border_map",
                     "ease_end_points",
                     "ease_monotonic",
-                    "ease_midpoints"
+                    "ease_midpoints",
+                    "add_remove_script",
+                    "add_remove_omitted",
+                    "add_remove_from_c",
+                    "neutral_supported",
+                    "neutral_unsupported_error"
                 ]
             },
             {

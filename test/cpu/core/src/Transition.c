@@ -1697,3 +1697,162 @@ void Transition_ease_midpoints(void) {
             1.0f - box_transition_ease(EaseOut, 1.0f - t), tol));
     }
 }
+
+void Transition_add_remove_script(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    transition_capture_begin();
+    int result = ecs_script_run(world, "add_remove",
+        "using box.geometry\n"
+        "using box.material\n"
+        "using box.transition\n"
+        "glow {\n"
+        "  Rect: {40, 40}\n"
+        "  Transition: [\n"
+        "    Emissive: {duration: 0.3, on_add: true, on_remove: true},\n"
+        "    Tint: {duration: 0.15, timing_function: EaseOut, on_add: true, on_remove: true},\n"
+        "    Opacity: {duration: 1, on_remove: true}\n"
+        "  ]\n"
+        "}\n", NULL);
+    char *errors = transition_capture_end();
+    test_int(result, 0);
+    test_assert(errors == NULL);
+
+    ecs_entity_t e = ecs_lookup(world, "glow");
+    test_assert(e != 0);
+    const TransitionSpec *emissive = box_transition_get(world, e, ecs_id(Emissive));
+    test_assert(emissive != NULL);
+    test_flt(emissive->duration, 0.3f);
+    test_bool(emissive->on_add, true);
+    test_bool(emissive->on_remove, true);
+    const TransitionSpec *tint = box_transition_get(world, e, ecs_id(Tint));
+    test_assert(tint != NULL);
+    test_int(tint->timing_function, EaseOut);
+    test_bool(tint->on_add, true);
+    test_bool(tint->on_remove, true);
+    const TransitionSpec *opacity = box_transition_get(world, e, ecs_id(Opacity));
+    test_assert(opacity != NULL);
+    test_bool(opacity->on_add, false);
+    test_bool(opacity->on_remove, true);
+
+    ecs_fini(world);
+}
+
+void Transition_add_remove_omitted(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script_run(world, "omitted",
+        "using box.material\n"
+        "using box.transition\n"
+        "e {\n"
+        "  Transition: [Tint: {duration: 1}]\n"
+        "}\n", NULL) == 0);
+    ecs_entity_t e = ecs_lookup(world, "e");
+    const TransitionSpec *s = box_transition_get(world, e, ecs_id(Tint));
+    test_assert(s != NULL);
+    test_bool(s->on_add, false);
+    test_bool(s->on_remove, false);
+
+    ecs_fini(world);
+}
+
+void Transition_add_remove_from_c(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t e = ecs_new(world);
+    box_transition_set(world, e, ecs_id(Emissive),
+        &(TransitionSpec){ .duration = 0.5f, .on_add = true });
+    box_transition_set(world, e, ecs_id(Scale),
+        &(TransitionSpec){ .duration = 0.5f, .on_remove = true });
+    const TransitionSpec *s = box_transition_get(world, e, ecs_id(Emissive));
+    test_assert(s != NULL);
+    test_bool(s->on_add, true);
+    test_bool(s->on_remove, false);
+    s = box_transition_get(world, e, ecs_id(Scale));
+    test_assert(s != NULL);
+    test_bool(s->on_add, false);
+    test_bool(s->on_remove, true);
+
+    ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, e);
+    box_transition_set(world, inst, ecs_id(Tint),
+        &(TransitionSpec){ .duration = 1, .on_add = true, .on_remove = true });
+    s = box_transition_get(world, inst, ecs_id(Emissive));
+    test_assert(s != NULL);
+    test_bool(s->on_add, true);
+    s = box_transition_get(world, inst, ecs_id(Tint));
+    test_assert(s != NULL);
+    test_bool(s->on_add, true);
+    test_bool(s->on_remove, true);
+
+    ecs_fini(world);
+}
+
+void Transition_neutral_supported(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t both[] = {
+        ecs_id(Rotation), ecs_id(Scale), ecs_id(Opacity), ecs_id(Tint), ecs_id(PbrMaterial),
+        ecs_id(Emissive), ecs_id(TextureTransform), ecs_id(ClearCoat),
+        ecs_id(SpecularAnisotropy), ecs_id(Sheen), ecs_id(DiffuseTransmission)
+    };
+    ecs_entity_t none[] = {
+        ecs_id(Position), ecs_id(Rgb), ecs_id(AlphaCutoff), ecs_id(Transmission),
+        ecs_id(PbrTextures), ecs_id(WorldTransform), ecs_id(Transition), 0
+    };
+    int32_t i;
+
+    for (i = 0; i < (int32_t)(sizeof(both) / sizeof(both[0])); i ++) {
+        test_assert(box_transition_neutral_supported(world, both[i], false));
+        test_assert(box_transition_neutral_supported(world, both[i], true));
+    }
+
+    for (i = 0; i < (int32_t)(sizeof(none) / sizeof(none[0])); i ++) {
+        test_assert(!box_transition_neutral_supported(world, none[i], false));
+        test_assert(!box_transition_neutral_supported(world, none[i], true));
+    }
+
+    test_assert(box_transition_neutral_supported(world, ecs_id(BoxShadow), false));
+    test_assert(!box_transition_neutral_supported(world, ecs_id(BoxShadow), true));
+
+    ecs_fini(world);
+}
+
+void Transition_neutral_unsupported_error(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    transition_capture_begin();
+    int result = ecs_script_run(world, "neutral",
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.transition\n"
+        "e {\n"
+        "  Transition: [Position: {duration: 1, on_add: true}, "
+        "BoxShadow: {duration: 1, on_add: true, on_remove: true}]\n"
+        "}\n", NULL);
+    char *errors = transition_capture_end();
+    test_int(result, 0);
+    test_assert(errors != NULL);
+    test_assert(strstr(errors, "Position") != NULL);
+    test_assert(strstr(errors, "BoxShadow") != NULL);
+    test_assert(strstr(errors, "neutral") != NULL);
+    test_assert(strstr(errors, "on_add ignored") != NULL);
+    test_assert(strstr(errors, "on_remove ignored") != NULL);
+    ecs_os_free(errors);
+
+    ecs_entity_t e = ecs_lookup(world, "e");
+    test_assert(box_transition_valid(world, ecs_id(Position),
+        box_transition_get(world, e, ecs_id(Position))));
+    test_assert(box_transition_valid(world, ecs_id(BoxShadow),
+        box_transition_get(world, e, ecs_id(BoxShadow))));
+
+    ecs_fini(world);
+}

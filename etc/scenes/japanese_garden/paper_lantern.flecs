@@ -11,7 +11,6 @@ using box.surface
 using box.controllers
 using box.movement
 
-@tree Parent
 template PaperLantern {
   prop tint: Rgb = {255, 197, 133}
 
@@ -25,6 +24,7 @@ template PaperLantern {
     Sphere: {radius: 0.29, segments: 16, smooth: true}
     Rgb: tint
     Emissive: {strength: 7, color: tint}
+    DiffuseTransmission: GardenShoji
   }
   for i in 0..5 {
     {

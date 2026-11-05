@@ -8,7 +8,6 @@ using box.light
 using box.text
 
 
-@tree Parent
 template WestSheriff {
   WestStorefront(width: 5.7, height: 3.5, tint: {186, 155, 103}, trim: {94, 66, 42}) { Position: {} }
   false_front : WestPlank { Position: {0, 4.1, 2.48}; Box: {5.95, 1.1, 0.22} }
@@ -21,7 +20,7 @@ template WestSheriff {
     { Position: {-1.15 + i * 0.2, 1.6, 2.6}; Box: {0.018, 2.2, 0.025}; Rgb: {59, 42, 28} }
   }
   for i in 0..2 {
-    { Position: {-0.65, 0.9 + i * 1.4, 2.65}; Box: {1.13, 0.1, 0.045}; Rgb: {49, 51, 48} }
+    { (IsA, WestIron); Position: {-0.65, 0.9 + i * 1.4, 2.65}; Box: {1.13, 0.1, 0.045} }
   }
   handle : WestIron { Position: {-0.18, 1.53, 2.73}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.065, tube: 0.019, segments: 12, rings: 6} }
   notice : WestTimber { Position: {-2, 1.92, 2.55}; Box: {0.77, 1.05, 0.06} }

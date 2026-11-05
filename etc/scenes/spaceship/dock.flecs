@@ -10,45 +10,34 @@ using box.material
 using box.texture
 using box.light
 
-@tree Parent
 template OrbitalDock {
   for side in 0..2 {
-    {
-      side_bulk {
-        Position: {(side - 0.5) * 173, -3, -12}
-        Rotation: {0, (1 - side) * math.PI, 0}
-        for bay in 0..4 {
-          { DockModule: {bay: (bay + side * 2) % 4}; Position: {0, 0, -46.5 + bay * 31} }
-        }
-        outer_rail : RustRed { Position: {22.5, 3, 0}; Box: {1.4, 3.5, 126} }
-        for i in 0..2 {
-          {
-            crane_foundation : DarkArmor { Position: {13, 6.25, -38 + i * 64}; Box: {8, 4, 8} }
-            crane { DockCrane: {}; Position: {13, 9, -38 + i * 64}; Rotation: {0, 0.15 + i * 0.75 + side * 0.3, 0} }
-            docking_lamp : AmberLight { Position: {-21, 11, -38 + i * 64}; Cylinder: {radius: 0.5, length: 1.3, segments: 12} }
+    "side_bulk_{side}" {
+      Position: {(side - 0.5) * 173, -3, -12}
+      Rotation: {0, (1 - side) * math.PI, 0}
+      for bay in 0..4 {
+        { DockModule: {bay: (bay + side * 2) % 4}; Position: {0, 0, -46.5 + bay * 31} }
+      }
+      outer_rail : RustRed { Position: {22.5, 3, 0}; Box: {1.4, 3.5, 126} }
+      for i in 0..2 {
+        "crane_foundation_{side}_{i}" : DarkArmor { Position: {13, 6.25, -38 + i * 64}; Box: {8, 4, 8} }
+        "crane_{side}_{i}" { DockCrane: {}; Position: {13, 9, -38 + i * 64}; Rotation: {0, 0.15 + i * 0.75 + side * 0.3, 0} }
+        "docking_lamp_{side}_{i}" : AmberLight { Position: {-21, 11, -38 + i * 64}; Cylinder: {radius: 0.5, length: 1.3, segments: 12} }
+      }
+      for i in 0..3 {
+        "outboard_truss_{side}_{i}" {
+          Position: {43, -2, -43 + i * 43}
+          station { DockOutboard: {station: (i + side) % 3}; Position: {4, 0, 0} }
+          for level in 0..2 {
+            "beam_{side}_{i}_{level}" : DarkArmor { Position: {0, -5 + level * 10, 0}; Box: {42, 2.4, 3} }
+            "edge_{side}_{i}_{level}" : Titanium { Position: {0, -3.6 + level * 7.2, 0}; Box: {42, 0.3, 3.8} }
           }
-        }
-        for i in 0..3 {
-          {
-            outboard_truss {
-              Position: {43, -2, -43 + i * 43}
-              station { DockOutboard: {station: (i + side) % 3}; Position: {4, 0, 0} }
-              for level in 0..2 {
-                {
-                  beam : DarkArmor { Position: {0, -5 + level * 10, 0}; Box: {42, 2.4, 3} }
-                  edge : Titanium { Position: {0, -3.6 + level * 7.2, 0}; Box: {42, 0.3, 3.8} }
-                }
-              }
-              for j in 0..5 {
-                {
-                  diagonal { ShipBeam: {ax: -20 + j * 8, ay: -4, az: 0, bx: -12 + j * 8, by: 4, bz: 0, radius: 0.6} }
-                  node : DockYellow { Position: {-20 + j * 8, 4, 0}; Box: {2.7, 2.8, 4.2} }
-                }
-              }
-              terminal : DarkArmor { Position: {21, 0, 0}; Box: {6, 14, 9} }
-              terminal_cap : RustRed { Position: {21, 7.3, 0}; Box: {7, 1, 10} }
-            }
+          for j in 0..5 {
+            "diagonal_{side}_{i}_{j}" { ShipBeam: {ax: -20 + j * 8, ay: -4, az: 0, bx: -12 + j * 8, by: 4, bz: 0, radius: 0.6} }
+            "node_{side}_{i}_{j}" : DockYellow { Position: {-20 + j * 8, 4, 0}; Box: {2.7, 2.8, 4.2} }
           }
+          terminal : DarkArmor { Position: {21, 0, 0}; Box: {6, 14, 9} }
+          terminal_cap : RustRed { Position: {21, 7.3, 0}; Box: {7, 1, 10} }
         }
       }
     }

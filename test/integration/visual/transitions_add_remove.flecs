@@ -1,0 +1,87 @@
+// Adding a component with on_add, frozen in the middle. The entities start without the
+// component; SetAt adds it at the start of the second frame, with linear durations of 0.05 s
+// (three frames at the fixed delta of 1/60 s), so the render of the third frame shows each a
+// third of the way in from its neutral value:
+// - glowing: gets an Emissive, a third of its strength
+// - tinted: gets a strong blue Tint, a third of its alpha
+// - both: gets both, on a parent whose children follow its Tint
+// SetAt cannot remove a component, so removal is covered by the CPU and GPU tests.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.app
+using box.transition
+
+camera {
+  Position: {0, 3.2, 9}
+  Rotation: {-0.3, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {30, 34, 44, 255}}}
+}
+
+sun {
+  Rotation: {0.7, 2.4, 0}
+  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+  Rgb: {255, 255, 255}
+}
+
+$ {
+  AmbientLight: {intensity: 0.2}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {16, 0.2, 8}
+  Rgb: {200, 200, 205}
+}
+
+glowing {
+  Position: {-3.5, 0.8, 0}
+  Sphere: {segments: 32, smooth: true, radius: 0.8}
+  Rgb: {90, 90, 100}
+  Transition: [Emissive: {duration: 0.05, on_add: true, on_remove: true}]
+}
+
+tinted {
+  Position: {0, 0.8, 0}
+  Box: {1.4, 1.4, 1.4}
+  Rgb: {255, 220, 120}
+  Transition: [Tint: {duration: 0.05, on_add: true, on_remove: true}]
+}
+
+both {
+  Position: {3.5, 0.6, 0}
+  Transition: [
+    Emissive: {duration: 0.05, on_add: true, on_remove: true},
+    Tint: {duration: 0.05, on_add: true, on_remove: true}
+  ]
+  Sphere: {segments: 32, smooth: true, radius: 0.6}
+  Rgb: {230, 70, 60}
+  block {
+    Position: {0, 1.1, 0}
+    Box: {0.8, 0.8, 0.8}
+    Rgb: {230, 70, 60}
+  }
+}
+
+add_glowing {
+  SetAt: {frame: 1, entity: glowing}
+  Emissive: {strength: 4, color: {255, 160, 40}}
+}
+
+add_tinted {
+  SetAt: {frame: 1, entity: tinted}
+  Tint: {r: 0, g: 0, b: 255, a: 255}
+}
+
+add_both {
+  SetAt: {frame: 1, entity: both}
+  Emissive: {strength: 2, color: {80, 160, 255}}
+  Tint: {r: 0, g: 255, b: 0, a: 255}
+}

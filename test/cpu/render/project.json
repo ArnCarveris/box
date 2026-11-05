@@ -668,6 +668,41 @@
                     "tint_stays_in_bake",
                     "opacity_stays_out_of_bake"
                 ]
+            },
+            {
+                "id": "TransitionAddRemove",
+                "testcases": [
+                    "tint_add",
+                    "tint_remove",
+                    "tint_add_snaps",
+                    "tint_remove_snaps",
+                    "emissive_add_2d",
+                    "emissive_remove_2d",
+                    "emissive_add_mesh",
+                    "emissive_remove_mesh",
+                    "emissive_add_mesh_new_material",
+                    "opacity_add_mesh",
+                    "opacity_remove_mesh",
+                    "scale_remove_child",
+                    "clear_coat_add",
+                    "sheen_remove",
+                    "anisotropy_add",
+                    "diffuse_transmission_remove",
+                    "pbr_add",
+                    "uv_remove",
+                    "box_shadow_add",
+                    "not_add_spawn",
+                    "not_add_transition_added",
+                    "not_add_override_inherited",
+                    "not_add_reenable",
+                    "remove_inherited_snaps",
+                    "prefab_remove_emissive",
+                    "remove_during_add",
+                    "add_during_remove",
+                    "delete_during_remove",
+                    "no_neutral_logs",
+                    "neutral_values"
+                ]
             }
         ]
     }

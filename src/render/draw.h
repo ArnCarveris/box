@@ -934,6 +934,16 @@ void box_draws_transition_fade_own(
     box_draw_tint_t *tint,
     float *alpha);
 
+/** Get the value of a component in the target material of a material or shading record.
+ *
+ * @param material The material
+ * @param component The component
+ * @return The value, NULL for a component that is not a material component
+ */
+void* box_draws_transition_value(
+    box_draw_transition_material_t *material,
+    box_render_transition_component_t component);
+
 /** Write the transform and the shading of a shadow from a box shadow record with the encoding
  * of the game thread (box_draws_box_shadow_patch), from the material of the record with the
  * rendered Tint, Opacity and fade. The rendered Border of the material is applied to its shape
@@ -963,6 +973,10 @@ void box_draws_transition_box_shadow(
  * @param parent The parent node, 0 for none
  * @param tint The composed tints of the chain from the parent node, NULL without one
  * @param alpha The product of the opacities of that chain, read with tint
+ * @param leaving_tint The neutral Tint a removed Tint of the node animates to, NULL when it does
+ * not leave
+ * @param leaving_opacity The neutral Opacity a removed Opacity of the node animates to, NULL
+ * when it does not leave
  */
 void box_draws_transition_send_fade(
     const ecs_world_t *world,
@@ -971,7 +985,9 @@ void box_draws_transition_send_fade(
     uint32_t node,
     uint32_t parent,
     const box_draw_tint_t *tint,
-    float alpha);
+    float alpha,
+    const Tint *leaving_tint,
+    const Opacity *leaving_opacity);
 
 /** Make the range of a single matrix.
  *

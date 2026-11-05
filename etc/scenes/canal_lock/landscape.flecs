@@ -37,23 +37,16 @@ template CanalWaterFace {
   prop x1: f32 = 1
   prop z0: f32 = 0
   prop z1: f32 = 1
-  const w = x1 - x0
-  const d = z1 - z0
-  const ou = x0 / 5
-  const ov = z0 / 5
-
   (IsA, CanalWater)
-  Position: {x0 + w / 2, 0, z0 + d / 2}
+  Position: {(x0 + x1) / 2, 0, (z0 + z1) / 2}
   Rotation: {-math.PI / 2, 0, 0}
-  Quad: {w, d}
-  TextureTransform: {scale_x: w / 5, scale_y: d / 5, offset_x: ou, offset_y: ov}
+  Quad: {x1 - x0, z1 - z0}
+  TextureTransform: {1, 1, 0, 0}
   Transition: [TextureTransform: {duration: 14400, timing_function: Linear}]
-
 }
 
 template CanalChamberLevel {
-  const level = match lock_high { true: -0.45; _: -2.25 }
-  Position: {0, level, 0}
+  Position: {0, lock_high ? -0.45 : -2.25, 0}
   Transition: [Position: {duration: 6, timing_function: EaseInOut}]
 }
 
@@ -62,9 +55,9 @@ template CanalStrataFace {
   prop x1: f32 = 1
   prop top: f32 = 0
   prop bottom: f32 = -4.9
-  const w = x1 - x0
-  const h = top - bottom
-  CanalFace(w: w, h: h, u: w / 8, v: h / 4.9, ou: x0 / 8, ov: -top / 4.9) { (IsA, CanalStrata); Position: {x0 + w / 2, top - h / 2, 0} }
+  (IsA, CanalStrata)
+  Position: {(x0 + x1) / 2, (top + bottom) / 2, 0}
+  Quad: {x1 - x0, top - bottom}
 }
 
 template CanalLandscape {
@@ -126,13 +119,13 @@ template CanalLandscape {
 
   for s in 0..2 {
     const sign = s * 2 - 1
-    const wall_rot = match s { 0: 0.0; _: math.PI }
+    const wall_rot = s == 0 ? 0.0 : math.PI
     CanalFace(w: 13, h: 4.5) { (IsA, CanalChamberWall); Position: {0, -2.25, sign * 1.6}; Rotation: {0, wall_rot, 0} }
-    CanalFace(w: 14.5, h: 2.52, u: 14.5 / 3.2, v: 2.52 / 3.2) { (IsA, CanalAshlar); Position: {-13.75, -2.44, sign * 3}; Rotation: {0, wall_rot, 0} }
-    CanalFace(w: 14.5, h: 1.9, u: 14.5 / 3.2, v: 1.9 / 3.2) { (IsA, CanalAshlar); Position: {13.75, -0.95, sign * 3}; Rotation: {0, wall_rot, 0} }
-    CanalFace(w: 1.4, h: 3.7, u: 1.4 / 3.2, v: 3.7 / 3.2) { (IsA, CanalAshlar); Position: {-6.5, -1.85, sign * 2.3}; Rotation: {0, -math.PI / 2, 0} }
-    CanalFace(w: 1.4, h: 1.9, u: 1.4 / 3.2, v: 1.9 / 3.2) { (IsA, CanalAshlar); Position: {6.5, -0.95, sign * 2.3}; Rotation: {0, math.PI / 2, 0} }
-    CanalFace(w: 7, h: 1.18, u: 7 / 1.5, v: 1.18 / 1.5) { (IsA, CanalBrick); Position: {-6.5, -0.59, sign * 6.5}; Rotation: {0, -math.PI / 2, 0} }
+    { (IsA, CanalAshlar); Quad: {14.5, 2.52}; Position: {-13.75, -2.44, sign * 3}; Rotation: {0, wall_rot, 0} }
+    { (IsA, CanalAshlar); Quad: {14.5, 1.9}; Position: {13.75, -0.95, sign * 3}; Rotation: {0, wall_rot, 0} }
+    { (IsA, CanalAshlar); Quad: {1.4, 3.7}; Position: {-6.5, -1.85, sign * 2.3}; Rotation: {0, -math.PI / 2, 0} }
+    { (IsA, CanalAshlar); Quad: {1.4, 1.9}; Position: {6.5, -0.95, sign * 2.3}; Rotation: {0, math.PI / 2, 0} }
+    { (IsA, CanalBrick); Quad: {7, 1.18}; Position: {-6.5, -0.59, sign * 6.5}; Rotation: {0, -math.PI / 2, 0} }
 
     CanalCopingRow(x0: -6.6, x1: 6.6, z: sign * 2.05, y: 0.03, width: 0.92) {}
     CanalCopingRow(x0: -21, x1: -6.6, z: sign * 3.24, y: -1.13, width: 0.5) {}
@@ -147,7 +140,7 @@ template CanalLandscape {
       { (IsA, CanalIron); Position: {-4 + i * 4, -0.5, sign * 1.565}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.09, tube: 0.016, segments: 16, rings: 6} }
     }
   }
-  CanalFace(w: 3.2, h: 3.15, u: 1, v: 3.15 / 3.2) { (IsA, CanalAshlar); Position: {5.84, -2.625, 0}; Rotation: {0, -math.PI / 2, 0} }
+  { (IsA, CanalAshlar); Quad: {3.2, 3.15}; Position: {5.84, -2.625, 0}; Rotation: {0, -math.PI / 2, 0} }
 
   for i in 0..15 {
     { (IsA, CanalIron); Position: {-1.7, -3.9 + i * 0.28, 1.56}; Rotation: {0, 0, math.PI / 2}; Cylinder: {radius: 0.016, length: 0.42, segments: 6} }

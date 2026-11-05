@@ -7,7 +7,6 @@ using box.light
 using box.text
 
 
-@tree Parent
 template WestScrub {
   for i in 0..11 {
     const a = i * 2.4

@@ -14,6 +14,7 @@ using box.controllers
 using box.layout
 using box.text
 using box.projection
+using flecs.script.math
 
 window {
   Surface: {width: 1280, height: 720, vsync: true}
@@ -38,7 +39,7 @@ world_view {
 
 sun {
   Rotation: {0.7359, 2.3726, 0}
-  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+  DirectionalLight: {intensity: 2 * PI}
   Rgb: {255, 244, 225}
 }
 
@@ -102,6 +103,7 @@ board {
   Rect: {1, 1}
   Rgb: {30, 34, 46}
   Border: {width: 3, radius: 16, color: {120, 140, 200, 255}}
+  BoxShadow: {offset_y: -6, blur: 18, color: {0, 0, 0, 110}}
 
   title {
     Text: {value: "Quest Board", size: 28}
@@ -146,6 +148,7 @@ screen_ui {
     status {
       Text: {value: "Output 82%   Coolant low", size: 22}
       Rgb: {250, 210, 90}
+      TextSpans: {spans: [{start: 13, end: 24, color: {250, 110, 80, 255}, bold: true}]}
     }
   }
 }
@@ -180,100 +183,13 @@ template Slice {
 screen {
   Position: {2.6, 2.1, 1.8}
 
-  slice_0 {
-    Position: {-2.0449, 0, -2.1951}
-    Rotation: {0, 0.75, 0}
-    Slice: {offset: 0}
-  }
-
-  slice_1 {
-    Position: {-1.8156, 0, -2.3883}
-    Rotation: {0, 0.65, 0}
-    Slice: {offset: 0.0625}
-  }
-
-  slice_2 {
-    Position: {-1.5681, 0, -2.5576}
-    Rotation: {0, 0.55, 0}
-    Slice: {offset: 0.125}
-  }
-
-  slice_3 {
-    Position: {-1.3049, 0, -2.7013}
-    Rotation: {0, 0.45, 0}
-    Slice: {offset: 0.1875}
-  }
-
-  slice_4 {
-    Position: {-1.0287, 0, -2.8181}
-    Rotation: {0, 0.35, 0}
-    Slice: {offset: 0.25}
-  }
-
-  slice_5 {
-    Position: {-0.7419, 0, -2.9068}
-    Rotation: {0, 0.25, 0}
-    Slice: {offset: 0.3125}
-  }
-
-  slice_6 {
-    Position: {-0.4477, 0, -2.9664}
-    Rotation: {0, 0.15, 0}
-    Slice: {offset: 0.375}
-  }
-
-  slice_7 {
-    Position: {-0.1499, 0, -2.9963}
-    Rotation: {0, 0.05, 0}
-    Slice: {offset: 0.4375}
-  }
-
-  slice_8 {
-    Position: {0.1499, 0, -2.9963}
-    Rotation: {0, -0.05, 0}
-    Slice: {offset: 0.5}
-  }
-
-  slice_9 {
-    Position: {0.4477, 0, -2.9664}
-    Rotation: {0, -0.15, 0}
-    Slice: {offset: 0.5625}
-  }
-
-  slice_10 {
-    Position: {0.7419, 0, -2.9068}
-    Rotation: {0, -0.25, 0}
-    Slice: {offset: 0.625}
-  }
-
-  slice_11 {
-    Position: {1.0287, 0, -2.8181}
-    Rotation: {0, -0.35, 0}
-    Slice: {offset: 0.6875}
-  }
-
-  slice_12 {
-    Position: {1.3049, 0, -2.7013}
-    Rotation: {0, -0.45, 0}
-    Slice: {offset: 0.75}
-  }
-
-  slice_13 {
-    Position: {1.5681, 0, -2.5576}
-    Rotation: {0, -0.55, 0}
-    Slice: {offset: 0.8125}
-  }
-
-  slice_14 {
-    Position: {1.8156, 0, -2.3883}
-    Rotation: {0, -0.65, 0}
-    Slice: {offset: 0.875}
-  }
-
-  slice_15 {
-    Position: {2.0449, 0, -2.1951}
-    Rotation: {0, -0.75, 0}
-    Slice: {offset: 0.9375}
+  for i in 0..16 {
+    "slice_{i}" {
+      const angle = 0.75 - i * 0.1
+      Position: {-3 * sin(angle), 0, -3 * cos(angle)}
+      Rotation: {0, angle, 0}
+      Slice: {offset: i * 0.0625}
+    }
   }
 }
 
@@ -295,6 +211,7 @@ hud {
     Rgb: {16, 20, 28}
     Opacity: {0.85}
     Border: {width: 1, radius: 8, color: {90, 110, 150, 255}}
+    BoxShadow: {offset_y: -4, blur: 14, color: {0, 0, 0, 120}}
 
     title {
       Text: {value: "Explorer", size: 18}
@@ -324,6 +241,7 @@ hud {
     Rect: {1, 1}
     Rgb: {16, 20, 28}
     Border: {radius: 5}
+    BoxShadow: {offset_y: -2, blur: 8, color: {0, 0, 0, 110}}
 
     name {
       Text: {value: "Hero", size: 14}
@@ -358,6 +276,7 @@ menu {
     Rect: {1, 1}
     Rgb: {34, 38, 50}
     Border: {width: 2, radius: 12, color: {120, 140, 200, 255}}
+    BoxShadow: {offset_y: -6, blur: 20, color: {0, 0, 0, 140}}
 
     title {
       Text: {value: "Menu", size: 20}
