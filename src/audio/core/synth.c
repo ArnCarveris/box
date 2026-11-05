@@ -1274,7 +1274,8 @@ void box_audio_source_synth(
     src->drive = p->drive;
     src->svf_r[0] = src->svf[0];
     src->svf_r[1] = src->svf[1];
-    src->model = src->filter ? (int32_t)p->model : BOX_AUDIO_SYNTH_SVF;
+    src->model = src->filter && src->filter <= BOX_AUDIO_SYNTH_NOTCH ?
+        (int32_t)p->model : BOX_AUDIO_SYNTH_SVF;
     if (src->model == BOX_AUDIO_SYNTH_LADDER) {
         box_audio_ladder_init(&src->ladder_coefs, src->ladder, src->filter, p->slope,
             p->resonance, p->drive);

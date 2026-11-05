@@ -337,8 +337,8 @@ passband within about 2 dB of resonance 0. `drive` is the gain into the ladder, 
 -6 dB at 0 to +12 dB at 1, the output scaled back, so higher drives saturate the stages
 sooner. On the stereo path both channels run their own ladder.
 In the `Synth` bench (`voices_64_ladder`, 64 voices, 48 kHz, a 24 dB lowpass with an
-envelope) the ladder costs about TBD µs per 128-frame quantum against about 125 µs for
-the 24 dB state variable filter.
+envelope) the ladder costs about 245 µs per 128-frame quantum against about 145 µs for
+the 24 dB state variable filter in the same run: about 12 ns more per voice and frame.
 
 ```
 prefab Acid {
