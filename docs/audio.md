@@ -280,6 +280,7 @@ voices on play, so edits affect subsequent plays.
 | `SynthSound` | `seed`, `pitch_variance`, `level_variance`; variances default to zero |
 | `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), modulation controls, `velocity` (0) |
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`; all zero by default |
+| `SynthDrive` | Root: `drive` (0.3, 0..1), `asymmetry` (0, 0..1) |
 | `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves) |
 | `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves and `velocity` (0); requires a filter |
 | `SynthUnison` | Per layer: `voices` (3, 1..7), `detune` (10 cents, 0..100), `width` (0, 0..1) |
@@ -313,6 +314,24 @@ In the `Synth` bench of [bench/audio](../bench/audio/) (64 voices, 48 kHz, one
 128-frame quantum), drive raises a 12 dB filter from about 75 to 115 µs and a 24 dB
 filter with an envelope from about 125 to 170 µs: roughly 4 ns per stage and frame of
 a voice.
+
+`SynthDrive` on the root drives the mix of the layers of each voice through a tanh
+soft clipper before the filter, or before the amp without a filter: the stage where
+analog synths get most of their thickness. Since it works on the mix, plucks, unison
+voices and FM pass through it, and layers that play together intermodulate. `drive`
+is a gain of -6 to +24 dB before the clipper; the level is compensated so that drive
+changes the tone more than the loudness: a sine at level 1 keeps its RMS at every
+drive, and a layer at its usual level stays within about 1.5 dB from 0.1 to 1. Quieter
+mixes are driven less and get louder with drive; louder ones squash. `asymmetry` adds
+an offset before the clipper for even harmonics, and a 5 Hz DC blocker after it takes
+off the DC the offset makes. The clipper is the one of `Saturator` (shared in
+[saturate.h](../src/audio/core/saturate.h)), run at twice the rate so high, loud
+notes alias little; the driven mix is 15 frames (0.3 ms) late. On the stereo path of
+unison with width, both channels drive with the same settings and their own state.
+Without the component there is no drive and the sound renders as before.
+In the `Synth` bench (`voices_64_pre_drive`, 64 voices, 48 kHz, drive 0.6 with an
+asymmetry of 0.3) the drive costs TODO ns per sample of the whole mix over
+`voices_64`, about TODO ns per voice and frame.
 
 ```flecs
 using box.audio
@@ -381,8 +400,9 @@ Working examples include [synth_examples.flecs](../test/assets/audio/synth_examp
 [synth_unison.flecs](../test/assets/audio/synth_unison.flecs),
 [synth_lfo.flecs](../test/assets/audio/synth_lfo.flecs),
 [synth_glide.flecs](../test/assets/audio/synth_glide.flecs),
-[synth_pluck.flecs](../test/assets/audio/synth_pluck.flecs) and
-[synth_sub.flecs](../test/assets/audio/synth_sub.flecs).
+[synth_pluck.flecs](../test/assets/audio/synth_pluck.flecs),
+[synth_sub.flecs](../test/assets/audio/synth_sub.flecs) and
+[synth_drive.flecs](../test/assets/audio/synth_drive.flecs).
 
 ## Music on the timeline
 

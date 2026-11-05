@@ -1,0 +1,28 @@
+// The sounds the SynthPreDrive suite of test/cpu/audio measures the drive of the mix from
+// script with.
+using box.audio
+
+// A growling bass: a saw and a square driven hard and a little asymmetric, into a lowpass
+prefab Growl {
+  SynthSound: {}
+  SynthDrive: {drive: 0.8, asymmetry: 0.25}
+  SynthEnvelope: {attack: 0.005, decay: 0.1, sustain: 0.8, hold: 0.3, release: 0.1}
+  SynthFilter: {kind: SynthLowPass, cutoff: 900, resonance: 0.3}
+  SynthOscillator: {wave: SynthSaw, frequency: 55, level: 0.6}
+  square { SynthOscillator: {wave: SynthSquare, frequency: 110, level: 0.3} }
+}
+
+// The defaults: a drive of 0.3, symmetric, without a filter
+prefab Warm {
+  SynthSound: {}
+  SynthDrive: {}
+  SynthEnvelope: {attack: 0.005, sustain: 1, hold: 0.1, release: 0.05}
+  SynthOscillator: {frequency: 220, level: 0.5}
+}
+
+// No drive at all
+prefab Clean {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.005, sustain: 1, hold: 0.1, release: 0.05}
+  SynthOscillator: {frequency: 220, level: 0.5}
+}

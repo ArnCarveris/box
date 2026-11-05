@@ -61,15 +61,16 @@ void box_audio_synth_init(
     ecs_entity_t ids[] = {
         ecs_id(SynthSound), ecs_id(SynthOscillator), ecs_id(SynthEnvelope), ecs_id(SynthFilter),
         ecs_id(SynthFilterEnvelope), ecs_id(SynthGlide), ecs_id(SynthUnison),
-        ecs_id(SynthString), ecs_id(SynthLfo)
+        ecs_id(SynthString), ecs_id(SynthLfo), ecs_id(SynthDrive)
     };
     const char *names[] = {
         "AudioSynthSoundDirty", "AudioSynthOscillatorDirty", "AudioSynthEnvelopeDirty",
         "AudioSynthFilterDirty", "AudioSynthFilterEnvelopeDirty", "AudioSynthGlideDirty",
-        "AudioSynthUnisonDirty", "AudioSynthStringDirty", "AudioSynthLfoDirty"
+        "AudioSynthUnisonDirty", "AudioSynthStringDirty", "AudioSynthLfoDirty",
+        "AudioSynthDriveDirty"
     };
     int32_t i;
-    for (i = 0; i < 9; i ++) {
+    for (i = 0; i < 10; i ++) {
         ecs_observer(world, {
             .entity = ecs_entity(world, { .name = names[i] }),
             .query.flags = EcsQueryMatchPrefab,
@@ -278,6 +279,7 @@ bool box_audio_synth_compile(
     const SynthFilterEnvelope *fenv = ecs_get(world, e, SynthFilterEnvelope);
     const SynthOscillator *osc = ecs_get(world, e, SynthOscillator);
     const SynthGlide *glide = ecs_get(world, e, SynthGlide);
+    const SynthDrive *drive = ecs_get(world, e, SynthDrive);
     int32_t extra = 0, orphans = 0, low = 0, lfos = 0, i;
     ecs_iter_t it;
     bool endless = false, fits = true, result;
@@ -289,6 +291,12 @@ bool box_audio_synth_compile(
 
     if (glide) {
         p.glide = glide->time;
+    }
+
+    if (drive) {
+        p.has_drive = 1;
+        p.pre_drive = drive->drive;
+        p.pre_asymmetry = drive->asymmetry;
     }
 
     if (env) {

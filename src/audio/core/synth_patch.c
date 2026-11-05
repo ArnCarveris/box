@@ -7,6 +7,9 @@
 
 #include "internal.h"
 
+/** Octaves per dB, log2(10) / 20 */
+#define BOX_AUDIO_SYNTH_DRIVE_OCTAVES 0.16609640474436813
+
 /** Clamp a value of a patch; NaN becomes the low end.
  *
  * @param v The value
@@ -123,6 +126,9 @@ static void box_audio_synth_patch_clamp(
 
     p->cutoff = box_audio_synth_clamp(p->cutoff, BOX_AUDIO_SYNTH_CUTOFF_MIN,
         BOX_AUDIO_SYNTH_HZ_MAX);
+    p->has_drive = p->has_drive != 0;
+    p->pre_drive = box_audio_synth_clamp(p->pre_drive, 0, 1);
+    p->pre_asymmetry = box_audio_synth_clamp(p->pre_asymmetry, 0, 1);
     p->resonance = box_audio_synth_clamp(p->resonance, 0, 1);
     p->drive = box_audio_synth_clamp(p->drive, 0, 1);
     if (p->slope > BOX_AUDIO_SYNTH_SLOPE_24) {
@@ -201,6 +207,18 @@ static void box_audio_synth_patch_clamp(
         lfo->pulse_width = box_audio_synth_depth_clamp(lfo->pulse_width,
             0.5f - BOX_AUDIO_SYNTH_PULSE_MIN);
     }
+}
+
+void box_audio_synth_drive_curve(
+    box_audio_saturate_curve_t *curve,
+    float drive,
+    float asymmetry)
+{
+    double db = (double)BOX_AUDIO_SYNTH_DRIVE_DB_MIN +
+        (double)drive * (double)(BOX_AUDIO_SYNTH_DRIVE_DB_MAX - BOX_AUDIO_SYNTH_DRIVE_DB_MIN);
+    float gain = (float)box_audio_synth_exp2(db * BOX_AUDIO_SYNTH_DRIVE_OCTAVES);
+    box_audio_saturate_curve_sine(curve, gain, asymmetry * BOX_AUDIO_SYNTH_DRIVE_BIAS,
+        BOX_AUDIO_SYNTH_DRIVE_REFERENCE);
 }
 
 void box_audio_synth_parts_init(
@@ -305,6 +323,11 @@ void box_audio_synth_command(
     core->synths[slot].patch = cmd->patch;
     box_audio_synth_patch_clamp(&core->synths[slot].patch);
     core->synths[slot].strings = 0;
+    if (core->synths[slot].patch.has_drive) {
+        box_audio_synth_drive_curve(&core->synths[slot].drive,
+            core->synths[slot].patch.pre_drive, core->synths[slot].patch.pre_asymmetry);
+    }
+
     for (i = 0; i < (int32_t)core->synths[slot].patch.layers; i ++) {
         if (core->synths[slot].patch.layer[i].wave == BOX_AUDIO_SYNTH_PLUCK) {
             core->synths[slot].strings += (int32_t)core->synths[slot].patch.layer[i].voices;

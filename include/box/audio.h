@@ -647,6 +647,20 @@ ECS_STRUCT(SynthFilterEnvelope, {
                             *   amount (1 - share + share v), default 0 */
 });
 
+/** A drive stage of a synth sound, on its root: the mix of the layers of each voice runs
+ * through a tanh soft clipper before the SynthFilter, or before the amp without one, where an
+ * analog synth gets most of its thickness. Plucks, unison and FM pass through it as they mix.
+ *
+ * The clipper runs at twice the rate and is level compensated: a sine at level 1 keeps its
+ * RMS at every drive. The driven mix is 15 frames late; with width both channels drive alike.
+ * Without the component there is no drive. See docs/audio.md.
+ */
+ECS_STRUCT(SynthDrive, {
+    float drive;           /**< 0..1, default 0.3: a gain of -6 to +24 dB before the clipper */
+    float asymmetry;       /**< 0..1, default 0: an offset before the clipper that adds even
+                            *   harmonics; its DC is blocked */
+});
+
 /** Portamento and mono legato of a synth sound, on its root.
  *
  * With a time, a change of the pitch of a voice, as a change of AudioSource.pitch, glides
@@ -690,7 +704,8 @@ ECS_STRUCT(SynthLfo, {
 
 /** A sound made by the synth from the components of this entity and its children, without a
  * file: SynthOscillator layers, each with an optional SynthUnison, a SynthEnvelope, a
- * SynthFilter, a SynthFilterEnvelope, a SynthGlide and SynthLfo. Usually a prefab.
+ * SynthDrive, a SynthFilter, a SynthFilterEnvelope, a SynthGlide and SynthLfo. Usually a
+ * prefab.
  *
  * It is compiled once, and again when one of its components changes, into a patch the core
  * holds; box_audio_play and AudioSource play it like any sound, with no allocation per play.

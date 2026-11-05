@@ -222,7 +222,8 @@
                     "delay",
                     "modulation",
                     "saturator",
-                    "synth_sub"
+                    "synth_sub",
+                    "synth_drive"
                 ]
             },
             {
@@ -592,6 +593,25 @@
                     "harmonics",
                     "slope_24",
                     "wide"
+                ]
+            },
+            {
+                "id": "SynthPreDrive",
+                "testcases": [
+                    "harmonics",
+                    "level_across_drive",
+                    "alias_oversampled",
+                    "before_filter",
+                    "wide",
+                    "without_identical",
+                    "layers_pass",
+                    "clamped"
+                ]
+            },
+            {
+                "id": "SynthPreDriveWorld",
+                "testcases": [
+                    "component"
                 ]
             },
             {

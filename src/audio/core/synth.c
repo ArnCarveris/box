@@ -1,7 +1,8 @@
 /**
  * @file audio/core/synth.c
  * @brief The synth source: band limited oscillators and seeded noise, each with a linear or
- * curved envelope, mixed into a state variable filter of one or two stages, whose cutoff an
+ * curved envelope, mixed, optionally driven through the oversampled soft clipper of saturate.h,
+ * into a state variable filter of one or two stages, whose cutoff an
  * envelope may move, and an amp, rendered per frame from a copy of the patch. A change of the
  * pitch glides exponentially in frequency over the glide of the patch, and a legato play
  * retargets the layers of a voice without a restart of its envelopes. A layer may play as
@@ -1035,6 +1036,51 @@ static void box_audio_synth_velocity_layers(
     }
 }
 
+/** Start the drive of a source: take the clipper of its patch and clear its state.
+ *
+ * @param src The source
+ * @param curve The clipper of the patch
+ * @param dc Whether the clipper has an offset, whose DC a blocker takes off
+ * @param rate Frames per second
+ */
+static void box_audio_synth_drive_start(
+    box_audio_synth_source_t *src,
+    const box_audio_saturate_curve_t *curve,
+    bool dc,
+    float rate)
+{
+    int32_t c;
+    src->drive_curve = *curve;
+    src->drive_dc = dc;
+    src->drive_dc_coef = (float)(1.0 - 2.0 * 3.14159265358979323846 *
+        (double)BOX_AUDIO_SYNTH_DRIVE_DC / (double)rate);
+    for (c = 0; c < 2; c ++) {
+        box_audio_oversample_clear(&src->drive_os[c]);
+        src->drive_blocker[c].x1 = 0;
+        src->drive_blocker[c].y1 = 0;
+    }
+}
+
+/** Run a sample of the mix of the layers of a channel through the drive.
+ *
+ * @param src The source, with a drive
+ * @param c The channel, 0 left or mono, 1 right
+ * @param x The mix
+ * @return The driven mix, BOX_AUDIO_SATURATE_LATENCY frames late
+ */
+static inline float box_audio_synth_drive_next(
+    box_audio_synth_source_t *src,
+    int32_t c,
+    float x)
+{
+    float y = box_audio_saturate_next(&src->drive_os[c], &src->drive_curve, x);
+    if (src->drive_dc) {
+        y = box_audio_dc_next(&src->drive_blocker[c], y, src->drive_dc_coef);
+    }
+
+    return y;
+}
+
 void box_audio_source_synth(
     box_audio_core_t *core,
     box_audio_source_t *source,
@@ -1112,6 +1158,10 @@ void box_audio_source_synth(
     src->drive = p->drive;
     src->svf_r[0] = src->svf[0];
     src->svf_r[1] = src->svf[1];
+    src->has_drive = p->has_drive != 0;
+    if (src->has_drive) {
+        box_audio_synth_drive_start(src, &slot->drive, p->pre_asymmetry > 0, core->sample_rate);
+    }
 
     src->lfos = (int32_t)p->lfos;
     src->lfo_cutoff = false;
@@ -2188,6 +2238,13 @@ static int32_t box_audio_synth_render_wide(
             box_audio_synth_mix_wide(src, levels, false, &l, &r);
         }
 
+        if (src->has_drive) {
+            l = box_audio_synth_drive_next(src, 0, l);
+            if (stereo) {
+                r = box_audio_synth_drive_next(src, 1, r);
+            }
+        }
+
         if (src->filter) {
             box_audio_synth_control(src, rate);
             if (src->stages > 1) {
@@ -2269,6 +2326,10 @@ int32_t box_audio_synth_render(
                 box_audio_synth_osc_t *o = &src->part[l]->osc;
                 mix += box_audio_synth_osc_next(o, &src->rng) * o->level * levels[o->env];
             }
+        }
+
+        if (src->has_drive) {
+            mix = box_audio_synth_drive_next(src, 0, mix);
         }
 
         if (src->filter) {
