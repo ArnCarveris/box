@@ -415,7 +415,7 @@ static bool box_gpu_gtao_pipelines(
 
     box_gpu_gtao_pipelines_free(g);
     for (i = 0; i < BOX_GPU_GTAO_PASSES; i ++) {
-        g->pipelines[i] = wgpuDeviceCreateComputePipeline(gpu->device,
+        g->pipelines[i] = box_gpu_compute_pipeline(gpu,
             &(WGPUComputePipelineDescriptor){
                 .layout = g->pipeline_layouts[i],
                 .compute = { .module = module,
@@ -433,7 +433,7 @@ static bool box_gpu_gtao_pipelines(
         .targetCount = 1,
         .targets = &target
     };
-    g->upsample = wgpuDeviceCreateRenderPipeline(gpu->device, &(WGPURenderPipelineDescriptor){
+    g->upsample = box_gpu_render_pipeline(gpu, &(WGPURenderPipelineDescriptor){
         .layout = g->upsample_pipeline_layout,
         .vertex = { .module = module, .entryPoint = { .data = "vs", .length = WGPU_STRLEN } },
         .primitive = { .topology = WGPUPrimitiveTopology_TriangleList },

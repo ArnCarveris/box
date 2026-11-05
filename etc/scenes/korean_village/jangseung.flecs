@@ -4,7 +4,6 @@ using box.transform
 using box.geometry
 using box.material
 
-@tree Parent
 template KoreanJangseung {
   prop hat: Rgb = {44, 44, 42}
   prop lips: Rgb = {160, 56, 44}

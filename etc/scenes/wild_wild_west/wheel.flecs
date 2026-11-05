@@ -7,7 +7,6 @@ using box.light
 using box.text
 
 
-@tree Parent
 template WestWheel {
   prop radius: f32 = 0.7
   rim : WestTimber { Position: {}; Rotation: {math.PI / 2, 0, 0}; Tube: {radius: radius, length: 0.13, thickness: 0.09, segments: 32} }

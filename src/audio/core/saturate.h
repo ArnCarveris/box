@@ -6,15 +6,25 @@
  * The clipper is tanh(g x + b) - tanh(b), level compensated at BOX_AUDIO_SATURATE_REFERENCE;
  * the oversampler is a polyphase halfband FIR of 31 taps up and down, flat to 17 kHz and 70 dB
  * down from 31 kHz at 48 kHz, BOX_AUDIO_SATURATE_LATENCY frames late.
+ *
+ * The other modes of the saturator are a shape: a tube curve, a hard clipper with a rounded
+ * corner and a sine wavefolder, both with first order ADAA and the folder at 4x, and a tanh
+ * rectifier, level compensated by the RMS of a sine of the reference.
  */
 
 #ifndef BOX_AUDIO_CORE_SATURATE_H
 #define BOX_AUDIO_CORE_SATURATE_H
 
 #include <stdint.h>
+#include "core.h"
 
 /** Frames of the base rate that the oversampler delays its signal, up and down together */
 #define BOX_AUDIO_SATURATE_LATENCY 15
+
+/** Frames of the base rate that the wavefolder delays its signal more than the other curves:
+ * it runs at four times the rate, through a second oversampler at the doubled rate, and a
+ * sample more of the doubled rate makes that delay whole frames */
+#define BOX_AUDIO_SATURATE_LATENCY_FOLD 8
 
 /** Peak level of the input whose gain the level compensation undoes, -14 dBFS: a sine about
  * that loud keeps its RMS within 0.7 dB over a drive of 0 to +30 dB */
@@ -327,6 +337,330 @@ static inline float box_audio_dc_next(
     float y = x - dc->x1 + coef * dc->y1, a = y < 0 ? -y : y;
     dc->x1 = x;
     dc->y1 = a >= BOX_AUDIO_SATURATE_TINY ? y : 0.0f;
+
+    return y;
+}
+
+/** Share of the level dependent offset of the tube curve: its positive half has a slope of
+ * 1 + this far out, its negative half 1 - this, so the positive half clips earlier */
+#define BOX_AUDIO_SATURATE_TUBE_EVEN 0.5f
+
+/** Half width of the rounded corner of the hard clipper, around a driven input of 1 */
+#define BOX_AUDIO_SATURATE_KNEE 0.1f
+
+/** Under this step of the driven input between two samples ADAA takes the curve at their
+ * middle, where the difference of the antiderivatives loses its precision */
+#define BOX_AUDIO_SATURATE_ADAA_MIN 1e-5
+
+/** Under this half step the sinc of the ADAA of the wavefolder is its series */
+#define BOX_AUDIO_SATURATE_SINC_SERIES 0.5
+
+/** Turns of a radian, 1 / (2 pi) */
+#define BOX_AUDIO_SATURATE_TURNS 0.15915494309189533577
+
+/** Step of the driven input of the slope of a shape at its bias */
+#define BOX_AUDIO_SATURATE_SLOPE_STEP 1e-3f
+
+/** The constants of a shape, the clipper of a mode other than BOX_AUDIO_SATURATOR_TANH, for a
+ * gain, a bias and a blend, which change only with them */
+typedef struct box_audio_saturate_shape_t {
+    int32_t mode;             /**< A box_audio_saturator_mode_t */
+    float gain;               /**< Linear gain before the curve */
+    float bias;               /**< Offset added to the driven input, 0 for the rectifier */
+    float blend;              /**< The rectifier: 0 is half wave, 1 is full wave */
+    float offset;             /**< The curve of the bias, taken off the output */
+    float comp;               /**< Gain after the curve, the level compensation */
+    float slope;              /**< 1 / the slope of the curve at the bias, 1 for the
+                               * rectifier */
+} box_audio_saturate_shape_t;
+
+/** A first order filter, y = c0 x + c1 x1 - c2 y1, the tone tilt of the saturator */
+typedef struct box_audio_saturate_tilt_t {
+    float x1;                 /**< Input of the frame before */
+    float y1;                 /**< Output of the frame before */
+} box_audio_saturate_tilt_t;
+
+/** The tube curve: tanh(u + e u^2 / (1 + |u|)) for the share e of
+ * BOX_AUDIO_SATURATE_TUBE_EVEN. The square term is an offset that grows with the level, so the
+ * curve makes even harmonics without a bias, and it rises monotonically.
+ *
+ * @param u The driven input
+ * @return The curve, within -1..1
+ */
+static inline float box_audio_saturate_tube(
+    float u)
+{
+    float a = u < 0 ? -u : u;
+
+    return box_audio_tanh(u + BOX_AUDIO_SATURATE_TUBE_EVEN * u * u / (1.0f + a));
+}
+
+/** The hard clipper: u up to 1 - k, 1 from 1 + k, a parabola that meets both with their slope
+ * in between, for the half width k of BOX_AUDIO_SATURATE_KNEE; odd.
+ *
+ * @param u The driven input
+ * @return The clipped input, within -1..1
+ */
+static inline float box_audio_saturate_hard(
+    float u)
+{
+    const float k = BOX_AUDIO_SATURATE_KNEE;
+    float t = u < 0 ? -u : u, e, r;
+    if (t <= 1 - k) {
+        r = t;
+    } else if (t < 1 + k) {
+        e = t - (1 - k);
+        r = t - e * e / (4 * k);
+    } else {
+        r = 1;
+    }
+
+    return u < 0 ? -r : r;
+}
+
+/** The antiderivative of box_audio_saturate_hard, 0 at 0; even.
+ *
+ * @param u The driven input
+ * @return The integral of the clipper from 0 to u
+ */
+static inline double box_audio_saturate_hard_integral(
+    double u)
+{
+    const double k = BOX_AUDIO_SATURATE_KNEE;
+    double t = u < 0 ? -u : u, e, result;
+    if (t <= 1 - k) {
+        result = 0.5 * t * t;
+    } else if (t < 1 + k) {
+        e = t - (1 - k);
+        result = 0.5 * t * t - e * e * e / (12 * k);
+    } else {
+        result = 0.5 * (1 + k) * (1 + k) - 2 * k * k / 3 + (t - (1 + k));
+    }
+
+    return result;
+}
+
+/** The sine wavefolder: sin(u), which folds the driven input back each time it passes pi / 2.
+ *
+ * @param u The driven input
+ * @return The folded input, within -1..1
+ */
+static inline float box_audio_saturate_fold(
+    float u)
+{
+    return box_audio_core_sin((double)u * BOX_AUDIO_SATURATE_TURNS);
+}
+
+/** The rectifier: v, its negative half turned up and scaled by the blend.
+ *
+ * @param v The input
+ * @param blend 0 for half wave, 1 for full wave
+ * @return The rectified input
+ */
+static inline float box_audio_saturate_rectify(
+    float v,
+    float blend)
+{
+    return v >= 0 ? v : -blend * v;
+}
+
+/** The curve of a mode at a driven input, without the offset of its bias.
+ *
+ * @param mode A box_audio_saturator_mode_t
+ * @param u The driven input
+ * @param blend The blend of the rectifier
+ * @return The curve
+ */
+static inline float box_audio_saturate_shape_curve(
+    int32_t mode,
+    float u,
+    float blend)
+{
+    float result;
+    if (mode == BOX_AUDIO_SATURATOR_TUBE) {
+        result = box_audio_saturate_tube(u);
+    } else if (mode == BOX_AUDIO_SATURATOR_HARD) {
+        result = box_audio_saturate_hard(u);
+    } else if (mode == BOX_AUDIO_SATURATOR_FOLD) {
+        result = box_audio_saturate_fold(u);
+    } else if (mode == BOX_AUDIO_SATURATOR_RECTIFY) {
+        result = box_audio_saturate_rectify(box_audio_tanh(u), blend);
+    } else {
+        result = box_audio_tanh(u);
+    }
+
+    return result;
+}
+
+/** A shape at an input, without ADAA: the curve of g x + b less the curve of b, 0 for
+ * silence.
+ *
+ * @param shape The constants
+ * @param x The input
+ * @return The shaped input, before the level compensation
+ */
+static inline float box_audio_saturate_shape_clip(
+    const box_audio_saturate_shape_t *shape,
+    float x)
+{
+    return box_audio_saturate_shape_curve(shape->mode, shape->gain * x + shape->bias,
+        shape->blend) - shape->offset;
+}
+
+/** Set the constants of a shape, with a level compensation that keeps the RMS of a sine of a
+ * peak without its mean, as box_audio_saturate_curve_sine does for the tanh clipper. The call
+ * belongs where the gain changes seldom.
+ *
+ * @param shape Receives the constants
+ * @param mode A box_audio_saturator_mode_t other than BOX_AUDIO_SATURATOR_TANH
+ * @param gain Linear gain before the curve, positive
+ * @param bias Offset added to the driven input; the rectifier takes it as its blend
+ * @param peak Peak of the sine whose RMS the shape keeps, positive
+ */
+static inline void box_audio_saturate_shape(
+    box_audio_saturate_shape_t *shape,
+    int32_t mode,
+    float gain,
+    float bias,
+    float peak)
+{
+    const double c = 0.99518472667219688, s = 0.098017140329560602;
+    double x = 0.99879545620517239, y = 0.049067674327418015, t, sum = 0, square = 0;
+    double power, target, root;
+    float d = BOX_AUDIO_SATURATE_SLOPE_STEP, slope;
+    int32_t i;
+    shape->mode = mode;
+    shape->gain = gain;
+    shape->bias = mode == BOX_AUDIO_SATURATOR_RECTIFY ? 0.0f : bias;
+    shape->blend = mode == BOX_AUDIO_SATURATOR_RECTIFY ? bias : 0.0f;
+    shape->offset = box_audio_saturate_shape_curve(mode, shape->bias, shape->blend);
+    shape->comp = 1.0f;
+    shape->slope = 1.0f;
+    if (mode != BOX_AUDIO_SATURATOR_RECTIFY) {
+        slope = (box_audio_saturate_shape_curve(mode, shape->bias + d, 0) -
+            box_audio_saturate_shape_curve(mode, shape->bias - d, 0)) / (2 * d);
+        if (slope > 1e-3f) {
+            shape->slope = 1.0f / slope;
+        }
+    }
+
+    for (i = 0; i < BOX_AUDIO_SATURATE_SINE_POINTS; i ++) {
+        double v = (double)box_audio_saturate_shape_clip(shape, peak * (float)y);
+        sum += v;
+        square += v * v;
+        t = x * c - y * s;
+        y = x * s + y * c;
+        x = t;
+    }
+
+    sum /= BOX_AUDIO_SATURATE_SINE_POINTS;
+    power = square / BOX_AUDIO_SATURATE_SINE_POINTS - sum * sum;
+    if (power > 0) {
+        target = 2 * power;
+        root = target > 1 ? target : 1;
+        for (i = 0; i < 40; i ++) {
+            root = 0.5 * (root + target / root);
+        }
+
+        shape->comp = (float)((double)peak / root);
+    }
+}
+
+/** sin(h) / h, from its series for a small h so that it keeps its precision.
+ *
+ * @param h The value
+ * @return The sinc
+ */
+static inline double box_audio_saturate_sinc(
+    double h)
+{
+    double a = h < 0 ? -h : h, h2 = h * h, result;
+    if (a < BOX_AUDIO_SATURATE_SINC_SERIES) {
+        result = 1 - h2 / 6 * (1 - h2 / 20 * (1 - h2 / 42));
+    } else {
+        result = (double)box_audio_core_sin(h * BOX_AUDIO_SATURATE_TURNS) / h;
+    }
+
+    return result;
+}
+
+/** A sample at the oversampled rate through the hard clipper or the wavefolder of a shape with
+ * first order antiderivative anti-aliasing (ADAA): (F(u) - F(u0)) / (u - u0) for the
+ * antiderivative F, the curve through a box filter of a sample, half a sample late.
+ *
+ * The box filter takes most of the harmonics above the Nyquist frequency out before they
+ * fold. The folder takes the difference of the cosines as sin(m) sinc(h) for the middle m and
+ * the half step h, which keeps its precision for any step.
+ *
+ * @param shape The constants, of BOX_AUDIO_SATURATOR_HARD or BOX_AUDIO_SATURATOR_FOLD
+ * @param last The driven input of the sample before, receives the one of this sample
+ * @param x The input
+ * @return The shaped input, before the level compensation; 0 while the input stays 0
+ */
+static inline float box_audio_saturate_adaa(
+    const box_audio_saturate_shape_t *shape,
+    double *last,
+    float x)
+{
+    double u = (double)(shape->gain * x + shape->bias), u0 = *last, d = u - u0, y;
+    *last = u;
+    if (shape->mode == BOX_AUDIO_SATURATOR_HARD) {
+        if (d > BOX_AUDIO_SATURATE_ADAA_MIN || d < -BOX_AUDIO_SATURATE_ADAA_MIN) {
+            y = (box_audio_saturate_hard_integral(u) - box_audio_saturate_hard_integral(u0)) /
+                d;
+        } else {
+            y = (double)box_audio_saturate_hard((float)(0.5 * (u + u0)));
+        }
+    } else {
+        y = (double)box_audio_saturate_fold((float)(0.5 * (u + u0))) *
+            box_audio_saturate_sinc(0.5 * d);
+    }
+
+    return (float)y - shape->offset;
+}
+
+/** A sample at the doubled rate through the wavefolder of a shape with ADAA at four times the
+ * rate, by a second oversampler, which lowers the aliases of a much folded sine 40 dB; held
+ * back a sample, so that it comes BOX_AUDIO_SATURATE_LATENCY_FOLD frames of the base rate late.
+ *
+ * @param shape The constants, of BOX_AUDIO_SATURATOR_FOLD
+ * @param os The second oversampler, which runs at the doubled rate
+ * @param last The driven input of the sample before at four times the rate
+ * @param late The output held back, receives the one of this sample
+ * @param x The input
+ * @return The folded input, before the level compensation
+ */
+static inline float box_audio_saturate_fold_next(
+    const box_audio_saturate_shape_t *shape,
+    box_audio_oversample_t *os,
+    double *last,
+    float *late,
+    float x)
+{
+    float a, b, result = *late;
+    box_audio_oversample_up(os, x, &a, &b);
+    a = box_audio_saturate_adaa(shape, last, a);
+    b = box_audio_saturate_adaa(shape, last, b);
+    *late = box_audio_oversample_down(os, a, b);
+
+    return result;
+}
+
+/** Run a sample through a first order filter.
+ *
+ * @param f The state
+ * @param c The coefficients c0, c1 and c2 of y = c0 x + c1 x1 - c2 y1
+ * @param x The input
+ * @return The output
+ */
+static inline float box_audio_saturate_tilt_next(
+    box_audio_saturate_tilt_t *f,
+    const float *c,
+    float x)
+{
+    float y = c[0] * x + c[1] * f->x1 - c[2] * f->y1, a = y < 0 ? -y : y;
+    f->x1 = x;
+    f->y1 = a >= BOX_AUDIO_SATURATE_TINY ? y : 0.0f;
 
     return y;
 }

@@ -18,7 +18,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template IslandHouse {
   prop width: f32 = 3.8
   prop depth: f32 = 3.2

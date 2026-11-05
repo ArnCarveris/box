@@ -534,10 +534,17 @@ void Shell_audio_command(void) {
     ecs_modified(world, grit, AudioBus);
     ecs_set(world, grit, Saturator, { .drive = 0.6f, .asymmetry = 0.2f, .bits = 8,
         .mix = 0.5f });
+    ecs_entity_t fuzz = ecs_entity(world, { .name = "fuzz" });
+    ecs_ensure(world, fuzz, AudioBus)->effects[0] = fuzz;
+    ecs_modified(world, fuzz, AudioBus);
+    ecs_set(world, fuzz, Saturator, { .drive = 0.8f, .bits = 16, .mix = 1,
+        .mode = SaturatorHard, .low_cut = 150, .tone = 0.25f, .high_cut = 5000,
+        .rate = 8000 });
     ecs_entity_t punch = ecs_entity(world, { .name = "punch" });
     ecs_ensure(world, punch, AudioBus)->effects[0] = punch;
     ecs_modified(world, punch, AudioBus);
     ecs_set(world, punch, TransientShaper, { .attack = 0.5f, .sustain = -0.25f });
+<<<<<<< HEAD
     ecs_entity_t lift = ecs_entity(world, { .name = "lift" });
     ecs_ensure(world, lift, AudioBus)->effects[0] = lift;
     ecs_modified(world, lift, AudioBus);
@@ -548,6 +555,13 @@ void Shell_audio_command(void) {
     ecs_modified(world, shine, AudioBus);
     ecs_set(world, shine, Reverb, { .decay = 6, .damping = 0.3f, .predelay = 0.02f,
         .size = 0.8f, .mix = 1, .shimmer = 0.5f, .shimmer_pitch = 12 });
+=======
+    ecs_entity_t bell = ecs_entity(world, { .name = "bell" });
+    ecs_ensure(world, bell, AudioBus)->effects[0] = bell;
+    ecs_modified(world, bell, AudioBus);
+    ecs_set(world, bell, FrequencyShifter, { .shift = 437, .mode = FrequencyRing,
+        .stereo = 0.5f, .feedback = -0.3f, .mix = 0.8f });
+>>>>>>> a4fe46bb42cb0d5a52610e937391d4ca8b68f4eb
     ecs_progress(world, 0.016f);
 
     bool error = true;
@@ -564,15 +578,23 @@ void Shell_audio_command(void) {
         "(does not run: no output)") != NULL);
     test_assert(strstr(out, "grit: group volume 1.00 pan 0.00 width 1.00 -> master, "
         "insert 0 grit: saturator drive 0.60 asymmetry 0.20 bits 8.0 mix 0.50") != NULL);
+    test_assert(strstr(out, "insert 0 fuzz: saturator hard drive 0.80 asymmetry 0.00 "
+        "low cut 150 Hz tone 0.25 high cut 5000 Hz rate 8000 Hz bits off mix 1.00") != NULL);
     test_assert(strstr(out, "punch: group volume 1.00 pan 0.00 width 1.00 -> master, "
         "insert 0 punch: transient shaper attack 0.50 sustain -0.25 "
         "(does not run: no output)") != NULL);
+<<<<<<< HEAD
     test_assert(strstr(out, "lift: group volume 1.00 pan 0.00 width 1.00 -> master, "
         "insert 0 lift: pitch shifter semitones +12.0 cents -8.0 stereo 1.00 window 30.0 ms "
         "feedback 0.20 mix 0.40 (does not run: no output)") != NULL);
     test_assert(strstr(out, "shine: group volume 1.00 pan 0.00 width 1.00 -> master, "
         "insert 0 shine: reverb decay 6.00 damping 0.30 predelay 0.020 size 0.80 mix 1.00 "
         "shimmer 0.50 pitch +12.0 (does not run: no output)") != NULL);
+=======
+    test_assert(strstr(out, "bell: group volume 1.00 pan 0.00 width 1.00 -> master, "
+        "insert 0 bell: frequency shifter ring +437.0 Hz stereo 0.50 feedback -0.30 mix 0.80 "
+        "(does not run: no output)") != NULL);
+>>>>>>> a4fe46bb42cb0d5a52610e937391d4ca8b68f4eb
     ecs_os_free(out);
 
     out = box_command_run(world, s, "audio volume 0.25", &error);

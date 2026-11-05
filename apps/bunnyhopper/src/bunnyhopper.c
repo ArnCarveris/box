@@ -67,9 +67,9 @@ static float bunny_random01(
     return (float)((z ^ (z >> 31)) >> 40) / (float)(1u << 24);
 }
 
-/** Move the bunny with gravity, land it on the ground and tilt it with its velocity. A landing
- * after a jump while playing plays the dust at its feet, the high dust when it was hard; once
- * the game is over the bunny lies on its back.
+/** Move the bunny with gravity, land it on the ground and tilt it with its velocity while
+ * playing. A landing after a jump while playing plays the dust at its feet, the high dust when it
+ * was hard. The bunny template rolls a dead bunny on its back.
  *
  * @param it Iterator over the players, with BunnyGame and whether the run is playing
  */
@@ -82,8 +82,7 @@ static void BunnyPhysics(
     BunnyPlayer *pl = ecs_field(it, BunnyPlayer, 3);
     const BunnyGame *g = ecs_field(it, BunnyGame, 4);
     bool playing = ecs_field_is_set(it, 5);
-    float ground_y = BUNNY_CFG(it->world, "groundY");
-    float ground = ground_y + (playing ? 0.0f : BUNNY_CFG(it->world, "deadHeight"));
+    float ground = BUNNY_CFG(it->world, "groundY");
     float gravity = BUNNY_CFG(it->world, "gravity");
     float hard = BUNNY_CFG(it->world, "hardLandingVelocity");
     float dt = it->delta_time;
@@ -94,7 +93,7 @@ static void BunnyPhysics(
         if (p[i].y <= ground) {
             if (playing && j[i].jumps > 0) {
                 ecs_entity_t dust = -j[i].v > hard ? g->dust_high : g->dust;
-                box_particle_burst_at(it->world, dust, (vec3){ p[i].x, ground_y, 0.0f }, 0.0f);
+                box_particle_burst_at(it->world, dust, (vec3){ p[i].x, ground, 0.0f }, 0.0f);
             }
 
             p[i].y = ground;
@@ -103,9 +102,7 @@ static void BunnyPhysics(
             pl[i].run_phase += playing ? dt * (4.0f + g->speed * 0.9f) : 0.0f;
         }
 
-        r[i].z = playing
-            ? glm_clamp(j[i].v * 0.025f, -0.35f, 0.35f)
-            : BUNNY_CFG(it->world, "deadAngle");
+        r[i].z = playing ? glm_clamp(j[i].v * 0.025f, -0.35f, 0.35f) : 0.0f;
     }
 }
 
@@ -220,9 +217,8 @@ static void BunnySpawn(
             BUNNY_CFG(it->world, "spawnX"), BUNNY_CFG(it->world, "groundY"), 0.0f });
         g->distance_since_spawn = 0.0f;
         g->next_spawn_distance = g->speed * (1.0f + bunny_random01(g));
+        ecs_singleton_modified(it->stage, BunnyGame);
     }
-
-    ecs_singleton_modified(it->stage, BunnyGame);
 }
 
 /** Hit the bunny: play the hit effect at it, take a life, then end the run or bounce and

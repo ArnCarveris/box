@@ -23,7 +23,9 @@ static const char *song_channels[] = {
 
 #define SONG_CHANNELS ((int32_t)(sizeof(song_channels) / sizeof(song_channels[0])))
 
-/** Create a world and run test/assets/audio/song.flecs in it.
+/** Create a world and run test/assets/audio/song.flecs in it. The world is headless, so every
+ * frame waits for the decodes of kick.wav and shaker.wav, and the first beat always has its kick
+ * however the decode threads are scheduled.
  *
  * @return The world
  */
@@ -31,6 +33,9 @@ static ecs_world_t* song_world(void)
 {
     ecs_world_t *world = audio_world();
     char *code = audio_read("test/assets/audio/song.flecs");
+    App *app = ecs_singleton_ensure(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
     test_assert(ecs_script_run(world, "song", code, NULL) == 0);
     ecs_os_free(code);
 

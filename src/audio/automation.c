@@ -49,17 +49,7 @@ static double box_audio_automation_beat(
     return result;
 }
 
-/** Walk a member path, segments separated by dots and elements in brackets such as
- * bands[2].gain, with a meta cursor to a float member.
- *
- * @param world The world
- * @param component The component
- * @param ptr A value of the component
- * @param member The path
- * @param cur Receives the cursor at the member
- * @return NULL when the member is a float, else the reason, to free with ecs_os_free
- */
-static char* box_audio_member_cursor(
+char* box_audio_member_cursor(
     const ecs_world_t *world,
     ecs_entity_t component,
     void *ptr,
@@ -170,6 +160,75 @@ static char* box_audio_bus_member(
     return result;
 }
 
+char* box_audio_target_resolve(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    ecs_entity_t target,
+    ecs_entity_t component_id,
+    const char *member,
+    box_audio_target_t *out)
+{
+    uint64_t copy[BOX_AUDIO_AUTOMATION_COMPONENT / 8];
+    const EcsComponent *c = NULL;
+    ecs_meta_cursor_t cur;
+    char *result = NULL, *name = NULL, *component = NULL;
+    const void *ptr;
+    ecs_os_zeromem(out);
+    out->send = -1;
+    out->entity = target;
+    out->component = component_id;
+    if (!target) {
+        result = flecs_asprintf("no target");
+    } else if (!ecs_is_alive(world, target)) {
+        result = flecs_asprintf("the target #%u is deleted", (uint32_t)target);
+    } else if (!component_id) {
+        result = flecs_asprintf("no component");
+    } else if (!ecs_is_alive(world, component_id) ||
+        !(c = ecs_get(world, component_id, EcsComponent)) || !c->size)
+    {
+        result = flecs_asprintf("the component #%u is not a component with data",
+            (uint32_t)component_id);
+    }
+
+    if (result) {
+        goto done;
+    }
+
+    name = ecs_get_path(world, target);
+    component = ecs_get_path(world, component_id);
+    if (component_id == ecs_id(AudioBus)) {
+        out->kind = BOX_AUDIO_TARGET_BUS;
+        if (target != state->master && !ecs_has(world, target, AudioBus)) {
+            result = flecs_asprintf("the target '%s' has no AudioBus", name);
+        } else {
+            result = box_audio_bus_member(member, &out->param, &out->send);
+        }
+
+        if (!result && target == state->master && out->send >= 0) {
+            result = flecs_asprintf("the master has no sends");
+        }
+    } else if (box_audio_module_effect_params(world, component_id, NULL, NULL) ==
+        BOX_AUDIO_EFFECT_NONE)
+    {
+        result = flecs_asprintf("the component '%s' is neither AudioBus nor an effect",
+            component);
+    } else if (!(ptr = ecs_get_id(world, target, component_id))) {
+        result = flecs_asprintf("the target '%s' has no %s", name, component);
+    } else if (c->size > BOX_AUDIO_AUTOMATION_COMPONENT) {
+        result = flecs_asprintf("the component '%s' is too large", component);
+    } else {
+        out->kind = BOX_AUDIO_TARGET_EFFECT;
+        ecs_os_memcpy(copy, ptr, c->size);
+        result = box_audio_member_cursor(world, component_id, copy, member, &cur);
+    }
+
+done:
+    ecs_os_free(name);
+    ecs_os_free(component);
+
+    return result;
+}
+
 /** Resolve the target of an automation clip.
  *
  * @param world The world
@@ -184,71 +243,15 @@ static char* box_audio_automation_resolve(
     const AutomationClip *ac,
     box_audio_target_t *out)
 {
-    uint64_t copy[BOX_AUDIO_AUTOMATION_COMPONENT / 8];
-    const EcsComponent *c = NULL;
-    ecs_meta_cursor_t cur;
-    char *result = NULL, *name = NULL, *component = NULL;
-    const void *ptr;
-    ecs_os_zeromem(out);
-    out->send = -1;
-    out->entity = ac->target;
-    out->component = ac->component;
-    if (!ac->target) {
-        result = flecs_asprintf("no target");
-    } else if (!ecs_is_alive(world, ac->target)) {
-        result = flecs_asprintf("the target #%u is deleted", (uint32_t)ac->target);
-    } else if (!ac->component) {
-        result = flecs_asprintf("no component");
-    } else if (!ecs_is_alive(world, ac->component) ||
-        !(c = ecs_get(world, ac->component, EcsComponent)) || !c->size)
-    {
-        result = flecs_asprintf("the component #%u is not a component with data",
-            (uint32_t)ac->component);
-    }
-
-    if (result) {
-        goto done;
-    }
-
-    name = ecs_get_path(world, ac->target);
-    component = ecs_get_path(world, ac->component);
-    if (ac->component == ecs_id(AudioBus)) {
-        out->kind = BOX_AUDIO_TARGET_BUS;
-        if (ac->target != state->master && !ecs_has(world, ac->target, AudioBus)) {
-            result = flecs_asprintf("the target '%s' has no AudioBus", name);
-        } else {
-            result = box_audio_bus_member(ac->member, &out->param, &out->send);
-        }
-
-        if (!result && ac->target == state->master && out->send >= 0) {
-            result = flecs_asprintf("the master has no sends");
-        }
-    } else if (box_audio_module_effect_params(world, ac->component, NULL, NULL) ==
-        BOX_AUDIO_EFFECT_NONE)
-    {
-        result = flecs_asprintf("the component '%s' is neither AudioBus nor an effect",
-            component);
-    } else if (!(ptr = ecs_get_id(world, ac->target, ac->component))) {
-        result = flecs_asprintf("the target '%s' has no %s", name, component);
-    } else if (c->size > BOX_AUDIO_AUTOMATION_COMPONENT) {
-        result = flecs_asprintf("the component '%s' is too large", component);
-    } else {
-        out->kind = BOX_AUDIO_TARGET_EFFECT;
-        ecs_os_memcpy(copy, ptr, c->size);
-        result = box_audio_member_cursor(world, ac->component, copy, ac->member, &cur);
-    }
-
+    char *result = box_audio_target_resolve(world, state, ac->target, ac->component,
+        ac->member, out), *curve;
     if (!result) {
-        char *curve = box_curve_validate(&ac->curve);
+        curve = box_curve_validate(&ac->curve);
         if (curve) {
             result = flecs_asprintf("curve: %s", curve);
             ecs_os_free(curve);
         }
     }
-
-done:
-    ecs_os_free(name);
-    ecs_os_free(component);
 
     return result;
 }

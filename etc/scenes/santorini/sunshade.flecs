@@ -12,7 +12,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template Sunshade {
   prop radius: f32 = 1.6
   pole { Position: {0, 1.55, 0}; Cylinder: {radius: 0.045, length: 3.1, segments: 12}; Rgb: IslandWood }
@@ -24,14 +23,16 @@ template Sunshade {
       Position: {}
       Mesh3: {vertices: [{0, 3.2, 0}, {math.sin(a) * radius, 2.74, math.cos(a) * radius}, {math.sin(b) * radius, 2.74, math.cos(b) * radius}], indices: [0, 1, 2]}
       BackFaceMode: {BackFacePlain}
-      if i % 2 == 0 { Rgb: IslandAzure } else { Rgb: IslandChalk }
+      Rgb: i % 2 == 0 ? IslandAzure : IslandChalk
+      DiffuseTransmission: IslandCloth
     }
     IslandBeam(ax: 0, ay: 3.17, bx: math.sin(a) * radius, by: 2.72, bz: math.cos(a) * radius, radius: 0.015, tint: IslandPlaster) {}
     {
       Position: {math.sin(a + math.PI / 12) * radius * 0.966, 2.67, math.cos(a + math.PI / 12) * radius * 0.966}
       Rotation: {0, a + math.PI / 12, 0}
       RoundedBox: {radius * 0.515, 0.17, 0.025, 0.045}
-      if i % 2 == 0 { Rgb: IslandAzure } else { Rgb: IslandChalk }
+      Rgb: i % 2 == 0 ? IslandAzure : IslandChalk
+      Sheen: IslandLinen
     }
   }
   finial { Position: {0, 3.23, 0}; Sphere: {radius: 0.08, segments: 12}; Rgb: IslandWood }

@@ -11,7 +11,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template CafeChair {
   seat { Position: {0, 0.45, 0}; RoundedBox: {0.48, 0.09, 0.48, 0.035}; Rgb: {194, 168, 118} }
   for side in 0..2 {

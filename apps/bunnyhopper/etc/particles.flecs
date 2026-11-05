@@ -9,6 +9,8 @@
 
 using box.particle
 using box.transform
+using box.light
+using box.material
 
 // The frame of the track: the systems keep its drift at (-BunnyGame.speed, 0, 0) while playing
 // and at 0 once the game is over. It adds no forces of its own.
@@ -42,6 +44,7 @@ prefab LandingDust {
     }
     ParticleBurst: {count: 11}
     ParticleForces: {gravity: {0, -5, 0}, drag: 2.5}
+    ParticleCollision: {height: 0, bounce: 0.15, friction: 0.6}
     ParticleCurves: {
       size: {keys: [{0, 1}, {0.33333334, 1.33}, {0.6666667, 1.65}, {1, 1.98}]},
       opacity: {keys: [{0, 0.7}, {0.33333334, 1.12}, {0.6666667, 0.7}, {1, 0}]}
@@ -69,6 +72,7 @@ prefab HardLandingDust {
     }
     ParticleBurst: {count: 23}
     ParticleForces: {gravity: {0, -5, 0}, drag: 2.5}
+    ParticleCollision: {height: 0, bounce: 0.15, friction: 0.6}
     ParticleCurves: {
       size: {keys: [{0, 1}, {0.33333334, 1.72}, {0.6666667, 2.44}, {1, 3.16}]},
       opacity: {keys: [{0, 0.7}, {0.33333334, 1.12}, {0.6666667, 0.7}, {1, 0}]}
@@ -96,6 +100,7 @@ prefab HitBurst {
     }
     ParticleBurst: {count: 28}
     ParticleForces: {gravity: {0, -9, 0}, drag: 2}
+    ParticleCollision: {height: 0, bounce: 0.15, friction: 0.6}
     ParticleCurves: {
       size: {keys: [{0, 1}, {0.33333334, 1.1}, {0.6666667, 1.21}, {1, 1.31}]},
       opacity: {keys: [{0, 0.7}, {0.33333334, 1.1}, {0.6666667, 0.56}, {1, 0}]}
@@ -103,9 +108,9 @@ prefab HitBurst {
   }
 }
 
-// Golden sparkles that rise from a carrot the bunny cleared. They add their light to the image,
-// and a wider glow layer drawn with the same seed adds a halo to each of them, so together they
-// are brighter than the sky and bloom, as the emissive strength 2 of the original did.
+// Golden sparkles that rise from a carrot the bunny cleared. They add their light to the image
+// above the brightness of the sky, so they bloom, and a short light flashes on the track below
+// them as they rise and fade.
 prefab CarrotSparkle {
   particles {
     Position: {0, 0, 0}
@@ -118,43 +123,23 @@ prefab CarrotSparkle {
       spread: 0,
       speed: {2, 8},
       lifetime: {0.5, 0.5},
-      size: {0.06, 0.16},
+      size: {0.08, 0.2},
       color: {255, 220, 80},
       forces: effect_drift,
       seed: 104
     }
     ParticleBurst: {count: 18}
     ParticleForces: {gravity: {0, 0, 0}}
-    ParticleAppearance: {blend: ParticleAdditive}
+    ParticleAppearance: {blend: ParticleAdditive, stretch: 0.02}
     ParticleCurves: {
-      opacity: {keys: [{0, 0.7}, {0.33333334, 1.09}, {0.6666667, 0.87}, {1, 0}]}
+      opacity: {keys: [{0, 1.4}, {0.33333334, 2.2}, {0.6666667, 1.7}, {1, 0}]}
     }
-  }
-
-  // The same particles twice as large and fainter: the same seed and draws place them on the
-  // sparkles of the layer above
-  glow {
-    Position: {0, 0, 0}
-    ParticleEmitter: {
-      max: 32,
-      rate: 0,
-      shape: EmitterBox,
-      extents: {0.25, 0, 0.25},
-      direction: {0, 1, 0},
-      spread: 0,
-      speed: {2, 8},
-      lifetime: {0.5, 0.5},
-      size: {0.12, 0.32},
-      opacity: {0.6, 0.6},
-      color: {255, 220, 80},
-      forces: effect_drift,
-      seed: 104
-    }
-    ParticleBurst: {count: 18}
-    ParticleForces: {gravity: {0, 0, 0}}
-    ParticleAppearance: {blend: ParticleAdditive}
-    ParticleCurves: {
-      opacity: {keys: [{0, 0.7}, {0.33333334, 1.09}, {0.6666667, 0.87}, {1, 0}]}
+    PointLight: {intensity: 3, range: 4}
+    Rgb: {255, 210, 90}
+    ParticleLight: {
+      intensity: 3,
+      curve: {keys: [{0, 1}, {0.5, 0.5}, {1, 0}]},
+      period: 0.5
     }
   }
 }

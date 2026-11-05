@@ -174,10 +174,14 @@ their tails end.
 | `Gate` | `threshold: -50` dB, `attack: 0.001` s, `hold: 0.05` s, `release: 0.1` s, `range: -80` dB |
 | `Delay` | `time: 0.25` s, `sync: 0` beats, `feedback: 0.35`, `mix: 0.3`, `ping_pong: false`, `damping: 6000` Hz |
 | `Phaser` | `stages: 4`, `rate: 0.5` Hz, `depth: 0.7`, `center: 800` Hz, `feedback: 0`, `mix: 0.5`, `stereo: 0.5` |
-| `Chorus` | `voices: 2`, `rate: 0.8` Hz, `depth: 3` ms, `delay: 12` ms, `mix: 0.5`, `spread: 0.5` |
-| `Saturator` | `drive: 0.3`, `asymmetry: 0`, `bits: 16`, `mix: 1` |
+| `Chorus` | `voices: 2`, `rate: 0.8` Hz, `depth: 3` ms, `delay: 12` ms, `mix: 0.5`, `spread: 0.5`, `feedback: 0` |
+| `Saturator` | `drive: 0.3`, `asymmetry: 0`, `bits: 16`, `mix: 1`, `mode: SaturatorTanh`, `low_cut: 0` Hz, `high_cut: 0` Hz, `tone: 0`, `rate: 0` Hz |
 | `TransientShaper` | `attack: 0`, `sustain: 0` |
+<<<<<<< HEAD
 | `PitchShifter` | `semitones: 0`, `cents: 0`, `stereo: 0`, `window: 40` ms, `feedback: 0`, `mix: 0.5` |
+=======
+| `FrequencyShifter` | `shift: 0` Hz, `mode: FrequencyShift`, `stereo: 0`, `feedback: 0`, `mix: 1` |
+>>>>>>> a4fe46bb42cb0d5a52610e937391d4ca8b68f4eb
 
 Equalizer bands use `AudioEqOff`, `AudioEqPeak`, `AudioEqLowShelf`,
 `AudioEqHighShelf`, `AudioEqLowCut` or `AudioEqHighCut`. Defaults are 100, 400,
@@ -192,15 +196,71 @@ Time changes crossfade
 between read positions instead of gliding pitch. Use `mix: 1` on a return.
 Phaser stages range from 2 to 12, even; chorus supports up to four voices.
 
+A chorus with `feedback` is a flanger. The first voice's tap feeds back into the
+delay line, so the comb resonates: peaks sit at multiples of `1000 / delay` Hz,
+and a negative feedback moves them to the odd multiples of half that, for the
+hollow flanger sound. Feedback ranges from -0.95 to 0.95; at 0 the chorus sounds
+exactly as without it. For a flanger use one voice, a `delay` of about 0.1 to
+10 ms and a `depth` a little under the delay, so the sweep nearly reaches zero:
+
+```flecs
+drums {
+  AudioBus: {effects: [drums]}
+  Chorus: {voices: 1, rate: 0.2, delay: 2, depth: 1.8, feedback: 0.7, mix: 0.5}
+}
+```
+
+Higher feedback sharpens the jet sweep; a negative one sounds hollow. The tail
+of the feedback rings out before the effect goes idle.
+
 A saturator adds warmth, grit or lo-fi to a drum bus, a synth bus or the master. It
-soft clips each channel with tanh at twice the sample rate, so it aliases less.
-`drive` goes from 0 to +30 dB into the clipper, and the output is level compensated,
-so drive mostly changes the tone and not the loudness: a sine around -14 dBFS keeps
-its RMS within about 1 dB at any drive. `asymmetry` biases the clipper to add even
-harmonics, and the DC it creates is filtered out. Below 16, `bits` runs a bit crusher
-after the saturation: 4 bits gives 16 levels. Oversampling delays the bus by 15
-frames, and the dry signal is delayed the same amount, so `mix` does not comb.
+clips each channel at twice the sample rate, so it aliases less. `drive` goes from 0
+to +30 dB into the clipper, and the output is level compensated per mode, so drive
+mostly changes the tone and not the loudness: a sine at -14 dBFS keeps its RMS
+within about 1.5 dB at any drive (tanh keeps its older compensation, which holds
+that at -12 dBFS and rises up to 2.5 dB at -14 dBFS). `asymmetry` biases the clipper to add even
+harmonics, and the DC it creates is filtered out. `mode` picks the curve:
+
+- `SaturatorTanh`, the default: a tanh soft clipper, smooth and symmetric.
+- `SaturatorTube`: a softer asymmetric tanh whose bias grows with the level, so it
+  adds even harmonics even at `asymmetry: 0`. Warmer.
+- `SaturatorHard`: a hard clip with a slightly rounded corner, fuzz.
+- `SaturatorFold`: a sine wavefolder. The more drive, the more folds and the
+  brighter the sound.
+- `SaturatorRectify`: a rectifier that `asymmetry` blends from half wave (0) to full
+  wave (1), octave-up grit.
+
+Hard clipping and folding alias much more than tanh, so those two modes add first
+order antiderivative anti-aliasing (ADAA) on top of the oversampling, and the folder
+runs at four times the rate. On a -6 dBFS 5 kHz sine at 48 kHz, the aliases below
+20 kHz are -51 dB (drive 0.8) and -42 dB (drive 1) for hard, against -30 and -21 dB
+without ADAA. For fold at drive 1 they are -68 dB, against -23 dB with ADAA at twice
+the rate and 0 dB at twice the rate alone. Above 20 kHz, the 25 kHz harmonic folds to
+23 kHz through the roll-off of the oversampler, at -10 to -25 dB, which neither
+removes.
+
+The filters around the clipper shape the distortion. `low_cut` is a 12 dB highpass
+before the clipper, so the bass is not distorted (and with `mix` below 1 the dry bass
+stays clean). `tone` (-1 to 1) tilts the input by up to 9 dB either way around 1 kHz
+and applies the inverse tilt after the clipper. Above 0 the highs distort most,
+below 0 the lows, and a clean signal passes as it was. `high_cut` is a 12 dB lowpass
+after the clipper that tames fizz. `rate` holds each sample for 1 / rate seconds,
+which gives the aliasing lo-fi sound of an old sampler. A cut, or the rate, of 0 is
+off. Below 16, `bits` runs a bit crusher last: 4 bits gives 16 levels. Oversampling
+delays the bus by 15 frames (23 for `SaturatorFold`), and the dry signal is delayed the
+same amount, so `mix` does not comb. Changes move over 20 ms; a change of `mode` applies at once.
 An `AudioMeter` on the saturator reads how hard the clipper squashes, in dB.
+
+Recipes:
+
+| Sound | Saturator |
+|---|---|
+| Tape warmth on a bus | `{drive: 0.3}` |
+| Tube on a synth or vocal | `{mode: SaturatorTube, drive: 0.5, high_cut: 9000}` |
+| Fuzz on a guitar or bass | `{mode: SaturatorHard, drive: 0.8, low_cut: 150, high_cut: 5000}` |
+| Wavefolded lead | `{mode: SaturatorFold, drive: 0.6, tone: 0.3, high_cut: 8000}` |
+| Octave-up grit | `{mode: SaturatorRectify, drive: 0.4, asymmetry: 1, mix: 0.5}` |
+| Lo-fi drums | `{drive: 0.4, bits: 8, rate: 8000, high_cut: 6000}` |
 
 A transient shaper gives drums and plucks more or less punch and more or less tail,
 without a threshold. Stereo linked like a compressor, it follows the peak of the
@@ -213,6 +273,7 @@ it works the same at any level. `attack` from -1 to 1 softens or boosts transien
 smoothed so it does not distort low notes, is the same on both channels, and 0 and 0
 pass the signal unchanged. It has no meter.
 
+<<<<<<< HEAD
 A pitch shifter thickens a lead with a few cents either way, adds octaves to
 basses and leads, and makes harmonies, without changing the speed of what plays
 through it. Each channel is a delay line read by two taps half a window apart. The
@@ -250,6 +311,30 @@ shimmer {
   AudioBus: {effects: [shimmer]}
   Reverb: {decay: 6, damping: 0.4, size: 0.8, shimmer: 0.5, mix: 1}
 }
+=======
+A frequency shifter moves every partial by the same number of Hz, unlike a pitch
+shifter, which multiplies them, so harmonic sounds turn inharmonic. `shift` goes from
+-5000 to 5000 Hz. It shifts the analytic signal of an allpass pair Hilbert transformer,
+whose image stays about 60 dB under the shift from 20 Hz to 20 Hz under Nyquist at 48 kHz
+(about 55 dB at 96 kHz).
+The allpasses turn the phase, so even a shift of 0 is not bit exact with the input.
+`mode: FrequencyRing` makes it a ring modulator instead: a sine at the magnitude of
+`shift` splits each partial into one above and one below at half the level, the
+partial itself gone. `stereo: 1` shifts the right channel the opposite way, and in
+between by `shift * (1 - 2 * stereo)`. `feedback` from -0.95 to 0.95 shifts the output
+again on each pass, through a DC blocker and a soft limit. Changes glide over 20 ms
+and a change of mode crossfades.
+
+```flecs
+// Thickening: a few Hz either way on each side widens a mono part
+pad_wide { FrequencyShifter: {shift: 3, stereo: 1, mix: 0.5} }
+
+// Barber pole: a small shift with feedback rises forever; a negative shift falls
+pad_rise { FrequencyShifter: {shift: 0.3, feedback: 0.85, mix: 0.5} }
+
+// Ring-mod bell: a clangorous, inharmonic tone from a plain one
+bell { FrequencyShifter: {mode: FrequencyRing, shift: 437, mix: 0.8} }
+>>>>>>> a4fe46bb42cb0d5a52610e937391d4ca8b68f4eb
 ```
 
 For ducking, key a compressor on another channel:
@@ -266,6 +351,73 @@ The sidechain runs before the compressed bus. A sidechain cycle logs an error an
 falls back to the compressor's own input; a missing sidechain also uses its own input.
 A gate always keys on its own input. See the effect scenes in
 [test/assets/audio](../test/assets/audio/) for EQ, filter, delay and modulation setups.
+
+#### Modulators
+
+An `AudioModulator` on an entity of its own moves one float member of a bus or an
+effect on its own, in time with the song: a filter that wobbles in eighths, a send
+that pulses, a tremolo, an auto-pan, an auto-wah. `target`, `component` and `member`
+name what it moves exactly as an [AutomationClip](#automation) does: `volume`, `pan`,
+`width` and `sends[i].level` of an `AudioBus` or of the master, and every float member
+of an effect component, such as `cutoff` or `bands[2].gain`.
+
+The modulator adds to the value the output has, from the component or from an
+automation lane, and the sum is clamped to the range of the member. It never writes
+the component. `depth` is the swing either way in the units of the member; with
+`scale: AudioModOctaves` it is in octaves, for a frequency (`cutoff`, `center`, the
+`frequency` of a band, the `damping` of a `Delay`), so a sweep sounds even.
+
+| Field | Meaning and default |
+| --- | --- |
+| `source` | `AudioModLfo` (default), `AudioModSteps` or `AudioModFollower` |
+| `depth`, `scale` | `0`, `AudioModLinear` |
+| `wave` | `AudioModSine`, `AudioModTriangle`, `AudioModSquare`, `AudioModSawUp`, `AudioModSawDown` or `AudioModRandom` (sample and hold) |
+| `rate`, `sync`, `phase` | `1` Hz, `0` beats, `0` turns; a positive `sync` wins over `rate` |
+| `unipolar` | `false`: an LFO moves 0..1 instead of -1..1 |
+| `steps`, `step_count`, `smooth` | up to 16 values in -1..1, `16`, `0` (hard steps) .. 1 (fully glided); `sync` is the length of a step |
+| `key`, `attack`, `release` | bus a follower measures, `0` for the bus of the target, `0.01` s, `0.1` s |
+
+A synced modulator is phase locked to the Transport: at any frame its phase is
+`phase + fract(beat / sync)`, beat being the position of the Transport at that frame,
+so a seek, a loop wrap and a tempo change keep it on the grid. A stopped Transport
+leaves the beat where it stands and moves it on at 120 bpm, like a synced synth LFO.
+A follower measures its bus before the inserts and the volume, so a drum bus at volume
+0 still keys it, and maps -60..0 dB to 0..1.
+
+Modulators run in the audio core every 32 frames and at the edges of squares, saws,
+steps and samples; a bus ramps to each value, an effect smooths it like any change,
+so a sine at 10 Hz on a cutoff stays free of zipper noise. A new modulator fades in
+over 50 ms. Disabling, deleting or retargeting one fades it out over 50 ms, and the
+member returns to its value without a click. There are 64 modulators and up to four
+on one member; each one past a limit, or with an unknown target or member, logs one
+error that names it. A modulator has no stereo phase offset: every member it can
+reach has one value for both channels. The `audio` command lists the modulators of
+each bus and insert.
+
+Recipes, at the tempo of the Transport:
+
+```flecs
+// Tremolo: the volume dips to 0 for the first half of every eighth
+trem { AudioModulator: {target: keys, component: AudioBus, member: "volume",
+  wave: AudioModSquare, unipolar: true, depth: -1, sync: 0.5} }
+
+// Auto-pan: left and right once per bar
+autopan { AudioModulator: {target: pad, component: AudioBus, member: "pan",
+  depth: 0.8, sync: 4} }
+
+// Wobble: the cutoff of a bass filter two octaves either way, in eighths
+bass_filter { AudioFilter: {cutoff: 400, resonance: 0.5} }
+bass { AudioBus: {effects: [bass_filter]} }
+wobble { AudioModulator: {target: bass_filter, component: AudioFilter,
+  member: "cutoff", scale: AudioModOctaves, depth: 2, sync: 0.5} }
+
+// Auto-wah: a bandpass that opens with the level of its own bus
+wah_filter { AudioFilter: {kind: SynthBandPass, cutoff: 300, resonance: 0.6} }
+guitar { AudioBus: {effects: [wah_filter]} }
+wah { AudioModulator: {target: wah_filter, component: AudioFilter, member: "cutoff",
+  source: AudioModFollower, scale: AudioModOctaves, depth: 3, attack: 0.005,
+  release: 0.15} }
+```
 
 ### Meters
 
@@ -1145,6 +1297,11 @@ Play and legato commands carry the velocity of a note, 0..1, after their priorit
 other writers send 1. The velocity makes a play command 48 bytes and a legato command 52, so
 a writer buffer of a given size holds fewer of them than before.
 
+The core also keeps a beat clock: the transport schedules a `BEAT` command with the
+beat and tempo at each start, seek, stop, tempo change and loop wrap, only while
+something in the core reads it, and the core derives the beat of any frame from the
+last one (`box_audio_core_beat`).
+
 The core owns a 64-bit rendered-frame clock. Scheduled play, stop, voice/bus set,
 release, legato and effect params commands carry a frame time. Future commands wait in a fixed
 4096-entry schedule; a full schedule applies the command immediately and reports
@@ -1153,7 +1310,7 @@ voice handle. Sound memory is freed by its owner after `SOUND_FREE`, which is
 retained even when other events overflow. See [core.h](../src/audio/core/core.h)
 and [transport.h](../src/audio/transport.h) for the low-level APIs.
 
-The main limits are 64 voices, 64 buses, 64 effects, four inserts and sends per
+The main limits are 64 voices, 64 buses, 64 effects, 64 modulators, four inserts and sends per
 bus, eight synth layers, two synth LFOs, seven unison copies per layer,
 32 pluck strings, 32 comb delay lines and 256 frames per wavetable, whose tables share the 1023 sound ids. Effects are algorithmic: no convolution or geometry-derived rooms.
 There is one transport and one music stream per world. There are no tempo ramps,

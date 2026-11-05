@@ -99,7 +99,7 @@ static WGPUComputePipeline box_gpu_scatter_pipeline(
             .entryPoint = { .data = "main", .length = WGPU_STRLEN }
         }
     };
-    gpu->scatter = wgpuDeviceCreateComputePipeline(gpu->device, &desc);
+    gpu->scatter = box_gpu_compute_pipeline(gpu, &desc);
     gpu->scatter_revision = s->revision;
 done:
     return s && s->module ? gpu->scatter : NULL;

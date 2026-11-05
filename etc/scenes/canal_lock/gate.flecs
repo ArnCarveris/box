@@ -49,11 +49,10 @@ template LockGateLeaf : LockControl {
   prop bottom: f32 = -4.5
 
   const open = (top && lock_top_gate) || (!top && lock_bottom_gate)
-  const angle = match open { true: 1.46; _: 0.18 }
   const height = 0.35 - bottom
   const middle = (0.35 + bottom) / 2
 
-  Rotation: {0, side * angle, 0}
+  Rotation: {0, side * (open ? 1.46 : 0.18), 0}
   Transition: [
     Rotation: {duration: 3.5, timing_function: EaseInOut},
     Tint: {duration: 0.12}
@@ -64,18 +63,16 @@ template LockGateLeaf : LockControl {
   async {
     while true {
       await on.click(this)
-      const now = AppStatus[AppStatus].elapsed
-      if now >= lock_busy_until {
-        if top && lock_high {
-          lock_top_gate = !lock_top_gate
-          hover = false
-          lock_busy_until = now + 3.6
-        } else if !top && !lock_high {
-          lock_bottom_gate = !lock_bottom_gate
-          hover = false
-          lock_busy_until = now + 3.6
-        }
+      if lock_busy || top != lock_high {
+        continue
       }
+      if top {
+        lock_top_gate = !lock_top_gate
+      } else {
+        lock_bottom_gate = !lock_bottom_gate
+      }
+      hover = false
+      emit LockBusy(seconds: 3.6)
     }
   }
 }
@@ -90,13 +87,8 @@ template LockSignal {
   lamp {
     Position: {0, 1.62, 0.08}
     Sphere: {radius: 0.11, segments: 16, smooth: true}
-    if lit {
-      Rgb: {120, 240, 130}
-      Emissive: {strength: 3, color: {90, 255, 110}}
-    } else {
-      Rgb: {240, 80, 60}
-      Emissive: {strength: 3, color: {255, 60, 40}}
-    }
+    Rgb: lit ? {120, 240, 130} : {240, 80, 60}
+    Emissive: {strength: 3, color: lit ? {90, 255, 110} : {255, 60, 40}}
     Transition: [Rgb: {duration: 1}, Emissive: {duration: 1}]
   }
 }
