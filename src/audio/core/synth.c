@@ -807,7 +807,7 @@ static void box_audio_synth_lfo_aim(
         v = m->value * m->gain;
         cents[d->layer] += (double)(d->pitch * v);
         width[d->layer] += (double)(d->pulse_width * v);
-        semitones[d->layer] += (double)(d->sync * v);
+        semitones[d->layer] += (double)(d->hard_sync * v);
         frames[d->layer] += (double)(d->position * v);
         dip[d->layer] *= 1 - d->amplitude * m->gain * 0.5f * (1 - m->value);
         octaves += (double)(d->cutoff * v);
@@ -1526,7 +1526,7 @@ static void box_audio_synth_pass(
         o->synced = o->sync_base > 1;
         for (n = 0; n < src->lfos; n ++) {
             o->synced = o->synced || (src->lfo_patch[n].layer == (uint32_t)l + 1 &&
-                src->lfo_patch[n].sync != 0);
+                src->lfo_patch[n].hard_sync != 0);
         }
 
         o->synced = o->synced && o->wave != BOX_AUDIO_SYNTH_NOISE &&
@@ -1641,17 +1641,25 @@ static void box_audio_synth_pass(
  * the seed of the patch and the count of its plays apart from the noise, so the noise and the
  * variances stay as without LFOs, and the start phase of each.
  *
+ * A synced LFO runs at the tempo of the play over its sync and starts at its phase +
+ * fract(beat / sync), the same phase of the grid for every note.
+ *
  * @param core The core
  * @param src The source
  * @param p The patch, clamped
  * @param plays Count of the plays of the patch
+ * @param beat Beat of the play, 0..BOX_AUDIO_BEAT_WRAP
+ * @param tempo Beats per second of the play, clamped
  */
 static void box_audio_synth_lfo_start(
     const box_audio_core_t *core,
     box_audio_synth_source_t *src,
     const box_audio_synth_patch_t *p,
-    uint32_t plays)
+    uint32_t plays,
+    float beat,
+    float tempo)
 {
+    double t;
     int32_t k;
     src->lfo_rng = box_audio_synth_hash(p->seed ^ 0x4C464F21u, plays);
     src->lfo_smooth = (float)(1 - box_audio_synth_exp2(-(double)BOX_AUDIO_SYNTH_CONTROL /
@@ -1661,6 +1669,14 @@ static void box_audio_synth_lfo_start(
         src->lfo_patch[k] = *d;
         src->lfo[k].start = d->random_phase ?
             0.5 * (1.0 + (double)box_audio_synth_noise(&src->lfo_rng)) : (double)d->phase;
+        if (d->sync > 0) {
+            src->lfo_patch[k].rate = tempo / d->sync < BOX_AUDIO_SYNTH_LFO_RATE_MAX ?
+                tempo / d->sync : BOX_AUDIO_SYNTH_LFO_RATE_MAX;
+            t = src->lfo[k].start + (double)beat / (double)d->sync;
+            t -= (double)(int64_t)t;
+            src->lfo[k].start = t < 1 ? t : 0.0;
+        }
+
         src->lfo_cutoff = src->lfo_cutoff || (src->filter &&
             src->filter != BOX_AUDIO_SYNTH_FORMANT && d->cutoff != 0);
         src->lfo_vowel = src->lfo_vowel || (src->filter == BOX_AUDIO_SYNTH_FORMANT &&
@@ -1823,6 +1839,8 @@ void box_audio_source_synth(
     uint32_t sound,
     float pitch,
     float velocity,
+    float beat,
+    float tempo,
     bool loop,
     bool gate)
 {
@@ -1959,7 +1977,11 @@ void box_audio_source_synth(
     src->lfo_vowel = false;
     src->lfo_vowels = 0;
     if (src->lfos) {
-        box_audio_synth_lfo_start(core, src, p, slot->plays);
+        beat = beat > 0 && beat < (float)BOX_AUDIO_BEAT_WRAP ? beat : 0.0f;
+        tempo = tempo > 0 ? (tempo > BOX_AUDIO_SYNTH_TEMPO_MIN ? (tempo <
+            BOX_AUDIO_SYNTH_TEMPO_MAX ? tempo : BOX_AUDIO_SYNTH_TEMPO_MAX) :
+            BOX_AUDIO_SYNTH_TEMPO_MIN) : BOX_AUDIO_SYNTH_TEMPO;
+        box_audio_synth_lfo_start(core, src, p, slot->plays, beat, tempo);
     }
 
     src->drift = (double)p->drift;

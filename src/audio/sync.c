@@ -778,7 +778,8 @@ static void box_audio_synths(
 }
 
 /** Build the wavetables the output does not have yet and hand them over as sounds; the copy
- * the transport takes is the only one, so a new output builds them again.
+ * the transport takes is the only one, so a new output builds them again. A table whose sound
+ * still decodes stays without frames, and is checked again each frame until it is ready.
  *
  * @param world The world
  * @param state The state
@@ -790,19 +791,22 @@ static void box_audio_wavetables(
     box_audio_transport_t *t)
 {
     ecs_iter_t it = ecs_query_iter(world, state->wavetables);
-    int32_t i, floats;
+    int32_t i, floats, frames;
     while (ecs_query_next(&it)) {
         const Wavetable *table = ecs_field(&it, Wavetable, 0);
         AudioWavetable *w = ecs_field(&it, AudioWavetable, 1);
         for (i = 0; i < it.count; i ++) {
             float *data;
+            bool loading = false;
             if (w[i].serial == state->serial) {
                 continue;
             }
 
-            data = box_audio_wavetable_kind((int32_t)table[i].kind, &floats);
+            data = box_audio_wavetable_of(world, it.entities[i], &table[i], &w[i], &frames,
+                &floats, &loading);
             w[i].id = data ? box_audio_sound_send(state, t, data, floats, 1, 0) : 0;
-            w[i].serial = state->serial;
+            w[i].frames = w[i].id ? frames : 0;
+            w[i].serial = loading ? 0 : state->serial;
             ecs_os_free(data);
         }
     }
@@ -1013,7 +1017,7 @@ static void box_audio_source(
 {
     uint32_t sound = src->playing ? box_audio_sound_of(world, state, src->sound) : 0;
     float volume = muted ? 0.0f : src->volume * (place ? place->gain : 1.0f);
-    float pan = place ? place->pan : 0.0f;
+    float pan = place ? place->pan : 0.0f, beat, tempo;
     bool away = place && !(place->gain > 0), resume;
     uint32_t handle;
     uint8_t bus;
@@ -1028,8 +1032,9 @@ static void box_audio_source(
             box_audio_sound_bus(world, state, src->sound);
         handle = box_audio_new_voice(state);
         if (box_audio_reserve(state)) {
-            box_audio_write_legato(&state->writer, handle, v->handle, sound, bus, volume, pan,
-                src->pitch, src->loop ? BOX_AUDIO_PLAY_LOOP : 0);
+            box_audio_timeline_grid(world, state, 0, &beat, &tempo);
+            box_audio_write_legato_note(&state->writer, handle, v->handle, sound, bus, volume,
+                pan, src->pitch, 1.0f, beat, tempo, src->loop ? BOX_AUDIO_PLAY_LOOP : 0, 0, 0);
         }
 
         ecs_map_remove(&state->voices, v->handle);
@@ -1120,8 +1125,9 @@ static void box_audio_source(
 
         ecs_map_insert(&state->voices, v->handle, e);
         if (box_audio_reserve(state)) {
-            box_audio_write_play(&state->writer, v->handle, sound, bus, volume, pan,
-                src->pitch, src->loop ? BOX_AUDIO_PLAY_LOOP : 0, 0);
+            box_audio_timeline_grid(world, state, 0, &beat, &tempo);
+            box_audio_write_play_note(&state->writer, v->handle, sound, bus, volume, pan,
+                src->pitch, 1.0f, beat, tempo, src->loop ? BOX_AUDIO_PLAY_LOOP : 0, 0, 0);
         }
 
         if (resume) {
@@ -1307,7 +1313,7 @@ void box_audio_play_send(
     box_audio_oneshot_t *shots, *shot, next;
     uint32_t sound = box_audio_sound_of(world, state, play->sound), held;
     const AudioSpatial *spatial = NULL;
-    float gain = 1.0f, pan = 0;
+    float gain = 1.0f, pan = 0, beat, tempo;
     int32_t k, channel;
     bool legato;
     if (!sound) {
@@ -1361,8 +1367,9 @@ void box_audio_play_send(
         held = shots[k].handle;
         shots[k] = next;
         if (box_audio_reserve(state)) {
-            box_audio_write_legato(&state->writer, next.handle, held, sound, next.bus,
-                next.sent_volume, pan, 1.0f, 0);
+            box_audio_timeline_grid(world, state, 0, &beat, &tempo);
+            box_audio_write_legato_note(&state->writer, next.handle, held, sound, next.bus,
+                next.sent_volume, pan, 1.0f, 1.0f, beat, tempo, 0, 0, 0);
         }
 
         goto done;
@@ -1375,8 +1382,9 @@ void box_audio_play_send(
     shot = ecs_vec_append_t(NULL, &state->oneshots, box_audio_oneshot_t);
     *shot = next;
     if (box_audio_reserve(state)) {
-        box_audio_write_play(&state->writer, shot->handle, sound, shot->bus,
-            shot->sent_volume, pan, 1.0f, 0, when);
+        box_audio_timeline_grid(world, state, when, &beat, &tempo);
+        box_audio_write_play_note(&state->writer, shot->handle, sound, shot->bus,
+            shot->sent_volume, pan, 1.0f, 1.0f, beat, tempo, 0, 0, when);
     }
 
 done:
@@ -1804,6 +1812,8 @@ static void BoxAudioWavetableChange(
         if (w) {
             w->id = 0;
             w->serial = 0;
+            w->frames = 0;
+            w->logged = false;
         }
     }
 
@@ -1977,6 +1987,8 @@ void box_audio_sync_init(
         .callback = BoxAudioWavetableChange,
         .ctx = state
     });
+
+    box_audio_wavetable_init(world, state);
 
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "AudioSynthRemove" }),

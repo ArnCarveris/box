@@ -231,7 +231,8 @@ static void box_audio_synth_lfo(
         .fade = lfo->fade, .phase = lfo->phase, .random_phase = lfo->random_phase,
         .layer = layer, .pitch = lfo->pitch, .amplitude = lfo->amplitude,
         .cutoff = lfo->cutoff, .pulse_width = lfo->pulse_width,
-        .sync = lfo->sync, .vowel = lfo->vowel, .position = lfo->position };
+        .hard_sync = lfo->hard_sync, .sync = lfo->sync, .vowel = lfo->vowel,
+        .position = lfo->position };
 done:
     return;
 }

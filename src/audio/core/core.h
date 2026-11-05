@@ -192,6 +192,21 @@
 /** Highest rate of a synth LFO in Hz */
 #define BOX_AUDIO_SYNTH_LFO_RATE_MAX 100.0f
 
+/** Longest cycle of a synth LFO synced to the tempo, in beats */
+#define BOX_AUDIO_SYNTH_LFO_SYNC_MAX 256.0f
+
+/** Tempo of a play without one, in beats per second: 120 quarter notes per minute */
+#define BOX_AUDIO_SYNTH_TEMPO 2.0f
+
+/** Slowest and fastest tempo of a play in beats per second, those of the timeline, 20 and 999
+ * quarter notes per minute */
+#define BOX_AUDIO_SYNTH_TEMPO_MIN (20.0f / 60.0f)
+#define BOX_AUDIO_SYNTH_TEMPO_MAX (999.0f / 60.0f)
+
+/** Beats the beat of a play wraps at, so that a float stays precise: a multiple of every
+ * synced LFO cycle of whole, dotted and triplet notes up to 256 beats */
+#define BOX_AUDIO_BEAT_WRAP 768.0
+
 /** Largest depth of the pitch of a synth LFO in cents, up or down */
 #define BOX_AUDIO_SYNTH_CENTS_MAX 2400.0f
 
@@ -361,6 +376,13 @@ typedef struct box_audio_cmd_play_t {
     float velocity;                 /**< Velocity of the note, 0..1, which a synth voice
                                      * keeps for the velocity fields of its patch; 1 for a
                                      * play that is not a note. Sample voices ignore it */
+    float beat;                     /**< Beat of the Transport at the frame it starts at,
+                                     * wrapped into 0..BOX_AUDIO_BEAT_WRAP, which phase locks
+                                     * the synced LFOs of a synth voice; sample voices ignore
+                                     * it */
+    float tempo;                    /**< Beats per second of the Transport at that frame, at
+                                     * which the synced LFOs of a synth voice run for its
+                                     * whole life; 0 for BOX_AUDIO_SYNTH_TEMPO, 120 bpm */
 } box_audio_cmd_play_t;
 
 /** Play a note of a mono voice: retarget the synth voice of a handle that has not reached its
@@ -385,6 +407,9 @@ typedef struct box_audio_cmd_legato_t {
     float velocity;                 /**< Velocity of the note, 0..1, of a new voice; a
                                      * retargeted voice keeps the velocity of the note that
                                      * started it, as its envelopes do not restart */
+    float beat;                     /**< Beat of the note, as of a play, of a new voice; a
+                                     * retargeted voice keeps its LFOs */
+    float tempo;                    /**< Beats per second, as of a play, of a new voice */
 } box_audio_cmd_legato_t;
 
 /** Stop a voice: it fades out and ends. A stop that applies now, with a when of 0 or in the
@@ -1032,7 +1057,7 @@ typedef struct box_audio_synth_lfo_t {
     float amplitude;        /**< Share of the level it takes at the bottom of the wave, 0..1 */
     float cutoff;           /**< Octaves of the cutoff at the top of the wave */
     float pulse_width;      /**< Share of the period the pulse width of squares moves by */
-    float sync;             /**< Semitones the ratio of hard sync moves by at the top of the
+    float hard_sync;        /**< Semitones the ratio of hard sync moves by at the top of the
                              * wave, -BOX_AUDIO_SYNTH_SYNC_SEMITONES..max; on a layer it syncs
                              * it, for every layer only those with a ratio over 1 */
     float vowel;            /**< Vowels of a formant filter at the top of the wave,
@@ -1040,6 +1065,9 @@ typedef struct box_audio_synth_lfo_t {
     float position;         /**< Frames the position of wavetable layers moves by at the top
                              * of the wave, -BOX_AUDIO_TABLE_FRAMES_MAX..max; the moved
                              * position is clamped to the frames of the table */
+    float sync;             /**< Cycle in beats, 0..BOX_AUDIO_SYNTH_LFO_SYNC_MAX, 0 for rate:
+                             * when positive it runs at the tempo of the play over sync and
+                             * starts at phase + fract(beat / sync) of the play */
 } box_audio_synth_lfo_t;
 
 /** A synth patch: up to BOX_AUDIO_SYNTH_LAYERS oscillators with envelopes, then one filter,
@@ -1492,6 +1520,39 @@ bool box_audio_write_play_priority(
     uint32_t priority,
     uint64_t when);
 
+/** Write a play command of a note: with a velocity, a priority and the beat and tempo of the
+ * Transport at its frame, which synced synth LFOs lock to.
+ *
+ * @param writer The writer
+ * @param voice Handle of the new voice
+ * @param sound Id of the sound
+ * @param bus Bus of the voice
+ * @param volume Volume
+ * @param pan Pan, -1..1
+ * @param pitch Pitch ratio
+ * @param velocity Velocity of the note, 0..1, 1 for a play that is not a note
+ * @param beat Beat at its first sample, wrapped into 0..BOX_AUDIO_BEAT_WRAP
+ * @param tempo Beats per second, 0 for BOX_AUDIO_SYNTH_TEMPO
+ * @param flags BOX_AUDIO_PLAY_ flags
+ * @param priority Priority of the voice, 0..BOX_AUDIO_PRIORITY_MAX
+ * @param when Frame of the core clock of its first sample, 0 for now
+ * @return Whether the command fit
+ */
+bool box_audio_write_play_note(
+    box_audio_writer_t *writer,
+    uint32_t voice,
+    uint32_t sound,
+    uint32_t bus,
+    float volume,
+    float pan,
+    float pitch,
+    float velocity,
+    float beat,
+    float tempo,
+    uint32_t flags,
+    uint32_t priority,
+    uint64_t when);
+
 /** Write a legato command at velocity 1: a note that follows the voice of a handle.
  *
  * @param writer The writer
@@ -1569,6 +1630,41 @@ bool box_audio_write_legato_priority(
     float pan,
     float pitch,
     float velocity,
+    uint32_t flags,
+    uint32_t priority,
+    uint64_t when);
+
+/** Write a legato command of a note: with a velocity, a priority and the beat and tempo of the
+ * Transport at its frame, which a new voice locks its synced LFOs to.
+ *
+ * @param writer The writer
+ * @param voice New handle of the voice
+ * @param from Handle of the voice the note follows
+ * @param sound Id of the sound
+ * @param bus Bus of the voice
+ * @param volume Volume
+ * @param pan Pan, -1..1
+ * @param pitch Pitch ratio
+ * @param velocity Velocity of the note, 0..1, of a new voice; a retargeted voice keeps its own
+ * @param beat Beat of the note, wrapped into 0..BOX_AUDIO_BEAT_WRAP
+ * @param tempo Beats per second, 0 for BOX_AUDIO_SYNTH_TEMPO
+ * @param flags BOX_AUDIO_PLAY_ flags
+ * @param priority Priority of the voice, 0..BOX_AUDIO_PRIORITY_MAX
+ * @param when Frame of the core clock of the note, 0 for now
+ * @return Whether the command fit
+ */
+bool box_audio_write_legato_note(
+    box_audio_writer_t *writer,
+    uint32_t voice,
+    uint32_t from,
+    uint32_t sound,
+    uint32_t bus,
+    float volume,
+    float pan,
+    float pitch,
+    float velocity,
+    float beat,
+    float tempo,
     uint32_t flags,
     uint32_t priority,
     uint64_t when);

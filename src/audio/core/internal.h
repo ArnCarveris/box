@@ -1478,6 +1478,9 @@ void box_audio_synth_end(
  * @param sound Id of a ready synth sound
  * @param pitch Pitch ratio
  * @param velocity Velocity of the note, 0..1, for the velocity fields of the patch
+ * @param beat Beat of the Transport at its start, which its synced LFOs lock to
+ * @param tempo Beats per second its synced LFOs run at, 0 or invalid for
+ *  BOX_AUDIO_SYNTH_TEMPO
  * @param loop Whether it starts over at the end of its envelopes
  * @param gate Whether its envelopes sustain until a release, BOX_AUDIO_PLAY_GATE
  */
@@ -1487,6 +1490,8 @@ void box_audio_source_synth(
     uint32_t sound,
     float pitch,
     float velocity,
+    float beat,
+    float tempo,
     bool loop,
     bool gate);
 

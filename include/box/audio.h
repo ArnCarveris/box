@@ -408,7 +408,7 @@ ECS_STRUCT(SynthOscillator, {
                             *   voice included, is the master: the wave runs at the master
                             *   times the ratio and restarts at phase 0 on every cycle of the
                             *   master, band limited at the restart, for sync leads and, with
-                            *   SynthLfo.sync, sync sweeps. Each unison voice syncs to its own
+                            *   SynthLfo.hard_sync, sync sweeps. Each unison voice syncs to its own
                             *   master; the sub stays at the master and phase modulation adds
                             *   to the synced phase. Ignored by SynthNoise and SynthPluck */
     SynthNoiseColor color; /**< SynthNoise: color of the noise, default SynthNoiseWhite. The
@@ -456,9 +456,23 @@ ECS_ENUM(WavetableKind, {
  * octave, 2048 samples at level 0, and hands it to the core, as the frames of a sound. A table
  * of up to 256 frames takes 16.6 KB per frame, a table of 64 frames about 1 MB. Voices that
  * play a table that changes or is deleted play the old one until they end.
+ *
+ * A table loaded from a sound, a WAV or FLAC of single cycle frames, is cut into
+ * floor(frames / frame_size) frames, at most 256, stereo summed to mono, each frame without
+ * its DC, the table normalized to a peak of 1 over all frames. Each frame keeps the harmonics
+ * under the Nyquist of its frame_size, at most 512, so a frame of other than 2048 samples is
+ * resampled to the frames of the table. Until the sound is ready the table has no frames and
+ * its layers play a sine; when the sound becomes ready or changes the table is built again,
+ * and the next play of the synth sounds that name it takes it. A sound that fails to load,
+ * that is not an entity with AudioPcm or SoundFile, or that is shorter than one frame logs
+ * one error that names the Wavetable; a sound of more than 256 frames logs one warning.
  */
 ECS_STRUCT(Wavetable, {
-    WavetableKind kind;    /**< The table, default WavetableBasic */
+    WavetableKind kind;    /**< The table, default WavetableBasic; ignored with a sound */
+    ecs_entity_t sound;    /**< An entity with AudioPcm or SoundFile whose frames make the
+                            *   table in place of kind, 0 for none, the default */
+    int32_t frame_size;    /**< Samples per frame of the sound, 64..4096, default 2048; 0 is
+                            *   the default */
 });
 
 /** The wavetable of a SynthWavetable layer, on the entity of its SynthOscillator.
@@ -878,7 +892,7 @@ ECS_STRUCT(SynthLfo, {
                             *   wave, -10..10; nothing on a SynthFormant filter */
     float pulse_width;     /**< Share of the period the pulse width of squares moves by at the
                             *   top of the wave, -0.49..0.49 */
-    float sync;            /**< Semitones the ratio of SynthOscillator.sync moves by at the
+    float hard_sync;       /**< Semitones the ratio of SynthOscillator.sync moves by at the
                             *   top of the wave, -48..48, default 0; the moved ratio is clamped
                             *   to 1..16. On a layer it syncs that layer, from a ratio of 1
                             *   when it has none; on the root it moves every layer with a
@@ -889,6 +903,15 @@ ECS_STRUCT(SynthLfo, {
     float position;        /**< Frames the position of SynthWavetable layers moves by at the
                             *   top of the wave, -256..256, default 0; the moved position is
                             *   clamped to the frames of the table */
+    float sync;            /**< Cycle in beats of the Transport, 0..256, default 0 for rate.
+                            *   When positive it wins over rate, like Delay.sync: a beat is a
+                            *   quarter note at the tempo of the Transport, 120 without one,
+                            *   so 0.25 is a sixteenth and 1.5 a dotted quarter. The LFO
+                            *   starts at phase + fract(beat / sync), beat being the position
+                            *   of the Transport at the start of the note, so every note sees
+                            *   the same phase of the grid. A voice keeps the tempo it started
+                            *   at: a tempo change applies to the next notes. Delay and fade
+                            *   stay in seconds; SynthLfoRandom steps once per cycle */
 });
 
 /** A sound made by the synth from the components of this entity and its children, without a

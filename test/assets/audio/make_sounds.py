@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Writes the sound files of the Sample tests (test/cpu/audio) and of the browser check
-test/integration/web/audio_sample.mjs, and the drum and the shaker of song.flecs, into this folder.
+test/integration/web/audio_sample.mjs, the drum and the shaker of song.flecs, and the wavetable of the
+SynthWavetableAsset tests, into this folder.
 
 Usage: python3 test/assets/audio/make_sounds.py
 
@@ -43,6 +44,25 @@ def shaker(rate, frames, steps):
         t = (i % step) / rate
         level = 0.5 if (i // step) % 2 == 0 else 0.25
         out.append(level * math.exp(-t / 0.025) * (seed / 0x3FFFFFFF - 1))
+    return out
+
+
+def saw_square(frames, size, harmonics, level):
+    """A wavetable of single cycle frames of size samples that morphs from a saw at frame 0 to
+    a square at the last frame, each frame a linear mix of the two, band limited to a number
+    of harmonics: the saw is the sum of -2 / (pi n) sin(n x), the square the sum of
+    4 / (pi n) sin(n x) over the odd n, as the saw and the square of WavetableBasic."""
+    out = []
+    for j in range(frames):
+        m = j / (frames - 1)
+        amps = []
+        for n in range(1, harmonics + 1):
+            saw = -2 / (math.pi * n)
+            square = 4 / (math.pi * n) if n % 2 else 0.0
+            amps.append(level * ((1 - m) * saw + m * square))
+        for t in range(size):
+            x = 2 * math.pi * t / size
+            out.append(sum(a * math.sin((n + 1) * x) for n, a in enumerate(amps)))
     return out
 
 
@@ -197,6 +217,9 @@ def main():
     # and a shaker of 8 sixteenths, 2 beats at 120 bpm
     wav("kick.wav", 48000, [kick(48000, 19200)])
     wav("shaker.wav", 48000, [shaker(48000, 48000, 8)])
+    # SynthWavetableAsset: 8 frames of 2048 samples from a saw to a square, 64 harmonics at a
+    # level of 0.5, as floats, which the table normalizes to a peak of 1
+    wav("wavetable_saw_square.wav", 48000, [saw_square(8, 2048, 64, 0.5)], float32=True)
 
 
 if __name__ == "__main__":

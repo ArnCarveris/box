@@ -100,7 +100,14 @@ typedef struct AudioWavetable {
     uint32_t id;            /**< Sound id of the table in the core, 0 when not sent */
     uint32_t serial;        /**< Serial of the output the table was built for, 0 to build it
                              *   again */
+    int32_t frames;         /**< Frames of the table sent, 0 while it has none */
+    bool logged;            /**< The error or the warning of its sound was logged */
 } AudioWavetable;
+
+/** Samples per frame of the sound of a Wavetable: the default and the limits */
+#define BOX_AUDIO_WAVETABLE_FRAME_SIZE 2048
+#define BOX_AUDIO_WAVETABLE_FRAME_SIZE_MIN 64
+#define BOX_AUDIO_WAVETABLE_FRAME_SIZE_MAX 4096
 
 /** What box.audio did with an Instrument */
 typedef struct AudioInstrumentState {
@@ -941,6 +948,70 @@ float* box_audio_wavetable_build(
     const double *cosines,
     const double *sines);
 
+/** Samples per frame of the sound of a Wavetable: 0 for the default, else clamped.
+ *
+ * @param frame_size Wavetable.frame_size
+ * @return Samples, BOX_AUDIO_WAVETABLE_FRAME_SIZE_MIN..BOX_AUDIO_WAVETABLE_FRAME_SIZE_MAX
+ */
+int32_t box_audio_wavetable_frame_size(
+    int32_t frame_size);
+
+/** Build a wavetable from the frames of a sound: cut into frames of frame_size samples, at
+ * most BOX_AUDIO_TABLE_FRAMES_MAX, summed to mono, each without its DC, normalized to a peak
+ * of 1 over all frames.
+ *
+ * A forward FFT band limits each frame to the harmonics under the Nyquist of a frame, at most
+ * BOX_AUDIO_TABLE_HARMONICS; a frame_size that is not a power of 2 is resampled to the next
+ * one first.
+ *
+ * @param data Frames of the sound, interleaved when it has more than one channel
+ * @param frames Number of frames of the sound
+ * @param channels Channels, 1 or more
+ * @param frame_size Samples per frame, from box_audio_wavetable_frame_size
+ * @param table_frames Receives the frames of the table
+ * @param floats Receives the floats of the table, BOX_AUDIO_TABLE_FLOATS of its frames
+ * @return The floats, freed with ecs_os_free, NULL when the sound is shorter than a frame
+ */
+float* box_audio_wavetable_load(
+    const float *data,
+    int32_t frames,
+    int32_t channels,
+    int32_t frame_size,
+    int32_t *table_frames,
+    int32_t *floats);
+
+/** Build the table of a Wavetable: of its kind, or from its sound when it has one. A sound
+ * that fails to load, is not a sound or is shorter than one frame logs one error that names
+ * the Wavetable, one of more frames than a table holds one warning.
+ *
+ * @param world The world
+ * @param e The Wavetable entity
+ * @param table Its Wavetable
+ * @param w What was sent for it
+ * @param frames Receives the frames of the table
+ * @param floats Receives the floats of the table
+ * @param loading Receives whether the sound still decodes
+ * @return The floats, freed with ecs_os_free, NULL for none
+ */
+float* box_audio_wavetable_of(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const Wavetable *table,
+    AudioWavetable *w,
+    int32_t *frames,
+    int32_t *floats,
+    bool *loading);
+
+/** Register the observers that build the Wavetables of a sound again when it becomes ready,
+ * changes or is removed. Needs the query of the wavetables of the state.
+ *
+ * @param world The world
+ * @param state The state
+ */
+void box_audio_wavetable_init(
+    ecs_world_t *world,
+    box_audio_module_t *state);
+
 /** Build a built-in wavetable by additive synthesis.
  *
  * @param kind A WavetableKind
@@ -1278,6 +1349,23 @@ double box_audio_anchor_beat(
 double box_audio_timeline_beat(
     const ecs_world_t *world,
     uint64_t frame);
+
+/** Get the beat and the tempo of a play at a frame, which synced synth LFOs lock to: through
+ * the pieces of the timeline while the Transport plays, its position and tempo while it is
+ * stopped, beat 0 at 120 bpm without one.
+ *
+ * @param world The world
+ * @param state The state
+ * @param when Frame of the play, 0 or a past one for the clock
+ * @param beat Receives the beat, wrapped into 0..BOX_AUDIO_BEAT_WRAP
+ * @param tempo Receives the beats per second
+ */
+void box_audio_timeline_grid(
+    const ecs_world_t *world,
+    const box_audio_module_t *state,
+    uint64_t when,
+    float *beat,
+    float *tempo);
 
 /** Convert a beat of the timeline to a frame of the core clock: the first piece that plays the
  * beat at or after the clock, else the first that played it, else the line of the last piece.

@@ -888,7 +888,7 @@ static void box_audio_seq_audio_pass(
 {
     box_audio_sequencer_t *seq = &state->sequencer;
     const box_audio_timeline_t *tl = &state->timeline;
-    float transpose = isfinite(v->p->transpose) ? v->p->transpose : 0.0f;
+    float transpose = isfinite(v->p->transpose) ? v->p->transpose : 0.0f, beat, tempo;
     double from = base > v->start ? base : v->start, end, frames, rate, ratio, position, left;
     box_audio_scheduled_t *sch;
     box_audio_clip_voice_t *cv;
@@ -940,8 +940,9 @@ static void box_audio_seq_audio_pass(
     }
 
     handle = box_audio_new_voice(state);
-    box_audio_write_play_priority(&state->writer, handle, sound, v->bus, v->p->gain, 0.0f,
-        (float)ratio, 1.0f, BOX_AUDIO_PLAY_ATTACK, v->priority, when);
+    box_audio_timeline_grid(world, state, when, &beat, &tempo);
+    box_audio_write_play_note(&state->writer, handle, sound, v->bus, v->p->gain, 0.0f,
+        (float)ratio, 1.0f, beat, tempo, BOX_AUDIO_PLAY_ATTACK, v->priority, when);
     if (position > 0) {
         box_audio_write_voice_set(&state->writer, handle, BOX_AUDIO_PARAM_POSITION,
             (float)position, when);

@@ -214,6 +214,15 @@
                 ]
             },
             {
+                "id": "SynthWavetableAsset",
+                "testcases": [
+                    "saw_to_square",
+                    "frame_size",
+                    "not_ready_fallback",
+                    "too_short"
+                ]
+            },
+            {
                 "id": "SynthPitch",
                 "testcases": [
                     "start_returns",
@@ -264,6 +273,24 @@
                     "legato_keeps",
                     "wide",
                     "script"
+                ]
+            },
+            {
+                "id": "SynthLfoSync",
+                "testcases": [
+                    "period",
+                    "rate",
+                    "phase",
+                    "wide",
+                    "random",
+                    "zero_identical",
+                    "clamped",
+                    "legato_new",
+                    "script",
+                    "timeline",
+                    "no_transport",
+                    "tempo_next_note",
+                    "stopped_position"
                 ]
             },
             {

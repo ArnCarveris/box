@@ -564,7 +564,7 @@ void SynthPitch_none_identical(void) {
 
     p.lfos = 1;
     p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 5,
-        .pitch = 20, .sync = 12 };
+        .pitch = 20, .hard_sync = 12 };
     pitch_render_a(&p);
     q = p;
     q.pitch_envelope = (box_audio_synth_pitch_envelope_t){ .decay = 0.3f, .curve = 4 };
