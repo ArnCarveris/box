@@ -11,7 +11,6 @@ KoreanJarProfile {
   ]}
 }
 prefab KoreanJarBody : KoreanGlaze { Lathe: {profile: KoreanJarProfile, cap_start: true, cap_end: true, segments: 32, rings: 20} }
-@tree Parent
 template KoreanOnggi {
   prop size: f32 = 1
   Scale: {size, size, size}

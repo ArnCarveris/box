@@ -1054,7 +1054,9 @@
                 "id": "TransitionTintOpacity",
                 "testcases": [
                     "tint_mid_transition",
-                    "opacity_mid_transition"
+                    "opacity_mid_transition",
+                    "tint_remove",
+                    "opacity_add"
                 ]
             },
             {
@@ -1074,6 +1076,13 @@
                     "box_shadow_end_matches_target",
                     "box_shadow_no_area",
                     "box_shadow_removed"
+                ]
+            },
+            {
+                "id": "TransitionBorder",
+                "testcases": [
+                    "width_color_mid_transition",
+                    "with_box_shadow"
                 ]
             },
             {

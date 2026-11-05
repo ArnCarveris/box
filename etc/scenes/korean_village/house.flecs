@@ -7,7 +7,6 @@ using box.transform
 using box.geometry
 using box.material
 
-@tree Parent
 template KoreanHouse {
   prop harvest: bool = false
   { (IsA, KoreanStone); Position: {0, 0.2, 0}; RoundedBox: {6.1, 0.4, 4.3, 0.08} }

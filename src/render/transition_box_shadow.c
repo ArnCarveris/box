@@ -10,11 +10,12 @@
 
 #include "transitions.h"
 
-/** Add the entity of a node with an active BoxShadow transition when it draws a shadow.
+/** Add the entity of a node with an active BoxShadow or Border transition when it draws a
+ * shadow: the cutout and the cover alpha of the shadow follow the Border of its shape.
  *
- * BoxShadow is copied into an IsA instance (OnInstantiate, Override), so an entity always draws
- * its shadow with its own value: an instance that inherits Transition and changes its copy is a
- * node of its own, and no change of a prefab reaches the instances made before it.
+ * BoxShadow and Border are copied into an IsA instance (OnInstantiate, Override), so an entity
+ * draws its shadow with its own values: an instance that changes its copy is a node of its own,
+ * and no change of a prefab reaches the instances made before it.
  *
  * @param world The world
  * @param s The state of the extract
@@ -52,8 +53,10 @@ void box_transitions_box_shadows(
 
     for (i = 1; p && i < count; i ++) {
         const box_transition_node_t *node = ecs_vec_get_t(&s->nodes, box_transition_node_t, i);
-        if (node->entity && box_render_transitions_active(
-                s, (uint32_t)i, BOX_RENDER_TRANSITION_BOX_SHADOW, p->time) &&
+        if (node->entity && (box_render_transitions_active(
+                s, (uint32_t)i, BOX_RENDER_TRANSITION_BOX_SHADOW, p->time) ||
+            box_render_transitions_active(
+                s, (uint32_t)i, BOX_RENDER_TRANSITION_BORDER, p->time)) &&
             ecs_is_alive(world, node->entity))
         {
             box_transition_box_shadow_add(world, s, node->entity, (uint32_t)i);
@@ -135,6 +138,8 @@ void box_transitions_send_box_shadows(
 
         box_transitions_fade_target(s, item->entity, p->time, &record.material);
         record.material.nodes[BOX_RENDER_TRANSITION_BOX_SHADOW] = item->node;
+        record.material.nodes[BOX_RENDER_TRANSITION_BORDER] = item->node;
+        box_transitions_leaving_target(s, &record.material);
         record.transform = transform;
         if (item->moving) {
             ecs_os_memcpy(record.rel, item->rel, ECS_SIZEOF(mat4));
