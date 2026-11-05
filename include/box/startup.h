@@ -54,8 +54,8 @@ extern "C" {
  * name and progress are Texts. */
 #define BOX_STARTUP_TEMPLATE "box.startup.StartupWidget"
 
-/** Frames the overlay waits for a first blocking task once the app starts; a start without
- * one in that time ends the startup and the overlay never opens */
+/** Frames in a row without a blocking task that end the startup: the overlay closes, or never
+ * opens when no blocking task came in that time once the app started */
 #define BOX_STARTUP_FRAMES (10)
 
 /** The startup overlay singleton.

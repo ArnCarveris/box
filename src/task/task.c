@@ -34,6 +34,7 @@ typedef struct TaskRegistry {
 } TaskRegistry;
 
 static ECS_COMPONENT_DECLARE(TaskRegistry);
+ECS_DECLARE(TaskPublish);
 
 /** Get the registry of a world.
  *
@@ -296,6 +297,27 @@ static void box_task_aggregate(
     }
 }
 
+/** Whether two InProgressTask values list the same tasks with the same progress.
+ *
+ * @param a A value
+ * @param b The other value
+ * @return Whether they are equal
+ */
+static bool box_task_equal(
+    const InProgressTask *a,
+    const InProgressTask *b)
+{
+    bool result = a->count == b->count && a->blocking == b->blocking;
+    int32_t i;
+    for (i = 0; i < a->count && result; i ++) {
+        const InProgressTaskItem *x = &a->tasks[i], *y = &b->tasks[i];
+        result = x->blocking == y->blocking && x->done == y->done && x->total == y->total &&
+            !ecs_os_strcmp(x->name, y->name);
+    }
+
+    return result;
+}
+
 void box_task_publish(
     ecs_world_t *world)
 {
@@ -317,7 +339,7 @@ void box_task_publish(
     }
 
     ecs_os_mutex_unlock(t->lock);
-    if (dirty && (!cur || ecs_os_memcmp(cur, &next, ECS_SIZEOF(InProgressTask)))) {
+    if (dirty && (!cur || !box_task_equal(cur, &next))) {
         ecs_singleton_set_ptr(world, InProgressTask, &next);
     }
 
@@ -351,6 +373,141 @@ static void box_tasks_free(
     ecs_vec_fini_t(NULL, &t->reports, box_task_report_t);
     ecs_os_mutex_free(t->lock);
     ecs_os_free(t);
+}
+
+/** Free the names of InProgressTaskItem values.
+ *
+ * @param ptr The values
+ * @param count Number of values
+ * @param ti The type info
+ */
+static void box_task_item_dtor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    InProgressTaskItem *items = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        ecs_os_free(items[i].name);
+    }
+}
+
+/** Copy InProgressTaskItem values with their own names.
+ *
+ * @param dst The destination values
+ * @param src The source values
+ * @param count Number of values
+ * @param ti The type info
+ */
+static void box_task_item_copy(
+    void *dst,
+    const void *src,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    InProgressTaskItem *d = dst;
+    const InProgressTaskItem *s = src;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        char *name = ecs_os_strdup(s[i].name);
+        ecs_os_free(d[i].name);
+        d[i] = s[i];
+        d[i].name = name;
+    }
+}
+
+/** Move the names of InProgressTaskItem values.
+ *
+ * @param dst The destination values
+ * @param src The source values
+ * @param count Number of values
+ * @param ti The type info
+ */
+static void box_task_item_move(
+    void *dst,
+    void *src,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    InProgressTaskItem *d = dst;
+    InProgressTaskItem *s = src;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        if (d[i].name != s[i].name) {
+            ecs_os_free(d[i].name);
+        }
+
+        d[i] = s[i];
+        s[i].name = NULL;
+    }
+}
+
+/** Free the names of InProgressTask values.
+ *
+ * @param ptr The values
+ * @param count Number of values
+ * @param ti The type info
+ */
+static void box_task_tasks_dtor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    InProgressTask *t = ptr;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        box_task_item_dtor(t[i].tasks, BOX_TASK_MAX, ti);
+    }
+}
+
+/** Copy InProgressTask values with their own names.
+ *
+ * @param dst The destination values
+ * @param src The source values
+ * @param count Number of values
+ * @param ti The type info
+ */
+static void box_task_tasks_copy(
+    void *dst,
+    const void *src,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    InProgressTask *d = dst;
+    const InProgressTask *s = src;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        d[i].count = s[i].count;
+        d[i].blocking = s[i].blocking;
+        box_task_item_copy(d[i].tasks, s[i].tasks, BOX_TASK_MAX, ti);
+    }
+}
+
+/** Move the names of InProgressTask values.
+ *
+ * @param dst The destination values
+ * @param src The source values
+ * @param count Number of values
+ * @param ti The type info
+ */
+static void box_task_tasks_move(
+    void *dst,
+    void *src,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    InProgressTask *d = dst;
+    InProgressTask *s = src;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        d[i].count = s[i].count;
+        d[i].blocking = s[i].blocking;
+        box_task_item_move(d[i].tasks, s[i].tasks, BOX_TASK_MAX, ti);
+    }
 }
 
 /** Free the registries of TaskRegistry values.
@@ -399,7 +556,18 @@ void BoxTaskImport(
 
     ECS_META_COMPONENT(world, InProgressTaskItem);
     ECS_META_COMPONENT(world, InProgressTask);
-    ecs_set_hooks(world, InProgressTask, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, InProgressTaskItem, {
+        .ctor = flecs_default_ctor,
+        .dtor = box_task_item_dtor,
+        .copy = box_task_item_copy,
+        .move = box_task_item_move
+    });
+    ecs_set_hooks(world, InProgressTask, {
+        .ctor = flecs_default_ctor,
+        .dtor = box_task_tasks_dtor,
+        .copy = box_task_tasks_copy,
+        .move = box_task_tasks_move
+    });
     ECS_COMPONENT_DEFINE(world, TaskRegistry);
     ecs_set_hooks(world, TaskRegistry, {
         .ctor = flecs_default_ctor,
@@ -414,9 +582,14 @@ void BoxTaskImport(
     ecs_singleton_ensure(world, TaskRegistry)->tasks = t;
     ecs_singleton_set(world, InProgressTask, {0});
 
+    TaskPublish = ecs_entity(world, { .name = "TaskPublish" });
+    ecs_add_id(world, TaskPublish, EcsPhase);
+    ecs_add_pair(world, TaskPublish, EcsDependsOn, EcsPostFrame);
+    ecs_id(TaskPublish) = TaskPublish;
+
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "TaskPublish" }),
-        .phase = EcsPostFrame,
+        .entity = ecs_entity(world, { .name = "TaskPublishTasks" }),
+        .phase = TaskPublish,
         .run = BoxTaskPublish,
         .immediate = true
     });

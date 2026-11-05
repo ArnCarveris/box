@@ -340,6 +340,7 @@ void BoxRenderImport(
     ecs_add_id(world, RenderSubmit, EcsPhase);
     ecs_add_pair(world, RenderSubmit, EcsDependsOn, RenderExtract);
     ecs_id(RenderSubmit) = RenderSubmit;
+    ecs_add_pair(world, TaskPublish, EcsDependsOn, RenderSubmit);
 
     ecs_singleton_set(world, RenderRing, { .ring = box_render_ring_new() });
     ecs_singleton_set(world, RenderStatus, {0});

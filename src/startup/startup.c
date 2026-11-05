@@ -36,7 +36,7 @@ typedef struct box_startup_t {
     bool missing;               /**< The script was not found since the overlay opened */
     bool shown;                 /**< The content is shown */
     bool relayout;              /**< The surface changed since the screen was sized */
-    int32_t frames;             /**< Frames the overlay could open in since the app started */
+    int32_t idle;               /**< Frames in a row without a blocking task */
     ecs_entity_t surface;       /**< Surface the screen fills, 0 while the world has none */
     float width;                /**< Surface width in points the screen was sized for */
     float height;               /**< Surface height in points the screen was sized for */
@@ -371,8 +371,9 @@ static bool box_startup_eligible(
     return !overlay->disabled && (overlay->enabled || run);
 }
 
-/** Decide whether the overlay is open: it opens while a task blocks, and once none is left
- * after it opened, or none came in the first BOX_STARTUP_FRAMES frames, the startup is over.
+/** Decide whether the overlay is open: it opens while a task blocks, and once BOX_STARTUP_FRAMES
+ * frames in a row had none, the startup is over. The frames bridge the gap between one blocking
+ * task and the next, such as a font that loaded and the glyph fields it needs.
  *
  * @param world The world
  * @param st The overlay state
@@ -390,10 +391,10 @@ static void box_startup_decide(
         goto done;
     }
 
-    st->frames ++;
+    st->idle = blocking > 0 ? 0 : st->idle + 1;
     if (blocking > 0) {
         value->open = true;
-    } else if (value->open || st->frames > BOX_STARTUP_FRAMES) {
+    } else if (st->idle > BOX_STARTUP_FRAMES) {
         value->open = false;
         value->finished = true;
     }

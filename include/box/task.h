@@ -57,7 +57,7 @@ extern "C" {
 /** A task in progress: the work of every report of the same name */
 ECS_STRUCT(InProgressTaskItem, {
     char *name;         /**< What the task is, short and stable, such as "Compiling shaders";
-                         *   owned by box.task, NULL for an unused entry */
+                         *   owned, NULL for an unused entry */
     bool blocking;      /**< The scene cannot be shown as intended until the task finishes:
                          *   any report of the name blocks */
     int32_t done;       /**< Units of the task that finished, such as pipelines or glyphs */
@@ -76,6 +76,10 @@ ECS_STRUCT(InProgressTask, {
     int32_t blocking;   /**< Tasks among them that are blocking */
     InProgressTaskItem tasks[16]; /**< The tasks, BOX_TASK_MAX entries */
 });
+
+/** Phase in which box.task writes InProgressTask, the last of the frame: modules that report
+ * in a later phase, such as the renderer in its extract, make it depend on that phase */
+extern ECS_DECLARE(TaskPublish);
 
 /** A report of a task, the handle box_task_start returns, 0 for none */
 typedef uint32_t box_task_id_t;
