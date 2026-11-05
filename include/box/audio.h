@@ -445,15 +445,12 @@ ECS_STRUCT(SynthFilter, {
     float resonance;       /**< 0 (a Butterworth response) to 1 (rings the longest) */
     SynthFilterSlope slope; /**< Steepness, default SynthSlope12; at SynthSlope24 the resonance
                             *   applies to the second stage only */
-<<<<<<< HEAD
     float drive;           /**< Saturation, 0 to 1, default 0 (linear): soft clips the input
                             *   and the resonance of each stage, so a high resonance compresses
                             *   and growls instead of whistling; 1 drives it hard */
-=======
     float velocity;        /**< Octaves of the cutoff at velocity 1 over velocity 0, -10..10,
                             *   default 0: the cutoff applies as authored at velocity 1 and is
                             *   cutoff * 2^(velocity (v - 1)) at the velocity v of a note */
->>>>>>> ae9e64879a2f6242c7e589da1089cfd4bcef853c
 });
 
 /** A filter, an effect in an insert slot of an AudioBus, as a Reverb is: the state variable

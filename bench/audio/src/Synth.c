@@ -2,13 +2,8 @@
  * @file Synth.c
  * @brief Benchmarks for the synth of the audio core: 64 looping synth voices on the master,
  * one item per sample of the output, with the patch of three layers, the same with two LFOs or
-<<<<<<< HEAD
- * one of FM or with curved envelopes or with a driven filter, 32 voices of a pluck string,
- * steady or under a vibrato, and 8 of a unison pluck of 4.
-=======
- * one of FM, with curved envelopes or with subs, 32 voices of a pluck string, steady or under
- * a vibrato, and 8 of a unison pluck of 4.
->>>>>>> ae9e64879a2f6242c7e589da1089cfd4bcef853c
+ * one of FM, with curved envelopes, with a driven filter or with subs, 32 voices of a pluck
+ * string, steady or under a vibrato, and 8 of a unison pluck of 4.
  *
  * Each iteration renders one quantum of 128 stereo frames, so the time per item is the time
  * per sample of the whole mix of 64 voices.
@@ -34,11 +29,8 @@
  * @param fm Whether the patch is the one of phase modulation
  * @param lfo Whether two LFOs move the patch
  * @param curved Whether the patch envelope and the envelope of the square are curved
-<<<<<<< HEAD
  * @param drive Drive of the filter, 0..1
-=======
  * @param sub Whether the saw has a sub an octave under and the square one two octaves under
->>>>>>> ae9e64879a2f6242c7e589da1089cfd4bcef853c
  * @return The core
  */
 static box_audio_core_t* bench_synth_core(
@@ -47,11 +39,8 @@ static box_audio_core_t* bench_synth_core(
     bool fm,
     bool lfo,
     bool curved,
-<<<<<<< HEAD
-    float drive)
-=======
+    float drive,
     bool sub)
->>>>>>> ae9e64879a2f6242c7e589da1089cfd4bcef853c
 {
     static uint8_t bytes[8192];
     box_audio_core_desc_t desc = { .sample_rate = BENCH_RATE };
@@ -199,11 +188,7 @@ void Synth_voices_64(
 {
     // audio/synth
     box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
-<<<<<<< HEAD
-        0);
-=======
-        false);
->>>>>>> ae9e64879a2f6242c7e589da1089cfd4bcef853c
+        0, false);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
@@ -213,11 +198,7 @@ void Synth_voices_64_filter_envelope(
 {
     // audio/synth
     box_audio_core_t *core = bench_synth_core(true, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
-<<<<<<< HEAD
-        0);
-=======
-        false);
->>>>>>> ae9e64879a2f6242c7e589da1089cfd4bcef853c
+        0, false);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
@@ -227,8 +208,7 @@ void Synth_voices_64_filter_24(
 {
     // audio/synth
     box_audio_core_t *core = bench_synth_core(true, BOX_AUDIO_SYNTH_SLOPE_24, false, false, false,
-<<<<<<< HEAD
-        0);
+        0, false);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
@@ -238,7 +218,7 @@ void Synth_voices_64_drive(
 {
     // audio/synth
     box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
-        1);
+        1, false);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
@@ -248,10 +228,7 @@ void Synth_voices_64_filter_24_drive(
 {
     // audio/synth
     box_audio_core_t *core = bench_synth_core(true, BOX_AUDIO_SYNTH_SLOPE_24, false, false, false,
-        1);
-=======
-        false);
->>>>>>> ae9e64879a2f6242c7e589da1089cfd4bcef853c
+        1, false);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
@@ -261,11 +238,7 @@ void Synth_voices_64_lfo(
 {
     // audio/synth
     box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, true, false,
-<<<<<<< HEAD
-        0);
-=======
-        false);
->>>>>>> ae9e64879a2f6242c7e589da1089cfd4bcef853c
+        0, false);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
@@ -275,11 +248,7 @@ void Synth_voices_64_fm(
 {
     // audio/synth
     box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, true, false, false,
-<<<<<<< HEAD
-        0);
-=======
-        false);
->>>>>>> ae9e64879a2f6242c7e589da1089cfd4bcef853c
+        0, false);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
@@ -289,10 +258,7 @@ void Synth_voices_64_curved(
 {
     // audio/synth
     box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, false, true,
-<<<<<<< HEAD
-        0);
-=======
-        false);
+        0, false);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
@@ -302,8 +268,7 @@ void Synth_voices_64_sub(
 {
     // audio/synth
     box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
-        true);
->>>>>>> ae9e64879a2f6242c7e589da1089cfd4bcef853c
+        0, true);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
