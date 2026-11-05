@@ -300,10 +300,21 @@ ECS_ENUM(SynthWave, {
     SynthSaw,              /**< Saw, band limited */
     SynthSquare,           /**< Square, band limited */
     SynthTriangle,         /**< Triangle */
-    SynthNoise,            /**< White noise, seeded per play from SynthSound.seed */
+    SynthNoise,            /**< Noise, seeded per play from SynthSound.seed, white or of the
+                            *   SynthOscillator.color */
     SynthPluck             /**< A plucked string (Karplus-Strong), set by the SynthString of
                             *   the layer; it rings out on its own and ends the sound when it
                             *   is silent, so it needs no envelope */
+});
+
+/** Color of the noise of a SynthNoise layer. Each is at about the RMS level of white noise at
+ * the same level, and keeps its slope at every sample rate */
+ECS_ENUM(SynthNoiseColor, {
+    SynthNoiseWhite,       /**< White, flat, the same power in every Hz */
+    SynthNoisePink,        /**< Pink, falls by 3 dB per octave, the same power in every
+                            *   octave: wind, surf, rain */
+    SynthNoiseBrown        /**< Brown, falls by 6 dB per octave, a leaky integral of white
+                            *   noise without DC: rumble, distant surf, soft hits */
 });
 
 /** Kind of the filter of a synth sound */
@@ -381,6 +392,10 @@ ECS_STRUCT(SynthOscillator, {
                             *   SynthLfo.sync, sync sweeps. Each unison voice syncs to its own
                             *   master; the sub stays at the master and phase modulation adds
                             *   to the synced phase. Ignored by SynthNoise and SynthPluck */
+    SynthNoiseColor color; /**< SynthNoise: color of the noise, default SynthNoiseWhite. The
+                            *   white noise it filters is seeded as white noise is, so a
+                            *   colored layer is as deterministic; each unison voice filters
+                            *   its own. Ignored by the other waves */
 });
 
 /** The string of a SynthPluck layer, on the layer: a delay line a period long, plucked with a

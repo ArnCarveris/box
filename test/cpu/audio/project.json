@@ -161,6 +161,24 @@
                 ]
             },
             {
+                "id": "SynthNoise",
+                "testcases": [
+                    "pink_slope_48000",
+                    "pink_slope_96000",
+                    "brown_slope_48000",
+                    "brown_slope_96000",
+                    "white_flat",
+                    "rms_matches_white",
+                    "seed_identical",
+                    "seed_plays",
+                    "white_unchanged",
+                    "unison",
+                    "paths",
+                    "clamped",
+                    "script"
+                ]
+            },
+            {
                 "id": "SynthVelocity",
                 "testcases": [
                     "filter_cutoff",

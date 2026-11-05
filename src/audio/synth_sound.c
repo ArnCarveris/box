@@ -151,6 +151,8 @@ static void box_audio_synth_layer(
     l->sub = osc->sub;
     l->sub_octave = osc->sub_octave >= 2 ? 2 : 1;
     l->sync = osc->sync;
+    l->color = osc->color == SynthNoisePink ? BOX_AUDIO_SYNTH_PINK :
+        (osc->color == SynthNoiseBrown ? BOX_AUDIO_SYNTH_BROWN : BOX_AUDIO_SYNTH_WHITE);
     l->voices = 1;
     if (unison) {
         l->voices = unison->voices > 1 ? (uint32_t)unison->voices : 1;

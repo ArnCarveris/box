@@ -178,6 +178,8 @@ static void box_audio_synth_patch_clamp(
         l->sub_octave = l->sub_octave >= 2 ? 2 : 1;
         l->sync = l->wave == BOX_AUDIO_SYNTH_NOISE || l->wave == BOX_AUDIO_SYNTH_PLUCK ? 1.0f :
             box_audio_synth_clamp(l->sync, 1, BOX_AUDIO_SYNTH_SYNC_MAX);
+        l->color = l->wave == BOX_AUDIO_SYNTH_NOISE && l->color <= BOX_AUDIO_SYNTH_BROWN ?
+            l->color : BOX_AUDIO_SYNTH_WHITE;
     }
 
     if (p->lfos > BOX_AUDIO_SYNTH_LFOS) {

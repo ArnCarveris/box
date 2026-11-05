@@ -278,7 +278,7 @@ voices on play, so edits affect subsequent plays.
 | Component | Authoring controls |
 | --- | --- |
 | `SynthSound` | `seed`, `pitch_variance`, `level_variance`; variances default to zero |
-| `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), `sync` (0, off, 1..16), modulation controls, `velocity` (0) |
+| `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), `sync` (0, off, 1..16), `color` (`SynthNoiseWhite`), modulation controls, `velocity` (0) |
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`; all zero by default |
 | `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves) |
 | `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves and `velocity` (0); requires a filter |
@@ -299,6 +299,17 @@ layer's level and envelope, so it shares them. It is derived from the layer's
 phase: it follows sweeps, glides, legato, pitch LFOs and every unison voice, but
 not phase modulation or feedback. A modulator modulates with its sub included.
 `SynthNoise` and `SynthPluck` ignore it.
+
+`color` sets the color of a `SynthNoise` layer, for wind, surf, hiss and softer
+percussion than white noise: `SynthNoiseWhite` (the default), `SynthNoisePink`, which
+falls by 3 dB per octave, or `SynthNoiseBrown`, which falls by 6 dB per octave. Pink
+filters the white noise through a cascade of poles and zeros two octaves apart, brown
+through a leaky integrator and a highpass that removes its DC. The filters are set in
+Hz from the sample rate, flat under 5 Hz (pink) or 10 Hz (brown), so the slope holds
+at every rate. Each color is at about the
+RMS level of white noise at the same `level`. The noise stays seeded per play from
+`SynthSound.seed`, so colored noise is as deterministic as white, and each unison
+voice colors its own noise. Other waves ignore it.
 
 `sync` hard syncs a layer, for sync leads and sync sweeps. The layer's note frequency,
 with its sweep, glide, pitch LFOs, unison detune and the voice pitch, is the master;

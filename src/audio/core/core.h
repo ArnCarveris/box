@@ -719,6 +719,13 @@ typedef enum box_audio_synth_wave_t {
     BOX_AUDIO_SYNTH_PLUCK = 5      /**< A Karplus-Strong string plucked with seeded noise */
 } box_audio_synth_wave_t;
 
+/** Colors of the noise of a synth oscillator, each at about the RMS level of white noise */
+typedef enum box_audio_synth_color_t {
+    BOX_AUDIO_SYNTH_WHITE = 0,     /**< White, flat */
+    BOX_AUDIO_SYNTH_PINK = 1,      /**< Pink, falls by 3 dB per octave */
+    BOX_AUDIO_SYNTH_BROWN = 2      /**< Brown, falls by 6 dB per octave */
+} box_audio_synth_color_t;
+
 /** Kinds of the filter of a synth patch */
 typedef enum box_audio_synth_filter_t {
     BOX_AUDIO_SYNTH_FILTER_NONE = 0,  /**< No filter */
@@ -812,6 +819,9 @@ typedef struct box_audio_synth_layer_t {
                                            * 1..BOX_AUDIO_SYNTH_SYNC_MAX, restarted on every
                                            * cycle of the frequency; 0 counts as 1, off.
                                            * Ignored by noise and pluck */
+    uint32_t color;                       /**< BOX_AUDIO_SYNTH_NOISE: a
+                                           * box_audio_synth_color_t, 0 white; ignored by
+                                           * the other waves */
 } box_audio_synth_layer_t;
 
 /** An LFO of a synth patch: a wave at a rate that starts after a delay and fades in, with a

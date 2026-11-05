@@ -517,6 +517,24 @@ typedef struct box_audio_synth_unison_t {
     uint32_t wraps[BOX_AUDIO_SYNTH_UNISON_MAX]; /**< Times the phase of each voice wrapped,
                                                 * for its sub */
 } box_audio_synth_unison_t;
+/** Most sections of the filter that colors noise */
+#define BOX_AUDIO_SYNTH_COLOR_SECTIONS 10
+
+/** The filter that colors the noise of a layer of a synth voice, pink or brown: a cascade of
+ * first order sections y = x - zero x1 + pole y1, their poles and zeros at frequencies in Hz
+ * mapped to the rate, times a gain that brings its RMS level to that of the white noise. Each
+ * unison voice filters its own noise with its own state; a layer without unison uses that of
+ * the first */
+typedef struct box_audio_synth_color_filter_t {
+    int32_t sections;     /**< Sections, 0 for white noise, which it leaves alone */
+    float zero[BOX_AUDIO_SYNTH_COLOR_SECTIONS]; /**< Zero of each section */
+    float pole[BOX_AUDIO_SYNTH_COLOR_SECTIONS]; /**< Pole of each section */
+    float gain;           /**< Gain of the output, 1 over the RMS gain of the sections */
+    float state[BOX_AUDIO_SYNTH_UNISON_MAX][BOX_AUDIO_SYNTH_COLOR_SECTIONS + 1]; /**< Per
+                           * unison voice: its last noise, then the last output of each
+                           * section, the last input of the next */
+} box_audio_synth_color_filter_t;
+
 /** A pluck string of a synth voice: a Karplus-Strong loop of a delay line, a symmetric lowpass
  * of one frame of delay and a first order allpass of the fraction of a frame left, with a gain
  * that sets its decay, and the old read point that crossfades into the new one at a crossing.
@@ -561,6 +579,7 @@ typedef struct box_audio_synth_part_t {
     box_audio_synth_string_t *string; /**< The string of its first unison voice, the others
                                        * chained after it, for a BOX_AUDIO_SYNTH_PLUCK layer;
                                        * NULL for another */
+    box_audio_synth_color_filter_t color; /**< The filter that colors its noise */
 } box_audio_synth_part_t;
 
 /** A source that plays a synth patch, a copy of it, so it never allocates: the patch without

@@ -55,6 +55,19 @@
 /** Pi */
 #define BOX_AUDIO_SYNTH_PI 3.14159265358979323846
 
+/** Hz of the lowest pole of the filter of pink noise, under which it is flat */
+#define BOX_AUDIO_SYNTH_PINK_LOW 5.0
+
+/** Ratio of the frequencies of two poles of the filter of pink noise, two octaves; the zero of
+ * each section lies half way between, an octave over its pole */
+#define BOX_AUDIO_SYNTH_PINK_SPACING 4.0
+
+/** Hz of the leak of the integrator of brown noise, under which it is flat */
+#define BOX_AUDIO_SYNTH_BROWN_LEAK 10.0
+
+/** Hz of the highpass that keeps brown noise from its DC */
+#define BOX_AUDIO_SYNTH_BROWN_DC 5.0
+
 /** Turns per radian */
 #define BOX_AUDIO_SYNTH_TURNS (1.0 / 6.28318530717958647692)
 
@@ -487,6 +500,117 @@ static inline float box_audio_synth_noise(
     *state = x;
 
     return (float)(int32_t)x * (1.0f / 2147483648.0f);
+}
+
+/** Pole or zero of a first order section at a frequency, exp(-2 pi f / rate), the matched z
+ * transform of it.
+ *
+ * @param hz Frequency in Hz
+ * @param rate Frames per second
+ * @return The pole or zero, 0..1
+ */
+static double box_audio_synth_color_root(
+    double hz,
+    float rate)
+{
+    return box_audio_synth_exp2(-2 * BOX_AUDIO_SYNTH_PI * hz /
+        ((double)rate * BOX_AUDIO_SYNTH_LN2));
+}
+
+/** Set the filter that colors the noise of a layer for a rate and clear its state.
+ *
+ * Pink: sections of a pole and a zero an octave over it, the poles two octaves apart up to
+ * Nyquist. Brown: a leaky integrator, then a highpass of its DC. The gain is 1 over the RMS
+ * gain, from the partial fractions of the cascade: H = d + sum r_k / (1 - p_k / z).
+ *
+ * @param f The filter
+ * @param color A box_audio_synth_color_t
+ * @param rate Frames per second
+ */
+static void box_audio_synth_color_init(
+    box_audio_synth_color_filter_t *f,
+    uint32_t color,
+    float rate)
+{
+    double p[BOX_AUDIO_SYNTH_COLOR_SECTIONS], z[BOX_AUDIO_SYNTH_COLOR_SECTIONS];
+    double r[BOX_AUDIO_SYNTH_COLOR_SECTIONS], d = 1, h0, energy, hz, num, den;
+    int32_t i, j, n = 0;
+    for (i = 0; i < BOX_AUDIO_SYNTH_UNISON_MAX; i ++) {
+        for (j = 0; j <= BOX_AUDIO_SYNTH_COLOR_SECTIONS; j ++) {
+            f->state[i][j] = 0;
+        }
+    }
+
+    if (color == BOX_AUDIO_SYNTH_PINK) {
+        for (hz = BOX_AUDIO_SYNTH_PINK_LOW; hz < 0.5 * (double)rate &&
+            n < BOX_AUDIO_SYNTH_COLOR_SECTIONS; hz *= BOX_AUDIO_SYNTH_PINK_SPACING)
+        {
+            f->pole[n] = (float)box_audio_synth_color_root(hz, rate);
+            f->zero[n] = (float)box_audio_synth_color_root(hz * 2, rate);
+            n ++;
+        }
+    } else if (color == BOX_AUDIO_SYNTH_BROWN) {
+        f->pole[0] = (float)box_audio_synth_color_root(BOX_AUDIO_SYNTH_BROWN_LEAK, rate);
+        f->zero[0] = 0;
+        f->pole[1] = (float)box_audio_synth_color_root(BOX_AUDIO_SYNTH_BROWN_DC, rate);
+        f->zero[1] = 1;
+        n = 2;
+    }
+
+    for (i = 0; i < n; i ++) {
+        p[i] = (double)f->pole[i];
+        z[i] = (double)f->zero[i];
+        d *= z[i] / p[i];
+    }
+
+    h0 = d;
+    for (i = 0; i < n; i ++) {
+        num = 1;
+        den = 1;
+        for (j = 0; j < n; j ++) {
+            num *= 1 - z[j] / p[i];
+            den *= j != i ? 1 - p[j] / p[i] : 1.0;
+        }
+
+        r[i] = num / den;
+        h0 += r[i];
+    }
+
+    energy = h0 * h0;
+    for (i = 0; i < n; i ++) {
+        for (j = 0; j < n; j ++) {
+            energy += r[i] * r[j] * p[i] * p[j] / (1 - p[i] * p[j]);
+        }
+    }
+
+    f->sections = n;
+    f->gain = n && energy > 0 ?
+        (float)box_audio_synth_exp2(-0.5 * box_audio_synth_log2(energy)) : 1.0f;
+}
+
+/** Color a frame of white noise of a unison voice by the filter of its layer.
+ *
+ * @param f The filter, with sections
+ * @param voice The unison voice, 0 for a layer without unison
+ * @param x The white noise
+ * @return The colored noise, at about the RMS level of the white
+ */
+static inline float box_audio_synth_color_next(
+    box_audio_synth_color_filter_t *f,
+    int32_t voice,
+    float x)
+{
+    float *s = f->state[voice], in;
+    int32_t i, n = f->sections;
+    for (i = 0; i < n; i ++) {
+        in = x;
+        x = in - f->zero[i] * s[i] + f->pole[i] * s[i + 1];
+        s[i] = in;
+    }
+
+    s[n] = x;
+
+    return x * f->gain;
 }
 
 /** Aim every destination of the LFOs of a source at their values: the factors of the pitch,
@@ -929,6 +1053,7 @@ static void box_audio_synth_pass(
             part->unison.wraps[n] = 0;
         }
 
+        box_audio_synth_color_init(&part->color, layer->color, rate);
         src->modulated = src->modulated || o->target >= 0 || layer->feedback > 0;
         if (o->env != BOX_AUDIO_SYNTH_ENV_FREE) {
             src->envs |= 1u << o->env;
@@ -1836,15 +1961,21 @@ static inline void box_audio_synth_osc_advance(
 /** Render a frame of an oscillator and advance it.
  *
  * @param o The oscillator
+ * @param color The filter that colors its noise
  * @param rng State of the noise
  * @return The sample, -1..1
  */
 static inline float box_audio_synth_osc_next(
     box_audio_synth_osc_t *o,
+    box_audio_synth_color_filter_t *color,
     uint32_t *rng)
 {
     float x = o->synced ? box_audio_synth_sync(o, o->phase, o->inc, 0, 0, rng) :
         box_audio_synth_wave(o->wave, o->phase, o->inc, o->width, rng);
+    if (color->sections) {
+        x = box_audio_synth_color_next(color, 0, x);
+    }
+
     if (o->sub != 0) {
         x += o->sub * box_audio_synth_sub(o->phase, o->wraps, o->sub_octave, o->inc);
     }
@@ -2001,6 +2132,10 @@ static inline float box_audio_synth_layers_lfo(
         } else {
             x = o->synced ? box_audio_synth_sync(o, o->phase, inc, 0, 0, &src->rng) :
                 box_audio_synth_wave(o->wave, o->phase, inc, o->width, &src->rng);
+            if (part->color.sections) {
+                x = box_audio_synth_color_next(&part->color, 0, x);
+            }
+
             if (o->sub != 0) {
                 x += o->sub * box_audio_synth_sub(o->phase, o->wraps, o->sub_octave, inc);
             }
@@ -2087,6 +2222,10 @@ static inline float box_audio_synth_modulate(
         } else {
             x = o->synced ? box_audio_synth_sync(o, o->phase, inc, shift, moved, &src->rng) :
                 box_audio_synth_wave(o->wave, t, dt, o->width, &src->rng);
+            if (src->part[l]->color.sections) {
+                x = box_audio_synth_color_next(&src->part[l]->color, 0, x);
+            }
+
             if (o->sub != 0) {
                 sub = o->sub * box_audio_synth_sub(o->phase, o->wraps, o->sub_octave, inc);
             }
@@ -2157,6 +2296,10 @@ static inline void box_audio_synth_unison_next(
         } else {
             t = shift != 0 ? box_audio_synth_wrap(u->phase[k] + shift) : u->phase[k];
             x = box_audio_synth_wave(o->wave, t, dt, o->width, &src->rng);
+        }
+
+        if (part->color.sections) {
+            x = box_audio_synth_color_next(&part->color, k, x);
         }
 
         l += x * u->left[k];
@@ -2282,6 +2425,10 @@ static inline void box_audio_synth_mix_wide(
                 x = o->synced ? box_audio_synth_sync(o, o->phase, inc, shift, 0, &src->rng) :
                     box_audio_synth_wave(o->wave, box_audio_synth_wrap(o->phase + shift), inc,
                     o->width, &src->rng);
+                if (part->color.sections) {
+                    x = box_audio_synth_color_next(&part->color, 0, x);
+                }
+
                 if (o->sub != 0) {
                     sub = o->sub * box_audio_synth_sub(o->phase, o->wraps, o->sub_octave, inc);
                 }
@@ -2458,13 +2605,14 @@ int32_t box_audio_synth_render(
                 box_audio_synth_osc_t *o = &src->part[l]->osc;
                 float x = o->wave == BOX_AUDIO_SYNTH_PLUCK ?
                     box_audio_synth_string_next(src, src->part[l], o->inc) :
-                    box_audio_synth_osc_next(o, &src->rng);
+                    box_audio_synth_osc_next(o, &src->part[l]->color, &src->rng);
                 mix += x * o->level * levels[o->env];
             }
         } else {
             for (l = 0; l < layers; l ++) {
                 box_audio_synth_osc_t *o = &src->part[l]->osc;
-                mix += box_audio_synth_osc_next(o, &src->rng) * o->level * levels[o->env];
+                mix += box_audio_synth_osc_next(o, &src->part[l]->color, &src->rng) *
+                    o->level * levels[o->env];
             }
         }
 

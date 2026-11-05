@@ -1127,6 +1127,7 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, SynthFilterKind);
     ECS_META_COMPONENT(world, SynthFilterSlope);
     ECS_META_COMPONENT(world, SynthModulation);
+    ECS_META_COMPONENT(world, SynthNoiseColor);
     ECS_META_COMPONENT(world, SynthOscillator);
     ecs_set_hooks(world, SynthOscillator, { .ctor = box_audio_synth_oscillator_ctor });
     ECS_META_COMPONENT(world, SynthUnison);
