@@ -398,6 +398,25 @@ static void box_audio_synth_filter_ctor(
     }
 }
 
+/** Construct SynthDrive values: a drive of 0.3, symmetric.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_synth_drive_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    SynthDrive *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (SynthDrive){ .drive = 0.3f, .asymmetry = 0 };
+    }
+}
+
 /** Construct SynthLfo values: a sine at 5 Hz from phase 0 without a delay, at depth 0 on
  * every destination.
  *
@@ -1147,6 +1166,7 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, SynthFilterKind);
     ECS_META_COMPONENT(world, SynthFilterSlope);
     ECS_META_COMPONENT(world, SynthModulation);
+    ECS_META_COMPONENT(world, SynthNoiseColor);
     ECS_META_COMPONENT(world, SynthOscillator);
     ecs_set_hooks(world, SynthOscillator, { .ctor = box_audio_synth_oscillator_ctor });
     ECS_META_COMPONENT(world, SynthUnison);
@@ -1174,6 +1194,8 @@ void BoxAudioImport(
     ecs_set_hooks(world, TransientShaper, { .ctor = box_audio_transient_shaper_ctor });
     ECS_META_COMPONENT(world, SynthFilterEnvelope);
     ECS_META_COMPONENT(world, SynthGlide);
+    ECS_META_COMPONENT(world, SynthDrive);
+    ecs_set_hooks(world, SynthDrive, { .ctor = box_audio_synth_drive_ctor });
     ECS_META_COMPONENT(world, SynthLfoWave);
     ECS_META_COMPONENT(world, SynthLfo);
     ecs_set_hooks(world, SynthLfo, { .ctor = box_audio_synth_lfo_ctor });
@@ -1193,6 +1215,8 @@ void BoxAudioImport(
     ecs_set_hooks(world, NoteClip, { .ctor = box_audio_note_clip_ctor });
     ECS_META_COMPONENT(world, AudioClip);
     ecs_set_hooks(world, AudioClip, { .ctor = box_audio_audio_clip_ctor });
+    ECS_META_COMPONENT(world, TrackSwingGrid);
+    ECS_META_COMPONENT(world, TrackHumanize);
     ECS_META_COMPONENT(world, Track);
     ecs_set_hooks(world, Track, { .ctor = box_audio_track_ctor });
     ECS_META_COMPONENT(world, ClipPlacement);

@@ -85,13 +85,13 @@ template Jukebox {
   shell : JBWood {
     Position: {0, 0, -0.04}
     Rotation: {-PI / 2, 0, 0}
-    ProfileExtrusion: {profile: JBProfile, depth: 0.76, cap_start: true, cap_end: true}
+    ProfileExtrusion: {profile: JBProfile, depth: 0.76, cap_start: true, cap_end: true, smooth: true}
   }
   face : JBEnamel {
     Position: {0, 0, 0.35}
     Rotation: {-PI / 2, 0, 0}
     Scale: {0.96, 1, 0.985}
-    ProfileExtrusion: {profile: JBProfile, depth: 0.045, cap_start: true, cap_end: true}
+    ProfileExtrusion: {profile: JBProfile, depth: 0.045, cap_start: true, cap_end: true, smooth: true}
   }
   plinth : JBDark { Position: {0, 0.08, 0}; RoundedBox: {1.53, 0.16, 0.94, 0.06} }
   bumper : JBChrome { Position: {0, 0.165, 0.015}; RoundedBox: {1.5, 0.055, 0.91, 0.025} }

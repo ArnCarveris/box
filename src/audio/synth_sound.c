@@ -61,15 +61,16 @@ void box_audio_synth_init(
     ecs_entity_t ids[] = {
         ecs_id(SynthSound), ecs_id(SynthOscillator), ecs_id(SynthEnvelope), ecs_id(SynthFilter),
         ecs_id(SynthFilterEnvelope), ecs_id(SynthGlide), ecs_id(SynthUnison),
-        ecs_id(SynthString), ecs_id(SynthLfo)
+        ecs_id(SynthString), ecs_id(SynthLfo), ecs_id(SynthDrive)
     };
     const char *names[] = {
         "AudioSynthSoundDirty", "AudioSynthOscillatorDirty", "AudioSynthEnvelopeDirty",
         "AudioSynthFilterDirty", "AudioSynthFilterEnvelopeDirty", "AudioSynthGlideDirty",
-        "AudioSynthUnisonDirty", "AudioSynthStringDirty", "AudioSynthLfoDirty"
+        "AudioSynthUnisonDirty", "AudioSynthStringDirty", "AudioSynthLfoDirty",
+        "AudioSynthDriveDirty"
     };
     int32_t i;
-    for (i = 0; i < 9; i ++) {
+    for (i = 0; i < 10; i ++) {
         ecs_observer(world, {
             .entity = ecs_entity(world, { .name = names[i] }),
             .query.flags = EcsQueryMatchPrefab,
@@ -91,7 +92,7 @@ static box_audio_synth_envelope_t box_audio_synth_envelope(
     return (box_audio_synth_envelope_t){
         .attack = env->attack, .decay = env->decay, .sustain = env->sustain,
         .release = env->release, .hold = env->hold, .curve = env->curve,
-        .attack_curve = env->attack_curve };
+        .attack_curve = env->attack_curve, .key_scale = env->key_scale };
 }
 
 /** Check whether an envelope fits in a pass of the core; NaN, infinite and negative times do
@@ -150,6 +151,9 @@ static void box_audio_synth_layer(
     l->pulse_width = osc->pulse_width;
     l->sub = osc->sub;
     l->sub_octave = osc->sub_octave >= 2 ? 2 : 1;
+    l->sync = osc->sync;
+    l->color = osc->color == SynthNoisePink ? BOX_AUDIO_SYNTH_PINK :
+        (osc->color == SynthNoiseBrown ? BOX_AUDIO_SYNTH_BROWN : BOX_AUDIO_SYNTH_WHITE);
     l->voices = 1;
     if (unison) {
         l->voices = unison->voices > 1 ? (uint32_t)unison->voices : 1;
@@ -192,7 +196,8 @@ static void box_audio_synth_lfo(
         .wave = (uint32_t)lfo->wave, .rate = lfo->rate, .delay = lfo->delay,
         .fade = lfo->fade, .phase = lfo->phase, .random_phase = lfo->random_phase,
         .layer = layer, .pitch = lfo->pitch, .amplitude = lfo->amplitude,
-        .cutoff = lfo->cutoff, .pulse_width = lfo->pulse_width };
+        .cutoff = lfo->cutoff, .pulse_width = lfo->pulse_width,
+        .sync = lfo->sync };
 done:
     return;
 }
@@ -278,6 +283,7 @@ bool box_audio_synth_compile(
     const SynthFilterEnvelope *fenv = ecs_get(world, e, SynthFilterEnvelope);
     const SynthOscillator *osc = ecs_get(world, e, SynthOscillator);
     const SynthGlide *glide = ecs_get(world, e, SynthGlide);
+    const SynthDrive *drive = ecs_get(world, e, SynthDrive);
     int32_t extra = 0, orphans = 0, low = 0, lfos = 0, i;
     ecs_iter_t it;
     bool endless = false, fits = true, result;
@@ -289,6 +295,12 @@ bool box_audio_synth_compile(
 
     if (glide) {
         p.glide = glide->time;
+    }
+
+    if (drive) {
+        p.has_drive = 1;
+        p.pre_drive = drive->drive;
+        p.pre_asymmetry = drive->asymmetry;
     }
 
     if (env) {
@@ -303,6 +315,7 @@ bool box_audio_synth_compile(
         p.slope = (uint32_t)filter->slope;
         p.drive = filter->drive;
         p.filter_velocity = filter->velocity;
+        p.keytrack = filter->keytrack;
     }
 
     if (filter && fenv && fenv->amount != 0) {
