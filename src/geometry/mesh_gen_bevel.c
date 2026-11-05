@@ -156,6 +156,16 @@ void box_bevel_round_fit(
     for (int32_t r = 0; r < BoxRimCount; r ++) {
         shape->rims[r] = used[r] ? shape->rims[r] * scale : 0.0f;
     }
+
+    int32_t steps = shape->steps < 1 ? 1 : shape->steps;
+    float unit = shape->length > 1.0f ? 1.0f / shape->length : 1.0f;
+    for (int32_t i = 0; i < section.count; i ++) {
+        int32_t rim = section.rims[i];
+        float turn = box_section_turn(&section, i);
+        if (rim >= 0 && shape->rims[rim] * unit * turn / (float)steps < 1e-3f) {
+            shape->rims[rim] = 0.0f;
+        }
+    }
 }
 
 /** Point of a cross section with its outward normal, in the units of the scale radius */

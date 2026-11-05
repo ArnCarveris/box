@@ -794,8 +794,10 @@ static void box_asset_key(const ecs_world_t *world, const void *value, int kind,
         }
     }
     if (bevel) {
-        /* Only the bevel variant hashes its rims, so that plain extrusions keep their keys */
-        float rims[3] = {bevel->bottom, bevel->top, (float)bevel->steps};
+        /* Only the bevel variant hashes its rims, so that plain extrusions keep their keys. The
+         * rims are in units while the mesh spans a unit depth, so the depth changes the mesh */
+        float rims[4] = {bevel->bottom, bevel->top, (float)bevel->steps,
+            box_shape_quantize(d.p[1][1])};
         bytes = (const uint8_t*)rims;
         for (size_t i = 0; i < sizeof(rims); i ++) {
             hash = (hash ^ bytes[i]) * 1099511628211ull;
@@ -1075,15 +1077,47 @@ static bool box_profile_bevel_flat(
         v->host.depth == 0.0f;
 }
 
-/** Test whether any two edges of the rings of a profile that share no point cross.
+/** Test whether a point lies inside one ring of a profile.
  *
  * @param ring The points of the rings, linked by the next index in w
  * @param count Number of points
- * @return True when two edges cross
+ * @param id The ring, the z of its points
+ * @param x The X coordinate of the point
+ * @param z The Z coordinate of the point
+ * @return True when the point lies inside the ring
+ */
+static bool box_profile_ring_contains(
+    const vec4 *ring,
+    int count,
+    float id,
+    float x,
+    float z)
+{
+    bool inside = false;
+    for (int i = 0; i < count; i ++) {
+        const float *a = ring[i], *b = ring[(int)ring[i][3]];
+        if (a[2] == id && (a[1] > z) != (b[1] > z) &&
+            x < (b[0] - a[0]) * (z - a[1]) / (b[1] - a[1]) + a[0])
+        {
+            inside = !inside;
+        }
+    }
+
+    return inside;
+}
+
+/** Test whether the rings of an inset profile are no longer valid: two edges that share no
+ * point cross, a hole left the outer ring or a ring lies inside a hole.
+ *
+ * @param ring The points of the rings, linked by the next index in w
+ * @param count Number of points
+ * @param outer Number of points of the outer ring
+ * @return True when the rings are not valid
  */
 static bool box_profile_crosses(
     const vec4 *ring,
-    int count)
+    int count,
+    int outer)
 {
     bool result = false;
     for (int i = 0; !result && i < count; i ++) {
@@ -1095,6 +1129,21 @@ static bool box_profile_crosses(
             }
 
             result = box_intersects(ring[i], ring[a], ring[j], ring[b]);
+        }
+    }
+
+    for (int h = outer; !result && h < count; h ++) {
+        if (h > outer && ring[h][2] == ring[h - 1][2]) {
+            continue;
+        }
+
+        result = !box_profile_ring_contains(ring, count, ring[0][2], ring[h][0], ring[h][1]);
+        for (int g = 0; !result && g < count; g ++) {
+            float id = ring[g][2];
+            if (g >= outer && id != ring[h][2] && (g == outer || id != ring[g - 1][2])) {
+                result = box_profile_ring_contains(ring, count, id, ring[0][0], ring[0][1]) ||
+                    box_profile_ring_contains(ring, count, id, ring[h][0], ring[h][1]);
+            }
         }
     }
 
@@ -1127,12 +1176,13 @@ static void box_profile_inset(
 /** Clamp the rim radius of a capped end of a beveled extrusion.
  *
  * The bound is deterministic: 0.9 times the smallest inset at which an edge of the profile
- * shrinks to zero length, then halved, up to 12 times and else 0, while any two edges of the
- * innermost ring cross, holes against the outer ring included.
+ * shrinks to zero length, then halved, up to 12 times and else 0, while the innermost rings
+ * are not valid (see box_profile_crosses()).
  *
  * @param points The profile points
  * @param offsets The inset direction of each point
  * @param count Number of points
+ * @param outer Number of points of the outer ring
  * @param limit The inset at which an edge shrinks to zero length
  * @param radius The authored radius
  * @param ring Scratch room for count points
@@ -1142,6 +1192,7 @@ static float box_profile_bevel_clamp(
     const vec4 *points,
     const vec2 *offsets,
     int count,
+    int outer,
     float limit,
     float radius,
     vec4 *ring)
@@ -1150,7 +1201,7 @@ static float box_profile_bevel_clamp(
     int tries = 0;
     for (; result > 0.0f && tries < 12; tries ++) {
         box_profile_inset(points, offsets, count, result, ring);
-        if (!box_profile_crosses(ring, count)) {
+        if (!box_profile_crosses(ring, count, outer)) {
             break;
         }
 
@@ -1266,8 +1317,8 @@ static void box_profile_bevel_generate(
 
     vec4 *scratch = rings + (size_t)count * (size_t)(2 * (steps + 1));
     float radii[2] = {
-        box_profile_bevel_clamp(points, offsets, count, limit, bevel.bottom, scratch),
-        box_profile_bevel_clamp(points, offsets, count, limit, bevel.top, scratch)
+        box_profile_bevel_clamp(points, offsets, count, outer, limit, bevel.bottom, scratch),
+        box_profile_bevel_clamp(points, offsets, count, outer, limit, bevel.top, scratch)
     };
     if (radii[0] + radii[1] > depth) {
         float scale = depth / (radii[0] + radii[1]);

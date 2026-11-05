@@ -87,7 +87,8 @@ typedef struct box_bevel_round_t {
  * zero the radii of rims that are not edges.
  *
  * The setbacks of the two rims of each side, radius * tan(turn / 2), must fit its length; when
- * they do not, every radius scales down by the smallest ratio.
+ * they do not, every radius scales down by the smallest ratio. A rim whose steps end up shorter
+ * than 0.001 in the unit mesh becomes sharp, so that its points do not collapse.
  *
  * @param shape The shape, whose rims are clamped
  */
