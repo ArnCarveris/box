@@ -18,14 +18,27 @@ bake3 --local-env
 ## Run
 
 ```sh
-bake3 run apps/boxrun --local-env -- etc/scenes/town.flecs
+bake3 run apps/boxrun --local-env -- etc/scenes/town.flecs                      # open a scene in a window
+bake3 run apps/boxrun --local-env -- --headless --frames 10 etc/scenes/town.flecs  # run 10 frames without a window and exit
+bake3 run apps/boxrun --local-env -- --headless --frames 3 --delta-time 1/60 --out /tmp/town.png etc/scenes/town.flecs  # render a frame to a PNG
+bake3 run apps/boxrun --local-env -- --headless --timeout 60 --port 27760 etc/scenes/town.flecs  # take shell commands on a REST port
+bake3 run apps/boxrun --local-env=agent_a -- etc/scenes/town.flecs              # a separate build environment per agent
+bake3 --target em --local-env apps/boxrun                                       # build for the browser
 ```
 
 ## Test
 
 ```sh
-bake3 run test/cpu/core --local-env -- -j 8
-python3 tools/integration.py visual
+bake3 runall test/cpu --local-env -- -j 8                     # every CPU test project
+bake3 run test/cpu/core --local-env -- -j 8                   # one test project
+bake3 run test/cpu/core --local-env -- Args -j 8              # one suite
+bake3 run test/cpu/core --local-env -- Args.defaults          # one case
+bake3 run test/cpu/core --local-env --test-report-failure-only -- -j 8 --json /tmp/core.json  # record the failures
+bake3 run test/cpu/core --local-env -- -j 8 --ignore /tmp/core.json                          # fail only on new failures
+bake3 run test/gpu/render --local-env -- -j 4                 # a GPU test project, needs a GPU
+python3 tools/integration.py visual                           # render the visual scenes and compare with the baselines
+python3 tools/integration.py visual --update-baseline <scene> # store the render of a scene as its baseline
+python3 tools/lint.py                                         # lint the sources, --fix fixes what it can
 ```
 
 ## Docs

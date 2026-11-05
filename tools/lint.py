@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Checks C sources against design/coding_style.c.
+"""Checks C sources against CODING_STYLE.md.
 
 Usage: lint.py [--fix] [paths...]
        lint.py <file> <log|error|autofix>   (bake3 "lint" command)

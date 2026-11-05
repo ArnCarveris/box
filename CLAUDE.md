@@ -1,3 +1,7 @@
+# Documentation
+
+Never write new documentation or add to existing documentation unless the task explicitly asks for it.
+
 # Tests
 
 Tests never rely on anything in `etc` (or an app's `etc`). A script, font, image or other file a
