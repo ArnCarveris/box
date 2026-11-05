@@ -206,21 +206,14 @@ template Gallery {
   // draws the UI that shows it
   preview_views {
     view {
-      if applied.light == "Night" {
-        View: {
-          camera: preview.camera, clear: {enabled: true, color: {16, 20, 38, 255}},
-          shadows: {enabled: true}
-        }
-      } else if applied.light == "Dusk" {
-        View: {
-          camera: preview.camera, clear: {enabled: true, color: {196, 128, 110, 255}},
-          shadows: {enabled: true}
-        }
-      } else {
-        View: {
-          camera: preview.camera, clear: {enabled: true, color: {150, 186, 226, 255}},
-          shadows: {enabled: true}
-        }
+      View: {
+        camera: preview.camera,
+        clear: {enabled: true, color: match applied.light {
+          "Night": {16, 20, 38, 255}
+          "Dusk": {196, 128, 110, 255}
+          _: {150, 186, 226, 255}
+        }},
+        shadows: {enabled: true}
       }
     }
   }

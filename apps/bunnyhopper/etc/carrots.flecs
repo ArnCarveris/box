@@ -12,9 +12,9 @@ using bunnyhopper
 // Depth the carrot reaches into the ground
 const sink: f32 = 0.45
 
-prefab SmallCarrot {
-  const height: f32 = 1.1
-  const width: f32 = 0.65
+template CarrotModel {
+  prop height: f32 = 1.1
+  prop width: f32 = 0.65
 
   BunnyCarrot: {half_width: width / 2, height: height}
 
@@ -27,60 +27,25 @@ prefab SmallCarrot {
     Emissive: {strength: 0.9, color: {255, 100, 50}}
   }
 
-  leaf_mid {
-    Position: {0, height + 0.15, 0}
-    Box: {0.12, 0.55, 0.12}
-    Rgb: {70, 160, 60}
-  }
+  for i in 0..3 {
+    const side = i - 1
 
-  leaf_left {
-    Position: {0.14, height + 0.15, 0}
-    Rotation: {0, 0, 0.5}
-    Box: {0.12, 0.55, 0.12}
-    Rgb: {70, 160, 60}
+    "leaf_{i}" {
+      Position: {0.14 * side, height + 0.15, 0}
+      Rotation: {0, 0, 0.5 * side}
+      Box: {0.12, 0.55, 0.12}
+      Bevel: {radius: 0.04, segments: 2}
+      Rgb: {70, 160, 60}
+      DiffuseTransmission: {factor: 0.4, color: {200, 255, 120}}
+    }
   }
+}
 
-  leaf_right {
-    Position: {-0.14, height + 0.15, 0}
-    Rotation: {0, 0, -0.5}
-    Box: {0.12, 0.55, 0.12}
-    Rgb: {70, 160, 60}
-  }
+prefab SmallCarrot {
+  CarrotModel: {height: 1.1, width: 0.65}
 }
 
 // A carrot too tall for a single jump
 prefab LargeCarrot {
-  const height: f32 = 3.2
-  const width: f32 = 1.0
-
-  BunnyCarrot: {half_width: width / 2, height: height}
-
-  body {
-    Position: {0, height - (height + sink) / 2, 0}
-    Rotation: {PI, 0, 0}
-    Scale: {width, 1, width}
-    Cone: {segments: 16, smooth: true, length: height + sink, radius: 0.5}
-    Rgb: {255, 100, 20}
-    Emissive: {strength: 0.9, color: {255, 100, 50}}
-  }
-
-  leaf_mid {
-    Position: {0, height + 0.15, 0}
-    Box: {0.12, 0.55, 0.12}
-    Rgb: {70, 160, 60}
-  }
-
-  leaf_left {
-    Position: {0.14, height + 0.15, 0}
-    Rotation: {0, 0, 0.5}
-    Box: {0.12, 0.55, 0.12}
-    Rgb: {70, 160, 60}
-  }
-
-  leaf_right {
-    Position: {-0.14, height + 0.15, 0}
-    Rotation: {0, 0, -0.5}
-    Box: {0.12, 0.55, 0.12}
-    Rgb: {70, 160, 60}
-  }
+  CarrotModel: {height: 3.2, width: 1.0}
 }

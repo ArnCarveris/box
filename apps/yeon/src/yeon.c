@@ -73,10 +73,11 @@ static bool yeon_action_down(
     return s && s->down;
 }
 
-/** Climb or dive the player kite with the controls and sway it while playing; once the game
- * is over the kite falls to cfg.fallFloorY, spinning and drifting back.
+/** Climb or dive the player kite with the controls and lean it with its climb while playing;
+ * once the game is over the kite falls to cfg.fallFloorY, spinning and drifting back. The sway
+ * of the kite is an animation of the scene.
  *
- * @param it Iterator over the player kite, with YeonGame, YeonControls and whether it plays
+ * @param it Iterator over the player kite, with YeonControls and whether it plays
  */
 static void YeonFlight(
     ecs_iter_t *it)
@@ -84,9 +85,8 @@ static void YeonFlight(
     Position *p = ecs_field(it, Position, 0);
     YeonPose *r = ecs_field(it, YeonPose, 1);
     YeonKite *k = ecs_field(it, YeonKite, 2);
-    const YeonGame *g = ecs_field(it, YeonGame, 3);
-    const YeonControls *c = ecs_field(it, YeonControls, 4);
-    bool playing = ecs_field_is_set(it, 5);
+    const YeonControls *c = ecs_field(it, YeonControls, 3);
+    bool playing = ecs_field_is_set(it, 4);
     float dt = it->delta_time;
     float min_y = YEON_CFG(it->world, "minY");
     float max_y = YEON_CFG(it->world, "maxY");
@@ -113,8 +113,8 @@ static void YeonFlight(
                 k[i].v = 0.0f;
             }
 
-            r[i].roll = sinf(g->time * 1.7f) * 0.07f - k[i].v * 0.025f;
-            r[i].pitch = -0.25f + sinf(g->time * 2.3f) * 0.04f;
+            r[i].roll = -k[i].v * 0.025f;
+            r[i].pitch = -0.25f;
         } else if (p[i].y > floor_y) {
             k[i].v += YEON_CFG(it->world, "gravity") * dt;
             p[i].y = fmaxf(p[i].y + k[i].v * dt, floor_y);
@@ -618,7 +618,6 @@ void YeonImport(
         .phase = EcsOnUpdate,
         .query.terms = {
             { .id = ecs_id(Position) }, { .id = ecs_id(YeonPose) }, { .id = ecs_id(YeonKite) },
-            { .id = game, .src.id = game, .inout = EcsIn },
             { .id = controls, .src.id = controls, .inout = EcsIn, .oper = EcsOptional },
             { .id = playing, .src.id = state, .oper = EcsOptional }
         },

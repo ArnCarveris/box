@@ -10,7 +10,6 @@ using box.light
 using box.text
 
 
-@tree Parent
 template WestGeneralStore {
   WestStorefront(width: 6.1, height: 3.8, tint: {66, 108, 101}) { Position: {} }
   front : WestTeal { Position: {0, 4.45, 2.48}; Box: {6.35, 1.2, 0.2} }

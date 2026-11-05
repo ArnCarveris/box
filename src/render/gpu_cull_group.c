@@ -198,6 +198,7 @@ static uint32_t box_gpu_cull_job(
     job->base = draw->base;
     job->history = history;
     job->mask = mask;
+    job->fixture = b->fixture ? 1u : 0u;
     if (b->bounded) {
         glm_vec3_copy(ECS_CONST_CAST(float*, b->center), job->center);
         glm_vec3_copy(ECS_CONST_CAST(float*, b->extent), job->extent);
@@ -851,6 +852,9 @@ void box_gpu_cull_casters_add(
         } else {
             box_gpu_cull_planes(ECS_CONST_CAST(vec4*, tiles[i].matrix), f->frustum.planes);
         }
+
+        glm_vec3_copy(ECS_CONST_CAST(float*, tiles[i].position), f->frustum.light);
+        f->frustum.light[3] = 1.0f;
     }
 
     if (ecs_vec_count(&c->frustums)) {

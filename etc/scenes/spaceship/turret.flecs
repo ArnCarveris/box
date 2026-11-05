@@ -6,35 +6,28 @@ using box.material
 using box.texture
 using box.light
 
-@tree Parent
 template FrigateTurret {
   pedestal : DarkArmor { Position: {}; Cylinder: {radius: 2.6, length: 0.7, segments: 12} }
   race : Titanium { Position: {0, 0.48, 0}; Tube: {radius: 2.3, thickness: 0.15, length: 0.3, segments: 24} }
   body : HullArmor { Position: {0, 1.2, 0}; BeveledPrism: {footprint: [{-2, -2}, {2, -2}, {1.7, 2.5}, {-1.7, 2.5}], depth: 1.8, inset: 0.4, bevel: 0.3} }
   for i in 0..2 {
-    {
-    sleeve : DarkArmor { Position: {(i - 0.5) * 1.6, 1.2, 3}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.4, length: 3.1, segments: 8} }
-    barrel : Titanium { Position: {(i - 0.5) * 1.6, 1.2, 5.8}; Rotation: {1.5707963, 0, 0}; Tube: {radius: 0.23, thickness: 0.08, length: 3.5, segments: 8} }
-    muzzle : RecessMetal { Position: {(i - 0.5) * 1.6, 1.2, 7.5}; Rotation: {1.5707963, 0, 0}; Tube: {radius: 0.34, thickness: 0.1, length: 0.8, segments: 8} }
-      }
+  "sleeve_{i}" : DarkArmor { Position: {(i - 0.5) * 1.6, 1.2, 3}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.4, length: 3.1, segments: 8} }
+  "barrel_{i}" : Titanium { Position: {(i - 0.5) * 1.6, 1.2, 5.8}; Rotation: {1.5707963, 0, 0}; Tube: {radius: 0.23, thickness: 0.08, length: 3.5, segments: 8} }
+  "muzzle_{i}" : RecessMetal { Position: {(i - 0.5) * 1.6, 1.2, 7.5}; Rotation: {1.5707963, 0, 0}; Tube: {radius: 0.34, thickness: 0.1, length: 0.8, segments: 8} }
 }
   sight : IceLight { Position: {0, 1.9, 1.5}; Box: {0.5, 0.25, 0.2} }
   rear : RustRed { Position: {0, 1.3, -1.93}; Box: {2.3, 0.7, 0.15} }
   for i in 0..8 {
-    {
-    fastener : Titanium { Position: {math.sin(i * math.PI / 4) * 2.45, 0.4, math.cos(i * math.PI / 4) * 2.45}; Cylinder: {radius: 0.1, length: 0.14, segments: 6} }
-      }
+  "fastener_{i}" : Titanium { Position: {math.sin(i * math.PI / 4) * 2.45, 0.4, math.cos(i * math.PI / 4) * 2.45}; Cylinder: {radius: 0.1, length: 0.14, segments: 6} }
 }
   mantle : DarkArmor { Position: {0, 1.25, 1.7}; Rotation: {0, 0, 1.5707963}; Cylinder: {radius: 0.74, length: 3.55, segments: 12} }
   roof : PaleArmor { Position: {0, 2.17, -0.3}; BeveledPrism: {footprint: [{-1.5, -1.3}, {1.5, -1.3}, {1.15, 1.4}, {-1.15, 1.4}], depth: 0.22, inset: 0.1, bevel: 0.06} }
   for side in 0..2 {
-    {
-      trunnion : Titanium { Position: {(side - 0.5) * 3.65, 1.25, 1.65}; Rotation: {0, 0, 1.5707963}; Cylinder: {radius: 0.43, length: 0.24, segments: 12} }
-      trunnion_bolt : DarkArmor { Position: {(side - 0.5) * 3.94, 1.25, 1.65}; Rotation: {0, 0, 1.5707963}; Cylinder: {radius: 0.19, length: 0.08, segments: 6} }
-      armor_cheek : PaleArmor { Position: {(side - 0.5) * 3.6, 1.55, -0.5}; Rotation: {0, 0, (side - 0.5) * 0.32}; Box: {0.24, 0.7, 1.8} }
-      recoil : Titanium { Position: {(side - 0.5) * 1.6, 1.72, 3.05}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.1, length: 2.6, segments: 8} }
-      barrel_rings { Position: {(side - 0.5) * 1.6, 1.2, 3.2}; Array: {axis: Z, count: 5, spacing: 0.35}; collar : Titanium { Rotation: {1.5707963, 0, 0}; Tube: {radius: 0.44, thickness: 0.08, length: 0.12, segments: 8} } }
-    }
+    "trunnion_{side}" : Titanium { Position: {(side - 0.5) * 3.65, 1.25, 1.65}; Rotation: {0, 0, 1.5707963}; Cylinder: {radius: 0.43, length: 0.24, segments: 12} }
+    "trunnion_bolt_{side}" : DarkArmor { Position: {(side - 0.5) * 3.94, 1.25, 1.65}; Rotation: {0, 0, 1.5707963}; Cylinder: {radius: 0.19, length: 0.08, segments: 6} }
+    "armor_cheek_{side}" : PaleArmor { Position: {(side - 0.5) * 3.6, 1.55, -0.5}; Rotation: {0, 0, (side - 0.5) * 0.32}; Box: {0.24, 0.7, 1.8} }
+    "recoil_{side}" : Titanium { Position: {(side - 0.5) * 1.6, 1.72, 3.05}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.1, length: 2.6, segments: 8} }
+    "barrel_rings_{side}" { Position: {(side - 0.5) * 1.6, 1.2, 3.2}; Array: {axis: Z, count: 5, spacing: 0.35}; collar : Titanium { Rotation: {1.5707963, 0, 0}; Tube: {radius: 0.44, thickness: 0.08, length: 0.12, segments: 8} } }
   }
   rear_vents { Position: {-0.9, 1.3, -2.04}; Array: {axis: X, count: 7, spacing: 0.3}; vane : RecessMetal { Position: {}; Box: {0.12, 0.5, 0.08} } }
   hatch : DarkArmor { Position: {0, 2.32, -0.7}; Cylinder: {radius: 0.48, length: 0.1, segments: 8} }

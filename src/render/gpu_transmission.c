@@ -190,7 +190,7 @@ static WGPURenderPipeline box_gpu_transmission_pipeline(
         .targetCount = 1,
         .targets = &target
     };
-    result = wgpuDeviceCreateRenderPipeline(gpu->device, &(WGPURenderPipelineDescriptor){
+    result = box_gpu_render_pipeline(gpu, &(WGPURenderPipelineDescriptor){
         .layout = tr->pipeline_layout,
         .vertex = {
             .module = shader->module,

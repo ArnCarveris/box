@@ -27,6 +27,7 @@ using box.effects
 using box.surface
 using box.controllers
 using box.text
+using box.atmosphere
 
 window {
   Surface: {width: 1440, height: 960, vsync: true}
@@ -44,10 +45,12 @@ tonemap {
   Tonemap: {}
 }
 
+market_aa {
+  Smaa: {}
+}
+
 cheese_market {
   Scene: {}
-  LightBake: {probe_spacing: 1, bounds_padding: 0.3, bounces: 1, capture_size: 64, budget_ms: 8}
-  ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 2.5}
   AmbientLight: {sky: {171, 193, 211}, ground: {119, 99, 72}, intensity: 0.35}
 
   camera {
@@ -60,8 +63,23 @@ cheese_market {
   afternoon {
     Rotation: {0.85, -2.4, 0}
     DirectionalLight: {intensity: 1.8 * math.PI}
-    Rgb: {255, 226, 180}
+    Rgb: {255, 236, 208}
   }
+
+  sky {
+    Atmosphere: {
+      sun: afternoon,
+      units_per_km: 60,
+      rayleigh: {scale_height: 8, scattering_scale: 1.6},
+      mie: {scale_height: 1.4, anisotropy: 0.76, scattering_scale: 2.2, tint: {255, 232, 196}},
+      ground_albedo: {92, 110, 118},
+      sun_disk_intensity: 6,
+      sun_radius: 0.6
+    }
+    HeightFog: {density: 0.004, falloff: 0.12, base_height: 0, max_opacity: 0.2, atmosphere: sky}
+  }
+  LightBake: {environment: sky, probe_spacing: 1, bounds_padding: 0.3, bounces: 1, capture_size: 64, budget_ms: 8}
+  ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 2.5, environment: sky}
 
   island {
     Position: {0, -0.48, 0}
@@ -145,6 +163,7 @@ cheese_market {
         Box: {0.11, 0.018, 0.36}
         Rgb: {203, 211, 201}
         PbrMaterial: {metallic: 0.8, roughness: 0.2}
+        SpecularAnisotropy: {strength: 0.6, rotation: 0}
       }
       handle {
         Position: {0, 0.008, -0.28}
@@ -233,8 +252,20 @@ main_view {
   View: {
     camera: cheese_market.camera,
     clear: {enabled: true, color: {91, 112, 123, 255}},
-    lighting: {enabled: true, baked: true, reflections: true},
+    lighting: {
+      enabled: true,
+      baked: true,
+      reflections: true,
+      atmosphere: true,
+      environment: {source: cheese_market.sky, intensity: 0.6, yaw: 0, background: false}
+    },
     shadows: {enabled: true, resolution: 2048, max_distance: 90},
-    effects: [{effect: contact_shadows}, {effect: lantern_bloom}, {effect: tonemap}]
+    effects: [
+      {effect: contact_shadows},
+      {effect: cheese_market.sky},
+      {effect: lantern_bloom},
+      {effect: tonemap},
+      {effect: market_aa}
+    ]
   }
 }

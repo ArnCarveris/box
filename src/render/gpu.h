@@ -50,6 +50,26 @@ WGPUComputePassEncoder box_gpu_compute_begin(
     WGPUCommandEncoder encoder,
     const WGPUPassTimestampWrites *writes);
 
+/** Create a render pipeline, counted in the stats while it is created and once it exists.
+ *
+ * @param gpu The backend
+ * @param desc The pipeline
+ * @return The pipeline
+ */
+WGPURenderPipeline box_gpu_render_pipeline(
+    box_gpu_t *gpu,
+    const WGPURenderPipelineDescriptor *desc);
+
+/** Create a compute pipeline, counted in the stats while it is created and once it exists.
+ *
+ * @param gpu The backend
+ * @param desc The pipeline
+ * @return The pipeline
+ */
+WGPUComputePipeline box_gpu_compute_pipeline(
+    box_gpu_t *gpu,
+    const WGPUComputePipelineDescriptor *desc);
+
 /** Add the pending counters to the counters the main thread reads, under the lock once.
  *
  * @param gpu The backend

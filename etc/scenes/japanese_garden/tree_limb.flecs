@@ -10,7 +10,6 @@ using box.surface
 using box.controllers
 using box.movement
 
-@tree Parent
 template TreeLimb {
   prop ax: f32 = 0
   prop ay: f32 = 0

@@ -7,7 +7,6 @@ using box.geometry
 using box.material
 
 assets {
-  @tree Parent
   template FlatRoof : Roof {
     {
       Position: {0, 0, 0}
@@ -50,7 +49,7 @@ assets {
         {
           Position: {(i - 1) * width * 0.2, 1.08, 0}
           Box: {width * 0.15, 0.64, 0.035}
-          if i == 1 { Rgb: TownPink } else { Rgb: TownCream }
+          Rgb: i == 1 ? TownPink : TownCream
         }
       }
     }

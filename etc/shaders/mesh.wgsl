@@ -286,8 +286,10 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Plac
     if (surface_data.p[0].x != 0.0) {
         var region = i32(v.position.z);
         if (surface_data.p[0].x == 7.0) {
+            // The caps are the only vertices with a vertical normal without a horizontal
+            // part: the rims of a Bevel keep one up to the cap (box_profile_region)
             region = select(0, 1, v.uv.x >= 2.0);
-            if (abs(v.normal.y) > 0.5) {
+            if (v.normal.x == 0.0 && v.normal.z == 0.0 && v.normal.y != 0.0) {
                 region = 2;
             } else if (region == 1) {
                 o.uv.x -= 2.0 * material.uv.x;

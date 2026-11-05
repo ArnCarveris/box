@@ -1,0 +1,79 @@
+// Modulators for the Modulators suite of test/cpu/audio, at 120 bpm: a lowpass that wobbles in
+// eighths, a tremolo, an auto-pan, a step sequence of a volume, a lowpass that opens on the
+// hits of a drum bus, a volume that a lane fades and a modulator lifts, and a swell to remove.
+// The suite plays its sounds on the buses; a bus without a sound is silent.
+using box.audio
+
+// A lowpass on the noise of the bus, its cutoff 2 octaves either way of 1000 Hz, twice a beat
+wobble {
+  AudioBus: {effects: [wobble]}
+  AudioFilter: {cutoff: 1000}
+}
+
+wobble_lfo {
+  AudioModulator: {target: wobble, component: AudioFilter, member: "cutoff",
+    scale: AudioModOctaves, depth: 2, sync: 0.5}
+}
+
+// A tremolo that cuts the bus in the first half of each eighth
+trem { AudioBus: {} }
+
+trem_lfo {
+  AudioModulator: {target: trem, component: AudioBus, member: "volume",
+    wave: AudioModSquare, unipolar: true, depth: -1, sync: 0.5}
+}
+
+// An auto-pan, right at the first quarter of each beat, left at the third
+pan { AudioBus: {} }
+
+pan_lfo {
+  AudioModulator: {target: pan, component: AudioBus, member: "pan", depth: 1, sync: 1}
+}
+
+// Four hard steps of a sixteenth each: volumes of 1, 0, 0.75 and 0.5
+seq { AudioBus: {volume: 0.5} }
+
+seq_steps {
+  AudioModulator: {target: seq, component: AudioBus, member: "volume",
+    source: AudioModSteps, steps: [1, -1, 0.5, 0], step_count: 4, sync: 0.25, depth: 0.5}
+}
+
+// A drum bus nobody hears, which a lowpass of the pad follows up to 4 octaves above 200 Hz
+drums { AudioBus: {volume: 0} }
+
+pad {
+  AudioBus: {effects: [pad]}
+  AudioFilter: {cutoff: 200}
+}
+
+pad_follow {
+  AudioModulator: {target: pad, component: AudioFilter, member: "cutoff",
+    source: AudioModFollower, key: drums, scale: AudioModOctaves, depth: 4,
+    attack: 0.002, release: 0.05}
+}
+
+// A track that a lane fades from 1 to 0 over 4 beats and a modulator lifts by 0.2
+lead { Track: {} }
+
+prefab fade {
+  AutomationClip: {target: lead, component: AudioBus, member: "volume", length: 4,
+    curve: {keys: [{0, 1}, {4, 0}]}}
+}
+
+lead {
+  fade_lane { ClipPlacement: {clip: fade, start: 0} }
+}
+
+lead_lift {
+  AudioModulator: {target: lead, component: AudioBus, member: "volume",
+    source: AudioModSteps, steps: [1], step_count: 1, sync: 1, depth: 0.2}
+}
+
+// A swell of the volume at 4 Hz, free running, that the suite deletes
+swell { AudioBus: {} }
+
+swell_lfo {
+  AudioModulator: {target: swell, component: AudioBus, member: "volume", depth: 0.5, rate: 4}
+}
+
+$ { Transport: {tempo: 120} }

@@ -362,7 +362,7 @@ bool box_gpu_environment_ready(
             wgpuComputePipelineRelease(s->sh);
         }
 
-        s->sh = wgpuDeviceCreateComputePipeline(gpu->device, &(WGPUComputePipelineDescriptor){
+        s->sh = box_gpu_compute_pipeline(gpu, &(WGPUComputePipelineDescriptor){
             .layout = s->sh_pipeline_layout,
             .compute = {
                 .module = shader->module,
@@ -660,7 +660,7 @@ static WGPURenderPipeline box_gpu_env_background_pipeline(
         .stencilFront = { .compare = WGPUCompareFunction_Always },
         .stencilBack = { .compare = WGPUCompareFunction_Always }
     };
-    result = wgpuDeviceCreateRenderPipeline(gpu->device, &(WGPURenderPipelineDescriptor){
+    result = box_gpu_render_pipeline(gpu, &(WGPURenderPipelineDescriptor){
         .layout = s->pipeline_layout,
         .vertex = {
             .module = shader->module,

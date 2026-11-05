@@ -236,15 +236,39 @@ static void box_audio_bus_gains(
     box_audio_core_t *core,
     box_audio_bus_t *b)
 {
-    float l, r, volume = b->mute ? 0.0f : b->volume;
+    box_audio_bus_gains_to(core, b, NULL, core->ramp_frames);
+    box_audio_mods_changed(core, -1, (int32_t)(b - core->buses));
+}
+
+void box_audio_bus_gains_to(
+    box_audio_core_t *core,
+    box_audio_bus_t *b,
+    const float *add,
+    int32_t frames)
+{
+    float l, r, volume = b->volume, pan = b->pan, width = b->width, level;
     int32_t j;
-    box_audio_pan(b->pan, &l, &r);
-    box_audio_ramp_to(&b->left, volume * l, core->ramp_frames);
-    box_audio_ramp_to(&b->right, volume * r, core->ramp_frames);
-    box_audio_ramp_to(&b->side, b->width, core->ramp_frames);
+    if (add) {
+        volume = box_audio_clamp(volume + add[BOX_AUDIO_MOD_BUS_VOLUME], 0,
+            BOX_AUDIO_VOLUME_MAX);
+        pan = box_audio_clamp(pan + add[BOX_AUDIO_MOD_BUS_PAN], -1, 1);
+        width = box_audio_clamp(width + add[BOX_AUDIO_MOD_BUS_WIDTH], 0, 2);
+    }
+
+    volume = b->mute ? 0.0f : volume;
+    box_audio_pan(pan, &l, &r);
+    box_audio_ramp_to(&b->left, volume * l, frames);
+    box_audio_ramp_to(&b->right, volume * r, frames);
+    box_audio_ramp_to(&b->side, width, frames);
     for (j = 0; j < BOX_AUDIO_SENDS; j ++) {
         bool muted = b->mute && (b->pre_fader & (1u << j));
-        box_audio_ramp_to(&b->send[j], muted ? 0.0f : b->send_level[j], core->ramp_frames);
+        level = b->send_level[j];
+        if (add) {
+            level = box_audio_clamp(level + add[BOX_AUDIO_MOD_BUS_SEND + j], 0,
+                BOX_AUDIO_VOLUME_MAX);
+        }
+
+        box_audio_ramp_to(&b->send[j], muted ? 0.0f : level, frames);
     }
 }
 
@@ -1059,6 +1083,8 @@ static void box_audio_cmd_timed(
         box_audio_effect_params_command(core, &cmd->effect);
     } else if (cmd->header.type == BOX_AUDIO_CMD_VOICE_RAMP) {
         box_audio_cmd_voice_ramp(core, &cmd->ramp);
+    } else if (cmd->header.type == BOX_AUDIO_CMD_BEAT) {
+        box_audio_beat_command(core, &cmd->beat);
     } else {
         box_audio_cmd_bus_set(core, &cmd->set);
     }
@@ -1222,11 +1248,14 @@ static void box_audio_schedule_cancel_sets(
     box_audio_core_t *core,
     const box_audio_cmd_cancel_t *cmd)
 {
+    uint64_t from = ((uint64_t)cmd->param << 32) | cmd->target;
     int32_t i, kept = 0;
     for (i = 0; i < core->schedule_count; i ++) {
         const box_audio_timed_cmd_t *c = &core->schedule[i].cmd;
         uint16_t type = c->header.type;
-        bool drop = (cmd->type == BOX_AUDIO_CMD_BUS_SET && type == BOX_AUDIO_CMD_BUS_SET &&
+        bool drop = (cmd->type == BOX_AUDIO_CMD_BEAT && type == BOX_AUDIO_CMD_BEAT &&
+            core->schedule[i].when >= from) ||
+            (cmd->type == BOX_AUDIO_CMD_BUS_SET && type == BOX_AUDIO_CMD_BUS_SET &&
             c->set.target == cmd->target && c->set.param == cmd->param) ||
             (cmd->type == BOX_AUDIO_CMD_EFFECT_PARAMS && type == BOX_AUDIO_CMD_EFFECT_PARAMS &&
             c->effect.slot == cmd->target) ||
@@ -1298,6 +1327,7 @@ static void box_audio_cmd(
     box_audio_cmd_effect_t effect;
     box_audio_cmd_cancel_t cancel;
     box_audio_cmd_synth_t synth;
+    box_audio_cmd_modulator_t modulator;
     uint32_t layers;
     if (type == BOX_AUDIO_CMD_PLAY && size >= (int32_t)sizeof(box_audio_cmd_play_t)) {
         box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_play_t));
@@ -1321,6 +1351,11 @@ static void box_audio_cmd(
         size >= (int32_t)sizeof(box_audio_cmd_ramp_t))
     {
         box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_ramp_t));
+    } else if (type == BOX_AUDIO_CMD_BEAT && size >= (int32_t)sizeof(box_audio_cmd_beat_t)) {
+        box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_beat_t));
+    } else if (type == BOX_AUDIO_CMD_MODULATOR && size >= (int32_t)sizeof(modulator)) {
+        box_audio_copy(&modulator, bytes, (int32_t)sizeof(modulator));
+        box_audio_mod_command(core, &modulator);
     } else if (type == BOX_AUDIO_CMD_CANCEL && size >= (int32_t)sizeof(cancel)) {
         box_audio_copy(&cancel, bytes, (int32_t)sizeof(cancel));
         box_audio_schedule_cancel_sets(core, &cancel);
@@ -1439,6 +1474,7 @@ box_audio_core_t* box_audio_core_new(
     core->event_lost_at = -1;
     box_audio_effects_init(core);
     box_audio_synth_parts_init(core);
+    box_audio_mods_init(core);
 
 done:
     return core;
@@ -1842,6 +1878,10 @@ static void box_audio_buses_render(
             &core->buses[route->output] : NULL;
         box_audio_meter_t *m = &core->meters[route->bus];
         float peak_l = m->peak_left, peak_r = m->peak_right, square_l = 0, square_r = 0;
+        if ((core->mods.keys >> route->bus) & 1) {
+            box_audio_mods_follow(core, route->bus, b->l, b->r, frames);
+        }
+
         if (core->bus_effects[route->bus] || (!route->bus && core->effect_tails)) {
             box_audio_effects_render(core, route->bus, b->l, b->r, frames);
         }
@@ -1896,6 +1936,10 @@ void box_audio_core_render(
             if (core->schedule_count && core->schedule[0].when - core->clock < (uint64_t)n) {
                 n = (int32_t)(core->schedule[0].when - core->clock);
             }
+        }
+
+        if (core->mods.on || core->mods.buses || core->mods.effects) {
+            n = box_audio_mods_block(core, n);
         }
 
         for (k = 0; k < core->order_count; k ++) {

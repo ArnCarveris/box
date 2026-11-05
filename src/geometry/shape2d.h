@@ -47,6 +47,19 @@ typedef struct Shape2D {
 /** Component id of Shape2D */
 extern ECS_COMPONENT_DECLARE(Shape2D);
 
+/** Resolve a Border into a shape: its width and color, and the corner radius of a rectangle
+ * that has none of its own (a Rect, not a Circle). A negative width or radius resolves to 0.
+ *
+ * Pure, so the transition resolver of the render thread applies the Border a transition
+ * renders with the same function.
+ *
+ * @param shape The resolved shape, its geometry set
+ * @param border The border
+ */
+void box_shape2d_border(
+    Shape2D *shape,
+    const Border *border);
+
 /** Sample the edges of a Polygon2D: its outline and holes, scaled and offset.
  *
  * Every edge is a vec4 of its start x, y and end x, y. A closed outline or hole ends with the

@@ -447,6 +447,8 @@ typedef struct box_pick_mesh_hit_t {
 /** Intersect a ray with the triangles of the mesh of a shape, through the triangle hierarchy of
  * its unit mesh when it has many triangles.
  *
+ * A ProfileExtrusion is hit on the plane of its caps, except where a Bevel rounds them (the rim
+ * radii in p[2] of its surface), which its triangles cover. *
  * @param world The world
  * @param st The module state
  * @param e The entity with a ShapeMesh
@@ -524,7 +526,9 @@ found:
 
         if (point) {
             point->plain = !shape->surface.p[0][0];
-            point->region = (int32_t)mesh->vertices[i0].position[2];
+            point->region = shape->surface.p[0][0] == 7 ?
+                box_profile_region(&mesh->vertices[i0]) :
+                (int32_t)mesh->vertices[i0].position[2];
             for (k = 0; k < 3; k ++) {
                 point->position[k] = (w0 * mesh->vertices[i0].position[k] +
                     best[1] * mesh->vertices[i1].position[k] +
@@ -546,7 +550,8 @@ done:
             float y = ((float)side - 0.5f) * shape->surface.p[1][1];
             float distance = (y - o[1]) / d[1];
             float x = o[0] + distance * d[0], z = o[2] + distance * d[2];
-            if ((regions & (1 << (side + 2))) && distance >= 0 && distance < best[0] &&
+            if ((regions & (1 << (side + 2))) && shape->surface.p[2][side] <= 0 &&
+                distance >= 0 && distance < best[0] &&
                 box_profile_contains(&shape->surface, x, z))
             {
                 *t = best[0] = distance;

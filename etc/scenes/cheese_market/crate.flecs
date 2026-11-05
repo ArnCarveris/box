@@ -12,7 +12,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template MarketCrate {
   prop filled: bool = true
 

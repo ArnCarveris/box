@@ -32,6 +32,9 @@ typedef struct box_render_gpu_stats_t {
     int32_t render_height;      /**< Render height of the last configured target */
     int32_t shaders;            /**< Shader modules alive */
     int32_t compiles;           /**< Shader modules compiled */
+    int32_t pipelines;          /**< Render and compute pipelines created */
+    int32_t pipelines_building; /**< Pipelines whose creation is in progress on the thread that
+                                 *   renders, which compiles them */
     int32_t shader_errors;      /**< Shader modules that failed to compile */
     int32_t meshes;             /**< Meshes alive */
     int32_t buffers;            /**< Buffers alive */

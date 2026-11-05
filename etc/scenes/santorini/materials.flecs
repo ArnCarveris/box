@@ -1,3 +1,5 @@
+using box.transform
+using box.geometry
 using box.material
 
 export const IslandPlaster: Rgb = {244, 240, 222}
@@ -9,3 +11,72 @@ export const IslandWood: Rgb = {137, 102, 66}
 export const IslandClay: Rgb = {193, 111, 77}
 export const IslandLeaf: Rgb = {103, 133, 76}
 export const IslandIron: Rgb = {49, 69, 76}
+export const IslandLinen: Sheen = {color: {120, 118, 110}, roughness: 0.6}
+export const IslandCloth: DiffuseTransmission = {factor: 0.45, color: {255, 244, 222}}
+export const IslandGlass: Transmission = {transmission_factor: 0.45, ior: 1.5, thickness_factor: 0.02, attenuation_distance: 0.4, attenuation_color: {120, 170, 190}}
+
+prefab IslandSquareShape {
+  Path2D: {
+    start: {-0.5, -0.5},
+    segments: [{kind: Line, end: {0.5, -0.5}}, {kind: Line, end: {0.5, 0.5}}, {kind: Line, end: {-0.5, 0.5}}],
+    closed: true
+  }
+}
+prefab IslandSquareProfile { Profile2D: {outer: IslandSquareShape} }
+
+prefab IslandRoundShape {
+  Path2D: {
+    start: {1, 0},
+    segments: [
+      {kind: CatmullRom, end: {0.7071, 0.7071}},
+      {kind: CatmullRom, end: {0, 1}},
+      {kind: CatmullRom, end: {-0.7071, 0.7071}},
+      {kind: CatmullRom, end: {-1, 0}},
+      {kind: CatmullRom, end: {-0.7071, -0.7071}},
+      {kind: CatmullRom, end: {0, -1}},
+      {kind: CatmullRom, end: {0.7071, -0.7071}}
+    ],
+    closed: true
+  }
+}
+prefab IslandRoundProfile { Profile2D: {outer: IslandRoundShape} }
+
+prefab IslandFanShape {
+  Path2D: {
+    start: {0.54, 0},
+    segments: [
+      {kind: CubicBezier, end: {0, 0.54}, control1: {0.54, 0.2982}, control2: {0.2982, 0.54}},
+      {kind: CubicBezier, end: {-0.54, 0}, control1: {-0.2982, 0.54}, control2: {-0.54, 0.2982}}
+    ],
+    closed: true
+  }
+}
+prefab IslandFanProfile { Profile2D: {outer: IslandFanShape} }
+
+template IslandRope {
+  prop ax: f32 = 0
+  prop ay: f32 = 0
+  prop az: f32 = 0
+  prop bx: f32 = 1
+  prop by: f32 = 0
+  prop bz: f32 = 0
+  prop sag: f32 = 0.1
+  prop thick: f32 = 0.012
+  prop tint: Rgb = {137, 102, 66}
+  route {
+    Path3D: {
+      start: {ax, ay, az},
+      segments: [{
+        kind: CubicBezier,
+        end: {bx, by, bz},
+        control1: {ax + (bx - ax) * 0.33, ay + (by - ay) * 0.33 - sag, az + (bz - az) * 0.33},
+        control2: {ax + (bx - ax) * 0.67, ay + (by - ay) * 0.67 - sag, az + (bz - az) * 0.67}
+      }]
+    }
+  }
+  cord {
+    Position: {0, 0, 0}
+    Sweep: {path: route, profile: IslandRoundProfile, scale: {thick, thick}, rings: 24}
+    Rgb: tint
+  }
+}
