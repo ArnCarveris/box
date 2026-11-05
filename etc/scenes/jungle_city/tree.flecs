@@ -79,7 +79,7 @@ template CanopyCrownLobe {
   prop seed: f32 = 0
   prop tint: Rgb = {64, 118, 54}
   prop blossom: bool = false
-  filler : CanopyCrownCore { Scale: {rx * 0.5, ry * 0.5, rz * 0.5}; IcoSphere: {radius: 1, segments: 2, smooth: true} }
+  filler : CanopyCrownCore { Scale: {rx * 0.5, ry * 0.5, rz * 0.5}; IcoSphere: {radius: 1, segments: 1, smooth: true} }
   for i in 0..count {
     const up = 1 - 2 * (i + 0.5) / count
     const flat = math.sqrt(1 - up * up)
@@ -158,9 +158,9 @@ template CanopyTree {
       const bx = lean + math.sin(a) * reach
       const bz = math.cos(a) * reach
       CanopyBranch(ax: lean * 0.8, ay: height * 0.5, bx: bx, by: y, bz: bz, radius: girth * 0.42) {}
-      CanopyCrownLobe(rx: height * 0.2, ry: height * 0.15 * squash, rz: height * 0.2, count: 15, card: height * 0.25, seed: a, tint: tint, blossom: flowering) { Position: {bx, y + height * 0.05, bz} }
+      CanopyCrownLobe(rx: height * 0.2, ry: height * 0.15 * squash, rz: height * 0.2, count: 7, card: height * 0.25, seed: a, tint: tint, blossom: flowering) { Position: {bx, y + height * 0.05, bz} }
     }
-    CanopyCrownLobe(rx: height * 0.24, ry: height * 0.17 * squash, rz: height * 0.24, count: 20, card: height * 0.27, seed: lean, tint: tint, blossom: flowering) { Position: {lean, height * 0.86, 0} }
+    CanopyCrownLobe(rx: height * 0.24, ry: height * 0.17 * squash, rz: height * 0.24, count: 10, card: height * 0.27, seed: lean, tint: tint, blossom: flowering) { Position: {lean, height * 0.86, 0} }
     if variant % 3 == 0 {
       { (IsA, CanopyVineCard); Position: {lean * 0.5 + girth, height * 0.32, girth}; Rotation: {0, 0.6, 0}; Quad: {height * 0.14, height * 0.6} }
     }

@@ -72,7 +72,7 @@ template LockLanternGlass {
   Rgb: lock_lantern_on ? {255, 226, 160} : {120, 128, 128}
   Emissive: {strength: lock_lantern_on ? 5 : 0, color: {255, 182, 96}}
   PbrMaterial: {roughness: 0.15}
-  NoShadow
+  LightFixture
   Transition: [Emissive: {duration: 0.5}, Rgb: {duration: 0.5}]
 }
 

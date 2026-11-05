@@ -51,6 +51,7 @@ static inline float box_audio_clean(
 #include "formant.h"
 #include "ladder.h"
 #include "saturate.h"
+#include "shift.h"
 
 /** A value that moves linearly to its target over a number of frames */
 typedef struct box_audio_ramp_t {
@@ -138,6 +139,10 @@ typedef struct box_audio_reverb_t {
     box_audio_ramp_t fade;    /**< Fade of the wet signal around a swap */
     box_audio_ramp_t feed;    /**< Fade in of the input after a swap, so it enters the clear
                                * lines without a step */
+    box_audio_shift_t shimmer; /**< Shifter of the shimmer, on the memory after the lines */
+    box_audio_ramp_t shimmer_amount; /**< Share of the feedback that is shifted */
+    box_audio_ramp_t shimmer_ratio; /**< Pitch ratio of the shimmer */
+    float shimmer_window;     /**< Window of the shifter of the shimmer in frames */
 } box_audio_reverb_t;
 
 /** Coefficients of a biquad: b0, b1, b2, a1 and a2, normalized by a0 */
@@ -399,6 +404,19 @@ typedef struct box_audio_frequency_shifter_t {
     box_audio_ramp_t feedback; /**< Feedback gain */
     box_audio_ramp_t mix;     /**< Wet level */
 } box_audio_frequency_shifter_t;
+/** A pitch shifter: a shifter per channel on the memory of its effect slot, and the last
+ * shifted sample of each channel for the feedback */
+typedef struct box_audio_pitch_shifter_t {
+    box_audio_pitch_shifter_params_t target; /**< Parameters of the last command, clamped */
+    box_audio_shift_t shift[2]; /**< Shifter of each channel */
+    float back[2];            /**< Last shifted sample of each channel, soft clipped */
+    int32_t still;            /**< Frames in a row in which the wet signal was silent */
+    box_audio_ramp_t ratio[2]; /**< Pitch ratio of each channel */
+    box_audio_ramp_t window;  /**< Window in frames */
+    box_audio_ramp_t feedback; /**< Feedback gain */
+    box_audio_ramp_t mix;     /**< Wet level */
+    box_audio_ramp_t feed;    /**< Fade in of the input after a move */
+} box_audio_pitch_shifter_t;
 
 /** State of the kinds of effects */
 typedef union box_audio_effect_data_t {
@@ -413,6 +431,7 @@ typedef union box_audio_effect_data_t {
     box_audio_saturator_t saturator; /**< BOX_AUDIO_EFFECT_SATURATOR */
     box_audio_transient_shaper_t transient_shaper; /**< BOX_AUDIO_EFFECT_TRANSIENT_SHAPER */
     box_audio_frequency_shifter_t frequency_shifter; /**< BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER */
+    box_audio_pitch_shifter_t pitch_shifter; /**< BOX_AUDIO_EFFECT_PITCH_SHIFTER */
 } box_audio_effect_data_t;
 
 /** An effect instance of the pool of the core: a kind in an insert slot of a bus, on the
@@ -1415,6 +1434,36 @@ bool box_audio_chorus_render(
 
 /** The chorus kind: a block skipped while idle */
 void box_audio_chorus_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    int32_t frames);
+
+/** The pitch shifter kind, in pitch_shifter.c: floats of its memory at a rate */
+int32_t box_audio_pitch_shifter_floats(
+    float sample_rate);
+
+/** The pitch shifter kind: start on its memory */
+void box_audio_pitch_shifter_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The pitch shifter kind: new parameters while it runs */
+void box_audio_pitch_shifter_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The pitch shifter kind: process a block */
+bool box_audio_pitch_shifter_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The pitch shifter kind: a block skipped while idle */
+void box_audio_pitch_shifter_rest(
     box_audio_core_t *core,
     box_audio_effect_t *fx,
     int32_t frames);

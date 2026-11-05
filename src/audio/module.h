@@ -780,6 +780,7 @@ typedef struct box_audio_module_t {
     ecs_vec_t samples;            /**< box_audio_sample_t*, the decoded sound files */
     uint64_t next_sample;         /**< Key of the next sample */
     box_audio_sample_sync_t *sample_sync; /**< Decodes in flight */
+    box_task_track_t sample_task; /**< Report of the decodes in flight */
     ecs_query_t *sample_users;    /**< AudioSample, to update the status of its entities */
     ecs_query_t *music_query;     /**< AudioStream with AudioMusic, disabled ones included */
     ecs_vec_t music;              /**< box_audio_music_t*, the streams, retired ones included */
@@ -889,8 +890,9 @@ uint32_t box_audio_module_effect_kind(
 #define BOX_AUDIO_EFFECT_COMPONENTS (16)
 
 /** Get the effect components: Reverb, Equalizer, AudioFilter, Compressor, Gate, Delay, Phaser,
- * Chorus, Saturator, TransientShaper and FrequencyShifter, in the order an entity that has
- * several takes the first of. A new effect is added here and to box_audio_module_effect_params.
+ * Chorus, Saturator, TransientShaper, FrequencyShifter and PitchShifter, in the order an entity
+ * that has several takes the first of. A new effect is added here and to
+ * box_audio_module_effect_params.
  *
  * @param out Receives up to BOX_AUDIO_EFFECT_COMPONENTS components
  * @return Number of components

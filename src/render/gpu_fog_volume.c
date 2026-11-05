@@ -314,7 +314,7 @@ static WGPURenderPipeline box_gpu_fog_pipeline(
         .stencilFront = { .compare = WGPUCompareFunction_Always },
         .stencilBack = { .compare = WGPUCompareFunction_Always }
     };
-    result = wgpuDeviceCreateRenderPipeline(gpu->device, &(WGPURenderPipelineDescriptor){
+    result = box_gpu_render_pipeline(gpu, &(WGPURenderPipelineDescriptor){
         .layout = f->pipeline_layout,
         .vertex = {
             .module = shader->module,

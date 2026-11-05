@@ -226,7 +226,7 @@ static WGPUComputePipeline box_gpu_env_image_pipeline(
             wgpuComputePipelineRelease(s->pipeline);
         }
 
-        s->pipeline = wgpuDeviceCreateComputePipeline(gpu->device,
+        s->pipeline = box_gpu_compute_pipeline(gpu,
             &(WGPUComputePipelineDescriptor){
                 .layout = s->pipeline_layout,
                 .compute = {

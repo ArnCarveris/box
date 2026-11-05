@@ -558,6 +558,23 @@
                 ]
             },
             {
+                "id": "LightFixture",
+                "testcases": [
+                    "point_inside_fixture_lit",
+                    "spot_inside_fixture_lit",
+                    "fixture_shadows_other_light",
+                    "fixture_shadows_sun",
+                    "fixture_on_light_entity",
+                    "fixture_parent_of_light",
+                    "fixture_sibling_of_light",
+                    "inherited_from_parent",
+                    "no_shadow_wins",
+                    "light_leaves_fixture",
+                    "tile_counts",
+                    "tag_change_renders_tile"
+                ]
+            },
+            {
                 "id": "ShadowCache",
                 "testcases": [
                     "static_scene_renders_once",
@@ -818,6 +835,14 @@
                 ]
             },
             {
+                "id": "InProgressTask",
+                "testcases": [
+                    "first_frame_compiles",
+                    "held_compile_blocks",
+                    "bake_reports_probes"
+                ]
+            },
+            {
                 "id": "PipelineCache",
                 "testcases": [
                     "every_state_combination_draws",
@@ -1002,7 +1027,8 @@
                     "radial_ring_in_plane",
                     "radial_burst_scaled",
                     "motion_velocity_curve_moves",
-                    "motion_force_curve_moves"
+                    "motion_force_curve_moves",
+                    "pool_grows_with_point_shadow"
                 ]
             },
             {
@@ -1046,7 +1072,9 @@
                 "id": "TransitionTintOpacity",
                 "testcases": [
                     "tint_mid_transition",
-                    "opacity_mid_transition"
+                    "opacity_mid_transition",
+                    "tint_remove",
+                    "opacity_add"
                 ]
             },
             {
@@ -1069,6 +1097,13 @@
                 ]
             },
             {
+                "id": "TransitionBorder",
+                "testcases": [
+                    "width_color_mid_transition",
+                    "with_box_shadow"
+                ]
+            },
+            {
                 "id": "Transmission",
                 "testcases": [
                     "factor_zero_matches_blended_path",
@@ -1081,7 +1116,15 @@
                     "partial_factor_keeps_diffuse",
                     "specular_on_top",
                     "no_depth_write_no_shadow",
-                    "blended_not_in_snapshot",
+                    "blended_behind_shows",
+                    "transmissive_behind_shows",
+                    "blended_in_front_draws_over",
+                    "one_snapshot_single_layer",
+                    "layers_take_snapshots",
+                    "snapshot_budget",
+                    "adjacent_runs_one_snapshot",
+                    "occlusion_view_layers",
+                    "diffuse_blur_behind_blended",
                     "opaque_and_sky_in_snapshot",
                     "snapshot_counter",
                     "resize_recreates_snapshot",

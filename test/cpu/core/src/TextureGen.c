@@ -15,6 +15,7 @@
 #define GEN_NOISE "test/assets/textures/gen/noise.flecs"
 #define GEN_BLOCKS "test/assets/textures/gen/blocks.flecs"
 #define GEN_CELLS "test/assets/textures/gen/cells.flecs"
+#define GEN_BLOCKS_TONES "test/assets/textures/gen/blocks_tones.flecs"
 
 /** Create a headless world, which waits for its texture loads.
  *
@@ -230,6 +231,73 @@ static void test_hash(
     test_assert(hash_file(file, prefix) == hash);
 }
 
+/** Run a script and generate one of its textures.
+ *
+ * @param world The world
+ * @param code The script
+ * @param name The texture entity
+ * @param size Receives the number of bytes
+ * @return The bytes, freed by the caller
+ */
+static uint8_t* script_bytes(
+    ecs_world_t *world,
+    const char *code,
+    const char *name,
+    int32_t *size)
+{
+    if (code) {
+        test_assert(ecs_script_run(world, "gen", code, NULL) == 0);
+    }
+
+    ecs_entity_t tex = ecs_lookup(world, name);
+    test_assert(tex != 0);
+
+    return gen_bytes(world, tex, size);
+}
+
+/** Check that an RGBA8 pixel has a color.
+ *
+ * @param px The pixels
+ * @param w Width
+ * @param x Column
+ * @param y Row
+ * @param c The color
+ */
+static void test_pixel(
+    const uint8_t *px,
+    int32_t w,
+    int32_t x,
+    int32_t y,
+    rgb c)
+{
+    const uint8_t *p = &px[(y * w + x) * 4];
+    test_int(p[0], c.r);
+    test_int(p[1], c.g);
+    test_int(p[2], c.b);
+    test_int(p[3], 255);
+}
+
+/** Check whether two RGBA8 pixels have the same color.
+ *
+ * @param px The pixels
+ * @param w Width
+ * @param a Index of the first pixel
+ * @param b Index of the second pixel
+ * @return Whether red, green and blue are equal
+ */
+static bool same_color(
+    const uint8_t *px,
+    int32_t w,
+    int32_t a,
+    int32_t b)
+{
+    (void)w;
+    return !memcmp(&px[a * 4], &px[b * 4], 3);
+}
+
+/** Palette of the tone tests, three distinct colors */
+static const rgb tone_colors[3] = { { 200, 0, 0 }, { 0, 0, 200 }, { 0, 180, 0 } };
+
 /** A noise layer of a few octaves */
 static const TextureGenLayer noise_layer = {
     .kind = GenNoise, .frequency = 4, .octaves = 3, .amount = 1 };
@@ -285,7 +353,7 @@ void TextureGen_pattern_wraps(void) {
 
     ecs_world_t *world = world_new();
     for (l = 0; l < 3; l ++) {
-        box_texture_gen_pattern(layers[l], 9, 64, 48, value, id);
+        box_texture_gen_pattern(layers[l], 9, 64, 48, value, id, NULL);
         for (y = 0; y < 48; y ++) {
             for (x = 0; x < 64; x ++) {
                 test_assert(value[y * 64 + x] >= 0 && value[y * 64 + x] <= 1);
@@ -294,7 +362,7 @@ void TextureGen_pattern_wraps(void) {
         }
     }
 
-    box_texture_gen_pattern(&noise_layer, 9, 64, 48, value, id);
+    box_texture_gen_pattern(&noise_layer, 9, 64, 48, value, id, NULL);
     for (y = 0; y < 48; y ++) {
         test_assert(fabsf(value[y * 64] - value[y * 64 + 63]) < 0.1f);
     }
@@ -440,7 +508,7 @@ void TextureGen_albedo_ramp(void) {
     static const TextureGenKey keys[2] = {
         { 0.25f, { 0, 100, 200 } }, { 0.75f, { 200, 100, 0 } } };
     uint8_t rgba[5 * 4];
-    box_texture_gen_albedo(height, 5, keys, 2, rgba);
+    box_texture_gen_albedo(height, 5, keys, 2, NULL, NULL, 0, rgba);
     test_int(rgba[0], 0);
     test_int(rgba[2], 200);
     test_int(rgba[4], 0);
@@ -452,7 +520,7 @@ void TextureGen_albedo_ramp(void) {
     test_int(rgba[16], 200);
     test_int(rgba[18], 0);
 
-    box_texture_gen_albedo(height, 5, NULL, 0, rgba);
+    box_texture_gen_albedo(height, 5, NULL, 0, NULL, NULL, 0, rgba);
     test_int(rgba[0], 0);
     test_int(rgba[8], 128);
     test_int(rgba[9], 128);
@@ -778,4 +846,357 @@ void TextureGen_source_deleted_with_derived(void) {
     ecs_progress(world, 0);
 
     ecs_fini(world);
+}
+
+void TextureGen_tone_checker(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    const char *code =
+        "using box.texture\n"
+        "floor_height { TextureGen: {width: 64, height: 48, seed: 3, layers: [\n"
+        "  {kind: GenBlocks, courses: 4, per_course: 4, gap: 0.02, jitter: 0,\n"
+        "   tones: 2, tone_order: GenToneChecker, amount: 1, id_amount: 0.2}\n"
+        "]} }\n"
+        "floor { TextureGen: {source: floor_height, output: GenAlbedo,\n"
+        "  palette: [{200, 0, 0}, {0, 0, 200}]} }\n";
+    int32_t size = 0, k, i;
+    uint8_t *px = script_bytes(world, code, "floor", &size);
+    test_int(size, 64 * 48 * 4);
+    for (k = 0; k < 4; k ++) {
+        int32_t y = k * 12 + 6;
+        for (i = 0; i < 4; i ++) {
+            int32_t x = i * 16 + 8;
+            test_pixel(px, 64, x, y, tone_colors[(k + i) % 2]);
+            test_assert(!same_color(px, 64, y * 64 + x, y * 64 + (x + 16) % 64));
+            test_assert(!same_color(px, 64, y * 64 + x, ((y + 12) % 48) * 64 + x));
+        }
+    }
+
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void TextureGen_tone_checker_staggered(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    const char *code =
+        "using box.texture\n"
+        "floor_height { TextureGen: {width: 64, height: 64, seed: 7, layers: [\n"
+        "  {kind: GenBlocks, courses: 8, per_course: 4, gap: 0.02, jitter: 0.3, stagger: 0.5,\n"
+        "   tones: 2, tone_order: GenToneChecker, amount: 1, id_amount: 0.2}\n"
+        "]} }\n"
+        "floor { TextureGen: {source: floor_height, output: GenAlbedo,\n"
+        "  palette: [{200, 0, 0}, {0, 0, 200}]} }\n";
+    int32_t size = 0, k, i, x;
+    uint8_t *px = script_bytes(world, code, "floor", &size);
+    test_int(size, 64 * 64 * 4);
+    for (k = 0; k < 8; k ++) {
+        int32_t y = k * 8 + 4, changes = 0;
+        double shift = (k % 2) ? 0.5 : 0.0;
+
+        /* Cuts move by at most 0.3 blocks, so the middle of the unjittered block is inside
+         * the block of its original index */
+        for (i = 0; i < 4; i ++) {
+            double u = (i + 0.5 + shift) / 4.0;
+            x = (int32_t)floor((u - floor(u)) * 64.0);
+            test_pixel(px, 64, x, y, tone_colors[(k + i) % 2]);
+        }
+
+        for (x = 0; x < 64; x ++) {
+            changes += !same_color(px, 64, y * 64 + x, y * 64 + (x + 1) % 64);
+        }
+
+        test_int(changes, 4);
+    }
+
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void TextureGen_tone_courses(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    const char *code =
+        "using box.texture\n"
+        "wall_height { TextureGen: {width: 64, height: 48, seed: 3, layers: [\n"
+        "  {kind: GenBlocks, courses: 6, per_course: 4, gap: 0.02,\n"
+        "   tones: 3, tone_order: GenToneCourses, amount: 1}\n"
+        "]} }\n"
+        "wall { TextureGen: {source: wall_height, output: GenAlbedo,\n"
+        "  palette: [{200, 0, 0}, {0, 0, 200}, {0, 180, 0}]} }\n";
+    int32_t size = 0, k, i;
+    uint8_t *px = script_bytes(world, code, "wall", &size);
+    for (k = 0; k < 6; k ++) {
+        for (i = 0; i < 4; i ++) {
+            test_pixel(px, 64, i * 16 + 8, k * 8 + 4, tone_colors[k % 3]);
+        }
+    }
+
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void TextureGen_tone_columns(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    const char *code =
+        "using box.texture\n"
+        "planks_height { TextureGen: {width: 96, height: 48, seed: 3, layers: [\n"
+        "  {kind: GenBlocks, courses: 4, per_course: 6, gap: 0.02,\n"
+        "   tones: 3, tone_order: GenToneColumns, amount: 1}\n"
+        "]} }\n"
+        "planks { TextureGen: {source: planks_height, output: GenAlbedo,\n"
+        "  palette: [{200, 0, 0}, {0, 0, 200}, {0, 180, 0}]} }\n";
+    int32_t size = 0, k, i;
+    uint8_t *px = script_bytes(world, code, "planks", &size);
+    test_int(size, 96 * 48 * 4);
+    for (k = 0; k < 4; k ++) {
+        for (i = 0; i < 6; i ++) {
+            test_pixel(px, 96, i * 16 + 8, k * 12 + 6, tone_colors[i % 3]);
+        }
+    }
+
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void TextureGen_tone_random(void) {
+    // materials/textures
+    TextureGenLayer layer = {
+        .kind = GenBlocks, .courses = 16, .per_course = 16, .gap = 0.01f, .amount = 1,
+        .id_amount = 0.2f, .tones = 4 };
+    static float value[64 * 64], id[64 * 64];
+    static int32_t tone[64 * 64], again[64 * 64], other[64 * 64];
+    int32_t used[4] = { 0 }, matches = 0, k, i;
+
+    ecs_world_t *world = world_new();
+    box_texture_gen_pattern(&layer, 9, 64, 64, value, id, tone);
+    box_texture_gen_pattern(&layer, 9, 64, 64, value, id, again);
+    test_assert(!memcmp(tone, again, sizeof(tone)));
+    box_texture_gen_pattern(&layer, 10, 64, 64, value, id, other);
+    test_assert(memcmp(tone, other, sizeof(tone)) != 0);
+
+    box_texture_gen_pattern(&layer, 9, 64, 64, value, id, tone);
+    for (k = 0; k < 16; k ++) {
+        for (i = 0; i < 16; i ++) {
+            int32_t p = (k * 4 + 2) * 64 + i * 4 + 2;
+            int32_t bucket = (int32_t)floor(id[p] * 4);
+            test_assert(tone[p] >= 0 && tone[p] < 4);
+            used[tone[p]] ++;
+            matches += tone[p] == bucket;
+        }
+    }
+
+    for (i = 0; i < 4; i ++) {
+        test_assert(used[i] > 0);
+    }
+
+    /* A tone that followed the id would match its bucket for every block, an independent one
+     * for about a quarter of them */
+    test_assert(matches < 128);
+
+    ecs_fini(world);
+}
+
+void TextureGen_tone_tiles(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    const char *code =
+        "using box.texture\n"
+        "floor_height { TextureGen: {width: 64, height: 48, seed: 3, layers: [\n"
+        "  {kind: GenBlocks, courses: 4, per_course: 4, gap: 0.02,\n"
+        "   tones: 2, tone_order: GenToneChecker, amount: 1}\n"
+        "]} }\n"
+        "floor { TextureGen: {source: floor_height, output: GenAlbedo,\n"
+        "  palette: [{200, 0, 0}, {0, 0, 200}]} }\n";
+    int32_t size = 0, x, y;
+    uint8_t *px = script_bytes(world, code, "floor", &size);
+
+    /* Across the wrap the checker alternates as it does between neighbors inside */
+    for (x = 0; x < 64; x ++) {
+        test_assert(!same_color(px, 64, x, 47 * 64 + x));
+    }
+
+    for (y = 0; y < 48; y ++) {
+        test_assert(!same_color(px, 64, y * 64, y * 64 + 63));
+    }
+
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void TextureGen_tone_amount(void) {
+    // materials/textures
+    TextureGenLayer layer = {
+        .kind = GenBlocks, .courses = 4, .per_course = 4, .gap = 0.04f, .amount = 1,
+        .tones = 2, .tone_order = GenToneChecker, .tone_amount = 0.5f };
+    int32_t size = 0, k, i;
+    uint8_t *px = layer_bytes(&layer, 3, &size);
+
+    /* Faces sum to 1 for tone 0 and 1.5 for tone 1, the joints of tone 0 to 0 */
+    for (k = 0; k < 4; k ++) {
+        for (i = 0; i < 4; i ++) {
+            int32_t v = px[(k * 12 + 6) * 64 + i * 16 + 8];
+            if ((k + i) % 2) {
+                test_int(v, 255);
+            } else {
+                test_assert(abs(v - 170) <= 1);
+            }
+        }
+    }
+
+    ecs_os_free(px);
+
+    TextureGenLayer plain = blocks_layer, toned = blocks_layer;
+    toned.tones = 2;
+    toned.tone_order = GenToneChecker;
+    int32_t a_size = 0, b_size = 0;
+    uint8_t *a = layer_bytes(&plain, 5, &a_size);
+    uint8_t *b = layer_bytes(&toned, 5, &b_size);
+    test_int(a_size, b_size);
+    test_assert(!memcmp(a, b, a_size));
+    ecs_os_free(a);
+    ecs_os_free(b);
+}
+
+void TextureGen_palette_ramp_multiply(void) {
+    // materials/textures
+    static const float height[3] = { 0.0f, 1.0f, 0.0f };
+    static const int32_t tone[3] = { 0, 1, 3 };
+    static const TextureGenKey keys[2] = {
+        { 0.0f, { 100, 200, 50 } }, { 1.0f, { 255, 255, 255 } } };
+    static const rgb palette[2] = { { 200, 100, 255 }, { 10, 20, 30 } };
+    uint8_t rgba[3 * 4];
+
+    box_texture_gen_albedo(height, 3, keys, 2, tone, palette, 2, rgba);
+    test_int(rgba[0], 78);
+    test_int(rgba[1], 78);
+    test_int(rgba[2], 50);
+    test_int(rgba[3], 255);
+    test_int(rgba[4], 10);
+    test_int(rgba[5], 20);
+    test_int(rgba[6], 30);
+    test_int(rgba[8], 4);
+    test_int(rgba[9], 16);
+    test_int(rgba[10], 6);
+    test_int(rgba[11], 255);
+
+    box_texture_gen_albedo(height, 3, NULL, 0, tone, palette, 2, rgba);
+    test_int(rgba[0], 200);
+    test_int(rgba[1], 100);
+    test_int(rgba[2], 255);
+    test_int(rgba[4], 10);
+    test_int(rgba[5], 20);
+    test_int(rgba[6], 30);
+    test_int(rgba[8], 10);
+    test_int(rgba[9], 20);
+    test_int(rgba[10], 30);
+}
+
+void TextureGen_palette_cells(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    const char *code =
+        "using box.texture\n"
+        "cobble_height { TextureGen: {width: 64, height: 64, seed: 3, layers: [\n"
+        "  {kind: GenCells, count: 36, distance: GenEdge, tones: 3, amount: 1, id_amount: 0.2}\n"
+        "]} }\n"
+        "cobble { TextureGen: {source: cobble_height, output: GenAlbedo,\n"
+        "  palette: [{200, 0, 0}, {0, 0, 200}, {0, 180, 0}]} }\n";
+    int32_t size = 0, used[3] = { 0 }, i, c;
+    uint8_t *px = script_bytes(world, code, "cobble", &size);
+    test_int(size, 64 * 64 * 4);
+    for (i = 0; i < 64 * 64; i ++) {
+        const uint8_t *p = &px[i * 4];
+        bool found = false;
+        for (c = 0; c < 3; c ++) {
+            if (p[0] == tone_colors[c].r && p[1] == tone_colors[c].g &&
+                p[2] == tone_colors[c].b)
+            {
+                used[c] ++;
+                found = true;
+            }
+        }
+
+        test_assert(found);
+    }
+
+    for (c = 0; c < 3; c ++) {
+        test_assert(used[c] > 0);
+    }
+
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void TextureGen_palette_layer_invalid(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    const char *code =
+        "using box.texture\n"
+        "field { TextureGen: {width: 16, height: 16, seed: 1, layers: [\n"
+        "  {kind: GenBlocks, courses: 2, per_course: 2, tones: 2, amount: 1}\n"
+        "  {kind: GenNoise, frequency: 4, amount: 0.2}\n"
+        "]} }\n"
+        "field_far { TextureGen: {source: field, output: GenAlbedo, palette_layer: 5,\n"
+        "  palette: [{200, 0, 0}, {0, 0, 200}]} }\n"
+        "field_noise { TextureGen: {source: field, output: GenAlbedo, palette_layer: 1,\n"
+        "  palette: [{200, 0, 0}, {0, 0, 200}]} }\n";
+    ecs_log_set_level(-4);
+    test_assert(ecs_script_run(world, "gen", code, NULL) == 0);
+    ecs_entity_t far = ecs_lookup(world, "field_far");
+    ecs_entity_t noise = ecs_lookup(world, "field_noise");
+    test_assert(far && noise);
+
+    const TextureStatus *status = wait_texture(world, far);
+    test_int(status->state, TextureFailed);
+    test_assert(status->error != NULL);
+    test_assert(strstr(status->error, "field_far") != NULL);
+    test_assert(strstr(status->error, "5") != NULL);
+
+    status = wait_texture(world, noise);
+    test_int(status->state, TextureFailed);
+    test_assert(status->error != NULL);
+    test_assert(strstr(status->error, "field_noise") != NULL);
+    test_assert(strstr(status->error, "1") != NULL);
+    test_assert(strstr(status->error, "GenNoise") != NULL);
+
+    ecs_fini(world);
+}
+
+void TextureGen_palette_ignored_for_normal(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    const char *code =
+        "using box.texture\n"
+        "field { TextureGen: {width: 32, height: 32, seed: 1, layers: [\n"
+        "  {kind: GenBlocks, courses: 4, per_course: 4, gap: 0.04, tones: 2,\n"
+        "   tone_order: GenToneChecker, amount: 1, id_amount: 0.2}\n"
+        "]} }\n"
+        "field_n { TextureGen: {source: field, output: GenNormal, strength: 2} }\n"
+        "field_np { TextureGen: {source: field, output: GenNormal, strength: 2,\n"
+        "  palette: [{200, 0, 0}, {0, 0, 200}], palette_layer: 7} }\n"
+        "field_h { TextureGen: {source: field} }\n"
+        "field_hp { TextureGen: {source: field, palette: [{200, 0, 0}]} }\n";
+    int32_t a_size = 0, b_size = 0;
+    uint8_t *a = script_bytes(world, code, "field_n", &a_size);
+    uint8_t *b = script_bytes(world, NULL, "field_np", &b_size);
+    test_int(a_size, b_size);
+    test_assert(!memcmp(a, b, a_size));
+    ecs_os_free(a);
+    ecs_os_free(b);
+
+    a = script_bytes(world, NULL, "field_h", &a_size);
+    b = script_bytes(world, NULL, "field_hp", &b_size);
+    test_int(a_size, b_size);
+    test_assert(!memcmp(a, b, a_size));
+    ecs_os_free(a);
+    ecs_os_free(b);
+
+    ecs_fini(world);
+}
+
+void TextureGen_hash_blocks_tones(void) {
+    // materials/textures
+    test_hash(GEN_BLOCKS_TONES, "blocks_tones", 0xc39e2c64U);
 }

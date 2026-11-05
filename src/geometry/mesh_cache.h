@@ -15,12 +15,24 @@ extern "C" {
 /** Mesh cache of a world, owned by the type hooks of ShapeMesh */
 typedef struct box_mesh_cache_t box_mesh_cache_t;
 
+/** Check whether the Bevel of the value of a Bevel variant rounds no edge of its host.
+ *
+ * @param value The host value followed by the Bevel
+ * @return True when the host resolves as a plain host
+ */
+typedef bool (*box_bevel_flat_fn)(
+    const void *value);
+
 /** Registered shape */
 typedef struct box_shape_t {
     const ecs_world_t *world; /**< World passed to the world-aware shape callbacks */
     box_shape_desc_t desc;   /**< Registration */
     ecs_size_t size;         /**< Size of the shape component */
     box_mesh_cache_t *cache; /**< Cache the shape resolves through */
+    ecs_entity_t host;       /**< Shape a Bevel variant rounds, 0 for other shapes */
+    ecs_size_t host_size;    /**< Size of the host value at the start of a variant value */
+    ecs_size_t bevel_offset; /**< Offset of the Bevel in the value of a Bevel variant */
+    box_bevel_flat_fn flat;  /**< Whether a variant value rounds nothing */
 } box_shape_t;
 
 /** Mesh and instance scale an entity's shape resolved to; holds a reference to the mesh */
@@ -36,11 +48,41 @@ typedef struct ShapeMesh {
 /** Component id of ShapeMesh */
 extern ECS_COMPONENT_DECLARE(ShapeMesh);
 
-/** Value of the Bevel shape: the Box and the Bevel of an entity */
+/** Value of the Bevel variant of a Box: the Box and the Bevel of an entity */
 typedef struct box_bevel_value_t {
     Box box;      /**< Size of the box */
     Bevel bevel;  /**< Edge radii */
 } box_bevel_value_t;
+
+/** Value of the Bevel variant of a Cylinder or a Cone, which share a layout */
+typedef struct box_bevel_cylinder_t {
+    Cylinder host; /**< The shape */
+    Bevel bevel;   /**< Rim radii */
+} box_bevel_cylinder_t;
+
+/** Value of the Bevel variant of a Frustum */
+typedef struct box_bevel_frustum_t {
+    Frustum host; /**< The shape */
+    Bevel bevel;  /**< Rim radii */
+} box_bevel_frustum_t;
+
+/** Value of the Bevel variant of a Tube */
+typedef struct box_bevel_tube_t {
+    Tube host;   /**< The shape */
+    Bevel bevel; /**< Rim radii */
+} box_bevel_tube_t;
+
+/** Value of the Bevel variant of a TrianglePrism or RightTrianglePrism */
+typedef struct box_bevel_prism_t {
+    TrianglePrism host; /**< The shape */
+    Bevel bevel;        /**< Edge radius */
+} box_bevel_prism_t;
+
+/** Value of the Bevel variant of a ProfileExtrusion */
+typedef struct box_bevel_extrusion_t {
+    ProfileExtrusion host; /**< The shape */
+    Bevel bevel;           /**< Cap edge radii */
+} box_bevel_extrusion_t;
 
 void box_geometry_validation_init(ecs_world_t *world);
 
@@ -181,7 +223,7 @@ void box_shape_apply(
     ecs_entity_t e,
     const void *value);
 
-/** Check whether a Bevel rounds no edge, so that its Box resolves as a plain Box.
+/** Check whether a Bevel rounds no edge of a Box, so that its Box resolves as a plain Box.
  *
  * @param bevel The bevel
  * @return True when every radius that applies is 0, negative or not finite
@@ -189,14 +231,56 @@ void box_shape_apply(
 bool box_bevel_flat(
     const Bevel *bevel);
 
-/** Create the observers that resolve entities with a Box and a Bevel.
+/** Get the radius of a rim: the radius of every edge when it is not 0, else the rim's own.
+ *
+ * @param bevel The bevel
+ * @param rim The rim's own radius, top or bottom
+ * @return The radius, negative and non-finite radii as 0
+ */
+float box_bevel_rim(
+    const Bevel *bevel,
+    float rim);
+
+/** Get the subdivisions per rounded edge of a Bevel.
+ *
+ * @param bevel The bevel
+ * @return The subdivisions, from 1 to 64
+ */
+int32_t box_bevel_segments(
+    const Bevel *bevel);
+
+/** Add the Bevel variant of a host shape: a cached shape whose value is the host value followed
+ * by a Bevel, keyed under the pair (Bevel, host), and the observers that resolve entities with
+ * the host and a Bevel through it. The host is registered with Bevel as its exclude.
  *
  * @param world The world
- * @param bevel The cached shape of the Bevel, whose value is a box_bevel_value_t
+ * @param desc The key, generator, scale and surface functions of the variant
+ * @param host The host shape component
+ * @param host_size Size of the host value
+ * @param offset Offset of the Bevel in the variant value
+ * @param size Size of the variant value
+ * @param flat Whether a variant value rounds nothing, so that it resolves as the plain host
+ * @return The variant, NULL when it is already registered
  */
-void box_geometry_bevel_init(
+box_shape_t* box_geometry_bevel_host(
     ecs_world_t *world,
-    box_shape_t *bevel);
+    const box_shape_desc_t *desc,
+    ecs_entity_t host,
+    ecs_size_t host_size,
+    ecs_size_t offset,
+    ecs_size_t size,
+    box_bevel_flat_fn flat);
+
+/** Get the region of a vertex of the mesh of a ProfileExtrusion as the shaders classify it.
+ *
+ * Caps carry a vertical normal without a horizontal part, which no wall or rim vertex has; the
+ * vertices of the holes carry a u offset of 2.
+ *
+ * @param vertex The vertex
+ * @return SurfaceOuter, SurfaceInner, SurfaceStart or SurfaceEnd
+ */
+int32_t box_profile_region(
+    const box_vertex_t *vertex);
 
 /** Free the arrays of a mesh.
  *

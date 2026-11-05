@@ -189,7 +189,8 @@ fn cutout_attributes(v: CutoutIn, o: ptr<function, CutoutOut>) {
     let shading = shadings[v.slot];
     let material = material_fetch(shading.material);
     (*o).uv = v.uv * material.uv.xy + material.uv.zw;
-    if (surface_data.p[0].x == 7.0 && v.uv.x >= 2.0 && abs(v.normal.y) <= 0.5) {
+    if (surface_data.p[0].x == 7.0 && v.uv.x >= 2.0 &&
+        !(v.normal.x == 0.0 && v.normal.z == 0.0 && v.normal.y != 0.0)) {
         (*o).uv.x -= 2.0 * material.uv.x;
     }
     if (material_mapped(material) && !material_world(material) && surface_data.p[0].x == 1.0) {
