@@ -968,3 +968,17 @@ void Instrument_spread_clamped(void) {
     test_flt(instrument_spread_pan(world, pitch, 66, 0), 0.25f);
     ecs_fini(world);
 }
+
+/** A deleted instrument drops the count of its notes. */
+void Instrument_spread_removed(void) {
+    // audio/instrument
+    ecs_world_t *world = audio_world();
+    box_audio_module_t *state = box_audio_module_get(world);
+    ecs_entity_t e = instrument_spread_new(world, 1, InstrumentSpreadAlternate);
+    audio_run(world, 1);
+    test_flt(instrument_spread_pan(world, e, 60, 0), 1);
+    test_assert(ecs_map_get(&state->spread_notes, e) != NULL);
+    ecs_delete(world, e);
+    test_assert(ecs_map_get(&state->spread_notes, e) == NULL);
+    ecs_fini(world);
+}

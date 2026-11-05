@@ -301,3 +301,37 @@ bool box_audio_play_note(
 done:
     return result;
 }
+
+/** Drop the spread note count of the instruments that lose their Instrument.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxAudioInstrumentRemove(
+    ecs_iter_t *it)
+{
+    box_audio_module_t *state = it->ctx;
+    int32_t i;
+    if (ecs_is_fini(it->world)) {
+        goto done;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        ecs_map_remove(&state->spread_notes, it->entities[i]);
+    }
+done:
+    return;
+}
+
+void box_audio_instrument_init(
+    ecs_world_t *world,
+    box_audio_module_t *state)
+{
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "InstrumentRemove" }),
+        .query.terms = {{ .id = ecs_id(Instrument), .src.id = EcsSelf }},
+        .query.flags = EcsQueryMatchDisabled,
+        .events = { EcsOnRemove },
+        .callback = BoxAudioInstrumentRemove,
+        .ctx = state
+    });
+}

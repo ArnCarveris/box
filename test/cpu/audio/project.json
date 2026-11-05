@@ -147,7 +147,8 @@
                     "spread_alternate",
                     "spread_random",
                     "spread_zero",
-                    "spread_clamped"
+                    "spread_clamped",
+                    "spread_removed"
                 ]
             },
             {

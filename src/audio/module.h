@@ -1296,6 +1296,15 @@ uint32_t box_audio_instrument_voice(
     bool release,
     uint8_t priority);
 
+/** Register the observer that drops the spread note count of a removed Instrument.
+ *
+ * @param world The world
+ * @param state The state
+ */
+void box_audio_instrument_init(
+    ecs_world_t *world,
+    box_audio_module_t *state);
+
 /** Register the observers and the timeline hook of the clips and tracks.
  *
  * @param world The world

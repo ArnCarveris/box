@@ -1217,6 +1217,7 @@ void BoxAudioImport(
     box_audio_sync_init(world, state);
     box_audio_sample_init(world, state);
     box_audio_music_init(world, state);
+    box_audio_instrument_init(world, state);
     box_audio_synth_init(world);
     box_audio_sequencer_init(world, state);
     box_audio_functions_init(world);
