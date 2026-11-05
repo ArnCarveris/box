@@ -1,3 +1,4 @@
+include materials
 using flecs.script
 using box.transform
 using box.geometry
@@ -10,7 +11,6 @@ using box.surface
 using box.controllers
 using box.movement
 
-@tree Parent
 template GardenLeaf {
   prop tint: Rgb = {111, 145, 100}
 
@@ -21,4 +21,5 @@ template GardenLeaf {
   Rgb: tint
   BackFaceMode: {BackFacePlain}
   PbrMaterial: {roughness: 0.85}
+  DiffuseTransmission: GardenLeafLight
 }

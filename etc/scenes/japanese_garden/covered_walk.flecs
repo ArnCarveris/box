@@ -12,7 +12,6 @@ using box.surface
 using box.controllers
 using box.movement
 
-@tree Parent
 template CoveredWalk {
   prop bays: i32 = 4
   prop bay_length: f32 = 2.27
@@ -50,6 +49,7 @@ template CoveredWalk {
       Position: {(side - 0.5) * 1.64, 2.66, center}
       Box: {0.15, 0.16, length + 0.22}
       Rgb: GardenVermilion
+      ClearCoat: GardenLacquer
     }
   }
   spine {
@@ -70,6 +70,7 @@ template CoveredWalk {
           Position: {(side - 0.5) * 1.82, 1.46, 0}
           Box: {0.15, 2.48, 0.15}
           Rgb: GardenVermilion
+          ClearCoat: GardenLacquer
         }
         {
           Position: {(side - 0.5) * 1.82, 0.4, 0}
@@ -86,6 +87,7 @@ template CoveredWalk {
           Position: {(side - 0.5) * 1.82, 2.56, 0}
           Box: {0.39, 0.1, 0.35}
           Rgb: GardenVermilion
+          ClearCoat: GardenLacquer
         }
         {
           Position: {(side - 0.5) * 1.46, 2.36, 0}
@@ -131,11 +133,13 @@ template CoveredWalk {
           Position: {(side - 0.5) * 1.82, 0.87, 0}
           RoundedBox: {0.115, 0.095, bay_length - 0.15, 0.02}
           Rgb: GardenVermilion
+          ClearCoat: GardenLacquer
         }
         {
           Position: {(side - 0.5) * 1.82, 0.43, 0}
           Box: {0.075, 0.075, bay_length - 0.15}
           Rgb: GardenVermilion
+          ClearCoat: GardenLacquer
         }
         for slat in 0..6 {
           {

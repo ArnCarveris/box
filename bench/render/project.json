@@ -197,7 +197,10 @@
                 "id": "Blended",
                 "benchcases": [
                     "gpu_10k",
-                    "gpu_10k_lit_culled"
+                    "gpu_10k_lit_culled",
+                    "gpu_100_no_glass",
+                    "gpu_100_glass_one_layer",
+                    "gpu_100_glass_budget_layers"
                 ]
             },
             {

@@ -5,7 +5,6 @@ using box.geometry
 using box.material
 
 assets {
-  @tree Parent
   template VendingMachine {
     prop color: Rgb = {206, 71, 70}
 
@@ -25,11 +24,7 @@ assets {
         {
           Position: {-0.36 + col * 0.18, 0.95 + row * 0.28, 0.43}
           Cylinder: {radius: 0.055, length: 0.17, segments: 8}
-          if (row + col) % 2 == 0 {
-            Rgb: {242, 178, 73}
-          } else {
-            Rgb: {81, 159, 158}
-          }
+          Rgb: (row + col) % 2 == 0 ? {242, 178, 73} : {81, 159, 158}
         }
         {
           Position: {-0.36 + col * 0.18, 0.83 + row * 0.28, 0.44}

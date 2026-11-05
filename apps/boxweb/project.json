@@ -13,6 +13,7 @@
                 "../../etc/environments",
                 "../../etc/assets",
                 "../../etc/fps",
+                "../../etc/startup",
                 "../../etc/editor"
             ],
             "ldflags": ["-sEXPORTED_RUNTIME_METHODS=cwrap,FS"]

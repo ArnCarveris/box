@@ -11,7 +11,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template MarketLantern {
   cord {
     Position: {0, 0.43, 0}

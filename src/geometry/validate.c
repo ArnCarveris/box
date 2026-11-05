@@ -404,7 +404,8 @@ done:
 
 /** Validate hook for Bevel that reports radii that are negative or not finite.
  *
- * A Bevel without a Box is not reported: a script can set the Bevel before the Box.
+ * A Bevel without a shape it rounds is not reported: a script can set the Bevel before the
+ * shape.
  *
  * @param world The world
  * @param entity The entity being validated
@@ -425,7 +426,8 @@ static bool box_validate_bevel_hook(
         bevel->radius,
         bevel->top_front, bevel->top_back, bevel->top_left, bevel->top_right,
         bevel->bottom_front, bevel->bottom_back, bevel->bottom_left, bevel->bottom_right,
-        bevel->front_left, bevel->front_right, bevel->back_left, bevel->back_right
+        bevel->front_left, bevel->front_right, bevel->back_left, bevel->back_right,
+        bevel->top, bevel->bottom
     };
     const char *reason = NULL;
     for (size_t i = 0; !reason && i < sizeof(radii) / sizeof(radii[0]); i ++) {

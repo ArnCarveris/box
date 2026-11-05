@@ -121,23 +121,34 @@ canal_lock {
     Position: {5.72, -1.25, 0}
     ParticleEmitter: {
       max: 2000,
-      rate: match lock_top_paddle { true: 900; _: 0 },
+      rate: lock_top_paddle ? 900 : 0,
       shape: EmitterBox, extents: {0.02, 0.07, 0.5},
       direction: {-1, 0.1, 0}, spread: 6, speed: {2.2, 3.4},
       lifetime: {0.35, 0.7}, size: {0.025, 0.09}, opacity: {0.3, 0.75},
       acceleration: {0, -9, 0}, color: {222, 240, 244}, seed: 21
     }
+    ParticleCollision: {height: -2.25, die: true}
   }
   bottom_jet {
     Position: {-5.75, -1.98, 0}
     ParticleEmitter: {
       max: 2000,
-      rate: match lock_bottom_paddle { true: 900; _: 0 },
+      rate: lock_bottom_paddle ? 900 : 0,
       shape: EmitterBox, extents: {0.02, 0.06, 0.55},
       direction: {-1, 0.1, 0}, spread: 7, speed: {2.4, 3.6},
       lifetime: {0.2, 0.42}, size: {0.025, 0.09}, opacity: {0.3, 0.75},
       acceleration: {0, -9, 0}, color: {222, 240, 244}, seed: 22
     }
+    ParticleCollision: {height: -2.25, die: true}
+  }
+
+  low_mist {
+    Position: {-13.75, -1.95, 0}
+    FogVolume: {extent: {7.4, 0.4, 3.2}, density: 0.15, color: {232, 238, 240}, asymmetry: 0.4, edge_fade: 0.35, noise_strength: 0.8, noise_scale: 3, wind: {0.25, 0, 0.05}, light_inscatter: 0.5}
+  }
+  high_mist {
+    Position: {13.75, -0.15, 0}
+    FogVolume: {extent: {7.4, 0.4, 3.2}, density: 0.15, color: {232, 238, 240}, asymmetry: 0.4, edge_fade: 0.35, noise_strength: 0.8, noise_scale: 3, wind: {0.25, 0, 0.05}, light_inscatter: 0.5}
   }
 
   LockNarrowboat boat(enabled: (lock_boat_up && lock_boat_at == 1 && lock_top_gate) || (lock_boat_at == 2 && lock_top_gate) || ((lock_boat_at == 0 || (lock_boat_at == 1 && !lock_boat_up)) && lock_bridge_up && lock_bottom_gate)) {}
@@ -213,11 +224,9 @@ canal_lock {
   CanalDuck(radius: 0.6, bob: 1.3) { Position: {-16.8, -2.27, 1.95}; Rotation: {0, -0.8, 0} }
 }
 
-scroll_low { SetAt: {frame: 2, entity: canal_lock.low_water}; TextureTransform: {scale_x: 14.5 / 5, scale_y: 6 / 5, offset_x: -21 / 5 + 300, offset_y: -3 / 5 + 720} }
-scroll_low_neck { SetAt: {frame: 2, entity: canal_lock.low_neck}; TextureTransform: {scale_x: 1.13 / 5, scale_y: 3.2 / 5, offset_x: -6.5 / 5 + 300, offset_y: -1.6 / 5 + 720} }
-scroll_high { SetAt: {frame: 2, entity: canal_lock.high_water}; TextureTransform: {scale_x: 14.5 / 5, scale_y: 6 / 5, offset_x: 6.5 / 5 + 300, offset_y: -3 / 5 + 720} }
-scroll_high_neck { SetAt: {frame: 2, entity: canal_lock.high_neck}; TextureTransform: {scale_x: 0.5 / 5, scale_y: 3.2 / 5, offset_x: 6 / 5 + 300, offset_y: -1.6 / 5 + 720} }
-scroll_chamber { SetAt: {frame: 2, entity: canal_lock.chamber_water.surface}; TextureTransform: {scale_x: 11.37 / 5, scale_y: 3.2 / 5, offset_x: -5.37 / 5 + 300, offset_y: -1.6 / 5 + 720} }
+for target in [canal_lock.low_water, canal_lock.low_neck, canal_lock.high_water, canal_lock.high_neck, canal_lock.chamber_water.surface] {
+  { SetAt: {frame: 2, entity: target}; TextureTransform: {scale_x: 1, scale_y: 1, offset_x: 720, offset_y: -300} }
+}
 
 main_view {
   View: {

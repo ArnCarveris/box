@@ -396,8 +396,8 @@ done:
     return;
 }
 
-/** In a headless run, wait for the decodes in flight so a frame always hears the same sounds,
- * and warn when the wait gives up.
+/** Report the decodes in flight as BOX_TASK_SOUNDS, not blocking, and in a headless run wait
+ * for them so a frame always hears the same sounds, and warn when the wait gives up.
  *
  * @param it The iterator of the system
  */
@@ -407,6 +407,8 @@ static void BoxAudioSampleFrame(
     box_audio_module_t *state = it->ctx;
     const App *app = ecs_singleton_get(it->world, App);
     ecs_time_t start = {0};
+    box_task_remaining(it->world, &state->sample_task, BOX_TASK_SOUNDS, false,
+        box_audio_sample_working(state->sample_sync));
     if (!app || !app->headless) {
         goto done;
     }

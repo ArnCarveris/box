@@ -12,7 +12,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template MarketAwning {
   prop tint: Rgb = {163, 65, 52}
 
@@ -23,11 +22,13 @@ template MarketAwning {
       Rotation: {0.14, 0, 0}
       Box: {0.38, 0.045, 2.45}
       Rgb: stripe[i % 2]
+      DiffuseTransmission: {factor: 0.4, thickness: 0.05}
     }
     {
       Position: {(i - 5.5) * 0.38, 2.64, 1.2}
       RoundedBox: {0.375, 0.35, 0.055, 0.09}
       Rgb: stripe[i % 2]
+      DiffuseTransmission: {factor: 0.4, thickness: 0.055}
     }
   }
   for side in 0..2 {

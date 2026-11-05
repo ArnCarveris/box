@@ -13,8 +13,8 @@ using box.effects
 using box.surface
 using box.controllers
 using box.text
+using box.particle
 
-@tree Parent
 template MarketFountain {
   base {
     Position: {0, 0.12, 0}
@@ -37,8 +37,9 @@ template MarketFountain {
   water {
     Position: {0, 0.5, 0}
     Cylinder: {radius: 1.36, length: 0.03, segments: 48}
-    Rgb: {96, 156, 148}
-    PbrMaterial: {roughness: 0.08, metallic: 0.25}
+    Rgb: {150, 218, 208}
+    PbrMaterial: {roughness: 0.06}
+    Transmission: {transmission_factor: 0.75, ior: 1.33, thickness_factor: 0.25, attenuation_distance: 0.5, attenuation_color: {70, 170, 160}}
   }
   pedestal {
     Position: {0, 1.04, 0}
@@ -60,12 +61,35 @@ template MarketFountain {
       Tube: {radius: 0.06, thickness: 0.02, length: 0.28, segments: 12}
       Rgb: {149, 119, 62}
     }
-    for segment in 0..7 {
-      const t = segment / 7.0
-      const n = (segment + 1.0) / 7
-      MarketBeam(ax: math.sin(a) * (0.54 + t * 0.48), ay: 1.32 - t * t * 0.8, az: math.cos(a) * (0.54 + t * 0.48),
-        bx: math.sin(a) * (0.54 + n * 0.48), by: 1.32 - n * n * 0.8, bz: math.cos(a) * (0.54 + n * 0.48),
-        radius: 0.018, tint: {176, 213, 201})
+    {
+      Position: {}
+      arc {
+        Path3D: {
+          start: {math.sin(a) * 0.54, 1.32, math.cos(a) * 0.54},
+          segments: [{
+            kind: CubicBezier,
+            end: {math.sin(a) * 1.02, 0.52, math.cos(a) * 1.02},
+            control1: {math.sin(a) * 0.7, 1.32, math.cos(a) * 0.7},
+            control2: {math.sin(a) * 0.86, 1.0533, math.cos(a) * 0.86}
+          }]
+        }
+      }
+      Sweep: {path: arc, profile: MarketRoundProfile, scale: {0.018, 0.018}, rings: 24}
+      Rgb: {176, 213, 201}
+      PbrMaterial: {roughness: 0.1}
+    }
+    {
+      Position: {math.sin(a) * 1.02, 0.53, math.cos(a) * 1.02}
+      ParticleEmitter: {
+        max: 120, rate: 60, shape: EmitterDisc, radius: 0.04,
+        direction: {0, 1, 0}, spread: 35, speed: {0.4, 0.9},
+        lifetime: {0.3, 0.6}, size: {0.012, 0.03}, opacity: {0.4, 0.8},
+        color: {226, 242, 238}, seed: i + 7
+      }
+      ParticleForces: {}
+      ParticleCollision: {height: 0.77, die: true}
+      ParticleAppearance: {lit: 0.8}
+      ParticleCurves: {opacity: {keys: [{0, 1}, {0.7, 0.8}, {1, 0}]}}
     }
     for ripple in 0..3 {
       {

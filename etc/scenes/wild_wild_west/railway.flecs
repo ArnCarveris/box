@@ -7,13 +7,12 @@ using box.light
 using box.text
 
 
-@tree Parent
 template WestRailway {
   ballast { Position: {0, 0.025, 0}; RoundedBox: {36, 0.13, 2.7, 0.06}; Rgb: {133, 114, 84} }
   for i in 0..46 {
     { Position: {-17.5 + i * 0.78, 0.15, 0}; Rotation: {0, math.sin(i * 7) * 0.025, 0}; Box: {0.26, 0.18, 2.25}; Rgb: {91 + i % 4 * 8, 67 + i % 4 * 6, 43} }
     for side in 0..2 {
-      { Position: {-17.5 + i * 0.78, 0.26, (side - 0.5) * 1.45}; Box: {0.3, 0.035, 0.3}; Rgb: {49, 51, 48} }
+      { (IsA, WestIron); Position: {-17.5 + i * 0.78, 0.26, (side - 0.5) * 1.45}; Box: {0.3, 0.035, 0.3} }
       for end in 0..2 {
         { Position: {-17.5 + i * 0.78, 0.29, (side - 0.5) * 1.45 + (end - 0.5) * 0.22}; Box: {0.055, 0.06, 0.055}; Rgb: {67, 63, 53} }
       }

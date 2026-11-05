@@ -167,7 +167,7 @@ their tails end.
 
 | Component | Main controls and defaults |
 | --- | --- |
-| `Reverb` | `decay: 1.5` s, `damping: 0.5`, `predelay: 0.02` s, `size: 0.5`, `mix: 1` |
+| `Reverb` | `decay: 1.5` s, `damping: 0.5`, `predelay: 0.02` s, `size: 0.5`, `mix: 1`, `shimmer: 0`, `shimmer_pitch: 12` semitones |
 | `Equalizer` | Four `bands` of `kind`, `frequency`, `gain` dB and `q`; off by default |
 | `AudioFilter` | `kind: SynthLowPass`, `cutoff: 1000` Hz, `resonance: 0`, `slope: SynthSlope12`, `mix: 1`, `drive: 0` |
 | `Compressor` | `threshold: -18` dB, `ratio: 4`, `attack: 0.01` s, `release: 0.15` s, `knee: 6` dB, `makeup: 0` dB, `mix: 1`, `sidechain: 0` |
@@ -178,6 +178,7 @@ their tails end.
 | `Saturator` | `drive: 0.3`, `asymmetry: 0`, `bits: 16`, `mix: 1`, `mode: SaturatorTanh`, `low_cut: 0` Hz, `high_cut: 0` Hz, `tone: 0`, `rate: 0` Hz |
 | `TransientShaper` | `attack: 0`, `sustain: 0` |
 | `FrequencyShifter` | `shift: 0` Hz, `mode: FrequencyShift`, `stereo: 0`, `feedback: 0`, `mix: 1` |
+| `PitchShifter` | `semitones: 0`, `cents: 0`, `stereo: 0`, `window: 40` ms, `feedback: 0`, `mix: 0.5` |
 
 Equalizer bands use `AudioEqOff`, `AudioEqPeak`, `AudioEqLowShelf`,
 `AudioEqHighShelf`, `AudioEqLowCut` or `AudioEqHighCut`. Defaults are 100, 400,
@@ -268,6 +269,45 @@ it works the same at any level. `attack` from -1 to 1 softens or boosts transien
 `sustain` from -1 to 1 shortens or boosts the tail, each by up to 12 dB. The gain is
 smoothed so it does not distort low notes, is the same on both channels, and 0 and 0
 pass the signal unchanged. It has no meter.
+
+A pitch shifter thickens a lead with a few cents either way, adds octaves to
+basses and leads, and makes harmonies, without changing the speed of what plays
+through it. Each channel is a delay line read by two taps half a window apart. The
+taps slide through the window at the speed of the shift and wrap around, with
+constant power sine crossfades between them. It is a granular shifter: it keeps the
+attacks of percussive material tight at short windows and sounds smooth on pads at
+long ones, but it does not preserve formants. `semitones` ranges from -24 to 24 and
+`cents` from -100 to 100. `stereo` from 0 to 1 moves the cents of the right channel
+from `cents` to `-cents`, the classic detune widener. `window` ranges from 10 to
+100 ms. `feedback` up to 0.9 sends the shifted signal back into the line, so each
+pass shifts again into a cascade; it is soft clipped and stays bounded. The shifted
+signal comes up to a window late, about half a window on average, and the dry
+signal is not delayed to match. A steady tone lands on its interval exactly only
+when the window holds a whole number of its periods; otherwise it is off by up to
+half the rate at which the taps wrap, up to 12.5 Hz an octave up at 40 ms. Small
+detunes wrap slowly and stay accurate.
+
+`shimmer` on a reverb pitches its tail up inside the reverb, the rising pad sound of
+ambient and cinematic tracks. A share of the feedback, from 0 to 1, runs through the
+same shifter with a 60 ms window, so each pass of the tail rises by
+`shimmer_pitch` semitones. The shifted share replaces part of the feedback, so the
+reverb stays bounded at any decay and the damping darkens the shimmer like the rest
+of the tail. A shimmer shortens the decay somewhat. At `shimmer: 0` the reverb is
+the same as without it, sample for sample.
+
+```flecs
+// A widener: the left channel 8 cents up, the right 8 cents down
+wide { AudioBus: {effects: [wide]}; PitchShifter: {cents: 8, stereo: 1, window: 30, mix: 0.5} }
+
+// An octave-up lead: the octave under the dry signal
+lead { AudioBus: {effects: [lead]}; PitchShifter: {semitones: 12, window: 25, mix: 0.35} }
+
+// A shimmer return that sources reach through a send
+shimmer {
+  AudioBus: {effects: [shimmer]}
+  Reverb: {decay: 6, damping: 0.4, size: 0.8, shimmer: 0.5, mix: 1}
+}
+```
 
 A frequency shifter moves every partial by the same number of Hz, unlike a pitch
 shifter, which multiplies them, so harmonic sounds turn inharmonic. `shift` goes from

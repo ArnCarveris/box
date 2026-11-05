@@ -28,9 +28,14 @@
                     "negative_bevel",
                     "infinite_bevel",
                     "bevel_before_box",
+<<<<<<< HEAD
                     "inherited_surface_child",
                     "inherited_surface_child_script",
                     "inherited_invalid_surface_child"
+=======
+                    "negative_bevel_rims",
+                    "infinite_bevel_rims"
+>>>>>>> 82b7ba1d902c9b330990eb39645db1f4a2183dec
                 ]
             },
             {
@@ -265,6 +270,48 @@
                 ]
             },
             {
+                "id": "BevelShapes",
+                "testcases": [
+                    "cylinder_bounds",
+                    "cylinder_rim",
+                    "cylinder_top_only",
+                    "cylinder_flat_facets",
+                    "cylinder_wall_uvs",
+                    "frustum_bounds",
+                    "frustum_rim",
+                    "frustum_steep",
+                    "cone_bounds",
+                    "cone_top_ignored",
+                    "tube_bounds",
+                    "tube_rims",
+                    "tube_thin_wall",
+                    "tube_partial",
+                    "prism_bounds",
+                    "prism_rim",
+                    "prism_uvs",
+                    "prism_clamp",
+                    "right_prism_rim",
+                    "extrusion_bounds",
+                    "extrusion_rim",
+                    "extrusion_holes",
+                    "extrusion_top_only",
+                    "extrusion_regions",
+                    "extrusion_path_change",
+                    "clamp_wall",
+                    "cache_shared",
+                    "cache_cylinder_frustum",
+                    "resolve_order",
+                    "resolve_flat",
+                    "resolve_remove_bevel",
+                    "resolve_remove_host",
+                    "resolve_delete",
+                    "resolve_prefab",
+                    "box_top_bottom",
+                    "box_edge_wins",
+                    "no_effect"
+                ]
+            },
+            {
                 "id": "Mesh3",
                 "testcases": [
                     "with_normals",
@@ -332,7 +379,13 @@
                     "frustum",
                     "rounded_box",
                     "bevel",
-                    "profile_extrusion"
+                    "profile_extrusion",
+                    "bevel_cylinder",
+                    "bevel_frustum",
+                    "bevel_cone",
+                    "bevel_tube",
+                    "bevel_prism",
+                    "bevel_profile_extrusion"
                 ]
             },
             {

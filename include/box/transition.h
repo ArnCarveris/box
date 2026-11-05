@@ -48,17 +48,29 @@ ECS_STRUCT(TransitionBezier, {
     float y2;   /**< Y of the second handle */
 });
 
-/** How changes of one component animate. Omitted fields are 0 and Linear. */
+/** How changes of one component animate. Omitted fields are 0, Linear and false.
+ *
+ * on_add and on_remove opt in to animating the component in and out from its neutral value,
+ * the value that renders like not having it (box_transition_neutral_supported). Without them
+ * adding and removing the component snaps.
+ */
 ECS_STRUCT(TransitionSpec, {
     float duration;                 /**< Seconds from start to target, 0 to switch at once */
     float delay;                    /**< Seconds the rendered value holds still before moving */
     TimingFunction timing_function; /**< Curve of the progress */
     TransitionBezier bezier;        /**< Handles of CubicBezier, ignored by the others */
+    bool on_add;                    /**< Adding the component to an entity without a value,
+                                     *   owned or inherited, animates from its neutral value */
+    bool on_remove;                 /**< Removing the component, when no inherited value
+                                     *   remains, animates to its neutral value, then the entity
+                                     *   renders without it */
 });
 
 /** Map from a component id to the TransitionSpec of its changes, inherited by instances that
  * do not set their own. In script: Transition: [Position: {...}]. An invalid entry
- * (box_transition_valid) logs an error and is ignored. Only a new value animates.
+ * (box_transition_valid) logs an error and is ignored.
+ *
+ * A new value animates; adding and removing the component animate only with on_add and on_remove.
  *
  * A flecs map (ecs_map_t) keyed by the component entity, whose values are allocated
  * TransitionSpecs: read one with ecs_map_get_deref(map, TransitionSpec, component), write one
@@ -109,8 +121,8 @@ bool box_transition_bezier_valid(
 /** Whether changes of a component can transition.
  *
  * Position, Rotation, Scale, Rgb, Opacity, AlphaCutoff, Tint, PbrMaterial, Emissive,
- * TextureTransform, Transmission, ClearCoat, SpecularAnisotropy, Sheen, DiffuseTransmission
- * and BoxShadow can. Every other id cannot.
+ * TextureTransform, Transmission, ClearCoat, SpecularAnisotropy, Sheen, DiffuseTransmission,
+ * BoxShadow and Border can. Every other id cannot.
  *
  * @param world The world
  * @param component The component id
@@ -119,6 +131,26 @@ bool box_transition_bezier_valid(
 bool box_transition_supported(
     const ecs_world_t *world,
     ecs_entity_t component);
+
+/** Whether adding or removing a component can animate from or to its neutral value, the value
+ * that renders like not having it.
+ *
+ * Rotation, Scale, Opacity, Tint, Emissive, PbrMaterial, TextureTransform, ClearCoat,
+ * SpecularAnisotropy, Sheen and DiffuseTransmission can in both directions, BoxShadow only when
+ * added: a removed BoxShadow frees its shadow at once.
+ *
+ * Position, Rgb, AlphaCutoff, Transmission and the components that cannot transition have no
+ * neutral value: on_add or on_remove on one of them logs an error and is ignored.
+ *
+ * @param world The world
+ * @param component The component id
+ * @param remove Whether the component is removed, else added
+ * @return True when the change can animate
+ */
+bool box_transition_neutral_supported(
+    const ecs_world_t *world,
+    ecs_entity_t component,
+    bool remove);
 
 /** Whether an entry of a Transition is used: the component is transitionable, the duration
  * and delay are not negative, and the handles of a CubicBezier are valid

@@ -4,7 +4,6 @@ using box.transform
 using box.geometry
 using box.material
 
-@tree Parent
 template WestHitchingRail {
   for side in 0..2 {
     { Position: {(side - 0.5) * 3, 0.6, 0}; Box: {0.18, 1.2, 0.18}; Rgb: {103, 64, 38} }

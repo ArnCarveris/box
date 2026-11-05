@@ -10,7 +10,6 @@ using box.surface
 using box.controllers
 using box.movement
 
-@tree Parent
 template TeaService {
   prop glaze: Rgb = {191, 212, 185}
 

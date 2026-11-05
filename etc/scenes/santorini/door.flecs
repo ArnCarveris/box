@@ -11,27 +11,21 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template IslandDoor {
   prop tint: Rgb = {27, 86, 171}
   threshold { Position: {0, 0.05, 0.12}; RoundedBox: {1.32, 0.1, 0.65, 0.05}; Rgb: IslandChalk }
   opening { Position: {0, 0.91, 0}; Box: {1.08, 1.72, 0.07}; Rgb: IslandRecess }
-  for i in 0..18 {
-    const a = i * math.PI / 18
-    const b = (i + 1) * math.PI / 18
-    {
-      Position: {}
-      Mesh3: {vertices: [{0, 1.76, 0.04}, {math.cos(a) * 0.54, 1.76 + math.sin(a) * 0.54, 0.04}, {math.cos(b) * 0.54, 1.76 + math.sin(b) * 0.54, 0.04}], indices: [0, 1, 2]}
-      Rgb: tint
-      BackFaceMode: {BackFacePlain}
-    }
-    {
-      Position: {math.cos(a + math.PI / 36) * 0.61, 1.76 + math.sin(a + math.PI / 36) * 0.61, 0.045}
-      Rotation: {0, 0, a + math.PI / 36 - math.PI / 2}
-      RoundedBox: {0.125, 0.18, 0.17, 0.025}
-      Rgb: IslandChalk
+  fan { Position: {0, 1.76, 0.03}; Rotation: {0 - math.PI / 2, 0, 0}; ProfileExtrusion: {profile: IslandFanProfile, depth: 0.02, cap_start: true, cap_end: true}; Rgb: tint }
+  arch_path {
+    Path3D: {
+      start: {0.61, 1.76, 0.045},
+      segments: [
+        {kind: CubicBezier, end: {0, 1.76 + 0.61, 0.045}, control1: {0.61, 1.76 + 0.61 * 0.5523, 0.045}, control2: {0.61 * 0.5523, 1.76 + 0.61, 0.045}},
+        {kind: CubicBezier, end: {0 - 0.61, 1.76, 0.045}, control1: {0 - 0.61 * 0.5523, 1.76 + 0.61, 0.045}, control2: {0 - 0.61, 1.76 + 0.61 * 0.5523, 0.045}}
+      ]
     }
   }
+  arch { Position: {0, 0, 0}; Sweep: {path: arch_path, profile: IslandSquareProfile, scale: {0.17, 0.18}, rings: 32}; Rgb: IslandChalk }
   for i in 0..8 {
     {
       Position: {-0.455 + i * 0.13, 0.92, 0.05}

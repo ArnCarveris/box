@@ -614,6 +614,43 @@ WGPUComputePassEncoder box_gpu_compute_begin(
         &(WGPUComputePassDescriptor){ .timestampWrites = writes });
 }
 
+/** Count a pipeline creation that starts or ends in the counters the main thread reads.
+ *
+ * @param gpu The backend
+ * @param start Whether the creation starts, else it ended
+ */
+static void box_gpu_pipeline_count(
+    box_gpu_t *gpu,
+    bool start)
+{
+    ecs_os_mutex_lock(gpu->lock);
+    gpu->stats.pipelines_building += start ? 1 : -1;
+    gpu->stats.pipelines += start ? 0 : 1;
+    ecs_os_mutex_unlock(gpu->lock);
+}
+
+WGPURenderPipeline box_gpu_render_pipeline(
+    box_gpu_t *gpu,
+    const WGPURenderPipelineDescriptor *desc)
+{
+    box_gpu_pipeline_count(gpu, true);
+    WGPURenderPipeline result = wgpuDeviceCreateRenderPipeline(gpu->device, desc);
+    box_gpu_pipeline_count(gpu, false);
+
+    return result;
+}
+
+WGPUComputePipeline box_gpu_compute_pipeline(
+    box_gpu_t *gpu,
+    const WGPUComputePipelineDescriptor *desc)
+{
+    box_gpu_pipeline_count(gpu, true);
+    WGPUComputePipeline result = wgpuDeviceCreateComputePipeline(gpu->device, desc);
+    box_gpu_pipeline_count(gpu, false);
+
+    return result;
+}
+
 void box_gpu_count(
     box_gpu_t *gpu,
     box_gpu_stat_t stat)

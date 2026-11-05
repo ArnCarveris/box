@@ -245,6 +245,7 @@ static void box_cmd_audio_effects(
         const Saturator *saturator;
         const TransientShaper *shaper;
         const FrequencyShifter *shifter;
+        const PitchShifter *pitch;
         const box_audio_module_t *state = box_audio_module_get(world);
         char *path;
         int32_t b, slot;
@@ -266,6 +267,10 @@ static void box_cmd_audio_effects(
             ecs_strbuf_append(buf, "reverb decay %.2f damping %.2f predelay %.3f size %.2f "
                 "mix %.2f", (double)reverb->decay, (double)reverb->damping,
                 (double)reverb->predelay, (double)reverb->size, (double)reverb->mix);
+            if (reverb->shimmer > 0) {
+                ecs_strbuf_append(buf, " shimmer %.2f pitch %+.1f", (double)reverb->shimmer,
+                    (double)reverb->shimmer_pitch);
+            }
         } else if ((eq = ecs_get(world, e, Equalizer))) {
             ecs_strbuf_appendstr(buf, "eq");
             for (b = 0; b < BOX_AUDIO_EQ_BANDS; b ++) {
@@ -360,6 +365,11 @@ static void box_cmd_audio_effects(
                 "mix %.2f", shifter->mode == FrequencyRing ? "ring" : "shift",
                 (double)shifter->shift, (double)shifter->stereo, (double)shifter->feedback,
                 (double)shifter->mix);
+        } else if ((pitch = ecs_get(world, e, PitchShifter))) {
+            ecs_strbuf_append(buf, "pitch shifter semitones %+.1f cents %+.1f stereo %.2f "
+                "window %.1f ms feedback %.2f mix %.2f", (double)pitch->semitones,
+                (double)pitch->cents, (double)pitch->stereo, (double)pitch->window,
+                (double)pitch->feedback, (double)pitch->mix);
         }
 
         slot = box_audio_module_effect_slot(world, e);

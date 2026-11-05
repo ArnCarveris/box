@@ -329,6 +329,12 @@
                 ]
             },
             {
+                "id": "StartupOverlay",
+                "testcases": [
+                    "draws_panel"
+                ]
+            },
+            {
                 "id": "ImageSlice",
                 "testcases": [
                     "corners_keep_size",

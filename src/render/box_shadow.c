@@ -253,16 +253,7 @@ static float box_shadow_linear(
     return c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f);
 }
 
-/** Get the alpha a shape covers what is under it with at its edge, which the shadow is cut out
- * by: its opacity, times the alpha of its border when it has one, for the blend modes that draw
- * over the target, 0 for the others (Additive, Multiply and the like), which cover nothing.
- *
- * @param shape The resolved shape
- * @param blend The blend mode of the shape
- * @param alpha Resolved opacity of the shape
- * @return The alpha from 0 to 1
- */
-static float box_shadow_cover_alpha(
+float box_draws_box_shadow_cover(
     const Shape2D *shape,
     uint8_t blend,
     float alpha)
@@ -415,7 +406,7 @@ static void box_shadow_write(
         float linear[4];
         box_shadow_color(linear, &shadow->color, material, alpha);
         box_shadow_shading(box_draws_slot_shading(b, bs->slot), box, linear,
-            box_shadow_cover_alpha(shape, blend, alpha), material->clip, bs->rank,
+            box_draws_box_shadow_cover(shape, blend, alpha), material->clip, bs->rank,
             material->slice);
     }
 
@@ -537,8 +528,8 @@ bool box_draws_box_shadow_target(
 
     box_draws_transition_target(out, material, BOX_DRAW_TRANSITION_BOX_SHADOW);
     out->shadow = shadow->color;
-    out->shadow_cover = box_shadow_cover_alpha(shape, box_draws_batch(d, s->batch)->key.blend,
-        1.0f);
+    out->shadow_blend = box_draws_batch(d, s->batch)->key.blend;
+    out->shadow_cover = box_draws_box_shadow_cover(shape, out->shadow_blend, 1.0f);
 done:
     return result;
 }

@@ -210,6 +210,7 @@ typedef struct box_text_state_t {
     ecs_entity_t default_font;  /**< box.text.DefaultFont, its variants named in FontVariants */
     bool relayout;              /**< A font was removed, every Text lays out again */
     int32_t watch;              /**< Kind of the fonts in the file watch */
+    box_task_track_t task;      /**< Report of the font and glyph jobs in flight */
 } box_text_state_t;
 
 /** Singleton that holds the font registry of a world */

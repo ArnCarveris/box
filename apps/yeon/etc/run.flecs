@@ -16,6 +16,7 @@ player {
     ready: false
   }
   YeonLives: {lives_left: cfg.maxLives}
+  PlayerKite: {hurt: player?[YeonInvulnerable]}
 }
 
 sky {}
