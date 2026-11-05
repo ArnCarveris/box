@@ -365,6 +365,47 @@ void SynthPitch_release_from_decay(void) {
         220 * pow(2, 9.6 * 0.5 / 12), 0.02));
 }
 
+/** A layer with its own amplitude envelope releases its pitch envelope over its own release:
+ * the root envelope releases at once, the layer over 0.4 s, and halfway it is 6 semitones
+ * down. */
+void SynthPitch_release_own_envelope(void) {
+    // audio/synth
+    box_audio_synth_patch_t p = pitch_patch(220);
+    int32_t release = AUDIO_RATE * 4 / 10;
+    p.envelope = (box_audio_synth_envelope_t){ .sustain = 1, .hold = 0.1f, .release = 0.01f };
+    p.layer[0].has_envelope = 1;
+    p.layer[0].envelope = (box_audio_synth_envelope_t){ .attack = 0.005f, .sustain = 1,
+        .hold = 0.1f, .release = 0.4f };
+    p.pitch_envelope = (box_audio_synth_pitch_envelope_t){ .release_amount = -12 };
+    pitch_render(&p, release);
+    test_assert(pitch_near("held", pitch_at(audio_l, 0.2, 0.4), 220, 0.002));
+    test_assert(pitch_near("half the release", pitch_at(audio_l, 0.59, 0.61),
+        220 * pow(2, -0.5), 0.02));
+}
+
+/** A legato note retargets the pitch of a voice without restarting its pitch envelope: after
+ * the decay, a fifth up plays the fifth from its start. */
+void SynthPitch_legato_keeps(void) {
+    // audio/synth
+    box_audio_synth_patch_t p = pitch_patch(220);
+    box_audio_core_desc_t desc = { .sample_rate = AUDIO_RATE };
+    box_audio_core_t *core = box_audio_core_new(&desc);
+    uint8_t bytes[64];
+    box_audio_writer_t w;
+    test_assert(core != NULL);
+    p.pitch_envelope = (box_audio_synth_pitch_envelope_t){ .amount = 12, .decay = 0.1f };
+    pitch_define(core, 1, &p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, BOX_AUDIO_PLAY_GATE);
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_legato_at(&w, 2, 1, 1, 0, 1, 0, 1.5f, BOX_AUDIO_PLAY_GATE,
+        (uint64_t)(AUDIO_RATE * 3 / 10)));
+    box_audio_core_apply(core, w.data, w.size);
+    audio_render(core, 0, AUDIO_FRAMES);
+    box_audio_core_free(core);
+    test_assert(pitch_near("before", pitch_at(audio_l, 0.2, 0.3), 220, 0.002));
+    test_assert(pitch_near("legato", pitch_at(audio_l, 0.305, 0.315), 330, 0.005));
+}
+
 /** The pitch envelope of a layer moves that layer only, in place of the one of the root: a
  * layer with its own envelope of all 0 plays its note under a root of 24 semitones. */
 void SynthPitch_layer(void) {

@@ -189,6 +189,8 @@
                     "curve",
                     "release_amount",
                     "release_from_decay",
+                    "release_own_envelope",
+                    "legato_keeps",
                     "layer",
                     "sync_sweep",
                     "pluck",
