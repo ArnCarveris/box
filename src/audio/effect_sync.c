@@ -171,6 +171,7 @@ uint32_t box_audio_module_effect_params(
             params[3] = chorus->delay;
             params[4] = chorus->mix;
             params[5] = chorus->spread;
+            params[6] = chorus->feedback;
         }
     } else if (component == ecs_id(Saturator)) {
         const Saturator *saturator = ptr;
@@ -180,6 +181,11 @@ uint32_t box_audio_module_effect_params(
             params[1] = saturator->asymmetry;
             params[2] = saturator->bits;
             params[3] = saturator->mix;
+            params[4] = (float)saturator->mode;
+            params[5] = saturator->low_cut;
+            params[6] = saturator->high_cut;
+            params[7] = saturator->tone;
+            params[8] = saturator->rate;
         }
     } else if (component == ecs_id(TransientShaper)) {
         const TransientShaper *shaper = ptr;

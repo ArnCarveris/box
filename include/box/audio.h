@@ -792,47 +792,102 @@ ECS_STRUCT(Phaser, {
  * phase and the voices panned across the stereo field by spread:
  * pad { AudioBus: {effects: [pad]}; Chorus: {voices: 3, spread: 1, mix: 0.4} }.
  *
+ * With feedback it is a flanger: the first tap of each channel goes back into its line, so a
+ * delay of 0.1 to 10 ms resonates at multiples of 1000 / delay Hz, and a negative feedback
+ * moves the peaks to the odd multiples of half that, which sounds hollow. Only the first tap
+ * feeds back, so the loop stays stable at any voices; the feedback reads its tap with a cubic
+ * interpolation, so the highs keep resonating while the sweep falls between frames. A jet sweep
+ * on drums:
+ * drums { AudioBus: {effects: [drums]};
+ *         Chorus: {voices: 1, rate: 0.2, delay: 2, depth: 1.8, feedback: 0.7, mix: 0.5} }.
+ *
  * Every chorus runs with its own memory of BOX_AUDIO_CHORUS_MAX milliseconds. The LFOs start
  * when the chorus is put on a channel and run on through a change of the rate without a jump.
- * Depth, delay, mix and spread move over 20 ms; a change of the voices fades the wet signal out
- * and back in over 40 ms. Once its input was silent for 50 ms it stops until its input sounds
- * again.
+ * Depth, delay, mix, spread and feedback move over 20 ms; a change of the voices fades the wet
+ * signal out and back in over 40 ms. Once its input was silent for 50 ms and its feedback rang
+ * out it stops until its input sounds again.
  */
 ECS_STRUCT(Chorus, {
     int32_t voices;        /**< Taps, 1 to 4, default 2 */
     float rate;            /**< Hz of the LFOs, default 0.8, 0 to 20 */
     float depth;           /**< Milliseconds the taps move either way, default 3, 0 to 25 */
     float delay;           /**< Milliseconds of the taps at the middle, default 12, 0 to 50;
-                            *   a tap reads at most 50 ms and at least a frame back */
+                            *   a tap reads at most 50 ms and at least a frame back, so a
+                            *   flanger goes down to about 0.1 ms */
     float mix;             /**< Wet level, 0 to 1, default 0.5; the dry signal passes at
                             *   1 - mix */
     float spread;          /**< 0 to 1, default 0.5: 0 keeps the voices in the center, so a mono
                             *   input stays mono, 1 pans the first voice left and the last
                             *   right */
+    float feedback;        /**< Share of the first tap fed back into the line, -0.95 to 0.95,
+                            *   default 0; 0 renders exactly as without it */
+});
+
+/** Curve of the clipper of a Saturator */
+ECS_ENUM(SaturatorMode, {
+    SaturatorTanh,         /**< tanh soft clipper, symmetric: warmth on a bus, smooth grit when
+                            *   driven. asymmetry biases it for even harmonics */
+    SaturatorTube,         /**< A softer asymmetric tanh whose positive half clips earlier than
+                            *   its negative half, so its bias grows with the level: even
+                            *   harmonics even at asymmetry 0, warmer than SaturatorTanh */
+    SaturatorHard,         /**< Hard clip with a slightly rounded corner: fuzz, a square wave
+                            *   at full drive. Anti-aliased (ADAA) on top of the oversampling */
+    SaturatorFold,         /**< Sine wavefolder: the driven signal wraps over and back, the more
+                            *   the drive, the more folds and the brighter. Anti-aliased (ADAA)
+                            *   at four times the rate, 8 frames later than the others */
+    SaturatorRectify       /**< A tanh rectifier: asymmetry blends from half wave at 0 to full
+                            *   wave at 1, octave up grit; the DC it makes is taken out */
 });
 
 /** A saturator, an effect in an insert slot of an AudioBus, as a Reverb is: warmth, grit or
- * lo-fi for a drum bus, a synth bus or the master. Each channel runs through a tanh soft
- * clipper at twice the sample rate, its level compensated so that the drive mostly changes
- * the tone and not the loudness: a sine around -14 dBFS keeps its RMS within about 1 dB at any
- * drive. The asymmetry biases the clipper for even harmonics, with the DC taken out after it,
- * and below 16 bits a bit crusher rounds the saturated signal:
+ * lo-fi for a drum bus, a synth bus or the master. Each channel runs through the clipper of
+ * the mode at twice the sample rate, its level compensated so that the drive mostly changes
+ * the tone and not the loudness: a sine at -14 dBFS keeps its RMS within about 1.5 dB at any
+ * drive in every mode but tanh, whose older compensation holds that at -12 dBFS. The
+ * asymmetry biases the clipper for even harmonics, with the DC taken out after it, and below
+ * 16 bits a bit crusher rounds the saturated signal:
  * drums { AudioBus: {effects: [drums]}; Saturator: {drive: 0.6, asymmetry: 0.2} }.
  *
- * The oversampling delays the channel by 15 frames, its dry signal too, so that a mix in
- * between does not comb. Drive, asymmetry, bits and mix move over 20 ms. An AudioMeter on its
- * entity reads how hard the clipper squashes as its reduction: the largest drop in dB of the
- * clipped peak against the driven peak, 0 while the clipper is all but linear. Once its input
- * is silent and its state decayed it stops until its input sounds again.
+ * Around the clipper, low_cut takes the bass out before it so that the bass stays clean (with
+ * a mix under 1) and does not muddy the distortion, and tone tilts the input around 1 kHz
+ * with the inverse tilt after the clipper, so it sets which band distorts most and leaves a
+ * clean signal as it was. After it, high_cut tames the fizz and rate holds each sample for
+ * 1 / rate seconds, the aliasing of an old sampler that bits alone does not give. Recipes:
+ * - Tape warmth on a bus: {mode: SaturatorTanh, drive: 0.3}
+ * - Tube on a synth or vocal: {mode: SaturatorTube, drive: 0.5, high_cut: 9000}
+ * - Fuzz on a guitar or bass: {mode: SaturatorHard, drive: 0.8, low_cut: 150,
+ *   high_cut: 5000}
+ * - Wavefolded lead: {mode: SaturatorFold, drive: 0.6, tone: 0.3, high_cut: 8000}
+ * - Octave up grit: {mode: SaturatorRectify, drive: 0.4, asymmetry: 1, mix: 0.5}
+ * - Lo-fi drums: {drive: 0.4, bits: 8, rate: 8000, high_cut: 6000}
+ *
+ * The oversampling delays the channel by 15 frames (23 in SaturatorFold), its dry signal too,
+ * so that a mix in between does not comb. Drive, asymmetry, bits, mix, the cuts, tone and
+ * rate move over 20 ms; a change of the mode is at once. An AudioMeter on its entity reads
+ * how hard the clipper squashes as its reduction: the largest drop in dB of the clipped peak
+ * against the driven peak, 0 while the clipper is all but linear. Once its input is silent
+ * and its state decayed it stops until its input sounds again.
  */
 ECS_STRUCT(Saturator, {
     float drive;           /**< 0 to 1, default 0.3: a gain of 0 to +30 dB into the clipper */
     float asymmetry;       /**< 0 to 1, default 0: a bias before the clipper, shared by both
-                            *   channels, that adds even harmonics */
+                            *   channels, that adds even harmonics; in SaturatorRectify the
+                            *   blend from half wave (0) to full wave (1) */
     float bits;            /**< Bits of the bit crusher, 1 to 16, default 16, which is off;
                             *   bits b round the output to 2^b levels */
     float mix;             /**< Wet level, 0 to 1, default 1; the dry signal passes at
                             *   1 - mix */
+    SaturatorMode mode;    /**< Curve of the clipper, default SaturatorTanh */
+    float low_cut;         /**< Hz of a 12 dB highpass before the clipper, 0 to 20000, default
+                            *   0, which is off */
+    float high_cut;        /**< Hz of a 12 dB lowpass after the clipper, 0 to 20000, default
+                            *   0, which is off; held under 0.45 times the sample rate */
+    float tone;            /**< -1 to 1, default 0: a tilt of up to 9 dB either way at the
+                            *   ends of the spectrum around 1 kHz before the clipper, the
+                            *   inverse after it; above 0 the highs distort most, below 0 the
+                            *   lows */
+    float rate;            /**< Hz of a sample and hold after the clipper, 0 or 100 to the
+                            *   sample rate, default 0, which is off */
 });
 
 /** A transient shaper, an effect in an insert slot of an AudioBus, as a Reverb is: more or
@@ -1275,6 +1330,105 @@ ECS_STRUCT(AutomationClip, {
                              *   the clip, and of a placement of duration 0 */
     Curve curve;            /**< The values: time in beats from the start of the clip, value
                              *   in the units of the member */
+});
+
+/** Source of an AudioModulator */
+ECS_ENUM(AudioModSource, {
+    AudioModLfo,           /**< A wave: AudioModulator.wave at rate or sync */
+    AudioModSteps,         /**< A sequence of up to 16 values, one per step of sync beats */
+    AudioModFollower       /**< The level of a bus, -60..0 dB mapped to 0..1 */
+});
+
+/** Wave of an AudioModulator. Its own enum rather than SynthLfoWave, which has no falling saw
+ * and whose square and saw smooth their edges in the synth */
+ECS_ENUM(AudioModWave, {
+    AudioModSine,          /**< Sine, from 0 rising */
+    AudioModTriangle,      /**< Triangle, from 0 rising */
+    AudioModSquare,        /**< Square, 1 for the first half of a cycle, -1 for the second */
+    AudioModSawUp,         /**< Rising saw, -1 to 1 */
+    AudioModSawDown,       /**< Falling saw, 1 to -1 */
+    AudioModRandom         /**< Sample and hold: a random value per cycle, the same for the
+                            *   same cycle of the Transport when synced */
+});
+
+/** How the depth of an AudioModulator applies */
+ECS_ENUM(AudioModScale, {
+    AudioModLinear,        /**< The value plus depth times the source, in the units of the
+                            *   member */
+    AudioModOctaves        /**< The value times 2^(depth times the source): depth in octaves,
+                            *   for a member that is a frequency (cutoff, center, frequency
+                            *   of a band, damping of a Delay), whose linear sweep sounds
+                            *   lopsided */
+});
+
+/** Modulators the core runs; more log one error that names the modulator and do nothing */
+#define BOX_AUDIO_MODULATORS 64
+
+/** Modulators that may move one member; more log one error that names the modulator and do
+ * nothing */
+#define BOX_AUDIO_MODULATORS_PER_TARGET 4
+
+/** A modulator, on an entity of its own: moves a float member of a bus or an effect on its own,
+ * in time with the song, for a filter that wobbles in eighths, a send that pulses, a tremolo,
+ * an auto-pan or an auto-wah:
+ * wobble { AudioModulator: {target: bass_filter, component: AudioFilter, member: "cutoff",
+ * scale: AudioModOctaves, depth: 2, sync: 0.5} }.
+ *
+ * target, component and member name what it moves as an AutomationClip does, with the same
+ * targets: volume, pan, width and sends[i].level of an AudioBus or of the master, and every
+ * float member of the effect component of an effect entity.
+ *
+ * Its value adds to the value the output has, the one of the component or of an automation
+ * lane that covers the member, and the sum is clamped to the range of the member. depth is the
+ * swing either way at the top of the source, in the units of the member, or in octaves with
+ * AudioModOctaves. The modulator never writes the component. Up to
+ * BOX_AUDIO_MODULATORS_PER_TARGET modulators of one member add up.
+ *
+ * A positive sync locks it to the Transport: the phase at a frame is phase + fract(beat /
+ * sync), beat being the position of the Transport at that frame, so a seek, a loop wrap and a
+ * tempo change keep it on the grid. A stopped Transport, or none, leaves the beat where it
+ * stands and moves it on at 120 bpm. Without sync an LFO runs at rate from the moment it
+ * starts.
+ *
+ * It runs in the audio core, once per 32 frames and at the edges of its square, saws, steps
+ * and samples: a bus ramps to each value, an effect smooths it as any change. It fades in over
+ * 50 ms when it starts; disabling, deleting or retargeting it fades it out over 50 ms, and the
+ * member returns to its value without a click. A modulator whose target, component or member
+ * is unknown logs one error that names it until it changes; one whose effect is in no insert
+ * slot waits for one.
+ *
+ * There is no stereo phase offset: every member it can move has one value for both channels
+ * (one cutoff for the filter of a bus, one pan of a bus), so the core has no right channel to
+ * move apart. An auto-pan is an LFO on pan. See Modulators in docs/audio.md.
+ */
+ECS_STRUCT(AudioModulator, {
+    ecs_entity_t target;    /**< The entity with the AudioBus or the effect component */
+    ecs_entity_t component; /**< The component: AudioBus or an effect component */
+    char *member;           /**< Path of a float member, such as "cutoff", "volume" or
+                             *   "sends[1].level" */
+    AudioModSource source;  /**< What moves it, default AudioModLfo */
+    float depth;            /**< Swing either way at a source of 1, in the units of the member,
+                             *   or in octaves; negative turns it upside down. Default 0 */
+    AudioModScale scale;    /**< Linear (default) or in octaves, for a frequency */
+    AudioModWave wave;      /**< Wave of an LFO, default AudioModSine */
+    float rate;             /**< Hz of an LFO, or steps per second, when sync is 0, 0..100,
+                             *   default 1 */
+    float sync;             /**< Beats of a cycle of an LFO, or of a step, 0..256, default 0 for
+                             *   rate; when positive it wins over rate, like SynthLfo.sync and
+                             *   Delay.sync: 0.5 is an eighth, 0.25 a sixteenth */
+    float phase;            /**< Phase in turns, 0..1: of a cycle of an LFO, of the whole
+                             *   sequence of steps */
+    bool unipolar;          /**< An LFO moves 0..1 instead of -1..1, for a tremolo that only
+                             *   dips: depth -1 on a volume of 1 */
+    float steps[16];        /**< Values of the steps, -1..1 */
+    int32_t step_count;     /**< Steps that play, 1..16, default 16 */
+    float smooth;           /**< Share of a step the value glides from the step before over, 0
+                             *   for hard steps (default) .. 1 */
+    ecs_entity_t key;       /**< Bus whose level a follower follows, measured before its
+                             *   inserts and volume; 0 for the bus that holds the target effect,
+                             *   or the target bus */
+    float attack;           /**< Seconds of the rise of a follower, default 0.01 */
+    float release;          /**< Seconds of the fall of a follower, default 0.1 */
 });
 
 /** The grid a Track swings */

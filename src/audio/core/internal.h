@@ -273,7 +273,8 @@ typedef struct box_audio_phaser_t {
 } box_audio_phaser_t;
 
 /** A chorus: a line per channel on the memory of its effect slot, read by up to
- * BOX_AUDIO_CHORUS_VOICES_MAX taps that a sine LFO each moves */
+ * BOX_AUDIO_CHORUS_VOICES_MAX taps that a sine LFO each moves, the first of which feeds back
+ * into the line */
 typedef struct box_audio_chorus_t {
     box_audio_chorus_params_t target; /**< Parameters of the last command, clamped */
     float *line[2];           /**< The lines of the left and the right channel in memory */
@@ -295,25 +296,54 @@ typedef struct box_audio_chorus_t {
     int32_t control;          /**< Frames until the next control block */
     bool stale;               /**< Skipped blocks left the taps behind the phase */
     bool swap;                /**< Waits for the fade to reach 0 to apply the voices */
+    int32_t still;            /**< Frames in a row in which nothing fed back */
     box_audio_ramp_t depth;   /**< Depth in frames, per control block */
     box_audio_ramp_t delay;   /**< Delay in frames, per control block */
     box_audio_ramp_t spread;  /**< Spread, per control block */
     box_audio_ramp_t mix;     /**< Wet level */
     box_audio_ramp_t fade;    /**< Fade of the wet signal around a change of the voices */
+    box_audio_ramp_t feedback; /**< Share of the first tap fed back into the lines */
     box_audio_ramp_t feed;    /**< Fade in of the input after a move */
 } box_audio_chorus_t;
 
-/** A saturator: the oversampled clipper of each channel, its DC blocker and the line that
- * delays the dry signal as much as the oversampler delays the wet one */
+/** A saturator: the filters before the clipper of each channel, the oversampled clipper, its
+ * DC blocker, the filters and the sample and hold after it, and the line that delays the dry
+ * signal as much as the oversampler delays the wet one */
 typedef struct box_audio_saturator_t {
     box_audio_saturator_params_t target; /**< Parameters of the last command, clamped */
     box_audio_oversample_t os[2]; /**< Oversampler of each channel */
     box_audio_dc_t dc[2];     /**< DC blocker of each channel */
-    float dry[2][16];         /**< Dry input of each channel, a ring */
+    box_audio_oversample_t fold[2]; /**< Second oversampler of each channel, at the doubled
+                               * rate, of the wavefolder */
+    float late[2];            /**< Output of the wavefolder at the doubled rate held back a
+                               * sample, of each channel */
+    float dry[2][32];         /**< Dry input of each channel, a ring */
     uint32_t pos;             /**< Write position of the dry rings */
     float dc_coef;            /**< Pole of the DC blockers */
     box_audio_saturate_curve_t curve; /**< Clipper at the drive and asymmetry of curve_at */
     float curve_at[2];        /**< Drive and asymmetry the curve is for */
+    int32_t mode;             /**< The box_audio_saturator_mode_t that runs */
+    box_audio_saturate_shape_t shape; /**< Clipper of the other modes at the drive and
+                               * asymmetry of shape_at */
+    float shape_at[2];        /**< Drive and asymmetry the shape is for */
+    double adaa[2];           /**< Driven input of the last sample at the oversampled rate of
+                               * each channel, for the ADAA of the hard clipper and the folder */
+    box_audio_svf_t low[2];   /**< Highpass of the low cut of each channel */
+    box_audio_svf_t high[2];  /**< Lowpass of the high cut of each channel */
+    box_audio_saturate_tilt_t pre[2]; /**< Tone tilt before the clipper of each channel */
+    box_audio_saturate_tilt_t post[2]; /**< Inverse tilt after it */
+    float tilt[6];            /**< Coefficients of the tilt before and of the one after */
+    float low_at;             /**< Low cut the highpass is for, 0 while it is off */
+    float high_at;            /**< High cut the lowpass is for, high_off while it is off */
+    float tone_at;            /**< Tone the tilts are for, 0 while they are off */
+    float high_off;           /**< High cut that counts as off,
+                               * BOX_AUDIO_SATURATOR_CUT_NYQUIST times the rate */
+    float rate_off;           /**< Rate of the sample and hold that counts as off, the rate */
+    float rate_at;            /**< Rate the step of the sample and hold is for */
+    uint32_t rate_step;       /**< Turns of the sample and hold per frame, times 2^32 */
+    uint32_t phase;           /**< Turns of the sample and hold times 2^32; it takes a sample
+                               * each time it wraps */
+    float hold[2];            /**< Sample each channel holds */
     float scale;              /**< Steps of each sign of the bit crusher, 2^(bits - 1); 0 when
                                * it is off */
     float scale_at;           /**< Bits the scale is for */
@@ -321,6 +351,10 @@ typedef struct box_audio_saturator_t {
     box_audio_ramp_t asymmetry; /**< Asymmetry */
     box_audio_ramp_t bits;    /**< Bits */
     box_audio_ramp_t mix;     /**< Wet level */
+    box_audio_ramp_t low_cut; /**< Low cut in Hz, 0 when off */
+    box_audio_ramp_t high_cut; /**< High cut in Hz, high_off when off */
+    box_audio_ramp_t tone;    /**< Tone */
+    box_audio_ramp_t rate;    /**< Rate of the sample and hold in Hz, rate_off when off */
 } box_audio_saturator_t;
 
 /** A transient shaper: the peak detector of the dynamics, a fast and a slow envelope of it and
@@ -393,8 +427,11 @@ typedef struct box_audio_effect_t {
     uint32_t target_bus;      /**< Bus of the last command, BUS_NONE when off */
     uint32_t target_index;    /**< Index of the last command */
     uint32_t target_key;      /**< Sidechain bus of the last command */
-    float params[BOX_AUDIO_EFFECT_PARAMS]; /**< Parameters of the last command that put it on,
-                               * as sent; the kind clamps them */
+    float params[BOX_AUDIO_EFFECT_PARAMS]; /**< Parameters the kind runs at: those of the last
+                               * command, as sent, plus what the modulators add; the kind clamps
+                               * them */
+    float base[BOX_AUDIO_EFFECT_PARAMS]; /**< Parameters of the last EFFECT or EFFECT_PARAMS
+                               * command, without the modulators */
     float *memory;            /**< Memory of the slot, NULL until it arrives */
     int32_t floats;           /**< Floats of memory */
     bool attached;            /**< Whether it renders: on a bus, or its tail fades out */
@@ -932,6 +969,7 @@ typedef union box_audio_timed_cmd_t {
     box_audio_cmd_legato_t legato;  /**< BOX_AUDIO_CMD_LEGATO */
     box_audio_cmd_effect_params_t effect; /**< BOX_AUDIO_CMD_EFFECT_PARAMS */
     box_audio_cmd_ramp_t ramp;      /**< BOX_AUDIO_CMD_VOICE_RAMP */
+    box_audio_cmd_beat_t beat;      /**< BOX_AUDIO_CMD_BEAT */
 } box_audio_timed_cmd_t;
 
 /** A command that waits in the schedule for its frame */
@@ -958,6 +996,52 @@ typedef struct box_audio_bus_t {
     float l[BOX_AUDIO_CORE_BLOCK];  /**< Left samples of the block */
     float r[BOX_AUDIO_CORE_BLOCK];  /**< Right samples of the block */
 } box_audio_bus_t;
+
+/** Parameters of a bus a modulator moves, by the index the modulators use */
+typedef enum box_audio_mod_bus_param_t {
+    BOX_AUDIO_MOD_BUS_VOLUME = 0,   /**< Volume */
+    BOX_AUDIO_MOD_BUS_PAN = 1,      /**< Pan */
+    BOX_AUDIO_MOD_BUS_WIDTH = 2,    /**< Width */
+    BOX_AUDIO_MOD_BUS_SEND = 3,     /**< Level of send 0, the others after it */
+    BOX_AUDIO_MOD_BUS_PARAMS = 3 + BOX_AUDIO_SENDS /**< Number of them */
+} box_audio_mod_bus_param_t;
+
+/** A modulator of the core */
+typedef struct box_audio_mod_t {
+    box_audio_cmd_modulator_t cmd; /**< Its settings, clamped; target NONE for a free slot */
+    box_audio_cmd_modulator_t next; /**< Settings it takes once it faded out of its target */
+    bool on;                  /**< It runs or fades out */
+    bool pending;             /**< next waits for the fade out */
+    uint32_t bus_param;       /**< box_audio_mod_bus_param_t of a bus target */
+    float gain0;              /**< Fade at fade_at, 0..1 */
+    float fade_dir;           /**< Change of the fade per frame: positive while it fades in,
+                               * negative while it fades out */
+    uint64_t fade_at;         /**< Frame of gain0 */
+    double cycles0;           /**< Cycles, or steps, of a free running source at cycles_at */
+    uint64_t cycles_at;       /**< Frame of cycles0 */
+    float env;                /**< Envelope of a follower, linear */
+    float env_rise;           /**< Share of the way to a louder sample the envelope moves per
+                               * frame */
+    float env_fall;           /**< Share of the way to a quieter sample */
+} box_audio_mod_t;
+
+/** The modulators of a core and what they move */
+typedef struct box_audio_mods_t {
+    box_audio_mod_t mod[BOX_AUDIO_MOD_MAX]; /**< Modulators by slot */
+    uint64_t on;              /**< Modulators that run or fade out, a bit per slot */
+    uint64_t buses;           /**< Buses the modulators moved at the last update, a bit each */
+    uint64_t effects;         /**< Effect slots the modulators moved at the last update */
+    uint64_t keys;            /**< Buses a follower measures, a bit each */
+    uint64_t next;            /**< Frame of the next update */
+    uint64_t edge;            /**< Frame of the next edge of a hard wave or a step */
+    bool dirty;               /**< Update before the next frame renders */
+    float bus_add[BOX_AUDIO_BUS_MAX][BOX_AUDIO_MOD_BUS_PARAMS]; /**< What the modulators add to
+                               * each parameter of each bus */
+    float fx_add[BOX_AUDIO_EFFECT_MAX][BOX_AUDIO_EFFECT_PARAMS]; /**< What they add to each
+                               * parameter of each effect slot, linearly */
+    float fx_octaves[BOX_AUDIO_EFFECT_MAX][BOX_AUDIO_EFFECT_PARAMS]; /**< Octaves they move each
+                               * parameter of each effect slot by */
+} box_audio_mods_t;
 
 /** The core */
 struct box_audio_core_t {
@@ -1018,6 +1102,11 @@ struct box_audio_core_t {
     uint64_t schedule_order; /**< Commands that entered the schedule so far */
     box_audio_scheduled_t schedule[BOX_AUDIO_SCHEDULE_MAX]; /**< Commands that wait for their
                            * frame, a binary heap ordered by frame, then by arrival */
+    uint64_t beat_frame;  /**< Frame of the last BEAT command that applied */
+    double beat_at;       /**< Beat at beat_frame */
+    double beat_tempo;    /**< Beats per second from beat_frame on */
+    double beat_rate;     /**< Beats per frame from beat_frame on */
+    box_audio_mods_t mods; /**< The modulators */
 };
 
 /** Push an event, or count it as lost when the ring is full. Does not allocate.
@@ -1073,6 +1162,92 @@ static inline void box_audio_effect_reduction(
         m->reduction = db;
     }
 }
+
+/** Set the beat clock and the modulators of a new core.
+ *
+ * @param core The core, zeroed
+ */
+void box_audio_mods_init(
+    box_audio_core_t *core);
+
+/** Apply a BEAT command.
+ *
+ * @param core The core
+ * @param cmd The command
+ */
+void box_audio_beat_command(
+    box_audio_core_t *core,
+    const box_audio_cmd_beat_t *cmd);
+
+/** Apply a MODULATOR command.
+ *
+ * @param core The core
+ * @param cmd The command
+ */
+void box_audio_mod_command(
+    box_audio_core_t *core,
+    const box_audio_cmd_modulator_t *cmd);
+
+/** Update the modulators when an update is due and limit a block to the next update, so that
+ * every update falls on the same frame whatever the render sizes.
+ *
+ * @param core The core
+ * @param frames Frames the block would have
+ * @return Frames of the block
+ */
+int32_t box_audio_mods_block(
+    box_audio_core_t *core,
+    int32_t frames);
+
+/** Let the followers that measure a bus take a block of it.
+ *
+ * @param core The core
+ * @param bus The bus
+ * @param l Left samples
+ * @param r Right samples
+ * @param frames Frames of the block
+ */
+void box_audio_mods_follow(
+    box_audio_core_t *core,
+    uint32_t bus,
+    const float *l,
+    const float *r,
+    int32_t frames);
+
+/** Tell the modulators that a command set the parameters of an effect slot or of a bus, so
+ * they add to the new values before the next frame renders.
+ *
+ * @param core The core
+ * @param effect Slot of the effect, -1 for none
+ * @param bus Index of the bus, -1 for none
+ */
+void box_audio_mods_changed(
+    box_audio_core_t *core,
+    int32_t effect,
+    int32_t bus);
+
+/** Set the gain targets of a bus from its parameters and what the modulators add, ramped over
+ * a number of frames.
+ *
+ * @param core The core
+ * @param b The bus
+ * @param add What the modulators add to each box_audio_mod_bus_param_t, NULL for nothing
+ * @param frames Frames of the ramps
+ */
+void box_audio_bus_gains_to(
+    box_audio_core_t *core,
+    box_audio_bus_t *b,
+    const float *add,
+    int32_t frames);
+
+/** Run the kind of an effect on its params after they changed, when it runs.
+ *
+ * @param core The core
+ * @param slot Slot of the effect
+ */
+void box_audio_effect_changed(
+    box_audio_core_t *core,
+    uint32_t slot);
 
 /** Set the effects of a new core to no kind and no memory, and the constants of the kinds.
  *
