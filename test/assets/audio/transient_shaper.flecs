@@ -1,0 +1,11 @@
+// A transient shaper set by a scene, for the Dynamics suite of test/cpu/audio: more punch and
+// a shorter tail on the drum bus. An effect entity comes before the bus that names it.
+using box.audio
+
+drum_punch {
+  TransientShaper: {attack: 0.6, sustain: -0.4}
+}
+
+drums {
+  AudioBus: {output: master, effects: [drum_punch]}
+}

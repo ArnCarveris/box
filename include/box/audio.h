@@ -300,10 +300,21 @@ ECS_ENUM(SynthWave, {
     SynthSaw,              /**< Saw, band limited */
     SynthSquare,           /**< Square, band limited */
     SynthTriangle,         /**< Triangle */
-    SynthNoise,            /**< White noise, seeded per play from SynthSound.seed */
+    SynthNoise,            /**< Noise, seeded per play from SynthSound.seed, white or of the
+                            *   SynthOscillator.color */
     SynthPluck             /**< A plucked string (Karplus-Strong), set by the SynthString of
                             *   the layer; it rings out on its own and ends the sound when it
                             *   is silent, so it needs no envelope */
+});
+
+/** Color of the noise of a SynthNoise layer. Each is at about the RMS level of white noise at
+ * the same level, and keeps its slope at every sample rate */
+ECS_ENUM(SynthNoiseColor, {
+    SynthNoiseWhite,       /**< White, flat, the same power in every Hz */
+    SynthNoisePink,        /**< Pink, falls by 3 dB per octave, the same power in every
+                            *   octave: wind, surf, rain */
+    SynthNoiseBrown        /**< Brown, falls by 6 dB per octave, a leaky integral of white
+                            *   noise without DC: rumble, distant surf, soft hits */
 });
 
 /** Kind of the filter of a synth sound */
@@ -381,6 +392,10 @@ ECS_STRUCT(SynthOscillator, {
                             *   SynthLfo.sync, sync sweeps. Each unison voice syncs to its own
                             *   master; the sub stays at the master and phase modulation adds
                             *   to the synced phase. Ignored by SynthNoise and SynthPluck */
+    SynthNoiseColor color; /**< SynthNoise: color of the noise, default SynthNoiseWhite. The
+                            *   white noise it filters is seeded as white noise is, so a
+                            *   colored layer is as deterministic; each unison voice filters
+                            *   its own. Ignored by the other waves */
 });
 
 /** The string of a SynthPluck layer, on the layer: a delay line a period long, plucked with a
@@ -648,6 +663,21 @@ ECS_STRUCT(Saturator, {
                             *   1 - mix */
 });
 
+/** A transient shaper, an effect in an insert slot of an AudioBus, as a Reverb is: more or
+ * less punch and tail on drums and plucks, without a threshold, at most 12 dB either way:
+ * drums { AudioBus: {effects: [drums]}; TransientShaper: {attack: 0.6, sustain: -0.4} }.
+ *
+ * Stereo linked as a Compressor, it compares a fast envelope (1 ms up, 20 ms down) of the
+ * louder channel with a slow one (20 ms up, 200 ms down) in dB. 0 and 0 pass the signal
+ * unchanged; changes move over 20 ms. It has no meter and stops while its input is silent.
+ */
+ECS_STRUCT(TransientShaper, {
+    float attack;          /**< -1 to 1, default 0: above 0 boosts the transients, below 0
+                            *   softens them */
+    float sustain;         /**< -1 to 1, default 0: above 0 boosts the tail, below 0 shortens
+                            *   it */
+});
+
 /** An envelope of the cutoff of the SynthFilter of the same root, with the segments of a
  * SynthEnvelope: the cutoff is cutoff times 2 to the amount times the level of the envelope,
  * so it rises over the attack, settles at the sustain and returns over the release.
@@ -670,6 +700,7 @@ ECS_STRUCT(SynthFilterEnvelope, {
                             *   amount (1 - share + share v), default 0 */
 });
 
+<<<<<<< HEAD
 /** A pitch envelope of a synth sound, relative to the note so it fits every pitch: the pitch
  * starts amount semitones off the note and returns to it over the decay with a curve, the
  * drop of a kick or a tom, the blip of a zap or the scoop of brass. Over the release of the
@@ -691,6 +722,20 @@ ECS_STRUCT(SynthPitchEnvelope, {
                             *   of a note, -48..48, default 0, returning to 0 with the decay: the
                             *   sweep of a sync lead. Only on layers with a ratio over 1; the
                             *   moved ratio is clamped to 1..16 */
+=======
+/** A drive stage of a synth sound, on its root: the mix of the layers of each voice runs
+ * through a tanh soft clipper before the SynthFilter, or before the amp without one, where an
+ * analog synth gets most of its thickness. Plucks, unison and FM pass through it as they mix.
+ *
+ * The clipper runs at twice the rate and is level compensated: a sine at level 1 keeps its
+ * RMS at every drive. The driven mix is 15 frames late; with width both channels drive alike.
+ * Without the component there is no drive. See docs/audio.md.
+ */
+ECS_STRUCT(SynthDrive, {
+    float drive;           /**< 0..1, default 0.3: a gain of -6 to +24 dB before the clipper */
+    float asymmetry;       /**< 0..1, default 0: an offset before the clipper that adds even
+                            *   harmonics; its DC is blocked */
+>>>>>>> fdf426e324e3e2852a5fe1aed64ec704ff8652e4
 });
 
 /** Portamento and mono legato of a synth sound, on its root.
@@ -741,8 +786,13 @@ ECS_STRUCT(SynthLfo, {
 
 /** A sound made by the synth from the components of this entity and its children, without a
  * file: SynthOscillator layers, each with an optional SynthUnison, a SynthEnvelope, a
+<<<<<<< HEAD
  * SynthFilter, a SynthFilterEnvelope, a SynthPitchEnvelope, a SynthGlide and SynthLfo.
  * Usually a prefab.
+=======
+ * SynthDrive, a SynthFilter, a SynthFilterEnvelope, a SynthGlide and SynthLfo. Usually a
+ * prefab.
+>>>>>>> fdf426e324e3e2852a5fe1aed64ec704ff8652e4
  *
  * It is compiled once, and again when one of its components changes, into a patch the core
  * holds; box_audio_play and AudioSource play it like any sound, with no allocation per play.

@@ -61,13 +61,21 @@ void box_audio_synth_init(
     ecs_entity_t ids[] = {
         ecs_id(SynthSound), ecs_id(SynthOscillator), ecs_id(SynthEnvelope), ecs_id(SynthFilter),
         ecs_id(SynthFilterEnvelope), ecs_id(SynthGlide), ecs_id(SynthUnison),
+<<<<<<< HEAD
         ecs_id(SynthString), ecs_id(SynthLfo), ecs_id(SynthPitchEnvelope)
+=======
+        ecs_id(SynthString), ecs_id(SynthLfo), ecs_id(SynthDrive)
+>>>>>>> fdf426e324e3e2852a5fe1aed64ec704ff8652e4
     };
     const char *names[] = {
         "AudioSynthSoundDirty", "AudioSynthOscillatorDirty", "AudioSynthEnvelopeDirty",
         "AudioSynthFilterDirty", "AudioSynthFilterEnvelopeDirty", "AudioSynthGlideDirty",
         "AudioSynthUnisonDirty", "AudioSynthStringDirty", "AudioSynthLfoDirty",
+<<<<<<< HEAD
         "AudioSynthPitchEnvelopeDirty"
+=======
+        "AudioSynthDriveDirty"
+>>>>>>> fdf426e324e3e2852a5fe1aed64ec704ff8652e4
     };
     int32_t i;
     for (i = 0; i < 10; i ++) {
@@ -172,6 +180,8 @@ static void box_audio_synth_layer(
     l->sub = osc->sub;
     l->sub_octave = osc->sub_octave >= 2 ? 2 : 1;
     l->sync = osc->sync;
+    l->color = osc->color == SynthNoisePink ? BOX_AUDIO_SYNTH_PINK :
+        (osc->color == SynthNoiseBrown ? BOX_AUDIO_SYNTH_BROWN : BOX_AUDIO_SYNTH_WHITE);
     l->voices = 1;
     if (unison) {
         l->voices = unison->voices > 1 ? (uint32_t)unison->voices : 1;
@@ -302,7 +312,11 @@ bool box_audio_synth_compile(
     const SynthFilterEnvelope *fenv = ecs_get(world, e, SynthFilterEnvelope);
     const SynthOscillator *osc = ecs_get(world, e, SynthOscillator);
     const SynthGlide *glide = ecs_get(world, e, SynthGlide);
+<<<<<<< HEAD
     const SynthPitchEnvelope *bend = ecs_get(world, e, SynthPitchEnvelope);
+=======
+    const SynthDrive *drive = ecs_get(world, e, SynthDrive);
+>>>>>>> fdf426e324e3e2852a5fe1aed64ec704ff8652e4
     int32_t extra = 0, orphans = 0, low = 0, lfos = 0, i;
     ecs_iter_t it;
     bool endless = false, fits = true, result;
@@ -316,8 +330,15 @@ bool box_audio_synth_compile(
         p.glide = glide->time;
     }
 
+<<<<<<< HEAD
     if (bend) {
         p.pitch_envelope = box_audio_synth_pitch_envelope(bend);
+=======
+    if (drive) {
+        p.has_drive = 1;
+        p.pre_drive = drive->drive;
+        p.pre_asymmetry = drive->asymmetry;
+>>>>>>> fdf426e324e3e2852a5fe1aed64ec704ff8652e4
     }
 
     if (env) {
