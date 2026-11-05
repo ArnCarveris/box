@@ -16,47 +16,14 @@ using box.surface
 using box.controllers
 using box.movement
 
-@tree Parent
 template TeaHouse {
   prop variant: i32 = 0
   prop scale: f32 = 1
 
-  const walls0: Rgb = {238, 222, 192}
-  const walls1: Rgb = {213, 224, 201}
-  const walls2: Rgb = {221, 211, 225}
-  const walls3: Rgb = {241, 213, 189}
-  const walls4: Rgb = {198, 217, 218}
-  const walls5: Rgb = {235, 222, 201}
-  const walls6: Rgb = {221, 201, 179}
-  const walls7: Rgb = {207, 220, 200}
-  const walls = [walls0, walls1, walls2, walls3, walls4, walls5, walls6, walls7]
-  const roofs0: Rgb = {65, 83, 101}
-  const roofs1: Rgb = {62, 80, 101}
-  const roofs2: Rgb = {117, 91, 83}
-  const roofs3: Rgb = {80, 101, 116}
-  const roofs4: Rgb = {68, 86, 107}
-  const roofs5: Rgb = {108, 91, 115}
-  const roofs6: Rgb = {73, 90, 109}
-  const roofs7: Rgb = {59, 77, 99}
-  const roofs = [roofs0, roofs1, roofs2, roofs3, roofs4, roofs5, roofs6, roofs7]
-  const accents0: Rgb = {151, 109, 139}
-  const accents1: Rgb = {112, 163, 153}
-  const accents2: Rgb = {112, 139, 172}
-  const accents3: Rgb = {185, 128, 130}
-  const accents4: Rgb = {137, 116, 153}
-  const accents5: Rgb = {173, 126, 89}
-  const accents6: Rgb = {165, 129, 99}
-  const accents7: Rgb = {124, 151, 117}
-  const accents = [accents0, accents1, accents2, accents3, accents4, accents5, accents6, accents7]
-  const timbers0: Rgb = {109, 65, 53}
-  const timbers1: Rgb = {117, 86, 61}
-  const timbers2: Rgb = {88, 73, 72}
-  const timbers3: Rgb = {135, 81, 65}
-  const timbers4: Rgb = {94, 81, 64}
-  const timbers5: Rgb = {112, 69, 61}
-  const timbers6: Rgb = {123, 89, 68}
-  const timbers7: Rgb = {92, 80, 64}
-  const timbers = [timbers0, timbers1, timbers2, timbers3, timbers4, timbers5, timbers6, timbers7]
+  const walls: Rgb[] = [{238, 222, 192}, {213, 224, 201}, {221, 211, 225}, {241, 213, 189}, {198, 217, 218}, {235, 222, 201}, {221, 201, 179}, {207, 220, 200}]
+  const roofs: Rgb[] = [{65, 83, 101}, {62, 80, 101}, {117, 91, 83}, {80, 101, 116}, {68, 86, 107}, {108, 91, 115}, {73, 90, 109}, {59, 77, 99}]
+  const accents: Rgb[] = [{151, 109, 139}, {112, 163, 153}, {112, 139, 172}, {185, 128, 130}, {137, 116, 153}, {173, 126, 89}, {165, 129, 99}, {124, 151, 117}]
+  const timbers: Rgb[] = [{109, 65, 53}, {117, 86, 61}, {88, 73, 72}, {135, 81, 65}, {94, 81, 64}, {112, 69, 61}, {123, 89, 68}, {92, 80, 64}]
   const wall: Rgb = walls[variant]
   const roof_color: Rgb = roofs[variant]
   const accent: Rgb = accents[variant]
@@ -190,6 +157,7 @@ template TeaHouse {
         Box: {0.85, 0.8, 0.03}
         Rgb: GardenPaper
         Emissive: {strength: 0.35, color: {255, 183, 105}}
+        DiffuseTransmission: GardenShoji
       }
       for bar in 0..5 {
         {
@@ -250,6 +218,7 @@ template TeaHouse {
       Box: {panel_width, 1.95, 0.065}
       Rgb: GardenPaper
       Emissive: {strength: 0.7, color: {255, 183, 105}}
+      DiffuseTransmission: GardenShoji
     }
     for i in 0..(panes + 1) {
       {
@@ -534,6 +503,7 @@ template TeaHouse {
     Cylinder: {radius: 0.45, length: 0.035, segments: 32}
     Rgb: GardenPaper
     Emissive: {strength: 1.2, color: {255, 195, 139}}
+    DiffuseTransmission: GardenShoji
   }
   rear_frame {
     Position: {0, 1.65, -1.48}

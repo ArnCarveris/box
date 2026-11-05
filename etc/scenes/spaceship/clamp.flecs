@@ -7,7 +7,6 @@ using box.material
 using box.texture
 using box.light
 
-@tree Parent
 template DockClamp {
   prop reach: f32 = 44
   root { AttachmentFrame: {} }
@@ -17,25 +16,21 @@ template DockClamp {
   lower_jaw : Titanium { Position: {0, -3.2, 0.2}; Box: {7.8, 1.2, 3} }
   pivot : DarkArmor { Position: {0, -3.3, 5}; Rotation: {0, 0, 1.5707963}; Cylinder: {radius: 2.7, length: 11, segments: 16} }
   for side in 0..2 {
-    {
-      const x = (side - 0.5) * 8.4
-      cheek : DockYellow { Position: {x, -4.8, 7.5}; Rotation: {0, 0, 1.5707963}; BeveledPrism: {footprint: [{-4, -4}, {4, -4}, {3, 6}, {-2, 6}], depth: 1, inset: 0.3, bevel: 0.25} }
-      axle : Titanium { Position: {(side - 0.5) * 11.3, -3.3, 5}; Rotation: {0, 0, 1.5707963}; Cylinder: {radius: 1.5, length: 0.6, segments: 12} }
-      piston_body : DockYellow { Position: {x, -7, reach - 11}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 1.65, length: 19, segments: 12} }
-      piston_rod : Titanium { Position: {x, -7, reach / 2 - 4.5}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.85, length: reach - 20, segments: 16, smooth: true} }
-      seal : RecessMetal { Position: {x, -7, reach - 20.6}; Rotation: {1.5707963, 0, 0}; Tube: {radius: 1.75, thickness: 0.42, length: 0.9, segments: 16} }
-      bearing : Titanium { Position: {x, -7, reach - 21.2}; Rotation: {1.5707963, 0, 0}; Tube: {radius: 1.4, thickness: 0.25, length: 0.4, segments: 16} }
-      for j in 0..5 {
-        {
-          collar : DarkArmor { Position: {x, -7, reach - 18 + j * 3.6}; Rotation: {1.5707963, 0, 0}; Tube: {radius: 1.78, thickness: 0.26, length: 0.35, segments: 12} }
-          hydraulic_line : Titanium { Position: {x + 1.9, -7, reach - 18 + j * 3.6}; Box: {0.3, 0.3, 3.4} }
-        }
-      }
-      brace { ShipBeam: {ax: x, ay: -7, az: 8, bx: x, by: -3.3, bz: 5, radius: 1} }
-      runner : DarkArmor { Position: {x, -10, reach / 2}; Box: {0.9, 1.5, reach - 6} }
-      runner_edge : Titanium { Position: {x, -9.2, reach / 2}; Box: {0.35, 0.18, reach - 7} }
-      indicator : AmberLight { Position: {x, -4.9, reach - 10}; Box: {0.6, 0.2, 3} }
+    const x = (side - 0.5) * 8.4
+    "cheek_{side}" : DockYellow { Position: {x, -4.8, 7.5}; Rotation: {0, 0, 1.5707963}; BeveledPrism: {footprint: [{-4, -4}, {4, -4}, {3, 6}, {-2, 6}], depth: 1, inset: 0.3, bevel: 0.25} }
+    "axle_{side}" : Titanium { Position: {(side - 0.5) * 11.3, -3.3, 5}; Rotation: {0, 0, 1.5707963}; Cylinder: {radius: 1.5, length: 0.6, segments: 12} }
+    "piston_body_{side}" : DockYellow { Position: {x, -7, reach - 11}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 1.65, length: 19, segments: 12} }
+    "piston_rod_{side}" : PistonChrome { Position: {x, -7, reach / 2 - 4.5}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.85, length: reach - 20, segments: 16, smooth: true} }
+    "seal_{side}" : RecessMetal { Position: {x, -7, reach - 20.6}; Rotation: {1.5707963, 0, 0}; Tube: {radius: 1.75, thickness: 0.42, length: 0.9, segments: 16} }
+    "bearing_{side}" : Titanium { Position: {x, -7, reach - 21.2}; Rotation: {1.5707963, 0, 0}; Tube: {radius: 1.4, thickness: 0.25, length: 0.4, segments: 16} }
+    for j in 0..5 {
+      "collar_{side}_{j}" : DarkArmor { Position: {x, -7, reach - 18 + j * 3.6}; Rotation: {1.5707963, 0, 0}; Tube: {radius: 1.78, thickness: 0.26, length: 0.35, segments: 12} }
+      "hydraulic_line_{side}_{j}" : Titanium { Position: {x + 1.9, -7, reach - 18 + j * 3.6}; Box: {0.3, 0.3, 3.4} }
     }
+    "brace_{side}" { ShipBeam: {ax: x, ay: -7, az: 8, bx: x, by: -3.3, bz: 5, radius: 1} }
+    "runner_{side}" : DarkArmor { Position: {x, -10, reach / 2}; Box: {0.9, 1.5, reach - 6} }
+    "runner_edge_{side}" : Titanium { Position: {x, -9.2, reach / 2}; Box: {0.35, 0.18, reach - 7} }
+    "indicator_{side}" : AmberLight { Position: {x, -4.9, reach - 10}; Box: {0.6, 0.2, 3} }
   }
   crosshead : DarkArmor { Position: {0, -7, 9}; Box: {11.3, 3, 3.5} }
   ram_label { Position: {0, -5.46, 9}; Rotation: {-1.5707963, 0, 0}; Quad: {7.8, 2.6}; Rgb: {255, 255, 255}; PbrTextures: {albedo: ship_warning} }
@@ -58,9 +53,7 @@ template DockClamp {
   back_inset : RecessMetal { Position: {0, -5, reach + 2.31}; Box: {8.5, 6, 0.1} }
   grille { Position: {-3.8, -5, reach + 2.45}; Array: {axis: X, count: 16, spacing: 0.5}; fin : Titanium { Position: {}; Box: {0.12, 5.5, 0.2} } }
   for i in 0..4 {
-    {
-      support : DockYellow { Position: {-6 + i * 4, -10.6, reach + 1}; Rotation: {0.3, 0, 0}; Box: {0.45, 5, 6} }
-      lock : Titanium { Position: {-3 + i * 2, 0, -0.1}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.22, length: 0.4, segments: 6} }
-    }
+    "support_{i}" : DockYellow { Position: {-6 + i * 4, -10.6, reach + 1}; Rotation: {0.3, 0, 0}; Box: {0.45, 5, 6} }
+    "lock_{i}" : Titanium { Position: {-3 + i * 2, 0, -0.1}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.22, length: 0.4, segments: 6} }
   }
 }

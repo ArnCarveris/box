@@ -57,6 +57,8 @@ struct Frustum {
     clip_w: vec4f,
     size: vec4f,
     flags: vec4u,
+    // World position of the light of a shadow tile, w 1, w 0 for a frustum without a light.
+    light: vec4f,
 };
 
 struct Job {
@@ -69,7 +71,9 @@ struct Job {
     extent: vec3f,
     list: u32,
     mask: u32,
-    pad: u32,
+    // 1 for a batch of LightFixture shapes: a frustum with a light inside the world box of an
+    // instance does not draw it.
+    fixture: u32,
 };
 
 // World space box around an instance.
@@ -227,6 +231,13 @@ fn occluded(job: Job, m: mat4x4f) -> bool {
     return depth < far;
 }
 
+// Whether the light of a frustum is inside a world space box, inclusive; false for a frustum
+// without a light.
+fn holds(b: Bounds, f: u32) -> bool {
+    let light = frustums[f].light;
+    return light.w != 0.0 && all(abs(light.xyz - b.center) <= b.extent);
+}
+
 // Phase a frustum of the group runs in: the phase of the dispatch for the frustum with a
 // history, the only phase for the others.
 fn phase_of(f: u32) -> u32 {
@@ -283,10 +294,14 @@ fn cull_instances(
         var drawn = 0u;
         var culled = 0u;
         var bits = job.mask;
+        let fixture = job.fixture != 0u;
         while (bits != 0u) {
             let f = firstTrailingBit(bits);
             bits &= bits - 1u;
-            let d = decide(job, slot, m, b, f);
+            var d = vec2<bool>(false, true);
+            if (!fixture || !holds(b, f)) {
+                d = decide(job, slot, m, b, f);
+            }
             if (d.x) {
                 drawn |= 1u << f;
             }

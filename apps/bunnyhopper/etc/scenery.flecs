@@ -20,6 +20,7 @@ prefab Tree {
   trunk {
     Position: {0, 0.9, 0}
     Box: {0.45, 1.8, 0.45}
+    Bevel: {radius: 0.08}
     Rgb: {110, 80, 50}
   }
 
@@ -27,6 +28,7 @@ prefab Tree {
     Position: {0, 2.7, 0}
     Sphere: {segments: 16, smooth: true, radius: 1.6}
     Rgb: {60, 145, 65}
+    DiffuseTransmission: {factor: 0.3, color: {190, 255, 120}, thickness: 1.5}
   }
 }
 

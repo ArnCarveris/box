@@ -24,11 +24,15 @@ using box.effects
 using box.surface
 using box.controllers
 using box.text
+using box.movement
+using box.texture
 
 window { Surface: {width: 1440, height: 960, vsync: true} }
 contact_shadows { Gtao: {radius: 0.6, final_value_power: 2.2} }
 sun_bloom { Bloom: {intensity: 0.07, threshold: 1.5} }
 tonemap { Tonemap: {} }
+smaa { Smaa: {} }
+clouds { TextureGen: {width: 256, seed: 17, layers: [{kind: GenNoise, frequency: 3, octaves: 4, gain: 0.55}]} }
 
 santorini {
   Scene: {}
@@ -42,14 +46,19 @@ santorini {
     Camera: {fov: 46, near_: 0.1, far_: 180}
     CameraController: {speed: 12}
   }
-  aegean_sun { Rotation: {0.83, -2.3, 0}; DirectionalLight: {intensity: 2.1 * math.PI}; Rgb: {255, 237, 208} }
-
+  aegean_sun {
+    Rotation: {0.83, -2.3, 0}
+    DirectionalLight: {intensity: 2.1 * math.PI}
+    Rgb: {255, 237, 208}
+    LightCookie: {texture: clouds, size: 48, height: 40, velocity: {0.7, 0.25}, threshold: 0.42, softness: 0.22, strength: 0.55}
+  }
   sea_base { Position: {0, -0.8, 1}; RoundedBox: {37, 1.4, 33, 0.65, segments: 6}; Rgb: {19, 89, 133} }
   water {
     Position: {0, -0.06, 1}
     RoundedBox: {36.8, 0.12, 32.8, 0.55, segments: 6}
-    Rgb: {32, 143, 174}
-    PbrMaterial: {roughness: 0.24, metallic: 0.3}
+    Rgb: {40, 152, 182}
+    PbrMaterial: {roughness: 0.12}
+    Transmission: {transmission_factor: 0.5, ior: 1.33, thickness_factor: 1, attenuation_distance: 0.6, attenuation_color: {70, 190, 205}}
   }
   for i in 0..160 {
     const x = -17.6 + (i * 17 % 71) * 0.5
@@ -194,17 +203,15 @@ santorini {
     for side in 0..2 {
       { Position: {(side - 0.5) * 2.9, 0.85, -0.55}; Cylinder: {radius: 0.028, length: 1.7, segments: 8}; Rgb: IslandIron }
     }
-    for i in 0..12 {
-      const x = -1.45 + i * 2.9 / 12
-      const nx = -1.45 + (i + 1) * 2.9 / 12
-      IslandBeam(ax: x, ay: 1.65 - 0.18 * (1 - x * x / 2.1025), az: -0.55, bx: nx, by: 1.65 - 0.18 * (1 - nx * nx / 2.1025), bz: -0.55, radius: 0.012, tint: IslandPlaster) {}
-    }
+    IslandRope(ax: -1.45, ay: 1.65, az: -0.55, bx: 1.45, by: 1.65, bz: -0.55, sag: 0.24, thick: 0.012, tint: IslandPlaster) {}
     for i in 0..5 {
       {
         Position: {-1.1 + i * 0.52, 1.1 + i % 2 * 0.06, -0.55}
         Rotation: {0.06, 0.08 * math.sin(i * 4), 0}
         Box: {0.42, 0.76 - i % 2 * 0.18, 0.018}
-        if i % 2 == 0 { Rgb: {90, 163, 194} } else { Rgb: IslandChalk }
+        Rgb: i % 2 == 0 ? {90, 163, 194} : IslandChalk
+        Sheen: IslandLinen
+        DiffuseTransmission: IslandCloth
       }
       for pin in 0..2 {
         { Position: {-1.26 + i * 0.52 + pin * 0.32, 1.5, -0.54}; Box: {0.03, 0.09, 0.04}; Rgb: IslandWood }
@@ -236,8 +243,8 @@ santorini {
   }
   FishingBoat() { Position: {-5.3, 0.04, 12.7}; Rotation: {0, 0.45, 0} }
   FishingBoat(tint: {182, 67, 48}) { Position: {5.3, 0.04, 12.5}; Rotation: {0, -0.38, 0}; Scale: {0.8, 0.8, 0.8} }
-  IslandBeam(ax: -5.1, ay: 0.6, az: 14.5, bx: -6.4, by: 1.04, bz: 10.1, radius: 0.015, tint: IslandWood) {}
-  IslandBeam(ax: 4.6, ay: 0.55, az: 13.9, bx: 3.2, by: 1.04, bz: 10.1, radius: 0.015, tint: IslandWood) {}
+  IslandRope(ax: -5.1, ay: 0.6, az: 14.5, bx: -6.4, by: 1.04, bz: 10.1, sag: 0.35, thick: 0.015) {}
+  IslandRope(ax: 4.6, ay: 0.55, az: 13.9, bx: 3.2, by: 1.04, bz: 10.1, sag: 0.35, thick: 0.015) {}
 
   for i in 0..5 {
     IslandPot(flowers: true, size: 0.85 + i % 2 * 0.3) { Position: {-12.6 + i * 5.7, 3.07, 6.85} }
@@ -263,6 +270,6 @@ main_view {
     clear: {enabled: true, color: {139, 191, 214, 255}},
     lighting: {enabled: true, baked: true, reflections: true},
     shadows: {enabled: true, resolution: 2048, max_distance: 120},
-    effects: [{effect: contact_shadows}, {effect: sun_bloom}, {effect: tonemap}]
+    effects: [{effect: contact_shadows}, {effect: sun_bloom}, {effect: tonemap}, {effect: smaa}]
   }
 }

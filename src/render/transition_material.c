@@ -95,6 +95,60 @@ void box_draws_transition_target(
     if (material->shape2d && kind == BOX_DRAW_TRANSITION_SHAPE) {
         out->shape2d = *material->shape2d;
     }
+
+    if (material->shape2d && material->border && material->shape2d->kind != BOX_SHAPE2D_LINE &&
+        (kind == BOX_DRAW_TRANSITION_SHAPE || kind == BOX_DRAW_TRANSITION_BOX_SHADOW))
+    {
+        out->present |= 1u << BOX_RENDER_TRANSITION_BORDER;
+        out->border = *material->border;
+        out->border_radius = material->border_radius;
+    }
+}
+
+void box_draws_transition_shape(
+    const box_draw_transition_material_t *material,
+    Shape2D *out)
+{
+    *out = material->shape2d;
+    if (material->present & (1u << BOX_RENDER_TRANSITION_BORDER)) {
+        if (material->border_radius) {
+            out->radius = 0.0f;
+        }
+
+        box_shape2d_border(out, &material->border);
+    }
+}
+
+void* box_draws_transition_value(
+    box_draw_transition_material_t *material,
+    box_render_transition_component_t component)
+{
+    void *result = NULL;
+    switch (component) {
+    case BOX_RENDER_TRANSITION_RGB: result = &material->color; break;
+    case BOX_RENDER_TRANSITION_ALPHA_CUTOFF: result = &material->cutoff; break;
+    case BOX_RENDER_TRANSITION_PBR_MATERIAL: result = &material->pbr; break;
+    case BOX_RENDER_TRANSITION_EMISSIVE: result = &material->emissive; break;
+    case BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM: result = &material->uv; break;
+    case BOX_RENDER_TRANSITION_TRANSMISSION: result = &material->transmission; break;
+    case BOX_RENDER_TRANSITION_CLEAR_COAT: result = &material->clear_coat; break;
+    case BOX_RENDER_TRANSITION_ANISOTROPY: result = &material->anisotropy; break;
+    case BOX_RENDER_TRANSITION_SHEEN: result = &material->sheen; break;
+    case BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION:
+        result = &material->diffuse_transmission;
+        break;
+    case BOX_RENDER_TRANSITION_OPACITY: result = &material->opacity; break;
+    case BOX_RENDER_TRANSITION_TINT: result = &material->tint; break;
+    case BOX_RENDER_TRANSITION_BORDER: result = &material->border; break;
+    case BOX_RENDER_TRANSITION_POSITION:
+    case BOX_RENDER_TRANSITION_ROTATION:
+    case BOX_RENDER_TRANSITION_SCALE:
+    case BOX_RENDER_TRANSITION_BOX_SHADOW:
+    case BOX_RENDER_TRANSITION_COMPONENTS:
+        break;
+    }
+
+    return result;
 }
 
 /** Get a component of a material transition, NULL when the material does not have it.
@@ -115,12 +169,19 @@ static const void* box_draws_transition_part(
 /** Point the material components of a record at the values of its target material.
  *
  * @param material The target material
+ * @param shape Receives the 2D shape of a shape record with its Border applied
+ *        (box_draws_transition_shape), which shape2d points at
  * @param out Receives the material components
  */
 static void box_draws_transition_parts(
     const box_draw_transition_material_t *material,
+    Shape2D *shape,
     box_draw_material_t *out)
 {
+    if (material->kind == BOX_DRAW_TRANSITION_SHAPE) {
+        box_draws_transition_shape(material, shape);
+    }
+
     *out = (box_draw_material_t){
         .color = box_draws_transition_part(material, BOX_RENDER_TRANSITION_RGB,
             &material->color),
@@ -148,7 +209,7 @@ static void box_draws_transition_parts(
         .tint = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TINT,
             &material->tint),
         .inherited = material->tinted ? &material->inherited : NULL,
-        .shape2d = material->kind == BOX_DRAW_TRANSITION_SHAPE ? &material->shape2d : NULL,
+        .shape2d = material->kind == BOX_DRAW_TRANSITION_SHAPE ? shape : NULL,
         .fade = material->fade
     };
 }
@@ -161,7 +222,8 @@ void box_draws_transition_encode(
     box_render_material_t record;
     box_render_shading_t shading;
     box_render_mesh_shading_t mesh;
-    box_draws_transition_parts(material, &m);
+    Shape2D shape;
+    box_draws_transition_parts(material, &shape, &m);
     if (material->kind == BOX_DRAW_TRANSITION_TABLE) {
         box_draws_material_pack(&record, &m);
         ecs_os_memcpy(dst, &record, ECS_SIZEOF(record));
@@ -209,9 +271,17 @@ void box_draws_transition_box_shadow(
     void *transform,
     void *shading)
 {
+    box_draw_transition_box_shadow_t patched = *record;
     box_draw_material_t m;
-    box_draws_transition_parts(&record->material, &m);
-    box_draws_box_shadow_patch(&m, record, shadow, world, transform, shading);
+    Shape2D shape;
+    box_draws_transition_parts(&record->material, &shape, &m);
+    if (record->material.present & (1u << BOX_RENDER_TRANSITION_BORDER)) {
+        box_draws_transition_shape(&record->material, &patched.material.shape2d);
+        patched.material.shadow_cover = box_draws_box_shadow_cover(
+            &patched.material.shape2d, record->material.shadow_blend, 1.0f);
+    }
+
+    box_draws_box_shadow_patch(&m, &patched, shadow, world, transform, shading);
 }
 
 void box_draws_transition_fade_own(
@@ -245,11 +315,15 @@ void box_draws_transition_send_fade(
     uint32_t node,
     uint32_t parent,
     const box_draw_tint_t *tint,
-    float alpha)
+    float alpha,
+    const Tint *leaving_tint,
+    const Opacity *leaving_opacity)
 {
     box_render_transition_fade_t fade = {0};
     const Tint *own_tint = ecs_get(world, e, Tint);
     const Opacity *opacity = ecs_get(world, e, Opacity);
+    own_tint = own_tint ? own_tint : leaving_tint;
+    opacity = opacity ? opacity : leaving_opacity;
     box_draw_tint_t ancestors;
     uint32_t offset = 0;
     if (tint) {

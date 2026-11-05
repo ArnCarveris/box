@@ -6,34 +6,27 @@ using box.material
 using box.texture
 using box.light
 
-@tree Parent
 template FrigateCockpit {
   deck : DarkArmor { Position: {}; Box: {12.5, 0.35, 13} }
   aisle : Titanium { Position: {0, 0.2, 0}; Box: {1.4, 0.1, 11} }
   for row in 0..3 {
-    {
-    for side in 0..2 {
-    {
-      station {
-        Position: {(side - 0.5) * 7.6, 0.3, -4 + row * 3.4}
-        pedestal : Titanium { Position: {0, 0.5, 0}; Box: {1.6, 1, 0.65} }
-        console : DarkArmor { Position: {0, 1.1, 0.4}; Rotation: {-0.35, 0, 0}; Box: {2.6, 0.8, 0.5} }
-        screen { Position: {0, 1.2, 0.7}; Rotation: {-0.35, 0, 0}; Quad: {2.1, 0.65}; Rgb: {0, 0, 0}; Emissive: {strength: 2, color: {83, 218, 240}}; PbrTextures: {emissive: ship_display} }
-        seat : RecessMetal { Position: {0, 0.65, -1}; Box: {1.15, 0.3, 1.15} }
-        seatback : RustRed { Position: {0, 1.3, -1.5}; Rotation: {-0.1, 0, 0}; Box: {1.15, 1.4, 0.25} }
-        leg : Titanium { Position: {0, 0.3, -1}; Cylinder: {radius: 0.18, length: 0.6, segments: 8} }
-      }
-        }
+  for side in 0..2 {
+  "station_{row}_{side}" {
+    Position: {(side - 0.5) * 7.6, 0.3, -4 + row * 3.4}
+    pedestal : Titanium { Position: {0, 0.5, 0}; Box: {1.6, 1, 0.65} }
+    console : DarkArmor { Position: {0, 1.1, 0.4}; Rotation: {-0.35, 0, 0}; Box: {2.6, 0.8, 0.5} }
+    screen { Position: {0, 1.2, 0.7}; Rotation: {-0.35, 0, 0}; Quad: {2.1, 0.65}; Rgb: {0, 0, 0}; Emissive: {strength: 2, color: {83, 218, 240}}; PbrTextures: {emissive: ship_display} }
+    seat : RecessMetal { Position: {0, 0.65, -1}; Box: {1.15, 0.3, 1.15} }
+    seatback : RustRed { Position: {0, 1.3, -1.5}; Rotation: {-0.1, 0, 0}; Box: {1.15, 1.4, 0.25} }
+    leg : Titanium { Position: {0, 0.3, -1}; Cylinder: {radius: 0.18, length: 0.6, segments: 8} }
+  }
 }
-      }
 }
   table : DarkArmor { Position: {0, 1.2, -3.5}; Box: {2.4, 0.4, 3} }
   tactical { Position: {0, 1.42, -3.5}; Rotation: {-1.5707963, 0, 0}; Quad: {2.2, 2.7}; Rgb: {0, 0, 0}; Emissive: {strength: 1.6, color: {70, 210, 255}}; PbrTextures: {emissive: ship_display} }
   for side in 0..2 {
-    {
-    floorlight : IceLight { Position: {(side - 0.5) * 2, 0.22, 0}; Box: {0.08, 0.05, 11} }
-    lockers : Titanium { Position: {(side - 0.5) * 10.8, 0.8, -5.5}; Box: {1.3, 1.6, 1} }
-      }
+  "floorlight_{side}" : IceLight { Position: {(side - 0.5) * 2, 0.22, 0}; Box: {0.08, 0.05, 11} }
+  "lockers_{side}" : Titanium { Position: {(side - 0.5) * 10.8, 0.8, -5.5}; Box: {1.3, 1.6, 1} }
 }
   interior_light { Position: {0, 3.1, 1}; PointLight: {intensity: 16, range: 12}; Rgb: {70, 185, 230} }
   rear_bulkhead : DarkArmor { Position: {0, 1.5, -6.3}; Box: {12.3, 2.7, 0.25} }
@@ -42,28 +35,22 @@ template FrigateCockpit {
   access_light : WhiteLight { Align: {target: access, self: {y: Min}, other: {y: Max}, offset: {0, 0.08, 0.06}}; Box: {1.7, 0.08, 0.07} }
   forward_console : DarkArmor { Position: {0, 0.9, 5.3}; BeveledPrism: {footprint: [{-5.8, -0.65}, {5.8, -0.65}, {5.2, 0.65}, {-5.2, 0.65}], depth: 1.4, inset: 0.25, offset: {0, 0.2}, bevel: 0.1} }
   for col in 0..5 {
-    {
-      forward_display { Position: {-4.4 + col * 2.2, 1.63, 5.1}; Rotation: {-1.2, 0, 0}; Quad: {1.65, 0.8}; Rgb: {0, 0, 0}; Emissive: {strength: 1.5, color: {83, 218, 240}}; PbrTextures: {emissive: ship_display} }
-      keypad : Titanium { Position: {-4.4 + col * 2.2, 1.63, 4.82}; Box: {1.1, 0.07, 0.2} }
-    }
+    "forward_display_{col}" { Position: {-4.4 + col * 2.2, 1.63, 5.1}; Rotation: {-1.2, 0, 0}; Quad: {1.65, 0.8}; Rgb: {0, 0, 0}; Emissive: {strength: 1.5, color: {83, 218, 240}}; PbrTextures: {emissive: ship_display} }
+    "keypad_{col}" : Titanium { Position: {-4.4 + col * 2.2, 1.63, 4.82}; Box: {1.1, 0.07, 0.2} }
   }
   floor_seams { Position: {0, 0.22, -5}; Array: {axis: Z, count: 12, spacing: 0.9}; seam : RecessMetal { Position: {}; Box: {12, 0.025, 0.035} } }
   for side in 0..2 {
-    {
-      equipment : RecessMetal { Position: {(side - 0.5) * 7.4, 1.5, -6.08}; Box: {2.8, 2.3, 0.12} }
-      racks {
-        Position: {(side - 0.5) * 7.4, 0.65, -5.97}
-        Array: {axis: Y, count: 7, spacing: 0.28}
-        drawer : Titanium { Position: {}; Box: {2.5, 0.19, 0.12} }
-        status : IceLight { Position: {0.95, 0, 0.08}; Box: {0.13, 0.045, 0.025} }
-      }
-      for row in 0..3 {
-        {
-          armrests { Position: {(side - 0.5) * 7.6 - 0.68, 1.24, -5 + row * 3.4}; Array: {axis: X, count: 2, spacing: 1.36}; arm : DarkArmor { Position: {}; Box: {0.12, 0.15, 0.85} } }
-          seat_head : RustRed { Position: {(side - 0.5) * 7.6, 2.12, -5.55 + row * 3.4}; Box: {0.65, 0.35, 0.2} }
-          console_keys { Position: {(side - 0.5) * 7.6 - 0.9, 1.25, -3.17 + row * 3.4}; Array: {axis: X, count: 8, spacing: 0.25}; key : WhiteLight { Position: {}; Box: {0.12, 0.055, 0.05} } }
-        }
-      }
+    "equipment_{side}" : RecessMetal { Position: {(side - 0.5) * 7.4, 1.5, -6.08}; Box: {2.8, 2.3, 0.12} }
+    "racks_{side}" {
+      Position: {(side - 0.5) * 7.4, 0.65, -5.97}
+      Array: {axis: Y, count: 7, spacing: 0.28}
+      drawer : Titanium { Position: {}; Box: {2.5, 0.19, 0.12} }
+      status : IceLight { Position: {0.95, 0, 0.08}; Box: {0.13, 0.045, 0.025} }
+    }
+    for row in 0..3 {
+      "armrests_{side}_{row}" { Position: {(side - 0.5) * 7.6 - 0.68, 1.24, -5 + row * 3.4}; Array: {axis: X, count: 2, spacing: 1.36}; arm : DarkArmor { Position: {}; Box: {0.12, 0.15, 0.85} } }
+      "seat_head_{side}_{row}" : RustRed { Position: {(side - 0.5) * 7.6, 2.12, -5.55 + row * 3.4}; Box: {0.65, 0.35, 0.2} }
+      "console_keys_{side}_{row}" { Position: {(side - 0.5) * 7.6 - 0.9, 1.25, -3.17 + row * 3.4}; Array: {axis: X, count: 8, spacing: 0.25}; key : WhiteLight { Position: {}; Box: {0.12, 0.055, 0.05} } }
     }
   }
 

@@ -11,19 +11,20 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template MilkCan {
   body {
     Position: {0, 0.37, 0}
     Cylinder: {radius: 0.24, length: 0.66, segments: 24, smooth: true}
     Rgb: {168, 185, 181}
     PbrMaterial: {metallic: 0.75, roughness: 0.28}
+    SpecularAnisotropy: {strength: 0.7, rotation: 0}
   }
   shoulder {
     Position: {0, 0.75, 0}
     Frustum: {radius_bottom: 0.24, radius_top: 0.14, length: 0.14, segments: 24, smooth: true}
     Rgb: {177, 194, 188}
     PbrMaterial: {metallic: 0.7, roughness: 0.3}
+    SpecularAnisotropy: {strength: 0.7, rotation: 0}
   }
   lid {
     Position: {0, 0.87, 0}

@@ -1,9 +1,0 @@
-// The look of the bunny follows the Bunny component the bunnyhopper systems write. It is a
-// script of its own: a script does not react to changes of a component it sets itself, and
-// run.flecs sets the Bunny of the player.
-
-using bunnyhopper
-
-player {
-  BunnyModel: {speed: player[Bunny].speed, dead: player[Bunny].dead}
-}

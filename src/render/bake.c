@@ -1506,6 +1506,51 @@ static void box_bake_progress(
     }
 }
 
+/** Report the probes left of the volumes that progress as BOX_TASK_PROBES, not blocking: every
+ * pass of a volume counts its valid probes. Once no volume progresses the report shows its
+ * total done for one frame and ends.
+ *
+ * @param world The world
+ * @param b The state
+ */
+static void box_bake_report(
+    ecs_world_t *world,
+    box_render_bake_t *b)
+{
+    int32_t i, done = 0, total = 0;
+    bool busy = false;
+    for (i = 0; i < ecs_vec_count(&b->volumes); i ++) {
+        const box_bake_volume_t *v = ecs_vec_get_t(&b->volumes, box_bake_volume_t, i);
+        int32_t current = v->completed < v->passes ? v->completed : v->passes - 1;
+        int32_t baked = v->valid_count - box_bake_left(v);
+        if (!v->pending || v->passes <= 0) {
+            continue;
+        }
+
+        baked = baked < 0 ? 0 : baked > v->valid_count ? v->valid_count : baked;
+        done += (current > 0 ? current : 0) * v->valid_count + baked;
+        total += v->passes * v->valid_count;
+        busy = true;
+    }
+
+    if (busy) {
+        if (!b->task) {
+            b->task = box_task_start(world, BOX_TASK_PROBES, false, total);
+        }
+
+        box_task_set(world, b->task, done, total);
+        b->task_total = total;
+        b->task_finished = false;
+    } else if (b->task && !b->task_finished) {
+        box_task_set(world, b->task, b->task_total, b->task_total);
+        b->task_finished = true;
+    } else if (b->task) {
+        box_task_end(world, b->task);
+        b->task = 0;
+        b->task_finished = false;
+    }
+}
+
 /** Point the views of the packet that sample a volume at the probe buffer it shows.
  *
  * @param b The state
@@ -1616,6 +1661,7 @@ static void BoxRenderExtractBake(
     }
 
     box_bake_progress(it, b, p);
+    box_bake_report(world, b);
     box_bake_display(b, p);
 }
 

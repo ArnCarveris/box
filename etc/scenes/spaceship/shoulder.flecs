@@ -9,7 +9,6 @@ using box.material
 using box.texture
 using box.light
 
-@tree Parent
 template FrigateShoulder {
   prop side: f32 = 1
   root { AttachmentFrame: {} }
@@ -31,27 +30,21 @@ template FrigateShoulder {
   }
 
   for i in 0..7 {
-    {
-    brace : Titanium { Position: {(8 + i * 1.8) * side, 3, 10 - i * 6}; Rotation: {0, -0.34 * side, 0}; Box: {3.6, 0.4, 0.55} }
-    stripe : RustRed { Position: {(6.8 + i * 2.1) * side, 4.05, 15 - i * 6}; Rotation: {0, -0.34 * side, 0}; Box: {2.5, 0.12, 3.8} }
-      }
+  "brace_{i}" : Titanium { Position: {(8 + i * 1.8) * side, 3, 10 - i * 6}; Rotation: {0, -0.34 * side, 0}; Box: {3.6, 0.4, 0.55} }
+  "stripe_{i}" : RustRed { Position: {(6.8 + i * 2.1) * side, 4.05, 15 - i * 6}; Rotation: {0, -0.34 * side, 0}; Box: {2.5, 0.12, 3.8} }
 }
   for i in 0..4 {
-    {
-    radiator { FrigateRadiator: {width: 4.6, length: 7.2}; Position: {(4.8 + i * 3.3) * side, 4.3, -7 - i * 9}; Rotation: {0, -0.32 * side, 0} }
-      }
+  "radiator_{i}" { FrigateRadiator: {width: 4.6, length: 7.2}; Position: {(4.8 + i * 3.3) * side, 4.3, -7 - i * 9}; Rotation: {0, -0.32 * side, 0} }
 }
   tip_light : IceLight { Position: {27 * side, 3.7, -41}; Box: {0.6, 0.3, 2.1} }
   turret { FrigateTurret: {}; Position: {7 * side, 4.5, -30} }
   for j in 0..12 {
-    {
-    access : DarkArmor { Position: {2.5 * side, 4.4, -38 + j * 3.4}; Box: {2, 0.12, 2.8} }
-    latch : Titanium { Position: {2.8 * side, 4.55, -38 + j * 3.4}; Box: {0.3, 0.1, 0.7} }
-      }
+  "access_{j}" : DarkArmor { Position: {2.5 * side, 4.4, -38 + j * 3.4}; Box: {2, 0.12, 2.8} }
+  "latch_{j}" : Titanium { Position: {2.8 * side, 4.55, -38 + j * 3.4}; Box: {0.3, 0.1, 0.7} }
 }
 
   for i in 0..6 {
-    {
+    "feather_bay_{i}" {
       feather : PaleArmor {
         Position: {(7.3 + i * 2.7) * side, 4.25, 4 - i * 7.4}
         Rotation: {0, -0.34 * side, 0}

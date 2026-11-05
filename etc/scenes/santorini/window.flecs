@@ -11,7 +11,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template IslandWindow {
   prop tint: Rgb = {27, 86, 171}
   prop shutters: bool = true
@@ -29,7 +28,8 @@ template IslandWindow {
     Position: {0, 0, 0.105}
     Box: {0.62, 0.88, 0.02}
     Rgb: {81, 139, 162}
-    PbrMaterial: {roughness: 0.22, metallic: 0.25}
+    PbrMaterial: {roughness: 0.05}
+    Transmission: IslandGlass
   }
   for side in 0..2 {
     {

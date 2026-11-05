@@ -29,9 +29,7 @@ template LockLiftSpanBody {
 }
 
 template LockLiftSpan : LockControl {
-  const angle = match lock_bridge_up { true: 1.32; _: 0.0 }
-
-  Rotation: {angle, 0, 0}
+  Rotation: {lock_bridge_up ? 1.32 : 0.0, 0, 0}
   Transition: [
     Rotation: {duration: 3.5, timing_function: EaseInOut},
     Tint: {duration: 0.12}
@@ -42,11 +40,10 @@ template LockLiftSpan : LockControl {
   async {
     while true {
       await on.click(this)
-      const now = AppStatus[AppStatus].elapsed
-      if now >= lock_busy_until {
+      if !lock_busy {
         lock_bridge_up = !lock_bridge_up
         hover = false
-        lock_busy_until = now + 3.6
+        emit LockBusy(seconds: 3.6)
       }
     }
   }

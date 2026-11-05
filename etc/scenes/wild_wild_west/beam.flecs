@@ -7,7 +7,6 @@ using box.light
 using box.text
 
 
-@tree Parent
 template WestBeam {
   prop ax: f32 = 0
   prop ay: f32 = 0

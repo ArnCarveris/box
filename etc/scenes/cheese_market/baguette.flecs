@@ -10,7 +10,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template Baguette {
   loaf {
     Position: {0, 0.12, 0}

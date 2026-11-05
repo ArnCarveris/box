@@ -432,6 +432,7 @@
                     "dynamics",
                     "delay",
                     "modulation",
+                    "pitch_shifter",
                     "saturator",
                     "transient_shaper",
                     "frequency_shifter",
@@ -719,6 +720,21 @@
                     "render_sizes",
                     "component",
                     "script"
+                ]
+            },
+            {
+                "id": "PitchShifter",
+                "testcases": [
+                    "octave_up",
+                    "octave_down",
+                    "stereo_detune",
+                    "feedback_bounded",
+                    "shimmer_octave",
+                    "shimmer_bounded",
+                    "shimmer_zero_identical",
+                    "render_identical",
+                    "silent_after_tail",
+                    "component"
                 ]
             },
             {

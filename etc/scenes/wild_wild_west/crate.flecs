@@ -7,7 +7,6 @@ using box.light
 using box.text
 
 
-@tree Parent
 template WestCrate {
   for side in 0..2 {
     for row in 0..4 {
@@ -17,7 +16,7 @@ template WestCrate {
     for end in 0..2 {
       { Position: {(end - 0.5) * 0.82, 0.4, (side - 0.5) * 0.94}; Box: {0.1, 0.8, 0.08}; Rgb: {115, 75, 40} }
       for nail in 0..2 {
-        { Position: {(end - 0.5) * 0.82, 0.1 + nail * 0.6, (side - 0.5) * 1.03}; Sphere: {radius: 0.018, segments: 6}; Rgb: {49, 51, 48} }
+        { (IsA, WestIron); Position: {(end - 0.5) * 0.82, 0.1 + nail * 0.6, (side - 0.5) * 1.03}; Sphere: {radius: 0.018, segments: 6} }
       }
     }
     WestBeam(ax: -0.38, ay: 0.09, az: (side - 0.5) * 0.95, bx: 0.38, by: 0.71, bz: (side - 0.5) * 0.95, width: 0.075) {}

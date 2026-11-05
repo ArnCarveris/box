@@ -40,8 +40,9 @@ _Static_assert(sizeof(Sheen) <= BOX_RENDER_TRANSITION_VALUE, "Sheen fits a value
 _Static_assert(sizeof(DiffuseTransmission) <= BOX_RENDER_TRANSITION_VALUE,
     "DiffuseTransmission fits a value");
 _Static_assert(sizeof(BoxShadow) <= BOX_RENDER_TRANSITION_VALUE, "BoxShadow fits a value");
+_Static_assert(sizeof(Border) <= BOX_RENDER_TRANSITION_VALUE, "Border fits a value");
 _Static_assert(BOX_RENDER_TRANSITION_VALUE % sizeof(float) == 0, "A value holds floats");
-_Static_assert(BOX_RENDER_TRANSITION_COMPONENTS <= 16,
+_Static_assert(BOX_RENDER_TRANSITION_COMPONENTS <= 32,
     "box_draw_transition_material_t.present holds a bit per component");
 
 /** Layout of every transitionable component, indexed by box_render_transition_component_t */
@@ -120,7 +121,14 @@ static const box_render_transition_layout_t box_transition_layouts[
         BOX_TRANSITION_U8(BoxShadow, color.r),
         BOX_TRANSITION_U8(BoxShadow, color.g),
         BOX_TRANSITION_U8(BoxShadow, color.b),
-        BOX_TRANSITION_U8(BoxShadow, color.a) } }
+        BOX_TRANSITION_U8(BoxShadow, color.a) } },
+    [BOX_RENDER_TRANSITION_BORDER] = { ECS_SIZEOF(Border), 6, {
+        BOX_TRANSITION_FLOAT(Border, width),
+        BOX_TRANSITION_FLOAT(Border, radius),
+        BOX_TRANSITION_U8(Border, color.r),
+        BOX_TRANSITION_U8(Border, color.g),
+        BOX_TRANSITION_U8(Border, color.b),
+        BOX_TRANSITION_U8(Border, color.a) } }
 };
 
 const box_render_transition_layout_t* box_render_transition_layout(
@@ -242,6 +250,71 @@ void box_render_transition_widen(
     }
 done:
     return;
+}
+
+bool box_render_transition_neutral(
+    box_render_transition_component_t component,
+    const void *target,
+    void *out)
+{
+    float value[BOX_RENDER_TRANSITION_VALUE / sizeof(float)];
+    bool result = true;
+    ecs_os_memcpy(value, target, BOX_RENDER_TRANSITION_VALUE);
+    switch (component) {
+    case BOX_RENDER_TRANSITION_ROTATION:
+        *(Rotation*)value = (Rotation){0};
+        break;
+    case BOX_RENDER_TRANSITION_SCALE:
+        *(Scale*)value = (Scale){1.0f, 1.0f, 1.0f};
+        break;
+    case BOX_RENDER_TRANSITION_OPACITY:
+        ((Opacity*)value)->value = 1.0f;
+        break;
+    case BOX_RENDER_TRANSITION_TINT:
+        ((Tint*)value)->a = 0;
+        break;
+    case BOX_RENDER_TRANSITION_EMISSIVE:
+        ((Emissive*)value)->strength = 0.0f;
+        break;
+    case BOX_RENDER_TRANSITION_PBR_MATERIAL:
+        ((PbrMaterial*)value)->metallic = BOX_MATERIAL_METALLIC;
+        ((PbrMaterial*)value)->roughness = BOX_MATERIAL_ROUGHNESS;
+        break;
+    case BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM:
+        ((TextureTransform*)value)->scale_x = 1.0f;
+        ((TextureTransform*)value)->scale_y = 1.0f;
+        ((TextureTransform*)value)->offset_x = 0.0f;
+        ((TextureTransform*)value)->offset_y = 0.0f;
+        break;
+    case BOX_RENDER_TRANSITION_CLEAR_COAT:
+        ((ClearCoat*)value)->strength = 0.0f;
+        break;
+    case BOX_RENDER_TRANSITION_ANISOTROPY:
+        ((SpecularAnisotropy*)value)->strength = 0.0f;
+        break;
+    case BOX_RENDER_TRANSITION_SHEEN:
+        ((Sheen*)value)->color = (Rgb){0, 0, 0};
+        break;
+    case BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION:
+        ((DiffuseTransmission*)value)->factor = 0.0f;
+        ((DiffuseTransmission*)value)->thickness = 0.0f;
+        ((DiffuseTransmission*)value)->blur = 0.0f;
+        break;
+    case BOX_RENDER_TRANSITION_BOX_SHADOW:
+        ((BoxShadow*)value)->color.a = 0;
+        break;
+    case BOX_RENDER_TRANSITION_POSITION:
+    case BOX_RENDER_TRANSITION_RGB:
+    case BOX_RENDER_TRANSITION_ALPHA_CUTOFF:
+    case BOX_RENDER_TRANSITION_TRANSMISSION:
+    case BOX_RENDER_TRANSITION_COMPONENTS:
+        result = false;
+        break;
+    }
+
+    ecs_os_memcpy(out, value, BOX_RENDER_TRANSITION_VALUE);
+
+    return result;
 }
 
 float box_render_transition_progress(
@@ -736,43 +809,6 @@ done:
     return result;
 }
 
-/** Get the value of a component in the target material of a material or shading record.
- *
- * @param material The material
- * @param component The component
- * @return The value, NULL for a component that is not a material component
- */
-static void* box_transition_material_value(
-    box_draw_transition_material_t *material,
-    box_render_transition_component_t component)
-{
-    void *result = NULL;
-    switch (component) {
-    case BOX_RENDER_TRANSITION_RGB: result = &material->color; break;
-    case BOX_RENDER_TRANSITION_ALPHA_CUTOFF: result = &material->cutoff; break;
-    case BOX_RENDER_TRANSITION_PBR_MATERIAL: result = &material->pbr; break;
-    case BOX_RENDER_TRANSITION_EMISSIVE: result = &material->emissive; break;
-    case BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM: result = &material->uv; break;
-    case BOX_RENDER_TRANSITION_TRANSMISSION: result = &material->transmission; break;
-    case BOX_RENDER_TRANSITION_CLEAR_COAT: result = &material->clear_coat; break;
-    case BOX_RENDER_TRANSITION_ANISOTROPY: result = &material->anisotropy; break;
-    case BOX_RENDER_TRANSITION_SHEEN: result = &material->sheen; break;
-    case BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION:
-        result = &material->diffuse_transmission;
-        break;
-    case BOX_RENDER_TRANSITION_OPACITY: result = &material->opacity; break;
-    case BOX_RENDER_TRANSITION_TINT: result = &material->tint; break;
-    case BOX_RENDER_TRANSITION_POSITION:
-    case BOX_RENDER_TRANSITION_ROTATION:
-    case BOX_RENDER_TRANSITION_SCALE:
-    case BOX_RENDER_TRANSITION_BOX_SHADOW:
-    case BOX_RENDER_TRANSITION_COMPONENTS:
-        break;
-    }
-
-    return result;
-}
-
 /** Replace the value of each component of a material that has a node by the value the node
  * renders.
  *
@@ -788,7 +824,7 @@ static void box_transition_material_rendered(
         box_render_transition_component_t component = (box_render_transition_component_t)c;
         const box_render_transition_node_t *node = material->nodes[c]
             ? box_transition_node_get(t, material->nodes[c]) : NULL;
-        void *value = box_transition_material_value(material, component);
+        void *value = box_draws_transition_value(material, component);
         if (!node || !node->alive || !node->values[c].present || !value ||
             !(material->present & (1u << c)))
         {

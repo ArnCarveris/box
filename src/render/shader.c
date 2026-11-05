@@ -20,6 +20,8 @@ typedef struct box_shader_t {
     bool dirty;             /**< Preprocess before the next send */
     bool sent;              /**< The backend received code under the handle */
     bool pending;           /**< The code changed since the backend received it */
+    int32_t awaited;        /**< Revision the GPU backend compiles whose outcome did not arrive,
+                             *   0 for none */
     int32_t revision;       /**< Times preprocessing produced new code */
     char *code;             /**< Last code that preprocessed without error */
     char *gpu_error;        /**< Error of the newest GPU outcome, NULL when it compiled */
@@ -39,6 +41,12 @@ typedef struct box_shader_state_t {
     int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
     int32_t watch;              /**< Kind of the shaders in the file watch */
     int32_t refs;               /**< Observers and systems that use the state */
+    box_task_id_t task;         /**< Report of the compiles in flight, 0 while there are none */
+    int32_t sent;               /**< Modules sent to the GPU backend to compile */
+    int32_t arrived;            /**< Outcomes of awaited modules that arrived */
+    int32_t sent_base;          /**< sent before the modules of the report */
+    int32_t arrived_base;       /**< arrived when the report started */
+    int32_t pipelines_base;     /**< Pipelines the backend had created when the report started */
 } box_shader_state_t;
 
 ECS_COMPONENT_DECLARE(Shader);
@@ -404,6 +412,7 @@ static void box_shader_backend(
     while (ecs_map_next(&it)) {
         box_shader_t *s = ecs_map_ptr(&it);
         s->sent = false;
+        s->awaited = 0;
     }
 
     ecs_vec_clear(&state->destroyed);
@@ -583,6 +592,11 @@ static void box_shader_results(
                 continue;
             }
 
+            if (s->awaited && r.revision >= s->awaited) {
+                s->awaited = 0;
+                state->arrived ++;
+            }
+
             ecs_os_free(s->gpu_error);
             s->gpu_error = r.message ? box_shader_map_message(s, r.message) : NULL;
             r.message = NULL;
@@ -598,6 +612,68 @@ static void box_shader_results(
         }
 
         ecs_os_free(r.message);
+    }
+}
+
+/** Await the outcome of a shader the GPU backend received, unless the backend drops it: the
+ * shadow clip shader of a device without clip distances.
+ *
+ * @param state The module state
+ * @param s The shader
+ * @param stats Counters of the GPU backend
+ */
+static void box_shader_await(
+    box_shader_state_t *state,
+    box_shader_t *s,
+    const box_render_gpu_stats_t *stats)
+{
+    if (s->handle != BOX_RENDER_SHADER_SHADOW_CLIP || stats->clip_distances) {
+        s->awaited = s->revision;
+        state->sent ++;
+    }
+}
+
+/** Report the shader modules whose outcome did not arrive and the pipelines being created as
+ * BOX_TASK_SHADERS, blocking. The task ends once every module arrived and no pipeline is
+ * being created; its units are the modules and the pipelines since it started.
+ *
+ * @param world The world or a stage
+ * @param state The module state
+ * @param stats Counters of the GPU backend
+ */
+static void box_shader_report(
+    ecs_world_t *world,
+    box_shader_state_t *state,
+    const box_render_gpu_stats_t *stats)
+{
+    int32_t waiting = 0;
+    ecs_map_iter_t it = ecs_map_iter(&state->shaders);
+    while (ecs_map_next(&it)) {
+        box_shader_t *s = ecs_map_ptr(&it);
+        if (stats->failed) {
+            s->awaited = 0;
+        }
+
+        waiting += s->awaited != 0;
+    }
+
+    bool busy = waiting || stats->pipelines_building > 0;
+    if (busy && !state->task) {
+        state->task = box_task_start(world, BOX_TASK_SHADERS, true, 0);
+        state->sent_base = state->sent - waiting;
+        state->arrived_base = state->arrived;
+        state->pipelines_base = stats->pipelines;
+    }
+
+    if (busy) {
+        int32_t built = stats->pipelines - state->pipelines_base;
+        int32_t modules = state->sent - state->sent_base;
+        int32_t arrived = state->arrived - state->arrived_base;
+        box_task_set(world, state->task, arrived + built,
+            modules + built + stats->pipelines_building);
+    } else if (state->task) {
+        box_task_end(world, state->task);
+        state->task = 0;
     }
 }
 
@@ -638,7 +714,14 @@ static void BoxShaderExtract(
 
         if (s->code && (!s->sent || s->pending)) {
             box_shader_send(world, s);
+            if (gpu && !stats.failed) {
+                box_shader_await(state, s, &stats);
+            }
         }
+    }
+
+    if (gpu) {
+        box_shader_report(world, state, &stats);
     }
 }
 
@@ -743,6 +826,7 @@ void BoxShaderImport(
 {
     ECS_MODULE(world, BoxShader);
     ECS_IMPORT(world, BoxRender);
+    ECS_IMPORT(world, BoxTask);
 
     ECS_META_COMPONENT(world, Shader);
     ECS_META_COMPONENT(world, ShaderStatus);
