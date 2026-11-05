@@ -155,7 +155,6 @@ void SynthWavetableAsset_saw_to_square(void) {
         peak = v > peak ? v : peak;
     }
 
-    printf("peak of level 0 of the table %g\n", (double)peak);
     test_assert(peak > 0.97f && peak < 1.03f);
 
     const float *saw = data + BOX_AUDIO_TABLE_HEADER;
@@ -232,7 +231,10 @@ void SynthWavetableAsset_frame_size(void) {
 
 /** A table whose sound still decodes has no frames, so its layers play the sine of the
  * fallback; once the sound is ready the table is built, the synth sound takes it, and the
- * next play has the harmonics of the saw of frame 0. */
+ * next play has the harmonics of the saw of frame 0.
+ *
+ * The decode completes at the start of the second frame, so the first play is queued before
+ * the first frame, while the sound loads. */
 void SynthWavetableAsset_not_ready_fallback(void) {
     // audio/synth
     ecs_world_t *world = wta_world();
@@ -241,18 +243,21 @@ void SynthWavetableAsset_not_ready_fallback(void) {
     int32_t start;
     audio_log_start();
     wta_script(world);
-    audio_run(world, 1);
     file = ecs_lookup(world, "SawSquareFile");
     table = ecs_lookup(world, "SawSquare");
     morph = ecs_lookup(world, "Morph");
+    test_assert(file != 0 && table != 0 && morph != 0);
+
+    start = audio_tap_count;
+    test_assert(box_audio_play(world, morph, 1.0f));
+    audio_run(world, 1);
     test_int(ecs_get(world, file, SoundStatus)->state, SoundLoading);
     w = ecs_get(world, table, AudioWavetable);
     test_int(w->id, 0);
     test_int(w->frames, 0);
     test_int(ecs_get(world, morph, AudioSynth)->patch.layer[0].table, 0);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 1);
 
-    start = audio_tap_count;
-    test_assert(box_audio_play(world, morph, 1.0f));
     audio_run(world, 6);
     test_int(wta_harmonics(start + 2 * AUDIO_FRAME), 1);
 
