@@ -12,7 +12,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template IslandOlive {
   IslandPot(size: 1.8) { Position: {} }
   IslandBeam(ay: 0.5, bx: 0.1, by: 2.1, radius: 0.095) {}

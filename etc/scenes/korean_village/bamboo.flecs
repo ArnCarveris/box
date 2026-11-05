@@ -4,14 +4,33 @@ using box.transform
 using box.geometry
 using box.material
 
-@tree Parent
 template KoreanBamboo {
   prop height: f32 = 7
   prop tone: i32 = 0
   const joint = height / 7.0
-  for node in 0..7 {
-    { Position: {0, (node + 0.5) * joint, 0}; Cylinder: {radius: 0.06 - node * 0.004, length: joint, segments: 8, smooth: true}; Rgb: {96 + tone * 10, 132 + tone * 9, 72 + tone * 5}; PbrMaterial: {roughness: 0.48} }
-    { Position: {0, node * joint, 0}; Torus: {radius: 0.06 - node * 0.004, tube: 0.008, segments: 10, rings: 4}; Rgb: {70, 92, 54} }
+  stalk_path {
+    Path3D: {
+      start: {0, 0, 0},
+      segments: [
+        {kind: CatmullRom, end: {0.02 * height * 0.0204082, height * 0.142857, 0}},
+        {kind: CatmullRom, end: {0.02 * height * 0.0816327, height * 0.285714, 0}},
+        {kind: CatmullRom, end: {0.02 * height * 0.183673, height * 0.428571, 0}},
+        {kind: CatmullRom, end: {0.02 * height * 0.326531, height * 0.571429, 0}},
+        {kind: CatmullRom, end: {0.02 * height * 0.510204, height * 0.714286, 0}},
+        {kind: CatmullRom, end: {0.02 * height * 0.734694, height * 0.857143, 0}},
+        {kind: CatmullRom, end: {0.02 * height * 1, height * 1, 0}}
+      ]
+    }
+  }
+  stalk {
+    Position: {0, 0, 0}
+    Sweep: {path: stalk_path, profile: KoreanRoundProfile, scale: {0.062, 0.062}, taper: 0.55, rings: 40}
+    Rgb: {96 + tone * 10, 132 + tone * 9, 72 + tone * 5}
+    PbrMaterial: {roughness: 0.48}
+  }
+  for node in 1..7 {
+    const t = node / 7.0
+    { Position: {0.02 * height * t * t, node * joint, 0}; Rotation: {0, 0, 0 - math.atan(0.04 * t)}; Torus: {radius: 0.062 * (1 - 0.45 * t), tube: 0.008, segments: 10, rings: 4}; Rgb: {70, 92, 54} }
   }
   for spray in 0..7 {
     const a = spray * 2.4 + tone

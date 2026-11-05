@@ -1,3 +1,4 @@
+include materials
 include tree_limb
 include blossom_spray
 using flecs.script
@@ -12,7 +13,6 @@ using box.surface
 using box.controllers
 using box.movement
 
-@tree Parent
 template CherryTree {
   prop variant: i32 = 0
 
@@ -25,15 +25,31 @@ template CherryTree {
       bx: math.cos(angle) * 0.47, by: 0.025, bz: math.sin(angle) * 0.47,
       base: 0.1, tip: 0.018)
   }
-  TreeLimb trunk_base(ax: 0, ay: 0.04, az: 0, bx: -0.12, by: 0.72, bz: 0.04,
-    base: 0.235, tip: 0.17, markings: true)
-  TreeLimb trunk_bend(ax: -0.12, ay: 0.69, az: 0.04, bx: 0.05, by: 1.35, bz: 0.09,
-    base: 0.175, tip: 0.125, markings: true)
-  TreeLimb trunk_fork(ax: 0.05, ay: 1.32, az: 0.09, bx: 0.13, by: 1.98, bz: -0.03,
-    base: 0.13, tip: 0.085, markings: true)
-  TreeLimb leader(ax: 0.13, ay: 1.94, az: -0.03, bx: 0, by: 2.65, bz: 0.1,
-    base: 0.09, tip: 0.025)
-
+  trunk_path {
+    Path3D: {
+      start: {0, 0.04, 0},
+      segments: [
+        {kind: CatmullRom, end: {-0.12, 0.7, 0.04}},
+        {kind: CatmullRom, end: {0.05, 1.335, 0.09}},
+        {kind: CatmullRom, end: {0.13, 1.96, -0.03}},
+        {kind: CatmullRom, end: {0, 2.65, 0.1}}
+      ]
+    }
+  }
+  trunk {
+    Position: {0, 0, 0}
+    Sweep: {path: trunk_path, profile: GardenRoundProfile, scale: {0.235, 0.235}, taper: 0.11, rings: 48}
+    Rgb: {119, 85, 74}
+    PbrMaterial: {roughness: 0.95}
+  }
+  for i in 0..24 {
+    const v = 0.03 + i * 0.03
+    {
+      SurfaceAttachment: {target: trunk, region: SurfaceOuter, u: i * 0.382 - math.floor(i * 0.382), v: v, offset: -0.002}
+      Box: {0.17 * (1 - v * 0.89), 0.012, 0.008}
+      Rgb: {151, 112, 95}
+    }
+  }
   for i in 0..6 {
     const angle = i * 2.4 + phase
     const shoulder_x = 0.08 + math.cos(angle) * 0.62

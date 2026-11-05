@@ -4,7 +4,6 @@ using box.transform
 using box.geometry
 using box.material
 
-@tree Parent
 template KoreanBench {
   for plank in 0..3 {
     { (IsA, KoreanTimber); Position: {0, 0.45, (plank - 1) * 0.2}; Box: {2.5, 0.13, 0.185} }
