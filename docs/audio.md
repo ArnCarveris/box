@@ -1392,14 +1392,9 @@ lanes {
 An `AudioBus` automates `volume`, `pan`, `width` and the `level` of its sends; the
 master automates its `volume`, `pan` and `width`. An effect automates every float
 member of its effect component: Reverb, Equalizer bands, AudioFilter, Compressor,
-<<<<<<< HEAD
-Gate, Delay, Phaser, Chorus, Saturator and later effects. An
+Gate, Delay, Phaser, Chorus, Saturator, Rotary and later effects. An
 [AudioMacro](#macros) automates its `value`, which moves all its maps. Kinds, slopes,
 stages, voices, entities and bools are not continuous and not automatable. A clip whose
-=======
-Gate, Delay, Phaser, Chorus, Saturator, Rotary and later effects. Kinds, slopes, stages,
-voices, entities and bools are not continuous and not automatable. A clip whose
->>>>>>> 4a3c99cc6a7977b5654a9e47fad3bf56d4bf8f6d
 target, component or member is unknown or not automatable logs one error that
 names it and does nothing until it changes.
 

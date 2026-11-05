@@ -472,11 +472,8 @@
                     "synth_comb",
                     "synth_routes",
                     "modulators",
-<<<<<<< HEAD
-                    "macros"
-=======
+                    "macros",
                     "pattern_gate"
->>>>>>> 4a3c99cc6a7977b5654a9e47fad3bf56d4bf8f6d
                 ]
             },
             {

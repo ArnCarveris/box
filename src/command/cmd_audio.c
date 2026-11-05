@@ -2,12 +2,8 @@
  * @file command/cmd_audio.c
  * @brief The audio command: the status of the audio, its transport, its buses and their insert
  * slots, its instruments, its tracks with their note and audio placements, sounding notes and
-<<<<<<< HEAD
- * playing audio clips, its macros with their maps, the master
-=======
- * playing audio clips, its emitters with their plays and skips, the master
->>>>>>> 4a3c99cc6a7977b5654a9e47fad3bf56d4bf8f6d
- * volume and mute, play, stop, seek and tempo, and captures of the master output to a WAV
+ * playing audio clips, its emitters with their plays and skips, its macros with their maps, the
+ * master volume and mute, play, stop, seek and tempo, and captures of the master output to a WAV
  * resource.
  *
  * The actions only write AudioSettings or Transport, which box.audio sends to the core at the
@@ -776,10 +772,6 @@ static void box_cmd_audio_tracks(
     ecs_query_fini(q);
 }
 
-<<<<<<< HEAD
-/** Append the macros: each with its value and whether it runs, and its maps with their member,
- * range, curve, the value the member has at the value of the component and whether they run.
-=======
 /** Get the name of an emitter shape as the audio command prints it.
  *
  * @param shape The shape
@@ -802,12 +794,64 @@ static const char* box_cmd_audio_shape(
 
 /** Append the lines of the emitters: the sound, the shape, the intervals, the plays sent and
  * skipped and the plays that sound.
->>>>>>> 4a3c99cc6a7977b5654a9e47fad3bf56d4bf8f6d
  *
  * @param world The world
  * @param buf The output
  */
-<<<<<<< HEAD
+static void box_cmd_audio_emitters(
+    ecs_world_t *world,
+    ecs_strbuf_t *buf)
+{
+    int32_t i;
+    ecs_query_t *q = ecs_query(world, {
+        .terms = {
+            { .id = ecs_id(AudioEmitter), .inout = EcsIn, .src.id = EcsSelf },
+            { .id = ecs_id(AudioEmitterState), .inout = EcsIn, .src.id = EcsSelf,
+                .oper = EcsOptional }
+        },
+        .flags = EcsQueryMatchDisabled
+    });
+    ecs_iter_t it = ecs_query_iter(world, q);
+    while (ecs_query_next(&it)) {
+        const AudioEmitter *em = ecs_field(&it, AudioEmitter, 0);
+        const AudioEmitterState *es = ecs_field(&it, AudioEmitterState, 1);
+        bool disabled = ecs_table_has_id(world, it.table, EcsDisabled);
+        for (i = 0; i < it.count; i ++) {
+            ecs_entity_t sound = em[i].sound;
+            bool alive = sound && ecs_is_alive(world, sound);
+            char *path = ecs_get_path(world, it.entities[i]);
+            char *name = alive ? ecs_get_path(world, sound) : NULL;
+            ecs_strbuf_append(buf, "\n  emitter %s: sound %s, %s, every %.3f to %.3f s, "
+                "%lld plays, %lld skipped, %d sounding", path, name ? name : "none",
+                box_cmd_audio_shape(em[i].shape), (double)em[i].interval_min,
+                (double)em[i].interval_max, es ? (long long)es[i].plays : 0LL,
+                es ? (long long)es[i].skipped : 0LL, es ? es[i].active : 0);
+            if (em[i].max_active > 0) {
+                ecs_strbuf_append(buf, " of %d", em[i].max_active);
+            }
+
+            if (!em[i].playing) {
+                ecs_strbuf_appendstr(buf, ", stopped");
+            }
+
+            if (disabled) {
+                ecs_strbuf_appendstr(buf, ", disabled");
+            }
+
+            ecs_os_free(name);
+            ecs_os_free(path);
+        }
+    }
+
+    ecs_query_fini(q);
+}
+
+/** Append the macros: each with its value and whether it runs, and its maps with their member,
+ * range, curve, the value the member has at the value of the component and whether they run.
+ *
+ * @param world The world
+ * @param buf The output
+ */
 static void box_cmd_audio_macros(
     ecs_world_t *world,
     ecs_strbuf_t *buf)
@@ -857,54 +901,6 @@ static void box_cmd_audio_macros(
             ecs_os_free(path);
         }
     }
-=======
-static void box_cmd_audio_emitters(
-    ecs_world_t *world,
-    ecs_strbuf_t *buf)
-{
-    int32_t i;
-    ecs_query_t *q = ecs_query(world, {
-        .terms = {
-            { .id = ecs_id(AudioEmitter), .inout = EcsIn, .src.id = EcsSelf },
-            { .id = ecs_id(AudioEmitterState), .inout = EcsIn, .src.id = EcsSelf,
-                .oper = EcsOptional }
-        },
-        .flags = EcsQueryMatchDisabled
-    });
-    ecs_iter_t it = ecs_query_iter(world, q);
-    while (ecs_query_next(&it)) {
-        const AudioEmitter *em = ecs_field(&it, AudioEmitter, 0);
-        const AudioEmitterState *es = ecs_field(&it, AudioEmitterState, 1);
-        bool disabled = ecs_table_has_id(world, it.table, EcsDisabled);
-        for (i = 0; i < it.count; i ++) {
-            ecs_entity_t sound = em[i].sound;
-            bool alive = sound && ecs_is_alive(world, sound);
-            char *path = ecs_get_path(world, it.entities[i]);
-            char *name = alive ? ecs_get_path(world, sound) : NULL;
-            ecs_strbuf_append(buf, "\n  emitter %s: sound %s, %s, every %.3f to %.3f s, "
-                "%lld plays, %lld skipped, %d sounding", path, name ? name : "none",
-                box_cmd_audio_shape(em[i].shape), (double)em[i].interval_min,
-                (double)em[i].interval_max, es ? (long long)es[i].plays : 0LL,
-                es ? (long long)es[i].skipped : 0LL, es ? es[i].active : 0);
-            if (em[i].max_active > 0) {
-                ecs_strbuf_append(buf, " of %d", em[i].max_active);
-            }
-
-            if (!em[i].playing) {
-                ecs_strbuf_appendstr(buf, ", stopped");
-            }
-
-            if (disabled) {
-                ecs_strbuf_appendstr(buf, ", disabled");
-            }
-
-            ecs_os_free(name);
-            ecs_os_free(path);
-        }
-    }
-
-    ecs_query_fini(q);
->>>>>>> 4a3c99cc6a7977b5654a9e47fad3bf56d4bf8f6d
 }
 
 /** Print the status of the audio and the buses in processing order.
@@ -957,11 +953,8 @@ static char* box_cmd_audio_print(
 
     box_cmd_audio_instruments(world, &buf);
     box_cmd_audio_tracks(world, &buf);
-<<<<<<< HEAD
-    box_cmd_audio_macros(world, &buf);
-=======
     box_cmd_audio_emitters(world, &buf);
->>>>>>> 4a3c99cc6a7977b5654a9e47fad3bf56d4bf8f6d
+    box_cmd_audio_macros(world, &buf);
 
     return ecs_strbuf_get(&buf);
 }
@@ -1131,14 +1124,8 @@ void box_cmd_audio_init(
 {
     ECS_IMPORT(world, BoxAudio);
     box_command_register(world,
-<<<<<<< HEAD
-        "Print the audio status, transport, buses, instruments, tracks and macros, set the volume "
-        "or mute, "
-        "play, stop, seek or set the tempo, or capture a WAV",
-=======
-        "Print the audio status, transport, buses, instruments, tracks and emitters, set the "
-        "volume or mute, play, stop, seek or set the tempo, or capture a WAV",
->>>>>>> 4a3c99cc6a7977b5654a9e47fad3bf56d4bf8f6d
+        "Print the audio status, transport, buses, instruments, tracks, emitters and macros, set "
+        "the volume or mute, play, stop, seek or set the tempo, or capture a WAV",
         (ecs_function_desc_t){
             .name = "audio",
             .return_type = ecs_id(ecs_string_t),

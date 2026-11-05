@@ -1703,7 +1703,6 @@ void NoAlloc_modulators(void) {
     test_int(noalloc_frees, 1);
 }
 
-<<<<<<< HEAD
 /** Write a map command of a macro into a core.
  *
  * @param core The core
@@ -1808,7 +1807,12 @@ void NoAlloc_macros(void) {
     audio_render(core, 0, AUDIO_FRAMES / 4);
     test_int(box_audio_core_macro_maps(core), 0);
     test_int(box_audio_core_modulators(core), 0);
-=======
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+}
+
 /* Pattern gates in the insert slots of buses on the beat clock: patterns, accents, swing,
  * gate lengths, floors and mixes that change, seeks and tempo changes of the clock, step
  * changes scheduled ahead, a move to another bus, silence in which they rest and a removal,
@@ -1882,7 +1886,6 @@ void NoAlloc_pattern_gate(void) {
         test_assert(!box_audio_core_effect_running(core, i));
     }
 
->>>>>>> 4a3c99cc6a7977b5654a9e47fad3bf56d4bf8f6d
     test_int(noalloc_allocs, 1);
     test_int(noalloc_frees, 0);
     box_audio_core_free(core);
