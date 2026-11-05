@@ -1198,5 +1198,5 @@ void TextureGen_palette_ignored_for_normal(void) {
 
 void TextureGen_hash_blocks_tones(void) {
     // materials/textures
-    test_hash(GEN_BLOCKS_TONES, "blocks_tones", 0x00000000U);
+    test_hash(GEN_BLOCKS_TONES, "blocks_tones", 0xc39e2c64U);
 }
