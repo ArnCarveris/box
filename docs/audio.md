@@ -306,10 +306,9 @@ falls by 3 dB per octave, or `SynthNoiseBrown`, which falls by 6 dB per octave. 
 filters the white noise through a cascade of poles and zeros two octaves apart, brown
 through a leaky integrator and a highpass that removes its DC. The filters are set in
 Hz from the sample rate, flat under 5 Hz (pink) or 10 Hz (brown), so the slope holds
-at every rate. Each color is at about the
-RMS level of white noise at the same `level`. The noise stays seeded per play from
-`SynthSound.seed`, so colored noise is as deterministic as white, and each unison
-voice colors its own noise. Other waves ignore it.
+at every rate. Each color is at about the RMS level of white noise at the same `level`.
+The noise stays seeded per play from `SynthSound.seed`, so colored noise is as
+deterministic as white, and each unison voice colors its own noise. Other waves ignore it.
 
 `sync` hard syncs a layer, for sync leads and sync sweeps. The layer's note frequency,
 with its sweep, glide, pitch LFOs, unison detune and the voice pitch, is the master;
