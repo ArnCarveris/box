@@ -387,6 +387,16 @@ sampler over `release` seconds (0.05). With gate false, a hit plays as authored,
 regardless of duration. A nonlooping sample can end before its gate. Sampler notes
 start without the usual 5 ms fade to preserve transients.
 
+`spread` (0..1, default 0) spreads the notes of a synth or a sampler over the
+stereo field without a pan per note. Its offset is added to the note's `pan` and
+the sum is clamped to -1..1. `spread_mode` picks the offset:
+
+| Spread mode | Offset |
+| --- | --- |
+| `InstrumentSpreadPitch` (default) | `spread * clamp((pitch - root) / 24, -1, 1)`: low notes left, high notes right, full two octaves from the root |
+| `InstrumentSpreadRandom` | `spread` times a random value in -1..1 per note, seeded from the instrument and its note count, so a song renders the same every time |
+| `InstrumentSpreadAlternate` | `+spread` and `-spread` on successive notes |
+
 A `NoteClip` has a `length` (4 beats) and notes with `start`, `duration`, `pitch`,
 `velocity` (1) and `pan` (0). A `Track` supplies the instrument and brings an
 `AudioBus`. Its child `ClipPlacement` entities arrange clips:

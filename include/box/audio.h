@@ -731,6 +731,18 @@ ECS_STRUCT(Transport, {
                             *   bar, default false */
 });
 
+/** How an Instrument spreads its notes over the stereo field. Each mode gives an offset that
+ * is added to the pan of a note, the sum clamped to -1..1. */
+ECS_ENUM(InstrumentSpreadMode, {
+    InstrumentSpreadPitch,     /**< spread * clamp((pitch - root) / 24, -1, 1): lower notes to
+                                *   the left, higher ones to the right, all the way two octaves
+                                *   from the root */
+    InstrumentSpreadRandom,    /**< spread * a random value in -1..1 per note, seeded from the
+                                *   instrument and the count of its notes, so the same song
+                                *   renders the same */
+    InstrumentSpreadAlternate  /**< +spread and -spread on successive notes */
+});
+
 /** An instrument: a synth or a sampler that plays notes with a pitch, a velocity, a pan and a
  * duration, ad hoc with box_audio_play_note, on the bus of its AudioOutput, else of its sound.
  *
@@ -752,6 +764,10 @@ ECS_STRUCT(Instrument, {
                             *   sound as authored, like a drum hit */
     float release;         /**< Seconds a sampler note fades out over after its end, default
                             *   0.05; a synth uses the release of its envelopes */
+    float spread;          /**< 0..1, default 0: how far the notes spread over the stereo
+                            *   field, an offset added to the pan of each note */
+    InstrumentSpreadMode spread_mode; /**< How the notes spread, default
+                            *   InstrumentSpreadPitch */
 });
 
 /** A note of a NoteClip, in beats from the start of the clip */

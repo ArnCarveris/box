@@ -587,6 +587,8 @@ typedef struct box_audio_module_t {
     uint8_t order[BOX_AUDIO_BUS_MAX]; /**< Bus indices of the last valid order, master last */
     int32_t order_count;          /**< Buses in order */
     ecs_map_t voices;             /**< Voice handle to source entity */
+    ecs_map_t spread_notes;       /**< Instrument entity to the count of the notes it played,
+                                   *   for the random and alternate spread */
     ecs_vec_t oneshots;           /**< box_audio_oneshot_t */
     ecs_vec_t plays;              /**< box_audio_play_t */
     ecs_vec_t notes;              /**< box_audio_note_t */

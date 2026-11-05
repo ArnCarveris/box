@@ -140,7 +140,14 @@
                     "legato_notes",
                     "legato_after_release",
                     "legato_cancels_release",
-                    "stop_cancels_release"
+                    "stop_cancels_release",
+                    "spread_defaults",
+                    "spread_pitch",
+                    "spread_pitch_render",
+                    "spread_alternate",
+                    "spread_random",
+                    "spread_zero",
+                    "spread_clamped"
                 ]
             },
             {

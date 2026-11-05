@@ -980,6 +980,7 @@ static void box_audio_module_free(
     (void)world;
     ecs_os_free(state->writer.data);
     ecs_map_fini(&state->voices);
+    ecs_map_fini(&state->spread_notes);
     ecs_vec_fini_t(NULL, &state->oneshots, box_audio_oneshot_t);
     ecs_vec_fini_t(NULL, &state->plays, box_audio_play_t);
     ecs_vec_fini_t(NULL, &state->notes, box_audio_note_t);
@@ -1139,6 +1140,7 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, Transport);
     ECS_META_COMPONENT(world, AudioQuantize);
     ecs_set_hooks(world, Transport, { .ctor = box_audio_transport_ctor });
+    ECS_META_COMPONENT(world, InstrumentSpreadMode);
     ECS_META_COMPONENT(world, Instrument);
     ecs_set_hooks(world, Instrument, { .ctor = box_audio_instrument_ctor });
     ECS_META_COMPONENT(world, Note);
@@ -1200,6 +1202,7 @@ void BoxAudioImport(
     state->master = master;
     ecs_os_memset(state->keys, BOX_AUDIO_BUS_NONE, ECS_SIZEOF(state->keys));
     ecs_map_init(&state->voices, NULL);
+    ecs_map_init(&state->spread_notes, NULL);
     ecs_vec_init_t(NULL, &state->oneshots, box_audio_oneshot_t, 0);
     ecs_vec_init_t(NULL, &state->plays, box_audio_play_t, 0);
     ecs_vec_init_t(NULL, &state->notes, box_audio_note_t, 0);
