@@ -741,7 +741,7 @@ typedef struct box_audio_delay_params_t {
 #define BOX_AUDIO_MODULATION_RATE_MAX 20.0f
 
 /** Seconds of a change of the depth, the center, the feedback, the mix or the stereo offset of
- * a phaser, of the depth, the delay, the mix or the spread of a chorus, and of each half of the
+ * a phaser, of the depth, the delay, the mix, the spread or the feedback of a chorus, and of each half of the
  * fade of the wet signal around a change of the stages of a phaser or the voices of a chorus */
 #define BOX_AUDIO_MODULATION_RAMP 0.02f
 
@@ -793,12 +793,18 @@ typedef struct box_audio_phaser_params_t {
 /** Largest depth of a chorus in milliseconds */
 #define BOX_AUDIO_CHORUS_DEPTH_MAX 25.0f
 
+/** Largest feedback of a chorus, either way */
+#define BOX_AUDIO_CHORUS_FEEDBACK_MAX 0.95f
+
 /** The parameters of a chorus, the first floats of the params of its effect command: voices
  * taps of a stereo line on the memory of its slot, each read with linear interpolation at
  * delay plus depth times a sine LFO, the LFOs of the voices spread evenly in phase and the
  * voices panned across the stereo field by the spread. A read never goes further back than
  * BOX_AUDIO_CHORUS_MAX nor nearer than a frame. The LFO starts at phase 0 when the effect is
- * put on and its phase stays continuous through a change of the rate */
+ * put on and its phase stays continuous through a change of the rate. The feedback adds the
+ * first tap of each channel times the feedback to the input of its line, which turns a delay
+ * of 0.1 to 10 ms into a flanger: comb peaks at multiples of 1 / delay, or at its odd
+ * multiples of half that at a negative feedback. A feedback of 0 renders as without it */
 typedef struct box_audio_chorus_params_t {
     float voices;     /**< Taps, 1..BOX_AUDIO_CHORUS_VOICES_MAX, rounded */
     float rate;       /**< Hz of the LFOs, 0..BOX_AUDIO_MODULATION_RATE_MAX */
@@ -807,6 +813,9 @@ typedef struct box_audio_chorus_params_t {
     float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
     float spread;     /**< 0 keeps every voice in the center, so a mono input stays mono; 1 pans
                        *   the first voice left and the last right */
+    float feedback;   /**< Share of the first tap fed back into the lines,
+                       *   -BOX_AUDIO_CHORUS_FEEDBACK_MAX..BOX_AUDIO_CHORUS_FEEDBACK_MAX; NaN
+                       *   is 0 */
 } box_audio_chorus_params_t;
 
 /** Gain before the clipper of a saturator at a drive of 1 in dB; a drive of 0 is 0 dB */

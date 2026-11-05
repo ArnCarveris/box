@@ -792,23 +792,34 @@ ECS_STRUCT(Phaser, {
  * phase and the voices panned across the stereo field by spread:
  * pad { AudioBus: {effects: [pad]}; Chorus: {voices: 3, spread: 1, mix: 0.4} }.
  *
+ * With feedback it is a flanger: the first tap of each channel goes back into its line, so a
+ * delay of 0.1 to 10 ms resonates at multiples of 1000 / delay Hz, and a negative feedback
+ * moves the peaks to the odd multiples of half that, which sounds hollow. Only the first tap
+ * feeds back, so the loop stays stable at any voices; the linear read damps the highs of the
+ * loop a little where the delay falls between frames. A jet sweep on drums:
+ * drums { AudioBus: {effects: [drums]};
+ *         Chorus: {voices: 1, rate: 0.2, delay: 2, depth: 1.8, feedback: 0.7, mix: 0.5} }.
+ *
  * Every chorus runs with its own memory of BOX_AUDIO_CHORUS_MAX milliseconds. The LFOs start
  * when the chorus is put on a channel and run on through a change of the rate without a jump.
- * Depth, delay, mix and spread move over 20 ms; a change of the voices fades the wet signal out
- * and back in over 40 ms. Once its input was silent for 50 ms it stops until its input sounds
- * again.
+ * Depth, delay, mix, spread and feedback move over 20 ms; a change of the voices fades the wet
+ * signal out and back in over 40 ms. Once its input was silent for 50 ms and its feedback rang
+ * out it stops until its input sounds again.
  */
 ECS_STRUCT(Chorus, {
     int32_t voices;        /**< Taps, 1 to 4, default 2 */
     float rate;            /**< Hz of the LFOs, default 0.8, 0 to 20 */
     float depth;           /**< Milliseconds the taps move either way, default 3, 0 to 25 */
     float delay;           /**< Milliseconds of the taps at the middle, default 12, 0 to 50;
-                            *   a tap reads at most 50 ms and at least a frame back */
+                            *   a tap reads at most 50 ms and at least a frame back, so a
+                            *   flanger goes down to about 0.1 ms */
     float mix;             /**< Wet level, 0 to 1, default 0.5; the dry signal passes at
                             *   1 - mix */
     float spread;          /**< 0 to 1, default 0.5: 0 keeps the voices in the center, so a mono
                             *   input stays mono, 1 pans the first voice left and the last
                             *   right */
+    float feedback;        /**< Share of the first tap fed back into the line, -0.95 to 0.95,
+                            *   default 0; 0 renders exactly as without it */
 });
 
 /** A saturator, an effect in an insert slot of an AudioBus, as a Reverb is: warmth, grit or

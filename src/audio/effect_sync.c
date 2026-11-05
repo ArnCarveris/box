@@ -171,6 +171,7 @@ uint32_t box_audio_module_effect_params(
             params[3] = chorus->delay;
             params[4] = chorus->mix;
             params[5] = chorus->spread;
+            params[6] = chorus->feedback;
         }
     } else if (component == ecs_id(Saturator)) {
         const Saturator *saturator = ptr;

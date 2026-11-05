@@ -611,6 +611,10 @@ void NoAlloc_modulation(void) {
             params[3] = 5.0f + 6.0f * (float)(k % 6);
             params[4] = 0.25f * (float)(k % 5);
             params[5] = 0.3f * (float)(k % 4);
+
+            // A flanger that resonates either way, without feedback at the last command so
+            // the tails decay within the renders below
+            params[6] = (k % 2 ? -0.95f : 0.95f) * (float)((k + 1) % 3) * 0.5f;
             test_assert(box_audio_write_effect(&w, 2 + i, BOX_AUDIO_EFFECT_CHORUS, bus, 2 + i,
                 BOX_AUDIO_BUS_NONE, params));
         }

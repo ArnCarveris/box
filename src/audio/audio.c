@@ -235,8 +235,8 @@ static void box_audio_phaser_ctor(
     }
 }
 
-/** Construct Chorus values: 2 voices at 0.8 Hz, 12 ms moved by 3 ms, a mix of 0.5 and a
- * spread of 0.5.
+/** Construct Chorus values: 2 voices at 0.8 Hz, 12 ms moved by 3 ms, a mix of 0.5, a
+ * spread of 0.5 and no feedback.
  *
  * @param ptr The components
  * @param count Number of components
@@ -252,7 +252,7 @@ static void box_audio_chorus_ctor(
     (void)ti;
     for (i = 0; i < count; i ++) {
         values[i] = (Chorus){ .voices = 2, .rate = 0.8f, .depth = 3.0f, .delay = 12.0f,
-            .mix = 0.5f, .spread = 0.5f };
+            .mix = 0.5f, .spread = 0.5f, .feedback = 0.0f };
     }
 }
 

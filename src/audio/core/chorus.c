@@ -14,6 +14,9 @@
 
 #include "internal.h"
 
+/** A tap that reads under this on both channels reads silence, for the tail of the feedback */
+#define BOX_AUDIO_CHORUS_SILENCE 1e-7f
+
 /** Turns per unit of the phase of the LFO */
 #define BOX_AUDIO_CHORUS_TURN (1.0 / 4294967296.0)
 
@@ -82,6 +85,8 @@ static void box_audio_chorus_target(
     ch->target.delay = box_audio_chorus_clamp(p[3], 0, BOX_AUDIO_CHORUS_MAX);
     ch->target.mix = box_audio_chorus_clamp(p[4], 0, 1);
     ch->target.spread = box_audio_chorus_clamp(p[5], 0, 1);
+    ch->target.feedback = p[6] == p[6] ? box_audio_chorus_clamp(p[6],
+        -BOX_AUDIO_CHORUS_FEEDBACK_MAX, BOX_AUDIO_CHORUS_FEEDBACK_MAX) : 0.0f;
     ch->step = (uint32_t)((double)ch->target.rate / (double)core->sample_rate * 4294967296.0);
 }
 
@@ -201,10 +206,12 @@ void box_audio_chorus_start(
     ch->phase = 0;
     ch->control = 0;
     ch->stale = false;
+    ch->still = 0;
     box_audio_ramp_set(&ch->depth, ch->target.depth * ms);
     box_audio_ramp_set(&ch->delay, ch->target.delay * ms);
     box_audio_ramp_set(&ch->spread, ch->target.spread);
     box_audio_ramp_set(&ch->mix, ch->target.mix);
+    box_audio_ramp_set(&ch->feedback, ch->target.feedback);
     box_audio_ramp_set(&ch->feed, 1);
     box_audio_chorus_settle(ch);
     if (fade_in) {
@@ -227,6 +234,7 @@ void box_audio_chorus_command(
     box_audio_ramp_to(&ch->delay, ch->target.delay * ms, controls);
     box_audio_ramp_to(&ch->spread, ch->target.spread, controls);
     box_audio_ramp_to(&ch->mix, ch->target.mix, ramp);
+    box_audio_ramp_to(&ch->feedback, ch->target.feedback, ramp);
     if ((int32_t)ch->target.voices != ch->voices) {
         if (fx->idle) {
             box_audio_chorus_settle(ch);
@@ -284,15 +292,19 @@ static void box_audio_chorus_control(
     }
 }
 
-/** Run the chorus over a block.
+/** Run the chorus over a block. The first tap of each channel times the feedback adds to the
+ * input of its line: one tap through a linear read, whose gain is at most 1, keeps the loop
+ * stable under a feedback of 1 at any voices, and damps its highs a little between frames.
  *
  * @param core The core
  * @param ch The chorus
  * @param l Left samples, the input and the output
  * @param r Right samples
  * @param frames Frames of the block
+ * @return Frames in a row up to the end of the block in which nothing fed back: the feedback
+ * was 0 or the first tap read under BOX_AUDIO_CHORUS_SILENCE
  */
-static void box_audio_chorus_block(
+static int32_t box_audio_chorus_block(
     const box_audio_core_t *core,
     box_audio_chorus_t *ch,
     float *l,
@@ -300,10 +312,11 @@ static void box_audio_chorus_block(
     int32_t frames)
 {
     float *bl = ch->line[0], *br = ch->line[1];
-    int32_t i, v;
+    int32_t i, v, still = 0;
     for (i = 0; i < frames; i ++) {
         float feed = box_audio_ramp_next(&ch->feed);
-        float wl = 0, wr = 0, wet, fade;
+        float fb = box_audio_ramp_next(&ch->feedback);
+        float wl = 0, wr = 0, xl = l[i] * feed, xr = r[i] * feed, wet, fade;
         if (ch->control == 0) {
             box_audio_chorus_control(ch);
             ch->control = BOX_AUDIO_MODULATION_CONTROL;
@@ -317,10 +330,17 @@ static void box_audio_chorus_block(
             wl += m[0] * a + m[1] * b;
             wr += m[2] * a + m[3] * b;
             ch->tap[v] += ch->slope[v];
+            if (v == 0 && fb != 0) {
+                float sum = (a < 0 ? -a : a) + (b < 0 ? -b : b);
+                xl += fb * a;
+                xr += fb * b;
+                still = sum < BOX_AUDIO_CHORUS_SILENCE ? still : -1;
+            }
         }
 
-        bl[ch->pos] = box_audio_clean(l[i] * feed);
-        br[ch->pos] = box_audio_clean(r[i] * feed);
+        still ++;
+        bl[ch->pos] = box_audio_clean(xl);
+        br[ch->pos] = box_audio_clean(xr);
         ch->pos = ch->pos + 1 < ch->length ? ch->pos + 1 : 0;
         ch->valid = ch->valid < ch->length ? ch->valid + 1 : ch->valid;
         ch->phase += ch->step;
@@ -335,6 +355,8 @@ static void box_audio_chorus_block(
             box_audio_ramp_to(&ch->fade, 1, ramp);
         }
     }
+
+    return still;
 }
 
 bool box_audio_chorus_render(
@@ -346,15 +368,19 @@ bool box_audio_chorus_render(
     bool silent)
 {
     box_audio_chorus_t *ch = &fx->data.chorus;
+    int32_t still;
     bool result = false;
     if (ch->stale) {
         ch->stale = false;
         box_audio_chorus_place(ch, ch->phase + (uint32_t)ch->control * ch->step);
     }
 
-    box_audio_chorus_block(core, ch, l, r, frames);
-    if (silent && fx->quiet >= ch->length) {
+    still = box_audio_chorus_block(core, ch, l, r, frames);
+    ch->still = still < frames ? still :
+        (ch->still < (1 << 30) ? ch->still + frames : ch->still);
+    if (silent && fx->quiet >= ch->length && ch->still >= ch->length) {
         ch->valid = 0;
+        ch->still = 0;
         if (ch->swap) {
             box_audio_chorus_settle(ch);
         }
@@ -380,6 +406,7 @@ void box_audio_chorus_rest(
     box_audio_ramp_set(&ch->delay, ch->delay.target);
     box_audio_ramp_set(&ch->spread, ch->spread.target);
     box_audio_ramp_set(&ch->mix, ch->mix.target);
+    box_audio_ramp_set(&ch->feedback, ch->feedback.target);
     box_audio_ramp_set(&ch->feed, ch->feed.target);
     if (ch->swap || ch->voices != (int32_t)ch->target.voices) {
         box_audio_chorus_settle(ch);

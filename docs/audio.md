@@ -174,7 +174,7 @@ their tails end.
 | `Gate` | `threshold: -50` dB, `attack: 0.001` s, `hold: 0.05` s, `release: 0.1` s, `range: -80` dB |
 | `Delay` | `time: 0.25` s, `sync: 0` beats, `feedback: 0.35`, `mix: 0.3`, `ping_pong: false`, `damping: 6000` Hz |
 | `Phaser` | `stages: 4`, `rate: 0.5` Hz, `depth: 0.7`, `center: 800` Hz, `feedback: 0`, `mix: 0.5`, `stereo: 0.5` |
-| `Chorus` | `voices: 2`, `rate: 0.8` Hz, `depth: 3` ms, `delay: 12` ms, `mix: 0.5`, `spread: 0.5` |
+| `Chorus` | `voices: 2`, `rate: 0.8` Hz, `depth: 3` ms, `delay: 12` ms, `mix: 0.5`, `spread: 0.5`, `feedback: 0` |
 | `Saturator` | `drive: 0.3`, `asymmetry: 0`, `bits: 16`, `mix: 1` |
 | `TransientShaper` | `attack: 0`, `sustain: 0` |
 
@@ -190,6 +190,23 @@ the same beats at the same tempo, phase locked to the Transport (see Synth sound
 Time changes crossfade
 between read positions instead of gliding pitch. Use `mix: 1` on a return.
 Phaser stages range from 2 to 12, even; chorus supports up to four voices.
+
+A chorus with `feedback` is a flanger. The first voice's tap feeds back into the
+delay line, so the comb resonates: peaks sit at multiples of `1000 / delay` Hz,
+and a negative feedback moves them to the odd multiples of half that, for the
+hollow flanger sound. Feedback ranges from -0.95 to 0.95; at 0 the chorus sounds
+exactly as without it. For a flanger use one voice, a `delay` of about 0.1 to
+10 ms and a `depth` a little under the delay, so the sweep nearly reaches zero:
+
+```flecs
+drums {
+  AudioBus: {effects: [drums]}
+  Chorus: {voices: 1, rate: 0.2, delay: 2, depth: 1.8, feedback: 0.7, mix: 0.5}
+}
+```
+
+Higher feedback sharpens the jet sweep; a negative one sounds hollow. The tail
+of the feedback rings out before the effect goes idle.
 
 A saturator adds warmth, grit or lo-fi to a drum bus, a synth bus or the master. It
 soft clips each channel with tanh at twice the sample rate, so it aliases less.

@@ -245,10 +245,10 @@ static void box_cmd_audio_effects(
                 (double)phaser->depth, (double)phaser->center, (double)phaser->feedback,
                 (double)phaser->mix, (double)phaser->stereo);
         } else if ((chorus = ecs_get(world, e, Chorus))) {
-            ecs_strbuf_append(buf, "chorus voices %d rate %.2f Hz depth %.1f ms delay %.1f ms "
-                "mix %.2f spread %.2f", chorus->voices, (double)chorus->rate,
+            ecs_strbuf_append(buf, "chorus voices %d rate %.2f Hz depth %.2f ms delay %.2f ms "
+                "mix %.2f spread %.2f feedback %.2f", chorus->voices, (double)chorus->rate,
                 (double)chorus->depth, (double)chorus->delay, (double)chorus->mix,
-                (double)chorus->spread);
+                (double)chorus->spread, (double)chorus->feedback);
         } else if ((saturator = ecs_get(world, e, Saturator))) {
             ecs_strbuf_append(buf, "saturator drive %.2f asymmetry %.2f",
                 (double)saturator->drive, (double)saturator->asymmetry);

@@ -273,7 +273,8 @@ typedef struct box_audio_phaser_t {
 } box_audio_phaser_t;
 
 /** A chorus: a line per channel on the memory of its effect slot, read by up to
- * BOX_AUDIO_CHORUS_VOICES_MAX taps that a sine LFO each moves */
+ * BOX_AUDIO_CHORUS_VOICES_MAX taps that a sine LFO each moves, the first of which feeds back
+ * into the line */
 typedef struct box_audio_chorus_t {
     box_audio_chorus_params_t target; /**< Parameters of the last command, clamped */
     float *line[2];           /**< The lines of the left and the right channel in memory */
@@ -295,11 +296,13 @@ typedef struct box_audio_chorus_t {
     int32_t control;          /**< Frames until the next control block */
     bool stale;               /**< Skipped blocks left the taps behind the phase */
     bool swap;                /**< Waits for the fade to reach 0 to apply the voices */
+    int32_t still;            /**< Frames in a row in which nothing fed back */
     box_audio_ramp_t depth;   /**< Depth in frames, per control block */
     box_audio_ramp_t delay;   /**< Delay in frames, per control block */
     box_audio_ramp_t spread;  /**< Spread, per control block */
     box_audio_ramp_t mix;     /**< Wet level */
     box_audio_ramp_t fade;    /**< Fade of the wet signal around a change of the voices */
+    box_audio_ramp_t feedback; /**< Share of the first tap fed back into the lines */
     box_audio_ramp_t feed;    /**< Fade in of the input after a move */
 } box_audio_chorus_t;
 

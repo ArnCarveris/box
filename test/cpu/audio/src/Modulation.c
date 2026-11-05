@@ -3,8 +3,9 @@
  * @brief The phaser and the chorus kinds of effect in an insert slot of a bus, in offline
  * renders: the notches of the phaser measured from white noise as they move at its rate and as
  * many as its stages make, its stability at full feedback, the reads of the chorus within its
- * delay and depth, its stereo spread, rate changes without a click, the dry mix, the silence
- * rule, bit identical renders, and the Phaser and Chorus components in a world.
+ * delay and depth, its stereo spread, the comb of its feedback as a flanger and its stability,
+ * rate changes without a click, the dry mix, the silence rule, bit identical renders, and the
+ * Phaser and Chorus components in a world.
  */
 
 #include "world.h"
@@ -76,7 +77,7 @@ static box_audio_phaser_params_t md_phaser(
     return (box_audio_phaser_params_t){ stages, rate, depth, center, feedback, mix, stereo };
 }
 
-/** The parameters of a chorus.
+/** The parameters of a chorus without feedback.
  *
  * @param voices Taps
  * @param rate Hz
@@ -94,7 +95,28 @@ static box_audio_chorus_params_t md_chorus(
     float mix,
     float spread)
 {
-    return (box_audio_chorus_params_t){ voices, rate, depth, delay, mix, spread };
+    return (box_audio_chorus_params_t){ voices, rate, depth, delay, mix, spread, 0 };
+}
+
+/** The parameters of a chorus with feedback, a flanger.
+ *
+ * @param voices Taps
+ * @param rate Hz
+ * @param depth Milliseconds
+ * @param delay Milliseconds
+ * @param mix Wet level
+ * @param feedback -0.95..0.95
+ * @return The parameters, at a spread of 0
+ */
+static box_audio_chorus_params_t md_flanger(
+    float voices,
+    float rate,
+    float depth,
+    float delay,
+    float mix,
+    float feedback)
+{
+    return (box_audio_chorus_params_t){ voices, rate, depth, delay, mix, 0, feedback };
 }
 
 /** Send an effect command into insert slot 0 of a bus.
@@ -665,6 +687,247 @@ void Modulation_chorus_delay_range(void) {
     test_int(hi, 1);
 }
 
+/** Gain of a static chorus from white noise per bin of MD_FFT, from the cross spectrum of its
+ * input and its output */
+static double md_comb_gain[MD_FFT / 2];
+
+/** Measure the gain of a static chorus into md_comb_gain: its input is the same core at a mix
+ * of 0, which is dry.
+ *
+ * @param p Parameters of the chorus, at a rate or a depth of 0
+ */
+static void md_comb(
+    box_audio_chorus_params_t p)
+{
+    static double sxx[MD_FFT / 2], sxy_re[MD_FFT / 2], sxy_im[MD_FFT / 2];
+    box_audio_chorus_params_t dry = p;
+    md_t md;
+    int32_t frames = AUDIO_RATE * 3, from, k;
+    md_noise(MD_MAX, 11);
+    dry.mix = 0;
+    md_open(&md, BOX_AUDIO_EFFECT_CHORUS, MD_MAX, true, true);
+    md_chorus_command(md.core, dry);
+    md_render(md.core, md_b_l, md_b_r, 0, frames, BOX_AUDIO_CORE_QUANTUM);
+    md_close(&md);
+    md_open(&md, BOX_AUDIO_EFFECT_CHORUS, MD_MAX, true, true);
+    md_chorus_command(md.core, p);
+    md_render(md.core, md_l, md_r, 0, frames, BOX_AUDIO_CORE_QUANTUM);
+    md_close(&md);
+    memset(sxx, 0, sizeof(sxx));
+    memset(sxy_re, 0, sizeof(sxy_re));
+    memset(sxy_im, 0, sizeof(sxy_im));
+    for (from = AUDIO_RATE / 2; from + MD_FFT <= frames; from += MD_FFT / 2) {
+        md_spectra(md_b_l, md_l, from, MD_FFT);
+        for (k = 0; k < MD_FFT / 2; k ++) {
+            sxx[k] += md_re[k] * md_re[k] + md_im[k] * md_im[k];
+            sxy_re[k] += md_re_b[k] * md_re[k] + md_im_b[k] * md_im[k];
+            sxy_im[k] += md_im_b[k] * md_re[k] - md_re_b[k] * md_im[k];
+        }
+    }
+
+    for (k = 0; k < MD_FFT / 2; k ++) {
+        md_comb_gain[k] = sxx[k] > 0 ?
+            sqrt(sxy_re[k] * sxy_re[k] + sxy_im[k] * sxy_im[k]) / sxx[k] : 0;
+    }
+}
+
+/** The largest or the smallest gain of md_comb_gain within 30 Hz of a frequency.
+ *
+ * @param hz The frequency
+ * @param largest Whether to take the largest
+ * @return The gain
+ */
+static double md_comb_at(
+    double hz,
+    bool largest)
+{
+    double bin = (double)AUDIO_RATE / MD_FFT, result = largest ? 0 : 1e30;
+    int32_t k, k0 = (int32_t)((hz - 30) / bin), k1 = (int32_t)((hz + 30) / bin) + 1;
+    for (k = k0; k <= k1; k ++) {
+        double g = md_comb_gain[k];
+        result = largest ? (g > result ? g : result) : (g < result ? g : result);
+    }
+
+    return result;
+}
+
+void Modulation_chorus_feedback_comb(void) {
+    // audio/chorus
+    double none[10], peaks[10], dips[10];
+    int32_t k;
+
+    // One tap 1 ms back at a mix of 0.5: without feedback a comb of peaks of 1 at multiples
+    // of 1 kHz, with a feedback of 0.8 peaks of 0.5 + 0.5 / 0.2 = 3 and dips of 0.22
+    md_comb(md_flanger(1, 0, 0, 1, 0.5f, 0));
+    for (k = 1; k <= 10; k ++) {
+        none[k - 1] = md_comb_at(k * 1000.0, true);
+    }
+
+    md_comb(md_flanger(1, 0, 0, 1, 0.5f, 0.8f));
+    for (k = 1; k <= 10; k ++) {
+        peaks[k - 1] = md_comb_at(k * 1000.0, true);
+        dips[k - 1] = md_comb_at(k * 1000.0 - 500.0, false);
+        printf("%d kHz: peak %.3f, %.3f without feedback, dip at %.1f kHz %.3f\n", k,
+            peaks[k - 1], none[k - 1], k - 0.5, dips[k - 1]);
+        test_assert(peaks[k - 1] > 2.0);
+        test_assert(peaks[k - 1] > none[k - 1] * 2.0);
+        test_assert(dips[k - 1] < 0.4);
+    }
+
+    // A negative feedback moves the peaks to the odd multiples of 500 Hz, of 0.5 + 0.5 / 0.2,
+    // and leaves 0.5 + 0.5 / 1.8 at the multiples of 1 kHz
+    md_comb(md_flanger(1, 0, 0, 1, 0.5f, -0.8f));
+    for (k = 1; k <= 10; k ++) {
+        double odd = md_comb_at(k * 1000.0 - 500.0, true);
+        double even = md_comb_at(k * 1000.0, true);
+        printf("feedback -0.8: peak at %.1f kHz %.3f, %.3f at %d kHz\n", k - 0.5, odd, even,
+            k);
+        test_assert(odd > 1.5);
+        test_assert(odd > even * 1.8);
+        test_assert(even < 1.0);
+    }
+}
+
+void Modulation_chorus_feedback_stable(void) {
+    // audio/chorus
+    box_audio_chorus_params_t cases[] = {
+        md_flanger(1, 0, 0, 1, 1, 0.95f),
+        md_flanger(1, 0, 0, 0.1f, 0.5f, -0.95f),
+        md_flanger(1, 0.3f, 0.1f, 0.1f, 1, 0.95f),
+        md_flanger(1, 0.2f, 1.8f, 2, 0.5f, 0.95f),
+        md_flanger(4, 20, 25, 25, 1, -0.95f),
+        md_flanger(3, 5, 10, 50, 1, 0.95f),
+        md_flanger(2, 0.5f, 5, 5, 1, 5),
+        md_flanger(4, 1, 0.5f, 0, 1, -5),
+        md_flanger(1, 0.1f, 0, 0, 1, NAN)
+    };
+    int32_t count = (int32_t)(sizeof(cases) / sizeof(cases[0]));
+    int32_t c, i, second;
+    for (c = 0; c < count; c ++) {
+        md_t md;
+        int32_t floats = box_audio_effect_floats(BOX_AUDIO_EFFECT_CHORUS, AUDIO_RATE);
+        float line = 0;
+
+        // Loud noise with clicks, at full scale
+        md_noise(AUDIO_RATE, 20 + (uint32_t)c);
+        for (i = 0; i < AUDIO_RATE; i ++) {
+            md_sound[i] = i % 480 == 0 ? 1.0f : md_sound[i] * (1.0f / MD_LEVEL);
+        }
+
+        md_open(&md, BOX_AUDIO_EFFECT_CHORUS, AUDIO_RATE, true, true);
+        md_chorus_command(md.core, cases[c]);
+        for (second = 0; second < 10; second ++) {
+            float peak;
+            md_render(md.core, md_l, md_r, 0, AUDIO_RATE, BOX_AUDIO_CORE_QUANTUM);
+            for (i = 0; i < AUDIO_RATE; i ++) {
+                test_assert(isfinite(md_l[i]) && isfinite(md_r[i]));
+            }
+
+            // The lines hold at most the input over 1 - 0.95, 20 times its peak
+            peak = 0;
+            for (i = 0; i < floats; i ++) {
+                float a = fabsf(md.memory[i]);
+                test_assert(isfinite(md.memory[i]));
+                peak = a > peak ? a : peak;
+            }
+
+            if (second % 3 == 0 || second == 9) {
+                printf("case %d: lines peak %.3f in second %d\n", c, (double)peak, second);
+            }
+
+            line = peak > line ? peak : line;
+        }
+
+        test_assert(line > 0);
+        test_assert(line <= 20.5f);
+        md_close(&md);
+    }
+}
+
+void Modulation_chorus_feedback_tail(void) {
+    // audio/chorus
+    float feedbacks[] = { 0.95f, -0.95f, 0.5f };
+    md_t md;
+    int32_t f, frames = AUDIO_RATE / 4;
+    for (f = 0; f < 3; f ++) {
+        md_noise(frames, 30 + (uint32_t)f);
+        md_open(&md, BOX_AUDIO_EFFECT_CHORUS, frames, false, false);
+        md_chorus_command(md.core, md_flanger(2, 0.5f, 1, 4, 0.5f, feedbacks[f]));
+        audio_play(md.core, 1, 1, 1, 1, 0, 1, 0);
+
+        // The noise ends after 250 ms; a feedback of 0.95 still rings 100 ms later, past the
+        // 50 ms after which a chorus without feedback goes idle
+        md_render(md.core, md_l, md_r, 0, frames + AUDIO_RATE / 10, BOX_AUDIO_CORE_QUANTUM);
+        if (fabsf(feedbacks[f]) > 0.9f) {
+            test_assert(box_audio_core_effect_running(md.core, 0));
+            test_assert(audio_peak(md_l, frames + AUDIO_RATE / 20,
+                frames + AUDIO_RATE / 10) > 1e-5f);
+        }
+
+        // At 0.95 a pass of at most 5 ms decays by 0.45 dB: under the silence within 2
+        // seconds
+        md_render(md.core, md_l, md_r, 0, AUDIO_RATE * 4, BOX_AUDIO_CORE_QUANTUM);
+        printf("feedback %.2f: tail %.2e at 1 s, %.2e at 3 s\n", (double)feedbacks[f],
+            (double)audio_peak(md_l, AUDIO_RATE - 480, AUDIO_RATE),
+            (double)audio_peak(md_l, AUDIO_RATE * 3 - 480, AUDIO_RATE * 3));
+        test_assert(!box_audio_core_effect_running(md.core, 0));
+        md_render(md.core, md_l, md_r, 0, AUDIO_RATE, BOX_AUDIO_CORE_QUANTUM);
+        test_flt(audio_peak(md_l, 0, AUDIO_RATE), 0);
+        test_flt(audio_peak(md_r, 0, AUDIO_RATE), 0);
+
+        // It starts again on the next sound, with nothing left of the last
+        audio_play(md.core, 2, 1, 1, 1, 0, 1, 0);
+        md_render(md.core, md_l, md_r, 0, AUDIO_RATE / 8, BOX_AUDIO_CORE_QUANTUM);
+        test_assert(box_audio_core_effect_running(md.core, 0));
+        test_assert(audio_peak(md_l, 0, AUDIO_RATE / 8) > 0.001f);
+        md_close(&md);
+    }
+}
+
+/** Render noise through a chorus whose parameters, rate and voices change, in renders of
+ * BOX_AUDIO_CORE_QUANTUM, and hash the output; the voice ends, so the chorus idles and starts
+ * again.
+ *
+ * @param floats Floats of the params of each command: 6 sends no feedback, as before the
+ * feedback was added, 7 sends it
+ * @param feedback The feedback of every command
+ * @return The hash of both channels
+ */
+static uint64_t md_feedback_sized(
+    size_t floats,
+    float feedback)
+{
+    md_t md;
+    int32_t k, frames = AUDIO_RATE / 2;
+    md_noise(frames, 40);
+    md_open(&md, BOX_AUDIO_EFFECT_CHORUS, frames, false, true);
+    for (k = 0; k < 8; k ++) {
+        box_audio_chorus_params_t p = md_flanger((float)(1 + k % 4), 0.5f + (float)k,
+            0.5f + (float)k, 1 + 3 * (float)k, 0.6f, feedback);
+        p.spread = 0.15f * (float)k;
+        md_command(md.core, 0, BOX_AUDIO_EFFECT_CHORUS, 1, &p, floats * sizeof(float));
+        md_render(md.core, md_l, md_r, k * (AUDIO_RATE / 4), AUDIO_RATE / 4,
+            BOX_AUDIO_CORE_QUANTUM);
+    }
+
+    audio_play(md.core, 2, 1, 1, 1, 0.2f, 1, 0);
+    md_render(md.core, md_l, md_r, 2 * AUDIO_RATE, AUDIO_RATE, BOX_AUDIO_CORE_QUANTUM);
+    md_close(&md);
+
+    return audio_hash(md_l, AUDIO_RATE * 3) ^ (audio_hash(md_r, AUDIO_RATE * 3) * 31);
+}
+
+void Modulation_chorus_feedback_zero_identical(void) {
+    // audio/chorus
+    uint64_t before = md_feedback_sized(6, 0);
+    uint64_t zero = md_feedback_sized(7, 0);
+    uint64_t negative_zero = md_feedback_sized(7, -0.0f);
+    uint64_t some = md_feedback_sized(7, 0.3f);
+    test_assert(before == zero);
+    test_assert(before == negative_zero);
+    test_assert(before != some);
+}
+
 /** Correlation of the channels of a range.
  *
  * @param l Left channel
@@ -979,6 +1242,7 @@ void Modulation_components(void) {
     test_flt(ch->delay, 12);
     test_flt(ch->mix, 0.5f);
     test_flt(ch->spread, 0.5f);
+    test_flt(ch->feedback, 0);
     test_assert(ecs_has(world, f, AudioEffectState));
     test_int(box_audio_module_effect_kind(world, f, params), BOX_AUDIO_EFFECT_CHORUS);
     test_flt(params[0], 2);
@@ -987,6 +1251,12 @@ void Modulation_components(void) {
     test_flt(params[3], 12);
     test_flt(params[4], 0.5f);
     test_flt(params[5], 0.5f);
+    test_flt(params[6], 0);
+    ecs_set(world, f, Chorus, { .voices = 1, .rate = 0.2f, .depth = 1.8f, .delay = 2,
+        .mix = 0.5f, .feedback = -0.7f });
+    test_int(box_audio_module_effect_kind(world, f, params), BOX_AUDIO_EFFECT_CHORUS);
+    test_flt(params[3], 2);
+    test_flt(params[6], -0.7f);
     test_int(box_audio_effect_floats(BOX_AUDIO_EFFECT_CHORUS, AUDIO_RATE),
         ((int32_t)(BOX_AUDIO_CHORUS_MAX * 0.001f * AUDIO_RATE) + 2) * 2);
     ecs_fini(world);
