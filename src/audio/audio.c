@@ -297,7 +297,8 @@ static void box_audio_gate_ctor(
 }
 
 /** Construct SynthOscillator values: a sine at 440 Hz at unity level, without a sweep, heard,
- * with an index of 1 for when it modulates and a pulse width of 0.5 for when it is a square.
+ * with an index of 1 for when it modulates, a pulse width of 0.5 for when it is a square, and
+ * no sub, one octave under for when it has one.
  *
  * @param ptr The components
  * @param count Number of components
@@ -314,7 +315,7 @@ static void box_audio_synth_oscillator_ctor(
     for (i = 0; i < count; i ++) {
         values[i] = (SynthOscillator){
             .wave = SynthSine, .frequency = 440.0f, .level = 1.0f, .index = 1.0f,
-            .pulse_width = 0.5f };
+            .pulse_width = 0.5f, .sub_octave = 1 };
     }
 }
 

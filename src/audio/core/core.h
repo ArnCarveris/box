@@ -263,6 +263,9 @@ typedef struct box_audio_cmd_play_t {
     uint32_t priority;              /**< Priority of the voice, 0..BOX_AUDIO_PRIORITY_MAX:
                                      * at the voice cap the play steals only a voice of at
                                      * most this priority, else it is refused */
+    float velocity;                 /**< Velocity of the note, 0..1, which a synth voice
+                                     * keeps for the velocity fields of its patch; 1 for a
+                                     * play that is not a note. Sample voices ignore it */
 } box_audio_cmd_play_t;
 
 /** Play a note of a mono voice: retarget the synth voice of a handle that has not reached its
@@ -284,6 +287,9 @@ typedef struct box_audio_cmd_legato_t {
     float pitch;                    /**< Pitch ratio, 1 plays the sound as is */
     uint32_t flags;                 /**< BOX_AUDIO_PLAY_ flags of a new voice */
     uint32_t priority;              /**< Priority of the voice, as of a play */
+    float velocity;                 /**< Velocity of the note, 0..1, of a new voice; a
+                                     * retargeted voice keeps the velocity of the note that
+                                     * started it, as its envelopes do not restart */
 } box_audio_cmd_legato_t;
 
 /** Stop a voice: it fades out and ends. A stop that applies now, with a when of 0 or in the
@@ -444,8 +450,8 @@ typedef struct box_audio_eq_band_t {
  * new value, exponentially in frequency */
 #define BOX_AUDIO_FILTER_SMOOTH 0.01f
 
-/** Seconds of a change of the mix of a filter effect, and of each half of the crossfade
- * through the dry signal of a change of its kind or slope */
+/** Seconds of a change of the mix or the drive of a filter effect, and of each half of the
+ * crossfade through the dry signal of a change of its kind or slope */
 #define BOX_AUDIO_FILTER_RAMP 0.02f
 
 /** The parameters of a filter effect, the first floats of the params of its effect command:
@@ -457,6 +463,8 @@ typedef struct box_audio_filter_params_t {
     float resonance;  /**< 0 (a Butterworth response) to 1 (rings the longest) */
     float slope;      /**< A box_audio_synth_slope_t: 0 for 12 dB per octave, 1 for 24 */
     float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+    float drive;      /**< Saturation of the input and the resonance, 0 (linear) to 1; moves
+                       *   over BOX_AUDIO_FILTER_RAMP */
 } box_audio_filter_params_t;
 
 /** Seconds of the windows of the peak detector of the compressor and the gate: the detector
@@ -785,6 +793,15 @@ typedef struct box_audio_synth_layer_t {
                                            * that plucks the string, 0 a soft finger, 1 a pick */
     uint32_t rings_free;                  /**< BOX_AUDIO_SYNTH_PLUCK: 1 when it uses no
                                            * envelope at all and the string alone ends it */
+    float sub;                            /**< Level of the sub oscillator, a band limited
+                                           * square under it, 0..1, 0 for none; ignored by
+                                           * noise and pluck */
+    uint32_t sub_octave;                  /**< Octaves the sub is under it, 1 or 2, 0 counts
+                                           * as 1 */
+    float index_velocity;                 /**< Share 0..1 of the index of a modulator that
+                                           * velocity scales: index (1 - share + share v) */
+    float hardness_velocity;              /**< BOX_AUDIO_SYNTH_PLUCK: share 0..1 of the
+                                           * hardness that velocity scales the same way */
 } box_audio_synth_layer_t;
 
 /** An LFO of a synth patch: a wave at a rate that starts after a delay and fades in, with a
@@ -817,10 +834,16 @@ typedef struct box_audio_synth_patch_t {
     float cutoff;                         /**< Hz */
     float resonance;                      /**< 0..1, 1 rings the longest */
     uint32_t slope;                       /**< A box_audio_synth_slope_t */
+    float drive;                          /**< Saturation of the filter, 0 (linear) to 1 */
     float filter_amount;                  /**< Octaves the filter envelope moves the cutoff at
                                            * its level 1, negative closes it; 0 for none */
     box_audio_synth_envelope_t filter_envelope; /**< Envelope of the cutoff, which does not
                                            * keep the voice playing */
+    float filter_velocity;                /**< Octaves of the cutoff at velocity 1 over velocity
+                                           * 0, -BOX_AUDIO_SYNTH_OCTAVES_MAX..max: the cutoff
+                                           * is cutoff * 2^(filter_velocity (v - 1)); 0 for none */
+    float filter_envelope_velocity;       /**< Share 0..1 of filter_amount that velocity
+                                           * scales: amount (1 - share + share v) */
     float glide;                          /**< Seconds a change of the pitch of a voice takes,
                                            * exponential in frequency, 0 jumps at once */
     uint32_t lfos;                        /**< LFOs that run, 0..BOX_AUDIO_SYNTH_LFOS */
@@ -1152,7 +1175,7 @@ void box_audio_writer_init(
     void *data,
     int32_t capacity);
 
-/** Write a play command.
+/** Write a play command, at velocity 1.
  *
  * @param writer The writer
  * @param voice Handle of the new voice
@@ -1176,7 +1199,7 @@ bool box_audio_write_play(
     uint32_t flags,
     uint64_t when);
 
-/** Write a play command with a priority.
+/** Write a play command with a velocity and a priority.
  *
  * @param writer The writer
  * @param voice Handle of the new voice
@@ -1185,6 +1208,7 @@ bool box_audio_write_play(
  * @param volume Volume
  * @param pan Pan, -1..1
  * @param pitch Pitch ratio
+ * @param velocity Velocity of the note, 0..1, 1 for a play that is not a note
  * @param flags BOX_AUDIO_PLAY_ flags
  * @param priority Priority of the voice, 0..BOX_AUDIO_PRIORITY_MAX
  * @param when Frame of the core clock of its first sample, 0 for now
@@ -1198,11 +1222,12 @@ bool box_audio_write_play_priority(
     float volume,
     float pan,
     float pitch,
+    float velocity,
     uint32_t flags,
     uint32_t priority,
     uint64_t when);
 
-/** Write a legato command: a note that follows the voice of a handle.
+/** Write a legato command at velocity 1: a note that follows the voice of a handle.
  *
  * @param writer The writer
  * @param voice New handle of the voice
@@ -1226,7 +1251,8 @@ bool box_audio_write_legato(
     float pitch,
     uint32_t flags);
 
-/** Write a legato command at a frame: a note that follows the voice of a handle.
+/** Write a legato command at a frame and velocity 1: a note that follows the voice of a
+ * handle.
  *
  * @param writer The writer
  * @param voice New handle of the voice
@@ -1252,7 +1278,7 @@ bool box_audio_write_legato_at(
     uint32_t flags,
     uint64_t when);
 
-/** Write a legato command at a frame with a priority.
+/** Write a legato command at a frame with a velocity and a priority.
  *
  * @param writer The writer
  * @param voice New handle of the voice
@@ -1262,6 +1288,7 @@ bool box_audio_write_legato_at(
  * @param volume Volume
  * @param pan Pan, -1..1
  * @param pitch Pitch ratio
+ * @param velocity Velocity of the note, 0..1, of a new voice; a retargeted voice keeps its own
  * @param flags BOX_AUDIO_PLAY_ flags
  * @param priority Priority of the voice, 0..BOX_AUDIO_PRIORITY_MAX
  * @param when Frame of the core clock of the note, 0 for now
@@ -1276,6 +1303,7 @@ bool box_audio_write_legato_priority(
     float volume,
     float pan,
     float pitch,
+    float velocity,
     uint32_t flags,
     uint32_t priority,
     uint64_t when);

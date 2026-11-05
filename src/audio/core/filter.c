@@ -9,7 +9,8 @@
  * BOX_AUDIO_FILTER_CONTROL frames, as the filter envelope of the synth does.
  *
  * The SVF is stable at any cutoff and resonance and while they move. A change of the kind or
- * the slope fades the wet signal out, swaps and fades it back in.
+ * the slope fades the wet signal out, swaps and fades it back in. The drive moves over
+ * BOX_AUDIO_FILTER_RAMP, as the mix does.
  */
 
 #include "internal.h"
@@ -67,6 +68,7 @@ static void box_audio_filter_target(
     f->target.slope = p[3] >= 0.5f ? (float)BOX_AUDIO_SYNTH_SLOPE_24 :
         (float)BOX_AUDIO_SYNTH_SLOPE_12;
     f->target.mix = box_audio_filter_clamp(p[4], 0, 1);
+    f->target.drive = box_audio_filter_clamp(p[5], 0, 1);
     f->octave_target = box_audio_synth_log2((double)f->target.cutoff);
 }
 
@@ -126,6 +128,7 @@ void box_audio_filter_start(
     f->moving = false;
     box_audio_filter_apply(core, f);
     box_audio_ramp_set(&f->mix, f->target.mix);
+    box_audio_ramp_set(&f->drive, f->target.drive);
     box_audio_ramp_set(&f->fade, 1);
 }
 
@@ -139,6 +142,7 @@ void box_audio_filter_command(
     f->moving = f->moving || f->octave != f->octave_target ||
         f->resonance != f->target.resonance;
     box_audio_ramp_to(&f->mix, f->target.mix, ramp);
+    box_audio_ramp_to(&f->drive, f->target.drive, ramp);
     if ((int32_t)f->target.kind != f->kind || (uint32_t)f->target.slope != f->slope) {
         f->swap = true;
         box_audio_ramp_to(&f->fade, 0, ramp);
@@ -172,18 +176,20 @@ static void box_audio_filter_smooth(
  * @param f The filter
  * @param svf The stages of the channel
  * @param x The input
+ * @param drive 0..1
  * @return The output
  */
 static inline float box_audio_filter_next(
     const box_audio_filter_t *f,
     box_audio_svf_t *svf,
-    float x)
+    float x,
+    float drive)
 {
     if (f->stages > 1) {
-        x = box_audio_svf_next(&svf[1], f->kind, x);
+        x = box_audio_svf_drive(&svf[1], f->kind, x, drive);
     }
 
-    return box_audio_svf_next(&svf[0], f->kind, x);
+    return box_audio_svf_drive(&svf[0], f->kind, x, drive);
 }
 
 bool box_audio_filter_render(
@@ -198,15 +204,16 @@ bool box_audio_filter_render(
     int32_t i;
     (void)silent;
     for (i = 0; i < frames; i ++) {
-        float a = l[i], b = r[i], wet;
+        float a = l[i], b = r[i], wet, drive;
         if (f->moving && -- f->control <= 0) {
             f->control = BOX_AUDIO_FILTER_CONTROL;
             box_audio_filter_smooth(core, f);
         }
 
         wet = box_audio_ramp_next(&f->mix) * box_audio_ramp_next(&f->fade);
-        l[i] = a + (box_audio_filter_next(f, f->svf, a) - a) * wet;
-        r[i] = b + (box_audio_filter_next(f, f->svf_r, b) - b) * wet;
+        drive = box_audio_ramp_next(&f->drive);
+        l[i] = a + (box_audio_filter_next(f, f->svf, a, drive) - a) * wet;
+        r[i] = b + (box_audio_filter_next(f, f->svf_r, b, drive) - b) * wet;
         if (f->swap && f->fade.left == 0 && f->fade.value == 0) {
             box_audio_filter_apply(core, f);
             box_audio_ramp_to(&f->fade, 1, (int32_t)(BOX_AUDIO_FILTER_RAMP * core->sample_rate));

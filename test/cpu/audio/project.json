@@ -144,6 +144,21 @@
                 ]
             },
             {
+                "id": "SynthVelocity",
+                "testcases": [
+                    "filter_cutoff",
+                    "filter_default",
+                    "filter_envelope",
+                    "fm_index",
+                    "pluck_hardness",
+                    "plain_play",
+                    "clamped",
+                    "legato_keeps",
+                    "wide",
+                    "script"
+                ]
+            },
+            {
                 "id": "Sequencer",
                 "testcases": [
                     "defaults",
@@ -206,7 +221,11 @@
                     "dynamics",
                     "delay",
                     "modulation",
+<<<<<<< HEAD
                     "saturator"
+=======
+                    "synth_sub"
+>>>>>>> c8fedb20432fab371766e2c7e36a2a7f0ad21e93
                 ]
             },
             {
@@ -521,7 +540,15 @@
                     "kind_change_no_click",
                     "mix",
                     "render_sizes",
-                    "component"
+                    "component",
+                    "drive_ramp_no_click"
+                ]
+            },
+            {
+                "id": "EffectFilterDrive",
+                "testcases": [
+                    "zero_identical",
+                    "bounded"
                 ]
             },
             {
@@ -544,6 +571,7 @@
                 ]
             },
             {
+<<<<<<< HEAD
                 "id": "Saturator",
                 "testcases": [
                     "harmonics",
@@ -557,6 +585,16 @@
                     "silent_after_tail",
                     "component",
                     "script"
+=======
+                "id": "SynthDrive",
+                "testcases": [
+                    "resonance_bounded",
+                    "sweep_stable",
+                    "zero_identical",
+                    "harmonics",
+                    "slope_24",
+                    "wide"
+>>>>>>> c8fedb20432fab371766e2c7e36a2a7f0ad21e93
                 ]
             },
             {
@@ -588,6 +626,7 @@
                     "filter_slope_24",
                     "script_filter_envelope",
                     "filter_extreme",
+                    "filter_drive_default",
                     "layers_sum",
                     "layer_own_envelope",
                     "eight_layers",
@@ -674,7 +713,16 @@
                     "pluck_vibrato_rate",
                     "pluck_crossing_smooth",
                     "pluck_steady_identical",
-                    "pluck_vibrato_cost"
+                    "pluck_vibrato_cost",
+                    "sub_octaves",
+                    "sub_zero_identical",
+                    "sub_phase_locked",
+                    "sub_clamped",
+                    "sub_unison",
+                    "sub_glide",
+                    "sub_alias",
+                    "sub_modulator",
+                    "script_sub"
                 ]
             },
             {

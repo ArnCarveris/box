@@ -175,6 +175,7 @@ typedef struct box_audio_filter_t {
     bool moving;              /**< Whether the cutoff or the resonance moves */
     bool swap;                /**< Waits for the fade to reach 0 to apply a kind or a slope */
     box_audio_ramp_t mix;     /**< Wet level */
+    box_audio_ramp_t drive;   /**< Saturation, 0 (linear) to 1 */
     box_audio_ramp_t fade;    /**< Fade of the wet signal around a swap */
 } box_audio_filter_t;
 
@@ -478,6 +479,9 @@ typedef struct box_audio_synth_osc_t {
     double vibrato_step;  /**< Change of vibrato per frame */
     float tremolo;        /**< Factor of its level from the LFOs, 1 without */
     float tremolo_step;   /**< Change of tremolo per frame */
+    float sub;            /**< Level of its sub oscillator, 0 for none */
+    int32_t sub_octave;   /**< Octaves the sub is under it, 1 or 2 */
+    uint32_t wraps;       /**< Times its phase wrapped, the phase of the sub above its own */
 } box_audio_synth_osc_t;
 
 /** An LFO of a synth voice, advanced per control block of BOX_AUDIO_SYNTH_CONTROL frames */
@@ -504,6 +508,8 @@ typedef struct box_audio_synth_unison_t {
     double detune[BOX_AUDIO_SYNTH_UNISON_MAX]; /**< Factor of inc of each voice */
     float left[BOX_AUDIO_SYNTH_UNISON_MAX];    /**< Gain of each voice on the left channel */
     float right[BOX_AUDIO_SYNTH_UNISON_MAX];   /**< Gain of each voice on the right channel */
+    uint32_t wraps[BOX_AUDIO_SYNTH_UNISON_MAX]; /**< Times the phase of each voice wrapped,
+                                                * for its sub */
 } box_audio_synth_unison_t;
 /** A pluck string of a synth voice: a Karplus-Strong loop of a delay line, a symmetric lowpass
  * of one frame of delay and a first order allpass of the fraction of a frame left, with a gain
@@ -568,12 +574,14 @@ typedef struct box_audio_synth_source_t {
     float pitch;          /**< Pitch ratio of the voice, the variance of the play included */
     float variance;       /**< Factor of the pitch that the variance of the play picked */
     float amp;            /**< Gain of the amp, the level variance of the play included */
+    float velocity;       /**< Velocity of the note that started it, 0..1; a legato keeps it */
     bool loop;            /**< Whether it starts over at the end of its envelopes */
     bool gate;            /**< Whether its envelopes sustain until a release */
     int32_t filter;       /**< A box_audio_synth_filter_t */
     int32_t stages;       /**< Stages of the filter: 1 for 12 dB per octave, 2 for 24 */
     box_audio_svf_t svf[2]; /**< The resonant stage, then the stage before it at 24 dB */
     box_audio_svf_t svf_r[2]; /**< The stages of the right channel, when stereo */
+    float drive;          /**< Saturation of the filter, 0 (linear) to 1 */
     bool unison;          /**< Whether a layer has unison voices, which renders through
                            * box_audio_synth_render_wide */
     bool stereo;          /**< Whether a layer with unison voices has width, so the source
@@ -1224,6 +1232,7 @@ void box_audio_synth_end(
  * @param source The source
  * @param sound Id of a ready synth sound
  * @param pitch Pitch ratio
+ * @param velocity Velocity of the note, 0..1, for the velocity fields of the patch
  * @param loop Whether it starts over at the end of its envelopes
  * @param gate Whether its envelopes sustain until a release, BOX_AUDIO_PLAY_GATE
  */
@@ -1232,6 +1241,7 @@ void box_audio_source_synth(
     box_audio_source_t *source,
     uint32_t sound,
     float pitch,
+    float velocity,
     bool loop,
     bool gate);
 

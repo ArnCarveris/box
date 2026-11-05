@@ -334,7 +334,7 @@ static void voice_play(
     uint8_t bytes[64];
     box_audio_writer_t w;
     box_audio_writer_init(&w, bytes, sizeof(bytes));
-    test_assert(box_audio_write_play_priority(&w, voice, sound, 0, volume, 0, 1,
+    test_assert(box_audio_write_play_priority(&w, voice, sound, 0, volume, 0, 1, 1,
         BOX_AUDIO_PLAY_LOOP, priority, 0));
     box_audio_core_apply(core, w.data, w.size);
 }
@@ -500,7 +500,7 @@ void Voice_refused(void) {
     }
 
     box_audio_writer_init(&w, bytes, sizeof(bytes));
-    test_assert(box_audio_write_play_priority(&w, 101, 1, 0, 0.5f, 0, 1, 0, 0,
+    test_assert(box_audio_write_play_priority(&w, 101, 1, 0, 0.5f, 0, 1, 1, 0, 0,
         box_audio_core_clock(core) + 100));
     box_audio_core_apply(core, w.data, w.size);
     test_int(voice_events_of(core, BOX_AUDIO_EVENT_VOICE_END, 101, NULL), 0);
@@ -509,7 +509,8 @@ void Voice_refused(void) {
     test_int(e.value, 2);
 
     box_audio_writer_init(&w, bytes, sizeof(bytes));
-    test_assert(box_audio_write_legato_priority(&w, 102, 9999, 1, 0, 0.5f, 0, 1, 0, 2, 0));
+    test_assert(box_audio_write_legato_priority(&w, 102, 9999, 1, 0, 0.5f, 0, 1, 1, 0, 2,
+        0));
     box_audio_core_apply(core, w.data, w.size);
     test_int(voice_events_of(core, BOX_AUDIO_EVENT_VOICE_END, 102, &e), 1);
     test_int(e.value, 3);
@@ -579,10 +580,10 @@ static uint64_t voice_workload(
                 box_audio_write_play(&w, voice, sound, 0, volume, pan, pitch, flags, when);
             } else if (voice % 4 == 0) {
                 box_audio_write_legato_priority(&w, voice, voice - 3, sound, 0, volume, pan,
-                    pitch, flags, priority, when);
+                    pitch, 1, flags, priority, when);
             } else {
-                box_audio_write_play_priority(&w, voice, sound, 0, volume, pan, pitch, flags,
-                    priority, when);
+                box_audio_write_play_priority(&w, voice, sound, 0, volume, pan, pitch, 1,
+                    flags, priority, when);
             }
         }
 

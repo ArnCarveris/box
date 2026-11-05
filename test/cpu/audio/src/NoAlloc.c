@@ -653,6 +653,7 @@ void NoAlloc_modulation(void) {
     }
 }
 
+<<<<<<< HEAD
 /* Saturators in the insert slots of buses: changes of the drive, the asymmetry, the bits and
  * the mix while they run, moves to another bus and slot, the reduction read, tails that decay
  * to silence and start again, and a removal, without a call of the allocator. */
@@ -727,6 +728,46 @@ void NoAlloc_saturator(void) {
         test_assert(!box_audio_core_effect_running(core, i));
     }
 
+=======
+/* Voices of a patch with subs, on a mono layer, a wide unison layer and a modulator with
+ * feedback, under a glide and an LFO, render without a call of the allocator. */
+void NoAlloc_synth_sub(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_synth_patch_t p = {0};
+    uint8_t bytes[sizeof(box_audio_cmd_synth_t)];
+    box_audio_writer_t w;
+    uint32_t i;
+    p.layers = 3;
+    p.seed = 9;
+    p.glide = 0.05f;
+    p.envelope = (box_audio_synth_envelope_t){
+        .attack = 0.01f, .decay = 0.05f, .sustain = 0.5f, .hold = 0.1f, .release = 0.05f };
+    p.layer[0] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_SAW, .frequency = 110,
+        .level = 0.3f, .sub = 0.7f, .sub_octave = 1, .voices = 3, .detune = 20, .width = 1 };
+    p.layer[1] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_SQUARE, .frequency = 220,
+        .level = 0.2f, .sub = 0.5f, .sub_octave = 2, .pulse_width = 0.3f, .feedback = 0.4f };
+    p.layer[2] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_SINE, .frequency = 440,
+        .level = 1, .sub = 1, .sub_octave = 1, .modulates = 2,
+        .modulation = BOX_AUDIO_SYNTH_PHASE, .index = 1 };
+    p.lfos = 1;
+    p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 5,
+        .pitch = 20, .amplitude = 0.2f };
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_synth(&w, 1, &p));
+    box_audio_core_apply(core, w.data, w.size);
+    for (i = 0; i < 16; i ++) {
+        audio_play(core, i, 1, 0, 0.02f, 0, 0.5f + 0.05f * (float)i, BOX_AUDIO_PLAY_LOOP);
+    }
+
+    audio_render(core, 0, AUDIO_FRAMES);
+    for (i = 0; i < 16; i ++) {
+        audio_voice_set(core, i, BOX_AUDIO_PARAM_PITCH, 1.5f);
+    }
+
+    audio_render(core, 0, AUDIO_FRAMES / 2);
+    test_assert(box_audio_core_voice_count(core) > 0);
+>>>>>>> c8fedb20432fab371766e2c7e36a2a7f0ad21e93
     test_int(noalloc_allocs, 1);
     test_int(noalloc_frees, 0);
     box_audio_core_free(core);
