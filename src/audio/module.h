@@ -431,6 +431,7 @@ typedef struct box_audio_timeline_stats_t {
     int64_t accents;        /**< Accented clicks among them */
     int64_t cancels;        /**< Plays cancelled with a STOP */
     int64_t anchors;        /**< Anchors set, wraps included */
+    int64_t beats;          /**< BEAT commands of the beat clock of the core written */
 } box_audio_timeline_stats_t;
 
 /** The timeline of the Transport singleton, in tempo.c */
@@ -453,6 +454,11 @@ typedef struct box_audio_timeline_t {
     int32_t hook_count;     /**< Hooks in hooks */
     uint32_t click;         /**< Sound id of the click of the metronome, 0 before it is sent */
     uint32_t click_serial;  /**< Serial of the output the click was sent to */
+    bool beat_wanted;       /**< Something in the core reads its beat clock, which the
+                             *   timeline then keeps in step with BEAT commands; set each
+                             *   frame before the update, by the modulators */
+    uint32_t beat_serial;   /**< Serial of the output whose beat clock the timeline keeps, 0
+                             *   for none */
     box_audio_timeline_stats_t stats; /**< Counters */
 } box_audio_timeline_t;
 
@@ -670,6 +676,51 @@ typedef struct box_audio_automation_t {
     box_audio_automation_stats_t stats; /**< Counters */
 } box_audio_automation_t;
 
+/** What became of an AudioModulator in the last frame */
+typedef enum box_audio_mod_status_t {
+    BOX_AUDIO_MOD_STATUS_NONE = 0,  /**< Not looked at yet */
+    BOX_AUDIO_MOD_STATUS_RUNS = 1,  /**< It runs in the core */
+    BOX_AUDIO_MOD_STATUS_WAITS = 2, /**< Its target is not in the output: a bus without an
+                                     *   index yet, an effect in no insert slot or disabled */
+    BOX_AUDIO_MOD_STATUS_ERROR = 3, /**< Its target, member or settings are not valid */
+    BOX_AUDIO_MOD_STATUS_FULL = 4,  /**< Every slot of the core is taken */
+    BOX_AUDIO_MOD_STATUS_CROWDED = 5, /**< BOX_AUDIO_MOD_PER_TARGET others move its member */
+    BOX_AUDIO_MOD_STATUS_DISABLED = 6 /**< It is disabled */
+} box_audio_mod_status_t;
+
+/** What the module did for an AudioModulator, added with it */
+typedef struct AudioModulatorState {
+    uint8_t slot;           /**< Slot of the core plus 1, 0 for none */
+    uint8_t status;         /**< A box_audio_mod_status_t */
+    bool logged;            /**< Its error was logged, until it changes */
+    uint32_t frame;         /**< Frame of the module it was looked at last */
+} AudioModulatorState;
+
+extern ECS_COMPONENT_DECLARE(AudioModulatorState);
+
+/** What a modulator slot of the core holds and got */
+typedef struct box_audio_mod_sent_t {
+    ecs_entity_t entity;    /**< Modulator entity of the slot, 0 for a free slot */
+    uint32_t serial;        /**< Serial of the output cmd went to, 0 for none */
+    box_audio_cmd_modulator_t cmd; /**< The last command, target NONE once released */
+} box_audio_mod_sent_t;
+
+/** Counters of the modulators, for the tests */
+typedef struct box_audio_mod_stats_t {
+    int64_t commands;       /**< MODULATOR commands that start or change a modulator */
+    int64_t releases;       /**< MODULATOR commands that release one */
+    int64_t errors;         /**< Errors logged */
+} box_audio_mod_stats_t;
+
+/** The modulators of the module, in modulator.c */
+typedef struct box_audio_modulators_t {
+    ecs_query_t *query;     /**< AudioModulator with its state, disabled ones included */
+    box_audio_mod_sent_t slots[BOX_AUDIO_MOD_MAX]; /**< The slots of the core */
+    uint32_t frame;         /**< Frames of the module, which tell the modulators of this frame
+                             *   from older ones */
+    box_audio_mod_stats_t stats; /**< Counters */
+} box_audio_modulators_t;
+
 /** The state of the module in a world */
 typedef struct box_audio_module_t {
     ecs_query_t *buses;           /**< AudioBus, disabled ones included */
@@ -745,6 +796,7 @@ typedef struct box_audio_module_t {
     box_audio_timeline_t timeline;   /**< The timeline of the Transport */
     box_audio_sequencer_t sequencer; /**< The tracks of the timeline */
     box_audio_automation_t automation; /**< The automation lanes of the timeline */
+    box_audio_modulators_t modulators; /**< The modulators */
     bool listener_warned;         /**< The warning of several listeners was logged */
     bool spatial_dirty;           /**< Update every spatial source, not only changed ones */
     bool waiting;                 /**< The page waited for a gesture in the last frame */
@@ -838,8 +890,8 @@ uint32_t box_audio_module_effect_kind(
 #define BOX_AUDIO_EFFECT_COMPONENTS (16)
 
 /** Get the effect components: Reverb, Equalizer, AudioFilter, Compressor, Gate, Delay, Phaser,
- * Chorus and Saturator, in the order an entity that has several takes the first of. A new
- * effect is added here and to box_audio_module_effect_params.
+ * Chorus, Saturator, TransientShaper and FrequencyShifter, in the order an entity that has
+ * several takes the first of. A new effect is added here and to box_audio_module_effect_params.
  *
  * @param out Receives up to BOX_AUDIO_EFFECT_COMPONENTS components
  * @return Number of components
@@ -873,6 +925,83 @@ uint32_t box_audio_module_effect_params(
     const void *ptr,
     float *params);
 
+
+/** Walk a member path, segments separated by dots and elements in brackets such as
+ * bands[2].gain, with a meta cursor to a float member.
+ *
+ * @param world The world
+ * @param component The component
+ * @param ptr A value of the component
+ * @param member The path
+ * @param cur Receives the cursor at the member
+ * @return NULL when the member is a float, else the reason, to free with ecs_os_free
+ */
+char* box_audio_member_cursor(
+    const ecs_world_t *world,
+    ecs_entity_t component,
+    void *ptr,
+    const char *member,
+    ecs_meta_cursor_t *cur);
+
+/** Resolve a float member of a bus or an effect that automation and modulators move: volume,
+ * pan, width and sends[i].level of an AudioBus or of the master, or a float member of the
+ * effect component of an effect entity.
+ *
+ * @param world The world
+ * @param state The state
+ * @param target The entity with the AudioBus or the effect component
+ * @param component AudioBus or the effect component
+ * @param member Path of the member
+ * @param out Receives the kind, entity, component, parameter and send of the target
+ * @return NULL when the member can be moved, else the reason, to free with ecs_os_free
+ */
+char* box_audio_target_resolve(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    ecs_entity_t target,
+    ecs_entity_t component,
+    const char *member,
+    box_audio_target_t *out);
+
+/** Send the AudioModulator entities to the modulators of the core: resolve their target, give
+ * them a slot, send what changed and release what no longer runs. Each one that cannot run
+ * logs one error that names it, until it changes. Sets whether the timeline keeps the beat
+ * clock of the core, so it runs before box_audio_timeline_update.
+ *
+ * @param world The world
+ * @param state The state, whose bus indices and effect slots are current
+ * @param t The transport
+ */
+void box_audio_modulators_sync(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    box_audio_transport_t *t);
+
+/** Register the query and the observer of the modulators.
+ *
+ * @param world The world
+ * @param state The state
+ */
+void box_audio_modulators_init(
+    ecs_world_t *world,
+    box_audio_module_t *state);
+
+/** Free what the modulators hold.
+ *
+ * @param state The state
+ */
+void box_audio_modulators_fini(
+    box_audio_module_t *state);
+
+/** Describe what became of a modulator, for the audio command.
+ *
+ * @param world The world
+ * @param e The modulator entity
+ * @return A text that lives as long as the program
+ */
+const char* box_audio_modulator_status(
+    const ecs_world_t *world,
+    ecs_entity_t e);
 
 /** Give the effects that the insert slots of the channels name their slots of the pool and
  * their memory, and send their kind, place and parameters when they changed, into the batch of

@@ -11,19 +11,8 @@ template LockControl {
 
   Interactive
 
-  if enabled {
-    Cursor: {CursorPointer}
-  } else {
-    Cursor: {CursorNotAllowed}
-  }
-
-  if hover && enabled {
-    Tint: {255, 226, 130, 90}
-  } else if hover {
-    Tint: {190, 50, 40, 90}
-  } else {
-    Tint: {255, 226, 130, 0}
-  }
+  Cursor: {enabled ? CursorPointer : CursorNotAllowed}
+  Tint: hover && !enabled ? {190, 50, 40, 90} : {255, 226, 130, hover ? 90 : 0}
 
   async {
     while true {

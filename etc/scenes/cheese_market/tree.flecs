@@ -13,7 +13,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template MarketTree {
   prop variant: i32 = 0
 
@@ -53,6 +52,7 @@ template MarketTree {
         Scale: {0.1, 0.027, 0.25}
         Sphere: {radius: 1, segments: 8, smooth: true}
         Rgb: {121 + leaf % 3 * 9, 151 + leaf % 3 * 7, 80 + leaf % 3 * 7}
+        DiffuseTransmission: {factor: 0.35, color: {220, 255, 160}, thickness: 0.05}
       }
     }
   }

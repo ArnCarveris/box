@@ -4,7 +4,6 @@ using box.geometry
 using box.material
 
 assets {
-  @tree Parent
   template Pavement {
     {
       Position: {}
