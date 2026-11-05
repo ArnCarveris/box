@@ -225,7 +225,10 @@ from `cents` to `-cents`, the classic detune widener. `window` ranges from 10 to
 100 ms. `feedback` up to 0.9 sends the shifted signal back into the line, so each
 pass shifts again into a cascade; it is soft clipped and stays bounded. The shifted
 signal comes up to a window late, about half a window on average, and the dry
-signal is not delayed to match.
+signal is not delayed to match. A steady tone lands on its interval exactly only
+when the window holds a whole number of its periods; otherwise it is off by up to
+half the rate at which the taps wrap, up to 12.5 Hz an octave up at 40 ms. Small
+detunes wrap slowly and stay accurate.
 
 `shimmer` on a reverb pitches its tail up inside the reverb, the rising pad sound of
 ambient and cinematic tracks. A share of the feedback, from 0 to 1, runs through the

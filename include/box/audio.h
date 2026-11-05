@@ -879,6 +879,11 @@ ECS_STRUCT(TransientShaper, {
  * shifted signal back into the line, so each pass shifts again, a cascade of rising or falling
  * copies; it is soft clipped, so it stays bounded.
  *
+ * As with every delay line shifter, a steady tone lands on its interval exactly only when the
+ * window holds a whole number of its periods; otherwise it is off by up to half the rate at
+ * which the taps wrap, the shift ratio minus 1 over the window: up to 12.5 Hz an octave up at
+ * 40 ms. Small detunes wrap slowly and stay accurate.
+ *
  * Latency: the shifted signal comes up to a window late, about half a window on average, and
  * the dry signal is not delayed to match, so a mix in between is a shifted copy behind the dry
  * one. Every pitch shifter runs with its own memory of BOX_AUDIO_PITCH_SHIFTER_WINDOW_MAX

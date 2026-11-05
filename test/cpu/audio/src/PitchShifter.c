@@ -256,30 +256,30 @@ static void ps_bounded(
 }
 
 /** Shift a 440 Hz sine at a mix of 1 and measure the peak of the left channel, and the powers
- * at the peak that is expected and at 440 Hz.
+ * at the peak and at 440 Hz.
  *
  * @param semitones Shift
- * @param expect Frequency expected
- * @param ratio Receives the power at expect over the power at 440 Hz
+ * @param window Milliseconds
+ * @param ratio Receives the power at the peak over the power at 440 Hz
  * @return The frequency of the peak
  */
 static double ps_shift_sine(
     float semitones,
-    double expect,
+    float window,
     double *ratio)
 {
     ps_t ps;
-    box_audio_pitch_shifter_params_t p = ps_params(semitones, 0, 0, 40, 0, 1);
+    box_audio_pitch_shifter_params_t p = ps_params(semitones, 0, 0, window, 0, 1);
     int32_t from = AUDIO_RATE / 2, n = 32768;
     double peak;
     audio_sine(ps_sound, AUDIO_RATE, 440, PS_LEVEL);
     ps_open(&ps, BOX_AUDIO_EFFECT_PITCH_SHIFTER, AUDIO_RATE, true);
     ps_command(ps.core, 0, BOX_AUDIO_EFFECT_PITCH_SHIFTER, 1, &p, sizeof(p));
     ps_render(ps.core, 0, AUDIO_RATE * 2, BOX_AUDIO_CORE_QUANTUM);
-    peak = ps_peak(ps_l, from, n, 100, 2000, 1);
-    *ratio = ps_power(ps_l, from, n, expect) / ps_power(ps_l, from, n, 440);
-    printf("shift %+.0f: peak at %.0f Hz, %.1f dB over 440 Hz\n", (double)semitones, peak,
-        10 * log10(*ratio));
+    peak = ps_peak(ps_l, from, n, 100, 2000, 0.5);
+    *ratio = ps_power(ps_l, from, n, peak) / ps_power(ps_l, from, n, 440);
+    printf("shift %+.0f, window %.0f ms: peak at %.1f Hz, %.1f dB over 440 Hz\n",
+        (double)semitones, (double)window, peak, 10 * log10(*ratio));
     ps_bounded(ps_l, 0, AUDIO_RATE * 2, 0.1f);
     ps_close(&ps);
 
@@ -288,15 +288,29 @@ static double ps_shift_sine(
 
 void PitchShifter_octave_up(void) {
     // audio/pitch_shifter
-    double ratio, peak = ps_shift_sine(12, 880, &ratio);
-    test_assert(fabs(peak - 880) <= 3);
+    double ratio, peak;
+
+    // A window of 50 ms holds 22 periods of 440 Hz, so a wrap of a tap keeps its phase
+    peak = ps_shift_sine(12, 50, &ratio);
+    test_assert(fabs(peak - 880) <= 1);
+    test_assert(ratio >= 100);
+
+    // Any other window is off by up to half the rate of the wraps, 25 Hz at 40 ms
+    peak = ps_shift_sine(12, 40, &ratio);
+    test_assert(fabs(peak - 880) <= 12.5);
     test_assert(ratio >= 100);
 }
 
 void PitchShifter_octave_down(void) {
     // audio/pitch_shifter
-    double ratio, peak = ps_shift_sine(-12, 220, &ratio);
-    test_assert(fabs(peak - 220) <= 3);
+    double ratio, peak;
+    peak = ps_shift_sine(-12, 50, &ratio);
+    test_assert(fabs(peak - 220) <= 1);
+    test_assert(ratio >= 100);
+
+    // The taps wrap at 12.5 Hz at 40 ms
+    peak = ps_shift_sine(-12, 40, &ratio);
+    test_assert(fabs(peak - 220) <= 6.25);
     test_assert(ratio >= 100);
 }
 
@@ -537,7 +551,7 @@ static uint64_t ps_sized(
 void PitchShifter_render_identical(void) {
     // audio/pitch_shifter
     uint64_t a = ps_sized(BOX_AUDIO_CORE_QUANTUM), b = ps_sized(BOX_AUDIO_CORE_QUANTUM);
-    uint64_t c = ps_sized(100), d = ps_sized(1000), e = ps_sized(1);
+    uint64_t c = ps_sized(100), d = ps_sized(1000), e = ps_sized(37);
     test_assert(a == b);
     test_assert(a == c);
     test_assert(a == d);

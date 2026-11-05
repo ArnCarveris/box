@@ -3,17 +3,13 @@
  * @brief The delay line pitch shifter of the core, shared by the pitch shifter effect and the
  * shimmer of the reverb.
  *
- * A shifter is a line that its input is written into and BOX_AUDIO_SHIFT_TAPS read taps spread
- * evenly over a window. Each tap slides through the window at 1 - ratio frames per frame, so it
- * plays its input ratio times as fast, and wraps around to the other end when it reaches one.
+ * A shifter is a line read by BOX_AUDIO_SHIFT_TAPS taps spread over a window, each sliding
+ * through it at 1 - ratio frames per frame and wrapping around, so it plays its input ratio
+ * times as fast, up to the window late. Private to src/audio/core; included by internal.h.
  *
  * A sine window, sin(pi phase), fades each tap in and out over its pass, so a wrap is silent;
  * two taps half a window apart have gains sin and cos, whose powers sum to 1, a constant power
- * crossfade. The taps read up to the window back, so the shifted signal comes up to it late.
- *
- * The line is read with linear interpolation; frames older than the ones written since it was
- * cleared read as silence. The phase is a double that advances by a step per frame, the same
- * whatever the render sizes. Private to src/audio/core; included by internal.h.
+ * crossfade. The phase is a double, so a render is the same whatever its sizes.
  */
 
 #ifndef BOX_AUDIO_CORE_SHIFT_H
