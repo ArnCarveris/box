@@ -58,55 +58,99 @@ fn point_shadow_depth(axis: f32, near_: f32, far_: f32, bias: f32) -> f32 {
     return near_ * (far_ - depth) / (depth * (far_ - near_));
 }
 
-// Fraction of a point light with a tile that reaches a position with a geometric normal.
-fn point_shadow(light: Light, world: vec3f, normal: vec3f) -> f32 {
+// Fraction of a spot or point light with a tile that reaches a position with a geometric normal,
+// by the projection of its tile record. A spot light compares every tap with the depth along its
+// axis, a point light with the depth along the axis of the octant of the tap. Both share one
+// filter loop, read as in shadow_cascade, as D3D compilers inline every call with its loops.
+fn punctual_shadow(light: Light, world: vec3f, normal: vec3f) -> f32 {
     let tile = shadow_tiles[light.shadow];
+    let octahedral = tile.light.w > SHADOW_OCTAHEDRAL;
     let near_ = tile.params.x;
     let far_ = tile.params.y;
-    let to = world - tile.light.xyz;
-    let len = length(to);
-    if (len < 1e-6) {
-        return 1.0;
+    var along = 0.0;
+    var texel = 0.0;
+    var moved_to = vec3f(0.0);
+    var uv = vec2f(0.0);
+    if (octahedral) {
+        let to = world - tile.light.xyz;
+        let len = length(to);
+        if (len < 1e-6) {
+            return 1.0;
+        }
+
+        along = dot(to, point_shadow_signs(point_shadow_uv(to)) * POINT_SHADOW_AXIS);
+        if (along <= 0.0 || along >= far_) {
+            return 1.0;
+        }
+
+        texel = along * tile.params.z;
+        let moved = world + shadow_normal_offset(normal, -to / len, view.spot_bias.y * texel);
+        moved_to = moved - tile.light.xyz;
+        uv = point_shadow_uv(moved_to);
+    } else {
+        let beam = dot(world - light.position, light.direction);
+        if (beam <= 0.0) {
+            return 1.0;
+        }
+
+        texel = beam * tile.params.z;
+        let l = normalize(light.position - world);
+        let moved = world + shadow_normal_offset(normal, l, view.spot_bias.y * texel);
+        along = dot(moved - light.position, light.direction);
+        if (along >= far_) {
+            return 1.0;
+        }
+
+        let p = tile.matrix * vec4f(moved, 1.0);
+        if (p.w <= 0.0) {
+            return 1.0;
+        }
+
+        uv = p.xy / p.w * vec2f(0.5, -0.5) + vec2f(0.5);
+        if (any(uv < vec2f(0.0)) || any(uv > vec2f(1.0))) {
+            return 1.0;
+        }
     }
 
-    let uv = point_shadow_uv(to);
-    let along = dot(to, point_shadow_signs(uv) * POINT_SHADOW_AXIS);
-    if (along <= 0.0 || along >= far_) {
-        return 1.0;
-    }
-
-    let texel = along * tile.params.z;
-    let moved = world + shadow_normal_offset(normal, -to / len, view.spot_bias.y * texel);
-    let moved_to = moved - tile.light.xyz;
-    let sample_uv = point_shadow_uv(moved_to);
     let bias = view.spot_bias.x * texel;
     let size = tile.rect.w;
     let lo = tile.rect.xy + vec2f(0.5 * size);
     let hi = tile.rect.xy + vec2f(tile.rect.z - 0.5 * size);
-    let t = shadow_filter_taps(tile.rect.xy + sample_uv * tile.rect.z, vec2f(size),
-        view.spot_config.y);
+    let t = shadow_filter_taps(tile.rect.xy + uv * tile.rect.z, vec2f(size), view.spot_config.y);
     var sum = 0.0;
-    for (var j = 0u; j < t.count; j++) {
-        for (var i = 0u; i < t.count; i++) {
-            let tap = clamp(t.base + vec2f(t.x[i], t.y[j]), lo, hi);
-            let signs = point_shadow_signs((tap - tile.rect.xy) / tile.rect.z);
-            let axis = dot(moved_to, signs * POINT_SHADOW_AXIS);
+    var y = t.y;
+    var wy = t.wy;
+    for (var j = 0u; j < 4u; j++) {
+        if (wy.x == 0.0) {
+            break;
+        }
+
+        var x = t.x;
+        var wx = t.wx;
+        for (var i = 0u; i < 4u; i++) {
+            if (wx.x == 0.0) {
+                break;
+            }
+
+            let tap = clamp(t.base + vec2f(x.x, y.x), lo, hi);
+            var axis = along;
+            if (octahedral) {
+                let signs = point_shadow_signs((tap - tile.rect.xy) / tile.rect.z);
+                axis = dot(moved_to, signs * POINT_SHADOW_AXIS);
+            }
+
             let reference = point_shadow_depth(axis, near_, far_, bias);
             let lit = textureSampleCompareLevel(shadow_atlas, shadow_sampler, tap, reference);
-            sum += t.wx[i] * t.wy[j] * lit;
+            sum += wx.x * wy.x * lit;
+            x = x.yzwx;
+            wx = wx.yzwx;
         }
+
+        y = y.yzwx;
+        wy = wy.yzwx;
     }
 
     return sum;
-}
-
-// Fraction of a spot or point light with a tile that reaches a position with a geometric normal,
-// by the projection of its tile record.
-fn punctual_shadow(light: Light, world: vec3f, normal: vec3f) -> f32 {
-    if (shadow_tiles[light.shadow].light.w > SHADOW_OCTAHEDRAL) {
-        return point_shadow(light, world, normal);
-    }
-    return spot_shadow(light, world, normal);
 }
 
 // Fraction of a point light with a tile that reaches a position in a medium, without a normal:
