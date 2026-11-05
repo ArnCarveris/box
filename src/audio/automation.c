@@ -7,11 +7,11 @@
  * parameters are built from a copy of its component with the automated members written
  * through a meta cursor.
  *
- * The automation never writes a component. A target whose lanes do not cover a beat gets the
- * value of its component, once, when the last lane ends; a stop sends it at once. A stop, a
- * seek and a change of a clip, a placement, a track or the component of a target cancel what
- * was scheduled ahead with a CANCEL, and a change schedules the earlier windows that did not
- * play yet again.
+ * The automation never writes a component. A target no lane covers gets the value of its
+ * component once, when its last lane ends or the transport stops.
+ *
+ * A stop, a seek and a change of a clip, a placement, a track or the component of a target
+ * cancel what was scheduled ahead with a CANCEL; a change schedules again from the clock.
  */
 
 #include "module.h"
@@ -860,9 +860,8 @@ done:
 }
 
 /** Follow a change of the clips, the placements, the tracks or the components of the targets:
- * cancel what was scheduled ahead, rebuild the lanes, send the value of its component to a
- * target no lane moves any more, and schedule the earlier windows that did not play yet again,
- * from the clock on.
+ * cancel what was scheduled ahead, rebuild the lanes, restore the targets no lane moves any
+ * more, and schedule the windows that did not play yet again from the clock on.
  *
  * @param world The world
  * @param state The state
@@ -1071,12 +1070,8 @@ void box_audio_automation_init(
         .window = box_audio_automation_window,
         .reset = box_audio_automation_reset
     };
-    ecs_entity_t components[] = {
-        ecs_id(AudioBus), ecs_id(Reverb), ecs_id(Equalizer), ecs_id(AudioFilter),
-        ecs_id(Compressor), ecs_id(Gate), ecs_id(Delay), ecs_id(Phaser), ecs_id(Chorus),
-        ecs_id(Saturator)
-    };
-    int32_t i;
+    ecs_entity_t components[BOX_AUDIO_EFFECT_COMPONENTS + 1] = { ecs_id(AudioBus) };
+    int32_t i, count = 1 + box_audio_module_effect_components(components + 1);
     ecs_vec_init_t(NULL, &a->lanes, box_audio_lane_t, 0);
     ecs_vec_init_t(NULL, &a->targets, box_audio_target_t, 0);
     ecs_vec_init_t(NULL, &a->past, box_audio_segment_t, 0);
@@ -1113,7 +1108,7 @@ void box_audio_automation_init(
         .ctx = state
     });
 
-    for (i = 0; i < (int32_t)(sizeof(components) / sizeof(components[0])); i ++) {
+    for (i = 0; i < count; i ++) {
         ecs_observer(world, {
             .query.flags = EcsQueryMatchDisabled,
             .query.terms = {{ .id = components[i], .src.id = EcsSelf }},

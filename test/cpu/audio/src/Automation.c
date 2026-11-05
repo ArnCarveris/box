@@ -16,6 +16,9 @@
 /** Level of the sounds of the cases */
 #define AUTO_LEVEL 0.5f
 
+/** Level of the sine of the equalizer, that its 12 dB peak keeps under the limiter */
+#define AUTO_EQ_LEVEL 0.2f
+
 /** Frequency of the sine of the sweep, 20 periods in AUTO_WINDOW */
 #define AUTO_TONE 2000.0
 
@@ -153,9 +156,8 @@ static void auto_check_cutoff(
 }
 
 /** The cutoff of the sweep moves from 200 to 5000 Hz over the 4 beats of its pass: the sine
- * of 2 kHz on the synth bus comes through as the lowpass at the cutoff of the curve at that
- * frame lets it, and once the pass ended at the cutoff of the component again. The component
- * keeps its value. */
+ * of 2 kHz on the synth bus comes through as a lowpass at the cutoff of the curve lets it,
+ * and after the pass at the cutoff of the component, which keeps its value. */
 void Automation_filter_sweep(void) {
     // audio/automation
     ecs_world_t *world = auto_world();
@@ -231,6 +233,38 @@ void Automation_send_level(void) {
     test_assert(fabsf(audio_tap_l[auto_frame(c0, 2.5)]) < 0.001f);
     test_flt(ecs_vec_first_t(&ecs_get(world, fx, AudioBus)->sends, AudioSend)[0].level, 0.0f);
     test_assert(state->automation.stats.bus_sets > 100);
+    ecs_fini(world);
+}
+
+/** The gain of the third band of the equalizer, a peak at the frequency of the sine, rises
+ * from 0 to 12 dB over the 4 beats of its pass, and is at 0 dB again after the pass; the
+ * component keeps its gain. */
+void Automation_eq_band(void) {
+    // audio/automation
+    ecs_world_t *world = auto_world();
+    box_audio_module_t *state = box_audio_module_get(world);
+    ecs_entity_t eq = ecs_lookup(world, "eq");
+    double expected, measured;
+    int64_t c0;
+    int32_t b;
+    auto_source(world, audio_tone(world, NULL, AUTO_TONE, AUTO_EQ_LEVEL, AUDIO_RATE), "eq");
+    audio_run(world, 30);
+    test_assert(fabs(auto_amplitude(audio_tap_count - AUDIO_FRAME) - AUTO_EQ_LEVEL) < 0.005);
+    c0 = auto_play(world, true);
+    auto_run_to(world, auto_frame(c0, 5));
+    for (b = 1; b <= 3; b ++) {
+        expected = AUTO_EQ_LEVEL * pow(10.0, 3.0 * b / 20.0);
+        measured = auto_amplitude(auto_frame(c0, b));
+        if (fabs(measured - expected) > expected * 0.05) {
+            printf("at beat %d: amplitude %f, expected %f\n", b, measured, expected);
+        }
+
+        test_assert(fabs(measured - expected) <= expected * 0.05);
+    }
+
+    test_assert(fabs(auto_amplitude(auto_frame(c0, 4.5)) - AUTO_EQ_LEVEL) < 0.005);
+    test_flt(ecs_get(world, eq, Equalizer)->bands[2].gain, 0.0f);
+    test_int(state->automation.stats.errors, 0);
     ecs_fini(world);
 }
 

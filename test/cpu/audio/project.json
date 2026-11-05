@@ -213,6 +213,7 @@
                     "filter_sweep",
                     "volume_fade",
                     "send_level",
+                    "eq_band",
                     "loop",
                     "stop",
                     "seek",

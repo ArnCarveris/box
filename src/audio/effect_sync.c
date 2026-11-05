@@ -186,21 +186,34 @@ done:
     return result;
 }
 
-ecs_entity_t box_audio_module_effect_component(
-    const ecs_world_t *world,
-    ecs_entity_t e)
+int32_t box_audio_module_effect_components(
+    ecs_entity_t *out)
 {
     const ecs_entity_t components[] = {
         ecs_id(Reverb), ecs_id(Equalizer), ecs_id(AudioFilter), ecs_id(Compressor),
         ecs_id(Gate), ecs_id(Delay), ecs_id(Phaser), ecs_id(Chorus), ecs_id(Saturator)
     };
-    ecs_entity_t result = 0;
-    int32_t i;
+    int32_t i, count = (int32_t)(sizeof(components) / sizeof(components[0]));
+    count = count < BOX_AUDIO_EFFECT_COMPONENTS ? count : BOX_AUDIO_EFFECT_COMPONENTS;
+    for (i = 0; i < count; i ++) {
+        out[i] = components[i];
+    }
+
+    return count;
+}
+
+ecs_entity_t box_audio_module_effect_component(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    ecs_entity_t components[BOX_AUDIO_EFFECT_COMPONENTS], result = 0;
+    int32_t i, count;
     if (!e || !ecs_is_alive(world, e)) {
         goto done;
     }
 
-    for (i = 0; i < (int32_t)(sizeof(components) / sizeof(components[0])) && !result; i ++) {
+    count = box_audio_module_effect_components(components);
+    for (i = 0; i < count && !result; i ++) {
         if (ecs_has_id(world, e, components[i])) {
             result = components[i];
         }
