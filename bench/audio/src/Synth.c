@@ -2,8 +2,8 @@
  * @file Synth.c
  * @brief Benchmarks for the synth of the audio core: 64 looping synth voices on the master,
  * one item per sample of the output, with the patch of three layers, the same with two LFOs or
- * one of FM, with curved envelopes or with subs, 32 voices of a pluck string, steady or under a vibrato,
- * and 8 of a unison pluck of 4.
+ * one of FM, with curved envelopes or with subs, 32 voices of a pluck string, steady or under
+ * a vibrato, and 8 of a unison pluck of 4.
  *
  * Each iteration renders one quantum of 128 stereo frames, so the time per item is the time
  * per sample of the whole mix of 64 voices.

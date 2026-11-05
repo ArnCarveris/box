@@ -4806,13 +4806,7 @@ void Synth_pluck_vibrato_cost(void) {
     printf("32 strings: %.1f ns per string and frame steady, %.1f under vibrato\n", ns[0], ns[1]);
 }
 
-/** Rate of the aliasing check of the sub, at which 2 kHz has an exact bin every 24 frames */
-#define SYNTH_SUB_RATE 48000
-
-/** Frames of the aliasing check of the sub, 0.8 seconds at SYNTH_SUB_RATE */
-#define SYNTH_SUB_FRAMES 38400
-
-/** A steady sine at 0.5 with a sub.
+/** A steady sine at 0.4 with a sub, so that a sub of 1 keeps it under the limiter.
  *
  * @param frequency Hz
  * @param sub Level of the sub
@@ -4824,7 +4818,7 @@ static box_audio_synth_patch_t synth_sub(
     float sub,
     uint32_t octave)
 {
-    box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SINE, frequency, 0.5f, 1.0f);
+    box_audio_synth_patch_t p = synth_steady(BOX_AUDIO_SYNTH_SINE, frequency, 0.4f, 1.0f);
     p.layer[0].sub = sub;
     p.layer[0].sub_octave = octave;
 
@@ -4922,7 +4916,7 @@ void Synth_sub_phase_locked(void) {
             s = (t + (double)(wraps & mask)) * scale;
             d = dt * scale;
             if (i >= edge && s >= d && s <= 1 - d && fabs(s - 0.5) > d) {
-                expected = (box_audio_core_sin(t) + (s < 0.5 ? 1.0f : -1.0f)) * 0.5f;
+                expected = (box_audio_core_sin(t) + (s < 0.5 ? 1.0f : -1.0f)) * 0.4f;
                 test_assert(fabsf(audio_l[i] - expected) < 1e-6f);
                 checked ++;
             }
@@ -4967,7 +4961,7 @@ void Synth_sub_clamped(void) {
     p = synth_sub(300, -1, 1);
     synth_render_patch(&p);
     memcpy(ref, audio_l, sizeof(ref));
-    p = synth_steady(BOX_AUDIO_SYNTH_SINE, 300, 0.5f, 1.0f);
+    p = synth_steady(BOX_AUDIO_SYNTH_SINE, 300, 0.4f, 1.0f);
     synth_render_patch(&p);
     test_assert(memcmp(ref, audio_l, sizeof(ref)) == 0);
 }
@@ -5043,33 +5037,34 @@ void Synth_sub_glide(void) {
     box_audio_core_free(core);
 }
 
-/** The sub aliases little: a sine at 4 kHz with a sub at 2 kHz at 48 kHz has little energy
- * outside the harmonics of 2 kHz and DC. */
+/** The sub aliases little: a sine at 4 kHz with a sub at 2 kHz at 44100 Hz, where 2 kHz has
+ * an exact bin every 441 frames and its aliases fall between its harmonics, has little energy
+ * outside the harmonics of 2 kHz and DC: 0.0003, where the plain square at 5 kHz has 0.004. */
 void Synth_sub_alias(void) {
     // audio/synth
-    box_audio_core_t *core = synth_core(SYNTH_SUB_RATE);
+    box_audio_core_t *core = synth_core(SYNTH_ALIAS_RATE);
     box_audio_synth_patch_t p = synth_sub(4000, 1, 1);
     const float *x = audio_l + 2048;
     double total = 0, mean = 0, harmonics = 0, alias;
     int32_t i, k;
     synth_define(core, 1, &p);
     audio_play(core, 1, 1, 0, 1, 0, 1, 0);
-    audio_render(core, 0, 2048 + SYNTH_SUB_FRAMES);
+    audio_render(core, 0, 2048 + SYNTH_ALIAS_FRAMES);
     box_audio_core_free(core);
-    for (i = 0; i < SYNTH_SUB_FRAMES; i ++) {
+    for (i = 0; i < SYNTH_ALIAS_FRAMES; i ++) {
         total += (double)x[i] * x[i];
         mean += x[i];
     }
 
-    mean /= SYNTH_SUB_FRAMES;
-    for (k = 1; k * 2000 < SYNTH_SUB_RATE / 2; k ++) {
-        harmonics += synth_bin_energy(x, SYNTH_SUB_FRAMES, k * 2000.0, SYNTH_SUB_RATE);
+    mean /= SYNTH_ALIAS_FRAMES;
+    for (k = 1; k * 2000 < SYNTH_ALIAS_RATE / 2; k ++) {
+        harmonics += synth_bin_energy(x, SYNTH_ALIAS_FRAMES, k * 2000.0, SYNTH_ALIAS_RATE);
     }
 
-    alias = (total - harmonics - mean * mean * SYNTH_SUB_FRAMES) / total;
+    alias = (total - harmonics - mean * mean * SYNTH_ALIAS_FRAMES) / total;
     printf("sub at 2 kHz: %.2f dB outside its harmonics\n", 10 * log10(alias));
     test_assert(alias >= 0);
-    test_assert(alias < 0.003);
+    test_assert(alias < 0.001);
 }
 
 /** A modulator with a sub modulates with it: a sine at 200 Hz with a sub at 100 Hz moving the

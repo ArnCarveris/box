@@ -344,9 +344,6 @@ ECS_ENUM(SynthModulation, {
  *
  * A layer with the modulation SynthPhase or SynthRing modulates its parent layer by its wave
  * times its own envelope, so the index follows that envelope. It is heard only when audible.
- *
- * A layer can have a sub oscillator, a square one or two octaves under it, for weight under
- * basses and leads without an extra layer: see sub.
  */
 ECS_STRUCT(SynthOscillator, {
     SynthWave wave;        /**< The wave, default SynthSine */
