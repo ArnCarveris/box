@@ -287,14 +287,10 @@
                     "delay",
                     "modulation",
                     "saturator",
-<<<<<<< HEAD
                     "transient_shaper",
-                    "synth_sub"
-=======
                     "synth_sub",
                     "synth_sync",
                     "synth_drive"
->>>>>>> af85d9b31dbca656344557a9600cb2d9bc795a8f
                 ]
             },
             {
