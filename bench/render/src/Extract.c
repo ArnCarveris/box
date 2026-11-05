@@ -69,7 +69,8 @@ static void bench_render_extract(
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     if (baked) {
-        ecs_singleton_set(world, LightBake, {.probe_spacing = 2, .bounds_padding = 1});
+        ecs_singleton_set(world, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
+            .compute = true});
     }
 
     box_render_backend_t backend = { .render = bench_render_drop };

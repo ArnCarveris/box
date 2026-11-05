@@ -933,6 +933,14 @@ typedef struct box_audio_voice_t {
     box_audio_ramp_t pressure; /**< Pressure, BOX_AUDIO_PARAM_PRESSURE */
     bool expressive;          /**< Whether a ramp of its expression runs, which renders it in
                                * blocks of BOX_AUDIO_EXPRESS_FRAMES; false renders as before */
+    float cutoff;             /**< Cutoff of BOX_AUDIO_PARAM_CUTOFF in Hz, clamped, 0 open */
+    box_audio_ramp_t lowpass; /**< log2 of the g of the low-pass, tan(pi cutoff / rate) */
+    bool filtered;            /**< Whether the low-pass runs; false skips it */
+    bool fresh;               /**< Whether it has not rendered yet, so a cutoff applies at once */
+    bool prime;               /**< Whether the low-pass started on a playing voice and takes the
+                               * next input as its state */
+    box_audio_svf_t lp[2];    /**< Low-pass of the left and right channel, a mono source uses
+                               * the left */
     box_audio_source_t source; /**< What it plays */
 } box_audio_voice_t;
 
@@ -1941,6 +1949,43 @@ void box_audio_synth_express(
 void box_audio_source_pitch(
     box_audio_source_t *source,
     float pitch);
+
+/** Open the low-pass of a voice and clear it, for a voice that starts.
+ *
+ * @param v The voice
+ */
+void box_audio_voice_filter_reset(
+    box_audio_voice_t *v);
+
+/** Move the low-pass of a voice to a cutoff of BOX_AUDIO_PARAM_CUTOFF. The log2 of its g
+ * ramps linearly over BOX_AUDIO_CUTOFF_RAMP, in octaves at low cutoffs, and the stages stay
+ * stable while it moves; an open target ramps to near the Nyquist and stops the filter there.
+ *
+ * A voice that has not rendered takes the cutoff at once. A filter that starts on a playing
+ * voice starts open, with its state at the next input, so it does not click.
+ *
+ * @param core The core
+ * @param v The voice
+ * @param value Cutoff in Hz
+ */
+void box_audio_voice_cutoff(
+    box_audio_core_t *core,
+    box_audio_voice_t *v,
+    float value);
+
+/** Run the low-pass of a voice over a block of its source in core->src_l and src_r, in
+ * place, and stop it once it opened.
+ *
+ * @param core The core
+ * @param v The voice, whose filter runs
+ * @param stereo Whether the source rendered both channels
+ * @param frames Frames of the block
+ */
+void box_audio_voice_filter(
+    box_audio_core_t *core,
+    box_audio_voice_t *v,
+    bool stereo,
+    int32_t frames);
 
 /** Reset the expression of a voice to its defaults: no bend, mod 1, no pressure.
  *

@@ -279,7 +279,7 @@ void SpotShadow_baked_light_has_no_tile(void) {
     ecs_entity_t light, slab;
     ecs_world_t *world = spot_scene(&light, &slab);
     ecs_singleton_set(world, LightBake, {.probe_spacing = 4, .bounces = 0, .capture_size = 8,
-        .budget_ms = 2, .bounds_padding = 1});
+        .budget_ms = 2, .bounds_padding = 1, .compute = true});
     SpotLight *s = ecs_get_mut(world, light, SpotLight);
     s->bake = LightBakeModeBaked;
     ecs_modified(world, light, SpotLight);
@@ -426,7 +426,7 @@ void SpotShadow_tile_change_rebakes_nothing(void) {
     spot_light(world, (vec3){0, 10, 0}, 20, 45, 60 * GLM_PIf);
     spot_slab(world, (vec3){0, 6, 0}, 1);
     ecs_singleton_set(world, LightBake, {.probe_spacing = 4, .bounces = 1, .capture_size = 8,
-        .budget_ms = 2, .bounds_padding = 1});
+        .budget_ms = 2, .bounds_padding = 1, .compute = true});
     ecs_singleton_set(world, ReflectionBake, {.resolution = 16, .budget_ms = 1,
         .scene_probe = true, .scene_probe_height = 2});
     ecs_entity_t surface = ecs_new(world);

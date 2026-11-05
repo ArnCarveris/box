@@ -1018,6 +1018,7 @@ static void box_audio_source(
     uint32_t sound = src->playing ? box_audio_sound_of(world, state, src->sound) : 0;
     float volume = muted ? 0.0f : src->volume * (place ? place->gain : 1.0f);
     float pan = place ? place->pan : 0.0f, beat, tempo;
+    float cutoff = place ? place->cutoff : 0.0f;
     bool away = place && !(place->gain > 0), resume;
     uint32_t handle;
     uint8_t bus;
@@ -1037,12 +1038,17 @@ static void box_audio_source(
                 pan, src->pitch, 1.0f, beat, tempo, src->loop ? BOX_AUDIO_PLAY_LOOP : 0, 0, 0);
         }
 
+        if (cutoff != 0 || v->cutoff != 0) {
+            box_audio_voice_set(state, handle, BOX_AUDIO_PARAM_CUTOFF, cutoff);
+        }
+
         ecs_map_remove(&state->voices, v->handle);
         ecs_map_insert(&state->voices, handle, e);
         v->handle = handle;
         v->sound = sound;
         v->volume = volume;
         v->pan = pan;
+        v->cutoff = cutoff;
         v->pitch = src->pitch;
         v->bus = bus;
         v->origin = state->time;
@@ -1116,6 +1122,7 @@ static void box_audio_source(
         v->loop = src->loop;
         v->volume = volume;
         v->pan = pan;
+        v->cutoff = cutoff;
         v->pitch = src->pitch;
         v->bus = bus;
         v->parked = false;
@@ -1128,6 +1135,10 @@ static void box_audio_source(
             box_audio_timeline_grid(world, state, 0, &beat, &tempo);
             box_audio_write_play_note(&state->writer, v->handle, sound, bus, volume, pan,
                 src->pitch, 1.0f, beat, tempo, src->loop ? BOX_AUDIO_PLAY_LOOP : 0, 0, 0);
+        }
+
+        if (cutoff != 0) {
+            box_audio_voice_set(state, v->handle, BOX_AUDIO_PARAM_CUTOFF, cutoff);
         }
 
         if (resume) {
@@ -1146,6 +1157,11 @@ static void box_audio_source(
     if (v->pan != pan) {
         box_audio_voice_set(state, v->handle, BOX_AUDIO_PARAM_PAN, pan);
         v->pan = pan;
+    }
+
+    if (v->cutoff != cutoff) {
+        box_audio_voice_set(state, v->handle, BOX_AUDIO_PARAM_CUTOFF, cutoff);
+        v->cutoff = cutoff;
     }
 
     if (v->pitch != src->pitch) {
@@ -1192,7 +1208,8 @@ static void box_audio_sources(
  * @param state The state
  * @param spatial Its distances
  * @param wt Its world transform, NULL for none
- * @return The gain and the pan, unity and centered without a listener or a transform
+ * @return The gain, the pan and the cutoff, unity, centered and open without a listener or a
+ *     transform
  */
 static box_audio_place_t box_audio_place(
     box_audio_module_t *state,
@@ -1202,8 +1219,8 @@ static box_audio_place_t box_audio_place(
     box_audio_place_t result = { .gain = 1.0f };
     state->stats.spatial_updates ++;
     if (wt && state->listener.entity) {
-        result.gain = box_audio_spatial_gain(spatial, (vec4*)state->listener.m, wt->m[3],
-            &result.pan);
+        result.gain = box_audio_spatial_place(spatial, (vec4*)state->listener.m, wt->m[3],
+            &result.pan, &result.cutoff);
     }
 
     return result;
@@ -1280,15 +1297,15 @@ static void box_audio_spatial_oneshots(
     int32_t i;
     for (i = 0; i < ecs_vec_count(&state->oneshots); i ++) {
         box_audio_oneshot_t *shot = &shots[i];
-        float pan = 0, gain = 1.0f;
+        float pan = 0, gain = 1.0f, cutoff = 0;
         if (!shot->spatial) {
             continue;
         }
 
         state->stats.spatial_updates ++;
         if (state->listener.entity) {
-            gain = box_audio_spatial_gain(&shot->distances, (vec4*)state->listener.m,
-                shot->position, &pan);
+            gain = box_audio_spatial_place(&shot->distances, (vec4*)state->listener.m,
+                shot->position, &pan, &cutoff);
         }
 
         if (shot->sent_volume != shot->volume * gain) {
@@ -1299,6 +1316,11 @@ static void box_audio_spatial_oneshots(
         if (shot->sent_pan != pan) {
             shot->sent_pan = pan;
             box_audio_voice_set(state, shot->handle, BOX_AUDIO_PARAM_PAN, pan);
+        }
+
+        if (shot->sent_cutoff != cutoff) {
+            shot->sent_cutoff = cutoff;
+            box_audio_voice_set(state, shot->handle, BOX_AUDIO_PARAM_CUTOFF, cutoff);
         }
     }
 }
@@ -1313,7 +1335,7 @@ void box_audio_play_send(
     box_audio_oneshot_t *shots, *shot, next;
     uint32_t sound = box_audio_sound_of(world, state, play->sound), held;
     const AudioSpatial *spatial = NULL;
-    float gain = 1.0f, pan = 0, beat, tempo;
+    float gain = 1.0f, pan = 0, cutoff = 0, held_cutoff, beat, tempo;
     int32_t k, channel;
     bool legato;
     if (!sound) {
@@ -1330,8 +1352,8 @@ void box_audio_play_send(
         spatial = ecs_get(world, play->sound, AudioSpatial);
         state->stats.spatial_updates ++;
         if (state->listener.entity) {
-            gain = box_audio_spatial_gain(spatial, (vec4*)state->listener.m,
-                play->position, &pan);
+            gain = box_audio_spatial_place(spatial, (vec4*)state->listener.m,
+                play->position, &pan, &cutoff);
         }
 
         if (!(gain > 0)) {
@@ -1360,16 +1382,22 @@ void box_audio_play_send(
             (AudioSpatial){ .min_distance = 1.0f, .max_distance = 50.0f, .rolloff = 1.0f },
         .volume = play->volume,
         .sent_volume = play->volume * gain,
-        .sent_pan = pan
+        .sent_pan = pan,
+        .sent_cutoff = cutoff
     };
 
     if (legato && !when && k >= 0) {
         held = shots[k].handle;
+        held_cutoff = shots[k].sent_cutoff;
         shots[k] = next;
         if (box_audio_reserve(state)) {
             box_audio_timeline_grid(world, state, 0, &beat, &tempo);
             box_audio_write_legato_note(&state->writer, next.handle, held, sound, next.bus,
                 next.sent_volume, pan, 1.0f, 1.0f, beat, tempo, 0, 0, 0);
+        }
+
+        if (cutoff != 0 || held_cutoff != 0) {
+            box_audio_voice_set(state, next.handle, BOX_AUDIO_PARAM_CUTOFF, cutoff);
         }
 
         goto done;
@@ -1385,6 +1413,10 @@ void box_audio_play_send(
         box_audio_timeline_grid(world, state, when, &beat, &tempo);
         box_audio_write_play_note(&state->writer, shot->handle, sound, shot->bus,
             shot->sent_volume, pan, 1.0f, 1.0f, beat, tempo, 0, 0, when);
+    }
+
+    if (cutoff != 0) {
+        box_audio_voice_set(state, shot->handle, BOX_AUDIO_PARAM_CUTOFF, cutoff);
     }
 
 done:

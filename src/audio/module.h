@@ -52,6 +52,7 @@ typedef struct AudioVoice {
     bool loop;              /**< Whether the voice loops */
     float volume;           /**< Volume sent, 0 for a Disabled source */
     float pan;              /**< Pan sent */
+    float cutoff;           /**< Cutoff of the distance filter sent, 0 open */
     float pitch;            /**< Pitch sent */
     uint8_t bus;            /**< Bus index sent */
     bool parked;            /**< A looping spatial source out of range: no voice, its time
@@ -305,6 +306,7 @@ typedef struct box_audio_oneshot_t {
     float volume;           /**< Volume of the play, before the distance */
     float sent_volume;      /**< Volume sent */
     float sent_pan;         /**< Pan sent */
+    float sent_cutoff;      /**< Cutoff of the distance filter sent, 0 open */
     bool legato;            /**< The mono voice of a legato synth sound */
     int32_t channel;        /**< SynthGlide.channel of a legato voice */
 } box_audio_oneshot_t;
@@ -330,6 +332,7 @@ typedef struct box_audio_note_t {
 typedef struct box_audio_place_t {
     float gain;             /**< Gain of the distance, 0 out of range */
     float pan;              /**< Pan, -1 left to 1 right */
+    float cutoff;           /**< Cutoff of the distance filter in Hz, 0 open */
 } box_audio_place_t;
 
 /** The listener the spatial sources are heard from */

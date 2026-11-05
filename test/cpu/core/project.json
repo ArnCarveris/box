@@ -49,6 +49,8 @@
                     "cpu_budget",
                     "cpu_budget_percent_sign",
                     "fps",
+                    "delta_time_fraction",
+                    "invalid_delta_time",
                     "port",
                     "scene",
                     "all_options",
@@ -532,6 +534,21 @@
                     "disabled_not_played",
                     "no_clip_no_op",
                     "no_animators_no_cost"
+                ]
+            },
+            {
+                "id": "ScriptHas",
+                "testcases": [
+                    "tag",
+                    "tag_entity_variable",
+                    "tag_next_to_dependency",
+                    "tag_declared_by_script",
+                    "tag_set_by_script",
+                    "tag_declared_by_script_next_to_dependency",
+                    "tag_declared_by_other_script",
+                    "component",
+                    "component_next_to_dependency",
+                    "component_declared_by_script"
                 ]
             }
         ]

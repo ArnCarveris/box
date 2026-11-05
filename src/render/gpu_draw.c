@@ -1581,9 +1581,12 @@ typedef struct box_gpu_view_pass_t {
                                      *   the depth instead of writing it */
     bool fog;                       /**< The fog volumes draw in a pass of their own that reads
                                      *   the depth instead of writing it */
-    box_gpu_snapshot_t *snapshot;   /**< Snapshot the image is copied into before the first
-                                     *   blended draw, NULL without transmissive draws or once
-                                     *   copied */
+    box_gpu_snapshot_t *snapshot;   /**< Snapshot the image is copied into before transmissive
+                                     *   draws (box_gpu_draw_snapshot), NULL without them */
+    int32_t snapshots;              /**< Snapshots the pass took, at most
+                                     *   BOX_GPU_TRANSMISSION_SNAPSHOTS */
+    bool drawn;                     /**< A draw that is not transmissive was recorded since the
+                                     *   last snapshot */
     WGPUTexture source;             /**< Texture of the color attachment, which the snapshot
                                      *   copies */
     WGPUTexture depth_texture;      /**< Texture of the depth attachment, which the snapshot
@@ -1612,7 +1615,9 @@ static WGPURenderPassEncoder box_gpu_view_pass_continue(
     WGPURenderPassDepthStencilAttachment depth = {
         .view = vp->depth,
         .depthLoadOp = WGPULoadOp_Load,
-        .depthStoreOp = vp->depth_store
+        .depthStoreOp = vp->snapshot && vp->snapshots < BOX_GPU_TRANSMISSION_SNAPSHOTS
+            ? WGPUStoreOp_Store
+            : vp->depth_store
     };
     if (read_only) {
         depth.depthLoadOp = WGPULoadOp_Undefined;
@@ -1689,9 +1694,13 @@ static bool box_gpu_draw_particles(
     return result;
 }
 
-/** End the pass of a view before its first blended draw, copy its image and depth into the
- * opaque snapshot and blur its pyramid (box_gpu_transmission_record), then continue in a new
- * pass with the groups of the forward pass bound again.
+/** End the pass of a view before a transmissive draw, copy its image into the snapshot and
+ * blur its pyramid (box_gpu_transmission_record), then continue in a new pass with the groups
+ * of the forward pass bound again.
+ *
+ * It holds everything the view drew before back to front, 2D shapes, particles, fog volumes and
+ * the blended meshes behind the glass. Each snapshot of the frame overwrites the same texture;
+ * only the first copies the depth, which no blended or transmissive draw writes.
  *
  * @param gpu The backend
  * @param vp The pass of the view, its pass replaced
@@ -1709,8 +1718,9 @@ static void box_gpu_draw_snapshot(
     wgpuRenderPassEncoderEnd(vp->pass);
     wgpuRenderPassEncoderRelease(vp->pass);
     box_gpu_transmission_record(gpu, vp->snapshot, vp->encoder, vp->source,
-        vp->depth_texture);
-    vp->snapshot = NULL;
+        vp->snapshots ? NULL : vp->depth_texture);
+    vp->snapshots ++;
+    vp->drawn = false;
     vp->pass = box_gpu_view_pass_continue(gpu, vp, false);
     wgpuRenderPassEncoderSetBindGroup(vp->pass, 0, group, 1, &offset);
     wgpuRenderPassEncoderSetBindGroup(vp->pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
@@ -1729,8 +1739,8 @@ static void box_gpu_draw_snapshot(
  * @param gpu The backend
  * @param t The target
  * @param vp The render pass of the view, which the fog volumes and particles may split, and its
- * opaque snapshot,
- * which splits it right before its first blended draw (box_gpu_draw_snapshot)
+ * snapshot, taken right before the first transmissive draw and again before a later one that
+ * follows other draws, BOX_GPU_TRANSMISSION_SNAPSHOTS at most (box_gpu_draw_snapshot)
  * @param format The format of the color target
  * @param packet The packet
  * @param v The view
@@ -1785,8 +1795,9 @@ static void box_gpu_draw_batches(
             }
         }
 
-        if (vp->snapshot && phase != 1 && b->view != -1 &&
-            b->pipeline != BOX_RENDER_SHADER_SHAPE2D)
+        if (vp->snapshot && phase != 1 && b->transmissive &&
+            (!vp->snapshots ||
+                (vp->drawn && vp->snapshots < BOX_GPU_TRANSMISSION_SNAPSHOTS)))
         {
             box_gpu_draw_snapshot(gpu, vp, v, group, offset);
             bound = NULL;
@@ -1813,12 +1824,14 @@ static void box_gpu_draw_batches(
             &instances))
         {
             box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
+            vp->drawn |= !b->transmissive;
         }
 
         if (late && mesh && box_gpu_cull_draw(gpu, vp->pass, packet, d, 2, true, true,
             &instances))
         {
             box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
+            vp->drawn |= !b->transmissive;
         }
     }
 
@@ -1833,8 +1846,8 @@ static void box_gpu_draw_batches(
 
 /** Record a render pass of a view and its draws of one phase.
  *
- * Counts the pass among the forward passes, and each pass the opaque snapshot, the fog volumes
- * and soft particles split it into (box_gpu_view_pass_continue).
+ * Counts the pass among the forward passes, and each pass the snapshots of transmission, the
+ * fog volumes and soft particles split it into (box_gpu_view_pass_continue).
  *
  * @param gpu The backend
  * @param t The target
@@ -1848,8 +1861,8 @@ static void box_gpu_draw_batches(
  * @param phase 0 for the only pass, 1 for the early and 2 for the late pass of a view that
  * culls by occlusion, 3 for the forward pass after the depth prepasses, which clears the color
  * and loads their depth
- * @param snapshot Opaque snapshot of a view with transmissive draws, which every phase but 1
- * copies before its first blended draw, NULL for none
+ * @param snapshot Snapshot of a view with transmissive draws, which every phase but 1 copies
+ * before its transmissive draws (box_gpu_draw_batches), NULL for none
  * @param source Texture of the color attachment, the HDR image of a view with effects
  */
 static void box_gpu_draw_pass(

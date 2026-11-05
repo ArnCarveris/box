@@ -78,7 +78,8 @@
                     "pan_step",
                     "mute_step",
                     "send_step",
-                    "restart_midway"
+                    "restart_midway",
+                    "cutoff_step"
                 ]
             },
             {
@@ -684,6 +685,7 @@
                     "level_change",
                     "play_function",
                     "spatial_scene",
+                    "spatial_cutoff_scene",
                     "reverb_hall",
                     "eq_filter"
                 ]
@@ -1182,7 +1184,16 @@
                     "teleport_no_click",
                     "disabled_silent",
                     "core_position",
-                    "cost_changed_only"
+                    "cost_changed_only",
+                    "cutoff_curve",
+                    "cutoff_zero_unchanged",
+                    "cutoff_moving_no_click",
+                    "cutoff_teleport_no_click",
+                    "cutoff_play_at",
+                    "cutoff_stereo",
+                    "cutoff_synth",
+                    "cutoff_extreme_values",
+                    "cutoff_first_frame"
                 ]
             }
         ]

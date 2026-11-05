@@ -338,6 +338,21 @@ static ecs_entity_t box_pick_to_focus(
         st->hook.focus(world, st, entity, current, source, pick, st->hook.ctx) : entity;
 }
 
+/** Get the id flecs gave the pointer event box.picking just sent, which is its last mouse event
+ * unless a script sent another one while it was delivered.
+ *
+ * @param world The world
+ * @return The id, 0 when flecs has no mouse event
+ */
+static uint64_t box_pick_sent_id(
+    const ecs_world_t *world)
+{
+    EcsScriptMouseEvent last;
+    ecs_script_get_mouse_state(world, &last, NULL);
+
+    return last.id;
+}
+
 /** Send a pointer event along the path of its pick through flecs.script.input.
  *
  * @param world The world
@@ -366,9 +381,11 @@ static void box_pick_send(
     box_pick_local(world, evt.target, pick, &evt);
     st->sending = pick;
     st->event = evt;
+    st->event.id = 0;
     st->has_event = true;
     ecs_script_mouse_event(world, &evt);
     st->sending = NULL;
+    st->event.id = box_pick_sent_id(world);
 
     box_pick_triggers(world, st, src, pick, pressed, released);
     if (st->hook.pointer) {

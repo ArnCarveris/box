@@ -107,6 +107,30 @@ void Script_spatial_scene(void) {
     ecs_fini(world);
 }
 
+void Script_spatial_cutoff_scene(void) {
+    // audio/script
+    ecs_world_t *world = audio_world();
+    char *code = script_read("test/assets/audio/spatial_cutoff.flecs");
+    test_assert(ecs_script_run(world, "spatial_cutoff", code, NULL) == 0);
+    ecs_os_free(code);
+    ecs_entity_t buzz = ecs_lookup(world, "buzz_source");
+    test_assert(buzz != 0);
+    test_flt(ecs_get(world, buzz, AudioSpatial)->cutoff, 400.0f);
+    test_flt(ecs_get(world, ecs_lookup(world, "click"), AudioSpatial)->cutoff, 400.0f);
+    test_flt(ecs_get(world, ecs_lookup(world, "click"), AudioSpatial)->max_distance, 50.0f);
+
+    audio_run(world, 6);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 2);
+    test_assert(fabsf(audio_level(AUDIO_FRAME / 2) - 0.4f) < 2e-3f);
+    test_assert(fabsf(audio_level_right(AUDIO_FRAME / 2) - 0.4f) < 2e-3f);
+
+    audio_run(world, 20);
+    test_int(ecs_singleton_get(world, AudioStatus)->voices, 1);
+    test_assert(audio_peak(audio_tap_l, audio_tap_count - AUDIO_FRAME, audio_tap_count) < 0.01f);
+    test_assert(audio_peak(audio_tap_r, audio_tap_count - AUDIO_FRAME, audio_tap_count) < 0.01f);
+    ecs_fini(world);
+}
+
 void Script_reverb_hall(void) {
     // audio/script
     ecs_world_t *world = audio_world();

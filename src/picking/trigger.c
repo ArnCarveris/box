@@ -40,6 +40,29 @@ done:
     return result;
 }
 
+/** Check whether an element is on the path of an entity: the entity or one of its ancestors.
+ *
+ * @param world The world
+ * @param e The element
+ * @param target The entity
+ * @return Whether the element is on the path
+ */
+static bool box_pick_trigger_on_path(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_entity_t target)
+{
+    ecs_entity_t cur;
+    int32_t depth = 0;
+    bool result = false;
+    for (cur = target; cur && !result && depth < BOX_PICK_CHAIN_MAX; depth ++) {
+        result = cur == e;
+        cur = ecs_get_parent(world, cur);
+    }
+
+    return result;
+}
+
 /** Check whether an element is under a cursor, ignoring the pointer capture: on the path from
  * the entity a pick there finds up to the root.
  *
@@ -56,16 +79,9 @@ static bool box_pick_trigger_under(
     const vec2 cursor)
 {
     box_pick_t pick;
-    ecs_entity_t cur;
-    int32_t depth = 0;
-    bool result = false;
     box_pick_at(world, st, cursor, &pick);
-    for (cur = pick.target; cur && !result && depth < BOX_PICK_CHAIN_MAX; depth ++) {
-        result = cur == e;
-        cur = ecs_get_parent(world, cur);
-    }
 
-    return result;
+    return box_pick_trigger_on_path(world, e, pick.target);
 }
 
 /** End the hold of a button.
@@ -120,13 +136,25 @@ static void box_pick_trigger_press(
     }
 }
 
-void box_pick_triggers(
+/** Drive the triggers from a pointer event.
+ *
+ * @param world The world
+ * @param st The module state
+ * @param src The event
+ * @param pick The pick the event was delivered by
+ * @param pressed The buttons that went down with the event
+ * @param released The buttons that came up with the event
+ * @param direct The event went to the target of the pick without a pick at its cursor, so a
+ *        release counts over that target
+ */
+static void box_pick_triggers_run(
     ecs_world_t *world,
     box_pick_state_t *st,
     const EcsScriptMouseEvent *src,
     const box_pick_t *pick,
     uint32_t pressed,
-    uint32_t released)
+    uint32_t released,
+    bool direct)
 {
     InputDevice *dev = box_input_device(world);
     vec2 cursor = { src->screen_x, src->screen_y };
@@ -143,8 +171,9 @@ void box_pick_triggers(
 
         if ((released & bit) && st->clicks[b]) {
             trigger = box_pick_trigger_get(world, st->clicks[b], b);
-            if (trigger && trigger->mode == ActionTriggerClick &&
-                box_pick_trigger_under(world, st, st->clicks[b], cursor))
+            if (trigger && trigger->mode == ActionTriggerClick && (direct ?
+                box_pick_trigger_on_path(world, st->clicks[b], pick->target) :
+                box_pick_trigger_under(world, st, st->clicks[b], cursor)))
             {
                 box_input_trigger_tap(dev, st->clicks[b], trigger->action, cursor);
             }
@@ -157,6 +186,44 @@ void box_pick_triggers(
             box_pick_trigger_press(dev, st, pick->handler, trigger, b, cursor);
         }
     }
+}
+
+void box_pick_triggers(
+    ecs_world_t *world,
+    box_pick_state_t *st,
+    const EcsScriptMouseEvent *src,
+    const box_pick_t *pick,
+    uint32_t pressed,
+    uint32_t released)
+{
+    box_pick_triggers_run(world, st, src, pick, pressed, released, false);
+}
+
+void box_pick_triggers_direct(
+    ecs_world_t *world,
+    const EcsScriptMouseEvent *evt,
+    uint32_t pressed,
+    uint32_t released)
+{
+    const PickingState *ps = ecs_id(PickingState) ?
+        ecs_singleton_get(world, PickingState) : NULL;
+    box_pick_t pick = {0};
+    ecs_entity_t cur;
+    int32_t depth = 0;
+    if (!ps || !ps->state || !evt->target || !ecs_is_alive(world, evt->target)) {
+        goto done;
+    }
+
+    pick.target = evt->target;
+    for (cur = evt->target; cur && !pick.handler && depth < BOX_PICK_CHAIN_MAX; depth ++) {
+        pick.handler = ecs_has_id(world, cur, Interactive) ? cur : 0;
+        cur = ecs_get_parent(world, cur);
+    }
+
+    box_pick_triggers_run(world, ps->state, evt, &pick, pressed, released, true);
+
+done:
+    return;
 }
 
 void box_pick_triggers_check(

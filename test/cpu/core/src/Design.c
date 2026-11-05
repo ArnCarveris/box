@@ -132,7 +132,7 @@ void Design_fitted_views(void)
     ecs_set_ptr(world, original, View, &view);
     ecs_vec_fini_t(NULL, &view.effects, ViewEffect);
     ecs_set(world, scene, AmbientLight, {.intensity = 2});
-    ecs_set(world, scene, LightBake, {.probe_spacing = 1});
+    ecs_set(world, scene, LightBake, {.probe_spacing = 1, .compute = true});
     ecs_entity_t light = ecs_entity(world, {.parent = scene});
     ecs_set(world, light, PointLight, {.intensity = 100, .range = 100});
     ecs_entity_t outside = ecs_new(world);
