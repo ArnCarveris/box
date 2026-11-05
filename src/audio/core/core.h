@@ -748,6 +748,14 @@ typedef enum box_audio_synth_slope_t {
     BOX_AUDIO_SYNTH_SLOPE_24 = 1   /**< 24 dB per octave, two cascaded stages */
 } box_audio_synth_slope_t;
 
+/** Models of the filter of a synth patch */
+typedef enum box_audio_synth_model_t {
+    BOX_AUDIO_SYNTH_SVF = 0,     /**< The state variable filter of svf.h */
+    BOX_AUDIO_SYNTH_LADDER = 1   /**< The transistor ladder of ladder.h: 4 saturating poles
+                                  * that oscillate at resonance 1; the slope picks the 4-pole
+                                  * or the 2-pole output */
+} box_audio_synth_model_t;
+
 /** Waves of a synth LFO; each starts at 0 rising at phase 0 but the square, which starts at 1,
  * and the random one, which holds a new random value each period */
 typedef enum box_audio_synth_lfo_wave_t {
@@ -873,7 +881,9 @@ typedef struct box_audio_synth_patch_t {
     float cutoff;                         /**< Hz */
     float resonance;                      /**< 0..1, 1 rings the longest */
     uint32_t slope;                       /**< A box_audio_synth_slope_t */
-    float drive;                          /**< Saturation of the filter, 0 (linear) to 1 */
+    float drive;                          /**< Saturation of the filter, 0 (linear) to 1; the
+                                           * gain into the ladder */
+    uint32_t model;                       /**< A box_audio_synth_model_t, 0 the SVF */
     float filter_amount;                  /**< Octaves the filter envelope moves the cutoff at
                                            * its level 1, negative closes it; 0 for none */
     box_audio_synth_envelope_t filter_envelope; /**< Envelope of the cutoff, which does not

@@ -48,6 +48,7 @@ static inline float box_audio_clean(
 }
 
 #include "svf.h"
+#include "ladder.h"
 #include "saturate.h"
 
 /** A value that moves linearly to its target over a number of frames */
@@ -588,6 +589,9 @@ typedef struct box_audio_synth_source_t {
     box_audio_svf_t svf[2]; /**< The resonant stage, then the stage before it at 24 dB */
     box_audio_svf_t svf_r[2]; /**< The stages of the right channel, when stereo */
     float drive;          /**< Saturation of the filter, 0 (linear) to 1 */
+    int32_t model;        /**< A box_audio_synth_model_t of the filter */
+    box_audio_ladder_coefs_t ladder_coefs; /**< Coefficients of the ladder, when the model */
+    box_audio_ladder_t ladder[2]; /**< The ladder of the left channel, then the right one */
     bool has_drive;       /**< Whether the mix of the layers runs through the drive before the
                            * filter */
     bool drive_dc;        /**< Whether the drive has an asymmetry, so a DC blocker follows it */

@@ -644,6 +644,26 @@
                 ]
             },
             {
+                "id": "SynthLadder",
+                "testcases": [
+                    "self_oscillation",
+                    "rings_out",
+                    "slope_24",
+                    "bass",
+                    "kinds",
+                    "sweep_bounded",
+                    "wide",
+                    "svf_identical",
+                    "deterministic"
+                ]
+            },
+            {
+                "id": "SynthLadderWorld",
+                "testcases": [
+                    "component"
+                ]
+            },
+            {
                 "id": "SynthPreDrive",
                 "testcases": [
                     "harmonics",

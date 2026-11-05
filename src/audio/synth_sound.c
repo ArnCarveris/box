@@ -314,6 +314,7 @@ bool box_audio_synth_compile(
         p.drive = filter->drive;
         p.filter_velocity = filter->velocity;
         p.keytrack = filter->keytrack;
+        p.model = (uint32_t)filter->model;
     }
 
     if (filter && fenv && fenv->amount != 0) {

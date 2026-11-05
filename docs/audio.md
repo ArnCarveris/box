@@ -281,7 +281,7 @@ voices on play, so edits affect subsequent plays.
 | `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), `sync` (0, off, 1..16), modulation controls, `velocity` (0) |
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`, `key_scale`; all zero by default |
 | `SynthDrive` | Root: `drive` (0.3, 0..1), `asymmetry` (0, 0..1) |
-| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves), `keytrack` (0) |
+| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves), `keytrack` (0), `model` (`SynthFilterSvf` or `SynthFilterLadder`) |
 | `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves and `velocity` (0); requires a filter |
 | `SynthUnison` | Per layer: `voices` (3, 1..7), `detune` (10 cents, 0..100), `width` (0, 0..1) |
 | `SynthGlide` | Root: `time` seconds (0, up to 10), `legato` (false), `channel` (0) |
@@ -323,6 +323,32 @@ In the `Synth` bench of [bench/audio](../bench/audio/) (64 voices, 48 kHz, one
 128-frame quantum), drive raises a 12 dB filter from about 75 to 115 µs and a 24 dB
 filter with an envelope from about 125 to 170 µs: roughly 4 ns per stage and frame of
 a voice.
+
+`model: SynthFilterLadder` swaps the state variable filter for a transistor ladder:
+four one-pole stages with a tanh in each stage and in the feedback loop, solved with
+zero delay feedback, so it stays in tune up to the clamp of the cutoff under Nyquist
+without oversampling. `SynthSlope24` is the fat 4-pole lowpass and `SynthSlope12` its
+2-pole tap; `SynthHighPass`, `SynthBandPass` and `SynthNotch` mix the poles as a
+multimode ladder does. Resonance 1 self-oscillates: with no input, after a pluck, it
+rings as a near sine at the cutoff at a steady level, so the cutoff envelope, the LFOs
+and keytrack can play it as an oscillator. A ladder loses its bass as the resonance
+rises; the lowpass adds a share of its input to the feedback sum, which keeps the
+passband within about 2 dB of resonance 0. `drive` is the gain into the ladder, from
+-6 dB at 0 to +12 dB at 1, the output scaled back, so higher drives saturate the stages
+sooner. On the stereo path both channels run their own ladder.
+In the `Synth` bench (`voices_64_ladder`, 64 voices, 48 kHz, a 24 dB lowpass with an
+envelope) the ladder costs about TBD µs per 128-frame quantum against about 125 µs for
+the 24 dB state variable filter.
+
+```
+prefab Acid {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.002, decay: 0.2, sustain: 0.5, hold: 0.2, release: 0.1}
+  SynthFilter: {cutoff: 400, resonance: 0.85, slope: SynthSlope24, model: SynthFilterLadder}
+  SynthFilterEnvelope: {decay: 0.2, sustain: 0, amount: 3}
+  SynthOscillator: {wave: SynthSaw, frequency: 55, level: 0.6}
+}
+```
 
 `SynthDrive` on the root drives the mix of the layers of each voice through a tanh
 soft clipper before the filter, or before the amp without a filter: the stage where

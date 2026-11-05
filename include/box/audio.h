@@ -320,6 +320,14 @@ ECS_ENUM(SynthFilterSlope, {
     SynthSlope24           /**< 24 dB per octave, two cascaded stages */
 });
 
+/** Model of the filter of a synth sound */
+ECS_ENUM(SynthFilterModel, {
+    SynthFilterSvf,        /**< A state variable filter, clean and stable, that rings but never
+                            *   oscillates */
+    SynthFilterLadder      /**< A 4-pole transistor ladder with a tanh in each stage and in its
+                            *   feedback: a fat lowpass that self-oscillates at resonance 1 */
+});
+
 /** Wave of a synth LFO */
 ECS_ENUM(SynthLfoWave, {
     SynthLfoSine,          /**< Sine, from 0 rising */
@@ -475,6 +483,13 @@ ECS_STRUCT(SynthFilter, {
     float keytrack;        /**< Key tracking 0..1, default 0: the cutoff is times the pitch
                             *   ratio of the voice to the keytrack, so 1 moves it 1:1 with the
                             *   pitch; it follows the pitch of the voice, glides included */
+    SynthFilterModel model; /**< The model, default SynthFilterSvf. SynthFilterLadder is a
+                            *   transistor ladder: SynthSlope24 is its 4-pole lowpass and
+                            *   SynthSlope12 the 2-pole tap; the highpass, bandpass and notch
+                            *   mix the poles as a multimode ladder. Its resonance oscillates
+                            *   at 1 as a near sine at the cutoff, its lowpass keeps its
+                            *   passband within 2 dB as the resonance rises, and drive is the
+                            *   gain into it, from -6 dB to +12 dB, the output scaled back */
 });
 
 /** A filter, an effect in an insert slot of an AudioBus, as a Reverb is: the state variable
