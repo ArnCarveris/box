@@ -888,7 +888,7 @@ typedef struct box_audio_transient_shaper_params_t {
 #define BOX_AUDIO_FREQUENCY_SHIFTER_LOW 20.0f
 
 /** Allpasses of second order of the Hilbert transformer of a frequency shifter, over both of
- * its paths; 12 keep the image of a shift more than 60 dB under it from 20 Hz to 20 kHz */
+ * its paths; 12 keep the image of a shift 60 dB under it from 20 Hz to 20 kHz at 48 kHz */
 #define BOX_AUDIO_FREQUENCY_SHIFTER_ALLPASSES 12
 
 /** Seconds of a change of the shift, the mode, the stereo, the feedback or the mix of a

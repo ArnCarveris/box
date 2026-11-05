@@ -4,8 +4,8 @@
  * their slots of the pool of the core, their memory and their commands.
  *
  * An effect entity is any entity with an effect component: Reverb, Equalizer, AudioFilter,
- * Compressor, Gate, Delay, Phaser, Chorus, Saturator, TransientShaper or FrequencyShifter, the first of them in
- * that order. A compressor gets the key bus that the order compile accepted for its insert.
+ * Compressor, Gate, Delay, Phaser, Chorus, Saturator, TransientShaper or FrequencyShifter, the
+ * first of them in that order. A compressor gets the key bus the order compile accepted.
  *
  * The module sends an EFFECT command when the kind, the channel, the slot or a parameter of an
  * effect changes, and takes it off when no insert slot names it any more.

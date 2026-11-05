@@ -864,14 +864,14 @@ ECS_ENUM(FrequencyShifterMode, {
  * hundreds of Hz give metallic and bell tones. The ring mode is a classic ring modulator:
  * pad { AudioBus: {effects: [pad]}; FrequencyShifter: {shift: 2, stereo: 1, mix: 0.5} }.
  *
- * It shifts the analytic signal from an allpass pair Hilbert transformer, whose two paths stay
- * 90 degrees apart from 20 Hz to 20 Hz under the Nyquist frequency, with the image of a shift
- * more than 60 dB under it there. The allpasses turn the phase of the signal but not its level,
- * so a shift of 0 at a mix of 1 changes the phase only. The oscillators start when the shifter is
- * put on a channel and run on through a change of the shift without a jump. The feedback runs
- * through a 20 Hz DC blocker and a soft limit at +12 dB. Changes move over 20 ms; a change of
- * the mode crossfades. Once its input is silent and its allpasses decayed it stops until its
- * input sounds again.
+ * It shifts the analytic signal from an allpass pair Hilbert transformer, whose two paths stay 90
+ * degrees apart from 20 Hz to 20 Hz under the Nyquist frequency, with the image of a shift about
+ * 60 dB under it there at 48 kHz. The allpasses turn the phase of the signal but not its level, so
+ * a shift of 0 at a mix of 1 changes the phase only. The oscillators start when the shifter is put
+ * on a channel and run on through a change of the shift without a jump. The feedback runs through a
+ * 20 Hz DC blocker and a soft limit at +12 dB. Changes move over 20 ms; a change of the mode
+ * crossfades. Once its input is silent and its allpasses decayed it stops until its input sounds
+ * again.
  */
 ECS_STRUCT(FrequencyShifter, {
     float shift;           /**< Hz, -5000 to 5000, default 0; in the ring mode the frequency of

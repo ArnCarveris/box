@@ -216,7 +216,8 @@ pass the signal unchanged. It has no meter.
 A frequency shifter moves every partial by the same number of Hz, unlike a pitch
 shifter, which multiplies them, so harmonic sounds turn inharmonic. `shift` goes from
 -5000 to 5000 Hz. It shifts the analytic signal of an allpass pair Hilbert transformer,
-whose image stays more than 60 dB under the shift from 20 Hz to 20 Hz under Nyquist.
+whose image stays about 60 dB under the shift from 20 Hz to 20 Hz under Nyquist at 48 kHz
+(about 55 dB at 96 kHz).
 The allpasses turn the phase, so even a shift of 0 is not bit exact with the input.
 `mode: FrequencyRing` makes it a ring modulator instead: a sine at the magnitude of
 `shift` splits each partial into one above and one below at half the level, the
