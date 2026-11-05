@@ -91,7 +91,7 @@ static box_audio_synth_envelope_t box_audio_synth_envelope(
     return (box_audio_synth_envelope_t){
         .attack = env->attack, .decay = env->decay, .sustain = env->sustain,
         .release = env->release, .hold = env->hold, .curve = env->curve,
-        .attack_curve = env->attack_curve };
+        .attack_curve = env->attack_curve, .key_scale = env->key_scale };
 }
 
 /** Check whether an envelope fits in a pass of the core; NaN, infinite and negative times do
@@ -142,11 +142,15 @@ static void box_audio_synth_layer(
         l->modulation = osc->modulation == SynthRing ? BOX_AUDIO_SYNTH_RING :
             BOX_AUDIO_SYNTH_PHASE;
         l->index = osc->index;
+        l->index_velocity = osc->velocity;
         l->audible = osc->audible;
     }
 
     l->feedback = osc->feedback;
     l->pulse_width = osc->pulse_width;
+    l->sub = osc->sub;
+    l->sub_octave = osc->sub_octave >= 2 ? 2 : 1;
+    l->sync = osc->sync;
     l->voices = 1;
     if (unison) {
         l->voices = unison->voices > 1 ? (uint32_t)unison->voices : 1;
@@ -159,6 +163,7 @@ static void box_audio_synth_layer(
         l->decay = string->decay;
         l->brightness = string->brightness;
         l->hardness = string->hardness;
+        l->hardness_velocity = string->velocity;
     }
 }
 
@@ -188,7 +193,8 @@ static void box_audio_synth_lfo(
         .wave = (uint32_t)lfo->wave, .rate = lfo->rate, .delay = lfo->delay,
         .fade = lfo->fade, .phase = lfo->phase, .random_phase = lfo->random_phase,
         .layer = layer, .pitch = lfo->pitch, .amplitude = lfo->amplitude,
-        .cutoff = lfo->cutoff, .pulse_width = lfo->pulse_width };
+        .cutoff = lfo->cutoff, .pulse_width = lfo->pulse_width,
+        .sync = lfo->sync };
 done:
     return;
 }
@@ -297,10 +303,14 @@ bool box_audio_synth_compile(
         p.cutoff = filter->cutoff;
         p.resonance = filter->resonance;
         p.slope = (uint32_t)filter->slope;
+        p.drive = filter->drive;
+        p.filter_velocity = filter->velocity;
+        p.keytrack = filter->keytrack;
     }
 
     if (filter && fenv && fenv->amount != 0) {
         p.filter_amount = fenv->amount;
+        p.filter_envelope_velocity = fenv->velocity;
         p.filter_envelope = (box_audio_synth_envelope_t){
             .attack = fenv->attack, .decay = fenv->decay, .sustain = fenv->sustain,
             .release = fenv->release, .hold = fenv->hold, .curve = fenv->curve,

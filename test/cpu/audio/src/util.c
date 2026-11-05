@@ -269,3 +269,28 @@ void audio_strings_rough(
         core->synth_strings[k].rough = true;
     }
 }
+
+bool audio_synth_cutoff(
+    box_audio_core_t *core,
+    uint32_t handle,
+    double *cutoff,
+    bool *unison)
+{
+    bool result = false;
+    int32_t i;
+    for (i = 0; i < BOX_AUDIO_VOICE_SLOTS && !result; i ++) {
+        box_audio_voice_t *v = &core->voices[i];
+        if (v->state == BOX_AUDIO_VOICE_PLAYING && v->handle == handle &&
+            v->source.kind == BOX_AUDIO_SOURCE_SYNTH)
+        {
+            *cutoff = v->source.data.synth.cutoff;
+            if (unison) {
+                *unison = v->source.data.synth.unison;
+            }
+
+            result = true;
+        }
+    }
+
+    return result;
+}

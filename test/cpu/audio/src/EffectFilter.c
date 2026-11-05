@@ -417,6 +417,7 @@ void EffectFilter_component(void) {
     test_flt(values->resonance, 0);
     test_int(values->slope, SynthSlope12);
     test_flt(values->mix, 1);
+    test_flt(values->drive, 0);
     ecs_set(world, filter, AudioFilter, { .kind = SynthLowPass, .cutoff = 375,
         .slope = SynthSlope24, .mix = 1 });
     audio_insert(world, music, 0, filter);
@@ -432,4 +433,30 @@ void EffectFilter_component(void) {
     test_assert(dry > 0);
     test_assert(10 * log10(wet / dry) < -60);
     ecs_fini(world);
+}
+
+void EffectFilter_drive_ramp_no_click(void) {
+    // audio/filter
+    box_audio_filter_params_t p = fl_params(BOX_AUDIO_SYNTH_LOWPASS, 4000, 0.5f,
+        BOX_AUDIO_SYNTH_SLOPE_24, 1);
+    float level = 0.2f, slope = (float)(2 * AUDIO_PI * 440 / AUDIO_RATE), before, up, down;
+    box_audio_core_t *core = fl_open(&p, 440, level, true);
+    audio_render(core, 0, AUDIO_RATE / 4);
+    before = audio_max_step(audio_l, AUDIO_RATE / 8, AUDIO_RATE / 4);
+    p.drive = 1;
+    fl_command(core, 0, 1, p);
+    audio_render(core, AUDIO_RATE / 4, AUDIO_RATE / 4);
+    up = audio_max_step(audio_l, AUDIO_RATE / 4 - 1, AUDIO_RATE / 2);
+    p.drive = 0;
+    fl_command(core, 0, 1, p);
+    audio_render(core, AUDIO_RATE / 2, AUDIO_RATE / 4);
+    down = audio_max_step(audio_l, AUDIO_RATE / 2 - 1, AUDIO_RATE * 3 / 4);
+    printf("largest step: %.5f before, %.5f while the drive moves to 1, %.5f back to 0, "
+        "%.5f for the sine\n", (double)before, (double)up, (double)down,
+        (double)(level * slope));
+    test_assert(up < level * slope * 1.25f);
+    test_assert(down < level * slope * 1.25f);
+    test_assert(audio_peak(audio_l, AUDIO_RATE * 3 / 8, AUDIO_RATE / 2) <
+        audio_peak(audio_l, AUDIO_RATE / 8, AUDIO_RATE / 4) * 0.95f);
+    box_audio_core_free(core);
 }
