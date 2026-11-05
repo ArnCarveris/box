@@ -434,7 +434,8 @@ track, the placement, the pass of the clip and the note, so a render is
 deterministic and each loop pass differs. A note never starts before its pass of
 the clip began, or before the frame the transport started or seeked to, and still
 ends where the rules above say. A track with humanized timing schedules its notes
-up to a beat earlier than others. Audio clips neither swing nor humanize.
+as much earlier than others as its `timing`, so a note that moves earlier still
+plays on time. Audio clips neither swing nor humanize.
 
 An `AudioClip` has `sound`, `offset` in **seconds**, and `length` in beats. It uses
 `AudioPcm` or `SoundFile`, and needs no instrument. A track can mix note and audio

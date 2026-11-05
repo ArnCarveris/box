@@ -1695,3 +1695,112 @@ void Sequencer_groove_transport_loop(void) {
 
     ecs_fini(world);
 }
+
+/** A placement added while a humanized track plays, on the next beat, plays all its notes
+ * within the timing of their beats. */
+void Sequencer_humanize_launch(void) {
+    // audio/sequencer
+    ecs_world_t *world = audio_world();
+    ecs_entity_t inst = seq_sampler(world, SEQ_LEVEL);
+    Note notes[4];
+    ecs_entity_t clip, track = seq_track(world, inst);
+    int64_t c0, frames[4], at;
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        notes[i] = (Note){ .start = 0.25f * (float)i, .duration = 0.125f, .pitch = 60,
+            .velocity = 1 };
+    }
+
+    clip = seq_clip(world, 1, notes, 4);
+    seq_groove(world, track, 0, TrackSwing8, 10, 0);
+    audio_run(world, 2);
+    c0 = seq_play(world, true);
+    seq_run_to(world, c0 + SEQ_BEAT * 3 / 2);
+    seq_place(world, track, clip, 2, 0, false, 0);
+    seq_run_to(world, c0 + 4 * SEQ_BEAT);
+    test_int(seq_onsets(c0, c0 + 4 * SEQ_BEAT, frames, 4), 4);
+    for (i = 0; i < 4; i ++) {
+        at = c0 + 2 * SEQ_BEAT + i * SEQ_BEAT / 4;
+        test_assert(frames[i] >= at - AUDIO_RATE / 100 - 1);
+        test_assert(frames[i] <= at + AUDIO_RATE / 100 + 1);
+    }
+
+    ecs_fini(world);
+}
+
+/** A tempo change while a humanized track plays keeps the starts in order and within the
+ * timing of their beats at the new tempo. */
+void Sequencer_humanize_tempo(void) {
+    // audio/sequencer
+    ecs_world_t *world = audio_world();
+    ecs_entity_t inst = seq_sampler(world, SEQ_LEVEL);
+    Note notes[4];
+    ecs_entity_t clip, track = seq_track(world, inst);
+    int64_t c0, frames[16], at, end;
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        notes[i] = (Note){ .start = 0.25f * (float)i, .duration = 0.125f, .pitch = 60,
+            .velocity = 1 };
+    }
+
+    clip = seq_clip(world, 1, notes, 4);
+    seq_groove(world, track, 0, TrackSwing8, 10, 0);
+    seq_place(world, track, clip, 0, 4, true, 0);
+    seq_tempo(world, 60);
+    audio_run(world, 2);
+    c0 = seq_play(world, true);
+    audio_run(world, 20);
+    seq_tempo(world, 180);
+    audio_run(world, 1);
+    end = box_audio_timeline_frame(world, 4.0);
+    seq_run_to(world, end + SEQ_BEAT);
+    test_int(seq_onsets(c0, end + SEQ_BEAT, frames, 16), 16);
+    for (i = 1; i < 16; i ++) {
+        test_assert(frames[i] > frames[i - 1]);
+    }
+
+    for (i = 2; i < 16; i ++) {
+        at = box_audio_timeline_frame(world, 0.25 * (double)i);
+        test_assert(frames[i] >= at - AUDIO_RATE / 100 - 1);
+        test_assert(frames[i] <= at + AUDIO_RATE / 100 + 1);
+    }
+
+    ecs_fini(world);
+}
+
+/** Switching the humanized timing on and off while a track plays neither loses nor doubles a
+ * note. */
+void Sequencer_humanize_toggle(void) {
+    // audio/sequencer
+    ecs_world_t *world = audio_world();
+    ecs_entity_t inst = seq_sampler(world, SEQ_LEVEL);
+    Note notes[] = {
+        { .start = 0, .duration = 0.125f, .pitch = 60, .velocity = 1 },
+        { .start = 0.5f, .duration = 0.125f, .pitch = 60, .velocity = 1 }
+    };
+    ecs_entity_t clip = seq_clip(world, 1, notes, 2);
+    ecs_entity_t track = seq_track(world, inst);
+    int64_t c0, frames[16], at, i;
+    int32_t k = 0;
+    seq_place(world, track, clip, 0, 8, true, 0);
+    audio_run(world, 2);
+    c0 = seq_play(world, true);
+    while (audio_tap_count < c0 + 9 * SEQ_BEAT) {
+        audio_run(world, 1);
+        seq_groove(world, track, 0, TrackSwing8, k % 2 ? 0 : 50, 0);
+        k ++;
+    }
+
+    test_int(seq_onsets(c0, c0 + 9 * SEQ_BEAT, frames, 16), 16);
+    for (i = 0; i < 16; i ++) {
+        at = c0 + i * SEQ_BEAT / 2;
+        test_assert(frames[i] >= at - AUDIO_RATE / 20 - 1);
+        test_assert(frames[i] <= at + AUDIO_RATE / 20 + 1);
+    }
+
+    for (i = c0; i < c0 + 9 * SEQ_BEAT; i ++) {
+        test_assert(audio_tap_l[i] <= SEQ_LEVEL + 1e-4f);
+    }
+
+    ecs_fini(world);
+}

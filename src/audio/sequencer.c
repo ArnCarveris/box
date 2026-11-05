@@ -25,11 +25,6 @@
 /** Beats two segments may differ by at their seam and still follow each other */
 #define BOX_AUDIO_SEQ_SEAM 1e-9
 
-/** Beats ahead of its segment a track with humanized timing scans for notes, so a note that
- * moves earlier is still scheduled on time: more than the 50 ms of the largest offset at the
- * top tempo of 999 */
-#define BOX_AUDIO_SEQ_EARLY 1.0
-
 /** Largest swing of a track */
 #define BOX_AUDIO_SEQ_SWING_MAX 0.75
 
@@ -217,8 +212,24 @@ static int box_audio_placement_compare(
     return result;
 }
 
+/** Order placements by entity.
+ *
+ * @param a A placement
+ * @param b Another placement
+ * @return Negative when a comes first
+ */
+static int box_audio_placement_compare_entity(
+    const void *a,
+    const void *b)
+{
+    const box_audio_placement_t *pa = a, *pb = b;
+
+    return pa->entity < pb->entity ? -1 : (pa->entity > pb->entity);
+}
+
 /** Rebuild the index of the placements: every ClipPlacement on a child of a Track, disabled
- * ones included, sorted by start, each with the largest end up to it.
+ * ones included, sorted by start, each with the largest end up to it and the beat up to which
+ * it was scanned before the rebuild.
  *
  * @param world The world
  * @param seq The sequencer
@@ -237,12 +248,22 @@ static void box_audio_sequencer_index(
 
     seq->dirty = false;
     seq->stats.rebuilds ++;
+    count = ecs_vec_count(&seq->index);
+    ecs_vec_set_count_t(NULL, &seq->scans, box_audio_placement_t, count);
+    if (count) {
+        memcpy(ecs_vec_first(&seq->scans), ecs_vec_first(&seq->index),
+            sizeof(box_audio_placement_t) * (size_t)count);
+        qsort(ecs_vec_first(&seq->scans), (size_t)count, sizeof(box_audio_placement_t),
+            box_audio_placement_compare_entity);
+    }
+
     ecs_vec_clear(&seq->index);
     it = ecs_query_iter(world, seq->placements);
     while (ecs_query_next(&it)) {
         const ClipPlacement *p = ecs_field(&it, ClipPlacement, 0);
         for (i = 0; i < it.count; i ++) {
             ecs_entity_t track = ecs_get_parent(world, it.entities[i]);
+            const box_audio_placement_t *prev;
             box_audio_placement_t *e;
             double start, span;
             if (!track || !ecs_has(world, track, Track)) {
@@ -257,7 +278,12 @@ static void box_audio_sequencer_index(
 
             e = ecs_vec_append_t(NULL, &seq->index, box_audio_placement_t);
             *e = (box_audio_placement_t){ .entity = it.entities[i], .track = track,
-                .start = start, .end = start + span };
+                .start = start, .end = start + span, .scanned = -INFINITY };
+            prev = bsearch(e, ecs_vec_first(&seq->scans), (size_t)ecs_vec_count(&seq->scans),
+                sizeof(box_audio_placement_t), box_audio_placement_compare_entity);
+            if (prev) {
+                e->scanned = prev->scanned;
+            }
         }
     }
 
@@ -555,16 +581,23 @@ static uint8_t box_audio_track_priority(
     return (uint8_t)(priority > 0 ? (priority < 255 ? priority : 255) : 0);
 }
 
-/** Get the beats ahead of its segment that a track scans for notes.
+/** Get the frames a note start of a track moves at most either way.
  *
  * @param tk The Track, NULL for none
- * @return BOX_AUDIO_SEQ_EARLY when its timing is humanized, else 0
+ * @param rate Frames per second of the timeline
+ * @return The frames, 0 when its timing is not humanized
  */
-static double box_audio_seq_early(
-    const Track *tk)
+static double box_audio_seq_timing(
+    const Track *tk,
+    double rate)
 {
-    return tk && isfinite(tk->humanize.timing) && tk->humanize.timing > 0 ?
-        BOX_AUDIO_SEQ_EARLY : 0.0;
+    double result = 0.0;
+    if (tk && isfinite(tk->humanize.timing) && tk->humanize.timing > 0) {
+        result = (tk->humanize.timing < BOX_AUDIO_SEQ_TIMING_MAX ? tk->humanize.timing :
+            BOX_AUDIO_SEQ_TIMING_MAX) / 1000.0 * rate;
+    }
+
+    return result;
 }
 
 /** Swing a beat of the timeline: within each pair of steps from beat 0 the first step
@@ -977,9 +1010,9 @@ static void box_audio_seq_passes(
 
 /** Schedule the notes and the audio passes of a placement that start in a segment.
  *
- * The notes of a track with humanized timing are picked BOX_AUDIO_SEQ_EARLY beats ahead of
- * the segment, up to loop_end when it wraps, and from its start after a jump, so each is
- * picked once.
+ * The notes of a track with humanized timing are picked as far ahead of the segment as their
+ * largest offset, up to loop_end when it wraps. The notes start from the beat the placement
+ * was scanned up to, so each is picked once when that changes with the tempo or the timing.
  *
  * @param world The world
  * @param state The state
@@ -990,7 +1023,7 @@ static void box_audio_seq_passes(
 static void box_audio_seq_visit(
     ecs_world_t *world,
     box_audio_module_t *state,
-    const box_audio_placement_t *pl,
+    box_audio_placement_t *pl,
     const box_audio_segment_t *seg,
     bool jump)
 {
@@ -1000,7 +1033,6 @@ static void box_audio_seq_visit(
         .jump = jump };
     box_audio_seq_visit_t nv;
     const Track *tk;
-    double early;
     seq->stats.visits ++;
     if (!box_audio_seq_live(world, pl->track, pl->entity)) {
         seq->dirty |= ecs_is_alive(world, pl->entity) &&
@@ -1027,27 +1059,23 @@ static void box_audio_seq_visit(
         v.step = tk->swing_grid == TrackSwing16 ? 0.25 : 0.5;
     }
 
-    if (isfinite(tk->humanize.timing) && tk->humanize.timing > 0) {
-        v.timing = (tk->humanize.timing < BOX_AUDIO_SEQ_TIMING_MAX ? tk->humanize.timing :
-            BOX_AUDIO_SEQ_TIMING_MAX) / 1000.0 * (double)tl->rate;
-    }
-
+    v.timing = box_audio_seq_timing(tk, (double)tl->rate);
     if (isfinite(tk->humanize.velocity) && tk->humanize.velocity > 0) {
         v.vary = tk->humanize.velocity < 1 ? tk->humanize.velocity : 1.0;
     }
 
     nv = v;
-    early = box_audio_seq_early(tk);
-    if (early > 0) {
-        nv.lo = jump ? seg->start : seg->start + early;
-        nv.hi = seg->end + early;
+    nv.lo = pl->scanned > v.lo ? pl->scanned : v.lo;
+    if (v.timing > 0) {
+        nv.hi = seg->end + v.timing / seg->anchor.frames_per_beat;
         if (seg->start < v.loop_end && nv.hi > v.loop_end) {
             nv.hi = v.loop_end;
         }
 
-        nv.lo = nv.lo > pl->start ? nv.lo : pl->start;
         nv.hi = nv.hi < pl->end ? nv.hi : pl->end;
     }
+
+    pl->scanned = nv.hi > pl->scanned ? nv.hi : pl->scanned;
 
     if (!(v.lo < v.hi) && !(nv.lo < nv.hi)) {
         goto done;
@@ -1086,7 +1114,8 @@ static void box_audio_sequencer_window(
     void *ctx)
 {
     box_audio_sequencer_t *seq = &state->sequencer;
-    const box_audio_placement_t *index;
+    box_audio_placement_t *index;
+    double ahead;
     int32_t i, k, lo, hi, n;
     bool jump;
     (void)ctx;
@@ -1106,6 +1135,10 @@ static void box_audio_sequencer_window(
             box_audio_seq_release_all(state, seg->frame);
         }
 
+        for (k = 0; jump && k < n; k ++) {
+            index[k].scanned = -INFINITY;
+        }
+
         lo = 0;
         hi = n;
         while (lo < hi) {
@@ -1117,10 +1150,13 @@ static void box_audio_sequencer_window(
             }
         }
 
-        for (k = lo; k < n && index[k].start < seg->end + BOX_AUDIO_SEQ_EARLY; k ++) {
+        ahead = BOX_AUDIO_SEQ_TIMING_MAX / 1000.0 * (double)state->timeline.rate /
+            seg->anchor.frames_per_beat;
+        for (k = lo; k < n && index[k].start < seg->end + ahead; k ++) {
             if (index[k].end > seg->start && (index[k].start < seg->end ||
-                (ecs_is_alive(world, index[k].track) &&
-                box_audio_seq_early(ecs_get(world, index[k].track, Track)) > 0)))
+                (ecs_is_alive(world, index[k].track) && index[k].start < seg->end +
+                box_audio_seq_timing(ecs_get(world, index[k].track, Track),
+                (double)state->timeline.rate) / seg->anchor.frames_per_beat)))
             {
                 box_audio_seq_visit(world, state, &index[k], seg, jump);
             }
@@ -1231,6 +1267,7 @@ void box_audio_sequencer_init(
         .reset = box_audio_sequencer_reset
     };
     ecs_vec_init_t(NULL, &seq->index, box_audio_placement_t, 0);
+    ecs_vec_init_t(NULL, &seq->scans, box_audio_placement_t, 0);
     ecs_vec_init_t(NULL, &seq->sounding, box_audio_sounding_t, 0);
     ecs_vec_init_t(NULL, &seq->voices, box_audio_clip_voice_t, 0);
     ecs_map_init(&seq->clips, NULL);
@@ -1292,6 +1329,7 @@ void box_audio_sequencer_fini(
 
     ecs_map_fini(&seq->clips);
     ecs_vec_fini_t(NULL, &seq->index, box_audio_placement_t);
+    ecs_vec_fini_t(NULL, &seq->scans, box_audio_placement_t);
     ecs_vec_fini_t(NULL, &seq->sounding, box_audio_sounding_t);
     ecs_vec_fini_t(NULL, &seq->voices, box_audio_clip_voice_t);
 }
