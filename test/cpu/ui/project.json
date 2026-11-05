@@ -618,6 +618,22 @@
                 ]
             },
             {
+                "id": "StartupOverlay",
+                "testcases": [
+                    "closed_by_default",
+                    "opens_while_blocking",
+                    "not_for_non_blocking",
+                    "lists_tasks",
+                    "closes_when_none_blocks",
+                    "does_not_reopen",
+                    "no_task_in_first_frames",
+                    "disabled",
+                    "app_run_with_window",
+                    "headless_never_opens",
+                    "script_from_test_folder"
+                ]
+            },
+            {
                 "id": "Msdf",
                 "setup": true,
                 "testcases": [

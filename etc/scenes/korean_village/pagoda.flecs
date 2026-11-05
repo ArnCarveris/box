@@ -4,7 +4,6 @@ using box.transform
 using box.geometry
 using box.material
 
-@tree Parent
 template KoreanPagoda {
   { (IsA, KoreanStone); Position: {0, 0.14, 0}; RoundedBox: {2, 0.28, 2, 0.03} }
   { (IsA, KoreanStone); Position: {0, 0.46, 0}; Box: {1.45, 0.36, 1.45} }

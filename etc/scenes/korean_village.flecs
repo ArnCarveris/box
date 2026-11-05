@@ -147,6 +147,20 @@ korean_village {
     { KoreanOnggi: {size: 0.65 + i * 0.12}; Position: {-6.8, 0.13, -9.6 + i * 0.88} }
   }
   bench { KoreanBench: {}; Position: {-4.2, 0.13, 5.6} }
+  bamboo_mist {
+    Position: {0, 1.4, -13.1}
+    FogVolume: {
+      extent: {15.6, 1.4, 1.3},
+      density: 0.22,
+      color: {232, 238, 236},
+      edge_fade: 1.1,
+      asymmetry: 0.45,
+      noise_strength: 0.75,
+      noise_scale: 3,
+      wind: {0.25, 0.02, 0},
+      steps: 8
+    }
+  }
   for i in 0..7 {
     { Position: {-4.3 + math.sin(i * 0.9) * 1.1, 0.22, 3.9 + math.cos(i * 0.9) * 0.85}; Scale: {0.35, 0.2, 0.3}; IcoSphere: {radius: 1, segments: 1}; Rgb: {136, 144, 125} }
   }

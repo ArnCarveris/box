@@ -8,7 +8,6 @@ using box.geometry
 using box.material
 
 assets {
-  @tree Parent
   template DormerRoof : Roof {
     TiledRoof(width: width, depth: depth, color: color) { Position: {} }
 

@@ -8,6 +8,7 @@
 
 /* This generated file contains includes for project dependencies */
 #include "box/bake_config.h"
+#include "box/task.h"
 #include "box/curve.h"
 #include "box/animation.h"
 #include "box/transform.h"
@@ -38,6 +39,7 @@
 #include "box/console.h"
 #include "box/editor.h"
 #include "box/fps.h"
+#include "box/startup.h"
 #include "box/atmosphere.h"
 #include "box/particle.h"
 #include "box/transition.h"

@@ -12,7 +12,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template IslandPergola {
   prop width: f32 = 4.3
   prop depth: f32 = 3

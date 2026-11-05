@@ -11,7 +11,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template CheeseWheel {
   prop radius: f32 = 0.42
   prop height: f32 = 0.24
@@ -23,6 +22,7 @@ template CheeseWheel {
     Cylinder: {radius: radius, length: height, segments: 32, smooth: true}
     Rgb: tint
     PbrMaterial: {roughness: 0.72}
+    ClearCoat: {strength: wax ? 0.85 : 0, roughness: 0.18}
   }
   for side in 0..2 {
     {

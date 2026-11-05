@@ -12,7 +12,6 @@ using box.surface
 using box.controllers
 using box.movement
 
-@tree Parent
 template WaterBasin {
   basin {
     Position: {0, 0.4, 0}

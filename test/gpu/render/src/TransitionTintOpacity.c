@@ -193,3 +193,111 @@ void TransitionTintOpacity_opacity_mid_transition(void) {
     tto_no_errors(world);
     ecs_fini(world);
 }
+
+/** Render the red child box with no Tint and no Opacity on the parent, at the target the
+ * transitions of the cases below end at, and read its center pixel.
+ *
+ * @param file Image file in the temporary folder
+ * @param out Receives red, green and blue of the center pixel
+ */
+static void tto_static(
+    const char *file,
+    int32_t *out)
+{
+    ecs_world_t *world;
+    ecs_entity_t child;
+    int32_t c;
+    tto_world(&world, &child);
+    stbi_image_free(tto_capture(world, file));
+    unsigned char *px = tto_capture(world, file);
+    for (c = 0; c < 3; c ++) {
+        out[c] = tto_center(px, c);
+    }
+
+    stbi_image_free(px);
+    tto_no_errors(world);
+    ecs_fini(world);
+}
+
+/** The parent removes its blue Tint with on_remove: the child goes from blue back to red over
+ * the transition, half way in the middle, and ends at the pixel of a scene without the Tint,
+ * while the game thread sees no Tint from the start.
+ */
+void TransitionTintOpacity_tint_remove(void) {
+    // engine_core/transition
+    ecs_world_t *world;
+    ecs_entity_t child;
+    ecs_entity_t parent = tto_world(&world, &child);
+    int32_t expected[3], c;
+    ecs_set(world, parent, Tint, {0, 0, 255, 255});
+    box_transition_set(world, parent, ecs_id(Tint),
+        &(TransitionSpec){ .duration = 1.0f, .on_remove = true });
+    unsigned char *px = tto_capture(world, "transition_tint_remove_0.png");
+    test_assert(tto_center(px, 2) > tto_center(px, 0) + 60);
+    stbi_image_free(px);
+
+    ecs_remove(world, parent, Tint);
+    px = tto_capture(world, "transition_tint_remove_1.png");
+    test_assert(!ecs_has(world, parent, Tint));
+    test_assert(tto_center(px, 2) > tto_center(px, 0) + 60);
+    stbi_image_free(px);
+
+    stbi_image_free(tto_capture(world, "transition_tint_remove_2.png"));
+    px = tto_capture(world, "transition_tint_remove_3.png");
+    int32_t r = tto_center(px, 0), b = tto_center(px, 2);
+    test_assert(r > 40);
+    test_assert(b > 40);
+    test_assert(abs(r - b) < 40);
+    stbi_image_free(px);
+
+    stbi_image_free(tto_capture(world, "transition_tint_remove_4.png"));
+    px = tto_capture(world, "transition_tint_remove_5.png");
+    tto_static("transition_tint_remove_static.png", expected);
+    for (c = 0; c < 3; c ++) {
+        test_assert(abs(tto_center(px, c) - expected[c]) <= 1);
+    }
+
+    stbi_image_free(px);
+    tto_no_errors(world);
+    ecs_fini(world);
+}
+
+/** The parent gets an Opacity of 0 with on_add: the child fades out from fully visible over the
+ * transition, dimmer in the middle, and ends black, while the game thread sees 0 from the start.
+ */
+void TransitionTintOpacity_opacity_add(void) {
+    // engine_core/transition
+    ecs_world_t *world;
+    ecs_entity_t child;
+    ecs_entity_t parent = tto_world(&world, &child);
+    int32_t expected[3];
+    box_transition_set(world, parent, ecs_id(Opacity),
+        &(TransitionSpec){ .duration = 1.0f, .on_add = true });
+    unsigned char *px = tto_capture(world, "transition_opacity_add_0.png");
+    int32_t full = tto_center(px, 0);
+    tto_static("transition_opacity_add_static.png", expected);
+    test_assert(full > 60);
+    test_assert(abs(full - expected[0]) <= 1);
+    stbi_image_free(px);
+
+    ecs_set(world, parent, Opacity, {0.0f});
+    px = tto_capture(world, "transition_opacity_add_1.png");
+    test_assert(abs(tto_center(px, 0) - full) < 10);
+    stbi_image_free(px);
+
+    stbi_image_free(tto_capture(world, "transition_opacity_add_2.png"));
+    px = tto_capture(world, "transition_opacity_add_3.png");
+    test_flt(ecs_get(world, parent, Opacity)->value, 0);
+    int32_t mid = tto_center(px, 0);
+    test_assert(mid > TTO_DARK);
+    test_assert(mid < full - 40);
+    stbi_image_free(px);
+
+    stbi_image_free(tto_capture(world, "transition_opacity_add_4.png"));
+    px = tto_capture(world, "transition_opacity_add_5.png");
+    test_assert(tto_center(px, 0) < TTO_DARK);
+    stbi_image_free(px);
+
+    tto_no_errors(world);
+    ecs_fini(world);
+}

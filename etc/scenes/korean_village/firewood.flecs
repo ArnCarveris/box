@@ -4,7 +4,6 @@ using box.transform
 using box.geometry
 using box.material
 
-@tree Parent
 template KoreanFirewood {
   for row in 0..4 {
     for log in 0..9 - row {

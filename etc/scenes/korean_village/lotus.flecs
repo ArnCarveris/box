@@ -4,7 +4,6 @@ using box.transform
 using box.geometry
 using box.material
 
-@tree Parent
 template KoreanLotus {
   { (IsA, KoreanBlue); Position: {}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.19, length: 0.012, segments: 24} }
   for petal in 0..8 {

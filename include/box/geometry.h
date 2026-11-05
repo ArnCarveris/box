@@ -580,6 +580,12 @@ ECS_STRUCT(Polygon2D, {
  * The border lies inside the edge of the shape and the fill (the Rgb of the entity) inside the
  * border. The radius rounds the corners of a Rect and is clamped to half its smaller side; a
  * Polygon2D keeps its corners.
+ *
+ * Transitionable (Transition): the width and radius interpolate linearly by the timing function
+ * and the color per channel in display encoding; a negative width or radius an overshooting
+ * curve renders draws as 0. The BoxShadow of the shape follows the rendered border. Picking,
+ * layout and the clip area of ClipChildren use the target, so clipped children keep the target
+ * corner radius while the radius transitions.
  */
 ECS_STRUCT(Border, {
     float width;  /**< Width of the border, 0 for none */

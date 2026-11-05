@@ -172,6 +172,9 @@ ECS_STRUCT(ViewEffect, {
 /** Order of the view of the fps panel: over the editor, under the console */
 #define BOX_VIEW_ORDER_FPS (1500000)
 
+/** Order of the view of the startup overlay: over the fps panel, under the console */
+#define BOX_VIEW_ORDER_STARTUP (1750000)
+
 /** Order of the view of the in game console, which renders after every other view */
 #define BOX_VIEW_ORDER_CONSOLE (2000000)
 

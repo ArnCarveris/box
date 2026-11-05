@@ -136,6 +136,15 @@ ECS_STRUCT(AudioBus, {
  * damping and mix change smoothly; a change of size or predelay fades the wet signal out and
  * in, and so does a move to another slot. Deleting the entity, as unloading its scene does,
  * taking it out of its slot or disabling it takes it off with a fade.
+ *
+ * Shimmer pitches the tail up inside the reverb: a share of its feedback runs through the
+ * pitch shifter of PitchShifter, a 60 ms window, so each pass of the tail rises by
+ * shimmer_pitch semitones, an octave by default, for the rising pads of ambient and cinematic
+ * tracks. The shifted share replaces part of the feedback rather than adding to it, so the
+ * reverb stays bounded at every decay, and the damping darkens the shifted tail as the rest;
+ * a shimmer shortens the decay somewhat. Shimmer and shimmer_pitch move over 50 ms. At a
+ * shimmer of 0 the reverb is the same as without one, sample for sample:
+ * shimmer { AudioBus: {effects: [shimmer]}; Reverb: {decay: 6, shimmer: 0.5, mix: 1} }.
  */
 ECS_STRUCT(Reverb, {
     float decay;           /**< Seconds until -60 dB, default 1.5 */
@@ -144,6 +153,10 @@ ECS_STRUCT(Reverb, {
     float size;            /**< Room scale, 0 to 1, default 0.5 */
     float mix;             /**< Wet level, 0 to 1, default 1 on a send bus; the dry signal
                             *   passes at 1 - mix */
+    float shimmer;         /**< Share of the feedback that is pitch shifted, 0 to 1, default 0
+                            *   (off) */
+    float shimmer_pitch;   /**< Semitones each pass of the shimmer shifts, -24 to 24, default
+                            *   12 (an octave up) */
 });
 
 /** Bands of an Equalizer */
@@ -905,6 +918,81 @@ ECS_STRUCT(TransientShaper, {
                             *   it */
 });
 
+/** Mode of a FrequencyShifter */
+ECS_ENUM(FrequencyShifterMode, {
+    FrequencyShift,        /**< Every partial moves up or down by the shift in Hz */
+    FrequencyRing          /**< Ring modulation by a sine at the magnitude of the shift: each
+                            *   partial splits into one shift above and one below it at half
+                            *   the level, the partial itself gone */
+});
+
+/** A frequency shifter, an effect in an insert slot of an AudioBus, as a Reverb is: every
+ * partial moves by the same number of Hz, so harmonic sounds turn inharmonic. A few Hz thicken
+ * and, with stereo, widen; feedback gives an endlessly rising or falling barber pole sweep;
+ * hundreds of Hz give metallic and bell tones. The ring mode is a classic ring modulator:
+ * pad { AudioBus: {effects: [pad]}; FrequencyShifter: {shift: 2, stereo: 1, mix: 0.5} }.
+ *
+ * It shifts the analytic signal from an allpass pair Hilbert transformer, whose two paths stay 90
+ * degrees apart from 20 Hz to 20 Hz under the Nyquist frequency, with the image of a shift about
+ * 60 dB under it there at 48 kHz. The allpasses turn the phase of the signal but not its level, so
+ * a shift of 0 at a mix of 1 changes the phase only. The oscillators start when the shifter is put
+ * on a channel and run on through a change of the shift without a jump. The feedback runs through a
+ * 20 Hz DC blocker and a soft limit at +12 dB. Changes move over 20 ms; a change of the mode
+ * crossfades. Once its input is silent and its allpasses decayed it stops until its input sounds
+ * again.
+ */
+ECS_STRUCT(FrequencyShifter, {
+    float shift;           /**< Hz, -5000 to 5000, default 0; in the ring mode the frequency of
+                            *   the sine is its magnitude */
+    FrequencyShifterMode mode; /**< FrequencyShift (default) or FrequencyRing */
+    float stereo;          /**< 0 to 1, default 0: the right channel shifts by shift times
+                            *   1 - 2 stereo, so at 1 the opposite way of the left */
+    float feedback;        /**< Share of the shifted signal fed back into the input, -0.95 to
+                            *   0.95, default 0 */
+    float mix;             /**< Wet level, 0 to 1, default 1; the dry signal passes at
+                            *   1 - mix */
+});
+
+/** Longest window of a PitchShifter in milliseconds, which sizes its memory */
+#define BOX_AUDIO_PITCH_SHIFTER_WINDOW_MAX 100.0f
+
+/** A pitch shifter, an effect in an insert slot of an AudioBus, as a Reverb is: thickens a lead
+ * by a few cents either way, adds octaves to basses and leads and makes harmonies, without
+ * changing the speed of what plays through it.
+ *
+ * Each channel is a delay line read by two taps half a window apart that slide through the
+ * window at the speed of the shift and wrap around, crossfaded with constant power sine
+ * windows (a granular, not a formant preserving, shifter). Shorter windows suit percussive
+ * material and keep its attacks tight, longer ones suit pads and sound smoother. The left
+ * channel shifts by semitones plus cents, the right one by semitones plus cents times 1 - 2
+ * stereo: a stereo of 1 mirrors the cents, the classic detune widener. Feedback sends the
+ * shifted signal back into the line, so each pass shifts again, a cascade of rising or falling
+ * copies; it is soft clipped, so it stays bounded.
+ *
+ * As with every delay line shifter, a steady tone lands on its interval exactly only when the
+ * window holds a whole number of its periods; otherwise it is off by up to half the rate at
+ * which the taps wrap, the shift ratio minus 1 over the window: up to 12.5 Hz an octave up at
+ * 40 ms. Small detunes wrap slowly and stay accurate.
+ *
+ * Latency: the shifted signal comes up to a window late, about half a window on average, and
+ * the dry signal is not delayed to match, so a mix in between is a shifted copy behind the dry
+ * one. Every pitch shifter runs with its own memory of BOX_AUDIO_PITCH_SHIFTER_WINDOW_MAX
+ * milliseconds per channel. All parameters move over 20 ms. Once its input and its feedback
+ * are silent for a window it stops until its input sounds again:
+ * lead { AudioBus: {effects: [lead]}; PitchShifter: {cents: 8, stereo: 1, window: 30} }.
+ */
+ECS_STRUCT(PitchShifter, {
+    float semitones;       /**< Shift, -24 to 24, default 0 */
+    float cents;           /**< Detune on top of the semitones, -100 to 100, default 0 */
+    float stereo;          /**< 0 to 1, default 0: the cents of the right channel go from cents
+                            *   at 0 to -cents at 1 */
+    float window;          /**< Milliseconds of the window, 10 to 100, default 40 */
+    float feedback;        /**< Share of the shifted signal fed back into the line, 0 to 0.9,
+                            *   default 0 */
+    float mix;             /**< Wet level, 0 to 1, default 0.5; the dry signal passes at
+                            *   1 - mix */
+});
+
 /** An envelope of the cutoff of the SynthFilter of the same root, with the segments of a
  * SynthEnvelope: the cutoff is cutoff times 2 to the amount times the level of the envelope,
  * so it rises over the attack, settles at the sustain and returns over the release.
@@ -1295,6 +1383,105 @@ ECS_STRUCT(AutomationClip, {
                              *   the clip, and of a placement of duration 0 */
     Curve curve;            /**< The values: time in beats from the start of the clip, value
                              *   in the units of the member */
+});
+
+/** Source of an AudioModulator */
+ECS_ENUM(AudioModSource, {
+    AudioModLfo,           /**< A wave: AudioModulator.wave at rate or sync */
+    AudioModSteps,         /**< A sequence of up to 16 values, one per step of sync beats */
+    AudioModFollower       /**< The level of a bus, -60..0 dB mapped to 0..1 */
+});
+
+/** Wave of an AudioModulator. Its own enum rather than SynthLfoWave, which has no falling saw
+ * and whose square and saw smooth their edges in the synth */
+ECS_ENUM(AudioModWave, {
+    AudioModSine,          /**< Sine, from 0 rising */
+    AudioModTriangle,      /**< Triangle, from 0 rising */
+    AudioModSquare,        /**< Square, 1 for the first half of a cycle, -1 for the second */
+    AudioModSawUp,         /**< Rising saw, -1 to 1 */
+    AudioModSawDown,       /**< Falling saw, 1 to -1 */
+    AudioModRandom         /**< Sample and hold: a random value per cycle, the same for the
+                            *   same cycle of the Transport when synced */
+});
+
+/** How the depth of an AudioModulator applies */
+ECS_ENUM(AudioModScale, {
+    AudioModLinear,        /**< The value plus depth times the source, in the units of the
+                            *   member */
+    AudioModOctaves        /**< The value times 2^(depth times the source): depth in octaves,
+                            *   for a member that is a frequency (cutoff, center, frequency
+                            *   of a band, damping of a Delay), whose linear sweep sounds
+                            *   lopsided */
+});
+
+/** Modulators the core runs; more log one error that names the modulator and do nothing */
+#define BOX_AUDIO_MODULATORS 64
+
+/** Modulators that may move one member; more log one error that names the modulator and do
+ * nothing */
+#define BOX_AUDIO_MODULATORS_PER_TARGET 4
+
+/** A modulator, on an entity of its own: moves a float member of a bus or an effect on its own,
+ * in time with the song, for a filter that wobbles in eighths, a send that pulses, a tremolo,
+ * an auto-pan or an auto-wah:
+ * wobble { AudioModulator: {target: bass_filter, component: AudioFilter, member: "cutoff",
+ * scale: AudioModOctaves, depth: 2, sync: 0.5} }.
+ *
+ * target, component and member name what it moves as an AutomationClip does, with the same
+ * targets: volume, pan, width and sends[i].level of an AudioBus or of the master, and every
+ * float member of the effect component of an effect entity.
+ *
+ * Its value adds to the value the output has, the one of the component or of an automation
+ * lane that covers the member, and the sum is clamped to the range of the member. depth is the
+ * swing either way at the top of the source, in the units of the member, or in octaves with
+ * AudioModOctaves. The modulator never writes the component. Up to
+ * BOX_AUDIO_MODULATORS_PER_TARGET modulators of one member add up.
+ *
+ * A positive sync locks it to the Transport: the phase at a frame is phase + fract(beat /
+ * sync), beat being the position of the Transport at that frame, so a seek, a loop wrap and a
+ * tempo change keep it on the grid. A stopped Transport, or none, leaves the beat where it
+ * stands and moves it on at 120 bpm. Without sync an LFO runs at rate from the moment it
+ * starts.
+ *
+ * It runs in the audio core, once per 32 frames and at the edges of its square, saws, steps
+ * and samples: a bus ramps to each value, an effect smooths it as any change. It fades in over
+ * 50 ms when it starts; disabling, deleting or retargeting it fades it out over 50 ms, and the
+ * member returns to its value without a click. A modulator whose target, component or member
+ * is unknown logs one error that names it until it changes; one whose effect is in no insert
+ * slot waits for one.
+ *
+ * There is no stereo phase offset: every member it can move has one value for both channels
+ * (one cutoff for the filter of a bus, one pan of a bus), so the core has no right channel to
+ * move apart. An auto-pan is an LFO on pan. See Modulators in docs/audio.md.
+ */
+ECS_STRUCT(AudioModulator, {
+    ecs_entity_t target;    /**< The entity with the AudioBus or the effect component */
+    ecs_entity_t component; /**< The component: AudioBus or an effect component */
+    char *member;           /**< Path of a float member, such as "cutoff", "volume" or
+                             *   "sends[1].level" */
+    AudioModSource source;  /**< What moves it, default AudioModLfo */
+    float depth;            /**< Swing either way at a source of 1, in the units of the member,
+                             *   or in octaves; negative turns it upside down. Default 0 */
+    AudioModScale scale;    /**< Linear (default) or in octaves, for a frequency */
+    AudioModWave wave;      /**< Wave of an LFO, default AudioModSine */
+    float rate;             /**< Hz of an LFO, or steps per second, when sync is 0, 0..100,
+                             *   default 1 */
+    float sync;             /**< Beats of a cycle of an LFO, or of a step, 0..256, default 0 for
+                             *   rate; when positive it wins over rate, like SynthLfo.sync and
+                             *   Delay.sync: 0.5 is an eighth, 0.25 a sixteenth */
+    float phase;            /**< Phase in turns, 0..1: of a cycle of an LFO, of the whole
+                             *   sequence of steps */
+    bool unipolar;          /**< An LFO moves 0..1 instead of -1..1, for a tremolo that only
+                             *   dips: depth -1 on a volume of 1 */
+    float steps[16];        /**< Values of the steps, -1..1 */
+    int32_t step_count;     /**< Steps that play, 1..16, default 16 */
+    float smooth;           /**< Share of a step the value glides from the step before over, 0
+                             *   for hard steps (default) .. 1 */
+    ecs_entity_t key;       /**< Bus whose level a follower follows, measured before its
+                             *   inserts and volume; 0 for the bus that holds the target effect,
+                             *   or the target bus */
+    float attack;           /**< Seconds of the rise of a follower, default 0.01 */
+    float release;          /**< Seconds of the fall of a follower, default 0.1 */
 });
 
 /** The grid a Track swings */

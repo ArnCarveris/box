@@ -1082,7 +1082,7 @@ static WGPURenderPipeline box_gpu_forward_create(
         .fragment = &fragment
     };
 
-    return wgpuDeviceCreateRenderPipeline(gpu->device, &desc);
+    return box_gpu_render_pipeline(gpu, &desc);
 }
 
 /** Get the pipeline layout of the alpha tested depth prepass of TextureBlend batches, created
@@ -1190,7 +1190,7 @@ static WGPURenderPipeline box_gpu_prepass_create(
         .fragment = cutout ? &fragment : NULL
     };
 
-    return wgpuDeviceCreateRenderPipeline(gpu->device, &desc);
+    return box_gpu_render_pipeline(gpu, &desc);
 }
 
 #ifndef __EMSCRIPTEN__

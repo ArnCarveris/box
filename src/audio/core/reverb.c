@@ -6,6 +6,10 @@
  * The delay memory comes from the transport, as the memory of its effect slot. The feedback
  * gain of every line is below 1 and the matrix is orthogonal, so no setting can make the
  * network grow. Its params are a box_audio_reverb_params_t.
+ *
+ * The shimmer replaces a share of the damped feedback along the input vector of the network by
+ * its copy through a shifter of shift.h, scaled to never sum above what it reads, so each pass
+ * rises by the interval without adding to the loop gain. A shimmer of 0 runs none of it.
  */
 
 #include "internal.h"
@@ -65,6 +69,10 @@ static const float box_audio_reverb_right[BOX_AUDIO_REVERB_LINES] = {
 
 /** ln(2) */
 #define BOX_AUDIO_REVERB_LN2 0.6931471805599453
+
+/** Gain of the shifted copy of the shimmer, 1 / sqrt(2): the constant power windows of its two
+ * taps sum to at most sqrt(2) */
+#define BOX_AUDIO_REVERB_SHIMMER_GAIN 0.70710678118654752440f
 
 /** 2 pi */
 #define BOX_AUDIO_REVERB_TAU 6.283185307179586
@@ -132,7 +140,19 @@ static float box_audio_reverb_clamp(
     return v;
 }
 
-/** Get the room of each line and of the predelay line at a sample rate.
+/** Get the frames of the window of the shifter of the shimmer at a sample rate.
+ *
+ * @param sample_rate Frames per second
+ * @return Frames of the window
+ */
+static int32_t box_audio_reverb_shimmer_window(
+    float sample_rate)
+{
+    return (int32_t)(BOX_AUDIO_REVERB_SHIMMER_WINDOW * sample_rate) + 1;
+}
+
+/** Get the room of each line, of the predelay line and of the line of the shimmer at a sample
+ * rate; the line of the shimmer comes after the others.
  *
  * @param sample_rate Frames per second
  * @param room Receives the floats of each line
@@ -152,7 +172,7 @@ static int32_t box_audio_reverb_layout(
         result += room[i];
     }
 
-    return result;
+    return result + box_audio_shift_length(box_audio_reverb_shimmer_window(sample_rate));
 }
 
 int32_t box_audio_reverb_floats(
@@ -233,6 +253,7 @@ static void box_audio_reverb_clear(
     }
 
     rv->pre_pos = 0;
+    box_audio_shift_clear(&rv->shimmer);
     fx->quiet = 0;
     rv->still = 0;
 }
@@ -266,6 +287,10 @@ static void box_audio_reverb_apply(
         prev = rv->length[i];
         at += room[i];
     }
+
+    rv->shimmer_window = (float)box_audio_reverb_shimmer_window(core->sample_rate);
+    box_audio_shift_init(&rv->shimmer, at,
+        box_audio_shift_length((int32_t)rv->shimmer_window));
 
     rv->pre_length = (int32_t)(rv->target.predelay * core->sample_rate + 0.5f);
     rv->pre_length = rv->pre_length < pre ? rv->pre_length : pre;
@@ -318,6 +343,20 @@ static void box_audio_reverb_target(
     rv->target.predelay = box_audio_reverb_clamp(p[2], 0, BOX_AUDIO_REVERB_PREDELAY_MAX);
     rv->target.size = box_audio_reverb_clamp(p[3], 0, 1);
     rv->target.mix = box_audio_reverb_clamp(p[4], 0, 1);
+    rv->target.shimmer = box_audio_reverb_clamp(p[5], 0, 1);
+    rv->target.shimmer_pitch = p[6] == p[6] ? box_audio_reverb_clamp(p[6],
+        -BOX_AUDIO_PITCH_SHIFTER_SEMITONES, BOX_AUDIO_PITCH_SHIFTER_SEMITONES) : 0;
+}
+
+/** Get the pitch ratio of the shimmer of the target.
+ *
+ * @param rv The reverb
+ * @return The ratio
+ */
+static float box_audio_reverb_shimmer_ratio(
+    const box_audio_reverb_t *rv)
+{
+    return (float)box_audio_synth_exp2((double)rv->target.shimmer_pitch / 12.0);
 }
 
 void box_audio_reverb_init(
@@ -337,6 +376,8 @@ void box_audio_reverb_start(
     box_audio_reverb_apply(core, fx);
     box_audio_ramp_set(&rv->fade, 1);
     box_audio_ramp_set(&rv->mix, rv->target.mix);
+    box_audio_ramp_set(&rv->shimmer_amount, rv->target.shimmer);
+    box_audio_ramp_set(&rv->shimmer_ratio, box_audio_reverb_shimmer_ratio(rv));
     if (fade_in) {
         box_audio_ramp_set(&rv->feed, 0);
         box_audio_ramp_to(&rv->feed, 1,
@@ -359,6 +400,15 @@ void box_audio_reverb_command(
     rv->damp = fx->idle ? rv->damp_target : rv->damp;
     box_audio_ramp_to(&rv->mix, rv->target.mix,
         (int32_t)(BOX_AUDIO_REVERB_MIX_RAMP * core->sample_rate));
+    if (fx->idle) {
+        box_audio_ramp_set(&rv->shimmer_amount, rv->target.shimmer);
+        box_audio_ramp_set(&rv->shimmer_ratio, box_audio_reverb_shimmer_ratio(rv));
+    } else {
+        int32_t ramp = (int32_t)(BOX_AUDIO_REVERB_SHIMMER_RAMP * core->sample_rate);
+        box_audio_ramp_to(&rv->shimmer_amount, rv->target.shimmer, ramp);
+        box_audio_ramp_to(&rv->shimmer_ratio, box_audio_reverb_shimmer_ratio(rv), ramp);
+    }
+
     if (rv->target.size != rv->size || rv->target.predelay != rv->predelay) {
         box_audio_reverb_swap(core, fx);
     } else if (rv->swap) {
@@ -384,6 +434,34 @@ static void box_audio_reverb_smooth(
     }
 
     rv->damp += (rv->damp_target - rv->damp) * k;
+}
+
+/** Run the shimmer for a frame: replace the part of the damped feedback along the input vector
+ * by a mix of it and its shifted copy.
+ *
+ * @param rv The reverb
+ * @param v The damped feedback of each line, before the matrix
+ */
+static void box_audio_reverb_shimmer(
+    box_audio_reverb_t *rv,
+    float *v)
+{
+    float s = box_audio_ramp_next(&rv->shimmer_amount);
+    double ratio = (double)box_audio_ramp_next(&rv->shimmer_ratio);
+    float p = 0, y, d;
+    int32_t k;
+    for (k = 0; k < BOX_AUDIO_REVERB_LINES; k ++) {
+        p += box_audio_reverb_in[k] * v[k];
+    }
+
+    p *= BOX_AUDIO_REVERB_NORM;
+    y = box_audio_shift_next(&rv->shimmer, p, ratio, (double)rv->shimmer_window) *
+        BOX_AUDIO_REVERB_SHIMMER_GAIN;
+    y = box_audio_clean(box_audio_shift_clip(y));
+    d = s * (y - p) * BOX_AUDIO_REVERB_NORM;
+    for (k = 0; k < BOX_AUDIO_REVERB_LINES; k ++) {
+        v[k] += d * box_audio_reverb_in[k];
+    }
 }
 
 /** Run the network over a block.
@@ -422,6 +500,10 @@ static int32_t box_audio_reverb_block(
             wl += box_audio_reverb_left[k] * o[k];
             wr += box_audio_reverb_right[k] * o[k];
             sum += o[k] < 0 ? -o[k] : o[k];
+        }
+
+        if (rv->shimmer_amount.value != 0 || rv->shimmer_amount.left > 0) {
+            box_audio_reverb_shimmer(rv, v);
         }
 
         for (h = 1; h < BOX_AUDIO_REVERB_LINES; h *= 2) {
@@ -465,6 +547,10 @@ bool box_audio_reverb_render(
     bool result = false;
     box_audio_reverb_smooth(core, rv);
     still = box_audio_reverb_block(rv, l, r, frames);
+    if (rv->shimmer_amount.value == 0 && rv->shimmer_amount.left == 0) {
+        box_audio_shift_clear(&rv->shimmer);
+    }
+
     rv->still = still < frames ? still : (rv->still < (1 << 30) ? rv->still + frames : rv->still);
     if (rv->swap && rv->fade.left == 0 && rv->fade.value == 0) {
         box_audio_reverb_apply(core, fx);
@@ -494,4 +580,6 @@ void box_audio_reverb_rest(
     }
 
     box_audio_ramp_set(&rv->mix, rv->mix.target);
+    box_audio_ramp_set(&rv->shimmer_amount, rv->shimmer_amount.target);
+    box_audio_ramp_set(&rv->shimmer_ratio, rv->shimmer_ratio.target);
 }

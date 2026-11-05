@@ -45,6 +45,10 @@ exposure {
   AutoExposure: {min_log_luma: -16, low_percentile: 0, min_brightness: 0.05, max_brightness: 0.55}
 }
 
+fog {
+  HeightFog: {density: 0.0025, falloff: 0.02, base_height: 0, max_opacity: 0.5, atmosphere: Atmosphere}
+}
+
 gtao {
   Gtao: {radius: 0.5, final_value_power: 2.2}
 }
@@ -64,7 +68,7 @@ main_view {
     lighting: {enabled: true, baked: true, reflections: true, atmosphere: true,
       environment: {source: Atmosphere, intensity: 0.8, yaw: 0, background: false}},
     shadows: {enabled: true, max_distance: 200},
-    effects: [{effect: gtao}, {effect: bloom}, {effect: tonemap}]
+    effects: [{effect: fog}, {effect: gtao}, {effect: bloom}, {effect: tonemap}]
   }
 }
 
