@@ -321,36 +321,18 @@ static void box_audio_transient_shaper_ctor(
     }
 }
 
-<<<<<<< HEAD
-/** Construct Rotary values: slow, the horn at 0.8 and 6.7 Hz, the drum at 0.7 and 5.9 Hz, an
- * acceleration of a second, both rotors, the mics half a turn apart, no drive, fully wet.
-=======
 /** Construct FrequencyShifter values: no shift in the shift mode, no stereo, no feedback and a
  * mix of 1.
->>>>>>> 92613e388c93051ebe97a2eb0b9ec4a7b900a756
  *
  * @param ptr The components
  * @param count Number of components
  * @param ti Type info
  */
-<<<<<<< HEAD
-static void box_audio_rotary_ctor(
-=======
 static void box_audio_frequency_shifter_ctor(
->>>>>>> 92613e388c93051ebe97a2eb0b9ec4a7b900a756
     void *ptr,
     int32_t count,
     const ecs_type_info_t *ti)
 {
-<<<<<<< HEAD
-    Rotary *values = ptr;
-    int32_t i;
-    (void)ti;
-    for (i = 0; i < count; i ++) {
-        values[i] = (Rotary){ .speed = 0, .horn_slow = 0.8f, .horn_fast = 6.7f,
-            .drum_slow = 0.7f, .drum_fast = 5.9f, .acceleration = 1.0f, .balance = 0,
-            .spread = 1.0f, .drive = 0, .mix = 1.0f };
-=======
     FrequencyShifter *values = ptr;
     int32_t i;
     (void)ti;
@@ -403,7 +385,28 @@ static void box_audio_pattern_gate_ctor(
         for (j = 0; j < BOX_AUDIO_PATTERN_GATE_STEPS; j ++) {
             values[i].steps[j] = 1.0f;
         }
->>>>>>> 92613e388c93051ebe97a2eb0b9ec4a7b900a756
+    }
+}
+
+/** Construct Rotary values: slow, the horn at 0.8 and 6.7 Hz, the drum at 0.7 and 5.9 Hz, an
+ * acceleration of a second, both rotors, the mics half a turn apart, no drive, fully wet.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_rotary_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Rotary *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Rotary){ .speed = 0, .horn_slow = 0.8f, .horn_fast = 6.7f,
+            .drum_slow = 0.7f, .drum_fast = 5.9f, .acceleration = 1.0f, .balance = 0,
+            .spread = 1.0f, .drive = 0, .mix = 1.0f };
     }
 }
 
@@ -1524,10 +1527,6 @@ void BoxAudioImport(
     ecs_set_hooks(world, Saturator, { .ctor = box_audio_saturator_ctor });
     ECS_META_COMPONENT(world, TransientShaper);
     ecs_set_hooks(world, TransientShaper, { .ctor = box_audio_transient_shaper_ctor });
-<<<<<<< HEAD
-    ECS_META_COMPONENT(world, Rotary);
-    ecs_set_hooks(world, Rotary, { .ctor = box_audio_rotary_ctor });
-=======
     ECS_META_COMPONENT(world, FrequencyShifterMode);
     ECS_META_COMPONENT(world, FrequencyShifter);
     ecs_set_hooks(world, FrequencyShifter, { .ctor = box_audio_frequency_shifter_ctor });
@@ -1535,7 +1534,8 @@ void BoxAudioImport(
     ecs_set_hooks(world, PitchShifter, { .ctor = box_audio_pitch_shifter_ctor });
     ECS_META_COMPONENT(world, PatternGate);
     ecs_set_hooks(world, PatternGate, { .ctor = box_audio_pattern_gate_ctor });
->>>>>>> 92613e388c93051ebe97a2eb0b9ec4a7b900a756
+    ECS_META_COMPONENT(world, Rotary);
+    ecs_set_hooks(world, Rotary, { .ctor = box_audio_rotary_ctor });
     ECS_META_COMPONENT(world, SynthFilterEnvelope);
     ECS_META_COMPONENT(world, SynthPitchEnvelope);
     ECS_META_COMPONENT(world, SynthGlide);
@@ -1626,14 +1626,11 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(Chorus), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(Saturator), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(TransientShaper), EcsWith, ecs_id(AudioEffectState));
-<<<<<<< HEAD
-    ecs_add_pair(world, ecs_id(Rotary), EcsWith, ecs_id(AudioEffectState));
-=======
     ecs_add_pair(world, ecs_id(FrequencyShifter), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(AudioModulator), EcsWith, ecs_id(AudioModulatorState));
     ecs_add_pair(world, ecs_id(PitchShifter), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(PatternGate), EcsWith, ecs_id(AudioEffectState));
->>>>>>> 92613e388c93051ebe97a2eb0b9ec4a7b900a756
+    ecs_add_pair(world, ecs_id(Rotary), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(SoundFile), EcsWith, ecs_id(AudioSample));
     ecs_add_pair(world, ecs_id(AudioStream), EcsWith, ecs_id(AudioMusic));
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSoundId));

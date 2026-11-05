@@ -581,16 +581,12 @@ typedef enum box_audio_effect_kind_t {
     BOX_AUDIO_EFFECT_SATURATOR = 9, /**< A saturator, box_audio_saturator_params_t */
     BOX_AUDIO_EFFECT_TRANSIENT_SHAPER = 10, /**< A transient shaper,
                                   *   box_audio_transient_shaper_params_t */
-<<<<<<< HEAD
-    BOX_AUDIO_EFFECT_ROTARY = 11, /**< A rotating speaker, box_audio_rotary_params_t */
-    BOX_AUDIO_EFFECT_KINDS = 12   /**< Number of kinds, NONE included */
-=======
     BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER = 11, /**< A frequency shifter,
                                   *   box_audio_frequency_shifter_params_t */
     BOX_AUDIO_EFFECT_PITCH_SHIFTER = 12, /**< A pitch shifter, box_audio_pitch_shifter_params_t */
     BOX_AUDIO_EFFECT_PATTERN_GATE = 13, /**< A pattern gate, box_audio_pattern_gate_params_t */
-    BOX_AUDIO_EFFECT_KINDS = 14   /**< Number of kinds, NONE included */
->>>>>>> 92613e388c93051ebe97a2eb0b9ec4a7b900a756
+    BOX_AUDIO_EFFECT_ROTARY = 14, /**< A rotating speaker, box_audio_rotary_params_t */
+    BOX_AUDIO_EFFECT_KINDS = 15   /**< Number of kinds, NONE included */
 } box_audio_effect_kind_t;
 
 /** The parameters of a reverb, the first floats of the params of its effect command. Shimmer
@@ -1001,81 +997,6 @@ typedef struct box_audio_transient_shaper_params_t {
     float sustain;    /**< -1..1: above 0 boosts the tail, below 0 shortens it */
 } box_audio_transient_shaper_params_t;
 
-<<<<<<< HEAD
-/** Crossover of a rotary between its drum and its horn in Hz */
-#define BOX_AUDIO_ROTARY_CROSSOVER 800.0f
-
-/** Longest read of a rotary in milliseconds, which sizes its memory */
-#define BOX_AUDIO_ROTARY_MAX 4.0f
-
-/** Milliseconds of the read of the horn and of the drum of a rotary at the middle of a turn,
- * and how far the turn moves it either way: the Doppler shift */
-#define BOX_AUDIO_ROTARY_HORN_DELAY 1.5f
-#define BOX_AUDIO_ROTARY_HORN_DEPTH 0.35f
-#define BOX_AUDIO_ROTARY_DRUM_DELAY 1.5f
-#define BOX_AUDIO_ROTARY_DRUM_DEPTH 0.15f
-
-/** Share of the level the horn and the drum of a rotary lose as they face away from a mic */
-#define BOX_AUDIO_ROTARY_HORN_AM 0.6f
-#define BOX_AUDIO_ROTARY_DRUM_AM 0.4f
-
-/** Cutoff in Hz of the lowpass the horn and the drum of a rotary fade into as they face away
- * from a mic, and the share of it they reach facing away */
-#define BOX_AUDIO_ROTARY_HORN_TONE 2500.0f
-#define BOX_AUDIO_ROTARY_HORN_DULL 0.6f
-#define BOX_AUDIO_ROTARY_DRUM_TONE 300.0f
-#define BOX_AUDIO_ROTARY_DRUM_DULL 0.3f
-
-/** Inertia of the drum of a rotary against that of the horn */
-#define BOX_AUDIO_ROTARY_DRUM_INERTIA 3.0f
-
-/** Shortest and longest acceleration of the horn of a rotary in seconds */
-#define BOX_AUDIO_ROTARY_ACCELERATION_MIN 0.01f
-#define BOX_AUDIO_ROTARY_ACCELERATION_MAX 20.0f
-
-/** Gain before the clipper of the preamp of a rotary at a drive of 1 in dB */
-#define BOX_AUDIO_ROTARY_DRIVE_DB 24.0f
-
-/** Offset the preamp of a rotary at a drive of 1 adds before its clipper, for the even
- * harmonics of a tube */
-#define BOX_AUDIO_ROTARY_BIAS 0.2f
-
-/** Seconds of silent input after which a rotary clears itself and idles */
-#define BOX_AUDIO_ROTARY_QUIET 0.05f
-
-/** Level of its preamp, filters and lines below which a rotary that has been quiet idles, so
- * the tail of its DC blocker does not click when it is cleared */
-#define BOX_AUDIO_ROTARY_SILENCE 1e-6f
-
-/** The parameters of a rotary, the first floats of the params of its effect command: a
- * rotating speaker cabinet. The sum of both channels runs through a tube preamp, the clipper
- * of saturate.h at twice the rate blended in by the drive, then a Linkwitz-Riley crossover at
- * BOX_AUDIO_ROTARY_CROSSOVER splits it into the drum below and the horn above. Each rotor
- * writes a line on the memory of its slot that two virtual mics read, the left one a quarter
- * turn times the spread one way and the right one as far the other way. As a rotor turns, the
- * read of a mic moves with the distance of the rotor (Doppler), and its level drops and its
- * tone dulls as the rotor faces away. The horn and the drum turn the opposite ways.
- *
- * Each rotor turns at its slow rate plus the speed times the way to its fast rate, and moves to
- * a new rate exponentially: the horn within 5% in the acceleration, the drum
- * BOX_AUDIO_ROTARY_DRUM_INERTIA times slower. The rotors start at phase 0 and at the rate of
- * their speed when the effect is put on. */
-typedef struct box_audio_rotary_params_t {
-    float speed;        /**< 0..1: 0 is slow (chorale), 1 fast (tremolo) */
-    float horn_slow;    /**< Hz of the horn at speed 0, 0..BOX_AUDIO_MODULATION_RATE_MAX */
-    float horn_fast;    /**< Hz of the horn at speed 1, 0..BOX_AUDIO_MODULATION_RATE_MAX */
-    float drum_slow;    /**< Hz of the drum at speed 0, 0..BOX_AUDIO_MODULATION_RATE_MAX */
-    float drum_fast;    /**< Hz of the drum at speed 1, 0..BOX_AUDIO_MODULATION_RATE_MAX */
-    float acceleration; /**< Seconds of the horn to a new rate,
-                         *   BOX_AUDIO_ROTARY_ACCELERATION_MIN..MAX */
-    float balance;      /**< -1..1: -1 is the drum alone, 1 the horn alone, 0 both */
-    float spread;       /**< 0..1: 0 puts both mics at the same place, so the output is mono;
-                         *   1 puts them half a turn apart */
-    float drive;        /**< 0..1: the share of the preamp, its gain 0 to
-                         *   BOX_AUDIO_ROTARY_DRIVE_DB dB */
-    float mix;          /**< Wet level, 0..1; the dry signal passes at 1 - mix */
-} box_audio_rotary_params_t;
-=======
 /** Largest shift of a frequency shifter in Hz, either way */
 #define BOX_AUDIO_FREQUENCY_SHIFTER_MAX 5000.0f
 
@@ -1167,7 +1088,80 @@ typedef struct box_audio_pattern_gate_params_t {
     float floor;      /**< Gain when closed in dB, BOX_AUDIO_PATTERN_GATE_FLOOR_MIN..0 */
     float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
 } box_audio_pattern_gate_params_t;
->>>>>>> 92613e388c93051ebe97a2eb0b9ec4a7b900a756
+
+/** Crossover of a rotary between its drum and its horn in Hz */
+#define BOX_AUDIO_ROTARY_CROSSOVER 800.0f
+
+/** Longest read of a rotary in milliseconds, which sizes its memory */
+#define BOX_AUDIO_ROTARY_MAX 4.0f
+
+/** Milliseconds of the read of the horn and of the drum of a rotary at the middle of a turn,
+ * and how far the turn moves it either way: the Doppler shift */
+#define BOX_AUDIO_ROTARY_HORN_DELAY 1.5f
+#define BOX_AUDIO_ROTARY_HORN_DEPTH 0.35f
+#define BOX_AUDIO_ROTARY_DRUM_DELAY 1.5f
+#define BOX_AUDIO_ROTARY_DRUM_DEPTH 0.15f
+
+/** Share of the level the horn and the drum of a rotary lose as they face away from a mic */
+#define BOX_AUDIO_ROTARY_HORN_AM 0.6f
+#define BOX_AUDIO_ROTARY_DRUM_AM 0.4f
+
+/** Cutoff in Hz of the lowpass the horn and the drum of a rotary fade into as they face away
+ * from a mic, and the share of it they reach facing away */
+#define BOX_AUDIO_ROTARY_HORN_TONE 2500.0f
+#define BOX_AUDIO_ROTARY_HORN_DULL 0.6f
+#define BOX_AUDIO_ROTARY_DRUM_TONE 300.0f
+#define BOX_AUDIO_ROTARY_DRUM_DULL 0.3f
+
+/** Inertia of the drum of a rotary against that of the horn */
+#define BOX_AUDIO_ROTARY_DRUM_INERTIA 3.0f
+
+/** Shortest and longest acceleration of the horn of a rotary in seconds */
+#define BOX_AUDIO_ROTARY_ACCELERATION_MIN 0.01f
+#define BOX_AUDIO_ROTARY_ACCELERATION_MAX 20.0f
+
+/** Gain before the clipper of the preamp of a rotary at a drive of 1 in dB */
+#define BOX_AUDIO_ROTARY_DRIVE_DB 24.0f
+
+/** Offset the preamp of a rotary at a drive of 1 adds before its clipper, for the even
+ * harmonics of a tube */
+#define BOX_AUDIO_ROTARY_BIAS 0.2f
+
+/** Seconds of silent input after which a rotary clears itself and idles */
+#define BOX_AUDIO_ROTARY_QUIET 0.05f
+
+/** Level of its preamp, filters and lines below which a rotary that has been quiet idles, so
+ * the tail of its DC blocker does not click when it is cleared */
+#define BOX_AUDIO_ROTARY_SILENCE 1e-6f
+
+/** The parameters of a rotary, the first floats of the params of its effect command: a
+ * rotating speaker cabinet. The sum of both channels runs through a tube preamp, the clipper
+ * of saturate.h at twice the rate blended in by the drive, then a Linkwitz-Riley crossover at
+ * BOX_AUDIO_ROTARY_CROSSOVER splits it into the drum below and the horn above. Each rotor
+ * writes a line on the memory of its slot that two virtual mics read, the left one a quarter
+ * turn times the spread one way and the right one as far the other way. As a rotor turns, the
+ * read of a mic moves with the distance of the rotor (Doppler), and its level drops and its
+ * tone dulls as the rotor faces away. The horn and the drum turn the opposite ways.
+ *
+ * Each rotor turns at its slow rate plus the speed times the way to its fast rate, and moves to
+ * a new rate exponentially: the horn within 5% in the acceleration, the drum
+ * BOX_AUDIO_ROTARY_DRUM_INERTIA times slower. The rotors start at phase 0 and at the rate of
+ * their speed when the effect is put on. */
+typedef struct box_audio_rotary_params_t {
+    float speed;        /**< 0..1: 0 is slow (chorale), 1 fast (tremolo) */
+    float horn_slow;    /**< Hz of the horn at speed 0, 0..BOX_AUDIO_MODULATION_RATE_MAX */
+    float horn_fast;    /**< Hz of the horn at speed 1, 0..BOX_AUDIO_MODULATION_RATE_MAX */
+    float drum_slow;    /**< Hz of the drum at speed 0, 0..BOX_AUDIO_MODULATION_RATE_MAX */
+    float drum_fast;    /**< Hz of the drum at speed 1, 0..BOX_AUDIO_MODULATION_RATE_MAX */
+    float acceleration; /**< Seconds of the horn to a new rate,
+                         *   BOX_AUDIO_ROTARY_ACCELERATION_MIN..MAX */
+    float balance;      /**< -1..1: -1 is the drum alone, 1 the horn alone, 0 both */
+    float spread;       /**< 0..1: 0 puts both mics at the same place, so the output is mono;
+                         *   1 puts them half a turn apart */
+    float drive;        /**< 0..1: the share of the preamp, its gain 0 to
+                         *   BOX_AUDIO_ROTARY_DRIVE_DB dB */
+    float mix;          /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+} box_audio_rotary_params_t;
 
 /** Put an effect into an insert slot of a bus, change its parameters, move it or take it off.
  *

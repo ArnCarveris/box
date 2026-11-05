@@ -436,11 +436,8 @@
                     "pitch_shifter",
                     "saturator",
                     "transient_shaper",
-<<<<<<< HEAD
-                    "rotary",
-=======
                     "frequency_shifter",
->>>>>>> 92613e388c93051ebe97a2eb0b9ec4a7b900a756
+                    "rotary",
                     "synth_sub",
                     "synth_sync",
                     "synth_drive",

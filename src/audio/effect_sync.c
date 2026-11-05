@@ -4,13 +4,8 @@
  * their slots of the pool of the core, their memory and their commands.
  *
  * An effect entity is any entity with an effect component: Reverb, Equalizer, AudioFilter,
-<<<<<<< HEAD
- * Compressor, Gate, Delay, Phaser, Chorus, Saturator, TransientShaper or Rotary, the first in
- * that order. A compressor gets the key bus that the order compile accepted for its insert.
-=======
  * Compressor, Gate, Delay, Phaser, Chorus, Saturator, TransientShaper, FrequencyShifter,
- * PitchShifter or PatternGate, the first of them in that order.
->>>>>>> 92613e388c93051ebe97a2eb0b9ec4a7b900a756
+ * PitchShifter, PatternGate or Rotary, the first of them in that order.
  *
  * The module sends an EFFECT command when the kind, the channel, the slot or a parameter of an
  * effect changes and takes it off when no slot names it. A compressor gets the key bus the
@@ -202,22 +197,6 @@ uint32_t box_audio_module_effect_params(
             params[0] = shaper->attack;
             params[1] = shaper->sustain;
         }
-<<<<<<< HEAD
-    } else if (component == ecs_id(Rotary)) {
-        const Rotary *rotary = ptr;
-        result = BOX_AUDIO_EFFECT_ROTARY;
-        if (params && ptr) {
-            params[0] = rotary->speed;
-            params[1] = rotary->horn_slow;
-            params[2] = rotary->horn_fast;
-            params[3] = rotary->drum_slow;
-            params[4] = rotary->drum_fast;
-            params[5] = rotary->acceleration;
-            params[6] = rotary->balance;
-            params[7] = rotary->spread;
-            params[8] = rotary->drive;
-            params[9] = rotary->mix;
-=======
     } else if (component == ecs_id(FrequencyShifter)) {
         const FrequencyShifter *shifter = ptr;
         result = BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER;
@@ -255,7 +234,21 @@ uint32_t box_audio_module_effect_params(
             params[BOX_AUDIO_PATTERN_GATE_STEPS + 5] = gate->gate;
             params[BOX_AUDIO_PATTERN_GATE_STEPS + 6] = gate->floor;
             params[BOX_AUDIO_PATTERN_GATE_STEPS + 7] = gate->mix;
->>>>>>> 92613e388c93051ebe97a2eb0b9ec4a7b900a756
+        }
+    } else if (component == ecs_id(Rotary)) {
+        const Rotary *rotary = ptr;
+        result = BOX_AUDIO_EFFECT_ROTARY;
+        if (params && ptr) {
+            params[0] = rotary->speed;
+            params[1] = rotary->horn_slow;
+            params[2] = rotary->horn_fast;
+            params[3] = rotary->drum_slow;
+            params[4] = rotary->drum_fast;
+            params[5] = rotary->acceleration;
+            params[6] = rotary->balance;
+            params[7] = rotary->spread;
+            params[8] = rotary->drive;
+            params[9] = rotary->mix;
         }
     }
 
@@ -269,12 +262,8 @@ int32_t box_audio_module_effect_components(
     const ecs_entity_t components[] = {
         ecs_id(Reverb), ecs_id(Equalizer), ecs_id(AudioFilter), ecs_id(Compressor),
         ecs_id(Gate), ecs_id(Delay), ecs_id(Phaser), ecs_id(Chorus), ecs_id(Saturator),
-<<<<<<< HEAD
-        ecs_id(TransientShaper), ecs_id(Rotary)
-=======
         ecs_id(TransientShaper), ecs_id(FrequencyShifter), ecs_id(PitchShifter),
-        ecs_id(PatternGate)
->>>>>>> 92613e388c93051ebe97a2eb0b9ec4a7b900a756
+        ecs_id(PatternGate), ecs_id(Rotary)
     };
     int32_t i, count = (int32_t)(sizeof(components) / sizeof(components[0]));
     count = count < BOX_AUDIO_EFFECT_COMPONENTS ? count : BOX_AUDIO_EFFECT_COMPONENTS;

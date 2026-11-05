@@ -86,15 +86,6 @@ static const box_audio_effect_def_t box_audio_effect_kinds[BOX_AUDIO_EFFECT_KIND
         .render = box_audio_transient_shaper_render,
         .rest = box_audio_transient_shaper_rest
     },
-<<<<<<< HEAD
-    [BOX_AUDIO_EFFECT_ROTARY] = {
-        .tail = true,
-        .floats = box_audio_rotary_floats,
-        .start = box_audio_rotary_start,
-        .command = box_audio_rotary_command,
-        .render = box_audio_rotary_render,
-        .rest = box_audio_rotary_rest
-=======
     [BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER] = {
         .tail = true,
         .start = box_audio_frequency_shifter_start,
@@ -116,7 +107,14 @@ static const box_audio_effect_def_t box_audio_effect_kinds[BOX_AUDIO_EFFECT_KIND
         .command = box_audio_pattern_gate_command,
         .render = box_audio_pattern_gate_render,
         .rest = box_audio_pattern_gate_rest
->>>>>>> 92613e388c93051ebe97a2eb0b9ec4a7b900a756
+    },
+    [BOX_AUDIO_EFFECT_ROTARY] = {
+        .tail = true,
+        .floats = box_audio_rotary_floats,
+        .start = box_audio_rotary_start,
+        .command = box_audio_rotary_command,
+        .render = box_audio_rotary_render,
+        .rest = box_audio_rotary_rest
     }
 };
 

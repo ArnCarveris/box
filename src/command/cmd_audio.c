@@ -244,13 +244,10 @@ static void box_cmd_audio_effects(
         const Chorus *chorus;
         const Saturator *saturator;
         const TransientShaper *shaper;
-<<<<<<< HEAD
-        const Rotary *rotary;
-=======
         const FrequencyShifter *shifter;
         const PitchShifter *pitch;
         const PatternGate *pattern;
->>>>>>> 92613e388c93051ebe97a2eb0b9ec4a7b900a756
+        const Rotary *rotary;
         const box_audio_module_t *state = box_audio_module_get(world);
         char *path;
         int32_t b, slot;
@@ -365,15 +362,6 @@ static void box_cmd_audio_effects(
         } else if ((shaper = ecs_get(world, e, TransientShaper))) {
             ecs_strbuf_append(buf, "transient shaper attack %.2f sustain %.2f",
                 (double)shaper->attack, (double)shaper->sustain);
-<<<<<<< HEAD
-        } else if ((rotary = ecs_get(world, e, Rotary))) {
-            ecs_strbuf_append(buf, "rotary speed %.2f horn %.2f-%.2f Hz drum %.2f-%.2f Hz "
-                "acceleration %.2f s balance %.2f spread %.2f drive %.2f mix %.2f",
-                (double)rotary->speed, (double)rotary->horn_slow, (double)rotary->horn_fast,
-                (double)rotary->drum_slow, (double)rotary->drum_fast,
-                (double)rotary->acceleration, (double)rotary->balance,
-                (double)rotary->spread, (double)rotary->drive, (double)rotary->mix);
-=======
         } else if ((shifter = ecs_get(world, e, FrequencyShifter))) {
             ecs_strbuf_append(buf, "frequency shifter %s %+.1f Hz stereo %.2f feedback %.2f "
                 "mix %.2f", shifter->mode == FrequencyRing ? "ring" : "shift",
@@ -396,7 +384,13 @@ static void box_cmd_audio_effects(
                 "release %.3f floor %.1f dB mix %.2f", (double)pattern->rate,
                 (double)pattern->swing, (double)pattern->gate, (double)pattern->attack,
                 (double)pattern->release, (double)pattern->floor, (double)pattern->mix);
->>>>>>> 92613e388c93051ebe97a2eb0b9ec4a7b900a756
+        } else if ((rotary = ecs_get(world, e, Rotary))) {
+            ecs_strbuf_append(buf, "rotary speed %.2f horn %.2f-%.2f Hz drum %.2f-%.2f Hz "
+                "acceleration %.2f s balance %.2f spread %.2f drive %.2f mix %.2f",
+                (double)rotary->speed, (double)rotary->horn_slow, (double)rotary->horn_fast,
+                (double)rotary->drum_slow, (double)rotary->drum_fast,
+                (double)rotary->acceleration, (double)rotary->balance,
+                (double)rotary->spread, (double)rotary->drive, (double)rotary->mix);
         }
 
         slot = box_audio_module_effect_slot(world, e);

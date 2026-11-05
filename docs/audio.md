@@ -177,13 +177,10 @@ their tails end.
 | `Chorus` | `voices: 2`, `rate: 0.8` Hz, `depth: 3` ms, `delay: 12` ms, `mix: 0.5`, `spread: 0.5`, `feedback: 0` |
 | `Saturator` | `drive: 0.3`, `asymmetry: 0`, `bits: 16`, `mix: 1`, `mode: SaturatorTanh`, `low_cut: 0` Hz, `high_cut: 0` Hz, `tone: 0`, `rate: 0` Hz |
 | `TransientShaper` | `attack: 0`, `sustain: 0` |
-<<<<<<< HEAD
-| `Rotary` | `speed: 0`, `horn_slow: 0.8` Hz, `horn_fast: 6.7` Hz, `drum_slow: 0.7` Hz, `drum_fast: 5.9` Hz, `acceleration: 1` s, `balance: 0`, `spread: 1`, `drive: 0`, `mix: 1` |
-=======
 | `FrequencyShifter` | `shift: 0` Hz, `mode: FrequencyShift`, `stereo: 0`, `feedback: 0`, `mix: 1` |
 | `PitchShifter` | `semitones: 0`, `cents: 0`, `stereo: 0`, `window: 40` ms, `feedback: 0`, `mix: 0.5` |
 | `PatternGate` | `steps`: 16 levels, all `1`, `length: 16`, `rate: 0.25` beats, `swing: 0`, `attack: 0.002` s, `release: 0.03` s, `gate: 0.5`, `floor: -80` dB, `mix: 1` |
->>>>>>> 92613e388c93051ebe97a2eb0b9ec4a7b900a756
+| `Rotary` | `speed: 0`, `horn_slow: 0.8` Hz, `horn_fast: 6.7` Hz, `drum_slow: 0.7` Hz, `drum_fast: 5.9` Hz, `acceleration: 1` s, `balance: 0`, `spread: 1`, `drive: 0`, `mix: 1` |
 
 Equalizer bands use `AudioEqOff`, `AudioEqPeak`, `AudioEqLowShelf`,
 `AudioEqHighShelf`, `AudioEqLowCut` or `AudioEqHighCut`. Defaults are 100, 400,
@@ -275,45 +272,6 @@ it works the same at any level. `attack` from -1 to 1 softens or boosts transien
 smoothed so it does not distort low notes, is the same on both channels, and 0 and 0
 pass the signal unchanged. It has no meter.
 
-<<<<<<< HEAD
-A rotary is a rotating speaker cabinet: the swirl of an organ, also good on guitars,
-electric pianos and vocals. The sum of both channels runs through a tube preamp,
-blended in by `drive` (up to +24 dB into the tanh clipper of the saturator), then a
-crossover at 800 Hz splits it into a drum below and a horn above. Each rotor shifts
-the pitch as it turns (a Doppler shift of a few tenths of a millisecond on the
-horn), and gets quieter and duller as it faces away. Two virtual mics hear both
-rotors; `spread` sets how far apart they are, from mono at 0 to half a turn at 1,
-so left and right swirl in opposite phase. `balance` goes from the drum alone at -1
-to the horn alone at 1. `speed` 0 is slow (chorale) and 1 fast (tremolo), with
-rates in between for values in between. The rotors never jump to a new speed: the
-horn gets there within `acceleration` seconds and the heavier drum takes three
-times as long, both when speeding up and when braking. The rotary keeps 4 ms of
-memory per effect, and its rotors keep turning while it is idle.
-
-Switch the speed like the half-moon switch of an organ by automating `speed`:
-
-```flecs
-using box.audio
-
-organ {
-  AudioBus: {output: master, effects: [organ]}
-  Rotary: {speed: 0, drive: 0.3}
-}
-
-prefab switch {
-  AutomationClip: {target: organ, component: Rotary, member: "speed", length: 16,
-    curve: {kind: CurveLinear, keys: [{0, 0}, {7.9, 0}, {8, 1}, {15.9, 1}, {16, 0}]}}
-}
-
-lanes {
-  Track: {}
-  leslie { ClipPlacement: {clip: switch, start: 0, duration: 64, loop: true} }
-}
-```
-
-The step of the curve is enough: the inertia of the rotors makes the ramp up and
-the slow down.
-=======
 A pitch shifter thickens a lead with a few cents either way, adds octaves to
 basses and leads, and makes harmonies, without changing the speed of what plays
 through it. Each channel is a delay line read by two taps half a window apart. The
@@ -409,7 +367,43 @@ pad { AudioBus: {effects: [pad_gate]} }
 chords_pump { PatternGate: {length: 2, steps: [1, 0], rate: 0.5, swing: 0.2, gate: 0.7,
   release: 0.12, floor: -9} }
 ```
->>>>>>> 92613e388c93051ebe97a2eb0b9ec4a7b900a756
+A rotary is a rotating speaker cabinet: the swirl of an organ, also good on guitars,
+electric pianos and vocals. The sum of both channels runs through a tube preamp,
+blended in by `drive` (up to +24 dB into the tanh clipper of the saturator), then a
+crossover at 800 Hz splits it into a drum below and a horn above. Each rotor shifts
+the pitch as it turns (a Doppler shift of a few tenths of a millisecond on the
+horn), and gets quieter and duller as it faces away. Two virtual mics hear both
+rotors; `spread` sets how far apart they are, from mono at 0 to half a turn at 1,
+so left and right swirl in opposite phase. `balance` goes from the drum alone at -1
+to the horn alone at 1. `speed` 0 is slow (chorale) and 1 fast (tremolo), with
+rates in between for values in between. The rotors never jump to a new speed: the
+horn gets there within `acceleration` seconds and the heavier drum takes three
+times as long, both when speeding up and when braking. The rotary keeps 4 ms of
+memory per effect, and its rotors keep turning while it is idle.
+
+Switch the speed like the half-moon switch of an organ by automating `speed`:
+
+```flecs
+using box.audio
+
+organ {
+  AudioBus: {output: master, effects: [organ]}
+  Rotary: {speed: 0, drive: 0.3}
+}
+
+prefab switch {
+  AutomationClip: {target: organ, component: Rotary, member: "speed", length: 16,
+    curve: {kind: CurveLinear, keys: [{0, 0}, {7.9, 0}, {8, 1}, {15.9, 1}, {16, 0}]}}
+}
+
+lanes {
+  Track: {}
+  leslie { ClipPlacement: {clip: switch, start: 0, duration: 64, loop: true} }
+}
+```
+
+The step of the curve is enough: the inertia of the rotors makes the ramp up and
+the slow down.
 
 For ducking, key a compressor on another channel:
 
