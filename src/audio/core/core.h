@@ -372,8 +372,8 @@ typedef enum box_audio_param_t {
 /** Header of every command: its type and its size in bytes, header included.
  *
  * PLAY, STOP, VOICE_SET, BUS_SET, RELEASE, LEGATO, EFFECT_PARAMS, VOICE_RAMP, BEAT and MACRO
- * follow it with when_lo and when_hi, the frame of the core clock (box_audio_core_clock) at which the
- * command takes effect, 64 bits in two words so that every field stays 32 bits.
+ * follow it with when_lo and when_hi, the frame of the core clock (box_audio_core_clock) at
+ * which the command takes effect, 64 bits in two words so that every field stays 32 bits.
  *
  * A when of 0, or of a frame that was already rendered, applies at the start of the next
  * block; a later one waits in the schedule of the core for its frame. Of the commands of one
@@ -1058,8 +1058,9 @@ typedef struct box_audio_cmd_effect_params_t {
 /** Drop the commands of the schedule that set a parameter of a bus or the parameters of an
  * effect slot, or the ramps of a voice, at once: the BUS_SET commands of a bus and a
  * parameter, every EFFECT_PARAMS command of a slot, every VOICE_RAMP command of a voice
- * handle, every MACRO command of a macro, or the BEAT commands from a frame on. The automation of the timeline cancels what it scheduled ahead with it on a stop, a
- * seek and a change, and the sequencer the expression of its notes */
+ * handle, every MACRO command of a macro, or the BEAT commands from a frame on. The automation
+ * of the timeline cancels what it scheduled ahead with it on a stop, a seek and a change, and
+ * the sequencer the expression of its notes */
 typedef struct box_audio_cmd_cancel_t {
     box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_CANCEL */
     uint32_t type;                  /**< BOX_AUDIO_CMD_BUS_SET, BOX_AUDIO_CMD_EFFECT_PARAMS,
@@ -1067,8 +1068,7 @@ typedef struct box_audio_cmd_cancel_t {
                                      *   BOX_AUDIO_CMD_BEAT */
     uint32_t target;                /**< Index of the bus, slot of the effect or of the macro,
                                      *   or handle of the voice; of a BEAT, the low word of
-                                     *   the first frame
-                                     *   whose BEAT commands are dropped */
+                                     *   the first frame whose BEAT commands are dropped */
     uint32_t param;                 /**< The box_audio_param_t of a BUS_SET, unused for an
                                      *   effect and a voice; of a BEAT, the high word of the
                                      *   frame */
@@ -1162,8 +1162,9 @@ typedef enum box_audio_mod_scale_t {
  * at the edges of its hard waves and steps, and at once after a command. Its value adds to the
  * value the parameter has from the commands, the BUS_SET, EFFECT and EFFECT_PARAMS ones, or
  * from the maps of a macro, the sum clamped to the range of the parameter; on a macro it adds
- * to the MACRO value before the maps shape it. The modulators of one parameter add up. A bus ramps its gains across each block, an effect
- * gets its new params and smooths them as it does any change.
+ * to the MACRO value before the maps shape it. The modulators of one parameter add up. A bus
+ * ramps its gains across each block, an effect gets its new params and smooths them as it does
+ * any change.
  *
  * A modulator fades in over BOX_AUDIO_MOD_FADE when it starts; a command with target NONE, or
  * one that moves it to another target, fades it out over BOX_AUDIO_MOD_FADE first, and the

@@ -228,21 +228,36 @@ void Macros_curve(void) {
     test_flt(box_audio_macro_map_value(NAN, 2, 4, 0, BOX_AUDIO_MOD_LINEAR), 2.0f);
 }
 
-/** At a value of 0.5 the build-up gives the lowpass of the synth a cutoff of about 1265 Hz and
- * the send of fx a level of 0.3, replacing the authored 1000 Hz and 0.1, which the components
- * keep; a write of the value from C applies at once. */
+/** At 0.5 the build-up gives the synth a cutoff of 1265 Hz, as loud as an authored 1264.9 Hz
+ * with the macro disabled, and the send of fx a level of 0.3, replacing the authored 1000 Hz
+ * and 0.1, which the components keep; a write of the value from C applies at once. */
 void Macros_value(void) {
     // audio/macros
     ecs_world_t *world = mc_world();
     box_audio_module_t *state = box_audio_module_get(world);
     ecs_entity_t build = ecs_lookup(world, "build"), synth = ecs_lookup(world, "synth");
     ecs_entity_t fx = ecs_lookup(world, "fx");
+    double reference, measured;
     int32_t k;
     mc_build_sources(world);
+    ecs_enable(world, build, false);
+    ecs_ensure(world, synth, AudioFilter)->cutoff = MC_CUTOFF_HALF;
+    ecs_modified(world, synth, AudioFilter);
+    audio_run(world, 30);
+    reference = mc_amplitude(audio_tap_count - MC_WINDOW);
+    ecs_ensure(world, synth, AudioFilter)->cutoff = 1000.0f;
+    ecs_modified(world, synth, AudioFilter);
+    ecs_enable(world, build, true);
     audio_run(world, 30);
     k = audio_tap_count - MC_WINDOW;
     mc_check_level(k, MC_LEVEL * 0.3, 0.002);
-    mc_check_cutoff(k, MC_CUTOFF_HALF);
+    measured = mc_amplitude(k);
+    if (fabs(measured - reference) > reference * 0.01) {
+        printf("amplitude %f, an authored cutoff of %f gives %f\n", measured,
+            (double)MC_CUTOFF_HALF, reference);
+    }
+
+    test_assert(fabs(measured - reference) <= reference * 0.01);
     test_flt(ecs_get(world, synth, AudioFilter)->cutoff, 1000.0f);
     test_flt(ecs_vec_first_t(&ecs_get(world, fx, AudioBus)->sends, AudioSend)[0].level, 0.1f);
     test_assert(box_audio_macro_slot(world, build) >= 0);

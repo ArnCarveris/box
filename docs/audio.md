@@ -1251,8 +1251,8 @@ An `AudioBus` automates `volume`, `pan`, `width` and the `level` of its sends; t
 master automates its `volume`, `pan` and `width`. An effect automates every float
 member of its effect component: Reverb, Equalizer bands, AudioFilter, Compressor,
 Gate, Delay, Phaser, Chorus, Saturator and later effects. An
-[AudioMacro](#macros) automates its `value`, which moves all its maps. Kinds, slopes, stages,
-voices, entities and bools are not continuous and not automatable. A clip whose
+[AudioMacro](#macros) automates its `value`, which moves all its maps. Kinds, slopes,
+stages, voices, entities and bools are not continuous and not automatable. A clip whose
 target, component or member is unknown or not automatable logs one error that
 names it and does nothing until it changes.
 
@@ -1396,16 +1396,16 @@ something in the core reads it, and the core derives the beat of any frame from 
 last one (`box_audio_core_beat`).
 
 The core owns a 64-bit rendered-frame clock. Scheduled play, stop, voice/bus set,
-release, legato, effect params and macro commands carry a frame time. Future commands wait in a fixed
-4096-entry schedule; a full schedule applies the command immediately and reports
-`BOX_AUDIO_EVENT_LATE`. Immediate stops also cancel scheduled commands for their
+release, legato, effect params and macro commands carry a frame time. Future commands
+wait in a fixed 4096-entry schedule; a full schedule applies the command immediately and
+reports `BOX_AUDIO_EVENT_LATE`. Immediate stops also cancel scheduled commands for their
 voice handle. Sound memory is freed by its owner after `SOUND_FREE`, which is
 retained even when other events overflow. See [core.h](../src/audio/core/core.h)
 and [transport.h](../src/audio/transport.h) for the low-level APIs.
 
-The main limits are 64 voices, 64 buses, 64 effects, 64 modulators, 32 macros of eight maps, four inserts and sends per
-bus, eight synth layers, two synth LFOs, seven unison copies per layer,
-32 pluck strings, 32 comb delay lines and 256 frames per wavetable, whose tables share the 1023 sound ids. Effects are algorithmic: no convolution or geometry-derived rooms.
+The main limits are 64 voices, 64 buses, 64 effects, 64 modulators, 32 macros of eight
+maps, four inserts and sends per bus, eight synth layers, two synth LFOs, seven unison
+copies per layer, 32 pluck strings, 32 comb delay lines and 256 frames per wavetable, whose tables share the 1023 sound ids. Effects are algorithmic: no convolution or geometry-derived rooms.
 There is one transport and one music stream per world. There are no tempo ramps,
 time stretching, MIDI I/O, plugins, mixer UI or piano roll.
 Scripts can change channel and effect values each frame.

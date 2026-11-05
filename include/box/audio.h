@@ -1358,8 +1358,8 @@ ECS_STRUCT(AudioClip, {
  * as AudioFilter.cutoff, Reverb.mix, Delay.feedback or bands[2].gain of an Equalizer, and
  * the value of an AudioMacro (component AudioMacro, member "value"), which moves its maps
  * sample accurately. Members that are not continuous (kinds, slopes, stages, voices, entities
- * and bools) are not automatable. A clip whose target, component or member is unknown or not automatable logs
- * one error that names it, and does nothing until it changes.
+ * and bools) are not automatable. A clip whose target, component or member is unknown or not
+ * automatable logs one error that names it, and does nothing until it changes.
  *
  * While the Transport plays, the curve is sampled within the lookahead window every 10 ms of
  * output and at its keys, and each value is scheduled sample accurately at its frame: a bus

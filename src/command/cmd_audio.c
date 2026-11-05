@@ -748,37 +748,37 @@ static void box_cmd_audio_macros(
         const AudioMacro *macro = ecs_field(&it, AudioMacro, 0);
         for (i = 0; i < it.count; i ++) {
             char *path = ecs_get_path(world, it.entities[i]);
-            ecs_iter_t mit = ecs_each(world, AudioMacroMap);
+            ecs_iter_t cit = ecs_children(world, it.entities[i]);
             ecs_strbuf_append(buf, "\n  macro %s: value %.2f (%s)", path,
                 (double)macro[i].value, box_audio_macro_status(world, it.entities[i]));
-            while (ecs_each_next(&mit)) {
-                const AudioMacroMap *m = ecs_field(&mit, AudioMacroMap, 0);
-                for (k = 0; k < mit.count; k ++) {
+            while (ecs_children_next(&cit)) {
+                for (k = 0; k < cit.count; k ++) {
+                    const AudioMacroMap *m = ecs_get(world, cit.entities[k], AudioMacroMap);
                     char *map_path, *target;
                     const char *component;
                     float value;
-                    if (ecs_get_parent(world, mit.entities[k]) != it.entities[i]) {
+                    if (!m) {
                         continue;
                     }
 
-                    map_path = ecs_get_path(world, mit.entities[k]);
-                    target = m[k].target && ecs_is_alive(world, m[k].target) ?
-                        ecs_get_path(world, m[k].target) : NULL;
-                    component = m[k].component && ecs_is_alive(world, m[k].component) ?
-                        ecs_get_name(world, m[k].component) : NULL;
-                    value = box_audio_macro_map_value(macro[i].value, m[k].min, m[k].max,
-                        m[k].curve, m[k].scale == AudioModOctaves ? BOX_AUDIO_MOD_OCTAVES :
+                    map_path = ecs_get_path(world, cit.entities[k]);
+                    target = m->target && ecs_is_alive(world, m->target) ?
+                        ecs_get_path(world, m->target) : NULL;
+                    component = m->component && ecs_is_alive(world, m->component) ?
+                        ecs_get_name(world, m->component) : NULL;
+                    value = box_audio_macro_map_value(macro[i].value, m->min, m->max,
+                        m->curve, m->scale == AudioModOctaves ? BOX_AUDIO_MOD_OCTAVES :
                         BOX_AUDIO_MOD_LINEAR);
                     ecs_strbuf_append(buf, "\n    map %s: %s %s.%s %.2f..%.2f%s", map_path,
                         target ? target : "(no target)", component ? component : "?",
-                        m[k].member ? m[k].member : "(no member)", (double)m[k].min,
-                        (double)m[k].max, m[k].scale == AudioModOctaves ? " oct" : "");
-                    if (m[k].curve != 0) {
-                        ecs_strbuf_append(buf, " curve %.2f", (double)m[k].curve);
+                        m->member ? m->member : "(no member)", (double)m->min,
+                        (double)m->max, m->scale == AudioModOctaves ? " oct" : "");
+                    if (m->curve != 0) {
+                        ecs_strbuf_append(buf, " curve %.2f", (double)m->curve);
                     }
 
                     ecs_strbuf_append(buf, " = %.2f (%s)", (double)value,
-                        box_audio_macro_status(world, mit.entities[k]));
+                        box_audio_macro_status(world, cit.entities[k]));
                     ecs_os_free(target);
                     ecs_os_free(map_path);
                 }
