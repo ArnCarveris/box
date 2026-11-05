@@ -347,13 +347,11 @@ template RocketLaunchFace {
 
     if enabled {
       tape_top {
-        LayoutItem: {h: Left, v: Top}
-        OreHazardRule: {width: width, height: 4}
+        OreHazardRule: {width: width, height: 4, h: Left, v: Top}
       }
 
       tape_bottom {
-        LayoutItem: {h: Left, v: Bottom}
-        OreHazardRule: {width: width, height: 4}
+        OreHazardRule: {width: width, height: 4, h: Left, v: Bottom}
       }
     }
   }
