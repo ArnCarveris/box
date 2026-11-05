@@ -1019,12 +1019,18 @@ typedef enum box_audio_synth_target_t {
     BOX_AUDIO_SYNTH_TO_PAN = 4,         /**< Pan of the voice, -1..1, smoothed */
     BOX_AUDIO_SYNTH_TO_DETUNE = 5,      /**< Cents of the unison detune */
     BOX_AUDIO_SYNTH_TO_PULSE_WIDTH = 6, /**< Share of the period of the pulse width */
-    BOX_AUDIO_SYNTH_TO_LEVEL = 7        /**< Share of the level of a layer, clamped at 0,
+    BOX_AUDIO_SYNTH_TO_LEVEL = 7,       /**< Share of the level of a layer, clamped at 0,
                                          * smoothed */
+    BOX_AUDIO_SYNTH_TO_SYNC = 8,        /**< Semitones of the ratio of hard sync of a synced
+                                         * layer, clamped 1..BOX_AUDIO_SYNTH_SYNC_MAX */
+    BOX_AUDIO_SYNTH_TO_POSITION = 9,    /**< Frames of the position of a wavetable layer,
+                                         * clamped to its frames */
+    BOX_AUDIO_SYNTH_TO_VOWEL = 10       /**< Vowels of a formant filter, clamped
+                                         * 0..BOX_AUDIO_SYNTH_VOWEL_MAX */
 } box_audio_synth_target_t;
 
 /** Targets of a route of a synth patch, one past the last */
-#define BOX_AUDIO_SYNTH_TARGETS 8
+#define BOX_AUDIO_SYNTH_TARGETS 11
 
 /** How a synth oscillator that modulates another one changes it */
 typedef enum box_audio_synth_modulation_t {

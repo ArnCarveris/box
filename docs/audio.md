@@ -717,11 +717,14 @@ The fixed routes above (the depths of `SynthLfo`, `SynthFilterEnvelope.amount`, 
 route on top of them: the value of a `source` times an `amount` moves a `target`. Each
 route is an entity of its own, a child of the root, where it moves every layer, or a child
 of a layer, where it moves that layer and takes the amp envelope of that layer as its
-source. The cutoff, resonance and pan are of the sound either way. A sound has up to
+source. The cutoff, resonance, vowel and pan are of the sound either way. A sound has up to
 `BOX_AUDIO_SYNTH_ROUTES` (8) routes: the children of the root first, then those of each
 layer in the order of the layers; more log one error that names the sound and are left
 out. Routes run once per control block, every 8 frames like the LFOs, and add to what the
-fixed routes give; the pan and the level ramp over the block so a step does not click.
+fixed routes give (the LFOs, the pitch envelope and the filter envelope); the pan, the
+level, the ratio of sync and the position ramp over the block so a step does not click. A
+route to a target that does not apply to its layer or to the sound does nothing, without
+an error.
 
 ```
 lead {
@@ -758,6 +761,9 @@ lead {
 | `SynthTargetDetune` | Cents of the unison detune, -100..100, the result clamped to 0..100 |
 | `SynthTargetPulseWidth` | Share of the period of the pulse width of squares, -0.49..0.49 |
 | `SynthTargetLevel` | Share of the level of the layer, -4..4: the level is times `1 + amount * value`, clamped at 0, and smoothed |
+| `SynthTargetHardSync` | Semitones of the ratio of `sync`, -48..48, the result clamped to 1..16; nothing on a layer without sync (a ratio over 1 or a `hard_sync` LFO of the layer) |
+| `SynthTargetPosition` | Frames of the position of a `SynthWavetable` layer, -256..256, the result clamped to 0..N-1 of its table; nothing on a layer that is not a wavetable |
+| `SynthTargetVowel` | Vowels of the `SynthFormant` filter, -4..4, the result clamped to 0..4; of the sound on a layer too; nothing without a `SynthFormant` filter |
 
 `SynthModEnvelope` is a third envelope on the root with the fields of `SynthEnvelope`.
 It runs only when a route uses it and does not keep the voice playing, as the filter

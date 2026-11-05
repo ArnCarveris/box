@@ -918,9 +918,10 @@ done:
 
 /** Run the routes of the modulation matrix of a source for a control block: each adds the
  * value of its source times its amount to its target, on top of the fixed routes. The pitch,
- * the pulse width and the level add to those of the LFOs, which aim them; the cutoff adds to
- * the octaves of the LFOs; the index, the detune, the resonance and the pan take their values
- * here, the pan over the control block.
+ * the pulse width, the level, the ratio of hard sync and the position of a wavetable add to
+ * those of the LFOs, which aim them; the cutoff and the vowel add to the octaves and the vowels
+ * of the LFOs; the index, the detune, the resonance and the pan take their values here, the pan
+ * over the control block.
  *
  * A route of a layer moves that layer, one of the patch every layer: index 0 of the arrays
  * is every layer, 1 + layer a layer.
@@ -931,7 +932,10 @@ done:
  * @param cents Cents of the pitch of each layer, which it adds to
  * @param width Pulse width of each layer, which it adds to
  * @param dip Factor of the level of each layer, which it multiplies
+ * @param semitones Semitones of the ratio of hard sync of each layer, which it adds to
+ * @param frames Frames of the position of each wavetable layer, which it adds to
  * @param octaves Octaves of the cutoff, which it adds to
+ * @param vowels Vowels of the formant filter, which it adds to
  */
 static void box_audio_synth_routes(
     box_audio_synth_source_t *src,
@@ -940,7 +944,10 @@ static void box_audio_synth_routes(
     double *cents,
     double *width,
     float *dip,
-    double *octaves)
+    double *semitones,
+    double *frames,
+    double *octaves,
+    double *vowels)
 {
     double index[1 + BOX_AUDIO_SYNTH_LAYERS] = {0}, detune[1 + BOX_AUDIO_SYNTH_LAYERS] = {0};
     double level[1 + BOX_AUDIO_SYNTH_LAYERS] = {0};
@@ -972,6 +979,15 @@ static void box_audio_synth_routes(
             break;
         case BOX_AUDIO_SYNTH_TO_PULSE_WIDTH:
             width[r->layer] += x;
+            break;
+        case BOX_AUDIO_SYNTH_TO_SYNC:
+            semitones[r->layer] += x;
+            break;
+        case BOX_AUDIO_SYNTH_TO_POSITION:
+            frames[r->layer] += x;
+            break;
+        case BOX_AUDIO_SYNTH_TO_VOWEL:
+            *vowels += x;
             break;
         default:
             level[r->layer] += x;
@@ -1088,7 +1104,8 @@ static void box_audio_synth_lfo_aim(
     }
 
     if (src->routes) {
-        box_audio_synth_routes(src, rate, now, cents, width, dip, &octaves);
+        box_audio_synth_routes(src, rate, now, cents, width, dip, semitones, frames,
+            &octaves, &vowels);
     }
 
     for (l = 0; l < src->layers; l ++) {
@@ -2168,6 +2185,12 @@ static void box_audio_synth_routes_start(
         src->filter != BOX_AUDIO_SYNTH_FORMANT)
     {
         src->lfo_cutoff = true;
+    }
+
+    if ((src->route_targets & (1u << BOX_AUDIO_SYNTH_TO_VOWEL)) &&
+        src->filter == BOX_AUDIO_SYNTH_FORMANT)
+    {
+        src->lfo_vowel = true;
     }
 
     src->panned = (src->route_targets & (1u << BOX_AUDIO_SYNTH_TO_PAN)) != 0;

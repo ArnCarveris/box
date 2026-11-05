@@ -152,6 +152,15 @@ static float box_audio_synth_amount_clamp(
     case BOX_AUDIO_SYNTH_TO_LEVEL:
         max = BOX_AUDIO_SYNTH_ROUTE_LEVEL_MAX;
         break;
+    case BOX_AUDIO_SYNTH_TO_SYNC:
+        max = BOX_AUDIO_SYNTH_SYNC_SEMITONES;
+        break;
+    case BOX_AUDIO_SYNTH_TO_POSITION:
+        max = (float)BOX_AUDIO_TABLE_FRAMES_MAX;
+        break;
+    case BOX_AUDIO_SYNTH_TO_VOWEL:
+        max = BOX_AUDIO_SYNTH_VOWEL_MAX;
+        break;
     default:
         max = 1.0f;
         break;

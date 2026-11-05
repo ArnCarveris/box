@@ -1,0 +1,24 @@
+// The sounds of the SynthModTargets suite of test/cpu/audio: a synced saw whose mod envelope
+// sweeps its ratio and whose first LFO moves the vowel of its formant filter, with a wavetable
+// layer that a route of its own makes brighter at a high velocity.
+using box.audio
+
+prefab TargetsTable {
+  Wavetable: {kind: WavetableHarmonics}
+}
+
+targets_lead {
+  SynthSound: {seed: 7}
+  SynthEnvelope: {attack: 0.005, sustain: 1, hold: 0.5, release: 0.05}
+  SynthFilter: {kind: SynthFormant, vowel: 1}
+  SynthModEnvelope: {attack: 0.1, decay: 0.2, sustain: 0.3, release: 0.1}
+  SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.4, sync: 2}
+  SynthLfo: {rate: 3}
+  sweep { SynthModRoute: {source: SynthSourceModEnvelope, target: SynthTargetHardSync, amount: 12} }
+  talk { SynthModRoute: {source: SynthSourceLfo1, target: SynthTargetVowel, amount: 1.5} }
+  bright {
+    SynthOscillator: {wave: SynthWavetable, frequency: 220, level: 0.2}
+    SynthTable: {table: TargetsTable}
+    open { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetPosition, amount: 3} }
+  }
+}

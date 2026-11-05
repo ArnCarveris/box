@@ -408,8 +408,18 @@ ECS_ENUM(SynthModTarget, {
                                 *   clamped to 0..100. Nothing on a layer without unison */
     SynthTargetPulseWidth,     /**< Share of the period of the pulse width of squares,
                                 *   -0.49..0.49 */
-    SynthTargetLevel           /**< Share of the level of the layer, -4..4: the level is times
+    SynthTargetLevel,          /**< Share of the level of the layer, -4..4: the level is times
                                 *   1 + amount value, clamped at 0, and smoothed */
+    SynthTargetHardSync,       /**< Semitones of the ratio of SynthOscillator.sync, -48..48;
+                                *   the moved ratio is clamped to 1..16. Nothing on a layer
+                                *   without sync: a ratio over 1 or a SynthLfo.hard_sync of
+                                *   the layer */
+    SynthTargetPosition,       /**< Frames of the position of a SynthWavetable layer,
+                                *   -256..256; the moved position is clamped to 0..N-1 of its
+                                *   table. Nothing on a layer that is not a wavetable */
+    SynthTargetVowel           /**< Vowels of the SynthFormant filter, -4..4; the moved vowel
+                                *   is clamped to 0..4. Of the sound on a layer too, as the
+                                *   cutoff. Nothing without a SynthFormant filter */
 });
 
 /** What a synth oscillator does with its signal */
@@ -972,8 +982,9 @@ ECS_STRUCT(SynthLfo, {
  * the LFOs.
  *
  * A child of the root moves every layer; a child of a layer moves that layer, and takes its
- * amp envelope as SynthSourceAmpEnvelope. The cutoff, resonance and pan are of the sound
- * either way. Up to BOX_AUDIO_SYNTH_ROUTES per sound, see the modulation matrix in
+ * amp envelope as SynthSourceAmpEnvelope. The cutoff, resonance, vowel and pan are of the
+ * sound either way. A route to a target that does not apply to its layer or to the sound
+ * does nothing, without an error. Up to BOX_AUDIO_SYNTH_ROUTES per sound, see the modulation matrix in
  * docs/audio.md.
  */
 ECS_STRUCT(SynthModRoute, {

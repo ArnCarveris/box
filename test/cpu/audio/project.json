@@ -295,6 +295,19 @@
                 ]
             },
             {
+                "id": "SynthModTargets",
+                "setup": true,
+                "testcases": [
+                    "mod_envelope_sync",
+                    "velocity_position",
+                    "lfo1_vowel",
+                    "not_applied",
+                    "defaults_identical",
+                    "clamped",
+                    "script"
+                ]
+            },
+            {
                 "id": "SynthLfoSync",
                 "testcases": [
                     "period",
