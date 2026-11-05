@@ -854,12 +854,11 @@ typedef enum box_audio_saturator_mode_t {
 } box_audio_saturator_mode_t;
 
 /** The parameters of a saturator, the first floats of the params of its effect command: each
- * channel runs through a highpass, a tone tilt, the clipper of its mode at twice the rate
- * (saturate.h), its level compensated so that the drive mostly changes the tone, then a DC
- * blocker, the inverse tilt, a lowpass, a sample and hold and a bit crusher at the base rate. The wet signal comes BOX_AUDIO_SATURATE_LATENCY frames late and the dry
- * signal is delayed as much, so that a mix in between does not comb. Its reduction is the
- * largest drop in dB of the peak of the clipped signal against the peak of the driven input,
- * the slope of the clipper at silence taken out */
+ * channel runs through a highpass, a tone tilt, the oversampled clipper of its mode
+ * (saturate.h), a DC blocker, the inverse tilt, a lowpass, a sample and hold and a bit crusher.
+ *
+ * The dry signal is as late as the wet one, so that a mix does not comb. The reduction is the
+ * largest drop in dB of the peak of the clipped signal against the driven input */
 typedef struct box_audio_saturator_params_t {
     float drive;      /**< 0..1: a gain of 0 to BOX_AUDIO_SATURATOR_DRIVE_DB dB before the
                        *   clipper */

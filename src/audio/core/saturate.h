@@ -7,11 +7,9 @@
  * the oversampler is a polyphase halfband FIR of 31 taps up and down, flat to 17 kHz and 70 dB
  * down from 31 kHz at 48 kHz, BOX_AUDIO_SATURATE_LATENCY frames late.
  *
- * The other curves of the saturator, a box_audio_saturator_mode_t, are a shape: a tube curve,
- * a hard clipper with a rounded corner and a sine wavefolder, the last two with first order
- * antiderivative anti-aliasing (ADAA) at the doubled rate, and a tanh rectifier. Their level
- * compensation keeps the RMS of a sine of the reference, as box_audio_saturate_curve_sine
- * does. The tanh clipper above does not change with them.
+ * The other modes of the saturator are a shape: a tube curve, a hard clipper with a rounded
+ * corner and a sine wavefolder, both with first order ADAA and the folder at 4x, and a tanh
+ * rectifier, level compensated by the RMS of a sine of the reference.
  */
 
 #ifndef BOX_AUDIO_CORE_SATURATE_H
@@ -22,6 +20,11 @@
 
 /** Frames of the base rate that the oversampler delays its signal, up and down together */
 #define BOX_AUDIO_SATURATE_LATENCY 15
+
+/** Frames of the base rate that the wavefolder delays its signal more than the other curves:
+ * it runs at four times the rate, through a second oversampler at the doubled rate, and a
+ * sample more of the doubled rate makes that delay whole frames */
+#define BOX_AUDIO_SATURATE_LATENCY_FOLD 8
 
 /** Peak level of the input whose gain the level compensation undoes, -14 dBFS: a sine about
  * that loud keeps its RMS within 0.7 dB over a drive of 0 to +30 dB */
@@ -581,13 +584,13 @@ static inline double box_audio_saturate_sinc(
     return result;
 }
 
-/** A sample at the doubled rate through the hard clipper or the wavefolder of a shape with
- * first order ADAA: the mean of the curve over the step of the driven input from the sample
- * before, (F(u) - F(u0)) / (u - u0) for the antiderivative F. It is the curve followed by a
- * box filter of a sample, which takes most of the harmonics above the doubled Nyquist out
- * before they fold, and delays the shaped signal by half a sample of the doubled rate. The
- * wavefolder takes the difference of the cosines as sin(m) sinc(h) for the middle m and the
- * half step h, which keeps its precision for any step.
+/** A sample at the oversampled rate through the hard clipper or the wavefolder of a shape with
+ * first order antiderivative anti-aliasing (ADAA): (F(u) - F(u0)) / (u - u0) for the
+ * antiderivative F, the curve through a box filter of a sample, half a sample late.
+ *
+ * The box filter takes most of the harmonics above the Nyquist frequency out before they
+ * fold. The folder takes the difference of the cosines as sin(m) sinc(h) for the middle m and
+ * the half step h, which keeps its precision for any step.
  *
  * @param shape The constants, of BOX_AUDIO_SATURATOR_HARD or BOX_AUDIO_SATURATOR_FOLD
  * @param last The driven input of the sample before, receives the one of this sample
@@ -614,6 +617,33 @@ static inline float box_audio_saturate_adaa(
     }
 
     return (float)y - shape->offset;
+}
+
+/** A sample at the doubled rate through the wavefolder of a shape with ADAA at four times the
+ * rate, by a second oversampler, which lowers the aliases of a much folded sine 40 dB; held
+ * back a sample, so that it comes BOX_AUDIO_SATURATE_LATENCY_FOLD frames of the base rate late.
+ *
+ * @param shape The constants, of BOX_AUDIO_SATURATOR_FOLD
+ * @param os The second oversampler, which runs at the doubled rate
+ * @param last The driven input of the sample before at four times the rate
+ * @param late The output held back, receives the one of this sample
+ * @param x The input
+ * @return The folded input, before the level compensation
+ */
+static inline float box_audio_saturate_fold_next(
+    const box_audio_saturate_shape_t *shape,
+    box_audio_oversample_t *os,
+    double *last,
+    float *late,
+    float x)
+{
+    float a, b, result = *late;
+    box_audio_oversample_up(os, x, &a, &b);
+    a = box_audio_saturate_adaa(shape, last, a);
+    b = box_audio_saturate_adaa(shape, last, b);
+    *late = box_audio_oversample_down(os, a, b);
+
+    return result;
 }
 
 /** Run a sample through a first order filter.

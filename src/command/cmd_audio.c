@@ -275,6 +275,7 @@ static void box_cmd_audio_effects(
             if (saturator->rate > 0) {
                 ecs_strbuf_append(buf, " rate %.0f Hz", (double)saturator->rate);
             }
+
             if (saturator->bits < 16) {
                 ecs_strbuf_append(buf, " bits %.1f", (double)saturator->bits);
             } else {

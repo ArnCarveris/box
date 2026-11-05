@@ -120,7 +120,8 @@ void Saturator_tanh(
     bench_t *b)
 {
     // audio/saturator
-    box_audio_saturator_params_t p = { 0.6f, 0.2f, 16, 1, (float)BOX_AUDIO_SATURATOR_TANH, 0, 0, 0, 0 };
+    box_audio_saturator_params_t p = { 0.6f, 0.2f, 16, 1,
+        (float)BOX_AUDIO_SATURATOR_TANH, 0, 0, 0, 0 };
     box_audio_core_t *core = bench_saturator_core(BOX_AUDIO_EFFECT_SATURATOR, &p, sizeof(p),
         1);
     bench_saturator_render(b, core);
@@ -131,7 +132,8 @@ void Saturator_tube(
     bench_t *b)
 {
     // audio/saturator
-    box_audio_saturator_params_t p = { 0.6f, 0.2f, 16, 1, (float)BOX_AUDIO_SATURATOR_TUBE, 0, 0, 0, 0 };
+    box_audio_saturator_params_t p = { 0.6f, 0.2f, 16, 1,
+        (float)BOX_AUDIO_SATURATOR_TUBE, 0, 0, 0, 0 };
     box_audio_core_t *core = bench_saturator_core(BOX_AUDIO_EFFECT_SATURATOR, &p, sizeof(p),
         1);
     bench_saturator_render(b, core);
@@ -142,7 +144,8 @@ void Saturator_hard(
     bench_t *b)
 {
     // audio/saturator
-    box_audio_saturator_params_t p = { 0.6f, 0.2f, 16, 1, (float)BOX_AUDIO_SATURATOR_HARD, 0, 0, 0, 0 };
+    box_audio_saturator_params_t p = { 0.6f, 0.2f, 16, 1,
+        (float)BOX_AUDIO_SATURATOR_HARD, 0, 0, 0, 0 };
     box_audio_core_t *core = bench_saturator_core(BOX_AUDIO_EFFECT_SATURATOR, &p, sizeof(p),
         1);
     bench_saturator_render(b, core);
@@ -153,7 +156,8 @@ void Saturator_fold(
     bench_t *b)
 {
     // audio/saturator
-    box_audio_saturator_params_t p = { 0.6f, 0.2f, 16, 1, (float)BOX_AUDIO_SATURATOR_FOLD, 0, 0, 0, 0 };
+    box_audio_saturator_params_t p = { 0.6f, 0.2f, 16, 1,
+        (float)BOX_AUDIO_SATURATOR_FOLD, 0, 0, 0, 0 };
     box_audio_core_t *core = bench_saturator_core(BOX_AUDIO_EFFECT_SATURATOR, &p, sizeof(p),
         1);
     bench_saturator_render(b, core);
@@ -164,7 +168,8 @@ void Saturator_rectify(
     bench_t *b)
 {
     // audio/saturator
-    box_audio_saturator_params_t p = { 0.6f, 0.2f, 16, 1, (float)BOX_AUDIO_SATURATOR_RECTIFY, 0, 0, 0, 0 };
+    box_audio_saturator_params_t p = { 0.6f, 0.2f, 16, 1,
+        (float)BOX_AUDIO_SATURATOR_RECTIFY, 0, 0, 0, 0 };
     box_audio_core_t *core = bench_saturator_core(BOX_AUDIO_EFFECT_SATURATOR, &p, sizeof(p),
         1);
     bench_saturator_render(b, core);
@@ -175,7 +180,8 @@ void Saturator_tanh_filters(
     bench_t *b)
 {
     // audio/saturator
-    box_audio_saturator_params_t p = { 0.6f, 0.2f, 16, 1, (float)BOX_AUDIO_SATURATOR_TANH, 150, 6000, 0.4f, 0 };
+    box_audio_saturator_params_t p = { 0.6f, 0.2f, 16, 1,
+        (float)BOX_AUDIO_SATURATOR_TANH, 150, 6000, 0.4f, 0 };
     box_audio_core_t *core = bench_saturator_core(BOX_AUDIO_EFFECT_SATURATOR, &p, sizeof(p),
         1);
     bench_saturator_render(b, core);
@@ -186,7 +192,8 @@ void Saturator_fold_filters_rate(
     bench_t *b)
 {
     // audio/saturator
-    box_audio_saturator_params_t p = { 0.6f, 0.2f, 16, 1, (float)BOX_AUDIO_SATURATOR_FOLD, 150, 6000, 0.4f, 8000 };
+    box_audio_saturator_params_t p = { 0.6f, 0.2f, 16, 1,
+        (float)BOX_AUDIO_SATURATOR_FOLD, 150, 6000, 0.4f, 8000 };
     box_audio_core_t *core = bench_saturator_core(BOX_AUDIO_EFFECT_SATURATOR, &p, sizeof(p),
         1);
     bench_saturator_render(b, core);
@@ -197,7 +204,8 @@ void Saturator_silent_tail(
     bench_t *b)
 {
     // audio/saturator
-    box_audio_saturator_params_t p = { 0.6f, 0.2f, 16, 1, (float)BOX_AUDIO_SATURATOR_HARD, 150, 6000, 0.4f, 8000 };
+    box_audio_saturator_params_t p = { 0.6f, 0.2f, 16, 1,
+        (float)BOX_AUDIO_SATURATOR_HARD, 150, 6000, 0.4f, 8000 };
     box_audio_core_t *core = bench_saturator_core(BOX_AUDIO_EFFECT_SATURATOR, &p, sizeof(p),
         0);
     bench_saturator_render(b, core);

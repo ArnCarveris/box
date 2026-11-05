@@ -310,7 +310,11 @@ typedef struct box_audio_saturator_t {
     box_audio_saturator_params_t target; /**< Parameters of the last command, clamped */
     box_audio_oversample_t os[2]; /**< Oversampler of each channel */
     box_audio_dc_t dc[2];     /**< DC blocker of each channel */
-    float dry[2][16];         /**< Dry input of each channel, a ring */
+    box_audio_oversample_t fold[2]; /**< Second oversampler of each channel, at the doubled
+                               * rate, of the wavefolder */
+    float late[2];            /**< Output of the wavefolder at the doubled rate held back a
+                               * sample, of each channel */
+    float dry[2][32];         /**< Dry input of each channel, a ring */
     uint32_t pos;             /**< Write position of the dry rings */
     float dc_coef;            /**< Pole of the DC blockers */
     box_audio_saturate_curve_t curve; /**< Clipper at the drive and asymmetry of curve_at */
@@ -319,8 +323,8 @@ typedef struct box_audio_saturator_t {
     box_audio_saturate_shape_t shape; /**< Clipper of the other modes at the drive and
                                * asymmetry of shape_at */
     float shape_at[2];        /**< Drive and asymmetry the shape is for */
-    double adaa[2];           /**< Driven input of the last sample at the doubled rate of each
-                               * channel, for the ADAA of the hard clipper and the folder */
+    double adaa[2];           /**< Driven input of the last sample at the oversampled rate of
+                               * each channel, for the ADAA of the hard clipper and the folder */
     box_audio_svf_t low[2];   /**< Highpass of the low cut of each channel */
     box_audio_svf_t high[2];  /**< Lowpass of the high cut of each channel */
     box_audio_saturate_tilt_t pre[2]; /**< Tone tilt before the clipper of each channel */
@@ -333,9 +337,9 @@ typedef struct box_audio_saturator_t {
                                * BOX_AUDIO_SATURATOR_CUT_NYQUIST times the rate */
     float rate_off;           /**< Rate of the sample and hold that counts as off, the rate */
     float rate_at;            /**< Rate the step of the sample and hold is for */
-    double rate_step;         /**< Turns of the sample and hold per frame */
-    double phase;             /**< Turns of the sample and hold; it takes a sample each time it
-                               * passes 1 */
+    uint32_t rate_step;       /**< Turns of the sample and hold per frame, times 2^32 */
+    uint32_t phase;           /**< Turns of the sample and hold times 2^32; it takes a sample
+                               * each time it wraps */
     float hold[2];            /**< Sample each channel holds */
     float scale;              /**< Steps of each sign of the bit crusher, 2^(bits - 1); 0 when
                                * it is off */

@@ -822,7 +822,7 @@ ECS_ENUM(SaturatorMode, {
                             *   at full drive. Anti-aliased (ADAA) on top of the oversampling */
     SaturatorFold,         /**< Sine wavefolder: the driven signal wraps over and back, the more
                             *   the drive, the more folds and the brighter. Anti-aliased (ADAA)
-                            *   on top of the oversampling */
+                            *   at four times the rate, 8 frames later than the others */
     SaturatorRectify       /**< A tanh rectifier: asymmetry blends from half wave at 0 to full
                             *   wave at 1, octave up grit; the DC it makes is taken out */
 });
@@ -830,9 +830,10 @@ ECS_ENUM(SaturatorMode, {
 /** A saturator, an effect in an insert slot of an AudioBus, as a Reverb is: warmth, grit or
  * lo-fi for a drum bus, a synth bus or the master. Each channel runs through the clipper of
  * the mode at twice the sample rate, its level compensated so that the drive mostly changes
- * the tone and not the loudness: a sine around -14 dBFS keeps its RMS within about 1.5 dB at
- * any drive in every mode. The asymmetry biases the clipper for even harmonics, with the DC
- * taken out after it, and below 16 bits a bit crusher rounds the saturated signal:
+ * the tone and not the loudness: a sine at -14 dBFS keeps its RMS within about 1.5 dB at any
+ * drive in every mode but tanh, whose older compensation holds that at -12 dBFS. The
+ * asymmetry biases the clipper for even harmonics, with the DC taken out after it, and below
+ * 16 bits a bit crusher rounds the saturated signal:
  * drums { AudioBus: {effects: [drums]}; Saturator: {drive: 0.6, asymmetry: 0.2} }.
  *
  * Around the clipper, low_cut takes the bass out before it so that the bass stays clean (with
@@ -848,12 +849,12 @@ ECS_ENUM(SaturatorMode, {
  * - Octave up grit: {mode: SaturatorRectify, drive: 0.4, asymmetry: 1, mix: 0.5}
  * - Lo-fi drums: {drive: 0.4, bits: 8, rate: 8000, high_cut: 6000}
  *
- * The oversampling delays the channel by 15 frames, its dry signal too, so that a mix in
- * between does not comb. Drive, asymmetry, bits, mix, the cuts, tone and rate move over 20 ms;
- * a change of the mode is at once. An AudioMeter on its entity reads how hard the clipper
- * squashes as its reduction: the largest drop in dB of the clipped peak against the driven
- * peak, 0 while the clipper is all but linear. Once its input is silent and its state decayed
- * it stops until its input sounds again.
+ * The oversampling delays the channel by 15 frames (23 in SaturatorFold), its dry signal too,
+ * so that a mix in between does not comb. Drive, asymmetry, bits, mix, the cuts, tone and
+ * rate move over 20 ms; a change of the mode is at once. An AudioMeter on its entity reads
+ * how hard the clipper squashes as its reduction: the largest drop in dB of the clipped peak
+ * against the driven peak, 0 while the clipper is all but linear. Once its input is silent
+ * and its state decayed it stops until its input sounds again.
  */
 ECS_STRUCT(Saturator, {
     float drive;           /**< 0 to 1, default 0.3: a gain of 0 to +30 dB into the clipper */

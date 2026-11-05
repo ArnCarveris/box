@@ -194,8 +194,9 @@ Phaser stages range from 2 to 12, even; chorus supports up to four voices.
 A saturator adds warmth, grit or lo-fi to a drum bus, a synth bus or the master. It
 clips each channel at twice the sample rate, so it aliases less. `drive` goes from 0
 to +30 dB into the clipper, and the output is level compensated per mode, so drive
-mostly changes the tone and not the loudness: a sine around -14 dBFS keeps its RMS
-within about 1.5 dB at any drive. `asymmetry` biases the clipper to add even
+mostly changes the tone and not the loudness: a sine at -14 dBFS keeps its RMS
+within about 1.5 dB at any drive (tanh keeps its older compensation, which holds
+that at -12 dBFS and rises up to 2.5 dB at -14 dBFS). `asymmetry` biases the clipper to add even
 harmonics, and the DC it creates is filtered out. `mode` picks the curve:
 
 - `SaturatorTanh`, the default: a tanh soft clipper, smooth and symmetric.
@@ -208,7 +209,13 @@ harmonics, and the DC it creates is filtered out. `mode` picks the curve:
   wave (1), octave-up grit.
 
 Hard clipping and folding alias much more than tanh, so those two modes add first
-order antiderivative anti-aliasing (ADAA) on top of the oversampling.
+order antiderivative anti-aliasing (ADAA) on top of the oversampling, and the folder
+runs at four times the rate. On a -6 dBFS 5 kHz sine at 48 kHz, the aliases below
+20 kHz are -51 dB (drive 0.8) and -42 dB (drive 1) for hard, against -30 and -21 dB
+without ADAA. For fold at drive 1 they are -68 dB, against -23 dB with ADAA at twice
+the rate and 0 dB at twice the rate alone. Above 20 kHz, the 25 kHz harmonic folds to
+23 kHz through the roll-off of the oversampler, at -10 to -25 dB, which neither
+removes.
 
 The filters around the clipper shape the distortion. `low_cut` is a 12 dB highpass
 before the clipper, so the bass is not distorted (and with `mix` below 1 the dry bass
@@ -218,8 +225,8 @@ below 0 the lows, and a clean signal passes as it was. `high_cut` is a 12 dB low
 after the clipper that tames fizz. `rate` holds each sample for 1 / rate seconds,
 which gives the aliasing lo-fi sound of an old sampler. A cut, or the rate, of 0 is
 off. Below 16, `bits` runs a bit crusher last: 4 bits gives 16 levels. Oversampling
-delays the bus by 15 frames, and the dry signal is delayed the same amount, so `mix`
-does not comb. Changes move over 20 ms; a change of `mode` applies at once.
+delays the bus by 15 frames (23 for `SaturatorFold`), and the dry signal is delayed the
+same amount, so `mix` does not comb. Changes move over 20 ms; a change of `mode` applies at once.
 An `AudioMeter` on the saturator reads how hard the clipper squashes, in dB.
 
 Recipes:
