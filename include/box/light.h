@@ -353,7 +353,8 @@ ECS_STRUCT(EnvironmentImage, {
  *
  * The first directional light of a scene casts the shadows of the views that enable them, and
  * so do its spot and point lights with shadows through the tiles of its ShadowAtlas; NoShadow
- * shapes and blended shapes cast none.
+ * shapes and blended shapes cast none. A LightFixture shape casts into all of them but the tile
+ * of a spot or point light whose position is inside its world bounds.
  *
  * In a scene with LightBake the views are shadowed by the first directional light that is not
  * Baked and the probe captures by the first one they shade surfaces with (see LightBakeMode).

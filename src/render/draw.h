@@ -158,6 +158,9 @@ typedef struct box_draw_key_t {
     bool dynamic_material;  /**< The shapes or a ChildOf ancestor have DynamicMaterial, so the
                              *   shading uploads every frame */
     bool shadow;            /**< Instances cast shadows, false under NoShadow */
+    bool fixture;           /**< The shapes or a ChildOf ancestor have LightFixture: they cast
+                             *   no shadow into the tile of a light inside their world bounds.
+                             *   Only set with shadow */
     bool surface;           /**< The shapes have a parametric surface: the batch has the
                              *   surface stream, its pages are of the surface store. The mesh
                              *   already tells surfaces apart, the bit selects the store */

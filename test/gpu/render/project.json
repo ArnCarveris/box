@@ -558,6 +558,23 @@
                 ]
             },
             {
+                "id": "LightFixture",
+                "testcases": [
+                    "point_inside_fixture_lit",
+                    "spot_inside_fixture_lit",
+                    "fixture_shadows_other_light",
+                    "fixture_shadows_sun",
+                    "fixture_on_light_entity",
+                    "fixture_parent_of_light",
+                    "fixture_sibling_of_light",
+                    "inherited_from_parent",
+                    "no_shadow_wins",
+                    "light_leaves_fixture",
+                    "tile_counts",
+                    "tag_change_renders_tile"
+                ]
+            },
+            {
                 "id": "ShadowCache",
                 "testcases": [
                     "static_scene_renders_once",

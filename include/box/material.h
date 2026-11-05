@@ -440,6 +440,17 @@ extern ECS_TAG_DECLARE(DynamicMaterial);
 /** Keeps an entity and its descendants out of the shadow pass of every view */
 extern ECS_TAG_DECLARE(NoShadow);
 
+/** Marks the fixture of a light, such as a lamp bulb or a lantern glass, applies to descendants.
+ *
+ * A 3D shape with it, or with a ChildOf ancestor that has it, casts shadows as usual into the
+ * cascades of the directional light and into the tiles of every spot and point light, except
+ * the tile of a light whose world position is inside the world bounds of the shape: the local
+ * bounds of its mesh or surface moved by its model matrix, inclusive, the box the cull tests.
+ * The box is conservative, so a large fixture also skips the tiles of other lights inside its
+ * box. It still receives light and shadows and is drawn in views and captures as before.
+ * NoShadow wins when a shape has both; 2D shapes ignore it. */
+extern ECS_TAG_DECLARE(LightFixture);
+
 /** Register the box.material module.
  *
  * @param world The world
