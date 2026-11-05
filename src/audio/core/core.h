@@ -750,6 +750,11 @@ typedef struct box_audio_synth_layer_t {
                                            * that plucks the string, 0 a soft finger, 1 a pick */
     uint32_t rings_free;                  /**< BOX_AUDIO_SYNTH_PLUCK: 1 when it uses no
                                            * envelope at all and the string alone ends it */
+    float sub;                            /**< Level of the sub oscillator, a band limited
+                                           * square under it, 0..1, 0 for none; ignored by
+                                           * noise and pluck */
+    uint32_t sub_octave;                  /**< Octaves the sub is under it, 1 or 2, 0 counts
+                                           * as 1 */
 } box_audio_synth_layer_t;
 
 /** An LFO of a synth patch: a wave at a rate that starts after a delay and fades in, with a

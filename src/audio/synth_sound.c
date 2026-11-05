@@ -147,6 +147,8 @@ static void box_audio_synth_layer(
 
     l->feedback = osc->feedback;
     l->pulse_width = osc->pulse_width;
+    l->sub = osc->sub;
+    l->sub_octave = osc->sub_octave >= 2 ? 2 : 1;
     l->voices = 1;
     if (unison) {
         l->voices = unison->voices > 1 ? (uint32_t)unison->voices : 1;

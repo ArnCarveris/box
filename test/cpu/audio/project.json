@@ -205,7 +205,8 @@
                     "eq_filter",
                     "dynamics",
                     "delay",
-                    "modulation"
+                    "modulation",
+                    "synth_sub"
                 ]
             },
             {
@@ -657,7 +658,16 @@
                     "pluck_vibrato_rate",
                     "pluck_crossing_smooth",
                     "pluck_steady_identical",
-                    "pluck_vibrato_cost"
+                    "pluck_vibrato_cost",
+                    "sub_octaves",
+                    "sub_zero_identical",
+                    "sub_phase_locked",
+                    "sub_clamped",
+                    "sub_unison",
+                    "sub_glide",
+                    "sub_alias",
+                    "sub_modulator",
+                    "script_sub"
                 ]
             },
             {

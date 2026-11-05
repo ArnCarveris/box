@@ -167,6 +167,9 @@ static void box_audio_synth_patch_clamp(
         l->hardness = box_audio_synth_clamp(l->hardness, 0, 1);
         l->rings_free = l->rings_free && l->wave == BOX_AUDIO_SYNTH_PLUCK && !l->has_envelope;
         l->pulse_width = box_audio_synth_width_clamp(l->pulse_width);
+        l->sub = l->wave == BOX_AUDIO_SYNTH_NOISE || l->wave == BOX_AUDIO_SYNTH_PLUCK ? 0.0f :
+            box_audio_synth_clamp(l->sub, 0, 1);
+        l->sub_octave = l->sub_octave >= 2 ? 2 : 1;
     }
 
     if (p->lfos > BOX_AUDIO_SYNTH_LFOS) {

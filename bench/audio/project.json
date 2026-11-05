@@ -67,6 +67,7 @@
                     "voices_64_lfo",
                     "voices_64_fm",
                     "voices_64_curved",
+                    "voices_64_sub",
                     "voices_32_pluck",
                     "voices_32_pluck_vibrato",
                     "voices_8_pluck_unison"

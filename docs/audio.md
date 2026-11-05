@@ -266,7 +266,7 @@ voices on play, so edits affect subsequent plays.
 | Component | Authoring controls |
 | --- | --- |
 | `SynthSound` | `seed`, `pitch_variance`, `level_variance`; variances default to zero |
-| `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), modulation controls |
+| `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), modulation controls |
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`; all zero by default |
 | `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`) |
 | `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves; requires a filter |
@@ -280,6 +280,13 @@ and `SynthPluck`. Frequency sweeps are exponential. Positive envelope curves mak
 decay/release fall quickly then settle; zero is linear, negative curves start slowly.
 Curve values range from -16 to 16. A sustain of zero ends after decay.
 For gated notes, sustain holds until release, ignoring hold.
+
+`sub` adds a band-limited square one or two octaves (`sub_octave`) under a layer,
+for weight under basses and leads without another layer. It is added before the
+layer's level and envelope, so it shares them. It is derived from the layer's
+phase: it follows sweeps, glides, legato, pitch LFOs and every unison voice, but
+not phase modulation or feedback. A modulator modulates with its sub included.
+`SynthNoise` and `SynthPluck` ignore it.
 
 A filter envelope uses `cutoff * 2^(amount * envelope_level)`. For example,
 cutoff 300 and amount 3 open to 2400 Hz. Its timing is independent of the amplitude
@@ -333,8 +340,9 @@ after the last note. Quantized legato plays start new voices.
 Working examples include [synth_examples.flecs](../test/assets/audio/synth_examples.flecs),
 [synth_unison.flecs](../test/assets/audio/synth_unison.flecs),
 [synth_lfo.flecs](../test/assets/audio/synth_lfo.flecs),
-[synth_glide.flecs](../test/assets/audio/synth_glide.flecs) and
-[synth_pluck.flecs](../test/assets/audio/synth_pluck.flecs).
+[synth_glide.flecs](../test/assets/audio/synth_glide.flecs),
+[synth_pluck.flecs](../test/assets/audio/synth_pluck.flecs) and
+[synth_sub.flecs](../test/assets/audio/synth_sub.flecs).
 
 ## Music on the timeline
 

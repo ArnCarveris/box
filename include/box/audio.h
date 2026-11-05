@@ -344,6 +344,9 @@ ECS_ENUM(SynthModulation, {
  *
  * A layer with the modulation SynthPhase or SynthRing modulates its parent layer by its wave
  * times its own envelope, so the index follows that envelope. It is heard only when audible.
+ *
+ * A layer can have a sub oscillator, a square one or two octaves under it, for weight under
+ * basses and leads without an extra layer: see sub.
  */
 ECS_STRUCT(SynthOscillator, {
     SynthWave wave;        /**< The wave, default SynthSine */
@@ -359,6 +362,15 @@ ECS_STRUCT(SynthOscillator, {
     bool audible;          /**< Whether a modulator is heard as well, at its level */
     float pulse_width;     /**< SynthSquare: share of the period it is high, 0.01..0.99,
                             *   default 0.5; band limited at every width, without DC */
+    float sub;             /**< Level of the sub oscillator, 0..1, default 0 (off): a band
+                            *   limited square sub_octave octaves under the layer, added to
+                            *   its signal before its level and envelope. It is derived from
+                            *   the phase of the layer, so it follows its pitch, sweep, glide,
+                            *   vibrato and unison, but not its phase modulation or feedback;
+                            *   a modulator modulates with the sub included. Ignored by
+                            *   SynthNoise and SynthPluck */
+    int32_t sub_octave;    /**< Octaves the sub is under the layer, 1 or 2, default 1; 0
+                            *   counts as 1 and other values are clamped */
 });
 
 /** The string of a SynthPluck layer, on the layer: a delay line a period long, plucked with a
