@@ -174,6 +174,8 @@ static void box_cmd_audio_effects(
         const Delay *delay;
         const Phaser *phaser;
         const Chorus *chorus;
+        const Saturator *saturator;
+        const TransientShaper *shaper;
         const box_audio_module_t *state = box_audio_module_get(world);
         char *path;
         int32_t b, slot;
@@ -247,10 +249,25 @@ static void box_cmd_audio_effects(
                 "mix %.2f spread %.2f", chorus->voices, (double)chorus->rate,
                 (double)chorus->depth, (double)chorus->delay, (double)chorus->mix,
                 (double)chorus->spread);
+        } else if ((saturator = ecs_get(world, e, Saturator))) {
+            ecs_strbuf_append(buf, "saturator drive %.2f asymmetry %.2f",
+                (double)saturator->drive, (double)saturator->asymmetry);
+            if (saturator->bits < 16) {
+                ecs_strbuf_append(buf, " bits %.1f", (double)saturator->bits);
+            } else {
+                ecs_strbuf_appendstr(buf, " bits off");
+            }
+
+            ecs_strbuf_append(buf, " mix %.2f", (double)saturator->mix);
+        } else if ((shaper = ecs_get(world, e, TransientShaper))) {
+            ecs_strbuf_append(buf, "transient shaper attack %.2f sustain %.2f",
+                (double)shaper->attack, (double)shaper->sustain);
         }
 
         slot = box_audio_module_effect_slot(world, e);
-        if ((ecs_has(world, e, Compressor) || ecs_has(world, e, Gate)) && state && slot >= 0) {
+        if ((ecs_has(world, e, Compressor) || ecs_has(world, e, Gate) ||
+            ecs_has(world, e, Saturator)) && state && slot >= 0)
+        {
             ecs_strbuf_append(buf, " reduction %.1f dB", (double)state->reduction[slot]);
         }
 

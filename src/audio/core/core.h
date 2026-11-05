@@ -172,11 +172,35 @@
 /** Largest depth of the pitch of a synth LFO in cents, up or down */
 #define BOX_AUDIO_SYNTH_CENTS_MAX 2400.0f
 
+/** Largest ratio of hard sync of a synth layer to its frequency */
+#define BOX_AUDIO_SYNTH_SYNC_MAX 16.0f
+
+/** Largest depth of the ratio of hard sync of a synth LFO in semitones, up or down */
+#define BOX_AUDIO_SYNTH_SYNC_SEMITONES 48.0f
+
+/** Largest amount of a synth pitch envelope in semitones, up or down, of the pitch at its start,
+ * of its release and of the ratio of hard sync */
+#define BOX_AUDIO_SYNTH_PITCH_SEMITONES 48.0f
+
 /** Narrowest pulse width of a square, as a share of its period; the widest is 1 minus it */
 #define BOX_AUDIO_SYNTH_PULSE_MIN 0.01f
 
 /** Default pulse width of a square, the symmetric square */
 #define BOX_AUDIO_SYNTH_PULSE_DEFAULT 0.5f
+
+/** Gain in dB before the clipper of the drive of a synth voice at a drive of 0 and of 1 */
+#define BOX_AUDIO_SYNTH_DRIVE_DB_MIN (-6.0f)
+#define BOX_AUDIO_SYNTH_DRIVE_DB_MAX 24.0f
+
+/** Offset the drive of a synth voice at an asymmetry of 1 adds to its driven input */
+#define BOX_AUDIO_SYNTH_DRIVE_BIAS 1.0f
+
+/** Peak of the sine whose RMS the drive of a synth voice keeps at every drive: a layer at
+ * level 1 */
+#define BOX_AUDIO_SYNTH_DRIVE_REFERENCE 1.0f
+
+/** Cutoff of the DC blocker after the drive of a synth voice with asymmetry in Hz */
+#define BOX_AUDIO_SYNTH_DRIVE_DC 5.0f
 
 /** Commands of the byte stream. Each starts with a box_audio_cmd_header_t */
 typedef enum box_audio_cmd_type_t {
@@ -191,7 +215,9 @@ typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_RELEASE = 10,      /**< box_audio_cmd_voice_release_t */
     BOX_AUDIO_CMD_EFFECT = 11,       /**< box_audio_cmd_effect_t; 7, the reverb command of
                                       *   before, is skipped as an unknown type */
-    BOX_AUDIO_CMD_LEGATO = 12        /**< box_audio_cmd_legato_t */
+    BOX_AUDIO_CMD_LEGATO = 12,       /**< box_audio_cmd_legato_t */
+    BOX_AUDIO_CMD_EFFECT_PARAMS = 13, /**< box_audio_cmd_effect_params_t */
+    BOX_AUDIO_CMD_CANCEL = 14        /**< box_audio_cmd_cancel_t */
 } box_audio_cmd_type_t;
 
 /** Parameters of BOX_AUDIO_CMD_VOICE_SET and BOX_AUDIO_CMD_BUS_SET */
@@ -236,9 +262,9 @@ typedef enum box_audio_param_t {
 
 /** Header of every command: its type and its size in bytes, header included.
  *
- * PLAY, STOP, VOICE_SET, BUS_SET, RELEASE and LEGATO follow it with when_lo and when_hi, the
- * frame of the core clock (box_audio_core_clock) at which the command takes effect, 64 bits in
- * two words so that every field stays 32 bits.
+ * PLAY, STOP, VOICE_SET, BUS_SET, RELEASE, LEGATO and EFFECT_PARAMS follow it with when_lo and
+ * when_hi, the frame of the core clock (box_audio_core_clock) at which the command takes
+ * effect, 64 bits in two words so that every field stays 32 bits.
  *
  * A when of 0, or of a frame that was already rendered, applies at the start of the next
  * block; a later one waits in the schedule of the core for its frame. Of the commands of one
@@ -393,7 +419,10 @@ typedef enum box_audio_effect_kind_t {
     BOX_AUDIO_EFFECT_DELAY = 6,   /**< A delay, box_audio_delay_params_t */
     BOX_AUDIO_EFFECT_PHASER = 7,  /**< A phaser, box_audio_phaser_params_t */
     BOX_AUDIO_EFFECT_CHORUS = 8,  /**< A chorus, box_audio_chorus_params_t */
-    BOX_AUDIO_EFFECT_KINDS = 9    /**< Number of kinds, NONE included */
+    BOX_AUDIO_EFFECT_SATURATOR = 9, /**< A saturator, box_audio_saturator_params_t */
+    BOX_AUDIO_EFFECT_TRANSIENT_SHAPER = 10, /**< A transient shaper,
+                                  *   box_audio_transient_shaper_params_t */
+    BOX_AUDIO_EFFECT_KINDS = 11   /**< Number of kinds, NONE included */
 } box_audio_effect_kind_t;
 
 /** The parameters of a reverb, the first floats of the params of its effect command */
@@ -449,8 +478,8 @@ typedef struct box_audio_eq_band_t {
  * new value, exponentially in frequency */
 #define BOX_AUDIO_FILTER_SMOOTH 0.01f
 
-/** Seconds of a change of the mix of a filter effect, and of each half of the crossfade
- * through the dry signal of a change of its kind or slope */
+/** Seconds of a change of the mix or the drive of a filter effect, and of each half of the
+ * crossfade through the dry signal of a change of its kind or slope */
 #define BOX_AUDIO_FILTER_RAMP 0.02f
 
 /** The parameters of a filter effect, the first floats of the params of its effect command:
@@ -462,6 +491,8 @@ typedef struct box_audio_filter_params_t {
     float resonance;  /**< 0 (a Butterworth response) to 1 (rings the longest) */
     float slope;      /**< A box_audio_synth_slope_t: 0 for 12 dB per octave, 1 for 24 */
     float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+    float drive;      /**< Saturation of the input and the resonance, 0 (linear) to 1; moves
+                       *   over BOX_AUDIO_FILTER_RAMP */
 } box_audio_filter_params_t;
 
 /** Seconds of the windows of the peak detector of the compressor and the gate: the detector
@@ -642,6 +673,72 @@ typedef struct box_audio_chorus_params_t {
                        *   the first voice left and the last right */
 } box_audio_chorus_params_t;
 
+/** Gain before the clipper of a saturator at a drive of 1 in dB; a drive of 0 is 0 dB */
+#define BOX_AUDIO_SATURATOR_DRIVE_DB 30.0f
+
+/** Offset a saturator at an asymmetry of 1 adds to its driven input before the clipper */
+#define BOX_AUDIO_SATURATOR_BIAS 1.0f
+
+/** Fewest and most bits of the bit crusher of a saturator; at the most it is off */
+#define BOX_AUDIO_SATURATOR_BITS_MIN 1.0f
+#define BOX_AUDIO_SATURATOR_BITS_MAX 16.0f
+
+/** Cutoff of the DC blocker after the clipper of a saturator in Hz */
+#define BOX_AUDIO_SATURATOR_DC 5.0f
+
+/** Seconds of a change of the drive, the asymmetry, the bits or the mix of a saturator */
+#define BOX_AUDIO_SATURATOR_RAMP 0.02f
+
+/** The parameters of a saturator, the first floats of the params of its effect command: each
+ * channel runs through a tanh soft clipper at twice the rate (saturate.h), its level
+ * compensated so that the drive mostly changes the tone, then a DC blocker and a bit crusher at
+ * the base rate. The wet signal comes BOX_AUDIO_SATURATE_LATENCY frames late and the dry
+ * signal is delayed as much, so that a mix in between does not comb. Its reduction is the
+ * largest drop in dB of the peak of the clipped signal against the peak of the driven input,
+ * the slope of the clipper at silence taken out */
+typedef struct box_audio_saturator_params_t {
+    float drive;      /**< 0..1: a gain of 0 to BOX_AUDIO_SATURATOR_DRIVE_DB dB before the
+                       *   clipper */
+    float asymmetry;  /**< 0..1: a bias of up to BOX_AUDIO_SATURATOR_BIAS before the clipper,
+                       *   shared by both channels, for even harmonics */
+    float bits;       /**< BOX_AUDIO_SATURATOR_BITS_MIN..MAX: the wet signal is rounded to
+                       *   2^bits levels over -1..1, 2^(bits - 1) steps of each sign; at
+                       *   BOX_AUDIO_SATURATOR_BITS_MAX it is not rounded */
+    float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+} box_audio_saturator_params_t;
+
+/** Attack and release in seconds of the fast envelope of a transient shaper */
+#define BOX_AUDIO_TRANSIENT_FAST_ATTACK 0.001f
+#define BOX_AUDIO_TRANSIENT_FAST_RELEASE 0.02f
+
+/** Attack and release in seconds of the slow envelope of a transient shaper */
+#define BOX_AUDIO_TRANSIENT_SLOW_ATTACK 0.02f
+#define BOX_AUDIO_TRANSIENT_SLOW_RELEASE 0.2f
+
+/** Largest gain of a transient shaper either way in dB, at an attack or sustain of 1 or -1 */
+#define BOX_AUDIO_TRANSIENT_RANGE 12.0f
+
+/** Seconds of the one pole that smooths the gain of a transient shaper in dB; the peak
+ * detector and the envelopes already keep it from following the cycles of a low tone */
+#define BOX_AUDIO_TRANSIENT_SMOOTH 0.0005f
+
+/** Seconds of a change of the attack or the sustain of a transient shaper */
+#define BOX_AUDIO_TRANSIENT_RAMP 0.02f
+
+/** The parameters of a transient shaper, the first floats of the params of its effect
+ * command: stereo linked, it follows the peak of the louder channel with a fast and a slow
+ * envelope (BOX_AUDIO_TRANSIENT_FAST_ATTACK and so on), the same gain on both channels.
+ *
+ * The fast one over the slow one in dB is a transient. The slow one over the fast one, or
+ * over the peak when that is higher, is sustain: it ends as soon as the next hit comes up,
+ * before the fast envelope catches up. The gain in dB is
+ * attack times the first plus sustain times the second, each at most
+ * BOX_AUDIO_TRANSIENT_RANGE and smoothed; 0 and 0 pass the signal unchanged */
+typedef struct box_audio_transient_shaper_params_t {
+    float attack;     /**< -1..1: above 0 boosts transients, below 0 softens them */
+    float sustain;    /**< -1..1: above 0 boosts the tail, below 0 shortens it */
+} box_audio_transient_shaper_params_t;
+
 /** Put an effect into an insert slot of a bus, change its parameters, move it or take it off.
  *
  * The inserts of a bus run in the order of their index on its block, before its width, pan and
@@ -666,6 +763,31 @@ typedef struct box_audio_cmd_effect_t {
                                      *   ones it does not read 0 */
 } box_audio_cmd_effect_t;
 
+/** Replace the parameters of the effect in a slot at a frame, as an EFFECT command that keeps
+ * its kind, bus, index and key; the kind smooths the change as it does any other. Ignored
+ * when the slot does not hold an effect of the kind by then. The automation of the timeline
+ * schedules one per value it samples */
+typedef struct box_audio_cmd_effect_params_t {
+    box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_EFFECT_PARAMS */
+    uint32_t when_lo;               /**< Low word of the frame it applies at, 0 for now */
+    uint32_t when_hi;               /**< High word of the frame */
+    uint32_t slot;                  /**< Slot of the effect, below BOX_AUDIO_EFFECT_MAX */
+    uint32_t kind;                  /**< The box_audio_effect_kind_t the slot must hold */
+    float params[BOX_AUDIO_EFFECT_PARAMS]; /**< The parameters of the kind */
+} box_audio_cmd_effect_params_t;
+
+/** Drop the commands of the schedule that set a parameter of a bus or the parameters of an
+ * effect slot, at once: the BUS_SET commands of a bus and a parameter, or every
+ * EFFECT_PARAMS command of a slot. The automation of the timeline cancels what it scheduled
+ * ahead with it on a stop, a seek and a change */
+typedef struct box_audio_cmd_cancel_t {
+    box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_CANCEL */
+    uint32_t type;                  /**< BOX_AUDIO_CMD_BUS_SET or BOX_AUDIO_CMD_EFFECT_PARAMS */
+    uint32_t target;                /**< Index of the bus or slot of the effect */
+    uint32_t param;                 /**< The box_audio_param_t of a BUS_SET, unused for an
+                                     *   effect */
+} box_audio_cmd_cancel_t;
+
 /** Waves of a synth oscillator */
 typedef enum box_audio_synth_wave_t {
     BOX_AUDIO_SYNTH_SINE = 0,      /**< Sine */
@@ -675,6 +797,13 @@ typedef enum box_audio_synth_wave_t {
     BOX_AUDIO_SYNTH_NOISE = 4,     /**< White noise, seeded per play */
     BOX_AUDIO_SYNTH_PLUCK = 5      /**< A Karplus-Strong string plucked with seeded noise */
 } box_audio_synth_wave_t;
+
+/** Colors of the noise of a synth oscillator, each at about the RMS level of white noise */
+typedef enum box_audio_synth_color_t {
+    BOX_AUDIO_SYNTH_WHITE = 0,     /**< White, flat */
+    BOX_AUDIO_SYNTH_PINK = 1,      /**< Pink, falls by 3 dB per octave */
+    BOX_AUDIO_SYNTH_BROWN = 2      /**< Brown, falls by 6 dB per octave */
+} box_audio_synth_color_t;
 
 /** Kinds of the filter of a synth patch */
 typedef enum box_audio_synth_filter_t {
@@ -719,7 +848,24 @@ typedef struct box_audio_synth_envelope_t {
     float curve;         /**< Curve of the decay and the release, 0 linear, positive fast at
                           *   first, -BOX_AUDIO_SYNTH_CURVE_MAX..BOX_AUDIO_SYNTH_CURVE_MAX */
     float attack_curve;  /**< Curve of the attack, the same way */
+    float key_scale;     /**< 0..1: the decay and the release are times 2^(-key_scale key / 12)
+                          *   at the key of a note, 12 log2 of its pitch ratio, fixed at its
+                          *   start; 0 for none and always 0 for the filter envelope */
 } box_audio_synth_envelope_t;
+
+/** A pitch envelope of a synth patch: an offset of the pitch in semitones relative to the note,
+ * amount at its start, which returns to 0 over the decay with a curve, and moves to
+ * release_amount over the release of the amplitude envelope of the layer. All 0 for none */
+typedef struct box_audio_synth_pitch_envelope_t {
+    float amount;          /**< Semitones at the start of a note,
+                            *   -BOX_AUDIO_SYNTH_PITCH_SEMITONES..max */
+    float decay;           /**< Seconds from amount back to the note */
+    float curve;           /**< Curve of the decay and the release, as the curve of a
+                            *   box_audio_synth_envelope_t */
+    float release_amount;  /**< Semitones the offset moves to over the release, the same range */
+    float sync;            /**< Semitones of the ratio of hard sync at the start of a note, which
+                            *   return to 0 with the decay; only on layers with a ratio over 1 */
+} box_audio_synth_pitch_envelope_t;
 
 /** An oscillator of a synth patch */
 typedef struct box_audio_synth_layer_t {
@@ -756,10 +902,26 @@ typedef struct box_audio_synth_layer_t {
                                            * that plucks the string, 0 a soft finger, 1 a pick */
     uint32_t rings_free;                  /**< BOX_AUDIO_SYNTH_PLUCK: 1 when it uses no
                                            * envelope at all and the string alone ends it */
+    float sub;                            /**< Level of the sub oscillator, a band limited
+                                           * square under it, 0..1, 0 for none; ignored by
+                                           * noise and pluck */
+    uint32_t sub_octave;                  /**< Octaves the sub is under it, 1 or 2, 0 counts
+                                           * as 1 */
     float index_velocity;                 /**< Share 0..1 of the index of a modulator that
                                            * velocity scales: index (1 - share + share v) */
     float hardness_velocity;              /**< BOX_AUDIO_SYNTH_PLUCK: share 0..1 of the
                                            * hardness that velocity scales the same way */
+    float sync;                           /**< Hard sync: ratio of its wave to its frequency,
+                                           * 1..BOX_AUDIO_SYNTH_SYNC_MAX, restarted on every
+                                           * cycle of the frequency; 0 counts as 1, off.
+                                           * Ignored by noise and pluck */
+    uint32_t has_pitch_envelope;          /**< 1 when it has its own pitch envelope, 0 for the
+                                           * one of the patch */
+    box_audio_synth_pitch_envelope_t pitch_envelope; /**< Its own pitch envelope, when
+                                           * has_pitch_envelope */
+    uint32_t color;                       /**< BOX_AUDIO_SYNTH_NOISE: a
+                                           * box_audio_synth_color_t, 0 white; ignored by
+                                           * the other waves */
 } box_audio_synth_layer_t;
 
 /** An LFO of a synth patch: a wave at a rate that starts after a delay and fades in, with a
@@ -777,6 +939,9 @@ typedef struct box_audio_synth_lfo_t {
     float amplitude;        /**< Share of the level it takes at the bottom of the wave, 0..1 */
     float cutoff;           /**< Octaves of the cutoff at the top of the wave */
     float pulse_width;      /**< Share of the period the pulse width of squares moves by */
+    float sync;             /**< Semitones the ratio of hard sync moves by at the top of the
+                             * wave, -BOX_AUDIO_SYNTH_SYNC_SEMITONES..max; on a layer it syncs
+                             * it, for every layer only those with a ratio over 1 */
 } box_audio_synth_lfo_t;
 
 /** A synth patch: up to BOX_AUDIO_SYNTH_LAYERS oscillators with envelopes, then one filter,
@@ -788,10 +953,20 @@ typedef struct box_audio_synth_patch_t {
     float pitch_variance;                 /**< Random share of the pitch per play, 0..1 */
     float level_variance;                 /**< Random share of the level per play, 0..1 */
     box_audio_synth_envelope_t envelope;  /**< Envelope of the layers without their own */
+    uint32_t has_drive;                   /**< 1 to run the mix of the layers through the
+                                           * drive before the filter, 0 for none */
+    float pre_drive;                      /**< Drive 0..1: a gain of BOX_AUDIO_SYNTH_DRIVE_DB_MIN
+                                           * to _MAX dB before a tanh soft clipper at twice
+                                           * the rate, level compensated so that a sine at
+                                           * BOX_AUDIO_SYNTH_DRIVE_REFERENCE keeps its RMS */
+    float pre_asymmetry;                  /**< 0..1: an offset of up to
+                                           * BOX_AUDIO_SYNTH_DRIVE_BIAS before the clipper,
+                                           * even harmonics; its DC is blocked */
     uint32_t filter;                      /**< A box_audio_synth_filter_t */
     float cutoff;                         /**< Hz */
     float resonance;                      /**< 0..1, 1 rings the longest */
     uint32_t slope;                       /**< A box_audio_synth_slope_t */
+    float drive;                          /**< Saturation of the filter, 0 (linear) to 1 */
     float filter_amount;                  /**< Octaves the filter envelope moves the cutoff at
                                            * its level 1, negative closes it; 0 for none */
     box_audio_synth_envelope_t filter_envelope; /**< Envelope of the cutoff, which does not
@@ -801,10 +976,15 @@ typedef struct box_audio_synth_patch_t {
                                            * is cutoff * 2^(filter_velocity (v - 1)); 0 for none */
     float filter_envelope_velocity;       /**< Share 0..1 of filter_amount that velocity
                                            * scales: amount (1 - share + share v) */
+    float keytrack;                       /**< 0..1: the cutoff is times the current pitch
+                                           * ratio of the voice, without its variance, to the
+                                           * keytrack, at the control rate; 0 for none */
     float glide;                          /**< Seconds a change of the pitch of a voice takes,
                                            * exponential in frequency, 0 jumps at once */
     uint32_t lfos;                        /**< LFOs that run, 0..BOX_AUDIO_SYNTH_LFOS */
     box_audio_synth_lfo_t lfo[BOX_AUDIO_SYNTH_LFOS]; /**< The LFOs */
+    box_audio_synth_pitch_envelope_t pitch_envelope; /**< Pitch envelope of the layers without
+                                           * their own, all 0 for none */
     box_audio_synth_layer_t layer[BOX_AUDIO_SYNTH_LAYERS]; /**< The oscillators, last: a
                                            * command sends only the layers of its patch */
 } box_audio_synth_patch_t;
@@ -964,8 +1144,9 @@ void box_audio_core_stream_status(
     box_audio_stream_status_t *status);
 
 /** Apply a batch of commands. They take effect at the start of the next render block, but
- * a PLAY, STOP, VOICE_SET, BUS_SET, RELEASE or LEGATO with a future when, which waits in the
- * schedule and takes effect on exactly its frame: the render splits its block there.
+ * a PLAY, STOP, VOICE_SET, BUS_SET, RELEASE, LEGATO or EFFECT_PARAMS with a future when, which
+ * waits in the schedule and takes effect on exactly its frame: the render splits its block
+ * there.
  *
  * Commands of an unknown type are skipped by their size; a truncated command ends the batch.
  * Does not allocate.
@@ -1388,6 +1569,37 @@ bool box_audio_write_effect(
     uint32_t index,
     uint32_t key,
     const float *params);
+
+/** Write a command that replaces the parameters of the effect in a slot at a frame.
+ *
+ * @param writer The writer
+ * @param slot Slot of the effect
+ * @param kind The kind the slot must hold
+ * @param params BOX_AUDIO_EFFECT_PARAMS parameters
+ * @param when Frame of the core clock it applies at, 0 for now
+ * @return Whether the command fit
+ */
+bool box_audio_write_effect_params(
+    box_audio_writer_t *writer,
+    uint32_t slot,
+    uint32_t kind,
+    const float *params,
+    uint64_t when);
+
+/** Write a command that drops the scheduled sets of a parameter of a bus or of the
+ * parameters of an effect slot.
+ *
+ * @param writer The writer
+ * @param type BOX_AUDIO_CMD_BUS_SET or BOX_AUDIO_CMD_EFFECT_PARAMS
+ * @param target Index of the bus or slot of the effect
+ * @param param The box_audio_param_t of a bus, unused for an effect
+ * @return Whether the command fit
+ */
+bool box_audio_write_cancel(
+    box_audio_writer_t *writer,
+    uint32_t type,
+    uint32_t target,
+    uint32_t param);
 
 /** Write a command that makes a sound id a synth patch or replaces its patch, of
  * BOX_AUDIO_CMD_SYNTH_SIZE bytes for the layers of the patch.

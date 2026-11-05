@@ -529,6 +529,15 @@ void Shell_audio_command(void) {
     ecs_modified(world, echo, AudioBus);
     ecs_set(world, echo, Delay, { .sync = 0.75f, .feedback = 0.4f, .mix = 1,
         .ping_pong = true, .damping = 4000 });
+    ecs_entity_t grit = ecs_entity(world, { .name = "grit" });
+    ecs_ensure(world, grit, AudioBus)->effects[0] = grit;
+    ecs_modified(world, grit, AudioBus);
+    ecs_set(world, grit, Saturator, { .drive = 0.6f, .asymmetry = 0.2f, .bits = 8,
+        .mix = 0.5f });
+    ecs_entity_t punch = ecs_entity(world, { .name = "punch" });
+    ecs_ensure(world, punch, AudioBus)->effects[0] = punch;
+    ecs_modified(world, punch, AudioBus);
+    ecs_set(world, punch, TransientShaper, { .attack = 0.5f, .sustain = -0.25f });
     ecs_progress(world, 0.016f);
 
     bool error = true;
@@ -542,6 +551,11 @@ void Shell_audio_command(void) {
         "(does not run: no output)") != NULL);
     test_assert(strstr(out, "echo: group volume 1.00 pan 0.00 width 1.00 -> master, "
         "insert 0 echo: delay sync 0.750 beats feedback 0.40 damping 4000 Hz mix 1.00 ping pong "
+        "(does not run: no output)") != NULL);
+    test_assert(strstr(out, "grit: group volume 1.00 pan 0.00 width 1.00 -> master, "
+        "insert 0 grit: saturator drive 0.60 asymmetry 0.20 bits 8.0 mix 0.50") != NULL);
+    test_assert(strstr(out, "punch: group volume 1.00 pan 0.00 width 1.00 -> master, "
+        "insert 0 punch: transient shaper attack 0.50 sustain -0.25 "
         "(does not run: no output)") != NULL);
     ecs_os_free(out);
 

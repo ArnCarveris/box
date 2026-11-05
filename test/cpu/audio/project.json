@@ -152,6 +152,82 @@
                 ]
             },
             {
+                "id": "SynthKey",
+                "testcases": [
+                    "keytrack_octave",
+                    "keytrack_half",
+                    "keytrack_off",
+                    "keytrack_glide",
+                    "keytrack_glide_wide",
+                    "keytrack_jump",
+                    "keytrack_legato",
+                    "keytrack_envelope",
+                    "key_scale_decay",
+                    "key_scale_layer",
+                    "key_scale_half",
+                    "key_scale_off",
+                    "key_scale_release",
+                    "defaults_identical",
+                    "clamped",
+                    "script"
+                ]
+            },
+            {
+                "id": "SynthSync",
+                "testcases": [
+                    "period_master",
+                    "ratio_one_identical",
+                    "alias_48000",
+                    "alias_44100",
+                    "lfo_spectrum",
+                    "lfo_layer_syncs",
+                    "unison_own_master",
+                    "unison_stereo",
+                    "fm_adds",
+                    "ignored_noise_pluck",
+                    "clamped",
+                    "script"
+                ]
+            },
+            {
+                "id": "SynthPitch",
+                "testcases": [
+                    "start_returns",
+                    "negative_amount",
+                    "curve",
+                    "release_amount",
+                    "release_from_decay",
+                    "release_own_envelope",
+                    "legato_keeps",
+                    "layer",
+                    "sync_sweep",
+                    "pluck",
+                    "wide",
+                    "adds",
+                    "none_identical",
+                    "clamped",
+                    "script"
+                ]
+            },
+            {
+                "id": "SynthNoise",
+                "testcases": [
+                    "pink_slope_48000",
+                    "pink_slope_96000",
+                    "brown_slope_48000",
+                    "brown_slope_96000",
+                    "white_flat",
+                    "rms_matches_white",
+                    "seed_identical",
+                    "seed_plays",
+                    "white_unchanged",
+                    "unison",
+                    "paths",
+                    "clamped",
+                    "script"
+                ]
+            },
+            {
                 "id": "SynthVelocity",
                 "testcases": [
                     "filter_cutoff",
@@ -189,6 +265,15 @@
                     "script",
                     "bit_identical",
                     "command",
+                    "swing_eighths",
+                    "swing_sixteenths",
+                    "humanize_timing",
+                    "humanize_velocity",
+                    "groove_zero",
+                    "groove_transport_loop",
+                    "humanize_launch",
+                    "humanize_tempo",
+                    "humanize_toggle",
                     "audio_defaults",
                     "audio_start",
                     "audio_placement_offset",
@@ -204,6 +289,20 @@
                     "audio_not_ready",
                     "audio_bit_identical",
                     "audio_command"
+                ]
+            },
+            {
+                "id": "Automation",
+                "testcases": [
+                    "filter_sweep",
+                    "volume_fade",
+                    "send_level",
+                    "eq_band",
+                    "loop",
+                    "stop",
+                    "seek",
+                    "unknown_member",
+                    "deterministic"
                 ]
             },
             {
@@ -228,7 +327,12 @@
                     "eq_filter",
                     "dynamics",
                     "delay",
-                    "modulation"
+                    "modulation",
+                    "saturator",
+                    "transient_shaper",
+                    "synth_sub",
+                    "synth_sync",
+                    "synth_drive"
                 ]
             },
             {
@@ -244,7 +348,9 @@
                     "stop_cancels",
                     "bit_identical",
                     "null_clock",
-                    "status_clock"
+                    "status_clock",
+                    "cancel_bus_set",
+                    "effect_params_at_frame"
                 ]
             },
             {
@@ -543,7 +649,15 @@
                     "kind_change_no_click",
                     "mix",
                     "render_sizes",
-                    "component"
+                    "component",
+                    "drive_ramp_no_click"
+                ]
+            },
+            {
+                "id": "EffectFilterDrive",
+                "testcases": [
+                    "zero_identical",
+                    "bounded"
                 ]
             },
             {
@@ -562,7 +676,63 @@
                     "component",
                     "world_duck",
                     "sidechain_cycle",
+                    "script",
+                    "transient_attack",
+                    "transient_sustain",
+                    "transient_level",
+                    "transient_low",
+                    "transient_neutral",
+                    "transient_linked",
+                    "transient_no_click",
+                    "transient_render_sizes",
+                    "transient_component",
+                    "transient_script"
+                ]
+            },
+            {
+                "id": "Saturator",
+                "testcases": [
+                    "harmonics",
+                    "level_across_drive",
+                    "alias_oversampled",
+                    "bits",
+                    "mix_dry",
+                    "reduction",
+                    "drive_no_click",
+                    "render_sizes",
+                    "silent_after_tail",
+                    "component",
                     "script"
+                ]
+            },
+            {
+                "id": "SynthDrive",
+                "testcases": [
+                    "resonance_bounded",
+                    "sweep_stable",
+                    "zero_identical",
+                    "harmonics",
+                    "slope_24",
+                    "wide"
+                ]
+            },
+            {
+                "id": "SynthPreDrive",
+                "testcases": [
+                    "harmonics",
+                    "level_across_drive",
+                    "alias_oversampled",
+                    "before_filter",
+                    "wide",
+                    "without_identical",
+                    "layers_pass",
+                    "clamped"
+                ]
+            },
+            {
+                "id": "SynthPreDriveWorld",
+                "testcases": [
+                    "component"
                 ]
             },
             {
@@ -594,6 +764,7 @@
                     "filter_slope_24",
                     "script_filter_envelope",
                     "filter_extreme",
+                    "filter_drive_default",
                     "layers_sum",
                     "layer_own_envelope",
                     "eight_layers",
@@ -680,7 +851,16 @@
                     "pluck_vibrato_rate",
                     "pluck_crossing_smooth",
                     "pluck_steady_identical",
-                    "pluck_vibrato_cost"
+                    "pluck_vibrato_cost",
+                    "sub_octaves",
+                    "sub_zero_identical",
+                    "sub_phase_locked",
+                    "sub_clamped",
+                    "sub_unison",
+                    "sub_glide",
+                    "sub_alias",
+                    "sub_modulator",
+                    "script_sub"
                 ]
             },
             {
