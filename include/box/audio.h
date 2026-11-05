@@ -359,6 +359,9 @@ ECS_STRUCT(SynthOscillator, {
     bool audible;          /**< Whether a modulator is heard as well, at its level */
     float pulse_width;     /**< SynthSquare: share of the period it is high, 0.01..0.99,
                             *   default 0.5; band limited at every width, without DC */
+    float velocity;        /**< SynthPhase, SynthRing: share 0..1 of the index that the
+                            *   velocity of a note scales, index (1 - share + share v), so
+                            *   soft notes have fewer sidebands; default 0 */
 });
 
 /** The string of a SynthPluck layer, on the layer: a delay line a period long, plucked with a
@@ -376,6 +379,9 @@ ECS_STRUCT(SynthString, {
                             *   default 0.5 */
     float hardness;        /**< Lowpass of the noise that plucks: 0 a soft finger, 1 a hard
                             *   pick; default 0.8 */
+    float velocity;        /**< Share 0..1 of the hardness that the velocity of a note
+                            *   scales, hardness (1 - share + share v), so soft notes are
+                            *   plucked softer; default 0 */
 });
 
 /** An envelope: from 0 to 1 over attack, to sustain over decay, hold seconds there, then to
@@ -430,6 +436,9 @@ ECS_STRUCT(SynthFilter, {
     float resonance;       /**< 0 (a Butterworth response) to 1 (rings the longest) */
     SynthFilterSlope slope; /**< Steepness, default SynthSlope12; at SynthSlope24 the resonance
                             *   applies to the second stage only */
+    float velocity;        /**< Octaves of the cutoff at velocity 1 over velocity 0, -10..10,
+                            *   default 0: the cutoff applies as authored at velocity 1 and is
+                            *   cutoff * 2^(velocity (v - 1)) at the velocity v of a note */
 });
 
 /** A filter, an effect in an insert slot of an AudioBus, as a Reverb is: the state variable
@@ -595,6 +604,8 @@ ECS_STRUCT(SynthFilterEnvelope, {
     float attack_curve;    /**< Curve of the attack, 0 linear (default), -16..16 */
     float amount;          /**< Octaves the cutoff moves at level 1, -10..10, negative closes
                             *   the filter, default 0 */
+    float velocity;        /**< Share 0..1 of the amount that the velocity of a note scales,
+                            *   amount (1 - share + share v), default 0 */
 });
 
 /** Portamento and mono legato of a synth sound, on its root.

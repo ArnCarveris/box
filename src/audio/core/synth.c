@@ -993,11 +993,50 @@ static void box_audio_synth_lfo_start(
     }
 }
 
+/** The factor by which velocity scales a value of which it scales a share: 1 - share +
+ * share * velocity, 1 at velocity 1 or a share of 0.
+ *
+ * @param share Share of the value that velocity scales, 0..1
+ * @param velocity The velocity, 0..1
+ * @return The factor, 0..1
+ */
+static float box_audio_synth_velocity(
+    float share,
+    float velocity)
+{
+    return 1 - share + share * velocity;
+}
+
+/** Take the velocity of a note into the layers of a play: the index of each modulator and the
+ * hardness of each pluck by their share, before its first pass. A layer with a share of 0
+ * keeps its value as it is.
+ *
+ * @param src The source, its parts holding copies of the layers of the patch
+ * @param velocity The velocity, 0..1
+ */
+static void box_audio_synth_velocity_layers(
+    box_audio_synth_source_t *src,
+    float velocity)
+{
+    int32_t l;
+    for (l = 0; l < src->layers; l ++) {
+        box_audio_synth_layer_t *layer = &src->part[l]->layer;
+        if (layer->index_velocity > 0) {
+            layer->index *= box_audio_synth_velocity(layer->index_velocity, velocity);
+        }
+
+        if (layer->hardness_velocity > 0) {
+            layer->hardness *= box_audio_synth_velocity(layer->hardness_velocity, velocity);
+        }
+    }
+}
+
 void box_audio_source_synth(
     box_audio_core_t *core,
     box_audio_source_t *source,
     uint32_t sound,
     float pitch,
+    float velocity,
     bool loop,
     bool gate)
 {
@@ -1033,9 +1072,21 @@ void box_audio_source_synth(
         }
     }
 
+    src->velocity = velocity;
+    if (velocity < 1) {
+        box_audio_synth_velocity_layers(src, velocity);
+    }
+
     src->envelope = p->envelope;
     src->filter_envelope = p->filter_envelope;
     src->cutoff_base = (double)p->cutoff;
+    if (p->filter_velocity != 0 && velocity < 1) {
+        src->cutoff_base *= box_audio_synth_exp2((double)p->filter_velocity *
+            ((double)velocity - 1));
+        src->cutoff_base = src->cutoff_base > BOX_AUDIO_SYNTH_CUTOFF_MIN ? src->cutoff_base :
+            BOX_AUDIO_SYNTH_CUTOFF_MIN;
+    }
+
     slot->plays ++;
     src->rng = box_audio_synth_hash(p->seed, slot->plays);
     src->variance = 1.0f + p->pitch_variance * box_audio_synth_noise(&src->rng);
@@ -1048,6 +1099,10 @@ void box_audio_source_synth(
     src->gate = gate;
     src->filter = (int32_t)p->filter;
     src->amount = src->filter ? p->filter_amount : 0.0f;
+    if (p->filter_envelope_velocity > 0 && velocity < 1) {
+        src->amount *= box_audio_synth_velocity(p->filter_envelope_velocity, velocity);
+    }
+
     src->glide_frames = box_audio_synth_frames(p->glide, core->sample_rate);
     src->stages = box_audio_svf_init(src->svf, p->slope, p->resonance);
     src->svf_r[0] = src->svf[0];
