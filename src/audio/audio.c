@@ -378,6 +378,25 @@ static void box_audio_synth_filter_ctor(
     }
 }
 
+/** Construct SynthDrive values: a drive of 0.3, symmetric.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_synth_drive_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    SynthDrive *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (SynthDrive){ .drive = 0.3f, .asymmetry = 0 };
+    }
+}
+
 /** Construct SynthLfo values: a sine at 5 Hz from phase 0 without a delay, at depth 0 on
  * every destination.
  *
@@ -1153,6 +1172,8 @@ void BoxAudioImport(
     ecs_set_hooks(world, Saturator, { .ctor = box_audio_saturator_ctor });
     ECS_META_COMPONENT(world, SynthFilterEnvelope);
     ECS_META_COMPONENT(world, SynthGlide);
+    ECS_META_COMPONENT(world, SynthDrive);
+    ecs_set_hooks(world, SynthDrive, { .ctor = box_audio_synth_drive_ctor });
     ECS_META_COMPONENT(world, SynthLfoWave);
     ECS_META_COMPONENT(world, SynthLfo);
     ecs_set_hooks(world, SynthLfo, { .ctor = box_audio_synth_lfo_ctor });

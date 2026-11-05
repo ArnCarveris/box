@@ -122,6 +122,36 @@ fn surface_boundary(u: f32, inner: i32) -> vec3f {
     return sv_mix(sp(offset + first + i), sp(offset + next), t - f32(i));
 }
 
+fn surface_profile_normal(u: f32, inner: i32) -> vec3f {
+    var offset = i32(sf(5, 0));
+    var count = i32(sf(5, 2));
+    var first = 0;
+    if (inner == 1) {
+        first = count;
+        count = i32(sf(5, 1)) - count;
+    }
+
+    var t = u * f32(count);
+    var i = i32(min(floor(t), f32(count - 1)));
+    var next = i32(sf(offset + first + i, 3));
+    var a = sp(offset + first + i);
+    var b = sp(offset + next);
+    var normal = sv(b.y - a.y, 0.0, a.x - b.x);
+    if (sf(8, 0) > 0.0) {
+        var normals = i32(sf(8, 0));
+        var from_normal = sv(sf(normals + first + i, 2), 0.0,
+            sf(normals + first + i, 3));
+        var to_normal = sv(sf(normals + next, 0), 0.0, sf(normals + next, 1));
+        normal = sv_mix(from_normal, to_normal, t - f32(i));
+    }
+
+    if (sv_dot(normal, normal) < 0.000000000001) {
+        return normal;
+    }
+
+    return sv_unit(normal);
+}
+
 struct SurfaceSweepSample {
     position: vec3f,
     normal: vec3f,
@@ -469,7 +499,12 @@ fn surface_normal(region: i32, u: f32, v: f32) -> vec3f {
         return sv(0.0, 1.0, 0.0);
     }
 
-    if (sf(0, 0) == 1.0 && region < 2) {
+    if (sf(0, 0) == 7.0 && region < 2) {
+        var profile_normal = surface_profile_normal(u, region);
+        if (sv_dot(profile_normal, profile_normal) >= 0.000000000001) {
+            return profile_normal;
+        }
+    } else if (sf(0, 0) == 1.0 && region < 2) {
         var sample = surface_sweep_sample(region, u, v);
         if (sv_dot(sample.normal, sample.normal) >= 0.000000000001) {
             return sv_unit(sample.normal);

@@ -144,6 +144,27 @@
                 ]
             },
             {
+                "id": "SynthKey",
+                "testcases": [
+                    "keytrack_octave",
+                    "keytrack_half",
+                    "keytrack_off",
+                    "keytrack_glide",
+                    "keytrack_glide_wide",
+                    "keytrack_jump",
+                    "keytrack_legato",
+                    "keytrack_envelope",
+                    "key_scale_decay",
+                    "key_scale_layer",
+                    "key_scale_half",
+                    "key_scale_off",
+                    "key_scale_release",
+                    "defaults_identical",
+                    "clamped",
+                    "script"
+                ]
+            },
+            {
                 "id": "SynthSync",
                 "testcases": [
                     "period_master",
@@ -267,7 +288,8 @@
                     "modulation",
                     "saturator",
                     "synth_sub",
-                    "synth_sync"
+                    "synth_sync",
+                    "synth_drive"
                 ]
             },
             {
@@ -637,6 +659,25 @@
                     "harmonics",
                     "slope_24",
                     "wide"
+                ]
+            },
+            {
+                "id": "SynthPreDrive",
+                "testcases": [
+                    "harmonics",
+                    "level_across_drive",
+                    "alias_oversampled",
+                    "before_filter",
+                    "wide",
+                    "without_identical",
+                    "layers_pass",
+                    "clamped"
+                ]
+            },
+            {
+                "id": "SynthPreDriveWorld",
+                "testcases": [
+                    "component"
                 ]
             },
             {

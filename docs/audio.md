@@ -278,9 +278,16 @@ voices on play, so edits affect subsequent plays.
 | Component | Authoring controls |
 | --- | --- |
 | `SynthSound` | `seed`, `pitch_variance`, `level_variance`; variances default to zero |
+<<<<<<< HEAD
 | `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), `sync` (0, off, 1..16), `color` (`SynthNoiseWhite`), modulation controls, `velocity` (0) |
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`; all zero by default |
 | `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves) |
+=======
+| `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), `sync` (0, off, 1..16), modulation controls, `velocity` (0) |
+| `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`, `key_scale`; all zero by default |
+| `SynthDrive` | Root: `drive` (0.3, 0..1), `asymmetry` (0, 0..1) |
+| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves), `keytrack` (0) |
+>>>>>>> c682ba1f8442f1afd4f3bb3723213220cafdea33
 | `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves and `velocity` (0); requires a filter |
 | `SynthUnison` | Per layer: `voices` (3, 1..7), `detune` (10 cents, 0..100), `width` (0, 0..1) |
 | `SynthGlide` | Root: `time` seconds (0, up to 10), `legato` (false), `channel` (0) |
@@ -333,6 +340,26 @@ In the `Synth` bench of [bench/audio](../bench/audio/) (64 voices, 48 kHz, one
 filter with an envelope from about 125 to 170 µs: roughly 4 ns per stage and frame of
 a voice.
 
+`SynthDrive` on the root drives the mix of the layers of each voice through a tanh
+soft clipper before the filter, or before the amp without a filter: the stage where
+analog synths get most of their thickness. Since it works on the mix, plucks, unison
+voices and FM pass through it, and layers that play together intermodulate. `drive`
+is a gain of -6 to +24 dB before the clipper; the level is compensated so that drive
+changes the tone more than the loudness: a sine at level 1 keeps its RMS at every
+drive, and a layer at its usual level stays within about 1.5 dB from 0.1 to 1. Quieter
+mixes are driven less and get louder with drive; louder ones squash. `asymmetry` adds
+an offset before the clipper for even harmonics, and a 5 Hz DC blocker after it takes
+off the DC the offset makes. The clipper is the one of `Saturator` (shared in
+[saturate.h](../src/audio/core/saturate.h)), run at twice the rate so high, loud
+notes alias little; the driven mix is 15 frames (0.3 ms) late. On the stereo path of
+unison with width, both channels drive with the same settings and their own state.
+Without the component there is no drive and the sound renders as before.
+In the `Synth` bench (`voices_64_pre_drive`, 64 voices, 48 kHz, drive 0.6 with an
+asymmetry of 0.3) the drive raises the 64 voices from about 610 to 1200 ns per sample
+(78 to 154 µs per 128-frame quantum): about 9 ns per voice and frame, which roughly
+doubles the cost of a plain voice. The 2x oversampler is most of it and is costly per
+voice; it is kept because a clipper at the base rate aliases audibly on high notes.
+
 ```flecs
 using box.audio
 
@@ -367,6 +394,24 @@ the voice as well as its gain, so harder notes can be brighter, not only louder.
 
 Plays that are not notes, such as `AudioSource`, `box_audio_play`, quantized plays and
 streams, play at velocity 1. Sample voices ignore velocity beyond its gain.
+
+The pitch of a note reaches the voice too, as key tracking on analog synths. The key of
+a voice is `12 * log2(ratio)` semitones, where the ratio is the pitch of its play without
+the `pitch_variance` of `SynthSound`. For an `Instrument` note the ratio is
+`2^((pitch - root) / 12)`, so the key is relative to `Instrument.root`; for any other play
+it is relative to a ratio of 1, the pitch of an `AudioSource` or of `box_audio_play`. Both
+fields default to 0, which leaves the sound as it was:
+
+- `SynthFilter.keytrack`, 0..1, multiplies the cutoff by `ratio^keytrack`, so 1 moves the
+  cutoff 1:1 with the pitch and 0.5 half an octave per octave. It follows the current pitch
+  of the voice: a glide, a change of `AudioSource.pitch` or a legato retarget moves the
+  cutoff along, at the control rate of the LFOs. It adds to the filter envelope, the
+  velocity and the LFOs.
+- `SynthEnvelope.key_scale`, 0..1, multiplies the decay and the release by
+  `2^(-key_scale * key / 12)`, fixed at the start of the note, so at 1 they halve per
+  octave above the root and double per octave below. It applies to the root envelope and
+  to the envelopes of layers, clamped to the limits of an envelope; the filter envelope
+  has no key scaling.
 
 ### Modulation, unison and glide
 
@@ -404,8 +449,9 @@ Working examples include [synth_examples.flecs](../test/assets/audio/synth_examp
 [synth_lfo.flecs](../test/assets/audio/synth_lfo.flecs),
 [synth_glide.flecs](../test/assets/audio/synth_glide.flecs),
 [synth_pluck.flecs](../test/assets/audio/synth_pluck.flecs),
-[synth_sub.flecs](../test/assets/audio/synth_sub.flecs) and
-[synth_sync.flecs](../test/assets/audio/synth_sync.flecs).
+[synth_sub.flecs](../test/assets/audio/synth_sub.flecs),
+[synth_sync.flecs](../test/assets/audio/synth_sync.flecs) and
+[synth_drive.flecs](../test/assets/audio/synth_drive.flecs).
 
 ## Music on the timeline
 

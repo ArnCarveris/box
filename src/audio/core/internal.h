@@ -607,6 +607,13 @@ typedef struct box_audio_synth_source_t {
     box_audio_svf_t svf[2]; /**< The resonant stage, then the stage before it at 24 dB */
     box_audio_svf_t svf_r[2]; /**< The stages of the right channel, when stereo */
     float drive;          /**< Saturation of the filter, 0 (linear) to 1 */
+    bool has_drive;       /**< Whether the mix of the layers runs through the drive before the
+                           * filter */
+    bool drive_dc;        /**< Whether the drive has an asymmetry, so a DC blocker follows it */
+    float drive_dc_coef;  /**< Pole of the DC blocker of the drive */
+    box_audio_saturate_curve_t drive_curve; /**< Clipper of the drive */
+    box_audio_oversample_t drive_os[2]; /**< Oversampler of the drive, left then right */
+    box_audio_dc_t drive_blocker[2]; /**< DC blocker of the drive, left then right */
     bool unison;          /**< Whether a layer has unison voices, which renders through
                            * box_audio_synth_render_wide */
     bool stereo;          /**< Whether a layer with unison voices has width, so the source
@@ -627,6 +634,15 @@ typedef struct box_audio_synth_source_t {
     int32_t lfo_control;  /**< Frames until the next control block of the LFOs */
     bool lfo_cutoff;      /**< Whether an LFO moves the cutoff */
     double lfo_octaves;   /**< Octaves the LFOs move the cutoff by, 0 without */
+    float keytrack;       /**< Share 0..1 of the key in octaves the cutoff follows, 0 without a
+                           * filter */
+    double key;           /**< Key of the voice in octaves, log2 of its pitch ratio without the
+                           * variance, moving with a glide */
+    double key_target;    /**< Key the voice moves to */
+    double key_step;      /**< Change of key per frame while it moves */
+    int32_t key_left;     /**< Frames left until key reaches key_target, 0 when it stands or
+                           * keytrack is 0 */
+    int32_t key_control;  /**< Frames until the filter takes the key while it moves */
     float tremolo;        /**< Factor of the output from the LFOs of every layer, 1 without */
     float tremolo_step;   /**< Change of tremolo per frame */
     int32_t strings;      /**< Pluck layers, each with a string per unison voice, 0 for none */
@@ -719,6 +735,7 @@ typedef struct box_audio_synth_slot_t {
     int32_t strings;    /**< Strings a play of the patch takes: one for each unison voice of
                          * each of its pluck layers */
     bool used;          /**< Whether a sound has the slot */
+    box_audio_saturate_curve_t drive; /**< Clipper of the drive of the patch, when it has one */
 } box_audio_synth_slot_t;
 
 /** A command that takes effect on a frame: PLAY, STOP, VOICE_SET, BUS_SET, RELEASE or LEGATO */
@@ -1202,6 +1219,19 @@ void box_audio_source_stream(
 void box_audio_synth_command(
     box_audio_core_t *core,
     const box_audio_cmd_synth_t *cmd);
+
+/** Set the clipper of the drive of a synth patch: a gain of BOX_AUDIO_SYNTH_DRIVE_DB_MIN to
+ * _MAX dB, an offset of up to BOX_AUDIO_SYNTH_DRIVE_BIAS, and a level compensation that keeps
+ * the RMS of a sine at BOX_AUDIO_SYNTH_DRIVE_REFERENCE.
+ *
+ * @param curve Receives the clipper
+ * @param drive 0..1
+ * @param asymmetry 0..1
+ */
+void box_audio_synth_drive_curve(
+    box_audio_saturate_curve_t *curve,
+    float drive,
+    float asymmetry);
 
 /** Set the parts of the synth layers and the pluck strings of a new core free.
  *

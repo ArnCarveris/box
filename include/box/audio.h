@@ -440,6 +440,11 @@ ECS_STRUCT(SynthEnvelope, {
     float curve;           /**< Curve of the decay and the release, 0 linear (default),
                             *   -16..16 */
     float attack_curve;    /**< Curve of the attack, 0 linear (default), -16..16 */
+    float key_scale;       /**< Key scaling 0..1, default 0: the decay and the release are
+                            *   times 2^(-key_scale key / 12) at the key of the note (see
+                            *   SynthFilter), fixed at its start, so at 1 they halve per
+                            *   octave above the root and double per octave below; clamped
+                            *   to the times of an envelope */
 });
 
 /** Unison of a synth layer, on the entity of its SynthOscillator: the layer plays as several
@@ -463,7 +468,13 @@ ECS_STRUCT(SynthUnison, {
 });
 
 /** The filter of a synth sound, on its root: a state variable filter on the mix of the layers,
- * stable at any cutoff and resonance */
+ * stable at any cutoff and resonance.
+ *
+ * The key of a voice, which keytrack and SynthEnvelope.key_scale follow, is 12 log2 of the
+ * pitch ratio of its play in semitones, without the pitch variance of SynthSound: relative to
+ * Instrument.root for a note of an instrument, to a ratio of 1 for any other play, as the
+ * pitch of an AudioSource or of box_audio_play.
+ */
 ECS_STRUCT(SynthFilter, {
     SynthFilterKind kind;  /**< The kind, default SynthLowPass */
     float cutoff;          /**< Hz, default 1000, clamped under Nyquist */
@@ -476,6 +487,9 @@ ECS_STRUCT(SynthFilter, {
     float velocity;        /**< Octaves of the cutoff at velocity 1 over velocity 0, -10..10,
                             *   default 0: the cutoff applies as authored at velocity 1 and is
                             *   cutoff * 2^(velocity (v - 1)) at the velocity v of a note */
+    float keytrack;        /**< Key tracking 0..1, default 0: the cutoff is times the pitch
+                            *   ratio of the voice to the keytrack, so 1 moves it 1:1 with the
+                            *   pitch; it follows the pitch of the voice, glides included */
 });
 
 /** A filter, an effect in an insert slot of an AudioBus, as a Reverb is: the state variable
@@ -671,6 +685,20 @@ ECS_STRUCT(SynthFilterEnvelope, {
                             *   amount (1 - share + share v), default 0 */
 });
 
+/** A drive stage of a synth sound, on its root: the mix of the layers of each voice runs
+ * through a tanh soft clipper before the SynthFilter, or before the amp without one, where an
+ * analog synth gets most of its thickness. Plucks, unison and FM pass through it as they mix.
+ *
+ * The clipper runs at twice the rate and is level compensated: a sine at level 1 keeps its
+ * RMS at every drive. The driven mix is 15 frames late; with width both channels drive alike.
+ * Without the component there is no drive. See docs/audio.md.
+ */
+ECS_STRUCT(SynthDrive, {
+    float drive;           /**< 0..1, default 0.3: a gain of -6 to +24 dB before the clipper */
+    float asymmetry;       /**< 0..1, default 0: an offset before the clipper that adds even
+                            *   harmonics; its DC is blocked */
+});
+
 /** Portamento and mono legato of a synth sound, on its root.
  *
  * With a time, a change of the pitch of a voice, as a change of AudioSource.pitch, glides
@@ -719,7 +747,8 @@ ECS_STRUCT(SynthLfo, {
 
 /** A sound made by the synth from the components of this entity and its children, without a
  * file: SynthOscillator layers, each with an optional SynthUnison, a SynthEnvelope, a
- * SynthFilter, a SynthFilterEnvelope, a SynthGlide and SynthLfo. Usually a prefab.
+ * SynthDrive, a SynthFilter, a SynthFilterEnvelope, a SynthGlide and SynthLfo. Usually a
+ * prefab.
  *
  * It is compiled once, and again when one of its components changes, into a patch the core
  * holds; box_audio_play and AudioSource play it like any sound, with no allocation per play.

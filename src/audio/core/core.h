@@ -184,6 +184,20 @@
 /** Default pulse width of a square, the symmetric square */
 #define BOX_AUDIO_SYNTH_PULSE_DEFAULT 0.5f
 
+/** Gain in dB before the clipper of the drive of a synth voice at a drive of 0 and of 1 */
+#define BOX_AUDIO_SYNTH_DRIVE_DB_MIN (-6.0f)
+#define BOX_AUDIO_SYNTH_DRIVE_DB_MAX 24.0f
+
+/** Offset the drive of a synth voice at an asymmetry of 1 adds to its driven input */
+#define BOX_AUDIO_SYNTH_DRIVE_BIAS 1.0f
+
+/** Peak of the sine whose RMS the drive of a synth voice keeps at every drive: a layer at
+ * level 1 */
+#define BOX_AUDIO_SYNTH_DRIVE_REFERENCE 1.0f
+
+/** Cutoff of the DC blocker after the drive of a synth voice with asymmetry in Hz */
+#define BOX_AUDIO_SYNTH_DRIVE_DC 5.0f
+
 /** Commands of the byte stream. Each starts with a box_audio_cmd_header_t */
 typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_PLAY = 1,          /**< box_audio_cmd_play_t */
@@ -769,6 +783,9 @@ typedef struct box_audio_synth_envelope_t {
     float curve;         /**< Curve of the decay and the release, 0 linear, positive fast at
                           *   first, -BOX_AUDIO_SYNTH_CURVE_MAX..BOX_AUDIO_SYNTH_CURVE_MAX */
     float attack_curve;  /**< Curve of the attack, the same way */
+    float key_scale;     /**< 0..1: the decay and the release are times 2^(-key_scale key / 12)
+                          *   at the key of a note, 12 log2 of its pitch ratio, fixed at its
+                          *   start; 0 for none and always 0 for the filter envelope */
 } box_audio_synth_envelope_t;
 
 /** An oscillator of a synth patch */
@@ -853,6 +870,15 @@ typedef struct box_audio_synth_patch_t {
     float pitch_variance;                 /**< Random share of the pitch per play, 0..1 */
     float level_variance;                 /**< Random share of the level per play, 0..1 */
     box_audio_synth_envelope_t envelope;  /**< Envelope of the layers without their own */
+    uint32_t has_drive;                   /**< 1 to run the mix of the layers through the
+                                           * drive before the filter, 0 for none */
+    float pre_drive;                      /**< Drive 0..1: a gain of BOX_AUDIO_SYNTH_DRIVE_DB_MIN
+                                           * to _MAX dB before a tanh soft clipper at twice
+                                           * the rate, level compensated so that a sine at
+                                           * BOX_AUDIO_SYNTH_DRIVE_REFERENCE keeps its RMS */
+    float pre_asymmetry;                  /**< 0..1: an offset of up to
+                                           * BOX_AUDIO_SYNTH_DRIVE_BIAS before the clipper,
+                                           * even harmonics; its DC is blocked */
     uint32_t filter;                      /**< A box_audio_synth_filter_t */
     float cutoff;                         /**< Hz */
     float resonance;                      /**< 0..1, 1 rings the longest */
@@ -867,6 +893,9 @@ typedef struct box_audio_synth_patch_t {
                                            * is cutoff * 2^(filter_velocity (v - 1)); 0 for none */
     float filter_envelope_velocity;       /**< Share 0..1 of filter_amount that velocity
                                            * scales: amount (1 - share + share v) */
+    float keytrack;                       /**< 0..1: the cutoff is times the current pitch
+                                           * ratio of the voice, without its variance, to the
+                                           * keytrack, at the control rate; 0 for none */
     float glide;                          /**< Seconds a change of the pitch of a voice takes,
                                            * exponential in frequency, 0 jumps at once */
     uint32_t lfos;                        /**< LFOs that run, 0..BOX_AUDIO_SYNTH_LFOS */

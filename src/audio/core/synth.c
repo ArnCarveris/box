@@ -1,7 +1,8 @@
 /**
  * @file audio/core/synth.c
  * @brief The synth source: band limited oscillators and seeded noise, each with a linear or
- * curved envelope, mixed into a state variable filter of one or two stages, whose cutoff an
+ * curved envelope, mixed, optionally driven through the oversampled soft clipper of saturate.h,
+ * into a state variable filter of one or two stages, whose cutoff an
  * envelope may move, and an amp, rendered per frame from a copy of the patch. A change of the
  * pitch glides exponentially in frequency over the glide of the patch, and a legato play
  * retargets the layers of a voice without a restart of its envelopes. A layer may play as
@@ -442,8 +443,8 @@ static void box_audio_synth_limits(
 }
 
 /** Move the cutoff by the level of the filter envelope, exponentially in frequency: the cutoff
- * of the patch times 2 to the amount times the level, and to the octaves of the LFOs, clamped
- * to the range of a cutoff.
+ * of the patch times 2 to the amount times the level, to the octaves of the LFOs and to the
+ * keytrack times the key, clamped to the range of a cutoff.
  *
  * @param src The source
  * @param level Level of the filter envelope, 0..1
@@ -457,6 +458,10 @@ static void box_audio_synth_cutoff(
     double octaves = (double)src->amount * (double)level, cut;
     if (src->lfo_cutoff) {
         octaves += src->lfo_octaves;
+    }
+
+    if (src->keytrack != 0) {
+        octaves += (double)src->keytrack * src->key;
     }
 
     cut = src->cutoff_base * box_audio_synth_exp2(octaves);
@@ -1103,7 +1108,13 @@ static void box_audio_synth_pass(
     }
 
     top = BOX_AUDIO_SYNTH_CUTOFF_NYQUIST * (double)rate;
-    cut = src->cutoff_base < top ? src->cutoff_base : top;
+    cut = src->cutoff_base;
+    if (src->keytrack != 0) {
+        cut *= box_audio_synth_exp2((double)src->keytrack * src->key);
+        cut = cut > BOX_AUDIO_SYNTH_CUTOFF_MIN ? cut : BOX_AUDIO_SYNTH_CUTOFF_MIN;
+    }
+
+    cut = cut < top ? cut : top;
     src->cutoff = cut;
     src->cutoff_top = top;
     src->control = BOX_AUDIO_SYNTH_CONTROL;
@@ -1147,6 +1158,72 @@ static void box_audio_synth_lfo_start(
     }
 }
 
+/** Scale the decay and the release of an envelope of a play by the key of its note:
+ * 2^(-key_scale key), clamped to the times of an envelope. An envelope without key_scale
+ * stays as it is.
+ *
+ * @param e The envelope of the play
+ * @param key The key in octaves
+ */
+static void box_audio_synth_key_scale(
+    box_audio_synth_envelope_t *e,
+    double key)
+{
+    double f, t;
+    if (e->key_scale > 0) {
+        f = box_audio_synth_exp2(-(double)e->key_scale * key);
+        t = (double)e->decay * f;
+        e->decay = (float)(t < BOX_AUDIO_SYNTH_LENGTH_MAX ? t : BOX_AUDIO_SYNTH_LENGTH_MAX);
+        t = (double)e->release * f;
+        e->release = (float)(t < BOX_AUDIO_SYNTH_LENGTH_MAX ? t : BOX_AUDIO_SYNTH_LENGTH_MAX);
+    }
+}
+
+/** Aim the key of a source at the key of a pitch ratio, over the frames of a glide or at the
+ * next frame, so the cutoff follows it. Without keytrack the key stays.
+ *
+ * @param src The source
+ * @param pitch The pitch ratio, without the variance
+ * @param frames Frames of the glide, 0 to jump
+ */
+static void box_audio_synth_key_aim(
+    box_audio_synth_source_t *src,
+    float pitch,
+    int32_t frames)
+{
+    if (src->keytrack != 0) {
+        src->key_target = box_audio_synth_log2((double)pitch);
+        src->key_left = frames > 0 ? frames : 1;
+        src->key_step = (src->key_target - src->key) / (double)src->key_left;
+        src->key_control = 1;
+    }
+}
+
+/** Advance the key of a source by a frame toward its target, and move the cutoff with it
+ * every BOX_AUDIO_SYNTH_CONTROL frames and at its end. An LFO of the cutoff or a filter
+ * envelope that runs takes the key in its own update of the cutoff instead.
+ *
+ * @param src The source, whose key moves
+ * @param rate Frames per second
+ */
+static void box_audio_synth_key_next(
+    box_audio_synth_source_t *src,
+    float rate)
+{
+    if (-- src->key_left == 0) {
+        src->key = src->key_target;
+    } else {
+        src->key += src->key_step;
+    }
+
+    if (!src->lfo_cutoff && (src->amount == 0 || src->fenv.segment >= BOX_AUDIO_SYNTH_DONE) &&
+        (-- src->key_control <= 0 || src->key_left == 0))
+    {
+        src->key_control = BOX_AUDIO_SYNTH_CONTROL;
+        box_audio_synth_cutoff(src, 0.0f, rate);
+    }
+}
+
 /** The factor by which velocity scales a value of which it scales a share: 1 - share +
  * share * velocity, 1 at velocity 1 or a share of 0.
  *
@@ -1183,6 +1260,51 @@ static void box_audio_synth_velocity_layers(
             layer->hardness *= box_audio_synth_velocity(layer->hardness_velocity, velocity);
         }
     }
+}
+
+/** Start the drive of a source: take the clipper of its patch and clear its state.
+ *
+ * @param src The source
+ * @param curve The clipper of the patch
+ * @param dc Whether the clipper has an offset, whose DC a blocker takes off
+ * @param rate Frames per second
+ */
+static void box_audio_synth_drive_start(
+    box_audio_synth_source_t *src,
+    const box_audio_saturate_curve_t *curve,
+    bool dc,
+    float rate)
+{
+    int32_t c;
+    src->drive_curve = *curve;
+    src->drive_dc = dc;
+    src->drive_dc_coef = (float)(1.0 - 2.0 * 3.14159265358979323846 *
+        (double)BOX_AUDIO_SYNTH_DRIVE_DC / (double)rate);
+    for (c = 0; c < 2; c ++) {
+        box_audio_oversample_clear(&src->drive_os[c]);
+        src->drive_blocker[c].x1 = 0;
+        src->drive_blocker[c].y1 = 0;
+    }
+}
+
+/** Run a sample of the mix of the layers of a channel through the drive.
+ *
+ * @param src The source, with a drive
+ * @param c The channel, 0 left or mono, 1 right
+ * @param x The mix
+ * @return The driven mix, BOX_AUDIO_SATURATE_LATENCY frames late
+ */
+static inline float box_audio_synth_drive_next(
+    box_audio_synth_source_t *src,
+    int32_t c,
+    float x)
+{
+    float y = box_audio_saturate_next(&src->drive_os[c], &src->drive_curve, x);
+    if (src->drive_dc) {
+        y = box_audio_dc_next(&src->drive_blocker[c], y, src->drive_dc_coef);
+    }
+
+    return y;
 }
 
 void box_audio_source_synth(
@@ -1231,7 +1353,17 @@ void box_audio_source_synth(
         box_audio_synth_velocity_layers(src, velocity);
     }
 
+    src->key = box_audio_synth_log2((double)pitch);
+    src->key_target = src->key;
+    src->key_step = 0;
+    src->key_left = 0;
+    src->key_control = 0;
     src->envelope = p->envelope;
+    box_audio_synth_key_scale(&src->envelope, src->key);
+    for (l = 0; l < src->layers; l ++) {
+        box_audio_synth_key_scale(&src->part[l]->layer.envelope, src->key);
+    }
+
     src->filter_envelope = p->filter_envelope;
     src->cutoff_base = (double)p->cutoff;
     if (p->filter_velocity != 0 && velocity < 1) {
@@ -1253,6 +1385,7 @@ void box_audio_source_synth(
     src->gate = gate;
     src->filter = (int32_t)p->filter;
     src->amount = src->filter ? p->filter_amount : 0.0f;
+    src->keytrack = src->filter ? p->keytrack : 0.0f;
     if (p->filter_envelope_velocity > 0 && velocity < 1) {
         src->amount *= box_audio_synth_velocity(p->filter_envelope_velocity, velocity);
     }
@@ -1262,6 +1395,10 @@ void box_audio_source_synth(
     src->drive = p->drive;
     src->svf_r[0] = src->svf[0];
     src->svf_r[1] = src->svf[1];
+    src->has_drive = p->has_drive != 0;
+    if (src->has_drive) {
+        box_audio_synth_drive_start(src, &slot->drive, p->pre_asymmetry > 0, core->sample_rate);
+    }
 
     src->lfos = (int32_t)p->lfos;
     src->lfo_cutoff = false;
@@ -1332,6 +1469,8 @@ void box_audio_synth_pitch(
             o->inc_end = o->inc_end * f < src->inc_max ? o->inc_end * f : src->inc_max;
         }
     }
+
+    box_audio_synth_key_aim(src, pitch, src->glide_frames);
 
     if (src->modulated) {
         box_audio_synth_limits(src);
@@ -1426,6 +1565,7 @@ bool box_audio_synth_legato(
     src->glide_frames = n;
     src->glide_left = n;
     src->pitch = p;
+    box_audio_synth_key_aim(src, pitch, n);
     if (src->modulated) {
         box_audio_synth_limits(src);
     }
@@ -2525,11 +2665,22 @@ static int32_t box_audio_synth_render_wide(
             box_audio_synth_glide_next(src);
         }
 
+        if (src->key_left > 0) {
+            box_audio_synth_key_next(src, rate);
+        }
+
         if (src->lfos) {
             box_audio_synth_lfo_next(src, rate);
             box_audio_synth_mix_wide(src, levels, true, &l, &r);
         } else {
             box_audio_synth_mix_wide(src, levels, false, &l, &r);
+        }
+
+        if (src->has_drive) {
+            l = box_audio_synth_drive_next(src, 0, l);
+            if (stereo) {
+                r = box_audio_synth_drive_next(src, 1, r);
+            }
         }
 
         if (src->filter) {
@@ -2591,6 +2742,10 @@ int32_t box_audio_synth_render(
             box_audio_synth_glide_next(src);
         }
 
+        if (src->key_left > 0) {
+            box_audio_synth_key_next(src, rate);
+        }
+
         if (src->lfos) {
             box_audio_synth_lfo_next(src, rate);
         }
@@ -2614,6 +2769,10 @@ int32_t box_audio_synth_render(
                 mix += box_audio_synth_osc_next(o, &src->part[l]->color, &src->rng) *
                     o->level * levels[o->env];
             }
+        }
+
+        if (src->has_drive) {
+            mix = box_audio_synth_drive_next(src, 0, mix);
         }
 
         if (src->filter) {
