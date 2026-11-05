@@ -39,17 +39,19 @@ typedef struct emitter_log_t {
 /** Logs of the cases, large for the stack */
 static emitter_log_t emitter_log_a, emitter_log_b;
 
-/** Start a log of an emitter.
+/** Start a log of an emitter, of the plays the module sends from now on.
  *
+ * @param world The world
  * @param log The log
  * @param e The emitter
  */
 static void emitter_log(
+    ecs_world_t *world,
     emitter_log_t *log,
     ecs_entity_t e)
 {
     log->emitter = e;
-    log->seen = 0;
+    log->seen = box_audio_module_get(world)->next_voice - 1;
     log->count = 0;
 }
 
@@ -238,7 +240,7 @@ void Emitter_interval_range(void) {
     ecs_entity_t e = emitter_new(world, dc, 0.1f, 0.3f);
     uint64_t lo = UINT64_MAX, hi = 0, d;
     int32_t i;
-    emitter_log(&emitter_log_a, e);
+    emitter_log(world, &emitter_log_a, e);
     emitter_run(world, 600, AUDIO_DT, &emitter_log_a, NULL);
     test_assert(emitter_log_a.count >= 30);
     test_assert(emitter_log_a.count <= 101);
@@ -265,7 +267,7 @@ void Emitter_first_play_delayed(void) {
     ecs_entity_t e = emitter_new(world, dc, 0.5f, 0.5f);
     ecs_entity_t many[8];
     int32_t i, k;
-    emitter_log(&emitter_log_a, e);
+    emitter_log(world, &emitter_log_a, e);
     emitter_run(world, 1, AUDIO_DT, &emitter_log_a, NULL);
     test_int(emitter_log_a.count, 0);
     test_int(emitter_state(world, e)->plays, 0);
@@ -304,7 +306,7 @@ void Emitter_sub_frame_interval(void) {
     ecs_entity_t dc = audio_dc(world, "dc", 0.5f, 280);
     ecs_entity_t e = emitter_new(world, dc, 0.01f, 0.01f);
     int32_t i;
-    emitter_log(&emitter_log_a, e);
+    emitter_log(world, &emitter_log_a, e);
     emitter_run(world, 40, 0.05f, &emitter_log_a, NULL);
     test_assert(emitter_log_a.count >= 195);
     test_assert(emitter_log_a.count <= 201);
@@ -335,7 +337,7 @@ void Emitter_shape_point(void) {
     emitter_edit(world, e)->radius = 5;
     emitter_edit(world, e)->extents[0] = 4;
     ecs_modified(world, e, AudioEmitter);
-    emitter_log(&emitter_log_a, e);
+    emitter_log(world, &emitter_log_a, e);
     emitter_run(world, 60, AUDIO_DT, &emitter_log_a, NULL);
     test_assert(emitter_log_a.count >= 15);
     for (i = 0; i < emitter_log_a.count; i ++) {
@@ -358,7 +360,7 @@ void Emitter_shape_disc(void) {
     emitter_edit(world, e)->shape = AudioEmitterDisc;
     emitter_edit(world, e)->radius = 4;
     ecs_modified(world, e, AudioEmitter);
-    emitter_log(&emitter_log_a, e);
+    emitter_log(world, &emitter_log_a, e);
     emitter_run(world, 600, AUDIO_DT, &emitter_log_a, NULL);
     test_assert(emitter_log_a.count >= 900);
     for (i = 0; i < emitter_log_a.count; i ++) {
@@ -390,7 +392,7 @@ void Emitter_shape_sphere(void) {
     emitter_edit(world, e)->shape = AudioEmitterSphere;
     emitter_edit(world, e)->radius = 2;
     ecs_modified(world, e, AudioEmitter);
-    emitter_log(&emitter_log_a, e);
+    emitter_log(world, &emitter_log_a, e);
     emitter_run(world, 600, AUDIO_DT, &emitter_log_a, NULL);
     test_assert(emitter_log_a.count >= 900);
     for (i = 0; i < emitter_log_a.count; i ++) {
@@ -418,7 +420,7 @@ void Emitter_shape_hemisphere(void) {
     emitter_edit(world, e)->shape = AudioEmitterHemisphere;
     emitter_edit(world, e)->radius = 6;
     ecs_modified(world, e, AudioEmitter);
-    emitter_log(&emitter_log_a, e);
+    emitter_log(world, &emitter_log_a, e);
     emitter_run(world, 600, AUDIO_DT, &emitter_log_a, NULL);
     test_assert(emitter_log_a.count >= 900);
     for (i = 0; i < emitter_log_a.count; i ++) {
@@ -450,7 +452,7 @@ void Emitter_shape_box(void) {
     emitter_edit(world, e)->extents[1] = 2;
     emitter_edit(world, e)->extents[2] = 3;
     ecs_modified(world, e, AudioEmitter);
-    emitter_log(&emitter_log_a, e);
+    emitter_log(world, &emitter_log_a, e);
     emitter_run(world, 600, AUDIO_DT, &emitter_log_a, NULL);
     test_assert(emitter_log_a.count >= 900);
     for (i = 0; i < emitter_log_a.count; i ++) {
@@ -497,8 +499,8 @@ void Emitter_shape_transform(void) {
     emitter_edit(world, disc)->shape = AudioEmitterDisc;
     emitter_edit(world, disc)->radius = 1;
     ecs_modified(world, disc, AudioEmitter);
-    emitter_log(&emitter_log_a, box);
-    emitter_log(&emitter_log_b, disc);
+    emitter_log(world, &emitter_log_a, box);
+    emitter_log(world, &emitter_log_b, disc);
     emitter_run(world, 300, AUDIO_DT, &emitter_log_a, &emitter_log_b);
     test_assert(emitter_log_a.count >= 400);
     test_assert(emitter_log_b.count >= 400);
@@ -556,8 +558,8 @@ void Emitter_shape_degenerate(void) {
     emitter_edit(world, flat)->shape = AudioEmitterBox;
     ecs_modified(world, flat, AudioEmitter);
 
-    emitter_log(&emitter_log_a, disc);
-    emitter_log(&emitter_log_b, sphere);
+    emitter_log(world, &emitter_log_a, disc);
+    emitter_log(world, &emitter_log_b, sphere);
     emitter_run(world, 60, AUDIO_DT, &emitter_log_a, &emitter_log_b);
     test_assert(emitter_log_a.count >= 50);
     test_assert(emitter_log_b.count >= 50);
@@ -573,8 +575,8 @@ void Emitter_shape_degenerate(void) {
 
     test_assert(far_ > 1.5f);
 
-    emitter_log(&emitter_log_a, box);
-    emitter_log(&emitter_log_b, flat);
+    emitter_log(world, &emitter_log_a, box);
+    emitter_log(world, &emitter_log_b, flat);
     emitter_run(world, 60, AUDIO_DT, &emitter_log_a, &emitter_log_b);
     test_assert(emitter_log_a.count >= 50);
     test_assert(emitter_log_b.count >= 50);
@@ -615,7 +617,7 @@ void Emitter_volume_pitch_ranges(void) {
     em->pitch_min = 0.5f;
     em->pitch_max = 2.0f;
     ecs_modified(world, e, AudioEmitter);
-    emitter_log(&emitter_log_a, e);
+    emitter_log(world, &emitter_log_a, e);
     emitter_run(world, 300, AUDIO_DT, &emitter_log_a, NULL);
     test_assert(emitter_log_a.count >= 200);
     for (i = 0; i < emitter_log_a.count; i ++) {
@@ -636,7 +638,7 @@ void Emitter_volume_pitch_ranges(void) {
     em->volume_min = em->volume_max = 0.3f;
     em->pitch_min = em->pitch_max = 1.5f;
     ecs_modified(world, e, AudioEmitter);
-    emitter_log(&emitter_log_a, e);
+    emitter_log(world, &emitter_log_a, e);
     emitter_run(world, 30, AUDIO_DT, &emitter_log_a, NULL);
     test_assert(emitter_log_a.count >= 20);
     for (i = 0; i < emitter_log_a.count; i ++) {
@@ -685,15 +687,15 @@ static void emitter_render_scene(
 
 void Emitter_deterministic(void) {
     // audio/emitter
-    float *first = ecs_os_malloc_n(float, AUDIO_RATE * 4);
-    float *second = ecs_os_malloc_n(float, AUDIO_RATE * 4);
+    float *first = malloc(sizeof(float) * AUDIO_RATE * 4);
+    float *second = malloc(sizeof(float) * AUDIO_RATE * 4);
     int32_t i, same = 0;
     emitter_render_scene(first);
     emitter_render_scene(second);
     test_assert(audio_peak(first, 0, AUDIO_RATE * 4) > 0.01f);
     test_assert(memcmp(first, second, sizeof(float) * AUDIO_RATE * 4) == 0);
-    ecs_os_free(first);
-    ecs_os_free(second);
+    free(first);
+    free(second);
 
     ecs_world_t *world = audio_world();
     ecs_entity_t dc = audio_dc(world, "dc", 0.01f, 48);
@@ -707,8 +709,8 @@ void Emitter_deterministic(void) {
     emitter_edit(world, b)->shape = AudioEmitterSphere;
     emitter_edit(world, b)->radius = 5;
     ecs_modified(world, b, AudioEmitter);
-    emitter_log(&emitter_log_a, a);
-    emitter_log(&emitter_log_b, b);
+    emitter_log(world, &emitter_log_a, a);
+    emitter_log(world, &emitter_log_b, b);
     emitter_run(world, 120, AUDIO_DT, &emitter_log_a, &emitter_log_b);
     test_assert(emitter_log_a.count >= 10);
     test_assert(emitter_log_b.count >= 10);
@@ -732,7 +734,7 @@ void Emitter_out_of_range_skipped(void) {
     emitter_listener(world, 0, 0, 0);
     ecs_set(world, e, Position, {100, 0, 0});
     ecs_set(world, e, AudioSpatial, {1, 50, 1});
-    emitter_log(&emitter_log_a, e);
+    emitter_log(world, &emitter_log_a, e);
     for (i = 0; i < 60; i ++) {
         emitter_run(world, 1, AUDIO_DT, &emitter_log_a, NULL);
         test_int(ecs_singleton_get(world, AudioStatus)->voices, 0);
@@ -744,6 +746,7 @@ void Emitter_out_of_range_skipped(void) {
     test_int(box_audio_module_stats(world).out_of_range - out_of_range,
         emitter_state(world, e)->skipped);
     test_assert(audio_peak(audio_tap_l, 0, audio_tap_count) == 0.0f);
+    test_assert(audio_peak(audio_tap_r, 0, audio_tap_count) == 0.0f);
 
     ecs_set(world, e, Position, {5, 0, 0});
     emitter_run(world, 60, AUDIO_DT, &emitter_log_a, NULL);
@@ -752,7 +755,7 @@ void Emitter_out_of_range_skipped(void) {
         test_uint(emitter_log_a.plays[i].when % (AUDIO_RATE / 10), 0);
     }
 
-    test_assert(audio_peak(audio_tap_l, 0, audio_tap_count) > 0.0f);
+    test_assert(audio_peak(audio_tap_r, 0, audio_tap_count) > 0.0f);
     ecs_fini(world);
 }
 
@@ -790,7 +793,7 @@ void Emitter_playing_false(void) {
     ecs_entity_t e = emitter_new(world, dc, 0.1f, 0.1f);
     int32_t count;
     uint64_t clock;
-    emitter_log(&emitter_log_a, e);
+    emitter_log(world, &emitter_log_a, e);
     emitter_run(world, 30, AUDIO_DT, &emitter_log_a, NULL);
     test_assert(emitter_log_a.count >= 3);
     test_assert(ecs_singleton_get(world, AudioStatus)->voices >= 1);
@@ -825,8 +828,8 @@ void Emitter_disable_delete(void) {
     ecs_entity_t b = emitter_new(world, dc, 0.05f, 0.05f);
     int32_t count_a, count_b;
     uint64_t clock;
-    emitter_log(&emitter_log_a, a);
-    emitter_log(&emitter_log_b, b);
+    emitter_log(world, &emitter_log_a, a);
+    emitter_log(world, &emitter_log_b, b);
     emitter_run(world, 30, AUDIO_DT, &emitter_log_a, &emitter_log_b);
     test_assert(emitter_log_a.count >= 5);
     test_assert(emitter_log_b.count >= 5);
@@ -859,7 +862,7 @@ void Emitter_sound_not_ready(void) {
     ecs_set(world, file, SoundFile, {
         .path = ECS_CONST_CAST(char*, "test/assets/audio/missing.wav") });
     e = emitter_new(world, file, 0.05f, 0.05f);
-    emitter_log(&emitter_log_a, e);
+    emitter_log(world, &emitter_log_a, e);
     emitter_run(world, 30, AUDIO_DT, &emitter_log_a, NULL);
     audio_log_stop();
     test_int(ecs_get(world, file, SoundStatus)->state, SoundFailed);
@@ -897,7 +900,7 @@ void Emitter_output_override(void) {
     ecs_set(world, dc, AudioOutput, { .bus = muted });
     emitter_edit(world, e)->max_active = 1;
     ecs_modified(world, e, AudioEmitter);
-    emitter_log(&emitter_log_a, e);
+    emitter_log(world, &emitter_log_a, e);
 
     emitter_run(world, 60, AUDIO_DT, &emitter_log_a, NULL);
     test_assert(emitter_log_a.count >= 2);
@@ -947,7 +950,7 @@ void Emitter_invalid_values(void) {
     AudioEmitter *em;
     int32_t i;
 
-    emitter_log(&emitter_log_a, e);
+    emitter_log(world, &emitter_log_a, e);
     emitter_run(world, 60, AUDIO_DT, &emitter_log_a, NULL);
     test_assert(emitter_log_a.count >= 95);
     test_assert(emitter_log_a.count <= 101);
@@ -957,7 +960,7 @@ void Emitter_invalid_values(void) {
     em->interval_min = 0;
     em->interval_max = 0;
     ecs_modified(world, e, AudioEmitter);
-    emitter_log(&emitter_log_a, e);
+    emitter_log(world, &emitter_log_a, e);
     emitter_run(world, 60, AUDIO_DT, &emitter_log_a, NULL);
     test_assert(emitter_log_a.count <= 101);
     emitter_expect_spacing(&emitter_log_a, AUDIO_RATE / 100, AUDIO_RATE / 100);
@@ -971,7 +974,7 @@ void Emitter_invalid_values(void) {
     em->pitch_max = -1.0f;
     em->max_active = -3;
     ecs_modified(world, e, AudioEmitter);
-    emitter_log(&emitter_log_a, e);
+    emitter_log(world, &emitter_log_a, e);
     emitter_run(world, 300, AUDIO_DT, &emitter_log_a, NULL);
     test_assert(emitter_log_a.count >= 20);
     emitter_expect_spacing(&emitter_log_a, AUDIO_RATE / 20, AUDIO_RATE / 5);
@@ -986,7 +989,7 @@ void Emitter_invalid_values(void) {
     em->pitch_min = NAN;
     em->pitch_max = 1000.0f;
     ecs_modified(world, e, AudioEmitter);
-    emitter_log(&emitter_log_a, e);
+    emitter_log(world, &emitter_log_a, e);
     emitter_run(world, 120, AUDIO_DT, &emitter_log_a, NULL);
     test_assert(emitter_log_a.count >= 5);
     for (i = 0; i < emitter_log_a.count; i ++) {
@@ -1012,7 +1015,7 @@ void Emitter_nonspatial(void) {
     emitter_edit(world, e)->shape = AudioEmitterSphere;
     emitter_edit(world, e)->radius = 10;
     ecs_modified(world, e, AudioEmitter);
-    emitter_log(&emitter_log_a, e);
+    emitter_log(world, &emitter_log_a, e);
     emitter_run(world, 45, AUDIO_DT, &emitter_log_a, NULL);
     test_int(emitter_log_a.count, 1);
     test_bool(emitter_log_a.plays[0].spatial, false);
