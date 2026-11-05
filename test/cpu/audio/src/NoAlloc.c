@@ -689,6 +689,8 @@ void NoAlloc_saturator(void) {
         box_audio_core_effect_meters(core, meters, BOX_AUDIO_EFFECT_MAX);
     }
 
+    // A saturator that arrived in its new slot during the last block runs from the next one
+    audio_render(core, 0, AUDIO_FRAMES / 40);
     for (i = 0; i < 3; i ++) {
         test_assert(box_audio_core_effect_running(core, i));
     }
