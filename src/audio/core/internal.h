@@ -342,8 +342,8 @@ typedef struct box_audio_transient_shaper_t {
  * variable bandpasses of the modulator and the carrier per channel, the envelope of the
  * modulator per channel and the coefficients of both */
 typedef struct box_audio_vocoder_band_t {
-    float mod[2][2][2];       /**< States ic1 and ic2 of each modulator stage per channel */
-    float car[2][2][2];       /**< States ic1 and ic2 of each carrier stage per channel */
+    float mod[2][4];          /**< States ic1 and ic2 of each modulator stage per channel */
+    float car[2][4];          /**< States ic1 and ic2 of each carrier stage per channel */
     float env[2];             /**< Envelope of the modulator band per channel */
     float mod_c[4];           /**< a1, a2, a3 and k of the modulator stages */
     float car_c[4];           /**< a1, a2, a3 and k of the carrier stages */

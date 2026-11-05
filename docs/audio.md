@@ -247,7 +247,8 @@ Play the drum loop on `drums` and a saw pad (a synth sound with a `SynthSaw` lay
 
 The cost grows with the bands: each band runs eight bandpass stages per frame. The
 `Modulation` bench of [bench/audio](../bench/audio/) measures it as `vocoder_16` and
-`vocoder_32`.
+`vocoder_32`: about 31 and 61 µs per 128-frame quantum in a release build, roughly
+250 and 480 ns per frame, or about 15 ns per band and frame.
 
 For ducking, key a compressor on another channel:
 

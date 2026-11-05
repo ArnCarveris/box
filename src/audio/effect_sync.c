@@ -453,9 +453,10 @@ static int32_t box_audio_effect_alloc(
 }
 
 /** Log once that a vocoder has no modulator, by the names of the vocoder and its channel: its
- * modulator is 0, deleted or no channel. A modulator refused for a cycle logged its error in
- * the order compile already. The error is logged again once the vocoder had a key or another
- * modulator in between.
+ * modulator is 0, deleted or no channel.
+ *
+ * A modulator refused for a cycle logged its error in the order compile already. The error is
+ * logged again once the vocoder had a key or another modulator in between.
  *
  * @param world The world
  * @param state The state

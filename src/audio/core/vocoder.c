@@ -4,15 +4,8 @@
  * of its own bus, the carrier, through matched banks of bandpasses with envelope followers.
  *
  * Each band is two cascaded state variable bandpasses (svf.h) per channel on the modulator and
- * on the carrier, log spaced from low to high; the carrier bands move by the shift against the
- * modulator bands, for a formant shift. The envelope of each modulator band scales the carrier
- * band of the same index and the scaled carrier bands are summed. White noise added to the
- * carrier of the high bands lets consonants through.
- *
- * The bands and their state live on the memory of the slot, BOX_AUDIO_VOCODER_BANDS_MAX bands
- * of 32 floats, so the state of the kind stays small. Every BOX_AUDIO_VOCODER_CONTROL frames
- * while low, high, q or shift move it sets the coefficients anew, on a count of frames that
- * does not depend on where a block ends. Its params are a box_audio_vocoder_params_t.
+ * the carrier, log spaced; the envelope of each modulator band scales the carrier band of the
+ * same index, and the scaled carrier bands are summed. The bands live on the slot memory.
  */
 
 #include "internal.h"
@@ -272,23 +265,23 @@ void box_audio_vocoder_command(
 /** Filter a frame through two cascaded state variable bandpasses of the same coefficients,
  * unity at their center.
  *
- * @param s States ic1 and ic2 of the two stages
+ * @param s States ic1 and ic2 of the first stage, then of the second
  * @param c a1, a2, a3 and k
  * @param x The input
  * @return The output
  */
 static inline float box_audio_vocoder_bandpass(
-    float (*s)[2],
+    float *s,
     const float *c,
     float x)
 {
     int32_t k;
-    for (k = 0; k < 2; k ++) {
-        float v3 = x - s[k][1];
-        float v1 = c[0] * s[k][0] + c[1] * v3;
-        float v2 = s[k][1] + c[1] * s[k][0] + c[2] * v3;
-        s[k][0] = box_audio_clean(2 * v1 - s[k][0]);
-        s[k][1] = box_audio_clean(2 * v2 - s[k][1]);
+    for (k = 0; k < 4; k += 2) {
+        float v3 = x - s[k + 1];
+        float v1 = c[0] * s[k] + c[1] * v3;
+        float v2 = s[k + 1] + c[1] * s[k] + c[2] * v3;
+        s[k] = box_audio_clean(2 * v1 - s[k]);
+        s[k + 1] = box_audio_clean(2 * v2 - s[k + 1]);
         x = c[3] * v1;
     }
 
@@ -312,6 +305,72 @@ static inline float box_audio_vocoder_noise(
     return (float)(int32_t)x * BOX_AUDIO_VOCODER_NOISE_SCALE;
 }
 
+/** Sum the scaled carrier bands of a chunk of frames, band by band, with the state of a band
+ * in locals over the chunk. A chunk ends at the next update of the coefficients, or where the
+ * fade of a swap of the bands ends, never at the end of a block.
+ *
+ * @param v The vocoder
+ * @param x The carrier per channel, the noise added from the band v->unvoiced_from up in xn
+ * @param xn The carrier with the noise, BOX_AUDIO_VOCODER_CONTROL frames per channel
+ * @param m The modulator per channel
+ * @param wet Receives the sum, BOX_AUDIO_VOCODER_CONTROL frames per channel
+ * @param n Frames of the chunk, at most BOX_AUDIO_VOCODER_CONTROL
+ */
+static void box_audio_vocoder_bands(
+    const box_audio_vocoder_t *v,
+    const float *const *x,
+    const float *xn,
+    const float *const *m,
+    float *wet,
+    int32_t n)
+{
+    float attack = v->attack, release = v->release;
+    int32_t b, c, j;
+    for (c = 0; c < 2; c ++) {
+        for (j = 0; j < n; j ++) {
+            wet[c * BOX_AUDIO_VOCODER_CONTROL + j] = 0;
+        }
+    }
+
+    for (b = 0; b < v->bands; b ++) {
+        box_audio_vocoder_band_t *band = &v->band[b];
+        const float *in[2];
+        float ms[2][4], cs[2][4], mc[4], cc[4], e[2], gain = band->gain;
+        int32_t k;
+        for (k = 0; k < 4; k ++) {
+            mc[k] = band->mod_c[k];
+            cc[k] = band->car_c[k];
+        }
+
+        for (c = 0; c < 2; c ++) {
+            in[c] = b < v->unvoiced_from ? x[c] : xn + c * BOX_AUDIO_VOCODER_CONTROL;
+            e[c] = band->env[c];
+            for (k = 0; k < 4; k ++) {
+                ms[c][k] = band->mod[c][k];
+                cs[c][k] = band->car[c][k];
+            }
+        }
+
+        for (j = 0; j < n; j ++) {
+            for (c = 0; c < 2; c ++) {
+                float y = box_audio_vocoder_bandpass(ms[c], mc, m[c][j]);
+                float a = y < 0 ? -y : y;
+                e[c] = box_audio_clean(e[c] + (a - e[c]) * (a > e[c] ? attack : release));
+                y = box_audio_vocoder_bandpass(cs[c], cc, in[c][j]);
+                wet[c * BOX_AUDIO_VOCODER_CONTROL + j] += y * e[c] * gain;
+            }
+        }
+
+        for (c = 0; c < 2; c ++) {
+            band->env[c] = e[c];
+            for (k = 0; k < 4; k ++) {
+                band->mod[c][k] = ms[c][k];
+                band->car[c][k] = cs[c][k];
+            }
+        }
+    }
+}
+
 bool box_audio_vocoder_render(
     box_audio_core_t *core,
     box_audio_effect_t *fx,
@@ -322,9 +381,10 @@ bool box_audio_vocoder_render(
 {
     box_audio_vocoder_t *v = &fx->data.vocoder;
     float *io[2] = { l, r };
-    const float *key[2];
+    float xn[2][BOX_AUDIO_VOCODER_CONTROL], wet[2][BOX_AUDIO_VOCODER_CONTROL];
+    const float *key[2], *x[2], *m[2];
     uint32_t bus = fx->key;
-    int32_t i, b, c;
+    int32_t i, j, c, n;
     (void)silent;
     if (!(bus < BOX_AUDIO_BUS_MAX && fx->bus < BOX_AUDIO_BUS_MAX && bus != fx->bus &&
         core->bus_active[bus] && core->bus_active[fx->bus] &&
@@ -335,8 +395,7 @@ bool box_audio_vocoder_render(
 
     key[0] = core->buses[bus].l;
     key[1] = core->buses[bus].r;
-    for (i = 0; i < frames; i ++) {
-        float noise, mix, fade, x[2], xn[2], m[2], wet[2] = { 0, 0 };
+    for (i = 0; i < frames; i += n) {
         if (v->control == 0) {
             if (v->low.left || v->high.left || v->q.left || v->shift.left) {
                 box_audio_ramp_next(&v->low);
@@ -349,32 +408,32 @@ bool box_audio_vocoder_render(
             v->control = BOX_AUDIO_VOCODER_CONTROL;
         }
 
-        v->control --;
-        noise = box_audio_vocoder_noise(v) * box_audio_ramp_next(&v->unvoiced) *
-            BOX_AUDIO_VOCODER_NOISE;
-        mix = box_audio_ramp_next(&v->mix);
-        fade = box_audio_ramp_next(&v->fade);
-        for (c = 0; c < 2; c ++) {
-            x[c] = io[c][i];
-            xn[c] = x[c] + noise;
-            m[c] = key[c][i];
+        n = frames - i < v->control ? frames - i : v->control;
+        if (v->swap) {
+            n = v->fade.left > 0 && v->fade.left < n ? v->fade.left :
+                (v->fade.left > 0 ? n : 1);
         }
 
-        for (b = 0; b < v->bands; b ++) {
-            box_audio_vocoder_band_t *band = &v->band[b];
-            const float *in = b < v->unvoiced_from ? x : xn;
+        v->control -= n;
+        for (c = 0; c < 2; c ++) {
+            x[c] = io[c] + i;
+            m[c] = key[c] + i;
+        }
+
+        for (j = 0; j < n; j ++) {
+            float noise = box_audio_vocoder_noise(v) * box_audio_ramp_next(&v->unvoiced) *
+                BOX_AUDIO_VOCODER_NOISE;
             for (c = 0; c < 2; c ++) {
-                float y = box_audio_vocoder_bandpass(band->mod[c], band->mod_c, m[c]);
-                float a = y < 0 ? -y : y, e = band->env[c];
-                e = box_audio_clean(e + (a - e) * (a > e ? v->attack : v->release));
-                band->env[c] = e;
-                y = box_audio_vocoder_bandpass(band->car[c], band->car_c, in[c]);
-                wet[c] += y * e * band->gain;
+                xn[c][j] = x[c][j] + noise;
             }
         }
 
-        for (c = 0; c < 2; c ++) {
-            io[c][i] = x[c] * (1 - mix) + wet[c] * (mix * fade);
+        box_audio_vocoder_bands(v, x, xn[0], m, wet[0], n);
+        for (j = 0; j < n; j ++) {
+            float mix = box_audio_ramp_next(&v->mix), fade = box_audio_ramp_next(&v->fade);
+            for (c = 0; c < 2; c ++) {
+                io[c][i + j] = x[c][j] * (1 - mix) + wet[c][j] * (mix * fade);
+            }
         }
 
         if (v->swap && v->fade.left == 0 && v->fade.value == 0) {
