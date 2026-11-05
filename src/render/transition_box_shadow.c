@@ -138,11 +138,8 @@ void box_transitions_send_box_shadows(
 
         box_transitions_fade_target(s, item->entity, p->time, &record.material);
         record.material.nodes[BOX_RENDER_TRANSITION_BOX_SHADOW] = item->node;
-<<<<<<< HEAD
         record.material.nodes[BOX_RENDER_TRANSITION_BORDER] = item->node;
-=======
         box_transitions_leaving_target(s, &record.material);
->>>>>>> 2803ad4919ab994c9f09cf8e689fc525e5761cc8
         record.transform = transform;
         if (item->moving) {
             ecs_os_memcpy(record.rel, item->rel, ECS_SIZEOF(mat4));

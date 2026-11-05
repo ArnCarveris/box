@@ -809,47 +809,6 @@ done:
     return result;
 }
 
-<<<<<<< HEAD
-/** Get the value of a component in the target material of a material or shading record.
- *
- * @param material The material
- * @param component The component
- * @return The value, NULL for a component that is not a material component
- */
-static void* box_transition_material_value(
-    box_draw_transition_material_t *material,
-    box_render_transition_component_t component)
-{
-    void *result = NULL;
-    switch (component) {
-    case BOX_RENDER_TRANSITION_RGB: result = &material->color; break;
-    case BOX_RENDER_TRANSITION_ALPHA_CUTOFF: result = &material->cutoff; break;
-    case BOX_RENDER_TRANSITION_PBR_MATERIAL: result = &material->pbr; break;
-    case BOX_RENDER_TRANSITION_EMISSIVE: result = &material->emissive; break;
-    case BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM: result = &material->uv; break;
-    case BOX_RENDER_TRANSITION_TRANSMISSION: result = &material->transmission; break;
-    case BOX_RENDER_TRANSITION_CLEAR_COAT: result = &material->clear_coat; break;
-    case BOX_RENDER_TRANSITION_ANISOTROPY: result = &material->anisotropy; break;
-    case BOX_RENDER_TRANSITION_SHEEN: result = &material->sheen; break;
-    case BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION:
-        result = &material->diffuse_transmission;
-        break;
-    case BOX_RENDER_TRANSITION_OPACITY: result = &material->opacity; break;
-    case BOX_RENDER_TRANSITION_TINT: result = &material->tint; break;
-    case BOX_RENDER_TRANSITION_BORDER: result = &material->border; break;
-    case BOX_RENDER_TRANSITION_POSITION:
-    case BOX_RENDER_TRANSITION_ROTATION:
-    case BOX_RENDER_TRANSITION_SCALE:
-    case BOX_RENDER_TRANSITION_BOX_SHADOW:
-    case BOX_RENDER_TRANSITION_COMPONENTS:
-        break;
-    }
-
-    return result;
-}
-
-=======
->>>>>>> 2803ad4919ab994c9f09cf8e689fc525e5761cc8
 /** Replace the value of each component of a material that has a node by the value the node
  * renders.
  *

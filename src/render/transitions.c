@@ -1376,7 +1376,7 @@ void box_transitions_leaving_target(
             continue;
         }
 
-        target->present |= (uint16_t)(1u << c);
+        target->present |= 1u << c;
         ecs_os_memcpy(value, n->slots[c].value, box_render_transition_layout(component)->size);
     }
 }

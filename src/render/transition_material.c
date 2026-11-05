@@ -139,6 +139,7 @@ void* box_draws_transition_value(
         break;
     case BOX_RENDER_TRANSITION_OPACITY: result = &material->opacity; break;
     case BOX_RENDER_TRANSITION_TINT: result = &material->tint; break;
+    case BOX_RENDER_TRANSITION_BORDER: result = &material->border; break;
     case BOX_RENDER_TRANSITION_POSITION:
     case BOX_RENDER_TRANSITION_ROTATION:
     case BOX_RENDER_TRANSITION_SCALE:
