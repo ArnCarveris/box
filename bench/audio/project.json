@@ -2,7 +2,7 @@
     "id": "bench_audio",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the audio core: voices mixed through buses, a reverb, a delay, a phaser, a chorus and synth voices, with the expression of notes too, in ns per frame, the spatial sources of box.audio, in ns per source, and its tracks, in ns per frame",
+        "description": "Benchmarks for the audio core: voices mixed through buses, a reverb, a delay, a phaser, a chorus, 16 modulators and synth voices, with the expression of notes too, in ns per frame, the spatial sources of box.audio, in ns per source, and its tracks, in ns per frame",
         "public": false,
         "use": [
             "box"
@@ -55,7 +55,9 @@
                 "benchcases": [
                     "phaser_12",
                     "chorus_4",
-                    "silent_tail"
+                    "silent_tail",
+                    "filter_16_modulators",
+                    "filter_no_modulators"
                 ]
             },
             {

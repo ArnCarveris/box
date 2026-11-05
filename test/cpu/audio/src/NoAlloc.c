@@ -1251,3 +1251,98 @@ void NoAlloc_synth_routes(void) {
     box_audio_core_free(core);
     test_int(noalloc_frees, 1);
 }
+
+/** Write a modulator command into a core.
+ *
+ * @param core The core
+ * @param cmd The command
+ */
+static void noalloc_modulator(
+    box_audio_core_t *core,
+    const box_audio_cmd_modulator_t *cmd)
+{
+    uint8_t bytes[512];
+    box_audio_writer_t w;
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_modulator(&w, cmd));
+    box_audio_core_apply(core, w.data, w.size);
+}
+
+/* Modulators of every source on a filter and a bus, BEAT commands of a seek, a tempo change and
+ * a loop wrap, changes, a retarget and releases, without a call of the allocator. */
+void NoAlloc_modulators(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_route_t routes[] = { AUDIO_OUT(2, 0), AUDIO_OUT(1, 0), AUDIO_MASTER };
+    float params[BOX_AUDIO_EFFECT_PARAMS] = { BOX_AUDIO_SYNTH_LOWPASS, 800, 0.3f, 0, 1, 0 };
+    box_audio_cmd_modulator_t m;
+    uint8_t bytes[512];
+    box_audio_writer_t w;
+    uint32_t i, k;
+    audio_order(core, routes, 3);
+    audio_sine(audio_sound_a, AUDIO_FRAMES / 4, 330, 0.25f);
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_FRAMES / 4, 1, AUDIO_RATE));
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_effect(&w, 0, BOX_AUDIO_EFFECT_FILTER, 1, 0,
+        BOX_AUDIO_BUS_NONE, params));
+    test_assert(box_audio_write_beat(&w, 7.25, 2.0f, 0));
+    box_audio_core_apply(core, w.data, w.size);
+    audio_play(core, 1, 1, 1, 0.5f, 0, 1, BOX_AUDIO_PLAY_LOOP);
+    audio_play(core, 2, 1, 2, 0.5f, 0, 0.5f, BOX_AUDIO_PLAY_LOOP);
+    for (k = 0; k < 12; k ++) {
+        for (i = 0; i < 6; i ++) {
+            m = (box_audio_cmd_modulator_t){ .slot = i, .depth = 0.3f + 0.1f * (float)k,
+                .rate = 0.5f + (float)(k % 5), .sync = k % 3 ? 0.25f * (float)(i + 1) : 0,
+                .phase = 0.1f * (float)i, .smooth = 0.2f, .attack = 0.005f, .release = 0.05f,
+                .step_count = 1 + (k + i) % 16, .key = 2, .unipolar = i % 2 };
+            m.source = (k + i) % 3;
+            m.wave = (k + i) % 6;
+            m.steps[0] = 1;
+            m.steps[3] = -0.5f;
+            if (i < 3) {
+                m.target = BOX_AUDIO_MOD_TARGET_EFFECT;
+                m.index = 0;
+                m.param = 1 + (i + k / 4) % 2;
+                m.kind = BOX_AUDIO_EFFECT_FILTER;
+                m.scale = m.param == 1 ? BOX_AUDIO_MOD_OCTAVES : BOX_AUDIO_MOD_LINEAR;
+            } else {
+                m.target = (k + i) % 7 == 0 ? BOX_AUDIO_MOD_TARGET_NONE :
+                    BOX_AUDIO_MOD_TARGET_BUS;
+                m.index = 1 + (i + k / 3) % 2;
+                m.param = i == 3 ? BOX_AUDIO_PARAM_VOLUME : (i == 4 ? BOX_AUDIO_PARAM_PAN :
+                    BOX_AUDIO_PARAM_WIDTH);
+            }
+
+            noalloc_modulator(core, &m);
+        }
+
+        box_audio_writer_init(&w, bytes, sizeof(bytes));
+        test_assert(box_audio_write_beat(&w, 3.5 * (double)k, 1.5f + 0.25f * (float)(k % 4),
+            box_audio_core_clock(core) + 1000));
+        if (k % 4 == 3) {
+            test_assert(box_audio_write_cancel(&w, BOX_AUDIO_CMD_BEAT, 0, 0));
+        }
+
+        params[1] = 400.0f + 300.0f * (float)(k % 5);
+        test_assert(box_audio_write_effect_params(&w, 0, BOX_AUDIO_EFFECT_FILTER, params,
+            box_audio_core_clock(core) + 2001));
+        test_assert(box_audio_write_bus_set(&w, 1, BOX_AUDIO_PARAM_VOLUME,
+            0.5f + 0.1f * (float)(k % 3), 0));
+        box_audio_core_apply(core, w.data, w.size);
+        audio_render(core, 0, k % 3 ? AUDIO_FRAMES / 40 : AUDIO_FRAMES / 4);
+        audio_events(core, 0, NULL);
+    }
+
+    m = (box_audio_cmd_modulator_t){ .target = BOX_AUDIO_MOD_TARGET_NONE };
+    for (i = 0; i < 6; i ++) {
+        m.slot = i;
+        noalloc_modulator(core, &m);
+    }
+
+    audio_render(core, 0, AUDIO_FRAMES / 4);
+    test_int(box_audio_core_modulators(core), 0);
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+}

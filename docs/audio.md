@@ -227,6 +227,73 @@ falls back to the compressor's own input; a missing sidechain also uses its own 
 A gate always keys on its own input. See the effect scenes in
 [test/assets/audio](../test/assets/audio/) for EQ, filter, delay and modulation setups.
 
+#### Modulators
+
+An `AudioModulator` on an entity of its own moves one float member of a bus or an
+effect on its own, in time with the song: a filter that wobbles in eighths, a send
+that pulses, a tremolo, an auto-pan, an auto-wah. `target`, `component` and `member`
+name what it moves exactly as an [AutomationClip](#automation) does: `volume`, `pan`,
+`width` and `sends[i].level` of an `AudioBus` or of the master, and every float member
+of an effect component, such as `cutoff` or `bands[2].gain`.
+
+The modulator adds to the value the output has, from the component or from an
+automation lane, and the sum is clamped to the range of the member. It never writes
+the component. `depth` is the swing either way in the units of the member; with
+`scale: AudioModOctaves` it is in octaves, for a frequency (`cutoff`, `center`, the
+`frequency` of a band, the `damping` of a `Delay`), so a sweep sounds even.
+
+| Field | Meaning and default |
+| --- | --- |
+| `source` | `AudioModLfo` (default), `AudioModSteps` or `AudioModFollower` |
+| `depth`, `scale` | `0`, `AudioModLinear` |
+| `wave` | `AudioModSine`, `AudioModTriangle`, `AudioModSquare`, `AudioModSawUp`, `AudioModSawDown` or `AudioModRandom` (sample and hold) |
+| `rate`, `sync`, `phase` | `1` Hz, `0` beats, `0` turns; a positive `sync` wins over `rate` |
+| `unipolar` | `false`: an LFO moves 0..1 instead of -1..1 |
+| `steps`, `step_count`, `smooth` | up to 16 values in -1..1, `16`, `0` (hard steps) .. 1 (fully glided); `sync` is the length of a step |
+| `key`, `attack`, `release` | bus a follower measures, `0` for the bus of the target, `0.01` s, `0.1` s |
+
+A synced modulator is phase locked to the Transport: at any frame its phase is
+`phase + fract(beat / sync)`, beat being the position of the Transport at that frame,
+so a seek, a loop wrap and a tempo change keep it on the grid. A stopped Transport
+leaves the beat where it stands and moves it on at 120 bpm, like a synced synth LFO.
+A follower measures its bus before the inserts and the volume, so a drum bus at volume
+0 still keys it, and maps -60..0 dB to 0..1.
+
+Modulators run in the audio core every 32 frames and at the edges of squares, saws,
+steps and samples; a bus ramps to each value, an effect smooths it like any change,
+so a sine at 10 Hz on a cutoff stays free of zipper noise. A new modulator fades in
+over 50 ms. Disabling, deleting or retargeting one fades it out over 50 ms, and the
+member returns to its value without a click. There are 64 modulators and up to four
+on one member; each one past a limit, or with an unknown target or member, logs one
+error that names it. A modulator has no stereo phase offset: every member it can
+reach has one value for both channels. The `audio` command lists the modulators of
+each bus and insert.
+
+Recipes, at the tempo of the Transport:
+
+```flecs
+// Tremolo: the volume dips to 0 for the first half of every eighth
+trem { AudioModulator: {target: keys, component: AudioBus, member: "volume",
+  wave: AudioModSquare, unipolar: true, depth: -1, sync: 0.5} }
+
+// Auto-pan: left and right once per bar
+autopan { AudioModulator: {target: pad, component: AudioBus, member: "pan",
+  depth: 0.8, sync: 4} }
+
+// Wobble: the cutoff of a bass filter two octaves either way, in eighths
+bass_filter { AudioFilter: {cutoff: 400, resonance: 0.5} }
+bass { AudioBus: {effects: [bass_filter]} }
+wobble { AudioModulator: {target: bass_filter, component: AudioFilter,
+  member: "cutoff", scale: AudioModOctaves, depth: 2, sync: 0.5} }
+
+// Auto-wah: a bandpass that opens with the level of its own bus
+wah_filter { AudioFilter: {kind: SynthBandPass, cutoff: 300, resonance: 0.6} }
+guitar { AudioBus: {effects: [wah_filter]} }
+wah { AudioModulator: {target: wah_filter, component: AudioFilter, member: "cutoff",
+  source: AudioModFollower, scale: AudioModOctaves, depth: 3, attack: 0.005,
+  release: 0.15} }
+```
+
 ### Meters
 
 Add `AudioMeter: {}` to a bus, master or effect to read it every frame:
@@ -1105,6 +1172,11 @@ Play and legato commands carry the velocity of a note, 0..1, after their priorit
 other writers send 1. The velocity makes a play command 48 bytes and a legato command 52, so
 a writer buffer of a given size holds fewer of them than before.
 
+The core also keeps a beat clock: the transport schedules a `BEAT` command with the
+beat and tempo at each start, seek, stop, tempo change and loop wrap, only while
+something in the core reads it, and the core derives the beat of any frame from the
+last one (`box_audio_core_beat`).
+
 The core owns a 64-bit rendered-frame clock. Scheduled play, stop, voice/bus set,
 release, legato and effect params commands carry a frame time. Future commands wait in a fixed
 4096-entry schedule; a full schedule applies the command immediately and reports
@@ -1113,7 +1185,7 @@ voice handle. Sound memory is freed by its owner after `SOUND_FREE`, which is
 retained even when other events overflow. See [core.h](../src/audio/core/core.h)
 and [transport.h](../src/audio/transport.h) for the low-level APIs.
 
-The main limits are 64 voices, 64 buses, 64 effects, four inserts and sends per
+The main limits are 64 voices, 64 buses, 64 effects, 64 modulators, four inserts and sends per
 bus, eight synth layers, two synth LFOs, seven unison copies per layer,
 32 pluck strings, 32 comb delay lines and 256 frames per wavetable, whose tables share the 1023 sound ids. Effects are algorithmic: no convolution or geometry-derived rooms.
 There is one transport and one music stream per world. There are no tempo ramps,

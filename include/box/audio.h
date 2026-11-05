@@ -1242,6 +1242,105 @@ ECS_STRUCT(AutomationClip, {
                              *   in the units of the member */
 });
 
+/** Source of an AudioModulator */
+ECS_ENUM(AudioModSource, {
+    AudioModLfo,           /**< A wave: AudioModulator.wave at rate or sync */
+    AudioModSteps,         /**< A sequence of up to 16 values, one per step of sync beats */
+    AudioModFollower       /**< The level of a bus, -60..0 dB mapped to 0..1 */
+});
+
+/** Wave of an AudioModulator. Its own enum rather than SynthLfoWave, which has no falling saw
+ * and whose square and saw smooth their edges in the synth */
+ECS_ENUM(AudioModWave, {
+    AudioModSine,          /**< Sine, from 0 rising */
+    AudioModTriangle,      /**< Triangle, from 0 rising */
+    AudioModSquare,        /**< Square, 1 for the first half of a cycle, -1 for the second */
+    AudioModSawUp,         /**< Rising saw, -1 to 1 */
+    AudioModSawDown,       /**< Falling saw, 1 to -1 */
+    AudioModRandom         /**< Sample and hold: a random value per cycle, the same for the
+                            *   same cycle of the Transport when synced */
+});
+
+/** How the depth of an AudioModulator applies */
+ECS_ENUM(AudioModScale, {
+    AudioModLinear,        /**< The value plus depth times the source, in the units of the
+                            *   member */
+    AudioModOctaves        /**< The value times 2^(depth times the source): depth in octaves,
+                            *   for a member that is a frequency (cutoff, center, frequency
+                            *   of a band, damping of a Delay), whose linear sweep sounds
+                            *   lopsided */
+});
+
+/** Modulators the core runs; more log one error that names the modulator and do nothing */
+#define BOX_AUDIO_MODULATORS 64
+
+/** Modulators that may move one member; more log one error that names the modulator and do
+ * nothing */
+#define BOX_AUDIO_MODULATORS_PER_TARGET 4
+
+/** A modulator, on an entity of its own: moves a float member of a bus or an effect on its own,
+ * in time with the song, for a filter that wobbles in eighths, a send that pulses, a tremolo,
+ * an auto-pan or an auto-wah:
+ * wobble { AudioModulator: {target: bass_filter, component: AudioFilter, member: "cutoff",
+ * scale: AudioModOctaves, depth: 2, sync: 0.5} }.
+ *
+ * target, component and member name what it moves as an AutomationClip does, with the same
+ * targets: volume, pan, width and sends[i].level of an AudioBus or of the master, and every
+ * float member of the effect component of an effect entity.
+ *
+ * Its value adds to the value the output has, the one of the component or of an automation
+ * lane that covers the member, and the sum is clamped to the range of the member. depth is the
+ * swing either way at the top of the source, in the units of the member, or in octaves with
+ * AudioModOctaves. The modulator never writes the component. Up to
+ * BOX_AUDIO_MODULATORS_PER_TARGET modulators of one member add up.
+ *
+ * A positive sync locks it to the Transport: the phase at a frame is phase + fract(beat /
+ * sync), beat being the position of the Transport at that frame, so a seek, a loop wrap and a
+ * tempo change keep it on the grid. A stopped Transport, or none, leaves the beat where it
+ * stands and moves it on at 120 bpm. Without sync an LFO runs at rate from the moment it
+ * starts.
+ *
+ * It runs in the audio core, once per 32 frames and at the edges of its square, saws, steps
+ * and samples: a bus ramps to each value, an effect smooths it as any change. It fades in over
+ * 50 ms when it starts; disabling, deleting or retargeting it fades it out over 50 ms, and the
+ * member returns to its value without a click. A modulator whose target, component or member
+ * is unknown logs one error that names it until it changes; one whose effect is in no insert
+ * slot waits for one.
+ *
+ * There is no stereo phase offset: every member it can move has one value for both channels
+ * (one cutoff for the filter of a bus, one pan of a bus), so the core has no right channel to
+ * move apart. An auto-pan is an LFO on pan. See Modulators in docs/audio.md.
+ */
+ECS_STRUCT(AudioModulator, {
+    ecs_entity_t target;    /**< The entity with the AudioBus or the effect component */
+    ecs_entity_t component; /**< The component: AudioBus or an effect component */
+    char *member;           /**< Path of a float member, such as "cutoff", "volume" or
+                             *   "sends[1].level" */
+    AudioModSource source;  /**< What moves it, default AudioModLfo */
+    float depth;            /**< Swing either way at a source of 1, in the units of the member,
+                             *   or in octaves; negative turns it upside down. Default 0 */
+    AudioModScale scale;    /**< Linear (default) or in octaves, for a frequency */
+    AudioModWave wave;      /**< Wave of an LFO, default AudioModSine */
+    float rate;             /**< Hz of an LFO, or steps per second, when sync is 0, 0..100,
+                             *   default 1 */
+    float sync;             /**< Beats of a cycle of an LFO, or of a step, 0..256, default 0 for
+                             *   rate; when positive it wins over rate, like SynthLfo.sync and
+                             *   Delay.sync: 0.5 is an eighth, 0.25 a sixteenth */
+    float phase;            /**< Phase in turns, 0..1: of a cycle of an LFO, of the whole
+                             *   sequence of steps */
+    bool unipolar;          /**< An LFO moves 0..1 instead of -1..1, for a tremolo that only
+                             *   dips: depth -1 on a volume of 1 */
+    float steps[16];        /**< Values of the steps, -1..1 */
+    int32_t step_count;     /**< Steps that play, 1..16, default 16 */
+    float smooth;           /**< Share of a step the value glides from the step before over, 0
+                             *   for hard steps (default) .. 1 */
+    ecs_entity_t key;       /**< Bus whose level a follower follows, measured before its
+                             *   inserts and volume; 0 for the bus that holds the target effect,
+                             *   or the target bus */
+    float attack;           /**< Seconds of the rise of a follower, default 0.01 */
+    float release;          /**< Seconds of the fall of a follower, default 0.1 */
+});
+
 /** The grid a Track swings */
 ECS_ENUM(TrackSwingGrid, {
     TrackSwing8 = 0,        /**< Eighths, a step of 0.5 beat */

@@ -389,6 +389,27 @@
                 ]
             },
             {
+                "id": "Modulators",
+                "testcases": [
+                    "lfo_filter_seek",
+                    "lfo_filter_loop",
+                    "tremolo",
+                    "auto_pan",
+                    "steps_hold",
+                    "follower",
+                    "with_automation",
+                    "remove_no_click",
+                    "limits",
+                    "errors",
+                    "deterministic",
+                    "none_no_beats",
+                    "render_sizes",
+                    "beats_identical",
+                    "release",
+                    "no_zipper"
+                ]
+            },
+            {
                 "id": "Song",
                 "testcases": [
                     "first_sound",
@@ -420,7 +441,8 @@
                     "synth_wavetable",
                     "expression",
                     "synth_comb",
-                    "synth_routes"
+                    "synth_routes",
+                    "modulators"
                 ]
             },
             {

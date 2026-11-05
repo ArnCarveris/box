@@ -22,6 +22,7 @@ ECS_COMPONENT_DECLARE(AudioSoundId);
 ECS_COMPONENT_DECLARE(AudioBusState);
 ECS_COMPONENT_DECLARE(AudioVoice);
 ECS_COMPONENT_DECLARE(AudioEffectState);
+ECS_COMPONENT_DECLARE(AudioModulatorState);
 ECS_COMPONENT_DECLARE(AudioSample);
 ECS_COMPONENT_DECLARE(AudioMusic);
 ECS_COMPONENT_DECLARE(AudioSynth);
@@ -725,6 +726,27 @@ static void box_audio_automation_clip_ctor(
     }
 }
 
+/** Construct AudioModulator values: a sine LFO at 1 Hz of depth 0 without a target, 16 steps,
+ * a follower with an attack of 10 ms and a release of 100 ms.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_modulator_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    AudioModulator *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (AudioModulator){ .rate = 1.0f, .step_count = 16, .attack = 0.01f,
+            .release = 0.1f };
+    }
+}
+
 /** Construct Track values: no instrument, at priority 1, above the one shots.
  *
  * @param ptr The components
@@ -1221,6 +1243,7 @@ static void box_audio_module_free(
     box_audio_sample_fini(state);
     box_audio_sequencer_fini(state);
     box_audio_automation_fini(state);
+    box_audio_modulators_fini(state);
     box_audio_timeline_fini(state);
     ecs_os_free(state->capture.path);
     ecs_os_free(state);
@@ -1425,6 +1448,12 @@ void BoxAudioImport(
     box_owned_hooks(world, AutomationClip, BOX_OWNED_STR(AutomationClip, member),
         BOX_OWNED_CURVE(AutomationClip, curve));
     ecs_set_hooks(world, AutomationClip, { .ctor = box_audio_automation_clip_ctor });
+    ECS_META_COMPONENT(world, AudioModSource);
+    ECS_META_COMPONENT(world, AudioModWave);
+    ECS_META_COMPONENT(world, AudioModScale);
+    ECS_META_COMPONENT(world, AudioModulator);
+    box_owned_hooks(world, AudioModulator, BOX_OWNED_STR(AudioModulator, member));
+    ecs_set_hooks(world, AudioModulator, { .ctor = box_audio_modulator_ctor });
     ECS_META_COMPONENT(world, TrackSwingGrid);
     ECS_META_COMPONENT(world, TrackHumanize);
     ECS_META_COMPONENT(world, Track);
@@ -1436,6 +1465,7 @@ void BoxAudioImport(
     ECS_COMPONENT_DEFINE(world, AudioBusState);
     ECS_COMPONENT_DEFINE(world, AudioVoice);
     ECS_COMPONENT_DEFINE(world, AudioEffectState);
+    ECS_COMPONENT_DEFINE(world, AudioModulatorState);
     ECS_COMPONENT_DEFINE(world, AudioSample);
     ECS_COMPONENT_DEFINE(world, AudioMusic);
     ECS_COMPONENT_DEFINE(world, AudioSynth);
@@ -1450,6 +1480,7 @@ void BoxAudioImport(
     ecs_set_hooks(world, AudioBusState, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioVoice, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioEffectState, { .copy = box_audio_track_copy });
+    ecs_set_hooks(world, AudioModulatorState, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioSample, { .copy = box_audio_track_copy });
     ecs_set_hooks(world, AudioMusic, { .copy = box_audio_track_copy });
     ecs_add_pair(world, ecs_id(AudioPcm), EcsWith, ecs_id(AudioSoundId));
@@ -1465,6 +1496,7 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(Chorus), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(Saturator), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(TransientShaper), EcsWith, ecs_id(AudioEffectState));
+    ecs_add_pair(world, ecs_id(AudioModulator), EcsWith, ecs_id(AudioModulatorState));
     ecs_add_pair(world, ecs_id(SoundFile), EcsWith, ecs_id(AudioSample));
     ecs_add_pair(world, ecs_id(AudioStream), EcsWith, ecs_id(AudioMusic));
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSoundId));
@@ -1503,5 +1535,6 @@ void BoxAudioImport(
     box_audio_synth_init(world);
     box_audio_sequencer_init(world, state);
     box_audio_automation_init(world, state);
+    box_audio_modulators_init(world, state);
     box_audio_functions_init(world);
 }
