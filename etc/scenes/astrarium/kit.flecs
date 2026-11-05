@@ -16,19 +16,16 @@ fn fit_scale(w: f32, h: f32) -> f32 {
 }
 
 template ScreenCamera {
-  const s = window[Surface]
-
   Position: {0, 0, 100}
-  Camera: {ortho: true, ortho_scale: fit_scale(s.width, s.height)}
+  Camera: {ortho: true, ortho_scale: fit_scale(screen_w, screen_h)}
 }
 
 template ScreenRoot {
-  const s = window[Surface]
-  const k = fit_scale(s.width, s.height)
+  const k = fit_scale(screen_w, screen_h)
 
   LayoutItem: {
-    width: {mode: Fixed, value: s.width / k},
-    height: {mode: Fixed, value: s.height / k}
+    width: {mode: Fixed, value: screen_w / k},
+    height: {mode: Fixed, value: screen_h / k}
   }
 }
 
