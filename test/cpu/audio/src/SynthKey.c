@@ -13,8 +13,11 @@
 /** Frames of a segment of the spectrum, Hann windowed */
 #define KEY_SEGMENT 2048
 
-/** Segments of the spectrum averaged into a measure of a peak */
-#define KEY_SEGMENTS 8
+/** Segments of the spectrum averaged into a measure of a peak, each half over the last */
+#define KEY_SEGMENTS 32
+
+/** Frames from the start of one segment to the next */
+#define KEY_HOP (KEY_SEGMENT / 2)
 
 /** Frames from the start of a play to the window whose peak is measured */
 #define KEY_SKIP 2400
@@ -111,7 +114,8 @@ static double key_cutoff(
     return result;
 }
 
-/** Power of a frequency in a range, averaged over Hann windowed segments of KEY_SEGMENT.
+/** Power of a frequency in a range, averaged over Hann windowed segments of KEY_SEGMENT that
+ * overlap by half.
  *
  * @param x Samples
  * @param from First frame
@@ -128,7 +132,7 @@ static double key_power(
     double w = 2 * cos(2 * AUDIO_PI * f / AUDIO_RATE), sum = 0, s0, s1, s2, h;
     int32_t k, i;
     for (k = 0; k < segments; k ++) {
-        const float *seg = x + from + k * KEY_SEGMENT;
+        const float *seg = x + from + k * KEY_HOP;
         s1 = 0;
         s2 = 0;
         for (i = 0; i < KEY_SEGMENT; i ++) {
@@ -187,7 +191,7 @@ static double key_render_peak(
     box_audio_core_t *core = audio_new();
     key_define(core, 1, p);
     audio_play(core, 1, 1, 0, 1, 0, pitch, 0);
-    audio_render(core, 0, AUDIO_FRAMES / 2);
+    audio_render(core, 0, AUDIO_FRAMES);
     box_audio_core_free(core);
 
     return key_peak(audio_l, KEY_SKIP);
@@ -643,7 +647,7 @@ void SynthKey_script(void) {
     next = audio_tap_count;
     test_assert(box_audio_play_note(world, lead, 72, 1, 1));
     audio_run(world, 50);
-    test_assert(next + KEY_SKIP + KEY_SEGMENT * KEY_SEGMENTS <= audio_tap_count);
+    test_assert(next + KEY_SKIP + KEY_HOP * (KEY_SEGMENTS + 1) <= audio_tap_count);
     root = key_peak(audio_tap_l, at + KEY_SKIP);
     up = key_peak(audio_tap_l, next + KEY_SKIP);
     printf("scripted keytrack: peak at %f Hz at the root, %f Hz an octave up\n",
