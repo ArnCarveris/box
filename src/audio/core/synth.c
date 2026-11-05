@@ -848,6 +848,7 @@ static float box_audio_synth_route_value(
         } else if (src->envs & 1u) {
             result = src->env.value;
         }
+
         break;
     case BOX_AUDIO_SYNTH_FROM_FILTER:
         result = src->fenv_on ? src->fenv.value : 0.0f;
