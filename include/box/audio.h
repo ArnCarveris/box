@@ -12,6 +12,7 @@
 #define BOX_AUDIO_H
 
 #include "types.h"
+#include "curve.h"
 
 #ifdef BOX_AUDIO_IMPL
 #define ECS_META_IMPL IMPL
@@ -300,10 +301,21 @@ ECS_ENUM(SynthWave, {
     SynthSaw,              /**< Saw, band limited */
     SynthSquare,           /**< Square, band limited */
     SynthTriangle,         /**< Triangle */
-    SynthNoise,            /**< White noise, seeded per play from SynthSound.seed */
+    SynthNoise,            /**< Noise, seeded per play from SynthSound.seed, white or of the
+                            *   SynthOscillator.color */
     SynthPluck             /**< A plucked string (Karplus-Strong), set by the SynthString of
                             *   the layer; it rings out on its own and ends the sound when it
                             *   is silent, so it needs no envelope */
+});
+
+/** Color of the noise of a SynthNoise layer. Each is at about the RMS level of white noise at
+ * the same level, and keeps its slope at every sample rate */
+ECS_ENUM(SynthNoiseColor, {
+    SynthNoiseWhite,       /**< White, flat, the same power in every Hz */
+    SynthNoisePink,        /**< Pink, falls by 3 dB per octave, the same power in every
+                            *   octave: wind, surf, rain */
+    SynthNoiseBrown        /**< Brown, falls by 6 dB per octave, a leaky integral of white
+                            *   noise without DC: rumble, distant surf, soft hits */
 });
 
 /** Kind of the filter of a synth sound */
@@ -389,6 +401,10 @@ ECS_STRUCT(SynthOscillator, {
                             *   SynthLfo.sync, sync sweeps. Each unison voice syncs to its own
                             *   master; the sub stays at the master and phase modulation adds
                             *   to the synced phase. Ignored by SynthNoise and SynthPluck */
+    SynthNoiseColor color; /**< SynthNoise: color of the noise, default SynthNoiseWhite. The
+                            *   white noise it filters is seeded as white noise is, so a
+                            *   colored layer is as deterministic; each unison voice filters
+                            *   its own. Ignored by the other waves */
 });
 
 /** The string of a SynthPluck layer, on the layer: a delay line a period long, plucked with a
@@ -663,6 +679,21 @@ ECS_STRUCT(Saturator, {
                             *   1 - mix */
 });
 
+/** A transient shaper, an effect in an insert slot of an AudioBus, as a Reverb is: more or
+ * less punch and tail on drums and plucks, without a threshold, at most 12 dB either way:
+ * drums { AudioBus: {effects: [drums]}; TransientShaper: {attack: 0.6, sustain: -0.4} }.
+ *
+ * Stereo linked as a Compressor, it compares a fast envelope (1 ms up, 20 ms down) of the
+ * louder channel with a slow one (20 ms up, 200 ms down) in dB. 0 and 0 pass the signal
+ * unchanged; changes move over 20 ms. It has no meter and stops while its input is silent.
+ */
+ECS_STRUCT(TransientShaper, {
+    float attack;          /**< -1 to 1, default 0: above 0 boosts the transients, below 0
+                            *   softens them */
+    float sustain;         /**< -1 to 1, default 0: above 0 boosts the tail, below 0 shortens
+                            *   it */
+});
+
 /** An envelope of the cutoff of the SynthFilter of the same root, with the segments of a
  * SynthEnvelope: the cutoff is cutoff times 2 to the amount times the level of the envelope,
  * so it rises over the attack, settles at the sustain and returns over the release.
@@ -683,6 +714,29 @@ ECS_STRUCT(SynthFilterEnvelope, {
                             *   the filter, default 0 */
     float velocity;        /**< Share 0..1 of the amount that the velocity of a note scales,
                             *   amount (1 - share + share v), default 0 */
+});
+
+/** A pitch envelope of a synth sound, relative to the note so it fits every pitch: the pitch
+ * starts amount semitones off the note and returns to it over the decay with a curve, the
+ * drop of a kick or a tom, the blip of a zap or the scoop of brass. Over the release of the
+ * amplitude envelope of the layer, its own or the one of the root, the offset moves from where
+ * it is to release_amount. It adds to the glide, the LFO pitch and the sweep of
+ * SynthOscillator, and moves SynthPluck strings as vibrato does.
+ *
+ * On the root it moves every layer; on a layer that layer, in place of the one of the root.
+ * It does not keep a sound playing, and a legato note does not restart it.
+ */
+ECS_STRUCT(SynthPitchEnvelope, {
+    float amount;          /**< Semitones at the start of a note, -48..48, default 0 */
+    float decay;           /**< Seconds back to the note, default 0 */
+    float curve;           /**< Curve of the decay and the release, 0 linear (default),
+                            *   -16..16, as SynthEnvelope.curve: positive moves fast at first */
+    float release_amount;  /**< Semitones the pitch moves to over the release, -48..48,
+                            *   default 0 */
+    float sync;            /**< Semitones the ratio of SynthOscillator.sync moves by at the start
+                            *   of a note, -48..48, default 0, returning to 0 with the decay: the
+                            *   sweep of a sync lead. Only on layers with a ratio over 1; the
+                            *   moved ratio is clamped to 1..16 */
 });
 
 /** A drive stage of a synth sound, on its root: the mix of the layers of each voice runs
@@ -747,8 +801,8 @@ ECS_STRUCT(SynthLfo, {
 
 /** A sound made by the synth from the components of this entity and its children, without a
  * file: SynthOscillator layers, each with an optional SynthUnison, a SynthEnvelope, a
- * SynthDrive, a SynthFilter, a SynthFilterEnvelope, a SynthGlide and SynthLfo. Usually a
- * prefab.
+ * SynthDrive, a SynthFilter, a SynthFilterEnvelope, a SynthPitchEnvelope, a SynthGlide and
+ * SynthLfo. Usually a prefab.
  *
  * It is compiled once, and again when one of its components changes, into a patch the core
  * holds; box_audio_play and AudioSource play it like any sound, with no allocation per play.
@@ -828,6 +882,18 @@ ECS_STRUCT(Transport, {
                             *   bar, default false */
 });
 
+/** How an Instrument spreads its notes over the stereo field. Each mode gives an offset that
+ * is added to the pan of a note, the sum clamped to -1..1. */
+ECS_ENUM(InstrumentSpreadMode, {
+    InstrumentSpreadPitch,     /**< spread * clamp((pitch - root) / 24, -1, 1): lower notes to
+                                *   the left, higher ones to the right, all the way two octaves
+                                *   from the root */
+    InstrumentSpreadRandom,    /**< spread * a random value in -1..1 per note, seeded from the
+                                *   instrument and the count of its notes, so the same song
+                                *   renders the same */
+    InstrumentSpreadAlternate  /**< +spread and -spread on successive notes */
+});
+
 /** An instrument: a synth or a sampler that plays notes with a pitch, a velocity, a pan and a
  * duration, ad hoc with box_audio_play_note, on the bus of its AudioOutput, else of its sound.
  *
@@ -849,6 +915,10 @@ ECS_STRUCT(Instrument, {
                             *   sound as authored, like a drum hit */
     float release;         /**< Seconds a sampler note fades out over after its end, default
                             *   0.05; a synth uses the release of its envelopes */
+    float spread;          /**< 0..1, default 0: how far the notes spread over the stereo
+                            *   field, an offset added to the pan of each note */
+    InstrumentSpreadMode spread_mode; /**< How the notes spread, default
+                            *   InstrumentSpreadPitch */
 });
 
 /** A note of a NoteClip, in beats from the start of the clip */
@@ -888,6 +958,49 @@ ECS_STRUCT(AudioClip, {
                             *   the clip, and of a placement of duration 0 */
 });
 
+/** A clip of automation, reusable as a NoteClip is: a Curve over beats that a ClipPlacement
+ * on a Track plays into one float member of a bus or an effect, for a filter sweep, a send
+ * that opens for a chorus or the fade of a track:
+ * sweep { AutomationClip: {target: synth, component: AudioFilter, member: "cutoff",
+ * curve: {keys: [{0, 200}, {4, 5000}]}} }.
+ *
+ * The keys are in beats from the start of the clip and in the units of the member; the kind
+ * of the curve shapes the spans, and outside its keys the curve holds the first or the last.
+ * A placement starts, lasts, offsets and loops it as it does a NoteClip; its gain and
+ * transpose are ignored, and a track of only automation needs no instrument.
+ *
+ * Targets: the volume, pan and width of an AudioBus and the level of its sends
+ * (sends[1].level), and every float member of the effect component of an effect entity, such
+ * as AudioFilter.cutoff, Reverb.mix, Delay.feedback or bands[2].gain of an Equalizer. Members
+ * that are not continuous (kinds, slopes, stages, voices, entities and bools) are not
+ * automatable. A clip whose target, component or member is unknown or not automatable logs
+ * one error that names it, and does nothing until it changes.
+ *
+ * While the Transport plays, the curve is sampled within the lookahead window every 10 ms of
+ * output and at its keys, and each value is scheduled sample accurately at its frame: a bus
+ * ramps to it as it does to any set, an effect gets all its parameters, built from a copy of
+ * its component with the automated members written, and smooths the change over its usual
+ * 10 to 20 ms. At a loop wrap the lanes go on from loop_start. A seek, a stop and a change
+ * of the clip, the placement or the component of the target cancel what was scheduled ahead
+ * and schedule again.
+ *
+ * The automation owns the value the output hears, never the component: game code keeps
+ * reading and writing the authored value. While no automation covers the target, and while
+ * the transport is stopped, the output has the value of the component again; the end of a
+ * placement and a stop send it. A write of the component applies at once, until the next
+ * value of the automation. See Automation in docs/audio.md.
+ */
+ECS_STRUCT(AutomationClip, {
+    ecs_entity_t target;    /**< The entity with the AudioBus or the effect component */
+    ecs_entity_t component; /**< The component: AudioBus or an effect component */
+    char *member;           /**< Path of a float member, such as "cutoff", "volume" or
+                             *   "sends[1].level" */
+    float length;           /**< Beats, default 4: the length of a pass when a placement loops
+                             *   the clip, and of a placement of duration 0 */
+    Curve curve;            /**< The values: time in beats from the start of the clip, value
+                             *   in the units of the member */
+});
+
 /** The grid a Track swings */
 ECS_ENUM(TrackSwingGrid, {
     TrackSwing8 = 0,        /**< Eighths, a step of 0.5 beat */
@@ -924,7 +1037,8 @@ ECS_STRUCT(TrackHumanize, {
  */
 ECS_STRUCT(Track, {
     ecs_entity_t instrument; /**< The entity with Instrument that plays the notes of its note
-                              *   clips; a track of only audio clips needs none */
+                              *   clips; a track of only audio clips and automation needs
+                              *   none */
     int32_t priority;        /**< Priority of the voices of its notes and audio clips, 0..255,
                               *   default 1: at the voice cap of 64 a play steals only a
                               *   voice of at most its priority, so one shots (0) cannot steal
@@ -936,7 +1050,8 @@ ECS_STRUCT(Track, {
     TrackHumanize humanize;  /**< Random timing and velocity of the notes, default none */
 });
 
-/** A clip on the timeline, on a child of a Track: a NoteClip or an AudioClip.
+/** A clip on the timeline, on a child of a Track: a NoteClip, an AudioClip or an
+ * AutomationClip.
  *
  * A note ends at the earliest of its own end, the end of its pass of the clip, the end of the
  * placement and the loop_end of a Transport that loops. A Disabled or deleted placement
@@ -945,9 +1060,13 @@ ECS_STRUCT(Track, {
  * An AudioClip plays its sound on the bus of the track at the gain and the pitch ratio
  * 2^(transpose / 12), each pass from its frame to the earliest of the end of the pass, of the
  * sound, of the placement and loop_end. See Audio clips in docs/audio.md.
+ *
+ * An AutomationClip moves its target from the start to the end of the placement, at the
+ * value of its curve at the beat of the clip; at the end its target returns to the value of
+ * its component.
  */
 ECS_STRUCT(ClipPlacement, {
-    ecs_entity_t clip;     /**< The entity with NoteClip or AudioClip */
+    ecs_entity_t clip;     /**< The entity with NoteClip, AudioClip or AutomationClip */
     double start;          /**< Beats on the timeline where the placement starts */
     double duration;       /**< Beats, 0 for the length of the clip minus the offset */
     bool loop;             /**< Repeat the clip every length beats until the duration ends */

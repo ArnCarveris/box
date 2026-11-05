@@ -140,7 +140,15 @@
                     "legato_notes",
                     "legato_after_release",
                     "legato_cancels_release",
-                    "stop_cancels_release"
+                    "stop_cancels_release",
+                    "spread_defaults",
+                    "spread_pitch",
+                    "spread_pitch_render",
+                    "spread_alternate",
+                    "spread_random",
+                    "spread_zero",
+                    "spread_clamped",
+                    "spread_removed"
                 ]
             },
             {
@@ -177,6 +185,44 @@
                     "unison_stereo",
                     "fm_adds",
                     "ignored_noise_pluck",
+                    "clamped",
+                    "script"
+                ]
+            },
+            {
+                "id": "SynthPitch",
+                "testcases": [
+                    "start_returns",
+                    "negative_amount",
+                    "curve",
+                    "release_amount",
+                    "release_from_decay",
+                    "release_own_envelope",
+                    "legato_keeps",
+                    "layer",
+                    "sync_sweep",
+                    "pluck",
+                    "wide",
+                    "adds",
+                    "none_identical",
+                    "clamped",
+                    "script"
+                ]
+            },
+            {
+                "id": "SynthNoise",
+                "testcases": [
+                    "pink_slope_48000",
+                    "pink_slope_96000",
+                    "brown_slope_48000",
+                    "brown_slope_96000",
+                    "white_flat",
+                    "rms_matches_white",
+                    "seed_identical",
+                    "seed_plays",
+                    "white_unchanged",
+                    "unison",
+                    "paths",
                     "clamped",
                     "script"
                 ]
@@ -246,6 +292,20 @@
                 ]
             },
             {
+                "id": "Automation",
+                "testcases": [
+                    "filter_sweep",
+                    "volume_fade",
+                    "send_level",
+                    "eq_band",
+                    "loop",
+                    "stop",
+                    "seek",
+                    "unknown_member",
+                    "deterministic"
+                ]
+            },
+            {
                 "id": "Song",
                 "testcases": [
                     "first_sound",
@@ -269,6 +329,7 @@
                     "delay",
                     "modulation",
                     "saturator",
+                    "transient_shaper",
                     "synth_sub",
                     "synth_sync",
                     "synth_drive"
@@ -287,7 +348,9 @@
                     "stop_cancels",
                     "bit_identical",
                     "null_clock",
-                    "status_clock"
+                    "status_clock",
+                    "cancel_bus_set",
+                    "effect_params_at_frame"
                 ]
             },
             {
@@ -613,7 +676,17 @@
                     "component",
                     "world_duck",
                     "sidechain_cycle",
-                    "script"
+                    "script",
+                    "transient_attack",
+                    "transient_sustain",
+                    "transient_level",
+                    "transient_low",
+                    "transient_neutral",
+                    "transient_linked",
+                    "transient_no_click",
+                    "transient_render_sizes",
+                    "transient_component",
+                    "transient_script"
                 ]
             },
             {

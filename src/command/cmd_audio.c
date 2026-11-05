@@ -175,6 +175,7 @@ static void box_cmd_audio_effects(
         const Phaser *phaser;
         const Chorus *chorus;
         const Saturator *saturator;
+        const TransientShaper *shaper;
         const box_audio_module_t *state = box_audio_module_get(world);
         char *path;
         int32_t b, slot;
@@ -258,6 +259,9 @@ static void box_cmd_audio_effects(
             }
 
             ecs_strbuf_append(buf, " mix %.2f", (double)saturator->mix);
+        } else if ((shaper = ecs_get(world, e, TransientShaper))) {
+            ecs_strbuf_append(buf, "transient shaper attack %.2f sustain %.2f",
+                (double)shaper->attack, (double)shaper->sustain);
         }
 
         slot = box_audio_module_effect_slot(world, e);
