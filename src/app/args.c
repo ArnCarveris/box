@@ -63,6 +63,7 @@ static int box_app_delta_time(
         if (!box_app_number(text, 0, out) && *out >= 0 && *out <= FLT_MAX) {
             result = 0;
         }
+
         goto done;
     }
 
