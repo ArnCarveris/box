@@ -177,6 +177,7 @@ their tails end.
 | `Chorus` | `voices: 2`, `rate: 0.8` Hz, `depth: 3` ms, `delay: 12` ms, `mix: 0.5`, `spread: 0.5` |
 | `Saturator` | `drive: 0.3`, `asymmetry: 0`, `bits: 16`, `mix: 1` |
 | `TransientShaper` | `attack: 0`, `sustain: 0` |
+| `FrequencyShifter` | `shift: 0` Hz, `mode: FrequencyShift`, `stereo: 0`, `feedback: 0`, `mix: 1` |
 
 Equalizer bands use `AudioEqOff`, `AudioEqPeak`, `AudioEqLowShelf`,
 `AudioEqHighShelf`, `AudioEqLowCut` or `AudioEqHighCut`. Defaults are 100, 400,
@@ -211,6 +212,29 @@ it works the same at any level. `attack` from -1 to 1 softens or boosts transien
 `sustain` from -1 to 1 shortens or boosts the tail, each by up to 12 dB. The gain is
 smoothed so it does not distort low notes, is the same on both channels, and 0 and 0
 pass the signal unchanged. It has no meter.
+
+A frequency shifter moves every partial by the same number of Hz, unlike a pitch
+shifter, which multiplies them, so harmonic sounds turn inharmonic. `shift` goes from
+-5000 to 5000 Hz. It shifts the analytic signal of an allpass pair Hilbert transformer,
+whose image stays more than 60 dB under the shift from 20 Hz to 20 Hz under Nyquist.
+The allpasses turn the phase, so even a shift of 0 is not bit exact with the input.
+`mode: FrequencyRing` makes it a ring modulator instead: a sine at the magnitude of
+`shift` splits each partial into one above and one below at half the level, the
+partial itself gone. `stereo: 1` shifts the right channel the opposite way, and in
+between by `shift * (1 - 2 * stereo)`. `feedback` from -0.95 to 0.95 shifts the output
+again on each pass, through a DC blocker and a soft limit. Changes glide over 20 ms
+and a change of mode crossfades.
+
+```flecs
+// Thickening: a few Hz either way on each side widens a mono part
+pad_wide { FrequencyShifter: {shift: 3, stereo: 1, mix: 0.5} }
+
+// Barber pole: a small shift with feedback rises forever; a negative shift falls
+pad_rise { FrequencyShifter: {shift: 0.3, feedback: 0.85, mix: 0.5} }
+
+// Ring-mod bell: a clangorous, inharmonic tone from a plain one
+bell { FrequencyShifter: {mode: FrequencyRing, shift: 437, mix: 0.8} }
+```
 
 For ducking, key a compressor on another channel:
 

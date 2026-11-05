@@ -558,7 +558,9 @@ typedef enum box_audio_effect_kind_t {
     BOX_AUDIO_EFFECT_SATURATOR = 9, /**< A saturator, box_audio_saturator_params_t */
     BOX_AUDIO_EFFECT_TRANSIENT_SHAPER = 10, /**< A transient shaper,
                                   *   box_audio_transient_shaper_params_t */
-    BOX_AUDIO_EFFECT_KINDS = 11   /**< Number of kinds, NONE included */
+    BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER = 11, /**< A frequency shifter,
+                                  *   box_audio_frequency_shifter_params_t */
+    BOX_AUDIO_EFFECT_KINDS = 12   /**< Number of kinds, NONE included */
 } box_audio_effect_kind_t;
 
 /** The parameters of a reverb, the first floats of the params of its effect command */
@@ -874,6 +876,48 @@ typedef struct box_audio_transient_shaper_params_t {
     float attack;     /**< -1..1: above 0 boosts transients, below 0 softens them */
     float sustain;    /**< -1..1: above 0 boosts the tail, below 0 shortens it */
 } box_audio_transient_shaper_params_t;
+
+/** Largest shift of a frequency shifter in Hz, either way */
+#define BOX_AUDIO_FREQUENCY_SHIFTER_MAX 5000.0f
+
+/** Largest feedback of a frequency shifter, either way */
+#define BOX_AUDIO_FREQUENCY_SHIFTER_FEEDBACK_MAX 0.95f
+
+/** Lowest frequency in Hz from which the Hilbert transformer of a frequency shifter keeps its
+ * two paths 90 degrees apart, up to as far under the Nyquist frequency */
+#define BOX_AUDIO_FREQUENCY_SHIFTER_LOW 20.0f
+
+/** Allpasses of second order of the Hilbert transformer of a frequency shifter, over both of
+ * its paths; 12 keep the image of a shift more than 60 dB under it from 20 Hz to 20 kHz */
+#define BOX_AUDIO_FREQUENCY_SHIFTER_ALLPASSES 12
+
+/** Seconds of a change of the shift, the mode, the stereo, the feedback or the mix of a
+ * frequency shifter */
+#define BOX_AUDIO_FREQUENCY_SHIFTER_RAMP 0.02f
+
+/** Modes of a frequency shifter */
+typedef enum box_audio_frequency_shifter_mode_t {
+    BOX_AUDIO_FREQUENCY_SHIFT = 0, /**< Every partial moves by the shift in Hz: single sideband
+                                    *   modulation of the analytic signal */
+    BOX_AUDIO_FREQUENCY_RING = 1   /**< Ring modulation by a sine at the magnitude of the
+                                    *   shift: both sidebands at half the level, no carrier */
+} box_audio_frequency_shifter_mode_t;
+
+/** The parameters of a frequency shifter, the first floats of the params of its effect
+ * command: the analytic signal of each channel from an allpass pair Hilbert transformer, its
+ * two paths 90 degrees apart from BOX_AUDIO_FREQUENCY_SHIFTER_LOW Hz to as far under the
+ * Nyquist frequency, times a complex oscillator at the shift. Its output is fed back into its
+ * input through a DC blocker and mixed with the dry signal. The oscillators start at phase 0
+ * when the effect is put on and their phases stay continuous through a change of the shift */
+typedef struct box_audio_frequency_shifter_params_t {
+    float shift;      /**< Hz, -BOX_AUDIO_FREQUENCY_SHIFTER_MAX..BOX_AUDIO_FREQUENCY_SHIFTER_MAX */
+    float mode;       /**< A box_audio_frequency_shifter_mode_t, rounded; a change crossfades */
+    float stereo;     /**< 0..1: the right channel shifts by shift times 1 - 2 stereo, so at 1
+                       *   the opposite way */
+    float feedback;   /**< Share of the output fed back into the input,
+                       *   -BOX_AUDIO_FREQUENCY_SHIFTER_FEEDBACK_MAX..MAX */
+    float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+} box_audio_frequency_shifter_params_t;
 
 /** Put an effect into an insert slot of a bus, change its parameters, move it or take it off.
  *

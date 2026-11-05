@@ -538,6 +538,11 @@ void Shell_audio_command(void) {
     ecs_ensure(world, punch, AudioBus)->effects[0] = punch;
     ecs_modified(world, punch, AudioBus);
     ecs_set(world, punch, TransientShaper, { .attack = 0.5f, .sustain = -0.25f });
+    ecs_entity_t bell = ecs_entity(world, { .name = "bell" });
+    ecs_ensure(world, bell, AudioBus)->effects[0] = bell;
+    ecs_modified(world, bell, AudioBus);
+    ecs_set(world, bell, FrequencyShifter, { .shift = 437, .mode = FrequencyRing,
+        .stereo = 0.5f, .feedback = -0.3f, .mix = 0.8f });
     ecs_progress(world, 0.016f);
 
     bool error = true;
@@ -556,6 +561,9 @@ void Shell_audio_command(void) {
         "insert 0 grit: saturator drive 0.60 asymmetry 0.20 bits 8.0 mix 0.50") != NULL);
     test_assert(strstr(out, "punch: group volume 1.00 pan 0.00 width 1.00 -> master, "
         "insert 0 punch: transient shaper attack 0.50 sustain -0.25 "
+        "(does not run: no output)") != NULL);
+    test_assert(strstr(out, "bell: group volume 1.00 pan 0.00 width 1.00 -> master, "
+        "insert 0 bell: frequency shifter ring +437.0 Hz stereo 0.50 feedback -0.30 mix 0.80 "
         "(does not run: no output)") != NULL);
     ecs_os_free(out);
 

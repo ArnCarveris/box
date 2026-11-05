@@ -338,6 +338,34 @@ typedef struct box_audio_transient_shaper_t {
     box_audio_ramp_t sustain; /**< Sustain */
 } box_audio_transient_shaper_t;
 
+/** Sections of the Hilbert transformer of a frequency shifter in each of its two paths */
+#define BOX_AUDIO_FREQUENCY_SHIFTER_SECTIONS (BOX_AUDIO_FREQUENCY_SHIFTER_ALLPASSES / 2)
+
+/** A frequency shifter: the two allpass paths of the Hilbert transformer of each channel, a
+ * phase of the oscillator per channel and the output that feeds back */
+typedef struct box_audio_frequency_shifter_t {
+    box_audio_frequency_shifter_params_t target; /**< Parameters of the last command, clamped */
+    double coef[BOX_AUDIO_FREQUENCY_SHIFTER_ALLPASSES]; /**< Coefficients of the allpasses at
+                               * the rate, the even ones in the real path, the odd ones in the
+                               * imaginary one */
+    double node[2][2][BOX_AUDIO_FREQUENCY_SHIFTER_SECTIONS + 1][2]; /**< Per channel and path,
+                               * the input and the output of each section one and two frames
+                               * back */
+    double prev[2];           /**< Input of each channel in the frame before, which the
+                               * imaginary path takes */
+    float last[2];            /**< Output of each channel in the frame before, which feeds
+                               * back */
+    box_audio_dc_t dc[2];     /**< DC blocker of the feedback of each channel */
+    float dc_coef;            /**< Pole of the DC blockers */
+    uint32_t phase[2];        /**< Phase of the oscillator of each channel in 2^-32 turns */
+    double turn;              /**< Units of the phase per frame of a shift of 1 Hz */
+    box_audio_ramp_t shift;   /**< Shift in Hz */
+    box_audio_ramp_t ring;    /**< Share of the ring modulation, 0 shifts, 1 rings */
+    box_audio_ramp_t stereo;  /**< Stereo */
+    box_audio_ramp_t feedback; /**< Feedback gain */
+    box_audio_ramp_t mix;     /**< Wet level */
+} box_audio_frequency_shifter_t;
+
 /** State of the kinds of effects */
 typedef union box_audio_effect_data_t {
     box_audio_reverb_t reverb;  /**< BOX_AUDIO_EFFECT_REVERB */
@@ -350,6 +378,7 @@ typedef union box_audio_effect_data_t {
     box_audio_chorus_t chorus;  /**< BOX_AUDIO_EFFECT_CHORUS */
     box_audio_saturator_t saturator; /**< BOX_AUDIO_EFFECT_SATURATOR */
     box_audio_transient_shaper_t transient_shaper; /**< BOX_AUDIO_EFFECT_TRANSIENT_SHAPER */
+    box_audio_frequency_shifter_t frequency_shifter; /**< BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER */
 } box_audio_effect_data_t;
 
 /** An effect instance of the pool of the core: a kind in an insert slot of a bus, on the
@@ -1389,6 +1418,33 @@ bool box_audio_transient_shaper_render(
 
 /** The transient shaper kind: a block skipped while idle */
 void box_audio_transient_shaper_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    int32_t frames);
+
+/** The frequency shifter kind, in frequency_shifter.c: start at the params of fx */
+void box_audio_frequency_shifter_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The frequency shifter kind: new parameters while it runs */
+void box_audio_frequency_shifter_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The frequency shifter kind: process a block; true once a silent block left its allpasses
+ * and its feedback decayed */
+bool box_audio_frequency_shifter_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The frequency shifter kind: a block skipped while idle */
+void box_audio_frequency_shifter_rest(
     box_audio_core_t *core,
     box_audio_effect_t *fx,
     int32_t frames);
