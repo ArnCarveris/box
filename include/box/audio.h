@@ -359,7 +359,6 @@ ECS_STRUCT(SynthOscillator, {
     bool audible;          /**< Whether a modulator is heard as well, at its level */
     float pulse_width;     /**< SynthSquare: share of the period it is high, 0.01..0.99,
                             *   default 0.5; band limited at every width, without DC */
-<<<<<<< HEAD
     float sub;             /**< Level of the sub oscillator, 0..1, default 0 (off): a band
                             *   limited square sub_octave octaves under the layer, added to
                             *   its signal before its level and envelope. It is derived from
@@ -369,11 +368,9 @@ ECS_STRUCT(SynthOscillator, {
                             *   SynthNoise and SynthPluck */
     int32_t sub_octave;    /**< Octaves the sub is under the layer, 1 or 2, default 1; 0
                             *   counts as 1 and other values are clamped */
-=======
     float velocity;        /**< SynthPhase, SynthRing: share 0..1 of the index that the
                             *   velocity of a note scales, index (1 - share + share v), so
                             *   soft notes have fewer sidebands; default 0 */
->>>>>>> d8b9c939605d96299bb379dd3a4963981c567e04
 });
 
 /** The string of a SynthPluck layer, on the layer: a delay line a period long, plucked with a

@@ -756,18 +756,15 @@ typedef struct box_audio_synth_layer_t {
                                            * that plucks the string, 0 a soft finger, 1 a pick */
     uint32_t rings_free;                  /**< BOX_AUDIO_SYNTH_PLUCK: 1 when it uses no
                                            * envelope at all and the string alone ends it */
-<<<<<<< HEAD
     float sub;                            /**< Level of the sub oscillator, a band limited
                                            * square under it, 0..1, 0 for none; ignored by
                                            * noise and pluck */
     uint32_t sub_octave;                  /**< Octaves the sub is under it, 1 or 2, 0 counts
                                            * as 1 */
-=======
     float index_velocity;                 /**< Share 0..1 of the index of a modulator that
                                            * velocity scales: index (1 - share + share v) */
     float hardness_velocity;              /**< BOX_AUDIO_SYNTH_PLUCK: share 0..1 of the
                                            * hardness that velocity scales the same way */
->>>>>>> d8b9c939605d96299bb379dd3a4963981c567e04
 } box_audio_synth_layer_t;
 
 /** An LFO of a synth patch: a wave at a rate that starts after a delay and fades in, with a
