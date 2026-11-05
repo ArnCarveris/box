@@ -516,7 +516,9 @@ default cutoff of 1000 Hz damps a comb strongly, so set 20000 for a bright one.
 `resonance`, `slope`, `drive` and `model` do nothing. The output is scaled by
 `1 - |feedback|`, so the peaks stay near the input level at any feedback, and broadband
 input comes out quieter as the feedback rises. On the stereo path of unison with width
-both channels run the same tuning.
+both channels run the same tuning. Once the envelopes of a voice end, its comb rings on
+without input until its output falls under -80 dB, so a short burst of noise rings as a
+pluck; a looping sound starts its next pass instead.
 
 The core holds 32 comb delay lines, each long enough for 40 Hz (up to 81.8 kHz sample
 rates; at higher rates the lowest comb frequency is the rate over 2045). A voice with a

@@ -543,7 +543,8 @@ ECS_STRUCT(SynthUnison, {
  * with a one pole lowpass, so SynthFilterEnvelope, SynthLfo.cutoff, velocity and keytrack
  * darken it over time; a cutoff of 0.49 of the rate or above, such as 20000 Hz at 44.1 kHz
  * and up, leaves it undamped. The output is times 1 - |feedback|, so its peaks stay near
- * unity at any feedback. The resonance, slope, drive and model do nothing. The core holds
+ * unity at any feedback. Once the envelopes end it rings on to silence, so a short burst of
+ * noise rings as a pluck. The resonance, slope, drive and model do nothing. The core holds
  * BOX_AUDIO_SYNTH_COMBS (32) delay lines for 40 Hz and up: a voice takes one, two on the stereo
  * path of SynthUnison with width, and a play that finds them taken is ignored, as a
  * SynthString play without a free string.

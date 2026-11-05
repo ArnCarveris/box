@@ -21,7 +21,8 @@
  * A comb filter is a feedback comb tuned to the note of the first layer, read at a fractional
  * delay with a 3rd order Lagrange interpolation and damped by a one pole lowpass at the cutoff
  * in its loop, whose phase delay at the fundamental comes off the delay so the comb stays in
- * tune; its delay lines come from the core, one per channel.
+ * tune; its delay lines come from the core, one per channel. Once the envelopes end it rings on
+ * without input until its output is silent.
  *
  * Every voice holds its own copy of the patch, so a play allocates nothing. Its layers are parts
  * of the core, one per layer (box_audio_synth_part_t), and each pluck layer takes a string of
@@ -1873,6 +1874,7 @@ void box_audio_source_synth(
 
         comb->write = 0;
         comb->damp = 0;
+        comb->peak = 0;
         src->comb[k] = comb;
     }
 
@@ -1881,6 +1883,8 @@ void box_audio_source_synth(
     src->comb_tune = (double)p->tune;
     src->comb_pitch = 1;
     src->comb_a = 1;
+    src->comb_window = 1;
+    src->comb_ringing = true;
     src->velocity = velocity;
     if (velocity < 1) {
         box_audio_synth_velocity_layers(src, velocity);
@@ -3405,7 +3409,7 @@ static inline float box_audio_synth_comb_next(
 {
     const int32_t mask = BOX_AUDIO_SYNTH_COMB_FRAMES - 1;
     int32_t d = (int32_t)src->comb_delay, at = c->write - d;
-    float f = (float)(src->comb_delay - (double)d), y;
+    float f = (float)(src->comb_delay - (double)d), y, m;
     float fm = f - 1, fm2 = f - 2, fp = f + 1;
     float r = -f * fm * fm2 * (1.0f / 6) * c->line[(at + 1) & mask] +
         fp * fm * fm2 * 0.5f * c->line[at & mask] -
@@ -3415,8 +3419,37 @@ static inline float box_audio_synth_comb_next(
     y = box_audio_clean(x + src->comb_feedback * c->damp);
     c->line[c->write] = y;
     c->write = (c->write + 1) & mask;
+    y *= src->comb_gain;
+    m = y < 0 ? -y : y;
+    c->peak = m > c->peak ? m : c->peak;
 
-    return y * src->comb_gain;
+    return y;
+}
+
+/** Whether the comb filter of a source rings on once its envelopes have ended, with no more
+ * input: until the output of a period of every channel falls under
+ * BOX_AUDIO_SYNTH_STRING_SILENCE, as a string does.
+ *
+ * @param src The source, with a comb filter
+ * @return Whether it still rings
+ */
+static inline bool box_audio_synth_comb_rings(
+    box_audio_synth_source_t *src)
+{
+    box_audio_synth_comb_t *r = src->comb[1];
+    if (-- src->comb_window <= 0) {
+        float peak = src->comb[0]->peak;
+        if (r) {
+            peak = r->peak > peak ? r->peak : peak;
+            r->peak = 0;
+        }
+
+        src->comb_ringing = peak >= BOX_AUDIO_SYNTH_STRING_SILENCE;
+        src->comb[0]->peak = 0;
+        src->comb_window = (int32_t)src->comb_delay + 2;
+    }
+
+    return src->comb_ringing;
 }
 
 /** Render a block of a source in which a layer has unison voices: into core->src_l, and
@@ -3439,9 +3472,15 @@ static int32_t box_audio_synth_render_wide(
     levels[BOX_AUDIO_SYNTH_ENV_FREE] = 1;
     for (i = 0; i < frames; i ++) {
         float l, r, gain;
-        bool playing = box_audio_synth_envs_next(src, levels);
+        bool playing = box_audio_synth_envs_next(src, levels), tail;
         if (src->strings) {
             playing = box_audio_synth_strings_play(src, playing);
+        }
+
+        tail = false;
+        if (!playing && src->comb[0] && !src->loop) {
+            tail = box_audio_synth_comb_rings(src);
+            playing = tail;
         }
 
         if (!playing) {
@@ -3492,6 +3531,11 @@ static int32_t box_audio_synth_render_wide(
         } else if (src->filter == BOX_AUDIO_SYNTH_COMB) {
             box_audio_synth_control(src, rate);
             box_audio_synth_comb_control(src, rate);
+            if (tail) {
+                l = 0;
+                r = 0;
+            }
+
             l = box_audio_synth_comb_next(src, src->comb[0], l);
             if (stereo) {
                 r = box_audio_synth_comb_next(src, src->comb[1], r);
@@ -3543,9 +3587,15 @@ int32_t box_audio_synth_render(
     levels[BOX_AUDIO_SYNTH_ENV_FREE] = 1;
     for (i = 0; i < frames; i ++) {
         float mix = 0, y;
-        bool playing = box_audio_synth_envs_next(src, levels);
+        bool playing = box_audio_synth_envs_next(src, levels), tail;
         if (src->strings) {
             playing = box_audio_synth_strings_play(src, playing);
+        }
+
+        tail = false;
+        if (!playing && src->comb[0] && !src->loop) {
+            tail = box_audio_synth_comb_rings(src);
+            playing = tail;
         }
 
         if (!playing) {
@@ -3604,7 +3654,7 @@ int32_t box_audio_synth_render(
         } else if (src->filter == BOX_AUDIO_SYNTH_COMB) {
             box_audio_synth_control(src, rate);
             box_audio_synth_comb_control(src, rate);
-            y = box_audio_synth_comb_next(src, src->comb[0], mix);
+            y = box_audio_synth_comb_next(src, src->comb[0], tail ? 0.0f : mix);
         } else if (src->filter) {
             if (src->amount != 0 && src->fenv.segment < BOX_AUDIO_SYNTH_DONE) {
                 float level = box_audio_synth_env_next(&src->fenv);

@@ -2,7 +2,8 @@
 // with.
 using box.audio
 
-// A pluck from a noise burst: a short burst of noise rings in a comb at the note, damped
+// A pluck from a noise burst: a short burst of noise rings on in a comb at the note after its
+// envelope ends, damped at 6 kHz
 prefab NoisePluck {
   SynthSound: {}
   SynthEnvelope: {attack: 0.001, decay: 0.02, sustain: 0, release: 0.01}

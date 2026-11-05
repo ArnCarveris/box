@@ -801,6 +801,7 @@
                     "damped",
                     "wide",
                     "pool",
+                    "tail",
                     "clamped",
                     "bounded",
                     "others_identical",

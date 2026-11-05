@@ -637,6 +637,7 @@ typedef struct box_audio_synth_comb_t {
     float line[BOX_AUDIO_SYNTH_COMB_FRAMES]; /**< The delay line of the output, a ring */
     int32_t write;        /**< Index the next frame is written to */
     float damp;           /**< Last output of the lowpass in the loop */
+    float peak;           /**< Largest magnitude of the output of the window that runs */
 } box_audio_synth_comb_t;
 
 /** A layer of a synth voice: its layer of the patch, its oscillator and its own envelope. The
@@ -759,6 +760,9 @@ typedef struct box_audio_synth_source_t {
     double comb_delay;    /**< Frames of the delay the comb reads at */
     double comb_step;     /**< Change of comb_delay per frame toward its aim */
     int32_t comb_control; /**< Frames until the comb aims at the delay of the note again */
+    int32_t comb_window;  /**< Frames left of the window over which the comb rings on once
+                           * the envelopes have ended, a period */
+    bool comb_ringing;    /**< Whether the comb is still over the silence */
 } box_audio_synth_source_t;
 
 /** State of the kinds of sources */

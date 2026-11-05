@@ -455,6 +455,60 @@ void SynthComb_pool(void) {
     box_audio_core_free(core);
 }
 
+/** Peak of a range of frames of audio_l and audio_r.
+ *
+ * @param from First frame
+ * @param to Frame past the last
+ * @return The peak
+ */
+static float sc_max(
+    int32_t from,
+    int32_t to)
+{
+    float peak = 0, m;
+    int32_t i;
+    for (i = from; i < to; i ++) {
+        m = fabsf(audio_l[i]) > fabsf(audio_r[i]) ? fabsf(audio_l[i]) : fabsf(audio_r[i]);
+        peak = m > peak ? m : peak;
+    }
+
+    return peak;
+}
+
+/** A pluck from a burst of noise: once the envelope ends after 31 ms the comb rings on without
+ * input, on the mono and the stereo path, and the voice ends and gives its lines back once
+ * the comb is silent. */
+void SynthComb_tail(void) {
+    // audio/synth
+    box_audio_synth_patch_t p = sc_patch(220, 0.95f);
+    box_audio_core_t *core;
+    int32_t pass;
+    p.envelope = (box_audio_synth_envelope_t){
+        .attack = 0.001f, .decay = 0.02f, .release = 0.01f };
+    p.cutoff = 6000;
+    p.layer[0].level = 0.5f;
+    for (pass = 0; pass < 2; pass ++) {
+        if (pass) {
+            p.layer[0].voices = 2;
+            p.layer[0].width = 1;
+        }
+
+        core = sc_core();
+        sc_define(core, 1, &p);
+        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+        audio_render(core, 0, AUDIO_FRAMES);
+        test_assert(sc_max(0, 1440) > 0.01f);
+        test_assert(sc_max(9600, 10080) > 0.05f * sc_max(2400, 2880));
+        test_assert(sc_max(9600, 10080) < sc_max(2400, 2880));
+        test_assert(sc_max(AUDIO_FRAMES - 480, AUDIO_FRAMES) < sc_max(9600, 10080));
+        audio_render(core, 0, AUDIO_FRAMES);
+        audio_render(core, 0, AUDIO_FRAMES);
+        test_int(box_audio_core_voice_count(core), 0);
+        test_int(core->comb_free_count, BOX_AUDIO_SYNTH_COMBS);
+        box_audio_core_free(core);
+    }
+}
+
 /** The core clamps the feedback to -0.98..0.98 and the tune to 0.125..8, a tune of 0 or NaN
  * counts as 1, and a kind past the comb is no filter. */
 void SynthComb_clamped(void) {
