@@ -330,10 +330,14 @@ ECS_ENUM(SynthFilterKind, {
     SynthHighPass,         /**< Highpass */
     SynthBandPass,         /**< Bandpass, unity at the cutoff */
     SynthNotch,            /**< Notch, silent at the cutoff */
-    SynthFormant           /**< Three resonant bandpasses in parallel at the first three
+    SynthFormant,          /**< Three resonant bandpasses in parallel at the first three
                             *   formants of SynthFilter.vowel, from the tenor table of the
                             *   Csound manual: vowels, talking pads, wah. A SynthFilter only;
                             *   an AudioFilter takes it as SynthLowPass */
+    SynthComb              /**< A feedback comb tuned to the note, its peaks at the harmonics
+                            *   of SynthFilter.tune times the note: metallic, flanged and
+                            *   resonator sounds, and plucks from noise bursts. A SynthFilter
+                            *   only; an AudioFilter takes it as SynthLowPass */
 });
 
 /** Slope of the filter of a synth sound */
@@ -456,9 +460,23 @@ ECS_ENUM(WavetableKind, {
  * octave, 2048 samples at level 0, and hands it to the core, as the frames of a sound. A table
  * of up to 256 frames takes 16.6 KB per frame, a table of 64 frames about 1 MB. Voices that
  * play a table that changes or is deleted play the old one until they end.
+ *
+ * A table loaded from a sound, a WAV or FLAC of single cycle frames, is cut into
+ * floor(frames / frame_size) frames, at most 256, stereo summed to mono, each frame without
+ * its DC, the table normalized to a peak of 1 over all frames. Each frame keeps the harmonics
+ * under the Nyquist of its frame_size, at most 512, so a frame of other than 2048 samples is
+ * resampled to the frames of the table. Until the sound is ready the table has no frames and
+ * its layers play a sine; when the sound becomes ready or changes the table is built again,
+ * and the next play of the synth sounds that name it takes it. A sound that fails to load,
+ * that is not an entity with AudioPcm or SoundFile, or that is shorter than one frame logs
+ * one error that names the Wavetable; a sound of more than 256 frames logs one warning.
  */
 ECS_STRUCT(Wavetable, {
-    WavetableKind kind;    /**< The table, default WavetableBasic */
+    WavetableKind kind;    /**< The table, default WavetableBasic; ignored with a sound */
+    ecs_entity_t sound;    /**< An entity with AudioPcm or SoundFile whose frames make the
+                            *   table in place of kind, 0 for none, the default */
+    int32_t frame_size;    /**< Samples per frame of the sound, 64..4096, default 2048; 0 is
+                            *   the default */
 });
 
 /** The wavetable of a SynthWavetable layer, on the entity of its SynthOscillator.
@@ -535,6 +553,20 @@ ECS_STRUCT(SynthUnison, {
  * their vowel depths do. The level is normalized so a saw at 110 Hz is about as loud as
  * without the filter.
  *
+ * SynthComb is a feedback comb, y = x + feedback * y delayed by one period of the note times
+ * tune, see SynthComb in docs/audio.md. The note is the frequency of the first layer times
+ * the pitch of the voice: its pitch ratio, glide, pitch variance, bend, SynthPitchEnvelope and
+ * the pitch of a SynthLfo of every layer, but not the unison detune, drift or the LFOs of
+ * single layers. A fractional delay keeps it in tune at high notes. The cutoff damps its loop
+ * with a one pole lowpass, so SynthFilterEnvelope, SynthLfo.cutoff, velocity and keytrack
+ * darken it over time; a cutoff of 0.49 of the rate or above, such as 20000 Hz at 44.1 kHz
+ * and up, leaves it undamped. The output is times 1 - |feedback|, so its peaks stay near
+ * unity at any feedback. Once the envelopes end it rings on to silence, so a short burst of
+ * noise rings as a pluck. The resonance, slope, drive and model do nothing. The core holds
+ * BOX_AUDIO_SYNTH_COMBS (32) delay lines for 40 Hz and up: a voice takes one, two on the stereo
+ * path of SynthUnison with width, and a play that finds them taken is ignored, as a
+ * SynthString play without a free string.
+ *
  * The key of a voice, which keytrack and SynthEnvelope.key_scale follow, is 12 log2 of the
  * pitch ratio of its play in semitones, without the pitch variance of SynthSound: relative to
  * Instrument.root for a note of an instrument, to a ratio of 1 for any other play, as the
@@ -566,6 +598,12 @@ ECS_STRUCT(SynthFilter, {
                             *   a fraction interpolates the frequencies, levels and widths of
                             *   the formants of the two nearest vowels. SynthLfo.vowel and
                             *   SynthFilterEnvelope.vowel move it, clamped to 0..4 */
+    float feedback;        /**< SynthComb: gain of the delayed output fed back to the input,
+                            *   -0.98..0.98, default 0.5: positive peaks at the harmonics of
+                            *   the comb, negative at the odd harmonics of half of it, hollow
+                            *   like a closed pipe; near 1 either way rings long */
+    float tune;            /**< SynthComb: ratio of the frequency of the comb to the note,
+                            *   0.125..8, default 1; 2 an octave up, 1.5 a fifth */
 });
 
 /** A filter, an effect in an insert slot of an AudioBus, as a Reverb is: the state variable

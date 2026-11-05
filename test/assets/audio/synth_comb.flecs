@@ -1,0 +1,20 @@
+// The sounds the SynthCombWorld suite of test/cpu/audio compiles the comb filter from script
+// with.
+using box.audio
+
+// A pluck from a noise burst: a short burst of noise rings on in a comb at the note after its
+// envelope ends, damped at 6 kHz
+prefab NoisePluck {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.001, decay: 0.02, sustain: 0, release: 0.01}
+  SynthFilter: {kind: SynthComb, cutoff: 6000, feedback: 0.95}
+  SynthOscillator: {wave: SynthNoise, frequency: 220, level: 0.5}
+}
+
+// A hollow resonator an octave up: negative feedback, undamped, the defaults of the rest
+prefab Hollow {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.01, sustain: 1, hold: 0.5, release: 0.2}
+  SynthFilter: {kind: SynthComb, cutoff: 24000, feedback: -0.8, tune: 2}
+  SynthOscillator: {wave: SynthSaw, frequency: 110, level: 0.5}
+}

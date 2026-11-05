@@ -214,6 +214,15 @@
                 ]
             },
             {
+                "id": "SynthWavetableAsset",
+                "testcases": [
+                    "saw_to_square",
+                    "frame_size",
+                    "not_ready_fallback",
+                    "too_short"
+                ]
+            },
+            {
                 "id": "SynthPitch",
                 "testcases": [
                     "start_returns",
@@ -377,6 +386,7 @@
                     "synth_drive",
                     "synth_formant",
                     "synth_wavetable",
+<<<<<<< HEAD
                     "expression"
                 ]
             },
@@ -402,6 +412,9 @@
                     "delete_placement",
                     "clip_copies",
                     "script"
+=======
+                    "synth_comb"
+>>>>>>> 942950f0529b6902eb7f0cb8f140fd6a2929c5cd
                 ]
             },
             {
@@ -830,6 +843,30 @@
                 "testcases": [
                     "component",
                     "envelope_off"
+                ]
+            },
+            {
+                "id": "SynthComb",
+                "testcases": [
+                    "peaks",
+                    "high",
+                    "negative",
+                    "tune",
+                    "glide",
+                    "damped",
+                    "wide",
+                    "pool",
+                    "tail",
+                    "clamped",
+                    "bounded",
+                    "others_identical",
+                    "deterministic"
+                ]
+            },
+            {
+                "id": "SynthCombWorld",
+                "testcases": [
+                    "component"
                 ]
             },
             {

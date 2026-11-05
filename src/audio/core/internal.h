@@ -631,6 +631,16 @@ typedef struct box_audio_synth_string_t {
                                             * NULL for the last */
 } box_audio_synth_string_t;
 
+/** The delay line of a channel of the comb filter of a synth voice, and the state of the one
+ * pole lowpass in its loop. A voice with a BOX_AUDIO_SYNTH_COMB filter takes one of the core
+ * for each of its channels */
+typedef struct box_audio_synth_comb_t {
+    float line[BOX_AUDIO_SYNTH_COMB_FRAMES]; /**< The delay line of the output, a ring */
+    int32_t write;        /**< Index the next frame is written to */
+    float damp;           /**< Last output of the lowpass in the loop */
+    float peak;           /**< Largest magnitude of the output of the window that runs */
+} box_audio_synth_comb_t;
+
 /** A layer of a synth voice: its layer of the patch, its oscillator and its own envelope. The
  * core holds BOX_AUDIO_SYNTH_PARTS of them for all its voices, so a voice holds only the layers
  * its patch has */
@@ -738,12 +748,31 @@ typedef struct box_audio_synth_source_t {
     int32_t ringing_free; /**< Strings of layers without an envelope still over the silence */
     bool tables;          /**< Whether a layer plays a wavetable, whose position moves per
                            * frame */
+<<<<<<< HEAD
     double bend;          /**< Factor of the pitch from the bend of the voice, 1 without; the
                            * turns of the oscillators and the key carry it */
     double mod;           /**< Factor of the depth of the pitch of the LFOs from the mod of the
                            * voice, 1 without */
     float pressure;       /**< Pressure of the voice, 0..1, 0 without: the cutoff moves up by
                            * BOX_AUDIO_SYNTH_PRESSURE_OCTAVES times it */
+=======
+    box_audio_synth_comb_t *comb[2]; /**< The delay lines of a BOX_AUDIO_SYNTH_COMB filter, of
+                           * the left or mono channel, then of the right one when stereo; NULL
+                           * for none */
+    float comb_feedback;  /**< Feedback of the comb */
+    float comb_gain;      /**< Gain of the output of the comb, 1 - |feedback| */
+    double comb_tune;     /**< Ratio of the frequency of the comb to the note */
+    double comb_pitch;    /**< Factor of the note from the LFOs of every layer and the pitch
+                           * envelope of the first layer, 1 without */
+    double comb_a;        /**< Share of the way the lowpass of the loop moves per frame, 1
+                           * undamped */
+    double comb_delay;    /**< Frames of the delay the comb reads at */
+    double comb_step;     /**< Change of comb_delay per frame toward its aim */
+    int32_t comb_control; /**< Frames until the comb aims at the delay of the note again */
+    int32_t comb_window;  /**< Frames left of the window over which the comb rings on once
+                           * the envelopes have ended, a period */
+    bool comb_ringing;    /**< Whether the comb is still over the silence */
+>>>>>>> 942950f0529b6902eb7f0cb8f140fd6a2929c5cd
 } box_audio_synth_source_t;
 
 /** State of the kinds of sources */
@@ -837,6 +866,8 @@ typedef struct box_audio_synth_slot_t {
     uint32_t plays;     /**< Plays so far, which seed the noise and the variances */
     int32_t strings;    /**< Strings a play of the patch takes: one for each unison voice of
                          * each of its pluck layers */
+    int32_t combs;      /**< Comb lines a play of the patch takes: 0 without a comb filter, 1
+                         * for one, 2 when it renders in stereo */
     bool used;          /**< Whether a sound has the slot */
     box_audio_saturate_curve_t drive; /**< Clipper of the drive of the patch, when it has one */
 } box_audio_synth_slot_t;
@@ -928,6 +959,10 @@ struct box_audio_core_t {
     box_audio_synth_string_t synth_strings[BOX_AUDIO_SYNTH_STRINGS]; /**< Pluck strings */
     uint16_t string_free[BOX_AUDIO_SYNTH_STRINGS]; /**< Indexes of the free strings, a stack */
     int32_t string_free_count; /**< Free strings */
+    box_audio_synth_comb_t synth_combs[BOX_AUDIO_SYNTH_COMBS]; /**< Delay lines of comb
+                           * filters */
+    uint16_t comb_free[BOX_AUDIO_SYNTH_COMBS]; /**< Indexes of the free comb lines, a stack */
+    int32_t comb_free_count; /**< Free comb lines */
     uint64_t clock;       /**< Frames rendered since the core was created */
     int32_t schedule_count; /**< Commands in schedule */
     uint64_t schedule_order; /**< Commands that entered the schedule so far */
@@ -1408,7 +1443,8 @@ void box_audio_synth_drive_curve(
 void box_audio_synth_parts_init(
     box_audio_core_t *core);
 
-/** Whether the free parts and strings of a core hold the layers of the patch of a synth sound.
+/** Whether the free parts, strings and comb lines of a core hold the layers and the filter of
+ * the patch of a synth sound.
  *
  * @param core The core
  * @param sound Id of a ready synth sound
@@ -1428,7 +1464,8 @@ int32_t box_audio_synth_parts(
     const box_audio_core_t *core,
     uint32_t sound);
 
-/** Whether the free strings of a core hold the pluck layers of a synth sound.
+/** Whether the free strings and comb lines of a core hold the pluck layers and the comb filter
+ * of a synth sound.
  *
  * @param core The core
  * @param sound Id of a ready synth sound
@@ -1438,7 +1475,7 @@ bool box_audio_synth_strings_fit(
     const box_audio_core_t *core,
     uint32_t sound);
 
-/** Give the parts and the strings of a synth source back to its core.
+/** Give the parts, the strings and the comb lines of a synth source back to its core.
  *
  * @param core The core
  * @param src The source
@@ -1448,8 +1485,9 @@ void box_audio_synth_end(
     box_audio_synth_source_t *src);
 
 /** Start a synth source on the patch of a synth sound, with a part of the core for each of its
- * layers and a string for each unison voice of each pluck layer, which box_audio_synth_fits
- * found. Takes no use of the sound: the source plays a copy of the patch.
+ * layers, a string for each unison voice of each pluck layer and the comb lines of a comb
+ * filter, which box_audio_synth_fits found. Takes no use of the sound: the source plays a
+ * copy of the patch.
  *
  * @param core The core
  * @param source The source

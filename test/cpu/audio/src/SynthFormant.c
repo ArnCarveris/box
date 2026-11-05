@@ -496,7 +496,7 @@ void SynthFormant_clamped(void) {
     test_assert(q->filter_vowel == 0);
     test_assert(q->lfo[0].vowel == 0);
 
-    p.filter = BOX_AUDIO_SYNTH_FORMANT + 1;
+    p.filter = BOX_AUDIO_SYNTH_COMB + 1;
     sf_define(core, 3, &p);
     q = &core->synths[core->sounds[3].synth - 1].patch;
     test_assert(q->filter == BOX_AUDIO_SYNTH_FILTER_NONE);

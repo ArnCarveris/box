@@ -66,6 +66,7 @@
                     "voices_64_filter_24",
                     "voices_64_ladder",
                     "voices_64_formant",
+                    "voices_32_comb",
                     "voices_64_drive",
                     "voices_64_pre_drive",
                     "voices_64_filter_24_drive",

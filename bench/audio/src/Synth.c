@@ -5,9 +5,15 @@
  * one of FM, with curved envelopes, with a driven filter, the ladder filter or the formant
  * filter with its vowel under an LFO and the filter envelope, with subs, hard synced under an
  * LFO, with pink noise, with drift or with the drive of the mix before the filter, 32 voices of
+<<<<<<< HEAD
  * a pluck string, steady or under a vibrato, 8 of a unison pluck of 4, and 64 of a patch of
  * wavetables whose positions an LFO and the envelope move, and 64 voices whose bend and pressure
  * ramp, the expression of notes.
+=======
+ * a pluck string, steady or under a vibrato, 8 of a unison pluck of 4, 64 of a patch of
+ * wavetables whose positions an LFO and the envelope move, and 32 through a comb filter, as
+ * many as the core has comb lines.
+>>>>>>> 942950f0529b6902eb7f0cb8f140fd6a2929c5cd
  *
  * Each iteration renders one quantum of 128 stereo frames, so the time per item is the time
  * per sample of the whole mix of 64 voices.
@@ -40,6 +46,11 @@
 /** Extra of bench_synth_core: the filter is the formant filter, its vowel moved by the filter
  * envelope and by an LFO */
 #define BENCH_FORMANT 64u
+
+/** Extra of bench_synth_core: the filter is a comb, damped by the cutoff the filter envelope
+ * moves, with a vibrato of an LFO on its note; the core has comb lines for 32 of the voices,
+ * the plays of the others are ignored */
+#define BENCH_COMB 128u
 
 /** Extra of bench_synth_core: a drift of 15 cents moves the pitch of every layer and the
  * cutoff, and the oscillators start at free phases */
@@ -129,6 +140,15 @@ static box_audio_core_t* bench_synth_core(
         p.lfos = 1;
         p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 3,
             .vowel = 1 };
+    }
+
+    if (extra & BENCH_COMB) {
+        p.filter = BOX_AUDIO_SYNTH_COMB;
+        p.feedback = 0.9f;
+        p.tune = 1;
+        p.lfos = 1;
+        p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 5,
+            .pitch = 20 };
     }
 
     if (extra & BENCH_SUB) {
@@ -312,6 +332,16 @@ void Synth_voices_64_formant(
     // audio/synth
     box_audio_core_t *core = bench_synth_core(true, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
         0, BENCH_FORMANT, -1);
+    bench_synth_render(b, core);
+    box_audio_core_free(core);
+}
+
+void Synth_voices_32_comb(
+    bench_t *b)
+{
+    // audio/synth
+    box_audio_core_t *core = bench_synth_core(true, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
+        0, BENCH_COMB, -1);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }

@@ -778,7 +778,8 @@ static void box_audio_synths(
 }
 
 /** Build the wavetables the output does not have yet and hand them over as sounds; the copy
- * the transport takes is the only one, so a new output builds them again.
+ * the transport takes is the only one, so a new output builds them again. A table whose sound
+ * still decodes stays without frames, and is checked again each frame until it is ready.
  *
  * @param world The world
  * @param state The state
@@ -790,19 +791,22 @@ static void box_audio_wavetables(
     box_audio_transport_t *t)
 {
     ecs_iter_t it = ecs_query_iter(world, state->wavetables);
-    int32_t i, floats;
+    int32_t i, floats, frames;
     while (ecs_query_next(&it)) {
         const Wavetable *table = ecs_field(&it, Wavetable, 0);
         AudioWavetable *w = ecs_field(&it, AudioWavetable, 1);
         for (i = 0; i < it.count; i ++) {
             float *data;
+            bool loading = false;
             if (w[i].serial == state->serial) {
                 continue;
             }
 
-            data = box_audio_wavetable_kind((int32_t)table[i].kind, &floats);
+            data = box_audio_wavetable_of(world, it.entities[i], &table[i], &w[i], &frames,
+                &floats, &loading);
             w[i].id = data ? box_audio_sound_send(state, t, data, floats, 1, 0) : 0;
-            w[i].serial = state->serial;
+            w[i].frames = w[i].id ? frames : 0;
+            w[i].serial = loading ? 0 : state->serial;
             ecs_os_free(data);
         }
     }
@@ -1808,6 +1812,8 @@ static void BoxAudioWavetableChange(
         if (w) {
             w->id = 0;
             w->serial = 0;
+            w->frames = 0;
+            w->logged = false;
         }
     }
 
@@ -1981,6 +1987,8 @@ void box_audio_sync_init(
         .callback = BoxAudioWavetableChange,
         .ctx = state
     });
+
+    box_audio_wavetable_init(world, state);
 
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "AudioSynthRemove" }),
