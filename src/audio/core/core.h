@@ -87,8 +87,11 @@
 /** Insert slots of a bus; its effects run in the order of their index */
 #define BOX_AUDIO_EFFECT_SLOTS 4
 
-/** Parameters of an effect command, read by each kind in its own way */
-#define BOX_AUDIO_EFFECT_PARAMS 16
+/** Parameters of an effect command, read by each kind in its own way. 32 hold the 16 steps of
+ * a pattern gate and its other parameters as plain floats, so automation and the modulators
+ * reach each step as they reach any other parameter; an EFFECT command is 152 bytes and an
+ * EFFECT_PARAMS command 148, the largest command of the schedule */
+#define BOX_AUDIO_EFFECT_PARAMS 32
 
 /** Seconds of the fade of the wet signal around a change of the kind, bus or index of an
  * effect, out and in, and of the tail of an effect taken off */
@@ -563,7 +566,8 @@ typedef enum box_audio_effect_kind_t {
     BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER = 11, /**< A frequency shifter,
                                   *   box_audio_frequency_shifter_params_t */
     BOX_AUDIO_EFFECT_PITCH_SHIFTER = 12, /**< A pitch shifter, box_audio_pitch_shifter_params_t */
-    BOX_AUDIO_EFFECT_KINDS = 13   /**< Number of kinds, NONE included */
+    BOX_AUDIO_EFFECT_PATTERN_GATE = 13, /**< A pattern gate, box_audio_pattern_gate_params_t */
+    BOX_AUDIO_EFFECT_KINDS = 14   /**< Number of kinds, NONE included */
 } box_audio_effect_kind_t;
 
 /** The parameters of a reverb, the first floats of the params of its effect command. Shimmer
@@ -1015,6 +1019,56 @@ typedef struct box_audio_frequency_shifter_params_t {
                        *   -BOX_AUDIO_FREQUENCY_SHIFTER_FEEDBACK_MAX..MAX */
     float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
 } box_audio_frequency_shifter_params_t;
+
+/** Steps of the pattern of a pattern gate */
+#define BOX_AUDIO_PATTERN_GATE_STEPS 16
+
+/** Shortest and longest step of a pattern gate in beats */
+#define BOX_AUDIO_PATTERN_GATE_RATE_MIN (1.0f / 64.0f)
+#define BOX_AUDIO_PATTERN_GATE_RATE_MAX 16.0f
+
+/** Largest swing of a pattern gate, that of Track */
+#define BOX_AUDIO_PATTERN_GATE_SWING_MAX 0.75f
+
+/** Shortest and longest attack or release of a pattern gate in seconds */
+#define BOX_AUDIO_PATTERN_GATE_EDGE_MIN 0.0005f
+#define BOX_AUDIO_PATTERN_GATE_EDGE_MAX 2.0f
+
+/** Smallest share of a step a pattern gate is open */
+#define BOX_AUDIO_PATTERN_GATE_GATE_MIN 0.05f
+
+/** Lowest floor of a pattern gate in dB; the highest is 0 */
+#define BOX_AUDIO_PATTERN_GATE_FLOOR_MIN (-80.0f)
+
+/** Seconds of a change of the floor or the mix of a pattern gate */
+#define BOX_AUDIO_PATTERN_GATE_RAMP 0.02f
+
+/** The parameters of a pattern gate, the floats of the params of its effect command: a level
+ * pattern locked to the beat clock of the core (box_audio_cmd_beat_t), the same gain on both
+ * channels.
+ *
+ * At each frame the step floor(beat / rate) mod length sounds, on a grid from beat 0 that
+ * swing bends as a Track swings its notes: in each pair of steps the first lasts 1 + swing
+ * steps and the second 1 - swing. A step is open for the first gate share of it, at its level,
+ * and closed after, at the floor; a level of 0 is closed all along. The gain is floor + (1 -
+ * floor) times the openness, which moves linearly toward the level of the step while it is
+ * open and toward 0 after: from 0 to 1 in attack seconds, from 1 to 0 in release seconds. So
+ * the edges sit on the grid after a seek, a loop wrap and a tempo change, and a change of a
+ * step or of the timing moves the gain at the speed of the edges, without a click */
+typedef struct box_audio_pattern_gate_params_t {
+    float steps[BOX_AUDIO_PATTERN_GATE_STEPS]; /**< Level of each step, 0..1 */
+    float length;     /**< Steps that play, rounded, 1..BOX_AUDIO_PATTERN_GATE_STEPS */
+    float rate;       /**< Beats per step, BOX_AUDIO_PATTERN_GATE_RATE_MIN..MAX */
+    float swing;      /**< 0..BOX_AUDIO_PATTERN_GATE_SWING_MAX: the second step of each pair
+                       *   starts later by swing steps */
+    float attack;     /**< Seconds of an edge from closed to open,
+                       *   BOX_AUDIO_PATTERN_GATE_EDGE_MIN..MAX */
+    float release;    /**< Seconds of an edge from open to closed,
+                       *   BOX_AUDIO_PATTERN_GATE_EDGE_MIN..MAX */
+    float gate;       /**< Share of each step that is open, BOX_AUDIO_PATTERN_GATE_GATE_MIN..1 */
+    float floor;      /**< Gain when closed in dB, BOX_AUDIO_PATTERN_GATE_FLOOR_MIN..0 */
+    float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+} box_audio_pattern_gate_params_t;
 
 /** Put an effect into an insert slot of a bus, change its parameters, move it or take it off.
  *

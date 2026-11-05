@@ -444,7 +444,8 @@
                     "expression",
                     "synth_comb",
                     "synth_routes",
-                    "modulators"
+                    "modulators",
+                    "pattern_gate"
                 ]
             },
             {
@@ -717,6 +718,25 @@
                     "time_clamped",
                     "silent_after_tail",
                     "mix_dry",
+                    "render_sizes",
+                    "component",
+                    "script"
+                ]
+            },
+            {
+                "id": "PatternGate",
+                "testcases": [
+                    "pattern",
+                    "edges",
+                    "accent",
+                    "seek",
+                    "loop_wrap",
+                    "swing",
+                    "floor_dips",
+                    "automate_step",
+                    "no_click",
+                    "reduction",
+                    "rest",
                     "render_sizes",
                     "component",
                     "script"

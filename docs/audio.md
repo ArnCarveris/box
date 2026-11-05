@@ -179,6 +179,7 @@ their tails end.
 | `TransientShaper` | `attack: 0`, `sustain: 0` |
 | `FrequencyShifter` | `shift: 0` Hz, `mode: FrequencyShift`, `stereo: 0`, `feedback: 0`, `mix: 1` |
 | `PitchShifter` | `semitones: 0`, `cents: 0`, `stereo: 0`, `window: 40` ms, `feedback: 0`, `mix: 0.5` |
+| `PatternGate` | `steps`: 16 levels, all `1`, `length: 16`, `rate: 0.25` beats, `swing: 0`, `attack: 0.002` s, `release: 0.03` s, `gate: 0.5`, `floor: -80` dB, `mix: 1` |
 
 Equalizer bands use `AudioEqOff`, `AudioEqPeak`, `AudioEqLowShelf`,
 `AudioEqHighShelf`, `AudioEqLowCut` or `AudioEqHighCut`. Defaults are 100, 400,
@@ -331,6 +332,39 @@ pad_rise { FrequencyShifter: {shift: 0.3, feedback: 0.85, mix: 0.5} }
 
 // Ring-mod bell: a clangorous, inharmonic tone from a plain one
 bell { FrequencyShifter: {mode: FrequencyRing, shift: 437, mix: 0.8} }
+```
+
+A pattern gate chops a sustained sound into rhythm, the classic trance gate: it
+turns pads, chords and noise into rhythmic parts without writing notes. `steps` holds
+the level of each of 16 steps from 0 (closed) to 1, so a step at 0.5 is an accent
+6 dB down, and `length` (1 to 16) says how many of them play. `rate` is the length of
+a step in beats: 0.25 for sixteenths, 0.5 for eighths, 0.375 for dotted sixteenths,
+1/6 for sixteenth triplets. The pattern is locked to the Transport: at every frame the
+step `floor(beat / rate) mod length` sounds, so the gate stays on the grid after a
+seek, a loop wrap or a tempo change. Without a playing Transport it runs at 120 bpm.
+`swing` (0 to 0.75) bends the step grid as `Track.swing` bends notes: the second step
+of each pair starts later by `swing` steps.
+
+A step is open for the first `gate` share of it (0.05 to 1) and closed after; at 1,
+neighbouring open steps run together. The gain rises in `attack` seconds and falls in
+`release` seconds, linearly, so the edges do not click, and a longer release gives a
+softer pulse. Closed is `floor` dB, -80 to 0: a floor of -6 to -12 dB pumps instead of
+chopping. Both channels get the same gain. A change of a step or of the timing moves
+the gain at the speed of the edges, and `floor` and `mix` move over 20 ms, so
+automating `steps[3]` or modulating a step is smooth. An `AudioMeter` on the gate reads
+its gain reduction, and the gate stops while its input is silent.
+
+```flecs
+// A trance gate on a pad: sixteenths with accents and a soft edge
+pad_gate {
+  PatternGate: {steps: [1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0.5, 0, 1, 0.5, 1],
+    gate: 0.6, release: 0.05}
+}
+pad { AudioBus: {effects: [pad_gate]} }
+
+// A gentle pump on chords: eighths with swing that only dip 9 dB
+chords_pump { PatternGate: {length: 2, steps: [1, 0], rate: 0.5, swing: 0.2, gate: 0.7,
+  release: 0.12, floor: -9} }
 ```
 
 For ducking, key a compressor on another channel:
@@ -1295,8 +1329,14 @@ a writer buffer of a given size holds fewer of them than before.
 
 The core also keeps a beat clock: the transport schedules a `BEAT` command with the
 beat and tempo at each start, seek, stop, tempo change and loop wrap, only while
-something in the core reads it, and the core derives the beat of any frame from the
-last one (`box_audio_core_beat`).
+something in the core reads it (a modulator or a pattern gate), and the core derives the
+beat of any frame from the last one (`box_audio_core_beat`).
+
+An effect command carries 32 floats of parameters, enough for the 16 steps of a
+pattern gate and its other values as plain floats, which automation and the modulators
+reach like any other parameter. An effect command is 152 bytes and an effect params
+command 148, the largest command of the schedule, so a writer buffer holds fewer of
+them than with the 16 floats before.
 
 The core owns a 64-bit rendered-frame clock. Scheduled play, stop, voice/bus set,
 release, legato and effect params commands carry a frame time. Future commands wait in a fixed

@@ -418,6 +418,20 @@ typedef struct box_audio_pitch_shifter_t {
     box_audio_ramp_t feed;    /**< Fade in of the input after a move */
 } box_audio_pitch_shifter_t;
 
+/** A pattern gate: the openness that follows the steps of its pattern on the beat clock,
+ * and its floor and mix */
+typedef struct box_audio_pattern_gate_t {
+    box_audio_pattern_gate_params_t target; /**< Parameters of the last command, clamped */
+    int32_t length;           /**< Steps that play */
+    double rate;              /**< Beats per step */
+    double swing;             /**< Swing */
+    float up;                 /**< Openness the gain gains per frame on the way up */
+    float down;               /**< Openness the gain loses per frame on the way down */
+    float open;               /**< Openness that runs, 0..1 */
+    box_audio_ramp_t floor;   /**< Linear gain when closed */
+    box_audio_ramp_t mix;     /**< Wet level */
+} box_audio_pattern_gate_t;
+
 /** State of the kinds of effects */
 typedef union box_audio_effect_data_t {
     box_audio_reverb_t reverb;  /**< BOX_AUDIO_EFFECT_REVERB */
@@ -432,6 +446,7 @@ typedef union box_audio_effect_data_t {
     box_audio_transient_shaper_t transient_shaper; /**< BOX_AUDIO_EFFECT_TRANSIENT_SHAPER */
     box_audio_frequency_shifter_t frequency_shifter; /**< BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER */
     box_audio_pitch_shifter_t pitch_shifter; /**< BOX_AUDIO_EFFECT_PITCH_SHIFTER */
+    box_audio_pattern_gate_t pattern_gate; /**< BOX_AUDIO_EFFECT_PATTERN_GATE */
 } box_audio_effect_data_t;
 
 /** An effect instance of the pool of the core: a kind in an insert slot of a bus, on the
@@ -1669,6 +1684,35 @@ bool box_audio_frequency_shifter_render(
 
 /** The frequency shifter kind: a block skipped while idle */
 void box_audio_frequency_shifter_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    int32_t frames);
+
+/** The pattern gate kind, in pattern_gate.c: start at the params of fx, open as the step of
+ * the frame of the core clock is */
+void box_audio_pattern_gate_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The pattern gate kind: new parameters while it runs */
+void box_audio_pattern_gate_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The pattern gate kind: process a block; true when the block is silent, which the gain
+ * keeps silent */
+bool box_audio_pattern_gate_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The pattern gate kind: a block skipped while idle, over which its gain moves on as it
+ * would have rendered */
+void box_audio_pattern_gate_rest(
     box_audio_core_t *core,
     box_audio_effect_t *fx,
     int32_t frames);

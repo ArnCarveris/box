@@ -4,12 +4,12 @@
  * their slots of the pool of the core, their memory and their commands.
  *
  * An effect entity is any entity with an effect component: Reverb, Equalizer, AudioFilter,
- * Compressor, Gate, Delay, Phaser, Chorus, Saturator, TransientShaper, FrequencyShifter or
- * PitchShifter, the first of them in that order. A compressor gets the key bus the order
- * compile accepted.
+ * Compressor, Gate, Delay, Phaser, Chorus, Saturator, TransientShaper, FrequencyShifter,
+ * PitchShifter or PatternGate, the first of them in that order.
  *
  * The module sends an EFFECT command when the kind, the channel, the slot or a parameter of an
- * effect changes, and takes it off when no insert slot names it any more.
+ * effect changes and takes it off when no slot names it. A compressor gets the key bus the
+ * order compile accepted; a pattern gate asks the timeline for the beat clock.
  */
 
 #include "module.h"
@@ -218,6 +218,23 @@ uint32_t box_audio_module_effect_params(
             params[4] = shifter->feedback;
             params[5] = shifter->mix;
         }
+    } else if (component == ecs_id(PatternGate)) {
+        const PatternGate *gate = ptr;
+        result = BOX_AUDIO_EFFECT_PATTERN_GATE;
+        for (i = 0; params && ptr && i < BOX_AUDIO_PATTERN_GATE_STEPS; i ++) {
+            params[i] = gate->steps[i];
+        }
+
+        if (params && ptr) {
+            params[BOX_AUDIO_PATTERN_GATE_STEPS] = (float)gate->length;
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 1] = gate->rate;
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 2] = gate->swing;
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 3] = gate->attack;
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 4] = gate->release;
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 5] = gate->gate;
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 6] = gate->floor;
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 7] = gate->mix;
+        }
     }
 
 done:
@@ -230,7 +247,8 @@ int32_t box_audio_module_effect_components(
     const ecs_entity_t components[] = {
         ecs_id(Reverb), ecs_id(Equalizer), ecs_id(AudioFilter), ecs_id(Compressor),
         ecs_id(Gate), ecs_id(Delay), ecs_id(Phaser), ecs_id(Chorus), ecs_id(Saturator),
-        ecs_id(TransientShaper), ecs_id(FrequencyShifter), ecs_id(PitchShifter)
+        ecs_id(TransientShaper), ecs_id(FrequencyShifter), ecs_id(PitchShifter),
+        ecs_id(PatternGate)
     };
     int32_t i, count = (int32_t)(sizeof(components) / sizeof(components[0]));
     count = count < BOX_AUDIO_EFFECT_COMPONENTS ? count : BOX_AUDIO_EFFECT_COMPONENTS;
@@ -495,6 +513,7 @@ void box_audio_effects_sync(
     }
 
     freed = box_audio_effects_free(world, state);
+    state->effect_beat = false;
     for (i = 0; i < count; i ++) {
         ecs_entity_t e = claimed[i];
         AudioEffectState *es = ecs_get_mut(world, e, AudioEffectState);
@@ -521,6 +540,7 @@ void box_audio_effects_sync(
         }
 
         send = ecs_has_id(world, e, EcsDisabled) ? BOX_AUDIO_EFFECT_NONE : kind;
+        state->effect_beat = state->effect_beat || send == BOX_AUDIO_EFFECT_PATTERN_GATE;
         key = send == BOX_AUDIO_EFFECT_COMPRESSOR ? state->keys[es->bus][es->index] :
             BOX_AUDIO_BUS_NONE;
         if (sent->serial != state->serial || sent->kind != send || sent->bus != es->bus ||

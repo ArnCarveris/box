@@ -246,6 +246,7 @@ static void box_cmd_audio_effects(
         const TransientShaper *shaper;
         const FrequencyShifter *shifter;
         const PitchShifter *pitch;
+        const PatternGate *pattern;
         const box_audio_module_t *state = box_audio_module_get(world);
         char *path;
         int32_t b, slot;
@@ -370,11 +371,24 @@ static void box_cmd_audio_effects(
                 "window %.1f ms feedback %.2f mix %.2f", (double)pitch->semitones,
                 (double)pitch->cents, (double)pitch->stereo, (double)pitch->window,
                 (double)pitch->feedback, (double)pitch->mix);
+        } else if ((pattern = ecs_get(world, e, PatternGate))) {
+            int32_t length = pattern->length < 1 ? 1 : (pattern->length > 16 ? 16 :
+                pattern->length);
+            ecs_strbuf_appendstr(buf, "pattern gate steps [");
+            for (b = 0; b < length; b ++) {
+                ecs_strbuf_append(buf, b ? " %g" : "%g", (double)pattern->steps[b]);
+            }
+
+            ecs_strbuf_append(buf, "] rate %.3f beats swing %.2f gate %.2f attack %.4f "
+                "release %.3f floor %.1f dB mix %.2f", (double)pattern->rate,
+                (double)pattern->swing, (double)pattern->gate, (double)pattern->attack,
+                (double)pattern->release, (double)pattern->floor, (double)pattern->mix);
         }
 
         slot = box_audio_module_effect_slot(world, e);
         if ((ecs_has(world, e, Compressor) || ecs_has(world, e, Gate) ||
-            ecs_has(world, e, Saturator)) && state && slot >= 0)
+            ecs_has(world, e, Saturator) || ecs_has(world, e, PatternGate)) && state &&
+            slot >= 0)
         {
             ecs_strbuf_append(buf, " reduction %.1f dB", (double)state->reduction[slot]);
         }

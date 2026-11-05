@@ -1524,3 +1524,82 @@ void NoAlloc_modulators(void) {
     box_audio_core_free(core);
     test_int(noalloc_frees, 1);
 }
+
+/* Pattern gates in the insert slots of buses on the beat clock: patterns, accents, swing,
+ * gate lengths, floors and mixes that change, seeks and tempo changes of the clock, step
+ * changes scheduled ahead, a move to another bus, silence in which they rest and a removal,
+ * without a call of the allocator. */
+void NoAlloc_pattern_gate(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_route_t routes[] = { AUDIO_OUT(1, 0), AUDIO_OUT(2, 0), AUDIO_MASTER };
+    box_audio_effect_meter_t meters[BOX_AUDIO_EFFECT_MAX];
+    float params[BOX_AUDIO_EFFECT_PARAMS] = {0};
+    uint8_t bytes[1024];
+    box_audio_writer_t w;
+    uint32_t i, k, b;
+    test_int(box_audio_effect_floats(BOX_AUDIO_EFFECT_PATTERN_GATE, AUDIO_RATE), 0);
+    audio_order(core, routes, 3);
+    audio_sine(audio_sound_a, AUDIO_FRAMES, 330, 0.25f);
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_FRAMES, 1, AUDIO_RATE));
+    audio_play(core, 1, 1, 1, 0.5f, 0, 1, BOX_AUDIO_PLAY_LOOP);
+    audio_play(core, 2, 1, 2, 0.5f, 0, 1.5f, 0);
+    for (k = 0; k < 12; k ++) {
+        box_audio_writer_init(&w, bytes, sizeof(bytes));
+        for (i = 0; i < 2; i ++) {
+            for (b = 0; b < BOX_AUDIO_PATTERN_GATE_STEPS; b ++) {
+                params[b] = (float)((b + k + i) % 3) * 0.5f;
+            }
+
+            params[BOX_AUDIO_PATTERN_GATE_STEPS] = (float)(1 + (k + i) % 16);
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 1] = 0.125f * (float)(1 + k % 4);
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 2] = 0.1f * (float)(k % 8);
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 3] = 0.001f * (float)(1 + k % 5);
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 4] = 0.01f * (float)(1 + k % 7);
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 5] = 0.1f * (float)(1 + k % 10);
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 6] = -10.0f * (float)(k % 9);
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 7] = 1 - 0.1f * (float)(k % 4);
+            test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_PATTERN_GATE,
+                1 + (i + k / 4) % 2, i, BOX_AUDIO_BUS_NONE, params));
+        }
+
+        test_assert(box_audio_write_beat(&w, 1.75 * (double)k, 1.5f + 0.5f * (float)(k % 3),
+            box_audio_core_clock(core) + 700));
+        params[2] = (float)(k % 2);
+        test_assert(box_audio_write_effect_params(&w, 0, BOX_AUDIO_EFFECT_PATTERN_GATE,
+            params, box_audio_core_clock(core) + 1501));
+        box_audio_core_apply(core, w.data, w.size);
+        audio_render(core, 0, k % 3 ? AUDIO_FRAMES / 40 : AUDIO_FRAMES / 4);
+        audio_events(core, 0, NULL);
+        box_audio_core_effect_meters(core, meters, BOX_AUDIO_EFFECT_MAX);
+    }
+
+    // The voices stop and the gates rest on silence, then a voice starts them again
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_stop(&w, 1, 0));
+    box_audio_core_apply(core, w.data, w.size);
+    for (k = 0; k < 4; k ++) {
+        audio_render(core, 0, AUDIO_FRAMES);
+    }
+
+    test_assert(!box_audio_core_effect_running(core, 0));
+    test_assert(!box_audio_core_effect_running(core, 1));
+    audio_play(core, 3, 1, 1, 0.5f, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES / 4);
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    for (i = 0; i < 2; i ++) {
+        test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_NONE, BOX_AUDIO_BUS_NONE,
+            0, BOX_AUDIO_BUS_NONE, NULL));
+    }
+
+    box_audio_core_apply(core, w.data, w.size);
+    audio_render(core, 0, AUDIO_FRAMES);
+    for (i = 0; i < 2; i ++) {
+        test_assert(!box_audio_core_effect_running(core, i));
+    }
+
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+}

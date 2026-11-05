@@ -456,7 +456,8 @@ typedef struct box_audio_timeline_t {
     uint32_t click_serial;  /**< Serial of the output the click was sent to */
     bool beat_wanted;       /**< Something in the core reads its beat clock, which the
                              *   timeline then keeps in step with BEAT commands; set each
-                             *   frame before the update, by the modulators */
+                             *   frame before the update, by the modulators and the
+                             *   effects that read it */
     uint32_t beat_serial;   /**< Serial of the output whose beat clock the timeline keeps, 0
                              *   for none */
     box_audio_timeline_stats_t stats; /**< Counters */
@@ -739,6 +740,8 @@ typedef struct box_audio_module_t {
                                    *   core holds and got */
     uint32_t effect_frame;        /**< Frames of the module, which tell the insert slots of
                                    *   this frame from older ones */
+    bool effect_beat;             /**< An effect of this frame reads the beat clock of the
+                                   *   core: a pattern gate */
     uint32_t serial;              /**< Serial of the output the state was sent to */
     box_audio_writer_t writer;    /**< The batch of the frame, grown as needed */
     uint32_t next_voice;          /**< Next voice handle */
@@ -890,8 +893,8 @@ uint32_t box_audio_module_effect_kind(
 #define BOX_AUDIO_EFFECT_COMPONENTS (16)
 
 /** Get the effect components: Reverb, Equalizer, AudioFilter, Compressor, Gate, Delay, Phaser,
- * Chorus, Saturator, TransientShaper, FrequencyShifter and PitchShifter, in the order an entity
- * that has several takes the first of. A new effect is added here and to
+ * Chorus, Saturator, TransientShaper, FrequencyShifter, PitchShifter and PatternGate, in the
+ * order an entity that has several takes the first of. A new effect is added here and to
  * box_audio_module_effect_params.
  *
  * @param out Receives up to BOX_AUDIO_EFFECT_COMPONENTS components

@@ -218,8 +218,8 @@ ECS_STRUCT(AudioMeter, {
                             *   BOX_AUDIO_METER_WINDOW seconds of output */
     float rms_right;       /**< Linear, the RMS of the right channel over the window */
     float reduction;       /**< dB, on an effect entity: the largest gain reduction since the
-                            *   last frame, for dynamics effects, and how hard the clipper of
-                            *   a Saturator squashes; 0 for others */
+                            *   last frame, for dynamics effects and a PatternGate, and how
+                            *   hard the clipper of a Saturator squashes; 0 for others */
 });
 
 /** The bus a sound or a source plays on. On a source it wins over the one of its sound */
@@ -990,6 +990,42 @@ ECS_STRUCT(PitchShifter, {
     float feedback;        /**< Share of the shifted signal fed back into the line, 0 to 0.9,
                             *   default 0 */
     float mix;             /**< Wet level, 0 to 1, default 0.5; the dry signal passes at
+                            *   1 - mix */
+});
+
+/** A pattern gate, an effect in an insert slot of an AudioBus, as a Reverb is: a tempo-synced
+ * level pattern that chops a sustained sound into rhythm, the trance gate. It turns pads,
+ * chords and noise into rhythmic parts without notes:
+ * pad { AudioBus: {effects: [pad]};
+ * PatternGate: {steps: [1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1], release: 0.05} }.
+ *
+ * The pattern is locked to the Transport: at every frame the step floor(beat / rate) mod
+ * length sounds, so the gate stays on the grid after a seek, a loop wrap and a tempo change.
+ * Without a playing Transport it runs at 120 bpm. Swing bends the step grid as Track.swing
+ * bends its notes: the second step of each pair starts later by swing steps. A step is open
+ * for the first gate share of it at its level, so a level of 0.5 is an accent 6 dB down, and
+ * closed after, at the floor; the gain rises in attack seconds and falls in release seconds,
+ * linearly, the same on both channels. A change of a step or of the timing moves the gain at
+ * the speed of the edges; floor and mix move over 20 ms. An AudioMeter on its entity reads its
+ * gain reduction. It stops while its input is silent.
+ */
+ECS_STRUCT(PatternGate, {
+    float steps[16];       /**< Level of each step, 0 (closed) to 1, default all 1; an accent
+                            *   is a level under 1 */
+    int32_t length;        /**< Steps in the pattern, 1 to 16, default 16 */
+    float rate;            /**< Beats per step, default 0.25 (sixteenths); 0.375 is a dotted
+                            *   sixteenth, 1 / 6 a sixteenth triplet, 1/64 to 16 */
+    float swing;           /**< 0 to 0.75, default 0: the second step of every pair starts
+                            *   later by swing steps, as Track.swing */
+    float attack;          /**< Seconds of an edge from closed to open, default 0.002, 0.0005
+                            *   to 2 */
+    float release;         /**< Seconds of an edge from open to closed, default 0.03, 0.0005
+                            *   to 2; a longer one gives a softer pulse */
+    float gate;            /**< Share of each step that is open, 0.05 to 1, default 0.5; at 1
+                            *   neighbouring open steps run together */
+    float floor;           /**< Gain when closed in dB, -80 (default) to 0; a higher floor
+                            *   pumps instead of chopping */
+    float mix;             /**< Wet level, 0 to 1, default 1; the dry signal passes at
                             *   1 - mix */
 });
 
