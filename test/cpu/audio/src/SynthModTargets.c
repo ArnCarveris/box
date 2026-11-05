@@ -511,7 +511,9 @@ static void mt_lfo_vowel(
     box_audio_synth_patch_t p = mt_formant(0);
     double e1, e2, l1, l2;
     if (wide) {
-        mt_wide(&p);
+        p.layer[0].voices = 2;
+        p.layer[0].detune = 0;
+        p.layer[0].width = 1;
     }
 
     p.lfos = 1;

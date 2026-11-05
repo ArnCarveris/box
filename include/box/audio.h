@@ -984,8 +984,8 @@ ECS_STRUCT(SynthLfo, {
  * A child of the root moves every layer; a child of a layer moves that layer, and takes its
  * amp envelope as SynthSourceAmpEnvelope. The cutoff, resonance, vowel and pan are of the
  * sound either way. A route to a target that does not apply to its layer or to the sound
- * does nothing, without an error. Up to BOX_AUDIO_SYNTH_ROUTES per sound, see the modulation matrix in
- * docs/audio.md.
+ * does nothing, without an error. Up to BOX_AUDIO_SYNTH_ROUTES per sound, see the modulation
+ * matrix in docs/audio.md.
  */
 ECS_STRUCT(SynthModRoute, {
     SynthModSource source; /**< The source, default SynthSourceAmpEnvelope */
