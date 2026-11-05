@@ -709,7 +709,7 @@ void LightCookie_bake_ignores_cookie(void) {
         ecs_entity_t scene = ecs_new(world);
         ecs_add(world, scene, Scene);
         ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
-            .capture_size = 16, .budget_ms = 2, .bounces = 1});
+            .capture_size = 16, .budget_ms = 2, .bounces = 1, .compute = true});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
         ecs_entity_t floor = ecs_new_w_pair(world, EcsChildOf, scene);
         ecs_set(world, floor, Position, {0, -0.1f, 0});

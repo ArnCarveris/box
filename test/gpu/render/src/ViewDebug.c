@@ -723,7 +723,7 @@ static void dg_capture(
         .scene_probe = false});
     if (bake) {
         ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
-            .bounces = 1, .capture_size = 16, .budget_ms = 4});
+            .bounces = 1, .capture_size = 16, .budget_ms = 4, .compute = true});
     }
 
     ecs_entity_t floor = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -992,7 +992,7 @@ static LightBake dp_light_bake(
     float padding)
 {
     return (LightBake){.probe_spacing = spacing, .bounds_padding = padding, .bounces = 1,
-        .capture_size = 16, .budget_ms = 8};
+        .capture_size = 16, .budget_ms = 8, .compute = true};
 }
 
 /** A ReflectionBake of small cubemaps without a scene probe.

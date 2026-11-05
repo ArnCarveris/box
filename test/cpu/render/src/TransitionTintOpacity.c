@@ -1230,7 +1230,8 @@ void TransitionTintOpacity_tint_stays_in_bake(void) {
     ecs_world_t *world = tr_scene(&null);
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
-    ecs_set(world, scene, LightBake, {.probe_spacing = 2, .capture_size = 8, .budget_ms = 2});
+    ecs_set(world, scene, LightBake, {.probe_spacing = 2, .capture_size = 8, .budget_ms = 2,
+        .compute = true});
     ecs_entity_t e = tr_shape(world, scene, 0);
     int32_t i;
     ecs_set(world, e, Tint, {0, 0, 255, 0});
@@ -1264,7 +1265,8 @@ void TransitionTintOpacity_opacity_stays_out_of_bake(void) {
     ecs_world_t *world = tr_scene(&null);
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
-    ecs_set(world, scene, LightBake, {.probe_spacing = 2, .capture_size = 8, .budget_ms = 2});
+    ecs_set(world, scene, LightBake, {.probe_spacing = 2, .capture_size = 8, .budget_ms = 2,
+        .compute = true});
     ecs_entity_t e = tr_shape(world, scene, 0);
     int32_t i;
     ecs_set(world, e, Opacity, {1.0f});

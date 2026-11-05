@@ -426,7 +426,15 @@
                     "cache_is_owned",
                     "view_baked_defaults",
                     "scene_renders_identically",
-                    "projected_anchor_not_baked"
+                    "projected_anchor_not_baked",
+                    "compute_default_true",
+                    "compute_off_schedules_nothing",
+                    "compute_off_in_progress_finishes",
+                    "compute_on_resumes",
+                    "compute_off_records_changes",
+                    "compute_off_still_applied",
+                    "compute_off_view_unbaked",
+                    "compute_change_no_rebuild"
                 ]
             },
             {
