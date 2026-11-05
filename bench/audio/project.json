@@ -2,11 +2,7 @@
     "id": "bench_audio",
     "type": "application",
     "value": {
-<<<<<<< HEAD
-        "description": "Benchmarks for the audio core: voices mixed through buses, a reverb, a delay, a phaser, a chorus, a saturator in each mode, 16 modulators and synth voices, with the expression of notes too, in ns per frame, the spatial sources and the emitters of box.audio, in ns per source or emitter, and its tracks, in ns per frame",
-=======
-        "description": "Benchmarks for the audio core: voices mixed through buses, a reverb, a delay, a phaser, a chorus, a saturator in each mode, 16 modulators and synth voices, with the expression of notes too, in ns per frame, the spatial sources of box.audio, in ns per source, and the cost of their distance filter in the core, in ns per voice per frame, and its tracks, in ns per frame",
->>>>>>> 6d23c87956e000007062c902abd7304fe881f720
+        "description": "Benchmarks for the audio core: voices mixed through buses, a reverb, a delay, a phaser, a chorus, a saturator in each mode, 16 modulators and synth voices, with the expression of notes too, in ns per frame, the spatial sources and the emitters of box.audio, in ns per source or emitter, and the cost of the distance filter of the sources in the core, in ns per voice per frame, and its tracks, in ns per frame",
         "public": false,
         "use": [
             "box"
@@ -35,18 +31,15 @@
                     "sources_1000_listener_moves",
                     "sources_1000_ten_move",
                     "sources_0",
-<<<<<<< HEAD
                     "emitters_300_idle",
                     "emitters_300_playing",
-                    "emitters_0_playing"
-=======
+                    "emitters_0_playing",
                     "sources_1000_filtered_listener_moves",
                     "sources_1000_filtered_ten_move",
                     "core_voices_32_open",
                     "core_voices_32_filtered",
                     "core_voices_32_stereo_open",
                     "core_voices_32_stereo_filtered"
->>>>>>> 6d23c87956e000007062c902abd7304fe881f720
                 ]
             },
             {

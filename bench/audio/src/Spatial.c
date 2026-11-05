@@ -6,20 +6,16 @@
  *
  * Each iteration runs one frame of a world with box. The frames are short (a microsecond), so
  * the null output renders next to nothing and the time is the time of the frame, the
-<<<<<<< HEAD
- * AudioSync of the module included; sources_0 is the same world without sources.
+ * AudioSync of the module included; sources_0 is the same world without sources. The
+ * filtered cases give the sources a distance filter.
  *
  * emitters_300_idle runs emitters that are never due. emitters_300_playing runs frames of 1/60
  * s in which a few play a short silent sound; minus emitters_0_playing, the same world without
  * emitters, it is the cost of an emitter on the main thread.
-=======
- * AudioSync of the module included; sources_0 is the same world without sources. The
- * filtered cases give the sources a distance filter.
  *
  * The core cases render 32 looping voices of the core in quanta, with and without the
  * low-pass of BOX_AUDIO_PARAM_CUTOFF, one item per voice per frame, so their difference is the
  * cost of the filter per voice.
->>>>>>> 6d23c87956e000007062c902abd7304fe881f720
  */
 
 #include <box.h>
@@ -159,7 +155,6 @@ void Spatial_sources_0(
     ecs_fini(world);
 }
 
-<<<<<<< HEAD
 /** Emitters of the benchmarks */
 #define BENCH_EMITTERS 300
 
@@ -249,7 +244,8 @@ void Spatial_emitters_0_playing(
 {
     // audio/emitter
     bench_emitters(b, 0, 1.0f / 60.0f);
-=======
+}
+
 void Spatial_sources_1000_filtered_listener_moves(
     bench_t *b)
 {
@@ -340,5 +336,4 @@ void Spatial_core_voices_32_stereo_filtered(
 {
     // audio/core
     bench_core_voices(b, true, 800);
->>>>>>> 6d23c87956e000007062c902abd7304fe881f720
 }

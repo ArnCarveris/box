@@ -1243,7 +1243,6 @@ ECS_STRUCT(AudioSpatial, {
                             *   default 0 */
 });
 
-<<<<<<< HEAD
 /** Volume an AudioEmitter places its plays in, in the space of the emitter entity, with the
  * conventions of EmitterShape. A zero radius or zero extents play at the origin */
 ECS_ENUM(AudioEmitterShape, {
@@ -1286,13 +1285,12 @@ ECS_STRUCT(AudioEmitter, {
     uint32_t seed;         /**< Seed of the randomness, default 0 */
     bool playing;          /**< Whether it plays, default true */
 });
-=======
+
 /** Cutoff in Hz of an open distance filter, where it starts at min_distance */
 #define BOX_AUDIO_SPATIAL_OPEN 20000.0f
 
 /** Lowest cutoff in Hz of a distance filter */
 #define BOX_AUDIO_SPATIAL_CUTOFF_MIN 10.0f
->>>>>>> 6d23c87956e000007062c902abd7304fe881f720
 
 /** Settings of the audio of the world, a singleton */
 ECS_STRUCT(AudioSettings, {

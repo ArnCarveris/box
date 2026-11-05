@@ -1336,11 +1336,8 @@ uint32_t box_audio_play_send(
     box_audio_oneshot_t *shots, *shot, next;
     uint32_t sound = box_audio_sound_of(world, state, play->sound), held, result = 0;
     const AudioSpatial *spatial = NULL;
-<<<<<<< HEAD
-    float gain = 1.0f, pan = 0, beat, tempo, pitch = play->pitch > 0 ? play->pitch : 1.0f;
-=======
     float gain = 1.0f, pan = 0, cutoff = 0, held_cutoff, beat, tempo;
->>>>>>> 6d23c87956e000007062c902abd7304fe881f720
+    float pitch = play->pitch > 0 ? play->pitch : 1.0f;
     int32_t k, channel;
     bool legato;
     if (!sound) {
@@ -1390,13 +1387,10 @@ uint32_t box_audio_play_send(
         .volume = play->volume,
         .sent_volume = play->volume * gain,
         .sent_pan = pan,
-<<<<<<< HEAD
+        .sent_cutoff = cutoff,
         .emitter = play->emitter,
         .pitch = pitch,
         .when = when
-=======
-        .sent_cutoff = cutoff
->>>>>>> 6d23c87956e000007062c902abd7304fe881f720
     };
 
     result = next.handle;
