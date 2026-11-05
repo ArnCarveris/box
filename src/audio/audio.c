@@ -255,6 +255,26 @@ static void box_audio_chorus_ctor(
     }
 }
 
+/** Construct Saturator values: a drive of 0.3, symmetric, without the bit crusher, fully
+ * wet.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_saturator_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Saturator *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Saturator){ .drive = 0.3f, .asymmetry = 0, .bits = 16.0f, .mix = 1.0f };
+    }
+}
+
 /** Construct Gate values: -50 dB, an attack of 1 ms, a hold of 50 ms, a release of 100 ms
  * and a range of -80 dB.
  *
@@ -1127,6 +1147,8 @@ void BoxAudioImport(
     ecs_set_hooks(world, Phaser, { .ctor = box_audio_phaser_ctor });
     ECS_META_COMPONENT(world, Chorus);
     ecs_set_hooks(world, Chorus, { .ctor = box_audio_chorus_ctor });
+    ECS_META_COMPONENT(world, Saturator);
+    ecs_set_hooks(world, Saturator, { .ctor = box_audio_saturator_ctor });
     ECS_META_COMPONENT(world, SynthFilterEnvelope);
     ECS_META_COMPONENT(world, SynthGlide);
     ECS_META_COMPONENT(world, SynthLfoWave);
@@ -1182,6 +1204,7 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(Delay), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(Phaser), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(Chorus), EcsWith, ecs_id(AudioEffectState));
+    ecs_add_pair(world, ecs_id(Saturator), EcsWith, ecs_id(AudioEffectState));
     ecs_add_pair(world, ecs_id(SoundFile), EcsWith, ecs_id(AudioSample));
     ecs_add_pair(world, ecs_id(AudioStream), EcsWith, ecs_id(AudioMusic));
     ecs_add_pair(world, ecs_id(SynthSound), EcsWith, ecs_id(AudioSoundId));

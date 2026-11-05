@@ -175,6 +175,7 @@ their tails end.
 | `Delay` | `time: 0.25` s, `sync: 0` beats, `feedback: 0.35`, `mix: 0.3`, `ping_pong: false`, `damping: 6000` Hz |
 | `Phaser` | `stages: 4`, `rate: 0.5` Hz, `depth: 0.7`, `center: 800` Hz, `feedback: 0`, `mix: 0.5`, `stereo: 0.5` |
 | `Chorus` | `voices: 2`, `rate: 0.8` Hz, `depth: 3` ms, `delay: 12` ms, `mix: 0.5`, `spread: 0.5` |
+| `Saturator` | `drive: 0.3`, `asymmetry: 0`, `bits: 16`, `mix: 1` |
 
 Equalizer bands use `AudioEqOff`, `AudioEqPeak`, `AudioEqLowShelf`,
 `AudioEqHighShelf`, `AudioEqLowCut` or `AudioEqHighCut`. Defaults are 100, 400,
@@ -186,6 +187,16 @@ A positive delay `sync` overrides time: `sync * 60 / tempo` seconds, capped at
 4 seconds. An eighth is 0.5 beats, a dotted eighth 0.75. Time changes crossfade
 between read positions instead of gliding pitch. Use `mix: 1` on a return.
 Phaser stages range from 2 to 12, even; chorus supports up to four voices.
+
+A saturator adds warmth, grit or lo-fi to a drum bus, a synth bus or the master. It
+soft clips each channel with tanh at twice the sample rate, so it aliases less.
+`drive` goes from 0 to +30 dB into the clipper, and the output is level compensated,
+so drive mostly changes the tone and not the loudness: a sine around -14 dBFS keeps
+its RMS within about 1 dB at any drive. `asymmetry` biases the clipper to add even
+harmonics, and the DC it creates is filtered out. Below 16, `bits` runs a bit crusher
+after the saturation: 4 bits gives 16 levels. Oversampling delays the bus by 15
+frames, and the dry signal is delayed the same amount, so `mix` does not comb.
+An `AudioMeter` on the saturator reads how hard the clipper squashes, in dB.
 
 For ducking, key a compressor on another channel:
 
@@ -209,7 +220,8 @@ Add `AudioMeter: {}` to a bus, master or effect to read it every frame:
 - `peak_left` and `peak_right`: largest absolute sample since the last frame, linear.
 - `rms_left` and `rms_right`: RMS over the last 300 ms of output, limited to
   64 application frames. A peak-0.5 sine reads an RMS of about 0.354.
-- `reduction`: largest gain reduction in dB for compressors and gates; zero otherwise.
+- `reduction`: largest gain reduction in dB for compressors and gates, and how hard
+  the clipper of a saturator squashes; zero otherwise.
 
 Buses meter their output after inserts, width, pan, volume and mute. Master meters
 **before the limiter**, so values above 1 indicate an overdriven mix. Lower the group

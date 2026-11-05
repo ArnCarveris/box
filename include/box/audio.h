@@ -196,7 +196,8 @@ ECS_STRUCT(AudioMeter, {
                             *   BOX_AUDIO_METER_WINDOW seconds of output */
     float rms_right;       /**< Linear, the RMS of the right channel over the window */
     float reduction;       /**< dB, on an effect entity: the largest gain reduction since the
-                            *   last frame, for dynamics effects; 0 for others */
+                            *   last frame, for dynamics effects, and how hard the clipper of
+                            *   a Saturator squashes; 0 for others */
 });
 
 /** The bus a sound or a source plays on. On a source it wins over the one of its sound */
@@ -575,6 +576,30 @@ ECS_STRUCT(Chorus, {
     float spread;          /**< 0 to 1, default 0.5: 0 keeps the voices in the center, so a mono
                             *   input stays mono, 1 pans the first voice left and the last
                             *   right */
+});
+
+/** A saturator, an effect in an insert slot of an AudioBus, as a Reverb is: warmth, grit or
+ * lo-fi for a drum bus, a synth bus or the master. Each channel runs through a tanh soft
+ * clipper at twice the sample rate, its level compensated so that the drive mostly changes
+ * the tone and not the loudness: a sine around -14 dBFS keeps its RMS within about 1 dB at any
+ * drive. The asymmetry biases the clipper for even harmonics, with the DC taken out after it,
+ * and below 16 bits a bit crusher rounds the saturated signal:
+ * drums { AudioBus: {effects: [drums]}; Saturator: {drive: 0.6, asymmetry: 0.2} }.
+ *
+ * The oversampling delays the channel by 15 frames, its dry signal too, so that a mix in
+ * between does not comb. Drive, asymmetry, bits and mix move over 20 ms. An AudioMeter on its
+ * entity reads how hard the clipper squashes as its reduction: the largest drop in dB of the
+ * clipped peak against the driven peak, 0 while the clipper is all but linear. Once its input
+ * is silent and its state decayed it stops until its input sounds again.
+ */
+ECS_STRUCT(Saturator, {
+    float drive;           /**< 0 to 1, default 0.3: a gain of 0 to +30 dB into the clipper */
+    float asymmetry;       /**< 0 to 1, default 0: a bias before the clipper, shared by both
+                            *   channels, that adds even harmonics */
+    float bits;            /**< Bits of the bit crusher, 1 to 16, default 16, which is off;
+                            *   bits b round the output to 2^b levels */
+    float mix;             /**< Wet level, 0 to 1, default 1; the dry signal passes at
+                            *   1 - mix */
 });
 
 /** An envelope of the cutoff of the SynthFilter of the same root, with the segments of a

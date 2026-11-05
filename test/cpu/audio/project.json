@@ -205,7 +205,8 @@
                     "eq_filter",
                     "dynamics",
                     "delay",
-                    "modulation"
+                    "modulation",
+                    "saturator"
                 ]
             },
             {
@@ -539,6 +540,22 @@
                     "component",
                     "world_duck",
                     "sidechain_cycle",
+                    "script"
+                ]
+            },
+            {
+                "id": "Saturator",
+                "testcases": [
+                    "harmonics",
+                    "level_across_drive",
+                    "alias_oversampled",
+                    "bits",
+                    "mix_dry",
+                    "reduction",
+                    "drive_no_click",
+                    "render_sizes",
+                    "silent_after_tail",
+                    "component",
                     "script"
                 ]
             },

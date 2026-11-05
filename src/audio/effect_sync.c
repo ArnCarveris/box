@@ -4,9 +4,8 @@
  * their slots of the pool of the core, their memory and their commands.
  *
  * An effect entity is any entity with an effect component: Reverb, Equalizer, AudioFilter,
- * Compressor, Gate, Delay, Phaser or Chorus, the first of them in that order when it has
- * several. A compressor
- * gets the key bus that the order compile accepted for its insert slot.
+ * Compressor, Gate, Delay, Phaser, Chorus or Saturator, the first of them in that order. A
+ * compressor gets the key bus that the order compile accepted for its insert slot.
  *
  * The module sends an EFFECT command when the kind, the channel, the slot or a parameter of an
  * effect changes, and takes it off when no insert slot names it any more.
@@ -84,6 +83,7 @@ uint32_t box_audio_module_effect_kind(
     const Delay *delay = NULL;
     const Phaser *phaser = NULL;
     const Chorus *chorus = NULL;
+    const Saturator *saturator = NULL;
     uint32_t result = BOX_AUDIO_EFFECT_NONE;
     int32_t i;
     for (i = 0; params && i < BOX_AUDIO_EFFECT_PARAMS; i ++) {
@@ -205,6 +205,19 @@ uint32_t box_audio_module_effect_kind(
             params[3] = chorus->delay;
             params[4] = chorus->mix;
             params[5] = chorus->spread;
+        }
+
+        goto done;
+    }
+
+    saturator = ecs_get(world, e, Saturator);
+    if (saturator) {
+        result = BOX_AUDIO_EFFECT_SATURATOR;
+        if (params) {
+            params[0] = saturator->drive;
+            params[1] = saturator->asymmetry;
+            params[2] = saturator->bits;
+            params[3] = saturator->mix;
         }
     }
 
