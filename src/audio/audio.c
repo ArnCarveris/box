@@ -236,8 +236,8 @@ static void box_audio_phaser_ctor(
     }
 }
 
-/** Construct Chorus values: 2 voices at 0.8 Hz, 12 ms moved by 3 ms, a mix of 0.5 and a
- * spread of 0.5.
+/** Construct Chorus values: 2 voices at 0.8 Hz, 12 ms moved by 3 ms, a mix of 0.5, a
+ * spread of 0.5 and no feedback.
  *
  * @param ptr The components
  * @param count Number of components
@@ -253,12 +253,12 @@ static void box_audio_chorus_ctor(
     (void)ti;
     for (i = 0; i < count; i ++) {
         values[i] = (Chorus){ .voices = 2, .rate = 0.8f, .depth = 3.0f, .delay = 12.0f,
-            .mix = 0.5f, .spread = 0.5f };
+            .mix = 0.5f, .spread = 0.5f, .feedback = 0.0f };
     }
 }
 
-/** Construct Saturator values: a drive of 0.3, symmetric, without the bit crusher, fully
- * wet.
+/** Construct Saturator values: the tanh clipper at a drive of 0.3, symmetric, without the
+ * filters, the sample and hold and the bit crusher, fully wet.
  *
  * @param ptr The components
  * @param count Number of components
@@ -273,7 +273,8 @@ static void box_audio_saturator_ctor(
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
-        values[i] = (Saturator){ .drive = 0.3f, .asymmetry = 0, .bits = 16.0f, .mix = 1.0f };
+        values[i] = (Saturator){ .drive = 0.3f, .asymmetry = 0, .bits = 16.0f, .mix = 1.0f,
+            .mode = SaturatorTanh, .low_cut = 0, .high_cut = 0, .tone = 0, .rate = 0 };
     }
 }
 
@@ -1405,6 +1406,7 @@ void BoxAudioImport(
     ecs_set_hooks(world, Phaser, { .ctor = box_audio_phaser_ctor });
     ECS_META_COMPONENT(world, Chorus);
     ecs_set_hooks(world, Chorus, { .ctor = box_audio_chorus_ctor });
+    ECS_META_COMPONENT(world, SaturatorMode);
     ECS_META_COMPONENT(world, Saturator);
     ecs_set_hooks(world, Saturator, { .ctor = box_audio_saturator_ctor });
     ECS_META_COMPONENT(world, TransientShaper);

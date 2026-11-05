@@ -174,8 +174,8 @@ their tails end.
 | `Gate` | `threshold: -50` dB, `attack: 0.001` s, `hold: 0.05` s, `release: 0.1` s, `range: -80` dB |
 | `Delay` | `time: 0.25` s, `sync: 0` beats, `feedback: 0.35`, `mix: 0.3`, `ping_pong: false`, `damping: 6000` Hz |
 | `Phaser` | `stages: 4`, `rate: 0.5` Hz, `depth: 0.7`, `center: 800` Hz, `feedback: 0`, `mix: 0.5`, `stereo: 0.5` |
-| `Chorus` | `voices: 2`, `rate: 0.8` Hz, `depth: 3` ms, `delay: 12` ms, `mix: 0.5`, `spread: 0.5` |
-| `Saturator` | `drive: 0.3`, `asymmetry: 0`, `bits: 16`, `mix: 1` |
+| `Chorus` | `voices: 2`, `rate: 0.8` Hz, `depth: 3` ms, `delay: 12` ms, `mix: 0.5`, `spread: 0.5`, `feedback: 0` |
+| `Saturator` | `drive: 0.3`, `asymmetry: 0`, `bits: 16`, `mix: 1`, `mode: SaturatorTanh`, `low_cut: 0` Hz, `high_cut: 0` Hz, `tone: 0`, `rate: 0` Hz |
 | `TransientShaper` | `attack: 0`, `sustain: 0` |
 
 Equalizer bands use `AudioEqOff`, `AudioEqPeak`, `AudioEqLowShelf`,
@@ -191,15 +191,71 @@ Time changes crossfade
 between read positions instead of gliding pitch. Use `mix: 1` on a return.
 Phaser stages range from 2 to 12, even; chorus supports up to four voices.
 
+A chorus with `feedback` is a flanger. The first voice's tap feeds back into the
+delay line, so the comb resonates: peaks sit at multiples of `1000 / delay` Hz,
+and a negative feedback moves them to the odd multiples of half that, for the
+hollow flanger sound. Feedback ranges from -0.95 to 0.95; at 0 the chorus sounds
+exactly as without it. For a flanger use one voice, a `delay` of about 0.1 to
+10 ms and a `depth` a little under the delay, so the sweep nearly reaches zero:
+
+```flecs
+drums {
+  AudioBus: {effects: [drums]}
+  Chorus: {voices: 1, rate: 0.2, delay: 2, depth: 1.8, feedback: 0.7, mix: 0.5}
+}
+```
+
+Higher feedback sharpens the jet sweep; a negative one sounds hollow. The tail
+of the feedback rings out before the effect goes idle.
+
 A saturator adds warmth, grit or lo-fi to a drum bus, a synth bus or the master. It
-soft clips each channel with tanh at twice the sample rate, so it aliases less.
-`drive` goes from 0 to +30 dB into the clipper, and the output is level compensated,
-so drive mostly changes the tone and not the loudness: a sine around -14 dBFS keeps
-its RMS within about 1 dB at any drive. `asymmetry` biases the clipper to add even
-harmonics, and the DC it creates is filtered out. Below 16, `bits` runs a bit crusher
-after the saturation: 4 bits gives 16 levels. Oversampling delays the bus by 15
-frames, and the dry signal is delayed the same amount, so `mix` does not comb.
+clips each channel at twice the sample rate, so it aliases less. `drive` goes from 0
+to +30 dB into the clipper, and the output is level compensated per mode, so drive
+mostly changes the tone and not the loudness: a sine at -14 dBFS keeps its RMS
+within about 1.5 dB at any drive (tanh keeps its older compensation, which holds
+that at -12 dBFS and rises up to 2.5 dB at -14 dBFS). `asymmetry` biases the clipper to add even
+harmonics, and the DC it creates is filtered out. `mode` picks the curve:
+
+- `SaturatorTanh`, the default: a tanh soft clipper, smooth and symmetric.
+- `SaturatorTube`: a softer asymmetric tanh whose bias grows with the level, so it
+  adds even harmonics even at `asymmetry: 0`. Warmer.
+- `SaturatorHard`: a hard clip with a slightly rounded corner, fuzz.
+- `SaturatorFold`: a sine wavefolder. The more drive, the more folds and the
+  brighter the sound.
+- `SaturatorRectify`: a rectifier that `asymmetry` blends from half wave (0) to full
+  wave (1), octave-up grit.
+
+Hard clipping and folding alias much more than tanh, so those two modes add first
+order antiderivative anti-aliasing (ADAA) on top of the oversampling, and the folder
+runs at four times the rate. On a -6 dBFS 5 kHz sine at 48 kHz, the aliases below
+20 kHz are -51 dB (drive 0.8) and -42 dB (drive 1) for hard, against -30 and -21 dB
+without ADAA. For fold at drive 1 they are -68 dB, against -23 dB with ADAA at twice
+the rate and 0 dB at twice the rate alone. Above 20 kHz, the 25 kHz harmonic folds to
+23 kHz through the roll-off of the oversampler, at -10 to -25 dB, which neither
+removes.
+
+The filters around the clipper shape the distortion. `low_cut` is a 12 dB highpass
+before the clipper, so the bass is not distorted (and with `mix` below 1 the dry bass
+stays clean). `tone` (-1 to 1) tilts the input by up to 9 dB either way around 1 kHz
+and applies the inverse tilt after the clipper. Above 0 the highs distort most,
+below 0 the lows, and a clean signal passes as it was. `high_cut` is a 12 dB lowpass
+after the clipper that tames fizz. `rate` holds each sample for 1 / rate seconds,
+which gives the aliasing lo-fi sound of an old sampler. A cut, or the rate, of 0 is
+off. Below 16, `bits` runs a bit crusher last: 4 bits gives 16 levels. Oversampling
+delays the bus by 15 frames (23 for `SaturatorFold`), and the dry signal is delayed the
+same amount, so `mix` does not comb. Changes move over 20 ms; a change of `mode` applies at once.
 An `AudioMeter` on the saturator reads how hard the clipper squashes, in dB.
+
+Recipes:
+
+| Sound | Saturator |
+|---|---|
+| Tape warmth on a bus | `{drive: 0.3}` |
+| Tube on a synth or vocal | `{mode: SaturatorTube, drive: 0.5, high_cut: 9000}` |
+| Fuzz on a guitar or bass | `{mode: SaturatorHard, drive: 0.8, low_cut: 150, high_cut: 5000}` |
+| Wavefolded lead | `{mode: SaturatorFold, drive: 0.6, tone: 0.3, high_cut: 8000}` |
+| Octave-up grit | `{mode: SaturatorRectify, drive: 0.4, asymmetry: 1, mix: 0.5}` |
+| Lo-fi drums | `{drive: 0.4, bits: 8, rate: 8000, high_cut: 6000}` |
 
 A transient shaper gives drums and plucks more or less punch and more or less tail,
 without a threshold. Stereo linked like a compressor, it follows the peak of the
