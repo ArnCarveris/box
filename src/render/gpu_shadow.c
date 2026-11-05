@@ -552,11 +552,12 @@ static WGPURenderPipeline box_gpu_shadow_clear_create(
     return box_gpu_render_pipeline(gpu, &desc);
 }
 
-/** Get the shadow pipelines, created again when the shadow shader was recompiled.
+/** Get the shadow pipelines, created again when the shadow shader was recompiled; the previous
+ * ones stay until all three new ones exist.
  *
  * @param gpu The backend
- * @return The plain pipeline, NULL while the shader has no module; the alpha tested one is
- * gpu->shadow_cutout, the one that clears an atlas tile gpu->shadow_clear
+ * @return The plain pipeline, NULL while the shader has no module or the first ones are being
+ * created; the alpha tested one is gpu->shadow_cutout, the one that clears a tile shadow_clear
  */
 static WGPURenderPipeline box_gpu_shadow_pipeline(
     box_gpu_t *gpu)
@@ -571,16 +572,14 @@ static WGPURenderPipeline box_gpu_shadow_pipeline(
         goto done;
     }
 
-    if (gpu->shadow) {
-        wgpuRenderPipelineRelease(gpu->shadow);
-    }
-
-    if (gpu->shadow_cutout) {
-        wgpuRenderPipelineRelease(gpu->shadow_cutout);
-    }
-
-    if (gpu->shadow_clear) {
-        wgpuRenderPipelineRelease(gpu->shadow_clear);
+    WGPURenderPipeline *current[3] = { &gpu->shadow, &gpu->shadow_cutout, &gpu->shadow_clear };
+    WGPURenderPipeline next[3] = {
+        box_gpu_shadow_create(gpu, s->module, false, false, false, false),
+        box_gpu_shadow_create(gpu, s->module, true, false, false, false),
+        box_gpu_shadow_clear_create(gpu, s->module)
+    };
+    if (!box_gpu_render_pipelines_swap(current, next, 3)) {
+        goto done;
     }
 
     if (gpu->shadow_cutout_blend) {
@@ -588,9 +587,6 @@ static WGPURenderPipeline box_gpu_shadow_pipeline(
         gpu->shadow_cutout_blend = NULL;
     }
 
-    gpu->shadow = box_gpu_shadow_create(gpu, s->module, false, false, false, false);
-    gpu->shadow_cutout = box_gpu_shadow_create(gpu, s->module, true, false, false, false);
-    gpu->shadow_clear = box_gpu_shadow_clear_create(gpu, s->module);
     gpu->shadow_revision = s->revision;
 done:
     return s && s->module ? gpu->shadow : NULL;
@@ -603,8 +599,8 @@ done:
  * off and that variant compiled, else from the core variant, which discards.
  *
  * @param gpu The backend
- * @return The plain pipeline, NULL while no variant has a module; the alpha tested one is
- * gpu->shadow_point_cutout
+ * @return The plain pipeline, NULL while no variant has a module or the first ones are being
+ * created; the alpha tested one is gpu->shadow_point_cutout
  */
 static WGPURenderPipeline box_gpu_shadow_point_pipeline(
     box_gpu_t *gpu)
@@ -631,12 +627,14 @@ static WGPURenderPipeline box_gpu_shadow_point_pipeline(
         goto done;
     }
 
-    if (gpu->shadow_point) {
-        wgpuRenderPipelineRelease(gpu->shadow_point);
-    }
-
-    if (gpu->shadow_point_cutout) {
-        wgpuRenderPipelineRelease(gpu->shadow_point_cutout);
+    bool discard = handle == BOX_RENDER_SHADER_SHADOW;
+    WGPURenderPipeline *current[2] = { &gpu->shadow_point, &gpu->shadow_point_cutout };
+    WGPURenderPipeline next[2] = {
+        box_gpu_shadow_create(gpu, s->module, false, true, discard, false),
+        box_gpu_shadow_create(gpu, s->module, true, true, discard, false)
+    };
+    if (!box_gpu_render_pipelines_swap(current, next, 2)) {
+        goto done;
     }
 
     if (gpu->shadow_point_cutout_blend) {
@@ -644,13 +642,16 @@ static WGPURenderPipeline box_gpu_shadow_point_pipeline(
         gpu->shadow_point_cutout_blend = NULL;
     }
 
-    bool discard = handle == BOX_RENDER_SHADER_SHADOW;
-    gpu->shadow_point = box_gpu_shadow_create(gpu, s->module, false, true, discard, false);
-    gpu->shadow_point_cutout = box_gpu_shadow_create(gpu, s->module, true, true, discard, false);
     gpu->shadow_point_shader = handle;
     gpu->shadow_point_revision = s->revision;
 done:
     return s && s->module ? gpu->shadow_point : NULL;
+}
+
+bool box_gpu_shadow_ready(
+    box_gpu_t *gpu)
+{
+    return box_gpu_shadow_pipeline(gpu) != NULL;
 }
 
 /** Make the shadow map hold the cascades of a view at its resolution.

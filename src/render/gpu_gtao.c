@@ -395,7 +395,8 @@ WGPUTextureView box_gpu_gtao_white(
     return gpu->gtao->white_view;
 }
 
-/** Get the pipelines of Gtao, created again when the Gtao shader was recompiled.
+/** Get the pipelines of Gtao, created again when the Gtao shader was recompiled; the previous
+ * ones stay until every new one exists.
  *
  * @param gpu The backend
  * @return Whether every pipeline exists
@@ -407,15 +408,17 @@ static bool box_gpu_gtao_pipelines(
     box_gpu_shader_t *shader = ecs_map_get_deref(
         &gpu->shaders, box_gpu_shader_t, BOX_RENDER_SHADER_GTAO);
     WGPUShaderModule module = shader ? shader->module : NULL;
-    bool result = module != NULL && g->upsample != NULL;
+    WGPUComputePipeline next[BOX_GPU_GTAO_PASSES];
+    WGPUComputePipeline *current[BOX_GPU_GTAO_PASSES];
+    WGPURenderPipeline *upsample_current = &g->upsample, upsample;
     int32_t i;
     if (!module || (g->upsample && g->revision == shader->revision)) {
         goto done;
     }
 
-    box_gpu_gtao_pipelines_free(g);
     for (i = 0; i < BOX_GPU_GTAO_PASSES; i ++) {
-        g->pipelines[i] = box_gpu_compute_pipeline(gpu,
+        current[i] = &g->pipelines[i];
+        next[i] = box_gpu_compute_pipeline(gpu,
             &(WGPUComputePipelineDescriptor){
                 .layout = g->pipeline_layouts[i],
                 .compute = { .module = module,
@@ -433,21 +436,24 @@ static bool box_gpu_gtao_pipelines(
         .targetCount = 1,
         .targets = &target
     };
-    g->upsample = box_gpu_render_pipeline(gpu, &(WGPURenderPipelineDescriptor){
+    upsample = box_gpu_render_pipeline(gpu, &(WGPURenderPipelineDescriptor){
         .layout = g->upsample_pipeline_layout,
         .vertex = { .module = module, .entryPoint = { .data = "vs", .length = WGPU_STRLEN } },
         .primitive = { .topology = WGPUPrimitiveTopology_TriangleList },
         .multisample = { .count = 1, .mask = 0xFFFFFFFF },
         .fragment = &fragment
     });
-    g->revision = shader->revision;
-    result = g->upsample != NULL;
-    for (i = 0; i < BOX_GPU_GTAO_PASSES; i ++) {
-        result = result && g->pipelines[i];
+    if (!upsample) {
+        box_gpu_compute_pipelines_release(next, BOX_GPU_GTAO_PASSES);
+    } else if (box_gpu_compute_pipelines_swap(current, next, BOX_GPU_GTAO_PASSES)) {
+        box_gpu_render_pipelines_swap(&upsample_current, &upsample, 1);
+        g->revision = shader->revision;
+    } else {
+        wgpuRenderPipelineRelease(upsample);
     }
 
 done:
-    return result;
+    return module != NULL && g->upsample != NULL;
 }
 
 /** Create an R32Float image the Gtao passes write and read.

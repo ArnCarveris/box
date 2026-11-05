@@ -180,12 +180,12 @@ static void box_gpu_cull_pipeline_release(
     }
 }
 
-/** Create a compute pipeline of an entry point of the cull shader.
+/** Request a compute pipeline of an entry point of the cull shader.
  *
  * @param gpu The backend
  * @param module The cull shader
  * @param entry Name of the entry point
- * @return The pipeline
+ * @return The pipeline, NULL while it is created
  */
 static WGPUComputePipeline box_gpu_cull_pipeline(
     box_gpu_t *gpu,
@@ -283,7 +283,8 @@ void box_gpu_cull_fini(
     box_gpu_cull_release(&gpu->no_surfaces);
 }
 
-/** Get the cull pipelines, created again when the cull shader was recompiled.
+/** Get the cull pipelines, created again with the pyramid pipelines when the cull shader was
+ * recompiled; the previous ones stay until every new one exists.
  *
  * @param gpu The backend
  * @return Whether every cull pipeline exists
@@ -302,16 +303,18 @@ static bool box_gpu_cull_pipelines(
         goto done;
     }
 
-    box_gpu_cull_pipeline_release(&c->parallel);
-    box_gpu_cull_pipeline_release(&c->ordered);
-    box_gpu_cull_pipeline_release(&c->scan);
-    box_gpu_cull_pipeline_release(&c->write);
-    c->parallel = box_gpu_cull_pipeline(gpu, s->module, "cull_instances");
-    c->ordered = box_gpu_cull_pipeline(gpu, s->module, "cull_ordered");
-    c->scan = box_gpu_cull_pipeline(gpu, s->module, "cull_scan");
-    c->write = box_gpu_cull_pipeline(gpu, s->module, "cull_write");
-    box_gpu_hiz_pipelines(gpu, s->module);
-    c->revision = s->revision;
+    WGPUComputePipeline next[6] = {
+        box_gpu_cull_pipeline(gpu, s->module, "cull_instances"),
+        box_gpu_cull_pipeline(gpu, s->module, "cull_ordered"),
+        box_gpu_cull_pipeline(gpu, s->module, "cull_scan"),
+        box_gpu_cull_pipeline(gpu, s->module, "cull_write")
+    };
+    WGPUComputePipeline *current[6] = { &c->parallel, &c->ordered, &c->scan, &c->write };
+    box_gpu_hiz_pipelines(gpu, s->module, &next[4], &current[4]);
+    if (box_gpu_compute_pipelines_swap(current, next, 6)) {
+        c->revision = s->revision;
+    }
+
 done:
     return s && s->module && c->parallel && c->ordered && c->scan && c->write;
 }

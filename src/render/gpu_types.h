@@ -920,9 +920,20 @@ typedef struct box_gpu_t {
                                      *   without an environment */
     WGPUBuffer no_environment_sh;   /**< Zero SH uniform of views without an environment */
     ecs_vec_t captures;             /**< box_gpu_capture_t* whose readback is mapping */
+    struct box_gpu_pipelines_t *pipelines; /**< Render and compute pipelines created in the
+                                     *   background, created by the first request */
+    const char *pipeline_error;     /**< Error of the pipeline the last request found failed,
+                                     *   NULL when it did not fail, owned by the pipelines */
+    bool pipeline_wait;             /**< Requests of this packet wait for their pipeline: a
+                                     *   headless run or a packet that captures a target */
+    bool pipeline_quiet;            /**< Requests do not report a failure, which the forward
+                                     *   check reports as the error of its shader */
     bool lost;                      /**< The device was lost, the ring recreates it */
     bool lose;                      /**< box_render_gpu_lose_device asked to destroy it */
 } box_gpu_t;
+
+/** Render and compute pipelines of the backend and the workers that create them */
+typedef struct box_gpu_pipelines_t box_gpu_pipelines_t;
 
 /** Fields of the counters of the backend */
 typedef enum box_gpu_stat_t {

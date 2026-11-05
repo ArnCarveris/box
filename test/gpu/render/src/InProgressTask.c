@@ -1,8 +1,8 @@
 /**
  * @file InProgressTask.c
  * @brief The tasks the renderer reports in InProgressTask: shader compiles whose outcome did not
- * arrive block until every module and pipeline is ready, and a LightBake reports its probes as
- * a task that does not block.
+ * arrive and pipelines being created block until every module and pipeline is ready, while
+ * frames keep rendering, and a LightBake reports its probes as a task that does not block.
  */
 
 #include <box.h>
@@ -126,6 +126,84 @@ void InProgressTask_held_compile_blocks(void) {
     test_bool(ecs_get(world, blit, ShaderStatus)->ok, true);
 
     ecs_os_free(magenta);
+    ecs_fini(world);
+}
+
+void InProgressTask_held_pipeline_blocks(void) {
+    ecs_world_t *world = task_world();
+    const InProgressTask *t = NULL;
+    box_render_gpu_stats_t before, stats;
+    int32_t i, frames, building = 0;
+    for (i = 0; i < 20; i ++) {
+        t = task_frame(world);
+    }
+
+    test_assert(box_task_find(t, BOX_TASK_SHADERS) == NULL);
+    test_bool(box_render_gpu_stats(world, &before), true);
+    test_int(before.pipelines_building, 0);
+
+    test_bool(box_render_gpu_compile_delivery(world, BOX_RENDER_COMPILE_HOLD), true);
+    ecs_entity_t cube = ecs_new(world);
+    ecs_set(world, cube, Box, {1, 1, 1});
+    ecs_set(world, cube, Position, {1, 0, 0});
+    ecs_set(world, cube, Rgb, {0, 255, 0});
+    BlendMode blend = Additive;
+    ecs_set_ptr(world, cube, BlendMode, &blend);
+    frames = before.frames;
+    for (i = 0; i < 5; i ++) {
+        t = task_frame(world);
+        test_bool(box_render_gpu_stats(world, &stats), true);
+        test_assert(stats.frames > frames);
+        frames = stats.frames;
+        test_assert(stats.pipelines_building >= 1);
+        if (i == 0) {
+            building = stats.pipelines_building;
+            continue;
+        }
+
+        test_int(stats.pipelines_building, building);
+        test_int(stats.pipelines, before.pipelines);
+        const InProgressTaskItem *item = box_task_find(t, BOX_TASK_SHADERS);
+        test_assert(item != NULL);
+        test_bool(item->blocking, true);
+        test_assert(item->total >= 1);
+        test_assert(item->done < item->total);
+        test_assert(t->blocking >= 1);
+    }
+
+    test_bool(box_render_gpu_compile_delivery(world, BOX_RENDER_COMPILE_AT_ONCE), true);
+    for (i = 0; i < 10 && box_task_find(t, BOX_TASK_SHADERS); i ++) {
+        t = task_frame(world);
+    }
+
+    test_assert(box_task_find(t, BOX_TASK_SHADERS) == NULL);
+    test_bool(box_render_gpu_stats(world, &stats), true);
+    test_int(stats.pipelines_building, 0);
+    test_assert(stats.pipelines >= before.pipelines + building);
+    test_assert(stats.frames > frames);
+
+    ecs_fini(world);
+}
+
+void InProgressTask_fini_with_held_pipeline(void) {
+    ecs_world_t *world = task_world();
+    box_render_gpu_stats_t stats;
+    int32_t i;
+    for (i = 0; i < 20; i ++) {
+        task_frame(world);
+    }
+
+    test_bool(box_render_gpu_compile_delivery(world, BOX_RENDER_COMPILE_HOLD), true);
+    ecs_entity_t cube = ecs_new(world);
+    ecs_set(world, cube, Box, {1, 1, 1});
+    ecs_set(world, cube, Position, {-1, 0, 0});
+    BlendMode blend = Screen;
+    ecs_set_ptr(world, cube, BlendMode, &blend);
+    task_frame(world);
+    task_frame(world);
+    test_bool(box_render_gpu_stats(world, &stats), true);
+    test_assert(stats.pipelines_building >= 1);
+
     ecs_fini(world);
 }
 

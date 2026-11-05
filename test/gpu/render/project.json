@@ -839,6 +839,8 @@
                 "testcases": [
                     "first_frame_compiles",
                     "held_compile_blocks",
+                    "held_pipeline_blocks",
+                    "fini_with_held_pipeline",
                     "bake_reports_probes"
                 ]
             },

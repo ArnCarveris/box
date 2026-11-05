@@ -1313,6 +1313,8 @@ typedef struct box_render_packet_t {
     double time;            /**< World time at the end of the frame, in seconds */
     float delta;            /**< Seconds the frame advanced the world */
     float fps;              /**< Frame rate cap of the frame, App.fps, 0 when uncapped */
+    bool headless;          /**< App.headless: the frame waits for the pipelines it draws
+                             *   with, so its output does not depend on how long they take */
     bool vsync;             /**< A window target of the frame presents with vsync */
     float refresh;          /**< Refresh rate in Hz of the display of that window, 0 unknown */
     uint32_t anisotropy;    /**< Anisotropic samples of the texture samplers, 1 to 16 */

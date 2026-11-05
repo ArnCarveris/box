@@ -1194,109 +1194,81 @@ static WGPURenderPipeline box_gpu_prepass_create(
 }
 
 #ifndef __EMSCRIPTEN__
-/** Keep the error a scope around a pipeline creation caught, as one line: the causes wgpu
- * lists below its "Caused by:" line joined by ": ".
+/** Take a pipeline the forward check requested: release it, or keep the error of a pipeline
+ * that failed, or note that it is still being created.
  *
- * @param status Whether the scope was popped
- * @param type Kind of error, NoError when there was none
- * @param message Error text
- * @param userdata1 The char* that receives the error
- * @param userdata2 Unused
+ * @param gpu The backend
+ * @param pipeline The pipeline the request returned
+ * @param failed Receives the error of the first pipeline that failed
+ * @param building Set when the pipeline is still being created
  */
-static void box_gpu_forward_on_scope(
-    WGPUPopErrorScopeStatus status,
-    WGPUErrorType type,
-    WGPUStringView message,
-    void *userdata1,
-    void *userdata2)
+static void box_gpu_forward_check_take(
+    box_gpu_t *gpu,
+    WGPURenderPipeline pipeline,
+    const char **failed,
+    bool *building)
 {
-    ecs_strbuf_t buf = ECS_STRBUF_INIT;
-    const char *text = message.data ? message.data : "";
-    const char *end = text + (message.length == WGPU_STRLEN
-        ? ecs_os_strlen(text) : (ecs_size_t)message.length);
-    const char *line = text;
-    int32_t lines = 0;
-    (void)userdata2;
-    if (status != WGPUPopErrorScopeStatus_Success || type == WGPUErrorType_NoError) {
-        goto done;
+    if (pipeline) {
+        wgpuRenderPipelineRelease(pipeline);
+    } else if (gpu->pipeline_error) {
+        *failed = *failed ? *failed : gpu->pipeline_error;
+    } else {
+        *building = true;
     }
-
-    while (line < end) {
-        const char *next = memchr(line, '\n', (size_t)(end - line));
-        const char *stop = next ? next : end;
-        while (line < stop && (*line == ' ' || *line == '\t')) {
-            line ++;
-        }
-
-        bool skip = line == stop || !strncmp(line, "Validation Error", 16) ||
-            !strncmp(line, "Caused by:", 10) || !strncmp(line, "In wgpu", 7);
-        if (!skip) {
-            ecs_strbuf_append(&buf, "%s%.*s", lines ++ ? ": " : "", (int)(stop - line), line);
-        }
-
-        line = next ? next + 1 : end;
-    }
-
-    if (!lines) {
-        ecs_strbuf_appendstr(&buf, "the pipeline cannot be created");
-    }
-
-    *(char**)userdata1 = ecs_strbuf_get(&buf);
-done:
-    ecs_strbuf_reset(&buf);
 }
 #endif
 
-char* box_gpu_forward_check(
+bool box_gpu_forward_check(
     box_gpu_t *gpu,
     uint32_t handle,
-    WGPUShaderModule shader)
+    WGPUShaderModule shader,
+    char **error)
 {
-    char *result = NULL;
+    bool result = true;
+    *error = NULL;
 #ifndef __EMSCRIPTEN__
-    WGPURenderPipeline pipeline, others[5] = {NULL, NULL, NULL, NULL, NULL};
-    int32_t i;
+    const WGPUTextureFormat rgba = WGPUTextureFormat_RGBA8Unorm;
+    const char *failed = NULL;
+    bool building = false;
     if (!gpu->device || !gpu->mesh_layout) {
         goto done;
     }
 
-    wgpuDevicePushErrorScope(gpu->device, WGPUErrorFilter_Validation);
-    pipeline = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm, Opaque,
-        BackFaceCull, false, false, false, false, false, false, false);
+    gpu->pipeline_quiet = true;
+    box_gpu_forward_check_take(gpu, box_gpu_forward_create(gpu, handle, shader, rgba, Opaque,
+        BackFaceCull, false, false, false, false, false, false, false), &failed, &building);
     if (handle == BOX_RENDER_SHADER_MESH) {
-        others[0] = box_gpu_prepass_create(gpu, shader, BackFaceCull, false, false);
-        others[1] = box_gpu_prepass_create(gpu, shader, BackFaceCull, true, false);
-        others[2] = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm,
-            Opaque, BackFaceCull, false, false, false, false, false, true, false);
-        others[3] = box_gpu_prepass_create(gpu, shader, BackFaceCull, true, true);
-        others[4] = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm,
-            Opaque, BackFaceCull, true, false, false, false, false, true, false);
+        box_gpu_forward_check_take(gpu, box_gpu_prepass_create(gpu, shader, BackFaceCull,
+            false, false), &failed, &building);
+        box_gpu_forward_check_take(gpu, box_gpu_prepass_create(gpu, shader, BackFaceCull,
+            true, false), &failed, &building);
+        box_gpu_forward_check_take(gpu, box_gpu_forward_create(gpu, handle, shader, rgba,
+            Opaque, BackFaceCull, false, false, false, false, false, true, false),
+            &failed, &building);
+        box_gpu_forward_check_take(gpu, box_gpu_prepass_create(gpu, shader, BackFaceCull,
+            true, true), &failed, &building);
+        box_gpu_forward_check_take(gpu, box_gpu_forward_create(gpu, handle, shader, rgba,
+            Opaque, BackFaceCull, true, false, false, false, false, true, false),
+            &failed, &building);
     } else if (handle == BOX_RENDER_SHADER_SHAPE2D) {
-        others[0] = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm,
-            AlphaBlend, BackFaceCull, false, false, false, true, false, false, false);
-        others[2] = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm,
-            Opaque, BackFaceCull, false, false, false, false, true, false, false);
-        others[3] = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm,
-            Opaque, BackFaceCull, false, false, false, false, false, false, true);
-        others[4] = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm,
-            AlphaBlend, BackFaceCull, false, false, false, true, false, false, true);
+        box_gpu_forward_check_take(gpu, box_gpu_forward_create(gpu, handle, shader, rgba,
+            AlphaBlend, BackFaceCull, false, false, false, true, false, false, false),
+            &failed, &building);
+        box_gpu_forward_check_take(gpu, box_gpu_forward_create(gpu, handle, shader, rgba,
+            Opaque, BackFaceCull, false, false, false, false, true, false, false),
+            &failed, &building);
+        box_gpu_forward_check_take(gpu, box_gpu_forward_create(gpu, handle, shader, rgba,
+            Opaque, BackFaceCull, false, false, false, false, false, false, true),
+            &failed, &building);
+        box_gpu_forward_check_take(gpu, box_gpu_forward_create(gpu, handle, shader, rgba,
+            AlphaBlend, BackFaceCull, false, false, false, true, false, false, true),
+            &failed, &building);
     }
 
-    wgpuDevicePopErrorScope(gpu->device, (WGPUPopErrorScopeCallbackInfo){
-        .mode = WGPUCallbackMode_AllowSpontaneous,
-        .callback = box_gpu_forward_on_scope,
-        .userdata1 = &result
-    });
-    if (pipeline) {
-        wgpuRenderPipelineRelease(pipeline);
-    }
-
-    for (i = 0; i < 5; i ++) {
-        if (others[i]) {
-            wgpuRenderPipelineRelease(others[i]);
-        }
-    }
-
+    gpu->pipeline_quiet = false;
+    gpu->pipeline_error = NULL;
+    *error = failed ? ecs_os_strdup(failed) : NULL;
+    result = failed || !building;
 done:
 #else
     (void)gpu;
@@ -1388,14 +1360,16 @@ WGPURenderPipeline box_gpu_forward_pipeline(
         b->pipeline == BOX_RENDER_SHADER_SHAPE2D ? b->polygon : texture_blend,
         equal ? BOX_GPU_DEPTH_EQUAL : BOX_GPU_DEPTH_GREATER);
     cached = ecs_map_get(&gpu->forward, key);
-    if (cached) {
+    if (cached && *cached) {
         result = (WGPURenderPipeline)(uintptr_t)*cached;
         goto done;
     }
 
     result = box_gpu_forward_create(gpu, b->pipeline, shader, format, b->blend, b->back_face,
         b->cutout, b->transmissive, equal, b->box_shadow, b->slice, texture_blend, b->polygon);
-    ecs_map_insert_ptr(&gpu->forward, key, result);
+    if (result) {
+        *ecs_map_ensure(&gpu->forward, key) = (ecs_map_val_t)(uintptr_t)result;
+    }
 done:
     return result;
 }
@@ -1424,13 +1398,15 @@ static WGPURenderPipeline box_gpu_prepass_pipeline(
     key = box_gpu_forward_key(BOX_RENDER_SHADER_MESH, WGPUTextureFormat_Undefined, Opaque,
         b->back_face, b->cutout, false, texture_blend, BOX_GPU_DEPTH_PREPASS);
     cached = ecs_map_get(&gpu->forward, key);
-    if (cached) {
+    if (cached && *cached) {
         result = (WGPURenderPipeline)(uintptr_t)*cached;
         goto done;
     }
 
     result = box_gpu_prepass_create(gpu, shader, b->back_face, b->cutout, texture_blend);
-    ecs_map_insert_ptr(&gpu->forward, key, result);
+    if (result) {
+        *ecs_map_ensure(&gpu->forward, key) = (ecs_map_val_t)(uintptr_t)result;
+    }
 done:
     return result;
 }

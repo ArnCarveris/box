@@ -70,10 +70,11 @@ void box_gpu_scatter_fini(
     }
 }
 
-/** Get the scatter pipeline, created again when the scatter shader was recompiled.
+/** Get the scatter pipeline, created again when the scatter shader was recompiled; the
+ * previous one stays until the new one exists.
  *
  * @param gpu The backend
- * @return The pipeline, NULL while the shader has no module
+ * @return The pipeline, NULL while the shader has no module or the first one is created
  */
 static WGPUComputePipeline box_gpu_scatter_pipeline(
     box_gpu_t *gpu)
@@ -88,10 +89,6 @@ static WGPUComputePipeline box_gpu_scatter_pipeline(
         goto done;
     }
 
-    if (gpu->scatter) {
-        wgpuComputePipelineRelease(gpu->scatter);
-    }
-
     WGPUComputePipelineDescriptor desc = {
         .layout = gpu->scatter_pipeline_layout,
         .compute = {
@@ -99,8 +96,12 @@ static WGPUComputePipeline box_gpu_scatter_pipeline(
             .entryPoint = { .data = "main", .length = WGPU_STRLEN }
         }
     };
-    gpu->scatter = box_gpu_compute_pipeline(gpu, &desc);
-    gpu->scatter_revision = s->revision;
+    WGPUComputePipeline *current = &gpu->scatter;
+    WGPUComputePipeline next = box_gpu_compute_pipeline(gpu, &desc);
+    if (box_gpu_compute_pipelines_swap(&current, &next, 1)) {
+        gpu->scatter_revision = s->revision;
+    }
+
 done:
     return s && s->module ? gpu->scatter : NULL;
 }

@@ -553,10 +553,11 @@ static WGPUBuffer box_gpu_cluster_buffer(
     return c->buffer;
 }
 
-/** Get the cluster pipeline, created again when the cluster shader was recompiled.
+/** Get the cluster pipeline, created again when the cluster shader was recompiled; the
+ * previous one stays until the new one exists.
  *
  * @param gpu The backend
- * @return The pipeline, NULL while the shader has no module
+ * @return The pipeline, NULL while the shader has no module or the first one is created
  */
 static WGPUComputePipeline box_gpu_cluster_pipeline(
     box_gpu_t *gpu)
@@ -571,10 +572,6 @@ static WGPUComputePipeline box_gpu_cluster_pipeline(
         goto done;
     }
 
-    if (gpu->cluster) {
-        wgpuComputePipelineRelease(gpu->cluster);
-    }
-
     WGPUComputePipelineDescriptor desc = {
         .layout = gpu->cluster_pipeline_layout,
         .compute = {
@@ -582,8 +579,12 @@ static WGPUComputePipeline box_gpu_cluster_pipeline(
             .entryPoint = { .data = "main", .length = WGPU_STRLEN }
         }
     };
-    gpu->cluster = box_gpu_compute_pipeline(gpu, &desc);
-    gpu->cluster_revision = s->revision;
+    WGPUComputePipeline *current = &gpu->cluster;
+    WGPUComputePipeline next = box_gpu_compute_pipeline(gpu, &desc);
+    if (box_gpu_compute_pipelines_swap(&current, &next, 1)) {
+        gpu->cluster_revision = s->revision;
+    }
+
 done:
     return s && s->module ? gpu->cluster : NULL;
 }

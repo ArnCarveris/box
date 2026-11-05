@@ -544,7 +544,8 @@ done:
     return;
 }
 
-/** Get the pipelines of the passes, created again when the atmosphere shader was recompiled.
+/** Get the pipelines of the passes, created again when the atmosphere shader was recompiled;
+ * the previous ones stay until every new one exists.
  *
  * @param gpu The backend
  * @param a The atmosphere state
@@ -562,13 +563,12 @@ static bool box_gpu_atmos_pipelines(
         goto done;
     }
 
-    if (a->revision != s->revision) {
+    if (a->revision != s->revision || !a->pipelines[0]) {
+        WGPUComputePipeline next[BOX_RENDER_ATMOS_PASSES];
+        WGPUComputePipeline *current[BOX_RENDER_ATMOS_PASSES];
         for (i = 0; i < BOX_RENDER_ATMOS_PASSES; i ++) {
-            if (a->pipelines[i]) {
-                wgpuComputePipelineRelease(a->pipelines[i]);
-            }
-
-            a->pipelines[i] = box_gpu_compute_pipeline(gpu,
+            current[i] = &a->pipelines[i];
+            next[i] = box_gpu_compute_pipeline(gpu,
                 &(WGPUComputePipelineDescriptor){
                     .layout = a->pipeline_layouts[i],
                     .compute = {
@@ -578,7 +578,9 @@ static bool box_gpu_atmos_pipelines(
                 });
         }
 
-        a->revision = s->revision;
+        if (box_gpu_compute_pipelines_swap(current, next, BOX_RENDER_ATMOS_PASSES)) {
+            a->revision = s->revision;
+        }
     }
 
     result = true;
@@ -1321,10 +1323,13 @@ static WGPURenderPipeline box_gpu_atmos_sky_pipeline(
         .multisample = { .count = 1, .mask = 0xFFFFFFFF },
         .fragment = &fragment
     });
-    *ecs_vec_append_t(NULL, &a->sky_pipelines, box_gpu_blit_t) = (box_gpu_blit_t){
-        .format = format,
-        .pipeline = result
-    };
+    if (result) {
+        *ecs_vec_append_t(NULL, &a->sky_pipelines, box_gpu_blit_t) = (box_gpu_blit_t){
+            .format = format,
+            .pipeline = result
+        };
+    }
+
 done:
     return result;
 }

@@ -50,25 +50,103 @@ WGPUComputePassEncoder box_gpu_compute_begin(
     WGPUCommandEncoder encoder,
     const WGPUPassTimestampWrites *writes);
 
-/** Create a render pipeline, counted in the stats while it is created and once it exists.
+/** Request a render pipeline, created in the background and counted in the stats while it is
+ * created and once it exists.
+ *
+ * The first request of a descriptor starts the creation; requests with the same descriptor get
+ * NULL until its outcome is delivered at the start of a packet, then a reference of the
+ * pipeline, and NULL again after it failed. A headless run or a packet that captures creates
+ * it during the request, unless box_render_gpu_compile_delivery holds the outcomes.
  *
  * @param gpu The backend
  * @param desc The pipeline
- * @return The pipeline
+ * @return A reference the caller releases, NULL while the pipeline is created or when it failed
  */
 WGPURenderPipeline box_gpu_render_pipeline(
     box_gpu_t *gpu,
     const WGPURenderPipelineDescriptor *desc);
 
-/** Create a compute pipeline, counted in the stats while it is created and once it exists.
+/** Request a compute pipeline, created in the background like box_gpu_render_pipeline.
  *
  * @param gpu The backend
  * @param desc The pipeline
- * @return The pipeline
+ * @return A reference the caller releases, NULL while the pipeline is created or when it failed
  */
 WGPUComputePipeline box_gpu_compute_pipeline(
     box_gpu_t *gpu,
     const WGPUComputePipelineDescriptor *desc);
+
+/** Replace a group of render pipelines once every pipeline that replaces them was created, so
+ * the group keeps its previous pipelines until then and when one of them failed.
+ *
+ * @param current The pipelines of the group, released and replaced when every next one exists
+ * @param next The pipelines that replace them, released when one is NULL, set to NULL
+ * @param count Pipelines of the group
+ * @return Whether the group was replaced
+ */
+bool box_gpu_render_pipelines_swap(
+    WGPURenderPipeline *const *current,
+    WGPURenderPipeline *next,
+    int32_t count);
+
+/** Replace a group of compute pipelines like box_gpu_render_pipelines_swap.
+ *
+ * @param current The pipelines of the group, released and replaced when every next one exists
+ * @param next The pipelines that replace them, released when one is NULL, set to NULL
+ * @param count Pipelines of the group
+ * @return Whether the group was replaced
+ */
+bool box_gpu_compute_pipelines_swap(
+    WGPUComputePipeline *const *current,
+    WGPUComputePipeline *next,
+    int32_t count);
+
+/** Release requested compute pipelines that are not used, the ones that are not NULL.
+ *
+ * @param pipelines The pipelines, set to NULL
+ * @param count Pipelines
+ */
+void box_gpu_compute_pipelines_release(
+    WGPUComputePipeline *pipelines,
+    int32_t count);
+
+/** Deliver the pipelines whose creation finished, unless box_render_gpu_compile_delivery holds
+ * them, at the start of a packet. A packet that waits for its pipelines (headless or with a
+ * capture) first waits for the creations in progress.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_pipelines_deliver(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Stop the workers and release every pipeline; the browser frees the ones it still creates
+ * when their outcome arrives.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_pipelines_fini(
+    box_gpu_t *gpu);
+
+/** Take a device error the pipeline creation that runs on this thread reported.
+ *
+ * @param message Error text
+ * @return Whether a pipeline creation runs on this thread and took the error
+ */
+bool box_gpu_pipeline_capture(
+    WGPUStringView message);
+
+/** Format a wgpu validation error as one line: the causes it lists below its "Caused by:"
+ * line, joined by ": ".
+ *
+ * @param text The error
+ * @param length Bytes of the error
+ * @return The line, which the caller frees
+ */
+char* box_gpu_pipeline_message(
+    const char *text,
+    int32_t length);
 
 /** Add the pending counters to the counters the main thread reads, under the lock once.
  *
@@ -138,7 +216,8 @@ WGPUShaderModule box_gpu_shader_get(
     box_gpu_t *gpu,
     uint32_t handle);
 
-/** Finish the compiles whose outcome box_render_gpu_compile_delivery held.
+/** Finish the compiles whose outcome box_render_gpu_compile_delivery held and those whose
+ * forward check finished.
  *
  * @param gpu The backend
  */
@@ -388,14 +467,18 @@ const box_gpu_reflect_t* box_gpu_reflect_of(
     box_gpu_t *gpu,
     const box_render_view_t *v);
 
-/** Create the store, mip and prefilter pipelines from the module of the bake shader.
+/** Request the store, mip and prefilter pipelines from the module of the bake shader.
  *
  * @param gpu The backend
  * @param module The module
+ * @param next Receives the store, mip and prefilter pipelines, NULL while one is created
+ * @param current Receives the fields they replace
  */
 void box_gpu_reflect_pipelines(
     box_gpu_t *gpu,
-    WGPUShaderModule module);
+    WGPUShaderModule module,
+    WGPUComputePipeline *next,
+    WGPUComputePipeline **current);
 
 /** Create a cube array and its views: the slots of a scene with mips down to
  * BOX_GPU_REFLECT_MIN_MIP texels and their SH, or source cubes with a full mip chain.
@@ -533,7 +616,7 @@ void box_gpu_bake_capture(
  * @param equal Whether the pipeline draws after a depth prepass: compare Equal without depth
  * writes and, alpha tested, without discarding, for the opaque meshes of a lit view; false for
  * the compare Greater with depth writes of the other draws, unlit views and the captures
- * @return The pipeline, NULL without a shader or for an unknown blend mode
+ * @return The pipeline, NULL without a shader, for an unknown blend mode or while it is created
  */
 WGPURenderPipeline box_gpu_forward_pipeline(
     box_gpu_t *gpu,
@@ -566,25 +649,28 @@ void box_gpu_draw_fini(
 void box_gpu_forward_reset(
     box_gpu_t *gpu);
 
-/** Create a forward pipeline from a mesh or 2D shape module inside an error scope, to find out
- * whether the module fits the pipeline layout before it replaces the module that renders. A
- * mesh module also creates the depth prepass and the texture_blend pipelines (fs_blend and
+/** Check whether a mesh or 2D shape module fits the pipeline layout before it replaces the
+ * module that renders, by requesting its forward pipelines. A
+ * mesh module also requests the depth prepass and the texture_blend pipelines (fs_blend and
  * fs_depth_cutout_blend) and a
  * 2D shape module the shadow, slice and polygon pipelines (fs_shadow, fs_slice, fs_polygon,
  * fs_shadow_polygon and the polygon override constant), so they need their entry points.
  *
- * wgpu-native reports the scope at once; the browser reports it later, so there the check
- * passes and an invalid pipeline shows as a device error.
+ * The pipelines are created in the background, so the check is asked again each packet until
+ * every one of them exists or one failed. The browser does not check: an invalid pipeline shows
+ * as a failed pipeline there.
  *
  * @param gpu The backend
  * @param handle Handle of the shader
  * @param shader The module
- * @return NULL when the pipeline is valid, else the error, which the caller frees
+ * @param error Receives NULL when the pipelines are valid, else the error, which the caller frees
+ * @return Whether the check finished, false while a pipeline is created
  */
-char* box_gpu_forward_check(
+bool box_gpu_forward_check(
     box_gpu_t *gpu,
     uint32_t handle,
-    WGPUShaderModule shader);
+    WGPUShaderModule shader,
+    char **error);
 
 /** Create or release a mesh from a BOX_RENDER_MESH resource.
  *
@@ -953,6 +1039,14 @@ WGPUTextureView box_gpu_shadow_capture(
     const box_render_packet_t *packet,
     int32_t slot,
     const box_render_cascade_t *cascade);
+
+/** Check whether the shadow pipelines of the cascades exist, created on first use.
+ *
+ * @param gpu The backend
+ * @return Whether box_gpu_shadow_capture renders casters
+ */
+bool box_gpu_shadow_ready(
+    box_gpu_t *gpu);
 
 /** Get the shadow map a view samples.
  *
@@ -1929,14 +2023,18 @@ void box_gpu_hiz_init(
 void box_gpu_hiz_fini(
     box_gpu_t *gpu);
 
-/** Create the pyramid pipelines from the module of the cull shader.
+/** Request the pyramid pipelines from the module of the cull shader.
  *
  * @param gpu The backend
  * @param module The cull shader
+ * @param next Receives the first and reduce pipelines, NULL while one is created
+ * @param current Receives the fields they replace
  */
 void box_gpu_hiz_pipelines(
     box_gpu_t *gpu,
-    WGPUShaderModule module);
+    WGPUShaderModule module,
+    WGPUComputePipeline *next,
+    WGPUComputePipeline **current);
 
 /** Get the pyramid of a render size, created on first use.
  *
