@@ -345,7 +345,10 @@ static uint64_t drift_hash(
 
 /** At their defaults, and with a drift that clamps to 0, drift and free_phase leave a patch
  * bit identical: a mono patch with an LFO, a filter envelope and phase modulation, a wide
- * unison patch through a filter and a pluck. */
+ * unison patch through a filter and a pluck.
+ *
+ * free_phase moves the mono patch only: unison voices, subs included, and strings start as
+ * they did. */
 void SynthDrift_defaults_identical(void) {
     // audio/synth
     box_audio_synth_patch_t p = drift_sine(0, 0.3f), q;
@@ -386,7 +389,7 @@ void SynthDrift_defaults_identical(void) {
         test_assert(drift_hash(&p) != drift_hash(&q));
         q = p;
         q.free_phase = 1;
-        test_assert(drift_hash(&p) != drift_hash(&q) || pass == 2);
+        test_assert((drift_hash(&p) != drift_hash(&q)) == (pass == 0));
     }
 }
 
@@ -398,12 +401,50 @@ void SynthDrift_clamped(void) {
     test_assert(drift_hash(&p) == drift_hash(&q));
 }
 
+/** Hz of a tone with harmonics from the lag in 100..400 frames at which it best matches
+ * itself, refined by a parabola through its neighbours.
+ *
+ * @param x Samples
+ * @param from First frame
+ * @param to End frame, over 400 frames past from
+ * @return The Hz
+ */
+static double drift_period_frequency(
+    const float *x,
+    int32_t from,
+    int32_t to)
+{
+    double score[401] = {0}, a, b, c, lag;
+    int32_t best = 100, k, i;
+    for (k = 100; k <= 400; k ++) {
+        double sum = 0, energy = 0;
+        for (i = from; i < to - k; i ++) {
+            sum += (double)x[i] * (double)x[i + k];
+            energy += (double)x[i + k] * (double)x[i + k] + (double)x[i] * (double)x[i];
+        }
+
+        score[k] = energy > 0 ? 2 * sum / energy : 0;
+        best = score[k] > score[best] ? k : best;
+    }
+
+    lag = best;
+    if (best > 100 && best < 400) {
+        a = score[best - 1];
+        b = score[best];
+        c = score[best + 1];
+        lag += a - 2 * b + c != 0 ? 0.5 * (a - c) / (a - 2 * b + c) : 0;
+    }
+
+    return AUDIO_RATE / lag;
+}
+
 /** A pluck string follows the drift as it follows vibrato: it renders otherwise than without,
  * its pitch stays near that of the string, and it ends. */
 void SynthDrift_pluck_follows(void) {
     // audio/synth
     box_audio_core_t *core = audio_new();
     box_audio_synth_patch_t p = drift_sine(0, 0);
+    uint64_t steady;
     double f;
     int32_t i;
     p.envelope = (box_audio_synth_envelope_t){0};
@@ -413,10 +454,10 @@ void SynthDrift_pluck_follows(void) {
     p.drift = 40;
     drift_define(core, 2, &p);
     drift_render(core, 1, 1, AUDIO_FRAMES);
-    memcpy(drift_r, drift_l, AUDIO_FRAMES * sizeof(float));
+    steady = audio_hash(drift_l, AUDIO_FRAMES);
     drift_render(core, 2, 2, AUDIO_FRAMES);
-    test_assert(memcmp(drift_l, drift_r, AUDIO_FRAMES * sizeof(float)) != 0);
-    f = audio_frequency(drift_l, 4800, 24000);
+    test_assert(audio_hash(drift_l, AUDIO_FRAMES) != steady);
+    f = drift_period_frequency(drift_l, 4800, 24000);
     test_assert(fabs(1200 * log2(f / 200)) < 40 + 10);
     for (i = 0; i < 4; i ++) {
         audio_render(core, 0, AUDIO_FRAMES);
