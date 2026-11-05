@@ -1381,3 +1381,317 @@ void Sequencer_audio_command(void) {
     ecs_os_free(out);
     ecs_fini(world);
 }
+
+/** Set the swing and the humanize of a track.
+ *
+ * @param world The world
+ * @param track The track
+ * @param swing The swing
+ * @param grid The grid of the swing
+ * @param timing Milliseconds of the humanized timing
+ * @param velocity Share of the humanized velocity
+ */
+static void seq_groove(
+    ecs_world_t *world,
+    ecs_entity_t track,
+    float swing,
+    TrackSwingGrid grid,
+    float timing,
+    float velocity)
+{
+    Track *tk = ecs_ensure(world, track, Track);
+    tk->swing = swing;
+    tk->swing_grid = grid;
+    tk->humanize.timing = timing;
+    tk->humanize.velocity = velocity;
+    ecs_modified(world, track, Track);
+}
+
+/** Find the frames at which the tap rises from silence in a range.
+ *
+ * @param from First frame, after the first frame of the tap
+ * @param to End frame
+ * @param frames Receives the frames
+ * @param max Most frames to receive
+ * @return Number of rises, which may be more than max
+ */
+static int32_t seq_onsets(
+    int64_t from,
+    int64_t to,
+    int64_t *frames,
+    int32_t max)
+{
+    int32_t result = 0;
+    int64_t i;
+    bool prev = audio_tap_l[from - 1] != 0.0f || audio_tap_r[from - 1] != 0.0f;
+    for (i = from; i < to; i ++) {
+        bool on = audio_tap_l[i] != 0.0f || audio_tap_r[i] != 0.0f;
+        if (on && !prev) {
+            if (result < max) {
+                frames[result] = i;
+            }
+
+            result ++;
+        }
+
+        prev = on;
+    }
+
+    return result;
+}
+
+/** Eighths at a swing of 0.5 put the off-beats a quarter beat late and leave the downbeats
+ * alone, a note keeps its duration, and a placement that starts on an off-beat swings as the
+ * timeline does. */
+void Sequencer_swing_eighths(void) {
+    // audio/sequencer
+    ecs_world_t *world = audio_world();
+    ecs_entity_t inst = seq_sampler(world, SEQ_LEVEL);
+    Note notes[8];
+    ecs_entity_t clip, track = seq_track(world, inst);
+    int64_t c0, at;
+    int32_t i;
+    for (i = 0; i < 8; i ++) {
+        notes[i] = (Note){ .start = 0.5f * (float)i, .duration = 0.125f, .pitch = 60,
+            .velocity = 1 };
+    }
+
+    clip = seq_clip(world, 4, notes, 8);
+    seq_groove(world, track, 0.5f, TrackSwing8, 0, 0);
+    seq_place(world, track, clip, 0, 0, false, 0);
+    seq_place(world, track, clip, 4.5, 1, false, 0);
+    audio_run(world, 2);
+    c0 = seq_play(world, true);
+    seq_run_to(world, c0 + 6 * SEQ_BEAT);
+    for (i = 0; i < 8; i ++) {
+        at = c0 + (i / 2) * SEQ_BEAT + (i % 2 ? SEQ_BEAT * 3 / 4 : 0);
+        seq_note(at, at + SEQ_BEAT / 8, SEQ_LEVEL);
+    }
+
+    at = c0 + 4 * SEQ_BEAT + SEQ_BEAT * 3 / 4;
+    seq_note(at, at + SEQ_BEAT / 8, SEQ_LEVEL);
+    seq_note(c0 + 5 * SEQ_BEAT, c0 + 5 * SEQ_BEAT + SEQ_BEAT / 8, SEQ_LEVEL);
+    test_int(seq_onsets(c0, c0 + 6 * SEQ_BEAT, NULL, 0), 10);
+    test_int(box_audio_module_get(world)->sequencer.stats.notes, 10);
+    ecs_fini(world);
+}
+
+/** A grid of sixteenths swings the sixteenths: at 0.5 the off-steps are an eighth of a beat
+ * late, the eighths stay put, also in a placement that starts on an off-step. */
+void Sequencer_swing_sixteenths(void) {
+    // audio/sequencer
+    ecs_world_t *world = audio_world();
+    ecs_entity_t inst = seq_sampler(world, SEQ_LEVEL);
+    Note notes[4];
+    ecs_entity_t clip, track = seq_track(world, inst);
+    int64_t c0, at;
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        notes[i] = (Note){ .start = 0.25f * (float)i, .duration = 0.0625f, .pitch = 60,
+            .velocity = 1 };
+    }
+
+    clip = seq_clip(world, 1, notes, 4);
+    seq_groove(world, track, 0.5f, TrackSwing16, 0, 0);
+    seq_place(world, track, clip, 0, 0, false, 0);
+    seq_place(world, track, clip, 1.25, 0.5, false, 0);
+    audio_run(world, 2);
+    c0 = seq_play(world, true);
+    seq_run_to(world, c0 + 3 * SEQ_BEAT);
+    for (i = 0; i < 4; i ++) {
+        at = c0 + i * SEQ_BEAT / 4 + (i % 2 ? SEQ_BEAT / 8 : 0);
+        seq_note(at, at + SEQ_BEAT / 16, SEQ_LEVEL);
+    }
+
+    at = c0 + SEQ_BEAT + SEQ_BEAT * 3 / 8;
+    seq_note(at, at + SEQ_BEAT / 16, SEQ_LEVEL);
+    at = c0 + SEQ_BEAT + SEQ_BEAT / 2;
+    seq_note(at, at + SEQ_BEAT / 16, SEQ_LEVEL);
+    test_int(seq_onsets(c0, c0 + 3 * SEQ_BEAT, NULL, 0), 6);
+    ecs_fini(world);
+}
+
+/** Play a clip of an eighth note on every half beat that loops over 8 beats on a track with a
+ * humanized timing and velocity, and get the frames of the note starts and their levels.
+ *
+ * @param timing Milliseconds of the timing
+ * @param velocity Share of the velocity
+ * @param frames Receives the 16 frames, relative to the start of the transport
+ * @param levels Receives the 16 levels at the starts
+ */
+static void seq_humanized(
+    float timing,
+    float velocity,
+    int64_t *frames,
+    float *levels)
+{
+    ecs_world_t *world = audio_world();
+    ecs_entity_t inst = seq_sampler(world, SEQ_LEVEL);
+    Note notes[] = {
+        { .start = 0, .duration = 0.125f, .pitch = 60, .velocity = 0.8f },
+        { .start = 0.5f, .duration = 0.125f, .pitch = 60, .velocity = 0.8f }
+    };
+    ecs_entity_t clip = seq_clip(world, 1, notes, 2);
+    ecs_entity_t track = seq_track(world, inst);
+    int64_t c0;
+    int32_t i;
+    seq_groove(world, track, 0, TrackSwing8, timing, velocity);
+    seq_place(world, track, clip, 0, 8, true, 0);
+    audio_run(world, 2);
+    c0 = seq_play(world, true);
+    seq_run_to(world, c0 + 9 * SEQ_BEAT);
+    test_int(seq_onsets(c0, c0 + 9 * SEQ_BEAT, frames, 16), 16);
+    for (i = 0; i < 16; i ++) {
+        levels[i] = audio_tap_l[frames[i]];
+        frames[i] -= c0;
+    }
+
+    ecs_fini(world);
+}
+
+/** A humanized timing of 10 ms keeps every start within 10 ms of its beat, never before the
+ * transport started, the same over two runs, and differs between the passes of a loop. */
+void Sequencer_humanize_timing(void) {
+    // audio/sequencer
+    int64_t a[16], b[16], shift;
+    float la[16], lb[16];
+    int32_t i, moved = 0, differ = 0;
+    seq_humanized(10, 0, a, la);
+    seq_humanized(10, 0, b, lb);
+    for (i = 0; i < 16; i ++) {
+        test_int(a[i], b[i]);
+        shift = a[i] - i * SEQ_BEAT / 2;
+        test_assert(shift >= -AUDIO_RATE / 100 - 1 && shift <= AUDIO_RATE / 100 + 1);
+        test_assert(a[i] >= 0);
+        test_flt(la[i], SEQ_LEVEL * 0.8f);
+        moved += shift != 0;
+        if (i >= 2) {
+            differ += shift != a[i - 2] - (i - 2) * SEQ_BEAT / 2;
+        }
+    }
+
+    test_assert(moved >= 8);
+    test_assert(differ >= 7);
+}
+
+/** A humanized velocity of 0.5 changes the velocities within half of them either way, at
+ * random, and leaves the starts on their beats. */
+void Sequencer_humanize_velocity(void) {
+    // audio/sequencer
+    int64_t frames[16];
+    float levels[16], share, lo = 1, hi = 0;
+    int32_t i;
+    seq_humanized(0, 0.5f, frames, levels);
+    for (i = 0; i < 16; i ++) {
+        test_int(frames[i], i * SEQ_BEAT / 2);
+        share = levels[i] / (SEQ_LEVEL * 0.8f) - 1;
+        test_assert(share >= -0.5f - 1e-4f && share <= 0.5f + 1e-4f);
+        lo = share < lo ? share : lo;
+        hi = share > hi ? share : hi;
+    }
+
+    test_assert(hi - lo > 0.2f);
+}
+
+/** Play notes off and on the grid on a track and capture the tap.
+ *
+ * @param grid The grid of the swing, which a swing of 0 ignores
+ * @param set Whether to set the swing and the humanize of the track to 0, else leave the
+ * Track as seq_track sets it
+ * @param tap Receives the first 4 beats of the tap from the start of the transport
+ */
+static void seq_ungrooved(
+    TrackSwingGrid grid,
+    bool set,
+    float *tap)
+{
+    ecs_world_t *world = audio_world();
+    ecs_entity_t inst = seq_sampler(world, SEQ_LEVEL);
+    Note notes[] = {
+        { .start = 0, .duration = 0.25f, .pitch = 60, .velocity = 1 },
+        { .start = 0.5f, .duration = 0.25f, .pitch = 60, .velocity = 0.7f },
+        { .start = 1.25f, .duration = 0.25f, .pitch = 60, .velocity = 1 },
+        { .start = 1.75f, .duration = 0.125f, .pitch = 60, .velocity = 0.3f }
+    };
+    ecs_entity_t clip = seq_clip(world, 2, notes, 4);
+    ecs_entity_t track = seq_track(world, inst);
+    int64_t c0;
+    if (set) {
+        seq_groove(world, track, 0, grid, 0, 0);
+    }
+
+    seq_place(world, track, clip, 0.1, 4, true, 0);
+    audio_run(world, 2);
+    c0 = seq_play(world, true);
+    seq_run_to(world, c0 + 4 * SEQ_BEAT);
+    memcpy(tap, &audio_tap_l[c0], sizeof(float) * 4 * SEQ_BEAT);
+    seq_note(c0 + llround(0.1 * SEQ_BEAT), c0 + llround(0.35 * SEQ_BEAT), SEQ_LEVEL);
+    seq_note(c0 + llround(0.6 * SEQ_BEAT), c0 + llround(0.85 * SEQ_BEAT), SEQ_LEVEL * 0.7f);
+    seq_note(c0 + llround(1.35 * SEQ_BEAT), c0 + llround(1.6 * SEQ_BEAT), SEQ_LEVEL);
+    seq_note(c0 + llround(2.1 * SEQ_BEAT), c0 + llround(2.35 * SEQ_BEAT), SEQ_LEVEL);
+    test_int(box_audio_module_get(world)->sequencer.stats.visits > 0, 1);
+    ecs_fini(world);
+}
+
+/** A swing of 0 and a humanize of 0 play bit identical to a track without them, on the exact
+ * frames of the beats. */
+void Sequencer_groove_zero(void) {
+    // audio/sequencer
+    float *a = ecs_os_malloc_n(float, 4 * SEQ_BEAT);
+    float *b = ecs_os_malloc_n(float, 4 * SEQ_BEAT);
+    float *c = ecs_os_malloc_n(float, 4 * SEQ_BEAT);
+    seq_ungrooved(TrackSwing8, false, a);
+    seq_ungrooved(TrackSwing8, true, b);
+    seq_ungrooved(TrackSwing16, true, c);
+    test_assert(!memcmp(a, b, sizeof(float) * 4 * SEQ_BEAT));
+    test_assert(!memcmp(a, c, sizeof(float) * 4 * SEQ_BEAT));
+    ecs_os_free(a);
+    ecs_os_free(b);
+    ecs_os_free(c);
+}
+
+/** A transport that loops over 2 beats plays every note of a swung and humanized track once
+ * per pass: none lost at the wrap, none doubled, each near its swung beat. */
+void Sequencer_groove_transport_loop(void) {
+    // audio/sequencer
+    ecs_world_t *world = audio_world();
+    ecs_entity_t inst = seq_sampler(world, SEQ_LEVEL);
+    Note notes[] = {
+        { .start = 0, .duration = 0.125f, .pitch = 60, .velocity = 1 },
+        { .start = 0.5f, .duration = 0.125f, .pitch = 60, .velocity = 1 },
+        { .start = 1, .duration = 0.125f, .pitch = 60, .velocity = 1 },
+        { .start = 1.5f, .duration = 0.125f, .pitch = 60, .velocity = 1 }
+    };
+    int64_t swung[] = { 0, SEQ_BEAT * 3 / 4, SEQ_BEAT, SEQ_BEAT * 7 / 4 };
+    ecs_entity_t clip = seq_clip(world, 2, notes, 4);
+    ecs_entity_t track = seq_track(world, inst);
+    Transport *tr;
+    int64_t c0, frames[16], at;
+    int32_t i;
+    float level;
+    seq_groove(world, track, 0.5f, TrackSwing8, 10, 0.2f);
+    seq_place(world, track, clip, 0, 0, false, 0);
+    tr = ecs_singleton_ensure(world, Transport);
+    tr->loop = true;
+    tr->loop_start = 0;
+    tr->loop_end = 2;
+    ecs_singleton_modified(world, Transport);
+    audio_run(world, 2);
+    c0 = seq_play(world, true);
+    seq_run_to(world, c0 + 8 * SEQ_BEAT);
+    test_int(seq_onsets(c0, c0 + 8 * SEQ_BEAT - SEQ_BEAT / 8, frames, 16), 16);
+    for (i = 0; i < 16; i ++) {
+        at = c0 + (i / 4) * 2 * SEQ_BEAT + swung[i % 4];
+        test_assert(frames[i] >= at - AUDIO_RATE / 100 - 1);
+        test_assert(frames[i] <= at + AUDIO_RATE / 100 + 1);
+        if (i % 4 == 0) {
+            test_assert(frames[i] >= at);
+        }
+
+        level = audio_tap_l[frames[i]];
+        test_assert(level >= SEQ_LEVEL * 0.8f - 1e-4f);
+        test_assert(level <= SEQ_LEVEL + 1e-4f);
+    }
+
+    ecs_fini(world);
+}

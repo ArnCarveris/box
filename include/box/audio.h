@@ -780,6 +780,23 @@ ECS_STRUCT(AudioClip, {
                             *   the clip, and of a placement of duration 0 */
 });
 
+/** The grid a Track swings */
+ECS_ENUM(TrackSwingGrid, {
+    TrackSwing8 = 0,        /**< Eighths, a step of 0.5 beat */
+    TrackSwing16 = 1        /**< Sixteenths, a step of 0.25 beat */
+});
+
+/** How far the notes of a Track move at random from where they are programmed. The jitter is
+ * seeded from the track, the placement, the pass of the clip and the note, so a render is
+ * deterministic and every pass of a looping clip differs.
+ */
+ECS_STRUCT(TrackHumanize, {
+    float timing;          /**< Milliseconds, 0..50, default 0: the most a note start moves
+                            *   either way */
+    float velocity;        /**< Share, 0..1, default 0: the most the velocity changes either
+                            *   way, relative, clamped to 0..1 */
+});
+
 /** A track of the timeline: a mixer channel whose notes play on an instrument. It brings an
  * AudioBus (the With trait), so it has a volume, a pan, a mute, an output and sends, and its
  * notes play on its own bus.
@@ -789,6 +806,13 @@ ECS_STRUCT(AudioClip, {
  * note of the instrument with the frame of its start. A Disabled or deleted track releases its
  * notes and schedules nothing more; a track whose instrument sound is not ready drops its
  * notes and logs once. See Clips and tracks in docs/audio.md.
+ *
+ * Swing works on the grid of the timeline, from its beat 0, so clips placed anywhere swing
+ * alike: a start p in a pair of steps [0, 2 * step) goes to p * (1 + swing) before step and to
+ * step * (1 + swing) + (p - step) * (1 - swing) after it. Humanize then moves the start by up
+ * to timing ms either way and scales the velocity by 1 + r * velocity. A note never starts
+ * before its pass of the clip began or before the frame the transport started or seeked to,
+ * and still ends at the earliest of the end of its pass, of the placement and loop_end.
  */
 ECS_STRUCT(Track, {
     ecs_entity_t instrument; /**< The entity with Instrument that plays the notes of its note
@@ -797,6 +821,11 @@ ECS_STRUCT(Track, {
                               *   default 1: at the voice cap of 64 a play steals only a
                               *   voice of at most its priority, so one shots (0) cannot steal
                               *   the voices of a track; streams play at 255 */
+    float swing;             /**< 0..0.75, default 0: the off-beat of every pair of steps of
+                              *   swing_grid moves later by swing * step, the downbeats stay
+                              *   put; notes keep their duration, audio clips do not swing */
+    TrackSwingGrid swing_grid; /**< The step of the swing, default TrackSwing8 */
+    TrackHumanize humanize;  /**< Random timing and velocity of the notes, default none */
 });
 
 /** A clip on the timeline, on a child of a Track: a NoteClip or an AudioClip.

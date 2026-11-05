@@ -419,6 +419,23 @@ Seeking does not restart a note that began before the new position. Ungated hits
 already playing ring out. Deleting or disabling tracks or placements releases their
 tracked notes and cancels future starts.
 
+A `Track` can groove its notes instead of playing them quantized. `swing` (0..0.75,
+default 0) works on `swing_grid`: `TrackSwing8` (default, eighths, a step of 0.5
+beat) or `TrackSwing16` (sixteenths, 0.25 beat). Steps are counted from beat 0 of
+the timeline, not of the clip, so clips placed anywhere swing alike. Within each
+pair of steps a start `p` before `step` goes to `p * (1 + swing)`, and one after it
+to `step * (1 + swing) + (p - step) * (1 - swing)`: the off-beat moves later by
+`swing * step` and the downbeats stay put. A note keeps its duration.
+
+`humanize` adds jitter: `timing` (0..50 ms) moves each start by a uniform random
+offset up to that far either way, and `velocity` (a share, 0..1) scales the
+velocity by `1 + r * velocity`, clamped to 0..1. The jitter is seeded from the
+track, the placement, the pass of the clip and the note, so a render is
+deterministic and each loop pass differs. A note never starts before its pass of
+the clip began, or before the frame the transport started or seeked to, and still
+ends where the rules above say. A track with humanized timing schedules its notes
+up to a beat earlier than others. Audio clips neither swing nor humanize.
+
 An `AudioClip` has `sound`, `offset` in **seconds**, and `length` in beats. It uses
 `AudioPcm` or `SoundFile`, and needs no instrument. A track can mix note and audio
 placements. Placement offsets remain in beats; transpose changes pitch and speed

@@ -1148,6 +1148,8 @@ void BoxAudioImport(
     ecs_set_hooks(world, NoteClip, { .ctor = box_audio_note_clip_ctor });
     ECS_META_COMPONENT(world, AudioClip);
     ecs_set_hooks(world, AudioClip, { .ctor = box_audio_audio_clip_ctor });
+    ECS_META_COMPONENT(world, TrackSwingGrid);
+    ECS_META_COMPONENT(world, TrackHumanize);
     ECS_META_COMPONENT(world, Track);
     ecs_set_hooks(world, Track, { .ctor = box_audio_track_ctor });
     ECS_META_COMPONENT(world, ClipPlacement);
