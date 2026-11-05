@@ -107,6 +107,22 @@ static void velocity_pluck(
         .decay = 1, .brightness = 0.5f, .hardness = 1, .velocity = amount });
 }
 
+/** The saw of velocity_filter as a unison of 3 copies spread over the full width, which
+ * renders in stereo.
+ *
+ * @param world The world
+ * @param sound The root of the sound
+ * @param amount SynthFilter.velocity
+ */
+static void velocity_wide(
+    ecs_world_t *world,
+    ecs_entity_t sound,
+    float amount)
+{
+    velocity_filter(world, sound, amount);
+    ecs_set(world, sound, SynthUnison, { .voices = 3, .detune = 10, .width = 1 });
+}
+
 /** Create a synth sound with a sustaining envelope and the components of a setup.
  *
  * @param world The world
@@ -147,18 +163,20 @@ static ecs_entity_t velocity_instrument(
 }
 
 /** Render a note of A4 at a velocity, a beat long, on a world of its own, and copy
- * VELOCITY_FRAMES of the tap from the first frame that is not silent.
+ * VELOCITY_FRAMES of both channels of the tap from the first frame that is not silent.
  *
  * @param setup The setup of the sound
  * @param amount Value of the velocity field of the setup
  * @param velocity Velocity of the note
- * @param out VELOCITY_FRAMES samples
+ * @param out VELOCITY_FRAMES samples of the left channel
+ * @param out_r VELOCITY_FRAMES samples of the right channel, or NULL
  */
-static void velocity_render(
+static void velocity_render_stereo(
     velocity_setup_t setup,
     float amount,
     float velocity,
-    float *out)
+    float *out,
+    float *out_r)
 {
     ecs_world_t *world = audio_world();
     ecs_entity_t sound = velocity_sound(world, setup, amount);
@@ -171,7 +189,28 @@ static void velocity_render(
     for (start = at; start < audio_tap_count && audio_tap_l[start] == 0; start ++) { }
     test_assert(start + VELOCITY_FRAMES <= audio_tap_count);
     memcpy(out, audio_tap_l + start, sizeof(float) * VELOCITY_FRAMES);
+    if (out_r) {
+        memcpy(out_r, audio_tap_r + start, sizeof(float) * VELOCITY_FRAMES);
+    }
+
     ecs_fini(world);
+}
+
+/** Render a note of A4 at a velocity and copy VELOCITY_FRAMES of the left channel, see
+ * velocity_render_stereo.
+ *
+ * @param setup The setup of the sound
+ * @param amount Value of the velocity field of the setup
+ * @param velocity Velocity of the note
+ * @param out VELOCITY_FRAMES samples
+ */
+static void velocity_render(
+    velocity_setup_t setup,
+    float amount,
+    float velocity,
+    float *out)
+{
+    velocity_render_stereo(setup, amount, velocity, out, NULL);
 }
 
 /** Brightness of a range, independent of its gain: the energy of its first difference over
@@ -265,10 +304,97 @@ void SynthVelocity_pluck_hardness(void) {
     soft = velocity_bright(velocity_a, 1, 4800);
     hard = velocity_bright(velocity_b, 1, 4800);
     printf("pluck velocity 1: brightness %f at 0.25, %f at 1\n", soft, hard);
-    test_assert(soft < hard * 0.8);
+    test_assert(soft < hard * 0.5);
 
     velocity_render(velocity_pluck, 0, 1, velocity_c);
     test_assert(memcmp(velocity_b, velocity_c, sizeof(velocity_b)) == 0);
+}
+
+/** The stereo render of a unison with width takes the velocity as the mono one does: with
+ * SynthFilter.velocity 3 both channels are darker at velocity 0.25, and at velocity 1 they are
+ * bit-identical to the filter without velocity. */
+void SynthVelocity_wide(void) {
+    // audio/synth
+    static float right_a[VELOCITY_FRAMES], right_b[VELOCITY_FRAMES], right_c[VELOCITY_FRAMES];
+    double soft, hard;
+    velocity_render_stereo(velocity_wide, 3, 0.25f, velocity_a, right_a);
+    velocity_render_stereo(velocity_wide, 3, 1, velocity_b, right_b);
+    velocity_render_stereo(velocity_wide, 0, 1, velocity_c, right_c);
+    test_assert(memcmp(velocity_b, right_b, sizeof(velocity_b)) != 0);
+    soft = velocity_bright(velocity_a, VELOCITY_SKIP, VELOCITY_FRAMES / 2);
+    hard = velocity_bright(velocity_b, VELOCITY_SKIP, VELOCITY_FRAMES / 2);
+    printf("wide filter velocity 3, left: brightness %f at 0.25, %f at 1\n", soft, hard);
+    test_assert(soft < hard * 0.5);
+    soft = velocity_bright(right_a, VELOCITY_SKIP, VELOCITY_FRAMES / 2);
+    hard = velocity_bright(right_b, VELOCITY_SKIP, VELOCITY_FRAMES / 2);
+    printf("wide filter velocity 3, right: brightness %f at 0.25, %f at 1\n", soft, hard);
+    test_assert(soft < hard * 0.5);
+    test_assert(memcmp(velocity_b, velocity_c, sizeof(velocity_b)) == 0);
+    test_assert(memcmp(right_b, right_c, sizeof(right_b)) == 0);
+}
+
+/** Read a file of the repository.
+ *
+ * @param file Path from the root of the repository
+ * @return The contents, which the caller frees
+ */
+static char* velocity_read(
+    const char *file)
+{
+    char *path = box_app_locate(file);
+    FILE *f;
+    char *result;
+    long size;
+    test_assert(path != NULL);
+    f = fopen(path, "rb");
+    test_assert(f != NULL);
+    fseek(f, 0, SEEK_END);
+    size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    result = ecs_os_malloc((ecs_size_t)size + 1);
+    test_assert(fread(result, 1, (size_t)size, f) == (size_t)size);
+    result[size] = '\0';
+    fclose(f);
+    ecs_os_free(path);
+
+    return result;
+}
+
+/** The velocity fields set in a script: each reads back as authored, and a note of the
+ * scripted instrument at velocity 0.25 is darker than one at velocity 1. */
+void SynthVelocity_script(void) {
+    // audio/synth
+    ecs_world_t *world = audio_world();
+    char *code = velocity_read("test/assets/audio/synth_velocity.flecs");
+    ecs_entity_t saw, modulator, pluck, lead;
+    int32_t at, next;
+    double soft, hard;
+    test_assert(ecs_script_run(world, "synth_velocity", code, NULL) == 0);
+    ecs_os_free(code);
+    saw = ecs_lookup(world, "velocity_saw");
+    modulator = ecs_lookup(world, "velocity_saw.modulator");
+    pluck = ecs_lookup(world, "velocity_pluck");
+    lead = ecs_lookup(world, "velocity_lead");
+    test_assert(saw != 0 && modulator != 0 && pluck != 0 && lead != 0);
+    test_flt(ecs_get(world, saw, SynthFilter)->velocity, 3);
+    test_flt(ecs_get(world, saw, SynthFilterEnvelope)->velocity, 0.5f);
+    test_flt(ecs_get(world, saw, SynthOscillator)->velocity, 0);
+    test_flt(ecs_get(world, modulator, SynthOscillator)->velocity, 0.5f);
+    test_flt(ecs_get(world, pluck, SynthString)->velocity, 1);
+
+    audio_run(world, 1);
+    at = audio_tap_count;
+    test_assert(box_audio_play_note(world, lead, 69, 0.25f, 0.5f));
+    audio_run(world, 50);
+    next = audio_tap_count;
+    test_assert(box_audio_play_note(world, lead, 69, 1, 0.5f));
+    audio_run(world, 50);
+    test_assert(next + VELOCITY_FRAMES / 2 <= audio_tap_count);
+    soft = velocity_bright(audio_tap_l, at + VELOCITY_SKIP, at + VELOCITY_FRAMES / 2);
+    hard = velocity_bright(audio_tap_l, next + VELOCITY_SKIP, next + VELOCITY_FRAMES / 2);
+    printf("scripted velocity: brightness %f at 0.25, %f at 1\n", soft, hard);
+    test_assert(soft < hard * 0.5);
+    ecs_fini(world);
 }
 
 /** Give a sound id of a core a patch with a single command.

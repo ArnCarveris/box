@@ -1,0 +1,28 @@
+// Synth sounds for the SynthVelocity suite of test/cpu/audio: a saw whose cutoff, filter
+// envelope and FM index follow the velocity of a note, and a pluck plucked softer by soft notes.
+using box.audio
+
+// A saw at 220 Hz through a lowpass at 2000 Hz that a soft note closes by 3 octaves, with a
+// sine modulator whose index halves at velocity 0
+prefab velocity_saw {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.002, decay: 0.01, sustain: 1, hold: 0.05, release: 0.05}
+  SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.5}
+  SynthFilter: {kind: SynthLowPass, cutoff: 2000, velocity: 3}
+  SynthFilterEnvelope: {decay: 0.2, amount: 1, velocity: 0.5}
+  modulator {
+    SynthOscillator: {wave: SynthSine, frequency: 220, modulation: SynthPhase, index: 2, velocity: 0.5}
+  }
+}
+
+// A pluck at 220 Hz with a hard pick that soft notes pluck softer
+prefab velocity_pluck {
+  SynthSound: {}
+  SynthOscillator: {wave: SynthPluck, frequency: 220, level: 0.5}
+  SynthString: {decay: 1, brightness: 0.5, hardness: 1, velocity: 1}
+}
+
+// The saw, with a gain that does not follow the velocity, so only the voice hears it
+velocity_lead {
+  Instrument: {sound: velocity_saw, root: 69, velocity_curve: 0, gate: true, release: 0.05}
+}

@@ -554,7 +554,8 @@ embeds it in the main module during Emscripten builds; no extra deployment file 
 
 Play and legato commands carry the velocity of a note, 0..1, after their priority;
 `box_audio_write_play_priority` and `box_audio_write_legato_priority` take it, and the
-other writers send 1.
+other writers send 1. The velocity makes a play command 48 bytes and a legato command 52, so
+a writer buffer of a given size holds fewer of them than before.
 
 The core owns a 64-bit rendered-frame clock. Scheduled play, stop, voice/bus set,
 release and legato commands carry a frame time. Future commands wait in a fixed
