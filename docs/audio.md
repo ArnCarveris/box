@@ -330,8 +330,10 @@ notes alias little; the driven mix is 15 frames (0.3 ms) late. On the stereo pat
 unison with width, both channels drive with the same settings and their own state.
 Without the component there is no drive and the sound renders as before.
 In the `Synth` bench (`voices_64_pre_drive`, 64 voices, 48 kHz, drive 0.6 with an
-asymmetry of 0.3) the drive costs TODO ns per sample of the whole mix over
-`voices_64`, about TODO ns per voice and frame.
+asymmetry of 0.3) the drive raises the 64 voices from about 610 to 1200 ns per sample
+(78 to 154 µs per 128-frame quantum): about 9 ns per voice and frame, which roughly
+doubles the cost of a plain voice. The 2x oversampler is most of it and is costly per
+voice; it is kept because a clipper at the base rate aliases audibly on high notes.
 
 ```flecs
 using box.audio

@@ -359,15 +359,18 @@ void SynthPreDrive_before_filter(void) {
     box_audio_svf_t svf[2];
     int32_t stages, i;
     double diff = 0;
-    pd_render(&p, AUDIO_RATE, 1, frames);
-    memcpy(pd_l, audio_l, (size_t)frames * sizeof(float));
+    pd_render(&p, AUDIO_RATE, PD_VOLUME, frames);
+    for (i = 0; i < frames; i ++) {
+        pd_l[i] = audio_l[i] / PD_VOLUME;
+    }
+
     p.has_drive = 1;
     p.pre_drive = 0.7f;
     p.pre_asymmetry = 0.2f;
     p.filter = BOX_AUDIO_SYNTH_LOWPASS;
     p.cutoff = 1200;
     p.resonance = 0.6f;
-    pd_render(&p, AUDIO_RATE, 1, frames);
+    pd_render(&p, AUDIO_RATE, PD_VOLUME, frames);
 
     pd_drive(pd_l, frames, 0.7f, 0.2f);
     stages = box_audio_svf_init(svf, BOX_AUDIO_SYNTH_SLOPE_12, 0.6f);
@@ -376,13 +379,13 @@ void SynthPreDrive_before_filter(void) {
     for (i = 0; i < frames; i ++) {
         float y = box_audio_clean(box_audio_svf_next(&svf[0], BOX_AUDIO_SYNTH_LOWPASS,
             pd_l[i]));
-        double d = fabs((double)audio_l[i] - (double)y);
+        double d = fabs((double)(audio_l[i] / PD_VOLUME) - (double)y);
         diff = d > diff ? d : diff;
     }
 
     printf("driven saw through a lowpass against the offline drive and filter: %.2e\n", diff);
     test_assert(diff < 1e-5);
-    test_assert(audio_peak(audio_l, 0, frames) > 0.1f);
+    test_assert(audio_peak(audio_l, 0, frames) > 0.1f * PD_VOLUME);
 }
 
 /** On the stereo path of unison with width both channels are driven alike, each with its own
