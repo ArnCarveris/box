@@ -17,15 +17,23 @@
 /** Level of the noise, so the limiter of the master stays out of it */
 #define SC_LEVEL 0.05f
 
-/** Frames of a segment of the measure of the response */
-#define SC_SEGMENT 8192
+/** Frames of a segment of the measure of the response, far longer than the comb rings */
+#define SC_SEGMENT 32768
 
 /** Frames the measure skips at the start, while the comb fills */
 #define SC_SKIP 4800
 
+/** Frames of a measure, 8 seconds, for enough segments that the peaks do not depend on the
+ * noise */
+#define SC_FRAMES (8 * AUDIO_FRAMES)
+
 /** Input of the measure, the noise without the filter */
-static float sc_in_l[AUDIO_FRAMES];
-static float sc_in_r[AUDIO_FRAMES];
+static float sc_in_l[SC_FRAMES];
+static float sc_in_r[SC_FRAMES];
+
+/** Output of the measure, the noise through the filter */
+static float sc_out_l[SC_FRAMES];
+static float sc_out_r[SC_FRAMES];
 
 /** Window of a segment */
 static double sc_window[SC_SEGMENT];
@@ -61,7 +69,7 @@ static void sc_define(
     box_audio_core_apply(core, w.data, w.size);
 }
 
-/** A patch of white noise held for more than a second through a comb filter, undamped, for a
+/** A patch of white noise held for longer than a measure through a comb filter, undamped, for a
  * note of a frequency: the noise layer has the frequency the comb takes.
  *
  * @param frequency Hz of the note
@@ -75,7 +83,7 @@ static box_audio_synth_patch_t sc_patch(
     box_audio_synth_patch_t p = {0};
     p.layers = 1;
     p.seed = 7;
-    p.envelope = (box_audio_synth_envelope_t){ .sustain = 1, .hold = 1.5f, .release = 0.001f };
+    p.envelope = (box_audio_synth_envelope_t){ .sustain = 1, .hold = 9, .release = 0.001f };
     p.layer[0] = (box_audio_synth_layer_t){
         .wave = BOX_AUDIO_SYNTH_NOISE, .frequency = frequency, .level = SC_LEVEL };
     p.filter = BOX_AUDIO_SYNTH_COMB;
@@ -100,8 +108,41 @@ static void sc_render(
     box_audio_core_free(core);
 }
 
-/** Render a patch without its filter into sc_in_l and sc_in_r, then with it into audio_l and
- * audio_r.
+/** Render SC_FRAMES of a patch, a second at a time through audio_l and audio_r, and set the
+ * pitch of its voice to a value at a frame.
+ *
+ * @param p The patch
+ * @param l Receives the left channel
+ * @param r Receives the right channel
+ * @param at Frame of the pitch, a multiple of AUDIO_FRAMES, SC_FRAMES for none
+ * @param pitch The pitch
+ */
+static void sc_render_long(
+    const box_audio_synth_patch_t *p,
+    float *l,
+    float *r,
+    int32_t at,
+    float pitch)
+{
+    box_audio_core_t *core = sc_core();
+    int32_t i;
+    sc_define(core, 1, p);
+    audio_play(core, 1, 1, 0, 1, 0, 1, 0);
+    for (i = 0; i < SC_FRAMES; i += AUDIO_FRAMES) {
+        if (i == at) {
+            audio_voice_set(core, 1, BOX_AUDIO_PARAM_PITCH, pitch);
+        }
+
+        audio_render(core, 0, AUDIO_FRAMES);
+        memcpy(l + i, audio_l, sizeof(audio_l));
+        memcpy(r + i, audio_r, sizeof(audio_r));
+    }
+
+    box_audio_core_free(core);
+}
+
+/** Render SC_FRAMES of a patch without its filter into sc_in_l and sc_in_r, then with it into
+ * sc_out_l and sc_out_r.
  *
  * @param p The patch
  */
@@ -110,20 +151,19 @@ static void sc_measure(
 {
     box_audio_synth_patch_t dry = *p;
     dry.filter = BOX_AUDIO_SYNTH_FILTER_NONE;
-    sc_render(&dry);
-    memcpy(sc_in_l, audio_l, sizeof(sc_in_l));
-    memcpy(sc_in_r, audio_r, sizeof(sc_in_r));
-    sc_render(p);
+    sc_render_long(&dry, sc_in_l, sc_in_r, SC_FRAMES, 1);
+    sc_render_long(p, sc_out_l, sc_out_r, SC_FRAMES, 1);
 }
 
-/** Magnitude of the response of the filter at a frequency, from the input and the output
- * over a range of frames, in Hann windowed segments that overlap by half.
+/** Response of the filter at a frequency, from the input and the output over a range of
+ * frames, in Hann windowed segments that overlap by half.
  *
  * @param x The input
  * @param y The output
  * @param from First frame
  * @param to End frame
  * @param frequency Hz
+ * @param phase Receives the phase of the response, may be NULL
  * @return The magnitude
  */
 static double sc_response(
@@ -131,7 +171,8 @@ static double sc_response(
     const float *y,
     int32_t from,
     int32_t to,
-    double frequency)
+    double frequency,
+    double *phase)
 {
     double w = 2 * AUDIO_PI * frequency / AUDIO_RATE, cw = cos(w), sw = sin(w);
     double cross_re = 0, cross_im = 0, power = 0;
@@ -160,11 +201,20 @@ static double sc_response(
         power += xr * xr + xi * xi;
     }
 
+    if (phase) {
+        *phase = atan2(cross_im, cross_re);
+    }
+
     return power > 0 ? sqrt(cross_re * cross_re + cross_im * cross_im) / power : 0.0;
 }
 
-/** Frequency of the largest response within 40 cents of a frequency, from a scan in steps of
- * 2 cents and then of 0.1 cent around the largest.
+/** Frequency of the peak of the response within 40 cents of a frequency.
+ *
+ * At a peak of a comb its loop is in phase, so the response is real. Its phase crosses zero
+ * there steeply, while the magnitude is flat on top and wavers with the noise.
+ *
+ * The crossing from positive to negative is found in steps of 2 cents, then by bisection; of
+ * more crossings the one with the largest response.
  *
  * @param x The input
  * @param y The output
@@ -172,7 +222,7 @@ static double sc_response(
  * @param to End frame
  * @param frequency Hz the peak is near
  * @param peak Receives the response at the peak, may be NULL
- * @return Hz of the peak
+ * @return Hz of the peak, frequency when the phase crosses zero nowhere
  */
 static double sc_peak(
     const float *x,
@@ -182,29 +232,36 @@ static double sc_peak(
     double frequency,
     double *peak)
 {
-    double best = -40, top = -1, cents, h;
+    double best = 0, top = -1, low, high, mid, phase, last = 0, h;
     int32_t i;
     for (i = -20; i <= 20; i ++) {
-        cents = 2.0 * i;
-        h = sc_response(x, y, from, to, frequency * pow(2, cents / 1200));
-        if (h > top) {
+        h = sc_response(x, y, from, to, frequency * pow(2, 2.0 * i / 1200), &phase);
+        if (i > -20 && last > 0 && phase <= 0 && h > top) {
             top = h;
-            best = cents;
+            best = 2.0 * i;
         }
+
+        last = phase;
     }
 
-    cents = best;
-    for (i = -20; i <= 20; i ++) {
-        double c = cents + 0.1 * i;
-        h = sc_response(x, y, from, to, frequency * pow(2, c / 1200));
-        if (h > top) {
-            top = h;
-            best = c;
+    if (top >= 0) {
+        low = best - 2;
+        high = best;
+        for (i = 0; i < 16; i ++) {
+            mid = (low + high) / 2;
+            sc_response(x, y, from, to, frequency * pow(2, mid / 1200), &phase);
+            if (phase > 0) {
+                low = mid;
+            } else {
+                high = mid;
+            }
         }
+
+        best = (low + high) / 2;
     }
 
     if (peak) {
-        *peak = top;
+        *peak = sc_response(x, y, from, to, frequency * pow(2, best / 1200), NULL);
     }
 
     return frequency * pow(2, best / 1200);
@@ -243,7 +300,7 @@ static void sc_expect_peaks(
     int32_t k;
     for (k = 0; k < count; k ++) {
         double expect = base * (double)(1 + k * step), f, h;
-        f = sc_peak(x, y, SC_SKIP, AUDIO_FRAMES, expect, &h);
+        f = sc_peak(x, y, SC_SKIP, SC_FRAMES, expect, &h);
         printf("%s: peak near %.1f Hz at %.2f Hz, %.2f cents, gain %.3f\n", label, expect, f,
             sc_cents(f, expect), h);
         test_assert(fabs(sc_cents(f, expect)) < 5);
@@ -258,9 +315,9 @@ void SynthComb_peaks(void) {
     box_audio_synth_patch_t p = sc_patch(220, 0.9f);
     double peak, dip;
     sc_measure(&p);
-    sc_expect_peaks(sc_in_l, audio_l, 220, 1, 6, "220 Hz");
-    peak = sc_response(sc_in_l, audio_l, SC_SKIP, AUDIO_FRAMES, 440);
-    dip = sc_response(sc_in_l, audio_l, SC_SKIP, AUDIO_FRAMES, 550);
+    sc_expect_peaks(sc_in_l, sc_out_l, 220, 1, 6, "220 Hz");
+    peak = sc_response(sc_in_l, sc_out_l, SC_SKIP, SC_FRAMES, 440, NULL);
+    dip = sc_response(sc_in_l, sc_out_l, SC_SKIP, SC_FRAMES, 550, NULL);
     printf("gain at 440 Hz %.3f, at 550 Hz %.3f\n", peak, dip);
     test_assert(peak > 0.7 && peak < 1.3);
     test_assert(dip < peak * 0.2);
@@ -271,7 +328,7 @@ void SynthComb_high(void) {
     // audio/synth
     box_audio_synth_patch_t p = sc_patch(1760, 0.9f);
     sc_measure(&p);
-    sc_expect_peaks(sc_in_l, audio_l, 1760, 1, 4, "1760 Hz");
+    sc_expect_peaks(sc_in_l, sc_out_l, 1760, 1, 4, "1760 Hz");
 }
 
 /** Negative feedback has its peaks at the odd multiples of half the note, 110 Hz, and dips
@@ -281,9 +338,9 @@ void SynthComb_negative(void) {
     box_audio_synth_patch_t p = sc_patch(220, -0.9f);
     double peak, dip;
     sc_measure(&p);
-    sc_expect_peaks(sc_in_l, audio_l, 110, 2, 5, "negative");
-    peak = sc_response(sc_in_l, audio_l, SC_SKIP, AUDIO_FRAMES, 330);
-    dip = sc_response(sc_in_l, audio_l, SC_SKIP, AUDIO_FRAMES, 440);
+    sc_expect_peaks(sc_in_l, sc_out_l, 110, 2, 5, "negative");
+    peak = sc_response(sc_in_l, sc_out_l, SC_SKIP, SC_FRAMES, 330, NULL);
+    dip = sc_response(sc_in_l, sc_out_l, SC_SKIP, SC_FRAMES, 440, NULL);
     printf("negative: gain at 330 Hz %.3f, at 440 Hz %.3f\n", peak, dip);
     test_assert(dip < peak * 0.2);
 }
@@ -294,40 +351,29 @@ void SynthComb_tune(void) {
     box_audio_synth_patch_t p = sc_patch(220, 0.9f);
     p.tune = 2;
     sc_measure(&p);
-    sc_expect_peaks(sc_in_l, audio_l, 440, 1, 4, "tune 2");
-    test_assert(sc_response(sc_in_l, audio_l, SC_SKIP, AUDIO_FRAMES, 220) < 0.2);
+    sc_expect_peaks(sc_in_l, sc_out_l, 440, 1, 4, "tune 2");
+    test_assert(sc_response(sc_in_l, sc_out_l, SC_SKIP, SC_FRAMES, 220, NULL) < 0.2);
 }
 
 /** A glide of the pitch of the voice to 1.5 moves the peaks from 220 k Hz to 330 k Hz. */
 void SynthComb_glide(void) {
     // audio/synth
-    box_audio_synth_patch_t p = sc_patch(220, 0.9f), dry;
-    box_audio_core_t *core;
+    box_audio_synth_patch_t p = sc_patch(220, 0.9f), dry = p;
+    int32_t at = SC_FRAMES / 2;
     double f;
-    int32_t n;
     p.glide = 0.1f;
-    for (n = 0; n < 2; n ++) {
-        dry = p;
-        dry.filter = n ? BOX_AUDIO_SYNTH_COMB : BOX_AUDIO_SYNTH_FILTER_NONE;
-        core = sc_core();
-        sc_define(core, 1, &dry);
-        audio_play(core, 1, 1, 0, 1, 0, 1, 0);
-        audio_render(core, 0, 19200);
-        audio_voice_set(core, 1, BOX_AUDIO_PARAM_PITCH, 1.5f);
-        audio_render(core, 19200, AUDIO_FRAMES - 19200);
-        box_audio_core_free(core);
-        if (!n) {
-            memcpy(sc_in_l, audio_l, sizeof(sc_in_l));
-        }
-    }
-
-    f = sc_peak(sc_in_l, audio_l, SC_SKIP, 19200, 440, NULL);
+    dry.glide = 0.1f;
+    dry.filter = BOX_AUDIO_SYNTH_FILTER_NONE;
+    sc_render_long(&dry, sc_in_l, sc_in_r, at, 1.5f);
+    sc_render_long(&p, sc_out_l, sc_out_r, at, 1.5f);
+    f = sc_peak(sc_in_l, sc_out_l, SC_SKIP, at, 440, NULL);
     printf("glide: before at %.2f Hz\n", f);
     test_assert(fabs(sc_cents(f, 440)) < 5);
-    f = sc_peak(sc_in_l, audio_l, 28800, AUDIO_FRAMES, 660, NULL);
+    f = sc_peak(sc_in_l, sc_out_l, at + AUDIO_FRAMES / 2, SC_FRAMES, 660, NULL);
     printf("glide: after at %.2f Hz\n", f);
     test_assert(fabs(sc_cents(f, 660)) < 5);
-    f = sc_peak(sc_in_l, audio_l, 28800, AUDIO_FRAMES, 330, NULL);
+    f = sc_peak(sc_in_l, sc_out_l, at + AUDIO_FRAMES / 2, SC_FRAMES, 330, NULL);
+    printf("glide: after at %.2f Hz\n", f);
     test_assert(fabs(sc_cents(f, 330)) < 5);
 }
 
@@ -338,12 +384,12 @@ void SynthComb_damped(void) {
     box_audio_synth_patch_t p = sc_patch(220, 0.9f);
     double open_low, open_high, low, high, f;
     sc_measure(&p);
-    sc_peak(sc_in_l, audio_l, SC_SKIP, AUDIO_FRAMES, 220, &open_low);
-    sc_peak(sc_in_l, audio_l, SC_SKIP, AUDIO_FRAMES, 2200, &open_high);
+    sc_peak(sc_in_l, sc_out_l, SC_SKIP, SC_FRAMES, 220, &open_low);
+    sc_peak(sc_in_l, sc_out_l, SC_SKIP, SC_FRAMES, 2200, &open_high);
     p.cutoff = 500;
     sc_measure(&p);
-    f = sc_peak(sc_in_l, audio_l, SC_SKIP, AUDIO_FRAMES, 220, &low);
-    sc_peak(sc_in_l, audio_l, SC_SKIP, AUDIO_FRAMES, 2200, &high);
+    f = sc_peak(sc_in_l, sc_out_l, SC_SKIP, SC_FRAMES, 220, &low);
+    sc_peak(sc_in_l, sc_out_l, SC_SKIP, SC_FRAMES, 2200, &high);
     printf("damped: 220 Hz %.3f of %.3f at %.2f Hz, 2200 Hz %.3f of %.3f\n", low, open_low, f,
         high, open_high);
     test_assert(low > open_low * 0.4);
@@ -361,8 +407,8 @@ void SynthComb_wide(void) {
     p.layer[0].detune = 0;
     p.layer[0].width = 1;
     sc_measure(&p);
-    sc_expect_peaks(sc_in_l, audio_l, 220, 1, 4, "wide, left");
-    sc_expect_peaks(sc_in_r, audio_r, 220, 1, 4, "wide, right");
+    sc_expect_peaks(sc_in_l, sc_out_l, 220, 1, 4, "wide, left");
+    sc_expect_peaks(sc_in_r, sc_out_r, 220, 1, 4, "wide, right");
 }
 
 /** The delay lines come from a pool of BOX_AUDIO_SYNTH_COMBS: a mono voice takes one and a
@@ -454,8 +500,8 @@ void SynthComb_bounded(void) {
     box_audio_synth_patch_t p = sc_patch(220, 0.98f);
     float in, out;
     sc_measure(&p);
-    in = audio_peak(sc_in_l, 0, AUDIO_FRAMES);
-    out = audio_peak(audio_l, 0, AUDIO_FRAMES);
+    in = audio_peak(sc_in_l, 0, SC_FRAMES);
+    out = audio_peak(sc_out_l, 0, SC_FRAMES);
     printf("feedback 0.98: peak %.3f of an input of %.3f\n", (double)out, (double)in);
     test_assert(out < in * 4);
     test_assert(out > 0);
