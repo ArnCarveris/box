@@ -1069,6 +1069,13 @@
                 ]
             },
             {
+                "id": "TransitionBorder",
+                "testcases": [
+                    "width_color_mid_transition",
+                    "with_box_shadow"
+                ]
+            },
+            {
                 "id": "Transmission",
                 "testcases": [
                     "factor_zero_matches_blended_path",

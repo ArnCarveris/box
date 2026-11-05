@@ -561,6 +561,25 @@
                 ]
             },
             {
+                "id": "TransitionBorder",
+                "testcases": [
+                    "values",
+                    "layout",
+                    "color",
+                    "width_radius",
+                    "appear",
+                    "overshoot",
+                    "polygon",
+                    "with_tint_opacity",
+                    "box_shadow_radius",
+                    "box_shadow_cover",
+                    "prefab_instances",
+                    "dynamic_batch",
+                    "no_shape",
+                    "present_bits"
+                ]
+            },
+            {
                 "id": "TransitionShadow",
                 "testcases": [
                     "interrupted",

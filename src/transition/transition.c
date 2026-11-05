@@ -108,7 +108,8 @@ bool box_transition_supported(
         component == ecs_id(SpecularAnisotropy) ||
         component == ecs_id(Sheen) ||
         component == ecs_id(DiffuseTransmission) ||
-        component == ecs_id(BoxShadow));
+        component == ecs_id(BoxShadow) ||
+        component == ecs_id(Border));
 }
 
 bool box_transition_valid(

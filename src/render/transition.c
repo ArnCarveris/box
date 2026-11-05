@@ -40,8 +40,9 @@ _Static_assert(sizeof(Sheen) <= BOX_RENDER_TRANSITION_VALUE, "Sheen fits a value
 _Static_assert(sizeof(DiffuseTransmission) <= BOX_RENDER_TRANSITION_VALUE,
     "DiffuseTransmission fits a value");
 _Static_assert(sizeof(BoxShadow) <= BOX_RENDER_TRANSITION_VALUE, "BoxShadow fits a value");
+_Static_assert(sizeof(Border) <= BOX_RENDER_TRANSITION_VALUE, "Border fits a value");
 _Static_assert(BOX_RENDER_TRANSITION_VALUE % sizeof(float) == 0, "A value holds floats");
-_Static_assert(BOX_RENDER_TRANSITION_COMPONENTS <= 16,
+_Static_assert(BOX_RENDER_TRANSITION_COMPONENTS <= 32,
     "box_draw_transition_material_t.present holds a bit per component");
 
 /** Layout of every transitionable component, indexed by box_render_transition_component_t */
@@ -120,7 +121,14 @@ static const box_render_transition_layout_t box_transition_layouts[
         BOX_TRANSITION_U8(BoxShadow, color.r),
         BOX_TRANSITION_U8(BoxShadow, color.g),
         BOX_TRANSITION_U8(BoxShadow, color.b),
-        BOX_TRANSITION_U8(BoxShadow, color.a) } }
+        BOX_TRANSITION_U8(BoxShadow, color.a) } },
+    [BOX_RENDER_TRANSITION_BORDER] = { ECS_SIZEOF(Border), 6, {
+        BOX_TRANSITION_FLOAT(Border, width),
+        BOX_TRANSITION_FLOAT(Border, radius),
+        BOX_TRANSITION_U8(Border, color.r),
+        BOX_TRANSITION_U8(Border, color.g),
+        BOX_TRANSITION_U8(Border, color.b),
+        BOX_TRANSITION_U8(Border, color.a) } }
 };
 
 const box_render_transition_layout_t* box_render_transition_layout(
@@ -762,6 +770,7 @@ static void* box_transition_material_value(
         break;
     case BOX_RENDER_TRANSITION_OPACITY: result = &material->opacity; break;
     case BOX_RENDER_TRANSITION_TINT: result = &material->tint; break;
+    case BOX_RENDER_TRANSITION_BORDER: result = &material->border; break;
     case BOX_RENDER_TRANSITION_POSITION:
     case BOX_RENDER_TRANSITION_ROTATION:
     case BOX_RENDER_TRANSITION_SCALE:

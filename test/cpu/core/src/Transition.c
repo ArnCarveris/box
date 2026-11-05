@@ -1449,6 +1449,7 @@ void Transition_supported(void) {
     test_assert(box_transition_supported(world, ecs_id(Sheen)));
     test_assert(box_transition_supported(world, ecs_id(DiffuseTransmission)));
     test_assert(box_transition_supported(world, ecs_id(BoxShadow)));
+    test_assert(box_transition_supported(world, ecs_id(Border)));
 
     test_assert(!box_transition_supported(world, ecs_id(PbrTextures)));
     test_assert(!box_transition_supported(world, ecs_id(WorldTransform)));
@@ -1608,6 +1609,36 @@ void Transition_diffuse_transmission_map(void) {
         "  DiffuseTransmission: {factor: 0.5, color: {255, 255, 255}}\n"
         "  Transition: [DiffuseTransmission: {duration: 0.5, timing_function: EaseInOut}]\n"
         "}\n", "box.material.DiffuseTransmission");
+}
+
+void Transition_border_map(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    transition_capture_begin();
+    int result = ecs_script_run(world, "border",
+        "using box.geometry\n"
+        "using box.transition\n"
+        "e {\n"
+        "  Rect: {100, 20}\n"
+        "  Border: {width: 1, radius: 4, color: {160, 160, 160, 255}}\n"
+        "  Transition: [Border: {duration: 0.2}]\n"
+        "}\n", NULL);
+    char *errors = transition_capture_end();
+    test_int(result, 0);
+    test_assert(errors == NULL);
+
+    ecs_entity_t e = ecs_lookup(world, "e");
+    test_assert(e != 0);
+    test_int(ecs_map_count(ecs_get(world, e, Transition)), 1);
+    const TransitionSpec *t = box_transition_get(world, e, ecs_id(Border));
+    test_assert(t != NULL);
+    test_flt(t->duration, 0.2f);
+    test_int(t->timing_function, Linear);
+    test_assert(box_transition_valid(world, ecs_id(Border), t));
+
+    ecs_fini(world);
 }
 
 void Transition_ease_end_points(void) {

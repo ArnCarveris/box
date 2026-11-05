@@ -50,10 +50,11 @@ static const box_render_transition_component_t box_transition_material_component
      (1u << BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION))
 
 /** Components the shading of a 2D shape reads: a 2D shape has no alpha test, transmission,
- * coat, anisotropy, sheen nor diffuse transmission and its material words hold its shape */
+ * coat, anisotropy, sheen nor diffuse transmission and its material words hold its shape and
+ * its Border, which a Line does not draw */
 #define BOX_TRANSITION_MASK_SHAPE \
     ((1u << BOX_RENDER_TRANSITION_RGB) | (1u << BOX_RENDER_TRANSITION_EMISSIVE) | \
-     (1u << BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM))
+     (1u << BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM) | (1u << BOX_RENDER_TRANSITION_BORDER))
 
 /** Components the shading of a glyph reads */
 #define BOX_TRANSITION_MASK_GLYPH \
@@ -91,6 +92,7 @@ static ecs_entity_t box_transition_id(
     case BOX_RENDER_TRANSITION_SHEEN: result = ecs_id(Sheen); break;
     case BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION: result = ecs_id(DiffuseTransmission); break;
     case BOX_RENDER_TRANSITION_BOX_SHADOW: result = ecs_id(BoxShadow); break;
+    case BOX_RENDER_TRANSITION_BORDER: result = ecs_id(Border); break;
     case BOX_RENDER_TRANSITION_COMPONENTS: break;
     }
 
@@ -570,6 +572,14 @@ static uint32_t box_transition_material_nodes(
         }
     }
 
+    if ((mask & (1u << BOX_RENDER_TRANSITION_BORDER)) && ecs_owns(world, e, Border)) {
+        uint32_t node = box_render_transitions_node(s, e);
+        if (node && box_render_transitions_active(s, node, BOX_RENDER_TRANSITION_BORDER, time)) {
+            out[BOX_RENDER_TRANSITION_BORDER] = node;
+            result |= 1u << BOX_RENDER_TRANSITION_BORDER;
+        }
+    }
+
     return result;
 }
 
@@ -611,8 +621,12 @@ static uint32_t box_transition_shading_mask(
         goto done;
     }
 
-    if (ecs_has(world, e, DrawSlot) && ecs_has(world, e, Shape2D)) {
+    const Shape2D *shape = ecs_has(world, e, DrawSlot) ? ecs_get(world, e, Shape2D) : NULL;
+    if (shape) {
         result |= BOX_TRANSITION_MASK_SHAPE;
+        if (shape->kind == BOX_SHAPE2D_LINE) {
+            result &= ~(1u << BOX_RENDER_TRANSITION_BORDER);
+        }
     }
 
     if (ecs_has(world, e, TextSlots)) {
@@ -711,6 +725,40 @@ static void box_transition_material_walk(
             }
         }
     }
+}
+
+/** Add the drawn 2D shape of a node with an active Border transition that no walk of a
+ * material transition visited.
+ *
+ * Border is copied into an IsA instance (OnInstantiate, Override), so a shape draws its own
+ * value and no change of a prefab reaches its instances: the entity alone reads it.
+ *
+ * @param world The world
+ * @param s The state of the extract
+ * @param e The entity of the node
+ * @param time World time, the time of the packet
+ */
+static void box_transition_border_add(
+    const ecs_world_t *world,
+    box_render_transitions_t *s,
+    ecs_entity_t e,
+    double time)
+{
+    uint32_t mask = box_transition_shading_mask(world, e);
+    box_transition_material_t item = { .entity = e };
+    if (ecs_map_get(&s->visited, e)) {
+        goto done;
+    }
+
+    ecs_map_insert(&s->visited, e, 1);
+    if ((mask & (1u << BOX_RENDER_TRANSITION_BORDER)) &&
+        box_transition_material_nodes(world, s, e, mask, time, item.nodes))
+    {
+        *ecs_vec_append_t(NULL, &s->shadings, box_transition_material_t) = item;
+        box_transitions_keep(s, &s->tagged_material, e);
+    }
+done:
+    return;
 }
 
 /** Check whether a node has an active transition of Tint or Opacity.
@@ -886,7 +934,8 @@ static void box_transition_materials(
     ecs_vec_clear(&s->material_slots);
     for (i = 1; p && i < count && !any; i ++) {
         const box_transition_node_t *node = ecs_vec_get_t(&s->nodes, box_transition_node_t, i);
-        any = node->entity && box_transition_material_active(s, (uint32_t)i, p->time);
+        any = node->entity && (box_transition_material_active(s, (uint32_t)i, p->time) ||
+            box_render_transitions_active(s, (uint32_t)i, BOX_RENDER_TRANSITION_BORDER, p->time));
     }
 
     if (ecs_map_count(&s->visited)) {
@@ -900,6 +949,16 @@ static void box_transition_materials(
             box_transition_material_active(s, (uint32_t)i, p->time))
         {
             box_transition_material_walk(world, s, d, node->entity, p->time);
+        }
+    }
+
+    for (i = 1; d && i < count; i ++) {
+        const box_transition_node_t *node = ecs_vec_get_t(&s->nodes, box_transition_node_t, i);
+        if (node->entity && box_render_transitions_active(
+                s, (uint32_t)i, BOX_RENDER_TRANSITION_BORDER, p->time) &&
+            ecs_is_alive(world, node->entity))
+        {
+            box_transition_border_add(world, s, node->entity, p->time);
         }
     }
 
@@ -1191,10 +1250,12 @@ static void box_transition_send_slots(
         box_draw_batch_t *b = box_draws_batch(d, bs->batch);
         animated->moving = item->node;
         glm_mat4_copy(rel, animated->rel);
-        if (owner && range && d->shadow_record && b->alive && box_draws_caster(b) &&
-            box_draws_box_shadow_bound(world, item->entity,
-                owner->slots[BOX_RENDER_TRANSITION_BOX_SHADOW].lo,
-                owner->slots[BOX_RENDER_TRANSITION_BOX_SHADOW].hi, instance))
+        const box_transition_slot_t *slot = owner
+            ? &owner->slots[BOX_RENDER_TRANSITION_BOX_SHADOW] : NULL;
+        if (slot && range && d->shadow_record && b->alive && box_draws_caster(b) &&
+            (slot->present
+                ? box_draws_box_shadow_bound(world, item->entity, slot->lo, slot->hi, instance)
+                : box_draws_box_shadow_instance(world, item->entity, instance)))
         {
             glm_mul(rel, instance, m);
             box_draws_range_region(world, b, bs->slot, range, m, ecs_vec_append_t(

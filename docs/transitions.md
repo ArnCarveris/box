@@ -128,6 +128,7 @@ error naming the entity/component and ignore that entry. Other entries still wor
 | Mesh material | `AlphaCutoff`, `PbrMaterial`, `Transmission`, `ClearCoat`, `SpecularAnisotropy`, `Sheen`, `DiffuseTransmission` | Mesh material table |
 | Hierarchy | `Tint`, `Opacity` | Composed down `ChildOf` and `Parent` |
 | 2D shadow | `BoxShadow` | Shadow offset, blur, spread and color |
+| 2D shape | `Border` | Border width, radius and color of a `Rect`, `Circle` or `Polygon2D` |
 
 Material values transition on the entity that owns them. A prefab change therefore
 animates its material and the instances inheriting it; an overridden value has its
@@ -164,6 +165,33 @@ of their shape or ancestors at the same time. A shadow that shrinks to no area c
 animate through that boundary; adding or removing `BoxShadow` snaps.
 `BoxShadow` copies into prefab instances, so each instance lifts independently.
 
+### Borders
+
+```flecs
+using box.geometry
+using box.material
+using box.transition
+
+field {
+  Rect: {240, 32}
+  Rgb: {255, 255, 255}
+  Border: {width: 1, radius: 4, color: {160, 160, 160}}
+  Transition: [Border: {duration: 0.12, timing_function: EaseOut}]
+}
+```
+
+Setting `Border: {width: 2, radius: 4, color: {40, 110, 240}}` on focus grows the
+ring and changes its color. Width and radius interpolate linearly by the timing
+function, the color per channel in display encoding; a width or radius that an
+overshooting curve takes below 0 draws as 0. A `BoxShadow` of the shape follows
+the rendered border: its cutout radius and the alpha it is covered with. Tint and
+opacity transitions of the shape or its ancestors apply to the border color at the
+same time. A `Line` draws no border, so a `Border` transition on it does nothing.
+`Border` copies into prefab instances, so each instance animates independently.
+Picking, layout and `ClipChildren` use the target border: clipped children keep
+the target corner radius and inset during a radius or width transition. Adding or
+removing `Border` snaps.
+
 ## Limitations
 
 - `ManualTransform`, including `SurfaceAttachment`, breaks transform propagation.
@@ -172,7 +200,7 @@ animate through that boundary; adding or removing `BoxShadow` snaps.
 - Lights and cameras read target `WorldTransform`. Their positions, rotations and
   light colors do not transition. A shape on the same entity can still animate.
 - Colored `TextSpans` retain their span colors during an `Rgb` transition, though
-  text opacity still affects their alpha. `SurfaceMaterial`, `Border`, `AmbientLight`
+  text opacity still affects their alpha. `SurfaceMaterial`, `AmbientLight`
   and other colors outside `src/material` do not transition.
 - Draw order and batch membership follow targets. Picking and collision can therefore
   disagree with the visible intermediate position.
@@ -230,7 +258,9 @@ Neither requires dividing out a target value, so zero opacity works.
 
 Box shadows have separate slots. A `BoxShadow` transition patches the whole shadow
 transform and shading; combined transforms and fades are resolved in that same
-record so they remain aligned with the shape.
+record so they remain aligned with the shape. A `Border` transition patches the
+material words of the 2D shading of its shape, and the shadow of the shape gets a
+box shadow record that applies the rendered border to its cutout.
 
 ## Cost and verification
 

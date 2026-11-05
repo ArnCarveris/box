@@ -109,8 +109,8 @@ bool box_transition_bezier_valid(
 /** Whether changes of a component can transition.
  *
  * Position, Rotation, Scale, Rgb, Opacity, AlphaCutoff, Tint, PbrMaterial, Emissive,
- * TextureTransform, Transmission, ClearCoat, SpecularAnisotropy, Sheen, DiffuseTransmission
- * and BoxShadow can. Every other id cannot.
+ * TextureTransform, Transmission, ClearCoat, SpecularAnisotropy, Sheen, DiffuseTransmission,
+ * BoxShadow and Border can. Every other id cannot.
  *
  * @param world The world
  * @param component The component id

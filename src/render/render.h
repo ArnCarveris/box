@@ -90,6 +90,9 @@ void box_render_draws_stats(
  * Border.width on each side and with the corners rounded by its Border.radius less the width,
  * the inner edge of the border as the 2D shader draws it.
  *
+ * Reads the target Border on the game thread: while a Border transition runs, the clipped
+ * children keep the target width and corner radius, not the ones the border renders with.
+ *
  * @param world The world
  * @param e The element
  * @param half Receives half the width and half the height of the area, 0 when it has neither

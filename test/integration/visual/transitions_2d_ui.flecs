@@ -14,6 +14,8 @@
 //   BoxShadow goes from close and sharp (offset_y -2, blur 4, alpha 120) to far and soft
 //   (offset_y -14, blur 28, spread 2, alpha 180), so a third of the way its shadow has an
 //   offset_y of -6, a blur of 12, a spread of 0.67 and an alpha of 140
+// - ring_field: a white rounded rect whose Border goes from 1 wide and grey to 3 wide and blue
+//   as on focus, so a third of the way it is 1.67 wide and a third of the way to blue
 using box.transform
 using box.geometry
 using box.material
@@ -87,6 +89,14 @@ lift_card {
     Position: {duration: 0.05},
     BoxShadow: {duration: 0.05}
   ]
+}
+
+ring_field {
+  Position: {-200, -150, 1}
+  Rect: {140, 30}
+  Rgb: {255, 255, 255}
+  Border: {width: 1, radius: 8, color: {150, 150, 150, 255}}
+  Transition: [Border: {duration: 0.05}]
 }
 
 ui {
@@ -166,4 +176,9 @@ change_lift_card {
   SetAt: {frame: 1, entity: lift_card}
   Position: {-100, 16, 1}
   BoxShadow: {offset_y: -14, blur: 28, spread: 2, color: {20, 30, 60, 180}}
+}
+
+change_ring_field {
+  SetAt: {frame: 1, entity: ring_field}
+  Border: {width: 3, radius: 8, color: {40, 110, 240, 255}}
 }

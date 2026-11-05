@@ -229,6 +229,10 @@ typedef struct box_draw_material_t {
     const Tint *tint;           /**< Tint of the shape itself, applied after the inherited */
     const box_draw_tint_t *inherited; /**< Composed tints of the ancestors, NULL for none */
     const Shape2D *shape2d;     /**< Resolved 2D shape, NULL for a 3D shape */
+    const Border *border;       /**< Border shape2d was resolved with, NULL for none, read by
+                                 *   the target of a transition */
+    bool border_radius;         /**< The corner radius of shape2d is the Border.radius: the
+                                 *   shape is a Rect */
     float fade;                 /**< Product of the Opacity of the ancestors */
     int32_t clip;               /**< Clip index of a 2D shape or glyph, 0 for none */
     int32_t slice;              /**< Slice record index of a sliced 2D shape, polygon record
@@ -257,7 +261,7 @@ typedef enum box_draw_transition_kind_t {
 typedef struct box_draw_transition_material_t {
     uint32_t nodes[BOX_RENDER_TRANSITION_COMPONENTS]; /**< By component, the node that owns the
                              *   value and runs a transition of it, 0 to keep the target */
-    uint16_t present;       /**< 1 << box_render_transition_component_t per component the
+    uint32_t present;       /**< 1 << box_render_transition_component_t per component the
                              *   material has */
     uint8_t kind;           /**< box_draw_transition_kind_t */
     bool tinted;            /**< inherited holds the tints of the ancestors */
@@ -277,7 +281,11 @@ typedef struct box_draw_transition_material_t {
     Tint tint;              /**< Tint of the shape itself */
     box_draw_tint_t inherited; /**< Tints of the ancestors, when tinted */
     float fade;             /**< Product of the Opacity of the ancestors */
-    Shape2D shape2d;        /**< The 2D shape of a shape record */
+    Shape2D shape2d;        /**< The 2D shape of a shape record, of a box shadow record, with
+                             *   its target Border */
+    Border border;          /**< Border of the 2D shape of a shape or box shadow record, which
+                             *   the encode applies to shape2d (box_shape2d_border) */
+    bool border_radius;     /**< The corner radius of shape2d is the Border.radius: a Rect */
     uint32_t fade_node;     /**< Nearest node at or above the entity with an active Tint or
                              *   Opacity transition, 0 for none: the resolver replaces
                              *   inherited and fade by the values it renders */
@@ -290,6 +298,8 @@ typedef struct box_draw_transition_material_t {
     rgba shadow;            /**< Display encoded color of a BoxShadow, of a shadow record */
     float shadow_cover;     /**< The alpha the shape of a shadow record covers it with at an
                              *   opacity of 1, 0 for a blend mode that covers nothing */
+    uint8_t shadow_blend;   /**< Blend mode of the batch of the shape of a shadow record, from
+                             *   which shadow_cover is computed again for a rendered Border */
 } box_draw_transition_material_t;
 
 /** What a box shadow record points at in the packet data: the target of the shadow of a 2D
@@ -879,6 +889,19 @@ void box_draws_transition_target(
     const box_draw_material_t *material,
     box_draw_transition_kind_t kind);
 
+/** Resolve the 2D shape of a shape or box shadow record with the Border of its material, the
+ * rendered value when it has a node: the shape of the record with that Border applied by
+ * box_shape2d_border, its corner radius set again from it for a Rect.
+ *
+ * Pure: reads no world, so the resolver calls it on the render thread.
+ *
+ * @param material The material
+ * @param out Receives the shape
+ */
+void box_draws_transition_shape(
+    const box_draw_transition_material_t *material,
+    Shape2D *out);
+
 /** Encode a record from a material transition with the encoding of the game thread: a table
  * record with box_draws_material_pack, a 2D shading (color, emission, material, UV words) or a
  * glyph (color, emission) with box_draws_material, a mesh shading with box_draws_mesh_shading.
@@ -913,7 +936,9 @@ void box_draws_transition_fade_own(
 
 /** Write the transform and the shading of a shadow from a box shadow record with the encoding
  * of the game thread (box_draws_box_shadow_patch), from the material of the record with the
- * rendered Tint, Opacity and fade. Pure: the resolver calls it on the render thread.
+ * rendered Tint, Opacity and fade. The rendered Border of the material is applied to its shape
+ * first, so the cutout radius and the cover alpha follow it. Pure: the resolver calls it on the
+ * render thread.
  *
  * @param record The record, its material holding the rendered values
  * @param shadow The BoxShadow its node renders
@@ -1843,6 +1868,22 @@ bool box_draws_box_shadow_bound(
     const float *lo,
     const float *hi,
     mat4 out);
+
+/** Get the alpha a shape covers what is under it with at its edge, which the shadow is cut out
+ * by: its opacity, times the alpha of its border when it has one, for the blend modes that draw
+ * over the target, 0 for the others (Additive, Multiply and the like), which cover nothing.
+ *
+ * Pure, so the resolver computes it again for the Border a transition renders.
+ *
+ * @param shape The resolved shape
+ * @param blend The blend mode of the shape
+ * @param alpha Resolved opacity of the shape
+ * @return The alpha from 0 to 1
+ */
+float box_draws_box_shadow_cover(
+    const Shape2D *shape,
+    uint8_t blend,
+    float alpha);
 
 /** Encode the color and the cover alpha of the shading of a shadow from a shadow record, as
  * box_draws_box_shadow_update writes them. Pure: the resolver calls it on the render thread.
