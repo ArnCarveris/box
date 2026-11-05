@@ -122,7 +122,7 @@ static box_audio_core_t* bench_synth_core(
         p.layer[1].sync = 3.2f;
         p.lfos = 1;
         p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_TRIANGLE, .rate = 0.5f,
-            .sync = 12 };
+            .hard_sync = 12 };
     }
 
     if (extra & BENCH_PITCH) {

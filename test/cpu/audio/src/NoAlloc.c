@@ -930,9 +930,9 @@ void NoAlloc_synth_sync(void) {
         .level = 1, .modulates = 3, .modulation = BOX_AUDIO_SYNTH_PHASE, .index = 1 };
     p.lfos = 2;
     p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 3,
-        .sync = 12 };
+        .hard_sync = 12 };
     p.lfo[1] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_TRIANGLE, .rate = 1,
-        .layer = 4, .sync = 24 };
+        .layer = 4, .hard_sync = 24 };
     box_audio_writer_init(&w, bytes, sizeof(bytes));
     test_assert(box_audio_write_synth(&w, 1, &p));
     box_audio_core_apply(core, w.data, w.size);
