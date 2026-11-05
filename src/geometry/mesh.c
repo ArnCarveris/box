@@ -208,3 +208,54 @@ void box_mesh_lathe(
         }
     }
 }
+
+void box_mesh_lathe_facets(
+    box_mesh_t *mesh,
+    const box_lathe_point_t *points,
+    int32_t count,
+    int32_t slices,
+    float arc)
+{
+    float h = 0.5f * arc / (float)slices;
+    float ch = cosf(h);
+    for (int32_t s = 0; s < slices; s ++) {
+        float a0 = arc * (float)s / (float)slices;
+        float a1 = arc * (float)(s + 1) / (float)slices;
+        float mid = arc * ((float)s + 0.5f) / (float)slices;
+        float c0 = cosf(a0), s0 = sinf(a0), c1 = cosf(a1), s1 = sinf(a1);
+        float cm = cosf(mid), sm = sinf(mid);
+        int32_t base = mesh->vertex_count;
+        for (int32_t i = 0; i < count; i ++) {
+            const box_lathe_point_t *p = &points[i];
+            vec3 normal = { p->nr * cm, p->ny * ch, p->nr * sm };
+            glm_vec3_normalize(normal);
+            if (p->r == 0.0f) {
+                vec3 pos = { 0.0f, p->y, 0.0f };
+                box_mesh_vertex(mesh, pos, normal, ((float)s + 0.5f) / (float)slices, p->v);
+                box_mesh_vertex(mesh, pos, normal, ((float)s + 0.5f) / (float)slices, p->v);
+            } else {
+                vec3 pos0 = { p->r * c0, p->y, p->r * s0 };
+                vec3 pos1 = { p->r * c1, p->y, p->r * s1 };
+                box_mesh_vertex(mesh, pos0, normal, (float)s / (float)slices, p->v);
+                box_mesh_vertex(mesh, pos1, normal, (float)(s + 1) / (float)slices, p->v);
+            }
+        }
+
+        for (int32_t i = 0; i < count - 1; i ++) {
+            bool pole_a = points[i].r == 0.0f;
+            bool pole_b = points[i + 1].r == 0.0f;
+            int32_t a = base + i * 2;
+            int32_t b = a + 1;
+            int32_t c = a + 2;
+            int32_t d = c + 1;
+            if (!pole_a && !pole_b) {
+                box_mesh_triangle(mesh, a, b, d);
+                box_mesh_triangle(mesh, a, d, c);
+            } else if (!pole_b) {
+                box_mesh_triangle(mesh, a, d, c);
+            } else if (!pole_a) {
+                box_mesh_triangle(mesh, a, b, c);
+            }
+        }
+    }
+}

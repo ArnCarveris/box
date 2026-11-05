@@ -49,6 +49,8 @@
                     "cpu_budget",
                     "cpu_budget_percent_sign",
                     "fps",
+                    "delta_time_fraction",
+                    "invalid_delta_time",
                     "port",
                     "scene",
                     "all_options",
@@ -306,7 +308,19 @@
                     "capped_by_quality",
                     "hash_noise",
                     "hash_blocks",
-                    "hash_cells"
+                    "hash_cells",
+                    "tone_checker",
+                    "tone_checker_staggered",
+                    "tone_courses",
+                    "tone_columns",
+                    "tone_random",
+                    "tone_tiles",
+                    "tone_amount",
+                    "palette_ramp_multiply",
+                    "palette_cells",
+                    "palette_layer_invalid",
+                    "palette_ignored_for_normal",
+                    "hash_blocks_tones"
                 ]
             },
             {
@@ -520,6 +534,21 @@
                     "disabled_not_played",
                     "no_clip_no_op",
                     "no_animators_no_cost"
+                ]
+            },
+            {
+                "id": "ScriptHas",
+                "testcases": [
+                    "tag",
+                    "tag_entity_variable",
+                    "tag_next_to_dependency",
+                    "tag_declared_by_script",
+                    "tag_set_by_script",
+                    "tag_declared_by_script_next_to_dependency",
+                    "tag_declared_by_other_script",
+                    "component",
+                    "component_next_to_dependency",
+                    "component_declared_by_script"
                 ]
             }
         ]

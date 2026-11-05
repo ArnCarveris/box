@@ -362,9 +362,9 @@ ECS_STRUCT(EnvironmentImage, {
 
 /** Register the box.light module.
  *
- * The first directional light of a scene casts the shadows of the views that enable them, and
- * so do its spot and point lights with shadows through the tiles of its ShadowAtlas; NoShadow
- * shapes and blended shapes cast none.
+ * The first directional light of a scene and its spot and point lights with shadows (the tiles
+ * of its ShadowAtlas) shadow the views that enable them. NoShadow and blended shapes cast none,
+ * LightFixture shapes cast into all but the tile of a light inside their world bounds.
  *
  * In a scene with LightBake the views are shadowed by the first directional light that is not
  * Baked and the probe captures by the first one they shade surfaces with (see LightBakeMode).

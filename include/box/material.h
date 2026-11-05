@@ -204,8 +204,8 @@ ECS_STRUCT(Sheen, {
  * is behind it, read from a depth copy of the snapshot, on top of the blur of its roughness. An
  * object touching the surface stays sharp and one further behind gets softer; the sky, with no
  * depth, takes the softest mip. A shape with DiffuseTransmission and no Transmission is opaque
- * and ignores the blur. Blended and transmissive shapes are not in the snapshot, so they are
- * neither seen nor blurred through it.
+ * and ignores the blur. Blended and transmissive shapes behind it are in the snapshot (see
+ * Transmission) but write no depth, so they blur like whatever lies behind them.
  *
  * Transitionable (Transition): factor, thickness and blur interpolate linearly by the timing
  * function and color per channel like Rgb, through a factor of 0 too; adding or removing
@@ -244,9 +244,13 @@ ECS_STRUCT(Emissive, {
  * alpha blended and additive shapes, without blending or depth writes. It casts no shadow, is not
  * in the probe, reflection or bake captures and ignores Opacity, BlendMode and AlphaCutoff.
  *
- * It shows the image of its view before the blended pass (no blended or transmissive shapes)
- * where the ray refracted by ior leaves thickness_factor times the scale, blurred by roughness,
- * absorbed toward attenuation_color and tinted by Rgb, with its own specular light on top.
+ * It shows a snapshot of its view where the ray refracted by ior leaves thickness_factor times
+ * the scale, blurred by roughness, absorbed toward attenuation_color and tinted by Rgb, with its
+ * own specular light on top. The snapshot holds everything drawn before it back to front.
+ *
+ * That is the opaque shapes, sky, fog volumes, particles and 2D shapes (even those in front of
+ * it) and the blended and transmissive shapes behind it. A view snapshots again before glass
+ * that follows a shape that is not glass, at most 4 times a frame; then glass shows the last.
  *
  * Transitionable (Transition): the four floats interpolate linearly by the timing function and
  * attenuation_color per channel like Rgb. The shape keeps its transmissive batch while its
@@ -443,6 +447,16 @@ extern ECS_TAG_DECLARE(DynamicMaterial);
 
 /** Keeps an entity and its descendants out of the shadow pass of every view */
 extern ECS_TAG_DECLARE(NoShadow);
+
+/** Marks the fixture of a light, such as a lamp bulb or a lantern glass, applies to descendants.
+ *
+ * A 3D shape with it casts shadows as usual for the directional light and every spot and point
+ * light, except into the tile of a light whose world position is inside the world bounds of the
+ * shape: the local bounds of its mesh or surface moved by its model matrix, inclusive.
+ *
+ * The box is conservative: a large fixture also skips other lights inside its box. The shape
+ * still receives light and shadows and is drawn as before. NoShadow wins, 2D shapes ignore it. */
+extern ECS_TAG_DECLARE(LightFixture);
 
 /** Register the box.material module.
  *

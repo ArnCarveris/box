@@ -50,8 +50,9 @@ typedef struct box_render_gpu_stats_t {
                                  *   their draw calls count among draws */
     int32_t fog_volumes;        /**< Fog volumes drawn, one per volume of a view in each frame
                                  *   it renders; their draw calls count among draws */
-    int32_t transmission_snapshots; /**< Opaque snapshots recorded for transmission, one per
-                                 *   frame of each view that draws a Transmission shape */
+    int32_t transmission_snapshots; /**< Snapshots recorded for transmission, per frame of a
+                                 *   view one before its first transmissive draw and one before
+                                 *   each later one that follows other draws, at most 4 */
     int32_t transmission_textures; /**< Snapshot textures created for transmission, one per
                                  *   color format of the views of a target that draw a
                                  *   Transmission shape, again only when its render size changes */
@@ -63,9 +64,9 @@ typedef struct box_render_gpu_stats_t {
                                  *   the mesh shader is not compiled yet or none of its culled
                                  *   batches draws in it (only blended or transmissive draws).
                                  *
-                                 *   Plus a split after its opaque snapshot of transmission,
-                                 *   one that reads the depth for its fog volumes and soft
-                                 *   particles and one more when draws follow those.
+                                 *   Plus a split after each transmission snapshot, one that
+                                 *   reads the depth for its fog volumes and soft particles
+                                 *   and one more when draws follow those.
                                  *
                                  *   Not the depth prepasses, the snapshot downsample passes,
                                  *   nor the shadow, cull, atmosphere, particle simulation or

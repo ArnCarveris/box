@@ -85,6 +85,9 @@ typedef struct box_texture_gen_t {
     TextureGenKey *colors;      /**< Color ramp of GenAlbedo */
     int32_t color_count;        /**< Number of keys of the ramp */
     float strength;             /**< Steepness of GenNormal */
+    rgb *palette;               /**< Colors of the tones of GenAlbedo, NULL without */
+    int32_t palette_count;      /**< Number of colors of the palette */
+    int32_t palette_layer;      /**< Layer whose tone picks the palette color */
 } box_texture_gen_t;
 
 /** A decode that runs on a worker: what to load and what came out */
@@ -176,7 +179,7 @@ float* box_texture_decode_float(
 void box_texture_generate(
     box_texture_job_t *job);
 
-/** Fill the raw value and id of one layer, before its amount, for every pixel.
+/** Fill the raw value, id and tone of one layer, before its amount, for every pixel.
  *
  * @param layer The layer
  * @param seed Seed of its generator
@@ -184,6 +187,8 @@ void box_texture_generate(
  * @param height Height in pixels
  * @param value Receives the value of the pattern of each pixel row by row, 0..1
  * @param id Receives the random block or cell id of each pixel, 0..1, 0 for GenNoise
+ * @param tone Receives the tone of the block or cell of each pixel, 0..tones - 1, 0 without
+ * tones and for GenNoise; may be NULL
  */
 void box_texture_gen_pattern(
     const TextureGenLayer *layer,
@@ -191,25 +196,34 @@ void box_texture_gen_pattern(
     int32_t width,
     int32_t height,
     float *value,
-    float *id);
+    float *id,
+    int32_t *tone);
 
 /** Fill the height field of a generator: its layers combined and scaled to span 0..1, 0.5
  * where they are flat.
  *
  * @param gen The generator
  * @param height Receives width * height values row by row from the top
+ * @param tone Receives the tone of each pixel in the layer palette_layer, which takes one tone
+ * per palette color when it has no tones; 0 everywhere when that layer does not exist. May be
+ * NULL
  */
 void box_texture_gen_height(
     const box_texture_gen_t *gen,
-    float *height);
+    float *height,
+    int32_t *tone);
 
 /** Map a height field through a color ramp into opaque RGBA8 pixels, linearly between the
- * display encoded keys; gray without keys.
+ * display encoded keys; gray without keys. With a palette the ramp color, white without keys,
+ * is multiplied per channel by the palette color of the tone of the pixel, a * b / 255.
  *
  * @param height The heights, 0..1
  * @param count Number of pixels
  * @param keys The keys in order of position
  * @param key_count Number of keys
+ * @param tone The tone of each pixel, not negative; may be NULL without a palette
+ * @param palette Display encoded color per tone, palette[tone % palette_count]
+ * @param palette_count Number of colors of the palette, 0 for none
  * @param rgba Receives four bytes per pixel
  */
 void box_texture_gen_albedo(
@@ -217,6 +231,9 @@ void box_texture_gen_albedo(
     int32_t count,
     const TextureGenKey *keys,
     int32_t key_count,
+    const int32_t *tone,
+    const rgb *palette,
+    int32_t palette_count,
     uint8_t *rgba);
 
 /** Make a tangent space normal map from a height field by central differences across the
