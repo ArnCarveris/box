@@ -795,8 +795,9 @@ ECS_STRUCT(Phaser, {
  * With feedback it is a flanger: the first tap of each channel goes back into its line, so a
  * delay of 0.1 to 10 ms resonates at multiples of 1000 / delay Hz, and a negative feedback
  * moves the peaks to the odd multiples of half that, which sounds hollow. Only the first tap
- * feeds back, so the loop stays stable at any voices; the linear read damps the highs of the
- * loop a little where the delay falls between frames. A jet sweep on drums:
+ * feeds back, so the loop stays stable at any voices; the feedback reads its tap with a cubic
+ * interpolation, so the highs keep resonating while the sweep falls between frames. A jet sweep
+ * on drums:
  * drums { AudioBus: {effects: [drums]};
  *         Chorus: {voices: 1, rate: 0.2, delay: 2, depth: 1.8, feedback: 0.7, mix: 0.5} }.
  *

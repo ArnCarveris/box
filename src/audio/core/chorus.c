@@ -3,8 +3,9 @@
  * @brief The chorus kind of effect: up to BOX_AUDIO_CHORUS_VOICES_MAX taps of a stereo line,
  * each moved by a sine LFO around a delay, spread in phase and panned across the stereo field.
  *
- * The lines live on the memory of the slot, read with linear interpolation; like the delay it
- * reads frames older than it wrote since it was silent as silence. Every
+ * The lines live on the memory of the slot, read with linear interpolation and, for the feedback
+ * of the first tap, with a cubic one; like the delay it reads frames older than it wrote since it
+ * was silent as silence. Every
  * BOX_AUDIO_MODULATION_CONTROL frames it aims each tap at its next place and moves it there.
  *
  * The phase of the LFO is a fixed point count of turns that advances by a whole step per frame,
@@ -268,6 +269,43 @@ static inline float box_audio_chorus_read(
     return a + frac * (b - a);
 }
 
+/** Read a line frames back for the feedback, with Catmull-Rom interpolation between the frames
+ * either side; its gain is at most 1 at any fraction, and it keeps the highs that a linear read
+ * would damp more on every pass through the loop. Under 2 frames back the frame on the near side
+ * is not written yet, and it reads with linear interpolation.
+ *
+ * @param ch The chorus
+ * @param line The line
+ * @param back Frames back, 1..length - 2
+ * @return The sample
+ */
+static inline float box_audio_chorus_read_cubic(
+    const box_audio_chorus_t *ch,
+    const float *line,
+    double back)
+{
+    int32_t whole = (int32_t)back, i0, i1, i2, i3;
+    float t, y0, y1, y2, y3, result;
+    if (whole < 2 || whole + 2 > ch->length - 1) {
+        result = box_audio_chorus_read(ch, line, back);
+    } else {
+        t = (float)(back - (double)whole);
+        i1 = ch->pos - whole;
+        i1 += i1 < 0 ? ch->length : 0;
+        i0 = i1 + 1 < ch->length ? i1 + 1 : 0;
+        i2 = i1 > 0 ? i1 - 1 : ch->length - 1;
+        i3 = i2 > 0 ? i2 - 1 : ch->length - 1;
+        y0 = whole - 1 <= ch->valid ? line[i0] : 0.0f;
+        y1 = whole <= ch->valid ? line[i1] : 0.0f;
+        y2 = whole + 1 <= ch->valid ? line[i2] : 0.0f;
+        y3 = whole + 2 <= ch->valid ? line[i3] : 0.0f;
+        result = y1 + 0.5f * t * ((y2 - y0) + t * ((2 * y0 - 5 * y1 + 4 * y2 - y3) +
+            t * (3 * (y1 - y2) + y3 - y0)));
+    }
+
+    return result;
+}
+
 /** Start a control block: the taps reach where the last one aimed them, and aim at where they
  * read at the next.
  *
@@ -293,8 +331,9 @@ static void box_audio_chorus_control(
 }
 
 /** Run the chorus over a block. The first tap of each channel times the feedback adds to the
- * input of its line: one tap through a linear read, whose gain is at most 1, keeps the loop
- * stable under a feedback of 1 at any voices, and damps its highs a little between frames.
+ * input of its line: one tap through a read whose gain is at most 1 keeps the loop stable under
+ * a feedback of 1 at any voices. The feedback reads the tap with a cubic, the voices with a
+ * linear interpolation.
  *
  * @param core The core
  * @param ch The chorus
@@ -329,13 +368,16 @@ static int32_t box_audio_chorus_block(
             float b = box_audio_chorus_read(ch, br, ch->tap[v]);
             wl += m[0] * a + m[1] * b;
             wr += m[2] * a + m[3] * b;
-            ch->tap[v] += ch->slope[v];
             if (v == 0 && fb != 0) {
-                float sum = (a < 0 ? -a : a) + (b < 0 ? -b : b);
-                xl += fb * a;
-                xr += fb * b;
+                float c = box_audio_chorus_read_cubic(ch, bl, ch->tap[v]);
+                float d = box_audio_chorus_read_cubic(ch, br, ch->tap[v]);
+                float sum = (c < 0 ? -c : c) + (d < 0 ? -d : d);
+                xl += fb * c;
+                xr += fb * d;
                 still = sum < BOX_AUDIO_CHORUS_SILENCE ? still : -1;
             }
+
+            ch->tap[v] += ch->slope[v];
         }
 
         still ++;

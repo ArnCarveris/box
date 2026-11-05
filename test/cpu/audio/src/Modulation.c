@@ -786,6 +786,16 @@ void Modulation_chorus_feedback_comb(void) {
         test_assert(odd > even * 1.8);
         test_assert(even < 1.0);
     }
+
+    // Half a frame past 48 frames the peaks sit at multiples of 48000 / 48.5 Hz; the cubic
+    // read of the feedback keeps a loop gain of 0.8 * 0.94 near 10 kHz, where a linear one
+    // would keep 0.8 * 0.79 and a peak of 1.6
+    md_comb(md_flanger(1, 0, 0, 48.5f / 48.0f, 0.5f, 0.8f));
+    for (k = 1; k <= 10; k ++) {
+        double peak = md_comb_at(k * 48000.0 / 48.5, true);
+        printf("delay 48.5 frames: peak at %.0f Hz %.3f\n", k * 48000.0 / 48.5, peak);
+        test_assert(peak > (k < 8 ? 2.2 : 1.9));
+    }
 }
 
 void Modulation_chorus_feedback_stable(void) {
@@ -823,7 +833,8 @@ void Modulation_chorus_feedback_stable(void) {
                 test_assert(isfinite(md_l[i]) && isfinite(md_r[i]));
             }
 
-            // The lines hold at most the input over 1 - 0.95, 20 times its peak
+            // The loop gain is at most 0.95 at every frequency, so the lines stay far under 20
+            // times the peak of the input
             peak = 0;
             for (i = 0; i < floats; i ++) {
                 float a = fabsf(md.memory[i]);

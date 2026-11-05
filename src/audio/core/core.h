@@ -741,8 +741,9 @@ typedef struct box_audio_delay_params_t {
 #define BOX_AUDIO_MODULATION_RATE_MAX 20.0f
 
 /** Seconds of a change of the depth, the center, the feedback, the mix or the stereo offset of
- * a phaser, of the depth, the delay, the mix, the spread or the feedback of a chorus, and of each half of the
- * fade of the wet signal around a change of the stages of a phaser or the voices of a chorus */
+ * a phaser, of the depth, the delay, the mix, the spread or the feedback of a chorus, and of
+ * each half of the fade of the wet signal around a change of the stages of a phaser or the
+ * voices of a chorus */
 #define BOX_AUDIO_MODULATION_RAMP 0.02f
 
 /** Frames between two updates of the coefficients of a phaser and of the read positions of a
@@ -802,7 +803,8 @@ typedef struct box_audio_phaser_params_t {
  * voices panned across the stereo field by the spread. A read never goes further back than
  * BOX_AUDIO_CHORUS_MAX nor nearer than a frame. The LFO starts at phase 0 when the effect is
  * put on and its phase stays continuous through a change of the rate. The feedback adds the
- * first tap of each channel times the feedback to the input of its line, which turns a delay
+ * first tap of each channel, read with cubic interpolation, times the feedback to the input of
+ * its line, which turns a delay
  * of 0.1 to 10 ms into a flanger: comb peaks at multiples of 1 / delay, or at its odd
  * multiples of half that at a negative feedback. A feedback of 0 renders as without it */
 typedef struct box_audio_chorus_params_t {
