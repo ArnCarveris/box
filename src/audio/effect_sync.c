@@ -76,19 +76,6 @@ uint32_t box_audio_module_effect_params(
     const void *ptr,
     float *params)
 {
-<<<<<<< HEAD
-=======
-    const Reverb *reverb = NULL;
-    const Equalizer *eq = NULL;
-    const AudioFilter *filter = NULL;
-    const Compressor *comp = NULL;
-    const Gate *gate = NULL;
-    const Delay *delay = NULL;
-    const Phaser *phaser = NULL;
-    const Chorus *chorus = NULL;
-    const Saturator *saturator = NULL;
-    const TransientShaper *shaper = NULL;
->>>>>>> 19189ed83f4818a8f45c1931ead40a6fb444f3f9
     uint32_t result = BOX_AUDIO_EFFECT_NONE;
     int32_t i;
     for (i = 0; params && i < BOX_AUDIO_EFFECT_PARAMS; i ++) {
@@ -193,14 +180,10 @@ uint32_t box_audio_module_effect_params(
             params[2] = saturator->bits;
             params[3] = saturator->mix;
         }
-
-        goto done;
-    }
-
-    shaper = ecs_get(world, e, TransientShaper);
-    if (shaper) {
+    } else if (component == ecs_id(TransientShaper)) {
+        const TransientShaper *shaper = ptr;
         result = BOX_AUDIO_EFFECT_TRANSIENT_SHAPER;
-        if (params) {
+        if (params && ptr) {
             params[0] = shaper->attack;
             params[1] = shaper->sustain;
         }
@@ -215,7 +198,8 @@ int32_t box_audio_module_effect_components(
 {
     const ecs_entity_t components[] = {
         ecs_id(Reverb), ecs_id(Equalizer), ecs_id(AudioFilter), ecs_id(Compressor),
-        ecs_id(Gate), ecs_id(Delay), ecs_id(Phaser), ecs_id(Chorus), ecs_id(Saturator)
+        ecs_id(Gate), ecs_id(Delay), ecs_id(Phaser), ecs_id(Chorus), ecs_id(Saturator),
+        ecs_id(TransientShaper)
     };
     int32_t i, count = (int32_t)(sizeof(components) / sizeof(components[0]));
     count = count < BOX_AUDIO_EFFECT_COMPONENTS ? count : BOX_AUDIO_EFFECT_COMPONENTS;
