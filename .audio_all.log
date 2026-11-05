@@ -1,8 +1,0 @@
-[run] package flecs (box) => '/opt/pm/tools/flecs/68790666a02b1dc679cdc9bc2d19fc285ba4fe1b-eccaa430d347/flecs'
-[run] package box => '.'
-$ python3 /pm/ws/tools/audio_core.py /pm/ws/src/audio/core/core.c /pm/mounts/bake/box/local_env/build/box/arm64-Linux-debug/generated /pm/ws
-[run] test audio => 'test/cpu/audio'
-HOST: Linux arm64
------------------------------
-PASS:779, FAIL:  0, EMPTY:  0 (audio.all)
-rc=0
