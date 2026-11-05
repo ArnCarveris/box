@@ -513,7 +513,7 @@ static WGPURenderPipeline box_gpu_shadow_create(
         .fragment = fs ? &fragment : NULL
     };
 
-    return wgpuDeviceCreateRenderPipeline(gpu->device, &desc);
+    return box_gpu_render_pipeline(gpu, &desc);
 }
 
 /** Create the pipeline that clears a tile of an atlas the pass loads: vs_clear of the shadow
@@ -549,7 +549,7 @@ static WGPURenderPipeline box_gpu_shadow_clear_create(
         .multisample = { .count = 1, .mask = 0xFFFFFFFF }
     };
 
-    return wgpuDeviceCreateRenderPipeline(gpu->device, &desc);
+    return box_gpu_render_pipeline(gpu, &desc);
 }
 
 /** Get the shadow pipelines, created again when the shadow shader was recompiled.

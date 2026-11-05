@@ -28,6 +28,7 @@ void BoxImport(
     ECS_IMPORT(world, FlecsScriptMath);
     ECS_IMPORT(world, FlecsStats);
     ecs_enable(world, ecs_id(FlecsStats), false);
+    ECS_IMPORT(world, BoxTask);
     ECS_IMPORT(world, BoxCurve);
     ECS_IMPORT(world, BoxAnimation);
     ECS_IMPORT(world, BoxTransform);
@@ -58,6 +59,7 @@ void BoxImport(
     ECS_IMPORT(world, BoxConsole);
     ECS_IMPORT(world, BoxEditor);
     ECS_IMPORT(world, BoxFps);
+    ECS_IMPORT(world, BoxStartup);
     ECS_IMPORT(world, BoxAtmosphere);
     ECS_IMPORT(world, BoxParticle);
     ECS_IMPORT(world, BoxTransition);

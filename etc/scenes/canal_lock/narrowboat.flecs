@@ -112,6 +112,8 @@ template LockNarrowboatBody {
       speed: {0.35, 0.6}, lifetime: {2, 3.5}, size: {0.08, 0.3},
       opacity: {0.05, 0.14}, color: {128, 128, 132}, seed: 3
     }
+    ParticleCurves: {size: {kind: CurveCatmullRom, keys: [{0, 0.5}, {1, 2.4}]}, opacity: {keys: [{0, 0}, {0.15, 1}, {0.6, 0.7}, {1, 0}]}}
+    ParticleForces: {gravity: {0, 0.15, 0}, wind: {0.5, 0, 0.2}, drag: 0.4, turbulence: 0.25, turbulence_scale: 1.5}
   }
 
   can : CanalGreen { Position: {0.1, 1.36, -0.32}; Lathe: {profile: LockCanShape, cap_start: true, cap_end: true, segments: 18, rings: 14} }
@@ -157,9 +159,8 @@ template LockNarrowboatBody {
 }
 
 template LockNarrowboat : LockControl {
-  const level = match lock_high { true: -0.45; _: -2.25 }
   const x = match lock_boat_at { 0: -16.6; 1: 0.6; _: 14.0 }
-  const y = match lock_boat_at { 0: -2.25; 1: level; _: -0.45 }
+  const y = match lock_boat_at { 0: -2.25; 1: lock_high ? -0.45 : -2.25; _: -0.45 }
 
   Position: {x, y, 0}
   Transition: [
@@ -172,31 +173,28 @@ template LockNarrowboat : LockControl {
   async {
     while true {
       await on.click(this)
-      const now = AppStatus[AppStatus].elapsed
-      if now >= lock_busy_until {
-        if lock_boat_at == 0 && lock_bridge_up && lock_bottom_gate {
-          lock_boat_at = 1
-          lock_boat_up = true
-          lock_busy_until = now + 6.1
-          hover = false
-        } else if lock_boat_at == 1 && lock_boat_up && lock_top_gate {
-          lock_boat_at = 2
-          lock_boat_up = false
-          lock_trips = lock_trips + 1
-          lock_busy_until = now + 6.1
-          hover = false
-        } else if lock_boat_at == 2 && lock_top_gate {
-          lock_boat_at = 1
-          lock_busy_until = now + 6.1
-          hover = false
-        } else if lock_boat_at == 1 && !lock_boat_up && lock_bridge_up && lock_bottom_gate {
-          lock_boat_at = 0
-          lock_boat_up = true
-          lock_trips = lock_trips + 1
-          lock_busy_until = now + 6.1
-          hover = false
-        }
+      if lock_busy {
+        continue
       }
+      const at_low = lock_bridge_up && lock_bottom_gate
+      if lock_boat_at == 0 && at_low {
+        lock_boat_at = 1
+        lock_boat_up = true
+      } else if lock_boat_at == 1 && lock_boat_up && lock_top_gate {
+        lock_boat_at = 2
+        lock_boat_up = false
+        lock_trips += 1
+      } else if lock_boat_at == 2 && lock_top_gate {
+        lock_boat_at = 1
+      } else if lock_boat_at == 1 && !lock_boat_up && at_low {
+        lock_boat_at = 0
+        lock_boat_up = true
+        lock_trips += 1
+      } else {
+        continue
+      }
+      hover = false
+      emit LockBusy(seconds: 6.1)
     }
   }
 }

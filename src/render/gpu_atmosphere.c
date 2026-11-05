@@ -568,7 +568,7 @@ static bool box_gpu_atmos_pipelines(
                 wgpuComputePipelineRelease(a->pipelines[i]);
             }
 
-            a->pipelines[i] = wgpuDeviceCreateComputePipeline(gpu->device,
+            a->pipelines[i] = box_gpu_compute_pipeline(gpu,
                 &(WGPUComputePipelineDescriptor){
                     .layout = a->pipeline_layouts[i],
                     .compute = {
@@ -1310,7 +1310,7 @@ static WGPURenderPipeline box_gpu_atmos_sky_pipeline(
         .stencilFront = { .compare = WGPUCompareFunction_Always },
         .stencilBack = { .compare = WGPUCompareFunction_Always }
     };
-    result = wgpuDeviceCreateRenderPipeline(gpu->device, &(WGPURenderPipelineDescriptor){
+    result = box_gpu_render_pipeline(gpu, &(WGPURenderPipelineDescriptor){
         .layout = a->sky_pipeline_layout,
         .vertex = {
             .module = shader->module,

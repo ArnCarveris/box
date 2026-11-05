@@ -19,6 +19,25 @@
     "test": {
         "testsuites": [
             {
+                "id": "InProgressTask",
+                "testcases": [
+                    "empty_by_default",
+                    "start_lists_task",
+                    "advance_and_set",
+                    "end_removes_task",
+                    "same_name_combines",
+                    "combined_unknown_total",
+                    "blocking_first",
+                    "limit",
+                    "remaining",
+                    "find",
+                    "publish_now",
+                    "unchanged_not_set",
+                    "reflected",
+                    "without_world"
+                ]
+            },
+            {
                 "id": "Args",
                 "testcases": [
                     "defaults",
@@ -365,9 +384,15 @@
                     "specular_anisotropy_map",
                     "sheen_map",
                     "diffuse_transmission_map",
+                    "border_map",
                     "ease_end_points",
                     "ease_monotonic",
-                    "ease_midpoints"
+                    "ease_midpoints",
+                    "add_remove_script",
+                    "add_remove_omitted",
+                    "add_remove_from_c",
+                    "neutral_supported",
+                    "neutral_unsupported_error"
                 ]
             },
             {

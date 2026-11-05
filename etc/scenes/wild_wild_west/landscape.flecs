@@ -10,20 +10,13 @@ using box.light
 using box.text
 
 
-@tree Parent
 template WestLandscape {
   foundation : WestStone { Position: {0, -0.73, 0}; RoundedBox: {38, 1.5, 30, 0.55} }
   strata { Position: {0, -0.28, 0}; RoundedBox: {38.05, 0.23, 30.05, 0.5}; Rgb: {173, 112, 65} }
   surface : WestSand { Position: {0, -0.015, 0}; RoundedBox: {37.9, 0.2, 29.9, 0.45} }
   road { Position: {0, 0.09, 2}; RoundedBox: {32, 0.035, 7, 0.017}; Rgb: {207, 164, 106} }
   for side in 0..2 {
-    const z = (side - 0.5) * 2.55
-    for i in 0..30 {
-      const ax = -16 + i * 0.88
-      const bx = ax + 0.88
-      WestRut(ax: ax, az: z + 0.65 - 1.25 * math.tanh((ax - 1.5) * 0.55) + math.sin(ax * 0.35) * 0.12,
-        bx: bx, bz: z + 0.65 - 1.25 * math.tanh((bx - 1.5) * 0.55) + math.sin(bx * 0.35) * 0.12) {}
-    }
+    WestRut(z: (side - 0.5) * 2.55) { Position: {} }
   }
   WestMesa(height: 5.3, width: 4.8) { Position: {-15.4, 0.09, -10.4} }
   WestMesa(height: 3.4, width: 3.1) { Position: {-17, 0.09, -6.4} }

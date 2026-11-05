@@ -5,9 +5,9 @@ using box.geometry
 using box.material
 using box.light
 using box.text
+using box.movement
 
 
-@tree Parent
 template WestWindmill {
   for side in 0..2 {
     for end in 0..2 {
@@ -31,6 +31,7 @@ template WestWindmill {
   rotor {
     Position: {0, 8.2, 0.55}
     Rotation: {0, -0.25, 0}
+    AngularVelocity: {0, 0, 1.1}
     hub : WestRed { Position: {}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.21, length: 0.4, segments: 16} }
     for i in 0..18 {
       const a = i * math.PI / 9

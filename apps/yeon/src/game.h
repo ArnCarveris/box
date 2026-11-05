@@ -30,7 +30,7 @@ ECS_STRUCT(YeonGame, {
     int32_t lanterns;             /**< Lanterns caught this run */
     int32_t max_lives;            /**< Strings the kite starts with, shown by the HUD */
     float speed;                  /**< Scroll speed of the village, raised by cfg.speedUp */
-    float time;                   /**< Seconds played, drives the sway of kites and lanterns */
+    float time;                   /**< Seconds played, drives the rivals, lanterns and strings */
     float distance_since_rival;   /**< Distance scrolled since the last rival spawned */
     float next_rival_distance;    /**< Distance at which the next rival spawns */
     float distance_since_lantern; /**< Distance scrolled since the last lantern spawned */

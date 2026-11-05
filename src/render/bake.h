@@ -207,6 +207,9 @@ typedef struct box_render_bake_t {
     const void *backend;    /**< Context of the backend the volumes were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
+    box_task_id_t task;     /**< Report of the probes left, 0 while no volume progresses */
+    int32_t task_total;     /**< Total of the report at the last frame */
+    bool task_finished;     /**< The report shows its total done and ends at the next frame */
 } box_render_bake_t;
 
 /** Find the volume of a scene.

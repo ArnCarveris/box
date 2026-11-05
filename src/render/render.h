@@ -90,6 +90,9 @@ void box_render_draws_stats(
  * Border.width on each side and with the corners rounded by its Border.radius less the width,
  * the inner edge of the border as the 2D shader draws it.
  *
+ * Reads the target Border on the game thread: while a Border transition runs, the clipped
+ * children keep the target width and corner radius, not the ones the border renders with.
+ *
  * @param world The world
  * @param e The element
  * @param half Receives half the width and half the height of the area, 0 when it has neither
@@ -1578,6 +1581,24 @@ void box_render_transition_mix(
     const void *from,
     const void *to,
     float t,
+    void *out);
+
+/** Get the neutral value of a component for a target: the value that renders like not having
+ * the component, with the fields that have no neutral of their own taken from the target, so a
+ * Tint fades in its own color. The value an added component animates from (on_add) and a
+ * removed one animates to (on_remove).
+ *
+ * Pure, with no world access. A component without a neutral value (Position, Rgb, AlphaCutoff,
+ * Transmission) gives the target.
+ *
+ * @param component The component
+ * @param target The target, packed (box_render_transition_pack)
+ * @param out Receives the neutral value, packed, BOX_RENDER_TRANSITION_VALUE bytes; may be target
+ * @return Whether the component has a neutral value
+ */
+bool box_render_transition_neutral(
+    box_render_transition_component_t component,
+    const void *target,
     void *out);
 
 /** Widen the per field range of the targets of a transform component or a BoxShadow by what a

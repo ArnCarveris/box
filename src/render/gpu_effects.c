@@ -777,7 +777,7 @@ static WGPURenderPipeline box_gpu_fx_pipeline(
         .multisample = { .count = 1, .mask = 0xFFFFFFFF },
         .fragment = &fragment
     };
-    found->pipeline = wgpuDeviceCreateRenderPipeline(gpu->device, &desc);
+    found->pipeline = box_gpu_render_pipeline(gpu, &desc);
     found->revision = revision;
 done:
     return module && found ? found->pipeline : NULL;
@@ -937,13 +937,13 @@ static bool box_gpu_fx_measure_pipelines(
         wgpuComputePipelineRelease(fx->adapt);
     }
 
-    fx->histogram = wgpuDeviceCreateComputePipeline(gpu->device,
+    fx->histogram = box_gpu_compute_pipeline(gpu,
         &(WGPUComputePipelineDescriptor){
             .layout = fx->measure_pipeline_layout,
             .compute = { .module = module,
                 .entryPoint = { .data = "histogram_main", .length = WGPU_STRLEN } }
         });
-    fx->adapt = wgpuDeviceCreateComputePipeline(gpu->device,
+    fx->adapt = box_gpu_compute_pipeline(gpu,
         &(WGPUComputePipelineDescriptor){
             .layout = fx->measure_pipeline_layout,
             .compute = { .module = module,

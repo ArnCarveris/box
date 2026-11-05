@@ -162,21 +162,59 @@ static bool box_audio_wraps(
         llround((tl->loop_end - tl->loop_start) * a->frames_per_beat) >= 1;
 }
 
-/** Start a piece at a frame: the pieces at or after the frame are replaced.
+/** Set the beat clock of the core at a frame, when the timeline keeps the one of the output:
+ * a BEAT command scheduled at the frame, after a CANCEL of the BEAT commands from the frame on
+ * when what was sent ahead no longer holds.
  *
- * @param tl The timeline
+ * @param state The state
+ * @param frame The frame
+ * @param beat The beat at the frame
+ * @param tempo Beats per second from the frame on, 0 for the 120 bpm of a stopped transport
+ * @param cancel Whether to cancel the BEAT commands sent for the frame and later ones
+ */
+static void box_audio_beat_send(
+    box_audio_module_t *state,
+    uint64_t frame,
+    double beat,
+    double tempo,
+    bool cancel)
+{
+    box_audio_timeline_t *tl = &state->timeline;
+    if (!state->serial || tl->beat_serial != state->serial) {
+        goto done;
+    }
+
+    if (cancel && box_audio_reserve(state)) {
+        box_audio_write_cancel(&state->writer, BOX_AUDIO_CMD_BEAT, (uint32_t)frame,
+            (uint32_t)(frame >> 32));
+    }
+
+    if (box_audio_reserve(state)) {
+        box_audio_write_beat(&state->writer, beat, (float)tempo, frame);
+        tl->stats.beats ++;
+    }
+
+done:
+    return;
+}
+
+/** Start a piece at a frame: the pieces at or after the frame are replaced, and so are the
+ * BEAT commands sent for them.
+ *
+ * @param state The state
  * @param frame The frame
  * @param beat The beat at the frame
  * @param frames_per_beat The tempo of the piece
  */
 static void box_audio_anchor_push(
-    box_audio_timeline_t *tl,
+    box_audio_module_t *state,
     uint64_t frame,
     double beat,
     double frames_per_beat)
 {
+    box_audio_timeline_t *tl = &state->timeline;
     box_audio_anchor_t *anchors = ecs_vec_first(&tl->anchors);
-    int32_t count = ecs_vec_count(&tl->anchors);
+    int32_t count = ecs_vec_count(&tl->anchors), was = count;
     while (count && anchors[count - 1].frame >= frame) {
         count --;
     }
@@ -186,21 +224,24 @@ static void box_audio_anchor_push(
     *ecs_vec_append_t(NULL, &tl->anchors, box_audio_anchor_t) = (box_audio_anchor_t){
         .frame = frame, .beat = beat, .frames_per_beat = frames_per_beat };
     tl->stats.anchors ++;
+    box_audio_beat_send(state, frame, beat, (double)tl->rate / frames_per_beat,
+        !was || count != was);
 }
 
 /** Anchor the timeline anew: one piece from a frame, the window starting there.
  *
- * @param tl The timeline
+ * @param state The state
  * @param frame The frame, the clock
  * @param beat The beat at the frame
  */
 static void box_audio_anchor_reset(
-    box_audio_timeline_t *tl,
+    box_audio_module_t *state,
     uint64_t frame,
     double beat)
 {
+    box_audio_timeline_t *tl = &state->timeline;
     ecs_vec_clear(&tl->anchors);
-    box_audio_anchor_push(tl, frame, beat, box_audio_frames_per_beat(tl));
+    box_audio_anchor_push(state, frame, beat, box_audio_frames_per_beat(tl));
     tl->window_end = frame;
 }
 
@@ -236,15 +277,16 @@ static void box_audio_segment_add(
  * and add the segments from a frame on to the window. A piece that starts at the loop start
  * does not wrap on its own first frame, so the window always moves forward.
  *
- * @param tl The timeline
+ * @param state The state
  * @param to The new end of the window
  * @param emit First frame that gets segments, UINT64_MAX for none
  */
 static void box_audio_timeline_advance(
-    box_audio_timeline_t *tl,
+    box_audio_module_t *state,
     uint64_t to,
     uint64_t emit)
 {
+    box_audio_timeline_t *tl = &state->timeline;
     uint64_t f = tl->window_end, end;
     box_audio_anchor_t a;
     int64_t w;
@@ -266,7 +308,7 @@ static void box_audio_timeline_advance(
 
         box_audio_segment_add(tl, &a, f > emit ? f : emit, end, wrap);
         if (wrap) {
-            box_audio_anchor_push(tl, end, tl->loop_start, a.frames_per_beat);
+            box_audio_anchor_push(state, end, tl->loop_start, a.frames_per_beat);
         }
 
         f = end;
@@ -473,7 +515,7 @@ static bool box_audio_timeline_follow(
         tl->serial = state->serial;
         if (tl->playing) {
             box_audio_timeline_cancel(world, state, BOX_AUDIO_TIMELINE_OUTPUT, clock);
-            box_audio_anchor_reset(tl, clock, seek ? position : tl->written);
+            box_audio_anchor_reset(state, clock, seek ? position : tl->written);
             seek = false;
             result = true;
         } else {
@@ -482,7 +524,7 @@ static bool box_audio_timeline_follow(
     }
 
     if (tr->playing && !tl->playing) {
-        box_audio_anchor_reset(tl, clock, position);
+        box_audio_anchor_reset(state, clock, position);
         tl->playing = true;
         result = true;
     } else if (!tr->playing && tl->playing) {
@@ -491,15 +533,62 @@ static bool box_audio_timeline_follow(
         ecs_vec_clear(&tl->anchors);
         tl->playing = false;
         box_audio_timeline_write(world, tl, position);
+        box_audio_beat_send(state, clock, position, 0, true);
     } else if (tl->playing && seek) {
         box_audio_timeline_cancel(world, state, BOX_AUDIO_TIMELINE_SEEK, clock);
-        box_audio_anchor_reset(tl, clock, position);
+        box_audio_anchor_reset(state, clock, position);
         result = true;
     } else if (!tl->playing) {
+        if (position != tl->written) {
+            box_audio_beat_send(state, clock, position, 0, true);
+        }
+
         tl->written = position;
     }
 
     return result;
+}
+
+/** Send the whole beat clock to an output that does not have it yet, when something reads
+ * it: the beat at the clock and every piece after it, or the position of a stopped transport.
+ * A frame without a reader forgets the output, so a later reader sends it again.
+ *
+ * @param state The state
+ * @param clock The clock
+ */
+static void box_audio_beat_clock(
+    box_audio_module_t *state,
+    uint64_t clock)
+{
+    box_audio_timeline_t *tl = &state->timeline;
+    const box_audio_anchor_t *anchors = ecs_vec_first(&tl->anchors), *a;
+    int32_t i, count = ecs_vec_count(&tl->anchors);
+    if (!tl->beat_wanted || !state->serial) {
+        tl->beat_serial = 0;
+        goto done;
+    }
+
+    if (tl->beat_serial == state->serial) {
+        goto done;
+    }
+
+    tl->beat_serial = state->serial;
+    a = tl->playing ? box_audio_anchor_at(tl, clock) : NULL;
+    if (a) {
+        box_audio_beat_send(state, clock, box_audio_anchor_beat(a, clock),
+            (double)tl->rate / a->frames_per_beat, true);
+        for (i = 0; i < count; i ++) {
+            if (anchors[i].frame > clock) {
+                box_audio_beat_send(state, anchors[i].frame, anchors[i].beat,
+                    (double)tl->rate / anchors[i].frames_per_beat, false);
+            }
+        }
+    } else {
+        box_audio_beat_send(state, clock, tl->written, 0, true);
+    }
+
+done:
+    return;
 }
 
 void box_audio_timeline_update(
@@ -530,17 +619,17 @@ void box_audio_timeline_update(
     }
 
     if (tl->window_end < clock) {
-        box_audio_timeline_advance(tl, clock, UINT64_MAX);
+        box_audio_timeline_advance(state, clock, UINT64_MAX);
     }
 
     if (changed && !anchored) {
-        box_audio_anchor_push(tl, tl->window_end, box_audio_beat_of(tl, tl->window_end),
+        box_audio_anchor_push(state, tl->window_end, box_audio_beat_of(tl, tl->window_end),
             box_audio_frames_per_beat(tl));
     }
 
     ahead = (uint64_t)llround(box_audio_tempo_clamp(tr.lookahead,
         BOX_AUDIO_LOOKAHEAD_MIN, BOX_AUDIO_LOOKAHEAD_MAX) * (double)tl->rate);
-    box_audio_timeline_advance(tl, clock + ahead, clock);
+    box_audio_timeline_advance(state, clock + ahead, clock);
     if (!waiting && tr.metronome) {
         box_audio_metronome(state, &tr);
     }
@@ -555,6 +644,10 @@ void box_audio_timeline_update(
     box_audio_timeline_prune(tl, clock);
     box_audio_timeline_write(world, tl, box_audio_beat_of(tl, clock));
 done:
+    if (ptr && t->sample_rate > 0) {
+        box_audio_beat_clock(state, tl->clock);
+    }
+
     return;
 }
 

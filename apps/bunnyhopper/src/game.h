@@ -26,7 +26,7 @@ ECS_ENUM(BunnyGameState, {
 });
 
 /** State of the game, a singleton run.flecs sets at the start of every run. The systems signal
- * every change (OnSet), so reactive scripts follow it.
+ * a passed carrot and a spawn (OnSet), so reactive scripts follow the count of carrots.
  */
 ECS_STRUCT(BunnyGame, {
     int32_t carrots;            /**< Carrots that passed the bunny in this run */

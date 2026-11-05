@@ -130,7 +130,8 @@ ECS_STRUCT(PbrMaterial, {
  * split sum albedo over the rest. Emission is not attenuated; an unlit view ignores the coat.
  *
  * Transitionable (Transition): strength and roughness interpolate linearly by the timing
- * function, through a strength of 0 too; adding or removing ClearCoat does not animate.
+ * function, through a strength of 0 too; adding or removing ClearCoat animates from and to a
+ * strength of 0 with on_add and on_remove of TransitionSpec, else it snaps.
  */
 ECS_STRUCT(ClearCoat, {
     float strength;  /**< 0 no coat to 1 full coat */
@@ -157,7 +158,8 @@ ECS_STRUCT(ClearCoat, {
  *
  * Transitionable (Transition): strength and rotation interpolate linearly by the timing function,
  * through a strength of 0 too; the rotation takes no shortest path and wraps only when rendered.
- * Adding or removing SpecularAnisotropy does not animate.
+ * Adding or removing SpecularAnisotropy animates from and to a strength of 0 with on_add and
+ * on_remove of TransitionSpec, else it snaps.
  */
 ECS_STRUCT(SpecularAnisotropy, {
     float strength; /**< 0 isotropic to 1 fully stretched, clamped to 0..1 */
@@ -177,7 +179,8 @@ ECS_STRUCT(SpecularAnisotropy, {
  * lookup table. It lies under the clear coat; emission is not scaled, an unlit view ignores it.
  *
  * Transitionable (Transition): color interpolates per channel like Rgb and roughness linearly by
- * the timing function, through a black color too; adding or removing Sheen does not animate.
+ * the timing function, through a black color too; adding or removing Sheen animates from and to
+ * a black color with on_add and on_remove of TransitionSpec, else it snaps.
  */
 ECS_STRUCT(Sheen, {
     Rgb color;       /**< Color of the sheen, display encoded, black for none */
@@ -206,7 +209,8 @@ ECS_STRUCT(Sheen, {
  *
  * Transitionable (Transition): factor, thickness and blur interpolate linearly by the timing
  * function and color per channel like Rgb, through a factor of 0 too; adding or removing
- * DiffuseTransmission does not animate.
+ * DiffuseTransmission animates from and to a factor of 0 with on_add and on_remove of
+ * TransitionSpec, else it snaps.
  */
 ECS_STRUCT(DiffuseTransmission, {
     float factor;    /**< 0 all diffuse light is reflected to 1 all of it passes through,

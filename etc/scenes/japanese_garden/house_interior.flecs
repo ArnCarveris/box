@@ -16,7 +16,6 @@ using box.surface
 using box.controllers
 using box.movement
 
-@tree Parent
 template HouseInterior {
   prop style: i32 = 0
   prop accent: Rgb = {151, 109, 139}

@@ -10,7 +10,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template IslandBeam {
   prop ax: f32 = 0
   prop ay: f32 = 0

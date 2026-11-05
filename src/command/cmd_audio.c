@@ -149,6 +149,74 @@ static const char* box_cmd_audio_filter_kind(
     return (uint32_t)kind < 4 ? names[kind] : "?";
 }
 
+/** Append the modulators that move a member of a bus or an effect: each with its source, its
+ * timing, its depth, its member and whether it runs.
+ *
+ * @param world The world
+ * @param buf The output
+ * @param target The bus or effect entity
+ */
+static void box_cmd_audio_modulators(
+    ecs_world_t *world,
+    ecs_strbuf_t *buf,
+    ecs_entity_t target)
+{
+    static const char *waves[] = { "sine", "triangle", "square", "saw up", "saw down",
+        "random" };
+    ecs_iter_t it = ecs_each(world, AudioModulator);
+    int32_t i;
+    while (ecs_each_next(&it)) {
+        const AudioModulator *m = ecs_field(&it, AudioModulator, 0);
+        for (i = 0; i < it.count; i ++) {
+            char *path;
+            if (m[i].target != target) {
+                continue;
+            }
+
+            path = ecs_get_path(world, it.entities[i]);
+            ecs_strbuf_append(buf, ", modulator %s: ", path);
+            if (m[i].source == AudioModSteps) {
+                ecs_strbuf_append(buf, "%d steps smooth %.2f", m[i].step_count,
+                    (double)m[i].smooth);
+            } else if (m[i].source == AudioModFollower) {
+                ecs_strbuf_appendstr(buf, "follower of ");
+                if (m[i].key && ecs_is_alive(world, m[i].key)) {
+                    char *key = ecs_get_path(world, m[i].key);
+                    ecs_strbuf_appendstr(buf, key);
+                    ecs_os_free(key);
+                } else {
+                    ecs_strbuf_appendstr(buf, "its bus");
+                }
+
+                ecs_strbuf_append(buf, " attack %.3f release %.3f", (double)m[i].attack,
+                    (double)m[i].release);
+            } else {
+                ecs_strbuf_append(buf, "lfo %s%s",
+                    (uint32_t)m[i].wave <= (uint32_t)AudioModRandom ? waves[m[i].wave] : "?",
+                    m[i].unipolar ? " unipolar" : "");
+            }
+
+            if (m[i].source != AudioModFollower) {
+                if (m[i].sync > 0) {
+                    ecs_strbuf_append(buf, " sync %.3f beats", (double)m[i].sync);
+                } else {
+                    ecs_strbuf_append(buf, " rate %.2f Hz", (double)m[i].rate);
+                }
+
+                if (m[i].phase != 0) {
+                    ecs_strbuf_append(buf, " phase %.2f", (double)m[i].phase);
+                }
+            }
+
+            ecs_strbuf_append(buf, " depth %.2f%s on %s (%s)", (double)m[i].depth,
+                m[i].scale == AudioModOctaves ? " oct" : "",
+                m[i].member ? m[i].member : "(no member)",
+                box_audio_modulator_status(world, it.entities[i]));
+            ecs_os_free(path);
+        }
+    }
+}
+
 /** Append the insert slots of a bus: each effect with its kind, its parameters and whether it
  * runs.
  *
@@ -176,6 +244,7 @@ static void box_cmd_audio_effects(
         const Chorus *chorus;
         const Saturator *saturator;
         const TransientShaper *shaper;
+        const FrequencyShifter *shifter;
         const box_audio_module_t *state = box_audio_module_get(world);
         char *path;
         int32_t b, slot;
@@ -286,6 +355,11 @@ static void box_cmd_audio_effects(
         } else if ((shaper = ecs_get(world, e, TransientShaper))) {
             ecs_strbuf_append(buf, "transient shaper attack %.2f sustain %.2f",
                 (double)shaper->attack, (double)shaper->sustain);
+        } else if ((shifter = ecs_get(world, e, FrequencyShifter))) {
+            ecs_strbuf_append(buf, "frequency shifter %s %+.1f Hz stereo %.2f feedback %.2f "
+                "mix %.2f", shifter->mode == FrequencyRing ? "ring" : "shift",
+                (double)shifter->shift, (double)shifter->stereo, (double)shifter->feedback,
+                (double)shifter->mix);
         }
 
         slot = box_audio_module_effect_slot(world, e);
@@ -296,6 +370,7 @@ static void box_cmd_audio_effects(
         }
 
         ecs_strbuf_append(buf, " (%s)", box_cmd_audio_effect_state(world, channel, j, e));
+        box_cmd_audio_modulators(world, buf, e);
         ecs_os_free(path);
     }
 }
@@ -382,6 +457,7 @@ static void box_cmd_audio_bus(
         }
     }
 
+    box_cmd_audio_modulators(world, buf, e);
     box_cmd_audio_effects(world, buf, e, bus);
     if (in_order) {
         box_cmd_audio_meter(world, buf, e);
@@ -674,6 +750,7 @@ static char* box_cmd_audio_print(
     if (mb) {
         ecs_strbuf_append(&buf, ", bus volume %.2f pan %.2f width %.2f%s", (double)mb->volume,
             (double)mb->pan, (double)mb->width, mb->mute ? " muted" : "");
+        box_cmd_audio_modulators(world, &buf, master);
         box_cmd_audio_effects(world, &buf, master, mb);
     }
 

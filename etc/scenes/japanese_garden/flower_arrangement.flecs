@@ -13,7 +13,6 @@ using box.surface
 using box.controllers
 using box.movement
 
-@tree Parent
 template FlowerArrangement {
   prop tint: Rgb = {247, 181, 204}
   prop phase: f32 = 0
