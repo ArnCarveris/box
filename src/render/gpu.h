@@ -1568,9 +1568,14 @@ WGPUTextureView box_gpu_transmission_depth_view(
     box_gpu_t *gpu,
     const box_gpu_snapshot_t *s);
 
+/** Snapshots of transmission a view takes at most in a frame (box_gpu_draw_batches); each costs
+ * a color copy, the blur pyramid and a pass split. 4 covers glass over three layers of glass or
+ * blended shapes, and beyond it later glass samples the last snapshot. */
+#define BOX_GPU_TRANSMISSION_SNAPSHOTS (4)
+
 /** Copy the color attachment of a view into mip 0 of its snapshot and blur every mip above
  * from the one below (a Jimenez 13 tap downsample), and copy its depth attachment into the
- * depth copy of the snapshot. Called between two render passes.
+ * depth copy of the snapshot. Called between two render passes, once per snapshot of the view.
  *
  * Until the downsample pipeline exists only mip 0 is written, which is all the view of the
  * snapshot shows then (box_gpu_transmission_view).
@@ -1579,7 +1584,9 @@ WGPUTextureView box_gpu_transmission_depth_view(
  * @param s The snapshot
  * @param encoder The encoder of the frame
  * @param source Texture of the color attachment, at least as large as the snapshot
- * @param depth Texture of the depth attachment (CopySrc), the size of the snapshot
+ * @param depth Texture of the depth attachment (CopySrc), the size of the snapshot, NULL to
+ * keep the depth copy of the previous snapshot of the frame: no blended or transmissive draw
+ * writes depth
  */
 void box_gpu_transmission_record(
     box_gpu_t *gpu,

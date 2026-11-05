@@ -1,0 +1,69 @@
+// A glass pane in front of an additive orange sphere, an alpha blended green quad and a magenta
+// Rect, over a dark wall, with a second smaller glass pane tinted blue behind the front one over
+// the right half of the quad and the Rect. Every shape behind the glass shows through it: the
+// view snapshots its image right before each pane, the back pane first, then the front one with
+// the back pane and the blended shapes sorted between them in its snapshot.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+camera {
+  Position: {0, 0, 6}
+  Camera: {fov: 50, far_: 100}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {20, 20, 30, 255}}}
+}
+
+sun {
+  Rotation: {-0.6, 0.4, 0}
+  DirectionalLight: {intensity: 3}
+  Rgb: {255, 255, 255}
+}
+
+wall {
+  Position: {0, 0, -6}
+  Box: {20, 12, 0.2}
+  Rgb: {60, 60, 70}
+}
+
+rect {
+  Position: {0.6, 0.9, -4.5}
+  Rect: {2.2, 1.2}
+  Rgb: {220, 40, 200}
+}
+
+sphere {
+  Position: {-1.2, -0.2, -3}
+  Sphere: {segments: 32, smooth: true, radius: 0.9}
+  Rgb: {0, 0, 0}
+  Emissive: {strength: 1, color: {255, 140, 30}}
+  BlendMode: Additive
+}
+
+quad {
+  Position: {0.9, -0.5, -2.2}
+  Box: {1.6, 1.6, 0.05}
+  Rgb: {40, 220, 90}
+  Opacity: {0.6}
+}
+
+back_pane {
+  Position: {1.4, 0, -1.2}
+  Box: {1.6, 2.6, 0.05}
+  Rgb: {150, 190, 255}
+  PbrMaterial: {roughness: 0.05}
+  Transmission: {transmission_factor: 1, ior: 1.3, thickness_factor: 0.05}
+}
+
+front_pane {
+  Position: {0, 0, 0}
+  Box: {4.4, 3.2, 0.1}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.02}
+  Transmission: {transmission_factor: 1, ior: 1.5, thickness_factor: 0.1}
+}

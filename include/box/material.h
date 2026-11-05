@@ -201,8 +201,8 @@ ECS_STRUCT(Sheen, {
  * is behind it, read from a depth copy of the snapshot, on top of the blur of its roughness. An
  * object touching the surface stays sharp and one further behind gets softer; the sky, with no
  * depth, takes the softest mip. A shape with DiffuseTransmission and no Transmission is opaque
- * and ignores the blur. Blended and transmissive shapes are not in the snapshot, so they are
- * neither seen nor blurred through it.
+ * and ignores the blur. Blended and transmissive shapes behind it are in the snapshot (see
+ * Transmission) but write no depth, so they blur like whatever lies behind them.
  *
  * Transitionable (Transition): factor, thickness and blur interpolate linearly by the timing
  * function and color per channel like Rgb, through a factor of 0 too; adding or removing
@@ -240,9 +240,13 @@ ECS_STRUCT(Emissive, {
  * alpha blended and additive shapes, without blending or depth writes. It casts no shadow, is not
  * in the probe, reflection or bake captures and ignores Opacity, BlendMode and AlphaCutoff.
  *
- * It shows the image of its view before the blended pass (no blended or transmissive shapes)
- * where the ray refracted by ior leaves thickness_factor times the scale, blurred by roughness,
- * absorbed toward attenuation_color and tinted by Rgb, with its own specular light on top.
+ * It shows a snapshot of its view where the ray refracted by ior leaves thickness_factor times
+ * the scale, blurred by roughness, absorbed toward attenuation_color and tinted by Rgb, with its
+ * own specular light on top. The snapshot holds everything drawn before it back to front.
+ *
+ * That is the opaque shapes, sky, fog volumes, particles and 2D shapes (even those in front of
+ * it) and blended and transmissive shapes behind it, snapshot again after other shapes drew,
+ * at most 4 times a view and frame; beyond that later glass shows the last snapshot.
  *
  * Transitionable (Transition): the four floats interpolate linearly by the timing function and
  * attenuation_color per channel like Rgb. The shape keeps its transmissive batch while its

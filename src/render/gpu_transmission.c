@@ -1,14 +1,14 @@
 /**
  * @file render/gpu_transmission.c
- * @brief Opaque snapshot of transmission of the webgpu backend.
+ * @brief Snapshot of transmission of the webgpu backend.
  *
- * A view with a transmissive draw copies its image into mip 0 of the snapshot of its target
- * before its first blended draw and blurs every mip from the one below (Jimenez downsample,
- * etc/shaders/transmission.wgsl); its transmissive draws sample it at their roughness.
+ * Right before a transmissive draw a view copies its image, everything drawn before back to
+ * front (2D shapes, particles, fog volumes, blended meshes behind), into mip 0 of its snapshot
+ * and blurs each mip from the one below (etc/shaders/transmission.wgsl) for the glass to sample.
  *
- * A target has one snapshot per color format of its views, at its render size. Until the
- * downsample shader compiles only mip 0 is copied and bound, so a rough shape samples the
- * sharp image. Views without transmissive draws bind a white image and a depth placeholder.
+ * Later glass after other draws snapshots again into the same texture, at most
+ * BOX_GPU_TRANSMISSION_SNAPSHOTS a view and frame, the depth only the first time. One snapshot
+ * per color format of a target; mip 0 alone until the downsample compiles, else white.
  */
 
 #include "gpu.h"
@@ -419,10 +419,13 @@ void box_gpu_transmission_record(
         &(WGPUTexelCopyTextureInfo){ .texture = source, .aspect = WGPUTextureAspect_All },
         &(WGPUTexelCopyTextureInfo){ .texture = s->texture, .aspect = WGPUTextureAspect_All },
         &(WGPUExtent3D){ s->width, s->height, 1 });
-    wgpuCommandEncoderCopyTextureToTexture(encoder,
-        &(WGPUTexelCopyTextureInfo){ .texture = depth, .aspect = WGPUTextureAspect_All },
-        &(WGPUTexelCopyTextureInfo){ .texture = s->depth, .aspect = WGPUTextureAspect_All },
-        &(WGPUExtent3D){ s->width, s->height, 1 });
+    if (depth) {
+        wgpuCommandEncoderCopyTextureToTexture(encoder,
+            &(WGPUTexelCopyTextureInfo){ .texture = depth, .aspect = WGPUTextureAspect_All },
+            &(WGPUTexelCopyTextureInfo){ .texture = s->depth, .aspect = WGPUTextureAspect_All },
+            &(WGPUExtent3D){ s->width, s->height, 1 });
+    }
+
     for (i = 1; pipeline && i < s->mip_count; i ++) {
         WGPURenderPassColorAttachment attachment = {
             .view = s->mips[i],
