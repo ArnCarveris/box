@@ -489,6 +489,28 @@ static void box_texture_request_gen(
     }
 
     desc->strength = gen->strength;
+    if (gen->output == GenAlbedo && ecs_vec_count(&gen->palette)) {
+        int32_t index = gen->palette_layer;
+        if (index < 0 || index >= desc->layer_count ||
+            desc->layers[index].kind == GenNoise)
+        {
+            char *name = ecs_get_path(world, e);
+            char *error = flecs_asprintf("texture '%s': palette_layer %d %s", name, index,
+                index < 0 || index >= desc->layer_count
+                    ? "does not exist" : "is a GenNoise layer, which has no tones");
+            box_texture_fail(world, t, e, error);
+            ecs_os_free(error);
+            ecs_os_free(name);
+            box_texture_gen_free(desc);
+            goto done;
+        }
+
+        desc->palette_count = ecs_vec_count(&gen->palette);
+        desc->palette = ecs_os_memdup(ecs_vec_first(&gen->palette),
+            desc->palette_count * ECS_SIZEOF(rgb));
+        desc->palette_layer = index;
+    }
+
     box_texture_job_t *job = ecs_os_calloc_t(box_texture_job_t);
     job->gen = desc;
     job->quality = quality;
@@ -848,6 +870,7 @@ void BoxTextureImport(
     ECS_META_COMPONENT(world, TextureGenPattern);
     ECS_META_COMPONENT(world, TextureGenOp);
     ECS_META_COMPONENT(world, TextureGenDistance);
+    ECS_META_COMPONENT(world, TextureGenToneOrder);
     ECS_META_COMPONENT(world, TextureGenOutput);
     ECS_META_COMPONENT(world, TextureGenLayer);
     ECS_META_COMPONENT(world, TextureGenKey);
@@ -856,7 +879,8 @@ void BoxTextureImport(
     ECS_META_COMPONENT(world, TextureStatus);
     box_owned_hooks(world, TexturePath, BOX_OWNED_STR(TexturePath, path));
     box_owned_hooks(world, TextureGen, BOX_OWNED_VEC(TextureGen, layers, TextureGenLayer),
-        BOX_OWNED_VEC(TextureGen, colors, TextureGenKey));
+        BOX_OWNED_VEC(TextureGen, colors, TextureGenKey),
+        BOX_OWNED_VEC(TextureGen, palette, rgb));
     box_owned_hooks(world, TextureStatus, BOX_OWNED_STR(TextureStatus, error));
 
     ECS_COMPONENT_DEFINE(world, TextureRegistry);
