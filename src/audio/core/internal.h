@@ -748,14 +748,12 @@ typedef struct box_audio_synth_source_t {
     int32_t ringing_free; /**< Strings of layers without an envelope still over the silence */
     bool tables;          /**< Whether a layer plays a wavetable, whose position moves per
                            * frame */
-<<<<<<< HEAD
     double bend;          /**< Factor of the pitch from the bend of the voice, 1 without; the
                            * turns of the oscillators and the key carry it */
     double mod;           /**< Factor of the depth of the pitch of the LFOs from the mod of the
                            * voice, 1 without */
     float pressure;       /**< Pressure of the voice, 0..1, 0 without: the cutoff moves up by
                            * BOX_AUDIO_SYNTH_PRESSURE_OCTAVES times it */
-=======
     box_audio_synth_comb_t *comb[2]; /**< The delay lines of a BOX_AUDIO_SYNTH_COMB filter, of
                            * the left or mono channel, then of the right one when stereo; NULL
                            * for none */
@@ -772,7 +770,6 @@ typedef struct box_audio_synth_source_t {
     int32_t comb_window;  /**< Frames left of the window over which the comb rings on once
                            * the envelopes have ended, a period */
     bool comb_ringing;    /**< Whether the comb is still over the silence */
->>>>>>> 942950f0529b6902eb7f0cb8f140fd6a2929c5cd
 } box_audio_synth_source_t;
 
 /** State of the kinds of sources */

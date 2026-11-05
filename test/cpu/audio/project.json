@@ -386,8 +386,8 @@
                     "synth_drive",
                     "synth_formant",
                     "synth_wavetable",
-<<<<<<< HEAD
-                    "expression"
+                    "expression",
+                    "synth_comb"
                 ]
             },
             {
@@ -412,9 +412,6 @@
                     "delete_placement",
                     "clip_copies",
                     "script"
-=======
-                    "synth_comb"
->>>>>>> 942950f0529b6902eb7f0cb8f140fd6a2929c5cd
                 ]
             },
             {

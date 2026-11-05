@@ -5,15 +5,10 @@
  * one of FM, with curved envelopes, with a driven filter, the ladder filter or the formant
  * filter with its vowel under an LFO and the filter envelope, with subs, hard synced under an
  * LFO, with pink noise, with drift or with the drive of the mix before the filter, 32 voices of
-<<<<<<< HEAD
- * a pluck string, steady or under a vibrato, 8 of a unison pluck of 4, and 64 of a patch of
- * wavetables whose positions an LFO and the envelope move, and 64 voices whose bend and pressure
- * ramp, the expression of notes.
-=======
  * a pluck string, steady or under a vibrato, 8 of a unison pluck of 4, 64 of a patch of
- * wavetables whose positions an LFO and the envelope move, and 32 through a comb filter, as
- * many as the core has comb lines.
->>>>>>> 942950f0529b6902eb7f0cb8f140fd6a2929c5cd
+ * wavetables whose positions an LFO and the envelope move, 64 voices whose bend and pressure
+ * ramp, the expression of notes, and 32 through a comb filter, as many as the core has comb
+ * lines.
  *
  * Each iteration renders one quantum of 128 stereo frames, so the time per item is the time
  * per sample of the whole mix of 64 voices.
