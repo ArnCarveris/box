@@ -293,7 +293,7 @@ voices on play, so edits affect subsequent plays.
 | `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), `sync` (0, off, 1..16), `color` (`SynthNoiseWhite`), modulation controls, `velocity` (0) |
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`, `key_scale`; all zero by default |
 | `SynthDrive` | Root: `drive` (0.3, 0..1), `asymmetry` (0, 0..1) |
-| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves), `keytrack` (0), `model` (`SynthFilterSvf` or `SynthFilterLadder`), `vowel` (0, 0..4, `SynthFormant`) |
+| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves), `keytrack` (0), `model` (`SynthFilterSvf` or `SynthFilterLadder`), `vowel` (0, 0..4, `SynthFormant`), `feedback` (0.5, -0.98..0.98, `SynthComb`), `tune` (1, 0.125..8, `SynthComb`) |
 | `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves, `velocity` (0) and `vowel` (0, -4..4, `SynthFormant`); requires a filter |
 | `SynthPitchEnvelope` | `amount` (0 semitones, -48..48), `decay` seconds, `curve` (0, -16..16), `release_amount` (0 semitones, -48..48), `sync` (0 semitones, -48..48) |
 | `SynthUnison` | Per layer: `voices` (3, 1..7), `detune` (10 cents, 0..100), `width` (0, 0..1) |
@@ -490,6 +490,47 @@ prefab Talk {
   SynthFilter: {kind: SynthFormant, vowel: 1, resonance: 0.3}
   SynthLfo: {rate: 1.5, vowel: 1}
   SynthOscillator: {wave: SynthSaw, frequency: 110, level: 0.6}
+}
+```
+
+`kind: SynthComb` is a feedback comb tuned to the note: `y = x + feedback * y` delayed
+by one period of the note times `tune`. Metallic and flanged tones, resonators, and
+plucks from short noise bursts come out of it. Positive `feedback` (default 0.5) puts
+peaks at the harmonics of the comb frequency; negative feedback puts them at the odd
+harmonics of half of it, a hollow, closed-pipe tone an octave lower. Near ±0.98 it
+rings long. `tune` (default 1, 0.125..8) is the ratio of the comb frequency to the
+note: 2 an octave up, 1.5 a fifth.
+
+The note is the frequency of the first layer times the current pitch of the voice:
+its pitch ratio, glide, pitch variance, bend, the `SynthPitchEnvelope` of that layer
+and the pitch depth of a `SynthLfo` on every layer. Unison detune, drift and the LFOs
+of single layers are left out. The delay line is read with a 3rd order Lagrange
+fractional delay, so the comb stays in tune at high notes too, within a few cents at
+1760 Hz.
+
+`cutoff` damps the loop with a one-pole lowpass, so the filter envelope `amount`,
+`SynthLfo.cutoff`, `velocity` and `keytrack` darken the comb over time; the phase
+delay of that lowpass at the fundamental comes off the delay, so a damped comb keeps
+its pitch. A cutoff of 0.49 of the sample rate or above leaves it undamped. The
+default cutoff of 1000 Hz damps a comb strongly, so set 20000 for a bright one.
+`resonance`, `slope`, `drive` and `model` do nothing. The output is scaled by
+`1 - |feedback|`, so the peaks stay near the input level at any feedback, and broadband
+input comes out quieter as the feedback rises. On the stereo path of unison with width
+both channels run the same tuning.
+
+The core holds 32 comb delay lines, each long enough for 40 Hz (up to 81.8 kHz sample
+rates; at higher rates the lowest comb frequency is the rate over 2045). A voice with a
+comb takes one line, or two on the stereo path, and gives them back when it ends; a
+play that finds too few free is ignored, as a pluck play without a free string is.
+Combs below 40 Hz are clamped to 40 Hz. `AudioFilter` has no comb kind and takes
+`SynthComb` as a lowpass.
+
+```
+prefab NoisePluck {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.001, decay: 0.02, sustain: 0, release: 0.01}
+  SynthFilter: {kind: SynthComb, cutoff: 6000, feedback: 0.95}
+  SynthOscillator: {wave: SynthNoise, frequency: 220, level: 0.5}
 }
 ```
 
@@ -926,7 +967,7 @@ and [transport.h](../src/audio/transport.h) for the low-level APIs.
 
 The main limits are 64 voices, 64 buses, 64 effects, four inserts and sends per
 bus, eight synth layers, two synth LFOs, seven unison copies per layer,
-32 pluck strings and 256 frames per wavetable, whose tables share the 1023 sound ids. Effects are algorithmic: no convolution or geometry-derived rooms.
+32 pluck strings, 32 comb delay lines and 256 frames per wavetable, whose tables share the 1023 sound ids. Effects are algorithmic: no convolution or geometry-derived rooms.
 There is one transport and one music stream per world. There are no tempo ramps,
 time stretching, MIDI I/O, plugins, mixer UI or piano roll.
 Scripts can change channel and effect values each frame.

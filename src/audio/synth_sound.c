@@ -395,6 +395,10 @@ bool box_audio_synth_compile(
         p.keytrack = filter->keytrack;
         p.model = (uint32_t)filter->model;
         p.vowel = filter->vowel;
+        if (filter->kind == SynthComb) {
+            p.feedback = filter->feedback;
+            p.tune = filter->tune;
+        }
     }
 
     formant = filter && filter->kind == SynthFormant;

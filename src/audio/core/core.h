@@ -166,6 +166,26 @@
 /** Shortest and longest decay of a pluck string in seconds, the time until -60 dB */
 #define BOX_AUDIO_SYNTH_PLUCK_DECAY_MIN 0.01f
 #define BOX_AUDIO_SYNTH_PLUCK_DECAY_MAX 60.0f
+
+/** Lowest frequency of a comb filter in Hz, its note times its tune; a lower one is clamped.
+ * At rates above 81.8 kHz the delay line of BOX_AUDIO_SYNTH_COMB_FRAMES limits it further, to
+ * the rate over 2045 */
+#define BOX_AUDIO_SYNTH_COMB_MIN 40.0f
+
+/** Delay lines of comb filters of a core: a voice with a BOX_AUDIO_SYNTH_COMB filter takes one
+ * per channel, two with unison and width; a play that does not find them free is ignored */
+#define BOX_AUDIO_SYNTH_COMBS 32
+
+/** Frames of the delay line of a comb filter, a power of 2: a delay of up to 2045 frames,
+ * BOX_AUDIO_SYNTH_COMB_MIN up to a rate of 81.8 kHz */
+#define BOX_AUDIO_SYNTH_COMB_FRAMES 2048
+
+/** Largest feedback of a comb filter, either way */
+#define BOX_AUDIO_SYNTH_COMB_FEEDBACK_MAX 0.98f
+
+/** Smallest and largest tune of a comb filter, a ratio to the frequency of its note */
+#define BOX_AUDIO_SYNTH_TUNE_MIN 0.125f
+#define BOX_AUDIO_SYNTH_TUNE_MAX 8.0f
 /** LFOs of a synth patch */
 #define BOX_AUDIO_SYNTH_LFOS 2
 
@@ -863,9 +883,12 @@ typedef enum box_audio_synth_filter_t {
     BOX_AUDIO_SYNTH_HIGHPASS = 2,     /**< Highpass, 12 dB per octave */
     BOX_AUDIO_SYNTH_BANDPASS = 3,     /**< Bandpass, unity at the cutoff */
     BOX_AUDIO_SYNTH_NOTCH = 4,        /**< Notch, silent at the cutoff */
-    BOX_AUDIO_SYNTH_FORMANT = 5       /**< Three bandpasses in parallel at the formants of a
+    BOX_AUDIO_SYNTH_FORMANT = 5,      /**< Three bandpasses in parallel at the formants of a
                                        * vowel, see formant.h; the cutoff, the slope and the
                                        * model do nothing */
+    BOX_AUDIO_SYNTH_COMB = 6          /**< A feedback comb at the note times the tune, see
+                                       * synth.c; the cutoff damps it, the resonance, the
+                                       * slope and the model do nothing */
 } box_audio_synth_filter_t;
 
 /** Slopes of the filter of a synth patch */
@@ -1074,6 +1097,15 @@ typedef struct box_audio_synth_patch_t {
                                            * envelope moves the vowel by at its level 1,
                                            * -BOX_AUDIO_SYNTH_VOWEL_MAX..max; 0 for none. The
                                            * envelope runs when this or filter_amount is not 0 */
+    float feedback;                       /**< BOX_AUDIO_SYNTH_COMB: gain of the delayed output
+                                           * added to the input,
+                                           * -BOX_AUDIO_SYNTH_COMB_FEEDBACK_MAX..max: positive
+                                           * peaks at the harmonics of the note, negative at
+                                           * the odd harmonics of half of it; 0 passes the
+                                           * input */
+    float tune;                           /**< BOX_AUDIO_SYNTH_COMB: ratio of the frequency of
+                                           * the comb to the note,
+                                           * BOX_AUDIO_SYNTH_TUNE_MIN..MAX; 0 counts as 1 */
     box_audio_synth_layer_t layer[BOX_AUDIO_SYNTH_LAYERS]; /**< The oscillators, last: a
                                            * command sends only the layers of its patch */
 } box_audio_synth_patch_t;

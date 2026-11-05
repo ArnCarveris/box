@@ -18,6 +18,10 @@
  * and the ratio of hard sync, per control block of frames and interpolated per frame
  * in between. A wavetable layer reads the frames of a table the main thread built, at the mip
  * level of its speed and at a position between two frames that its envelope and the LFOs move.
+ * A comb filter is a feedback comb tuned to the note of the first layer, read at a fractional
+ * delay with a 3rd order Lagrange interpolation and damped by a one pole lowpass at the cutoff
+ * in its loop, whose phase delay at the fundamental comes off the delay so the comb stays in
+ * tune; its delay lines come from the core, one per channel.
  *
  * Every voice holds its own copy of the patch, so a play allocates nothing. Its layers are parts
  * of the core, one per layer (box_audio_synth_part_t), and each pluck layer takes a string of
@@ -127,6 +131,13 @@ static const double box_audio_synth_unison_gain[BOX_AUDIO_SYNTH_UNISON_MAX + 1] 
 
 /** Envelope of the layers of strings without one, a level of 1 that never ends */
 #define BOX_AUDIO_SYNTH_ENV_FREE (BOX_AUDIO_SYNTH_LAYERS + 1)
+
+/** Shortest delay of a comb filter in frames, so the 4 taps of its interpolation lie in the
+ * past: Nyquist */
+#define BOX_AUDIO_SYNTH_COMB_DELAY_MIN 2.0
+
+/** Longest delay of a comb filter in frames, so its last tap lies within its delay line */
+#define BOX_AUDIO_SYNTH_COMB_DELAY_MAX ((double)(BOX_AUDIO_SYNTH_COMB_FRAMES - 3))
 
 /** Base 2 logarithm, from the exponent of the double and the series of atanh.
  *
@@ -476,6 +487,9 @@ static inline float box_audio_synth_env_next(
  * of the trapezoidal state variable filter, or of the ladder, which stay stable at any cutoff
  * and while it moves. Each stage is stable on its own, so their cascade is too.
  *
+ * A comb filter takes the share of its lowpass instead, 1 - exp(-2 pi cutoff / rate), and 1,
+ * undamped, at the top of the cutoff.
+ *
  * @param src The source
  * @param rate Frames per second
  */
@@ -483,8 +497,15 @@ static void box_audio_synth_coefs(
     box_audio_synth_source_t *src,
     float rate)
 {
-    float g = box_audio_svf_g(src->cutoff, rate);
+    float g;
     int32_t s;
+    if (src->filter == BOX_AUDIO_SYNTH_COMB) {
+        src->comb_a = src->cutoff < src->cutoff_top ? 1 - box_audio_synth_exp2(
+            -2 * BOX_AUDIO_SYNTH_PI * src->cutoff / ((double)rate * BOX_AUDIO_SYNTH_LN2)) : 1.0;
+        goto done;
+    }
+
+    g = box_audio_svf_g(src->cutoff, rate);
     if (src->model == BOX_AUDIO_SYNTH_LADDER) {
         src->ladder_coefs.g = g;
     } else {
@@ -498,6 +519,9 @@ static void box_audio_synth_coefs(
             }
         }
     }
+
+done:
+    return;
 }
 
 /** Set the indexes and the feedback of the oscillators from the patch.
@@ -861,6 +885,15 @@ static void box_audio_synth_lfo_aim(
     if (src->drifts) {
         octaves += src->drift * BOX_AUDIO_SYNTH_DRIFT_CUTOFF *
             (double)src->drift_cutoff.value * (1.0 / 1200);
+    }
+
+    if (src->comb[0] && src->layers > 0) {
+        c = cents[0];
+        if (src->bends && src->part[0]->bend.on) {
+            c += 100 * box_audio_synth_bend_offset(src->part[0]);
+        }
+
+        src->comb_pitch = c != 0 ? box_audio_synth_exp2(c * (1.0 / 1200)) : 1.0;
     }
 
     if (src->lfo_cutoff) {
@@ -1385,8 +1418,61 @@ static void box_audio_synth_string_pluck(
     s->ringing = true;
 }
 
+/** Arctangent of a value that is not negative, from a polynomial on 0..1 and pi / 2 minus the
+ * arctangent of the inverse over 1.
+ *
+ * @param x The value, 0 or more
+ * @return The arctangent in radians, within 1e-5
+ */
+static double box_audio_synth_atan(
+    double x)
+{
+    double t = x > 1 ? 1.0 / x : x, t2 = t * t, a;
+    a = t * (0.99997726 + t2 * (-0.33262347 + t2 * (0.19354346 + t2 * (-0.11643287 +
+        t2 * (0.05265332 + t2 * -0.01172120)))));
+
+    return x > 1 ? 0.5 * BOX_AUDIO_SYNTH_PI - a : a;
+}
+
+/** Delay in frames a comb filter aims at for its note: the period of the first layer times
+ * the pitch of the comb and its tune, within BOX_AUDIO_SYNTH_COMB_MIN and the delay line.
+ *
+ * Less the phase delay of the lowpass of its loop at its lowest peak, the note with positive
+ * feedback and half of it with negative, so that peak stays in tune.
+ *
+ * The lowpass y = a x + b y1, b = 1 - a, delays a frequency w by
+ * atan(b sin w / (1 - b cos w)) / w frames.
+ *
+ * @param src The source, with a comb filter
+ * @param rate Frames per second
+ * @return The delay in frames
+ */
+static double box_audio_synth_comb_aim(
+    const box_audio_synth_source_t *src,
+    float rate)
+{
+    double top = (double)rate / BOX_AUDIO_SYNTH_COMB_MIN, inc = 0, n, b, w, sn, cs;
+    if (src->layers > 0) {
+        inc = src->part[0]->osc.inc * src->comb_pitch * src->comb_tune;
+    }
+
+    top = top < BOX_AUDIO_SYNTH_COMB_DELAY_MAX ? top : BOX_AUDIO_SYNTH_COMB_DELAY_MAX;
+    n = inc * top > 1 ? 1.0 / inc : top;
+    if (src->comb_a < 1) {
+        b = 1 - src->comb_a;
+        w = src->comb_feedback < 0 ? 0.5 / n : 1.0 / n;
+        sn = (double)box_audio_core_sin(w);
+        cs = (double)box_audio_core_sin(w + 0.25);
+        n -= box_audio_synth_atan(b * sn / (1 - b * cs)) /
+            (2 * BOX_AUDIO_SYNTH_PI * w);
+    }
+
+    return n > BOX_AUDIO_SYNTH_COMB_DELAY_MIN ? n : BOX_AUDIO_SYNTH_COMB_DELAY_MIN;
+}
+
 /** Start a pass of the envelopes, the oscillators and the filter envelope, at the start of a
- * play and at each restart of a loop, and pluck the strings. The state of the filter goes on.
+ * play and at each restart of a loop, and pluck the strings. The state of the filter goes on;
+ * a comb filter takes the delay of the note at once.
  *
  * @param core The core
  * @param src The source
@@ -1541,6 +1627,12 @@ static void box_audio_synth_pass(
         box_audio_synth_vowel(src, src->vowel_amount != 0 ? src->fenv.value : 0.0f, rate);
     } else {
         box_audio_synth_coefs(src, rate);
+    }
+
+    if (src->comb[0]) {
+        src->comb_delay = box_audio_synth_comb_aim(src, rate);
+        src->comb_step = 0;
+        src->comb_control = BOX_AUDIO_SYNTH_CONTROL;
     }
 }
 
@@ -1737,7 +1829,8 @@ void box_audio_source_synth(
     const box_audio_synth_patch_t *p = &slot->patch;
     box_audio_synth_source_t *src = &source->data.synth;
     box_audio_synth_string_t **at;
-    int32_t l, k;
+    box_audio_synth_comb_t *comb;
+    int32_t l, k, i;
     bool formant;
     source->kind = BOX_AUDIO_SOURCE_SYNTH;
     src->layers = (int32_t)p->layers;
@@ -1770,6 +1863,24 @@ void box_audio_source_synth(
         }
     }
 
+    src->comb[0] = NULL;
+    src->comb[1] = NULL;
+    for (k = 0; k < slot->combs; k ++) {
+        comb = &core->synth_combs[core->comb_free[-- core->comb_free_count]];
+        for (i = 0; i < BOX_AUDIO_SYNTH_COMB_FRAMES; i ++) {
+            comb->line[i] = 0;
+        }
+
+        comb->write = 0;
+        comb->damp = 0;
+        src->comb[k] = comb;
+    }
+
+    src->comb_feedback = p->feedback;
+    src->comb_gain = 1 - (p->feedback < 0 ? -p->feedback : p->feedback);
+    src->comb_tune = (double)p->tune;
+    src->comb_pitch = 1;
+    src->comb_a = 1;
     src->velocity = velocity;
     if (velocity < 1) {
         box_audio_synth_velocity_layers(src, velocity);
@@ -3259,6 +3370,55 @@ static inline void box_audio_synth_formant_control(
     }
 }
 
+/** Move the delay of a comb filter by a frame toward its aim, which it takes from the note
+ * every BOX_AUDIO_SYNTH_CONTROL frames, so it follows a glide and the LFOs smoothly.
+ *
+ * @param src The source, with a comb filter
+ * @param rate Frames per second
+ */
+static inline void box_audio_synth_comb_control(
+    box_audio_synth_source_t *src,
+    float rate)
+{
+    if (-- src->comb_control <= 0) {
+        src->comb_control = BOX_AUDIO_SYNTH_CONTROL;
+        src->comb_step = (box_audio_synth_comb_aim(src, rate) - src->comb_delay) *
+            (1.0 / BOX_AUDIO_SYNTH_CONTROL);
+    }
+
+    src->comb_delay += src->comb_step;
+}
+
+/** Run a sample of a channel through a comb filter: y = x + feedback lowpass(delayed(y)), the
+ * delayed output read at the fractional delay of the comb by a 3rd order Lagrange
+ * interpolation of the 4 frames around it, and returned times the gain of the comb.
+ *
+ * @param src The source, with a comb filter
+ * @param c The delay line of the channel
+ * @param x The input
+ * @return The output
+ */
+static inline float box_audio_synth_comb_next(
+    const box_audio_synth_source_t *src,
+    box_audio_synth_comb_t *c,
+    float x)
+{
+    const int32_t mask = BOX_AUDIO_SYNTH_COMB_FRAMES - 1;
+    int32_t d = (int32_t)src->comb_delay, at = c->write - d;
+    float f = (float)(src->comb_delay - (double)d), y;
+    float fm = f - 1, fm2 = f - 2, fp = f + 1;
+    float r = -f * fm * fm2 * (1.0f / 6) * c->line[(at + 1) & mask] +
+        fp * fm * fm2 * 0.5f * c->line[at & mask] -
+        fp * f * fm2 * 0.5f * c->line[(at - 1) & mask] +
+        fp * f * fm * (1.0f / 6) * c->line[(at - 2) & mask];
+    c->damp = box_audio_clean(c->damp + (float)src->comb_a * (r - c->damp));
+    y = box_audio_clean(x + src->comb_feedback * c->damp);
+    c->line[c->write] = y;
+    c->write = (c->write + 1) & mask;
+
+    return y * src->comb_gain;
+}
+
 /** Render a block of a source in which a layer has unison voices: into core->src_l, and
  * core->src_r through the stages of the right channel when it is stereo.
  *
@@ -3328,6 +3488,13 @@ static int32_t box_audio_synth_render_wide(
             l = box_audio_formant_next(&src->formant, src->formant.svf, l, src->drive);
             if (stereo) {
                 r = box_audio_formant_next(&src->formant, src->formant.svf_r, r, src->drive);
+            }
+        } else if (src->filter == BOX_AUDIO_SYNTH_COMB) {
+            box_audio_synth_control(src, rate);
+            box_audio_synth_comb_control(src, rate);
+            l = box_audio_synth_comb_next(src, src->comb[0], l);
+            if (stereo) {
+                r = box_audio_synth_comb_next(src, src->comb[1], r);
             }
         } else if (src->filter && src->model == BOX_AUDIO_SYNTH_LADDER) {
             box_audio_synth_control(src, rate);
@@ -3434,6 +3601,10 @@ int32_t box_audio_synth_render(
         if (src->filter == BOX_AUDIO_SYNTH_FORMANT) {
             box_audio_synth_formant_control(src, rate);
             y = box_audio_formant_next(&src->formant, src->formant.svf, mix, src->drive);
+        } else if (src->filter == BOX_AUDIO_SYNTH_COMB) {
+            box_audio_synth_control(src, rate);
+            box_audio_synth_comb_control(src, rate);
+            y = box_audio_synth_comb_next(src, src->comb[0], mix);
         } else if (src->filter) {
             if (src->amount != 0 && src->fenv.segment < BOX_AUDIO_SYNTH_DONE) {
                 float level = box_audio_synth_env_next(&src->fenv);

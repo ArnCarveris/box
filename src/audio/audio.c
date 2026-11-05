@@ -380,7 +380,7 @@ static void box_audio_synth_string_ctor(
 }
 
 /** Construct SynthFilter values: a lowpass at 1000 Hz and 12 dB per octave without
- * resonance.
+ * resonance, with the feedback and the tune of a comb at their defaults.
  *
  * @param ptr The components
  * @param count Number of components
@@ -395,7 +395,8 @@ static void box_audio_synth_filter_ctor(
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
-        values[i] = (SynthFilter){ .kind = SynthLowPass, .cutoff = 1000.0f };
+        values[i] = (SynthFilter){ .kind = SynthLowPass, .cutoff = 1000.0f,
+            .feedback = 0.5f, .tune = 1.0f };
     }
 }
 

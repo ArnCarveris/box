@@ -1,8 +1,8 @@
 /**
  * @file audio/core/synth_patch.c
  * @brief The patches of synth sounds in the core: the SYNTH command, which clamps every value of
- * a patch into a slot of the core, and the parts and strings of the core that voices take for
- * their layers. The voices themselves render in synth.c.
+ * a patch into a slot of the core, and the parts, strings and comb lines of the core that
+ * voices take for their layers and their comb filters. The voices themselves render in synth.c.
  */
 
 #include "internal.h"
@@ -138,7 +138,7 @@ static void box_audio_synth_patch_clamp(
     p->free_phase = p->free_phase != 0;
     p->glide = box_audio_synth_clamp(p->glide, 0, BOX_AUDIO_SYNTH_GLIDE_MAX);
     box_audio_synth_envelope_clamp(&p->envelope);
-    if (p->filter > BOX_AUDIO_SYNTH_FORMANT) {
+    if (p->filter > BOX_AUDIO_SYNTH_COMB) {
         p->filter = BOX_AUDIO_SYNTH_FILTER_NONE;
     }
 
@@ -167,6 +167,9 @@ static void box_audio_synth_patch_clamp(
     p->keytrack = box_audio_synth_clamp(p->keytrack, 0, 1);
     p->vowel = box_audio_synth_clamp(p->vowel, 0, BOX_AUDIO_SYNTH_VOWEL_MAX);
     p->filter_vowel = box_audio_synth_depth_clamp(p->filter_vowel, BOX_AUDIO_SYNTH_VOWEL_MAX);
+    p->feedback = box_audio_synth_depth_clamp(p->feedback, BOX_AUDIO_SYNTH_COMB_FEEDBACK_MAX);
+    p->tune = p->tune > 0 ? box_audio_synth_clamp(p->tune, BOX_AUDIO_SYNTH_TUNE_MIN,
+        BOX_AUDIO_SYNTH_TUNE_MAX) : 1.0f;
     box_audio_synth_pitch_envelope_clamp(&p->pitch_envelope);
     for (i = p->layers; i < BOX_AUDIO_SYNTH_LAYERS; i ++) {
         p->layer[i] = (box_audio_synth_layer_t){0};
@@ -279,6 +282,11 @@ void box_audio_synth_parts_init(
     }
 
     core->string_free_count = BOX_AUDIO_SYNTH_STRINGS;
+    for (i = 0; i < BOX_AUDIO_SYNTH_COMBS; i ++) {
+        core->comb_free[i] = (uint16_t)(BOX_AUDIO_SYNTH_COMBS - 1 - i);
+    }
+
+    core->comb_free_count = BOX_AUDIO_SYNTH_COMBS;
 }
 
 bool box_audio_synth_fits(
@@ -300,7 +308,9 @@ bool box_audio_synth_strings_fit(
     const box_audio_core_t *core,
     uint32_t sound)
 {
-    return core->synths[core->sounds[sound].synth - 1].strings <= core->string_free_count;
+    const box_audio_synth_slot_t *slot = &core->synths[core->sounds[sound].synth - 1];
+
+    return slot->strings <= core->string_free_count && slot->combs <= core->comb_free_count;
 }
 
 int32_t box_audio_table_frames(
@@ -381,7 +391,7 @@ void box_audio_synth_end(
     box_audio_synth_source_t *src)
 {
     box_audio_synth_string_t *s, *next;
-    int32_t l;
+    int32_t l, c;
     for (l = src->layers - 1; l >= 0; l --) {
         box_audio_synth_table_drop(core, &src->part[l]->osc);
         for (s = src->part[l]->string; s; s = next) {
@@ -397,6 +407,14 @@ void box_audio_synth_end(
         src->part[l] = NULL;
     }
 
+    for (c = 1; c >= 0; c --) {
+        if (src->comb[c]) {
+            core->comb_free[core->comb_free_count ++] =
+                (uint16_t)(src->comb[c] - core->synth_combs);
+            src->comb[c] = NULL;
+        }
+    }
+
     src->layers = 0;
     src->strings = 0;
 }
@@ -407,6 +425,7 @@ void box_audio_synth_command(
 {
     box_audio_sound_t *s;
     int32_t slot = -1, i;
+    bool stereo = false;
     if (cmd->sound >= BOX_AUDIO_SOUND_MAX) {
         goto ignored;
     }
@@ -442,6 +461,7 @@ void box_audio_synth_command(
     core->synths[slot].patch = cmd->patch;
     box_audio_synth_patch_clamp(&core->synths[slot].patch);
     core->synths[slot].strings = 0;
+    core->synths[slot].combs = 0;
     if (core->synths[slot].patch.has_drive) {
         box_audio_synth_drive_curve(&core->synths[slot].drive,
             core->synths[slot].patch.pre_drive, core->synths[slot].patch.pre_asymmetry);
@@ -451,6 +471,15 @@ void box_audio_synth_command(
         if (core->synths[slot].patch.layer[i].wave == BOX_AUDIO_SYNTH_PLUCK) {
             core->synths[slot].strings += (int32_t)core->synths[slot].patch.layer[i].voices;
         }
+
+        if (core->synths[slot].patch.filter == BOX_AUDIO_SYNTH_COMB) {
+            stereo = stereo || (core->synths[slot].patch.layer[i].voices > 1 &&
+                core->synths[slot].patch.layer[i].width > 0);
+        }
+    }
+
+    if (core->synths[slot].patch.filter == BOX_AUDIO_SYNTH_COMB) {
+        core->synths[slot].combs = stereo ? 2 : 1;
     }
 
     goto done;

@@ -358,7 +358,8 @@
                     "synth_sync",
                     "synth_drive",
                     "synth_formant",
-                    "synth_wavetable"
+                    "synth_wavetable",
+                    "synth_comb"
                 ]
             },
             {
@@ -787,6 +788,29 @@
                 "testcases": [
                     "component",
                     "envelope_off"
+                ]
+            },
+            {
+                "id": "SynthComb",
+                "testcases": [
+                    "peaks",
+                    "high",
+                    "negative",
+                    "tune",
+                    "glide",
+                    "damped",
+                    "wide",
+                    "pool",
+                    "clamped",
+                    "bounded",
+                    "others_identical",
+                    "deterministic"
+                ]
+            },
+            {
+                "id": "SynthCombWorld",
+                "testcases": [
+                    "component"
                 ]
             },
             {

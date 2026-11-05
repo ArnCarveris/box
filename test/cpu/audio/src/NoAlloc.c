@@ -995,6 +995,61 @@ void NoAlloc_synth_formant(void) {
     test_int(noalloc_frees, 1);
 }
 
+/* Voices of a patch through a comb filter render without a call of the allocator: a mono
+ * noise layer and a wide unison saw, the cutoff moved by the filter envelope and an LFO, the
+ * note by a pitch envelope, an LFO and a glide, as many voices as the pool of comb lines
+ * holds and more, which are ignored. */
+void NoAlloc_synth_comb(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_synth_patch_t p = {0};
+    uint8_t bytes[sizeof(box_audio_cmd_synth_t)];
+    box_audio_writer_t w;
+    uint32_t i;
+    p.layers = 2;
+    p.seed = 9;
+    p.envelope = (box_audio_synth_envelope_t){
+        .attack = 0.01f, .decay = 0.05f, .sustain = 0.5f, .hold = 0.1f, .release = 0.05f };
+    p.filter = BOX_AUDIO_SYNTH_COMB;
+    p.cutoff = 4000;
+    p.feedback = 0.9f;
+    p.tune = 1.5f;
+    p.glide = 0.05f;
+    p.filter_amount = -2;
+    p.filter_envelope = (box_audio_synth_envelope_t){ .attack = 0.01f, .decay = 0.1f };
+    p.pitch_envelope = (box_audio_synth_pitch_envelope_t){ .amount = 7, .decay = 0.05f };
+    p.layer[0] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_NOISE, .frequency = 110,
+        .level = 0.3f };
+    p.layer[1] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_SAW, .frequency = 220,
+        .level = 0.3f, .voices = 3, .detune = 20, .width = 1 };
+    p.lfos = 1;
+    p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 5,
+        .cutoff = 1, .pitch = 30 };
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_synth(&w, 1, &p));
+    box_audio_core_apply(core, w.data, w.size);
+    p.layers = 1;
+    p.lfo[0].cutoff = 0;
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_synth(&w, 2, &p));
+    box_audio_core_apply(core, w.data, w.size);
+    for (i = 0; i < BOX_AUDIO_SYNTH_COMBS; i ++) {
+        audio_play(core, i, 1 + (i & 1), 0, 0.02f, 0, 0.5f + 0.05f * (float)i,
+            BOX_AUDIO_PLAY_LOOP);
+    }
+
+    for (i = 0; i < BOX_AUDIO_SYNTH_COMBS; i ++) {
+        audio_voice_set(core, i, BOX_AUDIO_PARAM_PITCH, 1.5f);
+    }
+
+    audio_render(core, 0, AUDIO_FRAMES);
+    test_assert(box_audio_core_voice_count(core) > 0);
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+}
+
 /* Voices of a patch of wavetable layers render without a call of the allocator: a mono layer
  * whose position an LFO and its envelope move, a wide unison layer under a glide, a synced
  * layer with a sub and a wavetable modulator, and a release of the table while they play. The
