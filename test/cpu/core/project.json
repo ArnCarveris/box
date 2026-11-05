@@ -30,6 +30,8 @@
                     "cpu_budget",
                     "cpu_budget_percent_sign",
                     "fps",
+                    "delta_time_fraction",
+                    "invalid_delta_time",
                     "port",
                     "scene",
                     "all_options",
