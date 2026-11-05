@@ -245,8 +245,8 @@ ECS_STRUCT(Emissive, {
  * own specular light on top. The snapshot holds everything drawn before it back to front.
  *
  * That is the opaque shapes, sky, fog volumes, particles and 2D shapes (even those in front of
- * it) and blended and transmissive shapes behind it, snapshot again after other shapes drew,
- * at most 4 times a view and frame; beyond that later glass shows the last snapshot.
+ * it) and the blended and transmissive shapes behind it. A view snapshots again before glass
+ * that follows a shape that is not glass, at most 4 times a frame; then glass shows the last.
  *
  * Transitionable (Transition): the four floats interpolate linearly by the timing function and
  * attenuation_color per channel like Rgb. The shape keeps its transmissive batch while its

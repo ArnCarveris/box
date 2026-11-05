@@ -6,10 +6,9 @@
  * camera moves, waiting for the GPU every frame; instructions (macOS) are those the process
  * retired over the measured frames, frames the frames they ran.
  *
- * The transmission cases put glass panes over 100 blended boxes in a 1280x720 surface: none,
- * one pane in front of them, or a pane between every group of them up to the budget of
- * snapshots of a view (BOX_GPU_TRANSMISSION_SNAPSHOTS). Their time per frame against the case
- * without glass is the GPU time of the snapshots; snapshots counts those recorded per frame.
+ * The glass cases put no pane, one, or the budget of snapshots of panes between groups of 100
+ * blended boxes (1280x720); their time per frame over the case without glass is the GPU time of
+ * the snapshots and panes, snapshots counts those recorded per frame.
  */
 
 #include <box.h>

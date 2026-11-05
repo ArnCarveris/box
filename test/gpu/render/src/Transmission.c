@@ -651,7 +651,9 @@ void Transmission_specular_on_top(void) {
 
 /** Two blended quads around a deep glass box (front face z -3, origin z -6): one behind its
  * front face that sorts after it shows over it, as the glass writes no depth; one behind it that
- * sorts before it shows only outside it, where the glass shows the green wall.
+ * sorts before it is in the snapshot and shows through the glass as it does beside it.
+ *
+ * Elsewhere the glass shows the green wall.
  *
  * The glass casts no shadow: the ground around it looks as it does without it, while an opaque
  * box in its place shades it. */
@@ -671,8 +673,9 @@ void Transmission_no_depth_write_no_shadow(void) {
     ecs_set(world, early, Opacity, {0.5f});
     unsigned char *px = tr_render(world, "order.png", TR_SIZE, TR_SIZE);
 
-    tr_expect(tr_px(px, TR_SIZE, 26, 32), 0, 200, 0, 3);
-    tr_expect(tr_px(px, TR_SIZE, 20, 32), 0, 200, 0, 3);
+    tr_expect(tr_px(px, TR_SIZE, 32, 32), 0, 200, 0, 3);
+    tr_expect(tr_px(px, TR_SIZE, 20, 32), 0, tr_srgb(tr_lin(200) * 0.5f),
+        tr_srgb(tr_lin(200) * 0.5f), 3);
 
     int32_t x = 32 + (int32_t)(0.8f / 4.5f / 0.57735f * 32.0f);
     tr_expect(tr_px(px, TR_SIZE, x, 32), tr_srgb(tr_lin(200) * 0.5f),
@@ -978,8 +981,9 @@ void Transmission_adjacent_runs_one_snapshot(void) {
 
 /** The scene of layers_take_snapshots in a view that culls by occlusion (unlit, an early and a
  * late pass, which takes the snapshots) and in one with a depth prepass (lit) looks as it does
- * in an unlit view without either. Without lights and with a black ambient the lit view shows
- * only the emission, as the unlit one does. */
+ * in an unlit view without either.
+ *
+ * Without lights and with a black ambient the lit view shows only the emission. */
 void Transmission_occlusion_view_layers(void) {
     // materials/transmission
     unsigned char *images[3];
@@ -1023,9 +1027,10 @@ void Transmission_occlusion_view_layers(void) {
 }
 
 /** A glass with a DiffuseTransmission blur in front of a red quad at half opacity, in front of
- * a green wall. The quad writes no depth, so the depth copy of the snapshot holds the wall
- * behind it: the quad blurs by its distance to the wall, as the wall does, not by its own
- * distance to the glass. Through the glass red and green mix, and nothing is invalid. */
+ * a green wall. Through the glass red and green mix, and nothing is invalid.
+ *
+ * The quad writes no depth, so the depth copy of the snapshot holds the wall behind it: the quad
+ * blurs by its distance to the wall, as the wall does, not by its own distance to the glass. */
 void Transmission_diffuse_blur_behind_blended(void) {
     // materials/transmission
     ecs_world_t *world = tr_world();
