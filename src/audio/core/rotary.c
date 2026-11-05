@@ -239,6 +239,17 @@ static void box_audio_rotary_turn(
     }
 }
 
+/** Absolute value of a sample.
+ *
+ * @param x The sample
+ * @return The absolute value
+ */
+static float box_audio_rotary_abs(
+    float x)
+{
+    return x < 0 ? -x : x;
+}
+
 /** Clear the preamp, the crossover, the lowpasses of the mics and the lines.
  *
  * @param rt The rotary
@@ -266,6 +277,40 @@ static void box_audio_rotary_clear(
     }
 
     rt->valid = 0;
+}
+
+/** Sum the levels left in the preamp, the crossover and the mics, and add the peak of the
+ * lines, to tell when a tail, such as the decay of the DC blocker, has died out.
+ *
+ * @param rt The rotary
+ * @return The level of the state
+ */
+static float box_audio_rotary_level(
+    const box_audio_rotary_t *rt)
+{
+    float sum = box_audio_oversample_level(&rt->os), peak = 0;
+    int32_t i, m;
+    sum += box_audio_rotary_abs(rt->dc.x1) + box_audio_rotary_abs(rt->dc.y1);
+    for (i = 0; i < 16; i ++) {
+        sum += box_audio_rotary_abs(rt->dry[i]);
+    }
+
+    for (i = 0; i < 2; i ++) {
+        sum += box_audio_rotary_abs(rt->low[i].ic1) + box_audio_rotary_abs(rt->low[i].ic2) +
+            box_audio_rotary_abs(rt->high[i].ic1) + box_audio_rotary_abs(rt->high[i].ic2);
+        for (m = 0; m < 2; m ++) {
+            sum += box_audio_rotary_abs(rt->mic[i][m].lp);
+        }
+    }
+
+    for (i = 0; i < rt->length; i ++) {
+        float d = box_audio_rotary_abs(rt->line[BOX_AUDIO_ROTARY_DRUM][i]);
+        float h = box_audio_rotary_abs(rt->line[BOX_AUDIO_ROTARY_HORN][i]);
+        peak = d > peak ? d : peak;
+        peak = h > peak ? h : peak;
+    }
+
+    return sum + peak;
 }
 
 void box_audio_rotary_start(
@@ -469,7 +514,9 @@ bool box_audio_rotary_render(
     }
 
     box_audio_rotary_block(core, rt, l, r, frames);
-    if (silent && fx->quiet >= (quiet > rt->length ? quiet : rt->length)) {
+    if (silent && fx->quiet >= (quiet > rt->length ? quiet : rt->length) &&
+        box_audio_rotary_level(rt) < BOX_AUDIO_ROTARY_SILENCE)
+    {
         box_audio_rotary_clear(rt);
         result = true;
     }

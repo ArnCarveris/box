@@ -527,6 +527,36 @@ void Rotary_silent_after_tail(void) {
     rt_close(&rt);
 }
 
+void Rotary_idle_no_click(void) {
+    // audio/rotary
+    box_audio_rotary_params_t p = rt_params(1);
+    rt_t rt;
+    int32_t i, idle = -1;
+    p.drive = 1;
+    audio_sine(rt_sound, AUDIO_RATE / 2, 110, 0.9f);
+    rt_open(&rt, AUDIO_RATE / 2);
+    audio_bus_set(rt.core, 1, BOX_AUDIO_PARAM_VOLUME, 1);
+    rt_command(rt.core, 0, 1, p);
+    audio_play(rt.core, 1, 1, 1, 1, 0, 1, 0);
+    for (i = 0; i < 3 * AUDIO_RATE; i += BOX_AUDIO_CORE_QUANTUM) {
+        box_audio_core_render(rt.core, rt_l + i, rt_r + i, BOX_AUDIO_CORE_QUANTUM);
+        if (idle < 0 && i > AUDIO_RATE / 4 && !box_audio_core_effect_running(rt.core, 0)) {
+            idle = i;
+        }
+    }
+
+    // The tail of the DC blocker of the driven preamp dies out before the rotary clears
+    test_assert(idle > AUDIO_RATE / 2);
+    test_assert(audio_max_step(rt_l, idle - BOX_AUDIO_CORE_QUANTUM,
+        idle + 2 * BOX_AUDIO_CORE_QUANTUM) < 1e-5f);
+    test_assert(audio_max_step(rt_r, idle - BOX_AUDIO_CORE_QUANTUM,
+        idle + 2 * BOX_AUDIO_CORE_QUANTUM) < 1e-5f);
+    test_assert(audio_peak(rt_l, AUDIO_RATE / 2 + AUDIO_RATE / 20, idle) > 1e-5f);
+    test_flt(audio_peak(rt_l, idle + BOX_AUDIO_CORE_QUANTUM, 3 * AUDIO_RATE), 0);
+    test_flt(audio_peak(rt_r, idle + BOX_AUDIO_CORE_QUANTUM, 3 * AUDIO_RATE), 0);
+    rt_close(&rt);
+}
+
 /** Render noise and a tone through a rotary on bus 1 whose speed, balance, spread, drive and
  * mix change, in renders of a size, and hash the output. The sounds loop, so it never idles.
  *

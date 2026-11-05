@@ -917,6 +917,10 @@ typedef struct box_audio_transient_shaper_params_t {
 /** Seconds of silent input after which a rotary clears itself and idles */
 #define BOX_AUDIO_ROTARY_QUIET 0.05f
 
+/** Level of its preamp, filters and lines below which a rotary that has been quiet idles, so
+ * the tail of its DC blocker does not click when it is cleared */
+#define BOX_AUDIO_ROTARY_SILENCE 1e-6f
+
 /** The parameters of a rotary, the first floats of the params of its effect command: a
  * rotating speaker cabinet. The sum of both channels runs through a tube preamp, the clipper
  * of saturate.h at twice the rate blended in by the drive, then a Linkwitz-Riley crossover at
@@ -928,8 +932,8 @@ typedef struct box_audio_transient_shaper_params_t {
  *
  * Each rotor turns at its slow rate plus the speed times the way to its fast rate, and moves to
  * a new rate exponentially: the horn within 5% in the acceleration, the drum
- * BOX_AUDIO_ROTARY_DRUM_INERTIA times slower. The rotors start at phase 0 and slow when the
- * effect is put on */
+ * BOX_AUDIO_ROTARY_DRUM_INERTIA times slower. The rotors start at phase 0 and at the rate of
+ * their speed when the effect is put on. */
 typedef struct box_audio_rotary_params_t {
     float speed;        /**< 0..1: 0 is slow (chorale), 1 fast (tremolo) */
     float horn_slow;    /**< Hz of the horn at speed 0, 0..BOX_AUDIO_MODULATION_RATE_MAX */

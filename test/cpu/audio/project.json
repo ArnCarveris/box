@@ -725,6 +725,7 @@
                     "stereo_phase",
                     "mix_dry",
                     "silent_after_tail",
+                    "idle_no_click",
                     "render_identical",
                     "component",
                     "script"

@@ -838,8 +838,7 @@ uint32_t box_audio_module_effect_kind(
 
 /** Get the effect components: Reverb, Equalizer, AudioFilter, Compressor, Gate, Delay, Phaser,
  * Chorus, Saturator, TransientShaper and Rotary, in the order an entity that has several takes
- * the first of. A new
- * effect is added here and to box_audio_module_effect_params.
+ * the first of. A new effect is added here and to box_audio_module_effect_params.
  *
  * @param out Receives up to BOX_AUDIO_EFFECT_COMPONENTS components
  * @return Number of components
