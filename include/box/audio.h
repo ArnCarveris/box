@@ -136,6 +136,15 @@ ECS_STRUCT(AudioBus, {
  * damping and mix change smoothly; a change of size or predelay fades the wet signal out and
  * in, and so does a move to another slot. Deleting the entity, as unloading its scene does,
  * taking it out of its slot or disabling it takes it off with a fade.
+ *
+ * Shimmer pitches the tail up inside the reverb: a share of its feedback runs through the
+ * pitch shifter of PitchShifter, a 60 ms window, so each pass of the tail rises by
+ * shimmer_pitch semitones, an octave by default, for the rising pads of ambient and cinematic
+ * tracks. The shifted share replaces part of the feedback rather than adding to it, so the
+ * reverb stays bounded at every decay, and the damping darkens the shifted tail as the rest;
+ * a shimmer shortens the decay somewhat. Shimmer and shimmer_pitch move over 50 ms. At a
+ * shimmer of 0 the reverb is the same as without one, sample for sample:
+ * shimmer { AudioBus: {effects: [shimmer]}; Reverb: {decay: 6, shimmer: 0.5, mix: 1} }.
  */
 ECS_STRUCT(Reverb, {
     float decay;           /**< Seconds until -60 dB, default 1.5 */
@@ -144,6 +153,10 @@ ECS_STRUCT(Reverb, {
     float size;            /**< Room scale, 0 to 1, default 0.5 */
     float mix;             /**< Wet level, 0 to 1, default 1 on a send bus; the dry signal
                             *   passes at 1 - mix */
+    float shimmer;         /**< Share of the feedback that is pitch shifted, 0 to 1, default 0
+                            *   (off) */
+    float shimmer_pitch;   /**< Semitones each pass of the shimmer shifts, -24 to 24, default
+                            *   12 (an octave up) */
 });
 
 /** Bands of an Equalizer */
@@ -848,6 +861,41 @@ ECS_STRUCT(TransientShaper, {
                             *   softens them */
     float sustain;         /**< -1 to 1, default 0: above 0 boosts the tail, below 0 shortens
                             *   it */
+});
+
+/** Longest window of a PitchShifter in milliseconds, which sizes its memory */
+#define BOX_AUDIO_PITCH_SHIFTER_WINDOW_MAX 100.0f
+
+/** A pitch shifter, an effect in an insert slot of an AudioBus, as a Reverb is: thickens a lead
+ * by a few cents either way, adds octaves to basses and leads and makes harmonies, without
+ * changing the speed of what plays through it.
+ *
+ * Each channel is a delay line read by two taps half a window apart that slide through the
+ * window at the speed of the shift and wrap around, crossfaded with constant power sine
+ * windows (a granular, not a formant preserving, shifter). Shorter windows suit percussive
+ * material and keep its attacks tight, longer ones suit pads and sound smoother. The left
+ * channel shifts by semitones plus cents, the right one by semitones plus cents times 1 - 2
+ * stereo: a stereo of 1 mirrors the cents, the classic detune widener. Feedback sends the
+ * shifted signal back into the line, so each pass shifts again, a cascade of rising or falling
+ * copies; it is soft clipped, so it stays bounded.
+ *
+ * Latency: the shifted signal comes up to a window late, about half a window on average, and
+ * the dry signal is not delayed to match, so a mix in between is a shifted copy behind the dry
+ * one. Every pitch shifter runs with its own memory of BOX_AUDIO_PITCH_SHIFTER_WINDOW_MAX
+ * milliseconds per channel. All parameters move over 20 ms. Once its input and its feedback
+ * are silent for a window it stops until its input sounds again:
+ * lead { AudioBus: {effects: [lead]}; PitchShifter: {cents: 8, stereo: 1, window: 30} }.
+ */
+ECS_STRUCT(PitchShifter, {
+    float semitones;       /**< Shift, -24 to 24, default 0 */
+    float cents;           /**< Detune on top of the semitones, -100 to 100, default 0 */
+    float stereo;          /**< 0 to 1, default 0: the cents of the right channel go from cents
+                            *   at 0 to -cents at 1 */
+    float window;          /**< Milliseconds of the window, 10 to 100, default 40 */
+    float feedback;        /**< Share of the shifted signal fed back into the line, 0 to 0.9,
+                            *   default 0 */
+    float mix;             /**< Wet level, 0 to 1, default 0.5; the dry signal passes at
+                            *   1 - mix */
 });
 
 /** An envelope of the cutoff of the SynthFilter of the same root, with the segments of a

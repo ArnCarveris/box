@@ -538,6 +538,16 @@ void Shell_audio_command(void) {
     ecs_ensure(world, punch, AudioBus)->effects[0] = punch;
     ecs_modified(world, punch, AudioBus);
     ecs_set(world, punch, TransientShaper, { .attack = 0.5f, .sustain = -0.25f });
+    ecs_entity_t lift = ecs_entity(world, { .name = "lift" });
+    ecs_ensure(world, lift, AudioBus)->effects[0] = lift;
+    ecs_modified(world, lift, AudioBus);
+    ecs_set(world, lift, PitchShifter, { .semitones = 12, .cents = -8, .stereo = 1,
+        .window = 30, .feedback = 0.2f, .mix = 0.4f });
+    ecs_entity_t shine = ecs_entity(world, { .name = "shine" });
+    ecs_ensure(world, shine, AudioBus)->effects[0] = shine;
+    ecs_modified(world, shine, AudioBus);
+    ecs_set(world, shine, Reverb, { .decay = 6, .damping = 0.3f, .predelay = 0.02f,
+        .size = 0.8f, .mix = 1, .shimmer = 0.5f, .shimmer_pitch = 12 });
     ecs_progress(world, 0.016f);
 
     bool error = true;
@@ -557,6 +567,12 @@ void Shell_audio_command(void) {
     test_assert(strstr(out, "punch: group volume 1.00 pan 0.00 width 1.00 -> master, "
         "insert 0 punch: transient shaper attack 0.50 sustain -0.25 "
         "(does not run: no output)") != NULL);
+    test_assert(strstr(out, "lift: group volume 1.00 pan 0.00 width 1.00 -> master, "
+        "insert 0 lift: pitch shifter semitones +12.0 cents -8.0 stereo 1.00 window 30.0 ms "
+        "feedback 0.20 mix 0.40 (does not run: no output)") != NULL);
+    test_assert(strstr(out, "shine: group volume 1.00 pan 0.00 width 1.00 -> master, "
+        "insert 0 shine: reverb decay 6.00 damping 0.30 predelay 0.020 size 0.80 mix 1.00 "
+        "shimmer 0.50 pitch +12.0 (does not run: no output)") != NULL);
     ecs_os_free(out);
 
     out = box_command_run(world, s, "audio volume 0.25", &error);

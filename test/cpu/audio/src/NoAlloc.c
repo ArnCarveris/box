@@ -655,6 +655,95 @@ void NoAlloc_modulation(void) {
     }
 }
 
+/* Pitch shifters in the insert slots of buses and a reverb with a shimmer: changes of the
+ * semitones, the cents, the stereo, the window, the feedback, the mix and the shimmer while
+ * they run, a move to another bus, tails that decay to silence and start again, and a removal,
+ * without a call of the allocator. */
+void NoAlloc_pitch_shifter(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_route_t routes[] = { AUDIO_OUT(1, 0), AUDIO_OUT(2, 0), AUDIO_MASTER };
+    int32_t floats = box_audio_effect_floats(BOX_AUDIO_EFFECT_PITCH_SHIFTER, AUDIO_RATE);
+    int32_t reverb = box_audio_effect_floats(BOX_AUDIO_EFFECT_REVERB, AUDIO_RATE);
+    float *memory[3], params[BOX_AUDIO_EFFECT_PARAMS] = {0};
+    uint8_t bytes[1024];
+    box_audio_writer_t w;
+    uint32_t i, k;
+    test_assert(floats > 0);
+    audio_order(core, routes, 3);
+    audio_sine(audio_sound_a, AUDIO_FRAMES / 4, 330, 0.25f);
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_FRAMES / 4, 1, AUDIO_RATE));
+    for (i = 0; i < 3; i ++) {
+        int32_t n = i < 2 ? floats : reverb;
+        memory[i] = calloc((size_t)n, sizeof(float));
+        test_assert(box_audio_core_effect_memory(core, i, memory[i], n));
+    }
+
+    audio_play(core, 1, 1, 1, 0.5f, 0, 1, BOX_AUDIO_PLAY_LOOP);
+    audio_play(core, 2, 1, 2, 0.5f, 0, 1.5f, 0);
+    for (k = 0; k < 12; k ++) {
+        box_audio_writer_init(&w, bytes, sizeof(bytes));
+        for (i = 0; i < 2; i ++) {
+            uint32_t bus = 1 + (i + k / 4) % 2;
+            params[0] = -24.0f + 4.0f * (float)((k + i) % 13);
+            params[1] = -100.0f + 20.0f * (float)(k % 11);
+            params[2] = 0.25f * (float)(k % 5);
+            params[3] = 10.0f + 15.0f * (float)(k % 7);
+            params[4] = 0.15f * (float)(k % 7);
+            params[5] = 0.2f * (float)(k % 6);
+            test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_PITCH_SHIFTER, bus, i,
+                BOX_AUDIO_BUS_NONE, params));
+        }
+
+        params[0] = 1.0f + 2.0f * (float)(k % 4);
+        params[1] = 0.1f * (float)(k % 8);
+        params[2] = 0.02f;
+        params[3] = 0.5f;
+        params[4] = 1;
+        params[5] = 0.25f * (float)(k % 5);
+        params[6] = k % 2 ? 12.0f : -5.0f;
+        test_assert(box_audio_write_effect(&w, 2, BOX_AUDIO_EFFECT_REVERB, 2, 2,
+            BOX_AUDIO_BUS_NONE, params));
+        box_audio_core_apply(core, w.data, w.size);
+        audio_render(core, 0, k % 3 ? AUDIO_FRAMES / 40 : AUDIO_FRAMES / 4);
+        audio_events(core, 0, NULL);
+    }
+
+    // The voices stop and the tails decay to silence, then a voice starts them again
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_stop(&w, 1, 0));
+    box_audio_core_apply(core, w.data, w.size);
+    for (k = 0; k < 16; k ++) {
+        audio_render(core, 0, AUDIO_FRAMES);
+    }
+
+    for (i = 0; i < 2; i ++) {
+        test_assert(!box_audio_core_effect_running(core, i));
+    }
+
+    audio_play(core, 3, 1, 1, 0.5f, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES / 4);
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    for (i = 0; i < 3; i ++) {
+        test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_NONE, BOX_AUDIO_BUS_NONE,
+            0, BOX_AUDIO_BUS_NONE, NULL));
+    }
+
+    box_audio_core_apply(core, w.data, w.size);
+    audio_render(core, 0, AUDIO_FRAMES);
+    for (i = 0; i < 3; i ++) {
+        test_assert(!box_audio_core_effect_running(core, i));
+    }
+
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+    for (i = 0; i < 3; i ++) {
+        free(memory[i]);
+    }
+}
+
 /* Saturators in the insert slots of buses: changes of the drive, the asymmetry, the bits and
  * the mix while they run, moves to another bus and slot, the reduction read, tails that decay
  * to silence and start again, and a removal, without a call of the allocator. */
