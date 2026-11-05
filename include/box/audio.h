@@ -1188,6 +1188,13 @@ extern ECS_TAG_DECLARE(AudioListener);
  * The gain is inverse distance, min / (min + rolloff * (d - min)) beyond min_distance, faded so
  * that it is exactly 0 at max_distance. Front and back sound alike.
  *
+ * A cutoff above 0 closes a 12 dB per octave low-pass with distance: open within
+ * min_distance, at cutoff at max_distance, and exponential between them, so that equal steps
+ * in distance are equal steps in pitch: BOX_AUDIO_SPATIAL_OPEN * (cutoff /
+ * BOX_AUDIO_SPATIAL_OPEN)^t with t = (d - min) / (max - min). A cutoff is clamped to
+ * BOX_AUDIO_SPATIAL_CUTOFF_MIN..BOX_AUDIO_SPATIAL_OPEN; 0, a negative cutoff or one of at least
+ * BOX_AUDIO_SPATIAL_OPEN filter nothing.
+ *
  * A looping source beyond max_distance uses no voice and keeps its place in time; a source
  * that does not loop does not start beyond it. On a sound it sets the distances of
  * box_audio_play_at.
@@ -1196,7 +1203,15 @@ ECS_STRUCT(AudioSpatial, {
     float min_distance;    /**< Full volume within this distance, default 1 */
     float max_distance;    /**< Silent from this distance, default 50 */
     float rolloff;         /**< How fast the volume falls beyond min_distance, default 1 */
+    float cutoff;          /**< Low-pass cutoff in Hz at max_distance, 0 for no filter,
+                            *   default 0 */
 });
+
+/** Cutoff in Hz of an open distance filter, where it starts at min_distance */
+#define BOX_AUDIO_SPATIAL_OPEN 20000.0f
+
+/** Lowest cutoff in Hz of a distance filter */
+#define BOX_AUDIO_SPATIAL_CUTOFF_MIN 10.0f
 
 /** Settings of the audio of the world, a singleton */
 ECS_STRUCT(AudioSettings, {
@@ -1683,6 +1698,33 @@ float box_audio_spatial_gain(
     const mat4 listener,
     const vec3 position,
     float *pan);
+
+/** Gain, pan and distance filter of a spatial source, as box.audio computes them: the gain and
+ * the pan of box_audio_spatial_gain, and the cutoff of box_audio_spatial_cutoff.
+ *
+ * @param spatial The distances, NULL for the defaults
+ * @param listener World transform of the listener
+ * @param position World position of the source
+ * @param pan Receives the pan, -1 left to 1 right, may be NULL
+ * @param cutoff Receives the cutoff in Hz, 0 for an open filter, may be NULL
+ * @return The gain, 0 at and beyond max_distance
+ */
+float box_audio_spatial_place(
+    const AudioSpatial *spatial,
+    const mat4 listener,
+    const vec3 position,
+    float *pan,
+    float *cutoff);
+
+/** Cutoff of the distance filter of a spatial source at a distance, as box.audio computes it.
+ *
+ * @param spatial The distances and cutoff, NULL for the defaults, which filter nothing
+ * @param distance Distance from the listener
+ * @return The cutoff in Hz, 0 when the filter is open: within min_distance or without a cutoff
+ */
+float box_audio_spatial_cutoff(
+    const AudioSpatial *spatial,
+    float distance);
 
 /** Record the master output of the next seconds to a 16 bit stereo WAV file.
  *

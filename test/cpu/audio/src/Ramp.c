@@ -1,6 +1,6 @@
 /**
  * @file Ramp.c
- * @brief Ramps of the audio core: a step of a volume, pan, mute or send never jumps.
+ * @brief Ramps of the audio core: a step of a volume, pan, mute, send or cutoff never jumps.
  */
 
 #include "util.h"
@@ -121,5 +121,34 @@ void Ramp_restart_midway(void) {
     audio_render(core, 2248, 1848);
     test_assert(audio_max_step(audio_l, 1, 4096) <= bound);
     test_flt(audio_l[4095], 0);
+    box_audio_core_free(core);
+}
+
+void Ramp_cutoff_step(void) {
+    // audio/ramp
+    box_audio_core_t *core = audio_new();
+    int32_t i;
+    audio_sine(audio_sound_a, AUDIO_RATE, 8000, 0.5f);
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_RATE, 1, AUDIO_RATE));
+    audio_play(core, 1, 1, 0, 1, 0, 1, BOX_AUDIO_PLAY_LOOP | BOX_AUDIO_PLAY_ATTACK);
+    audio_render(core, 0, 2048);
+    test_assert(audio_peak(audio_l, 1024, 2048) > 0.49f);
+
+    /* The filter closes over a ramp: the first frames are still bright, then dark */
+    audio_voice_set(core, 1, BOX_AUDIO_PARAM_CUTOFF, 200);
+    audio_render(core, 2048, 4096);
+    test_assert(audio_peak(audio_l, 2048, 2048 + AUDIO_RAMP / 5) > 0.1f);
+    test_assert(audio_peak(audio_l, 2048 + AUDIO_RAMP * 2, 6144) < 0.01f);
+    test_assert(audio_peak(audio_r, 2048 + AUDIO_RAMP * 2, 6144) < 0.01f);
+    test_assert(audio_peak(audio_l, 2048 + AUDIO_RAMP * 2, 6144) > 0);
+
+    /* Open again it passes the sound as is once the ramp ended */
+    audio_voice_set(core, 1, BOX_AUDIO_PARAM_CUTOFF, 0);
+    audio_render(core, 6144, 4096);
+    for (i = 6144 + AUDIO_RAMP + 8; i < 10240; i ++) {
+        test_assert(fabsf(audio_l[i] - audio_sound_a[i]) < 1e-5f);
+    }
+
+    test_int(audio_events(core, BOX_AUDIO_EVENT_IGNORED, NULL), 0);
     box_audio_core_free(core);
 }

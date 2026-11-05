@@ -441,7 +441,7 @@ ears { Position: {0, 1.7, 0}; AudioListener }
 engine {
   Position: {4, 0, -10}
   AudioSource: {sound: hum, loop: true}
-  AudioSpatial: {min_distance: 2, max_distance: 40}
+  AudioSpatial: {min_distance: 2, max_distance: 40, cutoff: 800}
 }
 const shot: bool = box.audio.play_at(click, {-3, 0, -5}, 1.0)
 ```
@@ -451,7 +451,8 @@ of the first enabled view in render order. Tag the main camera explicitly in sce
 with render-to-texture views. Multiple listeners warn and use the lowest entity ID.
 Without a listener, spatial sounds play centered at full volume.
 
-`AudioSpatial` defaults to `min_distance: 1`, `max_distance: 50`, `rolloff: 1`.
+`AudioSpatial` defaults to `min_distance: 1`, `max_distance: 50`, `rolloff: 1`,
+`cutoff: 0`.
 A source uses its world position, including parent transforms; without a
 `WorldTransform` it plays nonspatially. On a sound entity, `AudioSpatial` supplies
 distances for `play_at`, whose position stays fixed while the listener moves.
@@ -462,7 +463,17 @@ inverse-distance attenuation, normalized to reach zero at max:
 `gain = (g(d) - g(max)) / (1 - g(max))`.
 Rolloff zero holds full gain until max distance. Pan follows the listener's right
 axis and narrows to center within min distance. Front and back sound alike.
-There is no Doppler, occlusion, distance filter or HRTF.
+
+`cutoff` adds a distance filter, since air dulls distant sounds: a 12 dB per octave
+low-pass, open within min distance, reaching `cutoff` Hz at max distance. Between
+them it moves exponentially from 20000 Hz, so equal steps in distance sound like
+equal steps in brightness: `f(d) = 20000 * (cutoff / 20000)^t` with
+`t = (d - min) / (max - min)`. A `cutoff` of 0, the default, a negative one or one
+of 20000 Hz or more filters nothing and costs nothing; others are clamped to at
+least 10 Hz. The filter applies to sources and `play_at` one shots, each channel of
+a stereo sound, after the voice's sound and before its volume and pan, and moves
+with the core's 5 ms ramps, so a fast source or a teleporting listener does not
+click. A voice starts at its cutoff. There is no Doppler, occlusion or HRTF.
 
 Out-of-range looping sources release their voices but keep time on the game thread;
 returning in range resumes where the sound would have been. Nonlooping sources and

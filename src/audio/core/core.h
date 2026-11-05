@@ -334,9 +334,22 @@ typedef enum box_audio_param_t {
                                   *   everything that follows its pitch included */
     BOX_AUDIO_PARAM_MOD = 12,    /**< Mod of a synth voice, 0..1, default 1: scales the depth
                                   *   of the pitch of its LFOs, its vibrato */
-    BOX_AUDIO_PARAM_PRESSURE = 13 /**< Pressure of a synth voice, 0..1, default 0: moves its
+    BOX_AUDIO_PARAM_PRESSURE = 13, /**< Pressure of a synth voice, 0..1, default 0: moves its
                                   *   cutoff up by pressure * BOX_AUDIO_SYNTH_PRESSURE_OCTAVES */
+    BOX_AUDIO_PARAM_CUTOFF = 14  /**< Cutoff in Hz of the 12 dB per octave low-pass of a voice,
+                                  *   after its source and before its volume and pan, ramped.
+                                  *   0 (the default), a negative value or one of at least
+                                  *   BOX_AUDIO_CUTOFF_OPEN opens the filter, which the voice
+                                  *   then skips; others are clamped to BOX_AUDIO_CUTOFF_MIN..
+                                  *   0.45 of the rate. The first cutoff of a voice that has
+                                  *   not rendered applies at once */
 } box_audio_param_t;
+
+/** A cutoff of BOX_AUDIO_PARAM_CUTOFF of at least this many Hz opens the filter of a voice */
+#define BOX_AUDIO_CUTOFF_OPEN 20000.0f
+
+/** Lowest cutoff of BOX_AUDIO_PARAM_CUTOFF in Hz */
+#define BOX_AUDIO_CUTOFF_MIN 10.0f
 
 /** Largest pitch bend of a voice in semitones, either way */
 #define BOX_AUDIO_BEND_MAX 48.0f
