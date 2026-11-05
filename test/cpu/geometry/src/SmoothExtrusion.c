@@ -145,6 +145,44 @@ void SmoothExtrusion_arc_joints(void) {
     ecs_fini(world);
 }
 
+void SmoothExtrusion_curve_corner(void) {
+    /* The arch with a slight kink where the two arcs meet, well under the crease angle */
+    ecs_world_t *world = smooth_world();
+    test_int(ecs_script_run(world, "kink",
+        "using box.geometry\n"
+        "kink_outline { Path2D: {start: {-0.72, 0.16}, segments: ["
+        "{kind: Line, end: {0.72, 0.16}}, {kind: Line, end: {0.72, 1.5}},"
+        "{kind: CubicBezier, end: {0, 2.22}, control1: {0.72, 1.898}, control2: {0.398, 2.17}},"
+        "{kind: CubicBezier, end: {-0.72, 1.5}, control1: {-0.398, 2.17}, control2: {-0.72, 1.898}}"
+        "], closed: true}}\n"
+        "kink { Profile2D: {outer: kink_outline}}\n", NULL), 0);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, ProfileExtrusion, {.profile = ecs_lookup(world, "kink"), .depth = 1,
+        .cap_start = true, .cap_end = true, .smooth = true});
+    const box_mesh_t *mesh = smooth_mesh(world, e);
+    vec3 normals[4];
+
+    /* The kink stays sharp, each side keeps the normal of its own edge */
+    test_int(smooth_side_normals(mesh, 0, 2.22f, normals), 2);
+    test_assert(glm_vec3_dot(normals[0], normals[1]) < 0.99f);
+    test_assert(glm_vec3_dot(normals[0], normals[1]) > 0.9f);
+    test_assert(normals[0][0] * normals[1][0] < 0);
+
+    /* Inside the arcs it is still smooth */
+    int samples = 0;
+    for (int i = 0; i < mesh->vertex_count; i ++) {
+        const box_vertex_t *v = &mesh->vertices[i];
+        if (fabsf(v->normal[1]) > 0.5f || v->position[2] < 1.55f || v->position[2] > 2.2f) {
+            continue;
+        }
+        test_int(smooth_side_normals(mesh, v->position[0], v->position[2], normals), 2);
+        test_assert(glm_vec3_dot(normals[0], normals[1]) > 0.99999f);
+        samples ++;
+    }
+    test_assert(samples > 8);
+    ecs_fini(world);
+}
+
 void SmoothExtrusion_holes(void) {
     ecs_world_t *world = smooth_world();
     ecs_entity_t e = ecs_new(world);
@@ -228,7 +266,8 @@ void SmoothExtrusion_evaluation(void) {
     ecs_entity_t profile = test_circle(world, 0);
     ecs_entity_t flat = ecs_new(world), smooth = ecs_new(world);
     ecs_set(world, flat, ProfileExtrusion, {.profile = profile, .depth = 2});
-    ecs_set(world, smooth, ProfileExtrusion, {.profile = profile, .depth = 2, .smooth = true});
+    ecs_set(world, smooth, ProfileExtrusion, {.profile = profile, .depth = 2,
+        .cap_start = true, .cap_end = true, .smooth = true});
     box_surface_sample_t before, after;
 
     /* Across the profile point at a quarter turn the smooth normal is continuous and radial */

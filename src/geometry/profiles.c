@@ -38,7 +38,35 @@ static bool box_asset_append(
     return result;
 }
 
-/** Flag the samples of a closed Path2D that are anchors between a Line and a curve segment.
+/** Direction of a cubic at its start or end, from the nearest distinct control point.
+ *
+ * @param cubic The four points of the cubic
+ * @param end Whether to take the direction at the end
+ * @param out Receives the unit direction, zero for a degenerate cubic
+ */
+static void box_path2_tangent(
+    vec3 cubic[4],
+    bool end,
+    vec2 out)
+{
+    out[0] = out[1] = 0;
+    for (int i = 1; i < 4; i ++) {
+        const float *a = end ? cubic[3 - i] : cubic[0];
+        const float *b = end ? cubic[3] : cubic[i];
+        float x = b[0] - a[0], y = b[1] - a[1], length = hypotf(x, y);
+        if (length > 1e-6f) {
+            out[0] = x / length;
+            out[1] = y / length;
+            return;
+        }
+    }
+}
+
+/** Cosine of the angle between the tangents of two curves above which their anchor is smooth */
+#define BOX_PATH_TANGENT 0.9998477f
+
+/** Flag the samples of a closed Path2D that are corner anchors: between a Line and a curve
+ * segment, or between two curve segments whose tangents do not line up.
  *
  * @param path The path, sampled by box_path2_sample
  * @param count Number of samples of the path
@@ -51,13 +79,19 @@ static void box_path2_corners(
 {
     int total = box_path2_count(path), index = 0;
     vec3 cubic[4];
+    vec2 in, out;
     ecs_os_memset_n(flags, 0, int, count);
     PathSegmentKind previous = box_path2_cubic(path, total - 1, cubic);
+    box_path2_tangent(cubic, true, in);
     for (int i = 0; i < total && index < count; i ++) {
         PathSegmentKind kind = box_path2_cubic(path, i, cubic);
-        if ((kind == PathLine) != (previous == PathLine)) {
+        box_path2_tangent(cubic, false, out);
+        if ((kind == PathLine) != (previous == PathLine) || (kind != PathLine &&
+            previous != PathLine && glm_vec2_dot(in, out) < BOX_PATH_TANGENT))
+        {
             flags[index] = 1;
         }
+        box_path2_tangent(cubic, true, in);
 
         index += kind == PathLine ? 1 : 16;
         previous = kind;

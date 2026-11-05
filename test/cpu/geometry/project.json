@@ -338,6 +338,7 @@
                     "circle",
                     "rectangle",
                     "arc_joints",
+                    "curve_corner",
                     "holes",
                     "mesh_key",
                     "default_flat",
