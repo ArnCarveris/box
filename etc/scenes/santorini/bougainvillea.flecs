@@ -13,7 +13,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template Bougainvillea {
   prop width: f32 = 2.5
   prop height: f32 = 2.8

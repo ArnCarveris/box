@@ -4,7 +4,6 @@ using box.transform
 using box.geometry
 using box.material
 
-@tree Parent
 template KoreanSignboard {
   { (IsA, KoreanSignGround); Position: {}; RoundedBox: {1.02, 0.5, 0.05, 0.012} }
   for side in 0..2 {
@@ -15,7 +14,6 @@ template KoreanSignboard {
   }
 }
 
-@tree Parent
 template KoreanGlyphCenter {
   { (IsA, KoreanGold); Position: {0, 0, 0.03}; Box: {0.03, 0.36, 0.012} }
   for side in 0..2 {
@@ -24,7 +22,6 @@ template KoreanGlyphCenter {
   }
 }
 
-@tree Parent
 template KoreanGlyphRight {
   { (IsA, KoreanGold); Position: {0, 0.15, 0.03}; Box: {0.26, 0.03, 0.012} }
   { (IsA, KoreanGold); Position: {0, -0.15, 0.03}; Box: {0.32, 0.03, 0.012} }
@@ -33,7 +30,6 @@ template KoreanGlyphRight {
   { (IsA, KoreanGold); Position: {-0.1, -0.065, 0.03}; Box: {0.03, 0.17, 0.012} }
 }
 
-@tree Parent
 template KoreanGlyphGreat {
   { (IsA, KoreanGold); Position: {0, 0.05, 0.03}; Box: {0.3, 0.03, 0.012} }
   { (IsA, KoreanGold); Position: {0, 0.11, 0.03}; Box: {0.03, 0.12, 0.012} }
@@ -42,7 +38,6 @@ template KoreanGlyphGreat {
   }
 }
 
-@tree Parent
 template KoreanGlyphGate {
   for side in 0..2 {
     const sign = side * 2 - 1
