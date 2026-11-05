@@ -7,6 +7,7 @@
  */
 
 #include "world.h"
+#include "../../../../src/jobs/jobs.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -23,13 +24,15 @@ static const char *song_channels[] = {
 
 #define SONG_CHANNELS ((int32_t)(sizeof(song_channels) / sizeof(song_channels[0])))
 
-/** Create a world and run test/assets/audio/song.flecs in it.
+/** Create a world and run test/assets/audio/song.flecs in it. The sound files decode inline at
+ * the end of the first frame, so the music that starts at frame 3 never waits on a worker.
  *
  * @return The world
  */
 static ecs_world_t* song_world(void)
 {
     ecs_world_t *world = audio_world();
+    test_int(box_jobs_set_workers(world, 0), 0);
     char *code = audio_read("test/assets/audio/song.flecs");
     test_assert(ecs_script_run(world, "song", code, NULL) == 0);
     ecs_os_free(code);
