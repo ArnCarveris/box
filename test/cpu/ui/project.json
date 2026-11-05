@@ -420,7 +420,9 @@
                     "scroll_thumb_hover_look",
                     "panel_title_in_column",
                     "list_keeps_width",
-                    "scroll_content_added_after_bars"
+                    "scroll_content_added_after_bars",
+                    "shell_click_taps_button_action",
+                    "shell_click_changes_button"
                 ]
             },
             {

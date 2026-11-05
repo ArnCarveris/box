@@ -761,3 +761,165 @@ void Widgets_scroll_content_added_after_bars(void) {
     ecs_os_free(logs);
     ecs_fini(world);
 }
+
+/** A screen UI with a HeadlessButton that taps actions.play and one without an action, which
+ * reports a change, and a probe that counts the on.change of the second, its on.activate events
+ * and those ui.activation counts.
+ *
+ * On screen go is at [440, 260], plain at [840, 260]. */
+#define WIDGETS_BUTTONS \
+    "using flecs.script\n" \
+    "using box.widgets\n" \
+    "using box.transform\n" \
+    "using box.geometry\n" \
+    "using box.camera\n" \
+    "using box.view\n" \
+    "using box.input\n" \
+    "using box.ui\n" \
+    "actions {\n" \
+    "  play { Action: {} }\n" \
+    "}\n" \
+    "template ButtonProbe {\n" \
+    "  prop target: entity = 0\n" \
+    "  mut changes: i32 = 0\n" \
+    "  mut raw: i32 = 0\n" \
+    "  mut activations: i32 = 0\n" \
+    "  async {\n" \
+    "    while true {\n" \
+    "      await on.change(target)\n" \
+    "      changes = changes + 1\n" \
+    "    }\n" \
+    "  }\n" \
+    "  async {\n" \
+    "    while true {\n" \
+    "      const e = await on.activate(target)\n" \
+    "      raw = raw + 1\n" \
+    "      if ui.activation(e) == target {\n" \
+    "        activations = activations + 1\n" \
+    "      }\n" \
+    "    }\n" \
+    "  }\n" \
+    "}\n" \
+    "hud {\n" \
+    "  Scene: {}\n" \
+    "  camera {\n" \
+    "    Position: {0, 0, 100}\n" \
+    "    Camera: {ortho: true, ortho_scale: 1}\n" \
+    "  }\n" \
+    "  HeadlessButton go(action: actions.play) {\n" \
+    "    Position: {-200, 100, 1}\n" \
+    "    Rect: {100, 40}\n" \
+    "  }\n" \
+    "  HeadlessButton plain() {\n" \
+    "    Position: {200, 100, 1}\n" \
+    "    Rect: {100, 40}\n" \
+    "  }\n" \
+    "}\n" \
+    "hud_view {\n" \
+    "  View: {camera: hud.camera}\n" \
+    "}\n" \
+    "probe { ButtonProbe: {target: hud.plain} }\n"
+
+/** The muts of ButtonProbe */
+typedef struct {
+    int32_t changes;     /**< Times on.change of the button resolved */
+    int32_t raw;         /**< Every on.activate event of flecs on the button */
+    int32_t activations; /**< Those ui.activation counts as an activation of the button */
+} widgets_button_t;
+
+/** Run a terminal command and frames until the input queue is drained, counting the frames in
+ * which actions.play was pressed.
+ *
+ * @param world The world
+ * @param s The terminal session
+ * @param cmd The command
+ * @return Frames in which actions.play was pressed
+ */
+static int32_t widgets_run(
+    ecs_world_t *world,
+    ecs_entity_t s,
+    const char *cmd)
+{
+    ecs_entity_t play = ecs_lookup(world, "actions.play");
+    bool error = true;
+    int32_t i, result = 0;
+    char *out = box_command_run(world, s, cmd, &error);
+    if (error) {
+        printf("command '%s' failed: %s\n", cmd, out);
+    }
+
+    test_bool(error, false);
+    ecs_os_free(out);
+    for (i = 0; i < 6 || box_input_pending(world); i ++) {
+        ecs_progress(world, 0);
+        result += ecs_get(world, play, ActionState)->pressed;
+    }
+
+    return result;
+}
+
+/** Get the muts of the ButtonProbe.
+ *
+ * @param world The world
+ * @return The muts
+ */
+static const widgets_button_t* widgets_button(
+    ecs_world_t *world)
+{
+    const widgets_button_t *result = ecs_get_id(world, ecs_lookup(world, "probe"),
+        ecs_lookup(world, "ButtonProbe.mut"));
+    test_assert(result != NULL);
+
+    return result;
+}
+
+void Widgets_shell_click_taps_button_action(void) {
+    // ui/widgets
+    ecs_world_t *world = widgets_scene(WIDGETS_BUTTONS);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    widgets_frames(world);
+
+    // A real click taps the action
+    test_int(widgets_run(world, s, "mouse_click left [440, 260]"), 1);
+
+    // The click command of the shell on the button does too, a right click does not
+    test_int(widgets_run(world, s, "click hud.go"), 1);
+    test_int(widgets_run(world, s, "click hud.go right"), 0);
+
+    ecs_fini(world);
+}
+
+void Widgets_shell_click_changes_button(void) {
+    // ui/widgets
+    ecs_world_t *world = widgets_scene(WIDGETS_BUTTONS);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    widgets_frames(world);
+    test_int(widgets_button(world)->changes, 0);
+
+    // flecs delivers on.activate for the click command of the shell, which ui.activation counts
+    // and the button reports as a change
+    widgets_run(world, s, "click hud.plain");
+    test_int(widgets_button(world)->raw, 1);
+    test_int(widgets_button(world)->activations, 1);
+    test_int(widgets_button(world)->changes, 1);
+
+    // As for a real click
+    widgets_run(world, s, "mouse_click left [840, 260]");
+    test_int(widgets_button(world)->raw, 2);
+    test_int(widgets_button(world)->activations, 2);
+    test_int(widgets_button(world)->changes, 2);
+
+    // Also while the real pointer is elsewhere
+    widgets_run(world, s, "mouse_move [1200, 50]");
+    widgets_run(world, s, "click hud.plain");
+    test_int(widgets_button(world)->raw, 3);
+    test_int(widgets_button(world)->activations, 3);
+    test_int(widgets_button(world)->changes, 3);
+
+    // A right click does not activate it
+    widgets_run(world, s, "click hud.plain right");
+    test_int(widgets_button(world)->activations, 3);
+    test_int(widgets_button(world)->changes, 3);
+
+    ecs_fini(world);
+}
