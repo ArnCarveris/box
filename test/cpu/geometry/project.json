@@ -28,14 +28,11 @@
                     "negative_bevel",
                     "infinite_bevel",
                     "bevel_before_box",
-<<<<<<< HEAD
                     "inherited_surface_child",
                     "inherited_surface_child_script",
-                    "inherited_invalid_surface_child"
-=======
+                    "inherited_invalid_surface_child",
                     "negative_bevel_rims",
                     "infinite_bevel_rims"
->>>>>>> 82b7ba1d902c9b330990eb39645db1f4a2183dec
                 ]
             },
             {

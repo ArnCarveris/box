@@ -148,7 +148,6 @@ void Validation_bevel_before_box(void)
     ecs_fini(world);
 }
 
-<<<<<<< HEAD
 static const char *Validation_surface_assets =
     "using box.geometry\n"
     "edge { Path2D: {start: {-1,-1}, segments: [{kind: Line, end: {1,-1}},"
@@ -309,7 +308,9 @@ void Validation_inherited_invalid_surface_child(void)
     test_assert(first != NULL);
     test_assert(strstr(first + 1, "invalid ProfileExtrusion") == NULL);
     ecs_os_free(out);
-=======
+    ecs_fini(world);
+}
+
 void Validation_negative_bevel_rims(void)
 {
     ecs_world_t *world = ecs_init();
@@ -334,6 +335,5 @@ void Validation_infinite_bevel_rims(void)
     ecs_set(world, entity, Bevel, {.bottom = NAN, .segments = 4});
     Validation_logs(world, "invalid Bevel on subject: radii must be finite");
     test_assert(ecs_get(world, entity, ShapeMesh)->mesh != 0);
->>>>>>> 82b7ba1d902c9b330990eb39645db1f4a2183dec
     ecs_fini(world);
 }
