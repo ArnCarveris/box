@@ -435,7 +435,7 @@ void box_audio_modulators_sync(
         sent->entity = 0;
     }
 
-    state->timeline.beat_wanted = wanted;
+    state->timeline.beat_wanted = wanted || state->effect_beat;
 }
 
 const char* box_audio_modulator_status(

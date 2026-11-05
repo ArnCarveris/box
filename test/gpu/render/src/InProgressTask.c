@@ -139,7 +139,7 @@ void InProgressTask_bake_reports_probes(void) {
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
     ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
-        .capture_size = 8, .budget_ms = 2, .bounces = 1});
+        .capture_size = 8, .budget_ms = 2, .bounces = 1, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, camera, Position, {0, 1, 5});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});

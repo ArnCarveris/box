@@ -49,6 +49,8 @@
                     "cpu_budget",
                     "cpu_budget_percent_sign",
                     "fps",
+                    "delta_time_fraction",
+                    "invalid_delta_time",
                     "port",
                     "scene",
                     "all_options",
@@ -80,11 +82,7 @@
                     "run_headless_requires_limit",
                     "run_headless_timeout_infinite",
                     "run_headless_fixed_delta",
-                    "run_loads_scene",
-                    "run_missing_scene",
-                    "run_invalid_scene_headless",
-                    "run_invalid_scene_windowed",
-                    "run_scene_evaluation_error"
+                    "run_loads_scene"
                 ]
             },
             {
@@ -532,6 +530,21 @@
                     "disabled_not_played",
                     "no_clip_no_op",
                     "no_animators_no_cost"
+                ]
+            },
+            {
+                "id": "ScriptHas",
+                "testcases": [
+                    "tag",
+                    "tag_entity_variable",
+                    "tag_next_to_dependency",
+                    "tag_declared_by_script",
+                    "tag_set_by_script",
+                    "tag_declared_by_script_next_to_dependency",
+                    "tag_declared_by_other_script",
+                    "component",
+                    "component_next_to_dependency",
+                    "component_declared_by_script"
                 ]
             }
         ]

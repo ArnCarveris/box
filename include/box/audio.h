@@ -218,8 +218,8 @@ ECS_STRUCT(AudioMeter, {
                             *   BOX_AUDIO_METER_WINDOW seconds of output */
     float rms_right;       /**< Linear, the RMS of the right channel over the window */
     float reduction;       /**< dB, on an effect entity: the largest gain reduction since the
-                            *   last frame, for dynamics effects, and how hard the clipper of
-                            *   a Saturator squashes; 0 for others */
+                            *   last frame, for dynamics effects and a PatternGate, and how
+                            *   hard the clipper of a Saturator squashes; 0 for others */
 });
 
 /** The bus a sound or a source plays on. On a source it wins over the one of its sound */
@@ -993,6 +993,7 @@ ECS_STRUCT(PitchShifter, {
                             *   1 - mix */
 });
 
+<<<<<<< HEAD
 /** Longest slice of a BeatRepeat and longest lag of a TapeStop in seconds, which size their
  * memory: a slice of 4 beats under 60 bpm is held to it */
 #define BOX_AUDIO_BEAT_REPEAT_MAX 4.0f
@@ -1062,6 +1063,76 @@ ECS_STRUCT(TapeStop, {
     float stop_time;       /**< Seconds from full speed to the halt, 0.01 to 4, default 0.5 */
     float start_time;      /**< Seconds from the halt to full speed, 0.01 to 4, default 0.2 */
     float curve;           /**< Shape of the ramps, -1 to 1, default 0 (linear) */
+=======
+/** A pattern gate, an effect in an insert slot of an AudioBus, as a Reverb is: a tempo-synced
+ * level pattern that chops a sustained sound into rhythm, the trance gate. It turns pads,
+ * chords and noise into rhythmic parts without notes:
+ * pad { AudioBus: {effects: [pad]};
+ * PatternGate: {steps: [1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1], release: 0.05} }.
+ *
+ * The pattern is locked to the Transport: at every frame the step floor(beat / rate) mod
+ * length sounds, so the gate stays on the grid after a seek, a loop wrap and a tempo change.
+ * Without a playing Transport it runs at 120 bpm. Swing bends the step grid as Track.swing
+ * bends its notes: the second step of each pair starts later by swing steps. A step is open
+ * for the first gate share of it at its level, so a level of 0.5 is an accent 6 dB down, and
+ * closed after, at the floor; the gain rises in attack seconds and falls in release seconds,
+ * linearly, the same on both channels. A change of a step or of the timing moves the gain at
+ * the speed of the edges; floor and mix move over 20 ms. An AudioMeter on its entity reads its
+ * gain reduction. It stops while its input is silent.
+ */
+ECS_STRUCT(PatternGate, {
+    float steps[16];       /**< Level of each step, 0 (closed) to 1, default all 1; an accent
+                            *   is a level under 1 */
+    int32_t length;        /**< Steps in the pattern, 1 to 16, default 16 */
+    float rate;            /**< Beats per step, default 0.25 (sixteenths); 0.375 is a dotted
+                            *   sixteenth, 1 / 6 a sixteenth triplet, 1/64 to 16 */
+    float swing;           /**< 0 to 0.75, default 0: the second step of every pair starts
+                            *   later by swing steps, as Track.swing */
+    float attack;          /**< Seconds of an edge from closed to open, default 0.002, 0.0005
+                            *   to 2 */
+    float release;         /**< Seconds of an edge from open to closed, default 0.03, 0.0005
+                            *   to 2; a longer one gives a softer pulse */
+    float gate;            /**< Share of each step that is open, 0.05 to 1, default 0.5; at 1
+                            *   neighbouring open steps run together */
+    float floor;           /**< Gain when closed in dB, -80 (default) to 0; a higher floor
+                            *   pumps instead of chopping */
+    float mix;             /**< Wet level, 0 to 1, default 1; the dry signal passes at
+                            *   1 - mix */
+});
+
+/** A rotary, an effect in an insert slot of an AudioBus, as a Reverb is: a rotating speaker
+ * cabinet, the swirl of an organ, also on guitars, electric pianos and vocals. The sum of both
+ * channels runs through a tube preamp, then a crossover at 800 Hz splits it into a drum below
+ * and a horn above, which turn at their own rates. Two virtual mics hear each rotor, the left
+ * one a quarter turn times spread one way and the right one as far the other way: as a rotor
+ * turns, its pitch moves with the Doppler shift (a few tenths of a millisecond of the horn),
+ * and its level drops and its tone dulls as it faces away from a mic:
+ * organ { AudioBus: {effects: [organ]}; Rotary: {speed: 0, drive: 0.3} }.
+ *
+ * The rotors turn at their slow rates at speed 0 and at their fast rates at speed 1, and in
+ * between at rates in between. They do not jump to a new speed: the horn reaches it within
+ * acceleration seconds and the drum three times slower, so automating speed between 0 and 1
+ * gives the switch of a real cabinet between chorale and tremolo. The rotors start at the rate
+ * of their speed when the rotary is put on a channel. Balance, spread, drive and mix move over
+ * 20 ms. Every rotary runs with its own memory of 4 milliseconds. Once its input was silent for
+ * 50 ms it stops until its input sounds again, its rotors turning on.
+ */
+ECS_STRUCT(Rotary, {
+    float speed;           /**< 0 to 1, default 0: 0 is slow (chorale), 1 fast (tremolo) */
+    float horn_slow;       /**< Hz of the horn at speed 0, default 0.8, 0 to 20 */
+    float horn_fast;       /**< Hz of the horn at speed 1, default 6.7, 0 to 20 */
+    float drum_slow;       /**< Hz of the drum at speed 0, default 0.7, 0 to 20 */
+    float drum_fast;       /**< Hz of the drum at speed 1, default 5.9, 0 to 20 */
+    float acceleration;    /**< Seconds of the horn to a new speed, default 1, 0.01 to 20; the
+                            *   drum takes three times as long */
+    float balance;         /**< -1 to 1, default 0: -1 is the drum alone, 1 the horn alone */
+    float spread;          /**< 0 to 1, default 1: the stereo width of the mics; 0 is mono, 1
+                            *   puts them half a turn apart */
+    float drive;           /**< 0 to 1, default 0: the share of the tube preamp, its gain up to
+                            *   +24 dB */
+    float mix;             /**< Wet level, 0 to 1, default 1; the dry signal passes at
+                            *   1 - mix */
+>>>>>>> eddb532cfbb80a6555459db9537f6b0b9e691868
 });
 
 /** An envelope of the cutoff of the SynthFilter of the same root, with the segments of a
@@ -1259,6 +1330,13 @@ extern ECS_TAG_DECLARE(AudioListener);
  * The gain is inverse distance, min / (min + rolloff * (d - min)) beyond min_distance, faded so
  * that it is exactly 0 at max_distance. Front and back sound alike.
  *
+ * A cutoff above 0 closes a 12 dB per octave low-pass with distance: open within
+ * min_distance, at cutoff at max_distance, and exponential between them, so that equal steps
+ * in distance are equal steps in pitch: BOX_AUDIO_SPATIAL_OPEN * (cutoff /
+ * BOX_AUDIO_SPATIAL_OPEN)^t with t = (d - min) / (max - min). A cutoff is clamped to
+ * BOX_AUDIO_SPATIAL_CUTOFF_MIN..BOX_AUDIO_SPATIAL_OPEN; 0, a negative cutoff or one of at least
+ * BOX_AUDIO_SPATIAL_OPEN filter nothing.
+ *
  * A looping source beyond max_distance uses no voice and keeps its place in time; a source
  * that does not loop does not start beyond it. On a sound it sets the distances of
  * box_audio_play_at.
@@ -1267,7 +1345,58 @@ ECS_STRUCT(AudioSpatial, {
     float min_distance;    /**< Full volume within this distance, default 1 */
     float max_distance;    /**< Silent from this distance, default 50 */
     float rolloff;         /**< How fast the volume falls beyond min_distance, default 1 */
+    float cutoff;          /**< Low-pass cutoff in Hz at max_distance, 0 for no filter,
+                            *   default 0 */
 });
+
+/** Volume an AudioEmitter places its plays in, in the space of the emitter entity, with the
+ * conventions of EmitterShape. A zero radius or zero extents play at the origin */
+ECS_ENUM(AudioEmitterShape, {
+    AudioEmitterPoint = 0,      /**< The origin of the emitter */
+    AudioEmitterDisc = 1,       /**< Inside the disc of radius around the origin in the XZ
+                                 *   plane */
+    AudioEmitterSphere = 2,     /**< Inside the sphere of radius around the origin */
+    AudioEmitterHemisphere = 3, /**< Inside the upper half (+Y) of the sphere of radius */
+    AudioEmitterBox = 4         /**< Inside the box of half size extents around the origin */
+});
+
+/** Plays a sound once at random intervals, at a random point of a shape, with a random volume
+ * and pitch, seeded from seed, the entity and the count of plays: insects, drips and rain.
+ *
+ * The first play comes after an interval, on the clock of the output. Plays go the way of
+ * box_audio_play_at, on the AudioOutput and with the AudioSpatial of the emitter, else of the
+ * sound; its WorldTransform places the shape, without one the plays are not spatial.
+ *
+ * Plays beyond max_distance, over max_active or of a sound that is not ready are skipped. A
+ * Disabled or deleted emitter and playing false stop new plays; playing true starts over with
+ * a fresh interval. Changes apply from the next interval.
+ */
+ECS_STRUCT(AudioEmitter, {
+    ecs_entity_t sound;    /**< AudioPcm, SoundFile or SynthSound to play */
+    float interval_min;    /**< Seconds between plays, lower bound, default 1; at least
+                            *   0.01 */
+    float interval_max;    /**< Seconds between plays, upper bound, default 4; swapped with
+                            *   interval_min when below it */
+    AudioEmitterShape shape; /**< Volume plays are placed in, default AudioEmitterPoint */
+    float radius;          /**< Radius of disc, sphere and hemisphere, default 0; its absolute
+                            *   value */
+    vec3 extents;          /**< Half size of the box, default {0, 0, 0}; their absolute
+                            *   values */
+    float volume_min;      /**< Linear gain, lower bound, default 1; at least 0 */
+    float volume_max;      /**< Linear gain, upper bound, default 1 */
+    float pitch_min;       /**< Playback ratio, lower bound, default 1 */
+    float pitch_max;       /**< Playback ratio, upper bound, default 1 */
+    int32_t max_active;    /**< Plays of this emitter that may sound at once, 0 for no limit,
+                            *   default 0 */
+    uint32_t seed;         /**< Seed of the randomness, default 0 */
+    bool playing;          /**< Whether it plays, default true */
+});
+
+/** Cutoff in Hz of an open distance filter, where it starts at min_distance */
+#define BOX_AUDIO_SPATIAL_OPEN 20000.0f
+
+/** Lowest cutoff in Hz of a distance filter */
+#define BOX_AUDIO_SPATIAL_CUTOFF_MIN 10.0f
 
 /** Settings of the audio of the world, a singleton */
 ECS_STRUCT(AudioSettings, {
@@ -1754,6 +1883,33 @@ float box_audio_spatial_gain(
     const mat4 listener,
     const vec3 position,
     float *pan);
+
+/** Gain, pan and distance filter of a spatial source, as box.audio computes them: the gain and
+ * the pan of box_audio_spatial_gain, and the cutoff of box_audio_spatial_cutoff.
+ *
+ * @param spatial The distances, NULL for the defaults
+ * @param listener World transform of the listener
+ * @param position World position of the source
+ * @param pan Receives the pan, -1 left to 1 right, may be NULL
+ * @param cutoff Receives the cutoff in Hz, 0 for an open filter, may be NULL
+ * @return The gain, 0 at and beyond max_distance
+ */
+float box_audio_spatial_place(
+    const AudioSpatial *spatial,
+    const mat4 listener,
+    const vec3 position,
+    float *pan,
+    float *cutoff);
+
+/** Cutoff of the distance filter of a spatial source at a distance, as box.audio computes it.
+ *
+ * @param spatial The distances and cutoff, NULL for the defaults, which filter nothing
+ * @param distance Distance from the listener
+ * @return The cutoff in Hz, 0 when the filter is open: within min_distance or without a cutoff
+ */
+float box_audio_spatial_cutoff(
+    const AudioSpatial *spatial,
+    float distance);
 
 /** Record the master output of the next seconds to a 16 bit stereo WAV file.
  *

@@ -88,7 +88,7 @@ static void ps_command(
     const void *p,
     size_t size)
 {
-    uint8_t bytes[128];
+    uint8_t bytes[256];
     float params[BOX_AUDIO_EFFECT_PARAMS] = {0};
     box_audio_writer_t w;
     memcpy(params, p, size);

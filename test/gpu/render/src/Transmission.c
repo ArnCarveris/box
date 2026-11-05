@@ -651,7 +651,9 @@ void Transmission_specular_on_top(void) {
 
 /** Two blended quads around a deep glass box (front face z -3, origin z -6): one behind its
  * front face that sorts after it shows over it, as the glass writes no depth; one behind it that
- * sorts before it shows only outside it, where the glass shows the green wall.
+ * sorts before it is in the snapshot and shows through the glass as it does beside it.
+ *
+ * Elsewhere the glass shows the green wall.
  *
  * The glass casts no shadow: the ground around it looks as it does without it, while an opaque
  * box in its place shades it. */
@@ -671,8 +673,9 @@ void Transmission_no_depth_write_no_shadow(void) {
     ecs_set(world, early, Opacity, {0.5f});
     unsigned char *px = tr_render(world, "order.png", TR_SIZE, TR_SIZE);
 
-    tr_expect(tr_px(px, TR_SIZE, 26, 32), 0, 200, 0, 3);
-    tr_expect(tr_px(px, TR_SIZE, 20, 32), 0, 200, 0, 3);
+    tr_expect(tr_px(px, TR_SIZE, 32, 32), 0, 200, 0, 3);
+    tr_expect(tr_px(px, TR_SIZE, 20, 32), 0, tr_srgb(tr_lin(200) * 0.5f),
+        tr_srgb(tr_lin(200) * 0.5f), 3);
 
     int32_t x = 32 + (int32_t)(0.8f / 4.5f / 0.57735f * 32.0f);
     tr_expect(tr_px(px, TR_SIZE, x, 32), tr_srgb(tr_lin(200) * 0.5f),
@@ -730,40 +733,325 @@ void Transmission_no_depth_write_no_shadow(void) {
     ecs_os_free(with_box);
 }
 
-/** Through the front glass only the wall shows. Beside it the shape behind shows: the blended
- * quad over the wall, or the glass behind, which tints the green wall by its blue albedo to
- * black. */
-void Transmission_blended_not_in_snapshot(void) {
+/** Snapshots of transmission a view takes at most in a frame, BOX_GPU_TRANSMISSION_SNAPSHOTS of
+ * src/render/gpu.h */
+#define TR_SNAPSHOTS (4)
+
+/** Add an emissive quad facing the camera, alpha blended at an opacity, at a height.
+ *
+ * @param world The world
+ * @param x X of its center
+ * @param y Y of its center
+ * @param z Z of its center
+ * @param size Width and height
+ * @param r Red of the emission
+ * @param g Green of the emission
+ * @param b Blue of the emission
+ * @param opacity Opacity, 1 for an opaque wall
+ * @return The quad
+ */
+static ecs_entity_t tr_quad(
+    ecs_world_t *world,
+    float x,
+    float y,
+    float z,
+    float size,
+    uint8_t r,
+    uint8_t g,
+    uint8_t b,
+    float opacity)
+{
+    ecs_entity_t e = tr_wall(world, x, z, size, size, r, g, b);
+    ecs_set(world, e, Position, {x, y, z});
+    if (opacity < 1) {
+        ecs_set(world, e, Opacity, {opacity});
+    }
+
+    return e;
+}
+
+/** Count the snapshots and forward passes of a scene over 2 frames once it renders.
+ *
+ * @param world The world, with its view and shapes
+ * @param snapshots Receives the snapshots of the 2 frames
+ * @param passes Receives the forward passes of the 2 frames
+ */
+static void tr_count(
+    ecs_world_t *world,
+    int32_t *snapshots,
+    int32_t *passes)
+{
+    tr_surface(world, TR_SIZE, TR_SIZE, NULL);
+    box_render_gpu_stats_t before = tr_frames(world, 4);
+    box_render_gpu_stats_t after = tr_frames(world, 2);
+    *snapshots = after.transmission_snapshots - before.transmission_snapshots;
+    *passes = after.forward_passes - before.forward_passes;
+    test_int(after.errors, 0);
+}
+
+/** A red quad at half opacity behind the glass shows through it as it does beside the glass,
+ * and as an opaque red wall of half the emission does through the glass: the snapshot is taken
+ * right before the glass, after the blended quad sorted behind it. */
+void Transmission_blended_behind_shows(void) {
     // materials/transmission
+    unsigned char *images[2];
+    int32_t k;
+    for (k = 0; k < 2; k ++) {
+        ecs_world_t *world = tr_world();
+        tr_view(world, tr_camera(world, 0), true, false);
+        tr_glass(world, 0, -4, 2, 2, 1, 1, 0);
+        ecs_entity_t quad = tr_quad(world, 0, 0, -7, 8, 200, 0, 0, k ? 1 : 0.5f);
+        if (k) {
+            ecs_set(world, quad, Emissive, {.strength = 0.5f, .color = {200, 0, 0}});
+        }
+
+        images[k] = tr_render(world, k ? "behind_opaque.png" : "behind_blend.png",
+            TR_SIZE, TR_SIZE);
+        ecs_fini(world);
+    }
+
+    const unsigned char *blended = tr_px(images[0], TR_SIZE, 32, 32);
+    const unsigned char *opaque = tr_px(images[1], TR_SIZE, 32, 32);
+    tr_expect(blended, tr_srgb(tr_lin(200) * 0.5f), 0, 0, 3);
+    tr_expect(blended, opaque[0], opaque[1], opaque[2], 3);
+    tr_expect(tr_px(images[0], TR_SIZE, 12, 32), blended[0], blended[1], blended[2], 3);
+    stbi_image_free(images[0]);
+    stbi_image_free(images[1]);
+}
+
+/** A large red tinted glass behind a small white one shows through it: the green and red wall
+ * turns red through both panes as it does beside the front one.
+ *
+ * Glass right behind glass shares the snapshot of the front pane (adjacent_runs_one_snapshot),
+ * so a small blended chip sorted between the two panes, at the top left away from the pixels
+ * checked, makes the front pane take a second snapshot that holds the back one. */
+void Transmission_transmissive_behind_shows(void) {
+    // materials/transmission
+    ecs_world_t *world = tr_world();
+    tr_view(world, tr_camera(world, 0), true, false);
+    tr_wall(world, 0, -10, 40, 40, 200, 200, 0);
+    tr_glass(world, 0, -4, 2, 2, 1, 1, 0);
+    ecs_entity_t behind = tr_glass(world, 0, -7, 6, 6, 1, 1, 0);
+    ecs_set(world, behind, Rgb, {255, 0, 0});
+    tr_quad(world, -2.8f, 2.4f, -5.5f, 0.2f, 0, 0, 200, 0.5f);
+    box_render_gpu_stats_t before = tr_frames(world, 0);
+    unsigned char *px = tr_render(world, "behind_glass.png", TR_SIZE, TR_SIZE);
+    box_render_gpu_stats_t after = tr_frames(world, 1);
+
+    tr_expect(tr_px(px, TR_SIZE, 12, 32), 200, 0, 0, 3);
+    tr_expect(tr_px(px, TR_SIZE, 32, 32), 200, 0, 0, 3);
+    tr_expect(tr_px(px, TR_SIZE, 2, 32), 200, 200, 0, 3);
+    stbi_image_free(px);
+    before = after;
+    after = tr_frames(world, 1);
+    test_int(after.transmission_snapshots - before.transmission_snapshots, 2);
+    test_int(after.errors, 0);
+    ecs_fini(world);
+}
+
+/** A red quad at half opacity in front of the glass draws over it, with the pixels it has over
+ * the wall without the glass: the glass of ior 1 shows the wall unchanged under it. */
+void Transmission_blended_in_front_draws_over(void) {
+    // materials/transmission
+    unsigned char *images[2];
     int32_t k;
     for (k = 0; k < 2; k ++) {
         ecs_world_t *world = tr_world();
         tr_view(world, tr_camera(world, 0), true, false);
         tr_wall(world, 0, -10, 40, 40, 0, 200, 0);
-        tr_glass(world, 0, -4, 2, 2, 1, 1, 0);
-        if (k == 0) {
-            ecs_entity_t quad = tr_wall(world, 0, -7, 8, 8, 200, 0, 0);
-            ecs_set(world, quad, Opacity, {0.5f});
-        } else {
-            ecs_entity_t behind = tr_glass(world, 0, -7, 8, 8, 1, 1, 0);
-            ecs_set(world, behind, Rgb, {0, 0, 255});
+        if (k) {
+            tr_glass(world, 0, -4, 2, 2, 1, 1, 0);
         }
 
-        unsigned char *px = tr_render(world, k ? "behind_glass.png" : "behind_blend.png",
+        tr_quad(world, 0, 0, -3, 1, 200, 0, 0, 0.5f);
+        images[k] = tr_render(world, k ? "front_glass.png" : "front_bare.png",
             TR_SIZE, TR_SIZE);
-
-        tr_expect(tr_px(px, TR_SIZE, 32, 32), 0, 200, 0, 3);
-
-        const unsigned char *beside = tr_px(px, TR_SIZE, 12, 32);
-        if (k == 0) {
-            tr_expect(beside, tr_srgb(tr_lin(200) * 0.5f), tr_srgb(tr_lin(200) * 0.5f), 0, 3);
-        } else {
-            tr_expect(beside, 0, 0, 0, 3);
-        }
-
-        stbi_image_free(px);
         ecs_fini(world);
     }
+
+    const unsigned char *bare = tr_px(images[0], TR_SIZE, 32, 32);
+    tr_expect(bare, tr_srgb(tr_lin(200) * 0.5f), tr_srgb(tr_lin(200) * 0.5f), 0, 3);
+    tr_expect(tr_px(images[1], TR_SIZE, 32, 32), bare[0], bare[1], bare[2], 3);
+    stbi_image_free(images[0]);
+    stbi_image_free(images[1]);
+}
+
+/** One glass pane between a blended quad behind it and one in front of it takes one snapshot
+ * a frame, and its view one more forward pass than without the glass. */
+void Transmission_one_snapshot_single_layer(void) {
+    // materials/transmission
+    int32_t snapshots[2], passes[2], k;
+    for (k = 0; k < 2; k ++) {
+        ecs_world_t *world = tr_world();
+        tr_view(world, tr_camera(world, 0), true, false);
+        tr_wall(world, 0, -10, 40, 40, 0, 200, 0);
+        tr_quad(world, 0, 0, -7, 4, 200, 0, 0, 0.5f);
+        tr_quad(world, 0.5f, 0, -3, 1, 0, 0, 200, 0.5f);
+        if (k) {
+            tr_glass(world, 0, -4, 2, 2, 1, 1, 0);
+        }
+
+        tr_count(world, &snapshots[k], &passes[k]);
+        ecs_fini(world);
+    }
+
+    printf("2 frames: %d forward passes without the glass, %d with, %d snapshots\n",
+        passes[0], passes[1], snapshots[1]);
+    test_int(snapshots[0], 0);
+    test_int(snapshots[1], 2);
+    test_int(passes[1] - passes[0], 2);
+}
+
+/** The scene of layers_take_snapshots: a green wall, a white glass behind, a red quad at half
+ * opacity, then a small white glass in front, all over the center.
+ *
+ * @param world The world, with its view
+ */
+static void tr_layers(
+    ecs_world_t *world)
+{
+    tr_wall(world, 0, -10, 40, 40, 0, 200, 0);
+    tr_glass(world, 0, -8, 3, 3, 1, 1, 0);
+    tr_quad(world, 0, 0, -6, 2, 200, 0, 0, 0.5f);
+    tr_glass(world, 0, -4, 1, 1, 1, 1, 0);
+}
+
+/** Two overlapping glass panes with a blended quad between them take a snapshot each, and the
+ * quad shows through the front pane as it does beside it. */
+void Transmission_layers_take_snapshots(void) {
+    // materials/transmission
+    ecs_world_t *world = tr_world();
+    tr_view(world, tr_camera(world, 0), true, false);
+    tr_layers(world);
+    box_render_gpu_stats_t before = tr_frames(world, 0);
+    unsigned char *px = tr_render(world, "layers.png", TR_SIZE, TR_SIZE);
+    box_render_gpu_stats_t after = tr_frames(world, 0);
+    test_int(after.errors, before.errors);
+
+    int32_t half = tr_srgb(tr_lin(200) * 0.5f);
+    tr_expect(tr_px(px, TR_SIZE, 32, 32), half, half, 0, 3);
+    tr_expect(tr_px(px, TR_SIZE, 26, 32), half, half, 0, 3);
+    tr_expect(tr_px(px, TR_SIZE, 2, 2), 0, 200, 0, 1);
+    stbi_image_free(px);
+
+    before = after;
+    after = tr_frames(world, 2);
+    test_int(after.transmission_snapshots - before.transmission_snapshots, 4);
+    test_int(after.errors, 0);
+    ecs_fini(world);
+}
+
+/** Six glass panes interleaved with six blended quads, all over the center, take the budget of
+ * snapshots a frame and no more; the front panes sample the last one. */
+void Transmission_snapshot_budget(void) {
+    // materials/transmission
+    ecs_world_t *world = tr_world();
+    tr_view(world, tr_camera(world, 0), true, false);
+    tr_wall(world, 0, -12, 40, 40, 0, 200, 0);
+    int32_t i, snapshots, passes;
+    for (i = 0; i < 6; i ++) {
+        float z = -10.0f + (float)i * 1.2f;
+        tr_glass(world, 0, z, 2, 2, 1, 1, 0);
+        tr_quad(world, 0, 0, z + 0.6f, 1.5f, 200, 0, 0, 0.2f);
+    }
+
+    tr_count(world, &snapshots, &passes);
+    printf("2 frames: %d snapshots, %d forward passes\n", snapshots, passes);
+    test_int(snapshots, 2 * TR_SNAPSHOTS);
+    ecs_fini(world);
+}
+
+/** A glass box and a glass sphere side by side, two batches sorted next to each other with
+ * nothing drawn between them, share one snapshot. */
+void Transmission_adjacent_runs_one_snapshot(void) {
+    // materials/transmission
+    ecs_world_t *world = tr_world();
+    tr_view(world, tr_camera(world, 0), true, false);
+    tr_wall(world, 0, -10, 40, 40, 0, 200, 0);
+    tr_quad(world, 0, 0, -8, 2, 200, 0, 0, 0.5f);
+    tr_glass(world, -1.2f, -4, 1, 1, 1, 1, 0);
+    ecs_entity_t sphere = tr_glass(world, 1.2f, -4.5f, 1, 1, 1, 1, 0);
+    ecs_remove(world, sphere, Box);
+    ecs_set(world, sphere, Sphere, {.segments = 16, .smooth = true, .radius = 0.5f});
+    int32_t snapshots, passes;
+    tr_count(world, &snapshots, &passes);
+    test_int(snapshots, 2);
+    ecs_fini(world);
+}
+
+/** The scene of layers_take_snapshots in a view that culls by occlusion (unlit, an early and a
+ * late pass, which takes the snapshots) and in one with a depth prepass (lit) looks as it does
+ * in an unlit view without either.
+ *
+ * Without lights and with a black ambient the lit view shows only the emission. */
+void Transmission_occlusion_view_layers(void) {
+    // materials/transmission
+    unsigned char *images[3];
+    int32_t k, i, c, wrong = 0;
+    for (k = 0; k < 3; k ++) {
+        ecs_world_t *world = tr_world();
+        tr_view(world, tr_camera(world, 0), k == 2, k == 1);
+
+        tr_layers(world);
+        const char *file = k == 0 ? "layers_plain.png" :
+            (k == 1 ? "layers_occlusion.png" : "layers_prepass.png");
+        box_render_gpu_stats_t before = tr_frames(world, 0);
+        images[k] = tr_render(world, file, TR_SIZE, TR_SIZE);
+        box_render_gpu_stats_t after = tr_frames(world, 1);
+        test_int(after.errors, before.errors);
+        ecs_fini(world);
+    }
+
+    for (k = 1; k < 3; k ++) {
+        for (i = 0; i < TR_SIZE * TR_SIZE; i ++) {
+            bool differs = false;
+            for (c = 0; c < 3; c ++) {
+                differs |= abs((int)images[0][i * 4 + c] - (int)images[k][i * 4 + c]) > 3;
+            }
+
+            if (differs && wrong < 8) {
+                printf("image %d, pixel %d, %d differs: %d %d %d, want %d %d %d\n", k,
+                    i % TR_SIZE, i / TR_SIZE, images[k][i * 4], images[k][i * 4 + 1],
+                    images[k][i * 4 + 2], images[0][i * 4], images[0][i * 4 + 1],
+                    images[0][i * 4 + 2]);
+            }
+
+            wrong += differs;
+        }
+    }
+
+    test_int(wrong, 0);
+    for (k = 0; k < 3; k ++) {
+        stbi_image_free(images[k]);
+    }
+}
+
+/** A glass with a DiffuseTransmission blur in front of a red quad at half opacity, in front of
+ * a green wall. Through the glass red and green mix, and nothing is invalid.
+ *
+ * The quad writes no depth, so the depth copy of the snapshot holds the wall behind it: the quad
+ * blurs by its distance to the wall, as the wall does, not by its own distance to the glass. */
+void Transmission_diffuse_blur_behind_blended(void) {
+    // materials/transmission
+    ecs_world_t *world = tr_world();
+    tr_view(world, tr_camera(world, 0), true, false);
+    tr_wall(world, 0, -10, 40, 40, 0, 200, 0);
+    tr_quad(world, 0, 0, -5, 1, 200, 0, 0, 0.5f);
+    ecs_entity_t glass = tr_glass(world, 0, -4, 3, 3, 1, 1, 0);
+    ecs_set(world, glass, DiffuseTransmission, {.factor = 0, .color = {255, 255, 255},
+        .blur = 0.3f});
+    box_render_gpu_stats_t before = tr_frames(world, 0);
+    unsigned char *px = tr_render(world, "blur_blended.png", TR_SIZE, TR_SIZE);
+    box_render_gpu_stats_t after = tr_frames(world, 1);
+    test_int(after.errors, before.errors);
+
+    const unsigned char *center = tr_px(px, TR_SIZE, 32, 32);
+    printf("center through the blur: %d %d %d\n", center[0], center[1], center[2]);
+    test_assert(center[0] > 5);
+    test_assert(center[1] > 20);
+    test_assert(center[0] < tr_srgb(tr_lin(200) * 0.5f) + 3);
+    stbi_image_free(px);
+    ecs_fini(world);
 }
 
 /** A sunlit atmosphere over an emissive red box. A literal, because no world exists yet to

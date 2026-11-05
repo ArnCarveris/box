@@ -12,6 +12,7 @@
 #include <bake_test.h>
 #include "render.h"
 #include "bake.h"
+#include "particles.h"
 
 /** Check that the tiles of an allocation lie in the atlas, are powers of two and do not overlap.
  *
@@ -488,6 +489,8 @@ void ShadowAtlas_extract_assigns_tile(void) {
     const box_render_shadow_atlas_t *atlas = ecs_vec_first(&p->shadow_atlases);
     const box_render_shadow_tile_t *tile = ecs_vec_first(&p->shadow_tiles);
     test_assert(atlas->handle >= BOX_RENDER_BUFFER_SHADOW_FIRST);
+    test_assert(atlas->handle < BOX_RENDER_BUFFER_PARTICLE_FIRST ||
+        atlas->handle > BOX_RENDER_BUFFER_PARTICLE_CURVES);
     test_int(atlas->resolution, 2048);
     test_int(atlas->first, 0);
     test_int(atlas->count, 1);

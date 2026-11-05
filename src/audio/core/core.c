@@ -640,6 +640,7 @@ static void box_audio_cmd_play(
     box_audio_ramp_set(&v->left, 0);
     box_audio_ramp_set(&v->right, 0);
     box_audio_voice_express_reset(core, v, false);
+    box_audio_voice_filter_reset(v);
     box_audio_voice_gains(core, v);
     if (core->sounds[cmd->sound].synth) {
         box_audio_ramp_set(&v->left, v->left.target);
@@ -817,6 +818,7 @@ static void box_audio_cmd_stream(
     box_audio_ramp_set(&v->left, 0);
     box_audio_ramp_set(&v->right, 0);
     box_audio_voice_express_reset(core, v, false);
+    box_audio_voice_filter_reset(v);
     box_audio_voice_gains(core, v);
     box_audio_source_stream(core, &v->source, cmd->stream);
     core->playing ++;
@@ -883,6 +885,8 @@ static void box_audio_cmd_voice_set(
         v->bus = (uint32_t)value;
     } else if (cmd->param == BOX_AUDIO_PARAM_POSITION) {
         box_audio_source_seek(core, &v->source, value);
+    } else if (cmd->param == BOX_AUDIO_PARAM_CUTOFF) {
+        box_audio_voice_cutoff(core, v, value);
     } else {
         box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_VOICE_SET, 0);
     }
@@ -1686,7 +1690,8 @@ done:
     return result;
 }
 
-/** Render frames of the source of a voice into its bus from a frame of the block.
+/** Render frames of the source of a voice into its bus from a frame of the block, through
+ * its low-pass when that runs.
  *
  * @param core The core
  * @param v The voice
@@ -1707,6 +1712,10 @@ static int32_t box_audio_voice_mix(
     bool stereo;
     int32_t done = box_audio_source_render(core, &v->source, frames, &stereo), i;
     const float *sl = core->src_l, *sr = stereo ? core->src_r : core->src_l;
+    if (v->filtered) {
+        box_audio_voice_filter(core, v, stereo, frames);
+    }
+
     for (i = 0; i < frames; i ++) {
         float gl = box_audio_ramp_next(&v->left);
         float gr = box_audio_ramp_next(&v->right);
@@ -1735,6 +1744,7 @@ static void box_audio_voice_render(
     bool active = v->bus < BOX_AUDIO_BUS_MAX && core->bus_active[v->bus];
     box_audio_bus_t *b = &core->buses[active ? v->bus : 0];
     int32_t done, at, n, k;
+    v->fresh = false;
     if (!v->expressive) {
         done = box_audio_voice_mix(core, v, b, active, 0, frames);
     } else {

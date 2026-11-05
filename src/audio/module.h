@@ -52,12 +52,29 @@ typedef struct AudioVoice {
     bool loop;              /**< Whether the voice loops */
     float volume;           /**< Volume sent, 0 for a Disabled source */
     float pan;              /**< Pan sent */
+    float cutoff;           /**< Cutoff of the distance filter sent, 0 open */
     float pitch;            /**< Pitch sent */
     uint8_t bus;            /**< Bus index sent */
     bool parked;            /**< A looping spatial source out of range: no voice, its time
                              *   runs on from origin */
     double origin;          /**< Module time at which the sound was at its start, at pitch */
 } AudioVoice;
+
+/** The timer and counters of an AudioEmitter */
+typedef struct AudioEmitterState {
+    uint64_t next;          /**< Frame of the core clock of the next play */
+    uint32_t serial;        /**< Serial of the output the timer and active belong to */
+    bool running;           /**< The timer runs: the emitter was enabled and playing in the
+                             *   last frame */
+    uint32_t restarts;      /**< Starts of the timer, which seed its first interval */
+    int64_t count;          /**< Plays that were due, played or skipped, which seed the next */
+    int64_t plays;          /**< Plays that were sent */
+    int64_t skipped;        /**< Plays that were due and skipped: out of range, over
+                             *   max_active, a sound that is not ready, too late */
+    int32_t active;         /**< Plays sent that did not end */
+} AudioEmitterState;
+
+extern ECS_COMPONENT_DECLARE(AudioEmitterState);
 
 /** What box.audio did with an effect entity, one with an effect component such as Reverb */
 typedef struct AudioEffectState {
@@ -305,8 +322,12 @@ typedef struct box_audio_oneshot_t {
     float volume;           /**< Volume of the play, before the distance */
     float sent_volume;      /**< Volume sent */
     float sent_pan;         /**< Pan sent */
+    float sent_cutoff;      /**< Cutoff of the distance filter sent, 0 open */
     bool legato;            /**< The mono voice of a legato synth sound */
     int32_t channel;        /**< SynthGlide.channel of a legato voice */
+    ecs_entity_t emitter;   /**< AudioEmitter that played it, 0 for none */
+    float pitch;            /**< Pitch ratio of the play */
+    uint64_t when;          /**< Frame of the core clock it starts at, 0 for at once */
 } box_audio_oneshot_t;
 
 /** A play of box_audio_play, sent with the next batch */
@@ -316,6 +337,13 @@ typedef struct box_audio_play_t {
     bool spatial;           /**< A play of box_audio_play_at */
     float position[3];      /**< World position of a spatial play */
     AudioQuantize quantize; /**< Grid of a play of box_audio_play_quantized */
+    float pitch;            /**< Pitch ratio, 0 for 1 */
+    bool routed;            /**< The play has a bus of its own: output instead of the
+                             *   AudioOutput of the sound */
+    ecs_entity_t output;    /**< Bus of a routed play, 0 for the master */
+    bool has_distances;     /**< distances apply instead of the AudioSpatial of the sound */
+    AudioSpatial distances; /**< Distances of a spatial play that has them */
+    ecs_entity_t emitter;   /**< AudioEmitter of the play, 0 for none */
 } box_audio_play_t;
 
 /** A note of box_audio_play_note, sent with the next batch */
@@ -330,6 +358,7 @@ typedef struct box_audio_note_t {
 typedef struct box_audio_place_t {
     float gain;             /**< Gain of the distance, 0 out of range */
     float pan;              /**< Pan, -1 left to 1 right */
+    float cutoff;           /**< Cutoff of the distance filter in Hz, 0 open */
 } box_audio_place_t;
 
 /** The listener the spatial sources are heard from */
@@ -355,6 +384,8 @@ typedef struct box_audio_module_stats_t {
     int64_t music_starts;   /**< Voices of streams started */
     int64_t synths;         /**< Compiles of synth sounds */
     int64_t notes;          /**< Notes of instruments sent */
+    int64_t emitter_plays;  /**< Plays of emitters sent */
+    int64_t emitter_skipped; /**< Plays of emitters skipped */
 } box_audio_module_stats_t;
 
 /** A capture that waits for its frames */
@@ -456,7 +487,8 @@ typedef struct box_audio_timeline_t {
     uint32_t click_serial;  /**< Serial of the output the click was sent to */
     bool beat_wanted;       /**< Something in the core reads its beat clock, which the
                              *   timeline then keeps in step with BEAT commands; set each
-                             *   frame before the update, by the modulators */
+                             *   frame before the update, by the modulators and the
+                             *   effects that read it */
     uint32_t beat_serial;   /**< Serial of the output whose beat clock the timeline keeps, 0
                              *   for none */
     box_audio_timeline_stats_t stats; /**< Counters */
@@ -732,6 +764,7 @@ typedef struct box_audio_module_t {
     ecs_query_t *synths;          /**< SynthSound, prefabs included */
     ecs_query_t *wavetables;      /**< Wavetable, prefabs included */
     ecs_query_t *meter_query;     /**< AudioMeter, disabled entities included */
+    ecs_query_t *emitters;        /**< AudioEmitter with its state, disabled ones included */
     box_audio_meter_window_t meters[BOX_AUDIO_BUS_MAX]; /**< Levels of each bus index */
     float reduction[BOX_AUDIO_EFFECT_MAX]; /**< Gain reduction of each effect slot in the last
                                    *   frame, dB */
@@ -739,6 +772,8 @@ typedef struct box_audio_module_t {
                                    *   core holds and got */
     uint32_t effect_frame;        /**< Frames of the module, which tell the insert slots of
                                    *   this frame from older ones */
+    bool effect_beat;             /**< An effect of this frame reads the beat clock of the
+                                   *   core: a pattern gate */
     uint32_t serial;              /**< Serial of the output the state was sent to */
     box_audio_writer_t writer;    /**< The batch of the frame, grown as needed */
     uint32_t next_voice;          /**< Next voice handle */
@@ -890,9 +925,14 @@ uint32_t box_audio_module_effect_kind(
 #define BOX_AUDIO_EFFECT_COMPONENTS (16)
 
 /** Get the effect components: Reverb, Equalizer, AudioFilter, Compressor, Gate, Delay, Phaser,
+<<<<<<< HEAD
  * Chorus, Saturator, TransientShaper, FrequencyShifter, PitchShifter, BeatRepeat and TapeStop,
  * in the order an entity
  * that has several takes the first of. A new effect is added here and to
+=======
+ * Chorus, Saturator, TransientShaper, FrequencyShifter, PitchShifter, PatternGate and Rotary,
+ * in the order an entity that has several takes the first of. A new effect is added here and to
+>>>>>>> eddb532cfbb80a6555459db9537f6b0b9e691868
  * box_audio_module_effect_params.
  *
  * @param out Receives up to BOX_AUDIO_EFFECT_COMPONENTS components
@@ -1559,15 +1599,18 @@ void box_audio_timeline_quantized(
     box_audio_module_t *state,
     bool waiting);
 
-/** Send a play of box_audio_play, box_audio_play_at or box_audio_play_quantized as a one shot.
+/** Send a play of box_audio_play, box_audio_play_at, box_audio_play_quantized or an
+ * AudioEmitter as a one shot.
  *
  * @param world The world
  * @param state The state
  * @param play The play
  * @param waiting Whether the page waits for a gesture, which drops it
  * @param when Frame of its first sample, 0 for now; a later play does not glide a legato voice
+ * @return The handle of the voice, 0 when the play was dropped: a sound that is not ready, a
+ * gesture that is awaited, a spatial play beyond max_distance
  */
-void box_audio_play_send(
+uint32_t box_audio_play_send(
     ecs_world_t *world,
     box_audio_module_t *state,
     const box_audio_play_t *play,
@@ -1724,6 +1767,70 @@ uint32_t box_audio_instrument_voice(
     uint32_t handle,
     bool release,
     uint8_t priority);
+
+/** Seconds between the plays of an AudioEmitter at least */
+#define BOX_AUDIO_EMITTER_INTERVAL_MIN (0.01)
+
+/** Seconds a native or web output schedules the plays of emitters ahead of the frame, so a
+ * batch arrives before their frame */
+#define BOX_AUDIO_EMITTER_LOOKAHEAD (0.05)
+
+/** Seconds a play of an emitter may be late, after a stall of the frame, before it is skipped
+ * instead of sent at once */
+#define BOX_AUDIO_EMITTER_LATE_MAX (0.1)
+
+/** Register the query of the emitters.
+ *
+ * @param world The world
+ * @param state The state
+ */
+void box_audio_emitter_init(
+    ecs_world_t *world,
+    box_audio_module_t *state);
+
+/** Send the plays of the emitters that fall before the end of the next frame, each at its
+ * frame of the core clock. An emitter that is not due costs one comparison.
+ *
+ * @param world The world
+ * @param state The state
+ * @param t The transport
+ * @param waiting Whether the page waits for a gesture
+ * @param delta Seconds of the frame, which the output renders next
+ */
+void box_audio_emitters_update(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    box_audio_transport_t *t,
+    bool waiting,
+    float delta);
+
+/** Forget a one shot that ended or is no longer tracked: its emitter has one play fewer that
+ * sounds.
+ *
+ * @param world The world
+ * @param state The state
+ * @param shot The one shot
+ */
+void box_audio_oneshot_forget(
+    ecs_world_t *world,
+    const box_audio_module_t *state,
+    const box_audio_oneshot_t *shot);
+
+/** Point of an emitter shape in the space of the emitter, from three uniform numbers in [0, 1):
+ * uniform over the area of a disc and the volume of the other shapes.
+ *
+ * @param shape The shape
+ * @param radius Radius of disc, sphere and hemisphere, its absolute value is used
+ * @param extents Half size of the box, their absolute values are used
+ * @param u Three uniform numbers
+ * @param out Receives the point
+ */
+void box_audio_emitter_point(
+    AudioEmitterShape shape,
+    float radius,
+    const vec3 extents,
+    const double u[3],
+    vec3 out);
 
 /** Register the observer that drops the spread note count of a removed Instrument.
  *

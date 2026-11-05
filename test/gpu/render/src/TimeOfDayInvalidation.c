@@ -69,7 +69,7 @@ static ecs_entity_t scene_new(
 
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
         .capture_size = 8, .budget_ms = 2, .bounces = 1, .environment = source,
-        .light_threshold = light, .color_threshold = color});
+        .light_threshold = light, .color_threshold = color, .compute = true});
     ecs_set(world, scene, ReflectionBake, {.resolution = 16, .budget_ms = 1,
         .scene_probe = true, .scene_probe_height = 2, .environment = source,
         .light_threshold = light, .color_threshold = color});

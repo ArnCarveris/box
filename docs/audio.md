@@ -179,8 +179,13 @@ their tails end.
 | `TransientShaper` | `attack: 0`, `sustain: 0` |
 | `FrequencyShifter` | `shift: 0` Hz, `mode: FrequencyShift`, `stereo: 0`, `feedback: 0`, `mix: 1` |
 | `PitchShifter` | `semitones: 0`, `cents: 0`, `stereo: 0`, `window: 40` ms, `feedback: 0`, `mix: 0.5` |
+<<<<<<< HEAD
 | `BeatRepeat` | `active: 0`, `slice: 0.25` beats, `grid: -1` (the slice), `decay: 1`, `pitch: 0` semitones, `reverse: 0`, `gate: 1`, `mix: 1` |
 | `TapeStop` | `active: 0`, `stop_time: 0.5` s, `start_time: 0.2` s, `curve: 0` |
+=======
+| `PatternGate` | `steps`: 16 levels, all `1`, `length: 16`, `rate: 0.25` beats, `swing: 0`, `attack: 0.002` s, `release: 0.03` s, `gate: 0.5`, `floor: -80` dB, `mix: 1` |
+| `Rotary` | `speed: 0`, `horn_slow: 0.8` Hz, `horn_fast: 6.7` Hz, `drum_slow: 0.7` Hz, `drum_fast: 5.9` Hz, `acceleration: 1` s, `balance: 0`, `spread: 1`, `drive: 0`, `mix: 1` |
+>>>>>>> eddb532cfbb80a6555459db9537f6b0b9e691868
 
 Equalizer bands use `AudioEqOff`, `AudioEqPeak`, `AudioEqLowShelf`,
 `AudioEqHighShelf`, `AudioEqLowCut` or `AudioEqHighCut`. Defaults are 100, 400,
@@ -335,6 +340,7 @@ pad_rise { FrequencyShifter: {shift: 0.3, feedback: 0.85, mix: 0.5} }
 bell { FrequencyShifter: {mode: FrequencyRing, shift: 437, mix: 0.8} }
 ```
 
+<<<<<<< HEAD
 `BeatRepeat` and `TapeStop` are performance effects for fills and transitions,
 driven by their `active` member from an automation lane or a modulator. Both are
 float members, so a lane can switch them at a beat: `active` counts as on from 0.5.
@@ -363,10 +369,60 @@ to the input over 20 ms instead of catching up.
 
 Both follow the beat clock of the Transport, at 120 bpm while none plays, and run
 on 4 seconds of memory of their effect slot.
+=======
+A pattern gate chops a sustained sound into rhythm, the classic trance gate: it
+turns pads, chords and noise into rhythmic parts without writing notes. `steps` holds
+the level of each of 16 steps from 0 (closed) to 1, so a step at 0.5 is an accent
+6 dB down, and `length` (1 to 16) says how many of them play. `rate` is the length of
+a step in beats: 0.25 for sixteenths, 0.5 for eighths, 0.375 for dotted sixteenths,
+1/6 for sixteenth triplets. The pattern is locked to the Transport: at every frame the
+step `floor(beat / rate) mod length` sounds, so the gate stays on the grid after a
+seek, a loop wrap or a tempo change. Without a playing Transport it runs at 120 bpm.
+`swing` (0 to 0.75) bends the step grid as `Track.swing` bends notes: the second step
+of each pair starts later by `swing` steps.
+
+A step is open for the first `gate` share of it (0.05 to 1) and closed after; at 1,
+neighbouring open steps run together. The gain rises in `attack` seconds and falls in
+`release` seconds, linearly, so the edges do not click, and a longer release gives a
+softer pulse. Closed is `floor` dB, -80 to 0: a floor of -6 to -12 dB pumps instead of
+chopping. Both channels get the same gain. A change of a step or of the timing moves
+the gain at the speed of the edges, and `floor` and `mix` move over 20 ms, so
+automating `steps[3]` or modulating a step is smooth. An `AudioMeter` on the gate reads
+its gain reduction, and the gate stops while its input is silent.
+
+```flecs
+// A trance gate on a pad: sixteenths with accents and a soft edge
+pad_gate {
+  PatternGate: {steps: [1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0.5, 0, 1, 0.5, 1],
+    gate: 0.6, release: 0.05}
+}
+pad { AudioBus: {effects: [pad_gate]} }
+
+// A gentle pump on chords: eighths with swing that only dip 9 dB
+chords_pump { PatternGate: {length: 2, steps: [1, 0], rate: 0.5, swing: 0.2, gate: 0.7,
+  release: 0.12, floor: -9} }
+```
+A rotary is a rotating speaker cabinet: the swirl of an organ, also good on guitars,
+electric pianos and vocals. The sum of both channels runs through a tube preamp,
+blended in by `drive` (up to +24 dB into the tanh clipper of the saturator), then a
+crossover at 800 Hz splits it into a drum below and a horn above. Each rotor shifts
+the pitch as it turns (a Doppler shift of a few tenths of a millisecond on the
+horn), and gets quieter and duller as it faces away. Two virtual mics hear both
+rotors; `spread` sets how far apart they are, from mono at 0 to half a turn at 1,
+so left and right swirl in opposite phase. `balance` goes from the drum alone at -1
+to the horn alone at 1. `speed` 0 is slow (chorale) and 1 fast (tremolo), with
+rates in between for values in between. The rotors never jump to a new speed: the
+horn gets there within `acceleration` seconds and the heavier drum takes three
+times as long, both when speeding up and when braking. The rotary keeps 4 ms of
+memory per effect, and its rotors keep turning while it is idle.
+
+Switch the speed like the half-moon switch of an organ by automating `speed`:
+>>>>>>> eddb532cfbb80a6555459db9537f6b0b9e691868
 
 ```flecs
 using box.audio
 
+<<<<<<< HEAD
 // A stutter fill: the last beat of a four bar phrase repeats a sixteenth, each
 // repeat a little quieter and a semitone down
 drums { AudioBus: {effects: [drums]}; BeatRepeat: {slice: 0.25, decay: 0.85, pitch: -1} }
@@ -392,6 +448,27 @@ transitions {
 }
 ```
 
+=======
+organ {
+  AudioBus: {output: master, effects: [organ]}
+  Rotary: {speed: 0, drive: 0.3}
+}
+
+prefab switch {
+  AutomationClip: {target: organ, component: Rotary, member: "speed", length: 16,
+    curve: {kind: CurveLinear, keys: [{0, 0}, {7.9, 0}, {8, 1}, {15.9, 1}, {16, 0}]}}
+}
+
+lanes {
+  Track: {}
+  leslie { ClipPlacement: {clip: switch, start: 0, duration: 64, loop: true} }
+}
+```
+
+The step of the curve is enough: the inertia of the rotors makes the ramp up and
+the slow down.
+
+>>>>>>> eddb532cfbb80a6555459db9537f6b0b9e691868
 For ducking, key a compressor on another channel:
 
 ```flecs
@@ -500,7 +577,7 @@ ears { Position: {0, 1.7, 0}; AudioListener }
 engine {
   Position: {4, 0, -10}
   AudioSource: {sound: hum, loop: true}
-  AudioSpatial: {min_distance: 2, max_distance: 40}
+  AudioSpatial: {min_distance: 2, max_distance: 40, cutoff: 800}
 }
 const shot: bool = box.audio.play_at(click, {-3, 0, -5}, 1.0)
 ```
@@ -510,7 +587,8 @@ of the first enabled view in render order. Tag the main camera explicitly in sce
 with render-to-texture views. Multiple listeners warn and use the lowest entity ID.
 Without a listener, spatial sounds play centered at full volume.
 
-`AudioSpatial` defaults to `min_distance: 1`, `max_distance: 50`, `rolloff: 1`.
+`AudioSpatial` defaults to `min_distance: 1`, `max_distance: 50`, `rolloff: 1`,
+`cutoff: 0`.
 A source uses its world position, including parent transforms; without a
 `WorldTransform` it plays nonspatially. On a sound entity, `AudioSpatial` supplies
 distances for `play_at`, whose position stays fixed while the listener moves.
@@ -521,7 +599,17 @@ inverse-distance attenuation, normalized to reach zero at max:
 `gain = (g(d) - g(max)) / (1 - g(max))`.
 Rolloff zero holds full gain until max distance. Pan follows the listener's right
 axis and narrows to center within min distance. Front and back sound alike.
-There is no Doppler, occlusion, distance filter or HRTF.
+
+`cutoff` adds a distance filter, since air dulls distant sounds: a 12 dB per octave
+low-pass, open within min distance, reaching `cutoff` Hz at max distance. Between
+them it moves exponentially from 20000 Hz, so equal steps in distance sound like
+equal steps in brightness: `f(d) = 20000 * (cutoff / 20000)^t` with
+`t = (d - min) / (max - min)`. A `cutoff` of 0, the default, a negative one or one
+of 20000 Hz or more filters nothing and costs nothing; others are clamped to at
+least 10 Hz. The filter applies to sources and `play_at` one shots, each channel of
+a stereo sound, after the voice's sound and before its volume and pan, and glides
+to a new cutoff over 50 ms, so a fast source or a teleporting listener does not
+click. A voice starts at its cutoff. There is no Doppler, occlusion or HRTF.
 
 Out-of-range looping sources release their voices but keep time on the game thread;
 returning in range resumes where the sound would have been. Nonlooping sources and
@@ -1213,7 +1301,7 @@ lanes {
 An `AudioBus` automates `volume`, `pan`, `width` and the `level` of its sends; the
 master automates its `volume`, `pan` and `width`. An effect automates every float
 member of its effect component: Reverb, Equalizer bands, AudioFilter, Compressor,
-Gate, Delay, Phaser, Chorus, Saturator and later effects. Kinds, slopes, stages,
+Gate, Delay, Phaser, Chorus, Saturator, Rotary and later effects. Kinds, slopes, stages,
 voices, entities and bools are not continuous and not automatable. A clip whose
 target, component or member is unknown or not automatable logs one error that
 names it and does nothing until it changes.
@@ -1354,8 +1442,14 @@ a writer buffer of a given size holds fewer of them than before.
 
 The core also keeps a beat clock: the transport schedules a `BEAT` command with the
 beat and tempo at each start, seek, stop, tempo change and loop wrap, only while
-something in the core reads it, and the core derives the beat of any frame from the
-last one (`box_audio_core_beat`).
+something in the core reads it (a modulator or a pattern gate), and the core derives the
+beat of any frame from the last one (`box_audio_core_beat`).
+
+An effect command carries 32 floats of parameters, enough for the 16 steps of a
+pattern gate and its other values as plain floats, which automation and the modulators
+reach like any other parameter. An effect command is 152 bytes and an effect params
+command 148, the largest command of the schedule, so a writer buffer holds fewer of
+them than with the 16 floats before.
 
 The core owns a 64-bit rendered-frame clock. Scheduled play, stop, voice/bus set,
 release, legato and effect params commands carry a frame time. Future commands wait in a fixed

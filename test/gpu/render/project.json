@@ -426,7 +426,16 @@
                     "cache_is_owned",
                     "view_baked_defaults",
                     "scene_renders_identically",
-                    "projected_anchor_not_baked"
+                    "projected_anchor_not_baked",
+                    "compute_default_true",
+                    "compute_off_schedules_nothing",
+                    "compute_off_in_progress_finishes",
+                    "compute_on_resumes",
+                    "compute_off_records_changes",
+                    "compute_off_still_applied",
+                    "compute_off_view_unbaked",
+                    "compute_change_no_rebuild",
+                    "compute_follows_checkbox"
                 ]
             },
             {
@@ -1027,7 +1036,8 @@
                     "radial_ring_in_plane",
                     "radial_burst_scaled",
                     "motion_velocity_curve_moves",
-                    "motion_force_curve_moves"
+                    "motion_force_curve_moves",
+                    "pool_grows_with_point_shadow"
                 ]
             },
             {
@@ -1115,7 +1125,15 @@
                     "partial_factor_keeps_diffuse",
                     "specular_on_top",
                     "no_depth_write_no_shadow",
-                    "blended_not_in_snapshot",
+                    "blended_behind_shows",
+                    "transmissive_behind_shows",
+                    "blended_in_front_draws_over",
+                    "one_snapshot_single_layer",
+                    "layers_take_snapshots",
+                    "snapshot_budget",
+                    "adjacent_runs_one_snapshot",
+                    "occlusion_view_layers",
+                    "diffuse_blur_behind_blended",
                     "opaque_and_sky_in_snapshot",
                     "snapshot_counter",
                     "resize_recreates_snapshot",

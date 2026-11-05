@@ -1540,7 +1540,7 @@ void Transition_transform_static_rekeys(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_singleton_set(world, LightBake, {.probe_spacing = 2});
+    ecs_singleton_set(world, LightBake, {.probe_spacing = 2, .compute = true});
     ecs_entity_t e = tr_shape(world, 0, 0);
     box_transition_set(world, e, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
     tr_frame(world);

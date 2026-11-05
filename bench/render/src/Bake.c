@@ -41,7 +41,7 @@ static void bench_bake(
     ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
     if (baked) {
         ecs_singleton_set(world, LightBake, {.probe_spacing = 4, .bounds_padding = 1,
-            .capture_size = 16, .budget_ms = budget, .bounces = bounces});
+            .capture_size = 16, .budget_ms = budget, .bounces = bounces, .compute = true});
     }
 
     ecs_entity_t camera = ecs_new(world);
@@ -143,7 +143,7 @@ static void bench_bake_change(
     ecs_singleton_modified(world, App);
     ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
     ecs_singleton_set(world, LightBake, {.probe_spacing = 32, .bounds_padding = 1,
-        .capture_size = 8, .budget_ms = 2, .bounces = 0});
+        .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 60, 200});

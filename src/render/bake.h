@@ -124,7 +124,8 @@ typedef struct box_bake_volume_t {
     bool sent;              /**< The backend has the volume with this grid */
     bool viewed;            /**< A view of the scene is in the packet of this frame */
     bool converged;         /**< The backend reported every pass of every valid probe */
-    bool pending;           /**< The bake can progress this frame and has not converged */
+    bool pending;           /**< The bake can progress this frame, computes and has not
+                             *   converged */
     bool resort;            /**< The queue is sorted again before the next probes are taken */
     bool debug_warned;      /**< A view with ViewDebug.light_probes was warned that the grid has
                              *   more than BOX_RENDER_DEBUG_PROBES_MAX probes */
@@ -149,6 +150,7 @@ typedef struct box_bake_volume_t {
     vec3 max;               /**< Maximum corner of the static bounds of the grid */
     int32_t capture_size;   /**< LightBake.capture_size of this frame */
     float budget_ms;        /**< LightBake.budget_ms of this frame */
+    bool compute;           /**< LightBake.compute of this frame: new captures are scheduled */
     float credit;           /**< Share of a probe the budget of the last frame left */
     int32_t bounces;        /**< LightBake.bounces of this frame */
     uint32_t generation;    /**< Number of the bake, so captures of an earlier one are ignored */
