@@ -24,14 +24,9 @@ static const char *song_channels[] = {
 
 #define SONG_CHANNELS ((int32_t)(sizeof(song_channels) / sizeof(song_channels[0])))
 
-<<<<<<< HEAD
 /** Create a world and run test/assets/audio/song.flecs in it. The sound files decode inline at
- * the end of the first frame, so the music that starts at frame 3 never waits on a worker.
-=======
-/** Create a world and run test/assets/audio/song.flecs in it. The world is headless, so every
- * frame waits for the decodes of kick.wav and shaker.wav, and the first beat always has its kick
- * however the decode threads are scheduled.
->>>>>>> a11f27093a724fc40579089b23395f4d4f634d21
+ * the end of the first frame, so the music that starts at frame 3 never waits on a worker. The
+ * world is also headless, so every frame waits for the decodes of kick.wav and shaker.wav.
  *
  * @return The world
  */
