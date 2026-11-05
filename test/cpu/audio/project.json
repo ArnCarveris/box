@@ -243,6 +243,24 @@
                 ]
             },
             {
+                "id": "SynthLfoSync",
+                "testcases": [
+                    "period",
+                    "rate",
+                    "phase",
+                    "wide",
+                    "random",
+                    "zero_identical",
+                    "clamped",
+                    "legato_new",
+                    "script",
+                    "timeline",
+                    "no_transport",
+                    "tempo_next_note",
+                    "stopped_position"
+                ]
+            },
+            {
                 "id": "Sequencer",
                 "testcases": [
                     "defaults",

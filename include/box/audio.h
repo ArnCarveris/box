@@ -398,7 +398,7 @@ ECS_STRUCT(SynthOscillator, {
                             *   voice included, is the master: the wave runs at the master
                             *   times the ratio and restarts at phase 0 on every cycle of the
                             *   master, band limited at the restart, for sync leads and, with
-                            *   SynthLfo.sync, sync sweeps. Each unison voice syncs to its own
+                            *   SynthLfo.hard_sync, sync sweeps. Each unison voice syncs to its own
                             *   master; the sub stays at the master and phase modulation adds
                             *   to the synced phase. Ignored by SynthNoise and SynthPluck */
     SynthNoiseColor color; /**< SynthNoise: color of the noise, default SynthNoiseWhite. The
@@ -792,11 +792,20 @@ ECS_STRUCT(SynthLfo, {
                             *   wave, -10..10 */
     float pulse_width;     /**< Share of the period the pulse width of squares moves by at the
                             *   top of the wave, -0.49..0.49 */
-    float sync;            /**< Semitones the ratio of SynthOscillator.sync moves by at the
+    float hard_sync;       /**< Semitones the ratio of SynthOscillator.sync moves by at the
                             *   top of the wave, -48..48, default 0; the moved ratio is clamped
                             *   to 1..16. On a layer it syncs that layer, from a ratio of 1
                             *   when it has none; on the root it moves every layer with a
                             *   ratio over 1 */
+    float sync;            /**< Cycle in beats of the Transport, 0..256, default 0 for rate.
+                            *   When positive it wins over rate, like Delay.sync: a beat is a
+                            *   quarter note at the tempo of the Transport, 120 without one,
+                            *   so 0.25 is a sixteenth and 1.5 a dotted quarter. The LFO
+                            *   starts at phase + fract(beat / sync), beat being the position
+                            *   of the Transport at the start of the note, so every note sees
+                            *   the same phase of the grid. A voice keeps the tempo it started
+                            *   at: a tempo change applies to the next notes. Delay and fade
+                            *   stay in seconds; SynthLfoRandom steps once per cycle */
 });
 
 /** A sound made by the synth from the components of this entity and its children, without a

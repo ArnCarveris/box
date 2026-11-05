@@ -343,7 +343,7 @@ void SynthSync_ratio_one_identical(void) {
         .level = 1, .modulates = 2, .index = 1.5f, .feedback = 0.3f };
     p.lfos = 2;
     p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 5,
-        .pitch = 20, .sync = 12 };
+        .pitch = 20, .hard_sync = 12 };
     p.lfo[1] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_TRIANGLE, .rate = 2,
         .pulse_width = 0.2f };
     sync_render_a(&p);
@@ -418,7 +418,7 @@ void SynthSync_lfo_spectrum(void) {
     steady = sync_centroid_range();
     p.lfos = 1;
     p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 1,
-        .sync = 24 };
+        .hard_sync = 24 };
     sync_render(&p, AUDIO_RATE, AUDIO_FRAMES);
     swept = sync_centroid_range();
     printf("centroid of sync 2 at 200 Hz: range %f steady, %f under an LFO of 24 semitones\n",
@@ -438,7 +438,7 @@ void SynthSync_lfo_layer_syncs(void) {
     sync_render_a(&p);
     p.lfos = 1;
     p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_TRIANGLE, .rate = 1,
-        .sync = 24 };
+        .hard_sync = 24 };
     sync_render(&p, AUDIO_RATE, AUDIO_FRAMES);
     test_assert(sync_same_a());
     p.lfo[0].layer = 1;
@@ -483,7 +483,7 @@ void SynthSync_unison_stereo(void) {
     p.layer[0].pulse_width = 0.3f;
     p.lfos = 1;
     p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 3,
-        .sync = 12 };
+        .hard_sync = 12 };
     sync_render_a(&p);
     p.layer[0].sync = 3.3f;
     sync_render(&p, AUDIO_RATE, AUDIO_FRAMES);
@@ -532,7 +532,7 @@ void SynthSync_ignored_noise_pluck(void) {
         p.layer[0].sync = 4;
         p.lfos = 1;
         p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 3,
-            .layer = 1, .sync = 12 };
+            .layer = 1, .hard_sync = 12 };
         sync_render(&p, AUDIO_RATE, AUDIO_FRAMES);
         p.layer[0].sync = 0;
         memcpy(sync_a_r, audio_l, sizeof(sync_a_r));
@@ -563,9 +563,9 @@ void SynthSync_clamped(void) {
     p.layer[0].sync = 2;
     p.lfos = 1;
     p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 2,
-        .sync = 48 };
+        .hard_sync = 48 };
     sync_render_a(&p);
-    p.lfo[0].sync = 1000;
+    p.lfo[0].hard_sync = 1000;
     sync_render(&p, AUDIO_RATE, AUDIO_FRAMES);
     test_assert(sync_same_a());
     test_assert(sync_finite(audio_l, 0, AUDIO_FRAMES));
@@ -589,12 +589,12 @@ void SynthSync_script(void) {
     test_assert(lead != 0 && plain != 0);
     test_flt(ecs_get(world, plain, SynthOscillator)->sync, 0);
     test_flt(ecs_get(world, lead, SynthOscillator)->sync, 2.5f);
-    test_flt(ecs_get(world, lead, SynthLfo)->sync, 12);
+    test_flt(ecs_get(world, lead, SynthLfo)->hard_sync, 12);
     p = &ecs_get(world, lead, AudioSynth)->patch;
     test_int(p->layers, 1);
     test_flt(p->layer[0].sync, 2.5f);
     test_int(p->lfos, 1);
-    test_flt(p->lfo[0].sync, 12);
+    test_flt(p->lfo[0].hard_sync, 12);
     p = &ecs_get(world, plain, AudioSynth)->patch;
     test_flt(p->layer[0].sync, 0);
 

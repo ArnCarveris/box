@@ -712,6 +712,38 @@ double box_audio_timeline_beat(
     return state ? box_audio_beat_of(&state->timeline, frame) : 0.0;
 }
 
+void box_audio_timeline_grid(
+    const ecs_world_t *world,
+    const box_audio_module_t *state,
+    uint64_t when,
+    float *beat,
+    float *tempo)
+{
+    const box_audio_timeline_t *tl = &state->timeline;
+    const Transport *tr = ecs_singleton_get(world, Transport);
+    const box_audio_anchor_t *a = NULL;
+    uint64_t frame = when > tl->clock ? when : tl->clock;
+    double b = 0, bps = BOX_AUDIO_SYNTH_TEMPO;
+    if (!tr) {
+        goto done;
+    }
+
+    a = tl->playing ? box_audio_anchor_at(tl, frame) : NULL;
+    if (a) {
+        b = box_audio_anchor_beat(a, frame);
+        bps = (double)tl->rate / a->frames_per_beat;
+    } else {
+        b = box_audio_beat_finite(tr->position);
+        bps = box_audio_tempo_clamp(tr->tempo, BOX_AUDIO_TEMPO_MIN, BOX_AUDIO_TEMPO_MAX) / 60.0;
+    }
+
+    b = fmod(b, BOX_AUDIO_BEAT_WRAP);
+    b = b < 0 ? b + BOX_AUDIO_BEAT_WRAP : b;
+done:
+    *beat = (float)b;
+    *tempo = (float)bps;
+}
+
 int64_t box_audio_timeline_frame(
     const ecs_world_t *world,
     double beat)

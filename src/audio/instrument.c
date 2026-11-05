@@ -146,7 +146,7 @@ uint32_t box_audio_instrument_voice(
         ecs_get(world, instrument, Instrument) : NULL;
     box_audio_oneshot_t *shots, *shot, next;
     uint32_t sound = 0, flags, result = 0, held;
-    float ratio, gain, v, spread;
+    float ratio, gain, v, spread, beat, tempo;
     int32_t k = -1, channel = 0;
     bool synth, legato;
     if (inst) {
@@ -170,6 +170,7 @@ uint32_t box_audio_instrument_voice(
     flags = synth ? (inst->gate ? BOX_AUDIO_PLAY_GATE : 0) : BOX_AUDIO_PLAY_ATTACK;
     legato = synth && box_audio_legato_of(world, inst->sound, &channel);
     handle = handle ? handle : box_audio_new_voice(state);
+    box_audio_timeline_grid(world, state, start, &beat, &tempo);
     shots = ecs_vec_first(&state->oneshots);
     for (k = ecs_vec_count(&state->oneshots) - 1; legato && k >= 0; k --) {
         if (shots[k].legato && shots[k].channel == channel) {
@@ -192,8 +193,8 @@ uint32_t box_audio_instrument_voice(
     if (legato && k >= 0) {
         held = shots[k].handle;
         shots[k] = next;
-        box_audio_write_legato_priority(&state->writer, handle, held, sound, bus, gain, pan,
-            ratio, v, flags, priority, start);
+        box_audio_write_legato_note(&state->writer, handle, held, sound, bus, gain, pan,
+            ratio, v, beat, tempo, flags, priority, start);
     } else {
         if (ecs_vec_count(&state->oneshots) >= BOX_AUDIO_ONESHOT_MAX) {
             ecs_vec_remove_ordered_t(&state->oneshots, box_audio_oneshot_t, 0);
@@ -201,8 +202,8 @@ uint32_t box_audio_instrument_voice(
 
         shot = ecs_vec_append_t(NULL, &state->oneshots, box_audio_oneshot_t);
         *shot = next;
-        box_audio_write_play_priority(&state->writer, handle, sound, bus, gain, pan, ratio, v,
-            flags, priority, start);
+        box_audio_write_play_note(&state->writer, handle, sound, bus, gain, pan, ratio, v,
+            beat, tempo, flags, priority, start);
     }
 
     if (inst->gate && release && box_audio_reserve(state)) {

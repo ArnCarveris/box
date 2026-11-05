@@ -185,7 +185,9 @@ Filters also support `SynthHighPass`, `SynthBandPass`, `SynthNotch` and
 `SynthSlope24`; cutoff is clamped below Nyquist.
 
 A positive delay `sync` overrides time: `sync * 60 / tempo` seconds, capped at
-4 seconds. An eighth is 0.5 beats, a dotted eighth 0.75. Time changes crossfade
+4 seconds. An eighth is 0.5 beats, a dotted eighth 0.75. A synth LFO `sync` counts
+the same beats at the same tempo, phase locked to the Transport (see Synth sounds).
+Time changes crossfade
 between read positions instead of gliding pitch. Use `mix: 1` on a return.
 Phaser stages range from 2 to 12, even; chorus supports up to four voices.
 
@@ -298,7 +300,7 @@ voices on play, so edits affect subsequent plays.
 | `SynthPitchEnvelope` | `amount` (0 semitones, -48..48), `decay` seconds, `curve` (0, -16..16), `release_amount` (0 semitones, -48..48), `sync` (0 semitones, -48..48) |
 | `SynthUnison` | Per layer: `voices` (3, 1..7), `detune` (10 cents, 0..100), `width` (0, 0..1) |
 | `SynthGlide` | Root: `time` seconds (0, up to 10), `legato` (false), `channel` (0) |
-| `SynthLfo` | `wave`, `rate` (5 Hz), `delay`, `fade`, `phase`, `random_phase`, destination depths |
+| `SynthLfo` | `wave`, `rate` (5 Hz), `sync` (0 beats, off, 0..256), `delay`, `fade`, `phase`, `random_phase`, destination depths |
 | `SynthString` | Pluck layer: `decay` (2 s to -60 dB), `brightness` (0.5), `hardness` (0.8), `velocity` (0) |
 
 Waves are `SynthSine`, `SynthSaw`, `SynthSquare`, `SynthTriangle`, `SynthNoise`
@@ -487,12 +489,23 @@ pan balances their channels rather than narrowing them with distance.
 
 A sound supports two LFOs, on the root, a layer or another root child. Waves include
 sine, triangle, square, rising saw and sample-and-hold. Destinations are `pitch`
-(cents), `amplitude` (0..1), `cutoff` (octaves), `pulse_width` and `sync`, the
+(cents), `amplitude` (0..1), `cutoff` (octaves), `pulse_width` and `hard_sync`, the
 semitones (-48..48) the ratio of hard sync moves at the top of the wave, clamped to
 1..16. On a layer it syncs that layer, from a ratio of 1 when it has none; on the root
-it moves every layer whose `sync` is over 1.
+it moves every layer whose oscillator `sync` is over 1.
 Delay and fade bring modulation in gradually. Random phase and noise are seeded,
 so the same sequence of plays is reproducible.
+
+A positive LFO `sync` locks it to the tempo, like a delay `sync`: the cycle is `sync`
+beats of the Transport, a beat a quarter note, at 120 bpm without one, and it wins over
+`rate`. A sixteenth is 0.25, a dotted quarter 1.5, a bar of 4/4 is 4. Each voice starts
+the LFO at `phase + fract(beat / sync)`, where beat is the position of the Transport at
+the start frame of the voice: of the timeline for notes it schedules, else its position
+while stopped and the beat of the play's frame while playing. So every note sees the
+same phase of the grid, and wobbles, tremolos and filter pulses stay on the beat. A
+voice keeps the tempo it started at: a tempo change while it holds does not reach it,
+only the next notes. Delay and fade stay in seconds, and the random wave steps once per
+cycle. A retargeted legato voice keeps its LFOs.
 
 `SynthSound.drift` adds analog drift, so digital patches are never perfectly in tune.
 The pitch of each layer of a voice, and of each unison copy, wanders on its own smooth
