@@ -237,4 +237,16 @@ bool audio_synth_cutoff(
     double *cutoff,
     bool *unison);
 
+/** Frames of the wavetable a sound would hold, as the core reads its header.
+ *
+ * @param data Frames of the sound
+ * @param frames Number of frames
+ * @param channels 1 or 2
+ * @return Frames of the table, 0 when it is not one
+ */
+int32_t audio_table_frames(
+    const float *data,
+    int32_t frames,
+    int32_t channels);
+
 #endif

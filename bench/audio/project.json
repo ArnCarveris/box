@@ -75,7 +75,8 @@
                     "voices_64_pink",
                     "voices_32_pluck",
                     "voices_32_pluck_vibrato",
-                    "voices_8_pluck_unison"
+                    "voices_8_pluck_unison",
+                    "voices_64_wavetable"
                 ]
             },
             {

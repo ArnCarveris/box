@@ -198,6 +198,48 @@
 /** Cutoff of the DC blocker after the drive of a synth voice with asymmetry in Hz */
 #define BOX_AUDIO_SYNTH_DRIVE_DC 5.0f
 
+/** Most frames of a wavetable; a table takes a sound id of the core, so a core holds at most
+ * BOX_AUDIO_SOUND_MAX - 1 sounds, tables and synth patches together */
+#define BOX_AUDIO_TABLE_FRAMES_MAX 256
+
+/** Samples of a frame of a wavetable at mip level 0 */
+#define BOX_AUDIO_TABLE_LENGTH 2048
+
+/** Shortest frame of a mip level of a wavetable: the top levels, of few harmonics, keep this
+ * many samples, so their interpolation stays clean */
+#define BOX_AUDIO_TABLE_LENGTH_MIN 32
+
+/** Mip levels of a wavetable, one per octave of the turns per frame of the oscillator */
+#define BOX_AUDIO_TABLE_LEVELS 10
+
+/** Harmonics a frame of a wavetable holds at level 0; level k holds this over 2^k. Level k
+ * serves an oscillator of at most 2^k / (2 BOX_AUDIO_TABLE_HARMONICS) turns per frame, so its
+ * highest harmonic stays under Nyquist at any rate; level 0 serves everything slower, the
+ * highest level everything faster. Over the upper half of the octave of a level the
+ * oscillator crossfades into the next level, so a sweep has no step at the boundaries */
+#define BOX_AUDIO_TABLE_HARMONICS 512
+
+/** Samples of a frame of a wavetable at a mip level k, 0..BOX_AUDIO_TABLE_LEVELS - 1, a power
+ * of 2 of at least four samples per period of the highest harmonic of the level */
+#define BOX_AUDIO_TABLE_LEVEL_LENGTH(k) \
+    ((BOX_AUDIO_TABLE_LENGTH >> (k)) > BOX_AUDIO_TABLE_LENGTH_MIN ? \
+    (BOX_AUDIO_TABLE_LENGTH >> (k)) : BOX_AUDIO_TABLE_LENGTH_MIN)
+
+/** Samples of one frame of a wavetable over all its mip levels */
+#define BOX_AUDIO_TABLE_FRAME_FLOATS 4160
+
+/** Floats of the header of a wavetable before its levels */
+#define BOX_AUDIO_TABLE_HEADER 4
+
+/** First float of the header of a wavetable, which tells it from the frames of a sound */
+#define BOX_AUDIO_TABLE_MAGIC 6371329.0f
+
+/** Floats of a wavetable of a number of frames: the header, then for each mip level from 0
+ * its frames, frame after frame, each BOX_AUDIO_TABLE_LEVEL_LENGTH(level) samples of one
+ * period. A table of 64 frames takes 1064976 bytes, about 1 MB */
+#define BOX_AUDIO_TABLE_FLOATS(frames) \
+    (BOX_AUDIO_TABLE_HEADER + (frames) * BOX_AUDIO_TABLE_FRAME_FLOATS)
+
 /** Commands of the byte stream. Each starts with a box_audio_cmd_header_t */
 typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_PLAY = 1,          /**< box_audio_cmd_play_t */
@@ -730,7 +772,9 @@ typedef enum box_audio_synth_wave_t {
     BOX_AUDIO_SYNTH_SQUARE = 2,    /**< Square, band limited */
     BOX_AUDIO_SYNTH_TRIANGLE = 3,  /**< Triangle */
     BOX_AUDIO_SYNTH_NOISE = 4,     /**< White noise, seeded per play */
-    BOX_AUDIO_SYNTH_PLUCK = 5      /**< A Karplus-Strong string plucked with seeded noise */
+    BOX_AUDIO_SYNTH_PLUCK = 5,     /**< A Karplus-Strong string plucked with seeded noise */
+    BOX_AUDIO_SYNTH_WAVETABLE = 6  /**< The frames of a wavetable, morphed by a position; a
+                                    *   sine without a table */
 } box_audio_synth_wave_t;
 
 /** Colors of the noise of a synth oscillator, each at about the RMS level of white noise */
@@ -839,6 +883,14 @@ typedef struct box_audio_synth_layer_t {
     uint32_t color;                       /**< BOX_AUDIO_SYNTH_NOISE: a
                                            * box_audio_synth_color_t, 0 white; ignored by
                                            * the other waves */
+    uint32_t table;                       /**< BOX_AUDIO_SYNTH_WAVETABLE: id of the sound of
+                                           * its wavetable, 0 for none, a sine; ignored by
+                                           * the other waves */
+    float position;                       /**< BOX_AUDIO_SYNTH_WAVETABLE: frame of the table
+                                           * it plays, 0..frames - 1, between two frames a
+                                           * linear mix of them */
+    float position_envelope;              /**< BOX_AUDIO_SYNTH_WAVETABLE: frames the position
+                                           * moves at level 1 of its envelope, either way */
 } box_audio_synth_layer_t;
 
 /** An LFO of a synth patch: a wave at a rate that starts after a delay and fades in, with a
@@ -859,6 +911,9 @@ typedef struct box_audio_synth_lfo_t {
     float sync;             /**< Semitones the ratio of hard sync moves by at the top of the
                              * wave, -BOX_AUDIO_SYNTH_SYNC_SEMITONES..max; on a layer it syncs
                              * it, for every layer only those with a ratio over 1 */
+    float position;         /**< Frames the position of wavetable layers moves by at the top
+                             * of the wave, -BOX_AUDIO_TABLE_FRAMES_MAX..max; the moved
+                             * position is clamped to the frames of the table */
 } box_audio_synth_lfo_t;
 
 /** A synth patch: up to BOX_AUDIO_SYNTH_LAYERS oscillators with envelopes, then one filter,
@@ -1009,6 +1064,12 @@ float box_audio_core_sample_rate(
  *
  * The data is in the address space of the core and stays with the side that runs the core;
  * BOX_AUDIO_EVENT_SOUND_FREE after a release says when it may be freed.
+ *
+ * A mono sound of BOX_AUDIO_TABLE_FLOATS(n) frames that starts with the header of a wavetable
+ * (BOX_AUDIO_TABLE_MAGIC, n, BOX_AUDIO_TABLE_LEVELS, BOX_AUDIO_TABLE_LENGTH) is a wavetable of
+ * n frames, 1..BOX_AUDIO_TABLE_FRAMES_MAX, which the layers of synth patches name by its id.
+ * A synth voice that plays it counts as a voice that plays the sound, so a released table is
+ * freed once no voice plays it.
  *
  * @param core The core
  * @param id Id of the sound, below BOX_AUDIO_SOUND_MAX and not in use

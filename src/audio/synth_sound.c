@@ -4,8 +4,10 @@
  * marks it for a new compile when one of its components changes.
  *
  * The layers are the root and its children with a SynthOscillator, and the children of layers
- * with one, the modulators of their parent; a SynthPluck layer takes its SynthString. The LFOs
- * are the SynthLfo of the root, of the layers and of the other children of the root.
+ * with one, the modulators of their parent; a SynthPluck layer takes its SynthString, a
+ * SynthWavetable layer its SynthTable, whose table the patch names by the sound id of its
+ * Wavetable in the current output. The LFOs are the SynthLfo of the root, of the layers and of
+ * the other children of the root.
  *
  * The sync system sends the patch with a SYNTH command when it changed; the core plays every
  * voice from a copy of it, so a play allocates nothing.
@@ -61,16 +63,16 @@ void box_audio_synth_init(
     ecs_entity_t ids[] = {
         ecs_id(SynthSound), ecs_id(SynthOscillator), ecs_id(SynthEnvelope), ecs_id(SynthFilter),
         ecs_id(SynthFilterEnvelope), ecs_id(SynthGlide), ecs_id(SynthUnison),
-        ecs_id(SynthString), ecs_id(SynthLfo), ecs_id(SynthDrive)
+        ecs_id(SynthString), ecs_id(SynthLfo), ecs_id(SynthDrive), ecs_id(SynthTable)
     };
     const char *names[] = {
         "AudioSynthSoundDirty", "AudioSynthOscillatorDirty", "AudioSynthEnvelopeDirty",
         "AudioSynthFilterDirty", "AudioSynthFilterEnvelopeDirty", "AudioSynthGlideDirty",
         "AudioSynthUnisonDirty", "AudioSynthStringDirty", "AudioSynthLfoDirty",
-        "AudioSynthDriveDirty"
+        "AudioSynthDriveDirty", "AudioSynthTableDirty"
     };
     int32_t i;
-    for (i = 0; i < 10; i ++) {
+    for (i = 0; i < 11; i ++) {
         ecs_observer(world, {
             .entity = ecs_entity(world, { .name = names[i] }),
             .query.flags = EcsQueryMatchPrefab,
@@ -117,6 +119,8 @@ static bool box_audio_synth_envelope_fits(
  * @param env Its own envelope, NULL for the one of the root
  * @param unison Its unison, NULL for one voice
  * @param string Its string, NULL for the defaults; used by SynthPluck only
+ * @param table Its table, NULL for none; used by SynthWavetable only
+ * @param tables Receives SynthTable.table of the layer by its index, 0 without a table
  * @param carrier 1 + the layer its parent is, 0 when its parent is not a layer
  */
 static void box_audio_synth_layer(
@@ -125,9 +129,12 @@ static void box_audio_synth_layer(
     const SynthEnvelope *env,
     const SynthUnison *unison,
     const SynthString *string,
+    const SynthTable *table,
+    ecs_entity_t *tables,
     uint32_t carrier)
 {
-    box_audio_synth_layer_t *l = &p->layer[p->layers ++];
+    box_audio_synth_layer_t *l = &p->layer[p->layers];
+    tables[p->layers ++] = 0;
     l->wave = (uint32_t)osc->wave;
     l->frequency = osc->frequency;
     l->frequency_end = osc->frequency_end;
@@ -168,6 +175,12 @@ static void box_audio_synth_layer(
         l->hardness = string->hardness;
         l->hardness_velocity = string->velocity;
     }
+
+    if (osc->wave == SynthWavetable && table) {
+        tables[p->layers - 1] = table->table;
+        l->position = table->position;
+        l->position_envelope = table->envelope;
+    }
 }
 
 /** Add an LFO to a patch, or count it when the patch has BOX_AUDIO_SYNTH_LFOS.
@@ -197,7 +210,7 @@ static void box_audio_synth_lfo(
         .fade = lfo->fade, .phase = lfo->phase, .random_phase = lfo->random_phase,
         .layer = layer, .pitch = lfo->pitch, .amplitude = lfo->amplitude,
         .cutoff = lfo->cutoff, .pulse_width = lfo->pulse_width,
-        .sync = lfo->sync };
+        .sync = lfo->sync, .position = lfo->position };
 done:
     return;
 }
@@ -235,10 +248,12 @@ static int32_t box_audio_synth_count(
  * @param extra Counts the layers past BOX_AUDIO_SYNTH_LAYERS
  * @param orphans Counts the modulators whose parent is not a layer
  * @param lfos Counts the LFOs past BOX_AUDIO_SYNTH_LFOS
+ * @param tables Receives SynthTable.table of each layer by its index
  */
 static void box_audio_synth_children(
     ecs_world_t *world,
     box_audio_synth_patch_t *p,
+    ecs_entity_t *tables,
     ecs_entity_t parent,
     uint32_t carrier,
     int32_t *extra,
@@ -260,14 +275,44 @@ static void box_audio_synth_children(
             } else if (p->layers < BOX_AUDIO_SYNTH_LAYERS) {
                 box_audio_synth_layer(p, osc, ecs_get(world, child, SynthEnvelope),
                     ecs_get(world, child, SynthUnison), ecs_get(world, child, SynthString),
-                    carrier);
+                    ecs_get(world, child, SynthTable), tables, carrier);
                 box_audio_synth_lfo(p, ecs_get(world, child, SynthLfo), p->layers, lfos);
-                box_audio_synth_children(world, p, child, p->layers, extra, orphans, lfos);
+                box_audio_synth_children(world, p, tables, child, p->layers, extra, orphans,
+                    lfos);
             } else {
                 *extra += box_audio_synth_count(world, child);
             }
         }
     }
+}
+
+bool box_audio_synth_tables(
+    ecs_world_t *world,
+    const box_audio_module_t *state,
+    AudioSynth *synth)
+{
+    bool result = false;
+    int32_t i;
+    for (i = 0; i < (int32_t)synth->patch.layers; i ++) {
+        ecs_entity_t table = synth->tables[i];
+        const AudioWavetable *w;
+        uint32_t id = 0;
+        if (!(synth->table_layers & (1u << i))) {
+            continue;
+        }
+
+        if (table && ecs_is_alive(world, table) && ecs_has(world, table, Wavetable)) {
+            w = ecs_get(world, table, AudioWavetable);
+            id = w && state->serial && w->serial == state->serial ? w->id : 0;
+        }
+
+        if (synth->patch.layer[i].table != id) {
+            synth->patch.layer[i].table = id;
+            result = true;
+        }
+    }
+
+    return result;
 }
 
 bool box_audio_synth_compile(
@@ -276,7 +321,10 @@ bool box_audio_synth_compile(
     ecs_entity_t e,
     AudioSynth *synth)
 {
-    box_audio_synth_patch_t p = {0};
+    box_audio_synth_patch_t p = {0}, old;
+    ecs_entity_t tables[BOX_AUDIO_SYNTH_LAYERS] = {0};
+    uint32_t table_layers = 0;
+    int32_t untabled = 0;
     const SynthSound *sound = ecs_get(world, e, SynthSound);
     const SynthEnvelope *env = ecs_get(world, e, SynthEnvelope);
     const SynthFilter *filter = ecs_get(world, e, SynthFilter);
@@ -332,11 +380,11 @@ bool box_audio_synth_compile(
         orphans ++;
     } else if (osc) {
         box_audio_synth_layer(&p, osc, NULL, ecs_get(world, e, SynthUnison),
-            ecs_get(world, e, SynthString), 0);
+            ecs_get(world, e, SynthString), ecs_get(world, e, SynthTable), tables, 0);
     }
 
     box_audio_synth_lfo(&p, ecs_get(world, e, SynthLfo), 0, &lfos);
-    box_audio_synth_children(world, &p, e, p.layers, &extra, &orphans, &lfos);
+    box_audio_synth_children(world, &p, tables, e, p.layers, &extra, &orphans, &lfos);
     it = ecs_children(world, e);
     while (ecs_children_next(&it)) {
         for (i = 0; i < it.count; i ++) {
@@ -360,6 +408,12 @@ bool box_audio_synth_compile(
             }
         }
 
+        if (l->wave == BOX_AUDIO_SYNTH_WAVETABLE) {
+            table_layers |= 1u << i;
+            untabled += !tables[i] || !ecs_is_alive(world, tables[i]) ||
+                !ecs_has(world, tables[i], Wavetable);
+        }
+
         if (l->has_envelope) {
             fits = fits && box_audio_synth_envelope_fits(&l->envelope);
         } else if (!env && l->wave == BOX_AUDIO_SYNTH_PLUCK) {
@@ -376,7 +430,7 @@ bool box_audio_synth_compile(
         ecs_os_free(path);
     }
 
-    if (extra || endless || !fits || orphans || lfos) {
+    if (extra || endless || !fits || orphans || lfos || untabled) {
         char *path = ecs_get_path(world, e);
         if (extra) {
             ecs_err("box.audio: synth '%s' has %d layers, more than %d, the rest are left out",
@@ -406,11 +460,20 @@ bool box_audio_synth_compile(
                 "it is cut", path, (double)BOX_AUDIO_SYNTH_LENGTH_MAX);
         }
 
+        if (untabled) {
+            ecs_err("box.audio: synth '%s' has %d wavetable layers without a SynthTable that "
+                "names a Wavetable, they play a sine", path, (int)untabled);
+        }
+
         ecs_os_free(path);
     }
 
-    result = ecs_os_memcmp_t(&synth->patch, &p, box_audio_synth_patch_t) != 0;
+    old = synth->patch;
     synth->patch = p;
+    synth->table_layers = table_layers;
+    ecs_os_memcpy_n(synth->tables, tables, ecs_entity_t, BOX_AUDIO_SYNTH_LAYERS);
+    box_audio_synth_tables(world, state, synth);
+    result = ecs_os_memcmp_t(&old, &synth->patch, box_audio_synth_patch_t) != 0;
     synth->compiled = true;
     state->stats.synths ++;
 

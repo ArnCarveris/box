@@ -15,7 +15,8 @@
  * on every cycle of its frequency at a ratio of it, the restart band limited by a polyBLEP. Up
  * to two LFOs move the pitch, the level, the cutoff, the pulse width of squares and the ratio
  * of hard sync, per control block of frames and interpolated per frame
- * in between.
+ * in between. A wavetable layer reads the frames of a table the main thread built, at the mip
+ * level of its speed and at a position between two frames that its envelope and the LFOs move.
  *
  * Every voice holds its own copy of the patch, so a play allocates nothing. Its layers are parts
  * of the core, one per layer (box_audio_synth_part_t), and each pluck layer takes a string of
@@ -637,6 +638,7 @@ static void box_audio_synth_lfo_aim(
 {
     double cents[1 + BOX_AUDIO_SYNTH_LAYERS] = {0}, width[1 + BOX_AUDIO_SYNTH_LAYERS] = {0};
     double semitones[1 + BOX_AUDIO_SYNTH_LAYERS] = {0};
+    double frames[1 + BOX_AUDIO_SYNTH_LAYERS] = {0};
     double octaves = 0, c, w, r;
     float dip[1 + BOX_AUDIO_SYNTH_LAYERS], v;
     int32_t k, l;
@@ -651,6 +653,7 @@ static void box_audio_synth_lfo_aim(
         cents[d->layer] += (double)(d->pitch * v);
         width[d->layer] += (double)(d->pulse_width * v);
         semitones[d->layer] += (double)(d->sync * v);
+        frames[d->layer] += (double)(d->position * v);
         dip[d->layer] *= 1 - d->amplitude * m->gain * 0.5f * (1 - m->value);
         octaves += (double)(d->cutoff * v);
     }
@@ -680,6 +683,15 @@ static void box_audio_synth_lfo_aim(
             }
 
             o->sync_step = (r - o->sync) * (1.0 / BOX_AUDIO_SYNTH_CONTROL);
+        }
+
+        if (o->table) {
+            r = frames[0] + frames[l + 1];
+            if (now) {
+                o->position_lfo = r;
+            }
+
+            o->position_step = (r - o->position_lfo) * (1.0 / BOX_AUDIO_SYNTH_CONTROL);
         }
     }
 
@@ -1052,6 +1064,15 @@ static void box_audio_synth_pass(
 
         o->synced = o->synced && o->wave != BOX_AUDIO_SYNTH_NOISE &&
             o->wave != BOX_AUDIO_SYNTH_PLUCK;
+        if (o->table) {
+            o->position_base = (double)layer->position < (double)(o->table_frames - 1) ?
+                (double)layer->position : (double)(o->table_frames - 1);
+            o->position_env = layer->position_envelope;
+            o->position_lfo = 0;
+            o->position_step = 0;
+            o->position = o->position_base;
+        }
+
         for (n = 0; n < part->unison.voices && part->unison.voices > 1 && !part->string; n ++) {
             box_audio_synth_noise(&src->rng);
             part->unison.phase[n] = (double)(src->rng >> 11) * (1.0 / 2097152.0);
@@ -1326,10 +1347,14 @@ void box_audio_source_synth(
     src->unison = false;
     src->stereo = false;
     src->strings = 0;
+    src->tables = false;
     for (l = 0; l < src->layers; l ++) {
         src->part[l] = &core->synth_parts[core->synth_free[-- core->synth_free_count]];
         src->part[l]->layer = p->layer[l];
         src->part[l]->string = NULL;
+        box_audio_synth_table_take(core, &src->part[l]->osc,
+            p->layer[l].wave == BOX_AUDIO_SYNTH_WAVETABLE ? p->layer[l].table : 0);
+        src->tables = src->tables || src->part[l]->osc.table != NULL;
         box_audio_synth_unison_init(src->part[l]);
         if (src->part[l]->unison.voices > 1) {
             src->unison = true;
@@ -1735,6 +1760,32 @@ static inline void box_audio_synth_lfo_next(
     src->tremolo += src->tremolo_step;
 }
 
+/** Move the position of every wavetable layer of a source for a frame: its position, plus
+ * the step of the LFOs toward their aim, plus its depth times the level of its envelope,
+ * clamped to the frames of its table.
+ *
+ * @param src The source, with a wavetable layer
+ * @param levels The level of each envelope for the frame
+ */
+static inline void box_audio_synth_tables_next(
+    box_audio_synth_source_t *src,
+    const float *levels)
+{
+    double p, top;
+    int32_t l;
+    for (l = 0; l < src->layers; l ++) {
+        box_audio_synth_osc_t *o = &src->part[l]->osc;
+        if (!o->table) {
+            continue;
+        }
+
+        o->position_lfo += o->position_step;
+        p = o->position_base + o->position_lfo + (double)(o->position_env * levels[o->env]);
+        top = (double)(o->table_frames - 1);
+        o->position = p > 0 ? (p < top ? p : top) : 0.0;
+    }
+}
+
 /** Advance the envelopes a source uses by a frame.
  *
  * @param src The source
@@ -1829,6 +1880,101 @@ static inline float box_audio_synth_pulse(
         box_audio_synth_blep(t < w ? t + 1 - w : t - w, dt);
 }
 
+/** Offset of each mip level of a wavetable in samples of one frame; the level holds the
+ * offset times the frames of the table after the levels before it */
+static const int32_t box_audio_synth_table_offset[BOX_AUDIO_TABLE_LEVELS] = {
+    0, 2048, 3072, 3584, 3840, 3968, 4032, 4064, 4096, 4128 };
+
+_Static_assert(4128 + BOX_AUDIO_TABLE_LEVEL_LENGTH(BOX_AUDIO_TABLE_LEVELS - 1) ==
+    BOX_AUDIO_TABLE_FRAME_FLOATS, "the mip levels of a wavetable fill its frame floats");
+
+/** Read a period of a mip level of a wavetable between samples, with the optimal 4 point 3rd
+ * order interpolator for audio oversampled twice of Niemitalo, which a level is at least: its
+ * images stay under -70 dB of a saw.
+ *
+ * @param y The period, mask + 1 samples
+ * @param i Index of the sample at or before the read point
+ * @param mask Samples of the period minus 1, a power of 2 minus 1
+ * @param z Place of the read point between sample i and the next minus a half, -0.5..0.5
+ * @return The sample
+ */
+static inline float box_audio_synth_table_tap(
+    const float *y,
+    int32_t i,
+    int32_t mask,
+    float z)
+{
+    float ym1 = y[(i - 1) & mask], y0 = y[i & mask], y1 = y[(i + 1) & mask];
+    float y2 = y[(i + 2) & mask];
+    float even1 = y1 + y0, odd1 = y1 - y0, even2 = y2 + ym1, odd2 = y2 - ym1;
+    float c0 = even1 * 0.45868970870461956f + even2 * 0.04131401926395584f;
+    float c1 = odd1 * 0.48068024766578432f + odd2 * 0.17577925564495955f;
+    float c2 = even1 * -0.246185007019907091f + even2 * 0.24614027139700284f;
+    float c3 = odd1 * -0.36030925263849456f + odd2 * 0.10174985775982505f;
+
+    return ((c3 * z + c2) * z + c1) * z + c0;
+}
+
+/** Read a mip level of the wavetable of an oscillator at a phase, at the frame of its position
+ * and, between two frames, mixed linearly with the next.
+ *
+ * @param o The oscillator, with a table
+ * @param k The mip level
+ * @param t Phase in turns, 0..1
+ * @return The sample
+ */
+static inline float box_audio_synth_table_level(
+    const box_audio_synth_osc_t *o,
+    int32_t k,
+    double t)
+{
+    int32_t len = BOX_AUDIO_TABLE_LEVEL_LENGTH(k), a = (int32_t)o->position, i;
+    const float *level = o->table + o->table_frames * box_audio_synth_table_offset[k];
+    double x = t * (double)len, w = o->position - (double)a;
+    float y, z;
+    i = (int32_t)x;
+    z = (float)(x - (double)i) - 0.5f;
+    y = box_audio_synth_table_tap(level + a * len, i, len - 1, z);
+    if (w > 0 && a + 1 < o->table_frames) {
+        y += (float)w * (box_audio_synth_table_tap(level + (a + 1) * len, i, len - 1, z) - y);
+    }
+
+    return y;
+}
+
+/** Render a frame of a wavetable at a phase: the mip level of the speed of the phase, the
+ * first whose highest harmonic stays under Nyquist at it. Over the upper half of the octave
+ * of a level it crossfades linearly into the next level, of half the harmonics, which it
+ * reaches at the top of the octave, so a sweep moves from level to level without a step and
+ * never aliases.
+ *
+ * @param o The oscillator, with a table
+ * @param t Phase in turns, 0..1
+ * @param dt Turns per frame, the magnitude of the speed of the phase
+ * @return The sample
+ */
+static inline float box_audio_synth_table(
+    const box_audio_synth_osc_t *o,
+    double t,
+    double dt)
+{
+    double top = 1.0 / (2 * BOX_AUDIO_TABLE_HARMONICS), fade;
+    int32_t k = 0;
+    float y;
+    while (k < BOX_AUDIO_TABLE_LEVELS - 1 && dt > top) {
+        top += top;
+        k ++;
+    }
+
+    y = box_audio_synth_table_level(o, k, t);
+    fade = k < BOX_AUDIO_TABLE_LEVELS - 1 ? 4 * dt / top - 3 : 0.0;
+    if (fade > 0) {
+        y += (float)fade * (box_audio_synth_table_level(o, k + 1, t) - y);
+    }
+
+    return y;
+}
+
 /** Render a frame of a wave at a phase.
  *
  *
@@ -1836,7 +1982,7 @@ static inline float box_audio_synth_pulse(
  * time and the step changes sign with the direction, the polyBLAMP is even in time and the
  * change of slope keeps its sign, so both corrections stay the same function of the phase.
  *
- * @param wave A box_audio_synth_wave_t
+ * @param o The oscillator, whose wave and wavetable it renders
  * @param t Phase in turns, 0..1
  * @param dt Turns per frame, the magnitude of the speed of the phase
  * @param width Square: share of the period it is high
@@ -1844,14 +1990,14 @@ static inline float box_audio_synth_pulse(
  * @return The sample, -1..1, a pulse 2 width - 2..2 width
  */
 static inline float box_audio_synth_wave(
-    int32_t wave,
+    const box_audio_synth_osc_t *o,
     double t,
     double dt,
     double width,
     uint32_t *rng)
 {
     float x;
-    switch (wave) {
+    switch (o->wave) {
     case BOX_AUDIO_SYNTH_SAW:
         x = (float)(2 * t - 1) - box_audio_synth_blep(t, dt);
         break;
@@ -1871,6 +2017,9 @@ static inline float box_audio_synth_wave(
         break;
     case BOX_AUDIO_SYNTH_NOISE:
         x = box_audio_synth_noise(rng);
+        break;
+    case BOX_AUDIO_SYNTH_WAVETABLE:
+        x = o->table ? box_audio_synth_table(o, t, dt) : box_audio_core_sin(t);
         break;
     default:
         x = box_audio_core_sin(t);
@@ -1900,18 +2049,20 @@ static inline double box_audio_synth_wrap(
 /** Value of a wave at a phase without its corrections, a pulse without its DC, as
  * box_audio_synth_wave renders it away from its edges.
  *
- * @param wave A box_audio_synth_wave_t, not noise
+ * @param o The oscillator, whose wave is not noise
  * @param t Phase in turns, 0..1
+ * @param dt Turns per frame, for the mip level of a wavetable
  * @param width Square: share of the period it is high
  * @return The value
  */
 static inline double box_audio_synth_naive(
-    int32_t wave,
+    const box_audio_synth_osc_t *o,
     double t,
+    double dt,
     double width)
 {
     double x;
-    switch (wave) {
+    switch (o->wave) {
     case BOX_AUDIO_SYNTH_SAW:
         x = 2 * t - 1;
         break;
@@ -1920,6 +2071,9 @@ static inline double box_audio_synth_naive(
         break;
     case BOX_AUDIO_SYNTH_TRIANGLE:
         x = t < 0.5 ? 4 * t - 1 : 3 - 4 * t;
+        break;
+    case BOX_AUDIO_SYNTH_WAVETABLE:
+        x = o->table ? box_audio_synth_table(o, t, dt) : box_audio_core_sin(t);
         break;
     default:
         x = box_audio_core_sin(t);
@@ -2027,7 +2181,7 @@ static inline float box_audio_synth_sync(
 
     ds = ds < BOX_AUDIO_SYNTH_NYQUIST ? ds : BOX_AUDIO_SYNTH_NYQUIST;
     if (t >= dt && t <= 1 - dt) {
-        x = box_audio_synth_wave(o->wave, box_audio_synth_wrap(u), ds, width, rng);
+        x = box_audio_synth_wave(o, box_audio_synth_wrap(u), ds, width, rng);
     } else {
         if (o->wave == BOX_AUDIO_SYNTH_SQUARE && width != 0.5) {
             lo = ds < 0.5 ? ds : 0.5;
@@ -2035,7 +2189,7 @@ static inline float box_audio_synth_sync(
         }
 
         start = box_audio_synth_wrap(shift);
-        x = box_audio_synth_naive(o->wave, box_audio_synth_wrap(u), width);
+        x = box_audio_synth_naive(o, box_audio_synth_wrap(u), ds, width);
         if (t > 1 - dt) {
             x += box_audio_synth_edges(o->wave, width, u, ds, u - ds, end) +
                 box_audio_synth_edges(o->wave, width, u - ratio, ds, shift, u - ratio + ds);
@@ -2045,8 +2199,8 @@ static inline float box_audio_synth_sync(
         }
 
         end = box_audio_synth_wrap(end);
-        x += 0.5 * (box_audio_synth_naive(o->wave, start, width) -
-            box_audio_synth_naive(o->wave, end, width)) * (double)box_audio_synth_blep(t, dt);
+        x += 0.5 * (box_audio_synth_naive(o, start, ds, width) -
+            box_audio_synth_naive(o, end, ds, width)) * (double)box_audio_synth_blep(t, dt);
         if (o->wave == BOX_AUDIO_SYNTH_TRIANGLE || o->wave == BOX_AUDIO_SYNTH_SINE) {
             x += 0.5 * ratio * (box_audio_synth_slope(o->wave, start) -
                 box_audio_synth_slope(o->wave, end)) * dt * (double)box_audio_synth_blamp(t, dt);
@@ -2111,7 +2265,7 @@ static inline float box_audio_synth_osc_next(
     uint32_t *rng)
 {
     float x = o->synced ? box_audio_synth_sync(o, o->phase, o->inc, 0, 0, rng) :
-        box_audio_synth_wave(o->wave, o->phase, o->inc, o->width, rng);
+        box_audio_synth_wave(o, o->phase, o->inc, o->width, rng);
     if (color->sections) {
         x = box_audio_synth_color_next(color, 0, x);
     }
@@ -2271,7 +2425,7 @@ static inline float box_audio_synth_layers_lfo(
             x = box_audio_synth_string_next(src, part, inc);
         } else {
             x = o->synced ? box_audio_synth_sync(o, o->phase, inc, 0, 0, &src->rng) :
-                box_audio_synth_wave(o->wave, o->phase, inc, o->width, &src->rng);
+                box_audio_synth_wave(o, o->phase, inc, o->width, &src->rng);
             if (part->color.sections) {
                 x = box_audio_synth_color_next(&part->color, 0, x);
             }
@@ -2361,7 +2515,7 @@ static inline float box_audio_synth_modulate(
             x = box_audio_synth_string_next(src, src->part[l], inc);
         } else {
             x = o->synced ? box_audio_synth_sync(o, o->phase, inc, shift, moved, &src->rng) :
-                box_audio_synth_wave(o->wave, t, dt, o->width, &src->rng);
+                box_audio_synth_wave(o, t, dt, o->width, &src->rng);
             if (src->part[l]->color.sections) {
                 x = box_audio_synth_color_next(&src->part[l]->color, 0, x);
             }
@@ -2435,7 +2589,7 @@ static inline void box_audio_synth_unison_next(
             x = box_audio_synth_sync(o, u->phase[k], dt, shift, 0, &src->rng);
         } else {
             t = shift != 0 ? box_audio_synth_wrap(u->phase[k] + shift) : u->phase[k];
-            x = box_audio_synth_wave(o->wave, t, dt, o->width, &src->rng);
+            x = box_audio_synth_wave(o, t, dt, o->width, &src->rng);
         }
 
         if (part->color.sections) {
@@ -2563,7 +2717,7 @@ static inline void box_audio_synth_mix_wide(
                 x = box_audio_synth_string_next(src, part, inc);
             } else {
                 x = o->synced ? box_audio_synth_sync(o, o->phase, inc, shift, 0, &src->rng) :
-                    box_audio_synth_wave(o->wave, box_audio_synth_wrap(o->phase + shift), inc,
+                    box_audio_synth_wave(o, box_audio_synth_wrap(o->phase + shift), inc,
                     o->width, &src->rng);
                 if (part->color.sections) {
                     x = box_audio_synth_color_next(&part->color, 0, x);
@@ -2671,8 +2825,16 @@ static int32_t box_audio_synth_render_wide(
 
         if (src->lfos) {
             box_audio_synth_lfo_next(src, rate);
+            if (src->tables) {
+                box_audio_synth_tables_next(src, levels);
+            }
+
             box_audio_synth_mix_wide(src, levels, true, &l, &r);
         } else {
+            if (src->tables) {
+                box_audio_synth_tables_next(src, levels);
+            }
+
             box_audio_synth_mix_wide(src, levels, false, &l, &r);
         }
 
@@ -2748,6 +2910,10 @@ int32_t box_audio_synth_render(
 
         if (src->lfos) {
             box_audio_synth_lfo_next(src, rate);
+        }
+
+        if (src->tables) {
+            box_audio_synth_tables_next(src, levels);
         }
 
         if (src->modulated) {

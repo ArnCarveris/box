@@ -4,13 +4,15 @@
  * one item per sample of the output, with the patch of three layers, the same with two LFOs or
  * one of FM, with curved envelopes, with a driven filter, with subs, hard synced under an
  * LFO, with pink noise or with the drive of the mix before the filter, 32 voices of a pluck
- * string, steady or under a vibrato, and 8 of a unison pluck of 4.
+ * string, steady or under a vibrato, 8 of a unison pluck of 4, and 64 of a patch of
+ * wavetables whose positions an LFO and the envelope move.
  *
  * Each iteration renders one quantum of 128 stereo frames, so the time per item is the time
  * per sample of the whole mix of 64 voices.
  */
 
 #include <core.h>
+#include <module.h>
 #include <bake_bench.h>
 
 /** Sample rate of the benchmarks */
@@ -360,4 +362,63 @@ void Synth_voices_8_pluck_unison(
     box_audio_core_t *core = bench_pluck_core(4, false);
     bench_synth_render(b, core);
     box_audio_core_free(core);
+}
+
+/** Create a core with 64 looping voices of a patch of two wavetable layers of
+ * WavetableHarmonics into a lowpass: one whose position the envelope opens and an LFO moves,
+ * one that sweeps up between two frames, so every frame mixes two frames of a mip level and,
+ * in the upper half of an octave, two levels.
+ *
+ * @param table Receives the floats of the table, which the caller frees after the core
+ * @return The core
+ */
+static box_audio_core_t* bench_wavetable_core(
+    float **table)
+{
+    static uint8_t bytes[8192];
+    box_audio_core_desc_t desc = { .sample_rate = BENCH_RATE };
+    box_audio_core_t *core = box_audio_core_new(&desc);
+    box_audio_synth_patch_t p = {0};
+    box_audio_writer_t w;
+    int32_t floats = 0;
+    uint32_t i;
+    *table = box_audio_wavetable_kind(WavetableHarmonics, &floats);
+    box_audio_core_sound(core, 2, *table, floats, 1, 0);
+    p.layers = 2;
+    p.seed = 3;
+    p.envelope = (box_audio_synth_envelope_t){
+        .attack = 0.01f, .decay = 0.1f, .sustain = 0.6f, .hold = 2.0f, .release = 0.2f };
+    p.filter = BOX_AUDIO_SYNTH_LOWPASS;
+    p.cutoff = 2000;
+    p.resonance = 0.3f;
+    p.layer[0] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_WAVETABLE,
+        .frequency = 110, .level = 0.4f, .table = 2, .position = 4.5f,
+        .position_envelope = 12 };
+    p.layer[1] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_WAVETABLE,
+        .frequency = 330, .frequency_end = 660, .sweep = 2.0f, .level = 0.2f, .table = 2,
+        .position = 20.5f };
+    p.lfos = 1;
+    p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 0.7f,
+        .position = 6 };
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    box_audio_write_synth(&w, 1, &p);
+    for (i = 0; i < BOX_AUDIO_VOICE_MAX; i ++) {
+        box_audio_write_play(&w, i, 1, 0, 0.02f, -0.9f + 0.03f * (float)i,
+            0.75f + 0.01f * (float)i, BOX_AUDIO_PLAY_LOOP, 0);
+    }
+
+    box_audio_core_apply(core, w.data, w.size);
+
+    return core;
+}
+
+void Synth_voices_64_wavetable(
+    bench_t *b)
+{
+    // audio/synth
+    float *table = NULL;
+    box_audio_core_t *core = bench_wavetable_core(&table);
+    bench_synth_render(b, core);
+    box_audio_core_free(core);
+    ecs_os_free(table);
 }
