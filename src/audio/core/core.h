@@ -172,6 +172,12 @@
 /** Largest depth of the pitch of a synth LFO in cents, up or down */
 #define BOX_AUDIO_SYNTH_CENTS_MAX 2400.0f
 
+/** Largest ratio of hard sync of a synth layer to its frequency */
+#define BOX_AUDIO_SYNTH_SYNC_MAX 16.0f
+
+/** Largest depth of the ratio of hard sync of a synth LFO in semitones, up or down */
+#define BOX_AUDIO_SYNTH_SYNC_SEMITONES 48.0f
+
 /** Narrowest pulse width of a square, as a share of its period; the widest is 1 minus it */
 #define BOX_AUDIO_SYNTH_PULSE_MIN 0.01f
 
@@ -770,6 +776,9 @@ typedef struct box_audio_synth_envelope_t {
     float curve;         /**< Curve of the decay and the release, 0 linear, positive fast at
                           *   first, -BOX_AUDIO_SYNTH_CURVE_MAX..BOX_AUDIO_SYNTH_CURVE_MAX */
     float attack_curve;  /**< Curve of the attack, the same way */
+    float key_scale;     /**< 0..1: the decay and the release are times 2^(-key_scale key / 12)
+                          *   at the key of a note, 12 log2 of its pitch ratio, fixed at its
+                          *   start; 0 for none and always 0 for the filter envelope */
 } box_audio_synth_envelope_t;
 
 /** An oscillator of a synth patch */
@@ -816,6 +825,10 @@ typedef struct box_audio_synth_layer_t {
                                            * velocity scales: index (1 - share + share v) */
     float hardness_velocity;              /**< BOX_AUDIO_SYNTH_PLUCK: share 0..1 of the
                                            * hardness that velocity scales the same way */
+    float sync;                           /**< Hard sync: ratio of its wave to its frequency,
+                                           * 1..BOX_AUDIO_SYNTH_SYNC_MAX, restarted on every
+                                           * cycle of the frequency; 0 counts as 1, off.
+                                           * Ignored by noise and pluck */
 } box_audio_synth_layer_t;
 
 /** An LFO of a synth patch: a wave at a rate that starts after a delay and fades in, with a
@@ -833,6 +846,9 @@ typedef struct box_audio_synth_lfo_t {
     float amplitude;        /**< Share of the level it takes at the bottom of the wave, 0..1 */
     float cutoff;           /**< Octaves of the cutoff at the top of the wave */
     float pulse_width;      /**< Share of the period the pulse width of squares moves by */
+    float sync;             /**< Semitones the ratio of hard sync moves by at the top of the
+                             * wave, -BOX_AUDIO_SYNTH_SYNC_SEMITONES..max; on a layer it syncs
+                             * it, for every layer only those with a ratio over 1 */
 } box_audio_synth_lfo_t;
 
 /** A synth patch: up to BOX_AUDIO_SYNTH_LAYERS oscillators with envelopes, then one filter,
@@ -867,6 +883,9 @@ typedef struct box_audio_synth_patch_t {
                                            * is cutoff * 2^(filter_velocity (v - 1)); 0 for none */
     float filter_envelope_velocity;       /**< Share 0..1 of filter_amount that velocity
                                            * scales: amount (1 - share + share v) */
+    float keytrack;                       /**< 0..1: the cutoff is times the current pitch
+                                           * ratio of the voice, without its variance, to the
+                                           * keytrack, at the control rate; 0 for none */
     float glide;                          /**< Seconds a change of the pitch of a voice takes,
                                            * exponential in frequency, 0 jumps at once */
     uint32_t lfos;                        /**< LFOs that run, 0..BOX_AUDIO_SYNTH_LFOS */

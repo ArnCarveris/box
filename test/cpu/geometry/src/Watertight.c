@@ -1406,3 +1406,38 @@ void Watertight_bevel(void) {
     test_int(failures, 0);
     ecs_fini(world);
 }
+
+void Watertight_profile_extrusion(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    test_int(ecs_script_run(world, "arch",
+        "using box.geometry\n"
+        "arch_outline { Path2D: {start: {-0.72, 0.16}, segments: ["
+        "{kind: Line, end: {0.72, 0.16}}, {kind: Line, end: {0.72, 1.5}},"
+        "{kind: CubicBezier, end: {0, 2.22}, control1: {0.72, 1.898}, control2: {0.398, 2.22}},"
+        "{kind: CubicBezier, end: {-0.72, 1.5}, control1: {-0.398, 2.22},"
+        " control2: {-0.72, 1.898}}], closed: true}}\n"
+        "arch { Profile2D: {outer: arch_outline}}\n"
+        "round_outline { Path2D: {start: {1, 0}, segments: ["
+        "{kind: CubicBezier, end: {0, 1}, control1: {1, 0.5523}, control2: {0.5523, 1}},"
+        "{kind: CubicBezier, end: {-1, 0}, control1: {-0.5523, 1}, control2: {-1, 0.5523}},"
+        "{kind: CubicBezier, end: {0, -1}, control1: {-1, -0.5523}, control2: {-0.5523, -1}},"
+        "{kind: CubicBezier, end: {1, 0}, control1: {0.5523, -1}, control2: {1, -0.5523}}"
+        "], closed: true}}\n"
+        "round { Profile2D: {outer: round_outline}}\n", NULL), 0);
+    const char *profiles[2] = { "arch", "round" };
+    ecs_entity_t e = ecs_new(world);
+    char label[96];
+    int32_t failures = 0;
+    for (int32_t p = 0; p < 2; p ++) {
+        for (int32_t smooth = 0; smooth < 2; smooth ++) {
+            ecs_set(world, e, ProfileExtrusion, { .profile = ecs_lookup(world, profiles[p]),
+                .depth = 0.76f, .cap_start = true, .cap_end = true, .smooth = smooth });
+            snprintf(label, sizeof(label), "extrusion %s smooth %d", profiles[p], smooth);
+            failures += !watertight_check(world, e, label);
+        }
+    }
+
+    test_int(failures, 0);
+    ecs_fini(world);
+}

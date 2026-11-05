@@ -1,0 +1,86 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+// A flat and a smooth ProfileExtrusion of the same arched outline with a round hole. The flat
+// one on the left shows the facets of the arch and the hole, the smooth one on the right shades
+// them continuously, while the corners at the foot and the joints between the straight sides
+// and the arch stay sharp on both.
+
+camera {
+  Position: {0, 2.4, 5}
+  Rotation: {-0.3, 0, 0}
+  Camera: {fov: 45}
+}
+
+main_view {
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {28, 34, 45, 255}},
+    shadows: {enabled: true}
+  }
+}
+
+sun {
+  Rotation: {0.5, 2.2, 0}
+  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+}
+
+$ {
+  AmbientLight: {sky: {150, 175, 210}, ground: {65, 60, 55}, intensity: 0.5}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {10, 0.2, 6}
+  Rgb: {95, 100, 110}
+}
+
+arch_outline {
+  Path2D: {
+    start: {-0.8, 0},
+    segments: [
+      {kind: Line, end: {0.8, 0}},
+      {kind: Line, end: {0.8, 1.2}},
+      {kind: CubicBezier, end: {0, 2}, control1: {0.8, 1.642}, control2: {0.442, 2}},
+      {kind: CubicBezier, end: {-0.8, 1.2}, control1: {-0.442, 2}, control2: {-0.8, 1.642}}
+    ],
+    closed: true
+  }
+}
+
+arch_hole {
+  Path2D: {
+    start: {0.4, 1.1},
+    segments: [
+      {kind: CubicBezier, end: {0, 1.5}, control1: {0.4, 1.321}, control2: {0.221, 1.5}},
+      {kind: CubicBezier, end: {-0.4, 1.1}, control1: {-0.221, 1.5}, control2: {-0.4, 1.321}},
+      {kind: CubicBezier, end: {0, 0.7}, control1: {-0.4, 0.879}, control2: {-0.221, 0.7}},
+      {kind: CubicBezier, end: {0.4, 1.1}, control1: {0.221, 0.7}, control2: {0.4, 0.879}}
+    ],
+    closed: true
+  }
+}
+
+arch_profile { Profile2D: {outer: arch_outline, holes: [arch_hole]} }
+
+flat_arch {
+  Position: {-1.2, 0, 0}
+  Rotation: {-1.5707963, 0.9, 0}
+  ProfileExtrusion: {profile: arch_profile, depth: 0.8, cap_start: true, cap_end: true}
+  Rgb: {200, 140, 90}
+  PbrMaterial: {roughness: 0.25}
+}
+
+smooth_arch {
+  Position: {1.2, 0, 0}
+  Rotation: {-1.5707963, 0.9, 0}
+  ProfileExtrusion: {
+    profile: arch_profile, depth: 0.8, cap_start: true, cap_end: true, smooth: true
+  }
+  Rgb: {200, 140, 90}
+  PbrMaterial: {roughness: 0.25}
+}

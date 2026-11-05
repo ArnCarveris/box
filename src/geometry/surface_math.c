@@ -338,6 +338,53 @@ static box_sv surface_boundary(
     return sv_mix(sp(d, offset + first + i), sp(d, offset + next), t - (float)i);
 }
 
+/** Evaluate the side normal of an extrusion on the profile segment at a parameter.
+ *
+ * A flat extrusion has the normal of the segment, a smooth one interpolates the normals of the
+ * profile points along the segment.
+ *
+ * @param d The surface data
+ * @param u The parameter around the profile in [0, 1]
+ * @param inner 1 for the holes, 0 for the outer contour
+ * @return The unit normal, zero for a segment of zero length
+ */
+static box_sv surface_profile_normal(
+    const box_surface_data_t *d,
+    float u,
+    int inner)
+{
+    int offset = (int)sf(d, 5, 0);
+    int count = (int)sf(d, 5, 2);
+    int first = 0;
+    if (inner == 1) {
+        first = count;
+        count = (int)sf(d, 5, 1) - count;
+    }
+
+    float t = u * (float)count;
+    int i = (int)fminf(floorf(t), (float)(count - 1));
+    int next = (int)sf(d, offset + first + i, 3);
+    box_sv a = sp(d, offset + first + i);
+    box_sv b = sp(d, offset + next);
+    box_sv normal = sv(b.y - a.y, 0.0f, a.x - b.x);
+    if (sf(d, 8, 0) > 0.0f) {
+        int normals = (int)sf(d, 8, 0);
+        box_sv from_normal = sv(sf(d, normals + first + i, 2), 0.0f,
+            sf(d, normals + first + i, 3));
+        box_sv to_normal = sv(sf(d, normals + next, 0), 0.0f, sf(d, normals + next, 1));
+        normal = sv_mix(from_normal, to_normal, t - (float)i);
+    }
+
+    box_sv result;
+    if (sv_dot(normal, normal) < 0.000000000001f) {
+        result = normal;
+    } else {
+        result = sv_unit(normal);
+    }
+
+    return result;
+}
+
 /** Analytic sample of a sweep side surface. */
 typedef struct box_sweep_sample {
     box_sv position; /**< Surface position */
@@ -782,6 +829,12 @@ static box_sv surface_normal(
         }
 
         found = true;
+    } else if (sf(d, 0, 0) == 7.0f && region < 2) {
+        box_sv profile_normal = surface_profile_normal(d, u, region);
+        if (sv_dot(profile_normal, profile_normal) >= 0.000000000001f) {
+            result = profile_normal;
+            found = true;
+        }
     } else if (sf(d, 0, 0) == 1.0f && region < 2) {
         box_sweep_sample sample = surface_sweep_sample(d, region, u, v);
         if (sv_dot(sample.normal, sample.normal) >= 0.000000000001f) {

@@ -92,7 +92,7 @@ static box_audio_synth_envelope_t box_audio_synth_envelope(
     return (box_audio_synth_envelope_t){
         .attack = env->attack, .decay = env->decay, .sustain = env->sustain,
         .release = env->release, .hold = env->hold, .curve = env->curve,
-        .attack_curve = env->attack_curve };
+        .attack_curve = env->attack_curve, .key_scale = env->key_scale };
 }
 
 /** Check whether an envelope fits in a pass of the core; NaN, infinite and negative times do
@@ -151,6 +151,7 @@ static void box_audio_synth_layer(
     l->pulse_width = osc->pulse_width;
     l->sub = osc->sub;
     l->sub_octave = osc->sub_octave >= 2 ? 2 : 1;
+    l->sync = osc->sync;
     l->voices = 1;
     if (unison) {
         l->voices = unison->voices > 1 ? (uint32_t)unison->voices : 1;
@@ -193,7 +194,8 @@ static void box_audio_synth_lfo(
         .wave = (uint32_t)lfo->wave, .rate = lfo->rate, .delay = lfo->delay,
         .fade = lfo->fade, .phase = lfo->phase, .random_phase = lfo->random_phase,
         .layer = layer, .pitch = lfo->pitch, .amplitude = lfo->amplitude,
-        .cutoff = lfo->cutoff, .pulse_width = lfo->pulse_width };
+        .cutoff = lfo->cutoff, .pulse_width = lfo->pulse_width,
+        .sync = lfo->sync };
 done:
     return;
 }
@@ -311,6 +313,7 @@ bool box_audio_synth_compile(
         p.slope = (uint32_t)filter->slope;
         p.drive = filter->drive;
         p.filter_velocity = filter->velocity;
+        p.keytrack = filter->keytrack;
     }
 
     if (filter && fenv && fenv->amount != 0) {

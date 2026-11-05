@@ -278,10 +278,16 @@ voices on play, so edits affect subsequent plays.
 | Component | Authoring controls |
 | --- | --- |
 | `SynthSound` | `seed`, `pitch_variance`, `level_variance`; variances default to zero |
+<<<<<<< HEAD
 | `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), modulation controls, `velocity` (0) |
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`; all zero by default |
 | `SynthDrive` | Root: `drive` (0.3, 0..1), `asymmetry` (0, 0..1) |
 | `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves) |
+=======
+| `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), `sync` (0, off, 1..16), modulation controls, `velocity` (0) |
+| `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`, `key_scale`; all zero by default |
+| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves), `keytrack` (0) |
+>>>>>>> 6e076eb2124cdf0712ee4e5b4fca617a48f297ec
 | `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves and `velocity` (0); requires a filter |
 | `SynthUnison` | Per layer: `voices` (3, 1..7), `detune` (10 cents, 0..100), `width` (0, 0..1) |
 | `SynthGlide` | Root: `time` seconds (0, up to 10), `legato` (false), `channel` (0) |
@@ -300,6 +306,15 @@ layer's level and envelope, so it shares them. It is derived from the layer's
 phase: it follows sweeps, glides, legato, pitch LFOs and every unison voice, but
 not phase modulation or feedback. A modulator modulates with its sub included.
 `SynthNoise` and `SynthPluck` ignore it.
+
+`sync` hard syncs a layer, for sync leads and sync sweeps. The layer's note frequency,
+with its sweep, glide, pitch LFOs, unison detune and the voice pitch, is the master;
+the wave plays at the master times `sync`, a ratio from 1 to 16, and restarts at
+phase 0 on every master cycle, so the sound keeps the master's pitch while the ratio
+shapes its timbre. A ratio of 0 or 1 is off. The restart is band limited by a polyBLEP
+sized by the jump, and a polyBLAMP for the slope of triangles and sines. Each unison
+voice syncs to its own detuned master, the sub stays at the master, and phase
+modulation adds to the synced phase. `SynthNoise` and `SynthPluck` ignore it.
 
 A filter envelope uses `cutoff * 2^(amount * envelope_level)`. For example,
 cutoff 300 and amount 3 open to 2400 Hz. Its timing is independent of the amplitude
@@ -370,6 +385,24 @@ the voice as well as its gain, so harder notes can be brighter, not only louder.
 Plays that are not notes, such as `AudioSource`, `box_audio_play`, quantized plays and
 streams, play at velocity 1. Sample voices ignore velocity beyond its gain.
 
+The pitch of a note reaches the voice too, as key tracking on analog synths. The key of
+a voice is `12 * log2(ratio)` semitones, where the ratio is the pitch of its play without
+the `pitch_variance` of `SynthSound`. For an `Instrument` note the ratio is
+`2^((pitch - root) / 12)`, so the key is relative to `Instrument.root`; for any other play
+it is relative to a ratio of 1, the pitch of an `AudioSource` or of `box_audio_play`. Both
+fields default to 0, which leaves the sound as it was:
+
+- `SynthFilter.keytrack`, 0..1, multiplies the cutoff by `ratio^keytrack`, so 1 moves the
+  cutoff 1:1 with the pitch and 0.5 half an octave per octave. It follows the current pitch
+  of the voice: a glide, a change of `AudioSource.pitch` or a legato retarget moves the
+  cutoff along, at the control rate of the LFOs. It adds to the filter envelope, the
+  velocity and the LFOs.
+- `SynthEnvelope.key_scale`, 0..1, multiplies the decay and the release by
+  `2^(-key_scale * key / 12)`, fixed at the start of the note, so at 1 they halve per
+  octave above the root and double per octave below. It applies to the root envelope and
+  to the envelopes of layers, clamped to the limits of an envelope; the filter envelope
+  has no key scaling.
+
 ### Modulation, unison and glide
 
 A child oscillator with `modulation: SynthPhase` or `SynthRing` modulates its
@@ -386,7 +419,10 @@ pan balances their channels rather than narrowing them with distance.
 
 A sound supports two LFOs, on the root, a layer or another root child. Waves include
 sine, triangle, square, rising saw and sample-and-hold. Destinations are `pitch`
-(cents), `amplitude` (0..1), `cutoff` (octaves) and `pulse_width`.
+(cents), `amplitude` (0..1), `cutoff` (octaves), `pulse_width` and `sync`, the
+semitones (-48..48) the ratio of hard sync moves at the top of the wave, clamped to
+1..16. On a layer it syncs that layer, from a ratio of 1 when it has none; on the root
+it moves every layer whose `sync` is over 1.
 Delay and fade bring modulation in gradually. Random phase and noise are seeded,
 so the same sequence of plays is reproducible.
 
@@ -404,7 +440,11 @@ Working examples include [synth_examples.flecs](../test/assets/audio/synth_examp
 [synth_glide.flecs](../test/assets/audio/synth_glide.flecs),
 [synth_pluck.flecs](../test/assets/audio/synth_pluck.flecs),
 [synth_sub.flecs](../test/assets/audio/synth_sub.flecs) and
+<<<<<<< HEAD
 [synth_drive.flecs](../test/assets/audio/synth_drive.flecs).
+=======
+[synth_sync.flecs](../test/assets/audio/synth_sync.flecs).
+>>>>>>> 6e076eb2124cdf0712ee4e5b4fca617a48f297ec
 
 ## Music on the timeline
 
@@ -488,6 +528,24 @@ Stopping or seeking releases sounding gated notes and cancels scheduled starts.
 Seeking does not restart a note that began before the new position. Ungated hits
 already playing ring out. Deleting or disabling tracks or placements releases their
 tracked notes and cancels future starts.
+
+A `Track` can groove its notes instead of playing them quantized. `swing` (0..0.75,
+default 0) works on `swing_grid`: `TrackSwing8` (default, eighths, a step of 0.5
+beat) or `TrackSwing16` (sixteenths, 0.25 beat). Steps are counted from beat 0 of
+the timeline, not of the clip, so clips placed anywhere swing alike. Within each
+pair of steps a start `p` before `step` goes to `p * (1 + swing)`, and one after it
+to `step * (1 + swing) + (p - step) * (1 - swing)`: the off-beat moves later by
+`swing * step` and the downbeats stay put. A note keeps its duration.
+
+`humanize` adds jitter: `timing` (0..50 ms) moves each start by a uniform random
+offset up to that far either way, and `velocity` (a share, 0..1) scales the
+velocity by `1 + r * velocity`, clamped to 0..1. The jitter is seeded from the
+track, the placement, the pass of the clip and the note, so a render is
+deterministic and each loop pass differs. A note never starts before its pass of
+the clip began, or before the frame the transport started or seeked to, and still
+ends where the rules above say. A track with humanized timing schedules its notes
+as much earlier than others as its `timing`, so a note that moves earlier still
+plays on time. Audio clips neither swing nor humanize.
 
 An `AudioClip` has `sound`, `offset` in **seconds**, and `length` in beats. It uses
 `AudioPcm` or `SoundFile`, and needs no instrument. A track can mix note and audio
@@ -621,7 +679,7 @@ The main limits are 64 voices, 64 buses, 64 effects, four inserts and sends per
 bus, eight synth layers, two synth LFOs, seven unison copies per layer and
 32 pluck strings. Effects are algorithmic: no convolution or geometry-derived rooms.
 There is one transport and one music stream per world. There are no automation
-lanes, tempo ramps, swing, time stretching, MIDI I/O, plugins, mixer UI or piano roll.
+lanes, tempo ramps, time stretching, MIDI I/O, plugins, mixer UI or piano roll.
 Scripts can change channel and effect values each frame.
 
 Offline coverage lives in [test/cpu/audio](../test/cpu/audio/); browser and end-to-end
