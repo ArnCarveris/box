@@ -357,6 +357,36 @@ done:
     return;
 }
 
+void box_audio_effect_params_command(
+    box_audio_core_t *core,
+    const box_audio_cmd_effect_params_t *cmd)
+{
+    box_audio_effect_t *fx;
+    int32_t i;
+    if (cmd->slot >= BOX_AUDIO_EFFECT_MAX) {
+        box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_EFFECT_PARAMS, 0);
+        goto done;
+    }
+
+    fx = &core->effects[cmd->slot];
+    if (fx->target_kind == BOX_AUDIO_EFFECT_NONE || fx->target_kind != cmd->kind) {
+        goto done;
+    }
+
+    for (i = 0; i < BOX_AUDIO_EFFECT_PARAMS; i ++) {
+        fx->params[i] = cmd->params[i];
+    }
+
+    if (fx->attached && !fx->entering && fx->target_kind == fx->kind &&
+        fx->bus != BOX_AUDIO_BUS_NONE)
+    {
+        box_audio_effect_kind(fx->kind)->command(core, fx);
+    }
+
+done:
+    return;
+}
+
 void box_audio_effects_order(
     box_audio_core_t *core)
 {

@@ -48,6 +48,7 @@ static inline float box_audio_clean(
 }
 
 #include "svf.h"
+#include "ladder.h"
 #include "saturate.h"
 
 /** A value that moves linearly to its target over a number of frames */
@@ -661,6 +662,9 @@ typedef struct box_audio_synth_source_t {
     box_audio_svf_t svf[2]; /**< The resonant stage, then the stage before it at 24 dB */
     box_audio_svf_t svf_r[2]; /**< The stages of the right channel, when stereo */
     float drive;          /**< Saturation of the filter, 0 (linear) to 1 */
+    int32_t model;        /**< A box_audio_synth_model_t of the filter */
+    box_audio_ladder_coefs_t ladder_coefs; /**< Coefficients of the ladder, when the model */
+    box_audio_ladder_t ladder[2]; /**< The ladder of the left channel, then the right one */
     bool has_drive;       /**< Whether the mix of the layers runs through the drive before the
                            * filter */
     bool drive_dc;        /**< Whether the drive has an asymmetry, so a DC blocker follows it */
@@ -810,6 +814,7 @@ typedef union box_audio_timed_cmd_t {
     box_audio_cmd_set_t set;        /**< BOX_AUDIO_CMD_VOICE_SET or BOX_AUDIO_CMD_BUS_SET */
     box_audio_cmd_voice_release_t release; /**< BOX_AUDIO_CMD_RELEASE */
     box_audio_cmd_legato_t legato;  /**< BOX_AUDIO_CMD_LEGATO */
+    box_audio_cmd_effect_params_t effect; /**< BOX_AUDIO_CMD_EFFECT_PARAMS */
 } box_audio_timed_cmd_t;
 
 /** A command that waits in the schedule for its frame */
@@ -963,6 +968,16 @@ void box_audio_effects_init(
 void box_audio_effect_command(
     box_audio_core_t *core,
     const box_audio_cmd_effect_t *cmd);
+
+/** Apply an effect params command: the parameters of the slot when it holds the kind of the
+ * command, smoothed by the kind.
+ *
+ * @param core The core
+ * @param cmd The command
+ */
+void box_audio_effect_params_command(
+    box_audio_core_t *core,
+    const box_audio_cmd_effect_params_t *cmd);
 
 /** Let the effects that fade out of a bus that left the order fade out into the master
  * instead, after an ORDER command. An effect that stays on such a bus waits with it.

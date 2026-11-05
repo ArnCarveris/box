@@ -1,0 +1,35 @@
+// Automation clips that cannot play, for the Automation suite of test/cpu/audio: each logs one
+// error that names it, once.
+using box.audio
+
+grit {
+  AudioBus: {effects: [grit]}
+  AudioFilter: {cutoff: 1000}
+}
+
+// No member of AudioFilter is called brightness
+prefab unknown_member {
+  AutomationClip: {target: grit, component: AudioFilter, member: "brightness",
+    curve: {keys: [{0, 0}, {4, 1}]}}
+}
+
+// The kind of a filter is not continuous
+prefab not_continuous {
+  AutomationClip: {target: grit, component: AudioFilter, member: "kind",
+    curve: {keys: [{0, 0}, {4, 1}]}}
+}
+
+// The target has no Reverb
+prefab wrong_component {
+  AutomationClip: {target: grit, component: Reverb, member: "mix",
+    curve: {keys: [{0, 0}, {4, 1}]}}
+}
+
+broken {
+  Track: {}
+  a { ClipPlacement: {clip: unknown_member, start: 0} }
+  b { ClipPlacement: {clip: not_continuous, start: 0} }
+  c { ClipPlacement: {clip: wrong_component, start: 0} }
+}
+
+$ { Transport: {tempo: 120} }

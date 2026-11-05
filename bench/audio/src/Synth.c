@@ -2,8 +2,13 @@
  * @file Synth.c
  * @brief Benchmarks for the synth of the audio core: 64 looping synth voices on the master,
  * one item per sample of the output, with the patch of three layers, the same with two LFOs or
+<<<<<<< HEAD
  * one of FM, with curved envelopes, with a driven filter, with subs, hard synced under an
  * LFO, with pink noise, with drift or with the drive of the mix before the filter, 32
+=======
+ * one of FM, with curved envelopes, with a driven filter or the ladder filter, with subs, hard
+ * synced under an LFO, with pink noise or with the drive of the mix before the filter, 32
+>>>>>>> 19bc97c75d2d915bc010a3e9ceb596ea04e3d217
  * voices of a pluck string, steady or under a vibrato, and 8 of a unison pluck of 4.
  *
  * Each iteration renders one quantum of 128 stereo frames, so the time per item is the time
@@ -30,9 +35,14 @@
 /** Extra of bench_synth_core: the noise is pink */
 #define BENCH_PINK 8u
 
+<<<<<<< HEAD
 /** Extra of bench_synth_core: a drift of 15 cents moves the pitch of every layer and the
  * cutoff, and the oscillators start at free phases */
 #define BENCH_DRIFT 16u
+=======
+/** Extra of bench_synth_core: the filter is the transistor ladder */
+#define BENCH_LADDER 16u
+>>>>>>> 19bc97c75d2d915bc010a3e9ceb596ea04e3d217
 
 /** Create a core with 64 looping voices of a patch of three layers: a saw that sweeps up, a
  * square with its own envelope and noise, into a lowpass.
@@ -49,7 +59,11 @@
  * @param lfo Whether two LFOs move the patch
  * @param curved Whether the patch envelope and the envelope of the square are curved
  * @param drive Drive of the filter, 0..1
+<<<<<<< HEAD
  * @param extra BENCH_SUB, BENCH_SYNC, BENCH_PITCH, BENCH_PINK and BENCH_DRIFT, or 0
+=======
+ * @param extra BENCH_SUB, BENCH_SYNC, BENCH_PITCH, BENCH_PINK and BENCH_LADDER, or 0
+>>>>>>> 19bc97c75d2d915bc010a3e9ceb596ea04e3d217
  * @param pre Drive of the mix of the layers before the filter, 0..1, negative for none; its
  *   asymmetry is 0.3
  * @return The core
@@ -100,6 +114,10 @@ static box_audio_core_t* bench_synth_core(
         p.envelope.attack_curve = 1.5f;
         p.layer[1].envelope.curve = 4;
         p.layer[1].envelope.attack_curve = 1.5f;
+    }
+
+    if (extra & BENCH_LADDER) {
+        p.model = BOX_AUDIO_SYNTH_LADDER;
     }
 
     if (extra & BENCH_SUB) {
@@ -259,6 +277,16 @@ void Synth_voices_64_filter_24(
     // audio/synth
     box_audio_core_t *core = bench_synth_core(true, BOX_AUDIO_SYNTH_SLOPE_24, false, false, false,
         0, 0, -1);
+    bench_synth_render(b, core);
+    box_audio_core_free(core);
+}
+
+void Synth_voices_64_ladder(
+    bench_t *b)
+{
+    // audio/synth
+    box_audio_core_t *core = bench_synth_core(true, BOX_AUDIO_SYNTH_SLOPE_24, false, false, false,
+        0, BENCH_LADDER, -1);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }

@@ -153,6 +153,10 @@ static void box_audio_synth_patch_clamp(
         p->slope = BOX_AUDIO_SYNTH_SLOPE_12;
     }
 
+    if (p->model > BOX_AUDIO_SYNTH_LADDER) {
+        p->model = BOX_AUDIO_SYNTH_SVF;
+    }
+
     p->filter_amount = p->filter_amount == p->filter_amount ? box_audio_synth_clamp(
         p->filter_amount, -BOX_AUDIO_SYNTH_OCTAVES_MAX, BOX_AUDIO_SYNTH_OCTAVES_MAX) : 0.0f;
     box_audio_synth_envelope_clamp(&p->filter_envelope);

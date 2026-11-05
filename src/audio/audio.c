@@ -555,6 +555,25 @@ static void box_audio_audio_clip_ctor(
     }
 }
 
+/** Construct AutomationClip values: no target, 4 beats long, without keys.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_automation_clip_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    AutomationClip *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (AutomationClip){ .length = 4.0f };
+    }
+}
+
 /** Construct Track values: no instrument, at priority 1, above the one shots.
  *
  * @param ptr The components
@@ -1040,6 +1059,7 @@ static void box_audio_module_free(
     (void)world;
     ecs_os_free(state->writer.data);
     ecs_map_fini(&state->voices);
+    ecs_map_fini(&state->spread_notes);
     ecs_vec_fini_t(NULL, &state->oneshots, box_audio_oneshot_t);
     ecs_vec_fini_t(NULL, &state->plays, box_audio_play_t);
     ecs_vec_fini_t(NULL, &state->notes, box_audio_note_t);
@@ -1049,6 +1069,7 @@ static void box_audio_module_free(
     ecs_vec_fini_t(NULL, &state->moved, ecs_entity_t);
     box_audio_sample_fini(state);
     box_audio_sequencer_fini(state);
+    box_audio_automation_fini(state);
     box_audio_timeline_fini(state);
     ecs_os_free(state->capture.path);
     ecs_os_free(state);
@@ -1129,6 +1150,7 @@ void BoxAudioImport(
     ECS_IMPORT(world, BoxTransform);
     ECS_IMPORT(world, BoxView);
     ECS_IMPORT(world, BoxJobs);
+    ECS_IMPORT(world, BoxCurve);
 
     ECS_META_COMPONENT(world, AudioState);
     ECS_META_COMPONENT(world, AudioChannelKind);
@@ -1165,6 +1187,7 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, SynthWave);
     ECS_META_COMPONENT(world, SynthFilterKind);
     ECS_META_COMPONENT(world, SynthFilterSlope);
+    ECS_META_COMPONENT(world, SynthFilterModel);
     ECS_META_COMPONENT(world, SynthModulation);
     ECS_META_COMPONENT(world, SynthNoiseColor);
     ECS_META_COMPONENT(world, SynthOscillator);
@@ -1207,6 +1230,7 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, Transport);
     ECS_META_COMPONENT(world, AudioQuantize);
     ecs_set_hooks(world, Transport, { .ctor = box_audio_transport_ctor });
+    ECS_META_COMPONENT(world, InstrumentSpreadMode);
     ECS_META_COMPONENT(world, Instrument);
     ecs_set_hooks(world, Instrument, { .ctor = box_audio_instrument_ctor });
     ECS_META_COMPONENT(world, Note);
@@ -1216,6 +1240,10 @@ void BoxAudioImport(
     ecs_set_hooks(world, NoteClip, { .ctor = box_audio_note_clip_ctor });
     ECS_META_COMPONENT(world, AudioClip);
     ecs_set_hooks(world, AudioClip, { .ctor = box_audio_audio_clip_ctor });
+    ECS_META_COMPONENT(world, AutomationClip);
+    box_owned_hooks(world, AutomationClip, BOX_OWNED_STR(AutomationClip, member),
+        BOX_OWNED_CURVE(AutomationClip, curve));
+    ecs_set_hooks(world, AutomationClip, { .ctor = box_audio_automation_clip_ctor });
     ECS_META_COMPONENT(world, TrackSwingGrid);
     ECS_META_COMPONENT(world, TrackHumanize);
     ECS_META_COMPONENT(world, Track);
@@ -1272,6 +1300,7 @@ void BoxAudioImport(
     state->master = master;
     ecs_os_memset(state->keys, BOX_AUDIO_BUS_NONE, ECS_SIZEOF(state->keys));
     ecs_map_init(&state->voices, NULL);
+    ecs_map_init(&state->spread_notes, NULL);
     ecs_vec_init_t(NULL, &state->oneshots, box_audio_oneshot_t, 0);
     ecs_vec_init_t(NULL, &state->plays, box_audio_play_t, 0);
     ecs_vec_init_t(NULL, &state->notes, box_audio_note_t, 0);
@@ -1286,7 +1315,9 @@ void BoxAudioImport(
     box_audio_sync_init(world, state);
     box_audio_sample_init(world, state);
     box_audio_music_init(world, state);
+    box_audio_instrument_init(world, state);
     box_audio_synth_init(world);
     box_audio_sequencer_init(world, state);
+    box_audio_automation_init(world, state);
     box_audio_functions_init(world);
 }

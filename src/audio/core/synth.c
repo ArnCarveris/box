@@ -2,7 +2,7 @@
  * @file audio/core/synth.c
  * @brief The synth source: band limited oscillators and seeded noise, each with a linear or
  * curved envelope, mixed, optionally driven through the oversampled soft clipper of saturate.h,
- * into a state variable filter of one or two stages, whose cutoff an
+ * into a state variable filter of one or two stages or a transistor ladder, whose cutoff an
  * envelope may move, and an amp, rendered per frame from a copy of the patch. A change of the
  * pitch glides exponentially in frequency over the glide of the patch, and a legato play
  * retargets the layers of a voice without a restart of its envelopes. A layer may play as
@@ -471,8 +471,8 @@ static inline float box_audio_synth_env_next(
 }
 
 /** Set the coefficients of the stages of the filter from its cutoff: g = tan(pi cutoff / rate)
- * of the trapezoidal state variable filter, which stays stable at any cutoff and while it
- * moves. Each stage is stable on its own, so their cascade is too.
+ * of the trapezoidal state variable filter, or of the ladder, which stay stable at any cutoff
+ * and while it moves. Each stage is stable on its own, so their cascade is too.
  *
  * @param src The source
  * @param rate Frames per second
@@ -483,13 +483,17 @@ static void box_audio_synth_coefs(
 {
     float g = box_audio_svf_g(src->cutoff, rate);
     int32_t s;
-    for (s = 0; s < src->stages; s ++) {
-        box_audio_svf_t *f = &src->svf[s];
-        box_audio_svf_coefs(f, g);
-        if (src->stereo) {
-            src->svf_r[s].a1 = f->a1;
-            src->svf_r[s].a2 = f->a2;
-            src->svf_r[s].a3 = f->a3;
+    if (src->model == BOX_AUDIO_SYNTH_LADDER) {
+        src->ladder_coefs.g = g;
+    } else {
+        for (s = 0; s < src->stages; s ++) {
+            box_audio_svf_t *f = &src->svf[s];
+            box_audio_svf_coefs(f, g);
+            if (src->stereo) {
+                src->svf_r[s].a1 = f->a1;
+                src->svf_r[s].a2 = f->a2;
+                src->svf_r[s].a3 = f->a3;
+            }
         }
     }
 }
@@ -1750,6 +1754,13 @@ void box_audio_source_synth(
     src->drive = p->drive;
     src->svf_r[0] = src->svf[0];
     src->svf_r[1] = src->svf[1];
+    src->model = src->filter && src->filter <= BOX_AUDIO_SYNTH_NOTCH ?
+        (int32_t)p->model : BOX_AUDIO_SYNTH_SVF;
+    if (src->model == BOX_AUDIO_SYNTH_LADDER) {
+        box_audio_ladder_init(&src->ladder_coefs, src->ladder, src->filter, p->slope,
+            p->resonance, p->drive);
+    }
+
     src->has_drive = p->has_drive != 0;
     if (src->has_drive) {
         box_audio_synth_drive_start(src, &slot->drive, p->pre_asymmetry > 0, core->sample_rate);
@@ -3079,7 +3090,13 @@ static int32_t box_audio_synth_render_wide(
             }
         }
 
-        if (src->filter) {
+        if (src->filter && src->model == BOX_AUDIO_SYNTH_LADDER) {
+            box_audio_synth_control(src, rate);
+            l = box_audio_ladder_next(&src->ladder[0], &src->ladder_coefs, l);
+            if (stereo) {
+                r = box_audio_ladder_next(&src->ladder[1], &src->ladder_coefs, r);
+            }
+        } else if (src->filter) {
             box_audio_synth_control(src, rate);
             if (src->stages > 1) {
                 l = box_audio_svf_drive(&src->svf[1], src->filter, l, src->drive);
@@ -3182,12 +3199,16 @@ int32_t box_audio_synth_render(
                 }
             }
 
-            y = mix;
-            if (src->stages > 1) {
-                y = box_audio_svf_drive(&src->svf[1], src->filter, y, src->drive);
-            }
+            if (src->model == BOX_AUDIO_SYNTH_LADDER) {
+                y = box_audio_ladder_next(&src->ladder[0], &src->ladder_coefs, mix);
+            } else {
+                y = mix;
+                if (src->stages > 1) {
+                    y = box_audio_svf_drive(&src->svf[1], src->filter, y, src->drive);
+                }
 
-            y = box_audio_svf_drive(&src->svf[0], src->filter, y, src->drive);
+                y = box_audio_svf_drive(&src->svf[0], src->filter, y, src->drive);
+            }
         } else {
             y = mix;
         }

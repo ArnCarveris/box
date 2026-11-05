@@ -64,6 +64,7 @@
                     "voices_64",
                     "voices_64_filter_envelope",
                     "voices_64_filter_24",
+                    "voices_64_ladder",
                     "voices_64_drive",
                     "voices_64_pre_drive",
                     "voices_64_filter_24_drive",

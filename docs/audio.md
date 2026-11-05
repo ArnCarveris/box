@@ -293,7 +293,7 @@ voices on play, so edits affect subsequent plays.
 | `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), `sync` (0, off, 1..16), `color` (`SynthNoiseWhite`), modulation controls, `velocity` (0) |
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`, `key_scale`; all zero by default |
 | `SynthDrive` | Root: `drive` (0.3, 0..1), `asymmetry` (0, 0..1) |
-| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves), `keytrack` (0) |
+| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves), `keytrack` (0), `model` (`SynthFilterSvf` or `SynthFilterLadder`) |
 | `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves and `velocity` (0); requires a filter |
 | `SynthPitchEnvelope` | `amount` (0 semitones, -48..48), `decay` seconds, `curve` (0, -16..16), `release_amount` (0 semitones, -48..48), `sync` (0 semitones, -48..48) |
 | `SynthUnison` | Per layer: `voices` (3, 1..7), `detune` (10 cents, 0..100), `width` (0, 0..1) |
@@ -371,6 +371,32 @@ In the `Synth` bench of [bench/audio](../bench/audio/) (64 voices, 48 kHz, one
 128-frame quantum), drive raises a 12 dB filter from about 75 to 115 µs and a 24 dB
 filter with an envelope from about 125 to 170 µs: roughly 4 ns per stage and frame of
 a voice.
+
+`model: SynthFilterLadder` swaps the state variable filter for a transistor ladder:
+four one-pole stages with a tanh in each stage and in the feedback loop, solved with
+zero delay feedback, so it stays in tune up to the clamp of the cutoff under Nyquist
+without oversampling. `SynthSlope24` is the fat 4-pole lowpass and `SynthSlope12` its
+2-pole tap; `SynthHighPass`, `SynthBandPass` and `SynthNotch` mix the poles as a
+multimode ladder does. Resonance 1 self-oscillates: with no input, after a pluck, it
+rings as a near sine at the cutoff at a steady level, so the cutoff envelope, the LFOs
+and keytrack can play it as an oscillator. A ladder loses its bass as the resonance
+rises; the lowpass adds a share of its input to the feedback sum, which keeps the
+passband within about 2 dB of resonance 0. `drive` is the gain into the ladder, from
+-6 dB at 0 to +12 dB at 1, the output scaled back, so higher drives saturate the stages
+sooner. On the stereo path both channels run their own ladder.
+In the `Synth` bench (`voices_64_ladder`, 64 voices, 48 kHz, a 24 dB lowpass with an
+envelope) the ladder costs about 245 µs per 128-frame quantum against about 145 µs for
+the 24 dB state variable filter in the same run: about 12 ns more per voice and frame.
+
+```
+prefab Acid {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.002, decay: 0.2, sustain: 0.5, hold: 0.2, release: 0.1}
+  SynthFilter: {cutoff: 400, resonance: 0.85, slope: SynthSlope24, model: SynthFilterLadder}
+  SynthFilterEnvelope: {decay: 0.2, sustain: 0, amount: 3}
+  SynthOscillator: {wave: SynthSaw, frequency: 55, level: 0.6}
+}
+```
 
 `SynthDrive` on the root drives the mix of the layers of each voice through a tanh
 soft clipper before the filter, or before the amp without a filter: the stage where
@@ -530,13 +556,23 @@ sampler over `release` seconds (0.05). With gate false, a hit plays as authored,
 regardless of duration. A nonlooping sample can end before its gate. Sampler notes
 start without the usual 5 ms fade to preserve transients.
 
+`spread` (0..1, default 0) spreads the notes of a synth or a sampler over the
+stereo field without a pan per note. Its offset is added to the note's `pan` and
+the sum is clamped to -1..1. `spread_mode` picks the offset:
+
+| Spread mode | Offset |
+| --- | --- |
+| `InstrumentSpreadPitch` (default) | `spread * clamp((pitch - root) / 24, -1, 1)`: low notes left, high notes right, full two octaves from the root |
+| `InstrumentSpreadRandom` | `spread` times a random value in -1..1 per note, seeded from the instrument and its note count, so a song renders the same every time |
+| `InstrumentSpreadAlternate` | `+spread` and `-spread` on successive notes |
+
 A `NoteClip` has a `length` (4 beats) and notes with `start`, `duration`, `pitch`,
 `velocity` (1) and `pan` (0). A `Track` supplies the instrument and brings an
 `AudioBus`. Its child `ClipPlacement` entities arrange clips:
 
 | Placement field | Meaning and default |
 | --- | --- |
-| `clip` | Reusable `NoteClip` or `AudioClip` |
+| `clip` | Reusable `NoteClip`, `AudioClip` or `AutomationClip` |
 | `start` | Beat on the timeline |
 | `duration` | 0 uses clip length minus placement offset |
 | `loop` | False; true repeats passes until duration ends |
@@ -604,6 +640,70 @@ placements. Placement offsets remain in beats; transpose changes pitch and speed
 together. Audio is not stretched to tempo. Each looping pass starts a new voice;
 its seam uses the 5 ms stop fade. A seek or start within an audio placement resumes
 inside the relevant pass, unlike note clips.
+
+### Automation
+
+An `AutomationClip` moves one float member of a bus or an effect over beats: a
+filter sweep, a send that opens for a chorus, the fade of a track. It is placed
+with a `ClipPlacement` on a `Track` like any clip; `start`, `duration`, `offset`
+and `loop` work the same, `gain` and `transpose` are ignored, and a track of only
+automation needs no instrument.
+
+| Field | Meaning and default |
+| --- | --- |
+| `target` | The entity with the `AudioBus` or the effect component |
+| `component` | `AudioBus` or an effect component, such as `AudioFilter` |
+| `member` | Path of a float member: `cutoff`, `volume`, `sends[1].level`, `bands[2].gain` |
+| `length` | Beats of a pass, 4 |
+| `curve` | A [Curve](curves.md): time in beats from the clip start, value in member units |
+
+```flecs
+using box.audio
+
+synth {
+  AudioBus: {effects: [synth]}
+  AudioFilter: {cutoff: 1000}
+}
+
+prefab sweep {
+  AutomationClip: {target: synth, component: AudioFilter, member: "cutoff",
+    curve: {kind: CurveCatmullRom, keys: [{0, 200}, {2, 1200}, {4, 5000}]}}
+}
+
+lanes {
+  Track: {}
+  rise { ClipPlacement: {clip: sweep, start: 16, duration: 16, loop: true} }
+}
+```
+
+An `AudioBus` automates `volume`, `pan`, `width` and the `level` of its sends; the
+master automates its `volume`, `pan` and `width`. An effect automates every float
+member of its effect component: Reverb, Equalizer bands, AudioFilter, Compressor,
+Gate, Delay, Phaser, Chorus, Saturator and later effects. Kinds, slopes, stages,
+voices, entities and bools are not continuous and not automatable. A clip whose
+target, component or member is unknown or not automatable logs one error that
+names it and does nothing until it changes.
+
+While the transport plays, each lane samples its curve within the lookahead window
+every 10 ms of output and at its keys, and schedules every value at its frame. A
+bus ramps to each value as it does to any set. An effect gets a copy of its
+component with the automated members written, through the same parameter builder as
+any change of the component, and smooths the step over its usual 10 to 20 ms.
+Several lanes may move members of one effect; on one bus parameter the lane that
+starts last wins. At a loop wrap the lanes go on from `loop_start`. A seek, a stop
+and a change of the clip, the placement, the track or the component of the target
+cancel what was scheduled ahead and schedule again.
+
+The automation owns what the output hears, never the component. Game code reads
+and writes the authored value, which the automation does not change. Where no lane
+covers a target, and while the transport is stopped, the output has the value of
+the component: the end of a placement and a stop send it again. A write of the
+component while a lane runs applies at once and holds until the next value of the
+lane, at most 10 ms later. Scheduled values travel as `BUS_SET` and
+`EFFECT_PARAMS` commands with a frame, and a `CANCEL` command drops them; see
+[core.h](../src/audio/core/core.h).
+[automation.flecs](../test/assets/audio/automation.flecs) sweeps a filter, fades a
+track and opens a send.
 
 For a complete mixed song with samples, returns, ducking and a quantized game
 stinger, see [song.flecs](../test/assets/audio/song.flecs). Wait for its sound files
@@ -719,7 +819,7 @@ other writers send 1. The velocity makes a play command 48 bytes and a legato co
 a writer buffer of a given size holds fewer of them than before.
 
 The core owns a 64-bit rendered-frame clock. Scheduled play, stop, voice/bus set,
-release and legato commands carry a frame time. Future commands wait in a fixed
+release, legato and effect params commands carry a frame time. Future commands wait in a fixed
 4096-entry schedule; a full schedule applies the command immediately and reports
 `BOX_AUDIO_EVENT_LATE`. Immediate stops also cancel scheduled commands for their
 voice handle. Sound memory is freed by its owner after `SOUND_FREE`, which is
@@ -729,8 +829,8 @@ and [transport.h](../src/audio/transport.h) for the low-level APIs.
 The main limits are 64 voices, 64 buses, 64 effects, four inserts and sends per
 bus, eight synth layers, two synth LFOs, seven unison copies per layer and
 32 pluck strings. Effects are algorithmic: no convolution or geometry-derived rooms.
-There is one transport and one music stream per world. There are no automation
-lanes, tempo ramps, time stretching, MIDI I/O, plugins, mixer UI or piano roll.
+There is one transport and one music stream per world. There are no tempo ramps,
+time stretching, MIDI I/O, plugins, mixer UI or piano roll.
 Scripts can change channel and effect values each frame.
 
 Offline coverage lives in [test/cpu/audio](../test/cpu/audio/); browser and end-to-end

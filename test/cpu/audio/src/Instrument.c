@@ -7,6 +7,7 @@
 #include "world.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 /** Frames of a millisecond at AUDIO_RATE */
 #define INSTRUMENT_MS 48
@@ -766,4 +767,218 @@ void Instrument_stop_cancels_release(void) {
     box_audio_core_apply(core, w.data, w.size);
     test_int(box_audio_core_scheduled(core), 0);
     box_audio_core_free(core);
+}
+
+/** Play a sampler note of an instrument and get the pan it played at.
+ *
+ * @param world The world
+ * @param inst The instrument
+ * @param pitch MIDI note number
+ * @param pan Pan of the note
+ * @return The pan of its play
+ */
+static float instrument_spread_pan(
+    ecs_world_t *world,
+    ecs_entity_t inst,
+    float pitch,
+    float pan)
+{
+    box_audio_module_t *state = box_audio_module_get(world);
+    uint64_t start = box_audio_module_clock(world) + 1600;
+    const box_audio_oneshot_t *shot;
+    test_assert(box_audio_instrument_note(world, state, inst, pitch, 0.5f, pan, start,
+        start + 4800, 0, 0) != 0);
+    shot = ecs_vec_last_t(&state->oneshots, box_audio_oneshot_t);
+    test_assert(shot != NULL);
+
+    return shot->sent_pan;
+}
+
+/** Create a sampler instrument with root 60 and a spread.
+ *
+ * @param world The world
+ * @param spread The spread
+ * @param mode The spread mode
+ * @return The instrument
+ */
+static ecs_entity_t instrument_spread_new(
+    ecs_world_t *world,
+    float spread,
+    InstrumentSpreadMode mode)
+{
+    ecs_entity_t sound = audio_dc(world, NULL, 1.0f, AUDIO_RATE * 2);
+    ecs_entity_t e = instrument_new(world, sound, 60, true, 0.05f);
+    Instrument *inst = ecs_ensure(world, e, Instrument);
+    inst->spread = spread;
+    inst->spread_mode = mode;
+    ecs_modified(world, e, Instrument);
+
+    return e;
+}
+
+/** A new Instrument does not spread, in pitch mode. */
+void Instrument_spread_defaults(void) {
+    // audio/instrument
+    ecs_world_t *world = audio_world();
+    ecs_entity_t e = ecs_new(world);
+    const Instrument *inst;
+    ecs_add(world, e, Instrument);
+    inst = ecs_get(world, e, Instrument);
+    test_assert(inst != NULL);
+    test_flt(inst->spread, 0);
+    test_int(inst->spread_mode, InstrumentSpreadPitch);
+    ecs_fini(world);
+}
+
+/** With spread 1 in pitch mode a note two octaves above the root plays fully right, one at the
+ * root at its own pan, one an octave below halfway left, and the offset stops at two octaves. */
+void Instrument_spread_pitch(void) {
+    // audio/instrument
+    ecs_world_t *world = audio_world();
+    ecs_entity_t inst = instrument_spread_new(world, 1, InstrumentSpreadPitch);
+    audio_run(world, 1);
+    test_flt(instrument_spread_pan(world, inst, 84, 0), 1);
+    test_flt(instrument_spread_pan(world, inst, 60, 0.25f), 0.25f);
+    test_flt(instrument_spread_pan(world, inst, 60, 0), 0);
+    test_flt(instrument_spread_pan(world, inst, 48, 0), -0.5f);
+    test_flt(instrument_spread_pan(world, inst, 66, 0), 0.25f);
+    test_flt(instrument_spread_pan(world, inst, 12, 0), -1);
+
+    ecs_ensure(world, inst, Instrument)->spread = 0.5f;
+    ecs_modified(world, inst, Instrument);
+    test_flt(instrument_spread_pan(world, inst, 84, 0), 0.5f);
+    test_flt(instrument_spread_pan(world, inst, 108, 0), 0.5f);
+    test_flt(instrument_spread_pan(world, inst, 36, 0.25f), -0.25f);
+    ecs_fini(world);
+}
+
+/** A note two octaves above the root with spread 1 in pitch mode sounds only on the right
+ * channel. */
+void Instrument_spread_pitch_render(void) {
+    // audio/instrument
+    ecs_world_t *world = audio_world();
+    ecs_entity_t inst = instrument_spread_new(world, 1, InstrumentSpreadPitch);
+    audio_run(world, 1);
+    test_flt(instrument_spread_pan(world, inst, 84, 0), 1);
+    audio_run(world, 4);
+    test_flt(audio_level(AUDIO_FRAME), 0);
+    test_assert(fabsf(audio_level_right(AUDIO_FRAME) - 0.25f * 1.41421356f) < 1e-4f);
+    ecs_fini(world);
+}
+
+/** Alternate puts successive notes on either side, whatever their pitch. */
+void Instrument_spread_alternate(void) {
+    // audio/instrument
+    ecs_world_t *world = audio_world();
+    ecs_entity_t inst = instrument_spread_new(world, 0.5f, InstrumentSpreadAlternate);
+    audio_run(world, 1);
+    test_flt(instrument_spread_pan(world, inst, 60, 0), 0.5f);
+    test_flt(instrument_spread_pan(world, inst, 72, 0), -0.5f);
+    test_flt(instrument_spread_pan(world, inst, 48, 0), 0.5f);
+    test_flt(instrument_spread_pan(world, inst, 60, 0.25f), -0.25f);
+    test_flt(instrument_spread_pan(world, inst, 60, 0), 0.5f);
+    ecs_fini(world);
+}
+
+/** Play the same notes on a random spread in a new world.
+ *
+ * @param pans The pans of the 16 notes
+ */
+static void instrument_spread_random_run(
+    float *pans)
+{
+    ecs_world_t *world = audio_world();
+    ecs_entity_t inst = instrument_spread_new(world, 1, InstrumentSpreadRandom);
+    int32_t i;
+    audio_run(world, 1);
+    for (i = 0; i < 16; i ++) {
+        pans[i] = instrument_spread_pan(world, inst, 60, 0);
+        if (i % 4 == 3) {
+            audio_run(world, 20);
+        }
+    }
+
+    ecs_fini(world);
+}
+
+/** Random gives the same pans over two runs of the same notes, different ones between the
+ * notes, all in -1..1. */
+void Instrument_spread_random(void) {
+    // audio/instrument
+    float a[16], b[16];
+    int32_t i, j, distinct = 0;
+    instrument_spread_random_run(a);
+    instrument_spread_random_run(b);
+    for (i = 0; i < 16; i ++) {
+        printf("note %d: pan %f\n", i, (double)a[i]);
+        test_assert(a[i] == b[i]);
+        test_assert(a[i] >= -1 && a[i] <= 1);
+        for (j = 0; j < i; j ++) {
+            if (a[j] == a[i]) {
+                break;
+            }
+        }
+
+        distinct += j == i;
+    }
+
+    test_int(distinct, 16);
+}
+
+/** Spread 0 plays every note at exactly its own pan in every mode. */
+void Instrument_spread_zero(void) {
+    // audio/instrument
+    ecs_world_t *world = audio_world();
+    ecs_entity_t pitch = instrument_spread_new(world, 0, InstrumentSpreadPitch);
+    ecs_entity_t random = instrument_spread_new(world, 0, InstrumentSpreadRandom);
+    ecs_entity_t alternate = instrument_spread_new(world, 0, InstrumentSpreadAlternate);
+    const float pans[] = { 0, 0.3f, -0.7f, 1, -1, 0.123456f };
+    const float pitches[] = { 60, 84, 30, 99, 61.5f, 48 };
+    float p;
+    int32_t i;
+    audio_run(world, 1);
+    for (i = 0; i < 6; i ++) {
+        p = instrument_spread_pan(world, pitch, pitches[i], pans[i]);
+        test_assert(memcmp(&p, &pans[i], sizeof(float)) == 0);
+        p = instrument_spread_pan(world, random, pitches[i], pans[i]);
+        test_assert(memcmp(&p, &pans[i], sizeof(float)) == 0);
+        p = instrument_spread_pan(world, alternate, pitches[i], pans[i]);
+        test_assert(memcmp(&p, &pans[i], sizeof(float)) == 0);
+    }
+
+    ecs_fini(world);
+}
+
+/** The sum of the spread and the pan of a note is clamped to -1..1. */
+void Instrument_spread_clamped(void) {
+    // audio/instrument
+    ecs_world_t *world = audio_world();
+    ecs_entity_t pitch = instrument_spread_new(world, 1, InstrumentSpreadPitch);
+    ecs_entity_t alternate = instrument_spread_new(world, 1, InstrumentSpreadAlternate);
+    audio_run(world, 1);
+    test_flt(instrument_spread_pan(world, pitch, 84, 0.5f), 1);
+    test_flt(instrument_spread_pan(world, pitch, 36, -0.5f), -1);
+    test_flt(instrument_spread_pan(world, pitch, 72, -1), -0.5f);
+    test_flt(instrument_spread_pan(world, alternate, 60, 0.75f), 1);
+    test_flt(instrument_spread_pan(world, alternate, 60, -0.75f), -1);
+    test_flt(instrument_spread_pan(world, alternate, 60, -0.75f), 0.25f);
+
+    ecs_ensure(world, pitch, Instrument)->spread = 4;
+    ecs_modified(world, pitch, Instrument);
+    test_flt(instrument_spread_pan(world, pitch, 66, 0), 0.25f);
+    ecs_fini(world);
+}
+
+/** A deleted instrument drops the count of its notes. */
+void Instrument_spread_removed(void) {
+    // audio/instrument
+    ecs_world_t *world = audio_world();
+    box_audio_module_t *state = box_audio_module_get(world);
+    ecs_entity_t e = instrument_spread_new(world, 1, InstrumentSpreadAlternate);
+    audio_run(world, 1);
+    test_flt(instrument_spread_pan(world, e, 60, 0), 1);
+    test_assert(ecs_map_get(&state->spread_notes, e) != NULL);
+    ecs_delete(world, e);
+    test_assert(ecs_map_get(&state->spread_notes, e) == NULL);
+    ecs_fini(world);
 }
