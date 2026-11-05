@@ -653,7 +653,6 @@ void NoAlloc_modulation(void) {
     }
 }
 
-<<<<<<< HEAD
 /* Saturators in the insert slots of buses: changes of the drive, the asymmetry, the bits and
  * the mix while they run, moves to another bus and slot, the reduction read, tails that decay
  * to silence and start again, and a removal, without a call of the allocator. */
@@ -727,8 +726,12 @@ void NoAlloc_saturator(void) {
     for (i = 0; i < 3; i ++) {
         test_assert(!box_audio_core_effect_running(core, i));
     }
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+}
 
-=======
 /* Voices of a patch with subs, on a mono layer, a wide unison layer and a modulator with
  * feedback, under a glide and an LFO, render without a call of the allocator. */
 void NoAlloc_synth_sub(void) {
@@ -767,7 +770,6 @@ void NoAlloc_synth_sub(void) {
 
     audio_render(core, 0, AUDIO_FRAMES / 2);
     test_assert(box_audio_core_voice_count(core) > 0);
->>>>>>> c8fedb20432fab371766e2c7e36a2a7f0ad21e93
     test_int(noalloc_allocs, 1);
     test_int(noalloc_frees, 0);
     box_audio_core_free(core);

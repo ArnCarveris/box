@@ -221,11 +221,8 @@
                     "dynamics",
                     "delay",
                     "modulation",
-<<<<<<< HEAD
-                    "saturator"
-=======
+                    "saturator",
                     "synth_sub"
->>>>>>> c8fedb20432fab371766e2c7e36a2a7f0ad21e93
                 ]
             },
             {
@@ -571,7 +568,6 @@
                 ]
             },
             {
-<<<<<<< HEAD
                 "id": "Saturator",
                 "testcases": [
                     "harmonics",
@@ -585,7 +581,9 @@
                     "silent_after_tail",
                     "component",
                     "script"
-=======
+                ]
+            },
+            {
                 "id": "SynthDrive",
                 "testcases": [
                     "resonance_bounded",
@@ -594,7 +592,6 @@
                     "harmonics",
                     "slope_24",
                     "wide"
->>>>>>> c8fedb20432fab371766e2c7e36a2a7f0ad21e93
                 ]
             },
             {
