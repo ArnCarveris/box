@@ -584,19 +584,12 @@ pan balances their channels rather than narrowing them with distance.
 
 A sound supports two LFOs, on the root, a layer or another root child. Waves include
 sine, triangle, square, rising saw and sample-and-hold. Destinations are `pitch`
-<<<<<<< HEAD
-(cents), `amplitude` (0..1), `cutoff` (octaves), `pulse_width` and `hard_sync`, the
-semitones (-48..48) the ratio of hard sync moves at the top of the wave, clamped to
-1..16. On a layer it syncs that layer, from a ratio of 1 when it has none; on the root
-it moves every layer whose oscillator `sync` is over 1.
-=======
 (cents), `amplitude` (0..1), `cutoff` (octaves), `vowel` (vowels of a `SynthFormant`
-filter, -4..4), `pulse_width`, `sync`, the
+filter, -4..4), `pulse_width`, `hard_sync`, the
 semitones (-48..48) the ratio of hard sync moves at the top of the wave, clamped to
 1..16, and `position`, the frames (-256..256) the position of wavetable layers moves.
-On a layer `sync` syncs that layer, from a ratio of 1 when it has none; on the root
-it moves every layer whose `sync` is over 1.
->>>>>>> 54ffad9f4be74064a408eb640297be7cf6872114
+On a layer `hard_sync` syncs that layer, from a ratio of 1 when it has none; on the root
+it moves every layer whose oscillator `sync` is over 1.
 Delay and fade bring modulation in gradually. Random phase and noise are seeded,
 so the same sequence of plays is reproducible.
 

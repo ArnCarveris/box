@@ -859,7 +859,12 @@ ECS_STRUCT(SynthLfo, {
                             *   to 1..16. On a layer it syncs that layer, from a ratio of 1
                             *   when it has none; on the root it moves every layer with a
                             *   ratio over 1 */
-<<<<<<< HEAD
+    float vowel;           /**< Vowels of the SynthFormant filter at the top of the wave,
+                            *   -4..4, default 0; the moved vowel is clamped to 0..4. Of the
+                            *   sound on a layer too, as the cutoff */
+    float position;        /**< Frames the position of SynthWavetable layers moves by at the
+                            *   top of the wave, -256..256, default 0; the moved position is
+                            *   clamped to the frames of the table */
     float sync;            /**< Cycle in beats of the Transport, 0..256, default 0 for rate.
                             *   When positive it wins over rate, like Delay.sync: a beat is a
                             *   quarter note at the tempo of the Transport, 120 without one,
@@ -869,14 +874,6 @@ ECS_STRUCT(SynthLfo, {
                             *   the same phase of the grid. A voice keeps the tempo it started
                             *   at: a tempo change applies to the next notes. Delay and fade
                             *   stay in seconds; SynthLfoRandom steps once per cycle */
-=======
-    float vowel;           /**< Vowels of the SynthFormant filter at the top of the wave,
-                            *   -4..4, default 0; the moved vowel is clamped to 0..4. Of the
-                            *   sound on a layer too, as the cutoff */
-    float position;        /**< Frames the position of SynthWavetable layers moves by at the
-                            *   top of the wave, -256..256, default 0; the moved position is
-                            *   clamped to the frames of the table */
->>>>>>> 54ffad9f4be74064a408eb640297be7cf6872114
 });
 
 /** A sound made by the synth from the components of this entity and its children, without a

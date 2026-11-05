@@ -1037,17 +1037,14 @@ typedef struct box_audio_synth_lfo_t {
     float hard_sync;        /**< Semitones the ratio of hard sync moves by at the top of the
                              * wave, -BOX_AUDIO_SYNTH_SYNC_SEMITONES..max; on a layer it syncs
                              * it, for every layer only those with a ratio over 1 */
-<<<<<<< HEAD
-    float sync;             /**< Cycle in beats, 0..BOX_AUDIO_SYNTH_LFO_SYNC_MAX, 0 for rate:
-                             * when positive it runs at the tempo of the play over sync and
-                             * starts at phase + fract(beat / sync) of the play */
-=======
     float vowel;            /**< Vowels of a formant filter at the top of the wave,
                              * -BOX_AUDIO_SYNTH_VOWEL_MAX..max; of the patch, as the cutoff */
     float position;         /**< Frames the position of wavetable layers moves by at the top
                              * of the wave, -BOX_AUDIO_TABLE_FRAMES_MAX..max; the moved
                              * position is clamped to the frames of the table */
->>>>>>> 54ffad9f4be74064a408eb640297be7cf6872114
+    float sync;             /**< Cycle in beats, 0..BOX_AUDIO_SYNTH_LFO_SYNC_MAX, 0 for rate:
+                             * when positive it runs at the tempo of the play over sync and
+                             * starts at phase + fract(beat / sync) of the play */
 } box_audio_synth_lfo_t;
 
 /** A synth patch: up to BOX_AUDIO_SYNTH_LAYERS oscillators with envelopes, then one filter,

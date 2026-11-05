@@ -246,16 +246,12 @@ static void box_audio_synth_patch_clamp(
         lfo->cutoff = box_audio_synth_depth_clamp(lfo->cutoff, BOX_AUDIO_SYNTH_OCTAVES_MAX);
         lfo->pulse_width = box_audio_synth_depth_clamp(lfo->pulse_width,
             0.5f - BOX_AUDIO_SYNTH_PULSE_MIN);
-<<<<<<< HEAD
         lfo->hard_sync = box_audio_synth_depth_clamp(lfo->hard_sync,
             BOX_AUDIO_SYNTH_SYNC_SEMITONES);
         lfo->sync = box_audio_synth_clamp(lfo->sync, 0, BOX_AUDIO_SYNTH_LFO_SYNC_MAX);
-=======
-        lfo->sync = box_audio_synth_depth_clamp(lfo->sync, BOX_AUDIO_SYNTH_SYNC_SEMITONES);
         lfo->vowel = box_audio_synth_depth_clamp(lfo->vowel, BOX_AUDIO_SYNTH_VOWEL_MAX);
         lfo->position = box_audio_synth_depth_clamp(lfo->position,
             (float)BOX_AUDIO_TABLE_FRAMES_MAX);
->>>>>>> 54ffad9f4be74064a408eb640297be7cf6872114
     }
 }
 

@@ -782,12 +782,8 @@ static void box_audio_synth_lfo_aim(
         v = m->value * m->gain;
         cents[d->layer] += (double)(d->pitch * v);
         width[d->layer] += (double)(d->pulse_width * v);
-<<<<<<< HEAD
         semitones[d->layer] += (double)(d->hard_sync * v);
-=======
-        semitones[d->layer] += (double)(d->sync * v);
         frames[d->layer] += (double)(d->position * v);
->>>>>>> 54ffad9f4be74064a408eb640297be7cf6872114
         dip[d->layer] *= 1 - d->amplitude * m->gain * 0.5f * (1 - m->value);
         octaves += (double)(d->cutoff * v);
         vowels += (double)(d->vowel * v);
@@ -1580,7 +1576,6 @@ static void box_audio_synth_lfo_start(
         src->lfo_patch[k] = *d;
         src->lfo[k].start = d->random_phase ?
             0.5 * (1.0 + (double)box_audio_synth_noise(&src->lfo_rng)) : (double)d->phase;
-<<<<<<< HEAD
         if (d->sync > 0) {
             src->lfo_patch[k].rate = tempo / d->sync < BOX_AUDIO_SYNTH_LFO_RATE_MAX ?
                 tempo / d->sync : BOX_AUDIO_SYNTH_LFO_RATE_MAX;
@@ -1589,13 +1584,10 @@ static void box_audio_synth_lfo_start(
             src->lfo[k].start = t < 1 ? t : 0.0;
         }
 
-        src->lfo_cutoff = src->lfo_cutoff || (src->filter && d->cutoff != 0);
-=======
         src->lfo_cutoff = src->lfo_cutoff || (src->filter &&
             src->filter != BOX_AUDIO_SYNTH_FORMANT && d->cutoff != 0);
         src->lfo_vowel = src->lfo_vowel || (src->filter == BOX_AUDIO_SYNTH_FORMANT &&
             d->vowel != 0);
->>>>>>> 54ffad9f4be74064a408eb640297be7cf6872114
     }
 }
 
