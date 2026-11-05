@@ -178,6 +178,10 @@
 /** Largest depth of the ratio of hard sync of a synth LFO in semitones, up or down */
 #define BOX_AUDIO_SYNTH_SYNC_SEMITONES 48.0f
 
+/** Largest amount of a synth pitch envelope in semitones, up or down, of the pitch at its start,
+ * of its release and of the ratio of hard sync */
+#define BOX_AUDIO_SYNTH_PITCH_SEMITONES 48.0f
+
 /** Narrowest pulse width of a square, as a share of its period; the widest is 1 minus it */
 #define BOX_AUDIO_SYNTH_PULSE_MIN 0.01f
 
@@ -767,6 +771,20 @@ typedef struct box_audio_synth_envelope_t {
                           *   start; 0 for none and always 0 for the filter envelope */
 } box_audio_synth_envelope_t;
 
+/** A pitch envelope of a synth patch: an offset of the pitch in semitones relative to the note,
+ * amount at its start, which returns to 0 over the decay with a curve, and moves to
+ * release_amount over the release of the amplitude envelope of the layer. All 0 for none */
+typedef struct box_audio_synth_pitch_envelope_t {
+    float amount;          /**< Semitones at the start of a note,
+                            *   -BOX_AUDIO_SYNTH_PITCH_SEMITONES..max */
+    float decay;           /**< Seconds from amount back to the note */
+    float curve;           /**< Curve of the decay and the release, as the curve of a
+                            *   box_audio_synth_envelope_t */
+    float release_amount;  /**< Semitones the offset moves to over the release, the same range */
+    float sync;            /**< Semitones of the ratio of hard sync at the start of a note, which
+                            *   return to 0 with the decay; only on layers with a ratio over 1 */
+} box_audio_synth_pitch_envelope_t;
+
 /** An oscillator of a synth patch */
 typedef struct box_audio_synth_layer_t {
     uint32_t wave;                        /**< A box_audio_synth_wave_t */
@@ -815,6 +833,10 @@ typedef struct box_audio_synth_layer_t {
                                            * 1..BOX_AUDIO_SYNTH_SYNC_MAX, restarted on every
                                            * cycle of the frequency; 0 counts as 1, off.
                                            * Ignored by noise and pluck */
+    uint32_t has_pitch_envelope;          /**< 1 when it has its own pitch envelope, 0 for the
+                                           * one of the patch */
+    box_audio_synth_pitch_envelope_t pitch_envelope; /**< Its own pitch envelope, when
+                                           * has_pitch_envelope */
 } box_audio_synth_layer_t;
 
 /** An LFO of a synth patch: a wave at a rate that starts after a delay and fades in, with a
@@ -867,6 +889,8 @@ typedef struct box_audio_synth_patch_t {
                                            * exponential in frequency, 0 jumps at once */
     uint32_t lfos;                        /**< LFOs that run, 0..BOX_AUDIO_SYNTH_LFOS */
     box_audio_synth_lfo_t lfo[BOX_AUDIO_SYNTH_LFOS]; /**< The LFOs */
+    box_audio_synth_pitch_envelope_t pitch_envelope; /**< Pitch envelope of the layers without
+                                           * their own, all 0 for none */
     box_audio_synth_layer_t layer[BOX_AUDIO_SYNTH_LAYERS]; /**< The oscillators, last: a
                                            * command sends only the layers of its patch */
 } box_audio_synth_patch_t;

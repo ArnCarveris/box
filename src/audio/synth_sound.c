@@ -61,15 +61,16 @@ void box_audio_synth_init(
     ecs_entity_t ids[] = {
         ecs_id(SynthSound), ecs_id(SynthOscillator), ecs_id(SynthEnvelope), ecs_id(SynthFilter),
         ecs_id(SynthFilterEnvelope), ecs_id(SynthGlide), ecs_id(SynthUnison),
-        ecs_id(SynthString), ecs_id(SynthLfo)
+        ecs_id(SynthString), ecs_id(SynthLfo), ecs_id(SynthPitchEnvelope)
     };
     const char *names[] = {
         "AudioSynthSoundDirty", "AudioSynthOscillatorDirty", "AudioSynthEnvelopeDirty",
         "AudioSynthFilterDirty", "AudioSynthFilterEnvelopeDirty", "AudioSynthGlideDirty",
-        "AudioSynthUnisonDirty", "AudioSynthStringDirty", "AudioSynthLfoDirty"
+        "AudioSynthUnisonDirty", "AudioSynthStringDirty", "AudioSynthLfoDirty",
+        "AudioSynthPitchEnvelopeDirty"
     };
     int32_t i;
-    for (i = 0; i < 9; i ++) {
+    for (i = 0; i < 10; i ++) {
         ecs_observer(world, {
             .entity = ecs_entity(world, { .name = names[i] }),
             .query.flags = EcsQueryMatchPrefab,
@@ -94,6 +95,19 @@ static box_audio_synth_envelope_t box_audio_synth_envelope(
         .attack_curve = env->attack_curve, .key_scale = env->key_scale };
 }
 
+/** Copy a pitch envelope of the components into a patch.
+ *
+ * @param env The component
+ * @return The pitch envelope of the patch
+ */
+static box_audio_synth_pitch_envelope_t box_audio_synth_pitch_envelope(
+    const SynthPitchEnvelope *env)
+{
+    return (box_audio_synth_pitch_envelope_t){
+        .amount = env->amount, .decay = env->decay, .curve = env->curve,
+        .release_amount = env->release_amount, .sync = env->sync };
+}
+
 /** Check whether an envelope fits in a pass of the core; NaN, infinite and negative times do
  * not.
  *
@@ -114,6 +128,7 @@ static bool box_audio_synth_envelope_fits(
  * @param p The patch
  * @param osc The oscillator
  * @param env Its own envelope, NULL for the one of the root
+ * @param bend Its own pitch envelope, NULL for the one of the root
  * @param unison Its unison, NULL for one voice
  * @param string Its string, NULL for the defaults; used by SynthPluck only
  * @param carrier 1 + the layer its parent is, 0 when its parent is not a layer
@@ -122,6 +137,7 @@ static void box_audio_synth_layer(
     box_audio_synth_patch_t *p,
     const SynthOscillator *osc,
     const SynthEnvelope *env,
+    const SynthPitchEnvelope *bend,
     const SynthUnison *unison,
     const SynthString *string,
     uint32_t carrier)
@@ -135,6 +151,11 @@ static void box_audio_synth_layer(
     l->has_envelope = env != NULL;
     if (env) {
         l->envelope = box_audio_synth_envelope(env);
+    }
+
+    l->has_pitch_envelope = bend != NULL;
+    if (bend) {
+        l->pitch_envelope = box_audio_synth_pitch_envelope(bend);
     }
 
     if (osc->modulation != SynthMix) {
@@ -256,6 +277,7 @@ static void box_audio_synth_children(
                 (*orphans) ++;
             } else if (p->layers < BOX_AUDIO_SYNTH_LAYERS) {
                 box_audio_synth_layer(p, osc, ecs_get(world, child, SynthEnvelope),
+                    ecs_get(world, child, SynthPitchEnvelope),
                     ecs_get(world, child, SynthUnison), ecs_get(world, child, SynthString),
                     carrier);
                 box_audio_synth_lfo(p, ecs_get(world, child, SynthLfo), p->layers, lfos);
@@ -280,6 +302,7 @@ bool box_audio_synth_compile(
     const SynthFilterEnvelope *fenv = ecs_get(world, e, SynthFilterEnvelope);
     const SynthOscillator *osc = ecs_get(world, e, SynthOscillator);
     const SynthGlide *glide = ecs_get(world, e, SynthGlide);
+    const SynthPitchEnvelope *bend = ecs_get(world, e, SynthPitchEnvelope);
     int32_t extra = 0, orphans = 0, low = 0, lfos = 0, i;
     ecs_iter_t it;
     bool endless = false, fits = true, result;
@@ -291,6 +314,10 @@ bool box_audio_synth_compile(
 
     if (glide) {
         p.glide = glide->time;
+    }
+
+    if (bend) {
+        p.pitch_envelope = box_audio_synth_pitch_envelope(bend);
     }
 
     if (env) {
@@ -321,7 +348,7 @@ bool box_audio_synth_compile(
     if (osc && osc->modulation != SynthMix) {
         orphans ++;
     } else if (osc) {
-        box_audio_synth_layer(&p, osc, NULL, ecs_get(world, e, SynthUnison),
+        box_audio_synth_layer(&p, osc, NULL, NULL, ecs_get(world, e, SynthUnison),
             ecs_get(world, e, SynthString), 0);
     }
 

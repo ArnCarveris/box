@@ -670,6 +670,29 @@ ECS_STRUCT(SynthFilterEnvelope, {
                             *   amount (1 - share + share v), default 0 */
 });
 
+/** A pitch envelope of a synth sound, relative to the note so it fits every pitch: the pitch
+ * starts amount semitones off the note and returns to it over the decay with a curve, the
+ * drop of a kick or a tom, the blip of a zap or the scoop of brass. Over the release of the
+ * amplitude envelope of the layer, its own or the one of the root, the offset moves from where
+ * it is to release_amount. It adds to the glide, the LFO pitch and the sweep of
+ * SynthOscillator, and moves SynthPluck strings as vibrato does.
+ *
+ * On the root it moves every layer; on a layer that layer, in place of the one of the root.
+ * It does not keep a sound playing, and a legato note does not restart it.
+ */
+ECS_STRUCT(SynthPitchEnvelope, {
+    float amount;          /**< Semitones at the start of a note, -48..48, default 0 */
+    float decay;           /**< Seconds back to the note, default 0 */
+    float curve;           /**< Curve of the decay and the release, 0 linear (default),
+                            *   -16..16, as SynthEnvelope.curve: positive moves fast at first */
+    float release_amount;  /**< Semitones the pitch moves to over the release, -48..48,
+                            *   default 0 */
+    float sync;            /**< Semitones the ratio of SynthOscillator.sync moves by at the start
+                            *   of a note, -48..48, default 0, returning to 0 with the decay: the
+                            *   sweep of a sync lead. Only on layers with a ratio over 1; the
+                            *   moved ratio is clamped to 1..16 */
+});
+
 /** Portamento and mono legato of a synth sound, on its root.
  *
  * With a time, a change of the pitch of a voice, as a change of AudioSource.pitch, glides
@@ -718,7 +741,8 @@ ECS_STRUCT(SynthLfo, {
 
 /** A sound made by the synth from the components of this entity and its children, without a
  * file: SynthOscillator layers, each with an optional SynthUnison, a SynthEnvelope, a
- * SynthFilter, a SynthFilterEnvelope, a SynthGlide and SynthLfo. Usually a prefab.
+ * SynthFilter, a SynthFilterEnvelope, a SynthPitchEnvelope, a SynthGlide and SynthLfo.
+ * Usually a prefab.
  *
  * It is compiled once, and again when one of its components changes, into a patch the core
  * holds; box_audio_play and AudioSource play it like any sound, with no allocation per play.

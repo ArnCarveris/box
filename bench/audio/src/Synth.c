@@ -22,6 +22,10 @@
  * ratio */
 #define BENCH_SYNC 2u
 
+/** Extra of bench_synth_core: a curved pitch envelope of the root, with a sync sweep, moves
+ * every layer, the synced saw and square of BENCH_SYNC when it is set too */
+#define BENCH_PITCH 4u
+
 /** Create a core with 64 looping voices of a patch of three layers: a saw that sweeps up, a
  * square with its own envelope and noise, into a lowpass.
  *
@@ -37,7 +41,7 @@
  * @param lfo Whether two LFOs move the patch
  * @param curved Whether the patch envelope and the envelope of the square are curved
  * @param drive Drive of the filter, 0..1
- * @param extra BENCH_SUB and BENCH_SYNC, or 0
+ * @param extra BENCH_SUB, BENCH_SYNC and BENCH_PITCH, or 0
  * @return The core
  */
 static box_audio_core_t* bench_synth_core(
@@ -94,6 +98,11 @@ static box_audio_core_t* bench_synth_core(
         p.lfos = 1;
         p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_TRIANGLE, .rate = 0.5f,
             .sync = 12 };
+    }
+
+    if (extra & BENCH_PITCH) {
+        p.pitch_envelope = (box_audio_synth_pitch_envelope_t){ .amount = 12, .decay = 1.5f,
+            .curve = 4, .release_amount = -5, .sync = 12 };
     }
 
     if (fm) {
@@ -294,6 +303,26 @@ void Synth_voices_64_sync(
     // audio/synth
     box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
         0, BENCH_SYNC);
+    bench_synth_render(b, core);
+    box_audio_core_free(core);
+}
+
+void Synth_voices_64_pitch(
+    bench_t *b)
+{
+    // audio/synth
+    box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
+        0, BENCH_PITCH);
+    bench_synth_render(b, core);
+    box_audio_core_free(core);
+}
+
+void Synth_voices_64_pitch_sync(
+    bench_t *b)
+{
+    // audio/synth
+    box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
+        0, BENCH_SYNC | BENCH_PITCH);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }

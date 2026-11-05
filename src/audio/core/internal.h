@@ -452,6 +452,27 @@ typedef struct box_audio_synth_env_t {
                            * also when a sustain of 0 skips the release of a pass */
 } box_audio_synth_env_t;
 
+/** A curve from one value to another over a number of steps, linear or curved as a segment of
+ * an envelope, the last step taking the target */
+typedef struct box_audio_synth_curve_t {
+    double level;         /**< Current value */
+    double target;        /**< Value at the end */
+    double mul;           /**< Factor per step, 1 for a linear curve */
+    double add;           /**< Term per step */
+    int32_t left;         /**< Steps left, 0 once it is at its target */
+} box_audio_synth_curve_t;
+
+/** The pitch envelope of a layer of a synth voice, advanced per control block of
+ * BOX_AUDIO_SYNTH_CONTROL frames with the LFOs */
+typedef struct box_audio_synth_bend_t {
+    bool on;              /**< Whether the layer has a pitch envelope that moves something */
+    box_audio_synth_curve_t decay;   /**< Share of amount and sync left, from 1 to 0 */
+    box_audio_synth_curve_t release; /**< Share of the way left to release_amount, from 1 to
+                                      * 0, once released */
+    bool released;        /**< Whether the amplitude envelope of the layer reached its release */
+    double from;          /**< Semitones of the offset at the start of the release */
+} box_audio_synth_bend_t;
+
 /** An oscillator of a synth voice */
 typedef struct box_audio_synth_osc_t {
     int32_t wave;         /**< A box_audio_synth_wave_t */
@@ -557,6 +578,7 @@ typedef struct box_audio_synth_part_t {
     box_audio_synth_layer_t layer;  /**< The layer of the patch, clamped */
     box_audio_synth_osc_t osc;      /**< The oscillator */
     box_audio_synth_env_t env;      /**< Its own envelope, when the layer has one */
+    box_audio_synth_bend_t bend;    /**< Its pitch envelope, its own or that of the patch */
     box_audio_synth_unison_t unison; /**< Its unison voices */
     box_audio_synth_string_t *string; /**< The string of its first unison voice, the others
                                        * chained after it, for a BOX_AUDIO_SYNTH_PLUCK layer;
@@ -608,6 +630,10 @@ typedef struct box_audio_synth_source_t {
     int32_t lfo_control;  /**< Frames until the next control block of the LFOs */
     bool lfo_cutoff;      /**< Whether an LFO moves the cutoff */
     double lfo_octaves;   /**< Octaves the LFOs move the cutoff by, 0 without */
+    bool bends;           /**< Whether a layer has a pitch envelope, which runs with the LFOs */
+    bool mods;            /**< Whether LFOs or pitch envelopes run their control blocks and
+                           * move the vibrato and tremolo of each layer; false renders as
+                           * without both */
     float keytrack;       /**< Share 0..1 of the key in octaves the cutoff follows, 0 without a
                            * filter */
     double key;           /**< Key of the voice in octaves, log2 of its pitch ratio without the

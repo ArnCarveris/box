@@ -182,6 +182,24 @@
                 ]
             },
             {
+                "id": "SynthPitch",
+                "testcases": [
+                    "start_returns",
+                    "negative_amount",
+                    "curve",
+                    "release_amount",
+                    "release_from_decay",
+                    "layer",
+                    "sync_sweep",
+                    "pluck",
+                    "wide",
+                    "adds",
+                    "none_identical",
+                    "clamped",
+                    "script"
+                ]
+            },
+            {
                 "id": "SynthVelocity",
                 "testcases": [
                     "filter_cutoff",

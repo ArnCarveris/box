@@ -1151,6 +1151,7 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, Saturator);
     ecs_set_hooks(world, Saturator, { .ctor = box_audio_saturator_ctor });
     ECS_META_COMPONENT(world, SynthFilterEnvelope);
+    ECS_META_COMPONENT(world, SynthPitchEnvelope);
     ECS_META_COMPONENT(world, SynthGlide);
     ECS_META_COMPONENT(world, SynthLfoWave);
     ECS_META_COMPONENT(world, SynthLfo);

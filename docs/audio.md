@@ -282,6 +282,7 @@ voices on play, so edits affect subsequent plays.
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`, `key_scale`; all zero by default |
 | `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves), `keytrack` (0) |
 | `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves and `velocity` (0); requires a filter |
+| `SynthPitchEnvelope` | `amount` (0 semitones, -48..48), `decay` seconds, `curve` (0, -16..16), `release_amount` (0 semitones, -48..48), `sync` (0 semitones, -48..48) |
 | `SynthUnison` | Per layer: `voices` (3, 1..7), `detune` (10 cents, 0..100), `width` (0, 0..1) |
 | `SynthGlide` | Root: `time` seconds (0, up to 10), `legato` (false), `channel` (0) |
 | `SynthLfo` | `wave`, `rate` (5 Hz), `delay`, `fade`, `phase`, `random_phase`, destination depths |
@@ -308,6 +309,31 @@ shapes its timbre. A ratio of 0 or 1 is off. The restart is band limited by a po
 sized by the jump, and a polyBLAMP for the slope of triangles and sines. Each unison
 voice syncs to its own detuned master, the sub stays at the master, and phase
 modulation adds to the synced phase. `SynthNoise` and `SynthPluck` ignore it.
+
+`SynthPitchEnvelope` bends the pitch relative to the note, so one patch fits every
+pitch of an instrument, where `frequency_end` sweeps to one absolute frequency: the
+drop of a kick or a tom, the blip of a zap, the scoop of brass. A note starts `amount`
+semitones off and returns to the note over `decay`, with a `curve` that bends that
+return as `SynthEnvelope.curve` bends a decay. From the start of the release the offset
+moves from where it is to `release_amount` semitones, over the release of the layer's
+amplitude envelope, its own or the root's, with the same curve. `sync` is the semitones
+the ratio of hard sync starts off by, returning to the layer's `sync` with the decay:
+the classic sync sweep, on layers whose `sync` is over 1 only. On the root it moves
+every layer; on a layer it moves that layer in place of the root's. It adds to glides,
+sweeps and pitch LFOs, moves `SynthPluck` strings as vibrato does, runs at the control
+rate of the LFOs, does not keep a voice playing and is not restarted by a legato
+retarget.
+
+```flecs
+using box.audio
+
+prefab Kick {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.001, decay: 0.35, sustain: 0, release: 0.05, curve: 4}
+  SynthPitchEnvelope: {amount: 36, decay: 0.08, curve: 6}
+  SynthOscillator: {frequency: 50, level: 0.8}
+}
+```
 
 A filter envelope uses `cutoff * 2^(amount * envelope_level)`. For example,
 cutoff 300 and amount 3 open to 2400 Hz. Its timing is independent of the amplitude
@@ -412,8 +438,9 @@ Working examples include [synth_examples.flecs](../test/assets/audio/synth_examp
 [synth_lfo.flecs](../test/assets/audio/synth_lfo.flecs),
 [synth_glide.flecs](../test/assets/audio/synth_glide.flecs),
 [synth_pluck.flecs](../test/assets/audio/synth_pluck.flecs),
-[synth_sub.flecs](../test/assets/audio/synth_sub.flecs) and
-[synth_sync.flecs](../test/assets/audio/synth_sync.flecs).
+[synth_sub.flecs](../test/assets/audio/synth_sub.flecs),
+[synth_sync.flecs](../test/assets/audio/synth_sync.flecs) and
+[synth_pitch.flecs](../test/assets/audio/synth_pitch.flecs).
 
 ## Music on the timeline
 
