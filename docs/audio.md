@@ -278,16 +278,10 @@ voices on play, so edits affect subsequent plays.
 | Component | Authoring controls |
 | --- | --- |
 | `SynthSound` | `seed`, `pitch_variance`, `level_variance`; variances default to zero |
-<<<<<<< HEAD
-| `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), modulation controls, `velocity` (0) |
-| `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`; all zero by default |
-| `SynthDrive` | Root: `drive` (0.3, 0..1), `asymmetry` (0, 0..1) |
-| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves) |
-=======
 | `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), `sync` (0, off, 1..16), modulation controls, `velocity` (0) |
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`, `key_scale`; all zero by default |
+| `SynthDrive` | Root: `drive` (0.3, 0..1), `asymmetry` (0, 0..1) |
 | `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves), `keytrack` (0) |
->>>>>>> 6e076eb2124cdf0712ee4e5b4fca617a48f297ec
 | `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves and `velocity` (0); requires a filter |
 | `SynthUnison` | Per layer: `voices` (3, 1..7), `detune` (10 cents, 0..100), `width` (0, 0..1) |
 | `SynthGlide` | Root: `time` seconds (0, up to 10), `legato` (false), `channel` (0) |
@@ -439,12 +433,9 @@ Working examples include [synth_examples.flecs](../test/assets/audio/synth_examp
 [synth_lfo.flecs](../test/assets/audio/synth_lfo.flecs),
 [synth_glide.flecs](../test/assets/audio/synth_glide.flecs),
 [synth_pluck.flecs](../test/assets/audio/synth_pluck.flecs),
-[synth_sub.flecs](../test/assets/audio/synth_sub.flecs) and
-<<<<<<< HEAD
+[synth_sub.flecs](../test/assets/audio/synth_sub.flecs),
+[synth_sync.flecs](../test/assets/audio/synth_sync.flecs) and
 [synth_drive.flecs](../test/assets/audio/synth_drive.flecs).
-=======
-[synth_sync.flecs](../test/assets/audio/synth_sync.flecs).
->>>>>>> 6e076eb2124cdf0712ee4e5b4fca617a48f297ec
 
 ## Music on the timeline
 

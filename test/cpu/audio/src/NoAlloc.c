@@ -776,17 +776,10 @@ void NoAlloc_synth_sub(void) {
     test_int(noalloc_frees, 1);
 }
 
-<<<<<<< HEAD
 /* Voices of a patch through the drive of the mix, with an asymmetry: a mono saw, a wide unison
  * layer, a pluck and a modulator, into a filter, under an LFO, render without a call of the
  * allocator. */
 void NoAlloc_synth_drive(void) {
-=======
-/* Voices of a patch with hard sync, on a mono saw under a glide, a wide unison square and a
- * triangle phase modulated by a modulator, under LFOs of the ratio, render without a call of
- * the allocator. */
-void NoAlloc_synth_sync(void) {
->>>>>>> 6e076eb2124cdf0712ee4e5b4fca617a48f297ec
     // audio/noalloc
     box_audio_core_t *core = noalloc_core();
     box_audio_synth_patch_t p = {0};
@@ -795,7 +788,6 @@ void NoAlloc_synth_sync(void) {
     uint32_t i;
     p.layers = 4;
     p.seed = 5;
-<<<<<<< HEAD
     p.has_drive = 1;
     p.pre_drive = 0.7f;
     p.pre_asymmetry = 0.3f;
@@ -819,7 +811,29 @@ void NoAlloc_synth_sync(void) {
     test_assert(box_audio_write_synth(&w, 1, &p));
     box_audio_core_apply(core, w.data, w.size);
     for (i = 0; i < 8; i ++) {
-=======
+        audio_play(core, i, 1, 0, 0.02f, 0, 0.5f + 0.05f * (float)i, BOX_AUDIO_PLAY_LOOP);
+    }
+
+    audio_render(core, 0, AUDIO_FRAMES);
+    test_assert(box_audio_core_voice_count(core) > 0);
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+}
+
+/* Voices of a patch with hard sync, on a mono saw under a glide, a wide unison square and a
+ * triangle phase modulated by a modulator, under LFOs of the ratio, render without a call of
+ * the allocator. */
+void NoAlloc_synth_sync(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_synth_patch_t p = {0};
+    uint8_t bytes[sizeof(box_audio_cmd_synth_t)];
+    box_audio_writer_t w;
+    uint32_t i;
+    p.layers = 4;
+    p.seed = 5;
     p.glide = 0.05f;
     p.envelope = (box_audio_synth_envelope_t){
         .attack = 0.01f, .decay = 0.05f, .sustain = 0.5f, .hold = 0.1f, .release = 0.05f };
@@ -841,19 +855,15 @@ void NoAlloc_synth_sync(void) {
     test_assert(box_audio_write_synth(&w, 1, &p));
     box_audio_core_apply(core, w.data, w.size);
     for (i = 0; i < 16; i ++) {
->>>>>>> 6e076eb2124cdf0712ee4e5b4fca617a48f297ec
         audio_play(core, i, 1, 0, 0.02f, 0, 0.5f + 0.05f * (float)i, BOX_AUDIO_PLAY_LOOP);
     }
 
     audio_render(core, 0, AUDIO_FRAMES);
-<<<<<<< HEAD
-=======
     for (i = 0; i < 16; i ++) {
         audio_voice_set(core, i, BOX_AUDIO_PARAM_PITCH, 1.5f);
     }
 
     audio_render(core, 0, AUDIO_FRAMES / 2);
->>>>>>> 6e076eb2124cdf0712ee4e5b4fca617a48f297ec
     test_assert(box_audio_core_voice_count(core) > 0);
     test_int(noalloc_allocs, 1);
     test_int(noalloc_frees, 0);

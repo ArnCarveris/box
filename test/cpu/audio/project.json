@@ -270,11 +270,8 @@
                     "modulation",
                     "saturator",
                     "synth_sub",
-<<<<<<< HEAD
+                    "synth_sync",
                     "synth_drive"
-=======
-                    "synth_sync"
->>>>>>> 6e076eb2124cdf0712ee4e5b4fca617a48f297ec
                 ]
             },
             {
