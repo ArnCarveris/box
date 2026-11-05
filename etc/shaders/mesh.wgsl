@@ -40,7 +40,8 @@
 // A lit view draws its opaque meshes depth only first (vs_depth, vs_depth_cutout and
 // fs_depth_cutout), then shades them with depth compare Equal and without the alpha test.
 // A transmissive pipeline (transmissive, Transmission) draws in the sorted blended stream
-// without blending: it refracts the opaque snapshot of the view (opaque_snapshot), reduced by
+// without blending: it refracts the snapshot of the view taken right before it (opaque_snapshot,
+// everything drawn before it back to front, at most 4 snapshots a view and frame), reduced by
 // its Fresnel reflection, absorbed over its volume and tinted by its albedo, and adds its own
 // specular light and emission on top.
 // A clear coated material (ClearCoat) has a dielectric layer of f0 0.04 over its base, on the
@@ -149,13 +150,19 @@ const MIN_ROUGHNESS: f32 = 0.045;
 // view without Gtao, and the probe and reflection captures, bind a 1x1 white image.
 @group(0) @binding(14) var gtao_image: texture_2d<f32>;
 
-// Opaque snapshot of the view for transmission (gpu_transmission.c): its image before the
-// blended draws and a blur pyramid, mip k + 1 downsampled from mip k. A view without
-// transmissive draws, and the captures, bind a 1x1 white image.
+// Snapshot of the view for transmission (gpu_transmission.c): its image right before a
+// transmissive draw, with everything drawn before it back to front (opaque meshes, sky, fog
+// volumes, particles, 2D shapes and the blended and transmissive meshes behind it), and a blur
+// pyramid, mip k + 1 downsampled from mip k. A view takes one before its first transmissive draw
+// and one before each later one that follows other draws, at most 4 a frame, into this same
+// texture; beyond that later glass samples the last one. A view without transmissive draws, and
+// the captures, bind a 1x1 white image.
 @group(0) @binding(19) var opaque_snapshot: texture_2d<f32>;
 
-// Depth of the target copied with the opaque snapshot (gpu_transmission.c), reversed Z with 0 for
-// the sky, which the blur of a DiffuseTransmission reads with textureLoad. A view without
+// Depth of the target copied with the first snapshot of the view (gpu_transmission.c), reversed
+// Z with 0 for the sky, which the blur of a DiffuseTransmission reads with textureLoad. Blended
+// and transmissive draws write no depth, so a blended shape in the snapshot blurs like whatever
+// lies behind it. A view without
 // transmissive draws, and the captures, bind a 1x1 placeholder.
 @group(0) @binding(20) var opaque_snapshot_depth: texture_depth_2d;
 
@@ -279,8 +286,10 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Plac
     if (surface_data.p[0].x != 0.0) {
         var region = i32(v.position.z);
         if (surface_data.p[0].x == 7.0) {
+            // The caps are the only vertices with a vertical normal without a horizontal
+            // part: the rims of a Bevel keep one up to the cap (box_profile_region)
             region = select(0, 1, v.uv.x >= 2.0);
-            if (abs(v.normal.y) > 0.5) {
+            if (v.normal.x == 0.0 && v.normal.z == 0.0 && v.normal.y != 0.0) {
                 region = 2;
             } else if (region == 1) {
                 o.uv.x -= 2.0 * material.uv.x;
@@ -1210,64 +1219,60 @@ fn brdf_back(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> vec3f {
 // and spot lights of the cluster of the fragment, a spot or point light with a tile of the
 // shadow atlas through it. The back lobe of a diffuse transmission (brdf_back) adds to the
 // diffuse part, with its shadow, cookie and attenuation at the position thickness behind the
-// surface along the view ray, looked up with the inverted geometric normal.
+// surface along the view ray, looked up with the inverted geometric normal. The directional and
+// the cluster lights share one loop, and the front and the back one loop per light, so the
+// shadows, the cookie and the lobes each have one call: D3D compilers inline every call.
 fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32) -> Lit {
     var sum = Lit(vec3f(0.0), vec3f(0.0));
-    var shadow = shadow_factor(world, s.geometric);
-    if (view.lights.x > 0u) {
-        shadow *= light_cookie(world, normalize(lights[0].position), s.geometric);
-    }
-
-    let back = s.back_factor > 0.0;
-    let world_back = world - v * s.thickness;
-    var shadow_back = 1.0;
-    if (back) {
-        shadow_back = shadow_factor(world_back, -s.geometric);
-        if (view.lights.x > 0u) {
-            shadow_back *= light_cookie(world_back, normalize(lights[0].position), -s.geometric);
-        }
-    }
-
-    for (var i = 0u; i < view.lights.x; i++) {
-        let light = lights[i];
-        let visible = select(1.0, shadow, i == 0u);
-        let lit = brdf(s, v, normalize(light.position), light.color);
-        sum.diffuse += lit.diffuse * visible;
-        sum.specular += lit.specular * visible;
-        if (back) {
-            let visible_back = select(1.0, shadow_back, i == 0u);
-            sum.diffuse += brdf_back(s, v, normalize(light.position), light.color) *
-                visible_back;
-        }
-    }
-
+    let directional = view.lights.x;
+    var count = directional;
+    var first = 0u;
     if (view.lights.y > view.lights.x) {
-        let first = 1u + 2u * cluster_count(view) + clusters[1u + 2u * cluster];
-        let count = cluster_lights(clusters[2u + 2u * cluster]);
-        for (var i = 0u; i < count; i++) {
-            let light = lights[clusters[first + i]];
-            let delta = light.position - world;
-            let dist = length(delta);
-            let l = delta / max(dist, 1e-4);
-            var visible = 1.0;
-            if (light.shadow < view.spot_config.x) {
-                visible = punctual_shadow(light, world, s.geometric);
+        first = 1u + 2u * cluster_count(view) + clusters[1u + 2u * cluster];
+        count += cluster_lights(clusters[2u + 2u * cluster]);
+    }
+
+    let sides = select(1u, 2u, s.back_factor > 0.0);
+    for (var i = 0u; i < count; i++) {
+        var light: Light;
+        if (i < directional) {
+            light = lights[i];
+        } else {
+            light = lights[clusters[first + i - directional]];
+        }
+
+        for (var side = 0u; side < sides; side++) {
+            var at = world;
+            var n = s.geometric;
+            if (side == 1u) {
+                at = world - v * s.thickness;
+                n = -s.geometric;
             }
 
-            let lit = brdf(s, v, l, light.color * attenuation(light, l, dist));
-            sum.diffuse += lit.diffuse * visible;
-            sum.specular += lit.specular * visible;
-            if (back) {
-                let delta_back = light.position - world_back;
-                let dist_back = length(delta_back);
-                let l_back = delta_back / max(dist_back, 1e-4);
-                var visible_back = 1.0;
-                if (light.shadow < view.spot_config.x) {
-                    visible_back = punctual_shadow(light, world_back, -s.geometric);
+            var l: vec3f;
+            var radiance = light.color;
+            var visible = 1.0;
+            if (i < directional) {
+                l = normalize(light.position);
+                if (i == 0u) {
+                    visible = shadow_factor(at, n) * light_cookie(at, l, n);
                 }
+            } else {
+                let delta = light.position - at;
+                let dist = length(delta);
+                l = delta / max(dist, 1e-4);
+                radiance *= attenuation(light, l, dist);
+                if (light.shadow < view.spot_config.x) {
+                    visible = punctual_shadow(light, at, n);
+                }
+            }
 
-                sum.diffuse += brdf_back(s, v, l_back,
-                    light.color * attenuation(light, l_back, dist_back)) * visible_back;
+            if (side == 0u) {
+                let lit = brdf(s, v, l, radiance);
+                sum.diffuse += lit.diffuse * visible;
+                sum.specular += lit.specular * visible;
+            } else {
+                sum.diffuse += brdf_back(s, v, l, radiance) * visible;
             }
         }
     }
@@ -1400,11 +1405,6 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
         s.emissive);
 }
 
-fn shade(s: Surface, v: vec3f, world: vec3f) -> vec3f {
-    let lit = shade_split(s, v, world);
-    return lit.diffuse + lit.specular;
-}
-
 // Color of a fragment seen through the atmosphere between it and the camera, shaped for the
 // blend equation: a fragment that covers the target is attenuated and adds the in scattered
 // light weighted by its coverage, light added to or taken from the target is only attenuated,
@@ -1488,14 +1488,12 @@ fn transmission_blur_lod(world: vec3f, screen_uv: vec2f, blur: f32, rough_lod: f
 // and the transmitted light and adds its in scattered light by what is not transmitted. A
 // factor of 0 is the lit surface. It writes no depth, so it takes no ambient occlusion of the
 // view, which belongs to what is behind it.
-fn transmission(f: VertexOut, s: Surface) -> vec4f {
+fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
     var ap = vec4f(0.0, 0.0, 0.0, 1.0);
     if (view.aerial.w > 0.0) {
         ap = aerial_sample(f.pos, f.world);
     }
 
-    let v = normalize(view.camera.xyz - f.world);
-    let reflected = shade_split(s, v, f.world);
     let factor = f.transmission.x;
     let ior = f.transmission.y;
     let thickness = f.transmission.z;
@@ -1545,16 +1543,23 @@ fn transmission(f: VertexOut, s: Surface) -> vec4f {
     return vec4f(final_color, 1.0);
 }
 
-// The output of a shaded opaque or blended fragment: the ambient occlusion of the view applies
-// to an opaque one, then its lighting, the aerial perspective of the view and the blend output.
+// The output of a shaded fragment: the ambient occlusion of the view applies to an opaque one,
+// then its lighting, the aerial perspective of the view and the blend output; a transmissive one
+// is lit and passed to transmission. Both take the light from one call of shade_split, as D3D
+// compilers inline every call.
 fn lit(f: VertexOut, shaded: Surface) -> vec4f {
     var s = shaded;
-    if (blend_mode == 0u) {
+    if (!transmissive && blend_mode == 0u) {
         s.occlusion = min(s.occlusion, view_occlusion(f.pos));
     }
 
     let v = normalize(view.camera.xyz - f.world);
-    var color = shade(s, v, f.world);
+    let reflected = shade_split(s, v, f.world);
+    if (transmissive) {
+        return transmission(f, s, v, reflected);
+    }
+
+    var color = reflected.diffuse + reflected.specular;
     if (view.aerial.w > 0.0) {
         color = aerial_perspective(color, s.alpha, f.pos, f.world);
     }
@@ -1564,11 +1569,7 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
 
 @fragment fn fs(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     let s = surface(f, front);
-    if (transmissive) {
-        return transmission(f, s);
-    }
-
-    if (alpha_cutout && s.alpha < f.scalars.x) {
+    if (!transmissive && alpha_cutout && s.alpha < f.scalars.x) {
         discard;
     }
 
@@ -1578,11 +1579,7 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
 // A TextureBlend batch, of any blend mode, alpha tested or transmissive as fs is.
 @fragment fn fs_blend(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     let s = surface_blend(f, front);
-    if (transmissive) {
-        return transmission(f, s);
-    }
-
-    if (alpha_cutout && s.alpha < f.scalars.x) {
+    if (!transmissive && alpha_cutout && s.alpha < f.scalars.x) {
         discard;
     }
 

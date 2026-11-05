@@ -146,6 +146,7 @@ void Modulation_silent_tail(
     bench_modulation_free(core);
 }
 
+<<<<<<< HEAD
 /** Create a core with a vocoder on bus 1, keyed on bus 2, which runs first: a looping voice
  * on each, the one on bus 2 an octave up.
  *
@@ -177,25 +178,91 @@ static box_audio_core_t* bench_vocoder_core(
     box_audio_write_effect(&w, 0, BOX_AUDIO_EFFECT_VOCODER, 1, 0, 2, fx);
     box_audio_write_play(&w, 0, 1, 1, 0.5f, 0, 1, BOX_AUDIO_PLAY_LOOP, 0);
     box_audio_write_play(&w, 1, 1, 2, 0.5f, 0, 2, BOX_AUDIO_PLAY_LOOP, 0);
+=======
+/** Create a core with a lowpass on bus 1 and its voice, and a number of modulators of every
+ * source on its cutoff, its resonance and the volume and pan of the bus, four of each, with
+ * the beat clock at 128 bpm.
+ *
+ * @param count Modulators, at most 16
+ * @return The core
+ */
+static box_audio_core_t* bench_modulators_core(
+    uint32_t count)
+{
+    static uint8_t bytes[8192];
+    box_audio_filter_params_t p = { BOX_AUDIO_SYNTH_LOWPASS, 1200, 0.3f, 0, 1, 0 };
+    box_audio_core_t *core = bench_modulation_core(BOX_AUDIO_EFFECT_FILTER, &p, sizeof(p), 1);
+    box_audio_writer_t w;
+    uint32_t i;
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    box_audio_write_beat(&w, 0, 128.0f / 60.0f, 0);
+    for (i = 0; i < count; i ++) {
+        box_audio_cmd_modulator_t m = { .slot = i, .rate = 3.0f + (float)i,
+            .sync = i % 2 ? 0.25f * (float)(1 + i % 4) : 0, .phase = 0.07f * (float)i,
+            .depth = 0.2f, .step_count = 8, .smooth = 0.25f, .key = 1, .attack = 0.005f,
+            .release = 0.1f, .wave = i % 6 };
+        uint32_t k;
+        for (k = 0; k < 8; k ++) {
+            m.steps[k] = (float)((k * 5 + i) % 7) / 3.5f - 1.0f;
+        }
+
+        m.source = i % 4 == 3 ? BOX_AUDIO_MOD_FOLLOWER :
+            (i % 4 == 2 ? BOX_AUDIO_MOD_STEPS : BOX_AUDIO_MOD_LFO);
+        if (i / 4 == 0) {
+            m.target = BOX_AUDIO_MOD_TARGET_EFFECT;
+            m.kind = BOX_AUDIO_EFFECT_FILTER;
+            m.param = 1;
+            m.scale = BOX_AUDIO_MOD_OCTAVES;
+            m.depth = 1;
+        } else if (i / 4 == 1) {
+            m.target = BOX_AUDIO_MOD_TARGET_EFFECT;
+            m.kind = BOX_AUDIO_EFFECT_FILTER;
+            m.param = 2;
+        } else {
+            m.target = BOX_AUDIO_MOD_TARGET_BUS;
+            m.index = 1;
+            m.param = i / 4 == 2 ? BOX_AUDIO_PARAM_VOLUME : BOX_AUDIO_PARAM_PAN;
+        }
+
+        box_audio_write_modulator(&w, &m);
+    }
+
+>>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
     box_audio_core_apply(core, w.data, w.size);
 
     return core;
 }
 
+<<<<<<< HEAD
 void Modulation_vocoder_16(
     bench_t *b)
 {
     // audio/vocoder
     box_audio_core_t *core = bench_vocoder_core(16);
+=======
+void Modulation_filter_16_modulators(
+    bench_t *b)
+{
+    // audio/modulators
+    box_audio_core_t *core = bench_modulators_core(16);
+>>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
     bench_modulation_render(b, core);
     bench_modulation_free(core);
 }
 
+<<<<<<< HEAD
 void Modulation_vocoder_32(
     bench_t *b)
 {
     // audio/vocoder
     box_audio_core_t *core = bench_vocoder_core(32);
+=======
+void Modulation_filter_no_modulators(
+    bench_t *b)
+{
+    // audio/modulators
+    box_audio_core_t *core = bench_modulators_core(0);
+>>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
     bench_modulation_render(b, core);
     bench_modulation_free(core);
 }

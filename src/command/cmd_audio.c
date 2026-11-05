@@ -2,8 +2,8 @@
  * @file command/cmd_audio.c
  * @brief The audio command: the status of the audio, its transport, its buses and their insert
  * slots, its instruments, its tracks with their note and audio placements, sounding notes and
- * playing audio clips, the master
- * volume and mute, play, stop, seek and tempo, and captures of the master output to a WAV
+ * playing audio clips, its emitters with their plays and skips, its macros with their maps, the
+ * master volume and mute, play, stop, seek and tempo, and captures of the master output to a WAV
  * resource.
  *
  * The actions only write AudioSettings or Transport, which box.audio sends to the core at the
@@ -149,6 +149,74 @@ static const char* box_cmd_audio_filter_kind(
     return (uint32_t)kind < 4 ? names[kind] : "?";
 }
 
+/** Append the modulators that move a member of a bus or an effect: each with its source, its
+ * timing, its depth, its member and whether it runs.
+ *
+ * @param world The world
+ * @param buf The output
+ * @param target The bus or effect entity
+ */
+static void box_cmd_audio_modulators(
+    ecs_world_t *world,
+    ecs_strbuf_t *buf,
+    ecs_entity_t target)
+{
+    static const char *waves[] = { "sine", "triangle", "square", "saw up", "saw down",
+        "random" };
+    ecs_iter_t it = ecs_each(world, AudioModulator);
+    int32_t i;
+    while (ecs_each_next(&it)) {
+        const AudioModulator *m = ecs_field(&it, AudioModulator, 0);
+        for (i = 0; i < it.count; i ++) {
+            char *path;
+            if (m[i].target != target) {
+                continue;
+            }
+
+            path = ecs_get_path(world, it.entities[i]);
+            ecs_strbuf_append(buf, ", modulator %s: ", path);
+            if (m[i].source == AudioModSteps) {
+                ecs_strbuf_append(buf, "%d steps smooth %.2f", m[i].step_count,
+                    (double)m[i].smooth);
+            } else if (m[i].source == AudioModFollower) {
+                ecs_strbuf_appendstr(buf, "follower of ");
+                if (m[i].key && ecs_is_alive(world, m[i].key)) {
+                    char *key = ecs_get_path(world, m[i].key);
+                    ecs_strbuf_appendstr(buf, key);
+                    ecs_os_free(key);
+                } else {
+                    ecs_strbuf_appendstr(buf, "its bus");
+                }
+
+                ecs_strbuf_append(buf, " attack %.3f release %.3f", (double)m[i].attack,
+                    (double)m[i].release);
+            } else {
+                ecs_strbuf_append(buf, "lfo %s%s",
+                    (uint32_t)m[i].wave <= (uint32_t)AudioModRandom ? waves[m[i].wave] : "?",
+                    m[i].unipolar ? " unipolar" : "");
+            }
+
+            if (m[i].source != AudioModFollower) {
+                if (m[i].sync > 0) {
+                    ecs_strbuf_append(buf, " sync %.3f beats", (double)m[i].sync);
+                } else {
+                    ecs_strbuf_append(buf, " rate %.2f Hz", (double)m[i].rate);
+                }
+
+                if (m[i].phase != 0) {
+                    ecs_strbuf_append(buf, " phase %.2f", (double)m[i].phase);
+                }
+            }
+
+            ecs_strbuf_append(buf, " depth %.2f%s on %s (%s)", (double)m[i].depth,
+                m[i].scale == AudioModOctaves ? " oct" : "",
+                m[i].member ? m[i].member : "(no member)",
+                box_audio_modulator_status(world, it.entities[i]));
+            ecs_os_free(path);
+        }
+    }
+}
+
 /** Append the insert slots of a bus: each effect with its kind, its parameters and whether it
  * runs.
  *
@@ -176,7 +244,16 @@ static void box_cmd_audio_effects(
         const Chorus *chorus;
         const Saturator *saturator;
         const TransientShaper *shaper;
+<<<<<<< HEAD
         const Vocoder *vocoder;
+=======
+        const FrequencyShifter *shifter;
+        const PitchShifter *pitch;
+        const PatternGate *pattern;
+        const Rotary *rotary;
+        const BeatRepeat *repeat;
+        const TapeStop *stop;
+>>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
         const box_audio_module_t *state = box_audio_module_get(world);
         char *path;
         int32_t b, slot;
@@ -198,6 +275,10 @@ static void box_cmd_audio_effects(
             ecs_strbuf_append(buf, "reverb decay %.2f damping %.2f predelay %.3f size %.2f "
                 "mix %.2f", (double)reverb->decay, (double)reverb->damping,
                 (double)reverb->predelay, (double)reverb->size, (double)reverb->mix);
+            if (reverb->shimmer > 0) {
+                ecs_strbuf_append(buf, " shimmer %.2f pitch %+.1f", (double)reverb->shimmer,
+                    (double)reverb->shimmer_pitch);
+            }
         } else if ((eq = ecs_get(world, e, Equalizer))) {
             ecs_strbuf_appendstr(buf, "eq");
             for (b = 0; b < BOX_AUDIO_EQ_BANDS; b ++) {
@@ -246,13 +327,37 @@ static void box_cmd_audio_effects(
                 (double)phaser->depth, (double)phaser->center, (double)phaser->feedback,
                 (double)phaser->mix, (double)phaser->stereo);
         } else if ((chorus = ecs_get(world, e, Chorus))) {
-            ecs_strbuf_append(buf, "chorus voices %d rate %.2f Hz depth %.1f ms delay %.1f ms "
-                "mix %.2f spread %.2f", chorus->voices, (double)chorus->rate,
+            ecs_strbuf_append(buf, "chorus voices %d rate %.2f Hz depth %.2f ms delay %.2f ms "
+                "mix %.2f spread %.2f feedback %.2f", chorus->voices, (double)chorus->rate,
                 (double)chorus->depth, (double)chorus->delay, (double)chorus->mix,
-                (double)chorus->spread);
+                (double)chorus->spread, (double)chorus->feedback);
         } else if ((saturator = ecs_get(world, e, Saturator))) {
-            ecs_strbuf_append(buf, "saturator drive %.2f asymmetry %.2f",
+            static const char *modes[] = { "tanh", "tube", "hard", "fold", "rectify" };
+            ecs_strbuf_appendstr(buf, "saturator");
+            if (saturator->mode != SaturatorTanh && saturator->mode >= 0 &&
+                saturator->mode <= SaturatorRectify)
+            {
+                ecs_strbuf_append(buf, " %s", modes[saturator->mode]);
+            }
+
+            ecs_strbuf_append(buf, " drive %.2f asymmetry %.2f",
                 (double)saturator->drive, (double)saturator->asymmetry);
+            if (saturator->low_cut > 0) {
+                ecs_strbuf_append(buf, " low cut %.0f Hz", (double)saturator->low_cut);
+            }
+
+            if (saturator->tone != 0) {
+                ecs_strbuf_append(buf, " tone %.2f", (double)saturator->tone);
+            }
+
+            if (saturator->high_cut > 0) {
+                ecs_strbuf_append(buf, " high cut %.0f Hz", (double)saturator->high_cut);
+            }
+
+            if (saturator->rate > 0) {
+                ecs_strbuf_append(buf, " rate %.0f Hz", (double)saturator->rate);
+            }
+
             if (saturator->bits < 16) {
                 ecs_strbuf_append(buf, " bits %.1f", (double)saturator->bits);
             } else {
@@ -263,6 +368,7 @@ static void box_cmd_audio_effects(
         } else if ((shaper = ecs_get(world, e, TransientShaper))) {
             ecs_strbuf_append(buf, "transient shaper attack %.2f sustain %.2f",
                 (double)shaper->attack, (double)shaper->sustain);
+<<<<<<< HEAD
         } else if ((vocoder = ecs_get(world, e, Vocoder))) {
             char *key = vocoder->modulator && ecs_is_alive(world, vocoder->modulator) ?
                 ecs_get_path(world, vocoder->modulator) : NULL;
@@ -273,16 +379,65 @@ static void box_cmd_audio_effects(
                 (double)vocoder->attack, (double)vocoder->release, (double)vocoder->shift,
                 (double)vocoder->unvoiced, (double)vocoder->mix);
             ecs_os_free(key);
+=======
+        } else if ((shifter = ecs_get(world, e, FrequencyShifter))) {
+            ecs_strbuf_append(buf, "frequency shifter %s %+.1f Hz stereo %.2f feedback %.2f "
+                "mix %.2f", shifter->mode == FrequencyRing ? "ring" : "shift",
+                (double)shifter->shift, (double)shifter->stereo, (double)shifter->feedback,
+                (double)shifter->mix);
+        } else if ((pitch = ecs_get(world, e, PitchShifter))) {
+            ecs_strbuf_append(buf, "pitch shifter semitones %+.1f cents %+.1f stereo %.2f "
+                "window %.1f ms feedback %.2f mix %.2f", (double)pitch->semitones,
+                (double)pitch->cents, (double)pitch->stereo, (double)pitch->window,
+                (double)pitch->feedback, (double)pitch->mix);
+        } else if ((pattern = ecs_get(world, e, PatternGate))) {
+            int32_t length = pattern->length < 1 ? 1 : (pattern->length > 16 ? 16 :
+                pattern->length);
+            ecs_strbuf_appendstr(buf, "pattern gate steps [");
+            for (b = 0; b < length; b ++) {
+                ecs_strbuf_append(buf, b ? " %g" : "%g", (double)pattern->steps[b]);
+            }
+
+            ecs_strbuf_append(buf, "] rate %.3f beats swing %.2f gate %.2f attack %.4f "
+                "release %.3f floor %.1f dB mix %.2f", (double)pattern->rate,
+                (double)pattern->swing, (double)pattern->gate, (double)pattern->attack,
+                (double)pattern->release, (double)pattern->floor, (double)pattern->mix);
+        } else if ((rotary = ecs_get(world, e, Rotary))) {
+            ecs_strbuf_append(buf, "rotary speed %.2f horn %.2f-%.2f Hz drum %.2f-%.2f Hz "
+                "acceleration %.2f s balance %.2f spread %.2f drive %.2f mix %.2f",
+                (double)rotary->speed, (double)rotary->horn_slow, (double)rotary->horn_fast,
+                (double)rotary->drum_slow, (double)rotary->drum_fast,
+                (double)rotary->acceleration, (double)rotary->balance,
+                (double)rotary->spread, (double)rotary->drive, (double)rotary->mix);
+        } else if ((repeat = ecs_get(world, e, BeatRepeat))) {
+            ecs_strbuf_append(buf, "beat repeat %s slice %.4g beats", repeat->active >= 0.5f ?
+                "active" : "inactive", (double)repeat->slice);
+            if (repeat->grid < 0) {
+                ecs_strbuf_appendstr(buf, " grid slice");
+            } else {
+                ecs_strbuf_append(buf, " grid %.4g", (double)repeat->grid);
+            }
+
+            ecs_strbuf_append(buf, " decay %.2f pitch %+.1f gate %.2f mix %.2f%s",
+                (double)repeat->decay, (double)repeat->pitch, (double)repeat->gate,
+                (double)repeat->mix, repeat->reverse >= 0.5f ? " reverse" : "");
+        } else if ((stop = ecs_get(world, e, TapeStop))) {
+            ecs_strbuf_append(buf, "tape stop %s stop %.3f s start %.3f s curve %+.2f",
+                stop->active >= 0.5f ? "active" : "inactive", (double)stop->stop_time,
+                (double)stop->start_time, (double)stop->curve);
+>>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
         }
 
         slot = box_audio_module_effect_slot(world, e);
         if ((ecs_has(world, e, Compressor) || ecs_has(world, e, Gate) ||
-            ecs_has(world, e, Saturator)) && state && slot >= 0)
+            ecs_has(world, e, Saturator) || ecs_has(world, e, PatternGate)) && state &&
+            slot >= 0)
         {
             ecs_strbuf_append(buf, " reduction %.1f dB", (double)state->reduction[slot]);
         }
 
         ecs_strbuf_append(buf, " (%s)", box_cmd_audio_effect_state(world, channel, j, e));
+        box_cmd_audio_modulators(world, buf, e);
         ecs_os_free(path);
     }
 }
@@ -369,6 +524,7 @@ static void box_cmd_audio_bus(
         }
     }
 
+    box_cmd_audio_modulators(world, buf, e);
     box_cmd_audio_effects(world, buf, e, bus);
     if (in_order) {
         box_cmd_audio_meter(world, buf, e);
@@ -633,6 +789,137 @@ static void box_cmd_audio_tracks(
     ecs_query_fini(q);
 }
 
+/** Get the name of an emitter shape as the audio command prints it.
+ *
+ * @param shape The shape
+ * @return The name
+ */
+static const char* box_cmd_audio_shape(
+    AudioEmitterShape shape)
+{
+    const char *result = "point";
+    switch (shape) {
+    case AudioEmitterPoint: result = "point"; break;
+    case AudioEmitterDisc: result = "disc"; break;
+    case AudioEmitterSphere: result = "sphere"; break;
+    case AudioEmitterHemisphere: result = "hemisphere"; break;
+    case AudioEmitterBox: result = "box"; break;
+    }
+
+    return result;
+}
+
+/** Append the lines of the emitters: the sound, the shape, the intervals, the plays sent and
+ * skipped and the plays that sound.
+ *
+ * @param world The world
+ * @param buf The output
+ */
+static void box_cmd_audio_emitters(
+    ecs_world_t *world,
+    ecs_strbuf_t *buf)
+{
+    int32_t i;
+    ecs_query_t *q = ecs_query(world, {
+        .terms = {
+            { .id = ecs_id(AudioEmitter), .inout = EcsIn, .src.id = EcsSelf },
+            { .id = ecs_id(AudioEmitterState), .inout = EcsIn, .src.id = EcsSelf,
+                .oper = EcsOptional }
+        },
+        .flags = EcsQueryMatchDisabled
+    });
+    ecs_iter_t it = ecs_query_iter(world, q);
+    while (ecs_query_next(&it)) {
+        const AudioEmitter *em = ecs_field(&it, AudioEmitter, 0);
+        const AudioEmitterState *es = ecs_field(&it, AudioEmitterState, 1);
+        bool disabled = ecs_table_has_id(world, it.table, EcsDisabled);
+        for (i = 0; i < it.count; i ++) {
+            ecs_entity_t sound = em[i].sound;
+            bool alive = sound && ecs_is_alive(world, sound);
+            char *path = ecs_get_path(world, it.entities[i]);
+            char *name = alive ? ecs_get_path(world, sound) : NULL;
+            ecs_strbuf_append(buf, "\n  emitter %s: sound %s, %s, every %.3f to %.3f s, "
+                "%lld plays, %lld skipped, %d sounding", path, name ? name : "none",
+                box_cmd_audio_shape(em[i].shape), (double)em[i].interval_min,
+                (double)em[i].interval_max, es ? (long long)es[i].plays : 0LL,
+                es ? (long long)es[i].skipped : 0LL, es ? es[i].active : 0);
+            if (em[i].max_active > 0) {
+                ecs_strbuf_append(buf, " of %d", em[i].max_active);
+            }
+
+            if (!em[i].playing) {
+                ecs_strbuf_appendstr(buf, ", stopped");
+            }
+
+            if (disabled) {
+                ecs_strbuf_appendstr(buf, ", disabled");
+            }
+
+            ecs_os_free(name);
+            ecs_os_free(path);
+        }
+    }
+
+    ecs_query_fini(q);
+}
+
+/** Append the macros: each with its value and whether it runs, and its maps with their member,
+ * range, curve, the value the member has at the value of the component and whether they run.
+ *
+ * @param world The world
+ * @param buf The output
+ */
+static void box_cmd_audio_macros(
+    ecs_world_t *world,
+    ecs_strbuf_t *buf)
+{
+    ecs_iter_t it = ecs_each(world, AudioMacro);
+    int32_t i, k;
+    while (ecs_each_next(&it)) {
+        const AudioMacro *macro = ecs_field(&it, AudioMacro, 0);
+        for (i = 0; i < it.count; i ++) {
+            char *path = ecs_get_path(world, it.entities[i]);
+            ecs_iter_t cit = ecs_children(world, it.entities[i]);
+            ecs_strbuf_append(buf, "\n  macro %s: value %.2f (%s)", path,
+                (double)macro[i].value, box_audio_macro_status(world, it.entities[i]));
+            while (ecs_children_next(&cit)) {
+                for (k = 0; k < cit.count; k ++) {
+                    const AudioMacroMap *m = ecs_get(world, cit.entities[k], AudioMacroMap);
+                    char *map_path, *target;
+                    const char *component;
+                    float value;
+                    if (!m) {
+                        continue;
+                    }
+
+                    map_path = ecs_get_path(world, cit.entities[k]);
+                    target = m->target && ecs_is_alive(world, m->target) ?
+                        ecs_get_path(world, m->target) : NULL;
+                    component = m->component && ecs_is_alive(world, m->component) ?
+                        ecs_get_name(world, m->component) : NULL;
+                    value = box_audio_macro_map_value(macro[i].value, m->min, m->max,
+                        m->curve, m->scale == AudioModOctaves ? BOX_AUDIO_MOD_OCTAVES :
+                        BOX_AUDIO_MOD_LINEAR);
+                    ecs_strbuf_append(buf, "\n    map %s: %s %s.%s %.2f..%.2f%s", map_path,
+                        target ? target : "(no target)", component ? component : "?",
+                        m->member ? m->member : "(no member)", (double)m->min,
+                        (double)m->max, m->scale == AudioModOctaves ? " oct" : "");
+                    if (m->curve != 0) {
+                        ecs_strbuf_append(buf, " curve %.2f", (double)m->curve);
+                    }
+
+                    ecs_strbuf_append(buf, " = %.2f (%s)", (double)value,
+                        box_audio_macro_status(world, cit.entities[k]));
+                    ecs_os_free(target);
+                    ecs_os_free(map_path);
+                }
+            }
+
+            ecs_os_free(path);
+        }
+    }
+}
+
 /** Print the status of the audio and the buses in processing order.
  *
  * @param world The world
@@ -661,6 +948,7 @@ static char* box_cmd_audio_print(
     if (mb) {
         ecs_strbuf_append(&buf, ", bus volume %.2f pan %.2f width %.2f%s", (double)mb->volume,
             (double)mb->pan, (double)mb->width, mb->mute ? " muted" : "");
+        box_cmd_audio_modulators(world, &buf, master);
         box_cmd_audio_effects(world, &buf, master, mb);
     }
 
@@ -682,6 +970,8 @@ static char* box_cmd_audio_print(
 
     box_cmd_audio_instruments(world, &buf);
     box_cmd_audio_tracks(world, &buf);
+    box_cmd_audio_emitters(world, &buf);
+    box_cmd_audio_macros(world, &buf);
 
     return ecs_strbuf_get(&buf);
 }
@@ -851,8 +1141,8 @@ void box_cmd_audio_init(
 {
     ECS_IMPORT(world, BoxAudio);
     box_command_register(world,
-        "Print the audio status, transport, buses, instruments and tracks, set the volume or mute, "
-        "play, stop, seek or set the tempo, or capture a WAV",
+        "Print the audio status, transport, buses, instruments, tracks, emitters and macros, set "
+        "the volume or mute, play, stop, seek or set the tempo, or capture a WAV",
         (ecs_function_desc_t){
             .name = "audio",
             .return_type = ecs_id(ecs_string_t),

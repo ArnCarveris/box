@@ -416,6 +416,65 @@ bool box_audio_write_cancel(
     return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
 }
 
+bool box_audio_write_beat(
+    box_audio_writer_t *writer,
+    double beat,
+    float tempo,
+    uint64_t when)
+{
+    box_audio_cmd_beat_t cmd;
+    double whole;
+    beat = beat >= -2147483648.0 ? (beat < 2147483647.0 ? beat : 2147483647.0) :
+        -2147483648.0;
+    whole = (double)(int64_t)beat;
+    whole = whole > beat ? whole - 1.0 : whole;
+    box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_BEAT, sizeof(cmd));
+    cmd.when_lo = (uint32_t)when;
+    cmd.when_hi = (uint32_t)(when >> 32);
+    cmd.whole = (int32_t)whole;
+    cmd.fraction = (float)(beat - whole);
+    cmd.fraction = cmd.fraction < 1.0f ? cmd.fraction : 0.99999994f;
+    cmd.tempo = tempo;
+
+    return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
+}
+
+bool box_audio_write_modulator(
+    box_audio_writer_t *writer,
+    const box_audio_cmd_modulator_t *cmd)
+{
+    box_audio_cmd_modulator_t c = *cmd;
+    box_audio_write_header(&c.header, BOX_AUDIO_CMD_MODULATOR, sizeof(c));
+
+    return box_audio_write_bytes(writer, &c, (int32_t)sizeof(c));
+}
+
+bool box_audio_write_macro(
+    box_audio_writer_t *writer,
+    uint32_t macro,
+    float value,
+    uint64_t when)
+{
+    box_audio_cmd_macro_t cmd;
+    box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_MACRO, sizeof(cmd));
+    cmd.when_lo = (uint32_t)when;
+    cmd.when_hi = (uint32_t)(when >> 32);
+    cmd.macro = macro;
+    cmd.value = value;
+
+    return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
+}
+
+bool box_audio_write_macro_map(
+    box_audio_writer_t *writer,
+    const box_audio_cmd_macro_map_t *cmd)
+{
+    box_audio_cmd_macro_map_t c = *cmd;
+    box_audio_write_header(&c.header, BOX_AUDIO_CMD_MACRO_MAP, sizeof(c));
+
+    return box_audio_write_bytes(writer, &c, (int32_t)sizeof(c));
+}
+
 bool box_audio_write_synth(
     box_audio_writer_t *writer,
     uint32_t sound,

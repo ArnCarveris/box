@@ -87,8 +87,11 @@
 /** Insert slots of a bus; its effects run in the order of their index */
 #define BOX_AUDIO_EFFECT_SLOTS 4
 
-/** Parameters of an effect command, read by each kind in its own way */
-#define BOX_AUDIO_EFFECT_PARAMS 16
+/** Parameters of an effect command, read by each kind in its own way. 32 hold the 16 steps of
+ * a pattern gate and its other parameters as plain floats, so automation and the modulators
+ * reach each step as they reach any other parameter; an EFFECT command is 152 bytes and an
+ * EFFECT_PARAMS command 148, the largest command of the schedule */
+#define BOX_AUDIO_EFFECT_PARAMS 32
 
 /** Seconds of the fade of the wet signal around a change of the kind, bus or index of an
  * effect, out and in, and of the tail of an effect taken off */
@@ -308,7 +311,11 @@ typedef enum box_audio_cmd_type_t {
     BOX_AUDIO_CMD_LEGATO = 12,       /**< box_audio_cmd_legato_t */
     BOX_AUDIO_CMD_EFFECT_PARAMS = 13, /**< box_audio_cmd_effect_params_t */
     BOX_AUDIO_CMD_CANCEL = 14,       /**< box_audio_cmd_cancel_t */
-    BOX_AUDIO_CMD_VOICE_RAMP = 15    /**< box_audio_cmd_ramp_t */
+    BOX_AUDIO_CMD_VOICE_RAMP = 15,   /**< box_audio_cmd_ramp_t */
+    BOX_AUDIO_CMD_BEAT = 16,         /**< box_audio_cmd_beat_t */
+    BOX_AUDIO_CMD_MODULATOR = 17,    /**< box_audio_cmd_modulator_t */
+    BOX_AUDIO_CMD_MACRO = 18,        /**< box_audio_cmd_macro_t */
+    BOX_AUDIO_CMD_MACRO_MAP = 19     /**< box_audio_cmd_macro_map_t */
 } box_audio_cmd_type_t;
 
 /** Parameters of BOX_AUDIO_CMD_VOICE_SET and BOX_AUDIO_CMD_BUS_SET */
@@ -332,9 +339,27 @@ typedef enum box_audio_param_t {
                                   *   everything that follows its pitch included */
     BOX_AUDIO_PARAM_MOD = 12,    /**< Mod of a synth voice, 0..1, default 1: scales the depth
                                   *   of the pitch of its LFOs, its vibrato */
-    BOX_AUDIO_PARAM_PRESSURE = 13 /**< Pressure of a synth voice, 0..1, default 0: moves its
+    BOX_AUDIO_PARAM_PRESSURE = 13, /**< Pressure of a synth voice, 0..1, default 0: moves its
                                   *   cutoff up by pressure * BOX_AUDIO_SYNTH_PRESSURE_OCTAVES */
+    BOX_AUDIO_PARAM_CUTOFF = 14  /**< Cutoff in Hz of the 12 dB per octave low-pass of a voice,
+                                  *   after its source and before its volume and pan, ramped
+                                  *   over BOX_AUDIO_CUTOFF_RAMP.
+                                  *   0 (the default), a negative value or one of at least
+                                  *   BOX_AUDIO_CUTOFF_OPEN opens the filter, which the voice
+                                  *   then skips; others are clamped to BOX_AUDIO_CUTOFF_MIN..
+                                  *   0.45 of the rate. The first cutoff of a voice that has
+                                  *   not rendered applies at once */
 } box_audio_param_t;
+
+/** A cutoff of BOX_AUDIO_PARAM_CUTOFF of at least this many Hz opens the filter of a voice */
+#define BOX_AUDIO_CUTOFF_OPEN 20000.0f
+
+/** Lowest cutoff of BOX_AUDIO_PARAM_CUTOFF in Hz */
+#define BOX_AUDIO_CUTOFF_MIN 10.0f
+
+/** Seconds a cutoff of BOX_AUDIO_PARAM_CUTOFF ramps over, longer than the ramp of the gains:
+ * a jump of octaves sweeps the phase of what passes, which clicks when it is too fast */
+#define BOX_AUDIO_CUTOFF_RAMP 0.05f
 
 /** Largest pitch bend of a voice in semitones, either way */
 #define BOX_AUDIO_BEND_MAX 48.0f
@@ -367,9 +392,9 @@ typedef enum box_audio_param_t {
 
 /** Header of every command: its type and its size in bytes, header included.
  *
- * PLAY, STOP, VOICE_SET, BUS_SET, RELEASE, LEGATO, EFFECT_PARAMS and VOICE_RAMP follow it
- * with when_lo and when_hi, the frame of the core clock (box_audio_core_clock) at which the
- * command takes effect, 64 bits in two words so that every field stays 32 bits.
+ * PLAY, STOP, VOICE_SET, BUS_SET, RELEASE, LEGATO, EFFECT_PARAMS, VOICE_RAMP, BEAT and MACRO
+ * follow it with when_lo and when_hi, the frame of the core clock (box_audio_core_clock) at
+ * which the command takes effect, 64 bits in two words so that every field stays 32 bits.
  *
  * A when of 0, or of a frame that was already rendered, applies at the start of the next
  * block; a later one waits in the schedule of the core for its frame. Of the commands of one
@@ -558,19 +583,42 @@ typedef enum box_audio_effect_kind_t {
     BOX_AUDIO_EFFECT_SATURATOR = 9, /**< A saturator, box_audio_saturator_params_t */
     BOX_AUDIO_EFFECT_TRANSIENT_SHAPER = 10, /**< A transient shaper,
                                   *   box_audio_transient_shaper_params_t */
+<<<<<<< HEAD
     BOX_AUDIO_EFFECT_VOCODER = 11, /**< A vocoder, box_audio_vocoder_params_t, its modulator
                                   *   the key bus of its command */
     BOX_AUDIO_EFFECT_KINDS = 12   /**< Number of kinds, NONE included */
+=======
+    BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER = 11, /**< A frequency shifter,
+                                  *   box_audio_frequency_shifter_params_t */
+    BOX_AUDIO_EFFECT_PITCH_SHIFTER = 12, /**< A pitch shifter, box_audio_pitch_shifter_params_t */
+    BOX_AUDIO_EFFECT_PATTERN_GATE = 13, /**< A pattern gate, box_audio_pattern_gate_params_t */
+    BOX_AUDIO_EFFECT_ROTARY = 14, /**< A rotating speaker, box_audio_rotary_params_t */
+    BOX_AUDIO_EFFECT_BEAT_REPEAT = 15, /**< A beat repeat, box_audio_beat_repeat_params_t */
+    BOX_AUDIO_EFFECT_TAPE_STOP = 16, /**< A tape stop, box_audio_tape_stop_params_t */
+    BOX_AUDIO_EFFECT_KINDS = 17   /**< Number of kinds, NONE included */
+>>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
 } box_audio_effect_kind_t;
 
-/** The parameters of a reverb, the first floats of the params of its effect command */
+/** The parameters of a reverb, the first floats of the params of its effect command. Shimmer
+ * pitch shifts a share of the feedback of the network (shift.h) by shimmer_pitch semitones on
+ * each pass, so the tail rises by the interval; at a shimmer of 0 the reverb runs as it did
+ * without one, bit for bit */
 typedef struct box_audio_reverb_params_t {
     float decay;     /**< Seconds until -60 dB, BOX_AUDIO_REVERB_DECAY_MIN..MAX */
     float damping;   /**< High frequency loss, 0..1 */
     float predelay;  /**< Seconds before the first reflection, 0..BOX_AUDIO_REVERB_PREDELAY_MAX */
     float size;      /**< Room scale, 0..1, which sets the lengths of the delay lines */
     float mix;       /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+    float shimmer;   /**< Share of the feedback that is pitch shifted, 0..1 */
+    float shimmer_pitch; /**< Semitones of the shift of the shimmer,
+                      *   -BOX_AUDIO_PITCH_SHIFTER_SEMITONES..BOX_AUDIO_PITCH_SHIFTER_SEMITONES */
 } box_audio_reverb_params_t;
+
+/** Window of the shifter of the shimmer of a reverb in seconds */
+#define BOX_AUDIO_REVERB_SHIMMER_WINDOW 0.06f
+
+/** Seconds of a change of the shimmer or its pitch */
+#define BOX_AUDIO_REVERB_SHIMMER_RAMP 0.05f
 
 /** Bands of an equalizer; each takes 4 floats of the params of its effect command */
 #define BOX_AUDIO_EQ_BANDS 4
@@ -743,8 +791,9 @@ typedef struct box_audio_delay_params_t {
 #define BOX_AUDIO_MODULATION_RATE_MAX 20.0f
 
 /** Seconds of a change of the depth, the center, the feedback, the mix or the stereo offset of
- * a phaser, of the depth, the delay, the mix or the spread of a chorus, and of each half of the
- * fade of the wet signal around a change of the stages of a phaser or the voices of a chorus */
+ * a phaser, of the depth, the delay, the mix, the spread or the feedback of a chorus, and of
+ * each half of the fade of the wet signal around a change of the stages of a phaser or the
+ * voices of a chorus */
 #define BOX_AUDIO_MODULATION_RAMP 0.02f
 
 /** Frames between two updates of the coefficients of a phaser and of the read positions of a
@@ -795,12 +844,19 @@ typedef struct box_audio_phaser_params_t {
 /** Largest depth of a chorus in milliseconds */
 #define BOX_AUDIO_CHORUS_DEPTH_MAX 25.0f
 
+/** Largest feedback of a chorus, either way */
+#define BOX_AUDIO_CHORUS_FEEDBACK_MAX 0.95f
+
 /** The parameters of a chorus, the first floats of the params of its effect command: voices
  * taps of a stereo line on the memory of its slot, each read with linear interpolation at
  * delay plus depth times a sine LFO, the LFOs of the voices spread evenly in phase and the
  * voices panned across the stereo field by the spread. A read never goes further back than
  * BOX_AUDIO_CHORUS_MAX nor nearer than a frame. The LFO starts at phase 0 when the effect is
- * put on and its phase stays continuous through a change of the rate */
+ * put on and its phase stays continuous through a change of the rate. The feedback adds the
+ * first tap of each channel, read with cubic interpolation, times the feedback to the input of
+ * its line, which turns a delay
+ * of 0.1 to 10 ms into a flanger: comb peaks at multiples of 1 / delay, or at its odd
+ * multiples of half that at a negative feedback. A feedback of 0 renders as without it */
 typedef struct box_audio_chorus_params_t {
     float voices;     /**< Taps, 1..BOX_AUDIO_CHORUS_VOICES_MAX, rounded */
     float rate;       /**< Hz of the LFOs, 0..BOX_AUDIO_MODULATION_RATE_MAX */
@@ -809,7 +865,43 @@ typedef struct box_audio_chorus_params_t {
     float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
     float spread;     /**< 0 keeps every voice in the center, so a mono input stays mono; 1 pans
                        *   the first voice left and the last right */
+    float feedback;   /**< Share of the first tap fed back into the lines,
+                       *   -BOX_AUDIO_CHORUS_FEEDBACK_MAX..BOX_AUDIO_CHORUS_FEEDBACK_MAX; NaN
+                       *   is 0 */
 } box_audio_chorus_params_t;
+
+/** Largest shift of a pitch shifter in semitones, either way */
+#define BOX_AUDIO_PITCH_SHIFTER_SEMITONES 24.0f
+
+/** Largest detune of a pitch shifter in cents, either way */
+#define BOX_AUDIO_PITCH_SHIFTER_CENTS 100.0f
+
+/** Shortest and longest window of a pitch shifter in milliseconds; the longest sizes its
+ * memory */
+#define BOX_AUDIO_PITCH_SHIFTER_WINDOW_MIN 10.0f
+#define BOX_AUDIO_PITCH_SHIFTER_WINDOW_MAX 100.0f
+
+/** Largest feedback of a pitch shifter */
+#define BOX_AUDIO_PITCH_SHIFTER_FEEDBACK_MAX 0.9f
+
+/** Seconds of a change of the pitch, the window, the feedback or the mix of a pitch shifter */
+#define BOX_AUDIO_PITCH_SHIFTER_RAMP 0.02f
+
+/** The parameters of a pitch shifter, the first floats of the params of its effect command: a
+ * delay line pitch shifter per channel (shift.h), BOX_AUDIO_SHIFT_TAPS taps crossfaded with
+ * constant power windows. The left channel shifts by semitones plus cents, the right by
+ * semitones plus cents times 1 - 2 stereo, so a stereo of 1 mirrors its cents. Feedback sends
+ * the shifted signal, soft clipped, back into the line, so each pass shifts again. The wet
+ * signal comes up to a window late; the dry signal is not delayed */
+typedef struct box_audio_pitch_shifter_params_t {
+    float semitones;  /**< -BOX_AUDIO_PITCH_SHIFTER_SEMITONES..BOX_AUDIO_PITCH_SHIFTER_SEMITONES */
+    float cents;      /**< -BOX_AUDIO_PITCH_SHIFTER_CENTS..BOX_AUDIO_PITCH_SHIFTER_CENTS */
+    float stereo;     /**< 0..1: the cents of the right channel go from cents to -cents */
+    float window;     /**< Milliseconds of the window, BOX_AUDIO_PITCH_SHIFTER_WINDOW_MIN..MAX */
+    float feedback;   /**< Share of the shifted signal fed back into the line,
+                       *   0..BOX_AUDIO_PITCH_SHIFTER_FEEDBACK_MAX */
+    float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+} box_audio_pitch_shifter_params_t;
 
 /** Gain before the clipper of a saturator at a drive of 1 in dB; a drive of 0 is 0 dB */
 #define BOX_AUDIO_SATURATOR_DRIVE_DB 30.0f
@@ -824,16 +916,43 @@ typedef struct box_audio_chorus_params_t {
 /** Cutoff of the DC blocker after the clipper of a saturator in Hz */
 #define BOX_AUDIO_SATURATOR_DC 5.0f
 
-/** Seconds of a change of the drive, the asymmetry, the bits or the mix of a saturator */
+/** Seconds of a change of the drive, the asymmetry, the bits, the mix, the cuts, the tone or
+ * the rate of a saturator */
 #define BOX_AUDIO_SATURATOR_RAMP 0.02f
 
+/** Highest low cut and high cut of a saturator in Hz; a high cut is also held under
+ * BOX_AUDIO_SATURATOR_CUT_NYQUIST times the rate */
+#define BOX_AUDIO_SATURATOR_CUT_MAX 20000.0f
+
+/** Share of the rate under which the high cut of a saturator stays, where it counts as off */
+#define BOX_AUDIO_SATURATOR_CUT_NYQUIST 0.45f
+
+/** Pivot of the tone tilt of a saturator in Hz */
+#define BOX_AUDIO_SATURATOR_TONE_HZ 1000.0f
+
+/** dB the tone tilt of a saturator at a tone of 1 raises the highs and lowers the lows */
+#define BOX_AUDIO_SATURATOR_TONE_DB 9.0f
+
+/** Lowest rate of the sample and hold of a saturator in Hz, when it is on */
+#define BOX_AUDIO_SATURATOR_RATE_MIN 100.0f
+
+/** Curve of the clipper of a saturator */
+typedef enum box_audio_saturator_mode_t {
+    BOX_AUDIO_SATURATOR_TANH = 0,    /**< tanh(g x + b) - tanh(b) */
+    BOX_AUDIO_SATURATOR_TUBE = 1,    /**< tanh of the driven input with a level dependent
+                                      *   offset, box_audio_saturate_tube */
+    BOX_AUDIO_SATURATOR_HARD = 2,    /**< Hard clip with a rounded corner, with ADAA */
+    BOX_AUDIO_SATURATOR_FOLD = 3,    /**< Sine wavefolder, with ADAA */
+    BOX_AUDIO_SATURATOR_RECTIFY = 4, /**< tanh, then half to full wave rectified */
+    BOX_AUDIO_SATURATOR_MODES = 5    /**< Number of modes */
+} box_audio_saturator_mode_t;
+
 /** The parameters of a saturator, the first floats of the params of its effect command: each
- * channel runs through a tanh soft clipper at twice the rate (saturate.h), its level
- * compensated so that the drive mostly changes the tone, then a DC blocker and a bit crusher at
- * the base rate. The wet signal comes BOX_AUDIO_SATURATE_LATENCY frames late and the dry
- * signal is delayed as much, so that a mix in between does not comb. Its reduction is the
- * largest drop in dB of the peak of the clipped signal against the peak of the driven input,
- * the slope of the clipper at silence taken out */
+ * channel runs through a highpass, a tone tilt, the oversampled clipper of its mode
+ * (saturate.h), a DC blocker, the inverse tilt, a lowpass, a sample and hold and a bit crusher.
+ *
+ * The dry signal is as late as the wet one, so that a mix does not comb. The reduction is the
+ * largest drop in dB of the peak of the clipped signal against the driven input */
 typedef struct box_audio_saturator_params_t {
     float drive;      /**< 0..1: a gain of 0 to BOX_AUDIO_SATURATOR_DRIVE_DB dB before the
                        *   clipper */
@@ -843,6 +962,17 @@ typedef struct box_audio_saturator_params_t {
                        *   2^bits levels over -1..1, 2^(bits - 1) steps of each sign; at
                        *   BOX_AUDIO_SATURATOR_BITS_MAX it is not rounded */
     float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+    float mode;       /**< A box_audio_saturator_mode_t, rounded; others are
+                       *   BOX_AUDIO_SATURATOR_TANH */
+    float low_cut;    /**< Hz of a 12 dB Butterworth highpass before the clipper,
+                       *   0..BOX_AUDIO_SATURATOR_CUT_MAX, 0 is off */
+    float high_cut;   /**< Hz of a 12 dB Butterworth lowpass after the DC blocker,
+                       *   0..BOX_AUDIO_SATURATOR_CUT_MAX, 0 is off */
+    float tone;       /**< -1..1: a first order tilt around BOX_AUDIO_SATURATOR_TONE_HZ of
+                       *   up to BOX_AUDIO_SATURATOR_TONE_DB at the ends before the clipper,
+                       *   its exact inverse after it; 0 is off */
+    float rate;       /**< Hz of a sample and hold after the high cut, 0 is off, otherwise
+                       *   BOX_AUDIO_SATURATOR_RATE_MIN up to the rate, where it is off */
 } box_audio_saturator_params_t;
 
 /** Attack and release in seconds of the fast envelope of a transient shaper */
@@ -877,6 +1007,7 @@ typedef struct box_audio_transient_shaper_params_t {
     float sustain;    /**< -1..1: above 0 boosts the tail, below 0 shortens it */
 } box_audio_transient_shaper_params_t;
 
+<<<<<<< HEAD
 /** Fewest, most and default bands of a vocoder */
 #define BOX_AUDIO_VOCODER_BANDS_MIN 8
 #define BOX_AUDIO_VOCODER_BANDS_MAX 32
@@ -945,6 +1076,270 @@ typedef struct box_audio_vocoder_params_t {
                        *   to the carrier of the high bands, so consonants come through */
     float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
 } box_audio_vocoder_params_t;
+=======
+/** Largest shift of a frequency shifter in Hz, either way */
+#define BOX_AUDIO_FREQUENCY_SHIFTER_MAX 5000.0f
+
+/** Largest feedback of a frequency shifter, either way */
+#define BOX_AUDIO_FREQUENCY_SHIFTER_FEEDBACK_MAX 0.95f
+
+/** Lowest frequency in Hz from which the Hilbert transformer of a frequency shifter keeps its
+ * two paths 90 degrees apart, up to as far under the Nyquist frequency */
+#define BOX_AUDIO_FREQUENCY_SHIFTER_LOW 20.0f
+
+/** Allpasses of second order of the Hilbert transformer of a frequency shifter, over both of
+ * its paths; 12 keep the image of a shift 60 dB under it from 20 Hz to 20 kHz at 48 kHz */
+#define BOX_AUDIO_FREQUENCY_SHIFTER_ALLPASSES 12
+
+/** Seconds of a change of the shift, the mode, the stereo, the feedback or the mix of a
+ * frequency shifter */
+#define BOX_AUDIO_FREQUENCY_SHIFTER_RAMP 0.02f
+
+/** Modes of a frequency shifter */
+typedef enum box_audio_frequency_shifter_mode_t {
+    BOX_AUDIO_FREQUENCY_SHIFT = 0, /**< Every partial moves by the shift in Hz: single sideband
+                                    *   modulation of the analytic signal */
+    BOX_AUDIO_FREQUENCY_RING = 1   /**< Ring modulation by a sine at the magnitude of the
+                                    *   shift: both sidebands at half the level, no carrier */
+} box_audio_frequency_shifter_mode_t;
+
+/** The parameters of a frequency shifter, the first floats of the params of its effect
+ * command: the analytic signal of each channel from an allpass pair Hilbert transformer, its
+ * two paths 90 degrees apart from BOX_AUDIO_FREQUENCY_SHIFTER_LOW Hz to as far under the
+ * Nyquist frequency, times a complex oscillator at the shift. Its output is fed back into its
+ * input through a DC blocker and mixed with the dry signal. The oscillators start at phase 0
+ * when the effect is put on and their phases stay continuous through a change of the shift */
+typedef struct box_audio_frequency_shifter_params_t {
+    float shift;      /**< Hz, -BOX_AUDIO_FREQUENCY_SHIFTER_MAX..BOX_AUDIO_FREQUENCY_SHIFTER_MAX */
+    float mode;       /**< A box_audio_frequency_shifter_mode_t, rounded; a change crossfades */
+    float stereo;     /**< 0..1: the right channel shifts by shift times 1 - 2 stereo, so at 1
+                       *   the opposite way */
+    float feedback;   /**< Share of the output fed back into the input,
+                       *   -BOX_AUDIO_FREQUENCY_SHIFTER_FEEDBACK_MAX..MAX */
+    float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+} box_audio_frequency_shifter_params_t;
+
+/** Steps of the pattern of a pattern gate */
+#define BOX_AUDIO_PATTERN_GATE_STEPS 16
+
+/** Shortest and longest step of a pattern gate in beats */
+#define BOX_AUDIO_PATTERN_GATE_RATE_MIN (1.0f / 64.0f)
+#define BOX_AUDIO_PATTERN_GATE_RATE_MAX 16.0f
+
+/** Largest swing of a pattern gate, that of Track */
+#define BOX_AUDIO_PATTERN_GATE_SWING_MAX 0.75f
+
+/** Shortest and longest attack or release of a pattern gate in seconds */
+#define BOX_AUDIO_PATTERN_GATE_EDGE_MIN 0.0005f
+#define BOX_AUDIO_PATTERN_GATE_EDGE_MAX 2.0f
+
+/** Smallest share of a step a pattern gate is open */
+#define BOX_AUDIO_PATTERN_GATE_GATE_MIN 0.05f
+
+/** Lowest floor of a pattern gate in dB; the highest is 0 */
+#define BOX_AUDIO_PATTERN_GATE_FLOOR_MIN (-80.0f)
+
+/** Seconds of a change of the floor or the mix of a pattern gate */
+#define BOX_AUDIO_PATTERN_GATE_RAMP 0.02f
+
+/** The parameters of a pattern gate, the floats of the params of its effect command: a level
+ * pattern locked to the beat clock of the core (box_audio_cmd_beat_t), the same gain on both
+ * channels.
+ *
+ * At each frame the step floor(beat / rate) mod length sounds, on a grid from beat 0 that
+ * swing bends as a Track swings its notes: in each pair of steps the first lasts 1 + swing
+ * steps and the second 1 - swing. A step is open for the first gate share of it, at its level,
+ * and closed after, at the floor; a level of 0 is closed all along. The gain is floor + (1 -
+ * floor) times the openness, which moves linearly toward the level of the step while it is
+ * open and toward 0 after: from 0 to 1 in attack seconds, from 1 to 0 in release seconds. So
+ * the edges sit on the grid after a seek, a loop wrap and a tempo change, and a change of a
+ * step or of the timing moves the gain at the speed of the edges, without a click */
+typedef struct box_audio_pattern_gate_params_t {
+    float steps[BOX_AUDIO_PATTERN_GATE_STEPS]; /**< Level of each step, 0..1 */
+    float length;     /**< Steps that play, rounded, 1..BOX_AUDIO_PATTERN_GATE_STEPS */
+    float rate;       /**< Beats per step, BOX_AUDIO_PATTERN_GATE_RATE_MIN..MAX */
+    float swing;      /**< 0..BOX_AUDIO_PATTERN_GATE_SWING_MAX: the second step of each pair
+                       *   starts later by swing steps */
+    float attack;     /**< Seconds of an edge from closed to open,
+                       *   BOX_AUDIO_PATTERN_GATE_EDGE_MIN..MAX */
+    float release;    /**< Seconds of an edge from open to closed,
+                       *   BOX_AUDIO_PATTERN_GATE_EDGE_MIN..MAX */
+    float gate;       /**< Share of each step that is open, BOX_AUDIO_PATTERN_GATE_GATE_MIN..1 */
+    float floor;      /**< Gain when closed in dB, BOX_AUDIO_PATTERN_GATE_FLOOR_MIN..0 */
+    float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+} box_audio_pattern_gate_params_t;
+
+/** Crossover of a rotary between its drum and its horn in Hz */
+#define BOX_AUDIO_ROTARY_CROSSOVER 800.0f
+
+/** Longest read of a rotary in milliseconds, which sizes its memory */
+#define BOX_AUDIO_ROTARY_MAX 4.0f
+
+/** Milliseconds of the read of the horn and of the drum of a rotary at the middle of a turn,
+ * and how far the turn moves it either way: the Doppler shift */
+#define BOX_AUDIO_ROTARY_HORN_DELAY 1.5f
+#define BOX_AUDIO_ROTARY_HORN_DEPTH 0.35f
+#define BOX_AUDIO_ROTARY_DRUM_DELAY 1.5f
+#define BOX_AUDIO_ROTARY_DRUM_DEPTH 0.15f
+
+/** Share of the level the horn and the drum of a rotary lose as they face away from a mic */
+#define BOX_AUDIO_ROTARY_HORN_AM 0.6f
+#define BOX_AUDIO_ROTARY_DRUM_AM 0.4f
+
+/** Cutoff in Hz of the lowpass the horn and the drum of a rotary fade into as they face away
+ * from a mic, and the share of it they reach facing away */
+#define BOX_AUDIO_ROTARY_HORN_TONE 2500.0f
+#define BOX_AUDIO_ROTARY_HORN_DULL 0.6f
+#define BOX_AUDIO_ROTARY_DRUM_TONE 300.0f
+#define BOX_AUDIO_ROTARY_DRUM_DULL 0.3f
+
+/** Inertia of the drum of a rotary against that of the horn */
+#define BOX_AUDIO_ROTARY_DRUM_INERTIA 3.0f
+
+/** Shortest and longest acceleration of the horn of a rotary in seconds */
+#define BOX_AUDIO_ROTARY_ACCELERATION_MIN 0.01f
+#define BOX_AUDIO_ROTARY_ACCELERATION_MAX 20.0f
+
+/** Gain before the clipper of the preamp of a rotary at a drive of 1 in dB */
+#define BOX_AUDIO_ROTARY_DRIVE_DB 24.0f
+
+/** Offset the preamp of a rotary at a drive of 1 adds before its clipper, for the even
+ * harmonics of a tube */
+#define BOX_AUDIO_ROTARY_BIAS 0.2f
+
+/** Seconds of silent input after which a rotary clears itself and idles */
+#define BOX_AUDIO_ROTARY_QUIET 0.05f
+
+/** Level of its preamp, filters and lines below which a rotary that has been quiet idles, so
+ * the tail of its DC blocker does not click when it is cleared */
+#define BOX_AUDIO_ROTARY_SILENCE 1e-6f
+
+/** The parameters of a rotary, the first floats of the params of its effect command: a
+ * rotating speaker cabinet. The sum of both channels runs through a tube preamp, the clipper
+ * of saturate.h at twice the rate blended in by the drive, then a Linkwitz-Riley crossover at
+ * BOX_AUDIO_ROTARY_CROSSOVER splits it into the drum below and the horn above. Each rotor
+ * writes a line on the memory of its slot that two virtual mics read, the left one a quarter
+ * turn times the spread one way and the right one as far the other way. As a rotor turns, the
+ * read of a mic moves with the distance of the rotor (Doppler), and its level drops and its
+ * tone dulls as the rotor faces away. The horn and the drum turn the opposite ways.
+ *
+ * Each rotor turns at its slow rate plus the speed times the way to its fast rate, and moves to
+ * a new rate exponentially: the horn within 5% in the acceleration, the drum
+ * BOX_AUDIO_ROTARY_DRUM_INERTIA times slower. The rotors start at phase 0 and at the rate of
+ * their speed when the effect is put on. */
+typedef struct box_audio_rotary_params_t {
+    float speed;        /**< 0..1: 0 is slow (chorale), 1 fast (tremolo) */
+    float horn_slow;    /**< Hz of the horn at speed 0, 0..BOX_AUDIO_MODULATION_RATE_MAX */
+    float horn_fast;    /**< Hz of the horn at speed 1, 0..BOX_AUDIO_MODULATION_RATE_MAX */
+    float drum_slow;    /**< Hz of the drum at speed 0, 0..BOX_AUDIO_MODULATION_RATE_MAX */
+    float drum_fast;    /**< Hz of the drum at speed 1, 0..BOX_AUDIO_MODULATION_RATE_MAX */
+    float acceleration; /**< Seconds of the horn to a new rate,
+                         *   BOX_AUDIO_ROTARY_ACCELERATION_MIN..MAX */
+    float balance;      /**< -1..1: -1 is the drum alone, 1 the horn alone, 0 both */
+    float spread;       /**< 0..1: 0 puts both mics at the same place, so the output is mono;
+                         *   1 puts them half a turn apart */
+    float drive;        /**< 0..1: the share of the preamp, its gain 0 to
+                         *   BOX_AUDIO_ROTARY_DRIVE_DB dB */
+    float mix;          /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+} box_audio_rotary_params_t;
+
+/** Longest slice of a beat repeat in seconds, which sizes its memory: the longest slice of
+ * BOX_AUDIO_BEAT_REPEAT_SLICE_MAX beats at the slowest tempo is held to it */
+#define BOX_AUDIO_BEAT_REPEAT_MAX 4.0f
+
+/** Shortest and longest slice of a beat repeat in beats; the longest grid is the longest
+ * slice */
+#define BOX_AUDIO_BEAT_REPEAT_SLICE_MIN (1.0f / 32.0f)
+#define BOX_AUDIO_BEAT_REPEAT_SLICE_MAX 4.0f
+
+/** Largest pitch of a beat repeat per repeat in semitones, either way */
+#define BOX_AUDIO_BEAT_REPEAT_PITCH_MAX 12.0f
+
+/** Largest pitch a repeat of a beat repeat reaches in semitones, either way, the pitch of the
+ * repeats added up: the speed of a read stays within 1/16..16 */
+#define BOX_AUDIO_BEAT_REPEAT_PITCH_TOTAL 48.0f
+
+/** Shortest gate of a beat repeat */
+#define BOX_AUDIO_BEAT_REPEAT_GATE_MIN 0.1f
+
+/** Seconds of the crossfades of a beat repeat at the ends of its repeats and of the return
+ * of the dry signal, at most a quarter of the slice */
+#define BOX_AUDIO_BEAT_REPEAT_FADE 0.002f
+
+/** Seconds of a change of the mix of a beat repeat */
+#define BOX_AUDIO_BEAT_REPEAT_RAMP 0.02f
+
+/** The parameters of a beat repeat, the first floats of the params of its effect command: a
+ * stereo line on the memory of its slot that records the input until active rises to 0.5 or
+ * above. The capture then starts at the next grid point of the beat clock of the core
+ * (box_audio_core_beat), or at once on a grid of 0 or within half a frame of a point, and
+ * holds a slice of slice beats at the tempo of the clock at the rise, held to
+ * BOX_AUDIO_BEAT_REPEAT_MAX seconds.
+ *
+ * The first repeat is the input itself as it is captured; each one after it plays the slice
+ * again, from the start of the capture, decay times as loud as the one before it and pitch
+ * semitones from it, resampled with cubic interpolation, so it slows down or speeds up like a
+ * tape; reverse plays it from its end. Each repeat sounds for gate of the slice and less when
+ * a faster read reaches the end of the slice first. A repeat crossfades from the one before
+ * over BOX_AUDIO_BEAT_REPEAT_FADE, which plays on past its end for it. Decay, pitch, reverse
+ * and gate apply from the next repeat on; slice and grid at the next rise.
+ *
+ * When active falls under 0.5 the dry signal returns at once, over a crossfade of
+ * BOX_AUDIO_BEAT_REPEAT_FADE, and the line records again. Before the capture started a fall
+ * cancels it. While it repeats the output is the dry signal times 1 - mix plus the repeats
+ * times mix; while it is not active the input passes unchanged */
+typedef struct box_audio_beat_repeat_params_t {
+    float active;     /**< 0.5 and above repeats, under it passes the input */
+    float slice;      /**< Beats of the slice, BOX_AUDIO_BEAT_REPEAT_SLICE_MIN..MAX */
+    float grid;       /**< Beats of the grid the capture waits for,
+                       *   0..BOX_AUDIO_BEAT_REPEAT_SLICE_MAX; 0 captures at once, a negative
+                       *   grid is the slice */
+    float decay;      /**< Gain of a repeat against the one before it, 0..1 */
+    float pitch;      /**< Semitones of a repeat against the one before it,
+                       *   -BOX_AUDIO_BEAT_REPEAT_PITCH_MAX..BOX_AUDIO_BEAT_REPEAT_PITCH_MAX */
+    float reverse;    /**< 0.5 and above plays the repeats after the first from the end */
+    float gate;       /**< Share of each repeat that sounds, BOX_AUDIO_BEAT_REPEAT_GATE_MIN..1 */
+    float mix;        /**< Level of the repeats while it repeats, 0..1; the dry signal passes
+                       *   at 1 - mix */
+} box_audio_beat_repeat_params_t;
+
+/** Longest lag of a tape stop behind its input in seconds, which sizes its memory */
+#define BOX_AUDIO_TAPE_STOP_MAX 4.0f
+
+/** Shortest and longest stop and start of a tape stop in seconds */
+#define BOX_AUDIO_TAPE_STOP_TIME_MIN 0.01f
+#define BOX_AUDIO_TAPE_STOP_TIME_MAX 4.0f
+
+/** Speed under which the output of a tape stop fades out, linearly to silence at a speed of
+ * 0 */
+#define BOX_AUDIO_TAPE_STOP_FADE 0.1f
+
+/** Seconds of the crossfade of a tape stop from the read that lags behind its input after a
+ * start to the input */
+#define BOX_AUDIO_TAPE_STOP_CROSSFADE 0.02f
+
+/** The parameters of a tape stop, the first floats of the params of its effect command: a
+ * stereo line on the memory of its slot that records the input, read at a speed with cubic
+ * interpolation, so the pitch and the time slow down together.
+ *
+ * While active is 0.5 or above, the speed falls from 1 to 0 over stop_time seconds; while it
+ * is under 0.5 it rises back to 1 over start_time seconds, from where it stands. The speed at a
+ * phase p of the ramp, 0 at a speed of 1 and 1 at a stop, is 1 - p^(4^curve): a curve of 0 is
+ * linear, above 0 the speed holds longer and falls fast at the end, under 0 it falls fast at
+ * first and creeps to the stop; a start runs the same curve back.
+ *
+ * Under a speed of BOX_AUDIO_TAPE_STOP_FADE the output fades out, to silence at a stop. What
+ * comes in while it stands is skipped: a start reads from the input of the moment it starts,
+ * and once it is up to speed it crossfades to the input over BOX_AUDIO_TAPE_STOP_CROSSFADE,
+ * skipping what the start fell behind, so the output never catches up. At full speed the input
+ * passes unchanged */
+typedef struct box_audio_tape_stop_params_t {
+    float active;     /**< 0.5 and above stops, under it starts */
+    float stop_time;  /**< Seconds of the stop, BOX_AUDIO_TAPE_STOP_TIME_MIN..MAX */
+    float start_time; /**< Seconds of the start, BOX_AUDIO_TAPE_STOP_TIME_MIN..MAX */
+    float curve;      /**< Shape of the ramps, -1..1 */
+} box_audio_tape_stop_params_t;
+>>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
 
 /** Put an effect into an insert slot of a bus, change its parameters, move it or take it off.
  *
@@ -986,18 +1381,229 @@ typedef struct box_audio_cmd_effect_params_t {
 
 /** Drop the commands of the schedule that set a parameter of a bus or the parameters of an
  * effect slot, or the ramps of a voice, at once: the BUS_SET commands of a bus and a
- * parameter, every EFFECT_PARAMS command of a slot, or every VOICE_RAMP command of a voice
- * handle. The automation of the timeline cancels what it scheduled ahead with it on a stop, a
- * seek and a change, and the sequencer the expression of its notes */
+ * parameter, every EFFECT_PARAMS command of a slot, every VOICE_RAMP command of a voice
+ * handle, every MACRO command of a macro, or the BEAT commands from a frame on. The automation
+ * of the timeline cancels what it scheduled ahead with it on a stop, a seek and a change, and
+ * the sequencer the expression of its notes */
 typedef struct box_audio_cmd_cancel_t {
     box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_CANCEL */
-    uint32_t type;                  /**< BOX_AUDIO_CMD_BUS_SET, BOX_AUDIO_CMD_EFFECT_PARAMS or
-                                     *   BOX_AUDIO_CMD_VOICE_RAMP */
-    uint32_t target;                /**< Index of the bus or slot of the effect, or handle of
-                                     *   the voice */
+    uint32_t type;                  /**< BOX_AUDIO_CMD_BUS_SET, BOX_AUDIO_CMD_EFFECT_PARAMS,
+                                     *   BOX_AUDIO_CMD_VOICE_RAMP, BOX_AUDIO_CMD_MACRO or
+                                     *   BOX_AUDIO_CMD_BEAT */
+    uint32_t target;                /**< Index of the bus, slot of the effect or of the macro,
+                                     *   or handle of the voice; of a BEAT, the low word of
+                                     *   the first frame whose BEAT commands are dropped */
     uint32_t param;                 /**< The box_audio_param_t of a BUS_SET, unused for an
-                                     *   effect and a voice */
+                                     *   effect and a voice; of a BEAT, the high word of the
+                                     *   frame */
 } box_audio_cmd_cancel_t;
+
+/** Set the beat clock of the core at a frame: the beat of the Transport at that frame and the
+ * tempo from there on. The core derives the beat of any later frame from the last of them
+ * that applied, linearly, until the next one: the transport sends one at a start, a seek, a
+ * stop, a tempo change and each loop wrap, scheduled at its frame as it schedules notes.
+ * Before the first one the clock stands at beat 0 at frame 0 at BOX_AUDIO_SYNTH_TEMPO.
+ *
+ * What reads the clock: the synced modulators (box_audio_cmd_modulator_t), and any other
+ * part of the core that must stay phase locked to the Transport, through box_audio_core_beat */
+typedef struct box_audio_cmd_beat_t {
+    box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_BEAT */
+    uint32_t when_lo;               /**< Low word of the frame of the beat, 0 for now */
+    uint32_t when_hi;               /**< High word of the frame */
+    int32_t whole;                  /**< Whole beats at the frame, the floor of the beat */
+    float fraction;                 /**< Fraction of a beat at the frame, 0..1 */
+    float tempo;                    /**< Beats per second from the frame on, 0 (or a value
+                                     *   that is not positive) for BOX_AUDIO_SYNTH_TEMPO, the
+                                     *   120 bpm of a stopped or missing Transport */
+} box_audio_cmd_beat_t;
+
+/** Modulators of the core */
+#define BOX_AUDIO_MOD_MAX 64
+
+/** Modulators the module lets move one parameter */
+#define BOX_AUDIO_MOD_PER_TARGET 4
+
+/** Values of a step modulator */
+#define BOX_AUDIO_MOD_STEP_MAX 16
+
+/** Frames of the control block of the modulators: they compute their value for the end of
+ * each block of the core clock, which ramps the parameter across it */
+#define BOX_AUDIO_MOD_CONTROL 32
+
+/** Fewest frames of the ramp that follows an edge of a hard wave or a step */
+#define BOX_AUDIO_MOD_EDGE 16
+
+/** Seconds a modulator fades in over when it starts, and out over when it is released */
+#define BOX_AUDIO_MOD_FADE 0.05f
+
+/** Level in dB a follower maps to 0; 0 dB maps to 1 */
+#define BOX_AUDIO_MOD_FLOOR_DB (-60.0f)
+
+/** Shortest and longest attack and release of a follower in seconds */
+#define BOX_AUDIO_MOD_FOLLOW_MIN 0.0005f
+#define BOX_AUDIO_MOD_FOLLOW_MAX 5.0f
+
+/** What a modulator moves */
+typedef enum box_audio_mod_target_t {
+    BOX_AUDIO_MOD_TARGET_NONE = 0,  /**< Nothing: releases the modulator */
+    BOX_AUDIO_MOD_TARGET_BUS = 1,   /**< A parameter of a bus */
+    BOX_AUDIO_MOD_TARGET_EFFECT = 2, /**< A parameter of an effect slot */
+    BOX_AUDIO_MOD_TARGET_MACRO = 3  /**< The value of a macro, index is its slot: the modulator
+                                     *   adds to it before its maps shape it, linearly */
+} box_audio_mod_target_t;
+
+/** The source of a modulator */
+typedef enum box_audio_mod_source_t {
+    BOX_AUDIO_MOD_LFO = 0,          /**< A wave, -1..1, or 0..1 when unipolar */
+    BOX_AUDIO_MOD_STEPS = 1,        /**< A sequence of values, -1..1 */
+    BOX_AUDIO_MOD_FOLLOWER = 2      /**< The level of a bus, 0..1 */
+} box_audio_mod_source_t;
+
+/** Waves of an LFO modulator, at phase 0: the sine and the triangle at 0 rising, the square
+ * at its top, the saws at their start */
+typedef enum box_audio_mod_wave_t {
+    BOX_AUDIO_MOD_SINE = 0,         /**< Sine */
+    BOX_AUDIO_MOD_TRIANGLE = 1,     /**< Triangle */
+    BOX_AUDIO_MOD_SQUARE = 2,       /**< Square, 1 the first half of a cycle, -1 the second */
+    BOX_AUDIO_MOD_SAW_UP = 3,       /**< Rising saw, -1 to 1 */
+    BOX_AUDIO_MOD_SAW_DOWN = 4,     /**< Falling saw, 1 to -1 */
+    BOX_AUDIO_MOD_RANDOM = 5        /**< Sample and hold: a random value per cycle, the same
+                                     *   for the same cycle of the beat clock */
+} box_audio_mod_wave_t;
+
+/** How the depth of a modulator applies */
+typedef enum box_audio_mod_scale_t {
+    BOX_AUDIO_MOD_LINEAR = 0,       /**< The parameter plus depth times the source */
+    BOX_AUDIO_MOD_OCTAVES = 1       /**< The parameter times 2^(depth times the source), for a
+                                     *   frequency; a parameter that is not positive is left */
+} box_audio_mod_scale_t;
+
+/** Put a modulator into a slot, change it or release it.
+ *
+ * A modulator moves one parameter of a bus (BOX_AUDIO_PARAM_VOLUME, PAN, WIDTH, SEND or
+ * SEND_1..3), of an effect slot (an index of its params) or the value of a macro (its slot as
+ * index) on its own, once per control block of BOX_AUDIO_MOD_CONTROL frames of the core clock,
+ * at the edges of its hard waves and steps, and at once after a command. Its value adds to the
+ * value the parameter has from the commands, the BUS_SET, EFFECT and EFFECT_PARAMS ones, or
+ * from the maps of a macro, the sum clamped to the range of the parameter; on a macro it adds
+ * to the MACRO value before the maps shape it. The modulators of one parameter add up. A bus
+ * ramps its gains across each block, an effect gets its new params and smooths them as it does
+ * any change.
+ *
+ * A modulator fades in over BOX_AUDIO_MOD_FADE when it starts; a command with target NONE, or
+ * one that moves it to another target, fades it out over BOX_AUDIO_MOD_FADE first, and the
+ * parameter returns to its value without a click. A command for a slot that runs with the same
+ * target changes it without a restart: its phase stays locked */
+typedef struct box_audio_cmd_modulator_t {
+    box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_MODULATOR */
+    uint32_t slot;                  /**< Slot of the modulator, below BOX_AUDIO_MOD_MAX */
+    uint32_t target;                /**< A box_audio_mod_target_t */
+    uint32_t index;                 /**< Bus index or effect slot */
+    uint32_t param;                 /**< box_audio_param_t of a bus, index of a param of an
+                                     *   effect, below BOX_AUDIO_EFFECT_PARAMS */
+    uint32_t kind;                  /**< box_audio_effect_kind_t the effect slot must hold,
+                                     *   else the modulator waits */
+    uint32_t source;                /**< A box_audio_mod_source_t */
+    uint32_t scale;                 /**< A box_audio_mod_scale_t */
+    uint32_t wave;                  /**< A box_audio_mod_wave_t of an LFO */
+    uint32_t unipolar;              /**< Nonzero: an LFO moves 0..1 instead of -1..1 */
+    uint32_t key;                   /**< Bus a follower measures, before its inserts and
+                                     *   fader, BOX_AUDIO_BUS_NONE for none */
+    uint32_t step_count;            /**< Steps that play, 1..BOX_AUDIO_MOD_STEP_MAX */
+    float depth;                    /**< Swing of the parameter either way at a source of 1,
+                                     *   in its units, or in octaves */
+    float rate;                     /**< Hz of an LFO, steps per second of a step modulator,
+                                     *   when sync is not positive */
+    float sync;                     /**< Beats of a cycle of an LFO, of a step of a step
+                                     *   modulator, 0 for rate: the phase at a frame is
+                                     *   phase + fract(beat / sync), beat being the beat of
+                                     *   the beat clock at the frame */
+    float phase;                    /**< Phase at the start in turns, 0..1, of a cycle of an
+                                     *   LFO, of the whole sequence of a step modulator */
+    float smooth;                   /**< Share of a step a step modulator glides from the
+                                     *   value of the step before over, 0 hard .. 1 */
+    float attack;                   /**< Seconds of the rise of a follower */
+    float release;                  /**< Seconds of the fall of a follower */
+    float steps[BOX_AUDIO_MOD_STEP_MAX]; /**< Values of a step modulator, -1..1 */
+} box_audio_cmd_modulator_t;
+
+/** Macros of the core */
+#define BOX_AUDIO_MACRO_MAX 32
+
+/** Maps the module lets one macro have */
+#define BOX_AUDIO_MACRO_MAP_EACH 8
+
+/** Map slots of the core, shared by every macro */
+#define BOX_AUDIO_MACRO_MAP_MAX (BOX_AUDIO_MACRO_MAX * BOX_AUDIO_MACRO_MAP_EACH)
+
+/** Bits a curve of 1 bends a map by: shape(x) = (2^(k x) - 1) / (2^k - 1) with k this times
+ * the curve, so at curve 1 the middle of a macro gives 7 / 63 of the range of a map */
+#define BOX_AUDIO_MACRO_CURVE 6.0f
+
+/** Set the value of a macro at a frame: one value of 0..1 that its maps turn into the
+ * parameters of buses and effect slots (box_audio_cmd_macro_map_t). The modulators of the
+ * macro (BOX_AUDIO_MOD_TARGET_MACRO) add to it, and the sum is clamped to 0..1. The parameters
+ * follow at the next update of the modulators, which a MACRO command brings forward to its
+ * frame, so a value scheduled ahead applies on exactly its frame. Every macro starts at 0 */
+typedef struct box_audio_cmd_macro_t {
+    box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_MACRO */
+    uint32_t when_lo;               /**< Low word of the frame it applies at, 0 for now */
+    uint32_t when_hi;               /**< High word of the frame */
+    uint32_t macro;                 /**< Slot of the macro, below BOX_AUDIO_MACRO_MAX */
+    float value;                    /**< The value, clamped to 0..1, NaN for 0 */
+} box_audio_cmd_macro_t;
+
+/** Put a map of a macro into a slot, change it or release it.
+ *
+ * A map decides one parameter of a bus (BOX_AUDIO_PARAM_VOLUME, PAN, WIDTH, SEND or
+ * SEND_1..3) or of an effect slot (an index of its params) from the value v of its macro:
+ * min + (max - min) * shape(v), or min * (max / min)^shape(v) with BOX_AUDIO_MOD_OCTAVES, both
+ * through box_audio_macro_map_value. The value replaces the one of the commands (BUS_SET,
+ * EFFECT and EFFECT_PARAMS); the modulators of the parameter add to it after. The maps update
+ * with the modulators, every BOX_AUDIO_MOD_CONTROL frames and after a command; a bus that a
+ * map moves ramps over at least the ramp of a set, an effect smooths the change as any other.
+ *
+ * A map fades in over BOX_AUDIO_MOD_FADE from the value of the commands when it starts; a
+ * command with target NONE, or one that moves it to another parameter or macro, fades it out
+ * over BOX_AUDIO_MOD_FADE first, at the value its macro had, and the parameter returns to the
+ * value of the commands without a click. A command for a slot that runs with the same target
+ * and macro changes its range and curve at once. The module lets no two maps of one parameter
+ * run but while one fades out */
+typedef struct box_audio_cmd_macro_map_t {
+    box_audio_cmd_header_t header;  /**< BOX_AUDIO_CMD_MACRO_MAP */
+    uint32_t slot;                  /**< Slot of the map, below BOX_AUDIO_MACRO_MAP_MAX */
+    uint32_t macro;                 /**< Slot of its macro, below BOX_AUDIO_MACRO_MAX */
+    uint32_t target;                /**< BOX_AUDIO_MOD_TARGET_BUS, BOX_AUDIO_MOD_TARGET_EFFECT
+                                     *   or BOX_AUDIO_MOD_TARGET_NONE to release it */
+    uint32_t index;                 /**< Bus index or effect slot */
+    uint32_t param;                 /**< box_audio_param_t of a bus, index of a param of an
+                                     *   effect, below BOX_AUDIO_EFFECT_PARAMS */
+    uint32_t kind;                  /**< box_audio_effect_kind_t the effect slot must hold,
+                                     *   else the map waits */
+    uint32_t scale;                 /**< BOX_AUDIO_MOD_LINEAR, or BOX_AUDIO_MOD_OCTAVES for a
+                                     *   frequency of an effect, with min and max positive */
+    float min;                      /**< Value at a macro of 0, in the units of the parameter */
+    float max;                      /**< Value at a macro of 1; below min inverts the map */
+    float curve;                    /**< -1 logarithmic .. 0 linear .. 1 exponential */
+} box_audio_cmd_macro_map_t;
+
+/** Shape the value of a macro into the value of a map. Does not allocate.
+ *
+ * @param value The value of the macro, clamped to 0..1, NaN for 0
+ * @param min Value of the map at 0
+ * @param max Value of the map at 1
+ * @param curve -1..1, clamped: shape(x) = (2^(k x) - 1) / (2^k - 1), k = curve times
+ *        BOX_AUDIO_MACRO_CURVE, x at 0
+ * @param scale BOX_AUDIO_MOD_LINEAR: min + (max - min) * shape(x); BOX_AUDIO_MOD_OCTAVES:
+ *        min * (max / min)^shape(x), linear when min or max is not positive
+ * @return The value of the map
+ */
+float box_audio_macro_map_value(
+    float value,
+    float min,
+    float max,
+    float curve,
+    uint32_t scale);
 
 /** Waves of a synth oscillator */
 typedef enum box_audio_synth_wave_t {
@@ -1479,10 +2085,9 @@ void box_audio_core_stream_status(
     box_audio_stream_status_t *status);
 
 /** Apply a batch of commands. They take effect at the start of the next render block, but
- * a PLAY, STOP, VOICE_SET, BUS_SET, RELEASE, LEGATO, EFFECT_PARAMS or VOICE_RAMP with a future
- * when, which
- * waits in the schedule and takes effect on exactly its frame: the render splits its block
- * there.
+ * a PLAY, STOP, VOICE_SET, BUS_SET, RELEASE, LEGATO, EFFECT_PARAMS, VOICE_RAMP, BEAT or MACRO
+ * with a future when, which waits in the schedule and takes effect on exactly its frame: the
+ * render splits its block there.
  *
  * Commands of an unknown type are skipped by their size; a truncated command ends the batch.
  * Does not allocate.
@@ -1526,6 +2131,45 @@ int32_t box_audio_core_read_events(
     box_audio_core_t *core,
     box_audio_event_t *events,
     int32_t max);
+
+/** Get the beat of the beat clock of a core at a frame (box_audio_cmd_beat_t): the beat of the
+ * last BEAT command that applied, moved on at its tempo. A frame before that command reads the
+ * same line backwards.
+ *
+ * Frames are multiplied by the tempo before the division by the rate, so a beat on a whole
+ * frame comes out exact and the edges of a step fall on the same frames every time.
+ *
+ * @param core The core
+ * @param frame A frame of the core clock
+ * @return The beat
+ */
+double box_audio_core_beat(
+    const box_audio_core_t *core,
+    uint64_t frame);
+
+/** Get the tempo of the beat clock of a core.
+ *
+ * @param core The core
+ * @return Beats per second
+ */
+double box_audio_core_tempo(
+    const box_audio_core_t *core);
+
+/** Get the maps of macros of a core that run or fade out.
+ *
+ * @param core The core
+ * @return Number of maps
+ */
+int32_t box_audio_core_macro_maps(
+    const box_audio_core_t *core);
+
+/** Get the modulators of a core that run or fade out.
+ *
+ * @param core The core
+ * @return Number of modulators
+ */
+int32_t box_audio_core_modulators(
+    const box_audio_core_t *core);
 
 /** Get the clock of a core: the frames it rendered since it was created.
  *
@@ -1595,9 +2239,11 @@ int32_t box_audio_core_effect_meters(
     int32_t max);
 
 /** Get the floats of memory an effect of a kind needs at a sample rate; for the reverb its
- * delay lines at the largest size and its longest predelay, for the delay
- * BOX_AUDIO_DELAY_MAX seconds of both channels, for the chorus BOX_AUDIO_CHORUS_MAX
- * milliseconds of both channels.
+ * delay lines at the largest size, its longest predelay and the line of its shimmer, for the
+ * delay BOX_AUDIO_DELAY_MAX seconds of both channels, for the chorus BOX_AUDIO_CHORUS_MAX
+ * milliseconds of both channels, for the pitch shifter BOX_AUDIO_PITCH_SHIFTER_WINDOW_MAX
+ * milliseconds of both channels, for the beat repeat and the tape stop BOX_AUDIO_BEAT_REPEAT_MAX
+ * and BOX_AUDIO_TAPE_STOP_MAX seconds of both channels and the frames of their crossfades.
  *
  * @param kind A box_audio_effect_kind_t
  * @param sample_rate Frames per second of the core
@@ -2012,8 +2658,9 @@ bool box_audio_write_voice_ramp(
  * an effect slot or the ramps of a voice.
  *
  * @param writer The writer
- * @param type BOX_AUDIO_CMD_BUS_SET, BOX_AUDIO_CMD_EFFECT_PARAMS or BOX_AUDIO_CMD_VOICE_RAMP
- * @param target Index of the bus or slot of the effect, or handle of the voice
+ * @param type BOX_AUDIO_CMD_BUS_SET, BOX_AUDIO_CMD_EFFECT_PARAMS, BOX_AUDIO_CMD_VOICE_RAMP or
+ *        BOX_AUDIO_CMD_MACRO
+ * @param target Index of the bus, slot of the effect or of the macro, or handle of the voice
  * @param param The box_audio_param_t of a bus, unused for an effect
  * @return Whether the command fit
  */
@@ -2022,6 +2669,54 @@ bool box_audio_write_cancel(
     uint32_t type,
     uint32_t target,
     uint32_t param);
+
+/** Write a command that sets the beat clock of the core at a frame.
+ *
+ * @param writer The writer
+ * @param beat The beat of the Transport at the frame
+ * @param tempo Beats per second from the frame on, 0 for BOX_AUDIO_SYNTH_TEMPO
+ * @param when Frame of the beat, 0 for now
+ * @return Whether the command fit
+ */
+bool box_audio_write_beat(
+    box_audio_writer_t *writer,
+    double beat,
+    float tempo,
+    uint64_t when);
+
+/** Write a modulator command; the writer fills its header.
+ *
+ * @param writer The writer
+ * @param cmd The command
+ * @return Whether the command fit
+ */
+bool box_audio_write_modulator(
+    box_audio_writer_t *writer,
+    const box_audio_cmd_modulator_t *cmd);
+
+/** Write a command that sets the value of a macro at a frame.
+ *
+ * @param writer The writer
+ * @param macro Slot of the macro
+ * @param value The value, 0..1
+ * @param when Frame of the core clock it applies at, 0 for now
+ * @return Whether the command fit
+ */
+bool box_audio_write_macro(
+    box_audio_writer_t *writer,
+    uint32_t macro,
+    float value,
+    uint64_t when);
+
+/** Write a map command of a macro; the writer fills its header.
+ *
+ * @param writer The writer
+ * @param cmd The command
+ * @return Whether the command fit
+ */
+bool box_audio_write_macro_map(
+    box_audio_writer_t *writer,
+    const box_audio_cmd_macro_map_t *cmd);
 
 /** Write a command that makes a sound id a synth patch or replaces its patch, of
  * BOX_AUDIO_CMD_SYNTH_SIZE bytes for the layers of the patch.

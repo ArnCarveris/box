@@ -622,11 +622,14 @@ static void box_draws_key(
         ecs_get_target_for_id(world, e, EcsChildOf, DynamicMaterial) != 0;
     key->shadow = !shape2d && !ecs_has_id(world, e, NoShadow) &&
         !ecs_get_target_for_id(world, e, EcsChildOf, NoShadow);
+    key->fixture = key->shadow && (ecs_has_id(world, e, LightFixture) ||
+        ecs_get_target_for_id(world, e, EcsChildOf, LightFixture) != 0);
     key->transmissive = !shape2d && ecs_get(world, e, Transmission) != NULL;
     if (key->transmissive) {
         key->blend = AlphaBlend;
         key->cutout = false;
         key->shadow = false;
+        key->fixture = false;
     }
 
     ecs_entity_t blend = shape2d ? 0 : box_draws_blend_owner(world, e, key);
@@ -836,6 +839,9 @@ void box_draws_shape_material(
         .fade = s->fade
     };
     if (out->shape2d) {
+        out->border = ecs_get(world, e, Border);
+        out->border_radius = out->border && out->shape2d->kind == BOX_SHAPE2D_RECT &&
+            ecs_has(world, e, Rect);
         out->clip = s->clip;
         out->slice = s->slice;
         out->rank = s->rank;
@@ -1091,6 +1097,9 @@ static void box_draws_observers(
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnLightBake);
     box_draws_observer(world, d, "DrawsOnNoShadow", (ecs_observer_desc_t){
         .query.terms = {{ .id = NoShadow }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnMove);
+    box_draws_observer(world, d, "DrawsOnLightFixture", (ecs_observer_desc_t){
+        .query.terms = {{ .id = LightFixture }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnMove);
     box_draws_observer(world, d, "DrawsOnScene", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Scene) }},

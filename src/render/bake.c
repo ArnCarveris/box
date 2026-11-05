@@ -437,14 +437,16 @@ static void box_bake_status(
     bool same_error = v->error
         ? status->error && !strcmp(status->error, v->error)
         : !status->error;
+    bool held = !v->compute && !v->converged && !v->error && v->probes;
     if (status->probes != v->probes || status->baked != baked || status->pass != pass ||
-        status->converged != v->converged || !same_error)
+        status->converged != v->converged || status->held != held || !same_error)
     {
         LightBakeStatus value = *status;
         value.probes = v->probes;
         value.baked = baked;
         value.pass = pass;
         value.converged = v->converged;
+        value.held = held;
         value.error = ECS_CONST_CAST(char*, v->error);
         ecs_set_ptr(it->stage, v->entity, LightBakeStatus, &value);
     }
@@ -1494,7 +1496,7 @@ static void box_bake_progress(
         v->switches += v->converged && !converged;
         v->settled |= v->converged;
         v->pending = gpu && v->handle && v->sent && v->viewed && !v->error &&
-            v->budget_ms > 0 && !v->converged;
+            v->budget_ms > 0 && v->compute && !v->converged;
         if (v->pending) {
             box_bake_schedule(b, p, v, app && app->headless, packet);
             int32_t left = box_bake_complete(v);
@@ -1503,6 +1505,51 @@ static void box_bake_progress(
 
         box_bake_ops(p, v);
         box_bake_status(it, v);
+    }
+}
+
+/** Report the probes left of the volumes that progress as BOX_TASK_PROBES, not blocking: every
+ * pass of a volume counts its valid probes. Once no volume progresses the report shows its
+ * total done for one frame and ends.
+ *
+ * @param world The world
+ * @param b The state
+ */
+static void box_bake_report(
+    ecs_world_t *world,
+    box_render_bake_t *b)
+{
+    int32_t i, done = 0, total = 0;
+    bool busy = false;
+    for (i = 0; i < ecs_vec_count(&b->volumes); i ++) {
+        const box_bake_volume_t *v = ecs_vec_get_t(&b->volumes, box_bake_volume_t, i);
+        int32_t current = v->completed < v->passes ? v->completed : v->passes - 1;
+        int32_t baked = v->valid_count - box_bake_left(v);
+        if (!v->pending || v->passes <= 0) {
+            continue;
+        }
+
+        baked = baked < 0 ? 0 : baked > v->valid_count ? v->valid_count : baked;
+        done += (current > 0 ? current : 0) * v->valid_count + baked;
+        total += v->passes * v->valid_count;
+        busy = true;
+    }
+
+    if (busy) {
+        if (!b->task) {
+            b->task = box_task_start(world, BOX_TASK_PROBES, false, total);
+        }
+
+        box_task_set(world, b->task, done, total);
+        b->task_total = total;
+        b->task_finished = false;
+    } else if (b->task && !b->task_finished) {
+        box_task_set(world, b->task, b->task_total, b->task_total);
+        b->task_finished = true;
+    } else if (b->task) {
+        box_task_end(world, b->task);
+        b->task = 0;
+        b->task_finished = false;
     }
 }
 
@@ -1575,6 +1622,7 @@ static void BoxRenderExtractBake(
             v->environment = bakes[row].environment;
             v->capture_size = bakes[row].capture_size;
             v->budget_ms = bakes[row].budget_ms;
+            v->compute = bakes[row].compute;
             v->threshold.light = bakes[row].light_threshold;
             v->threshold.color = bakes[row].color_threshold;
             if (v->bounces != bakes[row].bounces) {
@@ -1616,6 +1664,7 @@ static void BoxRenderExtractBake(
     }
 
     box_bake_progress(it, b, p);
+    box_bake_report(world, b);
     box_bake_display(b, p);
 }
 

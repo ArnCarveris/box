@@ -33,9 +33,7 @@ template LockMillWheelBody {
 }
 
 template LockMillWheel {
-  const speed = match lock_mill_on { true: 1.15; _: 0.0 }
-
-  AngularVelocity: {0, 0, speed}
+  AngularVelocity: {0, 0, lock_mill_on ? 1.15 : 0.0}
 
   LockMillWheelBody body()
 }
@@ -53,11 +51,10 @@ template LockMillSluiceBoard {
 }
 
 template LockMillSluice : LockControl {
-  const lift = match lock_mill_on { true: 0.42; _: 0.0 }
   Transition: [Tint: {duration: 0.12}]
   LockMillSluiceBody body()
   board {
-    Position: {0, lift, 0}
+    Position: {0, lock_mill_on ? 0.42 : 0.0, 0}
     Transition: [Position: {duration: 0.8, timing_function: EaseInOut}]
     LockMillSluiceBoard body()
   }
@@ -96,18 +93,19 @@ template LockMill {
     Position: {-1.04, 0.2, 0}
     ParticleEmitter: {
       max: 1800,
-      rate: match lock_mill_on { true: 700; _: 0 },
+      rate: lock_mill_on ? 700 : 0,
       shape: EmitterBox, extents: {0.02, 0.02, 0.42},
       direction: {-1, -0.1, 0}, spread: 8, speed: {0.7, 1.2},
       lifetime: {0.55, 0.95}, size: {0.025, 0.08}, opacity: {0.3, 0.75},
       acceleration: {0, -7, 0}, color: {224, 240, 244}, seed: 11
     }
+    ParticleCollision: {height: -1.1, die: true}
   }
   tail_foam {
     Position: {-1.8, -1.08, 0}
     ParticleEmitter: {
       max: 800,
-      rate: match lock_mill_on { true: 320; _: 0 },
+      rate: lock_mill_on ? 320 : 0,
       shape: EmitterBox, extents: {0.5, 0.01, 0.42},
       direction: {0, 1, 0}, spread: 45, speed: {0.3, 0.8},
       lifetime: {0.5, 1.1}, size: {0.025, 0.08}, opacity: {0.25, 0.6},

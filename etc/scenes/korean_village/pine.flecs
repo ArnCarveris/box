@@ -1,16 +1,38 @@
+include materials
 include beam
 using flecs.script
 using box.transform
 using box.geometry
 using box.material
 
-@tree Parent
 template KoreanPine {
   prop variant: f32 = 0
-  for seg in 0..14 {
-    const t = seg / 14.0
-    const n = (seg + 1) / 14.0
-    KoreanBeam(ax: math.sin(t * 3) * 0.7, ay: t * 4.9, az: 0.1 * t, bx: math.sin(n * 3) * 0.7, by: n * 4.9, bz: 0.1 * n, radius: 0.23 - t * 0.14, tint: {112, 76, 52}) {}
+  trunk_path {
+    Path3D: {
+      start: {0, 0, 0},
+      segments: [
+        {kind: CatmullRom, end: {math.sin(0.214286) * 0.7, 0.35, 0.00714286}},
+        {kind: CatmullRom, end: {math.sin(0.428571) * 0.7, 0.7, 0.0142857}},
+        {kind: CatmullRom, end: {math.sin(0.642857) * 0.7, 1.05, 0.0214286}},
+        {kind: CatmullRom, end: {math.sin(0.857143) * 0.7, 1.4, 0.0285714}},
+        {kind: CatmullRom, end: {math.sin(1.07143) * 0.7, 1.75, 0.0357143}},
+        {kind: CatmullRom, end: {math.sin(1.28571) * 0.7, 2.1, 0.0428571}},
+        {kind: CatmullRom, end: {math.sin(1.5) * 0.7, 2.45, 0.05}},
+        {kind: CatmullRom, end: {math.sin(1.71429) * 0.7, 2.8, 0.0571429}},
+        {kind: CatmullRom, end: {math.sin(1.92857) * 0.7, 3.15, 0.0642857}},
+        {kind: CatmullRom, end: {math.sin(2.14286) * 0.7, 3.5, 0.0714286}},
+        {kind: CatmullRom, end: {math.sin(2.35714) * 0.7, 3.85, 0.0785714}},
+        {kind: CatmullRom, end: {math.sin(2.57143) * 0.7, 4.2, 0.0857143}},
+        {kind: CatmullRom, end: {math.sin(2.78571) * 0.7, 4.55, 0.0928571}},
+        {kind: CatmullRom, end: {math.sin(3) * 0.7, 4.9, 0.1}}
+      ]
+    }
+  }
+  trunk {
+    Position: {0, 0, 0}
+    Sweep: {path: trunk_path, profile: KoreanRoundProfile, scale: {0.23, 0.23}, taper: 0.39, rings: 56}
+    Rgb: {112, 76, 52}
+    PbrMaterial: {roughness: 0.7}
   }
   for plate in 0..54 {
     const t = plate / 54.0

@@ -5,7 +5,6 @@ using box.geometry
 using box.material
 
 assets {
-  @tree Parent
   template RoadMarkings {
     prop rows: i32 = 3
     prop columns: i32 = 3

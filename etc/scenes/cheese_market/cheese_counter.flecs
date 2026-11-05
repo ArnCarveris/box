@@ -15,7 +15,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template CheeseCounter {
   prop variant: i32 = 0
 

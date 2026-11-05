@@ -6,7 +6,6 @@ using box.transform
 using box.geometry
 using box.material
 
-@tree Parent
 template WestFreight {
   WestCrate() { Position: {} }
   WestCrate() { Position: {1.05, 0, 0.1}; Rotation: {0, 0.12, 0} }

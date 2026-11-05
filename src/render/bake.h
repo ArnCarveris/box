@@ -124,7 +124,8 @@ typedef struct box_bake_volume_t {
     bool sent;              /**< The backend has the volume with this grid */
     bool viewed;            /**< A view of the scene is in the packet of this frame */
     bool converged;         /**< The backend reported every pass of every valid probe */
-    bool pending;           /**< The bake can progress this frame and has not converged */
+    bool pending;           /**< The bake can progress this frame, computes and has not
+                             *   converged */
     bool resort;            /**< The queue is sorted again before the next probes are taken */
     bool debug_warned;      /**< A view with ViewDebug.light_probes was warned that the grid has
                              *   more than BOX_RENDER_DEBUG_PROBES_MAX probes */
@@ -149,6 +150,7 @@ typedef struct box_bake_volume_t {
     vec3 max;               /**< Maximum corner of the static bounds of the grid */
     int32_t capture_size;   /**< LightBake.capture_size of this frame */
     float budget_ms;        /**< LightBake.budget_ms of this frame */
+    bool compute;           /**< LightBake.compute of this frame: new captures are scheduled */
     float credit;           /**< Share of a probe the budget of the last frame left */
     int32_t bounces;        /**< LightBake.bounces of this frame */
     uint32_t generation;    /**< Number of the bake, so captures of an earlier one are ignored */
@@ -207,6 +209,9 @@ typedef struct box_render_bake_t {
     const void *backend;    /**< Context of the backend the volumes were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
+    box_task_id_t task;     /**< Report of the probes left, 0 while no volume progresses */
+    int32_t task_total;     /**< Total of the report at the last frame */
+    bool task_finished;     /**< The report shows its total done and ends at the next frame */
 } box_render_bake_t;
 
 /** Find the volume of a scene.

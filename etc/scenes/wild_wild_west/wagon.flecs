@@ -10,11 +10,10 @@ using box.light
 using box.text
 
 
-@tree Parent
 template WestWagon {
   chassis : WestRed { Position: {0, 0.93, 0}; Box: {2, 0.2, 3.7} }
   for end in 0..2 {
-    { Position: {0, 0.73, (end - 0.5) * 2.6}; Rotation: {0, 0, math.PI / 2}; Cylinder: {radius: 0.075, length: 2.6, segments: 12}; Rgb: {49, 51, 48}; PbrMaterial: {metallic: 0.72, roughness: 0.63} }
+    { (IsA, WestIron); Position: {0, 0.73, (end - 0.5) * 2.6}; Rotation: {0, 0, math.PI / 2}; Cylinder: {radius: 0.075, length: 2.6, segments: 12} }
     for side in 0..2 {
       WestWheel(radius: 0.72) { Position: {(side - 0.5) * 2.55, 0.75, (end - 0.5) * 2.6}; Rotation: {0, (side - 0.5) * math.PI, 0} }
     }
@@ -27,7 +26,7 @@ template WestWagon {
       { Position: {(side - 0.5) * 2.02, 1.14 + row * 0.21, 0}; Box: {0.08, 0.19, 3.6}; Rgb: {144 + row * 12, 95 + row * 8, 47} }
     }
     for strap in 0..4 {
-      { Position: {(side - 0.5) * 2.09, 1.36, -1.5 + strap}; Box: {0.04, 0.7, 0.07}; Rgb: {49, 51, 48} }
+      { (IsA, WestIron); Position: {(side - 0.5) * 2.09, 1.36, -1.5 + strap}; Box: {0.04, 0.7, 0.07} }
     }
     WestBeam(ax: (side - 0.5) * 1.5, ay: 0.85, az: 1.45, bx: (side - 0.5) * 1.15, by: 0.5, bz: 4.5, width: 0.09) {}
   }

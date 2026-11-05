@@ -4,12 +4,18 @@
  * their slots of the pool of the core, their memory and their commands.
  *
  * An effect entity is any entity with an effect component: Reverb, Equalizer, AudioFilter,
+<<<<<<< HEAD
  * Compressor, Gate, Delay, Phaser, Chorus, Saturator, TransientShaper or Vocoder, the first of
  * them in that order. A compressor gets the key bus that the order compile accepted for its
  * insert, a vocoder its modulator the same way; a vocoder without one logs an error once.
+=======
+ * Compressor, Gate, Delay, Phaser, Chorus, Saturator, TransientShaper, FrequencyShifter,
+ * PitchShifter, PatternGate, Rotary, BeatRepeat or TapeStop, the first of them in that order.
+>>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
  *
  * The module sends an EFFECT command when the kind, the channel, the slot or a parameter of an
- * effect changes, and takes it off when no insert slot names it any more.
+ * effect changes and takes it off when no slot names it. A compressor gets the key bus the
+ * order compile accepted; a pattern gate and a beat repeat ask the timeline for the beat clock.
  */
 
 #include "module.h"
@@ -96,6 +102,8 @@ uint32_t box_audio_module_effect_params(
             params[2] = reverb->predelay;
             params[3] = reverb->size;
             params[4] = reverb->mix;
+            params[5] = reverb->shimmer;
+            params[6] = reverb->shimmer_pitch;
         }
     } else if (component == ecs_id(Equalizer)) {
         const Equalizer *eq = ptr;
@@ -172,6 +180,7 @@ uint32_t box_audio_module_effect_params(
             params[3] = chorus->delay;
             params[4] = chorus->mix;
             params[5] = chorus->spread;
+            params[6] = chorus->feedback;
         }
     } else if (component == ecs_id(Saturator)) {
         const Saturator *saturator = ptr;
@@ -181,6 +190,11 @@ uint32_t box_audio_module_effect_params(
             params[1] = saturator->asymmetry;
             params[2] = saturator->bits;
             params[3] = saturator->mix;
+            params[4] = (float)saturator->mode;
+            params[5] = saturator->low_cut;
+            params[6] = saturator->high_cut;
+            params[7] = saturator->tone;
+            params[8] = saturator->rate;
         }
     } else if (component == ecs_id(TransientShaper)) {
         const TransientShaper *shaper = ptr;
@@ -189,6 +203,7 @@ uint32_t box_audio_module_effect_params(
             params[0] = shaper->attack;
             params[1] = shaper->sustain;
         }
+<<<<<<< HEAD
     } else if (component == ecs_id(Vocoder)) {
         const Vocoder *vocoder = ptr;
         result = BOX_AUDIO_EFFECT_VOCODER;
@@ -202,6 +217,82 @@ uint32_t box_audio_module_effect_params(
             params[6] = vocoder->shift;
             params[7] = vocoder->unvoiced;
             params[8] = vocoder->mix;
+=======
+    } else if (component == ecs_id(FrequencyShifter)) {
+        const FrequencyShifter *shifter = ptr;
+        result = BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER;
+        if (params && ptr) {
+            params[0] = shifter->shift;
+            params[1] = shifter->mode == FrequencyRing ? 1.0f : 0.0f;
+            params[2] = shifter->stereo;
+            params[3] = shifter->feedback;
+            params[4] = shifter->mix;
+        }
+    } else if (component == ecs_id(PitchShifter)) {
+        const PitchShifter *shifter = ptr;
+        result = BOX_AUDIO_EFFECT_PITCH_SHIFTER;
+        if (params && ptr) {
+            params[0] = shifter->semitones;
+            params[1] = shifter->cents;
+            params[2] = shifter->stereo;
+            params[3] = shifter->window;
+            params[4] = shifter->feedback;
+            params[5] = shifter->mix;
+        }
+    } else if (component == ecs_id(PatternGate)) {
+        const PatternGate *gate = ptr;
+        result = BOX_AUDIO_EFFECT_PATTERN_GATE;
+        for (i = 0; params && ptr && i < BOX_AUDIO_PATTERN_GATE_STEPS; i ++) {
+            params[i] = gate->steps[i];
+        }
+
+        if (params && ptr) {
+            params[BOX_AUDIO_PATTERN_GATE_STEPS] = (float)gate->length;
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 1] = gate->rate;
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 2] = gate->swing;
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 3] = gate->attack;
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 4] = gate->release;
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 5] = gate->gate;
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 6] = gate->floor;
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 7] = gate->mix;
+        }
+    } else if (component == ecs_id(Rotary)) {
+        const Rotary *rotary = ptr;
+        result = BOX_AUDIO_EFFECT_ROTARY;
+        if (params && ptr) {
+            params[0] = rotary->speed;
+            params[1] = rotary->horn_slow;
+            params[2] = rotary->horn_fast;
+            params[3] = rotary->drum_slow;
+            params[4] = rotary->drum_fast;
+            params[5] = rotary->acceleration;
+            params[6] = rotary->balance;
+            params[7] = rotary->spread;
+            params[8] = rotary->drive;
+            params[9] = rotary->mix;
+        }
+    } else if (component == ecs_id(BeatRepeat)) {
+        const BeatRepeat *repeat = ptr;
+        result = BOX_AUDIO_EFFECT_BEAT_REPEAT;
+        if (params && ptr) {
+            params[0] = repeat->active;
+            params[1] = repeat->slice;
+            params[2] = repeat->grid;
+            params[3] = repeat->decay;
+            params[4] = repeat->pitch;
+            params[5] = repeat->reverse;
+            params[6] = repeat->gate;
+            params[7] = repeat->mix;
+        }
+    } else if (component == ecs_id(TapeStop)) {
+        const TapeStop *stop = ptr;
+        result = BOX_AUDIO_EFFECT_TAPE_STOP;
+        if (params && ptr) {
+            params[0] = stop->active;
+            params[1] = stop->stop_time;
+            params[2] = stop->start_time;
+            params[3] = stop->curve;
+>>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
         }
     }
 
@@ -215,7 +306,12 @@ int32_t box_audio_module_effect_components(
     const ecs_entity_t components[] = {
         ecs_id(Reverb), ecs_id(Equalizer), ecs_id(AudioFilter), ecs_id(Compressor),
         ecs_id(Gate), ecs_id(Delay), ecs_id(Phaser), ecs_id(Chorus), ecs_id(Saturator),
+<<<<<<< HEAD
         ecs_id(TransientShaper), ecs_id(Vocoder)
+=======
+        ecs_id(TransientShaper), ecs_id(FrequencyShifter), ecs_id(PitchShifter),
+        ecs_id(PatternGate), ecs_id(Rotary), ecs_id(BeatRepeat), ecs_id(TapeStop)
+>>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
     };
     int32_t i, count = (int32_t)(sizeof(components) / sizeof(components[0]));
     count = count < BOX_AUDIO_EFFECT_COMPONENTS ? count : BOX_AUDIO_EFFECT_COMPONENTS;
@@ -535,6 +631,7 @@ void box_audio_effects_sync(
     }
 
     freed = box_audio_effects_free(world, state);
+    state->effect_beat = false;
     for (i = 0; i < count; i ++) {
         ecs_entity_t e = claimed[i];
         AudioEffectState *es = ecs_get_mut(world, e, AudioEffectState);
@@ -561,12 +658,19 @@ void box_audio_effects_sync(
         }
 
         send = ecs_has_id(world, e, EcsDisabled) ? BOX_AUDIO_EFFECT_NONE : kind;
+<<<<<<< HEAD
         key = send == BOX_AUDIO_EFFECT_COMPRESSOR || send == BOX_AUDIO_EFFECT_VOCODER ?
             state->keys[es->bus][es->index] : BOX_AUDIO_BUS_NONE;
         if (send == BOX_AUDIO_EFFECT_VOCODER) {
             box_audio_vocoder_unkeyed(world, state, e, es, key);
         }
 
+=======
+        state->effect_beat = state->effect_beat || send == BOX_AUDIO_EFFECT_PATTERN_GATE ||
+            send == BOX_AUDIO_EFFECT_BEAT_REPEAT;
+        key = send == BOX_AUDIO_EFFECT_COMPRESSOR ? state->keys[es->bus][es->index] :
+            BOX_AUDIO_BUS_NONE;
+>>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
         if (sent->serial != state->serial || sent->kind != send || sent->bus != es->bus ||
             sent->index != es->index || sent->key != key ||
             ecs_os_memcmp(sent->params, params, ECS_SIZEOF(float) * BOX_AUDIO_EFFECT_PARAMS))

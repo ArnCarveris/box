@@ -106,7 +106,8 @@ typedef struct box_reflect_scene_t {
     bool bake_known;        /**< bake_handle and bake_switches hold the light bake of a frame */
     uint32_t bake_handle;   /**< Volume handle of the light bake of the scene, 0 for none */
     int32_t bake_switches;  /**< box_bake_volume_t.switches of that light bake */
-    bool bake_settled;      /**< That light bake settled, or the scene has none */
+    bool bake_settled;      /**< That light bake settled or does not compute, or the scene
+                             *   has none */
     box_bake_threshold_t threshold; /**< Thresholds of the ReflectionBake of this frame */
     int32_t landed;         /**< Resident probes with a capture, current or not */
     bool relit;             /**< A directional light, the ambient, the environment or a settled
@@ -145,6 +146,7 @@ typedef struct box_render_reflect_t {
     box_render_bake_t *bake; /**< State of the bake extract, looked up once */
     const void *lights_state; /**< State of the light extract, looked up once */
     ecs_map_t light_map;    /**< Light entity to its index in a light record, scratch */
+    box_task_id_t task;     /**< Report of the captures left, 0 while no scene progresses */
 } box_render_reflect_t;
 
 /** Find the probes of a scene.
@@ -1281,7 +1283,7 @@ static void box_reflect_invalidate(
     s->bake_known = true;
     s->bake_handle = handle;
     s->bake_switches = switches;
-    s->bake_settled = !v || v->settled;
+    s->bake_settled = !v || v->settled || !v->compute;
 }
 
 /** Order probes for their captures: the scene probe first, then nearer to the cameras of the
@@ -1442,6 +1444,39 @@ static void box_reflect_progress(
     }
 }
 
+/** Report the captures left of the scenes that progress as BOX_TASK_REFLECTIONS, not
+ * blocking: the resident probes and those captured.
+ *
+ * @param world The world
+ * @param r The state
+ */
+static void box_reflect_report(
+    ecs_world_t *world,
+    box_render_reflect_t *r)
+{
+    int32_t i, done = 0, total = 0;
+    bool busy = false;
+    for (i = 0; i < ecs_vec_count(&r->scenes); i ++) {
+        const box_reflect_scene_t *s = ecs_vec_get_t(&r->scenes, box_reflect_scene_t, i);
+        if (s->pending) {
+            done += s->captured;
+            total += s->resident;
+            busy = true;
+        }
+    }
+
+    if (busy && !r->task) {
+        r->task = box_task_start(world, BOX_TASK_REFLECTIONS, false, total);
+    }
+
+    if (busy) {
+        box_task_set(world, r->task, done, total);
+    } else if (r->task) {
+        box_task_end(world, r->task);
+        r->task = 0;
+    }
+}
+
 /** Keep the probes of every scene with ReflectionBake, give them slots, upload them and
  * capture them.
  *
@@ -1510,6 +1545,7 @@ static void BoxRenderExtractReflect(
         box_reflect_status(it, s);
     }
 
+    box_reflect_report(world, r);
     box_reflect_views(world, r, p, false);
 }
 

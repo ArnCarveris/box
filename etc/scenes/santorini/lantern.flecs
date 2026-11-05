@@ -11,7 +11,6 @@ using box.surface
 using box.controllers
 using box.text
 
-@tree Parent
 template IslandLantern {
   bracket { Position: {0, 0.13, 0.12}; Box: {0.035, 0.035, 0.37}; Rgb: IslandIron }
   glass {

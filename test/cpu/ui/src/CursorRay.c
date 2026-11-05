@@ -394,3 +394,48 @@ void CursorRay_no_ray(void) {
 
     ecs_fini(world);
 }
+
+/** A ray at the rim of a ProfileExtrusion with a rounded top hits the rim, below the plane of the
+ * unbeveled cap, while a ray at the middle of the cap hits that plane.
+ *
+ * The camera looks straight down at 10 points per unit, so window x 659 is world x 1.9. The
+ * square is 4 wide and 1 deep, its top at y 0.5 with a rim of radius 0.5 whose arc is centered at
+ * x 1.5, y 0: the rim is at y 0.3 at x 1.9. */
+void CursorRay_beveled_extrusion_rim(void) {
+    // ui/picking
+    ecs_world_t *world = ray_world(
+        "top {\n"
+        "  Position: {0, 50, 0}\n"
+        "  Rotation: {-1.57079633, 0, 0}\n"
+        "  Camera: {ortho: true, ortho_height: 72}\n"
+        "}\n"
+        "top_view {\n"
+        "  View: {camera: top}\n"
+        "}\n"
+        "square_outline { Path2D: {start: {-2, -2}, segments: ["
+        "{kind: Line, end: {2, -2}}, {kind: Line, end: {2, 2}}, {kind: Line, end: {-2, 2}}],"
+        " closed: true}}\n"
+        "square { Profile2D: {outer: square_outline}}\n"
+        "slab {\n"
+        "  Position: {0, 0, 0}\n"
+        "  ProfileExtrusion: {profile: square, depth: 1, cap_start: true, cap_end: true}\n"
+        "  Bevel: {top: 0.5, segments: 16}\n"
+        "}\n");
+    ecs_entity_t slab = ecs_lookup(world, "slab");
+    for (int i = 0; i < 4; i ++) {
+        ray_cursor(world, 640 + (float)(i & 1), 360);
+    }
+
+    ray_cursor(world, 640, 360);
+    const PickStatus *status = ecs_singleton_get(world, PickStatus);
+    test_uint(status->hit, slab);
+    test_assert(fabsf(status->point[1] - 0.5f) < RAY_EPS);
+
+    ray_cursor(world, 659, 360);
+    status = ecs_singleton_get(world, PickStatus);
+    test_uint(status->hit, slab);
+    test_assert(fabsf(status->point[0] - 1.9f) < 0.01f);
+    test_assert(fabsf(status->point[1] - 0.3f) < 0.01f);
+
+    ecs_fini(world);
+}

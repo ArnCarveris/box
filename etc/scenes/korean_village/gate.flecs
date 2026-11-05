@@ -7,7 +7,6 @@ using box.transform
 using box.geometry
 using box.material
 
-@tree Parent
 template KoreanGate {
   for side in 0..2 {
     const x = (side - 0.5) * 3.7

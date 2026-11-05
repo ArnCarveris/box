@@ -7,14 +7,13 @@ using box.light
 using box.text
 
 
-@tree Parent
 template WestHandcar {
   deck : WestRed { Position: {0, 0.62, 0}; Box: {2.7, 0.17, 1.9} }
   for i in 0..12 {
     { Position: {-1.23 + i * 0.22, 0.73, 0}; Box: {0.2, 0.07, 1.85}; Rgb: {166 + i % 3 * 9, 113 + i % 3 * 7, 60} }
   }
   for end in 0..2 {
-    { Position: {(end - 0.5) * 1.85, 0.38, 0}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.055, length: 1.8, segments: 12}; Rgb: {49, 51, 48} }
+    { (IsA, WestIron); Position: {(end - 0.5) * 1.85, 0.38, 0}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.055, length: 1.8, segments: 12} }
     for side in 0..2 {
       {
         Position: {(end - 0.5) * 1.85, 0.38, (side - 0.5) * 1.45}
@@ -38,6 +37,6 @@ template WestHandcar {
     }
   }
   for side in 0..2 {
-    { Position: {(side - 0.5) * 2.85, 0.48, 0}; Box: {0.2, 0.08, 0.9}; Rgb: {49, 51, 48} }
+    { (IsA, WestIron); Position: {(side - 0.5) * 2.85, 0.48, 0}; Box: {0.2, 0.08, 0.9} }
   }
 }

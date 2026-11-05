@@ -8,7 +8,6 @@ using box.geometry
 using box.material
 
 assets {
-  @tree Parent
   template Shopfront {
     prop width: f32 = 4.4
     prop accent: Rgb = {181, 81, 72}

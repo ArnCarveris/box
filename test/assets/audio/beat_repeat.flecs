@@ -1,0 +1,27 @@
+// A beat repeat and a tape stop set by a scene, for the BeatRepeat and TapeStop suites of
+// test/cpu/audio: the lane of the stutter bus holds active up from beat 2 to beat 3, four
+// repeats of a sixteenth at 120 bpm. The suites play their sounds on the buses, whose volume
+// keeps the limiter of the master out.
+using box.audio
+
+stutter {
+  AudioBus: {volume: 0.25, effects: [stutter]}
+  BeatRepeat: {slice: 0.25, decay: 1, mix: 1}
+}
+
+drop {
+  AudioBus: {volume: 0.25, effects: [drop]}
+  TapeStop: {stop_time: 0.75, start_time: 0.3, curve: 0.5}
+}
+
+prefab fill {
+  AutomationClip: {target: stutter, component: BeatRepeat, member: "active", length: 4,
+    curve: {keys: [{0, 0}, {1.999, 0}, {2, 1}, {2.999, 1}, {3, 0}]}}
+}
+
+lanes {
+  Track: {}
+  fill_lane { ClipPlacement: {clip: fill, start: 0} }
+}
+
+$ { Transport: {tempo: 120} }

@@ -18,11 +18,11 @@
 @group(0) @binding(3) var shadow_map: texture_depth_2d_array;
 @group(0) @binding(4) var shadow_sampler: sampler_comparison;
 
-// Bilinear comparison taps of a tent filter: count by count taps at base plus the offsets
-// (x[i], y[j]) in uv, weighted by wx[i] * wy[j]; the weights sum to 1.
+// Bilinear comparison taps of a tent filter: up to 4 by 4 taps at base plus the offsets
+// (x[i], y[j]) in uv, weighted by wx[i] * wy[j]; the weights sum to 1. A tap in use has a
+// positive weight, and the unused taps have a weight of 0 and come last.
 struct ShadowTaps {
     base: vec2f,
-    count: u32,
     x: vec4f,
     y: vec4f,
     wx: vec4f,
@@ -37,7 +37,6 @@ fn shadow_filter_taps(uv: vec2f, texel: vec2f, size: u32) -> ShadowTaps {
     var t: ShadowTaps;
     if (size <= 1u) {
         t.base = uv;
-        t.count = 1u;
         t.wx = vec4f(1.0, 0.0, 0.0, 0.0);
         t.wy = t.wx;
         return t;
@@ -55,7 +54,6 @@ fn shadow_filter_taps(uv: vec2f, texel: vec2f, size: u32) -> ShadowTaps {
     var w2 = vec2f(0.0);
     var w3 = vec2f(0.0);
     if (size <= 3u) {
-        t.count = 2u;
         w0 = 3.0 - 2.0 * s;
         w1 = 1.0 + 2.0 * s;
         o0 = (2.0 - s) / w0 - 1.0;
@@ -63,7 +61,6 @@ fn shadow_filter_taps(uv: vec2f, texel: vec2f, size: u32) -> ShadowTaps {
         w0 /= 4.0;
         w1 /= 4.0;
     } else if (size <= 5u) {
-        t.count = 3u;
         w0 = 4.0 - 3.0 * s;
         w1 = vec2f(7.0);
         w2 = 1.0 + 3.0 * s;
@@ -74,7 +71,6 @@ fn shadow_filter_taps(uv: vec2f, texel: vec2f, size: u32) -> ShadowTaps {
         w1 /= 12.0;
         w2 /= 12.0;
     } else {
-        t.count = 4u;
         w0 = 6.0 - 5.0 * s;
         w1 = 28.0 - 11.0 * s;
         w2 = 17.0 + 11.0 * s;
@@ -119,7 +115,10 @@ fn shadow_box_edge(index: u32, world: vec3f) -> f32 {
     return select(edge, -1.0, p.z > 1.0);
 }
 
-// Fraction of light that reaches a position with a geometric normal through one cascade.
+// Fraction of light that reaches a position with a geometric normal through one cascade. The
+// taps are read in loops with a constant bound that stop at the first weight of 0, and the
+// offsets and weights rotate instead of being indexed by the loop: D3D compilers turn a local
+// indexed at run time into an indexable copy and are slow on loops with a run time bound.
 fn shadow_cascade(index: u32, world: vec3f, normal: vec3f, l: vec3f) -> f32 {
     let offset = world + shadow_normal_offset(normal, l, view.shadow_offset[index]);
     let p = view.shadow_matrix[index] * vec4f(offset, 1.0);
@@ -127,18 +126,37 @@ fn shadow_cascade(index: u32, world: vec3f, normal: vec3f, l: vec3f) -> f32 {
     let depth = p.z + view.shadow_bias[index];
     let t = shadow_filter_taps(uv, vec2f(view.shadow_params.z), view.shadow_config.y);
     var sum = 0.0;
-    for (var j = 0u; j < t.count; j++) {
-        for (var i = 0u; i < t.count; i++) {
-            let tap = t.base + vec2f(t.x[i], t.y[j]);
-            let lit = textureSampleCompareLevel(shadow_map, shadow_sampler, tap, index, depth);
-            sum += t.wx[i] * t.wy[j] * lit;
+    var y = t.y;
+    var wy = t.wy;
+    for (var j = 0u; j < 4u; j++) {
+        if (wy.x == 0.0) {
+            break;
         }
+
+        var x = t.x;
+        var wx = t.wx;
+        for (var i = 0u; i < 4u; i++) {
+            if (wx.x == 0.0) {
+                break;
+            }
+
+            let tap = t.base + vec2f(x.x, y.x);
+            let lit = textureSampleCompareLevel(shadow_map, shadow_sampler, tap, index, depth);
+            sum += wx.x * wy.x * lit;
+            x = x.yzwx;
+            wx = wx.yzwx;
+        }
+
+        y = y.yzwx;
+        wy = wy.yzwx;
     }
 
     return sum;
 }
 
-// Fraction of the first directional light that reaches a position with a geometric normal.
+// Fraction of the first directional light that reaches a position with a geometric normal. Both
+// cascades of a blend come from one call of shadow_cascade in a loop, as D3D compilers inline
+// every call.
 fn shadow_factor(world: vec3f, normal: vec3f) -> f32 {
     let count = view.shadow_config.x;
     let depth = -(view.view * vec4f(world, 1.0)).z;
@@ -161,12 +179,21 @@ fn shadow_factor(world: vec3f, normal: vec3f) -> f32 {
     }
 
     let l = shadow_light();
-    var shadow = shadow_cascade(index, world, normal, l);
     let band = view.shadow_edge.y;
     let next = index + 1u;
+    var cascades = 1u;
     if (edge < band && next < count && shadow_box_edge(next, world) >= 0.0) {
-        let blend = smoothstep(0.0, band, edge);
-        shadow = mix(shadow_cascade(next, world, normal, l), shadow, blend);
+        cascades = 2u;
+    }
+
+    var shadow = 1.0;
+    for (var i = 0u; i < cascades; i++) {
+        let cascade = shadow_cascade(index + i, world, normal, l);
+        if (i == 0u) {
+            shadow = cascade;
+        } else {
+            shadow = mix(cascade, shadow, smoothstep(0.0, band, edge));
+        }
     }
 
     let span = max(view.shadow_params.y - view.shadow_params.x, 1e-4);

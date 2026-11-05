@@ -144,6 +144,45 @@ void Args_fps(void) {
     ecs_fini(world);
 }
 
+void Args_delta_time_fraction(void) {
+    // engine_core/app
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    char *argv[] = {"boxrun", "--delta-time", "1/60"};
+    test_int(box_app_parse(world, 3, argv), 0);
+    test_flt(ecs_singleton_get(world, App)->delta_time, 1.0f / 60.0f);
+
+    char *argv_decimal[] = {"boxrun", "--delta-time", "0.5"};
+    test_int(box_app_parse(world, 3, argv_decimal), 0);
+    test_flt(ecs_singleton_get(world, App)->delta_time, 0.5f);
+
+    ecs_fini(world);
+}
+
+void Args_invalid_delta_time(void) {
+    // engine_core/app
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_log_set_level(-4);
+
+    char *argv_zero[] = {"boxrun", "--delta-time", "1/0"};
+    test_assert(box_app_parse(world, 3, argv_zero) != 0);
+
+    char *argv_negative[] = {"boxrun", "--delta-time", "-1/60"};
+    test_assert(box_app_parse(world, 3, argv_negative) != 0);
+
+    char *argv_missing[] = {"boxrun", "--delta-time", "1/"};
+    test_assert(box_app_parse(world, 3, argv_missing) != 0);
+
+    char *argv_text[] = {"boxrun", "--delta-time", "abc"};
+    test_assert(box_app_parse(world, 3, argv_text) != 0);
+
+    test_flt(ecs_singleton_get(world, App)->delta_time, 0);
+
+    ecs_fini(world);
+}
+
 void Args_port(void) {
     // engine_core/app
     ecs_world_t *world = ecs_init();

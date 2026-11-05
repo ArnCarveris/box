@@ -611,6 +611,10 @@ void NoAlloc_modulation(void) {
             params[3] = 5.0f + 6.0f * (float)(k % 6);
             params[4] = 0.25f * (float)(k % 5);
             params[5] = 0.3f * (float)(k % 4);
+
+            // A flanger that resonates either way, without feedback at the last command so
+            // the tails decay within the renders below
+            params[6] = (k % 2 ? -0.95f : 0.95f) * (float)((k + 1) % 3) * 0.5f;
             test_assert(box_audio_write_effect(&w, 2 + i, BOX_AUDIO_EFFECT_CHORUS, bus, 2 + i,
                 BOX_AUDIO_BUS_NONE, params));
         }
@@ -655,9 +659,194 @@ void NoAlloc_modulation(void) {
     }
 }
 
-/* Saturators in the insert slots of buses: changes of the drive, the asymmetry, the bits and
- * the mix while they run, moves to another bus and slot, the reduction read, tails that decay
- * to silence and start again, and a removal, without a call of the allocator. */
+/* Pitch shifters in the insert slots of buses and a reverb with a shimmer: changes of the
+ * semitones, the cents, the stereo, the window, the feedback, the mix and the shimmer while
+ * they run, a move to another bus, tails that decay to silence and start again, and a removal,
+ * without a call of the allocator. */
+void NoAlloc_pitch_shifter(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_route_t routes[] = { AUDIO_OUT(1, 0), AUDIO_OUT(2, 0), AUDIO_MASTER };
+    int32_t floats = box_audio_effect_floats(BOX_AUDIO_EFFECT_PITCH_SHIFTER, AUDIO_RATE);
+    int32_t reverb = box_audio_effect_floats(BOX_AUDIO_EFFECT_REVERB, AUDIO_RATE);
+    float *memory[3], params[BOX_AUDIO_EFFECT_PARAMS] = {0};
+    uint8_t bytes[1024];
+    box_audio_writer_t w;
+    uint32_t i, k;
+    test_assert(floats > 0);
+    audio_order(core, routes, 3);
+    audio_sine(audio_sound_a, AUDIO_FRAMES / 4, 330, 0.25f);
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_FRAMES / 4, 1, AUDIO_RATE));
+    for (i = 0; i < 3; i ++) {
+        int32_t n = i < 2 ? floats : reverb;
+        memory[i] = calloc((size_t)n, sizeof(float));
+        test_assert(box_audio_core_effect_memory(core, i, memory[i], n));
+    }
+
+    audio_play(core, 1, 1, 1, 0.5f, 0, 1, BOX_AUDIO_PLAY_LOOP);
+    audio_play(core, 2, 1, 2, 0.5f, 0, 1.5f, 0);
+    for (k = 0; k < 12; k ++) {
+        box_audio_writer_init(&w, bytes, sizeof(bytes));
+        for (i = 0; i < 2; i ++) {
+            uint32_t bus = 1 + (i + k / 4) % 2;
+            params[0] = -24.0f + 4.0f * (float)((k + i) % 13);
+            params[1] = -100.0f + 20.0f * (float)(k % 11);
+            params[2] = 0.25f * (float)(k % 5);
+            params[3] = 10.0f + 15.0f * (float)(k % 7);
+            params[4] = 0.15f * (float)(k % 7);
+            params[5] = 0.2f * (float)(k % 6);
+            test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_PITCH_SHIFTER, bus, i,
+                BOX_AUDIO_BUS_NONE, params));
+        }
+
+        params[0] = 1.0f + 2.0f * (float)(k % 4);
+        params[1] = 0.1f * (float)(k % 8);
+        params[2] = 0.02f;
+        params[3] = 0.5f;
+        params[4] = 1;
+        params[5] = 0.25f * (float)(k % 5);
+        params[6] = k % 2 ? 12.0f : -5.0f;
+        test_assert(box_audio_write_effect(&w, 2, BOX_AUDIO_EFFECT_REVERB, 2, 2,
+            BOX_AUDIO_BUS_NONE, params));
+        box_audio_core_apply(core, w.data, w.size);
+        audio_render(core, 0, k % 3 ? AUDIO_FRAMES / 40 : AUDIO_FRAMES / 4);
+        audio_events(core, 0, NULL);
+    }
+
+    // The voices stop and the tails decay to silence, then a voice starts them again
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_stop(&w, 1, 0));
+    box_audio_core_apply(core, w.data, w.size);
+    for (k = 0; k < 16; k ++) {
+        audio_render(core, 0, AUDIO_FRAMES);
+    }
+
+    for (i = 0; i < 2; i ++) {
+        test_assert(!box_audio_core_effect_running(core, i));
+    }
+
+    audio_play(core, 3, 1, 1, 0.5f, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES / 4);
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    for (i = 0; i < 3; i ++) {
+        test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_NONE, BOX_AUDIO_BUS_NONE,
+            0, BOX_AUDIO_BUS_NONE, NULL));
+    }
+
+    box_audio_core_apply(core, w.data, w.size);
+    audio_render(core, 0, AUDIO_FRAMES);
+    for (i = 0; i < 3; i ++) {
+        test_assert(!box_audio_core_effect_running(core, i));
+    }
+
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+    for (i = 0; i < 3; i ++) {
+        free(memory[i]);
+    }
+}
+
+/* Beat repeats and tape stops in the insert slots of buses: rises and falls of active at
+ * scheduled frames and at once, changes of the slice, the grid, the pitch, the decay, the
+ * reverse, the gate, the mix and the ramps while they run, a tempo change of the beat clock,
+ * moves and a removal, without the allocator. */
+void NoAlloc_beat_repeat(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_route_t routes[] = { AUDIO_OUT(1, 0), AUDIO_OUT(2, 0), AUDIO_MASTER };
+    int32_t repeat = box_audio_effect_floats(BOX_AUDIO_EFFECT_BEAT_REPEAT, AUDIO_RATE);
+    int32_t stop = box_audio_effect_floats(BOX_AUDIO_EFFECT_TAPE_STOP, AUDIO_RATE);
+    float *memory[4], params[BOX_AUDIO_EFFECT_PARAMS] = {0};
+    uint8_t bytes[2048];
+    box_audio_writer_t w;
+    uint64_t clock;
+    uint32_t i, k;
+    test_assert(repeat > 0);
+    test_assert(stop > 0);
+    audio_order(core, routes, 3);
+    audio_sine(audio_sound_a, AUDIO_FRAMES / 4, 330, 0.25f);
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_FRAMES / 4, 1, AUDIO_RATE));
+    for (i = 0; i < 4; i ++) {
+        int32_t n = i < 2 ? repeat : stop;
+        memory[i] = calloc((size_t)n, sizeof(float));
+        test_assert(box_audio_core_effect_memory(core, i, memory[i], n));
+    }
+
+    audio_play(core, 1, 1, 1, 0.5f, 0, 1, BOX_AUDIO_PLAY_LOOP);
+    audio_play(core, 2, 1, 2, 0.5f, 0, 1.5f, BOX_AUDIO_PLAY_LOOP);
+    for (k = 0; k < 16; k ++) {
+        clock = box_audio_core_clock(core);
+        box_audio_writer_init(&w, bytes, sizeof(bytes));
+        if (k % 5 == 2) {
+            test_assert(box_audio_write_beat(&w, (double)k * 0.37, 1.5f + 0.25f * (float)k,
+                clock + 300));
+        }
+
+        for (i = 0; i < 2; i ++) {
+            uint32_t bus = 1 + (i + k / 4) % 2;
+            params[0] = (k + i) % 3 ? 1.0f : 0.0f;
+            params[1] = 0.03125f * (float)(1 << ((k + i) % 8));
+            params[2] = (k % 4) == 0 ? -1.0f : 0.125f * (float)(k % 4);
+            params[3] = 0.2f * (float)(k % 6);
+            params[4] = -12.0f + 3.0f * (float)((k + i) % 9);
+            params[5] = (float)(k % 2);
+            params[6] = 0.1f + 0.15f * (float)(k % 7);
+            params[7] = 0.25f * (float)(k % 5);
+            test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_BEAT_REPEAT, bus, i,
+                BOX_AUDIO_BUS_NONE, params));
+            params[0] = params[0] ? 0.0f : 1.0f;
+            test_assert(box_audio_write_effect_params(&w, i, BOX_AUDIO_EFFECT_BEAT_REPEAT,
+                params, clock + 777 + 100 * i));
+        }
+
+        for (i = 2; i < 4; i ++) {
+            uint32_t bus = 1 + (i + k / 3) % 2;
+            params[0] = (k + i) % 2 ? 1.0f : 0.0f;
+            params[1] = 0.01f + 0.05f * (float)(k % 5);
+            params[2] = 0.01f + 0.03f * (float)(k % 4);
+            params[3] = -1.0f + 0.4f * (float)(k % 6);
+            params[4] = 0;
+            params[5] = 0;
+            params[6] = 0;
+            params[7] = 0;
+            test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_TAPE_STOP, bus, 2 + i % 2,
+                BOX_AUDIO_BUS_NONE, params));
+            params[0] = params[0] ? 0.0f : 1.0f;
+            test_assert(box_audio_write_effect_params(&w, i, BOX_AUDIO_EFFECT_TAPE_STOP,
+                params, clock + 1500 + 333 * i));
+        }
+
+        box_audio_core_apply(core, w.data, w.size);
+        audio_render(core, 0, k % 3 ? AUDIO_FRAMES / 10 : AUDIO_FRAMES / 2);
+        audio_events(core, 0, NULL);
+    }
+
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    for (i = 0; i < 4; i ++) {
+        test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_NONE, BOX_AUDIO_BUS_NONE,
+            0, BOX_AUDIO_BUS_NONE, NULL));
+    }
+
+    box_audio_core_apply(core, w.data, w.size);
+    audio_render(core, 0, AUDIO_FRAMES);
+    for (i = 0; i < 4; i ++) {
+        test_assert(!box_audio_core_effect_running(core, i));
+    }
+
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+    for (i = 0; i < 4; i ++) {
+        free(memory[i]);
+    }
+}
+
+/* Saturators in the insert slots of buses: changes of the drive, the asymmetry, the bits, the
+ * mix, the mode, the cuts, the tone and the rate while they run, moves, the reduction read,
+ * tails that decay to silence and start again, and a removal, without the allocator. */
 void NoAlloc_saturator(void) {
     // audio/noalloc
     box_audio_core_t *core = noalloc_core();
@@ -680,6 +869,11 @@ void NoAlloc_saturator(void) {
             params[1] = 0.25f * (float)((k + 2 * i) % 5);
             params[2] = 16.0f - 1.5f * (float)((k + i) % 11);
             params[3] = 1 - 0.2f * (float)(k % 6);
+            params[4] = (float)((k + i) % BOX_AUDIO_SATURATOR_MODES);
+            params[5] = 100.0f * (float)(k % 3);
+            params[6] = 6000.0f * (float)((k + i) % 2);
+            params[7] = -1 + 0.5f * (float)((k + 2 * i) % 5);
+            params[8] = 3000.0f * (float)(k % 4);
             test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_SATURATOR,
                 1 + (i + k / 4) % 2, (i + k) % BOX_AUDIO_EFFECT_SLOTS, BOX_AUDIO_BUS_NONE,
                 params));
@@ -728,6 +922,7 @@ void NoAlloc_saturator(void) {
     for (i = 0; i < 3; i ++) {
         test_assert(!box_audio_core_effect_running(core, i));
     }
+
     test_int(noalloc_allocs, 1);
     test_int(noalloc_frees, 0);
     box_audio_core_free(core);
@@ -814,6 +1009,7 @@ void NoAlloc_transient_shaper(void) {
     test_int(noalloc_frees, 1);
 }
 
+<<<<<<< HEAD
 /* Vocoders in the insert slots of buses, keyed on another bus: changes of every parameter
  * and of the band count while they run, a key that goes and comes back, moves to another bus
  * and slot, and a removal, without a call of the allocator. */
@@ -863,6 +1059,36 @@ void NoAlloc_vocoder(void) {
             test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_VOCODER,
                 1 + (i + k / 4) % 2, (i + k) % BOX_AUDIO_EFFECT_SLOTS,
                 k % 5 == 4 ? BOX_AUDIO_BUS_NONE : 3, params));
+=======
+/* Frequency shifters in the insert slots of buses: changes of the shift, the mode, the stereo,
+ * the feedback and the mix while they run, moves to another bus and slot, allpasses that decay
+ * to silence and start again, and a removal, without a call of the allocator. */
+void NoAlloc_frequency_shifter(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_route_t routes[] = { AUDIO_OUT(1, 0), AUDIO_OUT(2, 0), AUDIO_MASTER };
+    float params[BOX_AUDIO_EFFECT_PARAMS] = {0};
+    uint8_t bytes[1024];
+    box_audio_writer_t w;
+    uint32_t i, k;
+    test_int(box_audio_effect_floats(BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER, AUDIO_RATE), 0);
+    audio_order(core, routes, 3);
+    audio_sine(audio_sound_a, AUDIO_FRAMES / 4, 330, 0.5f);
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_FRAMES / 4, 1, AUDIO_RATE));
+    audio_play(core, 1, 1, 1, 0.8f, 0, 1, BOX_AUDIO_PLAY_LOOP);
+    audio_play(core, 2, 1, 2, 0.5f, 0, 1.5f, BOX_AUDIO_PLAY_LOOP);
+    for (k = 0; k < 12; k ++) {
+        box_audio_writer_init(&w, bytes, sizeof(bytes));
+        for (i = 0; i < 3; i ++) {
+            params[0] = -2000 + 350 * (float)((k + i) % 13);
+            params[1] = (float)((k + i) % 2);
+            params[2] = 0.25f * (float)((k + 2 * i) % 5);
+            params[3] = -0.95f + 0.19f * (float)((k + i) % 11);
+            params[4] = 0.2f * (float)((k + i) % 6);
+            test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER,
+                1 + (i + k / 4) % 2, (i + k) % BOX_AUDIO_EFFECT_SLOTS, BOX_AUDIO_BUS_NONE,
+                params));
+>>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
         }
 
         box_audio_core_apply(core, w.data, w.size);
@@ -870,11 +1096,119 @@ void NoAlloc_vocoder(void) {
         audio_events(core, 0, NULL);
     }
 
+<<<<<<< HEAD
     audio_render(core, 0, AUDIO_FRAMES / 40);
     for (i = 0; i < 2; i ++) {
         test_assert(box_audio_core_effect_running(core, i));
     }
 
+=======
+    // A shifter that arrived in its new slot during the last block runs from the next one
+    audio_render(core, 0, AUDIO_FRAMES / 40);
+    for (i = 0; i < 3; i ++) {
+        test_assert(box_audio_core_effect_running(core, i));
+    }
+
+    // The voices stop and the allpasses decay to silence, then a voice starts them again
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_stop(&w, 1, 0));
+    test_assert(box_audio_write_stop(&w, 2, 0));
+    box_audio_core_apply(core, w.data, w.size);
+    for (k = 0; k < 4; k ++) {
+        audio_render(core, 0, AUDIO_FRAMES);
+    }
+
+    for (i = 0; i < 3; i ++) {
+        test_assert(!box_audio_core_effect_running(core, i));
+    }
+
+    audio_play(core, 3, 1, 1, 0.5f, 0, 1, 0);
+    audio_play(core, 4, 1, 2, 0.5f, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES / 8);
+    for (i = 0; i < 3; i ++) {
+        test_assert(box_audio_core_effect_running(core, i));
+    }
+
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    for (i = 0; i < 3; i ++) {
+        test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_NONE, BOX_AUDIO_BUS_NONE,
+            0, BOX_AUDIO_BUS_NONE, NULL));
+    }
+
+    box_audio_core_apply(core, w.data, w.size);
+    audio_render(core, 0, AUDIO_FRAMES);
+    for (i = 0; i < 3; i ++) {
+        test_assert(!box_audio_core_effect_running(core, i));
+    }
+
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+}
+
+/* Rotaries in the insert slots of buses: steps of the speed while the rotors accelerate,
+ * changes of the rates, the balance, the spread, the drive and the mix, a move to another bus,
+ * tails that decay to silence while the rotors turn on and start again, and a removal, without
+ * a call of the allocator. */
+void NoAlloc_rotary(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_route_t routes[] = { AUDIO_OUT(1, 0), AUDIO_OUT(2, 0), AUDIO_MASTER };
+    int32_t floats = box_audio_effect_floats(BOX_AUDIO_EFFECT_ROTARY, AUDIO_RATE);
+    float *memory[2], params[BOX_AUDIO_EFFECT_PARAMS] = {0};
+    uint8_t bytes[1024];
+    box_audio_writer_t w;
+    uint32_t i, k;
+    test_assert(floats > 0);
+    audio_order(core, routes, 3);
+    audio_sine(audio_sound_a, AUDIO_FRAMES / 4, 330, 0.25f);
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_FRAMES / 4, 1, AUDIO_RATE));
+    for (i = 0; i < 2; i ++) {
+        memory[i] = calloc((size_t)floats, sizeof(float));
+        test_assert(box_audio_core_effect_memory(core, i, memory[i], floats));
+    }
+
+    audio_play(core, 1, 1, 1, 0.5f, 0, 1, BOX_AUDIO_PLAY_LOOP);
+    audio_play(core, 2, 1, 2, 0.5f, 0, 1.5f, 0);
+    for (k = 0; k < 12; k ++) {
+        box_audio_writer_init(&w, bytes, sizeof(bytes));
+        for (i = 0; i < 2; i ++) {
+            uint32_t bus = 1 + (i + k / 4) % 2;
+            params[0] = (float)((k + i) % 2);
+            params[1] = 0.5f + 0.1f * (float)(k % 5);
+            params[2] = 5.0f + 0.5f * (float)(k % 4);
+            params[3] = 0.4f + 0.1f * (float)(k % 3);
+            params[4] = 4.0f + 0.6f * (float)(k % 5);
+            params[5] = 0.2f + 0.5f * (float)(k % 4);
+            params[6] = -1.0f + 0.4f * (float)(k % 6);
+            params[7] = 0.25f * (float)(k % 5);
+            params[8] = 0.2f * (float)(k % 6);
+            params[9] = 1.0f - 0.25f * (float)(k % 5);
+            test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_ROTARY, bus, i,
+                BOX_AUDIO_BUS_NONE, params));
+        }
+
+        box_audio_core_apply(core, w.data, w.size);
+        audio_render(core, 0, k % 3 ? AUDIO_FRAMES / 40 : AUDIO_FRAMES / 4);
+        audio_events(core, 0, NULL);
+    }
+
+    // The voices stop and the tails decay to silence, then a voice starts them again
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_stop(&w, 1, 0));
+    box_audio_core_apply(core, w.data, w.size);
+    for (k = 0; k < 4; k ++) {
+        audio_render(core, 0, AUDIO_FRAMES);
+    }
+
+    for (i = 0; i < 2; i ++) {
+        test_assert(!box_audio_core_effect_running(core, i));
+    }
+
+    audio_play(core, 3, 1, 1, 0.5f, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES / 4);
+>>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
     box_audio_writer_init(&w, bytes, sizeof(bytes));
     for (i = 0; i < 2; i ++) {
         test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_NONE, BOX_AUDIO_BUS_NONE,
@@ -1328,6 +1662,290 @@ void NoAlloc_synth_routes(void) {
 
     audio_render(core, 0, AUDIO_FRAMES / 2);
     test_assert(box_audio_core_voice_count(core) > 0);
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+}
+
+/** Write a modulator command into a core.
+ *
+ * @param core The core
+ * @param cmd The command
+ */
+static void noalloc_modulator(
+    box_audio_core_t *core,
+    const box_audio_cmd_modulator_t *cmd)
+{
+    uint8_t bytes[512];
+    box_audio_writer_t w;
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_modulator(&w, cmd));
+    box_audio_core_apply(core, w.data, w.size);
+}
+
+/* Modulators of every source on a filter and a bus, BEAT commands of a seek, a tempo change and
+ * a loop wrap, changes, a retarget and releases, without a call of the allocator. */
+void NoAlloc_modulators(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_route_t routes[] = { AUDIO_OUT(2, 0), AUDIO_OUT(1, 0), AUDIO_MASTER };
+    float params[BOX_AUDIO_EFFECT_PARAMS] = { BOX_AUDIO_SYNTH_LOWPASS, 800, 0.3f, 0, 1, 0 };
+    box_audio_cmd_modulator_t m;
+    uint8_t bytes[512];
+    box_audio_writer_t w;
+    uint32_t i, k;
+    audio_order(core, routes, 3);
+    audio_sine(audio_sound_a, AUDIO_FRAMES / 4, 330, 0.25f);
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_FRAMES / 4, 1, AUDIO_RATE));
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_effect(&w, 0, BOX_AUDIO_EFFECT_FILTER, 1, 0,
+        BOX_AUDIO_BUS_NONE, params));
+    test_assert(box_audio_write_beat(&w, 7.25, 2.0f, 0));
+    box_audio_core_apply(core, w.data, w.size);
+    audio_play(core, 1, 1, 1, 0.5f, 0, 1, BOX_AUDIO_PLAY_LOOP);
+    audio_play(core, 2, 1, 2, 0.5f, 0, 0.5f, BOX_AUDIO_PLAY_LOOP);
+    for (k = 0; k < 12; k ++) {
+        for (i = 0; i < 6; i ++) {
+            m = (box_audio_cmd_modulator_t){ .slot = i, .depth = 0.3f + 0.1f * (float)k,
+                .rate = 0.5f + (float)(k % 5), .sync = k % 3 ? 0.25f * (float)(i + 1) : 0,
+                .phase = 0.1f * (float)i, .smooth = 0.2f, .attack = 0.005f, .release = 0.05f,
+                .step_count = 1 + (k + i) % 16, .key = 2, .unipolar = i % 2 };
+            m.source = (k + i) % 3;
+            m.wave = (k + i) % 6;
+            m.steps[0] = 1;
+            m.steps[3] = -0.5f;
+            if (i < 3) {
+                m.target = BOX_AUDIO_MOD_TARGET_EFFECT;
+                m.index = 0;
+                m.param = 1 + (i + k / 4) % 2;
+                m.kind = BOX_AUDIO_EFFECT_FILTER;
+                m.scale = m.param == 1 ? BOX_AUDIO_MOD_OCTAVES : BOX_AUDIO_MOD_LINEAR;
+            } else {
+                m.target = (k + i) % 7 == 0 ? BOX_AUDIO_MOD_TARGET_NONE :
+                    BOX_AUDIO_MOD_TARGET_BUS;
+                m.index = 1 + (i + k / 3) % 2;
+                m.param = i == 3 ? BOX_AUDIO_PARAM_VOLUME : (i == 4 ? BOX_AUDIO_PARAM_PAN :
+                    BOX_AUDIO_PARAM_WIDTH);
+            }
+
+            noalloc_modulator(core, &m);
+        }
+
+        box_audio_writer_init(&w, bytes, sizeof(bytes));
+        test_assert(box_audio_write_beat(&w, 3.5 * (double)k, 1.5f + 0.25f * (float)(k % 4),
+            box_audio_core_clock(core) + 1000));
+        if (k % 4 == 3) {
+            test_assert(box_audio_write_cancel(&w, BOX_AUDIO_CMD_BEAT, 0, 0));
+        }
+
+        params[1] = 400.0f + 300.0f * (float)(k % 5);
+        test_assert(box_audio_write_effect_params(&w, 0, BOX_AUDIO_EFFECT_FILTER, params,
+            box_audio_core_clock(core) + 2001));
+        test_assert(box_audio_write_bus_set(&w, 1, BOX_AUDIO_PARAM_VOLUME,
+            0.5f + 0.1f * (float)(k % 3), 0));
+        box_audio_core_apply(core, w.data, w.size);
+        audio_render(core, 0, k % 3 ? AUDIO_FRAMES / 40 : AUDIO_FRAMES / 4);
+        audio_events(core, 0, NULL);
+    }
+
+    m = (box_audio_cmd_modulator_t){ .target = BOX_AUDIO_MOD_TARGET_NONE };
+    for (i = 0; i < 6; i ++) {
+        m.slot = i;
+        noalloc_modulator(core, &m);
+    }
+
+    audio_render(core, 0, AUDIO_FRAMES / 4);
+    test_int(box_audio_core_modulators(core), 0);
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+}
+
+/** Write a map command of a macro into a core.
+ *
+ * @param core The core
+ * @param cmd The command
+ */
+static void noalloc_macro_map(
+    box_audio_core_t *core,
+    const box_audio_cmd_macro_map_t *cmd)
+{
+    uint8_t bytes[128];
+    box_audio_writer_t w;
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_macro_map(&w, cmd));
+    box_audio_core_apply(core, w.data, w.size);
+}
+
+/* Maps of macros on a filter and on buses, modulators on the macros, values at once and
+ * scheduled ahead, cancels, retargets and releases, without a call of the allocator. */
+void NoAlloc_macros(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_route_t routes[] = { AUDIO_OUT(2, 0), AUDIO_ROUTE(1, 0, 2), AUDIO_MASTER };
+    float params[BOX_AUDIO_EFFECT_PARAMS] = { BOX_AUDIO_SYNTH_LOWPASS, 800, 0.3f, 0, 1, 0 };
+    box_audio_cmd_macro_map_t map;
+    box_audio_cmd_modulator_t m;
+    uint8_t bytes[512];
+    box_audio_writer_t w;
+    uint32_t i, k;
+    audio_order(core, routes, 3);
+    audio_sine(audio_sound_a, AUDIO_FRAMES / 4, 330, 0.25f);
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_FRAMES / 4, 1, AUDIO_RATE));
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_effect(&w, 0, BOX_AUDIO_EFFECT_FILTER, 1, 0,
+        BOX_AUDIO_BUS_NONE, params));
+    box_audio_core_apply(core, w.data, w.size);
+    audio_play(core, 1, 1, 1, 0.5f, 0, 1, BOX_AUDIO_PLAY_LOOP);
+    audio_play(core, 2, 1, 2, 0.5f, 0, 0.5f, BOX_AUDIO_PLAY_LOOP);
+    for (k = 0; k < 12; k ++) {
+        for (i = 0; i < 6; i ++) {
+            map = (box_audio_cmd_macro_map_t){ .slot = i * 37, .macro = (i + k) % 3,
+                .min = 0.1f * (float)i, .max = 1.0f - 0.05f * (float)k,
+                .curve = 0.25f * (float)((int32_t)(k % 9) - 4) };
+            if (i < 2) {
+                map.target = BOX_AUDIO_MOD_TARGET_EFFECT;
+                map.index = 0;
+                map.param = 1 + (i + k / 4) % 2;
+                map.kind = BOX_AUDIO_EFFECT_FILTER;
+                map.scale = map.param == 1 ? BOX_AUDIO_MOD_OCTAVES : BOX_AUDIO_MOD_LINEAR;
+                map.min = map.param == 1 ? 200.0f : 0.1f;
+                map.max = map.param == 1 ? 4000.0f + 100.0f * (float)k : 0.6f;
+            } else {
+                map.target = (k + i) % 5 == 0 ? BOX_AUDIO_MOD_TARGET_NONE :
+                    BOX_AUDIO_MOD_TARGET_BUS;
+                map.index = 1 + (i + k / 3) % 2;
+                map.param = i == 2 ? BOX_AUDIO_PARAM_VOLUME : (i == 3 ? BOX_AUDIO_PARAM_PAN :
+                    (i == 4 ? BOX_AUDIO_PARAM_WIDTH : BOX_AUDIO_PARAM_SEND));
+            }
+
+            noalloc_macro_map(core, &map);
+        }
+
+        for (i = 0; i < 3; i ++) {
+            m = (box_audio_cmd_modulator_t){ .slot = i, .target = BOX_AUDIO_MOD_TARGET_MACRO,
+                .index = (i + k) % 3, .depth = 0.1f + 0.05f * (float)i,
+                .rate = 1.0f + (float)(k % 4), .sync = k % 2 ? 0.25f * (float)(i + 1) : 0,
+                .step_count = 1 + (k + i) % 16, .wave = (k + i) % 6, .smooth = 0.3f };
+            m.source = (k + i) % 2 ? BOX_AUDIO_MOD_STEPS : BOX_AUDIO_MOD_LFO;
+            m.steps[0] = 1;
+            m.steps[2] = -0.5f;
+            noalloc_modulator(core, &m);
+        }
+
+        box_audio_writer_init(&w, bytes, sizeof(bytes));
+        test_assert(box_audio_write_macro(&w, k % 3, 0.1f * (float)(k % 10), 0));
+        test_assert(box_audio_write_macro(&w, (k + 1) % 3, 0.9f,
+            box_audio_core_clock(core) + 1003));
+        test_assert(box_audio_write_macro(&w, (k + 2) % 3, 0.4f,
+            box_audio_core_clock(core) + 2011));
+        if (k % 4 == 1) {
+            test_assert(box_audio_write_cancel(&w, BOX_AUDIO_CMD_MACRO, (k + 2) % 3, 0));
+        }
+
+        test_assert(box_audio_write_beat(&w, 2.5 * (double)k, 2.0f,
+            box_audio_core_clock(core) + 500));
+        box_audio_core_apply(core, w.data, w.size);
+        audio_render(core, 0, k % 3 ? AUDIO_FRAMES / 40 : AUDIO_FRAMES / 4);
+        audio_events(core, 0, NULL);
+    }
+
+    map = (box_audio_cmd_macro_map_t){ .target = BOX_AUDIO_MOD_TARGET_NONE };
+    for (i = 0; i < 6; i ++) {
+        map.slot = i * 37;
+        noalloc_macro_map(core, &map);
+    }
+
+    m = (box_audio_cmd_modulator_t){ .target = BOX_AUDIO_MOD_TARGET_NONE };
+    for (i = 0; i < 3; i ++) {
+        m.slot = i;
+        noalloc_modulator(core, &m);
+    }
+
+    audio_render(core, 0, AUDIO_FRAMES / 4);
+    test_int(box_audio_core_macro_maps(core), 0);
+    test_int(box_audio_core_modulators(core), 0);
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+}
+
+/* Pattern gates in the insert slots of buses on the beat clock: patterns, accents, swing,
+ * gate lengths, floors and mixes that change, seeks and tempo changes of the clock, step
+ * changes scheduled ahead, a move to another bus, silence in which they rest and a removal,
+ * without a call of the allocator. */
+void NoAlloc_pattern_gate(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_route_t routes[] = { AUDIO_OUT(1, 0), AUDIO_OUT(2, 0), AUDIO_MASTER };
+    box_audio_effect_meter_t meters[BOX_AUDIO_EFFECT_MAX];
+    float params[BOX_AUDIO_EFFECT_PARAMS] = {0};
+    uint8_t bytes[1024];
+    box_audio_writer_t w;
+    uint32_t i, k, b;
+    test_int(box_audio_effect_floats(BOX_AUDIO_EFFECT_PATTERN_GATE, AUDIO_RATE), 0);
+    audio_order(core, routes, 3);
+    audio_sine(audio_sound_a, AUDIO_FRAMES, 330, 0.25f);
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_FRAMES, 1, AUDIO_RATE));
+    audio_play(core, 1, 1, 1, 0.5f, 0, 1, BOX_AUDIO_PLAY_LOOP);
+    audio_play(core, 2, 1, 2, 0.5f, 0, 1.5f, 0);
+    for (k = 0; k < 12; k ++) {
+        box_audio_writer_init(&w, bytes, sizeof(bytes));
+        for (i = 0; i < 2; i ++) {
+            for (b = 0; b < BOX_AUDIO_PATTERN_GATE_STEPS; b ++) {
+                params[b] = (float)((b + k + i) % 3) * 0.5f;
+            }
+
+            params[BOX_AUDIO_PATTERN_GATE_STEPS] = (float)(1 + (k + i) % 16);
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 1] = 0.125f * (float)(1 + k % 4);
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 2] = 0.1f * (float)(k % 8);
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 3] = 0.001f * (float)(1 + k % 5);
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 4] = 0.01f * (float)(1 + k % 7);
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 5] = 0.1f * (float)(1 + k % 10);
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 6] = -10.0f * (float)(k % 9);
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 7] = 1 - 0.1f * (float)(k % 4);
+            test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_PATTERN_GATE,
+                1 + (i + k / 4) % 2, i, BOX_AUDIO_BUS_NONE, params));
+        }
+
+        test_assert(box_audio_write_beat(&w, 1.75 * (double)k, 1.5f + 0.5f * (float)(k % 3),
+            box_audio_core_clock(core) + 700));
+        params[2] = (float)(k % 2);
+        test_assert(box_audio_write_effect_params(&w, 0, BOX_AUDIO_EFFECT_PATTERN_GATE,
+            params, box_audio_core_clock(core) + 1501));
+        box_audio_core_apply(core, w.data, w.size);
+        audio_render(core, 0, k % 3 ? AUDIO_FRAMES / 40 : AUDIO_FRAMES / 4);
+        audio_events(core, 0, NULL);
+        box_audio_core_effect_meters(core, meters, BOX_AUDIO_EFFECT_MAX);
+    }
+
+    // The voices stop and the gates rest on silence, then a voice starts them again
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_stop(&w, 1, 0));
+    box_audio_core_apply(core, w.data, w.size);
+    for (k = 0; k < 4; k ++) {
+        audio_render(core, 0, AUDIO_FRAMES);
+    }
+
+    test_assert(!box_audio_core_effect_running(core, 0));
+    test_assert(!box_audio_core_effect_running(core, 1));
+    audio_play(core, 3, 1, 1, 0.5f, 0, 1, 0);
+    audio_render(core, 0, AUDIO_FRAMES / 4);
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    for (i = 0; i < 2; i ++) {
+        test_assert(box_audio_write_effect(&w, i, BOX_AUDIO_EFFECT_NONE, BOX_AUDIO_BUS_NONE,
+            0, BOX_AUDIO_BUS_NONE, NULL));
+    }
+
+    box_audio_core_apply(core, w.data, w.size);
+    audio_render(core, 0, AUDIO_FRAMES);
+    for (i = 0; i < 2; i ++) {
+        test_assert(!box_audio_core_effect_running(core, i));
+    }
+
     test_int(noalloc_allocs, 1);
     test_int(noalloc_frees, 0);
     box_audio_core_free(core);

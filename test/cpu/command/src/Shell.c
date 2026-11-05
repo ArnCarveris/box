@@ -534,16 +534,62 @@ void Shell_audio_command(void) {
     ecs_modified(world, grit, AudioBus);
     ecs_set(world, grit, Saturator, { .drive = 0.6f, .asymmetry = 0.2f, .bits = 8,
         .mix = 0.5f });
+    ecs_entity_t fuzz = ecs_entity(world, { .name = "fuzz" });
+    ecs_ensure(world, fuzz, AudioBus)->effects[0] = fuzz;
+    ecs_modified(world, fuzz, AudioBus);
+    ecs_set(world, fuzz, Saturator, { .drive = 0.8f, .bits = 16, .mix = 1,
+        .mode = SaturatorHard, .low_cut = 150, .tone = 0.25f, .high_cut = 5000,
+        .rate = 8000 });
     ecs_entity_t punch = ecs_entity(world, { .name = "punch" });
     ecs_ensure(world, punch, AudioBus)->effects[0] = punch;
     ecs_modified(world, punch, AudioBus);
     ecs_set(world, punch, TransientShaper, { .attack = 0.5f, .sustain = -0.25f });
+<<<<<<< HEAD
     ecs_entity_t talk = ecs_entity(world, { .name = "talk" });
     ecs_ensure(world, talk, AudioBus)->effects[0] = talk;
     ecs_modified(world, talk, AudioBus);
     ecs_set(world, talk, Vocoder, { .modulator = punch, .bands = 24, .low = 120,
         .high = 7000, .q = 1.5f, .attack = 0.004f, .release = 0.06f, .shift = -0.25f,
         .unvoiced = 0.3f, .mix = 0.8f });
+=======
+    ecs_entity_t lift = ecs_entity(world, { .name = "lift" });
+    ecs_ensure(world, lift, AudioBus)->effects[0] = lift;
+    ecs_modified(world, lift, AudioBus);
+    ecs_set(world, lift, PitchShifter, { .semitones = 12, .cents = -8, .stereo = 1,
+        .window = 30, .feedback = 0.2f, .mix = 0.4f });
+    ecs_entity_t shine = ecs_entity(world, { .name = "shine" });
+    ecs_ensure(world, shine, AudioBus)->effects[0] = shine;
+    ecs_modified(world, shine, AudioBus);
+    ecs_set(world, shine, Reverb, { .decay = 6, .damping = 0.3f, .predelay = 0.02f,
+        .size = 0.8f, .mix = 1, .shimmer = 0.5f, .shimmer_pitch = 12 });
+    ecs_entity_t bell = ecs_entity(world, { .name = "bell" });
+    ecs_ensure(world, bell, AudioBus)->effects[0] = bell;
+    ecs_modified(world, bell, AudioBus);
+    ecs_set(world, bell, FrequencyShifter, { .shift = 437, .mode = FrequencyRing,
+        .stereo = 0.5f, .feedback = -0.3f, .mix = 0.8f });
+    ecs_entity_t chop = ecs_entity(world, { .name = "chop" });
+    ecs_ensure(world, chop, AudioBus)->effects[0] = chop;
+    ecs_modified(world, chop, AudioBus);
+    ecs_set(world, chop, PatternGate, { .steps = { 1, 0, 0.5f, 1 }, .length = 4,
+        .rate = 0.25f, .swing = 0.1f, .attack = 0.002f, .release = 0.03f, .gate = 0.5f,
+        .floor = -80, .mix = 1 });
+    ecs_entity_t organ = ecs_entity(world, { .name = "organ" });
+    ecs_ensure(world, organ, AudioBus)->effects[0] = organ;
+    ecs_modified(world, organ, AudioBus);
+    ecs_set(world, organ, Rotary, { .speed = 1, .horn_slow = 0.8f, .horn_fast = 6.7f,
+        .drum_slow = 0.7f, .drum_fast = 5.9f, .acceleration = 1, .balance = 0.2f,
+        .spread = 1, .drive = 0.3f, .mix = 1 });
+    ecs_entity_t fill = ecs_entity(world, { .name = "fill" });
+    ecs_ensure(world, fill, AudioBus)->effects[0] = fill;
+    ecs_modified(world, fill, AudioBus);
+    ecs_set(world, fill, BeatRepeat, { .slice = 0.125f, .grid = -1, .decay = 0.8f,
+        .pitch = -2, .reverse = 1, .gate = 0.5f, .mix = 1 });
+    ecs_entity_t drop = ecs_entity(world, { .name = "drop" });
+    ecs_ensure(world, drop, AudioBus)->effects[0] = drop;
+    ecs_modified(world, drop, AudioBus);
+    ecs_set(world, drop, TapeStop, { .active = 1, .stop_time = 1, .start_time = 0.25f,
+        .curve = 0.5f });
+>>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
     ecs_progress(world, 0.016f);
 
     bool error = true;
@@ -560,12 +606,37 @@ void Shell_audio_command(void) {
         "(does not run: no output)") != NULL);
     test_assert(strstr(out, "grit: group volume 1.00 pan 0.00 width 1.00 -> master, "
         "insert 0 grit: saturator drive 0.60 asymmetry 0.20 bits 8.0 mix 0.50") != NULL);
+    test_assert(strstr(out, "insert 0 fuzz: saturator hard drive 0.80 asymmetry 0.00 "
+        "low cut 150 Hz tone 0.25 high cut 5000 Hz rate 8000 Hz bits off mix 1.00") != NULL);
     test_assert(strstr(out, "punch: group volume 1.00 pan 0.00 width 1.00 -> master, "
         "insert 0 punch: transient shaper attack 0.50 sustain -0.25 "
         "(does not run: no output)") != NULL);
+<<<<<<< HEAD
     test_assert(strstr(out, "talk: group volume 1.00 pan 0.00 width 1.00 -> master, "
         "insert 0 talk: vocoder modulator punch bands 24 low 120 Hz high 7000 Hz q 1.50 "
         "attack 0.0040 release 0.060 shift -0.25 unvoiced 0.30 mix 0.80 "
+=======
+    test_assert(strstr(out, "lift: group volume 1.00 pan 0.00 width 1.00 -> master, "
+        "insert 0 lift: pitch shifter semitones +12.0 cents -8.0 stereo 1.00 window 30.0 ms "
+        "feedback 0.20 mix 0.40 (does not run: no output)") != NULL);
+    test_assert(strstr(out, "shine: group volume 1.00 pan 0.00 width 1.00 -> master, "
+        "insert 0 shine: reverb decay 6.00 damping 0.30 predelay 0.020 size 0.80 mix 1.00 "
+        "shimmer 0.50 pitch +12.0 (does not run: no output)") != NULL);
+    test_assert(strstr(out, "bell: group volume 1.00 pan 0.00 width 1.00 -> master, "
+        "insert 0 bell: frequency shifter ring +437.0 Hz stereo 0.50 feedback -0.30 mix 0.80 "
+        "(does not run: no output)") != NULL);
+    test_assert(strstr(out, "chop: group volume 1.00 pan 0.00 width 1.00 -> master, "
+        "insert 0 chop: pattern gate steps [1 0 0.5 1] rate 0.250 beats swing 0.10 gate 0.50 "
+        "attack 0.0020 release 0.030 floor -80.0 dB mix 1.00") != NULL);
+    test_assert(strstr(out, "organ: group volume 1.00 pan 0.00 width 1.00 -> master, "
+        "insert 0 organ: rotary speed 1.00 horn 0.80-6.70 Hz drum 0.70-5.90 Hz "
+        "acceleration 1.00 s balance 0.20 spread 1.00 drive 0.30 mix 1.00") != NULL);
+    test_assert(strstr(out, "fill: group volume 1.00 pan 0.00 width 1.00 -> master, "
+        "insert 0 fill: beat repeat inactive slice 0.125 beats grid slice decay 0.80 "
+        "pitch -2.0 gate 0.50 mix 1.00 reverse (does not run: no output)") != NULL);
+    test_assert(strstr(out, "drop: group volume 1.00 pan 0.00 width 1.00 -> master, "
+        "insert 0 drop: tape stop active stop 1.000 s start 0.250 s curve +0.50 "
+>>>>>>> c45b77d3b6b338b1018c4e2208b5af75961fc05a
         "(does not run: no output)") != NULL);
     ecs_os_free(out);
 

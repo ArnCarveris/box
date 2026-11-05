@@ -12,7 +12,6 @@ using box.surface
 using box.controllers
 using box.movement
 
-@tree Parent
 template GardenBed {
   prop length: f32 = 5
   prop flowers: i32 = 5

@@ -197,6 +197,7 @@ uint32_t box_audio_instrument_voice(
             ratio, v, beat, tempo, flags, priority, start);
     } else {
         if (ecs_vec_count(&state->oneshots) >= BOX_AUDIO_ONESHOT_MAX) {
+            box_audio_oneshot_forget(world, state, ecs_vec_first(&state->oneshots));
             ecs_vec_remove_ordered_t(&state->oneshots, box_audio_oneshot_t, 0);
         }
 

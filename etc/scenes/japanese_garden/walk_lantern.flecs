@@ -12,7 +12,6 @@ using box.surface
 using box.controllers
 using box.movement
 
-@tree Parent
 template WalkLantern {
   prop tint: Rgb = {255, 197, 133}
 
@@ -70,6 +69,7 @@ template WalkLantern {
     Scale: {1, 1.35, 1}
     Sphere: {radius: 0.027, segments: 12, smooth: true}
     Rgb: GardenVermilion
+    ClearCoat: GardenLacquer
   }
   for strand in 0..7 {
     {

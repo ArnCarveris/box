@@ -5,7 +5,8 @@
  * BOX_AUDIO_AUTOMATION_STEP seconds of frames and at their keys, and schedule each value at
  * its frame: a BUS_SET for a parameter of a bus, an EFFECT_PARAMS for an effect, whose
  * parameters are built from a copy of its component with the automated members written
- * through a meta cursor.
+ * through a meta cursor, a MACRO for the value of a macro, which the core shapes into its
+ * maps at that frame.
  *
  * The automation never writes a component. A target no lane covers gets the value of its
  * component once, when its last lane ends or the transport stops.
@@ -49,17 +50,7 @@ static double box_audio_automation_beat(
     return result;
 }
 
-/** Walk a member path, segments separated by dots and elements in brackets such as
- * bands[2].gain, with a meta cursor to a float member.
- *
- * @param world The world
- * @param component The component
- * @param ptr A value of the component
- * @param member The path
- * @param cur Receives the cursor at the member
- * @return NULL when the member is a float, else the reason, to free with ecs_os_free
- */
-static char* box_audio_member_cursor(
+char* box_audio_member_cursor(
     const ecs_world_t *world,
     ecs_entity_t component,
     void *ptr,
@@ -170,6 +161,83 @@ static char* box_audio_bus_member(
     return result;
 }
 
+char* box_audio_target_resolve(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    ecs_entity_t target,
+    ecs_entity_t component_id,
+    const char *member,
+    box_audio_target_t *out)
+{
+    uint64_t copy[BOX_AUDIO_AUTOMATION_COMPONENT / 8];
+    const EcsComponent *c = NULL;
+    ecs_meta_cursor_t cur;
+    char *result = NULL, *name = NULL, *component = NULL;
+    const void *ptr;
+    ecs_os_zeromem(out);
+    out->send = -1;
+    out->entity = target;
+    out->component = component_id;
+    if (!target) {
+        result = flecs_asprintf("no target");
+    } else if (!ecs_is_alive(world, target)) {
+        result = flecs_asprintf("the target #%u is deleted", (uint32_t)target);
+    } else if (!component_id) {
+        result = flecs_asprintf("no component");
+    } else if (!ecs_is_alive(world, component_id) ||
+        !(c = ecs_get(world, component_id, EcsComponent)) || !c->size)
+    {
+        result = flecs_asprintf("the component #%u is not a component with data",
+            (uint32_t)component_id);
+    }
+
+    if (result) {
+        goto done;
+    }
+
+    name = ecs_get_path(world, target);
+    component = ecs_get_path(world, component_id);
+    if (component_id == ecs_id(AudioMacro)) {
+        out->kind = BOX_AUDIO_TARGET_MACRO;
+        if (!ecs_has(world, target, AudioMacro)) {
+            result = flecs_asprintf("the target '%s' has no AudioMacro", name);
+        } else if (!member || strcmp(member, "value")) {
+            result = flecs_asprintf("member '%s' of AudioMacro does not move, only value does",
+                member ? member : "");
+        }
+    } else if (component_id == ecs_id(AudioBus)) {
+        out->kind = BOX_AUDIO_TARGET_BUS;
+        if (target != state->master && !ecs_has(world, target, AudioBus)) {
+            result = flecs_asprintf("the target '%s' has no AudioBus", name);
+        } else {
+            result = box_audio_bus_member(member, &out->param, &out->send);
+        }
+
+        if (!result && target == state->master && out->send >= 0) {
+            result = flecs_asprintf("the master has no sends");
+        }
+    } else if (box_audio_module_effect_params(world, component_id, NULL, NULL) ==
+        BOX_AUDIO_EFFECT_NONE)
+    {
+        result = flecs_asprintf("the component '%s' is neither AudioBus nor an effect",
+            component);
+    } else if (!(ptr = ecs_get_id(world, target, component_id))) {
+        result = flecs_asprintf("the target '%s' has no %s", name, component);
+    } else if (c->size > BOX_AUDIO_AUTOMATION_COMPONENT) {
+        result = flecs_asprintf("the component '%s' is too large", component);
+    } else {
+        out->kind = BOX_AUDIO_TARGET_EFFECT;
+        ecs_os_memcpy(copy, ptr, c->size);
+        result = box_audio_member_cursor(world, component_id, copy, member, &cur);
+    }
+
+done:
+    ecs_os_free(name);
+    ecs_os_free(component);
+
+    return result;
+}
+
 /** Resolve the target of an automation clip.
  *
  * @param world The world
@@ -184,71 +252,15 @@ static char* box_audio_automation_resolve(
     const AutomationClip *ac,
     box_audio_target_t *out)
 {
-    uint64_t copy[BOX_AUDIO_AUTOMATION_COMPONENT / 8];
-    const EcsComponent *c = NULL;
-    ecs_meta_cursor_t cur;
-    char *result = NULL, *name = NULL, *component = NULL;
-    const void *ptr;
-    ecs_os_zeromem(out);
-    out->send = -1;
-    out->entity = ac->target;
-    out->component = ac->component;
-    if (!ac->target) {
-        result = flecs_asprintf("no target");
-    } else if (!ecs_is_alive(world, ac->target)) {
-        result = flecs_asprintf("the target #%u is deleted", (uint32_t)ac->target);
-    } else if (!ac->component) {
-        result = flecs_asprintf("no component");
-    } else if (!ecs_is_alive(world, ac->component) ||
-        !(c = ecs_get(world, ac->component, EcsComponent)) || !c->size)
-    {
-        result = flecs_asprintf("the component #%u is not a component with data",
-            (uint32_t)ac->component);
-    }
-
-    if (result) {
-        goto done;
-    }
-
-    name = ecs_get_path(world, ac->target);
-    component = ecs_get_path(world, ac->component);
-    if (ac->component == ecs_id(AudioBus)) {
-        out->kind = BOX_AUDIO_TARGET_BUS;
-        if (ac->target != state->master && !ecs_has(world, ac->target, AudioBus)) {
-            result = flecs_asprintf("the target '%s' has no AudioBus", name);
-        } else {
-            result = box_audio_bus_member(ac->member, &out->param, &out->send);
-        }
-
-        if (!result && ac->target == state->master && out->send >= 0) {
-            result = flecs_asprintf("the master has no sends");
-        }
-    } else if (box_audio_module_effect_params(world, ac->component, NULL, NULL) ==
-        BOX_AUDIO_EFFECT_NONE)
-    {
-        result = flecs_asprintf("the component '%s' is neither AudioBus nor an effect",
-            component);
-    } else if (!(ptr = ecs_get_id(world, ac->target, ac->component))) {
-        result = flecs_asprintf("the target '%s' has no %s", name, component);
-    } else if (c->size > BOX_AUDIO_AUTOMATION_COMPONENT) {
-        result = flecs_asprintf("the component '%s' is too large", component);
-    } else {
-        out->kind = BOX_AUDIO_TARGET_EFFECT;
-        ecs_os_memcpy(copy, ptr, c->size);
-        result = box_audio_member_cursor(world, ac->component, copy, ac->member, &cur);
-    }
-
+    char *result = box_audio_target_resolve(world, state, ac->target, ac->component,
+        ac->member, out), *curve;
     if (!result) {
-        char *curve = box_curve_validate(&ac->curve);
+        curve = box_curve_validate(&ac->curve);
         if (curve) {
             result = flecs_asprintf("curve: %s", curve);
             ecs_os_free(curve);
         }
     }
-
-done:
-    ecs_os_free(name);
-    ecs_os_free(component);
 
     return result;
 }
@@ -536,6 +548,7 @@ static void box_audio_target_send(
     const AudioSettings *settings;
     const EcsComponent *c;
     const AutomationClip *ac;
+    const AudioMacro *macro;
     ecs_meta_cursor_t cur;
     const void *ptr;
     uint32_t target = 0, kind = 0;
@@ -547,7 +560,37 @@ static void box_audio_target_send(
         goto done;
     }
 
-    if (t->kind == BOX_AUDIO_TARGET_BUS) {
+    if (t->kind == BOX_AUDIO_TARGET_MACRO) {
+        slot = box_audio_macro_slot(world, t->entity);
+        macro = ecs_get(world, t->entity, AudioMacro);
+        if (slot < 0 || !macro) {
+            goto done;
+        }
+
+        value = macro->value;
+        for (i = 0; lanes && i < ecs_vec_count(&a->lanes); i ++) {
+            if (l[i].target == index && box_audio_lane_at(&l[i], beat, &local)) {
+                value = box_audio_lane_value(world, &l[i], local, value);
+                covered = true;
+            }
+        }
+
+        if (!covered && t->held && t->serial == state->serial) {
+            goto done;
+        }
+
+        if (!box_audio_reserve(state)) {
+            goto done;
+        }
+
+        target = (uint32_t)slot;
+        box_audio_write_macro(&state->writer, target, value, when);
+        if (covered) {
+            a->stats.macro_sets ++;
+        } else {
+            a->stats.restores ++;
+        }
+    } else if (t->kind == BOX_AUDIO_TARGET_BUS) {
         target = t->entity == state->master ? 0 :
             box_audio_bus_of(world, state, t->entity);
         if (!target && t->entity != state->master) {
@@ -656,7 +699,8 @@ static void box_audio_target_cancel(
     {
         if (box_audio_reserve(state)) {
             box_audio_write_cancel(&state->writer, t->kind == BOX_AUDIO_TARGET_BUS ?
-                BOX_AUDIO_CMD_BUS_SET : BOX_AUDIO_CMD_EFFECT_PARAMS, t->index, t->param);
+                BOX_AUDIO_CMD_BUS_SET : (t->kind == BOX_AUDIO_TARGET_MACRO ?
+                BOX_AUDIO_CMD_MACRO : BOX_AUDIO_CMD_EFFECT_PARAMS), t->index, t->param);
             state->automation.stats.cancels ++;
         }
 
@@ -1070,8 +1114,9 @@ void box_audio_automation_init(
         .window = box_audio_automation_window,
         .reset = box_audio_automation_reset
     };
-    ecs_entity_t components[BOX_AUDIO_EFFECT_COMPONENTS + 1] = { ecs_id(AudioBus) };
-    int32_t i, count = 1 + box_audio_module_effect_components(components + 1);
+    ecs_entity_t components[BOX_AUDIO_EFFECT_COMPONENTS + 2] = { ecs_id(AudioBus),
+        ecs_id(AudioMacro) };
+    int32_t i, count = 2 + box_audio_module_effect_components(components + 2);
     ecs_vec_init_t(NULL, &a->lanes, box_audio_lane_t, 0);
     ecs_vec_init_t(NULL, &a->targets, box_audio_target_t, 0);
     ecs_vec_init_t(NULL, &a->past, box_audio_segment_t, 0);

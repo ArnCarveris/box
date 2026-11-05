@@ -8,7 +8,6 @@ using box.transform
 using box.geometry
 using box.material
 
-@tree Parent
 template KoreanHall {
   { (IsA, KoreanStone); Position: {0, 0.25, 0}; RoundedBox: {8.1, 0.5, 5.7, 0.09} }
   { (IsA, KoreanStone); Position: {0, 0.56, 0}; Box: {8.35, 0.14, 5.9} }

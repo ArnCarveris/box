@@ -137,7 +137,8 @@ void Parametric_bake_hollow(void) {
     ECS_IMPORT(world, Box);
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
-    ecs_set(world, scene, LightBake, {.probe_spacing = 0.5f, .bounds_padding = 0.5f});
+    ecs_set(world, scene, LightBake, {.probe_spacing = 0.5f, .bounds_padding = 0.5f,
+        .compute = true});
     ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, e, Position, {0, 0, 0});
     Sweep value = test_sweep(world);

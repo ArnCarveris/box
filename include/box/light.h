@@ -179,6 +179,12 @@ ECS_STRUCT(ShadowAtlas, {
  * Values apply as specified: bounces 0 bakes direct emission and light only, budget_ms 0 bakes
  * nothing, a capture_size outside 1 to 256 or bounces outside 0 to 16 bakes nothing and sets
  * LightBakeStatus.error.
+ *
+ * Computing the bake and applying it are separate: compute decides whether the engine schedules
+ * captures, View.lighting.baked whether a view samples the probes. A volume that does not
+ * compute keeps the grid, loads from the cache and records changes, and views with
+ * lighting.baked show it as it was when computing stopped; captures already submitted finish.
+ * Once compute is true again the bake catches up on what changed meanwhile.
  */
 ECS_STRUCT(LightBake, {
     float probe_spacing; /**< World units between probes, default 2 */
@@ -196,6 +202,9 @@ ECS_STRUCT(LightBake, {
     float color_threshold; /**< Change of the linear color of a directional light from the
                           *   baked one, over its brightest channel, before it or an
                           *   environment change rebakes, default 0.05, 0 for any */
+    bool compute;        /**< The engine schedules new captures for the volume, default true;
+                          *   false holds the bake where it is without hiding it from views
+                          *   with View.lighting.baked */
 });
 
 /** Progress of the bake of a scene, written by the engine next to LightBake */
@@ -207,6 +216,8 @@ ECS_STRUCT(LightBakeStatus, {
                           *   when converged */
     bool converged;      /**< All bounces + 1 passes are baked and no change is queued */
     bool cache_hit;      /**< The volume was loaded from the cache */
+    bool held;           /**< Work is left but LightBake.compute is false, so nothing new is
+                          *   captured until it is true again */
     char *error;         /**< Why nothing is baked, such as an invalid setting, NULL for none */
 });
 
@@ -351,9 +362,9 @@ ECS_STRUCT(EnvironmentImage, {
 
 /** Register the box.light module.
  *
- * The first directional light of a scene casts the shadows of the views that enable them, and
- * so do its spot and point lights with shadows through the tiles of its ShadowAtlas; NoShadow
- * shapes and blended shapes cast none.
+ * The first directional light of a scene and its spot and point lights with shadows (the tiles
+ * of its ShadowAtlas) shadow the views that enable them. NoShadow and blended shapes cast none,
+ * LightFixture shapes cast into all but the tile of a light inside their world bounds.
  *
  * In a scene with LightBake the views are shadowed by the first directional light that is not
  * Baked and the probe captures by the first one they shade surfaces with (see LightBakeMode).
