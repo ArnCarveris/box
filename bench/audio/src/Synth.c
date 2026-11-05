@@ -23,14 +23,12 @@
  * ratio */
 #define BENCH_SYNC 2u
 
-<<<<<<< HEAD
 /** Extra of bench_synth_core: a curved pitch envelope of the root, with a sync sweep, moves
  * every layer, the synced saw and square of BENCH_SYNC when it is set too */
 #define BENCH_PITCH 4u
-=======
+
 /** Extra of bench_synth_core: the noise is pink */
-#define BENCH_PINK 4u
->>>>>>> fdf426e324e3e2852a5fe1aed64ec704ff8652e4
+#define BENCH_PINK 8u
 
 /** Create a core with 64 looping voices of a patch of three layers: a saw that sweeps up, a
  * square with its own envelope and noise, into a lowpass.
@@ -47,13 +45,9 @@
  * @param lfo Whether two LFOs move the patch
  * @param curved Whether the patch envelope and the envelope of the square are curved
  * @param drive Drive of the filter, 0..1
-<<<<<<< HEAD
- * @param extra BENCH_SUB, BENCH_SYNC and BENCH_PITCH, or 0
-=======
- * @param extra BENCH_SUB, BENCH_SYNC and BENCH_PINK, or 0
+ * @param extra BENCH_SUB, BENCH_SYNC, BENCH_PITCH and BENCH_PINK, or 0
  * @param pre Drive of the mix of the layers before the filter, 0..1, negative for none; its
  *   asymmetry is 0.3
->>>>>>> fdf426e324e3e2852a5fe1aed64ec704ff8652e4
  * @return The core
  */
 static box_audio_core_t* bench_synth_core(
@@ -119,14 +113,13 @@ static box_audio_core_t* bench_synth_core(
             .sync = 12 };
     }
 
-<<<<<<< HEAD
     if (extra & BENCH_PITCH) {
         p.pitch_envelope = (box_audio_synth_pitch_envelope_t){ .amount = 12, .decay = 1.5f,
             .curve = 4, .release_amount = -5, .sync = 12 };
-=======
+    }
+
     if (extra & BENCH_PINK) {
         p.layer[2].color = BOX_AUDIO_SYNTH_PINK;
->>>>>>> fdf426e324e3e2852a5fe1aed64ec704ff8652e4
     }
 
     if (fm) {
@@ -356,7 +349,7 @@ void Synth_voices_64_pitch(
 {
     // audio/synth
     box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
-        0, BENCH_PITCH);
+        0, BENCH_PITCH, -1);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }
@@ -366,7 +359,7 @@ void Synth_voices_64_pitch_sync(
 {
     // audio/synth
     box_audio_core_t *core = bench_synth_core(false, BOX_AUDIO_SYNTH_SLOPE_12, false, false, false,
-        0, BENCH_SYNC | BENCH_PITCH);
+        0, BENCH_SYNC | BENCH_PITCH, -1);
     bench_synth_render(b, core);
     box_audio_core_free(core);
 }

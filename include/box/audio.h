@@ -700,7 +700,6 @@ ECS_STRUCT(SynthFilterEnvelope, {
                             *   amount (1 - share + share v), default 0 */
 });
 
-<<<<<<< HEAD
 /** A pitch envelope of a synth sound, relative to the note so it fits every pitch: the pitch
  * starts amount semitones off the note and returns to it over the decay with a curve, the
  * drop of a kick or a tom, the blip of a zap or the scoop of brass. Over the release of the
@@ -722,7 +721,8 @@ ECS_STRUCT(SynthPitchEnvelope, {
                             *   of a note, -48..48, default 0, returning to 0 with the decay: the
                             *   sweep of a sync lead. Only on layers with a ratio over 1; the
                             *   moved ratio is clamped to 1..16 */
-=======
+});
+
 /** A drive stage of a synth sound, on its root: the mix of the layers of each voice runs
  * through a tanh soft clipper before the SynthFilter, or before the amp without one, where an
  * analog synth gets most of its thickness. Plucks, unison and FM pass through it as they mix.
@@ -735,7 +735,6 @@ ECS_STRUCT(SynthDrive, {
     float drive;           /**< 0..1, default 0.3: a gain of -6 to +24 dB before the clipper */
     float asymmetry;       /**< 0..1, default 0: an offset before the clipper that adds even
                             *   harmonics; its DC is blocked */
->>>>>>> fdf426e324e3e2852a5fe1aed64ec704ff8652e4
 });
 
 /** Portamento and mono legato of a synth sound, on its root.
@@ -786,13 +785,8 @@ ECS_STRUCT(SynthLfo, {
 
 /** A sound made by the synth from the components of this entity and its children, without a
  * file: SynthOscillator layers, each with an optional SynthUnison, a SynthEnvelope, a
-<<<<<<< HEAD
- * SynthFilter, a SynthFilterEnvelope, a SynthPitchEnvelope, a SynthGlide and SynthLfo.
- * Usually a prefab.
-=======
- * SynthDrive, a SynthFilter, a SynthFilterEnvelope, a SynthGlide and SynthLfo. Usually a
- * prefab.
->>>>>>> fdf426e324e3e2852a5fe1aed64ec704ff8652e4
+ * SynthDrive, a SynthFilter, a SynthFilterEnvelope, a SynthPitchEnvelope, a SynthGlide and
+ * SynthLfo. Usually a prefab.
  *
  * It is compiled once, and again when one of its components changes, into a patch the core
  * holds; box_audio_play and AudioSource play it like any sound, with no allocation per play.

@@ -888,16 +888,13 @@ typedef struct box_audio_synth_layer_t {
                                            * 1..BOX_AUDIO_SYNTH_SYNC_MAX, restarted on every
                                            * cycle of the frequency; 0 counts as 1, off.
                                            * Ignored by noise and pluck */
-<<<<<<< HEAD
     uint32_t has_pitch_envelope;          /**< 1 when it has its own pitch envelope, 0 for the
                                            * one of the patch */
     box_audio_synth_pitch_envelope_t pitch_envelope; /**< Its own pitch envelope, when
                                            * has_pitch_envelope */
-=======
     uint32_t color;                       /**< BOX_AUDIO_SYNTH_NOISE: a
                                            * box_audio_synth_color_t, 0 white; ignored by
                                            * the other waves */
->>>>>>> fdf426e324e3e2852a5fe1aed64ec704ff8652e4
 } box_audio_synth_layer_t;
 
 /** An LFO of a synth patch: a wave at a rate that starts after a delay and fades in, with a

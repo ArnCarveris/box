@@ -72,12 +72,9 @@
                     "voices_64_curved",
                     "voices_64_sub",
                     "voices_64_sync",
-<<<<<<< HEAD
                     "voices_64_pitch",
                     "voices_64_pitch_sync",
-=======
                     "voices_64_pink",
->>>>>>> fdf426e324e3e2852a5fe1aed64ec704ff8652e4
                     "voices_32_pluck",
                     "voices_32_pluck_vibrato",
                     "voices_8_pluck_unison"

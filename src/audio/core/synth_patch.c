@@ -203,13 +203,10 @@ static void box_audio_synth_patch_clamp(
         l->sub_octave = l->sub_octave >= 2 ? 2 : 1;
         l->sync = l->wave == BOX_AUDIO_SYNTH_NOISE || l->wave == BOX_AUDIO_SYNTH_PLUCK ? 1.0f :
             box_audio_synth_clamp(l->sync, 1, BOX_AUDIO_SYNTH_SYNC_MAX);
-<<<<<<< HEAD
         l->has_pitch_envelope = l->has_pitch_envelope != 0;
         box_audio_synth_pitch_envelope_clamp(&l->pitch_envelope);
-=======
         l->color = l->wave == BOX_AUDIO_SYNTH_NOISE && l->color <= BOX_AUDIO_SYNTH_BROWN ?
             l->color : BOX_AUDIO_SYNTH_WHITE;
->>>>>>> fdf426e324e3e2852a5fe1aed64ec704ff8652e4
     }
 
     if (p->lfos > BOX_AUDIO_SYNTH_LFOS) {

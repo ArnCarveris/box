@@ -579,7 +579,6 @@ static inline float box_audio_synth_noise(
     return (float)(int32_t)x * (1.0f / 2147483648.0f);
 }
 
-<<<<<<< HEAD
 /** Semitones the pitch envelope of a layer moves its pitch by: amount times the share of its
  * decay left, or after the release from the offset at its start toward release_amount.
  *
@@ -595,7 +594,8 @@ static double box_audio_synth_bend_offset(
 
     return b->released ? to + (b->from - to) * b->release.level :
         (double)d->amount * b->decay.level;
-=======
+}
+
 /** Pole or zero of a first order section at a frequency, exp(-2 pi f / rate), the matched z
  * transform of it.
  *
@@ -705,7 +705,6 @@ static inline float box_audio_synth_color_next(
     s[n] = x;
 
     return x * f->gain;
->>>>>>> fdf426e324e3e2852a5fe1aed64ec704ff8652e4
 }
 
 /** Aim every destination of the LFOs of a source at their values: the factors of the pitch,

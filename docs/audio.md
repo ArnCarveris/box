@@ -482,12 +482,9 @@ Working examples include [synth_examples.flecs](../test/assets/audio/synth_examp
 [synth_glide.flecs](../test/assets/audio/synth_glide.flecs),
 [synth_pluck.flecs](../test/assets/audio/synth_pluck.flecs),
 [synth_sub.flecs](../test/assets/audio/synth_sub.flecs),
-[synth_sync.flecs](../test/assets/audio/synth_sync.flecs) and
-<<<<<<< HEAD
+[synth_sync.flecs](../test/assets/audio/synth_sync.flecs),
+[synth_drive.flecs](../test/assets/audio/synth_drive.flecs) and
 [synth_pitch.flecs](../test/assets/audio/synth_pitch.flecs).
-=======
-[synth_drive.flecs](../test/assets/audio/synth_drive.flecs).
->>>>>>> fdf426e324e3e2852a5fe1aed64ec704ff8652e4
 
 ## Music on the timeline
 
