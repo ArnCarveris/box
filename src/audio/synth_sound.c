@@ -313,6 +313,8 @@ bool box_audio_synth_compile(
         p.seed = sound->seed;
         p.pitch_variance = sound->pitch_variance;
         p.level_variance = sound->level_variance;
+        p.drift = sound->drift;
+        p.free_phase = sound->free_phase;
     }
 
     if (glide) {

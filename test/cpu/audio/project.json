@@ -706,6 +706,21 @@
                 ]
             },
             {
+                "id": "SynthDrift",
+                "testcases": [
+                    "pitch_bounded",
+                    "pitch_bounded_filter",
+                    "unison_differ",
+                    "renders_identical",
+                    "plays_differ",
+                    "free_phase",
+                    "defaults_identical",
+                    "clamped",
+                    "pluck_follows",
+                    "script"
+                ]
+            },
+            {
                 "id": "SynthPreDriveWorld",
                 "testcases": [
                     "component"

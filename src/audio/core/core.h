@@ -145,6 +145,9 @@
 /** Most unison voices of a synth layer */
 #define BOX_AUDIO_SYNTH_UNISON_MAX 7
 
+/** Largest analog drift of the pitch of a synth sound in cents */
+#define BOX_AUDIO_SYNTH_DRIFT_MAX 50.0f
+
 /** Largest detune spread of the unison voices of a synth layer in cents, a semitone */
 #define BOX_AUDIO_SYNTH_DETUNE_MAX 100.0f
 /** Lowest frequency of a pluck string in Hz; a lower one is clamped. At rates above 81.8 kHz the
@@ -925,6 +928,11 @@ typedef struct box_audio_synth_patch_t {
     uint32_t seed;                        /**< Seed of the noise and of the variances */
     float pitch_variance;                 /**< Random share of the pitch per play, 0..1 */
     float level_variance;                 /**< Random share of the level per play, 0..1 */
+    float drift;                          /**< Cents the pitch of each layer and unison voice
+                                           * wanders within, 0..BOX_AUDIO_SYNTH_DRIFT_MAX, and
+                                           * the cutoff by a quarter of it; 0 for none */
+    uint32_t free_phase;                  /**< 1 to start the oscillators of a play at a
+                                           * random phase, 0 at phase 0 */
     box_audio_synth_envelope_t envelope;  /**< Envelope of the layers without their own */
     uint32_t has_drive;                   /**< 1 to run the mix of the layers through the
                                            * drive before the filter, 0 for none */

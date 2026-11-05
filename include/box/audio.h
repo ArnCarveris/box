@@ -795,6 +795,14 @@ ECS_STRUCT(SynthSound, {
     uint32_t seed;         /**< Seed of the noise and the variances, with a count of plays */
     float pitch_variance;  /**< Random share of the pitch per play, 0..1, default 0 */
     float level_variance;  /**< Random share of the level per play, 0..1, default 0 */
+    float drift;           /**< Cents of analog drift, 0..50, default 0: the pitch of each
+                            *   voice and of each unison voice of each layer wanders
+                            *   smoothly within this, over about 0.2 to 2 seconds, and the
+                            *   cutoff of its SynthFilter by a quarter of it; seeded from
+                            *   seed and the count of plays */
+    bool free_phase;       /**< Start the oscillators of each play, and their subs, at a
+                            *   random phase instead of 0, seeded as drift; default false.
+                            *   Unison voices always start at random phases */
 });
 
 /** The ears of the world: sources with AudioSpatial are heard from its WorldTransform.

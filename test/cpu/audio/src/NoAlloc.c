@@ -107,6 +107,8 @@ void NoAlloc_synth_voices(void) {
     p.layers = 3;
     p.seed = 5;
     p.pitch_variance = 0.1f;
+    p.drift = 15;
+    p.free_phase = 1;
     p.envelope = (box_audio_synth_envelope_t){
         .attack = 0.01f, .decay = 0.05f, .sustain = 0.5f, .hold = 0.1f, .release = 0.05f,
         .curve = 4, .attack_curve = 1 };

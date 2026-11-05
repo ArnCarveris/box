@@ -289,7 +289,7 @@ voices on play, so edits affect subsequent plays.
 
 | Component | Authoring controls |
 | --- | --- |
-| `SynthSound` | `seed`, `pitch_variance`, `level_variance`; variances default to zero |
+| `SynthSound` | `seed`, `pitch_variance`, `level_variance`, `drift` (0 cents, 0..50), `free_phase` (false); variances default to zero |
 | `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), `sync` (0, off, 1..16), `color` (`SynthNoiseWhite`), modulation controls, `velocity` (0) |
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`, `key_scale`; all zero by default |
 | `SynthDrive` | Root: `drive` (0.3, 0..1), `asymmetry` (0, 0..1) |
@@ -468,6 +468,16 @@ it moves every layer whose `sync` is over 1.
 Delay and fade bring modulation in gradually. Random phase and noise are seeded,
 so the same sequence of plays is reproducible.
 
+`SynthSound.drift` adds analog drift, so digital patches are never perfectly in tune.
+The pitch of each layer of a voice, and of each unison copy, wanders on its own smooth
+random walk within ±`drift` cents, moving over roughly 0.2 to 2 seconds; the cutoff of
+the filter drifts per voice by a quarter of it in cents. Pluck strings follow the drift
+as they follow vibrato. It adds to the pitch LFOs and pitch envelopes, at their control
+rate. `SynthSound.free_phase` starts the oscillators of each play, and their subs, at a
+random phase instead of 0; unison copies always start at random phases. Both are seeded
+from `seed` and the count of plays, so the same sequence of plays renders the same; at
+their defaults a sound renders exactly as without them.
+
 `SynthGlide.time` moves pitch exponentially in frequency. With `legato: true`,
 notes on the same channel retarget a held voice without restarting its envelopes.
 They keep the original waves, levels, filters and variances; use patches from the
@@ -483,7 +493,8 @@ Working examples include [synth_examples.flecs](../test/assets/audio/synth_examp
 [synth_pluck.flecs](../test/assets/audio/synth_pluck.flecs),
 [synth_sub.flecs](../test/assets/audio/synth_sub.flecs),
 [synth_sync.flecs](../test/assets/audio/synth_sync.flecs),
-[synth_drive.flecs](../test/assets/audio/synth_drive.flecs) and
+[synth_drive.flecs](../test/assets/audio/synth_drive.flecs),
+[synth_drift.flecs](../test/assets/audio/synth_drift.flecs) and
 [synth_pitch.flecs](../test/assets/audio/synth_pitch.flecs).
 
 ## Music on the timeline

@@ -50,6 +50,18 @@
 /** Seconds over which an LFO wave that jumps, square, saw or random, moves to its new value */
 #define BOX_AUDIO_SYNTH_LFO_SMOOTH 0.002
 
+/** Seconds each of the two lowpasses of a drift walk takes to move 1 - 1/e of the way to its
+ * target. A jump of the target from -1 to 1 moves the value, -1..1, by at most
+ * 2 / (e * this) per second, so a drift of 20 cents moves about 1.2 cents per 50 ms */
+#define BOX_AUDIO_SYNTH_DRIFT_SMOOTH 0.6
+
+/** Shortest and longest seconds a drift walk holds a target */
+#define BOX_AUDIO_SYNTH_DRIFT_HOLD_MIN 0.2
+#define BOX_AUDIO_SYNTH_DRIFT_HOLD_MAX 2.0
+
+/** Share of the drift of the pitch the cutoff drifts by, in cents */
+#define BOX_AUDIO_SYNTH_DRIFT_CUTOFF 0.25
+
 /** Shortest fade in seconds of an LFO with a delay, so its depth does not jump in at once */
 #define BOX_AUDIO_SYNTH_LFO_FADE_MIN 0.005f
 
@@ -755,6 +767,23 @@ static void box_audio_synth_lfo_aim(
             c += 100 * box_audio_synth_bend_offset(part);
         }
 
+        if (src->drifts) {
+            box_audio_synth_unison_t *u = &part->unison;
+            if (u->voices > 1) {
+                for (k = 0; k < u->voices; k ++) {
+                    r = box_audio_synth_exp2(src->drift * (double)u->walk[k].value *
+                        (1.0 / 1200));
+                    if (now) {
+                        u->drift[k] = r;
+                    }
+
+                    u->drift_step[k] = (r - u->drift[k]) * (1.0 / BOX_AUDIO_SYNTH_CONTROL);
+                }
+            } else {
+                c += src->drift * (double)part->walk.value;
+            }
+        }
+
         c = c != 0 ? box_audio_synth_exp2(c * (1.0 / 1200)) : 1.0;
         w = o->width_base + width[0] + width[l + 1];
         w = w > BOX_AUDIO_SYNTH_PULSE_MIN ? (w < 1 - BOX_AUDIO_SYNTH_PULSE_MIN ? w :
@@ -789,6 +818,11 @@ static void box_audio_synth_lfo_aim(
     }
 
     src->tremolo_step = (dip[0] - src->tremolo) * (1.0f / BOX_AUDIO_SYNTH_CONTROL);
+    if (src->drifts) {
+        octaves += src->drift * BOX_AUDIO_SYNTH_DRIFT_CUTOFF *
+            (double)src->drift_cutoff.value * (1.0 / 1200);
+    }
+
     if (src->lfo_cutoff) {
         src->lfo_octaves = octaves;
         box_audio_synth_cutoff(src, src->amount != 0 ? src->fenv.value : 0.0f, rate);
@@ -871,6 +905,142 @@ static int32_t box_audio_synth_blocks(
     int32_t n = (frames + BOX_AUDIO_SYNTH_CONTROL - 1) / BOX_AUDIO_SYNTH_CONTROL;
 
     return n > 0 ? n : 1;
+}
+
+/** Control blocks a drift walk holds its next target for, a random
+ * BOX_AUDIO_SYNTH_DRIFT_HOLD_MIN to _MAX seconds.
+ *
+ * @param rng The generator of the drift
+ * @param rate Frames per second
+ * @return The blocks
+ */
+static int32_t box_audio_synth_walk_hold(
+    uint32_t *rng,
+    float rate)
+{
+    double t = BOX_AUDIO_SYNTH_DRIFT_HOLD_MIN + (BOX_AUDIO_SYNTH_DRIFT_HOLD_MAX -
+        BOX_AUDIO_SYNTH_DRIFT_HOLD_MIN) * 0.5 * (1.0 + (double)box_audio_synth_noise(rng));
+
+    return box_audio_synth_blocks((int32_t)(t * (double)rate));
+}
+
+/** Start a drift walk at a random value, settled there, toward a random target.
+ *
+ * @param w The walk
+ * @param rng The generator of the drift
+ * @param rate Frames per second
+ */
+static void box_audio_synth_walk_start(
+    box_audio_synth_walk_t *w,
+    uint32_t *rng,
+    float rate)
+{
+    w->value = box_audio_synth_noise(rng);
+    w->a = w->value;
+    w->target = box_audio_synth_noise(rng);
+    w->left = box_audio_synth_walk_hold(rng, rate);
+}
+
+/** Advance a drift walk by a control block: a new target once it held the last for its
+ * time, and both lowpasses toward it. Each output is a mix of values in -1..1, so the value
+ * stays in -1..1.
+ *
+ * @param w The walk
+ * @param rng The generator of the drift
+ * @param coef Share of the way each lowpass moves per control block
+ * @param rate Frames per second
+ */
+static void box_audio_synth_walk_next(
+    box_audio_synth_walk_t *w,
+    uint32_t *rng,
+    float coef,
+    float rate)
+{
+    if (-- w->left <= 0) {
+        w->target = box_audio_synth_noise(rng);
+        w->left = box_audio_synth_walk_hold(rng, rate);
+    }
+
+    w->a += (w->target - w->a) * coef;
+    w->value += (w->a - w->value) * coef;
+}
+
+/** Start the drift of a play: its own generator, seeded from the seed of the patch and the
+ * count of its plays apart from the noise and the LFOs, so they stay as without drift.
+ *
+ * It picks the start phase of each oscillator with free_phase, and with drift a walk for each
+ * layer, each of its unison voices and the cutoff.
+ *
+ * @param core The core
+ * @param src The source, its layers set
+ * @param p The patch, clamped
+ * @param plays Count of the plays of the patch
+ */
+static void box_audio_synth_drift_start(
+    const box_audio_core_t *core,
+    box_audio_synth_source_t *src,
+    const box_audio_synth_patch_t *p,
+    uint32_t plays)
+{
+    float rate = core->sample_rate;
+    int32_t l, k;
+    src->drift_rng = box_audio_synth_hash(p->seed ^ 0x44524654u, plays);
+    for (l = 0; l < src->layers; l ++) {
+        box_audio_synth_part_t *part = src->part[l];
+        part->start = p->free_phase ?
+            0.5 * (1.0 + (double)box_audio_synth_noise(&src->drift_rng)) : 0.0;
+        part->start = part->start < 1 ? part->start : 0.0;
+    }
+
+    if (!src->drifts) {
+        goto done;
+    }
+
+    src->drift_coef = (float)(1 - box_audio_synth_exp2(-(double)BOX_AUDIO_SYNTH_CONTROL /
+        (BOX_AUDIO_SYNTH_DRIFT_SMOOTH * (double)rate * BOX_AUDIO_SYNTH_LN2)));
+    for (l = 0; l < src->layers; l ++) {
+        box_audio_synth_part_t *part = src->part[l];
+        box_audio_synth_walk_start(&part->walk, &src->drift_rng, rate);
+        for (k = 0; k < part->unison.voices && part->unison.voices > 1; k ++) {
+            box_audio_synth_walk_start(&part->unison.walk[k], &src->drift_rng, rate);
+            part->unison.drift[k] = 1;
+            part->unison.drift_step[k] = 0;
+        }
+    }
+
+    box_audio_synth_walk_start(&src->drift_cutoff, &src->drift_rng, rate);
+    src->lfo_cutoff = src->lfo_cutoff || src->filter;
+
+done:
+    return;
+}
+
+/** Advance the drift of a source by a control block: the walk of each layer, each of its
+ * unison voices and the cutoff.
+ *
+ * @param src The source, with drift
+ * @param rate Frames per second
+ */
+static void box_audio_synth_drift_block(
+    box_audio_synth_source_t *src,
+    float rate)
+{
+    float coef = src->drift_coef;
+    int32_t l, k;
+    for (l = 0; l < src->layers; l ++) {
+        box_audio_synth_part_t *part = src->part[l];
+        if (part->unison.voices > 1) {
+            for (k = 0; k < part->unison.voices; k ++) {
+                box_audio_synth_walk_next(&part->unison.walk[k], &src->drift_rng, coef, rate);
+            }
+        } else {
+            box_audio_synth_walk_next(&part->walk, &src->drift_rng, coef, rate);
+        }
+    }
+
+    if (src->filter) {
+        box_audio_synth_walk_next(&src->drift_cutoff, &src->drift_rng, coef, rate);
+    }
 }
 
 /** Start the pitch envelopes of a pass: each at its amount, which decays to 0 over its decay
@@ -1200,7 +1370,7 @@ static void box_audio_synth_pass(
         o->wave = (int32_t)layer->wave;
         o->level = layer->level;
         o->env = layer->has_envelope ? l + 1 : (layer->rings_free ? BOX_AUDIO_SYNTH_ENV_FREE : 0);
-        o->phase = 0;
+        o->phase = part->start;
         o->target = (int32_t)layer->modulates - 1;
         o->ring = layer->modulation == BOX_AUDIO_SYNTH_RING;
         o->audible = layer->audible != 0;
@@ -1592,6 +1762,9 @@ void box_audio_source_synth(
         box_audio_synth_lfo_start(core, src, p, slot->plays);
     }
 
+    src->drift = (double)p->drift;
+    src->drifts = p->drift > 0;
+    box_audio_synth_drift_start(core, src, p, slot->plays);
     src->bends = false;
     for (l = 0; l < src->layers; l ++) {
         box_audio_synth_layer_t *layer = &src->part[l]->layer;
@@ -1605,7 +1778,7 @@ void box_audio_source_synth(
         src->bends = src->bends || src->part[l]->bend.on;
     }
 
-    src->mods = src->lfos > 0 || src->bends;
+    src->mods = src->lfos > 0 || src->bends || src->drifts;
     box_audio_synth_pass(core, src);
 }
 
@@ -1907,6 +2080,10 @@ static void box_audio_synth_lfo_block(
         box_audio_synth_bend_block(src);
     }
 
+    if (src->drifts) {
+        box_audio_synth_drift_block(src, rate);
+    }
+
     box_audio_synth_lfo_aim(src, rate, false);
 }
 
@@ -1920,7 +2097,7 @@ static inline void box_audio_synth_lfo_next(
     box_audio_synth_source_t *src,
     float rate)
 {
-    int32_t l;
+    int32_t l, k;
     if (-- src->lfo_control <= 0) {
         src->lfo_control = BOX_AUDIO_SYNTH_CONTROL;
         box_audio_synth_lfo_block(src, rate);
@@ -1928,6 +2105,13 @@ static inline void box_audio_synth_lfo_next(
 
     for (l = 0; l < src->layers; l ++) {
         box_audio_synth_osc_t *o = &src->part[l]->osc;
+        if (src->drifts) {
+            box_audio_synth_unison_t *u = &src->part[l]->unison;
+            for (k = 0; k < u->voices && u->voices > 1; k ++) {
+                u->drift[k] += u->drift_step[k];
+            }
+        }
+
         o->vibrato += o->vibrato_step;
         o->width += o->width_step;
         o->tremolo += o->tremolo_step;
@@ -2634,6 +2818,10 @@ static inline void box_audio_synth_unison_next(
     int32_t k;
     for (k = 0; k < u->voices; k ++) {
         dt = inc * u->detune[k];
+        if (src->drifts) {
+            dt *= u->drift[k];
+        }
+
         dt = dt < src->inc_max ? dt : src->inc_max;
         if (o->synced) {
             x = box_audio_synth_sync(o, u->phase[k], dt, shift, 0, &src->rng);
@@ -2696,6 +2884,10 @@ static inline void box_audio_synth_strings_next(
     for (s = part->string, k = 0; s; s = s->next, k ++) {
         if (s->ringing) {
             dt = inc * u->detune[k];
+            if (src->drifts) {
+                dt *= u->drift[k];
+            }
+
             dt = dt < src->inc_max ? dt : src->inc_max;
             x = box_audio_synth_string_ring(src, s, rings_free, dt);
             l += x * u->left[k];
