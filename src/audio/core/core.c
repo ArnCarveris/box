@@ -1085,6 +1085,8 @@ static void box_audio_cmd_timed(
         box_audio_cmd_voice_ramp(core, &cmd->ramp);
     } else if (cmd->header.type == BOX_AUDIO_CMD_BEAT) {
         box_audio_beat_command(core, &cmd->beat);
+    } else if (cmd->header.type == BOX_AUDIO_CMD_MACRO) {
+        box_audio_macro_command(core, &cmd->macro);
     } else {
         box_audio_cmd_bus_set(core, &cmd->set);
     }
@@ -1260,7 +1262,9 @@ static void box_audio_schedule_cancel_sets(
             (cmd->type == BOX_AUDIO_CMD_EFFECT_PARAMS && type == BOX_AUDIO_CMD_EFFECT_PARAMS &&
             c->effect.slot == cmd->target) ||
             (cmd->type == BOX_AUDIO_CMD_VOICE_RAMP && type == BOX_AUDIO_CMD_VOICE_RAMP &&
-            c->ramp.voice == cmd->target);
+            c->ramp.voice == cmd->target) ||
+            (cmd->type == BOX_AUDIO_CMD_MACRO && type == BOX_AUDIO_CMD_MACRO &&
+            c->macro.macro == cmd->target);
         if (!drop) {
             if (kept != i) {
                 core->schedule[kept] = core->schedule[i];
@@ -1328,6 +1332,7 @@ static void box_audio_cmd(
     box_audio_cmd_cancel_t cancel;
     box_audio_cmd_synth_t synth;
     box_audio_cmd_modulator_t modulator;
+    box_audio_cmd_macro_map_t map;
     uint32_t layers;
     if (type == BOX_AUDIO_CMD_PLAY && size >= (int32_t)sizeof(box_audio_cmd_play_t)) {
         box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_play_t));
@@ -1353,9 +1358,14 @@ static void box_audio_cmd(
         box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_ramp_t));
     } else if (type == BOX_AUDIO_CMD_BEAT && size >= (int32_t)sizeof(box_audio_cmd_beat_t)) {
         box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_beat_t));
+    } else if (type == BOX_AUDIO_CMD_MACRO && size >= (int32_t)sizeof(box_audio_cmd_macro_t)) {
+        box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_macro_t));
     } else if (type == BOX_AUDIO_CMD_MODULATOR && size >= (int32_t)sizeof(modulator)) {
         box_audio_copy(&modulator, bytes, (int32_t)sizeof(modulator));
         box_audio_mod_command(core, &modulator);
+    } else if (type == BOX_AUDIO_CMD_MACRO_MAP && size >= (int32_t)sizeof(map)) {
+        box_audio_copy(&map, bytes, (int32_t)sizeof(map));
+        box_audio_macro_map_command(core, &map);
     } else if (type == BOX_AUDIO_CMD_CANCEL && size >= (int32_t)sizeof(cancel)) {
         box_audio_copy(&cancel, bytes, (int32_t)sizeof(cancel));
         box_audio_schedule_cancel_sets(core, &cancel);
@@ -1938,7 +1948,7 @@ void box_audio_core_render(
             }
         }
 
-        if (core->mods.on || core->mods.buses || core->mods.effects) {
+        if (core->mods.on || core->mods.maps || core->mods.buses || core->mods.effects) {
             n = box_audio_mods_block(core, n);
         }
 

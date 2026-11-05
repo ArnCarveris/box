@@ -23,6 +23,8 @@ ECS_COMPONENT_DECLARE(AudioBusState);
 ECS_COMPONENT_DECLARE(AudioVoice);
 ECS_COMPONENT_DECLARE(AudioEffectState);
 ECS_COMPONENT_DECLARE(AudioModulatorState);
+ECS_COMPONENT_DECLARE(AudioMacroState);
+ECS_COMPONENT_DECLARE(AudioMacroMapState);
 ECS_COMPONENT_DECLARE(AudioSample);
 ECS_COMPONENT_DECLARE(AudioMusic);
 ECS_COMPONENT_DECLARE(AudioSynth);
@@ -791,6 +793,25 @@ static void box_audio_modulator_ctor(
     }
 }
 
+/** Construct AudioMacroMap values: linear from 0 to 1 without a target.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_macro_map_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    AudioMacroMap *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (AudioMacroMap){ .max = 1.0f };
+    }
+}
+
 /** Construct Track values: no instrument, at priority 1, above the one shots.
  *
  * @param ptr The components
@@ -845,6 +866,25 @@ static void box_audio_track_copy(
 {
     (void)src;
     ecs_os_memset(dst, 0, ti->size * count);
+}
+
+/** Register AudioMacro, AudioMacroMap and the states the module adds to them.
+ *
+ * @param world The world
+ */
+static void box_audio_macro_components(
+    ecs_world_t *world)
+{
+    ECS_META_COMPONENT(world, AudioMacro);
+    ECS_META_COMPONENT(world, AudioMacroMap);
+    box_owned_hooks(world, AudioMacroMap, BOX_OWNED_STR(AudioMacroMap, member));
+    ecs_set_hooks(world, AudioMacroMap, { .ctor = box_audio_macro_map_ctor });
+    ECS_COMPONENT_DEFINE(world, AudioMacroState);
+    ECS_COMPONENT_DEFINE(world, AudioMacroMapState);
+    ecs_set_hooks(world, AudioMacroState, { .copy = box_audio_track_copy });
+    ecs_set_hooks(world, AudioMacroMapState, { .copy = box_audio_track_copy });
+    ecs_add_pair(world, ecs_id(AudioMacro), EcsWith, ecs_id(AudioMacroState));
+    ecs_add_pair(world, ecs_id(AudioMacroMap), EcsWith, ecs_id(AudioMacroMapState));
 }
 
 box_audio_module_t* box_audio_module_get(
@@ -1288,6 +1328,7 @@ static void box_audio_module_free(
     box_audio_sequencer_fini(state);
     box_audio_automation_fini(state);
     box_audio_modulators_fini(state);
+    box_audio_macros_fini(state);
     box_audio_timeline_fini(state);
     ecs_os_free(state->capture.path);
     ecs_os_free(state);
@@ -1505,6 +1546,7 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, AudioModulator);
     box_owned_hooks(world, AudioModulator, BOX_OWNED_STR(AudioModulator, member));
     ecs_set_hooks(world, AudioModulator, { .ctor = box_audio_modulator_ctor });
+    box_audio_macro_components(world);
     ECS_META_COMPONENT(world, TrackSwingGrid);
     ECS_META_COMPONENT(world, TrackHumanize);
     ECS_META_COMPONENT(world, Track);
@@ -1589,5 +1631,6 @@ void BoxAudioImport(
     box_audio_sequencer_init(world, state);
     box_audio_automation_init(world, state);
     box_audio_modulators_init(world, state);
+    box_audio_macros_init(world, state);
     box_audio_functions_init(world);
 }

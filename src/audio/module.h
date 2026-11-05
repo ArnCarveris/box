@@ -611,18 +611,19 @@ typedef struct box_audio_sequencer_t {
 /** What an automation moves in the core */
 typedef enum box_audio_target_kind_t {
     BOX_AUDIO_TARGET_BUS = 1,       /**< A parameter of a bus, with BUS_SET */
-    BOX_AUDIO_TARGET_EFFECT = 2     /**< The parameters of an effect slot, with EFFECT_PARAMS */
+    BOX_AUDIO_TARGET_EFFECT = 2,    /**< The parameters of an effect slot, with EFFECT_PARAMS */
+    BOX_AUDIO_TARGET_MACRO = 3      /**< The value of an AudioMacro, with MACRO */
 } box_audio_target_kind_t;
 
-/** A parameter of a bus or an effect entity that automation lanes move, kept across the
+/** A parameter of a bus, an effect entity or a macro that automation lanes move, kept across the
  * frames to cancel and restore what was scheduled for it */
 typedef struct box_audio_target_t {
     box_audio_target_kind_t kind; /**< What it is */
-    ecs_entity_t entity;    /**< The bus or the effect entity */
-    ecs_entity_t component; /**< AudioBus or the effect component */
+    ecs_entity_t entity;    /**< The bus, the effect entity or the macro */
+    ecs_entity_t component; /**< AudioBus, the effect component or AudioMacro */
     uint32_t param;         /**< The box_audio_param_t of a bus */
     int32_t send;           /**< Index of the send of a send level, -1 for another parameter */
-    uint32_t index;         /**< Bus index or effect slot the last value went to */
+    uint32_t index;         /**< Bus index, effect slot or macro slot the last value went to */
     uint32_t effect;        /**< Kind of effect the last value went to */
     uint32_t serial;        /**< Serial of the output the last value went to, 0 for none */
     uint64_t ahead;         /**< Frame of the last value scheduled, 0 for none */
@@ -656,6 +657,7 @@ typedef struct box_audio_automation_point_t {
 typedef struct box_audio_automation_stats_t {
     int64_t bus_sets;       /**< BUS_SET commands of automated values written */
     int64_t effect_sets;    /**< EFFECT_PARAMS commands written */
+    int64_t macro_sets;     /**< MACRO commands of automated values written */
     int64_t restores;       /**< Values of a component sent after a lane ended */
     int64_t cancels;        /**< CANCEL commands written */
     int64_t rebuilds;       /**< Rebuilds of the lanes */
@@ -720,6 +722,89 @@ typedef struct box_audio_modulators_t {
                              *   from older ones */
     box_audio_mod_stats_t stats; /**< Counters */
 } box_audio_modulators_t;
+
+/** What became of an AudioMacro or an AudioMacroMap in the last frame */
+typedef enum box_audio_macro_status_t {
+    BOX_AUDIO_MACRO_STATUS_NONE = 0,  /**< Not looked at yet */
+    BOX_AUDIO_MACRO_STATUS_RUNS = 1,  /**< A macro has a slot of the core, a map runs */
+    BOX_AUDIO_MACRO_STATUS_WAITS = 2, /**< A map whose target is not in the output, or whose
+                                       *   macro has no slot */
+    BOX_AUDIO_MACRO_STATUS_ERROR = 3, /**< A map whose parent, target, member or range is not
+                                       *   valid */
+    BOX_AUDIO_MACRO_STATUS_FULL = 4,  /**< Every macro slot is taken, or its macro has
+                                       *   BOX_AUDIO_MACRO_MAPS maps before it */
+    BOX_AUDIO_MACRO_STATUS_TAKEN = 5, /**< A map of a member a newer map moves */
+    BOX_AUDIO_MACRO_STATUS_DISABLED = 6 /**< It is disabled */
+} box_audio_macro_status_t;
+
+/** What the module did for an AudioMacro, added with it */
+typedef struct AudioMacroState {
+    uint8_t slot;           /**< Slot of the core plus 1, 0 for none */
+    uint8_t status;         /**< A box_audio_macro_status_t */
+    bool logged;            /**< The error of a full core was logged */
+    bool maps_logged;       /**< The error of too many maps was logged, until it has at most
+                             *   BOX_AUDIO_MACRO_MAPS again */
+    int32_t maps;           /**< Maps that can run in the last frame, the ones past the limit
+                             *   included */
+    uint32_t frame;         /**< Frame of the module it was looked at last */
+} AudioMacroState;
+
+extern ECS_COMPONENT_DECLARE(AudioMacroState);
+
+/** What the module did for an AudioMacroMap, added with it */
+typedef struct AudioMacroMapState {
+    uint16_t slot;          /**< Map slot of the core plus 1, 0 for none */
+    uint8_t status;         /**< A box_audio_macro_status_t */
+    bool logged;            /**< Its error was logged, until it changes */
+    bool warned;            /**< The warning of a member a newer map takes was logged, until
+                             *   it changes */
+    uint32_t frame;         /**< Frame of the module it was looked at last */
+} AudioMacroMapState;
+
+extern ECS_COMPONENT_DECLARE(AudioMacroMapState);
+
+/** What a macro slot of the core holds and got */
+typedef struct box_audio_macro_sent_t {
+    ecs_entity_t entity;    /**< Macro entity of the slot, 0 for a free slot */
+    uint32_t serial;        /**< Serial of the output value went to, 0 for none */
+    float value;            /**< The value of the component sent last */
+} box_audio_macro_sent_t;
+
+/** What a map slot of the core holds and got */
+typedef struct box_audio_map_sent_t {
+    ecs_entity_t entity;    /**< Map entity of the slot, 0 for a free slot */
+    uint32_t serial;        /**< Serial of the output cmd went to, 0 for none */
+    box_audio_cmd_macro_map_t cmd; /**< The last command, target NONE once released */
+} box_audio_map_sent_t;
+
+/** A map that can run in a frame, before the maps of one member are sorted out */
+typedef struct box_audio_map_candidate_t {
+    ecs_entity_t entity;    /**< The map entity */
+    ecs_entity_t macro;     /**< Its macro */
+    box_audio_cmd_macro_map_t cmd; /**< Its command, its slot aside */
+    bool taken;             /**< A newer map moves its member */
+} box_audio_map_candidate_t;
+
+/** Counters of the macros, for the tests */
+typedef struct box_audio_macro_stats_t {
+    int64_t values;         /**< MACRO commands of the values of the components */
+    int64_t maps;           /**< MACRO_MAP commands that start or change a map */
+    int64_t releases;       /**< MACRO_MAP commands that release one */
+    int64_t errors;         /**< Errors logged */
+    int64_t warnings;       /**< Warnings logged */
+} box_audio_macro_stats_t;
+
+/** The macros of the module, in macro_sync.c */
+typedef struct box_audio_macros_t {
+    ecs_query_t *query;     /**< AudioMacro with its state, disabled ones included */
+    ecs_query_t *map_query; /**< AudioMacroMap with its state, disabled ones included */
+    box_audio_macro_sent_t slots[BOX_AUDIO_MACRO_MAX]; /**< The macro slots of the core */
+    box_audio_map_sent_t maps[BOX_AUDIO_MACRO_MAP_MAX]; /**< The map slots of the core */
+    box_audio_map_candidate_t candidates[BOX_AUDIO_MACRO_MAP_MAX]; /**< The maps of the frame */
+    uint32_t frame;         /**< Frames of the module, which tell the macros of this frame from
+                             *   older ones */
+    box_audio_macro_stats_t stats; /**< Counters */
+} box_audio_macros_t;
 
 /** The state of the module in a world */
 typedef struct box_audio_module_t {
@@ -797,6 +882,7 @@ typedef struct box_audio_module_t {
     box_audio_sequencer_t sequencer; /**< The tracks of the timeline */
     box_audio_automation_t automation; /**< The automation lanes of the timeline */
     box_audio_modulators_t modulators; /**< The modulators */
+    box_audio_macros_t macros;    /**< The macros and their maps */
     bool listener_warned;         /**< The warning of several listeners was logged */
     bool spatial_dirty;           /**< Update every spatial source, not only changed ones */
     bool waiting;                 /**< The page waited for a gesture in the last frame */
@@ -944,9 +1030,10 @@ char* box_audio_member_cursor(
     const char *member,
     ecs_meta_cursor_t *cur);
 
-/** Resolve a float member of a bus or an effect that automation and modulators move: volume,
- * pan, width and sends[i].level of an AudioBus or of the master, or a float member of the
- * effect component of an effect entity.
+/** Resolve a float member of a bus, an effect or a macro that automation, modulators and the
+ * maps of macros move: volume, pan, width and sends[i].level of an AudioBus or of the master, a
+ * float member of the effect component of an effect entity, or the value of an AudioMacro,
+ * which the maps of a macro may not move.
  *
  * @param world The world
  * @param state The state
@@ -1001,6 +1088,88 @@ void box_audio_modulators_fini(
  * @return A text that lives as long as the program
  */
 const char* box_audio_modulator_status(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Find the index of the parameter of an effect a float member of its component becomes, by
+ * writing two marks into copies of the component and looking for them in the params its
+ * builder makes.
+ *
+ * @param world The world
+ * @param component The effect component
+ * @param ptr The value of the component
+ * @param size Bytes of the component, at most BOX_AUDIO_AUTOMATION_COMPONENT
+ * @param member The path of the member
+ * @return The index, -1 when the member reaches no parameter as it is
+ */
+int32_t box_audio_effect_member_param(
+    const ecs_world_t *world,
+    ecs_entity_t component,
+    const void *ptr,
+    ecs_size_t size,
+    const char *member);
+
+/** Check whether a member of an effect is a frequency, which AudioModOctaves applies to: a
+ * cutoff, a center, the frequency of a band or the damping of a Delay.
+ *
+ * @param component The effect component
+ * @param member The path of the member
+ * @return Whether it is a frequency
+ */
+bool box_audio_member_frequency(
+    ecs_entity_t component,
+    const char *member);
+
+/** Get the macro slot of the core of an AudioMacro, as of the last box_audio_macros_sync.
+ *
+ * @param world The world
+ * @param e The macro entity
+ * @return The slot, -1 when it has none: disabled, past the limit or not looked at yet
+ */
+int32_t box_audio_macro_slot(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Send the AudioMacro entities and their AudioMacroMap children to the core: give each macro
+ * a slot and send its value at once when its component changes; resolve each map, sort out the
+ * maps of one member (the newer wins), give the others a slot, send what changed and release
+ * what no longer runs. A macro past the limit, one with too many maps and a map that cannot
+ * run log one error that names them, a map whose member a newer map takes one warning. Runs
+ * before box_audio_modulators_sync and box_audio_timeline_update, which address the macros by
+ * their slots.
+ *
+ * @param world The world
+ * @param state The state, whose bus indices and effect slots are current
+ * @param t The transport
+ */
+void box_audio_macros_sync(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    box_audio_transport_t *t);
+
+/** Register the queries and the observer of the macros.
+ *
+ * @param world The world
+ * @param state The state
+ */
+void box_audio_macros_init(
+    ecs_world_t *world,
+    box_audio_module_t *state);
+
+/** Free what the macros hold.
+ *
+ * @param state The state
+ */
+void box_audio_macros_fini(
+    box_audio_module_t *state);
+
+/** Describe what became of a macro or a map, for the audio command.
+ *
+ * @param world The world
+ * @param e The macro or map entity
+ * @return A text that lives as long as the program
+ */
+const char* box_audio_macro_status(
     const ecs_world_t *world,
     ecs_entity_t e);
 

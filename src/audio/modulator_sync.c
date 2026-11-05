@@ -5,11 +5,10 @@
  * and the beat clock of the core they need.
  *
  * The module sends a modulator once, and again only when what it sends changes. The core runs
- * the modulator from there on.
+ * the modulator from there on, on a bus, an effect slot or a macro before its maps shape it.
  *
- * The member becomes a parameter of a bus or the index of a parameter of an effect slot. That
- * index is found by writing two marks into a copy of the effect component and looking for them
- * in the params its builder makes, so every member that reaches the core maps without a table.
+ * The index of the parameter of an effect is found by writing two marks into a copy of its
+ * component and looking for them in the params its builder makes, so no table is needed.
  */
 
 #include "module.h"
@@ -19,16 +18,7 @@
 #define BOX_AUDIO_MOD_MARK_A 0.1234567f
 #define BOX_AUDIO_MOD_MARK_B 0.8765433f
 
-/** Find the index of the parameter of an effect a float member of its component becomes.
- *
- * @param world The world
- * @param component The effect component
- * @param ptr The value of the component
- * @param size Bytes of the component, at most BOX_AUDIO_AUTOMATION_COMPONENT
- * @param member The path of the member
- * @return The index, -1 when the member reaches no parameter as it is
- */
-static int32_t box_audio_modulator_param(
+int32_t box_audio_effect_member_param(
     const ecs_world_t *world,
     ecs_entity_t component,
     const void *ptr,
@@ -68,14 +58,7 @@ done:
     return result;
 }
 
-/** Check whether a member of an effect is a frequency, which AudioModOctaves applies to: a
- * cutoff, a center, the frequency of a band or the damping of a Delay.
- *
- * @param component The effect component
- * @param member The path of the member
- * @return Whether it is a frequency
- */
-static bool box_audio_modulator_frequency(
+bool box_audio_member_frequency(
     ecs_entity_t component,
     const char *member)
 {
@@ -141,7 +124,27 @@ static bool box_audio_modulator_build(
     }
 
     cmd->depth = mod->depth;
-    if (spec.kind == BOX_AUDIO_TARGET_BUS) {
+    if (spec.kind == BOX_AUDIO_TARGET_MACRO) {
+        if (mod->scale == AudioModOctaves) {
+            *error = flecs_asprintf("AudioModOctaves applies to a frequency, not to the value "
+                "of a macro");
+            goto done;
+        }
+
+        if (mod->source == AudioModFollower && !mod->key) {
+            *error = flecs_asprintf("a follower of a macro needs a key bus");
+            goto done;
+        }
+
+        index = box_audio_macro_slot(world, mod->target);
+        if (index < 0) {
+            goto done;
+        }
+
+        cmd->target = BOX_AUDIO_MOD_TARGET_MACRO;
+        cmd->param = 0;
+        cmd->scale = BOX_AUDIO_MOD_LINEAR;
+    } else if (spec.kind == BOX_AUDIO_TARGET_BUS) {
         if (mod->scale == AudioModOctaves) {
             *error = flecs_asprintf("AudioModOctaves applies to a frequency, not to '%s' of "
                 "AudioBus", mod->member);
@@ -165,7 +168,7 @@ static bool box_audio_modulator_build(
     } else {
         ptr = ecs_get_id(world, mod->target, mod->component);
         c = ecs_get(world, mod->component, EcsComponent);
-        param = ptr && c ? box_audio_modulator_param(world, mod->component, ptr, c->size,
+        param = ptr && c ? box_audio_effect_member_param(world, mod->component, ptr, c->size,
             mod->member) : -1;
         if (param < 0) {
             *error = flecs_asprintf("member '%s' does not reach the output as the component "
@@ -174,7 +177,7 @@ static bool box_audio_modulator_build(
         }
 
         if (mod->scale == AudioModOctaves &&
-            !box_audio_modulator_frequency(mod->component, mod->member))
+            !box_audio_member_frequency(mod->component, mod->member))
         {
             *error = flecs_asprintf("AudioModOctaves applies to a frequency, not to '%s'",
                 mod->member);

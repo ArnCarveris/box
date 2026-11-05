@@ -1355,9 +1355,10 @@ ECS_STRUCT(AudioClip, {
  *
  * Targets: the volume, pan and width of an AudioBus and the level of its sends
  * (sends[1].level), and every float member of the effect component of an effect entity, such
- * as AudioFilter.cutoff, Reverb.mix, Delay.feedback or bands[2].gain of an Equalizer. Members
- * that are not continuous (kinds, slopes, stages, voices, entities and bools) are not
- * automatable. A clip whose target, component or member is unknown or not automatable logs
+ * as AudioFilter.cutoff, Reverb.mix, Delay.feedback or bands[2].gain of an Equalizer, and
+ * the value of an AudioMacro (component AudioMacro, member "value"), which moves its maps
+ * sample accurately. Members that are not continuous (kinds, slopes, stages, voices, entities
+ * and bools) are not automatable. A clip whose target, component or member is unknown or not automatable logs
  * one error that names it, and does nothing until it changes.
  *
  * While the Transport plays, the curve is sampled within the lookahead window every 10 ms of
@@ -1428,8 +1429,9 @@ ECS_ENUM(AudioModScale, {
  * scale: AudioModOctaves, depth: 2, sync: 0.5} }.
  *
  * target, component and member name what it moves as an AutomationClip does, with the same
- * targets: volume, pan, width and sends[i].level of an AudioBus or of the master, and every
- * float member of the effect component of an effect entity.
+ * targets: volume, pan, width and sends[i].level of an AudioBus or of the master, every float
+ * member of the effect component of an effect entity, and the value of an AudioMacro, which it
+ * moves linearly before the maps of the macro shape it (a follower of a macro needs a key).
  *
  * Its value adds to the value the output has, the one of the component or of an automation
  * lane that covers the member, and the sum is clamped to the range of the member. depth is the
@@ -1482,6 +1484,77 @@ ECS_STRUCT(AudioModulator, {
                              *   or the target bus */
     float attack;           /**< Seconds of the rise of a follower, default 0.01 */
     float release;          /**< Seconds of the fall of a follower, default 0.1 */
+});
+
+/** Macros the core runs; more log one error that names the macro and do nothing */
+#define BOX_AUDIO_MACROS 32
+
+/** Maps of one macro; more log one error that names the macro and do nothing */
+#define BOX_AUDIO_MACRO_MAPS 8
+
+/** A macro, on an entity of its own: one value of 0..1 that its AudioMacroMap children turn
+ * into several members of buses and effects at once, each over its own range and curve, like
+ * a knob of a Combinator. A build-up is one automation lane on the value of a macro that opens
+ * a filter, raises a drive, grows a reverb send and lifts a delay feedback together, and game
+ * code drives the intensity of the music with one value:
+ * intensity { AudioMacro: {value: 0}
+ *   cutoff { AudioMacroMap: {target: synth_filter, component: AudioFilter, member: "cutoff",
+ *     min: 200, max: 8000, scale: AudioModOctaves} }
+ *   reverb { AudioMacroMap: {target: synth, component: AudioBus, member: "sends[0].level",
+ *     max: 0.6} } }.
+ *
+ * While a map runs, the macro decides the member: the value of the component, and of an
+ * automation lane of the member itself, is replaced, not added to; the modulators of the member
+ * add to the value of the macro. The macro never writes a component, so game code keeps
+ * reading and writing the authored values.
+ *
+ * The value is itself a target of an AutomationClip and of an AudioModulator (component
+ * AudioMacro, member "value"), sample accurately: the audio core shapes the value of the macro,
+ * plus what its modulators add, clamped to 0..1, into its maps every 32 frames and at the frame
+ * of every scheduled value. A write of value from a script or from C applies at once through
+ * the same path, with the usual smoothing of the targets: a bus ramps over at least 5 ms, an
+ * effect smooths over its usual 10 to 20 ms. Disabling a macro releases its maps.
+ *
+ * Up to BOX_AUDIO_MACROS macros run, and up to BOX_AUDIO_MACRO_MAPS maps of each; a macro past
+ * a limit logs one error that names it. See Macros in docs/audio.md.
+ */
+ECS_STRUCT(AudioMacro, {
+    float value;            /**< 0..1, default 0, clamped */
+});
+
+/** A map of a macro, a child of the AudioMacro entity: one member of a bus or an effect that
+ * the macro moves from min at a value of 0 to max at 1.
+ *
+ * target, component and member name the member as an AutomationClip and an AudioModulator
+ * do, with the same members: volume, pan, width and sends[i].level of an AudioBus or of the
+ * master, and every float member of the effect component of an effect entity that reaches the
+ * output as it is (not the time of a Delay with a sync). The value of a macro is not a member
+ * a map moves.
+ *
+ * The value of the member is min + (max - min) * shape(value), or min * (max / min)^shape(value)
+ * with AudioModOctaves, for a frequency (cutoff, center, frequency of a band, damping of a
+ * Delay), whose even sweep is in octaves: 200..8000 Hz at 0.5 is 1265 Hz. A min above max
+ * inverts the map. curve bends shape(x) = (2^(6 curve x) - 1) / (2^(6 curve) - 1): 0 is
+ * linear, 1 exponential (the middle of the macro gives 11% of the range), -1 logarithmic (89%).
+ *
+ * A new map fades in over 50 ms; disabling, deleting or retargeting one fades it out over
+ * 50 ms, and the member returns to its authored value without a click. When two maps move one
+ * member, the one created last wins (the higher entity id): the other logs one warning that
+ * names both and does nothing until the newer one is gone. A map whose target, component or
+ * member is unknown, whose parent is no macro, or in octaves of a member that is no frequency
+ * or with a range that is not positive, logs one error that names it until it changes; one
+ * whose effect is in no insert slot waits for one.
+ */
+ECS_STRUCT(AudioMacroMap, {
+    ecs_entity_t target;    /**< The entity with the AudioBus or the effect component */
+    ecs_entity_t component; /**< The component: AudioBus or an effect component */
+    char *member;           /**< Path of a float member, such as "cutoff", "volume" or
+                             *   "sends[1].level" */
+    float min;              /**< Value at a macro of 0, in the units of the member, default 0 */
+    float max;              /**< Value at a macro of 1, default 1; below min inverts */
+    float curve;            /**< -1 logarithmic .. 0 linear (default) .. 1 exponential */
+    AudioModScale scale;    /**< AudioModLinear (default) or AudioModOctaves, for a frequency,
+                             *   with min and max above 0 */
 });
 
 /** The grid a Track swings */

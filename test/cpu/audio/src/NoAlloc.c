@@ -1524,3 +1524,113 @@ void NoAlloc_modulators(void) {
     box_audio_core_free(core);
     test_int(noalloc_frees, 1);
 }
+
+/** Write a map command of a macro into a core.
+ *
+ * @param core The core
+ * @param cmd The command
+ */
+static void noalloc_macro_map(
+    box_audio_core_t *core,
+    const box_audio_cmd_macro_map_t *cmd)
+{
+    uint8_t bytes[128];
+    box_audio_writer_t w;
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_macro_map(&w, cmd));
+    box_audio_core_apply(core, w.data, w.size);
+}
+
+/* Maps of macros on a filter and on buses, modulators on the macros, values at once and
+ * scheduled ahead, cancels, retargets and releases, without a call of the allocator. */
+void NoAlloc_macros(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_route_t routes[] = { AUDIO_OUT(2, 0), AUDIO_ROUTE(1, 0, 2), AUDIO_MASTER };
+    float params[BOX_AUDIO_EFFECT_PARAMS] = { BOX_AUDIO_SYNTH_LOWPASS, 800, 0.3f, 0, 1, 0 };
+    box_audio_cmd_macro_map_t map;
+    box_audio_cmd_modulator_t m;
+    uint8_t bytes[512];
+    box_audio_writer_t w;
+    uint32_t i, k;
+    audio_order(core, routes, 3);
+    audio_sine(audio_sound_a, AUDIO_FRAMES / 4, 330, 0.25f);
+    test_assert(box_audio_core_sound(core, 1, audio_sound_a, AUDIO_FRAMES / 4, 1, AUDIO_RATE));
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_effect(&w, 0, BOX_AUDIO_EFFECT_FILTER, 1, 0,
+        BOX_AUDIO_BUS_NONE, params));
+    box_audio_core_apply(core, w.data, w.size);
+    audio_play(core, 1, 1, 1, 0.5f, 0, 1, BOX_AUDIO_PLAY_LOOP);
+    audio_play(core, 2, 1, 2, 0.5f, 0, 0.5f, BOX_AUDIO_PLAY_LOOP);
+    for (k = 0; k < 12; k ++) {
+        for (i = 0; i < 6; i ++) {
+            map = (box_audio_cmd_macro_map_t){ .slot = i * 37, .macro = (i + k) % 3,
+                .min = 0.1f * (float)i, .max = 1.0f - 0.05f * (float)k,
+                .curve = 0.25f * (float)((int32_t)(k % 9) - 4) };
+            if (i < 2) {
+                map.target = BOX_AUDIO_MOD_TARGET_EFFECT;
+                map.index = 0;
+                map.param = 1 + (i + k / 4) % 2;
+                map.kind = BOX_AUDIO_EFFECT_FILTER;
+                map.scale = map.param == 1 ? BOX_AUDIO_MOD_OCTAVES : BOX_AUDIO_MOD_LINEAR;
+                map.min = map.param == 1 ? 200.0f : 0.1f;
+                map.max = map.param == 1 ? 4000.0f + 100.0f * (float)k : 0.6f;
+            } else {
+                map.target = (k + i) % 5 == 0 ? BOX_AUDIO_MOD_TARGET_NONE :
+                    BOX_AUDIO_MOD_TARGET_BUS;
+                map.index = 1 + (i + k / 3) % 2;
+                map.param = i == 2 ? BOX_AUDIO_PARAM_VOLUME : (i == 3 ? BOX_AUDIO_PARAM_PAN :
+                    (i == 4 ? BOX_AUDIO_PARAM_WIDTH : BOX_AUDIO_PARAM_SEND));
+            }
+
+            noalloc_macro_map(core, &map);
+        }
+
+        for (i = 0; i < 3; i ++) {
+            m = (box_audio_cmd_modulator_t){ .slot = i, .target = BOX_AUDIO_MOD_TARGET_MACRO,
+                .index = (i + k) % 3, .depth = 0.1f + 0.05f * (float)i,
+                .rate = 1.0f + (float)(k % 4), .sync = k % 2 ? 0.25f * (float)(i + 1) : 0,
+                .step_count = 1 + (k + i) % 16, .wave = (k + i) % 6, .smooth = 0.3f };
+            m.source = (k + i) % 2 ? BOX_AUDIO_MOD_STEPS : BOX_AUDIO_MOD_LFO;
+            m.steps[0] = 1;
+            m.steps[2] = -0.5f;
+            noalloc_modulator(core, &m);
+        }
+
+        box_audio_writer_init(&w, bytes, sizeof(bytes));
+        test_assert(box_audio_write_macro(&w, k % 3, 0.1f * (float)(k % 10), 0));
+        test_assert(box_audio_write_macro(&w, (k + 1) % 3, 0.9f,
+            box_audio_core_clock(core) + 1003));
+        test_assert(box_audio_write_macro(&w, (k + 2) % 3, 0.4f,
+            box_audio_core_clock(core) + 2011));
+        if (k % 4 == 1) {
+            test_assert(box_audio_write_cancel(&w, BOX_AUDIO_CMD_MACRO, (k + 2) % 3, 0));
+        }
+
+        test_assert(box_audio_write_beat(&w, 2.5 * (double)k, 2.0f,
+            box_audio_core_clock(core) + 500));
+        box_audio_core_apply(core, w.data, w.size);
+        audio_render(core, 0, k % 3 ? AUDIO_FRAMES / 40 : AUDIO_FRAMES / 4);
+        audio_events(core, 0, NULL);
+    }
+
+    map = (box_audio_cmd_macro_map_t){ .target = BOX_AUDIO_MOD_TARGET_NONE };
+    for (i = 0; i < 6; i ++) {
+        map.slot = i * 37;
+        noalloc_macro_map(core, &map);
+    }
+
+    m = (box_audio_cmd_modulator_t){ .target = BOX_AUDIO_MOD_TARGET_NONE };
+    for (i = 0; i < 3; i ++) {
+        m.slot = i;
+        noalloc_modulator(core, &m);
+    }
+
+    audio_render(core, 0, AUDIO_FRAMES / 4);
+    test_int(box_audio_core_macro_maps(core), 0);
+    test_int(box_audio_core_modulators(core), 0);
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+}

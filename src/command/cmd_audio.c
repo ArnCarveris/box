@@ -2,7 +2,7 @@
  * @file command/cmd_audio.c
  * @brief The audio command: the status of the audio, its transport, its buses and their insert
  * slots, its instruments, its tracks with their note and audio placements, sounding notes and
- * playing audio clips, the master
+ * playing audio clips, its macros with their maps, the master
  * volume and mute, play, stop, seek and tempo, and captures of the master output to a WAV
  * resource.
  *
@@ -732,6 +732,63 @@ static void box_cmd_audio_tracks(
     ecs_query_fini(q);
 }
 
+/** Append the macros: each with its value and whether it runs, and its maps with their member,
+ * range, curve, the value the member has at the value of the component and whether they run.
+ *
+ * @param world The world
+ * @param buf The output
+ */
+static void box_cmd_audio_macros(
+    ecs_world_t *world,
+    ecs_strbuf_t *buf)
+{
+    ecs_iter_t it = ecs_each(world, AudioMacro);
+    int32_t i, k;
+    while (ecs_each_next(&it)) {
+        const AudioMacro *macro = ecs_field(&it, AudioMacro, 0);
+        for (i = 0; i < it.count; i ++) {
+            char *path = ecs_get_path(world, it.entities[i]);
+            ecs_iter_t mit = ecs_each(world, AudioMacroMap);
+            ecs_strbuf_append(buf, "\n  macro %s: value %.2f (%s)", path,
+                (double)macro[i].value, box_audio_macro_status(world, it.entities[i]));
+            while (ecs_each_next(&mit)) {
+                const AudioMacroMap *m = ecs_field(&mit, AudioMacroMap, 0);
+                for (k = 0; k < mit.count; k ++) {
+                    char *map_path, *target;
+                    const char *component;
+                    float value;
+                    if (ecs_get_parent(world, mit.entities[k]) != it.entities[i]) {
+                        continue;
+                    }
+
+                    map_path = ecs_get_path(world, mit.entities[k]);
+                    target = m[k].target && ecs_is_alive(world, m[k].target) ?
+                        ecs_get_path(world, m[k].target) : NULL;
+                    component = m[k].component && ecs_is_alive(world, m[k].component) ?
+                        ecs_get_name(world, m[k].component) : NULL;
+                    value = box_audio_macro_map_value(macro[i].value, m[k].min, m[k].max,
+                        m[k].curve, m[k].scale == AudioModOctaves ? BOX_AUDIO_MOD_OCTAVES :
+                        BOX_AUDIO_MOD_LINEAR);
+                    ecs_strbuf_append(buf, "\n    map %s: %s %s.%s %.2f..%.2f%s", map_path,
+                        target ? target : "(no target)", component ? component : "?",
+                        m[k].member ? m[k].member : "(no member)", (double)m[k].min,
+                        (double)m[k].max, m[k].scale == AudioModOctaves ? " oct" : "");
+                    if (m[k].curve != 0) {
+                        ecs_strbuf_append(buf, " curve %.2f", (double)m[k].curve);
+                    }
+
+                    ecs_strbuf_append(buf, " = %.2f (%s)", (double)value,
+                        box_audio_macro_status(world, mit.entities[k]));
+                    ecs_os_free(target);
+                    ecs_os_free(map_path);
+                }
+            }
+
+            ecs_os_free(path);
+        }
+    }
+}
+
 /** Print the status of the audio and the buses in processing order.
  *
  * @param world The world
@@ -782,6 +839,7 @@ static char* box_cmd_audio_print(
 
     box_cmd_audio_instruments(world, &buf);
     box_cmd_audio_tracks(world, &buf);
+    box_cmd_audio_macros(world, &buf);
 
     return ecs_strbuf_get(&buf);
 }
@@ -951,7 +1009,8 @@ void box_cmd_audio_init(
 {
     ECS_IMPORT(world, BoxAudio);
     box_command_register(world,
-        "Print the audio status, transport, buses, instruments and tracks, set the volume or mute, "
+        "Print the audio status, transport, buses, instruments, tracks and macros, set the volume "
+        "or mute, "
         "play, stop, seek or set the tempo, or capture a WAV",
         (ecs_function_desc_t){
             .name = "audio",

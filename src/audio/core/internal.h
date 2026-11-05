@@ -978,7 +978,8 @@ typedef struct box_audio_synth_slot_t {
     box_audio_saturate_curve_t drive; /**< Clipper of the drive of the patch, when it has one */
 } box_audio_synth_slot_t;
 
-/** A command that takes effect on a frame: PLAY, STOP, VOICE_SET, BUS_SET, RELEASE or LEGATO */
+/** A command that takes effect on a frame: PLAY, STOP, VOICE_SET, BUS_SET, RELEASE, LEGATO,
+ * EFFECT_PARAMS, VOICE_RAMP, BEAT or MACRO */
 typedef union box_audio_timed_cmd_t {
     box_audio_cmd_header_t header;  /**< The header, first in each of them */
     box_audio_cmd_play_t play;      /**< BOX_AUDIO_CMD_PLAY */
@@ -989,6 +990,7 @@ typedef union box_audio_timed_cmd_t {
     box_audio_cmd_effect_params_t effect; /**< BOX_AUDIO_CMD_EFFECT_PARAMS */
     box_audio_cmd_ramp_t ramp;      /**< BOX_AUDIO_CMD_VOICE_RAMP */
     box_audio_cmd_beat_t beat;      /**< BOX_AUDIO_CMD_BEAT */
+    box_audio_cmd_macro_t macro;    /**< BOX_AUDIO_CMD_MACRO */
 } box_audio_timed_cmd_t;
 
 /** A command that waits in the schedule for its frame */
@@ -1044,6 +1046,22 @@ typedef struct box_audio_mod_t {
     float env_fall;           /**< Share of the way to a quieter sample */
 } box_audio_mod_t;
 
+/** A map of a macro in the core */
+typedef struct box_audio_macro_map_t {
+    box_audio_cmd_macro_map_t cmd; /**< Its settings, clamped; target NONE for a free slot */
+    box_audio_cmd_macro_map_t next; /**< Settings it takes once it faded out of its target */
+    bool on;                  /**< It runs or fades out */
+    bool pending;             /**< next waits for the fade out */
+    bool held;                /**< It fades out at hold rather than at the value of its macro,
+                               * which another macro may take over */
+    float hold;               /**< Value of its macro when it was released, 0..1 */
+    uint32_t bus_param;       /**< box_audio_mod_bus_param_t of a bus target */
+    float gain0;              /**< Fade at fade_at, 0..1 */
+    float fade_dir;           /**< Change of the fade per frame: positive while it fades in,
+                               * negative while it fades out */
+    uint64_t fade_at;         /**< Frame of gain0 */
+} box_audio_macro_map_t;
+
 /** The modulators of a core and what they move */
 typedef struct box_audio_mods_t {
     box_audio_mod_t mod[BOX_AUDIO_MOD_MAX]; /**< Modulators by slot */
@@ -1060,6 +1078,17 @@ typedef struct box_audio_mods_t {
                                * parameter of each effect slot, linearly */
     float fx_octaves[BOX_AUDIO_EFFECT_MAX][BOX_AUDIO_EFFECT_PARAMS]; /**< Octaves they move each
                                * parameter of each effect slot by */
+    float fx_macro[BOX_AUDIO_EFFECT_MAX][BOX_AUDIO_EFFECT_PARAMS]; /**< What the maps of the
+                               * macros move each parameter of each effect slot by, from the
+                               * value of the commands to theirs */
+    float macro_value[BOX_AUDIO_MACRO_MAX]; /**< Value of each macro from the MACRO commands,
+                               * 0..1 */
+    float macro_add[BOX_AUDIO_MACRO_MAX]; /**< What the modulators added to each macro at the
+                               * last update */
+    box_audio_macro_map_t map[BOX_AUDIO_MACRO_MAP_MAX]; /**< Maps of the macros by slot */
+    int32_t maps;             /**< Maps that run or fade out */
+    uint64_t macro_buses;     /**< Buses a map moved at the last update, which ramp over at
+                               * least the ramp of a set */
 } box_audio_mods_t;
 
 /** The core */
@@ -1206,6 +1235,24 @@ void box_audio_beat_command(
 void box_audio_mod_command(
     box_audio_core_t *core,
     const box_audio_cmd_modulator_t *cmd);
+
+/** Apply a MACRO command.
+ *
+ * @param core The core
+ * @param cmd The command
+ */
+void box_audio_macro_command(
+    box_audio_core_t *core,
+    const box_audio_cmd_macro_t *cmd);
+
+/** Apply a MACRO_MAP command.
+ *
+ * @param core The core
+ * @param cmd The command
+ */
+void box_audio_macro_map_command(
+    box_audio_core_t *core,
+    const box_audio_cmd_macro_map_t *cmd);
 
 /** Update the modulators when an update is due and limit a block to the next update, so that
  * every update falls on the same frame whatever the render sizes.

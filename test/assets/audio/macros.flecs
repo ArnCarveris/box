@@ -1,0 +1,60 @@
+// Macros for the Macros suite of test/cpu/audio, at 120 bpm: a build-up that opens the lowpass
+// of the synth bus from 200 to 8000 Hz in octaves and the send of fx to the room from 0 to 0.6,
+// with a lane that sweeps it from 0 to 1 over 4 beats, and an inverted macro that turns the
+// lead down from 1 to 0.2 and closes the lowpass of the pad from 8000 to 200 Hz. The suite
+// plays its sounds on the buses; a bus without a sound is silent.
+using box.audio
+
+// A lowpass whose authored cutoff the build-up replaces
+synth {
+  AudioBus: {effects: [synth]}
+  AudioFilter: {cutoff: 1000}
+}
+
+// A return that only the send of fx reaches: fx itself is silent and its send taps before
+// its volume, at an authored level the build-up replaces
+room { AudioBus: {kind: AudioChannelReturn} }
+
+fx { AudioBus: {volume: 0, sends: [{bus: room, level: 0.1, pre_fader: true}]} }
+
+build {
+  AudioMacro: {value: 0.5}
+  cutoff {
+    AudioMacroMap: {target: synth, component: AudioFilter, member: "cutoff", min: 200,
+      max: 8000, scale: AudioModOctaves}
+  }
+  reverb {
+    AudioMacroMap: {target: fx, component: AudioBus, member: "sends[0].level", min: 0,
+      max: 0.6}
+  }
+}
+
+// Two buses that the inverted macro moves down as it rises
+lead { AudioBus: {} }
+
+pad {
+  AudioBus: {effects: [pad]}
+  AudioFilter: {cutoff: 1000}
+}
+
+calm {
+  AudioMacro: {value: 0.25}
+  level { AudioMacroMap: {target: lead, component: AudioBus, member: "volume", min: 1, max: 0.2} }
+  dark {
+    AudioMacroMap: {target: pad, component: AudioFilter, member: "cutoff", min: 8000,
+      max: 200, scale: AudioModOctaves}
+  }
+}
+
+// The lane of the build-up: its value from 0 to 1 over the 4 beats of its pass
+prefab rise {
+  AutomationClip: {target: build, component: AudioMacro, member: "value", length: 4,
+    curve: {keys: [{0, 0}, {4, 1}]}}
+}
+
+lanes {
+  Track: {}
+  rise_lane { ClipPlacement: {clip: rise, start: 0} }
+}
+
+$ { Transport: {tempo: 120} }

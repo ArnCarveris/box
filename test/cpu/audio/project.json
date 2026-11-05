@@ -410,6 +410,30 @@
                 ]
             },
             {
+                "id": "Macros",
+                "testcases": [
+                    "curve",
+                    "value",
+                    "automation",
+                    "modulator",
+                    "inverted",
+                    "remove_no_click",
+                    "two_maps",
+                    "limits",
+                    "errors",
+                    "command",
+                    "deterministic"
+                ]
+            },
+            {
+                "id": "MacroCore",
+                "testcases": [
+                    "value",
+                    "scheduled",
+                    "render_sizes"
+                ]
+            },
+            {
                 "id": "Song",
                 "testcases": [
                     "first_sound",
@@ -444,7 +468,8 @@
                     "expression",
                     "synth_comb",
                     "synth_routes",
-                    "modulators"
+                    "modulators",
+                    "macros"
                 ]
             },
             {
