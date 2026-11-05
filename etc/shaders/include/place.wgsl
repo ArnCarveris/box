@@ -35,6 +35,9 @@ fn place(v: VertexIn) -> Placed {
     let model = instance_model(transforms[v.slot]);
     var position = v.position;
     var normal = v.normal;
+    // One call of surface_normal for both branches that need it, as D3D compilers inline each
+    // call (see surface_normal).
+    var derive = false;
     if (surface_data.p[19].x != 0.0) {
         position = v.position;
         normal = v.normal;
@@ -44,11 +47,13 @@ fn place(v: VertexIn) -> Placed {
         let sample = surface_sweep_sample(i32(v.position.z), v.position.x, v.position.y);
         position = sample.position;
         normal = sv_unit(sample.normal);
-        if (sv_dot(sample.normal, sample.normal) < 0.000000000001) {
-            normal = surface_normal(i32(v.position.z), v.position.x, v.position.y);
-        }
+        derive = sv_dot(sample.normal, sample.normal) < 0.000000000001;
     } else if (surface_data.p[0].x != 0.0) {
         position = surface_position(i32(v.position.z), v.position.x, v.position.y);
+        derive = true;
+    }
+
+    if (derive) {
         normal = surface_normal(i32(v.position.z), v.position.x, v.position.y);
     }
     let world = model * vec4f(position, 1.0);

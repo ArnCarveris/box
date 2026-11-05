@@ -422,10 +422,6 @@ fn surface_position(region: i32, u: f32, v: f32) -> vec3f {
             y * sf(1, 1), sf(6, 2) + (sf(6, 3) - sf(6, 2)) * v);
     }
 
-    if (region < 2) {
-        return surface_outer(u, v, region);
-    }
-
     var a = u;
     var b = 0.0;
     if (region == 3 || region == 7) {
@@ -441,11 +437,32 @@ fn surface_position(region: i32, u: f32, v: f32) -> vec3f {
         b = u;
     }
 
-    var outer = surface_outer(a, b, 0);
-    var inner = outer;
+    // The point of an outer region, or the outer and inner boundary of a side region, from one
+    // call of surface_outer in a loop (see surface_normal).
     var kind = i32(sf(0, 0));
-    if (sf(1, 0) > 0.0 && kind != 6) {
-        inner = surface_outer(a, b, 1);
+    var first = 0;
+    var count = 1;
+    if (region < 2) {
+        a = u;
+        b = v;
+        first = region;
+    } else if (sf(1, 0) > 0.0 && kind != 6) {
+        count = 2;
+    }
+
+    var boundary: array<vec3f, 2>;
+    for (var i = 0; i < count; i++) {
+        boundary[i] = surface_outer(a, b, first + i);
+    }
+
+    if (region < 2) {
+        return boundary[0];
+    }
+
+    var outer = boundary[0];
+    var inner = outer;
+    if (count == 2) {
+        inner = boundary[1];
     } else if (kind == 1) {
         inner = surface_curve(b);
     } else if (kind == 2) {
@@ -513,26 +530,43 @@ fn surface_normal(region: i32, u: f32, v: f32) -> vec3f {
 
     var flip = (region == 1 && sf(0, 0) == 3.0) || region == 3 || region == 4 ||
         region == 7;
+    // Central differences at v, and again at a v inside (0, 1) when they meet in a point. The
+    // samples share one call of surface_position in a loop: D3D compilers inline every call, and
+    // eight inlined copies made the mesh pipelines take tens of seconds to compile, long enough
+    // for the GPU watchdog of the browser to kill the device.
     var delta = 0.0001;
-    var du = sv_sub(surface_position(region, min(u + delta, 1.0), v),
-        surface_position(region, max(u - delta, 0.0), v));
-    var dv = sv_sub(surface_position(region, u, min(v + delta, 1.0)),
-        surface_position(region, u, max(v - delta, 0.0)));
-    var normal = sv_cross(dv, du);
-    if (flip) {
-        normal = sv_mul(normal, -1.0);
-    }
+    var at = v;
+    var du = sv(0.0, 0.0, 0.0);
+    var normal = du;
+    for (var attempt = 0; attempt < 2; attempt++) {
+        var p: array<vec3f, 4>;
+        for (var i = 0; i < 4; i++) {
+            var su = u;
+            var sv_at = at;
+            if (i == 0) {
+                su = min(u + delta, 1.0);
+            } else if (i == 1) {
+                su = max(u - delta, 0.0);
+            } else if (i == 2) {
+                sv_at = min(at + delta, 1.0);
+            } else {
+                sv_at = max(at - delta, 0.0);
+            }
 
-    if (sv_dot(normal, normal) < 0.000000000001) {
-        var fallback = min(max(v, 0.001), 0.999);
-        du = sv_sub(surface_position(region, min(u + delta, 1.0), fallback),
-            surface_position(region, max(u - delta, 0.0), fallback));
-        dv = sv_sub(surface_position(region, u, fallback + delta),
-            surface_position(region, u, fallback - delta));
-        normal = sv_cross(dv, du);
+            p[i] = surface_position(region, su, sv_at);
+        }
+
+        du = sv_sub(p[0], p[1]);
+        normal = sv_cross(sv_sub(p[2], p[3]), du);
         if (flip) {
             normal = sv_mul(normal, -1.0);
         }
+
+        if (sv_dot(normal, normal) >= 0.000000000001) {
+            break;
+        }
+
+        at = min(max(v, 0.001), 0.999);
     }
 
     if (sf(0, 0) == 1.0 && region < 2) {
