@@ -135,10 +135,33 @@ static double sf_rms(
     return sqrt(sum / (double)(to - from));
 }
 
+/** Prominence of a local maximum of the dB of the harmonics: how far it stands above the
+ * higher of the lowest points on each side before a higher harmonic, or the end.
+ *
+ * @param db dB of harmonics 1..SF_HARMONICS + 1
+ * @param h The harmonic of the maximum
+ * @return Its prominence in dB
+ */
+static double sf_prominence(
+    const double *db,
+    int32_t h)
+{
+    double left = db[h], right = db[h];
+    int32_t i;
+    for (i = h - 1; i >= 1 && db[i] <= db[h]; i --) {
+        left = db[i] < left ? db[i] : left;
+    }
+
+    for (i = h + 1; i <= SF_HARMONICS + 1 && db[i] <= db[h]; i ++) {
+        right = db[i] < right ? db[i] : right;
+    }
+
+    return db[h] - (left > right ? left : right);
+}
+
 /** The first two spectral peaks of a saw at SF_SAW through a filter: the amplitudes of its
- * harmonics times their number, which takes out the 1 / h of the saw and leaves the response of
- * the filter, and the first two local maxima of those within 30 dB of the highest, each refined
- * by a parabola through the dB of its neighbours.
+ * harmonics times their number, which leaves the response of the filter, and the first two
+ * local maxima within 30 dB of the highest and more than 6 dB prominent, refined by parabola.
  *
  * @param x Samples
  * @param from First frame
@@ -163,7 +186,9 @@ static void sf_peaks(
     *f1 = 0;
     *f2 = 0;
     for (h = 2; h <= SF_HARMONICS && found < 2; h ++) {
-        if (db[h] > db[h - 1] && db[h] >= db[h + 1] && db[h] > top - 30) {
+        if (db[h] > db[h - 1] && db[h] >= db[h + 1] && db[h] > top - 30 &&
+            sf_prominence(db, h) > 6)
+        {
             a = db[h - 1];
             b = db[h];
             c = db[h + 1];
@@ -434,6 +459,7 @@ void SynthFormant_wide_lfo(void) {
     for (c = 0; c < 2; c ++) {
         const float *x = c ? audio_r : audio_l;
         sf_peaks(x, 0, SF_PERIODS, &f1, &f2);
+        printf("wide LFO, channel %d: peaks at %.1f and %.1f Hz\n", (int)c, f1, f2);
         test_assert(f1 < 400);
         test_assert(f2 > 1600);
         sf_peaks(x, 28800, 43200, &f1, &f2);

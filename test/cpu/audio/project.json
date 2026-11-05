@@ -332,7 +332,8 @@
                     "transient_shaper",
                     "synth_sub",
                     "synth_sync",
-                    "synth_drive"
+                    "synth_drive",
+                    "synth_formant"
                 ]
             },
             {

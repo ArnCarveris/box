@@ -1,21 +1,10 @@
 /**
  * @file audio/core/formant.h
  * @brief The formant filter of the synth: three bandpasses of svf.h in parallel at the first
- * three formants of a vowel, each at its own level.
+ * three formants of a vowel, each at its own level, normalized for a saw at 110 Hz.
  *
- * The formants are the tenor table of the formant values in the appendix of the Csound
- * manual ("Formant Values", after Peterson and Barney): the frequency, the level and the
- * bandwidth of the first three formants of the vowels a, e, i, o and u. A vowel between two of
- * them interpolates the frequencies, the linear levels and the bandwidths linearly. The
- * resonance narrows every bandwidth, to a tenth at 1.
- *
- * The output is normalized so that a saw at BOX_AUDIO_FORMANT_REFERENCE Hz comes out at about
- * the RMS it has without a filter for every vowel: the power of a saw through a bandpass of
- * bandwidth B at F, as a continuous spectrum that falls as 1 / f^2, is about
- * f0 B / (pi F^2) times its level squared, of a total power of 1 / 3, so the gain is
- * sqrt(BOX_AUDIO_FORMANT_NORM / sum(level^2 B / F^2)). A higher note through the same
- * formants comes out louder, as more of its power falls in them.
- *
+ * The formants are the tenor table of the Csound manual, Appendix "Formant Values". A vowel
+ * between two of them interpolates the frequencies, linear levels and bandwidths linearly.
  * Private to src/audio/core; included by internal.h.
  */
 
@@ -33,9 +22,9 @@
 /** Hz of the fundamental of the saw the level is normalized for */
 #define BOX_AUDIO_FORMANT_REFERENCE 110.0
 
-/** The normalization of the level in Hz: pi / (3 BOX_AUDIO_FORMANT_REFERENCE), raised by
- * 1 dB for the dips between the formants of the parallel bandpasses, so that a saw at the
- * reference stays within about 3 dB of its level without a filter across the vowels */
+/** The normalization of the level in Hz. A saw at f0, as a spectrum falling as 1 / f^2, puts
+ * about f0 B / (pi F^2) of its power of 1 / 3 into a bandpass of width B at F, so the gain is
+ * sqrt(NORM / sum(level^2 B / F^2)) with NORM pi / (3 f0), raised by 1 dB for the dips. */
 #define BOX_AUDIO_FORMANT_NORM \
     (3.14159265358979323846 / (3.0 * BOX_AUDIO_FORMANT_REFERENCE) * 1.12201845430196343559)
 
@@ -125,37 +114,35 @@ static inline void box_audio_formant_vowel(
     const box_audio_formant_entry_t *a, *b;
     double power = 0, t, freq, level, width;
     int32_t i, n;
-    if (vowel == f->vowel) {
-        return;
-    }
+    if (vowel != f->vowel) {
+        f->vowel = vowel;
+        i = (int32_t)vowel;
+        i = i < BOX_AUDIO_FORMANT_VOWELS - 2 ? (i > 0 ? i : 0) : BOX_AUDIO_FORMANT_VOWELS - 2;
+        t = (double)vowel - (double)i;
+        t = t < 1 ? (t > 0 ? t : 0.0) : 1.0;
+        for (n = 0; n < BOX_AUDIO_FORMANTS; n ++) {
+            box_audio_svf_t *s = &f->svf[n], *r = &f->svf_r[n];
+            a = &box_audio_formant_table[i][n];
+            b = &box_audio_formant_table[i + 1][n];
+            freq = (double)a->frequency + ((double)b->frequency - (double)a->frequency) * t;
+            level = (double)a->level + ((double)b->level - (double)a->level) * t;
+            width = ((double)a->bandwidth + ((double)b->bandwidth - (double)a->bandwidth) * t) *
+                (double)f->narrow;
+            power += level * level * width / (freq * freq);
+            freq = freq < top ? freq : top;
+            s->k = (float)(width / freq);
+            box_audio_svf_coefs(s, box_audio_svf_g(freq, rate));
+            r->k = s->k;
+            r->a1 = s->a1;
+            r->a2 = s->a2;
+            r->a3 = s->a3;
+            f->level[n] = (float)level;
+        }
 
-    f->vowel = vowel;
-    i = (int32_t)vowel;
-    i = i < BOX_AUDIO_FORMANT_VOWELS - 2 ? (i > 0 ? i : 0) : BOX_AUDIO_FORMANT_VOWELS - 2;
-    t = (double)vowel - (double)i;
-    t = t < 1 ? (t > 0 ? t : 0.0) : 1.0;
-    for (n = 0; n < BOX_AUDIO_FORMANTS; n ++) {
-        box_audio_svf_t *s = &f->svf[n], *r = &f->svf_r[n];
-        a = &box_audio_formant_table[i][n];
-        b = &box_audio_formant_table[i + 1][n];
-        freq = (double)a->frequency + ((double)b->frequency - (double)a->frequency) * t;
-        level = (double)a->level + ((double)b->level - (double)a->level) * t;
-        width = ((double)a->bandwidth + ((double)b->bandwidth - (double)a->bandwidth) * t) *
-            (double)f->narrow;
-        power += level * level * width / (freq * freq);
-        freq = freq < top ? freq : top;
-        s->k = (float)(width / freq);
-        box_audio_svf_coefs(s, box_audio_svf_g(freq, rate));
-        r->k = s->k;
-        r->a1 = s->a1;
-        r->a2 = s->a2;
-        r->a3 = s->a3;
-        f->level[n] = (float)level;
-    }
-
-    t = box_audio_formant_sqrt(BOX_AUDIO_FORMANT_NORM / power);
-    for (n = 0; n < BOX_AUDIO_FORMANTS; n ++) {
-        f->level[n] = (float)((double)f->level[n] * t);
+        t = box_audio_formant_sqrt(BOX_AUDIO_FORMANT_NORM / power);
+        for (n = 0; n < BOX_AUDIO_FORMANTS; n ++) {
+            f->level[n] = (float)((double)f->level[n] * t);
+        }
     }
 }
 
