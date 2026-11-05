@@ -48,6 +48,7 @@ static inline float box_audio_clean(
 }
 
 #include "svf.h"
+#include "saturate.h"
 
 /** A value that moves linearly to its target over a number of frames */
 typedef struct box_audio_ramp_t {
@@ -174,6 +175,7 @@ typedef struct box_audio_filter_t {
     bool moving;              /**< Whether the cutoff or the resonance moves */
     bool swap;                /**< Waits for the fade to reach 0 to apply a kind or a slope */
     box_audio_ramp_t mix;     /**< Wet level */
+    box_audio_ramp_t drive;   /**< Saturation, 0 (linear) to 1 */
     box_audio_ramp_t fade;    /**< Fade of the wet signal around a swap */
 } box_audio_filter_t;
 
@@ -299,6 +301,26 @@ typedef struct box_audio_chorus_t {
     box_audio_ramp_t feed;    /**< Fade in of the input after a move */
 } box_audio_chorus_t;
 
+/** A saturator: the oversampled clipper of each channel, its DC blocker and the line that
+ * delays the dry signal as much as the oversampler delays the wet one */
+typedef struct box_audio_saturator_t {
+    box_audio_saturator_params_t target; /**< Parameters of the last command, clamped */
+    box_audio_oversample_t os[2]; /**< Oversampler of each channel */
+    box_audio_dc_t dc[2];     /**< DC blocker of each channel */
+    float dry[2][16];         /**< Dry input of each channel, a ring */
+    uint32_t pos;             /**< Write position of the dry rings */
+    float dc_coef;            /**< Pole of the DC blockers */
+    box_audio_saturate_curve_t curve; /**< Clipper at the drive and asymmetry of curve_at */
+    float curve_at[2];        /**< Drive and asymmetry the curve is for */
+    float scale;              /**< Steps of each sign of the bit crusher, 2^(bits - 1); 0 when
+                               * it is off */
+    float scale_at;           /**< Bits the scale is for */
+    box_audio_ramp_t drive;   /**< Drive */
+    box_audio_ramp_t asymmetry; /**< Asymmetry */
+    box_audio_ramp_t bits;    /**< Bits */
+    box_audio_ramp_t mix;     /**< Wet level */
+} box_audio_saturator_t;
+
 /** State of the kinds of effects */
 typedef union box_audio_effect_data_t {
     box_audio_reverb_t reverb;  /**< BOX_AUDIO_EFFECT_REVERB */
@@ -309,6 +331,7 @@ typedef union box_audio_effect_data_t {
     box_audio_delay_t delay;    /**< BOX_AUDIO_EFFECT_DELAY */
     box_audio_phaser_t phaser;  /**< BOX_AUDIO_EFFECT_PHASER */
     box_audio_chorus_t chorus;  /**< BOX_AUDIO_EFFECT_CHORUS */
+    box_audio_saturator_t saturator; /**< BOX_AUDIO_EFFECT_SATURATOR */
 } box_audio_effect_data_t;
 
 /** An effect instance of the pool of the core: a kind in an insert slot of a bus, on the
@@ -456,6 +479,15 @@ typedef struct box_audio_synth_osc_t {
     double vibrato_step;  /**< Change of vibrato per frame */
     float tremolo;        /**< Factor of its level from the LFOs, 1 without */
     float tremolo_step;   /**< Change of tremolo per frame */
+    float sub;            /**< Level of its sub oscillator, 0 for none */
+    int32_t sub_octave;   /**< Octaves the sub is under it, 1 or 2 */
+    uint32_t wraps;       /**< Times its phase wrapped, the phase of the sub above its own */
+    bool synced;          /**< Whether its wave is hard synced to its phase, the master: a
+                           * ratio over 1 or an LFO of its own on the ratio */
+    double sync;          /**< Ratio of its wave to its phase, 1..BOX_AUDIO_SYNTH_SYNC_MAX */
+    double sync_base;     /**< The ratio of its layer, without the LFOs; what moves the ratio
+                           * per control block aims from it */
+    double sync_step;     /**< Change of sync per frame from the LFOs */
 } box_audio_synth_osc_t;
 
 /** An LFO of a synth voice, advanced per control block of BOX_AUDIO_SYNTH_CONTROL frames */
@@ -482,6 +514,8 @@ typedef struct box_audio_synth_unison_t {
     double detune[BOX_AUDIO_SYNTH_UNISON_MAX]; /**< Factor of inc of each voice */
     float left[BOX_AUDIO_SYNTH_UNISON_MAX];    /**< Gain of each voice on the left channel */
     float right[BOX_AUDIO_SYNTH_UNISON_MAX];   /**< Gain of each voice on the right channel */
+    uint32_t wraps[BOX_AUDIO_SYNTH_UNISON_MAX]; /**< Times the phase of each voice wrapped,
+                                                * for its sub */
 } box_audio_synth_unison_t;
 /** A pluck string of a synth voice: a Karplus-Strong loop of a delay line, a symmetric lowpass
  * of one frame of delay and a first order allpass of the fraction of a frame left, with a gain
@@ -553,6 +587,7 @@ typedef struct box_audio_synth_source_t {
     int32_t stages;       /**< Stages of the filter: 1 for 12 dB per octave, 2 for 24 */
     box_audio_svf_t svf[2]; /**< The resonant stage, then the stage before it at 24 dB */
     box_audio_svf_t svf_r[2]; /**< The stages of the right channel, when stereo */
+    float drive;          /**< Saturation of the filter, 0 (linear) to 1 */
     bool unison;          /**< Whether a layer has unison voices, which renders through
                            * box_audio_synth_render_wide */
     bool stereo;          /**< Whether a layer with unison voices has width, so the source
@@ -1077,6 +1112,32 @@ bool box_audio_gate_render(
 
 /** The compressor and the gate: a block skipped while idle, which they never are */
 void box_audio_dynamics_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    int32_t frames);
+
+/** The saturator kind, in saturator.c: start at the params of fx */
+void box_audio_saturator_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The saturator kind: new parameters while it runs */
+void box_audio_saturator_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The saturator kind: process a block; true once a silent block left its state silent */
+bool box_audio_saturator_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The saturator kind: a block skipped while idle */
+void box_audio_saturator_rest(
     box_audio_core_t *core,
     box_audio_effect_t *fx,
     int32_t frames);

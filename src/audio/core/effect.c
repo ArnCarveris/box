@@ -71,6 +71,13 @@ static const box_audio_effect_def_t box_audio_effect_kinds[BOX_AUDIO_EFFECT_KIND
         .command = box_audio_chorus_command,
         .render = box_audio_chorus_render,
         .rest = box_audio_chorus_rest
+    },
+    [BOX_AUDIO_EFFECT_SATURATOR] = {
+        .tail = true,
+        .start = box_audio_saturator_start,
+        .command = box_audio_saturator_command,
+        .render = box_audio_saturator_render,
+        .rest = box_audio_saturator_rest
     }
 };
 

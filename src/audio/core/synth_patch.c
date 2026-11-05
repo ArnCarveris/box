@@ -125,6 +125,7 @@ static void box_audio_synth_patch_clamp(
     p->cutoff = box_audio_synth_clamp(p->cutoff, BOX_AUDIO_SYNTH_CUTOFF_MIN,
         BOX_AUDIO_SYNTH_HZ_MAX);
     p->resonance = box_audio_synth_clamp(p->resonance, 0, 1);
+    p->drive = box_audio_synth_clamp(p->drive, 0, 1);
     if (p->slope > BOX_AUDIO_SYNTH_SLOPE_24) {
         p->slope = BOX_AUDIO_SYNTH_SLOPE_12;
     }
@@ -175,6 +176,11 @@ static void box_audio_synth_patch_clamp(
         l->hardness_velocity = box_audio_synth_clamp(l->hardness_velocity, 0, 1);
         l->rings_free = l->rings_free && l->wave == BOX_AUDIO_SYNTH_PLUCK && !l->has_envelope;
         l->pulse_width = box_audio_synth_width_clamp(l->pulse_width);
+        l->sub = l->wave == BOX_AUDIO_SYNTH_NOISE || l->wave == BOX_AUDIO_SYNTH_PLUCK ? 0.0f :
+            box_audio_synth_clamp(l->sub, 0, 1);
+        l->sub_octave = l->sub_octave >= 2 ? 2 : 1;
+        l->sync = l->wave == BOX_AUDIO_SYNTH_NOISE || l->wave == BOX_AUDIO_SYNTH_PLUCK ? 1.0f :
+            box_audio_synth_clamp(l->sync, 1, BOX_AUDIO_SYNTH_SYNC_MAX);
     }
 
     if (p->lfos > BOX_AUDIO_SYNTH_LFOS) {
@@ -199,6 +205,7 @@ static void box_audio_synth_patch_clamp(
         lfo->cutoff = box_audio_synth_depth_clamp(lfo->cutoff, BOX_AUDIO_SYNTH_OCTAVES_MAX);
         lfo->pulse_width = box_audio_synth_depth_clamp(lfo->pulse_width,
             0.5f - BOX_AUDIO_SYNTH_PULSE_MIN);
+        lfo->sync = box_audio_synth_depth_clamp(lfo->sync, BOX_AUDIO_SYNTH_SYNC_SEMITONES);
     }
 }
 

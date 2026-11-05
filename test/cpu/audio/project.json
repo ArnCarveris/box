@@ -144,6 +144,7 @@
                 ]
             },
             {
+<<<<<<< HEAD
                 "id": "SynthKey",
                 "testcases": [
                     "keytrack_octave",
@@ -160,6 +161,20 @@
                     "key_scale_off",
                     "key_scale_release",
                     "defaults_identical",
+=======
+                "id": "SynthSync",
+                "testcases": [
+                    "period_master",
+                    "ratio_one_identical",
+                    "alias_48000",
+                    "alias_44100",
+                    "lfo_spectrum",
+                    "lfo_layer_syncs",
+                    "unison_own_master",
+                    "unison_stereo",
+                    "fm_adds",
+                    "ignored_noise_pluck",
+>>>>>>> f025647e140f393c91349ccb79fd748eaefe3674
                     "clamped",
                     "script"
                 ]
@@ -202,6 +217,15 @@
                     "script",
                     "bit_identical",
                     "command",
+                    "swing_eighths",
+                    "swing_sixteenths",
+                    "humanize_timing",
+                    "humanize_velocity",
+                    "groove_zero",
+                    "groove_transport_loop",
+                    "humanize_launch",
+                    "humanize_tempo",
+                    "humanize_toggle",
                     "audio_defaults",
                     "audio_start",
                     "audio_placement_offset",
@@ -241,7 +265,10 @@
                     "eq_filter",
                     "dynamics",
                     "delay",
-                    "modulation"
+                    "modulation",
+                    "saturator",
+                    "synth_sub",
+                    "synth_sync"
                 ]
             },
             {
@@ -556,7 +583,15 @@
                     "kind_change_no_click",
                     "mix",
                     "render_sizes",
-                    "component"
+                    "component",
+                    "drive_ramp_no_click"
+                ]
+            },
+            {
+                "id": "EffectFilterDrive",
+                "testcases": [
+                    "zero_identical",
+                    "bounded"
                 ]
             },
             {
@@ -576,6 +611,33 @@
                     "world_duck",
                     "sidechain_cycle",
                     "script"
+                ]
+            },
+            {
+                "id": "Saturator",
+                "testcases": [
+                    "harmonics",
+                    "level_across_drive",
+                    "alias_oversampled",
+                    "bits",
+                    "mix_dry",
+                    "reduction",
+                    "drive_no_click",
+                    "render_sizes",
+                    "silent_after_tail",
+                    "component",
+                    "script"
+                ]
+            },
+            {
+                "id": "SynthDrive",
+                "testcases": [
+                    "resonance_bounded",
+                    "sweep_stable",
+                    "zero_identical",
+                    "harmonics",
+                    "slope_24",
+                    "wide"
                 ]
             },
             {
@@ -607,6 +669,7 @@
                     "filter_slope_24",
                     "script_filter_envelope",
                     "filter_extreme",
+                    "filter_drive_default",
                     "layers_sum",
                     "layer_own_envelope",
                     "eight_layers",
@@ -693,7 +756,16 @@
                     "pluck_vibrato_rate",
                     "pluck_crossing_smooth",
                     "pluck_steady_identical",
-                    "pluck_vibrato_cost"
+                    "pluck_vibrato_cost",
+                    "sub_octaves",
+                    "sub_zero_identical",
+                    "sub_phase_locked",
+                    "sub_clamped",
+                    "sub_unison",
+                    "sub_glide",
+                    "sub_alias",
+                    "sub_modulator",
+                    "script_sub"
                 ]
             },
             {
