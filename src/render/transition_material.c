@@ -97,6 +97,37 @@ void box_draws_transition_target(
     }
 }
 
+void* box_draws_transition_value(
+    box_draw_transition_material_t *material,
+    box_render_transition_component_t component)
+{
+    void *result = NULL;
+    switch (component) {
+    case BOX_RENDER_TRANSITION_RGB: result = &material->color; break;
+    case BOX_RENDER_TRANSITION_ALPHA_CUTOFF: result = &material->cutoff; break;
+    case BOX_RENDER_TRANSITION_PBR_MATERIAL: result = &material->pbr; break;
+    case BOX_RENDER_TRANSITION_EMISSIVE: result = &material->emissive; break;
+    case BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM: result = &material->uv; break;
+    case BOX_RENDER_TRANSITION_TRANSMISSION: result = &material->transmission; break;
+    case BOX_RENDER_TRANSITION_CLEAR_COAT: result = &material->clear_coat; break;
+    case BOX_RENDER_TRANSITION_ANISOTROPY: result = &material->anisotropy; break;
+    case BOX_RENDER_TRANSITION_SHEEN: result = &material->sheen; break;
+    case BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION:
+        result = &material->diffuse_transmission;
+        break;
+    case BOX_RENDER_TRANSITION_OPACITY: result = &material->opacity; break;
+    case BOX_RENDER_TRANSITION_TINT: result = &material->tint; break;
+    case BOX_RENDER_TRANSITION_POSITION:
+    case BOX_RENDER_TRANSITION_ROTATION:
+    case BOX_RENDER_TRANSITION_SCALE:
+    case BOX_RENDER_TRANSITION_BOX_SHADOW:
+    case BOX_RENDER_TRANSITION_COMPONENTS:
+        break;
+    }
+
+    return result;
+}
+
 /** Get a component of a material transition, NULL when the material does not have it.
  *
  * @param material The material
@@ -245,11 +276,15 @@ void box_draws_transition_send_fade(
     uint32_t node,
     uint32_t parent,
     const box_draw_tint_t *tint,
-    float alpha)
+    float alpha,
+    const Tint *leaving_tint,
+    const Opacity *leaving_opacity)
 {
     box_render_transition_fade_t fade = {0};
     const Tint *own_tint = ecs_get(world, e, Tint);
     const Opacity *opacity = ecs_get(world, e, Opacity);
+    own_tint = own_tint ? own_tint : leaving_tint;
+    opacity = opacity ? opacity : leaving_opacity;
     box_draw_tint_t ancestors;
     uint32_t offset = 0;
     if (tint) {

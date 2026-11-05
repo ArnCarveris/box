@@ -16,6 +16,12 @@
 /** A transitioned component of an entity, as the extract last sent it */
 typedef struct box_transition_slot_t {
     bool present;                   /**< A target was sent and is the value of the node */
+    bool leaving;                   /**< The component was removed with on_remove and the node
+                                     *   renders its way to the neutral value: present stays set
+                                     *   and the node owns the value until it no longer runs */
+    bool absent;                    /**< The last extract saw the node with an on_add entry and
+                                     *   no value of the component, owned or inherited, so the
+                                     *   next value is an add */
     TimingFunction timing_function; /**< Curve of the last start */
     float delay;                    /**< Delay of the last start */
     float duration;                 /**< Duration of the last start */
@@ -115,6 +121,8 @@ struct box_render_transitions_t {
     ecs_map_t box_shadow_index;     /**< Entity to its entry of box_shadows plus 1 */
     ecs_map_t tagged_box_shadow;    /**< Entity with TransitionBoxShadow to the stamp of the
                                      *   last extract that kept it */
+    int32_t leaving;                /**< Slots that are leaving in this frame, 0 skips the
+                                     *   lookup of a leaving owner */
 };
 
 /** A record an active material transition patches: a slot of the material table or a drawn
@@ -126,6 +134,60 @@ typedef struct box_transition_material_t {
     uint32_t nodes[BOX_RENDER_TRANSITION_COMPONENTS]; /**< Node of a component that runs a
                                      *   transition, 0 for the target */
 } box_transition_material_t;
+
+/** Get the component id of a transitionable component.
+ *
+ * @param component The component
+ * @return The id
+ */
+ecs_entity_t box_transitions_id(
+    box_render_transition_component_t component);
+
+/** Check whether an entry opts in to animating adding or removing its component, and the
+ * component has a neutral value for it.
+ *
+ * @param world The world
+ * @param component The component
+ * @param spec The valid entry, NULL for none
+ * @param remove Whether to check on_remove, else on_add
+ * @return Whether the change animates
+ */
+bool box_transitions_opts(
+    const ecs_world_t *world,
+    box_render_transition_component_t component,
+    const TransitionSpec *spec,
+    bool remove);
+
+/** Compare a transitioned component of an entity to the last target sent, send what changed:
+ * the first value sets without a transition, a changed value starts one with the spec of the
+ * entry, and a value whose entry or component is gone snaps to its target.
+ *
+ * With on_add a value of a node that had none, owned or inherited, in the last frame sets the
+ * neutral value and starts from it in the same packet. With on_remove a removed value without an
+ * inherited one starts to the neutral value and the slot leaves until it no longer runs. A
+ * transform component and a BoxShadow keep the range of their targets since they were last idle,
+ * widened by what the curve overshoots, as the resolver starts from the value it renders.
+ *
+ * @param world The world
+ * @param s The state of the extract
+ * @param p The packet
+ * @param e The entity of the node
+ * @param node The node id
+ * @param component The component
+ * @param slot The slot of the component
+ * @param spec The valid entry of the component, NULL when there is none
+ * @param value The value the entity owns, NULL when it owns none
+ */
+void box_transitions_compare(
+    const ecs_world_t *world,
+    box_render_transitions_t *s,
+    box_render_packet_t *p,
+    ecs_entity_t e,
+    uint32_t node,
+    box_render_transition_component_t component,
+    box_transition_slot_t *slot,
+    const TransitionSpec *spec,
+    const void *value);
 
 /** Get the private state of a node.
  *
@@ -193,6 +255,17 @@ void box_transitions_fade_target(
     const box_render_transitions_t *s,
     ecs_entity_t e,
     double time,
+    box_draw_transition_material_t *target);
+
+/** Give the components of a target material whose node leaves them (box_transition_slot_t
+ * leaving) the neutral value the node animates to, and set their present bit, as the entity no
+ * longer has them and the resolver only patches a component the target has.
+ *
+ * @param s The state of the extract
+ * @param target The target material, with its nodes
+ */
+void box_transitions_leaving_target(
+    const box_render_transitions_t *s,
     box_draw_transition_material_t *target);
 
 /** Find the drawn entities whose BoxShadow has an active transition in this frame, before the

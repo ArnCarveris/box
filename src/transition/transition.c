@@ -111,6 +111,28 @@ bool box_transition_supported(
         component == ecs_id(BoxShadow));
 }
 
+bool box_transition_neutral_supported(
+    const ecs_world_t *world,
+    ecs_entity_t component,
+    bool remove)
+{
+    (void)world;
+
+    return component != 0 && (
+        component == ecs_id(Rotation) ||
+        component == ecs_id(Scale) ||
+        component == ecs_id(Opacity) ||
+        component == ecs_id(Tint) ||
+        component == ecs_id(PbrMaterial) ||
+        component == ecs_id(Emissive) ||
+        component == ecs_id(TextureTransform) ||
+        component == ecs_id(ClearCoat) ||
+        component == ecs_id(SpecularAnisotropy) ||
+        component == ecs_id(Sheen) ||
+        component == ecs_id(DiffuseTransmission) ||
+        (!remove && component == ecs_id(BoxShadow)));
+}
+
 bool box_transition_valid(
     const ecs_world_t *world,
     ecs_entity_t component,
@@ -360,6 +382,38 @@ const TransitionSpec* box_transition_get(
     return result;
 }
 
+/** Log an error for an on_add or on_remove of a valid entry whose component has no neutral value
+ * in that direction. The flag is ignored, the rest of the entry is used.
+ *
+ * @param world The world
+ * @param e The entity of the Transition
+ * @param component The key of the entry
+ * @param spec The entry
+ */
+static void box_transition_validate_neutral(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_entity_t component,
+    const TransitionSpec *spec)
+{
+    bool add = spec->on_add && !box_transition_neutral_supported(world, component, false);
+    bool remove = spec->on_remove && !box_transition_neutral_supported(world, component, true);
+    if (!add && !remove) {
+        goto done;
+    }
+
+    char *entity = ecs_get_path(world, e);
+    char *name = ecs_get_path(world, component);
+    ecs_err("Transition of '%s': component '%s' has no neutral value to animate %s from or "
+        "to, %s ignored", entity, name, add && remove ? "adding and removing" :
+        (add ? "adding" : "removing"), add && remove ? "on_add and on_remove" :
+        (add ? "on_add" : "on_remove"));
+    ecs_os_free(name);
+    ecs_os_free(entity);
+done:
+    return;
+}
+
 /** Log an error for every entry of a set Transition that is ignored.
  *
  * @param it Iterator over entities that own the Transition that was set
@@ -380,6 +434,7 @@ static void BoxTransitionValidate(
             ecs_entity_t component = ecs_map_key(&mit);
             const TransitionSpec *spec = ecs_map_ptr(&mit);
             if (box_transition_valid(it->world, component, spec)) {
+                box_transition_validate_neutral(it->world, it->entities[i], component, spec);
                 continue;
             }
 
