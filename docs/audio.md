@@ -169,7 +169,7 @@ their tails end.
 | --- | --- |
 | `Reverb` | `decay: 1.5` s, `damping: 0.5`, `predelay: 0.02` s, `size: 0.5`, `mix: 1` |
 | `Equalizer` | Four `bands` of `kind`, `frequency`, `gain` dB and `q`; off by default |
-| `AudioFilter` | `kind: SynthLowPass`, `cutoff: 1000` Hz, `resonance: 0`, `slope: SynthSlope12`, `mix: 1` |
+| `AudioFilter` | `kind: SynthLowPass`, `cutoff: 1000` Hz, `resonance: 0`, `slope: SynthSlope12`, `mix: 1`, `drive: 0` |
 | `Compressor` | `threshold: -18` dB, `ratio: 4`, `attack: 0.01` s, `release: 0.15` s, `knee: 6` dB, `makeup: 0` dB, `mix: 1`, `sidechain: 0` |
 | `Gate` | `threshold: -50` dB, `attack: 0.001` s, `hold: 0.05` s, `release: 0.1` s, `range: -80` dB |
 | `Delay` | `time: 0.25` s, `sync: 0` beats, `feedback: 0.35`, `mix: 0.3`, `ping_pong: false`, `damping: 6000` Hz |
@@ -268,7 +268,7 @@ voices on play, so edits affect subsequent plays.
 | `SynthSound` | `seed`, `pitch_variance`, `level_variance`; variances default to zero |
 | `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), modulation controls |
 | `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`; all zero by default |
-| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`) |
+| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1) |
 | `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves; requires a filter |
 | `SynthUnison` | Per layer: `voices` (3, 1..7), `detune` (10 cents, 0..100), `width` (0, 0..1) |
 | `SynthGlide` | Root: `time` seconds (0, up to 10), `legato` (false), `channel` (0) |
@@ -284,6 +284,12 @@ For gated notes, sustain holds until release, ignoring hold.
 A filter envelope uses `cutoff * 2^(amount * envelope_level)`. For example,
 cutoff 300 and amount 3 open to 2400 Hz. Its timing is independent of the amplitude
 envelope; author both when they should move together.
+
+`drive` soft clips the filter input and its resonance inside each filter stage,
+both stages at `SynthSlope24`. Quiet signals pass almost unchanged and loud ones
+compress and gain harmonics; a high resonance settles at a bounded level and growls
+instead of whistling. Zero is linear and costs nothing; 1 drives the filter hard.
+`AudioFilter.drive` does the same on a bus and moves over 20 ms like `mix`.
 
 ```flecs
 using box.audio

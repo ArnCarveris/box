@@ -174,6 +174,7 @@ typedef struct box_audio_filter_t {
     bool moving;              /**< Whether the cutoff or the resonance moves */
     bool swap;                /**< Waits for the fade to reach 0 to apply a kind or a slope */
     box_audio_ramp_t mix;     /**< Wet level */
+    box_audio_ramp_t drive;   /**< Saturation, 0 (linear) to 1 */
     box_audio_ramp_t fade;    /**< Fade of the wet signal around a swap */
 } box_audio_filter_t;
 
@@ -552,6 +553,7 @@ typedef struct box_audio_synth_source_t {
     int32_t stages;       /**< Stages of the filter: 1 for 12 dB per octave, 2 for 24 */
     box_audio_svf_t svf[2]; /**< The resonant stage, then the stage before it at 24 dB */
     box_audio_svf_t svf_r[2]; /**< The stages of the right channel, when stereo */
+    float drive;          /**< Saturation of the filter, 0 (linear) to 1 */
     bool unison;          /**< Whether a layer has unison voices, which renders through
                            * box_audio_synth_render_wide */
     bool stereo;          /**< Whether a layer with unison voices has width, so the source

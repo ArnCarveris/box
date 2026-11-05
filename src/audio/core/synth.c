@@ -1050,6 +1050,7 @@ void box_audio_source_synth(
     src->amount = src->filter ? p->filter_amount : 0.0f;
     src->glide_frames = box_audio_synth_frames(p->glide, core->sample_rate);
     src->stages = box_audio_svf_init(src->svf, p->slope, p->resonance);
+    src->drive = p->drive;
     src->svf_r[0] = src->svf[0];
     src->svf_r[1] = src->svf[1];
 
@@ -2061,15 +2062,15 @@ static int32_t box_audio_synth_render_wide(
         if (src->filter) {
             box_audio_synth_control(src, rate);
             if (src->stages > 1) {
-                l = box_audio_svf_next(&src->svf[1], src->filter, l);
+                l = box_audio_svf_drive(&src->svf[1], src->filter, l, src->drive);
                 if (stereo) {
-                    r = box_audio_svf_next(&src->svf_r[1], src->filter, r);
+                    r = box_audio_svf_drive(&src->svf_r[1], src->filter, r, src->drive);
                 }
             }
 
-            l = box_audio_svf_next(&src->svf[0], src->filter, l);
+            l = box_audio_svf_drive(&src->svf[0], src->filter, l, src->drive);
             if (stereo) {
-                r = box_audio_svf_next(&src->svf_r[0], src->filter, r);
+                r = box_audio_svf_drive(&src->svf_r[0], src->filter, r, src->drive);
             }
         }
 
@@ -2154,10 +2155,10 @@ int32_t box_audio_synth_render(
 
             y = mix;
             if (src->stages > 1) {
-                y = box_audio_svf_next(&src->svf[1], src->filter, y);
+                y = box_audio_svf_drive(&src->svf[1], src->filter, y, src->drive);
             }
 
-            y = box_audio_svf_next(&src->svf[0], src->filter, y);
+            y = box_audio_svf_drive(&src->svf[0], src->filter, y, src->drive);
         } else {
             y = mix;
         }

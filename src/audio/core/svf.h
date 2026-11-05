@@ -8,6 +8,10 @@
  * positive g and damping, so a stage is stable at any cutoff and resonance and while they
  * move. The 24 dB filter is a cascade of two stages, each stable on its own, so the cascade is
  * too. Private to src/audio/core; included by internal.h.
+ *
+ * Drive soft clips the input and the bandpass state of a stage, which bounds the resonance
+ * peak; the clipper never grows a value, so a driven stage is as stable as a linear one.
+ * Drive 0 skips it.
  */
 
 #ifndef BOX_AUDIO_CORE_SVF_H
@@ -27,6 +31,14 @@
 
 /** Damping of the second, resonant stage of the 24 dB filter at resonance 0, 2 cos(3 pi / 8) */
 #define BOX_AUDIO_SVF_BUTTERWORTH_2 0.76536686473017954346
+
+/** Gain of the soft clipper of the input of a stage at drive 1: a signal of 1 / this
+ * starts to saturate */
+#define BOX_AUDIO_SVF_DRIVE_INPUT 4.0f
+
+/** Gain of the soft clipper of the bandpass state of a stage at drive 1: the state, and so
+ * the resonance peak, stays under 1 / this */
+#define BOX_AUDIO_SVF_DRIVE_STATE 2.0f
 
 /** A stage of a trapezoidal state variable filter */
 typedef struct box_audio_svf_t {
@@ -136,6 +148,71 @@ static inline float box_audio_svf_next(
         y = x - f->k * v1;
     } else {
         y = f->k * v1;
+    }
+
+    return y;
+}
+
+/** Soft clip a value: tanh(a v) / a, from the rational approximation
+ * z (27 + z^2) / (27 + 9 z^2) of tanh(z), which reaches 1 with a flat slope at z = 3 and
+ * holds there. Never larger than |v|.
+ *
+ * @param v The value
+ * @param a Gain, above 0
+ * @return The clipped value, within 1 / a
+ */
+static inline float box_audio_svf_clip(
+    float v,
+    float a)
+{
+    float z = a * v, zz, result;
+    if (z >= 3.0f) {
+        result = 1.0f / a;
+    } else if (z <= -3.0f) {
+        result = -1.0f / a;
+    } else {
+        zz = z * z;
+        result = v * (27.0f + zz) / (27.0f + 9.0f * zz);
+    }
+
+    return result;
+}
+
+/** Filter a frame through a stage with drive: the input and the bandpass state go through
+ * box_audio_svf_clip. A drive of 0 is box_audio_svf_next.
+ *
+ * @param f The stage
+ * @param filter A box_audio_synth_filter_t, not BOX_AUDIO_SYNTH_FILTER_NONE
+ * @param x The input
+ * @param drive 0..1
+ * @return The output
+ */
+static inline float box_audio_svf_drive(
+    box_audio_svf_t *f,
+    int32_t filter,
+    float x,
+    float drive)
+{
+    float v1, v2, v3, y;
+    if (!(drive > 0)) {
+        y = box_audio_svf_next(f, filter, x);
+    } else {
+        x = box_audio_svf_clip(x, drive * BOX_AUDIO_SVF_DRIVE_INPUT);
+        v3 = x - f->ic2;
+        v1 = f->a1 * f->ic1 + f->a2 * v3;
+        v2 = f->ic2 + f->a2 * f->ic1 + f->a3 * v3;
+        f->ic1 = box_audio_clean(box_audio_svf_clip(2 * v1 - f->ic1,
+            drive * BOX_AUDIO_SVF_DRIVE_STATE));
+        f->ic2 = box_audio_clean(2 * v2 - f->ic2);
+        if (filter == BOX_AUDIO_SYNTH_LOWPASS) {
+            y = v2;
+        } else if (filter == BOX_AUDIO_SYNTH_HIGHPASS) {
+            y = x - f->k * v1 - v2;
+        } else if (filter == BOX_AUDIO_SYNTH_NOTCH) {
+            y = x - f->k * v1;
+        } else {
+            y = f->k * v1;
+        }
     }
 
     return y;

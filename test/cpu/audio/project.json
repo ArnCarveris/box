@@ -520,7 +520,15 @@
                     "kind_change_no_click",
                     "mix",
                     "render_sizes",
-                    "component"
+                    "component",
+                    "drive_ramp_no_click"
+                ]
+            },
+            {
+                "id": "EffectFilterDrive",
+                "testcases": [
+                    "zero_identical",
+                    "bounded"
                 ]
             },
             {
@@ -540,6 +548,17 @@
                     "world_duck",
                     "sidechain_cycle",
                     "script"
+                ]
+            },
+            {
+                "id": "SynthDrive",
+                "testcases": [
+                    "resonance_bounded",
+                    "sweep_stable",
+                    "zero_identical",
+                    "harmonics",
+                    "slope_24",
+                    "wide"
                 ]
             },
             {
@@ -571,6 +590,7 @@
                     "filter_slope_24",
                     "script_filter_envelope",
                     "filter_extreme",
+                    "filter_drive_default",
                     "layers_sum",
                     "layer_own_envelope",
                     "eight_layers",

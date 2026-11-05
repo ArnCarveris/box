@@ -297,6 +297,7 @@ bool box_audio_synth_compile(
         p.cutoff = filter->cutoff;
         p.resonance = filter->resonance;
         p.slope = (uint32_t)filter->slope;
+        p.drive = filter->drive;
     }
 
     if (filter && fenv && fenv->amount != 0) {

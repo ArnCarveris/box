@@ -124,6 +124,7 @@ static void box_audio_synth_patch_clamp(
     p->cutoff = box_audio_synth_clamp(p->cutoff, BOX_AUDIO_SYNTH_CUTOFF_MIN,
         BOX_AUDIO_SYNTH_HZ_MAX);
     p->resonance = box_audio_synth_clamp(p->resonance, 0, 1);
+    p->drive = box_audio_synth_clamp(p->drive, 0, 1);
     if (p->slope > BOX_AUDIO_SYNTH_SLOPE_24) {
         p->slope = BOX_AUDIO_SYNTH_SLOPE_12;
     }

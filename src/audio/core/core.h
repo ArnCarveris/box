@@ -443,8 +443,8 @@ typedef struct box_audio_eq_band_t {
  * new value, exponentially in frequency */
 #define BOX_AUDIO_FILTER_SMOOTH 0.01f
 
-/** Seconds of a change of the mix of a filter effect, and of each half of the crossfade
- * through the dry signal of a change of its kind or slope */
+/** Seconds of a change of the mix or the drive of a filter effect, and of each half of the
+ * crossfade through the dry signal of a change of its kind or slope */
 #define BOX_AUDIO_FILTER_RAMP 0.02f
 
 /** The parameters of a filter effect, the first floats of the params of its effect command:
@@ -456,6 +456,8 @@ typedef struct box_audio_filter_params_t {
     float resonance;  /**< 0 (a Butterworth response) to 1 (rings the longest) */
     float slope;      /**< A box_audio_synth_slope_t: 0 for 12 dB per octave, 1 for 24 */
     float mix;        /**< Wet level, 0..1; the dry signal passes at 1 - mix */
+    float drive;      /**< Saturation of the input and the resonance, 0 (linear) to 1; moves
+                       *   over BOX_AUDIO_FILTER_RAMP */
 } box_audio_filter_params_t;
 
 /** Seconds of the windows of the peak detector of the compressor and the gate: the detector
@@ -782,6 +784,7 @@ typedef struct box_audio_synth_patch_t {
     float cutoff;                         /**< Hz */
     float resonance;                      /**< 0..1, 1 rings the longest */
     uint32_t slope;                       /**< A box_audio_synth_slope_t */
+    float drive;                          /**< Saturation of the filter, 0 (linear) to 1 */
     float filter_amount;                  /**< Octaves the filter envelope moves the cutoff at
                                            * its level 1, negative closes it; 0 for none */
     box_audio_synth_envelope_t filter_envelope; /**< Envelope of the cutoff, which does not

@@ -430,6 +430,9 @@ ECS_STRUCT(SynthFilter, {
     float resonance;       /**< 0 (a Butterworth response) to 1 (rings the longest) */
     SynthFilterSlope slope; /**< Steepness, default SynthSlope12; at SynthSlope24 the resonance
                             *   applies to the second stage only */
+    float drive;           /**< Saturation, 0 to 1, default 0 (linear): soft clips the input
+                            *   and the resonance of each stage, so a high resonance compresses
+                            *   and growls instead of whistling; 1 drives it hard */
 });
 
 /** A filter, an effect in an insert slot of an AudioBus, as a Reverb is: the state variable
@@ -438,8 +441,8 @@ ECS_STRUCT(SynthFilter, {
  * music { AudioBus: {effects: [music]}; AudioFilter: {cutoff: 400, resonance: 0.3} }.
  *
  * The cutoff and the resonance move exponentially toward a new value over about 10 ms, so a
- * sweep driven from a script every frame is smooth; the mix moves over 20 ms. A change of the
- * kind or the slope fades the filtered signal out and back in over 40 ms.
+ * sweep driven from a script every frame is smooth; the mix and the drive move over 20 ms. A
+ * change of the kind or the slope fades the filtered signal out and back in over 40 ms.
  */
 ECS_STRUCT(AudioFilter, {
     SynthFilterKind kind;  /**< The kind, default SynthLowPass; SynthNotch for a notch */
@@ -450,6 +453,8 @@ ECS_STRUCT(AudioFilter, {
                             *   applies to the second stage only */
     float mix;             /**< Wet level, 0 to 1, default 1; the dry signal passes at
                             *   1 - mix */
+    float drive;           /**< Saturation, 0 to 1, default 0 (linear), as the drive of
+                            *   SynthFilter; moves over 20 ms */
 });
 
 /** A compressor, an effect in an insert slot of an AudioBus, as a Reverb is: feed-forward and

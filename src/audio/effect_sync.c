@@ -130,6 +130,7 @@ uint32_t box_audio_module_effect_kind(
             params[2] = filter->resonance;
             params[3] = (float)filter->slope;
             params[4] = filter->mix;
+            params[5] = filter->drive;
         }
 
         goto done;
