@@ -270,6 +270,28 @@ WGPUBindGroup box_gpu_material_group(
     const box_render_packet_t *packet,
     const box_render_batch_t *b);
 
+/** Binding of the DrawKind of mesh.wgsl in the material and blend groups, a uniform with a
+ * dynamic offset */
+#define BOX_GPU_DRAW_KIND_BINDING (11)
+
+/** Bytes between two DrawKinds in draw_kinds, the largest uniform offset alignment */
+#define BOX_GPU_DRAW_KIND_STRIDE (256)
+
+/** DrawKinds in draw_kinds: the BlendMode in the low 4 bits, then transmissive, then the alpha
+ * test */
+#define BOX_GPU_DRAW_KINDS (64)
+
+/** Get the dynamic offset of the DrawKind a batch draws with in the material or blend group.
+ *
+ * @param b The batch
+ * @param equal Whether the draw follows a depth prepass of its view, which a batch the prepass
+ * draws does without the alpha test
+ * @return The offset in draw_kinds
+ */
+uint32_t box_gpu_draw_kind(
+    const box_render_batch_t *b,
+    bool equal);
+
 /** Check whether a batch draws with the texture_blend variant of the mesh pipeline: a batch of
  * the mesh shader with a TextureBlend, of any blend mode, alpha tested or transmissive. Its
  * alpha tested depth prepass (fs_depth_cutout_blend) and shadow (fs_cutout_blend) pipelines bind
