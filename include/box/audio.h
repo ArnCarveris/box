@@ -68,7 +68,7 @@ ECS_ENUM(AudioState, {
 #endif
 
 /** Insert slots of a mixer channel, AudioBus.effects */
-#define BOX_AUDIO_EFFECT_SLOTS 4
+#define BOX_AUDIO_EFFECT_SLOTS 8
 
 /** Effect instances that run at once, in every channel together; more log one error that
  * names the effect */
@@ -123,7 +123,7 @@ ECS_STRUCT(AudioBus, {
     bool solo;             /**< Solo the channel, default false */
     AudioChannelKind kind; /**< What the channel is, default AudioChannelGroup */
     ecs_vec(AudioSend) sends; /**< Up to BOX_AUDIO_SENDS sends to other buses */
-    ecs_entity_t effects[4]; /**< Effect entities of the BOX_AUDIO_EFFECT_SLOTS insert slots,
+    ecs_entity_t effects[8]; /**< Effect entities of the BOX_AUDIO_EFFECT_SLOTS insert slots,
                             *   in the order they run, 0 for an empty slot */
 });
 

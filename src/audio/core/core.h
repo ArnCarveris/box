@@ -85,7 +85,7 @@
 #endif
 
 /** Insert slots of a bus; its effects run in the order of their index */
-#define BOX_AUDIO_EFFECT_SLOTS 4
+#define BOX_AUDIO_EFFECT_SLOTS 8
 
 /** Parameters of an effect command, read by each kind in its own way. 32 hold the 16 steps of
  * a pattern gate and its other parameters as plain floats, so automation and the modulators
