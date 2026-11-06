@@ -5,8 +5,6 @@
  * A module replaces the module of its handle once its outcome arrives (at once natively, from
  * the event loop in the browser) if no newer compile of the handle started; a module that
  * fails keeps the previous one. box_render_gpu_compile_delivery delays native outcomes.
- *
- * A mesh or 2D shape module waits for its forward check before it replaces the module.
  */
 
 #include "gpu.h"
@@ -36,10 +34,6 @@ struct box_gpu_compile_t {
     bool failed;                    /**< The module did not compile */
     bool arrived;                   /**< The outcome arrived */
     bool held;                      /**< The outcome arrived and waits for the next packet */
-    bool checking;                  /**< The outcome arrived and waits for the forward check,
-                                     *   asked again each packet */
-    bool early;                     /**< The module was installed while its check runs, as its
-                                     *   handle had no module to keep */
 };
 
 /** Get when compile outcomes apply.
@@ -95,8 +89,8 @@ static box_gpu_shader_slot_t* box_gpu_shader_slot(
 
 /** Release the module of a slot and detach the compiles that wait in it.
  *
- * Detached compiles free themselves when their outcome arrives; held and checking ones, whose
- * outcome already arrived, are freed here.
+ * Detached compiles free themselves when their outcome arrives; held ones, whose outcome
+ * already arrived, are freed here.
  *
  * @param gpu The backend
  * @param slot The slot, freed
@@ -111,7 +105,7 @@ static void box_gpu_shader_slot_free(
         c->gpu = NULL;
         c->slot = NULL;
         c->next = NULL;
-        if (c->held || c->checking) {
+        if (c->held) {
             box_gpu_compile_free(c);
         }
 
@@ -158,83 +152,19 @@ static void box_gpu_shader_install(
     }
 }
 
-/** Install the module of a compile while its forward check runs, when its handle has no module
- * the check would keep: the pipelines it draws with, such as those of the startup overlay, are
- * then requested before the check pipelines are created. A failed check removes it again.
- *
- * @param gpu The backend
- * @param slot The slot of the handle
- * @param compile The compile, checking
- */
-static void box_gpu_compile_early(
-    box_gpu_t *gpu,
-    box_gpu_shader_slot_t *slot,
-    box_gpu_compile_t *compile)
-{
-    if (!slot->shader.module && !compile->early) {
-        wgpuShaderModuleAddRef(compile->module);
-        box_gpu_shader_install(gpu, compile->handle, compile->module, compile->label);
-        compile->early = true;
-    }
-}
-
-/** Remove the module a compile installed early when its check failed, so the handle has no
- * module again.
- *
- * @param gpu The backend
- * @param slot The slot of the handle
- * @param compile The compile
- */
-static void box_gpu_compile_withdraw(
-    box_gpu_t *gpu,
-    box_gpu_shader_slot_t *slot,
-    box_gpu_compile_t *compile)
-{
-    if (compile->early && slot && slot->shader.module == compile->module) {
-        wgpuShaderModuleRelease(slot->shader.module);
-        slot->shader.module = NULL;
-        slot->shader.revision ++;
-        ecs_os_free(slot->label);
-        slot->label = NULL;
-        box_gpu_count(gpu, BOX_GPU_STAT_SHADER_DESTROYED);
-        box_gpu_forward_reset(gpu, false);
-    }
-}
-
 /** Apply the outcome of a compile: install its module or report its error.
  *
  * A module of a compile older than the newest one started for the handle is released, so a
- * late outcome never replaces newer code. A newest mesh or 2D shape module first waits for its
- * forward check, flagged checking; meanwhile it draws when its handle has no module yet.
+ * late outcome never replaces newer code.
  *
  * @param compile The compile, its outcome arrived and its backend exists
- * @return Whether the compile finished, so the caller frees it
  */
-static bool box_gpu_compile_finish(
+static void box_gpu_compile_finish(
     box_gpu_compile_t *compile)
 {
     box_gpu_t *gpu = compile->gpu;
     box_gpu_shader_slot_t *slot = ecs_map_get_deref(&gpu->shaders, box_gpu_shader_slot_t,
         compile->handle);
-    char *invalid = NULL;
-    bool result = true;
-    if (!compile->failed && compile->module && slot && compile->revision == slot->requested &&
-        (compile->handle == BOX_RENDER_SHADER_MESH ||
-            compile->handle == BOX_RENDER_SHADER_SHAPE2D))
-    {
-        gpu->checking = compile->module;
-        gpu->checking_label = compile->label;
-        result = box_gpu_forward_check(gpu, compile->handle, compile->module, &invalid);
-        gpu->checking = NULL;
-        gpu->checking_label = NULL;
-    }
-
-    compile->checking = !result;
-    if (!result) {
-        box_gpu_compile_early(gpu, slot, compile);
-        goto done;
-    }
-
     if (compile->slot) {
         box_gpu_compile_t **ptr = &slot->pending;
         while (*ptr != compile) {
@@ -245,23 +175,17 @@ static bool box_gpu_compile_finish(
         compile->slot = NULL;
     }
 
-<<<<<<< HEAD
-    if (compile->failed || !compile->module || invalid) {
-        const char *message = invalid ? invalid : compile->message
-=======
     if (compile->failed || !compile->module) {
         const char *message = compile->message
->>>>>>> 16533d425d72822f28ac581d26af9485e4e508c5
             ? compile->message : "shader module creation failed";
         ecs_err("shader '%s' failed to compile: %s", compile->label, message);
         box_gpu_count(gpu, BOX_GPU_STAT_SHADER_ERROR);
         box_gpu_shader_report(gpu, compile->handle, compile->revision, message,
             compile->label);
-        box_gpu_compile_withdraw(gpu, slot, compile);
     } else {
         box_gpu_count(gpu, BOX_GPU_STAT_COMPILED);
         box_gpu_shader_report(gpu, compile->handle, compile->revision, NULL, compile->label);
-        if (compile->revision == slot->requested && slot->shader.module != compile->module) {
+        if (compile->revision == slot->requested) {
             box_gpu_shader_install(gpu, compile->handle, compile->module, compile->label);
             compile->module = NULL;
         }
@@ -272,13 +196,6 @@ static bool box_gpu_compile_finish(
         ecs_os_free(slot->label);
         ecs_os_free(slot);
     }
-<<<<<<< HEAD
-
-    ecs_os_free(invalid);
-done:
-    return result;
-=======
->>>>>>> 16533d425d72822f28ac581d26af9485e4e508c5
 }
 
 /** Take the outcome of a compile; one that waits is finished and freed here.
@@ -311,15 +228,12 @@ static void box_gpu_compile_arrive(
 
     compile->arrived = true;
     if (compile->slot || !compile->gpu) {
-        bool finished = true;
         if (compile->gpu) {
-            finished = box_gpu_compile_finish(compile);
+            box_gpu_compile_finish(compile);
             box_gpu_stats_publish(compile->gpu);
         }
 
-        if (finished) {
-            box_gpu_compile_free(compile);
-        }
+        box_gpu_compile_free(compile);
     }
 
 done:
@@ -457,7 +371,8 @@ static void box_gpu_shader_compile(
     compile->revision = revision;
     slot->requested = revision;
     box_gpu_compile_create(gpu, compile, &desc);
-    if (compile->arrived && box_gpu_compile_finish(compile)) {
+    if (compile->arrived) {
+        box_gpu_compile_finish(compile);
         box_gpu_compile_free(compile);
         goto done;
     }
@@ -489,7 +404,7 @@ void box_gpu_shader_deliver(
         box_gpu_shader_slot_t *slot = ecs_map_ptr(&it);
         box_gpu_compile_t *c;
         for (c = slot->pending; c; c = c->next) {
-            if (c->held || c->checking) {
+            if (c->held) {
                 *ecs_vec_append_t(NULL, &held, box_gpu_compile_t*) = c;
             }
         }
@@ -501,9 +416,8 @@ void box_gpu_shader_deliver(
         box_gpu_compile_t *c = *ecs_vec_get_t(&held, box_gpu_compile_t*, at);
         c->held = false;
         c->arrived = true;
-        if (box_gpu_compile_finish(c)) {
-            box_gpu_compile_free(c);
-        }
+        box_gpu_compile_finish(c);
+        box_gpu_compile_free(c);
     }
 
     ecs_vec_fini_t(NULL, &held, box_gpu_compile_t*);

@@ -65,7 +65,6 @@ struct box_gpu_pipeline_t {
     double seconds;                 /**< Time the creation took */
     bool failed;                    /**< The creation failed */
     bool arrived;                   /**< The outcome arrived and waits for its delivery */
-    bool quiet;                     /**< A failure is not reported, see pipeline_quiet */
     int64_t used;                   /**< Packet of the last request */
 };
 
@@ -78,7 +77,7 @@ struct box_gpu_pipelines_t {
     ecs_os_cond_t wake;             /**< Wakes the workers for a queued creation or the stop */
     ecs_os_cond_t done;             /**< Signals an outcome that arrived */
     box_gpu_pipeline_t *queue[2];   /**< Creations no worker started, newest first: render
-                                     *   pipelines before compute and forward check ones, see
+                                     *   pipelines before compute ones, see
                                      *   box_gpu_pipeline_start */
     box_gpu_pipeline_t *arrived;    /**< Outcomes that wait for their delivery */
     int32_t active;                 /**< Creations running on the workers */
@@ -840,8 +839,8 @@ static void* box_gpu_pipeline_worker(
 /** Queue the creation of a pipeline for the workers, starting them on first use.
  *
  * The newest request goes first, as the startup overlay draws last in a frame and its pipelines
- * are the last ones requested. Render pipelines go before compute pipelines and the quiet ones
- * of the forward check, so draws such as those of the overlay are not held back by them.
+ * are the last ones requested. Render pipelines go before compute pipelines, so draws such as
+ * those of the overlay are not held back by them.
  *
  * @param c The cache
  * @param p The pipeline
@@ -850,7 +849,7 @@ static void box_gpu_pipeline_start(
     box_gpu_pipelines_t *c,
     box_gpu_pipeline_t *p)
 {
-    int32_t level = p->compute || p->quiet;
+    int32_t level = p->compute;
     while (c->workers < BOX_GPU_PIPELINE_WORKERS) {
         c->threads[c->workers ++] = ecs_os_thread_new(box_gpu_pipeline_worker, c);
     }
@@ -948,7 +947,7 @@ static void box_gpu_pipeline_finish(
         box_gpu_pipeline_log(p);
     }
 
-    if (p->failed && !p->quiet) {
+    if (p->failed) {
         ecs_err("pipeline '%s' failed to create: %s", label ? label : "",
             p->message ? p->message : "the pipeline cannot be created");
         box_gpu_count(gpu, BOX_GPU_STAT_SHADER_ERROR);
@@ -1007,7 +1006,6 @@ static box_gpu_pipeline_t* box_gpu_pipeline_request(
     p = box_gpu_pipeline_new(render, compute);
     p->hash = hash;
     p->cache = c;
-    p->quiet = gpu->pipeline_quiet;
     const char *shader = box_gpu_shader_label(gpu, render ? render->vertex.module
         : compute->compute.module);
     if (shader) {
@@ -1028,9 +1026,6 @@ static box_gpu_pipeline_t* box_gpu_pipeline_request(
 
 done:
     p->used = c->packets;
-    gpu->pipeline_error = p->state == BOX_GPU_PIPELINE_FAILED
-        ? (p->message ? p->message : "the pipeline cannot be created")
-        : NULL;
 
     return p;
 }
@@ -1288,7 +1283,6 @@ void box_gpu_pipelines_fini(
     ecs_os_mutex_free(c->lock);
     ecs_os_free(c);
     gpu->pipelines = NULL;
-    gpu->pipeline_error = NULL;
     ecs_os_mutex_lock(gpu->lock);
     gpu->stats.pipelines_building -= building;
     ecs_os_mutex_unlock(gpu->lock);

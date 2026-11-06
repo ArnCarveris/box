@@ -244,8 +244,7 @@ const char* box_gpu_shader_label(
     box_gpu_t *gpu,
     WGPUShaderModule module);
 
-/** Finish the compiles whose outcome box_render_gpu_compile_delivery held and those whose
- * forward check finished.
+/** Finish the compiles whose outcome box_render_gpu_compile_delivery held.
  *
  * @param gpu The backend
  */
@@ -706,32 +705,6 @@ void box_gpu_forward_reset(
     box_gpu_t *gpu,
     bool keep);
 
-<<<<<<< HEAD
-/** Check whether a mesh or 2D shape module fits the pipeline layout before it replaces the
- * module that renders, by requesting its forward pipelines. A
- * mesh module also requests the depth prepass and the texture_blend pipelines (fs_blend and
- * fs_depth_cutout_blend) and a
- * 2D shape module the shadow, slice and polygon pipelines (fs_shadow, fs_slice, fs_polygon,
- * fs_shadow_polygon and the polygon override constant), so they need their entry points.
- *
- * The pipelines are created in the background, so the check is asked again each packet until
- * every one of them exists or one failed. The browser does not check: an invalid pipeline shows
- * as a failed pipeline there.
- *
- * @param gpu The backend
- * @param handle Handle of the shader
- * @param shader The module
- * @param error Receives NULL when the pipelines are valid, else the error, which the caller frees
- * @return Whether the check finished, false while a pipeline is created
- */
-bool box_gpu_forward_check(
-    box_gpu_t *gpu,
-    uint32_t handle,
-    WGPUShaderModule shader,
-    char **error);
-
-=======
->>>>>>> 16533d425d72822f28ac581d26af9485e4e508c5
 /** Create or release a mesh from a BOX_RENDER_MESH resource.
  *
  * @param gpu The backend
