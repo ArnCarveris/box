@@ -132,6 +132,10 @@ void AudioCheck_problems(void) {
         test_assert(strstr(out, check_static_lines[i]) != NULL);
     }
 
+    if (!strstr(out, "warning track-silent track check_silent: ")) {
+        printf("%s\n", out);
+    }
+
     test_assert(strstr(out, "warning track-silent track check_silent: ") != NULL);
     test_assert(strstr(out, "track-silent track check_dup:") == NULL);
     test_assert(strstr(out, "note-overlap track check_glide") == NULL);
@@ -216,7 +220,9 @@ void AudioCheck_clipping(void) {
     ecs_entity_t s;
     ecs_world_t *world = check_world(&s, "test/assets/audio/songs/check_clip.flecs");
     char *out = check_ok(world, s, "audio check");
-    if (!strstr(out, "warning bus-clip bus check_hot at 1.1")) {
+    if (!strstr(out, "warning bus-clip bus check_hot at 1.1") ||
+        !strstr(out, " limiter master at 1.1: the master limiter reduces the gain"))
+    {
         printf("%s\n", out);
     }
 

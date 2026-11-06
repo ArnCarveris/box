@@ -1853,7 +1853,9 @@ master is more than 5 LU from -14 LUFS, and `track-silent` for a track with
 notes in the bars that stays under -100 dBFS. Positions of the dynamic checks
 are the frame of the play, 1/60 s, at the start of which the counter or the peak
 was seen. A play lasts up to 600 s. `audio check static` runs only the static
-checks, without the offline world. The same song gives the same text, apart from
+checks, without the offline world; when the offline world cannot play, such as when a
+sound file does not load, the summary ends in `not played: <why> (static checks only)`
+and the static findings stand. The same song gives the same text, apart from
 `core-load`, which measures the machine.
 
 If a track is silent, check sample readiness, its instrument and overlapping

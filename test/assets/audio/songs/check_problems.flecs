@@ -115,10 +115,11 @@ check_no_inst {
   part { ClipPlacement: {clip: check_tone_notes, start: 0, duration: 4} }
 }
 
+// From bar 2: the core ramps the volume of a new bus from 1 to 0 over its first milliseconds
 check_silent {
   Track: {instrument: check_inst}
   AudioBus: {volume: 0}
-  part { ClipPlacement: {clip: check_tone_notes, start: 0, duration: 4} }
+  part { ClipPlacement: {clip: check_tone_notes, start: 4, duration: 4} }
 }
 
 check_not_a_bus {}

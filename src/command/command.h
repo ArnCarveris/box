@@ -160,8 +160,8 @@ typedef void (*box_cmd_audio_probe_frames_t)(
     void *ctx);
 
 /** Called after each frame of the offline world of a render of the song once the timeline
- * plays, with the beat at the start of the frames it rendered; the module of the offline world
- * holds its meters, its counters and its AudioStatus */
+ * plays, with the beat at the start of the frames its meters measured, those of the frame
+ * before; the module of the offline world holds its meters, its counters and its AudioStatus */
 typedef void (*box_cmd_audio_probe_frame_t)(
     ecs_world_t *world,
     double beat,
@@ -183,13 +183,17 @@ typedef struct box_cmd_audio_probe_t {
  * @param argc Number of options
  * @param options The key=value options of audio render song: bars or beats, solo, mute, tail
  * @param probe Gets the frames and the frames of the offline world
- * @return 0 on success, nonzero with an error logged
+ * @param failed Receives, owned, why the offline world did not play, such as a sound file that
+ * did not load; NULL when it played or the options are invalid
+ * @return 0 on success, nonzero when the options are invalid, with an error logged, or with
+ * failed set
  */
 int box_cmd_audio_render_probe(
     ecs_world_t *world,
     int32_t argc,
     const char **options,
-    const box_cmd_audio_probe_t *probe);
+    const box_cmd_audio_probe_t *probe,
+    char **failed);
 
 /** Lint the loaded song, or the tracks of the scene: audio check [static] [bars=a..b]. One
  * line per finding with its severity, check, place and a hint, and a summary line.

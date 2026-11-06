@@ -1295,7 +1295,8 @@ int box_cmd_audio_render_probe(
     ecs_world_t *world,
     int32_t argc,
     const char **options,
-    const box_cmd_audio_probe_t *probe)
+    const box_cmd_audio_probe_t *probe,
+    char **failed)
 {
     box_cmd_audio_render_job_t *job = box_cmd_audio_render_job(world, "song", argc, options,
         BOX_CMD_AUDIO_RENDER_PREROLL_MAX);
@@ -1303,7 +1304,9 @@ int box_cmd_audio_render_probe(
     box_cmd_audio_render_job_t *prev_job = box_cmd_audio_render_logging;
     char *error = NULL;
     bool done = false;
+    uint64_t last = 0;
     int result = -1;
+    *failed = NULL;
     if (!job) {
         goto done;
     }
@@ -1315,19 +1318,16 @@ int box_cmd_audio_render_probe(
         uint64_t clock = job->clock;
         done = box_cmd_audio_render_step(job, &error);
         if (!error && job->phase == BOX_CMD_AUDIO_RENDER_RUN && job->anchored && probe->frame) {
-            probe->frame(job->world, box_cmd_audio_render_beat(job, clock), probe->ctx);
+            probe->frame(job->world, box_cmd_audio_render_beat(job, last), probe->ctx);
         }
+
+        last = clock;
     }
 
     ecs_os_api.log_ = prev;
     box_cmd_audio_render_logging = prev_job;
-    if (error) {
-        ecs_err("the song cannot be played offline: %s", error);
-    } else {
-        result = 0;
-    }
-
-    ecs_os_free(error);
+    *failed = error;
+    result = error ? -1 : 0;
     box_cmd_audio_render_job_free(job);
 done:
     return result;

@@ -1484,7 +1484,9 @@ static void box_cmd_check_play_report(
     }
 }
 
-/** Play the bars through once offline and add the findings of the dynamic checks.
+/** Play the bars through once offline and add the findings of the dynamic checks. When the
+ * offline world does not play, such as when a sound file does not load, the summary says why
+ * and the static findings stand.
  *
  * @param c The check
  * @param summary Receives what the play measured, for the summary line
@@ -1500,6 +1502,7 @@ static int box_cmd_check_play(
     double to = c->bars ? c->to : (c->length > 0 ? c->length : c->end);
     char option[96], pos[48];
     const char *options[1] = { option };
+    char *failed = NULL;
     float lufs;
     int result = 0;
     if (!(to > c->from)) {
@@ -1509,8 +1512,12 @@ static int box_cmd_check_play(
 
     snprintf(option, sizeof(option), "beats=%.17g..%.17g", c->from, to);
     box_cmd_check_play_init(c, &play);
-    result = box_cmd_audio_render_probe(c->world, 1, options, &probe);
-    if (!result) {
+    result = box_cmd_audio_render_probe(c->world, 1, options, &probe, &failed);
+    if (failed) {
+        ecs_strbuf_append(summary, "; not played: %s (static checks only)", failed);
+        ecs_os_free(failed);
+        result = 0;
+    } else if (!result) {
         box_cmd_check_play_report(c, &play);
         lufs = box_audio_loudness_meter_integrated(&play.loudness);
         box_cmd_check_pos(c, play.voices_beat, pos, sizeof(pos));
