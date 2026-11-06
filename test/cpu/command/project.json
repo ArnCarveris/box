@@ -62,12 +62,9 @@
                     "audio_analyze",
                     "audio_analyze_resource",
                     "audio_analyze_errors",
-<<<<<<< HEAD
                     "audio_meter_errors",
-=======
                     "audio_plot",
                     "audio_plot_errors",
->>>>>>> 99efcfd620056692c301c7a275076f9e5c3d9adb
                     "audio_notes_placed_twice",
                     "audio_notes_roll",
                     "audio_notes_drums",

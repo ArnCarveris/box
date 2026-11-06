@@ -1713,11 +1713,8 @@ Importing box alone does not open an output: `box_app_run` does.
 | `audio render <subject> [options]` | Render a sound, instrument, bus stem or song section on its own, faster than real time, to a WAV resource |
 | `audio song [<file>\|none]` | Show the song, load a song file or unload it |
 | `audio analyze <wav> [from] [to]` | Print a text report of a WAV resource or file, optionally of the seconds from..to |
-<<<<<<< HEAD
-| `audio meter [bus...] [seconds\|bars=a..b]` | Measure peak, RMS and loudness per bus and the gain reduction of its effects over a span of the live output; run again without arguments for the table |
-=======
 | `audio plot <wav> [kind] [options]` | Draw a PNG resource of a WAV resource or file: spectrogram, waveform, spectrum or loudness |
->>>>>>> 99efcfd620056692c301c7a275076f9e5c3d9adb
+| `audio meter [bus...] [seconds\|bars=a..b]` | Measure peak, RMS and loudness per bus and the gain reduction of its effects over a span of the live output; run again without arguments for the table |
 | `audio notes <track> [bars=a..b] [roll]` | Print the notes of a track per bar, or as a piano roll |
 | `audio chords [track...] [bars=a..b]` | Print the chords and the key of a section from the notes |
 
@@ -1819,7 +1816,30 @@ bar in LUFS and the band that changed the most against the whole span, counting 
 followed. The same WAV and span give the same text. The measures are a plain C library,
 [analyze.h](../src/audio/analyze.h).
 
-<<<<<<< HEAD
+`audio plot` reads a WAV as `audio analyze` does and returns the name of a PNG resource, as
+`audio capture` does; in the browser it writes `/tmp/audio_plot_<n>.png` in the page filesystem
+and returns that path. The image is drawn on the CPU, so it works headless and in the browser,
+and the same WAV and options give the same PNG bytes. Its first line names the kind, the WAV,
+its rate and the span.
+
+| Kind | Image |
+| --- | --- |
+| `spectrogram` (default) | Level per time and frequency: one Hann windowed FFT of about 85 ms per column, a log axis of 20 Hz to 20 kHz, colors from black at `min_db` to pale yellow at 0 dB (a full scale sine), with the scale on the right |
+| `waveform` | A lane per channel with the peak (dark) envelope of the frames of each column and the RMS (light) of at least 20 ms around it, -1 to 1 |
+| `spectrum` | Average level over the span per log frequency in dB, with the band edges and names of `audio analyze` |
+| `loudness` | Short-term (3 s, bright) and momentary (400 ms, dim) loudness over time in LUFS |
+
+| Option | Meaning |
+| --- | --- |
+| `size=WxH` | Image size in pixels, 240x160 to 4096x4096, default 1200x600 |
+| `from=<s>`, `to=<s>` | Plot the seconds from..to of the WAV, default all of it |
+| `min_db=<dB>` | Bottom of the scale, default -100 dB, or -60 LUFS for `loudness`; keep it fixed to compare images |
+
+Axes are labeled in Hz, s, dB and LUFS. A capture of a song (a `bxsg` chunk) also gets bar
+lines with the bar numbers above the plot and, when there is room, beat lines, from the beat and
+tempo the capture started at. A spectrogram shows masking, muddy low-mids, harsh highs, cut
+tails and clicks (thin vertical lines) at a glance.
+
 `audio meter` measures the buses for gain staging. It renders in real time: the first call
 starts a measurement of the live output over `seconds` (default 3, at most 600) and returns at
 once; `audio meter` without arguments prints the progress, and once the span is measured the
@@ -1852,31 +1872,6 @@ reduction in dB, `never engages` under 0.1 dB, or `did not run`. The headroom li
 the loudest measured bus is under 0 dBFS, and the largest gain reduction of the limiter of the
 master, from the peaks over its threshold. A bus that never rendered says so. Measured through
 the null output at a fixed delta time, the same scene gives the same table.
-=======
-`audio plot` reads a WAV as `audio analyze` does and returns the name of a PNG resource, as
-`audio capture` does; in the browser it writes `/tmp/audio_plot_<n>.png` in the page filesystem
-and returns that path. The image is drawn on the CPU, so it works headless and in the browser,
-and the same WAV and options give the same PNG bytes. Its first line names the kind, the WAV,
-its rate and the span.
-
-| Kind | Image |
-| --- | --- |
-| `spectrogram` (default) | Level per time and frequency: one Hann windowed FFT of about 85 ms per column, a log axis of 20 Hz to 20 kHz, colors from black at `min_db` to pale yellow at 0 dB (a full scale sine), with the scale on the right |
-| `waveform` | A lane per channel with the peak (dark) envelope of the frames of each column and the RMS (light) of at least 20 ms around it, -1 to 1 |
-| `spectrum` | Average level over the span per log frequency in dB, with the band edges and names of `audio analyze` |
-| `loudness` | Short-term (3 s, bright) and momentary (400 ms, dim) loudness over time in LUFS |
-
-| Option | Meaning |
-| --- | --- |
-| `size=WxH` | Image size in pixels, 240x160 to 4096x4096, default 1200x600 |
-| `from=<s>`, `to=<s>` | Plot the seconds from..to of the WAV, default all of it |
-| `min_db=<dB>` | Bottom of the scale, default -100 dB, or -60 LUFS for `loudness`; keep it fixed to compare images |
-
-Axes are labeled in Hz, s, dB and LUFS. A capture of a song (a `bxsg` chunk) also gets bar
-lines with the bar numbers above the plot and, when there is room, beat lines, from the beat and
-tempo the capture started at. A spectrogram shows masking, muddy low-mids, harsh highs, cut
-tails and clicks (thin vertical lines) at a glance.
->>>>>>> 99efcfd620056692c301c7a275076f9e5c3d9adb
 
 `audio notes` and `audio chords` read only the note data of the tracks, their
 placements and clips, so they work without an output and without a device. A
