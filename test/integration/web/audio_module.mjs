@@ -19,7 +19,7 @@ voice, the click dropped. A script that sets AudioBus.volume to 0.5 (script_writ
 the level. With AudioMeter on the bus the worklet has to post meters messages and the
 meter has to read the peak and the RMS of the tone. A hidden page has to fade out and suspend
 the context (AudioSuspended), its meter read silence, and a visible one resume it. A capture
-of one second (audio capture 1) has to land as a WAV in the file system of the page with the
+of one second (audio.capture 1) has to land as a WAV in the file system of the page with the
 tone, and a 500 ms busy loop on the main thread has to leave the loop playing. The commands run
 through Module.cwrap('box_command_web_run'), the shell of the page. The log has no error and no
 audio warning. Exits 0 on a pass, 1 on a failure and 2 when Chrome or the page cannot start.`;
@@ -359,9 +359,9 @@ async function main() {
       'fade back in');
 
     // A capture lands in the file system of the page
-    const path = await evaluate(shell('audio capture 1'));
+    const path = await evaluate(shell('audio.capture 1'));
     console.log(`capture: ${path}`);
-    expect(/^\/tmp\/audio_capture_\d+\.wav$/.test(path || ''), 'audio capture did not ' +
+    expect(/^\/tmp\/audio_capture_\d+\.wav$/.test(path || ''), 'audio.capture did not ' +
       'return a file');
     let wav = null;
     const deadline = Date.now() + 5000;

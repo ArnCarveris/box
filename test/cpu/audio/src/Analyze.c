@@ -341,7 +341,7 @@ void Analyze_song_capture(void) {
 
     ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = true;
-    char *out = box_command_run(world, s, "audio analyze audio_analyze_song.wav", &error);
+    char *out = box_command_run(world, s, "audio.analyze audio_analyze_song.wav", &error);
     test_bool(error, false);
     test_assert(strstr(out, "\nbars: 96.0 bpm, 3.00 beats per bar") != NULL);
     test_assert(strstr(out, "\nbar 1") != NULL);

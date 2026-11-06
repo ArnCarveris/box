@@ -200,7 +200,7 @@ It reads `AudioStatus` and runs commands through the shell of the page
 `AudioWaitingForGesture` before a trusted click and the click dropped, the tone at its level
 after it, half the level after a script that the shell writes (`script_write`) sets
 `AudioBus: {volume: 0.5}` on the bus, a suspended context (`AudioSuspended`) while the page is
-hidden and a resumed one when it shows again, a one second `audio capture 1` in `/tmp` of the
+hidden and a resumed one when it shows again, a one second `audio.capture 1` in `/tmp` of the
 page's file system with the tone, and the loop still playing after a 500 ms stall of the main
 thread:
 
@@ -226,7 +226,7 @@ node test/integration/web/audio_spatial.mjs \
 `world` that sends to the bus `hall`, which runs its own `Reverb: {decay: 2.4}` in its insert
 slot (`effects: [hall]`), through `sends: [{bus: hall, level: 0.5}]`. After the worklet took the
 memory of the effect slot (an `effect` message) and a trusted click it
-records `audio capture 4` while `box.audio.play` sends a click to the reverb, and measures the
+records `audio.capture 4` while `box.audio.play` sends a click to the reverb, and measures the
 decay of the tail after the click at the rate of the context. It then starts 32 looping voices
 through the reverb and prints the load of the worklet, which `Module.boxAudio.bench` measures by
 rendering 2000 quanta back to back, and which has to stay under real time:
@@ -237,7 +237,7 @@ node test/integration/web/audio_reverb.mjs \
 ```
 
 `audio_synth.mjs` checks synth sounds with `test/integration/web/audio_synth.flecs`. After a
-trusted click it records `audio capture 2` while a `script_write` plays the prefab `Beep` (a
+trusted click it records `audio.capture 2` while a `script_write` plays the prefab `Beep` (a
 660 Hz sine at 0.5 with an envelope of 0.36 s) with `box.audio.play`, and measures its
 frequency, its level and its length at the rate of the context. It then starts 64 looping voices
 of `Hum` (a saw, a square and noise into a filter envelope) and prints the load of the worklet over
@@ -251,7 +251,7 @@ node test/integration/web/audio_synth.mjs \
 `audio_sample.mjs` checks sound files (`SoundFile`, see `docs/audio.md`) in Chrome. It preloads
 `test/integration/web/audio_sample.flecs` and the WAV and FLAC files of `test/assets/audio` with
 `?preload=`; the scene decodes one second of 440 Hz at 44100 Hz. After a trusted click it
-records two seconds (`audio capture 2`) while a `script_write` plays the sound once, and expects
+records two seconds (`audio.capture 2`) while a `script_write` plays the sound once, and expects
 440 Hz for one second at the actual rate of the context. It then sets the `SoundFile` of 2
 seconds of stereo WAV and FLAC and prints the longest animation frame callback, the main
 loop, while each decodes inline, and last deletes a sound whose looping source plays (`rm`) and
@@ -266,7 +266,7 @@ node test/integration/web/audio_sample.mjs \
 `test/integration/web/audio_stream.flecs`, whose stream plays `test/assets/audio/tone.ogg`, 480 Hz
 at a peak of 0.5 in a loop of 0.25 s. The server serves the Ogg files by their path and the page
 preloads only the scene and `tone_960.ogg`, so the stream fetches `tone.ogg` next to the page.
-After a trusted click it records two seconds (`audio capture 2`), which have to hold 480 Hz at 0.5
+After a trusted click it records two seconds (`audio.capture 2`), which have to hold 480 Hz at 0.5
 without a step larger than the sine's over the eight loop crossings and without a gap. It prints
 `AudioStreamStatus.decode_ms`, the decode cost of a frame, and the longest animation frame, then
 expects at least 1.5 s buffered in the worklet and no underrun, in the status and in the worklet,

@@ -1,6 +1,6 @@
 /**
  * @file AudioCheck.c
- * @brief Tests for audio check, the lint of the loaded song: the findings of a song with one
+ * @brief Tests for audio.check, the lint of the loaded song: the findings of a song with one
  * instance of each problem and their places, a clean song, voice steals and a clipping bus.
  */
 
@@ -122,7 +122,7 @@ static const char *check_static_lines[] = {
 void AudioCheck_problems(void) {
     ecs_entity_t s;
     ecs_world_t *world = check_problems(&s);
-    char *out = check_ok(world, s, "audio check");
+    char *out = check_ok(world, s, "audio.check");
     int32_t i;
     for (i = 0; check_static_lines[i]; i ++) {
         if (!strstr(out, check_static_lines[i])) {
@@ -145,7 +145,7 @@ void AudioCheck_problems(void) {
     test_assert(strstr(last, " errors, ") != NULL);
     test_assert(strstr(last, "; played bars 1..4: peak ") != NULL);
 
-    char *again = check_ok(world, s, "audio check");
+    char *again = check_ok(world, s, "audio.check");
     test_str(again, out);
     ecs_os_free(again);
     ecs_os_free(out);
@@ -155,7 +155,7 @@ void AudioCheck_problems(void) {
 void AudioCheck_static(void) {
     ecs_entity_t s;
     ecs_world_t *world = check_problems(&s);
-    char *out = check_ok(world, s, "audio check static");
+    char *out = check_ok(world, s, "audio.check static");
     int32_t i;
     for (i = 0; check_static_lines[i]; i ++) {
         test_assert(strstr(out, check_static_lines[i]) != NULL);
@@ -166,7 +166,7 @@ void AudioCheck_static(void) {
     test_assert(strstr(check_last(out), "(static checks only)") != NULL);
     ecs_os_free(out);
 
-    out = check_ok(world, s, "audio check bars=2..2 static");
+    out = check_ok(world, s, "audio.check bars=2..2 static");
     test_assert(strstr(out, "note-range track check_low, clip check_low_notes, note 0 at 2.1")
         != NULL);
     test_assert(strstr(out, "track check_high") == NULL);
@@ -179,7 +179,7 @@ void AudioCheck_static(void) {
 void AudioCheck_clean(void) {
     ecs_entity_t s;
     ecs_world_t *world = check_world(&s, "test/assets/audio/songs/check_clean.flecs");
-    char *out = check_ok(world, s, "audio check");
+    char *out = check_ok(world, s, "audio.check");
     const char *last = check_last(out);
     if (strncmp(last, "no problems", 11)) {
         printf("%s\n", out);
@@ -191,7 +191,7 @@ void AudioCheck_clean(void) {
     test_assert(strstr(last, "; played bars 1..2: peak ") != NULL);
     ecs_os_free(out);
 
-    out = check_ok(world, s, "audio check static");
+    out = check_ok(world, s, "audio.check static");
     test_str(out, "no problems (static checks only)");
     ecs_os_free(out);
     ecs_fini(world);
@@ -200,7 +200,7 @@ void AudioCheck_clean(void) {
 void AudioCheck_voice_steals(void) {
     ecs_entity_t s;
     ecs_world_t *world = check_world(&s, "test/assets/audio/songs/check_voices.flecs");
-    char *out = check_ok(world, s, "audio check");
+    char *out = check_ok(world, s, "audio.check");
     if (!strstr(out, "warning voice-steal song at 3.")) {
         printf("%s\n", out);
     }
@@ -209,7 +209,7 @@ void AudioCheck_voice_steals(void) {
     test_assert(strstr(out, "at the voice cap of 64 (peak ") != NULL);
     ecs_os_free(out);
 
-    out = check_ok(world, s, "audio check bars=1..2");
+    out = check_ok(world, s, "audio.check bars=1..2");
     test_assert(strstr(out, "voice-steal") == NULL);
     test_assert(strstr(check_last(out), "played bars 1..2") != NULL);
     ecs_os_free(out);
@@ -219,7 +219,7 @@ void AudioCheck_voice_steals(void) {
 void AudioCheck_clipping(void) {
     ecs_entity_t s;
     ecs_world_t *world = check_world(&s, "test/assets/audio/songs/check_clip.flecs");
-    char *out = check_ok(world, s, "audio check");
+    char *out = check_ok(world, s, "audio.check");
     if (!strstr(out, "warning bus-clip bus check_hot at 1.1") ||
         !strstr(out, " limiter master at 1.1: the master limiter reduces the gain"))
     {
@@ -239,19 +239,19 @@ void AudioCheck_errors(void) {
     ecs_entity_t s;
     ecs_world_t *world = check_world(&s, "test/assets/audio/songs/check_clean.flecs");
     bool error = false;
-    char *out = box_command_run(world, s, "audio check loud", &error);
+    char *out = box_command_run(world, s, "audio.check loud", &error);
     test_bool(error, true);
     test_assert(strstr(out, "invalid argument 'loud'") != NULL);
     ecs_os_free(out);
 
     error = false;
-    out = box_command_run(world, s, "audio check bars=0..2", &error);
+    out = box_command_run(world, s, "audio.check bars=0..2", &error);
     test_bool(error, true);
     test_assert(strstr(out, "invalid bars") != NULL);
     ecs_os_free(out);
 
     error = false;
-    out = box_command_run(world, s, "audio check bars=3..2", &error);
+    out = box_command_run(world, s, "audio.check bars=3..2", &error);
     test_bool(error, true);
     ecs_os_free(out);
     ecs_fini(world);

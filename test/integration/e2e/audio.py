@@ -31,10 +31,11 @@ SECONDS = 0.5
 
 
 def capture(app, seconds=SECONDS, frames=600):
-    """Run audio capture and wait for the WAV resource: (channels, rate, left samples)."""
-    line = "audio capture %g" % seconds
-    name = parse_value(app.exec(line))
-    app.check(isinstance(name, str) and name, "audio capture returned %r" % name)
+    """Run audio.capture and wait for the WAV resource: (channels, rate, left samples)."""
+    line = "audio.capture %g" % seconds
+    value = parse_value(app.exec(line))
+    name = value.get("name") if isinstance(value, dict) else None
+    app.check(isinstance(name, str) and name, "audio.capture returned %r" % value)
     start = None
     while True:
         status, body = app.request("shell/session/%s/resource/%s" % (app.session, name),
@@ -79,15 +80,15 @@ def test_status(app):
 
 
 def test_volume_mute(app):
-    out = parse_value(app.exec("audio volume 0.5"))
-    app.check(out == "master volume 0.50", "audio volume printed %r" % out)
+    out = parse_value(app.exec("audio.volume 0.5"))
+    app.check(out == "master volume 0.50", "audio.volume printed %r" % out)
     volume = float(app.exec("get $ box.audio.AudioSettings.master_volume"))
     app.check(abs(volume - 0.5) < 1e-6, "AudioSettings.master_volume is %g" % volume)
-    out = parse_value(app.exec("audio mute on"))
-    app.check(out == "mute on", "audio mute on printed %r" % out)
+    out = parse_value(app.exec("audio.mute on"))
+    app.check(out == "mute on", "audio.mute on printed %r" % out)
     app.check(app.exec("get $ box.audio.AudioSettings.mute") == "true", "mute is not set")
-    out = parse_value(app.exec("audio mute"))
-    app.check(out == "mute off", "audio mute printed %r" % out)
+    out = parse_value(app.exec("audio.mute"))
+    app.check(out == "mute off", "audio.mute printed %r" % out)
 
 
 def test_capture_tone(app):
@@ -103,12 +104,12 @@ def test_capture_tone(app):
 
 
 def test_capture_volume(app):
-    app.exec("audio volume 0.5")
+    app.exec("audio.volume 0.5")
     app.wait_frames(2)
     channels, rate, left = capture(app)
     peak = max(abs(v) for v in left)
     app.check(abs(peak - PEAK / 2) < 0.01, "at volume 0.5 the tone peaks at %.4f" % peak)
-    app.exec("audio mute on")
+    app.exec("audio.mute on")
     app.wait_frames(2)
     channels, rate, left = capture(app, 0.2)
     peak = max(abs(v) for v in left)

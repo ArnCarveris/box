@@ -14,7 +14,7 @@ sounds with ?preload=.
   node test/integration/web/audio_sample.mjs [--chrome <path>] <bin dir>
 
 <bin dir> holds boxrun.html, .js and .wasm (see audio_core.mjs). After a trusted click the check
-records two seconds (audio capture 2) while a script plays the tone once: the capture has to
+records two seconds (audio.capture 2) while a script plays the tone once: the capture has to
 hold 440 Hz for one second at the actual rate of the context. It then sets the SoundFile of 2
 seconds of stereo WAV and FLAC (long_stereo.wav, .flac) and reports the longest animation frame
 callback while each decodes, the stall of the inline job, against the longest one before, and
@@ -253,7 +253,7 @@ async function main() {
 
     // One play of the tone during a capture of two seconds: one second of 440 Hz at the rate of
     // the context, whatever it is
-    const path = await evaluate(shell('audio capture 2'));
+    const path = await evaluate(shell('audio.capture 2'));
     // The capture starts with the next frames, so the play has to come after them
     await sleep(250);
     await evaluate(shell('script_write player_script ' +

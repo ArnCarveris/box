@@ -1,7 +1,7 @@
 // box.audio spec: every audio feature, as one playable song file.
 //
 // Play: $ { AudioSong: {file: "docs/audio.flecs"} } and $ { Transport: {playing: true} },
-// or the shell commands `audio song docs/audio.flecs` and `audio play`.
+// or the shell commands `audio.song docs/audio.flecs` and `audio.play`.
 //
 // Flecs script
 //   name { ... }                 entity; entities nested in a scope are its children

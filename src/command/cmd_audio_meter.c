@@ -1,6 +1,6 @@
 /**
  * @file command/cmd_audio_meter.c
- * @brief The audio meter action: per bus the peak, RMS and loudness over a span of the live
+ * @brief The audio.meter action: per bus the peak, RMS and loudness over a span of the live
  * output, the gain reduction of its effects and the headroom, for gain staging.
  *
  * The span renders in real time: the first call starts a measurement (meter.c of box.audio),
@@ -173,7 +173,7 @@ static int box_cmd_meter_section(
     int result = -1;
     if (!status || status->state != SongReady) {
         ecs_err("bars= measures a section of a song, and no song is loaded "
-            "(audio song <file>)");
+            "(audio.song <file>)");
         goto done;
     }
 
@@ -299,7 +299,7 @@ static char* box_cmd_meter_start(
         ecs_strbuf_appendstr(&buf, "; replaces the measurement that ran");
     }
 
-    ecs_strbuf_append(&buf, "\nrun audio meter after %.1f s for the table", span.seconds);
+    ecs_strbuf_append(&buf, "\nrun audio.meter after %.1f s for the table", span.seconds);
     result = ecs_strbuf_get(&buf);
     goto done;
 error:
@@ -471,7 +471,7 @@ char* box_cmd_audio_meter_span(
     } else if (job->running) {
         double rate = job->sample_rate > 0 ? (double)job->sample_rate : 48000.0;
         result = flecs_asprintf("meter: measuring, %.3f of %.3f s of the live output done; "
-            "run audio meter after %.1f s for the table", job->frames / rate,
+            "run audio.meter after %.1f s for the table", job->frames / rate,
             job->target / rate, (job->target - job->frames) / rate);
     } else {
         result = box_cmd_meter_start(world, argc, argv);

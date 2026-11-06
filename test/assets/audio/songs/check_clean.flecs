@@ -1,5 +1,5 @@
-// The clean song of the audio check tests in the Shell suite of test/cpu/command: a lead of a
-// four note phrase with a send to a reverb return, 2 bars of 4/4 at 120 bpm, which audio check
+// The clean song of the audio.check tests in the Shell suite of test/cpu/command: a lead of a
+// four note phrase with a send to a reverb return, 2 bars of 4/4 at 120 bpm, which audio.check
 // reports no problems for.
 using box.audio
 

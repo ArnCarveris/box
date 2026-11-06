@@ -822,14 +822,14 @@ void SongFile_command(void) {
     ecs_world_t *world = audio_world();
     ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = true;
-    char *out = box_command_run(world, s, "audio song " SONGFILE_DIR "basic.flecs", &error);
+    char *out = box_command_run(world, s, "audio.song " SONGFILE_DIR "basic.flecs", &error);
     test_bool(error, false);
     test_assert(strstr(out, "basic.flecs") != NULL);
     ecs_os_free(out);
     songfile_settle(world);
     test_int(songfile_state(world), SongReady);
 
-    out = box_command_run(world, s, "audio song", &error);
+    out = box_command_run(world, s, "audio.song", &error);
     test_bool(error, false);
     test_assert(strstr(out, "song: ready") != NULL);
     test_assert(strstr(out, "\"Basic\"") != NULL);
@@ -840,7 +840,7 @@ void SongFile_command(void) {
     test_assert(strstr(out, "\nsong: ready '" SONGFILE_DIR "basic.flecs'") != NULL);
     ecs_os_free(out);
 
-    out = box_command_run(world, s, "audio song none", &error);
+    out = box_command_run(world, s, "audio.song none", &error);
     test_bool(error, false);
     ecs_os_free(out);
     songfile_settle(world);

@@ -1,4 +1,4 @@
-// A song of the audio check tests in the Shell suite of test/cpu/command: a held A3 at a peak of
+// A song of the audio.check tests in the Shell suite of test/cpu/command: a held A3 at a peak of
 // 0.5 on a track whose output is the bus check_hot at a volume of 4, so check_hot peaks at about
 // +6 dBFS from the first beat. 2 bars of 4/4 at 120 bpm.
 using box.audio

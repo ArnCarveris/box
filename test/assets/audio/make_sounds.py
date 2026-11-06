@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes the sound files of the Sample and Analyze tests (test/cpu/audio), of the audio analyze
+"""Writes the sound files of the Sample and Analyze tests (test/cpu/audio), of the audio.analyze
 command (test/cpu/command) and of the browser check
 test/integration/web/audio_sample.mjs, the drum and the shaker of song.flecs, and the wavetable of the
 SynthWavetableAsset tests, into this folder.
@@ -229,7 +229,7 @@ def flac(name, rate, channels, block=4096):
 
 
 def analyze_sounds():
-    """The recordings of the Analyze tests and of the audio analyze command."""
+    """The recordings of the Analyze tests and of the audio.analyze command."""
     rate = 48000
     # A full scale 1000 Hz sine, mono, 2 s: -3.01 LUFS, 0 dBFS, all in the mid band
     wav("analyze_sine_1k.wav", rate, [sine(1000, rate, 2 * rate, 1.0)])
@@ -280,7 +280,7 @@ def f32(x):
 
 
 def diff_sounds():
-    """The recordings of the audio diff command: stereo pink noise at -20 dBFS RMS, 1 s, as
+    """The recordings of the audio.diff command: stereo pink noise at -20 dBFS RMS, 1 s, as
     floats, its left channel reversed on the right, and copies of it changed."""
     rate = 48000
     left = pink(rate, rate, 0.1)

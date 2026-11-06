@@ -1,4 +1,4 @@
-// The song of the audio check tests in the Shell suite of test/cpu/command: one instance of each
+// The song of the audio.check tests in the Shell suite of test/cpu/command: one instance of each
 // problem the static checks find, each on its own track, bus or effect, and a track that stays
 // silent. The test empties slot 1 of check_fx_bus, which a script cannot write, so that slot is
 // a gap and check_gap is named by no bus. 4 bars of 4/4 at 120 bpm.

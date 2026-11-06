@@ -4,7 +4,7 @@
  * ITU-R BS.1770), true peak, band energies, stereo, onsets, tails, clicks and pitch, and a
  * reader of WAV files. No Flecs and no platform code; the per sample loops do not allocate.
  *
- * The audio analyze command prints the result; audio plot, meter, diff and render reuse it.
+ * The audio.analyze command prints the result; audio.plot, meter, diff and render reuse it.
  */
 
 #ifndef BOX_AUDIO_ANALYZE_H

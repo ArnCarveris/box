@@ -607,14 +607,14 @@ void Timeline_command(void) {
     ecs_world_t *world = audio_world();
     ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = false;
-    char *out = box_command_run(world, s, "audio tempo 90", &error);
+    char *out = box_command_run(world, s, "audio.tempo 90", &error);
     test_bool(error, false);
     test_assert(out != NULL && strstr(out, "tempo 90.0") != NULL);
     ecs_os_free(out);
-    out = box_command_run(world, s, "audio seek 4", &error);
+    out = box_command_run(world, s, "audio.seek 4", &error);
     test_bool(error, false);
     ecs_os_free(out);
-    out = box_command_run(world, s, "audio play", &error);
+    out = box_command_run(world, s, "audio.play", &error);
     test_bool(error, false);
     ecs_os_free(out);
     int32_t start = audio_tap_count;
@@ -631,7 +631,7 @@ void Timeline_command(void) {
     test_assert(strstr(out, "playing, loop off") != NULL);
     ecs_os_free(out);
 
-    out = box_command_run(world, s, "audio stop", &error);
+    out = box_command_run(world, s, "audio.stop", &error);
     test_bool(error, false);
     ecs_os_free(out);
     audio_run(world, 1);
@@ -641,16 +641,16 @@ void Timeline_command(void) {
         "set box.audio.Transport box.audio.Transport {position: 1}", &error);
     test_bool(error, false);
     ecs_os_free(out);
-    out = box_command_run(world, s, "audio play", &error);
+    out = box_command_run(world, s, "audio.play", &error);
     ecs_os_free(out);
     audio_run(world, 1);
     test_assert(timeline_position(world) == 1.0);
 
     audio_log_start();
-    out = box_command_run(world, s, "audio tempo 5", &error);
+    out = box_command_run(world, s, "audio.tempo 5", &error);
     test_bool(error, true);
     ecs_os_free(out);
-    out = box_command_run(world, s, "audio seek later", &error);
+    out = box_command_run(world, s, "audio.seek later", &error);
     test_bool(error, true);
     ecs_os_free(out);
     audio_log_stop();

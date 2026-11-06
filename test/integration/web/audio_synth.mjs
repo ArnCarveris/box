@@ -13,7 +13,7 @@ filter envelope.
   node test/integration/web/audio_synth.mjs [--chrome <path>] <bin dir>
 
 <bin dir> holds boxrun.html, .js and .wasm (see audio_core.mjs). After a trusted click starts the
-audio, a capture of 2 seconds (audio capture 2) records Beep, which a script plays with
+audio, a capture of 2 seconds (audio.capture 2) records Beep, which a script plays with
 box.audio.play; its frequency, its level and its length are measured at the actual rate of the
 context. Then 64 looping Hum voices play and the worklet renders 2000 quanta back to back
 (Module.boxAudio.bench), whose load has to stay under real time. The log has no error and no
@@ -220,7 +220,7 @@ async function main() {
       `rate ${rate}`);
 
     // A beep from a script, recorded
-    const path = await evaluate(shell('audio capture 2'));
+    const path = await evaluate(shell('audio.capture 2'));
     await sleep(300);
     const played = await evaluate(shell('script_write beep ' +
       JSON.stringify('using box.audio\nconst played: bool = box.audio.play(Beep, 1.0)\n')));

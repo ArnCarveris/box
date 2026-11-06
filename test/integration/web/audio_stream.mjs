@@ -14,7 +14,7 @@ preload it, so the stream fetches it next to the page.
   node test/integration/web/audio_stream.mjs [--chrome <path>] <bin dir>
 
 <bin dir> holds boxrun.html, .js and .wasm (see audio_core.mjs). The check expects the stream to
-start at a trusted click, a capture of two seconds (audio capture 2) with 480 Hz at 0.5 and no
+start at a trusted click, a capture of two seconds (audio.capture 2) with 480 Hz at 0.5 and no
 step larger than the sine's over its loop crossings, at least 1.5 s decoded ahead in the worklet
 and no underrun after a 500 ms stall of the main thread, the decode cost per frame
 (AudioStreamStatus.decode_ms and the longest animation frame), the file fetched once and not in
@@ -260,7 +260,7 @@ async function main() {
 
     // The frequency and the level, and no step over the loop crossings, 8 of them in 2 s
     const rate = await evaluate('Module.boxAudio.ctx.sampleRate');
-    const path = await evaluate(shell('audio capture 2'));
+    const path = await evaluate(shell('audio.capture 2'));
     let capture = null;
     let deadline = Date.now() + 6000;
     while (Date.now() < deadline && !(capture && capture.frames)) {
@@ -341,7 +341,7 @@ async function main() {
     expect(await waitFor(`${shell('get preloaded box.audio.AudioStreamStatus')}` +
       `.includes('AudioStreamPlaying')`, 5000), 'the preloaded file does not play');
     await sleep(500);
-    const path2 = await evaluate(shell('audio capture 1'));
+    const path2 = await evaluate(shell('audio.capture 1'));
     let capture2 = null;
     deadline = Date.now() + 5000;
     while (Date.now() < deadline && !(capture2 && capture2.frames)) {

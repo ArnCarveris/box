@@ -4,7 +4,7 @@
  * the loudness over time, drawn on the CPU into RGB pixels with labeled axes in a built-in
  * bitmap font, and bar and beat lines for a capture of a song. No Flecs and no platform code.
  *
- * The audio plot command encodes the pixels as PNG. The FFT and the window are those of
+ * The audio.plot command encodes the pixels as PNG. The FFT and the window are those of
  * analyze.h. The same input gives the same pixels.
  */
 

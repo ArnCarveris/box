@@ -4,7 +4,7 @@
  * other by cross-correlation and the residual of a null test, per part of the recording. No
  * Flecs and no platform code; the per sample loops do not allocate.
  *
- * The audio diff command prints the result together with the analysis of analyze.h.
+ * The audio.diff command prints the result together with the analysis of analyze.h.
  */
 
 #ifndef BOX_AUDIO_DIFF_H

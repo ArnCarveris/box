@@ -1549,7 +1549,7 @@ ECS_STRUCT(Song, {
  * the old song before it loads the new one; an empty file or removing it unloads the song.
  *
  * The path is found as the one of a SoundFile. AudioSongStatus says how the load goes. See
- * box_audio_song_load, the shell command audio song [file] and Song files in docs/audio.md.
+ * box_audio_song_load, the shell command audio.song [file] and Song files in docs/audio.md.
  */
 ECS_STRUCT(AudioSong, {
     char *file;            /**< The .flecs file of the song, NULL or empty for none */

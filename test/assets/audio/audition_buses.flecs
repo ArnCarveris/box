@@ -1,4 +1,4 @@
-// Two buses for the audio solo and mute commands in the Shell suite of test/cpu/command: a
+// Two buses for the audio.solo and mute commands in the Shell suite of test/cpu/command: a
 // 440 Hz tone at a peak of 0.25 on a bus panned hard left and the same tone on a bus panned
 // hard right, so each bus has a channel of its own in a capture.
 using box.audio

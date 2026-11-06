@@ -1570,7 +1570,7 @@ $ {
 
 Play it by setting the `AudioSong` singleton, `$ { AudioSong: {file: "songs/neon_run.flecs"} }`,
 or with `box_audio_song_load(world, file)` and `box_audio_song_unload(world)` in C,
-or `audio song <file>` in the shell (`audio song` shows it, `audio song none`
+or `audio.song <file>` in the shell (`audio.song` shows it, `audio.song none`
 unloads it). The path is found as the one of a `SoundFile`. A new file swaps the
 song; an empty file or removing `AudioSong` unloads it.
 
@@ -1699,47 +1699,54 @@ Importing box alone does not open an output: `box_app_run` does.
 | Shell command | Action |
 | --- | --- |
 | `audio` | State, rate, voices, steals/refusals, load, clock, transport, routing, effects, meters and tracks |
-| `audio volume <v>` | Set master volume, 0..4 |
-| `audio mute [on\|off]` | Set or toggle master mute |
-| `audio play`, `audio stop` | Start or stop the transport |
-| `audio seek <beats>` | Seek the transport |
-| `audio tempo <bpm>` | Set tempo, 20..999 |
-| `audio solo <bus> [on\|off]` | Set or toggle the solo of a bus |
-| `audio solo none` | Clear every solo |
-| `audio mute <bus> [on\|off]` | Set or toggle the mute of a bus |
-| `audio bypass <effect> [on\|off]` | Set or toggle the bypass of an effect entity |
-| `audio note <sound\|instrument> <note> [vel] [dur]` | Play one note now, velocity 0..1 (default 1), for `dur` seconds (default 0.5) |
-| `audio capture <seconds>` | Record master output as a 16-bit stereo WAV resource |
-| `audio render <subject> [options]` | Render a sound, instrument, bus stem or song section on its own, faster than real time, to a WAV resource |
-| `audio song [<file>\|none]` | Show the song, load a song file or unload it |
-| `audio analyze <wav> [from] [to]` | Print a text report of a WAV resource or file, optionally of the seconds from..to |
-| `audio diff <a> <b> [from] [to]` | Print how WAV b differs from WAV a: bit identity, loudness, bands, stereo and a null test |
-| `audio plot <wav> [kind] [options]` | Draw a PNG resource of a WAV resource or file: spectrogram, waveform, spectrum or loudness |
-| `audio meter [bus...] [seconds\|bars=a..b]` | Measure peak, RMS and loudness per bus and the gain reduction of its effects over a span of the live output; run again without arguments for the table |
-| `audio notes <track> [bars=a..b] [roll]` | Print the notes of a track per bar, or as a piano roll |
-| `audio chords [track...] [bars=a..b]` | Print the chords and the key of a section from the notes |
-| `audio check [static] [bars=a..b]` | Lint the song, or the tracks of the scene: notes, clips, routing, effects and lanes, then voices, steals, clipping, the limiter, loudness and silent tracks from one offline play |
+| `audio.volume <volume>` | Set master volume, 0..4 |
+| `audio.mute [state]` | Set (`on`, `off`) or toggle master mute |
+| `audio.play`, `audio.stop` | Start or stop the transport |
+| `audio.seek <beats>` | Seek the transport |
+| `audio.tempo <bpm>` | Set tempo, 20..999 |
+| `audio.solo <bus> [state]` | Set or toggle the solo of a bus |
+| `audio.solo none` | Clear every solo |
+| `audio.mute_bus <bus> [state]` | Set or toggle the mute of a bus |
+| `audio.bypass <effect> [state]` | Set or toggle the bypass of an effect entity |
+| `audio.note <subject> <note> [velocity] [duration]` | Play one note of a sound or instrument now, velocity 0..1 (default 1), for `duration` seconds (default 0.5) |
+| `audio.capture <seconds>` | Record master output as a 16-bit stereo WAV resource |
+| `audio.render <subject> [options...]` | Render a sound, instrument, bus stem or song section on its own, faster than real time, to a WAV resource |
+| `audio.song [file]` | Show the song, load a song file or unload it with `none` |
+| `audio.analyze <wav> [from] [to]` | Print a text report of a WAV resource or file, optionally of the seconds from..to |
+| `audio.diff <a> <b> [from] [to]` | Print how WAV b differs from WAV a: bit identity, loudness, bands, stereo and a null test |
+| `audio.plot <wav> [options...]` | Draw a PNG resource of a WAV resource or file: spectrogram, waveform, spectrum or loudness |
+| `audio.meter [options...]` | Measure peak, RMS and loudness per bus (`[bus...] [seconds\|bars=a..b]`) and the gain reduction of its effects over a span of the live output; run again without options for the table |
+| `audio.notes <track> [options...]` | Print the notes of a track per bar (`bars=a..b`), or as a piano roll (`roll`) |
+| `audio.chords [options...]` | Print the chords and the key of a section (`[track...] [bars=a..b]`) from the notes |
+| `audio.check [options...]` | Lint the song, or the tracks of the scene (`[static] [bars=a..b]`): notes, clips, routing, effects and lanes, then voices, steals, clipping, the limiter, loudness and silent tracks from one offline play |
+
+Each subcommand is a function of its own under `audio`, so `help audio` lists them all with
+their parameters, and each has a fixed return type: `audio.capture`, `audio.render` and
+`audio.plot` return a `flecs.script.shell.resource` (its name and content type), the others a
+string. Numbers (`volume`, `beats`, `bpm`, `seconds`, `velocity`, `duration`, `from`, `to`) are
+typed, and `state` is the `box.command.Switch` enum, `on` or `off`; without it the command
+toggles.
 
 Solo, mute and bypass judge one element of a mix without editing the song. Solo and
 mute write `AudioBus` and bypass adds or removes `Disabled` on the effect entity, as a
-script or `set` would; bypass fails for an entity that is not an effect. `audio mute`
-without a bus, or with `on` or `off`, is still the master mute. These are runtime
+script or `set` would; bypass fails for an entity that is not an effect. `audio.mute` is the
+master mute, `audio.mute_bus` the mute of one bus, `master` for the master bus. These are runtime
 changes like any `set`: a song reload resets them. `audio` marks soloed and muted buses
 and bypassed effects.
 
-`audio note` plays one note on the live output, through the bus of the instrument when
-it has an `AudioOutput`, else of its sound, and releases it after `dur` seconds. A note is
+`audio.note` plays one note on the live output, through the bus of the instrument when
+it has an `AudioOutput`, else of its sound, and releases it after `duration` seconds. A note is
 a name, `C2`, `F#3` or `Bb4` with `C4` at 60, or a MIDI number 0..127. A sound without an
 instrument plays through an instrument of its own in `box.command.audition`, with the
 default root of A4, so `A4` plays the sound as authored. The note does not touch the
-transport or the song; capture it with `audio capture` started in the same frame.
+transport or the song; capture it with `audio.capture` started in the same frame.
 
 Fetch a capture with `GET /shell/session/<id>/resource/<name>`; it stays empty
 until recording finishes. In the browser it writes `/tmp/audio_capture_<n>.wav`
 in the page filesystem and returns that path. A script can capture from load
 with `box.audio.capture(seconds, path)`.
 
-`audio render` renders one thing on its own, without waiting for real time and
+`audio.render` renders one thing on its own, without waiting for real time and
 without the rest of the scene:
 
 | Subject | Options | What it renders |
@@ -1760,10 +1767,10 @@ from 0; without a range the whole song (`Song.beats`). `solo` and `mute` take
 buses separated by commas.
 
 ```
-audio render kick note=C1 vel=0.8
-audio render bass_synth note=A1 dur=0.5 tail=1
-audio render drums bars=5..8
-audio render song bars=9..12 mute=lead
+audio.render kick note=C1 vel=0.8
+audio.render bass_synth note=A1 dur=0.5 tail=1
+audio.render drums bars=5..8
+audio.render song bars=9..12 mute=lead
 ```
 
 The render runs in an offline world: box imported again, the managed scripts of
@@ -1777,7 +1784,7 @@ with the same options are bit identical. Effects with memory, such as reverbs an
 delays, start empty. A section that starts after bar 1 is played from beat 0 and
 the frames before it are dropped, so the tails of earlier bars, automation and
 modulators are as in playback (at most 600 s of song before a section); a section
-matches a headless `audio capture` of it within an RMS difference of about 1e-5,
+matches a headless `audio.capture` of it within an RMS difference of about 1e-5,
 the rounding to 16 bits. In the browser the render also runs on the main thread,
 not in the worklet, and writes `/tmp/audio_render_<n>.wav`. A render
 of a note silences the sources, streams, emitters and the timeline of the scene.
@@ -1793,7 +1800,8 @@ the same build. Use this to render music, compare changes or inspect scenes offl
 `PerfStatus.audio_load` records the largest load of the run; worklet load reports
 zero because it has no suitable high-resolution timer.
 
-`audio analyze` reads a resource of the session (the name `audio capture` returns), else a
+`audio.analyze` reads a resource of the session (by the name of the resource `audio.capture`
+returns), else a
 WAV file (PCM of 8 to 32 bits or float, mono or stereo); in the browser, a file of the page such
 as a capture. It prints one line per measure, each number with its unit:
 
@@ -1818,8 +1826,8 @@ bar in LUFS and the band that changed the most against the whole span, counting 
 followed. The same WAV and span give the same text. The measures are a plain C library,
 [analyze.h](../src/audio/analyze.h).
 
-`audio diff` compares two WAVs, each a resource or a file as for `audio analyze`, over the same
-seconds from..to of both. It reuses the measures of `audio analyze` and prints:
+`audio.diff` compares two WAVs, each a resource or a file as for `audio.analyze`, over the same
+seconds from..to of both. It reuses the measures of `audio.analyze` and prints:
 
 | Line | Measures |
 | --- | --- |
@@ -1838,8 +1846,8 @@ dB against a, the loudness of a and b and the band that changed most. WAVs of di
 rates are an error; a mono and a stereo WAV are compared as the mono sums, the mean of left and
 right. The alignment and residual are a plain C library, [diff.h](../src/audio/diff.h).
 
-`audio plot` reads a WAV as `audio analyze` does and returns the name of a PNG resource, as
-`audio capture` does; in the browser it writes `/tmp/audio_plot_<n>.png` in the page filesystem
+`audio.plot` reads a WAV as `audio.analyze` does and returns a PNG resource, as
+`audio.capture` does; in the browser it writes `/tmp/audio_plot_<n>.png` in the page filesystem
 and returns that path. The image is drawn on the CPU, so it works headless and in the browser,
 and the same WAV and options give the same PNG bytes. Its first line names the kind, the WAV,
 its rate and the span.
@@ -1848,7 +1856,7 @@ its rate and the span.
 | --- | --- |
 | `spectrogram` (default) | Level per time and frequency: one Hann windowed FFT of about 85 ms per column, a log axis of 20 Hz to 20 kHz, colors from black at `min_db` to pale yellow at 0 dB (a full scale sine), with the scale on the right |
 | `waveform` | A lane per channel with the peak (dark) envelope of the frames of each column and the RMS (light) of at least 20 ms around it, -1 to 1 |
-| `spectrum` | Average level over the span per log frequency in dB, with the band edges and names of `audio analyze` |
+| `spectrum` | Average level over the span per log frequency in dB, with the band edges and names of `audio.analyze` |
 | `loudness` | Short-term (3 s, bright) and momentary (400 ms, dim) loudness over time in LUFS |
 
 | Option | Meaning |
@@ -1862,9 +1870,9 @@ lines with the bar numbers above the plot and, when there is room, beat lines, f
 tempo the capture started at. A spectrogram shows masking, muddy low-mids, harsh highs, cut
 tails and clicks (thin vertical lines) at a glance.
 
-`audio meter` measures the buses for gain staging. It renders in real time: the first call
+`audio.meter` measures the buses for gain staging. It renders in real time: the first call
 starts a measurement of the live output over `seconds` (default 3, at most 600) and returns at
-once; `audio meter` without arguments prints the progress, and once the span is measured the
+once; `audio.meter` without arguments prints the progress, and once the span is measured the
 table, which it prints only once. Without buses it measures every bus of the processing order
 and the master. With `bars=a..b` and a loaded song it seeks the transport to bar `a`, plays and
 measures the length of the bars at the tempo of the transport. A call with arguments replaces a
@@ -1872,10 +1880,10 @@ measurement that runs. It needs an output that runs, the null output of a headle
 included; the AudioMeter of the entities, and which entities have one, stay as they are.
 
 ```
-> audio meter drums bass 2
+> audio.meter drums bass 2
 meter: measuring 2.000 s of the live output in real time: drums, bass
-run audio meter after 2.0 s for the table
-> audio meter
+run audio.meter after 2.0 s for the table
+> audio.meter
 meter: live output, 2.000 s at 48000 Hz
 drums: peak -4.1 dBFS, rms -15.2 dB, integrated -14.8 LUFS, short-term max -14.6 LUFS
   insert 0 glue compressor: reduction avg 2.3 dB, max 5.1 dB
@@ -1887,7 +1895,7 @@ headroom: 4.1 dB, loudest drums at -4.1 dBFS; master limiter max reduction 0.0 d
 A bus is measured at its output, after its inserts, volume, pan and mute, and the master
 before its limiter. The peak is the sample peak; the RMS is over both channels. The loudness
 uses the K-weighting of BS.1770, which the core runs on the measured buses only while a
-measurement runs, and the gating of `audio analyze` over 100 ms hops: integrated in LUFS, and
+measurement runs, and the gating of `audio.analyze` over 100 ms hops: integrated in LUFS, and
 the largest short-term (3 s) loudness, over the whole span when it is shorter. Each Compressor,
 Gate, PatternGate and Saturator in the inserts of a bus prints its average and largest gain
 reduction in dB, `never engages` under 0.1 dB, or `did not run`. The headroom line is how far
@@ -1895,7 +1903,7 @@ the loudest measured bus is under 0 dBFS, and the largest gain reduction of the 
 master, from the peaks over its threshold. A bus that never rendered says so. Measured through
 the null output at a fixed delta time, the same scene gives the same table.
 
-`audio notes` and `audio chords` read only the note data of the tracks, their
+`audio.notes` and `audio.chords` read only the note data of the tracks, their
 placements and clips, so they work without an output and without a device. A
 note prints once per placement and pass of a loop, at its programmed position,
 before swing and humanize; disabled placements are left out. Bars count from 1
@@ -1904,11 +1912,11 @@ in the time signature of the `Song`, else of the `Transport`, and `bars=a..b`
 of the last note.
 
 ```
-> audio notes lead
+> audio.notes lead
 notes of lead: pitched, instrument lead_inst, 4/4 at 120 bpm, bars 1..4, 6 notes; ...
 bar 1: 1.1.000 C5 1/4 v0.80, 1.2.000 E5 1/8 v0.60, 1.2.240 G5 1/8 v0.60
 bar 2: -
-> audio notes duo roll bars=1
+> audio.notes duo roll bars=1
 roll of duo: pitched, ...; a column per 1/16, x starts, = holds, . silent
    |1
 E4 |........x=......|
@@ -1932,7 +1940,7 @@ instrument has no `gate` and plays a single pitch, a one shot hit. Its sound is
 the name of the sound of the instrument, with the pitch after a colon when the
 track plays several (`tom_sound:A2`).
 
-`audio chords` names chords from the pitched notes that sound together in the
+`audio.chords` names chords from the pitched notes that sound together in the
 named tracks, by default every enabled track that has notes. In each span every
 pitch class weighs the beats it sounds, and the classes of at least a fifth of
 the weight of the strongest make the chord, so passing notes drop out. The bass
@@ -1950,7 +1958,7 @@ than four beats). The header says which. Equal chords in a row print as one
 line with their length in beats.
 
 ```
-> audio chords
+> audio.chords
 chords of bars 1..4 from bass, keys, lead; drums left out: kick; a chord per bar (3.4 pitch classes per beat)
 1.1 C 4 beats: C E G
 2.1 Am 4 beats: A C E
@@ -1968,7 +1976,7 @@ The notes outside the key of the bars, its major scale or its natural minor
 scale with the raised seventh, are listed per pitch class with their count and
 first positions.
 
-`audio check` lints the loaded song, or the tracks of the scene when no song is
+`audio.check` lints the loaded song, or the tracks of the scene when no song is
 loaded, and prints one line per finding: its severity (`error`, `warning` or
 `info`), the check, where it is (track, clip, note index and bar.beat, bus, slot
 or effect) and what it is with a hint. A last line counts the findings, or says
@@ -1977,7 +1985,7 @@ keeps the findings of notes and clips that start in those bars and plays only
 them; positions are the programmed ones, before swing and humanize.
 
 ```
-> audio check
+> audio.check
 error note-range track lead, clip lead_a, note 3 at 2.1: pitch 117 plays 28.2 kHz, over the Nyquist of 22.05 kHz, so it aliases or is lost; transpose it down
 warning note-overlap track bass, clip bass_line, note 1 at 1.2: starts while note 0 of the same pitch 36 holds until 1.3, so the pitch doubles or cuts off; shorten one of them
 warning voice-steal song at 9.1: 12 voices stolen from here on, at the voice cap of 64 (peak 64 voices at 9.1); ...
@@ -2002,7 +2010,7 @@ The static checks read the data:
 | `song-lane` | A `Song.lanes` entry whose bus does not exist |
 
 The dynamic checks play the bars, or the whole song, through once in the offline
-world of `audio render song`, within the call and without a file, and read the
+world of `audio.render song`, within the call and without a file, and read the
 counters, meters and frames of its core: `voice-steal` and `voice-refused` with
 the bar of the first one, `effect-pool` for an effect the pool of 64 refused,
 `core-load` over 50%, `bus-clip` for a bus or track whose output peaks over 0
@@ -2011,7 +2019,7 @@ limiter (a warning over 6 dB), `loudness` when the integrated loudness of the
 master is more than 5 LU from -14 LUFS, and `track-silent` for a track with
 notes in the bars that stays under -100 dBFS. Positions of the dynamic checks
 are the frame of the play, 1/60 s, at the start of which the counter or the peak
-was seen. A play lasts up to 600 s. `audio check static` runs only the static
+was seen. A play lasts up to 600 s. `audio.check static` runs only the static
 checks, without the offline world; when the offline world cannot play, such as when a
 sound file does not load, the summary ends in `not played: <why> (static checks only)`
 and the static findings stand. The same song gives the same text, apart from

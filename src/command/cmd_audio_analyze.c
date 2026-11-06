@@ -1,6 +1,6 @@
 /**
  * @file command/cmd_audio_analyze.c
- * @brief The audio analyze action: a text report of a WAV, a resource of the session or a
+ * @brief The audio.analyze action: a text report of a WAV, a resource of the session or a
  * file, with loudness, peaks, bands, stereo, onsets, tail, silence, clicks, discontinuities
  * and pitch, and a table per bar for a capture of a song.
  *
@@ -60,28 +60,6 @@ static void box_cmd_analyze_level(
         ecs_strbuf_append(buf, "%.*f %s", decimals, box_cmd_analyze_round(value, decimals),
             unit);
     }
-}
-
-/** Parse seconds of the span.
- *
- * @param text The text, NULL or empty to keep the default
- * @param out Receives the seconds
- * @return Whether the text is empty or a number of seconds of at least 0
- */
-static bool box_cmd_analyze_seconds(
-    const char *text,
-    double *out)
-{
-    char *end = NULL;
-    double v;
-    bool result = true;
-    if (text && text[0]) {
-        v = strtod(text, &end);
-        result = end && !end[0] && v >= 0 && isfinite(v);
-        *out = result ? v : *out;
-    }
-
-    return result;
 }
 
 /** Read a file into memory.
@@ -467,8 +445,8 @@ done:
 char* box_cmd_audio_analyze(
     ecs_world_t *world,
     const char *wav,
-    const char *from,
-    const char *to)
+    double from,
+    double to)
 {
     box_audio_wav_t file = {0};
     box_audio_analysis_t a;
@@ -476,17 +454,16 @@ char* box_cmd_audio_analyze(
     uint8_t *bytes = NULL;
     int64_t size = 0;
     const char *error;
-    double from_s = 0, to_s = -1, length;
+    double from_s = from, to_s = to, length;
     int32_t start, end;
     char *result = NULL;
     if (!wav || !wav[0]) {
-        ecs_err("audio analyze needs a WAV: a resource of the session or a file");
+        ecs_err("audio.analyze needs a WAV: a resource of the session or a file");
         goto done;
     }
 
-    if (!box_cmd_analyze_seconds(from, &from_s) || !box_cmd_analyze_seconds(to, &to_s)) {
-        ecs_err("invalid span '%s' to '%s', expected seconds", from ? from : "",
-            to ? to : "");
+    if (!(from >= 0) || !isfinite(from) || !isfinite(to)) {
+        ecs_err("invalid span %g to %g, expected seconds", from, to);
         goto done;
     }
 

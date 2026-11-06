@@ -62,31 +62,35 @@ builtins of the flecs shell (`ls`, `get`, `set`, `query`, ...):
 | `render <subject>` | Write a PNG of an entity, prefab or template on its own |
 | `fit [camera]` | Move the active camera or a camera so that it sees the whole scene |
 | `audio` | Print the audio state, rate, voices, load and the buses in processing order |
-| `audio volume <v>` | Set `AudioSettings.master_volume`, 0 to 4 |
-| `audio mute [on\|off]` | Set or toggle `AudioSettings.mute` |
-| `audio solo <bus> [on\|off]` | Set or toggle `AudioBus.solo`; `audio solo none` clears every solo |
-| `audio mute <bus> [on\|off]` | Set or toggle `AudioBus.mute` of a bus |
-| `audio bypass <effect> [on\|off]` | Bypass an effect, or stop bypassing it, with `Disabled` |
-| `audio note <sound\|instrument> <note> [vel] [dur]` | Play one note (C2, F#3 or a MIDI number) now, velocity 0 to 1, for `dur` seconds (default 0.5) |
-| `audio capture <seconds>` | Record the master output to a 16 bit stereo WAV resource |
-| `audio render <subject> [options]` | Render a sound, instrument, bus stem or song section on its own, faster than real time, to a WAV resource |
-| `audio analyze <wav> [from] [to]` | Print loudness, peaks, bands, stereo, onsets, tail, clicks and pitch of a WAV |
-| `audio diff <a> <b> [from] [to]` | Compare two WAVs: bit identity, length, loudness, true peak, bands, stereo, and the null test residual after alignment with its loudest spans and the bars that differ most |
-| `audio plot <wav> [kind] [size=WxH] [from=s] [to=s] [min_db=dB]` | Draw a PNG resource of a WAV: `spectrogram` (default), `waveform`, `spectrum` or `loudness`, with labeled axes and the bar lines of a capture of a song |
-| `audio meter [bus...] [seconds\|bars=a..b]` | Measure peak, RMS, integrated and short-term LUFS per bus and the gain reduction of its dynamics, PatternGate and Saturator inserts over a span of the live output, with the headroom; run `audio meter` again for the table |
-| `audio notes <track> [bars=a..b] [roll]` | Print the notes of a track per bar (position, pitch or drum sound, length, velocity), or with `roll` as a text piano roll of one column per sixteenth |
-| `audio chords [track...] [bars=a..b]` | Print the chords of a section per bar or per beat, its key, the key of the song and the notes outside the key, from the note data |
-| `audio check [static] [bars=a..b]` | Lint the song, or the tracks of the scene: one line per problem (note range, overlaps, clips past the end, routing, effects, lanes, and from one offline play voice steals, refused effects, clipping buses, the limiter, loudness and silent tracks) with its place and a hint |
+| `audio.volume <volume>` | Set `AudioSettings.master_volume`, 0 to 4 |
+| `audio.mute [state]` | Set (`on`, `off`) or toggle `AudioSettings.mute` |
+| `audio.solo <bus> [state]` | Set or toggle `AudioBus.solo`; `audio.solo none` clears every solo |
+| `audio.mute_bus <bus> [state]` | Set or toggle `AudioBus.mute` of a bus |
+| `audio.bypass <effect> [state]` | Bypass an effect, or stop bypassing it, with `Disabled` |
+| `audio.note <subject> <note> [velocity] [duration]` | Play one note (C2, F#3 or a MIDI number) of a sound or instrument now, velocity 0 to 1, for `duration` seconds (default 0.5) |
+| `audio.play`, `audio.stop`, `audio.seek <beats>`, `audio.tempo <bpm>` | Drive the transport |
+| `audio.song [file]` | Show the song, load a song file or unload it with `none` |
+| `audio.capture <seconds>` | Record the master output to a 16 bit stereo WAV resource |
+| `audio.render <subject> [options...]` | Render a sound, instrument, bus stem or song section on its own, faster than real time, to a WAV resource |
+| `audio.analyze <wav> [from] [to]` | Print loudness, peaks, bands, stereo, onsets, tail, clicks and pitch of a WAV |
+| `audio.diff <a> <b> [from] [to]` | Compare two WAVs: bit identity, length, loudness, true peak, bands, stereo, and the null test residual after alignment with its loudest spans and the bars that differ most |
+| `audio.plot <wav> [options...]` | Draw a PNG resource of a WAV: `spectrogram` (default), `waveform`, `spectrum` or `loudness`, `size=WxH`, `from=s`, `to=s`, `min_db=dB`, with labeled axes and the bar lines of a capture of a song |
+| `audio.meter [options...]` | Measure peak, RMS, integrated and short-term LUFS per bus (`[bus...] [seconds\|bars=a..b]`) and the gain reduction of its dynamics, PatternGate and Saturator inserts over a span of the live output, with the headroom; run `audio.meter` again for the table |
+| `audio.notes <track> [options...]` | Print the notes of a track per bar (position, pitch or drum sound, length, velocity), or with `roll` as a text piano roll of one column per sixteenth; `bars=a..b` limits the bars |
+| `audio.chords [options...]` | Print the chords of a section (`[track...] [bars=a..b]`) per bar or per beat, its key, the key of the song and the notes outside the key, from the note data |
+| `audio.check [options...]` | Lint the song, or the tracks of the scene (`[static] [bars=a..b]`): one line per problem (note range, overlaps, clips past the end, routing, effects, lanes, and from one offline play voice steals, refused effects, clipping buses, the limiter, loudness and silent tracks) with its place and a hint |
 | `fps [rate]`, `frames` | Toggle the fps panel or cap the rate, print the frame timing |
 | `edit [on\|off]` | Open or close the editor |
 | `logs [level] [count]` | Show the last log messages |
 | `key_*`, `mouse_*`, `action_*` | Send input, see `help` |
 
 `capture` of a camera that a view renders shows it as on screen, with the debug drawing of the
-view. `capture`, `audio capture` and `audio render` return a resource at once and fill it when the
-frames are in; fetch it with `GET /shell/session/<id>/resource/<name>`, which is empty until then.
-In the browser, which has no REST port, `audio capture` writes `/tmp/audio_capture_<n>.wav` and
-`audio render` `/tmp/audio_render_<n>.wav` in the file system of the page and return that path.
+view. `capture`, `audio.capture`, `audio.render` and `audio.plot` return a resource
+(`flecs.script.shell.resource`, its name and content type) at once and fill it when the frames are
+in; fetch it with `GET /shell/session/<id>/resource/<name>`, which is empty until then. In the
+browser, which has no REST port, `audio.capture` writes `/tmp/audio_capture_<n>.wav`,
+`audio.render` `/tmp/audio_render_<n>.wav` and `audio.plot` `/tmp/audio_plot_<n>.png` in the file
+system of the page and return that path.
 Headless with a fixed `--delta-time`, two runs capture identical audio, so a render can be listened
 to and compared. See [docs/audio.md](docs/audio.md).
 

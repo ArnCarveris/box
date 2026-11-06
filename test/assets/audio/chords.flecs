@@ -1,4 +1,4 @@
-// The song of the audio notes and audio chords tests of test/cpu/command: four bars in C major
+// The song of the audio.notes and audio.chords tests of test/cpu/command: four bars in C major
 // at 120 bpm, C Am F G7, held by keys over a bass. A motif plays twice, at bars 1 and 3, a duo
 // plays two notes and a kick that only plays C1 is a drum track left out of the chords.
 using box.audio

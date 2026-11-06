@@ -12,7 +12,7 @@ test/integration/web/audio_reverb.flecs: the bus world sends to the hall reverb 
   node test/integration/web/audio_reverb.mjs [--chrome <path>] <bin dir>
 
 <bin dir> holds boxrun.html, .js and .wasm (see audio_core.mjs). After a trusted click starts the
-audio, a capture of 4 seconds (audio capture 4) records a click that box.audio.play sends to the
+audio, a capture of 4 seconds (audio.capture 4) records a click that box.audio.play sends to the
 reverb; the tail after the click has to ring with a decay near 2.4 s, measured at the actual
 rate of the context. Then 32 looping voices play through the reverb and the worklet renders
 2000 quanta back to back (Module.boxAudio.bench), whose load has to stay under real time. The
@@ -220,7 +220,7 @@ async function main() {
     expect(reverbs === '{"0":true}', 'the worklet did not take the memory of the reverb');
 
     // A click through the send, recorded with its tail
-    const path = await evaluate(shell('audio capture 4'));
+    const path = await evaluate(shell('audio.capture 4'));
     await sleep(300);
     const played = await evaluate(shell('script_write click ' +
       JSON.stringify('using box.audio\nconst played: bool = box.audio.play(click, 1.0)\n')));

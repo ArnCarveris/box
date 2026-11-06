@@ -10,7 +10,7 @@
 #include <emscripten/emscripten.h>
 
 /** The world of the page, the first one alive that imported box.command, so the offline
- * world of an audio render does not take its place */
+ * world of an audio.render does not take its place */
 static ecs_world_t *box_command_web_world;
 
 /** The session of box_command_web_run */
@@ -68,7 +68,10 @@ ecs_entity_t box_command_register(
     const char *brief,
     ecs_function_desc_t desc)
 {
-    desc.parent = ecs_lookup(world, BOX_COMMAND_SCOPE);
+    if (!desc.parent) {
+        desc.parent = ecs_lookup(world, BOX_COMMAND_SCOPE);
+    }
+
     ecs_entity_t result = ecs_function_init(world, &desc);
     ecs_assert(result != 0, ECS_INVALID_OPERATION, "failed to register command");
     ecs_doc_set_brief(world, result, brief);

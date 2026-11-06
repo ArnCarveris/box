@@ -1,4 +1,4 @@
-// A reverb and a synth for the audio bypass and note commands in the Shell suite of
+// A reverb and a synth for the audio.bypass and note commands in the Shell suite of
 // test/cpu/command: a click on a bus whose reverb is an effect entity of its own, so a bypass
 // does not disable the bus, and a sine synth with an instrument in tune at A4.
 using box.audio

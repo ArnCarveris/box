@@ -1,6 +1,6 @@
 /**
  * @file MeterSpan.c
- * @brief The levels of buses over a span: the audio meter command measures the live output of
+ * @brief The levels of buses over a span: the audio.meter command measures the live output of
  * the null transport, per bus the peak, the RMS and the loudness, per effect the gain
  * reduction, and leaves the AudioMeter of the entities alone.
  */
@@ -93,12 +93,12 @@ static char* meter_span_two_buses(void)
     meter_span_bus(world, "loud", 1);
     meter_span_bus(world, "quiet", 0.5f);
     audio_run(world, 10);
-    out = meter_span_run(world, s, "audio meter loud quiet 1");
+    out = meter_span_run(world, s, "audio.meter loud quiet 1");
     test_assert(strncmp(out, "meter: measuring 1.000 s of the live output in real time: "
         "loud, quiet\n", 70) == 0);
     ecs_os_free(out);
     audio_run(world, METER_SPAN_SECOND);
-    out = meter_span_run(world, s, "audio meter");
+    out = meter_span_run(world, s, "audio.meter");
     ecs_fini(world);
 
     return out;
@@ -141,23 +141,23 @@ void MeterSpan_default_buses(void) {
     meter_span_bus(world, "loud", 1);
     meter_span_bus(world, "quiet", 0.5f);
     audio_run(world, 10);
-    char *out = meter_span_run(world, s, "audio meter 0.5");
+    char *out = meter_span_run(world, s, "audio.meter 0.5");
     test_assert(strstr(out, ": loud, quiet, master\n") != NULL ||
         strstr(out, ": quiet, loud, master\n") != NULL);
     ecs_os_free(out);
 
-    out = meter_span_run(world, s, "audio meter");
+    out = meter_span_run(world, s, "audio.meter");
     test_assert(strncmp(out, "meter: measuring, ", 18) == 0);
     ecs_os_free(out);
 
     audio_run(world, METER_SPAN_SECOND);
-    out = meter_span_run(world, s, "audio meter");
+    out = meter_span_run(world, s, "audio.meter");
     meter_span_row_t loud = meter_span_row(out, "loud");
     meter_span_row_t master = meter_span_row(out, "master");
     test_assert(fabsf(master.peak - loud.peak - (float)(20.0 * log10(1.5))) <= 0.1f);
     ecs_os_free(out);
 
-    out = meter_span_run(world, s, "audio meter");
+    out = meter_span_run(world, s, "audio.meter");
     test_assert(strncmp(out, "meter: measuring 3.000 s", 24) == 0);
     ecs_os_free(out);
     ecs_fini(world);
@@ -180,10 +180,10 @@ void MeterSpan_compressor(void) {
     audio_insert(world, calm, 0, above);
     audio_run(world, 30);
 
-    char *out = meter_span_run(world, s, "audio meter dry squash calm 1");
+    char *out = meter_span_run(world, s, "audio.meter dry squash calm 1");
     ecs_os_free(out);
     audio_run(world, METER_SPAN_SECOND);
-    out = meter_span_run(world, s, "audio meter");
+    out = meter_span_run(world, s, "audio.meter");
     meter_span_row_t dry = meter_span_row(out, "dry");
     test_assert(dry.peak < -1 && dry.peak > -30);
     test_assert(strstr(out, "\n  insert 0 above compressor: never engages") != NULL);
@@ -220,7 +220,7 @@ void MeterSpan_no_meter_left(void) {
     audio_run(world, 10);
     test_assert(!ecs_has(world, master, AudioMeter));
 
-    char *out = meter_span_run(world, s, "audio meter 1");
+    char *out = meter_span_run(world, s, "audio.meter 1");
     ecs_os_free(out);
     int32_t i;
     for (i = 0; i < METER_SPAN_SECOND; i ++) {
@@ -235,7 +235,7 @@ void MeterSpan_no_meter_left(void) {
         test_assert(w->rms_right == m.rms_right);
     }
 
-    out = meter_span_run(world, s, "audio meter");
+    out = meter_span_run(world, s, "audio.meter");
     test_assert(strstr(out, "\nloud: peak ") != NULL);
     test_assert(strstr(out, "\nwatched: peak ") != NULL);
     test_assert(strstr(out, "\nmaster: peak ") != NULL);
@@ -260,10 +260,10 @@ void MeterSpan_limiter(void) {
     ecs_entity_t s = ecs_shell_session_init(world, NULL);
     meter_span_bus(world, "hot", 4);
     audio_run(world, 10);
-    char *out = meter_span_run(world, s, "audio meter 0.5");
+    char *out = meter_span_run(world, s, "audio.meter 0.5");
     ecs_os_free(out);
     audio_run(world, METER_SPAN_SECOND);
-    out = meter_span_run(world, s, "audio meter");
+    out = meter_span_run(world, s, "audio.meter");
     meter_span_row_t master = meter_span_row(out, "master");
     test_assert(master.peak > 0);
     const char *line = strstr(out, "; master limiter max reduction ");
@@ -291,7 +291,7 @@ void MeterSpan_song_bars(void) {
 
     test_int(ecs_singleton_get(world, AudioSongStatus)->state, SongReady);
     audio_run(world, 2);
-    char *out = meter_span_run(world, s, "audio meter basic_lead bars=2..2");
+    char *out = meter_span_run(world, s, "audio.meter basic_lead bars=2..2");
     test_assert(strstr(out, ", bars 2..2 at 96.0 bpm 3/4 from beat 3.000: basic_lead\n") !=
         NULL);
     ecs_os_free(out);
@@ -300,7 +300,7 @@ void MeterSpan_song_bars(void) {
     test_assert(tr->position == 3);
 
     audio_run(world, 120);
-    out = meter_span_run(world, s, "audio meter");
+    out = meter_span_run(world, s, "audio.meter");
     test_assert(strncmp(out, "meter: live output, 1.8", 23) == 0);
     meter_span_row_t lead = meter_span_row(out, "basic_lead");
     test_assert(lead.peak > -40 && lead.peak < 0);

@@ -534,9 +534,10 @@ DAW.capture = async (seconds) => {
     conn.commandSessionCreate((r) => resolve(r), (e) => reject(e)));
   const id = session.session;
   const reply = await new Promise((resolve, reject) =>
-    conn.commandRun(id, "audio capture " + seconds, {}, (r) => resolve(r), (e) => reject(e)));
+    conn.commandRun(id, "audio.capture " + seconds, {}, (r) => resolve(r), (e) => reject(e)));
   if (reply.errors && reply.errors.length) throw new Error(reply.errors.join("\n"));
-  const name = reply.results && reply.results[0] && reply.results[0].result;
+  const result = reply.results && reply.results[0] && reply.results[0].result;
+  const name = result && result.name;
   if (!name) throw new Error("no resource in reply: " + JSON.stringify(reply));
   const deadline = performance.now() + seconds * 1000 + 15000;
   while (performance.now() < deadline) {

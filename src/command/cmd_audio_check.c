@@ -1,10 +1,10 @@
 /**
  * @file command/cmd_audio_check.c
- * @brief audio check: a lint of the loaded song, or of the tracks of the scene, that lists the
+ * @brief audio.check: a lint of the loaded song, or of the tracks of the scene, that lists the
  * problems visible in its data and in how the engine plays it, each with where it occurs.
  *
  * The static checks read the tracks, clips, notes, instruments, buses, effects and lanes. The
- * dynamic checks play the section once in the offline world of audio render and read its
+ * dynamic checks play the section once in the offline world of audio.render and read its
  * counters, meters and master frames.
  *
  * Positions are bar.beat from 1, with the ticks of a beat (480) when off the beat, and the
@@ -44,7 +44,7 @@
 /** Ticks of a beat of the time signature in a bar.beat.tick position */
 #define BOX_CMD_CHECK_TICKS (480)
 
-/** Frames per second of the render of the dynamic checks, the rate of audio render */
+/** Frames per second of the render of the dynamic checks, the rate of audio.render */
 #define BOX_CMD_CHECK_RATE (48000.0f)
 
 /** Peak under which a track counts as silent, -100 dBFS */

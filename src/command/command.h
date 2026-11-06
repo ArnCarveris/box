@@ -14,7 +14,7 @@
  *
  * @param world The world
  * @param brief One line description, stored as the doc brief that help lists
- * @param desc The function, its parent is set to box.command.commands
+ * @param desc The function, its parent box.command.commands when it has none
  * @return The function entity
  */
 ecs_entity_t box_command_register(
@@ -119,22 +119,28 @@ char* box_cmd_render_resource(
     const char *content_type,
     ecs_shell_resource_t *resource);
 
-/** Register the audio command that prints the status of the audio, sets its volume and
- * mute and records captures.
+typedef enum box_cmd_switch_t {
+    BoxCmdSwitchOff = 0,
+    BoxCmdSwitchOn = 1,
+    BoxCmdSwitchToggle = 2
+} box_cmd_switch_t;
+
+/** Register the audio command that prints the status of the audio and its subcommands, such
+ * as audio.volume, audio.capture and audio.plot.
  *
  * @param world The world
  */
 void box_cmd_audio_init(
     ecs_world_t *world);
 
-/** Register the system that advances the renders of audio render.
+/** Register the system that advances the renders of audio.render.
  *
  * @param world The world
  */
 void box_cmd_audio_render_init(
     ecs_world_t *world);
 
-/** Start audio render: render a sound, an instrument, a bus stem or a section of the song on
+/** Start audio.render: render a sound, an instrument, a bus stem or a section of the song on
  * its own, faster than real time, in an offline world, to a WAV resource that is filled once
  * the frames are in.
  *
@@ -142,6 +148,7 @@ void box_cmd_audio_render_init(
  * @param subject song, or the path of a sound, an instrument or a bus
  * @param argc Number of options
  * @param options The key=value options
+ * @param resource Receives the WAV resource, NULL in the browser
  * @return The name of the resource, or the file in the browser, which the caller frees, NULL
  * with an error logged when the subject cannot be rendered
  */
@@ -149,7 +156,8 @@ char* box_cmd_audio_render(
     ecs_world_t *world,
     const char *subject,
     int32_t argc,
-    const char **options);
+    const char **options,
+    ecs_shell_resource_t *resource);
 
 /** Receives the frames of the master of a render of the song, after the limiter, as they
  * render */
@@ -167,7 +175,7 @@ typedef void (*box_cmd_audio_probe_frame_t)(
     double beat,
     void *ctx);
 
-/** What a render of the song hands to its caller instead of writing a file, for audio check */
+/** What a render of the song hands to its caller instead of writing a file, for audio.check */
 typedef struct box_cmd_audio_probe_t {
     box_cmd_audio_probe_frames_t frames; /**< Gets the frames of the master, may be NULL */
     box_cmd_audio_probe_frame_t frame;   /**< Gets the frames of the offline world, may be
@@ -176,12 +184,12 @@ typedef struct box_cmd_audio_probe_t {
 } box_cmd_audio_probe_t;
 
 /** Play a section of the song, or of the tracks of the scene, through once at once: the
- * offline world of audio render, run to its end within the call, without a file. The section
+ * offline world of audio.render, run to its end within the call, without a file. The section
  * may last up to 600 s.
  *
  * @param world The live world
  * @param argc Number of options
- * @param options The key=value options of audio render song: bars or beats, solo, mute, tail
+ * @param options The key=value options of audio.render song: bars or beats, solo, mute, tail
  * @param probe Gets the frames and the frames of the offline world
  * @param failed Receives, owned, why the offline world did not play, such as a sound file that
  * did not load; NULL when it played or the options are invalid
@@ -195,7 +203,7 @@ int box_cmd_audio_render_probe(
     const box_cmd_audio_probe_t *probe,
     char **failed);
 
-/** Lint the loaded song, or the tracks of the scene: audio check [static] [bars=a..b]. One
+/** Lint the loaded song, or the tracks of the scene: audio.check [static] [bars=a..b]. One
  * line per finding with its severity, check, place and a hint, and a summary line.
  *
  * @param world The world
@@ -213,38 +221,38 @@ char* box_cmd_audio_check(
  *
  * @param world The world
  * @param name The path of the bus, or none
- * @param value on or off, NULL or empty to toggle
+ * @param state On, off or toggle
  * @return The text, which the caller frees, NULL with an error logged
  */
 char* box_cmd_audio_solo(
     ecs_world_t *world,
     const char *name,
-    const char *value);
+    box_cmd_switch_t state);
 
 /** Set or toggle the mute of a bus, as a script writes AudioBus.
  *
  * @param world The world
  * @param name The path of the bus, master for the master bus
- * @param value on or off, NULL or empty to toggle
+ * @param state On, off or toggle
  * @return The text, which the caller frees, NULL with an error logged
  */
 char* box_cmd_audio_bus_mute(
     ecs_world_t *world,
     const char *name,
-    const char *value);
+    box_cmd_switch_t state);
 
 /** Bypass an effect, or stop bypassing it: add or remove Disabled.
  *
  * @param world The world
  * @param name The path of the effect entity
- * @param value on or off, NULL or empty to toggle
+ * @param state On, off or toggle
  * @return The text, which the caller frees, NULL with an error logged, also for an entity
  * that is no effect
  */
 char* box_cmd_audio_bypass(
     ecs_world_t *world,
     const char *name,
-    const char *value);
+    box_cmd_switch_t state);
 
 /** Parse a note: a name such as C4, F#3 or Bb2, with C4 at 60, or a MIDI number 0 to 127.
  *
@@ -262,33 +270,33 @@ bool box_cmd_audio_note_parse(
  * @param world The world
  * @param name The path of the sound or the instrument
  * @param note The note, as box_cmd_audio_note_parse
- * @param vel Velocity 0 to 1, NULL or empty for 1
- * @param dur Seconds, NULL or empty for 0.5
+ * @param velocity Velocity 0 to 1
+ * @param seconds Seconds the note lasts
  * @return The text, which the caller frees, NULL with an error logged
  */
 char* box_cmd_audio_note(
     ecs_world_t *world,
     const char *name,
     const char *note,
-    const char *vel,
-    const char *dur);
+    double velocity,
+    double seconds);
 
-/** Analyze a WAV for the audio analyze action: loudness, peaks, bands, stereo, onsets, tail,
+/** Analyze a WAV for the audio.analyze action: loudness, peaks, bands, stereo, onsets, tail,
  * silence, clicks, discontinuities, pitch and, for a capture of a song, a table per bar.
  *
  * @param world The world
  * @param wav A resource of the session, else a WAV file
- * @param from First second of the span, NULL or empty for the start
- * @param to Last second of the span, NULL or empty for the end
+ * @param from First second of the span
+ * @param to Last second of the span, negative for the end
  * @return The report, which the caller frees, NULL with an error logged
  */
 char* box_cmd_audio_analyze(
     ecs_world_t *world,
     const char *wav,
-    const char *from,
-    const char *to);
+    double from,
+    double to);
 
-/** Load the bytes of a WAV for audio analyze, diff and plot: a resource of the session, else
+/** Load the bytes of a WAV for audio.analyze, diff and plot: a resource of the session, else
  * a file as written, else a file found from the working directory or the executable.
  *
  * @param world The world
@@ -301,19 +309,21 @@ uint8_t* box_cmd_audio_wav_load(
     const char *wav,
     int64_t *size);
 
-/** Draw a PNG of a WAV for the audio plot action: audio plot <wav> [kind] [size=WxH]
+/** Draw a PNG of a WAV for the audio.plot action: audio.plot <wav> [kind] [size=WxH]
  * [from=s] [to=s] [min_db=dB], a spectrogram, waveform, spectrum or loudness.
  *
  * @param world The world
  * @param argc Number of arguments
  * @param argv The WAV, then the kind and the options
+ * @param resource Receives the PNG resource, NULL in the browser
  * @return The name of the PNG resource, the file in the browser, which the caller frees,
  * NULL on an error
  */
 char* box_cmd_audio_plot(
     ecs_world_t *world,
     int32_t argc,
-    const char **argv);
+    const char **argv,
+    ecs_shell_resource_t *resource);
 
 struct box_audio_wav_t;
 
@@ -331,25 +341,25 @@ int box_cmd_audio_wav_decode(
     const char *action,
     struct box_audio_wav_t *out);
 
-/** Compare two WAVs for the audio diff action: bit identity, length, loudness, true peak,
+/** Compare two WAVs for the audio.diff action: bit identity, length, loudness, true peak,
  * bands, stereo, the null test residual after alignment, its loudest spans and the bars that
  * differ most.
  *
  * @param world The world
  * @param a The first WAV, a resource of the session or a file
  * @param b The second WAV, a resource of the session or a file
- * @param from First second of the span, NULL or empty for the start
- * @param to Last second of the span, NULL or empty for the end
+ * @param from First second of the span
+ * @param to Last second of the span, negative for the end
  * @return The report, which the caller frees, NULL with an error logged
  */
 char* box_cmd_audio_diff(
     ecs_world_t *world,
     const char *a,
     const char *b,
-    const char *from,
-    const char *to);
+    double from,
+    double to);
 
-/** Print the notes of a track per bar, or as a text piano roll: audio notes <track>
+/** Print the notes of a track per bar, or as a text piano roll: audio.notes <track>
  * [bars=a..b] [roll].
  *
  * @param world The world
@@ -362,8 +372,8 @@ char* box_cmd_audio_notes(
     int32_t argc,
     const char **argv);
 
-/** Measure the levels of buses over a span of the live output: audio meter [bus...]
- * [seconds|bars=a..b] starts a measurement, audio meter without arguments prints its progress
+/** Measure the levels of buses over a span of the live output: audio.meter [bus...]
+ * [seconds|bars=a..b] starts a measurement, audio.meter without arguments prints its progress
  * and, once it is measured, the table of the buses, their effects and the headroom.
  *
  * @param world The world
@@ -377,7 +387,7 @@ char* box_cmd_audio_meter_span(
     const char **argv);
 
 /** Print the chords of a section per beat or per bar, its key, the key of the song and the
- * notes outside the key: audio chords [track...] [bars=a..b].
+ * notes outside the key: audio.chords [track...] [bars=a..b].
  *
  * @param world The world
  * @param argc Number of arguments

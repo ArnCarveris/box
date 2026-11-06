@@ -1,4 +1,4 @@
-// The song of the audio render tests in the Shell suite of test/cpu/command: two tracks on two
+// The song of the audio.render tests in the Shell suite of test/cpu/command: two tracks on two
 // buses, a held A3 (220 Hz) on render_low and a held A6 (1760 Hz) on render_high, 4 bars of 4/4
 // at 120 bpm, so a stem of one bus shows by its frequency that the other is absent.
 using box.audio

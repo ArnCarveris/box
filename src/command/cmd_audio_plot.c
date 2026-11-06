@@ -1,6 +1,6 @@
 /**
  * @file command/cmd_audio_plot.c
- * @brief The audio plot action: a PNG of a WAV, a resource of the session or a file, as a
+ * @brief The audio.plot action: a PNG of a WAV, a resource of the session or a file, as a
  * spectrogram, waveform, average spectrum or loudness over time, with labeled axes and the
  * bars of a capture of a song.
  *
@@ -175,21 +175,23 @@ done:
  *
  * @param world The world
  * @param png The bytes
+ * @param resource Receives the resource, unused in the browser
  * @return The name of the resource or the file, which the caller frees, NULL on an error
  */
 static char* box_cmd_plot_store(
     ecs_world_t *world,
-    const box_cmd_plot_png_t *png)
+    const box_cmd_plot_png_t *png,
+    ecs_shell_resource_t *resource)
 {
     char *path = NULL, *result = NULL;
     FILE *f = NULL;
 #ifdef __EMSCRIPTEN__
     static int32_t box_cmd_audio_plots;
     (void)world;
+    (void)resource;
     path = flecs_asprintf("%s/audio_plot_%d.png", BOX_CMD_PLOT_WEB_DIR, ++ box_cmd_audio_plots);
 #else
-    ecs_shell_resource_t resource = {0};
-    path = box_cmd_render_resource(world, "image/png", &resource);
+    path = box_cmd_render_resource(world, "image/png", resource);
 #endif
     if (!path) {
         goto done;
@@ -205,17 +207,13 @@ static char* box_cmd_plot_store(
     result = path;
     path = NULL;
 #else
-    result = ecs_os_strdup(resource.name);
+    result = ecs_os_strdup(resource->name);
 #endif
 done:
     if (f) {
         fclose(f);
     }
 
-#ifndef __EMSCRIPTEN__
-    ecs_os_free(resource.name);
-    ecs_os_free(resource.content_type);
-#endif
     ecs_os_free(path);
 
     return result;
@@ -224,7 +222,8 @@ done:
 char* box_cmd_audio_plot(
     ecs_world_t *world,
     int32_t argc,
-    const char **argv)
+    const char **argv,
+    ecs_shell_resource_t *resource)
 {
     box_cmd_plot_opts_t opts = { .kind = BoxAudioPlotSpectrogram, .to = -1 };
     box_audio_wav_t file = {0};
@@ -238,7 +237,7 @@ char* box_cmd_audio_plot(
     int32_t start, end;
     char *title = NULL, *result = NULL;
     if (!wav || !wav[0]) {
-        ecs_err("audio plot needs a WAV: a resource of the session or a file");
+        ecs_err("audio.plot needs a WAV: a resource of the session or a file");
         goto done;
     }
 
@@ -299,7 +298,7 @@ char* box_cmd_audio_plot(
         goto done;
     }
 
-    result = box_cmd_plot_store(world, &png);
+    result = box_cmd_plot_store(world, &png, resource);
 done:
     ecs_os_free(png.data);
     ecs_os_free(title);

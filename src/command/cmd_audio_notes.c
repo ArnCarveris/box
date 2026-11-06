@@ -1,6 +1,6 @@
 /**
  * @file command/cmd_audio_notes.c
- * @brief The audio notes and audio chords commands: the notes of a track per bar or as a text
+ * @brief The audio.notes and audio.chords commands: the notes of a track per bar or as a text
  * piano roll, and the chords and the key of a section, from the note data of the timeline.
  *
  * They read only the Track, ClipPlacement, NoteClip and Instrument data and the time signature
@@ -779,7 +779,7 @@ char* box_cmd_audio_notes(
     char *result = NULL;
     ecs_vec_init_t(NULL, &notes, box_cmd_note_t, 0);
     if (argc < 1 || !argv[0] || !argv[0][0]) {
-        ecs_err("missing track, usage: audio notes <track> [bars=a..b] [roll]");
+        ecs_err("missing track, usage: audio.notes <track> [bars=a..b] [roll]");
         goto done;
     }
 

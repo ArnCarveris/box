@@ -27,37 +27,20 @@
 #define BOX_CMD_AUDITION_TEMPO_MIN 20.0
 #define BOX_CMD_AUDITION_TEMPO_MAX 999.0
 
-/** Default seconds of a note */
-#define BOX_CMD_AUDITION_DUR 0.5
-
 /** Most seconds of a note */
 #define BOX_CMD_AUDITION_DUR_MAX 60.0
 
-/** Parse on, off or nothing.
+/** Get the new state of a switch.
  *
- * @param value on or off, NULL or empty to toggle
+ * @param state On, off or toggle
  * @param current The current state, which a toggle inverts
- * @param out Receives the new state
- * @return Whether the value is valid; logs an error when not
+ * @return The new state
  */
 static bool box_cmd_audition_switch(
-    const char *value,
-    bool current,
-    bool *out)
+    box_cmd_switch_t state,
+    bool current)
 {
-    bool result = true;
-    if (!value || !value[0]) {
-        *out = !current;
-    } else if (!ecs_os_strcmp(value, "on")) {
-        *out = true;
-    } else if (!ecs_os_strcmp(value, "off")) {
-        *out = false;
-    } else {
-        ecs_err("invalid state '%s', expected on or off", value);
-        result = false;
-    }
-
-    return result;
+    return state == BoxCmdSwitchToggle ? !current : state == BoxCmdSwitchOn;
 }
 
 /** Look up an entity by its path relative to the scope of the session.
@@ -137,7 +120,7 @@ static char* box_cmd_audition_solo_none(
 char* box_cmd_audio_solo(
     ecs_world_t *world,
     const char *name,
-    const char *value)
+    box_cmd_switch_t state)
 {
     char *result = NULL, *path = NULL;
     ecs_entity_t bus;
@@ -158,9 +141,7 @@ char* box_cmd_audio_solo(
         goto done;
     }
 
-    if (!box_cmd_audition_switch(value, ecs_get(world, bus, AudioBus)->solo, &solo)) {
-        goto done;
-    }
+    solo = box_cmd_audition_switch(state, ecs_get(world, bus, AudioBus)->solo);
 
     b = ecs_ensure(world, bus, AudioBus);
     b->solo = solo;
@@ -176,7 +157,7 @@ done:
 char* box_cmd_audio_bus_mute(
     ecs_world_t *world,
     const char *name,
-    const char *value)
+    box_cmd_switch_t state)
 {
     char *result = NULL, *path = NULL;
     ecs_entity_t bus = box_cmd_audition_bus(world, name);
@@ -188,9 +169,7 @@ char* box_cmd_audio_bus_mute(
     }
 
     current = ecs_get(world, bus, AudioBus);
-    if (!box_cmd_audition_switch(value, current && current->mute, &mute)) {
-        goto done;
-    }
+    mute = box_cmd_audition_switch(state, current && current->mute);
 
     b = ecs_ensure(world, bus, AudioBus);
     b->mute = mute;
@@ -206,7 +185,7 @@ done:
 char* box_cmd_audio_bypass(
     ecs_world_t *world,
     const char *name,
-    const char *value)
+    box_cmd_switch_t state)
 {
     char *result = NULL, *path = NULL;
     ecs_entity_t e = box_cmd_audition_lookup(world, name);
@@ -226,9 +205,7 @@ char* box_cmd_audio_bypass(
         goto done;
     }
 
-    if (!box_cmd_audition_switch(value, ecs_has_id(world, e, EcsDisabled), &bypass)) {
-        goto done;
-    }
+    bypass = box_cmd_audition_switch(state, ecs_has_id(world, e, EcsDisabled));
 
     if (bypass) {
         ecs_add_id(world, e, EcsDisabled);
@@ -344,13 +321,13 @@ char* box_cmd_audio_note(
     ecs_world_t *world,
     const char *name,
     const char *note,
-    const char *vel,
-    const char *dur)
+    double velocity,
+    double seconds)
 {
     const Transport *tr = ecs_singleton_get(world, Transport);
     ecs_entity_t e = box_cmd_audition_lookup(world, name), inst;
-    double velocity = 1.0, seconds = BOX_CMD_AUDITION_DUR, tempo;
-    char *result = NULL, *path = NULL, *end = NULL;
+    double tempo;
+    char *result = NULL, *path = NULL;
     float pitch = 0;
     if (!name || !name[0]) {
         ecs_err("missing sound or instrument");
@@ -374,21 +351,15 @@ char* box_cmd_audio_note(
         goto done;
     }
 
-    if (vel && vel[0]) {
-        velocity = strtod(vel, &end);
-        if (!end || end[0] || !(velocity >= 0) || velocity > 1) {
-            ecs_err("invalid velocity '%s', expected 0 to 1", vel);
-            goto done;
-        }
+    if (!(velocity >= 0) || velocity > 1) {
+        ecs_err("invalid velocity %g, expected 0 to 1", velocity);
+        goto done;
     }
 
-    if (dur && dur[0]) {
-        seconds = strtod(dur, &end);
-        if (!end || end[0] || !(seconds > 0) || seconds > BOX_CMD_AUDITION_DUR_MAX) {
-            ecs_err("invalid duration '%s', expected more than 0 and at most %.0f seconds",
-                dur, BOX_CMD_AUDITION_DUR_MAX);
-            goto done;
-        }
+    if (!(seconds > 0) || seconds > BOX_CMD_AUDITION_DUR_MAX) {
+        ecs_err("invalid duration %g, expected more than 0 and at most %.0f seconds",
+            seconds, BOX_CMD_AUDITION_DUR_MAX);
+        goto done;
     }
 
     tempo = tr ? (double)tr->tempo : BOX_CMD_AUDITION_TEMPO;

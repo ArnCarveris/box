@@ -1,6 +1,6 @@
 /**
  * @file command/cmd_audio_render.c
- * @brief audio render: a sound, an instrument, a bus stem or a section of the song rendered on
+ * @brief audio.render: a sound, an instrument, a bus stem or a section of the song rendered on
  * its own and faster than real time to a WAV resource, without touching the world that plays.
  *
  * A render runs in an offline world that imports box and evaluates the managed scripts of the
@@ -111,7 +111,7 @@ typedef struct box_cmd_audio_render_job_t {
                              *   world instead of a file, NULL for a render to a file */
 } box_cmd_audio_render_job_t;
 
-/** State of the audio render command of a world */
+/** State of the audio.render command of a world */
 typedef struct box_cmd_audio_render_state_t {
     ecs_vec_t jobs;         /**< box_cmd_audio_render_job_t*, oldest first */
 } box_cmd_audio_render_state_t;
@@ -149,7 +149,7 @@ static void box_cmd_audio_render_job_free(
     ecs_os_free(job);
 }
 
-/** Free the state of the audio render command.
+/** Free the state of the audio.render command.
  *
  * @param ctx The state
  */
@@ -1196,9 +1196,9 @@ static void BoxAudioRenderCommands(
     }
 
     if (error) {
-        ecs_err("audio render %s: %s", job->subject ? job->subject : "song", error);
+        ecs_err("audio.render %s: %s", job->subject ? job->subject : "song", error);
     } else if (!written) {
-        ecs_err("audio render %s: cannot write '%s'", job->subject ? job->subject : "song",
+        ecs_err("audio.render %s: cannot write '%s'", job->subject ? job->subject : "song",
             job->path);
     }
 
@@ -1213,7 +1213,8 @@ char* box_cmd_audio_render(
     ecs_world_t *world,
     const char *subject,
     int32_t argc,
-    const char **options)
+    const char **options,
+    ecs_shell_resource_t *resource)
 {
     ecs_entity_t system = ecs_lookup(world, "box.command.AudioRenderCommands");
     const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
@@ -1241,15 +1242,12 @@ char* box_cmd_audio_render(
     job->path = flecs_asprintf("%s/audio_render_%d.wav", BOX_CMD_AUDIO_RENDER_WEB_DIR,
         ++ box_cmd_audio_renders);
     result = ecs_os_strdup(job->path);
+    (void)resource;
 #else
-    ecs_shell_resource_t resource = {0};
-    job->path = box_cmd_render_resource(world, "audio/wav", &resource);
+    job->path = box_cmd_render_resource(world, "audio/wav", resource);
     if (job->path) {
-        result = ecs_os_strdup(resource.name);
+        result = ecs_os_strdup(resource->name);
     }
-
-    ecs_os_free(resource.name);
-    ecs_os_free(resource.content_type);
 #endif
     if (!result) {
         box_cmd_audio_render_job_free(job);

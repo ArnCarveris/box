@@ -1,6 +1,6 @@
 /**
  * @file command/cmd_audio_diff.c
- * @brief The audio diff action: a text report of how two WAVs differ, resources of the
+ * @brief The audio.diff action: a text report of how two WAVs differ, resources of the
  * session or files: bit identity, length, loudness, true peak, bands, stereo, the residual of
  * a null test after aligning by cross-correlation, its loudest spans and, for a capture of a
  * song, the bars that differ most.
@@ -134,28 +134,6 @@ static void box_cmd_diff_ratio(
     } else {
         ecs_strbuf_append(buf, "%.1f %s", box_cmd_diff_round(db, 1), unit);
     }
-}
-
-/** Parse seconds of the span.
- *
- * @param text The text, NULL or empty to keep the default
- * @param out Receives the seconds
- * @return Whether the text is empty or a number of seconds of at least 0
- */
-static bool box_cmd_diff_seconds(
-    const char *text,
-    double *out)
-{
-    char *end = NULL;
-    double v;
-    bool result = true;
-    if (text && text[0]) {
-        v = strtod(text, &end);
-        result = end && !end[0] && v >= 0 && isfinite(v);
-        *out = result ? v : *out;
-    }
-
-    return result;
 }
 
 /** Sum a stereo WAV to mono in place, the mean of left and right.
@@ -682,26 +660,25 @@ char* box_cmd_audio_diff(
     ecs_world_t *world,
     const char *a,
     const char *b,
-    const char *from,
-    const char *to)
+    double from,
+    double to)
 {
     box_audio_wav_t wa = {0}, wb = {0};
     box_audio_analysis_t xa, xb;
     ecs_strbuf_t buf = ECS_STRBUF_INIT;
     const box_audio_wav_song_t *song = NULL;
-    double from_s = 0, to_s = -1;
+    double from_s = from, to_s = to;
     int32_t a_start, a_end, b_start, b_end, offset = 0;
     bool channels_differ;
     const float *da, *db;
     char *result = NULL;
     if (!a || !a[0] || !b || !b[0]) {
-        ecs_err("audio diff needs two WAVs: resources of the session or files");
+        ecs_err("audio.diff needs two WAVs: resources of the session or files");
         goto done;
     }
 
-    if (!box_cmd_diff_seconds(from, &from_s) || !box_cmd_diff_seconds(to, &to_s)) {
-        ecs_err("invalid span '%s' to '%s', expected seconds", from ? from : "",
-            to ? to : "");
+    if (!(from >= 0) || !isfinite(from) || !isfinite(to)) {
+        ecs_err("invalid span %g to %g, expected seconds", from, to);
         goto done;
     }
 

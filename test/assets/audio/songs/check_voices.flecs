@@ -1,4 +1,4 @@
-// A song of the audio check tests in the Shell suite of test/cpu/command: two single notes in
+// A song of the audio.check tests in the Shell suite of test/cpu/command: two single notes in
 // bars 1 and 2, then 70 held notes of 70 pitches that start together at beat 9, bar 3 beat 2, more
 // than the 64 voices of the core, so the voices are stolen from bar 3 on. 4 bars of 4/4 at 120
 // bpm.
