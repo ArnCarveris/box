@@ -4,7 +4,6 @@ struct JukeboxSong(title: string, file: string)
 
 export const SONGS: JukeboxSong[] = [
   {"Distant Orbit", "distant_orbit"}
-  {"Starfall", "starfall"}
   {"Voltage tide", "voltage_tide"},
   {"Late train", "late_train"}
   {"Drum Kit", "drum_kit"}
@@ -14,7 +13,6 @@ export const SONGS: JukeboxSong[] = [
   {"Trumpets", "trumpets"}
 ]
 
-export const LANE_MAX: i32 = 8
 export const IDLE: Rgb = {150, 155, 175}
 
 export mut song: i32 = 0
@@ -27,6 +25,5 @@ export mut song_beats: f32 = 1
 export mut loaded = false
 export mut lit = false
 export mut color: Rgb = IDLE
-export mut levels: f32[8] = {}
 export mut master_level: f32[2] = {}
 export mut glow: f32 = 0

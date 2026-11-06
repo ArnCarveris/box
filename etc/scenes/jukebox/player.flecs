@@ -87,22 +87,6 @@ async {
       color = IDLE
     }
 
-    const lanes = s.lanes.count()
-    for i in 0..LANE_MAX {
-      if i < lanes {
-        const e = s.lanes[i].bus
-        if e.has(AudioMeter) {
-          const m = e[AudioMeter]
-          const rms = max(max(m.rms_left, m.rms_right), 0.00001)
-          levels[i] = clamp((20 * log10(rms) + 48) / 48, 0, 1)
-        } else {
-          levels[i] = 0
-        }
-      } else {
-        levels[i] = 0
-      }
-    }
-
     const mm = box.audio.master[AudioMeter]
     master_level[0] = clamp((20 * log10(max(mm.rms_left, 0.00001)) + 48) / 48, 0, 1)
     master_level[1] = clamp((20 * log10(max(mm.rms_right, 0.00001)) + 48) / 48, 0, 1)
