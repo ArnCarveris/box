@@ -3,8 +3,8 @@
  * @brief The audio command: the status of the audio, its transport, its buses and their insert
  * slots, its instruments, its tracks with their note and audio placements, sounding notes and
  * playing audio clips, its emitters with their plays and skips, its macros with their maps, the
- * master volume and mute, play, stop, seek and tempo, the song of AudioSong, and captures of the
- * master output to a WAV resource.
+ * master volume and mute, play, stop, seek and tempo, the song of AudioSong, captures of the
+ * master output to a WAV resource, and the dispatch of audio render (cmd_audio_render.c).
  *
  * The actions only write AudioSettings, Transport or AudioSong, which box.audio applies at the
  * end of the frame as for a change from a script or the REST API. A capture taps the core, so
@@ -18,6 +18,9 @@
 
 /** Sounding notes listed per track at most */
 #define BOX_AUDIO_SEQ_LIST_MAX 16
+
+/** Options of audio render at most */
+#define BOX_CMD_AUDIO_OPTIONS 8
 
 /** Folder of the captures in the file system of the page */
 #define BOX_CMD_AUDIO_WEB_DIR "/tmp"
@@ -1164,12 +1167,12 @@ done:
     return result;
 }
 
-/** The audio command: print the status, set the volume or the mute, drive the transport or
- * start a capture.
+/** The audio command: print the status, set the volume or the mute, drive the transport,
+ * start a capture or a render.
  *
  * @param ctx The call context
  * @param argc Number of arguments
- * @param argv The action and its value, both optional
+ * @param argv The action, its value and the options of a render, all optional
  * @param result Receives the output
  */
 static void box_cmd_audio(
@@ -1181,13 +1184,22 @@ static void box_cmd_audio(
     ecs_world_t *world = ctx->world;
     const char *action = argc > 0 ? *(const char**)argv[0].ptr : NULL;
     const char *value = argc > 1 ? *(const char**)argv[1].ptr : NULL;
+    const char *options[BOX_CMD_AUDIO_OPTIONS];
+    int32_t i, count = argc > 2 ? argc - 2 : 0;
     char *out = NULL;
+    count = count < BOX_CMD_AUDIO_OPTIONS ? count : BOX_CMD_AUDIO_OPTIONS;
+    for (i = 0; i < count; i ++) {
+        options[i] = *(const char**)argv[i + 2].ptr;
+    }
+
     if (!ecs_id(AudioSettings) || !box_audio_module_get(world)) {
         ecs_err("box.audio is not imported");
         goto done;
     }
 
-    if (!action || !action[0]) {
+    if (count && (!action || ecs_os_strcmp(action, "render"))) {
+        ecs_err("only audio render takes options");
+    } else if (!action || !action[0]) {
         out = box_cmd_audio_print(world);
     } else if (!ecs_os_strcmp(action, "volume")) {
         out = box_cmd_audio_volume(world, value);
@@ -1195,6 +1207,8 @@ static void box_cmd_audio(
         out = box_cmd_audio_mute(world, value);
     } else if (!ecs_os_strcmp(action, "capture")) {
         out = box_cmd_audio_capture(world, value);
+    } else if (!ecs_os_strcmp(action, "render")) {
+        out = box_cmd_audio_render(world, value, count, options);
     } else if (!ecs_os_strcmp(action, "song")) {
         out = box_cmd_audio_song_set(world, value);
     } else if (!ecs_os_strcmp(action, "play") || !ecs_os_strcmp(action, "stop") ||
@@ -1202,8 +1216,8 @@ static void box_cmd_audio(
     {
         out = box_cmd_audio_transport_set(world, action, value);
     } else {
-        ecs_err("unknown action '%s', expected volume, mute, capture, play, stop, seek, "
-            "tempo or song", action);
+        ecs_err("unknown action '%s', expected volume, mute, capture, render, play, stop, "
+            "seek, tempo or song", action);
     }
 
     *(char**)result->ptr = out;
@@ -1215,20 +1229,39 @@ void box_cmd_audio_init(
     ecs_world_t *world)
 {
     ECS_IMPORT(world, BoxAudio);
+    box_cmd_audio_render_init(world);
     box_command_register(world,
         "Print the audio status, transport, song, buses, instruments, tracks, emitters and "
         "macros, set the volume or mute, play, stop, seek or set the tempo, show or change the "
-        "song, or capture a WAV",
+        "song, capture a WAV or render a sound, instrument, stem or song section to a WAV",
         (ecs_function_desc_t){
             .name = "audio",
             .return_type = ecs_id(ecs_string_t),
             .params = {
                 { .name = "action", .type = ecs_id(ecs_string_t), .optional = true,
-                  .brief = "volume, mute, capture, play, stop, seek, tempo or song (default: "
-                    "print the status)" },
+                  .brief = "volume, mute, capture, render, play, stop, seek, tempo or song "
+                    "(default: print the status)" },
                 { .name = "value", .type = ecs_id(ecs_string_t), .optional = true,
                   .brief = "volume 0 to 4, mute on or off (default: toggle), capture seconds, "
-                    "seek beats, tempo 20 to 999, song file or none (default: show the song)" }
+                    "seek beats, tempo 20 to 999, song file or none (default: show the song), "
+                    "render subject: song, a sound, an instrument or a bus" },
+                { .name = "option1", .type = ecs_id(ecs_string_t), .optional = true,
+                  .brief = "render option: note, vel, dur, tail, bars, beats, solo or mute, as "
+                    "key=value" },
+                { .name = "option2", .type = ecs_id(ecs_string_t), .optional = true,
+                  .brief = "render option" },
+                { .name = "option3", .type = ecs_id(ecs_string_t), .optional = true,
+                  .brief = "render option" },
+                { .name = "option4", .type = ecs_id(ecs_string_t), .optional = true,
+                  .brief = "render option" },
+                { .name = "option5", .type = ecs_id(ecs_string_t), .optional = true,
+                  .brief = "render option" },
+                { .name = "option6", .type = ecs_id(ecs_string_t), .optional = true,
+                  .brief = "render option" },
+                { .name = "option7", .type = ecs_id(ecs_string_t), .optional = true,
+                  .brief = "render option" },
+                { .name = "option8", .type = ecs_id(ecs_string_t), .optional = true,
+                  .brief = "render option" }
             },
             .callback = box_cmd_audio
         });

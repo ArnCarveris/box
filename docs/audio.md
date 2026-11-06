@@ -1626,12 +1626,59 @@ Importing box alone does not open an output: `box_app_run` does.
 | `audio seek <beats>` | Seek the transport |
 | `audio tempo <bpm>` | Set tempo, 20..999 |
 | `audio capture <seconds>` | Record master output as a 16-bit stereo WAV resource |
+| `audio render <subject> [options]` | Render a sound, instrument, bus stem or song section on its own, faster than real time, to a WAV resource |
 | `audio song [<file>\|none]` | Show the song, load a song file or unload it |
 
 Fetch a capture with `GET /shell/session/<id>/resource/<name>`; it stays empty
 until recording finishes. In the browser it writes `/tmp/audio_capture_<n>.wav`
 in the page filesystem and returns that path. A script can capture from load
 with `box.audio.capture(seconds, path)`.
+
+`audio render` renders one thing on its own, without waiting for real time and
+without the rest of the scene:
+
+| Subject | Options | What it renders |
+| --- | --- | --- |
+| a sound (`SynthSound`, `SoundFile`, `AudioPcm`) | `note`, `vel`, `dur`, `tail` | One note of the sound, on the bus of its `AudioOutput` |
+| an instrument | `note`, `vel`, `dur`, `tail` | One note through the instrument and its bus chain |
+| a bus | `bars`, `beats`, `solo`, `mute`, `tail`; `dur` without a song | The song with only that bus audible, as its solo makes it, with its returns; without a song the scene from its start, `dur` seconds (10) |
+| `song` | `bars`, `beats`, `solo`, `mute`, `tail` | The loaded song, or the `Transport` of the scene with a range |
+
+Options are `key=value`: `note` is a name (`C2`, `F#3`, `Bb4`, C4 is 60) or a
+MIDI number, by default the root of the instrument, A4 for a sound, which plays
+it as authored; `vel` 0..1, default 1; `dur` the seconds the note is held before
+its release, by default the natural length of the sound (no gate); `tail` the
+seconds rendered after the release or the end of the section, by default until
+the level stays under -90 dB for a note and 0 for a section. `bars=a..b` counts
+bars from 1 and includes bar b, `beats=a..b` is the beats of the `Transport`
+from 0; without a range the whole song (`Song.beats`). `solo` and `mute` take
+buses separated by commas.
+
+```
+audio render kick note=C1 vel=0.8
+audio render bass_synth note=A1 dur=0.5 tail=1
+audio render drums bars=5..8
+audio render song bars=9..12 mute=lead
+```
+
+The render runs in an offline world: box imported again, the managed scripts of
+the scene and the song file evaluated again, rendered by the same box.audio sync,
+sequencer and core on a null transport at 48000 Hz and fixed deltas of 1/60 s.
+The world that plays is only read: its transport, song, components and output do
+not change, and a frame spends at most 8 ms of wall time on a render so the live
+sequencer keeps its lookahead. The offline world loads its sound files without an
+output, so every render starts from an empty core, and two renders of a subject
+with the same options are bit identical. Effects with memory, such as reverbs and
+delays, start empty. A section that starts after bar 1 is played from beat 0 and
+the frames before it are dropped, so the tails of earlier bars, automation and
+modulators are as in playback (at most 600 s of song before a section). A render
+of a note silences the sources, streams, emitters and the timeline of the scene.
+Only what scripts and the song file make is rendered again: a subject made in C
+is an error, except a sound with `AudioPcm`, whose samples are copied. A render
+takes at most `BOX_AUDIO_CAPTURE_MAX` seconds; a longer one, a subject that is
+not a sound, instrument or bus, or a section without a song and range is an
+error that names why. To analyse a render, pass the resource it returns to the
+next command, in two steps.
 
 Headless with fixed `--delta-time`, repeated runs capture bit-identical audio on
 the same build. Use this to render music, compare changes or inspect scenes offline.

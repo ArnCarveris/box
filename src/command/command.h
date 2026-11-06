@@ -127,6 +127,30 @@ char* box_cmd_render_resource(
 void box_cmd_audio_init(
     ecs_world_t *world);
 
+/** Register the system that advances the renders of audio render.
+ *
+ * @param world The world
+ */
+void box_cmd_audio_render_init(
+    ecs_world_t *world);
+
+/** Start audio render: render a sound, an instrument, a bus stem or a section of the song on
+ * its own, faster than real time, in an offline world, to a WAV resource that is filled once
+ * the frames are in.
+ *
+ * @param world The world
+ * @param subject song, or the path of a sound, an instrument or a bus
+ * @param argc Number of options
+ * @param options The key=value options
+ * @return The name of the resource, or the file in the browser, which the caller frees, NULL
+ * with an error logged when the subject cannot be rendered
+ */
+char* box_cmd_audio_render(
+    ecs_world_t *world,
+    const char *subject,
+    int32_t argc,
+    const char **options);
+
 /** Register the fit command that moves a camera to a tight fit of its scene.
  *
  * @param world The world

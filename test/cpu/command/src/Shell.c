@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <math.h>
+#include <output.h>
 
 void Shell_box_scope_first(void) {
     ecs_world_t *world = ecs_init();
@@ -654,6 +656,433 @@ void Shell_audio_command(void) {
     ecs_os_free(out);
     out = box_command_run(world, s, "audio sing", &error);
     test_bool(error, true);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+/** Delta of a frame of the tests */
+#define RENDER_DT (1.0f / 60.0f)
+
+/** Frames per second of a render */
+#define RENDER_RATE (48000)
+
+/** Frames of the app a render may take at most in the tests */
+#define RENDER_WAIT (3000)
+
+/** Frames of the app of the test of the live output */
+#define RENDER_LIVE_FRAMES (240)
+
+/** Frames the tap of the live output keeps */
+#define RENDER_TAP_MAX (RENDER_LIVE_FRAMES * 800)
+
+/** The scene of the tests */
+#define RENDER_SCENE "test/assets/audio/render.flecs"
+
+/** The song of the tests */
+#define RENDER_SONG "test/assets/audio/songs/render_stems.flecs"
+
+/** A WAV that a render wrote, as floats */
+typedef struct render_wav_t {
+    float *left;            /**< Left channel */
+    float *right;           /**< Right channel */
+    int32_t frames;         /**< Frames */
+    uint8_t *bytes;         /**< The file */
+    long size;              /**< Bytes of the file */
+} render_wav_t;
+
+/** Output of the live world, left and right */
+static float render_tap[RENDER_TAP_MAX * 2];
+
+/** Frames in render_tap */
+static int32_t render_tap_count;
+
+static void render_tap_out(
+    const float *left,
+    const float *right,
+    int32_t frames,
+    void *ctx)
+{
+    int32_t i;
+    (void)ctx;
+    for (i = 0; i < frames && render_tap_count < RENDER_TAP_MAX; i ++) {
+        render_tap[render_tap_count * 2] = left[i];
+        render_tap[render_tap_count * 2 + 1] = right[i];
+        render_tap_count ++;
+    }
+}
+
+static ecs_world_t* render_world(
+    bool output,
+    bool scene)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    if (output) {
+        render_tap_count = 0;
+        box_audio_output_open(world, &(box_audio_output_desc_t){
+            .headless = true, .output = render_tap_out });
+        test_assert(box_audio_output_transport(world) != NULL);
+    }
+
+    if (scene) {
+        ecs_entity_t script = ecs_script(world, { .filename = RENDER_SCENE });
+        test_assert(script != 0);
+        const EcsScript *s = ecs_get(world, script, EcsScript);
+        test_assert(s != NULL);
+        test_assert(s->error == NULL);
+    }
+
+    return world;
+}
+
+static void render_song(
+    ecs_world_t *world)
+{
+    int32_t i;
+    box_audio_song_load(world, RENDER_SONG);
+    for (i = 0; i < 600; i ++) {
+        test_bool(ecs_progress(world, RENDER_DT), true);
+        const AudioSongStatus *st = ecs_singleton_get(world, AudioSongStatus);
+        if (st && st->state != SongLoading) {
+            break;
+        }
+    }
+
+    test_int(ecs_singleton_get(world, AudioSongStatus)->state, SongReady);
+}
+
+static long render_size(
+    const char *path)
+{
+    FILE *f = fopen(path, "rb");
+    long result = -1;
+    if (f) {
+        fseek(f, 0, SEEK_END);
+        result = ftell(f);
+        fclose(f);
+    }
+
+    return result;
+}
+
+static int16_t render_i16(
+    const uint8_t *p)
+{
+    return (int16_t)(uint16_t)(p[0] | (p[1] << 8));
+}
+
+/** Run a render command and the frames of the app until its WAV is written, then read it.
+ *
+ * @param world The world
+ * @param s The session
+ * @param cmd The command line
+ * @param frames Receives the frames of the app it took, may be NULL
+ * @return The WAV
+ */
+static render_wav_t render_run(
+    ecs_world_t *world,
+    ecs_entity_t s,
+    const char *cmd,
+    int32_t *frames)
+{
+    render_wav_t result = {0};
+    bool error = true;
+    char *name = box_command_run(world, s, cmd, &error);
+    test_bool(error, false);
+    test_assert(name != NULL && name[0]);
+    char *path = box_command_resource_file(world, s, name);
+    test_assert(path != NULL);
+    int32_t i;
+    for (i = 0; i < RENDER_WAIT && render_size(path) < 44; i ++) {
+        test_bool(ecs_progress(world, RENDER_DT), true);
+    }
+
+    test_assert(i < RENDER_WAIT);
+    if (frames) {
+        *frames = i;
+    }
+
+    FILE *f = fopen(path, "rb");
+    test_assert(f != NULL);
+    fseek(f, 0, SEEK_END);
+    result.size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    result.bytes = ecs_os_malloc((ecs_size_t)result.size);
+    test_assert(fread(result.bytes, 1, (size_t)result.size, f) == (size_t)result.size);
+    fclose(f);
+    test_assert(!memcmp(result.bytes, "RIFF", 4));
+    result.frames = (int32_t)((result.size - 44) / 4);
+    result.left = ecs_os_malloc_n(float, result.frames + 1);
+    result.right = ecs_os_malloc_n(float, result.frames + 1);
+    for (i = 0; i < result.frames; i ++) {
+        result.left[i] = (float)render_i16(result.bytes + 44 + i * 4) / 32768.0f;
+        result.right[i] = (float)render_i16(result.bytes + 44 + i * 4 + 2) / 32768.0f;
+    }
+
+    ecs_os_free(path);
+    ecs_os_free(name);
+
+    return result;
+}
+
+static void render_free(
+    render_wav_t *wav)
+{
+    ecs_os_free(wav->left);
+    ecs_os_free(wav->right);
+    ecs_os_free(wav->bytes);
+}
+
+/** Amplitude of a frequency in a span of samples, a Goertzel filter.
+ *
+ * @param data The samples
+ * @param count Number of samples
+ * @param frequency Hz
+ * @return The amplitude, 1 for a sine of peak 1
+ */
+static double render_tone(
+    const float *data,
+    int32_t count,
+    double frequency)
+{
+    double w = 2.0 * 3.14159265358979323846 * frequency / RENDER_RATE;
+    double c = 2.0 * cos(w), s0, s1 = 0, s2 = 0;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        s0 = data[i] + c * s1 - s2;
+        s2 = s1;
+        s1 = s0;
+    }
+
+    return count ? 2.0 * sqrt(s1 * s1 + s2 * s2 - c * s1 * s2) / count : 0;
+}
+
+static float render_peak(
+    const render_wav_t *wav)
+{
+    float result = 0;
+    int32_t i;
+    for (i = 0; i < wav->frames; i ++) {
+        result = fabsf(wav->left[i]) > result ? fabsf(wav->left[i]) : result;
+    }
+
+    return result;
+}
+
+void Shell_audio_render_sound(void) {
+    ecs_world_t *world = render_world(false, true);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, RENDER_DT);
+
+    render_wav_t a = render_run(world, s, "audio render render_blip dur=0.5 tail=0.25", NULL);
+    render_wav_t b = render_run(world, s, "audio render render_blip dur=0.5 tail=0.25", NULL);
+    test_int(a.frames, RENDER_RATE * 3 / 4);
+    test_int(a.size, b.size);
+    test_assert(!memcmp(a.bytes, b.bytes, (size_t)a.size));
+    test_assert(render_peak(&a) > 0.1f);
+    test_assert(render_tone(a.left + 4800, 9600, 440) > 0.05);
+
+    render_wav_t c = render_run(world, s, "audio render render_blip dur=0.2 tail=0.1", NULL);
+    test_int(c.frames, RENDER_RATE * 3 / 10);
+
+    render_wav_t d = render_run(world, s, "audio render render_blip note=A5 dur=0.2 tail=0",
+        NULL);
+    test_int(d.frames, RENDER_RATE / 5);
+    test_assert(render_tone(d.left + 2400, 4800, 880) > 0.05);
+    test_assert(render_tone(d.left + 2400, 4800, 440) < 0.01);
+
+    render_wav_t e = render_run(world, s, "audio render render_blip dur=0.2", NULL);
+    test_assert(e.frames > RENDER_RATE / 5);
+    test_assert(e.frames < RENDER_RATE);
+
+    render_wav_t f = render_run(world, s, "audio render render_keys note=69 vel=0.5 dur=0.3 "
+        "tail=0.2", NULL);
+    test_int(f.frames, RENDER_RATE / 2);
+    test_assert(render_peak(&f) > 0.01f);
+
+    render_free(&a);
+    render_free(&b);
+    render_free(&c);
+    render_free(&d);
+    render_free(&e);
+    render_free(&f);
+    ecs_fini(world);
+}
+
+void Shell_audio_render_isolated(void) {
+    static float with[RENDER_TAP_MAX * 2];
+    int32_t i, frames = 0, count;
+
+    ecs_world_t *world = render_world(true, true);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    for (i = 0; i < 20; i ++) {
+        test_bool(ecs_progress(world, RENDER_DT), true);
+    }
+
+    render_wav_t wav = render_run(world, s, "audio render render_blip dur=0.3 tail=0.2",
+        &frames);
+    test_assert(20 + frames < RENDER_LIVE_FRAMES);
+    for (i = 20 + frames; i < RENDER_LIVE_FRAMES; i ++) {
+        test_bool(ecs_progress(world, RENDER_DT), true);
+    }
+
+    test_int(wav.frames, RENDER_RATE / 2);
+    test_assert(render_tone(wav.left + 2400, 9600, 440) > 0.05);
+    test_assert(render_tone(wav.left + 2400, 9600, 1000) < 0.001);
+    count = render_tap_count;
+    test_assert(count > RENDER_RATE);
+    memcpy(with, render_tap, (size_t)count * 2 * sizeof(float));
+    render_free(&wav);
+    ecs_fini(world);
+
+    world = render_world(true, true);
+    for (i = 0; i < RENDER_LIVE_FRAMES; i ++) {
+        test_bool(ecs_progress(world, RENDER_DT), true);
+    }
+
+    test_int(render_tap_count, count);
+    test_assert(!memcmp(with, render_tap, (size_t)count * 2 * sizeof(float)));
+    ecs_fini(world);
+}
+
+void Shell_audio_render_stem(void) {
+    ecs_world_t *world = render_world(false, false);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    render_song(world);
+
+    render_wav_t low = render_run(world, s, "audio render render_low bars=1..2", NULL);
+    render_wav_t high = render_run(world, s, "audio render render_high bars=1..2", NULL);
+    render_wav_t both = render_run(world, s, "audio render song bars=1..2", NULL);
+    render_wav_t muted = render_run(world, s, "audio render song bars=1..2 mute=render_low",
+        NULL);
+    test_int(low.frames, RENDER_RATE * 4);
+    test_int(high.frames, RENDER_RATE * 4);
+    test_assert(render_tone(low.left + RENDER_RATE, RENDER_RATE, 220) > 0.05);
+    test_assert(render_tone(low.left + RENDER_RATE, RENDER_RATE, 1760) < 0.001);
+    test_assert(render_tone(high.left + RENDER_RATE, RENDER_RATE, 1760) > 0.05);
+    test_assert(render_tone(high.left + RENDER_RATE, RENDER_RATE, 220) < 0.001);
+    test_assert(render_tone(both.left + RENDER_RATE, RENDER_RATE, 220) > 0.05);
+    test_assert(render_tone(both.left + RENDER_RATE, RENDER_RATE, 1760) > 0.05);
+    test_assert(render_tone(muted.left + RENDER_RATE, RENDER_RATE, 220) < 0.001);
+    test_assert(render_tone(muted.left + RENDER_RATE, RENDER_RATE, 1760) > 0.05);
+    test_int(ecs_get(world, ecs_lookup(world, "render_low"), AudioBus)->mute, false);
+    test_int(ecs_get(world, ecs_lookup(world, "render_low"), AudioBus)->solo, false);
+    render_free(&low);
+    render_free(&high);
+    render_free(&both);
+    render_free(&muted);
+    ecs_fini(world);
+}
+
+void Shell_audio_render_section(void) {
+    ecs_world_t *world = render_world(false, false);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    render_song(world);
+    const Transport before = *ecs_singleton_get(world, Transport);
+
+    render_wav_t wav = render_run(world, s, "audio render song bars=2..3", NULL);
+    test_int(wav.frames, RENDER_RATE * 4);
+    test_assert(render_peak(&wav) > 0.1f);
+
+    render_wav_t beats = render_run(world, s, "audio render song beats=4..6 tail=0.5", NULL);
+    test_int(beats.frames, RENDER_RATE * 3 / 2);
+
+    const Transport *after = ecs_singleton_get(world, Transport);
+    test_bool(after->playing, before.playing);
+    test_flt(after->position, before.position);
+    test_bool(after->loop, before.loop);
+    render_free(&wav);
+    render_free(&beats);
+    ecs_fini(world);
+}
+
+void Shell_audio_render_faster(void) {
+    ecs_world_t *world = render_world(false, false);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    render_song(world);
+
+    ecs_time_t start;
+    ecs_time_measure(&start);
+    render_wav_t wav = render_run(world, s, "audio render song bars=1..4", NULL);
+    double seconds = ecs_time_measure(&start);
+    test_int(wav.frames, RENDER_RATE * 8);
+    test_assert(seconds < 8.0);
+    render_free(&wav);
+    ecs_fini(world);
+}
+
+void Shell_audio_render_capture(void) {
+    ecs_world_t *world = render_world(true, false);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    render_song(world);
+    int32_t i, from = render_tap_count;
+    Transport *tr = ecs_singleton_ensure(world, Transport);
+    tr->position = 0;
+    tr->loop = false;
+    tr->playing = true;
+    ecs_singleton_modified(world, Transport);
+    for (i = 0; i < 150; i ++) {
+        test_bool(ecs_progress(world, RENDER_DT), true);
+    }
+
+    tr = ecs_singleton_ensure(world, Transport);
+    tr->playing = false;
+    ecs_singleton_modified(world, Transport);
+    ecs_progress(world, RENDER_DT);
+
+    render_wav_t wav = render_run(world, s, "audio render song bars=1..1", NULL);
+    test_int(wav.frames, RENDER_RATE * 2);
+    double diff = 0, sum = 0;
+    for (i = 0; i < wav.frames; i ++) {
+        double d = (double)wav.left[i] - (double)render_tap[(from + i) * 2];
+        diff += d * d;
+        sum += (double)wav.left[i] * (double)wav.left[i];
+    }
+
+    test_assert(sum > 0);
+    test_assert(sqrt(diff / wav.frames) < 0.01);
+    render_free(&wav);
+    ecs_fini(world);
+}
+
+void Shell_audio_render_errors(void) {
+    ecs_world_t *world = render_world(false, true);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_entity_t made = ecs_entity(world, { .name = "render_c_bus" });
+    ecs_ensure(world, made, AudioBus)->volume = 1;
+    ecs_modified(world, made, AudioBus);
+    ecs_progress(world, RENDER_DT);
+    const char *lines[] = {
+        "audio render",
+        "audio render nothing_here",
+        "audio render render_drone",
+        "audio render render_blip bars=1..2",
+        "audio render render_blip note=H2",
+        "audio render render_blip vel=2",
+        "audio render render_blip dur=50 tail=20",
+        "audio render render_blip loud",
+        "audio render song",
+        "audio render render_c_bus dur=1",
+        "audio volume 1 note=C2"
+    };
+
+    int32_t i;
+    for (i = 0; i < (int32_t)(sizeof(lines) / sizeof(lines[0])); i ++) {
+        bool error = false;
+        char *out = box_command_run(world, s, lines[i], &error);
+        test_bool(error, true);
+        ecs_os_free(out);
+    }
+
+    bool error = true;
+    char *out = box_command_run(world, s, "audio render nothing_here", &error);
+    test_assert(strstr(out, "not found") != NULL);
+    ecs_os_free(out);
+    out = box_command_run(world, s, "audio render render_drone", &error);
+    test_assert(strstr(out, "not a sound, an instrument or a bus") != NULL);
+    ecs_os_free(out);
+    out = box_command_run(world, s, "audio render song", &error);
+    test_assert(strstr(out, "no song is loaded") != NULL);
     ecs_os_free(out);
     ecs_fini(world);
 }

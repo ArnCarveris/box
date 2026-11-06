@@ -65,16 +65,17 @@ builtins of the flecs shell (`ls`, `get`, `set`, `query`, ...):
 | `audio volume <v>` | Set `AudioSettings.master_volume`, 0 to 4 |
 | `audio mute [on\|off]` | Set or toggle `AudioSettings.mute` |
 | `audio capture <seconds>` | Record the master output to a 16 bit stereo WAV resource |
+| `audio render <subject> [options]` | Render a sound, instrument, bus stem or song section on its own, faster than real time, to a WAV resource |
 | `fps [rate]`, `frames` | Toggle the fps panel or cap the rate, print the frame timing |
 | `edit [on\|off]` | Open or close the editor |
 | `logs [level] [count]` | Show the last log messages |
 | `key_*`, `mouse_*`, `action_*` | Send input, see `help` |
 
 `capture` of a camera that a view renders shows it as on screen, with the debug drawing of the
-view. `capture` and `audio capture` return a resource at once and fill it when the frames are in;
-fetch it with `GET /shell/session/<id>/resource/<name>`, which is empty until then. In the
-browser, which has no REST port, `audio capture` writes `/tmp/audio_capture_<n>.wav` in the file
-system of the page and returns that path. Headless with a fixed `--delta-time`, two runs capture
+view. `capture`, `audio capture` and `audio render` return a resource at once and fill it when the
+frames are in; fetch it with `GET /shell/session/<id>/resource/<name>`, which is empty until then.
+In the browser, which has no REST port, `audio capture` writes `/tmp/audio_capture_<n>.wav` and
+`audio render` `/tmp/audio_render_<n>.wav` in the file system of the page and return that path. Headless with a fixed `--delta-time`, two runs capture
 identical audio, so a render can be listened to and compared. See [docs/audio.md](docs/audio.md).
 
 ## Screenshots
