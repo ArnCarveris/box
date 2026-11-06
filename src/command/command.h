@@ -127,7 +127,6 @@ char* box_cmd_render_resource(
 void box_cmd_audio_init(
     ecs_world_t *world);
 
-<<<<<<< HEAD
 /** Set or toggle the solo of a bus, or clear every solo with none, as a script writes
  * AudioBus.
  *
@@ -192,7 +191,7 @@ char* box_cmd_audio_note(
     const char *note,
     const char *vel,
     const char *dur);
-=======
+
 /** Analyze a WAV for the audio analyze action: loudness, peaks, bands, stereo, onsets, tail,
  * silence, clicks, discontinuities, pitch and, for a capture of a song, a table per bar.
  *
@@ -233,7 +232,6 @@ char* box_cmd_audio_chords(
     ecs_world_t *world,
     int32_t argc,
     const char **argv);
->>>>>>> 1cde799b5b3139d3ab3a75b563906ec8f7299e0e
 
 /** Register the fit command that moves a camera to a tight fit of its scene.
  *
