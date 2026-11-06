@@ -415,7 +415,7 @@ DAW.seek = (beats) => {
   DAW.lastPos = { pos: Math.max(0, beats), time: performance.now(), playing: DAW.lastPos.playing };
 };
 
-DAW.select = (path) => {
+DAW.select = (path, insert) => {
   if (DAW.detailPath && path && path !== DAW.sel) {
     DAW.detailPath = path;
     const url = new URL(location.href);
@@ -424,6 +424,7 @@ DAW.select = (path) => {
     document.title = `${DAW.leaf(path)} - box daw`;
   }
   DAW.sel = path;
+  DAW.selInsert = !!(path && insert);
   DAW.emit("select");
 };
 

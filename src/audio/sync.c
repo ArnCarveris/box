@@ -1591,12 +1591,37 @@ static void box_audio_status(
     }
 }
 
+/** Note the beat, tempo and bar length a capture starts at while a song that is ready plays,
+ * so the WAV of the capture tells where its bars are.
+ *
+ * @param world The world
+ * @param job The capture that starts
+ */
+static void box_audio_capture_song(
+    ecs_world_t *world,
+    box_audio_capture_job_t *job)
+{
+    const AudioSongStatus *status = ecs_singleton_get(world, AudioSongStatus);
+    const Transport *tr = ecs_singleton_get(world, Transport);
+    job->has_song = false;
+    if (status && status->state == SongReady && tr && tr->playing && tr->tempo > 0 &&
+        tr->beats_per_bar > 0 && tr->beat_unit > 0)
+    {
+        job->has_song = true;
+        job->song.start_beat = tr->position;
+        job->song.tempo = tr->tempo;
+        job->song.bar_beats = (float)tr->beats_per_bar * 4.0f / (float)tr->beat_unit;
+    }
+}
+
 /** Start the capture that waits and write the file of a capture that is complete.
  *
+ * @param world The world
  * @param state The state
  * @param t The transport, NULL for none
  */
 static void box_audio_capture_update(
+    ecs_world_t *world,
     box_audio_module_t *state,
     box_audio_transport_t *t)
 {
@@ -1625,12 +1650,14 @@ static void box_audio_capture_update(
         }
 
         job->serial = state->serial;
+        box_audio_capture_song(world, job);
         goto done;
     }
 
     data = t->capture_take(t, &frames);
     if (data) {
-        box_audio_wav_write(job->path, data, frames, (int32_t)t->sample_rate);
+        box_audio_wav_write(job->path, data, frames, (int32_t)t->sample_rate,
+            job->has_song ? &job->song : NULL);
         ecs_os_free(data);
         goto drop;
     }
@@ -1754,7 +1781,7 @@ static void BoxAudioSync(
     box_audio_music_send(world, state, t);
     box_audio_meters_update(world, state, t);
     box_audio_status(world, state, t);
-    box_audio_capture_update(state, t);
+    box_audio_capture_update(world, state, t);
     state->time += (double)it->delta_time;
 }
 

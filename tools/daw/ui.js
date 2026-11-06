@@ -251,6 +251,7 @@ UI.knob = (opts) => {
     if (m.def !== undefined) commit(m.def);
   });
   el.addEventListener("wheel", (e) => {
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
     e.preventDefault();
     const step = (e.shiftKey ? 0.002 : 0.02) * Math.sign(-e.deltaY);
     commit(UI.fromNorm(UI.toNorm(value || 0, m) + step, m));

@@ -1632,6 +1632,9 @@ Importing box alone does not open an output: `box_app_run` does.
 | `audio note <sound\|instrument> <note> [vel] [dur]` | Play one note now, velocity 0..1 (default 1), for `dur` seconds (default 0.5) |
 | `audio capture <seconds>` | Record master output as a 16-bit stereo WAV resource |
 | `audio song [<file>\|none]` | Show the song, load a song file or unload it |
+| `audio analyze <wav> [from] [to]` | Print a text report of a WAV resource or file, optionally of the seconds from..to |
+| `audio notes <track> [bars=a..b] [roll]` | Print the notes of a track per bar, or as a piano roll |
+| `audio chords [track...] [bars=a..b]` | Print the chords and the key of a section from the notes |
 
 Solo, mute and bypass judge one element of a mix without editing the song. Solo and
 mute write `AudioBus` and bypass adds or removes `Disabled` on the effect entity, as a
@@ -1656,6 +1659,104 @@ Headless with fixed `--delta-time`, repeated runs capture bit-identical audio on
 the same build. Use this to render music, compare changes or inspect scenes offline.
 `PerfStatus.audio_load` records the largest load of the run; worklet load reports
 zero because it has no suitable high-resolution timer.
+
+`audio analyze` reads a resource of the session (the name `audio capture` returns), else a
+WAV file (PCM of 8 to 32 bits or float, mono or stereo); in the browser, a file of the page such
+as a capture. It prints one line per measure, each number with its unit:
+
+| Line | Measures |
+| --- | --- |
+| `loudness` | Integrated loudness (BS.1770 K-weighting, EBU R128 gating) in LUFS, loudness range in LU, short-term (3 s) and momentary (400 ms) maxima |
+| `peak` | Sample peak and true peak (4x oversampled) in dBFS, RMS, crest factor, clipped samples (at full scale next to another one) |
+| `dc offset` | Mean of each channel, full scale 1 |
+| `bands` | Energy of sub 20-60, low 60-250, low-mid 250-500, mid 500-2k, presence 2k-6k, brilliance 6k-12k and air 12k-20k Hz in dB of the total |
+| `spectrum` | Spectral centroid and 85% rolloff in Hz |
+| `stereo` | L/R correlation, side over mid in dB, loudness lost when summed to mono |
+| `onsets` | Count and the first 16: time and rise in dB |
+| `attack`, `tail` | 10% to 90% rise of the first onset; time from the peak after the last onset to 60 dB below it, or how far it fell when the span ends first |
+| `silence`, `clicks` | Leading and trailing time under -60 dBFS; a first or last sample over -40 dBFS |
+| `discontinuities` | Sample steps far above the local slope: count and the first 8 |
+| `pitch` | Fundamental in Hz with note and cents, its spread in cents, harmonic to noise ratio and voiced share, or no stable pitch |
+
+A capture that starts while a song plays stores the beat, tempo and bar length it started at in a
+`bxsg` chunk of its WAV. Its report ends with a line per bar (64 at most): the loudness of the
+bar in LUFS and the band that changed the most against the whole span, counting a band at
+40 dB under the total as at least that. A tempo change or loop wrap during the capture is not
+followed. The same WAV and span give the same text. The measures are a plain C library,
+[analyze.h](../src/audio/analyze.h).
+
+`audio notes` and `audio chords` read only the note data of the tracks, their
+placements and clips, so they work without an output and without a device. A
+note prints once per placement and pass of a loop, at its programmed position,
+before swing and humanize; disabled placements are left out. Bars count from 1
+in the time signature of the `Song`, else of the `Transport`, and `bars=a..b`
+(or `bars=a`) picks a section; without it the bars run to the end of the song or
+of the last note.
+
+```
+> audio notes lead
+notes of lead: pitched, instrument lead_inst, 4/4 at 120 bpm, bars 1..4, 6 notes; ...
+bar 1: 1.1.000 C5 1/4 v0.80, 1.2.000 E5 1/8 v0.60, 1.2.240 G5 1/8 v0.60
+bar 2: -
+> audio notes duo roll bars=1
+roll of duo: pitched, ...; a column per 1/16, x starts, = holds, . silent
+   |1
+E4 |........x=......|
+C4 |x===............|
+```
+
+A position is bar.beat.tick, 480 ticks a beat of the time signature; C4 is MIDI
+60 and a microtone carries its cents (`A4+25c`). A length that is an exact note
+value prints as a share of a whole note (`1/4` a quarter, `3/8` a dotted quarter,
+`1/12` an eighth triplet), else in beats; the velocity is 0..1. The roll has one
+row per pitch the track plays in the bars, highest first, and one column per
+sixteenth, with `|` between bars. A run of bars without notes prints as one line
+(`bars 5..8: -`).
+
+A drum track is listed per sound instead of per pitch and left out of the
+chords. A track is a drum track when the name of the track, its instrument or
+its sound holds a drum word (kick, snare, hat, hihat, clap, tom, ride, crash,
+cymbal, perc, drum, rim, shaker, tamb, cowbell, conga, bongo, clave, kit and a
+few more, as a word of the name: `dk_kick_sound`, `MvKick`), or when its
+instrument has no `gate` and plays a single pitch, a one shot hit. Its sound is
+the name of the sound of the instrument, with the pitch after a colon when the
+track plays several (`tom_sound:A2`).
+
+`audio chords` names chords from the pitched notes that sound together in the
+named tracks, by default every enabled track that has notes. In each span every
+pitch class weighs the beats it sounds, and the classes of at least a fifth of
+the weight of the strongest make the chord, so passing notes drop out. The bass
+is the lowest note of those classes. The chord is the one whose notes are the
+set (a seventh chord may drop its fifth); when none fits four or more classes
+the weakest one is left out once. Qualities print as `C`, `Cm`, `C7`, `Cmaj7`,
+`Cm7`, `Cm7b5`, `Cdim`, `Caug`, `Csus4`, `Csus2`, `Cadd9`, `Cdim7` and `C5`, an
+inverted bass as a slash chord (`C/E`), a set that fits no chord as its classes
+(`[C D F#]`) and silence as `N.C.`.
+
+The span of a chord is a bar, or a beat when the notes are dense enough to
+name a chord per beat, at least three pitch classes per beat on average, and a
+bar holds two chords for at least two of its beats each (one in a bar of fewer
+than four beats). The header says which. Equal chords in a row print as one
+line with their length in beats.
+
+```
+> audio chords
+chords of bars 1..4 from bass, keys, lead; drums left out: kick; a chord per bar (3.4 pitch classes per beat)
+1.1 C 4 beats: C E G
+2.1 Am 4 beats: A C E
+3.1 F 4 beats: F A C
+4.1 G7 4 beats: G B D F
+key of the bars: C major (r 0.95), then A minor (r 0.79)
+key of the song: C major (r 0.95), then A minor (r 0.79)
+outside C major: none
+```
+
+The key is the major or minor Krumhansl-Kessler profile that correlates best
+(r) with the beats of each pitch class, of the bars and of the whole song, with
+the next most likely one. Chords and notes are spelled with flats in a flat key.
+The notes outside the key of the bars, its major scale or its natural minor
+scale with the raised seventh, are listed per pitch class with their count and
+first positions.
 
 If a track is silent, check sample readiness, its instrument and overlapping
 placements. If a return is silent, check its send and insert assignment. `audio`

@@ -366,7 +366,11 @@ void Shell_help_lists_box_commands(void) {
     test_bool(error, false);
     test_assert(strstr(out, "key_press <key> [dur]  Tap a key, held for dur frames") != NULL);
     test_assert(strstr(out, "capture [camera]  Write a PNG") != NULL);
+<<<<<<< HEAD
     test_assert(strstr(out, "audio [action] [value] [arg] [vel] [dur]  Print the audio status") != NULL);
+=======
+    test_assert(strstr(out, "audio [action] [value] [args...]  Print the audio status") != NULL);
+>>>>>>> 1cde799b5b3139d3ab3a75b563906ec8f7299e0e
     test_assert(strstr(out, "\nls [scope]  ") != NULL);
     ecs_os_free(out);
 
@@ -666,6 +670,7 @@ void Shell_audio_command(void) {
     ecs_fini(world);
 }
 
+<<<<<<< HEAD
 /** Create a world with a headless audio output and run a script of test/assets/audio in it.
  *
  * @param path The script
@@ -681,10 +686,185 @@ static ecs_world_t* shell_audio_world(
     test_assert(file != NULL);
     test_int(ecs_script_run_file(world, file), 0);
     ecs_os_free(file);
+=======
+void Shell_audio_analyze(void) {
+    // audio/analyze
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, 0.016f);
+
+    bool error = true;
+    char *out = box_command_run(world, s,
+        "audio analyze test/assets/audio/analyze_sine_1k.wav", &error);
+    test_bool(error, false);
+    const char *head = "analyze test/assets/audio/analyze_sine_1k.wav: 48000 Hz, mono, "
+        "2.000 s, span 0.000 to 2.000 s\nloudness: integrated -3.0";
+    test_assert(strncmp(out, head, strlen(head)) == 0);
+    test_assert(strstr(out, "\npeak: sample 0.00 dBFS, true ") != NULL);
+    test_assert(strstr(out, ", clipped 0 samples\ndc offset: ") != NULL);
+    test_assert(strstr(out, "\nbands: sub ") != NULL);
+    test_assert(strstr(out, ", mid 0.0 dB, presence ") != NULL);
+    test_assert(strstr(out, "\nspectrum: centroid ") != NULL);
+    test_assert(strstr(out, "\nstereo: mono file, correlation +1.00, side/mid -inf dB, "
+        "mono loss 0.0 dB") != NULL);
+    test_assert(strstr(out, "\nonsets: 1: 0.000 s +") != NULL);
+    test_assert(strstr(out, "\nattack: ") != NULL);
+    test_assert(strstr(out, "\ntail: cut short") != NULL);
+    test_assert(strstr(out, "\nsilence: leading 0.000 s, trailing ") != NULL);
+    test_assert(strstr(out, "\nclicks: start none, end ") != NULL);
+    test_assert(strstr(out, "\ndiscontinuities: 0\n") != NULL);
+    test_assert(strstr(out, "\npitch: 1000.0 Hz B5 +21 cents, spread ") != NULL);
+    test_assert(strstr(out, "\nbars:") == NULL);
+
+    char *again = box_command_run(world, s,
+        "audio analyze test/assets/audio/analyze_sine_1k.wav", &error);
+    test_bool(error, false);
+    test_str(again, out);
+    ecs_os_free(again);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio analyze test/assets/audio/analyze_sine_1k.wav 0.5 1",
+        &error);
+    test_bool(error, false);
+    test_assert(strstr(out, "2.000 s, span 0.500 to 1.000 s\n") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio analyze test/assets/audio/analyze_click.wav",
+        &error);
+    test_bool(error, false);
+    test_assert(strstr(out, "\nclicks: start 0.500 (-6.0 dBFS), end ") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio analyze test/assets/audio/analyze_decay.wav",
+        &error);
+    test_bool(error, false);
+    test_assert(strstr(out, "\ntail: 1.3") != NULL);
+    test_assert(strstr(out, " s to -60 dB after the onset at 0.000 s") != NULL);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+void Shell_audio_analyze_resource(void) {
+    // audio/analyze
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, 0.016f);
+
+    char *path = box_app_locate("test/assets/audio/analyze_inverted.wav");
+    test_assert(path != NULL);
+    FILE *f = fopen(path, "rb");
+    test_assert(f != NULL);
+    ecs_os_free(path);
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char *bytes = ecs_os_malloc((ecs_size_t)size);
+    test_assert(fread(bytes, 1, (size_t)size, f) == (size_t)size);
+    fclose(f);
+
+    ecs_shell_resource_t r = {0};
+    test_int(ecs_shell_resource_create(world, s, "audio/wav", bytes, (ecs_size_t)size, &r), 0);
+    ecs_os_free(bytes);
+    char *line = flecs_asprintf("audio analyze %s", r.name);
+    bool error = true;
+    char *out = box_command_run(world, s, line, &error);
+    test_bool(error, false);
+    char *head = flecs_asprintf("analyze %s: 48000 Hz, stereo, 1.000 s", r.name);
+    test_assert(strncmp(out, head, strlen(head)) == 0);
+    test_assert(strstr(out, "\nstereo: correlation -1.00, side/mid ") != NULL);
+    test_assert(strstr(out, ", mono loss 100.0 dB") != NULL);
+    ecs_os_free(head);
+    ecs_os_free(out);
+    ecs_os_free(line);
+    ecs_os_free(r.name);
+    ecs_os_free(r.content_type);
+
+    ecs_shell_resource_t empty = {0};
+    test_int(ecs_shell_resource_create(world, s, "audio/wav", NULL, 0, &empty), 0);
+    line = flecs_asprintf("audio analyze %s", empty.name);
+    out = box_command_run(world, s, line, &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "is empty") != NULL);
+    ecs_os_free(out);
+    ecs_os_free(line);
+    ecs_os_free(empty.name);
+    ecs_os_free(empty.content_type);
+    ecs_fini(world);
+}
+
+void Shell_audio_analyze_errors(void) {
+    // audio/analyze
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, 0.016f);
+
+    bool error = false;
+    char *out = box_command_run(world, s, "audio analyze", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "audio analyze needs a WAV") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s, "audio analyze test/assets/audio/missing.wav", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "cannot find 'test/assets/audio/missing.wav'") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s, "audio analyze test/assets/audio/analyze_adpcm.wav",
+        &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "unsupported WAV format") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s, "audio analyze test/assets/audio/corrupt.wav", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "not a WAV file") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s, "audio analyze test/assets/audio/analyze_sine_1k.wav 3 4",
+        &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "empty span") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio analyze test/assets/audio/analyze_sine_1k.wav 1 0.5", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "empty span") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio analyze test/assets/audio/analyze_sine_1k.wav soon", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "invalid span") != NULL);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+/** A world with the song of test/assets/audio/chords.flecs, no output and no device */
+static ecs_world_t* shell_chords_world(
+    ecs_entity_t *session)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    *session = ecs_shell_session_init(world, NULL);
+    char *path = box_app_locate("test/assets/audio/chords.flecs");
+    test_int(ecs_script_run_file(world, path), 0);
+    ecs_os_free(path);
+>>>>>>> 1cde799b5b3139d3ab3a75b563906ec8f7299e0e
 
     return world;
 }
 
+<<<<<<< HEAD
 /** Run frames of a fixed delta.
  *
  * @param world The world
@@ -1128,3 +1308,164 @@ void Shell_audio_note_capture(void) {
     ecs_os_free(wav);
     ecs_fini(world);
 }
+=======
+void Shell_audio_notes_placed_twice(void) {
+    ecs_entity_t s;
+    ecs_world_t *world = shell_chords_world(&s);
+    bool error = true;
+    char *out = box_command_run(world, s, "audio notes lead", &error);
+    test_bool(error, false);
+    test_assert(strncmp(out, "notes of lead: pitched, instrument chords_inst, 4/4 at 120 bpm, "
+        "bars 1..4, 6 notes;", 83) == 0);
+    test_assert(strstr(out,
+        "\nbar 1: 1.1.000 C5 1/4 v0.80, 1.2.000 E5 1/8 v0.60, 1.2.240 G5 1/8 v0.60"
+        "\nbar 2: -"
+        "\nbar 3: 3.1.000 C5 1/4 v0.80, 3.2.000 E5 1/8 v0.60, 3.2.240 G5 1/8 v0.60"
+        "\nbar 4: -") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio notes lead bars=3..3", &error);
+    test_bool(error, false);
+    test_assert(strstr(out, "bars 3..3, 3 notes;") != NULL);
+    test_assert(strstr(out, "\nbar 3: 3.1.000 C5 1/4 v0.80,") != NULL);
+    test_assert(strstr(out, "bar 1:") == NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio notes duo", &error);
+    test_bool(error, false);
+    const char *bars = strstr(out, "\nbar 1:");
+    test_str(bars, "\nbar 1: 1.1.000 C4 1/4 v1.00, 1.3.000 E4 1/8 v1.00\nbars 2..4: -");
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio notes lead", &error);
+    char *again = box_command_run(world, s, "audio notes lead", &error);
+    test_str(out, again);
+    ecs_os_free(again);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+void Shell_audio_notes_roll(void) {
+    ecs_entity_t s;
+    ecs_world_t *world = shell_chords_world(&s);
+    bool error = true;
+    char *out = box_command_run(world, s, "audio notes duo roll bars=1", &error);
+    test_bool(error, false);
+    test_assert(strncmp(out, "roll of duo: pitched", 20) == 0);
+    test_assert(strstr(out, "\nE4 |........x=......|\nC4 |x===............|") != NULL);
+    test_assert(strstr(out, "D4") == NULL);
+    const char *rows = strstr(out, "\nE4 |");
+    test_str(rows, "\nE4 |........x=......|\nC4 |x===............|");
+    int32_t lines = 0;
+    const char *ptr;
+    for (ptr = out; *ptr; ptr ++) {
+        lines += *ptr == '\n';
+    }
+
+    test_int(lines, 3);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio notes duo bars=1 roll", &error);
+    test_bool(error, false);
+    test_assert(strstr(out, "\nE4 |........x=......|\nC4 |x===............|") != NULL);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+void Shell_audio_notes_drums(void) {
+    ecs_entity_t s;
+    ecs_world_t *world = shell_chords_world(&s);
+    bool error = true;
+    char *out = box_command_run(world, s, "audio notes pulse bars=1..2", &error);
+    test_bool(error, false);
+    test_assert(strncmp(out, "notes of pulse: drums", 21) == 0);
+    test_assert(strstr(out, "\nbar 1: 1.1.000 chords_kick_sound 1/16 v1.00, "
+        "1.3.000 chords_kick_sound 1/16 v1.00") != NULL);
+    test_assert(strstr(out, "\nbar 2: 2.1.000 chords_kick_sound 1/16 v1.00, "
+        "2.3.000 chords_kick_sound 1/16 v1.00") != NULL);
+    test_assert(strstr(out, "C1") == NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio notes pulse roll bars=1", &error);
+    test_bool(error, false);
+    test_assert(strstr(out, "\nchords_kick_sound |x.......x.......|") != NULL);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+void Shell_audio_notes_errors(void) {
+    ecs_entity_t s;
+    ecs_world_t *world = shell_chords_world(&s);
+    bool error = false;
+    char *out = box_command_run(world, s, "audio notes", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    error = false;
+    out = box_command_run(world, s, "audio notes nope", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "no track 'nope'") != NULL);
+    ecs_os_free(out);
+    error = false;
+    out = box_command_run(world, s, "audio notes lead bars=3..1", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    error = false;
+    out = box_command_run(world, s, "audio notes lead loud", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    error = false;
+    out = box_command_run(world, s, "audio chords nope", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+void Shell_audio_chords_progression(void) {
+    ecs_entity_t s;
+    ecs_world_t *world = shell_chords_world(&s);
+    bool error = true;
+    char *out = box_command_run(world, s, "audio chords", &error);
+    test_bool(error, false);
+    test_assert(strncmp(out, "chords of bars 1..4 from bass, duo, keys, lead; "
+        "drums left out: pulse; a chord per bar (", 88) == 0);
+    test_assert(strstr(out,
+        "\n1.1 C 4 beats: C E G"
+        "\n2.1 Am 4 beats: A C E"
+        "\n3.1 F 4 beats: F A C"
+        "\n4.1 G7 4 beats: G B D F"
+        "\nkey of the bars: C major (r ") != NULL);
+    test_assert(strstr(out, "\nkey of the song: C major (r ") != NULL);
+    test_assert(strstr(out, "\noutside C major: none") != NULL);
+    char *again = box_command_run(world, s, "audio chords", &error);
+    test_str(out, again);
+    ecs_os_free(again);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+void Shell_audio_chords_tracks_and_bars(void) {
+    ecs_entity_t s;
+    ecs_world_t *world = shell_chords_world(&s);
+    bool error = true;
+    char *out = box_command_run(world, s, "audio chords keys bass bars=2..3", &error);
+    test_bool(error, false);
+    test_assert(strncmp(out, "chords of bars 2..3 from keys, bass; a chord per bar", 52) == 0);
+    test_assert(strstr(out, "\n2.1 Am 4 beats: A C E\n3.1 F 4 beats: F A C\nkey of the bars:")
+        != NULL);
+    test_assert(strstr(out, "1.1 C") == NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio chords keys bars=1", &error);
+    test_bool(error, false);
+    test_assert(strstr(out, "\n1.1 C 4 beats: C E G\n") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio chords pulse", &error);
+    test_bool(error, false);
+    test_assert(strstr(out, "no pitched track; drums left out: pulse") != NULL);
+    test_assert(strstr(out, "\n1.1 N.C. 16 beats") != NULL);
+    test_assert(strstr(out, "\nkey of the bars: none") != NULL);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+>>>>>>> 1cde799b5b3139d3ab3a75b563906ec8f7299e0e
