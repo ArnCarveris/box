@@ -1,11 +1,12 @@
 // Shadow pass: draws the shadow casters of a view into one cascade of its shadow map, depth
 // only. The cull pass writes the slots of the casters inside the cascade, which step per
-// instance; vs only reads the transform stream and the surface stream of the instance page
-// (group 1 without the shading stream).
-// Alpha tested casters (AlphaCutoff) draw with vs_cutout and fs_cutout, which also bind the
-// shading stream and the material table, read the alpha of the instance and the UV transform and
-// the cutoff of its material, and discard where the alpha times the albedo alpha of the batch
-// (group 2) is below the cutoff, as the forward pass does. A MappingObject or MappingWorld
+// instance. Every caster draws with vs, which reads the instance page with the shading stream
+// and the material table (group 1) and passes the alpha of the instance and the UV transform and
+// the cutoff of its material on, so a compiler that compiles the vertex stage for the inputs of
+// the fragment stage compiles it once. Plain casters draw with fs, which takes those inputs and
+// writes nothing. Alpha tested casters (AlphaCutoff) draw with fs_cutout, which discards where the
+// alpha times the albedo alpha of the batch (group 2) is below the cutoff, as the forward pass
+// does. A MappingObject or MappingWorld
 // material projects the UV in the fragment stage, as mesh.wgsl does (mapping_uv), and with a
 // blend above 0 blends the alpha of its three axis projections (mapping_alpha). Alpha tested
 // casters with a TextureBlend draw with fs_cutout_blend and fs_point_cutout_blend, which bind the
@@ -13,12 +14,12 @@
 // alpha of the layer albedos is below the cutoff (blend_alpha), so they cast the shadow they
 // show.
 //
-// Spot light tiles of the shadow atlas draw with vs and vs_cutout too. A point light tile is
-// drawn once per octant of its octahedron with vs_point and vs_point_cutout, the octant in the
-// uniforms (Praun and Hoppe, as Esoterica's octahedral shadows): each octant is a perspective
+// Spot light tiles of the shadow atlas draw with vs too. A point light tile is drawn once per
+// octant of its octahedron with vs_point, the octant in the uniforms (Praun and Hoppe, as Esoterica's octahedral shadows): each octant is a perspective
 // along the axis signs / sqrt(3) with fixed signs, and a triangle is kept to its octant by 3
 // half spaces. With BOX_SHADOW_CLIP_DISTANCES (the device has clip distances) they are clip
-// distances; without, fs_point and fs_point_cutout discard where one is negative.
+// distances, and the plain casters draw with fs; without, fs_point and fs_point_cutout discard
+// where one is negative.
 //
 // An atlas pass that keeps the tiles that did not change loads the atlas and clears each tile it
 // renders with vs_clear: a triangle over the viewport of the tile at depth 0, the reversed Z
@@ -63,11 +64,6 @@ const OCTANT_AXIS: f32 = 0.57735026919;
 @group(2) @binding(10) var blend_heights: texture_2d_array<f32>;
 
 struct VertexIn {
-    @location(0) position: vec3f,
-    @location(3) slot: u32,
-};
-
-struct CutoutIn {
     @builtin(vertex_index) vertex: u32,
     @location(0) position: vec3f,
     @location(1) normal: vec3f,
@@ -75,10 +71,10 @@ struct CutoutIn {
     @location(3) slot: u32,
 };
 
-// The UV of an alpha tested vertex, or for a MappingObject or MappingWorld material (mapped 1
-// plus its blend) the offset of its projection, with the object (or world) position and normal
-// mapping_uv projects, as mesh.wgsl has them.
-struct CutoutOut {
+// The UV of a vertex, or for a MappingObject or MappingWorld material (mapped 1 plus its blend)
+// the offset of its projection, with the object (or world) position and normal mapping_uv
+// projects, as mesh.wgsl has them.
+struct CasterOut {
     @builtin(position) pos: vec4f,
     @location(0) uv: vec2f,
     @location(1) @interpolate(flat) alpha: f32,
@@ -91,16 +87,6 @@ struct CutoutOut {
 // A vertex of a caster in an octant of a point light tile, with the 3 half space distances of
 // the octant.
 struct PointOut {
-    @builtin(position) pos: vec4f,
-#ifdef BOX_SHADOW_CLIP_DISTANCES
-    @builtin(clip_distances) clip: array<f32, 3>,
-#else
-    @location(0) clip: vec3f,
-#endif
-};
-
-// An alpha tested vertex of a caster in an octant of a point light tile.
-struct PointCutoutOut {
     @builtin(position) pos: vec4f,
     @location(0) uv: vec2f,
     @location(1) @interpolate(flat) alpha: f32,
@@ -176,16 +162,12 @@ fn octant_distances(world: vec3f) -> vec3f {
     return vec4f(corner * 2.0 - 1.0, 0.0, 1.0);
 }
 
-@vertex fn vs(v: VertexIn) -> @builtin(position) vec4f {
-    return caster_position(v.slot, v.position);
-}
-
-// The alpha tested attributes of a vertex: the UV as vs of mesh.wgsl transforms it (the side
+// The alpha test attributes of a vertex: the UV as vs of mesh.wgsl transforms it (the side
 // region of a kind 7 surface, whose UVs start two tiles over, moves back, and a MappingObject
 // material on a Sweep takes lengths over its size), or the projection of
 // a MappingObject or MappingWorld material on a plain mesh, the alpha of the instance and the
 // cutoff of its material. Reads surface_data, so the position comes first.
-fn cutout_attributes(v: CutoutIn, o: ptr<function, CutoutOut>) {
+fn cutout_attributes(v: VertexIn, o: ptr<function, CasterOut>) {
     let shading = shadings[v.slot];
     let material = material_fetch(shading.material);
     (*o).uv = v.uv * material.uv.xy + material.uv.zw;
@@ -222,8 +204,8 @@ fn cutout_attributes(v: CutoutIn, o: ptr<function, CutoutOut>) {
     (*o).cutoff = material.cutoff;
 }
 
-@vertex fn vs_cutout(v: CutoutIn) -> CutoutOut {
-    var o: CutoutOut;
+@vertex fn vs(v: VertexIn) -> CasterOut {
+    var o: CasterOut;
     o.pos = caster_position(v.slot, v.position);
     cutout_attributes(v, &o);
     return o;
@@ -240,7 +222,10 @@ fn cutout_test(uv: vec2f, alpha: f32, cutoff: f32, mapped: f32, object: vec4f,
     }
 }
 
-@fragment fn fs_cutout(f: CutoutOut) {
+@fragment fn fs(f: CasterOut) {
+}
+
+@fragment fn fs_cutout(f: CasterOut) {
     cutout_test(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
 }
 
@@ -255,29 +240,16 @@ fn cutout_test_blend(uv: vec2f, alpha: f32, cutoff: f32, mapped: f32, object: ve
     }
 }
 
-@fragment fn fs_cutout_blend(f: CutoutOut) {
+@fragment fn fs_cutout_blend(f: CasterOut) {
     cutout_test_blend(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
 }
 
 @vertex fn vs_point(v: VertexIn) -> PointOut {
     let world = caster_world(v.slot, v.position);
     let d = octant_distances(world);
-    var o: PointOut;
-    o.pos = octant_position(world);
-#ifdef BOX_SHADOW_CLIP_DISTANCES
-    o.clip = array<f32, 3>(d.x, d.y, d.z);
-#else
-    o.clip = d;
-#endif
-    return o;
-}
-
-@vertex fn vs_point_cutout(v: CutoutIn) -> PointCutoutOut {
-    let world = caster_world(v.slot, v.position);
-    let d = octant_distances(world);
-    var c: CutoutOut;
+    var c: CasterOut;
     cutout_attributes(v, &c);
-    var o: PointCutoutOut;
+    var o: PointOut;
     o.pos = octant_position(world);
     o.uv = c.uv;
     o.alpha = c.alpha;
@@ -295,11 +267,11 @@ fn cutout_test_blend(uv: vec2f, alpha: f32, cutoff: f32, mapped: f32, object: ve
 
 #ifdef BOX_SHADOW_CLIP_DISTANCES
 // The clip distances already kept the fragment to its octant.
-@fragment fn fs_point_cutout(f: CutoutOut) {
+@fragment fn fs_point_cutout(f: CasterOut) {
     cutout_test(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
 }
 
-@fragment fn fs_point_cutout_blend(f: CutoutOut) {
+@fragment fn fs_point_cutout_blend(f: CasterOut) {
     cutout_test_blend(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
 }
 #else
@@ -314,12 +286,12 @@ fn octant_discard(clip: vec3f) {
     octant_discard(f.clip);
 }
 
-@fragment fn fs_point_cutout(f: PointCutoutOut) {
+@fragment fn fs_point_cutout(f: PointOut) {
     cutout_test(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
     octant_discard(f.clip);
 }
 
-@fragment fn fs_point_cutout_blend(f: PointCutoutOut) {
+@fragment fn fs_point_cutout_blend(f: PointOut) {
     cutout_test_blend(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
     octant_discard(f.clip);
 }

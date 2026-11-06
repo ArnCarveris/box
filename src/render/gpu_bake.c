@@ -643,6 +643,7 @@ static void box_gpu_bake_draws(
                 .count = rb->instance_count,
                 .pipeline = box_gpu_forward_pipeline(gpu, BOX_GPU_HDR_FORMAT, rb, false),
                 .material = box_gpu_material_group(gpu, packet, rb),
+                .kind = box_gpu_draw_kind(rb, false),
                 .instances = box_gpu_instance_group(gpu, rb->instances, rb->mesh, m, true),
                 .page = box_gpu_instance_group(gpu, rb->instances, 0, NULL, false),
                 .vertices = m->vertices,
@@ -965,7 +966,7 @@ static bool box_gpu_bake_draws_equal(
         const box_gpu_bake_draw_t *x = ecs_vec_get_t(a, box_gpu_bake_draw_t, d);
         const box_gpu_bake_draw_t *y = ecs_vec_get_t(b, box_gpu_bake_draw_t, d);
         result = x->region == y->region && x->count == y->count &&
-            x->pipeline == y->pipeline && x->material == y->material &&
+            x->pipeline == y->pipeline && x->material == y->material && x->kind == y->kind &&
             x->instances == y->instances && x->vertices == y->vertices &&
             x->indices == y->indices;
     }
@@ -998,6 +999,7 @@ static WGPURenderBundle box_gpu_bake_bundle(
         });
     WGPURenderPipeline pipeline = NULL;
     WGPUBindGroup material = NULL, instances = NULL;
+    uint32_t kind = 0;
     uint32_t offset = (uint32_t)(face * BOX_GPU_VIEW_STRIDE);
     int32_t d, draws = ecs_vec_count(&b->draws);
     wgpuRenderBundleEncoderSetBindGroup(e, 0, s->faces_group, 1, &offset);
@@ -1015,9 +1017,10 @@ static WGPURenderBundle box_gpu_bake_bundle(
             pipeline = draw->pipeline;
         }
 
-        if (draw->material != material) {
-            wgpuRenderBundleEncoderSetBindGroup(e, 1, draw->material, 0, NULL);
+        if (draw->material != material || draw->kind != kind) {
+            wgpuRenderBundleEncoderSetBindGroup(e, 1, draw->material, 1, &draw->kind);
             material = draw->material;
+            kind = draw->kind;
         }
 
         if (draw->instances != instances) {
