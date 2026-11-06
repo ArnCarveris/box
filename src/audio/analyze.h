@@ -186,6 +186,15 @@ float box_audio_analyze_band_high(
 const char* box_audio_analyze_band_name(
     int32_t band);
 
+/** Fill a periodic Hann window, the window of the spectrum of the analysis.
+ *
+ * @param window Receives size values
+ * @param size Size of the window
+ */
+void box_audio_hann(
+    float *window,
+    int32_t size);
+
 /** Set up a real FFT.
  *
  * @param fft The FFT

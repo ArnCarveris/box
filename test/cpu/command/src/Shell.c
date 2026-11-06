@@ -820,6 +820,149 @@ void Shell_audio_analyze_errors(void) {
     ecs_fini(world);
 }
 
+/** Read a PNG resource of a session and check its content type and signature.
+ *
+ * @param world The world
+ * @param s The session
+ * @param name The name of the resource
+ * @param size Receives the bytes
+ * @return The bytes, which the caller frees
+ */
+static uint8_t* shell_png_read(
+    ecs_world_t *world,
+    ecs_entity_t s,
+    const char *name,
+    ecs_size_t *size)
+{
+    const char *type = NULL;
+    uint8_t *bytes = ecs_shell_resource_read(world, s, name, size, &type);
+    test_assert(bytes != NULL);
+    test_assert(*size > 8);
+    test_str(type, "image/png");
+    test_assert(!memcmp(bytes, "\x89PNG\r\n\x1a\n", 8));
+
+    return bytes;
+}
+
+void Shell_audio_plot(void) {
+    // audio/plot
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, 0.016f);
+
+    bool error = true;
+    char *a = box_command_run(world, s, "audio plot test/assets/audio/analyze_sine_1k.wav",
+        &error);
+    test_bool(error, false);
+    test_assert(a != NULL);
+    error = true;
+    char *b = box_command_run(world, s, "audio plot test/assets/audio/analyze_sine_1k.wav "
+        "spectrogram", &error);
+    test_bool(error, false);
+    test_assert(b != NULL);
+    test_assert(strcmp(a, b) != 0);
+
+    ecs_size_t size_a = 0, size_b = 0;
+    uint8_t *png_a = shell_png_read(world, s, a, &size_a);
+    uint8_t *png_b = shell_png_read(world, s, b, &size_b);
+    test_int(size_a, size_b);
+    test_assert(!memcmp(png_a, png_b, (size_t)size_a));
+    ecs_os_free(png_a);
+    ecs_os_free(png_b);
+    ecs_os_free(a);
+    ecs_os_free(b);
+
+    const char *lines[] = {
+        "audio plot test/assets/audio/analyze_sine_1k.wav waveform size=640x320 from=0.5 to=1",
+        "audio plot test/assets/audio/analyze_inverted.wav spectrum min_db=-80",
+        "audio plot test/assets/audio/analyze_decay.wav loudness",
+        "audio plot test/assets/audio/analyze_click.wav spectrogram size=300x200 min_db=-120"
+    };
+
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        error = true;
+        char *out = box_command_run(world, s, lines[i], &error);
+        test_bool(error, false);
+        test_assert(out != NULL);
+        ecs_size_t size = 0;
+        uint8_t *png = shell_png_read(world, s, out, &size);
+        ecs_os_free(png);
+        ecs_os_free(out);
+    }
+
+    ecs_fini(world);
+}
+
+void Shell_audio_plot_errors(void) {
+    // audio/plot
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, 0.016f);
+
+    bool error = false;
+    char *out = box_command_run(world, s, "audio plot", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "audio plot needs a WAV") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s, "audio plot test/assets/audio/missing.wav", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "cannot find 'test/assets/audio/missing.wav'") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s, "audio plot missing_resource waveform", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "cannot find 'missing_resource'") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s, "audio plot test/assets/audio/corrupt.wav", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "not a WAV file") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s, "audio plot test/assets/audio/analyze_sine_1k.wav pie",
+        &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "unknown plot argument 'pie'") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio plot test/assets/audio/analyze_sine_1k.wav size=10x10", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "invalid size") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio plot test/assets/audio/analyze_sine_1k.wav min_db=6", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "invalid min_db") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio plot test/assets/audio/analyze_sine_1k.wav from=3 to=4", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "empty span") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio plot test/assets/audio/analyze_sine_1k.wav from=soon", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "invalid from") != NULL);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
 /** A world with the song of test/assets/audio/chords.flecs, no output and no device */
 static ecs_world_t* shell_chords_world(
     ecs_entity_t *session)

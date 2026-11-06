@@ -1287,6 +1287,16 @@
                 ]
             },
             {
+                "id": "Plot",
+                "testcases": [
+                    "sweep_spectrogram",
+                    "waveform_silence_then_tone",
+                    "same_twice",
+                    "spectrum_sine_peak",
+                    "bad_arguments"
+                ]
+            },
+            {
                 "id": "Capture",
                 "testcases": [
                     "valid_wav",

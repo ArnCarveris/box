@@ -142,6 +142,33 @@ char* box_cmd_audio_analyze(
     const char *from,
     const char *to);
 
+/** Load the bytes of a WAV for audio analyze and audio plot: a resource of the session, else
+ * a file as written, else a file found from the working directory or the executable.
+ *
+ * @param world The world
+ * @param wav The resource or file
+ * @param size Receives the bytes read
+ * @return The bytes, which the caller frees, NULL with an error logged
+ */
+uint8_t* box_cmd_audio_wav_load(
+    ecs_world_t *world,
+    const char *wav,
+    int64_t *size);
+
+/** Draw a PNG of a WAV for the audio plot action: audio plot <wav> [kind] [size=WxH]
+ * [from=s] [to=s] [min_db=dB], a spectrogram, waveform, spectrum or loudness.
+ *
+ * @param world The world
+ * @param argc Number of arguments
+ * @param argv The WAV, then the kind and the options
+ * @return The name of the PNG resource, the file in the browser, which the caller frees,
+ * NULL on an error
+ */
+char* box_cmd_audio_plot(
+    ecs_world_t *world,
+    int32_t argc,
+    const char **argv);
+
 /** Print the notes of a track per bar, or as a text piano roll: audio notes <track>
  * [bars=a..b] [roll].
  *
