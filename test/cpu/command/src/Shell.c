@@ -677,7 +677,10 @@ static ecs_world_t* shell_audio_world(
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     box_audio_output_open(world, &(box_audio_output_desc_t){ .headless = true });
-    test_int(ecs_script_run_file(world, path), 0);
+    char *file = box_app_locate(path);
+    test_assert(file != NULL);
+    test_int(ecs_script_run_file(world, file), 0);
+    ecs_os_free(file);
 
     return world;
 }
