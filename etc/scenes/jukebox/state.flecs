@@ -17,8 +17,7 @@ export const IDLE: Rgb = {150, 155, 175}
 
 export mut song: i32 = 0
 export mut playing = false
-export mut low_pass_cutoff: f32 = 20000
-export mut high_pass_cutoff: f32 = 20
+export mut volume_level: f32 = 100
 export mut reverb_level: f32 = 100
 export mut beat: f32 = 0
 export mut song_beats: f32 = 1

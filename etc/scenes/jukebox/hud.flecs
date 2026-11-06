@@ -151,8 +151,7 @@ hud {
         Layout: {direction: Column, spacing: 8, padding: {4, 0, 0, 0}}
         LayoutItem: {width: {mode: Grow}}
 
-        Slider low_pass(label: "Low-pass", width: PANEL_W - 32, min: 20, max: 20000, step: 0, value: low_pass_cutoff, unit: " Hz")
-        Slider high_pass(label: "High-pass", width: PANEL_W - 32, min: 20, max: 20000, step: 0, value: high_pass_cutoff, unit: " Hz")
+        Slider volume(label: "Volume", width: PANEL_W - 32, min: 0, max: 100, step: 1, value: volume_level, unit: "%")
         Slider reverb(label: "Reverb", width: PANEL_W - 32, min: 0, max: 200, step: 1, value: reverb_level, unit: "%")
       }
     }
@@ -166,8 +165,7 @@ hud_view {
 async {
   while true {
     await on.change(hud.screen.panel.fx)
-    low_pass_cutoff = hud.screen.panel.fx.low_pass[Slider.mut].current
-    high_pass_cutoff = hud.screen.panel.fx.high_pass[Slider.mut].current
+    volume_level = hud.screen.panel.fx.volume[Slider.mut].current
     reverb_level = hud.screen.panel.fx.reverb[Slider.mut].current
   }
 }
