@@ -1676,7 +1676,7 @@ its rate and the span.
 | Kind | Image |
 | --- | --- |
 | `spectrogram` (default) | Level per time and frequency: one Hann windowed FFT of about 85 ms per column, a log axis of 20 Hz to 20 kHz, colors from black at `min_db` to pale yellow at 0 dB (a full scale sine), with the scale on the right |
-| `waveform` | A lane per channel with the peak (dark) and RMS (light) envelope of the frames of each column, -1 to 1 |
+| `waveform` | A lane per channel with the peak (dark) envelope of the frames of each column and the RMS (light) of at least 20 ms around it, -1 to 1 |
 | `spectrum` | Average level over the span per log frequency in dB, with the band edges and names of `audio analyze` |
 | `loudness` | Short-term (3 s, bright) and momentary (400 ms, dim) loudness over time in LUFS |
 

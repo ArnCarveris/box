@@ -59,6 +59,9 @@
 /** Hops of the momentary loudness window of 400 ms */
 #define BOX_PLOT_MOMENTARY_HOPS (40)
 
+/** Shortest window of the RMS envelope of a waveform in seconds */
+#define BOX_PLOT_RMS_WINDOW (0.02)
+
 /** First character of the font */
 #define BOX_PLOT_FONT_FIRST (32)
 
@@ -768,7 +771,7 @@ static void box_plot_hz_axis(
     int32_t alpha)
 {
     box_audio_plot_t *p = ctx->p;
-    int32_t i, m, pos;
+    int32_t i, m, pos, last = 0;
     float decade;
     for (decade = 10; decade <= 10000; decade *= 10) {
         for (m = 2; m <= 9; m ++) {
@@ -791,12 +794,24 @@ static void box_plot_hz_axis(
         if (vertical) {
             pos = (int32_t)floorf(box_audio_plot_hz_row(p, box_plot_hz_major[i]) + 0.5f);
             box_plot_hline(p, p->x, p->x + p->w, pos, grid, alpha);
+            if (i && last - pos < ctx->ch) {
+                continue;
+            }
+
             box_plot_label_y(ctx, pos, box_plot_hz_labels[i]);
         } else {
+            int32_t w = box_plot_text_width(ctx, box_plot_hz_labels[i]);
             pos = (int32_t)floorf(box_audio_plot_hz_column(p, box_plot_hz_major[i]) + 0.5f);
             box_plot_vline(p, pos, p->y, p->y + p->h, grid, alpha, 0);
+            if (i && pos - w / 2 - last < 2 * ctx->cw) {
+                continue;
+            }
+
             box_plot_label_x(ctx, pos, box_plot_hz_labels[i]);
+            pos += w - w / 2;
         }
+
+        last = pos;
     }
 }
 
@@ -880,8 +895,8 @@ done:
     return result;
 }
 
-/** Draw a waveform: a lane per channel with the peak and the RMS of the frames of each
- * column. A column whose peak is under -100 dBFS stays empty.
+/** Draw a waveform: a lane per channel with the peak of the frames of each column and the
+ * RMS of at least 20 ms around it. A column whose peak is under -100 dBFS stays empty.
  *
  * @param ctx The plot
  * @return 0
@@ -891,8 +906,9 @@ static int box_plot_waveform(
 {
     const box_audio_plot_desc_t *d = ctx->desc;
     box_audio_plot_t *p = ctx->p;
-    int32_t gap = ctx->ch, lanes = d->channels, lane_h = (p->h - gap * (lanes - 1)) / lanes;
+    int32_t gap = 2 * ctx->ch, lanes = d->channels, lane_h = (p->h - gap * (lanes - 1)) / lanes;
     int32_t c, x, i;
+    int32_t rms_frames = (int32_t)(d->sample_rate * BOX_PLOT_RMS_WINDOW) + 1;
     static const float marks[5] = { 1.0f, 0.5f, 0.0f, -0.5f, -1.0f };
     static const char *mark_labels[5] = { "1.0", "0.5", "0", "-0.5", "-1.0" };
     box_plot_time_axis(ctx, BOX_PLOT_GRID, 256);
@@ -915,7 +931,7 @@ static int box_plot_waveform(
 
         for (x = 0; x < p->w; x ++) {
             int32_t f0 = (int32_t)((int64_t)x * d->frames / p->w);
-            int32_t f1 = (int32_t)((int64_t)(x + 1) * d->frames / p->w), f, y0, y1;
+            int32_t f1 = (int32_t)((int64_t)(x + 1) * d->frames / p->w), f, y0, y1, r0, r1;
             float lo = 0, hi = 0, rms;
             double sq = 0;
             f1 = f1 > f0 ? f1 : f0 + 1;
@@ -924,11 +940,24 @@ static int box_plot_waveform(
                 float v = d->data[(int64_t)f * lanes + c];
                 lo = v < lo ? v : lo;
                 hi = v > hi ? v : hi;
-                sq += (double)v * v;
             }
 
             if ((hi > -lo ? hi : -lo) < 1e-5f) {
                 continue;
+            }
+
+            r0 = f0;
+            r1 = f1;
+            if (r1 - r0 < rms_frames) {
+                r0 = (f0 + f1 - rms_frames) / 2;
+                r1 = r0 + rms_frames;
+                r0 = r0 > 0 ? r0 : 0;
+                r1 = r1 < d->frames ? r1 : d->frames;
+            }
+
+            for (f = r0; f < r1; f ++) {
+                float v = d->data[(int64_t)f * lanes + c];
+                sq += (double)v * v;
             }
 
             hi = hi > 1 ? 1 : hi;
@@ -936,10 +965,10 @@ static int box_plot_waveform(
             y0 = top + (int32_t)floorf((1.0f - hi) * half + 0.5f);
             y1 = top + (int32_t)floorf((1.0f - lo) * half + 0.5f);
             box_plot_rect(p, p->x + x, y0, p->x + x + 1, y1 + 1, BOX_AUDIO_PLOT_PEAK);
-            rms = f1 > f0 ? (float)sqrt(sq / (f1 - f0)) : 0;
+            rms = r1 > r0 ? (float)sqrt(sq / (r1 - r0)) : 0;
             rms = rms > 1 ? 1 : rms;
-            y0 = top + (int32_t)floorf((1.0f - (rms < hi ? rms : hi)) * half + 0.5f);
-            y1 = top + (int32_t)floorf((1.0f - (-rms > lo ? -rms : lo)) * half + 0.5f);
+            y0 = top + (int32_t)floorf((1.0f - rms) * half + 0.5f);
+            y1 = top + (int32_t)floorf((1.0f + rms) * half + 0.5f);
             if (y1 >= y0) {
                 box_plot_rect(p, p->x + x, y0, p->x + x + 1, y1 + 1, BOX_AUDIO_PLOT_RMS);
             }
