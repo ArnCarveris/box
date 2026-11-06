@@ -78,6 +78,10 @@ ECS_STRUCT(ShadowSettings, {
     float blend;         /**< Fraction of the half extent of a cascade at the edge of its box
                           *   that blends into the next cascade, 0 for hard seams, the last one
                           *   fades instead; default 0.1, 0 to 0.5 */
+    float min_caster_texels; /**< Projected size in texels of a cascade below which a caster is
+                          *   not drawn into that cascade, so small casters drop out of the
+                          *   coarser cascades first; needs CullSettings.enabled, default 0 for
+                          *   none */
 });
 
 /** Culling settings of a view, applied as specified: all zero draws every instance.

@@ -446,6 +446,8 @@ typedef struct box_render_view_shadows_t {
     float fade;             /**< Fraction of the last cascade that fades out */
     float blend;            /**< Fraction of the half extent of a cascade that blends into
                              *   the next one at its edge */
+    float min_texels;       /**< Projected size in texels of a cascade below which a caster
+                             *   is not drawn into it, 0 for none */
     float near_;            /**< View depth the first cascade starts at */
     float splits[BOX_RENDER_SHADOW_CASCADES]; /**< View depth each cascade ends at */
     float direction[3];     /**< Direction toward the light that casts the shadows */

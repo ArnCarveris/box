@@ -647,7 +647,9 @@
                     "even_filter_size_rounds_up",
                     "cascade_blend_hides_seam",
                     "grazing_light_no_acne",
-                    "contact_shadow_close"
+                    "contact_shadow_close",
+                    "min_caster_texels_culls_small_caster",
+                    "min_caster_texels_keeps_large_caster"
                 ]
             },
             {

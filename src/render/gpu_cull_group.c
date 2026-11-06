@@ -812,8 +812,15 @@ void box_gpu_cull_add(
         cascade->flags = BOX_GPU_CULL_CASTERS;
         box_gpu_cull_frustum_all(&cascade->frustum);
         if (v->cull.enabled) {
-            box_gpu_cull_planes(ECS_CONST_CAST(vec4*, u->shadow_matrix[i < cascades ? i : 0]),
-                cascade->frustum.planes);
+            vec4 *m = ECS_CONST_CAST(vec4*, u->shadow_matrix[i < cascades ? i : 0]);
+            box_gpu_cull_planes(m, cascade->frustum.planes);
+            if (v->shadows.min_texels > 0) {
+                cascade->frustum.clip_w[3] = 1.0f;
+                cascade->frustum.size[0] = 0.5f * (float)v->shadows.resolution *
+                    glm_vec3_norm((vec3){m[0][0], m[1][0], m[2][0]});
+                cascade->frustum.size[1] = v->shadows.min_texels;
+                cascade->flags |= BOX_GPU_CULL_SIZE;
+            }
         }
     }
 

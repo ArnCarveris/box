@@ -1109,3 +1109,107 @@ void Shadow_contact_shadow_close(void) {
     stbi_image_free(px);
     ecs_fini(world);
 }
+
+void Shadow_min_caster_texels_culls_small_caster(void) {
+    // lighting/shadows
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 10, 0});
+    ecs_set(world, camera, Rotation, {-(float)GLM_PI_2, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
+        .color = {0, 0, 0, 255}}, .lighting.enabled = true, .culling.enabled = true,
+        .shadows = {.enabled = true, .depth_bias = 2, .normal_offset = 1.5f, .fade = 0.2f,
+            .cascades = 4, .resolution = 2048, .max_distance = 200, .filter_size = 3,
+            .min_caster_texels = 1000}});
+    ecs_singleton_set(world, AmbientLight, {.intensity = 0});
+    ecs_entity_t floor = ecs_new(world);
+    ecs_set(world, floor, Position, {0, -0.1f, 0});
+    ecs_set(world, floor, Box, {20, 0.2f, 20});
+    ecs_set(world, floor, Rgb, {255, 255, 255});
+    ecs_set(world, floor, PbrMaterial, {.roughness = 1});
+    ecs_entity_t caster = ecs_new(world);
+    ecs_set(world, caster, Position, {-3, 5, 0});
+    ecs_set(world, caster, Box, {1.5f, 0.2f, 1.5f});
+    ecs_entity_t sun = ecs_new(world);
+    ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 64,
+        .write_to_file = "min_texels_small.png", .resolution_scale = 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/min_texels_small.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    unsigned char *under = &px[(32 * 64 + 15) * 4];
+    unsigned char *open = &px[(32 * 64 + 48) * 4];
+    test_assert(open[0] > 200);
+    test_assert(abs((int)under[0] - (int)open[0]) < 8);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
+void Shadow_min_caster_texels_keeps_large_caster(void) {
+    // lighting/shadows
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 10, 0});
+    ecs_set(world, camera, Rotation, {-(float)GLM_PI_2, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
+        .color = {0, 0, 0, 255}}, .lighting.enabled = true, .culling.enabled = true,
+        .shadows = {.enabled = true, .depth_bias = 2, .normal_offset = 1.5f, .fade = 0.2f,
+            .cascades = 4, .resolution = 2048, .max_distance = 200, .filter_size = 3,
+            .min_caster_texels = 4}});
+    ecs_singleton_set(world, AmbientLight, {.intensity = 0});
+    ecs_entity_t floor = ecs_new(world);
+    ecs_set(world, floor, Position, {0, -0.1f, 0});
+    ecs_set(world, floor, Box, {20, 0.2f, 20});
+    ecs_set(world, floor, Rgb, {255, 255, 255});
+    ecs_set(world, floor, PbrMaterial, {.roughness = 1});
+    ecs_entity_t caster = ecs_new(world);
+    ecs_set(world, caster, Position, {-3, 5, 0});
+    ecs_set(world, caster, Box, {1.5f, 0.2f, 1.5f});
+    ecs_entity_t sun = ecs_new(world);
+    ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 64,
+        .write_to_file = "min_texels_large.png", .resolution_scale = 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/min_texels_large.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    unsigned char *under = &px[(32 * 64 + 15) * 4];
+    unsigned char *open = &px[(32 * 64 + 48) * 4];
+    test_assert(open[0] > 200);
+    test_assert(under[0] < 30);
+    test_assert(under[1] < 30);
+    test_assert(under[2] < 30);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
