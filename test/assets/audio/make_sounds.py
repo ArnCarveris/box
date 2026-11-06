@@ -260,6 +260,42 @@ def analyze_sounds():
         f.write(out)
 
 
+def peaking(x, rate, frequency, gain_db, q):
+    """A peaking filter of the Audio EQ Cookbook: gain_db at frequency, with a bandwidth of q."""
+    a = 10 ** (gain_db / 40)
+    w = 2 * math.pi * frequency / rate
+    alpha = math.sin(w) / (2 * q)
+    b0, b1, b2 = 1 + alpha * a, -2 * math.cos(w), 1 - alpha * a
+    a0, a1, a2 = 1 + alpha / a, -2 * math.cos(w), 1 - alpha / a
+    out, x1, x2, y1, y2 = [], 0.0, 0.0, 0.0, 0.0
+    for v in x:
+        o = (b0 * v + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2) / a0
+        x2, x1, y2, y1 = x1, v, y1, o
+        out.append(o)
+    return out
+
+
+def f32(x):
+    return [struct.unpack("<f", struct.pack("<f", v))[0] for v in x]
+
+
+def diff_sounds():
+    """The recordings of the audio diff command: stereo pink noise at -20 dBFS RMS, 1 s, as
+    floats, its left channel reversed on the right, and copies of it changed."""
+    rate = 48000
+    left = pink(rate, rate, 0.1)
+    base = [f32(left), f32(left[::-1])]
+    wav("diff_base.wav", rate, base, float32=True)
+    # 6 dB quieter
+    gain = 10 ** (-6 / 20)
+    wav("diff_quiet.wav", rate, [f32([v * gain for v in c]) for c in base], float32=True)
+    # 10 samples later, of the same length
+    wav("diff_delay.wav", rate, [[0.0] * 10 + c[:-10] for c in base], float32=True)
+    # A peaking boost of 6 dB at 3 kHz with a q of 1
+    wav("diff_boost.wav", rate, [f32(peaking(c, rate, 3000, 6, 1.0)) for c in base],
+        float32=True)
+
+
 def main():
     # Sample/wav_16, mono, flac: a 1000 Hz sine at 0.5, a quarter of a second at 48000 Hz
     tone = sine(1000, 48000, 12000, 0.5)
@@ -293,6 +329,7 @@ def main():
     # level of 0.5, as floats, which the table normalizes to a peak of 1
     wav("wavetable_saw_square.wav", 48000, [saw_square(8, 2048, 64, 0.5)], float32=True)
     analyze_sounds()
+    diff_sounds()
 
 
 if __name__ == "__main__":

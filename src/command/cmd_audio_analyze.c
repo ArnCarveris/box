@@ -14,6 +14,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 /** Largest WAV file read, in bytes */
 #define BOX_CMD_ANALYZE_FILE_MAX (512 * 1024 * 1024)
@@ -192,6 +193,34 @@ static uint8_t* box_cmd_analyze_load(
 
 done:
     ecs_os_free(found);
+
+    return result;
+}
+
+int box_cmd_audio_wav_load(
+    ecs_world_t *world,
+    const char *wav,
+    const char *action,
+    box_audio_wav_t *out)
+{
+    int64_t size = 0;
+    uint8_t *bytes = box_cmd_analyze_load(world, wav, &size);
+    const char *error = NULL;
+    int result = -1;
+    memset(out, 0, sizeof(*out));
+    if (!bytes) {
+        goto done;
+    }
+
+    error = box_audio_wav_read(bytes, (size_t)size, out);
+    if (error) {
+        ecs_err("cannot %s '%s': %s", action, wav, error);
+        goto done;
+    }
+
+    result = 0;
+done:
+    ecs_os_free(bytes);
 
     return result;
 }

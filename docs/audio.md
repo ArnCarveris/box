@@ -1628,6 +1628,7 @@ Importing box alone does not open an output: `box_app_run` does.
 | `audio capture <seconds>` | Record master output as a 16-bit stereo WAV resource |
 | `audio song [<file>\|none]` | Show the song, load a song file or unload it |
 | `audio analyze <wav> [from] [to]` | Print a text report of a WAV resource or file, optionally of the seconds from..to |
+| `audio diff <a> <b> [from] [to]` | Print how WAV b differs from WAV a: bit identity, loudness, bands, stereo and a null test |
 | `audio notes <track> [bars=a..b] [roll]` | Print the notes of a track per bar, or as a piano roll |
 | `audio chords [track...] [bars=a..b]` | Print the chords and the key of a section from the notes |
 
@@ -1665,6 +1666,26 @@ bar in LUFS and the band that changed the most against the whole span, counting 
 40 dB under the total as at least that. A tempo change or loop wrap during the capture is not
 followed. The same WAV and span give the same text. The measures are a plain C library,
 [analyze.h](../src/audio/analyze.h).
+
+`audio diff` compares two WAVs, each a resource or a file as for `audio analyze`, over the same
+seconds from..to of both. It reuses the measures of `audio analyze` and prints:
+
+| Line | Measures |
+| --- | --- |
+| `identical` | Whether the span is bit identical, else how many samples differ and the first |
+| `length` | Length of both files in s and b - a in s and frames |
+| `loudness` | Integrated loudness in LUFS and true peak in dBFS of a and b, and the change in dB |
+| `bands (b - a)` | Change of the energy of each band in dB |
+| `balance` | The band that changed the most against the total, which a change of gain leaves alone |
+| `stereo` | Correlation and width (side over mid) of a and b and their change |
+| `null test` | Offset of b in frames and ms, found by the cross-correlation of the mono sums within 20 ms over the loudest part of a; the residual b - a after that alignment in dB against a and in dBFS, over the frames both have |
+| `residual spans` | The loudest 100 ms spans of the residual (5 at most, next spans merged), in dBFS and in dB against a |
+
+Silence on one side prints as `-inf` or `+inf`. With a `bxsg` chunk in a (else in b), `bars`
+lists how many bars of the span differ and the 4 with the loudest residual: the residual in
+dB against a, the loudness of a and b and the band that changed most. WAVs of different sample
+rates are an error; a mono and a stereo WAV are compared as the mono sums, the mean of left and
+right. The alignment and residual are a plain C library, [diff.h](../src/audio/diff.h).
 
 `audio notes` and `audio chords` read only the note data of the tracks, their
 placements and clips, so they work without an output and without a device. A

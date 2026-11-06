@@ -1287,6 +1287,18 @@
                 ]
             },
             {
+                "id": "Diff",
+                "testcases": [
+                    "samples",
+                    "align_delay",
+                    "align_stereo",
+                    "align_out_of_window",
+                    "align_silent",
+                    "residual_gain",
+                    "residual_offset"
+                ]
+            },
+            {
                 "id": "Capture",
                 "testcases": [
                     "valid_wav",
