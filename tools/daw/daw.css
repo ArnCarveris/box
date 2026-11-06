@@ -16,7 +16,7 @@
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-* { box-sizing: border-box; overscroll-behavior-x: none; }
+* { box-sizing: border-box; }
 
 html, body {
   margin: 0;
