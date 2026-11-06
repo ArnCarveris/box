@@ -620,7 +620,8 @@ static void box_cmd_notes_header(
     ecs_os_free(inst);
 }
 
-/** Append the notes of a track per bar: position, pitch or sound, length and velocity.
+/** Append the notes of a track per bar: position, pitch or sound, length and velocity. A run
+ * of bars without notes makes one line.
  *
  * @param buf The output
  * @param t The track
@@ -638,7 +639,7 @@ static void box_cmd_notes_list(
     int32_t count)
 {
     char label[BOX_AUDIO_HARMONY_NAME * 2];
-    int32_t bar, i = 0, listed;
+    int32_t bar, i = 0, listed, empty;
     int64_t b;
     ecs_strbuf_appendstr(buf, "; position bar.beat.tick (480 ticks a beat), length as a note "
         "value (1/4 a quarter note) or in beats, velocity 0..1");
@@ -647,6 +648,23 @@ static void box_cmd_notes_list(
     }
 
     for (bar = bars->first; bar <= bars->last; bar ++) {
+        if (i >= count || box_cmd_notes_bar(m, notes[i].start) != bar) {
+            empty = bar;
+            while (bar < bars->last &&
+                (i >= count || box_cmd_notes_bar(m, notes[i].start) > bar + 1))
+            {
+                bar ++;
+            }
+
+            if (bar > empty) {
+                ecs_strbuf_append(buf, "\nbars %d..%d: -", empty, bar);
+            } else {
+                ecs_strbuf_append(buf, "\nbar %d: -", bar);
+            }
+
+            continue;
+        }
+
         ecs_strbuf_append(buf, "\nbar %d:", bar);
         for (listed = 0; i < count; i ++, listed ++) {
             b = box_cmd_notes_bar(m, notes[i].start);
@@ -660,10 +678,6 @@ static void box_cmd_notes_list(
             ecs_strbuf_append(buf, " %s ", label);
             box_cmd_notes_length(buf, notes[i].end - notes[i].start);
             ecs_strbuf_append(buf, " v%.2f", (double)notes[i].velocity);
-        }
-
-        if (!listed) {
-            ecs_strbuf_appendstr(buf, " -");
         }
     }
 }
@@ -842,6 +856,7 @@ static int box_cmd_notes_track_compare(
  * @param argv The arguments, tracks and bars=
  * @param tracks Receives the tracks
  * @param bars Receives the bars
+ * @param all Receives whether no track was named
  * @return Zero on success, nonzero with an error logged
  */
 static int box_cmd_chords_tracks(
@@ -849,7 +864,8 @@ static int box_cmd_chords_tracks(
     int32_t argc,
     const char **argv,
     ecs_vec_t *tracks,
-    box_cmd_bars_t *bars)
+    box_cmd_bars_t *bars,
+    bool *all)
 {
     box_cmd_track_t *t;
     ecs_entity_t e;
@@ -873,6 +889,7 @@ static int box_cmd_chords_tracks(
         named ++;
     }
 
+    *all = !named;
     if (!named) {
         ecs_iter_t it = ecs_each(world, Track);
         while (ecs_each_next(&it)) {
@@ -1225,21 +1242,30 @@ char* box_cmd_audio_chords(
     box_cmd_track_t *t;
     box_cmd_note_t *n;
     box_audio_key_t key;
-    bool *pitched = NULL, per_beat;
+    bool *pitched = NULL, per_beat, all;
     double density, from, to;
-    int32_t i, count, track_count;
+    int32_t i, count, track_count, kept;
     char *result = NULL;
     ecs_vec_init_t(NULL, &tracks, box_cmd_track_t, 0);
     ecs_vec_init_t(NULL, &notes, box_cmd_note_t, 0);
-    if (box_cmd_chords_tracks(world, argc, argv, &tracks, &bars)) {
+    if (box_cmd_chords_tracks(world, argc, argv, &tracks, &bars, &all)) {
         goto done;
     }
 
     t = ecs_vec_first(&tracks);
     track_count = ecs_vec_count(&tracks);
-    for (i = 0; i < track_count; i ++) {
-        box_cmd_notes_collect(world, t[i].e, i, &notes);
+    for (i = 0, kept = 0; i < track_count; i ++) {
+        count = ecs_vec_count(&notes);
+        box_cmd_notes_collect(world, t[i].e, kept, &notes);
+        if (all && ecs_vec_count(&notes) == count) {
+            ecs_os_free(t[i].path);
+        } else {
+            t[kept ++] = t[i];
+        }
     }
+
+    ecs_vec_set_count_t(NULL, &tracks, box_cmd_track_t, kept);
+    track_count = kept;
 
     n = ecs_vec_first(&notes);
     count = ecs_vec_count(&notes);

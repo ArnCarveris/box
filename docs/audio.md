@@ -1665,7 +1665,8 @@ A position is bar.beat.tick, 480 ticks a beat of the time signature; C4 is MIDI
 value prints as a share of a whole note (`1/4` a quarter, `3/8` a dotted quarter,
 `1/12` an eighth triplet), else in beats; the velocity is 0..1. The roll has one
 row per pitch the track plays in the bars, highest first, and one column per
-sixteenth, with `|` between bars.
+sixteenth, with `|` between bars. A run of bars without notes prints as one line
+(`bars 5..8: -`).
 
 A drum track is listed per sound instead of per pitch and left out of the
 chords. A track is a drum track when the name of the track, its instrument or
@@ -1677,15 +1678,15 @@ the name of the sound of the instrument, with the pitch after a colon when the
 track plays several (`tom_sound:A2`).
 
 `audio chords` names chords from the pitched notes that sound together in the
-named tracks, by default every enabled track. In each span every pitch class
-weighs the beats it sounds, and the classes of at least a fifth of the weight
-of the strongest make the chord, so passing notes drop out. The bass is the
-lowest note of those classes. The chord is the one whose notes are the set (a
-seventh chord may drop its fifth); when none fits four or more classes the
-weakest one is left out once. Qualities print as `C`, `Cm`, `C7`, `Cmaj7`,
-`Cm7`, `Cm7b5`, `Cdim`, `Caug`, `Csus4`, `Csus2`, `Cadd9`, `Cdim7` and `C5`,
-an inverted bass as a slash chord (`C/E`), a set that fits no chord as its
-classes (`[C D F#]`) and silence as `N.C.`.
+named tracks, by default every enabled track that has notes. In each span every
+pitch class weighs the beats it sounds, and the classes of at least a fifth of
+the weight of the strongest make the chord, so passing notes drop out. The bass
+is the lowest note of those classes. The chord is the one whose notes are the
+set (a seventh chord may drop its fifth); when none fits four or more classes
+the weakest one is left out once. Qualities print as `C`, `Cm`, `C7`, `Cmaj7`,
+`Cm7`, `Cm7b5`, `Cdim`, `Caug`, `Csus4`, `Csus2`, `Cadd9`, `Cdim7` and `C5`, an
+inverted bass as a slash chord (`C/E`), a set that fits no chord as its classes
+(`[C D F#]`) and silence as `N.C.`.
 
 The span of a chord is a bar, or a beat when the notes are dense enough to
 name a chord per beat, at least three pitch classes per beat on average, and a

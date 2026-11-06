@@ -358,7 +358,7 @@ void Shell_help_lists_box_commands(void) {
     test_bool(error, false);
     test_assert(strstr(out, "key_press <key> [dur]  Tap a key, held for dur frames") != NULL);
     test_assert(strstr(out, "capture [camera]  Write a PNG") != NULL);
-    test_assert(strstr(out, "audio [action] [value]  Print the audio status") != NULL);
+    test_assert(strstr(out, "audio [action] [value] [args...]  Print the audio status") != NULL);
     test_assert(strstr(out, "\nls [scope]  ") != NULL);
     ecs_os_free(out);
 
@@ -665,7 +665,9 @@ static ecs_world_t* shell_chords_world(
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     *session = ecs_shell_session_init(world, NULL);
-    test_int(ecs_script_run_file(world, "test/assets/audio/chords.flecs"), 0);
+    char *path = box_app_locate("test/assets/audio/chords.flecs");
+    test_int(ecs_script_run_file(world, path), 0);
+    ecs_os_free(path);
 
     return world;
 }
@@ -690,6 +692,12 @@ void Shell_audio_notes_placed_twice(void) {
     test_assert(strstr(out, "bars 3..3, 3 notes;") != NULL);
     test_assert(strstr(out, "\nbar 3: 3.1.000 C5 1/4 v0.80,") != NULL);
     test_assert(strstr(out, "bar 1:") == NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio notes duo", &error);
+    test_bool(error, false);
+    const char *bars = strstr(out, "\nbar 1:");
+    test_str(bars, "\nbar 1: 1.1.000 C4 1/4 v1.00, 1.3.000 E4 1/8 v1.00\nbars 2..4: -");
     ecs_os_free(out);
 
     out = box_command_run(world, s, "audio notes lead", &error);

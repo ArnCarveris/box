@@ -22,9 +22,9 @@
 /** Arguments of the audio command after its action and value, for notes and chords */
 #define BOX_CMD_AUDIO_MORE_ARGS 8
 
-/** A further argument of the audio command */
-#define BOX_CMD_AUDIO_MORE(n) { .name = "arg" #n, .type = ecs_id(ecs_string_t), \
-    .optional = true, .brief = "a further track, bars=a..b or roll of notes and chords" }
+/** A further argument of the audio command, help prints them once as [args...] */
+#define BOX_CMD_AUDIO_MORE { .name = "args", .type = ecs_id(ecs_string_t), \
+    .optional = true, .brief = "further tracks, bars=a..b or roll of notes and chords" }
 
 /** Folder of the captures in the file system of the page */
 #define BOX_CMD_AUDIO_WEB_DIR "/tmp"
@@ -1254,9 +1254,9 @@ void box_cmd_audio_init(
                   .brief = "volume 0 to 4, mute on or off (default: toggle), capture seconds, "
                     "seek beats, tempo 20 to 999, song file or none (default: show the song), "
                     "track of notes, track or bars=a..b of chords" },
-                BOX_CMD_AUDIO_MORE(3), BOX_CMD_AUDIO_MORE(4), BOX_CMD_AUDIO_MORE(5),
-                BOX_CMD_AUDIO_MORE(6), BOX_CMD_AUDIO_MORE(7), BOX_CMD_AUDIO_MORE(8),
-                BOX_CMD_AUDIO_MORE(9), BOX_CMD_AUDIO_MORE(10)
+                BOX_CMD_AUDIO_MORE, BOX_CMD_AUDIO_MORE, BOX_CMD_AUDIO_MORE,
+                BOX_CMD_AUDIO_MORE, BOX_CMD_AUDIO_MORE, BOX_CMD_AUDIO_MORE,
+                BOX_CMD_AUDIO_MORE, BOX_CMD_AUDIO_MORE
             },
             .callback = box_cmd_audio
         });
