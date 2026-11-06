@@ -1627,6 +1627,7 @@ Importing box alone does not open an output: `box_app_run` does.
 | `audio tempo <bpm>` | Set tempo, 20..999 |
 | `audio capture <seconds>` | Record master output as a 16-bit stereo WAV resource |
 | `audio song [<file>\|none]` | Show the song, load a song file or unload it |
+| `audio analyze <wav> [from] [to]` | Print a text report of a WAV resource or file, optionally of the seconds from..to |
 
 Fetch a capture with `GET /shell/session/<id>/resource/<name>`; it stays empty
 until recording finishes. In the browser it writes `/tmp/audio_capture_<n>.wav`
@@ -1637,6 +1638,30 @@ Headless with fixed `--delta-time`, repeated runs capture bit-identical audio on
 the same build. Use this to render music, compare changes or inspect scenes offline.
 `PerfStatus.audio_load` records the largest load of the run; worklet load reports
 zero because it has no suitable high-resolution timer.
+
+`audio analyze` reads a resource of the session (the name `audio capture` returns), else a
+WAV file (PCM of 8 to 32 bits or float, mono or stereo); in the browser, a file of the page such
+as a capture. It prints one line per measure, each number with its unit:
+
+| Line | Measures |
+| --- | --- |
+| `loudness` | Integrated loudness (BS.1770 K-weighting, EBU R128 gating) in LUFS, loudness range in LU, short-term (3 s) and momentary (400 ms) maxima |
+| `peak` | Sample peak and true peak (4x oversampled) in dBFS, RMS, crest factor, clipped samples (at full scale next to another one) |
+| `dc offset` | Mean of each channel, full scale 1 |
+| `bands` | Energy of sub 20-60, low 60-250, low-mid 250-500, mid 500-2k, presence 2k-6k, brilliance 6k-12k and air 12k-20k Hz in dB of the total |
+| `spectrum` | Spectral centroid and 85% rolloff in Hz |
+| `stereo` | L/R correlation, side over mid in dB, loudness lost when summed to mono |
+| `onsets` | Count and the first 16: time and rise in dB |
+| `attack`, `tail` | 10% to 90% rise of the first onset; time from the peak after the last onset to 60 dB below it, or how far it fell when the span ends first |
+| `silence`, `clicks` | Leading and trailing time under -60 dBFS; a first or last sample over -40 dBFS |
+| `discontinuities` | Sample steps far above the local slope: count and the first 8 |
+| `pitch` | Fundamental in Hz with note and cents, its spread in cents, harmonic to noise ratio and voiced share, or no stable pitch |
+
+A capture that starts while a song plays stores the beat, tempo and bar length it started at in a
+`bxsg` chunk of its WAV. Its report ends with a line per bar (64 at most): the loudness of the
+bar in LUFS and the band that changed the most against the whole span. A tempo change or loop
+wrap during the capture is not followed. The same WAV and span give the same text. The
+measures are a plain C library, [analyze.h](../src/audio/analyze.h).
 
 If a track is silent, check sample readiness, its instrument and overlapping
 placements. If a return is silent, check its send and insert assignment. `audio`

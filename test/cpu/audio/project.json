@@ -1249,6 +1249,25 @@
                 ]
             },
             {
+                "id": "Analyze",
+                "testcases": [
+                    "full_scale_sine",
+                    "pink_noise",
+                    "inverted_stereo",
+                    "true_peak",
+                    "decay_tail",
+                    "cut_tail",
+                    "start_click",
+                    "discontinuity",
+                    "same_twice",
+                    "fft",
+                    "wav_formats",
+                    "segments",
+                    "song_capture",
+                    "capture_without_song"
+                ]
+            },
+            {
                 "id": "Capture",
                 "testcases": [
                     "valid_wav",

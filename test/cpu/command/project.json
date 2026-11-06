@@ -43,7 +43,10 @@
                     "quit",
                     "console_session",
                     "resource_file",
-                    "audio_command"
+                    "audio_command",
+                    "audio_analyze",
+                    "audio_analyze_resource",
+                    "audio_analyze_errors"
                 ]
             },
             {

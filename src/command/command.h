@@ -127,6 +127,21 @@ char* box_cmd_render_resource(
 void box_cmd_audio_init(
     ecs_world_t *world);
 
+/** Analyze a WAV for the audio analyze action: loudness, peaks, bands, stereo, onsets, tail,
+ * silence, clicks, discontinuities, pitch and, for a capture of a song, a table per bar.
+ *
+ * @param world The world
+ * @param wav A resource of the session, else a WAV file
+ * @param from First second of the span, NULL or empty for the start
+ * @param to Last second of the span, NULL or empty for the end
+ * @return The report, which the caller frees, NULL with an error logged
+ */
+char* box_cmd_audio_analyze(
+    ecs_world_t *world,
+    const char *wav,
+    const char *from,
+    const char *to);
+
 /** Register the fit command that moves a camera to a tight fit of its scene.
  *
  * @param world The world

@@ -358,7 +358,7 @@ void Shell_help_lists_box_commands(void) {
     test_bool(error, false);
     test_assert(strstr(out, "key_press <key> [dur]  Tap a key, held for dur frames") != NULL);
     test_assert(strstr(out, "capture [camera]  Write a PNG") != NULL);
-    test_assert(strstr(out, "audio [action] [value]  Print the audio status") != NULL);
+    test_assert(strstr(out, "audio [action] [value] [from] [to]  Print the audio status") != NULL);
     test_assert(strstr(out, "\nls [scope]  ") != NULL);
     ecs_os_free(out);
 
@@ -654,6 +654,165 @@ void Shell_audio_command(void) {
     ecs_os_free(out);
     out = box_command_run(world, s, "audio sing", &error);
     test_bool(error, true);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+void Shell_audio_analyze(void) {
+    // audio/analyze
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, 0.016f);
+
+    bool error = true;
+    char *out = box_command_run(world, s,
+        "audio analyze test/assets/audio/analyze_sine_1k.wav", &error);
+    test_bool(error, false);
+    const char *head = "analyze test/assets/audio/analyze_sine_1k.wav: 48000 Hz, mono, "
+        "2.000 s, span 0.000 to 2.000 s\nloudness: integrated -3.0";
+    test_assert(strncmp(out, head, strlen(head)) == 0);
+    test_assert(strstr(out, "\npeak: sample 0.00 dBFS, true ") != NULL);
+    test_assert(strstr(out, ", clipped 0 samples\ndc offset: ") != NULL);
+    test_assert(strstr(out, "\nbands: sub ") != NULL);
+    test_assert(strstr(out, ", mid 0.0 dB, presence ") != NULL);
+    test_assert(strstr(out, "\nspectrum: centroid ") != NULL);
+    test_assert(strstr(out, "\nstereo: mono file, correlation +1.00, side/mid -inf dB, "
+        "mono loss 0.0 dB") != NULL);
+    test_assert(strstr(out, "\nonsets: 1: 0.000 s +") != NULL);
+    test_assert(strstr(out, "\nattack: ") != NULL);
+    test_assert(strstr(out, "\ntail: cut short") != NULL);
+    test_assert(strstr(out, "\nsilence: leading 0.000 s, trailing ") != NULL);
+    test_assert(strstr(out, "\nclicks: start none, end ") != NULL);
+    test_assert(strstr(out, "\ndiscontinuities: 0\n") != NULL);
+    test_assert(strstr(out, "\npitch: 1000.0 Hz B5 +21 cents, spread ") != NULL);
+    test_assert(strstr(out, "\nbars:") == NULL);
+
+    char *again = box_command_run(world, s,
+        "audio analyze test/assets/audio/analyze_sine_1k.wav", &error);
+    test_bool(error, false);
+    test_str(again, out);
+    ecs_os_free(again);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio analyze test/assets/audio/analyze_sine_1k.wav 0.5 1",
+        &error);
+    test_bool(error, false);
+    test_assert(strstr(out, "2.000 s, span 0.500 to 1.000 s\n") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio analyze test/assets/audio/analyze_click.wav",
+        &error);
+    test_bool(error, false);
+    test_assert(strstr(out, "\nclicks: start 0.500 (-6.0 dBFS), end ") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio analyze test/assets/audio/analyze_decay.wav",
+        &error);
+    test_bool(error, false);
+    test_assert(strstr(out, "\ntail: 1.3") != NULL);
+    test_assert(strstr(out, " s to -60 dB after the onset at 0.000 s") != NULL);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+void Shell_audio_analyze_resource(void) {
+    // audio/analyze
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, 0.016f);
+
+    FILE *f = fopen("test/assets/audio/analyze_inverted.wav", "rb");
+    test_assert(f != NULL);
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char *bytes = ecs_os_malloc((ecs_size_t)size);
+    test_assert(fread(bytes, 1, (size_t)size, f) == (size_t)size);
+    fclose(f);
+
+    ecs_shell_resource_t r = {0};
+    test_int(ecs_shell_resource_create(world, s, "audio/wav", bytes, (ecs_size_t)size, &r), 0);
+    ecs_os_free(bytes);
+    char *line = flecs_asprintf("audio analyze %s", r.name);
+    bool error = true;
+    char *out = box_command_run(world, s, line, &error);
+    test_bool(error, false);
+    char *head = flecs_asprintf("analyze %s: 48000 Hz, stereo, 1.000 s", r.name);
+    test_assert(strncmp(out, head, strlen(head)) == 0);
+    test_assert(strstr(out, "\nstereo: correlation -1.00, side/mid ") != NULL);
+    test_assert(strstr(out, ", mono loss 100.0 dB") != NULL);
+    ecs_os_free(head);
+    ecs_os_free(out);
+    ecs_os_free(line);
+    ecs_os_free(r.name);
+    ecs_os_free(r.content_type);
+
+    ecs_shell_resource_t empty = {0};
+    test_int(ecs_shell_resource_create(world, s, "audio/wav", NULL, 0, &empty), 0);
+    line = flecs_asprintf("audio analyze %s", empty.name);
+    out = box_command_run(world, s, line, &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "is empty") != NULL);
+    ecs_os_free(out);
+    ecs_os_free(line);
+    ecs_os_free(empty.name);
+    ecs_os_free(empty.content_type);
+    ecs_fini(world);
+}
+
+void Shell_audio_analyze_errors(void) {
+    // audio/analyze
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, 0.016f);
+
+    bool error = false;
+    char *out = box_command_run(world, s, "audio analyze", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "audio analyze needs a WAV") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s, "audio analyze test/assets/audio/missing.wav", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "cannot find 'test/assets/audio/missing.wav'") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s, "audio analyze test/assets/audio/analyze_adpcm.wav",
+        &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "unsupported WAV format") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s, "audio analyze test/assets/audio/corrupt.wav", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "not a WAV file") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s, "audio analyze test/assets/audio/analyze_sine_1k.wav 3 4",
+        &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "empty span") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio analyze test/assets/audio/analyze_sine_1k.wav 1 0.5", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "empty span") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio analyze test/assets/audio/analyze_sine_1k.wav soon", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "invalid span") != NULL);
     ecs_os_free(out);
     ecs_fini(world);
 }

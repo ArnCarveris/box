@@ -3,8 +3,8 @@
  * @brief The audio command: the status of the audio, its transport, its buses and their insert
  * slots, its instruments, its tracks with their note and audio placements, sounding notes and
  * playing audio clips, its emitters with their plays and skips, its macros with their maps, the
- * master volume and mute, play, stop, seek and tempo, the song of AudioSong, and captures of the
- * master output to a WAV resource.
+ * master volume and mute, play, stop, seek and tempo, the song of AudioSong, captures of the
+ * master output to a WAV resource, and the analysis of a WAV (cmd_audio_analyze.c).
  *
  * The actions only write AudioSettings, Transport or AudioSong, which box.audio applies at the
  * end of the frame as for a change from a script or the REST API. A capture taps the core, so
@@ -1164,12 +1164,12 @@ done:
     return result;
 }
 
-/** The audio command: print the status, set the volume or the mute, drive the transport or
- * start a capture.
+/** The audio command: print the status, set the volume or the mute, drive the transport,
+ * start a capture or analyze a WAV.
  *
  * @param ctx The call context
  * @param argc Number of arguments
- * @param argv The action and its value, both optional
+ * @param argv The action, its value and the span of an analysis, all optional
  * @param result Receives the output
  */
 static void box_cmd_audio(
@@ -1181,6 +1181,8 @@ static void box_cmd_audio(
     ecs_world_t *world = ctx->world;
     const char *action = argc > 0 ? *(const char**)argv[0].ptr : NULL;
     const char *value = argc > 1 ? *(const char**)argv[1].ptr : NULL;
+    const char *from = argc > 2 ? *(const char**)argv[2].ptr : NULL;
+    const char *to = argc > 3 ? *(const char**)argv[3].ptr : NULL;
     char *out = NULL;
     if (!ecs_id(AudioSettings) || !box_audio_module_get(world)) {
         ecs_err("box.audio is not imported");
@@ -1197,13 +1199,15 @@ static void box_cmd_audio(
         out = box_cmd_audio_capture(world, value);
     } else if (!ecs_os_strcmp(action, "song")) {
         out = box_cmd_audio_song_set(world, value);
+    } else if (!ecs_os_strcmp(action, "analyze")) {
+        out = box_cmd_audio_analyze(world, value, from, to);
     } else if (!ecs_os_strcmp(action, "play") || !ecs_os_strcmp(action, "stop") ||
         !ecs_os_strcmp(action, "seek") || !ecs_os_strcmp(action, "tempo"))
     {
         out = box_cmd_audio_transport_set(world, action, value);
     } else {
-        ecs_err("unknown action '%s', expected volume, mute, capture, play, stop, seek, "
-            "tempo or song", action);
+        ecs_err("unknown action '%s', expected volume, mute, capture, analyze, play, stop, "
+            "seek, tempo or song", action);
     }
 
     *(char**)result->ptr = out;
@@ -1218,17 +1222,22 @@ void box_cmd_audio_init(
     box_command_register(world,
         "Print the audio status, transport, song, buses, instruments, tracks, emitters and "
         "macros, set the volume or mute, play, stop, seek or set the tempo, show or change the "
-        "song, or capture a WAV",
+        "song, capture a WAV or analyze one",
         (ecs_function_desc_t){
             .name = "audio",
             .return_type = ecs_id(ecs_string_t),
             .params = {
                 { .name = "action", .type = ecs_id(ecs_string_t), .optional = true,
-                  .brief = "volume, mute, capture, play, stop, seek, tempo or song (default: "
-                    "print the status)" },
+                  .brief = "volume, mute, capture, analyze, play, stop, seek, tempo or song "
+                    "(default: print the status)" },
                 { .name = "value", .type = ecs_id(ecs_string_t), .optional = true,
                   .brief = "volume 0 to 4, mute on or off (default: toggle), capture seconds, "
-                    "seek beats, tempo 20 to 999, song file or none (default: show the song)" }
+                    "analyze WAV resource or file, seek beats, tempo 20 to 999, song file or "
+                    "none (default: show the song)" },
+                { .name = "from", .type = ecs_id(ecs_string_t), .optional = true,
+                  .brief = "analyze from this second (default: the start)" },
+                { .name = "to", .type = ecs_id(ecs_string_t), .optional = true,
+                  .brief = "analyze up to this second (default: the end)" }
             },
             .callback = box_cmd_audio
         });
