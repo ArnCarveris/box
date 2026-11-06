@@ -2,9 +2,15 @@
  * @file command/cmd_audio.c
  * @brief The audio command: the status of the audio, its transport, its buses and their insert
  * slots, its instruments, its tracks with their note and audio placements, sounding notes and
+<<<<<<< HEAD
  * playing audio clips, its emitters with their plays and skips, the master
  * volume and mute, play, stop, seek and tempo, the song of AudioSong, and captures of the
  * master output to a WAV resource.
+=======
+ * playing audio clips, its emitters with their plays and skips, its macros with their maps, the
+ * master volume and mute, play, stop, seek and tempo, and captures of the master output to a WAV
+ * resource.
+>>>>>>> d98572e6033d69ef2344d92fb3c2060b49fbab86
  *
  * The actions only write AudioSettings, Transport or AudioSong, which box.audio applies at the
  * end of the frame as for a change from a script or the REST API. A capture taps the core, so
@@ -250,6 +256,7 @@ static void box_cmd_audio_effects(
         const Rotary *rotary;
         const BeatRepeat *repeat;
         const TapeStop *stop;
+        const Vocoder *vocoder;
         const box_audio_module_t *state = box_audio_module_get(world);
         char *path;
         int32_t b, slot;
@@ -409,6 +416,16 @@ static void box_cmd_audio_effects(
             ecs_strbuf_append(buf, "tape stop %s stop %.3f s start %.3f s curve %+.2f",
                 stop->active >= 0.5f ? "active" : "inactive", (double)stop->stop_time,
                 (double)stop->start_time, (double)stop->curve);
+        } else if ((vocoder = ecs_get(world, e, Vocoder))) {
+            char *key = vocoder->modulator && ecs_is_alive(world, vocoder->modulator) ?
+                ecs_get_path(world, vocoder->modulator) : NULL;
+            ecs_strbuf_append(buf, "vocoder modulator %s bands %d low %.0f Hz high %.0f Hz "
+                "q %.2f attack %.4f release %.3f shift %.2f unvoiced %.2f mix %.2f",
+                key ? key : (vocoder->modulator ? "(deleted)" : "(none)"), vocoder->bands,
+                (double)vocoder->low, (double)vocoder->high, (double)vocoder->q,
+                (double)vocoder->attack, (double)vocoder->release, (double)vocoder->shift,
+                (double)vocoder->unvoiced, (double)vocoder->mix);
+            ecs_os_free(key);
         }
 
         slot = box_audio_module_effect_slot(world, e);
@@ -923,6 +940,63 @@ static void box_cmd_audio_emitters(
     ecs_query_fini(q);
 }
 
+/** Append the macros: each with its value and whether it runs, and its maps with their member,
+ * range, curve, the value the member has at the value of the component and whether they run.
+ *
+ * @param world The world
+ * @param buf The output
+ */
+static void box_cmd_audio_macros(
+    ecs_world_t *world,
+    ecs_strbuf_t *buf)
+{
+    ecs_iter_t it = ecs_each(world, AudioMacro);
+    int32_t i, k;
+    while (ecs_each_next(&it)) {
+        const AudioMacro *macro = ecs_field(&it, AudioMacro, 0);
+        for (i = 0; i < it.count; i ++) {
+            char *path = ecs_get_path(world, it.entities[i]);
+            ecs_iter_t cit = ecs_children(world, it.entities[i]);
+            ecs_strbuf_append(buf, "\n  macro %s: value %.2f (%s)", path,
+                (double)macro[i].value, box_audio_macro_status(world, it.entities[i]));
+            while (ecs_children_next(&cit)) {
+                for (k = 0; k < cit.count; k ++) {
+                    const AudioMacroMap *m = ecs_get(world, cit.entities[k], AudioMacroMap);
+                    char *map_path, *target;
+                    const char *component;
+                    float value;
+                    if (!m) {
+                        continue;
+                    }
+
+                    map_path = ecs_get_path(world, cit.entities[k]);
+                    target = m->target && ecs_is_alive(world, m->target) ?
+                        ecs_get_path(world, m->target) : NULL;
+                    component = m->component && ecs_is_alive(world, m->component) ?
+                        ecs_get_name(world, m->component) : NULL;
+                    value = box_audio_macro_map_value(macro[i].value, m->min, m->max,
+                        m->curve, m->scale == AudioModOctaves ? BOX_AUDIO_MOD_OCTAVES :
+                        BOX_AUDIO_MOD_LINEAR);
+                    ecs_strbuf_append(buf, "\n    map %s: %s %s.%s %.2f..%.2f%s", map_path,
+                        target ? target : "(no target)", component ? component : "?",
+                        m->member ? m->member : "(no member)", (double)m->min,
+                        (double)m->max, m->scale == AudioModOctaves ? " oct" : "");
+                    if (m->curve != 0) {
+                        ecs_strbuf_append(buf, " curve %.2f", (double)m->curve);
+                    }
+
+                    ecs_strbuf_append(buf, " = %.2f (%s)", (double)value,
+                        box_audio_macro_status(world, cit.entities[k]));
+                    ecs_os_free(target);
+                    ecs_os_free(map_path);
+                }
+            }
+
+            ecs_os_free(path);
+        }
+    }
+}
+
 /** Print the status of the audio and the buses in processing order.
  *
  * @param world The world
@@ -976,6 +1050,7 @@ static char* box_cmd_audio_print(
     box_cmd_audio_instruments(world, &buf);
     box_cmd_audio_tracks(world, &buf);
     box_cmd_audio_emitters(world, &buf);
+    box_cmd_audio_macros(world, &buf);
 
     return ecs_strbuf_get(&buf);
 }
@@ -1147,9 +1222,14 @@ void box_cmd_audio_init(
 {
     ECS_IMPORT(world, BoxAudio);
     box_command_register(world,
+<<<<<<< HEAD
         "Print the audio status, transport, song, buses, instruments, tracks and emitters, set "
         "the volume or mute, play, stop, seek or set the tempo, show or change the song, or "
         "capture a WAV",
+=======
+        "Print the audio status, transport, buses, instruments, tracks, emitters and macros, set "
+        "the volume or mute, play, stop, seek or set the tempo, or capture a WAV",
+>>>>>>> d98572e6033d69ef2344d92fb3c2060b49fbab86
         (ecs_function_desc_t){
             .name = "audio",
             .return_type = ecs_id(ecs_string_t),

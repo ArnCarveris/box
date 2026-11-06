@@ -18,6 +18,7 @@ typedef struct box_gpu_shader_slot_t {
     box_gpu_shader_t shader;        /**< Module and revision, read as box_gpu_shader_t */
     box_gpu_compile_t *pending;     /**< Compiles waiting for their outcome, oldest first */
     int32_t requested;              /**< Code revision of the newest compile started */
+    char *label;                    /**< Label of the installed module, NULL when none */
 } box_gpu_shader_slot_t;
 
 /** A module whose compile outcome is awaited, owned by the callback once it waits */
@@ -116,6 +117,7 @@ static void box_gpu_shader_slot_free(
         box_gpu_count(gpu, BOX_GPU_STAT_SHADER_DESTROYED);
     }
 
+    ecs_os_free(slot->label);
     ecs_os_free(slot);
 }
 
@@ -124,11 +126,13 @@ static void box_gpu_shader_slot_free(
  * @param gpu The backend
  * @param handle Handle of the shader
  * @param module The module
+ * @param label Label of the module
  */
 static void box_gpu_shader_install(
     box_gpu_t *gpu,
     uint32_t handle,
-    WGPUShaderModule module)
+    WGPUShaderModule module,
+    const char *label)
 {
     box_gpu_shader_slot_t *slot = box_gpu_shader_slot(gpu, handle);
     if (slot->shader.module) {
@@ -139,10 +143,12 @@ static void box_gpu_shader_install(
 
     slot->shader.module = module;
     slot->shader.revision ++;
+    ecs_os_free(slot->label);
+    slot->label = ecs_os_strdup(label);
     if (handle == BOX_RENDER_SHADER_BLIT) {
         box_gpu_blit_reset(gpu);
     } else if (handle == BOX_RENDER_SHADER_MESH || handle == BOX_RENDER_SHADER_SHAPE2D) {
-        box_gpu_forward_reset(gpu);
+        box_gpu_forward_reset(gpu, true);
     }
 }
 
@@ -169,16 +175,8 @@ static void box_gpu_compile_finish(
         compile->slot = NULL;
     }
 
-    char *invalid = NULL;
-    if (!compile->failed && compile->module && slot && compile->revision == slot->requested &&
-        (compile->handle == BOX_RENDER_SHADER_MESH ||
-            compile->handle == BOX_RENDER_SHADER_SHAPE2D))
-    {
-        invalid = box_gpu_forward_check(gpu, compile->handle, compile->module);
-    }
-
-    if (compile->failed || !compile->module || invalid) {
-        const char *message = invalid ? invalid : compile->message
+    if (compile->failed || !compile->module) {
+        const char *message = compile->message
             ? compile->message : "shader module creation failed";
         ecs_err("shader '%s' failed to compile: %s", compile->label, message);
         box_gpu_count(gpu, BOX_GPU_STAT_SHADER_ERROR);
@@ -188,17 +186,16 @@ static void box_gpu_compile_finish(
         box_gpu_count(gpu, BOX_GPU_STAT_COMPILED);
         box_gpu_shader_report(gpu, compile->handle, compile->revision, NULL, compile->label);
         if (compile->revision == slot->requested) {
-            box_gpu_shader_install(gpu, compile->handle, compile->module);
+            box_gpu_shader_install(gpu, compile->handle, compile->module, compile->label);
             compile->module = NULL;
         }
     }
 
     if (slot && !slot->shader.module && !slot->pending) {
         ecs_map_remove(&gpu->shaders, compile->handle);
+        ecs_os_free(slot->label);
         ecs_os_free(slot);
     }
-
-    ecs_os_free(invalid);
 }
 
 /** Take the outcome of a compile; one that waits is finished and freed here.
@@ -289,16 +286,18 @@ static void box_gpu_shader_on_info(
     ecs_os_free(message);
 }
 
-/** Request the compile outcome of a module from the browser.
+/** Create the module of a compile and request its outcome from the browser.
  *
  * @param gpu The backend
  * @param compile The compile
+ * @param desc The module
  */
-static void box_gpu_compile_request(
+static void box_gpu_compile_create(
     box_gpu_t *gpu,
-    box_gpu_compile_t *compile)
+    box_gpu_compile_t *compile,
+    const WGPUShaderModuleDescriptor *desc)
 {
-    (void)gpu;
+    compile->module = wgpuDeviceCreateShaderModule(gpu->device, desc);
     if (!compile->module) {
         box_gpu_compile_arrive(compile, true, NULL, 0);
         goto done;
@@ -315,47 +314,27 @@ done:
 
 #else
 
-/** Take the error the scope around a module creation caught.
+/** Create the module of a compile, whose errors wgpu-native reports at once on this thread.
  *
- * @param status Whether the scope was popped
- * @param type Kind of error, NoError when there was none
- * @param message Error text
- * @param userdata1 The box_gpu_compile_t
- * @param userdata2 Unused
- */
-static void box_gpu_shader_on_scope(
-    WGPUPopErrorScopeStatus status,
-    WGPUErrorType type,
-    WGPUStringView message,
-    void *userdata1,
-    void *userdata2)
-{
-    int len = 0;
-    bool failed = status == WGPUPopErrorScopeStatus_Success && type != WGPUErrorType_NoError;
-    (void)userdata2;
-    if (failed && message.data) {
-        len = message.length == WGPU_STRLEN
-            ? ecs_os_strlen(message.data)
-            : (int)message.length;
-    }
-
-    box_gpu_compile_arrive(userdata1, failed, failed ? message.data : NULL, len);
-}
-
-/** Pop the error scope around the creation of a module, which wgpu-native reports at once.
+ * The errors are captured on the thread rather than with an error scope, which belongs to the
+ * device and would also catch the errors of the pipelines the workers create meanwhile.
  *
  * @param gpu The backend
  * @param compile The compile
+ * @param desc The module
  */
-static void box_gpu_compile_request(
+static void box_gpu_compile_create(
     box_gpu_t *gpu,
-    box_gpu_compile_t *compile)
+    box_gpu_compile_t *compile,
+    const WGPUShaderModuleDescriptor *desc)
 {
-    wgpuDevicePopErrorScope(gpu->device, (WGPUPopErrorScopeCallbackInfo){
-        .mode = WGPUCallbackMode_AllowSpontaneous,
-        .callback = box_gpu_shader_on_scope,
-        .userdata1 = compile
-    });
+    box_gpu_error_capture_t capture = {0};
+    box_gpu_error_capture_begin(&capture);
+    compile->module = wgpuDeviceCreateShaderModule(gpu->device, desc);
+    box_gpu_error_capture_end();
+    box_gpu_compile_arrive(compile, capture.failed, capture.message,
+        capture.message ? ecs_os_strlen(capture.message) : 0);
+    ecs_os_free(capture.message);
 }
 
 #endif
@@ -391,11 +370,7 @@ static void box_gpu_shader_compile(
     compile->handle = handle;
     compile->revision = revision;
     slot->requested = revision;
-#ifndef __EMSCRIPTEN__
-    wgpuDevicePushErrorScope(gpu->device, WGPUErrorFilter_Validation);
-#endif
-    compile->module = wgpuDeviceCreateShaderModule(gpu->device, &desc);
-    box_gpu_compile_request(gpu, compile);
+    box_gpu_compile_create(gpu, compile, &desc);
     if (compile->arrived) {
         box_gpu_compile_finish(compile);
         box_gpu_compile_free(compile);
@@ -495,7 +470,7 @@ static void box_gpu_shader_release(
     if (handle == BOX_RENDER_SHADER_BLIT) {
         box_gpu_blit_reset(gpu);
     } else if (handle == BOX_RENDER_SHADER_MESH || handle == BOX_RENDER_SHADER_SHAPE2D) {
-        box_gpu_forward_reset(gpu);
+        box_gpu_forward_reset(gpu, false);
     }
 }
 
@@ -531,6 +506,23 @@ WGPUShaderModule box_gpu_shader_get(
     box_gpu_shader_t *s = ecs_map_get_deref(&gpu->shaders, box_gpu_shader_t, handle);
 
     return s ? s->module : NULL;
+}
+
+const char* box_gpu_shader_label(
+    box_gpu_t *gpu,
+    WGPUShaderModule module)
+{
+    const char *result = NULL;
+    ecs_map_iter_t it = ecs_map_iter(&gpu->shaders);
+    while (module && ecs_map_next(&it)) {
+        box_gpu_shader_slot_t *slot = ecs_map_ptr(&it);
+        if (slot->shader.module == module) {
+            result = slot->label;
+            break;
+        }
+    }
+
+    return result;
 }
 
 void box_gpu_shader_fini(

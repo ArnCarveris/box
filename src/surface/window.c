@@ -141,6 +141,7 @@ box_window_t* box_window_new(
     result->input.world = ECS_CONST_CAST(ecs_world_t*, ecs_get_world(world));
     result->input.surface = surface;
     box_input_glfw_attach(&result->input, window);
+    ecs_trace("opened window '%s' (%dx%d)", title ? title : "", width, height);
 done:
     return result;
 }

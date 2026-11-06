@@ -178,7 +178,7 @@ static WGPURenderPipeline box_gpu_transmission_pipeline(
     }
 
     cached = ecs_map_get(&tr->pipelines, (ecs_map_key_t)format);
-    if (cached) {
+    if (cached && *cached) {
         result = (WGPURenderPipeline)(uintptr_t)*cached;
         goto done;
     }
@@ -200,7 +200,10 @@ static WGPURenderPipeline box_gpu_transmission_pipeline(
         .multisample = { .count = 1, .mask = 0xFFFFFFFF },
         .fragment = &fragment
     });
-    ecs_map_insert_ptr(&tr->pipelines, (ecs_map_key_t)format, result);
+    if (result) {
+        *ecs_map_ensure(&tr->pipelines, (ecs_map_key_t)format) = (ecs_map_val_t)(uintptr_t)result;
+    }
+
 done:
     return result;
 }

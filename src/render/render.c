@@ -99,6 +99,7 @@ box_render_packet_t* box_render_packet(
         result->time = info->world_time_total;
         result->delta = info->delta_time;
         result->fps = app && app->fps > 0 ? app->fps : 0;
+        result->headless = app && app->headless;
     }
 
     return result;

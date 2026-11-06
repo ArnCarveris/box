@@ -427,27 +427,21 @@ static box_gpu_bake_t* box_gpu_bake_state_new(
     return b;
 }
 
-/** Create a compute pipeline of an entry point of the bake shader, releasing the one it
- * replaces.
+/** Request a compute pipeline of an entry point of the bake shader.
  *
  * @param gpu The backend
- * @param pipeline The pipeline, replaced
  * @param layout The pipeline layout
  * @param module The shader module
  * @param entry The entry point
+ * @return The pipeline, NULL while it is created
  */
-static void box_gpu_bake_compute(
+static WGPUComputePipeline box_gpu_bake_compute(
     box_gpu_t *gpu,
-    WGPUComputePipeline *pipeline,
     WGPUPipelineLayout layout,
     WGPUShaderModule module,
     const char *entry)
 {
-    if (*pipeline) {
-        wgpuComputePipelineRelease(*pipeline);
-    }
-
-    *pipeline = box_gpu_compute_pipeline(gpu, &(WGPUComputePipelineDescriptor){
+    return box_gpu_compute_pipeline(gpu, &(WGPUComputePipelineDescriptor){
         .layout = layout,
         .compute = {
             .module = module,
@@ -457,11 +451,12 @@ static void box_gpu_bake_compute(
 }
 
 /** Get the projection pipeline, created again with the cull pipeline and the reflection store
- * and mip pipelines when the bake shader was recompiled.
+ * and mip pipelines when the bake shader was recompiled; the previous ones stay until every
+ * new one exists.
  *
  * @param gpu The backend
  * @param b The capture state
- * @return The pipeline, NULL while the shader has no module
+ * @return The pipeline, NULL while the shader has no module or the first ones are created
  */
 static WGPUComputePipeline box_gpu_bake_pipeline(
     box_gpu_t *gpu,
@@ -473,11 +468,17 @@ static WGPUComputePipeline box_gpu_bake_pipeline(
         goto done;
     }
 
-    box_gpu_bake_compute(gpu, &b->project, b->pipeline_layout, s->module, "project");
-    box_gpu_bake_compute(gpu, &b->cull, b->cull_pipeline_layout, s->module, "cull");
-    box_gpu_bake_compute(gpu, &b->bounds, b->bounds_pipeline_layout, s->module, "cull_bounds");
-    box_gpu_reflect_pipelines(gpu, s->module);
-    b->revision = s->revision;
+    WGPUComputePipeline next[6] = {
+        box_gpu_bake_compute(gpu, b->pipeline_layout, s->module, "project"),
+        box_gpu_bake_compute(gpu, b->cull_pipeline_layout, s->module, "cull"),
+        box_gpu_bake_compute(gpu, b->bounds_pipeline_layout, s->module, "cull_bounds")
+    };
+    WGPUComputePipeline *current[6] = { &b->project, &b->cull, &b->bounds };
+    box_gpu_reflect_pipelines(gpu, s->module, &next[3], &current[3]);
+    if (box_gpu_compute_pipelines_swap(current, next, 6)) {
+        b->revision = s->revision;
+    }
+
 done:
     return s && s->module && b->cull ? b->project : NULL;
 }
@@ -642,6 +643,7 @@ static void box_gpu_bake_draws(
                 .count = rb->instance_count,
                 .pipeline = box_gpu_forward_pipeline(gpu, BOX_GPU_HDR_FORMAT, rb, false),
                 .material = box_gpu_material_group(gpu, packet, rb),
+                .kind = box_gpu_draw_kind(rb, false),
                 .instances = box_gpu_instance_group(gpu, rb->instances, rb->mesh, m, true),
                 .page = box_gpu_instance_group(gpu, rb->instances, 0, NULL, false),
                 .vertices = m->vertices,
@@ -964,7 +966,7 @@ static bool box_gpu_bake_draws_equal(
         const box_gpu_bake_draw_t *x = ecs_vec_get_t(a, box_gpu_bake_draw_t, d);
         const box_gpu_bake_draw_t *y = ecs_vec_get_t(b, box_gpu_bake_draw_t, d);
         result = x->region == y->region && x->count == y->count &&
-            x->pipeline == y->pipeline && x->material == y->material &&
+            x->pipeline == y->pipeline && x->material == y->material && x->kind == y->kind &&
             x->instances == y->instances && x->vertices == y->vertices &&
             x->indices == y->indices;
     }
@@ -997,6 +999,7 @@ static WGPURenderBundle box_gpu_bake_bundle(
         });
     WGPURenderPipeline pipeline = NULL;
     WGPUBindGroup material = NULL, instances = NULL;
+    uint32_t kind = 0;
     uint32_t offset = (uint32_t)(face * BOX_GPU_VIEW_STRIDE);
     int32_t d, draws = ecs_vec_count(&b->draws);
     wgpuRenderBundleEncoderSetBindGroup(e, 0, s->faces_group, 1, &offset);
@@ -1014,9 +1017,10 @@ static WGPURenderBundle box_gpu_bake_bundle(
             pipeline = draw->pipeline;
         }
 
-        if (draw->material != material) {
-            wgpuRenderBundleEncoderSetBindGroup(e, 1, draw->material, 0, NULL);
+        if (draw->material != material || draw->kind != kind) {
+            wgpuRenderBundleEncoderSetBindGroup(e, 1, draw->material, 1, &draw->kind);
             material = draw->material;
+            kind = draw->kind;
         }
 
         if (draw->instances != instances) {
@@ -1443,7 +1447,8 @@ static bool box_gpu_bake_fits(
     return result;
 }
 
-/** Capture one chunk of probes of a batch in one command buffer.
+/** Capture one chunk of probes of a batch in one command buffer, unless a pipeline is being
+ * created: the capture could miss what it draws.
  *
  * @param gpu The backend
  * @param b The capture state
@@ -1471,7 +1476,11 @@ static void box_gpu_bake_chunk_capture(
     const box_render_cascade_t *cascade = pass->sun ? &pass->cascade : NULL;
     int32_t i, faces = count * 6;
     bool caster = cascade && !*shadow;
-    if (!pipeline || !box_gpu_bake_fits(pass, probes, count)) {
+    if (cascade) {
+        box_gpu_shadow_request(gpu);
+    }
+
+    if (!pipeline || !box_gpu_bake_fits(pass, probes, count) || box_gpu_pipelines_building(gpu)) {
         goto done;
     }
 

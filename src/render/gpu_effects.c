@@ -708,8 +708,8 @@ static WGPUBlendState* box_gpu_fx_blend(
 }
 
 /** Get the pipeline of an effect entry point, created on first use and again when its shader
- * was recompiled. The SMAA shader has a layout of its own; the vertex
- * entry point of a pass follows from its fragment entry point.
+ * was recompiled, keeping the previous one until then. The SMAA shader has a layout of its own;
+ * the vertex entry point of a pass follows from its fragment entry point.
  *
  * @param gpu The backend
  * @param pass The pass
@@ -739,7 +739,7 @@ static WGPURenderPipeline box_gpu_fx_pipeline(
         }
     }
 
-    if (found && found->revision == revision) {
+    if (found && found->pipeline && found->revision == revision) {
         goto done;
     }
 
@@ -750,8 +750,6 @@ static WGPURenderPipeline box_gpu_fx_pipeline(
         found->entry = pass->entry;
         found->format = pass->format;
         found->blend = pass->blend;
-    } else if (found->pipeline) {
-        wgpuRenderPipelineRelease(found->pipeline);
     }
 
     WGPUColorTargetState target = {
@@ -777,8 +775,12 @@ static WGPURenderPipeline box_gpu_fx_pipeline(
         .multisample = { .count = 1, .mask = 0xFFFFFFFF },
         .fragment = &fragment
     };
-    found->pipeline = box_gpu_render_pipeline(gpu, &desc);
-    found->revision = revision;
+    WGPURenderPipeline *current = &found->pipeline;
+    WGPURenderPipeline next = box_gpu_render_pipeline(gpu, &desc);
+    if (box_gpu_render_pipelines_swap(&current, &next, 1)) {
+        found->revision = revision;
+    }
+
 done:
     return module && found ? found->pipeline : NULL;
 }
@@ -917,7 +919,8 @@ static void box_gpu_fx_uniforms(
     wgpuQueueWriteBuffer(gpu->queue, s->uniforms, 0, data, size);
 }
 
-/** Get the exposure compute pipelines, created again when the exposure shader was recompiled.
+/** Get the exposure compute pipelines, created again when the exposure shader was recompiled;
+ * the previous ones stay until both new ones exist.
  *
  * @param gpu The backend
  * @return Whether both pipelines exist
@@ -932,24 +935,25 @@ static bool box_gpu_fx_measure_pipelines(
         goto done;
     }
 
-    if (fx->histogram) {
-        wgpuComputePipelineRelease(fx->histogram);
-        wgpuComputePipelineRelease(fx->adapt);
+    WGPUComputePipeline *current[2] = { &fx->histogram, &fx->adapt };
+    WGPUComputePipeline next[2] = {
+        box_gpu_compute_pipeline(gpu,
+            &(WGPUComputePipelineDescriptor){
+                .layout = fx->measure_pipeline_layout,
+                .compute = { .module = module,
+                    .entryPoint = { .data = "histogram_main", .length = WGPU_STRLEN } }
+            }),
+        box_gpu_compute_pipeline(gpu,
+            &(WGPUComputePipelineDescriptor){
+                .layout = fx->measure_pipeline_layout,
+                .compute = { .module = module,
+                    .entryPoint = { .data = "adapt_main", .length = WGPU_STRLEN } }
+            })
+    };
+    if (box_gpu_compute_pipelines_swap(current, next, 2)) {
+        fx->measure_revision = revision;
     }
 
-    fx->histogram = box_gpu_compute_pipeline(gpu,
-        &(WGPUComputePipelineDescriptor){
-            .layout = fx->measure_pipeline_layout,
-            .compute = { .module = module,
-                .entryPoint = { .data = "histogram_main", .length = WGPU_STRLEN } }
-        });
-    fx->adapt = box_gpu_compute_pipeline(gpu,
-        &(WGPUComputePipelineDescriptor){
-            .layout = fx->measure_pipeline_layout,
-            .compute = { .module = module,
-                .entryPoint = { .data = "adapt_main", .length = WGPU_STRLEN } }
-        });
-    fx->measure_revision = revision;
 done:
     return module && fx->histogram && fx->adapt;
 }

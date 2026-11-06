@@ -1728,6 +1728,7 @@ static void BoxAudioSync(
         box_audio_queued(world, state, waiting);
         box_audio_emitters_update(world, state, t, waiting, it->delta_time);
         box_audio_notes_send(world, state, waiting);
+        box_audio_macros_sync(world, state, t);
         box_audio_modulators_sync(world, state, t);
         box_audio_timeline_update(world, state, t, waiting);
         box_audio_timeline_quantized(world, state, waiting);

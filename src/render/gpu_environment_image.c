@@ -222,11 +222,8 @@ static WGPUComputePipeline box_gpu_env_image_pipeline(
     }
 
     if (!s->pipeline || s->revision != shader->revision) {
-        if (s->pipeline) {
-            wgpuComputePipelineRelease(s->pipeline);
-        }
-
-        s->pipeline = box_gpu_compute_pipeline(gpu,
+        WGPUComputePipeline *current = &s->pipeline;
+        WGPUComputePipeline next = box_gpu_compute_pipeline(gpu,
             &(WGPUComputePipelineDescriptor){
                 .layout = s->pipeline_layout,
                 .compute = {
@@ -234,7 +231,9 @@ static WGPUComputePipeline box_gpu_env_image_pipeline(
                     .entryPoint = { .data = "equirect_to_cube", .length = WGPU_STRLEN }
                 }
             });
-        s->revision = shader->revision;
+        if (box_gpu_compute_pipelines_swap(&current, &next, 1)) {
+            s->revision = shader->revision;
+        }
     }
 
 done:

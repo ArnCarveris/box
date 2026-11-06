@@ -337,27 +337,21 @@ const box_gpu_reflect_t* box_gpu_reflect_of(
         : NULL;
 }
 
-/** Create a compute pipeline of an entry point of the bake shader, releasing the one it
- * replaces.
+/** Request a compute pipeline of an entry point of the bake shader.
  *
  * @param gpu The backend
- * @param pipeline The pipeline, replaced
  * @param layout The pipeline layout
  * @param module The shader module
  * @param entry The entry point
+ * @return The pipeline, NULL while it is created
  */
-static void box_gpu_reflect_compute(
+static WGPUComputePipeline box_gpu_reflect_compute(
     box_gpu_t *gpu,
-    WGPUComputePipeline *pipeline,
     WGPUPipelineLayout layout,
     WGPUShaderModule module,
     const char *entry)
 {
-    if (*pipeline) {
-        wgpuComputePipelineRelease(*pipeline);
-    }
-
-    *pipeline = box_gpu_compute_pipeline(gpu, &(WGPUComputePipelineDescriptor){
+    return box_gpu_compute_pipeline(gpu, &(WGPUComputePipelineDescriptor){
         .layout = layout,
         .compute = {
             .module = module,
@@ -368,14 +362,19 @@ static void box_gpu_reflect_compute(
 
 void box_gpu_reflect_pipelines(
     box_gpu_t *gpu,
-    WGPUShaderModule module)
+    WGPUShaderModule module,
+    WGPUComputePipeline *next,
+    WGPUComputePipeline **current)
 {
-    box_gpu_reflect_compute(gpu, &gpu->reflect_store, gpu->reflect_store_pipeline_layout,
-        module, "reflect_store");
-    box_gpu_reflect_compute(gpu, &gpu->reflect_mip, gpu->reflect_mip_pipeline_layout,
-        module, "reflect_mip");
-    box_gpu_reflect_compute(gpu, &gpu->reflect_prefilter,
-        gpu->reflect_prefilter_pipeline_layout, module, "reflect_prefilter");
+    next[0] = box_gpu_reflect_compute(gpu, gpu->reflect_store_pipeline_layout, module,
+        "reflect_store");
+    next[1] = box_gpu_reflect_compute(gpu, gpu->reflect_mip_pipeline_layout, module,
+        "reflect_mip");
+    next[2] = box_gpu_reflect_compute(gpu, gpu->reflect_prefilter_pipeline_layout, module,
+        "reflect_prefilter");
+    current[0] = &gpu->reflect_store;
+    current[1] = &gpu->reflect_mip;
+    current[2] = &gpu->reflect_prefilter;
 }
 
 /** Get the workgroups along an edge of a face of the store and mip passes.

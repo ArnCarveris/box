@@ -1,8 +1,8 @@
 /**
  * @file InProgressTask.c
  * @brief The tasks the renderer reports in InProgressTask: shader compiles whose outcome did not
- * arrive block until every module and pipeline is ready, and a LightBake reports its probes as
- * a task that does not block.
+ * arrive and pipelines being created block until every module and pipeline is ready, while
+ * frames keep rendering, and a LightBake reports its probes as a task that does not block.
  */
 
 #include <box.h>
@@ -25,11 +25,30 @@ static const char *task_magenta =
     "    return textureSample(scene, scene_sampler, v.uv) * 0.0 + vec4f(1.0, 0.0, 1.0, 1.0);\n"
     "}\n";
 
-/** Create a headless world with box that renders a cube into a surface.
+/** Mesh shader that compiles but whose pipelines do not fit the layout of the forward pipeline,
+ * which has no binding 99 */
+static const char *task_unbound =
+    "override blend_mode: u32 = 0u;\n"
+    "@group(0) @binding(99) var<uniform> extra: vec4f;\n"
+    "@vertex fn vs(@location(0) p: vec3f) -> @builtin(position) vec4f {\n"
+    "    return vec4f(p, 1.0);\n"
+    "}\n"
+    "@fragment fn fs() -> @location(0) vec4f {\n"
+    "    return extra + vec4f(f32(blend_mode));\n"
+    "}\n";
+
+/** Create a world with box that renders a cube into a surface.
  *
+ * A world that is not headless creates its pipelines on the workers instead of waiting for
+ * them; its surface renders into a texture, as one without a window. It keeps the temporary
+ * folder it got as a headless world.
+ *
+ * @param headless Whether the frames are headless
  * @return The world
  */
-static ecs_world_t* task_world(void) {
+static ecs_world_t* task_world_new(
+    bool headless)
+{
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     ecs_singleton_set(world, FileWatch, {.interval = -1});
@@ -48,9 +67,23 @@ static ecs_world_t* task_world(void) {
     ecs_set(world, cube, Position, {0, 0, 0});
     ecs_set(world, cube, Rgb, {255, 0, 0});
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 16, .height = 16, .resolution_scale = 1});
+    ecs_set(world, s, Surface, {.width = 16, .height = 16, .resolution_scale = 1,
+        .texture = headless ? 0 : ecs_new(world)});
+    if (!headless) {
+        app = ecs_singleton_get_mut(world, App);
+        app->headless = false;
+        ecs_singleton_modified(world, App);
+    }
 
     return world;
+}
+
+/** Create a headless world with box that renders a cube into a surface.
+ *
+ * @return The world
+ */
+static ecs_world_t* task_world(void) {
+    return task_world_new(true);
 }
 
 /** Run a frame and wait for the renderer.
@@ -126,6 +159,162 @@ void InProgressTask_held_compile_blocks(void) {
     test_bool(ecs_get(world, blit, ShaderStatus)->ok, true);
 
     ecs_os_free(magenta);
+    ecs_fini(world);
+}
+
+void InProgressTask_held_pipeline_blocks(void) {
+    ecs_world_t *world = task_world();
+    const InProgressTask *t = NULL;
+    box_render_gpu_stats_t before, stats;
+    int32_t i, frames, building = 0;
+    for (i = 0; i < 20; i ++) {
+        t = task_frame(world);
+    }
+
+    test_assert(box_task_find(t, BOX_TASK_SHADERS) == NULL);
+    test_bool(box_render_gpu_stats(world, &before), true);
+    test_int(before.pipelines_building, 0);
+
+    test_bool(box_render_gpu_compile_delivery(world, BOX_RENDER_COMPILE_HOLD), true);
+    ecs_entity_t cube = ecs_new(world);
+    ecs_set(world, cube, Box, {1, 1, 1});
+    ecs_set(world, cube, Position, {1, 0, 0});
+    ecs_set(world, cube, Rgb, {0, 255, 0});
+    BlendMode blend = Additive;
+    ecs_set_ptr(world, cube, BlendMode, &blend);
+    frames = before.frames;
+    for (i = 0; i < 5; i ++) {
+        t = task_frame(world);
+        test_bool(box_render_gpu_stats(world, &stats), true);
+        test_assert(stats.frames > frames);
+        frames = stats.frames;
+        test_assert(stats.pipelines_building >= 1);
+        if (i == 0) {
+            building = stats.pipelines_building;
+            continue;
+        }
+
+        test_int(stats.pipelines_building, building);
+        test_int(stats.pipelines, before.pipelines);
+        const InProgressTaskItem *item = box_task_find(t, BOX_TASK_SHADERS);
+        test_assert(item != NULL);
+        test_bool(item->blocking, true);
+        test_assert(item->total >= 1);
+        test_assert(item->done < item->total);
+        test_assert(t->blocking >= 1);
+    }
+
+    test_bool(box_render_gpu_compile_delivery(world, BOX_RENDER_COMPILE_AT_ONCE), true);
+    for (i = 0; i < 10 && box_task_find(t, BOX_TASK_SHADERS); i ++) {
+        t = task_frame(world);
+    }
+
+    test_assert(box_task_find(t, BOX_TASK_SHADERS) == NULL);
+    test_bool(box_render_gpu_stats(world, &stats), true);
+    test_int(stats.pipelines_building, 0);
+    test_assert(stats.pipelines >= before.pipelines + building);
+    test_assert(stats.frames > frames);
+
+    ecs_fini(world);
+}
+
+void InProgressTask_fini_with_held_pipeline(void) {
+    ecs_world_t *world = task_world();
+    box_render_gpu_stats_t stats;
+    int32_t i;
+    for (i = 0; i < 20; i ++) {
+        task_frame(world);
+    }
+
+    test_bool(box_render_gpu_compile_delivery(world, BOX_RENDER_COMPILE_HOLD), true);
+    ecs_entity_t cube = ecs_new(world);
+    ecs_set(world, cube, Box, {1, 1, 1});
+    ecs_set(world, cube, Position, {-1, 0, 0});
+    BlendMode blend = Screen;
+    ecs_set_ptr(world, cube, BlendMode, &blend);
+    task_frame(world);
+    task_frame(world);
+    test_bool(box_render_gpu_stats(world, &stats), true);
+    test_assert(stats.pipelines_building >= 1);
+
+    ecs_fini(world);
+}
+
+void InProgressTask_background_pipelines(void) {
+    ecs_world_t *world = task_world_new(false);
+    box_render_gpu_stats_t stats;
+    const InProgressTask *t = task_frame(world);
+    test_bool(box_render_gpu_stats(world, &stats), true);
+    test_assert(stats.pipelines_building >= 1);
+    test_assert(box_task_find(t, BOX_TASK_SHADERS) != NULL);
+
+    int32_t i, frames = stats.frames;
+    for (i = 0; i < 1000 && box_task_find(t, BOX_TASK_SHADERS); i ++) {
+        t = task_frame(world);
+        test_bool(box_render_gpu_stats(world, &stats), true);
+        test_assert(stats.frames > frames);
+        frames = stats.frames;
+    }
+
+    test_assert(box_task_find(t, BOX_TASK_SHADERS) == NULL);
+    test_int(stats.pipelines_building, 0);
+    test_int(stats.errors, 0);
+    test_int(stats.shader_errors, 0);
+
+    int32_t draws = stats.draws;
+    task_frame(world);
+    test_bool(box_render_gpu_stats(world, &stats), true);
+    test_assert(stats.draws > draws);
+    test_int(stats.pipelines_building, 0);
+
+    ecs_fini(world);
+}
+
+void InProgressTask_failed_pipeline_ends_task(void) {
+    ecs_world_t *world = task_world_new(false);
+    box_render_gpu_stats_t before, stats;
+    int32_t i;
+    const InProgressTask *t = task_frame(world);
+    for (i = 0; i < 1000 && box_task_find(t, BOX_TASK_SHADERS); i ++) {
+        t = task_frame(world);
+    }
+
+    test_assert(box_task_find(t, BOX_TASK_SHADERS) == NULL);
+    test_bool(box_render_gpu_stats(world, &before), true);
+    const char *tmp = ecs_singleton_get(world, AppStatus)->tmp_dir;
+    char *unbound = flecs_asprintf("%s/task_unbound.wgsl", tmp);
+    FILE *f = fopen(unbound, "w");
+    test_assert(f != NULL);
+    fputs(task_unbound, f);
+    fclose(f);
+
+    ecs_entity_t mesh = ecs_lookup(world, "box.shader.builtin.mesh");
+    test_assert(mesh != 0);
+    ecs_set(world, mesh, Shader, {.path = unbound});
+    ecs_log_set_level(-4);
+    t = task_frame(world);
+    test_assert(box_task_find(t, BOX_TASK_SHADERS) != NULL);
+    for (i = 0; i < 1000 && box_task_find(t, BOX_TASK_SHADERS); i ++) {
+        t = task_frame(world);
+    }
+
+    ecs_log_set_level(-1);
+    test_assert(box_task_find(t, BOX_TASK_SHADERS) == NULL);
+    const ShaderStatus *st = ecs_get(world, mesh, ShaderStatus);
+    test_bool(st->ok, false);
+    test_assert(st->error != NULL);
+    test_assert(strstr(st->error, "99") != NULL);
+    test_bool(box_render_gpu_stats(world, &stats), true);
+    test_int(stats.pipelines_building, 0);
+    test_int(stats.errors, before.errors);
+
+    int32_t draws = stats.draws;
+    task_frame(world);
+    test_bool(box_render_gpu_stats(world, &stats), true);
+    test_assert(stats.draws > draws);
+    test_int(stats.errors, before.errors);
+
+    ecs_os_free(unbound);
     ecs_fini(world);
 }
 

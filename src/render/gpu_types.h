@@ -731,6 +731,8 @@ typedef struct box_gpu_t {
     int32_t blit_count;             /**< Blit pipelines created */
     WGPUBindGroupLayout view_layout; /**< Bind group layout of the view uniforms */
     WGPUBindGroupLayout material_layout; /**< Bind group layout of the texture layers */
+    WGPUBuffer draw_kinds;          /**< DrawKind of mesh.wgsl of every kind, a
+                                     *   BOX_GPU_DRAW_KIND_STRIDE apart (box_gpu_draw_kind) */
     WGPUSampler samplers[BOX_GPU_WRAPS][BOX_GPU_ANISOTROPY_LEVELS]; /**< Created on use */
     box_gpu_texture_t *white;       /**< Default of the albedo, emissive and ORM layers */
     box_gpu_texture_t *flat;        /**< Default of the normal layer, an unperturbed normal */
@@ -750,15 +752,8 @@ typedef struct box_gpu_t {
     uint64_t blend_bytes;           /**< Bytes of the blend arrays */
     int64_t blend_frame;            /**< Packets the blend caches have seen */
     WGPUPipelineLayout mesh_layout; /**< Pipeline layout of the forward pass */
-    WGPUBindGroupLayout prepass_empty_layout; /**< Group 1 of the plain depth prepass, empty */
-    WGPUBindGroup prepass_empty;    /**< The empty group 1 of the plain depth prepass */
-    WGPUPipelineLayout prepass_layout; /**< Pipeline layout of the plain depth prepass: the view,
-                                     *   the empty group and the transform stream */
-    WGPUPipelineLayout prepass_cutout_layout; /**< Pipeline layout of the alpha tested depth
-                                     *   prepass: the view, the material and the instance group */
-    WGPUPipelineLayout prepass_blend_layout; /**< Pipeline layout of the alpha tested depth
-                                     *   prepass of TextureBlend batches: the view, the blend and
-                                     *   the instance group, NULL until the first one draws */
+    WGPUBindGroupLayout prepass_empty_layout; /**< An empty bind group layout */
+    WGPUBindGroup prepass_empty;    /**< The empty bind group of prepass_empty_layout */
     WGPUBindGroupLayout volume_layout; /**< Binds the probe volume a view samples */
     ecs_map_t volumes;              /**< Handle to box_gpu_volume_t */
     box_gpu_volume_t *no_volume;    /**< 1x1x1 volume of the views that use the hemisphere */
@@ -780,6 +775,9 @@ typedef struct box_gpu_t {
                                      *   alpha test, texture blend and depth mode, and the
                                      *   depth prepass pipelines by back face, alpha test and
                                      *   texture blend */
+    ecs_map_t forward_previous;     /**< Forward pipelines of the modules a recompile replaced,
+                                     *   by the same key, drawn with until the pipeline of the
+                                     *   new module of their key exists */
     WGPUBuffer view_buffer;         /**< Uniforms of the views of a target */
     int32_t view_capacity;          /**< Views the view buffer holds */
     WGPUBindGroupLayout cluster_layout; /**< Bind group layout of the cluster pass */
@@ -792,9 +790,8 @@ typedef struct box_gpu_t {
     WGPUBuffer no_clips;            /**< Clip buffer of the views while no element clips */
     ecs_vec_t view_data;            /**< Bytes of the view uniforms of a target */
     WGPUBindGroupLayout shadow_layout; /**< Bind group layout of the shadow pass */
-    WGPUPipelineLayout shadow_pipeline_layout; /**< Pipeline layout of the shadow pass */
-    WGPUPipelineLayout shadow_cutout_layout; /**< Pipeline layout of the alpha tested casters:
-                                     *   the shadow pass groups and the material group */
+    WGPUPipelineLayout shadow_pipeline_layout; /**< Pipeline layout of the shadow pass: the
+                                     *   cascade, the instance and the material group */
     WGPURenderPipeline shadow;      /**< Shadow pipeline, NULL until the shader exists */
     WGPURenderPipeline shadow_cutout; /**< Shadow pipeline of the alpha tested casters */
     int32_t shadow_revision;        /**< Revision of the shader the pipelines were made with */
@@ -920,9 +917,24 @@ typedef struct box_gpu_t {
                                      *   without an environment */
     WGPUBuffer no_environment_sh;   /**< Zero SH uniform of views without an environment */
     ecs_vec_t captures;             /**< box_gpu_capture_t* whose readback is mapping */
+    struct box_gpu_pipelines_t *pipelines; /**< Render and compute pipelines created in the
+                                     *   background, created by the first request */
+    bool pipeline_wait;             /**< Requests of this packet wait for their pipeline:
+                                     *   natively, a headless run or a packet that captures */
     bool lost;                      /**< The device was lost, the ring recreates it */
     bool lose;                      /**< box_render_gpu_lose_device asked to destroy it */
 } box_gpu_t;
+
+/** Render and compute pipelines of the backend and the workers that create them */
+typedef struct box_gpu_pipelines_t box_gpu_pipelines_t;
+
+/** The device errors a creation on a thread reports, which box_gpu_on_error hands to it instead
+ * of counting them. Natively error scopes belong to the device, not to a thread, so a scope
+ * cannot tell a creation on the render thread from one on a pipeline worker. */
+typedef struct box_gpu_error_capture_t {
+    char *message;                  /**< The first error, NULL without one */
+    bool failed;                    /**< An error was reported */
+} box_gpu_error_capture_t;
 
 /** Fields of the counters of the backend */
 typedef enum box_gpu_stat_t {

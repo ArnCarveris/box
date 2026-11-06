@@ -411,6 +411,30 @@
                 ]
             },
             {
+                "id": "Macros",
+                "testcases": [
+                    "curve",
+                    "value",
+                    "automation",
+                    "modulator",
+                    "inverted",
+                    "remove_no_click",
+                    "two_maps",
+                    "limits",
+                    "errors",
+                    "command",
+                    "deterministic"
+                ]
+            },
+            {
+                "id": "MacroCore",
+                "testcases": [
+                    "value",
+                    "scheduled",
+                    "render_sizes"
+                ]
+            },
+            {
                 "id": "Song",
                 "testcases": [
                     "first_sound",
@@ -437,6 +461,7 @@
                     "beat_repeat",
                     "saturator",
                     "transient_shaper",
+                    "vocoder",
                     "frequency_shifter",
                     "rotary",
                     "synth_sub",
@@ -448,6 +473,7 @@
                     "synth_comb",
                     "synth_routes",
                     "modulators",
+                    "macros",
                     "pattern_gate"
                 ]
             },
@@ -882,6 +908,22 @@
                     "transient_render_sizes",
                     "transient_component",
                     "transient_script"
+                ]
+            },
+            {
+                "id": "Vocoder",
+                "testcases": [
+                    "sine_band",
+                    "level",
+                    "silent_modulator",
+                    "bursts",
+                    "band_count",
+                    "render_sizes",
+                    "no_key_passes",
+                    "component",
+                    "missing_modulator",
+                    "cyclic_modulator",
+                    "script"
                 ]
             },
             {

@@ -33,8 +33,8 @@ typedef struct box_render_gpu_stats_t {
     int32_t shaders;            /**< Shader modules alive */
     int32_t compiles;           /**< Shader modules compiled */
     int32_t pipelines;          /**< Render and compute pipelines created */
-    int32_t pipelines_building; /**< Pipelines whose creation is in progress on the thread that
-                                 *   renders, which compiles them */
+    int32_t pipelines_building; /**< Pipelines whose creation is in progress in the background,
+                                 *   until their outcome is delivered at the start of a packet */
     int32_t shader_errors;      /**< Shader modules that failed to compile */
     int32_t meshes;             /**< Meshes alive */
     int32_t buffers;            /**< Buffers alive */
@@ -320,10 +320,11 @@ bool box_render_gpu_capture_pending(
 void box_render_gpu_lose_device(
     ecs_world_t *world);
 
-/** When the GPU backend applies the outcome of a shader compile.
+/** When the GPU backend applies the outcome of a shader compile or a pipeline creation.
  *
- * Natively an outcome arrives during the compile, in the browser after the frame; tests pick
- * a delayed delivery to run the asynchronous path of the browser natively.
+ * Natively a compile outcome arrives during the compile, in the browser after the frame; tests
+ * pick a delayed delivery to run the asynchronous path of the browser natively. Pipelines are
+ * delivered at the start of a packet, except while held.
  */
 typedef enum box_render_compile_delivery_t {
     BOX_RENDER_COMPILE_AT_ONCE = 0,     /**< During the compile, the native default */
@@ -332,10 +333,10 @@ typedef enum box_render_compile_delivery_t {
     BOX_RENDER_COMPILE_NEWEST_FIRST = 3 /**< At the start of the next packet, newest first */
 } box_render_compile_delivery_t;
 
-/** Set when the GPU backend of a world applies shader compile outcomes, for tests.
+/** Set when the GPU backend of a world applies shader compile and pipeline outcomes, for tests.
  *
  * Outcomes held when the delivery returns to BOX_RENDER_COMPILE_AT_ONCE are applied at the
- * start of the next packet, oldest first.
+ * start of the next packet, oldest first. A held pipeline is not drawn with until then.
  *
  * @param world The world
  * @param delivery When outcomes are applied

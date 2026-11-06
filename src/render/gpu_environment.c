@@ -358,20 +358,21 @@ bool box_gpu_environment_ready(
 
     box_gpu_env_process_t *s = box_gpu_env_process_get(gpu);
     if (!s->sh || s->revision != shader->revision) {
-        if (s->sh) {
-            wgpuComputePipelineRelease(s->sh);
+        WGPUComputePipeline *current = &s->sh;
+        WGPUComputePipeline next = box_gpu_compute_pipeline(gpu,
+            &(WGPUComputePipelineDescriptor){
+                .layout = s->sh_pipeline_layout,
+                .compute = {
+                    .module = shader->module,
+                    .entryPoint = { .data = "environment_sh", .length = WGPU_STRLEN }
+                }
+            });
+        if (box_gpu_compute_pipelines_swap(&current, &next, 1)) {
+            s->revision = shader->revision;
         }
-
-        s->sh = box_gpu_compute_pipeline(gpu, &(WGPUComputePipelineDescriptor){
-            .layout = s->sh_pipeline_layout,
-            .compute = {
-                .module = shader->module,
-                .entryPoint = { .data = "environment_sh", .length = WGPU_STRLEN }
-            }
-        });
-        s->revision = shader->revision;
     }
 
+    result = s->sh != NULL;
 done:
     return result;
 }
@@ -671,10 +672,13 @@ static WGPURenderPipeline box_gpu_env_background_pipeline(
         .multisample = { .count = 1, .mask = 0xFFFFFFFF },
         .fragment = &fragment
     });
-    *ecs_vec_append_t(NULL, &s->pipelines, box_gpu_blit_t) = (box_gpu_blit_t){
-        .format = format,
-        .pipeline = result
-    };
+    if (result) {
+        *ecs_vec_append_t(NULL, &s->pipelines, box_gpu_blit_t) = (box_gpu_blit_t){
+            .format = format,
+            .pipeline = result
+        };
+    }
+
 done:
     return result;
 }

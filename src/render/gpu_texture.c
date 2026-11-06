@@ -39,7 +39,7 @@ static const uint8_t box_gpu_flat[4] = { 128, 128, 255, 255 };
  *
  * The fragment stage of fs_blend samples 15 of the 16 textures WebGPU guarantees: 9 of the view
  * group (gpu_draw.c), the emissive layer, the 4 arrays and the mask. */
-#define BOX_GPU_BLEND_ENTRIES (8)
+#define BOX_GPU_BLEND_ENTRIES (9)
 
 /** BlendUniforms flag: the mask is loaded, else layer 0 shows alone */
 #define BOX_GPU_BLEND_MASKED (1u)
@@ -213,7 +213,17 @@ void box_gpu_materials_clear(
 void box_gpu_texture_init(
     box_gpu_t *gpu)
 {
-    WGPUBindGroupLayoutEntry entries[BOX_RENDER_TEXTURE_SLOTS + 1];
+    WGPUBindGroupLayoutEntry entries[BOX_RENDER_TEXTURE_SLOTS + 2];
+    WGPUBindGroupLayoutEntry kind = {
+        .binding = BOX_GPU_DRAW_KIND_BINDING,
+        .visibility = WGPUShaderStage_Fragment,
+        .buffer = {
+            .type = WGPUBufferBindingType_Uniform,
+            .hasDynamicOffset = true,
+            .minBindingSize = 4 * sizeof(uint32_t)
+        }
+    };
+    uint32_t kinds[BOX_GPU_DRAW_KINDS * BOX_GPU_DRAW_KIND_STRIDE / sizeof(uint32_t)] = {0};
     int32_t i;
     for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
         entries[i] = (WGPUBindGroupLayoutEntry){
@@ -231,11 +241,24 @@ void box_gpu_texture_init(
         .visibility = WGPUShaderStage_Fragment,
         .sampler = { .type = WGPUSamplerBindingType_Filtering }
     };
+    entries[BOX_RENDER_TEXTURE_SLOTS + 1] = kind;
     WGPUBindGroupLayoutDescriptor layout = {
-        .entryCount = BOX_RENDER_TEXTURE_SLOTS + 1,
+        .entryCount = BOX_RENDER_TEXTURE_SLOTS + 2,
         .entries = entries
     };
     gpu->material_layout = wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
+    for (i = 0; i < BOX_GPU_DRAW_KINDS; i ++) {
+        uint32_t *k = &kinds[i * BOX_GPU_DRAW_KIND_STRIDE / sizeof(uint32_t)];
+        k[0] = (uint32_t)i & 15u;
+        k[1] = ((uint32_t)i >> 4) & 1u;
+        k[2] = ((uint32_t)i >> 5) & 1u;
+    }
+
+    gpu->draw_kinds = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+        .usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
+        .size = sizeof(kinds)
+    });
+    wgpuQueueWriteBuffer(gpu->queue, gpu->draw_kinds, 0, kinds, sizeof(kinds));
     WGPUBindGroupLayoutEntry blend[BOX_GPU_BLEND_ENTRIES] = {
         {
             .binding = BOX_GPU_BLEND_EMISSIVE,
@@ -267,6 +290,7 @@ void box_gpu_texture_init(
             }
         }
     };
+    blend[BOX_GPU_BLEND_ENTRIES - 1] = kind;
     for (i = 0; i < BOX_RENDER_BLEND_SOURCES; i ++) {
         blend[4 + i] = (WGPUBindGroupLayoutEntry){
             .binding = i == BOX_RENDER_BLEND_HEIGHT
@@ -347,6 +371,11 @@ void box_gpu_texture_fini(
     if (gpu->material_layout) {
         wgpuBindGroupLayoutRelease(gpu->material_layout);
         gpu->material_layout = NULL;
+    }
+
+    if (gpu->draw_kinds) {
+        wgpuBufferRelease(gpu->draw_kinds);
+        gpu->draw_kinds = NULL;
     }
 
     if (gpu->blend_layout) {
@@ -809,7 +838,7 @@ WGPUBindGroup box_gpu_material_group(
     const box_render_batch_t *b)
 {
     uint32_t textures[BOX_RENDER_TEXTURE_SLOTS];
-    WGPUBindGroupEntry entries[BOX_RENDER_TEXTURE_SLOTS + 1];
+    WGPUBindGroupEntry entries[BOX_RENDER_TEXTURE_SLOTS + 2];
     uint32_t anisotropy = packet->anisotropy;
     WGPUBindGroup result = NULL;
     box_gpu_material_t *m = NULL;
@@ -853,9 +882,14 @@ WGPUBindGroup box_gpu_material_group(
         .binding = BOX_RENDER_TEXTURE_SLOTS,
         .sampler = box_gpu_texture_sampler(gpu, b->wrap, anisotropy)
     };
+    entries[BOX_RENDER_TEXTURE_SLOTS + 1] = (WGPUBindGroupEntry){
+        .binding = BOX_GPU_DRAW_KIND_BINDING,
+        .buffer = gpu->draw_kinds,
+        .size = 4 * sizeof(uint32_t)
+    };
     WGPUBindGroupDescriptor desc = {
         .layout = gpu->material_layout,
-        .entryCount = BOX_RENDER_TEXTURE_SLOTS + 1,
+        .entryCount = BOX_RENDER_TEXTURE_SLOTS + 2,
         .entries = entries
     };
     m = ecs_os_calloc_t(box_gpu_material_t);
@@ -1207,6 +1241,11 @@ static void box_gpu_blend_group_bind(
             .offset = 0,
             .size = sizeof(box_gpu_blend_uniforms_t)
         }
+    };
+    entries[BOX_GPU_BLEND_ENTRIES - 1] = (WGPUBindGroupEntry){
+        .binding = BOX_GPU_DRAW_KIND_BINDING,
+        .buffer = gpu->draw_kinds,
+        .size = 4 * sizeof(uint32_t)
     };
     for (m = 0; m < BOX_RENDER_BLEND_MAPS; m ++) {
         entries[4 + m] = (WGPUBindGroupEntry){

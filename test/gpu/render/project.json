@@ -848,6 +848,10 @@
                 "testcases": [
                     "first_frame_compiles",
                     "held_compile_blocks",
+                    "held_pipeline_blocks",
+                    "fini_with_held_pipeline",
+                    "background_pipelines",
+                    "failed_pipeline_ends_task",
                     "bake_reports_probes"
                 ]
             },

@@ -97,7 +97,8 @@ static void box_gpu_on_device(
 }
 
 /** Count and log an error no error scope caught, unless the device is lost: releasing what
- * belonged to a lost device reports errors, and the ring recovers from the loss itself.
+ * belonged to a lost device reports errors, and the ring recovers from the loss itself. An
+ * error of a creation that captures the errors of its thread goes to its capture.
  *
  * @param device The device
  * @param type Kind of error
@@ -115,7 +116,7 @@ static void box_gpu_on_error(
     (void)device;
     (void)type;
     (void)userdata2;
-    if (!((box_gpu_t*)userdata1)->lost) {
+    if (!box_gpu_error_capture_take(message) && !((box_gpu_t*)userdata1)->lost) {
         box_gpu_count(userdata1, BOX_GPU_STAT_ERRORS);
         box_gpu_report("webgpu device error", message);
     }
@@ -330,6 +331,12 @@ static int box_gpu_create(
         goto done;
     }
 
+    WGPUAdapterInfo info = WGPU_ADAPTER_INFO_INIT;
+    if (wgpuAdapterGetInfo(gpu->adapter, &info) == WGPUStatus_Success) {
+        ecs_trace("using gpu adapter '%.*s'", (int)info.device.length, info.device.data);
+        wgpuAdapterInfoFreeMembers(info);
+    }
+
     box_gpu_device_init(gpu);
     if (gpu->device) {
         result = 0;
@@ -432,6 +439,7 @@ static void box_gpu_render(
 {
     box_gpu_t *gpu = ctx;
     int32_t i, count = ecs_vec_count(&packet->resources);
+    box_gpu_pipelines_deliver(gpu, packet);
     box_gpu_shader_deliver(gpu);
     for (i = 0; i < count; i ++) {
         const box_render_resource_t *r = ecs_vec_get_t(
@@ -553,6 +561,7 @@ static void box_gpu_fini(
     void *ctx)
 {
     box_gpu_t *gpu = ctx;
+    box_gpu_pipelines_fini(gpu);
     if (gpu->device) {
         box_gpu_target_fini(gpu);
         ecs_map_fini(&gpu->targets);
@@ -612,43 +621,6 @@ WGPUComputePassEncoder box_gpu_compute_begin(
 
     return wgpuCommandEncoderBeginComputePass(encoder,
         &(WGPUComputePassDescriptor){ .timestampWrites = writes });
-}
-
-/** Count a pipeline creation that starts or ends in the counters the main thread reads.
- *
- * @param gpu The backend
- * @param start Whether the creation starts, else it ended
- */
-static void box_gpu_pipeline_count(
-    box_gpu_t *gpu,
-    bool start)
-{
-    ecs_os_mutex_lock(gpu->lock);
-    gpu->stats.pipelines_building += start ? 1 : -1;
-    gpu->stats.pipelines += start ? 0 : 1;
-    ecs_os_mutex_unlock(gpu->lock);
-}
-
-WGPURenderPipeline box_gpu_render_pipeline(
-    box_gpu_t *gpu,
-    const WGPURenderPipelineDescriptor *desc)
-{
-    box_gpu_pipeline_count(gpu, true);
-    WGPURenderPipeline result = wgpuDeviceCreateRenderPipeline(gpu->device, desc);
-    box_gpu_pipeline_count(gpu, false);
-
-    return result;
-}
-
-WGPUComputePipeline box_gpu_compute_pipeline(
-    box_gpu_t *gpu,
-    const WGPUComputePipelineDescriptor *desc)
-{
-    box_gpu_pipeline_count(gpu, true);
-    WGPUComputePipeline result = wgpuDeviceCreateComputePipeline(gpu->device, desc);
-    box_gpu_pipeline_count(gpu, false);
-
-    return result;
 }
 
 void box_gpu_count(

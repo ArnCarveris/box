@@ -141,6 +141,7 @@ typedef struct box_gpu_bake_draw_t {
     uint32_t count;                 /**< Instances of the batch */
     WGPURenderPipeline pipeline;    /**< Forward pipeline, NULL when it draws nothing */
     WGPUBindGroup material;         /**< Texture layers and sampler */
+    uint32_t kind;                  /**< Dynamic offset of the DrawKind in material */
     WGPUBindGroup instances;        /**< Instance page with the surface assets of the mesh */
     WGPUBindGroup page;             /**< Instance page the cull reads, not held by the bundles */
     WGPUBuffer vertices;            /**< Vertices of the mesh */

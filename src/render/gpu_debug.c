@@ -608,7 +608,7 @@ static WGPURenderPipeline box_gpu_debug_probe_pipeline_new(
  *
  * @param gpu The backend
  * @param format The format of the color target
- * @return The pipelines, NULL until the shader exists
+ * @return The pipelines, NULL until the shader and all three pipelines exist
  */
 static const box_gpu_probe_pipelines_t* box_gpu_debug_probe_pipelines(
     box_gpu_t *gpu,
@@ -629,18 +629,30 @@ static const box_gpu_probe_pipelines_t* box_gpu_debug_probe_pipelines(
 
     result = ecs_map_get_deref(&d->probe_pipelines, box_gpu_probe_pipelines_t,
         (ecs_map_key_t)format);
-    if (result) {
-        goto done;
+    if (!result) {
+        result = ecs_os_calloc_t(box_gpu_probe_pipelines_t);
+        ecs_map_insert_ptr(&d->probe_pipelines, (ecs_map_key_t)format, result);
     }
 
-    result = ecs_os_calloc_t(box_gpu_probe_pipelines_t);
-    result->light = box_gpu_debug_probe_pipeline_new(gpu, shader->module, format,
-        "vs_light", "fs_light", WGPUPrimitiveTopology_TriangleList);
-    result->reflection = box_gpu_debug_probe_pipeline_new(gpu, shader->module, format,
-        "vs_reflection", "fs_reflection", WGPUPrimitiveTopology_TriangleList);
-    result->box = box_gpu_debug_probe_pipeline_new(gpu, shader->module, format,
-        "vs_box", "fs_box", WGPUPrimitiveTopology_LineList);
-    ecs_map_insert_ptr(&d->probe_pipelines, (ecs_map_key_t)format, result);
+    if (!result->light) {
+        result->light = box_gpu_debug_probe_pipeline_new(gpu, shader->module, format,
+            "vs_light", "fs_light", WGPUPrimitiveTopology_TriangleList);
+    }
+
+    if (!result->reflection) {
+        result->reflection = box_gpu_debug_probe_pipeline_new(gpu, shader->module, format,
+            "vs_reflection", "fs_reflection", WGPUPrimitiveTopology_TriangleList);
+    }
+
+    if (!result->box) {
+        result->box = box_gpu_debug_probe_pipeline_new(gpu, shader->module, format,
+            "vs_box", "fs_box", WGPUPrimitiveTopology_LineList);
+    }
+
+    if (!result->light || !result->reflection || !result->box) {
+        result = NULL;
+    }
+
 done:
     return result;
 }

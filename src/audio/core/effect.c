@@ -86,6 +86,13 @@ static const box_audio_effect_def_t box_audio_effect_kinds[BOX_AUDIO_EFFECT_KIND
         .render = box_audio_transient_shaper_render,
         .rest = box_audio_transient_shaper_rest
     },
+    [BOX_AUDIO_EFFECT_VOCODER] = {
+        .floats = box_audio_vocoder_floats,
+        .start = box_audio_vocoder_start,
+        .command = box_audio_vocoder_command,
+        .render = box_audio_vocoder_render,
+        .rest = box_audio_vocoder_rest
+    },
     [BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER] = {
         .tail = true,
         .start = box_audio_frequency_shifter_start,

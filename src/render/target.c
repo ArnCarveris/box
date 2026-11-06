@@ -51,9 +51,12 @@ WGPURenderPipeline box_gpu_blit_pipeline(
         .fragment = &fragment
     };
     result = box_gpu_render_pipeline(gpu, &desc);
-    gpu->blits[gpu->blit_count].format = format;
-    gpu->blits[gpu->blit_count].pipeline = result;
-    gpu->blit_count ++;
+    if (result) {
+        gpu->blits[gpu->blit_count].format = format;
+        gpu->blits[gpu->blit_count].pipeline = result;
+        gpu->blit_count ++;
+    }
+
 done:
     return result;
 }

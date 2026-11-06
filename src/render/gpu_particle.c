@@ -528,10 +528,11 @@ static WGPUComputePipeline box_gpu_particle_compute(
     return box_gpu_compute_pipeline(gpu, &desc);
 }
 
-/** Make the compute pipelines match the simulation shader.
+/** Make the compute pipelines match the simulation shader; the previous ones stay until every
+ * new one exists.
  *
  * @param gpu The backend
- * @return Whether they exist, false while the shader has no module
+ * @return Whether they exist, false while the shader has no module or the first ones are created
  */
 static bool box_gpu_particle_sim_pipelines(
     box_gpu_t *gpu)
@@ -539,26 +540,27 @@ static bool box_gpu_particle_sim_pipelines(
     box_gpu_particles_t *s = gpu->particles;
     box_gpu_shader_t *shader = ecs_map_get_deref(
         &gpu->shaders, box_gpu_shader_t, BOX_RENDER_SHADER_PARTICLE_SIM);
-    bool result = shader && shader->module;
-    if (!result || (s->integrate && s->sim_revision == shader->revision)) {
+    if (!shader || !shader->module || (s->integrate && s->sim_revision == shader->revision)) {
         goto done;
     }
 
-    box_gpu_particle_sim_reset(s);
-    s->integrate = box_gpu_particle_compute(
-        gpu, s->sim_pipeline_layout, shader->module, "integrate");
-    s->spawn = box_gpu_particle_compute(gpu, s->sim_pipeline_layout, shader->module, "spawn");
-    s->sort_keys = box_gpu_particle_compute(
-        gpu, s->sort_pipeline_layout, shader->module, "sort_keys");
-    s->sort_local = box_gpu_particle_compute(
-        gpu, s->sort_pipeline_layout, shader->module, "sort_local");
-    s->sort_global = box_gpu_particle_compute(
-        gpu, s->sort_pipeline_layout, shader->module, "sort_global");
-    s->sort_merge = box_gpu_particle_compute(
-        gpu, s->sort_pipeline_layout, shader->module, "sort_merge");
-    s->sim_revision = shader->revision;
+    WGPUComputePipeline *current[6] = {
+        &s->integrate, &s->spawn, &s->sort_keys, &s->sort_local, &s->sort_global, &s->sort_merge
+    };
+    WGPUComputePipeline next[6] = {
+        box_gpu_particle_compute(gpu, s->sim_pipeline_layout, shader->module, "integrate"),
+        box_gpu_particle_compute(gpu, s->sim_pipeline_layout, shader->module, "spawn"),
+        box_gpu_particle_compute(gpu, s->sort_pipeline_layout, shader->module, "sort_keys"),
+        box_gpu_particle_compute(gpu, s->sort_pipeline_layout, shader->module, "sort_local"),
+        box_gpu_particle_compute(gpu, s->sort_pipeline_layout, shader->module, "sort_global"),
+        box_gpu_particle_compute(gpu, s->sort_pipeline_layout, shader->module, "sort_merge")
+    };
+    if (box_gpu_compute_pipelines_swap(current, next, 6)) {
+        s->sim_revision = shader->revision;
+    }
+
 done:
-    return result;
+    return shader && shader->module && s->integrate;
 }
 
 /** Create the draw pipeline of a color format and a blend.
@@ -670,6 +672,9 @@ static WGPURenderPipeline box_gpu_particle_draw_pipeline(
 
     if (s->draw_count < BOX_GPU_PARTICLE_DRAWS) {
         result = box_gpu_particle_draw_create(gpu, shader->module, format, blend);
+    }
+
+    if (result) {
         s->draws[s->draw_count].format = format;
         s->draws[s->draw_count].blend = blend;
         s->draws[s->draw_count].pipeline = result;
