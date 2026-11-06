@@ -127,6 +127,95 @@ char* box_cmd_render_resource(
 void box_cmd_audio_init(
     ecs_world_t *world);
 
+/** Register the system that advances the renders of audio render.
+ *
+ * @param world The world
+ */
+void box_cmd_audio_render_init(
+    ecs_world_t *world);
+
+/** Start audio render: render a sound, an instrument, a bus stem or a section of the song on
+ * its own, faster than real time, in an offline world, to a WAV resource that is filled once
+ * the frames are in.
+ *
+ * @param world The world
+ * @param subject song, or the path of a sound, an instrument or a bus
+ * @param argc Number of options
+ * @param options The key=value options
+ * @return The name of the resource, or the file in the browser, which the caller frees, NULL
+ * with an error logged when the subject cannot be rendered
+ */
+char* box_cmd_audio_render(
+    ecs_world_t *world,
+    const char *subject,
+    int32_t argc,
+    const char **options);
+
+/** Set or toggle the solo of a bus, or clear every solo with none, as a script writes
+ * AudioBus.
+ *
+ * @param world The world
+ * @param name The path of the bus, or none
+ * @param value on or off, NULL or empty to toggle
+ * @return The text, which the caller frees, NULL with an error logged
+ */
+char* box_cmd_audio_solo(
+    ecs_world_t *world,
+    const char *name,
+    const char *value);
+
+/** Set or toggle the mute of a bus, as a script writes AudioBus.
+ *
+ * @param world The world
+ * @param name The path of the bus, master for the master bus
+ * @param value on or off, NULL or empty to toggle
+ * @return The text, which the caller frees, NULL with an error logged
+ */
+char* box_cmd_audio_bus_mute(
+    ecs_world_t *world,
+    const char *name,
+    const char *value);
+
+/** Bypass an effect, or stop bypassing it: add or remove Disabled.
+ *
+ * @param world The world
+ * @param name The path of the effect entity
+ * @param value on or off, NULL or empty to toggle
+ * @return The text, which the caller frees, NULL with an error logged, also for an entity
+ * that is no effect
+ */
+char* box_cmd_audio_bypass(
+    ecs_world_t *world,
+    const char *name,
+    const char *value);
+
+/** Parse a note: a name such as C4, F#3 or Bb2, with C4 at 60, or a MIDI number 0 to 127.
+ *
+ * @param name The note
+ * @param pitch Receives the MIDI note number
+ * @return Whether the note is valid
+ */
+bool box_cmd_audio_note_parse(
+    const char *name,
+    float *pitch);
+
+/** Play one note of a sound or an instrument now on the live output, through the bus of the
+ * instrument, and release it after a number of seconds.
+ *
+ * @param world The world
+ * @param name The path of the sound or the instrument
+ * @param note The note, as box_cmd_audio_note_parse
+ * @param vel Velocity 0 to 1, NULL or empty for 1
+ * @param dur Seconds, NULL or empty for 0.5
+ * @return The text, which the caller frees, NULL with an error logged
+ */
+char* box_cmd_audio_note(
+    ecs_world_t *world,
+    const char *name,
+    const char *note,
+    const char *vel,
+    const char *dur);
+
 /** Analyze a WAV for the audio analyze action: loudness, peaks, bands, stereo, onsets, tail,
  * silence, clicks, discontinuities, pitch and, for a capture of a song, a table per bar.
  *

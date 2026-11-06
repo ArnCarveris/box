@@ -766,11 +766,12 @@ voices on play, so edits affect subsequent plays.
 | `SynthGlide` | Root: `time` seconds (0, up to 10), `legato` (false), `channel` (0) |
 | `SynthLfo` | `wave`, `rate` (5 Hz), `sync` (0 beats, off, 0..256), `delay`, `fade`, `phase`, `random_phase`, destination depths |
 | `SynthString` | Pluck layer: `decay` (2 s to -60 dB), `brightness` (0.5), `hardness` (0.8), `velocity` (0) |
+| `SynthBow` | Bowed layer: `pressure` (0.5, 0..1), `speed` (0.5, 0..1), `position` (0.12, 0.02..0.5), `brightness` (0.5), `noise` (0.1, 0..1), `velocity` (0) |
 | `SynthTable` | Wavetable layer: `table` (an entity with `Wavetable`), `position` (0 frames), `envelope` (0 frames) |
 | `Wavetable` | On an entity of its own, usually a prefab: `kind` (`WavetableBasic`), `sound` (0, an entity with `AudioPcm` or `SoundFile` that wins over `kind`), `frame_size` (2048 samples, 64..4096) |
 
 Waves are `SynthSine`, `SynthSaw`, `SynthSquare`, `SynthTriangle`, `SynthNoise`,
-`SynthPluck` and `SynthWavetable`. Frequency sweeps are exponential. Positive envelope curves make
+`SynthPluck`, `SynthWavetable` and `SynthBowed`. Frequency sweeps are exponential. Positive envelope curves make
 decay/release fall quickly then settle; zero is linear, negative curves start slowly.
 Curve values range from -16 to 16. A sustain of zero ends after decay.
 For gated notes, sustain holds until release, ignoring hold.
@@ -1068,8 +1069,80 @@ prefab Pluck {
 A layer without an envelope logs an error and plays for 10 seconds. `SynthPluck`
 is the exception: its physical string model rings out without an envelope. Brightness
 controls how quickly harmonics fade; hardness controls the attack. Frequencies below
-40 Hz warn and clamp. There are 32 strings total, one per pluck unison voice; long
-ringing chords can exhaust them and cause plays to be ignored.
+40 Hz warn and clamp. There are 32 strings total, one per pluck or bowed unison voice;
+long ringing chords can exhaust them and cause plays to be ignored.
+
+`SynthBowed` is the sustained counterpart of the pluck: a bowed string for violins,
+violas, cellos and basses, with the bow noise, the small jitter of pitch and level and
+the changing tone a saw through a filter does not have. It is a digital waveguide split
+at the bow into a bridge side and a nut side (McIntyre, Schumacher and Woodhouse; Smith;
+the STK `Bowed` instrument). The bow is a friction junction: the difference of the bow
+velocity to the string velocity at the bow goes through a friction curve that decides
+between stick and slip. The nut reflects inverted, the bridge inverted through a
+one-pole lowpass that damps the loop, and the output is the wave at the bridge. Both
+sides are read at fractional delays with a 3rd order Lagrange interpolation, and the
+phase delay of the lowpass at the fundamental comes off the loop, so a note settles in
+tune at high notes too.
+
+The `SynthBow` of the layer sets the bow; a bowed layer without one takes the defaults:
+
+- `pressure` (0.5): the force of the bow, the width of the stick region of the friction,
+  and how sharp the bow keeps the corner of the Helmholtz motion: it moves the lowpass of
+  the loop up to 1.5 octaves either way. Low gives a soft, airy tone, the middle the
+  Helmholtz motion, high a harder tone with more upper harmonics.
+- `speed` (0.5): the bow velocity, the level; the friction scales with it, so the tone
+  stays and only the bow hair noise and the attack change with it. 0 is silent.
+- `position` (0.12): the distance of the bow from the bridge as a share of the string,
+  0.02..0.5. Near the bridge is brighter (sul ponticello), far darker (sul tasto); it
+  notches the harmonics at the multiples of `1 / position`, so 0.2 takes out the 5th and
+  the 10th. A side keeps at least 2 frames, so at very high notes the bow moves off the
+  bridge a little.
+- `brightness` (0.5): the damping of the loop, 0 dark to 1 bright, a lowpass at the
+  bridge that follows the note, from its 4th to about its 23rd harmonic.
+- `noise` (0.1): the noise of the bow hair, added at the contact point in proportion to
+  the bow velocity, which the string filters into its own bow noise and jitter.
+- `velocity` (0): the share of the pressure and the speed that the velocity of a note
+  scales, as `SynthString.velocity` does the hardness.
+
+The bow speed follows the amplitude envelope of the layer, its own or the root's, in
+place of the level: the attack starts the bow, the decay and sustain hold it, the release
+lifts it. The bow touches the string while the envelope is over 0, firmly from a level of
+0.25 up. Once it lifts, the string rings out through its damping, its fundamental falling
+60 dB over about 220 periods (a second at A3, at most 4 seconds), less in a bright string; the voice ends once the envelope ended
+and the string is silent, as a pluck ends. A bowed layer without any envelope bows for 10
+seconds, as other waves do. Glide, legato, bend, pitch LFOs, `SynthPitchEnvelope` and
+drift change the length of the string smoothly without restarting it, as they move a
+pluck, so vibrato and legato do not click. Phase modulation, `sync` and `sub` do not apply.
+With `SynthUnison` each copy is a bowed string of its own, detuned and panned, on the mono
+and the stereo path. The routes `SynthTargetBowPressure`, `SynthTargetBowSpeed` and
+`SynthTargetBowPosition` move the bow, smoothed over about 5 ms, so the pressure curve of a
+note (`SynthSourcePressure`), the LFOs and the mod envelope can drive it.
+
+Bowed strings take their delay lines, one per unison copy, from the same 32 strings of the
+core as plucks, each long enough for 40 Hz (up to 81.8 kHz sample rates); a play that finds
+too few free is ignored with an ignored event, as a pluck play is, and a voice gives
+its strings back when it ends. A bowed note holds its string for its whole envelope and the
+ring out after it, so a part should keep its overlapping notes under 32 strings: a legato
+`SynthGlide` plays a whole line on one. Body resonance stays out of the model: it is the
+job of the bus EQ, as in the strings song of the jukebox. In the `Synth` bench
+(`voices_32_bowed`, 32 bowed voices under a vibrato and two routes to the bow, through a
+lowpass, 48 kHz) a bowed voice costs about 40 ns per frame (165 µs per 128-frame
+quantum for all 32), against about 25 ns for a pluck under a vibrato.
+
+```flecs
+using box.audio
+
+prefab Violin {
+  SynthSound: {seed: 11, drift: 3}
+  SynthGlide: {time: 0.045, legato: true}
+  SynthEnvelope: {attack: 0.09, attack_curve: -1, decay: 0.3, sustain: 0.9, release: 0.25, curve: 2}
+  SynthLfo: {rate: 5.8, delay: 0.16, fade: 0.4, random_phase: true, pitch: 20}
+  SynthOscillator: {wave: SynthBowed, frequency: 440, level: 0.5}
+  SynthBow: {pressure: 0.45, speed: 0.6, position: 0.11, brightness: 0.55, noise: 0.12, velocity: 0.5}
+  swell { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetBowPressure, amount: 0.4} }
+  push { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetBowSpeed, amount: 0.3} }
+}
+```
 
 The velocity of a note (an `Instrument` play or a `NoteClip`, clamped to 0..1) reaches
 the voice as well as its gain, so harder notes can be brighter, not only louder. Each
@@ -1084,6 +1157,8 @@ the voice as well as its gain, so harder notes can be brighter, not only louder.
   so soft notes have fewer sidebands.
 - `SynthString.velocity` scales the hardness of a pluck the same way, so soft notes are
   plucked softer.
+- `SynthBow.velocity` scales the pressure and the speed of a bow the same way, so soft notes
+  are bowed lighter and quieter.
 
 Plays that are not notes, such as `AudioSource`, `box_audio_play`, quantized plays and
 streams, play at velocity 1. Sample voices ignore velocity beyond its gain.
@@ -1228,6 +1303,9 @@ lead {
 | `SynthTargetHardSync` | Semitones of the ratio of `sync`, -48..48, the result clamped to 1..16; nothing on a layer without sync (a ratio over 1 or a `hard_sync` LFO of the layer) |
 | `SynthTargetPosition` | Frames of the position of a `SynthWavetable` layer, -256..256, the result clamped to 0..N-1 of its table; nothing on a layer that is not a wavetable |
 | `SynthTargetVowel` | Vowels of the `SynthFormant` filter, -4..4, the result clamped to 0..4; of the sound on a layer too; nothing without a `SynthFormant` filter |
+| `SynthTargetBowPressure` | Share of `SynthBow.pressure`, -1..1, the result clamped to 0..1; nothing on a layer that is not `SynthBowed` |
+| `SynthTargetBowSpeed` | Share of `SynthBow.speed`, -1..1, the result clamped to 0..1; nothing on a layer that is not `SynthBowed` |
+| `SynthTargetBowPosition` | Share of the string of `SynthBow.position`, -0.5..0.5, the result clamped to 0.02..0.5; nothing on a layer that is not `SynthBowed` |
 
 `SynthModEnvelope` is a third envelope on the root with the fields of `SynthEnvelope`.
 It runs only when a route uses it and does not keep the voice playing, as the filter
@@ -1242,6 +1320,7 @@ Working examples include [synth_examples.flecs](../test/assets/audio/synth_examp
 [synth_lfo.flecs](../test/assets/audio/synth_lfo.flecs),
 [synth_glide.flecs](../test/assets/audio/synth_glide.flecs),
 [synth_pluck.flecs](../test/assets/audio/synth_pluck.flecs),
+[synth_bowed.flecs](../test/assets/audio/synth_bowed.flecs),
 [synth_sub.flecs](../test/assets/audio/synth_sub.flecs),
 [synth_sync.flecs](../test/assets/audio/synth_sync.flecs),
 [synth_wavetable.flecs](../test/assets/audio/synth_wavetable.flecs),
@@ -1625,17 +1704,86 @@ Importing box alone does not open an output: `box_app_run` does.
 | `audio play`, `audio stop` | Start or stop the transport |
 | `audio seek <beats>` | Seek the transport |
 | `audio tempo <bpm>` | Set tempo, 20..999 |
+| `audio solo <bus> [on\|off]` | Set or toggle the solo of a bus |
+| `audio solo none` | Clear every solo |
+| `audio mute <bus> [on\|off]` | Set or toggle the mute of a bus |
+| `audio bypass <effect> [on\|off]` | Set or toggle the bypass of an effect entity |
+| `audio note <sound\|instrument> <note> [vel] [dur]` | Play one note now, velocity 0..1 (default 1), for `dur` seconds (default 0.5) |
 | `audio capture <seconds>` | Record master output as a 16-bit stereo WAV resource |
+| `audio render <subject> [options]` | Render a sound, instrument, bus stem or song section on its own, faster than real time, to a WAV resource |
 | `audio song [<file>\|none]` | Show the song, load a song file or unload it |
 | `audio analyze <wav> [from] [to]` | Print a text report of a WAV resource or file, optionally of the seconds from..to |
 | `audio plot <wav> [kind] [options]` | Draw a PNG resource of a WAV resource or file: spectrogram, waveform, spectrum or loudness |
 | `audio notes <track> [bars=a..b] [roll]` | Print the notes of a track per bar, or as a piano roll |
 | `audio chords [track...] [bars=a..b]` | Print the chords and the key of a section from the notes |
 
+Solo, mute and bypass judge one element of a mix without editing the song. Solo and
+mute write `AudioBus` and bypass adds or removes `Disabled` on the effect entity, as a
+script or `set` would; bypass fails for an entity that is not an effect. `audio mute`
+without a bus, or with `on` or `off`, is still the master mute. These are runtime
+changes like any `set`: a song reload resets them. `audio` marks soloed and muted buses
+and bypassed effects.
+
+`audio note` plays one note on the live output, through the bus of the instrument when
+it has an `AudioOutput`, else of its sound, and releases it after `dur` seconds. A note is
+a name, `C2`, `F#3` or `Bb4` with `C4` at 60, or a MIDI number 0..127. A sound without an
+instrument plays through an instrument of its own in `box.command.audition`, with the
+default root of A4, so `A4` plays the sound as authored. The note does not touch the
+transport or the song; capture it with `audio capture` started in the same frame.
+
 Fetch a capture with `GET /shell/session/<id>/resource/<name>`; it stays empty
 until recording finishes. In the browser it writes `/tmp/audio_capture_<n>.wav`
 in the page filesystem and returns that path. A script can capture from load
 with `box.audio.capture(seconds, path)`.
+
+`audio render` renders one thing on its own, without waiting for real time and
+without the rest of the scene:
+
+| Subject | Options | What it renders |
+| --- | --- | --- |
+| a sound (`SynthSound`, `SoundFile`, `AudioPcm`) | `note`, `vel`, `dur`, `tail` | One note of the sound, on the bus of its `AudioOutput` |
+| an instrument | `note`, `vel`, `dur`, `tail` | One note through the instrument and its bus chain |
+| a bus | `bars`, `beats`, `solo`, `mute`, `tail`; `dur` without a song | The song with only that bus audible, as its solo makes it, with its returns; without a song the scene from its start, `dur` seconds (10) |
+| `song` | `bars`, `beats`, `solo`, `mute`, `tail` | The loaded song, or the `Transport` of the scene with a range |
+
+Options are `key=value`: `note` is a name (`C2`, `F#3`, `Bb4`, C4 is 60) or a
+MIDI number, by default the root of the instrument, A4 for a sound, which plays
+it as authored; `vel` 0..1, default 1; `dur` the seconds the note is held before
+its release, by default the natural length of the sound (no gate); `tail` the
+seconds rendered after the release or the end of the section, by default until
+the level stays under -90 dB for a note and 0 for a section. `bars=a..b` counts
+bars from 1 and includes bar b, `beats=a..b` is the beats of the `Transport`
+from 0; without a range the whole song (`Song.beats`). `solo` and `mute` take
+buses separated by commas.
+
+```
+audio render kick note=C1 vel=0.8
+audio render bass_synth note=A1 dur=0.5 tail=1
+audio render drums bars=5..8
+audio render song bars=9..12 mute=lead
+```
+
+The render runs in an offline world: box imported again, the managed scripts of
+the scene and the song file evaluated again, rendered by the same box.audio sync,
+sequencer and core on a null transport at 48000 Hz and fixed deltas of 1/60 s.
+The world that plays is only read: its transport, song, components and output do
+not change, and a frame spends at most 8 ms of wall time on a render so the live
+sequencer keeps its lookahead. The offline world loads its sound files without an
+output, so every render starts from an empty core, and two renders of a subject
+with the same options are bit identical. Effects with memory, such as reverbs and
+delays, start empty. A section that starts after bar 1 is played from beat 0 and
+the frames before it are dropped, so the tails of earlier bars, automation and
+modulators are as in playback (at most 600 s of song before a section); a section
+matches a headless `audio capture` of it within an RMS difference of about 1e-5,
+the rounding to 16 bits. In the browser the render also runs on the main thread,
+not in the worklet, and writes `/tmp/audio_render_<n>.wav`. A render
+of a note silences the sources, streams, emitters and the timeline of the scene.
+Only what scripts and the song file make is rendered again: a subject made in C
+is an error, except a sound with `AudioPcm`, whose samples are copied. A render
+takes at most `BOX_AUDIO_CAPTURE_MAX` seconds; a longer one, a subject that is
+not a sound, instrument or bus, or a section without a song and range is an
+error that names why. To analyse a render, pass the resource it returns to the
+next command, in two steps.
 
 Headless with fixed `--delta-time`, repeated runs capture bit-identical audio on
 the same build. Use this to render music, compare changes or inspect scenes offline.
@@ -1807,7 +1955,7 @@ and [transport.h](../src/audio/transport.h) for the low-level APIs.
 
 The main limits are 64 voices, 64 buses, 64 effects, 64 modulators, 32 macros of eight
 maps, four inserts and sends per bus, eight synth layers, two synth LFOs, seven unison
-copies per layer, 32 pluck strings, 32 comb delay lines and 256 frames per wavetable, whose tables share the 1023 sound ids. Effects are algorithmic: no convolution or geometry-derived rooms.
+copies per layer, 32 strings shared by pluck and bowed layers, 32 comb delay lines and 256 frames per wavetable, whose tables share the 1023 sound ids. Effects are algorithmic: no convolution or geometry-derived rooms.
 There is one transport and one music stream per world. There are no tempo ramps,
 time stretching, MIDI I/O, plugins, mixer UI or piano roll.
 Scripts can change channel and effect values each frame.

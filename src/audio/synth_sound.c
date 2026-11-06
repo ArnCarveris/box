@@ -5,9 +5,9 @@
  *
  * The layers are the root and its children with a SynthOscillator, and the children of layers
  * with one, the modulators of their parent; a SynthPluck layer takes its SynthString, a
- * SynthWavetable layer its SynthTable, whose table the patch names by the sound id of its
- * Wavetable in the current output. The LFOs are the SynthLfo of the root, of the layers and of
- * the other children of the root. The routes of the modulation matrix are the SynthModRoute
+ * SynthBowed layer its SynthBow, a SynthWavetable layer its SynthTable, whose table the patch
+ * names by the sound id of its Wavetable in the current output. The LFOs are the SynthLfo of
+ * the root, of the layers and of the other children of the root. The routes of the modulation matrix are the SynthModRoute
  * children of the root, for every layer, then those of each layer, for that layer.
  *
  * The sync system sends the patch with a SYNTH command when it changed; the core plays every
@@ -22,6 +22,10 @@
 /** The string of a SynthPluck layer without a SynthString */
 static const SynthString box_audio_synth_string_default = {
     .decay = 2.0f, .brightness = 0.5f, .hardness = 0.8f };
+
+/** The bow of a SynthBowed layer without a SynthBow */
+static const SynthBow box_audio_synth_bow_default = {
+    .pressure = 0.5f, .speed = 0.5f, .position = 0.12f, .brightness = 0.5f, .noise = 0.1f };
 
 /** Mark the synth sound of an entity, itself or its nearest ancestor with one, for a new
  * compile.
@@ -65,17 +69,17 @@ void box_audio_synth_init(
         ecs_id(SynthSound), ecs_id(SynthOscillator), ecs_id(SynthEnvelope), ecs_id(SynthFilter),
         ecs_id(SynthFilterEnvelope), ecs_id(SynthGlide), ecs_id(SynthUnison),
         ecs_id(SynthString), ecs_id(SynthLfo), ecs_id(SynthPitchEnvelope), ecs_id(SynthDrive),
-        ecs_id(SynthTable), ecs_id(SynthModRoute), ecs_id(SynthModEnvelope)
+        ecs_id(SynthTable), ecs_id(SynthModRoute), ecs_id(SynthModEnvelope), ecs_id(SynthBow)
     };
     const char *names[] = {
         "AudioSynthSoundDirty", "AudioSynthOscillatorDirty", "AudioSynthEnvelopeDirty",
         "AudioSynthFilterDirty", "AudioSynthFilterEnvelopeDirty", "AudioSynthGlideDirty",
         "AudioSynthUnisonDirty", "AudioSynthStringDirty", "AudioSynthLfoDirty",
         "AudioSynthPitchEnvelopeDirty", "AudioSynthDriveDirty", "AudioSynthTableDirty",
-        "AudioSynthModRouteDirty", "AudioSynthModEnvelopeDirty"
+        "AudioSynthModRouteDirty", "AudioSynthModEnvelopeDirty", "AudioSynthBowDirty"
     };
     int32_t i;
-    for (i = 0; i < 14; i ++) {
+    for (i = 0; i < 15; i ++) {
         ecs_observer(world, {
             .entity = ecs_entity(world, { .name = names[i] }),
             .query.flags = EcsQueryMatchPrefab,
@@ -136,6 +140,7 @@ static bool box_audio_synth_envelope_fits(
  * @param bend Its own pitch envelope, NULL for the one of the root
  * @param unison Its unison, NULL for one voice
  * @param string Its string, NULL for the defaults; used by SynthPluck only
+ * @param bow Its bow, NULL for the defaults; used by SynthBowed only
  * @param table Its table, NULL for none; used by SynthWavetable only
  * @param tables Receives SynthTable.table of the layer by its index, 0 without a table
  * @param carrier 1 + the layer its parent is, 0 when its parent is not a layer
@@ -147,6 +152,7 @@ static void box_audio_synth_layer(
     const SynthPitchEnvelope *bend,
     const SynthUnison *unison,
     const SynthString *string,
+    const SynthBow *bow,
     const SynthTable *table,
     ecs_entity_t *tables,
     uint32_t carrier)
@@ -197,6 +203,16 @@ static void box_audio_synth_layer(
         l->brightness = string->brightness;
         l->hardness = string->hardness;
         l->hardness_velocity = string->velocity;
+    }
+
+    if (osc->wave == SynthBowed) {
+        bow = bow ? bow : &box_audio_synth_bow_default;
+        l->bow_pressure = bow->pressure;
+        l->bow_speed = bow->speed;
+        l->bow_position = bow->position;
+        l->brightness = bow->brightness;
+        l->bow_noise = bow->noise;
+        l->bow_velocity = bow->velocity;
     }
 
     if (osc->wave == SynthWavetable && table) {
@@ -343,7 +359,8 @@ static void box_audio_synth_children(
                 box_audio_synth_layer(p, osc, ecs_get(world, child, SynthEnvelope),
                     ecs_get(world, child, SynthPitchEnvelope),
                     ecs_get(world, child, SynthUnison), ecs_get(world, child, SynthString),
-                    ecs_get(world, child, SynthTable), tables, carrier);
+                    ecs_get(world, child, SynthBow), ecs_get(world, child, SynthTable), tables,
+                    carrier);
                 box_audio_synth_lfo(p, ecs_get(world, child, SynthLfo), p->layers, lfos);
                 box_audio_synth_routes(world, p, child, p->layers, routes);
                 box_audio_synth_children(world, p, tables, child, p->layers, extra, orphans,
@@ -454,7 +471,8 @@ bool box_audio_synth_compile(
         orphans ++;
     } else if (osc) {
         box_audio_synth_layer(&p, osc, NULL, NULL, ecs_get(world, e, SynthUnison),
-            ecs_get(world, e, SynthString), ecs_get(world, e, SynthTable), tables, 0);
+            ecs_get(world, e, SynthString), ecs_get(world, e, SynthBow),
+            ecs_get(world, e, SynthTable), tables, 0);
     }
 
     box_audio_synth_lfo(&p, ecs_get(world, e, SynthLfo), 0, &lfos);
@@ -500,7 +518,7 @@ bool box_audio_synth_compile(
 
     for (i = 0; i < (int32_t)p.layers; i ++) {
         box_audio_synth_layer_t *l = &p.layer[i];
-        if (l->wave == BOX_AUDIO_SYNTH_PLUCK) {
+        if (l->wave == BOX_AUDIO_SYNTH_PLUCK || l->wave == BOX_AUDIO_SYNTH_BOWED) {
             if (!(l->frequency >= BOX_AUDIO_SYNTH_PLUCK_LOWEST)) {
                 l->frequency = BOX_AUDIO_SYNTH_PLUCK_LOWEST;
                 low ++;

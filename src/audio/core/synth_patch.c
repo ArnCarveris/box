@@ -161,6 +161,9 @@ static float box_audio_synth_amount_clamp(
     case BOX_AUDIO_SYNTH_TO_VOWEL:
         max = BOX_AUDIO_SYNTH_VOWEL_MAX;
         break;
+    case BOX_AUDIO_SYNTH_TO_BOW_POSITION:
+        max = BOX_AUDIO_SYNTH_BOW_POSITION_MAX;
+        break;
     default:
         max = 1.0f;
         break;
@@ -258,12 +261,13 @@ static void box_audio_synth_patch_clamp(
         box_audio_synth_layer_t *l = &p->layer[i];
         bool table;
         float lo;
-        if (l->wave > BOX_AUDIO_SYNTH_WAVETABLE) {
+        bool string;
+        if (l->wave > BOX_AUDIO_SYNTH_BOWED) {
             l->wave = BOX_AUDIO_SYNTH_SINE;
         }
 
-        lo = l->wave == BOX_AUDIO_SYNTH_PLUCK ? BOX_AUDIO_SYNTH_PLUCK_MIN :
-            BOX_AUDIO_SYNTH_FREQUENCY_MIN;
+        string = l->wave == BOX_AUDIO_SYNTH_PLUCK || l->wave == BOX_AUDIO_SYNTH_BOWED;
+        lo = string ? BOX_AUDIO_SYNTH_PLUCK_MIN : BOX_AUDIO_SYNTH_FREQUENCY_MIN;
         l->has_envelope = l->has_envelope != 0;
         l->frequency = box_audio_synth_clamp(l->frequency, lo, BOX_AUDIO_SYNTH_HZ_MAX);
         l->frequency_end = box_audio_synth_end_clamp(l->frequency_end, lo);
@@ -289,10 +293,10 @@ static void box_audio_synth_patch_clamp(
         l->hardness_velocity = box_audio_synth_clamp(l->hardness_velocity, 0, 1);
         l->rings_free = l->rings_free && l->wave == BOX_AUDIO_SYNTH_PLUCK && !l->has_envelope;
         l->pulse_width = box_audio_synth_width_clamp(l->pulse_width);
-        l->sub = l->wave == BOX_AUDIO_SYNTH_NOISE || l->wave == BOX_AUDIO_SYNTH_PLUCK ? 0.0f :
+        l->sub = l->wave == BOX_AUDIO_SYNTH_NOISE || string ? 0.0f :
             box_audio_synth_clamp(l->sub, 0, 1);
         l->sub_octave = l->sub_octave >= 2 ? 2 : 1;
-        l->sync = l->wave == BOX_AUDIO_SYNTH_NOISE || l->wave == BOX_AUDIO_SYNTH_PLUCK ? 1.0f :
+        l->sync = l->wave == BOX_AUDIO_SYNTH_NOISE || string ? 1.0f :
             box_audio_synth_clamp(l->sync, 1, BOX_AUDIO_SYNTH_SYNC_MAX);
         l->has_pitch_envelope = l->has_pitch_envelope != 0;
         box_audio_synth_pitch_envelope_clamp(&l->pitch_envelope);
@@ -304,6 +308,13 @@ static void box_audio_synth_patch_clamp(
             (float)(BOX_AUDIO_TABLE_FRAMES_MAX - 1)) : 0.0f;
         l->position_envelope = table ? box_audio_synth_depth_clamp(l->position_envelope,
             (float)BOX_AUDIO_TABLE_FRAMES_MAX) : 0.0f;
+        l->bow_pressure = box_audio_synth_clamp(l->bow_pressure, 0, 1);
+        l->bow_speed = box_audio_synth_clamp(l->bow_speed, 0, 1);
+        l->bow_position = l->bow_position > 0 ? box_audio_synth_clamp(l->bow_position,
+            BOX_AUDIO_SYNTH_BOW_POSITION_MIN, BOX_AUDIO_SYNTH_BOW_POSITION_MAX) :
+            BOX_AUDIO_SYNTH_BOW_POSITION_DEFAULT;
+        l->bow_noise = box_audio_synth_clamp(l->bow_noise, 0, 1);
+        l->bow_velocity = box_audio_synth_clamp(l->bow_velocity, 0, 1);
     }
 
     if (p->lfos > BOX_AUDIO_SYNTH_LFOS) {
@@ -551,7 +562,9 @@ void box_audio_synth_command(
     }
 
     for (i = 0; i < (int32_t)core->synths[slot].patch.layers; i ++) {
-        if (core->synths[slot].patch.layer[i].wave == BOX_AUDIO_SYNTH_PLUCK) {
+        if (core->synths[slot].patch.layer[i].wave == BOX_AUDIO_SYNTH_PLUCK ||
+            core->synths[slot].patch.layer[i].wave == BOX_AUDIO_SYNTH_BOWED)
+        {
             core->synths[slot].strings += (int32_t)core->synths[slot].patch.layer[i].voices;
         }
 

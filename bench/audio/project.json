@@ -110,6 +110,7 @@
                     "voices_32_pluck",
                     "voices_32_pluck_vibrato",
                     "voices_8_pluck_unison",
+                    "voices_32_bowed",
                     "voices_64_wavetable"
                 ]
             },

@@ -1488,6 +1488,70 @@ void NoAlloc_synth_comb(void) {
     test_int(noalloc_frees, 1);
 }
 
+/* Voices of bowed strings render without a call of the allocator: a mono bowed layer under a
+ * vibrato, a glide and routes from pressure and an LFO to the bow, and a wide unison bowed
+ * layer, with pressure ramps, pitch changes, a legato note and more plays than strings. */
+void NoAlloc_synth_bowed(void) {
+    // audio/noalloc
+    box_audio_core_t *core = noalloc_core();
+    box_audio_synth_patch_t p = {0}, q;
+    static uint8_t bytes[64 * 1024];
+    box_audio_writer_t w;
+    uint32_t i;
+    p.layers = 1;
+    p.seed = 9;
+    p.envelope = (box_audio_synth_envelope_t){
+        .attack = 0.05f, .decay = 0.1f, .sustain = 0.8f, .hold = 0.2f, .release = 0.1f };
+    p.glide = 0.05f;
+    p.layer[0] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_BOWED, .frequency = 196,
+        .level = 0.3f, .brightness = 0.5f, .bow_pressure = 0.5f, .bow_speed = 0.6f,
+        .bow_position = 0.12f, .bow_noise = 0.2f, .bow_velocity = 0.5f };
+    p.lfos = 1;
+    p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 5.5f,
+        .pitch = 25 };
+    p.routes = 3;
+    p.route[0] = (box_audio_synth_route_t){ .source = BOX_AUDIO_SYNTH_FROM_PRESSURE,
+        .target = BOX_AUDIO_SYNTH_TO_BOW_PRESSURE, .amount = 0.4f };
+    p.route[1] = (box_audio_synth_route_t){ .source = BOX_AUDIO_SYNTH_FROM_LFO1,
+        .target = BOX_AUDIO_SYNTH_TO_BOW_SPEED, .amount = 0.1f };
+    p.route[2] = (box_audio_synth_route_t){ .source = BOX_AUDIO_SYNTH_FROM_LFO1,
+        .target = BOX_AUDIO_SYNTH_TO_BOW_POSITION, .amount = 0.02f };
+    q = p;
+    q.layer[0].voices = 3;
+    q.layer[0].detune = 12;
+    q.layer[0].width = 1;
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_synth(&w, 1, &p));
+    box_audio_core_apply(core, w.data, w.size);
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_synth(&w, 2, &q));
+    box_audio_core_apply(core, w.data, w.size);
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    for (i = 0; i < 24; i ++) {
+        uint64_t at = 1 + (uint64_t)i * 800;
+        test_assert(box_audio_write_play(&w, 1 + i, 1 + i % 2, 0, 0.05f, 0,
+            0.5f + 0.05f * (float)i, BOX_AUDIO_PLAY_GATE, at));
+        test_assert(box_audio_write_voice_ramp(&w, 1 + i, BOX_AUDIO_PARAM_PRESSURE, 1, 3000,
+            at + 300));
+        test_assert(box_audio_write_voice_set(&w, 1 + i, BOX_AUDIO_PARAM_PITCH, 1.5f,
+            at + 2500));
+        test_assert(box_audio_write_voice_release(&w, 1 + i, 0, at + 9000));
+    }
+
+    box_audio_core_apply(core, w.data, w.size);
+    audio_render(core, 0, AUDIO_FRAMES / 2);
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    test_assert(box_audio_write_legato_note(&w, 100, 3, 1, 0, 0.05f, 0, 1.2f, 1, 0, 0,
+        BOX_AUDIO_PLAY_GATE, 0, 0));
+    box_audio_core_apply(core, w.data, w.size);
+    audio_render(core, AUDIO_FRAMES / 2, AUDIO_FRAMES / 2);
+    test_assert(box_audio_core_voice_count(core) > 0);
+    test_int(noalloc_allocs, 1);
+    test_int(noalloc_frees, 0);
+    box_audio_core_free(core);
+    test_int(noalloc_frees, 1);
+}
+
 /* Voices of a patch of wavetable layers render without a call of the allocator: a mono layer
  * whose position an LFO and its envelope move, a wide unison layer under a glide, a synced
  * layer with a sub and a wavetable modulator, and a release of the table while they play. The

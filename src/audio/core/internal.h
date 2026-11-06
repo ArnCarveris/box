@@ -893,11 +893,19 @@ typedef struct box_audio_synth_color_filter_t {
                            * section, the last input of the next */
 } box_audio_synth_color_filter_t;
 
-/** A pluck string of a synth voice: a Karplus-Strong loop of a delay line, a symmetric lowpass
- * of one frame of delay and a first order allpass of the fraction of a frame left, with a gain
- * that sets its decay, and the old read point that crossfades into the new one at a crossing.
+/** A string of a synth voice, of a pluck or a bowed layer.
  *
- * A pluck layer has one for each of its unison voices, chained by next */
+ * A pluck string is a Karplus-Strong loop of a delay line, a symmetric lowpass of one frame of
+ * delay and a first order allpass of the fraction of a frame left, with a gain that sets its
+ * decay, and the old read point that crossfades into the new one at a crossing.
+ *
+ * A bowed string is a digital waveguide split at the bow: line is the round trip from the bow
+ * to the nut and back, bridge the one to the bridge and back, each read at a fractional delay
+ * with a 3rd order Lagrange interpolation. The nut reflects inverted, the bridge inverted
+ * through a one pole lowpass that follows the pitch and the gain of the loop, and the bow joins
+ * them through its friction. The fields of the allpass and the crossfade are those of a pluck only.
+ *
+ * A pluck or bowed layer has one for each of its unison voices, chained by next */
 typedef struct box_audio_synth_string_t {
     float line[BOX_AUDIO_SYNTH_STRING_FRAMES]; /**< The delay line, a ring */
     int32_t write;        /**< Index the next frame is written to */
@@ -922,9 +930,43 @@ typedef struct box_audio_synth_string_t {
     float peak;           /**< Largest magnitude of the window that runs */
     int32_t window;       /**< Frames left of the window, a period */
     bool ringing;         /**< Whether it is still over the silence */
+    float bridge[BOX_AUDIO_SYNTH_STRING_FRAMES]; /**< Bowed: the delay line of the bridge side,
+                           * a ring written at write as line, which holds the nut side */
+    double loop;          /**< Bowed: frames of both delay lines together, the period less
+                           * the phase delay of the lowpass at the fundamental */
+    double lag;           /**< Bowed: phase delay of the lowpass at the fundamental in frames,
+                           * less the advance of the corner by the friction */
+    float tone;           /**< Bowed: octaves the brightness of its layer raises its lowpass */
+    float pressure;       /**< Bowed: pressure of the bow of its last exact tuning */
+    float a;              /**< Bowed: share of the way the lowpass moves per frame, 1 - pole */
+    float lp;             /**< Bowed: last output of the lowpass */
+    box_audio_dc_t dc;    /**< Bowed: DC blocker of the output */
+    bool bowed;           /**< Bowed: a frame of the window that runs had the bow on it */
     struct box_audio_synth_string_t *next; /**< String of the next unison voice of its layer,
                                             * NULL for the last */
 } box_audio_synth_string_t;
+
+/** The bow of a BOX_AUDIO_SYNTH_BOWED layer of a synth voice, which its strings share: its
+ * pressure, speed and position, those of the layer moved by the routes, which the values its
+ * strings play at follow smoothly. */
+typedef struct box_audio_synth_bow_t {
+    float pressure;       /**< Pressure of the layer, 0..1, velocity included */
+    float speed;          /**< Speed of the layer, 0..1, velocity included */
+    float position;       /**< Position of the layer, a share of the string */
+    float noise;          /**< Level of the noise of the hair, the noise of the layer times
+                           * BOX_AUDIO_SYNTH_BOW_HAIR */
+    float pressure_aim;   /**< Pressure the routes give, clamped 0..1 */
+    float speed_aim;      /**< Speed the routes give, clamped 0..1 */
+    float position_aim;   /**< Position the routes give, clamped */
+    float pressure_play;  /**< Pressure that plays */
+    float speed_play;     /**< Speed that plays */
+    float position_play;  /**< Position that plays, a share of the loop */
+    float slope;          /**< Slope of the friction curve of pressure_play times the velocity
+                           * of the bow: the stick region is the narrower the steeper it is */
+    float smooth;         /**< Share of the way the values that play move to their aims per
+                           * frame */
+    float dc;             /**< Pole of the DC blockers of the outputs of its strings */
+} box_audio_synth_bow_t;
 
 /** The delay line of a channel of the comb filter of a synth voice, and the state of the one
  * pole lowpass in its loop. A voice with a BOX_AUDIO_SYNTH_COMB filter takes one of the core
@@ -946,8 +988,9 @@ typedef struct box_audio_synth_part_t {
     box_audio_synth_bend_t bend;    /**< Its pitch envelope, its own or that of the patch */
     box_audio_synth_unison_t unison; /**< Its unison voices */
     box_audio_synth_string_t *string; /**< The string of its first unison voice, the others
-                                       * chained after it, for a BOX_AUDIO_SYNTH_PLUCK layer;
-                                       * NULL for another */
+                                       * chained after it, for a BOX_AUDIO_SYNTH_PLUCK or
+                                       * BOX_AUDIO_SYNTH_BOWED layer; NULL for another */
+    box_audio_synth_bow_t bow;      /**< Its bow, for a BOX_AUDIO_SYNTH_BOWED layer */
     box_audio_synth_color_filter_t color; /**< The filter that colors its noise */
     box_audio_synth_walk_t walk;    /**< Drift of its pitch, without unison voices */
     double start;                   /**< Phase its oscillator starts at in turns, 0 without
@@ -1038,9 +1081,12 @@ typedef struct box_audio_synth_source_t {
     int32_t key_control;  /**< Frames until the filter takes the key while it moves */
     float tremolo;        /**< Factor of the output from the LFOs of every layer, 1 without */
     float tremolo_step;   /**< Change of tremolo per frame */
-    int32_t strings;      /**< Pluck layers, each with a string per unison voice, 0 for none */
+    int32_t strings;      /**< Pluck and bowed layers, each with a string per unison voice, 0
+                           * for none */
     int32_t ringing;      /**< Strings that are still over the silence, of every unison voice */
     int32_t ringing_free; /**< Strings of layers without an envelope still over the silence */
+    int32_t bowing;       /**< Bowed strings still over the silence or under the bow, which keep
+                           * the voice playing once its envelopes ended */
     bool tables;          /**< Whether a layer plays a wavetable, whose position moves per
                            * frame */
     double bend;          /**< Factor of the pitch from the bend of the voice, 1 without; the
@@ -1185,7 +1231,7 @@ typedef struct box_audio_synth_slot_t {
     box_audio_synth_patch_t patch;  /**< The patch, clamped */
     uint32_t plays;     /**< Plays so far, which seed the noise and the variances */
     int32_t strings;    /**< Strings a play of the patch takes: one for each unison voice of
-                         * each of its pluck layers */
+                         * each of its pluck and bowed layers */
     int32_t combs;      /**< Comb lines a play of the patch takes: 0 without a comb filter, 1
                          * for one, 2 when it renders in stereo */
     bool used;          /**< Whether a sound has the slot */

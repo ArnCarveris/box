@@ -41,8 +41,8 @@ extern "C" {
 /** Seconds a synth sound plays when it would never end, a layer without any envelope */
 #define BOX_AUDIO_SYNTH_ENDLESS (10.0f)
 
-/** Lowest frequency of a SynthPluck layer in Hz; a lower one, its frequency_end included, is
- * clamped with one warning */
+/** Lowest frequency of a SynthPluck or SynthBowed layer in Hz; a lower one, its frequency_end
+ * included, is clamped with one warning */
 #define BOX_AUDIO_SYNTH_PLUCK_LOWEST (40.0f)
 
 /** Octaves the pressure of a Note moves the cutoff of a synth voice up by at pressure 1, the
@@ -327,8 +327,11 @@ ECS_ENUM(SynthWave, {
     SynthPluck,            /**< A plucked string (Karplus-Strong), set by the SynthString of
                             *   the layer; it rings out on its own and ends the sound when it
                             *   is silent, so it needs no envelope */
-    SynthWavetable         /**< The frames of the Wavetable of the SynthTable of the layer,
+    SynthWavetable,        /**< The frames of the Wavetable of the SynthTable of the layer,
                             *   morphed by its position; a sine without one */
+    SynthBowed             /**< A bowed string, a waveguide driven by a friction bow, set by
+                            *   the SynthBow of the layer; the bow moves with the envelope of
+                            *   the layer and the string rings out after its release */
 });
 
 /** Color of the noise of a SynthNoise layer. Each is at about the RMS level of white noise at
@@ -430,9 +433,16 @@ ECS_ENUM(SynthModTarget, {
     SynthTargetPosition,       /**< Frames of the position of a SynthWavetable layer,
                                 *   -256..256; the moved position is clamped to 0..N-1 of its
                                 *   table. Nothing on a layer that is not a wavetable */
-    SynthTargetVowel           /**< Vowels of the SynthFormant filter, -4..4; the moved vowel
+    SynthTargetVowel,          /**< Vowels of the SynthFormant filter, -4..4; the moved vowel
                                 *   is clamped to 0..4. Of the sound on a layer too, as the
                                 *   cutoff. Nothing without a SynthFormant filter */
+    SynthTargetBowPressure,    /**< Share of SynthBow.pressure, -1..1; the moved pressure is
+                                *   clamped to 0..1. Nothing on a layer that is not SynthBowed */
+    SynthTargetBowSpeed,       /**< Share of SynthBow.speed, -1..1; the moved speed is clamped
+                                *   to 0..1. Nothing on a layer that is not SynthBowed */
+    SynthTargetBowPosition     /**< Share of the string of SynthBow.position, -0.5..0.5; the
+                                *   moved position is clamped to 0.02..0.5. Nothing on a layer
+                                *   that is not SynthBowed */
 });
 
 /** What a synth oscillator does with its signal */
@@ -510,6 +520,34 @@ ECS_STRUCT(SynthString, {
     float velocity;        /**< Share 0..1 of the hardness that the velocity of a note
                             *   scales, hardness (1 - share + share v), so soft notes are
                             *   plucked softer; default 0 */
+});
+
+/** The bow and the string of a SynthBowed layer, on the layer: a digital waveguide string split
+ * at the bow into a bridge side and a nut side, read at fractional delays so it is in tune at
+ * high notes too, driven by a bow through a friction curve that sticks and slips. Without one
+ * a SynthBowed layer takes the defaults.
+ *
+ * The bow speed follows the envelope of the layer, its own or the one of the root: the attack
+ * starts the bow and the release lifts it, after which the string rings out through the
+ * damping of its loop. The voice ends once the envelope ended and the string is silent.
+ * Pitch changes move the string without a restart. Body resonance is left to the bus EQ.
+ */
+ECS_STRUCT(SynthBow, {
+    float pressure;        /**< Force of the bow, 0..1, default 0.5: low gives a soft, airy
+                            *   tone, the middle the Helmholtz motion, high a harder tone with
+                            *   more upper harmonics */
+    float speed;           /**< Velocity of the bow, 0..1, default 0.5: the level, the tone
+                            *   stays; 0 is silent */
+    float position;        /**< Distance of the bow from the bridge as a share of the string,
+                            *   0.02..0.5, default 0.12: near the bridge is brighter (sul
+                            *   ponticello), far darker (sul tasto). It notches the harmonics
+                            *   at the multiples of 1 / position */
+    float brightness;      /**< Damping of the loop, 0 dark to 1 bright, default 0.5, as
+                            *   SynthString.brightness: a lowpass that follows the note */
+    float noise;           /**< Noise of the bow hair added at the contact point, 0..1,
+                            *   default 0.1 */
+    float velocity;        /**< Share 0..1 of the pressure and the speed that the velocity of a
+                            *   note scales, as SynthString.velocity; default 0 */
 });
 
 /** A built-in wavetable, generated by additive synthesis, so it needs no file */
@@ -603,8 +641,8 @@ ECS_STRUCT(SynthEnvelope, {
  * sound in which a layer has voices and width renders in stereo, see docs/audio.md.
  *
  * On a SynthPluck layer each copy is a string of its own, plucked with its own noise, detuned
- * and panned the same way; each takes one of the 32 strings of the core, and a play that does
- * not find one for each copy is ignored.
+ * and panned the same way, and on a SynthBowed layer a bowed string; each takes one of the 32
+ * strings of the core, and a play that does not find one for each copy is ignored.
  */
 ECS_STRUCT(SynthUnison, {
     int32_t voices;        /**< Copies of the oscillator, 1 to 7, default 3 */
@@ -1335,9 +1373,10 @@ ECS_STRUCT(SynthModEnvelope, {
 });
 
 /** A sound made by the synth from the components of this entity and its children, without a
- * file: SynthOscillator layers, each with an optional SynthUnison, a SynthTable, a
- * SynthEnvelope, a SynthDrive, a SynthFilter, a SynthFilterEnvelope, a SynthPitchEnvelope,
- * a SynthGlide, SynthLfo, a SynthModEnvelope and SynthModRoute children. Usually a prefab.
+ * file: SynthOscillator layers, each with an optional SynthUnison, a SynthString, a SynthBow,
+ * a SynthTable, a SynthEnvelope, a SynthDrive, a SynthFilter, a SynthFilterEnvelope, a
+ * SynthPitchEnvelope, a SynthGlide, SynthLfo, a SynthModEnvelope and SynthModRoute children.
+ * Usually a prefab.
  *
  * It is compiled once, and again when one of its components changes, into a patch the core
  * holds; box_audio_play and AudioSource play it like any sound, with no allocation per play.

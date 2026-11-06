@@ -130,7 +130,8 @@
                 "id": "Deterministic",
                 "testcases": [
                     "two_runs",
-                    "two_cores_at_once"
+                    "two_cores_at_once",
+                    "synth_bowed"
                 ]
             },
             {
@@ -487,6 +488,7 @@
                     "synth_drive",
                     "synth_formant",
                     "synth_wavetable",
+                    "synth_bowed",
                     "expression",
                     "synth_comb",
                     "synth_routes",
@@ -1100,6 +1102,32 @@
             },
             {
                 "id": "SynthCombWorld",
+                "testcases": [
+                    "component"
+                ]
+            },
+            {
+                "id": "SynthBowed",
+                "testcases": [
+                    "pitch",
+                    "harmonic",
+                    "position",
+                    "speed",
+                    "pressure",
+                    "ends",
+                    "legato",
+                    "vibrato",
+                    "pool",
+                    "routes",
+                    "routes_lfo",
+                    "velocity",
+                    "unison",
+                    "deterministic",
+                    "others_identical"
+                ]
+            },
+            {
+                "id": "SynthBowedWorld",
                 "testcases": [
                     "component"
                 ]
