@@ -305,10 +305,10 @@ UI.fader = (opts) => {
   const el = UI.el("div", { class: "fader", title: "Volume: drag, shift for fine, double click for 0 dB" },
     track, unity, cap);
   const place = () => {
-    const h = el.clientHeight - 12;
+    const h = el.clientHeight - 16;
     if (h <= 0) { requestAnimationFrame(place); return; }
-    cap.style.top = (6 + (1 - UI.faderNorm(value)) * h) + "px";
-    unity.style.top = (6 + (1 - UI.faderNorm(1)) * h) + "px";
+    cap.style.top = (8 + (1 - UI.faderNorm(value)) * h) + "px";
+    unity.style.top = (8 + (1 - UI.faderNorm(1)) * h) + "px";
     if (opts.onlabel) opts.onlabel(value);
   };
   let startY = 0, startN = 0;
@@ -321,7 +321,7 @@ UI.fader = (opts) => {
     startN = UI.faderNorm(value);
     if (e.target !== cap) {
       const r = el.getBoundingClientRect();
-      startN = 1 - (e.clientY - r.top - 6) / (r.height - 12);
+      startN = 1 - (e.clientY - r.top - 8) / (r.height - 16);
       value = UI.faderGain(Math.max(0, Math.min(1, startN)));
       place();
       opts.onchange(value);
@@ -329,7 +329,7 @@ UI.fader = (opts) => {
   });
   el.addEventListener("pointermove", (e) => {
     if (!el.classList.contains("active")) return;
-    const h = el.clientHeight - 12;
+    const h = el.clientHeight - 16;
     const scale = e.shiftKey ? 6 : 1;
     const n = Math.max(0, Math.min(1, startN + (startY - e.clientY) / h / scale));
     value = UI.faderGain(n);
@@ -346,68 +346,65 @@ UI.fader = (opts) => {
   el.addEventListener("dblclick", () => { value = 1; place(); opts.onchange(1); });
   el.set = (v) => { if (v !== value) { value = v; place(); } };
   requestAnimationFrame(place);
-  new ResizeObserver(() => { if (el.clientHeight > 12) place(); }).observe(el);
+  new ResizeObserver(() => { if (el.clientHeight > 16) place(); }).observe(el);
   return el;
 };
 
 UI.meters = new Set();
 
+const METER_TICKS = [0, -6, -12, -24, -48];
+
 UI.meter = (path, opts) => {
-  const c = UI.el("canvas", { class: "meter" });
+  const c = UI.el("div", { class: "meter" });
   c.path = path;
   c.opts = opts || {};
   c.peakHold = [0, 0];
   c.peakTime = [0, 0];
   c.smooth = [0, 0];
+  c.last = 0;
+  c.chans = [0, 1].map(() => {
+    const pk = UI.el("div", { class: "mpk" });
+    const rms = UI.el("div", { class: "mrms" });
+    const hold = UI.el("div", { class: "mhold" });
+    c.appendChild(UI.el("div", { class: "mch" }, pk, rms, hold));
+    return { pk, rms, hold };
+  });
+  if (!c.opts.noScale) {
+    for (const db of METER_TICKS) {
+      c.appendChild(UI.el("div", { class: "mtick", style: { bottom: ((db + 60) / 66 * 100) + "%" } }));
+    }
+  }
   UI.meters.add(c);
   return c;
 };
 
 const meterDb = (v) => v <= 0.00001 ? -90 : 20 * Math.log10(v);
 const meterNorm = (v) => Math.max(0, Math.min(1, (meterDb(v) + 60) / 66));
+const meterClip = (v) => `inset(${((1 - v) * 100).toFixed(2)}% 0 0 0)`;
+
+UI.meterSrc = null;
 
 UI.drawMeters = () => {
+  if (UI.meterSrc === DAW.meters) return;
+  UI.meterSrc = DAW.meters;
   const now = performance.now();
   for (const c of UI.meters) {
     if (!c.isConnected) { UI.meters.delete(c); continue; }
-    const w = c.clientWidth, h = c.clientHeight;
-    if (!w || !h) continue;
-    const dpr = window.devicePixelRatio || 1;
-    if (c.width !== w * dpr || c.height !== h * dpr) { c.width = w * dpr; c.height = h * dpr; }
-    const ctx = c.getContext("2d");
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, w, h);
+    const dt = c.last ? Math.min(0.5, (now - c.last) / 1000) : 0;
+    c.last = now;
     const m = DAW.meters[c.path];
     const peaks = m ? [m.peak_left, m.peak_right] : [0, 0];
     const rms = m ? [m.rms_left, m.rms_right] : [0, 0];
-    const bw = (w - 1) / 2;
     for (let i = 0; i < 2; i++) {
+      const ch = c.chans[i];
       const p = meterNorm(peaks[i]);
-      c.smooth[i] = Math.max(p, c.smooth[i] - 0.025);
+      c.smooth[i] = Math.max(p, c.smooth[i] - 1.5 * dt);
       if (p >= c.peakHold[i] || now - c.peakTime[i] > 1200) { c.peakHold[i] = p; c.peakTime[i] = now; }
-      const x = i * (bw + 1);
-      const ph = c.smooth[i] * h;
-      const grad = ctx.createLinearGradient(0, h, 0, 0);
-      grad.addColorStop(0, "#2e7d4f");
-      grad.addColorStop(0.75, "#5ad17a");
-      grad.addColorStop(0.9, "#ffd54f");
-      grad.addColorStop(1, "#ff5a5a");
-      ctx.fillStyle = grad;
-      ctx.globalAlpha = 0.45;
-      ctx.fillRect(x, h - ph, bw, ph);
-      ctx.globalAlpha = 1;
-      const rh = meterNorm(rms[i]) * h;
-      ctx.fillRect(x, h - rh, bw, rh);
-      const hy = h - c.peakHold[i] * h;
-      ctx.fillStyle = peaks[i] >= 1 || c.peakHold[i] >= meterNorm(1) ? "#ff5a5a" : "#e6e9ed";
-      if (c.peakHold[i] > 0.01) ctx.fillRect(x, hy, bw, 1);
-    }
-    if (!c.opts.noScale && h > 60) {
-      ctx.fillStyle = "rgba(255,255,255,0.15)";
-      for (const db of [0, -6, -12, -24, -48]) {
-        const y = h - (db + 60) / 66 * h;
-        ctx.fillRect(0, y, w, 1);
-      }
+      ch.pk.style.clipPath = meterClip(c.smooth[i]);
+      ch.rms.style.clipPath = meterClip(meterNorm(rms[i]));
+      ch.hold.style.bottom = (c.peakHold[i] * 100).toFixed(2) + "%";
+      ch.hold.classList.toggle("hidden", c.peakHold[i] <= 0.01);
+      ch.hold.classList.toggle("clip", peaks[i] >= 1 || c.peakHold[i] >= meterNorm(1));
     }
   }
 };

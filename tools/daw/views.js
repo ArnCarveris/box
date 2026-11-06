@@ -478,11 +478,6 @@ V.strip = (rec) => {
   const name = isMaster ? "Master" : isTrack ? V.laneName(path) : rec.name;
   const kind = isMaster ? "master" : isTrack ? "track" : UI.enumLabel(bus.kind).toLowerCase();
   const el = UI.el("div", { class: "strip" + (DAW.sel === path ? " sel" : "") + (rec.disabled ? " off" : ""), "data-path": path });
-  el.appendChild(UI.el("div", {
-    class: "sname", title: path + "\nclick to open in its own window", style: { borderBottomColor: DAW.color(path) },
-    onclick: () => DAW.openWindow(path)
-  }, name));
-  el.appendChild(UI.el("div", { class: "skind" }, kind));
   const ins = UI.el("div", { class: "inserts" });
   (bus.effects || []).forEach((fx, i) => {
     if (DAW.isNone(fx)) {
@@ -564,6 +559,11 @@ V.strip = (rec) => {
     btns.appendChild(solo);
   }
   el.appendChild(btns);
+  el.appendChild(UI.el("div", { class: "skind" }, kind));
+  el.appendChild(UI.el("div", {
+    class: "sname", title: path + "\nclick to open in its own window", style: { borderTopColor: DAW.color(path) },
+    onclick: () => DAW.openWindow(path)
+  }, name));
   return el;
 };
 
