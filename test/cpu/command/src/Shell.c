@@ -366,7 +366,7 @@ void Shell_help_lists_box_commands(void) {
     test_bool(error, false);
     test_assert(strstr(out, "key_press <key> [dur]  Tap a key, held for dur frames") != NULL);
     test_assert(strstr(out, "capture [camera]  Write a PNG") != NULL);
-    test_assert(strstr(out, "audio [action] [value]  Print the audio status") != NULL);
+    test_assert(strstr(out, "audio [action] [value] [arg] [vel] [dur]  Print the audio status") != NULL);
     test_assert(strstr(out, "\nls [scope]  ") != NULL);
     ecs_os_free(out);
 
@@ -1036,6 +1036,9 @@ void Shell_audio_note(void) {
     ecs_os_free(out);
     out = shell_audio_ok(world, s, "audio note lead 60 0.5 2");
     test_str(out, "note lead 60.00 (261.63 Hz) velocity 0.50 for 2.000 s");
+    ecs_os_free(out);
+    out = shell_audio_ok(world, s, "audio note lead F#3");
+    test_str(out, "note lead 54.00 (185.00 Hz) velocity 1.00 for 0.500 s");
     ecs_os_free(out);
 
     /* A sound plays through an instrument of its own at the root of A4 */

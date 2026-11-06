@@ -80,7 +80,8 @@ static ecs_entity_t box_cmd_audition_lookup(
     return result;
 }
 
-/** Look up a bus.
+/** Look up a bus. The master counts as one without an AudioBus of its own, which a write
+ * then adds with the defaults.
  *
  * @param world The world
  * @param name The path of the bus, master for the master
@@ -95,7 +96,9 @@ static ecs_entity_t box_cmd_audition_bus(
         ecs_err("missing bus");
     } else if (!result) {
         ecs_err("unknown bus '%s'", name);
-    } else if (!ecs_has(world, result, AudioBus)) {
+    } else if (!ecs_has(world, result, AudioBus) &&
+        result != ecs_lookup(world, "box.audio.master"))
+    {
         ecs_err("'%s' is not a bus", name);
         result = 0;
     }
@@ -177,13 +180,15 @@ char* box_cmd_audio_bus_mute(
 {
     char *result = NULL, *path = NULL;
     ecs_entity_t bus = box_cmd_audition_bus(world, name);
+    const AudioBus *current;
     AudioBus *b;
     bool mute;
     if (!bus) {
         goto done;
     }
 
-    if (!box_cmd_audition_switch(value, ecs_get(world, bus, AudioBus)->mute, &mute)) {
+    current = ecs_get(world, bus, AudioBus);
+    if (!box_cmd_audition_switch(value, current && current->mute, &mute)) {
         goto done;
     }
 

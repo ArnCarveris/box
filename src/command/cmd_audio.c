@@ -1245,12 +1245,12 @@ void box_cmd_audio_init(
                     "seek beats, tempo 20 to 999, song file or none (default: show the song), "
                     "the bus of solo or mute (solo none clears every solo), the effect of "
                     "bypass, the sound or instrument of note" },
-                { .name = "arg2", .type = ecs_id(ecs_string_t), .optional = true,
+                { .name = "arg", .type = ecs_id(ecs_string_t), .optional = true,
                   .brief = "on or off for solo, mute and bypass (default: toggle), the note of "
                     "note: C2, F#3 or a MIDI number" },
-                { .name = "arg3", .type = ecs_id(ecs_string_t), .optional = true,
+                { .name = "vel", .type = ecs_id(ecs_string_t), .optional = true,
                   .brief = "velocity of note, 0 to 1 (default: 1)" },
-                { .name = "arg4", .type = ecs_id(ecs_string_t), .optional = true,
+                { .name = "dur", .type = ecs_id(ecs_string_t), .optional = true,
                   .brief = "seconds of note (default: 0.5)" }
             },
             .callback = box_cmd_audio
