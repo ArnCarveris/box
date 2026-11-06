@@ -12,6 +12,7 @@ export const SONGS: JukeboxSong[] = [
   {"Horns", "horns"}
   {"Trumpets", "trumpets"}
   {"Synth Pads", "synth_pads"}
+  {"Organs", "organs"}
 ]
 
 export const IDLE: Rgb = {150, 155, 175}
