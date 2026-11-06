@@ -1268,6 +1268,7 @@ int box_audio_capture(
     state->capture.seconds = seconds;
     state->capture.path = ecs_os_strdup(path);
     state->capture.serial = 0;
+    state->capture.has_song = false;
     result = 0;
 done:
     return result;
@@ -1320,14 +1321,39 @@ static int16_t box_audio_wav_sample(
     return (int16_t)floorf(v * 32767.0f + 0.5f);
 }
 
+/** Write the song chunk of a capture: its id, size, start beat, tempo and bar length.
+ *
+ * @param out The bytes
+ * @param song The song
+ */
+static void box_audio_wav_song_chunk(
+    uint8_t *out,
+    const box_audio_wav_song_t *song)
+{
+    uint64_t beat;
+    uint32_t tempo, bar;
+    ecs_os_memcpy(&beat, &song->start_beat, 8);
+    ecs_os_memcpy(&tempo, &song->tempo, 4);
+    ecs_os_memcpy(&bar, &song->bar_beats, 4);
+    ecs_os_memcpy(out, BOX_AUDIO_WAV_SONG_CHUNK, 4);
+    box_audio_wav_u32(out + 4, BOX_AUDIO_WAV_SONG_BYTES);
+    box_audio_wav_u32(out + 8, (uint32_t)(beat & 0xFFFFFFFF));
+    box_audio_wav_u32(out + 12, (uint32_t)(beat >> 32));
+    box_audio_wav_u32(out + 16, tempo);
+    box_audio_wav_u32(out + 20, bar);
+}
+
 int box_audio_wav_write(
     const char *path,
     const float *data,
     int32_t frames,
-    int32_t sample_rate)
+    int32_t sample_rate,
+    const box_audio_wav_song_t *song)
 {
     uint32_t bytes = (uint32_t)frames * 4;
-    uint8_t *wav = ecs_os_malloc((ecs_size_t)bytes + 44);
+    uint32_t extra = song ? 8 + BOX_AUDIO_WAV_SONG_BYTES : 0;
+    uint32_t total = bytes + 44 + extra;
+    uint8_t *wav = ecs_os_malloc((ecs_size_t)total);
     char *tmp = flecs_asprintf("%s.tmp", path);
     FILE *f = NULL;
     int32_t i;
@@ -1337,7 +1363,7 @@ int box_audio_wav_write(
     }
 
     ecs_os_memcpy(wav, "RIFF", 4);
-    box_audio_wav_u32(wav + 4, 36 + bytes);
+    box_audio_wav_u32(wav + 4, total - 8);
     ecs_os_memcpy(wav + 8, "WAVEfmt ", 8);
     box_audio_wav_u32(wav + 16, 16);
     box_audio_wav_u16(wav + 20, 1);
@@ -1352,12 +1378,16 @@ int box_audio_wav_write(
         box_audio_wav_u16(wav + 44 + i * 2, (uint16_t)box_audio_wav_sample(data[i]));
     }
 
+    if (song) {
+        box_audio_wav_song_chunk(wav + 44 + bytes, song);
+    }
+
     f = fopen(tmp, "wb");
     if (!f) {
         goto done;
     }
 
-    if (fwrite(wav, 1, (size_t)bytes + 44, f) != (size_t)bytes + 44) {
+    if (fwrite(wav, 1, (size_t)total, f) != (size_t)total) {
         fclose(f);
         remove(tmp);
         goto done;

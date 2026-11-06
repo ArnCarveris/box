@@ -1,0 +1,98 @@
+// The song of the audio notes and audio chords tests of test/cpu/command: four bars in C major
+// at 120 bpm, C Am F G7, held by keys over a bass. A motif plays twice, at bars 1 and 3, a duo
+// plays two notes and a kick that only plays C1 is a drum track left out of the chords.
+using box.audio
+
+prefab chords_tone {
+  SynthSound: {}
+  body { SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.3} }
+}
+
+prefab chords_kick_sound {
+  SynthSound: {}
+  body { SynthOscillator: {wave: SynthSine, frequency: 50, level: 0.8} }
+}
+
+chords_inst { Instrument: {sound: chords_tone} }
+chords_kick_inst { Instrument: {sound: chords_kick_sound, root: 36, gate: false} }
+
+// C, Am, F and G7, a bar each
+prefab chords_progression {
+  NoteClip: {length: 16, notes: [
+    {start: 0, duration: 4, pitch: 60, velocity: 0.7},
+    {start: 0, duration: 4, pitch: 64, velocity: 0.7},
+    {start: 0, duration: 4, pitch: 67, velocity: 0.7},
+    {start: 4, duration: 4, pitch: 57, velocity: 0.7},
+    {start: 4, duration: 4, pitch: 60, velocity: 0.7},
+    {start: 4, duration: 4, pitch: 64, velocity: 0.7},
+    {start: 8, duration: 4, pitch: 53, velocity: 0.7},
+    {start: 8, duration: 4, pitch: 57, velocity: 0.7},
+    {start: 8, duration: 4, pitch: 60, velocity: 0.7},
+    {start: 12, duration: 4, pitch: 55, velocity: 0.7},
+    {start: 12, duration: 4, pitch: 59, velocity: 0.7},
+    {start: 12, duration: 4, pitch: 62, velocity: 0.7},
+    {start: 12, duration: 4, pitch: 65, velocity: 0.7}
+  ]}
+}
+
+// The roots, two octaves down
+prefab chords_roots {
+  NoteClip: {length: 16, notes: [
+    {start: 0, duration: 4, pitch: 36, velocity: 0.9},
+    {start: 4, duration: 4, pitch: 33, velocity: 0.9},
+    {start: 8, duration: 4, pitch: 29, velocity: 0.9},
+    {start: 12, duration: 4, pitch: 31, velocity: 0.9}
+  ]}
+}
+
+// A quarter and two eighths, placed at bar 1 and bar 3
+prefab chords_motif {
+  NoteClip: {length: 4, notes: [
+    {start: 0, duration: 1, pitch: 72, velocity: 0.8},
+    {start: 1, duration: 0.5, pitch: 76, velocity: 0.6},
+    {start: 1.5, duration: 0.5, pitch: 79, velocity: 0.6}
+  ]}
+}
+
+// C4 for a beat on beat 1, E4 for an eighth on beat 3
+prefab chords_duo {
+  NoteClip: {length: 4, notes: [
+    {start: 0, duration: 1, pitch: 60, velocity: 1},
+    {start: 2, duration: 0.5, pitch: 64, velocity: 1}
+  ]}
+}
+
+prefab chords_beat {
+  NoteClip: {length: 4, notes: [
+    {start: 0, duration: 0.25, pitch: 36, velocity: 1},
+    {start: 2, duration: 0.25, pitch: 36, velocity: 1}
+  ]}
+}
+
+keys {
+  Track: {instrument: chords_inst}
+  part { ClipPlacement: {clip: chords_progression, start: 0} }
+}
+
+bass {
+  Track: {instrument: chords_inst}
+  part { ClipPlacement: {clip: chords_roots, start: 0} }
+}
+
+lead {
+  Track: {instrument: chords_inst}
+  first { ClipPlacement: {clip: chords_motif, start: 0} }
+  again { ClipPlacement: {clip: chords_motif, start: 8} }
+}
+
+duo {
+  Track: {instrument: chords_inst}
+  part { ClipPlacement: {clip: chords_duo, start: 0} }
+}
+
+pulse {
+  Track: {instrument: chords_kick_inst}
+  part { ClipPlacement: {clip: chords_beat, start: 0, duration: 16, loop: true} }
+}
+
+$ { Song: {title: "Chords", tempo: 120, beats_per_bar: 4, beat_unit: 4, beats: 16} }

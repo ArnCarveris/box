@@ -22,24 +22,16 @@ prefab jb_crash {
   }
 }
 
-low_pass_filter {
-  AudioFilter: {kind: SynthLowPass, cutoff: low_pass_cutoff, slope: SynthSlope24}
-}
-
-high_pass_filter {
-  AudioFilter: {kind: SynthHighPass, cutoff: high_pass_cutoff, slope: SynthSlope24}
-}
-
 box {
   audio {
     master {
-      AudioBus: {effects: [high_pass_filter, low_pass_filter]}
       AudioMeter: {}
     }
   }
 }
 
 $ {
+  AudioSettings: {master_volume: volume_level / 100}
   AudioSong: {file: "etc/scenes/jukebox/songs/{SONGS[song].file}.flecs"}
   Transport = {playing: playing}
 }

@@ -1,0 +1,20 @@
+// The scene of the audio render tests in the Shell suite of test/cpu/command: a blip at 440 Hz
+// that the tests render on its own, and a hum at 1000 Hz that the scene plays on a loop
+// meanwhile, which a render of the blip must not contain.
+using box.audio
+
+prefab render_blip {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.005, decay: 0.1, sustain: 0.5, release: 0.1}
+  SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.5}
+}
+
+prefab render_hum {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.01, sustain: 1, hold: 4, release: 0.05}
+  SynthOscillator: {wave: SynthSine, frequency: 1000, level: 0.3}
+}
+
+render_drone { AudioSource: {sound: render_hum, loop: true} }
+
+render_keys { Instrument: {sound: render_blip} }

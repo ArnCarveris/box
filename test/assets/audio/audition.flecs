@@ -1,0 +1,29 @@
+// A reverb and a synth for the audio bypass and note commands in the Shell suite of
+// test/cpu/command: a click on a bus whose reverb is an effect entity of its own, so a bypass
+// does not disable the bus, and a sine synth with an instrument in tune at A4.
+using box.audio
+
+verb {
+  Reverb: {decay: 2.4, damping: 0.4, predelay: 0.02, size: 0.5, mix: 0.5}
+}
+
+hall {
+  AudioBus: {volume: 1, effects: [verb]}
+}
+
+// Silence over the start ramp of a voice, then one sample of 0.5
+click {
+  AudioPcm: {samples: [0, 0, 0, 0, 0.5], sample_rate: 400}
+  AudioOutput: {bus: hall}
+}
+
+// A sine at 440 Hz that sustains at 0.5 while a note holds and releases over 20 ms
+prefab tone_synth {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.005, decay: 0.01, sustain: 1, hold: 0.05, release: 0.02}
+  SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.5}
+}
+
+lead {
+  Instrument: {sound: tone_synth}
+}

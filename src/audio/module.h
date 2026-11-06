@@ -8,6 +8,7 @@
 
 #include <box.h>
 #include "output.h"
+#include "analyze.h"
 
 /** One shot voices the module keeps track of at most, the oldest are forgotten beyond this */
 #define BOX_AUDIO_ONESHOT_MAX (1024)
@@ -395,6 +396,8 @@ typedef struct box_audio_capture_job_t {
     float seconds;          /**< Seconds to record */
     char *path;             /**< File to write, NULL when no capture waits */
     uint32_t serial;        /**< Serial of the output that records, 0 before it started */
+    bool has_song;          /**< Whether it started while a song played */
+    box_audio_wav_song_t song; /**< The beat and tempo it started at, when has_song */
 } box_audio_capture_job_t;
 
 /** Hooks of the timeline at most */
@@ -1756,18 +1759,21 @@ void box_audio_decode(
     box_audio_sample_job_t *job);
 
 /** Write a capture as a 16 bit stereo WAV file, through a temporary file and one rename.
+ * A capture of a song gets a BOX_AUDIO_WAV_SONG_CHUNK after its data.
  *
  * @param path The file
  * @param data Interleaved stereo frames
  * @param frames Number of frames
  * @param sample_rate Frames per second
+ * @param song The beat and tempo the capture started at, NULL when no song played
  * @return 0 on success
  */
 int box_audio_wav_write(
     const char *path,
     const float *data,
     int32_t frames,
-    int32_t sample_rate);
+    int32_t sample_rate,
+    const box_audio_wav_song_t *song);
 
 /** Set up the timeline of the module.
  *
