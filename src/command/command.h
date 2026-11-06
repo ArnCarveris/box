@@ -127,6 +127,95 @@ char* box_cmd_render_resource(
 void box_cmd_audio_init(
     ecs_world_t *world);
 
+/** Register the system that advances the renders of audio render.
+ *
+ * @param world The world
+ */
+void box_cmd_audio_render_init(
+    ecs_world_t *world);
+
+/** Start audio render: render a sound, an instrument, a bus stem or a section of the song on
+ * its own, faster than real time, in an offline world, to a WAV resource that is filled once
+ * the frames are in.
+ *
+ * @param world The world
+ * @param subject song, or the path of a sound, an instrument or a bus
+ * @param argc Number of options
+ * @param options The key=value options
+ * @return The name of the resource, or the file in the browser, which the caller frees, NULL
+ * with an error logged when the subject cannot be rendered
+ */
+char* box_cmd_audio_render(
+    ecs_world_t *world,
+    const char *subject,
+    int32_t argc,
+    const char **options);
+
+/** Set or toggle the solo of a bus, or clear every solo with none, as a script writes
+ * AudioBus.
+ *
+ * @param world The world
+ * @param name The path of the bus, or none
+ * @param value on or off, NULL or empty to toggle
+ * @return The text, which the caller frees, NULL with an error logged
+ */
+char* box_cmd_audio_solo(
+    ecs_world_t *world,
+    const char *name,
+    const char *value);
+
+/** Set or toggle the mute of a bus, as a script writes AudioBus.
+ *
+ * @param world The world
+ * @param name The path of the bus, master for the master bus
+ * @param value on or off, NULL or empty to toggle
+ * @return The text, which the caller frees, NULL with an error logged
+ */
+char* box_cmd_audio_bus_mute(
+    ecs_world_t *world,
+    const char *name,
+    const char *value);
+
+/** Bypass an effect, or stop bypassing it: add or remove Disabled.
+ *
+ * @param world The world
+ * @param name The path of the effect entity
+ * @param value on or off, NULL or empty to toggle
+ * @return The text, which the caller frees, NULL with an error logged, also for an entity
+ * that is no effect
+ */
+char* box_cmd_audio_bypass(
+    ecs_world_t *world,
+    const char *name,
+    const char *value);
+
+/** Parse a note: a name such as C4, F#3 or Bb2, with C4 at 60, or a MIDI number 0 to 127.
+ *
+ * @param name The note
+ * @param pitch Receives the MIDI note number
+ * @return Whether the note is valid
+ */
+bool box_cmd_audio_note_parse(
+    const char *name,
+    float *pitch);
+
+/** Play one note of a sound or an instrument now on the live output, through the bus of the
+ * instrument, and release it after a number of seconds.
+ *
+ * @param world The world
+ * @param name The path of the sound or the instrument
+ * @param note The note, as box_cmd_audio_note_parse
+ * @param vel Velocity 0 to 1, NULL or empty for 1
+ * @param dur Seconds, NULL or empty for 0.5
+ * @return The text, which the caller frees, NULL with an error logged
+ */
+char* box_cmd_audio_note(
+    ecs_world_t *world,
+    const char *name,
+    const char *note,
+    const char *vel,
+    const char *dur);
+
 /** Analyze a WAV for the audio analyze action: loudness, peaks, bands, stereo, onsets, tail,
  * silence, clicks, discontinuities, pitch and, for a capture of a song, a table per bar.
  *
@@ -142,6 +231,7 @@ char* box_cmd_audio_analyze(
     const char *from,
     const char *to);
 
+<<<<<<< HEAD
 struct box_audio_wav_t;
 
 /** Load a WAV for an action of the audio command: a resource of the session, else a file.
@@ -175,6 +265,34 @@ char* box_cmd_audio_diff(
     const char *b,
     const char *from,
     const char *to);
+=======
+/** Load the bytes of a WAV for audio analyze and audio plot: a resource of the session, else
+ * a file as written, else a file found from the working directory or the executable.
+ *
+ * @param world The world
+ * @param wav The resource or file
+ * @param size Receives the bytes read
+ * @return The bytes, which the caller frees, NULL with an error logged
+ */
+uint8_t* box_cmd_audio_wav_load(
+    ecs_world_t *world,
+    const char *wav,
+    int64_t *size);
+
+/** Draw a PNG of a WAV for the audio plot action: audio plot <wav> [kind] [size=WxH]
+ * [from=s] [to=s] [min_db=dB], a spectrogram, waveform, spectrum or loudness.
+ *
+ * @param world The world
+ * @param argc Number of arguments
+ * @param argv The WAV, then the kind and the options
+ * @return The name of the PNG resource, the file in the browser, which the caller frees,
+ * NULL on an error
+ */
+char* box_cmd_audio_plot(
+    ecs_world_t *world,
+    int32_t argc,
+    const char **argv);
+>>>>>>> c4aa7770ee97f4532de2f276215f279fefd1eb97
 
 /** Print the notes of a track per bar, or as a text piano roll: audio notes <track>
  * [bars=a..b] [roll].
@@ -185,6 +303,20 @@ char* box_cmd_audio_diff(
  * @return The text, which the caller frees, NULL with an error logged
  */
 char* box_cmd_audio_notes(
+    ecs_world_t *world,
+    int32_t argc,
+    const char **argv);
+
+/** Measure the levels of buses over a span of the live output: audio meter [bus...]
+ * [seconds|bars=a..b] starts a measurement, audio meter without arguments prints its progress
+ * and, once it is measured, the table of the buses, their effects and the headroom.
+ *
+ * @param world The world
+ * @param argc Number of arguments
+ * @param argv The buses, none for every bus and the master, the seconds and bars=a..b
+ * @return The text, which the caller frees, NULL with an error logged
+ */
+char* box_cmd_audio_meter_span(
     ecs_world_t *world,
     int32_t argc,
     const char **argv);

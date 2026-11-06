@@ -130,7 +130,8 @@
                 "id": "Deterministic",
                 "testcases": [
                     "two_runs",
-                    "two_cores_at_once"
+                    "two_cores_at_once",
+                    "synth_bowed"
                 ]
             },
             {
@@ -487,6 +488,7 @@
                     "synth_drive",
                     "synth_formant",
                     "synth_wavetable",
+                    "synth_bowed",
                     "expression",
                     "synth_comb",
                     "synth_routes",
@@ -656,6 +658,18 @@
                     "effect",
                     "bus_deleted",
                     "command"
+                ]
+            },
+            {
+                "id": "MeterSpan",
+                "testcases": [
+                    "bus_difference",
+                    "deterministic",
+                    "default_buses",
+                    "compressor",
+                    "no_meter_left",
+                    "limiter",
+                    "song_bars"
                 ]
             },
             {
@@ -1105,6 +1119,32 @@
                 ]
             },
             {
+                "id": "SynthBowed",
+                "testcases": [
+                    "pitch",
+                    "harmonic",
+                    "position",
+                    "speed",
+                    "pressure",
+                    "ends",
+                    "legato",
+                    "vibrato",
+                    "pool",
+                    "routes",
+                    "routes_lfo",
+                    "velocity",
+                    "unison",
+                    "deterministic",
+                    "others_identical"
+                ]
+            },
+            {
+                "id": "SynthBowedWorld",
+                "testcases": [
+                    "component"
+                ]
+            },
+            {
                 "id": "SynthPreDrive",
                 "testcases": [
                     "harmonics",
@@ -1287,6 +1327,7 @@
                 ]
             },
             {
+<<<<<<< HEAD
                 "id": "Diff",
                 "testcases": [
                     "samples",
@@ -1297,6 +1338,15 @@
                     "align_silent",
                     "residual_gain",
                     "residual_offset"
+=======
+                "id": "Plot",
+                "testcases": [
+                    "sweep_spectrogram",
+                    "waveform_silence_then_tone",
+                    "same_twice",
+                    "spectrum_sine_peak",
+                    "bad_arguments"
+>>>>>>> c4aa7770ee97f4532de2f276215f279fefd1eb97
                 ]
             },
             {

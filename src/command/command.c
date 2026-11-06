@@ -9,7 +9,8 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 
-/** The world of the page, the last one that imported box.command */
+/** The world of the page, the first one alive that imported box.command, so the offline
+ * world of an audio render does not take its place */
 static ecs_world_t *box_command_web_world;
 
 /** The session of box_command_web_run */
@@ -299,8 +300,11 @@ void BoxCommandImport(
     box_cmd_frames_init(world);
     box_cmd_edit_init(world);
 #ifdef __EMSCRIPTEN__
-    box_command_web_world = world;
-    box_command_web_session = 0;
+    if (!box_command_web_world) {
+        box_command_web_world = world;
+        box_command_web_session = 0;
+    }
+
     ecs_atfini(world, box_command_web_fini, NULL);
 #endif
 }

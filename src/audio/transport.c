@@ -863,7 +863,7 @@ EM_JS(void, box_audio_web_meters, (box_audio_meter_t *buses, float *effects, int
         HEAPF64[d + 1] = m ? m.squares[i * 2] : 0;
         HEAPF64[d + 2] = m ? m.squares[i * 2 + 1] : 0;
         HEAPU32[w + 6] = m ? m.frames[i] : 0;
-        HEAPU32[w + 7] = 0;
+        HEAPF32[w + 7] = m ? m.loudness[i] : 0;
     }
     for (var k = 0; k < effect_max; k++) {
         HEAPF32[(effects >> 2) + k] = m ? m.reduction[k] : 0;
@@ -871,6 +871,7 @@ EM_JS(void, box_audio_web_meters, (box_audio_meter_t *buses, float *effects, int
     if (m) {
         m.peaks.fill(0);
         m.squares.fill(0);
+        m.loudness.fill(0);
         m.frames.fill(0);
         m.reduction.fill(0);
     }

@@ -64,9 +64,19 @@ builtins of the flecs shell (`ls`, `get`, `set`, `query`, ...):
 | `audio` | Print the audio state, rate, voices, load and the buses in processing order |
 | `audio volume <v>` | Set `AudioSettings.master_volume`, 0 to 4 |
 | `audio mute [on\|off]` | Set or toggle `AudioSettings.mute` |
+| `audio solo <bus> [on\|off]` | Set or toggle `AudioBus.solo`; `audio solo none` clears every solo |
+| `audio mute <bus> [on\|off]` | Set or toggle `AudioBus.mute` of a bus |
+| `audio bypass <effect> [on\|off]` | Bypass an effect, or stop bypassing it, with `Disabled` |
+| `audio note <sound\|instrument> <note> [vel] [dur]` | Play one note (C2, F#3 or a MIDI number) now, velocity 0 to 1, for `dur` seconds (default 0.5) |
 | `audio capture <seconds>` | Record the master output to a 16 bit stereo WAV resource |
+| `audio render <subject> [options]` | Render a sound, instrument, bus stem or song section on its own, faster than real time, to a WAV resource |
 | `audio analyze <wav> [from] [to]` | Print loudness, peaks, bands, stereo, onsets, tail, clicks and pitch of a WAV |
+<<<<<<< HEAD
 | `audio diff <a> <b> [from] [to]` | Compare two WAVs: bit identity, length, loudness, true peak, bands, stereo, and the null test residual after alignment with its loudest spans and the bars that differ most |
+=======
+| `audio plot <wav> [kind] [size=WxH] [from=s] [to=s] [min_db=dB]` | Draw a PNG resource of a WAV: `spectrogram` (default), `waveform`, `spectrum` or `loudness`, with labeled axes and the bar lines of a capture of a song |
+| `audio meter [bus...] [seconds\|bars=a..b]` | Measure peak, RMS, integrated and short-term LUFS per bus and the gain reduction of its dynamics, PatternGate and Saturator inserts over a span of the live output, with the headroom; run `audio meter` again for the table |
+>>>>>>> c4aa7770ee97f4532de2f276215f279fefd1eb97
 | `audio notes <track> [bars=a..b] [roll]` | Print the notes of a track per bar (position, pitch or drum sound, length, velocity), or with `roll` as a text piano roll of one column per sixteenth |
 | `audio chords [track...] [bars=a..b]` | Print the chords of a section per bar or per beat, its key, the key of the song and the notes outside the key, from the note data |
 | `fps [rate]`, `frames` | Toggle the fps panel or cap the rate, print the frame timing |
@@ -75,11 +85,12 @@ builtins of the flecs shell (`ls`, `get`, `set`, `query`, ...):
 | `key_*`, `mouse_*`, `action_*` | Send input, see `help` |
 
 `capture` of a camera that a view renders shows it as on screen, with the debug drawing of the
-view. `capture` and `audio capture` return a resource at once and fill it when the frames are in;
-fetch it with `GET /shell/session/<id>/resource/<name>`, which is empty until then. In the
-browser, which has no REST port, `audio capture` writes `/tmp/audio_capture_<n>.wav` in the file
-system of the page and returns that path. Headless with a fixed `--delta-time`, two runs capture
-identical audio, so a render can be listened to and compared. See [docs/audio.md](docs/audio.md).
+view. `capture`, `audio capture` and `audio render` return a resource at once and fill it when the
+frames are in; fetch it with `GET /shell/session/<id>/resource/<name>`, which is empty until then.
+In the browser, which has no REST port, `audio capture` writes `/tmp/audio_capture_<n>.wav` and
+`audio render` `/tmp/audio_render_<n>.wav` in the file system of the page and return that path.
+Headless with a fixed `--delta-time`, two runs capture identical audio, so a render can be listened
+to and compared. See [docs/audio.md](docs/audio.md).
 
 ## Screenshots
 <img width="1600" height="973" alt="image" src="https://github.com/user-attachments/assets/f79c8f68-4813-4564-88e7-5a14485cdaf8" />

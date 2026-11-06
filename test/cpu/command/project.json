@@ -11,7 +11,8 @@
         "include": [
             "../../../src/command",
             "../../../src/render",
-            "../../../src/geometry"
+            "../../../src/geometry",
+            "../../../src/audio"
         ]
     },
     "test": {
@@ -44,15 +45,35 @@
                     "console_session",
                     "resource_file",
                     "audio_command",
+                    "audio_render_sound",
+                    "audio_render_isolated",
+                    "audio_render_stem",
+                    "audio_render_section",
+                    "audio_render_faster",
+                    "audio_render_capture",
+                    "audio_render_errors",
+                    "audio_solo",
+                    "audio_solo_capture",
+                    "audio_mute_bus",
+                    "audio_bypass",
+                    "audio_bypass_capture",
+                    "audio_note",
+                    "audio_note_capture",
                     "audio_analyze",
                     "audio_analyze_resource",
                     "audio_analyze_errors",
+<<<<<<< HEAD
                     "audio_diff_identical",
                     "audio_diff_quieter",
                     "audio_diff_delay",
                     "audio_diff_boost",
                     "audio_diff_bars",
                     "audio_diff_errors",
+=======
+                    "audio_meter_errors",
+                    "audio_plot",
+                    "audio_plot_errors",
+>>>>>>> c4aa7770ee97f4532de2f276215f279fefd1eb97
                     "audio_notes_placed_twice",
                     "audio_notes_roll",
                     "audio_notes_drums",

@@ -664,7 +664,8 @@ void SynthModTargets_clamped(void) {
     test_int(SynthTargetHardSync, BOX_AUDIO_SYNTH_TO_SYNC);
     test_int(SynthTargetPosition, BOX_AUDIO_SYNTH_TO_POSITION);
     test_int(SynthTargetVowel, BOX_AUDIO_SYNTH_TO_VOWEL);
-    test_int(BOX_AUDIO_SYNTH_TARGETS, SynthTargetVowel + 1);
+    test_int(SynthTargetBowPosition, BOX_AUDIO_SYNTH_TO_BOW_POSITION);
+    test_int(BOX_AUDIO_SYNTH_TARGETS, SynthTargetBowPosition + 1);
 
     p = mt_patch(BOX_AUDIO_SYNTH_SAW, 200);
     p.layer[0].sync = 1.5f;

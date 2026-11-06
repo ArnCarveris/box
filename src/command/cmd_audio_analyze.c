@@ -148,15 +148,7 @@ static bool box_cmd_analyze_is_resource(
     return result;
 }
 
-/** Load the bytes of a WAV: a resource of the session, else a file as written, else a file
- * found from the working directory or the executable.
- *
- * @param world The world
- * @param wav The resource or file
- * @param size Receives the bytes read
- * @return The bytes, which the caller frees, NULL with an error logged
- */
-static uint8_t* box_cmd_analyze_load(
+uint8_t* box_cmd_audio_wav_load(
     ecs_world_t *world,
     const char *wav,
     int64_t *size)
@@ -497,7 +489,7 @@ char* box_cmd_audio_analyze(
         goto done;
     }
 
-    bytes = box_cmd_analyze_load(world, wav, &size);
+    bytes = box_cmd_audio_wav_load(world, wav, &size);
     if (!bytes) {
         goto done;
     }

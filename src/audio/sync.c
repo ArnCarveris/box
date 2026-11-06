@@ -1759,6 +1759,7 @@ static void BoxAudioSync(
         box_audio_modulators_sync(world, state, t);
         box_audio_timeline_update(world, state, t, waiting);
         box_audio_timeline_quantized(world, state, waiting);
+        box_audio_meter_job_sync(state, serial);
         state->spatial_dirty = false;
     } else {
         box_audio_music_update(world, state, NULL, false);

@@ -120,6 +120,8 @@ typedef struct box_audio_native_meter_t {
     atomic_uint_least64_t square_left;     /**< Bits of the left sum of squares, a double */
     atomic_uint_least64_t square_right;    /**< Bits of the right sum of squares, a double */
     atomic_uint frames;                    /**< Frames of the sums */
+    atomic_uint_least64_t loudness;        /**< Bits of the K-weighted sum of squares, a
+                                            *   double */
 } box_audio_native_meter_t;
 
 /** The memory of an effect slot handed to the audio thread; it stays with the main thread */
@@ -292,6 +294,10 @@ static void box_audio_native_publish(
         box_audio_native_raise(&nm->peak_right, m->peak_right);
         box_audio_native_add(&nm->square_left, m->square_left);
         box_audio_native_add(&nm->square_right, m->square_right);
+        if (m->loudness > 0) {
+            box_audio_native_add(&nm->loudness, (double)m->loudness);
+        }
+
         atomic_fetch_add(&nm->frames, m->frames);
     }
 
@@ -785,7 +791,11 @@ static void box_audio_native_meters(
         unsigned int r = atomic_exchange(&nm->peak_right, 0u);
         uint_least64_t sl = atomic_exchange(&nm->square_left, (uint_least64_t)0);
         uint_least64_t sr = atomic_exchange(&nm->square_right, (uint_least64_t)0);
+        uint_least64_t kw = atomic_exchange(&nm->loudness, (uint_least64_t)0);
+        double loudness;
         *m = (box_audio_meter_t){0};
+        memcpy(&loudness, &kw, sizeof(kw));
+        m->loudness = (float)loudness;
         memcpy(&m->peak_left, &l, sizeof(l));
         memcpy(&m->peak_right, &r, sizeof(r));
         memcpy(&m->square_left, &sl, sizeof(sl));
@@ -1008,6 +1018,7 @@ box_audio_transport_t* box_audio_transport_native_new(
         atomic_init(&n->meters[i].square_left, (uint_least64_t)0);
         atomic_init(&n->meters[i].square_right, (uint_least64_t)0);
         atomic_init(&n->meters[i].frames, 0u);
+        atomic_init(&n->meters[i].loudness, (uint_least64_t)0);
     }
 
     for (int32_t i = 0; i < BOX_AUDIO_EFFECT_MAX; i ++) {

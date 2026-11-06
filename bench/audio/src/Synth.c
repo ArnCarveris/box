@@ -5,7 +5,8 @@
  * one of FM, with curved envelopes, with a driven filter, the ladder filter or the formant
  * filter with its vowel under an LFO and the filter envelope, with subs, hard synced under an
  * LFO, with pink noise, with drift or with the drive of the mix before the filter, 32 voices of
- * a pluck string, steady or under a vibrato, 8 of a unison pluck of 4, 64 of a patch of
+ * a pluck string, steady or under a vibrato, 8 of a unison pluck of 4, 32 of a bowed string
+ * under a vibrato and routes to its bow, 64 of a patch of
  * wavetables whose positions an LFO and the envelope move, 64 voices whose bend and pressure
  * ramp, the expression of notes, and 32 through a comb filter, as many as the core has comb
  * lines.
@@ -536,6 +537,50 @@ void Synth_voices_8_pluck_unison(
     box_audio_core_free(core);
 }
 
+/** Create a core with looping voices of a bowed string that takes every string of
+ * BOX_AUDIO_SYNTH_STRINGS, each at its own pitch, bowing for 4 seconds under a vibrato of 25
+ * cents at 5.5 Hz, with the noise of the hair, the pressure of the note and an LFO routed to
+ * its bow, through a lowpass.
+ *
+ * @return The core
+ */
+static box_audio_core_t* bench_bowed_core(void)
+{
+    static uint8_t bytes[8192];
+    box_audio_core_desc_t desc = { .sample_rate = BENCH_RATE };
+    box_audio_core_t *core = box_audio_core_new(&desc);
+    box_audio_synth_patch_t p = {0};
+    box_audio_writer_t w;
+    uint32_t i;
+    p.layers = 1;
+    p.seed = 3;
+    p.envelope = (box_audio_synth_envelope_t){
+        .attack = 0.08f, .sustain = 0.9f, .hold = 4.0f, .release = 0.2f };
+    p.filter = BOX_AUDIO_SYNTH_LOWPASS;
+    p.cutoff = 6000;
+    p.layer[0] = (box_audio_synth_layer_t){ .wave = BOX_AUDIO_SYNTH_BOWED, .frequency = 196,
+        .level = 0.4f, .brightness = 0.5f, .bow_pressure = 0.5f, .bow_speed = 0.6f,
+        .bow_position = 0.12f, .bow_noise = 0.1f };
+    p.lfos = 1;
+    p.lfo[0] = (box_audio_synth_lfo_t){ .wave = BOX_AUDIO_SYNTH_LFO_SINE, .rate = 5.5f,
+        .pitch = 25 };
+    p.routes = 2;
+    p.route[0] = (box_audio_synth_route_t){ .source = BOX_AUDIO_SYNTH_FROM_PRESSURE,
+        .target = BOX_AUDIO_SYNTH_TO_BOW_PRESSURE, .amount = 0.3f };
+    p.route[1] = (box_audio_synth_route_t){ .source = BOX_AUDIO_SYNTH_FROM_LFO1,
+        .target = BOX_AUDIO_SYNTH_TO_BOW_SPEED, .amount = 0.05f };
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    box_audio_write_synth(&w, 1, &p);
+    for (i = 0; i < BOX_AUDIO_SYNTH_STRINGS; i ++) {
+        box_audio_write_play(&w, i, 1, 0, 0.02f, -0.9f + 0.05f * (float)i,
+            0.75f + 0.05f * (float)i, BOX_AUDIO_PLAY_LOOP, 0);
+    }
+
+    box_audio_core_apply(core, w.data, w.size);
+
+    return core;
+}
+
 /** Create a core with 64 looping voices of a patch of two wavetable layers of
  * WavetableHarmonics into a lowpass: one whose position the envelope opens and an LFO moves,
  * one that sweeps up between two frames, so every frame mixes two frames of a mip level and,
@@ -583,6 +628,15 @@ static box_audio_core_t* bench_wavetable_core(
     box_audio_core_apply(core, w.data, w.size);
 
     return core;
+}
+
+void Synth_voices_32_bowed(
+    bench_t *b)
+{
+    // audio/synth
+    box_audio_core_t *core = bench_bowed_core();
+    bench_synth_render(b, core);
+    box_audio_core_free(core);
 }
 
 void Synth_voices_64_wavetable(
