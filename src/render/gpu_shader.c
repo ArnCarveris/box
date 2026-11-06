@@ -175,20 +175,8 @@ static void box_gpu_compile_finish(
         compile->slot = NULL;
     }
 
-    char *invalid = NULL;
-    if (!compile->failed && compile->module && slot && compile->revision == slot->requested &&
-        (compile->handle == BOX_RENDER_SHADER_MESH ||
-            compile->handle == BOX_RENDER_SHADER_SHAPE2D))
-    {
-        gpu->checking = compile->module;
-        gpu->checking_label = compile->label;
-        invalid = box_gpu_forward_check(gpu, compile->handle, compile->module);
-        gpu->checking = NULL;
-        gpu->checking_label = NULL;
-    }
-
-    if (compile->failed || !compile->module || invalid) {
-        const char *message = invalid ? invalid : compile->message
+    if (compile->failed || !compile->module) {
+        const char *message = compile->message
             ? compile->message : "shader module creation failed";
         ecs_err("shader '%s' failed to compile: %s", compile->label, message);
         box_gpu_count(gpu, BOX_GPU_STAT_SHADER_ERROR);
@@ -208,8 +196,6 @@ static void box_gpu_compile_finish(
         ecs_os_free(slot->label);
         ecs_os_free(slot);
     }
-
-    ecs_os_free(invalid);
 }
 
 /** Take the outcome of a compile; one that waits is finished and freed here.
@@ -549,11 +535,6 @@ const char* box_gpu_shader_label(
     WGPUShaderModule module)
 {
     const char *result = NULL;
-    if (module && module == gpu->checking) {
-        result = gpu->checking_label;
-        goto done;
-    }
-
     ecs_map_iter_t it = ecs_map_iter(&gpu->shaders);
     while (module && ecs_map_next(&it)) {
         box_gpu_shader_slot_t *slot = ecs_map_ptr(&it);
@@ -563,7 +544,6 @@ const char* box_gpu_shader_label(
         }
     }
 
-done:
     return result;
 }
 
