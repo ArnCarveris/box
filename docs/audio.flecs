@@ -1,0 +1,965 @@
+// box.audio spec: every audio feature, as one playable song file.
+//
+// Play: $ { AudioSong: {file: "docs/audio.flecs"} } and $ { Transport: {playing: true} },
+// or the shell commands `audio song docs/audio.flecs` and `audio play`.
+//
+// Flecs script
+//   name { ... }                 entity; entities nested in a scope are its children
+//   prefab name { ... }          entity that is never active itself (sounds, clips, wavetables)
+//   Component: {field: value}    set a component; omitted fields keep their default
+//   Component: {}                set a component with all defaults
+//   Tag                          add a tag
+//   {a: 1, b: [x, y]}            struct, array/vector; "text" is a string; a; b on one line
+//   $ { Component: {...} }       singleton
+//   const name = expr            variable; expressions support + - * / % ( ) and a ? b : c
+//   using box.audio              resolve names without the box.audio. prefix
+// A name resolves only after it is declared: declare entities before referring to them.
+//
+// Song files
+//   Prefix every entity with a tag of the song (demo_) so names never collide with the host.
+//   Only set components on entities the song creates. The exceptions: master (box.audio.master)
+//   may be named as an output, and box.audio.Song may get an Rgb.
+//   Never write Transport or AudioSettings. The Song singleton, set last, sets tempo and length.
+//   Every song starts at beat 0 and loops over 0..Song.beats.
+//
+// Units: beats are quarter notes; pitch is a MIDI note (69 = A4 = 440 Hz, fractions allowed);
+// volume, level, gain are linear; times are seconds unless named in beats; mix, share and level
+// fields are 0..1; frequencies in Hz. Filters and sweeps sound even when moved in octaves.
+//
+// Limits: 64 voices, 63 buses + master, 64 effects, 8 insert slots and 4 sends per bus,
+// 8 layers, 2 LFOs and 8 mod routes per synth sound, 7 unison voices, 32 pluck strings,
+// 32 comb filters, 64 modulators (4 per member), 32 macros of 8 maps, 256 synth sounds.
+
+using box.audio
+using box.material
+
+const demo_tempo = 120
+const demo_bar = 4
+
+box { audio { Song { Rgb: {90, 200, 255} } } }
+
+// Mixer. Signal flow per bus: inserts in order, width, pre-fader sends, volume/pan/mute,
+// output, post-fader sends. kind: AudioChannelGroup | AudioChannelReturn | AudioChannelSfx.
+
+demo_lift {
+  AudioFilter: {
+    kind: SynthHighPass,   // SynthLowPass | SynthHighPass | SynthBandPass | SynthNotch
+    cutoff: 20,
+    resonance: 0.2,
+    slope: SynthSlope12,   // SynthSlope12 | SynthSlope24
+    mix: 1,
+    drive: 0
+  }
+}
+
+demo_glue {
+  Compressor: {
+    threshold: -14,        // dB, -80..0
+    ratio: 2,              // 1..20
+    attack: 0.02,
+    release: 0.2,
+    knee: 6,               // dB
+    makeup: 1,             // dB
+    mix: 1,
+    sidechain: 0           // bus whose output keys it, 0 = own input
+  }
+}
+
+demo_drop {
+  TapeStop: {
+    active: 0,             // >= 0.5 slows to a halt, < 0.5 spins back up; automate it
+    stop_time: 1,
+    start_time: 0.15,
+    curve: 0.3             // -1..1
+  }
+}
+
+demo_mix {
+  AudioBus: {
+    output: master,
+    volume: 0.75,          // 0..4
+    pan: 0,                // -1..1
+    width: 1,              // 0 mono, 1 as is, 2 extra wide
+    mute: false,
+    solo: false,
+    kind: AudioChannelGroup,
+    sends: [],
+    effects: [demo_lift, demo_glue, demo_drop]
+  }
+  AudioMeter: {}
+}
+
+demo_hall {
+  AudioBus: {output: demo_mix, kind: AudioChannelReturn, effects: [demo_hall]}
+  Reverb: {
+    decay: 3.2,
+    damping: 0.45,
+    predelay: 0.03,
+    size: 0.85,
+    mix: 1,
+    shimmer: 0.1,
+    shimmer_pitch: 12      // semitones, -24..24
+  }
+}
+
+demo_echo_eq {
+  Equalizer: {bands: [
+    {kind: AudioEqLowCut, frequency: 250, gain: 0, q: 0.7071},
+    {kind: AudioEqPeak, frequency: 900, gain: -2, q: 1},
+    {kind: AudioEqHighShelf, frequency: 6000, gain: -4, q: 0.7071},
+    {kind: AudioEqOff, frequency: 8000, gain: 0, q: 0.7071}
+  ]}
+}
+
+demo_echo {
+  AudioBus: {output: demo_mix, kind: AudioChannelReturn, effects: [demo_echo, demo_echo_eq]}
+  Delay: {
+    time: 0.25,
+    sync: 0.75,            // beats, > 0 wins over time
+    feedback: 0.4,         // 0..0.95
+    mix: 1,
+    ping_pong: true,
+    damping: 4000
+  }
+}
+
+demo_punch { TransientShaper: {attack: 0.4, sustain: -0.2} }
+
+demo_crunch {
+  Saturator: {
+    drive: 0.2,
+    asymmetry: 0.1,
+    bits: 16,              // 1..16, 16 = off
+    mix: 1,
+    mode: SaturatorTanh,   // SaturatorTanh | SaturatorTube | SaturatorHard | SaturatorFold | SaturatorRectify
+    low_cut: 60,           // 0 = off
+    high_cut: 12000,       // 0 = off
+    tone: 0,               // -1..1
+    rate: 0                // sample and hold Hz, 0 = off
+  }
+}
+
+demo_stutter {
+  BeatRepeat: {
+    active: 0,             // >= 0.5 repeats; automate it
+    slice: 0.25,           // beats, 1/32..4
+    grid: -1,              // beats, negative = slice, 0 = at once
+    decay: 0.85,
+    pitch: -1,             // semitones per repeat, -12..12
+    reverse: 0,
+    gate: 1,
+    mix: 1
+  }
+}
+
+demo_drums {
+  AudioBus: {output: demo_mix, volume: 0.6, effects: [demo_punch, demo_crunch, demo_stutter],
+    sends: [{bus: demo_hall, level: 0.08, pre_fader: false}]}
+  AudioMeter: {}
+}
+
+// Sounds. A sound is an entity with SynthSound, SoundFile or AudioPcm. A synth sound is a root
+// plus children; the root and every child with a SynthOscillator is a layer. Envelopes, LFOs and
+// routes on the root apply to all layers; on a layer to that layer.
+
+demo_kick_file { SoundFile: {path: "test/assets/audio/kick.wav"} }
+
+demo_tick_pcm {
+  AudioPcm: {samples: [0.6, -0.6, 0.5, -0.5, 0.4, -0.4, 0.3, -0.3, 0.2, -0.2, 0.1, -0.1, 0],
+    channels: 1, sample_rate: 8000}
+}
+
+demo_sawsquare_file { SoundFile: {path: "test/assets/audio/wavetable_saw_square.wav"} }
+
+prefab demo_sawsquare { Wavetable: {kind: WavetableBasic, sound: demo_sawsquare_file, frame_size: 2048} }
+prefab demo_harmonics { Wavetable: {kind: WavetableHarmonics} }  // WavetableBasic | WavetablePulse | WavetableHarmonics
+
+prefab demo_kick_sound {
+  SynthSound: {seed: 1}
+  SynthDrive: {drive: 0.4, asymmetry: 0.1}
+  body {
+    SynthOscillator: {wave: SynthSine, frequency: 50, level: 0.9}
+    SynthEnvelope: {attack: 0.001, decay: 0.45, curve: 4}
+    SynthPitchEnvelope: {amount: 30, decay: 0.06, curve: 6}
+  }
+  click {
+    SynthOscillator: {wave: SynthNoise, color: SynthNoiseBrown, level: 0.4}
+    SynthEnvelope: {attack: 0.0005, decay: 0.01, curve: 3}
+  }
+}
+
+prefab demo_snare_sound {
+  SynthSound: {seed: 2, pitch_variance: 0.02, level_variance: 0.05}
+  SynthFilter: {kind: SynthHighPass, cutoff: 160}
+  body {
+    SynthOscillator: {wave: SynthTriangle, frequency: 240, frequency_end: 170, sweep: 0.05, level: 0.5}
+    SynthEnvelope: {attack: 0.001, decay: 0.12, curve: 4}
+  }
+  wires {
+    SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.5}
+    SynthEnvelope: {attack: 0.001, decay: 0.22, curve: 5}
+  }
+}
+
+prefab demo_hat_sound {
+  SynthSound: {seed: 3, level_variance: 0.1}
+  SynthEnvelope: {attack: 0.0005, decay: 0.05, curve: 5}
+  SynthFilter: {kind: SynthHighPass, cutoff: 7500, resonance: 0.2, slope: SynthSlope24}
+  SynthOscillator: {wave: SynthNoise, color: SynthNoiseWhite, level: 0.5}
+}
+
+prefab demo_bass_sound {
+  SynthSound: {seed: 11}
+  SynthEnvelope: {attack: 0.003, decay: 0.25, sustain: 0.6, release: 0.08, curve: 4, key_scale: 0.3}
+  SynthDrive: {drive: 0.4, asymmetry: 0.2}
+  SynthFilter: {
+    kind: SynthLowPass,    // also SynthFormant (vowel filter) and SynthComb (tuned comb)
+    cutoff: 300,
+    resonance: 0.6,
+    slope: SynthSlope24,
+    drive: 0.2,
+    velocity: 1.5,         // octaves of cutoff at velocity 1 over velocity 0
+    keytrack: 1,           // 0..1, cutoff follows the pitch
+    model: SynthFilterLadder,  // SynthFilterSvf | SynthFilterLadder
+    vowel: 0,              // SynthFormant only, 0 a, 1 e, 2 i, 3 o, 4 u
+    feedback: 0.5,         // SynthComb only, -0.98..0.98
+    tune: 1                // SynthComb only, comb frequency / note
+  }
+  SynthFilterEnvelope: {
+    attack: 0.002, decay: 0.18, sustain: 0.1, release: 0.1, hold: 0, curve: 3, attack_curve: 0,
+    amount: 3,             // octaves at level 1, -10..10
+    velocity: 0.6,
+    vowel: 0               // SynthFormant only, -4..4
+  }
+  SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.5, sub: 0.6, sub_octave: 1}
+  accent { SynthModRoute: {source: SynthSourceFilterEnvelope, target: SynthTargetLevel, amount: 0.3} }
+}
+
+prefab demo_lead_sound {
+  SynthSound: {
+    seed: 21,
+    pitch_variance: 0,
+    level_variance: 0,
+    drift: 4,              // cents, 0..50
+    free_phase: true
+  }
+  SynthEnvelope: {
+    attack: 0.01,
+    decay: 0.3,
+    sustain: 0.8,
+    release: 0.25,
+    hold: 0,               // one shots hold this long at sustain; notes hold until their end
+    curve: 3,              // -16..16, > 0 falls fast then settles
+    attack_curve: 0,
+    key_scale: 0           // 0..1, shorter decay/release for higher notes
+  }
+  SynthFilter: {kind: SynthLowPass, cutoff: 1800, resonance: 0.25, slope: SynthSlope24, drive: 0.3,
+    velocity: 1, keytrack: 0.5}
+  SynthFilterEnvelope: {attack: 0.005, decay: 0.4, sustain: 0.3, release: 0.3, amount: 1.5, velocity: 0.5}
+  SynthGlide: {
+    time: 0.06,            // seconds, 0..10
+    legato: true,          // overlapping notes glide in one voice
+    channel: 1
+  }
+  SynthModEnvelope: {attack: 0.3, decay: 0.8, sustain: 0.2, release: 0.3}
+  SynthLfo: {
+    wave: SynthLfoSine,    // SynthLfoSine | SynthLfoTriangle | SynthLfoSquare | SynthLfoSaw | SynthLfoRandom
+    rate: 5.5,
+    sync: 0,               // beats per cycle, > 0 wins over rate
+    delay: 0.25,
+    fade: 0.4,
+    phase: 0,              // turns, 0..1
+    random_phase: false,
+    pitch: 18,             // cents
+    amplitude: 0,
+    cutoff: 0,             // octaves
+    pulse_width: 0,
+    hard_sync: 0,          // semitones of the sync ratio
+    vowel: 0,
+    position: 0            // wavetable frames
+  }
+  saw {
+    SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.3}
+    SynthUnison: {voices: 5, detune: 18, width: 0.8}
+    narrow { SynthModRoute: {source: SynthSourceKey, target: SynthTargetDetune, amount: -8} }
+  }
+  square {
+    SynthOscillator: {
+      wave: SynthSquare,   // SynthSine | SynthSaw | SynthSquare | SynthTriangle | SynthNoise | SynthPluck | SynthWavetable
+      frequency: 440,      // with Instrument.root 69 a layer at 440 plays the note's own pitch
+      frequency_end: 0,    // sweep target, 0 = no sweep
+      sweep: 0,
+      level: 0.15,
+      modulation: SynthMix,  // SynthMix | SynthPhase (FM of parent) | SynthRing (ring mod of parent)
+      index: 1,
+      feedback: 0,
+      audible: false,
+      pulse_width: 0.3,
+      sub: 0.4,
+      sub_octave: 1,       // 1..2
+      velocity: 0,
+      sync: 0,             // hard sync ratio 1..16, 0 = off
+      color: SynthNoiseWhite  // SynthNoiseWhite | SynthNoisePink | SynthNoiseBrown
+    }
+    SynthLfo: {wave: SynthLfoTriangle, rate: 0.7}
+    pwm { SynthModRoute: {source: SynthSourceLfo2, target: SynthTargetPulseWidth, amount: 0.15} }
+  }
+  swell { SynthModRoute: {source: SynthSourceModEnvelope, target: SynthTargetCutoff, amount: 2} }
+  place { SynthModRoute: {source: SynthSourceRandom, target: SynthTargetPan, amount: 0.3} }
+  bite { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetResonance, amount: 0.3} }
+}
+
+prefab demo_arp_sound {
+  SynthSound: {seed: 51}
+  SynthEnvelope: {attack: 0.002, decay: 0.15, sustain: 0.2, release: 0.1, curve: 4}
+  SynthFilter: {kind: SynthLowPass, cutoff: 5000, velocity: 1}
+  SynthPitchEnvelope: {
+    amount: 0,             // semitones at note start, -48..48
+    decay: 0.12,
+    curve: 3,
+    release_amount: -2,
+    sync: 12               // semitones of the sync ratio at note start
+  }
+  SynthLfo: {wave: SynthLfoSaw, sync: 4, hard_sync: 7}
+  sync_saw {
+    SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.25, sync: 2, sub: 0.3, sub_octave: 2}
+    rip { SynthModRoute: {source: SynthSourceAmpEnvelope, target: SynthTargetHardSync, amount: 5} }
+  }
+  table {
+    SynthOscillator: {wave: SynthWavetable, frequency: 440, level: 0.15}
+    SynthTable: {table: demo_sawsquare, position: 0, envelope: 1}
+    morph { SynthModRoute: {source: SynthSourceLfo1, target: SynthTargetPosition, amount: 0.5} }
+  }
+}
+
+prefab demo_pad_sound {
+  SynthSound: {seed: 41, drift: 6, free_phase: true}
+  SynthEnvelope: {attack: 0.8, decay: 1, sustain: 0.8, release: 1.5, attack_curve: 1}
+  SynthFilter: {kind: SynthLowPass, cutoff: 4000, keytrack: 0.3}
+  SynthLfo: {wave: SynthLfoTriangle, sync: 8, position: 8}
+  table {
+    SynthOscillator: {wave: SynthWavetable, frequency: 440, level: 0.25}
+    SynthTable: {table: demo_harmonics, position: 3, envelope: 10}
+    SynthUnison: {voices: 4, detune: 14, width: 1}
+  }
+}
+
+prefab demo_choir_sound {
+  SynthSound: {seed: 91, drift: 7, free_phase: true}
+  SynthEnvelope: {attack: 0.5, decay: 0.5, sustain: 0.9, release: 1.2, attack_curve: 1}
+  SynthFilter: {kind: SynthFormant, vowel: 0, resonance: 0.3, drive: 0.1}
+  SynthFilterEnvelope: {attack: 1.5, decay: 1, sustain: 0.5, release: 1, vowel: 2}
+  SynthLfo: {rate: 0.2, random_phase: true, vowel: 0.5}
+  vibrato { SynthLfo: {rate: 5, delay: 0.4, fade: 0.8, random_phase: true, pitch: 8, amplitude: 0.1} }
+  voices {
+    SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.35}
+    SynthUnison: {voices: 3, detune: 12, width: 0.7}
+  }
+  breath { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.03} }
+  open { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetVowel, amount: 1.5} }
+  spread { SynthModRoute: {source: SynthSourceMod, target: SynthTargetDetune, amount: 15} }
+  shade { SynthModRoute: {source: SynthSourceKey, target: SynthTargetVowel, amount: 0.5} }
+}
+
+prefab demo_organ_sound {
+  SynthSound: {seed: 101}
+  SynthEnvelope: {attack: 0.005, decay: 0.05, sustain: 1, release: 0.06}
+  sub { SynthOscillator: {frequency: 220, level: 0.25} }
+  main { SynthOscillator: {frequency: 440, level: 0.25} }
+  octave { SynthOscillator: {frequency: 880, level: 0.12} }
+  fifth { SynthOscillator: {frequency: 1320, level: 0.1} }
+}
+
+prefab demo_bell_sound {
+  SynthSound: {seed: 61, level_variance: 0.05}
+  SynthEnvelope: {attack: 0.002, decay: 1.8, sustain: 0, release: 1, curve: 4}
+  carrier {
+    SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.35}
+    fm {
+      SynthOscillator: {wave: SynthSine, frequency: 1232, modulation: SynthPhase, index: 3, feedback: 0.2,
+        velocity: 0.7}
+      SynthEnvelope: {attack: 0.001, decay: 0.6, sustain: 0.1, release: 0.5, curve: 4}
+      hit { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetIndex, amount: 2} }
+    }
+  }
+  shine {
+    SynthOscillator: {wave: SynthTriangle, frequency: 880, level: 0.12}
+    ring { SynthOscillator: {wave: SynthSine, frequency: 1310, modulation: SynthRing, index: 0.6} }
+  }
+  detune { SynthModRoute: {source: SynthSourceRandom, target: SynthTargetPitch, amount: 0.1} }
+}
+
+prefab demo_pluck_sound {
+  SynthSound: {seed: 71}
+  SynthOscillator: {wave: SynthPluck, frequency: 440, level: 0.5}
+  SynthString: {
+    decay: 1.5,            // seconds to -60 dB
+    brightness: 0.6,
+    hardness: 0.8,
+    velocity: 0.5
+  }
+  SynthUnison: {voices: 2, detune: 6, width: 0.6}
+}
+
+prefab demo_comb_sound {
+  SynthSound: {seed: 81}
+  SynthEnvelope: {attack: 0.001, decay: 0.02, release: 0.01}
+  SynthFilter: {kind: SynthComb, cutoff: 8000, feedback: 0.95, tune: 1}
+  SynthOscillator: {wave: SynthNoise, frequency: 440, level: 0.5}
+}
+
+// Instruments turn notes into voices. Pitch ratio = 2^((pitch - root) / 12), gain = velocity^velocity_curve.
+// gate false plays a hit as authored (drums); gate true releases at the note's end.
+
+demo_kick_inst { Instrument: {sound: demo_kick_sound, root: 36, gate: false} }
+demo_snare_inst { Instrument: {sound: demo_snare_sound, root: 38, gate: false} }
+demo_hat_inst { Instrument: {sound: demo_hat_sound, root: 42, gate: false, spread: 0.2, spread_mode: InstrumentSpreadRandom} }
+demo_sampler_inst { Instrument: {sound: demo_kick_file, root: 36, gate: false, release: 0.05} }
+demo_bass_inst { Instrument: {sound: demo_bass_sound, velocity_curve: 1.5} }
+demo_lead_inst {
+  Instrument: {
+    sound: demo_lead_sound,
+    root: 69,
+    velocity_curve: 1.5,
+    gate: true,
+    release: 0.05,         // sampler fade after a gated note
+    spread: 0,
+    spread_mode: InstrumentSpreadPitch  // InstrumentSpreadPitch | InstrumentSpreadRandom | InstrumentSpreadAlternate
+  }
+}
+demo_arp_inst { Instrument: {sound: demo_arp_sound, spread: 0.4, spread_mode: InstrumentSpreadAlternate} }
+demo_pad_inst { Instrument: {sound: demo_pad_sound, velocity_curve: 1.2, spread: 0.3} }
+demo_choir_inst { Instrument: {sound: demo_choir_sound, spread: 0.5, spread_mode: InstrumentSpreadAlternate} }
+demo_organ_inst { Instrument: {sound: demo_organ_sound} }
+demo_bell_inst { Instrument: {sound: demo_bell_sound, gate: false} }
+demo_pluck_inst { Instrument: {sound: demo_pluck_sound, spread: 0.5, spread_mode: InstrumentSpreadPitch} }
+demo_comb_inst { Instrument: {sound: demo_comb_sound, spread: 0.6, spread_mode: InstrumentSpreadRandom} }
+
+// Clips are reusable prefabs that ClipPlacements put on tracks. Note times are beats from the
+// clip start. bend (semitones), mod and pressure (0..1) are Curves over beats of the note.
+// Curve: {kind: CurveLinear | CurveCatmullRom | CurveBezier, keys: [{time, value}, ...]};
+// Bezier keys are {time, value, in_slope, out_slope}.
+
+prefab demo_kick_four {
+  NoteClip: {length: 4, notes: [
+    {start: 0, duration: 0.5, pitch: 36}, {start: 1, duration: 0.5, pitch: 36},
+    {start: 2, duration: 0.5, pitch: 36}, {start: 3, duration: 0.5, pitch: 36}
+  ]}
+}
+
+prefab demo_snare_back {
+  NoteClip: {length: 4, notes: [
+    {start: 1, duration: 0.5, pitch: 38, velocity: 0.9},
+    {start: 3, duration: 0.5, pitch: 38, velocity: 0.9},
+    {start: 3.75, duration: 0.25, pitch: 38, velocity: 0.3}
+  ]}
+}
+
+prefab demo_hat_eighths {
+  NoteClip: {length: 4, notes: [
+    {start: 0, duration: 0.25, pitch: 42, velocity: 0.9}, {start: 0.5, duration: 0.25, pitch: 42, velocity: 0.55},
+    {start: 1, duration: 0.25, pitch: 42, velocity: 0.9}, {start: 1.5, duration: 0.25, pitch: 42, velocity: 0.55},
+    {start: 2, duration: 0.25, pitch: 42, velocity: 0.9}, {start: 2.5, duration: 0.25, pitch: 42, velocity: 0.55},
+    {start: 3, duration: 0.25, pitch: 42, velocity: 0.9}, {start: 3.5, duration: 0.25, pitch: 42, velocity: 0.55}
+  ]}
+}
+
+prefab demo_ghosts {
+  NoteClip: {length: 8, notes: [
+    {start: 1.5, duration: 0.5, pitch: 36, velocity: 0.4},
+    {start: 5.75, duration: 0.25, pitch: 43, velocity: 0.3}
+  ]}
+}
+
+prefab demo_bass_line {
+  NoteClip: {length: 16, notes: [
+    {start: 0, duration: 1.5, pitch: 45}, {start: 2, duration: 0.5, pitch: 45, velocity: 0.7},
+    {start: 2.5, duration: 0.5, pitch: 57, velocity: 0.8}, {start: 3, duration: 1, pitch: 45, velocity: 0.9},
+    {start: 4, duration: 1.5, pitch: 41}, {start: 6, duration: 0.5, pitch: 41, velocity: 0.7},
+    {start: 6.5, duration: 0.5, pitch: 53, velocity: 0.8}, {start: 7, duration: 1, pitch: 41, velocity: 0.9},
+    {start: 8, duration: 1.5, pitch: 48}, {start: 10, duration: 0.5, pitch: 48, velocity: 0.7},
+    {start: 10.5, duration: 0.5, pitch: 60, velocity: 0.8}, {start: 11, duration: 1, pitch: 48, velocity: 0.9},
+    {start: 12, duration: 1.5, pitch: 43}, {start: 14, duration: 0.5, pitch: 43, velocity: 0.7},
+    {start: 14.5, duration: 0.5, pitch: 55, velocity: 0.8}, {start: 15, duration: 1, pitch: 43, velocity: 0.9}
+  ]}
+}
+
+prefab demo_melody {
+  NoteClip: {length: 16, notes: [
+    {start: 0, duration: 1.5, pitch: 76, velocity: 0.9, bend: {keys: [{0, -2}, {0.25, 0}]}},
+    {start: 1.5, duration: 0.6, pitch: 74, velocity: 0.7},
+    {start: 2, duration: 2, pitch: 72, velocity: 0.8, mod: {keys: [{0, 0}, {2, 1}]}},
+    {start: 4, duration: 1, pitch: 69, velocity: 0.8},
+    {start: 5, duration: 1, pitch: 72, velocity: 0.7},
+    {start: 6, duration: 2, pitch: 77, velocity: 0.9,
+      pressure: {kind: CurveCatmullRom, keys: [{0, 0}, {1, 0.8}, {2, 0.2}]}},
+    {start: 8, duration: 1.5, pitch: 79, velocity: 1},
+    {start: 9.5, duration: 0.6, pitch: 76, velocity: 0.7},
+    {start: 10, duration: 2, pitch: 72, velocity: 0.8},
+    {start: 12, duration: 1, pitch: 74, velocity: 0.8},
+    {start: 13, duration: 1, pitch: 71, velocity: 0.7},
+    {start: 14, duration: 2, pitch: 67, velocity: 0.8, pan: 0.2,
+      bend: {kind: CurveBezier, keys: [{0, 0, 0, 0}, {1.5, 0, 0, 0}, {2, -12, -24, 0}]}}
+  ]}
+}
+
+prefab demo_arp_line {
+  NoteClip: {length: 4, notes: [
+    {start: 0, duration: 0.2, pitch: 57, velocity: 0.9}, {start: 0.25, duration: 0.2, pitch: 64, velocity: 0.6},
+    {start: 0.5, duration: 0.2, pitch: 69, velocity: 0.75}, {start: 0.75, duration: 0.2, pitch: 64, velocity: 0.6},
+    {start: 1, duration: 0.2, pitch: 57, velocity: 0.9}, {start: 1.25, duration: 0.2, pitch: 64, velocity: 0.6},
+    {start: 1.5, duration: 0.2, pitch: 69, velocity: 0.75}, {start: 1.75, duration: 0.2, pitch: 64, velocity: 0.6},
+    {start: 2, duration: 0.2, pitch: 57, velocity: 0.9}, {start: 2.25, duration: 0.2, pitch: 64, velocity: 0.6},
+    {start: 2.5, duration: 0.2, pitch: 69, velocity: 0.75}, {start: 2.75, duration: 0.2, pitch: 64, velocity: 0.6},
+    {start: 3, duration: 0.2, pitch: 57, velocity: 0.9}, {start: 3.25, duration: 0.2, pitch: 64, velocity: 0.6},
+    {start: 3.5, duration: 0.2, pitch: 69, velocity: 0.75}, {start: 3.75, duration: 0.2, pitch: 76, velocity: 0.8}
+  ]}
+}
+
+prefab demo_chords {
+  NoteClip: {length: 16, notes: [
+    {start: 0, duration: 3.9, pitch: 57, velocity: 0.7}, {start: 0, duration: 3.9, pitch: 60, velocity: 0.65},
+    {start: 0, duration: 3.9, pitch: 64, velocity: 0.65},
+    {start: 4, duration: 3.9, pitch: 53, velocity: 0.7}, {start: 4, duration: 3.9, pitch: 57, velocity: 0.65},
+    {start: 4, duration: 3.9, pitch: 60, velocity: 0.65},
+    {start: 8, duration: 3.9, pitch: 55, velocity: 0.7}, {start: 8, duration: 3.9, pitch: 60, velocity: 0.65},
+    {start: 8, duration: 3.9, pitch: 64, velocity: 0.65},
+    {start: 12, duration: 3.9, pitch: 55, velocity: 0.7}, {start: 12, duration: 3.9, pitch: 59, velocity: 0.65},
+    {start: 12, duration: 3.9, pitch: 62, velocity: 0.65}
+  ]}
+}
+
+prefab demo_choir_chords {
+  NoteClip: {length: 16, notes: [
+    {start: 0, duration: 3.9, pitch: 64}, {start: 0, duration: 3.9, pitch: 69},
+    {start: 0, duration: 3.9, pitch: 72, pressure: {keys: [{0, 0}, {2, 0.8}, {4, 0.3}]}},
+    {start: 4, duration: 3.9, pitch: 65}, {start: 4, duration: 3.9, pitch: 69, mod: {keys: [{0, 0}, {4, 1}]}},
+    {start: 4, duration: 3.9, pitch: 72, pressure: {keys: [{0, 0}, {2, 0.8}, {4, 0.3}]}},
+    {start: 8, duration: 3.9, pitch: 64}, {start: 8, duration: 3.9, pitch: 67},
+    {start: 8, duration: 3.9, pitch: 72, pressure: {keys: [{0, 0}, {2, 0.8}, {4, 0.3}]}},
+    {start: 12, duration: 3.9, pitch: 62}, {start: 12, duration: 3.9, pitch: 67, mod: {keys: [{0, 0}, {4, 1}]}},
+    {start: 12, duration: 3.9, pitch: 71, pressure: {keys: [{0, 0}, {2, 0.8}, {4, 0.3}]}}
+  ]}
+}
+
+prefab demo_bells_line {
+  NoteClip: {length: 16, notes: [
+    {start: 0, duration: 2, pitch: 81, velocity: 0.7}, {start: 6, duration: 1, pitch: 84, velocity: 0.5},
+    {start: 8, duration: 2, pitch: 79, velocity: 0.7}, {start: 14, duration: 1, pitch: 76, velocity: 0.5}
+  ]}
+}
+
+prefab demo_pluck_line {
+  NoteClip: {length: 8, notes: [
+    {start: 0, duration: 0.5, pitch: 69}, {start: 0.5, duration: 0.5, pitch: 72, velocity: 0.6},
+    {start: 1, duration: 0.5, pitch: 76, velocity: 0.8}, {start: 1.5, duration: 0.5, pitch: 72, velocity: 0.6},
+    {start: 2, duration: 0.5, pitch: 69}, {start: 2.5, duration: 0.5, pitch: 72, velocity: 0.6},
+    {start: 3, duration: 0.5, pitch: 76, velocity: 0.8}, {start: 3.5, duration: 0.5, pitch: 79, velocity: 0.6},
+    {start: 4, duration: 0.5, pitch: 69}, {start: 4.5, duration: 0.5, pitch: 72, velocity: 0.6},
+    {start: 5, duration: 0.5, pitch: 77, velocity: 0.8}, {start: 5.5, duration: 0.5, pitch: 72, velocity: 0.6},
+    {start: 6, duration: 0.5, pitch: 69}, {start: 6.5, duration: 0.5, pitch: 72, velocity: 0.6},
+    {start: 7, duration: 0.5, pitch: 77, velocity: 0.8}, {start: 7.5, duration: 0.5, pitch: 81, velocity: 0.6}
+  ]}
+}
+
+prefab demo_comb_line {
+  NoteClip: {length: 8, notes: [
+    {start: 0, duration: 0.25, pitch: 57}, {start: 1.5, duration: 0.25, pitch: 64, velocity: 0.7},
+    {start: 3, duration: 0.25, pitch: 60, velocity: 0.8}, {start: 4.5, duration: 0.25, pitch: 65, velocity: 0.7},
+    {start: 6, duration: 0.25, pitch: 62, velocity: 0.8}
+  ]}
+}
+
+prefab demo_impact { AudioClip: {sound: demo_kick_file, offset: 0, length: 4} }  // offset in seconds
+prefab demo_tick { AudioClip: {sound: demo_tick_pcm, length: 1} }
+
+// Tracks. A Track is a mixer channel (it brings an AudioBus) that plays its ClipPlacement
+// children on its instrument. A track needs no instrument for audio and automation clips.
+// ClipPlacement: start, duration (0 = clip length), loop repeats the clip until duration ends,
+// offset in beats into the clip, gain, transpose in semitones.
+
+demo_kick {
+  Track: {instrument: demo_kick_inst}
+  AudioBus: {output: demo_drums}
+  AudioMeter: {}
+  groove { ClipPlacement: {clip: demo_kick_four, start: 16, duration: 44, loop: true} }
+}
+
+demo_snare_gate {
+  Gate: {
+    threshold: -40,        // dB, -100..0
+    attack: 0.001,
+    hold: 0.04,
+    release: 0.08,
+    range: -60             // dB when closed
+  }
+}
+
+demo_snare {
+  Track: {instrument: demo_snare_inst}
+  AudioBus: {output: demo_drums, effects: [demo_snare_gate], sends: [{bus: demo_hall, level: 0.15}]}
+  AudioMeter: {}
+  groove { ClipPlacement: {clip: demo_snare_back, start: 16, duration: 44, loop: true} }
+}
+
+demo_hats {
+  Track: {
+    instrument: demo_hat_inst,
+    priority: 1,           // 0..255, voice stealing; one shots are 0
+    swing: 0.15,           // 0..0.75
+    swing_grid: TrackSwing8,  // TrackSwing8 | TrackSwing16
+    humanize: {timing: 6, velocity: 0.1}  // ms, share
+  }
+  AudioBus: {output: demo_drums, pan: 0.15, sends: [{bus: demo_echo, level: 0.15}]}
+  AudioMeter: {}
+  groove { ClipPlacement: {clip: demo_hat_eighths, start: 16, duration: 44, loop: true} }
+}
+
+demo_samples {
+  Track: {instrument: demo_sampler_inst}
+  AudioBus: {output: demo_drums, volume: 0.7}
+  AudioMeter: {}
+  ticks { ClipPlacement: {clip: demo_tick, start: 0, duration: 16, loop: true, gain: 0.3} }
+  ghosts { ClipPlacement: {clip: demo_ghosts, start: 16, duration: 44, loop: true} }
+  drop_in { ClipPlacement: {clip: demo_impact, start: 16, gain: 0.8, transpose: -5} }
+  build_in { ClipPlacement: {clip: demo_impact, start: 48, gain: 0.6} }
+}
+
+demo_bass_filter { AudioFilter: {kind: SynthLowPass, cutoff: 1200, resonance: 0.3} }
+demo_duck {
+  Compressor: {threshold: -30, ratio: 6, attack: 0.003, release: 0.15, sidechain: demo_kick}
+  AudioMeter: {}           // on an effect: reduction is the gain reduction in dB
+}
+
+demo_bass {
+  Track: {instrument: demo_bass_inst, humanize: {timing: 3, velocity: 0.05}}
+  AudioBus: {output: demo_mix, volume: 0.85, effects: [demo_bass_filter, demo_duck]}
+  AudioMeter: {}
+  line { ClipPlacement: {clip: demo_bass_line, start: 16, duration: 44, loop: true} }
+}
+
+demo_lead_eq {
+  Equalizer: {bands: [
+    {kind: AudioEqLowCut, frequency: 180},
+    {kind: AudioEqPeak, frequency: 2500, gain: 2, q: 1.2},
+    {kind: AudioEqHighCut, frequency: 14000},
+    {kind: AudioEqHighShelf, frequency: 8000, gain: 0}  // AudioEqOff | AudioEqPeak | AudioEqLowShelf | AudioEqHighShelf | AudioEqLowCut | AudioEqHighCut
+  ]}
+}
+
+demo_lead_shift {
+  PitchShifter: {
+    semitones: 12,         // -24..24
+    cents: 0,              // -100..100
+    stereo: 0,             // 1 mirrors cents on the right channel (widener)
+    window: 25,            // ms, 10..100
+    feedback: 0,           // 0..0.9
+    mix: 0.2
+  }
+}
+
+demo_lead_chorus {
+  Chorus: {
+    voices: 2,             // 1..4
+    rate: 0.8,
+    depth: 3,              // ms
+    delay: 12,             // ms
+    mix: 0.35,
+    spread: 0.8,
+    feedback: 0            // -0.95..0.95, makes it a flanger with 1 voice and ~2 ms delay
+  }
+}
+
+demo_lead {
+  Track: {instrument: demo_lead_inst}
+  AudioBus: {output: demo_mix, volume: 0.75, effects: [demo_lead_eq, demo_lead_shift, demo_lead_chorus],
+    sends: [{bus: demo_hall, level: 0.2}, {bus: demo_echo, level: 0.25}]}
+  AudioMeter: {}
+  melody { ClipPlacement: {clip: demo_melody, start: 32, duration: 32, loop: true} }
+}
+
+demo_arp_phaser {
+  Phaser: {
+    stages: 6,             // 2..12, even
+    rate: 0.25,
+    depth: 0.7,
+    center: 900,
+    feedback: 0.4,         // -0.9..0.9
+    mix: 0.5,
+    stereo: 0.5
+  }
+}
+
+demo_arp {
+  Track: {instrument: demo_arp_inst, swing: 0.1, swing_grid: TrackSwing16}
+  AudioBus: {output: demo_mix, volume: 0.55, width: 1.4, effects: [demo_arp_phaser],
+    sends: [{bus: demo_echo, level: 0.3}]}
+  AudioMeter: {}
+  am { ClipPlacement: {clip: demo_arp_line, start: 4 * demo_bar} }
+  f { ClipPlacement: {clip: demo_arp_line, start: 5 * demo_bar, transpose: -4} }
+  c { ClipPlacement: {clip: demo_arp_line, start: 6 * demo_bar, transpose: 3} }
+  g { ClipPlacement: {clip: demo_arp_line, start: 7 * demo_bar, transpose: -2} }
+  am_2 { ClipPlacement: {clip: demo_arp_line, start: 8 * demo_bar} }
+  f_2 { ClipPlacement: {clip: demo_arp_line, start: 9 * demo_bar, transpose: -4} }
+  c_2 { ClipPlacement: {clip: demo_arp_line, start: 10 * demo_bar, transpose: 3} }
+  g_2 { ClipPlacement: {clip: demo_arp_line, start: 11 * demo_bar, transpose: -2} }
+}
+
+demo_pad_gate {
+  PatternGate: {
+    steps: [1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0.5, 0, 1, 0.5, 1],
+    length: 16,            // 1..16
+    rate: 0.25,            // beats per step
+    swing: 0,
+    attack: 0.002,
+    release: 0.05,
+    gate: 0.6,             // open share of a step
+    floor: -24,            // dB when closed, -80..0
+    mix: 1
+  }
+}
+
+demo_pad {
+  Track: {instrument: demo_pad_inst}
+  AudioBus: {output: demo_mix, volume: 0.9, effects: [demo_pad_gate], sends: [{bus: demo_hall, level: 0.3}]}
+  AudioMeter: {}
+  chords { ClipPlacement: {clip: demo_chords, start: 0, duration: 64, loop: true} }
+}
+
+demo_choir_vocoder {
+  Vocoder: {
+    modulator: demo_drums, // bus whose output shapes this bus
+    bands: 16,             // 8..32
+    low: 100,
+    high: 8000,
+    q: 1,
+    attack: 0.002,
+    release: 0.08,
+    shift: 0,              // -1..1, formant shift
+    unvoiced: 0.1,
+    mix: 0.5
+  }
+}
+
+demo_choir {
+  Track: {instrument: demo_choir_inst, humanize: {timing: 12, velocity: 0.05}}
+  AudioBus: {output: demo_mix, volume: 0.7, effects: [demo_choir_vocoder], sends: [{bus: demo_hall, level: 0.4}]}
+  AudioMeter: {}
+  chords { ClipPlacement: {clip: demo_choir_chords, start: 16, duration: 32, loop: true} }
+}
+
+demo_rotary {
+  Rotary: {
+    speed: 0,              // 0 slow (chorale) .. 1 fast (tremolo); automate it
+    horn_slow: 0.8,
+    horn_fast: 6.7,
+    drum_slow: 0.7,
+    drum_fast: 5.9,
+    acceleration: 1,
+    balance: 0,            // -1 drum .. 1 horn
+    spread: 1,
+    drive: 0.3,
+    mix: 1
+  }
+}
+
+demo_organ {
+  Track: {instrument: demo_organ_inst}
+  AudioBus: {output: demo_mix, volume: 0.5, effects: [demo_rotary], sends: [{bus: demo_hall, level: 0.15}]}
+  AudioMeter: {}
+  chords { ClipPlacement: {clip: demo_chords, start: 32, duration: 32, loop: true, transpose: -12, gain: 0.7} }
+}
+
+demo_bell_shift {
+  FrequencyShifter: {
+    shift: 4,              // Hz, -5000..5000
+    mode: FrequencyShift,  // FrequencyShift | FrequencyRing
+    stereo: 1,
+    feedback: 0,           // -0.95..0.95
+    mix: 0.4
+  }
+}
+
+demo_bells {
+  Track: {instrument: demo_bell_inst}
+  AudioBus: {output: demo_mix, volume: 0.6, effects: [demo_bell_shift],
+    sends: [{bus: demo_hall, level: 0.4}, {bus: demo_echo, level: 0.2, pre_fader: true}]}
+  AudioMeter: {}
+  intro { ClipPlacement: {clip: demo_bells_line, start: 0} }
+  answer { ClipPlacement: {clip: demo_bells_line, start: 32, offset: 8, duration: 8} }
+}
+
+demo_pluck_wah { AudioFilter: {kind: SynthBandPass, cutoff: 500, resonance: 0.5, mix: 0.7} }
+
+demo_plucks {
+  Track: {instrument: demo_pluck_inst, humanize: {timing: 5, velocity: 0.15}}
+  AudioBus: {output: demo_mix, volume: 0.6, effects: [demo_pluck_wah], sends: [{bus: demo_echo, level: 0.2}]}
+  AudioMeter: {}
+  line { ClipPlacement: {clip: demo_pluck_line, start: 16, duration: 32, loop: true} }
+}
+
+demo_combs {
+  Track: {instrument: demo_comb_inst}
+  AudioBus: {output: demo_mix, volume: 0.5, sends: [{bus: demo_hall, level: 0.35}]}
+  AudioMeter: {}
+  line { ClipPlacement: {clip: demo_comb_line, start: 16, duration: 32, loop: true} }
+}
+
+// Modulators add to a float member of a bus, an effect or a macro, without writing the component.
+// member is a path: "volume", "pan", "width", "sends[0].level", "cutoff", "bands[2].gain", "value".
+// source: AudioModLfo | AudioModSteps | AudioModFollower; scale: AudioModLinear | AudioModOctaves.
+
+demo_wobble {
+  AudioModulator: {
+    target: demo_bass_filter,
+    component: AudioFilter,
+    member: "cutoff",
+    source: AudioModLfo,
+    depth: 1,              // either way, member units or octaves
+    scale: AudioModOctaves,
+    wave: AudioModSine,    // AudioModSine | AudioModTriangle | AudioModSquare | AudioModSawUp | AudioModSawDown | AudioModRandom
+    rate: 1,
+    sync: 0.5,             // beats per cycle (or per step), > 0 wins over rate
+    phase: 0,
+    unipolar: false        // true moves 0..1 instead of -1..1
+  }
+}
+
+demo_autopan { AudioModulator: {target: demo_organ, component: AudioBus, member: "pan", wave: AudioModTriangle,
+  depth: 0.5, sync: 8} }
+
+demo_hat_steps {
+  AudioModulator: {target: demo_hats, component: AudioBus, member: "sends[0].level", source: AudioModSteps,
+    depth: 0.3, sync: 0.5, steps: [1, -1, 0, -1, 1, -1, 0.5, -1, 0, 0, 0, 0, 0, 0, 0, 0], step_count: 8,
+    smooth: 0.2}
+}
+
+demo_wah {
+  AudioModulator: {target: demo_pluck_wah, component: AudioFilter, member: "cutoff", source: AudioModFollower,
+    scale: AudioModOctaves, depth: 2,
+    key: 0,                // bus to follow, 0 = the bus holding the target
+    attack: 0.005, release: 0.15}
+}
+
+// A macro is one 0..1 value that drives several members through its AudioMacroMap children.
+// While a map runs it replaces the member's value; curve: -1 log .. 0 linear .. 1 exponential.
+
+demo_build {
+  AudioMacro: {value: 0}
+  lift { AudioMacroMap: {target: demo_lift, component: AudioFilter, member: "cutoff", min: 20, max: 700,
+    curve: 0, scale: AudioModOctaves} }
+  wash { AudioMacroMap: {target: demo_lead, component: AudioBus, member: "sends[0].level", min: 0.2, max: 0.7} }
+  heat { AudioMacroMap: {target: demo_crunch, component: Saturator, member: "drive", min: 0.2, max: 0.7,
+    curve: 0.5} }
+  climb { AudioMacroMap: {target: demo_echo, component: Delay, member: "feedback", min: 0.4, max: 0.65,
+    curve: -0.5} }
+}
+
+demo_build_pulse { AudioModulator: {target: demo_build, component: AudioMacro, member: "value",
+  wave: AudioModSquare, unipolar: true, depth: 0.05, sync: 0.5} }
+
+// Automation clips play a Curve over beats into one float member, placed like any clip.
+// Outside a placement, and while stopped, the member has its component value again.
+
+prefab demo_pad_fade {
+  AutomationClip: {target: demo_pad, component: AudioBus, member: "volume", length: 16,
+    curve: {keys: [{0, 0.2}, {16, 0.9}]}}
+}
+
+prefab demo_lead_air {
+  AutomationClip: {target: demo_lead_eq, component: Equalizer, member: "bands[3].gain", length: 32,
+    curve: {kind: CurveBezier, keys: [{0, -6, 0, 0}, {32, 3, 0.5, 0}]}}
+}
+
+prefab demo_fill {
+  AutomationClip: {target: demo_stutter, component: BeatRepeat, member: "active", length: 4,
+    curve: {keys: [{0, 0}, {2.999, 0}, {3, 1}, {3.999, 1}, {4, 0}]}}
+}
+
+prefab demo_rise {
+  AutomationClip: {target: demo_build, component: AudioMacro, member: "value", length: 12,
+    curve: {kind: CurveCatmullRom, keys: [{0, 0}, {6, 0.35}, {12, 1}]}}
+}
+
+prefab demo_fast {
+  AutomationClip: {target: demo_rotary, component: Rotary, member: "speed", length: 16,
+    curve: {keys: [{0, 0}, {3.99, 0}, {4, 1}]}}
+}
+
+prefab demo_stop {
+  AutomationClip: {target: demo_drop, component: TapeStop, member: "active", length: 4,
+    curve: {keys: [{0, 0}, {1.999, 0}, {2, 1}]}}
+}
+
+demo_lanes {
+  Track: {}
+  AudioBus: {output: demo_mix}
+  pad_fade { ClipPlacement: {clip: demo_pad_fade, start: 0} }
+  air { ClipPlacement: {clip: demo_lead_air, start: 32} }
+  fill { ClipPlacement: {clip: demo_fill, start: 44} }
+  rise { ClipPlacement: {clip: demo_rise, start: 48} }
+  fast { ClipPlacement: {clip: demo_fast, start: 48} }
+  stop { ClipPlacement: {clip: demo_stop, start: 60} }
+}
+
+// Scene features. Prefabs never play, so these are inert here; in a scene, put them on entities.
+// AudioSource plays a sound on an entity, AudioSpatial places it relative to the AudioListener,
+// AudioEmitter plays a sound at random times and places, AudioStream streams one Ogg Vorbis file.
+
+prefab demo_engine {
+  AudioSource: {sound: demo_organ_sound, volume: 0.5, pitch: 1, loop: true, playing: true}
+  AudioOutput: {bus: demo_organ}
+  AudioSpatial: {min_distance: 2, max_distance: 40, rolloff: 1, cutoff: 800}
+}
+
+prefab demo_crickets {
+  AudioEmitter: {
+    sound: demo_pluck_sound,
+    interval_min: 0.5, interval_max: 3,
+    shape: AudioEmitterSphere,  // AudioEmitterPoint | AudioEmitterDisc | AudioEmitterSphere | AudioEmitterHemisphere | AudioEmitterBox (extents)
+    radius: 8,
+    volume_min: 0.3, volume_max: 0.8,
+    pitch_min: 0.9, pitch_max: 1.2,
+    max_active: 4,
+    seed: 7,
+    playing: true
+  }
+}
+
+prefab demo_music { AudioStream: {path: "test/assets/audio/tone.ogg", volume: 1, loop: true, playing: true} }
+
+prefab demo_ears { AudioListener }
+
+// Scene and game code only, never in a song file:
+//   $ { Transport: {tempo: 120, beats_per_bar: 4, beat_unit: 4, position: 0, playing: true, loop: false,
+//       loop_start: 0, loop_end: 0, lookahead: 0.15, metronome: false} }
+//   $ { AudioSettings: {master_volume: 1, mute: false} }
+//   $ { AudioSong: {file: "docs/audio.flecs"} }
+//   box { audio { master { AudioBus: {width: 0.9}; AudioMeter: {} } } }
+//   box.audio.play(sound, volume)
+//   box.audio.play_at(sound, {x, y, z}, volume)
+//   box.audio.play_quantized(sound, volume, Bar)   // None | Beat | Bar
+//   box.audio.play_note(instrument, pitch, velocity, duration_in_beats)
+//   box.audio.capture(seconds, "out.wav")
+// Written by the engine: SoundStatus, AudioStatus, AudioStreamStatus, AudioSongStatus, AudioMeter.
+
+$ {
+  Song: {
+    title: "Audio Spec", tempo: demo_tempo, beats_per_bar: 4, beat_unit: 4, beats: 16 * demo_bar, loop: true,
+    lanes: [
+      {name: "Kick", bus: demo_kick},
+      {name: "Snare", bus: demo_snare},
+      {name: "Hats", bus: demo_hats},
+      {name: "Samples", bus: demo_samples},
+      {name: "Bass", bus: demo_bass},
+      {name: "Lead", bus: demo_lead},
+      {name: "Arp", bus: demo_arp},
+      {name: "Pad", bus: demo_pad},
+      {name: "Choir", bus: demo_choir},
+      {name: "Organ", bus: demo_organ},
+      {name: "Bells", bus: demo_bells},
+      {name: "Plucks", bus: demo_plucks},
+      {name: "Combs", bus: demo_combs}
+    ]
+  }
+}

@@ -127,6 +127,7 @@ char* box_cmd_render_resource(
 void box_cmd_audio_init(
     ecs_world_t *world);
 
+<<<<<<< HEAD
 /** Analyze a WAV for the audio analyze action: loudness, peaks, bands, stereo, onsets, tail,
  * silence, clicks, discontinuities, pitch and, for a capture of a song, a table per bar.
  *
@@ -141,6 +142,33 @@ char* box_cmd_audio_analyze(
     const char *wav,
     const char *from,
     const char *to);
+=======
+/** Print the notes of a track per bar, or as a text piano roll: audio notes <track>
+ * [bars=a..b] [roll].
+ *
+ * @param world The world
+ * @param argc Number of arguments
+ * @param argv The track, then bars=a..b and roll in any order
+ * @return The text, which the caller frees, NULL with an error logged
+ */
+char* box_cmd_audio_notes(
+    ecs_world_t *world,
+    int32_t argc,
+    const char **argv);
+
+/** Print the chords of a section per beat or per bar, its key, the key of the song and the
+ * notes outside the key: audio chords [track...] [bars=a..b].
+ *
+ * @param world The world
+ * @param argc Number of arguments
+ * @param argv The tracks, none for every track, and bars=a..b
+ * @return The text, which the caller frees, NULL with an error logged
+ */
+char* box_cmd_audio_chords(
+    ecs_world_t *world,
+    int32_t argc,
+    const char **argv);
+>>>>>>> 0dc42a70970d4fe571293440933000fe59e46300
 
 /** Register the fit command that moves a camera to a tight fit of its scene.
  *

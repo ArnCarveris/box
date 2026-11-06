@@ -91,7 +91,22 @@ ecs_entity_t box_command_scope(
 /** Path of the type of the elements that the help command of the shell returns */
 #define BOX_COMMAND_INFO_TYPE "flecs.script.shell.CommandInfo"
 
+/** Test whether a parameter repeats the one before it, an optional one with the same name.
+ *
+ * @param params The parameters
+ * @param i The index of the parameter
+ * @return Whether it repeats
+ */
+static bool box_command_param_repeats(
+    const ecs_shell_param_info_t *params,
+    int32_t i)
+{
+    return i > 0 && params[i].optional && params[i - 1].optional &&
+        !ecs_os_strcmp(params[i].name, params[i - 1].name);
+}
+
 /** Append a command that help returned: its usage, its brief and the briefs of its parameters.
+ * Optional parameters that repeat a name print once, as [name...].
  *
  * @param info The command
  * @param buf The buffer
@@ -104,7 +119,12 @@ static void box_command_format_info(
     int32_t i, count = ecs_vec_count(&info->params);
     ecs_strbuf_appendstr(buf, info->name);
     for (i = 0; i < count; i ++) {
-        ecs_strbuf_append(buf, params[i].optional ? " [%s]" : " <%s>", params[i].name);
+        if (box_command_param_repeats(params, i)) {
+            continue;
+        }
+
+        ecs_strbuf_append(buf, params[i].optional ? " [%s%s]" : " <%s%s>", params[i].name,
+            i + 1 < count && box_command_param_repeats(params, i + 1) ? "..." : "");
     }
 
     if (info->brief) {
@@ -112,7 +132,7 @@ static void box_command_format_info(
     }
 
     for (i = 0; i < count; i ++) {
-        if (params[i].brief) {
+        if (params[i].brief && !box_command_param_repeats(params, i)) {
             ecs_strbuf_append(buf, "\n    %s: %s", params[i].name, params[i].brief);
         }
     }

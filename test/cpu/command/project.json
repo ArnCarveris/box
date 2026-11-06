@@ -44,9 +44,18 @@
                     "console_session",
                     "resource_file",
                     "audio_command",
+<<<<<<< HEAD
                     "audio_analyze",
                     "audio_analyze_resource",
                     "audio_analyze_errors"
+=======
+                    "audio_notes_placed_twice",
+                    "audio_notes_roll",
+                    "audio_notes_drums",
+                    "audio_notes_errors",
+                    "audio_chords_progression",
+                    "audio_chords_tracks_and_bars"
+>>>>>>> 0dc42a70970d4fe571293440933000fe59e46300
                 ]
             },
             {
