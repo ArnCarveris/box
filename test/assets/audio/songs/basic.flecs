@@ -1,13 +1,6 @@
 using box.audio
 using box.material
 
-$ {
-  Song: {
-    title: "Basic", tempo: 96, beats_per_bar: 3, beat_unit: 4, beats: 12,
-    lanes: [{name: "Lead", bus: basic_lead}]
-  }
-}
-
 box { audio { Song { Rgb: {200, 100, 50} } } }
 
 basic_room {
@@ -40,4 +33,11 @@ basic_lead {
   AudioBus: {output: basic_group, sends: [{bus: basic_room, level: 0.3}]}
   AudioMeter: {}
   phrase { ClipPlacement: {clip: basic_notes, start: 0, duration: 12, loop: true} }
+}
+
+$ {
+  Song: {
+    title: "Basic", tempo: 96, beats_per_bar: 3, beat_unit: 4, beats: 12,
+    lanes: [{name: "Lead", bus: basic_lead}]
+  }
 }

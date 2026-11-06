@@ -1,20 +1,6 @@
 using box.audio
 using box.material
 
-$ {
-  Song: {
-    title: "Trade Lane Dawn", tempo: 72, beats_per_bar: 4, beat_unit: 4, beats: 160,
-    lanes: [
-      {name: "Choir", bus: lane_choirs},
-      {name: "Bows", bus: lane_strings},
-      {name: "Horn", bus: lane_horns},
-      {name: "Drive", bus: lane_engine},
-      {name: "Relay", bus: lane_signals},
-      {name: "Perc", bus: lane_motion}
-    ]
-  }
-}
-
 box { audio { Song { Rgb: {110, 205, 240} } } }
 
 lane_space_eq {
@@ -495,4 +481,18 @@ lane_corona_track {
   Track: {instrument: lane_corona_inst}
   AudioBus: {output: lane_choirs, volume: 0.7}
   phrase { ClipPlacement: {clip: lane_corona_notes, start: 0} }
+}
+
+$ {
+  Song: {
+    title: "Trade Lane Dawn", tempo: 72, beats_per_bar: 4, beat_unit: 4, beats: 160,
+    lanes: [
+      {name: "Choir", bus: lane_choirs},
+      {name: "Bows", bus: lane_strings},
+      {name: "Horn", bus: lane_horns},
+      {name: "Drive", bus: lane_engine},
+      {name: "Relay", bus: lane_signals},
+      {name: "Perc", bus: lane_motion}
+    ]
+  }
 }

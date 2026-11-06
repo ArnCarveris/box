@@ -1,13 +1,6 @@
 using box.audio
 using box.material
 
-$ {
-  Song: {
-    title: "Other", tempo: 140, beats_per_bar: 4, beat_unit: 4, beats: 16,
-    lanes: [{name: "Bass", bus: other_bass}, {name: "Keys", bus: other_keys}]
-  }
-}
-
 box { audio { Song { Rgb: {40, 180, 220} } } }
 
 other_echo_lows {
@@ -65,4 +58,11 @@ other_keys {
   AudioBus: {output: other_group, sends: [{bus: other_echo, level: 0.4}]}
   AudioMeter: {}
   line { ClipPlacement: {clip: other_keys_notes, start: 0, duration: 16, loop: true} }
+}
+
+$ {
+  Song: {
+    title: "Other", tempo: 140, beats_per_bar: 4, beat_unit: 4, beats: 16,
+    lanes: [{name: "Bass", bus: other_bass}, {name: "Keys", bus: other_keys}]
+  }
 }

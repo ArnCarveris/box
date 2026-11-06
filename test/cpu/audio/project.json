@@ -1289,6 +1289,7 @@
                     "old_voices_fade",
                     "foreign",
                     "external_reload",
+                    "hot_reload",
                     "component",
                     "command",
                     "jukebox_style"

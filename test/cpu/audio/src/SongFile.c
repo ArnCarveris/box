@@ -20,7 +20,7 @@
 /** Buses, effects and synth sounds of fx_a.flecs and fx_b.flecs */
 #define SONGFILE_FX_BUSES 10
 #define SONGFILE_FX_EFFECTS 40
-#define SONGFILE_FX_SOUNDS 600
+#define SONGFILE_FX_SOUNDS 200
 
 /** What the engine holds: bus, effect and sound slots, voices and decoded sound files */
 typedef struct songfile_counts_t {
@@ -338,7 +338,6 @@ void SongFile_unload(void) {
     test_int(box_audio_song_held(world), 0);
     test_int(box_audio_song_stats(world).unloads, 1);
 
-    /* The empty file unloads too */
     test_int(songfile_load(world, "basic.flecs"), SongReady);
     box_audio_song_load(world, "");
     songfile_settle(world);
@@ -454,7 +453,6 @@ void SongFile_swap_waits(void) {
         bool b = ecs_lookup(world, "fx_b_bus_0") != 0;
         test_assert(!(a && b));
         if (b) {
-            /* The load happened in this frame, after the last slot of fx_a was reusable */
             test_int(box_audio_song_held(world), 0);
             test_assert(ecs_lookup(world, "fx_a_sound_0") == 0);
             test_assert(ecs_lookup(world, "fx_a_fx_0_0") == 0);
@@ -525,7 +523,6 @@ void SongFile_too_big(void) {
     songfile_song_default(world);
     test_bool(box_audio_module_get(world)->song.hold, false);
 
-    /* A song that fits loads after it */
     test_int(songfile_load(world, "basic.flecs"), SongReady);
     ecs_fini(world);
 }
@@ -554,7 +551,6 @@ void SongFile_include(void) {
     test_int(box_audio_module_buses(world), base.buses);
     test_int(box_audio_module_sounds(world), base.sounds);
 
-    /* The include loads again with the song */
     test_int(songfile_load(world, "with_include.flecs"), SongReady);
     test_assert(ecs_lookup(world, "include_part_bus") != 0);
     test_int(songfile_scripts(world), 2);
@@ -564,15 +560,16 @@ void SongFile_include(void) {
 /** Load a song file that fails and check that nothing of it is left.
  *
  * @param world The world
+ * @param base The counts with no song loaded
  * @param name File name in SONGFILE_DIR
  * @param bus A bus the file declares
  */
 static void songfile_fails(
     ecs_world_t *world,
+    songfile_counts_t base,
     const char *name,
     const char *bus)
 {
-    songfile_counts_t base = songfile_counts(world);
     audio_log_start();
     test_int(songfile_load(world, name), SongFailed);
     audio_run(world, 5);
@@ -593,14 +590,14 @@ void SongFile_parse_error(void) {
     // audio/song
     ecs_world_t *world = audio_world();
     audio_run(world, 2);
-    songfile_fails(world, "broken.flecs", "broken_bus");
-    songfile_fails(world, "eval_error.flecs", "eval_error_bus");
+    songfile_counts_t base = songfile_counts(world);
+    songfile_fails(world, base, "broken.flecs", "broken_bus");
+    songfile_fails(world, base, "eval_error.flecs", "eval_error_bus");
     test_assert(ecs_lookup(world, "eval_error_tone") == 0);
     test_assert(ecs_lookup(world, "eval_error_bad") == 0);
 
-    /* A failed song does not stop the next one */
     test_int(songfile_load(world, "basic.flecs"), SongReady);
-    songfile_fails(world, "broken.flecs", "broken_bus");
+    songfile_fails(world, base, "broken.flecs", "broken_bus");
     test_assert(ecs_lookup(world, "basic_lead") == 0);
     ecs_fini(world);
 }
@@ -703,9 +700,9 @@ void SongFile_external_reload(void) {
     test_assert(script != 0);
     test_int(ecs_script_update(world, script, 0,
         "using box.audio\n"
+        "edited_bus { AudioBus: {} }\n"
         "$ { Song: {title: \"Edited\", tempo: 90, beats: 8, "
-            "lanes: [{name: \"Solo\", bus: edited_bus}]} }\n"
-        "edited_bus { AudioBus: {} }\n"), 0);
+            "lanes: [{name: \"Solo\", bus: edited_bus}]} }\n"), 0);
     songfile_settle(world);
     test_int(songfile_state(world), SongReady);
     test_int(box_audio_song_stats(world).reloads, 1);
@@ -723,6 +720,68 @@ void SongFile_external_reload(void) {
     test_int(box_audio_module_effects(world), base.effects);
     test_flt(ecs_singleton_get(world, Transport)->tempo, 90);
     test_int(songfile_scripts(world), 1);
+    ecs_fini(world);
+}
+
+/** Write a song file with one bus, for the hot reload. Names of other lengths give files of
+ * other sizes, which the file watch sees as a change within the same second.
+ *
+ * @param path The file
+ * @param name Name of the bus and title of the song
+ */
+static void songfile_write(
+    const char *path,
+    const char *name)
+{
+    FILE *f = fopen(path, "wb");
+    test_assert(f != NULL);
+    fprintf(f,
+        "using box.audio\n"
+        "using box.material\n"
+        "box { audio { Song { Rgb: {10, 20, 30} } } }\n"
+        "%s { AudioBus: {}; AudioMeter: {} }\n"
+        "$ { Song: {title: \"%s\", tempo: 100, beats: 8, lanes: [{name: \"Main\", bus: %s}]} }\n",
+        name, name, name);
+    fclose(f);
+}
+
+void SongFile_hot_reload(void) {
+    // audio/song
+    const char *path = "songfile_hot_reload.flecs";
+    ecs_world_t *world = audio_world();
+    int32_t i;
+    ecs_singleton_set(world, FileWatch, { .interval = 0 });
+    songfile_counts_t base = songfile_counts(world);
+    songfile_write(path, "hot_first");
+    box_audio_song_load(world, path);
+    songfile_settle(world);
+    test_int(songfile_state(world), SongReady);
+    test_assert(ecs_lookup(world, "hot_first") != 0);
+
+    songfile_write(path, "hot_second_edit");
+    for (i = 0; i < SONGFILE_FRAMES && !ecs_lookup(world, "hot_second_edit"); i ++) {
+        audio_run(world, 1);
+    }
+
+    songfile_settle(world);
+    test_int(songfile_state(world), SongReady);
+    test_assert(ecs_lookup(world, "hot_first") == 0);
+    ecs_entity_t bus = ecs_lookup(world, "hot_second_edit");
+    test_assert(bus != 0);
+    test_assert(box_audio_module_bus_index(world, bus) > 0);
+    const Song *song = ecs_singleton_get(world, Song);
+    test_str(song->title, "hot_second_edit");
+    test_int(ecs_vec_count(&song->lanes), 1);
+    test_uint(ecs_vec_get_t(&song->lanes, SongLane, 0)->bus, bus);
+    test_int(ecs_get(world, ecs_id(Song), Rgb)->g, 20);
+    test_int(box_audio_module_buses(world), base.buses + 1);
+    test_int(songfile_scripts(world), 1);
+    test_assert(box_audio_song_stats(world).reloads >= 1);
+
+    songfile_unload(world);
+    test_int(box_audio_module_buses(world), base.buses);
+    songfile_song_default(world);
+    remove(path);
     ecs_fini(world);
 }
 
@@ -797,26 +856,36 @@ void SongFile_jukebox_style(void) {
         .entity = ecs_entity(world, { .name = "host_scene" }),
         .code =
             "using box.audio\n"
-            "export mut host_title: string = \"\"\n"
-            "export mut host_lanes: i32 = 0\n"
-            "async {\n"
-            "  while true {\n"
-            "    const s = Song[Song]\n"
-            "    host_lanes = s.lanes.count()\n"
-            "    await next_frame()\n"
-            "  }\n"
-            "}\n"
+            "using box.material\n"
+            "host_view { Rgb: {Song[Song].beats_per_bar, Song[Song].lanes.count(), "
+                "Song[Song].tempo} }\n"
     });
     test_assert(host != 0);
     const EcsScript *hs = ecs_get(world, host, EcsScript);
     test_assert(hs != NULL && hs->error == NULL);
+    ecs_entity_t view = ecs_lookup(world, "host_view");
+    test_assert(view != 0);
+    test_int(ecs_get(world, view, Rgb)->b, 120);
+
     test_int(songfile_load(world, "other.flecs"), SongReady);
     audio_run(world, 2);
+    test_assert(ecs_is_alive(world, view));
+    test_int(ecs_get(world, view, Rgb)->g, 2);
+    test_int(ecs_get(world, view, Rgb)->b, 140);
+
     test_int(songfile_load(world, "basic.flecs"), SongReady);
     audio_run(world, 2);
+    test_int(ecs_get(world, view, Rgb)->r, 3);
+    test_int(ecs_get(world, view, Rgb)->g, 1);
+    test_int(ecs_get(world, view, Rgb)->b, 96);
+
     songfile_unload(world);
     audio_run(world, 2);
     hs = ecs_get(world, host, EcsScript);
     test_assert(hs != NULL && hs->error == NULL);
+    test_assert(ecs_lookup(world, "host_view") == view);
+    test_int(ecs_get(world, view, Rgb)->r, 4);
+    test_int(ecs_get(world, view, Rgb)->g, 0);
+    test_int(ecs_get(world, view, Rgb)->b, 120);
     ecs_fini(world);
 }

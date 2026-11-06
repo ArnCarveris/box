@@ -1,18 +1,6 @@
 using box.audio
 using box.material
 
-$ {
-  Song: {
-    title: "Distant Orbit", tempo: 60, beats_per_bar: 4, beat_unit: 4, beats: 128,
-    lanes: [
-      {name: "Pad", bus: orbit_pad},
-      {name: "Bass", bus: orbit_bass},
-      {name: "Bells", bus: orbit_bells},
-      {name: "Voice", bus: orbit_melody}
-    ]
-  }
-}
-
 box { audio { Song { Rgb: {130, 160, 255} } } }
 
 orbit_space {
@@ -216,4 +204,16 @@ orbit_melody {
   AudioBus: {output: orbit, volume: 0.9, sends: [{bus: orbit_space, level: 0.4}]}
   AudioMeter: {}
   phrase { ClipPlacement: {clip: orbit_voice_notes, start: 0} }
+}
+
+$ {
+  Song: {
+    title: "Distant Orbit", tempo: 60, beats_per_bar: 4, beat_unit: 4, beats: 128,
+    lanes: [
+      {name: "Pad", bus: orbit_pad},
+      {name: "Bass", bus: orbit_bass},
+      {name: "Bells", bus: orbit_bells},
+      {name: "Voice", bus: orbit_melody}
+    ]
+  }
 }

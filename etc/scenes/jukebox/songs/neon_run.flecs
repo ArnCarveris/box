@@ -1,19 +1,6 @@
 using box.audio
 using box.material
 
-$ {
-  Song: {
-    title: "Neon Run", tempo: 108, beats_per_bar: 4, beat_unit: 4, beats: 64,
-    lanes: [
-      {name: "Kit", bus: neon_kit},
-      {name: "Bass", bus: nr_bass},
-      {name: "Pad", bus: nr_pad},
-      {name: "Arp", bus: nr_arp},
-      {name: "Lead", bus: nr_lead}
-    ]
-  }
-}
-
 box { audio { Song { Rgb: {255, 60, 200} } } }
 
 neon_glue {
@@ -392,4 +379,17 @@ nr_lead {
   AudioBus: {output: neon, volume: 0.6, sends: [{bus: echo, level: 0.3}, {bus: plate, level: 0.2}]}
   AudioMeter: {}
   hook { ClipPlacement: {clip: nr_hook, start: 32} }
+}
+
+$ {
+  Song: {
+    title: "Neon Run", tempo: 108, beats_per_bar: 4, beat_unit: 4, beats: 64,
+    lanes: [
+      {name: "Kit", bus: neon_kit},
+      {name: "Bass", bus: nr_bass},
+      {name: "Pad", bus: nr_pad},
+      {name: "Arp", bus: nr_arp},
+      {name: "Lead", bus: nr_lead}
+    ]
+  }
 }

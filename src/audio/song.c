@@ -15,6 +15,7 @@
 #include "module.h"
 #include "../app/watch.h"
 #include "../render/preprocess.h"
+#include <ctype.h>
 #include <string.h>
 
 /** Ancestors a walk up the hierarchy visits at most */
@@ -616,6 +617,7 @@ static char* box_audio_song_fits(
     ecs_iter_t it = ecs_query_iter(world, state->buses);
     ecs_vec_t effects, samples;
     int32_t buses = 0, free_buses = 0, free_effects = 0, sounds = 0, free_sounds = 0, i, j;
+    int32_t synths = 0, used_synths = 0;
     char *result = NULL;
     ecs_vec_init_t(NULL, &effects, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &samples, box_audio_sample_t*, 0);
@@ -685,9 +687,21 @@ static char* box_audio_song_fits(
     it = ecs_query_iter(world, state->synths);
     while (ecs_query_next(&it)) {
         for (i = 0; i < it.count; i ++) {
-            sounds += box_audio_song_owns(world, song, it.entities[i]) &&
-                !box_audio_sound_of(world, state, it.entities[i]);
+            bool given = box_audio_sound_of(world, state, it.entities[i]) != 0;
+            if (box_audio_song_owns(world, song, it.entities[i])) {
+                synths += !given;
+            } else {
+                used_synths += given;
+            }
         }
+    }
+
+    sounds += synths;
+    if (synths > BOX_AUDIO_SYNTH_MAX - used_synths) {
+        result = flecs_asprintf("song '%s' needs %d synth sounds, more than the %d of the %d "
+            "synths of the engine that are free", song->target, synths,
+            BOX_AUDIO_SYNTH_MAX - used_synths, BOX_AUDIO_SYNTH_MAX);
+        goto done;
     }
 
     it = ecs_query_iter(world, state->wavetables);
@@ -909,7 +923,7 @@ static void box_audio_song_fail(
 }
 
 /** Check whether a table holds only what a script gives an entity it creates: a name, a
- * parent and the prefab tag.
+ * parent with its depth and the prefab tag.
  *
  * @param world The world
  * @param table The table of the entity before the script took it, NULL for a new entity
@@ -926,7 +940,8 @@ static bool box_audio_song_fresh(
         ecs_id_t id = type->array[i];
         if (ECS_IS_PAIR(id)) {
             ecs_entity_t first = ecs_pair_first(world, id);
-            result = first == ecs_id(EcsIdentifier) || first == EcsChildOf;
+            result = first == ecs_id(EcsIdentifier) || first == EcsChildOf ||
+                first == EcsParentDepth;
         } else {
             result = id == EcsPrefab || id == ecs_id(EcsParent);
         }
@@ -959,6 +974,9 @@ static void box_audio_song_foreign_add(
 /** During a load, note the components a song sets on entities it did not create: a host
  * entity it names, a singleton such as the Transport. box.audio.Song is the song's to set.
  *
+ * A host script that reads Song reactively evaluates again while the song loads, so what this
+ * notes on entities of other scripts is checked against the code of the song after the load.
+ *
  * @param it The iterator of the observer
  */
 static void BoxAudioSongChange(
@@ -984,6 +1002,65 @@ static void BoxAudioSongChange(
 
 done:
     return;
+}
+
+/** Check whether the code of a script of the song names an entity: its name appears in the
+ * code as a whole identifier.
+ *
+ * @param world The world
+ * @param scripts The script entities of the song
+ * @param e The entity
+ * @return Whether a script names it
+ */
+static bool box_audio_song_names(
+    ecs_world_t *world,
+    const ecs_vec_t *scripts,
+    ecs_entity_t e)
+{
+    const char *name = ecs_get_name(world, e);
+    int32_t len = name ? ecs_os_strlen(name) : 0, i;
+    bool result = false;
+    for (i = 0; len && !result && i < ecs_vec_count(scripts); i ++) {
+        const EcsScript *s = ecs_get(world, ecs_vec_get_t(scripts, ecs_entity_t, i)[0],
+            EcsScript);
+        const char *code = s ? s->code : NULL, *at = code;
+        while (at && !result && (at = strstr(at, name))) {
+            char before = at > code ? at[-1] : ' ', after = at[len];
+            result = !(isalnum((unsigned char)before) || before == '_') &&
+                !(isalnum((unsigned char)after) || after == '_');
+            at += len;
+        }
+    }
+
+    return result;
+}
+
+/** Drop the entities the song did not change from the ones the load noted: those of other
+ * scripts that the code of the song does not name, which a reactive host script changed.
+ *
+ * @param world The world
+ * @param song The song
+ */
+static void box_audio_song_foreign_filter(
+    ecs_world_t *world,
+    box_audio_song_t *song)
+{
+    ecs_vec_t scripts;
+    int32_t i;
+    ecs_vec_init_t(NULL, &scripts, ecs_entity_t, 0);
+    box_audio_song_collect(world, song->root, &scripts, 0);
+    for (i = ecs_vec_count(&song->foreign) - 1; i >= 0; i --) {
+        ecs_entity_t f = ecs_vec_get_t(&song->foreign, ecs_entity_t, i)[0];
+        ecs_entity_t owner = ecs_is_alive(world, f) ?
+            ecs_get_target(world, f, ecs_id(EcsScript), 0) : 0;
+        if (owner && !box_audio_song_is_script(world, song, owner) &&
+            !box_audio_song_names(world, &scripts, f))
+        {
+            ecs_vec_remove_t(&song->foreign, ecs_entity_t, i);
+        }
+    }
+
+    ecs_vec_fini_t(NULL, &scripts, ecs_entity_t);
 }
 
 /** Follow the entities that the scripts of the song take and give up.
@@ -1137,6 +1214,7 @@ static void box_audio_song_load_script(
         goto done;
     }
 
+    box_audio_song_foreign_filter(world, song);
     song->dropping = true;
     for (i = 0; i < ecs_vec_count(&song->foreign); i ++) {
         ecs_entity_t f = ecs_vec_get_t(&song->foreign, ecs_entity_t, i)[0];
@@ -1407,7 +1485,6 @@ void box_audio_song_init(
     song->root = ecs_entity(world, { .name = "songs" });
     ecs_singleton_add(world, Song);
     ecs_add_pair(world, ecs_id(Song), ecs_id(EcsScript), song->root);
-    ecs_add_pair(world, state->master, ecs_id(EcsScript), song->root);
     ecs_singleton_set(world, AudioSongStatus, { .state = SongNone });
 
     ecs_observer(world, {

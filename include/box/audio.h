@@ -1449,18 +1449,12 @@ ECS_STRUCT(SongLane, {
     ecs_entity_t bus;      /**< The bus of the channel, an entity with AudioBus of the song */
 });
 
-/** What a host reads of the song that is loaded, a singleton that always exists.
+/** What a host reads of the song that is loaded, a singleton that always exists, with its
+ * default value while no song is loaded. A song file sets it at its end, after the buses of
+ * lanes, and puts Rgb on box.audio.Song: box { audio { Song { Rgb: {...} } } }.
  *
- * A song file sets it with $ { Song: {...} } and puts components that describe the song, such
- * as its Rgb, on the same entity, box.audio.Song: box.audio.Song { Rgb: {...} }. The song
- * file sets this entity but does not create it, so box.audio resets it: when the song
- * unloads, Song goes back to its default value and every component the song added to the
- * entity is removed, before the entities of the song are deleted, so the buses of lanes never
- * name a deleted entity. No script owns the entity, so no script cleanup deletes it.
- *
- * On load box.audio applies it to the Transport: the tempo and the time signature, the position
- * 0, and a loop of 0..beats when loop is set and beats is positive. See Song files in
- * docs/audio.md.
+ * box.audio resets the entity on unload, before the song's entities are deleted, and applies
+ * Song to the Transport on load. See Song files in docs/audio.md.
  */
 ECS_STRUCT(Song, {
     char *title;           /**< Title of the song, NULL without a song */
@@ -1472,16 +1466,11 @@ ECS_STRUCT(Song, {
     ecs_vec(SongLane) lanes; /**< The channels a host can meter, in the order to show them */
 });
 
-/** The song to play: one .flecs file, a singleton.
+/** The song to play: one .flecs file, a singleton. A new file fades out, unloads and drains
+ * the old song before it loads the new one; an empty file or removing it unloads the song.
  *
- * Setting file loads that song; a new file stops the song that plays with a short fade,
- * unloads it, waits until every bus, effect and sound slot it held is free again and loads the
- * new one. A song that is not loaded holds nothing in the engine: its buses, effects, sounds,
- * instruments, clips, tracks, voices and meters exist while it is loaded only. An empty file
- * or removing the component unloads the song. The path is found as the one of a SoundFile.
- * Changing file during a swap goes straight to the newest file. AudioSongStatus says how the
- * load goes. Also box_audio_song_load, box_audio_song_unload and the shell command
- * audio song [file].
+ * The path is found as the one of a SoundFile. AudioSongStatus says how the load goes. See
+ * box_audio_song_load, the shell command audio song [file] and Song files in docs/audio.md.
  */
 ECS_STRUCT(AudioSong, {
     char *file;            /**< The .flecs file of the song, NULL or empty for none */

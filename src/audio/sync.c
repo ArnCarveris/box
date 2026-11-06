@@ -1645,8 +1645,7 @@ done:
 }
 
 /** Keep the master out of the scripts that set its AudioBus: a script owns the entities it
- * declares and deletes them when it reloads, which would delete the master. The pair of the
- * root of the songs stays, it keeps every script from taking the master.
+ * declares and deletes them when it reloads, which would delete the master.
  *
  * @param world The world
  * @param state The state
@@ -1655,9 +1654,16 @@ static void box_audio_master_unown(
     ecs_world_t *world,
     const box_audio_module_t *state)
 {
-    ecs_entity_t owner = ecs_get_target(world, state->master, ecs_id(EcsScript), 0);
-    if (owner && owner != state->song.root) {
-        ecs_remove_pair(world, state->master, ecs_id(EcsScript), owner);
+    ecs_entity_t owners[8], owner;
+    int32_t count = 0, i;
+    while (count < 8 &&
+        (owner = ecs_get_target(world, state->master, ecs_id(EcsScript), count)))
+    {
+        owners[count ++] = owner;
+    }
+
+    for (i = 0; i < count; i ++) {
+        ecs_remove_pair(world, state->master, ecs_id(EcsScript), owners[i]);
     }
 }
 

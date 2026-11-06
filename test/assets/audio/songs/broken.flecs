@@ -1,7 +1,7 @@
 using box.audio
 
-$ { Song: {title: "Broken", tempo: 100, beats: 8} }
-
 broken_bus {
   AudioBus: {volume: 0.5
 }
+
+$ { Song: {title: "Broken", tempo: 100, beats: 8} }

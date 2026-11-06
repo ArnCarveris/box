@@ -1,7 +1,5 @@
 using box.audio
 
-$ { Song: {title: "Big B", tempo: 120, beats: 8, lanes: [{name: "First", bus: big_b_0}]} }
-
 big_b_0 { AudioBus: {volume: 0.5} }
 big_b_1 { AudioBus: {volume: 0.5} }
 big_b_2 { AudioBus: {volume: 0.5} }
@@ -42,3 +40,5 @@ big_b_36 { AudioBus: {volume: 0.5} }
 big_b_37 { AudioBus: {volume: 0.5} }
 big_b_38 { AudioBus: {volume: 0.5} }
 big_b_39 { AudioBus: {volume: 0.5} }
+
+$ { Song: {title: "Big B", tempo: 120, beats: 8, lanes: [{name: "First", bus: big_b_0}]} }

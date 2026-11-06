@@ -2,8 +2,8 @@ include parts/include_part
 
 using box.audio
 
-$ { Song: {title: "With include", tempo: 100, beats: 8, lanes: [{name: "Part", bus: include_part_bus}]} }
-
 include_main_bus {
   AudioBus: {volume: 0.7}
 }
+
+$ { Song: {title: "With include", tempo: 100, beats: 8, lanes: [{name: "Part", bus: include_part_bus}]} }

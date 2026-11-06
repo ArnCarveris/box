@@ -1,7 +1,5 @@
 using box.audio
 
-$ { Song: {title: "Ringing", tempo: 120, beats: 64, lanes: [{name: "Bell", bus: ringing_bell}]} }
-
 ringing_group {
   AudioBus: {}
 }
@@ -26,3 +24,5 @@ ringing_bell {
   AudioMeter: {}
   hit { ClipPlacement: {clip: ringing_notes, start: 0} }
 }
+
+$ { Song: {title: "Ringing", tempo: 120, beats: 64, lanes: [{name: "Bell", bus: ringing_bell}]} }

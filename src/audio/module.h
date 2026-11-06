@@ -920,8 +920,8 @@ void box_audio_song_hooks(
 /** Register the song singletons, the root of the song scripts, the observer of what the song
  * scripts own and the system that loads and unloads songs.
  *
- * The root of the songs owns box.audio.Song and the master, so no script takes them and
- * deletes them when it unloads.
+ * The root of the songs owns box.audio.Song, so no script takes it and deletes it when it
+ * unloads.
  *
  * @param world The world
  * @param state The state

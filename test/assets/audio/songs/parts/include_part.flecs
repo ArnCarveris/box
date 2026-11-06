@@ -7,5 +7,6 @@ include_part_bus {
 
 prefab include_part_tone {
   SynthSound: {}
+  SynthEnvelope: {attack: 0.01, decay: 0.2}
   SynthOscillator: {wave: SynthSine, frequency: 330, level: 0.2}
 }

@@ -1,16 +1,17 @@
 using box.audio
 
-$ { Song: {title: "Eval error", tempo: 100, beats: 8} }
-
 eval_error_bus {
   AudioBus: {volume: 0.5}
 }
 
 prefab eval_error_tone {
   SynthSound: {}
+  SynthEnvelope: {attack: 0.01, decay: 0.2}
   SynthOscillator: {wave: SynthSine, frequency: 330, level: 0.2}
 }
 
 eval_error_bad {
   AudioBus: {no_such_member: 1}
 }
+
+$ { Song: {title: "Eval error", tempo: 100, beats: 8} }

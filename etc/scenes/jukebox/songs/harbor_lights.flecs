@@ -1,18 +1,6 @@
 using box.audio
 using box.material
 
-$ {
-  Song: {
-    title: "Harbor Lights", tempo: 84, beats_per_bar: 4, beat_unit: 4, beats: 64,
-    lanes: [
-      {name: "Kit", bus: harbor_kit},
-      {name: "Bass", bus: hl_bass},
-      {name: "Keys", bus: hl_keys},
-      {name: "Vibes", bus: hl_vibes}
-    ]
-  }
-}
-
 box { audio { Song { Rgb: {255, 165, 70} } } }
 
 harbor_tape {
@@ -447,4 +435,16 @@ hl_hats {
   Track: {instrument: hl_hat_inst, swing: 0.334, humanize: {timing: 6, velocity: 0.08}}
   AudioBus: {output: harbor_kit, volume: 0.5}
   beat { ClipPlacement: {clip: hl_hat_beat, start: 0, duration: 64, loop: true} }
+}
+
+$ {
+  Song: {
+    title: "Harbor Lights", tempo: 84, beats_per_bar: 4, beat_unit: 4, beats: 64,
+    lanes: [
+      {name: "Kit", bus: harbor_kit},
+      {name: "Bass", bus: hl_bass},
+      {name: "Keys", bus: hl_keys},
+      {name: "Vibes", bus: hl_vibes}
+    ]
+  }
 }

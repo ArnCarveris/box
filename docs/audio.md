@@ -1340,17 +1340,18 @@ drive `Transport` and `Track` directly keep working; song files are an addition.
 using box.audio
 using box.material
 
+box { audio { Song { Rgb: {255, 60, 200} } } }
+
+neon { AudioBus: {output: master}; AudioMeter: {} }
+nr_bass { Track: {instrument: nr_bass_inst}; AudioBus: {output: neon}; AudioMeter: {} }
+nr_lead { Track: {instrument: nr_lead_inst}; AudioBus: {output: neon}; AudioMeter: {} }
+
 $ {
   Song: {
     title: "Neon Run", tempo: 108, beats_per_bar: 4, beat_unit: 4, beats: 64,
     lanes: [{name: "Bass", bus: nr_bass}, {name: "Lead", bus: nr_lead}]
   }
 }
-
-box { audio { Song { Rgb: {255, 60, 200} } } }
-
-neon { AudioBus: {output: master}; AudioMeter: {} }
-nr_bass { Track: {instrument: nr_bass_inst}; AudioBus: {output: neon}; AudioMeter: {} }
 ```
 
 Play it by setting the `AudioSong` singleton, `$ { AudioSong: {file: "songs/neon_run.flecs"} }`,
@@ -1373,7 +1374,10 @@ engine resets it: on unload `Song` returns to its default and every component
 the song added is removed, before the entities of the song are deleted, so a
 host that reads the buses of `Song.lanes` never sees a deleted entity. The
 singleton always exists, so host scripts that read it stay alive. No script
-can own `box.audio.Song` or the master.
+can own `box.audio.Song`.
+
+A script resolves a name only after the entity is declared, so a song file sets
+`Song` at its end, after the buses its `lanes` name.
 
 On load the engine applies the `Song` to the `Transport`: tempo, time signature,
 position 0 and, with `loop` and a positive `beats`, a loop over `0..beats`. Song
@@ -1399,8 +1403,9 @@ every bus, effect and sound slot it held is reusable (a freed bus or effect
 slot is reusable from the next frame, a sound id once the core reports its
 free), at most five seconds; only then does the new song load. Changing the
 file again during a swap goes straight to the newest file. A song that needs
-more buses, effects or sounds than are free is unloaded before it allocates and
-fails with an error that names its count and the limit; a song that does not
+more buses, effects, sounds or synth sounds (the core holds 256 synths) than
+are free is unloaded before it allocates and fails with an error that names its
+count and the limit; a song that does not
 parse or evaluate fails and leaves nothing behind.
 
 Editing a loaded song reloads it the same way: the engine watches the files of
