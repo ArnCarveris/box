@@ -15,6 +15,7 @@
 #include "command.h"
 #include "../audio/module.h"
 #include "../audio/output.h"
+#include "../audio/transport.h"
 #include <stdlib.h>
 #include <math.h>
 
@@ -280,12 +281,14 @@ done:
 /** Parse a range a..b of two numbers.
  *
  * @param text The range
+ * @param inclusive b may equal a, else it is larger
  * @param from Receives a
  * @param to Receives b
  * @return 0 on success
  */
 static int box_cmd_audio_render_range(
     const char *text,
+    bool inclusive,
     double *from,
     double *to)
 {
@@ -305,7 +308,7 @@ static int box_cmd_audio_render_range(
     }
 
     *to = strtod(dots + 2, &end);
-    if (end == dots + 2 || end[0] || !(*to > *from)) {
+    if (end == dots + 2 || end[0] || !(inclusive ? *to >= *from : *to > *from)) {
         goto done;
     }
 
@@ -448,7 +451,7 @@ static int box_cmd_audio_render_options(
             const Transport *tr = ecs_singleton_get(world, Transport);
             double top = tr && tr->beats_per_bar > 0 ? tr->beats_per_bar : 4;
             double unit = tr && tr->beat_unit > 0 ? tr->beat_unit : 4;
-            if (box_cmd_audio_render_range(value, &a, &b) || a < 1 || a != floor(a) ||
+            if (box_cmd_audio_render_range(value, true, &a, &b) || a < 1 || a != floor(a) ||
                 b != floor(b))
             {
                 ecs_err("invalid bars '%s', expected a..b, from bar 1 on", value);
@@ -459,7 +462,7 @@ static int box_cmd_audio_render_options(
             job->to = b * top * 4.0 / unit;
             job->mode = BOX_CMD_AUDIO_RENDER_TIMELINE;
         } else if (len == 5 && !ecs_os_strncmp(options[i], "beats", 5) && !note) {
-            if (box_cmd_audio_render_range(value, &job->from, &job->to) || job->from < 0) {
+            if (box_cmd_audio_render_range(value, false, &job->from, &job->to) || job->from < 0) {
                 ecs_err("invalid beats '%s', expected a..b, from beat 0 on", value);
                 goto done;
             }
@@ -712,7 +715,7 @@ done:
 }
 
 /** Silence what the scene of the offline world plays by itself, for the render of a note:
- * its sources, streams and emitters, and the transport.
+ * remove its sources, streams and emitters before the output opens, and stop the transport.
  *
  * @param world The offline world
  */
@@ -729,11 +732,13 @@ static void box_cmd_audio_render_quiet(
                 ecs_vec_append_t(NULL, &entities, ecs_entity_t)[0] = it.entities[i];
             }
         }
-    }
 
-    ecs_entity_t *e = ecs_vec_first(&entities);
-    for (i = 0; i < ecs_vec_count(&entities); i ++) {
-        ecs_enable(world, e[i], false);
+        ecs_entity_t *e = ecs_vec_first(&entities);
+        for (i = 0; i < ecs_vec_count(&entities); i ++) {
+            ecs_remove_id(world, e[i], ids[k]);
+        }
+
+        ecs_vec_clear(&entities);
     }
 
     ecs_vec_fini_t(NULL, &entities, ecs_entity_t);
@@ -893,7 +898,6 @@ static void box_cmd_audio_render_start_note(
         goto done;
     }
 
-    box_cmd_audio_render_quiet(world);
     ecs_entity_t inst = job->instrument ? e : ecs_new(world);
     Instrument *in = ecs_ensure(world, inst, Instrument);
     if (!job->instrument) {
@@ -930,7 +934,8 @@ done:
     return;
 }
 
-/** Open the output of the offline world and start what a render plays.
+/** Open the output of the offline world and start what a render plays; a note silences the
+ * scene first.
  *
  * @param job The render
  * @param error Receives why the render fails
@@ -940,8 +945,13 @@ static void box_cmd_audio_render_start(
     char **error)
 {
     ecs_world_t *world = job->world;
-    box_audio_output_open(world, &(box_audio_output_desc_t){
-        .headless = true, .output = box_cmd_audio_render_tap, .ctx = job });
+    if (job->mode == BOX_CMD_AUDIO_RENDER_NOTE) {
+        box_cmd_audio_render_quiet(world);
+    }
+
+    box_audio_output_use(world, box_audio_transport_null_new(&(box_audio_null_desc_t){
+        .sample_rate = BOX_CMD_AUDIO_RENDER_RATE, .output = box_cmd_audio_render_tap,
+        .ctx = job }));
     job->phase = BOX_CMD_AUDIO_RENDER_RUN;
     if (job->mode == BOX_CMD_AUDIO_RENDER_NOTE) {
         box_cmd_audio_render_start_note(job, error);

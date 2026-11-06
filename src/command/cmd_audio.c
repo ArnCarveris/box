@@ -1246,22 +1246,15 @@ void box_cmd_audio_init(
                     "seek beats, tempo 20 to 999, song file or none (default: show the song), "
                     "render subject: song, a sound, an instrument or a bus" },
                 { .name = "option1", .type = ecs_id(ecs_string_t), .optional = true,
-                  .brief = "render option: note, vel, dur, tail, bars, beats, solo or mute, as "
-                    "key=value" },
-                { .name = "option2", .type = ecs_id(ecs_string_t), .optional = true,
-                  .brief = "render option" },
-                { .name = "option3", .type = ecs_id(ecs_string_t), .optional = true,
-                  .brief = "render option" },
-                { .name = "option4", .type = ecs_id(ecs_string_t), .optional = true,
-                  .brief = "render option" },
-                { .name = "option5", .type = ecs_id(ecs_string_t), .optional = true,
-                  .brief = "render option" },
-                { .name = "option6", .type = ecs_id(ecs_string_t), .optional = true,
-                  .brief = "render option" },
-                { .name = "option7", .type = ecs_id(ecs_string_t), .optional = true,
-                  .brief = "render option" },
-                { .name = "option8", .type = ecs_id(ecs_string_t), .optional = true,
-                  .brief = "render option" }
+                  .brief = "render options option1 to option8: note, vel, dur, tail, bars, "
+                    "beats, solo or mute, as key=value" },
+                { .name = "option2", .type = ecs_id(ecs_string_t), .optional = true },
+                { .name = "option3", .type = ecs_id(ecs_string_t), .optional = true },
+                { .name = "option4", .type = ecs_id(ecs_string_t), .optional = true },
+                { .name = "option5", .type = ecs_id(ecs_string_t), .optional = true },
+                { .name = "option6", .type = ecs_id(ecs_string_t), .optional = true },
+                { .name = "option7", .type = ecs_id(ecs_string_t), .optional = true },
+                { .name = "option8", .type = ecs_id(ecs_string_t), .optional = true }
             },
             .callback = box_cmd_audio
         });

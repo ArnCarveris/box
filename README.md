@@ -75,8 +75,9 @@ builtins of the flecs shell (`ls`, `get`, `set`, `query`, ...):
 view. `capture`, `audio capture` and `audio render` return a resource at once and fill it when the
 frames are in; fetch it with `GET /shell/session/<id>/resource/<name>`, which is empty until then.
 In the browser, which has no REST port, `audio capture` writes `/tmp/audio_capture_<n>.wav` and
-`audio render` `/tmp/audio_render_<n>.wav` in the file system of the page and return that path. Headless with a fixed `--delta-time`, two runs capture
-identical audio, so a render can be listened to and compared. See [docs/audio.md](docs/audio.md).
+`audio render` `/tmp/audio_render_<n>.wav` in the file system of the page and return that path.
+Headless with a fixed `--delta-time`, two runs capture identical audio, so a render can be listened
+to and compared. See [docs/audio.md](docs/audio.md).
 
 ## Screenshots
 <img width="1600" height="973" alt="image" src="https://github.com/user-attachments/assets/f79c8f68-4813-4564-88e7-5a14485cdaf8" />

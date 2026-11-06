@@ -360,7 +360,8 @@ void Shell_help_lists_box_commands(void) {
     test_bool(error, false);
     test_assert(strstr(out, "key_press <key> [dur]  Tap a key, held for dur frames") != NULL);
     test_assert(strstr(out, "capture [camera]  Write a PNG") != NULL);
-    test_assert(strstr(out, "audio [action] [value]  Print the audio status") != NULL);
+    test_assert(strstr(out, "audio [action] [value] [option1] [option2] [option3] [option4] "
+        "[option5] [option6] [option7] [option8]  Print the audio status") != NULL);
     test_assert(strstr(out, "\nls [scope]  ") != NULL);
     ecs_os_free(out);
 
@@ -725,7 +726,9 @@ static ecs_world_t* render_world(
     }
 
     if (scene) {
-        ecs_entity_t script = ecs_script(world, { .filename = RENDER_SCENE });
+        char *path = box_app_locate(RENDER_SCENE);
+        ecs_entity_t script = ecs_script(world, { .filename = path });
+        ecs_os_free(path);
         test_assert(script != 0);
         const EcsScript *s = ecs_get(world, script, EcsScript);
         test_assert(s != NULL);
@@ -1040,7 +1043,7 @@ void Shell_audio_render_capture(void) {
     }
 
     test_assert(sum > 0);
-    test_assert(sqrt(diff / wav.frames) < 0.01);
+    test_assert(sqrt(diff / wav.frames) < 0.0001);
     render_free(&wav);
     ecs_fini(world);
 }

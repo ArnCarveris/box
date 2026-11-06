@@ -1671,7 +1671,10 @@ output, so every render starts from an empty core, and two renders of a subject
 with the same options are bit identical. Effects with memory, such as reverbs and
 delays, start empty. A section that starts after bar 1 is played from beat 0 and
 the frames before it are dropped, so the tails of earlier bars, automation and
-modulators are as in playback (at most 600 s of song before a section). A render
+modulators are as in playback (at most 600 s of song before a section); a section
+matches a headless `audio capture` of it within an RMS difference of about 1e-5,
+the rounding to 16 bits. In the browser the render also runs on the main thread,
+not in the worklet, and writes `/tmp/audio_render_<n>.wav`. A render
 of a note silences the sources, streams, emitters and the timeline of the scene.
 Only what scripts and the song file make is rendered again: a subject made in C
 is an error, except a sound with `AudioPcm`, whose samples are copied. A render
