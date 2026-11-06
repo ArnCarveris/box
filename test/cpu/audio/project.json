@@ -1293,6 +1293,7 @@
                     "align_delay",
                     "align_stereo",
                     "align_out_of_window",
+                    "align_periodic_change",
                     "align_silent",
                     "residual_gain",
                     "residual_offset"

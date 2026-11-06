@@ -43,9 +43,13 @@ int64_t box_audio_diff_samples(
     int64_t count,
     int64_t *first);
 
-/** Find the offset of b against a: the lag within -max_lag..max_lag at which the normalized
- * cross-correlation of the mono sums is highest, over the loudest part of a of at most
- * BOX_AUDIO_DIFF_ALIGN_FRAMES frames. Ties go to the smallest lag. Does not allocate.
+/** Find the offset of b against a, within -max_lag..max_lag. Does not allocate.
+ *
+ * The candidates are lag 0 and the highest peaks of the normalized cross-correlation of the
+ * mono sums over the loudest part of a, of at most BOX_AUDIO_DIFF_ALIGN_FRAMES frames.
+ *
+ * The one with the least residual per frame over the whole overlap wins, ties go to the
+ * smallest lag, so that a part that changed in b does not move the offset.
  *
  * @param a Interleaved frames of the first recording
  * @param a_frames Frames of a

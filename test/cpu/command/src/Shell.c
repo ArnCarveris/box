@@ -883,8 +883,8 @@ void Shell_audio_diff_quieter(void) {
     test_assert(strstr(out, "\nbalance: unchanged") != NULL);
     test_assert(strstr(out, "\nnull test: offset +0 frames (+0.000 ms), residual -6.0 dB "
         "against a, ") != NULL);
-    test_assert(strstr(out, "\nresidual spans: ") != NULL);
-    test_assert(strstr(out, "(-6.0 dB against a)") != NULL);
+    test_assert(strstr(out, "\nresidual spans: 0.000 to 1.000 s -26.0 dBFS "
+        "(-6.0 dB against a)") != NULL);
     ecs_os_free(out);
     ecs_fini(world);
 }
@@ -990,7 +990,10 @@ void Shell_audio_diff_bars(void) {
     char *out = box_command_run(world, s, line, &error);
     test_bool(error, false);
     test_assert(strstr(out, ": 8000 Hz, mono, span 0.000 to 6.000 s\n") != NULL);
-    test_assert(strstr(out, "\nresidual spans: none") == NULL);
+    test_assert(strstr(out, "\nnull test: offset +0 frames (+0.000 ms), residual -4.8 dB "
+        "against a, ") != NULL);
+    test_assert(strstr(out, "\nresidual spans: 2.000 to 4.000 s ") != NULL);
+    test_assert(strstr(out, ", mid +70.4 dB, presence quiet,") != NULL);
     test_assert(strstr(out, "\nbars: 120.0 bpm, 4.00 beats per bar, 1 of 3 bars differ\n"
         "bar 2: residual ") != NULL);
     test_assert(strstr(out, "\nbar 1") == NULL);

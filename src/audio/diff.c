@@ -11,8 +11,11 @@
 #include <math.h>
 #include <string.h>
 
-/** Smallest gain of the correlation over the best one so far that moves the offset away
- * from a smaller lag, so that a periodic sound keeps the nearest match */
+/** Peaks of the cross-correlation whose residual is compared */
+#define BOX_AUDIO_DIFF_ALIGN_PEAKS (4)
+
+/** Smallest relative drop of the residual that moves the offset away from a smaller lag, so
+ * that a periodic sound keeps the nearest match */
 #define BOX_AUDIO_DIFF_ALIGN_EPSILON (1e-6)
 
 /** Get the sum of the channels of a frame.
@@ -125,6 +128,31 @@ static double box_audio_diff_correlate(
     return bb > 0 ? ab / sqrt(energy * bb) : 0;
 }
 
+/** Get the residual power per frame of b minus a at a lag, over the frames where they
+ * overlap.
+ *
+ * @param a Interleaved frames of the first recording
+ * @param a_frames Frames of a
+ * @param b Interleaved frames of the second recording
+ * @param b_frames Frames of b
+ * @param channels Channels of both
+ * @param lag Frame n of a goes with frame n + lag of b
+ * @return The power per frame, -1 when they do not overlap
+ */
+static double box_audio_diff_mean_residual(
+    const float *a,
+    int32_t a_frames,
+    const float *b,
+    int32_t b_frames,
+    int32_t channels,
+    int32_t lag)
+{
+    box_audio_diff_segment_t seg = { .start = 0, .end = a_frames };
+    box_audio_diff_residual(a, a_frames, b, b_frames, channels, lag, &seg, 1);
+
+    return seg.frames > 0 ? seg.power / seg.frames : -1;
+}
+
 int32_t box_audio_diff_align(
     const float *a,
     int32_t a_frames,
@@ -135,8 +163,8 @@ int32_t box_audio_diff_align(
 {
     int32_t len = a_frames < BOX_AUDIO_DIFF_ALIGN_FRAMES ? a_frames :
         BOX_AUDIO_DIFF_ALIGN_FRAMES;
-    int32_t start, k, s, result = 0;
-    double energy = 0, best = 0;
+    int32_t peaks[BOX_AUDIO_DIFF_ALIGN_PEAKS], count = 0, start, lag, k, result = 0;
+    double values[BOX_AUDIO_DIFF_ALIGN_PEAKS], energy = 0, prev = -2, cur = -2, best;
     if (!a || !b || a_frames < 1 || b_frames < 1 || channels < 1 || max_lag < 0) {
         goto done;
     }
@@ -146,15 +174,39 @@ int32_t box_audio_diff_align(
         goto done;
     }
 
-    for (k = 0; k <= max_lag; k ++) {
-        for (s = 0; s < (k ? 2 : 1); s ++) {
-            int32_t lag = s ? -k : k;
-            double c = box_audio_diff_correlate(a, b, b_frames, channels, start, len, energy,
-                lag);
-            if (c > best + BOX_AUDIO_DIFF_ALIGN_EPSILON) {
-                best = c;
-                result = lag;
+    for (lag = -max_lag; lag <= max_lag + 1; lag ++) {
+        double next = lag <= max_lag ? box_audio_diff_correlate(a, b, b_frames, channels,
+            start, len, energy, lag) : -2;
+        if (lag > -max_lag && cur > 0 && cur >= prev && cur > next &&
+            (count < BOX_AUDIO_DIFF_ALIGN_PEAKS || cur > values[count - 1]))
+        {
+            k = count < BOX_AUDIO_DIFF_ALIGN_PEAKS ? count ++ : count - 1;
+            for (; k > 0 && values[k - 1] < cur; k --) {
+                values[k] = values[k - 1];
+                peaks[k] = peaks[k - 1];
             }
+
+            values[k] = cur;
+            peaks[k] = lag - 1;
+        }
+
+        prev = cur;
+        cur = next;
+    }
+
+    best = box_audio_diff_mean_residual(a, a_frames, b, b_frames, channels, 0);
+    for (k = 0; k < count; k ++) {
+        int32_t l = peaks[k], al = l < 0 ? -l : l, ar = result < 0 ? -result : result;
+        double r = box_audio_diff_mean_residual(a, a_frames, b, b_frames, channels, l);
+        if (r < 0) {
+            continue;
+        }
+
+        if (best < 0 || r < best * (1.0 - BOX_AUDIO_DIFF_ALIGN_EPSILON) ||
+            (r <= best * (1.0 + BOX_AUDIO_DIFF_ALIGN_EPSILON) && al < ar))
+        {
+            best = r;
+            result = l;
         }
     }
 

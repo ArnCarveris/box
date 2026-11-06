@@ -106,6 +106,28 @@ void Diff_align_out_of_window(void) {
     free(b);
 }
 
+void Diff_align_periodic_change(void) {
+    int32_t i, frames = 48000;
+    float *a = malloc(sizeof(float) * (size_t)frames);
+    float *b = malloc(sizeof(float) * (size_t)frames);
+    for (i = 0; i < frames; i ++) {
+        a[i] = 0.25f * sinf(2.0f * 3.14159265f * 440.0f * (float)i / 8000.0f);
+        b[i] = a[i];
+        if (i >= 16000 && i < 32000) {
+            b[i] += 0.25f * sinf(2.0f * 3.14159265f * 1000.0f * (float)i / 8000.0f);
+        }
+    }
+
+    test_int(box_audio_diff_align(a, frames, b, frames, 1, 160), 0);
+    for (i = 0; i < frames; i ++) {
+        a[i] = i >= 7 ? b[i - 7] : 0;
+    }
+
+    test_int(box_audio_diff_align(b, frames, a, frames, 1, 160), 7);
+    free(a);
+    free(b);
+}
+
 void Diff_align_silent(void) {
     float a[256], b[256];
     memset(a, 0, sizeof(a));

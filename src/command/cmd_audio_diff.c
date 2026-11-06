@@ -26,6 +26,9 @@
 /** Loudest spans of the residual listed at most */
 #define BOX_CMD_DIFF_SPANS (5)
 
+/** Spans of the residual within this many dB of the loudest one are listed, in dB */
+#define BOX_CMD_DIFF_SPANS_DB (6.0)
+
 /** Bars compared at most */
 #define BOX_CMD_DIFF_BARS (256)
 
@@ -33,7 +36,7 @@
 #define BOX_CMD_DIFF_BARS_LISTED (4)
 
 /** Lowest band level compared, in dB against the total: a change of a band below it does
- * not matter to the mix */
+ * not matter to the mix, a band below it in both is printed as quiet */
 #define BOX_CMD_DIFF_BAND_FLOOR (-40.0f)
 
 /** Smallest change of the balance of the bands that is reported, in dB */
@@ -279,7 +282,12 @@ static void box_cmd_diff_levels(
         float x = a->bands[i] > BOX_CMD_DIFF_BAND_FLOOR ? a->bands[i] : BOX_CMD_DIFF_BAND_FLOOR;
         float y = b->bands[i] > BOX_CMD_DIFF_BAND_FLOOR ? b->bands[i] : BOX_CMD_DIFF_BAND_FLOOR;
         ecs_strbuf_append(buf, "%s %s ", i ? "," : "", box_audio_analyze_band_name(i));
-        box_cmd_diff_delta(buf, ea, eb);
+        if (a->bands[i] < BOX_CMD_DIFF_BAND_FLOOR && b->bands[i] < BOX_CMD_DIFF_BAND_FLOOR) {
+            ecs_strbuf_appendstr(buf, "quiet");
+        } else {
+            box_cmd_diff_delta(buf, ea, eb);
+        }
+
         if (best < 0 || fabsf(y - x) > fabsf(change)) {
             best = i;
             change = y - x;
@@ -308,8 +316,46 @@ static void box_cmd_diff_levels(
     }
 }
 
-/** Append the loudest spans of the residual: the spans of BOX_CMD_DIFF_SPAN_S with the most
- * power, in the order of time, next spans merged.
+/** Get the residual power per frame of a span, 0 when it compares no frame.
+ *
+ * @param seg The residual of the span
+ * @return The power per frame
+ */
+static double box_cmd_diff_density(
+    const box_audio_diff_segment_t *seg)
+{
+    return seg->frames > 0 ? seg->power / seg->frames : 0;
+}
+
+/** Find the run of spans of the residual from a span that are within BOX_CMD_DIFF_SPANS_DB
+ * of the loudest one.
+ *
+ * @param segs The residual per span
+ * @param count Number of spans
+ * @param threshold Lowest power per frame of a span of a run
+ * @param i The first span of the run
+ * @param peak Receives the highest power per frame of the run
+ * @return The span after the run
+ */
+static int32_t box_cmd_diff_run(
+    const box_audio_diff_segment_t *segs,
+    int32_t count,
+    double threshold,
+    int32_t i,
+    double *peak)
+{
+    *peak = 0;
+    for (; i < count && box_cmd_diff_density(&segs[i]) >= threshold; i ++) {
+        double d = box_cmd_diff_density(&segs[i]);
+        *peak = d > *peak ? d : *peak;
+    }
+
+    return i;
+}
+
+/** Append the loudest spans of the residual: the runs of spans of BOX_CMD_DIFF_SPAN_S within
+ * BOX_CMD_DIFF_SPANS_DB of the loudest one, at most BOX_CMD_DIFF_SPANS of them with the
+ * loudest peaks, in the order of time.
  *
  * @param buf The output
  * @param segs The residual per span
@@ -324,23 +370,38 @@ static void box_cmd_diff_spans(
     int32_t channels,
     float rate)
 {
-    int32_t picked[BOX_CMD_DIFF_SPANS], n = 0, i, j, k;
-    for (k = 0; k < BOX_CMD_DIFF_SPANS; k ++) {
+    int32_t picked[BOX_CMD_DIFF_SPANS], n = 0, runs = 0, i, j, k, m;
+    double loudest = 0, threshold, peak, best_peak;
+    for (i = 0; i < count; i ++) {
+        double d = box_cmd_diff_density(&segs[i]);
+        loudest = d > loudest ? d : loudest;
+    }
+
+    threshold = loudest * pow(10.0, -BOX_CMD_DIFF_SPANS_DB / 10.0);
+    for (k = 0; loudest > 0 && k < BOX_CMD_DIFF_SPANS; k ++) {
         int32_t best = -1;
-        for (i = 0; i < count; i ++) {
+        best_peak = 0;
+        for (i = 0; i < count; i = j > i ? j : i + 1) {
             bool taken = false;
-            for (j = 0; j < n; j ++) {
-                taken = taken || picked[j] == i;
+            j = box_cmd_diff_run(segs, count, threshold, i, &peak);
+            for (m = 0; m < n; m ++) {
+                taken = taken || picked[m] == i;
             }
 
-            if (!taken && segs[i].power > 0 && (best < 0 || segs[i].power > segs[best].power)) {
+            if (j > i && !taken && peak > best_peak) {
                 best = i;
+                best_peak = peak;
             }
         }
 
         if (best >= 0) {
             picked[n ++] = best;
         }
+    }
+
+    for (i = 0; loudest > 0 && i < count; i = j > i ? j : i + 1) {
+        j = box_cmd_diff_run(segs, count, threshold, i, &peak);
+        runs += j > i;
     }
 
     for (i = 1; i < n; i ++) {
@@ -356,20 +417,25 @@ static void box_cmd_diff_spans(
         ecs_strbuf_appendstr(buf, " none");
     }
 
-    for (i = 0; i < n; i = j) {
+    for (k = 0; k < n; k ++) {
         double power = 0, reference = 0, frames = 0;
-        for (j = i; j < n && picked[j] == picked[i] + (j - i); j ++) {
-            power += segs[picked[j]].power;
-            reference += segs[picked[j]].reference;
-            frames += segs[picked[j]].frames;
+        j = box_cmd_diff_run(segs, count, threshold, picked[k], &peak);
+        for (i = picked[k]; i < j; i ++) {
+            power += segs[i].power;
+            reference += segs[i].reference;
+            frames += segs[i].frames;
         }
 
-        ecs_strbuf_append(buf, "%s %.3f to %.3f s ", i ? "," : "",
-            segs[picked[i]].start / (double)rate, segs[picked[j - 1]].end / (double)rate);
+        ecs_strbuf_append(buf, "%s %.3f to %.3f s ", k ? "," : "",
+            segs[picked[k]].start / (double)rate, segs[j - 1].end / (double)rate);
         box_cmd_diff_ratio(buf, power, frames * channels, "dBFS");
         ecs_strbuf_appendstr(buf, " (");
         box_cmd_diff_ratio(buf, power, reference, "dB against a");
         ecs_strbuf_appendstr(buf, ")");
+    }
+
+    if (runs > n) {
+        ecs_strbuf_append(buf, ", %d more spans", runs - n);
     }
 }
 
