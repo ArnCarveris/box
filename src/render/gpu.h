@@ -706,6 +706,7 @@ void box_gpu_forward_reset(
     box_gpu_t *gpu,
     bool keep);
 
+<<<<<<< HEAD
 /** Check whether a mesh or 2D shape module fits the pipeline layout before it replaces the
  * module that renders, by requesting its forward pipelines. A
  * mesh module also requests the depth prepass and the texture_blend pipelines (fs_blend and
@@ -729,6 +730,8 @@ bool box_gpu_forward_check(
     WGPUShaderModule shader,
     char **error);
 
+=======
+>>>>>>> 16533d425d72822f28ac581d26af9485e4e508c5
 /** Create or release a mesh from a BOX_RENDER_MESH resource.
  *
  * @param gpu The backend

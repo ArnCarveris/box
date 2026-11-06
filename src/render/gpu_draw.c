@@ -1148,6 +1148,7 @@ static WGPURenderPipeline box_gpu_prepass_create(
     return box_gpu_render_pipeline(gpu, &desc);
 }
 
+<<<<<<< HEAD
 #ifndef __EMSCRIPTEN__
 /** Take a pipeline the forward check requested: release it, or keep the error of a pipeline
  * that failed, or note that it is still being created.
@@ -1234,6 +1235,8 @@ done:
     return result;
 }
 
+=======
+>>>>>>> 16533d425d72822f28ac581d26af9485e4e508c5
 /** Depth state of a pipeline of the forward cache */
 typedef enum box_gpu_depth_mode_t {
     BOX_GPU_DEPTH_GREATER,          /**< Forward, compare Greater, opaque draws write depth */
