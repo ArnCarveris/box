@@ -143,6 +143,16 @@ const char* box_audio_analyze_band_name(
     return band >= 0 && band < BOX_AUDIO_ANALYZE_BANDS ? box_audio_band_names[band] : "?";
 }
 
+void box_audio_hann(
+    float *window,
+    int32_t size)
+{
+    int32_t i;
+    for (i = 0; i < size; i ++) {
+        window[i] = (float)(0.5 - 0.5 * cos(2.0 * M_PI * i / size));
+    }
+}
+
 int box_audio_fft_init(
     box_audio_fft_t *fft,
     int32_t size)
@@ -387,7 +397,7 @@ static int box_audio_spectrum_init(
     box_audio_spectrum_t *s,
     int32_t size)
 {
-    int32_t i, bins = size / 2 + 1;
+    int32_t bins = size / 2 + 1;
     int result = -1;
     memset(s, 0, sizeof(*s));
     if (box_audio_fft_init(&s->fft, size)) {
@@ -403,10 +413,7 @@ static int box_audio_spectrum_init(
         goto done;
     }
 
-    for (i = 0; i < size; i ++) {
-        s->window[i] = (float)(0.5 - 0.5 * cos(2.0 * M_PI * i / size));
-    }
-
+    box_audio_hann(s->window, size);
     result = 0;
 done:
     return result;

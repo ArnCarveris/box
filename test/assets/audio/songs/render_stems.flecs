@@ -1,0 +1,40 @@
+// The song of the audio render tests in the Shell suite of test/cpu/command: two tracks on two
+// buses, a held A3 (220 Hz) on render_low and a held A6 (1760 Hz) on render_high, 4 bars of 4/4
+// at 120 bpm, so a stem of one bus shows by its frequency that the other is absent.
+using box.audio
+
+prefab render_tone {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.005, decay: 0.05, sustain: 0.8, release: 0.05}
+  SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.4}
+}
+
+render_low_inst { Instrument: {sound: render_tone} }
+render_high_inst { Instrument: {sound: render_tone} }
+
+prefab render_low_notes {
+  NoteClip: {length: 4, notes: [{start: 0, duration: 4, pitch: 57, velocity: 1}]}
+}
+
+prefab render_high_notes {
+  NoteClip: {length: 4, notes: [{start: 0, duration: 4, pitch: 93, velocity: 1}]}
+}
+
+render_low {
+  Track: {instrument: render_low_inst}
+  AudioBus: {}
+  part { ClipPlacement: {clip: render_low_notes, start: 0, duration: 16, loop: true} }
+}
+
+render_high {
+  Track: {instrument: render_high_inst}
+  AudioBus: {}
+  part { ClipPlacement: {clip: render_high_notes, start: 0, duration: 16, loop: true} }
+}
+
+$ {
+  Song: {
+    title: "Render stems", tempo: 120, beats_per_bar: 4, beat_unit: 4, beats: 16,
+    lanes: [{name: "Low", bus: render_low}, {name: "High", bus: render_high}]
+  }
+}

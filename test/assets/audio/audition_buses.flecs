@@ -1,0 +1,31 @@
+// Two buses for the audio solo and mute commands in the Shell suite of test/cpu/command: a
+// 440 Hz tone at a peak of 0.25 on a bus panned hard left and the same tone on a bus panned
+// hard right, so each bus has a channel of its own in a capture.
+using box.audio
+
+tone {
+  AudioPcm: {
+    samples: [0, 0.0772542, 0.146946, 0.202254, 0.237764, 0.25, 0.237764, 0.202254, 0.146946,
+      0.0772542, 0, -0.0772542, -0.146946, -0.202254, -0.237764, -0.25, -0.237764, -0.202254,
+      -0.146946, -0.0772542],
+    sample_rate: 8800
+  }
+}
+
+left {
+  AudioBus: {volume: 1, pan: -1}
+}
+
+right {
+  AudioBus: {volume: 1, pan: 1}
+}
+
+left_source {
+  AudioSource: {sound: tone, loop: true}
+  AudioOutput: {bus: left}
+}
+
+right_source {
+  AudioSource: {sound: tone, loop: true}
+  AudioOutput: {bus: right}
+}
