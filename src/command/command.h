@@ -231,42 +231,7 @@ char* box_cmd_audio_analyze(
     const char *from,
     const char *to);
 
-<<<<<<< HEAD
-struct box_audio_wav_t;
-
-/** Load a WAV for an action of the audio command: a resource of the session, else a file.
- *
- * @param world The world
- * @param wav A resource of the session, else a WAV file
- * @param action The action for the errors, such as "analyze"
- * @param out Receives the frames, freed with box_audio_wav_fini
- * @return 0 on success, -1 with an error logged
- */
-int box_cmd_audio_wav_load(
-    ecs_world_t *world,
-    const char *wav,
-    const char *action,
-    struct box_audio_wav_t *out);
-
-/** Compare two WAVs for the audio diff action: bit identity, length, loudness, true peak,
- * bands, stereo, the null test residual after alignment, its loudest spans and the bars that
- * differ most.
- *
- * @param world The world
- * @param a The first WAV, a resource of the session or a file
- * @param b The second WAV, a resource of the session or a file
- * @param from First second of the span, NULL or empty for the start
- * @param to Last second of the span, NULL or empty for the end
- * @return The report, which the caller frees, NULL with an error logged
- */
-char* box_cmd_audio_diff(
-    ecs_world_t *world,
-    const char *a,
-    const char *b,
-    const char *from,
-    const char *to);
-=======
-/** Load the bytes of a WAV for audio analyze and audio plot: a resource of the session, else
+/** Load the bytes of a WAV for audio analyze, diff and plot: a resource of the session, else
  * a file as written, else a file found from the working directory or the executable.
  *
  * @param world The world
@@ -292,7 +257,40 @@ char* box_cmd_audio_plot(
     ecs_world_t *world,
     int32_t argc,
     const char **argv);
->>>>>>> c4aa7770ee97f4532de2f276215f279fefd1eb97
+
+struct box_audio_wav_t;
+
+/** Load and decode a WAV for an action of the audio command, with box_cmd_audio_wav_load.
+ *
+ * @param world The world
+ * @param wav A resource of the session, else a WAV file
+ * @param action The action for the errors, such as "analyze"
+ * @param out Receives the frames, freed with box_audio_wav_fini
+ * @return 0 on success, -1 with an error logged
+ */
+int box_cmd_audio_wav_decode(
+    ecs_world_t *world,
+    const char *wav,
+    const char *action,
+    struct box_audio_wav_t *out);
+
+/** Compare two WAVs for the audio diff action: bit identity, length, loudness, true peak,
+ * bands, stereo, the null test residual after alignment, its loudest spans and the bars that
+ * differ most.
+ *
+ * @param world The world
+ * @param a The first WAV, a resource of the session or a file
+ * @param b The second WAV, a resource of the session or a file
+ * @param from First second of the span, NULL or empty for the start
+ * @param to Last second of the span, NULL or empty for the end
+ * @return The report, which the caller frees, NULL with an error logged
+ */
+char* box_cmd_audio_diff(
+    ecs_world_t *world,
+    const char *a,
+    const char *b,
+    const char *from,
+    const char *to);
 
 /** Print the notes of a track per bar, or as a text piano roll: audio notes <track>
  * [bars=a..b] [roll].

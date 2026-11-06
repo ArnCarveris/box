@@ -1713,12 +1713,9 @@ Importing box alone does not open an output: `box_app_run` does.
 | `audio render <subject> [options]` | Render a sound, instrument, bus stem or song section on its own, faster than real time, to a WAV resource |
 | `audio song [<file>\|none]` | Show the song, load a song file or unload it |
 | `audio analyze <wav> [from] [to]` | Print a text report of a WAV resource or file, optionally of the seconds from..to |
-<<<<<<< HEAD
 | `audio diff <a> <b> [from] [to]` | Print how WAV b differs from WAV a: bit identity, loudness, bands, stereo and a null test |
-=======
 | `audio plot <wav> [kind] [options]` | Draw a PNG resource of a WAV resource or file: spectrogram, waveform, spectrum or loudness |
 | `audio meter [bus...] [seconds\|bars=a..b]` | Measure peak, RMS and loudness per bus and the gain reduction of its effects over a span of the live output; run again without arguments for the table |
->>>>>>> c4aa7770ee97f4532de2f276215f279fefd1eb97
 | `audio notes <track> [bars=a..b] [roll]` | Print the notes of a track per bar, or as a piano roll |
 | `audio chords [track...] [bars=a..b]` | Print the chords and the key of a section from the notes |
 
@@ -1820,7 +1817,6 @@ bar in LUFS and the band that changed the most against the whole span, counting 
 followed. The same WAV and span give the same text. The measures are a plain C library,
 [analyze.h](../src/audio/analyze.h).
 
-<<<<<<< HEAD
 `audio diff` compares two WAVs, each a resource or a file as for `audio analyze`, over the same
 seconds from..to of both. It reuses the measures of `audio analyze` and prints:
 
@@ -1840,7 +1836,7 @@ lists how many bars of the span differ and the 4 with the loudest residual: the 
 dB against a, the loudness of a and b and the band that changed most. WAVs of different sample
 rates are an error; a mono and a stereo WAV are compared as the mono sums, the mean of left and
 right. The alignment and residual are a plain C library, [diff.h](../src/audio/diff.h).
-=======
+
 `audio plot` reads a WAV as `audio analyze` does and returns the name of a PNG resource, as
 `audio capture` does; in the browser it writes `/tmp/audio_plot_<n>.png` in the page filesystem
 and returns that path. The image is drawn on the CPU, so it works headless and in the browser,
@@ -1897,7 +1893,6 @@ reduction in dB, `never engages` under 0.1 dB, or `did not run`. The headroom li
 the loudest measured bus is under 0 dBFS, and the largest gain reduction of the limiter of the
 master, from the peaks over its threshold. A bus that never rendered says so. Measured through
 the null output at a fixed delta time, the same scene gives the same table.
->>>>>>> c4aa7770ee97f4532de2f276215f279fefd1eb97
 
 `audio notes` and `audio chords` read only the note data of the tracks, their
 placements and clips, so they work without an output and without a device. A

@@ -705,8 +705,8 @@ char* box_cmd_audio_diff(
         goto done;
     }
 
-    if (box_cmd_audio_wav_load(world, a, "diff", &wa) ||
-        box_cmd_audio_wav_load(world, b, "diff", &wb))
+    if (box_cmd_audio_wav_decode(world, a, "diff", &wa) ||
+        box_cmd_audio_wav_decode(world, b, "diff", &wb))
     {
         goto done;
     }

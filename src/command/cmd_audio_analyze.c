@@ -189,17 +189,18 @@ done:
     return result;
 }
 
-int box_cmd_audio_wav_load(
+int box_cmd_audio_wav_decode(
     ecs_world_t *world,
     const char *wav,
     const char *action,
     box_audio_wav_t *out)
 {
     int64_t size = 0;
-    uint8_t *bytes = box_cmd_analyze_load(world, wav, &size);
+    uint8_t *bytes;
     const char *error = NULL;
     int result = -1;
     memset(out, 0, sizeof(*out));
+    bytes = box_cmd_audio_wav_load(world, wav, &size);
     if (!bytes) {
         goto done;
     }

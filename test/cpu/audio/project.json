@@ -1327,7 +1327,6 @@
                 ]
             },
             {
-<<<<<<< HEAD
                 "id": "Diff",
                 "testcases": [
                     "samples",
@@ -1338,7 +1337,9 @@
                     "align_silent",
                     "residual_gain",
                     "residual_offset"
-=======
+                ]
+            },
+            {
                 "id": "Plot",
                 "testcases": [
                     "sweep_spectrogram",
@@ -1346,7 +1347,6 @@
                     "same_twice",
                     "spectrum_sine_peak",
                     "bad_arguments"
->>>>>>> c4aa7770ee97f4532de2f276215f279fefd1eb97
                 ]
             },
             {

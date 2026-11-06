@@ -1723,7 +1723,6 @@ void Shell_audio_analyze_errors(void) {
     ecs_fini(world);
 }
 
-<<<<<<< HEAD
 /** Run audio diff on two WAVs of test/assets/audio and check it succeeds */
 static char* shell_diff(
     ecs_world_t *world,
@@ -1865,40 +1864,11 @@ static char* shell_diff_song_wav(
 
 void Shell_audio_diff_bars(void) {
     // audio/diff
-=======
-/** Read a PNG resource of a session and check its content type and signature.
- *
- * @param world The world
- * @param s The session
- * @param name The name of the resource
- * @param size Receives the bytes
- * @return The bytes, which the caller frees
- */
-static uint8_t* shell_png_read(
-    ecs_world_t *world,
-    ecs_entity_t s,
-    const char *name,
-    ecs_size_t *size)
-{
-    const char *type = NULL;
-    uint8_t *bytes = ecs_shell_resource_read(world, s, name, size, &type);
-    test_assert(bytes != NULL);
-    test_assert(*size > 8);
-    test_str(type, "image/png");
-    test_assert(!memcmp(bytes, "\x89PNG\r\n\x1a\n", 8));
-
-    return bytes;
-}
-
-void Shell_audio_plot(void) {
-    // audio/plot
->>>>>>> c4aa7770ee97f4532de2f276215f279fefd1eb97
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_progress(world, 0.016f);
 
-<<<<<<< HEAD
     int32_t i, frames = 48000;
     float *a = ecs_os_malloc_n(float, frames), *b = ecs_os_malloc_n(float, frames);
     for (i = 0; i < frames; i ++) {
@@ -1953,7 +1923,102 @@ void Shell_audio_plot(void) {
 
 void Shell_audio_diff_errors(void) {
     // audio/diff
-=======
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, 0.016f);
+
+    bool error = false;
+    char *out = box_command_run(world, s, "audio diff test/assets/audio/diff_base.wav",
+        &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "audio diff needs two WAVs") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio diff test/assets/audio/diff_base.wav test/assets/audio/missing.wav", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "cannot find 'test/assets/audio/missing.wav'") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio diff test/assets/audio/diff_base.wav test/assets/audio/corrupt.wav", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "cannot diff 'test/assets/audio/corrupt.wav': not a WAV file")
+        != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio diff test/assets/audio/diff_base.wav test/assets/audio/tone_44100.wav", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "at 48000 Hz with 'test/assets/audio/tone_44100.wav' at 44100 Hz: "
+        "the sample rates must be the same") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio diff test/assets/audio/diff_base.wav test/assets/audio/diff_base.wav 2 3",
+        &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "empty span") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio diff test/assets/audio/diff_base.wav test/assets/audio/diff_base.wav soon",
+        &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "invalid span") != NULL);
+    ecs_os_free(out);
+
+    error = true;
+    out = box_command_run(world, s,
+        "audio diff test/assets/audio/diff_base.wav test/assets/audio/analyze_sine_1k.wav",
+        &error);
+    test_bool(error, false);
+    test_assert(strstr(out, ": 48000 Hz, mono sums of a mono and a stereo WAV, span 0.000 to "
+        "1.000 s\nidentical: no, one is mono and the other stereo\n") != NULL);
+    test_assert(strstr(out, "\nlength: a 1.000 s, b 2.000 s, b - a +1.000 s (+48000 frames)")
+        != NULL);
+    test_assert(strstr(out, "\nstereo: mono, not compared") != NULL);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+/** Read a PNG resource of a session and check its content type and signature.
+ *
+ * @param world The world
+ * @param s The session
+ * @param name The name of the resource
+ * @param size Receives the bytes
+ * @return The bytes, which the caller frees
+ */
+static uint8_t* shell_png_read(
+    ecs_world_t *world,
+    ecs_entity_t s,
+    const char *name,
+    ecs_size_t *size)
+{
+    const char *type = NULL;
+    uint8_t *bytes = ecs_shell_resource_read(world, s, name, size, &type);
+    test_assert(bytes != NULL);
+    test_assert(*size > 8);
+    test_str(type, "image/png");
+    test_assert(!memcmp(bytes, "\x89PNG\r\n\x1a\n", 8));
+
+    return bytes;
+}
+
+void Shell_audio_plot(void) {
+    // audio/plot
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, 0.016f);
+
     bool error = true;
     char *a = box_command_run(world, s, "audio plot test/assets/audio/analyze_sine_1k.wav",
         &error);
@@ -2000,24 +2065,12 @@ void Shell_audio_diff_errors(void) {
 
 void Shell_audio_plot_errors(void) {
     // audio/plot
->>>>>>> c4aa7770ee97f4532de2f276215f279fefd1eb97
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_progress(world, 0.016f);
 
     bool error = false;
-<<<<<<< HEAD
-    char *out = box_command_run(world, s, "audio diff test/assets/audio/diff_base.wav",
-        &error);
-    test_bool(error, true);
-    test_assert(strstr(out, "audio diff needs two WAVs") != NULL);
-    ecs_os_free(out);
-
-    error = false;
-    out = box_command_run(world, s,
-        "audio diff test/assets/audio/diff_base.wav test/assets/audio/missing.wav", &error);
-=======
     char *out = box_command_run(world, s, "audio plot", &error);
     test_bool(error, true);
     test_assert(strstr(out, "audio plot needs a WAV") != NULL);
@@ -2025,34 +2078,11 @@ void Shell_audio_plot_errors(void) {
 
     error = false;
     out = box_command_run(world, s, "audio plot test/assets/audio/missing.wav", &error);
->>>>>>> c4aa7770ee97f4532de2f276215f279fefd1eb97
     test_bool(error, true);
     test_assert(strstr(out, "cannot find 'test/assets/audio/missing.wav'") != NULL);
     ecs_os_free(out);
 
     error = false;
-<<<<<<< HEAD
-    out = box_command_run(world, s,
-        "audio diff test/assets/audio/diff_base.wav test/assets/audio/corrupt.wav", &error);
-    test_bool(error, true);
-    test_assert(strstr(out, "cannot diff 'test/assets/audio/corrupt.wav': not a WAV file")
-        != NULL);
-    ecs_os_free(out);
-
-    error = false;
-    out = box_command_run(world, s,
-        "audio diff test/assets/audio/diff_base.wav test/assets/audio/tone_44100.wav", &error);
-    test_bool(error, true);
-    test_assert(strstr(out, "at 48000 Hz with 'test/assets/audio/tone_44100.wav' at 44100 Hz: "
-        "the sample rates must be the same") != NULL);
-    ecs_os_free(out);
-
-    error = false;
-    out = box_command_run(world, s,
-        "audio diff test/assets/audio/diff_base.wav test/assets/audio/diff_base.wav 2 3",
-        &error);
-    test_bool(error, true);
-=======
     out = box_command_run(world, s, "audio plot missing_resource waveform", &error);
     test_bool(error, true);
     test_assert(strstr(out, "cannot find 'missing_resource'") != NULL);
@@ -2089,34 +2119,14 @@ void Shell_audio_plot_errors(void) {
     out = box_command_run(world, s,
         "audio plot test/assets/audio/analyze_sine_1k.wav from=3 to=4", &error);
     test_bool(error, true);
->>>>>>> c4aa7770ee97f4532de2f276215f279fefd1eb97
     test_assert(strstr(out, "empty span") != NULL);
     ecs_os_free(out);
 
     error = false;
     out = box_command_run(world, s,
-<<<<<<< HEAD
-        "audio diff test/assets/audio/diff_base.wav test/assets/audio/diff_base.wav soon",
-        &error);
-    test_bool(error, true);
-    test_assert(strstr(out, "invalid span") != NULL);
-    ecs_os_free(out);
-
-    error = true;
-    out = box_command_run(world, s,
-        "audio diff test/assets/audio/diff_base.wav test/assets/audio/analyze_sine_1k.wav",
-        &error);
-    test_bool(error, false);
-    test_assert(strstr(out, ": 48000 Hz, mono sums of a mono and a stereo WAV, span 0.000 to "
-        "1.000 s\nidentical: no, one is mono and the other stereo\n") != NULL);
-    test_assert(strstr(out, "\nlength: a 1.000 s, b 2.000 s, b - a +1.000 s (+48000 frames)")
-        != NULL);
-    test_assert(strstr(out, "\nstereo: mono, not compared") != NULL);
-=======
         "audio plot test/assets/audio/analyze_sine_1k.wav from=soon", &error);
     test_bool(error, true);
     test_assert(strstr(out, "invalid from") != NULL);
->>>>>>> c4aa7770ee97f4532de2f276215f279fefd1eb97
     ecs_os_free(out);
     ecs_fini(world);
 }
