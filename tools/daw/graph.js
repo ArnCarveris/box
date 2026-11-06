@@ -640,7 +640,7 @@ G.render = (root) => {
   for (const n of m.nodes.values()) {
     const rec = n.rec;
     const attrs = {
-      class: `gnode k-${n.kind}` + (rec && rec.disabled ? " off" : "") + (rec ? "" : " ghost") + (rec && DAW.sel === n.path ? " sel" : ""),
+      class: `gnode k-${n.kind}` + (rec && rec.disabled ? " off" : "") + (rec ? "" : " ghost") + (rec && DAW.sel === n.path && !DAW.selInsert ? " sel" : ""),
       "data-id": n.id,
       title: (n.members && n.members.length > 1 ? n.members.join("\n") : n.path) + (rec && rec.script ? "\nscript: " + rec.script : ""),
       style: { left: n.x + "px", top: n.y + "px", width: GNODEW + "px", height: n.h + "px" },
@@ -651,28 +651,41 @@ G.render = (root) => {
           G.picked.clear();
           G.applyPicked();
         }
-        if (G.focus === n.id && (!rec || DAW.sel === n.path)) G.clearFocus();
+        if (G.focus === n.id && (!rec || (DAW.sel === n.path && !DAW.selInsert))) G.clearFocus();
         else G.setFocus(n);
       },
       onmouseenter: () => G.hot(n.id),
       onmouseleave: () => G.hot(null)
     };
     if (rec) attrs["data-path"] = n.path;
-    const el = UI.el("div", attrs, UI.el("div", { class: "ghead" },
+    const head = UI.el("div", { class: "ghead" },
       UI.el("span", { class: "swatch", style: { background: DAW.color(n.path) } }),
-      UI.el("div", { class: "gtext" }, UI.el("div", { class: "gtitle" }, n.title), UI.el("div", { class: "gsub" }, n.sub))));
+      UI.el("div", { class: "gtext" }, UI.el("div", { class: "gtitle" }, n.title), UI.el("div", { class: "gsub" }, n.sub)));
+    if (rec && DAW.has(rec, "AudioBus")) {
+      const free = (rec.comps[A + "AudioBus"].effects || ["#0"]).findIndex((fx) => DAW.isNone(fx));
+      if (free >= 0) {
+        head.appendChild(UI.el("button", {
+          class: "small gadd", text: "+", title: "Add an insert",
+          onclick: (ev) => { ev.stopPropagation(); V.addEffectMenu(ev, n.path, free); }
+        }));
+      }
+    }
+    const el = UI.el("div", attrs, head);
     el.addEventListener("pointerdown", (ev) => G.drag(n, el, ev));
     for (const ins of n.inserts) {
       el.appendChild(UI.el("div", {
-        class: "gins" + (ins.off ? " off" : "") + (DAW.sel === ins.path ? " sel" : ""), title: `${ins.path}, insert slot ${ins.slot + 1}`,
+        class: "gins" + (ins.off ? " off" : "") + (DAW.sel === ins.path && DAW.selInsert ? " sel" : ""), title: `${ins.path}, insert slot ${ins.slot + 1}`,
         "data-path": ins.path,
         style: { borderLeftColor: DAW.color(ins.path) },
         onclick: (ev) => {
           ev.stopPropagation();
           if (G.justDragged) return;
-          G.focus = n.id;
-          G.applyFocus();
-          DAW.select(ins.path);
+          DAW.select(ins.path, true);
+        },
+        oncontextmenu: (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          V.effectMenu(ev, n.path, ins.slot, ins.path);
         }
       }, ins.label));
     }

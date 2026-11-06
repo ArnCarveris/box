@@ -435,7 +435,7 @@ V.addEffect = async (bus, slot, fx) => {
     await DAW.create(path);
     await DAW.add(path, A + fx);
     V.setSlot(bus, slot, path);
-    DAW.select(path);
+    DAW.select(path, true);
     DAW.toast(`added ${fx} to ${bus}`);
   } catch (err) {
     DAW.toast(String(err), true);
@@ -769,13 +769,13 @@ V.renderDetail = () => {
       `${DAW.sel || "no entity"} is not in ${DAW.host}, waiting for it to appear`));
     return;
   }
-  const kind = DAW.kindOf(rec);
+  const kind = DAW.selInsert ? "effect" : DAW.kindOf(rec);
   const head = UI.el("div", { class: "detail-head" },
     UI.el("span", { class: "swatch", style: { background: DAW.color(rec.path) } }),
-    UI.el("span", { class: "title" }, kind === "track" ? V.laneName(rec.path) : rec.name),
+    UI.el("span", { class: "title" }, kind === "track" ? V.laneName(rec.path) : DAW.selInsert ? DAW.effectComps(rec).map(DAW.short).join(" / ") : rec.name),
     UI.el("span", { class: "kind" }, `${kind}  ${rec.path}${rec.prefab ? "  (prefab)" : ""}${rec.script ? "  from " + rec.script : ""}`),
     UI.el("span", { class: "grow" }));
-  if (kind !== "track" && kind !== "bus" && rec.path !== A + "master") head.appendChild(V.enableBtn(rec));
+  if (kind !== "track" && kind !== "bus" && rec.path !== A + "master" && !DAW.has(rec, "AudioBus")) head.appendChild(V.enableBtn(rec));
   if (!DAW.detailPath) {
     head.appendChild(UI.el("button", { class: "small", text: "window", title: "Open in its own window", onclick: () => DAW.openWindow(rec.path) }));
     head.appendChild(UI.el("button", { class: "small", text: "×", title: "Close (Escape)", onclick: () => G.clearFocus() }));
@@ -813,17 +813,7 @@ V.renderDetail = () => {
       if (!DAW.isNone(t.instrument)) V.instrumentBlock(t.instrument, body, rec.path);
     }
   } else if (kind === "effect") {
-    const bus = DAW.busOfEffect(rec.path);
-    if (bus) {
-      const i = bus.comps[A + "AudioBus"].effects.indexOf(rec.path);
-      body.appendChild(UI.el("div", { class: "section-title" }, `Insert slot ${i + 1} of `, UI.el("a", { class: "link", onclick: () => DAW.select(bus.path) }, bus.path)));
-      body.appendChild(UI.el("div", { class: "chain" }, V.slot(bus.path, i)));
-    } else {
-      body.appendChild(UI.el("div", { class: "section-title" }, "Not in an insert slot"));
-      body.appendChild(UI.el("div", { class: "chain" }, V.effectCards(rec.path, {})));
-    }
-    const other = V.genericCards(rec.path, DAW.effectComps(rec).concat([A + "AudioBus", A + "AudioMeter"]));
-    if (other.childNodes.length) body.appendChild(other);
+    body.appendChild(UI.el("div", { class: "chain" }, V.effectCards(rec.path, {})));
   } else if (kind === "placement") {
     const cp = rec.comps[A + "ClipPlacement"];
     body.appendChild(UI.el("div", { class: "chain" }, V.cardFor(rec.path, A + "ClipPlacement", {})));
@@ -861,7 +851,10 @@ V.prune = () => {
 };
 
 V.markSel = () => {
-  document.querySelectorAll("[data-path]").forEach((el) => el.classList.toggle("sel", el.dataset.path === DAW.sel));
+  document.querySelectorAll("[data-path]").forEach((el) => {
+    const ins = el.classList.contains("gins"), node = el.classList.contains("gnode");
+    el.classList.toggle("sel", el.dataset.path === DAW.sel && (ins ? DAW.selInsert : !(node && DAW.selInsert)));
+  });
 };
 
 V.sideOpen = () => !DAW.detailPath && DAW.view === "graph" && !!DAW.sel && !!DAW.ents[DAW.sel];
