@@ -5,26 +5,9 @@ using box.input
 using box.material
 
 jukebox_actions {
-  previous { Action: {description: "Play the previous song"}; Binding: {key: Left} }
-  next { Action: {description: "Play the next song"}; Binding: {key: Right} }
   play { Action: {description: "Play or pause"}; Binding: {key: Space} }
   crash { Action: {description: "Crash on the next bar"}; Binding: {key: C} }
-  pick_1 { Action: {description: "Play song 1"}; Binding: {key: Num1} }
-  pick_2 { Action: {description: "Play song 2"}; Binding: {key: Num2} }
-  pick_3 { Action: {description: "Play song 3"}; Binding: {key: Num3} }
-  pick_4 { Action: {description: "Play song 4"}; Binding: {key: Num4} }
-  pick_5 { Action: {description: "Play song 5"}; Binding: {key: Num5} }
-  pick_6 { Action: {description: "Play song 6"}; Binding: {key: Num6} }
-  pick_7 { Action: {description: "Play song 7"}; Binding: {key: Num7} }
-  pick_8 { Action: {description: "Play song 8"}; Binding: {key: Num8} }
-  pick_9 { Action: {description: "Play song 9"}; Binding: {key: Num9} }
 }
-
-const PICKS = [
-  jukebox_actions.pick_1, jukebox_actions.pick_2, jukebox_actions.pick_3,
-  jukebox_actions.pick_4, jukebox_actions.pick_5, jukebox_actions.pick_6,
-  jukebox_actions.pick_7, jukebox_actions.pick_8, jukebox_actions.pick_9
-]
 
 prefab jb_crash {
   AudioOutput: {bus: sfx}
@@ -57,45 +40,8 @@ box {
 }
 
 $ {
-  AudioSong: {file: "etc/scenes/jukebox/songs/{SONGS[song]}.flecs"}
+  AudioSong: {file: "etc/scenes/jukebox/songs/{SONGS[song].file}.flecs"}
   Transport = {playing: playing}
-}
-
-// Play song n, or pause it when it is the one that plays
-proc pick(n: i32) {
-  if n >= 0 && n < SONGS.count() {
-    if playing && song == n {
-      playing = false
-    } else {
-      song = n
-      playing = true
-    }
-  }
-}
-
-// Play the song that is by songs away from the current one, wrapping around the list
-proc skip(by: i32) {
-  const count = SONGS.count()
-  song = (song + by + count) % count
-  playing = true
-}
-
-template SongPicker {
-  prop index: i32 = 0
-  prop action: entity = 0
-
-  async {
-    while true {
-      await on.pressed(action)
-      pick(index)
-    }
-  }
-}
-
-jukebox_pickers {
-  for i in 0..9 {
-    "pick_{i}" { SongPicker: {index: i, action: PICKS[i]} }
-  }
 }
 
 async {
@@ -107,26 +53,11 @@ async {
 
 async {
   while true {
-    await on.pressed(jukebox_actions.previous)
-    skip(-1)
-  }
-}
-
-async {
-  while true {
-    await on.pressed(jukebox_actions.next)
-    skip(1)
-  }
-}
-
-async {
-  while true {
     await on.pressed(jukebox_actions.crash)
     const c = box.audio.play_quantized(jb_crash, 0.7, Bar)
   }
 }
 
-// Follow the song that plays: its position, length, colour and the levels of its lanes
 async {
   while true {
     const t = Transport[Transport]
@@ -149,15 +80,11 @@ async {
 
     if shows {
       const c = se[Rgb]
-      if song_r != c.r || song_g != c.g || song_b != c.b {
-        song_r = c.r
-        song_g = c.g
-        song_b = c.b
+      if color.r != c.r || color.g != c.g || color.b != c.b {
+        color = c
       }
-    } else if song_r != 150 || song_g != 155 || song_b != 175 {
-      song_r = 150
-      song_g = 155
-      song_b = 175
+    } else if color.r != IDLE.r || color.g != IDLE.g || color.b != IDLE.b {
+      color = IDLE
     }
 
     const lanes = s.lanes.count()

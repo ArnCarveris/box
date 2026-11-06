@@ -17,10 +17,56 @@ const PANEL_W: f32 = 320
 const METER_H: f32 = 110
 const MASTER_SIDE: string[] = ["left", "right"]
 
+template SongButton : HeadlessButton {
+  prop index: i32 = 0
+
+  const selected = song == index
+  const active = selected && lit
+
+  Layout: {direction: Row, spacing: 10, padding: {7, 7, 10, 10}, v: Middle}
+  LayoutItem: {width: {mode: Grow}}
+  Rect: {1, 1}
+
+  if active {
+    Rgb: {color.r * 0.25, color.g * 0.25, color.b * 0.25}
+    Border: {radius: 6, width: 2, color: {color.r, color.g, color.b, 255}}
+  } else if hover {
+    Rgb: {44, 48, 62}
+    Border: {radius: 6, width: 2, color: {80, 85, 105, 255}}
+  } else {
+    Rgb: {30, 33, 44}
+    Border: {radius: 6, width: 2, color: selected ? {80, 85, 105, 255} : {30, 33, 44, 255}}
+  }
+
+  number {
+    Text: {value: "{index + 1}", size: 15}
+    Rgb: active ? color : IDLE
+  }
+
+  title {
+    Text: {value: SONGS[index].title, size: 17}
+    Rgb: {240, 240, 245}
+  }
+
+  async {
+    while true {
+      const e = await on.activate(this)
+      if ui.activation(e) == this {
+        if playing && song == index {
+          playing = false
+        } else {
+          song = index
+          playing = true
+        }
+      }
+    }
+  }
+}
+
 box {
   ui {
     theme {
-      UiTheme = {accent: {song_r, song_g, song_b}, text: {240, 240, 245}, text_muted: {170, 175, 195}, font_size: 13}
+      UiTheme = {accent: color, text: {240, 240, 245}, text_muted: {170, 175, 195}, font_size: 13}
     }
   }
 }
@@ -45,16 +91,20 @@ hud {
       Rect: {1, 1}
       Rgb: {14, 16, 24}
       Opacity: {0.92}
-      Border: {width: 1, radius: 10, color: {song_r * 0.6, song_g * 0.6, song_b * 0.6, 255}}
+      Border: {width: 1, radius: 10, color: {color.r * 0.6, color.g * 0.6, color.b * 0.6, 255}}
 
       title {
         Text: {value: "JUKEBOX", size: 24}
-        Rgb: {song_r, song_g, song_b}
+        Rgb: color
       }
 
-      keys {
-        Text: {value: "1-9 pick  <- -> previous, next  space play", size: 11}
-        Rgb: {150, 155, 175}
+      songs {
+        Layout: {direction: Column, spacing: 4}
+        LayoutItem: {width: {mode: Grow}}
+
+        for i in 0..SONGS.count() {
+          "song_{i}" { SongButton: {index: i} }
+        }
       }
 
       now {
@@ -64,7 +114,7 @@ hud {
         state {
           if lit {
             Text: {value: "NOW PLAYING", size: 12}
-            Rgb: {song_r, song_g, song_b}
+            Rgb: color
           } else if playing && !loaded {
             Text: {value: "LOADING", size: 12}
             Rgb: {150, 155, 175}
@@ -93,7 +143,7 @@ hud {
           fill {
             LayoutItem: {h: Left, width: {mode: Fixed, value: max(6, clamp(beat / song_beats, 0, 1) * (PANEL_W - 32))}, height: {mode: Fixed, value: 6}}
             Rect: {1, 1}
-            Rgb: {song_r, song_g, song_b}
+            Rgb: color
             Border: {radius: 3}
           }
         }
@@ -122,7 +172,7 @@ hud {
                   level {
                     LayoutItem: {v: Bottom, width: {mode: Grow}, height: {mode: Fixed, value: max(2, levels[i] * METER_H)}}
                     Rect: {1, 1}
-                    Rgb: {song_r, song_g, song_b}
+                    Rgb: color
                     Border: {radius: 3}
                   }
                 }

@@ -55,34 +55,7 @@ template JBArch {
   Sweep: {path: route, profile: JBRoundProfile, scale: {tube, tube}, rings: 160}
 }
 
-template JBKey {
-  prop action: entity = 0
-  prop label: string = ""
-  prop on: bool = false
-  ActionTrigger: {action: action}
-  RoundedBox: {0.17, 0.09, 0.07, 0.014}
-  Rgb: {242, 225, 186}
-  PbrMaterial: {roughness: 0.28}
-  ClearCoat: {strength: 0.7, roughness: 0.15}
-  symbol {
-    Position: {0, 0.006, 0.037}
-    Scale: {0.0015, 0.0015, 0.0015}
-    Text: {value: label, size: 25}
-    Rgb: {28, 49, 48}
-  }
-  indicator {
-    Position: {0, -0.031, 0.037}
-    RoundedBox: {0.11, 0.009, 0.006, 0.003}
-    Rgb: {song_r, song_g, song_b}
-    Emissive: {strength: 0.15 + 1.5 * on, color: {song_r, song_g, song_b}}
-  }
-}
-
 template Jukebox {
-  const R = song_r
-  const G = song_g
-  const B = song_b
-
   shell : JBWood {
     Position: {0, 0, -0.04}
     Rotation: {-PI / 2, 0, 0}
@@ -102,8 +75,8 @@ template Jukebox {
   JBArch light_channel(radius: 0.632, tube: 0.048) { Position: {0, 0, 0.402}; (IsA, JBBrass) }
   JBArch neon(radius: 0.632, tube: 0.033) {
     Position: {0, 0, 0.439}
-    Rgb: playing ? {R, G, B} : {58, 60, 68}
-    Emissive: {strength: playing ? 0.7 + 1.15 * glow : 0, color: {R, G, B}}
+    Rgb: lit ? color : {58, 60, 68}
+    Emissive: {strength: lit ? 0.7 + 1.15 * glow : 0, color: color}
     Transition: [Rgb: {duration: 0.4, timing_function: EaseOut}, Emissive: {duration: 0.12, timing_function: EaseOut}]
     PbrMaterial: {roughness: 0.25}
     ClearCoat: {strength: 1, roughness: 0.12}
@@ -154,7 +127,7 @@ template Jukebox {
           PbrMaterial: {metallic: 0.25, roughness: 0.35}
         }
       }
-      label { Position: {0, 0.007, 0}; Cylinder: {radius: 0.104, length: 0.005, segments: 48, smooth: true}; Rgb: {R, G, B} }
+      label { Position: {0, 0.007, 0}; Cylinder: {radius: 0.104, length: 0.005, segments: 48, smooth: true}; Rgb: color }
       label_ring : JBBrass { Position: {0, 0.011, 0}; Torus: {radius: 0.081, tube: 0.002, segments: 48, rings: 6, smooth: true} }
       spindle : JBChrome { Position: {0, 0.014, 0}; Cylinder: {radius: 0.014, length: 0.02, segments: 24, smooth: true} }
     }
@@ -185,9 +158,6 @@ template Jukebox {
 
   console : JBChrome { Position: {0, 1.035, 0.425}; RoundedBox: {1.075, 0.25, 0.16, 0.045} }
   console_inset : JBDark { Position: {0, 1.041, 0.51}; RoundedBox: {0.975, 0.17, 0.018, 0.022} }
-  previous_key { JBKey: {action: jukebox_actions.previous, label: "<<"}; Position: {-0.19, 1.015, 0.538} }
-  play_key { JBKey: {action: jukebox_actions.play, label: ">", on: lit}; Position: {0, 1.015, 0.538} }
-  next_key { JBKey: {action: jukebox_actions.next, label: ">>"}; Position: {0.19, 1.015, 0.538} }
   song_plate : JBIvory { Position: {0, 1.092, 0.525}; RoundedBox: {0.55, 0.033, 0.006, 0.006} }
   song_title {
     Position: {0, 1.093, 0.531}
@@ -225,7 +195,7 @@ template Jukebox {
     "spill_{side}" {
       Position: {(side * 2 - 1) * 0.72, 0.75, 0.66}
       PointLight: {intensity: (0.12 + 0.5 * master_level[side]) * PI, range: 1.8}
-      Rgb: {R, G, B}
+      Rgb: color
     }
   }
 }
