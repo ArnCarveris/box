@@ -1636,6 +1636,7 @@ Importing box alone does not open an output: `box_app_run` does.
 | `audio analyze <wav> [from] [to]` | Print a text report of a WAV resource or file, optionally of the seconds from..to |
 | `audio notes <track> [bars=a..b] [roll]` | Print the notes of a track per bar, or as a piano roll |
 | `audio chords [track...] [bars=a..b]` | Print the chords and the key of a section from the notes |
+| `audio check [static] [bars=a..b]` | Lint the song, or the tracks of the scene: notes, clips, routing, effects and lanes, then voices, steals, clipping, the limiter, loudness and silent tracks from one offline play |
 
 Solo, mute and bypass judge one element of a mix without editing the song. Solo and
 mute write `AudioBus` and bypass adds or removes `Disabled` on the effect entity, as a
@@ -1807,6 +1808,53 @@ the next most likely one. Chords and notes are spelled with flats in a flat key.
 The notes outside the key of the bars, its major scale or its natural minor
 scale with the raised seventh, are listed per pitch class with their count and
 first positions.
+
+`audio check` lints the loaded song, or the tracks of the scene when no song is
+loaded, and prints one line per finding: its severity (`error`, `warning` or
+`info`), the check, where it is (track, clip, note index and bar.beat, bus, slot
+or effect) and what it is with a hint. A last line counts the findings, or says
+`no problems` when there is no error and no warning. `bars=a..b` (or `bars=a`)
+keeps the findings of notes and clips that start in those bars and plays only
+them; positions are the programmed ones, before swing and humanize.
+
+```
+> audio check
+error note-range track lead, clip lead_a, note 3 at 2.1: pitch 117 plays 28.2 kHz, over the Nyquist of 22.05 kHz, so it aliases or is lost; transpose it down
+warning note-overlap track bass, clip bass_line, note 1 at 1.2: starts while note 0 of the same pitch 36 holds until 1.3, so the pitch doubles or cuts off; shorten one of them
+warning voice-steal song at 9.1: 12 voices stolen from here on, at the voice cap of 64 (peak 64 voices at 9.1); ...
+warning bus-clip bus drums at 5.1: its output peaks at +2.3 dBFS before the master limiter; lower its volume or what feeds it
+1 error, 3 warnings; played bars 1..16: peak 64 voices at 9.1, master peak -0.4 dBFS, -12.8 LUFS
+```
+
+The static checks read the data:
+
+| Check | Finds |
+| --- | --- |
+| `note-range` | A note under 20 Hz or over 22.05 kHz, the Nyquist of 44.1 kHz, on the fundamental of its synth after the pitch ratio; a note past the 4 octaves up or 6 down the core plays |
+| `note-length`, `note-velocity` | A note of zero length on a gated instrument, a note of velocity 0 |
+| `note-overlap`, `note-legato` | Notes of one pitch that overlap on a track; notes that overlap on a legato (`SynthGlide.legato`) sound, which glide (info) |
+| `note-late`, `clip-late` | Notes that start and placements that end after `Song.beats` |
+| `clip-overlap` | Note or audio placements that overlap on a track |
+| `track-instrument`, `instrument-sound` | A track with note clips and no instrument, an instrument without a sound |
+| `bus-send`, `bus-output` | A send to a deleted entity or one without `AudioBus`; an output that is no bus |
+| `bus-unreachable` | A bus whose output path loops or goes through a disabled bus, so it never reaches the master |
+| `bus-slot`, `effect-missing` | An empty insert slot between used ones (info); a slot that names no effect |
+| `effect-disabled`, `effect-unused` | An effect in a slot that is disabled; an effect no slot names |
+| `song-lane` | A `Song.lanes` entry whose bus does not exist |
+
+The dynamic checks play the bars, or the whole song, through once in the offline
+world of `audio render song`, within the call and without a file, and read the
+counters, meters and frames of its core: `voice-steal` and `voice-refused` with
+the bar of the first one, `effect-pool` for an effect the pool of 64 refused,
+`core-load` over 50%, `bus-clip` for a bus or track whose output peaks over 0
+dBFS before the master limiter, `limiter` for the gain reduction of the master
+limiter (a warning over 6 dB), `loudness` when the integrated loudness of the
+master is more than 5 LU from -14 LUFS, and `track-silent` for a track with
+notes in the bars that stays under -100 dBFS. Positions of the dynamic checks
+are the frame of the play, 1/60 s, at the start of which the counter or the peak
+was seen. A play lasts up to 600 s. `audio check static` runs only the static
+checks, without the offline world. The same song gives the same text, apart from
+`core-load`, which measures the machine.
 
 If a track is silent, check sample readiness, its instrument and overlapping
 placements. If a return is silent, check its send and insert assignment. `audio`

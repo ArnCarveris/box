@@ -1283,7 +1283,8 @@
                     "wav_formats",
                     "segments",
                     "song_capture",
-                    "capture_without_song"
+                    "capture_without_song",
+                    "loudness_meter"
                 ]
             },
             {

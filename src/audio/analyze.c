@@ -330,6 +330,121 @@ float box_audio_loudness(
     return result < BOX_AUDIO_ANALYZE_FLOOR ? BOX_AUDIO_ANALYZE_FLOOR : result;
 }
 
+void box_audio_loudness_meter_init(
+    box_audio_loudness_meter_t *m,
+    int32_t channels,
+    float sample_rate)
+{
+    memset(m, 0, sizeof(*m));
+    m->channels = channels > 1 ? 2 : 1;
+    box_audio_kweight_init(&m->k[0], sample_rate);
+    box_audio_kweight_init(&m->k[1], sample_rate);
+    m->step = (int32_t)lround(sample_rate * 0.1);
+    m->step = m->step > 0 ? m->step : 1;
+}
+
+/** Close the step of 100 ms that filled, and the block of the last four steps.
+ *
+ * @param m The meter
+ */
+static void box_audio_loudness_meter_step(
+    box_audio_loudness_meter_t *m)
+{
+    m->steps[m->done % 4] = m->sum;
+    m->done ++;
+    m->sum = 0;
+    m->filled = 0;
+    if (m->done < 4) {
+        goto done;
+    }
+
+    if (m->block_count == m->block_size) {
+        int32_t size = m->block_size ? m->block_size * 2 : 256;
+        double *blocks = realloc(m->blocks, sizeof(double) * (size_t)size);
+        if (!blocks) {
+            goto done;
+        }
+
+        m->blocks = blocks;
+        m->block_size = size;
+    }
+
+    m->blocks[m->block_count ++] = (m->steps[0] + m->steps[1] + m->steps[2] + m->steps[3]) /
+        (4.0 * m->step);
+done:
+    return;
+}
+
+void box_audio_loudness_meter_add(
+    box_audio_loudness_meter_t *m,
+    const float *left,
+    const float *right,
+    int32_t frames)
+{
+    int32_t i;
+    for (i = 0; i < frames; i ++) {
+        double l = box_audio_kweight(&m->k[0], left[i]), sq = l * l;
+        if (m->channels > 1) {
+            double r = box_audio_kweight(&m->k[1], right ? right[i] : left[i]);
+            sq += r * r;
+        }
+
+        m->sum += sq;
+        m->total += sq;
+        m->frames ++;
+        if (++ m->filled == m->step) {
+            box_audio_loudness_meter_step(m);
+        }
+    }
+}
+
+float box_audio_loudness_meter_integrated(
+    const box_audio_loudness_meter_t *m)
+{
+    double sum = 0, rel_sum = 0;
+    float rel, result = BOX_AUDIO_ANALYZE_FLOOR;
+    int32_t b, n = 0;
+    if (!m->block_count) {
+        result = m->frames ? box_audio_loudness(m->total / (double)m->frames) :
+            BOX_AUDIO_ANALYZE_FLOOR;
+        goto done;
+    }
+
+    for (b = 0; b < m->block_count; b ++) {
+        if (box_audio_loudness(m->blocks[b]) > -70.0f) {
+            sum += m->blocks[b];
+            n ++;
+        }
+    }
+
+    if (!n) {
+        goto done;
+    }
+
+    rel = box_audio_loudness(sum / n) - 10.0f;
+    n = 0;
+    for (b = 0; b < m->block_count; b ++) {
+        float l = box_audio_loudness(m->blocks[b]);
+        if (l > -70.0f && l > rel) {
+            rel_sum += m->blocks[b];
+            n ++;
+        }
+    }
+
+    result = n ? box_audio_loudness(rel_sum / n) : BOX_AUDIO_ANALYZE_FLOOR;
+done:
+    return result;
+}
+
+void box_audio_loudness_meter_fini(
+    box_audio_loudness_meter_t *m)
+{
+    free(m->blocks);
+    m->blocks = NULL;
+    m->block_count = 0;
+    m->block_size = 0;
+}
+
 void box_audio_true_peak_init(
     box_audio_true_peak_t *tp)
 {

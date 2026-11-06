@@ -1,0 +1,40 @@
+// The clean song of the audio check tests in the Shell suite of test/cpu/command: a lead of a
+// four note phrase with a send to a reverb return, 2 bars of 4/4 at 120 bpm, which audio check
+// reports no problems for.
+using box.audio
+
+prefab check_clean_tone {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.005, decay: 0.05, sustain: 0.8, release: 0.05}
+  SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.3}
+}
+
+check_clean_inst { Instrument: {sound: check_clean_tone} }
+
+prefab check_clean_notes {
+  NoteClip: {length: 4, notes: [
+    {start: 0, duration: 1, pitch: 60, velocity: 0.8},
+    {start: 1, duration: 1, pitch: 64, velocity: 0.8},
+    {start: 2, duration: 1, pitch: 67, velocity: 0.8},
+    {start: 3, duration: 1, pitch: 72, velocity: 0.8}
+  ]}
+}
+
+check_clean_verb { Reverb: {decay: 1, mix: 1} }
+
+check_clean_return {
+  AudioBus: {kind: AudioChannelReturn, effects: [check_clean_verb]}
+}
+
+check_clean_lead {
+  Track: {instrument: check_clean_inst}
+  AudioBus: {sends: [{bus: check_clean_return, level: 0.2}]}
+  part { ClipPlacement: {clip: check_clean_notes, start: 0, duration: 8, loop: true} }
+}
+
+$ {
+  Song: {
+    title: "Check clean", tempo: 120, beats_per_bar: 4, beat_unit: 4, beats: 8,
+    lanes: [{name: "Lead", bus: check_clean_lead}, {name: "Verb", bus: check_clean_return}]
+  }
+}

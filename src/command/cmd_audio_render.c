@@ -46,6 +46,9 @@
 /** Folder of the renders in the file system of the page */
 #define BOX_CMD_AUDIO_RENDER_WEB_DIR "/tmp"
 
+/** Frames handed to a probe at once when the frames kept before the anchor are passed on */
+#define BOX_CMD_AUDIO_RENDER_PROBE_BLOCK (256)
+
 /** What a render plays */
 typedef enum box_cmd_audio_render_mode_t {
     BOX_CMD_AUDIO_RENDER_NOTE = 0,     /**< One note of a sound or an instrument */
@@ -104,6 +107,8 @@ typedef struct box_cmd_audio_render_job_t {
     float peak;             /**< Peak of the frames of the last frame of the offline world */
     ecs_vec_t frames;       /**< Interleaved stereo frames kept */
     char *log;              /**< First error the offline world logged, NULL for none */
+    const box_cmd_audio_probe_t *probe; /**< Gets the frames and the frames of the offline
+                             *   world instead of a file, NULL for a render to a file */
 } box_cmd_audio_render_job_t;
 
 /** State of the audio render command of a world */
@@ -208,7 +213,12 @@ static void box_cmd_audio_render_tap(
         job->peak = r > job->peak ? r : job->peak;
     }
 
-    if (to > from) {
+    if (to > from && job->probe && job->anchored) {
+        int32_t at = (int32_t)(from - job->clock);
+        if (job->probe->frames) {
+            job->probe->frames(left + at, right + at, (int32_t)(to - from), job->probe->ctx);
+        }
+    } else if (to > from) {
         int32_t n = (int32_t)(to - from), at = (int32_t)(from - job->clock);
         float *out = ecs_vec_grow_t(NULL, &job->frames, float, n * 2);
         for (i = 0; i < n; i ++) {
@@ -545,11 +555,13 @@ static void box_cmd_audio_render_scripts(
  *
  * @param world The live world
  * @param job The render
+ * @param max Seconds a render takes at most
  * @return 0 when it fits, nonzero with an error logged
  */
 static int box_cmd_audio_render_length(
     ecs_world_t *world,
-    const box_cmd_audio_render_job_t *job)
+    const box_cmd_audio_render_job_t *job,
+    double max)
 {
     const Transport *tr = ecs_singleton_get(world, Transport);
     double tempo = tr && tr->tempo > 0 ? tr->tempo : 120;
@@ -563,9 +575,9 @@ static int box_cmd_audio_render_length(
     }
 
     seconds += job->tail > 0 ? job->tail : 0;
-    if (seconds > BOX_AUDIO_CAPTURE_MAX) {
+    if (seconds > max) {
         ecs_err("the render takes %.2f s, more than the %.0f s a render takes at most",
-            seconds, (double)BOX_AUDIO_CAPTURE_MAX);
+            seconds, max);
         result = -1;
     } else if (preroll > BOX_CMD_AUDIO_RENDER_PREROLL_MAX) {
         ecs_err("the section starts %.2f s into the song, more than the %.0f s a render "
@@ -650,13 +662,15 @@ done:
  * @param subject The subject
  * @param argc Number of options
  * @param options The options
+ * @param max Seconds the render takes at most
  * @return The render, NULL with an error logged
  */
 static box_cmd_audio_render_job_t* box_cmd_audio_render_job(
     ecs_world_t *world,
     const char *subject,
     int32_t argc,
-    const char **options)
+    const char **options,
+    double max)
 {
     box_cmd_audio_render_job_t *job = ecs_os_calloc_t(box_cmd_audio_render_job_t);
     const AudioSong *song = ecs_singleton_get(world, AudioSong);
@@ -701,7 +715,7 @@ static box_cmd_audio_render_job_t* box_cmd_audio_render_job(
         job->duration = BOX_CMD_AUDIO_RENDER_SCENE_SECONDS;
     }
 
-    if (box_cmd_audio_render_length(world, job)) {
+    if (box_cmd_audio_render_length(world, job, max)) {
         goto error;
     }
 
@@ -1023,6 +1037,26 @@ static void box_cmd_audio_render_anchor(
     job->end = (uint64_t)(to > from ? to : from) + box_cmd_audio_render_frames(
         job->tail > 0 ? job->tail : 0);
     job->anchored = true;
+    if (job->probe) {
+        int32_t n = ecs_vec_count(&job->frames) / 2, i;
+        uint64_t length = job->end - job->start;
+        float *f = ecs_vec_first(&job->frames);
+        n = (uint64_t)n > length ? (int32_t)length : n;
+        for (i = 0; i < n && job->probe->frames; i += BOX_CMD_AUDIO_RENDER_PROBE_BLOCK) {
+            float left[BOX_CMD_AUDIO_RENDER_PROBE_BLOCK], right[BOX_CMD_AUDIO_RENDER_PROBE_BLOCK];
+            int32_t k, count = n - i < BOX_CMD_AUDIO_RENDER_PROBE_BLOCK ?
+                n - i : BOX_CMD_AUDIO_RENDER_PROBE_BLOCK;
+            for (k = 0; k < count; k ++) {
+                left[k] = f[(i + k) * 2];
+                right[k] = f[(i + k) * 2 + 1];
+            }
+
+            job->probe->frames(left, right, count, job->probe->ctx);
+        }
+
+        ecs_vec_clear(&job->frames);
+    }
+
 done:
     return;
 }
@@ -1196,7 +1230,8 @@ char* box_cmd_audio_render(
         goto done;
     }
 
-    job = box_cmd_audio_render_job(world, subject, argc, options);
+    job = box_cmd_audio_render_job(world, subject, argc, options,
+        (double)BOX_AUDIO_CAPTURE_MAX);
     if (!job) {
         goto done;
     }
@@ -1222,6 +1257,78 @@ char* box_cmd_audio_render(
     }
 
     ecs_vec_append_t(NULL, &state->jobs, box_cmd_audio_render_job_t*)[0] = job;
+done:
+    return result;
+}
+
+/** Get the beat of the timeline of the offline world of a render at a frame of its clock.
+ *
+ * @param job The render
+ * @param frame The frame
+ * @return The beat, the beat of the first anchor for a frame before it, the first beat of
+ * the section before the timeline started
+ */
+static double box_cmd_audio_render_beat(
+    const box_cmd_audio_render_job_t *job,
+    uint64_t frame)
+{
+    const box_audio_timeline_t *tl = &box_audio_module_get(job->world)->timeline;
+    const box_audio_anchor_t *a = ecs_vec_first(&tl->anchors), *at = a;
+    int32_t i, count = ecs_vec_count(&tl->anchors);
+    double result = job->from;
+    for (i = 1; i < count; i ++) {
+        if (a[i].frame <= frame) {
+            at = &a[i];
+        }
+    }
+
+    if (at && frame < at->frame) {
+        result = at->beat;
+    } else if (at && at->frames_per_beat > 0) {
+        result = at->beat + ((double)frame - (double)at->frame) / at->frames_per_beat;
+    }
+
+    return result;
+}
+
+int box_cmd_audio_render_probe(
+    ecs_world_t *world,
+    int32_t argc,
+    const char **options,
+    const box_cmd_audio_probe_t *probe)
+{
+    box_cmd_audio_render_job_t *job = box_cmd_audio_render_job(world, "song", argc, options,
+        BOX_CMD_AUDIO_RENDER_PREROLL_MAX);
+    ecs_os_api_log_t prev = ecs_os_api.log_;
+    box_cmd_audio_render_job_t *prev_job = box_cmd_audio_render_logging;
+    char *error = NULL;
+    bool done = false;
+    int result = -1;
+    if (!job) {
+        goto done;
+    }
+
+    job->probe = probe;
+    box_cmd_audio_render_logging = job;
+    ecs_os_api.log_ = box_cmd_audio_render_log;
+    while (!done) {
+        uint64_t clock = job->clock;
+        done = box_cmd_audio_render_step(job, &error);
+        if (!error && job->phase == BOX_CMD_AUDIO_RENDER_RUN && job->anchored && probe->frame) {
+            probe->frame(job->world, box_cmd_audio_render_beat(job, clock), probe->ctx);
+        }
+    }
+
+    ecs_os_api.log_ = prev;
+    box_cmd_audio_render_logging = prev_job;
+    if (error) {
+        ecs_err("the song cannot be played offline: %s", error);
+    } else {
+        result = 0;
+    }
+
+    ecs_os_free(error);
+    box_cmd_audio_render_job_free(job);
 done:
     return result;
 }

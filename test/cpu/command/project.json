@@ -71,6 +71,17 @@
                 ]
             },
             {
+                "id": "AudioCheck",
+                "testcases": [
+                    "problems",
+                    "static",
+                    "clean",
+                    "voice_steals",
+                    "clipping",
+                    "errors"
+                ]
+            },
+            {
                 "id": "Logs",
                 "testcases": [
                     "captures_error",

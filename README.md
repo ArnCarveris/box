@@ -73,6 +73,7 @@ builtins of the flecs shell (`ls`, `get`, `set`, `query`, ...):
 | `audio analyze <wav> [from] [to]` | Print loudness, peaks, bands, stereo, onsets, tail, clicks and pitch of a WAV |
 | `audio notes <track> [bars=a..b] [roll]` | Print the notes of a track per bar (position, pitch or drum sound, length, velocity), or with `roll` as a text piano roll of one column per sixteenth |
 | `audio chords [track...] [bars=a..b]` | Print the chords of a section per bar or per beat, its key, the key of the song and the notes outside the key, from the note data |
+| `audio check [static] [bars=a..b]` | Lint the song, or the tracks of the scene: one line per problem (note range, overlaps, clips past the end, routing, effects, lanes, and from one offline play voice steals, refused effects, clipping buses, the limiter, loudness and silent tracks) with its place and a hint |
 | `fps [rate]`, `frames` | Toggle the fps panel or cap the rate, print the frame timing |
 | `edit [on\|off]` | Open or close the editor |
 | `logs [level] [count]` | Show the last log messages |

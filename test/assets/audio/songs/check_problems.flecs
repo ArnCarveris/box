@@ -1,0 +1,156 @@
+// The song of the audio check tests in the Shell suite of test/cpu/command: one instance of each
+// problem the static checks find, each on its own track, bus or effect, and a track that stays
+// silent. The test empties slot 1 of check_fx_bus, which a script cannot write, so that slot is
+// a gap and check_gap is named by no bus. 4 bars of 4/4 at 120 bpm.
+using box.audio
+
+prefab check_tone {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.005, decay: 0.05, sustain: 0.8, release: 0.05}
+  SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.2}
+}
+
+prefab check_high_tone {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.005, decay: 0.05, sustain: 0.8, release: 0.05}
+  SynthOscillator: {wave: SynthSine, frequency: 4000, level: 0.2}
+}
+
+prefab check_low_tone {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.005, decay: 0.05, sustain: 0.8, release: 0.05}
+  SynthOscillator: {wave: SynthSine, frequency: 100, level: 0.2}
+}
+
+prefab check_glide_tone {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.005, decay: 0.05, sustain: 0.8, release: 0.05}
+  SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.2}
+  SynthGlide: {time: 0.05, legato: true}
+}
+
+check_inst { Instrument: {sound: check_tone} }
+check_high_inst { Instrument: {sound: check_high_tone} }
+check_low_inst { Instrument: {sound: check_low_tone} }
+check_glide_inst { Instrument: {sound: check_glide_tone} }
+check_soundless_inst { Instrument: {} }
+
+// 4000 Hz at the root A4, 3 octaves up: 32 kHz
+prefab check_high_notes {
+  NoteClip: {length: 4, notes: [{start: 0, duration: 1, pitch: 105, velocity: 0.5}]}
+}
+
+// 100 Hz at the root A4, 3 octaves down: 12.5 Hz; then a note of zero length and one of zero
+// velocity
+prefab check_low_notes {
+  NoteClip: {length: 4, notes: [
+    {start: 0, duration: 1, pitch: 33, velocity: 0.5},
+    {start: 1, duration: 0, pitch: 69, velocity: 0.5},
+    {start: 2, duration: 1, pitch: 69, velocity: 0}
+  ]}
+}
+
+prefab check_dup_notes {
+  NoteClip: {length: 4, notes: [
+    {start: 0, duration: 2, pitch: 60, velocity: 0.5},
+    {start: 1, duration: 2, pitch: 60, velocity: 0.5}
+  ]}
+}
+
+prefab check_glide_notes {
+  NoteClip: {length: 4, notes: [
+    {start: 0, duration: 2, pitch: 60, velocity: 0.5},
+    {start: 1, duration: 2, pitch: 64, velocity: 0.5}
+  ]}
+}
+
+prefab check_late_notes {
+  NoteClip: {length: 4, notes: [{start: 3, duration: 1, pitch: 69, velocity: 0.5}]}
+}
+
+prefab check_tone_notes {
+  NoteClip: {length: 4, notes: [{start: 0, duration: 1, pitch: 69, velocity: 0.5}]}
+}
+
+check_high {
+  Track: {instrument: check_high_inst}
+  AudioBus: {}
+  part { ClipPlacement: {clip: check_high_notes, start: 0, duration: 4} }
+}
+
+check_low {
+  Track: {instrument: check_low_inst}
+  AudioBus: {}
+  part { ClipPlacement: {clip: check_low_notes, start: 4, duration: 4} }
+}
+
+check_dup {
+  Track: {instrument: check_inst}
+  AudioBus: {}
+  part { ClipPlacement: {clip: check_dup_notes, start: 0, duration: 4} }
+}
+
+check_glide {
+  Track: {instrument: check_glide_inst}
+  AudioBus: {}
+  part { ClipPlacement: {clip: check_glide_notes, start: 0, duration: 4} }
+}
+
+check_late {
+  Track: {instrument: check_inst}
+  AudioBus: {}
+  part { ClipPlacement: {clip: check_late_notes, start: 14, duration: 4} }
+}
+
+check_stack {
+  Track: {instrument: check_inst}
+  AudioBus: {}
+  first { ClipPlacement: {clip: check_tone_notes, start: 0, duration: 4} }
+  second { ClipPlacement: {clip: check_tone_notes, start: 2, duration: 4} }
+}
+
+check_no_inst {
+  Track: {}
+  AudioBus: {}
+  part { ClipPlacement: {clip: check_tone_notes, start: 0, duration: 4} }
+}
+
+check_silent {
+  Track: {instrument: check_inst}
+  AudioBus: {volume: 0}
+  part { ClipPlacement: {clip: check_tone_notes, start: 0, duration: 4} }
+}
+
+check_not_a_bus {}
+
+check_send_bus {
+  AudioBus: {sends: [{bus: check_not_a_bus, level: 0.5}]}
+}
+
+check_off_group {
+  AudioBus: {}
+  flecs.core.Disabled
+}
+
+check_orphan_bus {
+  AudioBus: {output: check_off_group}
+}
+
+check_eq { Equalizer: {} }
+check_gap { Equalizer: {} }
+
+check_reverb {
+  Reverb: {decay: 1}
+  flecs.core.Disabled
+}
+
+check_fx_bus {
+  AudioBus: {effects: [check_eq, check_gap, check_reverb]}
+}
+
+$ {
+  Song: {
+    title: "Check problems", tempo: 120, beats_per_bar: 4, beat_unit: 4, beats: 16,
+    lanes: [{name: "Ghost", bus: check_not_a_bus}]
+  }
+}

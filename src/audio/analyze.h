@@ -154,6 +154,23 @@ typedef struct box_audio_analysis_t {
     float voiced;           /**< Fraction of the loud frames with a pitch, 0..1 */
 } box_audio_analysis_t;
 
+/** Integrated loudness measured as the frames come, for a recording that is not kept: the
+ * gating blocks of 400 ms, a step of 100 ms apart, as box_audio_analyze gates them */
+typedef struct box_audio_loudness_meter_t {
+    box_audio_kweight_t k[2]; /**< K-weighting of the left and the right channel */
+    int32_t channels;       /**< 1 or 2 */
+    int32_t step;           /**< Frames of a step of 100 ms */
+    int32_t filled;         /**< Frames in the step that fills */
+    double sum;             /**< Sum of the squares of the weighted samples of that step */
+    double steps[4];        /**< Sums of the last four steps, step i at i % 4 */
+    int64_t done;           /**< Steps done */
+    double total;           /**< Sum of the squares of every weighted sample */
+    int64_t frames;         /**< Frames measured */
+    double *blocks;         /**< Power of each gating block */
+    int32_t block_count;    /**< Blocks in blocks */
+    int32_t block_size;     /**< Blocks blocks holds room for */
+} box_audio_loudness_meter_t;
+
 /** A part of a recording, such as a bar, with its loudness and bands */
 typedef struct box_audio_analyze_segment_t {
     int32_t start;          /**< First frame */
@@ -242,6 +259,46 @@ double box_audio_kweight(
  */
 float box_audio_loudness(
     double power);
+
+/** Set up a loudness meter.
+ *
+ * @param m The meter
+ * @param channels 1 or 2
+ * @param sample_rate Frames per second
+ */
+void box_audio_loudness_meter_init(
+    box_audio_loudness_meter_t *m,
+    int32_t channels,
+    float sample_rate);
+
+/** Measure frames. Grows the blocks once per 100 ms of frames at most, never per sample.
+ *
+ * @param m The meter
+ * @param left The left channel, or the only one
+ * @param right The right channel, NULL for mono
+ * @param frames Number of frames
+ */
+void box_audio_loudness_meter_add(
+    box_audio_loudness_meter_t *m,
+    const float *left,
+    const float *right,
+    int32_t frames);
+
+/** Get the integrated loudness of the frames measured: gated at -70 LUFS and at 10 LU under
+ * the mean of the blocks over it. Frames shorter than a block are one block.
+ *
+ * @param m The meter
+ * @return The loudness in LUFS, BOX_AUDIO_ANALYZE_FLOOR for silence or no frames
+ */
+float box_audio_loudness_meter_integrated(
+    const box_audio_loudness_meter_t *m);
+
+/** Free the blocks of a loudness meter.
+ *
+ * @param m The meter
+ */
+void box_audio_loudness_meter_fini(
+    box_audio_loudness_meter_t *m);
 
 /** Set up the interpolator of the true peak.
  *

@@ -151,6 +151,59 @@ char* box_cmd_audio_render(
     int32_t argc,
     const char **options);
 
+/** Receives the frames of the master of a render of the song, after the limiter, as they
+ * render */
+typedef void (*box_cmd_audio_probe_frames_t)(
+    const float *left,
+    const float *right,
+    int32_t count,
+    void *ctx);
+
+/** Called after each frame of the offline world of a render of the song once the timeline
+ * plays, with the beat at the start of the frames it rendered; the module of the offline world
+ * holds its meters, its counters and its AudioStatus */
+typedef void (*box_cmd_audio_probe_frame_t)(
+    ecs_world_t *world,
+    double beat,
+    void *ctx);
+
+/** What a render of the song hands to its caller instead of writing a file, for audio check */
+typedef struct box_cmd_audio_probe_t {
+    box_cmd_audio_probe_frames_t frames; /**< Gets the frames of the master, may be NULL */
+    box_cmd_audio_probe_frame_t frame;   /**< Gets the frames of the offline world, may be
+                                          *   NULL */
+    void *ctx;                           /**< Context of the callbacks */
+} box_cmd_audio_probe_t;
+
+/** Play a section of the song, or of the tracks of the scene, through once at once: the
+ * offline world of audio render, run to its end within the call, without a file. The section
+ * may last up to 600 s.
+ *
+ * @param world The live world
+ * @param argc Number of options
+ * @param options The key=value options of audio render song: bars or beats, solo, mute, tail
+ * @param probe Gets the frames and the frames of the offline world
+ * @return 0 on success, nonzero with an error logged
+ */
+int box_cmd_audio_render_probe(
+    ecs_world_t *world,
+    int32_t argc,
+    const char **options,
+    const box_cmd_audio_probe_t *probe);
+
+/** Lint the loaded song, or the tracks of the scene: audio check [static] [bars=a..b]. One
+ * line per finding with its severity, check, place and a hint, and a summary line.
+ *
+ * @param world The world
+ * @param argc Number of arguments
+ * @param argv static and bars=a..b in any order
+ * @return The text, which the caller frees, NULL with an error logged
+ */
+char* box_cmd_audio_check(
+    ecs_world_t *world,
+    int32_t argc,
+    const char **argv);
+
 /** Set or toggle the solo of a bus, or clear every solo with none, as a script writes
  * AudioBus.
  *

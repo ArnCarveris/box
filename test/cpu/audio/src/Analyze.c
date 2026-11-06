@@ -375,3 +375,67 @@ void Analyze_capture_without_song(void) {
     free(bytes);
     remove(path);
 }
+
+/** Measure the integrated loudness of a WAV of ANALYZE_DIR with a loudness meter, in chunks.
+ *
+ * @param name The file
+ * @param chunk Frames per call
+ * @param analysis Receives the integrated loudness of box_audio_analyze
+ * @return The integrated loudness of the meter
+ */
+static float analyze_meter(
+    const char *name,
+    int32_t chunk,
+    float *analysis)
+{
+    box_audio_wav_t wav;
+    box_audio_analysis_t a;
+    box_audio_loudness_meter_t m;
+    analyze_wav(name, &wav);
+    test_int(box_audio_analyze(wav.data, wav.frames, wav.channels, wav.sample_rate, &a), 0);
+    *analysis = a.integrated;
+    float *left = malloc(sizeof(float) * (size_t)wav.frames);
+    float *right = malloc(sizeof(float) * (size_t)wav.frames);
+    int32_t i;
+    for (i = 0; i < wav.frames; i ++) {
+        left[i] = wav.data[i * wav.channels];
+        right[i] = wav.data[i * wav.channels + (wav.channels > 1 ? 1 : 0)];
+    }
+
+    box_audio_loudness_meter_init(&m, wav.channels, wav.sample_rate);
+    for (i = 0; i < wav.frames; i += chunk) {
+        int32_t n = wav.frames - i < chunk ? wav.frames - i : chunk;
+        box_audio_loudness_meter_add(&m, left + i, wav.channels > 1 ? right + i : NULL, n);
+    }
+
+    float result = box_audio_loudness_meter_integrated(&m);
+    box_audio_loudness_meter_fini(&m);
+    free(left);
+    free(right);
+    box_audio_wav_fini(&wav);
+
+    return result;
+}
+
+void Analyze_loudness_meter(void) {
+    float expect;
+    float sine = analyze_meter("analyze_sine_1k.wav", 4096, &expect);
+    test_assert(fabsf(sine - -3.01f) < 0.1f);
+    test_assert(fabsf(sine - expect) < 0.05f);
+
+    float pink = analyze_meter("analyze_pink.wav", 4096, &expect);
+    test_assert(fabsf(pink - ANALYZE_PINK_LUFS) < 1.0f);
+    test_assert(fabsf(pink - expect) < 0.1f);
+    test_flt(analyze_meter("analyze_pink.wav", 77, &expect), pink);
+
+    float stereo = analyze_meter("analyze_inverted.wav", 1000, &expect);
+    test_assert(fabsf(stereo - expect) < 0.1f);
+
+    box_audio_loudness_meter_t m;
+    box_audio_loudness_meter_init(&m, 2, 48000);
+    test_flt(box_audio_loudness_meter_integrated(&m), BOX_AUDIO_ANALYZE_FLOOR);
+    float silence[480] = {0};
+    box_audio_loudness_meter_add(&m, silence, silence, 480);
+    test_flt(box_audio_loudness_meter_integrated(&m), BOX_AUDIO_ANALYZE_FLOOR);
+    box_audio_loudness_meter_fini(&m);
+}
