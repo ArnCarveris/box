@@ -645,27 +645,29 @@ V.updateGr = () => {
   }
 };
 
+V.slot = (busPath, i) => {
+  const fx = DAW.val(busPath, "AudioBus").effects[i];
+  if (DAW.isNone(fx)) {
+    return [UI.el("div", { class: "slot-empty" }, `slot ${i + 1}`,
+      UI.el("button", { class: "small", text: "+ effect", onclick: (e) => V.addEffectMenu(e, busPath, i) }))];
+  }
+  const rec = DAW.ents[fx];
+  const buttons = [
+    rec && fx !== busPath ? UI.el("button", {
+      class: "small" + (rec.disabled ? "" : " on"), text: rec.disabled ? "off" : "on", title: "Bypass by disabling the effect entity",
+      onclick: () => DAW.enable(fx, rec.disabled).then(() => { rec.disabled = !rec.disabled; DAW.sig = ""; })
+    }) : null,
+    i > 0 ? UI.el("button", { class: "small", text: "◀", title: "Move left", onclick: () => V.moveSlot(busPath, i, -1) }) : null,
+    i < 3 ? UI.el("button", { class: "small", text: "▶", title: "Move right", onclick: () => V.moveSlot(busPath, i, 1) }) : null,
+    UI.el("button", { class: "small", text: "✕", title: "Remove from slot", onclick: () => V.setSlot(busPath, i, null) })
+  ].filter(Boolean);
+  return V.effectCards(fx, { buttons });
+};
+
 V.chain = (busPath) => {
   const bus = DAW.val(busPath, "AudioBus");
   const chain = UI.el("div", { class: "chain" });
-  (bus.effects || []).forEach((fx, i) => {
-    if (DAW.isNone(fx)) {
-      chain.appendChild(UI.el("div", { class: "slot-empty" }, `slot ${i + 1}`,
-        UI.el("button", { class: "small", text: "+ effect", onclick: (e) => V.addEffectMenu(e, busPath, i) })));
-      return;
-    }
-    const rec = DAW.ents[fx];
-    const buttons = [
-      rec && fx !== busPath ? UI.el("button", {
-        class: "small" + (rec.disabled ? "" : " on"), text: rec.disabled ? "off" : "on", title: "Bypass by disabling the effect entity",
-        onclick: () => DAW.enable(fx, rec.disabled).then(() => { rec.disabled = !rec.disabled; DAW.sig = ""; })
-      }) : null,
-      i > 0 ? UI.el("button", { class: "small", text: "◀", title: "Move left", onclick: () => V.moveSlot(busPath, i, -1) }) : null,
-      i < 3 ? UI.el("button", { class: "small", text: "▶", title: "Move right", onclick: () => V.moveSlot(busPath, i, 1) }) : null,
-      UI.el("button", { class: "small", text: "✕", title: "Remove from slot", onclick: () => V.setSlot(busPath, i, null) })
-    ].filter(Boolean);
-    V.effectCards(fx, { buttons }).forEach((c) => chain.appendChild(c));
-  });
+  (bus.effects || []).forEach((_, i) => V.slot(busPath, i).forEach((c) => chain.appendChild(c)));
   return chain;
 };
 
@@ -819,8 +821,9 @@ V.renderDetail = () => {
   } else if (kind === "effect") {
     const bus = DAW.busOfEffect(rec.path);
     if (bus) {
-      body.appendChild(UI.el("div", { class: "section-title" }, "Inserts of ", UI.el("a", { class: "link", onclick: () => DAW.select(bus.path) }, bus.path)));
-      body.appendChild(V.chain(bus.path));
+      const i = bus.comps[A + "AudioBus"].effects.indexOf(rec.path);
+      body.appendChild(UI.el("div", { class: "section-title" }, `Insert slot ${i + 1} of `, UI.el("a", { class: "link", onclick: () => DAW.select(bus.path) }, bus.path)));
+      body.appendChild(UI.el("div", { class: "chain" }, V.slot(bus.path, i)));
     } else {
       body.appendChild(UI.el("div", { class: "section-title" }, "Not in an insert slot"));
       body.appendChild(UI.el("div", { class: "chain" }, V.effectCards(rec.path, {})));
