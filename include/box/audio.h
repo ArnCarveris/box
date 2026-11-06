@@ -533,17 +533,17 @@ ECS_STRUCT(SynthString, {
  * Pitch changes move the string without a restart. Body resonance is left to the bus EQ.
  */
 ECS_STRUCT(SynthBow, {
-    float pressure;        /**< Force of the bow, 0..1, default 0.5: low gives the airy surface
-                            *   sound, the middle the Helmholtz motion, high a raucous,
-                            *   scratchy tone with more upper harmonics */
-    float speed;           /**< Velocity of the bow, 0..1, default 0.5: mostly the level, and
-                            *   some brightness; 0 is silent */
+    float pressure;        /**< Force of the bow, 0..1, default 0.5: low gives a soft, airy
+                            *   tone, the middle the Helmholtz motion, high a harder tone with
+                            *   more upper harmonics */
+    float speed;           /**< Velocity of the bow, 0..1, default 0.5: the level, the tone
+                            *   stays; 0 is silent */
     float position;        /**< Distance of the bow from the bridge as a share of the string,
                             *   0.02..0.5, default 0.12: near the bridge is brighter (sul
                             *   ponticello), far darker (sul tasto). It notches the harmonics
                             *   at the multiples of 1 / position */
     float brightness;      /**< Damping of the loop, 0 dark to 1 bright, default 0.5, as
-                            *   SynthString.brightness */
+                            *   SynthString.brightness: a lowpass that follows the note */
     float noise;           /**< Noise of the bow hair added at the contact point, 0..1,
                             *   default 0.1 */
     float velocity;        /**< Share 0..1 of the pressure and the speed that the velocity of a

@@ -902,8 +902,8 @@ typedef struct box_audio_synth_color_filter_t {
  * A bowed string is a digital waveguide split at the bow: line is the round trip from the bow
  * to the nut and back, bridge the one to the bridge and back, each read at a fractional delay
  * with a 3rd order Lagrange interpolation. The nut reflects inverted, the bridge inverted
- * through a one pole lowpass and the gain of the loop, and the bow joins them through its
- * friction. The fields of the allpass and the crossfade are those of a pluck only.
+ * through a one pole lowpass that follows the pitch and the gain of the loop, and the bow joins
+ * them through its friction. The fields of the allpass and the crossfade are those of a pluck only.
  *
  * A pluck or bowed layer has one for each of its unison voices, chained by next */
 typedef struct box_audio_synth_string_t {
@@ -934,7 +934,10 @@ typedef struct box_audio_synth_string_t {
                            * a ring written at write as line, which holds the nut side */
     double loop;          /**< Bowed: frames of both delay lines together, the period less
                            * the phase delay of the lowpass at the fundamental */
-    double lag;           /**< Bowed: phase delay of the lowpass at the fundamental in frames */
+    double lag;           /**< Bowed: phase delay of the lowpass at the fundamental in frames,
+                           * less the advance of the corner by the friction */
+    float tone;           /**< Bowed: octaves the brightness of its layer raises its lowpass */
+    float pressure;       /**< Bowed: pressure of the bow of its last exact tuning */
     float a;              /**< Bowed: share of the way the lowpass moves per frame, 1 - pole */
     float lp;             /**< Bowed: last output of the lowpass */
     box_audio_dc_t dc;    /**< Bowed: DC blocker of the output */
@@ -958,8 +961,8 @@ typedef struct box_audio_synth_bow_t {
     float pressure_play;  /**< Pressure that plays */
     float speed_play;     /**< Speed that plays */
     float position_play;  /**< Position that plays, a share of the loop */
-    float slope;          /**< Slope of the friction curve of pressure_play: the stick region
-                           * is the narrower the steeper it is */
+    float slope;          /**< Slope of the friction curve of pressure_play times the velocity
+                           * of the bow: the stick region is the narrower the steeper it is */
     float smooth;         /**< Share of the way the values that play move to their aims per
                            * frame */
     float dc;             /**< Pole of the DC blockers of the outputs of its strings */

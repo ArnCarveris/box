@@ -1086,17 +1086,19 @@ tune at high notes too.
 
 The `SynthBow` of the layer sets the bow; a bowed layer without one takes the defaults:
 
-- `pressure` (0.5): the force of the bow, the width of the stick region of the friction.
-  Low gives the airy surface sound, the middle the Helmholtz motion, high a raucous,
-  scratchy tone with more upper harmonics.
-- `speed` (0.5): the bow velocity, mostly the level and some brightness; 0 is silent.
+- `pressure` (0.5): the force of the bow, the width of the stick region of the friction,
+  and how sharp the bow keeps the corner of the Helmholtz motion: it moves the lowpass of
+  the loop up to 1.5 octaves either way. Low gives a soft, airy tone, the middle the
+  Helmholtz motion, high a harder tone with more upper harmonics.
+- `speed` (0.5): the bow velocity, the level; the friction scales with it, so the tone
+  stays and only the bow hair noise and the attack change with it. 0 is silent.
 - `position` (0.12): the distance of the bow from the bridge as a share of the string,
   0.02..0.5. Near the bridge is brighter (sul ponticello), far darker (sul tasto); it
   notches the harmonics at the multiples of `1 / position`, so 0.2 takes out the 5th and
   the 10th. A side keeps at least 2 frames, so at very high notes the bow moves off the
   bridge a little.
 - `brightness` (0.5): the damping of the loop, 0 dark to 1 bright, a lowpass at the
-  bridge from 1.5 to 18 kHz.
+  bridge that follows the note, from its 4th to about its 23rd harmonic.
 - `noise` (0.1): the noise of the bow hair, added at the contact point in proportion to
   the bow velocity, which the string filters into its own bow noise and jitter.
 - `velocity` (0): the share of the pressure and the speed that the velocity of a note
@@ -1106,7 +1108,7 @@ The bow speed follows the amplitude envelope of the layer, its own or the root's
 place of the level: the attack starts the bow, the decay and sustain hold it, the release
 lifts it. The bow touches the string while the envelope is over 0, firmly from a level of
 0.25 up. Once it lifts, the string rings out through its damping, its fundamental falling
-60 dB in about a second, less in a bright string; the voice ends once the envelope ended
+60 dB over about 220 periods (a second at A3, at most 4 seconds), less in a bright string; the voice ends once the envelope ended
 and the string is silent, as a pluck ends. A bowed layer without any envelope bows for 10
 seconds, as other waves do. Glide, legato, bend, pitch LFOs, `SynthPitchEnvelope` and
 drift change the length of the string smoothly without restarting it, as they move a
@@ -1124,7 +1126,8 @@ ring out after it, so a part should keep its overlapping notes under 32 strings:
 `SynthGlide` plays a whole line on one. Body resonance stays out of the model: it is the
 job of the bus EQ, as in the strings song of the jukebox. In the `Synth` bench
 (`voices_32_bowed`, 32 bowed voices under a vibrato and two routes to the bow, through a
-lowpass, 48 kHz) a bowed voice costs about TODO(bench) ns per frame.
+lowpass, 48 kHz) a bowed voice costs about 40 ns per frame (165 µs per 128-frame
+quantum for all 32), against about 25 ns for a pluck under a vibrato.
 
 ```flecs
 using box.audio

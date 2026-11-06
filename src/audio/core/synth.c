@@ -144,10 +144,12 @@ static const double box_audio_synth_unison_gain[BOX_AUDIO_SYNTH_UNISON_MAX + 1] 
 /** Velocity of the bow at speed 1 and level 1 of its envelope, in the unit of the waves */
 #define BOX_AUDIO_SYNTH_BOW_VELOCITY 0.25f
 
-/** Slope of the friction curve at pressure 0, and how much pressure 1 lowers it: the stick
- * region of the curve is the wider the lower the slope */
-#define BOX_AUDIO_SYNTH_BOW_SLOPE 5.0f
-#define BOX_AUDIO_SYNTH_BOW_SLOPE_RANGE 4.0f
+/** Slope of the friction curve times the velocity of the bow at pressure 0, and how much
+ * pressure 1 lowers it: the stick region of the curve is the wider the lower the slope. The
+ * slope is over the velocity of the bow, so the motion of the string scales with the speed of
+ * the bow, and 0.05..0.2 keeps it in the Helmholtz motion over the range of the pressure */
+#define BOX_AUDIO_SYNTH_BOW_SLOPE 0.2f
+#define BOX_AUDIO_SYNTH_BOW_SLOPE_RANGE 0.15f
 
 /** Smallest and largest reflection of the friction of the bow, slip and stick */
 #define BOX_AUDIO_SYNTH_BOW_SLIP 0.01f
@@ -160,17 +162,34 @@ static const double box_audio_synth_unison_gain[BOX_AUDIO_SYNTH_UNISON_MAX + 1] 
 /** Noise of the bow hair at noise 1, a share of the velocity of the bow */
 #define BOX_AUDIO_SYNTH_BOW_HAIR 0.5f
 
-/** Hz of the lowpass at the bridge of a bowed string at brightness 0, and the octaves
- * brightness 1 raises it by, to 18 kHz */
-#define BOX_AUDIO_SYNTH_BOW_CUTOFF 1500.0
-#define BOX_AUDIO_SYNTH_BOW_OCTAVES 3.5849625007211562
+/** Harmonic of the note the lowpass at the bridge of a bowed string cuts at, at brightness 0
+ * and pressure 0.5, and the octaves brightness 1 raises it by. The lowpass follows the pitch,
+ * so the loop damps each harmonic the same at every note, which keeps the Helmholtz motion
+ * stable from the lowest to the highest notes */
+#define BOX_AUDIO_SYNTH_BOW_HARMONIC 4.0
+#define BOX_AUDIO_SYNTH_BOW_OCTAVES 2.5
+
+/** Octaves the lowpass at the bridge rises by from pressure 0 to 1, half of it either side of
+ * pressure 0.5: a harder bow sharpens the corner of the Helmholtz motion that the losses round */
+#define BOX_AUDIO_SYNTH_BOW_PRESSURE_OCTAVES 3.0
 
 /** Largest share of the rate of the lowpass at the bridge */
 #define BOX_AUDIO_SYNTH_BOW_CUTOFF_MAX 0.45
 
-/** Seconds the fundamental of a bowed string takes to fall 60 dB once the bow lifted, from the
- * gain of its loop; the lowpass at the bridge shortens it */
-#define BOX_AUDIO_SYNTH_BOW_DECAY 1.0
+/** Share of the time constant of the lowpass at the bridge by which the friction advances the
+ * corner of the Helmholtz motion it sharpens, which would make the note sharp: the loop is
+ * that much longer */
+#define BOX_AUDIO_SYNTH_BOW_ADVANCE 0.17
+
+/** Periods the fundamental of a bowed string takes to fall 60 dB once the bow lifted, from the
+ * gain of its loop, up to BOX_AUDIO_SYNTH_BOW_DECAY_MAX seconds; the lowpass at the bridge
+ * shortens it */
+#define BOX_AUDIO_SYNTH_BOW_DECAY 220.0
+#define BOX_AUDIO_SYNTH_BOW_DECAY_MAX 4.0
+
+/** Share of the wave at the bridge a bow position earlier that the output takes off it, so the
+ * bow position notches the harmonics at its multiples of 1 / position */
+#define BOX_AUDIO_SYNTH_BOW_NOTCH 0.5f
 
 /** Hz of the DC blocker of the output of a bowed string */
 #define BOX_AUDIO_SYNTH_BOW_DC 20.0
@@ -1872,39 +1891,55 @@ static double box_audio_synth_comb_aim(
     return n > BOX_AUDIO_SYNTH_COMB_DELAY_MIN ? n : BOX_AUDIO_SYNTH_COMB_DELAY_MIN;
 }
 
-/** Tune a bowed string to a frequency: a period of n frames is its two delay lines together,
- * its loop, and the phase delay of the one pole lowpass at the bridge at the fundamental w,
- * atan(b sin w / (1 - b cos w)) / w frames for its pole b, so the settled pitch is exact. The
- * fractional delays of both sides follow the loop.
+/** Tune a bowed string to a frequency and a pressure of its bow: a period of n frames is its
+ * two delay lines together, its loop, and the phase delay of the one pole lowpass at the bridge
+ * at the fundamental w, atan(b sin w / (1 - b cos w)) / w frames for its pole b, less the
+ * advance of the corner by the friction, BOX_AUDIO_SYNTH_BOW_ADVANCE of the time constant of
+ * the lowpass, so the settled pitch is exact. The fractional delays of both sides follow the
+ * loop.
  *
- * The gain of the loop makes the fundamental fall 60 dB over BOX_AUDIO_SYNTH_BOW_DECAY without
- * the lowpass once the bow lifted.
+ * The lowpass cuts at a harmonic of the note, BOX_AUDIO_SYNTH_BOW_HARMONIC raised by the
+ * brightness of the layer and the pressure of the bow. The gain of the loop makes the
+ * fundamental fall 60 dB over BOX_AUDIO_SYNTH_BOW_DECAY periods without the lowpass once the
+ * bow lifted, at most BOX_AUDIO_SYNTH_BOW_DECAY_MAX seconds.
  *
  * @param s The string, bowed
  * @param inc Turns per frame of its oscillator
+ * @param pressure Pressure of the bow, 0..1
  */
 static void box_audio_synth_bow_tune(
     box_audio_synth_string_t *s,
-    double inc)
+    double inc,
+    float pressure)
 {
-    double n = 1.0 / inc, b = 1 - (double)s->a, w, sn, cs, g;
+    double n = 1.0 / inc, b, w, sn, cs, g, cut, decay;
     n = n < s->period_max ? n : s->period_max;
     n = n > BOX_AUDIO_SYNTH_BOW_PERIOD_MIN ? n : BOX_AUDIO_SYNTH_BOW_PERIOD_MIN;
     w = 1.0 / n;
+    cut = w * BOX_AUDIO_SYNTH_BOW_HARMONIC * box_audio_synth_exp2((double)s->tone +
+        BOX_AUDIO_SYNTH_BOW_PRESSURE_OCTAVES * ((double)pressure - 0.5));
+    cut = cut < BOX_AUDIO_SYNTH_BOW_CUTOFF_MAX ? cut : BOX_AUDIO_SYNTH_BOW_CUTOFF_MAX;
+    s->a = (float)(1 - box_audio_synth_exp2(-2 * BOX_AUDIO_SYNTH_PI * cut /
+        BOX_AUDIO_SYNTH_LN2));
+    b = 1 - (double)s->a;
     sn = (double)box_audio_core_sin(w);
     cs = (double)box_audio_core_sin(w + 0.25);
     s->inc = inc;
     s->period = n;
-    s->lag = box_audio_synth_atan(b * sn / (1 - b * cs)) / (2 * BOX_AUDIO_SYNTH_PI * w);
+    s->pressure = pressure;
+    s->lag = box_audio_synth_atan(b * sn / (1 - b * cs)) / (2 * BOX_AUDIO_SYNTH_PI * w) -
+        BOX_AUDIO_SYNTH_BOW_ADVANCE / (2 * BOX_AUDIO_SYNTH_PI * cut);
     s->loop = n - s->lag;
-    g = box_audio_synth_exp2(-BOX_AUDIO_SYNTH_DB60 * n / s->decay_frames);
+    decay = BOX_AUDIO_SYNTH_BOW_DECAY * n;
+    decay = decay < s->decay_frames ? decay : s->decay_frames;
+    g = box_audio_synth_exp2(-BOX_AUDIO_SYNTH_DB60 * n / decay);
     s->gain = (float)(g < BOX_AUDIO_SYNTH_STRING_GAIN_MAX ? g : BOX_AUDIO_SYNTH_STRING_GAIN_MAX);
 }
 
 /** Tune a bowed string cheaply to a frequency while its pitch moves, as
  * box_audio_synth_string_follow does a pluck: the period from the last one by two terms of the
- * series of 1 / (1 - e), or by a division when the pitch jumps, and the phase delay of the
- * lowpass and the gain of the last exact tuning, which move little.
+ * series of 1 / (1 - e), or by a division when the pitch jumps, and the lowpass, its phase
+ * delay and the gain of the last exact tuning, which move little.
  *
  * @param s The string, bowed
  * @param inc Turns per frame of its oscillator
@@ -1922,52 +1957,53 @@ static void box_audio_synth_bow_follow(
     s->loop = n - s->lag;
 }
 
-/** Retune a bowed string whose pitch moves: exactly every BOX_AUDIO_SYNTH_STRING_RETUNE frames,
- * cheaply on the frames between, as box_audio_synth_string_move does a pluck. The string goes
- * on from where it is: its delay lines are read by an interpolation of their fractional delay,
- * so a read point that moves by whole frames moves on smoothly and needs no crossfade.
+/** Retune a bowed string whose pitch or bow pressure moves: exactly every
+ * BOX_AUDIO_SYNTH_STRING_RETUNE frames, cheaply on the frames between, as
+ * box_audio_synth_string_move does a pluck. The string goes on from where it is: its delay
+ * lines are read by an interpolation of their fractional delay, so a read point that moves by
+ * whole frames moves on smoothly and needs no crossfade.
  *
  * @param s The string, bowed
  * @param inc Turns per frame of its oscillator
+ * @param pressure Pressure of the bow, 0..1
  */
 static void box_audio_synth_bow_move(
     box_audio_synth_string_t *s,
-    double inc)
+    double inc,
+    float pressure)
 {
     if (-- s->retune <= 0) {
         s->retune = BOX_AUDIO_SYNTH_STRING_RETUNE;
-        box_audio_synth_bow_tune(s, inc);
+        box_audio_synth_bow_tune(s, inc, pressure);
     } else {
         box_audio_synth_bow_follow(s, inc);
     }
 }
 
-/** Start a bowed string at rest: tune it, set the lowpass at the bridge from the brightness of
- * its layer and clear its delay lines, so it sounds only once the bow moves.
+/** Start a bowed string at rest: tune it, its lowpass at the bridge from the brightness of its
+ * layer and the pressure of its bow, and clear its delay lines, so it sounds only once the bow
+ * moves.
  *
  * @param s The string
  * @param layer Its layer, clamped
  * @param inc Turns per frame of its oscillator
+ * @param pressure Pressure of the bow, 0..1
  * @param rate Frames per second
  */
 static void box_audio_synth_bow_string(
     box_audio_synth_string_t *s,
     const box_audio_synth_layer_t *layer,
     double inc,
+    float pressure,
     float rate)
 {
-    double top = (double)rate / BOX_AUDIO_SYNTH_PLUCK_MIN, cut;
+    double top = (double)rate / BOX_AUDIO_SYNTH_PLUCK_MIN;
     int32_t i;
-    s->decay_frames = BOX_AUDIO_SYNTH_BOW_DECAY * (double)rate;
+    s->decay_frames = BOX_AUDIO_SYNTH_BOW_DECAY_MAX * (double)rate;
     s->period_max = top < BOX_AUDIO_SYNTH_STRING_PERIOD_MAX ? top :
         BOX_AUDIO_SYNTH_STRING_PERIOD_MAX;
-    cut = BOX_AUDIO_SYNTH_BOW_CUTOFF * box_audio_synth_exp2(BOX_AUDIO_SYNTH_BOW_OCTAVES *
-        (double)layer->brightness);
-    top = BOX_AUDIO_SYNTH_BOW_CUTOFF_MAX * (double)rate;
-    cut = cut < top ? cut : top;
-    s->a = (float)(1 - box_audio_synth_exp2(-2 * BOX_AUDIO_SYNTH_PI * cut / (double)rate /
-        BOX_AUDIO_SYNTH_LN2));
-    box_audio_synth_bow_tune(s, inc);
+    s->tone = (float)BOX_AUDIO_SYNTH_BOW_OCTAVES * layer->brightness;
+    box_audio_synth_bow_tune(s, inc, pressure);
     for (i = 0; i < BOX_AUDIO_SYNTH_STRING_FRAMES; i ++) {
         s->line[i] = 0;
         s->bridge[i] = 0;
@@ -2126,7 +2162,7 @@ static void box_audio_synth_pass(
             }
 
             if (o->wave == BOX_AUDIO_SYNTH_BOWED) {
-                box_audio_synth_bow_string(s, layer, inc, rate);
+                box_audio_synth_bow_string(s, layer, inc, layer->bow_pressure, rate);
                 src->bowing ++;
             } else {
                 box_audio_synth_string_pluck(s, layer, inc, rate, &src->rng);
@@ -3717,7 +3753,10 @@ static inline float box_audio_synth_bow_read(
  * The waves that arrive at the bow, from the bridge through its lowpass and gain and from the
  * nut, both inverted, sum to the velocity of the string there. The difference of the velocity
  * of the bow to it goes through the friction curve, which sticks or slips, and what the bow
- * adds, with the noise of the hair, goes out to both sides. The output is the wave at the bridge.
+ * adds, with the noise of the hair, goes out to both sides. The slope of the friction is over
+ * the velocity of the bow, so the motion scales with it. The output is the wave at the bridge
+ * less BOX_AUDIO_SYNTH_BOW_NOTCH of it a bow position earlier, which notches the harmonics at
+ * the multiples of 1 / position.
  *
  * The bow touches the string while the level of the envelope is over 0, with a contact that
  * rises up to BOX_AUDIO_SYNTH_BOW_LIFT. A window of a period without the bow whose peak is
@@ -3738,10 +3777,10 @@ static inline float box_audio_synth_bow_ring(
     float level)
 {
     const int32_t mask = BOX_AUDIO_SYNTH_STRING_FRAMES - 1;
-    float xb, xn, rb, rn, v, dv, t, r, j = 0, contact, m;
+    float xb, xn, xo, rb, rn, v, dv, t, r, j = 0, contact, m;
     double db, dn;
-    if (inc != s->inc) {
-        box_audio_synth_bow_move(s, inc);
+    if (inc != s->inc || b->pressure_play != s->pressure) {
+        box_audio_synth_bow_move(s, inc, b->pressure_play);
     }
 
     db = (double)b->position_play * s->loop;
@@ -3751,6 +3790,8 @@ static inline float box_audio_synth_bow_ring(
         BOX_AUDIO_SYNTH_BOW_DELAY_MAX) : BOX_AUDIO_SYNTH_BOW_DELAY_MIN;
     xb = box_audio_synth_bow_read(s->bridge, s->write, db);
     xn = box_audio_synth_bow_read(s->line, s->write, dn);
+    xo = xb - BOX_AUDIO_SYNTH_BOW_NOTCH *
+        box_audio_synth_bow_read(s->bridge, s->write, db + db);
     s->lp = box_audio_clean(s->lp + s->a * (xb - s->lp));
     rb = -s->gain * s->lp;
     rn = -xn;
@@ -3759,12 +3800,16 @@ static inline float box_audio_synth_bow_ring(
     if (contact > 0) {
         v = BOX_AUDIO_SYNTH_BOW_VELOCITY * b->speed_play * level;
         dv = v - (rb + rn);
-        t = dv * b->slope;
-        t = (t < 0 ? -t : t) + 0.75f;
-        t *= t;
-        r = 1.0f / (t * t);
-        r = r < BOX_AUDIO_SYNTH_BOW_STICK ? (r > BOX_AUDIO_SYNTH_BOW_SLIP ? r :
-            BOX_AUDIO_SYNTH_BOW_SLIP) : BOX_AUDIO_SYNTH_BOW_STICK;
+        r = BOX_AUDIO_SYNTH_BOW_SLIP;
+        if (v > 0) {
+            t = dv * b->slope / v;
+            t = (t < 0 ? -t : t) + 0.75f;
+            t *= t;
+            r = 1.0f / (t * t);
+            r = r < BOX_AUDIO_SYNTH_BOW_STICK ? (r > BOX_AUDIO_SYNTH_BOW_SLIP ? r :
+                BOX_AUDIO_SYNTH_BOW_SLIP) : BOX_AUDIO_SYNTH_BOW_STICK;
+        }
+
         j = contact * dv * r;
         if (b->noise > 0) {
             j += b->noise * v * box_audio_synth_noise(&src->rng);
@@ -3790,7 +3835,7 @@ static inline float box_audio_synth_bow_ring(
         s->window = (int32_t)s->period + 2;
     }
 
-    return box_audio_dc_next(&s->dc, xb, b->dc) * BOX_AUDIO_SYNTH_BOW_LEVEL;
+    return box_audio_dc_next(&s->dc, xo, b->dc) * BOX_AUDIO_SYNTH_BOW_LEVEL;
 }
 
 /** Render a frame of the string of a bowed layer of one voice and advance it, its bow and its
