@@ -559,6 +559,27 @@ static void box_audio_synth_string_ctor(
     }
 }
 
+/** Construct SynthBow values: a pressure and a speed of 0.5, a position of 0.12, a brightness
+ * of 0.5 and a noise of 0.1.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_audio_synth_bow_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    SynthBow *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (SynthBow){ .pressure = 0.5f, .speed = 0.5f, .position = 0.12f,
+            .brightness = 0.5f, .noise = 0.1f };
+    }
+}
+
 /** Construct Wavetable values: WavetableBasic, without a sound, frames of 2048 samples.
  *
  * @param ptr The values
@@ -1519,6 +1540,7 @@ static void box_audio_module_free(
     box_audio_timeline_fini(state);
     box_audio_song_fini(state);
     ecs_os_free(state->capture.path);
+    box_audio_meter_job_fini(state);
     ecs_os_free(state);
 }
 
@@ -1663,6 +1685,8 @@ void BoxAudioImport(
     ecs_set_hooks(world, SynthUnison, { .ctor = box_audio_synth_unison_ctor });
     ECS_META_COMPONENT(world, SynthString);
     ecs_set_hooks(world, SynthString, { .ctor = box_audio_synth_string_ctor });
+    ECS_META_COMPONENT(world, SynthBow);
+    ecs_set_hooks(world, SynthBow, { .ctor = box_audio_synth_bow_ctor });
     ECS_META_COMPONENT(world, WavetableKind);
     ECS_META_COMPONENT(world, Wavetable);
     ecs_set_hooks(world, Wavetable, { .ctor = box_audio_wavetable_ctor });

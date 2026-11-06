@@ -4,8 +4,14 @@
  * slots, its instruments, its tracks with their note and audio placements, sounding notes and
  * playing audio clips, its emitters with their plays and skips, its macros with their maps, the
  * master volume and mute, play, stop, seek and tempo, the song of AudioSong, captures of the
+<<<<<<< HEAD
  * master output to a WAV resource, the analysis of a WAV (cmd_audio_analyze.c) and the
  * dispatch of audio render (cmd_audio_render.c) and audio check (cmd_audio_check.c). Solo,
+=======
+ * master output to a WAV resource, the analysis of a WAV (cmd_audio_analyze.c), the
+ * comparison of two (cmd_audio_diff.c), its plots (cmd_audio_plot.c), the levels of the buses
+ * over a span (cmd_audio_meter.c) and the dispatch of audio render (cmd_audio_render.c). Solo,
+>>>>>>> c12b2e2e4eae830809b359995595b7e46a06f919
  * mute of a bus, bypass and note are in cmd_audio_audition.c.
  *
  * The actions only write AudioSettings, Transport or AudioSong, which box.audio applies at the
@@ -22,16 +28,23 @@
 #define BOX_AUDIO_SEQ_LIST_MAX 16
 
 /** Arguments of the audio command after its action and value, for solo, mute, bypass, note,
- * analyze, notes, chords and the options of render */
+ * analyze, plot, meter, notes, chords and the options of render */
 #define BOX_CMD_AUDIO_MORE_ARGS 8
 
 /** A further argument of the audio command, help prints them once as [args...] */
 #define BOX_CMD_AUDIO_MORE { .name = "args", .type = ecs_id(ecs_string_t), \
     .optional = true, .brief = "on or off for solo, mute and bypass (default: toggle), " \
     "note, velocity 0 to 1 (default: 1) and seconds (default: 0.5) of note, analyze from and " \
+<<<<<<< HEAD
     "to seconds, further tracks, bars=a..b or roll of notes and chords, static or " \
     "bars=a..b of check, key=value options of render: note, vel, dur, tail, bars, beats, " \
     "solo or mute" }
+=======
+    "to seconds, second WAV and seconds of diff, plot kind and size=WxH, from=, to=, min_db=, " \
+    "further tracks, bars=a..b or roll of notes and chords, further buses, seconds or " \
+    "bars=a..b of meter, key=value options of render: note, vel, dur, tail, bars, beats, solo " \
+    "or mute" }
+>>>>>>> c12b2e2e4eae830809b359995595b7e46a06f919
 
 /** Folder of the captures in the file system of the page */
 #define BOX_CMD_AUDIO_WEB_DIR "/tmp"
@@ -1253,15 +1266,29 @@ static void box_cmd_audio(
         out = box_cmd_audio_song_set(world, value);
     } else if (!ecs_os_strcmp(action, "analyze")) {
         out = box_cmd_audio_analyze(world, value, arg2, arg3);
+<<<<<<< HEAD
     } else if (!ecs_os_strcmp(action, "check")) {
         out = box_cmd_audio_check(world, argc - 1, args);
+=======
+    } else if (!ecs_os_strcmp(action, "diff")) {
+        out = box_cmd_audio_diff(world, value, arg2, arg3, arg4);
+    } else if (!ecs_os_strcmp(action, "plot")) {
+        out = box_cmd_audio_plot(world, argc - 1, args);
+    } else if (!ecs_os_strcmp(action, "meter")) {
+        out = box_cmd_audio_meter_span(world, argc - 1, args);
+>>>>>>> c12b2e2e4eae830809b359995595b7e46a06f919
     } else if (!ecs_os_strcmp(action, "play") || !ecs_os_strcmp(action, "stop") ||
         !ecs_os_strcmp(action, "seek") || !ecs_os_strcmp(action, "tempo"))
     {
         out = box_cmd_audio_transport_set(world, action, value);
     } else {
         ecs_err("unknown action '%s', expected volume, mute, solo, bypass, note, capture, "
+<<<<<<< HEAD
             "render, analyze, check, play, stop, seek, tempo, song, notes or chords", action);
+=======
+            "render, analyze, diff, plot, meter, play, stop, seek, tempo, song, notes or "
+            "chords", action);
+>>>>>>> c12b2e2e4eae830809b359995595b7e46a06f919
     }
 
     *(char**)result->ptr = out;
@@ -1277,14 +1304,22 @@ void box_cmd_audio_init(
     box_command_register(world,
         "Print the audio status, transport, song, buses, instruments, tracks, emitters and "
         "macros, set the volume or mute, solo or mute a bus, bypass an effect, play a note, "
+<<<<<<< HEAD
         "play, stop, seek or set the tempo, show or change the song, capture a WAV or analyze "
         "one, render a sound, instrument, stem or song section to a WAV, print the notes of "
         "a track and the chords and key of a section, or lint the song with check",
+=======
+        "play, stop, seek or set the tempo, show or change the song, capture a WAV, analyze or "
+        "plot one or diff two, render a sound, instrument, stem or song section to a WAV, "
+        "measure the levels of the buses over a span, or print the notes of a track and the "
+        "chords and key of a section",
+>>>>>>> c12b2e2e4eae830809b359995595b7e46a06f919
         (ecs_function_desc_t){
             .name = "audio",
             .return_type = ecs_id(ecs_string_t),
             .params = {
                 { .name = "action", .type = ecs_id(ecs_string_t), .optional = true,
+<<<<<<< HEAD
                   .brief = "volume, mute, solo, bypass, note, capture, render, analyze, check, "
                     "play, stop, seek, tempo, song, notes or chords (default: print the "
                     "status)" },
@@ -1295,6 +1330,18 @@ void box_cmd_audio_init(
                     "every solo), the effect of bypass, the sound or instrument of note, track "
                     "of notes, track or bars=a..b of chords, render subject: song, a sound, an "
                     "instrument or a bus, static or bars=a..b of check" },
+=======
+                  .brief = "volume, mute, solo, bypass, note, capture, render, analyze, diff, "
+                    "plot, meter, play, stop, seek, tempo, song, notes or chords (default: "
+                    "print the status)" },
+                { .name = "value", .type = ecs_id(ecs_string_t), .optional = true,
+                  .brief = "volume 0 to 4, mute on or off (default: toggle), capture seconds, "
+                    "analyze, diff or plot WAV resource or file, meter bus, seconds or "
+                    "bars=a..b, seek beats, tempo 20 to 999, song file or none (default: show "
+                    "the song), the bus of solo or mute (solo none clears every solo), the "
+                    "effect of bypass, the sound or instrument of note, track of notes, track or "
+                    "bars=a..b of chords, render subject: song, a sound, an instrument or a bus" },
+>>>>>>> c12b2e2e4eae830809b359995595b7e46a06f919
                 BOX_CMD_AUDIO_MORE, BOX_CMD_AUDIO_MORE, BOX_CMD_AUDIO_MORE,
                 BOX_CMD_AUDIO_MORE, BOX_CMD_AUDIO_MORE, BOX_CMD_AUDIO_MORE,
                 BOX_CMD_AUDIO_MORE, BOX_CMD_AUDIO_MORE

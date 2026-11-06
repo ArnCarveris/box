@@ -5,7 +5,9 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <math.h>
@@ -1721,7 +1723,466 @@ void Shell_audio_analyze_errors(void) {
     ecs_fini(world);
 }
 
+/** Run audio diff on two WAVs of test/assets/audio and check it succeeds */
+static char* shell_diff(
+    ecs_world_t *world,
+    ecs_entity_t s,
+    const char *a,
+    const char *b)
+{
+    char *line = flecs_asprintf("audio diff test/assets/audio/%s test/assets/audio/%s", a, b);
+    bool error = true;
+    char *out = box_command_run(world, s, line, &error);
+    test_bool(error, false);
+    test_assert(out != NULL);
+    ecs_os_free(line);
+
+    return out;
+}
+
+void Shell_audio_diff_identical(void) {
+    // audio/diff
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, 0.016f);
+
+    char *out = shell_diff(world, s, "diff_base.wav", "diff_base.wav");
+    const char *head = "diff test/assets/audio/diff_base.wav test/assets/audio/diff_base.wav: "
+        "48000 Hz, stereo, span 0.000 to 1.000 s\nidentical: yes, bit identical\n";
+    test_assert(strncmp(out, head, strlen(head)) == 0);
+    test_assert(strstr(out, "\nlength: a 1.000 s, b 1.000 s, b - a +0.000 s (+0 frames)\n")
+        != NULL);
+    test_assert(strstr(out, " LUFS (+0.0 dB), true peak ") != NULL);
+    test_assert(strstr(out, "\nbands (b - a): sub +0.0 dB, low +0.0 dB") != NULL);
+    test_assert(strstr(out, "\nbalance: unchanged") != NULL);
+    test_assert(strstr(out, "\nstereo: correlation ") != NULL);
+    test_assert(strstr(out, "\nnull test: offset +0 frames (+0.000 ms), residual -inf dB "
+        "against a, -inf dBFS over 1.000 s\nresidual spans: none") != NULL);
+    test_assert(strstr(out, "\nbars:") == NULL);
+
+    char *again = shell_diff(world, s, "diff_base.wav", "diff_base.wav");
+    test_str(again, out);
+    ecs_os_free(again);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+void Shell_audio_diff_quieter(void) {
+    // audio/diff
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, 0.016f);
+
+    char *out = shell_diff(world, s, "diff_base.wav", "diff_quiet.wav");
+    test_assert(strstr(out, "\nidentical: no, 96000 of 96000 samples differ, first at "
+        "0.0000 s\n") != NULL);
+    test_assert(strstr(out, " LUFS (-6.0 dB), true peak ") != NULL);
+    test_assert(strstr(out, " dBFS (-6.0 dB)\nbands (b - a): sub -6.0 dB, low -6.0 dB, "
+        "low-mid -6.0 dB, mid -6.0 dB, presence -6.0 dB") != NULL);
+    test_assert(strstr(out, "\nbalance: unchanged") != NULL);
+    test_assert(strstr(out, "\nnull test: offset +0 frames (+0.000 ms), residual -6.0 dB "
+        "against a, ") != NULL);
+    test_assert(strstr(out, "\nresidual spans: 0.000 to 1.000 s -26.0 dBFS "
+        "(-6.0 dB against a)") != NULL);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+void Shell_audio_diff_delay(void) {
+    // audio/diff
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, 0.016f);
+
+    char *out = shell_diff(world, s, "diff_base.wav", "diff_delay.wav");
+    test_assert(strstr(out, "\nidentical: no, ") != NULL);
+    test_assert(strstr(out, "\nnull test: offset +10 frames (+0.208 ms), residual -inf dB "
+        "against a, -inf dBFS over 1.000 s\nresidual spans: none") != NULL);
+    ecs_os_free(out);
+
+    out = shell_diff(world, s, "diff_delay.wav", "diff_base.wav");
+    test_assert(strstr(out, "\nnull test: offset -10 frames (-0.208 ms), residual -inf dB")
+        != NULL);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+void Shell_audio_diff_boost(void) {
+    // audio/diff
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, 0.016f);
+
+    char *out = shell_diff(world, s, "diff_base.wav", "diff_boost.wav");
+    test_assert(strstr(out, "\nbalance: presence changed most, +") != NULL);
+    const char *presence = strstr(out, ", presence +");
+    test_assert(presence != NULL);
+    test_assert(atof(presence + strlen(", presence ")) > 2.0);
+    test_assert(strstr(out, "\nnull test: offset +0 frames") != NULL);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+/** Write a mono float WAV of 8000 Hz, with a song chunk of 120 bpm and 4 beats per bar */
+static char* shell_diff_song_wav(
+    const float *data,
+    int32_t frames,
+    ecs_size_t *size)
+{
+    int32_t body = frames * 4, total = 12 + 24 + 24 + 8 + body;
+    char *out = ecs_os_calloc(total);
+    uint32_t u32;
+    uint16_t u16;
+    double start = 0;
+    float tempo = 120, bar = 4;
+    memcpy(out, "RIFF", 4);
+    u32 = (uint32_t)(total - 8); memcpy(out + 4, &u32, 4);
+    memcpy(out + 8, "WAVEfmt ", 8);
+    u32 = 16; memcpy(out + 16, &u32, 4);
+    u16 = 3; memcpy(out + 20, &u16, 2);
+    u16 = 1; memcpy(out + 22, &u16, 2);
+    u32 = 8000; memcpy(out + 24, &u32, 4);
+    u32 = 32000; memcpy(out + 28, &u32, 4);
+    u16 = 4; memcpy(out + 32, &u16, 2);
+    u16 = 32; memcpy(out + 34, &u16, 2);
+    memcpy(out + 36, "bxsg", 4);
+    u32 = 16; memcpy(out + 40, &u32, 4);
+    memcpy(out + 44, &start, 8);
+    memcpy(out + 52, &tempo, 4);
+    memcpy(out + 56, &bar, 4);
+    memcpy(out + 60, "data", 4);
+    u32 = (uint32_t)body; memcpy(out + 64, &u32, 4);
+    memcpy(out + 68, data, (size_t)body);
+    *size = total;
+
+    return out;
+}
+
+void Shell_audio_diff_bars(void) {
+    // audio/diff
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, 0.016f);
+
+    int32_t i, frames = 48000;
+    float *a = ecs_os_malloc_n(float, frames), *b = ecs_os_malloc_n(float, frames);
+    for (i = 0; i < frames; i ++) {
+        a[i] = 0.25f * sinf(2.0f * 3.14159265f * 440.0f * (float)i / 8000.0f);
+        b[i] = a[i];
+        if (i >= 16000 && i < 32000) {
+            b[i] += 0.25f * sinf(2.0f * 3.14159265f * 1000.0f * (float)i / 8000.0f);
+        }
+    }
+
+    ecs_size_t size_a, size_b;
+    char *wav_a = shell_diff_song_wav(a, frames, &size_a);
+    char *wav_b = shell_diff_song_wav(b, frames, &size_b);
+    ecs_shell_resource_t ra = {0}, rb = {0};
+    test_int(ecs_shell_resource_create(world, s, "audio/wav", wav_a, size_a, &ra), 0);
+    test_int(ecs_shell_resource_create(world, s, "audio/wav", wav_b, size_b, &rb), 0);
+
+    char *line = flecs_asprintf("audio diff %s %s", ra.name, rb.name);
+    bool error = true;
+    char *out = box_command_run(world, s, line, &error);
+    test_bool(error, false);
+    test_assert(strstr(out, ": 8000 Hz, mono, span 0.000 to 6.000 s\n") != NULL);
+    test_assert(strstr(out, "\nnull test: offset +0 frames (+0.000 ms), residual -4.8 dB "
+        "against a, ") != NULL);
+    test_assert(strstr(out, "\nresidual spans: 2.000 to 4.000 s ") != NULL);
+    test_assert(strstr(out, ", mid +70.4 dB, presence quiet,") != NULL);
+    test_assert(strstr(out, "\nbars: 120.0 bpm, 4.00 beats per bar, 1 of 3 bars differ\n"
+        "bar 2: residual ") != NULL);
+    test_assert(strstr(out, "\nbar 1") == NULL);
+    test_assert(strstr(out, "\nbar 3") == NULL);
+    ecs_os_free(out);
+    ecs_os_free(line);
+
+    line = flecs_asprintf("audio diff %s %s 2 4", ra.name, rb.name);
+    out = box_command_run(world, s, line, &error);
+    test_bool(error, false);
+    test_assert(strstr(out, "span 2.000 to 4.000 s\n") != NULL);
+    test_assert(strstr(out, "1 of 1 bars differ\nbar 2: ") != NULL);
+    ecs_os_free(out);
+    ecs_os_free(line);
+
+    ecs_os_free(ra.name);
+    ecs_os_free(ra.content_type);
+    ecs_os_free(rb.name);
+    ecs_os_free(rb.content_type);
+    ecs_os_free(wav_a);
+    ecs_os_free(wav_b);
+    ecs_os_free(a);
+    ecs_os_free(b);
+    ecs_fini(world);
+}
+
+void Shell_audio_diff_errors(void) {
+    // audio/diff
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, 0.016f);
+
+    bool error = false;
+    char *out = box_command_run(world, s, "audio diff test/assets/audio/diff_base.wav",
+        &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "audio diff needs two WAVs") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio diff test/assets/audio/diff_base.wav test/assets/audio/missing.wav", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "cannot find 'test/assets/audio/missing.wav'") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio diff test/assets/audio/diff_base.wav test/assets/audio/corrupt.wav", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "cannot diff 'test/assets/audio/corrupt.wav': not a WAV file")
+        != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio diff test/assets/audio/diff_base.wav test/assets/audio/tone_44100.wav", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "at 48000 Hz with 'test/assets/audio/tone_44100.wav' at 44100 Hz: "
+        "the sample rates must be the same") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio diff test/assets/audio/diff_base.wav test/assets/audio/diff_base.wav 2 3",
+        &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "empty span") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio diff test/assets/audio/diff_base.wav test/assets/audio/diff_base.wav soon",
+        &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "invalid span") != NULL);
+    ecs_os_free(out);
+
+    error = true;
+    out = box_command_run(world, s,
+        "audio diff test/assets/audio/diff_base.wav test/assets/audio/analyze_sine_1k.wav",
+        &error);
+    test_bool(error, false);
+    test_assert(strstr(out, ": 48000 Hz, mono sums of a mono and a stereo WAV, span 0.000 to "
+        "1.000 s\nidentical: no, one is mono and the other stereo\n") != NULL);
+    test_assert(strstr(out, "\nlength: a 1.000 s, b 2.000 s, b - a +1.000 s (+48000 frames)")
+        != NULL);
+    test_assert(strstr(out, "\nstereo: mono, not compared") != NULL);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+/** Read a PNG resource of a session and check its content type and signature.
+ *
+ * @param world The world
+ * @param s The session
+ * @param name The name of the resource
+ * @param size Receives the bytes
+ * @return The bytes, which the caller frees
+ */
+static uint8_t* shell_png_read(
+    ecs_world_t *world,
+    ecs_entity_t s,
+    const char *name,
+    ecs_size_t *size)
+{
+    const char *type = NULL;
+    uint8_t *bytes = ecs_shell_resource_read(world, s, name, size, &type);
+    test_assert(bytes != NULL);
+    test_assert(*size > 8);
+    test_str(type, "image/png");
+    test_assert(!memcmp(bytes, "\x89PNG\r\n\x1a\n", 8));
+
+    return bytes;
+}
+
+void Shell_audio_plot(void) {
+    // audio/plot
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, 0.016f);
+
+    bool error = true;
+    char *a = box_command_run(world, s, "audio plot test/assets/audio/analyze_sine_1k.wav",
+        &error);
+    test_bool(error, false);
+    test_assert(a != NULL);
+    error = true;
+    char *b = box_command_run(world, s, "audio plot test/assets/audio/analyze_sine_1k.wav "
+        "spectrogram", &error);
+    test_bool(error, false);
+    test_assert(b != NULL);
+    test_assert(strcmp(a, b) != 0);
+
+    ecs_size_t size_a = 0, size_b = 0;
+    uint8_t *png_a = shell_png_read(world, s, a, &size_a);
+    uint8_t *png_b = shell_png_read(world, s, b, &size_b);
+    test_int(size_a, size_b);
+    test_assert(!memcmp(png_a, png_b, (size_t)size_a));
+    ecs_os_free(png_a);
+    ecs_os_free(png_b);
+    ecs_os_free(a);
+    ecs_os_free(b);
+
+    const char *lines[] = {
+        "audio plot test/assets/audio/analyze_sine_1k.wav waveform size=640x320 from=0.5 to=1",
+        "audio plot test/assets/audio/analyze_inverted.wav spectrum min_db=-80",
+        "audio plot test/assets/audio/analyze_decay.wav loudness",
+        "audio plot test/assets/audio/analyze_click.wav spectrogram size=300x200 min_db=-120"
+    };
+
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        error = true;
+        char *out = box_command_run(world, s, lines[i], &error);
+        test_bool(error, false);
+        test_assert(out != NULL);
+        ecs_size_t size = 0;
+        uint8_t *png = shell_png_read(world, s, out, &size);
+        ecs_os_free(png);
+        ecs_os_free(out);
+    }
+
+    ecs_fini(world);
+}
+
+void Shell_audio_plot_errors(void) {
+    // audio/plot
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, 0.016f);
+
+    bool error = false;
+    char *out = box_command_run(world, s, "audio plot", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "audio plot needs a WAV") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s, "audio plot test/assets/audio/missing.wav", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "cannot find 'test/assets/audio/missing.wav'") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s, "audio plot missing_resource waveform", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "cannot find 'missing_resource'") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s, "audio plot test/assets/audio/corrupt.wav", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "not a WAV file") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s, "audio plot test/assets/audio/analyze_sine_1k.wav pie",
+        &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "unknown plot argument 'pie'") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio plot test/assets/audio/analyze_sine_1k.wav size=10x10", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "invalid size") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio plot test/assets/audio/analyze_sine_1k.wav min_db=6", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "invalid min_db") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio plot test/assets/audio/analyze_sine_1k.wav from=3 to=4", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "empty span") != NULL);
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(world, s,
+        "audio plot test/assets/audio/analyze_sine_1k.wav from=soon", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "invalid from") != NULL);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
 /** A world with the song of test/assets/audio/chords.flecs, no output and no device */
+void Shell_audio_meter_errors(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_entity_t music = ecs_entity(world, { .name = "music" });
+    ecs_ensure(world, music, AudioBus)->volume = 0.5f;
+    ecs_modified(world, music, AudioBus);
+    ecs_progress(world, 0.016f);
+
+    bool error = false;
+    char *out = box_command_run(world, s, "audio meter music 1", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "the output does not run") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio meter nothing 1", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "no bus 'nothing'") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio meter 0", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "invalid seconds '0'") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio meter 1000", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio meter bars=2..1", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "invalid bars '2..1'") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio meter bars=1..2", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "no song is loaded") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio meter 2 bars=1..2", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "either seconds or bars=a..b") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio meter", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    test_assert(!ecs_has(world, music, AudioMeter));
+    ecs_fini(world);
+}
+
 static ecs_world_t* shell_chords_world(
     ecs_entity_t *session)
 {

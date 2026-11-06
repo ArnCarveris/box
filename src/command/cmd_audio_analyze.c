@@ -14,6 +14,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 /** Largest WAV file read, in bytes */
 #define BOX_CMD_ANALYZE_FILE_MAX (512 * 1024 * 1024)
@@ -147,15 +148,7 @@ static bool box_cmd_analyze_is_resource(
     return result;
 }
 
-/** Load the bytes of a WAV: a resource of the session, else a file as written, else a file
- * found from the working directory or the executable.
- *
- * @param world The world
- * @param wav The resource or file
- * @param size Receives the bytes read
- * @return The bytes, which the caller frees, NULL with an error logged
- */
-static uint8_t* box_cmd_analyze_load(
+uint8_t* box_cmd_audio_wav_load(
     ecs_world_t *world,
     const char *wav,
     int64_t *size)
@@ -192,6 +185,35 @@ static uint8_t* box_cmd_analyze_load(
 
 done:
     ecs_os_free(found);
+
+    return result;
+}
+
+int box_cmd_audio_wav_decode(
+    ecs_world_t *world,
+    const char *wav,
+    const char *action,
+    box_audio_wav_t *out)
+{
+    int64_t size = 0;
+    uint8_t *bytes;
+    const char *error = NULL;
+    int result = -1;
+    memset(out, 0, sizeof(*out));
+    bytes = box_cmd_audio_wav_load(world, wav, &size);
+    if (!bytes) {
+        goto done;
+    }
+
+    error = box_audio_wav_read(bytes, (size_t)size, out);
+    if (error) {
+        ecs_err("cannot %s '%s': %s", action, wav, error);
+        goto done;
+    }
+
+    result = 0;
+done:
+    ecs_os_free(bytes);
 
     return result;
 }
@@ -468,7 +490,7 @@ char* box_cmd_audio_analyze(
         goto done;
     }
 
-    bytes = box_cmd_analyze_load(world, wav, &size);
+    bytes = box_cmd_audio_wav_load(world, wav, &size);
     if (!bytes) {
         goto done;
     }

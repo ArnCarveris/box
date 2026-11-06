@@ -766,11 +766,12 @@ voices on play, so edits affect subsequent plays.
 | `SynthGlide` | Root: `time` seconds (0, up to 10), `legato` (false), `channel` (0) |
 | `SynthLfo` | `wave`, `rate` (5 Hz), `sync` (0 beats, off, 0..256), `delay`, `fade`, `phase`, `random_phase`, destination depths |
 | `SynthString` | Pluck layer: `decay` (2 s to -60 dB), `brightness` (0.5), `hardness` (0.8), `velocity` (0) |
+| `SynthBow` | Bowed layer: `pressure` (0.5, 0..1), `speed` (0.5, 0..1), `position` (0.12, 0.02..0.5), `brightness` (0.5), `noise` (0.1, 0..1), `velocity` (0) |
 | `SynthTable` | Wavetable layer: `table` (an entity with `Wavetable`), `position` (0 frames), `envelope` (0 frames) |
 | `Wavetable` | On an entity of its own, usually a prefab: `kind` (`WavetableBasic`), `sound` (0, an entity with `AudioPcm` or `SoundFile` that wins over `kind`), `frame_size` (2048 samples, 64..4096) |
 
 Waves are `SynthSine`, `SynthSaw`, `SynthSquare`, `SynthTriangle`, `SynthNoise`,
-`SynthPluck` and `SynthWavetable`. Frequency sweeps are exponential. Positive envelope curves make
+`SynthPluck`, `SynthWavetable` and `SynthBowed`. Frequency sweeps are exponential. Positive envelope curves make
 decay/release fall quickly then settle; zero is linear, negative curves start slowly.
 Curve values range from -16 to 16. A sustain of zero ends after decay.
 For gated notes, sustain holds until release, ignoring hold.
@@ -1068,8 +1069,80 @@ prefab Pluck {
 A layer without an envelope logs an error and plays for 10 seconds. `SynthPluck`
 is the exception: its physical string model rings out without an envelope. Brightness
 controls how quickly harmonics fade; hardness controls the attack. Frequencies below
-40 Hz warn and clamp. There are 32 strings total, one per pluck unison voice; long
-ringing chords can exhaust them and cause plays to be ignored.
+40 Hz warn and clamp. There are 32 strings total, one per pluck or bowed unison voice;
+long ringing chords can exhaust them and cause plays to be ignored.
+
+`SynthBowed` is the sustained counterpart of the pluck: a bowed string for violins,
+violas, cellos and basses, with the bow noise, the small jitter of pitch and level and
+the changing tone a saw through a filter does not have. It is a digital waveguide split
+at the bow into a bridge side and a nut side (McIntyre, Schumacher and Woodhouse; Smith;
+the STK `Bowed` instrument). The bow is a friction junction: the difference of the bow
+velocity to the string velocity at the bow goes through a friction curve that decides
+between stick and slip. The nut reflects inverted, the bridge inverted through a
+one-pole lowpass that damps the loop, and the output is the wave at the bridge. Both
+sides are read at fractional delays with a 3rd order Lagrange interpolation, and the
+phase delay of the lowpass at the fundamental comes off the loop, so a note settles in
+tune at high notes too.
+
+The `SynthBow` of the layer sets the bow; a bowed layer without one takes the defaults:
+
+- `pressure` (0.5): the force of the bow, the width of the stick region of the friction,
+  and how sharp the bow keeps the corner of the Helmholtz motion: it moves the lowpass of
+  the loop up to 1.5 octaves either way. Low gives a soft, airy tone, the middle the
+  Helmholtz motion, high a harder tone with more upper harmonics.
+- `speed` (0.5): the bow velocity, the level; the friction scales with it, so the tone
+  stays and only the bow hair noise and the attack change with it. 0 is silent.
+- `position` (0.12): the distance of the bow from the bridge as a share of the string,
+  0.02..0.5. Near the bridge is brighter (sul ponticello), far darker (sul tasto); it
+  notches the harmonics at the multiples of `1 / position`, so 0.2 takes out the 5th and
+  the 10th. A side keeps at least 2 frames, so at very high notes the bow moves off the
+  bridge a little.
+- `brightness` (0.5): the damping of the loop, 0 dark to 1 bright, a lowpass at the
+  bridge that follows the note, from its 4th to about its 23rd harmonic.
+- `noise` (0.1): the noise of the bow hair, added at the contact point in proportion to
+  the bow velocity, which the string filters into its own bow noise and jitter.
+- `velocity` (0): the share of the pressure and the speed that the velocity of a note
+  scales, as `SynthString.velocity` does the hardness.
+
+The bow speed follows the amplitude envelope of the layer, its own or the root's, in
+place of the level: the attack starts the bow, the decay and sustain hold it, the release
+lifts it. The bow touches the string while the envelope is over 0, firmly from a level of
+0.25 up. Once it lifts, the string rings out through its damping, its fundamental falling
+60 dB over about 220 periods (a second at A3, at most 4 seconds), less in a bright string; the voice ends once the envelope ended
+and the string is silent, as a pluck ends. A bowed layer without any envelope bows for 10
+seconds, as other waves do. Glide, legato, bend, pitch LFOs, `SynthPitchEnvelope` and
+drift change the length of the string smoothly without restarting it, as they move a
+pluck, so vibrato and legato do not click. Phase modulation, `sync` and `sub` do not apply.
+With `SynthUnison` each copy is a bowed string of its own, detuned and panned, on the mono
+and the stereo path. The routes `SynthTargetBowPressure`, `SynthTargetBowSpeed` and
+`SynthTargetBowPosition` move the bow, smoothed over about 5 ms, so the pressure curve of a
+note (`SynthSourcePressure`), the LFOs and the mod envelope can drive it.
+
+Bowed strings take their delay lines, one per unison copy, from the same 32 strings of the
+core as plucks, each long enough for 40 Hz (up to 81.8 kHz sample rates); a play that finds
+too few free is ignored with an ignored event, as a pluck play is, and a voice gives
+its strings back when it ends. A bowed note holds its string for its whole envelope and the
+ring out after it, so a part should keep its overlapping notes under 32 strings: a legato
+`SynthGlide` plays a whole line on one. Body resonance stays out of the model: it is the
+job of the bus EQ, as in the strings song of the jukebox. In the `Synth` bench
+(`voices_32_bowed`, 32 bowed voices under a vibrato and two routes to the bow, through a
+lowpass, 48 kHz) a bowed voice costs about 40 ns per frame (165 µs per 128-frame
+quantum for all 32), against about 25 ns for a pluck under a vibrato.
+
+```flecs
+using box.audio
+
+prefab Violin {
+  SynthSound: {seed: 11, drift: 3}
+  SynthGlide: {time: 0.045, legato: true}
+  SynthEnvelope: {attack: 0.09, attack_curve: -1, decay: 0.3, sustain: 0.9, release: 0.25, curve: 2}
+  SynthLfo: {rate: 5.8, delay: 0.16, fade: 0.4, random_phase: true, pitch: 20}
+  SynthOscillator: {wave: SynthBowed, frequency: 440, level: 0.5}
+  SynthBow: {pressure: 0.45, speed: 0.6, position: 0.11, brightness: 0.55, noise: 0.12, velocity: 0.5}
+  swell { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetBowPressure, amount: 0.4} }
+  push { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetBowSpeed, amount: 0.3} }
+}
+```
 
 The velocity of a note (an `Instrument` play or a `NoteClip`, clamped to 0..1) reaches
 the voice as well as its gain, so harder notes can be brighter, not only louder. Each
@@ -1084,6 +1157,8 @@ the voice as well as its gain, so harder notes can be brighter, not only louder.
   so soft notes have fewer sidebands.
 - `SynthString.velocity` scales the hardness of a pluck the same way, so soft notes are
   plucked softer.
+- `SynthBow.velocity` scales the pressure and the speed of a bow the same way, so soft notes
+  are bowed lighter and quieter.
 
 Plays that are not notes, such as `AudioSource`, `box_audio_play`, quantized plays and
 streams, play at velocity 1. Sample voices ignore velocity beyond its gain.
@@ -1228,6 +1303,9 @@ lead {
 | `SynthTargetHardSync` | Semitones of the ratio of `sync`, -48..48, the result clamped to 1..16; nothing on a layer without sync (a ratio over 1 or a `hard_sync` LFO of the layer) |
 | `SynthTargetPosition` | Frames of the position of a `SynthWavetable` layer, -256..256, the result clamped to 0..N-1 of its table; nothing on a layer that is not a wavetable |
 | `SynthTargetVowel` | Vowels of the `SynthFormant` filter, -4..4, the result clamped to 0..4; of the sound on a layer too; nothing without a `SynthFormant` filter |
+| `SynthTargetBowPressure` | Share of `SynthBow.pressure`, -1..1, the result clamped to 0..1; nothing on a layer that is not `SynthBowed` |
+| `SynthTargetBowSpeed` | Share of `SynthBow.speed`, -1..1, the result clamped to 0..1; nothing on a layer that is not `SynthBowed` |
+| `SynthTargetBowPosition` | Share of the string of `SynthBow.position`, -0.5..0.5, the result clamped to 0.02..0.5; nothing on a layer that is not `SynthBowed` |
 
 `SynthModEnvelope` is a third envelope on the root with the fields of `SynthEnvelope`.
 It runs only when a route uses it and does not keep the voice playing, as the filter
@@ -1242,6 +1320,7 @@ Working examples include [synth_examples.flecs](../test/assets/audio/synth_examp
 [synth_lfo.flecs](../test/assets/audio/synth_lfo.flecs),
 [synth_glide.flecs](../test/assets/audio/synth_glide.flecs),
 [synth_pluck.flecs](../test/assets/audio/synth_pluck.flecs),
+[synth_bowed.flecs](../test/assets/audio/synth_bowed.flecs),
 [synth_sub.flecs](../test/assets/audio/synth_sub.flecs),
 [synth_sync.flecs](../test/assets/audio/synth_sync.flecs),
 [synth_wavetable.flecs](../test/assets/audio/synth_wavetable.flecs),
@@ -1634,6 +1713,9 @@ Importing box alone does not open an output: `box_app_run` does.
 | `audio render <subject> [options]` | Render a sound, instrument, bus stem or song section on its own, faster than real time, to a WAV resource |
 | `audio song [<file>\|none]` | Show the song, load a song file or unload it |
 | `audio analyze <wav> [from] [to]` | Print a text report of a WAV resource or file, optionally of the seconds from..to |
+| `audio diff <a> <b> [from] [to]` | Print how WAV b differs from WAV a: bit identity, loudness, bands, stereo and a null test |
+| `audio plot <wav> [kind] [options]` | Draw a PNG resource of a WAV resource or file: spectrogram, waveform, spectrum or loudness |
+| `audio meter [bus...] [seconds\|bars=a..b]` | Measure peak, RMS and loudness per bus and the gain reduction of its effects over a span of the live output; run again without arguments for the table |
 | `audio notes <track> [bars=a..b] [roll]` | Print the notes of a track per bar, or as a piano roll |
 | `audio chords [track...] [bars=a..b]` | Print the chords and the key of a section from the notes |
 | `audio check [static] [bars=a..b]` | Lint the song, or the tracks of the scene: notes, clips, routing, effects and lanes, then voices, steals, clipping, the limiter, loudness and silent tracks from one offline play |
@@ -1735,6 +1817,83 @@ bar in LUFS and the band that changed the most against the whole span, counting 
 40 dB under the total as at least that. A tempo change or loop wrap during the capture is not
 followed. The same WAV and span give the same text. The measures are a plain C library,
 [analyze.h](../src/audio/analyze.h).
+
+`audio diff` compares two WAVs, each a resource or a file as for `audio analyze`, over the same
+seconds from..to of both. It reuses the measures of `audio analyze` and prints:
+
+| Line | Measures |
+| --- | --- |
+| `identical` | Whether the span is bit identical, else how many samples differ and the first |
+| `length` | Length of both files in s and b - a in s and frames |
+| `loudness` | Integrated loudness in LUFS and true peak in dBFS of a and b, and the change in dB |
+| `bands (b - a)` | Change of the energy of each band in dB, `quiet` when the band is 40 dB under the total in both |
+| `balance` | The band that changed the most against the total, which a change of gain leaves alone |
+| `stereo` | Correlation and width (side over mid) of a and b and their change |
+| `null test` | Offset of b in frames and ms within 20 ms: of lag 0 and the peaks of the cross-correlation of the mono sums over the loudest part of a, the one with the least residual; the residual b - a after that alignment in dB against a and in dBFS, over the frames both have |
+| `residual spans` | Where the residual is loudest: runs of 100 ms within 6 dB of the loudest 100 ms (5 at most, the loudest), in dBFS and in dB against a |
+
+Silence on one side prints as `-inf` or `+inf`. With a `bxsg` chunk in a (else in b), `bars`
+lists how many bars of the span differ and the 4 with the loudest residual: the residual in
+dB against a, the loudness of a and b and the band that changed most. WAVs of different sample
+rates are an error; a mono and a stereo WAV are compared as the mono sums, the mean of left and
+right. The alignment and residual are a plain C library, [diff.h](../src/audio/diff.h).
+
+`audio plot` reads a WAV as `audio analyze` does and returns the name of a PNG resource, as
+`audio capture` does; in the browser it writes `/tmp/audio_plot_<n>.png` in the page filesystem
+and returns that path. The image is drawn on the CPU, so it works headless and in the browser,
+and the same WAV and options give the same PNG bytes. Its first line names the kind, the WAV,
+its rate and the span.
+
+| Kind | Image |
+| --- | --- |
+| `spectrogram` (default) | Level per time and frequency: one Hann windowed FFT of about 85 ms per column, a log axis of 20 Hz to 20 kHz, colors from black at `min_db` to pale yellow at 0 dB (a full scale sine), with the scale on the right |
+| `waveform` | A lane per channel with the peak (dark) envelope of the frames of each column and the RMS (light) of at least 20 ms around it, -1 to 1 |
+| `spectrum` | Average level over the span per log frequency in dB, with the band edges and names of `audio analyze` |
+| `loudness` | Short-term (3 s, bright) and momentary (400 ms, dim) loudness over time in LUFS |
+
+| Option | Meaning |
+| --- | --- |
+| `size=WxH` | Image size in pixels, 240x160 to 4096x4096, default 1200x600 |
+| `from=<s>`, `to=<s>` | Plot the seconds from..to of the WAV, default all of it |
+| `min_db=<dB>` | Bottom of the scale, default -100 dB, or -60 LUFS for `loudness`; keep it fixed to compare images |
+
+Axes are labeled in Hz, s, dB and LUFS. A capture of a song (a `bxsg` chunk) also gets bar
+lines with the bar numbers above the plot and, when there is room, beat lines, from the beat and
+tempo the capture started at. A spectrogram shows masking, muddy low-mids, harsh highs, cut
+tails and clicks (thin vertical lines) at a glance.
+
+`audio meter` measures the buses for gain staging. It renders in real time: the first call
+starts a measurement of the live output over `seconds` (default 3, at most 600) and returns at
+once; `audio meter` without arguments prints the progress, and once the span is measured the
+table, which it prints only once. Without buses it measures every bus of the processing order
+and the master. With `bars=a..b` and a loaded song it seeks the transport to bar `a`, plays and
+measures the length of the bars at the tempo of the transport. A call with arguments replaces a
+measurement that runs. It needs an output that runs, the null output of a headless run
+included; the AudioMeter of the entities, and which entities have one, stay as they are.
+
+```
+> audio meter drums bass 2
+meter: measuring 2.000 s of the live output in real time: drums, bass
+run audio meter after 2.0 s for the table
+> audio meter
+meter: live output, 2.000 s at 48000 Hz
+drums: peak -4.1 dBFS, rms -15.2 dB, integrated -14.8 LUFS, short-term max -14.6 LUFS
+  insert 0 glue compressor: reduction avg 2.3 dB, max 5.1 dB
+  insert 1 grit saturator: never engages
+bass: peak -9.6 dBFS, rms -17.0 dB, integrated -19.9 LUFS, short-term max -19.7 LUFS
+headroom: 4.1 dB, loudest drums at -4.1 dBFS; master limiter max reduction 0.0 dB
+```
+
+A bus is measured at its output, after its inserts, volume, pan and mute, and the master
+before its limiter. The peak is the sample peak; the RMS is over both channels. The loudness
+uses the K-weighting of BS.1770, which the core runs on the measured buses only while a
+measurement runs, and the gating of `audio analyze` over 100 ms hops: integrated in LUFS, and
+the largest short-term (3 s) loudness, over the whole span when it is shorter. Each Compressor,
+Gate, PatternGate and Saturator in the inserts of a bus prints its average and largest gain
+reduction in dB, `never engages` under 0.1 dB, or `did not run`. The headroom line is how far
+the loudest measured bus is under 0 dBFS, and the largest gain reduction of the limiter of the
+master, from the peaks over its threshold. A bus that never rendered says so. Measured through
+the null output at a fixed delta time, the same scene gives the same table.
 
 `audio notes` and `audio chords` read only the note data of the tracks, their
 placements and clips, so they work without an output and without a device. A
@@ -1901,7 +2060,7 @@ and [transport.h](../src/audio/transport.h) for the low-level APIs.
 
 The main limits are 64 voices, 64 buses, 64 effects, 64 modulators, 32 macros of eight
 maps, four inserts and sends per bus, eight synth layers, two synth LFOs, seven unison
-copies per layer, 32 pluck strings, 32 comb delay lines and 256 frames per wavetable, whose tables share the 1023 sound ids. Effects are algorithmic: no convolution or geometry-derived rooms.
+copies per layer, 32 strings shared by pluck and bowed layers, 32 comb delay lines and 256 frames per wavetable, whose tables share the 1023 sound ids. Effects are algorithmic: no convolution or geometry-derived rooms.
 There is one transport and one music stream per world. There are no tempo ramps,
 time stretching, MIDI I/O, plugins, mixer UI or piano roll.
 Scripts can change channel and effect values each frame.

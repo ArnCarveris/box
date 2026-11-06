@@ -9,6 +9,7 @@
 #include <box.h>
 #include "output.h"
 #include "analyze.h"
+#include "meter_span.h"
 
 /** One shot voices the module keeps track of at most, the oldest are forgotten beyond this */
 #define BOX_AUDIO_ONESHOT_MAX (1024)
@@ -524,6 +525,37 @@ typedef struct box_audio_meter_window_t {
     float rms_right;        /**< Right RMS over the window */
 } box_audio_meter_window_t;
 
+/** Channels a measurement over a span follows: every bus and the master */
+#define BOX_AUDIO_METER_JOB_MAX (BOX_AUDIO_BUS_MAX + 1)
+
+/** Longest measurement over a span in seconds */
+#define BOX_AUDIO_METER_JOB_SECONDS (600.0)
+
+/** A measurement of the levels of channels over a span of the output, for the audio meter
+ * command: it reads the meters the module takes once per frame, turns on the loudness meters
+ * of its buses in the core while it runs and leaves the AudioMeter of the entities alone */
+typedef struct box_audio_meter_job_t {
+    bool running;           /**< It measures */
+    bool done;              /**< It measured its span and waits to be read */
+    double target;          /**< Frames of output to measure */
+    double frames;          /**< Frames of output measured */
+    float sample_rate;      /**< Frames per second of the output */
+    int32_t skip;           /**< Reads of the meters to skip before the span starts, so the
+                             *   loudness meters and a seek apply first */
+    int32_t count;          /**< Channels, the master last */
+    bool master_listed;     /**< The master was asked for, it is measured anyway for the
+                             *   limiter */
+    ecs_entity_t channels[BOX_AUDIO_METER_JOB_MAX]; /**< The channels, the master last */
+    box_audio_span_level_t levels[BOX_AUDIO_METER_JOB_MAX]; /**< Levels of each channel */
+    bool lost[BOX_AUDIO_METER_JOB_MAX]; /**< The channel lost its bus index during the span */
+    ecs_entity_t effects[BOX_AUDIO_EFFECT_MAX]; /**< Effect measured in each slot, 0 for none */
+    box_audio_span_reduction_t reduction[BOX_AUDIO_EFFECT_MAX]; /**< Reduction of each slot */
+    float limiter;          /**< Largest gain reduction of the limiter of the master in dB */
+    int32_t stalls;         /**< Reads during which the output did not run */
+    uint64_t loudness;      /**< Bus indices whose loudness meter is on in the core */
+    uint32_t loudness_serial; /**< Serial of the output the loudness meters were sent to */
+} box_audio_meter_job_t;
+
 /** Shortest pass of a looping placement in beats; a shorter clip loops at this length */
 #define BOX_AUDIO_CLIP_LENGTH_MIN (1.0 / 64.0)
 
@@ -977,6 +1009,8 @@ typedef struct box_audio_module_t {
     int64_t voices_stolen;        /**< Steals the core reported */
     int64_t voices_refused;       /**< Refusals the core reported */
     box_audio_capture_job_t capture; /**< The capture that waits */
+    box_audio_meter_job_t meter_job; /**< The measurement over a span of the audio meter
+                                   *   command */
     box_audio_listener_t listener;   /**< The listener of the last frame */
     box_audio_timeline_t timeline;   /**< The timeline of the Transport */
     box_audio_sequencer_t sequencer; /**< The tracks of the timeline */
@@ -1368,6 +1402,55 @@ void box_audio_meters_update(
     ecs_world_t *world,
     box_audio_module_t *state,
     box_audio_transport_t *t);
+
+/** Turn the loudness meters of the core on for the buses of a measurement over a span that
+ * runs, and off for the others, into the batch of the frame.
+ *
+ * @param state The state, whose bus indices are current
+ * @param serial Serial of the output
+ */
+void box_audio_meter_job_sync(
+    box_audio_module_t *state,
+    uint32_t serial);
+
+/** Free a measurement over a span.
+ *
+ * @param state The state
+ */
+void box_audio_meter_job_fini(
+    box_audio_module_t *state);
+
+/** Start a measurement of the levels of channels over a span of the output. A measurement that
+ * waits to be read is dropped.
+ *
+ * @param world The world
+ * @param channels Bus entities and the master to measure
+ * @param count Number of channels
+ * @param seconds Seconds of output to measure
+ * @param skip Reads of the meters to skip first, at least 2 so the loudness meters apply
+ * @return Zero on success, nonzero with an error logged
+ */
+int box_audio_meter_job_start(
+    ecs_world_t *world,
+    const ecs_entity_t *channels,
+    int32_t count,
+    double seconds,
+    int32_t skip);
+
+/** Get the measurement over a span.
+ *
+ * @param world The world
+ * @return The measurement, NULL when box.audio is not imported
+ */
+const box_audio_meter_job_t* box_audio_meter_job_get(
+    const ecs_world_t *world);
+
+/** Drop the measurement over a span, measured or not, and turn its loudness meters off.
+ *
+ * @param world The world
+ */
+void box_audio_meter_job_clear(
+    ecs_world_t *world);
 
 /** Get the levels of a channel the module measured in the last frame, with or without an
  * AudioMeter.

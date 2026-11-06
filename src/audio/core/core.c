@@ -926,6 +926,9 @@ static void box_audio_cmd_bus_set(
             box_audio_clamp(value, 0, BOX_AUDIO_VOLUME_MAX);
     } else if (cmd->param == BOX_AUDIO_PARAM_WIDTH) {
         b->width = box_audio_clamp(value, 0, 2);
+    } else if (cmd->param == BOX_AUDIO_PARAM_LOUDNESS) {
+        box_audio_core_loudness(b, value != 0 && value == value);
+        known = false;
     } else {
         known = false;
         box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_BUS_SET, 0);
@@ -1465,6 +1468,7 @@ box_audio_core_t* box_audio_core_new(
     core->steal_frames = core->steal_frames > 0 ? core->steal_frames : 1;
     core->limiter_gain = 1;
     core->limiter_step = 1.0f / (BOX_AUDIO_LIMITER_RELEASE * core->sample_rate);
+    box_audio_core_kweight_init(core);
     for (i = 0; i < BOX_AUDIO_BUS_MAX; i ++) {
         box_audio_bus_t *b = &core->buses[i];
         b->volume = 1;
@@ -1927,6 +1931,7 @@ static void box_audio_buses_render(
             }
         }
 
+        m->loudness += b->loudness ? box_audio_core_kweight(core, b, frames) : 0.0f;
         m->peak_left = peak_l;
         m->peak_right = peak_r;
         m->square_left += (double)square_l;
