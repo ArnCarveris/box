@@ -1,4 +1,30 @@
 using box.audio
+using box.material
+
+$ {
+  Song: {
+    title: "Neon Run", tempo: 108, beats_per_bar: 4, beat_unit: 4, beats: 64,
+    lanes: [
+      {name: "Kit", bus: neon_kit},
+      {name: "Bass", bus: nr_bass},
+      {name: "Pad", bus: nr_pad},
+      {name: "Arp", bus: nr_arp},
+      {name: "Lead", bus: nr_lead}
+    ]
+  }
+}
+
+box { audio { Song { Rgb: {255, 60, 200} } } }
+
+neon_glue {
+  Compressor: {threshold: -16, ratio: 2.5, attack: 0.02, release: 0.25, knee: 6, makeup: 2}
+  AudioMeter: {}
+}
+
+neon {
+  AudioBus: {output: master, volume: 0.85, effects: [neon_glue]}
+  AudioMeter: {}
+}
 
 prefab nr_supersaw {
   SynthSound: {seed: 3}
@@ -299,8 +325,6 @@ prefab nr_snare_roll {
   ]}
 }
 
-const NR: f32 = 1000
-
 neon_kit {
   AudioBus: {output: neon, volume: 0.8}
   AudioMeter: {}
@@ -309,20 +333,20 @@ neon_kit {
 nr_kick {
   Track: {instrument: nr_kick_inst}
   AudioBus: {output: neon_kit}
-  drop { ClipPlacement: {clip: nr_four_floor, start: NR + 16, duration: 48, loop: true} }
+  drop { ClipPlacement: {clip: nr_four_floor, start: 16, duration: 48, loop: true} }
 }
 
 nr_snare {
   Track: {instrument: nr_snare_inst}
   AudioBus: {output: neon_kit, volume: 0.65, sends: [{bus: plate, level: 0.5}]}
-  roll { ClipPlacement: {clip: nr_snare_roll, start: NR + 12, gain: 0.8} }
-  drop { ClipPlacement: {clip: nr_backbeat, start: NR + 16, duration: 48, loop: true} }
+  roll { ClipPlacement: {clip: nr_snare_roll, start: 12, gain: 0.8} }
+  drop { ClipPlacement: {clip: nr_backbeat, start: 16, duration: 48, loop: true} }
 }
 
 nr_hats {
   Track: {instrument: nr_hat_inst}
   AudioBus: {output: neon_kit, volume: 0.5, pan: 0.1}
-  drop { ClipPlacement: {clip: nr_sixteenths, start: NR + 16, duration: 48, loop: true} }
+  drop { ClipPlacement: {clip: nr_sixteenths, start: 16, duration: 48, loop: true} }
 }
 
 nr_duck {
@@ -338,14 +362,14 @@ nr_pad {
   Track: {instrument: nr_pad_inst}
   AudioBus: {output: neon, volume: 0.8, effects: [nr_duck, nr_wide], sends: [{bus: hall, level: 0.2}]}
   AudioMeter: {}
-  chords { ClipPlacement: {clip: nr_pad_chords, start: NR, duration: 64, loop: true} }
+  chords { ClipPlacement: {clip: nr_pad_chords, start: 0, duration: 64, loop: true} }
 }
 
 nr_bass {
   Track: {instrument: nr_bass_inst}
   AudioBus: {output: neon, volume: 0.8}
   AudioMeter: {}
-  drop { ClipPlacement: {clip: nr_bass_octaves, start: NR + 16, duration: 48, loop: true} }
+  drop { ClipPlacement: {clip: nr_bass_octaves, start: 16, duration: 48, loop: true} }
 }
 
 nr_sweep {
@@ -360,12 +384,12 @@ nr_arp {
   Track: {instrument: nr_arp_inst}
   AudioBus: {output: neon, volume: 0.55, effects: [nr_sweep, nr_echo]}
   AudioMeter: {}
-  line { ClipPlacement: {clip: nr_arp_line, start: NR, duration: 64, loop: true} }
+  line { ClipPlacement: {clip: nr_arp_line, start: 0, duration: 64, loop: true} }
 }
 
 nr_lead {
   Track: {instrument: nr_lead_inst}
   AudioBus: {output: neon, volume: 0.6, sends: [{bus: echo, level: 0.3}, {bus: plate, level: 0.2}]}
   AudioMeter: {}
-  hook { ClipPlacement: {clip: nr_hook, start: NR + 32} }
+  hook { ClipPlacement: {clip: nr_hook, start: 32} }
 }

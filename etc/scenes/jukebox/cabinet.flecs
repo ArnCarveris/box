@@ -8,6 +8,7 @@ using box.text
 using box.input
 using box.picking
 using box.transition
+using box.audio
 
 prefab JBOutline {
   Path2D: {
@@ -54,41 +55,33 @@ template JBArch {
   Sweep: {path: route, profile: JBRoundProfile, scale: {tube, tube}, rings: 160}
 }
 
-template JBSongKey {
-  prop index: i32 = 0
+template JBKey {
   prop action: entity = 0
-  const r = SONG_R[index]
-  const g = SONG_G[index]
-  const b = SONG_B[index]
+  prop label: string = ""
+  prop on: bool = false
   ActionTrigger: {action: action}
   RoundedBox: {0.17, 0.09, 0.07, 0.014}
   Rgb: {242, 225, 186}
   PbrMaterial: {roughness: 0.28}
   ClearCoat: {strength: 0.7, roughness: 0.15}
-  number {
+  symbol {
     Position: {0, 0.006, 0.037}
     Scale: {0.0015, 0.0015, 0.0015}
-    Text: {value: "{index + 1}", size: 25}
+    Text: {value: label, size: 25}
     Rgb: {28, 49, 48}
   }
   indicator {
     Position: {0, -0.031, 0.037}
     RoundedBox: {0.11, 0.009, 0.006, 0.003}
-    Rgb: {r, g, b}
-    Emissive: {strength: 0.15 + 1.5 * (song == index), color: {r, g, b}}
-  }
-  async {
-    while true {
-      await on.pressed(action)
-      pick(index)
-    }
+    Rgb: {song_r, song_g, song_b}
+    Emissive: {strength: 0.15 + 1.5 * on, color: {song_r, song_g, song_b}}
   }
 }
 
 template Jukebox {
-  const R = SONG_R[song]
-  const G = SONG_G[song]
-  const B = SONG_B[song]
+  const R = song_r
+  const G = song_g
+  const B = song_b
 
   shell : JBWood {
     Position: {0, 0, -0.04}
@@ -192,15 +185,19 @@ template Jukebox {
 
   console : JBChrome { Position: {0, 1.035, 0.425}; RoundedBox: {1.075, 0.25, 0.16, 0.045} }
   console_inset : JBDark { Position: {0, 1.041, 0.51}; RoundedBox: {0.975, 0.17, 0.018, 0.022} }
-  for i in 0..5 {
-    "{SONG_KEY[i]}_key" { JBSongKey: {index: i, action: SONG_ACTION[i]}; Position: {(i - 2) * 0.19, 1.015, 0.538} }
-    "song_plate_{i}" : JBIvory { Position: {(i - 2) * 0.19, 1.092, 0.525}; RoundedBox: {0.17, 0.033, 0.006, 0.006} }
-    "title_{i}" {
-      Position: {(i - 2) * 0.19, 1.093, 0.531}
-      Scale: {0.00041, 0.00041, 0.00041}
-      Text: {value: SONG_TITLE[i], size: 25}
-      Rgb: {28, 49, 48}
+  previous_key { JBKey: {action: jukebox_actions.previous, label: "<<"}; Position: {-0.19, 1.015, 0.538} }
+  play_key { JBKey: {action: jukebox_actions.play, label: ">", on: lit}; Position: {0, 1.015, 0.538} }
+  next_key { JBKey: {action: jukebox_actions.next, label: ">>"}; Position: {0.19, 1.015, 0.538} }
+  song_plate : JBIvory { Position: {0, 1.092, 0.525}; RoundedBox: {0.55, 0.033, 0.006, 0.006} }
+  song_title {
+    Position: {0, 1.093, 0.531}
+    Scale: {0.00041, 0.00041, 0.00041}
+    if lit {
+      Text: {value: "{Song[Song].title}", size: 25}
+    } else {
+      Text: {value: "", size: 25}
     }
+    Rgb: {28, 49, 48}
   }
 
   grille_frame : JBBrass { Position: {0, 0.609, 0.412}; RoundedBox: {1.036, 0.61, 0.06, 0.1} }

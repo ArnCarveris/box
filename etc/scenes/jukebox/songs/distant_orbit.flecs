@@ -1,4 +1,19 @@
 using box.audio
+using box.material
+
+$ {
+  Song: {
+    title: "Distant Orbit", tempo: 60, beats_per_bar: 4, beat_unit: 4, beats: 128,
+    lanes: [
+      {name: "Pad", bus: orbit_pad},
+      {name: "Bass", bus: orbit_bass},
+      {name: "Bells", bus: orbit_bells},
+      {name: "Voice", bus: orbit_melody}
+    ]
+  }
+}
+
+box { audio { Song { Rgb: {130, 160, 255} } } }
 
 orbit_space {
   AudioBus: {output: master, kind: AudioChannelReturn, volume: reverb_level / 100, effects: [orbit_space]}
@@ -116,7 +131,7 @@ orbit_pad {
   Track: {instrument: orbit_pad_inst}
   AudioBus: {output: orbit, volume: 0.7, sends: [{bus: orbit_space, level: 0.65}]}
   AudioMeter: {}
-  phrase { ClipPlacement: {clip: orbit_pad_notes, start: 3000} }
+  phrase { ClipPlacement: {clip: orbit_pad_notes, start: 0} }
 }
 
 prefab orbit_bass_notes {
@@ -136,7 +151,7 @@ orbit_bass {
   Track: {instrument: orbit_bass_inst}
   AudioBus: {output: orbit, volume: 0.7, sends: [{bus: orbit_space, level: 0.15}]}
   AudioMeter: {}
-  phrase { ClipPlacement: {clip: orbit_bass_notes, start: 3000} }
+  phrase { ClipPlacement: {clip: orbit_bass_notes, start: 0} }
 }
 
 prefab orbit_bells_notes {
@@ -164,7 +179,7 @@ orbit_bells {
   Track: {instrument: orbit_bells_inst}
   AudioBus: {output: orbit, volume: 0.4, sends: [{bus: orbit_space, level: 0.45}]}
   AudioMeter: {}
-  phrase { ClipPlacement: {clip: orbit_bells_notes, start: 3000} }
+  phrase { ClipPlacement: {clip: orbit_bells_notes, start: 0} }
 }
 
 prefab orbit_voice_notes {
@@ -200,5 +215,5 @@ orbit_melody {
   Track: {instrument: orbit_voice_inst}
   AudioBus: {output: orbit, volume: 0.9, sends: [{bus: orbit_space, level: 0.4}]}
   AudioMeter: {}
-  phrase { ClipPlacement: {clip: orbit_voice_notes, start: 3000} }
+  phrase { ClipPlacement: {clip: orbit_voice_notes, start: 0} }
 }

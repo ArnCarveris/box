@@ -1,0 +1,7 @@
+using box.audio
+
+$ { Song: {title: "Third", tempo: 120, beats: 8, lanes: [{name: "Main", bus: third_bus}]} }
+
+third_bus { AudioBus: {} }
+
+prefab third_tone { SynthSound: {}; SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.2} }

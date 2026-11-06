@@ -1,0 +1,43 @@
+using box.audio
+using box.material
+
+$ {
+  Song: {
+    title: "Basic", tempo: 96, beats_per_bar: 3, beat_unit: 4, beats: 12,
+    lanes: [{name: "Lead", bus: basic_lead}]
+  }
+}
+
+box { audio { Song { Rgb: {200, 100, 50} } } }
+
+basic_room {
+  AudioBus: {kind: AudioChannelReturn, effects: [basic_room]}
+  Reverb: {decay: 1, damping: 0.5, size: 0.4}
+}
+
+basic_group {
+  AudioBus: {volume: 0.8}
+}
+
+prefab basic_tone {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.01, decay: 0.2, sustain: 0.8, release: 0.05}
+  SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.3}
+}
+
+basic_inst { Instrument: {sound: basic_tone} }
+
+prefab basic_notes {
+  NoteClip: {length: 3, notes: [
+    {start: 0, duration: 1, pitch: 60, velocity: 0.8},
+    {start: 1, duration: 1, pitch: 64, velocity: 0.8},
+    {start: 2, duration: 1, pitch: 67, velocity: 0.8}
+  ]}
+}
+
+basic_lead {
+  Track: {instrument: basic_inst}
+  AudioBus: {output: basic_group, sends: [{bus: basic_room, level: 0.3}]}
+  AudioMeter: {}
+  phrase { ClipPlacement: {clip: basic_notes, start: 0, duration: 12, loop: true} }
+}

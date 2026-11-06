@@ -1,0 +1,28 @@
+using box.audio
+
+$ { Song: {title: "Ringing", tempo: 120, beats: 64, lanes: [{name: "Bell", bus: ringing_bell}]} }
+
+ringing_group {
+  AudioBus: {}
+}
+
+prefab ringing_tone {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.005, decay: 30, curve: 0.2}
+  SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.4}
+}
+
+ringing_inst { Instrument: {sound: ringing_tone, gate: false} }
+
+prefab ringing_notes {
+  NoteClip: {length: 64, notes: [
+    {start: 0, duration: 32, pitch: 69, velocity: 1}
+  ]}
+}
+
+ringing_bell {
+  Track: {instrument: ringing_inst}
+  AudioBus: {output: ringing_group}
+  AudioMeter: {}
+  hit { ClipPlacement: {clip: ringing_notes, start: 0} }
+}

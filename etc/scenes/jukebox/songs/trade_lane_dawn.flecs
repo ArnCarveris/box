@@ -1,6 +1,21 @@
 using box.audio
+using box.material
 
-box { audio { master {} } }
+$ {
+  Song: {
+    title: "Trade Lane Dawn", tempo: 72, beats_per_bar: 4, beat_unit: 4, beats: 160,
+    lanes: [
+      {name: "Choir", bus: lane_choirs},
+      {name: "Bows", bus: lane_strings},
+      {name: "Horn", bus: lane_horns},
+      {name: "Drive", bus: lane_engine},
+      {name: "Relay", bus: lane_signals},
+      {name: "Perc", bus: lane_motion}
+    ]
+  }
+}
+
+box { audio { Song { Rgb: {110, 205, 240} } } }
 
 lane_space_eq {
   Equalizer: {bands: [{kind: AudioEqLowCut, frequency: 240}, {kind: AudioEqHighCut, frequency: 6200}]}
@@ -168,7 +183,7 @@ prefab lane_vowel_notes {
 lane_vowel_track {
   Track: {instrument: lane_vowel_inst}
   AudioBus: {output: lane_choirs, volume: 0.85}
-  phrase { ClipPlacement: {clip: lane_vowel_notes, start: 4000} }
+  phrase { ClipPlacement: {clip: lane_vowel_notes, start: 0} }
 }
 
 lane_bow_inst { Instrument: {sound: lane_bow, gate: true} }
@@ -199,7 +214,7 @@ prefab lane_bow_notes {
 lane_bow_track {
   Track: {instrument: lane_bow_inst}
   AudioBus: {output: lane_strings, volume: 0.8}
-  phrase { ClipPlacement: {clip: lane_bow_notes, start: 4000} }
+  phrase { ClipPlacement: {clip: lane_bow_notes, start: 0} }
 }
 
 lane_horn_inst { Instrument: {sound: lane_horn, gate: true} }
@@ -230,7 +245,7 @@ prefab lane_horn_notes {
 lane_horn_track {
   Track: {instrument: lane_horn_inst}
   AudioBus: {output: lane_horns, volume: 0.85}
-  phrase { ClipPlacement: {clip: lane_horn_notes, start: 4000} }
+  phrase { ClipPlacement: {clip: lane_horn_notes, start: 0} }
 }
 
 lane_drive_inst { Instrument: {sound: lane_drive, gate: true} }
@@ -253,7 +268,7 @@ prefab lane_drive_notes {
 lane_drive_track {
   Track: {instrument: lane_drive_inst}
   AudioBus: {output: lane_engine, volume: 0.8}
-  phrase { ClipPlacement: {clip: lane_drive_notes, start: 4000} }
+  phrase { ClipPlacement: {clip: lane_drive_notes, start: 0} }
 }
 
 lane_relay_inst { Instrument: {sound: lane_relay, gate: false} }
@@ -350,7 +365,7 @@ prefab lane_relay_notes {
 lane_relay_track {
   Track: {instrument: lane_relay_inst}
   AudioBus: {output: lane_signals, volume: 0.7}
-  phrase { ClipPlacement: {clip: lane_relay_notes, start: 4000} }
+  phrase { ClipPlacement: {clip: lane_relay_notes, start: 0} }
 }
 
 lane_beacon_inst { Instrument: {sound: lane_beacon, gate: false} }
@@ -380,7 +395,7 @@ prefab lane_beacon_notes {
 lane_beacon_track {
   Track: {instrument: lane_beacon_inst}
   AudioBus: {output: lane_signals, volume: 0.65}
-  phrase { ClipPlacement: {clip: lane_beacon_notes, start: 4000} }
+  phrase { ClipPlacement: {clip: lane_beacon_notes, start: 0} }
 }
 
 lane_timpani_inst { Instrument: {sound: lane_timpani, gate: false} }
@@ -411,7 +426,7 @@ prefab lane_timpani_notes {
 lane_timpani_track {
   Track: {instrument: lane_timpani_inst}
   AudioBus: {output: lane_motion, volume: 0.65}
-  phrase { ClipPlacement: {clip: lane_timpani_notes, start: 4000} }
+  phrase { ClipPlacement: {clip: lane_timpani_notes, start: 0} }
 }
 
 lane_clink_inst { Instrument: {sound: lane_clink, gate: false} }
@@ -442,7 +457,7 @@ prefab lane_clink_notes {
 lane_clink_track {
   Track: {instrument: lane_clink_inst}
   AudioBus: {output: lane_motion, volume: 0.55}
-  phrase { ClipPlacement: {clip: lane_clink_notes, start: 4000} }
+  phrase { ClipPlacement: {clip: lane_clink_notes, start: 0} }
 }
 
 lane_air_inst { Instrument: {sound: lane_air, gate: false} }
@@ -461,7 +476,7 @@ prefab lane_air_notes {
 lane_air_track {
   Track: {instrument: lane_air_inst}
   AudioBus: {output: lane_motion, volume: 0.7}
-  phrase { ClipPlacement: {clip: lane_air_notes, start: 4000} }
+  phrase { ClipPlacement: {clip: lane_air_notes, start: 0} }
 }
 
 lane_corona_inst { Instrument: {sound: lane_corona, gate: true} }
@@ -479,5 +494,5 @@ prefab lane_corona_notes {
 lane_corona_track {
   Track: {instrument: lane_corona_inst}
   AudioBus: {output: lane_choirs, volume: 0.7}
-  phrase { ClipPlacement: {clip: lane_corona_notes, start: 4000} }
+  phrase { ClipPlacement: {clip: lane_corona_notes, start: 0} }
 }

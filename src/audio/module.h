@@ -753,6 +753,66 @@ typedef struct box_audio_modulators_t {
     box_audio_mod_stats_t stats; /**< Counters */
 } box_audio_modulators_t;
 
+/** Seconds the voices and buses of a song fade out before it unloads, past the ramp of a stop
+ * and a mute of the core */
+#define BOX_AUDIO_SONG_FADE_TIME (0.012)
+
+/** Seconds a swap waits at most for the slots of the old song before it gives up */
+#define BOX_AUDIO_SONG_TIMEOUT (5.0)
+
+/** Where the load of a song is */
+typedef enum box_audio_song_stage_t {
+    BOX_AUDIO_SONG_IDLE = 0,    /**< Nothing in flight: a song plays, failed, or none is loaded */
+    BOX_AUDIO_SONG_FADE = 1,    /**< The voices and buses of the old song fade out */
+    BOX_AUDIO_SONG_DRAIN = 2,   /**< The old song is deleted, its slots are not reusable yet */
+    BOX_AUDIO_SONG_DECODE = 3   /**< The new song is loaded, its sound files decode */
+} box_audio_song_stage_t;
+
+/** Counters of the songs, for the tests */
+typedef struct box_audio_song_stats_t {
+    int64_t loads;              /**< Song scripts loaded */
+    int64_t unloads;            /**< Song scripts deleted */
+    int64_t failures;           /**< Loads that ended in SongFailed */
+    int64_t reloads;            /**< Reloads of a song whose file or script changed */
+    int64_t waits;              /**< Frames a swap waited for the slots of the old song */
+} box_audio_song_stats_t;
+
+/** The song of the module, in song.c */
+typedef struct box_audio_song_t {
+    ecs_entity_t root;          /**< box.audio.songs, the parent of the song scripts */
+    ecs_entity_t script;        /**< Managed script of the loaded song, 0 for none */
+    char *file;                 /**< AudioSong.file of the loaded song */
+    char *code;                 /**< Code the song script was evaluated with */
+    char *next_code;            /**< Code an evaluation outside the engine gave the song
+                                 *   script, which its reload loads instead of the file */
+    char *target;               /**< The file the engine works towards, NULL for none */
+    box_audio_song_stage_t stage; /**< Where the load is */
+    double elapsed;             /**< Seconds in the stage */
+    int32_t frames;             /**< Frames in the stage */
+    bool pending;               /**< The target waits to be loaded once no song is loaded */
+    bool settled;               /**< The sound files of the new song were ready a frame ago */
+    bool reload;                /**< The file of the song changed on disk, or one of its
+                                 *   scripts was evaluated again outside the engine */
+    bool loading;               /**< The engine evaluates the song script */
+    bool dropping;              /**< The engine deletes the song scripts or takes entities
+                                 *   from them */
+    ecs_vec_t baseline;         /**< ecs_id_t, the type of box.audio.Song before the load */
+    uint64_t held_buses;        /**< Bus indices the unloaded song held, still marked freed */
+    ecs_entity_t held_effects[BOX_AUDIO_EFFECT_MAX]; /**< Deleted effect of each effect slot
+                                 *   the unloaded song held that the sync did not free yet */
+    ecs_vec_t held_sounds;      /**< uint32_t sound ids the unloaded song held whose free the
+                                 *   core did not report yet */
+    uint32_t held_serial;       /**< Serial of the output the held slots belong to */
+    char *held_file;            /**< File of the song whose slots are held, for the error */
+    ecs_vec_t foreign;          /**< ecs_entity_t, entities the song changed that it did not
+                                 *   create, collected during its load */
+    ecs_entity_t observer;      /**< Observer of the changes during a load, 0 outside it */
+    int32_t watch;              /**< Id of the file watch kind of the songs, 0 without box.app */
+    bool hold;                  /**< Keep the timeline stopped: a song swaps or loads */
+    uint64_t silenced;          /**< Bus indices of a song that fades out, sent muted */
+    box_audio_song_stats_t stats; /**< Counters */
+} box_audio_song_t;
+
 /** The state of the module in a world */
 typedef struct box_audio_module_t {
     ecs_query_t *buses;           /**< AudioBus, disabled ones included */
@@ -832,6 +892,7 @@ typedef struct box_audio_module_t {
     box_audio_sequencer_t sequencer; /**< The tracks of the timeline */
     box_audio_automation_t automation; /**< The automation lanes of the timeline */
     box_audio_modulators_t modulators; /**< The modulators */
+    box_audio_song_t song;           /**< The song of AudioSong */
     bool listener_warned;         /**< The warning of several listeners was logged */
     bool spatial_dirty;           /**< Update every spatial source, not only changed ones */
     bool waiting;                 /**< The page waited for a gesture in the last frame */
@@ -846,6 +907,76 @@ typedef struct box_audio_module_t {
  * @return The state, NULL when box.audio is not imported
  */
 box_audio_module_t* box_audio_module_get(
+    const ecs_world_t *world);
+
+/** Install the lifecycle hooks of Song, SongLane, AudioSong and AudioSongStatus, right after
+ * their registration.
+ *
+ * @param world The world
+ */
+void box_audio_song_hooks(
+    ecs_world_t *world);
+
+/** Register the song singletons, the root of the song scripts, the observer of what the song
+ * scripts own and the system that loads and unloads songs.
+ *
+ * The root of the songs owns box.audio.Song and the master, so no script takes them and
+ * deletes them when it unloads.
+ *
+ * @param world The world
+ * @param state The state
+ */
+void box_audio_song_init(
+    ecs_world_t *world,
+    box_audio_module_t *state);
+
+/** Free what the song of the module holds.
+ *
+ * @param state The state
+ */
+void box_audio_song_fini(
+    box_audio_module_t *state);
+
+/** Tell the song that the core freed a sound id, from the events of the output.
+ *
+ * @param state The state
+ * @param id The sound id
+ */
+void box_audio_song_sound_free(
+    box_audio_module_t *state,
+    uint32_t id);
+
+/** Count the slots a swap still waits for: the bus, effect and sound slots of the song that
+ * unloaded that are not reusable yet, for the tests.
+ *
+ * @param world The world
+ * @return Slots, 0 without a swap
+ */
+int32_t box_audio_song_held(
+    const ecs_world_t *world);
+
+/** Get the counters of the songs, for the tests.
+ *
+ * @param world The world
+ * @return The counters, zero when box.audio is not imported
+ */
+box_audio_song_stats_t box_audio_song_stats(
+    const ecs_world_t *world);
+
+/** Count the bus indices in use, the master excluded, for the tests.
+ *
+ * @param world The world
+ * @return Bus slots that have an entity
+ */
+int32_t box_audio_module_buses(
+    const ecs_world_t *world);
+
+/** Count the effect slots in use, for the tests.
+ *
+ * @param world The world
+ * @return Effect slots that have an entity
+ */
+int32_t box_audio_module_effects(
     const ecs_world_t *world);
 
 /** Get the counters of the module of a world, for the tests.
@@ -1483,7 +1614,8 @@ void box_audio_timeline_fini(
 
 /** Once per frame, into the batch of the frame: follow the Transport (start, stop, seek,
  * tempo and loop changes), compute the lookahead window, schedule the metronome, call the
- * hooks and write the position from the clock.
+ * hooks and write the position from the clock. While a song swaps or loads the timeline
+ * stays stopped, whatever Transport.playing says.
  *
  * @param world The world
  * @param state The state

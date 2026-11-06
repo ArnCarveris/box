@@ -1,0 +1,7 @@
+using box.audio
+
+$ { Song: {title: "Quiet", tempo: 120, beats: 8} }
+
+quiet_bus {
+  AudioBus: {}
+}

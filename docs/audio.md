@@ -1328,6 +1328,90 @@ to decode before setting transport playing. A quantized play uses `None`, `Beat`
 or `Bar` in script, or `AudioQuantizeNone`, `AudioQuantizeBeat`, `AudioQuantizeBar`
 in C. With no playing transport it starts immediately.
 
+### Song files
+
+A song can live in one `.flecs` file that the engine loads, plays and unloads as a
+whole. One song is loaded at a time, and a song that is not loaded holds nothing
+in the engine: its buses, effects, synth and sample sounds, instruments, clips,
+tracks, voices and meters exist only while it is loaded. Scenes and tests that
+drive `Transport` and `Track` directly keep working; song files are an addition.
+
+```flecs
+using box.audio
+using box.material
+
+$ {
+  Song: {
+    title: "Neon Run", tempo: 108, beats_per_bar: 4, beat_unit: 4, beats: 64,
+    lanes: [{name: "Bass", bus: nr_bass}, {name: "Lead", bus: nr_lead}]
+  }
+}
+
+box { audio { Song { Rgb: {255, 60, 200} } } }
+
+neon { AudioBus: {output: master}; AudioMeter: {} }
+nr_bass { Track: {instrument: nr_bass_inst}; AudioBus: {output: neon}; AudioMeter: {} }
+```
+
+Play it by setting the `AudioSong` singleton, `$ { AudioSong: {file: "songs/neon_run.flecs"} }`,
+or with `box_audio_song_load(world, file)` and `box_audio_song_unload(world)` in C,
+or `audio song <file>` in the shell (`audio song` shows it, `audio song none`
+unloads it). The path is found as the one of a `SoundFile`. A new file swaps the
+song; an empty file or removing `AudioSong` unloads it.
+
+| Component | Meaning |
+| --- | --- |
+| `Song` | Singleton the song sets: `title`, `tempo`, `beats_per_bar`, `beat_unit`, `beats` (its length), `loop` (true) and `lanes`, the `{name, bus}` channels a host meters. Default value without a song |
+| `AudioSong` | Singleton with the `file` of the song to play |
+| `AudioSongStatus` | Written by the engine: `SongLoading`, `SongReady`, `SongFailed` with `error`, or `SongNone`; `file`; `foreign` counts the host entities the song changed |
+
+The song entity is `box.audio.Song`, the entity of the singleton. A song file
+sets it and puts what describes the song on it, such as its `Rgb`, with
+`box { audio { Song { ... } } }`; hosts read the colour there, and it is only
+there while a song is loaded. The song does not create the entity, so the
+engine resets it: on unload `Song` returns to its default and every component
+the song added is removed, before the entities of the song are deleted, so a
+host that reads the buses of `Song.lanes` never sees a deleted entity. The
+singleton always exists, so host scripts that read it stay alive. No script
+can own `box.audio.Song` or the master.
+
+On load the engine applies the `Song` to the `Transport`: tempo, time signature,
+position 0 and, with `loop` and a positive `beats`, a loop over `0..beats`. Song
+files do not write the `Transport`, and every song starts at beat 0. While the
+song loads and its sound files decode the status is `SongLoading` and the
+transport does not run, even with `playing` true; once ready it plays when
+`Transport.playing` is true.
+
+The song is a managed script owned by the engine, `box.audio.songs.<name>`,
+evaluated in the root scope like a scene, so it resolves the names of the host:
+it may send to host returns and read exported variables such as a reverb level.
+It must not change host entities. A song that sets a component on an entity it
+did not create, or names an entity that existed before it, is reported with a
+warning and in `AudioSongStatus.foreign`, and that change stays after unload.
+A song file may `include` other files; they become managed scripts next to it
+under `box.audio.songs` and unload with it.
+
+Unloading clears the managed scripts of the song, which deletes every entity
+each created, and deletes them. A swap runs over several frames, at
+`SongLoading`: the voices of the old song stop with a short fade and its buses
+mute, so no tail rings on the master; the song unloads; the engine waits until
+every bus, effect and sound slot it held is reusable (a freed bus or effect
+slot is reusable from the next frame, a sound id once the core reports its
+free), at most five seconds; only then does the new song load. Changing the
+file again during a swap goes straight to the newest file. A song that needs
+more buses, effects or sounds than are free is unloaded before it allocates and
+fails with an error that names its count and the limit; a song that does not
+parse or evaluate fails and leaves nothing behind.
+
+Editing a loaded song reloads it the same way: the engine watches the files of
+the song and its includes, and follows an evaluation of its script by someone
+else, such as an editor, with a staged reload of that code. The position starts
+over at beat 0.
+
+The jukebox scene ([jukebox.flecs](../etc/scenes/jukebox.flecs)) keeps one file
+per song in `etc/scenes/jukebox/songs/` and a list of their names; adding a song
+is adding its file and its name.
+
 ## Streamed and rendered music
 
 ```flecs
@@ -1402,6 +1486,7 @@ Importing box alone does not open an output: `box_app_run` does.
 | `audio seek <beats>` | Seek the transport |
 | `audio tempo <bpm>` | Set tempo, 20..999 |
 | `audio capture <seconds>` | Record master output as a 16-bit stereo WAV resource |
+| `audio song [<file>\|none]` | Show the song, load a song file or unload it |
 
 Fetch a capture with `GET /shell/session/<id>/resource/<name>`; it stays empty
 until recording finishes. In the browser it writes `/tmp/audio_capture_<n>.wav`

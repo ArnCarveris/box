@@ -1,0 +1,68 @@
+using box.audio
+using box.material
+
+$ {
+  Song: {
+    title: "Other", tempo: 140, beats_per_bar: 4, beat_unit: 4, beats: 16,
+    lanes: [{name: "Bass", bus: other_bass}, {name: "Keys", bus: other_keys}]
+  }
+}
+
+box { audio { Song { Rgb: {40, 180, 220} } } }
+
+other_echo_lows {
+  Equalizer: {bands: [{kind: AudioEqLowCut, frequency: 300}]}
+}
+
+other_echo {
+  AudioBus: {kind: AudioChannelReturn, effects: [other_echo, other_echo_lows]}
+  Delay: {sync: 0.5, feedback: 0.3, mix: 1}
+}
+
+other_group {
+  AudioBus: {volume: 0.9}
+}
+
+prefab other_low {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.005, decay: 0.3, sustain: 0.6, release: 0.05}
+  SynthOscillator: {wave: SynthTriangle, frequency: 440, level: 0.3}
+}
+
+prefab other_bell {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.002, decay: 0.8, curve: 3}
+  SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.2}
+}
+
+other_bass_inst { Instrument: {sound: other_low} }
+other_keys_inst { Instrument: {sound: other_bell, gate: false} }
+
+prefab other_bass_notes {
+  NoteClip: {length: 4, notes: [
+    {start: 0, duration: 1.5, pitch: 40, velocity: 0.8},
+    {start: 2, duration: 1.5, pitch: 43, velocity: 0.8}
+  ]}
+}
+
+prefab other_keys_notes {
+  NoteClip: {length: 4, notes: [
+    {start: 0.5, duration: 0.5, pitch: 72, velocity: 0.6},
+    {start: 1.5, duration: 0.5, pitch: 76, velocity: 0.6},
+    {start: 2.5, duration: 0.5, pitch: 79, velocity: 0.6}
+  ]}
+}
+
+other_bass {
+  Track: {instrument: other_bass_inst}
+  AudioBus: {output: other_group}
+  AudioMeter: {}
+  line { ClipPlacement: {clip: other_bass_notes, start: 0, duration: 16, loop: true} }
+}
+
+other_keys {
+  Track: {instrument: other_keys_inst}
+  AudioBus: {output: other_group, sends: [{bus: other_echo, level: 0.4}]}
+  AudioMeter: {}
+  line { ClipPlacement: {clip: other_keys_notes, start: 0, duration: 16, loop: true} }
+}

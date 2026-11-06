@@ -2,7 +2,7 @@
  * @file audio/audio.c
  * @brief Registers the box.audio components, the play and capture functions and their script
  * functions, and writes the WAV files of captures. Sound files are in sample.c, music streams
- * in music.c.
+ * in music.c, song files in song.c.
  */
 
 #define BOX_AUDIO_IMPL
@@ -1007,6 +1007,30 @@ int32_t box_audio_module_sounds(
     return result;
 }
 
+int32_t box_audio_module_buses(
+    const ecs_world_t *world)
+{
+    box_audio_module_t *state = box_audio_module_get(world);
+    int32_t i, result = 0;
+    for (i = 1; state && i < BOX_AUDIO_BUS_MAX; i ++) {
+        result += state->bus_entity[i] != 0;
+    }
+
+    return result;
+}
+
+int32_t box_audio_module_effects(
+    const ecs_world_t *world)
+{
+    box_audio_module_t *state = box_audio_module_get(world);
+    int32_t i, result = 0;
+    for (i = 0; state && i < BOX_AUDIO_EFFECT_MAX; i ++) {
+        result += state->effects[i].entity != 0;
+    }
+
+    return result;
+}
+
 int32_t box_audio_module_bus_index(
     const ecs_world_t *world,
     ecs_entity_t bus)
@@ -1400,6 +1424,7 @@ static void box_audio_module_free(
     box_audio_automation_fini(state);
     box_audio_modulators_fini(state);
     box_audio_timeline_fini(state);
+    box_audio_song_fini(state);
     ecs_os_free(state->capture.path);
     ecs_os_free(state);
 }
@@ -1601,6 +1626,12 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, Transport);
     ECS_META_COMPONENT(world, AudioQuantize);
     ecs_set_hooks(world, Transport, { .ctor = box_audio_transport_ctor });
+    ECS_META_COMPONENT(world, SongLane);
+    ECS_META_COMPONENT(world, Song);
+    ECS_META_COMPONENT(world, AudioSong);
+    ECS_META_COMPONENT(world, SongState);
+    ECS_META_COMPONENT(world, AudioSongStatus);
+    box_audio_song_hooks(world);
     ECS_META_COMPONENT(world, InstrumentSpreadMode);
     ECS_META_COMPONENT(world, Instrument);
     ecs_set_hooks(world, Instrument, { .ctor = box_audio_instrument_ctor });
@@ -1719,5 +1750,6 @@ void BoxAudioImport(
     box_audio_sequencer_init(world, state);
     box_audio_automation_init(world, state);
     box_audio_modulators_init(world, state);
+    box_audio_song_init(world, state);
     box_audio_functions_init(world);
 }

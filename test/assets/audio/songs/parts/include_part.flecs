@@ -1,0 +1,11 @@
+using box.audio
+
+include_part_bus {
+  AudioBus: {volume: 0.5}
+  AudioMeter: {}
+}
+
+prefab include_part_tone {
+  SynthSound: {}
+  SynthOscillator: {wave: SynthSine, frequency: 330, level: 0.2}
+}

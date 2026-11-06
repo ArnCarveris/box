@@ -1271,6 +1271,28 @@
                     "script",
                     "audio_command"
                 ]
+            },
+            {
+                "id": "SongFile",
+                "testcases": [
+                    "load",
+                    "second_song",
+                    "unload",
+                    "swap_buses",
+                    "swap_effects_sounds",
+                    "swap_waits",
+                    "three_changes",
+                    "too_big",
+                    "include",
+                    "parse_error",
+                    "sound_files_wait",
+                    "old_voices_fade",
+                    "foreign",
+                    "external_reload",
+                    "component",
+                    "command",
+                    "jukebox_style"
+                ]
             }
         ]
     }

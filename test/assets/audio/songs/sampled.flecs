@@ -1,0 +1,19 @@
+using box.audio
+
+$ { Song: {title: "Sampled", tempo: 120, beats: 8, lanes: [{name: "Loop", bus: sampled_track}]} }
+
+sampled_long { SoundFile: {path: "test/assets/audio/long_stereo.flac"} }
+sampled_kick { SoundFile: {path: "test/assets/audio/kick.wav"} }
+
+prefab sampled_clip {
+  AudioClip: {sound: sampled_long, length: 4}
+}
+
+sampled_track {
+  Track: {}
+  AudioBus: {}
+  AudioMeter: {}
+  loop { ClipPlacement: {clip: sampled_clip, start: 0, duration: 8, loop: true} }
+}
+
+sampled_kick_inst { Instrument: {sound: sampled_kick, gate: false} }

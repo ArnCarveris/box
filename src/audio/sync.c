@@ -173,6 +173,7 @@ static void box_audio_events(
             const box_audio_event_t *e = &events[i];
             if (e->type == BOX_AUDIO_EVENT_SOUND_FREE && e->id < BOX_AUDIO_SOUND_MAX) {
                 state->sound_used[e->id] = 0;
+                box_audio_song_sound_free(state, e->id);
             } else if (e->type == BOX_AUDIO_EVENT_VOICE_STOLEN) {
                 state->voices_stolen = e->value;
             } else if (e->type == BOX_AUDIO_EVENT_VOICE_END) {
@@ -255,6 +256,7 @@ static box_audio_param_t box_audio_send_param(
 }
 
 /** Send the parameters of a bus that changed, all of them to a new output or a new index.
+ * A bus of a song that fades out before it unloads is sent muted.
  *
  * @param state The state
  * @param bus The bus
@@ -268,7 +270,8 @@ static void box_audio_bus_params(
     bool disabled)
 {
     bool all = s->serial != state->serial, mute = bus->mute || disabled ||
-        !(state->audible & ((uint64_t)1 << s->index));
+        !(state->audible & ((uint64_t)1 << s->index)) ||
+        (state->song.silenced & ((uint64_t)1 << s->index));
     const AudioSend *sends = ecs_vec_first(&bus->sends);
     int32_t j, count = ecs_vec_count(&bus->sends);
     if (!state->serial) {
@@ -1642,7 +1645,8 @@ done:
 }
 
 /** Keep the master out of the scripts that set its AudioBus: a script owns the entities it
- * declares and deletes them when it reloads, which would delete the master.
+ * declares and deletes them when it reloads, which would delete the master. The pair of the
+ * root of the songs stays, it keeps every script from taking the master.
  *
  * @param world The world
  * @param state The state
@@ -1651,9 +1655,9 @@ static void box_audio_master_unown(
     ecs_world_t *world,
     const box_audio_module_t *state)
 {
-    if (ecs_has_pair(world, state->master, ecs_id(EcsScript), EcsWildcard)) {
-        ecs_remove_pair(world, state->master, ecs_id(EcsScript),
-            ecs_get_target(world, state->master, ecs_id(EcsScript), 0));
+    ecs_entity_t owner = ecs_get_target(world, state->master, ecs_id(EcsScript), 0);
+    if (owner && owner != state->song.root) {
+        ecs_remove_pair(world, state->master, ecs_id(EcsScript), owner);
     }
 }
 
@@ -1765,6 +1769,7 @@ static void BoxAudioBusRemove(
         if (s && s->index && state->bus_entity[s->index] == it->entities[i]) {
             state->bus_entity[s->index] = 0;
             state->bus_freed |= (uint64_t)1 << s->index;
+            state->song.silenced &= ~((uint64_t)1 << s->index);
             state->order_dirty = true;
         }
     }

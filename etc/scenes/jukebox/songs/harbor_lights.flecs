@@ -1,4 +1,32 @@
 using box.audio
+using box.material
+
+$ {
+  Song: {
+    title: "Harbor Lights", tempo: 84, beats_per_bar: 4, beat_unit: 4, beats: 64,
+    lanes: [
+      {name: "Kit", bus: harbor_kit},
+      {name: "Bass", bus: hl_bass},
+      {name: "Keys", bus: hl_keys},
+      {name: "Vibes", bus: hl_vibes}
+    ]
+  }
+}
+
+box { audio { Song { Rgb: {255, 165, 70} } } }
+
+harbor_tape {
+  Equalizer: {bands: [
+    {kind: AudioEqLowShelf, frequency: 180, gain: 2.5},
+    {kind: AudioEqPeak, frequency: 2800, gain: -2, q: 0.9},
+    {kind: AudioEqHighCut, frequency: 6500}
+  ]}
+}
+
+harbor {
+  AudioBus: {output: master, effects: [harbor_tape]}
+  AudioMeter: {}
+}
 
 prefab hl_rhodes {
   SynthSound: {level_variance: 0.04}

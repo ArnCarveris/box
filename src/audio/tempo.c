@@ -609,6 +609,10 @@ void box_audio_timeline_update(
     }
 
     tr = *ptr;
+    if (state->song.hold) {
+        tr.playing = false;
+    }
+
     clock = t->clock(t);
     tl->clock = clock;
     tl->rate = t->sample_rate;

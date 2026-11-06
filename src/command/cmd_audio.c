@@ -3,12 +3,12 @@
  * @brief The audio command: the status of the audio, its transport, its buses and their insert
  * slots, its instruments, its tracks with their note and audio placements, sounding notes and
  * playing audio clips, its emitters with their plays and skips, the master
- * volume and mute, play, stop, seek and tempo, and captures of the master output to a WAV
- * resource.
+ * volume and mute, play, stop, seek and tempo, the song of AudioSong, and captures of the
+ * master output to a WAV resource.
  *
- * The actions only write AudioSettings or Transport, which box.audio sends to the core at the
- * end of the frame, as for a change from a script or the REST API. A capture taps the core, so
- * it works with every output; in the browser it is written to the file system of the page.
+ * The actions only write AudioSettings, Transport or AudioSong, which box.audio applies at the
+ * end of the frame as for a change from a script or the REST API. A capture taps the core, so
+ * it works with every output; in the browser it goes to the file system of the page.
  */
 
 #include "command.h"
@@ -551,6 +551,83 @@ static void box_cmd_audio_transport(
     }
 }
 
+/** Get the name of the state of a song as the audio command prints it.
+ *
+ * @param state The state
+ * @return The name
+ */
+static const char* box_cmd_audio_song_state(
+    SongState state)
+{
+    const char *result = "none";
+    if (state == SongLoading) {
+        result = "loading";
+    } else if (state == SongReady) {
+        result = "ready";
+    } else if (state == SongFailed) {
+        result = "failed";
+    }
+
+    return result;
+}
+
+/** Append the line of the song: its file, state, title, length and lanes, or the error.
+ *
+ * @param world The world
+ * @param buf The output
+ */
+static void box_cmd_audio_song(
+    ecs_world_t *world,
+    ecs_strbuf_t *buf)
+{
+    const AudioSongStatus *status = ecs_singleton_get(world, AudioSongStatus);
+    const Song *song = ecs_singleton_get(world, Song);
+    AudioSongStatus s = status ? *status : (AudioSongStatus){ .state = SongNone };
+    ecs_strbuf_append(buf, "song: %s", box_cmd_audio_song_state(s.state));
+    if (s.file) {
+        ecs_strbuf_append(buf, " '%s'", s.file);
+    }
+
+    if (s.state == SongReady && song) {
+        ecs_strbuf_append(buf, ", \"%s\", %.0f beats, %d lanes", song->title ? song->title : "",
+            song->beats, ecs_vec_count(&song->lanes));
+    }
+
+    if (s.foreign) {
+        ecs_strbuf_append(buf, ", changes %d entities it did not create", s.foreign);
+    }
+
+    if (s.state == SongFailed && s.error) {
+        ecs_strbuf_append(buf, ": %s", s.error);
+    }
+}
+
+/** Show the song, load another one or unload it.
+ *
+ * @param world The world
+ * @param value The file, none to unload, NULL or empty to show the song
+ * @return The text, which the caller frees
+ */
+static char* box_cmd_audio_song_set(
+    ecs_world_t *world,
+    const char *value)
+{
+    ecs_strbuf_t buf = ECS_STRBUF_INIT;
+    char *result = NULL;
+    if (!value || !value[0]) {
+        box_cmd_audio_song(world, &buf);
+        result = ecs_strbuf_get(&buf);
+    } else if (!ecs_os_strcmp(value, "none")) {
+        box_audio_song_unload(world);
+        result = ecs_os_strdup("unloading the song");
+    } else {
+        box_audio_song_load(world, value);
+        result = flecs_asprintf("loading '%s'", value);
+    }
+
+    return result;
+}
+
 /** Play, stop, seek or set the tempo of the transport.
  *
  * @param world The world
@@ -866,6 +943,8 @@ static char* box_cmd_audio_print(
     ecs_strbuf_append(&buf, "\nclock: %lld frames (%.3f s)", (long long)s.clock,
         s.sample_rate > 0 ? (double)s.clock / (double)s.sample_rate : 0.0);
     box_cmd_audio_transport(world, &buf);
+    ecs_strbuf_appendch(&buf, '\n');
+    box_cmd_audio_song(world, &buf);
     ecs_entity_t master = ecs_lookup(world, "box.audio.master");
     const AudioBus *mb = master ? ecs_get(world, master, AudioBus) : NULL;
     ecs_strbuf_append(&buf, "\nmaster: volume %.2f%s",
@@ -1047,13 +1126,15 @@ static void box_cmd_audio(
         out = box_cmd_audio_mute(world, value);
     } else if (!ecs_os_strcmp(action, "capture")) {
         out = box_cmd_audio_capture(world, value);
+    } else if (!ecs_os_strcmp(action, "song")) {
+        out = box_cmd_audio_song_set(world, value);
     } else if (!ecs_os_strcmp(action, "play") || !ecs_os_strcmp(action, "stop") ||
         !ecs_os_strcmp(action, "seek") || !ecs_os_strcmp(action, "tempo"))
     {
         out = box_cmd_audio_transport_set(world, action, value);
     } else {
-        ecs_err("unknown action '%s', expected volume, mute, capture, play, stop, seek or "
-            "tempo", action);
+        ecs_err("unknown action '%s', expected volume, mute, capture, play, stop, seek, "
+            "tempo or song", action);
     }
 
     *(char**)result->ptr = out;
@@ -1066,18 +1147,19 @@ void box_cmd_audio_init(
 {
     ECS_IMPORT(world, BoxAudio);
     box_command_register(world,
-        "Print the audio status, transport, buses, instruments, tracks and emitters, set the "
-        "volume or mute, play, stop, seek or set the tempo, or capture a WAV",
+        "Print the audio status, transport, song, buses, instruments, tracks and emitters, set "
+        "the volume or mute, play, stop, seek or set the tempo, show or change the song, or "
+        "capture a WAV",
         (ecs_function_desc_t){
             .name = "audio",
             .return_type = ecs_id(ecs_string_t),
             .params = {
                 { .name = "action", .type = ecs_id(ecs_string_t), .optional = true,
-                  .brief = "volume, mute, capture, play, stop, seek or tempo (default: print "
-                    "the status)" },
+                  .brief = "volume, mute, capture, play, stop, seek, tempo or song (default: "
+                    "print the status)" },
                 { .name = "value", .type = ecs_id(ecs_string_t), .optional = true,
                   .brief = "volume 0 to 4, mute on or off (default: toggle), capture seconds, "
-                    "seek beats, tempo 20 to 999" }
+                    "seek beats, tempo 20 to 999, song file or none (default: show the song)" }
             },
             .callback = box_cmd_audio
         });

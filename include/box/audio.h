@@ -1443,6 +1443,69 @@ ECS_STRUCT(Transport, {
                             *   bar, default false */
 });
 
+/** A channel of a song that a host can meter: a name to show and the bus to read */
+ECS_STRUCT(SongLane, {
+    char *name;            /**< Name of the channel, such as "Bass" */
+    ecs_entity_t bus;      /**< The bus of the channel, an entity with AudioBus of the song */
+});
+
+/** What a host reads of the song that is loaded, a singleton that always exists.
+ *
+ * A song file sets it with $ { Song: {...} } and puts components that describe the song, such
+ * as its Rgb, on the same entity, box.audio.Song: box.audio.Song { Rgb: {...} }. The song
+ * file sets this entity but does not create it, so box.audio resets it: when the song
+ * unloads, Song goes back to its default value and every component the song added to the
+ * entity is removed, before the entities of the song are deleted, so the buses of lanes never
+ * name a deleted entity. No script owns the entity, so no script cleanup deletes it.
+ *
+ * On load box.audio applies it to the Transport: the tempo and the time signature, the position
+ * 0, and a loop of 0..beats when loop is set and beats is positive. See Song files in
+ * docs/audio.md.
+ */
+ECS_STRUCT(Song, {
+    char *title;           /**< Title of the song, NULL without a song */
+    float tempo;           /**< Quarter notes per minute, default 120 */
+    int32_t beats_per_bar; /**< Top of the time signature, default 4 */
+    int32_t beat_unit;     /**< Bottom of the time signature, default 4 */
+    double beats;          /**< Length of the song in beats, 0 for unknown */
+    bool loop;             /**< Loop the Transport over 0..beats, default true */
+    ecs_vec(SongLane) lanes; /**< The channels a host can meter, in the order to show them */
+});
+
+/** The song to play: one .flecs file, a singleton.
+ *
+ * Setting file loads that song; a new file stops the song that plays with a short fade,
+ * unloads it, waits until every bus, effect and sound slot it held is free again and loads the
+ * new one. A song that is not loaded holds nothing in the engine: its buses, effects, sounds,
+ * instruments, clips, tracks, voices and meters exist while it is loaded only. An empty file
+ * or removing the component unloads the song. The path is found as the one of a SoundFile.
+ * Changing file during a swap goes straight to the newest file. AudioSongStatus says how the
+ * load goes. Also box_audio_song_load, box_audio_song_unload and the shell command
+ * audio song [file].
+ */
+ECS_STRUCT(AudioSong, {
+    char *file;            /**< The .flecs file of the song, NULL or empty for none */
+});
+
+/** Progress of the load of an AudioSong */
+ECS_ENUM(SongState, {
+    SongLoading = 0,       /**< The old song unloads, or the new one loads and its sound files
+                            *   decode; the Transport does not play */
+    SongReady = 1,         /**< The song is loaded and plays when Transport.playing is true */
+    SongFailed = 2,        /**< The song did not load, error says why; nothing of it is left */
+    SongNone = 3           /**< No song is loaded */
+});
+
+/** Outcome of the load of an AudioSong, a singleton written by box.audio and read only for
+ * applications */
+ECS_STRUCT(AudioSongStatus, {
+    SongState state;       /**< Progress of the load */
+    char *file;            /**< The file it is about, NULL for none */
+    char *error;           /**< Why the load failed, NULL unless state is SongFailed */
+    int32_t foreign;       /**< Entities the song changed that it did not create, each logged
+                            *   with a warning; their changes stay after the song unloads */
+});
+
 /** How an Instrument spreads its notes over the stereo field. Each mode gives an offset that
  * is added to the pan of a note, the sum clamped to -1..1. */
 ECS_ENUM(InstrumentSpreadMode, {
@@ -1909,6 +1972,25 @@ float box_audio_spatial_place(
 float box_audio_spatial_cutoff(
     const AudioSpatial *spatial,
     float distance);
+
+/** Load a song: set the file of the AudioSong singleton. The engine stops and unloads the
+ * song that plays over the next frames and then loads this one; AudioSongStatus follows it.
+ *
+ * @param world The world
+ * @param file The .flecs file of the song, found as the path of a SoundFile; NULL or empty
+ * unloads the song
+ */
+void box_audio_song_load(
+    ecs_world_t *world,
+    const char *file);
+
+/** Unload the song: remove the AudioSong singleton. The song fades out and everything it
+ * created is deleted over the next frames.
+ *
+ * @param world The world
+ */
+void box_audio_song_unload(
+    ecs_world_t *world);
 
 /** Record the master output of the next seconds to a 16 bit stereo WAV file.
  *
