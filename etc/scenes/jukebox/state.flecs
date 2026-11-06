@@ -6,6 +6,7 @@ export const SONGS: JukeboxSong[] = [
   {"Distant Orbit", "distant_orbit"}
   {"Starfall", "starfall"}
   {"Voltage tide", "voltage_tide"},
+  {"Late train", "late_train"}
   {"Drum Kit", "drum_kit"}
   {"Woodwinds", "woodwinds"}
   {"Strings", "strings"}
