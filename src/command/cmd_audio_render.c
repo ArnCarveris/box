@@ -1116,7 +1116,7 @@ static int box_cmd_audio_render_write(
     }
 
     return box_audio_wav_write(job->path, ecs_vec_first(&job->frames), frames,
-        BOX_CMD_AUDIO_RENDER_RATE);
+        BOX_CMD_AUDIO_RENDER_RATE, NULL);
 }
 
 /** Advance the oldest render within the budget of wall time of a frame, and write its file

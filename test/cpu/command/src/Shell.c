@@ -8,10 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-<<<<<<< HEAD
 #include <math.h>
-#include <output.h>
-=======
 #include <output.h>
 #include "command.h"
 
@@ -20,7 +17,6 @@
 
 /** Rate of the headless output */
 #define SHELL_AUDIO_RATE 48000
->>>>>>> 011b9110c49ada0ccb8b0a6ea106d171fff9c30d
 
 void Shell_box_scope_first(void) {
     ecs_world_t *world = ecs_init();
@@ -371,12 +367,7 @@ void Shell_help_lists_box_commands(void) {
     test_bool(error, false);
     test_assert(strstr(out, "key_press <key> [dur]  Tap a key, held for dur frames") != NULL);
     test_assert(strstr(out, "capture [camera]  Write a PNG") != NULL);
-<<<<<<< HEAD
-    test_assert(strstr(out, "audio [action] [value] [option1] [option2] [option3] [option4] "
-        "[option5] [option6] [option7] [option8]  Print the audio status") != NULL);
-=======
     test_assert(strstr(out, "audio [action] [value] [args...]  Print the audio status") != NULL);
->>>>>>> 011b9110c49ada0ccb8b0a6ea106d171fff9c30d
     test_assert(strstr(out, "\nls [scope]  ") != NULL);
     ecs_os_free(out);
 
@@ -676,7 +667,6 @@ void Shell_audio_command(void) {
     ecs_fini(world);
 }
 
-<<<<<<< HEAD
 /** Delta of a frame of the tests */
 #define RENDER_DT (1.0f / 60.0f)
 
@@ -750,7 +740,10 @@ static ecs_world_t* render_world(
         test_assert(s != NULL);
         test_assert(s->error == NULL);
     }
-=======
+
+    return world;
+}
+
 /** Create a world with a headless audio output and run a script of test/assets/audio in it.
  *
  * @param path The script
@@ -766,12 +759,10 @@ static ecs_world_t* shell_audio_world(
     test_assert(file != NULL);
     test_int(ecs_script_run_file(world, file), 0);
     ecs_os_free(file);
->>>>>>> 011b9110c49ada0ccb8b0a6ea106d171fff9c30d
 
     return world;
 }
 
-<<<<<<< HEAD
 static void render_song(
     ecs_world_t *world)
 {
@@ -857,7 +848,11 @@ static render_wav_t render_run(
     }
 
     ecs_os_free(path);
-=======
+    ecs_os_free(name);
+
+    return result;
+}
+
 /** Run frames of a fixed delta.
  *
  * @param world The world
@@ -948,13 +943,11 @@ static int16_t* shell_audio_capture_read(
     fclose(f);
     *frames = (int32_t)((size - 44) / 4);
     ecs_os_free(file);
->>>>>>> 011b9110c49ada0ccb8b0a6ea106d171fff9c30d
     ecs_os_free(name);
 
     return result;
 }
 
-<<<<<<< HEAD
 static void render_free(
     render_wav_t *wav)
 {
@@ -994,7 +987,11 @@ static float render_peak(
     int32_t i;
     for (i = 0; i < wav->frames; i ++) {
         result = fabsf(wav->left[i]) > result ? fabsf(wav->left[i]) : result;
-=======
+    }
+
+    return result;
+}
+
 /** Get the peak of a channel of a capture over a range of frames.
  *
  * @param samples The samples, interleaved
@@ -1014,13 +1011,11 @@ static int32_t shell_audio_peak(
         int32_t v = samples[i * 2 + channel];
         v = v < 0 ? -v : v;
         result = v > result ? v : result;
->>>>>>> 011b9110c49ada0ccb8b0a6ea106d171fff9c30d
     }
 
     return result;
 }
 
-<<<<<<< HEAD
 void Shell_audio_render_sound(void) {
     ecs_world_t *world = render_world(false, true);
     ecs_entity_t s = ecs_shell_session_init(world, NULL);
@@ -1235,7 +1230,10 @@ void Shell_audio_render_errors(void) {
     ecs_os_free(out);
     out = box_command_run(world, s, "audio render song", &error);
     test_assert(strstr(out, "no song is loaded") != NULL);
-=======
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
 void Shell_audio_solo(void) {
     ecs_world_t *world = shell_audio_world("test/assets/audio/audition_buses.flecs");
     ecs_entity_t s = ecs_shell_session_init(world, NULL);
@@ -1893,7 +1891,6 @@ void Shell_audio_chords_tracks_and_bars(void) {
     test_assert(strstr(out, "no pitched track; drums left out: pulse") != NULL);
     test_assert(strstr(out, "\n1.1 N.C. 16 beats") != NULL);
     test_assert(strstr(out, "\nkey of the bars: none") != NULL);
->>>>>>> 011b9110c49ada0ccb8b0a6ea106d171fff9c30d
     ecs_os_free(out);
     ecs_fini(world);
 }

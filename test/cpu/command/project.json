@@ -45,15 +45,13 @@
                     "console_session",
                     "resource_file",
                     "audio_command",
-<<<<<<< HEAD
                     "audio_render_sound",
                     "audio_render_isolated",
                     "audio_render_stem",
                     "audio_render_section",
                     "audio_render_faster",
                     "audio_render_capture",
-                    "audio_render_errors"
-=======
+                    "audio_render_errors",
                     "audio_solo",
                     "audio_solo_capture",
                     "audio_mute_bus",
@@ -70,7 +68,6 @@
                     "audio_notes_errors",
                     "audio_chords_progression",
                     "audio_chords_tracks_and_bars"
->>>>>>> 011b9110c49ada0ccb8b0a6ea106d171fff9c30d
                 ]
             },
             {

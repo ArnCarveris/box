@@ -69,13 +69,10 @@ builtins of the flecs shell (`ls`, `get`, `set`, `query`, ...):
 | `audio bypass <effect> [on\|off]` | Bypass an effect, or stop bypassing it, with `Disabled` |
 | `audio note <sound\|instrument> <note> [vel] [dur]` | Play one note (C2, F#3 or a MIDI number) now, velocity 0 to 1, for `dur` seconds (default 0.5) |
 | `audio capture <seconds>` | Record the master output to a 16 bit stereo WAV resource |
-<<<<<<< HEAD
 | `audio render <subject> [options]` | Render a sound, instrument, bus stem or song section on its own, faster than real time, to a WAV resource |
-=======
 | `audio analyze <wav> [from] [to]` | Print loudness, peaks, bands, stereo, onsets, tail, clicks and pitch of a WAV |
 | `audio notes <track> [bars=a..b] [roll]` | Print the notes of a track per bar (position, pitch or drum sound, length, velocity), or with `roll` as a text piano roll of one column per sixteenth |
 | `audio chords [track...] [bars=a..b]` | Print the chords of a section per bar or per beat, its key, the key of the song and the notes outside the key, from the note data |
->>>>>>> 011b9110c49ada0ccb8b0a6ea106d171fff9c30d
 | `fps [rate]`, `frames` | Toggle the fps panel or cap the rate, print the frame timing |
 | `edit [on\|off]` | Open or close the editor |
 | `logs [level] [count]` | Show the last log messages |

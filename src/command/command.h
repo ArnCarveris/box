@@ -127,7 +127,6 @@ char* box_cmd_render_resource(
 void box_cmd_audio_init(
     ecs_world_t *world);
 
-<<<<<<< HEAD
 /** Register the system that advances the renders of audio render.
  *
  * @param world The world
@@ -151,7 +150,7 @@ char* box_cmd_audio_render(
     const char *subject,
     int32_t argc,
     const char **options);
-=======
+
 /** Set or toggle the solo of a bus, or clear every solo with none, as a script writes
  * AudioBus.
  *
@@ -257,7 +256,6 @@ char* box_cmd_audio_chords(
     ecs_world_t *world,
     int32_t argc,
     const char **argv);
->>>>>>> 011b9110c49ada0ccb8b0a6ea106d171fff9c30d
 
 /** Register the fit command that moves a camera to a tight fit of its scene.
  *
