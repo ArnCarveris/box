@@ -117,6 +117,7 @@ void MeterSpan_bus_difference(void) {
     test_assert(fabsf(loud.short_term - quiet.short_term - expect) <= 0.1f);
     test_assert(fabsf(loud.peak - loud.rms - 3.01f) <= 0.1f);
     test_assert(fabsf(loud.integrated - loud.short_term) <= 0.1f);
+    test_assert(fabsf(loud.integrated - loud.peak) <= 0.2f);
     test_assert(strstr(out, "\nmaster: ") == NULL);
     test_assert(strstr(out, "\nheadroom: ") != NULL);
     test_assert(strstr(out, ", loudest loud at ") != NULL);
