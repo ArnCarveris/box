@@ -766,11 +766,12 @@ voices on play, so edits affect subsequent plays.
 | `SynthGlide` | Root: `time` seconds (0, up to 10), `legato` (false), `channel` (0) |
 | `SynthLfo` | `wave`, `rate` (5 Hz), `sync` (0 beats, off, 0..256), `delay`, `fade`, `phase`, `random_phase`, destination depths |
 | `SynthString` | Pluck layer: `decay` (2 s to -60 dB), `brightness` (0.5), `hardness` (0.8), `velocity` (0) |
+| `SynthBow` | Bowed layer: `pressure` (0.5, 0..1), `speed` (0.5, 0..1), `position` (0.12, 0.02..0.5), `brightness` (0.5), `noise` (0.1, 0..1), `velocity` (0) |
 | `SynthTable` | Wavetable layer: `table` (an entity with `Wavetable`), `position` (0 frames), `envelope` (0 frames) |
 | `Wavetable` | On an entity of its own, usually a prefab: `kind` (`WavetableBasic`), `sound` (0, an entity with `AudioPcm` or `SoundFile` that wins over `kind`), `frame_size` (2048 samples, 64..4096) |
 
 Waves are `SynthSine`, `SynthSaw`, `SynthSquare`, `SynthTriangle`, `SynthNoise`,
-`SynthPluck` and `SynthWavetable`. Frequency sweeps are exponential. Positive envelope curves make
+`SynthPluck`, `SynthWavetable` and `SynthBowed`. Frequency sweeps are exponential. Positive envelope curves make
 decay/release fall quickly then settle; zero is linear, negative curves start slowly.
 Curve values range from -16 to 16. A sustain of zero ends after decay.
 For gated notes, sustain holds until release, ignoring hold.
@@ -1068,8 +1069,77 @@ prefab Pluck {
 A layer without an envelope logs an error and plays for 10 seconds. `SynthPluck`
 is the exception: its physical string model rings out without an envelope. Brightness
 controls how quickly harmonics fade; hardness controls the attack. Frequencies below
-40 Hz warn and clamp. There are 32 strings total, one per pluck unison voice; long
-ringing chords can exhaust them and cause plays to be ignored.
+40 Hz warn and clamp. There are 32 strings total, one per pluck or bowed unison voice;
+long ringing chords can exhaust them and cause plays to be ignored.
+
+`SynthBowed` is the sustained counterpart of the pluck: a bowed string for violins,
+violas, cellos and basses, with the bow noise, the small jitter of pitch and level and
+the changing tone a saw through a filter does not have. It is a digital waveguide split
+at the bow into a bridge side and a nut side (McIntyre, Schumacher and Woodhouse; Smith;
+the STK `Bowed` instrument). The bow is a friction junction: the difference of the bow
+velocity to the string velocity at the bow goes through a friction curve that decides
+between stick and slip. The nut reflects inverted, the bridge inverted through a
+one-pole lowpass that damps the loop, and the output is the wave at the bridge. Both
+sides are read at fractional delays with a 3rd order Lagrange interpolation, and the
+phase delay of the lowpass at the fundamental comes off the loop, so a note settles in
+tune at high notes too.
+
+The `SynthBow` of the layer sets the bow; a bowed layer without one takes the defaults:
+
+- `pressure` (0.5): the force of the bow, the width of the stick region of the friction.
+  Low gives the airy surface sound, the middle the Helmholtz motion, high a raucous,
+  scratchy tone with more upper harmonics.
+- `speed` (0.5): the bow velocity, mostly the level and some brightness; 0 is silent.
+- `position` (0.12): the distance of the bow from the bridge as a share of the string,
+  0.02..0.5. Near the bridge is brighter (sul ponticello), far darker (sul tasto); it
+  notches the harmonics at the multiples of `1 / position`, so 0.2 takes out the 5th and
+  the 10th. A side keeps at least 2 frames, so at very high notes the bow moves off the
+  bridge a little.
+- `brightness` (0.5): the damping of the loop, 0 dark to 1 bright, a lowpass at the
+  bridge from 1.5 to 18 kHz.
+- `noise` (0.1): the noise of the bow hair, added at the contact point in proportion to
+  the bow velocity, which the string filters into its own bow noise and jitter.
+- `velocity` (0): the share of the pressure and the speed that the velocity of a note
+  scales, as `SynthString.velocity` does the hardness.
+
+The bow speed follows the amplitude envelope of the layer, its own or the root's, in
+place of the level: the attack starts the bow, the decay and sustain hold it, the release
+lifts it. The bow touches the string while the envelope is over 0, firmly from a level of
+0.25 up. Once it lifts, the string rings out through its damping, its fundamental falling
+60 dB in about a second, less in a bright string; the voice ends once the envelope ended
+and the string is silent, as a pluck ends. A bowed layer without any envelope bows for 10
+seconds, as other waves do. Glide, legato, bend, pitch LFOs, `SynthPitchEnvelope` and
+drift change the length of the string smoothly without restarting it, as they move a
+pluck, so vibrato and legato do not click. Phase modulation, `sync` and `sub` do not apply.
+With `SynthUnison` each copy is a bowed string of its own, detuned and panned, on the mono
+and the stereo path. The routes `SynthTargetBowPressure`, `SynthTargetBowSpeed` and
+`SynthTargetBowPosition` move the bow, smoothed over about 5 ms, so the pressure curve of a
+note (`SynthSourcePressure`), the LFOs and the mod envelope can drive it.
+
+Bowed strings take their delay lines, one per unison copy, from the same 32 strings of the
+core as plucks, each long enough for 40 Hz (up to 81.8 kHz sample rates); a play that finds
+too few free is ignored with an ignored event, as a pluck play is, and a voice gives
+its strings back when it ends. A bowed note holds its string for its whole envelope and the
+ring out after it, so a part should keep its overlapping notes under 32 strings: a legato
+`SynthGlide` plays a whole line on one. Body resonance stays out of the model: it is the
+job of the bus EQ, as in the strings song of the jukebox. In the `Synth` bench
+(`voices_32_bowed`, 32 bowed voices under a vibrato and two routes to the bow, through a
+lowpass, 48 kHz) a bowed voice costs about TODO(bench) ns per frame.
+
+```flecs
+using box.audio
+
+prefab Violin {
+  SynthSound: {seed: 11, drift: 3}
+  SynthGlide: {time: 0.045, legato: true}
+  SynthEnvelope: {attack: 0.09, attack_curve: -1, decay: 0.3, sustain: 0.9, release: 0.25, curve: 2}
+  SynthLfo: {rate: 5.8, delay: 0.16, fade: 0.4, random_phase: true, pitch: 20}
+  SynthOscillator: {wave: SynthBowed, frequency: 440, level: 0.5}
+  SynthBow: {pressure: 0.45, speed: 0.6, position: 0.11, brightness: 0.55, noise: 0.12, velocity: 0.5}
+  swell { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetBowPressure, amount: 0.4} }
+  push { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetBowSpeed, amount: 0.3} }
+}
+```
 
 The velocity of a note (an `Instrument` play or a `NoteClip`, clamped to 0..1) reaches
 the voice as well as its gain, so harder notes can be brighter, not only louder. Each
@@ -1084,6 +1154,8 @@ the voice as well as its gain, so harder notes can be brighter, not only louder.
   so soft notes have fewer sidebands.
 - `SynthString.velocity` scales the hardness of a pluck the same way, so soft notes are
   plucked softer.
+- `SynthBow.velocity` scales the pressure and the speed of a bow the same way, so soft notes
+  are bowed lighter and quieter.
 
 Plays that are not notes, such as `AudioSource`, `box_audio_play`, quantized plays and
 streams, play at velocity 1. Sample voices ignore velocity beyond its gain.
@@ -1228,6 +1300,9 @@ lead {
 | `SynthTargetHardSync` | Semitones of the ratio of `sync`, -48..48, the result clamped to 1..16; nothing on a layer without sync (a ratio over 1 or a `hard_sync` LFO of the layer) |
 | `SynthTargetPosition` | Frames of the position of a `SynthWavetable` layer, -256..256, the result clamped to 0..N-1 of its table; nothing on a layer that is not a wavetable |
 | `SynthTargetVowel` | Vowels of the `SynthFormant` filter, -4..4, the result clamped to 0..4; of the sound on a layer too; nothing without a `SynthFormant` filter |
+| `SynthTargetBowPressure` | Share of `SynthBow.pressure`, -1..1, the result clamped to 0..1; nothing on a layer that is not `SynthBowed` |
+| `SynthTargetBowSpeed` | Share of `SynthBow.speed`, -1..1, the result clamped to 0..1; nothing on a layer that is not `SynthBowed` |
+| `SynthTargetBowPosition` | Share of the string of `SynthBow.position`, -0.5..0.5, the result clamped to 0.02..0.5; nothing on a layer that is not `SynthBowed` |
 
 `SynthModEnvelope` is a third envelope on the root with the fields of `SynthEnvelope`.
 It runs only when a route uses it and does not keep the voice playing, as the filter
@@ -1242,6 +1317,7 @@ Working examples include [synth_examples.flecs](../test/assets/audio/synth_examp
 [synth_lfo.flecs](../test/assets/audio/synth_lfo.flecs),
 [synth_glide.flecs](../test/assets/audio/synth_glide.flecs),
 [synth_pluck.flecs](../test/assets/audio/synth_pluck.flecs),
+[synth_bowed.flecs](../test/assets/audio/synth_bowed.flecs),
 [synth_sub.flecs](../test/assets/audio/synth_sub.flecs),
 [synth_sync.flecs](../test/assets/audio/synth_sync.flecs),
 [synth_wavetable.flecs](../test/assets/audio/synth_wavetable.flecs),
@@ -1681,7 +1757,7 @@ and [transport.h](../src/audio/transport.h) for the low-level APIs.
 
 The main limits are 64 voices, 64 buses, 64 effects, 64 modulators, 32 macros of eight
 maps, four inserts and sends per bus, eight synth layers, two synth LFOs, seven unison
-copies per layer, 32 pluck strings, 32 comb delay lines and 256 frames per wavetable, whose tables share the 1023 sound ids. Effects are algorithmic: no convolution or geometry-derived rooms.
+copies per layer, 32 strings shared by pluck and bowed layers, 32 comb delay lines and 256 frames per wavetable, whose tables share the 1023 sound ids. Effects are algorithmic: no convolution or geometry-derived rooms.
 There is one transport and one music stream per world. There are no tempo ramps,
 time stretching, MIDI I/O, plugins, mixer UI or piano roll.
 Scripts can change channel and effect values each frame.

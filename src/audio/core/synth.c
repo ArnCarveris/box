@@ -130,6 +130,62 @@ static const double box_audio_synth_unison_gain[BOX_AUDIO_SYNTH_UNISON_MAX + 1] 
 /** Peak of a period of a string under which it is silent, -80 dB of its pluck */
 #define BOX_AUDIO_SYNTH_STRING_SILENCE 1e-4f
 
+/** Shortest period of a bowed string in frames: room for its two delay lines of
+ * BOX_AUDIO_SYNTH_BOW_DELAY_MIN frames and the phase delay of its lowpass, 4 kHz at 48 kHz */
+#define BOX_AUDIO_SYNTH_BOW_PERIOD_MIN 12.0
+
+/** Shortest delay of a side of a bowed string in frames, so the 4 taps of its interpolation lie
+ * in the past */
+#define BOX_AUDIO_SYNTH_BOW_DELAY_MIN 2.0
+
+/** Longest delay of a side of a bowed string in frames, so its last tap lies within its line */
+#define BOX_AUDIO_SYNTH_BOW_DELAY_MAX ((double)(BOX_AUDIO_SYNTH_STRING_FRAMES - 3))
+
+/** Velocity of the bow at speed 1 and level 1 of its envelope, in the unit of the waves */
+#define BOX_AUDIO_SYNTH_BOW_VELOCITY 0.25f
+
+/** Slope of the friction curve at pressure 0, and how much pressure 1 lowers it: the stick
+ * region of the curve is the wider the lower the slope */
+#define BOX_AUDIO_SYNTH_BOW_SLOPE 5.0f
+#define BOX_AUDIO_SYNTH_BOW_SLOPE_RANGE 4.0f
+
+/** Smallest and largest reflection of the friction of the bow, slip and stick */
+#define BOX_AUDIO_SYNTH_BOW_SLIP 0.01f
+#define BOX_AUDIO_SYNTH_BOW_STICK 0.98f
+
+/** Level of the envelope of a bowed layer under which the bow lifts off the string: its
+ * contact is the level over this, up to 1 */
+#define BOX_AUDIO_SYNTH_BOW_LIFT 0.25f
+
+/** Noise of the bow hair at noise 1, a share of the velocity of the bow */
+#define BOX_AUDIO_SYNTH_BOW_HAIR 0.5f
+
+/** Hz of the lowpass at the bridge of a bowed string at brightness 0, and the octaves
+ * brightness 1 raises it by, to 18 kHz */
+#define BOX_AUDIO_SYNTH_BOW_CUTOFF 1500.0
+#define BOX_AUDIO_SYNTH_BOW_OCTAVES 3.5849625007211562
+
+/** Largest share of the rate of the lowpass at the bridge */
+#define BOX_AUDIO_SYNTH_BOW_CUTOFF_MAX 0.45
+
+/** Seconds the fundamental of a bowed string takes to fall 60 dB once the bow lifted, from the
+ * gain of its loop; the lowpass at the bridge shortens it */
+#define BOX_AUDIO_SYNTH_BOW_DECAY 1.0
+
+/** Hz of the DC blocker of the output of a bowed string */
+#define BOX_AUDIO_SYNTH_BOW_DC 20.0
+
+/** Seconds the bow takes to move 1 - 1/e of the way to the pressure, speed and position the
+ * routes give */
+#define BOX_AUDIO_SYNTH_BOW_SMOOTH 0.005
+
+/** Gain of the output of a bowed string, taken at the bridge */
+#define BOX_AUDIO_SYNTH_BOW_LEVEL 1.0f
+
+/** Bits of the targets of the routes that move the bow of a bowed layer */
+#define BOX_AUDIO_SYNTH_BOW_TARGETS ((1u << BOX_AUDIO_SYNTH_TO_BOW_PRESSURE) |\
+    (1u << BOX_AUDIO_SYNTH_TO_BOW_SPEED) | (1u << BOX_AUDIO_SYNTH_TO_BOW_POSITION))
+
 /** Envelope of the layers of strings without one, a level of 1 that never ends */
 #define BOX_AUDIO_SYNTH_ENV_FREE (BOX_AUDIO_SYNTH_LAYERS + 1)
 
@@ -916,6 +972,46 @@ done:
     return;
 }
 
+/** Aim the bows of the bowed layers of a source at the pressure, speed and position of their
+ * layers plus what the routes add to them, clamped, which the bows then move to smoothly.
+ *
+ * @param src The source, with routes to the bow
+ * @param bow What the routes add to the pressure, the speed and the position: index 0 of each
+ *  every layer, 1 + layer a layer
+ * @param now Whether the bows take their aims at once, at the start of a pass
+ */
+static void box_audio_synth_bow_routes(
+    box_audio_synth_source_t *src,
+    double bow[3][1 + BOX_AUDIO_SYNTH_LAYERS],
+    bool now)
+{
+    double x;
+    int32_t l;
+    for (l = 0; l < src->layers; l ++) {
+        box_audio_synth_part_t *part = src->part[l];
+        box_audio_synth_bow_t *b = &part->bow;
+        if (part->osc.wave != BOX_AUDIO_SYNTH_BOWED) {
+            continue;
+        }
+
+        x = (double)b->pressure + bow[0][0] + bow[0][l + 1];
+        b->pressure_aim = (float)(x > 0 ? (x < 1 ? x : 1.0) : 0.0);
+        x = (double)b->speed + bow[1][0] + bow[1][l + 1];
+        b->speed_aim = (float)(x > 0 ? (x < 1 ? x : 1.0) : 0.0);
+        x = (double)b->position + bow[2][0] + bow[2][l + 1];
+        x = x > BOX_AUDIO_SYNTH_BOW_POSITION_MIN ? (x < BOX_AUDIO_SYNTH_BOW_POSITION_MAX ? x :
+            (double)BOX_AUDIO_SYNTH_BOW_POSITION_MAX) : (double)BOX_AUDIO_SYNTH_BOW_POSITION_MIN;
+        b->position_aim = (float)x;
+        if (now) {
+            b->pressure_play = b->pressure_aim;
+            b->speed_play = b->speed_aim;
+            b->position_play = b->position_aim;
+            b->slope = BOX_AUDIO_SYNTH_BOW_SLOPE - BOX_AUDIO_SYNTH_BOW_SLOPE_RANGE *
+                b->pressure_play;
+        }
+    }
+}
+
 /** Run the routes of the modulation matrix of a source for a control block: each adds the
  * value of its source times its amount to its target, on top of the fixed routes. The pitch,
  * the pulse width, the level, the ratio of hard sync and the position of a wavetable add to
@@ -951,6 +1047,7 @@ static void box_audio_synth_routes(
 {
     double index[1 + BOX_AUDIO_SYNTH_LAYERS] = {0}, detune[1 + BOX_AUDIO_SYNTH_LAYERS] = {0};
     double level[1 + BOX_AUDIO_SYNTH_LAYERS] = {0};
+    double bow[3][1 + BOX_AUDIO_SYNTH_LAYERS] = {{0}};
     double pan = 0, resonance = 0, x, at;
     float f, gl, gr;
     bool limits = false;
@@ -989,10 +1086,19 @@ static void box_audio_synth_routes(
         case BOX_AUDIO_SYNTH_TO_VOWEL:
             *vowels += x;
             break;
+        case BOX_AUDIO_SYNTH_TO_BOW_PRESSURE:
+        case BOX_AUDIO_SYNTH_TO_BOW_SPEED:
+        case BOX_AUDIO_SYNTH_TO_BOW_POSITION:
+            bow[r->target - BOX_AUDIO_SYNTH_TO_BOW_PRESSURE][r->layer] += x;
+            break;
         default:
             level[r->layer] += x;
             break;
         }
+    }
+
+    if (src->route_targets & BOX_AUDIO_SYNTH_BOW_TARGETS) {
+        box_audio_synth_bow_routes(src, bow, now);
     }
 
     if (src->route_targets & (1u << BOX_AUDIO_SYNTH_TO_LEVEL)) {
@@ -1766,6 +1872,147 @@ static double box_audio_synth_comb_aim(
     return n > BOX_AUDIO_SYNTH_COMB_DELAY_MIN ? n : BOX_AUDIO_SYNTH_COMB_DELAY_MIN;
 }
 
+/** Tune a bowed string to a frequency: a period of n frames is its two delay lines together,
+ * its loop, and the phase delay of the one pole lowpass at the bridge at the fundamental w,
+ * atan(b sin w / (1 - b cos w)) / w frames for its pole b, so the settled pitch is exact. The
+ * fractional delays of both sides follow the loop.
+ *
+ * The gain of the loop makes the fundamental fall 60 dB over BOX_AUDIO_SYNTH_BOW_DECAY without
+ * the lowpass once the bow lifted.
+ *
+ * @param s The string, bowed
+ * @param inc Turns per frame of its oscillator
+ */
+static void box_audio_synth_bow_tune(
+    box_audio_synth_string_t *s,
+    double inc)
+{
+    double n = 1.0 / inc, b = 1 - (double)s->a, w, sn, cs, g;
+    n = n < s->period_max ? n : s->period_max;
+    n = n > BOX_AUDIO_SYNTH_BOW_PERIOD_MIN ? n : BOX_AUDIO_SYNTH_BOW_PERIOD_MIN;
+    w = 1.0 / n;
+    sn = (double)box_audio_core_sin(w);
+    cs = (double)box_audio_core_sin(w + 0.25);
+    s->inc = inc;
+    s->period = n;
+    s->lag = box_audio_synth_atan(b * sn / (1 - b * cs)) / (2 * BOX_AUDIO_SYNTH_PI * w);
+    s->loop = n - s->lag;
+    g = box_audio_synth_exp2(-BOX_AUDIO_SYNTH_DB60 * n / s->decay_frames);
+    s->gain = (float)(g < BOX_AUDIO_SYNTH_STRING_GAIN_MAX ? g : BOX_AUDIO_SYNTH_STRING_GAIN_MAX);
+}
+
+/** Tune a bowed string cheaply to a frequency while its pitch moves, as
+ * box_audio_synth_string_follow does a pluck: the period from the last one by two terms of the
+ * series of 1 / (1 - e), or by a division when the pitch jumps, and the phase delay of the
+ * lowpass and the gain of the last exact tuning, which move little.
+ *
+ * @param s The string, bowed
+ * @param inc Turns per frame of its oscillator
+ */
+static void box_audio_synth_bow_follow(
+    box_audio_synth_string_t *s,
+    double inc)
+{
+    double e = 1 - inc * s->period, n;
+    n = e > -0.01 && e < 0.01 ? s->period * (1 + e * (1 + e)) : 1.0 / inc;
+    n = n < s->period_max ? n : s->period_max;
+    n = n > BOX_AUDIO_SYNTH_BOW_PERIOD_MIN ? n : BOX_AUDIO_SYNTH_BOW_PERIOD_MIN;
+    s->inc = inc;
+    s->period = n;
+    s->loop = n - s->lag;
+}
+
+/** Retune a bowed string whose pitch moves: exactly every BOX_AUDIO_SYNTH_STRING_RETUNE frames,
+ * cheaply on the frames between, as box_audio_synth_string_move does a pluck. The string goes
+ * on from where it is: its delay lines are read by an interpolation of their fractional delay,
+ * so a read point that moves by whole frames moves on smoothly and needs no crossfade.
+ *
+ * @param s The string, bowed
+ * @param inc Turns per frame of its oscillator
+ */
+static void box_audio_synth_bow_move(
+    box_audio_synth_string_t *s,
+    double inc)
+{
+    if (-- s->retune <= 0) {
+        s->retune = BOX_AUDIO_SYNTH_STRING_RETUNE;
+        box_audio_synth_bow_tune(s, inc);
+    } else {
+        box_audio_synth_bow_follow(s, inc);
+    }
+}
+
+/** Start a bowed string at rest: tune it, set the lowpass at the bridge from the brightness of
+ * its layer and clear its delay lines, so it sounds only once the bow moves.
+ *
+ * @param s The string
+ * @param layer Its layer, clamped
+ * @param inc Turns per frame of its oscillator
+ * @param rate Frames per second
+ */
+static void box_audio_synth_bow_string(
+    box_audio_synth_string_t *s,
+    const box_audio_synth_layer_t *layer,
+    double inc,
+    float rate)
+{
+    double top = (double)rate / BOX_AUDIO_SYNTH_PLUCK_MIN, cut;
+    int32_t i;
+    s->decay_frames = BOX_AUDIO_SYNTH_BOW_DECAY * (double)rate;
+    s->period_max = top < BOX_AUDIO_SYNTH_STRING_PERIOD_MAX ? top :
+        BOX_AUDIO_SYNTH_STRING_PERIOD_MAX;
+    cut = BOX_AUDIO_SYNTH_BOW_CUTOFF * box_audio_synth_exp2(BOX_AUDIO_SYNTH_BOW_OCTAVES *
+        (double)layer->brightness);
+    top = BOX_AUDIO_SYNTH_BOW_CUTOFF_MAX * (double)rate;
+    cut = cut < top ? cut : top;
+    s->a = (float)(1 - box_audio_synth_exp2(-2 * BOX_AUDIO_SYNTH_PI * cut / (double)rate /
+        BOX_AUDIO_SYNTH_LN2));
+    box_audio_synth_bow_tune(s, inc);
+    for (i = 0; i < BOX_AUDIO_SYNTH_STRING_FRAMES; i ++) {
+        s->line[i] = 0;
+        s->bridge[i] = 0;
+    }
+
+    s->write = 0;
+    s->lp = 0;
+    s->dc.x1 = 0;
+    s->dc.y1 = 0;
+    s->peak = 0;
+    s->bowed = true;
+    s->window = (int32_t)s->period + 2;
+    s->retune = 0;
+    s->fade = 0;
+    s->ringing = true;
+}
+
+/** Start the bow of a bowed layer: its pressure, speed, position and noise from its layer, the
+ * velocity of the play included, which the routes then move.
+ *
+ * @param part The part of the layer, bowed
+ * @param rate Frames per second
+ */
+static void box_audio_synth_bow_start(
+    box_audio_synth_part_t *part,
+    float rate)
+{
+    const box_audio_synth_layer_t *layer = &part->layer;
+    box_audio_synth_bow_t *b = &part->bow;
+    b->pressure = layer->bow_pressure;
+    b->speed = layer->bow_speed;
+    b->position = layer->bow_position;
+    b->noise = layer->bow_noise * BOX_AUDIO_SYNTH_BOW_HAIR;
+    b->pressure_aim = b->pressure;
+    b->speed_aim = b->speed;
+    b->position_aim = b->position;
+    b->pressure_play = b->pressure;
+    b->speed_play = b->speed;
+    b->position_play = b->position;
+    b->slope = BOX_AUDIO_SYNTH_BOW_SLOPE - BOX_AUDIO_SYNTH_BOW_SLOPE_RANGE * b->pressure;
+    b->smooth = (float)(1 - box_audio_synth_exp2(-1.0 / (BOX_AUDIO_SYNTH_BOW_SMOOTH *
+        (double)rate * BOX_AUDIO_SYNTH_LN2)));
+    b->dc = (float)(1.0 - 2.0 * BOX_AUDIO_SYNTH_PI * BOX_AUDIO_SYNTH_BOW_DC / (double)rate);
+}
+
 /** Start a pass of the envelopes, the oscillators and the filter envelope, at the start of a
  * play and at each restart of a loop, and pluck the strings. The state of the filter goes on;
  * a comb filter takes the delay of the note at once.
@@ -1791,6 +2038,7 @@ static void box_audio_synth_pass(
     src->modulated = false;
     src->ringing = 0;
     src->ringing_free = 0;
+    src->bowing = 0;
     for (l = 0; l < src->layers; l ++) {
         box_audio_synth_part_t *part = src->part[l];
         const box_audio_synth_layer_t *layer = &part->layer;
@@ -1826,7 +2074,7 @@ static void box_audio_synth_pass(
         }
 
         o->synced = o->synced && o->wave != BOX_AUDIO_SYNTH_NOISE &&
-            o->wave != BOX_AUDIO_SYNTH_PLUCK;
+            o->wave != BOX_AUDIO_SYNTH_PLUCK && o->wave != BOX_AUDIO_SYNTH_BOWED;
         if (o->table) {
             o->position_base = (double)layer->position < (double)(o->table_frames - 1) ?
                 (double)layer->position : (double)(o->table_frames - 1);
@@ -1877,9 +2125,19 @@ static void box_audio_synth_pass(
                 inc = inc < src->inc_max ? inc : src->inc_max;
             }
 
-            box_audio_synth_string_pluck(s, layer, inc, rate, &src->rng);
+            if (o->wave == BOX_AUDIO_SYNTH_BOWED) {
+                box_audio_synth_bow_string(s, layer, inc, rate);
+                src->bowing ++;
+            } else {
+                box_audio_synth_string_pluck(s, layer, inc, rate, &src->rng);
+            }
+
             src->ringing ++;
             src->ringing_free += o->env == BOX_AUDIO_SYNTH_ENV_FREE;
+        }
+
+        if (o->wave == BOX_AUDIO_SYNTH_BOWED) {
+            box_audio_synth_bow_start(part, rate);
         }
     }
 
@@ -2075,8 +2333,9 @@ static float box_audio_synth_velocity(
     return 1 - share + share * velocity;
 }
 
-/** Take the velocity of a note into the layers of a play: the index of each modulator and the
- * hardness of each pluck by their share, before its first pass. A layer with a share of 0
+/** Take the velocity of a note into the layers of a play: the index of each modulator, the
+ * hardness of each pluck and the pressure and speed of each bow by their share, before its
+ * first pass. A layer with a share of 0
  * keeps its value as it is.
  *
  * @param src The source, its parts holding copies of the layers of the patch
@@ -2095,6 +2354,11 @@ static void box_audio_synth_velocity_layers(
 
         if (layer->hardness_velocity > 0) {
             layer->hardness *= box_audio_synth_velocity(layer->hardness_velocity, velocity);
+        }
+
+        if (layer->bow_velocity > 0) {
+            layer->bow_pressure *= box_audio_synth_velocity(layer->bow_velocity, velocity);
+            layer->bow_speed *= box_audio_synth_velocity(layer->bow_velocity, velocity);
         }
     }
 }
@@ -2237,7 +2501,9 @@ void box_audio_source_synth(
             src->stereo = src->stereo || p->layer[l].width > 0;
         }
 
-        if (p->layer[l].wave == BOX_AUDIO_SYNTH_PLUCK) {
+        if (p->layer[l].wave == BOX_AUDIO_SYNTH_PLUCK ||
+            p->layer[l].wave == BOX_AUDIO_SYNTH_BOWED)
+        {
             at = &src->part[l]->string;
             for (k = 0; k < (int32_t)p->layer[l].voices; k ++) {
                 *at = &core->synth_strings[core->string_free[-- core->string_free_count]];
@@ -3409,9 +3675,154 @@ static inline float box_audio_synth_string_next(
     return x;
 }
 
+/** Move the bow of a bowed layer a frame toward the pressure, speed and position it aims at.
+ *
+ * @param b The bow
+ */
+static inline void box_audio_synth_bow_next(
+    box_audio_synth_bow_t *b)
+{
+    b->pressure_play = box_audio_clean(b->pressure_play +
+        (b->pressure_aim - b->pressure_play) * b->smooth);
+    b->speed_play = box_audio_clean(b->speed_play + (b->speed_aim - b->speed_play) * b->smooth);
+    b->position_play += (b->position_aim - b->position_play) * b->smooth;
+    b->slope = BOX_AUDIO_SYNTH_BOW_SLOPE - BOX_AUDIO_SYNTH_BOW_SLOPE_RANGE * b->pressure_play;
+}
+
+/** Read a delay line of a bowed string at a fractional delay by a 3rd order Lagrange
+ * interpolation of the 4 frames around it, as the comb filter reads its line.
+ *
+ * @param line The delay line, a ring of BOX_AUDIO_SYNTH_STRING_FRAMES
+ * @param write Index the next frame is written to
+ * @param delay Frames of the delay, BOX_AUDIO_SYNTH_BOW_DELAY_MIN..MAX
+ * @return The frame
+ */
+static inline float box_audio_synth_bow_read(
+    const float *line,
+    int32_t write,
+    double delay)
+{
+    const int32_t mask = BOX_AUDIO_SYNTH_STRING_FRAMES - 1;
+    int32_t d = (int32_t)delay, at = write - d;
+    float f = (float)(delay - (double)d), fm = f - 1, fm2 = f - 2, fp = f + 1;
+
+    return -f * fm * fm2 * (1.0f / 6) * line[(at + 1) & mask] +
+        fp * fm * fm2 * 0.5f * line[at & mask] -
+        fp * f * fm2 * 0.5f * line[(at - 1) & mask] +
+        fp * f * fm * (1.0f / 6) * line[(at - 2) & mask];
+}
+
+/** Render a frame of a bowed string that rings and advance it.
+ *
+ * The waves that arrive at the bow, from the bridge through its lowpass and gain and from the
+ * nut, both inverted, sum to the velocity of the string there. The difference of the velocity
+ * of the bow to it goes through the friction curve, which sticks or slips, and what the bow
+ * adds, with the noise of the hair, goes out to both sides. The output is the wave at the bridge.
+ *
+ * The bow touches the string while the level of the envelope is over 0, with a contact that
+ * rises up to BOX_AUDIO_SYNTH_BOW_LIFT. A window of a period without the bow whose peak is
+ * under BOX_AUDIO_SYNTH_STRING_SILENCE leaves src->ringing and src->bowing.
+ *
+ * @param src The source
+ * @param b The bow of its layer
+ * @param s The string, ringing
+ * @param inc Turns of the frame
+ * @param level Level of the envelope of its layer, which the speed of the bow follows
+ * @return The sample
+ */
+static inline float box_audio_synth_bow_ring(
+    box_audio_synth_source_t *src,
+    const box_audio_synth_bow_t *b,
+    box_audio_synth_string_t *s,
+    double inc,
+    float level)
+{
+    const int32_t mask = BOX_AUDIO_SYNTH_STRING_FRAMES - 1;
+    float xb, xn, rb, rn, v, dv, t, r, j = 0, contact, m;
+    double db, dn;
+    if (inc != s->inc) {
+        box_audio_synth_bow_move(s, inc);
+    }
+
+    db = (double)b->position_play * s->loop;
+    db = db > BOX_AUDIO_SYNTH_BOW_DELAY_MIN ? db : BOX_AUDIO_SYNTH_BOW_DELAY_MIN;
+    dn = s->loop - db;
+    dn = dn > BOX_AUDIO_SYNTH_BOW_DELAY_MIN ? (dn < BOX_AUDIO_SYNTH_BOW_DELAY_MAX ? dn :
+        BOX_AUDIO_SYNTH_BOW_DELAY_MAX) : BOX_AUDIO_SYNTH_BOW_DELAY_MIN;
+    xb = box_audio_synth_bow_read(s->bridge, s->write, db);
+    xn = box_audio_synth_bow_read(s->line, s->write, dn);
+    s->lp = box_audio_clean(s->lp + s->a * (xb - s->lp));
+    rb = -s->gain * s->lp;
+    rn = -xn;
+    contact = level * (1.0f / BOX_AUDIO_SYNTH_BOW_LIFT);
+    contact = contact < 1 ? contact : 1.0f;
+    if (contact > 0) {
+        v = BOX_AUDIO_SYNTH_BOW_VELOCITY * b->speed_play * level;
+        dv = v - (rb + rn);
+        t = dv * b->slope;
+        t = (t < 0 ? -t : t) + 0.75f;
+        t *= t;
+        r = 1.0f / (t * t);
+        r = r < BOX_AUDIO_SYNTH_BOW_STICK ? (r > BOX_AUDIO_SYNTH_BOW_SLIP ? r :
+            BOX_AUDIO_SYNTH_BOW_SLIP) : BOX_AUDIO_SYNTH_BOW_STICK;
+        j = contact * dv * r;
+        if (b->noise > 0) {
+            j += b->noise * v * box_audio_synth_noise(&src->rng);
+        }
+
+        s->bowed = true;
+    }
+
+    s->line[s->write] = box_audio_clean(rb + j);
+    s->bridge[s->write] = box_audio_clean(rn + j);
+    s->write = (s->write + 1) & mask;
+    m = xb < 0 ? -xb : xb;
+    s->peak = m > s->peak ? m : s->peak;
+    if (-- s->window <= 0) {
+        if (!s->bowed && s->peak < BOX_AUDIO_SYNTH_STRING_SILENCE) {
+            s->ringing = false;
+            src->ringing --;
+            src->bowing --;
+        }
+
+        s->peak = 0;
+        s->bowed = false;
+        s->window = (int32_t)s->period + 2;
+    }
+
+    return box_audio_dc_next(&s->dc, xb, b->dc) * BOX_AUDIO_SYNTH_BOW_LEVEL;
+}
+
+/** Render a frame of the string of a bowed layer of one voice and advance it, its bow and its
+ * oscillator, while it rings. Its sample is not times the level of its envelope, which is the
+ * speed of its bow instead.
+ *
+ * @param src The source
+ * @param part The part of the string
+ * @param inc Turns of the frame: the inc of its oscillator, or that times its vibrato
+ * @param level Level of the envelope of the layer
+ * @return The sample, 0 once the string is silent
+ */
+static inline float box_audio_synth_bowed_next(
+    box_audio_synth_source_t *src,
+    box_audio_synth_part_t *part,
+    double inc,
+    float level)
+{
+    box_audio_synth_string_t *s = part->string;
+    float x = 0;
+    if (s->ringing) {
+        box_audio_synth_bow_next(&part->bow);
+        x = box_audio_synth_bow_ring(src, &part->bow, s, inc, level);
+        box_audio_synth_osc_advance(&part->osc, inc);
+    }
+
+    return x;
+}
+
 /** Whether a source with strings plays on: while one of its envelopes plays, unless every
  * layer is a string and all of them, those of every unison voice, are silent, and while a
- * string without an envelope rings.
+ * string without an envelope or a bowed string rings.
  *
  * @param src The source, with strings
  * @param envs Whether one of its envelopes plays
@@ -3421,7 +3832,7 @@ static inline bool box_audio_synth_strings_play(
     const box_audio_synth_source_t *src,
     bool envs)
 {
-    bool result = envs || src->ringing_free > 0;
+    bool result = envs || src->ringing_free > 0 || src->bowing > 0;
     if (src->strings == src->layers && !src->ringing) {
         result = false;
     }
@@ -3460,7 +3871,11 @@ static inline float box_audio_synth_layers_lfo(
         box_audio_synth_part_t *part = src->part[l];
         box_audio_synth_osc_t *o = &part->osc;
         double inc = box_audio_synth_osc_inc(src, o);
-        if (o->wave == BOX_AUDIO_SYNTH_PLUCK) {
+        float level = levels[o->env];
+        if (o->wave == BOX_AUDIO_SYNTH_BOWED) {
+            x = box_audio_synth_bowed_next(src, part, inc, level);
+            level = 1;
+        } else if (o->wave == BOX_AUDIO_SYNTH_PLUCK) {
             x = box_audio_synth_string_next(src, part, inc);
         } else {
             x = o->synced ? box_audio_synth_sync(o, o->phase, inc, 0, 0, &src->rng) :
@@ -3476,7 +3891,7 @@ static inline float box_audio_synth_layers_lfo(
             box_audio_synth_osc_advance(o, inc);
         }
 
-        mix += x * o->level * o->tremolo * levels[o->env];
+        mix += x * o->level * o->tremolo * level;
     }
 
     return mix;
@@ -3550,7 +3965,10 @@ static inline float box_audio_synth_modulate(
             o->shift = shift;
         }
 
-        if (o->wave == BOX_AUDIO_SYNTH_PLUCK) {
+        if (o->wave == BOX_AUDIO_SYNTH_BOWED) {
+            x = box_audio_synth_bowed_next(src, src->part[l], inc, levels[o->env]);
+            level = lfo ? o->tremolo : 1.0f;
+        } else if (o->wave == BOX_AUDIO_SYNTH_PLUCK) {
             x = box_audio_synth_string_next(src, src->part[l], inc);
         } else {
             x = o->synced ? box_audio_synth_sync(o, o->phase, inc, shift, moved, &src->rng) :
@@ -3709,6 +4127,54 @@ static inline void box_audio_synth_strings_next(
     *right = r;
 }
 
+/** Render a frame of the strings of the unison voices of a bowed layer and advance them, each
+ * at the detune of its voice and with its gains, and its bow and its oscillator while one rings.
+ *
+ * @param src The source
+ * @param part The part of the layer, with more than one voice
+ * @param inc Turns of the frame of its oscillator: its inc, or that times its vibrato
+ * @param level Level of the envelope of the layer, the speed of its bows
+ * @param left Receives the left sample
+ * @param right Receives the right sample
+ */
+static inline void box_audio_synth_bows_next(
+    box_audio_synth_source_t *src,
+    box_audio_synth_part_t *part,
+    double inc,
+    float level,
+    float *left,
+    float *right)
+{
+    box_audio_synth_unison_t *u = &part->unison;
+    box_audio_synth_string_t *s;
+    float l = 0, r = 0, x;
+    bool rang = false;
+    double dt;
+    int32_t k;
+    box_audio_synth_bow_next(&part->bow);
+    for (s = part->string, k = 0; s; s = s->next, k ++) {
+        if (s->ringing) {
+            dt = inc * u->detune[k];
+            if (src->drifts) {
+                dt *= u->drift[k];
+            }
+
+            dt = dt < src->inc_max ? dt : src->inc_max;
+            x = box_audio_synth_bow_ring(src, &part->bow, s, dt, level);
+            l += x * u->left[k];
+            r += x * u->right[k];
+            rang = true;
+        }
+    }
+
+    if (rang) {
+        box_audio_synth_osc_advance(&part->osc, inc);
+    }
+
+    *left = l;
+    *right = r;
+}
+
 /** Render a frame of the layers of a source in which a layer has unison voices, in stereo.
  *
  * As box_audio_synth_modulate, the layers render from the last. A layer without unison is the
@@ -3750,7 +4216,10 @@ static inline void box_audio_synth_mix_wide(
 
         sub = 0;
         if (part->unison.voices > 1) {
-            if (part->string) {
+            if (o->wave == BOX_AUDIO_SYNTH_BOWED) {
+                box_audio_synth_bows_next(src, part, inc, levels[o->env], &xl, &xr);
+                level = lfo ? o->tremolo : 1.0f;
+            } else if (part->string) {
                 box_audio_synth_strings_next(src, part, inc, &xl, &xr);
             } else {
                 box_audio_synth_unison_next(src, part, shift, inc, &xl, &xr, &sub);
@@ -3760,7 +4229,10 @@ static inline void box_audio_synth_mix_wide(
             o->fb2 = o->fb1;
             o->fb1 = o->sub != 0 ? x - sub : x;
         } else {
-            if (o->wave == BOX_AUDIO_SYNTH_PLUCK) {
+            if (o->wave == BOX_AUDIO_SYNTH_BOWED) {
+                x = box_audio_synth_bowed_next(src, part, inc, levels[o->env]);
+                level = lfo ? o->tremolo : 1.0f;
+            } else if (o->wave == BOX_AUDIO_SYNTH_PLUCK) {
                 x = box_audio_synth_string_next(src, part, inc);
             } else {
                 x = o->synced ? box_audio_synth_sync(o, o->phase, inc, shift, 0, &src->rng) :
@@ -4120,10 +4592,17 @@ int32_t box_audio_synth_render(
         } else if (src->strings) {
             for (l = 0; l < layers; l ++) {
                 box_audio_synth_osc_t *o = &src->part[l]->osc;
-                float x = o->wave == BOX_AUDIO_SYNTH_PLUCK ?
-                    box_audio_synth_string_next(src, src->part[l], o->inc) :
-                    box_audio_synth_osc_next(o, &src->part[l]->color, &src->rng);
-                mix += x * o->level * levels[o->env];
+                float x, level = levels[o->env];
+                if (o->wave == BOX_AUDIO_SYNTH_BOWED) {
+                    x = box_audio_synth_bowed_next(src, src->part[l], o->inc, level);
+                    level = 1;
+                } else {
+                    x = o->wave == BOX_AUDIO_SYNTH_PLUCK ?
+                        box_audio_synth_string_next(src, src->part[l], o->inc) :
+                        box_audio_synth_osc_next(o, &src->part[l]->color, &src->rng);
+                }
+
+                mix += x * o->level * level;
             }
         } else {
             for (l = 0; l < layers; l ++) {

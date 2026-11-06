@@ -1,0 +1,19 @@
+// The sounds the SynthBowedWorld suite of test/cpu/audio compiles the bowed string from script
+// with.
+using box.audio
+
+// A violin: a bowed string whose bow presses harder with the pressure of the note
+prefab Violin {
+  SynthSound: {seed: 11}
+  SynthEnvelope: {attack: 0.08, decay: 0.2, sustain: 0.9, release: 0.25}
+  SynthOscillator: {wave: SynthBowed, frequency: 440, level: 0.5}
+  SynthBow: {pressure: 0.45, speed: 0.6, position: 0.1, brightness: 0.6, noise: 0.15, velocity: 0.5}
+  swell { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetBowPressure, amount: 0.4} }
+}
+
+// A bowed string without a SynthBow, which takes the defaults
+prefab Plain {
+  SynthSound: {}
+  SynthEnvelope: {attack: 0.05, sustain: 1, hold: 0.3, release: 0.2}
+  SynthOscillator: {wave: SynthBowed, frequency: 220, level: 0.5}
+}

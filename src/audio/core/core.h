@@ -157,14 +157,20 @@
  * delay line of BOX_AUDIO_SYNTH_STRING_FRAMES limits it further, to the rate over 2046 */
 #define BOX_AUDIO_SYNTH_PLUCK_MIN 40.0f
 
-/** Pluck strings the voices of a core play at once, each with its delay line. A pluck layer
- * takes one for each of its unison voices; a play that does not find a string for each is
- * ignored */
+/** Strings the voices of a core play at once, each with its delay lines, shared by pluck and
+ * bowed layers. A BOX_AUDIO_SYNTH_PLUCK or BOX_AUDIO_SYNTH_BOWED layer takes one for each of
+ * its unison voices; a play that does not find a string for each is ignored */
 #define BOX_AUDIO_SYNTH_STRINGS 32
 
 /** Frames of the delay line of a pluck string, a power of 2: a period of up to 2046 frames,
  * BOX_AUDIO_SYNTH_PLUCK_MIN up to a rate of 81.8 kHz */
 #define BOX_AUDIO_SYNTH_STRING_FRAMES 2048
+
+/** Smallest, largest and default bow position of a BOX_AUDIO_SYNTH_BOWED layer, the distance
+ * of the bow from the bridge as a share of the string */
+#define BOX_AUDIO_SYNTH_BOW_POSITION_MIN 0.02f
+#define BOX_AUDIO_SYNTH_BOW_POSITION_MAX 0.5f
+#define BOX_AUDIO_SYNTH_BOW_POSITION_DEFAULT 0.12f
 
 /** Shortest and longest decay of a pluck string in seconds, the time until -60 dB */
 #define BOX_AUDIO_SYNTH_PLUCK_DECAY_MIN 0.01f
@@ -1606,8 +1612,10 @@ typedef enum box_audio_synth_wave_t {
     BOX_AUDIO_SYNTH_TRIANGLE = 3,  /**< Triangle */
     BOX_AUDIO_SYNTH_NOISE = 4,     /**< White noise, seeded per play */
     BOX_AUDIO_SYNTH_PLUCK = 5,     /**< A Karplus-Strong string plucked with seeded noise */
-    BOX_AUDIO_SYNTH_WAVETABLE = 6  /**< The frames of a wavetable, morphed by a position; a
+    BOX_AUDIO_SYNTH_WAVETABLE = 6, /**< The frames of a wavetable, morphed by a position; a
                                     *   sine without a table */
+    BOX_AUDIO_SYNTH_BOWED = 7      /**< A waveguide string driven by a friction bow, whose speed
+                                    *   follows the envelope of the layer */
 } box_audio_synth_wave_t;
 
 /** Colors of the noise of a synth oscillator, each at about the RMS level of white noise */
@@ -1696,12 +1704,19 @@ typedef enum box_audio_synth_target_t {
                                          * layer, clamped 1..BOX_AUDIO_SYNTH_SYNC_MAX */
     BOX_AUDIO_SYNTH_TO_POSITION = 9,    /**< Frames of the position of a wavetable layer,
                                          * clamped to its frames */
-    BOX_AUDIO_SYNTH_TO_VOWEL = 10       /**< Vowels of a formant filter, clamped
+    BOX_AUDIO_SYNTH_TO_VOWEL = 10,      /**< Vowels of a formant filter, clamped
                                          * 0..BOX_AUDIO_SYNTH_VOWEL_MAX */
+    BOX_AUDIO_SYNTH_TO_BOW_PRESSURE = 11, /**< Share of the bow pressure of a bowed layer,
+                                         * clamped 0..1 */
+    BOX_AUDIO_SYNTH_TO_BOW_SPEED = 12,  /**< Share of the bow speed of a bowed layer, clamped
+                                         * 0..1 */
+    BOX_AUDIO_SYNTH_TO_BOW_POSITION = 13 /**< Share of the string of the bow position of a
+                                         * bowed layer, clamped BOX_AUDIO_SYNTH_BOW_POSITION_MIN
+                                         * ..BOX_AUDIO_SYNTH_BOW_POSITION_MAX */
 } box_audio_synth_target_t;
 
 /** Targets of a route of a synth patch, one past the last */
-#define BOX_AUDIO_SYNTH_TARGETS 11
+#define BOX_AUDIO_SYNTH_TARGETS 14
 
 /** How a synth oscillator that modulates another one changes it */
 typedef enum box_audio_synth_modulation_t {
@@ -1802,6 +1817,18 @@ typedef struct box_audio_synth_layer_t {
                                            * linear mix of them */
     float position_envelope;              /**< BOX_AUDIO_SYNTH_WAVETABLE: frames the position
                                            * moves at level 1 of its envelope, either way */
+    float bow_pressure;                   /**< BOX_AUDIO_SYNTH_BOWED: force of the bow, 0..1:
+                                           * the width of the stick region of its friction */
+    float bow_speed;                      /**< BOX_AUDIO_SYNTH_BOWED: velocity of the bow at
+                                           * level 1 of its envelope, 0..1; 0 is silent */
+    float bow_position;                   /**< BOX_AUDIO_SYNTH_BOWED: distance of the bow from
+                                           * the bridge as a share of the string,
+                                           * BOX_AUDIO_SYNTH_BOW_POSITION_MIN..MAX; 0 for
+                                           * BOX_AUDIO_SYNTH_BOW_POSITION_DEFAULT */
+    float bow_noise;                      /**< BOX_AUDIO_SYNTH_BOWED: noise of the bow hair
+                                           * added at the contact point, 0..1 */
+    float bow_velocity;                   /**< BOX_AUDIO_SYNTH_BOWED: share 0..1 of the
+                                           * pressure and the speed that velocity scales */
 } box_audio_synth_layer_t;
 
 /** An LFO of a synth patch: a wave at a rate that starts after a delay and fades in, with a
