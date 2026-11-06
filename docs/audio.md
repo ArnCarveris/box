@@ -1628,6 +1628,7 @@ Importing box alone does not open an output: `box_app_run` does.
 | `audio capture <seconds>` | Record master output as a 16-bit stereo WAV resource |
 | `audio song [<file>\|none]` | Show the song, load a song file or unload it |
 | `audio analyze <wav> [from] [to]` | Print a text report of a WAV resource or file, optionally of the seconds from..to |
+| `audio meter [bus...] [seconds\|bars=a..b]` | Measure peak, RMS and loudness per bus and the gain reduction of its effects over a span of the live output; run again without arguments for the table |
 | `audio notes <track> [bars=a..b] [roll]` | Print the notes of a track per bar, or as a piano roll |
 | `audio chords [track...] [bars=a..b]` | Print the chords and the key of a section from the notes |
 
@@ -1665,6 +1666,39 @@ bar in LUFS and the band that changed the most against the whole span, counting 
 40 dB under the total as at least that. A tempo change or loop wrap during the capture is not
 followed. The same WAV and span give the same text. The measures are a plain C library,
 [analyze.h](../src/audio/analyze.h).
+
+`audio meter` measures the buses for gain staging. It renders in real time: the first call
+starts a measurement of the live output over `seconds` (default 3, at most 600) and returns at
+once; `audio meter` without arguments prints the progress, and once the span is measured the
+table, which it prints only once. Without buses it measures every bus of the processing order
+and the master. With `bars=a..b` and a loaded song it seeks the transport to bar `a`, plays and
+measures the length of the bars at the tempo of the transport. A call with arguments replaces a
+measurement that runs. It needs an output that runs, the null output of a headless run
+included; the AudioMeter of the entities, and which entities have one, stay as they are.
+
+```
+> audio meter drums bass 2
+meter: measuring 2.000 s of the live output in real time: drums, bass
+run audio meter after 2.0 s for the table
+> audio meter
+meter: live output, 2.000 s at 48000 Hz
+drums: peak -4.1 dBFS, rms -15.2 dB, integrated -14.8 LUFS, short-term max -14.6 LUFS
+  insert 0 glue compressor: reduction avg 2.3 dB, max 5.1 dB
+  insert 1 grit saturator: never engages
+bass: peak -9.6 dBFS, rms -17.0 dB, integrated -19.9 LUFS, short-term max -19.7 LUFS
+headroom: 4.1 dB, loudest drums at -4.1 dBFS; master limiter max reduction 0.0 dB
+```
+
+A bus is measured at its output, after its inserts, volume, pan and mute, and the master
+before its limiter. The peak is the sample peak; the RMS is over both channels. The loudness
+uses the K-weighting of BS.1770, which the core runs on the measured buses only while a
+measurement runs, and the gating of `audio analyze` over 100 ms hops: integrated in LUFS, and
+the largest short-term (3 s) loudness, over the whole span when it is shorter. Each Compressor,
+Gate, PatternGate and Saturator in the inserts of a bus prints its average and largest gain
+reduction in dB, `never engages` under 0.1 dB, or `did not run`. The headroom line is how far
+the loudest measured bus is under 0 dBFS, and the largest gain reduction of the limiter of the
+master, from the peaks over its threshold. A bus that never rendered says so. Measured through
+the null output at a fixed delta time, the same scene gives the same table.
 
 `audio notes` and `audio chords` read only the note data of the tracks, their
 placements and clips, so they work without an output and without a device. A

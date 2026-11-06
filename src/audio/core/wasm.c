@@ -386,7 +386,7 @@ double box_audio_core_wasm_clock(void)
 
 /** Take the meters of the buses and the effects since the last read into their buffers,
  * BOX_AUDIO_BUS_MAX box_audio_meter_t of 32 bytes each: the peaks as 2 floats, the sums of
- * squares as 2 doubles and the frames as a word.
+ * squares as 2 doubles, the frames as a word and the K-weighted sum as a float.
  *
  * @return Address of the meters of the buses in the memory of the core
  */

@@ -1230,6 +1230,9 @@ typedef struct box_audio_bus_t {
                               *   pre-fader one */
     float l[BOX_AUDIO_CORE_BLOCK];  /**< Left samples of the block */
     float r[BOX_AUDIO_CORE_BLOCK];  /**< Right samples of the block */
+    bool loudness;           /**< Its loudness meter runs, BOX_AUDIO_PARAM_LOUDNESS */
+    double kweight[2][2][4]; /**< K-weighting of each channel: of the shelf and the high pass,
+                              *   x[n-1], x[n-2], y[n-1] and y[n-2] */
 } box_audio_bus_t;
 
 /** Parameters of a bus a modulator moves, by the index the modulators use */
@@ -1344,6 +1347,8 @@ struct box_audio_core_t {
     float reverb_smooth;  /**< Share of the way to their targets a decay and a damping move
                            * per block */
     box_audio_meter_t meters[BOX_AUDIO_BUS_MAX]; /**< Levels of each bus since the last read */
+    double kweight[2][5]; /**< Coefficients of the K-weighting at the rate: of the shelf and
+                           * the high pass, b0, b1, b2, a1 and a2 */
     box_audio_effect_meter_t effect_meters[BOX_AUDIO_EFFECT_MAX]; /**< Values of each effect
                            * since the last read */
     float limiter_gain;   /**< Current gain of the limiter, 0..1 */
@@ -1424,6 +1429,36 @@ static inline void box_audio_effect_reduction(
         m->reduction = db;
     }
 }
+
+/** Turn the loudness meter of a bus on or off, in loudness.c; turned on, its K-weighting
+ * starts from silence.
+ *
+ * @param b The bus
+ * @param on Whether it measures
+ */
+void box_audio_core_loudness(
+    box_audio_bus_t *b,
+    bool on);
+
+/** Set up the coefficients of the K-weighting of BS.1770 at the rate of a core, as
+ * box_audio_kweight_init of analyze.c does, in loudness.c.
+ *
+ * @param core The core
+ */
+void box_audio_core_kweight_init(
+    box_audio_core_t *core);
+
+/** K-weight the output of a bus over a block for its loudness meter, in loudness.c.
+ *
+ * @param core The core
+ * @param b The bus, after its gains
+ * @param frames Frames of the block
+ * @return The sum of the K-weighted squares of both channels
+ */
+float box_audio_core_kweight(
+    box_audio_core_t *core,
+    box_audio_bus_t *b,
+    int32_t frames);
 
 /** Set the beat clock and the modulators of a new core.
  *

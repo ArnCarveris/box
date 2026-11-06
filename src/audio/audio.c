@@ -1519,6 +1519,7 @@ static void box_audio_module_free(
     box_audio_timeline_fini(state);
     box_audio_song_fini(state);
     ecs_os_free(state->capture.path);
+    box_audio_meter_job_fini(state);
     ecs_os_free(state);
 }
 

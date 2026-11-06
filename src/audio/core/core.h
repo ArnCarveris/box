@@ -341,7 +341,7 @@ typedef enum box_audio_param_t {
                                   *   of the pitch of its LFOs, its vibrato */
     BOX_AUDIO_PARAM_PRESSURE = 13, /**< Pressure of a synth voice, 0..1, default 0: moves its
                                   *   cutoff up by pressure * BOX_AUDIO_SYNTH_PRESSURE_OCTAVES */
-    BOX_AUDIO_PARAM_CUTOFF = 14  /**< Cutoff in Hz of the 12 dB per octave low-pass of a voice,
+    BOX_AUDIO_PARAM_CUTOFF = 14, /**< Cutoff in Hz of the 12 dB per octave low-pass of a voice,
                                   *   after its source and before its volume and pan, ramped
                                   *   over BOX_AUDIO_CUTOFF_RAMP.
                                   *   0 (the default), a negative value or one of at least
@@ -349,6 +349,11 @@ typedef enum box_audio_param_t {
                                   *   then skips; others are clamped to BOX_AUDIO_CUTOFF_MIN..
                                   *   0.45 of the rate. The first cutoff of a voice that has
                                   *   not rendered applies at once */
+    BOX_AUDIO_PARAM_LOUDNESS = 15 /**< Loudness meter of a bus, nonzero turns it on: the
+                                  *   K-weighting of BS.1770 at its output, whose squares go
+                                  *   into box_audio_meter_t.loudness. Off by default, as it
+                                  *   costs two biquads per channel and sample; turning it on
+                                  *   starts its filters from silence */
 } box_audio_param_t;
 
 /** A cutoff of BOX_AUDIO_PARAM_CUTOFF of at least this many Hz opens the filter of a voice */
@@ -1943,7 +1948,8 @@ typedef struct box_audio_meter_t {
     double square_left;   /**< Sum of the squares of the left samples */
     double square_right;  /**< Sum of the squares of the right samples */
     uint32_t frames;      /**< Frames the sums hold, 0 for a bus that did not render */
-    uint32_t unused;      /**< Padding, 0 */
+    float loudness;       /**< Sum of the K-weighted squares of both channels, 0 unless the
+                           *   bus has BOX_AUDIO_PARAM_LOUDNESS on */
 } box_audio_meter_t;
 
 /** The values of an effect since the last box_audio_core_effect_meters, which the kinds that

@@ -155,6 +155,20 @@ char* box_cmd_audio_notes(
     int32_t argc,
     const char **argv);
 
+/** Measure the levels of buses over a span of the live output: audio meter [bus...]
+ * [seconds|bars=a..b] starts a measurement, audio meter without arguments prints its progress
+ * and, once it is measured, the table of the buses, their effects and the headroom.
+ *
+ * @param world The world
+ * @param argc Number of arguments
+ * @param argv The buses, none for every bus and the master, the seconds and bars=a..b
+ * @return The text, which the caller frees, NULL with an error logged
+ */
+char* box_cmd_audio_meter_span(
+    ecs_world_t *world,
+    int32_t argc,
+    const char **argv);
+
 /** Print the chords of a section per beat or per bar, its key, the key of the song and the
  * notes outside the key: audio chords [track...] [bars=a..b].
  *

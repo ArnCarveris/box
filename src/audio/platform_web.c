@@ -286,6 +286,7 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                 var reduction = new Float32Array(this.buffer, fx, this.effectCount).slice();
                 var peaks = new Float32Array(this.buses * 2);
                 var squares = new Float64Array(this.buses * 2);
+                var loudness = new Float64Array(this.buses);
                 var frames = new Uint32Array(this.buses);
                 var signal = false, most = 0;
                 for (var i = 0; i < this.buses; i++) {
@@ -294,6 +295,7 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                     squares[i * 2] = doubles[i * 4 + 1];
                     squares[i * 2 + 1] = doubles[i * 4 + 2];
                     frames[i] = words[i * 8 + 6];
+                    loudness[i] = floats[i * 8 + 7];
                     most = Math.max(most, frames[i]);
                     signal = signal || peaks[i * 2] > 0 || peaks[i * 2 + 1] > 0;
                 }
@@ -303,8 +305,9 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                 this.meterSilent = signal ? 0 : this.meterSilent + most;
                 if (this.meterSilent <= this.meterHold) {
                     this.port.postMessage({ type: 'meters', peaks: peaks, squares: squares,
-                        frames: frames, reduction: reduction },
-                        [peaks.buffer, squares.buffer, frames.buffer, reduction.buffer]);
+                        loudness: loudness, frames: frames, reduction: reduction },
+                        [peaks.buffer, squares.buffer, loudness.buffer, frames.buffer,
+                        reduction.buffer]);
                 }
             }
 
@@ -375,6 +378,7 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
         visibilityResumes: 0, capturing: false, captured: null, streams: [], chunksSent: 0,
         clockCore: 0, clockFrame: -1, clockLast: 0, metersReceived: 0,
         meters: { peaks: new Float32Array(buses * 2), squares: new Float64Array(buses * 2),
+            loudness: new Float64Array(buses),
             frames: new Uint32Array(buses), reduction: new Float32Array(effects) } };
     audio.post = function(m, transfer) {
         if (audio.node) {
@@ -477,6 +481,7 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
                 acc.peaks[i * 2 + 1] = Math.max(acc.peaks[i * 2 + 1], m.peaks[i * 2 + 1]);
                 acc.squares[i * 2] += m.squares[i * 2];
                 acc.squares[i * 2 + 1] += m.squares[i * 2 + 1];
+                acc.loudness[i] += m.loudness[i];
                 acc.frames[i] += m.frames[i];
             }
             for (var k = 0; k < m.reduction.length && k < acc.reduction.length; k++) {

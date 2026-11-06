@@ -66,6 +66,7 @@ builtins of the flecs shell (`ls`, `get`, `set`, `query`, ...):
 | `audio mute [on\|off]` | Set or toggle `AudioSettings.mute` |
 | `audio capture <seconds>` | Record the master output to a 16 bit stereo WAV resource |
 | `audio analyze <wav> [from] [to]` | Print loudness, peaks, bands, stereo, onsets, tail, clicks and pitch of a WAV |
+| `audio meter [bus...] [seconds\|bars=a..b]` | Measure peak, RMS, integrated and short-term LUFS per bus and the gain reduction of its dynamics, PatternGate and Saturator inserts over a span of the live output, with the headroom; run `audio meter` again for the table |
 | `audio notes <track> [bars=a..b] [roll]` | Print the notes of a track per bar (position, pitch or drum sound, length, velocity), or with `roll` as a text piano roll of one column per sixteenth |
 | `audio chords [track...] [bars=a..b]` | Print the chords of a section per bar or per beat, its key, the key of the song and the notes outside the key, from the note data |
 | `fps [rate]`, `frames` | Toggle the fps panel or cap the rate, print the frame timing |

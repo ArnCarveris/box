@@ -821,6 +821,57 @@ void Shell_audio_analyze_errors(void) {
 }
 
 /** A world with the song of test/assets/audio/chords.flecs, no output and no device */
+void Shell_audio_meter_errors(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_entity_t music = ecs_entity(world, { .name = "music" });
+    ecs_ensure(world, music, AudioBus)->volume = 0.5f;
+    ecs_modified(world, music, AudioBus);
+    ecs_progress(world, 0.016f);
+
+    bool error = false;
+    char *out = box_command_run(world, s, "audio meter music 1", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "the output does not run") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio meter nothing 1", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "no bus 'nothing'") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio meter 0", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "invalid seconds '0'") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio meter 1000", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio meter bars=2..1", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "invalid bars '2..1'") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio meter bars=1..2", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "no song is loaded") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio meter 2 bars=1..2", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "either seconds or bars=a..b") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio meter", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    test_assert(!ecs_has(world, music, AudioMeter));
+    ecs_fini(world);
+}
+
 static ecs_world_t* shell_chords_world(
     ecs_entity_t *session)
 {

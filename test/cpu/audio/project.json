@@ -659,6 +659,18 @@
                 ]
             },
             {
+                "id": "MeterSpan",
+                "testcases": [
+                    "bus_difference",
+                    "deterministic",
+                    "default_buses",
+                    "compressor",
+                    "no_meter_left",
+                    "limiter",
+                    "song_bars"
+                ]
+            },
+            {
                 "id": "Mixer",
                 "testcases": [
                     "solo_track",

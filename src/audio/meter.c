@@ -126,6 +126,215 @@ static void box_audio_meter_write(
     }
 }
 
+/** Add the meters of a read to the measurement over a span that runs.
+ *
+ * @param state The state
+ * @param buses The meters of the buses by index
+ * @param effects The meters of the effects by slot
+ * @param live Whether the output runs
+ * @param rate Frames per second of the output
+ */
+static void box_audio_meter_job_add(
+    box_audio_module_t *state,
+    const box_audio_meter_t *buses,
+    const box_audio_effect_meter_t *effects,
+    bool live,
+    double rate)
+{
+    box_audio_meter_job_t *job = &state->meter_job;
+    uint32_t frames = buses[0].frames;
+    float peak;
+    int32_t i;
+    if (!job->running) {
+        goto done;
+    }
+
+    if (!live || !frames) {
+        job->stalls ++;
+        goto done;
+    }
+
+    if (job->skip > 0) {
+        job->skip --;
+        goto done;
+    }
+
+    job->sample_rate = (float)rate;
+    for (i = 0; i < job->count; i ++) {
+        ecs_entity_t e = job->channels[i];
+        int32_t index = -1, k;
+        if (e == state->master) {
+            index = 0;
+        } else {
+            for (k = 1; k < BOX_AUDIO_BUS_MAX && index < 0; k ++) {
+                index = state->bus_entity[k] == e ? k : -1;
+            }
+        }
+
+        if (index < 0) {
+            job->lost[i] = true;
+        } else {
+            box_audio_span_level_add(&job->levels[i], &buses[index], rate);
+        }
+    }
+
+    for (i = 0; i < BOX_AUDIO_EFFECT_MAX; i ++) {
+        ecs_entity_t e = state->effects[i].entity;
+        if (!e) {
+            continue;
+        }
+
+        if (job->effects[i] != e) {
+            job->effects[i] = e;
+            job->reduction[i] = (box_audio_span_reduction_t){0};
+        }
+
+        box_audio_span_reduction_add(&job->reduction[i], effects[i].reduction, frames);
+    }
+
+    peak = buses[0].peak_left > buses[0].peak_right ? buses[0].peak_left : buses[0].peak_right;
+    if (peak > BOX_AUDIO_LIMITER_THRESHOLD) {
+        float db = (float)(20.0 * log10((double)peak / (double)BOX_AUDIO_LIMITER_THRESHOLD));
+        job->limiter = db > job->limiter ? db : job->limiter;
+    }
+
+    job->frames += (double)frames;
+    if (job->frames >= job->target) {
+        job->running = false;
+        job->done = true;
+    }
+
+done:
+    return;
+}
+
+void box_audio_meter_job_sync(
+    box_audio_module_t *state,
+    uint32_t serial)
+{
+    box_audio_meter_job_t *job = &state->meter_job;
+    uint64_t wanted = 0;
+    int32_t i, k;
+    if (job->loudness_serial != serial) {
+        job->loudness = 0;
+        job->loudness_serial = serial;
+    }
+
+    for (i = 0; job->running && i < job->count; i ++) {
+        if (job->channels[i] == state->master) {
+            wanted |= 1;
+            continue;
+        }
+
+        for (k = 1; k < BOX_AUDIO_BUS_MAX; k ++) {
+            if (state->bus_entity[k] == job->channels[i]) {
+                wanted |= (uint64_t)1 << k;
+            }
+        }
+    }
+
+    for (k = 0; k < BOX_AUDIO_BUS_MAX; k ++) {
+        uint64_t bit = (uint64_t)1 << k;
+        if ((wanted & bit) != (job->loudness & bit) && box_audio_reserve(state)) {
+            box_audio_write_bus_set(&state->writer, (uint32_t)k, BOX_AUDIO_PARAM_LOUDNESS,
+                (wanted & bit) ? 1.0f : 0.0f, 0);
+            job->loudness ^= bit;
+        }
+    }
+}
+
+void box_audio_meter_job_fini(
+    box_audio_module_t *state)
+{
+    box_audio_meter_job_t *job = &state->meter_job;
+    int32_t i;
+    for (i = 0; i < BOX_AUDIO_METER_JOB_MAX; i ++) {
+        box_audio_span_level_fini(&job->levels[i]);
+    }
+
+    job->running = false;
+    job->done = false;
+    job->count = 0;
+}
+
+int box_audio_meter_job_start(
+    ecs_world_t *world,
+    const ecs_entity_t *channels,
+    int32_t count,
+    double seconds,
+    int32_t skip)
+{
+    box_audio_module_t *state = box_audio_module_get(world);
+    box_audio_transport_t *t = box_audio_output_transport(world);
+    box_audio_meter_job_t *job;
+    uint64_t loudness;
+    uint32_t serial;
+    double rate;
+    int32_t i, k;
+    int result = -1;
+    if (!state) {
+        ecs_err("box.audio is not imported");
+        goto done;
+    }
+
+    if (!t || !box_audio_meter_live(t)) {
+        ecs_err("box.audio: the output does not run, there is nothing to measure");
+        goto done;
+    }
+
+    if (!(seconds > 0) || seconds > BOX_AUDIO_METER_JOB_SECONDS) {
+        ecs_err("box.audio: a measurement takes more than 0 and at most %.0f seconds",
+            BOX_AUDIO_METER_JOB_SECONDS);
+        goto done;
+    }
+
+    job = &state->meter_job;
+    loudness = job->loudness;
+    serial = job->loudness_serial;
+    box_audio_meter_job_fini(state);
+    ecs_os_memset_t(job, 0, box_audio_meter_job_t);
+    job->loudness = loudness;
+    job->loudness_serial = serial;
+    rate = t->sample_rate > 0 ? (double)t->sample_rate : 48000.0;
+    for (i = 0; i < count && job->count < BOX_AUDIO_METER_JOB_MAX - 1; i ++) {
+        if (channels[i] == state->master) {
+            job->master_listed = true;
+            continue;
+        }
+
+        for (k = 0; k < job->count && job->channels[k] != channels[i]; k ++) { }
+        if (k == job->count) {
+            job->channels[job->count ++] = channels[i];
+        }
+    }
+
+    job->channels[job->count ++] = state->master;
+    job->target = seconds * rate;
+    job->sample_rate = (float)rate;
+    job->skip = skip > 2 ? skip : 2;
+    job->running = true;
+    result = 0;
+done:
+    return result;
+}
+
+const box_audio_meter_job_t* box_audio_meter_job_get(
+    const ecs_world_t *world)
+{
+    box_audio_module_t *state = box_audio_module_get(world);
+
+    return state ? &state->meter_job : NULL;
+}
+
+void box_audio_meter_job_clear(
+    ecs_world_t *world)
+{
+    box_audio_module_t *state = box_audio_module_get(world);
+    if (state) {
+        box_audio_meter_job_fini(state);
+    }
+}
+
 void box_audio_meters_update(
     ecs_world_t *world,
     box_audio_module_t *state,
@@ -163,6 +372,8 @@ void box_audio_meters_update(
     for (i = 0; i < BOX_AUDIO_EFFECT_MAX; i ++) {
         state->reduction[i] = live ? effects[i].reduction : 0.0f;
     }
+
+    box_audio_meter_job_add(state, buses, effects, live, rate);
 
     if (ecs_query_is_true(state->meter_query)) {
         box_audio_meter_write(world, state);
