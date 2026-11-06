@@ -4,14 +4,16 @@ struct JukeboxSong(title: string, file: string)
 
 export const SONGS: JukeboxSong[] = [
   {"Distant Orbit", "distant_orbit"}
-  {"Voltage tide", "voltage_tide"},
+  {"Voltage tide", "voltage_tide"}
   {"Late train", "late_train"}
+  {"After the horizon", "after_the_horizon"}
   {"Drum Kit", "drum_kit"}
   {"Woodwinds", "woodwinds"}
   {"Strings", "strings"}
   {"Horns", "horns"}
   {"Trumpets", "trumpets"}
   {"Synth Pads", "synth_pads"}
+  {"Organs", "organs"}
 ]
 
 export const IDLE: Rgb = {150, 155, 175}

@@ -21,7 +21,7 @@ og_tone {
 }
 og_glue { Compressor: {threshold: -14, ratio: 2, attack: 0.03, release: 0.3, knee: 8} }
 og_organs {
-  AudioBus: {output: master, volume: 1, effects: [og_tone, og_glue]}
+  AudioBus: {output: master, volume: 0.75, effects: [og_tone, og_glue]}
   AudioMeter: {}
 }
 
@@ -540,7 +540,7 @@ prefab og_hymn_combo {
 og_tonewheel_leslie { Rotary: {speed: 0, drive: 0.35, balance: 0.1} }
 og_track_tonewheel {
   Track: {instrument: og_tonewheel, humanize: {timing: 5}}
-  AudioBus: {output: og_organs, volume: 0.9, effects: [og_tonewheel_leslie], sends: [{bus: og_club, level: 0.35}]}
+  AudioBus: {output: og_organs, volume: 0.65, effects: [og_tonewheel_leslie], sends: [{bus: og_club, level: 0.35}]}
   AudioMeter: {}
   og_solo { ClipPlacement: {clip: og_gospel, start: 0} }
   og_tutti { ClipPlacement: {clip: og_hymn_wheel, start: 112, gain: 0.55} }
@@ -549,7 +549,7 @@ og_track_tonewheel {
 og_jazz_leslie { Rotary: {speed: 0, drive: 0.5, balance: 0.25} }
 og_track_jazz {
   Track: {instrument: og_jazz, swing: 0.3, humanize: {timing: 6}}
-  AudioBus: {output: og_organs, volume: 0.9, effects: [og_jazz_leslie], sends: [{bus: og_club, level: 0.3}]}
+  AudioBus: {output: og_organs, volume: 1, effects: [og_jazz_leslie], sends: [{bus: og_club, level: 0.3}]}
   AudioMeter: {}
   og_solo { ClipPlacement: {clip: og_jazz_line, start: 16} }
   og_tutti { ClipPlacement: {clip: og_hymn_stabs, start: 128, gain: 0.5} }
@@ -563,7 +563,7 @@ og_combo_tone {
 }
 og_track_combo {
   Track: {instrument: og_combo, humanize: {timing: 5}}
-  AudioBus: {output: og_organs, volume: 0.8, pan: 0.2, effects: [og_combo_tone], sends: [{bus: og_club, level: 0.4}]}
+  AudioBus: {output: og_organs, volume: 0.55, pan: 0.2, effects: [og_combo_tone], sends: [{bus: og_club, level: 0.4}]}
   AudioMeter: {}
   og_solo { ClipPlacement: {clip: og_combo_riff, start: 32} }
   og_tutti { ClipPlacement: {clip: og_hymn_combo, start: 128, gain: 0.4} }
@@ -571,7 +571,7 @@ og_track_combo {
 
 og_track_flute {
   Track: {instrument: og_flute, humanize: {timing: 4}}
-  AudioBus: {output: og_organs, volume: 0.9, pan: -0.15, sends: [{bus: og_church, level: 0.55}]}
+  AudioBus: {output: og_organs, volume: 0.4, pan: -0.15, sends: [{bus: og_church, level: 0.55}]}
   AudioMeter: {}
   og_solo { ClipPlacement: {clip: og_flute_tune, start: 48} }
   og_tutti { ClipPlacement: {clip: og_hymn_melody, start: 128, offset: 16, transpose: 12, gain: 0.6} }
@@ -579,7 +579,7 @@ og_track_flute {
 
 og_track_principal {
   Track: {instrument: og_principal, humanize: {timing: 4}}
-  AudioBus: {output: og_organs, volume: 0.8, sends: [{bus: og_church, level: 0.6}]}
+  AudioBus: {output: og_organs, volume: 0.35, sends: [{bus: og_church, level: 0.6}]}
   AudioMeter: {}
   og_solo { ClipPlacement: {clip: og_chorale, start: 64} }
   og_tutti { ClipPlacement: {clip: og_hymn_inner, start: 112} }
@@ -594,7 +594,7 @@ og_reed_tone {
 }
 og_track_reed {
   Track: {instrument: og_reed, humanize: {timing: 4}}
-  AudioBus: {output: og_organs, volume: 0.7, pan: 0.15, effects: [og_reed_tone], sends: [{bus: og_church, level: 0.55}]}
+  AudioBus: {output: og_organs, volume: 0.45, pan: 0.15, effects: [og_reed_tone], sends: [{bus: og_church, level: 0.55}]}
   AudioMeter: {}
   og_solo { ClipPlacement: {clip: og_fanfare, start: 80} }
   og_tutti { ClipPlacement: {clip: og_hymn_melody, start: 112, gain: 0.8} }
@@ -602,7 +602,7 @@ og_track_reed {
 
 og_track_pedal {
   Track: {instrument: og_pedal, humanize: {timing: 4}}
-  AudioBus: {output: og_organs, volume: 1, sends: [{bus: og_church, level: 0.4}]}
+  AudioBus: {output: og_organs, volume: 0.42, sends: [{bus: og_church, level: 0.4}]}
   AudioMeter: {}
   og_solo { ClipPlacement: {clip: og_pedal_walk, start: 96} }
   og_tutti { ClipPlacement: {clip: og_hymn_bass, start: 112} }
