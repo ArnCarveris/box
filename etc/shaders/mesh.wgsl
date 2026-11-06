@@ -35,11 +35,11 @@
 // the view (Gtao, white without one) at their pixel and the occlusion of their ORM layer; it
 // scales the indirect diffuse light, and the indirect specular light by the specular occlusion
 // of Lagarde that follows from it. Blended draws take the ORM occlusion alone.
-// An alpha tested pipeline (alpha_cutout) discards the fragments whose alpha, the instance alpha
+// An alpha tested draw (kind.alpha_cutout) discards the fragments whose alpha, the instance alpha
 // times the albedo alpha, is below the cutoff of their material, once every texture is sampled.
-// A lit view draws its opaque meshes depth only first (vs_depth, vs_depth_cutout and
-// fs_depth_cutout), then shades them with depth compare Equal and without the alpha test.
-// A transmissive pipeline (transmissive, Transmission) draws in the sorted blended stream
+// A lit view draws its opaque meshes depth only first (vs with fs_depth and fs_depth_cutout),
+// then shades them with depth compare Equal and without the alpha test.
+// A transmissive draw (kind.transmissive, Transmission) draws in the sorted blended stream
 // without blending: it refracts the snapshot of the view taken right before it (opaque_snapshot,
 // everything drawn before it back to front, at most 4 snapshots a view and frame), reduced by
 // its Fresnel reflection, absorbed over its volume and tinted by its albedo, and adds its own
@@ -98,15 +98,16 @@
 #include "include/probes.wgsl"
 #include "include/aerial.wgsl"
 
-// BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
-override blend_mode: u32 = 0u;
-
-// The pipeline alpha tests its fragments against the cutoff of their material (AlphaCutoff).
-override alpha_cutout: bool = false;
-
-// The pipeline draws Transmission shapes: no alpha test, no blending, no depth writes, and the
-// opaque snapshot of the view shows through them.
-override transmissive: bool = false;
+// What a draw shades, at the dynamic offset of its batch (box_gpu_draw_kind), so one compiled
+// fragment stage serves every kind: blend_mode is the BlendMode the output is shaped for,
+// alpha_cutout tests the fragments against the cutoff of their material (AlphaCutoff), and
+// transmissive draws Transmission shapes, through which the opaque snapshot of the view shows.
+struct DrawKind {
+    blend_mode: u32,
+    transmissive: u32,
+    alpha_cutout: u32,
+    pad: u32,
+};
 
 const PI: f32 = 3.141592653589793;
 const MIN_ROUGHNESS: f32 = 0.045;
@@ -120,6 +121,7 @@ const MIN_ROUGHNESS: f32 = 0.045;
 @group(1) @binding(2) var orm_map: texture_2d<f32>;
 @group(1) @binding(3) var normal_map: texture_2d<f32>;
 @group(1) @binding(4) var material_sampler: sampler;
+@group(1) @binding(11) var<uniform> kind: DrawKind;
 
 // Group 1 of fs_blend and fs_depth_cutout_blend besides emissive_map and material_sampler: the
 // albedo (decoded from sRGB), ORM and normal of each layer as a slice of an array, the mask as
@@ -353,67 +355,29 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Plac
     return o;
 }
 
-// Depth prepass of a lit view (box_gpu_draw_prepass): the opaque meshes draw depth only with
-// vs_depth, which binds the transform stream of the instance page without the shading stream
-// (group 2) and nothing in group 1, and has no fragment stage.
-struct DepthOut {
-    @builtin(position) @invariant pos: vec4f,
-};
-
-@vertex fn vs_depth(v: VertexIn) -> DepthOut {
-    return DepthOut(place(v).pos);
+// Depth prepass of a lit view (box_gpu_draw_prepass): the opaque meshes draw depth only with vs,
+// as the forward pass does, and fs_depth, which takes the inputs fs takes and writes nothing. The
+// alpha tested meshes draw with fs_depth_cutout, which discards what fs discards: the alpha of
+// the vertex times the albedo alpha, below the cutoff of the material. The forward pass after the
+// prepass does not alpha test, its Equal depth test rejects those.
+@fragment fn fs_depth(f: VertexOut) {
 }
 
-// The alpha tested meshes of the prepass draw with vs_depth_cutout and fs_depth_cutout, which
-// also bind the shading stream, the material table and the texture layers and discard what fs
-// discards: the alpha of the vertex as vs makes it times the albedo alpha, below the cutoff of
-// the material. The forward pass after the prepass does not alpha test, its Equal depth test
-// rejects those.
-struct DepthCutoutOut {
-    @builtin(position) @invariant pos: vec4f,
-    @location(0) uv: vec2f,
-    @location(1) alpha: f32,
-    @location(2) @interpolate(flat) cutoff: f32,
-    // A MappingObject or MappingWorld material: 1 plus its blend in mapped, and what mapping_uv
-    // projects, as VertexOut has them
-    @location(3) @interpolate(flat) mapped: f32,
-    @location(4) object: vec4f,
-    @location(5) object_normal: vec3f,
-};
-
-@vertex fn vs_depth_cutout(v: VertexIn) -> DepthCutoutOut {
-    let shading = shadings[v.slot];
-    let material = material_fetch(shading.material);
-    let p = place(v);
-    let c0 = p.model[0].xyz;
-    let c1 = p.model[1].xyz;
-    let c2 = p.model[2].xyz;
-    let scale = vec3f(length(c0), length(c1), length(c2));
-    var normal = vec3f(0.0);
-    if (material_world(material)) {
-        let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
-        normal = mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1)) * p.normal * flip;
-    }
-    let s = vertex_shading(v, shading, material, p, scale, normal);
-    return DepthCutoutOut(p.pos, s.uv, s.color.a, material.cutoff, s.mapped, s.object,
-        s.object_normal);
-}
-
-@fragment fn fs_depth_cutout(f: DepthCutoutOut) {
-    let albedo = mapping_alpha(albedo_map, material_sampler, f.uv, f.mapped, f.object,
+@fragment fn fs_depth_cutout(f: VertexOut) {
+    let albedo = mapping_alpha(albedo_map, material_sampler, f.uv.xy, f.scalars.w, f.object,
         f.object_normal);
-    if (f.alpha * albedo < f.cutoff) {
+    if (f.color.a * albedo < f.scalars.x) {
         discard;
     }
 }
 
-// The alpha tested meshes of a TextureBlend draw with vs_depth_cutout and fs_depth_cutout_blend,
-// which binds the blend group and discards what fs_blend discards: the weighted alpha of the
-// layer albedos (blend_alpha).
-@fragment fn fs_depth_cutout_blend(f: DepthCutoutOut) {
+// The alpha tested meshes of a TextureBlend draw with fs_depth_cutout_blend, which binds the blend
+// group and discards what fs_blend discards: the weighted alpha of the layer albedos
+// (blend_alpha).
+@fragment fn fs_depth_cutout_blend(f: VertexOut) {
     let albedo = blend_alpha(blend_albedo, blend_mask, blend_heights, material_sampler, blending,
-        f.uv, f.mapped, f.object, f.object_normal);
-    if (f.alpha * albedo < f.cutoff) {
+        f.uv.xy, f.scalars.w, f.object, f.object_normal);
+    if (f.color.a * albedo < f.scalars.x) {
         discard;
     }
 }
@@ -902,7 +866,7 @@ fn blend_layers(f: VertexOut, geometric: vec3f, front: bool) -> Layers {
     o.albedo = vec4f(0.0);
     o.orm = vec3f(0.0);
     o.normal = geometric;
-    if (front || alpha_cutout) {
+    if (front || kind.alpha_cutout != 0u) {
         let b = blend_sample(uv, gx, gy, w, front);
         o.albedo = b.albedo;
         o.orm = b.orm;
@@ -928,7 +892,7 @@ fn blend_triplanar(f: VertexOut, geometric: vec3f, front: bool) -> Layers {
     let w = mapping_weights(n, f.scalars.w - 1.0);
     let s = mapping_signs(n);
     let dominant = mapping_axis(n);
-    let sampled = front || alpha_cutout;
+    let sampled = front || kind.alpha_cutout != 0u;
     var planes = mapping_planes(f.object, s);
     var gx = mapping_planes(dx, s);
     var gy = mapping_planes(dy, s);
@@ -1023,7 +987,7 @@ fn surface_of(f: VertexOut, front: bool, geometric: vec3f, layers: Layers) -> Su
         s.emissive *= emissive;
         s.normal = mapped;
         s.geometric = geometric;
-    } else if (alpha_cutout) {
+    } else if (kind.alpha_cutout != 0u) {
         s.alpha *= albedo.a;
     }
 
@@ -1411,7 +1375,7 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
 // and a filter of the target is left as it is.
 fn aerial_perspective(color: vec3f, alpha: f32, pos: vec4f, world: vec3f) -> vec3f {
     let ap = aerial_sample(pos, world);
-    switch blend_mode {
+    switch kind.blend_mode {
         case 0u, 1u: {
             return color * ap.a + ap.rgb;
         }
@@ -1428,7 +1392,7 @@ fn aerial_perspective(color: vec3f, alpha: f32, pos: vec4f, world: vec3f) -> vec
 }
 
 fn output(color: vec3f, alpha: f32) -> vec4f {
-    switch blend_mode {
+    switch kind.blend_mode {
         case 0u: {
             return vec4f(color, 1.0);
         }
@@ -1549,13 +1513,13 @@ fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
 // compilers inline every call.
 fn lit(f: VertexOut, shaded: Surface) -> vec4f {
     var s = shaded;
-    if (!transmissive && blend_mode == 0u) {
+    if (kind.transmissive == 0u && kind.blend_mode == 0u) {
         s.occlusion = min(s.occlusion, view_occlusion(f.pos));
     }
 
     let v = normalize(view.camera.xyz - f.world);
     let reflected = shade_split(s, v, f.world);
-    if (transmissive) {
+    if (kind.transmissive != 0u) {
         return transmission(f, s, v, reflected);
     }
 
@@ -1569,7 +1533,7 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
 
 @fragment fn fs(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     let s = surface(f, front);
-    if (!transmissive && alpha_cutout && s.alpha < f.scalars.x) {
+    if (kind.alpha_cutout != 0u && s.alpha < f.scalars.x) {
         discard;
     }
 
@@ -1579,7 +1543,7 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
 // A TextureBlend batch, of any blend mode, alpha tested or transmissive as fs is.
 @fragment fn fs_blend(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     let s = surface_blend(f, front);
-    if (!transmissive && alpha_cutout && s.alpha < f.scalars.x) {
+    if (kind.alpha_cutout != 0u && s.alpha < f.scalars.x) {
         discard;
     }
 
