@@ -76,6 +76,17 @@ async function capture(seconds) {
   T.rec.textContent = "● rec 10s";
 }
 
+window.addEventListener("wheel", (e) => {
+  if (e.defaultPrevented || e.deltaX === 0 || Math.abs(e.deltaX) < Math.abs(e.deltaY)) return;
+  for (let n = e.target; n instanceof Element; n = n.parentElement) {
+    if (n.scrollWidth <= n.clientWidth) continue;
+    const ox = getComputedStyle(n).overflowX;
+    if (ox !== "auto" && ox !== "scroll") continue;
+    if (e.deltaX < 0 ? n.scrollLeft > 0 : n.scrollLeft + n.clientWidth < n.scrollWidth - 1) return;
+  }
+  e.preventDefault();
+}, { passive: false });
+
 function updateTopbar() {
   const t = DAW.single.Transport;
   if (t) {

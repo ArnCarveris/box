@@ -594,7 +594,7 @@ G.render = (root) => {
   const tools = UI.el("div", { class: "arrange-tools" },
     ...legend,
     G.focusEl,
-    UI.el("span", { class: "ghint", title: "click a node to trace it, drag to move, shift+click or drag the background to select several, Escape shows all, ctrl+wheel zooms" }, "click a node to trace it, drag to move, shift+click or drag the background to select several, Escape shows all, ctrl+wheel zooms"),
+    UI.el("span", { class: "grow" }),
     UI.el("button", { class: "small", text: "auto arrange", title: "Discard moved nodes and restore the default layout", onclick: () => G.autoArrange() }),
     UI.el("button", { class: "small", text: "−", onclick: () => G.setZoom(G.zoom / 1.2) }),
     UI.el("button", { class: "small", text: "+", onclick: () => G.setZoom(G.zoom * 1.2) }),

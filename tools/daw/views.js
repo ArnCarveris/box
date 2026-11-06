@@ -89,10 +89,7 @@ V.arrange = (root) => {
       value: String(st.snap), onchange: (v) => { st.snap = parseFloat(v); }
     }),
     UI.toggle({ label: "follow", value: st.follow, onchange: (v) => { st.follow = v; } }),
-    UI.el("button", { class: "small", text: "fit", onclick: () => V.fitArrange() }),
-    UI.el("span", { class: "grow" }),
-    UI.el("span", { style: { color: "var(--fg2)" } },
-      "click ruler to seek, shift+drag ruler for the loop, drag clips to move, double click opens, Delete removes, Cmd+D duplicates"));
+    UI.el("button", { class: "small", text: "fit", onclick: () => V.fitArrange() }));
   const heads = UI.el("div", { class: "track-heads" }, UI.el("div", { class: "ruler-head" }));
   const lanes = UI.el("div", { class: "lanes" });
   const canvas = UI.el("canvas", { tabindex: 0 });
@@ -744,8 +741,6 @@ V.clipEditor = (clipPath, body, placementPath) => {
     UI.bind(clipPath, A + "NoteClip", ["length"], (v) => len.set(v), len);
     head.appendChild(UI.el("label", {}, "length", len));
     head.appendChild(UI.el("button", { class: "small", text: "fit", onclick: () => roll.fit() }));
-    head.appendChild(UI.el("span", { style: { color: "var(--fg2)" } },
-      "double click adds, drag moves, edge resizes, alt+drag copies, shift selects, arrows nudge, Delete removes, drag in the lower lane sets velocity"));
     body.appendChild(UI.el("div", { class: "piano-wrap" }, head, roll));
     const a = audition();
     if (a) body.appendChild(ED.keyboard(audition));
@@ -753,8 +748,7 @@ V.clipEditor = (clipPath, body, placementPath) => {
     const ac = rec.comps[A + "AutomationClip"];
     body.appendChild(UI.el("div", { class: "piano-tools" }, UI.el("b", {}, "Automation "),
       UI.el("a", { class: "link", onclick: () => DAW.select(clipPath) }, clipPath),
-      UI.el("span", {}, ` → ${ac.target} ${DAW.short(ac.component)}.${ac.member}`),
-      UI.el("span", { style: { color: "var(--fg2)" } }, "  double click adds a key, drag moves, Delete removes")));
+      UI.el("span", {}, ` → ${ac.target} ${DAW.short(ac.component)}.${ac.member}`)));
     body.appendChild(ED.curveEditor(clipPath, { placement: placementPath }));
     body.appendChild(UI.el("div", { class: "chain", style: { marginTop: "8px" } }, V.cardFor(clipPath, A + "AutomationClip", { skip: ["curve"] })));
   } else {
