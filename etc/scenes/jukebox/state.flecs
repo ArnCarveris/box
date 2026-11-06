@@ -3,11 +3,7 @@ using box.material
 struct JukeboxSong(title: string, file: string)
 
 export const SONGS: JukeboxSong[] = [
-  {"Distant Orbit", "distant_orbit"},
-  {"Neon Run", "neon_run"},
-  {"Harbor Lights", "harbor_lights"},
-  {"Lantern Waltz", "lantern_waltz"},
-  {"Trade Lane Dawn", "trade_lane_dawn"}
+  {"Distant Orbit", "distant_orbit"}
 ]
 
 export const LANE_MAX: i32 = 8
@@ -18,7 +14,6 @@ export mut playing = false
 export mut low_pass_cutoff: f32 = 20000
 export mut high_pass_cutoff: f32 = 20
 export mut reverb_level: f32 = 100
-export mut sweep: f32 = 300
 export mut beat: f32 = 0
 export mut song_beats: f32 = 1
 export mut loaded = false

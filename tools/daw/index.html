@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>box daw</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="daw.css">
+</head>
+<body>
+<header id="topbar">
+  <div class="brand">box<span>daw</span></div>
+  <div class="group" id="app-group">
+    <span class="dot" id="conn-dot"></span>
+    <select id="app-select" title="Flecs apps found on localhost"></select>
+    <input id="app-host" placeholder="host:port" title="Connect to a host that discovery does not find">
+  </div>
+  <div class="group" id="transport"></div>
+  <div class="group" id="song-group"></div>
+  <div class="group grow"></div>
+  <div class="group" id="master-group"></div>
+  <div class="group" id="status-group"></div>
+</header>
+<main id="layout">
+  <aside id="browser"></aside>
+  <section id="center">
+    <nav id="tabs">
+      <button data-view="arrange" class="active">Arrange</button>
+      <button data-view="mixer">Mixer</button>
+      <button data-view="modulation">Modulation</button>
+      <span class="grow"></span>
+      <span id="hint"></span>
+    </nav>
+    <div id="view"></div>
+    <div id="splitter"></div>
+    <div id="detail"></div>
+  </section>
+</main>
+<div id="toast"></div>
+<script src="flecs.js"></script>
+<script src="params.js"></script>
+<script src="core.js"></script>
+<script src="ui.js"></script>
+<script src="editors.js"></script>
+<script src="views.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

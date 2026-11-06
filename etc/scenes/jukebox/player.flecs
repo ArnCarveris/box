@@ -108,11 +108,6 @@ async {
     master_level[1] = clamp((20 * log10(max(mm.rms_right, 0.00001)) + 48) / 48, 0, 1)
     glow = clamp((20 * log10(max(max(mm.peak_left, mm.peak_right), 0.00001)) + 30) / 30, 0, 1)
 
-    const open = 300 * pow(2, 5 * clamp(b / 16, 0, 1))
-    if abs(open - sweep) > sweep * 0.01 {
-      sweep = open
-    }
-
     await next_frame()
   }
 }
