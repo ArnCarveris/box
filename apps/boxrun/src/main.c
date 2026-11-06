@@ -5,6 +5,7 @@
 
 #include <boxrun.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
@@ -53,6 +54,34 @@ static void boxrun_log(
         colors ? color : "", name, colors ? "\033[0m" : "", msg ? msg : "");
 }
 
+/** Append .flecs to the scene of App when it has no extension and name the world after it.
+ *
+ * @param world The world
+ */
+static void boxrun_scene_name(
+    ecs_world_t *world)
+{
+    App *app = ecs_singleton_get_mut(world, App);
+    if (app && app->scene && app->scene[0]) {
+        const char *file = strrchr(app->scene, '/');
+        file = file ? file + 1 : app->scene;
+        const char *ext = strrchr(file, '.');
+        if (!ext || strcmp(ext, ".flecs")) {
+            char *scene = flecs_asprintf("%s.flecs", app->scene);
+            ecs_os_free(app->scene);
+            app->scene = scene;
+            file = strrchr(scene, '/');
+            file = file ? file + 1 : scene;
+            ext = strrchr(file, '.');
+        }
+
+        char *name = ecs_os_strdup(file);
+        name[ext - file] = '\0';
+        ecs_doc_set_name(world, EcsWorld, name);
+        ecs_os_free(name);
+    }
+}
+
 /** Parse the command line into the App singleton and run the world.
  *
  * @param argc Argument count
@@ -76,6 +105,7 @@ int main(
 
     result = box_app_parse(world, argc, argv);
     if (!result) {
+        boxrun_scene_name(world);
         result = box_app_run(world);
     }
 
