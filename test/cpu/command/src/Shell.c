@@ -358,11 +358,7 @@ void Shell_help_lists_box_commands(void) {
     test_bool(error, false);
     test_assert(strstr(out, "key_press <key> [dur]  Tap a key, held for dur frames") != NULL);
     test_assert(strstr(out, "capture [camera]  Write a PNG") != NULL);
-<<<<<<< HEAD
-    test_assert(strstr(out, "audio [action] [value] [from] [to]  Print the audio status") != NULL);
-=======
     test_assert(strstr(out, "audio [action] [value] [args...]  Print the audio status") != NULL);
->>>>>>> 0dc42a70970d4fe571293440933000fe59e46300
     test_assert(strstr(out, "\nls [scope]  ") != NULL);
     ecs_os_free(out);
 
@@ -662,7 +658,6 @@ void Shell_audio_command(void) {
     ecs_fini(world);
 }
 
-<<<<<<< HEAD
 void Shell_audio_analyze(void) {
     // audio/analyze
     ecs_world_t *world = ecs_init();
@@ -821,7 +816,10 @@ void Shell_audio_analyze_errors(void) {
         "audio analyze test/assets/audio/analyze_sine_1k.wav soon", &error);
     test_bool(error, true);
     test_assert(strstr(out, "invalid span") != NULL);
-=======
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
 /** A world with the song of test/assets/audio/chords.flecs, no output and no device */
 static ecs_world_t* shell_chords_world(
     ecs_entity_t *session)
@@ -992,7 +990,6 @@ void Shell_audio_chords_tracks_and_bars(void) {
     test_assert(strstr(out, "no pitched track; drums left out: pulse") != NULL);
     test_assert(strstr(out, "\n1.1 N.C. 16 beats") != NULL);
     test_assert(strstr(out, "\nkey of the bars: none") != NULL);
->>>>>>> 0dc42a70970d4fe571293440933000fe59e46300
     ecs_os_free(out);
     ecs_fini(world);
 }

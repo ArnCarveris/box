@@ -1627,12 +1627,9 @@ Importing box alone does not open an output: `box_app_run` does.
 | `audio tempo <bpm>` | Set tempo, 20..999 |
 | `audio capture <seconds>` | Record master output as a 16-bit stereo WAV resource |
 | `audio song [<file>\|none]` | Show the song, load a song file or unload it |
-<<<<<<< HEAD
 | `audio analyze <wav> [from] [to]` | Print a text report of a WAV resource or file, optionally of the seconds from..to |
-=======
 | `audio notes <track> [bars=a..b] [roll]` | Print the notes of a track per bar, or as a piano roll |
 | `audio chords [track...] [bars=a..b]` | Print the chords and the key of a section from the notes |
->>>>>>> 0dc42a70970d4fe571293440933000fe59e46300
 
 Fetch a capture with `GET /shell/session/<id>/resource/<name>`; it stays empty
 until recording finishes. In the browser it writes `/tmp/audio_capture_<n>.wav`
@@ -1644,7 +1641,6 @@ the same build. Use this to render music, compare changes or inspect scenes offl
 `PerfStatus.audio_load` records the largest load of the run; worklet load reports
 zero because it has no suitable high-resolution timer.
 
-<<<<<<< HEAD
 `audio analyze` reads a resource of the session (the name `audio capture` returns), else a
 WAV file (PCM of 8 to 32 bits or float, mono or stereo); in the browser, a file of the page such
 as a capture. It prints one line per measure, each number with its unit:
@@ -1669,7 +1665,7 @@ bar in LUFS and the band that changed the most against the whole span, counting 
 40 dB under the total as at least that. A tempo change or loop wrap during the capture is not
 followed. The same WAV and span give the same text. The measures are a plain C library,
 [analyze.h](../src/audio/analyze.h).
-=======
+
 `audio notes` and `audio chords` read only the note data of the tracks, their
 placements and clips, so they work without an output and without a device. A
 note prints once per placement and pass of a loop, at its programmed position,
@@ -1742,7 +1738,6 @@ the next most likely one. Chords and notes are spelled with flats in a flat key.
 The notes outside the key of the bars, its major scale or its natural minor
 scale with the raised seventh, are listed per pitch class with their count and
 first positions.
->>>>>>> 0dc42a70970d4fe571293440933000fe59e46300
 
 If a track is silent, check sample readiness, its instrument and overlapping
 placements. If a return is silent, check its send and insert assignment. `audio`

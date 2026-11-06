@@ -19,12 +19,13 @@
 /** Sounding notes listed per track at most */
 #define BOX_AUDIO_SEQ_LIST_MAX 16
 
-/** Arguments of the audio command after its action and value, for notes and chords */
+/** Arguments of the audio command after its action and value, for analyze, notes and chords */
 #define BOX_CMD_AUDIO_MORE_ARGS 8
 
 /** A further argument of the audio command, help prints them once as [args...] */
 #define BOX_CMD_AUDIO_MORE { .name = "args", .type = ecs_id(ecs_string_t), \
-    .optional = true, .brief = "further tracks, bars=a..b or roll of notes and chords" }
+    .optional = true, .brief = "analyze from and to seconds, further tracks, bars=a..b or " \
+    "roll of notes and chords" }
 
 /** Folder of the captures in the file system of the page */
 #define BOX_CMD_AUDIO_WEB_DIR "/tmp"
@@ -1188,12 +1189,9 @@ static void box_cmd_audio(
     ecs_world_t *world = ctx->world;
     const char *action = argc > 0 ? *(const char**)argv[0].ptr : NULL;
     const char *value = argc > 1 ? *(const char**)argv[1].ptr : NULL;
-<<<<<<< HEAD
     const char *from = argc > 2 ? *(const char**)argv[2].ptr : NULL;
     const char *to = argc > 3 ? *(const char**)argv[3].ptr : NULL;
-=======
     const char *args[2 + BOX_CMD_AUDIO_MORE_ARGS];
->>>>>>> 0dc42a70970d4fe571293440933000fe59e46300
     char *out = NULL;
     int32_t i;
     for (i = 1; i < argc && i <= 2 + BOX_CMD_AUDIO_MORE_ARGS; i ++) {
@@ -1233,13 +1231,8 @@ static void box_cmd_audio(
     {
         out = box_cmd_audio_transport_set(world, action, value);
     } else {
-<<<<<<< HEAD
         ecs_err("unknown action '%s', expected volume, mute, capture, analyze, play, stop, "
-            "seek, tempo or song", action);
-=======
-        ecs_err("unknown action '%s', expected volume, mute, capture, play, stop, seek, "
-            "tempo, song, notes or chords", action);
->>>>>>> 0dc42a70970d4fe571293440933000fe59e46300
+            "seek, tempo, song, notes or chords", action);
     }
 
     *(char**)result->ptr = out;
@@ -1254,38 +1247,23 @@ void box_cmd_audio_init(
     box_command_register(world,
         "Print the audio status, transport, song, buses, instruments, tracks, emitters and "
         "macros, set the volume or mute, play, stop, seek or set the tempo, show or change the "
-<<<<<<< HEAD
-        "song, capture a WAV or analyze one",
-=======
-        "song, capture a WAV, or print the notes of a track and the chords and key of a section",
->>>>>>> 0dc42a70970d4fe571293440933000fe59e46300
+        "song, capture a WAV or analyze one, or print the notes of a track and the chords and "
+        "key of a section",
         (ecs_function_desc_t){
             .name = "audio",
             .return_type = ecs_id(ecs_string_t),
             .params = {
                 { .name = "action", .type = ecs_id(ecs_string_t), .optional = true,
-<<<<<<< HEAD
-                  .brief = "volume, mute, capture, analyze, play, stop, seek, tempo or song "
-                    "(default: print the status)" },
+                  .brief = "volume, mute, capture, analyze, play, stop, seek, tempo, song, "
+                    "notes or chords (default: print the status)" },
                 { .name = "value", .type = ecs_id(ecs_string_t), .optional = true,
                   .brief = "volume 0 to 4, mute on or off (default: toggle), capture seconds, "
                     "analyze WAV resource or file, seek beats, tempo 20 to 999, song file or "
-                    "none (default: show the song)" },
-                { .name = "from", .type = ecs_id(ecs_string_t), .optional = true,
-                  .brief = "analyze from this second (default: the start)" },
-                { .name = "to", .type = ecs_id(ecs_string_t), .optional = true,
-                  .brief = "analyze up to this second (default: the end)" }
-=======
-                  .brief = "volume, mute, capture, play, stop, seek, tempo, song, notes or "
-                    "chords (default: print the status)" },
-                { .name = "value", .type = ecs_id(ecs_string_t), .optional = true,
-                  .brief = "volume 0 to 4, mute on or off (default: toggle), capture seconds, "
-                    "seek beats, tempo 20 to 999, song file or none (default: show the song), "
-                    "track of notes, track or bars=a..b of chords" },
+                    "none (default: show the song), track of notes, track or bars=a..b of "
+                    "chords" },
                 BOX_CMD_AUDIO_MORE, BOX_CMD_AUDIO_MORE, BOX_CMD_AUDIO_MORE,
                 BOX_CMD_AUDIO_MORE, BOX_CMD_AUDIO_MORE, BOX_CMD_AUDIO_MORE,
                 BOX_CMD_AUDIO_MORE, BOX_CMD_AUDIO_MORE
->>>>>>> 0dc42a70970d4fe571293440933000fe59e46300
             },
             .callback = box_cmd_audio
         });
