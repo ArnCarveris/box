@@ -89,7 +89,8 @@ V.arrange = (root) => {
       value: String(st.snap), onchange: (v) => { st.snap = parseFloat(v); }
     }),
     UI.toggle({ label: "follow", value: st.follow, onchange: (v) => { st.follow = v; } }),
-    UI.el("button", { class: "small", text: "fit", onclick: () => V.fitArrange() }));
+    UI.el("button", { class: "small", text: "fit", onclick: () => V.fitArrange() }),
+    UI.el("button", { class: "small", text: "reset", title: "Play the entire song: move the markers to its start and end", onclick: () => V.resetRange() }));
   const heads = UI.el("div", { class: "track-heads" }, UI.el("div", { class: "ruler-head" }));
   const lanes = UI.el("div", { class: "lanes" });
   const canvas = UI.el("canvas", { tabindex: 0 });
@@ -123,7 +124,7 @@ V.arrange = (root) => {
   V.arrangeCanvas(canvas, tracks);
 };
 
-V.songBeats = (tracks) => {
+V.contentBeats = (tracks) => {
   let end = (DAW.single.Song || {}).beats || 0;
   for (const t of tracks) {
     for (const p of DAW.placementsOf(t.path)) {
@@ -131,9 +132,24 @@ V.songBeats = (tracks) => {
       end = Math.max(end, cp.start + V.placementLength(cp));
     }
   }
-  const tr = DAW.single.Transport;
-  if (tr && tr.loop) end = Math.max(end, tr.loop_end);
   return Math.max(end, 16);
+};
+
+V.songBeats = (tracks) => {
+  const tr = DAW.single.Transport;
+  return Math.max(V.contentBeats(tracks), tr && tr.loop ? tr.loop_end : 0);
+};
+
+V.playRange = (tracks) => {
+  const tr = DAW.single.Transport || {};
+  if (tr.loop_end > tr.loop_start) return { lo: tr.loop_start, hi: tr.loop_end, on: !!tr.loop };
+  return { lo: 0, hi: V.contentBeats(tracks), on: false };
+};
+
+V.resetRange = () => {
+  const s = DAW.single.Song || {};
+  const beats = s.beats > 0 ? s.beats : V.contentBeats(V.trackOrder());
+  DAW.transport({ loop: s.beats > 0 && !!s.loop, loop_start: 0, loop_end: beats });
 };
 
 V.clipComp = (clipPath) => {
@@ -162,6 +178,14 @@ V.arrangeCanvas = (c, tracks) => {
   const xOf = (b) => (b - st.x0) * st.ppb;
   const bOf = (x) => x / st.ppb + st.x0;
   const rowOf = (y) => Math.floor((y - RULERH) / ROWH);
+  const markerAt = (x) => {
+    const r = V.playRange(tracks);
+    const xl = xOf(r.lo), xr = xOf(r.hi);
+    const dl = x >= xl - 4 && x <= xl + 10 ? Math.abs(x - (xl + 4)) : Infinity;
+    const dr = x >= xr - 10 && x <= xr + 4 ? Math.abs(x - (xr - 4)) : Infinity;
+    if (dl === Infinity && dr === Infinity) return null;
+    return dl < dr ? "lo" : "hi";
+  };
   const placementAt = (x, y) => {
     const row = rowOf(y);
     const t = tracks[row];
@@ -277,11 +301,12 @@ V.arrangeCanvas = (c, tracks) => {
     });
     ctx.fillStyle = "#23272c";
     ctx.fillRect(0, 0, w, RULERH);
-    if (tr.loop && tr.loop_end > tr.loop_start) {
+    const range = V.playRange(tracks);
+    if (range.on) {
       ctx.fillStyle = "rgba(255,159,46,0.35)";
-      ctx.fillRect(xOf(tr.loop_start), 0, (tr.loop_end - tr.loop_start) * st.ppb, RULERH);
+      ctx.fillRect(xOf(range.lo), 0, (range.hi - range.lo) * st.ppb, RULERH);
       ctx.fillStyle = "rgba(255,159,46,0.05)";
-      ctx.fillRect(xOf(tr.loop_start), RULERH, (tr.loop_end - tr.loop_start) * st.ppb, h);
+      ctx.fillRect(xOf(range.lo), RULERH, (range.hi - range.lo) * st.ppb, h);
     }
     ctx.fillStyle = "#b4bac2";
     ctx.font = "10px sans-serif";
@@ -292,6 +317,17 @@ V.arrangeCanvas = (c, tracks) => {
       const x = xOf(b);
       ctx.fillRect(x, RULERH - 8, 1, 8);
       ctx.fillText(String(n + 1), x + 3, 12);
+    }
+    for (const [b, dir] of [[range.lo, 1], [range.hi, -1]]) {
+      const x = Math.round(xOf(b));
+      if (x < -10 || x > w + 10) continue;
+      ctx.fillStyle = range.on ? "rgba(255,159,46,0.5)" : "rgba(255,159,46,0.25)";
+      ctx.fillRect(x - (dir > 0 ? 0 : 1), RULERH, 1, h - RULERH);
+      ctx.fillStyle = range.on ? "#ff9f2e" : "rgba(255,159,46,0.55)";
+      ctx.fillRect(x - (dir > 0 ? 0 : 2), 0, 2, RULERH);
+      ctx.beginPath();
+      ctx.moveTo(x, 0); ctx.lineTo(x + dir * 10, 0); ctx.lineTo(x + dir * 10, 6); ctx.lineTo(x, 12);
+      ctx.fill();
     }
     const pos = DAW.position();
     const px = xOf(pos);
@@ -315,9 +351,10 @@ V.arrangeCanvas = (c, tracks) => {
     const { x, y } = local(e);
     c.setPointerCapture(e.pointerId);
     if (y < RULERH) {
-      if (e.shiftKey) {
-        const b = snap(bOf(x), e);
-        drag = { kind: "loop", b0: b };
+      const m = markerAt(x);
+      if (m) {
+        const r = V.playRange(tracks);
+        drag = { kind: "marker", which: m, lo: r.lo, hi: r.hi };
       } else {
         drag = { kind: "seek" };
         DAW.seek(Math.max(0, bOf(x)));
@@ -340,14 +377,16 @@ V.arrangeCanvas = (c, tracks) => {
     const { x, y } = local(e);
     if (!drag) {
       const h = y >= RULERH ? placementAt(x, y) : null;
-      c.style.cursor = y < RULERH ? "pointer" : h ? (h.edge ? "ew-resize" : "grab") : "default";
+      c.style.cursor = y < RULERH ? (markerAt(x) ? "ew-resize" : "pointer") : h ? (h.edge ? "ew-resize" : "grab") : "default";
       return;
     }
     if (drag.kind === "seek") { DAW.seek(Math.max(0, bOf(x))); return; }
-    if (drag.kind === "loop") {
+    if (drag.kind === "marker") {
       const b = snap(bOf(x), e);
-      const lo = Math.max(0, Math.min(drag.b0, b)), hi = Math.max(drag.b0, b);
-      if (hi > lo) DAW.transport({ loop: true, loop_start: lo, loop_end: hi });
+      const min = e.altKey ? 0.25 : st.snap;
+      if (drag.which === "lo") drag.lo = Math.max(0, Math.min(b, drag.hi - min));
+      else drag.hi = Math.max(b, drag.lo + min);
+      DAW.transport({ loop: true, loop_start: drag.lo, loop_end: drag.hi });
       return;
     }
     const db = snap(bOf(x) - drag.b, e);
@@ -357,7 +396,15 @@ V.arrangeCanvas = (c, tracks) => {
       DAW.write(drag.rec.path, A + "ClipPlacement", { duration: Math.max(e.altKey ? 0.25 : st.snap, drag.len + db) });
     }
   });
-  const end = () => { if (drag) { drag = null; DAW.dragging = Math.max(0, DAW.dragging - 1); } };
+  const end = () => {
+    if (!drag) return;
+    if (drag.kind === "marker") {
+      const pos = DAW.position();
+      if (pos < drag.lo || pos >= drag.hi) DAW.seek(drag.lo);
+    }
+    drag = null;
+    DAW.dragging = Math.max(0, DAW.dragging - 1);
+  };
   c.addEventListener("dblclick", (e) => {
     const { x, y } = local(e);
     if (y < RULERH) return;
@@ -435,7 +482,7 @@ V.addEffect = async (bus, slot, fx) => {
     await DAW.create(path);
     await DAW.add(path, A + fx);
     V.setSlot(bus, slot, path);
-    DAW.select(path);
+    DAW.select(path, true);
     DAW.toast(`added ${fx} to ${bus}`);
   } catch (err) {
     DAW.toast(String(err), true);
@@ -769,13 +816,13 @@ V.renderDetail = () => {
       `${DAW.sel || "no entity"} is not in ${DAW.host}, waiting for it to appear`));
     return;
   }
-  const kind = DAW.kindOf(rec);
+  const kind = DAW.selInsert ? "effect" : DAW.kindOf(rec);
   const head = UI.el("div", { class: "detail-head" },
     UI.el("span", { class: "swatch", style: { background: DAW.color(rec.path) } }),
-    UI.el("span", { class: "title" }, kind === "track" ? V.laneName(rec.path) : rec.name),
+    UI.el("span", { class: "title" }, kind === "track" ? V.laneName(rec.path) : DAW.selInsert ? DAW.effectComps(rec).map(DAW.short).join(" / ") : rec.name),
     UI.el("span", { class: "kind" }, `${kind}  ${rec.path}${rec.prefab ? "  (prefab)" : ""}${rec.script ? "  from " + rec.script : ""}`),
     UI.el("span", { class: "grow" }));
-  if (kind !== "track" && kind !== "bus" && rec.path !== A + "master") head.appendChild(V.enableBtn(rec));
+  if (kind !== "track" && kind !== "bus" && rec.path !== A + "master" && !DAW.has(rec, "AudioBus")) head.appendChild(V.enableBtn(rec));
   if (!DAW.detailPath) {
     head.appendChild(UI.el("button", { class: "small", text: "window", title: "Open in its own window", onclick: () => DAW.openWindow(rec.path) }));
     head.appendChild(UI.el("button", { class: "small", text: "×", title: "Close (Escape)", onclick: () => G.clearFocus() }));
@@ -813,17 +860,7 @@ V.renderDetail = () => {
       if (!DAW.isNone(t.instrument)) V.instrumentBlock(t.instrument, body, rec.path);
     }
   } else if (kind === "effect") {
-    const bus = DAW.busOfEffect(rec.path);
-    if (bus) {
-      const i = bus.comps[A + "AudioBus"].effects.indexOf(rec.path);
-      body.appendChild(UI.el("div", { class: "section-title" }, `Insert slot ${i + 1} of `, UI.el("a", { class: "link", onclick: () => DAW.select(bus.path) }, bus.path)));
-      body.appendChild(UI.el("div", { class: "chain" }, V.slot(bus.path, i)));
-    } else {
-      body.appendChild(UI.el("div", { class: "section-title" }, "Not in an insert slot"));
-      body.appendChild(UI.el("div", { class: "chain" }, V.effectCards(rec.path, {})));
-    }
-    const other = V.genericCards(rec.path, DAW.effectComps(rec).concat([A + "AudioBus", A + "AudioMeter"]));
-    if (other.childNodes.length) body.appendChild(other);
+    body.appendChild(UI.el("div", { class: "chain" }, V.effectCards(rec.path, {})));
   } else if (kind === "placement") {
     const cp = rec.comps[A + "ClipPlacement"];
     body.appendChild(UI.el("div", { class: "chain" }, V.cardFor(rec.path, A + "ClipPlacement", {})));
@@ -861,7 +898,10 @@ V.prune = () => {
 };
 
 V.markSel = () => {
-  document.querySelectorAll("[data-path]").forEach((el) => el.classList.toggle("sel", el.dataset.path === DAW.sel));
+  document.querySelectorAll("[data-path]").forEach((el) => {
+    const ins = el.classList.contains("gins"), node = el.classList.contains("gnode");
+    el.classList.toggle("sel", el.dataset.path === DAW.sel && (ins ? DAW.selInsert : !(node && DAW.selInsert)));
+  });
 };
 
 V.sideOpen = () => !DAW.detailPath && DAW.view === "graph" && !!DAW.sel && !!DAW.ents[DAW.sel];

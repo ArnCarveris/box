@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Writes the sound files of the Sample tests (test/cpu/audio) and of the browser check
+"""Writes the sound files of the Sample and Analyze tests (test/cpu/audio), of the audio analyze
+command (test/cpu/command) and of the browser check
 test/integration/web/audio_sample.mjs, the drum and the shaker of song.flecs, and the wavetable of the
 SynthWavetableAsset tests, into this folder.
 
@@ -64,6 +65,45 @@ def saw_square(frames, size, harmonics, level):
             x = 2 * math.pi * t / size
             out.append(sum(a * math.sin((n + 1) * x) for n, a in enumerate(amps)))
     return out
+
+
+def pink(rate, frames, rms):
+    """Pink noise at an RMS level: white noise of a linear congruential generator through the
+    filter of Paul Kellet, scaled so the RMS is exact."""
+    out, seed, b = [], 1, [0.0] * 7
+    for _ in range(frames):
+        seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF
+        w = seed / 0x3FFFFFFF - 1
+        b[0] = 0.99886 * b[0] + w * 0.0555179
+        b[1] = 0.99332 * b[1] + w * 0.0750759
+        b[2] = 0.96900 * b[2] + w * 0.1538520
+        b[3] = 0.86650 * b[3] + w * 0.3104856
+        b[4] = 0.55000 * b[4] + w * 0.5329522
+        b[5] = -0.7616 * b[5] - w * 0.0168980
+        out.append(sum(b) + w * 0.5362)
+        b[6] = w * 0.115926
+    scale = rms / math.sqrt(sum(x * x for x in out) / frames)
+    return [x * scale for x in out]
+
+
+def loudness_48k(channels):
+    """Ungated loudness in LUFS of channels at 48000 Hz, with the K-weighting coefficients that
+    ITU-R BS.1770 lists for 48 kHz, as the expected value of the Analyze tests."""
+    stages = [((1.53512485958697, -2.69169618940638, 1.19839281085285),
+               (-1.69065929318241, 0.73248077421585)),
+              ((1.0, -2.0, 1.0), (-1.99004745483398, 0.99007225036621))]
+    power = 0.0
+    for c in channels:
+        x = list(c)
+        for (b0, b1, b2), (a1, a2) in stages:
+            y, x1, x2, y1, y2 = [], 0.0, 0.0, 0.0, 0.0
+            for v in x:
+                o = b0 * v + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
+                x2, x1, y2, y1 = x1, v, y1, o
+                y.append(o)
+            x = y
+        power += sum(v * v for v in x) / len(x)
+    return -0.691 + 10 * math.log10(power)
 
 
 def interleave(channels):
@@ -188,6 +228,38 @@ def flac(name, rate, channels, block=4096):
         f.write(out)
 
 
+def analyze_sounds():
+    """The recordings of the Analyze tests and of the audio analyze command."""
+    rate = 48000
+    # A full scale 1000 Hz sine, mono, 2 s: -3.01 LUFS, 0 dBFS, all in the mid band
+    wav("analyze_sine_1k.wav", rate, [sine(1000, rate, 2 * rate, 1.0)])
+    # Pink noise at -20 dBFS RMS, 4 s, as floats
+    noise = [struct.unpack("<f", struct.pack("<f", x))[0] for x in pink(rate, 4 * rate, 0.1)]
+    wav("analyze_pink.wav", rate, [noise], float32=True)
+    print("analyze_pink.wav: %.2f LUFS" % loudness_48k([noise]))
+    # A 440 Hz sine at 0.5 on the left and its inverted copy on the right, 1 s
+    tone = sine(440, rate, rate, 0.5)
+    wav("analyze_inverted.wav", rate, [tone, [-x for x in tone]])
+    # A full scale sine at a quarter of the rate with a phase of 45 degrees: its samples peak
+    # at -3.01 dBFS, the wave between them at 0 dBFS
+    wav("analyze_true_peak.wav", rate, [sine(rate / 4, rate, rate, 1.0, math.pi / 4)],
+        float32=True)
+    # A 440 Hz tone at 0.8 that decays with a time constant of 0.2 s, 3 s as floats: it falls
+    # 60 dB in 0.2 * ln(1000) = 1.3816 s
+    wav("analyze_decay.wav", rate, [[0.8 * math.exp(-i / rate / 0.2) *
+        math.sin(2 * math.pi * 440 * i / rate) for i in range(3 * rate)]], float32=True)
+    # A 440 Hz cosine at 0.5, 0.5 s: its first sample is 0.5, a click
+    wav("analyze_click.wav", rate, [sine(440, rate, rate // 2, 0.5, math.pi / 2)])
+    # An IMA ADPCM header, a format the analysis does not read
+    chunk = struct.pack("<HHIIHH", 0x11, 1, rate, rate // 2, 256, 4)
+    body = bytes(256)
+    out = b"RIFF" + struct.pack("<I", 4 + 8 + len(chunk) + 8 + len(body)) + b"WAVE"
+    out += b"fmt " + struct.pack("<I", len(chunk)) + chunk
+    out += b"data" + struct.pack("<I", len(body)) + body
+    with open(os.path.join(HERE, "analyze_adpcm.wav"), "wb") as f:
+        f.write(out)
+
+
 def main():
     # Sample/wav_16, mono, flac: a 1000 Hz sine at 0.5, a quarter of a second at 48000 Hz
     tone = sine(1000, 48000, 12000, 0.5)
@@ -220,6 +292,7 @@ def main():
     # SynthWavetableAsset: 8 frames of 2048 samples from a saw to a square, 64 harmonics at a
     # level of 0.5, as floats, which the table normalizes to a peak of 1
     wav("wavetable_saw_square.wav", 48000, [saw_square(8, 2048, 64, 0.5)], float32=True)
+    analyze_sounds()
 
 
 if __name__ == "__main__":
