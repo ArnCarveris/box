@@ -173,7 +173,7 @@ static void box_gpu_compile_early(
 {
     if (!slot->shader.module && !compile->early) {
         wgpuShaderModuleAddRef(compile->module);
-        box_gpu_shader_install(gpu, compile->handle, compile->module);
+        box_gpu_shader_install(gpu, compile->handle, compile->module, compile->label);
         compile->early = true;
     }
 }
@@ -194,6 +194,8 @@ static void box_gpu_compile_withdraw(
         wgpuShaderModuleRelease(slot->shader.module);
         slot->shader.module = NULL;
         slot->shader.revision ++;
+        ecs_os_free(slot->label);
+        slot->label = NULL;
         box_gpu_count(gpu, BOX_GPU_STAT_SHADER_DESTROYED);
         box_gpu_forward_reset(gpu, false);
     }
@@ -220,7 +222,11 @@ static bool box_gpu_compile_finish(
         (compile->handle == BOX_RENDER_SHADER_MESH ||
             compile->handle == BOX_RENDER_SHADER_SHAPE2D))
     {
+        gpu->checking = compile->module;
+        gpu->checking_label = compile->label;
         result = box_gpu_forward_check(gpu, compile->handle, compile->module, &invalid);
+        gpu->checking = NULL;
+        gpu->checking_label = NULL;
     }
 
     compile->checking = !result;
@@ -239,21 +245,6 @@ static bool box_gpu_compile_finish(
         compile->slot = NULL;
     }
 
-<<<<<<< HEAD
-=======
-    char *invalid = NULL;
-    if (!compile->failed && compile->module && slot && compile->revision == slot->requested &&
-        (compile->handle == BOX_RENDER_SHADER_MESH ||
-            compile->handle == BOX_RENDER_SHADER_SHAPE2D))
-    {
-        gpu->checking = compile->module;
-        gpu->checking_label = compile->label;
-        invalid = box_gpu_forward_check(gpu, compile->handle, compile->module);
-        gpu->checking = NULL;
-        gpu->checking_label = NULL;
-    }
-
->>>>>>> 3d0cbea4dceaf40620267b60d60360620040984d
     if (compile->failed || !compile->module || invalid) {
         const char *message = invalid ? invalid : compile->message
             ? compile->message : "shader module creation failed";
@@ -265,13 +256,8 @@ static bool box_gpu_compile_finish(
     } else {
         box_gpu_count(gpu, BOX_GPU_STAT_COMPILED);
         box_gpu_shader_report(gpu, compile->handle, compile->revision, NULL, compile->label);
-<<<<<<< HEAD
         if (compile->revision == slot->requested && slot->shader.module != compile->module) {
-            box_gpu_shader_install(gpu, compile->handle, compile->module);
-=======
-        if (compile->revision == slot->requested) {
             box_gpu_shader_install(gpu, compile->handle, compile->module, compile->label);
->>>>>>> 3d0cbea4dceaf40620267b60d60360620040984d
             compile->module = NULL;
         }
     }

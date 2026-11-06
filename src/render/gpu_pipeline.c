@@ -59,6 +59,10 @@ struct box_gpu_pipeline_t {
     WGPURenderPipeline render_pipeline; /**< The render pipeline once created */
     WGPUComputePipeline compute_pipeline; /**< The compute pipeline once created */
     char *message;                  /**< Error of a failed creation */
+    const char *shader;             /**< Label of the module of the first stage, owned, NULL
+                                     *   when the module is not the module of a shader */
+    ecs_time_t start;               /**< When the asynchronous creation started */
+    double seconds;                 /**< Time the creation took */
     bool failed;                    /**< The creation failed */
     bool arrived;                   /**< The outcome arrived and waits for its delivery */
     bool quiet;                     /**< A failure is not reported, see pipeline_quiet */
@@ -650,6 +654,8 @@ static void box_gpu_pipeline_create(
     box_gpu_pipeline_t *p)
 {
     box_gpu_error_capture_t capture = {0};
+    ecs_time_t start = {0};
+    ecs_time_measure(&start);
     box_gpu_error_capture_begin(&capture);
     if (p->compute) {
         p->compute_pipeline = wgpuDeviceCreateComputePipeline(device, &p->compute_desc);
@@ -658,6 +664,7 @@ static void box_gpu_pipeline_create(
     }
 
     box_gpu_error_capture_end();
+    p->seconds = ecs_time_measure(&start);
     p->failed = capture.failed || (!p->compute_pipeline && !p->render_pipeline);
     if (capture.message) {
         p->message = box_gpu_pipeline_message(capture.message, ecs_os_strlen(capture.message));
@@ -718,6 +725,7 @@ static void box_gpu_pipeline_on_render(
 {
     box_gpu_pipeline_t *p = userdata1;
     (void)userdata2;
+    p->seconds = ecs_time_measure(&p->start);
     p->failed = status != WGPUCreatePipelineAsyncStatus_Success || !pipeline;
     if (p->failed && pipeline) {
         wgpuRenderPipelineRelease(pipeline);
@@ -749,6 +757,7 @@ static void box_gpu_pipeline_on_compute(
 {
     box_gpu_pipeline_t *p = userdata1;
     (void)userdata2;
+    p->seconds = ecs_time_measure(&p->start);
     p->failed = status != WGPUCreatePipelineAsyncStatus_Success || !pipeline;
     if (p->failed && pipeline) {
         wgpuComputePipelineRelease(pipeline);
@@ -772,6 +781,7 @@ static void box_gpu_pipeline_start(
     box_gpu_pipelines_t *c,
     box_gpu_pipeline_t *p)
 {
+    ecs_time_measure(&p->start);
     if (p->compute) {
         wgpuDeviceCreateComputePipelineAsync(c->device, &p->compute_desc,
             (WGPUCreateComputePipelineAsyncCallbackInfo){
@@ -897,6 +907,28 @@ static void box_gpu_pipeline_count(
     ecs_os_mutex_unlock(gpu->lock);
 }
 
+/** Log the creation of a pipeline with its shader, entry points and duration.
+ *
+ * @param p The pipeline, created
+ */
+static void box_gpu_pipeline_log(
+    const box_gpu_pipeline_t *p)
+{
+    WGPUStringView first = p->compute ? p->compute_desc.compute.entryPoint
+        : p->render.vertex.entryPoint;
+    WGPUStringView second = {0};
+    if (!p->compute && p->render.fragment) {
+        second = p->fragment.entryPoint;
+    }
+
+    int first_len = (int)box_gpu_str_len(first);
+    int second_len = (int)box_gpu_str_len(second);
+    ecs_trace("created %s pipeline '%s' (%.*s%s%.*s) in %.2f ms",
+        p->compute ? "compute" : "render", p->shader ? p->shader : "unknown",
+        first_len, first.data ? first.data : "", second_len ? ", " : "",
+        second_len, second.data ? second.data : "", p->seconds * 1000.0);
+}
+
 /** Deliver the outcome of a creation: the pipeline is ready, or it failed and is reported
  * like a shader that failed to compile.
  *
@@ -912,6 +944,10 @@ static void box_gpu_pipeline_finish(
     p->state = p->failed ? BOX_GPU_PIPELINE_FAILED : BOX_GPU_PIPELINE_READY;
     p->cache->building --;
     box_gpu_pipeline_count(gpu, false, !p->failed);
+    if (!p->failed) {
+        box_gpu_pipeline_log(p);
+    }
+
     if (p->failed && !p->quiet) {
         ecs_err("pipeline '%s' failed to create: %s", label ? label : "",
             p->message ? p->message : "the pipeline cannot be created");
@@ -972,6 +1008,12 @@ static box_gpu_pipeline_t* box_gpu_pipeline_request(
     p->hash = hash;
     p->cache = c;
     p->quiet = gpu->pipeline_quiet;
+    const char *shader = box_gpu_shader_label(gpu, render ? render->vertex.module
+        : compute->compute.module);
+    if (shader) {
+        p->shader = box_gpu_pipeline_dup(p, shader, ecs_os_strlen(shader) + 1);
+    }
+
     box_gpu_key_bytes(&p->key, ecs_vec_first(&c->scratch), ecs_vec_count(&c->scratch));
     p->next = ecs_map_get_deref(&c->entries, box_gpu_pipeline_t, hash);
     *ecs_map_ensure(&c->entries, hash) = (ecs_map_val_t)(uintptr_t)p;
