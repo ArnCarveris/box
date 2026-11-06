@@ -449,6 +449,32 @@ bool box_audio_write_modulator(
     return box_audio_write_bytes(writer, &c, (int32_t)sizeof(c));
 }
 
+bool box_audio_write_macro(
+    box_audio_writer_t *writer,
+    uint32_t macro,
+    float value,
+    uint64_t when)
+{
+    box_audio_cmd_macro_t cmd;
+    box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_MACRO, sizeof(cmd));
+    cmd.when_lo = (uint32_t)when;
+    cmd.when_hi = (uint32_t)(when >> 32);
+    cmd.macro = macro;
+    cmd.value = value;
+
+    return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
+}
+
+bool box_audio_write_macro_map(
+    box_audio_writer_t *writer,
+    const box_audio_cmd_macro_map_t *cmd)
+{
+    box_audio_cmd_macro_map_t c = *cmd;
+    box_audio_write_header(&c.header, BOX_AUDIO_CMD_MACRO_MAP, sizeof(c));
+
+    return box_audio_write_bytes(writer, &c, (int32_t)sizeof(c));
+}
+
 bool box_audio_write_synth(
     box_audio_writer_t *writer,
     uint32_t sound,

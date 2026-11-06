@@ -7,9 +7,9 @@
  * frame, so a synced source reads its phase at any frame: phase + fract(beat / sync). The
  * modulators update every BOX_AUDIO_MOD_CONTROL frames, at hard edges and after commands.
  *
- * An update computes the value of each modulator for the last frame before the next update and
- * ramps a bus to it, or gives an effect new params that its kind smooths. The render splits its
- * blocks at the updates, so the output does not depend on render sizes.
+ * An update computes the modulators, then the maps of the macros, for the last frame before
+ * the next update and ramps a bus to it, or gives an effect new params that its kind smooths.
+ * The render splits its blocks at the updates, so the output does not depend on render sizes.
  */
 
 #include "internal.h"
@@ -85,6 +85,73 @@ int32_t box_audio_core_modulators(
     while (on) {
         on &= on - 1;
         result ++;
+    }
+
+    return result;
+}
+
+int32_t box_audio_core_macro_maps(
+    const box_audio_core_t *core)
+{
+    return core ? core->mods.maps : 0;
+}
+
+float box_audio_macro_map_value(
+    float value,
+    float min,
+    float max,
+    float curve,
+    uint32_t scale)
+{
+    double x = value >= 0 ? (value <= 1 ? (double)value : 1.0) : 0.0, k, result;
+    float c = curve != curve ? 0.0f : (curve < -1 ? -1.0f : (curve > 1 ? 1.0f : curve));
+    k = (double)c * (double)BOX_AUDIO_MACRO_CURVE;
+    if (k > 1e-6 || k < -1e-6) {
+        x = (box_audio_synth_exp2(k * x) - 1.0) / (box_audio_synth_exp2(k) - 1.0);
+    }
+
+    if (scale == BOX_AUDIO_MOD_OCTAVES && min > 0 && max > 0) {
+        result = (double)min * box_audio_synth_exp2(x *
+            box_audio_synth_log2((double)max / (double)min));
+    } else {
+        result = (double)min + ((double)max - (double)min) * x;
+    }
+
+    return (float)result;
+}
+
+/** Get the index the modulators and the maps use for a parameter of a bus.
+ *
+ * @param param A box_audio_param_t of a bus: VOLUME, PAN, WIDTH, SEND or SEND_1..3
+ * @return The box_audio_mod_bus_param_t
+ */
+static uint32_t box_audio_mod_bus_param(
+    uint32_t param)
+{
+    return param == BOX_AUDIO_PARAM_VOLUME ? BOX_AUDIO_MOD_BUS_VOLUME :
+        (param == BOX_AUDIO_PARAM_PAN ? BOX_AUDIO_MOD_BUS_PAN :
+        (param == BOX_AUDIO_PARAM_WIDTH ? BOX_AUDIO_MOD_BUS_WIDTH :
+        (param == BOX_AUDIO_PARAM_SEND ? BOX_AUDIO_MOD_BUS_SEND :
+        BOX_AUDIO_MOD_BUS_SEND + 1 + (param - BOX_AUDIO_PARAM_SEND_1))));
+}
+
+/** Get the value a bus has for a parameter from its commands.
+ *
+ * @param b The bus
+ * @param bus_param A box_audio_mod_bus_param_t
+ * @return The value
+ */
+static float box_audio_mod_bus_value(
+    const box_audio_bus_t *b,
+    uint32_t bus_param)
+{
+    float result = b->volume;
+    if (bus_param == BOX_AUDIO_MOD_BUS_PAN) {
+        result = b->pan;
+    } else if (bus_param == BOX_AUDIO_MOD_BUS_WIDTH) {
+        result = b->width;
+    } else if (bus_param >= BOX_AUDIO_MOD_BUS_SEND && bus_param < BOX_AUDIO_MOD_BUS_PARAMS) {
+        result = b->send_level[bus_param - BOX_AUDIO_MOD_BUS_SEND];
     }
 
     return result;
@@ -371,11 +438,7 @@ static void box_audio_mod_start(
     m->cycles_at = core->clock;
     m->env = 0;
     if (cmd->target == BOX_AUDIO_MOD_TARGET_BUS) {
-        m->bus_param = cmd->param == BOX_AUDIO_PARAM_VOLUME ? BOX_AUDIO_MOD_BUS_VOLUME :
-            (cmd->param == BOX_AUDIO_PARAM_PAN ? BOX_AUDIO_MOD_BUS_PAN :
-            (cmd->param == BOX_AUDIO_PARAM_WIDTH ? BOX_AUDIO_MOD_BUS_WIDTH :
-            (cmd->param == BOX_AUDIO_PARAM_SEND ? BOX_AUDIO_MOD_BUS_SEND :
-            BOX_AUDIO_MOD_BUS_SEND + 1 + (cmd->param - BOX_AUDIO_PARAM_SEND_1))));
+        m->bus_param = box_audio_mod_bus_param(cmd->param);
     }
 
     box_audio_mod_follow_coefs(core, m);
@@ -422,6 +485,11 @@ static bool box_audio_mod_check(
             cmd->kind > BOX_AUDIO_EFFECT_NONE && cmd->kind < BOX_AUDIO_EFFECT_KINDS;
         out->scale = cmd->scale == BOX_AUDIO_MOD_OCTAVES ? BOX_AUDIO_MOD_OCTAVES :
             BOX_AUDIO_MOD_LINEAR;
+    } else if (cmd->target == BOX_AUDIO_MOD_TARGET_MACRO) {
+        result = cmd->index < BOX_AUDIO_MACRO_MAX;
+        out->param = 0;
+        out->kind = 0;
+        out->scale = BOX_AUDIO_MOD_LINEAR;
     } else {
         result = cmd->target == BOX_AUDIO_MOD_TARGET_NONE;
     }
@@ -507,6 +575,185 @@ done:
     return;
 }
 
+void box_audio_macro_command(
+    box_audio_core_t *core,
+    const box_audio_cmd_macro_t *cmd)
+{
+    if (cmd->macro >= BOX_AUDIO_MACRO_MAX) {
+        box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_MACRO, 0);
+        goto done;
+    }
+
+    core->mods.macro_value[cmd->macro] = box_audio_mod_clamp(cmd->value, 0, 1);
+    core->mods.dirty = true;
+done:
+    return;
+}
+
+/** Get the fade of a map at a frame.
+ *
+ * @param m The map
+ * @param frame The frame, at or after its fade_at
+ * @return The fade, 0..1
+ */
+static float box_audio_map_gain(
+    const box_audio_macro_map_t *m,
+    uint64_t frame)
+{
+    float g = m->gain0 + m->fade_dir * (float)(int64_t)(frame - m->fade_at);
+
+    return g < 0 ? 0.0f : (g > 1 ? 1.0f : g);
+}
+
+/** Get the value of the macro of a map, 0..1: the value of its commands plus what its
+ * modulators added at the last update, or the one it held when it was released.
+ *
+ * @param ms The modulators
+ * @param m The map
+ * @return The value
+ */
+static float box_audio_map_macro(
+    const box_audio_mods_t *ms,
+    const box_audio_macro_map_t *m)
+{
+    return m->held ? m->hold : box_audio_mod_clamp(ms->macro_value[m->cmd.macro] +
+        ms->macro_add[m->cmd.macro], 0, 1);
+}
+
+/** Start a map on its target: it fades in from 0 at the clock.
+ *
+ * @param core The core
+ * @param slot Slot of the map
+ * @param cmd Its settings, clamped
+ */
+static void box_audio_map_start(
+    box_audio_core_t *core,
+    uint32_t slot,
+    const box_audio_cmd_macro_map_t *cmd)
+{
+    box_audio_macro_map_t *m = &core->mods.map[slot];
+    float fade = BOX_AUDIO_MOD_FADE * core->sample_rate;
+    m->cmd = *cmd;
+    m->on = true;
+    m->pending = false;
+    m->held = false;
+    m->gain0 = 0;
+    m->fade_at = core->clock;
+    m->fade_dir = 1.0f / (fade > 1 ? fade : 1.0f);
+    m->bus_param = cmd->target == BOX_AUDIO_MOD_TARGET_BUS ?
+        box_audio_mod_bus_param(cmd->param) : 0;
+    core->mods.maps ++;
+}
+
+/** Fade a map out from where its fade stands, at the value its macro has now.
+ *
+ * @param core The core
+ * @param m The map
+ */
+static void box_audio_map_release(
+    box_audio_core_t *core,
+    box_audio_macro_map_t *m)
+{
+    float fade = BOX_AUDIO_MOD_FADE * core->sample_rate;
+    m->gain0 = box_audio_map_gain(m, core->clock);
+    m->fade_at = core->clock;
+    m->fade_dir = -1.0f / (fade > 1 ? fade : 1.0f);
+    if (!m->held) {
+        m->hold = box_audio_map_macro(&core->mods, m);
+        m->held = true;
+    }
+}
+
+/** Clamp the settings of a map command.
+ *
+ * @param cmd The command
+ * @param out Receives the clamped settings
+ * @return Whether the target is valid, NONE included
+ */
+static bool box_audio_map_check(
+    const box_audio_cmd_macro_map_t *cmd,
+    box_audio_cmd_macro_map_t *out)
+{
+    bool result = true;
+    *out = *cmd;
+    if (cmd->target == BOX_AUDIO_MOD_TARGET_BUS) {
+        result = cmd->index < BOX_AUDIO_BUS_MAX && (cmd->param == BOX_AUDIO_PARAM_VOLUME ||
+            cmd->param == BOX_AUDIO_PARAM_PAN || cmd->param == BOX_AUDIO_PARAM_WIDTH ||
+            cmd->param == BOX_AUDIO_PARAM_SEND || (cmd->param >= BOX_AUDIO_PARAM_SEND_1 &&
+            cmd->param <= BOX_AUDIO_PARAM_SEND_3));
+        out->kind = 0;
+        out->scale = BOX_AUDIO_MOD_LINEAR;
+    } else if (cmd->target == BOX_AUDIO_MOD_TARGET_EFFECT) {
+        result = cmd->index < BOX_AUDIO_EFFECT_MAX && cmd->param < BOX_AUDIO_EFFECT_PARAMS &&
+            cmd->kind > BOX_AUDIO_EFFECT_NONE && cmd->kind < BOX_AUDIO_EFFECT_KINDS;
+        out->scale = cmd->scale == BOX_AUDIO_MOD_OCTAVES ? BOX_AUDIO_MOD_OCTAVES :
+            BOX_AUDIO_MOD_LINEAR;
+    } else {
+        result = cmd->target == BOX_AUDIO_MOD_TARGET_NONE;
+    }
+
+    result = result && (cmd->target == BOX_AUDIO_MOD_TARGET_NONE ||
+        cmd->macro < BOX_AUDIO_MACRO_MAX);
+    out->macro = cmd->macro < BOX_AUDIO_MACRO_MAX ? cmd->macro : 0;
+    out->min = cmd->min == cmd->min ? box_audio_mod_clamp(cmd->min, -BOX_AUDIO_MOD_DEPTH_MAX,
+        BOX_AUDIO_MOD_DEPTH_MAX) : 0.0f;
+    out->max = cmd->max == cmd->max ? box_audio_mod_clamp(cmd->max, -BOX_AUDIO_MOD_DEPTH_MAX,
+        BOX_AUDIO_MOD_DEPTH_MAX) : 0.0f;
+    out->curve = cmd->curve == cmd->curve ? box_audio_mod_clamp(cmd->curve, -1, 1) : 0.0f;
+
+    return result;
+}
+
+void box_audio_macro_map_command(
+    box_audio_core_t *core,
+    const box_audio_cmd_macro_map_t *cmd)
+{
+    box_audio_cmd_macro_map_t c;
+    box_audio_macro_map_t *m;
+    float fade;
+    bool same;
+    if (cmd->slot >= BOX_AUDIO_MACRO_MAP_MAX || !box_audio_map_check(cmd, &c)) {
+        box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_MACRO_MAP, 0);
+        goto done;
+    }
+
+    m = &core->mods.map[cmd->slot];
+    if (!m->on) {
+        if (c.target != BOX_AUDIO_MOD_TARGET_NONE) {
+            box_audio_map_start(core, cmd->slot, &c);
+        }
+    } else if (c.target == BOX_AUDIO_MOD_TARGET_NONE) {
+        m->pending = false;
+        if (m->fade_dir > 0) {
+            box_audio_map_release(core, m);
+        }
+    } else {
+        same = c.target == m->cmd.target && c.index == m->cmd.index &&
+            c.param == m->cmd.param && c.kind == m->cmd.kind && c.macro == m->cmd.macro;
+        if (same) {
+            m->cmd = c;
+            m->pending = false;
+            if (m->fade_dir < 0) {
+                fade = BOX_AUDIO_MOD_FADE * core->sample_rate;
+                m->gain0 = box_audio_map_gain(m, core->clock);
+                m->fade_at = core->clock;
+                m->fade_dir = 1.0f / (fade > 1 ? fade : 1.0f);
+                m->held = false;
+            }
+        } else {
+            m->next = c;
+            m->pending = true;
+            if (m->fade_dir > 0) {
+                box_audio_map_release(core, m);
+            }
+        }
+    }
+
+    core->mods.dirty = true;
+done:
+    return;
+}
+
 /** Retire the modulators that faded out: a pending one starts on its new target, another
  * frees its slot.
  *
@@ -537,11 +784,44 @@ static void box_audio_mods_retire(
     if (changed) {
         box_audio_mods_keys(core);
     }
+
+    for (i = 0; i < BOX_AUDIO_MACRO_MAP_MAX && ms->maps; i ++) {
+        box_audio_macro_map_t *m = &ms->map[i];
+        box_audio_cmd_macro_map_t map;
+        if (!m->on || m->fade_dir >= 0 || box_audio_map_gain(m, core->clock) > 0) {
+            continue;
+        }
+
+        m->on = false;
+        ms->maps --;
+        if (m->pending) {
+            map = m->next;
+            box_audio_map_start(core, i, &map);
+        }
+    }
 }
 
-/** Update the modulators at the clock: find the frame of the next update, sum what they add to
- * each parameter at the frame before it, and ramp the buses and set the effects to it. A bus
- * or an effect no modulator moves any more gets its own values again.
+/** Clear what the modulators and the maps add to the parameters of an effect slot, the first
+ * time an update moves it.
+ *
+ * @param ms The modulators
+ * @param slot Slot of the effect
+ */
+static void box_audio_mods_effect_clear(
+    box_audio_mods_t *ms,
+    int32_t slot)
+{
+    int32_t j;
+    for (j = 0; j < BOX_AUDIO_EFFECT_PARAMS; j ++) {
+        ms->fx_add[slot][j] = 0;
+        ms->fx_octaves[slot][j] = 0;
+        ms->fx_macro[slot][j] = 0;
+    }
+}
+
+/** Update the modulators at the clock: sum what they add to each parameter and macro at the
+ * frame before the next update, shape the macros into their maps, and ramp the buses and set
+ * the effects to it. A bus or an effect nothing moves any more gets its own values again.
  *
  * @param core The core
  */
@@ -549,10 +829,15 @@ static void box_audio_mods_update(
     box_audio_core_t *core)
 {
     box_audio_mods_t *ms = &core->mods;
-    uint64_t t0 = core->clock, t1, e = UINT64_MAX, f, buses = 0, effects = 0, mask, bit;
-    int32_t i, j, frames;
+    uint64_t t0 = core->clock, t1, e = UINT64_MAX, f, buses = 0, effects = 0, macro_buses = 0;
+    uint64_t mask, bit;
+    int32_t i, j, frames, ramp;
     bool edge = t0 >= ms->edge;
     box_audio_mods_retire(core);
+    for (i = 0; i < BOX_AUDIO_MACRO_MAX; i ++) {
+        ms->macro_add[i] = 0;
+    }
+
     t1 = ((t0 + (edge ? BOX_AUDIO_MOD_EDGE : 0)) / BOX_AUDIO_MOD_CONTROL + 1) *
         BOX_AUDIO_MOD_CONTROL;
     for (i = 0; i < BOX_AUDIO_MOD_MAX; i ++) {
@@ -573,7 +858,9 @@ static void box_audio_mods_update(
         }
 
         a = box_audio_mod_gain(m, f) * c->depth * box_audio_mod_value(core, m, f);
-        if (c->target == BOX_AUDIO_MOD_TARGET_BUS) {
+        if (c->target == BOX_AUDIO_MOD_TARGET_MACRO) {
+            ms->macro_add[c->index] += a;
+        } else if (c->target == BOX_AUDIO_MOD_TARGET_BUS) {
             bit = (uint64_t)1 << c->index;
             if (!(buses & bit)) {
                 for (j = 0; j < BOX_AUDIO_MOD_BUS_PARAMS; j ++) {
@@ -586,10 +873,7 @@ static void box_audio_mods_update(
         } else if (core->effects[c->index].target_kind == c->kind) {
             bit = (uint64_t)1 << c->index;
             if (!(effects & bit)) {
-                for (j = 0; j < BOX_AUDIO_EFFECT_PARAMS; j ++) {
-                    ms->fx_add[c->index][j] = 0;
-                    ms->fx_octaves[c->index][j] = 0;
-                }
+                box_audio_mods_effect_clear(ms, (int32_t)c->index);
             }
 
             effects |= bit;
@@ -601,13 +885,49 @@ static void box_audio_mods_update(
         }
     }
 
+    for (i = 0; i < BOX_AUDIO_MACRO_MAP_MAX && ms->maps; i ++) {
+        const box_audio_macro_map_t *m = &ms->map[i];
+        const box_audio_cmd_macro_map_t *c = &m->cmd;
+        float g, value;
+        if (!m->on) {
+            continue;
+        }
+
+        g = box_audio_map_gain(m, f);
+        value = box_audio_macro_map_value(box_audio_map_macro(ms, m), c->min, c->max, c->curve,
+            c->scale);
+        if (c->target == BOX_AUDIO_MOD_TARGET_BUS) {
+            bit = (uint64_t)1 << c->index;
+            if (!(buses & bit)) {
+                for (j = 0; j < BOX_AUDIO_MOD_BUS_PARAMS; j ++) {
+                    ms->bus_add[c->index][j] = 0;
+                }
+            }
+
+            buses |= bit;
+            macro_buses |= bit;
+            ms->bus_add[c->index][m->bus_param] += g *
+                (value - box_audio_mod_bus_value(&core->buses[c->index], m->bus_param));
+        } else if (core->effects[c->index].target_kind == c->kind) {
+            bit = (uint64_t)1 << c->index;
+            if (!(effects & bit)) {
+                box_audio_mods_effect_clear(ms, (int32_t)c->index);
+            }
+
+            effects |= bit;
+            ms->fx_macro[c->index][c->param] += g *
+                (value - core->effects[c->index].base[c->param]);
+        }
+    }
+
     frames = (int32_t)(t1 - t0);
     mask = buses | ms->buses;
     for (i = 0; mask >> i; i ++) {
         bit = (uint64_t)1 << i;
+        ramp = (macro_buses & bit) && core->ramp_frames > frames ? core->ramp_frames : frames;
         if (mask & bit) {
             box_audio_bus_gains_to(core, &core->buses[i], (buses & bit) ? ms->bus_add[i] : NULL,
-                frames);
+                ramp);
         }
     }
 
@@ -622,6 +942,7 @@ static void box_audio_mods_update(
         for (j = 0; j < BOX_AUDIO_EFFECT_PARAMS; j ++) {
             float p = fx->base[j], oct;
             if (effects & bit) {
+                p += ms->fx_macro[i][j];
                 oct = box_audio_mod_clamp(ms->fx_octaves[i][j], -BOX_AUDIO_MOD_OCTAVES_MAX,
                     BOX_AUDIO_MOD_OCTAVES_MAX);
                 if (oct != 0 && p > 0) {
@@ -639,6 +960,7 @@ static void box_audio_mods_update(
 
     ms->buses = buses;
     ms->effects = effects;
+    ms->macro_buses = macro_buses;
     ms->next = t1;
     ms->edge = e;
     ms->dirty = false;
@@ -653,7 +975,9 @@ int32_t box_audio_mods_block(
         box_audio_mods_update(core);
     }
 
-    if ((ms->on || ms->buses || ms->effects) && ms->next - core->clock < (uint64_t)frames) {
+    if ((ms->on || ms->maps || ms->buses || ms->effects) &&
+        ms->next - core->clock < (uint64_t)frames)
+    {
         frames = (int32_t)(ms->next - core->clock);
     }
 
@@ -695,7 +1019,7 @@ void box_audio_mods_changed(
     int32_t bus)
 {
     box_audio_mods_t *ms = &core->mods;
-    if (ms->on || (effect >= 0 && ((ms->effects >> effect) & 1)) ||
+    if (ms->on || ms->maps || (effect >= 0 && ((ms->effects >> effect) & 1)) ||
         (bus >= 0 && ((ms->buses >> bus) & 1)))
     {
         ms->dirty = true;

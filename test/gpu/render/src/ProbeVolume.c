@@ -20,7 +20,7 @@ void ProbeVolume_probe_count_of_layout(void) {
 
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
-    ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1});
+    ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1, .compute = true});
     ecs_entity_t box = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, box, Position, {0, 0, 0});
     ecs_set(world, box, Box, {4, 2, 2});
@@ -37,7 +37,7 @@ void ProbeVolume_probe_count_of_layout(void) {
     test_flt(probe.position[1], -1);
     test_flt(probe.position[2], -1);
 
-    ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0});
+    ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0, .compute = true});
     ecs_progress(world, 0);
     test_int(ecs_get(world, scene, LightBakeStatus)->probes, 4 * 2 * 2);
     test_assert(box_render_bake_probe(world, scene, corner, &probe));
@@ -53,7 +53,7 @@ void ProbeVolume_no_static_shapes_no_probes(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 1});
+    ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 1, .compute = true});
     ecs_entity_t mover = ecs_new(world);
     ecs_add(world, mover, DynamicTransform);
     ecs_set(world, mover, Position, {0, 0, 0});
@@ -85,7 +85,7 @@ void ProbeVolume_invalid_inside_box(void) {
 
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
-    ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 1});
+    ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 1, .compute = true});
     ecs_entity_t box = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, box, Position, {0, 0, 0});
     ecs_set(world, box, Box, {3, 3, 3});
@@ -130,7 +130,7 @@ void ProbeVolume_invalid_inside_rotated_box(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0});
+    ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0, .compute = true});
     ecs_entity_t wall = ecs_new(world);
     ecs_set(world, wall, Position, {0, 0, 0});
     ecs_set(world, wall, Rotation, {0, (float)GLM_PI_4, 0});
@@ -160,7 +160,7 @@ void ProbeVolume_valid_outside_sphere_inside_bounds(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0});
+    ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0, .compute = true});
     ecs_entity_t ball = ecs_new(world);
     ecs_set(world, ball, Position, {0, 0, 0});
     ecs_set(world, ball, Sphere, {.segments = 24, .radius = 2});
@@ -199,7 +199,8 @@ void ProbeVolume_valid_inside_torus_hole(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_singleton_set(world, LightBake, {.probe_spacing = 0.5f, .bounds_padding = 0});
+    ecs_singleton_set(world, LightBake, {.probe_spacing = 0.5f, .bounds_padding = 0,
+        .compute = true});
     ecs_entity_t ring = ecs_new(world);
     ecs_set(world, ring, Position, {0, 0, 0});
     ecs_set(world, ring, Torus, {.segments = 24, .rings = 12, .radius = 2, .tube = 0.5f});
@@ -235,7 +236,7 @@ void ProbeVolume_grid_follows_static_bounds(void) {
 
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
-    ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0});
+    ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0, .compute = true});
     ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, a, Position, {0, 0, 0});
     ecs_set(world, a, Box, {2, 2, 2});
@@ -283,7 +284,8 @@ void ProbeVolume_unbaked_view_renders_identically(void) {
         ecs_entity_t scene = ecs_new(world);
         ecs_add(world, scene, Scene);
         if (i == 1) {
-            ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 1});
+            ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 1,
+                .compute = true});
         }
 
         ecs_set(world, scene, AmbientLight, {.sky = {120, 160, 255}, .ground = {200, 90, 40},
@@ -342,7 +344,8 @@ void ProbeVolume_ambient_probes_match_hemisphere(void) {
         ecs_singleton_modified(world, App);
 
         if (i == 1) {
-            ecs_singleton_set(world, LightBake, {.probe_spacing = 0.75f, .bounds_padding = 1});
+            ecs_singleton_set(world, LightBake, {.probe_spacing = 0.75f, .bounds_padding = 1,
+                .compute = true});
         }
 
         ecs_singleton_set(world, AmbientLight, {.sky = {120, 160, 255},
@@ -407,7 +410,7 @@ void ProbeVolume_open_air_probes_invalid(void) {
 
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
-    ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 0});
+    ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 0, .compute = true});
     ecs_entity_t floor = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, floor, Position, {0, 0, 0});
     ecs_set(world, floor, Box, {20, 1, 20});
@@ -443,7 +446,7 @@ void ProbeVolume_probes_around_shape_follow_it(void) {
 
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
-    ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 0});
+    ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 0, .compute = true});
     ecs_entity_t floor = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, floor, Position, {0, 0, 0});
     ecs_set(world, floor, Box, {20, 1, 20});
@@ -481,7 +484,7 @@ void ProbeVolume_probes_around_moved_shape_follow_it(void) {
 
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
-    ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 0});
+    ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 0, .compute = true});
     ecs_entity_t floor = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, floor, Position, {0, 0, 0});
     ecs_set(world, floor, Box, {20, 1, 20});

@@ -5,7 +5,8 @@
  * BOX_AUDIO_AUTOMATION_STEP seconds of frames and at their keys, and schedule each value at
  * its frame: a BUS_SET for a parameter of a bus, an EFFECT_PARAMS for an effect, whose
  * parameters are built from a copy of its component with the automated members written
- * through a meta cursor.
+ * through a meta cursor, a MACRO for the value of a macro, which the core shapes into its
+ * maps at that frame.
  *
  * The automation never writes a component. A target no lane covers gets the value of its
  * component once, when its last lane ends or the transport stops.
@@ -196,7 +197,15 @@ char* box_audio_target_resolve(
 
     name = ecs_get_path(world, target);
     component = ecs_get_path(world, component_id);
-    if (component_id == ecs_id(AudioBus)) {
+    if (component_id == ecs_id(AudioMacro)) {
+        out->kind = BOX_AUDIO_TARGET_MACRO;
+        if (!ecs_has(world, target, AudioMacro)) {
+            result = flecs_asprintf("the target '%s' has no AudioMacro", name);
+        } else if (!member || strcmp(member, "value")) {
+            result = flecs_asprintf("member '%s' of AudioMacro does not move, only value does",
+                member ? member : "");
+        }
+    } else if (component_id == ecs_id(AudioBus)) {
         out->kind = BOX_AUDIO_TARGET_BUS;
         if (target != state->master && !ecs_has(world, target, AudioBus)) {
             result = flecs_asprintf("the target '%s' has no AudioBus", name);
@@ -539,6 +548,7 @@ static void box_audio_target_send(
     const AudioSettings *settings;
     const EcsComponent *c;
     const AutomationClip *ac;
+    const AudioMacro *macro;
     ecs_meta_cursor_t cur;
     const void *ptr;
     uint32_t target = 0, kind = 0;
@@ -550,7 +560,37 @@ static void box_audio_target_send(
         goto done;
     }
 
-    if (t->kind == BOX_AUDIO_TARGET_BUS) {
+    if (t->kind == BOX_AUDIO_TARGET_MACRO) {
+        slot = box_audio_macro_slot(world, t->entity);
+        macro = ecs_get(world, t->entity, AudioMacro);
+        if (slot < 0 || !macro) {
+            goto done;
+        }
+
+        value = macro->value;
+        for (i = 0; lanes && i < ecs_vec_count(&a->lanes); i ++) {
+            if (l[i].target == index && box_audio_lane_at(&l[i], beat, &local)) {
+                value = box_audio_lane_value(world, &l[i], local, value);
+                covered = true;
+            }
+        }
+
+        if (!covered && t->held && t->serial == state->serial) {
+            goto done;
+        }
+
+        if (!box_audio_reserve(state)) {
+            goto done;
+        }
+
+        target = (uint32_t)slot;
+        box_audio_write_macro(&state->writer, target, value, when);
+        if (covered) {
+            a->stats.macro_sets ++;
+        } else {
+            a->stats.restores ++;
+        }
+    } else if (t->kind == BOX_AUDIO_TARGET_BUS) {
         target = t->entity == state->master ? 0 :
             box_audio_bus_of(world, state, t->entity);
         if (!target && t->entity != state->master) {
@@ -659,7 +699,8 @@ static void box_audio_target_cancel(
     {
         if (box_audio_reserve(state)) {
             box_audio_write_cancel(&state->writer, t->kind == BOX_AUDIO_TARGET_BUS ?
-                BOX_AUDIO_CMD_BUS_SET : BOX_AUDIO_CMD_EFFECT_PARAMS, t->index, t->param);
+                BOX_AUDIO_CMD_BUS_SET : (t->kind == BOX_AUDIO_TARGET_MACRO ?
+                BOX_AUDIO_CMD_MACRO : BOX_AUDIO_CMD_EFFECT_PARAMS), t->index, t->param);
             state->automation.stats.cancels ++;
         }
 
@@ -1073,8 +1114,9 @@ void box_audio_automation_init(
         .window = box_audio_automation_window,
         .reset = box_audio_automation_reset
     };
-    ecs_entity_t components[BOX_AUDIO_EFFECT_COMPONENTS + 1] = { ecs_id(AudioBus) };
-    int32_t i, count = 1 + box_audio_module_effect_components(components + 1);
+    ecs_entity_t components[BOX_AUDIO_EFFECT_COMPONENTS + 2] = { ecs_id(AudioBus),
+        ecs_id(AudioMacro) };
+    int32_t i, count = 2 + box_audio_module_effect_components(components + 2);
     ecs_vec_init_t(NULL, &a->lanes, box_audio_lane_t, 0);
     ecs_vec_init_t(NULL, &a->targets, box_audio_target_t, 0);
     ecs_vec_init_t(NULL, &a->past, box_audio_segment_t, 0);

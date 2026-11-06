@@ -78,7 +78,8 @@
                     "pan_step",
                     "mute_step",
                     "send_step",
-                    "restart_midway"
+                    "restart_midway",
+                    "cutoff_step"
                 ]
             },
             {
@@ -410,6 +411,30 @@
                 ]
             },
             {
+                "id": "Macros",
+                "testcases": [
+                    "curve",
+                    "value",
+                    "automation",
+                    "modulator",
+                    "inverted",
+                    "remove_no_click",
+                    "two_maps",
+                    "limits",
+                    "errors",
+                    "command",
+                    "deterministic"
+                ]
+            },
+            {
+                "id": "MacroCore",
+                "testcases": [
+                    "value",
+                    "scheduled",
+                    "render_sizes"
+                ]
+            },
+            {
                 "id": "Song",
                 "testcases": [
                     "first_sound",
@@ -433,9 +458,12 @@
                     "delay",
                     "modulation",
                     "pitch_shifter",
+                    "beat_repeat",
                     "saturator",
                     "transient_shaper",
+                    "vocoder",
                     "frequency_shifter",
+                    "rotary",
                     "synth_sub",
                     "synth_sync",
                     "synth_drive",
@@ -444,7 +472,9 @@
                     "expression",
                     "synth_comb",
                     "synth_routes",
-                    "modulators"
+                    "modulators",
+                    "macros",
+                    "pattern_gate"
                 ]
             },
             {
@@ -683,6 +713,7 @@
                     "level_change",
                     "play_function",
                     "spatial_scene",
+                    "spatial_cutoff_scene",
                     "reverb_hall",
                     "eq_filter"
                 ]
@@ -723,6 +754,25 @@
                 ]
             },
             {
+                "id": "PatternGate",
+                "testcases": [
+                    "pattern",
+                    "edges",
+                    "accent",
+                    "seek",
+                    "loop_wrap",
+                    "swing",
+                    "floor_dips",
+                    "automate_step",
+                    "no_click",
+                    "reduction",
+                    "rest",
+                    "render_sizes",
+                    "component",
+                    "script"
+                ]
+            },
+            {
                 "id": "PitchShifter",
                 "testcases": [
                     "octave_up",
@@ -754,6 +804,22 @@
                     "silent_after_tail",
                     "render_identical",
                     "components",
+                    "script"
+                ]
+            },
+            {
+                "id": "Rotary",
+                "testcases": [
+                    "horn_rate",
+                    "drum_rate",
+                    "acceleration_horn",
+                    "acceleration_drum",
+                    "stereo_phase",
+                    "mix_dry",
+                    "silent_after_tail",
+                    "idle_no_click",
+                    "render_identical",
+                    "component",
                     "script"
                 ]
             },
@@ -845,6 +911,22 @@
                 ]
             },
             {
+                "id": "Vocoder",
+                "testcases": [
+                    "sine_band",
+                    "level",
+                    "silent_modulator",
+                    "bursts",
+                    "band_count",
+                    "render_sizes",
+                    "no_key_passes",
+                    "component",
+                    "missing_modulator",
+                    "cyclic_modulator",
+                    "script"
+                ]
+            },
+            {
                 "id": "Saturator",
                 "testcases": [
                     "harmonics",
@@ -869,6 +951,37 @@
                     "mode_render_sizes",
                     "mode_silent_after_tail",
                     "mode_reduction"
+                ]
+            },
+            {
+                "id": "BeatRepeat",
+                "testcases": [
+                    "repeats_slice",
+                    "grid_at_once",
+                    "waits_for_grid",
+                    "tempo",
+                    "reverse",
+                    "pitch_down",
+                    "decay",
+                    "gate",
+                    "mix",
+                    "no_click",
+                    "render_sizes",
+                    "component",
+                    "script",
+                    "automation"
+                ]
+            },
+            {
+                "id": "TapeStop",
+                "testcases": [
+                    "halves_frequency",
+                    "silent_after_stop",
+                    "restart",
+                    "curve",
+                    "no_click",
+                    "render_sizes",
+                    "component"
                 ]
             },
             {
@@ -1162,7 +1275,43 @@
                     "teleport_no_click",
                     "disabled_silent",
                     "core_position",
-                    "cost_changed_only"
+                    "cost_changed_only",
+                    "cutoff_curve",
+                    "cutoff_zero_unchanged",
+                    "cutoff_moving_no_click",
+                    "cutoff_teleport_no_click",
+                    "cutoff_play_at",
+                    "cutoff_stereo",
+                    "cutoff_synth",
+                    "cutoff_extreme_values",
+                    "cutoff_first_frame"
+                ]
+            },
+            {
+                "id": "Emitter",
+                "testcases": [
+                    "interval_range",
+                    "first_play_delayed",
+                    "sub_frame_interval",
+                    "shape_point",
+                    "shape_disc",
+                    "shape_sphere",
+                    "shape_hemisphere",
+                    "shape_box",
+                    "shape_transform",
+                    "shape_degenerate",
+                    "volume_pitch_ranges",
+                    "deterministic",
+                    "out_of_range_skipped",
+                    "max_active",
+                    "playing_false",
+                    "disable_delete",
+                    "sound_not_ready",
+                    "output_override",
+                    "invalid_values",
+                    "nonspatial",
+                    "script",
+                    "audio_command"
                 ]
             }
         ]

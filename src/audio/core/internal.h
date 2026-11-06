@@ -113,6 +113,34 @@ static inline float box_audio_ramp_next(
     return ramp->value;
 }
 
+/** Read a delay line of an effect frames back from its write position, with linear
+ * interpolation; frames older than the ones written since the line was silent read as silence,
+ * so its memory needs no clearing. Shared by the chorus and the rotary.
+ *
+ * @param line The line
+ * @param length Frames of the line
+ * @param pos Frame the next input is written to
+ * @param valid Frames written since the line was silent
+ * @param back Frames back, 1..length - 2
+ * @return The sample
+ */
+static inline float box_audio_line_read(
+    const float *line,
+    int32_t length,
+    int32_t pos,
+    int32_t valid,
+    double back)
+{
+    int32_t whole = (int32_t)back, i0 = pos - whole, i1 = i0 - 1;
+    float frac = (float)(back - (double)whole), a, b;
+    i0 += i0 < 0 ? length : 0;
+    i1 += i1 < 0 ? length : 0;
+    a = whole <= valid ? line[i0] : 0.0f;
+    b = whole < valid ? line[i1] : 0.0f;
+
+    return a + frac * (b - a);
+}
+
 /** Input under this magnitude counts as silence for the effects with a tail */
 #define BOX_AUDIO_EFFECT_FLOOR 1e-9f
 
@@ -377,6 +405,40 @@ typedef struct box_audio_transient_shaper_t {
     box_audio_ramp_t sustain; /**< Sustain */
 } box_audio_transient_shaper_t;
 
+/** A band of a vocoder on the memory of its slot, floats only: the two cascaded state
+ * variable bandpasses of the modulator and the carrier per channel, the envelope of the
+ * modulator per channel and the coefficients of both */
+typedef struct box_audio_vocoder_band_t {
+    float mod[2][4];          /**< States ic1 and ic2 of each modulator stage per channel */
+    float car[2][4];          /**< States ic1 and ic2 of each carrier stage per channel */
+    float env[2];             /**< Envelope of the modulator band per channel */
+    float mod_c[4];           /**< a1, a2, a3 and k of the modulator stages */
+    float car_c[4];           /**< a1, a2, a3 and k of the carrier stages */
+    float gain;               /**< Gain of the band: the normalization of its envelope and of
+                               * the sum */
+    float pad[3];             /**< Fills the band to 32 floats */
+} box_audio_vocoder_band_t;
+
+/** A vocoder: BOX_AUDIO_VOCODER_BANDS_MAX bands on the memory of its slot, the noise of its
+ * unvoiced carrier and the ramps of its parameters */
+typedef struct box_audio_vocoder_t {
+    box_audio_vocoder_params_t target; /**< Parameters of the last command, clamped */
+    box_audio_vocoder_band_t *band; /**< The bands in memory */
+    int32_t bands;            /**< Bands that run */
+    int32_t unvoiced_from;    /**< First band whose carrier takes the noise */
+    uint32_t rng;             /**< State of the noise, xorshift32, never 0 */
+    float attack;             /**< Share of the distance an envelope moves per frame up */
+    float release;            /**< Share of the distance an envelope moves per frame down */
+    int32_t control;          /**< Frames until the next update of the coefficients */
+    bool swap;                /**< Waits for the fade to reach 0 to apply the bands */
+    box_audio_ramp_t low;     /**< log2 of the low band, per control block */
+    box_audio_ramp_t high;    /**< log2 of the high band, per control block */
+    box_audio_ramp_t q;       /**< Sharpness, per control block */
+    box_audio_ramp_t shift;   /**< Shift, per control block */
+    box_audio_ramp_t unvoiced; /**< Level of the noise */
+    box_audio_ramp_t mix;     /**< Wet level */
+    box_audio_ramp_t fade;    /**< Fade of the wet signal around a change of the bands */
+} box_audio_vocoder_t;
 /** Sections of the Hilbert transformer of a frequency shifter in each of its two paths */
 #define BOX_AUDIO_FREQUENCY_SHIFTER_SECTIONS (BOX_AUDIO_FREQUENCY_SHIFTER_ALLPASSES / 2)
 
@@ -418,6 +480,145 @@ typedef struct box_audio_pitch_shifter_t {
     box_audio_ramp_t feed;    /**< Fade in of the input after a move */
 } box_audio_pitch_shifter_t;
 
+/** A pattern gate: the openness that follows the steps of its pattern on the beat clock,
+ * and its floor and mix */
+typedef struct box_audio_pattern_gate_t {
+    box_audio_pattern_gate_params_t target; /**< Parameters of the last command, clamped */
+    int32_t length;           /**< Steps that play */
+    double rate;              /**< Beats per step */
+    double swing;             /**< Swing */
+    float up;                 /**< Openness the gain gains per frame on the way up */
+    float down;               /**< Openness the gain loses per frame on the way down */
+    float open;               /**< Openness that runs, 0..1 */
+    box_audio_ramp_t floor;   /**< Linear gain when closed */
+    box_audio_ramp_t mix;     /**< Wet level */
+} box_audio_pattern_gate_t;
+
+/** A virtual mic of a rotor of a rotary: where it reads the line of the rotor, its gain and
+ * how dull its tone is, each moved linearly from control block to control block */
+typedef struct box_audio_rotary_mic_t {
+    double tap;               /**< Frames back of the read in this frame */
+    double tap_slope;         /**< Change of the read per frame */
+    double tap_next;          /**< Frames back of the read at the next control block */
+    float gain;               /**< Gain in this frame */
+    float gain_slope;         /**< Change of the gain per frame */
+    float gain_next;          /**< Gain at the next control block */
+    float dull;               /**< Share of the lowpass in this frame */
+    float dull_slope;         /**< Change of the share per frame */
+    float dull_next;          /**< Share at the next control block */
+    float lp;                 /**< State of the lowpass */
+} box_audio_rotary_mic_t;
+
+/** A rotor of a rotary: its phase and its rate, which moves to its target with inertia */
+typedef struct box_audio_rotary_rotor_t {
+    double phase;             /**< Turns at the next control block, 0..1 */
+    double rate;              /**< Hz it turns at */
+    double target;            /**< Hz it moves to */
+    double coef;              /**< Share of the way to the target it moves per control block */
+} box_audio_rotary_rotor_t;
+
+/** A rotary: a tube preamp, a crossover, and a drum and a horn, each a line on the memory of
+ * its effect slot that two mics read */
+typedef struct box_audio_rotary_t {
+    box_audio_rotary_params_t target; /**< Parameters of the last command, clamped */
+    float *line[2];           /**< The lines of the drum and the horn in memory */
+    int32_t length;           /**< Frames of each line */
+    int32_t pos;              /**< Frame the next input is written to */
+    int32_t valid;            /**< Frames written since the lines were last silent */
+    box_audio_rotary_rotor_t rotor[2]; /**< The drum and the horn */
+    box_audio_rotary_mic_t mic[2][2]; /**< The left and the right mic of each rotor */
+    float center[2];          /**< Frames back of the read of each rotor at the middle */
+    float depth[2];           /**< Frames the read of each rotor moves either way */
+    float tone[2];            /**< Coefficient of the lowpass of the mics of each rotor */
+    box_audio_svf_t low[2];   /**< Lowpass stages of the crossover */
+    box_audio_svf_t high[2];  /**< Highpass stages of the crossover */
+    box_audio_oversample_t os; /**< Oversampler of the preamp */
+    box_audio_dc_t dc;        /**< DC blocker after the clipper */
+    float dc_coef;            /**< Pole of the DC blocker */
+    float dry[16];            /**< Input of the preamp, a ring as late as its oversampler */
+    uint32_t dry_pos;         /**< Write position of the dry ring */
+    box_audio_saturate_curve_t curve; /**< Clipper at the drive of curve_at */
+    float curve_at;           /**< Drive the curve is for */
+    int32_t control;          /**< Frames until the next control block */
+    bool stale;               /**< Skipped blocks left the mics behind the rotors */
+    box_audio_ramp_t drive;   /**< Drive */
+    box_audio_ramp_t spread;  /**< Spread, per control block */
+    box_audio_ramp_t drum;    /**< Gain of the drum from the balance */
+    box_audio_ramp_t horn;    /**< Gain of the horn from the balance */
+    box_audio_ramp_t mix;     /**< Wet level */
+    box_audio_ramp_t feed;    /**< Fade in of the input after a move */
+} box_audio_rotary_t;
+
+/** A repeat of a beat repeat: how it reads the slice */
+typedef struct box_audio_beat_repeat_pass_t {
+    double ratio;             /**< Frames of the slice per frame of output */
+    float gain;               /**< Gain, decay to the number of repeats before it */
+    float semitones;          /**< Pitch against the slice, the pitch of the repeats added up */
+    int32_t sound;            /**< Frames that sound, before the fade out */
+    bool reverse;             /**< Reads the slice from its end */
+    bool fade_in;             /**< Fades in from the repeat before over the fade */
+} box_audio_beat_repeat_pass_t;
+
+/** States of a beat repeat */
+typedef enum box_audio_beat_repeat_state_t {
+    BOX_AUDIO_BEAT_REPEAT_OFF = 0,     /**< Passes the input and records it, until an armed
+                                        *   capture starts */
+    BOX_AUDIO_BEAT_REPEAT_HOLD = 1,    /**< Captures and repeats the slice */
+    BOX_AUDIO_BEAT_REPEAT_RELEASE = 2  /**< Not active any more, crossfades to the input */
+} box_audio_beat_repeat_state_t;
+
+/** A beat repeat: a line per channel on the memory of its effect slot that records the input,
+ * frozen once the capture holds the slice and what its crossfades read past its ends, and the
+ * repeat that plays with the one before it, whose end crossfades */
+typedef struct box_audio_beat_repeat_t {
+    box_audio_beat_repeat_params_t target; /**< Parameters of the last command, clamped */
+    float *line[2];           /**< The lines of the left and the right channel in memory */
+    int32_t length;           /**< Frames of each line */
+    int32_t pos;              /**< Frame the next input is written to */
+    int32_t valid;            /**< Frames written in a row since the line last started to
+                               * record; older frames read as silence, so the memory needs no
+                               * clearing */
+    int32_t room;             /**< Frames the crossfades read past either end of a slice at
+                               * the fastest read */
+    int32_t state;            /**< A box_audio_beat_repeat_state_t */
+    bool on;                  /**< active was 0.5 or above at the last command */
+    bool armed;               /**< A capture waits for its frame */
+    bool frozen;              /**< The line stopped recording; it starts over when it records
+                               * again */
+    uint64_t begin;           /**< Frame of the core clock the armed capture starts at */
+    int32_t slice;            /**< Frames of the slice of the capture */
+    int32_t wait;             /**< Frames of the slice of the armed capture */
+    int32_t fade;             /**< Frames of the crossfades of the capture */
+    int32_t origin;           /**< Frame of the line the slice starts at */
+    int32_t before;           /**< Frames of the line before origin that hold input */
+    int32_t captured;         /**< Frames of the line from origin on that hold input */
+    int32_t at;               /**< Frames into the repeat that plays */
+    box_audio_beat_repeat_pass_t pass; /**< The repeat that plays */
+    box_audio_beat_repeat_pass_t last; /**< The repeat before it, whose end fades out over
+                               * the first frames of this one; its gain is 0 for none */
+    box_audio_ramp_t share;   /**< Share of the repeats in the output, 0 to pass the input */
+    box_audio_ramp_t mix;     /**< Wet level */
+} box_audio_beat_repeat_t;
+
+/** A tape stop: a line per channel on the memory of its effect slot, the phase of its ramp
+ * and the lag of its read behind the input */
+typedef struct box_audio_tape_stop_t {
+    box_audio_tape_stop_params_t target; /**< Parameters of the last command, clamped */
+    float *line[2];           /**< The lines of the left and the right channel in memory */
+    int32_t length;           /**< Frames of each line */
+    int32_t pos;              /**< Frame the next input is written to */
+    int32_t valid;            /**< Frames written since the start; older frames read as
+                               * silence */
+    double phase;             /**< Phase of the ramp, 0 at full speed, 1 at a stop */
+    double down;              /**< Phase per frame of a stop */
+    double up;                /**< Phase per frame of a start */
+    double power;             /**< Exponent of the phase in the speed, 4^curve */
+    double lag;               /**< Frames the read lags behind the last input */
+    double from;              /**< Lag of the read the crossfade leaves */
+    bool crossfade;           /**< Crossfades from the read at from to the one at lag */
+    box_audio_ramp_t xfade;   /**< Share of the read at lag in the crossfade */
+} box_audio_tape_stop_t;
+
 /** State of the kinds of effects */
 typedef union box_audio_effect_data_t {
     box_audio_reverb_t reverb;  /**< BOX_AUDIO_EFFECT_REVERB */
@@ -430,8 +631,13 @@ typedef union box_audio_effect_data_t {
     box_audio_chorus_t chorus;  /**< BOX_AUDIO_EFFECT_CHORUS */
     box_audio_saturator_t saturator; /**< BOX_AUDIO_EFFECT_SATURATOR */
     box_audio_transient_shaper_t transient_shaper; /**< BOX_AUDIO_EFFECT_TRANSIENT_SHAPER */
+    box_audio_vocoder_t vocoder; /**< BOX_AUDIO_EFFECT_VOCODER */
     box_audio_frequency_shifter_t frequency_shifter; /**< BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER */
     box_audio_pitch_shifter_t pitch_shifter; /**< BOX_AUDIO_EFFECT_PITCH_SHIFTER */
+    box_audio_pattern_gate_t pattern_gate; /**< BOX_AUDIO_EFFECT_PATTERN_GATE */
+    box_audio_rotary_t rotary;  /**< BOX_AUDIO_EFFECT_ROTARY */
+    box_audio_beat_repeat_t beat_repeat; /**< BOX_AUDIO_EFFECT_BEAT_REPEAT */
+    box_audio_tape_stop_t tape_stop; /**< BOX_AUDIO_EFFECT_TAPE_STOP */
 } box_audio_effect_data_t;
 
 /** An effect instance of the pool of the core: a kind in an insert slot of a bus, on the
@@ -918,6 +1124,14 @@ typedef struct box_audio_voice_t {
     box_audio_ramp_t pressure; /**< Pressure, BOX_AUDIO_PARAM_PRESSURE */
     bool expressive;          /**< Whether a ramp of its expression runs, which renders it in
                                * blocks of BOX_AUDIO_EXPRESS_FRAMES; false renders as before */
+    float cutoff;             /**< Cutoff of BOX_AUDIO_PARAM_CUTOFF in Hz, clamped, 0 open */
+    box_audio_ramp_t lowpass; /**< log2 of the g of the low-pass, tan(pi cutoff / rate) */
+    bool filtered;            /**< Whether the low-pass runs; false skips it */
+    bool fresh;               /**< Whether it has not rendered yet, so a cutoff applies at once */
+    bool prime;               /**< Whether the low-pass started on a playing voice and takes the
+                               * next input as its state */
+    box_audio_svf_t lp[2];    /**< Low-pass of the left and right channel, a mono source uses
+                               * the left */
     box_audio_source_t source; /**< What it plays */
 } box_audio_voice_t;
 
@@ -978,7 +1192,8 @@ typedef struct box_audio_synth_slot_t {
     box_audio_saturate_curve_t drive; /**< Clipper of the drive of the patch, when it has one */
 } box_audio_synth_slot_t;
 
-/** A command that takes effect on a frame: PLAY, STOP, VOICE_SET, BUS_SET, RELEASE or LEGATO */
+/** A command that takes effect on a frame: PLAY, STOP, VOICE_SET, BUS_SET, RELEASE, LEGATO,
+ * EFFECT_PARAMS, VOICE_RAMP, BEAT or MACRO */
 typedef union box_audio_timed_cmd_t {
     box_audio_cmd_header_t header;  /**< The header, first in each of them */
     box_audio_cmd_play_t play;      /**< BOX_AUDIO_CMD_PLAY */
@@ -989,6 +1204,7 @@ typedef union box_audio_timed_cmd_t {
     box_audio_cmd_effect_params_t effect; /**< BOX_AUDIO_CMD_EFFECT_PARAMS */
     box_audio_cmd_ramp_t ramp;      /**< BOX_AUDIO_CMD_VOICE_RAMP */
     box_audio_cmd_beat_t beat;      /**< BOX_AUDIO_CMD_BEAT */
+    box_audio_cmd_macro_t macro;    /**< BOX_AUDIO_CMD_MACRO */
 } box_audio_timed_cmd_t;
 
 /** A command that waits in the schedule for its frame */
@@ -1044,6 +1260,22 @@ typedef struct box_audio_mod_t {
     float env_fall;           /**< Share of the way to a quieter sample */
 } box_audio_mod_t;
 
+/** A map of a macro in the core */
+typedef struct box_audio_macro_map_t {
+    box_audio_cmd_macro_map_t cmd; /**< Its settings, clamped; target NONE for a free slot */
+    box_audio_cmd_macro_map_t next; /**< Settings it takes once it faded out of its target */
+    bool on;                  /**< It runs or fades out */
+    bool pending;             /**< next waits for the fade out */
+    bool held;                /**< It fades out at hold rather than at the value of its macro,
+                               * which another macro may take over */
+    float hold;               /**< Value of its macro when it was released, 0..1 */
+    uint32_t bus_param;       /**< box_audio_mod_bus_param_t of a bus target */
+    float gain0;              /**< Fade at fade_at, 0..1 */
+    float fade_dir;           /**< Change of the fade per frame: positive while it fades in,
+                               * negative while it fades out */
+    uint64_t fade_at;         /**< Frame of gain0 */
+} box_audio_macro_map_t;
+
 /** The modulators of a core and what they move */
 typedef struct box_audio_mods_t {
     box_audio_mod_t mod[BOX_AUDIO_MOD_MAX]; /**< Modulators by slot */
@@ -1060,6 +1292,17 @@ typedef struct box_audio_mods_t {
                                * parameter of each effect slot, linearly */
     float fx_octaves[BOX_AUDIO_EFFECT_MAX][BOX_AUDIO_EFFECT_PARAMS]; /**< Octaves they move each
                                * parameter of each effect slot by */
+    float fx_macro[BOX_AUDIO_EFFECT_MAX][BOX_AUDIO_EFFECT_PARAMS]; /**< What the maps of the
+                               * macros move each parameter of each effect slot by, from the
+                               * value of the commands to theirs */
+    float macro_value[BOX_AUDIO_MACRO_MAX]; /**< Value of each macro from the MACRO commands,
+                               * 0..1 */
+    float macro_add[BOX_AUDIO_MACRO_MAX]; /**< What the modulators added to each macro at the
+                               * last update */
+    box_audio_macro_map_t map[BOX_AUDIO_MACRO_MAP_MAX]; /**< Maps of the macros by slot */
+    int32_t maps;             /**< Maps that run or fade out */
+    uint64_t macro_buses;     /**< Buses a map moved at the last update, which ramp over at
+                               * least the ramp of a set */
 } box_audio_mods_t;
 
 /** The core */
@@ -1206,6 +1449,24 @@ void box_audio_beat_command(
 void box_audio_mod_command(
     box_audio_core_t *core,
     const box_audio_cmd_modulator_t *cmd);
+
+/** Apply a MACRO command.
+ *
+ * @param core The core
+ * @param cmd The command
+ */
+void box_audio_macro_command(
+    box_audio_core_t *core,
+    const box_audio_cmd_macro_t *cmd);
+
+/** Apply a MACRO_MAP command.
+ *
+ * @param core The core
+ * @param cmd The command
+ */
+void box_audio_macro_map_command(
+    box_audio_core_t *core,
+    const box_audio_cmd_macro_map_t *cmd);
 
 /** Update the modulators when an update is due and limit a block to the next update, so that
  * every update falls on the same frame whatever the render sizes.
@@ -1468,6 +1729,96 @@ void box_audio_pitch_shifter_rest(
     box_audio_effect_t *fx,
     int32_t frames);
 
+/** The rotary kind, in rotary.c: floats of its memory at a rate */
+int32_t box_audio_rotary_floats(
+    float sample_rate);
+
+/** The rotary kind: start on its memory */
+void box_audio_rotary_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The rotary kind: new parameters while it runs */
+void box_audio_rotary_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The rotary kind: process a block */
+bool box_audio_rotary_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The rotary kind: a block skipped while idle */
+void box_audio_rotary_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    int32_t frames);
+
+/** The beat repeat kind, in beat_repeat.c: floats of its memory at a rate */
+int32_t box_audio_beat_repeat_floats(
+    float sample_rate);
+
+/** The beat repeat kind: start on its memory */
+void box_audio_beat_repeat_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The beat repeat kind: new parameters while it runs */
+void box_audio_beat_repeat_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The beat repeat kind: process a block */
+bool box_audio_beat_repeat_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The beat repeat kind: a block skipped while idle */
+void box_audio_beat_repeat_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    int32_t frames);
+
+/** The tape stop kind, in tape_stop.c: floats of its memory at a rate */
+int32_t box_audio_tape_stop_floats(
+    float sample_rate);
+
+/** The tape stop kind: start on its memory */
+void box_audio_tape_stop_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The tape stop kind: new parameters while it runs */
+void box_audio_tape_stop_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The tape stop kind: process a block */
+bool box_audio_tape_stop_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The tape stop kind: a block skipped while idle */
+void box_audio_tape_stop_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    int32_t frames);
+
 /** The equalizer kind, in eq.c: start at the params of fx */
 void box_audio_eq_start(
     box_audio_core_t *core,
@@ -1646,6 +1997,36 @@ void box_audio_transient_shaper_rest(
     box_audio_effect_t *fx,
     int32_t frames);
 
+/** The vocoder kind: floats of memory, its bands */
+int32_t box_audio_vocoder_floats(
+    float sample_rate);
+
+/** The vocoder kind: start on the memory of its slot */
+void box_audio_vocoder_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The vocoder kind: new parameters while it runs */
+void box_audio_vocoder_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The vocoder kind: process a block on the output of its key bus */
+bool box_audio_vocoder_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The vocoder kind: a block skipped while idle */
+void box_audio_vocoder_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    int32_t frames);
+
 /** The frequency shifter kind, in frequency_shifter.c: start at the params of fx */
 void box_audio_frequency_shifter_start(
     box_audio_core_t *core,
@@ -1669,6 +2050,35 @@ bool box_audio_frequency_shifter_render(
 
 /** The frequency shifter kind: a block skipped while idle */
 void box_audio_frequency_shifter_rest(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    int32_t frames);
+
+/** The pattern gate kind, in pattern_gate.c: start at the params of fx, open as the step of
+ * the frame of the core clock is */
+void box_audio_pattern_gate_start(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    bool fade_in);
+
+/** The pattern gate kind: new parameters while it runs */
+void box_audio_pattern_gate_command(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx);
+
+/** The pattern gate kind: process a block; true when the block is silent, which the gain
+ * keeps silent */
+bool box_audio_pattern_gate_render(
+    box_audio_core_t *core,
+    box_audio_effect_t *fx,
+    float *l,
+    float *r,
+    int32_t frames,
+    bool silent);
+
+/** The pattern gate kind: a block skipped while idle, over which its gain moves on as it
+ * would have rendered */
+void box_audio_pattern_gate_rest(
     box_audio_core_t *core,
     box_audio_effect_t *fx,
     int32_t frames);
@@ -1897,6 +2307,43 @@ void box_audio_synth_express(
 void box_audio_source_pitch(
     box_audio_source_t *source,
     float pitch);
+
+/** Open the low-pass of a voice and clear it, for a voice that starts.
+ *
+ * @param v The voice
+ */
+void box_audio_voice_filter_reset(
+    box_audio_voice_t *v);
+
+/** Move the low-pass of a voice to a cutoff of BOX_AUDIO_PARAM_CUTOFF. The log2 of its g
+ * ramps linearly over BOX_AUDIO_CUTOFF_RAMP, in octaves at low cutoffs, and the stages stay
+ * stable while it moves; an open target ramps to near the Nyquist and stops the filter there.
+ *
+ * A voice that has not rendered takes the cutoff at once. A filter that starts on a playing
+ * voice starts open, with its state at the next input, so it does not click.
+ *
+ * @param core The core
+ * @param v The voice
+ * @param value Cutoff in Hz
+ */
+void box_audio_voice_cutoff(
+    box_audio_core_t *core,
+    box_audio_voice_t *v,
+    float value);
+
+/** Run the low-pass of a voice over a block of its source in core->src_l and src_r, in
+ * place, and stop it once it opened.
+ *
+ * @param core The core
+ * @param v The voice, whose filter runs
+ * @param stereo Whether the source rendered both channels
+ * @param frames Frames of the block
+ */
+void box_audio_voice_filter(
+    box_audio_core_t *core,
+    box_audio_voice_t *v,
+    bool stereo,
+    int32_t frames);
 
 /** Reset the expression of a voice to its defaults: no bend, mod 1, no pressure.
  *

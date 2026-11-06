@@ -218,8 +218,8 @@ ECS_STRUCT(AudioMeter, {
                             *   BOX_AUDIO_METER_WINDOW seconds of output */
     float rms_right;       /**< Linear, the RMS of the right channel over the window */
     float reduction;       /**< dB, on an effect entity: the largest gain reduction since the
-                            *   last frame, for dynamics effects, and how hard the clipper of
-                            *   a Saturator squashes; 0 for others */
+                            *   last frame, for dynamics effects and a PatternGate, and how
+                            *   hard the clipper of a Saturator squashes; 0 for others */
 });
 
 /** The bus a sound or a source plays on. On a source it wins over the one of its sound */
@@ -918,6 +918,46 @@ ECS_STRUCT(TransientShaper, {
                             *   it */
 });
 
+/** A vocoder, an effect in an insert slot of an AudioBus, as a Reverb is: the spectrum of
+ * its modulator, a channel keyed as the sidechain of a Compressor, shapes the input of its own
+ * channel, the carrier. Talking synths and robot voices take a voice as the modulator and a
+ * saw pad as the carrier; a drum loop as the modulator makes a pad that follows its rhythm:
+ * pad { AudioBus: {effects: [pad]}; Vocoder: {modulator: drums, bands: 16} }.
+ *
+ * Both run through bands matched bandpasses, log spaced from low to high, each two cascaded
+ * state variable bandpasses per channel; an envelope follower on each modulator band scales
+ * the carrier band of the same index. The bands are made up so that a full band modulator at
+ * about -5 dBFS RMS gives about the level of a full band carrier; a silent modulator gives
+ * silence. Shift moves the carrier bands up or down by up to an octave against the modulator
+ * bands, for a formant shift; unvoiced adds white noise to the carrier of the bands from 3 kHz
+ * up and the top quarter, so the consonants of a voice come through.
+ *
+ * The order of the channels runs the modulator first. Without a modulator, or with one that is
+ * deleted, is no channel or would form a cycle, it logs one error that names it and passes its
+ * input. Every vocoder runs with its own memory for 32 bands. Low, high, q, shift, unvoiced and
+ * mix move over 20 ms; a change of the bands fades the vocoded signal out and back in over 40
+ * ms. The bands are not automatable.
+ */
+ECS_STRUCT(Vocoder, {
+    ecs_entity_t modulator; /**< Channel (an AudioBus) whose output is the modulator, the key */
+    int32_t bands;         /**< Bands, 8 to 32, default 16 */
+    float low;             /**< Center of the lowest band in Hz, default 100, at least 20 */
+    float high;            /**< Center of the highest band in Hz, default 8000, at least an
+                            *   octave over low and under 0.45 of the sample rate */
+    float q;               /**< Sharpness of the bands, 0.25 to 8, default 1: at 1 neighboring
+                            *   bands cross at -3 dB, above 1 they are narrower */
+    float attack;          /**< Seconds in which a band envelope rises 63% of a step, default
+                            *   0.005, 0.0001 to 1 */
+    float release;         /**< Seconds in which it falls 63% of a step, default 0.05, 0.001 to
+                            *   5 */
+    float shift;           /**< -1 to 1, default 0: moves the carrier bands up to an octave up
+                            *   or down against the modulator bands, for a formant shift */
+    float unvoiced;        /**< 0 to 1, default 0: white noise added to the carrier of the high
+                            *   bands, so consonants come through */
+    float mix;             /**< Wet level, 0 to 1, default 1; the dry signal passes at
+                            *   1 - mix */
+});
+
 /** Mode of a FrequencyShifter */
 ECS_ENUM(FrequencyShifterMode, {
     FrequencyShift,        /**< Every partial moves up or down by the shift in Hz */
@@ -991,6 +1031,147 @@ ECS_STRUCT(PitchShifter, {
                             *   default 0 */
     float mix;             /**< Wet level, 0 to 1, default 0.5; the dry signal passes at
                             *   1 - mix */
+});
+
+/** A pattern gate, an effect in an insert slot of an AudioBus, as a Reverb is: a tempo-synced
+ * level pattern that chops a sustained sound into rhythm, the trance gate. It turns pads,
+ * chords and noise into rhythmic parts without notes:
+ * pad { AudioBus: {effects: [pad]};
+ * PatternGate: {steps: [1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1], release: 0.05} }.
+ *
+ * The pattern is locked to the Transport: at every frame the step floor(beat / rate) mod
+ * length sounds, so the gate stays on the grid after a seek, a loop wrap and a tempo change.
+ * Without a playing Transport it runs at 120 bpm. Swing bends the step grid as Track.swing
+ * bends its notes: the second step of each pair starts later by swing steps. A step is open
+ * for the first gate share of it at its level, so a level of 0.5 is an accent 6 dB down, and
+ * closed after, at the floor; the gain rises in attack seconds and falls in release seconds,
+ * linearly, the same on both channels. A change of a step or of the timing moves the gain at
+ * the speed of the edges; floor and mix move over 20 ms. An AudioMeter on its entity reads its
+ * gain reduction. It stops while its input is silent.
+ */
+ECS_STRUCT(PatternGate, {
+    float steps[16];       /**< Level of each step, 0 (closed) to 1, default all 1; an accent
+                            *   is a level under 1 */
+    int32_t length;        /**< Steps in the pattern, 1 to 16, default 16 */
+    float rate;            /**< Beats per step, default 0.25 (sixteenths); 0.375 is a dotted
+                            *   sixteenth, 1 / 6 a sixteenth triplet, 1/64 to 16 */
+    float swing;           /**< 0 to 0.75, default 0: the second step of every pair starts
+                            *   later by swing steps, as Track.swing */
+    float attack;          /**< Seconds of an edge from closed to open, default 0.002, 0.0005
+                            *   to 2 */
+    float release;         /**< Seconds of an edge from open to closed, default 0.03, 0.0005
+                            *   to 2; a longer one gives a softer pulse */
+    float gate;            /**< Share of each step that is open, 0.05 to 1, default 0.5; at 1
+                            *   neighbouring open steps run together */
+    float floor;           /**< Gain when closed in dB, -80 (default) to 0; a higher floor
+                            *   pumps instead of chopping */
+    float mix;             /**< Wet level, 0 to 1, default 1; the dry signal passes at
+                            *   1 - mix */
+});
+
+/** A rotary, an effect in an insert slot of an AudioBus, as a Reverb is: a rotating speaker
+ * cabinet, the swirl of an organ, also on guitars, electric pianos and vocals. The sum of both
+ * channels runs through a tube preamp, then a crossover at 800 Hz splits it into a drum below
+ * and a horn above, which turn at their own rates. Two virtual mics hear each rotor, the left
+ * one a quarter turn times spread one way and the right one as far the other way: as a rotor
+ * turns, its pitch moves with the Doppler shift (a few tenths of a millisecond of the horn),
+ * and its level drops and its tone dulls as it faces away from a mic:
+ * organ { AudioBus: {effects: [organ]}; Rotary: {speed: 0, drive: 0.3} }.
+ *
+ * The rotors turn at their slow rates at speed 0 and at their fast rates at speed 1, and in
+ * between at rates in between. They do not jump to a new speed: the horn reaches it within
+ * acceleration seconds and the drum three times slower, so automating speed between 0 and 1
+ * gives the switch of a real cabinet between chorale and tremolo. The rotors start at the rate
+ * of their speed when the rotary is put on a channel. Balance, spread, drive and mix move over
+ * 20 ms. Every rotary runs with its own memory of 4 milliseconds. Once its input was silent for
+ * 50 ms it stops until its input sounds again, its rotors turning on.
+ */
+ECS_STRUCT(Rotary, {
+    float speed;           /**< 0 to 1, default 0: 0 is slow (chorale), 1 fast (tremolo) */
+    float horn_slow;       /**< Hz of the horn at speed 0, default 0.8, 0 to 20 */
+    float horn_fast;       /**< Hz of the horn at speed 1, default 6.7, 0 to 20 */
+    float drum_slow;       /**< Hz of the drum at speed 0, default 0.7, 0 to 20 */
+    float drum_fast;       /**< Hz of the drum at speed 1, default 5.9, 0 to 20 */
+    float acceleration;    /**< Seconds of the horn to a new speed, default 1, 0.01 to 20; the
+                            *   drum takes three times as long */
+    float balance;         /**< -1 to 1, default 0: -1 is the drum alone, 1 the horn alone */
+    float spread;          /**< 0 to 1, default 1: the stereo width of the mics; 0 is mono, 1
+                            *   puts them half a turn apart */
+    float drive;           /**< 0 to 1, default 0: the share of the tube preamp, its gain up to
+                            *   +24 dB */
+    float mix;             /**< Wet level, 0 to 1, default 1; the dry signal passes at
+                            *   1 - mix */
+});
+
+/** Longest slice of a BeatRepeat and longest lag of a TapeStop in seconds, which size their
+ * memory: a slice of 4 beats under 60 bpm is held to it */
+#define BOX_AUDIO_BEAT_REPEAT_MAX 4.0f
+#define BOX_AUDIO_TAPE_STOP_MAX 4.0f
+
+/** A beat repeat, an effect in an insert slot of an AudioBus, as a Reverb is: the stutter of
+ * a fill, which captures a slice of the beat and repeats it, each repeat quieter, pitched or
+ * reversed, while active is up. An automation lane or a modulator drives active, as any
+ * float member:
+ * drums { AudioBus: {effects: [drums]}; BeatRepeat: {slice: 0.125, decay: 0.8} }.
+ *
+ * When active rises to 0.5 or above, the capture waits for the next grid point of the
+ * Transport (every grid beats, at once for a grid of 0) and holds slice beats from there at
+ * the tempo of that moment. The first repeat is the input itself as it is captured, then the
+ * slice plays again and again, each repeat decay times the gain and pitch semitones from the
+ * one before it: the slice is resampled like a tape, so a pitch of -12 plays the second
+ * repeat an octave down at half speed, and the third two octaves down. reverse plays the
+ * repeats after the first from the end of the slice, and each repeat sounds for gate of the
+ * slice. A repeat crossfades from the one before it over 2 ms, so they do not click. Decay,
+ * pitch, reverse and gate apply from the next repeat on, slice and grid at the next rise.
+ *
+ * When active falls under 0.5 the dry input returns at once, over a 2 ms crossfade, not at a
+ * grid point, so the lane decides where a fill ends; a fall before the capture started
+ * cancels it. While it repeats the output is the repeats times mix plus the input times 1 -
+ * mix; while it is not active the input passes unchanged. It follows the beat clock of the
+ * Transport through seeks, loops and tempo changes, at 120 bpm while none plays. Every beat
+ * repeat runs with its own memory of BOX_AUDIO_BEAT_REPEAT_MAX seconds per channel. See
+ * Effects in docs/audio.md for a stutter fill.
+ */
+ECS_STRUCT(BeatRepeat, {
+    float active;          /**< 0 to 1, default 0: 0.5 and above repeats */
+    float slice;           /**< Beats of the slice, 1/32 to 4, default 0.25 */
+    float grid;            /**< Beats of the grid the capture waits for, 0 to 4; 0 captures
+                            *   at once; default -1, any negative grid, is the slice */
+    float decay;           /**< Gain of a repeat against the one before it, 0 to 1, default
+                            *   1: 0.5 drops each repeat by 6 dB */
+    float pitch;           /**< Semitones of a repeat against the one before it, -12 to 12,
+                            *   default 0; the repeats add up to at most 48 either way */
+    float reverse;         /**< 0 to 1, default 0: 0.5 and above plays the repeats after the
+                            *   first reversed */
+    float gate;            /**< Share of each repeat that sounds, 0.1 to 1, default 1 */
+    float mix;             /**< Level of the repeats while it repeats, 0 to 1, default 1: the
+                            *   input is replaced; the dry signal passes at 1 - mix */
+});
+
+/** A tape stop, an effect in an insert slot of an AudioBus, as a Reverb is: the drop of a
+ * transition, which slows what plays through it down to a halt, pitch and time together, and
+ * spins it back up. An automation lane or a modulator drives active, as any float member:
+ * master_fx { AudioBus: {effects: [master_fx]}; TapeStop: {stop_time: 1, curve: 0.5} }.
+ *
+ * While active is 0.5 or above the speed falls from 1 to 0 over stop_time seconds; under 0.5
+ * it rises back to 1 over start_time seconds, from wherever it stands. The input is recorded
+ * and read at the speed with cubic interpolation, so halfway through a linear stop a sine
+ * sounds an octave down. curve shapes both ramps: the speed is 1 - p^(4^curve) at a phase p
+ * of the stop; 0 is linear, above 0 the speed holds longer and drops at the end, under 0 it
+ * drops at once and creeps to the halt. A start runs the same curve back.
+ *
+ * Under a tenth of the speed the output fades out, to silence at the halt. What comes in
+ * during the stop is skipped: a start plays the input of its moment, slowed, and once it is up
+ * to speed it crossfades to the input over 20 ms, so the output never catches up on what the
+ * ramps fell behind. At full speed the input passes unchanged. Every tape stop runs with its
+ * own memory of BOX_AUDIO_TAPE_STOP_MAX seconds per channel. See Effects in docs/audio.md for
+ * a tape stop drop.
+ */
+ECS_STRUCT(TapeStop, {
+    float active;          /**< 0 to 1, default 0: 0.5 and above stops, under it starts */
+    float stop_time;       /**< Seconds from full speed to the halt, 0.01 to 4, default 0.5 */
+    float start_time;      /**< Seconds from the halt to full speed, 0.01 to 4, default 0.2 */
+    float curve;           /**< Shape of the ramps, -1 to 1, default 0 (linear) */
 });
 
 /** An envelope of the cutoff of the SynthFilter of the same root, with the segments of a
@@ -1188,6 +1369,13 @@ extern ECS_TAG_DECLARE(AudioListener);
  * The gain is inverse distance, min / (min + rolloff * (d - min)) beyond min_distance, faded so
  * that it is exactly 0 at max_distance. Front and back sound alike.
  *
+ * A cutoff above 0 closes a 12 dB per octave low-pass with distance: open within
+ * min_distance, at cutoff at max_distance, and exponential between them, so that equal steps
+ * in distance are equal steps in pitch: BOX_AUDIO_SPATIAL_OPEN * (cutoff /
+ * BOX_AUDIO_SPATIAL_OPEN)^t with t = (d - min) / (max - min). A cutoff is clamped to
+ * BOX_AUDIO_SPATIAL_CUTOFF_MIN..BOX_AUDIO_SPATIAL_OPEN; 0, a negative cutoff or one of at least
+ * BOX_AUDIO_SPATIAL_OPEN filter nothing.
+ *
  * A looping source beyond max_distance uses no voice and keeps its place in time; a source
  * that does not loop does not start beyond it. On a sound it sets the distances of
  * box_audio_play_at.
@@ -1196,7 +1384,58 @@ ECS_STRUCT(AudioSpatial, {
     float min_distance;    /**< Full volume within this distance, default 1 */
     float max_distance;    /**< Silent from this distance, default 50 */
     float rolloff;         /**< How fast the volume falls beyond min_distance, default 1 */
+    float cutoff;          /**< Low-pass cutoff in Hz at max_distance, 0 for no filter,
+                            *   default 0 */
 });
+
+/** Volume an AudioEmitter places its plays in, in the space of the emitter entity, with the
+ * conventions of EmitterShape. A zero radius or zero extents play at the origin */
+ECS_ENUM(AudioEmitterShape, {
+    AudioEmitterPoint = 0,      /**< The origin of the emitter */
+    AudioEmitterDisc = 1,       /**< Inside the disc of radius around the origin in the XZ
+                                 *   plane */
+    AudioEmitterSphere = 2,     /**< Inside the sphere of radius around the origin */
+    AudioEmitterHemisphere = 3, /**< Inside the upper half (+Y) of the sphere of radius */
+    AudioEmitterBox = 4         /**< Inside the box of half size extents around the origin */
+});
+
+/** Plays a sound once at random intervals, at a random point of a shape, with a random volume
+ * and pitch, seeded from seed, the entity and the count of plays: insects, drips and rain.
+ *
+ * The first play comes after an interval, on the clock of the output. Plays go the way of
+ * box_audio_play_at, on the AudioOutput and with the AudioSpatial of the emitter, else of the
+ * sound; its WorldTransform places the shape, without one the plays are not spatial.
+ *
+ * Plays beyond max_distance, over max_active or of a sound that is not ready are skipped. A
+ * Disabled or deleted emitter and playing false stop new plays; playing true starts over with
+ * a fresh interval. Changes apply from the next interval.
+ */
+ECS_STRUCT(AudioEmitter, {
+    ecs_entity_t sound;    /**< AudioPcm, SoundFile or SynthSound to play */
+    float interval_min;    /**< Seconds between plays, lower bound, default 1; at least
+                            *   0.01 */
+    float interval_max;    /**< Seconds between plays, upper bound, default 4; swapped with
+                            *   interval_min when below it */
+    AudioEmitterShape shape; /**< Volume plays are placed in, default AudioEmitterPoint */
+    float radius;          /**< Radius of disc, sphere and hemisphere, default 0; its absolute
+                            *   value */
+    vec3 extents;          /**< Half size of the box, default {0, 0, 0}; their absolute
+                            *   values */
+    float volume_min;      /**< Linear gain, lower bound, default 1; at least 0 */
+    float volume_max;      /**< Linear gain, upper bound, default 1 */
+    float pitch_min;       /**< Playback ratio, lower bound, default 1 */
+    float pitch_max;       /**< Playback ratio, upper bound, default 1 */
+    int32_t max_active;    /**< Plays of this emitter that may sound at once, 0 for no limit,
+                            *   default 0 */
+    uint32_t seed;         /**< Seed of the randomness, default 0 */
+    bool playing;          /**< Whether it plays, default true */
+});
+
+/** Cutoff in Hz of an open distance filter, where it starts at min_distance */
+#define BOX_AUDIO_SPATIAL_OPEN 20000.0f
+
+/** Lowest cutoff in Hz of a distance filter */
+#define BOX_AUDIO_SPATIAL_CUTOFF_MIN 10.0f
 
 /** Settings of the audio of the world, a singleton */
 ECS_STRUCT(AudioSettings, {
@@ -1355,10 +1594,11 @@ ECS_STRUCT(AudioClip, {
  *
  * Targets: the volume, pan and width of an AudioBus and the level of its sends
  * (sends[1].level), and every float member of the effect component of an effect entity, such
- * as AudioFilter.cutoff, Reverb.mix, Delay.feedback or bands[2].gain of an Equalizer. Members
- * that are not continuous (kinds, slopes, stages, voices, entities and bools) are not
- * automatable. A clip whose target, component or member is unknown or not automatable logs
- * one error that names it, and does nothing until it changes.
+ * as AudioFilter.cutoff, Reverb.mix, Delay.feedback or bands[2].gain of an Equalizer, and
+ * the value of an AudioMacro (component AudioMacro, member "value"), which moves its maps
+ * sample accurately. Members that are not continuous (kinds, slopes, stages, voices, entities
+ * and bools) are not automatable. A clip whose target, component or member is unknown or not
+ * automatable logs one error that names it, and does nothing until it changes.
  *
  * While the Transport plays, the curve is sampled within the lookahead window every 10 ms of
  * output and at its keys, and each value is scheduled sample accurately at its frame: a bus
@@ -1428,8 +1668,9 @@ ECS_ENUM(AudioModScale, {
  * scale: AudioModOctaves, depth: 2, sync: 0.5} }.
  *
  * target, component and member name what it moves as an AutomationClip does, with the same
- * targets: volume, pan, width and sends[i].level of an AudioBus or of the master, and every
- * float member of the effect component of an effect entity.
+ * targets: volume, pan, width and sends[i].level of an AudioBus or of the master, every float
+ * member of the effect component of an effect entity, and the value of an AudioMacro, which it
+ * moves linearly before the maps of the macro shape it (a follower of a macro needs a key).
  *
  * Its value adds to the value the output has, the one of the component or of an automation
  * lane that covers the member, and the sum is clamped to the range of the member. depth is the
@@ -1482,6 +1723,77 @@ ECS_STRUCT(AudioModulator, {
                              *   or the target bus */
     float attack;           /**< Seconds of the rise of a follower, default 0.01 */
     float release;          /**< Seconds of the fall of a follower, default 0.1 */
+});
+
+/** Macros the core runs; more log one error that names the macro and do nothing */
+#define BOX_AUDIO_MACROS 32
+
+/** Maps of one macro; more log one error that names the macro and do nothing */
+#define BOX_AUDIO_MACRO_MAPS 8
+
+/** A macro, on an entity of its own: one value of 0..1 that its AudioMacroMap children turn
+ * into several members of buses and effects at once, each over its own range and curve, like
+ * a knob of a Combinator. A build-up is one automation lane on the value of a macro that opens
+ * a filter, raises a drive, grows a reverb send and lifts a delay feedback together, and game
+ * code drives the intensity of the music with one value:
+ * intensity { AudioMacro: {value: 0}
+ *   cutoff { AudioMacroMap: {target: synth_filter, component: AudioFilter, member: "cutoff",
+ *     min: 200, max: 8000, scale: AudioModOctaves} }
+ *   reverb { AudioMacroMap: {target: synth, component: AudioBus, member: "sends[0].level",
+ *     max: 0.6} } }.
+ *
+ * While a map runs, the macro decides the member: the value of the component, and of an
+ * automation lane of the member itself, is replaced, not added to; the modulators of the member
+ * add to the value of the macro. The macro never writes a component, so game code keeps
+ * reading and writing the authored values.
+ *
+ * The value is itself a target of an AutomationClip and of an AudioModulator (component
+ * AudioMacro, member "value"), sample accurately: the audio core shapes the value of the macro,
+ * plus what its modulators add, clamped to 0..1, into its maps every 32 frames and at the frame
+ * of every scheduled value. A write of value from a script or from C applies at once through
+ * the same path, with the usual smoothing of the targets: a bus ramps over at least 5 ms, an
+ * effect smooths over its usual 10 to 20 ms. Disabling a macro releases its maps.
+ *
+ * Up to BOX_AUDIO_MACROS macros run, and up to BOX_AUDIO_MACRO_MAPS maps of each; a macro past
+ * a limit logs one error that names it. See Macros in docs/audio.md.
+ */
+ECS_STRUCT(AudioMacro, {
+    float value;            /**< 0..1, default 0, clamped */
+});
+
+/** A map of a macro, a child of the AudioMacro entity: one member of a bus or an effect that
+ * the macro moves from min at a value of 0 to max at 1.
+ *
+ * target, component and member name the member as an AutomationClip and an AudioModulator
+ * do, with the same members: volume, pan, width and sends[i].level of an AudioBus or of the
+ * master, and every float member of the effect component of an effect entity that reaches the
+ * output as it is (not the time of a Delay with a sync). The value of a macro is not a member
+ * a map moves.
+ *
+ * The value of the member is min + (max - min) * shape(value), or min * (max / min)^shape(value)
+ * with AudioModOctaves, for a frequency (cutoff, center, frequency of a band, damping of a
+ * Delay), whose even sweep is in octaves: 200..8000 Hz at 0.5 is 1265 Hz. A min above max
+ * inverts the map. curve bends shape(x) = (2^(6 curve x) - 1) / (2^(6 curve) - 1): 0 is
+ * linear, 1 exponential (the middle of the macro gives 11% of the range), -1 logarithmic (89%).
+ *
+ * A new map fades in over 50 ms; disabling, deleting or retargeting one fades it out over
+ * 50 ms, and the member returns to its authored value without a click. When two maps move one
+ * member, the one created last wins (the higher entity id): the other logs one warning that
+ * names both and does nothing until the newer one is gone. A map whose target, component or
+ * member is unknown, whose parent is no macro, or in octaves of a member that is no frequency
+ * or with a range that is not positive, logs one error that names it until it changes; one
+ * whose effect is in no insert slot waits for one.
+ */
+ECS_STRUCT(AudioMacroMap, {
+    ecs_entity_t target;    /**< The entity with the AudioBus or the effect component */
+    ecs_entity_t component; /**< The component: AudioBus or an effect component */
+    char *member;           /**< Path of a float member, such as "cutoff", "volume" or
+                             *   "sends[1].level" */
+    float min;              /**< Value at a macro of 0, in the units of the member, default 0 */
+    float max;              /**< Value at a macro of 1, default 1; below min inverts */
+    float curve;            /**< -1 logarithmic .. 0 linear (default) .. 1 exponential */
+    AudioModScale scale;    /**< AudioModLinear (default) or AudioModOctaves, for a frequency,
+                             *   with min and max above 0 */
 });
 
 /** The grid a Track swings */
@@ -1683,6 +1995,33 @@ float box_audio_spatial_gain(
     const mat4 listener,
     const vec3 position,
     float *pan);
+
+/** Gain, pan and distance filter of a spatial source, as box.audio computes them: the gain and
+ * the pan of box_audio_spatial_gain, and the cutoff of box_audio_spatial_cutoff.
+ *
+ * @param spatial The distances, NULL for the defaults
+ * @param listener World transform of the listener
+ * @param position World position of the source
+ * @param pan Receives the pan, -1 left to 1 right, may be NULL
+ * @param cutoff Receives the cutoff in Hz, 0 for an open filter, may be NULL
+ * @return The gain, 0 at and beyond max_distance
+ */
+float box_audio_spatial_place(
+    const AudioSpatial *spatial,
+    const mat4 listener,
+    const vec3 position,
+    float *pan,
+    float *cutoff);
+
+/** Cutoff of the distance filter of a spatial source at a distance, as box.audio computes it.
+ *
+ * @param spatial The distances and cutoff, NULL for the defaults, which filter nothing
+ * @param distance Distance from the listener
+ * @return The cutoff in Hz, 0 when the filter is open: within min_distance or without a cutoff
+ */
+float box_audio_spatial_cutoff(
+    const AudioSpatial *spatial,
+    float distance);
 
 /** Record the master output of the next seconds to a 16 bit stereo WAV file.
  *

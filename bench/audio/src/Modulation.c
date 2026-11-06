@@ -1,7 +1,7 @@
 /**
  * @file Modulation.c
- * @brief Benchmarks for the phaser and the chorus of the audio core, one item per stereo
- * frame.
+ * @brief Benchmarks for the phaser, the chorus and the vocoder of the audio core, one item
+ * per stereo frame.
  *
  * Each iteration renders one quantum of 128 frames, so the time per item is the time per
  * sample of the effect and what feeds it.
@@ -146,6 +146,42 @@ void Modulation_silent_tail(
     bench_modulation_free(core);
 }
 
+/** Create a core with a vocoder on bus 1, keyed on bus 2, which runs first: a looping voice
+ * on each, the one on bus 2 an octave up.
+ *
+ * @param bands Bands of the vocoder
+ * @return The core
+ */
+static box_audio_core_t* bench_vocoder_core(
+    float bands)
+{
+    static uint8_t bytes[8192];
+    box_audio_route_t routes[] = { BENCH_OUT(2, 0), BENCH_OUT(1, 0), BENCH_MASTER };
+    box_audio_vocoder_params_t p = { bands, 100, 8000, 1, 0.005f, 0.05f, 0.2f, 0.3f, 1 };
+    float fx[BOX_AUDIO_EFFECT_PARAMS] = {0};
+    box_audio_core_desc_t desc = { .sample_rate = BENCH_RATE };
+    box_audio_core_t *core = box_audio_core_new(&desc);
+    int32_t floats = box_audio_effect_floats(BOX_AUDIO_EFFECT_VOCODER, BENCH_RATE);
+    box_audio_writer_t w;
+    uint32_t i;
+    for (i = 0; i < BENCH_SOUND; i ++) {
+        bench_sound[i] = 0.3f * (float)sin(i * 0.023) + 0.1f * (float)sin(i * 0.31);
+    }
+
+    box_audio_core_sound(core, 1, bench_sound, BENCH_SOUND, 1, BENCH_RATE);
+    bench_memory = calloc((size_t)floats, sizeof(float));
+    box_audio_core_effect_memory(core, 0, bench_memory, floats);
+    box_audio_writer_init(&w, bytes, sizeof(bytes));
+    box_audio_write_order(&w, routes, 3);
+    memcpy(fx, &p, sizeof(p));
+    box_audio_write_effect(&w, 0, BOX_AUDIO_EFFECT_VOCODER, 1, 0, 2, fx);
+    box_audio_write_play(&w, 0, 1, 1, 0.5f, 0, 1, BOX_AUDIO_PLAY_LOOP, 0);
+    box_audio_write_play(&w, 1, 1, 2, 0.5f, 0, 2, BOX_AUDIO_PLAY_LOOP, 0);
+    box_audio_core_apply(core, w.data, w.size);
+
+    return core;
+}
+
 /** Create a core with a lowpass on bus 1 and its voice, and a number of modulators of every
  * source on its cutoff, its resonance and the volume and pan of the bus, four of each, with
  * the beat clock at 128 bpm.
@@ -199,11 +235,29 @@ static box_audio_core_t* bench_modulators_core(
     return core;
 }
 
+void Modulation_vocoder_16(
+    bench_t *b)
+{
+    // audio/vocoder
+    box_audio_core_t *core = bench_vocoder_core(16);
+    bench_modulation_render(b, core);
+    bench_modulation_free(core);
+}
+
 void Modulation_filter_16_modulators(
     bench_t *b)
 {
     // audio/modulators
     box_audio_core_t *core = bench_modulators_core(16);
+    bench_modulation_render(b, core);
+    bench_modulation_free(core);
+}
+
+void Modulation_vocoder_32(
+    bench_t *b)
+{
+    // audio/vocoder
+    box_audio_core_t *core = bench_vocoder_core(32);
     bench_modulation_render(b, core);
     bench_modulation_free(core);
 }

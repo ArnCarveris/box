@@ -4,6 +4,54 @@
  */
 
 #include <boxrun.h>
+#include <stdio.h>
+#include <sys/time.h>
+#include <time.h>
+#include <unistd.h>
+
+/** Print a log message to stderr with the local time of day.
+ *
+ * @param level The flecs log level
+ * @param file The file that logged
+ * @param line The line that logged
+ * @param msg The message
+ */
+static void boxrun_log(
+    int32_t level,
+    const char *file,
+    int32_t line,
+    const char *msg)
+{
+    (void)file;
+    (void)line;
+    struct timeval tv;
+    struct tm tm;
+    const char *name = "info", *color = "";
+    bool colors = ecs_os_api.flags_ & EcsOsApiLogWithColors;
+    gettimeofday(&tv, NULL);
+    time_t sec = tv.tv_sec;
+    localtime_r(&sec, &tm);
+    if (level <= -4) {
+        name = "fatal";
+        color = "\033[1;31m";
+    } else if (level == -3) {
+        name = "error";
+        color = "\033[1;31m";
+    } else if (level < 0) {
+        name = "warning";
+        color = "\033[1;33m";
+    } else if (level > 0) {
+        name = "debug";
+        color = "\033[0;34m";
+    } else {
+        color = "\033[0;35m";
+    }
+
+    fprintf(stderr, "%s%02d:%02d:%02d.%03d%s %s%s%s: %s\n",
+        colors ? "\033[0;90m" : "", tm.tm_hour, tm.tm_min, tm.tm_sec,
+        (int)(tv.tv_usec / 1000), colors ? "\033[0m" : "",
+        colors ? color : "", name, colors ? "\033[0m" : "", msg ? msg : "");
+}
 
 /** Parse the command line into the App singleton and run the world.
  *
@@ -18,13 +66,21 @@ int main(
     ecs_world_t *world = ecs_init();
     int result = 0;
 
+    ecs_os_api.log_ = boxrun_log;
+    ecs_log_enable_colors(isatty(STDERR_FILENO));
+
     ECS_IMPORT(world, Box);
+
+    ecs_log_set_level(0);
+    ecs_trace("imported box modules");
 
     result = box_app_parse(world, argc, argv);
     if (!result) {
         result = box_app_run(world);
     }
 
+    ecs_trace("shutting down");
+    ecs_log_set_level(-1);
     ecs_fini(world);
 
     return result ? 1 : 0;

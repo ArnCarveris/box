@@ -179,6 +179,11 @@ their tails end.
 | `TransientShaper` | `attack: 0`, `sustain: 0` |
 | `FrequencyShifter` | `shift: 0` Hz, `mode: FrequencyShift`, `stereo: 0`, `feedback: 0`, `mix: 1` |
 | `PitchShifter` | `semitones: 0`, `cents: 0`, `stereo: 0`, `window: 40` ms, `feedback: 0`, `mix: 0.5` |
+| `PatternGate` | `steps`: 16 levels, all `1`, `length: 16`, `rate: 0.25` beats, `swing: 0`, `attack: 0.002` s, `release: 0.03` s, `gate: 0.5`, `floor: -80` dB, `mix: 1` |
+| `Rotary` | `speed: 0`, `horn_slow: 0.8` Hz, `horn_fast: 6.7` Hz, `drum_slow: 0.7` Hz, `drum_fast: 5.9` Hz, `acceleration: 1` s, `balance: 0`, `spread: 1`, `drive: 0`, `mix: 1` |
+| `BeatRepeat` | `active: 0`, `slice: 0.25` beats, `grid: -1` (the slice), `decay: 1`, `pitch: 0` semitones, `reverse: 0`, `gate: 1`, `mix: 1` |
+| `TapeStop` | `active: 0`, `stop_time: 0.5` s, `start_time: 0.2` s, `curve: 0` |
+| `Vocoder` | `modulator: 0`, `bands: 16`, `low: 100` Hz, `high: 8000` Hz, `q: 1`, `attack: 0.005` s, `release: 0.05` s, `shift: 0`, `unvoiced: 0`, `mix: 1` |
 
 Equalizer bands use `AudioEqOff`, `AudioEqPeak`, `AudioEqLowShelf`,
 `AudioEqHighShelf`, `AudioEqLowCut` or `AudioEqHighCut`. Defaults are 100, 400,
@@ -333,6 +338,170 @@ pad_rise { FrequencyShifter: {shift: 0.3, feedback: 0.85, mix: 0.5} }
 bell { FrequencyShifter: {mode: FrequencyRing, shift: 437, mix: 0.8} }
 ```
 
+A pattern gate chops a sustained sound into rhythm, the classic trance gate: it
+turns pads, chords and noise into rhythmic parts without writing notes. `steps` holds
+the level of each of 16 steps from 0 (closed) to 1, so a step at 0.5 is an accent
+6 dB down, and `length` (1 to 16) says how many of them play. `rate` is the length of
+a step in beats: 0.25 for sixteenths, 0.5 for eighths, 0.375 for dotted sixteenths,
+1/6 for sixteenth triplets. The pattern is locked to the Transport: at every frame the
+step `floor(beat / rate) mod length` sounds, so the gate stays on the grid after a
+seek, a loop wrap or a tempo change. Without a playing Transport it runs at 120 bpm.
+`swing` (0 to 0.75) bends the step grid as `Track.swing` bends notes: the second step
+of each pair starts later by `swing` steps.
+
+A step is open for the first `gate` share of it (0.05 to 1) and closed after; at 1,
+neighbouring open steps run together. The gain rises in `attack` seconds and falls in
+`release` seconds, linearly, so the edges do not click, and a longer release gives a
+softer pulse. Closed is `floor` dB, -80 to 0: a floor of -6 to -12 dB pumps instead of
+chopping. Both channels get the same gain. A change of a step or of the timing moves
+the gain at the speed of the edges, and `floor` and `mix` move over 20 ms, so
+automating `steps[3]` or modulating a step is smooth. An `AudioMeter` on the gate reads
+its gain reduction, and the gate stops while its input is silent.
+
+```flecs
+// A trance gate on a pad: sixteenths with accents and a soft edge
+pad_gate {
+  PatternGate: {steps: [1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0.5, 0, 1, 0.5, 1],
+    gate: 0.6, release: 0.05}
+}
+pad { AudioBus: {effects: [pad_gate]} }
+
+// A gentle pump on chords: eighths with swing that only dip 9 dB
+chords_pump { PatternGate: {length: 2, steps: [1, 0], rate: 0.5, swing: 0.2, gate: 0.7,
+  release: 0.12, floor: -9} }
+```
+A rotary is a rotating speaker cabinet: the swirl of an organ, also good on guitars,
+electric pianos and vocals. The sum of both channels runs through a tube preamp,
+blended in by `drive` (up to +24 dB into the tanh clipper of the saturator), then a
+crossover at 800 Hz splits it into a drum below and a horn above. Each rotor shifts
+the pitch as it turns (a Doppler shift of a few tenths of a millisecond on the
+horn), and gets quieter and duller as it faces away. Two virtual mics hear both
+rotors; `spread` sets how far apart they are, from mono at 0 to half a turn at 1,
+so left and right swirl in opposite phase. `balance` goes from the drum alone at -1
+to the horn alone at 1. `speed` 0 is slow (chorale) and 1 fast (tremolo), with
+rates in between for values in between. The rotors never jump to a new speed: the
+horn gets there within `acceleration` seconds and the heavier drum takes three
+times as long, both when speeding up and when braking. The rotary keeps 4 ms of
+memory per effect, and its rotors keep turning while it is idle.
+
+Switch the speed like the half-moon switch of an organ by automating `speed`:
+
+```flecs
+using box.audio
+
+organ {
+  AudioBus: {output: master, effects: [organ]}
+  Rotary: {speed: 0, drive: 0.3}
+}
+
+prefab switch {
+  AutomationClip: {target: organ, component: Rotary, member: "speed", length: 16,
+    curve: {kind: CurveLinear, keys: [{0, 0}, {7.9, 0}, {8, 1}, {15.9, 1}, {16, 0}]}}
+}
+
+lanes {
+  Track: {}
+  leslie { ClipPlacement: {clip: switch, start: 0, duration: 64, loop: true} }
+}
+```
+
+The step of the curve is enough: the inertia of the rotors makes the ramp up and
+the slow down.
+
+`BeatRepeat` and `TapeStop` are performance effects for fills and transitions,
+driven by their `active` member from an automation lane or a modulator. Both are
+float members, so a lane can switch them at a beat: `active` counts as on from 0.5.
+
+A beat repeat waits for the next `grid` point of the Transport after `active`
+rises (a negative grid is the slice, 0 captures at once), then repeats the next
+`slice` beats, from 1/32 to 4, held to 4 seconds. The first repeat is the input
+itself; each repeat after it is `decay` times as loud as the one before (0.5 drops
+6 dB a repeat) and `pitch` semitones from it, from -12 to 12, resampled like a
+tape: at -12 the second repeat plays at half speed, the third at a quarter.
+`reverse: 1` plays the repeats after the first backwards, `gate` from 0.1 to 1 is
+the share of each repeat that sounds, and `mix` blends the repeats with the input
+while it repeats. Repeats crossfade over 2 ms. When `active` falls the input
+returns at once, over 2 ms, not at a grid point, so the lane sets the end of the
+fill. Decay, pitch, reverse and gate apply from the next repeat, slice and grid at
+the next rise.
+
+A tape stop slows its input down to a halt over `stop_time` seconds while
+`active` is up, pitch and time together, and spins it back up over `start_time`
+seconds after it falls, both from 0.01 to 4. Halfway through a linear stop a sine
+sounds an octave down. `curve` from -1 to 1 shapes the ramps: above 0 the speed
+holds longer and drops at the end, under 0 it drops at once. The output fades out
+under a tenth of the speed and is silent at the halt; what comes in meanwhile is
+skipped. A start plays the input of its moment and, once up to speed, crossfades
+to the input over 20 ms instead of catching up.
+
+Both follow the beat clock of the Transport, at 120 bpm while none plays, and run
+on 4 seconds of memory of their effect slot.
+
+```flecs
+using box.audio
+
+// A stutter fill: the last beat of a four bar phrase repeats a sixteenth, each
+// repeat a little quieter and a semitone down
+drums { AudioBus: {effects: [drums]}; BeatRepeat: {slice: 0.25, decay: 0.85, pitch: -1} }
+
+prefab fill {
+  AutomationClip: {target: drums, component: BeatRepeat, member: "active", length: 16,
+    curve: {keys: [{0, 0}, {14.999, 0}, {15, 1}, {15.999, 1}, {16, 0}]}}
+}
+
+// A tape stop drop: the music winds down over the last two beats at 120 bpm and
+// spins back up on the downbeat of the next phrase
+music { AudioBus: {effects: [music]}; TapeStop: {stop_time: 1, start_time: 0.15, curve: 0.3} }
+
+prefab drop {
+  AutomationClip: {target: music, component: TapeStop, member: "active", length: 16,
+    curve: {keys: [{0, 0}, {13.999, 0}, {14, 1}, {15.999, 1}, {16, 0}]}}
+}
+
+transitions {
+  Track: {}
+  fill_lane { ClipPlacement: {clip: fill, start: 0} }
+  drop_lane { ClipPlacement: {clip: drop, start: 16} }
+}
+```
+
+A vocoder lets the spectrum of one channel, the `modulator`, shape the input of the
+channel it sits on, the carrier: a voice on a saw pad gives a talking synth or a robot
+voice, a drum loop on a pad gives a pad that pumps with the beat. Both run through
+`bands` matched bandpasses (8 to 32, two cascaded state variable filters each), spaced
+logarithmically from `low` to `high`. An envelope follower with `attack` and `release`
+on each modulator band sets the level of the carrier band of the same index. `q` sets
+how sharp the bands are: at 1 neighboring bands cross at -3 dB, higher is narrower and
+more tonal. The level is made up so that a full band modulator around -5 dBFS RMS gives
+about the carrier's level; a silent modulator gives silence. `shift` from -1 to 1 moves
+the carrier bands up to an octave up or down against the modulator bands, which shifts
+the formants. `unvoiced` adds white noise to the carrier of the bands from 3 kHz up, so
+the consonants of a voice come through a carrier without highs.
+
+The modulator is keyed like a sidechain: it runs before the vocoded channel, and its
+output after its fader is the key, so route it into a muted group when only the
+vocoded sound should be heard. Without a modulator, or with one that is deleted, is no
+channel or would form a cycle, the vocoder logs one error and passes its input. Each
+vocoder takes memory for 32 bands. The band count is not automatable; changing it fades
+the vocoded sound out and back in. A drum loop vocodes a saw pad:
+
+```flecs
+drum_key { AudioBus: {output: master, volume: 0} }
+drums { AudioBus: {output: drum_key} }
+pad_vocoder {
+  Vocoder: {modulator: drums, bands: 16, attack: 0.002, release: 0.08, unvoiced: 0.2}
+}
+pad { AudioBus: {output: master, effects: [pad_vocoder]} }
+```
+
+Play the drum loop on `drums` and a saw pad (a synth sound with a `SynthSaw` layer) on
+`pad`; add `drums` to the master too, or give `drum_key` volume, to hear the loop with it.
+
+The cost grows with the bands: each band runs eight bandpass stages per frame. The
+`Modulation` bench of [bench/audio](../bench/audio/) measures it as `vocoder_16` and
+`vocoder_32`: about 31 and 61 µs per 128-frame quantum in a release build, roughly
+250 and 480 ns per frame, or about 15 ns per band and frame.
+
 For ducking, key a compressor on another channel:
 
 ```flecs
@@ -354,8 +523,9 @@ An `AudioModulator` on an entity of its own moves one float member of a bus or a
 effect on its own, in time with the song: a filter that wobbles in eighths, a send
 that pulses, a tremolo, an auto-pan, an auto-wah. `target`, `component` and `member`
 name what it moves exactly as an [AutomationClip](#automation) does: `volume`, `pan`,
-`width` and `sends[i].level` of an `AudioBus` or of the master, and every float member
-of an effect component, such as `cutoff` or `bands[2].gain`.
+`width` and `sends[i].level` of an `AudioBus` or of the master, every float member
+of an effect component, such as `cutoff` or `bands[2].gain`, and the `value` of an
+[AudioMacro](#macros).
 
 The modulator adds to the value the output has, from the component or from an
 automation lane, and the sum is clamped to the range of the member. It never writes
@@ -415,6 +585,101 @@ wah { AudioModulator: {target: wah_filter, component: AudioFilter, member: "cuto
   release: 0.15} }
 ```
 
+#### Macros
+
+An `AudioMacro` on an entity of its own is one value of 0..1 that moves several members
+at once, each over its own range and curve, like a knob of a Combinator. Its maps are
+children with an `AudioMacroMap`: `target`, `component` and `member` name a member
+exactly as an [AutomationClip](#automation) and a modulator do, and the member goes
+from `min` at a value of 0 to `max` at 1. A build-up is then one automation lane on one
+macro instead of four lanes kept in sync by hand, and game code drives the intensity of
+the music by writing one value.
+
+| Field | Meaning and default |
+| --- | --- |
+| `AudioMacro.value` | `0`, clamped to 0..1 |
+| `target`, `component`, `member` | The member, as of an `AutomationClip` |
+| `min`, `max` | `0`, `1`, in the units of the member; a `min` above `max` inverts |
+| `curve` | `0` linear; `1` exponential, the middle gives 11% of the range; `-1` logarithmic, 89% |
+| `scale` | `AudioModLinear`, or `AudioModOctaves` for a frequency, with `min` and `max` above 0 |
+
+The value of a member is `min + (max - min) * shape(value)`, or with
+`scale: AudioModOctaves` `min * (max / min)^shape(value)`, even in pitch like a modulator
+in octaves: 200..8000 Hz at 0.5 is 1265 Hz. The curve is
+`shape(x) = (2^(6 curve x) - 1) / (2^(6 curve) - 1)`.
+
+While a map runs, the macro decides its member: the value of the component, and of an
+automation lane of the member itself, is replaced, not added to. Modulators of the member
+add to the value of the macro. The macro never writes a component, so game code keeps
+reading and writing the authored values. When two maps move one member, the one created
+last (the higher entity id) wins; the other logs one warning that names both and does
+nothing until the newer one is gone, then takes over with a fade.
+
+The value of a macro is itself a target: an `AutomationClip` or an `AudioModulator` with
+`component: AudioMacro, member: "value"` moves it, sample accurately. The macros are
+expanded in the audio core, not on the main thread: the module sends each macro and its
+maps to the core once, an automation lane schedules `MACRO` commands with the value at
+their frame as it schedules any value, and the modulators of a macro add to its value in
+the core. Every 32 frames, and at the frame of every scheduled value, the core clamps the
+value plus its modulators to 0..1 and shapes it into each map, so neither automation nor
+modulation writes a component. A write of `AudioMacro.value` from a script or from C goes
+the same way at once, with the usual smoothing of the targets: a bus ramps over at least
+5 ms, an effect smooths over its usual 10 to 20 ms. A modulator of a macro is linear; a
+follower of a macro needs a `key` bus.
+
+A new map fades in over 50 ms. Disabling or deleting a map or its macro, or retargeting a
+map, fades it out over 50 ms, and the member returns to its authored value without a
+click. There are 32 macros and 8 maps per macro; a macro past a limit logs one error that
+names it. A map whose target, component or member is unknown, whose parent has no
+`AudioMacro`, that maps the value of a macro, or in octaves of a member that is no
+frequency, logs one error that names it. The `audio` command lists the macros with their
+value and each map with its member, range and the value it gives.
+
+A build-up over 16 beats, on one lane, with the music intensity also in reach of game code:
+
+```flecs
+using box.audio
+
+synth_filter { AudioFilter: {cutoff: 1000} }
+drive { Saturator: {drive: 0} }
+echo { Delay: {time: 0.375, feedback: 0.2, mix: 0.3} }
+room { AudioBus: {kind: AudioChannelReturn, effects: [room]}
+  Reverb: {} }
+synth { AudioBus: {effects: [synth_filter, drive, echo],
+  sends: [{bus: room, level: 0.1}]} }
+
+build {
+  AudioMacro: {}
+  open { AudioMacroMap: {target: synth_filter, component: AudioFilter,
+    member: "cutoff", min: 300, max: 9000, scale: AudioModOctaves} }
+  heat { AudioMacroMap: {target: drive, component: Saturator, member: "drive",
+    min: 0, max: 0.8, curve: 0.5} }
+  wash { AudioMacroMap: {target: synth, component: AudioBus,
+    member: "sends[0].level", min: 0.1, max: 0.6} }
+  climb { AudioMacroMap: {target: echo, component: Delay, member: "feedback",
+    min: 0.2, max: 0.7, curve: 0.3} }
+}
+
+prefab rise {
+  AutomationClip: {target: build, component: AudioMacro, member: "value",
+    length: 16, curve: {keys: [{0, 0}, {16, 1}]}}
+}
+
+lanes {
+  Track: {}
+  build_up { ClipPlacement: {clip: rise, start: 48} }
+}
+
+// A pulse on top of the rise, in eighths
+build_pulse { AudioModulator: {target: build, component: AudioMacro,
+  member: "value", depth: 0.05, sync: 0.5} }
+```
+
+From game code the same macro follows the danger of the scene:
+`ecs_set(world, build, AudioMacro, { .value = danger })`.
+[macros.flecs](../test/assets/audio/macros.flecs) maps a cutoff and a send, sweeps them
+with a lane and inverts two ranges.
+
 ### Meters
 
 Add `AudioMeter: {}` to a bus, master or effect to read it every frame:
@@ -441,7 +706,7 @@ ears { Position: {0, 1.7, 0}; AudioListener }
 engine {
   Position: {4, 0, -10}
   AudioSource: {sound: hum, loop: true}
-  AudioSpatial: {min_distance: 2, max_distance: 40}
+  AudioSpatial: {min_distance: 2, max_distance: 40, cutoff: 800}
 }
 const shot: bool = box.audio.play_at(click, {-3, 0, -5}, 1.0)
 ```
@@ -451,7 +716,8 @@ of the first enabled view in render order. Tag the main camera explicitly in sce
 with render-to-texture views. Multiple listeners warn and use the lowest entity ID.
 Without a listener, spatial sounds play centered at full volume.
 
-`AudioSpatial` defaults to `min_distance: 1`, `max_distance: 50`, `rolloff: 1`.
+`AudioSpatial` defaults to `min_distance: 1`, `max_distance: 50`, `rolloff: 1`,
+`cutoff: 0`.
 A source uses its world position, including parent transforms; without a
 `WorldTransform` it plays nonspatially. On a sound entity, `AudioSpatial` supplies
 distances for `play_at`, whose position stays fixed while the listener moves.
@@ -462,7 +728,17 @@ inverse-distance attenuation, normalized to reach zero at max:
 `gain = (g(d) - g(max)) / (1 - g(max))`.
 Rolloff zero holds full gain until max distance. Pan follows the listener's right
 axis and narrows to center within min distance. Front and back sound alike.
-There is no Doppler, occlusion, distance filter or HRTF.
+
+`cutoff` adds a distance filter, since air dulls distant sounds: a 12 dB per octave
+low-pass, open within min distance, reaching `cutoff` Hz at max distance. Between
+them it moves exponentially from 20000 Hz, so equal steps in distance sound like
+equal steps in brightness: `f(d) = 20000 * (cutoff / 20000)^t` with
+`t = (d - min) / (max - min)`. A `cutoff` of 0, the default, a negative one or one
+of 20000 Hz or more filters nothing and costs nothing; others are clamped to at
+least 10 Hz. The filter applies to sources and `play_at` one shots, each channel of
+a stereo sound, after the voice's sound and before its volume and pan, and glides
+to a new cutoff over 50 ms, so a fast source or a teleporting listener does not
+click. A voice starts at its cutoff. There is no Doppler, occlusion or HRTF.
 
 Out-of-range looping sources release their voices but keep time on the game thread;
 returning in range resumes where the sound would have been. Nonlooping sources and
@@ -1154,8 +1430,9 @@ lanes {
 An `AudioBus` automates `volume`, `pan`, `width` and the `level` of its sends; the
 master automates its `volume`, `pan` and `width`. An effect automates every float
 member of its effect component: Reverb, Equalizer bands, AudioFilter, Compressor,
-Gate, Delay, Phaser, Chorus, Saturator and later effects. Kinds, slopes, stages,
-voices, entities and bools are not continuous and not automatable. A clip whose
+Gate, Delay, Phaser, Chorus, Saturator, Rotary and later effects. An
+[AudioMacro](#macros) automates its `value`, which moves all its maps. Kinds, slopes,
+stages, voices, entities and bools are not continuous and not automatable. A clip whose
 target, component or member is unknown or not automatable logs one error that
 names it and does nothing until it changes.
 
@@ -1295,20 +1572,26 @@ a writer buffer of a given size holds fewer of them than before.
 
 The core also keeps a beat clock: the transport schedules a `BEAT` command with the
 beat and tempo at each start, seek, stop, tempo change and loop wrap, only while
-something in the core reads it, and the core derives the beat of any frame from the
-last one (`box_audio_core_beat`).
+something in the core reads it (a modulator or a pattern gate), and the core derives the
+beat of any frame from the last one (`box_audio_core_beat`).
+
+An effect command carries 32 floats of parameters, enough for the 16 steps of a
+pattern gate and its other values as plain floats, which automation and the modulators
+reach like any other parameter. An effect command is 152 bytes and an effect params
+command 148, the largest command of the schedule, so a writer buffer holds fewer of
+them than with the 16 floats before.
 
 The core owns a 64-bit rendered-frame clock. Scheduled play, stop, voice/bus set,
-release, legato and effect params commands carry a frame time. Future commands wait in a fixed
-4096-entry schedule; a full schedule applies the command immediately and reports
-`BOX_AUDIO_EVENT_LATE`. Immediate stops also cancel scheduled commands for their
+release, legato, effect params and macro commands carry a frame time. Future commands
+wait in a fixed 4096-entry schedule; a full schedule applies the command immediately and
+reports `BOX_AUDIO_EVENT_LATE`. Immediate stops also cancel scheduled commands for their
 voice handle. Sound memory is freed by its owner after `SOUND_FREE`, which is
 retained even when other events overflow. See [core.h](../src/audio/core/core.h)
 and [transport.h](../src/audio/transport.h) for the low-level APIs.
 
-The main limits are 64 voices, 64 buses, 64 effects, 64 modulators, four inserts and sends per
-bus, eight synth layers, two synth LFOs, seven unison copies per layer,
-32 pluck strings, 32 comb delay lines and 256 frames per wavetable, whose tables share the 1023 sound ids. Effects are algorithmic: no convolution or geometry-derived rooms.
+The main limits are 64 voices, 64 buses, 64 effects, 64 modulators, 32 macros of eight
+maps, four inserts and sends per bus, eight synth layers, two synth LFOs, seven unison
+copies per layer, 32 pluck strings, 32 comb delay lines and 256 frames per wavetable, whose tables share the 1023 sound ids. Effects are algorithmic: no convolution or geometry-derived rooms.
 There is one transport and one music stream per world. There are no tempo ramps,
 time stretching, MIDI I/O, plugins, mixer UI or piano roll.
 Scripts can change channel and effect values each frame.

@@ -1,0 +1,20 @@
+// A vocoder set by a scene, for the Vocoder suite of test/cpu/audio: a drum loop vocodes a saw
+// pad. The drums run into a silent group, so only the vocoded pad is heard; they key the
+// vocoder after their own fader. An effect entity comes before the bus that names it.
+using box.audio
+
+drum_key {
+  AudioBus: {output: master, volume: 0}
+}
+
+drums {
+  AudioBus: {output: drum_key}
+}
+
+pad_vocoder {
+  Vocoder: {modulator: drums, bands: 16, attack: 0.002, release: 0.08, unvoiced: 0.2}
+}
+
+pad {
+  AudioBus: {output: master, effects: [pad_vocoder]}
+}

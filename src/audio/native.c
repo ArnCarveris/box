@@ -445,6 +445,8 @@ static int box_audio_native_open(
         goto done;
     }
 
+    ecs_trace("opened audio device '%s' (%u Hz)", n->device.playback.name,
+        n->device.sampleRate);
     result = 0;
 done:
     if (result && n->device_open) {

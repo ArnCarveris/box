@@ -640,6 +640,7 @@ static void box_audio_cmd_play(
     box_audio_ramp_set(&v->left, 0);
     box_audio_ramp_set(&v->right, 0);
     box_audio_voice_express_reset(core, v, false);
+    box_audio_voice_filter_reset(v);
     box_audio_voice_gains(core, v);
     if (core->sounds[cmd->sound].synth) {
         box_audio_ramp_set(&v->left, v->left.target);
@@ -817,6 +818,7 @@ static void box_audio_cmd_stream(
     box_audio_ramp_set(&v->left, 0);
     box_audio_ramp_set(&v->right, 0);
     box_audio_voice_express_reset(core, v, false);
+    box_audio_voice_filter_reset(v);
     box_audio_voice_gains(core, v);
     box_audio_source_stream(core, &v->source, cmd->stream);
     core->playing ++;
@@ -883,6 +885,8 @@ static void box_audio_cmd_voice_set(
         v->bus = (uint32_t)value;
     } else if (cmd->param == BOX_AUDIO_PARAM_POSITION) {
         box_audio_source_seek(core, &v->source, value);
+    } else if (cmd->param == BOX_AUDIO_PARAM_CUTOFF) {
+        box_audio_voice_cutoff(core, v, value);
     } else {
         box_audio_core_event(core, BOX_AUDIO_EVENT_IGNORED, BOX_AUDIO_CMD_VOICE_SET, 0);
     }
@@ -1085,6 +1089,8 @@ static void box_audio_cmd_timed(
         box_audio_cmd_voice_ramp(core, &cmd->ramp);
     } else if (cmd->header.type == BOX_AUDIO_CMD_BEAT) {
         box_audio_beat_command(core, &cmd->beat);
+    } else if (cmd->header.type == BOX_AUDIO_CMD_MACRO) {
+        box_audio_macro_command(core, &cmd->macro);
     } else {
         box_audio_cmd_bus_set(core, &cmd->set);
     }
@@ -1260,7 +1266,9 @@ static void box_audio_schedule_cancel_sets(
             (cmd->type == BOX_AUDIO_CMD_EFFECT_PARAMS && type == BOX_AUDIO_CMD_EFFECT_PARAMS &&
             c->effect.slot == cmd->target) ||
             (cmd->type == BOX_AUDIO_CMD_VOICE_RAMP && type == BOX_AUDIO_CMD_VOICE_RAMP &&
-            c->ramp.voice == cmd->target);
+            c->ramp.voice == cmd->target) ||
+            (cmd->type == BOX_AUDIO_CMD_MACRO && type == BOX_AUDIO_CMD_MACRO &&
+            c->macro.macro == cmd->target);
         if (!drop) {
             if (kept != i) {
                 core->schedule[kept] = core->schedule[i];
@@ -1328,6 +1336,7 @@ static void box_audio_cmd(
     box_audio_cmd_cancel_t cancel;
     box_audio_cmd_synth_t synth;
     box_audio_cmd_modulator_t modulator;
+    box_audio_cmd_macro_map_t map;
     uint32_t layers;
     if (type == BOX_AUDIO_CMD_PLAY && size >= (int32_t)sizeof(box_audio_cmd_play_t)) {
         box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_play_t));
@@ -1353,9 +1362,14 @@ static void box_audio_cmd(
         box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_ramp_t));
     } else if (type == BOX_AUDIO_CMD_BEAT && size >= (int32_t)sizeof(box_audio_cmd_beat_t)) {
         box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_beat_t));
+    } else if (type == BOX_AUDIO_CMD_MACRO && size >= (int32_t)sizeof(box_audio_cmd_macro_t)) {
+        box_audio_cmd_when(core, bytes, (int32_t)sizeof(box_audio_cmd_macro_t));
     } else if (type == BOX_AUDIO_CMD_MODULATOR && size >= (int32_t)sizeof(modulator)) {
         box_audio_copy(&modulator, bytes, (int32_t)sizeof(modulator));
         box_audio_mod_command(core, &modulator);
+    } else if (type == BOX_AUDIO_CMD_MACRO_MAP && size >= (int32_t)sizeof(map)) {
+        box_audio_copy(&map, bytes, (int32_t)sizeof(map));
+        box_audio_macro_map_command(core, &map);
     } else if (type == BOX_AUDIO_CMD_CANCEL && size >= (int32_t)sizeof(cancel)) {
         box_audio_copy(&cancel, bytes, (int32_t)sizeof(cancel));
         box_audio_schedule_cancel_sets(core, &cancel);
@@ -1686,7 +1700,8 @@ done:
     return result;
 }
 
-/** Render frames of the source of a voice into its bus from a frame of the block.
+/** Render frames of the source of a voice into its bus from a frame of the block, through
+ * its low-pass when that runs.
  *
  * @param core The core
  * @param v The voice
@@ -1707,6 +1722,10 @@ static int32_t box_audio_voice_mix(
     bool stereo;
     int32_t done = box_audio_source_render(core, &v->source, frames, &stereo), i;
     const float *sl = core->src_l, *sr = stereo ? core->src_r : core->src_l;
+    if (v->filtered) {
+        box_audio_voice_filter(core, v, stereo, frames);
+    }
+
     for (i = 0; i < frames; i ++) {
         float gl = box_audio_ramp_next(&v->left);
         float gr = box_audio_ramp_next(&v->right);
@@ -1735,6 +1754,7 @@ static void box_audio_voice_render(
     bool active = v->bus < BOX_AUDIO_BUS_MAX && core->bus_active[v->bus];
     box_audio_bus_t *b = &core->buses[active ? v->bus : 0];
     int32_t done, at, n, k;
+    v->fresh = false;
     if (!v->expressive) {
         done = box_audio_voice_mix(core, v, b, active, 0, frames);
     } else {
@@ -1938,7 +1958,7 @@ void box_audio_core_render(
             }
         }
 
-        if (core->mods.on || core->mods.buses || core->mods.effects) {
+        if (core->mods.on || core->mods.maps || core->mods.buses || core->mods.effects) {
             n = box_audio_mods_block(core, n);
         }
 

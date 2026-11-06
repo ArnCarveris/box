@@ -24,7 +24,7 @@ void Invalidation_static_move_rebakes_nearby_probes(void) {
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
-        .capture_size = 8, .budget_ms = 2, .bounces = 0});
+        .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, camera, Position, {0, 4, 10});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -114,7 +114,7 @@ void Invalidation_dynamic_move_rebakes_nothing(void) {
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
-        .capture_size = 8, .budget_ms = 2, .bounces = 0});
+        .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, camera, Position, {0, 4, 10});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -167,7 +167,7 @@ void Invalidation_point_light_change_limited_to_range(void) {
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
-        .capture_size = 8, .budget_ms = 2, .bounces = 0});
+        .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, camera, Position, {0, 4, 10});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -233,7 +233,7 @@ void Invalidation_directional_light_change_rebakes_scene(void) {
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
-        .capture_size = 8, .budget_ms = 2, .bounces = 0});
+        .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, camera, Position, {0, 4, 10});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -293,7 +293,7 @@ void Invalidation_removed_and_recolored_shapes_rebake(void) {
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
-        .capture_size = 8, .budget_ms = 2, .bounces = 0});
+        .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, camera, Position, {0, 4, 10});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -378,7 +378,7 @@ void Invalidation_moved_emissive_leaves_no_light_behind(void) {
         ecs_entity_t scene = ecs_new(world);
         ecs_add(world, scene, Scene);
         ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
-            .capture_size = 8, .budget_ms = 2, .bounces = 1});
+            .capture_size = 8, .budget_ms = 2, .bounces = 1, .compute = true});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
         ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
         ecs_set(world, dark, DirectionalLight, {.intensity = 0});
@@ -479,7 +479,7 @@ void Invalidation_requeued_probes_keep_values(void) {
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
-        .capture_size = 8, .budget_ms = 1000000, .bounces = 1});
+        .capture_size = 8, .budget_ms = 1000000, .bounces = 1, .compute = true});
     ecs_set(world, scene, AmbientLight, {.intensity = 0});
     ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, dark, DirectionalLight, {.intensity = 0});
@@ -530,7 +530,7 @@ void Invalidation_requeued_probes_keep_values(void) {
 
     stbi_image_free(image);
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
-        .capture_size = 8, .budget_ms = 0.001f, .bounces = 1});
+        .capture_size = 8, .budget_ms = 0.001f, .bounces = 1, .compute = true});
     ecs_progress(world, 0);
     box_render_sync(world);
     test_bool(ecs_get(world, scene, LightBakeStatus)->converged, true);
@@ -580,7 +580,7 @@ void Invalidation_edge_changes_keep_the_volume(void) {
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
-        .capture_size = 8, .budget_ms = 1000000, .bounces = 0});
+        .capture_size = 8, .budget_ms = 1000000, .bounces = 0, .compute = true});
     ecs_set(world, scene, AmbientLight, {.intensity = 0});
     ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, dark, DirectionalLight, {.intensity = 0});
@@ -627,7 +627,7 @@ void Invalidation_edge_changes_keep_the_volume(void) {
 
     test_bool(ecs_get(world, scene, LightBakeStatus)->converged, true);
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
-        .capture_size = 8, .budget_ms = 0.001f, .bounces = 0});
+        .capture_size = 8, .budget_ms = 0.001f, .bounces = 0, .compute = true});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -699,7 +699,7 @@ void Invalidation_deleting_uncaptured_shapes_rebakes_nothing(void) {
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
-        .capture_size = 8, .budget_ms = 2, .bounces = 0});
+        .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, camera, Position, {0, 4, 10});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -760,7 +760,7 @@ void Invalidation_parent_opacity_and_prefab_textures_rebake(void) {
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
-        .capture_size = 8, .budget_ms = 2, .bounces = 0});
+        .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, camera, Position, {0, 4, 10});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -839,7 +839,7 @@ void Invalidation_newly_valid_probe_hidden_until_baked(void) {
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
     ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 1,
-        .capture_size = 8, .budget_ms = 1000000, .bounces = 0});
+        .capture_size = 8, .budget_ms = 1000000, .bounces = 0, .compute = true});
     ecs_set(world, scene, AmbientLight, {.intensity = 0});
     ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, dark, DirectionalLight, {.intensity = 0});
@@ -884,7 +884,7 @@ void Invalidation_newly_valid_probe_hidden_until_baked(void) {
 
     test_bool(ecs_get(world, scene, LightBakeStatus)->converged, true);
     ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 1,
-        .capture_size = 8, .budget_ms = 0.001f, .bounces = 0});
+        .capture_size = 8, .budget_ms = 0.001f, .bounces = 0, .compute = true});
     ecs_set(world, glow, Emissive, {.strength = 5, .color = {255, 255, 255}});
     ecs_progress(world, 0);
     box_render_sync(world);
@@ -940,7 +940,7 @@ void Invalidation_full_rebakes_keep_values(void) {
         ecs_entity_t scene = ecs_new(world);
         ecs_add(world, scene, Scene);
         ecs_set(world, scene, LightBake, {.probe_spacing = 3, .bounds_padding = 0,
-            .capture_size = 8, .budget_ms = 1000000, .bounces = 1});
+            .capture_size = 8, .budget_ms = 1000000, .bounces = 1, .compute = true});
         ecs_set(world, scene, AmbientLight, {.sky = {40, 40, 40}, .ground = {40, 40, 40},
             .intensity = 1});
         ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -978,7 +978,7 @@ void Invalidation_full_rebakes_keep_values(void) {
 
         test_bool(ecs_get(world, scene, LightBakeStatus)->converged, true);
         ecs_set(world, scene, LightBake, {.probe_spacing = 3, .bounds_padding = 0,
-            .capture_size = 8, .budget_ms = 0.001f, .bounces = 1});
+            .capture_size = 8, .budget_ms = 0.001f, .bounces = 1, .compute = true});
         ecs_progress(world, 0);
         box_render_sync(world);
         test_bool(ecs_get(world, scene, LightBakeStatus)->converged, true);
@@ -997,10 +997,10 @@ void Invalidation_full_rebakes_keep_values(void) {
                 .intensity = 1});
         } else if (i == 1) {
             ecs_set(world, scene, LightBake, {.probe_spacing = 3, .bounds_padding = 0,
-                .capture_size = 12, .budget_ms = 0.001f, .bounces = 1});
+                .capture_size = 12, .budget_ms = 0.001f, .bounces = 1, .compute = true});
         } else {
             ecs_set(world, scene, LightBake, {.probe_spacing = 3, .bounds_padding = 0,
-                .capture_size = 8, .budget_ms = 0.001f, .bounces = 2});
+                .capture_size = 8, .budget_ms = 0.001f, .bounces = 2, .compute = true});
         }
 
         int32_t lowest = before, partial = 0;
@@ -1042,7 +1042,7 @@ void Invalidation_tint_rebakes_nothing(void) {
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
-        .capture_size = 8, .budget_ms = 2, .bounces = 0});
+        .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, camera, Position, {0, 4, 10});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -1113,7 +1113,7 @@ void Invalidation_bake_ignores_tint(void) {
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
     ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 1,
-        .capture_size = 16, .budget_ms = 1000000, .bounces = 0});
+        .capture_size = 16, .budget_ms = 1000000, .bounces = 0, .compute = true});
     ecs_set(world, scene, AmbientLight, {.intensity = 0});
     ecs_entity_t sun = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, sun, DirectionalLight, {.intensity = 4});
@@ -1177,7 +1177,7 @@ void Invalidation_same_transform_rebakes_nothing(void) {
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
-        .capture_size = 8, .budget_ms = 2, .bounces = 0});
+        .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, camera, Position, {0, 4, 10});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -1238,7 +1238,7 @@ void Invalidation_moved_caster_matches_fresh_bake(void) {
         ecs_entity_t scene = ecs_new(world);
         ecs_add(world, scene, Scene);
         ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
-            .capture_size = 16, .budget_ms = 2, .bounces = 1});
+            .capture_size = 16, .budget_ms = 2, .bounces = 1, .compute = true});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
         ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
         ecs_set(world, camera, Position, {4, 1.5f, 0});

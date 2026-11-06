@@ -777,7 +777,7 @@ static float fv_capture(
     ecs_set(world, scene, ReflectionBake, {.resolution = 16, .budget_ms = 1,
         .scene_probe = false});
     ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
-        .capture_size = 8, .budget_ms = 2, .bounces = 1});
+        .capture_size = 8, .budget_ms = 2, .bounces = 1, .compute = true});
     ecs_entity_t floor = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, floor, Position, {0, -0.1f, 0});
     ecs_set(world, floor, Box, {4, 0.2f, 4});

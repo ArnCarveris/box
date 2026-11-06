@@ -8,6 +8,7 @@
 
 #include "command.h"
 #include "../input/input.h"
+#include "../picking/picking.h"
 #include <ctype.h>
 #include <math.h>
 #include <stdlib.h>
@@ -1128,11 +1129,126 @@ static void box_cmd_input_action_cmds(
         });
 }
 
+/** Find a command of the shell that box.command does not override: the first one with the name
+ * in the command paths after box.command.commands, as one of flecs.
+ *
+ * @param world The world
+ * @param name Name of the command
+ * @return The function entity, 0 when there is none
+ */
+static ecs_entity_t box_cmd_input_shadowed(
+    const ecs_world_t *world,
+    const char *name)
+{
+    const EcsScriptShell *shell = ecs_singleton_get(world, EcsScriptShell);
+    const ecs_entity_t *paths = shell ? ecs_vec_first(&shell->command_paths) : NULL;
+    ecs_entity_t own = ecs_lookup(world, BOX_COMMAND_SCOPE), result = 0;
+    int32_t i, count = shell ? ecs_vec_count(&shell->command_paths) : 0;
+    for (i = 0; i < count && !result; i ++) {
+        ecs_entity_t fn = paths[i] && paths[i] != own ?
+            ecs_lookup_child(world, paths[i], name) : 0;
+        result = fn && ecs_has(world, fn, EcsScriptFunction) ? fn : 0;
+    }
+
+    return result;
+}
+
+/** The press, release and click commands: run the command of flecs, which sends the events to
+ * the entity through flecs.script.input, then let box.picking drive the ActionTrigger of the
+ * entity with them as it does for the events of the pointer.
+ *
+ * flecs does not tell which events a command sent, so the last mouse event of flecs before and
+ * after the command gives them: the buttons that went down and came up, and for a click that
+ * released its button, its press first.
+ *
+ * @param ctx The call context, its ctx is the name of the command
+ * @param argc Number of arguments
+ * @param argv The arguments of the command of flecs
+ * @param result Receives the result of the command of flecs
+ */
+static void box_cmd_input_direct(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    ecs_world_t *world = ctx->world;
+    const char *name = ctx->ctx;
+    ecs_entity_t fn = box_cmd_input_shadowed(world, name);
+    const EcsScriptFunction *f = fn ? ecs_get(world, fn, EcsScriptFunction) : NULL;
+    ecs_function_ctx_t inner = { .world = world, .function = fn, .entity = ctx->entity };
+    EcsScriptMouseEvent before, after, press;
+    uint32_t bit;
+    if (!f || !f->callback) {
+        ecs_err("command '%s' of flecs is not registered", name);
+        goto done;
+    }
+
+    inner.ctx = f->ctx;
+    ecs_script_get_mouse_state(world, &before, NULL);
+    f->callback(&inner, argc, argv, result);
+    ecs_script_get_mouse_state(world, &after, NULL);
+    if (after.id == before.id || after.button < 0 || after.button >= 32) {
+        goto done;
+    }
+
+    bit = 1u << after.button;
+    if (!strcmp(name, "click") && !(after.buttons & bit)) {
+        press = after;
+        press.buttons |= bit;
+        box_pick_triggers_direct(world, &press, bit & ~before.buttons, 0);
+        box_pick_triggers_direct(world, &after, 0, bit);
+    } else {
+        box_pick_triggers_direct(world, &after,
+            after.buttons & ~before.buttons, before.buttons & ~after.buttons);
+    }
+
+done:
+    return;
+}
+
+/** Override the press, release and click commands of flecs with box_cmd_input_direct, with
+ * their parameters, result and brief.
+ *
+ * @param world The world
+ */
+static void box_cmd_input_pointer(
+    ecs_world_t *world)
+{
+    static const char *names[] = { "press", "release", "click" };
+    int32_t i, p;
+    for (i = 0; i < (int32_t)(sizeof(names) / sizeof(names[0])); i ++) {
+        ecs_entity_t fn = box_cmd_input_shadowed(world, names[i]);
+        const EcsScriptFunction *f = fn ? ecs_get(world, fn, EcsScriptFunction) : NULL;
+        const ecs_script_parameter_t *params = f ? ecs_vec_first(&f->params) : NULL;
+        int32_t count = f ? ecs_vec_count(&f->params) : 0;
+        ecs_function_desc_t desc = {
+            .name = names[i],
+            .callback = box_cmd_input_direct,
+            .ctx = ECS_CONST_CAST(char*, names[i])
+        };
+        char *brief;
+        if (!f || count > FLECS_SCRIPT_FUNCTION_ARGS_MAX) {
+            continue;
+        }
+
+        brief = ecs_doc_get_brief(world, fn) ? ecs_os_strdup(ecs_doc_get_brief(world, fn)) : NULL;
+        desc.return_type = f->return_type;
+        for (p = 0; p < count; p ++) {
+            desc.params[p] = params[p];
+        }
+
+        box_command_register(world, brief ? brief : "", desc);
+        ecs_os_free(brief);
+    }
+}
+
 void box_cmd_input_init(
     ecs_world_t *world)
 {
     box_cmd_input_keys(world);
     box_cmd_input_mouse(world);
+    box_cmd_input_pointer(world);
 
     box_cmd_input_register(world,
         "Empty the input queue and release every key, button, action and the cursor",

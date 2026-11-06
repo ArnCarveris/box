@@ -1,0 +1,63 @@
+// An ambience of emitters for the Emitter suite of test/cpu/audio: an AudioListener at the
+// origin, a synth chirp and a sampled drip, and one AudioEmitter of each shape, each with a
+// short interval so all of them play within a few seconds. The box is turned and scaled, the
+// disc sits on the ground, the hemisphere is a dome of rain over the listener. The rain plays
+// on a bus of its own, which wins over the sfx bus of the drip.
+using box.transform
+using box.audio
+
+ears {
+  Position: {0, 1.7, 0}
+  AudioListener
+}
+
+sfx { AudioBus: {output: master, kind: AudioChannelSfx} }
+rain_bus { AudioBus: {output: master, volume: 0.5} }
+
+prefab Chirp {
+  AudioOutput: {bus: sfx}
+  SynthSound: {pitch_variance: 0.1}
+  SynthEnvelope: {attack: 0.002, decay: 0.08}
+  SynthOscillator: {wave: SynthSine, frequency: 3200, level: 0.3}
+  AudioSpatial: {min_distance: 1, max_distance: 40, rolloff: 1}
+}
+
+drip {
+  AudioOutput: {bus: sfx}
+  SoundFile: {path: "test/assets/audio/sine_16.wav"}
+}
+
+cricket {
+  Position: {3, 0, -4}
+  AudioEmitter: {sound: Chirp, interval_min: 0.1, interval_max: 0.4, volume_min: 0.5,
+    volume_max: 1, pitch_min: 0.9, pitch_max: 1.1, seed: 1}
+}
+
+meadow {
+  Position: {0, 0, -6}
+  AudioEmitter: {sound: Chirp, interval_min: 0.1, interval_max: 0.3, shape: AudioEmitterDisc,
+    radius: 8, max_active: 4, seed: 2}
+}
+
+canopy {
+  Position: {0, 4, 0}
+  AudioEmitter: {sound: Chirp, interval_min: 0.2, interval_max: 0.5,
+    shape: AudioEmitterSphere, radius: 5, pitch_min: 0.8, pitch_max: 1.25, seed: 3}
+}
+
+rain {
+  Position: {0, 0, 0}
+  AudioOutput: {bus: rain_bus}
+  AudioSpatial: {min_distance: 2, max_distance: 30, rolloff: 0.5}
+  AudioEmitter: {sound: drip, interval_min: 0.05, interval_max: 0.15,
+    shape: AudioEmitterHemisphere, radius: 10, volume_min: 0.2, volume_max: 0.6,
+    pitch_min: 0.7, pitch_max: 1.4, max_active: 8, seed: 4}
+}
+
+cellar {
+  Position: {-5, 0, 2}
+  Rotation: {0, 0.6, 0}
+  Scale: {2, 1, 1}
+  AudioEmitter: {sound: drip, interval_min: 0.3, interval_max: 0.6, shape: AudioEmitterBox,
+    extents: {2, 1.5, 3}, volume_min: 0.4, volume_max: 0.8}
+}

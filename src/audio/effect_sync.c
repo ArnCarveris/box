@@ -4,12 +4,15 @@
  * their slots of the pool of the core, their memory and their commands.
  *
  * An effect entity is any entity with an effect component: Reverb, Equalizer, AudioFilter,
- * Compressor, Gate, Delay, Phaser, Chorus, Saturator, TransientShaper, FrequencyShifter or
- * PitchShifter, the first of them in that order. A compressor gets the key bus the order
- * compile accepted.
+ * Compressor, Gate, Delay, Phaser, Chorus, Saturator, TransientShaper, FrequencyShifter,
+ * PitchShifter, PatternGate, Rotary, BeatRepeat, TapeStop or Vocoder, the first of them in
+ * that order.
  *
  * The module sends an EFFECT command when the kind, the channel, the slot or a parameter of an
- * effect changes, and takes it off when no insert slot names it any more.
+ * effect changes and takes it off when no slot names it. A compressor gets the key bus the
+ * order compile accepted for its insert, a vocoder its modulator the same way; a vocoder
+ * without one logs an error once. A pattern gate and a beat repeat ask the timeline for the
+ * beat clock.
  */
 
 #include "module.h"
@@ -197,6 +200,20 @@ uint32_t box_audio_module_effect_params(
             params[0] = shaper->attack;
             params[1] = shaper->sustain;
         }
+    } else if (component == ecs_id(Vocoder)) {
+        const Vocoder *vocoder = ptr;
+        result = BOX_AUDIO_EFFECT_VOCODER;
+        if (params && ptr) {
+            params[0] = (float)vocoder->bands;
+            params[1] = vocoder->low;
+            params[2] = vocoder->high;
+            params[3] = vocoder->q;
+            params[4] = vocoder->attack;
+            params[5] = vocoder->release;
+            params[6] = vocoder->shift;
+            params[7] = vocoder->unvoiced;
+            params[8] = vocoder->mix;
+        }
     } else if (component == ecs_id(FrequencyShifter)) {
         const FrequencyShifter *shifter = ptr;
         result = BOX_AUDIO_EFFECT_FREQUENCY_SHIFTER;
@@ -218,6 +235,60 @@ uint32_t box_audio_module_effect_params(
             params[4] = shifter->feedback;
             params[5] = shifter->mix;
         }
+    } else if (component == ecs_id(PatternGate)) {
+        const PatternGate *gate = ptr;
+        result = BOX_AUDIO_EFFECT_PATTERN_GATE;
+        for (i = 0; params && ptr && i < BOX_AUDIO_PATTERN_GATE_STEPS; i ++) {
+            params[i] = gate->steps[i];
+        }
+
+        if (params && ptr) {
+            params[BOX_AUDIO_PATTERN_GATE_STEPS] = (float)gate->length;
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 1] = gate->rate;
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 2] = gate->swing;
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 3] = gate->attack;
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 4] = gate->release;
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 5] = gate->gate;
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 6] = gate->floor;
+            params[BOX_AUDIO_PATTERN_GATE_STEPS + 7] = gate->mix;
+        }
+    } else if (component == ecs_id(Rotary)) {
+        const Rotary *rotary = ptr;
+        result = BOX_AUDIO_EFFECT_ROTARY;
+        if (params && ptr) {
+            params[0] = rotary->speed;
+            params[1] = rotary->horn_slow;
+            params[2] = rotary->horn_fast;
+            params[3] = rotary->drum_slow;
+            params[4] = rotary->drum_fast;
+            params[5] = rotary->acceleration;
+            params[6] = rotary->balance;
+            params[7] = rotary->spread;
+            params[8] = rotary->drive;
+            params[9] = rotary->mix;
+        }
+    } else if (component == ecs_id(BeatRepeat)) {
+        const BeatRepeat *repeat = ptr;
+        result = BOX_AUDIO_EFFECT_BEAT_REPEAT;
+        if (params && ptr) {
+            params[0] = repeat->active;
+            params[1] = repeat->slice;
+            params[2] = repeat->grid;
+            params[3] = repeat->decay;
+            params[4] = repeat->pitch;
+            params[5] = repeat->reverse;
+            params[6] = repeat->gate;
+            params[7] = repeat->mix;
+        }
+    } else if (component == ecs_id(TapeStop)) {
+        const TapeStop *stop = ptr;
+        result = BOX_AUDIO_EFFECT_TAPE_STOP;
+        if (params && ptr) {
+            params[0] = stop->active;
+            params[1] = stop->stop_time;
+            params[2] = stop->start_time;
+            params[3] = stop->curve;
+        }
     }
 
 done:
@@ -230,7 +301,9 @@ int32_t box_audio_module_effect_components(
     const ecs_entity_t components[] = {
         ecs_id(Reverb), ecs_id(Equalizer), ecs_id(AudioFilter), ecs_id(Compressor),
         ecs_id(Gate), ecs_id(Delay), ecs_id(Phaser), ecs_id(Chorus), ecs_id(Saturator),
-        ecs_id(TransientShaper), ecs_id(FrequencyShifter), ecs_id(PitchShifter)
+        ecs_id(TransientShaper), ecs_id(FrequencyShifter), ecs_id(PitchShifter),
+        ecs_id(PatternGate), ecs_id(Rotary), ecs_id(BeatRepeat), ecs_id(TapeStop),
+        ecs_id(Vocoder)
     };
     int32_t i, count = (int32_t)(sizeof(components) / sizeof(components[0]));
     count = count < BOX_AUDIO_EFFECT_COMPONENTS ? count : BOX_AUDIO_EFFECT_COMPONENTS;
@@ -467,6 +540,61 @@ static int32_t box_audio_effect_alloc(
     return result;
 }
 
+/** Log once that a vocoder has no modulator, by the names of the vocoder and its channel: its
+ * modulator is 0, deleted or no channel.
+ *
+ * A modulator refused for a cycle logged its error in the order compile already. The error is
+ * logged again once the vocoder had a key or another modulator in between.
+ *
+ * @param world The world
+ * @param state The state
+ * @param e The vocoder entity
+ * @param es What was done for it
+ * @param key The key bus it gets, BOX_AUDIO_BUS_NONE for none
+ */
+static void box_audio_vocoder_unkeyed(
+    ecs_world_t *world,
+    box_audio_module_t *state,
+    ecs_entity_t e,
+    AudioEffectState *es,
+    uint32_t key)
+{
+    const Vocoder *v = ecs_get(world, e, Vocoder);
+    ecs_entity_t modulator = v ? v->modulator : 0;
+    char *path, *channel;
+    if (key != BOX_AUDIO_BUS_NONE || !v || state->sidechain_refused[es->bus][es->index]) {
+        es->unkeyed = false;
+        goto done;
+    }
+
+    if (es->unkeyed && es->modulator == modulator) {
+        goto done;
+    }
+
+    path = ecs_get_path(world, e);
+    channel = ecs_get_path(world, es->channel);
+    if (!modulator) {
+        ecs_err("box.audio: the vocoder '%s' on '%s' has no modulator, it passes its input",
+            path, channel);
+    } else if (!ecs_is_alive(world, modulator)) {
+        ecs_err("box.audio: the modulator of the vocoder '%s' on '%s' is deleted, it passes its "
+            "input", path, channel);
+    } else {
+        char *name = ecs_get_path(world, modulator);
+        ecs_err("box.audio: the modulator '%s' of the vocoder '%s' on '%s' is no channel, it "
+            "passes its input", name, path, channel);
+        ecs_os_free(name);
+    }
+
+    ecs_os_free(path);
+    ecs_os_free(channel);
+    es->unkeyed = true;
+    es->modulator = modulator;
+
+done:
+    return;
+}
+
 void box_audio_effects_sync(
     ecs_world_t *world,
     box_audio_module_t *state,
@@ -495,6 +623,7 @@ void box_audio_effects_sync(
     }
 
     freed = box_audio_effects_free(world, state);
+    state->effect_beat = false;
     for (i = 0; i < count; i ++) {
         ecs_entity_t e = claimed[i];
         AudioEffectState *es = ecs_get_mut(world, e, AudioEffectState);
@@ -521,8 +650,14 @@ void box_audio_effects_sync(
         }
 
         send = ecs_has_id(world, e, EcsDisabled) ? BOX_AUDIO_EFFECT_NONE : kind;
-        key = send == BOX_AUDIO_EFFECT_COMPRESSOR ? state->keys[es->bus][es->index] :
-            BOX_AUDIO_BUS_NONE;
+        state->effect_beat = state->effect_beat || send == BOX_AUDIO_EFFECT_PATTERN_GATE ||
+            send == BOX_AUDIO_EFFECT_BEAT_REPEAT;
+        key = send == BOX_AUDIO_EFFECT_COMPRESSOR || send == BOX_AUDIO_EFFECT_VOCODER ?
+            state->keys[es->bus][es->index] : BOX_AUDIO_BUS_NONE;
+        if (send == BOX_AUDIO_EFFECT_VOCODER) {
+            box_audio_vocoder_unkeyed(world, state, e, es, key);
+        }
+
         if (sent->serial != state->serial || sent->kind != send || sent->bus != es->bus ||
             sent->index != es->index || sent->key != key ||
             ecs_os_memcmp(sent->params, params, ECS_SIZEOF(float) * BOX_AUDIO_EFFECT_PARAMS))

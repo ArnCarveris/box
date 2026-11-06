@@ -520,7 +520,7 @@ void ReflectionShading_grid_darkens_dim_fragment(void) {
         ecs_entity_t scene = scene_new(world, &(ReflectionBake){
             .resolution = RESOLUTION, .budget_ms = 1, .scene_probe = false});
         ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounces = 0, .capture_size = 8,
-            .budget_ms = 2, .bounds_padding = 1, .cache = ""});
+            .budget_ms = 2, .bounds_padding = 1, .cache = "", .compute = true});
         enclosure_new(world, scene, 6, (Rgb){255, 0, 0});
         probe_new(world, scene, 6, 0, 3, 0);
         mirror_new(world, scene, 0, 0);
