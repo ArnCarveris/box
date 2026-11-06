@@ -8,6 +8,14 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <output.h>
+#include "command.h"
+
+/** Delta time of a frame of the audio tests, 800 frames at 48000 Hz */
+#define SHELL_AUDIO_DT (1.0f / 60.0f)
+
+/** Rate of the headless output */
+#define SHELL_AUDIO_RATE 48000
 
 void Shell_box_scope_first(void) {
     ecs_world_t *world = ecs_init();
@@ -655,5 +663,462 @@ void Shell_audio_command(void) {
     out = box_command_run(world, s, "audio sing", &error);
     test_bool(error, true);
     ecs_os_free(out);
+    ecs_fini(world);
+}
+
+/** Create a world with a headless audio output and run a script of test/assets/audio in it.
+ *
+ * @param path The script
+ * @return The world
+ */
+static ecs_world_t* shell_audio_world(
+    const char *path)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_audio_output_open(world, &(box_audio_output_desc_t){ .headless = true });
+    test_int(ecs_script_run_file(world, path), 0);
+
+    return world;
+}
+
+/** Run frames of a fixed delta.
+ *
+ * @param world The world
+ * @param frames Number of frames
+ */
+static void shell_audio_run(
+    ecs_world_t *world,
+    int32_t frames)
+{
+    int32_t i;
+    for (i = 0; i < frames; i ++) {
+        test_bool(ecs_progress(world, SHELL_AUDIO_DT), true);
+    }
+}
+
+/** Run a command that must succeed.
+ *
+ * @param world The world
+ * @param s The session
+ * @param line The command line
+ * @return The output, which the caller frees
+ */
+static char* shell_audio_ok(
+    ecs_world_t *world,
+    ecs_entity_t s,
+    const char *line)
+{
+    bool error = true;
+    char *out = box_command_run(world, s, line, &error);
+    if (error) {
+        printf("%s: %s\n", line, out);
+    }
+
+    test_bool(error, false);
+
+    return out;
+}
+
+/** Start a capture with the audio command.
+ *
+ * @param world The world
+ * @param s The session
+ * @param seconds Seconds of the capture, as text
+ * @return The name of the resource, which the caller frees
+ */
+static char* shell_audio_capture(
+    ecs_world_t *world,
+    ecs_entity_t s,
+    const char *seconds)
+{
+    char *line = flecs_asprintf("audio capture %s", seconds);
+    char *result = shell_audio_ok(world, s, line);
+    ecs_os_free(line);
+
+    return result;
+}
+
+/** Run frames until a capture wrote its resource, and read its samples.
+ *
+ * @param world The world
+ * @param s The session
+ * @param name The name of the resource, freed
+ * @param frames Receives the number of stereo frames
+ * @return The samples, left and right interleaved, which the caller frees
+ */
+static int16_t* shell_audio_capture_read(
+    ecs_world_t *world,
+    ecs_entity_t s,
+    char *name,
+    int32_t *frames)
+{
+    int32_t i;
+    for (i = 0; i < 400 && box_audio_capture_pending(world); i ++) {
+        shell_audio_run(world, 1);
+    }
+
+    test_bool(box_audio_capture_pending(world), false);
+    char *file = box_command_resource_file(world, s, name);
+    test_assert(file != NULL);
+    FILE *f = fopen(file, "rb");
+    test_assert(f != NULL);
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 44, SEEK_SET);
+    test_assert(size > 44);
+    int16_t *result = ecs_os_malloc((ecs_size_t)(size - 44));
+    test_assert(fread(result, 1, (size_t)(size - 44), f) == (size_t)(size - 44));
+    fclose(f);
+    *frames = (int32_t)((size - 44) / 4);
+    ecs_os_free(file);
+    ecs_os_free(name);
+
+    return result;
+}
+
+/** Get the peak of a channel of a capture over a range of frames.
+ *
+ * @param samples The samples, interleaved
+ * @param channel 0 for left, 1 for right
+ * @param from First frame
+ * @param to Frame past the last
+ * @return The largest magnitude
+ */
+static int32_t shell_audio_peak(
+    const int16_t *samples,
+    int32_t channel,
+    int32_t from,
+    int32_t to)
+{
+    int32_t i, result = 0;
+    for (i = from; i < to; i ++) {
+        int32_t v = samples[i * 2 + channel];
+        v = v < 0 ? -v : v;
+        result = v > result ? v : result;
+    }
+
+    return result;
+}
+
+void Shell_audio_solo(void) {
+    ecs_world_t *world = shell_audio_world("test/assets/audio/audition_buses.flecs");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_entity_t left = ecs_lookup(world, "left");
+    ecs_entity_t right = ecs_lookup(world, "right");
+    test_assert(left != 0);
+    test_assert(right != 0);
+
+    char *out = shell_audio_ok(world, s, "audio solo left");
+    test_str(out, "solo left on");
+    ecs_os_free(out);
+    test_bool(ecs_get(world, left, AudioBus)->solo, true);
+    test_bool(ecs_get(world, right, AudioBus)->solo, false);
+
+    out = shell_audio_ok(world, s, "audio");
+    test_assert(strstr(out, "\n  left: group volume 1.00 pan -1.00 width 1.00 solo -> master")
+        != NULL);
+    ecs_os_free(out);
+
+    out = shell_audio_ok(world, s, "audio solo left");
+    test_str(out, "solo left off");
+    ecs_os_free(out);
+    test_bool(ecs_get(world, left, AudioBus)->solo, false);
+
+    out = shell_audio_ok(world, s, "audio solo right on");
+    test_str(out, "solo right on");
+    ecs_os_free(out);
+    out = shell_audio_ok(world, s, "audio solo left on");
+    ecs_os_free(out);
+    out = shell_audio_ok(world, s, "audio solo none");
+    test_str(out, "solo none, 2 cleared");
+    ecs_os_free(out);
+    test_bool(ecs_get(world, left, AudioBus)->solo, false);
+    test_bool(ecs_get(world, right, AudioBus)->solo, false);
+
+    bool error = false;
+    out = box_command_run(world, s, "audio solo nowhere", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    out = box_command_run(world, s, "audio solo left_source", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    out = box_command_run(world, s, "audio solo left maybe", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+void Shell_audio_solo_capture(void) {
+    ecs_world_t *world = shell_audio_world("test/assets/audio/audition_buses.flecs");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    int32_t frames = 0;
+    shell_audio_run(world, 5);
+
+    char *out = shell_audio_ok(world, s, "audio solo left");
+    ecs_os_free(out);
+    shell_audio_run(world, 5);
+    int16_t *wav = shell_audio_capture_read(world, s,
+        shell_audio_capture(world, s, "0.25"), &frames);
+    test_int(frames, SHELL_AUDIO_RATE / 4);
+    test_assert(shell_audio_peak(wav, 0, 2400, frames) > 3000);
+    test_assert(shell_audio_peak(wav, 1, 2400, frames) < 30);
+    ecs_os_free(wav);
+
+    out = shell_audio_ok(world, s, "audio solo none");
+    ecs_os_free(out);
+    shell_audio_run(world, 5);
+    wav = shell_audio_capture_read(world, s, shell_audio_capture(world, s, "0.25"), &frames);
+    test_assert(shell_audio_peak(wav, 0, 2400, frames) > 3000);
+    test_assert(shell_audio_peak(wav, 1, 2400, frames) > 3000);
+    ecs_os_free(wav);
+    ecs_fini(world);
+}
+
+void Shell_audio_mute_bus(void) {
+    ecs_world_t *world = shell_audio_world("test/assets/audio/audition_buses.flecs");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_entity_t left = ecs_lookup(world, "left");
+    int32_t frames = 0;
+    shell_audio_run(world, 5);
+
+    char *out = shell_audio_ok(world, s, "audio mute left");
+    test_str(out, "mute left on");
+    ecs_os_free(out);
+    test_bool(ecs_get(world, left, AudioBus)->mute, true);
+    test_bool(ecs_singleton_get(world, AudioSettings)->mute, false);
+
+    out = shell_audio_ok(world, s, "audio");
+    test_assert(strstr(out, "\n  left: group volume 1.00 pan -1.00 width 1.00 muted -> master")
+        != NULL);
+    ecs_os_free(out);
+
+    shell_audio_run(world, 5);
+    int16_t *wav = shell_audio_capture_read(world, s,
+        shell_audio_capture(world, s, "0.25"), &frames);
+    test_assert(shell_audio_peak(wav, 0, 2400, frames) < 30);
+    test_assert(shell_audio_peak(wav, 1, 2400, frames) > 3000);
+    ecs_os_free(wav);
+
+    out = shell_audio_ok(world, s, "audio mute left off");
+    test_str(out, "mute left off");
+    ecs_os_free(out);
+    test_bool(ecs_get(world, left, AudioBus)->mute, false);
+
+    out = shell_audio_ok(world, s, "audio mute master on");
+    test_str(out, "mute box.audio.master on");
+    ecs_os_free(out);
+    out = shell_audio_ok(world, s, "audio mute master off");
+    ecs_os_free(out);
+
+    /* Without a bus mute still mutes everything */
+    out = shell_audio_ok(world, s, "audio mute on");
+    test_str(out, "mute on");
+    ecs_os_free(out);
+    test_bool(ecs_singleton_get(world, AudioSettings)->mute, true);
+
+    bool error = false;
+    out = box_command_run(world, s, "audio mute nowhere", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+void Shell_audio_bypass(void) {
+    ecs_world_t *world = shell_audio_world("test/assets/audio/audition.flecs");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_entity_t verb = ecs_lookup(world, "verb");
+    test_assert(verb != 0);
+    shell_audio_run(world, 2);
+
+    char *out = shell_audio_ok(world, s, "audio bypass verb");
+    test_str(out, "bypass verb on");
+    ecs_os_free(out);
+    test_assert(ecs_has_id(world, verb, EcsDisabled));
+
+    out = shell_audio_ok(world, s, "audio");
+    test_assert(strstr(out, "insert 0 verb: reverb") != NULL);
+    test_assert(strstr(out, "(bypassed)") != NULL);
+    ecs_os_free(out);
+
+    out = shell_audio_ok(world, s, "audio bypass verb");
+    test_str(out, "bypass verb off");
+    ecs_os_free(out);
+    test_assert(!ecs_has_id(world, verb, EcsDisabled));
+
+    out = shell_audio_ok(world, s, "audio bypass verb on");
+    ecs_os_free(out);
+    test_assert(ecs_has_id(world, verb, EcsDisabled));
+    out = shell_audio_ok(world, s, "audio bypass verb off");
+    ecs_os_free(out);
+    test_assert(!ecs_has_id(world, verb, EcsDisabled));
+
+    bool error = false;
+    out = box_command_run(world, s, "audio bypass hall", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "is not an effect") != NULL);
+    ecs_os_free(out);
+    test_assert(!ecs_has_id(world, ecs_lookup(world, "hall"), EcsDisabled));
+    out = box_command_run(world, s, "audio bypass nowhere", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+/** Capture a click on the reverb bus of test/assets/audio/audition.flecs and get the peak of
+ * its tail, from 0.3 seconds on.
+ *
+ * @param world The world
+ * @param s The session
+ * @return The peak of the left channel
+ */
+static int32_t shell_audio_tail(
+    ecs_world_t *world,
+    ecs_entity_t s)
+{
+    int32_t frames = 0, result;
+    shell_audio_run(world, 10);
+    char *name = shell_audio_capture(world, s, "1");
+    test_bool(box_audio_play(world, ecs_lookup(world, "click"), 1.0f), true);
+    int16_t *wav = shell_audio_capture_read(world, s, name, &frames);
+    test_int(frames, SHELL_AUDIO_RATE);
+    test_assert(shell_audio_peak(wav, 0, 0, SHELL_AUDIO_RATE / 10) > 1000);
+    result = shell_audio_peak(wav, 0, SHELL_AUDIO_RATE * 3 / 10, frames);
+    ecs_os_free(wav);
+
+    return result;
+}
+
+void Shell_audio_bypass_capture(void) {
+    ecs_world_t *world = shell_audio_world("test/assets/audio/audition.flecs");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    test_assert(shell_audio_tail(world, s) > 30);
+
+    char *out = shell_audio_ok(world, s, "audio bypass verb");
+    ecs_os_free(out);
+    shell_audio_run(world, 120);
+    test_assert(shell_audio_tail(world, s) < 5);
+
+    out = shell_audio_ok(world, s, "audio bypass verb");
+    ecs_os_free(out);
+    test_assert(shell_audio_tail(world, s) > 30);
+    ecs_fini(world);
+}
+
+void Shell_audio_note(void) {
+    ecs_world_t *world = shell_audio_world("test/assets/audio/audition.flecs");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    shell_audio_run(world, 2);
+
+    float pitch = 0;
+    test_bool(box_cmd_audio_note_parse("C4", &pitch), true);
+    test_flt(pitch, 60);
+    test_bool(box_cmd_audio_note_parse("C2", &pitch), true);
+    test_flt(pitch, 36);
+    test_bool(box_cmd_audio_note_parse("F#3", &pitch), true);
+    test_flt(pitch, 54);
+    test_bool(box_cmd_audio_note_parse("Bb2", &pitch), true);
+    test_flt(pitch, 46);
+    test_bool(box_cmd_audio_note_parse("a4", &pitch), true);
+    test_flt(pitch, 69);
+    test_bool(box_cmd_audio_note_parse("C-1", &pitch), true);
+    test_flt(pitch, 0);
+    test_bool(box_cmd_audio_note_parse("72", &pitch), true);
+    test_flt(pitch, 72);
+    test_bool(box_cmd_audio_note_parse("H4", &pitch), false);
+    test_bool(box_cmd_audio_note_parse("C", &pitch), false);
+    test_bool(box_cmd_audio_note_parse("C4x", &pitch), false);
+    test_bool(box_cmd_audio_note_parse("128", &pitch), false);
+    test_bool(box_cmd_audio_note_parse("", &pitch), false);
+
+    char *out = shell_audio_ok(world, s, "audio note lead A4");
+    test_str(out, "note lead 69.00 (440.00 Hz) velocity 1.00 for 0.500 s");
+    ecs_os_free(out);
+    out = shell_audio_ok(world, s, "audio note lead 60 0.5 2");
+    test_str(out, "note lead 60.00 (261.63 Hz) velocity 0.50 for 2.000 s");
+    ecs_os_free(out);
+
+    /* A sound plays through an instrument of its own at the root of A4 */
+    out = shell_audio_ok(world, s, "audio note tone_synth C5");
+    test_str(out, "note tone_synth 72.00 (523.25 Hz) velocity 1.00 for 0.500 s");
+    ecs_os_free(out);
+    test_assert(ecs_lookup(world, "box.command.audition") != 0);
+    test_assert(!ecs_has(world, ecs_lookup(world, "tone_synth"), Instrument));
+    test_assert(ecs_get(world, ecs_lookup(world, "lead"), Instrument)->sound ==
+        ecs_lookup(world, "tone_synth"));
+    test_assert(ecs_singleton_get(world, Transport) == NULL ||
+        !ecs_singleton_get(world, Transport)->playing);
+
+    bool error = false;
+    out = box_command_run(world, s, "audio note lead H4", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "invalid note 'H4'") != NULL);
+    ecs_os_free(out);
+    out = box_command_run(world, s, "audio note lead", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    out = box_command_run(world, s, "audio note lead C4 2", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    out = box_command_run(world, s, "audio note lead C4 1 0", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    out = box_command_run(world, s, "audio note nowhere C4", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    out = box_command_run(world, s, "audio note hall C4", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+/** Count the rising zero crossings of the left channel of a capture over a range of frames.
+ *
+ * @param samples The samples, interleaved
+ * @param from First frame
+ * @param to Frame past the last
+ * @return The count
+ */
+static int32_t shell_audio_crossings(
+    const int16_t *samples,
+    int32_t from,
+    int32_t to)
+{
+    int32_t i, result = 0;
+    for (i = from + 1; i < to; i ++) {
+        result += samples[(i - 1) * 2] < 0 && samples[i * 2] >= 0;
+    }
+
+    return result;
+}
+
+void Shell_audio_note_capture(void) {
+    ecs_world_t *world = shell_audio_world("test/assets/audio/audition.flecs");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    int32_t frames = 0;
+    shell_audio_run(world, 5);
+
+    /* A4 on an instrument at the root of A4 plays 440 Hz: 88 periods in 0.2 seconds */
+    char *name = shell_audio_capture(world, s, "1");
+    char *out = shell_audio_ok(world, s, "audio note lead A4");
+    ecs_os_free(out);
+    int16_t *wav = shell_audio_capture_read(world, s, name, &frames);
+    test_int(frames, SHELL_AUDIO_RATE);
+    int32_t from = SHELL_AUDIO_RATE / 10, to = SHELL_AUDIO_RATE * 3 / 10;
+    test_assert(shell_audio_peak(wav, 0, from, to) > 5000);
+    int32_t n = shell_audio_crossings(wav, from, to);
+    test_assert(n >= 87 && n <= 89);
+    /* Released after 0.5 seconds */
+    test_assert(shell_audio_peak(wav, 0, SHELL_AUDIO_RATE * 7 / 10, frames) < 30);
+    ecs_os_free(wav);
+
+    /* A5 of the sound itself plays 880 Hz */
+    name = shell_audio_capture(world, s, "0.5");
+    out = shell_audio_ok(world, s, "audio note tone_synth A5");
+    ecs_os_free(out);
+    wav = shell_audio_capture_read(world, s, name, &frames);
+    n = shell_audio_crossings(wav, from, to);
+    test_assert(n >= 175 && n <= 177);
+    ecs_os_free(wav);
     ecs_fini(world);
 }

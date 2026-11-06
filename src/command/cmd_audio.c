@@ -4,7 +4,8 @@
  * slots, its instruments, its tracks with their note and audio placements, sounding notes and
  * playing audio clips, its emitters with their plays and skips, its macros with their maps, the
  * master volume and mute, play, stop, seek and tempo, the song of AudioSong, and captures of the
- * master output to a WAV resource.
+ * master output to a WAV resource. Solo, mute of a bus, bypass and note are in
+ * cmd_audio_audition.c.
  *
  * The actions only write AudioSettings, Transport or AudioSong, which box.audio applies at the
  * end of the frame as for a change from a script or the REST API. A capture taps the core, so
@@ -99,6 +100,8 @@ static const char* box_cmd_audio_effect_state(
     const char *result = "runs";
     if (!state) {
         result = "does not run: no output";
+    } else if (ecs_has_id(world, e, EcsDisabled)) {
+        result = "bypassed";
     } else if (es && state->effect_frame && es->frame == state->effect_frame &&
         (es->channel != channel || es->index != j))
     {
@@ -109,8 +112,6 @@ static const char* box_cmd_audio_effect_state(
         result = "does not run: no output";
     } else if (slot < 0) {
         result = "does not run: no slot yet";
-    } else if (ecs_has_id(world, e, EcsDisabled)) {
-        result = "bypassed";
     } else if (box_audio_effect_floats(kind, state->rate) > 0 &&
         (state->effects[slot].memory != state->serial ||
             state->effects[slot].floats < box_audio_effect_floats(kind, state->rate)))
@@ -1164,12 +1165,12 @@ done:
     return result;
 }
 
-/** The audio command: print the status, set the volume or the mute, drive the transport or
- * start a capture.
+/** The audio command: print the status, set the volume or the mute, solo or mute a bus, bypass
+ * an effect, play a note, drive the transport or start a capture.
  *
  * @param ctx The call context
  * @param argc Number of arguments
- * @param argv The action and its value, both optional
+ * @param argv The action and up to four values, all optional
  * @param result Receives the output
  */
 static void box_cmd_audio(
@@ -1181,6 +1182,9 @@ static void box_cmd_audio(
     ecs_world_t *world = ctx->world;
     const char *action = argc > 0 ? *(const char**)argv[0].ptr : NULL;
     const char *value = argc > 1 ? *(const char**)argv[1].ptr : NULL;
+    const char *arg2 = argc > 2 ? *(const char**)argv[2].ptr : NULL;
+    const char *arg3 = argc > 3 ? *(const char**)argv[3].ptr : NULL;
+    const char *arg4 = argc > 4 ? *(const char**)argv[4].ptr : NULL;
     char *out = NULL;
     if (!ecs_id(AudioSettings) || !box_audio_module_get(world)) {
         ecs_err("box.audio is not imported");
@@ -1191,8 +1195,18 @@ static void box_cmd_audio(
         out = box_cmd_audio_print(world);
     } else if (!ecs_os_strcmp(action, "volume")) {
         out = box_cmd_audio_volume(world, value);
+    } else if (!ecs_os_strcmp(action, "mute") && value && value[0] &&
+        ecs_os_strcmp(value, "on") && ecs_os_strcmp(value, "off"))
+    {
+        out = box_cmd_audio_bus_mute(world, value, arg2);
     } else if (!ecs_os_strcmp(action, "mute")) {
         out = box_cmd_audio_mute(world, value);
+    } else if (!ecs_os_strcmp(action, "solo")) {
+        out = box_cmd_audio_solo(world, value, arg2);
+    } else if (!ecs_os_strcmp(action, "bypass")) {
+        out = box_cmd_audio_bypass(world, value, arg2);
+    } else if (!ecs_os_strcmp(action, "note")) {
+        out = box_cmd_audio_note(world, value, arg2, arg3, arg4);
     } else if (!ecs_os_strcmp(action, "capture")) {
         out = box_cmd_audio_capture(world, value);
     } else if (!ecs_os_strcmp(action, "song")) {
@@ -1202,8 +1216,8 @@ static void box_cmd_audio(
     {
         out = box_cmd_audio_transport_set(world, action, value);
     } else {
-        ecs_err("unknown action '%s', expected volume, mute, capture, play, stop, seek, "
-            "tempo or song", action);
+        ecs_err("unknown action '%s', expected volume, mute, solo, bypass, note, capture, "
+            "play, stop, seek, tempo or song", action);
     }
 
     *(char**)result->ptr = out;
@@ -1217,18 +1231,27 @@ void box_cmd_audio_init(
     ECS_IMPORT(world, BoxAudio);
     box_command_register(world,
         "Print the audio status, transport, song, buses, instruments, tracks, emitters and "
-        "macros, set the volume or mute, play, stop, seek or set the tempo, show or change the "
-        "song, or capture a WAV",
+        "macros, set the volume or mute, solo or mute a bus, bypass an effect, play a note, "
+        "play, stop, seek or set the tempo, show or change the song, or capture a WAV",
         (ecs_function_desc_t){
             .name = "audio",
             .return_type = ecs_id(ecs_string_t),
             .params = {
                 { .name = "action", .type = ecs_id(ecs_string_t), .optional = true,
-                  .brief = "volume, mute, capture, play, stop, seek, tempo or song (default: "
-                    "print the status)" },
+                  .brief = "volume, mute, solo, bypass, note, capture, play, stop, seek, tempo "
+                    "or song (default: print the status)" },
                 { .name = "value", .type = ecs_id(ecs_string_t), .optional = true,
                   .brief = "volume 0 to 4, mute on or off (default: toggle), capture seconds, "
-                    "seek beats, tempo 20 to 999, song file or none (default: show the song)" }
+                    "seek beats, tempo 20 to 999, song file or none (default: show the song), "
+                    "the bus of solo or mute (solo none clears every solo), the effect of "
+                    "bypass, the sound or instrument of note" },
+                { .name = "arg2", .type = ecs_id(ecs_string_t), .optional = true,
+                  .brief = "on or off for solo, mute and bypass (default: toggle), the note of "
+                    "note: C2, F#3 or a MIDI number" },
+                { .name = "arg3", .type = ecs_id(ecs_string_t), .optional = true,
+                  .brief = "velocity of note, 0 to 1 (default: 1)" },
+                { .name = "arg4", .type = ecs_id(ecs_string_t), .optional = true,
+                  .brief = "seconds of note (default: 0.5)" }
             },
             .callback = box_cmd_audio
         });

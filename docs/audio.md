@@ -1625,8 +1625,27 @@ Importing box alone does not open an output: `box_app_run` does.
 | `audio play`, `audio stop` | Start or stop the transport |
 | `audio seek <beats>` | Seek the transport |
 | `audio tempo <bpm>` | Set tempo, 20..999 |
+| `audio solo <bus> [on\|off]` | Set or toggle the solo of a bus |
+| `audio solo none` | Clear every solo |
+| `audio mute <bus> [on\|off]` | Set or toggle the mute of a bus |
+| `audio bypass <effect> [on\|off]` | Set or toggle the bypass of an effect entity |
+| `audio note <sound\|instrument> <note> [vel] [dur]` | Play one note now, velocity 0..1 (default 1), for `dur` seconds (default 0.5) |
 | `audio capture <seconds>` | Record master output as a 16-bit stereo WAV resource |
 | `audio song [<file>\|none]` | Show the song, load a song file or unload it |
+
+Solo, mute and bypass judge one element of a mix without editing the song. Solo and
+mute write `AudioBus` and bypass adds or removes `Disabled` on the effect entity, as a
+script or `set` would; bypass fails for an entity that is not an effect. `audio mute`
+without a bus, or with `on` or `off`, is still the master mute. These are runtime
+changes like any `set`: a song reload resets them. `audio` marks soloed and muted buses
+and bypassed effects.
+
+`audio note` plays one note on the live output, through the bus of the instrument when
+it has an `AudioOutput`, else of its sound, and releases it after `dur` seconds. A note is
+a name, `C2`, `F#3` or `Bb4` with `C4` at 60, or a MIDI number 0..127. A sound without an
+instrument plays through an instrument of its own in `box.command.audition`, with the
+default root of A4, so `A4` plays the sound as authored. The note does not touch the
+transport or the song; capture it with `audio capture` started in the same frame.
 
 Fetch a capture with `GET /shell/session/<id>/resource/<name>`; it stays empty
 until recording finishes. In the browser it writes `/tmp/audio_capture_<n>.wav`

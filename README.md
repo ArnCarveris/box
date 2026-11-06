@@ -64,6 +64,10 @@ builtins of the flecs shell (`ls`, `get`, `set`, `query`, ...):
 | `audio` | Print the audio state, rate, voices, load and the buses in processing order |
 | `audio volume <v>` | Set `AudioSettings.master_volume`, 0 to 4 |
 | `audio mute [on\|off]` | Set or toggle `AudioSettings.mute` |
+| `audio solo <bus> [on\|off]` | Set or toggle `AudioBus.solo`; `audio solo none` clears every solo |
+| `audio mute <bus> [on\|off]` | Set or toggle `AudioBus.mute` of a bus |
+| `audio bypass <effect> [on\|off]` | Bypass an effect, or stop bypassing it, with `Disabled` |
+| `audio note <sound\|instrument> <note> [vel] [dur]` | Play one note (C2, F#3 or a MIDI number) now, velocity 0 to 1, for `dur` seconds (default 0.5) |
 | `audio capture <seconds>` | Record the master output to a 16 bit stereo WAV resource |
 | `fps [rate]`, `frames` | Toggle the fps panel or cap the rate, print the frame timing |
 | `edit [on\|off]` | Open or close the editor |

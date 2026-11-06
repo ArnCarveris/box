@@ -11,7 +11,8 @@
         "include": [
             "../../../src/command",
             "../../../src/render",
-            "../../../src/geometry"
+            "../../../src/geometry",
+            "../../../src/audio"
         ]
     },
     "test": {
@@ -43,7 +44,14 @@
                     "quit",
                     "console_session",
                     "resource_file",
-                    "audio_command"
+                    "audio_command",
+                    "audio_solo",
+                    "audio_solo_capture",
+                    "audio_mute_bus",
+                    "audio_bypass",
+                    "audio_bypass_capture",
+                    "audio_note",
+                    "audio_note_capture"
                 ]
             },
             {
