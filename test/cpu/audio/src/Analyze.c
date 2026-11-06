@@ -31,6 +31,7 @@ static uint8_t* analyze_bytes(
     size_t *size)
 {
     char path[512];
+    ecs_os_set_api_defaults();
     snprintf(path, sizeof(path), "%s%s", dir ? ANALYZE_DIR : "", name);
     char *file = dir ? box_shader_locate(path) : ecs_os_strdup(path);
     test_assert(file != NULL);
@@ -124,6 +125,7 @@ void Analyze_pink_noise(void) {
     test_assert(fabsf(a.integrated - ANALYZE_PINK_LUFS) < 1.0f);
     test_assert(fabsf(a.rms - -20.0f) < 0.1f);
     test_assert(!a.pitched);
+    test_assert(a.attack >= 0 && a.attack < 0.05f);
     int32_t b;
     float per_octave[BOX_AUDIO_ANALYZE_BANDS], mean = 0;
     for (b = 1; b < 6; b ++) {
@@ -213,6 +215,23 @@ void Analyze_same_twice(void) {
     analyze_file("analyze_pink.wav", &a);
     analyze_file("analyze_pink.wav", &b);
     test_assert(!memcmp(&a, &b, sizeof(a)));
+}
+
+void Analyze_attack_swell(void) {
+    int32_t i, frames = 48000;
+    float *x = malloc(sizeof(float) * (size_t)frames);
+    for (i = 0; i < frames; i ++) {
+        float t = (float)i / 48000.0f;
+        float env = t < 0.1f ? 0 : (t < 0.4f ? (t - 0.1f) / 0.3f : 1.0f);
+        x[i] = 0.5f * env * sinf(2.0f * (float)M_PI * 440.0f * t);
+    }
+
+    box_audio_analysis_t a;
+    test_int(box_audio_analyze(x, frames, 1, 48000, &a), 0);
+    test_assert(a.onset_count >= 1);
+    test_assert(fabsf(a.onsets[0].time - 0.1f) < 0.02f);
+    test_assert(fabsf(a.attack - 0.24f) < 0.24f * 0.05f);
+    free(x);
 }
 
 void Analyze_fft(void) {

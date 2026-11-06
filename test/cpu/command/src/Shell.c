@@ -723,8 +723,11 @@ void Shell_audio_analyze_resource(void) {
     ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_progress(world, 0.016f);
 
-    FILE *f = fopen("test/assets/audio/analyze_inverted.wav", "rb");
+    char *path = box_app_locate("test/assets/audio/analyze_inverted.wav");
+    test_assert(path != NULL);
+    FILE *f = fopen(path, "rb");
     test_assert(f != NULL);
+    ecs_os_free(path);
     fseek(f, 0, SEEK_END);
     long size = ftell(f);
     fseek(f, 0, SEEK_SET);

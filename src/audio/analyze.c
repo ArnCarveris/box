@@ -841,16 +841,40 @@ static void box_audio_analyze_onsets(
     }
 }
 
-/** Measure the attack of the first onset, 10% to 90% of its peak within a second or until
- * the next onset.
+/** Mean power of a hop and the 5 on either side in dB, a level contour that ignores the
+ * swings of single hops.
+ *
+ * @param ctx The analysis
+ * @param h The hop
+ * @return The level in dB
+ */
+static float box_audio_hop_smooth(
+    const box_audio_analyze_ctx_t *ctx,
+    int32_t h)
+{
+    double power = 0;
+    int32_t j, n = 0;
+    for (j = h - 5; j <= h + 5; j ++) {
+        if (j >= 0 && j < ctx->hops) {
+            power += pow(10.0, ctx->hop_level[j] / 10.0);
+            n ++;
+        }
+    }
+
+    return box_audio_db_power(power / n);
+}
+
+/** Measure the attack of the first onset, 10% to 90% of its peak. The peak is the loudest
+ * sample up to 5 hops after the level contour comes within 1.5 dB of its top in the second
+ * after the onset (or until the next onset), so a steady noise does not wait for a spike.
  *
  * @param ctx The analysis
  */
 static void box_audio_analyze_attack(
     box_audio_analyze_ctx_t *ctx)
 {
-    int32_t ch = ctx->channels, start = ctx->first_onset, end, i, c, t10 = -1, t90 = -1;
-    float peak = 0;
+    int32_t ch = ctx->channels, start = ctx->first_onset, end, i, c, t10 = -1, t90 = -1, h;
+    float peak = 0, top = BOX_AUDIO_ANALYZE_FLOOR;
     ctx->out->attack = -1;
     if (start < 0) {
         goto done;
@@ -859,6 +883,18 @@ static void box_audio_analyze_attack(
     end = start + (int32_t)ctx->rate;
     end = end < ctx->frames ? end : ctx->frames;
     end = ctx->second_onset > start && ctx->second_onset < end ? ctx->second_onset : end;
+    for (h = start / ctx->hop; h * ctx->hop < end; h ++) {
+        float level = box_audio_hop_smooth(ctx, h);
+        top = level > top ? level : top;
+    }
+
+    for (h = start / ctx->hop; h * ctx->hop < end; h ++) {
+        if (box_audio_hop_smooth(ctx, h) >= top - 1.5f) {
+            end = (h + 5) * ctx->hop < end ? (h + 5) * ctx->hop : end;
+            break;
+        }
+    }
+
     for (i = start; i < end; i ++) {
         for (c = 0; c < ch; c ++) {
             float a = fabsf(ctx->data[(int64_t)i * ch + c]);

@@ -21,8 +21,9 @@
 /** Bars listed at most */
 #define BOX_CMD_ANALYZE_BARS (64)
 
-/** Lowest band level compared between a bar and the song, in dB */
-#define BOX_CMD_ANALYZE_BAND_FLOOR (-90.0f)
+/** Lowest band level compared between a bar and the song, in dB against the total: a change
+ * of a band below it does not matter to the mix */
+#define BOX_CMD_ANALYZE_BAND_FLOOR (-40.0f)
 
 /** Round a value to a number of decimals so that it never prints as -0.
  *

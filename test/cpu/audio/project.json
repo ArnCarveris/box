@@ -1260,6 +1260,7 @@
                     "start_click",
                     "discontinuity",
                     "same_twice",
+                    "attack_swell",
                     "fft",
                     "wav_formats",
                     "segments",

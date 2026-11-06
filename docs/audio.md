@@ -1659,9 +1659,10 @@ as a capture. It prints one line per measure, each number with its unit:
 
 A capture that starts while a song plays stores the beat, tempo and bar length it started at in a
 `bxsg` chunk of its WAV. Its report ends with a line per bar (64 at most): the loudness of the
-bar in LUFS and the band that changed the most against the whole span. A tempo change or loop
-wrap during the capture is not followed. The same WAV and span give the same text. The
-measures are a plain C library, [analyze.h](../src/audio/analyze.h).
+bar in LUFS and the band that changed the most against the whole span, counting a band at
+40 dB under the total as at least that. A tempo change or loop wrap during the capture is not
+followed. The same WAV and span give the same text. The measures are a plain C library,
+[analyze.h](../src/audio/analyze.h).
 
 If a track is silent, check sample readiness, its instrument and overlapping
 placements. If a return is silent, check its send and insert assignment. `audio`
