@@ -346,6 +346,7 @@ UI.fader = (opts) => {
   el.addEventListener("dblclick", () => { value = 1; place(); opts.onchange(1); });
   el.set = (v) => { if (v !== value) { value = v; place(); } };
   requestAnimationFrame(place);
+  new ResizeObserver(() => { if (el.clientHeight > 12) place(); }).observe(el);
   return el;
 };
 

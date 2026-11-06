@@ -1,8 +1,7 @@
 "use strict";
 
 const V = window.V = {
-  arr: { ppb: 24, x0: 0, follow: true, snap: 1 },
-  collapsed: JSON.parse(localStorage.getItem("daw.collapsed") || "{}")
+  arr: { ppb: 24, x0: 0, follow: true, snap: 1 }
 };
 
 const ROWH = 52, RULERH = 22;
@@ -54,53 +53,9 @@ V.auditionFor = (path) => {
   return null;
 };
 
-V.renderBrowser = () => {
-  const el = document.getElementById("browser");
-  const scroll = el.scrollTop;
-  el.textContent = "";
-  if (!DAW.conn) return;
-  const section = (key, title, recs, sub) => {
-    const closed = V.collapsed[key];
-    const h = UI.el("h3", {
-      onclick: () => {
-        V.collapsed[key] = !closed;
-        localStorage.setItem("daw.collapsed", JSON.stringify(V.collapsed));
-        V.renderBrowser();
-      }
-    }, (closed ? "▸ " : "▾ ") + title, UI.el("span", {}, String(recs.length)));
-    el.appendChild(h);
-    if (closed) return;
-    if (!recs.length) { el.appendChild(UI.el("div", { class: "empty" }, "none")); return; }
-    for (const r of recs) {
-      el.appendChild(UI.el("div", {
-        class: "item" + (DAW.sel === r.path ? " sel" : "") + (r.disabled ? " off" : ""),
-        title: r.path + (r.script ? "\nscript: " + r.script : ""),
-        onclick: () => DAW.select(r.path)
-      }, UI.el("span", { class: "swatch", style: { background: DAW.color(r.path) } }),
-        UI.el("span", {}, key === "tracks" ? V.laneName(r.path) : r.name), sub ? UI.el("span", { class: "sub" }, sub(r)) : null));
-    }
-  };
-  const tracks = V.trackOrder();
-  section("tracks", "Tracks", tracks, (r) => {
-    const t = r.comps[A + "Track"];
-    return DAW.isNone(t.instrument) ? "" : DAW.leaf(t.instrument);
-  });
-  section("buses", "Buses", DAW.buses().filter((r) => !DAW.has(r, "Track")),
-    (r) => UI.enumLabel(r.comps[A + "AudioBus"].kind).toLowerCase());
-  section("effects", "Effects", DAW.effects(), (r) => DAW.effectComps(r).map(DAW.short).join(" "));
-  section("instruments", "Instruments", DAW.list("Instrument"), (r) => DAW.leaf(r.comps[A + "Instrument"].sound));
-  section("sounds", "Sounds", DAW.sounds(), (r) => DAW.has(r, "SynthSound") ? "synth" : "sample");
-  section("clips", "Clips", DAW.clips(), (r) => DAW.has(r, "NoteClip") ? `${(r.comps[A + "NoteClip"].notes || []).length} notes` :
-    DAW.has(r, "AutomationClip") ? "auto" : "audio");
-  section("mods", "Modulators", DAW.list("AudioModulator"), (r) => r.comps[A + "AudioModulator"].member);
-  section("macros", "Macros", DAW.list("AudioMacro"), (r) => (r.comps[A + "AudioMacro"].value || 0).toFixed(2));
-  section("sources", "Sources and streams", Object.values(DAW.ents).filter((r) => DAW.has(r, "AudioSource") || DAW.has(r, "AudioStream")));
-  el.scrollTop = scroll;
-};
-
 V.renderView = () => {
   const el = document.getElementById("view");
-  const keep = el.querySelector(".mixer, .arrange-body, .macro-grid");
+  const keep = el.querySelector(".mixer, .arrange-body, .macro-grid, .graph");
   const scroll = keep ? [keep.scrollLeft, keep.scrollTop] : [0, 0];
   el.textContent = "";
   if (!DAW.conn) {
@@ -116,10 +71,11 @@ V.renderView = () => {
     el.appendChild(UI.el("div", { class: "placeholder" }, `${DAW.host} has no box.audio module.`));
     return;
   }
-  if (DAW.view === "arrange") V.arrange(el);
+  if (DAW.view === "graph") G.render(el);
+  else if (DAW.view === "arrange") V.arrange(el);
   else if (DAW.view === "mixer") V.mixer(el);
   else V.modulation(el);
-  const now = el.querySelector(".mixer, .arrange-body, .macro-grid");
+  const now = el.querySelector(".mixer, .arrange-body, .macro-grid, .graph");
   if (now) { now.scrollLeft = scroll[0]; now.scrollTop = scroll[1]; }
 };
 
@@ -136,7 +92,7 @@ V.arrange = (root) => {
     UI.el("button", { class: "small", text: "fit", onclick: () => V.fitArrange() }),
     UI.el("span", { class: "grow" }),
     UI.el("span", { style: { color: "var(--fg2)" } },
-      "click ruler to seek, shift+drag ruler for the loop, drag clips to move, Delete removes, Cmd+D duplicates"));
+      "click ruler to seek, shift+drag ruler for the loop, drag clips to move, double click opens, Delete removes, Cmd+D duplicates"));
   const heads = UI.el("div", { class: "track-heads" }, UI.el("div", { class: "ruler-head" }));
   const lanes = UI.el("div", { class: "lanes" });
   const canvas = UI.el("canvas", { tabindex: 0 });
@@ -144,7 +100,7 @@ V.arrange = (root) => {
   const body = UI.el("div", { class: "arrange-body" }, heads, lanes);
   root.appendChild(UI.el("div", { class: "arrange" }, tools, body));
   if (!tracks.length) {
-    lanes.appendChild(UI.el("div", { class: "placeholder" }, "No tracks. Load a song in the bar above, or select a bus in the browser."));
+    lanes.appendChild(UI.el("div", { class: "placeholder" }, "No tracks. Load a song in the bar above."));
   }
   for (const t of tracks) {
     const bus = t.comps[A + "AudioBus"];
@@ -157,7 +113,9 @@ V.arrange = (root) => {
     meter.style.height = (ROWH - 8) + "px";
     heads.appendChild(UI.el("div", {
       class: "track-head" + (DAW.sel === t.path ? " sel" : ""), style: { height: ROWH + "px" }, "data-path": t.path,
-      onclick: () => DAW.select(t.path)
+      title: "click selects, double click opens the track in its own window",
+      onclick: () => DAW.select(t.path),
+      ondblclick: () => DAW.openWindow(t.path)
     }, UI.el("div", { class: "color", style: { background: DAW.color(t.path) } }),
       UI.el("div", { class: "tname" }, UI.el("div", {}, V.laneName(t.path)),
         UI.el("div", { class: "tsub" }, DAW.isNone(tr.instrument) ? t.name : DAW.leaf(tr.instrument))),
@@ -403,6 +361,13 @@ V.arrangeCanvas = (c, tracks) => {
     }
   });
   const end = () => { if (drag) { drag = null; DAW.dragging = Math.max(0, DAW.dragging - 1); } };
+  c.addEventListener("dblclick", (e) => {
+    const { x, y } = local(e);
+    if (y < RULERH) return;
+    const h = placementAt(x, y);
+    const t = tracks[rowOf(y)];
+    DAW.openWindow(h ? h.rec.path : t ? t.path : null);
+  });
   c.addEventListener("pointerup", end);
   c.addEventListener("pointercancel", end);
   c.addEventListener("wheel", (e) => {
@@ -484,7 +449,7 @@ V.effectMenu = (e, bus, slot, fx) => {
   const rec = DAW.ents[fx];
   const b = DAW.val(bus, "AudioBus");
   const items = [
-    { label: "Select", action: () => DAW.select(fx) },
+    { label: "Open", action: () => DAW.openWindow(fx) },
     rec && rec.path !== bus ? { label: rec.disabled ? "Enable" : "Bypass (disable entity)", action: () => DAW.enable(fx, rec.disabled) } : null,
     slot > 0 ? { label: "Move left", action: () => V.moveSlot(bus, slot, -1) } : null,
     slot < 3 ? { label: "Move right", action: () => V.moveSlot(bus, slot, 1) } : null,
@@ -514,8 +479,8 @@ V.strip = (rec) => {
   const kind = isMaster ? "master" : isTrack ? "track" : UI.enumLabel(bus.kind).toLowerCase();
   const el = UI.el("div", { class: "strip" + (DAW.sel === path ? " sel" : "") + (rec.disabled ? " off" : ""), "data-path": path });
   el.appendChild(UI.el("div", {
-    class: "sname", title: path, style: { borderBottomColor: DAW.color(path) },
-    onclick: () => DAW.select(path)
+    class: "sname", title: path + "\nclick to open in its own window", style: { borderBottomColor: DAW.color(path) },
+    onclick: () => DAW.openWindow(path)
   }, name));
   el.appendChild(UI.el("div", { class: "skind" }, kind));
   const ins = UI.el("div", { class: "inserts" });
@@ -526,9 +491,9 @@ V.strip = (rec) => {
       const frec = DAW.ents[fx];
       const label = frec ? DAW.effectComps(frec).map(DAW.short).join("/") || DAW.leaf(fx) : DAW.leaf(fx);
       ins.appendChild(UI.el("div", {
-        class: "ins" + (frec && frec.disabled ? " off" : ""), title: `${fx}\nclick to edit, right click for options`,
+        class: "ins" + (frec && frec.disabled ? " off" : ""), title: `${fx}\nclick to open in its own window, right click for options`,
         style: { borderLeft: `3px solid ${DAW.color(fx)}` },
-        onclick: () => DAW.select(fx),
+        onclick: () => DAW.openWindow(fx),
         oncontextmenu: (e) => { e.preventDefault(); V.effectMenu(e, path, i, fx); }
       }, label));
     }
@@ -599,7 +564,6 @@ V.strip = (rec) => {
     btns.appendChild(solo);
   }
   el.appendChild(btns);
-  requestAnimationFrame(() => { meter.style.height = (meter.parentNode ? meter.parentNode.clientHeight : 100) + "px"; });
   return el;
 };
 
@@ -630,8 +594,8 @@ V.modulation = (root) => {
       return UI.el("div", { title: `${mm.target} ${DAW.short(mm.component)}.${mm.member}` },
         `${DAW.leaf(mm.target)}.${mm.member} ${UI.fmt(mm.min, {})}→${UI.fmt(mm.max, {})}`);
     });
-    el.appendChild(UI.el("div", { class: "macro" + (DAW.sel === m.path ? " sel" : ""), "data-path": m.path, onclick: (e) => { if (e.target === e.currentTarget) DAW.select(m.path); } },
-      k, UI.el("a", { class: "link", onclick: () => DAW.select(m.path) }, "edit maps"), UI.el("div", { class: "maps" }, maps)));
+    el.appendChild(UI.el("div", { class: "macro" + (DAW.sel === m.path ? " sel" : ""), "data-path": m.path, onclick: (e) => { if (e.target === e.currentTarget) DAW.openWindow(m.path); } },
+      k, UI.el("a", { class: "link", onclick: () => DAW.openWindow(m.path) }, "edit maps"), UI.el("div", { class: "maps" }, maps)));
   }
   el.appendChild(UI.el("div", { class: "section-title" }, "Modulators"));
   const mods = DAW.list("AudioModulator");
@@ -805,7 +769,8 @@ V.renderDetail = () => {
   ED.activeKeyboard = null;
   const rec = DAW.ents[DAW.sel];
   if (!rec) {
-    el.appendChild(UI.el("div", { class: "detail-empty" }, DAW.conn ? "Select a track, bus, effect, clip, instrument or sound" : ""));
+    el.appendChild(UI.el("div", { class: "detail-empty" }, !DAW.conn ? "" : !DAW.connected ? `Connecting to ${DAW.host}...` :
+      `${DAW.sel || "no entity"} is not in ${DAW.host}, waiting for it to appear`));
     return;
   }
   const kind = DAW.kindOf(rec);
@@ -815,6 +780,10 @@ V.renderDetail = () => {
     UI.el("span", { class: "kind" }, `${kind}  ${rec.path}${rec.prefab ? "  (prefab)" : ""}${rec.script ? "  from " + rec.script : ""}`),
     UI.el("span", { class: "grow" }));
   if (kind !== "track" && kind !== "bus" && rec.path !== A + "master") head.appendChild(V.enableBtn(rec));
+  if (!DAW.detailPath) {
+    head.appendChild(UI.el("button", { class: "small", text: "window", title: "Open in its own window", onclick: () => DAW.openWindow(rec.path) }));
+    head.appendChild(UI.el("button", { class: "small", text: "×", title: "Close (Escape)", onclick: () => G.clearFocus() }));
+  }
   if (kind === "placement") {
     head.appendChild(UI.el("button", { class: "small", text: "duplicate", onclick: () => V.duplicatePlacement(rec) }));
     head.appendChild(UI.el("button", {
@@ -898,18 +867,30 @@ V.markSel = () => {
   document.querySelectorAll("[data-path]").forEach((el) => el.classList.toggle("sel", el.dataset.path === DAW.sel));
 };
 
+V.sideOpen = () => !DAW.detailPath && DAW.view === "graph" && !!DAW.sel && !!DAW.ents[DAW.sel];
+
+V.updateSide = () => {
+  const open = V.sideOpen();
+  const was = document.body.classList.contains("side-open");
+  document.body.classList.toggle("side-open", open);
+  if (open) V.renderDetail();
+  else if (was) document.getElementById("detail").textContent = "";
+};
+
 V.renderSelection = () => {
-  V.renderBrowser();
-  V.renderDetail();
+  if (DAW.detailPath) V.renderDetail();
+  else V.updateSide();
   V.markSel();
   V.prune();
 };
 
 V.renderAll = () => {
   DAW.bindings = [];
-  V.renderBrowser();
-  V.renderView();
-  V.renderDetail();
+  if (DAW.detailPath) V.renderDetail();
+  else {
+    V.renderView();
+    V.updateSide();
+  }
   V.prune();
   DAW.needRender = false;
 };

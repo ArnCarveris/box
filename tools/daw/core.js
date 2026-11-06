@@ -41,7 +41,8 @@ const DAW = window.DAW = {
   meters: {},
   sel: null,
   selKind: null,
-  view: "arrange",
+  view: "graph",
+  detailPath: new URLSearchParams(location.search).get("entity"),
   sig: "",
   bindings: [],
   dragging: 0,
@@ -113,7 +114,7 @@ DAW.placementsOf = (track) => Object.values(DAW.ents)
   .filter((r) => r.parent === track && DAW.has(r, "ClipPlacement"));
 DAW.childrenOf = (path) => Object.values(DAW.ents).filter((r) => r.parent === path)
   .sort((a, b) => a.order - b.order);
-DAW.isAudition = (path) => path === DAW.auditionPath || (path || "").startsWith(DAW.auditionPath + ".");
+DAW.isAudition = (path) => /^daw_audition(_\w+)?(\.|$)/.test(path || "");
 
 DAW.busOfEffect = (path) => DAW.buses().find((b) => {
   const fx = b.comps[A + "AudioBus"].effects || [];
@@ -325,7 +326,7 @@ async function pollStructure(epoch) {
       const sig = signature();
       const changed = sig !== DAW.sig;
       DAW.sig = sig;
-      if (DAW.sel && !DAW.ents[DAW.sel]) DAW.select(null);
+      if (DAW.sel && !DAW.ents[DAW.sel] && !DAW.detailPath) DAW.select(null);
       DAW.emit(changed ? "structure" : "values");
     } catch (e) {
       console.error(e);
@@ -415,8 +416,26 @@ DAW.seek = (beats) => {
 };
 
 DAW.select = (path) => {
+  if (DAW.detailPath && path && path !== DAW.sel) {
+    DAW.detailPath = path;
+    const url = new URL(location.href);
+    url.searchParams.set("entity", path);
+    history.replaceState(null, "", url);
+    document.title = `${DAW.leaf(path)} - box daw`;
+  }
   DAW.sel = path;
   DAW.emit("select");
+};
+
+DAW.openWindow = (path) => {
+  if (!path || !DAW.host) return;
+  const url = new URL(location.href);
+  url.search = "";
+  url.searchParams.set("host", DAW.host);
+  url.searchParams.set("entity", path);
+  const w = window.open(url.toString(), "daw_" + path.replace(/\W/g, "_"), "width=1100,height=760");
+  if (w) w.focus();
+  else DAW.toast("the browser blocked the window, allow popups for this page", true);
 };
 
 DAW.connect = (host) => {
@@ -455,7 +474,7 @@ DAW.disconnect = () => {
   DAW.meters = {};
   DAW.pending = {};
   DAW.sig = "";
-  DAW.sel = null;
+  DAW.sel = DAW.detailPath || null;
   DAW.requestedMeters = new Set();
   DAW.auditionReady = null;
   DAW.emit("structure");

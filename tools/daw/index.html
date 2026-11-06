@@ -21,19 +21,19 @@
   <div class="group" id="status-group"></div>
 </header>
 <main id="layout">
-  <aside id="browser"></aside>
   <section id="center">
     <nav id="tabs">
-      <button data-view="arrange" class="active">Arrange</button>
+      <button data-view="graph" class="active">Graph</button>
+      <button data-view="arrange">Arrange</button>
       <button data-view="mixer">Mixer</button>
       <button data-view="modulation">Modulation</button>
       <span class="grow"></span>
       <span id="hint"></span>
     </nav>
     <div id="view"></div>
-    <div id="splitter"></div>
-    <div id="detail"></div>
   </section>
+  <div id="side-grip"></div>
+  <aside id="detail"></aside>
 </main>
 <div id="toast"></div>
 <script src="flecs.js"></script>
@@ -42,6 +42,7 @@
 <script src="ui.js"></script>
 <script src="editors.js"></script>
 <script src="views.js"></script>
+<script src="graph.js"></script>
 <script src="main.js"></script>
 </body>
 </html>

@@ -180,23 +180,26 @@ function setupLayout() {
     DAW.view = saved;
     document.querySelectorAll("#tabs button").forEach((x) => x.classList.toggle("active", x.dataset.view === saved));
   }
-  const split = document.getElementById("splitter");
-  const view = document.getElementById("view");
-  const detail = document.getElementById("detail");
-  const h = parseFloat(localStorage.getItem("daw.split") || "0");
-  if (h) { view.style.flex = `0 0 ${h}px`; detail.style.flex = "1 1 0"; }
-  split.addEventListener("pointerdown", (e) => {
-    split.setPointerCapture(e.pointerId);
-    const y0 = e.clientY, h0 = view.getBoundingClientRect().height;
+  const grip = document.getElementById("side-grip");
+  const sideW = localStorage.getItem("daw.side.w");
+  if (sideW) document.body.style.setProperty("--side-w", sideW + "px");
+  grip.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    grip.setPointerCapture(e.pointerId);
+    grip.classList.add("active");
+    const startX = e.clientX, startW = document.getElementById("detail").offsetWidth;
     const move = (ev) => {
-      const nh = Math.max(100, Math.min(window.innerHeight - 160, h0 + ev.clientY - y0));
-      view.style.flex = `0 0 ${nh}px`;
-      detail.style.flex = "1 1 0";
-      localStorage.setItem("daw.split", nh);
+      const w = Math.max(280, Math.min(window.innerWidth * 0.7, startW + startX - ev.clientX));
+      document.body.style.setProperty("--side-w", w + "px");
+      localStorage.setItem("daw.side.w", Math.round(w));
     };
-    const up = () => { split.removeEventListener("pointermove", move); split.removeEventListener("pointerup", up); };
-    split.addEventListener("pointermove", move);
-    split.addEventListener("pointerup", up);
+    const up = () => {
+      grip.classList.remove("active");
+      grip.removeEventListener("pointermove", move);
+      grip.removeEventListener("pointerup", up);
+    };
+    grip.addEventListener("pointermove", move);
+    grip.addEventListener("pointerup", up);
   });
   appSel().addEventListener("change", () => { if (appSel().value) DAW.connect(appSel().value); });
   const hostInput = document.getElementById("app-host");
@@ -217,6 +220,8 @@ function setupLayout() {
       if (DAW.single.Transport) DAW.transport({ playing: !DAW.single.Transport.playing });
     } else if (e.key === "Home") {
       DAW.seek(0);
+    } else if (e.key === "Escape" && !DAW.detailPath && DAW.view === "graph") {
+      G.clearFocus();
     }
   });
 }
@@ -255,6 +260,11 @@ function frame() {
   requestAnimationFrame(frame);
 }
 
+if (DAW.detailPath) {
+  document.body.classList.add("detail-mode");
+  document.title = `${DAW.leaf(DAW.detailPath)} - box daw`;
+  DAW.auditionPath = "daw_audition_" + Math.random().toString(36).slice(2, 8);
+}
 buildTopbar();
 setupLayout();
 V.renderAll();
@@ -262,5 +272,5 @@ updateDot();
 DAW.autoMeter = true;
 const urlHost = new URLSearchParams(location.search).get("host");
 if (urlHost) DAW.connect(flecs.normalizeHost(urlHost));
-DAW.discovery = flecs.startDiscovery({ interval_ms: 4000, on_hosts: updateApps });
+if (!DAW.detailPath) DAW.discovery = flecs.startDiscovery({ interval_ms: 4000, on_hosts: updateApps });
 requestAnimationFrame(frame);
