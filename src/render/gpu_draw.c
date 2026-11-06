@@ -1189,73 +1189,35 @@ bool box_gpu_forward_check(
         goto done;
     }
 
-<<<<<<< HEAD
     gpu->pipeline_quiet = true;
     box_gpu_forward_check_take(gpu, box_gpu_forward_create(gpu, handle, shader, rgba, Opaque,
-        BackFaceCull, false, false, false, false, false, false, false), &failed, &building);
+        BackFaceCull, false, false, false, false, false, false), &failed, &building);
     if (handle == BOX_RENDER_SHADER_MESH) {
         box_gpu_forward_check_take(gpu, box_gpu_prepass_create(gpu, shader, BackFaceCull,
             false, false), &failed, &building);
         box_gpu_forward_check_take(gpu, box_gpu_prepass_create(gpu, shader, BackFaceCull,
             true, false), &failed, &building);
         box_gpu_forward_check_take(gpu, box_gpu_forward_create(gpu, handle, shader, rgba,
-            Opaque, BackFaceCull, false, false, false, false, false, true, false),
+            Opaque, BackFaceCull, false, false, false, false, true, false),
             &failed, &building);
         box_gpu_forward_check_take(gpu, box_gpu_prepass_create(gpu, shader, BackFaceCull,
             true, true), &failed, &building);
         box_gpu_forward_check_take(gpu, box_gpu_forward_create(gpu, handle, shader, rgba,
-            Opaque, BackFaceCull, true, false, false, false, false, true, false),
+            AlphaBlend, BackFaceCull, true, false, false, false, false, false),
             &failed, &building);
     } else if (handle == BOX_RENDER_SHADER_SHAPE2D) {
         box_gpu_forward_check_take(gpu, box_gpu_forward_create(gpu, handle, shader, rgba,
-            AlphaBlend, BackFaceCull, false, false, false, true, false, false, false),
+            AlphaBlend, BackFaceCull, false, false, true, false, false, false),
             &failed, &building);
         box_gpu_forward_check_take(gpu, box_gpu_forward_create(gpu, handle, shader, rgba,
-            Opaque, BackFaceCull, false, false, false, false, true, false, false),
+            Opaque, BackFaceCull, false, false, false, true, false, false),
             &failed, &building);
         box_gpu_forward_check_take(gpu, box_gpu_forward_create(gpu, handle, shader, rgba,
-            Opaque, BackFaceCull, false, false, false, false, false, false, true),
+            Opaque, BackFaceCull, false, false, false, false, false, true),
             &failed, &building);
         box_gpu_forward_check_take(gpu, box_gpu_forward_create(gpu, handle, shader, rgba,
-            AlphaBlend, BackFaceCull, false, false, false, true, false, false, true),
+            AlphaBlend, BackFaceCull, false, false, true, false, false, true),
             &failed, &building);
-=======
-    wgpuDevicePushErrorScope(gpu->device, WGPUErrorFilter_Validation);
-    pipeline = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm, Opaque,
-        BackFaceCull, false, false, false, false, false, false);
-    if (handle == BOX_RENDER_SHADER_MESH) {
-        others[0] = box_gpu_prepass_create(gpu, shader, BackFaceCull, false, false);
-        others[1] = box_gpu_prepass_create(gpu, shader, BackFaceCull, true, false);
-        others[2] = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm,
-            Opaque, BackFaceCull, false, false, false, false, true, false);
-        others[3] = box_gpu_prepass_create(gpu, shader, BackFaceCull, true, true);
-        others[4] = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm,
-            AlphaBlend, BackFaceCull, true, false, false, false, false, false);
-    } else if (handle == BOX_RENDER_SHADER_SHAPE2D) {
-        others[0] = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm,
-            AlphaBlend, BackFaceCull, false, false, true, false, false, false);
-        others[2] = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm,
-            Opaque, BackFaceCull, false, false, false, true, false, false);
-        others[3] = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm,
-            Opaque, BackFaceCull, false, false, false, false, false, true);
-        others[4] = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm,
-            AlphaBlend, BackFaceCull, false, false, true, false, false, true);
-    }
-
-    wgpuDevicePopErrorScope(gpu->device, (WGPUPopErrorScopeCallbackInfo){
-        .mode = WGPUCallbackMode_AllowSpontaneous,
-        .callback = box_gpu_forward_on_scope,
-        .userdata1 = &result
-    });
-    if (pipeline) {
-        wgpuRenderPipelineRelease(pipeline);
-    }
-
-    for (i = 0; i < 5; i ++) {
-        if (others[i]) {
-            wgpuRenderPipelineRelease(others[i]);
-        }
->>>>>>> 2a661196876c474f0e5277c528a36917b7052322
     }
 
     gpu->pipeline_quiet = false;
@@ -1325,7 +1287,6 @@ static bool box_gpu_prepass_draws(
     return b->view == -1 && b->pipeline == BOX_RENDER_SHADER_MESH && b->blend == Opaque;
 }
 
-<<<<<<< HEAD
 /** Keep a requested forward pipeline in the cache. Until it exists, a draw of its key uses the
  * pipeline of the module a recompile replaced, which it then releases.
  *
@@ -1353,7 +1314,8 @@ static WGPURenderPipeline box_gpu_forward_cache(
     }
 
     return result;
-=======
+}
+
 uint32_t box_gpu_draw_kind(
     const box_render_batch_t *b,
     bool equal)
@@ -1367,7 +1329,6 @@ uint32_t box_gpu_draw_kind(
     result = (b->blend & 15u) | (b->transmissive ? 16u : 0u) | (cutout ? 32u : 0u);
 done:
     return result * BOX_GPU_DRAW_KIND_STRIDE;
->>>>>>> 2a661196876c474f0e5277c528a36917b7052322
 }
 
 WGPURenderPipeline box_gpu_forward_pipeline(
@@ -1403,15 +1364,9 @@ WGPURenderPipeline box_gpu_forward_pipeline(
         goto done;
     }
 
-<<<<<<< HEAD
     result = box_gpu_forward_cache(gpu, key, box_gpu_forward_create(gpu, b->pipeline, shader,
-        format, b->blend, b->back_face, b->cutout, b->transmissive, equal, b->box_shadow,
-        b->slice, texture_blend, b->polygon));
-=======
-    result = box_gpu_forward_create(gpu, b->pipeline, shader, format, b->blend, b->back_face,
-        b->transmissive, equal, b->box_shadow, b->slice, texture_blend, b->polygon);
-    ecs_map_insert_ptr(&gpu->forward, key, result);
->>>>>>> 2a661196876c474f0e5277c528a36917b7052322
+        format, b->blend, b->back_face, b->transmissive, equal, b->box_shadow, b->slice,
+        texture_blend, b->polygon));
 done:
     return result;
 }
