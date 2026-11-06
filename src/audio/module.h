@@ -757,7 +757,6 @@ typedef struct box_audio_modulators_t {
     box_audio_mod_stats_t stats; /**< Counters */
 } box_audio_modulators_t;
 
-<<<<<<< HEAD
 /** Seconds the voices and buses of a song fade out before it unloads, past the ramp of a stop
  * and a mute of the core */
 #define BOX_AUDIO_SONG_FADE_TIME (0.012)
@@ -817,7 +816,7 @@ typedef struct box_audio_song_t {
     uint64_t silenced;          /**< Bus indices of a song that fades out, sent muted */
     box_audio_song_stats_t stats; /**< Counters */
 } box_audio_song_t;
-=======
+
 /** What became of an AudioMacro or an AudioMacroMap in the last frame */
 typedef enum box_audio_macro_status_t {
     BOX_AUDIO_MACRO_STATUS_NONE = 0,  /**< Not looked at yet */
@@ -900,7 +899,6 @@ typedef struct box_audio_macros_t {
                              *   older ones */
     box_audio_macro_stats_t stats; /**< Counters */
 } box_audio_macros_t;
->>>>>>> d98572e6033d69ef2344d92fb3c2060b49fbab86
 
 /** The state of the module in a world */
 typedef struct box_audio_module_t {
@@ -981,11 +979,8 @@ typedef struct box_audio_module_t {
     box_audio_sequencer_t sequencer; /**< The tracks of the timeline */
     box_audio_automation_t automation; /**< The automation lanes of the timeline */
     box_audio_modulators_t modulators; /**< The modulators */
-<<<<<<< HEAD
-    box_audio_song_t song;           /**< The song of AudioSong */
-=======
     box_audio_macros_t macros;    /**< The macros and their maps */
->>>>>>> d98572e6033d69ef2344d92fb3c2060b49fbab86
+    box_audio_song_t song;           /**< The song of AudioSong */
     bool listener_warned;         /**< The warning of several listeners was logged */
     bool spatial_dirty;           /**< Update every spatial source, not only changed ones */
     bool waiting;                 /**< The page waited for a gesture in the last frame */

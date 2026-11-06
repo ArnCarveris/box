@@ -2,15 +2,9 @@
  * @file command/cmd_audio.c
  * @brief The audio command: the status of the audio, its transport, its buses and their insert
  * slots, its instruments, its tracks with their note and audio placements, sounding notes and
-<<<<<<< HEAD
- * playing audio clips, its emitters with their plays and skips, the master
- * volume and mute, play, stop, seek and tempo, the song of AudioSong, and captures of the
- * master output to a WAV resource.
-=======
  * playing audio clips, its emitters with their plays and skips, its macros with their maps, the
- * master volume and mute, play, stop, seek and tempo, and captures of the master output to a WAV
- * resource.
->>>>>>> d98572e6033d69ef2344d92fb3c2060b49fbab86
+ * master volume and mute, play, stop, seek and tempo, the song of AudioSong, and captures of the
+ * master output to a WAV resource.
  *
  * The actions only write AudioSettings, Transport or AudioSong, which box.audio applies at the
  * end of the frame as for a change from a script or the REST API. A capture taps the core, so
@@ -1222,14 +1216,9 @@ void box_cmd_audio_init(
 {
     ECS_IMPORT(world, BoxAudio);
     box_command_register(world,
-<<<<<<< HEAD
-        "Print the audio status, transport, song, buses, instruments, tracks and emitters, set "
-        "the volume or mute, play, stop, seek or set the tempo, show or change the song, or "
-        "capture a WAV",
-=======
-        "Print the audio status, transport, buses, instruments, tracks, emitters and macros, set "
-        "the volume or mute, play, stop, seek or set the tempo, or capture a WAV",
->>>>>>> d98572e6033d69ef2344d92fb3c2060b49fbab86
+        "Print the audio status, transport, song, buses, instruments, tracks, emitters and "
+        "macros, set the volume or mute, play, stop, seek or set the tempo, show or change the "
+        "song, or capture a WAV",
         (ecs_function_desc_t){
             .name = "audio",
             .return_type = ecs_id(ecs_string_t),

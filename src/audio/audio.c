@@ -1817,10 +1817,7 @@ void BoxAudioImport(
     box_audio_sequencer_init(world, state);
     box_audio_automation_init(world, state);
     box_audio_modulators_init(world, state);
-<<<<<<< HEAD
-    box_audio_song_init(world, state);
-=======
     box_audio_macros_init(world, state);
->>>>>>> d98572e6033d69ef2344d92fb3c2060b49fbab86
+    box_audio_song_init(world, state);
     box_audio_functions_init(world);
 }
