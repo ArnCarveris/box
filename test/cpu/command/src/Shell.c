@@ -657,3 +657,169 @@ void Shell_audio_command(void) {
     ecs_os_free(out);
     ecs_fini(world);
 }
+
+/** A world with the song of test/assets/audio/chords.flecs, no output and no device */
+static ecs_world_t* shell_chords_world(
+    ecs_entity_t *session)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    *session = ecs_shell_session_init(world, NULL);
+    test_int(ecs_script_run_file(world, "test/assets/audio/chords.flecs"), 0);
+
+    return world;
+}
+
+void Shell_audio_notes_placed_twice(void) {
+    ecs_entity_t s;
+    ecs_world_t *world = shell_chords_world(&s);
+    bool error = true;
+    char *out = box_command_run(world, s, "audio notes lead", &error);
+    test_bool(error, false);
+    test_assert(strncmp(out, "notes of lead: pitched, instrument chords_inst, 4/4 at 120 bpm, "
+        "bars 1..4, 6 notes;", 83) == 0);
+    test_assert(strstr(out,
+        "\nbar 1: 1.1.000 C5 1/4 v0.80, 1.2.000 E5 1/8 v0.60, 1.2.240 G5 1/8 v0.60"
+        "\nbar 2: -"
+        "\nbar 3: 3.1.000 C5 1/4 v0.80, 3.2.000 E5 1/8 v0.60, 3.2.240 G5 1/8 v0.60"
+        "\nbar 4: -") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio notes lead bars=3..3", &error);
+    test_bool(error, false);
+    test_assert(strstr(out, "bars 3..3, 3 notes;") != NULL);
+    test_assert(strstr(out, "\nbar 3: 3.1.000 C5 1/4 v0.80,") != NULL);
+    test_assert(strstr(out, "bar 1:") == NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio notes lead", &error);
+    char *again = box_command_run(world, s, "audio notes lead", &error);
+    test_str(out, again);
+    ecs_os_free(again);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+void Shell_audio_notes_roll(void) {
+    ecs_entity_t s;
+    ecs_world_t *world = shell_chords_world(&s);
+    bool error = true;
+    char *out = box_command_run(world, s, "audio notes duo roll bars=1", &error);
+    test_bool(error, false);
+    test_assert(strncmp(out, "roll of duo: pitched", 20) == 0);
+    test_assert(strstr(out, "\nE4 |........x=......|\nC4 |x===............|") != NULL);
+    test_assert(strstr(out, "D4") == NULL);
+    const char *rows = strstr(out, "\nE4 |");
+    test_str(rows, "\nE4 |........x=......|\nC4 |x===............|");
+    int32_t lines = 0;
+    const char *ptr;
+    for (ptr = out; *ptr; ptr ++) {
+        lines += *ptr == '\n';
+    }
+
+    test_int(lines, 3);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio notes duo bars=1 roll", &error);
+    test_bool(error, false);
+    test_assert(strstr(out, "\nE4 |........x=......|\nC4 |x===............|") != NULL);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+void Shell_audio_notes_drums(void) {
+    ecs_entity_t s;
+    ecs_world_t *world = shell_chords_world(&s);
+    bool error = true;
+    char *out = box_command_run(world, s, "audio notes pulse bars=1..2", &error);
+    test_bool(error, false);
+    test_assert(strncmp(out, "notes of pulse: drums", 21) == 0);
+    test_assert(strstr(out, "\nbar 1: 1.1.000 chords_kick_sound 1/16 v1.00, "
+        "1.3.000 chords_kick_sound 1/16 v1.00") != NULL);
+    test_assert(strstr(out, "\nbar 2: 2.1.000 chords_kick_sound 1/16 v1.00, "
+        "2.3.000 chords_kick_sound 1/16 v1.00") != NULL);
+    test_assert(strstr(out, "C1") == NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio notes pulse roll bars=1", &error);
+    test_bool(error, false);
+    test_assert(strstr(out, "\nchords_kick_sound |x.......x.......|") != NULL);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+void Shell_audio_notes_errors(void) {
+    ecs_entity_t s;
+    ecs_world_t *world = shell_chords_world(&s);
+    bool error = false;
+    char *out = box_command_run(world, s, "audio notes", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    error = false;
+    out = box_command_run(world, s, "audio notes nope", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "no track 'nope'") != NULL);
+    ecs_os_free(out);
+    error = false;
+    out = box_command_run(world, s, "audio notes lead bars=3..1", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    error = false;
+    out = box_command_run(world, s, "audio notes lead loud", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    error = false;
+    out = box_command_run(world, s, "audio chords nope", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+void Shell_audio_chords_progression(void) {
+    ecs_entity_t s;
+    ecs_world_t *world = shell_chords_world(&s);
+    bool error = true;
+    char *out = box_command_run(world, s, "audio chords", &error);
+    test_bool(error, false);
+    test_assert(strncmp(out, "chords of bars 1..4 from bass, duo, keys, lead; "
+        "drums left out: pulse; a chord per bar (", 88) == 0);
+    test_assert(strstr(out,
+        "\n1.1 C 4 beats: C E G"
+        "\n2.1 Am 4 beats: A C E"
+        "\n3.1 F 4 beats: F A C"
+        "\n4.1 G7 4 beats: G B D F"
+        "\nkey of the bars: C major (r ") != NULL);
+    test_assert(strstr(out, "\nkey of the song: C major (r ") != NULL);
+    test_assert(strstr(out, "\noutside C major: none") != NULL);
+    char *again = box_command_run(world, s, "audio chords", &error);
+    test_str(out, again);
+    ecs_os_free(again);
+    ecs_os_free(out);
+    ecs_fini(world);
+}
+
+void Shell_audio_chords_tracks_and_bars(void) {
+    ecs_entity_t s;
+    ecs_world_t *world = shell_chords_world(&s);
+    bool error = true;
+    char *out = box_command_run(world, s, "audio chords keys bass bars=2..3", &error);
+    test_bool(error, false);
+    test_assert(strncmp(out, "chords of bars 2..3 from keys, bass; a chord per bar", 52) == 0);
+    test_assert(strstr(out, "\n2.1 Am 4 beats: A C E\n3.1 F 4 beats: F A C\nkey of the bars:")
+        != NULL);
+    test_assert(strstr(out, "1.1 C") == NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio chords keys bars=1", &error);
+    test_bool(error, false);
+    test_assert(strstr(out, "\n1.1 C 4 beats: C E G\n") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "audio chords pulse", &error);
+    test_bool(error, false);
+    test_assert(strstr(out, "no pitched track; drums left out: pulse") != NULL);
+    test_assert(strstr(out, "\n1.1 N.C. 16 beats") != NULL);
+    test_assert(strstr(out, "\nkey of the bars: none") != NULL);
+    ecs_os_free(out);
+    ecs_fini(world);
+}

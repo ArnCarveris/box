@@ -16,6 +16,24 @@
     "test": {
         "testsuites": [
             {
+                "id": "Harmony",
+                "testcases": [
+                    "pitch_names",
+                    "triads",
+                    "sevenths",
+                    "seventh_without_fifth",
+                    "slash_chord",
+                    "no_chord",
+                    "weakest_left_out",
+                    "set_from_weights",
+                    "key_major",
+                    "key_minor",
+                    "key_none",
+                    "key_scale",
+                    "deterministic"
+                ]
+            },
+            {
                 "id": "Voice",
                 "testcases": [
                     "plays_exactly",

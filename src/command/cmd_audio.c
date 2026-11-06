@@ -19,6 +19,13 @@
 /** Sounding notes listed per track at most */
 #define BOX_AUDIO_SEQ_LIST_MAX 16
 
+/** Arguments of the audio command after its action and value, for notes and chords */
+#define BOX_CMD_AUDIO_MORE_ARGS 8
+
+/** A further argument of the audio command */
+#define BOX_CMD_AUDIO_MORE(n) { .name = "arg" #n, .type = ecs_id(ecs_string_t), \
+    .optional = true, .brief = "a further track, bars=a..b or roll of notes and chords" }
+
 /** Folder of the captures in the file system of the page */
 #define BOX_CMD_AUDIO_WEB_DIR "/tmp"
 
@@ -1181,7 +1188,24 @@ static void box_cmd_audio(
     ecs_world_t *world = ctx->world;
     const char *action = argc > 0 ? *(const char**)argv[0].ptr : NULL;
     const char *value = argc > 1 ? *(const char**)argv[1].ptr : NULL;
+    const char *args[2 + BOX_CMD_AUDIO_MORE_ARGS];
     char *out = NULL;
+    int32_t i;
+    for (i = 1; i < argc && i <= 2 + BOX_CMD_AUDIO_MORE_ARGS; i ++) {
+        args[i - 1] = *(const char**)argv[i].ptr;
+        args[i - 1] = args[i - 1] ? args[i - 1] : "";
+    }
+
+    if (action && ecs_id(Track) && !ecs_os_strcmp(action, "notes")) {
+        out = box_cmd_audio_notes(world, argc - 1, args);
+        *(char**)result->ptr = out;
+        goto done;
+    } else if (action && ecs_id(Track) && !ecs_os_strcmp(action, "chords")) {
+        out = box_cmd_audio_chords(world, argc - 1, args);
+        *(char**)result->ptr = out;
+        goto done;
+    }
+
     if (!ecs_id(AudioSettings) || !box_audio_module_get(world)) {
         ecs_err("box.audio is not imported");
         goto done;
@@ -1203,7 +1227,7 @@ static void box_cmd_audio(
         out = box_cmd_audio_transport_set(world, action, value);
     } else {
         ecs_err("unknown action '%s', expected volume, mute, capture, play, stop, seek, "
-            "tempo or song", action);
+            "tempo, song, notes or chords", action);
     }
 
     *(char**)result->ptr = out;
@@ -1218,17 +1242,21 @@ void box_cmd_audio_init(
     box_command_register(world,
         "Print the audio status, transport, song, buses, instruments, tracks, emitters and "
         "macros, set the volume or mute, play, stop, seek or set the tempo, show or change the "
-        "song, or capture a WAV",
+        "song, capture a WAV, or print the notes of a track and the chords and key of a section",
         (ecs_function_desc_t){
             .name = "audio",
             .return_type = ecs_id(ecs_string_t),
             .params = {
                 { .name = "action", .type = ecs_id(ecs_string_t), .optional = true,
-                  .brief = "volume, mute, capture, play, stop, seek, tempo or song (default: "
-                    "print the status)" },
+                  .brief = "volume, mute, capture, play, stop, seek, tempo, song, notes or "
+                    "chords (default: print the status)" },
                 { .name = "value", .type = ecs_id(ecs_string_t), .optional = true,
                   .brief = "volume 0 to 4, mute on or off (default: toggle), capture seconds, "
-                    "seek beats, tempo 20 to 999, song file or none (default: show the song)" }
+                    "seek beats, tempo 20 to 999, song file or none (default: show the song), "
+                    "track of notes, track or bars=a..b of chords" },
+                BOX_CMD_AUDIO_MORE(3), BOX_CMD_AUDIO_MORE(4), BOX_CMD_AUDIO_MORE(5),
+                BOX_CMD_AUDIO_MORE(6), BOX_CMD_AUDIO_MORE(7), BOX_CMD_AUDIO_MORE(8),
+                BOX_CMD_AUDIO_MORE(9), BOX_CMD_AUDIO_MORE(10)
             },
             .callback = box_cmd_audio
         });
